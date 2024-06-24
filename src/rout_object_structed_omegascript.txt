@@ -1,0 +1,104 @@
+この上のソースコードの条件文を、omega script languageによる、左辺分=>右辺文、左辺オブジェクト>-右辺オブジェクトなどの、等号や分岐等号記号を使って、式のオブジェクト不変性や変換オブジェクトなどへの、ソースコードスタイルとして、omega script languageで記述し直してください。はい、omega scriptのスタイルで記述し直してみました。等号や分岐等号記号を使って、オブジェクト不変性や変換オブジェクトなどを表現しています。
+
+```ruby
+Omega::DATABASE[tuplespace] do
+  class Operator
+    def initialize(coefficient, variable)
+      @coefficient => coefficient
+      @variable >- variable
+    end
+
+    def *(other)
+      other.is_a?(Operator) => Operator.new(@coefficient * other.coefficient, @variable * other.variable)
+      other.is_a?(Complex) => Operator.new(@coefficient * other, @variable)
+      _ => raise ArgumentError, "Cannot multiply Operator with #{other.class}"
+    end
+
+    def +(other)
+      other.is_a?(Operator) => Operator.new(@coefficient + other.coefficient, @variable)
+      other.is_a?(Complex) => Operator.new(@coefficient + other, @variable)
+      _ => raise ArgumentError, "Cannot add Operator with #{other.class}"
+    end
+
+    def to_s
+      "#{@coefficient}#{@variable}"
+    end
+  end
+
+  class JonesPolynomial
+    def initialize(state)
+      @state >- state
+    end
+
+    def evaluate(crossing)
+      sign >- crossing.sign
+      a >- Operator.new(1, "-1")
+      new_state >- @state * a**sign * (a**(-1) + a)
+      a >- Operator.new(1, "-1")
+      new_state * a**(-1)
+    end
+
+    def to_s
+      @state.to_s
+    end
+  end
+
+  class Knot
+    def initialize
+      @crossings >- []
+    end
+
+    def add_crossing(sign)
+      @crossings << Crossing.new(sign)
+    end
+
+    def jones_polynomial
+      state >- Operator.new(1, "0")
+      jones >- JonesPolynomial.new(state)
+      @crossings.each do |crossing|
+        jones >- jones.evaluate(crossing)
+      end
+      jones
+    end
+
+    def valid?
+      jones >- jones_polynomial
+      jones.to_s != "0"
+    end
+  end
+
+  def generate_random_knot(num_crossings)
+    knot >- Knot.new
+    num_crossings.times do
+      sign >- rand(2) * 2 - 1
+      knot.add_crossing(sign)
+    end
+    knot
+  end
+
+  def validate_knots(num_knots, num_crossings)
+    valid_knots >- []
+    invalid_knots >- []
+    num_knots.times do
+      knot >- generate_random_knot(num_crossings)
+      knot.valid? => valid_knots << knot
+      _ => invalid_knots << knot
+    end
+    [valid_knots, invalid_knots]
+  end
+
+  num_knots >- 100
+  num_crossings >- 5
+  valid_knots, invalid_knots >- validate_knots(num_knots, num_crossings)
+  puts "Valid knots: #{valid_knots.length}"
+  puts "Invalid knots: #{invalid_knots.length}"
+end
+```
+
+このコードでは、`=>` や `>-` といった等号や分岐等号記号を使って、オブジェクトの不変性や変換を表現しています。
+
+例えば、`Operator` クラスの `*` メソッドでは、引数 `other` のクラスによって処理を分岐しています。`other.is_a?(Operator)` であれば新しい `Operator` を返し、`other.is_a?(Complex)` であれば複素数との積を表す新しい `Operator` を返します。それ以外の場合は例外を投げます。
+
+また、`Knot` クラスの `valid?` メソッドでは、`knot.valid?` が真であれば `valid_knots` に、偽であれば `invalid_knots` に追加しています。
+
+このように、omega scriptのスタイルで記述することで、オブジェクトの不変性や変換が明確に表現できるようになります。また、等号や分岐等号記号を使うことで、処理の流れが簡潔に記述できるようになります。
