@@ -1,0 +1,17 @@
+PKGDIR = omega_causal_pkg
+PY = $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+BIN = $(PKGDIR)/bin
+.PHONY: all build run test clean help
+all: build
+build:
+	@echo "Package skeleton created under $(PKGDIR)"
+	@ls -1 $(PKGDIR) || true
+run: build
+	@cd $(BIN) && $(PY) chat_assistant.py --interactive || true
+test: build
+	@if [ -d "$(PKGDIR)" ]; then echo "OK: $(PKGDIR) exists"; else echo "MISSING: $(PKGDIR)"; exit 1; fi
+	@if [ -f "$(BIN)/chat_assistant.py" ]; then echo "OK: chat_assistant.py"; else echo "MISSING: chat_assistant.py"; exit 1; fi
+clean:
+	@rm -rf $(PKGDIR) || true
+help:
+	@echo "Targets: all build run test clean help"

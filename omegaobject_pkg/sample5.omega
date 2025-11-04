@@ -1,0 +1,62 @@
+Omega::DATABASE[tuplespace] {
+  class Operator {
+    Operator.coefficient >- 0
+    Operator.variable >- "0"
+    /* multiply */
+    def mul(self, other) {
+      other.is_operator => Operator.new(self.coefficient * other.coefficient, self.variable * other.variable);
+      other.is_complex => Operator.new(self.coefficient * other, self.variable);
+      _ => raise("Cannot multiply Operator with other")
+    }
+    /* add */
+    def add(self, other) {
+      other.is_operator => Operator.new(self.coefficient + other.coefficient, self.variable);
+      other.is_complex => Operator.new(self.coefficient + other, self.variable);
+      _ => raise("Cannot add Operator with other")
+    }
+    def to_s(self) { self.coefficient.to_s + self.variable }
+  }
+
+  class Knot {
+    Knot.crossings >- []
+    def add_crossing(self, sign) { self.crossings.push(sign) }
+    def jones_polynomial(self) {
+      state >- Operator.new(1, "0")
+      jones >- state
+      for c in self.crossings {
+        /* simplified evaluate */
+        jones >- jones /* placeholder for evaluate */
+      }
+      jones
+    }
+    def valid?(self) { jones >- self.jones_polynomial; jones.to_s != "0" }
+  }
+
+  def generate_random_knot(n) {
+    knot >- Knot.new
+    i = 0
+    while i < n {
+      sign >- (rand(2) * 2 - 1)
+      knot.add_crossing(sign)
+      i = i + 1
+    }
+    knot
+  }
+
+  num_knots >- 100 
+  num_crossings >- 5
+  /* generate and validate - here simplified */
+  valid_knots = []
+  invalid_knots = []
+  i = 0
+  while i < num_knots {
+    k >- generate_random_knot(num_crossings)
+    if k.valid? => valid_knots.push(k) else => invalid_knots.push(k)
+    i = i + 1
+  }
+  puts("Valid knots: ")
+  puts(valid_knots.length.to_s)
+  puts("Invalid knots: ")
+  puts(invalid_knots.length.to_s)
+}
+
