@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+PY=${PY:-python3}
+PRE="$ROOT/usr/tools/audio_preprocess.py"
+BIOM="$ROOT/usr/tools/biomodel.py"
+ASR="$ROOT/usr/tools/asr_engine"
+OMEGA="$ROOT/usr/lang/omegascript"
+OUTDIR="$ROOT/generated"
+mkdir -p "$OUTDIR"
+WAV=""
+SEED=""
+COUNT=3
+while [[ $# -gt 0 ]]; do case "$1" in --wav) WAV="$2"; shift 2;; --seed) SEED="$2"; shift 2;; --outdir) OUTDIR="$2"; shift 2;; --count) COUNT="$2"; shift 2;; *) shift;; esac; done
+if [ -n "$WAV" ]; then echo "Preprocessing $WAV"; $PY "$PRE" --wav "$WAV" --out "$OUTDIR/feat.json" || true; fi
+echo "Generating biomodel templates"
+$PY "$BIOM" --seed "$SEED" --out "$OUTDIR/templates.json"
+echo "Running ASR engine (prototype)"
+"$ASR" --feat "$OUTDIR/feat.json" --templates "$OUTDIR/templates.json" --out "$OUTDIR/transcripts.txt" --count "$COUNT" || true
+echo "Preview via Omega Script"
+"$OMEGA" --run "$OUTDIR" || true
+echo "Done. See $OUTDIR"

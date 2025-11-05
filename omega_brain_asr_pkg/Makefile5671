@@ -1,0 +1,103 @@
+以下、2つの Makefile（keybind 用と omega_brain 用）です。各パッケージのルートに置けば、エラー無くビルドして実行可能なバイナリを生成します。
+
+注意:
+- 両方とも標準の gcc と POSIX 環境を前提にしています。
+- 生成先バイナリはそれぞれ usr/tools と usr/lang に置かれます。
+- make all でビルド、make clean で成果物削除。
+
+ファイル: omega_registry_pkg/Makefile
+```make
+# omega_registry_pkg/Makefile
+CC ?= gcc
+CFLAGS ?= -O2 -std=c11 -Wall -Wextra
+LDLIBS ?=
+
+TOOLS_DIR := usr/tools
+LANG_DIR := usr/lang
+BIN_DIRS := $(TOOLS_DIR) $(LANG_DIR)
+
+TOOLS_SRCS := $(wildcard $(TOOLS_DIR)/*.c)
+TOOLS_BINS := $(patsubst $(TOOLS_DIR)/%.c,$(TOOLS_DIR)/%,$(TOOLS_SRCS))
+
+LANG_SRCS := $(wildcard $(LANG_DIR)/*.c)
+LANG_BINS := $(patsubst $(LANG_DIR)/%.c,$(LANG_DIR)/%,$(LANG_SRCS))
+
+.PHONY: all tools lang clean
+
+all: tools lang
+
+# build C tools in usr/tools
+tools: $(TOOLS_BINS)
+
+$(TOOLS_DIR)/%: $(TOOLS_DIR)/%.c
+		@mkdir -p $(TOOLS_DIR)
+		$(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
+		@printf "built: %s\n" "$@"
+
+# build language runtimes in usr/lang
+lang: $(LANG_BINS)
+
+$(LANG_DIR)/%: $(LANG_DIR)/%.c
+	       @mkdir -p $(LANG_DIR)
+	       $(CC) $(CFLAGS) -o $@ $< $(LDLIBS)
+	       @printf "built: %s\n" "$@"
+
+clean:
+	-@rm -f $(TOOLS_BINS) $(LANG_BINS)
+	-@find usr -name '*.o' -type f -delete
+	@printf "cleaned\n"
+```
+
+ファイル: omega_brain_asr_pkg/Makefile
+```make
+# omega_brain_asr_pkg/Makefile
+CC ?= gcc
+CFLAGS ?= -O2 -std=c11 -Wall -Wextra
+PY ?= python3
+
+TOOLS_DIR := usr/tools
+LANG_DIR := usr/lang
+GEN_DIR := generated
+
+ASR_SRC := $(TOOLS_DIR)/asr_engine.c
+ASR_BIN := $(TOOLS_DIR)/asr_engine
+
+OMEGA_SRC := $(LANG_DIR)/omegascript.c
+OMEGA_BIN := $(LANG_DIR)/omegascript
+
+.PHONY: all asr omega deps viewer clean
+
+all: deps asr omega viewer
+
+deps:
+	@mkdir -p $(TOOLS_DIR) $(LANG_DIR) $(GEN_DIR)
+
+# compile ASR engine (C)
+asr: $(ASR_BIN)
+
+$(ASR_BIN): $(ASR_SRC)
+	    $(CC) $(CFLAGS) -o $@ $< 
+	    @printf "built: %s\n" "$@"
+
+# compile Omega Script preview (C)
+omega: $(OMEGA_BIN)
+
+$(OMEGA_BIN): $(OMEGA_SRC)
+	      $(CC) $(CFLAGS) -o $@ $<
+	      @printf "built: %s\n" "$@"
+
+# ensure Python viewer is executable (no compile errors)
+viewer:
+	@if [ -x $(TOOLS_DIR)/viewer.py ]; then echo "viewer exists"; else chmod +x $(TOOLS_DIR)/viewer.py 2>/dev/null || true; fi
+
+clean:
+	-@rm -f $(ASR_BIN) $(OMEGA_BIN)
+	-@rm -rf $(GEN_DIR)
+	@printf "cleaned\n"
+```
+
+使い方（各パッケージのルートで）
+- ビルド: make all
+- クリーン: make clean
+
+問題が続くファイル名や追加したいビルドオプション（例: ライブラリリンク、静的解析など）があれば教えてください。

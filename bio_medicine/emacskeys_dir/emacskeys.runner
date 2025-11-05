@@ -1,0 +1,9 @@
+#!/bin/sh
+CMD=${1:-run}
+run_via_wine(){ command -v wine >/dev/null 2>&1 || return 1; wine ./remapper.exe; }
+case "$CMD" in
+  build) ./build-win.sh || exit $? ;; 
+  run) if [ -f ./remapper.exe ]; then run_via_wine || echo "wine missing or failed"; else echo "remapper.exe not found. Run './emacskeys.runner build'"; fi ;; 
+  build-and-run) ./build-win.sh && run_via_wine ;; 
+  *) echo "Usage: $0 [build|run|build-and-run]"; exit 1 ;;
+esac
