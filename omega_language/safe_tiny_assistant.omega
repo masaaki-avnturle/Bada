@@ -1,0 +1,302 @@
+# safe_tiny_assistant.tl
+# Tiny_lang assistant script — safe, non-crashing, copy/paste friendly.
+# Provides:
+#   - mini Vim-like editor usage via runtime builtin `editor_open(path)` (assumed safe)
+#   - Build KB from note file, PDFs and URLs via safe builtins:
+#       file_read, file_write, file_exists, http_get, load_report, openai_chat
+#   - Search KB and answer questions using local extracts first, then OpenAI fallback
+# Notes / assumptions:
+#   - Runtime must provide the following builtins and guarantee they do not crash:
+#       input(prompt) -> string | null
+#       print(s) -> void
+#       file_read(path) -> string | null
+#       file_write(path, content) -> bool
+#       file_exists(path) -> bool
+#       split(s, sep) -> list
+#       join(list, sep) -> string
+#       http_get(url) -> string | null
+#       load_report(path) -> string | null
+#       editor_open(path) -> void    # interactive editor implemented by runtime (Vim-like)
+#       openai_chat(prompt) -> string | null
+#       trim(s) -> string
+#       lower(s) -> string
+#       find(hay, needle) -> int     # -1 if not found
+#   - This script performs defensive checks to avoid null dereferences or crashes.
+#   - No shell invocation is performed here; OpenAI/HTTP/PDF functions are runtime-provided.
+
+# Configuration
+note_file        <- "node.md"
+kb_path          <- "tiny_kb.txt"
+session_urls     <- []           # list of URLs
+session_reports  <- []           # list of PDF paths
+
+# Utility: safe substring (handles bounds)
+substr_safe <- func(s, start, end) {
+    if s == null { return "" }
+    if start < 0 { start <- 0 }
+    if end < start { return "" }
+    if start >= len(s) { return "" }
+    if end > len(s) { end <- len(s) }
+    return s[start:end]
+}
+
+# Utility: trim trailing CR/LF safely
+trim_newlines <- func(s) {
+    if s == null { return "" }
+    r <- s
+    while len(r) > 0 and (r[-1] == "\n" or r[-1] == "\r") {
+        r <- r[0:len(r)-1]
+    }
+    return r
+}
+
+# Ensure note exists
+ensure_note_exists <- func() {
+    if not file_exists(note_file) {
+        file_write(note_file, "# assistant notes\n")
+    }
+}
+
+# Split CSV into list, safe
+split_csv_to_list <- func(s) {
+    out <- []
+    if s == null { return out }
+    s2 <- trim(s)
+    if s2 == "" { return out }
+    parts <- split(s2, ",")
+    i <- 0
+    while i < len(parts) {
+        p <- trim(parts[i])
+        if p != "" { out <- out + [p] }
+        i <- i + 1
+    }
+    return out
+}
+
+# Words from string: split by whitespace, safe
+words_from <- func(s) {
+    out <- []
+    if s == null { return out }
+    s2 <- trim(s)
+    if s2 == "" { return out }
+    parts <- split(s2, " ")
+    i <- 0
+    while i < len(parts) {
+        p <- trim(parts[i])
+        if p != "" { out <- out + [p] }
+        i <- i + 1
+    }
+    return out
+}
+
+# Find lines matching any keyword (case-insensitive). Defensive: handles nulls.
+find_lines_matching <- func(text, keywords) {
+    out <- []
+    if text == null or len(text) == 0 { return out }
+    if keywords == null or len(keywords) == 0 { return out }
+    lines <- split(text, "\n")
+    lowkeys <- []
+    i <- 0
+    while i < len(keywords) {
+        k <- keywords[i]
+        if k == null { k <- "" }
+        lowkeys <- lowkeys + [ lower(trim(k)) ]
+        i <- i + 1
+    }
+    i <- 0
+    while i < len(lines) {
+        line <- lines[i]
+        if line == null { line <- "" }
+        ll <- lower(line)
+        j <- 0
+        matched <- false
+        while j < len(lowkeys) {
+            k <- lowkeys[j]
+            if k != "" and find(ll, k) >= 0 {
+                matched <- true
+                break
+            }
+            j <- j + 1
+        }
+        if matched {
+            out <- out + [ trim_newlines(line) ]
+        }
+        i <- i + 1
+    }
+    return out
+}
+
+# Build KB from note, reports (PDFs), and URLs. Uses safe builtins only.
+build_kb <- func() {
+    parts <- []
+    note_txt <- file_read(note_file)
+    if note_txt != null and len(note_txt) > 0 {
+        parts <- parts + [ "=== NOTE ===\n" + note_txt ]
+    }
+
+    i <- 0
+    while i < len(session_reports) {
+        path <- session_reports[i]
+        if path == null { path <- "" }
+        parts <- parts + [ "\n=== REPORT: " + path + " ===\n" ]
+        txt <- load_report(path)           # runtime must handle missing/bad files gracefully
+        if txt != null and len(txt) > 0 { parts <- parts + [ txt ] }
+        i <- i + 1
+    }
+
+    i <- 0
+    while i < len(session_urls) {
+        url <- session_urls[i]
+        if url == null { url <- "" }
+        parts <- parts + [ "\n=== URL: " + url + " ===\n" ]
+        pg <- http_get(url)                # runtime should return null or empty string on failure
+        if pg != null and len(pg) > 0 { parts <- parts + [ pg ] }
+        i <- i + 1
+    }
+
+    full <- join(parts, "\n")
+    ok <- file_write(kb_path, full)
+    if ok {
+        print("KB built at " + kb_path)
+    } else {
+        print("Failed to write KB. Check permissions.")
+    }
+}
+
+# Answer a question: try local KB extracts first, fallback to OpenAI via openai_chat (runtime)
+answer_question <- func(question) {
+    if question == null or trim(question) == "" {
+        print("Please provide a non-empty question.")
+        return
+    }
+    if not file_exists(kb_path) {
+        print("KB not found. Run /build or add sources (/use) and then /build.")
+        return
+    }
+    kb <- file_read(kb_path)
+    if kb == null { kb <- "" }
+    kws <- words_from(question)
+    hits <- find_lines_matching(kb, kws)
+    if hits != null and len(hits) > 0 {
+        print("Local extracts (relevant lines):")
+        i <- 0
+        limit <- 5
+        while i < len(hits) and i < limit {
+            print("- " + hits[i])
+            i <- i + 1
+        }
+        # Provide a concise suggested answer composed from top extracts (safe slicing)
+        take_n <- 3
+        if len(hits) < take_n { take_n <- len(hits) }
+        if take_n > 0 {
+            summary_lines <- hits[0:take_n]
+            summary <- join(summary_lines, "\n")
+            print("\nSuggested concise answer (from KB):")
+            print(trim_newlines(summary))
+        }
+        return
+    }
+
+    # Fallback to OpenAI via runtime openai_chat; runtime should handle network and key management.
+    prompt <- "You are a helpful assistant. Use the CONTEXT below to answer concisely.\n\nCONTEXT:\n" +
+              kb + "\n\nQUESTION:\n" + question + "\n\nANSWER:"
+    resp <- openai_chat(prompt)
+    if resp == null or trim(resp) == "" {
+        print("No answer from OpenAI. Ensure runtime supports openai_chat and OPENAI API is configured.")
+        return
+    }
+    print("OpenAI answer:")
+    print(trim_newlines(resp))
+}
+
+# Parse /use arguments safely: supports "urls=a,b reports=x,y"
+set_session_from_arg <- func(argstr) {
+    if argstr == null { return }
+    s <- trim(argstr)
+    if s == "" { return }
+    # find substrings safely
+    urls_idx <- find(s, "urls=")
+    reps_idx <- find(s, "reports=")
+    # Extract urls part (between urls= and next token)
+    if urls_idx >= 0 {
+        start <- urls_idx + 5
+        end <- len(s)
+        if reps_idx >= 0 and reps_idx > urls_idx { end <- reps_idx }
+        sub <- trim(substr_safe(s, start, end))
+        session_urls <- split_csv_to_list(sub)
+    }
+    # Extract reports part
+    if reps_idx >= 0 {
+        start <- reps_idx + 8
+        end <- len(s)
+        if urls_idx >= 0 and urls_idx > reps_idx { end <- urls_idx }
+        sub <- trim(substr_safe(s, start, end))
+        session_reports <- split_csv_to_list(sub)
+    }
+    print("Configured URLs: " + join(session_urls, ","))
+    print("Configured reports: " + join(session_reports, ","))
+}
+
+# Simple help text
+print_help <- func() {
+    print("Commands:")
+    print("  /edit [file]                  - open Vim-like editor (defaults to note file)")
+    print("  /use urls=url1,url2 reports=path1,path2")
+    print("                                - set session sources (comma-separated)")
+    print("  /build                        - build KB from note, PDFs, and URLs")
+    print("  /ask <question>               - ask question (local KB then OpenAI fallback)")
+    print("  /help                         - show this help")
+    print("  /quit                         - exit")
+}
+
+# Main REPL — defensive and avoids operations that can crash in runtime.
+main <- func() {
+    ensure_note_exists()
+    print("Safe Tiny Assistant (tiny_lang). Type /help")
+    while true {
+        prompt <- input("You: ")
+        if prompt == null { break }           # EOF or canceled input
+        line <- trim(prompt)
+        if line == "" { continue }
+        if line == "/quit" or line == "quit" { break }
+        if line == "/help" { print_help(); continue }
+
+        # /edit command: delegate to runtime editor_open (assumed safe)
+        if substr_safe(line, 0, 5) == "/edit" {
+            arg <- trim(substr_safe(line, 5, len(line)))
+            file_to_open <- arg
+            if file_to_open == "" { file_to_open <- note_file }
+            # editor_open is interactive; runtime must implement NORMAL/INSERT modes robustly.
+            editor_open(file_to_open)
+            continue
+        }
+
+        # /use command
+        if substr_safe(line, 0, 5) == "/use " {
+            argstr <- trim(substr_safe(line, 5, len(line)))
+            set_session_from_arg(argstr)
+            continue
+        }
+
+        # /build
+        if line == "/build" {
+            build_kb()
+            continue
+        }
+
+        # /ask
+        if substr_safe(line, 0, 5) == "/ask " {
+            q <- trim(substr_safe(line, 5, len(line)))
+            if q == "" { print("Empty question."); continue }
+            answer_question(q)
+            continue
+        }
+
+        # Plain question fallback
+        answer_question(line)
+    }
+    print("Goodbye.")
+}
+
+# run
+main()

@@ -1,0 +1,305 @@
+#- 機能：  
+#  - Vim 風の編集（実際の Vim を起動してノーマル／インサートモードを利用、もし組み込みでモードを実装したい場合は後述）。  
+#  - PDF を pdftotext でテキスト化して知識ベースへ取り込み。  
+#  - Web は `http_get(url)` 組み込み（あるいは `exec "curl ..."`）で取得して取り込み。  
+#  - 取得した PDF/Web/ノートを結合してナレッジベースを作成。  
+#  - 質問を受け、環境変数 `OPENAI_API_KEY` があれば OpenAI Chat API を呼んで回答（シェル経由）、なければローカル検索＋抜粋で応答。  
+#  - すべての代入に `<-` を使用。  
+#- 依存ツール（実用化に必須）： `vim`（編集）、`pdftotext`（PDF→テキスト）、`curl`（OpenAI 呼出しまたは http_get 実装がない場合）。`jq` は出力整形用（無くても可）。  
+#- セキュリティ注意：ユーザ入力をそのまま shell に渡しています。実運用では厳格にエスケープしてください。
+#
+#保存名例: chat_assistant_with_vim.omega
+#
+#```txt
+# chat_assistant_with_vim.omega
+print("TinyLang Assistant with Vim + PDF + Web. Type 'quit' to exit.") ;
+
+# セッションデフォルト（URL/レポートリスト）
+session_urls <- [] ;
+session_reports <- [] ;
+
+# キャッシュ
+_web_cache <- {} ;
+_report_cache <- {} ;
+
+# ユーティリティ（シェル実行ラッパ）
+sh_exec <- func(cmd) {
+  # exec は tiny_lang の組み込みコマンドを利用
+  exec cmd ;
+  return null ;
+}
+
+# PDF 読み込み（pdftotext を使う）
+fetch_report <- func(path) {
+  if (_report_cache[path]) return _report_cache[path] ;
+  out <- "/tmp/tiny_report_" + ('' + (rand() % 100000)) + ".txt" ;
+  sh_exec("sh -c 'if [ -f \"" + path + "\" ]; then pdftotext \"" + path + "\" \"" + out + "\" 2>/dev/null || true; fi'") ;
+  # read file content into string (インタープリタに load_report があれば簡略)
+  content <- "" ;
+  sh_exec("sh -c 'if [ -f " + out + " ]; then cat " + out + " > /tmp/tiny_last_report.txt; else echo -n \"\" > /tmp/tiny_last_report.txt; fi'") ;
+  # tiny_lang に file_read 組み込みがなければ exec で cat 出力を input で受ける方法を代替
+  # ここはインタープリタの file_read がある想定:
+  if (file_exists("/tmp/tiny_last_report.txt")) {
+    content <- file_read("/tmp/tiny_last_report.txt") ;
+  } else {
+    # fallback: empty
+    content <- "" ;
+  }
+  _report_cache[path] <- content ;
+  return content ;
+}
+
+# Web fetch (http_get 組み込みがあればそれを使う／無ければ curl via exec)
+fetch_web <- func(url) {
+  if (_web_cache[url]) return _web_cache[url] ;
+  body <- "" ;
+  if (typeof(http_get) == "function") {
+    body <- http_get(url) ;
+  } else {
+    tmpf <- "/tmp/tiny_fetch_" + ('' + (rand() % 100000)) + ".html" ;
+    sh_exec("sh -c 'curl -s -L \"" + url + "\" -o " + tmpf + " || true'") ;
+    if (file_exists(tmpf)) {
+      # crude html->text via sed (shell)
+      txtf <- tmpf + ".txt" ;
+      sh_exec("sh -c 'sed -e \"s/<script[^>]*>.*<\\/script>//gI\" -e \"s/<[^>]*>/ /g\" " + tmpf + " | tr -s \" \\n\\t\" \" \" > " + txtf + " || true'") ;
+      if (file_exists(txtf)) { body <- file_read(txtf); } else { body <- ""; }
+    } else {
+      body <- "" ;
+    }
+  }
+  _web_cache[url] <- body ;
+  return body ;
+}
+
+# テキスト検索ユーティリティ（行ごとにキーワードを探す）
+find_lines <- func(text, keywords) {
+  out <- [] ;
+  if (text == "") return out ;
+  lines <- split(text, "\n") ;
+  i <- 0 ;
+  while (i < len(lines)) {
+    ln <- lines[i] ;
+    low <- tolower(ln) ;
+    j <- 0 ;
+    found <- 0 ;
+    while (j < len(keywords)) {
+      if (index_of(low, tolower(keywords[j])) >= 0) { found <- 1; break; }
+      j <- j + 1 ;
+    }
+    if (found) push(out, ln) ;
+    i <- i + 1 ;
+  }
+  return out ;
+}
+
+# ナレッジベース構築（ノート、レポート、URL を結合して /tmp/tiny_kb.txt に保存）
+build_kb <- func(note_path, reports, urls) {
+  kb <- "/tmp/tiny_kb.txt" ;
+  sh_exec("sh -c 'rm -f " + kb + " ; touch " + kb + "'") ;
+  # note
+  if (file_exists(note_path)) {
+    sh_exec("sh -c 'echo \"--- NOTE ---\" >> " + kb + " ; cat " + note_path + " >> " + kb + "'") ;
+  }
+  # reports
+  i <- 0 ;
+  while (i < len(reports)) {
+    rp <- reports[i] ;
+    txt <- fetch_report(rp) ;
+    if (txt != "") {
+      # append via temp file
+      tmpn <- "/tmp/tiny_rep_append.txt" ;
+      sh_exec("sh -c 'echo \"\\n--- REPORT: " + rp + " ---\\n\" >> " + kb + "'") ;
+      sh_exec("sh -c 'cat /dev/null > " + tmpn + "'") ;
+      # write content to tmpn (assume file_write exists)
+      if (file_write) {
+        file_write(tmpn, txt) ;
+      } else {
+        # fallback: use echo via here-doc (escape naive)
+        sh_exec("sh -c 'cat > " + tmpn + " <<EOF\n" + txt + "\nEOF'") ;
+      }
+      sh_exec("sh -c 'cat " + tmpn + " >> " + kb + "'") ;
+    }
+    i <- i + 1 ;
+  }
+  # urls
+  i <- 0 ;
+  while (i < len(urls)) {
+    u <- urls[i] ;
+    txt <- fetch_web(u) ;
+    if (txt != "") {
+      tmpu <- "/tmp/tiny_url_append.txt" ;
+      if (file_write) {
+        file_write(tmpu, txt) ;
+      } else {
+        sh_exec("sh -c 'cat > " + tmpu + " <<EOF\n" + txt + "\nEOF'") ;
+      }
+      sh_exec("sh -c 'echo \"\\n--- URL: " + u + " ---\\n\" >> " + kb + "'") ;
+      sh_exec("sh -c 'cat " + tmpu + " >> " + kb + "'") ;
+    }
+    i <- i + 1 ;
+  }
+  return kb ;
+}
+
+# 回答生成: OpenAI が使えるなら API 呼び出し、無ければローカル検索で抜粋生成
+answer_by_sources <- func(question, kb_path) {
+  qlow <- tolower(question) ;
+  # local fallback: extract keywords (split by spaces) and grep top matches
+  kws <- split(qlow, " ") ;
+  candidates <- [] ;
+  if (file_exists(kb_path)) {
+    kbtext <- file_read(kb_path) ;
+    hits <- find_lines(kbtext, kws) ;
+    i <- 0 ;
+    while (i < len(hits) && i < 10) { push(candidates, hits[i]); i <- i + 1; }
+  }
+  if (len(candidates) > 0) {
+    # simple inline summary: join up to 5 candidates
+    out <- [] ;
+    i <- 0 ;
+    while (i < len(candidates) && i < 5) { push(out, candidates[i]); i <- i + 1; }
+    return join(out, "\n") ;
+  }
+
+  # Try OpenAI if available
+  if (env("OPENAI_API_KEY") != "") {
+    # build prompt file
+    pfile <- "/tmp/tiny_prompt.txt" ;
+    ctx <- "" ;
+    if (file_exists(kb_path)) { ctx <- substr(file_read(kb_path), 0, 4000); } # trim
+    prompt <- "Context:\\n" + ctx + "\\n\\nQuestion: " + question + "\\nAnswer concisely." ;
+    # write prompt
+    if (file_write) {
+      file_write(pfile, prompt) ;
+    } else {
+      sh_exec("sh -c 'cat > " + pfile + " <<'EOF'\n" + prompt + "\nEOF'") ;
+    }
+    payload <- "/tmp/tiny_payload.json" ;
+    sh_exec("sh -c 'cat > " + payload + " <<JSON\n{\"model\":\"gpt-3.5-turbo\",\"messages\":[{\"role\":\"user\",\"content\":\"'$(sed \"s/\\\"/\\\\\\\"/g\" " + pfile + ")'\"}],\"temperature\":0.2}\nJSON'") ;
+    # call OpenAI
+    res <- "" ;
+    sh_exec("sh -c 'curl -s -X POST https://api.openai.com/v1/chat/completions -H \"Authorization: Bearer " + env("OPENAI_API_KEY") + "\" -H \"Content-Type: application/json\" -d @" + payload + " -o /tmp/tiny_openai_resp.json || true'") ;
+    if (file_exists("/tmp/tiny_openai_resp.json")) {
+      if (file_read) {
+        jtxt <- file_read("/tmp/tiny_openai_resp.json") ;
+        # attempt to extract via naive string search for "content"
+        # (better: use jq; here do simple parse)
+        pos <- index_of(jtxt, "\"content\"") ;
+        if (pos >= 0) {
+          # extract substring after "content":
+          subtxt <- substr(jtxt, pos + 9) ;
+          # crude trim quotes
+          # find first quote
+          q1 <- index_of(subtxt, "\"") ;
+          if (q1 >= 0) {
+            sub2 <- substr(subtxt, q1+1) ;
+            q2 <- index_of(sub2, "\"") ;
+            if (q2 >= 0) {
+              res <- substr(sub2, 0, q2) ;
+            } else { res <- sub2; }
+          } else { res <- subtxt; }
+        } else {
+          res <- jtxt ;
+        }
+      } else {
+        res <- "" ;
+      }
+    }
+    if (res != "") return res ;
+  }
+
+  # 最終フォールバック
+  return "No relevant content found. Please add report files or URLs using the /use command." ;
+}
+
+# コマンド: /edit -> vim でノート編集（Vim のノーマル/インサートをそのまま利用）
+#         /use urls=... reports=... -> セッション設定
+#         /build -> ナレッジベース構築
+#         /ask <question> -> 質問
+#         quit or exit -> 終了
+
+note_file <- "assistant_note.txt" ;
+
+# ensure note exists
+if (!file_exists(note_file)) {
+  if (file_write) { file_write(note_file, "# assistant note\n"); } else { sh_exec("sh -c 'echo \"# assistant note\" > " + note_file + "'"); }
+}
+
+print("Commands: /edit  /use urls=... reports=...  /build  /ask <question>  quit") ;
+
+while (1) {
+  line <- input("You: ") ;
+  if (!line) break ;
+  if (line == "quit" || line == "exit") { print("Bot: Bye"); break; }
+
+  if (substr(line,0,6) == "/edit ") {
+    # allow "/edit note" or plain "/edit"
+    sh_exec("sh -c '${EDITOR:-vim} " + note_file + "'") ;
+    print("Note saved: " + note_file) ;
+    continue ;
+  }
+
+  if (line == "/edit") {
+    sh_exec("sh -c '${EDITOR:-vim} " + note_file + "'") ;
+    print("Note saved: " + note_file) ;
+    continue ;
+  }
+
+  if (substr(line,0,5) == "/use ") {
+    args <- substr(line,6) ;
+    # parse urls= and reports=
+    session_urls <- [] ; session_reports <- [] ;
+    parts <- split(args, " ") ;
+    i <- 0 ;
+    while (i < len(parts)) {
+      p <- parts[i] ;
+      if (substr(p,0,5) == "urls=") {
+        ustr <- substr(p,6) ;
+        us <- split(ustr, ",") ;
+        j <- 0 ; while (j < len(us)) { push(session_urls, us[j]); j <- j + 1; }
+      } else if (substr(p,0,8) == "reports=") {
+        rstr <- substr(p,9) ;
+        rs <- split(rstr, ",") ;
+        j <- 0 ; while (j < len(rs)) { push(session_reports, rs[j]); j <- j + 1; }
+      }
+      i <- i + 1 ;
+    }
+    print("Configured. URLs: " + join(session_urls, ", ") + "  Reports: " + join(session_reports, ", ")) ;
+    continue ;
+  }
+
+  if (line == "/build") {
+    kbpath <- build_kb(note_file, session_reports, session_urls) ;
+    print("Knowledge base built at " + kbpath) ;
+    continue ;
+  }
+
+  if (substr(line,0,5) == "/ask ") {
+    q <- substr(line,6) ;
+    if (!file_exists("/tmp/tiny_kb.txt")) {
+      print("KB not found. Run /build first.") ;
+      continue ;
+    }
+    ans <- answer_by_sources(q, "/tmp/tiny_kb.txt") ;
+    print("Bot: " + ans) ;
+    continue ;
+  }
+
+  # simple free question: auto build KB from existing session and answer
+  if (!session_urls) session_urls <- [] ;
+  if (!session_reports) session_reports <- [] ;
+  # build KB temp for single-shot if not exists
+  if (!file_exists("/tmp/tiny_kb.txt")) {
+    build_kb(note_file, session_reports, session_urls) ;
+  }
+  ans <- answer_by_sources(line, "/tmp/tiny_kb.txt") ;
+  print("Bot: " + ans) ;
+}
+
+
+#補足／拡張案（必要なら対応します）
+#- もし「tiny_lang 自体のパーサで `<-` をサポート」する必要があれば、tiny_lang のソース（C 実装）のパーサ部を修正して代入演算子として扱う変更を作成します（短いパッチを提示可能）。  
+#- 本スクリプト内の `file_exists` / `file_read` / `file_write` / `env` / `rand` 等はインタープリタにより未実装の可能性があります。未実装の場合、代替として `exec`（shell）経由で実現するよう書き換えます。必要ならそれらを shell ベースで確実に動くバージョンへ変換します。  
+#- Vim のモードを完全に tiny_lang 内で自前実装したい場合（端末 raw モード操作でノーマル/インサートを自作）、その実装（約数百行のターミナル制御 C 実装を tiny_lang 上で呼ぶ形、あるいはインタープリタ側拡張でコマンドを追加）を作成します。希望するなら作ります。
+#
+#どの部分を優先して「確実に動く形（shell ベースで安全に動作）」へ落とし込むか指示ください。
