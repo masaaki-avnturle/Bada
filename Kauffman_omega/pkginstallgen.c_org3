@@ -1,0 +1,644 @@
+/*了解しました。`print_laurent` と `jones_free`（および `print_jones`）の定義を追加してリンクエラーを解消した完全版 `pkginstallgen.c` を下に示します。以前の機能はそのまま保持しています。ファイルを保存してビルドしてください。
+
+ビルド:
+  gcc -std=c11 -O2 -o pkginstallgen pkginstallgen.c -lm
+
+    ファイル（pkginstallgen.c）:
+
+```c
+*/
+  /* pkginstallgen.c
+   Complete program with print_laurent and jones_free implementations.
+   Build:
+     gcc -std=c11 -O2 -o pkginstallgen pkginstallgen.c -lm
+  */
+
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <math.h>
+#include <complex.h>
+#include <time.h>
+#include <unistd.h>   /* access, F_OK */
+#include <errno.h>
+
+  /* -------------------- Utilities -------------------- */
+  static char *read_whole(const char *path) {
+					     FILE *f = fopen(path, "rb"); if (!f) return NULL;
+					     if (fseek(f,0,SEEK_END)!=0){ fclose(f); return NULL; }
+					     long sz = ftell(f); if (sz < 0){ fclose(f); return NULL; }
+					     rewind(f);
+					     char *b = malloc((size_t)sz + 1); if (!b){ fclose(f); return NULL; }
+					     if (fread(b,1,(size_t)sz,f) != (size_t)sz){ free(b); fclose(f); return NULL; }
+					     fclose(f); b[sz]='\0'; return b;
+}
+static int file_exists(const char *p){ return access(p, F_OK) == 0; }
+static char **lines_dup(const char *text, int *out_n) {
+						       *out_n = 0; if (!text) return NULL;
+						       char *dup = strdup(text);
+						       if (!dup) return NULL;
+						       int cap = 64; char **arr = malloc(sizeof(char*)*cap);
+						       if(!arr){ free(dup); return NULL; }
+						       char *save = NULL; char *ln = strtok_r(dup, "\r\n", &save);
+						       while(ln){
+							 while(*ln && isspace((unsigned char)*ln)) ln++;
+							 if (*ln) {
+							   if (*out_n >= cap) { cap *= 2; arr = realloc(arr, sizeof(char*)*cap); if(!arr) { free(dup); return NULL; } }
+							   arr[*out_n] = strdup(ln); (*out_n)++;
+							 }
+							 ln = strtok_r(NULL, "\r\n", &save);
+						       }
+						       free(dup);
+						       return arr;
+}
+static char **extract_eq_lines_dup(const char *text, int *out_n) {
+								  *out_n = 0; if (!text) return NULL;
+								  char *dup = strdup(text); if (!dup) return NULL;
+								  int cap = 64; char **arr = malloc(sizeof(char*)*cap); if(!arr){ free(dup); return NULL; }
+								  char *save = NULL; char *ln = strtok_r(dup, "\r\n", &save);
+								  while(ln){
+								    if (strchr(ln,'=')) {
+								      char *s = ln; while(*s && isspace((unsigned char)*s)) s++;
+								      if (*s) {
+									if (*out_n >= cap) { cap *= 2; arr = realloc(arr, sizeof(char*)*cap); if(!arr){ free(dup); return NULL; } }
+									arr[*out_n] = strdup(s); (*out_n)++;
+								      }
+								    }
+								    ln = strtok_r(NULL, "\r\n", &save);
+								  }
+								  free(dup);
+								  return arr;
+}
+
+/* -------------------- Polynomial utilities -------------------- */
+typedef struct { int deg; double *coeff; } Poly;
+static Poly *make_poly_from_coeffs(const double *c, int deg) {
+  Poly *P = malloc(sizeof(Poly)); if(!P) return NULL;
+  P->deg = deg; P->coeff = calloc((size_t)deg+1, sizeof(double)); if(!P->coeff){ free(P); return NULL; }
+  for(int i=0;i<=deg;i++) P->coeff[i] = c[i];
+  return P;
+}
+static void free_poly(Poly *p){ if(!p) return; free(p->coeff); free(p); }
+
+static Poly *parse_polynomial(const char *s) {
+  if (!s) return NULL;
+  double coeffs[64] = {0.0}; int maxdeg = 0;
+  const char *p = s;
+  while (*p && *p != '=') {
+    while (*p && isspace((unsigned char)*p)) p++;
+    int sign = +1;
+    if (*p == '+') { sign = +1; p++; }
+    else if (*p == '-') { sign = -1; p++; }
+    while (*p && isspace((unsigned char)*p)) p++;
+    double num = 0.0; int hasnum = 0;
+    char *endptr = NULL;
+    if (isdigit((unsigned char)*p) || *p == '.') {
+      num = strtod(p, &endptr); if (endptr && endptr != p) { hasnum = 1; p = endptr; }
+      if (*p == '/') {
+	p++; char *end2 = NULL; double d = strtod(p, &end2);
+	if (end2 && end2 != p && d != 0.0) { num = num / d; p = end2; }
+      }
+    }
+    while (*p && isspace((unsigned char)*p)) p++;
+    int hasvar = 0; int deg = 0;
+    if (tolower((unsigned char)*p) == 'x' || tolower((unsigned char)*p) == 't') {
+      hasvar = 1; deg = 1; p++;
+      if (*p == '^') { p++; int expo = 0; while(isdigit((unsigned char)*p)){ expo = expo*10 + (*p - '0'); p++; } deg = expo; }
+    }
+    double term = hasnum ? num * sign : (hasvar ? 1.0 * sign : 0.0 * sign);
+    if (!hasvar) deg = 0;
+    if (deg < 0 || deg >= 64) return NULL;
+    coeffs[deg] += term;
+    if (deg > maxdeg) maxdeg = deg;
+    while (*p && *p != '+' && *p != '-' && *p != '=') p++;
+  }
+  return make_poly_from_coeffs(coeffs, maxdeg);
+}
+
+static double poly_eval_abs(const Poly *p, double complex z) {
+  if (!p) return 0.0;
+  double complex acc = 0.0 + 0.0*I;
+  for (int i = p->deg; i >= 0; --i) acc = acc * z + p->coeff[i];
+  return cabs(acc);
+}
+static double shannon_entropy(const double *arr, int n) {
+  if (!arr || n<=0) return 0.0;
+  double tot = 0.0; for(int i=0;i<n;i++){ if (arr[i] < 0) return 0.0; tot += arr[i]; }
+  if (tot <= 0) return 0.0;
+  double H = 0.0; for(int i=0;i<n;i++){ double p = arr[i]/tot; if (p>0) H -= p * log(p); }
+  return H;
+}
+static double coef_entropy(const Poly *p) {
+  if (!p) return 0.0;
+  int n = p->deg + 1; double *a = malloc(sizeof(double)*n); if(!a) return 0.0;
+  for(int i=0;i<n;i++) a[i] = fabs(p->coeff[i]);
+  double H = shannon_entropy(a, n); free(a); return H;
+}
+static double eval_entropy(const Poly *p, int N) {
+  if (!p || N<=0) return 0.0;
+  double *vals = malloc(sizeof(double)*N); if(!vals) return 0.0;
+  for(int k=0;k<N;k++){ double theta = 2.0*M_PI*(double)k/(double)N; double complex z = cos(theta) + sin(theta)*I; vals[k] = poly_eval_abs(p,z); }
+  double H = shannon_entropy(vals,N); free(vals); return H;
+}
+
+/* -------------------- Kauffman bracket / Jones -------------------- */
+typedef struct { int a,b,c,d; int sign; } Crossing;
+static Crossing *parse_knot_file(const char *path, int *ncount) {
+  *ncount = 0;
+  char *txt = read_whole(path); if (!txt) return NULL;
+  char *save = NULL; char *tok = strtok_r(txt, " \t\r\n", &save);
+  Crossing *arr = NULL; int cap = 0, n = 0;
+  while(tok){
+    if (*tok == 'X' || *tok == 'x') {
+      const char *p = tok+1; int sign = 0;
+      if (*p == '+') { sign = +1; p++; } else if (*p == '-') { sign = -1; p++; }
+      if (*p != '(') { tok = strtok_r(NULL, " \t\r\n", &save); continue; }
+      p++;
+      int v[4]; int idx = 0;
+      while (*p && *p != ')' && idx < 4) {
+	if (isdigit((unsigned char)*p)) {
+	  char buf[32]; int bi=0;
+	  while (isdigit((unsigned char)*p) && bi < (int)sizeof(buf)-1) buf[bi++]=*p++;
+	  buf[bi]=0; v[idx++] = atoi(buf);
+	} else p++;
+      }
+      if (idx == 4) {
+	if (n >= cap) { int nc = cap?cap*2:32; Crossing *t = realloc(arr, sizeof(Crossing)*nc); if(!t){ free(arr); free(txt); return NULL; } arr=t; cap=nc; }
+	arr[n].a = v[0]; arr[n].b = v[1]; arr[n].c = v[2]; arr[n].d = v[3]; arr[n].sign = sign; n++;
+      }
+    }
+    tok = strtok_r(NULL, " \t\r\n", &save);
+  }
+  free(txt); *ncount = n; return arr;
+}
+
+/* union-find */
+typedef struct { int *p,*r; int n; } UF;
+static UF *uf_new(int n){ UF *u = malloc(sizeof(UF)); u->p = malloc(sizeof(int)*n); u->r = malloc(sizeof(int)*n); u->n=n; for(int i=0;i<n;i++){u->p[i]=i;u->r[i]=0;} return u;}
+static void uf_free(UF *u){ if(!u) return; free(u->p); free(u->r); free(u); }
+static int uf_find(UF *u,int x){ return u->p[x]==x?x:(u->p[x]=uf_find(u,u->p[x])); }
+    static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a), rb=uf_find(u,b); if(ra==rb) return; if(u->r[ra]<u->r[rb]) u->p[ra]=rb; else if(u->r[rb]<u->r[ra]) u->p[rb]=ra; else { u->p[rb]=ra; u->r[ra]++; } }
+
+  /* count loops in a given state (used by Kauffman bracket) */
+  static int state_loops_count(const Crossing *cr, int ncr, unsigned int state) {
+										 int maxlabel = 0;
+										 for (int i = 0; i < ncr; ++i) {
+										   if (cr[i].a > maxlabel) maxlabel = cr[i].a;
+										   if (cr[i].b > maxlabel) maxlabel = cr[i].b;
+										   if (cr[i].c > maxlabel) maxlabel = cr[i].c;
+										   if (cr[i].d > maxlabel) maxlabel = cr[i].d;
+										 }
+										 int m = maxlabel + 1;
+										 UF *u = uf_new(m);
+										 if (!u) return 0;
+										 for (int i = 0; i < ncr; ++i) {
+										   int a = cr[i].a, b = cr[i].b, c = cr[i].c, d = cr[i].d;
+										   int bit = (state >> i) & 1u;
+										   if (bit == 0) { uf_union(u, a, b); uf_union(u, c, d); }
+										   else { uf_union(u, b, c); uf_union(u, d, a); }
+										 }
+										 char *seen = calloc((size_t)m, 1);
+										 if (!seen) { uf_free(u); return 0; }
+										 int loops = 0;
+										 for (int i = 0; i < m; ++i) {
+										   int appears = 0;
+										   for (int j = 0; j < ncr && !appears; ++j)
+										     if (cr[j].a == i || cr[j].b == i || cr[j].c == i || cr[j].d == i) appears = 1;
+										   if (!appears) continue;
+										   int r = uf_find(u, i);
+										   if (!seen[r]) { seen[r] = 1; loops++; }
+										 }
+										 free(seen);
+										 uf_free(u);
+										 return loops;
+  }
+
+  /* simple binomial (double) */
+  static double binom_d(int n, int k) {
+				       if (k < 0 || k > n) return 0.0;
+				       if (k == 0 || k == n) return 1.0;
+				       double res = 1.0;
+				       if (k > n/2) k = n - k;
+				       for (int i = 1; i <= k; ++i) {
+					 res *= (double)(n - (k - i));
+					 res /= (double)i;
+				       }
+				       return res;
+  }
+
+  /* Laurent polynomial container and helpers */
+  typedef struct { int minpow, maxpow; double *coeff; } Laurent;
+  static Laurent *laurent_new(int minp, int maxp) {
+    if (maxp < minp) return NULL;
+    Laurent *L = malloc(sizeof(Laurent));
+    if (!L) return NULL;
+    L->minpow = minp; L->maxpow = maxp;
+    int len = maxp - minp + 1;
+    L->coeff = calloc((size_t)len, sizeof(double));
+    if (!L->coeff) { free(L); return NULL; }
+    return L;
+  }
+  static void laurent_free(Laurent *L) { if (!L) return; free(L->coeff); free(L); }
+
+  /* Kauffman bracket via state sum (warn: exponential) */
+  static Laurent *kauffman_bracket(const Crossing *cr, int ncr) {
+    if (ncr < 0) return NULL;
+    if (ncr >= 31) return NULL; /* avoid huge state space */
+    int bound = 5 * ncr + 4;
+    int minp = -bound, maxp = bound;
+    Laurent *acc = laurent_new(minp, maxp);
+    if (!acc) return NULL;
+    unsigned int total = 1u << ncr;
+    for (unsigned int s = 0; s < total; ++s) {
+      int numA = 0;
+      for (int i = 0; i < ncr; ++i) if (((s >> i) & 1u) == 0) numA++;
+      int numB = ncr - numA;
+      int diff = numA - numB;
+      int loops = state_loops_count(cr, ncr, s);
+      if (loops <= 0) continue;
+      int k = loops - 1;
+      double sign = (k % 2 == 0) ? 1.0 : -1.0;
+      for (int m = 0; m <= k; ++m) {
+	double c = binom_d(k, m) * sign;
+	int power = (4 * m - 2 * k) + diff;
+	if (power < acc->minpow || power > acc->maxpow) continue;
+	acc->coeff[power - acc->minpow] += c;
+      }
+    }
+    return acc;
+  }
+
+  /* diagram writhe */
+  static int diagram_writhe(const Crossing *cr, int ncr) {
+    int w = 0;
+    for (int i = 0; i < ncr; ++i) w += cr[i].sign;
+    return w;
+  }
+
+  /* Jones representation from bracket (heuristic) */
+  typedef struct { int mink, maxk; double *coeff; } JonesRep;
+  static JonesRep *jones_from_bracket(const Laurent *br, int writhe) {
+    if (!br) return NULL;
+    int mink = -4 * br->maxpow + 3 * writhe;
+    int maxk = -4 * br->minpow + 3 * writhe;
+    JonesRep *J = malloc(sizeof(JonesRep));
+    if (!J) return NULL;
+    J->mink = mink; J->maxk = maxk;
+    int len = maxk - mink + 1;
+    J->coeff = calloc((size_t)len, sizeof(double));
+    if (!J->coeff) { free(J); return NULL; }
+    for (int p = br->minpow; p <= br->maxpow; ++p) {
+      double c = br->coeff[p - br->minpow];
+      if (fabs(c) < 1e-15) continue;
+      int k = -4 * p + 3 * writhe;
+      if (k < J->mink || k > J->maxk) continue;
+      J->coeff[k - J->mink] += c * pow((-1.0), -writhe);
+    }
+    return J;
+  }
+  static void jones_free(JonesRep *J) { if (!J) return; free(J->coeff); free(J); }
+
+  /* printing helpers for Laurent and Jones */
+  static void print_laurent(const Laurent *L, FILE *out) {
+    if (!L) { fprintf(out, "0\n"); return; }
+    int first = 1;
+    for (int p = L->maxpow; p >= L->minpow; --p) {
+      double c = L->coeff[p - L->minpow];
+      if (fabs(c) < 1e-12) continue;
+      if (!first) fprintf(out, " %c ", (c >= 0.0) ? '+' : '-');
+      else if (c < 0.0) fprintf(out, "-");
+      double ac = fabs(c);
+      if (fabs(ac - 1.0) > 1e-12) fprintf(out, "%.6g", ac);
+      fprintf(out, " A");
+      if (p != 0) fprintf(out, "^%d", p);
+      first = 0;
+    }
+    if (first) fprintf(out, "0");
+    fprintf(out, "\n");
+  }
+  static void print_jones(const JonesRep *J, FILE *out) {
+    if (!J) { fprintf(out, "0\n"); return; }
+    int first = 1;
+    for (int k = J->maxk; k >= J->mink; --k) {
+      double c = J->coeff[k - J->mink];
+      if (fabs(c) < 1e-12) continue;
+      if (!first) fprintf(out, " %c ", (c >= 0.0) ? '+' : '-');
+      else if (c < 0.0) fprintf(out, "-");
+      double ac = fabs(c);
+      if (fabs(ac - 1.0) > 1e-12) fprintf(out, "%.6g", ac);
+      if (k == 0) fprintf(out, "1");
+      else fprintf(out, "t^%d", k); /* simple display */
+      first = 0;
+    }
+    if (first) fprintf(out, "0");
+    fprintf(out, "\n");
+  }
+
+  /* laurent coefficient entropy */
+  static double laurent_coef_entropy(const Laurent *L) {
+    if (!L) return 0.0;
+    int len = L->maxpow - L->minpow + 1;
+    double *a = malloc(sizeof(double) * len);
+    if (!a) return 0.0;
+    for (int i = 0; i < len; ++i) a[i] = fabs(L->coeff[i]);
+    double H = shannon_entropy(a, len);
+    free(a);
+    return H;
+  }
+
+  /* manifold heuristic based on state loop statistics */
+  static double manifold_entropy_heuristic(const Crossing *cr, int ncr) {
+    if (!cr || ncr <= 0) return 0.0;
+    if (ncr >= 26) return (double)ncr * 0.5;
+    unsigned int total = 1u << ncr;
+    double sumloops = 0.0;
+    for (unsigned int s = 0; s < total; ++s) {
+      int loops = state_loops_count(cr, ncr, s);
+      sumloops += (double)loops;
+    }
+    double avg_loops = sumloops / (double)total;
+    double var_factor = fabs((double)ncr - avg_loops);
+    return log(1.0 + (double)ncr) * (1.0 + var_factor * 0.3);
+  }
+
+  /* -------------------- Vocabulary & generation (reused implementations) -------------------- */
+  static const char *NOUNS[] = { "horizon","signal","memory","pattern","silence","surface","fabric","depth","measure","shadow","curve","knot","polynomial","entropy","echo","sequence","vector","whisper","boundary","flux","field","matrix","texture","phase","resonance","grain","path","mirror","cipher","cadence" };
+  static const char *VERBS[] = { "shifts","resonates","whispers","unfolds","evokes","binds","measures","reflects","fractures","flows","transforms","hides","reveals","sings","converges","diverges","balances","returns","oscillates","lingers","threads","spins","rotates","glides","surfaces","slides","coheres","fades","sharpens","flickers" };
+  static const char *ADJS[] = { "quiet","luminous","fractured","continuous","strange","ancient","delicate","rigid","fluid","tenuous","complex","simple","hidden","radiant","dense","sparse","cyclic","muted","vivid","elliptic" };
+  static const char *ADVS[] = { "softly","suddenly","gently","quietly","boldly","subtly","rarely","often","briefly","slowly","smoothly","wildly","calmly","surely","nearly","evenly","oddly","brightly" };
+  static const char *CONJS[] = { "and","while","as","though","because","since","whereas","although","when","if","where","unless","until","before","after" };
+  static int N_NOUNS = sizeof(NOUNS)/sizeof(NOUNS[0]);
+  static int N_VERBS = sizeof(VERBS)/sizeof(VERBS[0]);
+  static int N_ADJS = sizeof(ADJS)/sizeof(ADJS[0]);
+  static int N_ADVS = sizeof(ADVS)/sizeof(ADVS[0]);
+  static int N_CONJS = sizeof(CONJS)/sizeof(CONJS[0]);
+
+ static int sample_index_temp(const double *scores, int n, double T) {
+	  if (n <= 0) return -1;
+	  double maxs = scores[0];
+	  for (int i = 1; i < n; ++i) if (scores[i] > maxs) maxs = scores[i];
+	  double *p = malloc(sizeof(double) * n);
+	  if (!p) return rand() % n;
+	  double sum = 0.0;
+	  for (int i = 0; i < n; ++i) {
+	    double v = exp((scores[i] - maxs) / (T > 1e-9 ? T : 1e-9));
+	    p[i] = v;
+	    sum += v;
+	  }
+	  if (sum <= 0.0) { free(p); return rand() % n; }
+	  double r = ((double)rand() / (double)RAND_MAX) * sum;
+	  double acc = 0.0;
+	  int idx = n - 1;
+	  for (int i = 0; i < n; ++i) {
+	    acc += p[i];
+	    if (r <= acc) { idx = i; break; }
+	  }
+	  free(p);
+	  return idx;
+	}
+
+    static double invariants_to_temperature(double coefH, double evalH, double manifoldH) {
+      double combined = 0.5 * coefH + 0.3 * evalH + 0.2 * manifoldH;
+      double maxexp = 5.0;
+      if (combined < 0) combined = 0;
+      if (combined > maxexp) combined = maxexp;
+      double Tmin = 0.7, Tmax = 2.8;
+      double norm = combined / maxexp;
+      return Tmin + (Tmax - Tmin) * norm;
+    }
+
+    static int invariants_to_sentence_count(double coefH, double evalH, double manifoldH) {
+      double comb = 0.6 * coefH + 0.4 * manifoldH;
+      int base = 1 + (int)(comb);
+      if (base < 1) base = 1;
+      if (base > 8) base = 8;
+      return base;
+    }
+
+    /* generate text guided by invariants (non-template) */
+    static void generate_text_guided(FILE *out, double coefH, double evalH, double manifoldH, int sentences_total) {
+      double T = invariants_to_temperature(coefH, evalH, manifoldH);
+      for (int s = 0; s < sentences_total; ++s) {
+        int words = 6 + (int)(T * 6.0) + (rand() % 4);
+        int first = 1;
+        for (int w = 0; w < words; ++w) {
+	  int pos_choice;
+	  if (first) pos_choice = (rand() % 3) == 0 ? 1 : 0;
+	  else {
+	    int r = rand() % 100;
+	    if (r < 30) pos_choice = 2;
+	    else if (r < 55) pos_choice = 0;
+	    else if (r < 70) pos_choice = 1;
+	    else pos_choice = 3;
+	  }
+	  if (pos_choice == 1) {
+	    double ascores[64];
+	    for (int i = 0; i < N_ADJS; ++i) ascores[i] = 1.0 + ((double)rand() / RAND_MAX - 0.5);
+	    int a = sample_index_temp(ascores, N_ADJS, T);
+	    double nscores[128];
+	    for (int i = 0; i < N_NOUNS; ++i) nscores[i] = 1.0;
+	    int n = sample_index_temp(nscores, N_NOUNS, T);
+	    if (!first) fprintf(out, " ");
+	    char tmp[256];
+	    snprintf(tmp, sizeof(tmp), "%s %s", ADJS[a], NOUNS[n]);
+	    if (first) tmp[0] = toupper((unsigned char)tmp[0]);
+	    fprintf(out, "%s", tmp);
+	  } else if (pos_choice == 0) {
+	    double nscores[128];
+	    for (int i = 0; i < N_NOUNS; ++i) nscores[i] = 1.0 + ((double)rand() / RAND_MAX - 0.5);
+	    int n = sample_index_temp(nscores, N_NOUNS, T);
+	    if (!first) fprintf(out, " ");
+	    char tmp[128];
+	    snprintf(tmp, sizeof(tmp), "%s", NOUNS[n]);
+	    if (first) tmp[0] = toupper((unsigned char)tmp[0]);
+	    fprintf(out, "%s", tmp);
+	  } else if (pos_choice == 2) {
+	    double vscores[256];
+	    for (int i = 0; i < N_VERBS; ++i) vscores[i] = 1.0 + ((double)rand() / RAND_MAX - 0.5);
+	    int v = sample_index_temp(vscores, N_VERBS, T);
+	    if (!first) fprintf(out, " ");
+	    fprintf(out, "%s", VERBS[v]);
+	  } else {
+	    double ascores[128];
+	    for (int i = 0; i < N_ADVS; ++i) ascores[i] = 1.0 + ((double)rand() / RAND_MAX - 0.5);
+	    int a = sample_index_temp(ascores, N_ADVS, T);
+	    if (!first) fprintf(out, " ");
+	    fprintf(out, "%s", ADVS[a]);
+	  }
+	  first = 0;
+	  if ((rand() % 10) == 0 && w + 2 < words) {
+	    int c = rand() % N_CONJS;
+	    fprintf(out, " %s", CONJS[c]);
+	  }
+        }
+        double r = (double)rand() / RAND_MAX;
+        if (T > 2.0 && r < 0.15) fprintf(out, "...");
+        else if (T > 1.5 && r < 0.2) fprintf(out, ":");
+        else if (r < 0.1) fprintf(out, "?");
+        else fprintf(out, ".");
+        fprintf(out, "\n\n");
+      }
+    }
+
+    /* generate polynomial equation guided by invariants */
+    static Poly *generate_equation_guided(int D, double coefH_target, double evalH_target, double manifoldH, double T_scale) {
+      int deg = (D > 0) ? (rand() % (D + 1)) : 0;
+      double *coeffs = calloc((size_t)deg + 1, sizeof(double));
+      if (!coeffs) return NULL;
+      double base_scale = 0.5 + (coefH_target * 0.3) + (evalH_target * 0.2) + (manifoldH * 0.2);
+      base_scale *= (0.5 + T_scale);
+      for (int i = 0; i <= deg; ++i) {
+        double u1 = ((double)rand() + 1.0) / ((double)RAND_MAX + 2.0);
+        double u2 = ((double)rand() + 1.0) / ((double)RAND_MAX + 2.0);
+        double z0 = sqrt(-2.0 * log(u1)) * cos(2.0 * M_PI * u2);
+        coeffs[i] = z0 * base_scale;
+        if ((rand() % 10) == 0) coeffs[i] = round(coeffs[i] * 2.0) / 2.0;
+      }
+      if (fabs(coeffs[deg]) < 1e-6) coeffs[deg] += (coeffs[deg] >= 0 ? 1.0 : -1.0) * (0.2 + base_scale * 0.1);
+      Poly *P = make_poly_from_coeffs(coeffs, deg);
+      free(coeffs);
+      return P;
+    }
+
+    static void print_poly_equation(FILE *out, const Poly *P) {
+      if (!P) { fprintf(out, "0 = 0\n"); return; }
+      int first = 1;
+      for (int d = P->deg; d >= 0; --d) {
+        double c = P->coeff[d];
+        if (fabs(c) < 1e-12) continue;
+        if (!first) fprintf(out, " %c ", (c >= 0.0) ? '+' : '-');
+        else if (c < 0.0) fprintf(out, "-");
+        double ac = fabs(c);
+        if (!(d > 0 && fabs(ac - 1.0) < 1e-9)) fprintf(out, "%.6g", ac);
+        if (d > 0) {
+	  fprintf(out, "x");
+	  if (d != 1) fprintf(out, "^%d", d);
+        }
+        first = 0;
+      }
+      if (first) fprintf(out, "0");
+      fprintf(out, " = 0\n");
+    }
+
+    /* -------------------- Main -------------------- */
+    int main(int argc, char **argv) {
+      srand((unsigned)time(NULL));
+      if (argc < 4) {
+        fprintf(stderr, "Usage: %s report.txt target_text.txt questions.txt [--generate K] [--deg D] [--save out.txt] [--knot knot.txt]\n", argv[0]);
+        return 1;
+      }
+      const char *report_path = argv[1];
+      const char *target_path = argv[2];
+      const char *questions_path = argv[3];
+      int genK = 1, deg_limit = 3;
+      const char *save_path = NULL;
+      const char *knot_path = NULL;
+      for (int i = 4; i < argc; ++i) {
+        if (strcmp(argv[i], "--generate") == 0 && i + 1 < argc) { genK = atoi(argv[++i]); if (genK <= 0) genK = 1; }
+        else if (strcmp(argv[i], "--deg") == 0 && i + 1 < argc) { deg_limit = atoi(argv[++i]); if (deg_limit < 0) deg_limit = 0; }
+        else if (strcmp(argv[i], "--save") == 0 && i + 1 < argc) { save_path = argv[++i]; }
+        else if (strcmp(argv[i], "--knot") == 0 && i + 1 < argc) { knot_path = argv[++i]; }
+      }
+
+      char *report = read_whole(report_path);
+      char *target = read_whole(target_path);
+      char *questions = read_whole(questions_path);
+      if (!report || !target || !questions) {
+        fprintf(stderr, "Error reading one of the input files\n");
+        free(report); free(target); free(questions);
+        return 2;
+      }
+
+      int nrep = 0, ntgt = 0, nquestions = 0;
+      char **rep_lines = extract_eq_lines_dup(report, &nrep);
+      char **tgt_lines = extract_eq_lines_dup(target, &ntgt);
+      char **q_lines = lines_dup(questions, &nquestions);
+
+      Poly **tgt_poly = calloc((size_t)ntgt, sizeof(Poly*));
+      double *tgt_coefH = calloc((size_t)ntgt, sizeof(double));
+      double *tgt_evalH = calloc((size_t)ntgt, sizeof(double));
+      for (int j = 0; j < ntgt; ++j) {
+        tgt_poly[j] = parse_polynomial(tgt_lines[j]);
+        if (tgt_poly[j]) {
+	  tgt_coefH[j] = coef_entropy(tgt_poly[j]);
+	  tgt_evalH[j] = eval_entropy(tgt_poly[j], 64);
+        } else { tgt_coefH[j] = tgt_evalH[j] = 0.0; }
+      }
+
+      FILE *outf = stdout;
+      if (save_path) {
+        outf = fopen(save_path, "w");
+        if (!outf) { fprintf(stderr, "Failed to open save file %s, using stdout\n", save_path); outf = stdout; }
+      }
+
+      double knot_coefH = 0.0, knot_manifoldH = 0.0;
+      if (knot_path) {
+        int ncr = 0;
+        Crossing *cr = parse_knot_file(knot_path, &ncr);
+        if (!cr || ncr == 0) {
+	  fprintf(stderr, "Failed to parse knot file or empty: %s\n", knot_path);
+        } else {
+	  fprintf(outf, "Parsed knot with %d crossings\n", ncr);
+	  Laurent *br = kauffman_bracket(cr, ncr);
+	  if (!br) fprintf(outf, "Kauffman bracket computation failed (too many crossings?)\n");
+	  else {
+	    fprintf(outf, "Kauffman bracket <D> (in A):\n"); print_laurent(br, outf);
+	    knot_coefH = laurent_coef_entropy(br);
+	    int w = diagram_writhe(cr, ncr);
+	    JonesRep *J = jones_from_bracket(br, w);
+            if (J) { fprintf(outf, "Jones polynomial V(t):\n"); print_jones(J, outf); jones_free(J); }
+			     knot_manifoldH = manifold_entropy_heuristic(cr, ncr);
+			     laurent_free(br);
+			     }
+		free(cr);
+	    }
+	  }
+
+	  /* For each question, generate genK responses (text + equations) guided by nearest target invariants */
+	  for (int qi = 0; qi < nquestions; ++qi) {
+	    const char *question = q_lines[qi];
+	    fprintf(outf, "\n=== Question %d: %s ===\n", qi + 1, question);
+	    int chosen = -1;
+	    if (ntgt > 0) {
+	      double bestd = 1e18;
+	      for (int j = 0; j < ntgt; ++j) {
+                /* Use a simple distance on invariants (could be improved) */
+                double d = fabs(tgt_coefH[j] - tgt_evalH[j]);
+                if (d < bestd) { bestd = d; chosen = j; }
+	      }
+	    }
+
+	    double coefH = (chosen >= 0) ? tgt_coefH[chosen] : 0.5;
+	    double evalH = (chosen >= 0) ? tgt_evalH[chosen] : 0.5;
+	    double manifoldH = knot_manifoldH;
+
+	    double T = invariants_to_temperature(coefH, evalH, manifoldH);
+	    int sentences = invariants_to_sentence_count(coefH, evalH, manifoldH);
+
+	    for (int g = 0; g < genK; ++g) {
+	      fprintf(outf, "\n-- Generated Response %d --\n", g + 1);
+	      fprintf(outf, "[Answer Text]\n\n");
+	      generate_text_guided(outf, coefH, evalH, manifoldH, sentences);
+	      fprintf(outf, "\n[Proposed Equations]\n");
+	      int neqs = 2 + (rand() % 3);
+	      for (int e = 0; e < neqs; ++e) {
+                Poly *P = generate_equation_guided(deg_limit, coefH, evalH, manifoldH, T);
+                print_poly_equation(outf, P);
+                free_poly(P);
+	      }
+	    }
+	  }
+
+	  /* cleanup */
+	  for (int i = 0; i < nquestions; ++i) free(q_lines[i]);
+	  for (int j = 0; j < ntgt; ++j) { if (tgt_poly[j]) free_poly(tgt_poly[j]); free(tgt_lines[j]); }
+	  for (int i = 0; i < nrep; ++i) free(rep_lines[i]);
+	  free(q_lines); free(tgt_lines); free(rep_lines);
+	  free(tgt_poly); free(tgt_coefH); free(tgt_evalH);
+	  free(report); free(target); free(questions);
+
+	  if (outf != stdout) fclose(outf);
+	  return 0;
+	}
