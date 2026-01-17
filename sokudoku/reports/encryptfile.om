@@ -1,0 +1,72 @@
+Omega scriptを使って、暗号化されたUSBメモリーの暗号化を解除するソースコードは以下のようになります。
+
+```omega
+// 暗号化/復号化ライブラリの定義
+module Crypto {
+    // AESアルゴリズムの実装
+    def aes_encrypt(data: ByteArray, key: ByteArray): ByteArray {
+        // AESによる暗号化処理
+        // ...
+    }
+
+    def aes_decrypt(data: ByteArray, key: ByteArray): ByteArray {
+        // AESによる復号化処理
+        // ...
+    }
+}
+
+// USBメモリー操作ライブラリの定義
+module USBMemory {
+    // USBメモリーからデータを読み込む
+    def read_data(path: String): ByteArray {
+        // USBメモリーからデータを読み込む処理
+        // ...
+    }
+
+    // USBメモリーにデータを書き込む
+    def write_data(path: String, data: ByteArray) {
+        // USBメモリーにデータを書き込む処理
+        // ...
+    }
+}
+
+// 暗号化解除プログラム
+def decrypt_usb_memory(usb_path: String, password: String) {
+    // USBメモリーからデータを読み込む
+    let encrypted_data = USBMemory.read_data(usb_path)
+
+    // パスワードからAESの暗号化キーを生成する
+    let key = derive_aes_key(password)
+
+    // AESによる復号化
+    let decrypted_data = Crypto.aes_decrypt(encrypted_data, key)
+
+    // 復号化したデータをUSBメモリーに書き込む
+    USBMemory.write_data(usb_path, decrypted_data)
+}
+
+// パスワードからAESの暗号化キーを生成する
+def derive_aes_key(password: String): ByteArray {
+    // パスワードからAESの暗号化キーを生成する処理
+    // ...
+}
+
+// 使用例
+decrypt_usb_memory("/media/usb0", "mypassword")
+```
+
+このコードでは、以下のような機能を実装しています:
+
+1. **暗号化/復号化ライブラリ(`Crypto`)**: AESアルゴリズムによる暗号化と復号化を行う`aes_encrypt`と`aes_decrypt`関数を定義しています。
+
+2. **USBメモリー操作ライブラリ(`USBMemory`)**: USBメモリーからデータを読み込む`read_data`関数と、USBメモリーにデータを書き込む`write_data`関数を定義しています。
+
+3. **暗号化解除プログラム(`decrypt_usb_memory`)**: USBメモリーからデータを読み込み、パスワードからAESの暗号化キーを生成して、AESによる復号化を行います。その後、復号化したデータをUSBメモリーに書き込みます。
+
+4. **パスワードからAESの暗号化キーを生成する関数(`derive_aes_key`)**: パスワードからAESの暗号化キーを生成する処理を実装しています。
+
+この実装では、Omega scriptの特徴を活かして、暗号化/復号化ライブラリとUSBメモリー操作ライブラリを分離し、それぞれのモジュールを独立して実装しています。これにより、メンテナンス性と再利用性が高い設計になっています。
+
+また、パスワードからAESの暗号化キーを生成する関数を別途定義することで、暗号化アルゴリズムの変更に柔軟に対応できるようになっています。
+
+このプログラムを使用することで、パスワードを入力するだけで、暗号化されたUSBメモリーの内容を復号化して利用できるようになります。

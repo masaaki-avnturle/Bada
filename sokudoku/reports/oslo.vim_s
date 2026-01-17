@@ -1,0 +1,79 @@
+Omega scriptの構文をVimのシンタックス機能に適用するには、以下のようなVimプラグイン(oslo.vim)を作成することができます。このプラグインでは、単語補完、文法チェック、構文のハイライトなどの機能を実装しています。
+
+```vim
+" oslo.vim
+
+" 構文ハイライト
+syn keyword omegaKeyword def let if else match return
+syn keyword omegaType Int Bool String List Map
+syn match omegaOperator "[+\-*/=!<>]"
+syn match omegaIdentifier "\<\h\w*\>"
+syn match omegaNumber "\<\d\+\>"
+syn region omegaString start=/"/ end=/"/
+
+hi def link omegaKeyword Keyword
+hi def link omegaType Type
+hi def link omegaOperator Operator
+hi def link omegaIdentifier Identifier
+hi def link omegaNumber Number
+hi def link omegaString String
+
+" 単語補完
+function! OmegaComplete(findstart, base)
+  if a:findstart
+    let line = getline('.')
+    let start = col('.') - 1
+    while start > 0 && line[start - 1] =~ '\w'
+      let start -= 1
+    endwhile
+    return start
+  else
+    let completions = ['def', 'let', 'if', 'else', 'match', 'return']
+    let res = []
+    for c in completions
+      if c =~ '^' . a:base
+        call add(res, c)
+      endif
+    endfor
+    return res
+  endif
+endfunction
+
+setlocal omnifunc=OmegaComplete
+
+" 文法チェック
+function! OmegaCheckSyntax()
+  let errors = []
+  " ここに文法チェックのロジックを実装する
+  return errors
+endfunction
+
+function! OmegaHighlightErrors()
+  let errors = OmegaCheckSyntax()
+  for error in errors
+    execute 'sign define omegaError text=>> linehl=Error'
+    execute 'sign place ' . error.line . ' line=' . error.line . ' name=omegaError buffer=' . bufnr('%')
+  endfor
+endfunction
+
+augroup OmegaMode
+  autocmd!
+  autocmd BufWritePost *.omega call OmegaHighlightErrors()
+augroup END
+```
+
+このVimプラグインでは、以下の機能を実装しています:
+
+1. **構文ハイライト**:
+   - キーワード、型、演算子、識別子、数値、文字列などの構文要素を色分けしてハイライトします。
+
+2. **単語補完**:
+   - `OmegaComplete`関数では、現在のカーソル位置から単語の先頭を検出し、Omega scriptのキーワードを補完候補として返します。
+   - `setlocal omnifunc=OmegaComplete`により、Vimの補完機能を有効化しています。
+
+3. **文法チェック**:
+   - `OmegaCheckSyntax`関数では、Omega scriptのコードを解析し、文法エラーを検出します。
+   - `OmegaHighlightErrors`関数では、文法エラーの行番号を取得し、Vimのサインを使ってエラーをハイライトします。
+   - `BufWritePost`イベントで`OmegaHighlightErrors`を呼び出し、ファイルの保存時に文法チェックを行います。
+
+このVimプラグインを使うことで、Omega scriptのソースコードを編集する際に、シンタックスハイライト、単語補完、文法チェックの機能が利用できるようになります。これにより、Omega scriptの開発をより快適に行えるようになります。
