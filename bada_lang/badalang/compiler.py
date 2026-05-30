@@ -133,9 +133,56 @@ class Compiler:
         self.emit(O.JUMP, self.loops[-1].continue_target)
 
     def stmt_ImportStmt(self, node):
-        # Imports are advisory: built-in namespaces (Omega, math...) are
-        # always available.  Record nothing executable.
-        self.emit(O.NOP)
+        bind = node.alias or node.path[-1]
+        self.emit(O.IMPORT_MODULE, self.const(tuple(node.path)))
+        self.emit(O.DECLARE_NAME, self.const(bind))
+
+    def stmt_ThrowStmt(self, node):
+        self.expression(node.value)
+        self.emit(O.THROW)
+
+    def stmt_TryStmt(self, node):
+        # SETUP_TRY records (catch_ip, finally_ip); a finally section always
+        # exists (it may be empty) to simplify the unwinding protocol.
+        setup = self.emit(O.SETUP_TRY, None)
+
+        # --- try body ---
+        self.stmt_Block(node.try_block)
+        self.emit(O.POP_BLOCK)
+        jump_to_finally_normal = self.emit(O.JUMP)
+
+        # --- catch body (VM jumps here with the exception value on the stack) ---
+        catch_ip = self.here()
+        if node.catch_block is not None:
+            if node.catch_var is not None:
+                self.emit(O.DECLARE_NAME, self.const(node.catch_var))
+            else:
+                self.emit(O.POP)
+            self.stmt_Block(node.catch_block)
+            self.emit(O.POP_BLOCK)   # drop the finally-only handler
+            jump_after_catch = self.emit(O.JUMP)
+        else:
+            # no catch clause: discard the pushed value, fall through to reraise
+            self.emit(O.POP)
+            jump_after_catch = None
+
+        # --- finally (exceptional path): run, then re-raise ---
+        finally_ip = self.here()
+        if node.finally_block is not None:
+            self.stmt_Block(node.finally_block)
+        self.emit(O.RERAISE)
+
+        # --- finally (normal / caught path) ---
+        normal_finally = self.here()
+        self.patch(jump_to_finally_normal, normal_finally)
+        if jump_after_catch is not None:
+            self.patch(jump_after_catch, normal_finally)
+        if node.finally_block is not None:
+            self.stmt_Block(node.finally_block)
+
+        # patch SETUP_TRY argument with (catch_ip, finally_ip)
+        target_catch = catch_ip if node.catch_block is not None else None
+        self.code.code[setup][1] = self.const((target_catch, finally_ip))
 
     def stmt_FuncDecl(self, node):
         sub = Compiler(node.name, node.params)
@@ -269,5 +316,10 @@ class Compiler:
 
 def compile_source(source, filename="<bada>"):
     from .parser import parse
-    ast = parse(source, filename)
-    return Compiler("<main>").compile_program(ast)
+    from .reviser import Reviser
+    # The reviser rewrites the source text (grammar / lexer) before parsing.
+    revised, rules = Reviser.process(source)
+    ast = parse(revised, filename)
+    code = Compiler("<main>").compile_program(ast)
+    code.reviser_rules = rules
+    return code

@@ -37,7 +37,7 @@ def cmd_run(args):
     src = read_file(path)
     try:
         code = compile_source(src, path)
-        VM().run_main(code)
+        VM().run_main(code, base_dir=os.path.dirname(os.path.abspath(path)))
     except BadaError as e:
         die(str(e))
     return 0
