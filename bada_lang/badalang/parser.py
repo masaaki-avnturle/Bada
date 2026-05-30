@@ -123,6 +123,10 @@ class Parser:
             return self.print_stmt()
         if self.check_kw("import"):
             return self.import_stmt()
+        if self.check_kw("try"):
+            return self.try_stmt()
+        if self.check_kw("throw"):
+            return self.throw_stmt()
         if self.check_op("{"):
             return self.block()
         return self.expr_stmt()
@@ -268,11 +272,39 @@ class Parser:
 
     def import_stmt(self):
         line = self.advance().line
-        parts = [self.expect(IDENT, what="module name").value]
-        while self.match_op("::"):
-            parts.append(self.expect(IDENT, what="module name").value)
+        # accept either an identifier path (a::b::c) or a quoted file path
+        if self.check(STRING):
+            parts = [self.advance().value]
+        else:
+            parts = [self.expect(IDENT, what="module name").value]
+            while self.match_op("::"):
+                parts.append(self.expect(IDENT, what="module name").value)
+        alias = None
+        if self.match_kw("as"):
+            alias = self.expect(IDENT, what="alias name").value
         self.skip_semis()
-        return N.ImportStmt(parts, line)
+        return N.ImportStmt(parts, alias, line)
+
+    def try_stmt(self):
+        line = self.advance().line  # 'try'
+        try_block = self.block()
+        catch_var, catch_block, finally_block = None, None, None
+        if self.match_kw("catch"):
+            if self.match_op("("):
+                catch_var = self.expect(IDENT, what="catch variable").value
+                self.expect_op(")")
+            catch_block = self.block()
+        if self.match_kw("finally"):
+            finally_block = self.block()
+        if catch_block is None and finally_block is None:
+            raise BadaSyntaxError("'try' requires a 'catch' or 'finally' block", line)
+        return N.TryStmt(try_block, catch_var, catch_block, finally_block, line)
+
+    def throw_stmt(self):
+        line = self.advance().line  # 'throw'
+        value = self.expression()
+        self.skip_semis()
+        return N.ThrowStmt(value, line)
 
     def expr_stmt(self):
         expr = self.expression()

@@ -190,6 +190,51 @@ class TupleSpace:
         return f"<TupleSpace {self.name} ({len(self._store)} entries)>"
 
 
+class FileHandle:
+    """An open file, wrapping a Python file object for streaming I/O."""
+
+    def __init__(self, path, mode):
+        self.path = path
+        self.mode = mode
+        self._fh = None
+
+    def open(self):
+        from .errors import BadaRuntimeError
+        try:
+            self._fh = open(self.path, self.mode, encoding="utf-8")
+        except OSError as e:
+            raise BadaRuntimeError(f"cannot open {self.path!r}: {e}")
+        return self
+
+    def _require(self):
+        from .errors import BadaRuntimeError
+        if self._fh is None or self._fh.closed:
+            raise BadaRuntimeError(f"file {self.path!r} is not open")
+        return self._fh
+
+    def read(self):
+        return self._require().read()
+
+    def readline(self):
+        line = self._require().readline()
+        return line if line != "" else None
+
+    def lines(self):
+        return self._require().read().splitlines()
+
+    def write(self, text):
+        self._require().write(text)
+        return self
+
+    def close(self):
+        if self._fh is not None and not self._fh.closed:
+            self._fh.close()
+        return None
+
+    def __repr__(self):
+        return f"<file {self.path!r} mode={self.mode!r}>"
+
+
 class Namespace:
     """A simple bag of named members, used for Omega:: and modules."""
 

@@ -6,9 +6,10 @@ pi-operator pi_op.
 """
 
 import math
+import os
 
 from .objects import (
-    NativeFunction, Namespace, TupleSpace, bada_str, bada_repr,
+    NativeFunction, Namespace, TupleSpace, FileHandle, bada_str, bada_repr,
 )
 from .errors import BadaTypeError, BadaRuntimeError
 
@@ -88,6 +89,16 @@ def make_builtins():
     reg("assert", lambda a: _assert(a))
     reg("error", lambda a: _error(a[0]))
     reg("clock", lambda a: __import__("time").time())
+
+    # file I/O
+    reg("open", lambda a: _open(a[0], a[1] if len(a) > 1 else "r"))
+    reg("read_file", lambda a: _read_file(a[0]), 1)
+    reg("write_file", lambda a: _write_file(a[0], a[1]), 2)
+    reg("append_file", lambda a: _append_file(a[0], a[1]), 2)
+    reg("read_lines", lambda a: _read_lines(a[0]), 1)
+    reg("file_exists", lambda a: os.path.exists(a[0]), 1)
+    reg("delete_file", lambda a: _delete_file(a[0]), 1)
+    reg("list_dir", lambda a: _list_dir(a[0] if a else "."))
 
     # constants
     funcs["PI"] = math.pi
@@ -216,6 +227,63 @@ def _assert(a):
 
 def _error(msg):
     raise BadaRuntimeError(bada_str(msg))
+
+
+# --- file I/O --------------------------------------------------------------
+
+def _open(path, mode):
+    if mode not in ("r", "w", "a"):
+        raise BadaRuntimeError(f"unsupported file mode {mode!r} (use r/w/a)")
+    return FileHandle(path, mode).open()
+
+
+def _read_file(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except OSError as e:
+        raise BadaRuntimeError(f"read_file: {e}")
+
+
+def _write_file(path, content):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(bada_str(content))
+        return True
+    except OSError as e:
+        raise BadaRuntimeError(f"write_file: {e}")
+
+
+def _append_file(path, content):
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(bada_str(content))
+        return True
+    except OSError as e:
+        raise BadaRuntimeError(f"append_file: {e}")
+
+
+def _read_lines(path):
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read().splitlines()
+    except OSError as e:
+        raise BadaRuntimeError(f"read_lines: {e}")
+
+
+def _delete_file(path):
+    try:
+        os.remove(path)
+        return True
+    except OSError as e:
+        raise BadaRuntimeError(f"delete_file: {e}")
+
+
+def _list_dir(path):
+    try:
+        return sorted(os.listdir(path))
+    except OSError as e:
+        raise BadaRuntimeError(f"list_dir: {e}")
 
 
 # --- operator-algebra functions --------------------------------------------

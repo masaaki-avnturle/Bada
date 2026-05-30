@@ -168,8 +168,24 @@ class ContinueStmt(Node):
 
 
 class ImportStmt(Node):
-    def __init__(self, path, line=0):
+    def __init__(self, path, alias=None, line=0):
         self.path = path  # list of name parts
+        self.alias = alias  # bound name override, or None
+        self.line = line
+
+
+class TryStmt(Node):
+    def __init__(self, try_block, catch_var, catch_block, finally_block, line=0):
+        self.try_block = try_block
+        self.catch_var = catch_var      # name string or None
+        self.catch_block = catch_block  # Block or None
+        self.finally_block = finally_block  # Block or None
+        self.line = line
+
+
+class ThrowStmt(Node):
+    def __init__(self, value, line=0):
+        self.value = value
         self.line = line
 
 

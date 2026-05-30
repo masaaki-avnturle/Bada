@@ -148,6 +148,94 @@ expect("print gamma(5)", "24.0\n", "gamma")
 expect("print beta(2, 3)", "0.08333333333333333\n", "beta")
 expect("print 2 -< 3", "0.08333333333333333\n", "manifold branch operator")
 
+# --- reviser ---------------------------------------------------------------
+
+expect(
+    'reviser { word "表示" => "print" }\n表示 "hi"',
+    "hi\n", "reviser word rewrite")
+expect(
+    'reviser { op "←" => "<-" }\nlet x ← 9\nprint x',
+    "9\n", "reviser operator rewrite")
+expect(
+    'reviser { word "fun" => "fun" }\nprint "kept literal: 表示"',
+    "kept literal: 表示\n", "reviser leaves strings untouched")
+expect(
+    'reviser { word "F" => "fun" }\nF g() { return 5 }\nprint g()',
+    "5\n", "reviser custom keyword")
+
+# --- garbage collection ----------------------------------------------------
+
+expect(
+    "class N { method init() {} }\n"
+    "let keep <- N.new()\nN.new()\nN.new()\n"
+    "print gc_collect() >= 2",
+    "true\n", "gc reclaims unreachable instances")
+expect(
+    "class N { field tag\n method init(t) { self.tag <- t }\n"
+    " method __finalize__() { print \"bye\", self.tag } }\n"
+    "N.new(7)\ngc_collect()",
+    "bye 7\n", "gc runs finalizer")
+expect(
+    "let a <- [1, 2, 3]\ngc_collect()\nprint a[2]",
+    "3\n", "gc keeps reachable list")
+expect(
+    "gc_disable()\nlet s <- gc_stats()\nprint s[\"enabled\"]",
+    "false\n", "gc enable/disable")
+
+# --- exceptions ------------------------------------------------------------
+
+expect(
+    'try { throw "x" } catch (e) { print "caught", e }',
+    "caught x\n", "throw/catch")
+expect(
+    'try { print 1 } catch (e) { print 2 } finally { print 3 }',
+    "1\n3\n", "finally on normal path")
+expect(
+    'try { throw "e" } catch (x) { print "c" } finally { print "f" }',
+    "c\nf\n", "finally on caught path")
+expect(
+    'try { let a <- [1]\nprint a[9] } catch (e) { print e["type"] }',
+    "RuntimeError\n", "catch builtin error as map")
+expect(
+    'try { try { throw "boom" } finally { print "inner" } } '
+    'catch (e) { print "outer", e }',
+    "inner\nouter boom\n", "nested try reraise through finally")
+expect(
+    'fun f() { try { throw 42 } catch (e) { return e } }\nprint f()',
+    "42\n", "throw non-string value")
+
+# --- file I/O --------------------------------------------------------------
+
+expect(
+    'let p <- "/tmp/_bada_test_io.txt"\n'
+    'write_file(p, "hello")\nappend_file(p, " world")\n'
+    'print read_file(p)\ndelete_file(p)',
+    "hello world\n", "write/append/read file")
+expect(
+    'let p <- "/tmp/_bada_test_lines.txt"\n'
+    'write_file(p, "a\\nb\\nc")\nprint len(read_lines(p))\ndelete_file(p)',
+    "3\n", "read_lines")
+expect(
+    'let p <- "/tmp/_bada_test_h.txt"\n'
+    'let f <- open(p, "w")\nf.write("xyz")\nf.close()\n'
+    'let g <- open(p, "r")\nprint g.read()\ng.close()\ndelete_file(p)',
+    "xyz\n", "file handle write/read")
+expect_error(
+    'read_file("/no/such/path/here.txt")',
+    BadaError, "read_file missing -> error")
+
+# --- import / libraries ----------------------------------------------------
+
+expect("import mathx\nprint mathx.gcd(12, 18)", "6\n", "import library function")
+expect("import collections\n"
+       "let s <- collections.Stack.new()\ns.push(5)\nprint s.pop()",
+       "5\n", "import library class")
+expect("import mathx as M\nprint M.is_prime(13)", "true\n", "import as alias")
+expect("import Omega::DATABASE as DB\n"
+       "let d <- DB.new()\nd.push(\"k\", 1)\nprint d.get(\"k\")",
+       "1\n", "import builtin namespace member")
+expect_error("import no_such_library_xyz", BadaError, "missing module -> error")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")

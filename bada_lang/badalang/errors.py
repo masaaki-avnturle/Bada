@@ -39,3 +39,22 @@ class BadaImmutableError(BadaError):
     """Raised when a write-once TupleSpace key is overwritten."""
 
     kind = "ImmutableError"
+
+
+class BadaModuleError(BadaError):
+    """Raised when an imported module cannot be found or loaded."""
+
+    kind = "ModuleError"
+
+
+class BadaThrow(Exception):
+    """Carries a user-thrown Bada value through the Python call stack.
+
+    This is distinct from BadaError: it represents an explicit `throw` of an
+    arbitrary Bada value (number, string, map, instance, ...), not an internal
+    interpreter error.
+    """
+
+    def __init__(self, value):
+        self.value = value
+        super().__init__("Bada exception")

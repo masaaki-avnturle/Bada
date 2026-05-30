@@ -19,7 +19,8 @@ EOF = "EOF"
 KEYWORDS = {
     "let", "class", "method", "static", "field", "operator", "fun",
     "if", "else", "while", "for", "in", "return", "break", "continue",
-    "print", "import", "and", "or", "not",
+    "print", "import", "as", "and", "or", "not",
+    "try", "catch", "finally", "throw",
     "true", "false", "nil", "self", "super",
 }
 

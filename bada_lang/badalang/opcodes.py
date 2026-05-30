@@ -30,8 +30,13 @@
     PRINT,             # pop arg values and print them
     GET_ITER,          # replace top with an iterator
     FOR_ITER,          # advance iterator; jump to arg when exhausted
+    SETUP_TRY,         # install exception handler consts[arg]=(catch_ip, finally_ip)
+    POP_BLOCK,         # remove the topmost exception handler
+    RERAISE,           # re-raise the pending exception (end of finally path)
+    THROW,             # pop value and raise it as a Bada exception
+    IMPORT_MODULE,     # load module consts[arg]=(parts,) and push its namespace
     NOP,
-) = range(27)
+) = range(32)
 
 
 OPNAMES = {
@@ -61,5 +66,10 @@ OPNAMES = {
     PRINT: "PRINT",
     GET_ITER: "GET_ITER",
     FOR_ITER: "FOR_ITER",
+    SETUP_TRY: "SETUP_TRY",
+    POP_BLOCK: "POP_BLOCK",
+    RERAISE: "RERAISE",
+    THROW: "THROW",
+    IMPORT_MODULE: "IMPORT_MODULE",
     NOP: "NOP",
 }

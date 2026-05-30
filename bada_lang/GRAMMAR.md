@@ -7,7 +7,8 @@
 - **Strings:** `"..."` or `'...'`, with escapes `\n \t \r \\ \" \' \0`.
 - **Identifiers:** letter or `_` followed by letters/digits/`_`.
 - **Keywords:** `let class method static field operator fun if else while for
-  in return break continue print import and or not true false nil self super`.
+  in return break continue print import as and or not try catch finally throw
+  true false nil self super`.
 - **Operators / punctuation:**
   `<- <~ ~> -< :: => == != <= >= < > + - * / % ( ) { } [ ] , . : ;`
 
@@ -18,7 +19,7 @@ program     = { statement } ;
 
 statement   = letStmt | classDecl | funcDecl | ifStmt | whileStmt
             | forStmt | returnStmt | "break" | "continue"
-            | printStmt | importStmt | block | exprStmt ;
+            | printStmt | importStmt | tryStmt | throwStmt | block | exprStmt ;
 
 letStmt     = "let" IDENT "<-" expression ;
 funcDecl    = "fun" IDENT params block ;
@@ -35,7 +36,11 @@ whileStmt   = "while" expression block ;
 forStmt     = "for" IDENT "in" expression block ;
 returnStmt  = "return" [ expression ] ;
 printStmt   = "print" [ expression { "," expression } ] ;
-importStmt  = "import" IDENT { "::" IDENT } ;
+importStmt  = "import" ( STRING | IDENT { "::" IDENT } ) [ "as" IDENT ] ;
+tryStmt     = "try" block [ "catch" [ "(" IDENT ")" ] block ] [ "finally" block ] ;
+throwStmt   = "throw" expression ;
+reviserBlock= "reviser" "{" { rule } "}" ;          (* processed before lexing *)
+rule        = ( "word" | "op" | "text" ) STRING "=>" STRING ;
 block       = "{" { statement } "}" ;
 exprStmt    = expression ;
 
@@ -125,7 +130,22 @@ constant pool. Most `arg`s index into that pool.
 | `PRINT n`             | pop `n` values; print them space-separated |
 | `GET_ITER`            | replace top with an iterator |
 | `FOR_ITER t`          | push next value, or jump to `t` when exhausted |
+| `SETUP_TRY i`         | install handler `consts[i]=(catch_ip, finally_ip)` |
+| `POP_BLOCK`           | remove the topmost exception handler |
+| `THROW`               | pop a value and raise it as a Bada exception |
+| `RERAISE`             | re-raise the pending exception (end of a finally path) |
+| `IMPORT_MODULE i`     | load module `consts[i]=(parts…)`; push its namespace |
 | `NOP`                 | no operation |
+
+### Exception unwinding
+
+`SETUP_TRY` records `(catch_ip, finally_ip, stack_depth)` on the frame's
+handler stack. When a `BadaError` or a thrown value escapes an instruction
+(including from nested calls), the VM pops the handler, truncates the operand
+stack to `stack_depth`, and either jumps to `catch_ip` (pushing the exception
+value) or to `finally_ip` (re-raising afterwards via `RERAISE`). Entering a
+`catch` re-installs a finally-only handler so a `throw` inside the `catch`
+still runs `finally`.
 
 Inspect any program's bytecode with `./bada dis file.bada`.
 

@@ -1,0 +1,57 @@
+// 09 — Exception handling: try / catch / finally and throw.
+
+// throw any value; catch binds it to a variable
+fun safe_div(a, b) {
+    if b == 0 {
+        throw "division by zero!"
+    }
+    return a / b
+}
+
+try {
+    print "10 / 2 =", safe_div(10, 2)
+    print "10 / 0 =", safe_div(10, 0)
+    print "this line never runs"
+} catch (err) {
+    print "caught:", err
+} finally {
+    print "finally always runs"
+}
+
+// Built-in runtime errors are catchable too. The caught value is a map
+// with "type" and "message".
+try {
+    let a <- [1, 2, 3]
+    print a[99]
+} catch (e) {
+    print "error type:", e["type"]
+    print "error message:", e["message"]
+}
+
+// throwing structured values (maps / instances)
+fun parse_age(s) {
+    let n <- num(s)
+    if n < 0 {
+        throw {"code": 400, "reason": "age cannot be negative"}
+    }
+    return n
+}
+
+try {
+    print parse_age("-5")
+} catch (problem) {
+    print "rejected, code", problem["code"], "-", problem["reason"]
+}
+
+// nested try: inner finally runs, then the outer catch handles re-thrown error
+try {
+    try {
+        throw "boom"
+    } finally {
+        print "inner finally"
+    }
+} catch (e) {
+    print "outer caught:", e
+}
+
+print "done."
