@@ -30,6 +30,16 @@ clean, runnable language:
 - **Libraries & imports** — `import name` loads `name.bada` from a search path
   and binds a namespace; supports `import a::b`, `import "file.bada"` and
   `import x as y`.
+- **Regular expressions** — `regex(pattern, flags)` objects with
+  `.test/.match/.find_all/.replace/.split`, plus `re_*` convenience builtins.
+- **Multithreading** — `spawn(fn, arg)`, `Channel`, `Mutex`, `sleep`, running
+  under a cooperative VM lock released at blocking points.
+- **Numerical analysis** — `derivative`, `gradient`, `integrate`,
+  `integrate2`, `solve_ode` (RK4) and `newton`, all taking Bada functions.
+- **Advanced mathematics libraries** — `manifold` (vectors, surfaces with a
+  metric, surface integrals, integral curves), `topology` (spaces, Euler
+  characteristic, and the fundamental group π₁ with overloaded operators) and
+  `diffeq` (ODEs and their integral manifolds).
 
 ## Pipeline
 
@@ -226,6 +236,75 @@ in the `BADA_PATH` environment variable, and the bundled standard library
 (`bada_lang/lib/`). A module's top-level `let`/`fun`/`class` become the members
 of the imported namespace. Modules are executed once and cached.
 
+### Regular expressions
+
+```bada
+let date <- regex("([0-9]{4})-([0-9]{2})-([0-9]{2})", "i")
+print date.test("2026-05-30")            // true
+let m <- date.match("on 2026-05-30")     // [whole, y, m, d] or nil
+print m[1], m[2], m[3]
+print regex("\\s+").replace("a  b", "_") // "a_b"
+// convenience: re_test, re_match, re_find_all, re_replace, re_split
+```
+
+### Multithreading
+
+```bada
+fun work(n) { return n * n }
+let t <- spawn(work, 9)        // run on a background thread
+print t.join()                 // 81  (join returns the result)
+
+let ch <- Channel.new()        // thread-safe queue
+spawn(fun_that_sends, ch)
+print ch.receive()             // blocks until a value arrives
+
+let lock <- Mutex.new()
+lock.lock(); /* critical section */ lock.unlock()
+```
+
+Threads run under a cooperative VM lock (a "GIL") that is released at blocking
+points — `sleep`, `Channel.receive`, `Mutex.lock`, `thread.join` — so threads
+make progress around I/O and coordination. The garbage collector treats every
+live thread's call frames as roots.
+
+### Numerical analysis & differential equations
+
+```bada
+fun f(x) { return x * x }
+print derivative(f, 3)              // 6.0
+print integrate(f, 0, 1)           // ~0.3333  (Simpson)
+print integrate2(g, 0, 2, 0, 3)    // double integral over a rectangle
+print newton(fun(x){...}, 1)       // Newton-Raphson root
+
+fun field(t, y) { return -0.5 * y }   // dy/dt = -0.5 y
+let curve <- solve_ode(field, 10, 0, 4, 400)   // RK4 -> [[t,y], ...]
+```
+
+### Advanced mathematics: manifolds & topology
+
+```bada
+import manifold
+import topology
+
+let a <- manifold.Vector.new([1, 2, 2])
+print a.norm()                    // 3.0  (uses overloaded -< dot product)
+
+// surface area is an integral over a 2-manifold (first fundamental form)
+let sphere <- manifold.Surface.new(SX, SY, SZ)
+print sphere.area(0, 6.2831, 0, 3.1415)   // ~4*pi
+
+// fundamental group pi_1: loops with overloaded * (compose) and ~> (conjugate)
+let x <- topology.Loop.new("a")
+let y <- topology.Loop.new("b")
+print (x * x.inverse()).is_identity()     // true  (free reduction)
+print topology.Complex.new(4, 6, 4).euler()  // 2  (tetrahedron = sphere)
+```
+
+These libraries showcase **operator overloading on advanced mathematical
+objects**: `Vector` overloads `+ - * -<`, `Loop` (a π₁ element) overloads
+`* ~> ==`, and surfaces compute their metric and integral via the numerical
+routines above.
+
 > **Note on operator naming.** The design documents write the three manifold
 > operators as `<-`, `-<`, `>-`. Because executable Bada uses `<-` for
 > assignment (as in `sample.omega`), the left/right-action operators are
@@ -240,15 +319,15 @@ of the imported namespace. Modules are executed once and cached.
 | `badalang/nodes.py`    | AST node definitions |
 | `badalang/compiler.py` | AST → bytecode |
 | `badalang/opcodes.py`  | bytecode instruction set |
-| `badalang/objects.py`  | runtime object model (class, instance, TupleSpace, FileHandle, …) |
-| `badalang/builtins.py` | builtin functions, math, operator-algebra, file I/O, `Omega` |
+| `badalang/objects.py`  | runtime object model (class, instance, TupleSpace, FileHandle, Regex, Thread, …) |
+| `badalang/builtins.py` | builtin functions, math, operator-algebra, regex, file I/O, `Omega` |
 | `badalang/reviser.py`  | the Reviser — source/grammar rewriting |
 | `badalang/gc.py`       | the mark-and-sweep garbage collector |
-| `badalang/vm.py`       | the bytecode interpreter (VM): exceptions, imports, GC roots |
+| `badalang/vm.py`       | the bytecode interpreter (VM): exceptions, imports, threads, calculus, GC |
 | `bada.py` / `bada`     | command-line driver (`run`/`dis`/`compile`/`exec`/`repl`) |
-| `lib/`                 | bundled standard library (`mathx`, `collections`) |
-| `examples/`            | sample programs (01–11) |
-| `tests/run_tests.py`   | test suite (63 checks) |
+| `lib/`                 | standard library (`mathx`, `collections`, `manifold`, `topology`, `diffeq`) |
+| `examples/`            | sample programs (01–15) |
+| `tests/run_tests.py`   | test suite (85 checks) |
 
 See [`GRAMMAR.md`](GRAMMAR.md) for the full grammar and the bytecode
 instruction set.

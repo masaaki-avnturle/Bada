@@ -3,6 +3,8 @@
 import os
 import sys
 import math
+import time
+import threading
 
 from . import opcodes as O
 from .objects import (
@@ -69,14 +71,26 @@ class VM:
         self.builtins_env = Environment()
         self.builtins_env.vars = make_builtins()
         self.global_env = Environment(self.builtins_env)
-        self.frames = []                       # live call frames (GC roots)
+        # call frames are per-thread; the dict (thread id -> list) lets the
+        # GC gather roots across every live Bada thread.
+        self.thread_frames = {}
+        self.exec_lock = threading.RLock()     # the Bada "GIL"
         from .gc import GarbageCollector
         self.gc = GarbageCollector(self)
         self._install_gc_builtins()
+        self._install_runtime_builtins()
         # module / import machinery
         self.base_dir = os.getcwd()
         self.module_cache = {}
         self.importing = set()                 # cycle detection
+
+    @property
+    def frames(self):
+        fr = self.thread_frames.get(threading.get_ident())
+        if fr is None:
+            fr = []
+            self.thread_frames[threading.get_ident()] = fr
+        return fr
 
     # --- public -----------------------------------------------------------
 
@@ -84,17 +98,19 @@ class VM:
         if base_dir is not None:
             self.base_dir = base_dir
         self._install_reviser(getattr(code, "reviser_rules", None))
-        return self.run(code, self.global_env)
+        with self.exec_lock:
+            return self.run(code, self.global_env)
 
     # --- core loop --------------------------------------------------------
 
     def run(self, code, env, self_obj=None, defining_class=None):
         frame = Frame(code, env, self_obj, defining_class)
-        self.frames.append(frame)
+        frames = self.frames
+        frames.append(frame)
         try:
             return self._run_frame(frame)
         finally:
-            self.frames.pop()
+            frames.pop()
 
     def _run_frame(self, frame):
         stack = frame.stack
@@ -275,6 +291,185 @@ class VM:
         b["gc_disable"] = NativeFunction("gc_disable", gc_disable, 0)
         b["gc_threshold"] = NativeFunction("gc_threshold", gc_threshold, 1)
         b["gc_heap"] = NativeFunction("gc_heap", gc_heap, 0)
+
+    # --- threading & numerical-analysis builtins --------------------------
+
+    def _install_runtime_builtins(self):
+        from .objects import Mutex, Channel
+        b = self.builtins_env.vars
+
+        # threads
+        b["spawn"] = NativeFunction(
+            "spawn", lambda a: self._spawn(a[0], a[1:]))
+        b["sleep"] = NativeFunction(
+            "sleep", lambda a: self._park(lambda: time.sleep(a[0])), 1)
+        b["yield_now"] = NativeFunction(
+            "yield_now", lambda a: self._park(lambda: time.sleep(0)), 0)
+        b["Mutex"] = self._mk_factory("Mutex", Mutex)
+        b["Channel"] = self._mk_factory("Channel", Channel)
+        b["thread_id"] = NativeFunction(
+            "thread_id", lambda a: threading.get_ident(), 0)
+        b["cpu_count"] = NativeFunction(
+            "cpu_count", lambda a: os.cpu_count() or 1, 0)
+
+        # numerical analysis (differential equations, integral manifolds, ...)
+        b["derivative"] = NativeFunction("derivative", self._b_derivative)
+        b["gradient"] = NativeFunction("gradient", self._b_gradient)
+        b["integrate"] = NativeFunction("integrate", self._b_integrate)
+        b["integrate2"] = NativeFunction("integrate2", self._b_integrate2)
+        b["solve_ode"] = NativeFunction("solve_ode", self._b_solve_ode)
+        b["newton"] = NativeFunction("newton", self._b_newton)
+
+    def _mk_factory(self, name, cls):
+        ns = Namespace(name)
+        ns.members["new"] = NativeFunction(
+            f"{name}.new", lambda a: self.gc.track(cls()))
+        return ns
+
+    # --- thread primitives ------------------------------------------------
+
+    def _park(self, blocking_callable):
+        """Release the Bada GIL while performing a blocking operation."""
+        self.exec_lock.release()
+        try:
+            return blocking_callable()
+        finally:
+            self.exec_lock.acquire()
+
+    def _spawn(self, fn, args):
+        from .objects import BadaThread
+        handle = BadaThread()
+        self.gc.track(handle)
+        args = list(args)
+
+        def target():
+            with self.exec_lock:
+                try:
+                    handle.result = self.call(fn, args)
+                except BadaThrow as e:
+                    handle.error = e.value
+                except BadaError as e:
+                    handle.error = {"type": e.kind, "message": e.message}
+                finally:
+                    handle.done = True
+                    self.thread_frames.pop(threading.get_ident(), None)
+
+        t = threading.Thread(target=target, daemon=True)
+        handle.thread = t
+        t.start()
+        return handle
+
+    def _thread_join(self, handle):
+        if handle.thread is not None:
+            self._park(handle.thread.join)
+        if handle.error is not None:
+            from .errors import BadaThrow
+            raise BadaThrow(handle.error)
+        return handle.result
+
+    def _mutex_lock(self, mx):
+        self._park(mx._lock.acquire)
+        return None
+
+    def _channel_send(self, ch, value):
+        ch._q.put(value)
+        return None
+
+    def _channel_receive(self, ch):
+        return self._park(ch._q.get)
+
+    def _channel_close(self, ch):
+        ch.closed = True
+        return None
+
+    # --- numerical analysis -----------------------------------------------
+
+    def _num_call(self, fn, args):
+        """Call a Bada function and require a numeric result."""
+        r = self.call(fn, list(args))
+        if isinstance(r, bool) or not isinstance(r, (int, float)):
+            raise BadaTypeError("numerical routine expects the function to return a number")
+        return float(r)
+
+    def _b_derivative(self, a):
+        fn, x = a[0], a[1]
+        h = a[2] if len(a) > 2 else 1e-6
+        return (self._num_call(fn, [x + h]) - self._num_call(fn, [x - h])) / (2 * h)
+
+    def _b_gradient(self, a):
+        fn, point = a[0], a[1]
+        h = a[2] if len(a) > 2 else 1e-6
+        grad = []
+        for i in range(len(point)):
+            fwd = list(point); fwd[i] = fwd[i] + h
+            bwd = list(point); bwd[i] = bwd[i] - h
+            grad.append((self._num_call(fn, [fwd]) - self._num_call(fn, [bwd])) / (2 * h))
+        return grad
+
+    def _b_integrate(self, a):
+        """Definite integral via composite Simpson's rule."""
+        fn, lo, hi = a[0], float(a[1]), float(a[2])
+        n = int(a[3]) if len(a) > 3 else 1000
+        if n % 2 == 1:
+            n += 1
+        h = (hi - lo) / n
+        total = self._num_call(fn, [lo]) + self._num_call(fn, [hi])
+        for i in range(1, n):
+            x = lo + i * h
+            total += (4 if i % 2 else 2) * self._num_call(fn, [x])
+        return total * h / 3.0
+
+    def _b_integrate2(self, a):
+        """Double integral over a rectangle — an integral over a 2-manifold patch."""
+        fn = a[0]
+        x0, x1, y0, y1 = float(a[1]), float(a[2]), float(a[3]), float(a[4])
+        nx = int(a[5]) if len(a) > 5 else 100
+        ny = int(a[6]) if len(a) > 6 else 100
+        hx = (x1 - x0) / nx
+        hy = (y1 - y0) / ny
+        total = 0.0
+        for i in range(nx):
+            xc = x0 + (i + 0.5) * hx
+            for j in range(ny):
+                yc = y0 + (j + 0.5) * hy
+                total += self._num_call(fn, [xc, yc])
+        return total * hx * hy
+
+    def _b_solve_ode(self, a):
+        """Solve dy/dt = f(t, y) with classic Runge-Kutta (RK4).
+
+        Returns a list of [t, y] samples — a discretised integral curve on
+        the solution manifold.
+        """
+        fn, y0, t0, t1 = a[0], float(a[1]), float(a[2]), float(a[3])
+        steps = int(a[4]) if len(a) > 4 else 100
+        h = (t1 - t0) / steps
+        t, y = t0, y0
+        out = [[t, y]]
+        for _ in range(steps):
+            k1 = self._num_call(fn, [t, y])
+            k2 = self._num_call(fn, [t + h / 2, y + h / 2 * k1])
+            k3 = self._num_call(fn, [t + h / 2, y + h / 2 * k2])
+            k4 = self._num_call(fn, [t + h, y + h * k3])
+            y = y + h / 6 * (k1 + 2 * k2 + 2 * k3 + k4)
+            t = t + h
+            out.append([t, y])
+        return out
+
+    def _b_newton(self, a):
+        """Find a root of f via the Newton-Raphson method."""
+        fn, x = a[0], float(a[1])
+        iters = int(a[2]) if len(a) > 2 else 50
+        tol = a[3] if len(a) > 3 else 1e-10
+        for _ in range(iters):
+            fx = self._num_call(fn, [x])
+            if abs(fx) < tol:
+                break
+            dfx = (self._num_call(fn, [x + 1e-7]) - self._num_call(fn, [x - 1e-7])) / 2e-7
+            if dfx == 0:
+                raise BadaRuntimeError("newton: zero derivative")
+            x = x - fx / dfx
+        return x
 
     def _install_reviser(self, rules):
         """Expose the applied reviser rules as an immutable Reviser tuplespace."""
@@ -483,9 +678,17 @@ class VM:
         if isinstance(obj, str):
             return self._str_attr(obj, name)
 
-        from .objects import FileHandle
+        from .objects import FileHandle, Regex, BadaThread, Mutex, Channel
         if isinstance(obj, FileHandle):
             return self._file_attr(obj, name)
+        if isinstance(obj, Regex):
+            return self._regex_attr(obj, name)
+        if isinstance(obj, BadaThread):
+            return self._thread_attr(obj, name)
+        if isinstance(obj, Mutex):
+            return self._mutex_attr(obj, name)
+        if isinstance(obj, Channel):
+            return self._channel_attr(obj, name)
 
         raise BadaTypeError(f"cannot read attribute {name!r} on {type(obj).__name__}")
 
@@ -580,6 +783,52 @@ class VM:
         if name in table:
             return NativeFunction(f"list.{name}", table[name])
         raise BadaNameError(f"list has no method {name!r}")
+
+    def _regex_attr(self, rx, name):
+        table = {
+            "test": lambda a: rx.test(a[0]),
+            "match": lambda a: rx.match(a[0]),
+            "find_all": lambda a: rx.find_all(a[0]),
+            "replace": lambda a: rx.replace(a[0], a[1]),
+            "split": lambda a: rx.split(a[0]),
+            "source": lambda a: rx.source,
+        }
+        if name == "source":
+            return rx.source
+        if name in table:
+            return NativeFunction(f"regex.{name}", table[name])
+        raise BadaNameError(f"regex has no method {name!r}")
+
+    def _thread_attr(self, th, name):
+        if name == "join":
+            return NativeFunction("thread.join", lambda a: self._thread_join(th))
+        if name == "result":
+            return th.result
+        if name == "error":
+            return th.error
+        if name == "done":
+            return th.done
+        raise BadaNameError(f"thread has no method {name!r}")
+
+    def _mutex_attr(self, mx, name):
+        table = {
+            "lock": lambda a: self._mutex_lock(mx),
+            "unlock": lambda a: (mx._lock.release(), None)[1],
+        }
+        if name in table:
+            return NativeFunction(f"mutex.{name}", table[name])
+        raise BadaNameError(f"mutex has no method {name!r}")
+
+    def _channel_attr(self, ch, name):
+        table = {
+            "send": lambda a: self._channel_send(ch, a[0]),
+            "receive": lambda a: self._channel_receive(ch),
+            "close": lambda a: self._channel_close(ch),
+            "size": lambda a: ch._q.qsize(),
+        }
+        if name in table:
+            return NativeFunction(f"channel.{name}", table[name])
+        raise BadaNameError(f"channel has no method {name!r}")
 
     def _file_attr(self, fh, name):
         table = {
