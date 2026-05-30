@@ -236,6 +236,75 @@ expect("import Omega::DATABASE as DB\n"
        "1\n", "import builtin namespace member")
 expect_error("import no_such_library_xyz", BadaError, "missing module -> error")
 
+# --- regular expressions ---------------------------------------------------
+
+expect('let r <- regex("[0-9]+")\nprint r.test("abc123")', "true\n", "regex test")
+expect('let r <- regex("[0-9]+")\nprint r.find_all("a1 b22 c3")',
+       '["1", "22", "3"]\n', "regex find_all")
+expect('let r <- regex("\\\\s+")\nprint r.replace("a b  c", "_")',
+       "a_b_c\n", "regex replace")
+expect('let r <- regex("(\\\\d+)-(\\\\d+)")\nprint r.match("12-34")[1]',
+       "12\n", "regex capture group")
+expect('print re_test("^\\\\d+$", "999")', "true\n", "re_test builtin")
+expect('print re_replace("[aeiou]", "cat", "*")', "c*t\n", "re_replace builtin")
+
+# --- calculus / differential equations -------------------------------------
+
+expect("fun f(x) { return x * x }\nprint round(derivative(f, 3), 3)",
+       "6.0\n", "numerical derivative")
+expect("fun f(x) { return x * x }\nprint round(integrate(f, 0, 1, 1000), 4)",
+       "0.3333\n", "definite integral (Simpson)")
+expect("fun one(x, y) { return 1 }\nprint round(integrate2(one, 0, 2, 0, 3), 4)",
+       "6.0\n", "double integral over a patch")
+expect("fun g(x) { return x * x - 2 }\nprint round(newton(g, 1), 6)",
+       "1.414214\n", "newton root finding")
+expect("fun dy(t, y) { return y }\n"
+       "let s <- solve_ode(dy, 1, 0, 1, 200)\n"
+       "print round(s[len(s)-1][1], 4)",
+       "2.7183\n", "ODE solver (RK4) -> e")
+expect("fun gg(p) { return p[0]*p[0] + 3*p[1] }\nprint gradient(gg, [2, 5])",
+       "[4.0, 3.0000000000419095]\n", "gradient (approx)")
+
+# --- threading -------------------------------------------------------------
+
+expect("fun sq(n) { return n * n }\nlet t <- spawn(sq, 7)\nprint t.join()",
+       "49\n", "spawn + join returns result")
+expect("let ch <- Channel.new()\n"
+       "fun send_it(x) { ch.send(x * 2) }\n"
+       "spawn(send_it, 21)\nprint ch.receive()",
+       "42\n", "channel send/receive across threads")
+expect("let lock <- Mutex.new()\nlet box <- {\"n\": 0}\n"
+       "fun add(k) { let i <- 0\n while i < k { lock.lock()\n"
+       " box[\"n\"] <- box[\"n\"] + 1\n lock.unlock()\n i <- i + 1 } }\n"
+       "let a <- spawn(add, 500)\nlet b <- spawn(add, 500)\n"
+       "a.join()\nb.join()\nprint box[\"n\"]",
+       "1000\n", "mutex protects shared state")
+
+# --- manifolds & topology (advanced math overloading) ----------------------
+
+expect("import manifold\n"
+       "let a <- manifold.Vector.new([1,2,2])\nprint a.norm()",
+       "3.0\n", "manifold vector norm")
+expect("import manifold\n"
+       "let a <- manifold.Vector.new([1,2,3])\n"
+       "let b <- manifold.Vector.new([4,5,6])\nprint a -< b",
+       "32\n", "manifold vector dot via -< operator")
+expect("import topology\n"
+       "let c <- topology.Complex.new(4, 6, 4)\nprint c.euler()",
+       "2\n", "euler characteristic of tetrahedron")
+expect("import topology\n"
+       "let a <- topology.Loop.new(\"a\")\n"
+       "print (a * a.inverse()).is_identity()",
+       "true\n", "fundamental group: a * a^-1 = identity")
+expect("import topology\n"
+       "let a <- topology.Loop.new(\"a\")\nlet b <- topology.Loop.new(\"b\")\n"
+       "print (a * b).show()",
+       "ab\n", "fundamental group composition")
+expect("import topology\n"
+       "let p <- topology.Loop.new(\"abB\")\nlet a <- topology.Loop.new(\"a\")\n"
+       "print p == a",
+       "true\n", "loop homotopy via free reduction")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")

@@ -7,9 +7,11 @@ pi-operator pi_op.
 
 import math
 import os
+import re as _re
 
 from .objects import (
-    NativeFunction, Namespace, TupleSpace, FileHandle, bada_str, bada_repr,
+    NativeFunction, Namespace, TupleSpace, FileHandle, Regex,
+    bada_str, bada_repr,
 )
 from .errors import BadaTypeError, BadaRuntimeError
 
@@ -89,6 +91,14 @@ def make_builtins():
     reg("assert", lambda a: _assert(a))
     reg("error", lambda a: _error(a[0]))
     reg("clock", lambda a: __import__("time").time())
+
+    # regular expressions
+    reg("regex", lambda a: _regex(a))
+    reg("re_test", lambda a: _to_regex(a[0]).test(a[1]), 2)
+    reg("re_match", lambda a: _to_regex(a[0]).match(a[1]), 2)
+    reg("re_find_all", lambda a: _to_regex(a[0]).find_all(a[1]), 2)
+    reg("re_replace", lambda a: _to_regex(a[0]).replace(a[1], a[2]), 3)
+    reg("re_split", lambda a: _to_regex(a[0]).split(a[1]), 2)
 
     # file I/O
     reg("open", lambda a: _open(a[0], a[1] if len(a) > 1 else "r"))
@@ -227,6 +237,24 @@ def _assert(a):
 
 def _error(msg):
     raise BadaRuntimeError(bada_str(msg))
+
+
+# --- regular expressions ---------------------------------------------------
+
+def _regex(a):
+    flags = 0
+    if len(a) > 1 and isinstance(a[1], str):
+        if "i" in a[1]:
+            flags |= _re.IGNORECASE
+        if "m" in a[1]:
+            flags |= _re.MULTILINE
+        if "s" in a[1]:
+            flags |= _re.DOTALL
+    return Regex(a[0], flags)
+
+
+def _to_regex(x):
+    return x if isinstance(x, Regex) else Regex(x)
 
 
 # --- file I/O --------------------------------------------------------------

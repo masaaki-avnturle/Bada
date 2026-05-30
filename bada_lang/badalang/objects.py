@@ -235,6 +235,77 @@ class FileHandle:
         return f"<file {self.path!r} mode={self.mode!r}>"
 
 
+class Regex:
+    """A compiled regular expression, wrapping a Python re.Pattern."""
+
+    def __init__(self, pattern, flags=0):
+        import re
+        from .errors import BadaRuntimeError
+        self.source = pattern
+        try:
+            self._pat = re.compile(pattern, flags)
+        except re.error as e:
+            raise BadaRuntimeError(f"invalid regex {pattern!r}: {e}")
+
+    def test(self, s):
+        return self._pat.search(s) is not None
+
+    def match(self, s):
+        m = self._pat.search(s)
+        if m is None:
+            return None
+        return [m.group(0)] + list(m.groups())
+
+    def find_all(self, s):
+        return self._pat.findall(s)
+
+    def replace(self, s, repl):
+        return self._pat.sub(repl, s)
+
+    def split(self, s):
+        return self._pat.split(s)
+
+    def __repr__(self):
+        return f"<regex {self.source!r}>"
+
+
+class BadaThread:
+    """A handle to a spawned thread of Bada execution."""
+
+    def __init__(self):
+        self.thread = None
+        self.result = None
+        self.error = None
+        self.done = False
+
+    def __repr__(self):
+        state = "done" if self.done else "running"
+        return f"<thread {state}>"
+
+
+class Mutex:
+    """A mutual-exclusion lock for coordinating Bada threads."""
+
+    def __init__(self):
+        import threading
+        self._lock = threading.Lock()
+
+    def __repr__(self):
+        return "<mutex>"
+
+
+class Channel:
+    """A thread-safe queue for passing values between Bada threads."""
+
+    def __init__(self):
+        import queue
+        self._q = queue.Queue()
+        self.closed = False
+
+    def __repr__(self):
+        return "<channel>"
+
+
 class Namespace:
     """A simple bag of named members, used for Omega:: and modules."""
 

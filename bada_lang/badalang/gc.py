@@ -76,13 +76,15 @@ class GarbageCollector:
 
     def _roots(self):
         roots = [self.vm.global_env]
-        for frame in self.vm.frames:
-            roots.append(frame.env)
-            roots.extend(frame.stack)
-            if frame.self_obj is not None:
-                roots.append(frame.self_obj)
-            if frame.defining_class is not None:
-                roots.append(frame.defining_class)
+        # include the call frames of every live Bada thread
+        for frames in list(self.vm.thread_frames.values()):
+            for frame in frames:
+                roots.append(frame.env)
+                roots.extend(frame.stack)
+                if frame.self_obj is not None:
+                    roots.append(frame.self_obj)
+                if frame.defining_class is not None:
+                    roots.append(frame.defining_class)
         return roots
 
     def _mark(self):

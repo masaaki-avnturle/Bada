@@ -1,0 +1,70 @@
+// 13 — Multithreading: spawn, channels, mutexes.
+//
+// Bada threads run under a cooperative VM lock that is released at blocking
+// points (sleep, channel receive, mutex lock, thread join), so threads make
+// progress concurrently around I/O and coordination.
+
+print "cpu_count:", cpu_count()
+
+// --- spawn + join, collecting results -------------------------------------
+
+fun square(n) {
+    return n * n
+}
+
+let workers <- []
+for i in range(1, 6) {
+    push(workers, spawn(square, i))
+}
+
+let total <- 0
+for w in workers {
+    total <- total + w.join()      // join returns the worker's return value
+}
+print "sum of squares 1..5:", total
+
+// --- producer / consumer over a channel -----------------------------------
+
+let ch <- Channel.new()
+
+fun producer(count) {
+    for i in range(count) {
+        ch.send(i)
+    }
+    ch.send(-1)        // sentinel
+}
+
+spawn(producer, 5)
+
+let received <- []
+let running <- true
+while running {
+    let v <- ch.receive()          // blocks until a value is available
+    if v == -1 {
+        running <- false
+    } else {
+        push(received, v)
+    }
+}
+print "consumed:", received
+
+// --- mutex protecting a shared counter ------------------------------------
+
+let lock <- Mutex.new()
+let shared <- {"count": 0}
+
+fun bump(times) {
+    let i <- 0
+    while i < times {
+        lock.lock()
+        shared["count"] <- shared["count"] + 1
+        lock.unlock()
+        i <- i + 1
+    }
+}
+
+let t1 <- spawn(bump, 1000)
+let t2 <- spawn(bump, 1000)
+t1.join()
+t2.join()
+print "final count (expect 2000):", shared["count"]
