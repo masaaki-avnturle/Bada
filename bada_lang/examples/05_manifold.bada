@@ -1,0 +1,43 @@
+// 05 — Operator-algebra / manifold features.
+//
+// Bada ships with the operator-algebra functions from the Yamaguchi
+// framework: zeta, gamma, beta and the non-commutative pi-operator, plus
+// three "manifold" operators usable in expressions and overloadable:
+//
+//   <~   left action    default: pi(a,b) = PI * a * log(b)
+//   ~>   right action    default: a * exp(-b*log(b))   (gamma-deprivation)
+//   -<   branch/integral default: beta(a,b) = G(a)G(b)/G(a+b)
+
+print "zeta(2)  ~ pi^2/6 =", zeta(2)
+print "gamma(5) = 4!     =", gamma(5)
+print "beta(2,3)         =", beta(2, 3)
+print "pi_op(1, E)       =", pi_op(1, E)
+
+print "3 <~ 10 =", 3 <~ 10
+print "2 -< 3  =", 2 -< 3       // same as beta(2,3)
+
+// A class that overloads the manifold operators to behave as a
+// ManifoldNode in the operator-algebra database.
+class ManifoldNode {
+    field value
+
+    method init(v) {
+        self.value <- v
+    }
+
+    // non-commutative left action  pi(chi, x)
+    operator <~ (input) {
+        return pi_op(self.value, input)
+    }
+
+    // branch: combine two nodes via the beta integral
+    operator -< (other) {
+        return ManifoldNode.new(beta(self.value, other.value))
+    }
+}
+
+let node <- ManifoldNode.new(3.0)
+print "node <~ 2.0 =", node <~ 2.0
+
+let merged <- ManifoldNode.new(2.0) -< ManifoldNode.new(3.0)
+print "merged.value =", merged.value
