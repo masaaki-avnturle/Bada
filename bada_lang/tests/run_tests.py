@@ -262,8 +262,9 @@ expect("fun dy(t, y) { return y }\n"
        "let s <- solve_ode(dy, 1, 0, 1, 200)\n"
        "print round(s[len(s)-1][1], 4)",
        "2.7183\n", "ODE solver (RK4) -> e")
-expect("fun gg(p) { return p[0]*p[0] + 3*p[1] }\nprint gradient(gg, [2, 5])",
-       "[4.0, 3.0000000000419095]\n", "gradient (approx)")
+expect("fun gg(p) { return p[0]*p[0] + 3*p[1] }\n"
+       "let g <- gradient(gg, [2, 5])\nprint round(g[0], 3), round(g[1], 3)",
+       "4.0 3.0\n", "gradient (approx)")
 
 # --- threading -------------------------------------------------------------
 
