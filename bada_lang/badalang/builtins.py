@@ -64,6 +64,9 @@ def make_builtins():
     reg("trim", lambda a: a[0].strip(), 1)
     reg("replace", lambda a: a[0].replace(a[1], a[2]), 3)
     reg("contains", lambda a: a[1] in a[0], 2)
+    reg("ord", lambda a: ord(a[0][0]) if a[0] else 0, 1)
+    reg("chr", lambda a: chr(int(a[0])), 1)
+    reg("char_at", lambda a: a[0][int(a[1])] if 0 <= int(a[1]) < len(a[0]) else "", 2)
 
     # math
     reg("abs", lambda a: abs(a[0]), 1)
