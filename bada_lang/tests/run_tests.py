@@ -466,6 +466,28 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- PET / ultrasound / ECG ------------------------------------------------
+
+expect("import pet\nlet s <- pet.brain_fdg(48)\n"
+       "print s[\"fused\"].mode, s[\"suv\"] > 0",
+       "RGB true\n", "PET produces a fused colour image with SUV")
+expect("import ultrasound\nlet ph <- ultrasound.abdomen_phantom(60)\n"
+       "let im <- ultrasound.scan(ph, 30, 2, 56, 0.6)\nprint im.width, im.height",
+       "60 60\n", "ultrasound B-mode scan size")
+expect("let src <- image(40,40,\"L\",0)\nsrc.fill(120)\n"
+       "let out <- image(40,40,\"L\",0)\n"
+       "ultrasound_bmode(src, out, 20, 2, 38, 0.6, 1.5708, 0.01, 5)\n"
+       "print out.get(20, 38) >= 0 and out.get(0, 0) == 0",
+       "true\n", "ultrasound kernel masks outside the sector")
+expect("import ecg\nlet t <- ecg.lead(60, 2, 100)\nprint len(t)",
+       "200\n", "ECG sample count")
+expect("import ecg\nlet a <- ecg.analyze(120)\nprint a[\"flag\"]",
+       "tachycardia\n", "ECG flags tachycardia")
+expect("import ecg\nlet a <- ecg.analyze(50)\nprint a[\"flag\"]",
+       "bradycardia\n", "ECG flags bradycardia")
+expect("import ecg\nlet ls <- ecg.three_leads(70, 1, 100)\nprint len(ls)",
+       "3\n", "ECG three-lead set")
+
 # --- GUI toolkit & text rendering ------------------------------------------
 
 expect("import gui\nprint gui.h1(\"Hi\")", "<h1>Hi</h1>\n", "gui element builder")
