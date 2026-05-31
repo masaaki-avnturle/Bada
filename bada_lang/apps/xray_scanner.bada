@@ -1,0 +1,77 @@
+// ============================================================================
+//  X-RAY SCANNER  —  a Bada application
+//
+//  Synthesises a chest radiograph (the same kind of image as a lung X-ray)
+//  directly from the report's mathematics:
+//
+//    * Each tissue's linear attenuation coefficient mu follows a GAMMA-function
+//      density across its radial manifold (the report's global differential
+//      manifold of the gamma operator).
+//    * Every detector ray integrates mu along its path — a LINE INTEGRAL over
+//      the part of the body manifold it pierces: the "global partial-integral
+//      manifold".
+//    * Beer-Lambert  I = I0 * exp(-∫ mu ds)  turns that integral into the
+//      surviving beam, and the film negative 255 - I into the pixel.
+//
+//  Outputs:
+//    chest_xray.pgm    — the still radiograph (open in any image viewer)
+//    chest_xray.ppm    — a false-colour (hot) version
+//    chest_breathing.gif — an animated breathing scan (video)
+//
+//  Run:  ./bada run apps/xray_scanner.bada
+// ============================================================================
+
+import xray
+import imaging
+
+let W <- 240
+let H <- 280
+
+print "=== Bada X-Ray Scanner ==="
+print "principle: I = I0 * exp( - integral of mu(s) ds )  [Beer-Lambert]"
+print "mu(s): gamma-function density over the tissue manifold"
+print ""
+
+// ---- 1. still radiograph --------------------------------------------------
+
+print "[1/3] exposing chest radiograph", W, "x", H, "..."
+let scan <- xray.chest_phantom(W, H)
+scan.expose()
+scan.save("chest_xray.pgm")
+print "      wrote chest_xray.pgm"
+
+// verify the physics: bone should attenuate more than lung
+let surf <- scan.surface()
+let spine_px <- surf.get(W / 2, H / 2)
+let lung_px <- surf.get(W / 2 - 42, H / 2)
+print "      spine density:", spine_px, " lung density:", lung_px
+if spine_px > lung_px {
+    print "      OK: bone is brighter than lung (correct radiographic contrast)"
+}
+
+// ---- 2. false-colour radiograph ------------------------------------------
+
+print "[2/3] rendering false-colour (hot) map ..."
+scan.save_color("chest_xray.ppm")
+print "      wrote chest_xray.ppm"
+
+// ---- 3. breathing-motion video -------------------------------------------
+
+print "[3/3] recording breathing video (animated GIF) ..."
+let rec <- imaging.Recorder.new("chest_breathing.gif", W, H, 12)
+let frames <- 16
+let i <- 0
+while i < frames {
+    // breath sweeps 0 -> 1 -> 0 (one full respiratory cycle)
+    let phase <- i / frames
+    let breath <- (1 - cos(phase * 2 * PI)) / 2
+    let f <- xray.chest_phantom_breath(W, H, breath)
+    f.expose()
+    rec.capture(f.surface())
+    i <- i + 1
+}
+rec.finish()
+print "      wrote chest_breathing.gif (" + str(rec.count) + " frames)"
+
+print ""
+print "done. open chest_xray.pgm / chest_xray.ppm / chest_breathing.gif"

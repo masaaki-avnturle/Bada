@@ -306,6 +306,29 @@ expect("import topology\n"
        "print p == a",
        "true\n", "loop homotopy via free reduction")
 
+# --- media: images, gif, x-ray --------------------------------------------
+
+expect('let im <- image(8, 8, "L", 0)\nim.set(3, 3, 200)\nprint im.get(3, 3)',
+       "200\n", "image set/get pixel")
+expect('let im <- image(4, 4, "L", 0)\nim.fill(99)\nprint im.get(0, 0), im.get(3, 3)',
+       "99 99\n", "image fill")
+expect('let im <- image(6, 6, "L", 7)\nprint im.save("/tmp/_bada_t.pgm")\n'
+       'print read_file("/tmp/_bada_t.pgm")[0]\ndelete_file("/tmp/_bada_t.pgm")',
+       "/tmp/_bada_t.pgm\nP\n", "image saves a PGM file")
+expect('let g <- gif("/tmp/_bada_t.gif", 8, 8, 5, 0)\n'
+       'g.add(image(8, 8, "L", 10))\ng.add(image(8, 8, "L", 250))\n'
+       'g.save()\nprint g.frame_count\ndelete_file("/tmp/_bada_t.gif")',
+       "2\n", "gif collects frames and saves")
+expect("import xray\n"
+       "let s <- xray.chest_phantom(40, 48)\ns.expose()\n"
+       "let surf <- s.surface()\n"
+       "print surf.get(20, 24) > surf.get(7, 24)",
+       "true\n", "x-ray: bone attenuates more than lung")
+expect("import xray\n"
+       "let s <- xray.chest_phantom(30, 30)\n"
+       "print round(s.ray_intensity(15, 30), 0) <= 255",
+       "true\n", "x-ray Beer-Lambert ray intensity bounded")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")
