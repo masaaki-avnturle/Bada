@@ -30,6 +30,7 @@ import ecg
 import labtest
 import genomics
 import basal_ganglia
+import sensors
 import plot
 import gui
 
@@ -92,6 +93,15 @@ print "[3j] vital-signs monitor ..."
 let patient <- monitor.Patient.new()
 let monitor_img <- patient.strip(N * 2, 4, 150)
 let vit <- patient.vitals()
+
+print "[3k] thermometer & infrared sensor ..."
+let thermo_dev <- sensors.Thermometer.new()
+let ir_dev <- sensors.Infrared.new(N)
+let ir_sources <- sensors.body_sources(N, 1.0)
+let ir_field <- ir_dev.heat_field(ir_sources)
+let ir_thermal <- ir_dev.thermal_image(ir_sources)
+let body_temp <- thermo_dev.read_k(5.0)
+let ir_peak <- ir_dev.peak(ir_field, 30, 12)
 
 print "[4] blood panel ..."
 let lab <- labtest.Analyzer.new()
@@ -167,6 +177,9 @@ cards <- cards + scan_card("ECG", "leads I/II/III  " + str(ecg_info["bpm"])
     + " bpm  " + ecg_info["flag"], ecg_img)
 cards <- cards + scan_card("Vitals Monitor", "HR " + str(vit["hr"]) + "  SpO2 "
     + str(vit["spo2"]) + "%  BP " + vit["bp"], monitor_img)
+cards <- cards + scan_card("Infrared Sensor", "thermal camera  -  body temp "
+    + str(body_temp) + "C  peak " + str(ir_peak) + "C  "
+    + thermo_dev.classify(body_temp), ir_thermal)
 app.add(gui.div("grid", cards))
 
 // blood panel table
