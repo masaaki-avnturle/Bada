@@ -1,0 +1,101 @@
+// ============================================================================
+//  QUANTUM_BADA — interactive single-qubit quantum lab (Bada GUI)
+//
+//  A qubit on the Bloch sphere (the report's complex rotation body).  Apply
+//  gates (Hadamard, Pauli X/Y/Z, S, T) and continuous rotations RX/RY/RZ - each
+//  is an SU(2) rotation of the Bloch vector.  Inject a rotation ERROR, then
+//  CORRECT it (project back to the nearest basis state - stabiliser-code error
+//  correction).  The Bloch sphere, the |0>/|1> probabilities and the state
+//  amplitudes update live.  The JS engine mirrors lib/quantum.bada.
+//
+//  Run:  ./bada run apps/quantum_bada.bada   ->  quantum_bada.html
+// ============================================================================
+
+import gui
+
+let app <- gui.App.new("Quantum_Bada")
+app.style(gui.dark_theme())
+app.style("canvas{background:#0c121d;border-radius:12px}
+.lab{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
+.gates button{width:auto;margin:4px;background:#1f2a3a}
+.gates button:hover{background:var(--accent)}
+.gates .rot{background:#33405a}
+.amp{font-family:monospace;font-size:13px;color:#9fe0b0;background:#0c121d;border-radius:8px;padding:10px}
+.pbar{margin:8px 0}.big{font-size:18px;font-weight:800}")
+
+app.add(gui.h1("&#9883; Quantum_Bada"))
+app.add(gui.h2("single-qubit lab - SU(2) rotations on the Bloch sphere, with quantum error correction"))
+
+app.add("<div class=\"lab\">"
+    + "<div><canvas id=\"bloch\" width=\"280\" height=\"280\"></canvas>"
+    + "<div class=\"pbar\"><div class=\"label\">P(0)</div><div class=\"meter\"><div class=\"bar\" id=\"p0\" style=\"background:#5fd0a0\"></div></div></div>"
+    + "<div class=\"pbar\"><div class=\"label\">P(1)</div><div class=\"meter\"><div class=\"bar\" id=\"p1\" style=\"background:#e0a83c\"></div></div></div>"
+    + "<div class=\"amp\" id=\"amp\"></div></div>"
+    + "<div class=\"gates\">"
+    + "<div class=\"label\">Clifford / Pauli gates</div>"
+    + "<button onclick=\"g('H')\">H</button><button onclick=\"g('X')\">X</button>"
+    + "<button onclick=\"g('Y')\">Y</button><button onclick=\"g('Z')\">Z</button>"
+    + "<button onclick=\"g('S')\">S</button><button onclick=\"g('T')\">T</button>"
+    + "<div class=\"label\">rotations (complex rotation body)</div>"
+    + "<div class=\"row\"><label>angle</label>"
+    + gui.slider("th", 0, 360, 1, 90, "document.getElementById('thv').textContent=this.value+'\\u00B0'")
+    + "<span class=\"val\" id=\"thv\">90&deg;</span></div>"
+    + "<button class=\"rot\" onclick=\"g('RX')\">RX</button>"
+    + "<button class=\"rot\" onclick=\"g('RY')\">RY</button>"
+    + "<button class=\"rot\" onclick=\"g('RZ')\">RZ</button>"
+    + "<div class=\"label\">error correction</div>"
+    + "<button onclick=\"noise()\" class=\"stop\">&#9889; inject error</button>"
+    + "<button onclick=\"correct()\" class=\"forge\">&#9851; correct</button>"
+    + "<button onclick=\"reset()\">reset |0&rang;</button>"
+    + "<div class=\"big\" id=\"msg\" style=\"margin-top:12px\"></div>"
+    + "</div></div>")
+
+let js <- [
+    "var q=[1,0,0,0];",                       // |0>
+    "function cmul(ar,ai,br,bi){return [ar*br-ai*bi, ar*bi+ai*br];}",
+    "function apply(m){ var ar=q[0],ai=q[1],br=q[2],bi=q[3];",
+    "  var t0=cmul(m[0],m[1],ar,ai),t1=cmul(m[2],m[3],br,bi),t2=cmul(m[4],m[5],ar,ai),t3=cmul(m[6],m[7],br,bi);",
+    "  q=[t0[0]+t1[0],t0[1]+t1[1],t2[0]+t3[0],t2[1]+t3[1]]; draw(); }",
+    "function g(name){ var s=1/Math.SQRT2, th=document.getElementById('th').value*Math.PI/180;",
+    "  var c=Math.cos(th/2), sn=Math.sin(th/2);",
+    "  var M={H:[s,0,s,0,s,0,-s,0], X:[0,0,1,0,1,0,0,0], Y:[0,0,0,-1,0,1,0,0],",
+    "    Z:[1,0,0,0,0,0,-1,0], S:[1,0,0,0,0,0,0,1], T:[1,0,0,0,0,0,Math.cos(Math.PI/4),Math.sin(Math.PI/4)],",
+    "    RX:[c,0,0,-sn,0,-sn,c,0], RY:[c,0,-sn,0,sn,0,c,0], RZ:[c,-sn,0,0,0,0,c,sn]};",
+    "  setMsg(name+' applied'); apply(M[name]); }",
+    "function prob0(){return q[0]*q[0]+q[1]*q[1];}",
+    "function prob1(){return q[2]*q[2]+q[3]*q[3];}",
+    "function bloch(){ var ar=q[0],ai=q[1],br=q[2],bi=q[3];",
+    "  return [2*(ar*br+ai*bi), 2*(ar*bi-ai*br), (ar*ar+ai*ai)-(br*br+bi*bi)]; }",
+    "function noise(){ var th=(Math.random()*1.4-0.7); var c=Math.cos(th/2),sn=Math.sin(th/2);",
+    "  setMsg('rotation error injected'); apply([c,0,0,-sn,0,-sn,c,0]); }",
+    "function correct(){ if(prob0()>=prob1()) q=[1,0,0,0]; else q=[0,0,1,0];",
+    "  setMsg('corrected -> nearest basis state'); draw(); }",
+    "function reset(){ q=[1,0,0,0]; setMsg('reset'); draw(); }",
+    "function setMsg(m){ document.getElementById('msg').textContent=m; }",
+    "function fmt(re,im){ var s=re.toFixed(2); s+=(im>=0?'+':'-')+Math.abs(im).toFixed(2)+'i'; return s; }",
+    "function draw(){",
+    "  document.getElementById('p0').style.width=(prob0()*100).toFixed(1)+'%';",
+    "  document.getElementById('p1').style.width=(prob1()*100).toFixed(1)+'%';",
+    "  document.getElementById('amp').innerHTML='|psi> = ('+fmt(q[0],q[1])+')|0> + ('+fmt(q[2],q[3])+')|1>';",
+    "  var cv=document.getElementById('bloch'), x=cv.getContext('2d'), W=cv.width, H=cv.height, cx=W/2, cy=H/2, R=110;",
+    "  x.clearRect(0,0,W,H);",
+    "  // sphere outline + equator + axes (simple orthographic, y into screen)",
+    "  x.strokeStyle='#33405a'; x.lineWidth=1;",
+    "  x.beginPath(); x.arc(cx,cy,R,0,7); x.stroke();",
+    "  x.beginPath(); x.ellipse(cx,cy,R,R*0.32,0,0,7); x.stroke();",
+    "  x.strokeStyle='#22303f';",
+    "  x.beginPath(); x.moveTo(cx,cy-R); x.lineTo(cx,cy+R); x.stroke();",     // z axis
+    "  x.beginPath(); x.moveTo(cx-R,cy); x.lineTo(cx+R,cy); x.stroke();",     // x axis
+    "  x.fillStyle='#8aa0bd'; x.font='12px sans-serif';",
+    "  x.fillText('|0>',cx+4,cy-R+12); x.fillText('|1>',cx+4,cy+R-2);",
+    "  // state vector (project: screen_x = bx - by*0.5, screen_y = -bz + by*0.16)",
+    "  var b=bloch(); var sx=cx+(b[0]-b[1]*0.5)*R, sy=cy-(b[2]-b[1]*0.16)*R;",
+    "  x.strokeStyle='#4a80d0'; x.lineWidth=3; x.beginPath(); x.moveTo(cx,cy); x.lineTo(sx,sy); x.stroke();",
+    "  x.fillStyle='#5fd0a0'; x.beginPath(); x.arc(sx,sy,6,0,7); x.fill();",
+    "}",
+    "draw();"
+]
+app.script(join(js, "\n"))
+
+app.save("quantum_bada.html")
+print "wrote quantum_bada.html"
