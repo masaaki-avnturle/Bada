@@ -2,22 +2,35 @@
 CC      ?= gcc
 CFLAGS  ?= -std=c99 -O2 -Wall -Wextra -D_POSIX_C_SOURCE=200809L
 LDFLAGS ?= -lm
-BIN      = omega_neurothermal
-SRC      = $(wildcard src/*.c)
-OBJ      = $(SRC:.c=.o)
 
-all: $(BIN)
+CLI      = omega_neurothermal
+GUI      = omega_neurothermal_gui
 
-$(BIN): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $(OBJ) $(LDFLAGS)
+# shared computation library (no main())
+LIBSRC   = src/gamma_thermal.c src/basal_ganglia.c src/sensors.c \
+           src/imaging.c src/labanalysis.c
+LIBOBJ   = $(LIBSRC:.c=.o)
+
+all: $(CLI) $(GUI)
+
+$(CLI): src/main.o $(LIBOBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(GUI): src/gui_server.o $(LIBOBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-run: $(BIN)
-	./$(BIN) pipeline
+# CLI demo
+run: $(CLI)
+	./$(CLI) pipeline
+
+# launch the GUI (open http://localhost:8080 in a browser)
+gui: $(GUI)
+	./$(GUI) 8080 ./web
 
 clean:
-	rm -f $(OBJ) $(BIN)
+	rm -f src/*.o $(CLI) $(GUI)
 
-.PHONY: all run clean
+.PHONY: all run gui clean
