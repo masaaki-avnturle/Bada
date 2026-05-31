@@ -466,6 +466,24 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- Bada Forge: source auto-correction ------------------------------------
+
+expect('print bada_check("let x <- 5")', "\n", "bada_check passes valid source")
+expect('print bada_check("let x <- (") == ""', "false\n", "bada_check reports invalid source")
+expect("import forge\nprint forge.defect(\"a(b[c{d\")", "3\n",
+       "invariant defect counts unbalanced brackets")
+expect("import forge\nprint forge.defect(\"f(x) { return x }\")", "0\n",
+       "balanced source has zero defect")
+expect("import forge\nlet r <- forge.autofix(\"fun f(r) { return r * r\")\n"
+       "print r[\"ok\"], r[\"defect_after\"]",
+       "true 0\n", "forge fixes missing brace -> valid")
+expect("import forge\nlet r <- forge.autofix(\"let x = (3 + 4\")\nprint r[\"fixed\"]",
+       "let x <- (3 + 4)\n", "forge fixes = to <- and balances parens")
+expect("import forge\nprint forge.valid(\"let y <- 1\\nprint y\")",
+       "true\n", "forge.valid accepts good source")
+expect("import forge\nlet r <- forge.autofix(\"print \\\"hi\")\nprint r[\"ok\"]",
+       "true\n", "forge closes an unterminated string")
+
 # --- silent talk (subvocal BCI) --------------------------------------------
 
 expect("import silenttalk\nprint len(silenttalk.vocabulary())",
