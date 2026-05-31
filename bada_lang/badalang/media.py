@@ -252,6 +252,70 @@ def xray_project(image, tissues, i0, samples, soft, edge):
     return image
 
 
+# --- binaural soundscape kernel --------------------------------------------
+
+def binaural_soundscape(carrier, beat, relief, duration, rate):
+    """Native synth of a psychotropic biofeedback soundscape (stereo).
+
+    Returns (left, right) lists of float samples.  Left ear plays `carrier`,
+    right ear `carrier + beat`; the perceived beat entrains the target EEG
+    band.  As `relief` rises the timbre warms (low overtone in, high shimmer
+    out) and a slow beat-locked swell gives a breathing feel.
+    """
+    rate = int(rate)
+    n = int(duration * rate)
+    if n <= 0:
+        return [], []
+    tension = 1.0 - relief
+    two_pi = 2.0 * math.pi
+    left = [0.0] * n
+    right = [0.0] * n
+    # simple LCG noise bed state
+    s = 12345
+    prev = 0.0
+    inv_rate = 1.0 / rate
+    inv_n = 1.0 / n
+    warm_amp = 0.30 * relief
+    shim_amp = 0.12 * tension
+    bed_amp = 0.08 * (0.5 + 0.5 * tension)
+    for i in range(n):
+        t = i * inv_rate
+        env = math.sin(math.pi * i * inv_n)          # fade in/out
+        # binaural carriers
+        l = 0.5 * env * math.sin(two_pi * carrier * t)
+        r = 0.5 * env * math.sin(two_pi * (carrier + beat) * t)
+        # warm low overtone (richer as relief rises)
+        warm = warm_amp * env * math.sin(two_pi * (carrier * 0.5) * t)
+        # tense high shimmer (fades with relief)
+        shim = shim_amp * env * math.sin(two_pi * (carrier * 4.0) * t)
+        # soft noise bed
+        s = (s * 1103515245 + 12345) % 2147483648
+        white = (s / 1073741824.0) - 1.0
+        prev = prev * 0.96 + white * 0.04
+        bed = bed_amp * prev
+        # slow beat-locked swell
+        lfo = (1.0 + math.sin(two_pi * (beat / 10.0) * t)) / 2.0
+        g = 0.55 + 0.45 * lfo
+        left[i] = (l + warm + shim + bed) * g
+        right[i] = (r + warm + shim + bed) * g
+    _normalize_inplace(left, 0.9)
+    _normalize_inplace(right, 0.9)
+    return left, right
+
+
+def _normalize_inplace(buf, peak):
+    mx = 0.0
+    for v in buf:
+        a = v if v >= 0 else -v
+        if a > mx:
+            mx = a
+    if mx == 0:
+        return
+    g = peak / mx
+    for i in range(len(buf)):
+        buf[i] *= g
+
+
 # --- neural / entropy field kernel -----------------------------------------
 #
 # Renders a scalar field sampled from Gaussian/gamma "activity sources" over a
@@ -327,7 +391,6 @@ def field_project(image, sources, base, gain, entropy_flag):
 def write_wav(path, samples, rate):
     import struct as _struct
     rate = int(rate)
-    n = len(samples)
     frames = bytearray()
     for s in samples:
         if s > 1.0:
@@ -343,6 +406,45 @@ def write_wav(path, samples, rate):
         f.write(b"WAVE")
         f.write(b"fmt ")
         f.write(_struct.pack("<IHHIIHH", 16, 1, 1, rate, byte_rate, 2, 16))
+        f.write(b"data")
+        f.write(_struct.pack("<I", data_size))
+        f.write(bytes(frames))
+    return path
+
+
+def write_wav_stereo(path, left, right, rate):
+    """Write a 16-bit stereo WAV from two float channels in [-1, 1].
+
+    Used for binaural-beat biofeedback: a slightly different tone in each ear
+    produces a perceived beat at the difference frequency, entraining the
+    listener toward a target brain-wave band.
+    """
+    import struct as _struct
+    rate = int(rate)
+    n = min(len(left), len(right))
+    frames = bytearray()
+    for i in range(n):
+        l = left[i]
+        r = right[i]
+        if l > 1.0:
+            l = 1.0
+        elif l < -1.0:
+            l = -1.0
+        if r > 1.0:
+            r = 1.0
+        elif r < -1.0:
+            r = -1.0
+        frames += _struct.pack("<hh", int(l * 32767.0), int(r * 32767.0))
+    data_size = len(frames)
+    byte_rate = rate * 2 * 2          # 2 channels, 2 bytes each
+    block_align = 2 * 2
+    with open(path, "wb") as f:
+        f.write(b"RIFF")
+        f.write(_struct.pack("<I", 36 + data_size))
+        f.write(b"WAVE")
+        f.write(b"fmt ")
+        f.write(_struct.pack("<IHHIIHH", 16, 1, 2, rate, byte_rate,
+                             block_align, 16))
         f.write(b"data")
         f.write(_struct.pack("<I", data_size))
         f.write(bytes(frames))

@@ -399,6 +399,40 @@ expect("import yamaguchi_health as yh\n"
        "let e <- c.administer(\"sennoside\", 1)\nprint e[\"haptic_region\"]",
        "abdomen\n", "sennoside targets the abdomen")
 
+# --- binaural audio & psychotropic biofeedback -----------------------------
+
+expect("import audio\n"
+       "let bb <- audio.binaural(200, 10, 1, 8000, 0.5)\n"
+       "print len(bb), len(bb[0]), len(bb[1])",
+       "2 8000 8000\n", "binaural returns two channels")
+expect("import audio\nprint audio.band_beat(\"delta\"), audio.band_beat(\"alpha\")",
+       "2.5 10\n", "EEG band beat frequencies")
+expect("let s <- binaural_soundscape(180, 6, 0.8, 1, 8000)\n"
+       "print len(s[0]) == 8000 and len(s[1]) == 8000",
+       "true\n", "native binaural soundscape length")
+expect("let s <- binaural_soundscape(180, 6, 0.5, 1, 8000)\n"
+       "write_wav_stereo(\"/tmp/_bt2.wav\", s[0], s[1], 8000)\n"
+       "print file_exists(\"/tmp/_bt2.wav\")\ndelete_file(\"/tmp/_bt2.wav\")",
+       "true\n", "stereo WAV writes a file")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\nprint len(c.names())",
+       "10\n", "psychotropic formulary size")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "let e <- c.dose(\"flunitrazepam\", 1, 1, \"/tmp/_bt3.wav\")\n"
+       "print e[\"band\"]\ndelete_file(\"/tmp/_bt3.wav\")",
+       "delta\n", "hypnotic targets the delta band")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "let hyp <- c.relief_of(c.drugs[\"flunitrazepam\"], 1)\n"
+       "let ad <- c.relief_of(c.drugs[\"snri\"], 1)\n"
+       "print hyp > ad",
+       "true\n", "hypnotic gives more relief than SNRI")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "try { c.dose(\"aspirin\", 1, 1, \"/tmp/x.wav\") } catch (e) { print \"caught\" }",
+       "caught\n", "unknown psychotropic throws")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")
