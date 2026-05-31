@@ -486,6 +486,152 @@ def ct_reconstruct(image, n_angles, filtered):
     return out
 
 
+# --- 3-D volume rendering (direct volume ray casting) ----------------------
+#
+# A stack of axial slices forms a voxel volume.  For each output pixel a ray
+# is marched through the rotated volume; a transfer function maps each voxel
+# intensity to colour + opacity, and samples are composited front-to-back with
+# gradient-based diffuse shading — true direct volume rendering (DVR).
+
+class Volume:
+    def __init__(self, nx, ny, nz):
+        self.nx = nx
+        self.ny = ny
+        self.nz = nz
+        self.data = bytearray(nx * ny * nz)
+
+    def set(self, x, y, z, v):
+        if 0 <= x < self.nx and 0 <= y < self.ny and 0 <= z < self.nz:
+            self.data[(z * self.ny + y) * self.nx + x] = _clamp8(v)
+
+    def get(self, x, y, z):
+        if 0 <= x < self.nx and 0 <= y < self.ny and 0 <= z < self.nz:
+            return self.data[(z * self.ny + y) * self.nx + x]
+        return 0
+
+    def __repr__(self):
+        return f"<volume {self.nx}x{self.ny}x{self.nz}>"
+
+
+def volume_from_slices(slices):
+    """Stack a list of equal-size grayscale Images into a voxel Volume."""
+    nz = len(slices)
+    if nz == 0:
+        return Volume(1, 1, 1)
+    nx = slices[0].width
+    ny = slices[0].height
+    vol = Volume(nx, ny, nz)
+    for z in range(nz):
+        s = slices[z].to_gray()
+        base = z * ny * nx
+        vol.data[base:base + nx * ny] = s.data[:nx * ny]
+    return vol
+
+
+def ct_head_volume(n):
+    """Build an analytic 3-D head phantom (skull, brain, ventricles, tumour)."""
+    vol = Volume(n, n, n)
+    c = (n - 1) / 2.0
+    rx = n * 0.40; ry = n * 0.46; rz = n * 0.44
+    br = n * 0.34
+    data = vol.data
+    for z in range(n):
+        dz = (z - c)
+        for y in range(n):
+            dy = (y - c)
+            row = (z * n + y) * n
+            for x in range(n):
+                dx = (x - c)
+                # skull shell (ellipsoid rim) -> bone (bright)
+                e = (dx / rx) ** 2 + (dy / ry) ** 2 + (dz / rz) ** 2
+                v = 0
+                if e <= 1.0:
+                    if e > 0.82:
+                        v = 235                       # skull bone
+                    else:
+                        rb = math.sqrt(dx * dx + dy * dy + dz * dz)
+                        if rb < br * 0.30:
+                            v = 25                    # ventricles (CSF, dark)
+                        else:
+                            v = 90                    # brain tissue
+                        # a tumour focus, off-centre
+                        tx = dx - n * 0.10
+                        ty = dy + n * 0.04
+                        tz = dz - n * 0.05
+                        if tx * tx + ty * ty + tz * tz < (n * 0.07) ** 2:
+                            v = 160
+                data[row + x] = v
+    return vol
+
+
+def volume_render(vol, yaw, pitch, tf_r, tf_g, tf_b, tf_a,
+                  out_w, out_h, shade):
+    """Direct volume rendering of `vol` from (yaw, pitch); transfer functions
+    tf_* are length-256 ramps (colour and opacity).  Returns an RGB Image."""
+    nx, ny, nz = vol.nx, vol.ny, vol.nz
+    data = vol.data
+    cx = (nx - 1) / 2.0
+    cy = (ny - 1) / 2.0
+    cz = (nz - 1) / 2.0
+    S = max(nx, ny, nz)
+    steps = int(S * 1.4)
+    cyaw = math.cos(yaw); syaw = math.sin(yaw)
+    cpit = math.cos(pitch); spit = math.sin(pitch)
+    # light direction (normalised)
+    lx, ly, lz = 0.4, 0.5, 0.75
+    out = Image(out_w, out_h, "RGB")
+    od = out.data
+    nyx = ny * nx
+    for py in range(out_h):
+        vv = (py / out_h - 0.5) * S
+        for px in range(out_w):
+            uu = (px / out_w - 0.5) * S
+            ar = ag = ab = 0.0
+            aa = 0.0
+            si = 0
+            while si < steps:
+                d = (si / steps - 0.5) * S
+                si += 1
+                # view-space (uu, vv, d) -> rotate (pitch about X, yaw about Y)
+                y1 = vv * cpit - d * spit
+                z1 = vv * spit + d * cpit
+                xw = uu * cyaw + z1 * syaw
+                zw = -uu * syaw + z1 * cyaw
+                vx = int(xw + cx)
+                vy = int(y1 + cy)
+                vz = int(zw + cz)
+                if vx < 0 or vx >= nx or vy < 0 or vy >= ny or vz < 0 or vz >= nz:
+                    continue
+                iv = data[(vz * ny + vy) * nx + vx]
+                a = tf_a[iv]
+                if a <= 0.0:
+                    continue
+                lum = 1.0
+                if shade:
+                    # central-difference gradient for diffuse lighting
+                    gx = vol.get(vx + 1, vy, vz) - vol.get(vx - 1, vy, vz)
+                    gy = vol.get(vx, vy + 1, vz) - vol.get(vx, vy - 1, vz)
+                    gz = vol.get(vx, vy, vz + 1) - vol.get(vx, vy, vz - 1)
+                    gm = math.sqrt(gx * gx + gy * gy + gz * gz)
+                    if gm > 0:
+                        dot = (gx * lx + gy * ly + gz * lz) / gm
+                        if dot < 0:
+                            dot = -dot
+                        lum = 0.35 + 0.65 * dot
+                t = (1.0 - aa) * a
+                ar += t * tf_r[iv] * lum
+                ag += t * tf_g[iv] * lum
+                ab += t * tf_b[iv] * lum
+                aa += t
+                if aa >= 0.96:
+                    break
+            o = (py * out_w + px) * 3
+            od[o] = _clamp8(ar)
+            od[o + 1] = _clamp8(ag)
+            od[o + 2] = _clamp8(ab)
+    return out
+
+
 # --- ultrasound B-mode sector scan -----------------------------------------
 #
 # Pulse-echo imaging: from a transducer apex, scan lines fan out across a

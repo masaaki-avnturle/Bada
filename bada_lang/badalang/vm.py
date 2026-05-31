@@ -690,13 +690,30 @@ class VM:
         if isinstance(obj, Channel):
             return self._channel_attr(obj, name)
 
-        from .media import Image, GifWriter
+        from .media import Image, GifWriter, Volume
         if isinstance(obj, Image):
             return self._image_attr(obj, name)
         if isinstance(obj, GifWriter):
             return self._gif_attr(obj, name)
+        if isinstance(obj, Volume):
+            return self._volume_attr(obj, name)
 
         raise BadaTypeError(f"cannot read attribute {name!r} on {type(obj).__name__}")
+
+    def _volume_attr(self, vol, name):
+        if name == "nx":
+            return vol.nx
+        if name == "ny":
+            return vol.ny
+        if name == "nz":
+            return vol.nz
+        table = {
+            "get": lambda a: vol.get(int(a[0]), int(a[1]), int(a[2])),
+            "set": lambda a: (vol.set(int(a[0]), int(a[1]), int(a[2]), a[3]), None)[1],
+        }
+        if name in table:
+            return NativeFunction(f"volume.{name}", table[name])
+        raise BadaNameError(f"volume has no member {name!r}")
 
     def set_attr(self, obj, name, value):
         if isinstance(obj, BadaInstance):

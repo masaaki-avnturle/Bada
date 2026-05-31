@@ -119,6 +119,9 @@ def make_builtins():
     reg("ct_reconstruct", lambda a: _ct_reconstruct(a))
     reg("ultrasound_bmode", lambda a: _ultrasound_bmode(a))
     reg("endoscope_view", lambda a: _endoscope_view(a))
+    reg("ct_head_volume", lambda a: _ct_head_volume(a))
+    reg("volume_from_slices", lambda a: _volume_from_slices(a))
+    reg("volume_render", lambda a: _volume_render(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
     reg("write_wav", lambda a: _write_wav(a))
     reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
@@ -488,6 +491,42 @@ def _endoscope_view(a):
     if not isinstance(out, Image) or out.mode != "RGB":
         raise BadaTypeError("endoscope_view expects an RGB image")
     return endoscope_view(out, int(a[1]) if len(a) > 1 else 7)
+
+
+def _ct_head_volume(a):
+    """Build an analytic 3-D head voxel volume. a = [n]"""
+    from .media import ct_head_volume
+    return ct_head_volume(int(a[0]))
+
+
+def _volume_from_slices(a):
+    """Stack a list of grayscale images into a voxel volume. a = [slices]"""
+    from .media import Image, volume_from_slices
+    slices = a[0]
+    if not isinstance(slices, list):
+        raise BadaTypeError("volume_from_slices expects a list of images")
+    return volume_from_slices(slices)
+
+
+def _volume_render(a):
+    """Direct volume rendering.
+
+    a = [volume, yaw, pitch, tf_r, tf_g, tf_b, tf_a, out_w, out_h, shade?]
+    where tf_* are length-256 ramp lists.
+    """
+    from .media import Volume, volume_render
+    vol = a[0]
+    if not isinstance(vol, Volume):
+        raise BadaTypeError("volume_render expects a volume")
+    yaw = float(a[1]); pitch = float(a[2])
+    tf_r = [float(x) for x in a[3]]
+    tf_g = [float(x) for x in a[4]]
+    tf_b = [float(x) for x in a[5]]
+    tf_a = [float(x) for x in a[6]]
+    out_w = int(a[7]); out_h = int(a[8])
+    shade = bool(a[9]) if len(a) > 9 else True
+    return volume_render(vol, yaw, pitch, tf_r, tf_g, tf_b, tf_a,
+                         out_w, out_h, shade)
 
 
 def _gamma_entropy(a):
