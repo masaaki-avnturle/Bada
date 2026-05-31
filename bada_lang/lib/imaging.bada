@@ -1,0 +1,128 @@
+// imaging — Bada's image & video toolkit (built on the native media backend).
+//
+//   import imaging
+//   let canvas <- imaging.Canvas.new(256, 256)
+//   canvas.dot(x, y, 200) ... canvas.save("out.pgm")
+//
+// Wraps native `image()`/`gif()` in an object-oriented drawing surface with
+// grayscale primitives, plus colormaps and a video recorder.
+
+// ---- a drawable grayscale canvas -----------------------------------------
+
+class Canvas {
+    field img
+    field w <- 0
+    field h <- 0
+
+    method init(w, h) {
+        self.w <- w
+        self.h <- h
+        self.img <- image(w, h, "L", 0)
+    }
+
+    method clear(v) { self.img.fill(v) }
+    method set(x, y, v) { self.img.set(x, y, v) }
+    method get(x, y) { return self.img.get(x, y) }
+    method raw() { return self.img }
+
+    // additive splat (accumulate intensity, saturating at 255)
+    method add(x, y, v) {
+        let cur <- self.img.get(x, y)
+        self.img.set(x, y, cur + v)
+    }
+
+    // filled axis-aligned rectangle
+    method rect(x0, y0, x1, y1, v) {
+        let y <- y0
+        while y <= y1 {
+            let x <- x0
+            while x <= x1 {
+                self.img.set(x, y, v)
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+    }
+
+    // filled disc centred at (cx,cy)
+    method disc(cx, cy, r, v) {
+        let y <- cy - r
+        while y <= cy + r {
+            let x <- cx - r
+            while x <= cx + r {
+                let dx <- x - cx
+                let dy <- y - cy
+                if dx * dx + dy * dy <= r * r {
+                    self.img.set(x, y, v)
+                }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+    }
+
+    method save(path) { return self.img.save(path) }
+
+    // save a false-colour version using a cold->hot ramp
+    method save_color(path) {
+        let rgb <- image(self.w, self.h, "RGB", 0)
+        let y <- 0
+        while y < self.h {
+            let x <- 0
+            while x < self.w {
+                let v <- self.img.get(x, y)
+                let c <- hot_colormap(v)
+                rgb.set_rgb(x, y, c[0], c[1], c[2])
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+        return rgb.save(path)
+    }
+}
+
+// cold(blue) -> hot(white) colour ramp for an 8-bit intensity
+fun hot_colormap(v) {
+    let r <- 0
+    let g <- 0
+    let b <- 0
+    if v < 85 {
+        b <- v * 3
+    } else if v < 170 {
+        b <- 255
+        r <- (v - 85) * 3
+    } else {
+        r <- 255
+        b <- 255 - (v - 170) * 3
+        g <- (v - 170) * 3
+    }
+    return [r, g, b]
+}
+
+// ---- video recorder (animated GIF) ---------------------------------------
+
+class Recorder {
+    field writer
+    field w <- 0
+    field h <- 0
+    field count <- 0
+
+    method init(path, w, h, delay_cs) {
+        self.w <- w
+        self.h <- h
+        self.writer <- gif(path, w, h, delay_cs, 0)
+    }
+
+    // add a frame from a Canvas
+    method capture(canvas) {
+        self.writer.add(canvas.raw())
+        self.count <- self.count + 1
+    }
+
+    method finish() { return self.writer.save() }
+}
+
+// ---- convenience constructors --------------------------------------------
+
+fun new_canvas(w, h) { return Canvas.new(w, h) }
+fun new_recorder(path, w, h, delay_cs) { return Recorder.new(path, w, h, delay_cs) }

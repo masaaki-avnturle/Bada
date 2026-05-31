@@ -110,6 +110,11 @@ def make_builtins():
     reg("delete_file", lambda a: _delete_file(a[0]), 1)
     reg("list_dir", lambda a: _list_dir(a[0] if a else "."))
 
+    # media: raster images & animated GIF video (native backend)
+    reg("image", lambda a: _new_image(a))
+    reg("gif", lambda a: _new_gif(a))
+    reg("xray_project", lambda a: _xray_project(a))
+
     # constants
     funcs["PI"] = math.pi
     funcs["E"] = math.e
@@ -117,6 +122,8 @@ def make_builtins():
 
     funcs["TupleSpace"] = _tuplespace_class()
     funcs["Omega"] = _omega_namespace(funcs)
+    funcs["Image"] = _image_namespace()
+    funcs["Gif"] = _gif_namespace()
 
     return funcs
 
@@ -369,3 +376,52 @@ def _omega_namespace(funcs):
         "PI": math.pi,
     }
     return Namespace("Omega", members)
+
+
+# --- media: images & video -------------------------------------------------
+
+def _new_image(a):
+    from .media import Image
+    w = int(a[0]); h = int(a[1])
+    mode = a[2] if len(a) > 2 else "L"
+    fill = int(a[3]) if len(a) > 3 else 0
+    return Image(w, h, mode, fill)
+
+
+def _new_gif(a):
+    from .media import GifWriter
+    path = a[0]
+    w = int(a[1]); h = int(a[2])
+    delay = int(a[3]) if len(a) > 3 else 10
+    loop = int(a[4]) if len(a) > 4 else 0
+    return GifWriter(path, w, h, delay, loop)
+
+
+def _xray_project(a):
+    """Native Beer-Lambert projection over a gamma-profile tissue manifold.
+
+    a = [image, tissues, i0, samples, soft, edge] where tissues is a list of
+    [cx, cy, rx, ry, mu, k] lists.
+    """
+    from .media import Image, xray_project
+    img = a[0]
+    if not isinstance(img, Image):
+        raise BadaTypeError("xray_project expects an image as first argument")
+    tissues = [tuple(t) for t in a[1]]
+    i0 = float(a[2])
+    samples = int(a[3]) if len(a) > 3 else img.height
+    soft = float(a[4]) if len(a) > 4 else 0.06
+    edge = float(a[5]) if len(a) > 5 else 40.0
+    return xray_project(img, tissues, i0, samples, soft, edge)
+
+
+def _image_namespace():
+    ns = Namespace("Image")
+    ns.members["new"] = NativeFunction("Image.new", _new_image)
+    return ns
+
+
+def _gif_namespace():
+    ns = Namespace("Gif")
+    ns.members["new"] = NativeFunction("Gif.new", _new_gif)
+    return ns

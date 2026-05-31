@@ -690,6 +690,12 @@ class VM:
         if isinstance(obj, Channel):
             return self._channel_attr(obj, name)
 
+        from .media import Image, GifWriter
+        if isinstance(obj, Image):
+            return self._image_attr(obj, name)
+        if isinstance(obj, GifWriter):
+            return self._gif_attr(obj, name)
+
         raise BadaTypeError(f"cannot read attribute {name!r} on {type(obj).__name__}")
 
     def set_attr(self, obj, name, value):
@@ -829,6 +835,37 @@ class VM:
         if name in table:
             return NativeFunction(f"channel.{name}", table[name])
         raise BadaNameError(f"channel has no method {name!r}")
+
+    def _image_attr(self, img, name):
+        table = {
+            "set": lambda a: (img.set(a[0], a[1], a[2]), None)[1],
+            "set_rgb": lambda a: (img.set_rgb(a[0], a[1], a[2], a[3], a[4]), None)[1],
+            "get": lambda a: img.get(a[0], a[1]),
+            "fill": lambda a: (img.fill(a[0]), None)[1],
+            "save": lambda a: img.save(a[0]),
+            "to_rgb": lambda a: self.gc.track(img.to_rgb()),
+            "to_gray": lambda a: self.gc.track(img.to_gray()),
+        }
+        if name == "width":
+            return img.width
+        if name == "height":
+            return img.height
+        if name == "mode":
+            return img.mode
+        if name in table:
+            return NativeFunction(f"image.{name}", table[name])
+        raise BadaNameError(f"image has no method {name!r}")
+
+    def _gif_attr(self, gif, name):
+        table = {
+            "add": lambda a: (gif.add(a[0]), gif)[1],
+            "save": lambda a: gif.save(),
+        }
+        if name == "frame_count":
+            return len(gif.frames)
+        if name in table:
+            return NativeFunction(f"gif.{name}", table[name])
+        raise BadaNameError(f"gif has no method {name!r}")
 
     def _file_attr(self, fh, name):
         table = {
