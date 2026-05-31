@@ -466,6 +466,23 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- Quantum_Bada: single-qubit simulator ----------------------------------
+
+expect("import quantum\nprint quantum.bloch(quantum.zero())",
+       "[0, 0, 1]\n", "qubit |0> points to the north pole")
+expect("import quantum\nprint quantum.bloch(quantum.x(quantum.zero()))",
+       "[0, 0, -1]\n", "X gate flips |0> to the south pole")
+expect("import quantum\nprint quantum.bloch(quantum.h(quantum.zero()))",
+       "[1.0, 0.0, 0.0]\n", "H gate makes the |+> equatorial state")
+expect("import quantum\nlet q <- quantum.ry(quantum.zero(), PI/2)\n"
+       "print round(quantum.prob0(q), 3)",
+       "0.5\n", "RY(pi/2) gives equal superposition")
+expect("import quantum\nlet n <- quantum.rx(quantum.zero(), 0.4)\n"
+       "print quantum.bloch(quantum.correct(n))",
+       "[0, 0, 1]\n", "error correction snaps back to |0>")
+expect("import quantum\nprint quantum.fidelity(quantum.h(quantum.zero()), quantum.h(quantum.zero()))",
+       "1.0\n", "fidelity of a state with itself is 1")
+
 # --- Project Forge: zip / project completion -------------------------------
 
 expect('let f <- {"a.txt": "hi", "b.txt": "yo"}\n'
