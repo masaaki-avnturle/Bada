@@ -321,13 +321,50 @@ routines above.
 | `badalang/opcodes.py`  | bytecode instruction set |
 | `badalang/objects.py`  | runtime object model (class, instance, TupleSpace, FileHandle, Regex, Thread, …) |
 | `badalang/builtins.py` | builtin functions, math, operator-algebra, regex, file I/O, `Omega` |
+| `badalang/media.py`    | media backend: images (PGM/PPM), GIF encoder, WAV writer, X-ray & field kernels, gamma-manifold entropy |
 | `badalang/reviser.py`  | the Reviser — source/grammar rewriting |
 | `badalang/gc.py`       | the mark-and-sweep garbage collector |
-| `badalang/vm.py`       | the bytecode interpreter (VM): exceptions, imports, threads, calculus, GC |
+| `badalang/vm.py`       | the bytecode interpreter (VM): exceptions, imports, threads, calculus, media, GC |
 | `bada.py` / `bada`     | command-line driver (`run`/`dis`/`compile`/`exec`/`repl`) |
-| `lib/`                 | standard library (`mathx`, `collections`, `manifold`, `topology`, `diffeq`) |
+| `lib/`                 | standard library — see below |
+| `apps/`                | applications (`xray_scanner`, `brain_scanner`, `health_biofeedback`) |
 | `examples/`            | sample programs (01–15) |
-| `tests/run_tests.py`   | test suite (85 checks) |
+| `tests/run_tests.py`   | test suite (105 checks) |
+
+### Standard library (`lib/`)
+
+| Module | Purpose |
+|--------|---------|
+| `mathx`       | gcd/lcm, sums, primes, extra constants |
+| `collections` | `Stack`, `Queue` |
+| `manifold`    | vectors, surfaces (metric & area integral), integral curves |
+| `topology`    | spaces, Euler characteristic, the fundamental group π₁ |
+| `diffeq`      | ODEs and their integral manifolds |
+| `imaging`     | `Canvas` drawing surface, hot colormap, GIF `Recorder` |
+| `plot`        | stacked-trace strip charts (EEG / waveforms) |
+| `audio`       | oscillators, envelopes, relief soundscapes, WAV output |
+| `haptic`      | tactile actuators (soothing / alert touch waveforms) |
+| `xray`        | radiography from the gamma-manifold line integral |
+| `neuro`       | brain imaging (MRI/fMRI/topography/EEG) via gamma-manifold thermal entropy |
+| `yamaguchi_health` | medication biofeedback: drugs as entropy-lowering operators with haptic + audio + visual relief |
+
+### Applications & the report's mathematics
+
+The `apps/` programs turn the report's *global partial-integral manifold of
+the gamma operator* into working medical software:
+
+- **`xray_scanner`** — a chest radiograph from Beer-Lambert,
+  `I = I₀·exp(−∫ μ ds)`, where each tissue's attenuation μ is a gamma-function
+  density and the exponent is the line integral over the pierced manifold.
+- **`brain_scanner`** — MRI, fMRI, qEEG topography and EEG, all from one
+  field weighted by the gamma manifold's **thermal entropy**
+  `S(k,θ) = k + ln θ + ln Γ(k) + (1−k)ψ(k)`.
+- **`health_biofeedback`** — the YamaguchiHealth formulary (リスパダール,
+  ジプレキサ, シクレスト, ルーラン, センノサイド, ロヒプノール, 降圧剤).
+  Each drug is an operator that lowers a target region's thermal entropy; the
+  entropy removed is fed back as a soothing **haptic** touch on the mapped
+  body part, a calming **audio** soundscape (`.wav`), and a **visual** body
+  relief map.
 
 See [`GRAMMAR.md`](GRAMMAR.md) for the full grammar and the bytecode
 instruction set.

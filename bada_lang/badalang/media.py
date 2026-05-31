@@ -319,6 +319,36 @@ def field_project(image, sources, base, gain, entropy_flag):
     return image
 
 
+# --- audio: PCM WAV writer -------------------------------------------------
+#
+# Turns a list of float samples in [-1, 1] into a real, playable 16-bit mono
+# WAV file — the backend for Bada's auditory biofeedback.
+
+def write_wav(path, samples, rate):
+    import struct as _struct
+    rate = int(rate)
+    n = len(samples)
+    frames = bytearray()
+    for s in samples:
+        if s > 1.0:
+            s = 1.0
+        elif s < -1.0:
+            s = -1.0
+        frames += _struct.pack("<h", int(s * 32767.0))
+    data_size = len(frames)
+    byte_rate = rate * 2
+    with open(path, "wb") as f:
+        f.write(b"RIFF")
+        f.write(_struct.pack("<I", 36 + data_size))
+        f.write(b"WAVE")
+        f.write(b"fmt ")
+        f.write(_struct.pack("<IHHIIHH", 16, 1, 1, rate, byte_rate, 2, 16))
+        f.write(b"data")
+        f.write(_struct.pack("<I", data_size))
+        f.write(bytes(frames))
+    return path
+
+
 # --- helpers ---------------------------------------------------------------
 
 def _clamp8(v):

@@ -355,6 +355,50 @@ expect("import neuro\n"
        "print len(ch), len(ch[0])",
        "2 32\n", "neuro EEG channels and samples")
 
+# --- audio & haptic biofeedback --------------------------------------------
+
+expect("import audio\n"
+       "let t <- audio.note(440, 1, 8000, 0.5)\nprint len(t)",
+       "8000\n", "audio note sample count")
+expect("import audio\n"
+       "let s <- audio.relief_soundscape(1, 1, 8000)\n"
+       "audio.save(\"/tmp/_bt.wav\", s, 8000)\n"
+       "print file_exists(\"/tmp/_bt.wav\")\ndelete_file(\"/tmp/_bt.wav\")",
+       "true\n", "audio writes a WAV file")
+expect("import haptic\n"
+       "let a <- haptic.Actuator.new(\"chest\", 0, 0)\n"
+       "a.soothe(1, 1, 100)\nprint a.delivered() > 0",
+       "true\n", "haptic soothe delivers signal")
+expect("import haptic\n"
+       "let a <- haptic.Actuator.new(\"chest\", 0, 0)\n"
+       "let hi <- a.soothe(1, 1, 100)\nlet d1 <- a.delivered()\n"
+       "a.soothe(0.2, 1, 100)\nprint d1 > a.delivered()",
+       "true\n", "haptic intensity scales delivery")
+
+# --- YamaguchiHealth medication biofeedback --------------------------------
+
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"striatum\", 1)\n"
+       "let e <- c.administer(\"risperidone\", 1)\nprint e[\"relief\"] > 0",
+       "true\n", "risperidone produces relief")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"vasomotor\", 1)\n"
+       "let e <- c.administer(\"amlodipine\", 1)\nprint e[\"haptic_region\"]",
+       "chest\n", "antihypertensive haptic targets the chest")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"striatum\", 1)\n"
+       "let before <- c.total_tension()\nc.administer(\"risperidone\", 1)\n"
+       "print c.total_tension() < before",
+       "true\n", "treatment lowers total tension")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\n"
+       "try { c.administer(\"aspirin\", 1) } catch (e) { print \"caught\" }",
+       "caught\n", "unknown drug throws")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"gut_myenteric\", 1)\n"
+       "let e <- c.administer(\"sennoside\", 1)\nprint e[\"haptic_region\"]",
+       "abdomen\n", "sennoside targets the abdomen")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")

@@ -1,0 +1,228 @@
+// yamaguchi_health — medication biofeedback on the gamma-entropy brain model.
+//
+//   import yamaguchi_health as yh
+//   let app <- yh.Clinic.new(200, 200)
+//   app.administer("risperidone", 1.0)
+//   app.report()
+//
+// MODEL.  The brain is the gamma-manifold of `neuro`; each cortical/limbic
+// region carries a THERMAL ENTROPY  S(k,theta)  (the report's heat-entropy of
+// the gamma operator's global integral manifold).  A symptom = excess entropy
+// (hyper-activation) in a target region.  A DRUG is an operator that lowers
+// the entropy of specific regions toward calm; the entropy DROP it produces is
+// fed back to the patient as:
+//
+//    * HAPTIC relief  — a soothing touch on the mapped body part
+//                       (e.g. an antihypertensive -> calm pulse on the chest)
+//    * AUDITORY relief — a soundscape that glides from tense to calm
+//
+// So every administration yields measurable, multi-sensory biofeedback.
+
+import neuro
+import haptic
+import audio
+
+// ---- region map: target sites on the brain & body ------------------------
+//
+// Each region has a brain location (for the entropy model) and a body
+// location (for the haptic actuator), plus a baseline gamma shape k.
+
+fun region_table(w, h) {
+    let cx <- w / 2
+    let cy <- h / 2
+    // name -> [brain_x, brain_y, body_label, body_x, body_y, k0]
+    let t <- {}
+    t["striatum"]      <- [cx, cy - h * 0.02, "forehead", cx, h * 0.12, 4.5]
+    t["prefrontal"]    <- [cx, cy - h * 0.22, "forehead", cx, h * 0.10, 4.0]
+    t["mesolimbic"]    <- [cx - w * 0.06, cy + h * 0.04, "chest", cx, h * 0.55, 4.2]
+    t["amygdala"]      <- [cx - w * 0.05, cy + h * 0.06, "chest", cx, h * 0.55, 4.8]
+    t["serotonin_raphe"] <- [cx, cy + h * 0.10, "abdomen", cx, h * 0.72, 3.8]
+    t["histamine_tmn"] <- [cx + w * 0.05, cy + h * 0.05, "eyes", cx, h * 0.18, 4.0]
+    t["vasomotor"]     <- [cx, cy + h * 0.12, "chest", cx, h * 0.55, 4.6]
+    t["gut_myenteric"] <- [cx, cy + h * 0.30, "abdomen", cx, h * 0.80, 3.5]
+    t["gaba_cortex"]   <- [cx, cy - h * 0.05, "temples", cx, h * 0.16, 3.6]
+    return t
+}
+
+// ---- drug database (YamaguchiHealth formulary) ---------------------------
+//
+// Each drug lists the regions it calms and how strongly (entropy-reduction
+// gain in [0,1]), the primary haptic body target, and a relief "color" used
+// for the auditory soundscape pitch.  Doses are normalised to [0,1].
+
+fun drug_table() {
+    let d <- {}
+    // antipsychotics (D2 / 5-HT2A antagonists): calm striatum & mesolimbic
+    d["risperidone"] <- {"label": "リスパダール (risperidone)",
+        "targets": {"striatum": 0.8, "mesolimbic": 0.7, "prefrontal": 0.4},
+        "haptic": "forehead", "tone": 0.85, "class": "antipsychotic"}
+    d["olanzapine"] <- {"label": "ジプレキサ (olanzapine)",
+        "targets": {"mesolimbic": 0.75, "histamine_tmn": 0.7, "serotonin_raphe": 0.5},
+        "haptic": "chest", "tone": 0.8, "class": "antipsychotic"}
+    d["asenapine"] <- {"label": "シクレスト (asenapine)",
+        "targets": {"striatum": 0.7, "serotonin_raphe": 0.6, "prefrontal": 0.5},
+        "haptic": "temples", "tone": 0.82, "class": "antipsychotic"}
+    d["perospirone"] <- {"label": "ルーラン (perospirone)",
+        "targets": {"striatum": 0.65, "serotonin_raphe": 0.6, "amygdala": 0.5},
+        "haptic": "forehead", "tone": 0.83, "class": "antipsychotic"}
+    // laxative: calms / regulates the gut
+    d["sennoside"] <- {"label": "センノサイド (sennoside)",
+        "targets": {"gut_myenteric": 0.85},
+        "haptic": "abdomen", "tone": 0.6, "class": "laxative"}
+    // hypnotic / benzodiazepine: GABAergic calm
+    d["flunitrazepam"] <- {"label": "ロヒプノール (flunitrazepam)",
+        "targets": {"gaba_cortex": 0.85, "amygdala": 0.6, "prefrontal": 0.4},
+        "haptic": "temples", "tone": 0.7, "class": "hypnotic"}
+    // antihypertensive: calms the vasomotor centre -> relief on the chest
+    d["amlodipine"] <- {"label": "降圧剤 (amlodipine)",
+        "targets": {"vasomotor": 0.85, "amygdala": 0.4},
+        "haptic": "chest", "tone": 0.75, "class": "antihypertensive"}
+    return d
+}
+
+// ---- a treated region: tracks its thermal entropy ------------------------
+
+class Region {
+    field name
+    field bx
+    field by
+    field body
+    field body_x
+    field body_y
+    field k             // current gamma shape (higher -> more excess entropy)
+    field k0            // healthy baseline
+
+    method init(name, bx, by, body, body_x, body_y, k0) {
+        self.name <- name
+        self.bx <- bx
+        self.by <- by
+        self.body <- body
+        self.body_x <- body_x
+        self.body_y <- body_y
+        self.k <- k0
+        self.k0 <- k0
+    }
+
+    method entropy() { return gamma_entropy(self.k, 1) }
+    method baseline_entropy() { return gamma_entropy(self.k0, 1) }
+
+    // "tension" = excess activation (k - k0) on the manifold, weighted by the
+    // local thermal entropy of the gamma state.  Monotonic in the excess, it
+    // is the clinical signal the drug operator drives toward zero.
+    method tension() {
+        let excess <- self.k - self.k0
+        if excess < 0 { excess <- 0 }
+        return excess * (1 + gamma_entropy(self.k, 1))
+    }
+
+    // an unwell region starts with raised k (excess entropy / hyper-activation)
+    method set_symptom(severity) {
+        self.k <- self.k0 + severity * 4
+    }
+}
+
+// ---- the clinic: patient brain + formulary + biofeedback -----------------
+
+class Clinic {
+    field w
+    field h
+    field regions <- {}
+    field drugs
+    field log <- []
+
+    method init(w, h) {
+        self.w <- w
+        self.h <- h
+        self.drugs <- drug_table()
+        let tbl <- region_table(w, h)
+        for name in keys(tbl) {
+            let r <- tbl[name]
+            self.regions[name] <- Region.new(name, r[0], r[1], r[2], r[3], r[4], r[5])
+        }
+    }
+
+    // mark a region as symptomatic (raised entropy)
+    method symptom(region, severity) {
+        if has(self.regions, region) {
+            self.regions[region].set_symptom(severity)
+        }
+    }
+
+    // ===== administer a drug: lower target entropy, emit biofeedback =======
+
+    method administer(drug_name, dose) {
+        if not has(self.drugs, drug_name) {
+            throw "unknown drug: " + drug_name
+        }
+        let drug <- self.drugs[drug_name]
+        let targets <- drug["targets"]
+
+        // entropy-weighted tension removed across the drug's target regions.
+        // The drug operator pulls each target's k toward the healthy baseline
+        // k0, lowering its entropy-weighted tension; relief is the fraction of
+        // tension the dose removes.
+        let tension_before <- 0
+        let tension_after <- 0
+        for region in keys(targets) {
+            if has(self.regions, region) {
+                let r <- self.regions[region]
+                let gain <- targets[region] * dose
+                tension_before <- tension_before + r.tension()
+                // the drug operator pulls k back toward the healthy baseline
+                r.k <- r.k - (r.k - r.k0) * gain
+                tension_after <- tension_after + r.tension()
+            }
+        }
+
+        // relief signal in [0,1]: fraction of tension removed
+        let relief <- 0
+        if tension_before > 0 {
+            relief <- (tension_before - tension_after) / tension_before
+        }
+        if relief < 0 { relief <- 0 }
+        if relief > 1 { relief <- 1 }
+
+        // ---- HAPTIC biofeedback: soothe the mapped body part ----
+        let body <- drug["haptic"]
+        let act <- haptic.Actuator.new(body, 0, 0)
+        act.soothe(relief, 1.5, 200)
+
+        // ---- AUDITORY biofeedback: a relief soundscape ----
+        let safe <- replace(drug_name, "/", "_")
+        let wav <- "biofeedback_" + safe + ".wav"
+        let scape <- audio.relief_soundscape(relief, 2, 22050)
+        audio.save(wav, scape, 22050)
+
+        let entry <- {
+            "drug": drug["label"],
+            "class": drug["class"],
+            "dose": dose,
+            "relief": relief,
+            "haptic_region": body,
+            "haptic_delivered": act.delivered(),
+            "sound": wav
+        }
+        push(self.log, entry)
+        return entry
+    }
+
+    // total entropy-weighted tension across all regions (whole-patient load)
+    method total_tension() {
+        let s <- 0
+        for name in keys(self.regions) {
+            s <- s + self.regions[name].tension()
+        }
+        return s
+    }
+
+    method report() {
+        print "=== YamaguchiHealth biofeedback report ==="
+        for e in self.log {
+            print "-", e["drug"], "(" + e["class"] + ")"
+            print "    dose:", e["dose"], " relief:", round(e["relief"] * 100, 1), "%"
+            print "    haptic:", e["haptic_region"],
+                  "(delivered", round(e["haptic_delivered"] * 100, 1), "%)"
+            print "    sound:", e["sound"]
+        }
+    }
+}
