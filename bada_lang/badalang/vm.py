@@ -843,6 +843,8 @@ class VM:
             "get": lambda a: img.get(a[0], a[1]),
             "fill": lambda a: (img.fill(a[0]), None)[1],
             "save": lambda a: img.save(a[0]),
+            "save_png": lambda a: img.save_png(a[0]),
+            "data_uri": lambda a: img.data_uri(),
             "to_rgb": lambda a: self.gc.track(img.to_rgb()),
             "to_gray": lambda a: self.gc.track(img.to_gray()),
         }
