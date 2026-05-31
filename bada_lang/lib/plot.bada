@@ -76,3 +76,32 @@ fun signals_scaled(channels, path, width, row_height, amp_scale) {
     }
     return canvas.save(path)
 }
+
+// like signals() but returns the raw image (for embedding in a GUI)
+fun signals_image(channels, width, row_height) {
+    let nch <- len(channels)
+    let canvas <- imaging.Canvas.new(width, nch * row_height)
+    canvas.clear(10)
+    let maxlen <- 0
+    for c in channels {
+        if len(c) > maxlen { maxlen <- len(c) }
+    }
+    let x_scale <- (width - 1) / maxlen
+    let ci <- 0
+    while ci < nch {
+        let y0 <- ci * row_height
+        let x <- 0
+        while x < width { canvas.set(x, y0 + row_height / 2, 40)  x <- x + 1 }
+        let peak <- 0
+        for v in channels[ci] {
+            let aa <- v
+            if aa < 0 { aa <- 0 - aa }
+            if aa > peak { peak <- aa }
+        }
+        if peak == 0 { peak <- 1 }
+        draw_channel(canvas, channels[ci], x_scale, y0, row_height,
+                     (row_height * 0.4) / peak, 230)
+        ci <- ci + 1
+    }
+    return canvas.raw()
+}

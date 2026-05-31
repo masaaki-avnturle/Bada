@@ -18,9 +18,13 @@
 import neuro
 import xray
 import ct
+import pet
+import ultrasound
+import ecg
 import labtest
 import genomics
 import basal_ganglia
+import plot
 import gui
 
 let N <- 110           // imaging resolution
@@ -48,6 +52,19 @@ for region in ct.REGIONS {
     print "    reconstructed", region
 }
 
+print "[3b] PET (FDG metabolic) ..."
+let pet_scan <- pet.brain_fdg(N)
+let pet_img <- pet_scan["fused"]
+
+print "[3c] ultrasound (B-mode sector) ..."
+let us_phantom <- ultrasound.abdomen_phantom(N)
+let us_img <- ultrasound.scan(us_phantom, N / 2, 4, N * 0.95, 0.6)
+
+print "[3d] ECG (12-lead strip) ..."
+let leads <- ecg.three_leads(78, 4, 200)
+let ecg_img <- plot.signals_image(leads, N * 2, 38)
+let ecg_info <- ecg.analyze(78)
+
 print "[4] blood panel ..."
 let lab <- labtest.Analyzer.new()
 lab.measure("glucose", 182)
@@ -70,6 +87,9 @@ bg.input("fMRI", 0.7)
 bg.input("X-ray", 0.6)
 bg.input("Blood", lab.total_salience())
 bg.input("DNA-RNA", seq.expression_weight())
+bg.input("PET", pet_scan["suv"])
+bg.input("US", 0.45)
+bg.input("ECG", 0.35)
 let gate <- bg.weights()
 let winner <- bg.select()
 print "    selected:", winner[0], round(winner[1] * 100, 1), "%"
@@ -100,9 +120,13 @@ cards <- cards + scan_card("Brain Topography", "qEEG scalp map", topo)
 cards <- cards + scan_card("MRI", "structural anatomy", mri)
 cards <- cards + scan_card("fMRI", "BOLD activation (entropy-weighted)", fmri)
 cards <- cards + scan_card("X-ray", "Beer-Lambert projection", xr)
+cards <- cards + scan_card("PET", "FDG metabolic (SUV " + str(round(pet_scan["suv"], 2)) + ")", pet_img)
+cards <- cards + scan_card("Ultrasound", "B-mode sector echo", us_img)
 for ci in ct_imgs {
     cards <- cards + scan_card("CT: " + ci[0], "Radon FBP reconstruction", ci[1])
 }
+cards <- cards + scan_card("ECG", "leads I/II/III  " + str(ecg_info["bpm"])
+    + " bpm  " + ecg_info["flag"], ecg_img)
 app.add(gui.div("grid", cards))
 
 // blood panel table

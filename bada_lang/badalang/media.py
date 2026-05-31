@@ -477,6 +477,58 @@ def ct_reconstruct(image, n_angles, filtered):
     return out
 
 
+# --- ultrasound B-mode sector scan -----------------------------------------
+#
+# Pulse-echo imaging: from a transducer apex, scan lines fan out across a
+# sector.  Each pixel's brightness is the local acoustic-impedance interface
+# strength (the gradient of the tissue map) attenuated with depth (time-gain
+# compensation) and modulated by multiplicative speckle — the characteristic
+# grainy ultrasound texture.
+
+def ultrasound_bmode(src, out, apex_x, apex_y, max_r, half_angle,
+                     center_angle, atten, seed):
+    w, h = src.width, src.height
+    sd = src.data
+    od = out.data
+    s = int(seed) & 0x7fffffff
+    two_pi = 2.0 * math.pi
+    for y in range(h):
+        for x in range(w):
+            dx = x - apex_x
+            dy = y - apex_y
+            r = math.hypot(dx, dy)
+            od_i = y * w + x
+            if r < 1 or r > max_r:
+                od[od_i] = 0
+                continue
+            ang = math.atan2(dy, dx)
+            da = ang - center_angle
+            while da > math.pi:
+                da -= two_pi
+            while da < -math.pi:
+                da += two_pi
+            if da < -half_angle or da > half_angle:
+                od[od_i] = 0
+                continue
+            # interface strength = gradient magnitude of the tissue map
+            xi = int(x); yi = int(y)
+            if 0 < xi < w - 1 and 0 < yi < h - 1:
+                gx = sd[yi * w + xi + 1] - sd[yi * w + xi - 1]
+                gy = sd[(yi + 1) * w + xi] - sd[(yi - 1) * w + xi]
+                grad = math.sqrt(gx * gx + gy * gy)
+            else:
+                grad = 0.0
+            base = sd[od_i] * 0.12          # faint tissue echo
+            echo = base + grad * 1.1
+            # time-gain compensation: brighten with depth to offset attenuation
+            tgc = math.exp(-atten * r) * (1.0 + r / max_r)
+            # multiplicative speckle (Rayleigh-ish via LCG noise)
+            s = (s * 1103515245 + 12345) & 0x7fffffff
+            sp = 0.55 + 0.9 * (s / 2147483648.0)
+            od[od_i] = _clamp8(echo * tgc * sp)
+    return out
+
+
 # --- neural / entropy field kernel -----------------------------------------
 #
 # Renders a scalar field sampled from Gaussian/gamma "activity sources" over a

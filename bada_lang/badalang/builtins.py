@@ -117,6 +117,7 @@ def make_builtins():
     reg("field_project", lambda a: _field_project(a))
     reg("ct_sinogram", lambda a: _ct_sinogram(a))
     reg("ct_reconstruct", lambda a: _ct_reconstruct(a))
+    reg("ultrasound_bmode", lambda a: _ultrasound_bmode(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
     reg("write_wav", lambda a: _write_wav(a))
     reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
@@ -461,6 +462,22 @@ def _ct_reconstruct(a):
     n_angles = int(a[1]) if len(a) > 1 else 90
     filtered = bool(a[2]) if len(a) > 2 else True
     return ct_reconstruct(img, n_angles, filtered)
+
+
+def _ultrasound_bmode(a):
+    """B-mode sector ultrasound from a tissue map.
+
+    a = [src, out, apex_x, apex_y, max_r, half_angle, center_angle, atten, seed]
+    """
+    from .media import Image, ultrasound_bmode
+    src = a[0]
+    out = a[1]
+    if not isinstance(src, Image) or not isinstance(out, Image):
+        raise BadaTypeError("ultrasound_bmode expects two images")
+    return ultrasound_bmode(src, out, float(a[2]), float(a[3]), float(a[4]),
+                            float(a[5]), float(a[6]),
+                            float(a[7]) if len(a) > 7 else 0.012,
+                            int(a[8]) if len(a) > 8 else 7)
 
 
 def _gamma_entropy(a):
