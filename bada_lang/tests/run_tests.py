@@ -466,6 +466,23 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- thermometer & infrared sensor -----------------------------------------
+
+expect("import sensors\nlet t <- sensors.Thermometer.new()\nprint t.read_k(1.5)",
+       "36.5\n", "thermometer reads normal at calm baseline")
+expect("import sensors\nlet t <- sensors.Thermometer.new()\n"
+       "print t.classify(t.read_k(6.0))",
+       "fever\n", "thermometer classifies fever from high gamma shape")
+expect("import sensors\nlet t <- sensors.Thermometer.new()\nprint t.classify(34.0)",
+       "hypothermia\n", "thermometer flags hypothermia")
+expect("import sensors\nlet ir <- sensors.Infrared.new(40)\n"
+       "let im <- ir.thermal_image(sensors.body_sources(40, 1.0))\nprint im.mode",
+       "RGB\n", "infrared thermal image is RGB")
+expect("import sensors\nlet ir <- sensors.Infrared.new(48)\n"
+       "let f <- ir.heat_field(sensors.body_sources(48, 1.2))\n"
+       "print ir.peak(f, 33, 9) > ir.spot(f, 0, 0, 33, 9)",
+       "true\n", "IR peak exceeds a cold corner spot")
+
 # --- 3-D volume rendering --------------------------------------------------
 
 expect("let v <- ct_head_volume(24)\nprint v.nx, v.ny, v.nz",
