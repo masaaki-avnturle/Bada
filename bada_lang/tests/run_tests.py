@@ -466,6 +466,30 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- Bada Quantum OS: multi-qubit simulator & algorithms -------------------
+
+expect("let r <- qreg(3)\nprint qn(r), len(qprobs(r))",
+       "3 8\n", "quantum register has 2^n amplitudes")
+expect("let r <- qreg(2)\nqgate(r, \"H\", 0)\nqcnot(r, 0, 1)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[3], 3)",
+       "0.5 0.5\n", "Bell state has equal |00> and |11> weight")
+expect("let r <- qreg(1)\nqgate(r, \"X\", 0)\nprint round(qprobs(r)[1], 3)",
+       "1.0\n", "X gate flips |0> to |1>")
+expect("import qalgo\nlet r <- qalgo.grover(3, 5)\n"
+       "let p <- qprobs(r)\nlet top <- 0\nlet i <- 0\n"
+       "while i < len(p) { if p[i] > p[top] { top <- i }\n i <- i + 1 }\nprint top",
+       "5\n", "Grover amplifies the marked item")
+expect("import qalgo\nlet r <- qalgo.bernstein_vazirani(4, 11)\nprint qmeasure(r)",
+       "11\n", "Bernstein-Vazirani recovers the secret in one query")
+expect("import qalgo\nlet r <- qalgo.ghz(3)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[7], 3)",
+       "0.5 0.5\n", "GHZ state is (|000>+|111>)/sqrt2")
+expect("import qos\nlet k <- qos.Kernel.new()\nk.boot()\n"
+       "let p <- k.run(\"grover\", [3, 6])\nprint p[\"top\"], p[\"prob\"] > 0.9",
+       "6 true\n", "quantum OS runs Grover and finds the answer")
+expect("import qos\nprint qos.to_ket(6, 3)",
+       "110\n", "kernel formats a measurement as a ket")
+
 # --- compounding (drug mixing / interactions) ------------------------------
 
 expect("import compounding\n"
