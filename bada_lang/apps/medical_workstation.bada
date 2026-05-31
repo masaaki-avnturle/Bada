@@ -18,8 +18,14 @@
 import neuro
 import xray
 import ct
+import ct3d
 import pet
 import ultrasound
+import echo
+import endoscope
+import thermography
+import dexa
+import monitor
 import ecg
 import labtest
 import genomics
@@ -60,10 +66,32 @@ print "[3c] ultrasound (B-mode sector) ..."
 let us_phantom <- ultrasound.abdomen_phantom(N)
 let us_img <- ultrasound.scan(us_phantom, N / 2, 4, N * 0.95, 0.6)
 
-print "[3d] ECG (12-lead strip) ..."
+print "[3d] ECG (3-lead strip) ..."
 let leads <- ecg.three_leads(78, 4, 200)
 let ecg_img <- plot.signals_image(leads, N * 2, 38)
 let ecg_info <- ecg.analyze(78)
+
+print "[3e] echocardiography (4-chamber + M-mode) ..."
+let echo_img <- echo.four_chamber(N, 0.0)
+let mmode_img <- echo.mmode(N, 90)
+let ef <- echo.ejection_fraction()
+
+print "[3f] endoscopy ..."
+let endo_img <- endoscope.view(N)
+
+print "[3g] thermography (IR) ..."
+let thermo_img <- thermography.body(N)
+
+print "[3h] DEXA bone densitometry ..."
+let dexa_scan <- dexa.spine(N)
+
+print "[3i] CT 3D slice stack ..."
+let ct3d_img <- ct3d.stack(ct_imgs)
+
+print "[3j] vital-signs monitor ..."
+let patient <- monitor.Patient.new()
+let monitor_img <- patient.strip(N * 2, 4, 150)
+let vit <- patient.vitals()
 
 print "[4] blood panel ..."
 let lab <- labtest.Analyzer.new()
@@ -90,6 +118,9 @@ bg.input("DNA-RNA", seq.expression_weight())
 bg.input("PET", pet_scan["suv"])
 bg.input("US", 0.45)
 bg.input("ECG", 0.35)
+bg.input("Echo", 0.5)
+bg.input("Thermo", 0.8)
+bg.input("DEXA", 0.6)
 let gate <- bg.weights()
 let winner <- bg.select()
 print "    selected:", winner[0], round(winner[1] * 100, 1), "%"
@@ -122,11 +153,20 @@ cards <- cards + scan_card("fMRI", "BOLD activation (entropy-weighted)", fmri)
 cards <- cards + scan_card("X-ray", "Beer-Lambert projection", xr)
 cards <- cards + scan_card("PET", "FDG metabolic (SUV " + str(round(pet_scan["suv"], 2)) + ")", pet_img)
 cards <- cards + scan_card("Ultrasound", "B-mode sector echo", us_img)
+cards <- cards + scan_card("Echocardiography", "4-chamber  EF " + str(ef) + "%", echo_img)
+cards <- cards + scan_card("Echo M-mode", "wall motion vs time", mmode_img)
+cards <- cards + scan_card("Endoscopy", "mucosal lumen view", endo_img)
+cards <- cards + scan_card("Thermography", "infrared (iron palette)", thermo_img)
+cards <- cards + scan_card("DEXA", "bone density  T " + str(dexa_scan["t"])
+    + "  " + dexa_scan["dx"], dexa_scan["image"])
 for ci in ct_imgs {
     cards <- cards + scan_card("CT: " + ci[0], "Radon FBP reconstruction", ci[1])
 }
+cards <- cards + scan_card("CT 3D stack", "isometric slice volume", ct3d_img)
 cards <- cards + scan_card("ECG", "leads I/II/III  " + str(ecg_info["bpm"])
     + " bpm  " + ecg_info["flag"], ecg_img)
+cards <- cards + scan_card("Vitals Monitor", "HR " + str(vit["hr"]) + "  SpO2 "
+    + str(vit["spo2"]) + "%  BP " + vit["bp"], monitor_img)
 app.add(gui.div("grid", cards))
 
 // blood panel table

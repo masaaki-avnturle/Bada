@@ -529,6 +529,60 @@ def ultrasound_bmode(src, out, apex_x, apex_y, max_r, half_angle,
     return out
 
 
+# --- endoscope tunnel view -------------------------------------------------
+#
+# A fibre-optic endoscope sees down a mucosal lumen: a circular field of view,
+# a dark vanishing hole at the centre, pink mucosa receding in perspective,
+# circular haustral folds, fine vessels and a bright specular reflection from
+# the scope light.  Rendered in polar coordinates into an RGB image.
+
+def endoscope_view(out, seed):
+    w, h = out.width, out.height
+    cx = (w - 1) / 2.0
+    cy = (h - 1) / 2.0
+    radius = min(w, h) / 2.0 - 1
+    s = int(seed) & 0x7fffffff
+    # specular highlight position (scope light), offset up-left
+    hlx = cx - radius * 0.30
+    hly = cy - radius * 0.30
+    for y in range(h):
+        for x in range(w):
+            dx = x - cx
+            dy = y - cy
+            rr = math.hypot(dx, dy)
+            idx = y * w + x
+            if rr > radius:
+                out.set_rgb(x, y, 0, 0, 0)
+                continue
+            ang = math.atan2(dy, dx)
+            # perspective depth: centre = deep (dark), rim = near (bright)
+            t = rr / radius                      # 0 centre .. 1 rim
+            depth = 1.0 / (t + 0.12)             # large near centre
+            # mucosa base brightness brightens toward the rim (vignette)
+            vig = t * t
+            # haustral folds: bright rings receding in depth
+            folds = 0.5 + 0.5 * math.sin(depth * 3.0 + ang * 0.0)
+            # vessel network: thin dark sinusoidal striae
+            vessel = math.sin(ang * 7.0 + depth * 2.0)
+            vfac = 1.0 - 0.35 * max(0.0, vessel - 0.6) / 0.4
+            # speckle
+            s = (s * 1103515245 + 12345) & 0x7fffffff
+            sp = 0.85 + 0.3 * (s / 2147483648.0)
+            base = (0.25 + 0.75 * vig) * (0.6 + 0.4 * folds) * vfac * sp
+            # specular highlight
+            hd = math.hypot(x - hlx, y - hly)
+            spec = math.exp(-(hd * hd) / (2 * (radius * 0.10) ** 2))
+            lum = base * 0.85 + spec * 0.9
+            if lum > 1.0:
+                lum = 1.0
+            # mucosa colour: warm pink-red
+            r = lum * 235
+            g = lum * 120 + spec * 90
+            b = lum * 120 + spec * 90
+            out.set_rgb(x, y, int(r), int(g), int(b))
+    return out
+
+
 # --- neural / entropy field kernel -----------------------------------------
 #
 # Renders a scalar field sampled from Gaussian/gamma "activity sources" over a

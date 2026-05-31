@@ -1,0 +1,54 @@
+// dexa — dual-energy X-ray absorptiometry (bone densitometry).
+//
+//   import dexa
+//   let scan <- dexa.spine(140)
+//
+// DEXA measures bone mineral density (BMD) from the differential attenuation
+// of two X-ray energies through bone vs soft tissue (Beer-Lambert over the
+// gamma-density manifold).  A spine/hip phantom is projected; the BMD is read
+// off and converted to the standard T-score and Z-score.
+
+import xray
+import imaging
+
+// build a lumbar-spine bone phantom (vertebrae L1-L4) with given density mu
+fun spine_phantom(n, bone_mu) {
+    let scan <- xray.Radiograph.new(n, n)
+    let cx <- n / 2
+    // soft tissue background
+    scan.add_tissue(xray.Tissue.new(cx, n / 2, n * 0.30, n * 0.42, 0.5, 2.0))
+    // four vertebral bodies stacked along the spine
+    let i <- 0
+    while i < 4 {
+        let cy <- n * 0.22 + i * (n * 0.16)
+        scan.add_tissue(xray.Tissue.new(cx, cy, n * 0.10, n * 0.06, bone_mu, 4.0))
+        // intervertebral disc (low density) below
+        scan.add_tissue(xray.Tissue.new(cx, cy + n * 0.08, n * 0.09, n * 0.02, 0.3, 2.0))
+        i <- i + 1
+    }
+    return scan
+}
+
+// T-score = (BMD - young_normal) / young_sd ; Z-score vs age-matched
+fun scores(bmd) {
+    let young_mean <- 1.0          // g/cm^2 reference
+    let young_sd <- 0.12
+    let age_mean <- 0.92
+    let t <- (bmd - young_mean) / young_sd
+    let z <- (bmd - age_mean) / young_sd
+    let dx <- "normal"
+    if t <= -2.5 { dx <- "osteoporosis" } else if t <= -1.0 { dx <- "osteopenia" }
+    return {"bmd": bmd, "t": round(t, 1), "z": round(z, 1), "dx": dx}
+}
+
+// a full DEXA spine scan: returns image + BMD scores derived from the bone mu
+fun spine(n) {
+    let bone_mu <- 2.1                         // attenuation -> proxy for BMD
+    let scan <- spine_phantom(n, bone_mu)
+    scan.expose_with(0.9, 60)
+    let img <- scan.surface().raw()
+    // map the modelled bone attenuation to a BMD value (g/cm^2)
+    let bmd <- round(bone_mu / 2.6, 3)
+    let sc <- scores(bmd)
+    return {"image": img, "bmd": sc["bmd"], "t": sc["t"], "z": sc["z"], "dx": sc["dx"]}
+}

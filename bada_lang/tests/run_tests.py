@@ -466,6 +466,37 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- thermography / DEXA / echo / endoscope / monitor / ct3d ---------------
+
+expect("import thermography\nlet im <- thermography.body(40)\nprint im.mode",
+       "RGB\n", "thermography renders an RGB IR map")
+expect("import thermography\nlet c <- thermography.iron(255)\nprint c[0]",
+       "255\n", "iron palette hot end is red-saturated")
+expect("import dexa\nlet s <- dexa.spine(40)\nprint s[\"dx\"]",
+       "osteopenia\n", "DEXA classifies T-score")
+expect("import dexa\nlet sc <- dexa.scores(0.6)\nprint sc[\"dx\"]",
+       "osteoporosis\n", "DEXA flags osteoporosis at low BMD")
+expect("import echo\nlet im <- echo.four_chamber(48, 0)\nprint im.width",
+       "48\n", "echocardiography 4-chamber view")
+expect("import echo\nprint echo.ejection_fraction() > 0",
+       "true\n", "echo ejection fraction")
+expect("import endoscope\nlet im <- endoscope.view(40)\n"
+       "print im.mode, im.get(20, 20) >= 0",
+       "RGB true\n", "endoscope tunnel view")
+expect("let im <- image(30,30,\"RGB\",0)\nendoscope_view(im, 5)\n"
+       "print im.get(0,0)",
+       "0\n", "endoscope masks outside the circular field")
+expect("import monitor\nlet m <- monitor.Patient.new()\n"
+       "let v <- m.vitals()\nprint v[\"hr\"], v[\"spo2\"]",
+       "78 97\n", "monitor reports vitals")
+expect("import monitor\nlet m <- monitor.Patient.new()\n"
+       "let im <- m.strip(120, 2, 100)\nprint im.width",
+       "120\n", "monitor strip image")
+expect("import ct3d\nimport ct\n"
+       "let sl <- [[\"a\", ct.body_slice(30, \"head\")], [\"b\", ct.body_slice(30, \"thorax\")]]\n"
+       "let im <- ct3d.stack(sl)\nprint im.mode, im.width > 30",
+       "RGB true\n", "CT 3D isometric stack")
+
 # --- PET / ultrasound / ECG ------------------------------------------------
 
 expect("import pet\nlet s <- pet.brain_fdg(48)\n"
