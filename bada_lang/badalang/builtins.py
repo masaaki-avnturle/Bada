@@ -93,6 +93,19 @@ def make_builtins():
     reg("input", lambda a: input(bada_str(a[0]) if a else ""))
     reg("assert", lambda a: _assert(a))
     reg("bada_check", lambda a: _bada_check(a[0]), 1)
+
+    # quantum register (the Bada Quantum OS simulator)
+    reg("qreg", lambda a: _qreg(int(a[0])), 1)
+    reg("qn", lambda a: a[0].n, 1)
+    reg("qgate", lambda a: _qgate(a), None)
+    reg("qrot", lambda a: _qrot(a), None)
+    reg("qcnot", lambda a: _qcnot(a[0], int(a[1]), int(a[2])), 3)
+    reg("qcz", lambda a: _qcz(a[0], int(a[1]), int(a[2])), 3)
+    reg("qcphase", lambda a: _qcphase(a[0], int(a[1]), int(a[2]), float(a[3])), 4)
+    reg("qphase_flip", lambda a: _qphase_flip(a[0], int(a[1])), 2)
+    reg("qprobs", lambda a: a[0].probs(), 1)
+    reg("qmeasure", lambda a: _qmeasure(a), None)
+    reg("qstate", lambda a: a[0].state_str(), 1)
     reg("error", lambda a: _error(a[0]))
     reg("clock", lambda a: __import__("time").time())
 
@@ -262,6 +275,59 @@ def _assert(a):
         msg = bada_str(a[1]) if len(a) > 1 else "assertion failed"
         raise BadaRuntimeError(msg)
     return True
+
+
+def _qreg(n):
+    from .qsim import QReg
+    return QReg(n)
+
+
+def _qgate(a):
+    """Apply a named 1-qubit gate. a = [reg, name, target]"""
+    from .qsim import QReg, gate_matrix
+    reg = a[0]
+    if not isinstance(reg, QReg):
+        raise BadaTypeError("qgate expects a quantum register")
+    reg.apply1(gate_matrix(str(a[1])), int(a[2]))
+    return reg
+
+
+def _qrot(a):
+    """Apply a rotation. a = [reg, name(RX/RY/RZ/PHASE), target, theta]"""
+    from .qsim import QReg, _rot
+    reg = a[0]
+    reg.apply1(_rot(str(a[1]), float(a[3])), int(a[2]))
+    return reg
+
+
+def _qcnot(reg, control, t):
+    from .qsim import gate_matrix
+    reg.applyc(gate_matrix("X"), control, t)
+    return reg
+
+
+def _qcz(reg, control, t):
+    from .qsim import gate_matrix
+    reg.applyc(gate_matrix("Z"), control, t)
+    return reg
+
+
+def _qcphase(reg, control, t, theta):
+    from .qsim import _rot
+    reg.applyc(_rot("PHASE", theta), control, t)
+    return reg
+
+
+def _qphase_flip(reg, index):
+    reg.phase_flip(index)
+    return reg
+
+
+def _qmeasure(a):
+    """Measure the register, collapsing it. a = [reg, seed?]"""
+    reg = a[0]
+    seed = int(a[1]) if len(a) > 1 else None
+    return reg.measure(seed)
 
 
 def _bada_check(src):
