@@ -327,9 +327,9 @@ routines above.
 | `badalang/vm.py`       | the bytecode interpreter (VM): exceptions, imports, threads, calculus, media, GC |
 | `bada.py` / `bada`     | command-line driver (`run`/`dis`/`compile`/`exec`/`repl`) |
 | `lib/`                 | standard library — see below |
-| `apps/`                | applications (`xray_scanner`, `brain_scanner`, `health_biofeedback`) |
+| `apps/`                | applications (`xray_scanner`, `brain_scanner`, `health_biofeedback`, `psychotropic_sound`) |
 | `examples/`            | sample programs (01–15) |
-| `tests/run_tests.py`   | test suite (105 checks) |
+| `tests/run_tests.py`   | test suite (113 checks) |
 
 ### Standard library (`lib/`)
 
@@ -342,8 +342,9 @@ routines above.
 | `diffeq`      | ODEs and their integral manifolds |
 | `imaging`     | `Canvas` drawing surface, hot colormap, GIF `Recorder` |
 | `plot`        | stacked-trace strip charts (EEG / waveforms) |
-| `audio`       | oscillators, envelopes, relief soundscapes, WAV output |
+| `audio`       | oscillators, envelopes, relief soundscapes, binaural beats, mono/stereo WAV |
 | `haptic`      | tactile actuators (soothing / alert touch waveforms) |
+| `psychotropic`| psychotropic-drug auditory biofeedback (binaural EEG-band entrainment) |
 | `xray`        | radiography from the gamma-manifold line integral |
 | `neuro`       | brain imaging (MRI/fMRI/topography/EEG) via gamma-manifold thermal entropy |
 | `yamaguchi_health` | medication biofeedback: drugs as entropy-lowering operators with haptic + audio + visual relief |
@@ -365,6 +366,12 @@ the gamma operator* into working medical software:
   entropy removed is fed back as a soothing **haptic** touch on the mapped
   body part, a calming **audio** soundscape (`.wav`), and a **visual** body
   relief map.
+- **`psychotropic_sound`** — auditory biofeedback for psychotropics
+  (リスパダール, ジプレキサ, シクレスト, ロヒプノール, サイレース, エチゾラム,
+  ブロチゾラム, デパス, レンドルミン, SSRI, SNRI). Each drug entrains the EEG
+  toward a target band (delta/theta/alpha/beta) and lowers the gamma manifold's
+  thermal entropy; the relief drives a stereo **binaural-beat** soundscape
+  (`.wav`) whose beat = the target band and whose timbre warms as relief rises.
 
 See [`GRAMMAR.md`](GRAMMAR.md) for the full grammar and the bytecode
 instruction set.

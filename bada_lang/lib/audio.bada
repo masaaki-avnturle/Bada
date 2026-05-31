@@ -108,3 +108,59 @@ fun relief_soundscape(relief, duration, rate) {
 fun save(path, samples, rate) {
     return write_wav(path, samples, rate)
 }
+
+fun save_stereo(path, left, right, rate) {
+    return write_wav_stereo(path, left, right, rate)
+}
+
+// ---- binaural beats & brain-wave entrainment -----------------------------
+//
+// A carrier tone at `carrier` Hz is played in one ear and `carrier + beat` Hz
+// in the other.  The brain perceives a beat at `beat` Hz; tuning `beat` to a
+// target EEG band gently entrains cortical rhythm toward it.  Bands (Hz):
+//   delta 1-4 (deep sleep), theta 4-8 (drowsy/calm), alpha 8-12 (relaxed),
+//   beta 12-30 (alert), gamma 30+ (high cognition).
+
+// EEG band -> a representative beat frequency
+fun band_beat(band) {
+    if band == "delta" { return 2.5 }
+    if band == "theta" { return 6 }
+    if band == "alpha" { return 10 }
+    if band == "beta"  { return 18 }
+    if band == "gamma" { return 40 }
+    return 10
+}
+
+// returns [left, right] sample lists for a binaural beat
+fun binaural(carrier, beat, duration, rate, amp) {
+    let n <- floor(duration * rate)
+    let left <- []
+    let right <- []
+    let i <- 0
+    while i < n {
+        let t <- i / rate
+        let env <- sin(PI * (i / n))         // smooth fade in/out
+        push(left, amp * env * sin(2 * PI * carrier * t))
+        push(right, amp * env * sin(2 * PI * (carrier + beat) * t))
+        i <- i + 1
+    }
+    return [left, right]
+}
+
+// a calming pink-ish noise bed (smoothed white noise) for masking
+fun calm_bed(duration, rate, amp, seed) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let s <- seed
+    let prev <- 0
+    let i <- 0
+    while i < n {
+        // simple LCG noise in [-1,1], low-pass filtered for a soft bed
+        s <- (s * 1103515245 + 12345) % 2147483648
+        let white <- (s / 1073741824) - 1
+        prev <- prev * 0.96 + white * 0.04
+        push(out, amp * prev)
+        i <- i + 1
+    }
+    return out
+}

@@ -117,6 +117,8 @@ def make_builtins():
     reg("field_project", lambda a: _field_project(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
     reg("write_wav", lambda a: _write_wav(a))
+    reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
+    reg("binaural_soundscape", lambda a: _binaural_soundscape(a))
 
     # constants
     funcs["PI"] = math.pi
@@ -452,6 +454,33 @@ def _write_wav(a):
     if not isinstance(samples, list):
         raise BadaTypeError("write_wav expects a list of samples")
     return write_wav(path, samples, rate)
+
+
+def _write_wav_stereo(a):
+    """Write a 16-bit stereo WAV from two float channels (binaural beats)."""
+    from .media import write_wav_stereo
+    path = a[0]
+    left = a[1]
+    right = a[2]
+    rate = int(a[3]) if len(a) > 3 else 22050
+    if not isinstance(left, list) or not isinstance(right, list):
+        raise BadaTypeError("write_wav_stereo expects two lists of samples")
+    return write_wav_stereo(path, left, right, rate)
+
+
+def _binaural_soundscape(a):
+    """Native psychotropic biofeedback soundscape -> [left, right] sample lists.
+
+    a = [carrier, beat, relief, duration, rate]
+    """
+    from .media import binaural_soundscape
+    carrier = float(a[0])
+    beat = float(a[1])
+    relief = float(a[2])
+    duration = float(a[3])
+    rate = int(a[4]) if len(a) > 4 else 22050
+    left, right = binaural_soundscape(carrier, beat, relief, duration, rate)
+    return [left, right]
 
 
 def _image_namespace():
