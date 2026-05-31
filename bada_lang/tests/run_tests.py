@@ -466,6 +466,20 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- compounding (drug mixing / interactions) ------------------------------
+
+expect("import compounding\n"
+       "let r <- compounding.compound([\"risperidone\", \"flunitrazepam\"])\n"
+       "print r[\"sedating\"], len(r[\"warnings\"]) > 0",
+       "2 true\n", "compounding flags additive CNS depression")
+expect("import compounding\n"
+       "let r <- compounding.compound([\"amlodipine\"])\nprint len(r[\"warnings\"])",
+       "0\n", "single drug has no interaction warning")
+expect("import compounding\n"
+       "let r <- compounding.compound([\"sennoside\"])\n"
+       "print has(r[\"regions\"], \"gut_myenteric\")",
+       "true\n", "compound carries the drug target region")
+
 # --- Quantum_Bada: single-qubit simulator ----------------------------------
 
 expect("import quantum\nprint quantum.bloch(quantum.zero())",

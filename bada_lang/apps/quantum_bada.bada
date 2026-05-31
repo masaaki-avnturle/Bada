@@ -1,99 +1,315 @@
 // ============================================================================
-//  QUANTUM_BADA — interactive single-qubit quantum lab (Bada GUI)
+//  QUANTUM_BADA — integrated medical application (Bada GUI)
 //
-//  A qubit on the Bloch sphere (the report's complex rotation body).  Apply
-//  gates (Hadamard, Pauli X/Y/Z, S, T) and continuous rotations RX/RY/RZ - each
-//  is an SU(2) rotation of the Bloch vector.  Inject a rotation ERROR, then
-//  CORRECT it (project back to the nearest basis state - stabiliser-code error
-//  correction).  The Bloch sphere, the |0>/|1> probabilities and the state
-//  amplitudes update live.  The JS engine mirrors lib/quantum.bada.
+//  A tabbed clinical workstation built entirely in Bada, unified by the
+//  report's gamma-manifold / complex-rotation framework:
+//
+//    Imaging      MRI, fMRI, qEEG brain topography
+//    EEG          multi-channel electroencephalograph
+//    Blood        chemistry / haematology panel
+//    Silent Talk  subvocal brain-computer interface
+//    Compounding  drug compounding + interaction checks (薬の調合)
+//    Biofeedback  drug administration -> haptic + entropy relief
+//    Compiler     Bada code editor (compiled by the real Bada compiler)
+//    Quantum      single-qubit Bloch-sphere lab (complex rotation body)
 //
 //  Run:  ./bada run apps/quantum_bada.bada   ->  quantum_bada.html
 // ============================================================================
 
+import neuro
+import plot
+import labtest
+import silenttalk
+import compounding
+import yamaguchi_health as yh
 import gui
 
+let N <- 120
+print "=== Quantum_Bada (integrated medical application) ==="
+
+// ---- JS data-builder helpers (defined before use) -------------------------
+
+fun js_map(m, ks) {
+    let s <- "{"
+    let i <- 0
+    while i < len(ks) {
+        if i > 0 { s <- s + "," }
+        s <- s + "'" + ks[i] + "':'" + m[ks[i]] + "'"
+        i <- i + 1
+    }
+    return s + "}"
+}
+fun js_map_str(m, ks) { return js_map(m, ks) }
+fun drugs_js(table, ks) {
+    let s <- "{"
+    let i <- 0
+    while i < len(ks) {
+        let k <- ks[i]
+        let d <- table[k]
+        if i > 0 { s <- s + "," }
+        s <- s + "'" + k + "':{label:'" + d["label"] + "',cls:'" + d["class"]
+            + "',haptic:'" + d["haptic"] + "',targets:{"
+        let t <- d["targets"]
+        let j <- 0
+        let rks <- keys(t)
+        while j < len(rks) {
+            if j > 0 { s <- s + "," }
+            s <- s + "'" + rks[j] + "':" + str(t[rks[j]])
+            j <- j + 1
+        }
+        s <- s + "}}"
+        i <- i + 1
+    }
+    return s + "}"
+}
+
+// ---- imaging + EEG + blood (pre-rendered) ---------------------------------
+
+print "[1] imaging / EEG / blood ..."
+let brain <- neuro.default_brain(N, N)
+let mri  <- brain.render_mri("qb_mri.pgm")
+let fmri <- brain.render_fmri("qb_fmri.ppm")
+let topo <- brain.render_topography("qb_topo.ppm")
+let cx <- N / 2
+let cy <- N / 2
+let elec <- [[cx, cy + N * 0.22], [cx - N * 0.14, cy - N * 0.20],
+             [cx + N * 0.14, cy - N * 0.20], [cx, cy - N * 0.02],
+             [cx - N * 0.22, cy], [cx + N * 0.22, cy]]
+let eeg_img <- plot.signals_image(brain.eeg(elec, 3, 128), N * 3, 34)
+
+let lab <- labtest.Analyzer.new()
+lab.measure("glucose", 178)
+lab.measure("crp", 2.4)
+lab.measure("hb", 12.0)
+lab.measure("alt", 58)
+lab.measure("ldl", 168)
+
+// ---- compiler: pre-validate Bada snippets with the real compiler ----------
+
+print "[2] Bada compiler checks ..."
+let snippets <- [
+    ["valid", "let x <- 3\nfun sq(n){ return n*n }\nprint sq(x)"],
+    ["broken", "let y <- (3 + 4\nprint y"]
+]
+let compile_results <- []
+for s in snippets {
+    let err <- bada_check(s[1])
+    push(compile_results, [s[0], s[1], err])
+}
+
+// ---- silent talk + compounding tables for JS ------------------------------
+
+print "[3] silent talk + compounding ..."
+let st <- silenttalk.SilentTalk.new()
+let vocab <- st.words()
+
+// pre-decode each word and its candidate scores for the live word pad
+let st_eeg <- {}
+let st_scores <- {}
+let st_decoded <- {}
+for w in vocab {
+    st_eeg[w] <- st.eeg_image(w, 320, 22).data_uri()
+    let g <- st.decode(st.emit(w))
+    let lst <- []
+    for x in g.weights() { push(lst, [x[0], round(x[1], 4)]) }
+    st_scores[w] <- lst
+    st_decoded[w] <- g.select()[0]
+}
+
+let drug_keys <- ["risperidone", "olanzapine", "amlodipine", "sennoside",
+                  "flunitrazepam", "asenapine"]
+let drug_table <- yh.drug_table()
+
+// ---- build the GUI --------------------------------------------------------
+
+print "[4] building GUI ..."
 let app <- gui.App.new("Quantum_Bada")
 app.style(gui.dark_theme())
-app.style("canvas{background:#0c121d;border-radius:12px}
-.lab{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:start}
-.gates button{width:auto;margin:4px;background:#1f2a3a}
-.gates button:hover{background:var(--accent)}
-.gates .rot{background:#33405a}
-.amp{font-family:monospace;font-size:13px;color:#9fe0b0;background:#0c121d;border-radius:8px;padding:10px}
-.pbar{margin:8px 0}.big{font-size:18px;font-weight:800}")
+app.style(".tabs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.tabs button{width:auto;background:#1f2a3a;font-size:13px;padding:9px 13px}
+.tabs button.on{background:var(--accent)}
+.panel{display:none}.panel.on{display:block}
+.scans{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.scans img,.wide img{width:100%;border-radius:8px;background:#000}
+canvas{background:#0c121d;border-radius:10px}
+textarea{width:100%;height:150px;background:#0c121d;color:#cfe9d8;border:1px solid #1f2a3a;
+  border-radius:8px;padding:10px;font-family:monospace;font-size:13px}
+.pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:520px}
+.pad button{background:#1f2a3a}
+.big{font-size:30px;font-weight:800;color:#5fd0a0}
+.warn{color:#e0863c;font-weight:700}.okc{color:#5fd0a0;font-weight:700}
+.qlab{display:grid;grid-template-columns:300px 1fr;gap:18px}
+table{width:100%;border-collapse:collapse;font-size:12px}td{padding:3px 6px;border-bottom:1px solid #1f2a3a}
+.chk{margin:3px 0}")
 
 app.add(gui.h1("&#9883; Quantum_Bada"))
-app.add(gui.h2("single-qubit lab - SU(2) rotations on the Bloch sphere, with quantum error correction"))
+app.add(gui.h2("integrated medical workstation - gamma-manifold imaging, BCI, pharmacy, compiler & quantum lab"))
 
-app.add("<div class=\"lab\">"
+// tab bar
+let tabnames <- ["Imaging", "EEG", "Blood", "SilentTalk", "Compounding", "Biofeedback", "Compiler", "Quantum"]
+let tabbar <- ""
+for t in tabnames {
+    tabbar <- tabbar + "<button id=\"tb_" + t + "\" onclick=\"tab('" + t + "')\">" + t + "</button>"
+}
+app.add(gui.div("tabs", tabbar))
+
+// --- Imaging panel ---
+app.add("<div class=\"panel\" id=\"p_Imaging\">" + gui.div("scans",
+    "<div><div class=\"tag\">MRI</div><img src=\"" + mri.data_uri() + "\"></div>"
+    + "<div><div class=\"tag\">fMRI (BOLD)</div><img src=\"" + fmri.data_uri() + "\"></div>"
+    + "<div><div class=\"tag\">qEEG topography</div><img src=\"" + topo.data_uri() + "\"></div>")
+    + "</div>")
+
+// --- EEG panel ---
+app.add("<div class=\"panel\" id=\"p_EEG\">" + gui.div("tag", "electroencephalograph - 6 channels")
+    + gui.div("wide", "<img src=\"" + eeg_img.data_uri() + "\">") + "</div>")
+
+// --- Blood panel ---
+let tbl <- "<table><tr><td>analyte</td><td>value</td><td>ref</td><td>flag</td></tr>"
+for e in lab.results {
+    let col <- "okc"
+    if e["flag"] != "normal" { col <- "warn" }
+    tbl <- tbl + "<tr><td>" + e["name"] + "</td><td>" + str(e["value"]) + " " + e["unit"]
+        + "</td><td>" + str(e["lo"]) + "-" + str(e["hi"]) + "</td><td class=\"" + col + "\">" + e["flag"] + "</td></tr>"
+}
+tbl <- tbl + "</table>"
+app.add("<div class=\"panel\" id=\"p_Blood\">" + gui.div("tag", "blood chemistry / haematology") + tbl + "</div>")
+
+// --- Silent Talk panel ---
+let pad <- ""
+for w in vocab { pad <- pad + "<button onclick=\"think('" + w + "')\">" + w + "</button>" }
+app.add("<div class=\"panel\" id=\"p_SilentTalk\">"
+    + gui.div("tag", "subvocal brain-computer interface - imagine a word")
+    + gui.div("pad", pad)
+    + "<div class=\"tag\" style=\"margin-top:10px\">imagined EEG</div>"
+    + "<img id=\"steeg\" style=\"width:100%;max-width:520px;border-radius:8px;background:#000\">"
+    + "<div class=\"big\" id=\"stdec\">&mdash;</div>"
+    + "<div class=\"tag\">message</div><div id=\"stmsg\" style=\"font-size:18px\"></div>"
+    + "</div>")
+
+// --- Compounding panel ---
+let checks <- ""
+for k in drug_keys {
+    checks <- checks + "<div class=\"chk\"><label><input type=\"checkbox\" value=\"" + k
+        + "\" onchange=\"recompound()\"> " + drug_table[k]["label"] + "</label></div>"
+}
+app.add("<div class=\"panel\" id=\"p_Compounding\">"
+    + gui.div("tag", "薬の調合 - select drugs to compound; interactions are checked")
+    + checks
+    + "<div id=\"compound\" style=\"margin-top:10px\"></div></div>")
+
+// --- Biofeedback panel ---
+let bf <- ""
+for k in drug_keys {
+    bf <- bf + "<button onclick=\"administer('" + k + "')\" style=\"width:auto;margin:4px;background:#1f2a3a\">"
+        + drug_table[k]["label"] + "</button>"
+}
+app.add("<div class=\"panel\" id=\"p_Biofeedback\">"
+    + gui.div("tag", "administer a drug -> entropy relief fed back as a haptic pulse")
+    + bf + "<div id=\"bfout\" style=\"margin-top:12px\"></div></div>")
+
+// --- Compiler panel ---
+let examples_js <- "["
+let i <- 0
+while i < len(compile_results) {
+    let c <- compile_results[i]
+    if i > 0 { examples_js <- examples_js + "," }
+    // escape for a JS single-quoted string (newlines + stray single quotes)
+    let src <- replace(replace(c[1], "\n", "\\n"), "'", "`")
+    let err <- replace(replace(c[2], "\n", " "), "'", "`")
+    examples_js <- examples_js + "{name:'" + c[0] + "',src:'" + src + "',err:'" + err + "'}"
+    i <- i + 1
+}
+examples_js <- examples_js + "]"
+app.add("<div class=\"panel\" id=\"p_Compiler\">"
+    + gui.div("tag", "Bada code editor - structural check live; bundled examples validated by the real Bada compiler")
+    + "<div class=\"row\"><button onclick=\"loadEx(0)\">load valid example</button>"
+    + "<button onclick=\"loadEx(1)\">load broken example</button>"
+    + "<button class=\"forge\" onclick=\"checkCode()\">check</button></div>"
+    + "<textarea id=\"code\">let x <- 3\nprint x</textarea>"
+    + "<div id=\"cstatus\" style=\"margin-top:8px\"></div></div>")
+
+// --- Quantum panel ---
+app.add("<div class=\"panel\" id=\"p_Quantum\"><div class=\"qlab\">"
     + "<div><canvas id=\"bloch\" width=\"280\" height=\"280\"></canvas>"
-    + "<div class=\"pbar\"><div class=\"label\">P(0)</div><div class=\"meter\"><div class=\"bar\" id=\"p0\" style=\"background:#5fd0a0\"></div></div></div>"
-    + "<div class=\"pbar\"><div class=\"label\">P(1)</div><div class=\"meter\"><div class=\"bar\" id=\"p1\" style=\"background:#e0a83c\"></div></div></div>"
-    + "<div class=\"amp\" id=\"amp\"></div></div>"
-    + "<div class=\"gates\">"
-    + "<div class=\"label\">Clifford / Pauli gates</div>"
-    + "<button onclick=\"g('H')\">H</button><button onclick=\"g('X')\">X</button>"
-    + "<button onclick=\"g('Y')\">Y</button><button onclick=\"g('Z')\">Z</button>"
-    + "<button onclick=\"g('S')\">S</button><button onclick=\"g('T')\">T</button>"
-    + "<div class=\"label\">rotations (complex rotation body)</div>"
-    + "<div class=\"row\"><label>angle</label>"
-    + gui.slider("th", 0, 360, 1, 90, "document.getElementById('thv').textContent=this.value+'\\u00B0'")
-    + "<span class=\"val\" id=\"thv\">90&deg;</span></div>"
-    + "<button class=\"rot\" onclick=\"g('RX')\">RX</button>"
-    + "<button class=\"rot\" onclick=\"g('RY')\">RY</button>"
-    + "<button class=\"rot\" onclick=\"g('RZ')\">RZ</button>"
-    + "<div class=\"label\">error correction</div>"
-    + "<button onclick=\"noise()\" class=\"stop\">&#9889; inject error</button>"
-    + "<button onclick=\"correct()\" class=\"forge\">&#9851; correct</button>"
-    + "<button onclick=\"reset()\">reset |0&rang;</button>"
-    + "<div class=\"big\" id=\"msg\" style=\"margin-top:12px\"></div>"
+    + "<div class=\"tag\">P(0)</div><div class=\"meter\"><div class=\"bar\" id=\"qp0\" style=\"background:#5fd0a0\"></div></div>"
+    + "<div class=\"tag\">P(1)</div><div class=\"meter\"><div class=\"bar\" id=\"qp1\" style=\"background:#e0a83c\"></div></div></div>"
+    + "<div class=\"gates\"><div class=\"tag\">gates (SU(2) rotations)</div>"
+    + "<button onclick=\"qg('H')\">H</button><button onclick=\"qg('X')\">X</button>"
+    + "<button onclick=\"qg('Y')\">Y</button><button onclick=\"qg('Z')\">Z</button>"
+    + "<button onclick=\"qg('S')\">S</button><button onclick=\"qg('T')\">T</button><br>"
+    + "<button onclick=\"qnoise()\" class=\"stop\">inject error</button>"
+    + "<button onclick=\"qcorrect()\" class=\"forge\">correct</button>"
+    + "<button onclick=\"qreset()\">reset</button>"
+    + "<div class=\"amp\" id=\"qamp\" style=\"font-family:monospace;margin-top:10px;color:#9fe0b0\"></div></div>"
     + "</div></div>")
 
+// ---- JavaScript ----------------------------------------------------------
+
 let js <- [
-    "var q=[1,0,0,0];",                       // |0>
-    "function cmul(ar,ai,br,bi){return [ar*br-ai*bi, ar*bi+ai*br];}",
-    "function apply(m){ var ar=q[0],ai=q[1],br=q[2],bi=q[3];",
-    "  var t0=cmul(m[0],m[1],ar,ai),t1=cmul(m[2],m[3],br,bi),t2=cmul(m[4],m[5],ar,ai),t3=cmul(m[6],m[7],br,bi);",
-    "  q=[t0[0]+t1[0],t0[1]+t1[1],t2[0]+t3[0],t2[1]+t3[1]]; draw(); }",
-    "function g(name){ var s=1/Math.SQRT2, th=document.getElementById('th').value*Math.PI/180;",
-    "  var c=Math.cos(th/2), sn=Math.sin(th/2);",
-    "  var M={H:[s,0,s,0,s,0,-s,0], X:[0,0,1,0,1,0,0,0], Y:[0,0,0,-1,0,1,0,0],",
-    "    Z:[1,0,0,0,0,0,-1,0], S:[1,0,0,0,0,0,0,1], T:[1,0,0,0,0,0,Math.cos(Math.PI/4),Math.sin(Math.PI/4)],",
-    "    RX:[c,0,0,-sn,0,-sn,c,0], RY:[c,0,-sn,0,sn,0,c,0], RZ:[c,-sn,0,0,0,0,c,sn]};",
-    "  setMsg(name+' applied'); apply(M[name]); }",
-    "function prob0(){return q[0]*q[0]+q[1]*q[1];}",
-    "function prob1(){return q[2]*q[2]+q[3]*q[3];}",
-    "function bloch(){ var ar=q[0],ai=q[1],br=q[2],bi=q[3];",
-    "  return [2*(ar*br+ai*bi), 2*(ar*bi-ai*br), (ar*ar+ai*ai)-(br*br+bi*bi)]; }",
-    "function noise(){ var th=(Math.random()*1.4-0.7); var c=Math.cos(th/2),sn=Math.sin(th/2);",
-    "  setMsg('rotation error injected'); apply([c,0,0,-sn,0,-sn,c,0]); }",
-    "function correct(){ if(prob0()>=prob1()) q=[1,0,0,0]; else q=[0,0,1,0];",
-    "  setMsg('corrected -> nearest basis state'); draw(); }",
-    "function reset(){ q=[1,0,0,0]; setMsg('reset'); draw(); }",
-    "function setMsg(m){ document.getElementById('msg').textContent=m; }",
-    "function fmt(re,im){ var s=re.toFixed(2); s+=(im>=0?'+':'-')+Math.abs(im).toFixed(2)+'i'; return s; }",
-    "function draw(){",
-    "  document.getElementById('p0').style.width=(prob0()*100).toFixed(1)+'%';",
-    "  document.getElementById('p1').style.width=(prob1()*100).toFixed(1)+'%';",
-    "  document.getElementById('amp').innerHTML='|psi> = ('+fmt(q[0],q[1])+')|0> + ('+fmt(q[2],q[3])+')|1>';",
-    "  var cv=document.getElementById('bloch'), x=cv.getContext('2d'), W=cv.width, H=cv.height, cx=W/2, cy=H/2, R=110;",
-    "  x.clearRect(0,0,W,H);",
-    "  // sphere outline + equator + axes (simple orthographic, y into screen)",
-    "  x.strokeStyle='#33405a'; x.lineWidth=1;",
-    "  x.beginPath(); x.arc(cx,cy,R,0,7); x.stroke();",
-    "  x.beginPath(); x.ellipse(cx,cy,R,R*0.32,0,0,7); x.stroke();",
-    "  x.strokeStyle='#22303f';",
-    "  x.beginPath(); x.moveTo(cx,cy-R); x.lineTo(cx,cy+R); x.stroke();",     // z axis
-    "  x.beginPath(); x.moveTo(cx-R,cy); x.lineTo(cx+R,cy); x.stroke();",     // x axis
-    "  x.fillStyle='#8aa0bd'; x.font='12px sans-serif';",
-    "  x.fillText('|0>',cx+4,cy-R+12); x.fillText('|1>',cx+4,cy+R-2);",
-    "  // state vector (project: screen_x = bx - by*0.5, screen_y = -bz + by*0.16)",
-    "  var b=bloch(); var sx=cx+(b[0]-b[1]*0.5)*R, sy=cy-(b[2]-b[1]*0.16)*R;",
-    "  x.strokeStyle='#4a80d0'; x.lineWidth=3; x.beginPath(); x.moveTo(cx,cy); x.lineTo(sx,sy); x.stroke();",
-    "  x.fillStyle='#5fd0a0'; x.beginPath(); x.arc(sx,sy,6,0,7); x.fill();",
-    "}",
-    "draw();"
+    "var ST_EEG=" + js_map(st_eeg, vocab) + ";",
+    "var ST_DEC=" + js_map_str(st_decoded, vocab) + ";",
+    "var DRUGS=" + drugs_js(drug_table, drug_keys) + ";",
+    "var EXAMPLES=" + examples_js + ";",
+    "var stmsg='';",
+    // tabs
+    "function tab(n){ var ps=document.querySelectorAll('.panel'); for(var i=0;i<ps.length;i++)ps[i].classList.remove('on');",
+    "  document.getElementById('p_'+n).classList.add('on');",
+    "  var bs=document.querySelectorAll('.tabs button'); for(var i=0;i<bs.length;i++)bs[i].classList.remove('on');",
+    "  document.getElementById('tb_'+n).classList.add('on'); if(n==='Quantum')qdraw(); }",
+    // silent talk
+    "function think(w){ document.getElementById('steeg').src=ST_EEG[w]; var d=ST_DEC[w];",
+    "  document.getElementById('stdec').textContent=d; stmsg+=d+' '; document.getElementById('stmsg').textContent=stmsg; }",
+    // compounding (mirror of lib/compounding.bada)
+    "var SED=['hypnotic-benzo','anxiolytic-benzo','antipsychotic','hypnotic'];",
+    "function recompound(){ var sel=[]; document.querySelectorAll('#p_Compounding input:checked').forEach(function(c){sel.push(c.value);});",
+    "  var regions={},classes={},sed=0,labels=[];",
+    "  sel.forEach(function(k){ var d=DRUGS[k]; labels.push(d.label); classes[d.cls]=(classes[d.cls]||0)+1;",
+    "    if(SED.indexOf(d.cls)>=0)sed++; for(var r in d.targets)regions[r]=(regions[r]||0)+d.targets[r]; });",
+    "  var warn=[]; if(sed>=2)warn.push('ADDITIVE CNS DEPRESSION: '+sed+' sedating agents');",
+    "  for(var c in classes)if(classes[c]>=2)warn.push('DUPLICATE CLASS: '+classes[c]+' x '+c);",
+    "  var total=0; for(var r in regions)total+=Math.min(1,regions[r]);",
+    "  var h='<div class=\"tag\">compound of '+sel.length+' drug(s) - total relief '+total.toFixed(2)+'</div>';",
+    "  for(var r in regions)h+='<div class=\"chk\">'+r+': '+(Math.min(1,regions[r])*100).toFixed(0)+'%</div>';",
+    "  warn.forEach(function(w){h+='<div class=\"warn\">&#9888; '+w+'</div>';});",
+    "  if(sel.length&&!warn.length)h+='<div class=\"okc\">no interactions detected</div>';",
+    "  document.getElementById('compound').innerHTML=h; }",
+    // biofeedback
+    "function administer(k){ var d=DRUGS[k]; var relief=0,n=0; for(var r in d.targets){relief+=d.targets[r];n++;}",
+    "  relief=Math.min(1,relief/Math.max(1,n));",
+    "  document.getElementById('bfout').innerHTML='<div class=\"big\">'+d.label+'</div>'+",
+    "   '<div class=\"meter\"><div class=\"bar\" style=\"width:'+(relief*100).toFixed(0)+'%;background:#5fd0a0\"></div></div>'+",
+    "   '<div class=\"tag\">relief '+(relief*100).toFixed(0)+'% -> haptic on '+d.haptic+'</div>'; }",
+    // compiler (structural check; bundled examples carry real compiler verdicts)
+    "function defectC(s){var p=0,sq=0,br=0,inStr=false,q='';for(var i=0;i<s.length;i++){var c=s[i];",
+    "  if(inStr){if(c==='\\\\'){i++;}else if(c===q)inStr=false;}else if(c==='\"'||c===\"'\"){inStr=true;q=c;}",
+    "  else if(c==='(')p++;else if(c===')')p--;else if(c==='[')sq++;else if(c===']')sq--;else if(c==='{')br++;else if(c==='}')br--;}",
+    "  return Math.abs(p)+Math.abs(sq)+Math.abs(br)+(inStr?1:0);}",
+    "function checkCode(){ var s=document.getElementById('code').value; var d=defectC(s);",
+    "  var ex=EXAMPLES.find(function(e){return e.src.replace(/\\\\n/g,String.fromCharCode(10))===s;});",
+    "  var st=document.getElementById('cstatus');",
+    "  if(ex){ st.innerHTML = ex.err==='' ? '<span class=okc>Bada compiler: OK</span>' : '<span class=warn>Bada compiler: '+ex.err+'</span>'; }",
+    "  else { st.innerHTML = d===0 ? '<span class=okc>structural check OK (defect 0)</span>' : '<span class=warn>structural defect '+d+' (unbalanced brackets/quotes)</span>'; } }",
+    "function loadEx(i){ document.getElementById('code').value=EXAMPLES[i].src.replace(/\\\\n/g,String.fromCharCode(10)); checkCode(); }",
+    // quantum
+    "var q=[1,0,0,0];",
+    "function cmul(ar,ai,br,bi){return [ar*br-ai*bi,ar*bi+ai*br];}",
+    "function qapply(m){var ar=q[0],ai=q[1],br=q[2],bi=q[3];var t0=cmul(m[0],m[1],ar,ai),t1=cmul(m[2],m[3],br,bi),t2=cmul(m[4],m[5],ar,ai),t3=cmul(m[6],m[7],br,bi);q=[t0[0]+t1[0],t0[1]+t1[1],t2[0]+t3[0],t2[1]+t3[1]];qdraw();}",
+    "function qg(n){var s=1/Math.SQRT2;var M={H:[s,0,s,0,s,0,-s,0],X:[0,0,1,0,1,0,0,0],Y:[0,0,0,-1,0,1,0,0],Z:[1,0,0,0,0,0,-1,0],S:[1,0,0,0,0,0,0,1],T:[1,0,0,0,0,0,Math.cos(Math.PI/4),Math.sin(Math.PI/4)]};qapply(M[n]);}",
+    "function qnoise(){var th=Math.random()*1.2-0.6,c=Math.cos(th/2),sn=Math.sin(th/2);qapply([c,0,0,-sn,0,-sn,c,0]);}",
+    "function qcorrect(){var p0=q[0]*q[0]+q[1]*q[1],p1=q[2]*q[2]+q[3]*q[3];q=p0>=p1?[1,0,0,0]:[0,0,1,0];qdraw();}",
+    "function qreset(){q=[1,0,0,0];qdraw();}",
+    "function qdraw(){var p0=q[0]*q[0]+q[1]*q[1],p1=q[2]*q[2]+q[3]*q[3];",
+    "  document.getElementById('qp0').style.width=(p0*100).toFixed(0)+'%';document.getElementById('qp1').style.width=(p1*100).toFixed(0)+'%';",
+    "  document.getElementById('qamp').textContent='|psi> = ('+q[0].toFixed(2)+'+'+q[1].toFixed(2)+'i)|0> + ('+q[2].toFixed(2)+'+'+q[3].toFixed(2)+'i)|1>';",
+    "  var cv=document.getElementById('bloch');if(!cv)return;var x=cv.getContext('2d'),W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=110;x.clearRect(0,0,W,H);",
+    "  x.strokeStyle='#33405a';x.beginPath();x.arc(cx,cy,R,0,7);x.stroke();x.beginPath();x.ellipse(cx,cy,R,R*0.32,0,0,7);x.stroke();",
+    "  x.strokeStyle='#22303f';x.beginPath();x.moveTo(cx,cy-R);x.lineTo(cx,cy+R);x.stroke();x.beginPath();x.moveTo(cx-R,cy);x.lineTo(cx+R,cy);x.stroke();",
+    "  x.fillStyle='#8aa0bd';x.fillText('|0>',cx+4,cy-R+12);x.fillText('|1>',cx+4,cy+R-2);",
+    "  var bx=2*(q[0]*q[2]+q[1]*q[3]),by=2*(q[0]*q[3]-q[1]*q[2]),bz=(q[0]*q[0]+q[1]*q[1])-(q[2]*q[2]+q[3]*q[3]);",
+    "  var sx=cx+(bx-by*0.5)*R,sy=cy-(bz-by*0.16)*R;x.strokeStyle='#4a80d0';x.lineWidth=3;x.beginPath();x.moveTo(cx,cy);x.lineTo(sx,sy);x.stroke();",
+    "  x.fillStyle='#5fd0a0';x.beginPath();x.arc(sx,sy,6,0,7);x.fill();}",
+    "tab('Imaging');"
 ]
 app.script(join(js, "\n"))
 
