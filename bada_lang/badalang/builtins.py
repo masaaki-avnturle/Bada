@@ -113,6 +113,9 @@ def make_builtins():
     reg("file_exists", lambda a: os.path.exists(a[0]), 1)
     reg("delete_file", lambda a: _delete_file(a[0]), 1)
     reg("list_dir", lambda a: _list_dir(a[0] if a else "."))
+    reg("zip_read", lambda a: _zip_read(a[0]), 1)
+    reg("zip_write", lambda a: _zip_write(a[0], a[1]), 2)
+    reg("read_tree", lambda a: _read_tree(a[0]), 1)
 
     # media: raster images & animated GIF video (native backend)
     reg("image", lambda a: _new_image(a))
@@ -355,6 +358,55 @@ def _list_dir(path):
         return sorted(os.listdir(path))
     except OSError as e:
         raise BadaRuntimeError(f"list_dir: {e}")
+
+
+def _zip_read(path):
+    """Read a .zip into a map {filename: text-content} (text files only)."""
+    import zipfile
+    out = {}
+    try:
+        with zipfile.ZipFile(path, "r") as z:
+            for name in z.namelist():
+                if name.endswith("/"):
+                    continue
+                try:
+                    out[name] = z.read(name).decode("utf-8", errors="replace")
+                except Exception:
+                    out[name] = ""
+    except (OSError, zipfile.BadZipFile) as e:
+        raise BadaRuntimeError(f"zip_read: {e}")
+    return out
+
+
+def _zip_write(path, files):
+    """Write a map {filename: content} to a .zip archive."""
+    import zipfile
+    if not isinstance(files, dict):
+        raise BadaTypeError("zip_write expects a map of {name: content}")
+    try:
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, content in files.items():
+                z.writestr(str(name), bada_str(content))
+    except OSError as e:
+        raise BadaRuntimeError(f"zip_write: {e}")
+    return path
+
+
+def _read_tree(root):
+    """Read a directory tree into a map {relative-path: text-content}."""
+    out = {}
+    if not os.path.isdir(root):
+        raise BadaRuntimeError(f"read_tree: {root!r} is not a directory")
+    for dirpath, _dirs, names in os.walk(root):
+        for nm in names:
+            full = os.path.join(dirpath, nm)
+            rel = os.path.relpath(full, root)
+            try:
+                with open(full, "r", encoding="utf-8", errors="replace") as f:
+                    out[rel.replace(os.sep, "/")] = f.read()
+            except OSError:
+                pass
+    return out
 
 
 # --- operator-algebra functions --------------------------------------------

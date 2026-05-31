@@ -466,6 +466,32 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- Project Forge: zip / project completion -------------------------------
+
+expect('let f <- {"a.txt": "hi", "b.txt": "yo"}\n'
+       'zip_write("/tmp/_pf.zip", f)\n'
+       'let g <- zip_read("/tmp/_pf.zip")\nprint g["a.txt"], g["b.txt"]\n'
+       'delete_file("/tmp/_pf.zip")',
+       "hi yo\n", "zip write/read round-trip")
+expect("import project\n"
+       "let html <- \"<link href=\\\"style.css\\\"><script src=\\\"app.js\\\">\"\n"
+       "let r <- project.referenced_assets(html)\nprint len(r)",
+       "2\n", "referenced-asset extraction from HTML")
+expect("import project\n"
+       "let files <- {\"index.html\": \"<link href=\\\"style.css\\\">\"}\n"
+       "let r <- project.complete(files)\nprint has(r[\"files\"], \"style.css\")",
+       "true\n", "project generates a referenced-but-missing file")
+expect("import project\n"
+       "let files <- {\"app.js\": \"function f(){ return (1\"}\n"
+       "let r <- project.complete(files)\nprint r[\"files\"][\"app.js\"]",
+       "function f(){ return (1)}\n", "project auto-fixes a broken file")
+expect("import project\n"
+       "let r <- project.complete({})\n"
+       "print has(r[\"files\"], \"index.html\"), has(r[\"files\"], \"README.md\")",
+       "true true\n", "empty project gets scaffolding")
+expect("import project\nprint project.ends(\"app.js\", \".js\")",
+       "true\n", "filename suffix test")
+
 # --- Bada Forge: source auto-correction ------------------------------------
 
 expect('print bada_check("let x <- 5")', "\n", "bada_check passes valid source")
