@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     Pixmap buf = XCreatePixmap(dpy, win, WIN_W, WIN_H, DefaultDepth(dpy, scr));
 
     int sel = 0, feedback = 0;
-    char status[256];
+    char status[512];
     snprintf(status, sizeof(status), "↑↓:選択  P:再生  S:保存  B:バイオFB  Q:終了");
 
     Button btns[4] = {

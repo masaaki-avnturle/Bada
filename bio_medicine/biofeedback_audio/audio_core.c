@@ -147,7 +147,7 @@ int bfa_play_wav(const char *path, double carrier, double beat, double seconds) 
             else
                 snprintf(cmd, sizeof(cmd),
                          "%s '%s' >/dev/null 2>&1 &", players[i], path);
-            system(cmd);
+            if (system(cmd) == -1) return 0;
             return 0;
         }
     }

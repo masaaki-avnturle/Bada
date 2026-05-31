@@ -60,7 +60,8 @@ static int selftest(void) {
 
 /* 水平バーゲージを描画 */
 static void draw_gauge(int y, int x, int width, double frac, const char *label, double value, const char *unit) {
-    if (frac < 0) frac = 0; if (frac > 1) frac = 1;
+    if (frac < 0) frac = 0;
+    if (frac > 1) frac = 1;
     int fill = (int)(frac * width + 0.5);
     mvprintw(y, x, "%-10s [", label);
     int bx = x + 12;
@@ -78,7 +79,7 @@ int main(int argc, char **argv) {
 
     int sel = 0;
     int feedback = 0;
-    char status[256] = "↑↓/jk:選択  p/Enter:再生  s:保存  b:バイオFB  q:終了";
+    char status[512] = "↑↓/jk:選択  p/Enter:再生  s:保存  b:バイオFB  q:終了";
 
     initscr();
     if (!stdscr) { fprintf(stderr, "端末を初期化できません(TTYで実行してください)\n"); return 1; }
