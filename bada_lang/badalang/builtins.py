@@ -119,6 +119,9 @@ def make_builtins():
     reg("write_wav", lambda a: _write_wav(a))
     reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
     reg("binaural_soundscape", lambda a: _binaural_soundscape(a))
+    reg("text_draw", lambda a: _text_draw(a))
+    reg("text_draw_rgb", lambda a: _text_draw_rgb(a))
+    reg("text_width", lambda a: _text_width(a))
 
     # constants
     funcs["PI"] = math.pi
@@ -481,6 +484,29 @@ def _binaural_soundscape(a):
     rate = int(a[4]) if len(a) > 4 else 22050
     left, right = binaural_soundscape(carrier, beat, relief, duration, rate)
     return [left, right]
+
+
+def _text_draw(a):
+    """Draw text on a grayscale image. a = [image, x, y, text, value, scale?]"""
+    from .media import draw_text
+    img = a[0]
+    scale = int(a[5]) if len(a) > 5 else 1
+    return draw_text(img, int(a[1]), int(a[2]), bada_str(a[3]), int(a[4]), scale)
+
+
+def _text_draw_rgb(a):
+    """Draw coloured text. a = [image, x, y, text, r, g, b, scale?]"""
+    from .media import draw_text_rgb
+    img = a[0]
+    scale = int(a[7]) if len(a) > 7 else 1
+    return draw_text_rgb(img, int(a[1]), int(a[2]), bada_str(a[3]),
+                         int(a[4]), int(a[5]), int(a[6]), scale)
+
+
+def _text_width(a):
+    from .media import text_width
+    scale = int(a[1]) if len(a) > 1 else 1
+    return text_width(bada_str(a[0]), scale)
 
 
 def _image_namespace():

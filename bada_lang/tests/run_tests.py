@@ -433,6 +433,24 @@ expect("import psychotropic as ps\n"
        "try { c.dose(\"aspirin\", 1, 1, \"/tmp/x.wav\") } catch (e) { print \"caught\" }",
        "caught\n", "unknown psychotropic throws")
 
+# --- GUI toolkit & text rendering ------------------------------------------
+
+expect("import gui\nprint gui.h1(\"Hi\")", "<h1>Hi</h1>\n", "gui element builder")
+expect("import gui\nprint gui.button(\"b\", \"Go\", \"f()\")",
+       "<button id=\"b\" onclick=\"f()\">Go</button>\n", "gui button")
+expect("import gui\n"
+       "let a <- gui.App.new(\"T\")\na.add(gui.h1(\"X\"))\n"
+       "let h <- a.render()\nprint contains(h, \"<!DOCTYPE html>\"), contains(h, \"<h1>X</h1>\")",
+       "true true\n", "gui App renders a document")
+expect("import gui\n"
+       "let a <- gui.App.new(\"T\")\na.save(\"/tmp/_g.html\")\n"
+       "print file_exists(\"/tmp/_g.html\")\ndelete_file(\"/tmp/_g.html\")",
+       "true\n", "gui App saves an HTML file")
+expect("let im <- image(60, 12, \"L\", 0)\n"
+       "text_draw(im, 1, 2, \"AB\", 255, 1)\nprint im.get(3, 2) > 0",
+       "true\n", "bitmap text draws pixels")
+expect("print text_width(\"ABCD\", 2)", "48\n", "text width measurement")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")
