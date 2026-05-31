@@ -466,6 +466,29 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- silent talk (subvocal BCI) --------------------------------------------
+
+expect("import silenttalk\nprint len(silenttalk.vocabulary())",
+       "8\n", "silent-talk vocabulary size")
+expect("import silenttalk\nlet a <- silenttalk.signature(\"STOP\")\n"
+       "let b <- silenttalk.signature(\"PAIN\")\nprint silenttalk.dot(a,b) < 0.99",
+       "true\n", "distinct words have distinct signatures")
+expect("import silenttalk\nlet s <- silenttalk.signature(\"YES\")\n"
+       "print round(silenttalk.dot(s, s), 3)",
+       "1.0\n", "signature is unit-normalised")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "let r <- st.think(\"HELP\")\nprint r[\"decoded\"], r[\"correct\"]",
+       "HELP true\n", "silent talk decodes the imagined word")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "let correct <- 0\nfor w in st.words() { if st.think(w)[\"correct\"] { correct <- correct + 1 } }\n"
+       "print correct",
+       "8\n", "silent talk decodes the whole vocabulary")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "st.speak([\"YES\", \"NO\"])\nprint contains(st.transcript, \"YES\")",
+       "true\n", "silent talk assembles a transcript")
+expect("print ord(\"A\"), chr(66), char_at(\"hello\", 1)",
+       "65 B e\n", "ord / chr / char_at builtins")
+
 # --- thermometer & infrared sensor -----------------------------------------
 
 expect("import sensors\nlet t <- sensors.Thermometer.new()\nprint t.read_k(1.5)",
