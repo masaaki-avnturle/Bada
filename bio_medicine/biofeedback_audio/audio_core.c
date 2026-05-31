@@ -154,3 +154,17 @@ int bfa_play_wav(const char *path, double carrier, double beat, double seconds) 
     /* プレイヤーが無くても WAV は生成済み */
     return 0;
 }
+
+double bfa_feedback_beat(double base_beat, double ambient_c) {
+    double b = base_beat + (ambient_c - 24.0) * 0.5;
+    if (b < 0.5)  b = 0.5;
+    if (b > 30.0) b = 30.0;
+    return b;
+}
+
+double bfa_feedback_carrier(double base_carrier, double ir_object_c) {
+    double c = base_carrier + (ir_object_c - 30.0) * 10.0;
+    if (c < 80.0)   c = 80.0;
+    if (c > 1200.0) c = 1200.0;
+    return c;
+}

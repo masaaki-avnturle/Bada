@@ -53,4 +53,19 @@ void bfa_sample_at(double t, double carrier, double beat,
  */
 int bfa_play_wav(const char *path, double carrier, double beat, double seconds);
 
+/* ---- センサー → 周波数 マッピング(バイオフィードバック共通) ---- */
+
+/*
+ * 温度計の周囲温度から beat 周波数(Hz)を変調する。
+ * 基準 24C で base_beat、±1C ごとに ±0.5Hz。範囲 [0.5, 30]Hz にクランプ。
+ */
+double bfa_feedback_beat(double base_beat, double ambient_c);
+
+/*
+ * IR が捉えた対象物体温度から carrier 周波数(Hz)を変調する。
+ * 基準 30C で base_carrier、+1C ごとに +10Hz。範囲 [80, 1200]Hz にクランプ。
+ * (対象が近く/温かいほど高い音になる)
+ */
+double bfa_feedback_carrier(double base_carrier, double ir_object_c);
+
 #endif /* AUDIO_CORE_H */
