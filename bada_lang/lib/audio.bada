@@ -1,0 +1,110 @@
+// audio — sound synthesis & auditory biofeedback for Bada.
+//
+//   import audio
+//   let tone <- audio.tone(220, 2, 22050)      // 220 Hz, 2 s
+//   audio.save("a.wav", tone, 22050)
+//
+// Provides oscillators, envelopes, mixing and biofeedback "soundscapes" that
+// sonify a physiological signal: a calm low drone for relief, a tense high
+// shimmer for arousal.  Real, playable 16-bit WAV files are written.
+
+let RATE <- 22050
+
+// ---- oscillators ----------------------------------------------------------
+
+fun tone(freq, duration, rate) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    while i < n {
+        push(out, sin(2 * PI * freq * (i / rate)))
+        i <- i + 1
+    }
+    return out
+}
+
+// a sine with an ADSR-ish raised-cosine envelope (no clicks)
+fun note(freq, duration, rate, amp) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    while i < n {
+        let t <- i / rate
+        let env <- sin(PI * (i / n))        // smooth in/out
+        push(out, amp * env * sin(2 * PI * freq * t))
+        i <- i + 1
+    }
+    return out
+}
+
+// ---- combiners ------------------------------------------------------------
+
+// add b into a sample-wise (a may be longer); returns a
+fun mix_into(a, b, gain) {
+    let n <- len(b)
+    let i <- 0
+    while i < n {
+        if i < len(a) {
+            a[i] <- a[i] + b[i] * gain
+        }
+        i <- i + 1
+    }
+    return a
+}
+
+fun silence(duration, rate) {
+    let n <- floor(duration * rate)
+    let out <- []
+    let i <- 0
+    while i < n { push(out, 0)  i <- i + 1 }
+    return out
+}
+
+// normalise to peak `peak` to avoid clipping
+fun normalize(samples, peak) {
+    let mx <- 0
+    for v in samples {
+        let a <- v
+        if a < 0 { a <- 0 - a }
+        if a > mx { mx <- a }
+    }
+    if mx == 0 { return samples }
+    let g <- peak / mx
+    let i <- 0
+    while i < len(samples) {
+        samples[i] <- samples[i] * g
+        i <- i + 1
+    }
+    return samples
+}
+
+// ---- biofeedback soundscapes ---------------------------------------------
+//
+// relief in [0,1]: 0 = high arousal/tension, 1 = full calm/relief.
+// The soundscape glides from a tense high cluster toward a warm low drone as
+// relief rises — an auditory analogue of the body relaxing.
+
+fun relief_soundscape(relief, duration, rate) {
+    let base <- silence(duration, rate)
+    // calm component: warm low drone (a soft perfect fifth), louder with relief
+    mix_into(base, note(110, duration, rate, 0.5 * relief), 1)
+    mix_into(base, note(165, duration, rate, 0.35 * relief), 1)
+    // tension component: high shimmer, fades out as relief rises
+    let tension <- 1 - relief
+    mix_into(base, note(880, duration, rate, 0.25 * tension), 1)
+    mix_into(base, note(1320, duration, rate, 0.15 * tension), 1)
+    // a slow calming pulse (binaural-style beat) tied to relief
+    let n <- len(base)
+    let i <- 0
+    while i < n {
+        let t <- i / rate
+        let lfo <- (1 + sin(2 * PI * (0.15 + 0.1 * relief) * t)) / 2
+        base[i] <- base[i] * (0.5 + 0.5 * lfo)
+        i <- i + 1
+    }
+    return normalize(base, 0.9)
+}
+
+fun save(path, samples, rate) {
+    return write_wav(path, samples, rate)
+}

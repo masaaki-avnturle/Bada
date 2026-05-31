@@ -116,6 +116,7 @@ def make_builtins():
     reg("xray_project", lambda a: _xray_project(a))
     reg("field_project", lambda a: _field_project(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
+    reg("write_wav", lambda a: _write_wav(a))
 
     # constants
     funcs["PI"] = math.pi
@@ -440,6 +441,17 @@ def _gamma_entropy(a):
     k = float(a[0])
     theta = float(a[1]) if len(a) > 1 else 1.0
     return gamma_manifold_entropy(k, theta)
+
+
+def _write_wav(a):
+    """Write a 16-bit mono WAV from float samples in [-1, 1]."""
+    from .media import write_wav
+    path = a[0]
+    samples = a[1]
+    rate = int(a[2]) if len(a) > 2 else 22050
+    if not isinstance(samples, list):
+        raise BadaTypeError("write_wav expects a list of samples")
+    return write_wav(path, samples, rate)
 
 
 def _image_namespace():
