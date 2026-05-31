@@ -252,6 +252,73 @@ def xray_project(image, tissues, i0, samples, soft, edge):
     return image
 
 
+# --- neural / entropy field kernel -----------------------------------------
+#
+# Renders a scalar field sampled from Gaussian/gamma "activity sources" over a
+# manifold, optionally converted to a local thermal-entropy reading.  This is
+# the fast backend for the brain-imaging library: MRI anatomy, fMRI BOLD
+# activation and EEG/topography scalp fields are all such fields.
+
+def _digamma(x):
+    """Digamma psi(x) for x > 0 (used for gamma-manifold entropy)."""
+    result = 0.0
+    while x < 6.0:
+        result -= 1.0 / x
+        x += 1.0
+    f = 1.0 / (x * x)
+    result += math.log(x) + 0.5 / x - f * (
+        1.0 / 12 - f * (1.0 / 120 - f * (1.0 / 252)))
+    return result
+
+
+def gamma_manifold_entropy(k, theta):
+    """Differential (thermal) entropy of a Gamma(k, theta) manifold:
+
+        S = k + ln(theta) + ln Gamma(k) + (1 - k) psi(k)
+
+    This is the heat-entropy value of the report's global partial-integral
+    manifold of the gamma operator, used to weight neural activity.
+    """
+    if k <= 0 or theta <= 0:
+        return 0.0
+    return k + math.log(theta) + math.lgamma(k) + (1.0 - k) * _digamma(k)
+
+
+def field_project(image, sources, base, gain, entropy_flag):
+    """Render a scalar field of `sources` into a grayscale `image`.
+
+    sources: list of (cx, cy, sigma, amp, k) — a localised activity blob whose
+    spatial falloff is Gaussian (sigma) and whose strength `amp` is modulated
+    by the gamma-manifold entropy of shape `k` when entropy_flag is set.
+
+    The pixel value is  base + gain * field(x,y)  clamped to 8 bits.
+    """
+    w, h = image.width, image.height
+    prepared = []
+    for src in sources:
+        cx, cy, sigma, amp, k = src
+        s = float(sigma)
+        if s < 1e-6:
+            s = 1e-6
+        weight = float(amp)
+        if entropy_flag:
+            # scale activity by the gamma manifold's thermal entropy
+            ent = gamma_manifold_entropy(float(k), 1.0)
+            weight *= (1.0 + 0.5 * ent)
+        prepared.append((float(cx), float(cy), 1.0 / (2.0 * s * s), weight))
+    data = image.data
+    for y in range(h):
+        row = y * w
+        for x in range(w):
+            acc = 0.0
+            for (cx, cy, inv2s2, weight) in prepared:
+                dx = x - cx
+                dy = y - cy
+                acc += weight * math.exp(-(dx * dx + dy * dy) * inv2s2)
+            data[row + x] = _clamp8(base + gain * acc)
+    return image
+
+
 # --- helpers ---------------------------------------------------------------
 
 def _clamp8(v):

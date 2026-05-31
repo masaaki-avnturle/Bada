@@ -1,0 +1,106 @@
+// ============================================================================
+//  BRAIN SCANNER  —  a Bada application
+//
+//  Synthesises the four major brain-imaging modalities from ONE manifold and
+//  ONE thermal-entropy law taken from the report:
+//
+//      S(k, theta) = k + ln(theta) + ln Gamma(k) + (1 - k) psi(k)
+//
+//  This is the differential (heat) entropy of a Gamma(k, theta) state on the
+//  report's global partial-integral manifold of the gamma operator.  Every
+//  cortical source lives on that manifold; its activity is weighted by its
+//  local thermal entropy S.  Sampling the entropy-weighted field four ways:
+//
+//    brain_mri.pgm        — MRI structural anatomy
+//    brain_fmri.ppm       — fMRI BOLD activation (entropy-weighted, hot map)
+//    brain_topography.ppm — qEEG brain-topography scalp map
+//    brain_eeg.pgm        — multi-channel EEG strip chart
+//    brain_activation.gif — animated entropy-driven activation video
+//
+//  Run:  ./bada run apps/brain_scanner.bada
+// ============================================================================
+
+import neuro
+import plot
+import imaging
+
+let W <- 200
+let H <- 200
+
+print "=== Bada Brain Scanner ==="
+print "thermal entropy  S(k,th) = k + ln th + ln G(k) + (1-k) psi(k)"
+print "(heat entropy of the gamma operator's global integral manifold)"
+print ""
+print "entropy samples:"
+print "  S(k=2.5, th=1) =", gamma_entropy(2.5, 1)
+print "  S(k=4.0, th=1) =", gamma_entropy(4.0, 1)
+print ""
+
+let brain <- neuro.default_brain(W, H)
+
+// ---- 1. MRI ---------------------------------------------------------------
+
+print "[1/5] MRI structural anatomy ..."
+brain.render_mri("brain_mri.pgm")
+print "      wrote brain_mri.pgm"
+
+// ---- 2. fMRI --------------------------------------------------------------
+
+print "[2/5] fMRI BOLD activation (entropy-weighted) ..."
+brain.render_fmri("brain_fmri.ppm")
+print "      wrote brain_fmri.ppm"
+
+// ---- 3. brain topography --------------------------------------------------
+
+print "[3/5] brain topography (qEEG scalp map) ..."
+brain.render_topography("brain_topography.ppm")
+print "      wrote brain_topography.ppm"
+
+// ---- 4. EEG ---------------------------------------------------------------
+
+print "[4/5] EEG multi-channel recording ..."
+let cx <- W / 2
+let cy <- H / 2
+let electrodes <- [
+    [cx, cy + H * 0.22],          // O  (occipital alpha)
+    [cx - W * 0.14, cy - H * 0.20],  // F3 (frontal beta)
+    [cx + W * 0.14, cy - H * 0.20],  // F4
+    [cx, cy - H * 0.02],          // Cz (mu)
+    [cx - W * 0.22, cy],          // T3 (temporal theta)
+    [cx + W * 0.22, cy]           // T4
+]
+let channels <- brain.eeg(electrodes, 2, 128)
+plot.signals(channels, "brain_eeg.pgm", 512, 56)
+print "      wrote brain_eeg.pgm  (" + str(len(channels)) + " channels, "
+print "            " + str(len(channels[0])) + " samples each)"
+
+// ---- 5. animated activation video -----------------------------------------
+
+print "[5/5] entropy-driven activation video ..."
+let rec <- imaging.Recorder.new("brain_activation.gif", W, H, 12)
+let frames <- 20
+let i <- 0
+while i < frames {
+    let t <- i / frames
+    // a travelling wave of activation: each source pulses at its own rhythm,
+    // entropy-weighted, sweeping the cortex
+    let f <- neuro.Brain.new(W, H)
+    let phase <- t * 2 * PI
+    // occipital alpha pulsing
+    f.activate(cx, cy + H * 0.22, W * 0.10, 0.6 + 0.6 * sin(phase * 10 / 6), 2.5, 10)
+    // frontal beta
+    f.activate(cx - W * 0.14, cy - H * 0.20, W * 0.08, 0.5 + 0.5 * sin(phase * 2), 4.0, 20)
+    f.activate(cx + W * 0.14, cy - H * 0.20, W * 0.08, 0.5 + 0.5 * sin(phase * 2 + 1), 4.0, 20)
+    // central mu
+    f.activate(cx, cy - H * 0.02, W * 0.09, 0.5 + 0.5 * sin(phase), 3.0, 11)
+    let img <- image(W, H, "L", 0)
+    field_project(img, f.source_rows(), 10, 150, true)
+    f.mask_head(img, 20)
+    rec.capture_image(img)
+    i <- i + 1
+}
+rec.finish()
+print "      wrote brain_activation.gif (" + str(rec.count) + " frames)"
+
+print ""
+print "done. four modalities + activation video generated."

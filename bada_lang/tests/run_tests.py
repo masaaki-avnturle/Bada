@@ -329,6 +329,32 @@ expect("import xray\n"
        "print round(s.ray_intensity(15, 30), 0) <= 255",
        "true\n", "x-ray Beer-Lambert ray intensity bounded")
 
+# --- brain imaging: thermal entropy & modalities ---------------------------
+
+expect("print round(gamma_entropy(1, 1), 4)", "1.0\n", "gamma entropy at k=1,theta=1")
+expect("print gamma_entropy(3, 2) > gamma_entropy(3, 1)", "true\n",
+       "entropy grows with theta")
+expect("let im <- image(20, 20, \"L\", 0)\n"
+       "field_project(im, [[10, 10, 4, 1, 2]], 0, 200, false)\n"
+       "print im.get(10, 10) > im.get(0, 0)",
+       "true\n", "field_project peaks at the source")
+expect("let im <- image(16, 16, \"L\", 0)\n"
+       "field_project(im, [[8, 8, 3, 1, 2]], 0, 100, true)\n"
+       "let plain <- image(16, 16, \"L\", 0)\n"
+       "field_project(plain, [[8, 8, 3, 1, 2]], 0, 100, false)\n"
+       "print im.get(8, 8) >= plain.get(8, 8)",
+       "true\n", "entropy weighting raises activation")
+expect("import neuro\n"
+       "let b <- neuro.default_brain(40, 40)\n"
+       "b.render_mri(\"/tmp/_bt_mri.pgm\")\n"
+       "print file_exists(\"/tmp/_bt_mri.pgm\")\ndelete_file(\"/tmp/_bt_mri.pgm\")",
+       "true\n", "neuro MRI renders a file")
+expect("import neuro\n"
+       "let b <- neuro.default_brain(40, 40)\n"
+       "let ch <- b.eeg([[20, 30], [20, 10]], 1, 32)\n"
+       "print len(ch), len(ch[0])",
+       "2 32\n", "neuro EEG channels and samples")
+
 # --- errors ----------------------------------------------------------------
 
 expect_error("print undefined_var", BadaError, "undefined name")

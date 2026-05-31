@@ -114,6 +114,8 @@ def make_builtins():
     reg("image", lambda a: _new_image(a))
     reg("gif", lambda a: _new_gif(a))
     reg("xray_project", lambda a: _xray_project(a))
+    reg("field_project", lambda a: _field_project(a))
+    reg("gamma_entropy", lambda a: _gamma_entropy(a))
 
     # constants
     funcs["PI"] = math.pi
@@ -413,6 +415,31 @@ def _xray_project(a):
     soft = float(a[4]) if len(a) > 4 else 0.06
     edge = float(a[5]) if len(a) > 5 else 40.0
     return xray_project(img, tissues, i0, samples, soft, edge)
+
+
+def _field_project(a):
+    """Native Gaussian/gamma activity-field renderer (brain imaging backend).
+
+    a = [image, sources, base, gain, entropy_flag] where sources is a list of
+    [cx, cy, sigma, amp, k] rows.
+    """
+    from .media import Image, field_project
+    img = a[0]
+    if not isinstance(img, Image):
+        raise BadaTypeError("field_project expects an image as first argument")
+    sources = [tuple(s) for s in a[1]]
+    base = float(a[2]) if len(a) > 2 else 0.0
+    gain = float(a[3]) if len(a) > 3 else 1.0
+    entropy_flag = bool(a[4]) if len(a) > 4 else False
+    return field_project(img, sources, base, gain, entropy_flag)
+
+
+def _gamma_entropy(a):
+    """Thermal (differential) entropy of a Gamma(k, theta) manifold."""
+    from .media import gamma_manifold_entropy
+    k = float(a[0])
+    theta = float(a[1]) if len(a) > 1 else 1.0
+    return gamma_manifold_entropy(k, theta)
 
 
 def _image_namespace():
