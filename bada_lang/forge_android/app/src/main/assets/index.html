@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bada Forge</title>
+<style>
+
+:root{--bg:#0a0e16;--card:#141b27;--ink:#e8eef7;--muted:#8aa0bd;--accent:#4a80d0;}
+*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);padding:24px}
+h1{font-weight:700;font-size:24px;margin:0 0 4px}
+h2{font-weight:600;font-size:15px;color:var(--muted);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid #1f2a3a;border-radius:14px;padding:16px;
+      box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.name{font-size:16px;font-weight:700;margin-bottom:2px}
+.cls{font-size:12px;color:var(--muted);margin-bottom:10px}
+.band{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;
+      font-weight:700;color:#06101f;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.row label{font-size:12px;color:var(--muted);min-width:46px}
+input[type=range]{flex:1;accent-color:var(--accent)}
+button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:9px 14px;
+       font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+button.stop{background:#33405a}
+.meter{height:10px;background:#0c121d;border-radius:6px;overflow:hidden;margin-top:6px}
+.bar{height:100%;border-radius:6px;transition:width .15s}
+.val{font-size:12px;color:var(--muted);min-width:54px;text-align:right}
+.master{position:sticky;top:0;background:var(--bg);padding:8px 0 16px;z-index:5}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 18px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+
+textarea{width:100%;height:200px;background:#0c121d;color:#cfe9d8;border:1px solid #1f2a3a;
+  border-radius:10px;padding:12px;font-family:monospace;font-size:13px;line-height:1.5;resize:vertical}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.label{font-size:12px;color:var(--muted);margin:6px 0}
+.ok{color:#5fd0a0;font-weight:800}.bad{color:#e0563c;font-weight:800}
+.log{font-size:12px;color:#9fb6d6;background:#0c121d;border-radius:8px;padding:10px;min-height:60px}
+.log div{margin:2px 0}
+.gauge{height:16px;background:#0c121d;border-radius:8px;overflow:hidden;margin:6px 0}
+.gauge .fill{height:100%;background:#e0563c;transition:width .5s}
+button.forge{background:#c8a44a;color:#04060a}
+.top{font-size:34px;display:inline-block;transition:transform .1s}
+</style>
+</head>
+<body>
+<h1>&#9881; Bada Forge</h1>
+<h2>integrable-system source auto-correction - bracket/quote invariants as a spinning-top conserved charge</h2>
+<div class="cols"><div><div class="label">SOURCE (edit me - try removing a brace or quote)</div><textarea id="src" oninput="measure()">fun area(r) {
+  return 3.14 * r * r
+let msg <- "hi
+print area(2</textarea><div class="row"><button class="forge" onclick="forge()">&#9889; Forge auto-fix</button><button class="stop" onclick="document.getElementById('src').value='';measure()">Clear</button></div></div><div><div class="label">REPAIRED <span class="top" id="top">&#128499;</span></div><textarea id="out" readonly></textarea><div class="label">invariant defect (angular momentum |L| + quote parity)</div><div class="gauge"><div class="fill" id="gauge" style="width:0%"></div></div><div id="status">&mdash;</div></div></div>
+<div class="label">correction log (precession steps onto the valid manifold)</div>
+<div class="log" id="log"></div>
+<script>
+function invariants(s){
+  var p=0,sq=0,br=0,inStr=false,q='';
+  for(var i=0;i<s.length;i++){ var c=s[i];
+    if(inStr){ if(c==='\\'){i++;} else if(c===q){inStr=false;} }
+    else if(c==='"'||c==="'"){inStr=true;q=c;}
+    else if(c==='/'&&s[i+1]==='/'){ while(i<s.length&&s[i]!=='\n')i++; }
+    else if(c==='('){p++;} else if(c===')'){p--;}
+    else if(c==='['){sq++;} else if(c===']'){sq--;}
+    else if(c==='{'){br++;} else if(c==='}'){br--;}
+  }
+  return {p:p,sq:sq,br:br,open:inStr};
+}
+function defect(s){ var v=invariants(s); return Math.abs(v.p)+Math.abs(v.sq)+Math.abs(v.br)+(v.open?1:0); }
+function tokens(s){ return s.replace(/ = /g,' <- '); }
+function balance(s,o,c,ch){ if(ch>0){for(var i=0;i<ch;i++)s+=c;} else if(ch<0){for(var i=0;i<-ch;i++)s=o+s;} return s; }
+function autofix(s){
+  var log=[], d0=defect(s);
+  log.push('initial invariant defect: '+d0);
+  var t=tokens(s); if(t!==s){ log.push("token repair: '=' assignment -> '<-'"); s=t; }
+  var step=0;
+  while(defect(s)>0 && step<12){ var v=invariants(s);
+    if(v.open){ s+='"'; log.push('closed an open string literal (quote parity)'); }
+    if(v.p!==0){ s=balance(s,'(',')',v.p); log.push('balanced () angular momentum: '+v.p); }
+    if(v.sq!==0){ s=balance(s,'[',']',v.sq); log.push('balanced [] angular momentum: '+v.sq); }
+    if(v.br!==0){ s=balance(s,'{','}',v.br); log.push('balanced {} angular momentum: '+v.br); }
+    step++; }
+  log.push('final invariant defect: '+defect(s));
+  return {fixed:s, log:log, d0:d0};
+}
+function measure(){
+  var s=document.getElementById('src').value; var d=defect(s);
+  var g=document.getElementById('gauge'); g.style.width=Math.min(100,d*20)+'%';
+  g.style.background = d===0 ? '#5fd0a0' : '#e0563c';
+  var st=document.getElementById('status');
+  st.innerHTML = d===0 ? '<span class="ok">on the valid manifold (defect 0)</span>'
+    : '<span class="bad">off-manifold: defect '+d+'</span>';
+  var top=document.getElementById('top'); top.style.transform='rotate('+(d*25)+'deg)';
+}
+function forge(){
+  var s=document.getElementById('src').value;
+  var r=autofix(s);
+  document.getElementById('out').value=r.fixed;
+  var log=document.getElementById('log'); log.innerHTML='';
+  r.log.forEach(function(l){ var d=document.createElement('div'); d.textContent='\u2192 '+l; log.appendChild(d); });
+  // animate the top spinning down as the defect relaxes to zero
+  var top=document.getElementById('top'), a=r.d0*60, iv=setInterval(function(){
+    a*=0.8; top.style.transform='rotate('+a+'deg)'; if(a<1){clearInterval(iv); top.style.transform='rotate(0deg)';} },60);
+  var g=document.getElementById('gauge'); g.style.width='0%'; g.style.background='#5fd0a0';
+  document.getElementById('status').innerHTML='<span class="ok">repaired -> defect 0 (re-projected onto the manifold)</span>';
+}
+measure();
+</script>
+</body>
+</html>

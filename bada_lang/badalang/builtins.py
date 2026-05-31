@@ -92,6 +92,7 @@ def make_builtins():
     # io / system
     reg("input", lambda a: input(bada_str(a[0]) if a else ""))
     reg("assert", lambda a: _assert(a))
+    reg("bada_check", lambda a: _bada_check(a[0]), 1)
     reg("error", lambda a: _error(a[0]))
     reg("clock", lambda a: __import__("time").time())
 
@@ -258,6 +259,23 @@ def _assert(a):
         msg = bada_str(a[1]) if len(a) > 1 else "assertion failed"
         raise BadaRuntimeError(msg)
     return True
+
+
+def _bada_check(src):
+    """Compile a Bada source string; return "" if it is valid, else the error.
+
+    Lets Bada inspect Bada — the verification oracle used by the Forge
+    error-correction loop to confirm a repair lands on the valid manifold.
+    """
+    from .compiler import compile_source
+    from .errors import BadaError
+    try:
+        compile_source(str(src), "<forge>")
+        return ""
+    except BadaError as e:
+        return str(e)
+    except Exception as e:  # noqa
+        return "Error: " + str(e)
 
 
 def _error(msg):
