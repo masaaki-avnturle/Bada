@@ -118,6 +118,7 @@ def make_builtins():
     reg("ct_sinogram", lambda a: _ct_sinogram(a))
     reg("ct_reconstruct", lambda a: _ct_reconstruct(a))
     reg("ultrasound_bmode", lambda a: _ultrasound_bmode(a))
+    reg("endoscope_view", lambda a: _endoscope_view(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
     reg("write_wav", lambda a: _write_wav(a))
     reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
@@ -478,6 +479,15 @@ def _ultrasound_bmode(a):
                             float(a[5]), float(a[6]),
                             float(a[7]) if len(a) > 7 else 0.012,
                             int(a[8]) if len(a) > 8 else 7)
+
+
+def _endoscope_view(a):
+    """Render an endoscopic tunnel view into an RGB image. a = [out, seed?]"""
+    from .media import Image, endoscope_view
+    out = a[0]
+    if not isinstance(out, Image) or out.mode != "RGB":
+        raise BadaTypeError("endoscope_view expects an RGB image")
+    return endoscope_view(out, int(a[1]) if len(a) > 1 else 7)
 
 
 def _gamma_entropy(a):

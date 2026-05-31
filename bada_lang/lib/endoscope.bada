@@ -1,0 +1,28 @@
+// endoscope — fibre-optic endoscopy (tunnel view of a mucosal lumen).
+//
+//   import endoscope
+//   let img <- endoscope.view(180)
+//
+// Renders the characteristic round endoscopic image: a dark vanishing lumen
+// at the centre, pink mucosa receding in perspective with haustral folds,
+// vessels and the scope's specular light reflection.  The native
+// endoscope_view kernel does the per-pixel polar rendering.
+
+fun view(n) {
+    let img <- image(n, n, "RGB", 0)
+    endoscope_view(img, 13)
+    return img
+}
+
+// a short fly-through loop (changing seed shifts the texture forward)
+fun flythrough(n, frames) {
+    let imgs <- []
+    let f <- 0
+    while f < frames {
+        let img <- image(n, n, "RGB", 0)
+        endoscope_view(img, 13 + f * 97)
+        push(imgs, img)
+        f <- f + 1
+    }
+    return imgs
+}
