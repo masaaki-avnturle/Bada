@@ -79,7 +79,8 @@ int sensor_read(SensorCtx *ctx, SensorReading *out) {
         out->ir_object_c = got_ir ? normalize_temp(ir) : out->ambient_c;
         /* IR 生値: 体温域(30-40C)を 0..1 に正規化 */
         double r = (out->ir_object_c - 20.0) / 20.0;
-        if (r < 0) r = 0; if (r > 1) r = 1;
+        if (r < 0) r = 0;
+        if (r > 1) r = 1;
         out->ir_raw  = r;
         out->present = (out->ir_object_c >= 28.0) ? 1 : 0; /* 体温域なら検知 */
         return 0;
@@ -97,7 +98,8 @@ int sensor_read(SensorCtx *ctx, SensorReading *out) {
     out->ir_object_c = 36.5 + breath + noise_ir;
 
     double r = (out->ir_object_c - 20.0) / 20.0;
-    if (r < 0) r = 0; if (r > 1) r = 1;
+    if (r < 0) r = 0;
+    if (r > 1) r = 1;
     out->ir_raw  = r;
     /* 近接検知: 周期的に対象が出入りする様子を模擬 */
     out->present = (sin(ctx->sim_t * 0.13) > -0.5) ? 1 : 0;
