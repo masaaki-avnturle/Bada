@@ -2,12 +2,16 @@
 
 名前付きプリセットそれぞれに **キャリア周波数** と **バイノーラルビート周波数**
 を割り当て、サイン波の音（16bit/44.1kHz/ステレオ WAV）を生成するアプリです。
-**赤外線(IR)センサー**と**温度計**のライブ表示を備え、**CLI / ncurses GUI / X11 GUI**
-の3つのフロントエンドを持ちます。
+**赤外線(IR)センサー**と**温度計**のライブ表示を備え、**CLI / ncurses GUI /
+X11 GUI / GTK+3 GUI** の4つのフロントエンドを持ちます。
 
 - 左チャンネル: `sin(2π·carrier·t)` / 右チャンネル: `sin(2π·(carrier+beat)·t)`
 - 左右差 `beat` が「うなり（binaural beat）」として知覚される音響手法（ヘッドホン推奨）
-- **バイオフィードバックモード**: 温度計の値で beat 周波数をリアルタイム変調
+- **リアルタイム連続再生（ALSA）**: WAV を介さず ALSA へ直接ストリーム出力。
+  再生中もセンサー値に追従して音が滑らかに変化（位相連続でクリックノイズ無し）。
+- **バイオフィードバックモード**: センサー値で周波数をリアルタイム変調
+  - **温度計 → beat 周波数**（基準24℃、±1℃ごとに±0.5Hz、0.5〜30Hzにクランプ）
+  - **IR対象温度 → carrier 周波数**（基準30℃、+1℃ごとに+10Hz、80〜1200Hzにクランプ）
 
 ## ⚠️ 重要な注意
 
@@ -20,23 +24,32 @@
 
 | ファイル | 役割 |
 |---|---|
-| `audio_core.{c,h}` | プリセット定義・WAV合成・波形サンプル（共有コア） |
+| `audio_core.{c,h}` | プリセット定義・WAV合成・波形サンプル・センサー→周波数マッピング（共有コア） |
 | `sensors.{c,h}` | 赤外線センサー + 温度計 の抽象化（実機/シミュレーション） |
+| `rt_audio.{c,h}` | リアルタイム音声出力（ALSA直結、別スレッドで連続再生） |
 | `biofeedback_audio.c` | **CLI** フロントエンド |
 | `gui_ncurses.c` → `bfa_tui` | **端末GUI**（ncurses） |
 | `gui_x11.c` → `bfa_gui` | **X11 グラフィカルGUI** |
+| `gui_gtk.c` → `bfa_gtk` | **GTK+3 グラフィカルGUI** |
 
 ## ビルド
 
 ```sh
-make            # 3つ全部 (要: libncurses, libX11)
+make            # 全部 (CLI/TUI/X11、gtk+-3.0 があれば GTK も)
 make cli        # CLI のみ
 make tui        # ncurses GUI のみ
 make gui        # X11 GUI のみ
-make selftest   # GUIを開かず内部ロジック(センサー+合成)を検証
+make gtk        # GTK GUI のみ
+make info       # ALSA / GTK 検出状況を表示
+make selftest   # GUIを開かず内部ロジック(センサー+合成+ALSA有無)を検証
 ```
 
-依存: `gcc`, `-lm`, `bfa_tui`→`-lncurses`, `bfa_gui`→`-lX11`。
+依存:
+- 必須: `gcc`, `-lm`
+- `bfa_tui` → `-lncurses` / `bfa_gui` → `-lX11` / `bfa_gtk` → `gtk+-3.0`
+- 任意: **`libasound`(ALSA)** … 見つかれば Makefile が自動検出して
+  `-DBFA_HAVE_ALSA` を付け、**リアルタイム連続再生**を有効化（`-lasound -lpthread`）。
+  無い環境では自動的に WAV 生成へフォールバックし、GUI は通常どおり動作します。
 
 ## 使い方
 
@@ -51,19 +64,33 @@ make selftest   # GUIを開かず内部ロジック(センサー+合成)を検�
 ### ncurses GUI（端末で動作）
 ```sh
 ./bfa_tui
-#  ↑↓/jk: プリセット選択   p/Enter: 再生   s: WAV保存
-#  b: バイオフィードバックON/OFF   q: 終了
+#  ↑↓/jk: 選択   p/Enter: WAV再生   s: WAV保存
+#  r: リアルタイム連続再生(ALSA) ON/OFF   b: バイオフィードバック ON/OFF   q: 終了
 ./bfa_tui --selftest    # 画面を開かず検証
 ```
 
 ### X11 GUI（Xディスプレイのあるデスクトップで動作）
 ```sh
 DISPLAY=:0 ./bfa_gui
-#  プリセット行/ボタンをクリック、または ↑↓ P S B Q キー
+#  プリセット行/ボタンをクリック、または ↑↓ P S R B Q キー
+#  ボタン: Play / Save / Realtime / BioFB / Quit
 ./bfa_gui --selftest    # ディスプレイを開かず検証
 ```
-> リモート/ヘッドホン環境ではディスプレイが無いため X11 ウィンドウは表示できません。
-> その場合は `--selftest` か `bfa_tui` を使ってください。
+
+### GTK+3 GUI（Xディスプレイのあるデスクトップで動作）
+```sh
+DISPLAY=:0 ./bfa_gtk
+#  ツリービューで選択、ボタン: Play / Save / Realtime / BioFB / Quit
+./bfa_gtk --selftest    # ディスプレイを開かず検証
+```
+> リモート/ヘッドレス環境ではディスプレイが無いため X11/GTK ウィンドウは表示
+> できません。その場合は `--selftest` か `bfa_tui` を使ってください。
+
+### リアルタイム連続再生（ALSA）について
+`r` キー / Realtime ボタンで、WAVファイルを介さず ALSA へ直接ストリーム再生します。
+別スレッドが位相連続でサイン波を生成し続けるため、`Realtime` + `BioFB` を両方 ON に
+すると、**温度計・IRセンサーの値に追従して音程（carrier/beat）がリアルタイムに変化**
+します。サウンドデバイスが無い環境では開始に失敗し、安全に WAV 生成へ戻れます。
 
 ## 赤外線センサー + 温度計
 
@@ -87,10 +114,14 @@ export BFA_IR_PATH=/run/mlx90614_object_temp
 ```
 
 読み取り項目（`SensorReading`）:
-- `ambient_c` … 温度計（周囲温度）
-- `ir_object_c` … IRが捉えた対象物体温度
+- `ambient_c` … 温度計（周囲温度）→ バイオFB時は **beat 周波数**に写像
+- `ir_object_c` … IRが捉えた対象物体温度 → バイオFB時は **carrier 周波数**に写像
 - `ir_raw` … IR生値（0..1正規化）
 - `present` … IR近接検知（体温域なら検知）
+
+写像式（`audio_core.c`）:
+- `bfa_feedback_beat(base, ambient)   = clamp(base + (ambient-24)*0.5, 0.5, 30)`
+- `bfa_feedback_carrier(base, ir_obj) = clamp(base + (ir_obj-30)*10, 80, 1200)`
 
 ## プリセットと周波数
 

@@ -1,40 +1,77 @@
 # biofeedback_audio - Makefile
+#
 # ターゲット:
 #   biofeedback_audio : CLI 版
 #   bfa_tui           : ncurses GUI 版 (端末で動作)
-#   bfa_gui           : X11 GUI 版 (Xディスプレイのあるデスクトップで動作)
+#   bfa_gui           : X11 GUI 版 (Xディスプレイのあるデスクトップ)
+#   bfa_gtk           : GTK+3 GUI 版 (要 gtk+-3.0)
+#
+# リアルタイム音声(ALSA)は libasound が見つかれば自動で有効化される
+# (-DBFA_HAVE_ALSA + -lasound -lpthread)。無い環境では WAV 生成に
+# フォールバックし、GUI は普通にビルド・動作する。
 CC      ?= gcc
 CFLAGS  ?= -std=c99 -O2 -Wall -Wextra
 LDM     := -lm
 
-CORE := audio_core.c sensors.c
+# ---- ALSA 自動検出 ----
+HAVE_ALSA := $(shell pkg-config --exists alsa && echo 1 || echo 0)
+ifeq ($(HAVE_ALSA),1)
+  CFLAGS  += -DBFA_HAVE_ALSA $(shell pkg-config --cflags alsa)
+  ALSA_LIBS := $(shell pkg-config --libs alsa) -lpthread
+else
+  ALSA_LIBS :=
+endif
 
-.PHONY: all cli tui gui clean demo selftest
+# ---- GTK 検出 ----
+HAVE_GTK := $(shell pkg-config --exists gtk+-3.0 && echo 1 || echo 0)
+GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 2>/dev/null)
+GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 2>/dev/null)
 
-all: biofeedback_audio bfa_tui bfa_gui
+CORE := audio_core.c sensors.c rt_audio.c
+HDRS := audio_core.h sensors.h rt_audio.h
+
+.PHONY: all cli tui gui gtk clean demo selftest info
+
+all: biofeedback_audio bfa_tui bfa_gui gtk
 
 cli: biofeedback_audio
 tui: bfa_tui
 gui: bfa_gui
 
-biofeedback_audio: biofeedback_audio.c audio_core.c audio_core.h
-	$(CC) $(CFLAGS) -o $@ biofeedback_audio.c audio_core.c $(LDM)
+biofeedback_audio: biofeedback_audio.c $(CORE) $(HDRS)
+	$(CC) $(CFLAGS) -o $@ biofeedback_audio.c $(CORE) $(ALSA_LIBS) $(LDM)
 
-bfa_tui: gui_ncurses.c $(CORE) audio_core.h sensors.h
-	$(CC) $(CFLAGS) -o $@ gui_ncurses.c $(CORE) -lncurses $(LDM)
+bfa_tui: gui_ncurses.c $(CORE) $(HDRS)
+	$(CC) $(CFLAGS) -o $@ gui_ncurses.c $(CORE) -lncurses $(ALSA_LIBS) $(LDM)
 
-bfa_gui: gui_x11.c $(CORE) audio_core.h sensors.h
-	$(CC) $(CFLAGS) -o $@ gui_x11.c $(CORE) -lX11 $(LDM)
+bfa_gui: gui_x11.c $(CORE) $(HDRS)
+	$(CC) $(CFLAGS) -o $@ gui_x11.c $(CORE) -lX11 $(ALSA_LIBS) $(LDM)
+
+# GTK 版(gtk+-3.0 がある場合のみビルド)
+gtk:
+ifeq ($(HAVE_GTK),1)
+	$(MAKE) bfa_gtk
+else
+	@echo "gtk+-3.0 が見つからないため bfa_gtk はスキップしました"
+endif
+
+bfa_gtk: gui_gtk.c $(CORE) $(HDRS)
+	$(CC) $(CFLAGS) $(GTK_CFLAGS) -o $@ gui_gtk.c $(CORE) $(GTK_LIBS) $(ALSA_LIBS) $(LDM)
 
 # GUI を開かずに内部ロジック(センサー+音合成)を検証
 selftest: bfa_tui bfa_gui
 	./bfa_tui --selftest
 	./bfa_gui --selftest
+ifeq ($(HAVE_GTK),1)
+	$(MAKE) bfa_gtk && ./bfa_gtk --selftest
+endif
 
-# 全プリセットを 10 秒で ./out に生成
 demo: biofeedback_audio
 	./biofeedback_audio gen all 10 ./out
 
+info:
+	@echo "ALSA(libasound): $(HAVE_ALSA)   GTK(gtk+-3.0): $(HAVE_GTK)"
+
 clean:
-	rm -f biofeedback_audio bfa_tui bfa_gui
+	rm -f biofeedback_audio bfa_tui bfa_gui bfa_gtk
 	rm -rf ./out

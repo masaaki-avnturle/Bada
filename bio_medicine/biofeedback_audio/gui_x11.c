@@ -5,24 +5,22 @@
  *   - プリセット一覧(クリック/↑↓ で選択)
  *   - 赤外線(IR)センサー + 温度計 のライブ表示(バーゲージ)
  *   - 選択プリセットの波形描画
- *   - ボタン: Play / Save / BioFB / Quit
- *       BioFB(バイオフィードバック)ON 時は温度計の値で beat を変調
+ *   - ボタン: Play / Save / Realtime / BioFB / Quit
+ *       BioFB ON 時: 温度計 -> beat、IR対象温度 -> carrier を変調
+ *       Realtime ON 時: ALSA で連続再生し、センサー値に追従して音が変化
  *
  * 重要: 音響トーン発生器です。プリセット名はラベルであり、薬剤や治療効果を
  *       再現・代替しません(医学的主張なし)。
  *
- * ビルド:
- *   gcc -std=c99 -O2 -Wall -o bfa_gui gui_x11.c audio_core.c sensors.c -lX11 -lm
+ * ビルド: Makefile 参照(ALSA があれば実時間再生有効)
  * 実行:
  *   DISPLAY=:0 ./bfa_gui      (Xディスプレイのあるデスクトップで)
  *   ./bfa_gui --selftest      (ディスプレイを開かず検証して終了)
- *
- * 注意: このリモートコンテナはディスプレイ非接続のため、実ウィンドウ表示は
- *       Xサーバのある環境で確認してください。--selftest はどこでも動きます。
  */
 #define _POSIX_C_SOURCE 200809L
 #include "audio_core.h"
 #include "sensors.h"
+#include "rt_audio.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,20 +32,15 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 
-#define WIN_W 780
-#define WIN_H 540
-
-static double feedback_beat(double base_beat, double ambient_c) {
-    double b = base_beat + (ambient_c - 24.0) * 0.5;
-    if (b < 0.5) b = 0.5;
-    if (b > 30.0) b = 30.0;
-    return b;
-}
+#define WIN_W 800
+#define WIN_H 560
 
 /* ---- ディスプレイを開かない自己診断 ---- */
 static int selftest(void) {
     SensorCtx sc; sensor_init(&sc);
     printf("[selftest] sensor backend = %s\n", sensor_backend_name(&sc));
+    printf("[selftest] realtime audio (ALSA) = %s\n",
+           rt_audio_available() ? "compiled-in" : "not available");
     SensorReading r;
     for (int i = 0; i < 3; i++) {
         sensor_read(&sc, &r);
@@ -55,8 +48,10 @@ static int selftest(void) {
                r.ambient_c, r.ir_object_c, r.ir_raw, r.present);
     }
     const Preset *p = &BFA_PRESETS[0];
-    printf("[selftest] preset[0]=%s carrier=%.1f beat=%.1f fb_beat=%.2f\n",
-           p->jp, p->carrier, p->beat, feedback_beat(p->beat, r.ambient_c));
+    printf("[selftest] preset[0]=%s carrier=%.1f beat=%.1f -> fb_carrier=%.2f fb_beat=%.2f\n",
+           p->jp, p->carrier, p->beat,
+           bfa_feedback_carrier(p->carrier, r.ir_object_c),
+           bfa_feedback_beat(p->beat, r.ambient_c));
     if (bfa_write_wav("/tmp/bfa_x11_selftest.wav", p->carrier, p->beat, 0.5) != 0) {
         printf("[selftest] WAV write FAILED\n"); return 1;
     }
@@ -64,7 +59,6 @@ static int selftest(void) {
     return 0;
 }
 
-/* ---- 色確保ヘルパ ---- */
 static unsigned long alloc_rgb(Display *d, Colormap cm, int r, int g, int b) {
     XColor c;
     c.red = r * 257; c.green = g * 257; c.blue = b * 257;
@@ -73,7 +67,6 @@ static unsigned long alloc_rgb(Display *d, Colormap cm, int r, int g, int b) {
     return c.pixel;
 }
 
-/* ボタン矩形 */
 typedef struct { int x, y, w, h; const char *label; } Button;
 
 static int in_rect(int px, int py, int x, int y, int w, int h) {
@@ -86,6 +79,7 @@ int main(int argc, char **argv) {
 
     SensorCtx sc; sensor_init(&sc);
     SensorReading rd; memset(&rd, 0, sizeof(rd));
+    RtAudio *rt = rt_audio_create();
 
     Display *dpy = XOpenDisplay(NULL);
     if (!dpy) {
@@ -93,6 +87,7 @@ int main(int argc, char **argv) {
             "Xディスプレイを開けません(DISPLAY未設定/未接続)。\n"
             "Xサーバのある環境で実行してください。検証だけなら: %s --selftest\n",
             argv[0]);
+        if (rt) rt_audio_destroy(rt);
         return 1;
     }
     int scr = DefaultScreen(dpy);
@@ -109,8 +104,7 @@ int main(int argc, char **argv) {
     unsigned long c_wave  = alloc_rgb(dpy, cm, 120, 200, 240);
     unsigned long c_btn   = alloc_rgb(dpy, cm, 60, 66, 80);
 
-    Window win = XCreateSimpleWindow(dpy, root, 0, 0, WIN_W, WIN_H, 0,
-                                     c_fg, c_bg);
+    Window win = XCreateSimpleWindow(dpy, root, 0, 0, WIN_W, WIN_H, 0, c_fg, c_bg);
     XStoreName(dpy, win, "Biofeedback Audio (X11) - IR sensor & thermometer");
     XSelectInput(dpy, win, ExposureMask | KeyPressMask | ButtonPressMask | StructureNotifyMask);
 
@@ -121,19 +115,18 @@ int main(int argc, char **argv) {
     GC gc = XCreateGC(dpy, win, 0, NULL);
     XFontStruct *font = XLoadQueryFont(dpy, "fixed");
     if (font) XSetFont(dpy, gc, font->fid);
-
-    /* 描画はバッキング Pixmap 経由(ちらつき防止) */
     Pixmap buf = XCreatePixmap(dpy, win, WIN_W, WIN_H, DefaultDepth(dpy, scr));
 
-    int sel = 0, feedback = 0;
+    int sel = 0, feedback = 0, realtime = 0;
     char status[512];
-    snprintf(status, sizeof(status), "↑↓:選択  P:再生  S:保存  B:バイオFB  Q:終了");
+    snprintf(status, sizeof(status), "↑↓:選択 P:再生 S:保存 R:実時間 B:バイオFB Q:終了");
 
-    Button btns[4] = {
-        { 300, 470, 90, 30, "Play" },
-        { 400, 470, 90, 30, "Save" },
-        { 500, 470, 110, 30, "BioFB" },
-        { 620, 470, 90, 30, "Quit" },
+    Button btns[5] = {
+        { 300, 500, 80, 30, "Play" },
+        { 388, 500, 80, 30, "Save" },
+        { 476, 500, 100, 30, "Realtime" },
+        { 584, 500, 90, 30, "BioFB" },
+        { 682, 500, 80, 30, "Quit" },
     };
 
     int fd = ConnectionNumber(dpy);
@@ -141,10 +134,13 @@ int main(int argc, char **argv) {
     int running = 1;
 
     while (running) {
-        /* --- イベント処理 --- */
         while (XPending(dpy)) {
             XEvent ev;
             XNextEvent(dpy, &ev);
+            const Preset *p = &BFA_PRESETS[sel];
+            double ec = feedback ? bfa_feedback_carrier(p->carrier, rd.ir_object_c) : p->carrier;
+            double eb = feedback ? bfa_feedback_beat(p->beat, rd.ambient_c)         : p->beat;
+
             if (ev.type == ClientMessage) {
                 if ((Atom)ev.xclient.data.l[0] == wm_delete) running = 0;
             } else if (ev.type == KeyPress) {
@@ -154,78 +150,96 @@ int main(int argc, char **argv) {
                 else if (ks == XK_Down && sel < (int)BFA_PRESET_COUNT - 1) sel++;
                 else if (ks == XK_b || ks == XK_B) {
                     feedback = !feedback;
-                    snprintf(status, sizeof(status), "バイオフィードバック %s", feedback ? "ON" : "OFF");
+                    snprintf(status, sizeof(status), "バイオFB %s", feedback ? "ON" : "OFF");
+                } else if (ks == XK_r || ks == XK_R) {
+                    if (!rt_audio_available())
+                        snprintf(status, sizeof(status), "実時間再生は無効(ALSA無し)");
+                    else if (realtime && rt_audio_is_running(rt)) {
+                        rt_audio_stop(rt); realtime = 0;
+                        snprintf(status, sizeof(status), "実時間再生 停止");
+                    } else {
+                        rt_audio_set_freq(rt, ec, eb);
+                        if (rt_audio_start(rt) == 0) { realtime = 1;
+                            snprintf(status, sizeof(status), "実時間再生 開始(ALSA)"); }
+                        else snprintf(status, sizeof(status), "実時間再生 失敗(デバイス無し?)");
+                    }
                 } else if (ks == XK_p || ks == XK_P || ks == XK_Return) {
-                    const Preset *p = &BFA_PRESETS[sel];
-                    double eb = feedback ? feedback_beat(p->beat, rd.ambient_c) : p->beat;
                     char path[256]; snprintf(path, sizeof(path), "/tmp/bfa_%s.wav", p->key);
-                    bfa_play_wav(path, p->carrier, eb, 15.0);
-                    snprintf(status, sizeof(status), "再生(試行): %s eff_beat=%.2fHz", p->jp, eb);
+                    bfa_play_wav(path, ec, eb, 15.0);
+                    snprintf(status, sizeof(status), "再生(試行): %s c=%.0f b=%.2f", p->jp, ec, eb);
                 } else if (ks == XK_s || ks == XK_S) {
-                    const Preset *p = &BFA_PRESETS[sel];
-                    double eb = feedback ? feedback_beat(p->beat, rd.ambient_c) : p->beat;
                     char path[256]; snprintf(path, sizeof(path), "%s.wav", p->key);
-                    if (bfa_write_wav(path, p->carrier, eb, 30.0) == 0)
-                        snprintf(status, sizeof(status), "保存: %s (30s)", path);
+                    if (bfa_write_wav(path, ec, eb, 30.0) == 0)
+                        snprintf(status, sizeof(status), "保存(30s)");
                 }
             } else if (ev.type == ButtonPress) {
                 int mx = ev.xbutton.x, my = ev.xbutton.y;
-                /* プリセット行クリック */
                 int row_top = 60, row_h = 22;
                 if (mx >= 10 && mx < 280 && my >= row_top) {
                     int idx = (my - row_top) / row_h;
                     if (idx >= 0 && idx < (int)BFA_PRESET_COUNT) sel = idx;
                 }
-                /* ボタン */
-                for (int i = 0; i < 4; i++) {
+                for (int i = 0; i < 5; i++) {
                     if (in_rect(mx, my, btns[i].x, btns[i].y, btns[i].w, btns[i].h)) {
-                        const Preset *p = &BFA_PRESETS[sel];
-                        double eb = feedback ? feedback_beat(p->beat, rd.ambient_c) : p->beat;
                         if (i == 0) { char pa[256]; snprintf(pa,sizeof(pa),"/tmp/bfa_%s.wav",p->key);
-                                      bfa_play_wav(pa, p->carrier, eb, 15.0);
-                                      snprintf(status,sizeof(status),"再生(試行): %s eff_beat=%.2fHz",p->jp,eb); }
+                                      bfa_play_wav(pa, ec, eb, 15.0);
+                                      snprintf(status,sizeof(status),"再生(試行): %s",p->jp); }
                         else if (i == 1) { char pa[256]; snprintf(pa,sizeof(pa),"%s.wav",p->key);
-                                      if (bfa_write_wav(pa,p->carrier,eb,30.0)==0)
-                                        snprintf(status,sizeof(status),"保存: %s (30s)",pa); }
-                        else if (i == 2) { feedback = !feedback;
-                                      snprintf(status,sizeof(status),"バイオフィードバック %s",feedback?"ON":"OFF"); }
-                        else if (i == 3) running = 0;
+                                      if (bfa_write_wav(pa,ec,eb,30.0)==0)
+                                        snprintf(status,sizeof(status),"保存(30s)"); }
+                        else if (i == 2) {
+                            if (!rt_audio_available())
+                                snprintf(status,sizeof(status),"実時間再生は無効(ALSA無し)");
+                            else if (realtime && rt_audio_is_running(rt)) {
+                                rt_audio_stop(rt); realtime = 0;
+                                snprintf(status,sizeof(status),"実時間再生 停止"); }
+                            else { rt_audio_set_freq(rt, ec, eb);
+                                if (rt_audio_start(rt)==0){ realtime=1;
+                                    snprintf(status,sizeof(status),"実時間再生 開始(ALSA)"); }
+                                else snprintf(status,sizeof(status),"実時間再生 失敗"); }
+                        }
+                        else if (i == 3) { feedback = !feedback;
+                                      snprintf(status,sizeof(status),"バイオFB %s",feedback?"ON":"OFF"); }
+                        else if (i == 4) running = 0;
                     }
                 }
             }
         }
         if (!running) break;
 
-        /* --- センサー更新(タイマ: 150ms) --- */
         fd_set fds; FD_ZERO(&fds); FD_SET(fd, &fds);
         struct timeval tv = { 0, 150000 };
         select(fd + 1, &fds, NULL, NULL, &tv);
         sensor_read(&sc, &rd);
 
         const Preset *p = &BFA_PRESETS[sel];
-        double eff_beat = feedback ? feedback_beat(p->beat, rd.ambient_c) : p->beat;
+        double eff_carrier = feedback ? bfa_feedback_carrier(p->carrier, rd.ir_object_c) : p->carrier;
+        double eff_beat    = feedback ? bfa_feedback_beat(p->beat, rd.ambient_c)         : p->beat;
 
-        /* --- 描画(バッキング Pixmap) --- */
+        if (realtime && rt && rt_audio_is_running(rt))
+            rt_audio_set_freq(rt, eff_carrier, eff_beat);
+
+        /* --- 描画 --- */
         XSetForeground(dpy, gc, c_bg);
         XFillRectangle(dpy, buf, gc, 0, 0, WIN_W, WIN_H);
 
         XSetForeground(dpy, gc, c_fg);
         XDrawString(dpy, buf, gc, 10, 20,
                     "Biofeedback Audio (X11)  IR sensor & thermometer", 48);
-        char hdr[128];
-        snprintf(hdr, sizeof(hdr), "sensor backend: %s", sensor_backend_name(&sc));
+        char hdr[160];
+        snprintf(hdr, sizeof(hdr), "sensor: %s   realtime(ALSA): %s",
+                 sensor_backend_name(&sc),
+                 (realtime && rt_audio_is_running(rt)) ? "ON" :
+                 (rt_audio_available() ? "OFF" : "N/A"));
         XDrawString(dpy, buf, gc, 10, 36, hdr, (int)strlen(hdr));
         XDrawString(dpy, buf, gc, 10, 50,
                     "* tone generator only - not a medical/therapeutic device", 56);
 
-        /* プリセット一覧 */
         int row_top = 60, row_h = 22;
         for (int i = 0; i < (int)BFA_PRESET_COUNT; i++) {
             int y = row_top + i * row_h;
-            if (i == sel) {
-                XSetForeground(dpy, gc, c_sel);
-                XFillRectangle(dpy, buf, gc, 10, y, 270, row_h);
-            }
+            if (i == sel) { XSetForeground(dpy, gc, c_sel);
+                            XFillRectangle(dpy, buf, gc, 10, y, 270, row_h); }
             XSetForeground(dpy, gc, c_fg);
             char line[128];
             snprintf(line, sizeof(line), "%-12s %6.1fHz %4.1fHz %s",
@@ -234,15 +248,13 @@ int main(int argc, char **argv) {
             XDrawString(dpy, buf, gc, 16, y + 15, line, (int)strlen(line));
         }
 
-        /* センサーパネル */
-        int px = 300, py = 70, pw = 460, ph = 150;
+        int px = 300, py = 70, pw = 480, ph = 150;
         XSetForeground(dpy, gc, c_panel);
         XFillRectangle(dpy, buf, gc, px, py, pw, ph);
         XSetForeground(dpy, gc, c_fg);
         XDrawString(dpy, buf, gc, px + 8, py + 16, "Sensors (live)", 14);
 
-        /* 温度計バー */
-        int bx = px + 110, bw = 240, bh = 14;
+        int bx = px + 110, bw = 250, bh = 14;
         double f_temp = (rd.ambient_c - 10.0) / 30.0; if (f_temp<0)f_temp=0; if(f_temp>1)f_temp=1;
         XDrawString(dpy, buf, gc, px + 8, py + 40, "Thermometer", 11);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 30, bw, bh);
@@ -250,7 +262,6 @@ int main(int argc, char **argv) {
         char t1[64]; snprintf(t1,sizeof(t1),"%.2f C", rd.ambient_c);
         XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 42, t1, (int)strlen(t1));
 
-        /* IR 対象温度バー */
         double f_iro = (rd.ir_object_c - 20.0) / 20.0; if(f_iro<0)f_iro=0; if(f_iro>1)f_iro=1;
         XDrawString(dpy, buf, gc, px + 8, py + 70, "IR object", 9);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 60, bw, bh);
@@ -258,58 +269,54 @@ int main(int argc, char **argv) {
         char t2[64]; snprintf(t2,sizeof(t2),"%.2f C", rd.ir_object_c);
         XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 72, t2, (int)strlen(t2));
 
-        /* IR 生値バー */
         XDrawString(dpy, buf, gc, px + 8, py + 100, "IR raw", 6);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 90, bw, bh);
         XSetForeground(dpy, gc, c_ir); XFillRectangle(dpy, buf, gc, bx, py + 90, (int)(bw*rd.ir_raw), bh);
         char t3[64]; snprintf(t3,sizeof(t3),"%.2f", rd.ir_raw);
         XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 102, t3, (int)strlen(t3));
 
-        /* 近接 */
         XSetForeground(dpy, gc, rd.present ? c_temp : c_warn);
         XDrawString(dpy, buf, gc, px + 8, py + 130,
                     rd.present ? "IR proximity: DETECTED" : "IR proximity: none", 22);
 
-        /* 選択情報 */
         XSetForeground(dpy, gc, c_fg);
-        char info[160];
-        snprintf(info, sizeof(info), "Selected: %s  carrier=%.1fHz  beat=%.1f -> eff=%.2fHz(%s) %s",
-                 p->key, p->carrier, p->beat, eff_beat, bfa_band_name(eff_beat),
-                 feedback ? "[FB:ON]" : "[FB:OFF]");
+        char info[200];
+        snprintf(info, sizeof(info),
+                 "Selected: %s  carrier %.1f->%.1fHz  beat %.1f->%.2fHz(%s) %s",
+                 p->key, p->carrier, eff_carrier, p->beat, eff_beat,
+                 bfa_band_name(eff_beat), feedback ? "[FB:ON]" : "[FB:OFF]");
         XDrawString(dpy, buf, gc, px, py + ph + 20, info, (int)strlen(info));
 
-        /* 波形 */
         int wx = px, wy = py + ph + 35, ww = pw, wh = 90;
         XSetForeground(dpy, gc, c_panel); XFillRectangle(dpy, buf, gc, wx, wy, ww, wh);
         XSetForeground(dpy, gc, c_wave);
         int prev_y = wy + wh/2;
         for (int xx = 0; xx < ww; xx++) {
-            double t = phase + (double)xx / ww * (3.0 / p->carrier);
-            double l, r; bfa_sample_at(t, p->carrier, eff_beat, &l, &r);
+            double t = phase + (double)xx / ww * (3.0 / eff_carrier);
+            double l, r; bfa_sample_at(t, eff_carrier, eff_beat, &l, &r);
             int yy = wy + (int)((1.0 - l) * 0.5 * (wh - 4)) + 2;
             if (xx > 0) XDrawLine(dpy, buf, gc, wx + xx - 1, prev_y, wx + xx, yy);
             prev_y = yy;
         }
 
-        /* ボタン */
-        for (int i = 0; i < 4; i++) {
-            XSetForeground(dpy, gc, (i == 2 && feedback) ? c_sel : c_btn);
+        for (int i = 0; i < 5; i++) {
+            int hot = (i == 2 && realtime) || (i == 3 && feedback);
+            XSetForeground(dpy, gc, hot ? c_sel : c_btn);
             XFillRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
             XSetForeground(dpy, gc, c_fg);
             XDrawRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
-            XDrawString(dpy, buf, gc, btns[i].x + 12, btns[i].y + 20,
+            XDrawString(dpy, buf, gc, btns[i].x + 10, btns[i].y + 20,
                         btns[i].label, (int)strlen(btns[i].label));
         }
 
-        /* ステータス */
         XDrawString(dpy, buf, gc, 10, WIN_H - 8, status, (int)strlen(status));
 
-        /* バッファをウィンドウへ転送 */
         XCopyArea(dpy, buf, win, gc, 0, 0, WIN_W, WIN_H, 0, 0);
         XFlush(dpy);
         phase += 0.02;
     }
 
+    if (rt) rt_audio_destroy(rt);
     XFreePixmap(dpy, buf);
     if (font) XFreeFont(dpy, font);
     XFreeGC(dpy, gc);
