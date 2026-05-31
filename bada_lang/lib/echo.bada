@@ -57,6 +57,24 @@ fun mmode(n, frames) {
     return mm
 }
 
+// 4-D cardiac loop: list of B-mode frames over one cardiac cycle
+fun loop_frames(n, frames) {
+    let imgs <- []
+    let f <- 0
+    while f < frames {
+        push(imgs, four_chamber(n, f / frames))
+        f <- f + 1
+    }
+    return imgs
+}
+
+// write a beating-heart animated GIF and return its path
+fun loop_gif(n, frames, path, delay_cs) {
+    let g <- gif(path, n, n, delay_cs, 0)
+    for fr in loop_frames(n, frames) { g.add(fr) }
+    return g
+}
+
 // estimate ejection fraction proxy from the contraction model
 fun ejection_fraction() {
     let edv <- 1.0                 // end-diastolic (relative)

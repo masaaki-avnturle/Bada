@@ -466,6 +466,33 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- fusion / report / 4D cardiac ------------------------------------------
+
+expect("import fusion\nimport ct\nimport pet\n"
+       "let a <- ct.body_slice(40, \"head\")\nlet u <- pet.uptake_map(40, [[20,20,5,1,5]])\n"
+       "let f <- fusion.pet_ct(a, u, 0.6)\nprint f.mode",
+       "RGB\n", "PET-CT fusion produces RGB")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "r.add(\"PET\", \"hot focus\", 1.2, \"abnormal\")\n"
+       "r.add(\"Echo\", \"normal\", 0.3, \"normal\")\n"
+       "print r.ranked()[0][\"modality\"]",
+       "PET\n", "report ranks findings by salience")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "r.add(\"PET\", \"focus\", 1.2, \"abnormal\")\n"
+       "let t <- r.generate(\"PET\", 0.9)\nprint contains(t, \"IMPRESSION\")",
+       "true\n", "report generates an impression section")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "print contains(r.recommendation(\"PET\"), \"biopsy\")",
+       "true\n", "report recommends per leading modality")
+expect("import echo\nlet fr <- echo.loop_frames(40, 6)\nprint len(fr)",
+       "6\n", "4D cardiac loop frame count")
+expect("import echo\nlet g <- echo.loop_gif(40, 4, \"/tmp/_c.gif\", 10)\n"
+       "g.save()\nprint file_exists(\"/tmp/_c.gif\")\ndelete_file(\"/tmp/_c.gif\")",
+       "true\n", "4D cardiac GIF saves")
+expect("let g <- gif(\"/tmp/_u.gif\", 8, 8, 5, 0)\ng.add(image(8,8,\"L\",10))\n"
+       "let u <- g.data_uri()\nprint u[0],u[1],u[2],u[3]",
+       "d a t a\n", "gif data URI for embedding animation")
+
 # --- thermography / DEXA / echo / endoscope / monitor / ct3d ---------------
 
 expect("import thermography\nlet im <- thermography.body(40)\nprint im.mode",

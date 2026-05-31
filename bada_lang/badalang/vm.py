@@ -862,6 +862,7 @@ class VM:
         table = {
             "add": lambda a: (gif.add(a[0]), gif)[1],
             "save": lambda a: gif.save(),
+            "data_uri": lambda a: gif.data_uri(),
         }
         if name == "frame_count":
             return len(gif.frames)

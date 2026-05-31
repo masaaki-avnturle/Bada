@@ -177,15 +177,24 @@ class GifWriter:
         self.frames.append(image.gray_bytes())
         return self
 
-    def save(self):
+    def to_bytes(self):
         if not self.frames:
             from .errors import BadaRuntimeError
             raise BadaRuntimeError("gif has no frames")
-        data = _encode_gif(self.frames, self.width, self.height,
-                            self.delay, self.loop)
+        return _encode_gif(self.frames, self.width, self.height,
+                           self.delay, self.loop)
+
+    def save(self):
+        data = self.to_bytes()
         with open(self.path, "wb") as f:
             f.write(data)
         return self.path
+
+    def data_uri(self):
+        """Return a base64 GIF data: URI for embedding an animation in HTML."""
+        import base64
+        b64 = base64.b64encode(self.to_bytes()).decode("ascii")
+        return "data:image/gif;base64," + b64
 
     def __repr__(self):
         return f"<gif {self.path!r} {len(self.frames)} frames>"
