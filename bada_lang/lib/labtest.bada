@@ -1,0 +1,89 @@
+// labtest — blood chemistry/haematology analyser on the gamma manifold.
+//
+//   import labtest
+//   let lab <- labtest.Analyzer.new()
+//   lab.measure("glucose", 180)
+//   lab.report()
+//
+// Each analyte has a reference interval [lo, hi].  A measurement is placed on
+// a gamma manifold whose shape encodes how far it sits outside the interval;
+// the THERMAL ENTROPY of that state is the abnormality / salience score, so
+// values deep outside the range carry high entropy (high diagnostic weight).
+
+// reference intervals: name -> [low, high, unit]
+fun reference_ranges() {
+    let r <- {}
+    r["wbc"]        <- [3.5, 9.0, "10^3/uL"]
+    r["rbc"]        <- [4.0, 5.5, "10^6/uL"]
+    r["hb"]         <- [13.0, 17.0, "g/dL"]
+    r["hct"]        <- [38, 50, "%"]
+    r["plt"]        <- [15, 35, "10^4/uL"]
+    r["glucose"]    <- [70, 110, "mg/dL"]
+    r["hba1c"]      <- [4.6, 6.2, "%"]
+    r["ast"]        <- [10, 40, "U/L"]
+    r["alt"]        <- [5, 45, "U/L"]
+    r["creatinine"] <- [0.6, 1.1, "mg/dL"]
+    r["crp"]        <- [0, 0.3, "mg/dL"]
+    r["na"]         <- [135, 145, "mEq/L"]
+    r["k"]          <- [3.5, 5.0, "mEq/L"]
+    r["ldl"]        <- [60, 139, "mg/dL"]
+    return r
+}
+
+class Analyzer {
+    field ranges
+    field results <- []
+
+    method init() { self.ranges <- reference_ranges() }
+
+    method names() { return keys(self.ranges) }
+
+    // gamma shape from how far the value lies outside [lo,hi] (in range widths)
+    method deviation_k(name, value) {
+        let r <- self.ranges[name]
+        let lo <- r[0]
+        let hi <- r[1]
+        let width <- hi - lo
+        if width <= 0 { width <- 1 }
+        let dev <- 0
+        if value < lo { dev <- (lo - value) / width }
+        if value > hi { dev <- (value - hi) / width }
+        // k grows with deviation; baseline k=1.5 in-range
+        return 1.5 + dev * 4
+    }
+
+    method measure(name, value) {
+        if not has(self.ranges, name) { throw "unknown analyte: " + name }
+        let r <- self.ranges[name]
+        let lo <- r[0]
+        let hi <- r[1]
+        let k <- self.deviation_k(name, value)
+        // salience = excess thermal entropy over the healthy baseline
+        let salience <- gamma_entropy(k, 1) - gamma_entropy(1.5, 1)
+        if salience < 0 { salience <- 0 }
+        let flag <- "normal"
+        if value < lo { flag <- "LOW" }
+        if value > hi { flag <- "HIGH" }
+        let e <- {"name": name, "value": value, "unit": r[2],
+                  "lo": lo, "hi": hi, "flag": flag,
+                  "salience": salience}
+        push(self.results, e)
+        return e
+    }
+
+    // overall abnormality load (sum of saliences) — feeds the basal ganglia
+    method total_salience() {
+        let s <- 0
+        for e in self.results { s <- s + e["salience"] }
+        return s
+    }
+
+    method report() {
+        print "=== Blood / chemistry panel ==="
+        for e in self.results {
+            print " ", e["name"], "=", e["value"], e["unit"],
+                  "[" + str(e["lo"]) + "-" + str(e["hi"]) + "]",
+                  e["flag"], " salience", round(e["salience"], 3)
+        }
+    }
+}

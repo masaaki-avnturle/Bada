@@ -1,0 +1,140 @@
+// ============================================================================
+//  MEDICAL WORKSTATION — a Bada GUI application
+//
+//  A unified diagnostic suite built on the report's GLOBAL PARTIAL-INTEGRAL
+//  MANIFOLD of the gamma operator, organised by the BASAL-GANGLIA PRINCIPLE:
+//  each device reports an abnormality salience, and a basal-ganglia gate
+//  (direct/indirect pathway competition modulated by dopamine) selects which
+//  findings drive the diagnosis.
+//
+//  Devices: brain topography, MRI, fMRI, X-ray, full-body CT (4 slices),
+//           blood panel, DNA/RNA sequencer.
+//
+//  Output: medical_workstation.html  (open in a browser)
+//
+//  Run:  ./bada run apps/medical_workstation.bada
+// ============================================================================
+
+import neuro
+import xray
+import ct
+import labtest
+import genomics
+import basal_ganglia
+import gui
+
+let N <- 110           // imaging resolution
+print "=== Bada Medical Workstation ==="
+
+// ---- imaging devices ------------------------------------------------------
+
+print "[1] brain topography / MRI / fMRI ..."
+let brain <- neuro.default_brain(N, N)
+let mri  <- brain.render_mri("ws_mri.pgm")
+let fmri <- brain.render_fmri("ws_fmri.ppm")
+let topo <- brain.render_topography("ws_topo.ppm")
+
+print "[2] X-ray ..."
+let chest <- xray.chest_phantom(N, N)
+chest.expose()
+let xr <- chest.surface().raw()
+
+print "[3] full-body CT (Radon transform + filtered back-projection) ..."
+let ct_imgs <- []
+for region in ct.REGIONS {
+    let phantom <- ct.body_slice(N, region)
+    let recon <- ct_reconstruct(phantom, 100, true)
+    push(ct_imgs, [region, recon])
+    print "    reconstructed", region
+}
+
+print "[4] blood panel ..."
+let lab <- labtest.Analyzer.new()
+lab.measure("glucose", 182)
+lab.measure("hb", 11.5)
+lab.measure("crp", 2.4)
+lab.measure("ldl", 178)
+lab.measure("alt", 62)
+
+print "[5] DNA / RNA sequencer ..."
+let seq <- genomics.Sequencer.new("ATGGCCATTGTAATGGGCCGCTGTAGC")
+seq.translate()
+
+// ---- basal-ganglia diagnostic gate ---------------------------------------
+
+print "[6] basal-ganglia gating ..."
+let bg <- basal_ganglia.Gate.new(0.65)
+bg.input("CT", 1.1)
+bg.input("MRI", 0.5)
+bg.input("fMRI", 0.7)
+bg.input("X-ray", 0.6)
+bg.input("Blood", lab.total_salience())
+bg.input("DNA-RNA", seq.expression_weight())
+let gate <- bg.weights()
+let winner <- bg.select()
+print "    selected:", winner[0], round(winner[1] * 100, 1), "%"
+
+// ---- build the GUI --------------------------------------------------------
+
+print "rendering GUI ..."
+let app <- gui.App.new("Bada Medical Workstation")
+app.style(gui.dark_theme())
+app.style(".scan img{width:100%;image-rendering:pixelated;border-radius:8px;background:#000}
+.scan{padding:6px 0}.tag{font-size:11px;color:var(--muted);margin-bottom:6px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+td{padding:3px 6px;border-bottom:1px solid #1f2a3a}
+.HIGH{color:#e08a6a;font-weight:700}.LOW{color:#6a9ae0;font-weight:700}
+.seq{font-family:monospace;font-size:11px;color:#9fe0b0;word-break:break-all;margin:2px 0}")
+
+app.add(gui.h1("Bada Medical Workstation"))
+app.add(gui.h2("gamma-manifold imaging, gated by the basal-ganglia principle"))
+
+// imaging cards (embed PNGs as data URIs)
+fun scan_card(title, sub, img) {
+    return gui.div("card", gui.div("name", title) + gui.div("tag", sub)
+        + gui.div("scan", "<img src=\"" + img.data_uri() + "\">"))
+}
+
+let cards <- ""
+cards <- cards + scan_card("Brain Topography", "qEEG scalp map", topo)
+cards <- cards + scan_card("MRI", "structural anatomy", mri)
+cards <- cards + scan_card("fMRI", "BOLD activation (entropy-weighted)", fmri)
+cards <- cards + scan_card("X-ray", "Beer-Lambert projection", xr)
+for ci in ct_imgs {
+    cards <- cards + scan_card("CT: " + ci[0], "Radon FBP reconstruction", ci[1])
+}
+app.add(gui.div("grid", cards))
+
+// blood panel table
+let tbl <- "<table><tr><td>analyte</td><td>value</td><td>ref</td><td>flag</td></tr>"
+for e in lab.results {
+    tbl <- tbl + "<tr><td>" + e["name"] + "</td><td>" + str(e["value"]) + " " + e["unit"]
+        + "</td><td>" + str(e["lo"]) + "-" + str(e["hi"]) + "</td><td class=\""
+        + e["flag"] + "\">" + e["flag"] + "</td></tr>"
+}
+tbl <- tbl + "</table>"
+app.add(gui.div("card", gui.div("name", "Blood Panel") + tbl))
+
+// DNA/RNA card
+let dna_html <- gui.div("name", "DNA / RNA Sequencer")
+    + "<div class=\"seq\">DNA " + seq.dna + "</div>"
+    + "<div class=\"seq\">RNA " + seq.rna + "</div>"
+    + "<div class=\"seq\">protein " + seq.protein + "</div>"
+    + gui.div("tag", "GC " + str(round(seq.gc_content() * 100, 1)) + "%  entropy "
+        + str(round(seq.shannon_entropy(), 2)) + " bits")
+app.add(gui.div("card", dna_html))
+
+// basal ganglia gate card with bars
+let bgh <- gui.div("name", "Basal-Ganglia Diagnostic Gate")
+    + gui.div("tag", "dopamine 0.65 - direct/indirect competition selects findings")
+for w in gate {
+    bgh <- bgh + "<div class=\"row\"><label>" + w[0] + "</label>"
+        + gui.meter("g_" + w[0], w[1], "#4a80d0")
+        + "<span class=\"val\">" + str(round(w[1] * 100, 1)) + "%</span></div>"
+}
+bgh <- bgh + gui.div("name", "&#9658; " + winner[0] + " (" + str(round(winner[1] * 100, 1)) + "%)")
+app.add(gui.div("card", bgh))
+
+app.save("medical_workstation.html")
+print "wrote medical_workstation.html"
+print "done. open it in a browser."

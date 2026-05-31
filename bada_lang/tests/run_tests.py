@@ -433,6 +433,39 @@ expect("import psychotropic as ps\n"
        "try { c.dose(\"aspirin\", 1, 1, \"/tmp/x.wav\") } catch (e) { print \"caught\" }",
        "caught\n", "unknown psychotropic throws")
 
+# --- CT / labtest / genomics / basal ganglia -------------------------------
+
+expect("let im <- image(32,32,\"L\",0)\nim.set(16,16,200)\n"
+       "let s <- ct_sinogram(im, 30)\nprint s.height",
+       "30\n", "CT sinogram angle count")
+expect("let im <- image(24,24,\"L\",0)\nim.fill(50)\n"
+       "let r <- ct_reconstruct(im, 40, true)\nprint r.width",
+       "24\n", "CT reconstruct size")
+expect("import labtest\nlet a <- labtest.Analyzer.new()\n"
+       "let e <- a.measure(\"glucose\", 200)\nprint e[\"flag\"]",
+       "HIGH\n", "blood panel flags high glucose")
+expect("import labtest\nlet a <- labtest.Analyzer.new()\n"
+       "a.measure(\"glucose\", 90)\nprint a.results[0][\"flag\"]",
+       "normal\n", "blood panel normal in range")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"ATGTGA\")\n"
+       "print g.transcribe()",
+       "AUGUGA\n", "DNA transcribes to RNA")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"ATGGCCTGA\")\n"
+       "print g.translate()",
+       "MA\n", "RNA translates and stops at stop codon")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"GGCCGGCC\")\n"
+       "print round(g.gc_content()*100, 0)",
+       "100.0\n", "GC content")
+expect("import basal_ganglia\nlet b <- basal_ganglia.Gate.new(0.8)\n"
+       "b.input(\"CT\", 2)\nb.input(\"MRI\", 0.2)\nprint b.select()[0]",
+       "CT\n", "basal ganglia selects the most salient")
+expect("import ct\nlet s <- ct.body_slice(40, \"thorax\")\n"
+       "print s.get(20, 20) >= 0",
+       "true\n", "CT body slice phantom builds")
+expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
+       "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
+       "d a t a\n", "image data URI for HTML embedding")
+
 # --- GUI toolkit & text rendering ------------------------------------------
 
 expect("import gui\nprint gui.h1(\"Hi\")", "<h1>Hi</h1>\n", "gui element builder")

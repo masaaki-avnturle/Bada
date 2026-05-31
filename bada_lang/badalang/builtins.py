@@ -115,6 +115,8 @@ def make_builtins():
     reg("gif", lambda a: _new_gif(a))
     reg("xray_project", lambda a: _xray_project(a))
     reg("field_project", lambda a: _field_project(a))
+    reg("ct_sinogram", lambda a: _ct_sinogram(a))
+    reg("ct_reconstruct", lambda a: _ct_reconstruct(a))
     reg("gamma_entropy", lambda a: _gamma_entropy(a))
     reg("write_wav", lambda a: _write_wav(a))
     reg("write_wav_stereo", lambda a: _write_wav_stereo(a))
@@ -438,6 +440,27 @@ def _field_project(a):
     gain = float(a[3]) if len(a) > 3 else 1.0
     entropy_flag = bool(a[4]) if len(a) > 4 else False
     return field_project(img, sources, base, gain, entropy_flag)
+
+
+def _ct_sinogram(a):
+    """Radon transform: image -> sinogram. a = [image, n_angles]"""
+    from .media import Image, ct_sinogram
+    img = a[0]
+    if not isinstance(img, Image):
+        raise BadaTypeError("ct_sinogram expects an image")
+    n_angles = int(a[1]) if len(a) > 1 else 90
+    return ct_sinogram(img, n_angles)
+
+
+def _ct_reconstruct(a):
+    """CT forward+FBP reconstruction. a = [image, n_angles, filtered?]"""
+    from .media import Image, ct_reconstruct
+    img = a[0]
+    if not isinstance(img, Image):
+        raise BadaTypeError("ct_reconstruct expects an image")
+    n_angles = int(a[1]) if len(a) > 1 else 90
+    filtered = bool(a[2]) if len(a) > 2 else True
+    return ct_reconstruct(img, n_angles, filtered)
 
 
 def _gamma_entropy(a):

@@ -115,6 +115,44 @@ class Image:
         """Return a w*h bytes buffer of grayscale indices (for GIF frames)."""
         return bytes(self.to_gray().data)
 
+    def to_png_bytes(self):
+        """Encode the image as PNG (grayscale or RGB) using stdlib zlib."""
+        import zlib, struct
+        w, h = self.width, self.height
+        if self.mode == "RGB":
+            ctype = 2
+            stride = w * 3
+            pix = bytes(self.data)
+        else:
+            ctype = 0
+            stride = w
+            pix = bytes(self.to_gray().data)
+        rows = bytearray()
+        for y in range(h):
+            rows.append(0)
+            rows += pix[y * stride:(y + 1) * stride]
+
+        def chunk(typ, data):
+            return (struct.pack(">I", len(data)) + typ + data
+                    + struct.pack(">I", zlib.crc32(typ + data) & 0xffffffff))
+
+        ihdr = struct.pack(">IIBBBBB", w, h, 8, ctype, 0, 0, 0)
+        return (b"\x89PNG\r\n\x1a\n"
+                + chunk(b"IHDR", ihdr)
+                + chunk(b"IDAT", zlib.compress(bytes(rows), 9))
+                + chunk(b"IEND", b""))
+
+    def save_png(self, path):
+        with open(path, "wb") as f:
+            f.write(self.to_png_bytes())
+        return path
+
+    def data_uri(self):
+        """Return a base64 PNG data: URI for embedding in HTML."""
+        import base64
+        b64 = base64.b64encode(self.to_png_bytes()).decode("ascii")
+        return "data:image/png;base64," + b64
+
     def __repr__(self):
         return f"<image {self.mode} {self.width}x{self.height}>"
 
@@ -314,6 +352,129 @@ def _normalize_inplace(buf, peak):
     g = peak / mx
     for i in range(len(buf)):
         buf[i] *= g
+
+
+# --- CT: Radon transform & filtered back-projection ------------------------
+#
+# A CT scan recovers a cross-section from its projections.  For each angle the
+# scanner measures the LINE INTEGRAL of attenuation along every ray — the
+# Radon transform.  Taken over all angles this is the "global partial integral
+# manifold" of the gamma operator across the body cross-section.  Inverting it
+# (filtered back-projection) reconstructs the slice.
+
+def ct_sinogram(image, n_angles):
+    """Forward Radon transform of a grayscale image -> sinogram image.
+
+    Output: an Image of width=n_detectors, height=n_angles; each row is the
+    parallel-beam projection (line integrals) of the slice at one angle.
+    """
+    w, h = image.width, image.height
+    cx = (w - 1) / 2.0
+    cy = (h - 1) / 2.0
+    n_det = int(math.ceil(math.hypot(w, h)))
+    det_c = (n_det - 1) / 2.0
+    src = image.data
+    sino = Image(n_det, n_angles, "L")
+    raw = [0.0] * (n_det * n_angles)
+    peak = 1e-9
+    for ai in range(n_angles):
+        theta = math.pi * ai / n_angles
+        ct = math.cos(theta)
+        st = math.sin(theta)
+        base = ai * n_det
+        for y in range(h):
+            dy = y - cy
+            for x in range(w):
+                v = src[y * w + x]
+                if v == 0:
+                    continue
+                t = (x - cx) * ct + dy * st + det_c
+                ti = int(t)
+                if 0 <= ti < n_det:
+                    raw[base + ti] += v
+        for d in range(n_det):
+            if raw[base + d] > peak:
+                peak = raw[base + d]
+    scale = 255.0 / peak
+    sd = sino.data
+    for i in range(n_det * n_angles):
+        sd[i] = _clamp8(raw[i] * scale)
+    return sino
+
+
+def _ramp_filter(row, n):
+    """Apply a discrete Ram-Lak ramp high-pass to one projection row."""
+    # Ram-Lak spatial kernel: h[0]=1/4, h[odd]=-1/(pi^2 k^2), h[even]=0
+    out = [0.0] * n
+    half = 32
+    for i in range(n):
+        acc = row[i] * 0.25
+        for k in range(1, half):
+            if k % 2 == 1:
+                hk = -1.0 / (math.pi * math.pi * k * k)
+                li = i - k
+                ri = i + k
+                if li >= 0:
+                    acc += hk * row[li]
+                if ri < n:
+                    acc += hk * row[ri]
+        out[i] = acc
+    return out
+
+
+def ct_reconstruct(image, n_angles, filtered):
+    """Full CT: forward-project `image` then filtered back-projection.
+
+    Returns the reconstructed Image (same size as input).  When `filtered` is
+    true a ramp filter sharpens the projections (true FBP); otherwise plain
+    back-projection (blurred) is returned.
+    """
+    w, h = image.width, image.height
+    cx = (w - 1) / 2.0
+    cy = (h - 1) / 2.0
+    n_det = int(math.ceil(math.hypot(w, h)))
+    det_c = (n_det - 1) / 2.0
+    src = image.data
+
+    # forward project into float rows
+    rows = []
+    for ai in range(n_angles):
+        theta = math.pi * ai / n_angles
+        ct = math.cos(theta); st = math.sin(theta)
+        proj = [0.0] * n_det
+        for y in range(h):
+            dy = y - cy
+            for x in range(w):
+                v = src[y * w + x]
+                if v:
+                    t = (x - cx) * ct + dy * st + det_c
+                    ti = int(t)
+                    if 0 <= ti < n_det:
+                        proj[ti] += v
+        if filtered:
+            proj = _ramp_filter(proj, n_det)
+        rows.append((proj, ct, st))
+
+    # back-project
+    recon = [0.0] * (w * h)
+    for (proj, ct, st) in rows:
+        for y in range(h):
+            dy = y - cy
+            base = y * w
+            for x in range(w):
+                t = (x - cx) * ct + dy * st + det_c
+                ti = int(t)
+                if 0 <= ti < n_det:
+                    recon[base + x] += proj[ti]
+
+    # normalise to 8-bit
+    mn = min(recon); mx = max(recon)
+    rng = (mx - mn) or 1.0
+    out = Image(w, h, "L")
+    od = out.data
+    for i in range(w * h):
+        od[i] = _clamp8((recon[i] - mn) / rng * 255.0)
+    return out
 
 
 # --- neural / entropy field kernel -----------------------------------------

@@ -1,0 +1,120 @@
+// genomics — DNA / RNA analysis on the gamma manifold.
+//
+//   import genomics
+//   let g <- genomics.Sequencer.new("ATGGCCATTGTAATG")
+//   g.transcribe()   g.translate()   g.report()
+//
+// DNA is sequenced, transcribed to RNA (T->U), and translated to protein.
+// Base-composition information is summarised by the SHANNON ENTROPY of the
+// sequence, and an expression / abnormality weight is read off a gamma
+// manifold whose thermal entropy reflects compositional bias (e.g. high GC).
+
+// genetic code (standard, partial-to-full) RNA codon -> amino acid letter
+fun codon_table() {
+    let c <- {}
+    let bases <- ["U", "C", "A", "G"]
+    let aa <- "FFLLSSSSYY**CC*WLLLLPPPPHHQQRRRRIIIMTTTTNNKKSSRRVVVVAAAADDEEGGGG"
+    let i <- 0
+    let idx <- 0
+    while i < 4 {
+        let j <- 0
+        while j < 4 {
+            let k <- 0
+            while k < 4 {
+                let codon <- bases[i] + bases[j] + bases[k]
+                c[codon] <- aa[idx]
+                idx <- idx + 1
+                k <- k + 1
+            }
+            j <- j + 1
+        }
+        i <- i + 1
+    }
+    return c
+}
+
+class Sequencer {
+    field dna
+    field rna <- ""
+    field protein <- ""
+    field codons
+
+    method init(dna) {
+        self.dna <- upper(dna)
+        self.codons <- codon_table()
+    }
+
+    // base counts and GC content
+    method composition() {
+        let cnt <- {"A": 0, "T": 0, "G": 0, "C": 0, "U": 0, "N": 0}
+        for b in self.dna {
+            if has(cnt, b) { cnt[b] <- cnt[b] + 1 } else { cnt["N"] <- cnt["N"] + 1 }
+        }
+        return cnt
+    }
+
+    method gc_content() {
+        let c <- self.composition()
+        let total <- len(self.dna)
+        if total == 0 { return 0 }
+        return (c["G"] + c["C"]) / total
+    }
+
+    // Shannon entropy (bits) of the base distribution = information content
+    method shannon_entropy() {
+        let c <- self.composition()
+        let total <- len(self.dna)
+        if total == 0 { return 0 }
+        let h <- 0
+        for b in ["A", "T", "G", "C"] {
+            let p <- c[b] / total
+            if p > 0 { h <- h - p * log(p) / log(2) }
+        }
+        return h
+    }
+
+    // transcription DNA -> mRNA (T -> U)
+    method transcribe() {
+        self.rna <- replace(self.dna, "T", "U")
+        return self.rna
+    }
+
+    // translation mRNA -> protein (from first base, until stop)
+    method translate() {
+        if self.rna == "" { self.transcribe() }
+        let prot <- ""
+        let i <- 0
+        let n <- len(self.rna)
+        while i + 3 <= n {
+            let codon <- self.rna[i] + self.rna[i + 1] + self.rna[i + 2]
+            if has(self.codons, codon) {
+                let aa <- self.codons[codon]
+                if aa == "*" { i <- n } else { prot <- prot + aa  i <- i + 3 }
+            } else {
+                prot <- prot + "X"
+                i <- i + 3
+            }
+        }
+        self.protein <- prot
+        return prot
+    }
+
+    // expression / abnormality weight from a gamma manifold whose shape is
+    // driven by compositional bias (deviation of GC from the 0.5 balance).
+    method expression_weight() {
+        let bias <- self.gc_content() - 0.5
+        if bias < 0 { bias <- 0 - bias }
+        let k <- 1.5 + bias * 6
+        return gamma_entropy(k, 1)
+    }
+
+    method report() {
+        print "=== DNA / RNA sequencer ==="
+        print "  DNA:", self.dna
+        print "  RNA:", self.transcribe()
+        print "  protein:", self.translate()
+        print "  GC content:", round(self.gc_content() * 100, 1), "%"
+        print "  Shannon entropy:", round(self.shannon_entropy(), 3), "bits"
+        print "  expression weight:", round(self.expression_weight(), 3)
+    }
+}
