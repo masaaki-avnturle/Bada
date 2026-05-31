@@ -466,6 +466,27 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- 3-D volume rendering --------------------------------------------------
+
+expect("let v <- ct_head_volume(24)\nprint v.nx, v.ny, v.nz",
+       "24 24 24\n", "CT head volume dimensions")
+expect("let v <- ct_head_volume(24)\nprint v.get(12, 12, 12) >= 0",
+       "true\n", "volume voxel access")
+expect("let s <- []\nfor i in range(3) { push(s, image(8, 8, \"L\", i * 50)) }\n"
+       "let v <- volume_from_slices(s)\nprint v.nz, v.get(4, 4, 1)",
+       "3 50\n", "volume from image slices")
+expect("import volume\nlet tf <- volume.bone_tissue_tf()\n"
+       "print len(tf), len(tf[0])",
+       "4 256\n", "transfer function shape")
+expect("import volume\nlet v <- ct_head_volume(28)\n"
+       "let tf <- volume.bone_tissue_tf()\n"
+       "let img <- volume.render(v, 0.5, 0.3, tf, 40)\nprint img.mode, img.width",
+       "RGB 40\n", "volume render produces an RGB image")
+expect("import volume\nlet v <- ct_head_volume(24)\n"
+       "let tf <- volume.xray_tf()\nlet fr <- volume.turntable(v, tf, 30, 4)\n"
+       "print len(fr)",
+       "4\n", "volume turntable frame count")
+
 # --- fusion / report / 4D cardiac ------------------------------------------
 
 expect("import fusion\nimport ct\nimport pet\n"
