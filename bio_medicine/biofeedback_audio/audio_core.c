@@ -1,16 +1,18 @@
 /*
  * audio_core.c — プリセット定義と WAV サイン波合成の実装
  */
-#define _POSIX_C_SOURCE 200809L
+#define _GNU_SOURCE          /* strcasestr ほか(POSIX も内包) */
 #include "audio_core.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <math.h>
 #include <stdint.h>
 #include <ctype.h>
 #include <errno.h>
+#include <locale.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -182,4 +184,27 @@ double bfa_ecg_carrier(double base_carrier, double bpm) {
     if (c < 80.0)   c = 80.0;
     if (c > 1200.0) c = 1200.0;
     return c;
+}
+
+static int locale_is_utf8(const char *s) {
+    if (!s) return 0;
+    return strcasestr(s, "utf-8") != NULL || strcasestr(s, "utf8") != NULL;
+}
+
+const char *bfa_enable_utf8_locale(void) {
+    /* まず環境の指定を尊重 */
+    const char *cur = setlocale(LC_ALL, "");
+    if (locale_is_utf8(cur))
+        return cur;
+
+    /* 環境が UTF-8 でない(POSIX/C 等)。広く存在する UTF-8 ロケールを順に試す。
+     * LC_CTYPE だけ UTF-8 にすればワイド文字/フォント選択は機能する。 */
+    static const char *cands[] = {
+        "C.UTF-8", "C.utf8", "en_US.UTF-8", "ja_JP.UTF-8", "ja_JP.utf8", NULL
+    };
+    for (int i = 0; cands[i]; i++) {
+        const char *r = setlocale(LC_CTYPE, cands[i]);
+        if (r) return r;
+    }
+    return NULL; /* 見つからなければ既定のまま */
 }

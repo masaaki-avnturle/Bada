@@ -292,6 +292,8 @@ int main(int argc, char **argv) {
         return selftest();
     }
 
+    bfa_enable_utf8_locale();   /* 文字化け対策(GTK/Pango のフォント選択用) */
+
     if (!gtk_init_check(&argc, &argv)) {
         fprintf(stderr,
             "GTK を初期化できません(DISPLAY未設定/未接続)。\n"

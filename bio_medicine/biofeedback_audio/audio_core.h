@@ -83,4 +83,15 @@ double bfa_eeg_beat(int dominant_band);
  */
 double bfa_ecg_carrier(double base_carrier, double bpm);
 
+/* ---- ロケール ---- */
+
+/*
+ * UTF-8(日本語表示)を保証するためロケールを有効化する。
+ * 環境変数(LANG等)が UTF-8 ならそれを採用し、そうでなければ
+ * C.UTF-8 / C.utf8 / en_US.UTF-8 / ja_JP.UTF-8 を順に試す。
+ * 文字化け対策として、全フロントエンドが起動時に呼ぶ。
+ * 戻り値: 採用された locale 文字列(静的領域) または NULL。
+ */
+const char *bfa_enable_utf8_locale(void);
+
 #endif /* AUDIO_CORE_H */

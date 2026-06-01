@@ -27,6 +27,19 @@ HAVE_GTK := $(shell pkg-config --exists gtk+-3.0 && echo 1 || echo 0)
 GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 2>/dev/null)
 GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 2>/dev/null)
 
+# ---- Xft(fontconfig) 検出 ----
+# X11 GUI の日本語表示に使う。無ければ旧来の XDrawString にフォールバック。
+XFT_CFLAGS := $(shell pkg-config --cflags xft 2>/dev/null)
+XFT_LIBS   := $(shell pkg-config --libs xft 2>/dev/null)
+
+# ---- ncurses(ワイド文字版) 検出 ----
+# 日本語など UTF-8 を正しく表示するため、ワイド対応の ncursesw を優先する。
+NCURSES_CFLAGS := $(shell pkg-config --cflags ncursesw 2>/dev/null)
+NCURSES_LIBS   := $(shell pkg-config --libs ncursesw 2>/dev/null)
+ifeq ($(strip $(NCURSES_LIBS)),)
+  NCURSES_LIBS := -lncursesw
+endif
+
 CORE := audio_core.c sensors.c rt_audio.c biosignal.c
 HDRS := audio_core.h sensors.h rt_audio.h biosignal.h
 
@@ -42,10 +55,10 @@ biofeedback_audio: biofeedback_audio.c $(CORE) $(HDRS)
 	$(CC) $(CFLAGS) -o $@ biofeedback_audio.c $(CORE) $(ALSA_LIBS) $(LDM)
 
 bfa_tui: gui_ncurses.c $(CORE) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ gui_ncurses.c $(CORE) -lncurses $(ALSA_LIBS) $(LDM)
+	$(CC) $(CFLAGS) $(NCURSES_CFLAGS) -o $@ gui_ncurses.c $(CORE) $(NCURSES_LIBS) $(ALSA_LIBS) $(LDM)
 
 bfa_gui: gui_x11.c $(CORE) $(HDRS)
-	$(CC) $(CFLAGS) -o $@ gui_x11.c $(CORE) -lX11 $(ALSA_LIBS) $(LDM)
+	$(CC) $(CFLAGS) $(XFT_CFLAGS) -o $@ gui_x11.c $(CORE) -lX11 $(XFT_LIBS) $(ALSA_LIBS) $(LDM)
 
 # GTK 版(gtk+-3.0 がある場合のみビルド)
 gtk:

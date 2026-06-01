@@ -27,11 +27,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <locale.h>
 #include <sys/select.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <X11/Xft/Xft.h>   /* fontconfig 経由で日本語(TrueType)を描画 */
 
 #define WIN_W 820
 #define WIN_H 760
@@ -81,6 +83,39 @@ static int in_rect(int px, int py, int x, int y, int w, int h) {
     return px >= x && px < x + w && py >= y && py < y + h;
 }
 
+/* UTF-8(日本語含む)を描画するための Xft フォント。
+ * Xlib の XDrawString/XFontSet は 8bit ないし旧式 X コアフォント前提で、
+ * fontconfig の TrueType(IPAGothic 等)を使えず日本語が化ける。
+ * Xft は fontconfig 経由で TrueType を扱えるため確実に表示できる。 */
+static XftFont   *g_font = NULL;
+static XftDraw   *g_xft  = NULL;
+static Display   *g_dpy  = NULL;
+static Visual    *g_vis  = NULL;
+static Colormap   g_cmap;
+
+/* GC の現在の前景ピクセルを RGB に戻して XftColor を作り、UTF-8 を描画。
+ * 既存の各描画箇所は直前に XSetForeground しているので色が一致する。
+ * シグネチャは XDrawString と同一(末尾の len も受け取る)。 */
+static void draw_u8(Display *dpy, Drawable d, GC gc, int x, int y,
+                    const char *s, int len) {
+    if (!g_font || !g_xft) {                 /* フォールバック */
+        XDrawString(dpy, d, gc, x, y, s, len);
+        return;
+    }
+    XGCValues gv;
+    XGetGCValues(dpy, gc, GCForeground, &gv);
+    XColor xc; xc.pixel = gv.foreground;
+    XQueryColor(dpy, g_cmap, &xc);
+    XRenderColor rc = { xc.red, xc.green, xc.blue, 0xffff };
+    XftColor col;
+    if (!XftColorAllocValue(dpy, g_vis, g_cmap, &rc, &col)) {
+        XDrawString(dpy, d, gc, x, y, s, len);
+        return;
+    }
+    XftDrawStringUtf8(g_xft, &col, g_font, x, y, (const FcChar8 *)s, len);
+    XftColorFree(dpy, g_vis, g_cmap, &col);
+}
+
 /* 有効周波数を一元計算: neuro(脳波/心電) > feedback(温度/IR) > 既定 */
 static void eff_freq(const Preset *p, int feedback, int neuro,
                      const SensorReading *rd, const BioReading *br,
@@ -100,6 +135,11 @@ static void eff_freq(const Preset *p, int feedback, int neuro,
 int main(int argc, char **argv) {
     if (argc >= 2 && strcmp(argv[1], "--selftest") == 0)
         return selftest();
+
+    /* UTF-8 の日本語を描画するためロケールを有効化(XFontSet が利用)。
+     * 環境が POSIX/C でも C.UTF-8 等へ自動フォールバックする。 */
+    bfa_enable_utf8_locale();
+    if (!XSupportsLocale()) XSetLocaleModifiers("");
 
     SensorCtx sc; sensor_init(&sc);
     SensorReading rd; memset(&rd, 0, sizeof(rd));
@@ -139,9 +179,20 @@ int main(int argc, char **argv) {
     XMapWindow(dpy, win);
 
     GC gc = XCreateGC(dpy, win, 0, NULL);
-    XFontStruct *font = XLoadQueryFont(dpy, "fixed");
-    if (font) XSetFont(dpy, gc, font->fid);
     Pixmap buf = XCreatePixmap(dpy, win, WIN_W, WIN_H, DefaultDepth(dpy, scr));
+
+    /* Xft フォント(fontconfig)で日本語表示。
+     * ":lang=ja" を付けて「日本語を含むフォント」を fontconfig に選ばせる
+     * (この環境では IPAGothic 等が選ばれ、Latin も日本語も同一フェイスで描ける)。
+     * 単一の XftFont は自動グリフ補完をしないため、最初から CJK 対応フェイスを要求するのが要点。 */
+    g_dpy  = dpy;
+    g_vis  = DefaultVisual(dpy, scr);
+    g_cmap = cm;
+    g_font = XftFontOpenName(dpy, scr, "sans-12:lang=ja");
+    if (!g_font) g_font = XftFontOpenName(dpy, scr, "IPAGothic-12");
+    if (!g_font) g_font = XftFontOpenName(dpy, scr, "sans-12");
+    /* 描画先はバッキング Pixmap(buf) */
+    g_xft  = XftDrawCreate(dpy, buf, g_vis, g_cmap);
 
     int sel = 0, feedback = 0, neuro = 0, realtime = 0;
     char status[512];
@@ -258,15 +309,15 @@ int main(int argc, char **argv) {
         XFillRectangle(dpy, buf, gc, 0, 0, WIN_W, WIN_H);
 
         XSetForeground(dpy, gc, c_fg);
-        XDrawString(dpy, buf, gc, 10, 20,
+        draw_u8(dpy, buf, gc, 10, 20,
                     "Biofeedback Audio (X11)  IR sensor & thermometer", 48);
         char hdr[160];
         snprintf(hdr, sizeof(hdr), "sensor: %s   realtime(ALSA): %s",
                  sensor_backend_name(&sc),
                  (realtime && rt_audio_is_running(rt)) ? "ON" :
                  (rt_audio_available() ? "OFF" : "N/A"));
-        XDrawString(dpy, buf, gc, 10, 36, hdr, (int)strlen(hdr));
-        XDrawString(dpy, buf, gc, 10, 50,
+        draw_u8(dpy, buf, gc, 10, 36, hdr, (int)strlen(hdr));
+        draw_u8(dpy, buf, gc, 10, 50,
                     "* tone generator only - not a medical/therapeutic device", 56);
 
         int row_top = 60, row_h = 22;
@@ -279,48 +330,48 @@ int main(int argc, char **argv) {
             snprintf(line, sizeof(line), "%-12s %6.1fHz %4.1fHz %s",
                      BFA_PRESETS[i].key, BFA_PRESETS[i].carrier,
                      BFA_PRESETS[i].beat, bfa_band_name(BFA_PRESETS[i].beat));
-            XDrawString(dpy, buf, gc, 16, y + 15, line, (int)strlen(line));
+            draw_u8(dpy, buf, gc, 16, y + 15, line, (int)strlen(line));
         }
 
         int px = 300, py = 70, pw = 480, ph = 150;
         XSetForeground(dpy, gc, c_panel);
         XFillRectangle(dpy, buf, gc, px, py, pw, ph);
         XSetForeground(dpy, gc, c_fg);
-        XDrawString(dpy, buf, gc, px + 8, py + 16, "Sensors (live)", 14);
+        draw_u8(dpy, buf, gc, px + 8, py + 16, "Sensors (live)", 14);
 
         int bx = px + 110, bw = 250, bh = 14;
         double f_temp = (rd.ambient_c - 10.0) / 30.0; if (f_temp<0)f_temp=0; if(f_temp>1)f_temp=1;
-        XDrawString(dpy, buf, gc, px + 8, py + 40, "Thermometer", 11);
+        draw_u8(dpy, buf, gc, px + 8, py + 40, "Thermometer", 11);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 30, bw, bh);
         XSetForeground(dpy, gc, c_temp); XFillRectangle(dpy, buf, gc, bx, py + 30, (int)(bw*f_temp), bh);
         char t1[64]; snprintf(t1,sizeof(t1),"%.2f C", rd.ambient_c);
-        XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 42, t1, (int)strlen(t1));
+        XSetForeground(dpy, gc, c_fg); draw_u8(dpy, buf, gc, bx + bw + 8, py + 42, t1, (int)strlen(t1));
 
         double f_iro = (rd.ir_object_c - 20.0) / 20.0; if(f_iro<0)f_iro=0; if(f_iro>1)f_iro=1;
-        XDrawString(dpy, buf, gc, px + 8, py + 70, "IR object", 9);
+        draw_u8(dpy, buf, gc, px + 8, py + 70, "IR object", 9);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 60, bw, bh);
         XSetForeground(dpy, gc, c_ir); XFillRectangle(dpy, buf, gc, bx, py + 60, (int)(bw*f_iro), bh);
         char t2[64]; snprintf(t2,sizeof(t2),"%.2f C", rd.ir_object_c);
-        XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 72, t2, (int)strlen(t2));
+        XSetForeground(dpy, gc, c_fg); draw_u8(dpy, buf, gc, bx + bw + 8, py + 72, t2, (int)strlen(t2));
 
-        XDrawString(dpy, buf, gc, px + 8, py + 100, "IR raw", 6);
+        draw_u8(dpy, buf, gc, px + 8, py + 100, "IR raw", 6);
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, bx, py + 90, bw, bh);
         XSetForeground(dpy, gc, c_ir); XFillRectangle(dpy, buf, gc, bx, py + 90, (int)(bw*rd.ir_raw), bh);
         char t3[64]; snprintf(t3,sizeof(t3),"%.2f", rd.ir_raw);
-        XSetForeground(dpy, gc, c_fg); XDrawString(dpy, buf, gc, bx + bw + 8, py + 102, t3, (int)strlen(t3));
+        XSetForeground(dpy, gc, c_fg); draw_u8(dpy, buf, gc, bx + bw + 8, py + 102, t3, (int)strlen(t3));
 
         XSetForeground(dpy, gc, rd.present ? c_temp : c_warn);
-        XDrawString(dpy, buf, gc, px + 8, py + 130,
+        draw_u8(dpy, buf, gc, px + 8, py + 130,
                     rd.present ? "IR proximity: DETECTED" : "IR proximity: none", 22);
 
         XSetForeground(dpy, gc, c_fg);
         char info[256];
         const char *mode = neuro ? "[NEURO]" : (feedback ? "[TEMP-FB]" : "[OFF]");
         snprintf(info, sizeof(info),
-                 "Selected: %s  carrier %.1f->%.1fHz  beat %.1f->%.2fHz(%s) %s",
+                 "%s  carrier %.0f→%.0fHz  beat %.1f→%.1fHz(%s) %s",
                  p->key, p->carrier, eff_carrier, p->beat, eff_beat,
                  bfa_band_name(eff_beat), mode);
-        XDrawString(dpy, buf, gc, px, py + ph + 20, info, (int)strlen(info));
+        draw_u8(dpy, buf, gc, px, py + ph + 20, info, (int)strlen(info));
 
         int wx = px, wy = py + ph + 35, ww = pw, wh = 80;
         XSetForeground(dpy, gc, c_panel); XFillRectangle(dpy, buf, gc, wx, wy, ww, wh);
@@ -339,10 +390,8 @@ int main(int argc, char **argv) {
         XSetForeground(dpy, gc, c_panel); XFillRectangle(dpy, buf, gc, gx, gy, gw, gh);
         XSetForeground(dpy, gc, c_fg);
         char bh1[128];
-        snprintf(bh1, sizeof(bh1), "EEG(脳波計) %s    dominant=%s -> beat %.1fHz",
-                 bio_backend_name(&bc), bio_band_name(br.eeg_dominant),
-                 bfa_eeg_beat(br.eeg_dominant));
-        XDrawString(dpy, buf, gc, gx + 8, gy + 16, bh1, (int)strlen(bh1));
+        snprintf(bh1, sizeof(bh1), "EEG(脳波計) %s", bio_band_name(br.eeg_dominant));
+        draw_u8(dpy, buf, gc, gx + 8, gy + 16, bh1, (int)strlen(bh1));
 
         /* EEG 帯域パワーバー(縦棒5本) */
         int eb_x = gx + 8, eb_w = 36, eb_gap = 8, eb_top = gy + 26, eb_h = 50;
@@ -354,7 +403,7 @@ int main(int argc, char **argv) {
             XSetForeground(dpy, gc, (b == br.eeg_dominant) ? c_temp : c_ir);
             XFillRectangle(dpy, buf, gc, x, eb_top + (eb_h - hh), eb_w, hh);
             XSetForeground(dpy, gc, c_fg);
-            XDrawString(dpy, buf, gc, x, eb_top + eb_h + 14,
+            draw_u8(dpy, buf, gc, x, eb_top + eb_h + 14,
                         bio_band_name(b), (int)strlen(bio_band_name(b)));
         }
 
@@ -365,7 +414,7 @@ int main(int argc, char **argv) {
         char bh2[96];
         snprintf(bh2, sizeof(bh2), "ECG(心電図)  %.1f bpm %s",
                  br.bpm, br.beat ? "<HEART R>" : "");
-        XDrawString(dpy, buf, gc, ex, gy + 16, bh2, (int)strlen(bh2));
+        draw_u8(dpy, buf, gc, ex, gy + 16, bh2, (int)strlen(bh2));
         XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, ex, ey, ew, eh);
         if (br.ecg_count > 0 && ew > 1) {
             XSetForeground(dpy, gc, br.beat ? c_warn : c_wave);
@@ -387,11 +436,11 @@ int main(int argc, char **argv) {
             XFillRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
             XSetForeground(dpy, gc, c_fg);
             XDrawRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
-            XDrawString(dpy, buf, gc, btns[i].x + 8, btns[i].y + 20,
+            draw_u8(dpy, buf, gc, btns[i].x + 8, btns[i].y + 20,
                         btns[i].label, (int)strlen(btns[i].label));
         }
 
-        XDrawString(dpy, buf, gc, 10, WIN_H - 8, status, (int)strlen(status));
+        draw_u8(dpy, buf, gc, 10, WIN_H - 8, status, (int)strlen(status));
 
         XCopyArea(dpy, buf, win, gc, 0, 0, WIN_W, WIN_H, 0, 0);
         XFlush(dpy);
@@ -399,8 +448,9 @@ int main(int argc, char **argv) {
     }
 
     if (rt) rt_audio_destroy(rt);
+    if (g_xft)  XftDrawDestroy(g_xft);
+    if (g_font) XftFontClose(dpy, g_font);
     XFreePixmap(dpy, buf);
-    if (font) XFreeFont(dpy, font);
     XFreeGC(dpy, gc);
     XDestroyWindow(dpy, win);
     XCloseDisplay(dpy);
