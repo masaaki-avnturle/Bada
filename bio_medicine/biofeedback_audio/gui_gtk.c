@@ -21,6 +21,7 @@
 #include "audio_core.h"
 #include "sensors.h"
 #include "rt_audio.h"
+#include "biosignal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,9 +33,12 @@
 typedef struct {
     SensorCtx     sc;
     SensorReading rd;
+    BioCtx        bc;
+    BioReading    br;
     RtAudio      *rt;
     int           sel;
-    int           feedback;
+    int           feedback;   /* 温度/IR -> beat/carrier */
+    int           neuro;      /* EEG/ECG -> beat/carrier */
     int           realtime;
     double        phase;
 
@@ -46,18 +50,27 @@ typedef struct {
     GtkWidget *lbl_present;
     GtkWidget *lbl_info;
     GtkWidget *lbl_status;
+    GtkWidget *lbl_eeg;
+    GtkWidget *pb_band[BIO_BAND_COUNT];
+    GtkWidget *lbl_ecg;
+    GtkWidget *ecg_draw;
     GtkWidget *draw;
     GtkWidget *btn_rt;
     GtkWidget *btn_fb;
+    GtkWidget *btn_neuro;
 } App;
 
 static double eff_carrier(App *a) {
     const Preset *p = &BFA_PRESETS[a->sel];
-    return a->feedback ? bfa_feedback_carrier(p->carrier, a->rd.ir_object_c) : p->carrier;
+    if (a->neuro)    return bfa_ecg_carrier(p->carrier, a->br.bpm);
+    if (a->feedback) return bfa_feedback_carrier(p->carrier, a->rd.ir_object_c);
+    return p->carrier;
 }
 static double eff_beat(App *a) {
     const Preset *p = &BFA_PRESETS[a->sel];
-    return a->feedback ? bfa_feedback_beat(p->beat, a->rd.ambient_c) : p->beat;
+    if (a->neuro)    return bfa_eeg_beat(a->br.eeg_dominant);
+    if (a->feedback) return bfa_feedback_beat(p->beat, a->rd.ambient_c);
+    return p->beat;
 }
 
 static void set_status(App *a, const char *msg) {
@@ -87,10 +100,35 @@ static gboolean on_draw(GtkWidget *w, cairo_t *cr, gpointer data) {
     return FALSE;
 }
 
-/* ---- 周期更新(センサー + 表示 + 実時間音声) ---- */
+/* ---- ECG 波形描画 ---- */
+static gboolean on_draw_ecg(GtkWidget *w, cairo_t *cr, gpointer data) {
+    App *a = data;
+    GtkAllocation al; gtk_widget_get_allocation(w, &al);
+    int W = al.width, H = al.height;
+
+    cairo_set_source_rgb(cr, 0.15, 0.16, 0.20);
+    cairo_paint(cr);
+    if (a->br.ecg_count <= 0) return FALSE;
+
+    if (a->br.beat) cairo_set_source_rgb(cr, 0.90, 0.35, 0.35);
+    else            cairo_set_source_rgb(cr, 0.47, 0.78, 0.94);
+    cairo_set_line_width(cr, 1.5);
+    for (int x = 0; x < W; x++) {
+        int idx = (int)((double)x / W * (ECG_WIN - 1));
+        double v = a->br.ecg_wave[idx];
+        double y = (1.0 - v) * 0.5 * (H - 4) + 2;
+        if (x == 0) cairo_move_to(cr, x, y);
+        else        cairo_line_to(cr, x, y);
+    }
+    cairo_stroke(cr);
+    return FALSE;
+}
+
+/* ---- 周期更新(センサー + 生体信号 + 表示 + 実時間音声) ---- */
 static gboolean tick(gpointer data) {
     App *a = data;
     sensor_read(&a->sc, &a->rd);
+    bio_read(&a->bc, &a->br);
 
     double ec = eff_carrier(a), eb = eff_beat(a);
     if (a->realtime && a->rt && rt_audio_is_running(a->rt))
@@ -111,16 +149,34 @@ static gboolean tick(gpointer data) {
     gtk_label_set_text(GTK_LABEL(a->lbl_present),
                        a->rd.present ? "IR近接: ●検知" : "IR近接: ○なし");
 
+    /* EEG 帯域パワー */
+    for (int b = 0; b < BIO_BAND_COUNT; b++) {
+        char bt[48];
+        gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(a->pb_band[b]), a->br.eeg_band[b]);
+        snprintf(bt, sizeof(bt), "%s %.0f%%%s", bio_band_name(b),
+                 a->br.eeg_band[b] * 100.0, (b == a->br.eeg_dominant) ? " ◀" : "");
+        gtk_progress_bar_set_text(GTK_PROGRESS_BAR(a->pb_band[b]), bt);
+    }
+    char el[128];
+    snprintf(el, sizeof(el), "EEG(脳波計) 支配帯域: %s → beat %.1fHz",
+             bio_band_name(a->br.eeg_dominant), bfa_eeg_beat(a->br.eeg_dominant));
+    gtk_label_set_text(GTK_LABEL(a->lbl_eeg), el);
+    char cl[96];
+    snprintf(cl, sizeof(cl), "ECG(心電図) 心拍: %.1f bpm %s → carrier",
+             a->br.bpm, a->br.beat ? "♥" : "");
+    gtk_label_set_text(GTK_LABEL(a->lbl_ecg), cl);
+
     const Preset *p = &BFA_PRESETS[a->sel];
+    const char *mode = a->neuro ? "[脳波/心電FB]" : (a->feedback ? "[温度FB]" : "[FB:OFF]");
     char info[400];
     snprintf(info, sizeof(info),
              "選択: %s   carrier %.1f→%.1fHz   beat %.1f→%.2fHz(%s)   %s",
-             p->jp, p->carrier, ec, p->beat, eb, bfa_band_name(eb),
-             a->feedback ? "[FB:ON]" : "[FB:OFF]");
+             p->jp, p->carrier, ec, p->beat, eb, bfa_band_name(eb), mode);
     gtk_label_set_text(GTK_LABEL(a->lbl_info), info);
 
     a->phase += 0.02;
     gtk_widget_queue_draw(a->draw);
+    gtk_widget_queue_draw(a->ecg_draw);
     return TRUE; /* 継続 */
 }
 
@@ -173,8 +229,16 @@ static void on_realtime(GtkButton *b, gpointer data) {
 static void on_fb(GtkButton *b, gpointer data) {
     (void)b; App *a = data;
     a->feedback = !a->feedback;
-    gtk_button_set_label(GTK_BUTTON(a->btn_fb), a->feedback ? "BioFB■" : "BioFB");
-    set_status(a, a->feedback ? "バイオFB ON (温度→beat, IR→carrier)" : "バイオFB OFF");
+    if (a->feedback) { a->neuro = 0; gtk_button_set_label(GTK_BUTTON(a->btn_neuro), "Neuro"); }
+    gtk_button_set_label(GTK_BUTTON(a->btn_fb), a->feedback ? "TempFB■" : "TempFB");
+    set_status(a, a->feedback ? "温度FB ON (温度→beat, IR→carrier)" : "温度FB OFF");
+}
+static void on_neuro(GtkButton *b, gpointer data) {
+    (void)b; App *a = data;
+    a->neuro = !a->neuro;
+    if (a->neuro) { a->feedback = 0; gtk_button_set_label(GTK_BUTTON(a->btn_fb), "TempFB"); }
+    gtk_button_set_label(GTK_BUTTON(a->btn_neuro), a->neuro ? "Neuro■" : "Neuro");
+    set_status(a, a->neuro ? "脳波/心電FB ON (脳波支配帯域→beat, 心拍→carrier)" : "脳波/心電FB OFF");
 }
 static void on_quit(GtkButton *b, gpointer data) {
     (void)b; App *a = data;
@@ -201,6 +265,13 @@ static int selftest(void) {
            p->jp, p->carrier, p->beat,
            bfa_feedback_carrier(p->carrier, r.ir_object_c),
            bfa_feedback_beat(p->beat, r.ambient_c));
+    BioCtx bc; bio_init(&bc);
+    BioReading br;
+    for (int i = 0; i < 40; i++) bio_read(&bc, &br);
+    printf("[selftest] biosignal backend = %s\n", bio_backend_name(&bc));
+    printf("[selftest] EEG dominant=%s -> beat=%.1fHz   ECG bpm=%.1f -> carrier=%.1fHz\n",
+           bio_band_name(br.eeg_dominant), bfa_eeg_beat(br.eeg_dominant),
+           br.bpm, bfa_ecg_carrier(p->carrier, br.bpm));
     if (bfa_write_wav("/tmp/bfa_gtk_selftest.wav", p->carrier, p->beat, 0.5) != 0) {
         printf("[selftest] WAV write FAILED\n"); return 1;
     }
@@ -231,13 +302,14 @@ int main(int argc, char **argv) {
 
     App a; memset(&a, 0, sizeof(a));
     sensor_init(&a.sc);
+    bio_init(&a.bc);
     a.rt = rt_audio_create();
     a.sel = 0;
 
     a.win = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(a.win),
-        "バイオフィードバック 音アプリ (GTK) — IRセンサー + 温度計");
-    gtk_window_set_default_size(GTK_WINDOW(a.win), 860, 600);
+        "バイオフィードバック 音アプリ (GTK) — IR/温度/脳波計/心電図");
+    gtk_window_set_default_size(GTK_WINDOW(a.win), 880, 760);
     g_signal_connect(a.win, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     GtkWidget *root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
@@ -315,13 +387,33 @@ int main(int argc, char **argv) {
     gtk_label_set_xalign(GTK_LABEL(be), 0.0);
     gtk_box_pack_start(GTK_BOX(sensors), be, FALSE, FALSE, 0);
 
+    /* --- 脳波計(EEG) パネル --- */
+    a.lbl_eeg = gtk_label_new(NULL);
+    gtk_label_set_xalign(GTK_LABEL(a.lbl_eeg), 0.0);
+    gtk_label_set_markup(GTK_LABEL(a.lbl_eeg), "<b>EEG(脳波計)</b>");
+    gtk_box_pack_start(GTK_BOX(sensors), a.lbl_eeg, FALSE, FALSE, 4);
+    for (int b = 0; b < BIO_BAND_COUNT; b++) {
+        a.pb_band[b] = make_gauge(bio_band_name(b));
+        gtk_box_pack_start(GTK_BOX(sensors), a.pb_band[b], FALSE, FALSE, 0);
+    }
+
+    /* --- 心電図(ECG) パネル --- */
+    a.lbl_ecg = gtk_label_new(NULL);
+    gtk_label_set_xalign(GTK_LABEL(a.lbl_ecg), 0.0);
+    gtk_label_set_markup(GTK_LABEL(a.lbl_ecg), "<b>ECG(心電図)</b>");
+    gtk_box_pack_start(GTK_BOX(sensors), a.lbl_ecg, FALSE, FALSE, 4);
+    a.ecg_draw = gtk_drawing_area_new();
+    gtk_widget_set_size_request(a.ecg_draw, -1, 70);
+    g_signal_connect(a.ecg_draw, "draw", G_CALLBACK(on_draw_ecg), &a);
+    gtk_box_pack_start(GTK_BOX(sensors), a.ecg_draw, FALSE, FALSE, 0);
+
     /* 波形 */
     GtkWidget *wl = gtk_label_new(NULL);
     gtk_label_set_xalign(GTK_LABEL(wl), 0.0);
-    gtk_label_set_markup(GTK_LABEL(wl), "<b>波形 (L=carrier)</b>");
+    gtk_label_set_markup(GTK_LABEL(wl), "<b>音声波形 (L=carrier)</b>");
     gtk_box_pack_start(GTK_BOX(root), wl, FALSE, FALSE, 0);
     a.draw = gtk_drawing_area_new();
-    gtk_widget_set_size_request(a.draw, -1, 120);
+    gtk_widget_set_size_request(a.draw, -1, 110);
     g_signal_connect(a.draw, "draw", G_CALLBACK(on_draw), &a);
     gtk_box_pack_start(GTK_BOX(root), a.draw, FALSE, FALSE, 0);
 
@@ -331,17 +423,20 @@ int main(int argc, char **argv) {
     GtkWidget *bp = gtk_button_new_with_label("Play");
     GtkWidget *bs = gtk_button_new_with_label("Save");
     a.btn_rt = gtk_button_new_with_label("Realtime");
-    a.btn_fb = gtk_button_new_with_label("BioFB");
+    a.btn_fb = gtk_button_new_with_label("TempFB");
+    a.btn_neuro = gtk_button_new_with_label("Neuro");
     GtkWidget *bq = gtk_button_new_with_label("Quit");
     g_signal_connect(bp, "clicked", G_CALLBACK(on_play), &a);
     g_signal_connect(bs, "clicked", G_CALLBACK(on_save), &a);
     g_signal_connect(a.btn_rt, "clicked", G_CALLBACK(on_realtime), &a);
     g_signal_connect(a.btn_fb, "clicked", G_CALLBACK(on_fb), &a);
+    g_signal_connect(a.btn_neuro, "clicked", G_CALLBACK(on_neuro), &a);
     g_signal_connect(bq, "clicked", G_CALLBACK(on_quit), &a);
     gtk_box_pack_start(GTK_BOX(bbox), bp, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(bbox), bs, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(bbox), a.btn_rt, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(bbox), a.btn_fb, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(bbox), a.btn_neuro, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(bbox), bq, TRUE, TRUE, 0);
 
     /* ステータスバー */

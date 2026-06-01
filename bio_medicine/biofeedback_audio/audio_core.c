@@ -168,3 +168,18 @@ double bfa_feedback_carrier(double base_carrier, double ir_object_c) {
     if (c > 1200.0) c = 1200.0;
     return c;
 }
+
+double bfa_eeg_beat(int dominant_band) {
+    /* delta/theta/alpha/beta/gamma の代表周波数 */
+    static const double hz[5] = { 2.5, 6.0, 10.0, 20.0, 35.0 };
+    if (dominant_band < 0) dominant_band = 0;
+    if (dominant_band > 4) dominant_band = 4;
+    return hz[dominant_band];
+}
+
+double bfa_ecg_carrier(double base_carrier, double bpm) {
+    double c = base_carrier + (bpm - 60.0) * 1.0;
+    if (c < 80.0)   c = 80.0;
+    if (c > 1200.0) c = 1200.0;
+    return c;
+}

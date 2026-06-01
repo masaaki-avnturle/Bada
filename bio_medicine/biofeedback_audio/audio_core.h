@@ -68,4 +68,19 @@ double bfa_feedback_beat(double base_beat, double ambient_c);
  */
 double bfa_feedback_carrier(double base_carrier, double ir_object_c);
 
+/* ---- 生体信号(EEG/ECG) → 周波数 マッピング ---- */
+
+/*
+ * 脳波の支配帯域(0=delta..4=gamma)から、その帯域の代表周波数(Hz)を返す。
+ * バイオフィードバックで「今の脳波に音のうなり(beat)を合わせる」用途。
+ *   delta=2.5, theta=6, alpha=10, beta=20, gamma=35
+ */
+double bfa_eeg_beat(int dominant_band);
+
+/*
+ * 心拍数(BPM)から carrier 周波数(Hz)へのオフセットを与える。
+ * 基準 60BPM で base_carrier、+1BPM ごとに +1Hz。範囲 [80, 1200]Hz。
+ */
+double bfa_ecg_carrier(double base_carrier, double bpm);
+
 #endif /* AUDIO_CORE_H */
