@@ -67,15 +67,19 @@ bfa_gui: gui_x11.c $(CORE) $(HDRS)
 	$(CC) $(CFLAGS) $(XFT_CFLAGS) -o $@ gui_x11.c $(CORE) -lX11 $(XFT_LIBS) $(ALSA_LIBS) $(LDM)
 
 # GTK 版(gtk+-3.0 がある場合のみビルド)
-gtk:
-ifeq ($(HAVE_GTK),1)
-	$(MAKE) bfa_gtk
-else
-	@echo "gtk+-3.0 が見つからないため bfa_gtk はスキップしました"
-endif
+gtk: bfa_gtk
 
+# gtk+-3.0 が無い環境では直接 'make bfa_gtk' を叩いても
+# fatal error(gtk/gtk.h not found)にせず、案内を出して安全にスキップする。
+# 導入するには: sudo apt-get install libgtk-3-dev
 bfa_gtk: gui_gtk.c $(CORE) $(HDRS)
+ifeq ($(HAVE_GTK),1)
 	$(CC) $(CFLAGS) $(GTK_CFLAGS) -o $@ gui_gtk.c $(CORE) $(GTK_LIBS) $(ALSA_LIBS) $(LDM)
+else
+	@echo "[skip] gtk+-3.0 が見つからないため bfa_gtk はビルドしません。"
+	@echo "       GTK GUI を使うには: sudo apt-get install libgtk-3-dev"
+	@echo "       (CLI/TUI/X11 は make all でそのまま使えます)"
+endif
 
 # GUI を開かずに内部ロジック(センサー+音合成)を検証
 selftest: bfa_tui bfa_gui
