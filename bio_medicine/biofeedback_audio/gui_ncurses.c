@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <locale.h>
 #include <ncurses.h>
 
 /* ---- 画面を開かない自己診断(コンテナ等での検証用) ---- */
@@ -80,6 +81,11 @@ static void draw_gauge(int y, int x, int width, double frac, const char *label,
 int main(int argc, char **argv) {
     if (argc >= 2 && strcmp(argv[1], "--selftest") == 0)
         return selftest();
+
+    /* UTF-8 の日本語/記号(♥ 等)を正しく表示するためロケールを有効化。
+     * 環境が POSIX/C でも C.UTF-8 等に自動フォールバック。
+     * ワイド文字対応の ncursesw とセットで文字化けを防ぐ。 */
+    bfa_enable_utf8_locale();
 
     SensorCtx sc; sensor_init(&sc);
     SensorReading rd; memset(&rd, 0, sizeof(rd));
