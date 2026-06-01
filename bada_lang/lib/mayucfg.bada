@@ -1,0 +1,173 @@
+// mayucfg — a shell-script configuration language for key bindings (窓使いの憂鬱).
+//
+//   import mayucfg
+//   let r <- mayucfg.compile(script, winreg.Registry.new())
+//
+// A small but powerful DSL: variables, keymaps and per-window blocks, compiled
+// into Windows-registry entries.  Example script:
+//
+//   # mayu config
+//   os win11
+//   define MOD = C
+//   keymap emacs {
+//     key $MOD-a -> move-beginning-of-line
+//     key $MOD-e -> move-end-of-line
+//     key C-k    -> kill-line
+//   }
+//   window "Editor" : emacs {
+//     key C-s -> save-buffer
+//   }
+//   window "Files" {
+//     key j -> cursor-down
+//     key / -> search
+//   }
+//
+// compile() parses the script, substitutes $variables, resolves window-to-
+// keymap inheritance, and writes each binding to
+//   HKEY_CURRENT_USER\Software\Mayu\<os>\<scope>\  value <chord> = <action>
+
+import winreg
+
+// substitute $VAR tokens using a variable map
+fun subst(s, vars) {
+    let out <- s
+    for k in keys(vars) {
+        out <- replace(out, "$" + k, vars[k])
+    }
+    return out
+}
+
+fun strip_comment(line) {
+    let i <- 0
+    let q <- false
+    while i < len(line) {
+        let c <- line[i]
+        if c == "\"" { q <- not q }
+        else if not q and c == "#" { return slice_to(line, i) }
+        else if not q and c == "/" and i + 1 < len(line) and line[i + 1] == "/" {
+            return slice_to(line, i)
+        }
+        i <- i + 1
+    }
+    return line
+}
+fun slice_to(s, end) {
+    let out <- ""
+    let i <- 0
+    while i < end { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+
+// parse + compile a script into the given registry; returns a result map
+fun compile(script, reg) {
+    let os <- "win11"
+    let vars <- {}
+    let scopes <- {}        // scope-name -> {chord: action}
+    let inherits <- {}      // window-name -> base keymap (or "")
+    let cur <- ""           // current scope being filled
+    let errors <- []
+    let nbind <- 0
+
+    let lines <- split(script, "\n")
+    let ln <- 0
+    while ln < len(lines) {
+        let raw <- trim(strip_comment(lines[ln]))
+        ln <- ln + 1
+        if raw == "" {
+        } else if raw == "}" {
+            cur <- ""
+        } else if starts_w(raw, "os ") {
+            os <- trim(slice_from2(raw, 3))
+        } else if starts_w(raw, "define ") {
+            let body <- trim(slice_from2(raw, 7))
+            let eq <- find_char(body, "=")
+            if eq >= 0 {
+                let name <- trim(slice_to(body, eq))
+                let val <- trim(slice_from2(body, eq + 1))
+                vars[name] <- val
+            }
+        } else if starts_w(raw, "keymap ") {
+            let name <- trim(replace(slice_from2(raw, 7), "{", ""))
+            cur <- name
+            if not has(scopes, cur) { scopes[cur] <- {} }
+            inherits[cur] <- ""
+        } else if starts_w(raw, "window ") {
+            // window "App" : base {   or   window "App" {
+            let rest <- slice_from2(raw, 7)
+            let name <- extract_quoted(rest)
+            let base <- ""
+            let colon <- find_char(rest, ":")
+            if colon >= 0 {
+                base <- trim(replace(slice_from2(rest, colon + 1), "{", ""))
+            }
+            cur <- name
+            if not has(scopes, cur) { scopes[cur] <- {} }
+            inherits[cur] <- base
+        } else if starts_w(raw, "key ") {
+            let body <- subst(trim(slice_from2(raw, 4)), vars)
+            let arrow <- find_arrow(body)
+            if arrow < 0 {
+                push(errors, "line " + str(ln) + ": expected 'key CHORD -> ACTION'")
+            } else if cur == "" {
+                push(errors, "line " + str(ln) + ": 'key' outside a keymap/window block")
+            } else {
+                let chord <- trim(slice_to(body, arrow))
+                let action <- trim(slice_from2(body, arrow + 2))
+                scopes[cur][chord] <- action
+                nbind <- nbind + 1
+            }
+        } else {
+            push(errors, "line " + str(ln) + ": unknown directive: " + raw)
+        }
+    }
+
+    // write to the registry: HKCU\Software\Mayu\<os>\<scope>
+    let base <- "HKEY_CURRENT_USER\\Software\\Mayu\\" + os
+    for scope in keys(scopes) {
+        let path <- base + "\\" + scope
+        // inherited base recorded as a value for traceability
+        if has(inherits, scope) and inherits[scope] != "" {
+            reg.set(path, "(inherits)", "REG_SZ", inherits[scope])
+        }
+        let m <- scopes[scope]
+        for chord in keys(m) {
+            reg.set(path, chord, "REG_SZ", m[chord])
+        }
+    }
+
+    return {"os": os, "scopes": scopes, "inherits": inherits,
+            "errors": errors, "bindings": nbind, "registry": reg}
+}
+
+// ---- string helpers -------------------------------------------------------
+
+fun starts_w(s, p) {
+    if len(s) < len(p) { return false }
+    let i <- 0
+    while i < len(p) { if s[i] != p[i] { return false }  i <- i + 1 }
+    return true
+}
+fun slice_from2(s, start) {
+    let out <- ""
+    let i <- start
+    while i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun find_char(s, c) {
+    let i <- 0
+    while i < len(s) { if s[i] == c { return i }  i <- i + 1 }
+    return 0 - 1
+}
+fun find_arrow(s) {
+    let i <- 0
+    while i + 1 < len(s) { if s[i] == "-" and s[i + 1] == ">" { return i }  i <- i + 1 }
+    return 0 - 1
+}
+fun extract_quoted(s) {
+    let i <- find_char(s, "\"")
+    if i < 0 { return "" }
+    let j <- i + 1
+    let out <- ""
+    while j < len(s) and s[j] != "\"" { out <- out + s[j]  j <- j + 1 }
+    return out
+}

@@ -466,6 +466,116 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- mayu: Windows registry + config DSL -----------------------------------
+
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print r.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\")",
+       "beg\n", "registry stores and reads a value")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\A\", \"x\", \"REG_SZ\", \"1\")\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\B\", \"y\", \"REG_SZ\", \"2\")\n"
+       "print r.subkeys(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\")",
+       "[\"A\", \"B\"]\n", "registry enumerates subkeys")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print contains(r.export_reg(), \"Windows Registry Editor Version 5.00\")",
+       "true\n", "registry exports .reg format")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"os win10\\nkeymap emacs {\\n key C-a -> beg\\n}\", reg)\n"
+       "print res[\"os\"], res[\"bindings\"], len(res[\"errors\"])",
+       "win10 1 0\n", "DSL compiles bindings for the target OS")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"define M = C\\nkeymap e {\\n key $M-k -> kill\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\e\", \"C-k\")",
+       "kill\n", "DSL substitutes $variables and registers")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"window \\\"Files\\\" : base {\\n key / -> search\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\Files\", \"(inherits)\")",
+       "base\n", "DSL window inheritance is recorded")
+
+# --- mayu: keymap registry & editor (Emacs / vim) --------------------------
+
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"emacs\", \"C-a\")",
+       "move-beginning-of-line\n", "registry resolves an Emacs binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_vim(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"vim-normal\", \"d d\")",
+       "delete-line\n", "registry resolves a vim binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "r.bind(\"Files\", \"vim-normal\", \"/\", \"search\")\n"
+       "print r.lookup(\"Files\", \"vim-normal\", \"/\")",
+       "search\n", "per-application binding registered")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"C-k\")",
+       "C-k -> kill-line  [Editor/emacs]\n", "investigation key reports the binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"Z\")",
+       "Z -> (unbound)\n", "investigation key reports unbound")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello world\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"move-beginning-of-line\", \"\")\n"
+       "b.act(\"forward-word\", \"\")\nb.act(\"kill-line\", \"\")\nprint b.line()",
+       "hello\n", "Emacs kill-line after forward-word")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"kill-line\", \"\")\nb.act(\"kill-line\", \"\")\n"
+       "b.act(\"move-beginning-of-line\", \"\")\nb.act(\"yank\", \"\")\nprint b.line()",
+       "hello\n", "kill then yank restores text")
+expect("import editor\nlet b <- editor.Buffer.new([\"aaa\", \"bbb\", \"ccc\"])\n"
+       "b.act(\"delete-line\", \"\")\nprint b.text()",
+       "bbb\nccc\n", "vim dd deletes the current line")
+expect("import editor\nlet b <- editor.Buffer.new([\"x\"])\n"
+       "b.act(\"insert-mode\", \"\")\nprint b.mode",
+       "vim-insert\n", "vim i enters insert mode")
+
+# --- Bada OS shell (CLI + GUI terminal engine) -----------------------------
+
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"pwd\")",
+       "/home/user\n", "shell pwd")
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"ls\")",
+       "Documents/  Pictures/  hello.bada\n", "shell ls lists directory")
+expect("import shell\nlet sh <- shell.Shell.new()\nsh.exec(\"cd Documents\")\n"
+       "print sh.cwd",
+       "/home/user/Documents\n", "shell cd changes the working directory")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print sh.exec(\"cat Documents/readme.txt\")[0]",
+       "W\n", "shell cat reads a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"mkdir Projects\")\nsh.exec(\"write Projects/a.txt hi there\")\n"
+       "print sh.exec(\"cat Projects/a.txt\")",
+       "hi there\n", "shell mkdir + write + cat")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print contains(sh.exec(\"bada hello.bada\"), \"compiles OK\")",
+       "true\n", "shell runs the Bada compiler on a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"cd ..\")\nprint sh.cwd",
+       "/home\n", "shell cd .. goes up a level")
+expect("import shell\nprint shell.basename(\"/home/user/x.txt\")",
+       "x.txt\n", "shell basename")
+
+# --- Bada Quantum OS: multi-qubit simulator & algorithms -------------------
+
+expect("let r <- qreg(3)\nprint qn(r), len(qprobs(r))",
+       "3 8\n", "quantum register has 2^n amplitudes")
+expect("let r <- qreg(2)\nqgate(r, \"H\", 0)\nqcnot(r, 0, 1)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[3], 3)",
+       "0.5 0.5\n", "Bell state has equal |00> and |11> weight")
+expect("let r <- qreg(1)\nqgate(r, \"X\", 0)\nprint round(qprobs(r)[1], 3)",
+       "1.0\n", "X gate flips |0> to |1>")
+expect("import qalgo\nlet r <- qalgo.grover(3, 5)\n"
+       "let p <- qprobs(r)\nlet top <- 0\nlet i <- 0\n"
+       "while i < len(p) { if p[i] > p[top] { top <- i }\n i <- i + 1 }\nprint top",
+       "5\n", "Grover amplifies the marked item")
+expect("import qalgo\nlet r <- qalgo.bernstein_vazirani(4, 11)\nprint qmeasure(r)",
+       "11\n", "Bernstein-Vazirani recovers the secret in one query")
+expect("import qalgo\nlet r <- qalgo.ghz(3)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[7], 3)",
+       "0.5 0.5\n", "GHZ state is (|000>+|111>)/sqrt2")
+expect("import qos\nlet k <- qos.Kernel.new()\nk.boot()\n"
+       "let p <- k.run(\"grover\", [3, 6])\nprint p[\"top\"], p[\"prob\"] > 0.9",
+       "6 true\n", "quantum OS runs Grover and finds the answer")
+expect("import qos\nprint qos.to_ket(6, 3)",
+       "110\n", "kernel formats a measurement as a ket")
+
 # --- compounding (drug mixing / interactions) ------------------------------
 
 expect("import compounding\n"

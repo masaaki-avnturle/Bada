@@ -1,0 +1,116 @@
+// ============================================================================
+//  mayu — 窓使いの憂鬱 command-line application (packaged as an executable)
+//
+//  Compiles a key-binding DSL into the Windows registry (Windows 10 / 11),
+//  prints the registry tree, exports a .reg file, and offers an interactive
+//  prompt to investigate / search bindings and switch the target OS.
+//
+//  This program is bundled with the Bada VM into a single executable by
+//  tools/build_exe.sh  ->  dist/mayu  (run it directly).
+// ============================================================================
+
+import winreg
+import mayucfg
+
+let DEFAULT <- "# mayu config\nos win11\ndefine MOD = C\n\nkeymap emacs {\n  key $MOD-a -> move-beginning-of-line\n  key $MOD-e -> move-end-of-line\n  key C-f -> forward-char\n  key C-b -> backward-char\n  key C-n -> next-line\n  key C-p -> previous-line\n  key C-k -> kill-line\n  key C-y -> yank\n  key M-f -> forward-word\n  key M-b -> backward-word\n}\n\nkeymap vim-normal {\n  key h -> cursor-left\n  key j -> cursor-down\n  key k -> cursor-up\n  key l -> cursor-right\n  key x -> delete-char\n  key d d -> delete-line\n  key i -> insert-mode\n  key ESC -> normal-mode\n}\n\nwindow \"Editor\" : emacs {\n  key C-x C-s -> save-buffer\n}\n\nwindow \"Files\" {\n  key j -> cursor-down\n  key / -> search\n}\n"
+
+let script <- DEFAULT
+let os <- "win11"
+let reg <- winreg.Registry.new()
+let res <- mayucfg.compile(script, reg)
+
+fun banner() {
+    print "============================================"
+    print "  mayu - 窓使いの憂鬱  (Bada executable)"
+    print "  key-binding remapper -> Windows registry"
+    print "============================================"
+}
+
+fun show_registry(reg, os) {
+    let base <- "HKEY_CURRENT_USER\\Software\\Mayu\\" + os
+    print "[" + base + "]"
+    for scope in reg.subkeys(base) {
+        let path <- base + "\\" + scope
+        print "  [" + scope + "]"
+        let vals <- reg.values_at(path)
+        for name in keys(vals) {
+            print "    " + name + " = " + vals[name][1]
+        }
+    }
+}
+
+fun recompile(newos) {
+    let s <- DEFAULT + "\nos " + newos
+    let r <- winreg.Registry.new()
+    let res2 <- mayucfg.compile(s, r)
+    return [r, res2]
+}
+
+fun find_chord(res, chord) {
+    let scopes <- res["scopes"]
+    let hits <- []
+    for scope in keys(scopes) {
+        let m <- scopes[scope]
+        if has(m, chord) { push(hits, scope + " : " + chord + " -> " + m[chord]) }
+    }
+    return hits
+}
+
+banner()
+print "compiled " + str(res["bindings"]) + " bindings, " + str(res["errors"] == [] or len(res["errors"]) == 0) + " errors=0"
+print "registered to HKEY_CURRENT_USER\\Software\\Mayu\\" + os
+let regfile <- "mayu_" + os + ".reg"
+write_file(regfile, reg.export_reg())
+print "exported " + regfile
+print ""
+print "commands: reg | export <file> | find <chord> | os <win10|win11> | scopes | help | quit"
+print ""
+
+let running <- true
+while running {
+    let line <- input("mayu> ")
+    let t <- trim(line)
+    let parts <- split(t, " ")
+    let cmd <- parts[0]
+    if cmd == "quit" or cmd == "exit" { running <- false }
+    else if cmd == "" { }
+    else if cmd == "help" {
+        print "  reg              show the Windows registry tree"
+        print "  export <file>    write a .reg file"
+        print "  find <chord>     search every scope for a key chord"
+        print "  os <win10|win11> recompile for that target OS"
+        print "  scopes           list the registered scopes"
+        print "  quit"
+    }
+    else if cmd == "reg" { show_registry(reg, os) }
+    else if cmd == "scopes" {
+        for s in reg.subkeys("HKEY_CURRENT_USER\\Software\\Mayu\\" + os) { print "  " + s }
+    }
+    else if cmd == "export" {
+        let f <- regfile
+        if len(parts) > 1 { f <- parts[1] }
+        write_file(f, reg.export_reg())
+        print "wrote " + f
+    }
+    else if cmd == "find" {
+        if len(parts) < 2 { print "usage: find <chord>" }
+        else {
+            let hits <- find_chord(res, parts[1])
+            if len(hits) == 0 { print "  (unbound) " + parts[1] }
+            else { for h in hits { print "  " + h } }
+        }
+    }
+    else if cmd == "os" {
+        if len(parts) < 2 { print "usage: os win10|win11" }
+        else {
+            os <- parts[1]
+            let rr <- recompile(os)
+            reg <- rr[0]
+            res <- rr[1]
+            regfile <- "mayu_" + os + ".reg"
+            print "recompiled for " + os + " -> HKEY_CURRENT_USER\\Software\\Mayu\\" + os
+        }
+    }
+    else { print cmd + ": unknown command (try 'help')" }
+}
+print "registry saved. bye."
