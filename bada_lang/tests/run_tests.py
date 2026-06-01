@@ -466,6 +466,39 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- mayu: keymap registry & editor (Emacs / vim) --------------------------
+
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"emacs\", \"C-a\")",
+       "move-beginning-of-line\n", "registry resolves an Emacs binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_vim(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"vim-normal\", \"d d\")",
+       "delete-line\n", "registry resolves a vim binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "r.bind(\"Files\", \"vim-normal\", \"/\", \"search\")\n"
+       "print r.lookup(\"Files\", \"vim-normal\", \"/\")",
+       "search\n", "per-application binding registered")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"C-k\")",
+       "C-k -> kill-line  [Editor/emacs]\n", "investigation key reports the binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"Z\")",
+       "Z -> (unbound)\n", "investigation key reports unbound")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello world\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"move-beginning-of-line\", \"\")\n"
+       "b.act(\"forward-word\", \"\")\nb.act(\"kill-line\", \"\")\nprint b.line()",
+       "hello\n", "Emacs kill-line after forward-word")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"kill-line\", \"\")\nb.act(\"kill-line\", \"\")\n"
+       "b.act(\"move-beginning-of-line\", \"\")\nb.act(\"yank\", \"\")\nprint b.line()",
+       "hello\n", "kill then yank restores text")
+expect("import editor\nlet b <- editor.Buffer.new([\"aaa\", \"bbb\", \"ccc\"])\n"
+       "b.act(\"delete-line\", \"\")\nprint b.text()",
+       "bbb\nccc\n", "vim dd deletes the current line")
+expect("import editor\nlet b <- editor.Buffer.new([\"x\"])\n"
+       "b.act(\"insert-mode\", \"\")\nprint b.mode",
+       "vim-insert\n", "vim i enters insert mode")
+
 # --- Bada OS shell (CLI + GUI terminal engine) -----------------------------
 
 expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"pwd\")",

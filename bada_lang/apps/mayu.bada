@@ -1,0 +1,166 @@
+// ============================================================================
+//  窓使いの憂鬱 (mayu) — a key-binding registry & remapper (Bada GUI)
+//
+//  Register key bindings in a per-application REGISTRY, switch the editor
+//  between EMACS and VIM key maps, watch the live editor obey them, and use
+//  the INVESTIGATION KEY (調査キー) to ask what any key is bound to here -
+//  the model of "Madotsukai no Yuuutsu".  The Bada registry (lib/keymap.bada)
+//  is serialised into the page; the JS editor mirrors lib/editor.bada.
+//
+//  Run:  ./bada run apps/mayu.bada   ->  mayu.html
+// ============================================================================
+
+import keymap
+import gui
+
+// ---- build the registry in Bada -------------------------------------------
+
+let reg <- keymap.Registry.new()
+reg.load_emacs("Editor")
+reg.load_vim("Editor")
+reg.load_emacs("Terminal")              // Terminal: emacs line editing
+reg.load_vim("Files")                   // Files: vim-style navigation
+reg.bind("Files", "vim-normal", "/", "search")
+reg.bind("Files", "vim-normal", "RET", "open")
+
+let apps <- ["Editor", "Terminal", "Files"]
+let modes <- ["emacs", "vim-normal", "vim-insert"]
+
+// serialise REG[app][mode] = {chord:action} into a JS object literal
+fun js_reg(reg, apps, modes) {
+    let s <- "{"
+    let ai <- 0
+    while ai < len(apps) {
+        let app <- apps[ai]
+        if ai > 0 { s <- s + "," }
+        s <- s + "'" + app + "':{"
+        let mi <- 0
+        while mi < len(modes) {
+            let mode <- modes[mi]
+            if mi > 0 { s <- s + "," }
+            s <- s + "'" + mode + "':{"
+            let m <- reg.bindings(app, mode)
+            let cks <- keys(m)
+            let ci <- 0
+            while ci < len(cks) {
+                if ci > 0 { s <- s + "," }
+                s <- s + "'" + cks[ci] + "':'" + m[cks[ci]] + "'"
+                ci <- ci + 1
+            }
+            s <- s + "}"
+            mi <- mi + 1
+        }
+        s <- s + "}"
+        ai <- ai + 1
+    }
+    return s + "}"
+}
+let REG <- js_reg(reg, apps, modes)
+
+print "=== mayu (窓使いの憂鬱) ==="
+
+let app <- gui.App.new("mayu")
+app.style(gui.dark_theme())
+app.style(".mayu{display:grid;grid-template-columns:1fr 320px;gap:16px}
+.ed{background:#0c0c12;border:1px solid #1f2a3a;border-radius:8px;padding:12px;font-family:Consolas,monospace;
+  font-size:15px;line-height:1.6;min-height:260px;outline:none}
+.ed .ln{white-space:pre}
+.cur{background:#5fd0a0;color:#04130c}
+.cur.ins{background:transparent;border-left:2px solid #5fd0a0;margin-left:-2px}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.bar select,.bar button{background:#1f2a3a;color:#eaeef7;border:1px solid #2a3340;border-radius:6px;padding:6px 10px;font-size:13px}
+.modepill{padding:3px 10px;border-radius:999px;font-weight:800;font-size:12px}
+.kt{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;max-height:300px;overflow:auto}
+.kt .row2{display:flex;justify-content:space-between;padding:2px 4px;border-bottom:1px solid #161b24}
+.kt .ch{color:#5fd0a0}.kt .ac{color:#9fb6d6}
+.inv{background:#0c0c12;border:1px solid #2a6cf0;border-radius:8px;padding:12px;font-family:Consolas,monospace}
+.inv .big{font-size:20px;font-weight:800;color:#5fd0a0}
+.cfg{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;color:#cfe9d8}")
+
+app.add(gui.h1("窓使いの憂鬱 &middot; mayu"))
+app.add(gui.h2("per-application key-binding registry - Emacs / vim editor, with the investigation key"))
+
+app.add(gui.div("bar",
+    "<label>Application</label><select id=\"app\" onchange=\"setApp(this.value)\"><option>Editor</option><option>Terminal</option><option>Files</option></select>"
+    + "<label>Key map</label><select id=\"style\" onchange=\"setStyle(this.value)\"><option value=\"emacs\">Emacs</option><option value=\"vim\">vim</option></select>"
+    + "<span class=\"modepill\" id=\"modepill\" style=\"background:#2a6cf0\">emacs</span>"
+    + "<span style=\"color:#9fb6d6;font-size:12px\">click the editor, then type - keys obey the active map</span>"))
+
+app.add("<div class=\"mayu\"><div>"
+    + "<div class=\"ed\" id=\"ed\" tabindex=\"0\"></div>"
+    + gui.div("tag", "投資キー / investigation - the last key you pressed:")
+    + "<div class=\"inv\"><div class=\"big\" id=\"invchord\">-</div><div id=\"invres\" style=\"color:#9fb6d6\">press a key in the editor</div></div>"
+    + "</div><div>"
+    + gui.div("tag", "REGISTRY (chord &rarr; action)")
+    + "<div class=\"kt\" id=\"ktab\"></div>"
+    + gui.div("tag", "mayu config")
+    + "<div class=\"cfg\" id=\"cfg\"></div>"
+    + "</div></div>")
+
+let js <- [
+    "var REG=" + REG + ";",
+    "var curApp='Editor', style='emacs';",
+    // --- editor buffer (mirror of lib/editor.bada) ---
+    "var buf={lines:['hello world','the quick brown fox','edit me with Emacs or vim keys'],row:0,col:0,mode:'emacs',kill:'',killline:false};",
+    "function line(){return buf.lines[buf.row];}",
+    "function clamp(){if(buf.row<0)buf.row=0;if(buf.row>=buf.lines.length)buf.row=buf.lines.length-1;var ll=buf.lines[buf.row].length;if(buf.col<0)buf.col=0;if(buf.col>ll)buf.col=ll;}",
+    "function insert(ch){var l=line();buf.lines[buf.row]=l.slice(0,buf.col)+ch+l.slice(buf.col);buf.col+=ch.length;}",
+    "function newline(){var l=line(),a=l.slice(0,buf.col),b=l.slice(buf.col);buf.lines.splice(buf.row,1,a,b);buf.row++;buf.col=0;}",
+    "function fwdWord(){var l=line(),i=buf.col;while(i<l.length&&l[i]===' ')i++;while(i<l.length&&l[i]!==' ')i++;buf.col=i;}",
+    "function bwdWord(){var l=line(),i=buf.col;if(i>0)i--;while(i>0&&l[i]===' ')i--;while(i>0&&l[i-1]!==' ')i--;buf.col=i;}",
+    "function act(a){",
+    "  if(a==='move-beginning-of-line'||a==='line-start')buf.col=0;",
+    "  else if(a==='move-end-of-line'||a==='line-end')buf.col=line().length;",
+    "  else if(a==='forward-char'||a==='cursor-right')buf.col++;",
+    "  else if(a==='backward-char'||a==='cursor-left')buf.col--;",
+    "  else if(a==='next-line'||a==='cursor-down')buf.row++;",
+    "  else if(a==='previous-line'||a==='cursor-up')buf.row--;",
+    "  else if(a==='goto-start'){buf.row=0;buf.col=0;}else if(a==='goto-end')buf.row=buf.lines.length-1;",
+    "  else if(a==='forward-word')fwdWord();else if(a==='backward-word')bwdWord();",
+    "  else if(a==='delete-char'){var l=line();if(buf.col<l.length)buf.lines[buf.row]=l.slice(0,buf.col)+l.slice(buf.col+1);}",
+    "  else if(a==='kill-line'){var l=line();buf.kill=l.slice(buf.col);buf.killline=false;buf.lines[buf.row]=l.slice(0,buf.col);}",
+    "  else if(a==='kill-word'){var s=buf.col;fwdWord();var l=line();buf.kill=l.slice(s,buf.col);buf.lines[buf.row]=l.slice(0,s)+l.slice(buf.col);buf.col=s;}",
+    "  else if(a==='delete-line'){buf.kill=line();buf.killline=true;if(buf.lines.length===1)buf.lines[0]='';else buf.lines.splice(buf.row,1);buf.col=0;}",
+    "  else if(a==='yank-line'){buf.kill=line();buf.killline=true;}",
+    "  else if(a==='yank'||a==='paste'){if(buf.killline){buf.lines.splice(buf.row+1,0,buf.kill);buf.row++;buf.col=0;}else insert(buf.kill);}",
+    "  else if(a==='newline')newline();",
+    "  else if(a==='insert-mode')buf.mode='vim-insert';",
+    "  else if(a==='normal-mode'){buf.mode='vim-normal';if(buf.col>0)buf.col--;}",
+    "  else if(a==='append'){buf.mode='vim-insert';buf.col++;}",
+    "  else if(a==='open-line'){buf.lines.splice(buf.row+1,0,'');buf.row++;buf.col=0;buf.mode='vim-insert';}",
+    "  clamp();}",
+    // --- key handling ---
+    "var pending='';",
+    "function curMode(){return style==='emacs'?'emacs':buf.mode;}",
+    "function chordFor(e){var c='';if(e.ctrlKey)c+='C-';if(e.altKey||e.metaKey)c+='M-';var k=e.key;if(k===' ')k='SPC';else if(k==='Enter')k='RET';else if(k==='Escape')k='ESC';else if(k.length>1)k='<'+k+'>';return c+k;}",
+    "function lookup(app,mode,ch){var r=REG[app]&&REG[app][mode]&&REG[app][mode][ch];if(r)return r;return '';}",
+    "function onKey(e){var mode=curMode();",
+    "  if(pending==='C-x'){pending='';doChord('C-x '+chordFor(e),mode,e);e.preventDefault();return;}",
+    "  var ch=chordFor(e);",
+    "  if(ch==='C-x'){pending='C-x';e.preventDefault();return;}",
+    "  if(mode==='vim-normal'&&(pending==='d'||pending==='y'||pending==='g')){var two=pending+' '+e.key;pending='';doChord(two,mode,e);e.preventDefault();return;}",
+    "  if(mode==='vim-normal'&&!e.ctrlKey&&!e.altKey&&(e.key==='d'||e.key==='y'||e.key==='g')){pending=e.key;e.preventDefault();return;}",
+    "  doChord(ch,mode,e);}",
+    "function doChord(ch,mode,e){var action=lookup(curApp,mode,ch);",
+    "  if(action){act(action);render();invShow(ch,action,mode);if(e)e.preventDefault();return;}",
+    "  if((mode==='emacs'||mode==='vim-insert')&&ch.length===1&&!ch.startsWith('C-')&&!ch.startsWith('M-')){insert(ch);render();invShow(ch,'self-insert-command',mode);if(e)e.preventDefault();return;}",
+    "  invShow(ch,'(unbound)',mode);if((ch.startsWith('C-')||ch.startsWith('M-'))&&e)e.preventDefault();}",
+    "function invShow(ch,action,mode){document.getElementById('invchord').textContent=ch;",
+    "  var src=(REG[curApp]&&REG[curApp][mode]&&REG[curApp][mode][ch])?curApp+'/'+mode:(action==='self-insert-command'?'self-insert':'unbound');",
+    "  document.getElementById('invres').textContent=ch+'  \\u2192  '+action+'   ['+src+']';}",
+    // --- render ---
+    "function render(){clamp();var html='';for(var r=0;r<buf.lines.length;r++){var l=buf.lines[r];if(r===buf.row){var c=buf.col;var cls='cur'+(buf.mode==='vim-insert'?' ins':'');var chr=c<l.length?l[c]:' ';html+='<div class=\"ln\">'+esc(l.slice(0,c))+'<span class=\"'+cls+'\">'+esc(chr)+'</span>'+esc(l.slice(c+1))+'</div>';}else html+='<div class=\"ln\">'+esc(l)+'</div>';}",
+    "  document.getElementById('ed').innerHTML=html||'<div class=\"ln\"> </div>';",
+    "  document.getElementById('modepill').textContent=curMode();renderTab();}",
+    "function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')||'';}",
+    "function renderTab(){var mode=curMode();var m=(REG[curApp]&&REG[curApp][mode])||{};var h='';for(var ch in m)h+='<div class=\"row2\"><span class=\"ch\">'+ch+'</span><span class=\"ac\">'+m[ch]+'</span></div>';document.getElementById('ktab').innerHTML=h||'<div style=\"color:#789\">(no bindings)</div>';",
+    "  var cfg='window '+curApp+' : Global\\n';for(var ch in m)cfg+='  key '+ch+' = &'+m[ch]+'\\n';document.getElementById('cfg').textContent=cfg;}",
+    // --- controls ---
+    "function setApp(a){curApp=a;render();}",
+    "function setStyle(s){style=s;buf.mode=(s==='vim')?'vim-normal':'emacs';render();}",
+    "var ed=document.getElementById('ed');ed.addEventListener('keydown',onKey);ed.focus();render();"
+]
+app.script(join(js, "\n"))
+
+app.save("mayu.html")
+print "wrote mayu.html"
