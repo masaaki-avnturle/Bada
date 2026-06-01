@@ -21,6 +21,7 @@
 #include "audio_core.h"
 #include "sensors.h"
 #include "rt_audio.h"
+#include "biosignal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,8 +33,8 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 
-#define WIN_W 800
-#define WIN_H 560
+#define WIN_W 820
+#define WIN_H 760
 
 /* ---- ディスプレイを開かない自己診断 ---- */
 static int selftest(void) {
@@ -52,6 +53,13 @@ static int selftest(void) {
            p->jp, p->carrier, p->beat,
            bfa_feedback_carrier(p->carrier, r.ir_object_c),
            bfa_feedback_beat(p->beat, r.ambient_c));
+    BioCtx bc; bio_init(&bc);
+    BioReading br;
+    for (int i = 0; i < 40; i++) bio_read(&bc, &br);
+    printf("[selftest] biosignal backend = %s\n", bio_backend_name(&bc));
+    printf("[selftest] EEG dominant=%s -> beat=%.1fHz   ECG bpm=%.1f -> carrier=%.1fHz\n",
+           bio_band_name(br.eeg_dominant), bfa_eeg_beat(br.eeg_dominant),
+           br.bpm, bfa_ecg_carrier(p->carrier, br.bpm));
     if (bfa_write_wav("/tmp/bfa_x11_selftest.wav", p->carrier, p->beat, 0.5) != 0) {
         printf("[selftest] WAV write FAILED\n"); return 1;
     }
@@ -73,12 +81,30 @@ static int in_rect(int px, int py, int x, int y, int w, int h) {
     return px >= x && px < x + w && py >= y && py < y + h;
 }
 
+/* 有効周波数を一元計算: neuro(脳波/心電) > feedback(温度/IR) > 既定 */
+static void eff_freq(const Preset *p, int feedback, int neuro,
+                     const SensorReading *rd, const BioReading *br,
+                     double *carrier, double *beat) {
+    double c = p->carrier, b = p->beat;
+    if (feedback) {
+        c = bfa_feedback_carrier(p->carrier, rd->ir_object_c);
+        b = bfa_feedback_beat(p->beat, rd->ambient_c);
+    }
+    if (neuro) {
+        c = bfa_ecg_carrier(p->carrier, br->bpm);
+        b = bfa_eeg_beat(br->eeg_dominant);
+    }
+    *carrier = c; *beat = b;
+}
+
 int main(int argc, char **argv) {
     if (argc >= 2 && strcmp(argv[1], "--selftest") == 0)
         return selftest();
 
     SensorCtx sc; sensor_init(&sc);
     SensorReading rd; memset(&rd, 0, sizeof(rd));
+    BioCtx bc; bio_init(&bc);
+    BioReading br; memset(&br, 0, sizeof(br));
     RtAudio *rt = rt_audio_create();
 
     Display *dpy = XOpenDisplay(NULL);
@@ -117,17 +143,19 @@ int main(int argc, char **argv) {
     if (font) XSetFont(dpy, gc, font->fid);
     Pixmap buf = XCreatePixmap(dpy, win, WIN_W, WIN_H, DefaultDepth(dpy, scr));
 
-    int sel = 0, feedback = 0, realtime = 0;
+    int sel = 0, feedback = 0, neuro = 0, realtime = 0;
     char status[512];
-    snprintf(status, sizeof(status), "↑↓:選択 P:再生 S:保存 R:実時間 B:バイオFB Q:終了");
+    snprintf(status, sizeof(status), "↑↓:選択 P:再生 S:保存 R:実時間 B:温度FB E:脳波/心電FB Q:終了");
 
-    Button btns[5] = {
-        { 300, 500, 80, 30, "Play" },
-        { 388, 500, 80, 30, "Save" },
-        { 476, 500, 100, 30, "Realtime" },
-        { 584, 500, 90, 30, "BioFB" },
-        { 682, 500, 80, 30, "Quit" },
+    Button btns[6] = {
+        {  10, 720, 70, 30, "Play" },
+        {  86, 720, 70, 30, "Save" },
+        { 162, 720, 90, 30, "Realtime" },
+        { 258, 720, 80, 30, "TempFB" },
+        { 344, 720, 100, 30, "Neuro" },
+        { 450, 720, 70, 30, "Quit" },
     };
+    const int NBTN = 6;
 
     int fd = ConnectionNumber(dpy);
     double phase = 0.0;
@@ -138,8 +166,8 @@ int main(int argc, char **argv) {
             XEvent ev;
             XNextEvent(dpy, &ev);
             const Preset *p = &BFA_PRESETS[sel];
-            double ec = feedback ? bfa_feedback_carrier(p->carrier, rd.ir_object_c) : p->carrier;
-            double eb = feedback ? bfa_feedback_beat(p->beat, rd.ambient_c)         : p->beat;
+            double ec, eb;
+            eff_freq(p, feedback, neuro, &rd, &br, &ec, &eb);
 
             if (ev.type == ClientMessage) {
                 if ((Atom)ev.xclient.data.l[0] == wm_delete) running = 0;
@@ -149,8 +177,11 @@ int main(int argc, char **argv) {
                 else if (ks == XK_Up   && sel > 0) sel--;
                 else if (ks == XK_Down && sel < (int)BFA_PRESET_COUNT - 1) sel++;
                 else if (ks == XK_b || ks == XK_B) {
-                    feedback = !feedback;
-                    snprintf(status, sizeof(status), "バイオFB %s", feedback ? "ON" : "OFF");
+                    feedback = !feedback; if (feedback) neuro = 0;
+                    snprintf(status, sizeof(status), "温度FB %s", feedback ? "ON" : "OFF");
+                } else if (ks == XK_e || ks == XK_E) {
+                    neuro = !neuro; if (neuro) feedback = 0;
+                    snprintf(status, sizeof(status), "脳波/心電FB %s", neuro ? "ON" : "OFF");
                 } else if (ks == XK_r || ks == XK_R) {
                     if (!rt_audio_available())
                         snprintf(status, sizeof(status), "実時間再生は無効(ALSA無し)");
@@ -179,7 +210,7 @@ int main(int argc, char **argv) {
                     int idx = (my - row_top) / row_h;
                     if (idx >= 0 && idx < (int)BFA_PRESET_COUNT) sel = idx;
                 }
-                for (int i = 0; i < 5; i++) {
+                for (int i = 0; i < NBTN; i++) {
                     if (in_rect(mx, my, btns[i].x, btns[i].y, btns[i].w, btns[i].h)) {
                         if (i == 0) { char pa[256]; snprintf(pa,sizeof(pa),"/tmp/bfa_%s.wav",p->key);
                                       bfa_play_wav(pa, ec, eb, 15.0);
@@ -198,9 +229,11 @@ int main(int argc, char **argv) {
                                     snprintf(status,sizeof(status),"実時間再生 開始(ALSA)"); }
                                 else snprintf(status,sizeof(status),"実時間再生 失敗"); }
                         }
-                        else if (i == 3) { feedback = !feedback;
-                                      snprintf(status,sizeof(status),"バイオFB %s",feedback?"ON":"OFF"); }
-                        else if (i == 4) running = 0;
+                        else if (i == 3) { feedback = !feedback; if (feedback) neuro = 0;
+                                      snprintf(status,sizeof(status),"温度FB %s",feedback?"ON":"OFF"); }
+                        else if (i == 4) { neuro = !neuro; if (neuro) feedback = 0;
+                                      snprintf(status,sizeof(status),"脳波/心電FB %s",neuro?"ON":"OFF"); }
+                        else if (i == 5) running = 0;
                     }
                 }
             }
@@ -211,10 +244,11 @@ int main(int argc, char **argv) {
         struct timeval tv = { 0, 150000 };
         select(fd + 1, &fds, NULL, NULL, &tv);
         sensor_read(&sc, &rd);
+        bio_read(&bc, &br);
 
         const Preset *p = &BFA_PRESETS[sel];
-        double eff_carrier = feedback ? bfa_feedback_carrier(p->carrier, rd.ir_object_c) : p->carrier;
-        double eff_beat    = feedback ? bfa_feedback_beat(p->beat, rd.ambient_c)         : p->beat;
+        double eff_carrier, eff_beat;
+        eff_freq(p, feedback, neuro, &rd, &br, &eff_carrier, &eff_beat);
 
         if (realtime && rt && rt_audio_is_running(rt))
             rt_audio_set_freq(rt, eff_carrier, eff_beat);
@@ -280,14 +314,15 @@ int main(int argc, char **argv) {
                     rd.present ? "IR proximity: DETECTED" : "IR proximity: none", 22);
 
         XSetForeground(dpy, gc, c_fg);
-        char info[200];
+        char info[256];
+        const char *mode = neuro ? "[NEURO]" : (feedback ? "[TEMP-FB]" : "[OFF]");
         snprintf(info, sizeof(info),
                  "Selected: %s  carrier %.1f->%.1fHz  beat %.1f->%.2fHz(%s) %s",
                  p->key, p->carrier, eff_carrier, p->beat, eff_beat,
-                 bfa_band_name(eff_beat), feedback ? "[FB:ON]" : "[FB:OFF]");
+                 bfa_band_name(eff_beat), mode);
         XDrawString(dpy, buf, gc, px, py + ph + 20, info, (int)strlen(info));
 
-        int wx = px, wy = py + ph + 35, ww = pw, wh = 90;
+        int wx = px, wy = py + ph + 35, ww = pw, wh = 80;
         XSetForeground(dpy, gc, c_panel); XFillRectangle(dpy, buf, gc, wx, wy, ww, wh);
         XSetForeground(dpy, gc, c_wave);
         int prev_y = wy + wh/2;
@@ -299,13 +334,60 @@ int main(int argc, char **argv) {
             prev_y = yy;
         }
 
-        for (int i = 0; i < 5; i++) {
-            int hot = (i == 2 && realtime) || (i == 3 && feedback);
+        /* --- 脳波計(EEG) + 心電図(ECG) パネル --- */
+        int gx = 10, gy = 540, gw = WIN_W - 20, gh = 165;
+        XSetForeground(dpy, gc, c_panel); XFillRectangle(dpy, buf, gc, gx, gy, gw, gh);
+        XSetForeground(dpy, gc, c_fg);
+        char bh1[128];
+        snprintf(bh1, sizeof(bh1), "EEG(脳波計) %s    dominant=%s -> beat %.1fHz",
+                 bio_backend_name(&bc), bio_band_name(br.eeg_dominant),
+                 bfa_eeg_beat(br.eeg_dominant));
+        XDrawString(dpy, buf, gc, gx + 8, gy + 16, bh1, (int)strlen(bh1));
+
+        /* EEG 帯域パワーバー(縦棒5本) */
+        int eb_x = gx + 8, eb_w = 36, eb_gap = 8, eb_top = gy + 26, eb_h = 50;
+        for (int b = 0; b < BIO_BAND_COUNT; b++) {
+            int x = eb_x + b * (eb_w + eb_gap);
+            int hh = (int)(br.eeg_band[b] * eb_h);
+            XSetForeground(dpy, gc, c_btn);
+            XFillRectangle(dpy, buf, gc, x, eb_top, eb_w, eb_h);
+            XSetForeground(dpy, gc, (b == br.eeg_dominant) ? c_temp : c_ir);
+            XFillRectangle(dpy, buf, gc, x, eb_top + (eb_h - hh), eb_w, hh);
+            XSetForeground(dpy, gc, c_fg);
+            XDrawString(dpy, buf, gc, x, eb_top + eb_h + 14,
+                        bio_band_name(b), (int)strlen(bio_band_name(b)));
+        }
+
+        /* ECG 波形 + 心拍 */
+        int ex = eb_x + BIO_BAND_COUNT * (eb_w + eb_gap) + 20;
+        int ew = gx + gw - ex - 10, eh = 70, ey = gy + 26;
+        XSetForeground(dpy, gc, c_fg);
+        char bh2[96];
+        snprintf(bh2, sizeof(bh2), "ECG(心電図)  %.1f bpm %s",
+                 br.bpm, br.beat ? "<HEART R>" : "");
+        XDrawString(dpy, buf, gc, ex, gy + 16, bh2, (int)strlen(bh2));
+        XSetForeground(dpy, gc, c_btn); XFillRectangle(dpy, buf, gc, ex, ey, ew, eh);
+        if (br.ecg_count > 0 && ew > 1) {
+            XSetForeground(dpy, gc, br.beat ? c_warn : c_wave);
+            int pe = ey + eh/2;
+            for (int xx = 0; xx < ew; xx++) {
+                int idx = (int)((double)xx / ew * (ECG_WIN - 1));
+                float v = br.ecg_wave[idx];
+                int yy = ey + (int)((1.0 - v) * 0.5 * (eh - 4)) + 2;
+                if (yy < ey) yy = ey;
+                if (yy > ey + eh) yy = ey + eh;
+                if (xx > 0) XDrawLine(dpy, buf, gc, ex + xx - 1, pe, ex + xx, yy);
+                pe = yy;
+            }
+        }
+
+        for (int i = 0; i < NBTN; i++) {
+            int hot = (i == 2 && realtime) || (i == 3 && feedback) || (i == 4 && neuro);
             XSetForeground(dpy, gc, hot ? c_sel : c_btn);
             XFillRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
             XSetForeground(dpy, gc, c_fg);
             XDrawRectangle(dpy, buf, gc, btns[i].x, btns[i].y, btns[i].w, btns[i].h);
-            XDrawString(dpy, buf, gc, btns[i].x + 10, btns[i].y + 20,
+            XDrawString(dpy, buf, gc, btns[i].x + 8, btns[i].y + 20,
                         btns[i].label, (int)strlen(btns[i].label));
         }
 

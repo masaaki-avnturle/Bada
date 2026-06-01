@@ -15,13 +15,22 @@
  *   ./biofeedback_audio play <preset> [seconds]
  *   ./biofeedback_audio custom <carrier_hz> <beat_hz> <seconds> <out.wav>
  */
+#define _POSIX_C_SOURCE 200809L
 #include "audio_core.h"
+#include "biosignal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
 #include <sys/stat.h>
+
+/* 短い待機(ミリ秒)。usleep は POSIX.2008 で廃止のため nanosleep を使う */
+static void sleep_ms(long ms) {
+    struct timespec ts = { ms / 1000, (ms % 1000) * 1000000L };
+    nanosleep(&ts, NULL);
+}
 
 static void cmd_list(void) {
     printf("利用可能なプリセット (%zu 件):\n", BFA_PRESET_COUNT);
@@ -99,16 +108,46 @@ static int cmd_custom(int argc, char **argv) {
     return 0;
 }
 
+/* 脳波計(EEG) + 心電図(ECG) のライブモニタ(テキスト) */
+static int cmd_bio(int argc, char **argv) {
+    int frames = (argc >= 3) ? atoi(argv[2]) : 40;
+    if (frames <= 0) frames = 40;
+
+    BioCtx ctx; bio_init(&ctx);
+    printf("脳波計(EEG) + 心電図(ECG) モニタ  バックエンド:%s\n", bio_backend_name(&ctx));
+    printf("EEG=%dHz/%dch相当(1ch) ECG=%dHz  (Ctrl-C で中断)\n\n", EEG_FS, 1, ECG_FS);
+
+    BioReading r;
+    for (int k = 0; k < frames; k++) {
+        bio_read(&ctx, &r);
+        /* EEG 帯域パワーを百分率で */
+        printf("\rEEG ");
+        for (int b = 0; b < BIO_BAND_COUNT; b++)
+            printf("%s:%-3.0f%% ", bio_band_name(b), r.eeg_band[b] * 100);
+        printf("| 支配=%-5s  ECG bpm=%5.1f %s     ",
+               bio_band_name(r.eeg_dominant), r.bpm, r.beat ? "♥" : " ");
+        fflush(stdout);
+        sleep_ms(120);
+    }
+    printf("\n\nEEG -> 推奨 beat = %.1fHz (%s)\n",
+           bfa_eeg_beat(r.eeg_dominant), bio_band_name(r.eeg_dominant));
+    printf("ECG -> 推奨 carrier(base200) = %.1fHz (bpm=%.1f)\n",
+           bfa_ecg_carrier(200.0, r.bpm), r.bpm);
+    printf("\n注意: 医療機器ではありません。教育・可視化・バイオフィードバック用途。\n");
+    return 0;
+}
+
 static void usage(const char *prog) {
     printf("バイオフィードバック 音(サイン波)ジェネレータ — CLI\n\n");
     printf("Usage:\n");
     printf("  %s list\n", prog);
     printf("  %s gen <preset|all> [seconds] [outdir]\n", prog);
     printf("  %s play <preset> [seconds]\n", prog);
-    printf("  %s custom <carrier_hz> <beat_hz> <seconds> <out.wav>\n\n", prog);
+    printf("  %s custom <carrier_hz> <beat_hz> <seconds> <out.wav>\n", prog);
+    printf("  %s bio [frames]   (脳波計EEG + 心電図ECG ライブモニタ)\n\n", prog);
     printf("注意: 音響トーン発生器です。プリセット名はラベルであり、薬剤や\n");
     printf("      治療効果を再現・代替するものではありません。\n");
-    printf("GUI 版: ./bfa_tui (ncurses) / ./bfa_gui (X11)\n");
+    printf("GUI 版: ./bfa_tui (ncurses) / ./bfa_gui (X11) / ./bfa_gtk (GTK)\n");
 }
 
 int main(int argc, char **argv) {
@@ -117,6 +156,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "gen"))    return cmd_gen(argc, argv);
     if (!strcmp(argv[1], "play"))   return cmd_play(argc, argv);
     if (!strcmp(argv[1], "custom")) return cmd_custom(argc, argv);
+    if (!strcmp(argv[1], "bio"))    return cmd_bio(argc, argv);
     if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) { usage(argv[0]); return 0; }
     fprintf(stderr, "未知のコマンド '%s'\n\n", argv[1]);
     usage(argv[0]);

@@ -27,8 +27,8 @@ HAVE_GTK := $(shell pkg-config --exists gtk+-3.0 && echo 1 || echo 0)
 GTK_CFLAGS := $(shell pkg-config --cflags gtk+-3.0 2>/dev/null)
 GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 2>/dev/null)
 
-CORE := audio_core.c sensors.c rt_audio.c
-HDRS := audio_core.h sensors.h rt_audio.h
+CORE := audio_core.c sensors.c rt_audio.c biosignal.c
+HDRS := audio_core.h sensors.h rt_audio.h biosignal.h
 
 .PHONY: all cli tui gui gtk clean demo selftest info
 

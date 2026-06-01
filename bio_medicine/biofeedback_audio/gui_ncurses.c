@@ -23,6 +23,7 @@
 #include "audio_core.h"
 #include "sensors.h"
 #include "rt_audio.h"
+#include "biosignal.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,14 @@ static int selftest(void) {
            p->jp, p->carrier, p->beat,
            bfa_feedback_carrier(p->carrier, r.ir_object_c),
            bfa_feedback_beat(p->beat, r.ambient_c));
+    /* EEG/ECG */
+    BioCtx bc; bio_init(&bc);
+    BioReading br;
+    for (int i = 0; i < 40; i++) bio_read(&bc, &br);
+    printf("[selftest] biosignal backend = %s\n", bio_backend_name(&bc));
+    printf("[selftest] EEG dominant=%s -> beat=%.1fHz   ECG bpm=%.1f -> carrier=%.1fHz\n",
+           bio_band_name(br.eeg_dominant), bfa_eeg_beat(br.eeg_dominant),
+           br.bpm, bfa_ecg_carrier(p->carrier, br.bpm));
     if (bfa_write_wav("/tmp/bfa_selftest.wav", p->carrier, p->beat, 0.5) != 0) {
         printf("[selftest] WAV write FAILED\n");
         return 1;
@@ -74,13 +83,16 @@ int main(int argc, char **argv) {
 
     SensorCtx sc; sensor_init(&sc);
     SensorReading rd; memset(&rd, 0, sizeof(rd));
+    BioCtx bc; bio_init(&bc);
+    BioReading br; memset(&br, 0, sizeof(br));
 
     RtAudio *rt = rt_audio_create();   /* ALSA 非対応ビルドでは NULL */
 
     int sel = 0;
-    int feedback = 0;
+    int feedback = 0;   /* 温度/IR -> beat/carrier */
+    int neuro = 0;      /* EEG/ECG -> beat/carrier */
     int realtime = 0;
-    char status[512] = "↑↓:選択 p:再生 s:保存 r:実時間再生 b:バイオFB q:終了";
+    char status[512] = "↑↓:選択 p:再生 s:保存 r:実時間 b:温度FB e:脳波/心電FB q:終了";
 
     initscr();
     if (!stdscr) { fprintf(stderr, "端末を初期化できません(TTYで実行してください)\n"); return 1; }
@@ -98,9 +110,18 @@ int main(int argc, char **argv) {
     int running = 1;
     while (running) {
         sensor_read(&sc, &rd);
+        bio_read(&bc, &br);
         const Preset *p = &BFA_PRESETS[sel];
-        double eff_carrier = feedback ? bfa_feedback_carrier(p->carrier, rd.ir_object_c) : p->carrier;
-        double eff_beat    = feedback ? bfa_feedback_beat(p->beat, rd.ambient_c)         : p->beat;
+        /* 周波数決定の優先順位: 脳波/心電FB > 温度/IR FB > プリセット既定 */
+        double eff_carrier = p->carrier, eff_beat = p->beat;
+        if (feedback) {
+            eff_carrier = bfa_feedback_carrier(p->carrier, rd.ir_object_c);
+            eff_beat    = bfa_feedback_beat(p->beat, rd.ambient_c);
+        }
+        if (neuro) {
+            eff_carrier = bfa_ecg_carrier(p->carrier, br.bpm);   /* 心拍 -> carrier */
+            eff_beat    = bfa_eeg_beat(br.eeg_dominant);         /* 脳波支配帯域 -> beat */
+        }
 
         /* リアルタイム再生中は周波数をライブ更新 */
         if (realtime && rt && rt_audio_is_running(rt))
@@ -147,10 +168,40 @@ int main(int argc, char **argv) {
         if (rd.present) { attron(COLOR_PAIR(2)); mvprintw(list_top + 3, panel_x, "IR近接: ●検知"); attroff(COLOR_PAIR(2)); }
         else            { attron(COLOR_PAIR(4)); mvprintw(list_top + 3, panel_x, "IR近接: ○なし"); attroff(COLOR_PAIR(4)); }
 
-        mvprintw(list_top + 5, panel_x, "選択: %s %s", p->jp, feedback ? "[FB:ON]" : "[FB:OFF]");
+        mvprintw(list_top + 5, panel_x, "選択: %s %s%s", p->jp,
+                 feedback ? "[温度FB]" : "", neuro ? "[脳波/心電FB]" : "");
         mvprintw(list_top + 6, panel_x, "carrier=%.1fHz -> 実効=%.1fHz", p->carrier, eff_carrier);
         mvprintw(list_top + 7, panel_x, "beat=%.1fHz -> 実効=%.2fHz(%s)",
                  p->beat, eff_beat, bfa_band_name(eff_beat));
+
+        /* --- 脳波計(EEG) + 心電図(ECG) パネル --- */
+        int bio_y = list_top + 9;
+        attron(A_BOLD); mvprintw(bio_y - 1, panel_x, "[ 脳波計/心電図 %s ]", bio_backend_name(&bc)); attroff(A_BOLD);
+        attron(COLOR_PAIR(1));
+        for (int b = 0; b < BIO_BAND_COUNT; b++)
+            draw_gauge(bio_y + b, panel_x, 16, br.eeg_band[b],
+                       bio_band_name(b), br.eeg_band[b] * 100.0, "%");
+        attroff(COLOR_PAIR(1));
+        mvprintw(bio_y + BIO_BAND_COUNT, panel_x, "EEG支配帯域: %-6s (-> beat %.1fHz)",
+                 bio_band_name(br.eeg_dominant), bfa_eeg_beat(br.eeg_dominant));
+        if (br.beat) attron(COLOR_PAIR(4) | A_BOLD);
+        mvprintw(bio_y + BIO_BAND_COUNT + 1, panel_x, "ECG 心拍: %5.1f bpm %s",
+                 br.bpm, br.beat ? "♥ R" : "  ");
+        if (br.beat) attroff(COLOR_PAIR(4) | A_BOLD);
+
+        /* ECG 波形(1行ミニ表示) */
+        int ecg_y = bio_y + BIO_BAND_COUNT + 2;
+        if (ecg_y < H - 3 && br.ecg_count > 0) {
+            int ecg_w = (W - panel_x - 2);
+            if (ecg_w > 40) ecg_w = 40;
+            mvprintw(ecg_y, panel_x, "ECG:");
+            for (int xx = 0; xx < ecg_w; xx++) {
+                int idx = (int)((double)xx / ecg_w * (ECG_WIN - 1));
+                float v = br.ecg_wave[idx];
+                char ch2 = (v > 0.5) ? '^' : (v > 0.1) ? '\'' : (v < -0.1) ? '.' : '-';
+                mvaddch(ecg_y, panel_x + 5 + xx, ch2);
+            }
+        }
 
         int wf_top = list_top + (max_rows > 9 ? max_rows : 9) + 1;
         if (wf_top > H - 5) wf_top = H - 5;
@@ -178,8 +229,15 @@ int main(int argc, char **argv) {
             case KEY_DOWN: case 'j': if (sel < (int)BFA_PRESET_COUNT - 1) sel++; break;
             case 'b': case 'B':
                 feedback = !feedback;
+                if (feedback) neuro = 0;
                 snprintf(status, sizeof(status),
-                         "バイオFB %s (温度->beat, IR->carrier)", feedback ? "ON" : "OFF");
+                         "温度FB %s (温度->beat, IR->carrier)", feedback ? "ON" : "OFF");
+                break;
+            case 'e': case 'E':
+                neuro = !neuro;
+                if (neuro) feedback = 0;
+                snprintf(status, sizeof(status),
+                         "脳波/心電FB %s (脳波支配帯域->beat, 心拍->carrier)", neuro ? "ON" : "OFF");
                 break;
             case 'r': case 'R':
                 if (!rt_audio_available()) {
