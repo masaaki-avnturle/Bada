@@ -33,7 +33,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#ifdef BFA_HAVE_XFT
 #include <X11/Xft/Xft.h>   /* fontconfig 経由で日本語(TrueType)を描画 */
+#endif
 
 #define WIN_W 820
 #define WIN_H 760
@@ -86,18 +88,24 @@ static int in_rect(int px, int py, int x, int y, int w, int h) {
 /* UTF-8(日本語含む)を描画するための Xft フォント。
  * Xlib の XDrawString/XFontSet は 8bit ないし旧式 X コアフォント前提で、
  * fontconfig の TrueType(IPAGothic 等)を使えず日本語が化ける。
- * Xft は fontconfig 経由で TrueType を扱えるため確実に表示できる。 */
+ * Xft は fontconfig 経由で TrueType を扱えるため確実に表示できる。
+ *
+ * libxft が無い環境(-DBFA_HAVE_XFT 未定義)では従来の XDrawString に
+ * フォールバックしてビルドできる(その場合 ASCII のみ正しく表示)。 */
+#ifdef BFA_HAVE_XFT
 static XftFont   *g_font = NULL;
 static XftDraw   *g_xft  = NULL;
 static Display   *g_dpy  = NULL;
 static Visual    *g_vis  = NULL;
 static Colormap   g_cmap;
+#endif
 
 /* GC の現在の前景ピクセルを RGB に戻して XftColor を作り、UTF-8 を描画。
  * 既存の各描画箇所は直前に XSetForeground しているので色が一致する。
  * シグネチャは XDrawString と同一(末尾の len も受け取る)。 */
 static void draw_u8(Display *dpy, Drawable d, GC gc, int x, int y,
                     const char *s, int len) {
+#ifdef BFA_HAVE_XFT
     if (!g_font || !g_xft) {                 /* フォールバック */
         XDrawString(dpy, d, gc, x, y, s, len);
         return;
@@ -114,6 +122,9 @@ static void draw_u8(Display *dpy, Drawable d, GC gc, int x, int y,
     }
     XftDrawStringUtf8(g_xft, &col, g_font, x, y, (const FcChar8 *)s, len);
     XftColorFree(dpy, g_vis, g_cmap, &col);
+#else
+    XDrawString(dpy, d, gc, x, y, s, len);   /* Xft 無し: ASCII のみ */
+#endif
 }
 
 /* 有効周波数を一元計算: neuro(脳波/心電) > feedback(温度/IR) > 既定 */
@@ -181,6 +192,7 @@ int main(int argc, char **argv) {
     GC gc = XCreateGC(dpy, win, 0, NULL);
     Pixmap buf = XCreatePixmap(dpy, win, WIN_W, WIN_H, DefaultDepth(dpy, scr));
 
+#ifdef BFA_HAVE_XFT
     /* Xft フォント(fontconfig)で日本語表示。
      * ":lang=ja" を付けて「日本語を含むフォント」を fontconfig に選ばせる
      * (この環境では IPAGothic 等が選ばれ、Latin も日本語も同一フェイスで描ける)。
@@ -193,6 +205,7 @@ int main(int argc, char **argv) {
     if (!g_font) g_font = XftFontOpenName(dpy, scr, "sans-12");
     /* 描画先はバッキング Pixmap(buf) */
     g_xft  = XftDrawCreate(dpy, buf, g_vis, g_cmap);
+#endif
 
     int sel = 0, feedback = 0, neuro = 0, realtime = 0;
     char status[512];
@@ -448,8 +461,10 @@ int main(int argc, char **argv) {
     }
 
     if (rt) rt_audio_destroy(rt);
+#ifdef BFA_HAVE_XFT
     if (g_xft)  XftDrawDestroy(g_xft);
     if (g_font) XftFontClose(dpy, g_font);
+#endif
     XFreePixmap(dpy, buf);
     XFreeGC(dpy, gc);
     XDestroyWindow(dpy, win);
