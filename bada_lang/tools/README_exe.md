@@ -1,3 +1,30 @@
+# Bada executables
+
+Two standalone executables are built from the standard library only (no
+third-party tools), each bundling the Bada VM so they need only a Python 3
+interpreter:
+
+| build | output | what it is |
+|-------|--------|------------|
+| `python3 tools/build_all.py` | `dist/bada` | the **whole toolchain** — VM + every library + every app, in one file |
+| `python3 tools/build_exe.py` | `dist/mayu` | just the **mayu** (窓使いの憂鬱) registry remapper |
+
+## dist/bada — the whole Bada toolchain in one file
+
+```bash
+./dist/bada list              # list every bundled application
+./dist/bada run quantum_os    # run an app (writes its .html into the cwd)
+./dist/bada run xray_scanner  # writes chest_xray.pgm / .ppm / .gif
+./dist/bada mayu              # the mayu CLI
+./dist/bada repl              # interactive Bada REPL
+./dist/bada version
+```
+
+Apps that build a GUI write their `.html`; imaging apps write `.pgm/.ppm/.gif`;
+all 20 applications are available from this one executable.
+
+---
+
 # mayu — executable build (窓使いの憂鬱)
 
 `mayu` (Madotsukai no Yuuutsu) is shipped as a **standalone executable file**
