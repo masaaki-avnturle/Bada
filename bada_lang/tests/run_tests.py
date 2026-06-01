@@ -466,6 +466,31 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- Bada OS shell (CLI + GUI terminal engine) -----------------------------
+
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"pwd\")",
+       "/home/user\n", "shell pwd")
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"ls\")",
+       "Documents/  Pictures/  hello.bada\n", "shell ls lists directory")
+expect("import shell\nlet sh <- shell.Shell.new()\nsh.exec(\"cd Documents\")\n"
+       "print sh.cwd",
+       "/home/user/Documents\n", "shell cd changes the working directory")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print sh.exec(\"cat Documents/readme.txt\")[0]",
+       "W\n", "shell cat reads a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"mkdir Projects\")\nsh.exec(\"write Projects/a.txt hi there\")\n"
+       "print sh.exec(\"cat Projects/a.txt\")",
+       "hi there\n", "shell mkdir + write + cat")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print contains(sh.exec(\"bada hello.bada\"), \"compiles OK\")",
+       "true\n", "shell runs the Bada compiler on a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"cd ..\")\nprint sh.cwd",
+       "/home\n", "shell cd .. goes up a level")
+expect("import shell\nprint shell.basename(\"/home/user/x.txt\")",
+       "x.txt\n", "shell basename")
+
 # --- Bada Quantum OS: multi-qubit simulator & algorithms -------------------
 
 expect("let r <- qreg(3)\nprint qn(r), len(qprobs(r))",

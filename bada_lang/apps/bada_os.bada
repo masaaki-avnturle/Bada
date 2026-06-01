@@ -1,0 +1,182 @@
+// ============================================================================
+//  BADA OS — a w9wm-style desktop (Bada GUI)
+//
+//  The window manager follows w9wm (a virtual-desktop 9wm, from Plan 9's rio):
+//   - windows have NO title bars, just a thin border (click to raise/focus);
+//   - the ROOT window's button-3 (right-click) menu drives everything:
+//       New >    sweep out a rectangle to place a new app window
+//       Reshape  pick a window, then sweep its new geometry
+//       Move     pick a window, then drag it
+//       Delete   pick a window to close
+//       Hide     pick a window to hide (it returns in the menu's hidden list)
+//       Desktop 1..4   switch virtual desktops
+//   - built-in apps: Terminal (bada-sh), File Explorer, Settings, Notepad,
+//     Calculator, This PC, Bada Apps.
+//
+//  Run:  ./bada run apps/bada_os.bada   ->  bada_os.html
+// ============================================================================
+
+import gui
+
+let app <- gui.App.new("Bada OS (w9wm)")
+
+app.style("
+*{margin:0;padding:0;box-sizing:border-box;font-family:'DejaVu Sans Mono',Consolas,monospace}
+html,body{height:100%;overflow:hidden;user-select:none}
+#root{position:fixed;inset:0;background:#7d8a99;cursor:default}
+#bar{position:fixed;top:0;left:0;right:0;height:20px;background:#000;color:#cfe9d8;
+  font-size:12px;display:flex;align-items:center;gap:14px;padding:0 8px;z-index:9000}
+#bar b{color:#5fd0a0}
+.win{position:absolute;background:#1c1f26;border:2px solid #000;outline:1px solid #c8c8b8;
+  display:flex;flex-direction:column;overflow:hidden;color:#eaeef7;box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+.win.focus{outline:2px solid #5fd0a0}
+.wgrip{height:14px;background:#000;cursor:move;display:flex;align-items:center;justify-content:space-between;padding:0 6px}
+.wgrip .nm{color:#9fb6d6;font-size:10px}.wgrip .x{color:#e06a6a;font-size:11px;cursor:pointer;padding:0 4px}
+.wbody{flex:1;overflow:auto;padding:10px;background:#1c1f26}
+#menu{position:fixed;z-index:9500;background:#ffffea;color:#000;border:1px solid #000;
+  font-size:13px;display:none;min-width:120px;box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+#menu .mi{padding:3px 14px 3px 10px;cursor:pointer;position:relative;white-space:nowrap}
+#menu .mi:hover{background:#000;color:#ffffea}
+#menu .sep{height:1px;background:#888;margin:2px 0}
+#menu .sub{position:absolute;left:100%;top:-1px;background:#ffffea;border:1px solid #000;display:none;min-width:120px}
+#menu .mi.has:hover .sub{display:block}
+#menu .sub .mi{color:#000}
+#rubber{position:fixed;border:2px dashed #5fd0a0;background:rgba(95,208,160,.12);display:none;z-index:9400;pointer-events:none}
+#hint{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:#000;color:#5fd0a0;
+  font-size:12px;padding:4px 12px;border-radius:3px;display:none;z-index:9600}
+/* app content */
+.term{background:#0c0c12;color:#cfe9d8;font-size:13px;height:100%;padding:8px;white-space:pre-wrap;overflow:auto}
+.term .pin{display:flex}.term .pin span{color:#5fd0a0}.term input{flex:1;background:transparent;border:0;color:#cfe9d8;font-family:inherit;font-size:13px;outline:none}
+.exp{display:grid;grid-template-columns:150px 1fr;height:100%}
+.exp .nav{background:#12151b;padding:8px;font-size:12px}.exp .nav div{padding:4px 6px;cursor:pointer}.exp .nav div:hover{background:#2a2f3a}
+.exp .main{padding:10px}.crumb{font-size:11px;color:#9fb6d6;margin-bottom:8px}
+.files{display:grid;grid-template-columns:repeat(auto-fill,84px);gap:8px}
+.fitem{text-align:center;padding:6px 2px;cursor:pointer;font-size:11px;word-break:break-all}.fitem:hover{background:#2a2f3a}.fitem .g{font-size:26px;display:block}
+.calc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:260px}
+.calc .disp{grid-column:1/5;background:#0c0c12;padding:12px;text-align:right;font-size:22px}
+.calc button{padding:12px;border:0;background:#2a2f3a;color:#fff;cursor:pointer}.calc button:hover{background:#3a4250}.calc .eq{background:#2a6cf0}
+textarea.note{width:100%;height:100%;min-height:200px;background:#0c0c12;color:#eaeef7;border:0;padding:10px;font-size:14px;resize:none}
+.setrow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #2a2f3a}
+pre{font-size:12px;line-height:1.5}a{color:#5aa0ff}
+")
+
+app.add("<div id=\"root\">"
+    + "<div id=\"bar\"><b>Bada OS</b> &middot; w9wm &middot; <span id=\"deskind\">desktop 1</span>"
+    + "<span style=\"flex:1\"></span><span style=\"color:#9fb6d6\">button-3 on background = menu</span>"
+    + "<span id=\"clock\"></span></div>"
+    + "<div id=\"menu\"></div><div id=\"rubber\"></div><div id=\"hint\"></div>"
+    + "</div>")
+
+let js <- [
+    "var APPS={terminal:{name:'Terminal',icon:'\\uD83D\\uDDA5'},explorer:{name:'File Explorer',icon:'\\uD83D\\uDCC1'},",
+    "  settings:{name:'Settings',icon:'\\u2699'},notepad:{name:'Notepad',icon:'\\uD83D\\uDCDD'},",
+    "  calc:{name:'Calculator',icon:'\\uD83E\\uDDEE'},thispc:{name:'This PC',icon:'\\uD83D\\uDCBB'},apps:{name:'Bada Apps',icon:'\\uD83C\\uDFE0'}};",
+    "var wins={}, seq=0, zTop=10, curDesk=1, NDESK=4, mode='', modeApp='', focusId='';",
+    // --- virtual filesystem ---
+    "var FS={'/':'dir','/home':'dir','/home/user':'dir','/home/user/Documents':'dir',",
+    "  '/home/user/Documents/readme.txt':'Welcome to Bada OS!\\nWindow manager: w9wm (9wm + virtual desktops).',",
+    "  '/home/user/Documents/notes.md':'# Notes\\n- right-click background for the menu','/home/user/Pictures':'dir',",
+    "  '/home/user/hello.bada':'print \"Hello from Bada OS\"','/apps':'dir','/apps/quantum_os.html':'Bada Quantum OS'};",
+    "function children(dir){var pre=dir==='/'?'/':dir+'/',out=[];for(var k in FS){if(k===dir)continue;if(k.indexOf(pre)===0){var r=k.slice(pre.length);if(r&&r.indexOf('/')<0)out.push(r);}}return out.sort();}",
+    "function isDir(p){return FS[p]==='dir';}",
+    // --- window manager ---
+    "function raise(id){var w=wins[id];if(!w)return;w.el.style.zIndex=++zTop;if(focusId&&wins[focusId])wins[focusId].el.classList.remove('focus');focusId=id;w.el.classList.add('focus');}",
+    "function createWin(appId,x,y,w,h){var id='w'+(++seq);var a=APPS[appId];",
+    "  var el=document.createElement('div');el.className='win';el.id=id;el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';el.style.height=h+'px';el.style.zIndex=++zTop;",
+    "  el.innerHTML='<div class=\"wgrip\" onmousedown=\"gripDown(event,\\''+id+'\\')\"><span class=\"nm\">'+a.icon+' '+a.name+'</span><span class=\"x\" onclick=\"delWin(\\''+id+'\\')\">\\u2715</span></div><div class=\"wbody\" id=\"body_'+id+'\"></div>';",
+    "  el.onmousedown=function(){raise(id);};",
+    "  document.getElementById('root').appendChild(el);",
+    "  wins[id]={el:el,app:appId,desk:curDesk,hidden:false};",
+    "  document.getElementById('body_'+id).innerHTML=render(appId,id);",
+    "  if(appId==='terminal')initTerm(id);raise(id);return id;}",
+    "function delWin(id){if(wins[id]){wins[id].el.remove();delete wins[id];}}",
+    "function gripDown(e,id){raise(id);var w=wins[id].el,r=w.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;",
+    "  function mv(ev){w.style.left=(ev.clientX-dx)+'px';w.style.top=Math.max(20,ev.clientY-dy)+'px';}",
+    "  function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}",
+    "  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.stopPropagation();}",
+    // --- the w9wm root menu ---
+    "function showMenu(x,y){var m=document.getElementById('menu');",
+    "  var sub='';for(var a in APPS)sub+='<div class=\"mi\" onclick=\"startNew(\\''+a+'\\')\">'+APPS[a].icon+' '+APPS[a].name+'</div>';",
+    "  var hid='';for(var id in wins)if(wins[id].hidden)hid+='<div class=\"mi\" onclick=\"unhide(\\''+id+'\\')\">'+APPS[wins[id].app].name+'</div>';",
+    "  var desks='';for(var d=1;d<=NDESK;d++)desks+='<div class=\"mi\" onclick=\"switchDesk('+d+')\">'+(d===curDesk?'\\u2713 ':'   ')+'Desktop '+d+'</div>';",
+    "  m.innerHTML='<div class=\"mi has\">New \\u25B8<div class=\"sub\">'+sub+'</div></div>'+",
+    "    '<div class=\"mi\" onclick=\"setMode(\\'reshape-pick\\')\">Reshape</div>'+",
+    "    '<div class=\"mi\" onclick=\"setMode(\\'move-pick\\')\">Move</div>'+",
+    "    '<div class=\"mi\" onclick=\"setMode(\\'delete-pick\\')\">Delete</div>'+",
+    "    '<div class=\"mi\" onclick=\"setMode(\\'hide-pick\\')\">Hide</div>'+",
+    "    (hid?'<div class=\"sep\"></div>'+hid:'')+'<div class=\"sep\"></div>'+desks;",
+    "  m.style.left=Math.min(x,innerWidth-160)+'px';m.style.top=Math.min(y,innerHeight-220)+'px';m.style.display='block';}",
+    "function hideMenu(){document.getElementById('menu').style.display='none';}",
+    "function setHint(t){var h=document.getElementById('hint');if(t){h.textContent=t;h.style.display='block';}else h.style.display='none';}",
+    "function setMode(m){mode=m;hideMenu();",
+    "  if(m==='reshape-pick')setHint('click a window to reshape');",
+    "  else if(m==='move-pick')setHint('click a window, then drag it');",
+    "  else if(m==='delete-pick')setHint('click a window to delete');",
+    "  else if(m==='hide-pick')setHint('click a window to hide');}",
+    "function startNew(appId){modeApp=appId;mode='sweep-new';hideMenu();setHint('sweep a rectangle to place '+APPS[appId].name);}",
+    "function switchDesk(n){curDesk=n;hideMenu();document.getElementById('deskind').textContent='desktop '+n;",
+    "  for(var id in wins){wins[id].el.style.display=(wins[id].desk===n&&!wins[id].hidden)?'flex':'none';}}",
+    "function unhide(id){wins[id].hidden=false;wins[id].desk=curDesk;wins[id].el.style.display='flex';raise(id);hideMenu();}",
+    // --- which window is under a point ---
+    "function winAt(x,y){var best=null,bz=-1;for(var id in wins){if(wins[id].hidden||wins[id].desk!==curDesk)continue;var r=wins[id].el.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){var z=+wins[id].el.style.zIndex;if(z>bz){bz=z;best=id;}}}return best;}",
+    // --- rubber-band sweep ---
+    "var sw=null;",
+    "function rootDown(e){ if(e.button===2)return; hideMenu();",
+    "  if(mode==='sweep-new'||mode.indexOf('reshape-sweep')===0){ sw={x:e.clientX,y:e.clientY}; var rb=document.getElementById('rubber');rb.style.display='block';rb.style.left=e.clientX+'px';rb.style.top=e.clientY+'px';rb.style.width='0px';rb.style.height='0px';",
+    "    document.addEventListener('mousemove',rootMove);document.addEventListener('mouseup',rootUp);return;}",
+    "  if(mode==='reshape-pick'||mode==='move-pick'||mode==='delete-pick'||mode==='hide-pick'){var id=winAt(e.clientX,e.clientY);if(!id){mode='';setHint('');return;}",
+    "    if(mode==='delete-pick'){delWin(id);mode='';setHint('');}",
+    "    else if(mode==='hide-pick'){wins[id].hidden=true;wins[id].el.style.display='none';mode='';setHint('');}",
+    "    else if(mode==='reshape-pick'){mode='reshape-sweep:'+id;setHint('sweep the new geometry');}",
+    "    else if(mode==='move-pick'){mode='';setHint('');var w=wins[id].el,r=w.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;raise(id);",
+    "      function mv(ev){w.style.left=(ev.clientX-dx)+'px';w.style.top=Math.max(20,ev.clientY-dy)+'px';}function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);}",
+    "    return;} }",
+    "function rootMove(e){if(!sw)return;var rb=document.getElementById('rubber');var x=Math.min(sw.x,e.clientX),y=Math.min(sw.y,e.clientY);rb.style.left=x+'px';rb.style.top=y+'px';rb.style.width=Math.abs(e.clientX-sw.x)+'px';rb.style.height=Math.abs(e.clientY-sw.y)+'px';}",
+    "function rootUp(e){document.removeEventListener('mousemove',rootMove);document.removeEventListener('mouseup',rootUp);var rb=document.getElementById('rubber');rb.style.display='none';if(!sw)return;",
+    "  var x=Math.min(sw.x,e.clientX),y=Math.max(22,Math.min(sw.y,e.clientY)),w=Math.max(220,Math.abs(e.clientX-sw.x)),h=Math.max(140,Math.abs(e.clientY-sw.y));sw=null;",
+    "  if(mode==='sweep-new'){createWin(modeApp,x,y,w,h);} else if(mode.indexOf('reshape-sweep')===0){var id=mode.split(':')[1];if(wins[id]){var el=wins[id].el;el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';el.style.height=h+'px';}}",
+    "  mode='';modeApp='';setHint('');}",
+    // --- app content (same renderers) ---
+    "function render(id,wid){if(id==='explorer')return explorerHTML('/home/user',wid);if(id==='terminal')return '<div class=\"term\" id=\"termout_'+wid+'\"></div>';if(id==='settings')return settingsHTML();if(id==='notepad')return '<textarea class=\"note\" placeholder=\"type...\"></textarea>';if(id==='calc')return calcHTML(wid);if(id==='thispc')return thispcHTML();if(id==='apps')return appsHTML();return '';}",
+    "function explorerHTML(dir,wid){var items='';children(dir).forEach(function(n){var full=dir==='/'?'/'+n:dir+'/'+n;items+='<div class=\"fitem\" ondblclick=\"expOpen(\\''+full+'\\',\\''+wid+'\\')\"><span class=\"g\">'+(isDir(full)?'\\uD83D\\uDCC1':'\\uD83D\\uDCC4')+'</span>'+n+'</div>';});",
+    "  return '<div class=\"exp\"><div class=\"nav\"><div onclick=\"expGo(\\'/home/user\\',\\''+wid+'\\')\">\\uD83C\\uDFE0 Home</div><div onclick=\"expGo(\\'/home/user/Documents\\',\\''+wid+'\\')\">\\uD83D\\uDCC1 Documents</div><div onclick=\"expGo(\\'/\\',\\''+wid+'\\')\">\\uD83D\\uDCBB This PC</div></div><div class=\"main\"><div class=\"crumb\">'+dir+'</div><div class=\"files\">'+(items||'(empty)')+'</div></div></div>';}",
+    "function expGo(d,wid){document.getElementById('body_'+wid).innerHTML=explorerHTML(d,wid);}",
+    "function expOpen(p,wid){if(isDir(p))expGo(p,wid);else{var id=createWin('notepad',120,80,460,320);setTimeout(function(){var t=document.querySelector('#body_'+id+' textarea');if(t)t.value=FS[p]||'';},30);}}",
+    // terminal
+    "function resolve(cwd,p){if(!p)return cwd;var abs=p[0]==='/'?p:(cwd==='/'?'/'+p:cwd+'/'+p);var st=[];abs.split('/').forEach(function(s){if(s===''||s==='.')return;if(s==='..')st.pop();else st.push(s);});return '/'+st.join('/');}",
+    "var NEO='   ___     user@bada-os\\n  | _ )    OS: Bada OS 1.0\\n  | _ \\\\    WM: w9wm (virtual desktops)\\n  |___/    Shell: bada-sh\\n          CPU: Bada interpreter';",
+    "function mkShell(){return {cwd:'/home/user'};}",
+    "function shexec(S,line){var t=line.trim();if(!t)return'';var a=t.split(/\\s+/),c=a[0],ar=a.slice(1);",
+    "  if(c==='help')return 'ls cd pwd cat mkdir touch echo clear neofetch date whoami open <app> help';",
+    "  if(c==='pwd')return S.cwd;",
+    "  if(c==='ls'){var d=ar[0]?resolve(S.cwd,ar[0]):S.cwd;if(!isDir(d))return 'ls: not a dir';return children(d).map(function(n){return isDir((d==='/'?'/':d+'/')+n)?n+'/':n;}).join('  ');}",
+    "  if(c==='cd'){if(!ar[0]){S.cwd='/home/user';return'';}var p=resolve(S.cwd,ar[0]);if(isDir(p)){S.cwd=p;return'';}return 'cd: no such dir';}",
+    "  if(c==='cat'){var p=resolve(S.cwd,ar[0]||'');return FS[p]&&FS[p]!=='dir'?FS[p]:'cat: no such file';}",
+    "  if(c==='echo')return ar.join(' ');if(c==='mkdir'){FS[resolve(S.cwd,ar[0])]='dir';return'';}if(c==='touch'){FS[resolve(S.cwd,ar[0])]='';return'';}",
+    "  if(c==='clear')return null;if(c==='whoami')return 'user';if(c==='date')return new Date().toString();",
+    "  if(c==='open'){if(APPS[ar[0]]){createWin(ar[0],140,90,520,360);return 'opening '+ar[0];}return 'no such app';}",
+    "  if(c==='neofetch'||c==='about')return NEO;return c+': command not found';}",
+    "function initTerm(wid){var o=document.getElementById('termout_'+wid);o._S=mkShell();o.innerHTML='<div>bada-sh 1.0 - type help</div>';tline(o);}",
+    "function tline(o){var d=document.createElement('div');d.className='pin';d.innerHTML='<span>'+o._S.cwd+' $</span>&nbsp;';var inp=document.createElement('input');d.appendChild(inp);o.appendChild(d);inp.focus();",
+    "  inp.onkeydown=function(e){if(e.key==='Enter'){var v=inp.value;inp.disabled=true;var r=shexec(o._S,v);if(r===null){o.innerHTML='';} else if(r!==''){var p=document.createElement('div');p.textContent=r;o.appendChild(p);}tline(o);o.scrollTop=o.scrollHeight;}};}",
+    // settings / calc / thispc / apps
+    "function settingsHTML(){return '<h3>Settings</h3><div class=\"setrow\"><span>Root colour</span><input type=color value=\"#7d8a99\" oninput=\"document.getElementById(\\'root\\').style.background=this.value\"></div><div class=\"setrow\"><span>WM</span><span>w9wm</span></div><div class=\"setrow\"><span>Version</span><span>Bada OS 1.0</span></div>';}",
+    "var calcE={};function calcHTML(wid){var b=['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'],g='';b.forEach(function(k){g+='<button class=\"'+(k==='='?'eq':'')+'\" onclick=\"ck(\\''+wid+'\\',\\''+k+'\\')\">'+k+'</button>';});calcE[wid]='';return '<div class=\"calc\"><div class=\"disp\" id=\"cd_'+wid+'\">0</div><button style=\"grid-column:1/5;background:#444\" onclick=\"cc(\\''+wid+'\\')\">C</button>'+g+'</div>';}",
+    "function ck(wid,k){if(k==='='){try{calcE[wid]=String(Function('return '+calcE[wid])());}catch(e){calcE[wid]='Error';}}else{if(calcE[wid]==='Error')calcE[wid]='';calcE[wid]+=k;}document.getElementById('cd_'+wid).textContent=calcE[wid]||'0';}",
+    "function cc(wid){calcE[wid]='';document.getElementById('cd_'+wid).textContent='0';}",
+    "function thispcHTML(){return '<pre>'+NEO+'\\n\\nStorage: C: Bada VM   Memory: GC-managed\\nApps: 30+   Tests: 200+ passing</pre>';}",
+    "function appsHTML(){var L=[['Quantum OS','quantum_os.html','\\u269B'],['Medical Workstation','medical_workstation.html','\\uD83E\\uDE7A'],['Bada Brain','bada_brain.html','\\uD83E\\uDDE0'],['Bada Forge','bada_forge.html','\\u2699'],['Project Forge','project_forge.html','\\uD83D\\uDCE6'],['Volume Viewer','volume_viewer.html','\\uD83E\\uDDCA']];var h='<div class=\"files\">';L.forEach(function(a){h+='<div class=\"fitem\" onclick=\"window.open(\\''+a[1]+'\\',\\'_blank\\')\"><span class=\"g\">'+a[2]+'</span>'+a[0]+'</div>';});return h+'</div>';}",
+    // --- wire up the root window ---
+    "var root=document.getElementById('root');",
+    "root.addEventListener('contextmenu',function(e){e.preventDefault();showMenu(e.clientX,e.clientY);});",
+    // during a WM mode (sweep / pick) the WM grabs the pointer over the whole root, even atop windows
+    "document.addEventListener('mousedown',function(e){if(mode){e.preventDefault();e.stopPropagation();rootDown(e);}},true);",
+    "document.addEventListener('mousedown',function(e){var m=document.getElementById('menu');if(m.style.display==='block'&&!m.contains(e.target))hideMenu();});",
+    "function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}tick();setInterval(tick,1000);",
+    // open a terminal to start
+    "createWin('terminal',90,60,520,300);createWin('explorer',640,60,520,320);"
+]
+app.script(join(js, "\n"))
+
+app.save("bada_os.html")
+print "wrote bada_os.html"
