@@ -466,6 +466,34 @@ expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
        "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
        "d a t a\n", "image data URI for HTML embedding")
 
+# --- mayu: Windows registry + config DSL -----------------------------------
+
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print r.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\")",
+       "beg\n", "registry stores and reads a value")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\A\", \"x\", \"REG_SZ\", \"1\")\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\B\", \"y\", \"REG_SZ\", \"2\")\n"
+       "print r.subkeys(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\")",
+       "[\"A\", \"B\"]\n", "registry enumerates subkeys")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print contains(r.export_reg(), \"Windows Registry Editor Version 5.00\")",
+       "true\n", "registry exports .reg format")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"os win10\\nkeymap emacs {\\n key C-a -> beg\\n}\", reg)\n"
+       "print res[\"os\"], res[\"bindings\"], len(res[\"errors\"])",
+       "win10 1 0\n", "DSL compiles bindings for the target OS")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"define M = C\\nkeymap e {\\n key $M-k -> kill\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\e\", \"C-k\")",
+       "kill\n", "DSL substitutes $variables and registers")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"window \\\"Files\\\" : base {\\n key / -> search\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\Files\", \"(inherits)\")",
+       "base\n", "DSL window inheritance is recorded")
+
 # --- mayu: keymap registry & editor (Emacs / vim) --------------------------
 
 expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
