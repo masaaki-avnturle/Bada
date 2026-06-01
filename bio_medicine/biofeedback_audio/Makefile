@@ -29,8 +29,14 @@ GTK_LIBS   := $(shell pkg-config --libs gtk+-3.0 2>/dev/null)
 
 # ---- Xft(fontconfig) 検出 ----
 # X11 GUI の日本語表示に使う。無ければ旧来の XDrawString にフォールバック。
-XFT_CFLAGS := $(shell pkg-config --cflags xft 2>/dev/null)
-XFT_LIBS   := $(shell pkg-config --libs xft 2>/dev/null)
+HAVE_XFT := $(shell pkg-config --exists xft && echo 1 || echo 0)
+ifeq ($(HAVE_XFT),1)
+  XFT_CFLAGS := -DBFA_HAVE_XFT $(shell pkg-config --cflags xft 2>/dev/null)
+  XFT_LIBS   := $(shell pkg-config --libs xft 2>/dev/null)
+else
+  XFT_CFLAGS :=
+  XFT_LIBS   :=
+endif
 
 # ---- ncurses(ワイド文字版) 検出 ----
 # 日本語など UTF-8 を正しく表示するため、ワイド対応の ncursesw を優先する。
@@ -83,7 +89,7 @@ demo: biofeedback_audio
 	./biofeedback_audio gen all 10 ./out
 
 info:
-	@echo "ALSA(libasound): $(HAVE_ALSA)   GTK(gtk+-3.0): $(HAVE_GTK)"
+	@echo "ALSA(libasound): $(HAVE_ALSA)   GTK(gtk+-3.0): $(HAVE_GTK)   Xft: $(HAVE_XFT)"
 
 clean:
 	rm -f biofeedback_audio bfa_tui bfa_gui bfa_gtk

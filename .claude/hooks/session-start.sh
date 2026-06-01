@@ -6,6 +6,8 @@
 #   - build-essential / gcc, make
 #   - libncurses-dev  (bfa_tui)
 #   - libx11-dev      (bfa_gui)
+#   - libxft-dev      (bfa_gui Japanese text via Xft/fontconfig)
+#   - fonts-ipafont-gothic (Japanese glyphs for the X11 GUI)
 #   - libgtk-3-dev    (bfa_gtk)
 #   - libasound2-dev  (realtime ALSA playback, optional but auto-detected)
 #
@@ -26,7 +28,8 @@ sudo apt-get update -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0" \
   || apt-get update -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0" \
   || true
 
-PKGS="build-essential pkg-config libncurses-dev libx11-dev libgtk-3-dev libasound2-dev"
+PKGS="build-essential pkg-config libncurses-dev libx11-dev libxft-dev \
+fonts-ipafont-gothic libgtk-3-dev libasound2-dev"
 
 # apt-get install is idempotent: already-installed packages are skipped, and
 # the container state is cached after the hook so this is fast on resume.
@@ -39,3 +42,4 @@ pkg-config --exists alsa     && echo "  ALSA      : $(pkg-config --modversion al
 pkg-config --exists gtk+-3.0 && echo "  GTK+3     : $(pkg-config --modversion gtk+-3.0)" || echo "  GTK+3     : missing"
 pkg-config --exists ncursesw && echo "  ncursesw  : $(pkg-config --modversion ncursesw)" || true
 pkg-config --exists x11      && echo "  X11       : $(pkg-config --modversion x11)"      || true
+pkg-config --exists xft      && echo "  Xft       : $(pkg-config --modversion xft)"      || echo "  Xft       : missing"
