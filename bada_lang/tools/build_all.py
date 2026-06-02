@@ -153,13 +153,21 @@ def main():
                     os.path.join(BUILD, "badalang"),
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
 
-    # 2. gather every lib and app
+    # 2. gather every lib and app (and the .mayu config tree)
     files = {}
     for sub in ("lib", "apps"):
         d = os.path.join(ROOT, sub)
         for nm in sorted(os.listdir(d)):
             if nm.endswith(".bada"):
                 files[sub + "/" + nm] = read(os.path.join(d, nm))
+    cfg = os.path.join(ROOT, "config")
+    if os.path.isdir(cfg):
+        for dirpath, _dirs, fnames in os.walk(cfg):
+            for nm in sorted(fnames):
+                if nm.endswith(".mayu"):
+                    full = os.path.join(dirpath, nm)
+                    rel = os.path.relpath(full, ROOT).replace(os.sep, "/")
+                    files[rel] = read(full)
 
     launcher = LAUNCHER.replace("__BADA_FILES__", repr(files))
     with open(os.path.join(BUILD, "__main__.py"), "w", encoding="utf-8") as f:
