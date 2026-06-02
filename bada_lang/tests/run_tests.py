@@ -523,6 +523,43 @@ expect("import winapps\nlet a <- winapps.by_name(\"Notepad\")\n"
        "print a[\"exe\"], a[\"class\"], a[\"style\"]",
        "notepad.exe Notepad emacs\n", "catalog lookup by name")
 
+# --- yamy: genuine .mayu engine (file -> registry) -------------------------
+
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print r[\"sections\"], r[\"windows\"], r[\"bindings\"], len(r[\"errors\"])",
+       "2 1 2 0\n", "parses keymap + window section")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Notepad\", \"(class)\")",
+       "Notepad\n", "window class registered under HKCU\\Software\\yamy")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Notepad\", \"C-k\")",
+       "S-End Delete\n", "key sequence value registered")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window VSCode /Chrome_WidgetWin_1:Visual Studio Code/ : Global\\n"
+       " key C-p = C-p\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\VSCode\", \"(title)\")",
+       "Visual Studio Code\n", "window matched by class:title")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = kill\", reg)\n"
+       "print yamycfg.investigate(r[\"parsed\"], \"Notepad\", \"C-a\")",
+       "C-a -> Home  [Notepad]\n", "investigation resolves an inherited binding")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = kill\", reg)\n"
+       "let e <- yamycfg.effective(r[\"parsed\"], \"Notepad\")\n"
+       "print e[\"C-a\"], e[\"C-k\"]",
+       "Home kill\n", "effective keymap merges inherited + own bindings")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile_file(\"config/default.mayu\", reg)\n"
+       "print r[\"windows\"], len(r[\"errors\"]), "
+       "reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Explorer\", \"j\")",
+       "5 0 Down\n", "compile_file loads .mayu with includes from disk")
+
 # --- mayu: keymap registry & editor (Emacs / vim) --------------------------
 
 expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
