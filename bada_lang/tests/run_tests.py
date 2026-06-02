@@ -494,6 +494,35 @@ expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
        "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\Files\", \"(inherits)\")",
        "base\n", "DSL window inheritance is recorded")
 
+# --- mayu: installed-application remaps (shell-script actions) --------------
+
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n exe notepad.exe\\n class Notepad\\n base emacs\\n"
+       " key C-s -> send C-s\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(exe)\")",
+       "notepad.exe\n", "app block registers exe under apps\\<name>")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n class Notepad\\n key C-s -> send C-s\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(class)\")",
+       "Notepad\n", "app block records the window class")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n base emacs\\n key F5 -> type \\\"x\\\"\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(inherits)\")",
+       "emacs\n", "app block base map becomes (inherits)")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- mayucfg.compile(\"app \\\"Notepad\\\" {\\n key C-s -> send C-s\\n}\", reg)\n"
+       "print has(r[\"appmeta\"], \"Notepad\")",
+       "true\n", "compile result exposes appmeta")
+expect("import mayucfg\n"
+       "print mayucfg.action_kind(\"send C-s\"), mayucfg.action_kind(\"exec cmd\"), "
+       "mayucfg.action_kind(\"type x\"), mayucfg.action_kind(\"kill-line\")",
+       "send-keys shell-exec type-text command\n", "shell-script action kinds classified")
+expect("import winapps\nprint len(winapps.catalog()) >= 10",
+       "true\n", "installed-apps catalog is populated")
+expect("import winapps\nlet a <- winapps.by_name(\"Notepad\")\n"
+       "print a[\"exe\"], a[\"class\"], a[\"style\"]",
+       "notepad.exe Notepad emacs\n", "catalog lookup by name")
+
 # --- mayu: keymap registry & editor (Emacs / vim) --------------------------
 
 expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
