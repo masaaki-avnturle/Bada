@@ -1,0 +1,165 @@
+// ============================================================================
+//  yamy — Yet Another Madotsukai no Yuuutsu  (Bada GUI + registry loader)
+//
+//  Uses the GENUINE yamy mechanism: a line-based `.mayu` configuration file
+//  (with `include`, `keymap`, `window /class/ : Base`, `key FROM = TO`) that
+//  is COMPILED INTO THE WINDOWS REGISTRY under HKCU\Software\yamy.  Each
+//  application's key bindings live in their own .mayu file under config/apps/.
+//
+//  This program:
+//    1. loads config/default.mayu (resolving its includes) from disk,
+//    2. compiles every keymap/window section into a winreg.Registry,
+//    3. writes yamy.reg (import with `regedit /s yamy.reg`), and
+//    4. builds yamy.html - a viewer that re-parses the same .mayu live, shows
+//       the registry tree, the effective per-application keymaps, and a 調査キー.
+//
+//  Run:  ./bada run apps/yamy.bada   ->  yamy.reg + yamy.html
+// ============================================================================
+
+import gui
+import winreg
+import yamycfg
+
+// An embedded fallback .mayu, used when the config/ directory is not on disk
+// (e.g. when running from the single-file bundled executable).  Normally the
+// real files under config/ are read instead.
+let FALLBACK <- "keymap Global\n  key A-F4 = &Maximize\n  key C-f = Right\n  key C-b = Left\n  key C-n = Down\n  key C-p = Up\n  key C-a = Home\n  key C-e = End\nwindow Notepad /Notepad/ : Global\n  key C-k = S-End Delete\n  key C-d = Delete\n  key A-w = C-c\n  key C-w = C-x\n  key C-y = C-v\nwindow Explorer /CabinetWClass/ : Global\n  key h = Left\n  key j = Down\n  key k = Up\n  key l = Right\nwindow Chrome /Chrome_WidgetWin_1/ : Global\n  key S-j = C-Tab\n  key S-k = C-S-Tab\n  key C-l = C-l\nwindow VSCode /Chrome_WidgetWin_1:Visual Studio Code/ : Global\n  key C-p = C-p\n  key C-S-p = C-S-p\n"
+
+// load the real .mayu config from disk; fall back to the embedded copy
+fun load_config() {
+    try {
+        return yamycfg.load("config/default.mayu")
+    } catch (e) {
+        print "yamy: config/default.mayu not found, using embedded config"
+        return FALLBACK
+    }
+}
+
+// --- load the real .mayu config and register it (the file -> registry step) -
+let CONFIG <- load_config()
+let reg <- winreg.Registry.new()
+let res <- yamycfg.compile(CONFIG, reg)
+print "yamy: loaded .mayu configuration"
+print "  " + str(res["sections"]) + " sections, " + str(res["windows"])
+    + " window keymaps, " + str(res["bindings"]) + " bindings, "
+    + str(len(res["errors"])) + " errors"
+write_file("yamy.reg", reg.export_reg())
+print "wrote yamy.reg"
+
+// escape a string for a JS single-quoted literal (defined before use)
+fun js_str(s) {
+    let out <- replace(replace(s, "\\", "\\\\"), "\n", "\\n")
+    return "'" + replace(out, "'", "\\'") + "'"
+}
+
+let app <- gui.App.new("yamy")
+app.style(gui.dark_theme())
+app.style(".tabs{display:flex;gap:6px;margin-bottom:14px}.tabs button{width:auto;background:#1f2a3a}.tabs button.on{background:var(--accent)}
+.panel{display:none}.panel.on{display:block}
+.cfg2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+textarea.script{width:100%;height:420px;background:#0c0c12;color:#cfe9d8;border:1px solid #1f2a3a;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;line-height:1.5}
+.regtree{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:12px;max-height:360px;overflow:auto}
+.regtree .k{color:#e0c060;margin-top:6px}.regtree .v{color:#9fb6d6;margin-left:18px}.regtree .v b{color:#5fd0a0}
+.regtree .meta{color:#7a8aa0}
+.reg{background:#0c0c12;border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:11px;white-space:pre-wrap;max-height:160px;overflow:auto;color:#cfe9d8;margin-top:8px}
+.bar{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}
+.bar select,.bar button{background:#1f2a3a;color:#eaeef7;border:1px solid #2a3340;border-radius:6px;padding:6px 10px;font-size:13px}
+.ok{color:#5fd0a0}.bad{color:#e0863c}
+.appcard{background:#0c0c12;border:1px solid #1f2a3a;border-radius:8px;padding:12px;margin-bottom:12px}
+.appcard h3{margin:0 0 4px 0;color:#cfe9d8}.appcard .cls{color:#7a8aa0;font-family:Consolas,monospace;font-size:12px;margin-bottom:8px}
+.appcard table{width:100%;border-collapse:collapse;font-family:Consolas,monospace;font-size:13px}
+.appcard td{padding:3px 8px;border-bottom:1px solid #161c26}.appcard td.f{color:#e0c060;width:30%}.appcard td.t b{color:#5fd0a0}
+.appcard .inh{color:#5f7fd0;font-style:italic}
+.inv{background:#0c0c12;border:1px solid #2a6cf0;border-radius:8px;padding:12px;font-family:Consolas,monospace}
+.inv .big{font-size:22px;font-weight:800;color:#5fd0a0}
+.ed{background:#0c0c12;border:1px solid #2a6cf0;border-radius:8px;padding:12px;font-family:Consolas,monospace;outline:none}")
+
+app.add(gui.h1("yamy &middot; Yet Another Madotsukai no Yuuutsu"))
+app.add(gui.h2(".mayu configuration files compiled into the Windows registry (HKCU\\Software\\yamy)"))
+app.add(gui.div("tabs",
+    "<button id=\"tb_cfg\" onclick=\"tab('cfg')\">.mayu &amp; Registry</button>"
+    + "<button id=\"tb_apps\" onclick=\"tab('apps')\">Applications</button>"
+    + "<button id=\"tb_inv\" onclick=\"tab('inv')\">Investigate</button>"))
+
+// --- .mayu + Registry tab ---
+app.add("<div class=\"panel\" id=\"p_cfg\">"
+    + gui.div("bar",
+        "<button class=\"forge\" onclick=\"recompile()\">&#9889; Compile &amp; Register</button>"
+        + "<button onclick=\"downloadReg()\">&#11015; Export yamy.reg</button>"
+        + "<span id=\"cstat\"></span>")
+    + "<div class=\"cfg2\"><div>" + gui.div("tag", "config/default.mayu  (includes 109.mayu + apps/*.mayu, expanded)")
+    + "<textarea class=\"script\" id=\"script\" oninput=\"recompile()\"></textarea></div>"
+    + "<div>" + gui.div("tag", "Windows Registry  (HKEY_CURRENT_USER\\Software\\yamy)")
+    + "<div class=\"regtree\" id=\"regtree\"></div>"
+    + gui.div("tag", "exported yamy.reg")
+    + "<div class=\"reg\" id=\"regfile\"></div></div></div></div>")
+
+// --- Applications tab ---
+app.add("<div class=\"panel\" id=\"p_apps\">"
+    + gui.div("tag", "per-application keymaps - matched by window class (and title), with Global bindings inherited")
+    + "<div id=\"appcards\"></div></div>")
+
+// --- Investigate tab ---
+app.add("<div class=\"panel\" id=\"p_inv\">"
+    + gui.div("bar", "<label>Application</label><select id=\"invapp\" onchange=\"invClear()\"></select>"
+        + "<span style=\"color:#9fb6d6;font-size:12px\">choose an app, focus the box, press a key - the 調査キー reports what the registry resolves it to</span>")
+    + "<div class=\"ed\" id=\"ed\" tabindex=\"0\">focus me and press a key</div>"
+    + "<div class=\"inv\" style=\"margin-top:10px\"><div class=\"big\" id=\"invchord\">-</div><div id=\"invres\" style=\"color:#9fb6d6\">-</div></div></div>")
+
+let js <- [
+    "var CONFIG=" + js_str(CONFIG) + ";",
+    "var P={sections:[],byName:{}};",
+    // ---- .mayu parser (mirror of lib/yamy.bada) ----
+    "function stripComment(line){var q=false;for(var i=0;i<line.length;i++){var c=line[i];if(c==='\"')q=!q;else if(!q&&c==='#')return line.slice(0,i);else if(!q&&c==='/'&&line[i+1]==='/')return line.slice(0,i);}return line;}",
+    "function startKeymap(secs,rest,kind){var name=rest,base='';var c=rest.indexOf(':');if(c>=0){name=rest.slice(0,c);base=rest.slice(c+1).trim();}var s={name:name.trim(),kind:kind,cls:'',title:'',base:base,binds:{},order:[]};secs.push(s);return secs.length-1;}",
+    "function startWindow(secs,rest,errs,idx){var s1=rest.indexOf('/');if(s1<0){errs.push('line '+(idx+1)+': window needs /class/');return -1;}var name=rest.slice(0,s1).trim();var after=rest.slice(s1+1);var s2=after.indexOf('/');var spec=after,tail='';if(s2>=0){spec=after.slice(0,s2);tail=after.slice(s2+1);}var cls=spec,title='';var cc=spec.indexOf(':');if(cc>=0){cls=spec.slice(0,cc);title=spec.slice(cc+1).trim();}var base='';var bc=tail.indexOf(':');if(bc>=0)base=tail.slice(bc+1).trim();var s={name:name,kind:'window',cls:cls.trim(),title:title,base:base,binds:{},order:[]};secs.push(s);return secs.length-1;}",
+    "function parseKey(sec,body,errs,idx){var eq=body.indexOf('=');if(eq<0){errs.push('line '+(idx+1)+': expected FROM = TO');return;}var from=body.slice(0,eq).trim(),to=body.slice(eq+1).trim();if(!(from in sec.binds))sec.order.push(from);sec.binds[from]=to;}",
+    "function parseMayu(text){var secs=[],byName={},errs=[],cur=-1;text.split('\\n').forEach(function(raw,idx){var line=stripComment(raw).trim();if(!line)return;",
+    "    if(line.indexOf('include ')===0)return;if(line.indexOf('def ')===0)return;",
+    "    if(line.indexOf('keymap2 ')===0){cur=startKeymap(secs,line.slice(8),'keymap2');byName[secs[cur].name]=secs[cur];return;}",
+    "    if(line.indexOf('keymap ')===0){cur=startKeymap(secs,line.slice(7),'keymap');byName[secs[cur].name]=secs[cur];return;}",
+    "    if(line.indexOf('window ')===0){cur=startWindow(secs,line.slice(7),errs,idx);if(cur>=0)byName[secs[cur].name]=secs[cur];return;}",
+    "    if(line.indexOf('key ')===0){if(cur<0){errs.push('line '+(idx+1)+': key outside keymap');return;}parseKey(secs[cur],line.slice(4),errs,idx);return;}",
+    "    errs.push('line '+(idx+1)+': unknown: '+line);});return {sections:secs,byName:byName,errors:errs};}",
+    // ---- inheritance ----
+    "function chain(byName,name){var out=[],s=byName[name],g=0;while(s&&g<64){out.push(s);s=s.base?byName[s.base]:null;g++;}return out;}",
+    "function effective(byName,name){var ch=chain(byName,name),map={},order=[];for(var i=ch.length-1;i>=0;i--){ch[i].order.forEach(function(k){if(map[k]===undefined)order.push(k);map[k]=ch[i].binds[k];});}return {map:map,order:order};}",
+    "function lookup(byName,name,chord){var ch=chain(byName,name);for(var i=0;i<ch.length;i++)if(ch[i].binds[chord]!==undefined)return {to:ch[i].binds[chord],via:ch[i].name};return null;}",
+    // ---- compile -> registry render ----
+    "function regBase(){return 'HKEY_CURRENT_USER\\\\Software\\\\yamy';}",
+    "function recompile(){var text=document.getElementById('script').value;P=parseMayu(text);",
+    "  var st=document.getElementById('cstat');var nb=0,nw=0;P.sections.forEach(function(s){nb+=s.order.length;if(s.kind==='window')nw++;});",
+    "  st.innerHTML=P.errors.length?'<span class=bad>'+P.errors.length+' error(s): '+P.errors[0]+'</span>':'<span class=ok>registered '+P.sections.length+' sections / '+nw+' apps / '+nb+' bindings to HKCU\\\\Software\\\\yamy</span>';",
+    "  renderReg();renderApps();fillInvApps();}",
+    "function renderReg(){var tree='<div class=\"k\">['+regBase()+']</div>';var rf='Windows Registry Editor Version 5.00\\n';rf+='\\n['+regBase()+']\\n';",
+    "  P.sections.forEach(function(s){var path=regBase()+'\\\\'+s.name;tree+='<div class=\"k\">['+path+']<span class=\"meta\"> '+s.kind+'</span></div>';rf+='\\n['+path+']\\n';",
+    "    tree+='<div class=\"v\">(kind) = <b>'+s.kind+'</b></div>';rf+='\"(kind)\"=\"'+s.kind+'\"\\n';",
+    "    if(s.cls){tree+='<div class=\"v\">(class) = <b>'+esc(s.cls)+'</b></div>';rf+='\"(class)\"=\"'+s.cls+'\"\\n';}",
+    "    if(s.title){tree+='<div class=\"v\">(title) = <b>'+esc(s.title)+'</b></div>';rf+='\"(title)\"=\"'+s.title+'\"\\n';}",
+    "    if(s.base){tree+='<div class=\"v\">(inherits) = <b>'+s.base+'</b></div>';rf+='\"(inherits)\"=\"'+s.base+'\"\\n';}",
+    "    s.order.forEach(function(ch){tree+='<div class=\"v\">'+esc(ch)+' = <b>'+esc(s.binds[ch])+'</b></div>';rf+='\"'+esc(ch)+'\"=\"'+s.binds[ch].replace(/\"/g,'\\\\\"')+'\"\\n';});});",
+    "  document.getElementById('regtree').innerHTML=tree;document.getElementById('regfile').textContent=rf;window._REG=rf;}",
+    "function downloadReg(){var blob=new Blob([window._REG||''],{type:'text/plain'});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='yamy.reg';a.click();}",
+    // ---- application cards (effective keymaps) ----
+    "function renderApps(){var h='';P.sections.forEach(function(s){if(s.kind!=='window')return;var eff=effective(P.byName,s.name);",
+    "    h+='<div class=\"appcard\"><h3>'+s.name+'</h3><div class=\"cls\">class /'+esc(s.cls)+'/'+(s.title?'  title /'+esc(s.title)+'/':'')+(s.base?'   inherits '+s.base:'')+'</div><table>';",
+    "    eff.order.forEach(function(ch){var own=s.binds[ch]!==undefined;h+='<tr><td class=\"f\">'+esc(ch)+'</td><td class=\"t\"><b>'+esc(eff.map[ch])+'</b>'+(own?'':' <span class=\"inh\">(inherited)</span>')+'</td></tr>';});",
+    "    h+='</table></div>';});document.getElementById('appcards').innerHTML=h;}",
+    // ---- investigate ----
+    "function fillInvApps(){var sel=document.getElementById('invapp');var prev=sel.value;sel.innerHTML='';P.sections.forEach(function(s){if(s.kind==='window'){var o=document.createElement('option');o.textContent=s.name;sel.appendChild(o);}});if(prev)sel.value=prev;}",
+    "function invClear(){document.getElementById('invchord').textContent='-';document.getElementById('invres').textContent='-';}",
+    "function chordFor(e){var c='';if(e.ctrlKey)c+='C-';if(e.altKey)c+='A-';if(e.metaKey)c+='W-';var k=e.key;if(e.shiftKey&&k.length===1&&/[a-zA-Z]/.test(k)){c+='S-';k=k.toLowerCase();}if(k===' ')k='Space';else if(k==='Enter')k='Return';else if(k==='Escape')k='Escape';else if(k==='Backspace')k='BackSpace';else if(k==='/')k='slash';return c+k;}",
+    "function onKey(e){var app=document.getElementById('invapp').value;var ch=chordFor(e);var r=lookup(P.byName,app,ch);document.getElementById('invchord').textContent=ch;",
+    "  var box=document.getElementById('invres');if(r){box.innerHTML=ch+'  \\u2192  <b style=\"color:#5fd0a0\">'+esc(r.to)+'</b>   [HKCU\\\\..\\\\yamy\\\\'+r.via+']';}else{box.textContent=ch+'  \\u2192  (unbound)';}",
+    "  if((ch.indexOf('C-')===0||ch.indexOf('A-')===0||ch.indexOf('W-')===0))e.preventDefault();}",
+    "function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}",
+    "function tab(n){['cfg','apps','inv'].forEach(function(t){document.getElementById('p_'+t).classList.toggle('on',t===n);document.getElementById('tb_'+t).classList.toggle('on',t===n);});if(n==='inv')document.getElementById('ed').focus();}",
+    // wiring
+    "document.getElementById('script').value=CONFIG;",
+    "document.getElementById('ed').addEventListener('keydown',onKey);",
+    "recompile();tab('cfg');"
+]
+app.script(join(js, "\n"))
+
+app.save("yamy.html")
+print "wrote yamy.html"

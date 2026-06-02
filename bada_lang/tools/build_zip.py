@@ -23,6 +23,7 @@ BADA = os.path.join(ROOT, "bada.py")
 APPS = [
     ("bada_os.bada", "bada_os.html", "Bada OS (w9wm / WindowMaker / Windows 11)"),
     ("mayu.bada", "mayu.html", "窓使いの憂鬱 mayu (registry key remapper)"),
+    ("yamy.bada", "yamy.html", "yamy (.mayu config files → registry)"),
     ("quantum_bada.bada", "quantum_bada.html", "Quantum_Bada (integrated medical)"),
     ("quantum_os.bada", "quantum_os.html", "Bada Quantum OS"),
     ("bada_forge.bada", "bada_forge.html", "Bada Forge (source auto-fix)"),
@@ -78,6 +79,10 @@ def main():
     appdir = os.path.join(stage, "apps")
     os.makedirs(appdir)
 
+    # the .mayu config tree must be present so yamy can read it while running
+    if os.path.isdir(os.path.join(ROOT, "config")):
+        shutil.copytree(os.path.join(ROOT, "config"), os.path.join(stage, "config"))
+
     produced = []
     print("generating application HTML ...")
     for src, html, title in APPS:
@@ -110,9 +115,11 @@ def main():
     # source
     srcdir = os.path.join(stage, "src")
     os.makedirs(srcdir)
-    for d in ("badalang", "lib", "apps", "tests"):
-        shutil.copytree(os.path.join(ROOT, d), os.path.join(srcdir, d),
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    for d in ("badalang", "lib", "apps", "tests", "config"):
+        src_d = os.path.join(ROOT, d)
+        if os.path.isdir(src_d):
+            shutil.copytree(src_d, os.path.join(srcdir, d),
+                            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for fn in ("README.md", "GRAMMAR.md", "bada.py", "bada"):
         p = os.path.join(ROOT, fn)
         if os.path.isfile(p):
