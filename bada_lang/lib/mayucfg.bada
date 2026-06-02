@@ -65,6 +65,8 @@ fun compile(script, reg) {
     let scopes <- {}        // scope-name -> {chord: action}
     let inherits <- {}      // window-name -> base keymap (or "")
     let cur <- ""           // current scope being filled
+    let curapp <- ""        // current app block (or "")
+    let appmeta <- {}       // app-name -> {exe, class, base}
     let errors <- []
     let nbind <- 0
 
@@ -76,6 +78,20 @@ fun compile(script, reg) {
         if raw == "" {
         } else if raw == "}" {
             cur <- ""
+            curapp <- ""
+        } else if starts_w(raw, "app ") {
+            // app "Notepad" {   - target an installed application by exe/class
+            let name <- extract_quoted(slice_from2(raw, 4))
+            cur <- name
+            curapp <- name
+            if not has(scopes, cur) { scopes[cur] <- {} }
+            if not has(appmeta, name) { appmeta[name] <- {"exe": "", "class": "", "base": ""} }
+        } else if curapp != "" and starts_w(raw, "exe ") {
+            appmeta[curapp]["exe"] <- trim(slice_from2(raw, 4))
+        } else if curapp != "" and starts_w(raw, "class ") {
+            appmeta[curapp]["class"] <- trim(slice_from2(raw, 6))
+        } else if curapp != "" and starts_w(raw, "base ") {
+            appmeta[curapp]["base"] <- trim(slice_from2(raw, 5))
         } else if starts_w(raw, "os ") {
             os <- trim(slice_from2(raw, 3))
         } else if starts_w(raw, "define ") {
@@ -121,12 +137,18 @@ fun compile(script, reg) {
         }
     }
 
-    // write to the registry: HKCU\Software\Mayu\<os>\<scope>
+    // write to the registry.  keymap/window scopes -> HKCU\..\<os>\<scope>;
+    // installed-app scopes -> HKCU\..\<os>\apps\<AppName> with exe/class meta.
     let base <- "HKEY_CURRENT_USER\\Software\\Mayu\\" + os
     for scope in keys(scopes) {
         let path <- base + "\\" + scope
-        // inherited base recorded as a value for traceability
-        if has(inherits, scope) and inherits[scope] != "" {
+        if has(appmeta, scope) {
+            path <- base + "\\apps\\" + scope
+            let meta <- appmeta[scope]
+            if meta["exe"] != "" { reg.set(path, "(exe)", "REG_SZ", meta["exe"]) }
+            if meta["class"] != "" { reg.set(path, "(class)", "REG_SZ", meta["class"]) }
+            if meta["base"] != "" { reg.set(path, "(inherits)", "REG_SZ", meta["base"]) }
+        } else if has(inherits, scope) and inherits[scope] != "" {
             reg.set(path, "(inherits)", "REG_SZ", inherits[scope])
         }
         let m <- scopes[scope]
@@ -135,8 +157,17 @@ fun compile(script, reg) {
         }
     }
 
-    return {"os": os, "scopes": scopes, "inherits": inherits,
+    return {"os": os, "scopes": scopes, "inherits": inherits, "appmeta": appmeta,
             "errors": errors, "bindings": nbind, "registry": reg}
+}
+
+// classify a shell-script-like action expression for display
+fun action_kind(action) {
+    if starts_w(action, "send ") { return "send-keys" }
+    if starts_w(action, "exec ") { return "shell-exec" }
+    if starts_w(action, "type ") { return "type-text" }
+    if starts_w(action, "seq ") or starts_w(action, "seq{") { return "sequence" }
+    return "command"
 }
 
 // ---- string helpers -------------------------------------------------------
