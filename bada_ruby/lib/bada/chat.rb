@@ -89,6 +89,19 @@ module Bada
       @info.render(question, branch_length: branch_length)
     end
 
+    # Penrose graphical notation: draw picture-symbols, auto-compute, and get an
+    # auto-answer + paper + source code. `drawing` is the ASCII diagram; `values`
+    # maps tensor names to nested arrays.
+    def penrose(drawing, values: {}, question: nil)
+      studio = Penrose::Studio.new(knowledge: @knowledge)
+      studio.draw(drawing, values: values)
+      studio.report(question: question)
+    end
+
+    def penrose_palette
+      Penrose::Palette.render
+    end
+
     # Human-readable single-string answer (what the REPL prints).
     # info: append the Thurston/catastrophe/millennium information-generation block.
     def ask(question, info: true)

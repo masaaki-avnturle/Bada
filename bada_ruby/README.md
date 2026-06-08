@@ -178,6 +178,55 @@ Cardano で厳密に求解）を計算します。**分岐の発生・消滅す�
 多様体の質問では主分解先が**ポアンカレ予想**に、ゼータ/素数の質問では**リーマン予想**に
 なることを確認済み。
 
+## ペンローズ絵記号 — 描くと自動計算し、論文とコードを生成
+
+`Bada::Penrose` は、ロジャー・ペンローズの**図式記法（絵記号）**を動く仕組みにします。
+彼の微分 ∇・偏微分 ∂・積分 ∫・テンソル箱・縮約線・(反)対称化バー・計量の上げ下げ
+などを **ASCII 絵記号のパレット**で提供し、**絵記号を描くと自動でアインシュタイン縮約を
+計算**します（純 Ruby のテンソル einsum エンジン）。さらに、描いた図式について
+**ChatGPT が自動解答し、論文（Markdown+LaTeX）とソースコード（Ruby）を生成**します。
+
+```bash
+bin/bada palette                                   # 絵記号パレットを表示
+bin/bada penrose examples/matmul.penrose \
+         --values examples/matmul.values.json \
+         --q "この図式は何を計算しているか？"      # 描画→計算→解答→論文→コード
+ruby examples/penrose_demo.rb
+```
+
+### 描画の約束（絵記号）
+
+| 絵記号 | 意味 |
+|:--|:--|
+| `[A]` | テンソル（箱から出る線が添字、本数=階数） |
+| `[A]-[B]` | 横線で結ぶと縮約（その添字でアインシュタイン総和） |
+| 縦線 `\|`（列を揃える） | 上下のテンソルを縮約 |
+| 両端の小文字/数字 | 自由添字（出力の脚） |
+| `(D X m)` `(d X m)` | 共変微分 ∇ / 偏微分 ∂（添字 m） |
+| `(I m)` | 積分 ∫（添字 m を単位測度で縮約＝総和） |
+| `S{i j}` `A{i j}` | (反)対称化 |
+
+```
+i-[A]-[B]-j      ⇒   A_{i k1} B_{k1 j} → R_{i j}   （行列積）
+A=[[1,2],[3,4]], B=[[5,6],[7,8]]  →  [[19,22],[43,50]]  を自動計算
+```
+
+```ruby
+studio = Bada::Penrose::Studio.new
+studio.draw("i-[A]-[B]-j", values: { "A" => [[1,2],[3,4]], "B" => [[5,6],[7,8]] })
+studio.compute          # => 行列積を自動縮約
+puts studio.ask("これは何を計算している？")   # 自動解答
+puts studio.paper(question: "...")            # 論文 (Markdown+LaTeX)
+puts studio.code                              # 生成 Ruby ソースコード（実行可能）
+
+# OmegaChat からも:
+Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
+  values: { "A" => [[1,2],[3,4]], "B" => [[5,6],[7,8]] }, question: "行列積")
+```
+
+論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
+ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
+
 ## モジュール構成
 
 ```
@@ -194,6 +243,14 @@ lib/bada/thurston.rb         サーストン・ペレルマン多様体 + シャ
 lib/bada/catastrophe.rb      トム7カタストロフィ・分岐点情報生成
 lib/bada/millennium.rb       クレイ7問のガンマ多様体理論分解
 lib/bada/info_engine.rb      情報生成エンジン（上記3つの Facade）
+lib/bada/penrose/tensor.rb   テンソル + 一般アインシュタイン縮約 einsum
+lib/bada/penrose/palette.rb  ペンローズ絵記号パレット
+lib/bada/penrose/diagram.rb  図式モデル + DSL ビルダー
+lib/bada/penrose/canvas.rb   絵記号パーサ（描画→図式）+ レンダラ
+lib/bada/penrose/evaluator.rb 図式の自動計算（縮約・積分・(反)対称化・微分）
+lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
+lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
+lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
