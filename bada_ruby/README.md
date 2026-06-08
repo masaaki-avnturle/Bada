@@ -84,6 +84,59 @@ print g
 Ruby からは `Bada::BadaNode`（演算子ランタイム）と `Bada::Interpreter`（スクリプト評価器）
 として使えます。
 
+## ニューラルネットワーク LLM（未知エンジン ChatGPT を元から）
+
+`Bada::NN` は、**ニューラルネットワークの LLM を元から（純 Ruby・外部依存なし）**
+実装したものです。Bengio 型の MLP 言語モデル（埋め込み → 隠れ層 tanh → softmax）を
+**バックプロパゲーション**で学習します（勾配は有限差分テストで検証済み）。
+さらに **GoF デザインパターン**でアーキテクチャを構成し、Bada の多様体・エントロピー
+理論と接続して「未知エンジン」を実現します。
+
+```bash
+bin/bada neural          # corpus を学習 → ニューラル未知エンジンの REPL
+bin/bada train model.json # 学習して Memento チェックポイントを保存
+ruby examples/neural_demo.rb
+```
+
+```ruby
+require "bada"
+
+chat = Bada::NN::NeuralOmegaChat.new(dim: 16, context: 2, hidden: 32, seed: 42)
+Dir["corpus/*.txt"].each { |f| chat.learn_file(f) }
+chat.train!(epochs: 8, lr: 0.01)        # 純 Ruby のバックプロップ学習
+puts chat.ask("ベータ関数とガンマ関数の関係は？")
+chat.save("model.json")                 # Memento で保存
+Bada::NN::NeuralOmegaChat.load("model.json")
+```
+
+### 採用デザインパターン
+
+| パターン | 適用箇所 |
+|:--|:--|
+| **Composite** | `Sequential`（レイヤー群を 1 つのレイヤーとして扱う） |
+| **Strategy** | `Layer#forward/backward`, `Optimizer`(SGD/Adam), `Sampler`(各デコード戦略) |
+| **Factory Method** | `LayerFactory`（種別からレイヤー生成） |
+| **Builder** | `LanguageModelBuilder`（モデルを流れるように組み立て） |
+| **Template Method** | `Trainer#train`（学習ループの骨格を固定、ステップは hook） |
+| **Observer** | `LossLogger` / `Checkpointer`（エポックイベント購読） |
+| **Adapter** | `CorpusAdapter`（`Bada::Knowledge` → 学習データ） |
+| **Decorator** | `UnknownEngineSampler`（多様体不変量・エントロピーで logits を操作） |
+| **Chain of Responsibility** | 計測→検索→生成→誤差修正→記録 の推論パイプライン |
+| **Singleton** | `Akashic`（プロセス唯一の Ω::DATABASE） |
+| **Memento** | `Sequential#to_memento/load_memento`, `NeuralOmegaChat.save/load` |
+| **Facade** | `NeuralOmegaChat`（全体を 1 つの窓口に） |
+
+### 未知エンジンの推論パイプライン（Chain of Responsibility）
+
+1. **MeasureHandler** — 質問のシャノンエントロピー `H_q` と多様体不変量 `Ξ_q` を計測。
+2. **RetrieveHandler** — コーパスからエントロピー・不変量近傍を検索。
+3. **NeuralGenerateHandler** — 学習済みニューラルネットを自己回帰生成。デコードは
+   `UnknownEngineSampler`（Decorator）が担当し、生成中テキストの `Ξ` を計測して
+   `Ξ_q` に近づくよう logits を補正し、目標エントロピーを**複素回転体（特殊相対性
+   理論のコマ幾何の可積分系）**で誤差修正する。
+4. **ErrorCorrectHandler** — 不変量 `Ξ` を回転閉軌道上で保存確認（certify）。
+5. **RecordHandler** — 対話を `Ω::DATABASE`（Singleton）へ記録。
+
 ## モジュール構成
 
 ```
@@ -97,6 +150,19 @@ lib/bada/knowledge.rb        レポート/Web 取り込み → 計測済みコ�
 lib/bada/generator.rb        エントロピー駆動の文章/方程式/理論生成
 lib/bada/qa_engine.rb        エントロピー駆動の質問応答
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
+
+lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
+lib/bada/nn/layers.rb        Layer（EmbeddingConcat / Linear / Tanh / ReLU）
+lib/bada/nn/sequential.rb    Sequential（Composite）+ CrossEntropy 損失 + Memento
+lib/bada/nn/factory.rb       LayerFactory + LanguageModelBuilder
+lib/bada/nn/optimizer.rb     SGD / Adam（Strategy）
+lib/bada/nn/observer.rb      LossLogger / Checkpointer（Observer）
+lib/bada/nn/vocab.rb         Vocab + CorpusAdapter（Adapter）
+lib/bada/nn/trainer.rb       Trainer（Template Method）バックプロップ学習
+lib/bada/nn/sampler.rb       デコード戦略 + UnknownEngineSampler（Decorator）
+lib/bada/nn/generator.rb     NeuralGenerator（自己回帰生成）
+lib/bada/nn/pipeline.rb      推論パイプライン（Chain of Responsibility）+ Akashic（Singleton）
+lib/bada/nn/chat.rb          NeuralOmegaChat（Facade）
 ```
 
 ---

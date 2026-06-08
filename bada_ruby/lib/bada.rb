@@ -33,6 +33,7 @@ require_relative "bada/knowledge"
 require_relative "bada/generator"
 require_relative "bada/qa_engine"
 require_relative "bada/chat"
+require_relative "bada/nn"
 
 module Bada
 end

@@ -26,7 +26,12 @@ module Bada
 
     # Ingest a raw text blob from a named source (a report file, web page, ...).
     def ingest(text, source: "report")
-      text = text.to_s.gsub("\r\n", "\n").tr("\r", "\n")
+      text = text.to_s
+      unless text.encoding == Encoding::UTF_8 && text.valid_encoding?
+        text = text.dup.force_encoding("UTF-8")
+        text = text.encode("UTF-8", invalid: :replace, undef: :replace, replace: "") unless text.valid_encoding?
+      end
+      text = text.gsub("\r\n", "\n").tr("\r", "\n")
       paras = text.split(/\n\s*\n/).map(&:strip).reject(&:empty?)
       paras.each_with_index do |p, pi|
         p.split(SENT_SPLIT).map(&:strip).reject(&:empty?).each do |s|

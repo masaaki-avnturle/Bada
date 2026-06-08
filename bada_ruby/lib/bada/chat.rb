@@ -114,7 +114,7 @@ module Bada
         output.print "\nあなた> "
         line = input.gets
         break if line.nil?
-        q = line.strip
+        q = line.dup.force_encoding("UTF-8").strip
         break if q.empty?
         output.puts
         output.puts ask(q)

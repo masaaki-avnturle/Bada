@@ -52,10 +52,30 @@ when "xi"
   puts format("manifold M : %.6f  (∬ 1/(x log x)^2)", s[:manifold_integral])
   puts format("extent N   : %d tokens", s[:extent])
   puts format("invariant Ξ: %.6f  (β(H+1,M+1)/log(N+1))", s[:invariant])
+when "neural"
+  # Train the from-scratch neural LLM on the corpus, then start the REPL.
+  chat = Bada::NN::NeuralOmegaChat.new(seed: 42)
+  if Dir.exist?(CORPUS_DIR)
+    Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each { |f| chat.learn_file(f) }
+  end
+  ARGV.each { |f| chat.learn_file(f) if File.file?(f) }
+  puts "ニューラルネットワーク学習中…（純Ruby・バックプロップ）"
+  chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
+  chat.repl
+when "train"
+  # Train and save a model checkpoint (Memento) to a JSON file.
+  out = ARGV.shift || "model.json"
+  chat = Bada::NN::NeuralOmegaChat.new(seed: 42)
+  if Dir.exist?(CORPUS_DIR)
+    Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each { |f| chat.learn_file(f) }
+  end
+  chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
+  chat.save(out)
+  puts "saved checkpoint -> #{out}"
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | run | learn | xi | version"
+  warn "commands: repl | ask | run | learn | xi | neural | train | version"
   exit 1
 end
