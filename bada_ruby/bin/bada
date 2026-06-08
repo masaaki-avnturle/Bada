@@ -1,0 +1,61 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bada — CLI for the Bada/Ruby OmegaChat 分派.
+#
+#   bin/bada repl                       start the chat REPL
+#   bin/bada ask "質問..."              one-shot question
+#   bin/bada run script.bada            run a Bada language script
+#   bin/bada learn file1 file2 ...      ingest then start REPL
+#   bin/bada xi "text"                  show entropy + manifold invariant
+
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "bada"
+
+CORPUS_DIR = File.expand_path("../corpus", __dir__)
+
+def load_corpus(chat)
+  return unless Dir.exist?(CORPUS_DIR)
+  Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each do |f|
+    chat.learn_file(f)
+  end
+end
+
+cmd = ARGV.shift || "repl"
+
+case cmd
+when "repl"
+  chat = Bada::OmegaChat.new
+  load_corpus(chat)
+  chat.repl
+when "ask"
+  chat = Bada::OmegaChat.new
+  load_corpus(chat)
+  puts chat.ask(ARGV.join(" "))
+when "learn"
+  chat = Bada::OmegaChat.new
+  ARGV.each { |f| chat.learn_file(f) }
+  chat.repl
+when "run"
+  path = ARGV.shift or abort("usage: bada run script.bada")
+  interp = Bada::Interpreter.new
+  interp.run(File.read(path)).each { |line| puts line }
+when "xi"
+  text = ARGV.join(" ")
+  s = Bada::Manifold.invariant(text)
+  puts format("text       : %s", text)
+  puts format("entropy H  : %.6f bits", s[:entropy])
+  puts format("manifold M : %.6f  (∬ 1/(x log x)^2)", s[:manifold_integral])
+  puts format("extent N   : %d tokens", s[:extent])
+  puts format("invariant Ξ: %.6f  (β(H+1,M+1)/log(N+1))", s[:invariant])
+when "version", "-v", "--version"
+  puts "bada #{Bada::VERSION}"
+else
+  warn "unknown command: #{cmd}"
+  warn "commands: repl | ask | run | learn | xi | version"
+  exit 1
+end
