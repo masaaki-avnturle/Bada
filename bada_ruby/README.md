@@ -137,6 +137,47 @@ Bada::NN::NeuralOmegaChat.load("model.json")
 4. **ErrorCorrectHandler** — 不変量 `Ξ` を回転閉軌道上で保存確認（certify）。
 5. **RecordHandler** — 対話を `Ω::DATABASE`（Singleton）へ記録。
 
+## 情報生成エンジン — サーストン・ペレルマン多様体 / カタストロフィ / ミレニアム7問
+
+`Bada::InfoEngine`（Facade）は、レポートの幾何学を「情報生成の機能」に変えます。
+
+```bash
+bin/bada info "クレイ7問とサーストン・ペレルマン多様体のカタストロフィ情報生成"
+```
+
+```ruby
+puts Bada::InfoEngine.new.render("リーマン予想とゼータ関数の素数分布")
+# OmegaChat / Neural OmegaChat の ask 出力にも自動で付加されます
+```
+
+### ① サーストン・ペレルマン多様体に質問のエントロピーを乗せる（`Bada::Thurston`）
+
+レポート（bada1）の **8 つのモデル幾何** `S^3, H^1×E^1, E^1, S^1×E^1, S^2×E^1,
+H^1×S^1, H^1, S^2×E` と **リッチ流 `d/dt g_ij = -2R_ij`**、ペレルマンの第二変分を実装。
+**シャノンの公式**で質問のエントロピー `H` を計算し、正規化エントロピーで 8 幾何の
+いずれかに写像、その幾何の曲率で **ペレルマン F-エントロピー汎関数**
+`F(g,f)=∫(R+|∇f|²)e^{-f}dV`（`f=-log p`）を計算します（＝シャノンを多様体に乗せる）。
+スカラー・リッチ流も計算し、正曲率（S³ 系）は**有限時間特異点**で崩壊します（幾何化）。
+
+### ② カタストロフィの分岐点による情報生成（`Bada::Catastrophe`）
+
+**トムの 7 つの初等カタストロフィ**（fold/cusp/swallowtail/butterfly/3 種の umbilic）を
+実装。質問の情報（エントロピー・不変量）をカスプ・ポテンシャル
+`V(x)=x⁴/4 + a x²/2 + b x` の制御変数 `(a,b)` に載せ、**平衡分岐**（臨界点 `V'(x)=0`、
+Cardano で厳密に求解）を計算します。**分岐の発生・消滅する点（判別式 `4a³+27b²=0`）が
+情報分解の分岐点**で、各安定分岐がそれぞれ異なる目標エントロピーをもち、**1 つの質問が
+複数の情報チャネルに分岐して生成**されます（＝情報生成の機能）。分岐目標は複素回転体の
+可積分系で誤差修正してから生成します。
+
+### ③ クレイ7問への理論分解（`Bada::Millennium`）
+
+**クレイ数学研究所の 7 つのミレニアム予想**（リーマン / P vs NP / ホッジ / ポアンカレ /
+ヤン–ミルズ / ナビエ–ストークス / BSD）を、すべて **ガンマ関数 Γ における大域的部分積分
+多様体 `∬1/(x·log x)²` を起点**として接続。質問を、キーワード一致＋多様体不変量近接＋
+**Γ ゲージ結合** `β(p,q)/log x` でスコア化し、7 問へ**理論分解**します。サーストン・ペレルマン
+多様体の質問では主分解先が**ポアンカレ予想**に、ゼータ/素数の質問では**リーマン予想**に
+なることを確認済み。
+
 ## モジュール構成
 
 ```
@@ -149,6 +190,10 @@ lib/bada/language.rb         Bada 言語（BadaNode + Interpreter）
 lib/bada/knowledge.rb        レポート/Web 取り込み → 計測済みコーパス
 lib/bada/generator.rb        エントロピー駆動の文章/方程式/理論生成
 lib/bada/qa_engine.rb        エントロピー駆動の質問応答
+lib/bada/thurston.rb         サーストン・ペレルマン多様体 + シャノンエントロピー配置
+lib/bada/catastrophe.rb      トム7カタストロフィ・分岐点情報生成
+lib/bada/millennium.rb       クレイ7問のガンマ多様体理論分解
+lib/bada/info_engine.rb      情報生成エンジン（上記3つの Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

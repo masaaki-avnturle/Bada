@@ -20,7 +20,12 @@
 #   Bada::Knowledge        report/web ingestion -> measured corpus
 #   Bada::Generator        entropy-driven text / equation / theory generation
 #   Bada::QAEngine         entropy-driven question answering
+#   Bada::Thurston         Thurston-Perelman manifold + Shannon entropy placement
+#   Bada::Catastrophe      Thom catastrophe branch-point information generation
+#   Bada::Millennium       7 Clay problems, gamma-manifold theory decomposition
+#   Bada::InfoEngine       information-generation facade (the three above)
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
+#   Bada::NN               from-scratch neural-network LLM (unknown engine)
 
 require_relative "bada/version"
 require_relative "bada/special"
@@ -32,6 +37,10 @@ require_relative "bada/language"
 require_relative "bada/knowledge"
 require_relative "bada/generator"
 require_relative "bada/qa_engine"
+require_relative "bada/thurston"
+require_relative "bada/catastrophe"
+require_relative "bada/millennium"
+require_relative "bada/info_engine"
 require_relative "bada/chat"
 require_relative "bada/nn"
 

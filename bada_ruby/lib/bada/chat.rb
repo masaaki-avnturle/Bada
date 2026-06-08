@@ -32,6 +32,7 @@ module Bada
       @db = TupleSpace.new
       @qa = QAEngine.new(@knowledge)
       @generator = Generator.new(knowledge: @knowledge, seed: seed)
+      @info = InfoEngine.new(knowledge: @knowledge, seed: seed)
     end
 
     # Ingest reference material (reports, web snippets) into the engine.
@@ -39,6 +40,7 @@ module Bada
       @knowledge.ingest(text, source: source)
       @qa = QAEngine.new(@knowledge)
       @generator = Generator.new(knowledge: @knowledge)
+      @info = InfoEngine.new(knowledge: @knowledge)
       self
     end
 
@@ -46,6 +48,7 @@ module Bada
       @knowledge.ingest_file(path, source: source)
       @qa = QAEngine.new(@knowledge)
       @generator = Generator.new(knowledge: @knowledge)
+      @info = InfoEngine.new(knowledge: @knowledge)
       self
     end
 
@@ -81,8 +84,14 @@ module Bada
       }
     end
 
+    # Information generation across Thurston-Perelman / catastrophe / millennium.
+    def info(question, branch_length: 16)
+      @info.render(question, branch_length: branch_length)
+    end
+
     # Human-readable single-string answer (what the REPL prints).
-    def ask(question)
+    # info: append the Thurston/catastrophe/millennium information-generation block.
+    def ask(question, info: true)
       r = reply(question)
       out = []
       out << "── OmegaChat (Bada/Ruby 分派) ──"
@@ -104,6 +113,10 @@ module Bada
       out << ""
       out << format("【言語生成 (H≈%.2f / 目標%.2f)】", r[:generated_text][:entropy], r[:target_entropy])
       out << r[:generated_text][:text]
+      if info
+        out << ""
+        out << @info.render(question)
+      end
       out.join("\n")
     end
 

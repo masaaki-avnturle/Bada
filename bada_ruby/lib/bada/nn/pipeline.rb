@@ -3,6 +3,7 @@
 require_relative "../manifold"
 require_relative "../error_correction"
 require_relative "../tuplespace"
+require_relative "../info_engine"
 require_relative "generator"
 require_relative "sampler"
 
@@ -75,6 +76,19 @@ module Bada
         out = @generator.generate(prompt: ctx[:question], length: ctx[:length] || 24,
                                   sampler: engine, target_h: ctx[:target_h])
         ctx[:generated] = out
+      end
+    end
+
+    # 3b. Information generation: place the question's entropy on the Thurston-
+    # Perelman manifold, branch it through the catastrophe bifurcation set, and
+    # decompose its theory across the seven Clay Millennium problems.
+    class InfoGenerateHandler < Handler
+      def initialize(info_engine)
+        @info = info_engine
+      end
+
+      def process(ctx)
+        ctx[:info] = @info.generate(ctx[:question], branch_length: 14)
       end
     end
 

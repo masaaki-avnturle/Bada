@@ -72,10 +72,12 @@ module Bada
         ctx = { question: question, length: length }
         gen = NeuralGenerator.new(@model, @vocab, context: @context)
         qa = Bada::QAEngine.new(@knowledge)
+        info = Bada::InfoEngine.new(knowledge: @knowledge, seed: @seed)
 
         chain = MeasureHandler.new
         chain.then(RetrieveHandler.new(qa))
              .then(NeuralGenerateHandler.new(gen, @vocab, seed: @seed))
+             .then(InfoGenerateHandler.new(info))
              .then(ErrorCorrectHandler.new)
              .then(RecordHandler.new)
         chain.handle(ctx)
@@ -99,7 +101,30 @@ module Bada
         out << format("【ニューラル言語生成 (H≈%.2f / 目標%.2f)】",
                       r[:generated][:entropy], r[:target_h])
         out << r[:generated][:text]
+        if (info = r[:info])
+          out << ""
+          out << render_info(info)
+        end
         out.join("\n")
+      end
+
+      # Render the Thurston / catastrophe / millennium information block.
+      def render_info(info)
+        p = info[:placement]
+        c = info[:catastrophe]
+        m = info[:millennium]
+        lines = []
+        lines << format("【サーストン・ペレルマン多様体】幾何=%s (曲率%.2f) · Perelman F=%.4f · Ricci%s",
+                        p[:geometry], p[:curvature], p[:perelman_f],
+                        p[:ricci_collapsed] ? "=有限時間特異点" : format("→%.3f", p[:ricci_final]))
+        lines << format("【カタストロフィ分岐（情報分解の分岐点）】判別式=%.4f%s · 分岐数=%d",
+                        c[:discriminant], c[:on_bifurcation] ? " (分岐点上!)" : "", c[:branch_count])
+        info[:branches].each do |b|
+          lines << format("  分岐#%d (x=%.2f,目標H=%.2f): %s", b[:index], b[:equilibrium_x], b[:target_entropy], b[:text])
+        end
+        lines << "【ミレニアム7問への理論分解】起点: #{m[:origin]} / 主分解先: #{m[:dominant]}"
+        m[:decomposition].first(3).each { |d| lines << "  - #{d[:theory]}" }
+        lines.join("\n")
       end
 
       def repl(input: $stdin, output: $stdout)
