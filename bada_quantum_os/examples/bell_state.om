@@ -1,0 +1,26 @@
+ Masaaki Yamaguchi — QuantumOS 上で動く量子プログラム例。
+ ベル状態 (|00⟩+|11⟩)/√2 を生成し、時間発展・リッチフロー緩和を経て観測する。
+ 中枢機能 boot → syscall → run → halt の流れを示す。
+
+import QuantumOS::QuantumKernel
+
+// ユーザ量子プログラム: 中枢への syscall 列として記述される。
+class BellProgram <- TupleSpace {
+  def instructions() {
+    return [
+      { name: "alloc",    args: { size: 2 } },                 // -< 2量子ビット確保
+      { name: "gate",     args: { gate: "H",    targets: [0] } },   // 重ね合わせ
+      { name: "gate",     args: { gate: "CNOT", targets: [0,1] } }, // もつれ生成
+      { name: "evolve",   args: { dt: 1.0e-3 } },              // >- 時間発展
+      { name: "schedule", args: { hamiltonian: "ising" } },    // リッチフロー基底探索
+      { name: "measure",  args: { targets: [0,1] } },          // 観測
+    ]
+  }
+}
+
+// ── 起動 ────────────────────────────────────────────────────────────
+let os = QuantumKernel.new(2)   // 2量子ビットの量子OS
+os.run(BellProgram.new())       // boot → 主ループ → halt
+
+// 期待: 観測結果は 00 または 11 に相関(ベル相関)。
+// すべての tick は Ω::DATABASE (Akashic Record) に保存される。

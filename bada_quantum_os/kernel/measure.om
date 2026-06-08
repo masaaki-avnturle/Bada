@@ -1,0 +1,60 @@
+ Masaaki Yamaguchi — Measure は QuantumOS の観測 I/O(中枢機能)です。
+ レポート「Euler product estrade from Heisenberg Non-commutative with deprivate equation」の
+   「Euler product represent with reverse of zeta function」、および Shannon entropy equation を機能化。
+ 観測は状態ベクトル |Ψ⟩ を |amp|² で標本化し、Heisenberg 非可換 □⊠Ψ ≠ Ψ⊠□ により |b⟩ へ崩壊させる。
+
+import Omega::Database
+
+class Measure <- TupleSpace {
+
+  def initialize(core) { @core = core }
+
+  // ── euler_product — ζ の逆 (Euler product = reverse of zeta) ─────
+  //   ∏_p 1/(1 − p^{-s}) を先頭素数で近似し、観測の規格化に用いる。
+  def euler_product(s) {
+    let primes = [2,3,5,7,11,13]
+    let prod = 1.0
+    for p in primes do prod = prod * (1 / (1 - pow(p, -s)))
+    return prod
+  }
+
+  // ── observe — 観測(波束崩壊) ───────────────────────────────────
+  //   状態ベクトル全体を Born 則 |amp[b]|² で標本化し、|chosen⟩ へ射影してから
+  //   対象量子ビットのビット値を返す。もつれは崩壊後の相関として現れる。
+  def observe(targets) {
+    let amp = @core.amp()
+    let total = 0.0
+    for b from 0 to @core.dim() - 1 do total = total + abs2(amp[b])
+    let r = random() * total
+    let acc = 0.0
+    let chosen = 0
+    for b from 0 to @core.dim() - 1 do {
+      acc = acc + abs2(amp[b])
+      if r <= acc then { chosen = b; break }
+    }
+    // 波束崩壊: |chosen⟩ へ射影
+    let collapsed = complex[@core.dim()]
+    for b from 0 to @core.dim() - 1 do collapsed[b] = complex(0,0)
+    collapsed[chosen] = complex(1,0)
+    @core.set_amp(collapsed)
+
+    let bits = []
+    for i in targets do bits.push((chosen >> i) & 1)
+    Ω::DATABASE.push("measure", bits)
+    return bits
+  }
+
+  // ── shannon_entropy — S = −Σ_b |amp_b|² log|amp_b|² ─────────────
+  //   レポートの「shannon entropy equatioon」。系の不確かさ(残留情報量)を測る。
+  def shannon_entropy(core) {
+    let amp = core.amp()
+    let s = 0.0
+    for b from 0 to core.dim() - 1 do {
+      let p = abs2(amp[b])
+      if p > 0 then s = s - p * log(p)
+    }
+    return s
+  }
+}
+
+// 中枢機能: Euler 積(ζの逆)規格化、状態ベクトル Born 則観測と非可換崩壊、Shannon エントロピー測定。

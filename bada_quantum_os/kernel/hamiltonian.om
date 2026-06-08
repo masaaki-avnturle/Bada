@@ -1,0 +1,83 @@
+ Masaaki Yamaguchi — Hamiltonian は QuantumOS の時間発展(システムクロック)の中枢機能です。
+ レポート「Beta function reveal …」の
+   HΨ = ⊕(iℏ∇)^⊕L = e^{x·log x}、および iℏ d/dt ψ(t) = ℏ を機能化した。
+ 量子作用素右作用 >- が ⊕(iℏ∇)^⊕L に対応する。
+
+ 状態ベクトル |Ψ⟩ に対し、対角(Ising 型)ハミルトニアン H|b⟩ = E_b|b⟩ を用いる。
+ E_b = (基底 b 中の 1 の個数)。時間発展 e^{-iH dt} は各基底に位相を与え、
+ |amp|² を保つユニタリ作用となる(πe = ∫e^{-□}d□ の規格化を保存)。
+
+import Omega::Database
+
+class Hamiltonian <- TupleSpace {
+
+  def initialize(hbar) { @hbar = hbar }
+
+  // 基底 b のエネルギー E_b = ハミング重み(励起クォーク数)
+  def energy(b) {
+    let e = 0
+    let x = b
+    while x > 0 do { e = e + (x & 1); x = x >> 1 }
+    return e
+  }
+
+  // ── step — e^{-iH dt} による 1 ステップ時間発展 ─────────────────
+  def step(core, dt) {
+    let amp = core.amp()
+    for b from 0 to core.dim() - 1 do {
+      let e = energy(b)
+      let theta = -e * dt / @hbar
+      amp[b] = amp[b] * complex(cos(theta), sin(theta))   // 位相回転
+    }
+    core.set_amp(amp)
+    Ω::DATABASE.push("evolve", core.snapshot())
+    return core
+  }
+
+  // 量子作用素右作用 >- : ⊕(iℏ∇)^⊕L を core へ適用する糖衣構文(dt=1)。
+  operator >- (core) { return step(core, 1.0) }
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  RicciScheduler — リッチフロー基底状態スケジューラ(中枢機能)
+//   レポート「Quantum Computer in a certain theorem」の
+//     ∂g_ij/∂t = −2R_ij (Rich flow equation, cohomological → locality)
+//   を機能化。命令キューを実行しつつ各準位を基底状態へ向けて緩和(annealing)する。
+// ───────────────────────────────────────────────────────────────────────
+class RicciScheduler <- TupleSpace {
+
+  def initialize() {
+    @queue = []
+    @pc    = 0
+  }
+
+  def load(program) { @queue = program.instructions(); @pc = 0 }
+
+  // 次に実行すべき量子命令。なければ nil。
+  def next() {
+    if @pc >= @queue.length then return nil
+    let inst = @queue[@pc]
+    @pc = @pc + 1
+    return inst
+  }
+
+  // ── anneal — 低エネルギー(基底)状態探索 ─────────────────────────
+  def anneal(core, hamiltonian) {
+    for k from 0 to 63 do relax(core)
+    Ω::DATABASE.push("anneal", core.snapshot())
+    return core
+  }
+
+  // ── relax — リッチフロー 1 ステップ ∂g_ij/∂t = −2R_ij ───────────
+  //   各量子ビットの曲率 R_ij = P(1) − P(0) を計量 level から差し引き、谷(基底)へ流す。
+  def relax(core) {
+    for i from 0 to core.size() - 1 do {
+      let p1 = core.prob_one(i)
+      let ricci = p1 - (1.0 - p1)
+      core.set_level(i, core.level(i) - 2 * ricci)   // g_ij ← g_ij − 2R_ij
+    }
+    return core
+  }
+}
+
+// 中枢機能: HΨ=⊕(iℏ∇)^⊕L 時間発展(>-)、e^{-iH dt} ステップ、∂g_ij/∂t=−2R_ij リッチフロー緩和。

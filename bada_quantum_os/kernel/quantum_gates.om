@@ -1,0 +1,67 @@
+ Masaaki Yamaguchi — QuantumGates は QuantumOS の命令セット(中枢機能)です。
+ src/d_wave.om の executive QuantumComputer(single/two qubit gate)を継承し、状態ベクトル
+ |Ψ⟩ 上で作用させる。レポート「Quantum Computer in a certain theorem」に現れる
+ XOR(∇M⁺) を論理ゲートとして加えた。
+
+import Omega::Database
+
+class QuantumGates <- TupleSpace {
+
+  def initialize(core) { @core = core }
+
+  // ── apply — ゲートディスパッチ ──────────────────────────────────
+  def apply(gate, targets) {
+    let r = 1 / sqrt(2)
+    case gate {
+      "X"    : single(targets[0], [[complex(0,0), complex(1,0)], [complex(1,0), complex(0,0)]])
+      "Y"    : single(targets[0], [[complex(0,0), complex(0,-1)], [complex(0,1), complex(0,0)]])
+      "Z"    : single(targets[0], [[complex(1,0), complex(0,0)], [complex(0,0), complex(-1,0)]])
+      "H"    : single(targets[0], [[complex(r,0), complex(r,0)], [complex(r,0), complex(-r,0)]])
+      "CNOT" : cnot(targets[0], targets[1])
+      "XOR"  : return xor(targets[0], targets[1])     // レポートの XOR(∇M⁺)
+      default: return error("unknown gate: " + gate)
+    }
+    Ω::DATABASE.push("gate:" + gate, targets)
+    return { gate: gate, targets: targets }
+  }
+
+  // ── single — 1量子ビットゲート ──────────────────────────────────
+  //   ビット i が 0/1 で対になる基底ペア (|…0…⟩, |…1…⟩) に 2x2 行列 m を作用。
+  def single(i, m) {
+    let amp = @core.amp()
+    for b from 0 to @core.dim() - 1 do {
+      if ((b >> i) & 1) == 0 then {
+        let b1 = b | (1 << i)
+        let a0 = amp[b]
+        let a1 = amp[b1]
+        amp[b]  = m[0][0] * a0 + m[0][1] * a1
+        amp[b1] = m[1][0] * a0 + m[1][1] * a1
+      }
+    }
+    @core.set_amp(amp)
+  }
+
+  // ── cnot — control が |1⟩ の基底で target を反転(もつれ生成) ────
+  def cnot(control, target) {
+    let amp = @core.amp()
+    let seen = {}
+    for b from 0 to @core.dim() - 1 do {
+      if !seen[b] && ((b >> control) & 1) == 1 then {
+        let b2 = b ^ (1 << target)
+        let t = amp[b]; amp[b] = amp[b2]; amp[b2] = t
+        seen[b] = true; seen[b2] = true
+      }
+    }
+    @core.set_amp(amp)
+    Ω::DATABASE.push("gate:CNOT", [control, target])
+  }
+
+  // ── xor — レポート ∃(M⁻∇C⁺) = XOR(∇M⁺) ────────────────────────
+  //   周辺確率から古典 XOR を取る論理ゲート。
+  def xor(a, b) {
+    let bit = (@core.prob_one(a) > 0.5) ^ (@core.prob_one(b) > 0.5)
+    return { bit: bit }
+  }
+}
+
+// 中枢機能: 状態ベクトル上の X/Y/Z/H/CNOT 量子ゲートと XOR 論理ゲート。d_wave.om 継承。

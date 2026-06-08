@@ -1,0 +1,73 @@
+ Masaaki Yamaguchi — ManifoldMemory は QuantumOS の量子メモリ管理(中枢機能)です。
+ レポート「Beta function reveal with global differential manifold」の
+   β(p,q) = Γ(p)Γ(q)/Γ(p+q)、および「global deprivate / integral manifold」を機能化した。
+ 確保 = 多様体積分 -< (∬1/(x·log x)² dx_m)、解放 = global deprivate(剥奪)。
+
+import Omega::Database
+
+struct MemBlock {
+  let handle: int
+  let size:   int
+  let weight: float   // β(p,q) による確保重み
+  let live:   bool
+}
+
+class ManifoldMemory <- TupleSpace {
+
+  def initialize(capacity) {
+    @capacity = capacity
+    @blocks   = {}        // handle -> MemBlock
+    @next     = 1
+    @used     = 0
+  }
+
+  // ── Γ(s) = ∫ e^{-x} x^{s-1} dx ── ガンマ関数(スターリング近似) ────
+  def gamma(s) {
+    if s < 0.5 then return PI / (sin(PI*s) * gamma(1 - s))   // 反射公式
+    let x = s - 1
+    return sqrt(2*PI) * pow(x, x + 0.5) * exp(-x) * (1 + 1/(12*x))
+  }
+
+  // ── β(p,q) = Γ(p)Γ(q)/Γ(p+q) ── レポートの beta function ─────────
+  def beta(p, q) {
+    return gamma(p) * gamma(q) / gamma(p + q)
+  }
+
+  // ── format — 多様体メモリ初期化 ─────────────────────────────────
+  def format() {
+    @blocks = {}
+    @used   = 0
+    @next   = 1
+    Ω::DATABASE.push("mem:format", @capacity)
+  }
+
+  // ── alloc — 多様体積分 -< による確保 ────────────────────────────
+  //   ∬ 1/(x·log x)² dx_m に相当。size に応じた β 重みで領域を切り出す。
+  def alloc(size) {
+    if @used + size > @capacity then return error("out of quantum memory")
+    let h = @next
+    @blocks[h] = MemBlock { handle: h, size: size, weight: beta(size, @capacity - size + 1), live: true }
+    @used = @used + size
+    @next = @next + 1
+    Ω::DATABASE.push("mem:alloc", @blocks[h])
+    return h
+  }
+
+  // 確保演算子 -< : 多様体積分としての alloc 糖衣構文。
+  operator -< (size) { return alloc(size) }
+
+  // ── deprivate — global deprivate による解放(剥奪) ──────────────
+  def deprivate(handle) {
+    let b = @blocks[handle]
+    if b == nil || !b.live then return false
+    @used = @used - b.size
+    b.live = false
+    @blocks[handle] = b
+    Ω::DATABASE.push("mem:free", handle)
+    return true
+  }
+
+  def usage() { return { used: @used, capacity: @capacity } }
+}
+
+// 中枢機能: β(p,q)=Γ(p)Γ(q)/Γ(p+q) による確保重み、-< 多様体積分確保、deprivate 剥奪解放。
