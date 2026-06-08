@@ -39,6 +39,19 @@
 
 ---
 
+## 📱 Bada Biofeedback アプリ — `bada_biofeedback_app/`
+
+Bada言語ミニランタイムで駆動する Android アプリ（→ APK）。脳トポグラフィー / fMRI・MRI /
+脳波(EEG) / 心電図(ECG) / 薬「ほっと」バイオフィードバック / サイレントトーク（無声盤）/
+血液成分・血圧 を収録。`Γ(s)` Lanczos近似・オイラー定数・熱エントロピー envelope が音と
+可視化を駆動します。GitHub Actions が `bada_biofeedback_app/` の変更で APK を自動ビルドします。
+
+> ⚠️ **免責**: 教育・リラクゼーション用のシミュレーションです。脳波/MRI/血液/血圧/思考は
+> 実測せず（心拍PPGのみ実測の目安）、薬効の再現や医療・投薬の代替ではありません。
+> 詳細は [`bada_biofeedback_app/README.md`](./bada_biofeedback_app/README.md)。
+
+---
+
 ## 🔤 Bada Language — 設計原理
 
 山口フレームワークの作用素環プログラミングを実現するために設計された独自OOP言語。
