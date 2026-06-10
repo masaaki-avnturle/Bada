@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<!--
+  Ω-Apriori Core — 未知事前エンジン CPU 可視化ダッシュボード
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_apriori_cpu
+
+  テロメア分裂細胞の原理で、FPGA様ロジックファブリックを進化させて
+  隠れた a-priori 目標関数を自己発見する AI エンジン CPU。
+  本HTMLはブラウザ内で同じGAをライブ実行でき、Python(apriori_engine.py)が
+  出力した run.json も読み込める。C中核は apriori_cpu.c。
+
+  ⚠ 概念実証・教育用。実在の人体/医療/「人類の進化」とは無関係。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Apriori Core — 未知事前エンジン CPU</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#070b12,#04060a);}
+  h1{margin:0 0 4px;font-size:22px}.h1 .om{color:var(--gold)}
+  h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:13px;margin-top:8px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;
+    border-radius:8px;color:var(--warn);font-size:12.5px}
+  main{padding:18px 20px 60px}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block;width:100%;height:auto}
+  .cap{font-size:11.5px;color:var(--dim);margin-top:5px;text-align:center}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:10px 0 4px}
+  select,input[type=text]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);
+    border-radius:6px;padding:7px 9px;font-size:13px}
+  input[type=range]{width:100%}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);
+    border-radius:8px;padding:10px 16px;cursor:pointer;font-weight:700;font-size:13.5px;margin-top:10px;width:100%}
+  button.act:hover{background:#1f2f4a}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12.5px;
+    padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}
+  table{width:100%;border-collapse:collapse;font-size:11.5px;font-family:var(--mono)}
+  td,th{padding:3px 6px;border-bottom:1px solid var(--line);text-align:center}
+  th{color:var(--dim)}
+  .ok{color:var(--good)}.ng{color:var(--bad)}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+  .pipe{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Apriori Core — 未知事前エンジン CPU</h1>
+  <div class="sub">Telomere-Evolved Reconfigurable Fabric · Yamaguchi Theory · Bada / bio_medicine</div>
+  <div class="eq">分裂細胞テロメア原理 → FPGA様LUTファブリック → 進化的 a-priori 発見 → AI-CPU コア</div>
+</header>
+
+<div class="disc">
+  ⚠ <b>概念実証・教育用／非医療</b>:
+  本アプリは「テロメア分裂の原理」を遺伝的アルゴリズムのメタファに用い、4入力LUTを並べた
+  <b>FPGA様再構成ファブリック</b>を世代進化させて、事前に与えない隠れ関数(=未知事前 a-priori)を
+  自己発見する小型 <b>AI-CPU コア</b>のデモです。実在の人体・医療・「人類の進化」とは一切無関係です。
+</div>
+
+<main>
+  <div class="row">
+    <!-- 制御 -->
+    <div style="flex:0 0 300px">
+      <div class="card">
+        <h3>進化設定</h3>
+        <label>未知事前 目標関数 (隠れ a-priori)</label>
+        <select id="target">
+          <option value="popcount">popcount (ハミング重み/情報量)</option>
+          <option value="parity">parity (パリティ)</option>
+          <option value="add">add (3bit+3bit 加算)</option>
+        </select>
+        <label>個体数 (世代の人口): <span class="val" id="pop_v">80</span></label>
+        <input type="range" id="pop" min="20" max="160" step="20" value="80"/>
+        <label>世代数: <span class="val" id="gens_v">150</span></label>
+        <input type="range" id="gens" min="30" max="400" step="10" value="150"/>
+        <label>初期テロメア / Hayflick: <span class="val" id="telo_v">1000 / 200</span></label>
+        <input type="range" id="telo" min="400" max="2000" step="100" value="1000"/>
+        <label>世代あたりテロメア短縮 (attrition): <span class="val" id="attr_v">18</span></label>
+        <input type="range" id="attr" min="4" max="60" step="2" value="18"/>
+        <button class="act" id="run">▶ 進化を実行 (ブラウザ内)</button>
+        <div class="cap" id="status">準備完了 — 純JS中核</div>
+      </div>
+      <div class="card">
+        <h3>Python/C 連携</h3>
+        <p style="font-size:12px;margin:4px 0">
+        C中核ビルド: <code>cc -O2 -fPIC -shared -o libaprioricpu.so apriori_cpu.c</code><br>
+        Python実行: <code>python3 apriori_engine.py --generations 150 --out run.json</code></p>
+        <label>run.json を読み込む</label>
+        <input type="file" id="file" accept=".json" style="font-size:12px"/>
+        <div class="cap" id="fstatus"></div>
+      </div>
+      <div class="card">
+        <h3>現在の統計</h3>
+        <div class="stat"><span>バックエンド</span><b id="s_back">JS</b></div>
+        <div class="stat"><span>適合度 best</span><b id="s_best">—</b></div>
+        <div class="stat"><span>適合度 mean</span><b id="s_mean">—</b></div>
+        <div class="stat"><span>平均テロメア</span><b id="s_telo">—</b></div>
+        <div class="stat"><span>複製老化率</span><b id="s_sen">—</b></div>
+        <div class="stat"><span>ゲノム長</span><b id="s_gsize">144 B</b></div>
+      </div>
+    </div>
+
+    <!-- 可視化 -->
+    <div style="flex:1;min-width:320px">
+      <div class="row">
+        <div class="card" style="flex:1;min-width:300px">
+          <h3>適合度 & テロメアの世代推移</h3>
+          <canvas id="c_fit" width="520" height="240"></canvas>
+          <div class="cap">緑=best適合度 / 青=mean / 橙=平均テロメア / 赤=複製老化率</div>
+        </div>
+        <div class="card" style="flex:0 0 240px">
+          <h3>FPGA ファブリック (LUT状態)</h3>
+          <canvas id="c_fab" width="220" height="220"></canvas>
+          <div class="cap">セル=4入力LUT。明=活性 / 暗赤=複製老化。左→右が層伝播</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>進化した AI-CPU の真理値表 (target vs evolved)</h3>
+        <div style="max-height:260px;overflow:auto"><table id="tt"></table></div>
+        <div class="pipe" id="genome"></div>
+      </div>
+      <div class="card">
+        <h3>原理パイプライン</h3>
+        <p style="font-size:12.5px;margin:6px 0">
+        ① 各個体 = 分裂細胞系列(ゲノム+テロメア)。② 世代分裂ごとにテロメアが <code>attrition</code> 短縮、
+        Hayflick限界で複製老化(LUT凍結=可塑性喪失)。③ 適合度=隠れ目標関数との出力ビット一致率。
+        ④ トーナメント選択+交叉+(テロメア比例)変異で次世代。⑤ エリートにテロメラーゼ再活性化を施し
+        「全世代」を継続。⑥ 収束したLUTネットワークが <b>未知事前を体得したAI-CPUコア</b>。
+        C(apriori_cpu.c)が中核ファブリック、Python(apriori_engine.py)が進化エンジン、本HTMLが可視化。</p>
+      </div>
+    </div>
+  </div>
+</main>
+<footer>Ω-Apriori Core · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+/* ===== 定数 (apriori_cpu.c / apriori_engine.py と一致) ===== */
+const LUT_INPUTS=4, CELL_BYTES=6;
+const CFG={inbits:6,layers:3,width:8,outbits:3};
+
+/* ===== 目標関数 (未知事前) ===== */
+const TARGETS={
+  popcount:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;},
+  parity:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c&1;},
+  add:x=>((x&7)+((x>>3)&7))&7,
+};
+
+/* ===== JS ファブリック (PyFabric/fab_eval と同一仕様) ===== */
+class Fabric{
+  constructor(cfg,teloInit,hayflick){
+    this.cfg=cfg;this.teloInit=teloInit;this.hayflick=hayflick;
+    const n=cfg.layers*cfg.width;
+    this.lut=new Int32Array(n);this.insel=Array.from({length:n},()=>[0,0,0,0]);
+    this.telo=new Int32Array(n).fill(teloInit);this.sen=new Uint8Array(n);
+  }
+  genomeSize(){return this.cfg.layers*this.cfg.width*CELL_BYTES;}
+  load(g){
+    let idx=0;const{inbits,layers,width}=this.cfg;
+    for(let L=0;L<layers;L++){const src=L===0?inbits:width;
+      for(let w=0;w<width;w++){const p=idx*CELL_BYTES;
+        for(let k=0;k<LUT_INPUTS;k++)this.insel[idx][k]=g[p+k]%Math.max(1,src);
+        this.lut[idx]=g[p+4]|(g[p+5]<<8);idx++;}}
+  }
+  eval(x){
+    const{inbits,layers,width,outbits}=this.cfg;
+    let prev=x&((1<<inbits)-1),src=inbits,cur=0;
+    for(let L=0;L<layers;L++){cur=0;
+      for(let w=0;w<width;w++){const c=L*width+w;let addr=0;
+        for(let k=0;k<LUT_INPUTS;k++){let sel=this.insel[c][k];if(sel>=src)sel=src?sel%src:0;
+          addr|=((prev>>sel)&1)<<k;}
+        let out;
+        if(this.sen[c]){let sel=this.insel[c][0];if(src&&sel>=src)sel%=src;out=(prev>>sel)&1;}
+        else out=(this.lut[c]>>addr)&1;
+        cur|=out<<w;}
+      prev=cur;src=width;}
+    return cur&((1<<outbits)-1);
+  }
+}
+
+/* ===== テロメア進化エンジン (apriori_engine.py と同一ロジック) ===== */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+class Evolver{
+  constructor(opts){
+    this.rng=mulberry32(opts.seed||1);
+    this.target=TARGETS[opts.target];this.targetName=opts.target;
+    this.ncases=1<<CFG.inbits;this.pop=opts.pop;
+    this.teloInit=opts.telo;this.hayflick=Math.round(opts.telo*0.2);this.attrition=opts.attr;
+    this.fab=new Fabric(CFG,this.teloInit,this.hayflick);
+    this.gsize=this.fab.genomeSize();
+    this.population=[];for(let i=0;i<this.pop;i++)this.population.push({genome:this.randGenome(),telomere:this.teloInit,fit:0});
+    this.history=[];this.best=null;
+  }
+  randGenome(){const g=new Uint8Array(this.gsize);for(let i=0;i<g.length;i++)g[i]=(this.rng()*256)|0;return g;}
+  fitness(g){this.fab.load(g);let m=0,t=0;
+    for(let x=0;x<this.ncases;x++){const y=this.fab.eval(x);const tt=this.target(x)&((1<<CFG.outbits)-1);
+      const d=y^tt;for(let b=0;b<CFG.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+  mutate(g,telo){if(telo<=this.hayflick)return g;
+    const frac=(telo-this.hayflick)/Math.max(1,this.teloInit-this.hayflick);
+    const rate=0.01+0.06*frac;const o=g.slice();
+    for(let i=0;i<o.length;i++)if(this.rng()<rate)o[i]=(this.rng()*256)|0;return o;}
+  cross(a,b){const cut=1+((this.rng()*(a.length-1))|0);const o=new Uint8Array(a.length);
+    o.set(a.subarray(0,cut));o.set(b.subarray(cut),cut);return o;}
+  tour(k=3){let best=null;for(let i=0;i<k;i++){const ind=this.population[(this.rng()*this.pop)|0];
+    if(!best||ind.fit>best.fit)best=ind;}return best;}
+  step(gen){
+    for(const ind of this.population)ind.fit=this.fitness(ind.genome);
+    this.population.sort((a,b)=>b.fit-a.fit);
+    const best=this.population[0];
+    const mean=this.population.reduce((s,i)=>s+i.fit,0)/this.pop;
+    const teloMean=this.population.reduce((s,i)=>s+i.telomere,0)/this.pop;
+    const senFrac=this.population.filter(i=>i.telomere<=this.hayflick).length/this.pop;
+    const eliteN=Math.max(2,(this.pop/10)|0);
+    const elites=[];for(let i=0;i<eliteN;i++){const e=this.population[i];
+      elites.push({genome:e.genome.slice(),telomere:this.teloInit,fit:e.fit});} // telomerase
+    const children=[];
+    while(children.length<this.pop-eliteN){const p1=this.tour(),p2=this.tour();
+      const ct=Math.max(this.hayflick,Math.min(p1.telomere,p2.telomere)-this.attrition);
+      let g=this.cross(p1.genome,p2.genome);g=this.mutate(g,ct);
+      children.push({genome:g,telomere:ct,fit:0});}
+    this.population=elites.concat(children);
+    if(!this.best||best.fit>this.best.fit)this.best={genome:best.genome.slice(),telomere:best.telomere,fit:best.fit};
+    const rec={gen,best:best.fit,mean,teloMean,senFrac};this.history.push(rec);return rec;
+  }
+}
+
+/* ===== 描画 ===== */
+function drawFit(history,teloInit){
+  const c=document.getElementById('c_fit'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);const W=c.width,H=c.height,pad=28;
+  ctx.strokeStyle='#1b2638';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+  ctx.fillStyle='#8794a8';ctx.font='10px monospace';ctx.textAlign='right';
+  ctx.fillText('1.0',pad-4,pad+4);ctx.fillText('0',pad-4,H-pad);
+  if(!history.length)return;const n=history.length;
+  const X=i=>pad+(W-2*pad)*i/Math.max(1,n-1);
+  const Y=v=>H-pad-(H-2*pad)*v;
+  function line(key,col,scale){ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();
+    history.forEach((h,i)=>{const v=scale(h);i===0?ctx.moveTo(X(i),Y(v)):ctx.lineTo(X(i),Y(v));});ctx.stroke();}
+  line('best','#48c08a',h=>h.best);
+  line('mean','#4a80d0',h=>h.mean);
+  line('telo','#e0b020',h=>h.teloMean/teloInit);
+  line('sen','#d0506a',h=>h.senFrac);
+  ctx.lineWidth=1;ctx.textAlign='left';ctx.fillText('gen→',W-pad-30,H-pad+14);
+}
+function drawFabric(fab){
+  const c=document.getElementById('c_fab'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const {layers,width}=CFG;const mw=c.width/layers,mh=c.height/width,pad=4;
+  for(let L=0;L<layers;L++)for(let w=0;w<width;w++){const idx=L*width+w;
+    const bits=fab.lut[idx];let pc=0;for(let b=0;b<16;b++)pc+=(bits>>b)&1;
+    const x=L*mw+pad,y=w*mh+pad,W=mw-2*pad,H=mh-2*pad;
+    if(fab.sen[idx]){ctx.fillStyle='#3a1018';}
+    else{const t=pc/16;ctx.fillStyle=`rgb(${Math.round(40+t*200)},${Math.round(80+t*140)},${Math.round(120+t*100)})`;}
+    ctx.fillRect(x,y,W,H);ctx.strokeStyle='#000';ctx.strokeRect(x,y,W,H);}
+}
+function drawTable(ev,genome){
+  const tb=document.getElementById('tt');ev.fab.load(genome);
+  let h='<thead><tr><th>in(bin)</th><th>target</th><th>CPU out</th><th>✓</th></tr></thead><tbody>';
+  let ok=0;
+  for(let x=0;x<ev.ncases;x++){const y=ev.fab.eval(x);const t=ev.target(x)&((1<<CFG.outbits)-1);
+    const good=y===t;if(good)ok++;
+    h+=`<tr><td>${x.toString(2).padStart(6,'0')}</td><td>${t}</td>`+
+       `<td class="${good?'ok':'ng'}">${y}</td><td>${good?'✓':'✗'}</td></tr>`;}
+  h+='</tbody>';tb.innerHTML=h;
+  document.getElementById('genome').textContent='best genome ('+genome.length+'B): '+
+    Array.from(genome.slice(0,24)).map(b=>b.toString(16).padStart(2,'0')).join('')+'…';
+}
+function setStats(rec,teloInit,gsize,backend){
+  document.getElementById('s_back').textContent=backend;
+  document.getElementById('s_best').textContent=rec.best.toFixed(4);
+  document.getElementById('s_mean').textContent=rec.mean.toFixed(4);
+  document.getElementById('s_telo').textContent=rec.teloMean.toFixed(0)+' / '+teloInit;
+  document.getElementById('s_sen').textContent=(rec.senFrac*100).toFixed(0)+'%';
+  document.getElementById('s_gsize').textContent=gsize+' B';
+}
+
+/* ===== 実行 (非同期にステップして UI を更新) ===== */
+let running=false;
+async function runEvolution(){
+  if(running)return;running=true;
+  const target=document.getElementById('target').value;
+  const pop=+document.getElementById('pop').value;
+  const gens=+document.getElementById('gens').value;
+  const telo=+document.getElementById('telo').value;
+  const attr=+document.getElementById('attr').value;
+  const ev=new Evolver({target,pop,telo,attr,seed:1});
+  const st=document.getElementById('status');
+  for(let g=0;g<gens;g++){
+    const rec=ev.step(g);
+    if(g%3===0||g===gens-1){
+      drawFit(ev.history,telo);drawFabric(ev.fab);
+      setStats(rec,telo,ev.gsize,'JS-core');
+      st.textContent=`進化中… gen ${g+1}/${gens}`;
+      await new Promise(r=>setTimeout(r,0));
+    }
+  }
+  drawFit(ev.history,telo);drawTable(ev,ev.best.genome);
+  st.textContent=`完了 — best 適合度 ${ev.best.fit.toFixed(4)} (${target})`;
+  running=false;
+}
+document.getElementById('run').onclick=runEvolution;
+
+/* スライダ表示 */
+const bind=(id,vid,f)=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(vid).textContent=f(+e.value);};
+bind('pop','pop_v',v=>v);bind('gens','gens_v',v=>v);
+bind('telo','telo_v',v=>v+' / '+Math.round(v*0.2));bind('attr','attr_v',v=>v);
+
+/* run.json 読込 (Python/C 出力) */
+document.getElementById('file').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;const fr=new FileReader();
+  fr.onload=()=>{try{
+    const d=JSON.parse(fr.result);
+    const teloInit=d.params.telo_init;
+    const hist=d.history.map(h=>({gen:h.gen,best:h.best,mean:h.mean,teloMean:h.telo_mean,senFrac:h.senescent_frac}));
+    drawFit(hist,teloInit);
+    const last=hist[hist.length-1];
+    setStats(last,teloInit,d.params.genome_bytes,d.backend||'python');
+    // 真理値表
+    const tb=document.getElementById('tt');let h='<thead><tr><th>in(bin)</th><th>target</th><th>CPU out</th><th>✓</th></tr></thead><tbody>';
+    for(const r of d.truth_table){const good=r.out===(r.target&((1<<CFG.outbits)-1));
+      h+=`<tr><td>${r.in.toString(2).padStart(6,'0')}</td><td>${r.target}</td><td class="${good?'ok':'ng'}">${r.out}</td><td>${good?'✓':'✗'}</td></tr>`;}
+    document.getElementById('tt').innerHTML=h+'</tbody>';
+    document.getElementById('genome').textContent='best genome: '+(d.best_genome_hex||'').slice(0,48)+'…';
+    document.getElementById('fstatus').textContent=`読込完了: ${d.target} best=${d.best_fitness} (${d.backend})`;
+  }catch(err){document.getElementById('fstatus').textContent='JSON解析失敗: '+err.message;}};
+  fr.readAsText(f);
+};
+
+/* 初期実行 */
+runEvolution();
+</script>
+</body>
+</html>
