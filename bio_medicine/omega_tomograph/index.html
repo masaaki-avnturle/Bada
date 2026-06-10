@@ -104,6 +104,7 @@
   <button class="active" data-tab="tomo">① Γ多様体トモグラフ (CT/MRI原理)</button>
   <button data-tab="xray">② Γ X線投影 (肺X線風)</button>
   <button data-tab="whisper">③ Whispered 合致率</button>
+  <button data-tab="telomere">④ Γ-テロメア寿命シミュレータ</button>
   <button data-tab="theory">理論メモ</button>
 </nav>
 
@@ -228,7 +229,76 @@
   </div>
 </section>
 
-<!-- ================= TAB 4 : THEORY ================= -->
+<!-- ================= TAB 4 : TELOMERE / LIFESPAN ================= -->
+<section id="telomere" class="tab">
+  <div class="row">
+    <div class="col" style="flex:0 0 320px">
+      <div class="card">
+        <h3>赤外線・体温センサー入力</h3>
+        <label>体温 T (赤外線/体温計): <span class="val" id="l_temp_v">37.0</span> ℃</label>
+        <input type="range" id="l_temp" min="355" max="390" value="370"/>
+        <canvas id="l_ir" width="280" height="40"></canvas>
+        <div class="cap">赤外線サーモ読み取り（代謝率→テロメア減衰に反映, Q10=2.5）</div>
+      </div>
+      <div class="card">
+        <h3>テロメア / DNA パラメータ</h3>
+        <label>初期テロメア長 L₀: <span class="val" id="l_l0_v">10000</span> bp</label>
+        <input type="range" id="l_l0" min="6000" max="15000" step="250" value="10000"/>
+        <label>Hayflick 臨界長 L_c: <span class="val" id="l_lc_v">5000</span> bp</label>
+        <input type="range" id="l_lc" min="3000" max="6000" step="100" value="5000"/>
+        <label>分裂あたり基本減衰 δ₀: <span class="val" id="l_d0_v">80</span> bp</label>
+        <input type="range" id="l_d0" min="40" max="200" value="80"/>
+        <label>TTAGGG 反復→ノット交差数 n(奇数): <span class="val" id="l_n_v">7</span></label>
+        <input type="range" id="l_n" min="3" max="21" step="2" value="7"/>
+        <label>Γ熱核 κ (大域的多様体): <span class="val" id="l_kappa_v">1.00</span></label>
+        <input type="range" id="l_kappa" min="0" max="200" value="100"/>
+        <button class="act" id="l_run">寿命を計算 ▶</button>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>推定寿命レンジ（概念モデル）</h3>
+        <div class="grid3">
+          <div><div class="cap">最低寿命 (高体温・低忠実度)</div><div class="big" id="l_min" style="color:var(--bad);font-size:30px">— 年</div></div>
+          <div><div class="cap">推定中央値 (現在設定)</div><div class="big" id="l_med" style="color:var(--cyan);font-size:34px">— 年</div></div>
+          <div><div class="cap">最大寿命 (低体温・高忠実度)</div><div class="big" id="l_max" style="color:var(--good);font-size:30px">— 年</div></div>
+        </div>
+        <div class="cap" id="l_detail" style="margin-top:8px"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>テロメア減衰曲線 L(年)</h3>
+          <canvas id="l_curve" width="340" height="200"></canvas>
+          <div class="cap">Γ大域的多様体核 e<sup>−κ·x log x</sup> で変調した減衰。点線=線形, 実線=Γ多様体</div>
+        </div>
+        <div class="card">
+          <h3>Jones多項式 V(t) — RNA転写トポロジー</h3>
+          <canvas id="l_jones" width="340" height="200"></canvas>
+          <div class="cap" id="l_jpoly" style="font-family:var(--mono);font-size:11px;color:var(--violet)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>原理</h3>
+        <p style="font-size:12.5px;margin:6px 0">
+        テロメア(TTAGGG反復)はテロメラーゼRNA(TERC)鋳型から転写・伸長されますが、細胞分裂ごとに
+        <code>δ</code> bp ずつ短縮し、Hayflick臨界長 <code>L_c</code> で複製老化に至ります。本タブは
+        TTAGGG反復鎖を <b>(2,n)トーラスノット</b> として捉え、その <b>Jones多項式</b>
+        <code>V_{T(2,n)}(t)=t^{(n−1)/2}(1−t³−t^{n+1}+t^{n+2})/(1−t²)</code> を計算し、
+        <code>|V(e^{2πi/5})|</code> から「転写トポロジー忠実度 φ」を導きます。
+        赤外線/体温計の体温 T は代謝率(Q10則)として減衰速度を変調します。
+        減衰は大域的部分積分多様体核 <code>e^{−κ·x log x}</code> で曲げ、
+        可能分裂数 <code>D=(L₀−L_c)/δ_eff</code> から最大寿命・最低寿命を算出します。</p>
+      </div>
+    </div>
+  </div>
+  <div class="disc" style="margin:0">
+    ⚠ 寿命は実際には遺伝・環境・確率に強く依存し、テロメアや体温から個人の寿命を測定することはできません。
+    本タブはレポートの数式・Jonesノット理論・テロメア生物学の数値を組み合わせた<b>概念モデル</b>であり、
+    実際の余命予測・医療判定ではありません。
+  </div>
+</section>
+
+<!-- ================= TAB 5 : THEORY ================= -->
 <section id="theory" class="tab">
   <div class="card">
     <h3>レポート方程式とアプリ機能の対応 (analyze/GammaFunction.pdf)</h3>
@@ -245,6 +315,10 @@
             <td>各投影角θの回転サンプリングに使用。</td></tr>
         <tr><td>Whispered言語 / ミラー統計</td>
             <td>署名IDから合成した特徴ベクトルのコサイン一致＋鏡映対称統計。タブ③。</td></tr>
+        <tr><td>Jones多項式 V_{T(2,n)}(t)（テロメアRNA転写）</td>
+            <td>TTAGGG反復鎖を(2,n)トーラスノット化し Jones多項式を計算、|V(e<sup>2πi/5</sup>)| を転写忠実度φに。タブ④。</td></tr>
+        <tr><td>赤外線/体温（代謝Q10則）＋ Hayflick限界</td>
+            <td>体温→減衰速度変調、可能分裂数 D=(L₀−L_c)/δ_eff から最大/最低寿命を算出。タブ④。</td></tr>
       </tbody>
     </table>
   </div>
@@ -633,11 +707,124 @@ function drawRadar(vals,labels){
     const lab=labels[i].length>8?labels[i].slice(0,7)+'…':labels[i];ctx.fillText(lab,x,y);}
 }
 
+/* ===================== TAB4 テロメア寿命 ===================== */
+// Jones多項式 V_{T(2,n)}(t) (n奇数=ノット): t^{(n-1)/2}(1-t^3-t^{n+1}+t^{n+2})/(1-t^2)
+function jonesT2n(n){
+  let r={0:1,3:-1}; r[n+1]=(r[n+1]||0)-1; r[n+2]=(r[n+2]||0)+1;
+  let q={};
+  for(let p=0;p<=n;p++){const c=r[p]||0;if(c!==0){q[p]=(q[p]||0)+c;r[p]-=c;r[p+2]=(r[p+2]||0)+c;}}
+  const shift=(n-1)/2; let out={};
+  for(const k in q){if(Math.abs(q[k])>1e-9) out[(+k)+shift]=q[k];}
+  return out;
+}
+function jonesAbs(poly,theta){let re=0,im=0;for(const k in poly){const a=poly[k];re+=a*Math.cos(theta*k);im+=a*Math.sin(theta*k);}return Math.hypot(re,im);}
+function fmtPoly(p){return Object.keys(p).map(Number).sort((a,b)=>a-b)
+  .map(k=>`${p[k]>0?"+":"−"}t^${k}`).join(" ").replace(/\+t\^0/,"+1");}
+
+// 1セットのパラメータから可能分裂数→寿命(年)
+function lifespan(L0,Lc,d0,phi,tempC,kappa){
+  const Q10=2.5;
+  const m=Math.pow(Q10,(tempC-37)/10);      // 代謝率(体温依存)
+  const dEff=d0*m/phi;                        // 実効減衰 bp/分裂
+  const D=Math.max(0,(L0-Lc)/dEff);           // 可能分裂数
+  // Γ多様体核で年/分裂を変調: 健康な核(高φ)で寿命延伸
+  const Ypd=1.6*phi*(0.8+0.4*gammaKernel(0.6,kappa)); // 年/分裂(概念係数)
+  return {years:D*Ypd, D, dEff, Ypd, m};
+}
+
+function ircolor(t){const c=cmapThermal(t);return`rgb(${c[0]},${c[1]},${c[2]})`;}
+function drawIR(tempC){
+  const c=document.getElementById('l_ir'),ctx=c.getContext('2d');
+  const t=(tempC-35.5)/(39-35.5);
+  for(let i=0;i<c.width;i++){const tt=Math.min(1,Math.max(0,t+ (i/c.width-0.5)*0.25));
+    ctx.fillStyle=ircolor(tt);ctx.fillRect(i,0,1,c.height);}
+  ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+  ctx.fillText(tempC.toFixed(1)+' ℃',c.width/2,26);
+}
+
+function drawDecay(L0,Lc,curMed,curMax,curMin,kappa){
+  const c=document.getElementById('l_curve'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const W=c.width,H=c.height,pad=24;
+  const maxYr=curMax.years*1.05||100;
+  function X(yr){return pad+(W-2*pad)*yr/maxYr;}
+  function Y(len){return H-pad-(H-2*pad)*(len-Lc*0.6)/(L0-Lc*0.6);}
+  // axes
+  ctx.strokeStyle='#1b2638';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+  // Lc line
+  ctx.strokeStyle='#5a3a12';ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(pad,Y(Lc));ctx.lineTo(W-pad,Y(Lc));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#8794a8';ctx.font='10px monospace';ctx.textAlign='left';
+  ctx.fillText('L_c='+Lc+'bp',pad+4,Y(Lc)-3);
+  ctx.fillText('0',pad-2,H-pad+12);ctx.fillText(Math.round(maxYr)+'yr',W-pad-22,H-pad+12);
+  const sets=[[curMin,'#d0506a'],[curMed,'#40b8c0'],[curMax,'#48c08a']];
+  for(const [s,col] of sets){
+    const yr=s.years;
+    // linear (dotted)
+    ctx.strokeStyle=col;ctx.globalAlpha=.4;ctx.setLineDash([3,3]);ctx.beginPath();
+    ctx.moveTo(X(0),Y(L0));ctx.lineTo(X(yr),Y(Lc));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    // gamma-manifold curved
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<=60;i++){const x=i/60;const g=gammaKernel(0.05+x*0.95,kappa);
+      const frac=Math.pow(x,0.7+0.6*(1-g/2)); // 多様体で曲げる
+      const len=L0-(L0-Lc)*frac;
+      i===0?ctx.moveTo(X(x*yr),Y(len)):ctx.lineTo(X(x*yr),Y(len));}
+    ctx.stroke();ctx.lineWidth=1;
+  }
+}
+
+function drawJones(poly){
+  const c=document.getElementById('l_jones'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cx=c.width/2,cy=c.height/2,R=78;
+  ctx.strokeStyle='#1b2638';ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.stroke();
+  // |V(e^{i theta})| polar curve
+  let mx=0;for(let d=0;d<360;d++){const v=jonesAbs(poly,d*Math.PI/180);if(v>mx)mx=v;}
+  ctx.strokeStyle='#9060d0';ctx.lineWidth=2;ctx.beginPath();
+  for(let d=0;d<=360;d++){const th=d*Math.PI/180;const v=jonesAbs(poly,th)/(mx||1);
+    const r=10+R*0.9*v;const x=cx+r*Math.cos(th),y=cy+r*Math.sin(th);
+    d===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.closePath();ctx.stroke();ctx.lineWidth=1;
+  ctx.fillStyle='#8794a8';ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillText('|V(e^{iθ})|  span='+ (Math.max(...Object.keys(poly).map(Number))-Math.min(...Object.keys(poly).map(Number))) ,cx,c.height-4);
+}
+
+function runTelomere(){
+  const L0=+document.getElementById('l_l0').value;
+  const Lc=+document.getElementById('l_lc').value;
+  const d0=+document.getElementById('l_d0').value;
+  const n=+document.getElementById('l_n').value;
+  const kappa=document.getElementById('l_kappa').value/100;
+  const tempC=+document.getElementById('l_temp').value/10;
+  // Jones → 転写忠実度 φ
+  const poly=jonesT2n(n);
+  const vabs=jonesAbs(poly,2*Math.PI/5);     // |V(e^{2pi i/5})|
+  const phi=Math.min(1,Math.max(0.55, 0.6 + 0.12*vabs)); // 0.55..1
+  // 現在/最大/最低
+  const med=lifespan(L0,Lc,d0,phi,tempC,kappa);
+  const max=lifespan(L0,Lc,d0,Math.min(1,phi*1.1),36.0,kappa);
+  const min=lifespan(L0,Lc,d0,phi*0.9,38.5,kappa);
+  document.getElementById('l_med').textContent=med.years.toFixed(0)+' 年';
+  document.getElementById('l_max').textContent=max.years.toFixed(0)+' 年';
+  document.getElementById('l_min').textContent=min.years.toFixed(0)+' 年';
+  document.getElementById('l_detail').textContent=
+    `Jones |V(e^{2πi/5})|=${vabs.toFixed(3)} → 転写忠実度 φ=${(phi*100).toFixed(1)}% ｜ `+
+    `実効減衰 δ_eff=${med.dEff.toFixed(1)}bp/分裂 ｜ 可能分裂数 D=${med.D.toFixed(1)} ｜ 代謝率×${med.m.toFixed(2)}`;
+  document.getElementById('l_jpoly').textContent='V_{T(2,'+n+')}(t) = '+fmtPoly(poly);
+  drawIR(tempC);
+  drawDecay(L0,Lc,med,max,min,kappa);
+  drawJones(poly);
+}
+[['l_temp','l_temp_v',v=>(v/10).toFixed(1)],['l_l0','l_l0_v',v=>v],['l_lc','l_lc_v',v=>v],
+ ['l_d0','l_d0_v',v=>v],['l_n','l_n_v',v=>v],['l_kappa','l_kappa_v',v=>(v/100).toFixed(2)]]
+ .forEach(([id,vid,f])=>{const el=document.getElementById(id);el.oninput=()=>{document.getElementById(vid).textContent=f(+el.value);};});
+document.getElementById('l_run').onclick=runTelomere;
+
 /* ===================== 初期描画 ===================== */
 drawKernel();
 document.getElementById('t_run').click();
 document.getElementById('x_run').click();
 document.getElementById('w_run').click();
+runTelomere();
 </script>
 </body>
 </html>
