@@ -135,6 +135,11 @@ async function run(bundlePath, manifestPath) {
       seq.push(nz(q.map(x => x + (Math.random() - 0.5) * 0.25))); }
     console.log("integrable_top:", eng.call("integrable_top", seq, { omega: w, dt, velocity: 0.6, ai: true }).summary);
   }
+  if (caps.includes("codegen")) {
+    var ver = eng.call("codegen", "verilog");
+    console.log("codegen→Verilog:", ver.split("\n").length, "lines (AI emits its own FPGA source)");
+    console.log(ver.split("\n").slice(0, 4).join("\n"));
+  }
 }
 
 async function main() {
