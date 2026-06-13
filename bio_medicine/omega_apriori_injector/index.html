@@ -96,6 +96,7 @@
       <label class="chk"><input type="checkbox" class="plg" value="patternmatch" checked> パターンマッチ生成 <small>中枢知能FPGAをマッチャ化＋ソース生成</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="word_complete" checked> 単語補完 <small>接頭辞＋語彙＋FPGA推論で候補ランク</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="self_evolve" checked> 自己進化＋一意ID <small>実行時テロメア自己進化・UID・自己進化ソース生成</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="fpga_functions" checked> FPGA関数ライブラリ <small>自己進化FPGAから任意の名前付き関数を実行/表出</small></label>
       <div class="stat"><span>読込済みソース</span><b id="srcstat">…</b></div>
     </div>
 
@@ -147,7 +148,7 @@
 
 <script>
 "use strict";
-const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top","codegen","patternmatch","word_complete","self_evolve"];
+const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top","codegen","patternmatch","word_complete","self_evolve","fpga_functions"];
 let SRC = { runtime:null, plugins:{} };       // 取得したソース
 let STATE = { genomeHex:null, cfg:null, bundle:null, manifest:null, keys:null, pubJwk:null, engine:null };
 
@@ -318,6 +319,8 @@ async function doVerify(){
     html+="word_complete('comp'): "+wc.map(c=>c.word).join(", ")+"<br>";}
   if(eng.plugins.self_evolve){const uid=eng.call("self_evolve","uid");
     html+="self_evolve UID(一意の機能): <b>"+uid+"</b><br>";}
+  if(eng.plugins.fpga_functions){const fns=eng.call("fpga_functions","list");
+    html+="fpga_functions: "+(fns.length?fns.join(", "):"(fn_library未設定 — Function Foundryで生成)")+"<br>";}
   document.getElementById("demo").innerHTML=html;
   document.getElementById("gomsg").textContent="盤をクリックして黒の先読み手を表示";
   drawGoban();
