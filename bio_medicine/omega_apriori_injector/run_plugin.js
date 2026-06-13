@@ -145,6 +145,9 @@ async function run(bundlePath, manifestPath) {
     var src = eng.call("patternmatch", "source", "c");
     console.log("patternmatch→C matcher:", src.split("\n").length, "lines (pattern_match/is_match)");
   }
+  if (caps.includes("word_complete")) {
+    console.log("word_complete('co'):", eng.call("word_complete", "co", { k: 5 }).map(function (c) { return c.word; }));
+  }
 }
 
 async function main() {
