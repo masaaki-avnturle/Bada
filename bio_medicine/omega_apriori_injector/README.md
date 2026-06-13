@@ -32,6 +32,7 @@
 | `plugins/completion.js` | 補完 (系列の次要素予測) プラグイン |
 | `plugins/integrable_top.js` | 複素回転体(四元数)における相対論的コマの**可積分系エラー修正**プラグイン (保存量 E・|L|²・四元数ノルムへの射影＋Thomas歳差補正＋AI信頼度) |
 | `plugins/codegen.js` | 付加したAIを **Verilog(FPGA)/C/Python/JS のソースコードに表出**するプラグイン (`eng.call("codegen","verilog")`) |
+| `plugins/patternmatch.js` | 中枢知能FPGAを**パターンマッチ器**化し、分類/レポート/**マッチャ・ソース生成**を行うプラグイン (`eng.call("patternmatch","source","c")`) |
 | `index.html` | **Injector Studio**: 進化→プラグイン選択→Web Crypto署名→4形式ダウンロード |
 | `verify_and_load.js` | **ホスト側ローダ**: 署名検証に通った場合のみバンドルを実行して付加 |
 | `run_plugin.js` | **Node CLI**: build / keygen / sign / verify / run（実行形式） |
