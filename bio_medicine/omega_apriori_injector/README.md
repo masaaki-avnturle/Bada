@@ -34,6 +34,7 @@
 | `plugins/codegen.js` | 付加したAIを **Verilog(FPGA)/C/Python/JS のソースコードに表出**するプラグイン (`eng.call("codegen","verilog")`) |
 | `plugins/patternmatch.js` | 中枢知能FPGAを**パターンマッチ器**化し、分類/レポート/**マッチャ・ソース生成**を行うプラグイン (`eng.call("patternmatch","source","c")`) |
 | `plugins/word_complete.js` | **単語補完**プラグイン: 接頭辞＋語彙＋FPGA推論で候補をランク (`eng.call("word_complete","co",{k:8})`) |
+| `plugins/self_evolve.js` | **自己進化＋一意の機能(UID)**プラグイン: 実行時テロメア自己進化 (`step`)・一意ID (`uid`)・**自己進化できるソースコード**生成 (`source`) |
 | `index.html` | **Injector Studio**: 進化→プラグイン選択→Web Crypto署名→4形式ダウンロード |
 | `verify_and_load.js` | **ホスト側ローダ**: 署名検証に通った場合のみバンドルを実行して付加 |
 | `run_plugin.js` | **Node CLI**: build / keygen / sign / verify / run（実行形式） |

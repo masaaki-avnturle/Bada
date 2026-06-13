@@ -148,6 +148,11 @@ async function run(bundlePath, manifestPath) {
   if (caps.includes("word_complete")) {
     console.log("word_complete('co'):", eng.call("word_complete", "co", { k: 5 }).map(function (c) { return c.word; }));
   }
+  if (caps.includes("self_evolve")) {
+    console.log("self_evolve UID:", eng.call("self_evolve", "uid"));
+    var s = eng.call("self_evolve", "source", "js");
+    console.log("self_evolve→self-evolving JS:", s.split("\n").length, "lines (selfEvolve()+uid() embedded)");
+  }
 }
 
 async function main() {
