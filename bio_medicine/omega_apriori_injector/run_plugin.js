@@ -125,6 +125,16 @@ async function run(bundlePath, manifestPath) {
     const b = [[0, 0, 0], [0, 1, 2], [0, 0, 0]];
     console.log("go_lookahead best move:", eng.call("go_lookahead", b, 1, 2).move);
   }
+  if (caps.includes("integrable_top")) {
+    const qm = (a, b) => [a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3], a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],
+      a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1], a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];
+    const nz = q => { const n = Math.hypot(q[0], q[1], q[2], q[3]) || 1; return q.map(x => x / n); };
+    let q = [1, 0, 0, 0]; const w = [1.0, 0.3, 0.2], dt = 0.05, seq = [q.slice()];
+    for (let i = 0; i < 40; i++) { const d = qm(q, [0, w[0], w[1], w[2]]).map(x => 0.5 * x);
+      q = nz([q[0]+d[0]*dt, q[1]+d[1]*dt, q[2]+d[2]*dt, q[3]+d[3]*dt]);
+      seq.push(nz(q.map(x => x + (Math.random() - 0.5) * 0.25))); }
+    console.log("integrable_top:", eng.call("integrable_top", seq, { omega: w, dt, velocity: 0.6, ai: true }).summary);
+  }
 }
 
 async function main() {

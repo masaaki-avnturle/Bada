@@ -30,6 +30,7 @@
 | `plugins/go_lookahead.js` | 囲碁 先読み (alpha-beta negamax) プラグイン |
 | `plugins/overview.js` | 俯瞰 (ヒートマップ・要点・ホットスポット) プラグイン |
 | `plugins/completion.js` | 補完 (系列の次要素予測) プラグイン |
+| `plugins/integrable_top.js` | 複素回転体(四元数)における相対論的コマの**可積分系エラー修正**プラグイン (保存量 E・|L|²・四元数ノルムへの射影＋Thomas歳差補正＋AI信頼度) |
 | `index.html` | **Injector Studio**: 進化→プラグイン選択→Web Crypto署名→4形式ダウンロード |
 | `verify_and_load.js` | **ホスト側ローダ**: 署名検証に通った場合のみバンドルを実行して付加 |
 | `run_plugin.js` | **Node CLI**: build / keygen / sign / verify / run（実行形式） |

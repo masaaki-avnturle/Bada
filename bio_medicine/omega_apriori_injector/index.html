@@ -91,6 +91,7 @@
       <label class="chk"><input type="checkbox" class="plg" value="go_lookahead" checked> 囲碁 先読み <small>alpha-beta 最善手</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="overview" checked> 俯瞰 <small>ヒートマップ・要点抽出</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="completion" checked> 補完 <small>系列の次要素予測</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="integrable_top" checked> 可積分系エラー修正 <small>相対論的コマ(複素回転体)の保存量訂正</small></label>
       <div class="stat"><span>読込済みソース</span><b id="srcstat">…</b></div>
     </div>
 
@@ -142,7 +143,7 @@
 
 <script>
 "use strict";
-const PLUGIN_NAMES = ["go_lookahead","overview","completion"];
+const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top"];
 let SRC = { runtime:null, plugins:{} };       // 取得したソース
 let STATE = { genomeHex:null, cfg:null, bundle:null, manifest:null, keys:null, pubJwk:null, engine:null };
 
@@ -297,6 +298,14 @@ async function doVerify(){
   if(eng.plugins.completion)html+="completion('AI',6) = <b>"+eng.call("completion","AI",6).predicted+"</b><br>";
   if(eng.plugins.overview){const grid=[[1,2,3,4],[2,9,8,1],[0,1,7,2],[3,1,0,1]];
     html+="overview: "+eng.call("overview",grid,{rows:2,cols:2}).summary+"<br>";}
+  if(eng.plugins.integrable_top){
+    // ノイズ付き相対論的コマの姿勢列を生成して誤り訂正
+    function qm(a,b){return[a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];}
+    function nz(q){const n=Math.hypot(q[0],q[1],q[2],q[3])||1;return[q[0]/n,q[1]/n,q[2]/n,q[3]/n];}
+    let q=[1,0,0,0];const w=[1.0,0.3,0.2],dt=0.05,seq=[q.slice()];
+    for(let i=0;i<40;i++){const d=qm(q,[0,w[0],w[1],w[2]]).map(x=>0.5*x);q=nz([q[0]+d[0]*dt,q[1]+d[1]*dt,q[2]+d[2]*dt,q[3]+d[3]*dt]);
+      seq.push(nz(q.map(x=>x+(Math.random()-0.5)*0.25)));}
+    html+="integrable_top: "+eng.call("integrable_top",seq,{omega:w,dt,velocity:0.6,ai:true}).summary+"<br>";}
   document.getElementById("demo").innerHTML=html;
   document.getElementById("gomsg").textContent="盤をクリックして黒の先読み手を表示";
   drawGoban();
