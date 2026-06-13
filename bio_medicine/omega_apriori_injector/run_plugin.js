@@ -53,6 +53,7 @@ function buildBundle(spec) {
     parts.push(fs.readFileSync(p, "utf8"));
   }
   const manifest = { cfg: spec.cfg, genome_hex: spec.genome_hex, plugins: wanted };
+  if (spec.fn_library) manifest.fn_library = spec.fn_library;   // FPGA関数ライブラリを付加先へ運ぶ
   const boot = `
 /* bootstrap: instantiate engine and attach plugins to host */
 (function(){
@@ -152,6 +153,10 @@ async function run(bundlePath, manifestPath) {
     console.log("self_evolve UID:", eng.call("self_evolve", "uid"));
     var s = eng.call("self_evolve", "source", "js");
     console.log("self_evolve→self-evolving JS:", s.split("\n").length, "lines (selfEvolve()+uid() embedded)");
+  }
+  if (caps.includes("fpga_functions")) {
+    var fns = eng.call("fpga_functions", "list");
+    console.log("fpga_functions list:", fns.length ? fns : "(empty — set fn_library in spec.json via Function Foundry)");
   }
 }
 
