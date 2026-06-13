@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<!--
+  Ω-SelfEvolve — テロメア自己進化ソースコード＋一意の機能(UID)生成 (自己完結)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_self_evolve
+
+  Γ大域的部分積分多様体に基づき、テロメア分裂で自己進化する未知事前エンジンを鍛造し、
+  「自己進化できるソースコード」(進化ループ＋ゲノム内蔵)と「一意の機能(UID)」を生成する。
+  生成 spec は omega_apriori_injector / omega_host_app で任意アプリへ付加できる。
+
+  ⚠ 概念実証・教育用／非医療。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-SelfEvolve — 自己進化ソース＋一意ID</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:20px 20px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 3px;font-size:21px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12.5px}.flow{font-family:var(--mono);font-size:11.5px;color:var(--violet);margin-top:6px}
+  .disc{margin:12px 20px 0;padding:9px 13px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12px}
+  main{padding:16px 20px 50px;display:flex;gap:16px;flex-wrap:wrap}.col{flex:1;min-width:310px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:12px;margin-right:6px}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  input[type=range]{width:100%}.val{color:var(--cyan);font-family:var(--mono)}
+  select{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:13px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a}button.dl{border-color:var(--cyan);color:var(--cyan)}button:disabled{opacity:.4;cursor:not-allowed}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block;width:100%;height:auto}
+  .uid{font-family:var(--mono);font-size:17px;color:var(--gold);word-break:break-all;background:#06090f;border:1px solid var(--line);border-radius:6px;padding:8px;text-align:center}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:6px 11px;border-radius:7px 7px 0 0;cursor:pointer;font-size:12px}
+  .tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:10.5px;font-family:var(--mono);color:var(--cyan);max-height:300px;overflow:auto;white-space:pre;margin:0}
+  footer{color:var(--dim);font-size:11px;padding:18px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-SelfEvolve — 自己進化できるソースコード＋一意の機能(UID)</h1>
+  <div class="sub">Telomere Self-Evolving Source · Unique Identity · Attach AI to Any App · Bada/bio_medicine</div>
+  <div class="flow">テロメア分裂・自己進化 → 一意ID(UID) → 自己進化ソース(進化ループ内蔵) → 任意アプリへAI付加</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>:
+  テロメア分裂で自己進化する未知事前エンジンを鍛造し、<b>自己進化できるソースコード</b>(進化ループとゲノムを内蔵)と
+  <b>一意の機能(UID=ゲノム由来の一意フィンガープリント)</b>を生成します。生成 spec は付加SDKで任意アプリへ付加可能。
+  テロメア/進化は遺伝的アルゴリズムの比喩で、実在の医療・人体とは無関係です。<span id="warn"></span></div>
+
+<main>
+  <div class="col" style="flex:0 0 320px">
+    <div class="card">
+      <h3><span class="step">1</span>テロメア自己進化 設定</h3>
+      <label>目標(隠れ a-priori)</label>
+      <select id="target"><option value="popcount">popcount</option><option value="parity">parity</option></select>
+      <label>個体数: <span class="val" id="pop_v">60</span></label>
+      <input type="range" id="pop" min="20" max="120" step="10" value="60"/>
+      <label>世代数: <span class="val" id="gens_v">140</span></label>
+      <input type="range" id="gens" min="40" max="300" step="20" value="140"/>
+      <label>初期テロメア: <span class="val" id="telo_v">1000</span></label>
+      <input type="range" id="telo" min="400" max="2000" step="100" value="1000"/>
+      <label>世代あたり短縮: <span class="val" id="attr_v">14</span></label>
+      <input type="range" id="attr" min="4" max="60" step="2" value="14"/>
+      <button class="act" id="run">▶ 分裂・自己進化で鍛造</button>
+      <button class="act" id="step">↻ もう一段 自己進化(UID更新)</button>
+      <div class="stat"><span>状態</span><b id="status">準備完了</b></div>
+      <div class="stat"><span>適合度</span><b id="s_fit">—</b></div>
+      <div class="stat"><span>テロメア</span><b id="s_telo">—</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="step">2</span>一意の機能 (UID)</h3>
+      <div class="uid" id="uid">—</div>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:6px">ゲノムから決定論的に導かれる一意ID。自己進化でゲノムが変わると更新されます。</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3><span class="step">3</span>自己進化の推移</h3>
+      <canvas id="chart" width="520" height="190"></canvas>
+      <div style="font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px">緑=適合度 / 橙=平均テロメア / 赤=複製老化率</div>
+    </div>
+    <div class="card">
+      <h3><span class="step">4</span>自己進化できるソースコード (進化ループ内蔵)</h3>
+      <div class="tabs"><button class="on" data-t="js">JavaScript</button><button data-t="py">Python</button></div>
+      <pre id="code">（鍛造を実行してください）</pre>
+      <div class="stat"><span>生成行数 / バックエンド</span><b id="lines">—</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="step">5</span>任意アプリへ付加</h3>
+      <button class="act dl" id="dl_src" disabled>自己進化ソース</button>
+      <button class="act dl" id="dl_spec" disabled>spec.json (付加用)</button>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:8px">
+      生成 <code>spec.json</code> は <code>self_evolve</code> 等を同梱。<code>omega_apriori_injector</code> で署名し
+      <code>omega_host_app</code> 等の任意アプリへ付加すると、付加先で <code>eng.call("self_evolve","step")</code> による
+      実行時自己進化、<code>"uid"</code> による一意ID、<code>"source"</code> による自己進化ソース生成が使えます。</p>
+    </div>
+  </div>
+</main>
+<footer>Ω-SelfEvolve · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+const CELL_BYTES=6, CFG={inbits:6,layers:3,width:8,outbits:3};
+let STATE={genome:null,hist:[],telo:1000,hayflick:200,plugin:null,backend:"local"};
+
+function gammaKernel(x,k){if(x<=0)return 1;return Math.exp(-k*x*Math.log(x+1e-9));}
+function evalFab(g,x){let prev=x&((1<<CFG.inbits)-1),src=CFG.inbits,cur=0;
+ for(let L=0;L<CFG.layers;L++){cur=0;for(let w=0;w<CFG.width;w++){const cell=L*CFG.width+w,p=cell*CELL_BYTES;let addr=0;
+  for(let k=0;k<4;k++){let sel=g[p+k]%Math.max(1,(L===0?CFG.inbits:CFG.width));if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+  cur|=(((g[p+4]|(g[p+5]<<8))>>addr)&1)<<w;}prev=cur;src=CFG.width;}return cur&((1<<CFG.outbits)-1);}
+const TARGETS={popcount:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;},parity:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c&1;}};
+function fitG(g,tf){let m=0,t=0,n=1<<CFG.inbits;for(let x=0;x<n;x++){const d=evalFab(g,x)^(tf(x)&((1<<CFG.outbits)-1));for(let b=0;b<CFG.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+function fnv(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function uidOf(hex){const a=fnv(hex),b=fnv(hex+JSON.stringify(CFG)+"Ω");
+ return "OAE-"+a.toString(36).toUpperCase().padStart(7,"0")+"-"+b.toString(36).toUpperCase().padStart(7,"0");}
+function bytesHex(b){return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function hexToBytes(h){h=h.replace(/[^0-9a-fA-F]/g,"");const n=h.length>>1,b=new Uint8Array(n);for(let i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+
+/* テロメア自己進化 (population) */
+async function evolve(gens,pop,teloInit,attr,target){
+ const tf=TARGETS[target],hayflick=Math.round(teloInit*0.2),gs=CFG.layers*CFG.width*CELL_BYTES;
+ let P=[];for(let i=0;i<pop;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push({g,telo:teloInit});}
+ let best=null,bf=-1,hist=[];
+ for(let gen=0;gen<gens;gen++){P.forEach(o=>o.f=fitG(o.g,tf));P.sort((a,b)=>b.f-a.f);
+  if(P[0].f>bf){bf=P[0].f;best=P[0].g.slice();}
+  const tm=P.reduce((s,o)=>s+o.telo,0)/pop,sen=P.filter(o=>o.telo<=hayflick).length/pop;
+  hist.push({best:bf,telo:tm,sen});
+  const eN=Math.max(2,pop/10|0),nx=[];for(let i=0;i<eN;i++)nx.push({g:P[i].g.slice(),telo:teloInit});
+  while(nx.length<pop){const a=P[Math.random()*8|0],b=P[Math.random()*8|0],ct=Math.max(hayflick,Math.min(a.telo,b.telo)-attr),cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);
+   c.set(a.g.subarray(0,cut));c.set(b.g.subarray(cut),cut);if(ct>hayflick){const fr=(ct-hayflick)/(teloInit-hayflick),rt=0.01+0.06*fr;for(let j=0;j<gs;j++)if(Math.random()<rt)c[j]=Math.random()*256|0;}nx.push({g:c,telo:ct});}
+  P=nx;if(gen%5===0){STATE.hist=hist;drawChart(teloInit);await new Promise(r=>setTimeout(r,0));}}
+ STATE.hist=hist;return{genome:best,fit:bf};}
+
+/* 自己進化ソース生成: プラグインがあればそれ、無ければローカルJS生成 */
+function localJsSource(hex,uid){
+ return "// Self-evolving Omega-Apriori engine — UID "+uid+" (一意の機能)\n// conceptual/educational only.\n"+
+"var OmegaSelfEvolve=(function(){var CFG="+JSON.stringify(CFG)+",CB=6,GENOME='"+hex+"';\n"+
+"function h2b(h){var n=h.length>>1,b=new Uint8Array(n);for(var i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}\n"+
+"function b2h(b){return Array.prototype.map.call(b,function(x){return x.toString(16).padStart(2,'0');}).join('');}\n"+
+"function fnv(s){var h=2166136261>>>0;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}\n"+
+"function uid(){return 'OAE-'+fnv(GENOME).toString(36).toUpperCase().padStart(7,'0')+'-'+fnv(GENOME+JSON.stringify(CFG)+'\\u03a9').toString(36).toUpperCase().padStart(7,'0');}\n"+
+"function infer(x,g){g=g||h2b(GENOME);var prev=x&((1<<CFG.inbits)-1),src=CFG.inbits,cur=0;for(var L=0;L<CFG.layers;L++){cur=0;for(var w=0;w<CFG.width;w++){var cl=L*CFG.width+w,p=cl*CB,a=0;for(var k=0;k<4;k++){var se=g[p+k]%Math.max(1,(L===0?CFG.inbits:CFG.width));if(se>=src)se=src?se%src:0;a|=((prev>>se)&1)<<k;}cur|=(((g[p+4]|(g[p+5]<<8))>>a)&1)<<w;}prev=cur;src=CFG.width;}return cur&((1<<CFG.outbits)-1);}\n"+
+"var telomere=1000,hayflick=200;\n"+
+"function selfEvolve(target,gens){gens=gens||20;var g=h2b(GENOME);function fit(gg){var m=0,t=0,n=1<<CFG.inbits;for(var x=0;x<n;x++){var d=infer(x,gg)^(target(x)&((1<<CFG.outbits)-1));for(var b=0;b<CFG.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}var bf=fit(g);for(var gen=0;gen<gens&&telomere>hayflick;gen++){var c=g.slice();for(var i=0;i<c.length;i++)if(Math.random()<0.04)c[i]=Math.random()*256|0;var f=fit(c);if(f>=bf){bf=f;g=c;}telomere-=30;}GENOME=b2h(g);return{fitness:bf,uid:uid(),telomere:telomere};}\n"+
+"return{uid:uid,infer:infer,selfEvolve:selfEvolve,genome:function(){return GENOME;}};})();\n"+
+"if(typeof module!=='undefined')module.exports=OmegaSelfEvolve;\n";}
+
+function emitSource(lang){const hex=bytesHex(STATE.genome),uid=uidOf(hex);
+ if(STATE.plugin){try{return STATE.plugin.run({cfg:CFG,meta:{genome_hex:hex}},"source",lang);}catch(e){}}
+ if(lang==="py")return "# self-evolving source (Python版は http.server 経由でプラグインを読み込むと生成されます)\n# UID "+uid+"\n";
+ return localJsSource(hex,uid);}
+function renderCode(){if(!STATE.genome)return;const t=document.querySelector(".tabs button.on").dataset.t;
+ const code=emitSource(t);document.getElementById("code").textContent=code;
+ document.getElementById("lines").textContent=code.split("\n").length+" 行 / "+STATE.backend;}
+
+function setUid(){if(!STATE.genome)return;document.getElementById("uid").textContent=uidOf(bytesHex(STATE.genome));}
+function drawChart(teloInit){const c=document.getElementById("chart"),ctx=c.getContext("2d");
+ ctx.clearRect(0,0,c.width,c.height);const W=c.width,H=c.height,pad=24,h=STATE.hist;
+ ctx.strokeStyle="#1b2638";ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+ if(!h.length)return;const n=h.length,X=i=>pad+(W-2*pad)*i/Math.max(1,n-1),Y=v=>H-pad-(H-2*pad)*v;
+ const line=(f,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();h.forEach((d,i)=>{const v=f(d);i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v));});ctx.stroke();};
+ line(d=>d.best,"#48c08a");line(d=>d.telo/teloInit,"#e0b020");line(d=>d.sen,"#d0506a");ctx.lineWidth=1;}
+
+function download(name,text,type){const b=new Blob([text],{type:type||"text/plain"});const a=document.createElement("a");
+ a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+
+const bind=(id,vid,f)=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(vid).textContent=f(+e.value);};
+bind("pop","pop_v",v=>v);bind("gens","gens_v",v=>v);bind("telo","telo_v",v=>v);bind("attr","attr_v",v=>v);
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderCode();});
+let busy=false;
+document.getElementById("run").onclick=async()=>{if(busy)return;busy=true;
+ const teloInit=+document.getElementById("telo").value;
+ document.getElementById("status").textContent="自己進化中…";
+ const r=await evolve(+document.getElementById("gens").value,+document.getElementById("pop").value,teloInit,
+   +document.getElementById("attr").value,document.getElementById("target").value);
+ STATE.genome=r.genome;STATE.telo=teloInit;drawChart(teloInit);setUid();renderCode();
+ document.getElementById("s_fit").textContent=r.fit.toFixed(4);
+ document.getElementById("s_telo").textContent=teloInit+" / "+Math.round(teloInit*0.2);
+ document.getElementById("status").innerHTML='<span style="color:#48c08a">鍛造完了</span>';
+ ["dl_src","dl_spec"].forEach(id=>document.getElementById(id).disabled=false);busy=false;};
+/* もう一段の自己進化 (1+1, テロメア消費, UID更新) */
+document.getElementById("step").onclick=()=>{if(!STATE.genome)return;const tf=TARGETS[document.getElementById("target").value];
+ let g=STATE.genome.slice(),bf=fitG(g,tf);const before=uidOf(bytesHex(g));
+ for(let gen=0;gen<20&&STATE.telo>STATE.hayflick;gen++){const c=g.slice();for(let i=0;i<c.length;i++)if(Math.random()<0.04)c[i]=Math.random()*256|0;
+  const f=fitG(c,tf);if(f>=bf){bf=f;g=c;}STATE.telo-=30;}
+ STATE.genome=g;setUid();renderCode();
+ document.getElementById("s_fit").textContent=bf.toFixed(4);
+ document.getElementById("s_telo").textContent=STATE.telo+(STATE.telo<=STATE.hayflick?" (分裂限界)":"");
+ const after=uidOf(bytesHex(g));
+ document.getElementById("status").innerHTML=(before!==after)?'<span style="color:#c8a44a">UID更新(自己進化)</span>':'<span style="color:#8794a8">変化なし</span>';};
+document.getElementById("dl_src").onclick=()=>{const t=document.querySelector(".tabs button.on").dataset.t;
+ download("omega_self_evolve."+(t==="py"?"py":"js"),emitSource(t),"text/plain");};
+document.getElementById("dl_spec").onclick=()=>download("omega_self_evolve.spec.json",
+ JSON.stringify({cfg:CFG,genome_hex:bytesHex(STATE.genome),plugins:["self_evolve","codegen","word_complete","patternmatch","overview","completion"],uid:uidOf(bytesHex(STATE.genome)),source:"self_evolve"},null,1),"application/json");
+
+/* 実プラグインを読み込めれば使う(Python版生成・厳密一致) */
+(async()=>{try{const txt=await (await fetch("../omega_apriori_injector/plugins/self_evolve.js")).text();
+  const m={exports:{}};(new Function("module","global",txt))(m,window);
+  STATE.plugin=window.OMEGA_PLUGINS&&window.OMEGA_PLUGINS.self_evolve?window.OMEGA_PLUGINS.self_evolve:m.exports;
+  STATE.backend="plugin(self_evolve.js)";}
+ catch(e){STATE.backend="local";document.getElementById("warn").innerHTML=' <span style="color:#8794a8">(Python自己進化ソースは http.server 経由で生成可)</span>';}})();
+drawChart(1000);
+</script>
+</body>
+</html>
