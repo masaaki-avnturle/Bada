@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!--
+  Ω-PatternForge — テロメア分裂限界で生成するパターンマッチAI (自己完結)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_patternforge
+
+  Γ大域的部分積分多様体 e^{-x log x} に基づき、テロメア分裂で自己進化し、
+  テロメア分裂の限界値(Hayflick限界)に到達した時点で最良マッチャを「生成」する生成AI。
+  中枢知能FPGA(LUTファブリック)が学習したパターンを、パターンマッチ用ソースコード
+  (C/Python/JS/Verilog)に生成する。生成 spec は omega_apriori_injector で任意アプリへ付加可能。
+
+  ⚠ 概念実証・教育用／非医療。テロメア/進化は遺伝的アルゴリズムのメタファ。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-PatternForge</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 4px;font-size:22px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}.flow{font-family:var(--mono);font-size:11.5px;color:var(--violet);margin-top:6px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12.5px}
+  main{padding:18px 20px 60px}.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}.col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:12px;margin-right:6px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}.val{color:var(--cyan);font-family:var(--mono)}
+  select,input[type=text],textarea{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px;font-family:var(--mono)}
+  textarea{height:60px;resize:vertical}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 15px;cursor:pointer;font-weight:700;font-size:13.5px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a}button.dl{border-color:var(--cyan);color:var(--cyan)}button:disabled{opacity:.4;cursor:not-allowed}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block;width:100%;height:auto}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:6px 11px;border-radius:7px 7px 0 0;cursor:pointer;font-size:12px}
+  .tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:11px;font-family:var(--mono);color:var(--cyan);max-height:300px;overflow:auto;white-space:pre;margin:0}
+  .limit{color:var(--bad);font-weight:700}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-PatternForge — テロメア分裂限界で生成するパターンマッチAI</h1>
+  <div class="sub">Γ Global Partial-Integration Manifold · Telomere-Limit Generative AI · Pattern-Match Codegen · Bada/bio_medicine</div>
+  <div class="flow">パターン定義 → テロメア分裂・自己進化 → <span class="limit">分裂限界(Hayflick)で生成</span> → パターンマッチ用ソース(C/Py/JS/Verilog) → 付加</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>:
+  Γカーネル <code>e^{−x log x}</code> で変調したテロメア分裂を自己進化させ、
+  <b>テロメア分裂の限界値(Hayflick限界)に到達した時点で</b>最良マッチャを生成します。
+  中枢知能FPGA(LUTファブリック)が学習したパターンを<b>パターンマッチ用ソースコード</b>に生成します。
+  テロメア/進化は比喩で、実在の医療・人体とは無関係です。</div>
+
+<main>
+<div class="row">
+  <div class="col" style="flex:0 0 330px">
+    <div class="card">
+      <h3><span class="step">1</span>パターン定義 (学習対象)</h3>
+      <label>プリセット・パターン</label>
+      <select id="pattern">
+        <option value="palindrome">回文 (bit対称) → 1/0</option>
+        <option value="mult3">x mod 3 → 0..2</option>
+        <option value="mask">マスク一致 0b010101 → 1/0</option>
+        <option value="popcount">popcount(情報量) → 0..6</option>
+        <option value="custom">カスタム例示</option>
+      </select>
+      <label>カスタム例示 (x=label を改行区切り, 入力0..63)</label>
+      <textarea id="examples" placeholder="5=1&#10;42=0&#10;63=1"></textarea>
+    </div>
+    <div class="card">
+      <h3><span class="step">2</span>テロメア分裂限界 設定</h3>
+      <label>個体数: <span class="val" id="pop_v">70</span></label>
+      <input type="range" id="pop" min="20" max="140" step="10" value="70"/>
+      <label>初期テロメア: <span class="val" id="telo_v">1000</span></label>
+      <input type="range" id="telo" min="400" max="2000" step="100" value="1000"/>
+      <label>分裂限界 Hayflick (初期比): <span class="val" id="lim_v">0.20</span></label>
+      <input type="range" id="lim" min="5" max="60" value="20"/>
+      <label>世代あたり短縮: <span class="val" id="attr_v">14</span></label>
+      <input type="range" id="attr" min="4" max="60" step="2" value="14"/>
+      <label>テロメラーゼ回数(限界延長): <span class="val" id="tase_v">3</span></label>
+      <input type="range" id="tase" min="0" max="10" value="3"/>
+      <label>Γ熱核 κ: <span class="val" id="kappa_v">1.00</span></label>
+      <input type="range" id="kappa" min="0" max="200" value="100"/>
+      <button class="act" id="run">▶ 分裂限界まで自己進化→生成</button>
+      <div class="stat"><span>状態</span><b id="status">準備完了</b></div>
+    </div>
+    <div class="card">
+      <h3>マッチャ性能</h3>
+      <div class="stat"><span>パターン一致率</span><b id="s_acc">—</b></div>
+      <div class="stat"><span>平均テロメア</span><b id="s_telo">—</b></div>
+      <div class="stat"><span>複製老化率</span><b id="s_sen">—</b></div>
+      <div class="stat"><span>生成トリガ</span><b id="s_trig">—</b></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3><span class="step">3</span>分裂限界での生成過程</h3>
+      <canvas id="chart" width="520" height="220"></canvas>
+      <div style="font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px">緑=一致率 / 橙=平均テロメア / 赤=複製老化率 / 縦線=分裂限界(生成点)</div>
+    </div>
+    <div class="card">
+      <h3><span class="step">4</span>生成されたパターンマッチ用ソースコード</h3>
+      <div class="tabs">
+        <button class="on" data-t="js">JavaScript</button>
+        <button data-t="c">C</button>
+        <button data-t="python">Python</button>
+        <button data-t="verilog">Verilog (FPGA)</button>
+      </div>
+      <pre id="code">（自己進化を実行してください）</pre>
+      <div class="stat"><span>生成行数</span><b id="lines">—</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="step">5</span>任意アプリへ付加 (機能拡張)</h3>
+      <button class="act dl" id="dl_src" disabled>この言語のマッチャ</button>
+      <button class="act dl" id="dl_spec" disabled>spec.json (付加用)</button>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:8px">
+      <code>spec.json</code> を <code>omega_apriori_injector</code> へ:
+      <code>node run_plugin.js build spec.json plugin.js</code> → sign →
+      付加先で <code>patternmatch</code> プラグインが分類・<code>pattern_match()</code> ソース生成を提供。</p>
+    </div>
+  </div>
+</div>
+</main>
+<footer>Ω-PatternForge · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+const CELL_BYTES=6;
+let cfg={inbits:6,layers:3,width:8,outbits:1};
+let STATE={genome:null,hist:[],triggerGen:-1,target:null,target_name:"palindrome"};
+
+function gammaKernel(x,k){if(x<=0)return 1;return Math.exp(-k*x*Math.log(x+1e-9));}
+
+/* パターン(目標関数)と必要outbits */
+function buildTarget(){
+  const name=document.getElementById("pattern").value;STATE.target_name=name;
+  if(name==="palindrome"){cfg.outbits=1;return x=>(((x>>0&1)===(x>>5&1))&&((x>>1&1)===(x>>4&1))&&((x>>2&1)===(x>>3&1)))?1:0;}
+  if(name==="mult3"){cfg.outbits=2;return x=>x%3;}
+  if(name==="mask"){cfg.outbits=1;return x=>((x&0b010101)===0b010101)?1:0;}
+  if(name==="popcount"){cfg.outbits=3;return x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;};}
+  // custom: parse examples
+  const map={};let maxL=0;
+  document.getElementById("examples").value.split(/\n+/).forEach(line=>{
+    const m=line.match(/(\d+)\s*=\s*(\d+)/);if(m){const x=+m[1]&63,l=+m[2];map[x]=l;if(l>maxL)maxL=l;}});
+  cfg.outbits=Math.max(1,Math.ceil(Math.log2(maxL+1)));
+  STATE._customMap=map;STATE._customKeys=Object.keys(map).map(Number);
+  return x=>(x in map)?map[x]:0;
+}
+
+function evalFab(g,x){let prev=x&((1<<cfg.inbits)-1),src=cfg.inbits,cur=0;
+ for(let L=0;L<cfg.layers;L++){cur=0;for(let w=0;w<cfg.width;w++){const cell=L*cfg.width+w,p=cell*CELL_BYTES;let addr=0;
+  for(let k=0;k<4;k++){let sel=g[p+k]%Math.max(1,(L===0?cfg.inbits:cfg.width));if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+  cur|=(((g[p+4]|(g[p+5]<<8))>>addr)&1)<<w;}prev=cur;src=cfg.width;}return cur&((1<<cfg.outbits)-1);}
+
+/* 適合度: カスタムは例示のみ, プリセットは全64入力 */
+function fit(g){const tf=STATE.target;
+ if(STATE.target_name==="custom"&&STATE._customKeys.length){const ks=STATE._customKeys;let m=0,t=0;
+  for(const x of ks){const d=evalFab(g,x)^(tf(x)&((1<<cfg.outbits)-1));for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+ let m=0,t=0;for(let x=0;x<64;x++){const d=evalFab(g,x)^(tf(x)&((1<<cfg.outbits)-1));for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+/* ラベル完全一致率(マッチャ精度) */
+function matchAcc(g){const tf=STATE.target;
+ const xs=(STATE.target_name==="custom"&&STATE._customKeys.length)?STATE._customKeys:Array.from({length:64},(_,i)=>i);
+ let ok=0;for(const x of xs)if(evalFab(g,x)===(tf(x)&((1<<cfg.outbits)-1)))ok++;return ok/xs.length;}
+
+/* テロメア分裂限界まで自己進化し、限界点で「生成」 */
+async function evolveToLimit(pop,teloInit,limFrac,attr,taseBudget,kappa){
+ const hayflick=Math.round(teloInit*limFrac),gs=cfg.layers*cfg.width*CELL_BYTES;
+ let P=[];for(let i=0;i<pop;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push({g,telo:teloInit});}
+ let best=null,bf=-1,hist=[],budget=taseBudget,trigger=-1,gen=0,maxGen=600;
+ while(gen<maxGen){
+  P.forEach(o=>o.f=fit(o.g));P.sort((a,b)=>b.f-a.f);
+  if(P[0].f>bf){bf=P[0].f;best=P[0].g.slice();}
+  const teloMean=P.reduce((s,o)=>s+o.telo,0)/pop, sen=P.filter(o=>o.telo<=hayflick).length/pop;
+  hist.push({gen,best:matchAcc(best||P[0].g),telo:teloMean,sen});
+  /* 分裂限界: 全個体が老化 (telomere<=Hayflick) で生成トリガ */
+  const allSen=P.every(o=>o.telo<=hayflick);
+  if(allSen){
+   if(budget>0){budget--; for(let i=0;i<Math.max(2,pop/10|0);i++)P[i].telo=teloInit;} /* テロメラーゼ延長 */
+   else{trigger=gen;break;} /* 分裂限界に到達 → 生成 */
+  }
+  const eN=Math.max(2,pop/10|0),next=[];
+  for(let i=0;i<eN;i++)next.push({g:P[i].g.slice(),telo:Math.max(0,P[i].telo-attr)}); /* エリートも分裂で短縮→限界へ */
+  while(next.length<pop){const a=P[Math.random()*8|0],b=P[Math.random()*8|0];
+   const ct=Math.max(0,Math.min(a.telo,b.telo)-attr);
+   const cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);c.set(a.g.subarray(0,cut));c.set(b.g.subarray(cut),cut);
+   if(ct>hayflick){const frac=(ct-hayflick)/Math.max(1,teloInit-hayflick),rate=0.01+0.06*frac*(0.5+0.5*gammaKernel(0.6,kappa));
+    for(let j=0;j<gs;j++)if(Math.random()<rate)c[j]=Math.random()*256|0;}
+   next.push({g:c,telo:ct});}
+  P=next;gen++;
+  if(gen%4===0){STATE.hist=hist;STATE.triggerGen=trigger;drawChart(teloInit);
+   document.getElementById("status").textContent="自己進化中 gen "+gen+" (残テロメラーゼ "+budget+")";
+   document.getElementById("s_telo").textContent=teloMean.toFixed(0)+" / "+teloInit;
+   document.getElementById("s_sen").textContent=(sen*100).toFixed(0)+"%";
+   await new Promise(r=>setTimeout(r,0));}
+ }
+ if(trigger<0)trigger=gen;
+ return{genome:best,acc:matchAcc(best),triggerGen:trigger,gens:gen};
+}
+
+/* パターンマッチ用ソース生成 */
+function h16(v){return(v&0xFFFF).toString(16).toUpperCase().padStart(4,"0");}
+function cellsOf(g){const o=[];let idx=0;for(let L=0;L<cfg.layers;L++){const src=L===0?cfg.inbits:cfg.width;
+ for(let w=0;w<cfg.width;w++){const p=idx*CELL_BYTES,sel=[];for(let k=0;k<4;k++)sel.push(g[p+k]%Math.max(1,src));
+  o.push({L,w,sel,lut:(g[p+4]|(g[p+5]<<8))&0xFFFF});idx++;}}return o;}
+function emit(g,lang){const C=cellsOf(g),inM=(1<<cfg.inbits)-1,outM=(1<<cfg.outbits)-1,s=[];
+ const hdr="pattern='"+STATE.target_name+"'  生成(テロメア分裂限界) — conceptual/educational only";
+ if(lang==="verilog"){let prev="din";s.push("// "+hdr);
+  s.push("module pattern_match (input ["+(cfg.inbits-1)+":0] din, output ["+(cfg.outbits-1)+":0] dout);");
+  for(let L=0;L<cfg.layers;L++){const wn="s"+L;s.push("  wire ["+(cfg.width-1)+":0] "+wn+";");
+   for(let w=0;w<cfg.width;w++){const c=C[L*cfg.width+w],lp="LUT_"+L+"_"+w;s.push("  localparam [15:0] "+lp+" = 16'h"+h16(c.lut)+";");
+    const sl=c.sel.map(x=>prev+"["+x+"]");s.push("  assign "+wn+"["+w+"] = "+lp+"[{"+sl[3]+","+sl[2]+","+sl[1]+","+sl[0]+"}];");}prev=wn;}
+  s.push("  assign dout = "+prev+"["+(cfg.outbits-1)+":0]; // = matched class");s.push("endmodule");return s.join("\n");}
+ const px=lang==="py"?"    ":"  ";
+ if(lang==="c"){s.push("/* "+hdr+" */");s.push("#include <stdint.h>");s.push("int pattern_match(uint32_t din){");s.push("  uint32_t prev=din&0x"+inM.toString(16)+"u,cur=0;int addr;");}
+ else if(lang==="py"){s.push("# "+hdr);s.push("def pattern_match(din):");s.push("    prev = din & "+inM);}
+ else{s.push("// "+hdr);s.push("function pattern_match(din){");s.push("  var prev=din&"+inM+",cur=0,addr;");}
+ for(let L=0;L<cfg.layers;L++){s.push(lang==="py"?"    cur = 0":px+"cur = 0;");
+  for(let w=0;w<cfg.width;w++){const c=C[L*cfg.width+w];
+   const a="((prev>>"+c.sel[0]+")&1)|(((prev>>"+c.sel[1]+")&1)<<1)|(((prev>>"+c.sel[2]+")&1)<<2)|(((prev>>"+c.sel[3]+")&1)<<3)";
+   if(lang==="py"){s.push("    addr = "+a);s.push("    cur |= ((0x"+h16(c.lut)+">>addr)&1)<<"+w);}
+   else{s.push(px+"addr="+a+";");s.push(px+"cur|=((0x"+h16(c.lut)+">>addr)&1)<<"+w+";");}}
+  s.push(lang==="py"?"    prev = cur":px+"prev = cur;");}
+ if(lang==="py"){s.push("    return cur & "+outM+"  # matched class");s.push("");s.push("def is_match(x, label):");s.push("    return pattern_match(x) == label");}
+ else if(lang==="c"){s.push(px+"return (int)(cur & 0x"+outM.toString(16)+"u);");s.push("}");s.push("int is_match(uint32_t x,int label){ return pattern_match(x)==label; }");}
+ else{s.push(px+"return cur & "+outM+";");s.push("}");s.push("function is_match(x,label){ return pattern_match(x)===label; }");}
+ return s.join("\n");}
+function renderCode(){if(!STATE.genome)return;const t=document.querySelector(".tabs button.on").dataset.t;
+ const code=emit(STATE.genome,t==="python"?"py":t);document.getElementById("code").textContent=code;
+ document.getElementById("lines").textContent=code.split("\n").length+" 行";}
+
+function drawChart(teloInit){const c=document.getElementById("chart"),ctx=c.getContext("2d");
+ ctx.clearRect(0,0,c.width,c.height);const W=c.width,H=c.height,pad=26,h=STATE.hist;
+ ctx.strokeStyle="#1b2638";ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+ if(!h.length)return;const n=h.length,X=i=>pad+(W-2*pad)*i/Math.max(1,n-1),Y=v=>H-pad-(H-2*pad)*v;
+ const line=(f,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();h.forEach((d,i)=>{const v=f(d);i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v));});ctx.stroke();};
+ line(d=>d.best,"#48c08a");line(d=>d.telo/teloInit,"#e0b020");line(d=>d.sen,"#d0506a");ctx.lineWidth=1;
+ if(STATE.triggerGen>=0){const gi=h.findIndex(d=>d.gen>=STATE.triggerGen);if(gi>=0){ctx.strokeStyle="#d0506a";ctx.setLineDash([4,3]);
+  ctx.beginPath();ctx.moveTo(X(gi),pad);ctx.lineTo(X(gi),H-pad);ctx.stroke();ctx.setLineDash([]);}}}
+
+function download(name,text,type){const b=new Blob([text],{type:type||"text/plain"});const a=document.createElement("a");
+ a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function genomeHex(){return Array.from(STATE.genome).map(b=>b.toString(16).padStart(2,"0")).join("");}
+
+const bind=(id,vid,f)=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(vid).textContent=f(+e.value);};
+bind("pop","pop_v",v=>v);bind("telo","telo_v",v=>v);bind("lim","lim_v",v=>(v/100).toFixed(2));
+bind("attr","attr_v",v=>v);bind("tase","tase_v",v=>v);bind("kappa","kappa_v",v=>(v/100).toFixed(2));
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderCode();});
+let busy=false;
+document.getElementById("run").onclick=async()=>{if(busy)return;busy=true;
+ STATE.target=buildTarget();STATE.hist=[];STATE.triggerGen=-1;
+ const r=await evolveToLimit(+document.getElementById("pop").value,+document.getElementById("telo").value,
+   document.getElementById("lim").value/100,+document.getElementById("attr").value,
+   +document.getElementById("tase").value,document.getElementById("kappa").value/100);
+ STATE.genome=r.genome;STATE.triggerGen=r.triggerGen;drawChart(+document.getElementById("telo").value);renderCode();
+ document.getElementById("s_acc").textContent=(r.acc*100).toFixed(1)+"%";
+ document.getElementById("s_trig").innerHTML='<span class="limit">分裂限界 gen '+r.triggerGen+'</span>';
+ document.getElementById("status").innerHTML='<span style="color:#48c08a">生成完了 一致率='+(r.acc*100).toFixed(1)+'%</span>';
+ ["dl_src","dl_spec"].forEach(id=>document.getElementById(id).disabled=false);busy=false;};
+document.getElementById("dl_src").onclick=()=>{const t=document.querySelector(".tabs button.on").dataset.t;
+ const ext={js:"js",c:"c",python:"py",verilog:"v"}[t];download("pattern_match."+ext,emit(STATE.genome,t==="python"?"py":t),"text/plain");};
+document.getElementById("dl_spec").onclick=()=>download("pattern_match.spec.json",
+ JSON.stringify({cfg,genome_hex:genomeHex(),plugins:["patternmatch","codegen","go_lookahead","overview","completion","integrable_top"],pattern:STATE.target_name,source:"patternforge"},null,1),"application/json");
+drawChart(1000);
+</script>
+</body>
+</html>

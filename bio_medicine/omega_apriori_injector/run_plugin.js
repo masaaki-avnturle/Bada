@@ -140,6 +140,11 @@ async function run(bundlePath, manifestPath) {
     console.log("codegen→Verilog:", ver.split("\n").length, "lines (AI emits its own FPGA source)");
     console.log(ver.split("\n").slice(0, 4).join("\n"));
   }
+  if (caps.includes("patternmatch")) {
+    console.log("patternmatch classify([5,42,63]):", eng.call("patternmatch", "classify", [5, 42, 63]));
+    var src = eng.call("patternmatch", "source", "c");
+    console.log("patternmatch→C matcher:", src.split("\n").length, "lines (pattern_match/is_match)");
+  }
 }
 
 async function main() {

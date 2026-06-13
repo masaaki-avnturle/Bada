@@ -93,6 +93,7 @@
       <label class="chk"><input type="checkbox" class="plg" value="completion" checked> 補完 <small>系列の次要素予測</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="integrable_top" checked> 可積分系エラー修正 <small>相対論的コマ(複素回転体)の保存量訂正</small></label>
       <label class="chk"><input type="checkbox" class="plg" value="codegen" checked> ソースコード生成 <small>AIを Verilog(FPGA)/C/Python/JS に表出</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="patternmatch" checked> パターンマッチ生成 <small>中枢知能FPGAをマッチャ化＋ソース生成</small></label>
       <div class="stat"><span>読込済みソース</span><b id="srcstat">…</b></div>
     </div>
 
@@ -144,7 +145,7 @@
 
 <script>
 "use strict";
-const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top","codegen"];
+const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top","codegen","patternmatch"];
 let SRC = { runtime:null, plugins:{} };       // 取得したソース
 let STATE = { genomeHex:null, cfg:null, bundle:null, manifest:null, keys:null, pubJwk:null, engine:null };
 
@@ -309,6 +310,8 @@ async function doVerify(){
     html+="integrable_top: "+eng.call("integrable_top",seq,{omega:w,dt,velocity:0.6,ai:true}).summary+"<br>";}
   if(eng.plugins.codegen){const v=eng.call("codegen","verilog");
     html+="codegen→Verilog: <b>"+v.split("\n").length+"行</b> 生成 (AIが自分のFPGAソースを表出)<br>";}
+  if(eng.plugins.patternmatch){const s=eng.call("patternmatch","source","js");
+    html+="patternmatch→マッチャJS: <b>"+s.split("\n").length+"行</b> 生成 (pattern_match()付き)<br>";}
   document.getElementById("demo").innerHTML=html;
   document.getElementById("gomsg").textContent="盤をクリックして黒の先読み手を表示";
   drawGoban();
