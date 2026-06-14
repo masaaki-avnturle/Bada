@@ -51,6 +51,7 @@ public class HhkbImeService extends InputMethodService
     private static final int T_FUNC = 3;   // special function key (Esc/Tab/Enter/Space/Delete/...)
     private static final int T_JP   = 4;   // Japanese key (変換 / 無変換)
     private static final int T_MODE = 5;   // Japanese/English (あ/A) toggle
+    private static final int T_WIDTH = 6;  // full-width / half-width (全/半) toggle
 
     // ---- Japanese key actions / input modes ------------------------------
     private static final int JP_HENKAN   = 1;   // 変換
@@ -86,7 +87,9 @@ public class HhkbImeService extends InputMethodService
     // ---- Japanese input --------------------------------------------------
     private final JapaneseInputEngine jp = new JapaneseInputEngine();
     private int inputMode = MODE_EN;
+    private boolean fullWidth = false;        // 全角(true) / 半角(false)
     private Button modeButton;
+    private Button widthButton;
     private HorizontalScrollView candidateScroll;
     private LinearLayout candidateBar;
 
@@ -169,6 +172,9 @@ public class HhkbImeService extends InputMethodService
     private static KeyDef modeKey(float w) {
         return new KeyDef("A", "A", 0, T_MODE, w);
     }
+    private static KeyDef widthKey(float w) {
+        return new KeyDef("半", "半", 0, T_WIDTH, w);
+    }
 
     // =====================================================================
     //  HHKB Pro (US) layout
@@ -215,7 +221,7 @@ public class HhkbImeService extends InputMethodService
         r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
         rows.add(r4);
 
-        // Row 5 (JIS-style): ◇ Alt 無変換 Space 変換 あ/A ◇
+        // Row 5 (JIS-style): ◇ Alt 無変換 Space 変換 あ/A 全/半
         List<KeyDef> r5 = new ArrayList<>();
         r5.add(mod("◇", MOD_META, 1.5f));
         r5.add(mod("Alt", MOD_ALT, 1.5f));
@@ -223,7 +229,7 @@ public class HhkbImeService extends InputMethodService
         r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 4f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
         r5.add(jpKey("変換", JP_HENKAN, 2f));
         r5.add(modeKey(2f));
-        r5.add(mod("◇", MOD_META, 2f));
+        r5.add(widthKey(2f));
         rows.add(r5);
 
         return rows;
@@ -274,6 +280,7 @@ public class HhkbImeService extends InputMethodService
 
         rootView = root;
         updateModeButton();
+        updateWidthButton();
         return root;
     }
 
@@ -380,6 +387,7 @@ public class HhkbImeService extends InputMethodService
         }
         if (k.type == T_FN) fnButton = b;
         if (k.type == T_MODE) modeButton = b;
+        if (k.type == T_WIDTH) widthButton = b;
 
         b.setOnClickListener(v -> onKey(k));
         return b;
@@ -396,7 +404,7 @@ public class HhkbImeService extends InputMethodService
 
     private float labelSize(KeyDef k) {
         if (k.type == T_JP) return 11f;               // 変換 / 無変換
-        if (k.type == T_MODE) return 16f;             // あ / A
+        if (k.type == T_MODE || k.type == T_WIDTH) return 16f;   // あ/A · 全/半
         if (k.type == T_FUNC || k.type == T_MOD || k.type == T_FN) return 12f;
         if (k.type == T_CHAR && k.label.length() == 1 && Character.isLetter(k.label.charAt(0)))
             return 16f;
@@ -435,6 +443,9 @@ public class HhkbImeService extends InputMethodService
             case T_MODE:
                 toggleMode();
                 return;
+            case T_WIDTH:
+                toggleWidth();
+                return;
             default: // T_CHAR
                 sendChar(k);
                 consumeOneShots();
@@ -457,6 +468,24 @@ public class HhkbImeService extends InputMethodService
         modeButton.setText(k ? "あ" : "A");
         modeButton.setBackground(keyBackground(k ? COL_GOLD : COL_SPECIAL));
         modeButton.setTextColor(k ? COL_LOCK_TXT : COL_KEY_TXT);
+    }
+
+    private void toggleWidth() {
+        fullWidth = !fullWidth;
+        jp.setPreferFullWidth(fullWidth);
+        updateWidthButton();
+    }
+
+    private void updateWidthButton() {
+        if (widthButton == null) return;
+        widthButton.setText(fullWidth ? "全" : "半");
+        widthButton.setBackground(keyBackground(fullWidth ? COL_GOLD : COL_SPECIAL));
+        widthButton.setTextColor(fullWidth ? COL_LOCK_TXT : COL_KEY_TXT);
+    }
+
+    /** Apply the current 全角/半角 preference to directly-typed ASCII text. */
+    private String applyWidth(String s) {
+        return fullWidth ? JapaneseInputEngine.toFullWidth(s) : s;
     }
 
     private void handleJp(KeyDef k) {
@@ -553,12 +582,12 @@ public class HhkbImeService extends InputMethodService
             }
             // Digits / symbols / shifted letters: confirm any reading, then type ASCII.
             jp.commitIfComposing(ic);
-            ic.commitText(active(MOD_SHIFT) ? k.shift : k.label, 1);
+            ic.commitText(applyWidth(active(MOD_SHIFT) ? k.shift : k.label), 1);
             return;
         }
 
         // English mode.
-        ic.commitText(active(MOD_SHIFT) ? k.shift : k.label, 1);
+        ic.commitText(applyWidth(active(MOD_SHIFT) ? k.shift : k.label), 1);
     }
 
     private void sendFunctional(KeyDef k) {

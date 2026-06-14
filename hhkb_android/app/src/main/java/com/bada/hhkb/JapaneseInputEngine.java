@@ -39,11 +39,17 @@ final class JapaneseInputEngine {
 
     private Map<String, List<String>> dict = new HashMap<>();
     private Listener listener;
+    private boolean preferFullWidth = false;   // 全角(true) / 半角(false) preference
 
     private static final Map<String, String> M = buildTable();
+    private static final Map<Character, String> HALF_KATA = buildHalfKatakana();
 
     void setDictionary(Map<String, List<String>> d) {
         if (d != null) dict = d;
+    }
+
+    void setPreferFullWidth(boolean full) {
+        preferFullWidth = full;
     }
 
     void setListener(Listener l) {
@@ -96,13 +102,21 @@ final class JapaneseInputEngine {
     private void buildCandidates() {
         cands.clear();
         String hira = toHiragana(raw.toString());
+        String kataFull = toKatakana(hira);
+        String kataHalf = toHalfWidthKatakana(hira);
+        String latinFull = toFullWidth(raw.toString());
+        String latinHalf = raw.toString();
+
         LinkedHashSet<String> set = new LinkedHashSet<>();
         List<String> kanji = dict.get(hira);
         if (kanji != null) set.addAll(kanji);
         set.add(hira);
-        set.add(toKatakana(hira));
-        String fw = toFullWidth(raw.toString());
-        if (!fw.equals(hira)) set.add(fw);
+        // Order the width variants by the current 全角/半角 preference.
+        if (preferFullWidth) {
+            set.add(kataFull); set.add(latinFull); set.add(kataHalf); set.add(latinHalf);
+        } else {
+            set.add(kataHalf); set.add(latinHalf); set.add(kataFull); set.add(latinFull);
+        }
         cands.addAll(set);
     }
 
@@ -241,6 +255,46 @@ final class JapaneseInputEngine {
             else out.append(c);
         }
         return out.toString();
+    }
+
+    /** hiragana -> half-width katakana (ｶﾀｶﾅ), incl. dakuten/handakuten splitting. */
+    static String toHalfWidthKatakana(String hira) {
+        String full = toKatakana(hira);
+        StringBuilder out = new StringBuilder(full.length());
+        for (int i = 0; i < full.length(); i++) {
+            char c = full.charAt(i);
+            String h = HALF_KATA.get(c);
+            out.append(h != null ? h : String.valueOf(c));
+        }
+        return out.toString();
+    }
+
+    private static Map<Character, String> buildHalfKatakana() {
+        Map<Character, String> m = new HashMap<>();
+        String[] pairs = {
+            "ア","ｱ","イ","ｲ","ウ","ｳ","エ","ｴ","オ","ｵ",
+            "カ","ｶ","キ","ｷ","ク","ｸ","ケ","ｹ","コ","ｺ",
+            "サ","ｻ","シ","ｼ","ス","ｽ","セ","ｾ","ソ","ｿ",
+            "タ","ﾀ","チ","ﾁ","ツ","ﾂ","テ","ﾃ","ト","ﾄ",
+            "ナ","ﾅ","ニ","ﾆ","ヌ","ﾇ","ネ","ﾈ","ノ","ﾉ",
+            "ハ","ﾊ","ヒ","ﾋ","フ","ﾌ","ヘ","ﾍ","ホ","ﾎ",
+            "マ","ﾏ","ミ","ﾐ","ム","ﾑ","メ","ﾒ","モ","ﾓ",
+            "ヤ","ﾔ","ユ","ﾕ","ヨ","ﾖ",
+            "ラ","ﾗ","リ","ﾘ","ル","ﾙ","レ","ﾚ","ロ","ﾛ",
+            "ワ","ﾜ","ヲ","ｦ","ン","ﾝ",
+            "ガ","ｶﾞ","ギ","ｷﾞ","グ","ｸﾞ","ゲ","ｹﾞ","ゴ","ｺﾞ",
+            "ザ","ｻﾞ","ジ","ｼﾞ","ズ","ｽﾞ","ゼ","ｾﾞ","ゾ","ｿﾞ",
+            "ダ","ﾀﾞ","ヂ","ﾁﾞ","ヅ","ﾂﾞ","デ","ﾃﾞ","ド","ﾄﾞ",
+            "バ","ﾊﾞ","ビ","ﾋﾞ","ブ","ﾌﾞ","ベ","ﾍﾞ","ボ","ﾎﾞ",
+            "パ","ﾊﾟ","ピ","ﾋﾟ","プ","ﾌﾟ","ペ","ﾍﾟ","ポ","ﾎﾟ",
+            "ァ","ｧ","ィ","ｨ","ゥ","ｩ","ェ","ｪ","ォ","ｫ",
+            "ッ","ｯ","ャ","ｬ","ュ","ｭ","ョ","ｮ",
+            "ヴ","ｳﾞ","ー","ｰ","、","､","。","｡","・","･"
+        };
+        for (int i = 0; i + 1 < pairs.length; i += 2) {
+            m.put(pairs[i].charAt(0), pairs[i + 1]);
+        }
+        return m;
     }
 
     private static boolean isVowel(char c) {
