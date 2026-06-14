@@ -1,0 +1,523 @@
+package com.bada.hhkb;
+
+import android.graphics.drawable.GradientDrawable;
+import android.inputmethodservice.InputMethodService;
+import android.os.SystemClock;
+import android.util.DisplayMetrics;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowManager;
+import android.view.inputmethod.InputConnection;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Bada HHKB Pro — a Happy Hacking Keyboard Pro style soft keyboard for Android 12.
+ *
+ * <p>Highlights:
+ * <ul>
+ *   <li>Faithful HHKB Pro (US) layout: Esc, Tab, Control, Shift, Alt, Meta(&#9670;),
+ *       Fn, Return, Delete and the full Fn layer (arrows, F1&ndash;F12,
+ *       Home/End, PgUp/PgDn, Insert, CapsLock, forward-delete).</li>
+ *   <li>Sticky modifiers: one tap = apply to the next key only, second tap = lock,
+ *       third tap = release.</li>
+ *   <li>The whole keyboard floats and can be dragged anywhere on screen via the
+ *       handle bar; the [Dock] button snaps it back to the bottom centre.</li>
+ * </ul>
+ */
+public class HhkbImeService extends InputMethodService {
+
+    // ---- key types -------------------------------------------------------
+    private static final int T_CHAR = 0;   // printable: types label/shift, or keyCode when modified
+    private static final int T_MOD  = 1;   // modifier: Shift/Ctrl/Alt/Meta
+    private static final int T_FN   = 2;   // the Fn key
+    private static final int T_FUNC = 3;   // special function key (Esc/Tab/Enter/Space/Delete/...)
+
+    // ---- modifier ids ----------------------------------------------------
+    private static final int MOD_SHIFT = 0;
+    private static final int MOD_CTRL  = 1;
+    private static final int MOD_ALT   = 2;
+    private static final int MOD_META  = 3;
+
+    // ---- sticky states ---------------------------------------------------
+    private static final int OFF = 0, ONESHOT = 1, LOCK = 2;
+
+    // ---- colours ---------------------------------------------------------
+    private static final int COL_BG       = 0xFF1B1F24;
+    private static final int COL_KEY      = 0xFF2C323A;
+    private static final int COL_KEY_TXT  = 0xFFE8E8E8;
+    private static final int COL_SPECIAL  = 0xFF3A3026;
+    private static final int COL_GOLD     = 0xFFC8A44A;
+    private static final int COL_ONESHOT  = 0xFF6E5A22;
+    private static final int COL_LOCK     = 0xFFC8A44A;
+    private static final int COL_LOCK_TXT = 0xFF1B1F24;
+
+    private final int[] modState = new int[]{OFF, OFF, OFF, OFF};
+    private int fnState = OFF;
+
+    private final Map<Integer, List<Button>> modButtons = new HashMap<>();
+    private Button fnButton;
+
+    // ---- floating window state ------------------------------------------
+    private View rootView;
+    private boolean floating = false;
+    private int winX = 0, winY = 0;
+    private int keyboardWidthPx = 0;
+    private int screenW = 0, screenH = 0;
+
+    // =====================================================================
+    //  Key definition
+    // =====================================================================
+    private static final class KeyDef {
+        final String label;
+        final String shift;
+        final int keyCode;
+        final int type;
+        final float weight;
+        int modId = -1;
+        int fnKeyCode = 0;   // when Fn is active and != 0, send this instead
+
+        KeyDef(String label, String shift, int keyCode, int type, float weight) {
+            this.label = label;
+            this.shift = shift;
+            this.keyCode = keyCode;
+            this.type = type;
+            this.weight = weight;
+        }
+
+        KeyDef fn(int code) { this.fnKeyCode = code; return this; }
+        KeyDef mod(int id) { this.modId = id; return this; }
+    }
+
+    // ---- key factory helpers --------------------------------------------
+    private static KeyDef c(String label, String shift, int keyCode) {
+        return new KeyDef(label, shift, keyCode, T_CHAR, 1f);
+    }
+    private static KeyDef func(String label, int keyCode, float w) {
+        return new KeyDef(label, label, keyCode, T_FUNC, w);
+    }
+    private static KeyDef mod(String label, int modId, float w) {
+        return new KeyDef(label, label, 0, T_MOD, w).mod(modId);
+    }
+
+    // =====================================================================
+    //  HHKB Pro (US) layout
+    // =====================================================================
+    private List<List<KeyDef>> buildLayout() {
+        List<List<KeyDef>> rows = new ArrayList<>();
+
+        // Row 1: Esc 1..0 - = \ `
+        List<KeyDef> r1 = new ArrayList<>();
+        r1.add(func("Esc", KeyEvent.KEYCODE_ESCAPE, 1f));
+        addDigits(r1);                                              // 1..0 + F1..F10 via Fn
+        r1.add(c("-", "_", KeyEvent.KEYCODE_MINUS).fn(KeyEvent.KEYCODE_F11));
+        r1.add(c("=", "+", KeyEvent.KEYCODE_EQUALS).fn(KeyEvent.KEYCODE_F12));
+        r1.add(c("\\", "|", KeyEvent.KEYCODE_BACKSLASH).fn(KeyEvent.KEYCODE_INSERT));
+        r1.add(c("`", "~", KeyEvent.KEYCODE_GRAVE));
+        rows.add(r1);
+
+        // Row 2: Tab Q..P [ ] Delete
+        List<KeyDef> r2 = new ArrayList<>();
+        r2.add(func("Tab", KeyEvent.KEYCODE_TAB, 1.5f).fn(KeyEvent.KEYCODE_CAPS_LOCK));
+        addLetters(r2, "QWERTYUIOP");
+        r2.add(c("[", "{", KeyEvent.KEYCODE_LEFT_BRACKET).fn(KeyEvent.KEYCODE_DPAD_UP));
+        r2.add(c("]", "}", KeyEvent.KEYCODE_RIGHT_BRACKET).fn(KeyEvent.KEYCODE_PAGE_UP));
+        r2.add(func("Delete", KeyEvent.KEYCODE_DEL, 1.5f).fn(KeyEvent.KEYCODE_FORWARD_DEL));
+        rows.add(r2);
+
+        // Row 3: Control A..L ; ' Return
+        List<KeyDef> r3 = new ArrayList<>();
+        r3.add(mod("Ctrl", MOD_CTRL, 1.75f));
+        addLetters(r3, "ASDFGHJKL");
+        r3.add(c(";", ":", KeyEvent.KEYCODE_SEMICOLON).fn(KeyEvent.KEYCODE_DPAD_LEFT));
+        r3.add(c("'", "\"", KeyEvent.KEYCODE_APOSTROPHE).fn(KeyEvent.KEYCODE_DPAD_RIGHT));
+        r3.add(func("Return", KeyEvent.KEYCODE_ENTER, 2.25f));
+        rows.add(r3);
+
+        // Row 4: Shift Z..M , . / Shift Fn
+        List<KeyDef> r4 = new ArrayList<>();
+        r4.add(mod("Shift", MOD_SHIFT, 2.25f));
+        addLetters(r4, "ZXCVBNM");
+        r4.add(c(",", "<", KeyEvent.KEYCODE_COMMA).fn(KeyEvent.KEYCODE_MOVE_HOME));
+        r4.add(c(".", ">", KeyEvent.KEYCODE_PERIOD).fn(KeyEvent.KEYCODE_MOVE_END));
+        r4.add(c("/", "?", KeyEvent.KEYCODE_SLASH).fn(KeyEvent.KEYCODE_DPAD_DOWN));
+        r4.add(mod("Shift", MOD_SHIFT, 1.75f));
+        r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
+        rows.add(r4);
+
+        // Row 5: ◇ Alt [ Space ] Alt ◇
+        List<KeyDef> r5 = new ArrayList<>();
+        r5.add(mod("◇", MOD_META, 2f));
+        r5.add(mod("Alt", MOD_ALT, 2f));
+        r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 7f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+        r5.add(mod("Alt", MOD_ALT, 2f));
+        r5.add(mod("◇", MOD_META, 2f));
+        rows.add(r5);
+
+        return rows;
+    }
+
+    private void addDigits(List<KeyDef> row) {
+        String[] sh = {")", "!", "@", "#", "$", "%", "^", "&", "*", "("}; // 0..9 shifted
+        for (int d = 1; d <= 10; d++) {
+            int digit = d % 10;                 // 1..9 then 0
+            KeyDef k = c(String.valueOf(digit), sh[digit], KeyEvent.KEYCODE_0 + digit);
+            k.fn(KeyEvent.KEYCODE_F1 + (d - 1)); // 1->F1 ... 9->F9, 0->F10
+            row.add(k);
+        }
+    }
+
+    private void addLetters(List<KeyDef> row, String letters) {
+        for (int i = 0; i < letters.length(); i++) {
+            char up = letters.charAt(i);
+            char lo = Character.toLowerCase(up);
+            row.add(c(String.valueOf(lo), String.valueOf(up),
+                    KeyEvent.KEYCODE_A + (up - 'A')));
+        }
+    }
+
+    // =====================================================================
+    //  View construction
+    // =====================================================================
+    @Override
+    public View onCreateInputView() {
+        DisplayMetrics dm = getResources().getDisplayMetrics();
+        screenW = dm.widthPixels;
+        screenH = dm.heightPixels;
+        keyboardWidthPx = Math.min(screenW, dp(520));
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(COL_BG);
+        root.setPadding(dp(4), dp(2), dp(4), dp(6));
+        root.setLayoutParams(new ViewGroup.LayoutParams(keyboardWidthPx,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        root.addView(buildHandleBar());
+
+        for (List<KeyDef> rowDef : buildLayout()) {
+            root.addView(buildRow(rowDef));
+        }
+
+        rootView = root;
+        return root;
+    }
+
+    /** Top bar: drag handle + title + Dock button. */
+    private View buildHandleBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(30));
+        lp.bottomMargin = dp(4);
+        bar.setLayoutParams(lp);
+
+        TextView handle = new TextView(this);
+        handle.setText("⠿  HHKB Pro — ドラッグで移動");
+        handle.setTextColor(COL_GOLD);
+        handle.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        handle.setPadding(dp(10), 0, 0, 0);
+        LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
+        handle.setLayoutParams(hlp);
+        handle.setGravity(Gravity.CENTER_VERTICAL);
+        attachDrag(handle);
+        bar.addView(handle);
+
+        Button dock = new Button(this);
+        dock.setText("Dock");
+        dock.setAllCaps(false);
+        dock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        dock.setTextColor(COL_KEY_TXT);
+        dock.setBackground(keyBackground(COL_SPECIAL));
+        dock.setPadding(dp(8), 0, dp(8), 0);
+        dock.setMinWidth(0);
+        dock.setMinimumWidth(0);
+        dock.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(28)));
+        dock.setOnClickListener(v -> dockToBottom());
+        bar.addView(dock);
+
+        return bar;
+    }
+
+    private LinearLayout buildRow(List<KeyDef> rowDef) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        float sum = 0f;
+        for (KeyDef k : rowDef) sum += k.weight;
+        row.setWeightSum(sum);
+        LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(46));
+        rlp.bottomMargin = dp(3);
+        row.setLayoutParams(rlp);
+
+        for (KeyDef k : rowDef) row.addView(buildKey(k));
+        return row;
+    }
+
+    private Button buildKey(final KeyDef k) {
+        Button b = new Button(this);
+        b.setAllCaps(false);
+        b.setText(keyLabel(k));
+        b.setTextColor(COL_KEY_TXT);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, labelSize(k));
+        b.setPadding(0, 0, 0, 0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setMinHeight(0);
+        b.setMinimumHeight(0);
+
+        boolean special = k.type != T_CHAR;
+        b.setBackground(keyBackground(special ? COL_SPECIAL : COL_KEY));
+
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.MATCH_PARENT, k.weight);
+        lp.leftMargin = dp(2);
+        lp.rightMargin = dp(2);
+        b.setLayoutParams(lp);
+
+        if (k.type == T_MOD) {
+            List<Button> list = modButtons.get(k.modId);
+            if (list == null) { list = new ArrayList<>(); modButtons.put(k.modId, list); }
+            list.add(b);
+        }
+        if (k.type == T_FN) fnButton = b;
+
+        b.setOnClickListener(v -> onKey(k));
+        return b;
+    }
+
+    private String keyLabel(KeyDef k) {
+        if (k.type == T_CHAR && !k.label.equals(k.shift)
+                && k.shift.length() == 1 && !Character.isLetter(k.shift.charAt(0))) {
+            // show shifted symbol above the base, e.g. "! / 1"
+            return k.shift + "\n" + k.label;
+        }
+        return k.label;
+    }
+
+    private float labelSize(KeyDef k) {
+        if (k.type == T_FUNC || k.type == T_MOD || k.type == T_FN) return 12f;
+        if (k.type == T_CHAR && k.label.length() == 1 && Character.isLetter(k.label.charAt(0)))
+            return 16f;
+        return 12f;
+    }
+
+    private GradientDrawable keyBackground(int color) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(color);
+        g.setCornerRadius(dp(6));
+        g.setStroke(dp(1), 0xFF12161A);
+        return g;
+    }
+
+    // =====================================================================
+    //  Key handling
+    // =====================================================================
+    private void onKey(KeyDef k) {
+        switch (k.type) {
+            case T_MOD:
+                cycle(k.modId);
+                refreshModVisuals();
+                return;
+            case T_FN:
+                fnState = next(fnState);
+                refreshModVisuals();
+                return;
+            case T_FUNC:
+                sendFunctional(k);
+                consumeOneShots();
+                return;
+            default: // T_CHAR
+                sendChar(k);
+                consumeOneShots();
+        }
+    }
+
+    private void cycle(int modId) { modState[modId] = next(modState[modId]); }
+
+    private int next(int s) { return (s + 1) % 3; }
+
+    private boolean active(int modId) { return modState[modId] != OFF; }
+
+    private boolean fnActive() { return fnState != OFF; }
+
+    private int currentMeta() {
+        int m = 0;
+        if (active(MOD_SHIFT)) m |= KeyEvent.META_SHIFT_ON | KeyEvent.META_SHIFT_LEFT_ON;
+        if (active(MOD_CTRL))  m |= KeyEvent.META_CTRL_ON  | KeyEvent.META_CTRL_LEFT_ON;
+        if (active(MOD_ALT))   m |= KeyEvent.META_ALT_ON   | KeyEvent.META_ALT_LEFT_ON;
+        if (active(MOD_META))  m |= KeyEvent.META_META_ON  | KeyEvent.META_META_LEFT_ON;
+        return m;
+    }
+
+    private void sendChar(KeyDef k) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+
+        // Fn layer takes priority when mapped (arrows, F-keys, navigation…).
+        if (fnActive() && k.fnKeyCode != 0) {
+            sendKey(ic, k.fnKeyCode, currentMeta());
+            return;
+        }
+
+        boolean ctrlAltMeta = active(MOD_CTRL) || active(MOD_ALT) || active(MOD_META);
+        if (ctrlAltMeta) {
+            // Combos such as Ctrl+C, Alt+Tab, Meta+L are delivered as key events.
+            sendKey(ic, k.keyCode, currentMeta());
+        } else {
+            String s = active(MOD_SHIFT) ? k.shift : k.label;
+            ic.commitText(s, 1);
+        }
+    }
+
+    private void sendFunctional(KeyDef k) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        int code = (fnActive() && k.fnKeyCode != 0) ? k.fnKeyCode : k.keyCode;
+        sendKey(ic, code, currentMeta());
+    }
+
+    private void sendKey(InputConnection ic, int keyCode, int meta) {
+        long now = SystemClock.uptimeMillis();
+        ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0,
+                meta, KeyEvent.KEYCODE_UNKNOWN, 0,
+                KeyEvent.FLAG_SOFT_KEYBOARD | KeyEvent.FLAG_KEEP_TOUCH_MODE));
+        ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0,
+                meta, KeyEvent.KEYCODE_UNKNOWN, 0,
+                KeyEvent.FLAG_SOFT_KEYBOARD | KeyEvent.FLAG_KEEP_TOUCH_MODE));
+    }
+
+    /** Clear all one-shot modifiers after a key, keep locks. */
+    private void consumeOneShots() {
+        boolean changed = false;
+        for (int i = 0; i < modState.length; i++) {
+            if (modState[i] == ONESHOT) { modState[i] = OFF; changed = true; }
+        }
+        if (fnState == ONESHOT) { fnState = OFF; changed = true; }
+        if (changed) refreshModVisuals();
+    }
+
+    private void refreshModVisuals() {
+        for (Map.Entry<Integer, List<Button>> e : modButtons.entrySet()) {
+            for (Button b : e.getValue()) styleSticky(b, modState[e.getKey()]);
+        }
+        if (fnButton != null) styleSticky(fnButton, fnState);
+    }
+
+    private void styleSticky(Button b, int state) {
+        switch (state) {
+            case ONESHOT:
+                b.setBackground(keyBackground(COL_ONESHOT));
+                b.setTextColor(COL_KEY_TXT);
+                break;
+            case LOCK:
+                b.setBackground(keyBackground(COL_LOCK));
+                b.setTextColor(COL_LOCK_TXT);
+                break;
+            default:
+                b.setBackground(keyBackground(COL_SPECIAL));
+                b.setTextColor(COL_KEY_TXT);
+        }
+    }
+
+    // =====================================================================
+    //  Floating window: drag to move, Dock to reset
+    // =====================================================================
+    @Override
+    public void onStartInputView(android.view.inputmethod.EditorInfo info, boolean restarting) {
+        super.onStartInputView(info, restarting);
+        // Re-apply the chosen geometry each time the keyboard is shown.
+        if (floating) applyFloating(); else dockToBottom();
+    }
+
+    private void attachDrag(View handle) {
+        handle.setOnTouchListener(new View.OnTouchListener() {
+            float downRawX, downRawY;
+            int startX, startY;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent ev) {
+                switch (ev.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        if (!floating) {
+                            // Enter floating mode anchored at the current location.
+                            int h = rootView != null ? rootView.getHeight() : dp(280);
+                            winX = Math.max(0, (screenW - keyboardWidthPx) / 2);
+                            winY = Math.max(0, screenH - h - dp(40));
+                            floating = true;
+                        }
+                        startX = winX;
+                        startY = winY;
+                        downRawX = ev.getRawX();
+                        downRawY = ev.getRawY();
+                        return true;
+                    case MotionEvent.ACTION_MOVE:
+                        winX = (int) (startX + (ev.getRawX() - downRawX));
+                        winY = (int) (startY + (ev.getRawY() - downRawY));
+                        clampWindow();
+                        applyFloating();
+                        return true;
+                    default:
+                        return false;
+                }
+            }
+        });
+    }
+
+    private void clampWindow() {
+        int h = rootView != null ? rootView.getHeight() : dp(280);
+        winX = Math.max(0, Math.min(winX, Math.max(0, screenW - keyboardWidthPx)));
+        winY = Math.max(0, Math.min(winY, Math.max(0, screenH - h)));
+    }
+
+    private Window imeWindow() {
+        return getWindow() != null ? getWindow().getWindow() : null;
+    }
+
+    private void applyFloating() {
+        Window w = imeWindow();
+        if (w == null || keyboardWidthPx == 0) return;
+        WindowManager.LayoutParams lp = w.getAttributes();
+        lp.gravity = Gravity.TOP | Gravity.START;
+        lp.width = keyboardWidthPx;
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.x = winX;
+        lp.y = winY;
+        // Let touches outside the keyboard reach the app underneath.
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+        w.setAttributes(lp);
+    }
+
+    private void dockToBottom() {
+        floating = false;
+        Window w = imeWindow();
+        if (w == null || keyboardWidthPx == 0) return;
+        WindowManager.LayoutParams lp = w.getAttributes();
+        lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        lp.width = keyboardWidthPx;
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        lp.x = 0;
+        lp.y = 0;
+        lp.flags |= WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL;
+        w.setAttributes(lp);
+    }
+
+    // ---- util ------------------------------------------------------------
+    private int dp(int v) {
+        return Math.round(getResources().getDisplayMetrics().density * v);
+    }
+}
