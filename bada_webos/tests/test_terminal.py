@@ -96,6 +96,53 @@ class TestEditors(unittest.TestCase):
         self.assertEqual(self.t.vfs.read("shared.txt"), "from vim + emacs")
 
 
+class TestInteractiveInput(unittest.TestCase):
+    """Real character input via the line-input fallback (no tty needed)."""
+
+    def test_line_vim_types_and_saves(self):
+        import io
+        from terminal import VimSession, line_vim
+        t = Terminal()
+        v = VimSession(t.vfs, "f.txt")
+        line_vim(v, io.StringIO("hello\nworld\n:wq\n"), io.StringIO())
+        self.assertEqual(t.vfs.read("f.txt"), "hello\nworld")
+
+    def test_line_vim_quit_without_save(self):
+        import io
+        from terminal import VimSession, line_vim
+        t = Terminal()
+        v = VimSession(t.vfs, "g.txt")
+        line_vim(v, io.StringIO("ignored\n:q\n"), io.StringIO())
+        self.assertFalse(t.vfs.is_file("g.txt"))
+
+    def test_line_emacs_types_and_saves(self):
+        import io
+        from terminal import EmacsSession, line_emacs
+        t = Terminal()
+        e = EmacsSession(t.vfs, "m.txt")
+        line_emacs(e, io.StringIO("first\nsecond\nC-x C-s\nC-x C-c\n"),
+                   io.StringIO())
+        self.assertEqual(t.vfs.read("m.txt"), "first\nsecond")
+        self.assertFalse(e.alive)
+
+    def test_repl_vim_then_run_bada(self):
+        import io
+        t = Terminal()
+        script = ("vim prog.bada\n"
+                  'say "typed live"\n'
+                  "print 7 * 7\n"
+                  ":wq\n"
+                  "bada prog.bada\n"
+                  "exit\n")
+        out = io.StringIO()
+        t.interactive(instream=io.StringIO(script), out=out, force_line=True)
+        content = t.vfs.read("prog.bada")
+        self.assertIn('say "typed live"', content)
+        self.assertIn("print 7 * 7", content)
+        self.assertIn("typed live", out.getvalue())
+        self.assertIn("49", out.getvalue())
+
+
 class TestRender(unittest.TestCase):
     def test_html_render_has_prompt_and_output(self):
         t = Terminal()

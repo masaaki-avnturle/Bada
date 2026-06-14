@@ -121,17 +121,8 @@ def cmd_wm(args):
 def cmd_term(args):
     t = Terminal()
     if args.interactive:
-        print("BadaWebOS terminal — type 'help', 'exit' to quit.")
-        while True:
-            try:
-                line = input(t.prompt())
-            except EOFError:
-                break
-            if line.strip() in ("exit", "logout"):
-                break
-            out = t.bash(line)
-            if out:
-                print(out, end="" if out.endswith("\n") else "\n")
+        # real keyboard input: vim/emacs open an interactive editor
+        t.interactive(force_line=args.line)
         return
     # scripted demo: bash + vim + emacs over one VFS
     t.run_script(["pwd",
@@ -178,6 +169,8 @@ def build_parser():
 
     sp = sub.add_parser("term", help="terminal: bash + vim + emacs")
     sp.add_argument("-i", "--interactive", action="store_true")
+    sp.add_argument("--line", action="store_true",
+                    help="force line-input editors (no curses)")
     sp.set_defaults(func=cmd_term)
 
     sp = sub.add_parser("run"); sp.add_argument("file")
