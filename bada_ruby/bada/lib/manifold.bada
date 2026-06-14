@@ -1,0 +1,42 @@
+# manifold.bada — ガンマ関数における大域的部分積分多様体ライブラリ（Bada 言語）
+# ネイティブ Manifold / Entropy / Special を Bada 言語の関数として束ねる。
+
+import "lib/core.bada"
+
+library Mani
+  # 質問のシャノンエントロピー
+  def entropy(q)
+    return Entropy.of(q)
+  end
+
+  # 大域的部分積分多様体のエントロピー不変量 Ξ
+  def xi(q)
+    return Manifold.xi(q)
+  end
+
+  # ペレルマン的な多様体積分 ∬ 1/(x log x)^2
+  def integral(q)
+    return Manifold.perelman(q)
+  end
+
+  # Bada 演算子で「不変量を測って右作用」する例:  (Ξ) >- (Ξ)
+  def quantum(q)
+    let x = Manifold.xi(q)
+    return x >- x
+  end
+
+  # ベータ/ゼータ ゲージ ζ(s) = β(p,q)/log x
+  def zeta_gauge(q)
+    let x = Manifold.xi(q)
+    return Special.zeta_gauge(x + 1, x + 1, 3)
+  end
+
+  def report(q)
+    print Core.rule("大域的部分積分多様体")
+    print Core.labeled("H (シャノン)", entropy(q))
+    print Core.labeled("Xi (不変量)", xi(q))
+    print Core.labeled("M (多様体積分)", integral(q))
+    print Core.labeled("zeta ゲージ", zeta_gauge(q))
+    return xi(q)
+  end
+end

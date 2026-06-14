@@ -12,7 +12,8 @@
 #   bin/bada penrose draw.penrose       draw -> auto-compute -> answer + paper + code
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
-#   bin/bada run script.bada            run a Bada language script
+#   bin/bada run script.bada            run a legacy operator script (<- -< >-)
+#   bin/bada lang [app.bada]            run a Bada-language program (libs + app)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
 
@@ -51,6 +52,11 @@ when "run"
   path = ARGV.shift or abort("usage: bada run script.bada")
   interp = Bada::Interpreter.new
   interp.run(File.read(path)).each { |line| puts line }
+when "lang"
+  # Run a program written in the Bada scripting language (functions, libraries,
+  # import, native bridge). Defaults to the unknown-engine app.
+  path = ARGV.shift || File.expand_path("../bada/app/unknown_engine.bada", __dir__)
+  Bada::Lang.run_file(path)
 when "info"
   # Information generation: Thurston-Perelman placement + catastrophe branching
   # + millennium theory decomposition for a question.
@@ -121,6 +127,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | learn | xi | neural | train | version"
   exit 1
 end
