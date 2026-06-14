@@ -48,6 +48,53 @@ class Terminal:
     def run_script(self, lines: list[str]) -> str:
         return "".join(self.bash(l) for l in lines)
 
+    # -- interactive REPL (real character input) --------------------------
+    def interactive(self, instream=None, out=None, force_line: bool = False):
+        """A read-eval-print loop with real keyboard input.  ``vim``/``emacs``
+        drop into an interactive editor (curses on a tty, line-input
+        otherwise) so you can type characters straight into the file."""
+        import sys
+
+        from .editors import EmacsSession, VimSession
+        from .interactive import run_emacs, run_vim
+
+        instream = instream or sys.stdin
+        out = out or sys.stdout
+        out.write("BadaWebOS terminal — 'help' for apps, 'exit' to quit.\n")
+        while True:
+            out.write(self.prompt())
+            out.flush()
+            raw = instream.readline()
+            if not raw:                       # EOF
+                break
+            line = raw.rstrip("\n")
+            if line.strip() in ("exit", "logout"):
+                break
+            prompt = self.prompt()
+            result = self.shell.run(line)
+            req = self.shell.launch_request
+            if req is not None:
+                if req.program == "vim":
+                    sess = VimSession(self.vfs, req.filename)
+                    self.editors.append(("vim", sess))
+                    run_vim(sess, instream=instream, out=out,
+                            force_line=force_line)
+                else:
+                    sess = EmacsSession(self.vfs, req.filename)
+                    self.editors.append(("emacs", sess))
+                    run_emacs(sess, instream=instream, out=out,
+                              force_line=force_line)
+                self.transcript.append(
+                    (prompt, line, f"[{req.program}] {req.filename}"))
+                continue
+            if result == "\x0c":              # clear
+                self.transcript.clear()
+                continue
+            self.transcript.append((prompt, line, result))
+            if result:
+                out.write(result if result.endswith("\n") else result + "\n")
+        out.write("logout\n")
+
     # -- editors -----------------------------------------------------------
     def open_vim(self, filename: str | None,
                  script: list[str] | None = None) -> VimSession:
