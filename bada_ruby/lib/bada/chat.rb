@@ -102,6 +102,12 @@ module Bada
       Penrose::Palette.render
     end
 
+    # Unknown a-priori engine: imagine unsolved-style problems and soundly
+    # prove / disprove / flag-open them.
+    def discover(question, count: 5)
+      (@prover ||= Prover::Engine.new).render(question, count: count)
+    end
+
     # Human-readable single-string answer (what the REPL prints).
     # info: append the Thurston/catastrophe/millennium information-generation block.
     def ask(question, info: true)

@@ -227,6 +227,38 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
 ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
 
+## 未知事前エンジン — 数学の未解決問題を想像して証明する
+
+`Bada::Prover`（未知事前エンジン / Unknown A-priori Engine）は、多様体・エントロピー
+機構を種にして**未解決風の数学命題を「想像」し、健全な自動推論で判定**します。
+
+```bash
+bin/bada prove "大域的部分積分多様体の未解決問題を想像して証明して"
+```
+
+```ruby
+puts Bada::Prover::Engine.new.render("ガンマ関数の未解決問題を想像して証明")
+# OmegaChat からも: Bada::OmegaChat.new.discover("未解決問題を想像して")
+```
+
+### 健全性の契約（重要）
+
+このエンジンは**証明できるものだけを「証明完了」と判定**し、誇張しません。
+
+| 判定 | 意味 | 手法 |
+|:--|:--|:--|
+| **∎ 証明完了** | 完全・検証可能な方法で確立 | 多項式和の閉形式＋**数学的帰納法**、剰余系の**全数検査**、有限領域の全数検査 |
+| **✗ 反証** | 具体的な**反例**を発見（健全） | 反例の明示 |
+| **? 未解決** | 我々の手法では決定不能 | **経験的証拠のみ**（証明とは主張しない） |
+
+実例（自動生成・自動判定）:
+- `Σ_{k=1}^n (2k+2) = n²+3n` を帰納法で**証明**（閉形式を有限差分で構成し基底・段階を検証）。
+- `7 | n⁷ − n`（フェルマーの小定理型）を**剰余系の全数検査で証明**。
+- 誤った恒等式・整除性は**反例つきで反証**（例 `5 | n²−n` は n=2 で反例）。
+- コラッツ／ゴールドバッハ型は**未解決**として範囲内の証拠のみ提示（証明ではないと明示）。
+
+各命題は `engine.paper(conjecture)` で証明論文（Markdown+LaTeX）にもなります。
+
 ## モジュール構成
 
 ```
@@ -251,6 +283,10 @@ lib/bada/penrose/evaluator.rb 図式の自動計算（縮約・積分・(反)対
 lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
 lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
 lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
+lib/bada/prover/polynomial.rb  厳密な有理数係数多項式（健全な証明の基盤）
+lib/bada/prover/proof.rb       証明器（恒等式/整除性/有限/経験的）と Proof
+lib/bada/prover/conjecture.rb  命題の「想像」生成 + 数論ユーティリティ
+lib/bada/prover/engine.rb      未知事前エンジン（imagine→prove→render/paper）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
