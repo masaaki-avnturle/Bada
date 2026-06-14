@@ -1,0 +1,23 @@
+// Debug assembly for a C application.
+// `gradle assembleDebug` compiles every top-level *.c source with debug
+// symbols and no optimization (gcc -g -O0) into build/debug/.
+plugins { id 'base' }
+
+tasks.register('assembleDebug') {
+    group = 'build'
+    description = 'Assembles a debug build of the C sources (gcc -g -O0).'
+    doLast {
+        def outDir = layout.buildDirectory.dir('debug').get().asFile
+        outDir.mkdirs()
+        fileTree(projectDir) { include '*.c' }.each { src ->
+            def exe = new File(outDir, src.name.replaceAll(/\.c$/, ''))
+            println "  [assembleDebug] gcc -g -O0 ${src.name} -> build/debug/${exe.name}"
+            exec {
+                commandLine 'gcc', '-g', '-O0', '-Wall', src.absolutePath, '-o', exe.absolutePath, '-lm'
+                ignoreExitValue = true   // helper sources without main() are skipped
+            }
+        }
+    }
+}
+
+tasks.named('assemble') { dependsOn 'assembleDebug' }

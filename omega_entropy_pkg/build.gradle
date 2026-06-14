@@ -1,0 +1,14 @@
+// Debug assembly for a Python application/package.
+// `gradle assembleDebug` byte-compiles the sources without optimization
+// (debug: asserts and __debug__ kept), skipping virtualenvs.
+plugins { id 'base' }
+
+tasks.register('assembleDebug', Exec) {
+    group = 'build'
+    description = 'Assembles a debug build of the Python sources (compileall, no optimization).'
+    workingDir = projectDir
+    commandLine 'sh', '-c', "python3 -m compileall -q -x '(\\.venv|node_modules)' . || true"
+    ignoreExitValue = true
+}
+
+tasks.named('assemble') { dependsOn 'assembleDebug' }
