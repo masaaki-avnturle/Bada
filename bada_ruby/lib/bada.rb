@@ -26,6 +26,7 @@
 #   Bada::InfoEngine       information-generation facade (the three above)
 #   Bada::Penrose          Penrose graphical notation: draw -> compute -> paper/code
 #   Bada::Prover           unknown a-priori engine: imagine + soundly prove conjectures
+#   Bada::Basal            basal-ganglia thermal in-body neural system (action selection)
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
 
@@ -47,6 +48,7 @@ require_relative "bada/penrose"
 require_relative "bada/prover"
 require_relative "bada/chat"
 require_relative "bada/nn"
+require_relative "bada/basal"
 
 module Bada
 end
