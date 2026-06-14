@@ -27,19 +27,39 @@ Fn レイヤーで矢印・ファンクションキー・ナビゲーション�
 
 ---
 
-## ビルド方法
+## APK の入手（ビルド済みパッケージ）
 
-> Android SDK（API 31）と JDK 11 が必要です。**Android Studio で開くのが最も簡単**です。
+このリポジトリには **GitHub Actions による自動APKビルド**（`.github/workflows/android.yml`）が
+含まれており、`hhkb_android/` への push ごとに APK が生成されます。
 
-1. Android Studio で `hhkb_android/` フォルダを開く（`File → Open`）。
-2. Gradle 同期が完了したら、実機 / エミュレータ（Android 12 推奨）へ Run。
+### ① Actions の成果物からダウンロード（最も簡単）
 
-コマンドラインの場合（Gradle 7.3+ がインストール済みなら）:
+1. GitHub の **Actions** タブ →「Build HHKB APK」の最新の成功した実行を開く。
+2. 画面下部 **Artifacts** の `BadaHHKB-debug-apk` をダウンロード（zip）。
+3. zip を展開すると `app-debug.apk` が得られます。
+
+### ② Release から直接ダウンロード
+
+GitHub で **Release を作成**すると、同じワークフローが APK を Release に添付します
+（単一ファイルとして直接ダウンロード可能）。
+
+### APK のインストール
+
+1. `app-debug.apk` を Android 12 端末へ転送。
+2. 「提供元不明のアプリ／このソースを許可」を有効にしてインストール。
+   （デバッグ署名済みなので、そのままインストールできます。）
+
+## 自分でビルドする場合
+
+> JDK 17 と Android SDK（platform 34 / build-tools 34）が必要です。
+> Gradle Wrapper を同梱しているので Gradle の事前インストールは不要です。
+
+- **Android Studio**：`hhkb_android/` を開く → Gradle 同期 → Run。
+- **コマンドライン**：
 
 ```bash
 cd hhkb_android
-gradle wrapper          # 初回のみ gradlew を生成
-./gradlew assembleDebug # app/build/outputs/apk/debug/app-debug.apk が生成される
+./gradlew assembleDebug   # app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
