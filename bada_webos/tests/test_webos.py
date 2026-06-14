@@ -164,7 +164,7 @@ class TestFullBoot(unittest.TestCase):
         self.assertEqual(r["objects"], ["article"])
         self.assertEqual(r["android"], ["com.bada.notes"])
         self.assertEqual(r["ultranetwork"]["xor"]["accuracy"], 1.0)
-        self.assertEqual(len(r["windows"]), 5)
+        self.assertEqual(len(r["windows"]), 6)
         with tempfile.TemporaryDirectory() as d:
             p = os_.save_html(os.path.join(d, "desktop.html"))
             with open(p) as fh:
