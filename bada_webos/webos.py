@@ -37,6 +37,7 @@ from cloud.settings_bridge import (Bridge, CloudStore,         # noqa: E402
                                    SettingsPanel)
 from ultranet import UltraNetwork                              # noqa: E402
 from android.installer import Android12Installer, AndroidManifest  # noqa
+from terminal import Terminal                                  # noqa: E402
 from render.desktop import render_desktop                      # noqa: E402
 
 _APP_DIR = os.path.join(_HERE, "apps")
@@ -57,6 +58,7 @@ class BadaWebOS:
         self.bridge = Bridge(self.cloud, Repeater(hops=2))
         self.panel = SettingsPanel(self.bridge)
         self.ultranet = UltraNetwork()
+        self.terminal = Terminal()
 
     # ----------------------------------------------------------------
     def boot(self) -> dict:
@@ -90,6 +92,12 @@ class BadaWebOS:
                                    470, 250)
         self.window_content[w_set.wid] = self._settings_html()
 
+        # 5b. Terminal bundling bash + vim + emacs (all over one VFS)
+        self._terminal_demo()
+        w_term = self.wm.new_window("Terminal — bash·vim·emacs", 250, 150,
+                                    540, 320)
+        self.window_content[w_term.wid] = self.terminal.render_html()
+
         # 6. Android 12 app installed + launched onto screen 2
         manifest = AndroidManifest(
             package="com.bada.notes", label="Bada Notes",
@@ -115,6 +123,12 @@ class BadaWebOS:
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
             "android": [a.package for a in self.installer.list_apps()],
+            "terminal": {
+                "apps": sorted(self.terminal.shell.BUILTINS),
+                "editors": [f"{k}:{s.filename}" for k, s
+                            in self.terminal.editors],
+                "files": sorted(self.terminal.vfs.files),
+            },
             "screens": self.wm.screens,
             "windows": [(w.name, w.screen) for w in self.wm.windows],
         }
@@ -130,6 +144,23 @@ class BadaWebOS:
         with open(path, "w") as f:
             f.write(self.render())
         return path
+
+    # -- terminal demo: bash + vim + emacs, one VFS -----------------------
+    def _terminal_demo(self):
+        t = self.terminal
+        t.run_script([
+            "pwd",
+            'echo say \\"hello from the terminal\\" > hello.bada',
+            "cat hello.bada",
+        ])
+        # edit the Bada file in vim (append a line), then run it
+        t.open_vim("hello.bada", ["o", "print 6 * 7", "ESC", ":wq"])
+        t.run_script(["bada hello.bada"])
+        # jot a note in emacs
+        t.open_emacs("notes.txt",
+                     ["bash, vim and emacs share one VFS", "C-x C-s",
+                      "C-x C-c"])
+        t.run_script(["ls", "wc hello.bada"])
 
     # -- window body builders ---------------------------------------------
     def _settings_html(self) -> str:
@@ -175,4 +206,6 @@ if __name__ == "__main__":
     print(f"  ultranetwork XOR acc: "
           f"{report['ultranetwork']['xor']['accuracy']}")
     print(f"  android installed: {report['android']}")
+    print(f"  terminal apps: bash builtins + "
+          f"{report['terminal']['editors']}")
     print(f"  desktop written to {out}")

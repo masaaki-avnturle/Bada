@@ -44,6 +44,12 @@ body { margin:0; font-family: 'Lucida Console','DejaVu Sans Mono',monospace;
 h2 { font-size:14px; margin:0 0 6px; }
 .taskbar { background:#1d1f21; border-top:2px solid #c8a44a; padding:4px 12px;
            font-size:12px; color:#9aa; }
+.terminal { background:#0b0b0b; color:#c7f0c7; font-size:11px; padding:4px;
+            height:100%; overflow:auto; }
+.terminal .t-prompt { color:#c8a44a; }
+.terminal .t-cmd { white-space:pre-wrap; }
+.terminal .t-out { margin:0 0 4px; color:#9fe0a0; white-space:pre-wrap; }
+.terminal .t-foot { color:#7a9; border-top:1px dashed #355; margin-top:4px; }
 """
 
 
