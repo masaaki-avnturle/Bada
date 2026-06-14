@@ -14,10 +14,15 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputConnection;
 import android.widget.Button;
+import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +41,8 @@ import java.util.Map;
  *       handle bar; the [Dock] button snaps it back to the bottom centre.</li>
  * </ul>
  */
-public class HhkbImeService extends InputMethodService {
+public class HhkbImeService extends InputMethodService
+        implements JapaneseInputEngine.Listener {
 
     // ---- key types -------------------------------------------------------
     private static final int T_CHAR = 0;   // printable: types label/shift, or keyCode when modified
@@ -81,6 +87,8 @@ public class HhkbImeService extends InputMethodService {
     private final JapaneseInputEngine jp = new JapaneseInputEngine();
     private int inputMode = MODE_EN;
     private Button modeButton;
+    private HorizontalScrollView candidateScroll;
+    private LinearLayout candidateBar;
 
     // ---- floating window state ------------------------------------------
     private View rootView;
@@ -88,6 +96,34 @@ public class HhkbImeService extends InputMethodService {
     private int winX = 0, winY = 0;
     private int keyboardWidthPx = 0;
     private int screenW = 0, screenH = 0;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        jp.setDictionary(loadDictionary());
+        jp.setListener(this);
+    }
+
+    /** Load the bundled reading→kanji dictionary from assets/jadict.tsv. */
+    private Map<String, List<String>> loadDictionary() {
+        Map<String, List<String>> dict = new HashMap<>();
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                getAssets().open("jadict.tsv"), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.isEmpty() || line.charAt(0) == '#') continue;
+                int tab = line.indexOf('\t');
+                if (tab <= 0) continue;
+                String reading = line.substring(0, tab).trim();
+                String[] words = line.substring(tab + 1).trim().split(",");
+                if (reading.isEmpty() || words.length == 0) continue;
+                dict.put(reading, new ArrayList<>(Arrays.asList(words)));
+            }
+        } catch (Exception ignored) {
+            // No dictionary => kanji conversion simply offers no kanji candidates.
+        }
+        return dict;
+    }
 
     // =====================================================================
     //  Key definition
@@ -230,6 +266,7 @@ public class HhkbImeService extends InputMethodService {
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
         root.addView(buildHandleBar());
+        root.addView(buildCandidateBar());
 
         for (List<KeyDef> rowDef : buildLayout()) {
             root.addView(buildRow(rowDef));
@@ -238,6 +275,28 @@ public class HhkbImeService extends InputMethodService {
         rootView = root;
         updateModeButton();
         return root;
+    }
+
+    /** Conversion candidate bar (hidden until 変換/Space is used). */
+    private View buildCandidateBar() {
+        candidateScroll = new HorizontalScrollView(this);
+        candidateScroll.setHorizontalScrollBarEnabled(false);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(36));
+        lp.bottomMargin = dp(4);
+        candidateScroll.setLayoutParams(lp);
+        candidateScroll.setBackground(keyBackground(0xFF12161A));
+
+        candidateBar = new LinearLayout(this);
+        candidateBar.setOrientation(LinearLayout.HORIZONTAL);
+        candidateBar.setGravity(Gravity.CENTER_VERTICAL);
+        candidateBar.setLayoutParams(new HorizontalScrollView.LayoutParams(
+                HorizontalScrollView.LayoutParams.WRAP_CONTENT,
+                HorizontalScrollView.LayoutParams.MATCH_PARENT));
+        candidateScroll.addView(candidateBar);
+
+        candidateScroll.setVisibility(View.GONE);
+        return candidateScroll;
     }
 
     /** Top bar: drag handle + title + Dock button. */
@@ -405,12 +464,47 @@ public class HhkbImeService extends InputMethodService {
         if (ic == null) return;
         boolean handled;
         if (k.jpAction == JP_HENKAN) {
-            handled = jp.henkan(ic);
+            handled = jp.convertNext(ic);   // kanji / kana candidate cycling
         } else {
             handled = jp.muhenkan(ic);
         }
         // Nothing to convert: behave like a hardware JIS key for other IMEs.
         if (!handled) sendKey(ic, k.keyCode, currentMeta());
+    }
+
+    // ---- candidate bar (JapaneseInputEngine.Listener) --------------------
+    @Override
+    public void onCandidates(List<String> candidates, int selected) {
+        if (candidateBar == null || candidateScroll == null) return;
+        candidateBar.removeAllViews();
+        for (int i = 0; i < candidates.size(); i++) {
+            final int idx = i;
+            TextView chip = new TextView(this);
+            chip.setText(candidates.get(i));
+            chip.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+            chip.setPadding(dp(12), dp(2), dp(12), dp(2));
+            chip.setGravity(Gravity.CENTER);
+            boolean sel = i == selected;
+            chip.setBackground(keyBackground(sel ? COL_GOLD : COL_KEY));
+            chip.setTextColor(sel ? COL_LOCK_TXT : COL_KEY_TXT);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT);
+            clp.rightMargin = dp(4);
+            chip.setLayoutParams(clp);
+            chip.setOnClickListener(v -> {
+                InputConnection ic = getCurrentInputConnection();
+                if (ic != null) jp.selectCandidate(ic, idx);
+            });
+            candidateBar.addView(chip);
+        }
+        candidateScroll.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    public void onHideCandidates() {
+        if (candidateBar != null) candidateBar.removeAllViews();
+        if (candidateScroll != null) candidateScroll.setVisibility(View.GONE);
     }
 
     private void cycle(int modId) { modState[modId] = next(modState[modId]); }
@@ -472,9 +566,14 @@ public class HhkbImeService extends InputMethodService {
         if (ic == null) return;
         boolean ctrlAltMeta = active(MOD_CTRL) || active(MOD_ALT) || active(MOD_META);
 
-        // While composing Japanese, Space/Enter confirm and Backspace edits the reading.
+        // While composing Japanese: Space converts/cycles candidates, Enter
+        // confirms the selection, and Backspace edits/cancels the reading.
         if (kana() && jp.isComposing() && !ctrlAltMeta && !fnActive()) {
-            if (k.keyCode == KeyEvent.KEYCODE_SPACE || k.keyCode == KeyEvent.KEYCODE_ENTER) {
+            if (k.keyCode == KeyEvent.KEYCODE_SPACE) {
+                jp.convertNext(ic);
+                return;
+            }
+            if (k.keyCode == KeyEvent.KEYCODE_ENTER) {
                 jp.commit(ic);
                 return;
             }
@@ -538,6 +637,7 @@ public class HhkbImeService extends InputMethodService {
     public void onStartInputView(android.view.inputmethod.EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
         jp.reset();  // no stale composition carried into a new field
+        onHideCandidates();
         // Re-apply the chosen geometry each time the keyboard is shown.
         if (floating) applyFloating(); else dockToBottom();
     }

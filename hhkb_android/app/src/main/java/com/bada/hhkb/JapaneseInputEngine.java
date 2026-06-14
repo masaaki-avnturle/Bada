@@ -2,30 +2,53 @@ package com.bada.hhkb;
 
 import android.view.inputmethod.InputConnection;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Minimal, dictionary-free Japanese input engine for the HHKB soft keyboard.
+ * Japanese input engine for the HHKB soft keyboard.
  *
- * <p>It converts typed romaji into hiragana live (shown as composing text), and
- * offers two confirmation behaviours that mirror a real JIS keyboard:
- * <ul>
- *   <li><b>変換 (henkan)</b> — cycles the current reading through candidate forms:
- *       hiragana → katakana → full-width latin → (back to hiragana).
- *       Without a kanji dictionary this is the meaningful, self-contained set of
- *       conversions.</li>
- *   <li><b>無変換 (muhenkan)</b> — commits the reading as-is in hiragana.</li>
- * </ul>
+ * <p>Pipeline:
+ * <ol>
+ *   <li><b>Romaji → hiragana</b> live conversion shown as composing text.</li>
+ *   <li><b>変換 / Space</b> converts the reading to candidates and cycles through
+ *       them: dictionary kanji (from {@code assets/jadict.tsv}) first, then
+ *       hiragana, katakana and full-width latin.</li>
+ *   <li><b>Enter / tap a candidate</b> confirms; <b>Backspace</b> cancels the
+ *       conversion back to the reading; <b>無変換</b> commits as hiragana.</li>
+ * </ol>
  *
- * The engine never touches the network or storage; it only drives the
- * {@link InputConnection} composing region of whatever field has focus.
+ * The engine drives the focused field's composing region and notifies a
+ * {@link Listener} so the keyboard can render a candidate bar.
  */
 final class JapaneseInputEngine {
 
-    private final StringBuilder raw = new StringBuilder();  // pending romaji
-    private int candIndex = -1;                             // -1 => showing hiragana
+    /** UI callback for the candidate bar. */
+    interface Listener {
+        void onCandidates(List<String> candidates, int selected);
+        void onHideCandidates();
+    }
+
+    private final StringBuilder raw = new StringBuilder();   // pending romaji
+    private boolean converting = false;
+    private final List<String> cands = new ArrayList<>();
+    private int candIndex = -1;
+
+    private Map<String, List<String>> dict = new HashMap<>();
+    private Listener listener;
+
     private static final Map<String, String> M = buildTable();
+
+    void setDictionary(Map<String, List<String>> d) {
+        if (d != null) dict = d;
+    }
+
+    void setListener(Listener l) {
+        listener = l;
+    }
 
     boolean isComposing() {
         return raw.length() > 0;
@@ -33,34 +56,65 @@ final class JapaneseInputEngine {
 
     void reset() {
         raw.setLength(0);
+        converting = false;
         candIndex = -1;
+        cands.clear();
     }
 
-    /** A letter was typed in Japanese mode. */
+    // -- typing ------------------------------------------------------------
     void inputLetter(InputConnection ic, char c) {
-        if (candIndex >= 0) {
-            // The reading was already converted; confirm it and start anew.
-            commit(ic);
+        if (converting) {
+            commit(ic);          // confirm the highlighted candidate, then continue
         }
         raw.append(Character.toLowerCase(c));
         render(ic);
     }
 
     private void render(InputConnection ic) {
+        converting = false;
         candIndex = -1;
+        cands.clear();
         ic.setComposingText(toHiragana(raw.toString()), 1);
+        hideBar();
     }
 
-    /** 変換: cycle hiragana → katakana → full-width latin. */
-    boolean henkan(InputConnection ic) {
+    // -- conversion (変換 / Space) -----------------------------------------
+    boolean convertNext(InputConnection ic) {
         if (raw.length() == 0) return false;
-        String[] cands = candidates();
-        candIndex = (candIndex + 1) % cands.length;
-        ic.setComposingText(cands[candIndex], 1);
+        if (!converting) {
+            buildCandidates();
+            converting = true;
+            candIndex = 0;
+        } else {
+            candIndex = (candIndex + 1) % cands.size();
+        }
+        ic.setComposingText(cands.get(candIndex), 1);
+        if (listener != null) listener.onCandidates(cands, candIndex);
         return true;
     }
 
-    /** 無変換: commit the reading as hiragana. */
+    private void buildCandidates() {
+        cands.clear();
+        String hira = toHiragana(raw.toString());
+        LinkedHashSet<String> set = new LinkedHashSet<>();
+        List<String> kanji = dict.get(hira);
+        if (kanji != null) set.addAll(kanji);
+        set.add(hira);
+        set.add(toKatakana(hira));
+        String fw = toFullWidth(raw.toString());
+        if (!fw.equals(hira)) set.add(fw);
+        cands.addAll(set);
+    }
+
+    /** Tapping a candidate in the bar. */
+    void selectCandidate(InputConnection ic, int i) {
+        if (!converting || i < 0 || i >= cands.size()) return;
+        ic.setComposingText(cands.get(i), 1);
+        candIndex = i;
+        commit(ic);
+    }
+
+    // -- 無変換 ------------------------------------------------------------
     boolean muhenkan(InputConnection ic) {
         if (raw.length() == 0) return false;
         ic.setComposingText(toHiragana(raw.toString()), 1);
@@ -68,37 +122,41 @@ final class JapaneseInputEngine {
         return true;
     }
 
-    /** Backspace inside a composition. Returns true if it was handled. */
+    // -- editing -----------------------------------------------------------
     boolean backspace(InputConnection ic) {
         if (raw.length() == 0) return false;
-        if (candIndex >= 0) {            // revert conversion first
-            render(ic);
+        if (converting) {            // cancel conversion, return to the reading
+            converting = false;
+            candIndex = -1;
+            cands.clear();
+            ic.setComposingText(toHiragana(raw.toString()), 1);
+            hideBar();
             return true;
         }
         raw.deleteCharAt(raw.length() - 1);
         if (raw.length() == 0) {
             ic.setComposingText("", 1);
             ic.finishComposingText();
+            hideBar();
         } else {
             render(ic);
         }
         return true;
     }
 
-    /** Confirm whatever is currently composed. */
+    // -- commit ------------------------------------------------------------
     void commit(InputConnection ic) {
         ic.finishComposingText();
-        raw.setLength(0);
-        candIndex = -1;
+        reset();
+        hideBar();
     }
 
     void commitIfComposing(InputConnection ic) {
         if (raw.length() > 0) commit(ic);
     }
 
-    private String[] candidates() {
-        String hira = toHiragana(raw.toString());
-        return new String[]{hira, toKatakana(hira), toFullWidth(raw.toString())};
+    private void hideBar() {
+        if (listener != null) listener.onHideCandidates();
     }
 
     // -- conversions -------------------------------------------------------
