@@ -47,10 +47,11 @@ python3 cli.py rails article title:string body:text published:boolean
 python3 cli.py android           # install + launch the Android 12 app
 python3 cli.py wm                # w9wm ASCII desktop + root menu
 python3 cli.py term              # terminal demo: bash + vim + emacs + bada
-python3 cli.py term -i           # interactive terminal (type 'help')
+python3 cli.py term -i           # interactive terminal — type into vim/emacs
+python3 cli.py term -i --line    # interactive, line-input editors (no curses)
 python3 cli.py run apps/ultranetwork.bada   # run a Bada app through the kernel
 
-make test                        # 32 tests
+make test                        # 36 tests
 ```
 
 ### Terminal — bash · vim · emacs in one place
@@ -68,6 +69,28 @@ bada@webos:~$ emacs notes.txt       # C-x C-s save, C-x C-c exit
 bash builtins: `pwd cd ls echo cat mkdir touch rm cp mv head grep wc env
 export whoami clear bada vim emacs help`, with pipes (`|`) and redirection
 (`>`/`>>`).  bash, vim and emacs all share the same VFS.
+
+#### Interactive character input
+`term -i` is a real REPL: running `vim FILE` or `emacs FILE` drops you into the
+editor and **your keystrokes go straight into the buffer**.
+
+* On a real terminal it opens a full-screen **curses** editor — vim with
+  INSERT/NORMAL modes (`i` to insert, `Esc`, `hjkl`, `:w`/`:q`/`:wq`) and emacs
+  with self-insert + `C-f C-b C-n C-p C-a C-e`, `C-d`, `C-k` kill, `C-y` yank,
+  `C-x C-s` save, `C-x C-c` exit.
+* With no tty (pipes / web shell) it falls back to **line input** — typed lines
+  are inserted; `:wq`/`:q` (vim) and `C-x C-s`/`C-x C-c` (emacs) still work — so
+  character input works everywhere.
+
+```
+bada@webos:~$ vim story.bada
+say "typed live in vim"      ← typed by you
+print 6 * 7                  ← typed by you
+:wq
+bada@webos:~$ bada story.bada
+typed live in vim
+42
+```
 
 ### What `boot` produces
 ```
