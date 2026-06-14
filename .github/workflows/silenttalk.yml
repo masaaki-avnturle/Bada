@@ -1,0 +1,56 @@
+name: Build SilentTalk APK
+
+on:
+  push:
+    branches:
+      - "claude/happy-hacking-android12-guiap5"
+      - "main"
+    paths:
+      - "silenttalk_android/**"
+      - ".github/workflows/silenttalk.yml"
+  workflow_dispatch:
+  release:
+    types: [created]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: silenttalk_android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentTalk-debug-apk
+          path: silenttalk_android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Attach APK to release (on tag/release)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: silenttalk_android/app/build/outputs/apk/debug/*.apk
