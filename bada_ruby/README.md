@@ -259,6 +259,56 @@ puts Bada::Prover::Engine.new.render("ガンマ関数の未解決問題を想像
 
 各命題は `engine.paper(conjecture)` で証明論文（Markdown+LaTeX）にもなります。
 
+## 大脳基底核の熱ネットワーク — 体内神経システム（行動選択）
+
+`Bada::Basal` は、**大脳基底核（basal ganglia）を体内の熱ネットワークとして模擬した
+体内神経システム**を、**小型・モジュール化された小規模クラス**で実装します。各神経核は
+ニューロン層と**同型**（重み付き和＋整流＝ニューロン）で、古典的**デザインパターン**で
+配線され、横方向の熱伝導度は**ガンマ関数の大域的部分積分多様体** `1/(x·log x)²` から
+与えられます。これが LLM デコーダと未知事前エンジン（命題エンジン）の**行動選択器**です。
+
+```bash
+bin/bada basal "大脳基底核の熱ネットワークで未解決問題を想像して証明する"
+ruby examples/basal_demo.rb
+```
+
+### 神経核 = 小型クラス（ニューラルネットと同型）
+
+| 神経核（クラス） | 役割 | 経路 |
+|:--|:--|:--|
+| `Cortex` | 候補（行動/トークン）の顕著性入力 | 入力 |
+| `StriatumD1` | 直接路 / Go（ドーパミンで促進） | direct |
+| `StriatumD2` | 間接路 / NoGo（ドーパミンで抑制） | indirect |
+| `STN` | ハイパー直接路（広域 NoGo） | hyperdirect |
+| `GPe` / `GPi` | 淡蒼球（GPi は出力、緊張性抑制） | 出力 |
+| `Thalamus` | 選択的脱抑制でゲート＝行動選択 | 出力ゲート |
+
+GPi の緊張性抑制を Go 路が下げて視床を**脱抑制**＝最も顕著なチャネルが選択されます。
+
+### 採用デザインパターン
+
+| パターン | 適用箇所 |
+|:--|:--|
+| **Strategy** | `Nucleus#activate`、ゲーティング（Argmax/Boltzmann） |
+| **Composite** | `BasalGanglia`（神経核の小ネットワーク） |
+| **Mediator** | `BasalGanglia` が核間の信号伝達を仲介 |
+| **Observer** | `Dopamine`(SNc) が報酬予測誤差 RPE を線条体へ配信し学習 |
+| **Factory** | `CircuitFactory`（配線済み回路を生成） |
+| **Facade** | `BodyNeuralSystem` / `AprioriEngine` |
+
+### 熱ネットワーク（体内）
+
+`ThermalField` が顕著性をチャネル間で**熱拡散**（多様体伝導度で横方向相互作用、熱量保存）
+し、**焼きなまし温度** `T(step)=T₀/log(step+e)` で冷却しながら Boltzmann ゲートで選択
+します。ドーパミン（SNc）が RPE を配信して線条体の Go/NoGo 重みを学習させます。
+
+### LLM・未知事前エンジンとの統合
+
+- `Bada::Basal::BasalGangliaSampler` … LLM のロジットを大脳基底核に通し、上位 k トークンを
+  皮質チャネルとして Go/NoGo＋熱焼きなましで選択する **Bada::NN デコーダ Strategy**。
+- `Bada::Basal::AprioriEngine` … 未知事前エンジンが命題を「想像」→ 大脳基底核が**取り組む
+  順序を顕著性で選択**→ 健全に証明→ 結果でドーパミン学習。`OmegaChat#deliberate` から利用可。
+
 ## モジュール構成
 
 ```
@@ -287,6 +337,14 @@ lib/bada/prover/polynomial.rb  厳密な有理数係数多項式（健全な証�
 lib/bada/prover/proof.rb       証明器（恒等式/整除性/有限/経験的）と Proof
 lib/bada/prover/conjecture.rb  命題の「想像」生成 + 数論ユーティリティ
 lib/bada/prover/engine.rb      未知事前エンジン（imagine→prove→render/paper）
+lib/bada/basal/nucleus.rb      神経核の小型クラス（Cortex/Striatum/STN/GPe/GPi/Thalamus）
+lib/bada/basal/synapse.rb      シナプス + ガンマ多様体由来の熱伝導度
+lib/bada/basal/thermal.rb      熱拡散場 + 焼きなまし温度 + ゲート戦略
+lib/bada/basal/dopamine.rb     ドーパミン（SNc, Observer）+ 可塑性
+lib/bada/basal/circuit.rb      BasalGanglia（Mediator+Composite）行動選択
+lib/bada/basal/factory.rb      CircuitFactory（回路生成）
+lib/bada/basal/sampler.rb      BasalGangliaSampler（NN デコーダ）
+lib/bada/basal/engine.rb       BodyNeuralSystem / AprioriEngine（Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

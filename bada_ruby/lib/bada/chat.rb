@@ -108,6 +108,13 @@ module Bada
       (@prover ||= Prover::Engine.new).render(question, count: count)
     end
 
+    # Deliberate via the basal-ganglia in-body neural system: imagine problems,
+    # let the thermal action-selection network choose the order to pursue them,
+    # prove each soundly, and learn from the outcome (dopamine).
+    def deliberate(question, count: 5)
+      (@apriori ||= Basal::AprioriEngine.new).render(question, count: count)
+    end
+
     # Human-readable single-string answer (what the REPL prints).
     # info: append the Thurston/catastrophe/millennium information-generation block.
     def ask(question, info: true)
