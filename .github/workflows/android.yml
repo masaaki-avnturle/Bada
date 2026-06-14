@@ -1,0 +1,56 @@
+name: Build HHKB APK
+
+on:
+  push:
+    branches:
+      - "claude/happy-hacking-android12-guiap5"
+      - "main"
+    paths:
+      - "hhkb_android/**"
+      - ".github/workflows/android.yml"
+  workflow_dispatch:        # allow manual runs from the Actions tab
+  release:
+    types: [created]
+
+permissions:
+  contents: write           # needed to attach the APK to a release
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hhkb_android
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadaHHKB-debug-apk
+          path: hhkb_android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      - name: Attach APK to release (on tag/release)
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: hhkb_android/app/build/outputs/apk/debug/*.apk
