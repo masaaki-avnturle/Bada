@@ -309,6 +309,61 @@ GPi の緊張性抑制を Go 路が下げて視床を**脱抑制**＝最も顕�
 - `Bada::Basal::AprioriEngine` … 未知事前エンジンが命題を「想像」→ 大脳基底核が**取り組む
   順序を顕著性で選択**→ 健全に証明→ 結果でドーパミン学習。`OmegaChat#deliberate` から利用可。
 
+## Bada 言語そのもの — ライブラリもアプリも Bada で記述
+
+これまでの機能は Ruby で実装した「エンジン（カーネル）」です。`Bada::Lang` はその上に
+**Bada 言語（字句解析→Pratt 構文解析→木構造インタプリタ）**を載せ、**必要なライブラリも
+アプリ本体も Bada 言語自身で記述**できるようにします。Bada 言語は関数・ライブラリ
+（モジュール）・`import`・ネイティブ橋渡し（カーネル）を備えます。
+
+```bash
+bin/bada lang bada/app/unknown_engine.bada   # Bada 言語で書いたアプリを実行
+bin/bada lang                                # 既定アプリを実行
+```
+
+### Bada 言語の構文
+
+```
+import "lib/manifold.bada"
+
+library Mani
+  def xi(q)
+    return Manifold.xi(q)      # ネイティブ橋渡し（カーネル）
+  end
+  def quantum(q)
+    let x = Manifold.xi(q)
+    return x >- x              # Bada 演算子（量子右作用）
+  end
+end
+
+def fib(n)
+  if n < 2
+    return n
+  end
+  return fib(n - 1) + fib(n - 2)
+end
+
+print "Xi = " + str(Mani.xi("..."))
+```
+
+- 値: 数値・文字列・真偽・`nil`・リスト `[...]`
+- 演算: `+ - * /`、比較 `== != < <= > >=`、`and/or/not`、**Bada 演算子 `<- -< >-`**
+- 文: `let`/代入・`def`/`return`・`library/end`・`if/elsif/else/end`・`while/end`・`print`・`import`
+- `Mod.fn(args)`: ユーザーライブラリ／ネイティブモジュール（`Manifold`/`Entropy`/`Special`/
+  `Info`/`Prover`/`Basal`/`Penrose`）を呼ぶ
+
+### Bada 言語で書いたライブラリとアプリ（`bada/` ディレクトリ）
+
+```
+bada/lib/core.bada       基盤ヘルパ（整形・最大値）
+bada/lib/manifold.bada   大域的部分積分多様体ライブラリ（H/Ξ/M/ζ ゲージ）
+bada/lib/engines.bada    情報生成・証明・大脳基底核・ペンローズを束ねる
+bada/app/unknown_engine.bada  未知事前エンジン アプリ本体（Bada 言語）
+```
+
+アプリは Bada 言語で書かれ、Bada 言語のライブラリを `import` し、ネイティブカーネル経由で
+各エンジンを駆動します（計測→情報生成→健全な証明→大脳基底核ゲーティング→ペンローズ計算）。
+
 ## モジュール構成
 
 ```
@@ -345,6 +400,12 @@ lib/bada/basal/circuit.rb      BasalGanglia（Mediator+Composite）行動選択
 lib/bada/basal/factory.rb      CircuitFactory（回路生成）
 lib/bada/basal/sampler.rb      BasalGangliaSampler（NN デコーダ）
 lib/bada/basal/engine.rb       BodyNeuralSystem / AprioriEngine（Facade）
+lib/bada/lang/lexer.rb       Bada 言語 字句解析
+lib/bada/lang/parser.rb      Bada 言語 構文解析（Pratt）+ AST
+lib/bada/lang/interpreter.rb Bada 言語 インタプリタ（関数/モジュール/演算子）
+lib/bada/lang/kernel.rb      ネイティブ橋渡し（エンジンを Bada へ公開）
+lib/bada/lang.rb             Bada 言語 Facade（run/run_file/import）
+bada/lib/*.bada · bada/app/*.bada  Bada 言語で書いたライブラリとアプリ
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
