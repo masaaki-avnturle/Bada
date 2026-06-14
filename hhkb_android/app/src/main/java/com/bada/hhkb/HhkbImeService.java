@@ -43,6 +43,14 @@ public class HhkbImeService extends InputMethodService {
     private static final int T_MOD  = 1;   // modifier: Shift/Ctrl/Alt/Meta
     private static final int T_FN   = 2;   // the Fn key
     private static final int T_FUNC = 3;   // special function key (Esc/Tab/Enter/Space/Delete/...)
+    private static final int T_JP   = 4;   // Japanese key (変換 / 無変換)
+    private static final int T_MODE = 5;   // Japanese/English (あ/A) toggle
+
+    // ---- Japanese key actions / input modes ------------------------------
+    private static final int JP_HENKAN   = 1;   // 変換
+    private static final int JP_MUHENKAN = 2;   // 無変換
+    private static final int MODE_EN   = 0;
+    private static final int MODE_KANA = 1;
 
     // ---- modifier ids ----------------------------------------------------
     private static final int MOD_SHIFT = 0;
@@ -69,6 +77,11 @@ public class HhkbImeService extends InputMethodService {
     private final Map<Integer, List<Button>> modButtons = new HashMap<>();
     private Button fnButton;
 
+    // ---- Japanese input --------------------------------------------------
+    private final JapaneseInputEngine jp = new JapaneseInputEngine();
+    private int inputMode = MODE_EN;
+    private Button modeButton;
+
     // ---- floating window state ------------------------------------------
     private View rootView;
     private boolean floating = false;
@@ -87,6 +100,7 @@ public class HhkbImeService extends InputMethodService {
         final float weight;
         int modId = -1;
         int fnKeyCode = 0;   // when Fn is active and != 0, send this instead
+        int jpAction = 0;    // JP_HENKAN / JP_MUHENKAN for T_JP keys
 
         KeyDef(String label, String shift, int keyCode, int type, float weight) {
             this.label = label;
@@ -109,6 +123,15 @@ public class HhkbImeService extends InputMethodService {
     }
     private static KeyDef mod(String label, int modId, float w) {
         return new KeyDef(label, label, 0, T_MOD, w).mod(modId);
+    }
+    private static KeyDef jpKey(String label, int action, float w) {
+        int code = (action == JP_HENKAN) ? KeyEvent.KEYCODE_HENKAN : KeyEvent.KEYCODE_MUHENKAN;
+        KeyDef k = new KeyDef(label, label, code, T_JP, w);
+        k.jpAction = action;
+        return k;
+    }
+    private static KeyDef modeKey(float w) {
+        return new KeyDef("A", "A", 0, T_MODE, w);
     }
 
     // =====================================================================
@@ -156,12 +179,14 @@ public class HhkbImeService extends InputMethodService {
         r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
         rows.add(r4);
 
-        // Row 5: ◇ Alt [ Space ] Alt ◇
+        // Row 5 (JIS-style): ◇ Alt 無変換 Space 変換 あ/A ◇
         List<KeyDef> r5 = new ArrayList<>();
-        r5.add(mod("◇", MOD_META, 2f));
-        r5.add(mod("Alt", MOD_ALT, 2f));
-        r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 7f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
-        r5.add(mod("Alt", MOD_ALT, 2f));
+        r5.add(mod("◇", MOD_META, 1.5f));
+        r5.add(mod("Alt", MOD_ALT, 1.5f));
+        r5.add(jpKey("無変換", JP_MUHENKAN, 2f));
+        r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 4f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+        r5.add(jpKey("変換", JP_HENKAN, 2f));
+        r5.add(modeKey(2f));
         r5.add(mod("◇", MOD_META, 2f));
         rows.add(r5);
 
@@ -211,6 +236,7 @@ public class HhkbImeService extends InputMethodService {
         }
 
         rootView = root;
+        updateModeButton();
         return root;
     }
 
@@ -294,6 +320,7 @@ public class HhkbImeService extends InputMethodService {
             list.add(b);
         }
         if (k.type == T_FN) fnButton = b;
+        if (k.type == T_MODE) modeButton = b;
 
         b.setOnClickListener(v -> onKey(k));
         return b;
@@ -309,6 +336,8 @@ public class HhkbImeService extends InputMethodService {
     }
 
     private float labelSize(KeyDef k) {
+        if (k.type == T_JP) return 11f;               // 変換 / 無変換
+        if (k.type == T_MODE) return 16f;             // あ / A
         if (k.type == T_FUNC || k.type == T_MOD || k.type == T_FN) return 12f;
         if (k.type == T_CHAR && k.label.length() == 1 && Character.isLetter(k.label.charAt(0)))
             return 16f;
@@ -340,10 +369,48 @@ public class HhkbImeService extends InputMethodService {
                 sendFunctional(k);
                 consumeOneShots();
                 return;
+            case T_JP:
+                handleJp(k);
+                consumeOneShots();
+                return;
+            case T_MODE:
+                toggleMode();
+                return;
             default: // T_CHAR
                 sendChar(k);
                 consumeOneShots();
         }
+    }
+
+    // ---- Japanese mode ---------------------------------------------------
+    private boolean kana() { return inputMode == MODE_KANA; }
+
+    private void toggleMode() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) jp.commitIfComposing(ic);
+        inputMode = (inputMode == MODE_EN) ? MODE_KANA : MODE_EN;
+        updateModeButton();
+    }
+
+    private void updateModeButton() {
+        if (modeButton == null) return;
+        boolean k = kana();
+        modeButton.setText(k ? "あ" : "A");
+        modeButton.setBackground(keyBackground(k ? COL_GOLD : COL_SPECIAL));
+        modeButton.setTextColor(k ? COL_LOCK_TXT : COL_KEY_TXT);
+    }
+
+    private void handleJp(KeyDef k) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        boolean handled;
+        if (k.jpAction == JP_HENKAN) {
+            handled = jp.henkan(ic);
+        } else {
+            handled = jp.muhenkan(ic);
+        }
+        // Nothing to convert: behave like a hardware JIS key for other IMEs.
+        if (!handled) sendKey(ic, k.keyCode, currentMeta());
     }
 
     private void cycle(int modId) { modState[modId] = next(modState[modId]); }
@@ -367,25 +434,56 @@ public class HhkbImeService extends InputMethodService {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
 
+        boolean ctrlAltMeta = active(MOD_CTRL) || active(MOD_ALT) || active(MOD_META);
+
         // Fn layer takes priority when mapped (arrows, F-keys, navigation…).
         if (fnActive() && k.fnKeyCode != 0) {
+            jp.commitIfComposing(ic);
             sendKey(ic, k.fnKeyCode, currentMeta());
             return;
         }
 
-        boolean ctrlAltMeta = active(MOD_CTRL) || active(MOD_ALT) || active(MOD_META);
         if (ctrlAltMeta) {
             // Combos such as Ctrl+C, Alt+Tab, Meta+L are delivered as key events.
+            jp.commitIfComposing(ic);
             sendKey(ic, k.keyCode, currentMeta());
-        } else {
-            String s = active(MOD_SHIFT) ? k.shift : k.label;
-            ic.commitText(s, 1);
+            return;
         }
+
+        // Japanese mode: route plain lowercase letters through romaji conversion.
+        if (kana()) {
+            char ch = k.label.length() == 1 ? k.label.charAt(0) : 0;
+            if (!active(MOD_SHIFT) && ch >= 'a' && ch <= 'z') {
+                jp.inputLetter(ic, ch);
+                return;
+            }
+            // Digits / symbols / shifted letters: confirm any reading, then type ASCII.
+            jp.commitIfComposing(ic);
+            ic.commitText(active(MOD_SHIFT) ? k.shift : k.label, 1);
+            return;
+        }
+
+        // English mode.
+        ic.commitText(active(MOD_SHIFT) ? k.shift : k.label, 1);
     }
 
     private void sendFunctional(KeyDef k) {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
+        boolean ctrlAltMeta = active(MOD_CTRL) || active(MOD_ALT) || active(MOD_META);
+
+        // While composing Japanese, Space/Enter confirm and Backspace edits the reading.
+        if (kana() && jp.isComposing() && !ctrlAltMeta && !fnActive()) {
+            if (k.keyCode == KeyEvent.KEYCODE_SPACE || k.keyCode == KeyEvent.KEYCODE_ENTER) {
+                jp.commit(ic);
+                return;
+            }
+            if (k.keyCode == KeyEvent.KEYCODE_DEL) {
+                if (jp.backspace(ic)) return;
+            }
+            jp.commitIfComposing(ic);  // Esc / Tab: confirm first, then fall through
+        }
+
         int code = (fnActive() && k.fnKeyCode != 0) ? k.fnKeyCode : k.keyCode;
         sendKey(ic, code, currentMeta());
     }
@@ -439,8 +537,16 @@ public class HhkbImeService extends InputMethodService {
     @Override
     public void onStartInputView(android.view.inputmethod.EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
+        jp.reset();  // no stale composition carried into a new field
         // Re-apply the chosen geometry each time the keyboard is shown.
         if (floating) applyFloating(); else dockToBottom();
+    }
+
+    @Override
+    public void onFinishInputView(boolean finishingInput) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) jp.commitIfComposing(ic);
+        super.onFinishInputView(finishingInput);
     }
 
     private void attachDrag(View handle) {
