@@ -30,6 +30,7 @@ Pure **Python 3 (stdlib only)** + Bada programs running on the Bada VM
 | `cloud/` | **Settings panel** synced to a **CloudStore** through a **Bridge + Repeater**, and `adapt_to_hardware` to fit the design to the device (dpi→font, size→layout, touch→hit-target). |
 | `ultranet/` | the **ultranetwork**: TupleSpace + arrow-syntax eval (on the Bada VM), neural **XOR learning**, **gravity-port** gates, **bridge/repeater** propagation. |
 | `android/` | **Android 12** installer — verify manifest (targetSdk 31), resolve runtime permissions, install, launch as a window. |
+| `terminal/` | a **terminal** that bundles **bash** (20+ builtins, pipes, redirection), **vim** (the modal BadaVim) and **emacs** (C-x C-s / C-k / C-y …) over one in-memory **VFS** — files made with bash are edited by either editor and run with `bada`. |
 | `render/` | renders the whole desktop to one HTML page (the "HTML-template OS frame"). |
 | `apps/` | Bada applications (`ultranetwork.bada`). |
 
@@ -45,10 +46,28 @@ python3 cli.py ultranet          # TupleSpace + XOR + gravity + repeater
 python3 cli.py rails article title:string body:text published:boolean
 python3 cli.py android           # install + launch the Android 12 app
 python3 cli.py wm                # w9wm ASCII desktop + root menu
+python3 cli.py term              # terminal demo: bash + vim + emacs + bada
+python3 cli.py term -i           # interactive terminal (type 'help')
 python3 cli.py run apps/ultranetwork.bada   # run a Bada app through the kernel
 
-make test                        # 18 tests
+make test                        # 32 tests
 ```
+
+### Terminal — bash · vim · emacs in one place
+```
+bada@webos:~$ echo say \"hello from the terminal\" > hello.bada
+bada@webos:~$ vim hello.bada        # modal editor; o-pen a line, :wq to save
+bada@webos:~$ cat hello.bada
+say "hello from the terminal"
+print 6 * 7
+bada@webos:~$ bada hello.bada       # run it on the Bada VM
+hello from the terminal
+42
+bada@webos:~$ emacs notes.txt       # C-x C-s save, C-x C-c exit
+```
+bash builtins: `pwd cd ls echo cat mkdir touch rm cp mv head grep wc env
+export whoami clear bada vim emacs help`, with pipes (`|`) and redirection
+(`>`/`>>`).  bash, vim and emacs all share the same VFS.
 
 ### What `boot` produces
 ```

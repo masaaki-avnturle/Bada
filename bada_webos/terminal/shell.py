@@ -1,0 +1,240 @@
+"""A small bash-like shell for the BadaWebOS terminal.
+
+Implements a useful set of POSIX-ish builtins over the :class:`VFS`, plus
+pipelines (``|``) and output redirection (``>`` / ``>>``).  Two commands are
+"launchers": ``vim`` and ``emacs`` hand a request back to the Terminal, and
+``bada`` runs a Bada program on the VM.
+"""
+
+from __future__ import annotations
+
+import io
+import os
+import shlex
+import sys
+from contextlib import redirect_stdout
+
+from .vfs import VFS, VFSError
+
+# the Bada VM (application language)
+_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+for _p in (_ROOT, os.path.join(_ROOT, "bada_silent_vim")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+from bada import run_source  # noqa: E402
+
+
+class LaunchRequest:
+    """Returned to the Terminal when the user runs vim/emacs."""
+
+    def __init__(self, program: str, filename: str | None):
+        self.program = program
+        self.filename = filename
+
+
+class Shell:
+    def __init__(self, vfs: VFS | None = None):
+        self.vfs = vfs or VFS()
+        self.env = {"USER": "bada", "HOME": "/home/bada",
+                    "SHELL": "/bin/bash", "TERM": "w9wm-256color"}
+        self.launch_request: LaunchRequest | None = None
+
+    # -- entry point -------------------------------------------------------
+    def run(self, line: str) -> str:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            return ""
+        self.launch_request = None
+        # pipeline
+        stages = [s.strip() for s in line.split("|")]
+        stdin = ""
+        out = ""
+        for stage in stages:
+            out = self._run_stage(stage, stdin)
+            stdin = out
+            if self.launch_request is not None:
+                break
+        return out
+
+    # -- one command (with redirection) ------------------------------------
+    def _run_stage(self, stage: str, stdin: str) -> str:
+        try:
+            tokens = shlex.split(stage)
+        except ValueError as e:
+            return f"bash: {e}"
+        if not tokens:
+            return ""
+
+        redirect = None
+        append = False
+        clean: list[str] = []
+        i = 0
+        while i < len(tokens):
+            t = tokens[i]
+            if t in (">", ">>"):
+                append = t == ">>"
+                if i + 1 >= len(tokens):
+                    return "bash: syntax error near redirection"
+                redirect = tokens[i + 1]
+                i += 2
+                continue
+            clean.append(t)
+            i += 1
+
+        cmd, args = clean[0], clean[1:]
+        fn = self.BUILTINS.get(cmd)
+        if fn is None:
+            return f"bash: {cmd}: command not found"
+        try:
+            out = fn(self, args, stdin)
+        except VFSError as e:
+            return str(e)
+
+        if redirect is not None:
+            existing = ""
+            if append and self.vfs.is_file(redirect):
+                existing = self.vfs.read(redirect)
+            self.vfs.write(redirect, existing + out)
+            return ""
+        return out
+
+    # ====================================================================
+    # builtins
+    # ====================================================================
+    def _pwd(self, args, stdin):
+        return self.vfs.cwd + "\n"
+
+    def _cd(self, args, stdin):
+        self.vfs.chdir(args[0] if args else self.env["HOME"])
+        return ""
+
+    def _ls(self, args, stdin):
+        path = args[-1] if args and not args[-1].startswith("-") else None
+        long = "-l" in args
+        names = self.vfs.listdir(path)
+        if long:
+            return "\n".join(
+                ("d " if n.endswith("/") else "- ") + n for n in names
+            ) + ("\n" if names else "")
+        return ("  ".join(names) + "\n") if names else ""
+
+    def _echo(self, args, stdin):
+        # expand $VAR
+        words = [self.env.get(a[1:], "") if a.startswith("$") else a
+                 for a in args]
+        return " ".join(words) + "\n"
+
+    def _cat(self, args, stdin):
+        if not args:
+            return stdin
+        return "".join(self.vfs.read(a) for a in args)
+
+    def _mkdir(self, args, stdin):
+        for a in args:
+            if a == "-p":
+                continue
+            self.vfs.mkdir(a)
+        return ""
+
+    def _touch(self, args, stdin):
+        for a in args:
+            if not self.vfs.is_file(a):
+                self.vfs.write(a, "")
+        return ""
+
+    def _rm(self, args, stdin):
+        for a in args:
+            if a.startswith("-"):
+                continue
+            self.vfs.remove(a)
+        return ""
+
+    def _cp(self, args, stdin):
+        src, dst = args[0], args[1]
+        self.vfs.write(dst, self.vfs.read(src))
+        return ""
+
+    def _mv(self, args, stdin):
+        src, dst = args[0], args[1]
+        self.vfs.write(dst, self.vfs.read(src))
+        self.vfs.remove(src)
+        return ""
+
+    def _head(self, args, stdin):
+        n = 10
+        files = []
+        i = 0
+        while i < len(args):
+            if args[i] == "-n":
+                n = int(args[i + 1])
+                i += 2
+            else:
+                files.append(args[i])
+                i += 1
+        text = "".join(self.vfs.read(f) for f in files) if files else stdin
+        return "\n".join(text.splitlines()[:n]) + "\n"
+
+    def _grep(self, args, stdin):
+        pattern = args[0]
+        text = ("".join(self.vfs.read(f) for f in args[1:])
+                if len(args) > 1 else stdin)
+        return "\n".join(l for l in text.splitlines() if pattern in l) + "\n"
+
+    def _wc(self, args, stdin):
+        text = ("".join(self.vfs.read(f) for f in args)
+                if args else stdin)
+        lines = text.count("\n")
+        words = len(text.split())
+        chars = len(text)
+        return f"{lines} {words} {chars}\n"
+
+    def _env(self, args, stdin):
+        return "".join(f"{k}={v}\n" for k, v in sorted(self.env.items()))
+
+    def _export(self, args, stdin):
+        for a in args:
+            if "=" in a:
+                k, _, v = a.partition("=")
+                self.env[k] = v
+        return ""
+
+    def _whoami(self, args, stdin):
+        return self.env["USER"] + "\n"
+
+    def _clear(self, args, stdin):
+        return "\x0c"          # form-feed: Terminal clears its transcript
+
+    def _bada(self, args, stdin):
+        if not args:
+            return "bada: usage: bada FILE.bada\n"
+        src = self.vfs.read(args[0])
+        buf = io.StringIO()
+        try:
+            with redirect_stdout(buf):
+                run_source(src)
+        except Exception as e:
+            return f"{type(e).__name__}: {e}\n"
+        return buf.getvalue()
+
+    def _vim(self, args, stdin):
+        self.launch_request = LaunchRequest("vim", args[0] if args else None)
+        return ""
+
+    def _emacs(self, args, stdin):
+        self.launch_request = LaunchRequest("emacs", args[0] if args else None)
+        return ""
+
+    def _help(self, args, stdin):
+        names = " ".join(sorted(self.BUILTINS))
+        return ("BadaWebOS terminal — available apps:\n"
+                f"  {names}\n"
+                "  editors: vim FILE, emacs FILE\n"
+                "  run Bada: bada FILE.bada\n")
+
+    BUILTINS = {
+        "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
+        "mkdir": _mkdir, "touch": _touch, "rm": _rm, "cp": _cp, "mv": _mv,
+        "head": _head, "grep": _grep, "wc": _wc, "env": _env,
+        "export": _export, "whoami": _whoami, "clear": _clear,
+        "bada": _bada, "vim": _vim, "emacs": _emacs, "help": _help,
+    }

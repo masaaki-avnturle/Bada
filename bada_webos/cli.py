@@ -8,6 +8,7 @@ Subcommands
   ultranet             boot the ultranetwork (TupleSpace/XOR/gravity/repeater)
   android              install + launch the Android 12 demo app
   wm                   demo the w9wm window manager (ASCII)
+  term [-i]            terminal bundling bash + vim + emacs (-i interactive)
   run FILE.bada        run a Bada application through the kernel
 """
 
@@ -31,6 +32,7 @@ from ultranet import UltraNetwork                            # noqa: E402
 from android.installer import Android12Installer, AndroidManifest  # noqa
 from wm.w9wm import W9wm                                     # noqa: E402
 from kernel.kernel import QuantumKernel                      # noqa: E402
+from terminal import Terminal                                # noqa: E402
 
 
 def cmd_boot(args):
@@ -116,6 +118,33 @@ def cmd_wm(args):
     print("\nroot menu:", wm.root_menu())
 
 
+def cmd_term(args):
+    t = Terminal()
+    if args.interactive:
+        print("BadaWebOS terminal — type 'help', 'exit' to quit.")
+        while True:
+            try:
+                line = input(t.prompt())
+            except EOFError:
+                break
+            if line.strip() in ("exit", "logout"):
+                break
+            out = t.bash(line)
+            if out:
+                print(out, end="" if out.endswith("\n") else "\n")
+        return
+    # scripted demo: bash + vim + emacs over one VFS
+    t.run_script(["pwd",
+                  'echo say \\"hello from the terminal\\" > hello.bada',
+                  "cat hello.bada"])
+    t.open_vim("hello.bada", ["o", "print 6 * 7", "ESC", ":wq"])
+    t.run_script(["bada hello.bada"])
+    t.open_emacs("notes.txt",
+                 ["bash, vim and emacs share one VFS", "C-x C-s", "C-x C-c"])
+    t.run_script(["ls", "wc hello.bada", "help"])
+    print(t.render_ascii())
+
+
 def cmd_run(args):
     k = QuantumKernel()
     proc = k.run_app_file(os.path.basename(args.file), args.file)
@@ -146,6 +175,10 @@ def build_parser():
     sub.add_parser("ultranet").set_defaults(func=cmd_ultranet)
     sub.add_parser("android").set_defaults(func=cmd_android)
     sub.add_parser("wm").set_defaults(func=cmd_wm)
+
+    sp = sub.add_parser("term", help="terminal: bash + vim + emacs")
+    sp.add_argument("-i", "--interactive", action="store_true")
+    sp.set_defaults(func=cmd_term)
 
     sp = sub.add_parser("run"); sp.add_argument("file")
     sp.set_defaults(func=cmd_run)
