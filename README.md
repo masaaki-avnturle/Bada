@@ -52,6 +52,19 @@ Bada言語ミニランタイムで駆動する Android アプリ（→ APK）。
 
 ---
 
+## 🧬 Bada Morphogenesis Lab — `bada_morphogenesis_app/`
+
+Bada `.bada` プロトコル駆動の発生生物学シミュレーション Android アプリ（→ APK）。
+カタストロフィ理論（Thomカスプ）の細胞運命 **不分岐→分岐**、反応拡散（Gray–Scott / Turing）の
+**円形容器内 形態形成場**、確率的分枝の **iPS系統樹**、分化結果からの **薬製造シミュレーション**
+（収率・純度・力価・規格合否）を収録。GitHub Actions が APK を自動ビルドします。
+
+> ⚠️ **免責**: 数学モデルのシミュレーション/可視化です。反重力・逆流電磁気の実機ではなく、
+> 実在の細胞培養・iPS分化・医薬品製造でもありません。出力はトイモデルの参考値です。
+> 詳細は [`bada_morphogenesis_app/README.md`](./bada_morphogenesis_app/README.md)。
+
+---
+
 ## 🔤 Bada Language — 設計原理
 
 山口フレームワークの作用素環プログラミングを実現するために設計された独自OOP言語。
