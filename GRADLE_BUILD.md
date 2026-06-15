@@ -38,6 +38,22 @@ CI（`.github/workflows/build-apk.yml` 等）でも APK をビルドします。
 > ルートの `./gradlew`（C/Python 等のマルチプロジェクト）と Android アプリの `./gradlew` は
 > それぞれ独立したビルドです。Android アプリはルートの集約ビルドには含めていません。
 
+### Android アプリの Linux ネイティブ版（APK 不要）
+
+各 Android アプリのコアを **Linux のネイティブ実行ファイル（ELF）** に移植したものを
+用意しています。Android SDK もネットワークも要らず、ターミナルですぐ動きます。
+ルートの `assembleDebug` に含まれ、`make` でも単体ビルドできます。
+
+| Android アプリ | Linux ネイティブ版 | 実行ファイル |
+|:--|:--|:--|
+| `bada_biofeedback_app` | `bada_biofeedback_linux` | リラクゼーション音風景（WAV生成）＋EEG/ECG/部位グロー |
+| `bada_morphogenesis_app` | `bada_morphogenesis_linux` | カスプ・カタストロフィ＋Gray-Scott反応拡散＋分化系譜樹＋製造指標 |
+
+```bash
+cd bada_biofeedback_linux && make && ./bin/bada_biofeedback --list
+cd bada_morphogenesis_linux && make && ./bin/bada_morphogenesis cardio
+```
+
 ## C / Python / Ruby / その他アプリ
 
 - C アプリ … `gcc -D_GNU_SOURCE -g -O0` で各 `*.c` をビルド（まず実行ファイル、ダメなら `.o`）。
