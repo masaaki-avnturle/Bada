@@ -1,24 +1,3 @@
-了解しました。以下は、先に作成したジェネレータを改訂し、添付レポート中の Omega スクリプト風コード（等号記法 `=>` と `>-` を含む）を生成物に組み込み、ランタイム側でそれらの記法を解釈・保持して出力できるように拡張した堅牢な `pkginstallgen.c` です。
-
-主な変更点（要点）
-- 生成される例 `omega_pkg/examples/objects.omega` を、あなたが提示した Omega スクリプト風コードに置換。
-- ランタイムのパーサ（極簡易）は `=>`（分岐等号）と `>-`（変換代入）を認識して内部の「transform map / binding map」に格納する機能を追加。
-  - `puts(name);` がマッピングやオブジェクト（配列・ハッシュ・list・func）を優先して表示するよう改善。
-- 既存の配列/hash/list/func 登録機能は維持。不要な外部準備なしで動作するよう堅牢化。
-
-注意：あくまで自動生成する「実用的な雛形」です。Omega スクリプトの完全な仕様が定義済みであれば、より厳密なパーサ／評価器に拡張できます。
-
-保存してビルド・実行
-1. 保存：pkginstallgen.c（下記全文）
-2. ビルド：gcc -std=c11 -O2 -Wall -o pkginstallgen pkginstallgen.c
-3. 実行：./pkginstallgen Bada++1.pdf
-   - pdftotext が無ければ第1引数にプレーンテキストファイルを渡してください。
-4. ビルド生成物：make -C omega_pkg all
-5. 実行例：./omega_pkg/omega-bin omega_pkg/examples/objects.omega
-
-pkginstallgen.c（全文）：
-
-```c
 		  // pkginstallgen.c
 		  // Generates omega_pkg with runtime that supports:
 		  // - arrays, lists, hashes, func objects
@@ -349,11 +328,3 @@ int main(int argc, char **argv) {
   puts("Run: make -C omega_pkg all && ./omega_pkg/omega-bin omega_pkg/examples/objects.omega");
   return 0;
 }
-```
-
-必要ならこの生成物を次の点でさらに強化します（指示ください）：
-- `=>` / `>-` の意味論を厳密に（例：左辺が式の場合の評価戦略、オブジェクト不変性のトラッキング）実装する。
-- Omega スクリプトの完全な文法に沿うパーサ（トークナイザ→AST→実行）を自動生成する。
-- 生成した BNF をもとに C の再帰下降パーサを自動生成し、全ての例を実行可能にする。
-
-どのレベルで自動化／厳密化するか指示ください。

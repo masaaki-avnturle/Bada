@@ -1,22 +1,3 @@
-了解しました。以下は、生成したサンプルスクリプト（omega_pkg/examples/objects.omega）を実際に実行できるように、生成器（pkginstallgen.c）を再記述したものです。
-
-要点
-- 事前のディレクトリ作成や外部ツールなしで動作します。
-- 生成されるランタイムは、サンプル内で使われている構成（配列/list/hash/func、puts、数値変数、while ループの要旨、generate_random_knot と validate の処理）を実行するための簡易インタプリタ兼シミュレータを実装します。
-- サンプルの Omega 記法（"=>", ">-" 等）は簡易的に解析して値を抽出します（完全仕様ではありませんが、例の実行に必要な振る舞いは満たします）。
-- 出力は実行可能なバイナリを作るためのソース群（omega_pkg/src/*.c, include, Makefile など）を生成します。生成物をビルドして実行すると、サンプルスクリプトの主要な処理（乱数での knot 生成と有効/無効のカウント表示）が動きます。
-
-使い方
-1. ファイルとして保存：pkginstallgen.c
-2. ビルド：gcc -std=c11 -O2 -Wall -o pkginstallgen pkginstallgen.c
-3. 実行：./pkginstallgen rout_object_structed_omegascript.txt
-   - 第一引数は PDF かプレーンテキストですが、この実装はテキストファイルを期待します（提供の rout_object_structed_omegascript.txt を渡してください）。
-4. 生成物ビルド：make -C omega_pkg all
-5. 実行：./omega_pkg/omega-bin omega_pkg/examples/objects.omega
-
-ソース（pkginstallgen.c）。保存してコンパイル・実行してください。
-
-```c
 /*
  pkginstallgen.c
 
@@ -260,8 +241,3 @@ static int write_lines(const char *path, const char **lines, size_t n, int exec)
     puts("Run:   ./omega_pkg/omega-bin omega_pkg/examples/objects.omega");
 	 return 0;
 	 }
-```
-
-補足
-- この実装は "objects.omega" に含まれる高度なクラス／メソッド表現を完全に実行するフル実装ではなく、サンプルで使われる主要値（num_knots, num_crossings）を抽出してシミュレーション結果を出すように作られています。これにより「生成されたサンプルファイルを実行可能」にしています。
-- より忠実にクラスやメソッド、演算子や分岐等を完全に解釈実行したい場合は、追加で AST 構築と実行系（メソッド呼出し、オブジェクトモデル、式評価など）を実装できます。望む場合はそのレベル（どの機能まで）を指示してください。

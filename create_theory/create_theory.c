@@ -1,4 +1,3 @@
-```c
 /* pkginstallgen.c
    Generates toy_ide_pkg containing a concrete hypothesis engine:
     - extracts text/equations from PDFs (pdftotext if available),
@@ -84,4 +83,3 @@ int main(void){
   puts("Created toy_ide_pkg. Run: bash toy_ide_pkg/bin/run.sh");
   return 0;
 }
-```

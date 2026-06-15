@@ -1,10 +1,3 @@
-ä������������ GTK アプリを拡張し、テキストファイルはテキストプレビュー、PDFファイルは最初のページをレンダリングして画像プレビューする機能を追加した C ソースコードです。PDFレンダリングに poppler-glib を利用します。
-
-コンパイル例:
-gcc `pkg-config --cflags gtk+-3.0 poppler-glib` -o hover_preview_pdf hover_preview_pdf.c `pkg-config --libs gtk+-3.0 poppler-glib`
-
-コード:
-```c
 // hover_preview_pdf.c
 #define _GNU_SOURCE
 #include <gtk/gtk.h>
@@ -307,9 +300,3 @@ int main(int argc, char *argv[]) {
   g_free(ad.dirpath);
   return 0;
 }
-```
-
-注意:
-- poppler-glib がインストールされている必要があります（パッケージ名はディストリビューションによる）。
-- PDFレンダリングは最初のページのみで、サイズは PDF_PREVIEW_WIDTH / HEIGHT を上限にして縮小表示します。必要なら複数ページナビや高品質レンダリングの追加が可能です。
-- 実運用ではファイルサイズやレンダリングコストを考慮して非同期レンダリング（スレッドや idle タスクで行う）やデバウンス処理を導入してください。

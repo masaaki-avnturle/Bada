@@ -1,14 +1,3 @@
-承知しました。リクエストどおり、「薬剤生成・検証の機能を一切含まない」ことを明記した上で、同時実装（インタープリタ + コンパイラ→バイトコード + スタックVM + 標準ライブラリ + テスト）を展開するパッケージを生成する C プログラム `pkginstallgen.c` を出力します。
-
-使い方（簡潔）
-1. ファイルを保存: `pkginstallgen.c`  
-2. ビルド: `gcc -std=c99 -O2 -o pkginstallgen pkginstallgen.c`  
-  3. 実行: `./pkginstallgen ./omega_package`  
-4. 生成パッケージ内で `make` → `./build/omega interp usr/share/omega/examples/qsim.os` 等で動作確認可能（雛形・教育用）。
-
-以下が `pkginstallgen.c` の完全ソースです（生成物は教育／研究用の言語処理系雛形であり、危険な化学・生物・薬剤設計機能は一切含みません）：
-
-```c
   /* pkginstallgen.c
    Generate Omega Script full-package skeleton:
    - Interpreter (lexer, parser stub, AST skeleton, evaluator skeleton)
@@ -201,12 +190,3 @@ static int write_file(const char *path, const char *data) {
 		printf("Next: cd %s && make && ./build/omega interp usr/share/omega/examples/qsim.os\n", out);
 		return 0;
     }
-```
-
-必要なら次の作業を進めます：
-- 完全な再帰下降パーサ（BNF に基づく AST を生成）を実装してパッケージへ組み込む。  
-- AST 評価器（関数呼び出し、メソッド呼び出し、例外処理、オブジェクトランタイム）を実装する。  
-- コンパイラ（AST→バイトコード）と VM 命令セットの拡張。  
-- 標準ライブラリの実装（正規表現は POSIX regex でラップ、IO、配列/ハッシュユーティリティ等）。  
-
-どれを優先しますか（短く選択で回答してください）？

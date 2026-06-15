@@ -1,15 +1,3 @@
-了解しました。ではデフォルト（生成先ディレクトリ名 `omega_bio_chem_package`）でパッケージを作る C プログラム `pkginstallgen.c` を出力します。生成物は以下の条件を厳守します：
-- 主目的：教育・可視化・記録。FASTA の読み込み、配列統計、k-mer 頻度、距離行列（等長配列に対するハミング距離）および簡易クラスタ表示（ASCIIツリー）を含む配列解析ツール群。
-- 化学DSL：簡易 SMILES 風の記法を「記述・正規化・表示」するのみ。合成・設計・薬効予測・実験手順等、危険性のある機能は一切含まれません。
-- 明示的に安全制約をREADMEに記載します。
-
-以下をそのままファイル名 `pkginstallgen.c` として保存してコンパイルしてください：
-- ビルド: gcc -std=c99 -O2 -o pkginstallgen pkginstallgen.c
-  - 実行: ./pkginstallgen
-
-（出力は長めの C ソースです）
-
-```c
   /*
  pkginstallgen.c
 

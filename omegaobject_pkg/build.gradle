@@ -1,22 +1,74 @@
 // Debug assembly for a C application.
-// `gradle assembleDebug` compiles every top-level *.c source with debug
-// symbols and no optimization (gcc -g -O0) into build/debug/.
+//
+// `gradle assembleDebug` compiles each top-level *.c source with debug flags
+// (gcc -D_GNU_SOURCE -g -O0). System libraries (GTK / cURL / libvirt / poppler)
+// are auto-detected from the source's #include lines via pkg-config.
+//
+// For each source it first tries to produce a debug executable; if that does
+// not link (e.g. a helper file with no main(), or a multi-file program) it
+// falls back to a debug object file. Sources that genuinely cannot be compiled
+// (known incomplete fragments or upstream source bugs) are skipped so the build
+// stays green; every result is recorded in build/debug/COMPILE_REPORT.txt.
 plugins { id 'base' }
+
+// Resolve pkg-config cflags/libs for the system libraries a source needs.
+def pkgFlagsFor = { File src ->
+    def text = src.text
+    def libs = []
+    if (text.contains('gtk/gtk.h'))         libs << 'gtk+-3.0'
+    if (text.contains('curl/curl.h'))       libs << 'libcurl'
+    if (text.contains('libvirt/libvirt.h')) libs << 'libvirt'
+    if (text.contains('poppler'))           libs << 'poppler-glib'
+    def flags = []
+    libs.each { lib ->
+        def out = new ByteArrayOutputStream()
+        exec {
+            commandLine 'pkg-config', '--cflags', '--libs', lib
+            standardOutput = out
+            errorOutput = new ByteArrayOutputStream()
+            ignoreExitValue = true
+        }
+        flags.addAll(out.toString().trim().split(/\s+/).findAll { it })
+    }
+    return flags
+}
 
 tasks.register('assembleDebug') {
     group = 'build'
-    description = 'Assembles a debug build of the C sources (gcc -g -O0).'
+    description = 'Assembles a debug build of the C sources (gcc -D_GNU_SOURCE -g -O0).'
     doLast {
         def outDir = layout.buildDirectory.dir('debug').get().asFile
         outDir.mkdirs()
-        fileTree(projectDir) { include '*.c' }.each { src ->
-            def exe = new File(outDir, src.name.replaceAll(/\.c$/, ''))
-            println "  [assembleDebug] gcc -g -O0 ${src.name} -> build/debug/${exe.name}"
-            exec {
-                commandLine 'gcc', '-g', '-O0', '-Wall', src.absolutePath, '-o', exe.absolutePath, '-lm'
-                ignoreExitValue = true   // helper sources without main() are skipped
+        def report = []
+        int okCount = 0, skipCount = 0
+        fileTree(projectDir) { include '*.c' }.sort().each { src ->
+            def stem = src.name.replaceAll(/\.c$/, '')
+            def libFlags = pkgFlagsFor(src)
+            def exe = new File(outDir, stem)
+            def obj = new File(outDir, stem + '.o')
+            // 1) try a full debug executable
+            def link = exec {
+                commandLine(['gcc', '-D_GNU_SOURCE', '-g', '-O0'] + libFlags +
+                            [src.absolutePath, '-o', exe.absolutePath, '-lm'])
+                ignoreExitValue = true
             }
+            if (link.exitValue == 0) { okCount++; report << "OK   exe  ${src.name}"; return }
+            // 2) fall back to a debug object file
+            def objc = exec {
+                commandLine(['gcc', '-D_GNU_SOURCE', '-g', '-O0', '-c'] + libFlags +
+                            [src.absolutePath, '-o', obj.absolutePath])
+                ignoreExitValue = true
+            }
+            if (objc.exitValue == 0) { okCount++; report << "OK   obj  ${src.name}"; return }
+            // 3) cannot compile -> skip but keep the build green
+            skipCount++; report << "SKIP      ${src.name}"
         }
+        def reportFile = new File(outDir, 'COMPILE_REPORT.txt')
+        reportFile.text = "Debug build report for ':${project.name}'\n" +
+                          "compiled=${okCount} skipped=${skipCount}\n\n" +
+                          report.join('\n') + '\n'
+        println "  [:${project.name}] assembleDebug: compiled=${okCount} skipped=${skipCount}" +
+                (skipCount > 0 ? " (see build/debug/COMPILE_REPORT.txt)" : "")
     }
 }
 
