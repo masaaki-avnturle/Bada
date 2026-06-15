@@ -18,9 +18,27 @@ cd omega_finance_pkg
 ./gradlew assembleDebug        # → :omega_finance_pkg:assembleDebug だけ実行
 ```
 
-> 注: `gradlew` はリポジトリのルートと各アプリのフォルダにあります。`main` ブランチには無く
-> `claude/gradle-assembledebug-config-ffph0f` ブランチにあるので、`git switch` 後に
+> 注: `gradlew` はリポジトリのルートと各アプリのフォルダにあります。`git switch` 後に
 > 見当たらない場合は `git pull` で最新を取得してください。小文字 `assembledebug` でも動きます。
+
+## Android アプリ（このブランチのみ）
+
+`bada_biofeedback_app` と `bada_morphogenesis_app` は本物の Android アプリ
+（Kotlin + Jetpack Compose / Android Gradle Plugin 8.5.2）で、**独立した Gradle ビルド**です。
+それぞれに Gradle 8.7 のラッパーを同梱しているので、フォルダ内で直接ビルドできます。
+
+```bash
+cd bada_biofeedback_app
+./gradlew assembleDebug         # APK: app/build/outputs/apk/debug/*.apk
+```
+
+ビルドには JDK 17・Android SDK・初回はネットワーク（Gradle 8.7 と依存の取得）が必要です。
+CI（`.github/workflows/build-apk.yml` 等）でも APK をビルドします。
+
+> ルートの `./gradlew`（C/Python 等のマルチプロジェクト）と Android アプリの `./gradlew` は
+> それぞれ独立したビルドです。Android アプリはルートの集約ビルドには含めていません。
+
+## C / Python / Ruby / その他アプリ
 
 - C アプリ … `gcc -D_GNU_SOURCE -g -O0` で各 `*.c` をビルド（まず実行ファイル、ダメなら `.o`）。
   必要なシステムライブラリ（GTK / cURL / libvirt / poppler）は `#include` から自動検出し
