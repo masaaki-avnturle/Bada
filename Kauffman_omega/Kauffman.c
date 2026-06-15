@@ -1,11 +1,3 @@
-了解しました。`print_laurent` と `jones_free`（および `print_jones`）の定義を追加してリンクエラーを解消した完全版 `pkginstallgen.c` を下に示します。以前の機能はそのまま保持しています。ファイルを保存してビルドしてください。
-
-ビルド:
-  gcc -std=c11 -O2 -o pkginstallgen pkginstallgen.c -lm
-
-    ファイル（pkginstallgen.c）:
-
-```c
   /* pkginstallgen.c
    Complete program with print_laurent and jones_free implementations.
    Build:
@@ -178,9 +170,6 @@ typedef struct { int *p,*r; int n; } UF;
 static UF *uf_new(int n){ UF *u = malloc(sizeof(UF)); u->p = malloc(sizeof(int)*n); u->r = malloc(sizeof(int)*n); u->n=n; for(int i=0;i<n;i++){u->p[i]=i;u->r[i]=0;} return u;}
 static void uf_free(UF *u){ if(!u) return; free(u->p); free(u->r); free(u); }
 static int uf_find(UF *u,int x){ return u->p[x]==x?x:(u->p[x]=uf_find(u,u->p[x])); }
-static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a),
-
-    ```c
     static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a), rb=uf_find(u,b); if(ra==rb) return; if(u->r[ra]<u->r[rb]) u->p[ra]=rb; else if(u->r[rb]<u->r[ra]) u->p[rb]=ra; else { u->p[rb]=ra; u->r[ra]++; } }
 
   /* count loops in a given state (used by Kauffman bracket) */
@@ -377,12 +366,6 @@ static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a),
   static int N_ADVS = sizeof(ADVS)/sizeof(ADVS[0]);
   static int N_CONJS = sizeof(CONJS)/sizeof(CONJS[0]);
 
-  static int sample_index_temp(const double *scores, int n, double T) {
-    if (n <= 0) return -1;
-    double maxs = scores[0];
-    for (int i = 1; i < n; ++i) if (scores[i] > maxs) max
-
-      ```c
 							static int sample_index_temp(const double *scores, int n, double T) {
 	  if (n <= 0) return -1;
 	  double maxs = scores[0];
@@ -596,9 +579,6 @@ static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a),
 	    knot_coefH = laurent_coef_entropy(br);
 	    int w = diagram_writhe(cr, ncr);
 	    JonesRep *J = jones_from_bracket(br, w);
-	    if (J) { fprintf(outf
-
-			     ```c
 			     if (J) { fprintf(outf, "Jones polynomial V(t):\n"); print_jones(J, outf); jones_free(J); }
 			     knot_manifoldH = manifold_entropy_heuristic(cr, ncr);
 			     laurent_free(br);
@@ -653,4 +633,3 @@ static void uf_union(UF *u,int a,int b){ int ra=uf_find(u,a),
 	  if (outf != stdout) fclose(outf);
 	  return 0;
 	}
-```

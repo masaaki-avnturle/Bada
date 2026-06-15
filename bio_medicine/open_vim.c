@@ -1,10 +1,3 @@
-以下は、指定したルートディレクトリ（絶対パスを想定）に移動し、そのディレクトリ内で `vim` を起動して指定ファイルを編集する簡単な C プログラムです。指定したディレクトリへ移動できなかった場合はエラーを出力します。端末エミュレータを開いて実行したい場合はコメントにある別方法を参照してください。
-
-使い方:
-./open_vim /path/to/dir filename
-
-コード:
-```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -58,9 +51,3 @@ int main(int argc, char *argv[]) {
     }
     return 0;
 }
-```
-
-注意点:
-- このプログラムは現在の端末で `vim` を起動します（グラフィカル端末エミュレータは開きません）。もし GUI ターミナルを新しく開いて実行したい場合は、例えば `execlp("gnome-terminal", "gnome-terminal", "--", "bash", "-c", "cd /path && exec vim file", NULL)` のように端末コマンドを実行してください（端末により引数は異なります）。
-- 実行前にコンパイル: `gcc -o open_vim open_vim.c`
-- 指定する `target_dir` は絶対パスでも相対パスでも可。バイナリをどの端末から実行するかで挙動が変わります。

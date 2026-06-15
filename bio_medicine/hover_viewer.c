@@ -1,15 +1,3 @@
-以下は、指定フォルダ内のファイル一覧を GTK3 ウィンドウに表示し、ファイル名にマウスをポイント（hover）すると別プロセスで端末エミュレータ（例: `xterm`）を起動してそのファイルの内容（例: 最初の 200 行）を表示する簡易デモアプリケーションの C ソースです。
-
-注意点（重要）
-- 実用的には「ホバーで毎回新しい端末を開く」のは望ましくないので、このサンプルは概念実証です。実際の用途では既存ウィンドウへ表示する、1 つの端末を再利用する、あるいはアプリ内でプレビュー表示する実装にすることを推奨します。
-- このコードは `gtk+-3.0` と `xterm`（または `gnome-terminal` 等）を想定しています。環境に合わせてコマンドを変更してください。
-- ユーザ入力に由来するファイル名でコマンドを直接組み立てる点は注入リスクがあります。実運用時は適切に検証・エスケープしてください。
-
-コンパイル例:
-gcc `pkg-config --cflags gtk+-3.0` -o hover_viewer hover_viewer.c `pkg-config --libs gtk+-3.0`
-
-コード:
-```c
 // hover_viewer.c
 #include <gtk/gtk.h>
 #include <stdlib.h>
@@ -147,11 +135,3 @@ int main(int argc, char *argv[]) {
   gtk_main();
   return 0;
 }
-```
-
-使い方例:
-- コンパイル: gcc `pkg-config --cflags gtk+-3.0` -o hover_viewer hover_viewer.c `pkg-config --libs gtk+-3.0`
-- 実行: ./hover_viewer /path/to/target/folder
-- ウィンドウに表示されたファイル名にマウスをポイントすると、`xterm`（無ければ `gnome-terminal`）が開いてファイルの先頭を表示します。
-
-必要なら、「1 つの端末を再利用する方法」や「アプリ内プレビュー（GtkTextView）での表示」など、より実用的な改良案を提示します。どれを希望しますか？

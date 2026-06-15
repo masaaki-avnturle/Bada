@@ -500,9 +500,11 @@ static ASTNode *parse_primary(Parser *p) {
       ASTNode *e = parse_expression(p);
       n->items = realloc(n->items, sizeof(ASTNode*)*(n->items_len+1)); n->items[n->items_len++] = e;
       nx = curtok(p); if (nx.type==TOK_SYMBOL && strcmp(nx.text,",")==0) { consume(p); nx = curtok(p); continue; }
-	Token rb = curtok(p); if (rb.type==TOK_SYMBOL && strcmp(rb.text,"]")==0) consume(p);
-      return n;
+      break;
     }
+    Token rb = curtok(p); if (rb.type==TOK_SYMBOL && strcmp(rb.text,"]")==0) consume(p);
+    return n;
+  }
     if (t.type==TOK_SYMBOL && strcmp(t.text,"{")==0) {
       consume(p);
       ASTNode *n = ast_new(AST_EXPR_HASH); n->items = NULL; n->items_len = 0;
@@ -1319,5 +1321,4 @@ static ASTNode *parse_primary(Parser *p) {
   - ./noema                 （REPL）
   - ./noema script.noema    （スクリプト実行）
   - ./noema -c script.noema wrapper.c  （Cラッパー生成）
-```
 */

@@ -1,0 +1,112 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# bada — CLI for the Bada/Ruby OmegaChat 分派.
+#
+#   bin/bada repl                       start the chat REPL
+#   bin/bada ask "質問..."              one-shot question (incl. info block)
+#   bin/bada info "質問..."             Thurston/catastrophe/millennium info gen
+#   bin/bada palette                    show the Penrose graphical-notation palette
+#   bin/bada penrose draw.penrose       draw -> auto-compute -> answer + paper + code
+#   bin/bada neural                     train the neural LLM, then REPL
+#   bin/bada train [model.json]         train and save a checkpoint
+#   bin/bada run script.bada            run a Bada language script
+#   bin/bada learn file1 file2 ...      ingest then start REPL
+#   bin/bada xi "text"                  show entropy + manifold invariant
+
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "bada"
+
+CORPUS_DIR = File.expand_path("../corpus", __dir__)
+
+def load_corpus(chat)
+  return unless Dir.exist?(CORPUS_DIR)
+  Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each do |f|
+    chat.learn_file(f)
+  end
+end
+
+cmd = ARGV.shift || "repl"
+
+case cmd
+when "repl"
+  chat = Bada::OmegaChat.new
+  load_corpus(chat)
+  chat.repl
+when "ask"
+  chat = Bada::OmegaChat.new
+  load_corpus(chat)
+  puts chat.ask(ARGV.join(" "))
+when "learn"
+  chat = Bada::OmegaChat.new
+  ARGV.each { |f| chat.learn_file(f) }
+  chat.repl
+when "run"
+  path = ARGV.shift or abort("usage: bada run script.bada")
+  interp = Bada::Interpreter.new
+  interp.run(File.read(path)).each { |line| puts line }
+when "info"
+  # Information generation: Thurston-Perelman placement + catastrophe branching
+  # + millennium theory decomposition for a question.
+  chat = Bada::OmegaChat.new
+  load_corpus(chat)
+  puts chat.info(ARGV.join(" "))
+when "palette"
+  # Show the Roger Penrose graphical-notation palette.
+  puts Bada::Penrose::Palette.render
+when "penrose"
+  # Draw -> auto-compute -> answer + paper + source code.
+  #   bada penrose <drawing-file> [--values vals.json] [--q "question"]
+  require "json"
+  path = ARGV.shift or abort("usage: bada penrose <drawing-file> [--values json] [--q question]")
+  values = {}
+  question = nil
+  until ARGV.empty?
+    case ARGV.shift
+    when "--values" then values = JSON.parse(File.read(ARGV.shift))
+    when "--q" then question = ARGV.shift
+    end
+  end
+  drawing = File.read(path)
+  studio = Bada::Penrose::Studio.new
+  studio.draw(drawing, values: values)
+  puts studio.report(question: question)
+when "xi"
+  text = ARGV.join(" ")
+  s = Bada::Manifold.invariant(text)
+  puts format("text       : %s", text)
+  puts format("entropy H  : %.6f bits", s[:entropy])
+  puts format("manifold M : %.6f  (∬ 1/(x log x)^2)", s[:manifold_integral])
+  puts format("extent N   : %d tokens", s[:extent])
+  puts format("invariant Ξ: %.6f  (β(H+1,M+1)/log(N+1))", s[:invariant])
+when "neural"
+  # Train the from-scratch neural LLM on the corpus, then start the REPL.
+  chat = Bada::NN::NeuralOmegaChat.new(seed: 42)
+  if Dir.exist?(CORPUS_DIR)
+    Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each { |f| chat.learn_file(f) }
+  end
+  ARGV.each { |f| chat.learn_file(f) if File.file?(f) }
+  puts "ニューラルネットワーク学習中…（純Ruby・バックプロップ）"
+  chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
+  chat.repl
+when "train"
+  # Train and save a model checkpoint (Memento) to a JSON file.
+  out = ARGV.shift || "model.json"
+  chat = Bada::NN::NeuralOmegaChat.new(seed: 42)
+  if Dir.exist?(CORPUS_DIR)
+    Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each { |f| chat.learn_file(f) }
+  end
+  chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
+  chat.save(out)
+  puts "saved checkpoint -> #{out}"
+when "version", "-v", "--version"
+  puts "bada #{Bada::VERSION}"
+else
+  warn "unknown command: #{cmd}"
+  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  exit 1
+end

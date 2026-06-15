@@ -1,13 +1,4 @@
-以下は、Noema ランタイムに登録するネイティブ関数 `llm_query(prompt, opts)` の C 実装例です。libcurl を使って外部 LLM エンドポイントへ JSON を POST し、レスポンス本文をそのまま文字列として返します。エンドポイントや API キーは環境変数 `LLM_ENDPOINT` / `LLM_API_KEY` で指定します。レスポンスは「プレーンテキスト」を想定しています（JSON を帰す API の場合はパース処理を追加してください）。
-
-注意：
-- ビルド時に libcurl をリンクしてください（例: -lcurl）。
-- あなたの VM の Value 型と文字列生成関数（ここでは `val_string`）に合わせて調整してください。
-- 第2引数 `opts` は任意で、文字列（JSON 形式）あるいは null を受け取ります。簡易実装のため opts をそのまま JSON に埋め込みます。
-
-コード：
-
-```c
+#include "noema_value.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -121,10 +112,3 @@ static Value *native_llm_query(int argc, Value **argv) {
 /* 登録例（bootstrap 内など）:
        env_set("llm_query", val_func(native_llm_query, 2));
        */
-```
-
-必要なら：
-- API が JSON で応答する場合のパース例（libjson/cJSON を使う実装）や、
-- TLS 証明書やプロキシ設定の追加、
-- 非同期呼び出し（スレッド化）対応、
-を追加で提供します。必要なターゲット環境（Value 構造体定義やビルド方法）を教えてください。

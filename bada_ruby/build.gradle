@@ -1,0 +1,14 @@
+// Debug assembly for the Ruby gem.
+// `gradle assembleDebug` builds the gem into build/debug/.
+plugins { id 'base' }
+
+tasks.register('assembleDebug', Exec) {
+    group = 'build'
+    description = 'Assembles a debug build of the Ruby gem (gem build).'
+    workingDir = projectDir
+    doFirst { file("$projectDir/build/debug").mkdirs() }
+    commandLine 'sh', '-c', 'gem build *.gemspec -o build/debug/bada-debug.gem'
+    ignoreExitValue = true
+}
+
+tasks.named('assemble') { dependsOn 'assembleDebug' }

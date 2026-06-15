@@ -1,6 +1,4 @@
-以下はインタプリタ側に追加する C 実装のネイティブ関数です。標準入力から行を読み取り、改行を除去して `Value*`（文字列）で返します。プロンプト表示も行います。最後に bootstrap に追加する登録行も示します。
-
-```c
+#include "noema_value.h"
 /* readline(prompt) native implementation for Noema */
 /* Requires: val_string(), val_null(), Value type definitions, memory utilities */
 
@@ -45,6 +43,3 @@ static Value *native_readline(int argc, Value **argv){
 /* Registration: add to bootstrap_env() */
 /* env_set("readline", val_func(native_readline, 1)); */
 
-```
-
-注意：

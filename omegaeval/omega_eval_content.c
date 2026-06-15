@@ -1,4 +1,3 @@
-```c
 // pkginstallgen.c
 // Robust generator that emits a safe, diagnostic-enabled Omega-style interpreter.
 // Avoids buffer overflows, duplicate symbol definitions, and handles expressions like
@@ -232,4 +231,3 @@ int main(int argc, char **argv) {
   puts("Run:   ./omega_pkg/omega-bin omega_pkg/examples/sample5.omega");
   return 0;
 }
-```

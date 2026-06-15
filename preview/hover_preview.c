@@ -1,10 +1,3 @@
-以下は、前回の GTK アプリを拡張し、ファイル名にマウスをポイント（hover）またはクリックするとアプリ内のプレビュー領域（GtkTextView）にそのファイル内容を表示する C ソースコードです。外部端末を開かずアプリ内でプレビューするため、安全かつ実用的です。大きなファイル対策として最大文字数を制限しています。
-
-コンパイル例:
-gcc `pkg-config --cflags gtk+-3.0` -o hover_preview hover_preview.c `pkg-config --libs gtk+-3.0`
-
-コード:
-```c
 // hover_preview.c
 #define _GNU_SOURCE
 #include <gtk/gtk.h>
@@ -204,12 +197,3 @@ int main(int argc, char *argv[]) {
   g_free(ad.dirpath);
   return 0;
 }
-```
-
-使い方:
-- コンパイル（再掲）:
-  gcc `pkg-config --cflags gtk+-3.0` -o hover_preview hover_preview.c `pkg-config --libs gtk+-3.0`
-  - 実行:
-  ./hover_preview /path/to/target/folder
-
-必要なら、プレビュー更新の遅延（デバウンス）や検索フィルタ、シンタックスハイライト（GtkSourceView）を追加する改良版も作成します。どれを希望しますか？

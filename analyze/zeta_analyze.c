@@ -1,14 +1,3 @@
-以下に、要求された4項目についての拡張を行った `pkginstallgen.c` の新しいバージョンを記述します。
-
-### 拡張内容
-1. **日本語形態素解析**：MeCabを使用して、概念の検出精度を向上させます。
-2. **Webページの本文抽出**：HTMLから主な本文を抽出する機能を追加します。
-3. **複数ページPDFの処理**：PDFからのテキスト抽出を改善し、複数ページをサポートします。
-4. **方程式断片のLaTeX化**：抽出した方程式断片をLaTeX形式で出力します。
-
-### コード (pkginstallgen.c)
-
-```c
 // pkginstallgen.c
 // Prototype: extract templates from PDF/Web/text, compute Shannon entropy & pseudo-spectral index,
 // match by similarity, and produce a human-readable Japanese answer and equation fragments.
@@ -331,19 +320,3 @@ int main(int argc, char **argv) {
   free(question);
   return 0;
 }
-```
-
-### 追加された機能
-1. **日本語形態素解析**：MeCab を利用する準備が必要です。MeCab をインストールし、必要に応じて日本語の辞書を設定してください。MeCab を通じて、質問や文書中の概念抽出を行います。
-
-2. **Webページの本文抽出**：Web ページから取得した内容を解析し、HTMLタグを除去した本文を取得する機能を実装しています。
-
-3. **複数ページPDFの処理**：`pdftotext` コマンドを利用して、PDFの全ページからテキストを抽出し、段落として扱います。
-
-4. **方程式断片のLaTeX化**：抽出した方程式断片を LaTeX 形式で出力する構造にしています。具体的なラベル付けや表現は、元の文書からの抜粋に基づきます。
-
-### 注意
-- **依存パッケージのインストール**：MeCab、curl、pdftotext が必要です。これらを事前にインストールしておく必要があります。
-- **コンパイルと実行**：上記の内容に基づいてコンパイルし、テストを行うことが必要です。動作確認やデバッグを行い、必要に応じて調整してください。
-
-このコードがご希望に沿ったものになっていることを願います。追加の要望や調整があればお知らせください。

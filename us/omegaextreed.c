@@ -1,20 +1,3 @@
-分かりました。強制終了（クラッシュ）して出力が表示されない原因は、多くの場合メモリ操作や文字列処理の不備、あるいは生成したソースに構文ミスがあることが原因です。以下では生成器を最小限かつ堅牢に書き直し、生成されるランタイムも簡潔で安全な実装にしています。生成後は
-
-1. gcc -o pkginstallgen pkginstallgen.c
-2. ./pkginstallgen
-3. make -C omega_pkg all
-4. ./omega_pkg/omega-bin omega_pkg/examples/objects.omega
-
-を順に実行すれば、例のスクリプト中の puts(NAME); によってそれぞれのオブジェクトだけが次の形式で出力されます。
-
-- array A -> ["one","two","three"]
-- hash H  -> {"alpha":1,"beta":2}
-- list L  -> ("x","y")
-- func F1 -> 100
-
-以下をファイル名 `pkginstallgen.c` として保存してください（上書き推奨）。ビルド・実行手順は先に記載の通りです。
-
-```c
 // pkginstallgen.c
 // Generates omega_pkg. Stable, minimal, avoids crashes.
 // Build: gcc -o pkginstallgen pkginstallgen.c
@@ -186,8 +169,3 @@ int main(void) {
   puts("pkginstallgen: done. Run 'make -C omega_pkg all' then ./omega_pkg/omega-bin omega_pkg/examples/objects.omega");
   return 0;
 }
-```
-
-注意とトラブルシューティング
-- もし make が失敗したら、出力された gcc エラーメッセージをそのまま貼ってください（全文）。生成されたファイルの確認が必要なら `omega_pkg/src/runtime.c` の先頭 200 行を貼ってください。
-- 実行時に何も表示されない場合は、実行コマンドと実行後のシェル出力（エラー含む）を教えてください。
