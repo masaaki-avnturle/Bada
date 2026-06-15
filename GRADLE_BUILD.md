@@ -3,9 +3,24 @@
 このリポジトリの各アプリケーションは Gradle で **デバッグビルド** できます。
 
 ```bash
+# リポジトリのルートから
 ./gradlew assembleDebug                       # 全アプリをデバッグビルド
 ./gradlew :omega_finance_pkg:assembleDebug    # 単一アプリのみ
 ```
+
+### アプリのフォルダの中から実行する
+各アプリのフォルダにも `gradlew` を置いてあるので、フォルダの中から直接実行できます
+（そのアプリだけがビルドされます）。`gradlew` 本体はリポジトリのルートにあり、各フォルダの
+`gradlew` はそこへ転送する薄いラッパーです。
+
+```bash
+cd omega_finance_pkg
+./gradlew assembleDebug        # → :omega_finance_pkg:assembleDebug だけ実行
+```
+
+> 注: `gradlew` はリポジトリのルートと各アプリのフォルダにあります。`main` ブランチには無く
+> `claude/gradle-assembledebug-config-ffph0f` ブランチにあるので、`git switch` 後に
+> 見当たらない場合は `git pull` で最新を取得してください。小文字 `assembledebug` でも動きます。
 
 - C アプリ … `gcc -D_GNU_SOURCE -g -O0` で各 `*.c` をビルド（まず実行ファイル、ダメなら `.o`）。
   必要なシステムライブラリ（GTK / cURL / libvirt / poppler）は `#include` から自動検出し
