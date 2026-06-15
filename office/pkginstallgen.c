@@ -1,3 +1,6 @@
+/* NON-C CONTENT — Office add-in manifest/assets (prose + XML), not a C program.
+   Payload preserved verbatim but excluded from compilation. */
+#if 0
 /*了解しました。単独キーの割当やグローバルフックを使わず、Word の既存機能を壊さない「タスクペイン内で Vim ライクに編集し、選択範囲や段落単位で書式を保持して文書に反映する」Office Add-in（Office.js）パッケージを提供します。ローカルでホストしてサイドロードできる最小実装一式と手順、主要コードを掲載します。
 
 ポイント（要約）
@@ -326,3 +329,8 @@ Notes:
 - あるいは段落マッピング（単語境界でのより正確な割当）や Monaco エディタへの移行、HTTPS ローカルサーバ設定手順（mkcert 等）を詳しく出しますか？
 
 希望を番号か短文で教えてください。
+
+/* defensively close any comment left open by the payload: */ /*
+*/
+#endif
+typedef int bada_noncompiled_placeholder;

@@ -1,3 +1,6 @@
+/* Windows-only module (uses <windows.h>). Compiled only on Windows;
+   on other platforms this is an (empty) translation unit. */
+#if defined(_WIN32)
 /* vim_bindings.c - simple Vim-like handlers with numeric prefix and dd/yy */
 #include <windows.h>
 #include <wchar.h>
@@ -10,3 +13,6 @@ static void do_yy(void){ send_vk(VK_HOME); INPUT a[2]; ZeroMemory(a,sizeof(a)); 
 
 int vim_handle_key(unsigned int vk){ DWORD now = GetTickCount(); if(now - last_time > 800){ blen = 0; numeric_prefix = 0; } last_time = now; if(vk >= 0x30 && vk <= 0x39){ numeric_prefix = numeric_prefix*10 + (vk - 0x30); return 1; } if(blen < 4) buf[blen++] = (WORD)vk; else blen = 0; if(blen >= 2){ if(buf[blen-2]==0x44 && buf[blen-1]==0x44){ int cnt = numeric_prefix?numeric_prefix:1; for(int i=0;i<cnt;i++) do_dd(); numeric_prefix=0; blen=0; return 1; } if(buf[blen-2]==0x59 && buf[blen-1]==0x59){ int cnt = numeric_prefix?numeric_prefix:1; for(int i=0;i<cnt;i++) do_yy(); numeric_prefix=0; blen=0; return 1; } }
     int times = numeric_prefix?numeric_prefix:1; switch(vk){ case 0x48: for(int i=0;i<times;i++) send_vk(VK_LEFT); numeric_prefix=0; blen=0; return 1; case 0x4A: for(int i=0;i<times;i++) send_vk(VK_DOWN); numeric_prefix=0; blen=0; return 1; case 0x4B: for(int i=0;i<times;i++) send_vk(VK_UP); numeric_prefix=0; blen=0; return 1; case 0x4C: for(int i=0;i<times;i++) send_vk(VK_RIGHT); numeric_prefix=0; blen=0; return 1; default: return 0; } }
+
+#endif /* _WIN32 */
+typedef int emacskeys_translation_unit_not_empty;

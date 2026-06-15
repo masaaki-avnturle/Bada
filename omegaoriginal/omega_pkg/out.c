@@ -1,3 +1,7 @@
+/* NON-C CONTENT — Omega-language example generated from examples/objects.omega
+   This file's payload below is NOT C source; it is preserved verbatim
+   but excluded from compilation so the tree builds cleanly. */
+#if 0
 /* parser stub generated from examples/objects.omega */
 /* grammar:*/
 /* Omega-style example derived from the report (uses => and >- forms) */
@@ -65,3 +69,6 @@ Omega::DATABASE[tuplespace] {
 
 
 */
+
+#endif
+typedef int bada_noncompiled_placeholder;
