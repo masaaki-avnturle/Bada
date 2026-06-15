@@ -1,12 +1,3 @@
-以下に、前回のミニVim実装をエラーなくビルドできるように最初から最後まで単一ファイル `pkginstallgen.c` として書き直しました。ncurses（wide 版でなくても可）を使います。ビルド例はファイル末尾に記載しています。
-
-注意：
-- これは教育・プロトタイプ目的の簡易実装です。Vimの全機能は含みません。
-- マルチバイト／Unicode やパフォーマンス向上、細かなVim挙動は未実装です。
-
-保存してビルドしてください。
-
-```c
 /* pkginstallgen.c
  *
  * omega-vim-lite: simplified "mini-Vim" prototype (single-file).
@@ -664,7 +655,6 @@ static void visual_handle(int ch) {
       size_t p = 0;
       for (size_t r = srow; r <= erow && r < b->nlines; ++r) {
 	if (b->lines[r].len) memcpy(acc + p, b->lines[r].data, b->lines[r].len);
-                p += b->lines[r```c
 			      p += b->lines[r].len;
 			      acc[p++] = '\n';
 			      }
@@ -675,6 +665,7 @@ static void visual_handle(int ch) {
 		mode = MODE_NORMAL;
 		clamp_cursor();
 		return;
+      }
       } else if (ch == 'd') {
         size_t srow = visual_srow, scol = visual_scol, erow = cy, ecol = cx;
         if (srow > erow || (srow == erow && scol > ecol)) { size_t t; t = srow; srow = erow; erow = t; t = scol; scol = ecol; ecol = t; }
@@ -816,4 +807,3 @@ static void visual_handle(int ch) {
       free(clipboard);
       return 0;
     }
-```

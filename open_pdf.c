@@ -1,10 +1,3 @@
-以下は、端末上で子プロセスとして `bash` を起動し、指定したルートディレクトリへ移動して指定のアプリケーションで指定 PDF ファイルを開く C プログラムです。
-
-使い方:
-./open_pdf /path/to/dir viewer_app file.pdf
-
-コード:
-```c
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -52,11 +45,3 @@ int main(int argc, char *argv[]) {
   }
   return 0;
 }
-```
-
-コンパイル:
-gcc -o open_pdf open_pdf.c
-
-注意:
-- `viewer_app`（例: `evince`, `xdg-open`, `okular` など）が PATH にあること。
-- このプログラムは現在の端末上で viewer を起動します。GUI ターミナルを新しく開いて実行したい場合は別途端末起動コマンドを使ってください。

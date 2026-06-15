@@ -1,3 +1,6 @@
+/* Windows-only module (uses <windows.h>). Compiled only on Windows;
+   on other platforms this is an (empty) translation unit. */
+#if defined(_WIN32)
 /* remapper.c - main entry for remapper (educational demo)
    Uses emacs_bindings and vim_bindings modules. Loads targets.txt for process filtering.
 */
@@ -38,3 +41,6 @@ int wmain(int argc, wchar_t **argv){ load_targets(); if(g_target_count==0){ g_ta
     if(!g_hHook){ fwprintf(stderr,L"failed to install hook (%lu)\n", GetLastError()); free_targets(); return 1; }
     MSG msg; while(GetMessage(&msg,NULL,0,0)){ TranslateMessage(&msg); DispatchMessage(&msg); }
     UnhookWindowsHookEx(g_hHook); free_targets(); return 0; }
+
+#endif /* _WIN32 */
+typedef int emacskeys_translation_unit_not_empty;
