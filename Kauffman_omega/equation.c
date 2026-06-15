@@ -1,3 +1,5 @@
+#include "report_ask.h"
+
   int main(int argc, char **argv) {
   if (argc < 2) {
     fprintf(stderr, "Usage: %s question.txt [source1.pdf|source2.txt|https://... ...]\n", argv[0]);

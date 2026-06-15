@@ -1,27 +1,3 @@
-以下は、要求どおり「提出したレポートから『何ができるのか』等の多様な質問に対して、可能な限り自動で答える」機能を含むパッケージ骨格を生成する C プログラム `pkginstallgen.c` です。
-
-特徴（要点）
-- 実行すると指定ディレクトリにパッケージ骨格を生成します（bin/, etc/, usr/share/omega/ 等）。
-- 生成されるスクリプトには：
-  - テキスト／TeX から節・文・式を抽出する `extract_sections.py`
-  - レポートの能力（What can be done / 何が出来るか）を推定して複数の質問に回答する `qa_engine.py`
-  - 質問生成器 `question_gen.py`
-  - 簡易生成AIフック（テンプレート＋ルール／マルコフ） `gen_ai.py`
-- QA エンジンはルールベース＋キーワード照合＋エントロピー・情報量に基づくヒューリスティック抽出で応答を生成。外部 LLM を利用するオプションフックを用意（API 呼び出しやローカルモデルは利用者環境で設定）。
-- 出力される回答は可能な限り根拠（該当スニペットの参照）を添えます。論理的検証や高度な推論は外部ツール／人間の検証が必要です。
-
-保存してコンパイル（例）
-- gcc -std=c99 -O2 -o pkginstallgen pkginstallgen.c
-- ./pkginstallgen ./omega_qa_package
-
-生成後の簡単な実行例
-- python3 ./omega_qa_package/bin/extract_sections.py report.txt sections.txt
-- python3 ./omega_qa_package/bin/question_gen.py sections.txt questions.txt
-- python3 ./omega_qa_package/bin/qa_engine.py report.txt questions.txt answers.txt
-
-以下が `pkginstallgen.c` の完全ソースです。保存してコンパイル・実行してください。
-
-```c
   /* pkginstallgen.c
    Generate a package skeleton that provides:
     - section/formula extraction from reports
@@ -144,21 +120,9 @@ snprintf(buf, sizeof(buf), "%s/package/src", out); mkdir_p(buf);
 	 }
 #endif
 
-	 printf(\"Omega QA package created at: %s\\n\", out);
-	 printf(\"Examples:\\n  python3 %s/bin/extract_sections.py report.txt %s/sections.txt\\n\", out, out);
-	 printf(\"  python3 %s/bin/question_gen.py %s/sections.txt %s/questions.txt\\n\", out, out, out);
-	 printf(\"  python3 %s/bin/qa_engine.py report.txt %s/questions.txt %s/answers.txt\\n\", out, out, out);
+	 printf("Omega QA package created at: %s\n", out);
+	 printf("Examples:\n  python3 %s/bin/extract_sections.py report.txt %s/sections.txt\n", out, out);
+	 printf("  python3 %s/bin/question_gen.py %s/sections.txt %s/questions.txt\n", out, out, out);
+	 printf("  python3 %s/bin/qa_engine.py report.txt %s/questions.txt %s/answers.txt\n", out, out, out);
 	 return 0;
 	 }
-```
-
-注意（重要・簡潔）
-- 提供する QA はヒューリスティックな自動処理です。高度な証明、厳密な検証、あるいはモデル化・再現実験は人間の検証や専門ツール（SymPy/Sage/Coq/Lean/外部 LLM 等）で補強してください。
-- 外部 LLM を使う場合は API キー管理・利用規約を遵守してください。パッケージは外部呼び出しのフックを用意するにとどめ、本体モデルは含みません。
-
-必要なら：
-- QA エンジンの改善案（日本語形態素解析、TF-IDF / embedding ベース類似度、外部 LLM 統合サンプル）
-- 生成されるスクリプト群の説明ドキュメント（関数ごとの振る舞い）
-- テスト用のサンプルレポートと期待出力（questions/answers の例）
-
-どれを出力するか指示してください。

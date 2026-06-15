@@ -29,25 +29,30 @@ sudo apt-get install -y libgtk-3-dev libcurl4-openssl-dev libvirt-dev libpoppler
 
 未インストールでも該当ファイルが SKIP されるだけで、ビルド自体は成功します。
 
-## まだコンパイルできないソース（11ファイル）
+## コンパイル状況：54/54 すべて成功 ✅
 
-以下はソース側の事情で単独コンパイルできないため、`assembleDebug` では **SKIP**（報告のみ）
-しています。修正には設計上の判断が必要なため、原本のまま残しています。
+全ての C ソースがコンパイルできます（`compiled=54 skipped=0`）。
+以前コンパイルできなかった 11 ファイルは次のように修正しました。
 
-### 不完全な断片（共有ヘッダ／型に依存。単独では完結しない）
-- `Kauffman_omega/equation.c` — `main()` の断片。`#include` が無く、他ファイルの補助関数を参照
-- `noema_system/llm_qury.c` — omega VM の型 `Value` を参照（ヘッダ未提供）
-- `noema_system/readline.c` — 同上 `Value`
-- `noema_system/set_env.c` — 同上 `Value`
-- `omega_language/lex_lang.c` — 型 `Lexer` を参照
+### 不完全な断片 → 共有ヘッダを追加
+型や補助関数の定義が他ファイルにあった断片に、必要な型・プロトタイプを宣言する
+ヘッダを新設して取り込みました。
 
-### 生成物の破損（説明文・markdown 断片や文字列のエスケープ崩れが混入）
-- `Kauffman_omega/Kauffman.c` — 説明文とコードブロックが複数入り混じっている
-- `neovim/omega-vim.c` — 行の途中に ```` ```c ```` が混入し波括弧が不整合
-- `vim-neo/omega-neo.c` — 同上
-- `noema_system/noema_read.c` — 関数の入れ子／波括弧の構造崩れ
-- `omega_qa_package/omega_qa_pkg.c` — 文字列中の不正なバックスラッシュ
-- `omegastreem/omegastreem_pkg.c` — 文字列リテラルが未エスケープの `"` を含むソースを埋め込み
+- `noema_system/noema_value.h` — `Value` 型・タグ・`val_*` / `env_set` を宣言
+  → `llm_qury.c` / `readline.c` / `set_env.c` が利用
+- `omega_language/omega_lang.h` — `Token` / `Lexer` / `Ex` / `Parser` ・`TK_*` ・
+  レキサ/パーサ補助関数を宣言 → `lex_lang.c` が利用
+- `Kauffman_omega/report_ask.h` — `equation.c`（`main()` 断片）が呼ぶ補助関数の
+  プロトタイプと定数（`BUF_CHUNK` 等）を宣言
 
-> 残り 43/54 の C ソースは、先頭に混入していた markdown フェンス（```` ```c ````）や日本語
-> 説明文を除去することでコンパイルできるようになりました。
+### 生成物の破損 → 壊れた文字列・行を再生成
+- `omegastreem/omegastreem_pkg.c` — 文字列リテラル内の未エスケープ `'"'` を `'\"'` に修正
+- `omega_qa_package/omega_qa_pkg.c` — 実コードの `printf` 文が過剰エスケープ（`\"`）→ 1段アンエスケープ
+- `noema_system/noema_read.c` — リスト `[` パーサで欠落していた `}` を補い構造を修復
+- `neovim/omega-vim.c` / `vim-neo/omega-neo.c` — 行に混入した ```` ```c ```` で分断された
+  行（`p += b->lines[r].len;`）を再生成し、visual モードハンドラの欠落 `}` を補完
+- `Kauffman_omega/Kauffman.c` — ```` ```c ```` で挿入された切り詰め重複ブロックを除去し
+  完全版を採用
+
+> 先頭に混入していた markdown フェンス（```` ```c ````）や日本語説明文の除去も併用しています。
+> ビルドは引き続き、万一コンパイルできないソースがあっても SKIP して green になります。

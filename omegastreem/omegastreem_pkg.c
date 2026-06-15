@@ -147,7 +147,7 @@ int main(void) {
     "#endif",
     "",
     "/* read quoted string starting at '\"' and advance p */",
-    "static char *read_quoted(const char **pp){ const char *p=*pp; while(*p && *p!='"' ) ++p; if(!*p) return NULL; p++; size_t cap=64; char *buf=malloc(cap); if(!buf) return NULL; size_t n=0; while(*p && *p!='"'){ char c=*p++; if(c=='\\\\' && *p){ char e=*p++; if(e=='n') c='\\n'; else if(e=='t') c='\\t'; else c=e; } if(n+1>=cap){ cap*=2; char *t=realloc(buf,cap); if(!t){ free(buf); return NULL; } buf=t; } buf[n++]=c; } buf[n]=0; if(*p=='\"') ++p; *pp=p; return buf; }",
+    "static char *read_quoted(const char **pp){ const char *p=*pp; while(*p && *p!='\"' ) ++p; if(!*p) return NULL; p++; size_t cap=64; char *buf=malloc(cap); if(!buf) return NULL; size_t n=0; while(*p && *p!='\"'){ char c=*p++; if(c=='\\\\' && *p){ char e=*p++; if(e=='n') c='\\n'; else if(e=='t') c='\\t'; else c=e; } if(n+1>=cap){ cap*=2; char *t=realloc(buf,cap); if(!t){ free(buf); return NULL; } buf=t; } buf[n++]=c; } buf[n]=0; if(*p=='\"') ++p; *pp=p; return buf; }",
     "",
     "/* print object specified by name only */",
     "static int print_object_by_name(const char *name){ for(ArrayObj *a=arrays;a;a=a->next){ if(a->name && strcmp(a->name,name)==0){ putchar('['); StrNode *it=a->items; int first=1; while(it){ if(!first) putchar(','); printf(\"\\\"%s\\\"\", it->s); first=0; it=it->next; } puts(\"]\"); return 1; } }",
