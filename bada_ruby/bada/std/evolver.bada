@@ -1,0 +1,45 @@
+# evolver.bada — 自己進化する亜種ChatGPT：ソースコード自体の生成AI。
+# 各世代は量子BIOS+NPU+微小管の FPGA SoC（亜種ChatGPT）を生成し、ChatGPT分派で評価し、
+# 多様体不変量 Ξ（フィットネス）で回路を進化させ、テロメアを1短縮して、自分の
+# 「自己進化版ソースコード」(organism_gen_N.bada) を書き出す。テロメア枯渇で老化。
+
+import "std/quantum_npu.bada"
+import "std/telomere.bada"
+
+library Evolver
+  # 次世代の自己進化版ソースコード（実行すると Verilog を生成し、さらに進化する）
+  def organism_source(qubits, width, telomere, gen)
+    let q <- "\""
+    let s <- "# organism gen " + str(gen) + " — 自己進化する亜種ChatGPT (量子BIOS+NPU+微小管)" + FPGA.nl()
+    s = s + "# テロメア=" + str(telomere) + " / 世代=" + str(gen) + "（このソース自体が次世代を生成する）" + FPGA.nl()
+    s = s + "import " + q + "std/evolver.bada" + q + FPGA.nl()
+    s = s + "Evolver.live(" + str(qubits) + ", " + str(width) + ", " + str(telomere) + ", " + str(gen) + ")" + FPGA.nl()
+    return s
+  end
+
+  # 進化的変異：フィットネス Ξ で qubit/NPU幅を成長、テロメアを1短縮
+  def mutate(qubits, width, telomere, gen, fitness)
+    let nq <- qubits + 2 + floor(fitness * 30)
+    let nw <- width + 4
+    let nt <- Telo.divide(telomere)
+    return [nq, nw, nt, gen + 1]
+  end
+
+  # 1世代を「生きる」：SoC Verilog を生成し、評価し、次世代ソースを書き出す
+  def live(qubits, width, telomere, gen)
+    let soc <- QNPU.soc(qubits, width)
+    write_file("organism_gen_" + str(gen) + ".v", soc)
+    let fitness <- Manifold.xi(soc)
+    print "── 世代 " + str(gen) + " ──  qubits=" + str(qubits) + "  NPU幅=" + str(width) + "  テロメア=" + str(telomere) + "  Ξ=" + str(fitness)
+    print "  亜種ChatGPT(分派)評価: " + Chat.line("第" + str(gen) + "世代の量子BIOS+NPU FPGA回路を一言で")
+    if Telo.alive(telomere)
+      arr nx <- mutate(qubits, width, telomere, gen, fitness)
+      let nsrc <- organism_source(at(nx, 0), at(nx, 1), at(nx, 2), at(nx, 3))
+      write_file("organism_gen_" + str(at(nx, 3)) + ".bada", nsrc)
+      print "  自己進化 → organism_gen_" + str(at(nx, 3)) + ".bada  (テロメア " + str(telomere) + "→" + str(at(nx, 2)) + ")"
+      return nx
+    end
+    print "  老化（ヘイフリック限界）：分裂停止 / senescence"
+    return [qubits, width, 0 - 1, gen]
+  end
+end

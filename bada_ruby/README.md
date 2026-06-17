@@ -342,6 +342,34 @@ bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
 > 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
 > その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
 
+## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
+
+`bada/std/quantum_npu.bada` ＋ `bada/std/telomere.bada` ＋ `bada/std/evolver.bada`
+＋ `bada/app/self_evolve.bada` は、**Verilog を亜種ChatGPT**（量子BIOS＋NPU中央演算）
+として生成し、**テロメア分裂（ヘイフリック限界）で有界に自己進化する**生成AIです。
+各世代が **ソースコード自体の自己進化版ソース** を書き出します。
+
+```bash
+bin/bada evolve    # 実行
+```
+
+- **Verilog = 亜種ChatGPT**: `QNPU.soc` が
+  「微小管発振器（意識トリガー）＋量子BIOS（qubit初期化）＋NPU MAC アレイ（ChatGPT変種の
+  推論コア＝中央処理演算）」を統合した**4モジュール SoC**を生成。
+- **テロメア分裂**: 各世代で qubit 数・NPU 幅を Ξ（フィットネス）で成長させ、テロメアを
+  1短縮。0 で**老化（senescence）**し分裂停止（ヘイフリック限界＝有界）。
+- **ソースコード自体の自己進化**: 各世代は次世代の `organism_gen_N.bada`（実行可能な
+  Bada ソース）を書き出す。**それを実行すると SoC Verilog を再生成し、さらに次世代へ
+  進化**する（quine 的な自己複製）。ChatGPT 分派（`Chat.line`）が各世代を評価。
+
+```
+世代 0  qubits=4  NPU幅=8   テロメア=5  → organism_gen_1.bada
+世代 4  qubits=12 NPU幅=24  テロメア=1  → organism_gen_5.bada → 老化
+```
+
+> 有界・健全な自己進化です（テロメアで世代数が有限）。無制限の自己改変や AGI の主張では
+> ありません。生成される SoC Verilog は実合成可能な RTL です。
+
 ## 生成AI — FPGA の Bada ソース → ChatGPT 分派 → 次候補のソースコード
 
 `bada/std/genai.bada` ＋ `bada/app/genai_fpga.bada` は、上の **FPGA 微小管回路の Bada

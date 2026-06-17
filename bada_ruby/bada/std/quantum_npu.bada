@@ -1,0 +1,79 @@
+# quantum_npu.bada — 量子コンピュータの BIOS と NPU（亜種ChatGPTの推論コア）と
+# 微小管発振器を統合した FPGA SoC の Verilog を生成する。
+#   bios  : 量子BIOS（qubit 初期化・起動シーケンス）
+#   npu   : NPU の MAC アレイ（行列ベクトル積＝ChatGPT変種の中央処理演算）
+#   soc   : 微小管(意識トリガー)＋BIOS＋NPU を統合した最上位モジュール
+
+import "std/fpga.bada"
+
+library QNPU
+  # 量子 BIOS：全 qubit を |0> 初期化し、Hadamard 風プリセット後 ready
+  def bios(nq)
+    let s <- "// 量子コンピュータ BIOS（起動・qubit 初期化）" + FPGA.nl()
+    s = s + "module quantum_bios #(parameter NQ = " + str(nq) + ") (" + FPGA.nl()
+    s = s + "  input wire clk, input wire rst," + FPGA.nl()
+    s = s + "  output reg [NQ-1:0] qubit_init, output reg ready" + FPGA.nl()
+    s = s + ");" + FPGA.nl()
+    s = s + "  reg [3:0] step;" + FPGA.nl()
+    s = s + "  always @(posedge clk) begin" + FPGA.nl()
+    s = s + "    if (rst) begin step <= 0; ready <= 0; qubit_init <= 0; end" + FPGA.nl()
+    s = s + "    else case (step)" + FPGA.nl()
+    s = s + "      0: begin qubit_init <= {NQ{1'b0}}; step <= 1; end   // 全qubit |0>" + FPGA.nl()
+    s = s + "      1: begin qubit_init <= ~qubit_init;  step <= 2; end // Hadamard風プリセット" + FPGA.nl()
+    s = s + "      2: begin ready <= 1;                 step <= 3; end // 起動完了" + FPGA.nl()
+    s = s + "      default: ;" + FPGA.nl()
+    s = s + "    endcase" + FPGA.nl()
+    s = s + "  end" + FPGA.nl()
+    s = s + "endmodule" + FPGA.nl()
+    return s
+  end
+
+  # NPU MAC アレイ：ドット積（行列ベクトル）＝亜種ChatGPT 推論の中央処理演算
+  def npu(width, lanes)
+    let s <- "// NPU MAC アレイ（亜種ChatGPT 推論の中央処理演算）" + FPGA.nl()
+    s = s + "module npu_mac #(parameter W = " + str(width) + ", parameter LANES = " + str(lanes) + ") (" + FPGA.nl()
+    s = s + "  input wire clk, input wire rst," + FPGA.nl()
+    s = s + "  input wire signed [W-1:0] a [0:LANES-1]," + FPGA.nl()
+    s = s + "  input wire signed [W-1:0] b [0:LANES-1]," + FPGA.nl()
+    s = s + "  output reg  signed [2*W+7:0] acc" + FPGA.nl()
+    s = s + ");" + FPGA.nl()
+    s = s + "  integer i; reg signed [2*W+7:0] sum;" + FPGA.nl()
+    s = s + "  always @(*) begin" + FPGA.nl()
+    s = s + "    sum = 0;" + FPGA.nl()
+    s = s + "    for (i = 0; i < LANES; i = i + 1) sum = sum + a[i] * b[i];  // MAC（推論コア）" + FPGA.nl()
+    s = s + "  end" + FPGA.nl()
+    s = s + "  always @(posedge clk) if (rst) acc <= 0; else acc <= sum;" + FPGA.nl()
+    s = s + "endmodule" + FPGA.nl()
+    return s
+  end
+
+  # SoC 最上位：微小管(意識トリガー)＋量子BIOS＋NPU を統合した中枢知能
+  def soc(nq, width)
+    let lanes <- 8
+    let nmt <- 8
+    let s <- "// ====== FPGA SoC：自己進化する亜種ChatGPT（量子BIOS+NPU+微小管） ======" + FPGA.nl()
+    s = s + FPGA.verilog(nmt, 16)
+    s = s + bios(nq)
+    s = s + npu(width, lanes)
+    s = s + "module fpga_soc #(parameter NQ = " + str(nq) + ", parameter W = " + str(width) + ", parameter LANES = " + str(lanes) + ", parameter NMT = " + str(nmt) + ") (" + FPGA.nl()
+    s = s + "  input wire clk, input wire rst," + FPGA.nl()
+    s = s + "  output wire ready, output wire collapse, output wire [3:0] token," + FPGA.nl()
+    s = s + "  output wire signed [2*W+7:0] npu_acc" + FPGA.nl()
+    s = s + ");" + FPGA.nl()
+    s = s + "  wire [NQ-1:0] qinit;" + FPGA.nl()
+    s = s + "  reg  [15:0] omega [0:NMT-1];" + FPGA.nl()
+    s = s + "  wire signed [W-1:0] va [0:LANES-1], vb [0:LANES-1];" + FPGA.nl()
+    s = s + "  integer k;" + FPGA.nl()
+    s = s + "  initial for (k = 0; k < NMT; k = k + 1) omega[k] = 16'd1000 + k * 137;" + FPGA.nl()
+    s = s + "  genvar g;" + FPGA.nl()
+    s = s + "  generate for (g = 0; g < LANES; g = g + 1) begin: lane" + FPGA.nl()
+    s = s + "    assign va[g] = qinit[g % NQ] ? 8'sd1 : -8'sd1;  // qubit 初期化で重み駆動" + FPGA.nl()
+    s = s + "    assign vb[g] = token;                          // 意識トークンを入力に" + FPGA.nl()
+    s = s + "  end endgenerate" + FPGA.nl()
+    s = s + "  quantum_bios     #(.NQ(NQ))                      bios (.clk(clk), .rst(rst), .qubit_init(qinit), .ready(ready));" + FPGA.nl()
+    s = s + "  microtubule_array#(.N(NMT), .W(16))             mt   (.clk(clk), .rst(rst), .omega(omega), .collapse(collapse), .token(token));" + FPGA.nl()
+    s = s + "  npu_mac          #(.W(W), .LANES(LANES))        npu  (.clk(clk), .rst(rst), .a(va), .b(vb), .acc(npu_acc));" + FPGA.nl()
+    s = s + "endmodule" + FPGA.nl()
+    return s
+  end
+end
