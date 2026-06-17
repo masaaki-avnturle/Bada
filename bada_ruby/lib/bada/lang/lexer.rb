@@ -9,11 +9,19 @@ module Bada
     class Lexer
       KEYWORDS = %w[let def end if elsif else while return print import library true false and or not nil].freeze
 
-      def initialize(source)
+      # Default surface-keyword -> canonical-role map (identity). A dialect
+      # supplies an extended map so an aliased surface word (e.g. "関数") lexes
+      # to the canonical role token (:def) the parser already understands.
+      def self.base_keyword_map
+        KEYWORDS.each_with_object({}) { |k, h| h[k] = k.to_sym }
+      end
+
+      def initialize(source, keyword_map: nil)
         @s = source
         @i = 0
         @line = 1
         @tokens = []
+        @kw = keyword_map || Lexer.base_keyword_map
       end
 
       def tokenize
@@ -48,8 +56,10 @@ module Bada
       def advance = (@i += 1)
       def push(t, v) = (@tokens << Token.new(t, v, @line))
       def digit?(c) = c =~ /[0-9]/
-      def ident_start?(c) = c =~ /[A-Za-z_]/
-      def ident_char?(c) = c =~ /[A-Za-z0-9_]/
+      # identifiers may include any non-ASCII (UTF-8) char, so a dialect can use
+      # Japanese keywords / identifiers (e.g. 関数, 表示).
+      def ident_start?(c) = (c =~ /[A-Za-z_]/) || c.ord >= 0x80
+      def ident_char?(c) = (c =~ /[A-Za-z0-9_]/) || c.ord >= 0x80
 
       def skip_to_eol
         advance until eof? || cur == "\n"
@@ -103,8 +113,8 @@ module Bada
           buf << cur
           advance
         end
-        if KEYWORDS.include?(buf)
-          push(buf.to_sym, buf)
+        if (role = @kw[buf])
+          push(role, buf)        # canonical role token (dialect alias resolved)
         else
           push(:ident, buf)
         end

@@ -9,8 +9,8 @@ module Bada
     class Parser
       include AST
 
-      def self.parse(source)
-        new(Lexer.new(source).tokenize).parse_program
+      def self.parse(source, keyword_map: nil)
+        new(Lexer.new(source, keyword_map: keyword_map).tokenize).parse_program
       end
 
       def initialize(tokens)
