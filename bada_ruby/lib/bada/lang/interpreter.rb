@@ -40,6 +40,13 @@ module Bada
     # A user-defined Bada function (closure).
     Function = Struct.new(:name, :params, :body, :closure)
 
+    # A first-class native callable (a builtin or a bound foreign-module method),
+    # so imported Ruby/Python/C functions can be passed directly as directive
+    # branch / merge directives.
+    NativeFn = Struct.new(:fn, :name) do
+      def to_s = "<fn #{name}>"
+    end
+
     # Non-local return.
     class ReturnSignal < StandardError
       attr_reader :value
@@ -119,8 +126,12 @@ module Bada
       def resolve_ident(name, env)
         found, val = env.lookup(name)
         return val if found
+        # builtins are first-class: a bare builtin name yields a callable value
+        return NativeFn.new(@natives[name], name) if @natives.key?(name)
         raise "Bada: undefined variable '#{name}'"
       end
+
+      def callable?(v) = v.is_a?(Function) || v.is_a?(NativeFn)
 
       def define_function(node, env)
         fn = Function.new(node.name, node.params, node.body, env)
@@ -212,9 +223,9 @@ module Bada
       def directive_branch(l, r)
         d = as_directive(l)
         lanes =
-          if r.is_a?(Function)
+          if callable?(r) # function / builtin / foreign method
             d.lanes.map { |x| call_function(r, [x]) }
-          elsif r.is_a?(Array) && !r.empty? && r.all? { |e| e.is_a?(Function) }
+          elsif r.is_a?(Array) && !r.empty? && r.all? { |e| callable?(e) }
             d.lanes.flat_map { |x| r.map { |f| call_function(f, [x]) } }
           elsif r.is_a?(Array)
             r.dup
@@ -232,7 +243,7 @@ module Bada
       def directive_merge(l, r)
         d = as_directive(l)
         return d.lanes.dup if r.nil?
-        raise "Bada: >- needs a 2-arg merge directive" unless r.is_a?(Function)
+        raise "Bada: >- needs a 2-arg merge directive" unless callable?(r)
         return nil if d.lanes.empty?
         d.lanes.reduce { |acc, x| call_function(r, [acc, x]) }
       end
@@ -245,12 +256,12 @@ module Bada
         end
         if callee.is_a?(Ident)
           found, val = env.lookup(callee.name)
-          return call_function(val, args) if found && val.is_a?(Function)
+          return call_function(val, args) if found && callable?(val)
           return @natives[callee.name].call(*args) if @natives.key?(callee.name)
           raise "Bada: undefined function '#{callee.name}'"
         end
         fnval = eval_node(callee, env)
-        return call_function(fnval, args) if fnval.is_a?(Function)
+        return call_function(fnval, args) if callable?(fnval)
         raise "Bada: not callable"
       end
 
@@ -267,6 +278,7 @@ module Bada
       end
 
       def call_function(fn, args)
+        return fn.fn.call(*args) if fn.is_a?(NativeFn) # builtin / foreign method
         local = Env.new(fn.closure)
         fn.params.each_with_index { |p, i| local.define(p, args[i]) }
         result = nil
@@ -278,7 +290,14 @@ module Bada
         result
       end
 
+      # `Mod.method` without a call yields a first-class bound callable, so an
+      # imported foreign method can be used directly as a directive.
       def eval_member_value(node, _env)
+        if node.obj.is_a?(Ident) && @modules.key?(node.obj.name)
+          mod = node.obj.name
+          meth = node.name
+          return NativeFn.new(->(*args) { call_module(mod, meth, args) }, "#{mod}.#{meth}")
+        end
         raise "Bada: '#{node.name}' on #{node.obj.inspect} is only valid as a call"
       end
 

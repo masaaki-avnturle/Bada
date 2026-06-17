@@ -498,6 +498,25 @@ import "std/flow.bada"
 Flow.mapreduce([1,2,3,4], def(k) return P.sqrt(k) end, def(a,b) return a+b end)  # Σ√k
 ```
 
+### 指示指向オブジェクトとの併用（外部関数は第一級ディレクティブ）
+
+取り込んだ Ruby/Python/C の関数とビルトインは**第一級の callable 値**なので、ラムダで
+包まずに **分岐 `-<` / 合流 `>-` のディレクティブに直接**渡せます。
+
+```
+import "ruby:Math as M"
+import "python:math as P"
+import "c:m as LibM"
+import "std/flow.bada"
+def add(a, b) return a + b end
+
+Flow.seed([1,4,9,16]) -< M.sqrt      >- add   # Σ√k (Ruby)   = 10
+Flow.seed([1,2,3,4])  -< P.factorial >- add   # Σk! (Python) = 33
+Flow.seed([2,3,4,5])  -< LibM.tgamma >- add   # ΣΓ(k) (C)    = 33
+Flow.seed([4])        -< [M.sqrt, LibM.tgamma] >- add   # fanout = 8
+Flow.seed([1,4,9,16]) -< sqrt        >- add   # builtin も第一級 = 10
+```
+
 > 注: FFI は外部コードをローカルで実行します（任意の FFI と同様）。信頼できるライブラリで利用してください。
 
 ## Bada 言語そのもの — ライブラリもアプリも Bada で記述

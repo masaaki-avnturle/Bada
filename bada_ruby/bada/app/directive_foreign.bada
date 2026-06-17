@@ -1,0 +1,38 @@
+# directive_foreign.bada — 指示指向オブジェクトを外部ライブラリに適応。
+# 取り込んだ Ruby/Python/C の関数を、分岐 -< / 合流 >- のディレクティブに「直接」渡す
+# （ラムダで包む必要なし。外部メソッドとビルトインは第一級の callable）。
+
+import "ruby:Math as M"
+import "python:math as P"
+import "c:m as LibM"
+import "std/flow.bada"
+
+def add(a, b)
+  return a + b
+end
+def maxd(a, b)
+  if a > b
+    return a
+  end
+  return b
+end
+
+print "──── 外部関数 × 指示指向オブジェクト ────"
+
+# 各レーンを Ruby の Math.sqrt で分岐し、和で合流
+print "Σ√k (Ruby Math.sqrt)      = " + str(Flow.seed([1, 4, 9, 16]) -< M.sqrt >- add)
+
+# Python の factorial を各レーンに分岐
+print "Σk! (Python factorial)    = " + str(Flow.seed([1, 2, 3, 4]) -< P.factorial >- add)
+
+# C の tgamma を各レーンに分岐、最大で合流
+print "max tgamma (C libm)       = " + str(Flow.seed([2, 3, 4, 5]) -< LibM.tgamma >- maxd)
+
+# 複数の外部関数へファンアウト（lanes が増える）
+print "fanout [√, Γ] of 4        = " + str(Flow.seed([4]) -< [M.sqrt, LibM.tgamma] >- add)
+
+# ビルトインも第一級ディレクティブ
+print "Σ√k (builtin sqrt)        = " + str(Flow.seed([1, 4, 9, 16]) -< sqrt >- add)
+
+# 名前付き/条件分岐レーンと外部関数の併用
+print "filter even → Python sqrt = " + str(Flow.filter([1, 2, 3, 4, 5, 6], def(x) return mod(x, 2) == 0 end) -< P.sqrt >- add)

@@ -48,6 +48,7 @@ check "cfn double tgamma" "C tgamma(5)     = 24" "$OUT"
 check "cint string strlen" "C strlen(hello) = 5" "$OUT"
 check "cint int abs" "C abs(-7)       = 7" "$OUT"
 check "cstr getenv" "C getenv(HOME)  = " "$OUT"
+check "FFI fn as directive" "Σtgamma C-FFI   = 33" "$OUT"
 
 echo "== objects (classes/objects are cons-lists) =="
 OUT="$(./bada run examples/objects.bada)"
