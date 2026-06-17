@@ -342,6 +342,52 @@ bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
 > 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
 > その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
 
+## 構文オブジェクト — 配列・範囲・添字・ハッシュ・型付き宣言・ループ
+
+指示指向オブジェクトの上に、配列／ハッシュ／範囲／添字／型付き宣言／ループ構文を追加。
+
+```bash
+bin/bada syntax    # デモ実行
+```
+
+```
+arr x <- [1..5]            # 配列（範囲リテラル [a..b]）→ [1,2,3,4,5]
+print x[0]                  # 添字 → 1
+print x[1..3]               # スライス → [2,3,4]
+
+has cfg <- {width: 80, height: 24}   # ハッシュ（bareword キー = 文字列）
+print cfg["width"]          # キー添字 → 80
+print keys(cfg)             # → [width, height]
+
+let int n <- 42             # 型付き宣言（型はヒント、<- は代入オブジェクト）
+let str s <- "hello,world"  # → hello,world
+
+# 分岐ループ：配列を分岐(-<)してから loop で各レーンを処理
+arr r <- [1..5]
+let squared <- r -< def(x) return x * x end   # <| 1, 4, 9, 16, 25 |>
+loop v in squared -> p(v)                       # 1 4 9 16 25 を出力
+
+# 配列はそのまま指示オブジェクト（分岐→合流）
+print [1..5] -< def(x) return x * x end >- def(a, b) return a + b end   # 55
+
+loop kv in cfg              # ハッシュ走査（[キー, 値] でレーン）
+  print str(kv[0]) + " => " + str(kv[1])
+end
+```
+
+| 構文 | 意味 |
+|:--|:--|
+| `arr x <- expr` / `has x <- expr` | 配列／ハッシュ宣言（型を緩く検証、`<-` は代入オブジェクト） |
+| `let [型] x <- expr` | 型付き宣言（`int`/`str` 等はヒント、`<-` か `=`） |
+| `[a..b]` | 範囲リテラル → 配列 |
+| `x[i]` / `x[a..b]` | 添字 / スライス（配列・文字列・ハッシュ・指示オブジェクト） |
+| `{k: v, ...}` | ハッシュリテラル（bareword キーは文字列） |
+| `loop x in expr -> stmt` / `... end` | 反復（配列/範囲/ハッシュ/指示オブジェクト上） |
+| `p(x)` | 表示して値を返す（`print` 別名。`p` という変数名とも衝突しない） |
+
+配列は**そのまま指示オブジェクト**として扱われ、要素がレーンになります
+（`[1..5] -< fn >- merge`）。
+
 ## 指示指向オブジェクト — `<-` 代入 / `-<` 分岐 / `>-` 合流
 
 Bada 言語の3つの演算子を、**指示指向オブジェクト（directive-oriented objects）**の

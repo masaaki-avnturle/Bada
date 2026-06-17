@@ -16,6 +16,11 @@ module Bada
       Member   = Struct.new(:obj, :name)   # A.b
       Call     = Struct.new(:callee, :args)
       Assign   = Struct.new(:name, :expr)
+      Decl     = Struct.new(:type, :name, :expr)  # typed/collection decl (arr/has/let int ...)
+      Index    = Struct.new(:obj, :index)         # x[i] / x[a..b]
+      HashLit  = Struct.new(:pairs)               # {k: v, ...}
+      RangeLit = Struct.new(:from, :to)           # [a..b]
+      Loop     = Struct.new(:var, :iter, :body)   # loop x in expr -> / ... end
       Def      = Struct.new(:name, :params, :body)
       Lambda   = Struct.new(:params, :body)        # def(params) ... end as a value
       Library  = Struct.new(:name, :defs)

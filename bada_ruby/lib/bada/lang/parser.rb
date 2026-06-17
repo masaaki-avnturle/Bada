@@ -49,6 +49,9 @@ module Bada
       def statement
         case kind
         when :let then parse_let
+        when :arr then parse_decl("arr")
+        when :has then parse_decl("has")
+        when :loop then parse_loop
         when :def then parse_def
         when :library then parse_library
         when :if then parse_if
@@ -69,11 +72,48 @@ module Bada
 
       def end_of_stmt? = at?(:newline) || at?(:eof) || at?(:end)
 
+      # let [type] name (= | <-) expr     (type optional: let int x <- ...)
       def parse_let
         advance
+        first = expect(:ident).value
+        if at?(:ident)
+          type = first
+          name = advance.value
+        else
+          type = nil
+          name = first
+        end
+        expect_binder
+        Decl.new(type, name, expression)
+      end
+
+      # arr name (= | <-) expr   /   has name (= | <-) expr
+      def parse_decl(kind)
+        advance
         name = expect(:ident).value
-        expect(:assign)
-        Assign.new(name, expression)
+        expect_binder
+        Decl.new(kind, name, expression)
+      end
+
+      # binder is '=' or '<-' (the assignment-object arrow)
+      def expect_binder
+        return advance if at?(:assign) || at?(:larrow)
+        raise "Bada parse error: expected '=' or '<-', got #{kind} line #{peek.line}"
+      end
+
+      # loop x in expr -> stmt     OR     loop x in expr <newline> ... end
+      def parse_loop
+        advance
+        var = expect(:ident).value
+        expect(:in)
+        iter = expression
+        if accept(:arrow)
+          body = [statement]
+        else
+          body = block(%i[end])
+          expect(:end)
+        end
+        Loop.new(var, iter, body)
       end
 
       def parse_def
@@ -231,11 +271,34 @@ module Bada
             expr = Member.new(expr, name)
           elsif at?(:lparen)
             expr = Call.new(expr, parse_args)
+          elsif at?(:lbracket)
+            advance
+            idx = parse_index_contents
+            expect(:rbracket)
+            expr = Index.new(expr, idx)
           else
             break
           end
         end
         expr
+      end
+
+      # hash key: bareword ident -> string; otherwise a literal/expr
+      def parse_hash_key
+        if at?(:ident) then Str.new(advance.value)
+        elsif at?(:string) then Str.new(advance.value)
+        elsif at?(:number) then Num.new(advance.value)
+        else expression
+        end
+      end
+
+      # index contents: a single expr, or a range a..b (slice)
+      def parse_index_contents
+        a = expression
+        if accept(:dotdot)
+          return RangeLit.new(a, expression)
+        end
+        a
       end
 
       def parse_args
@@ -274,15 +337,36 @@ module Bada
         when :lbracket
           advance
           skip_newlines
-          elems = []
-          until at?(:rbracket)
-            elems << expression
+          if at?(:rbracket) then advance; return ListLit.new([]) end
+          first = expression
+          if accept(:dotdot) # range literal [a..b]
+            to = expression
             skip_newlines
-            break unless accept(:comma)
+            expect(:rbracket)
+            return RangeLit.new(first, to)
+          end
+          elems = [first]
+          skip_newlines
+          while accept(:comma)
+            skip_newlines
+            break if at?(:rbracket)
+            elems << expression
             skip_newlines
           end
           expect(:rbracket)
           ListLit.new(elems)
+        when :lbrace # hash literal {k: v, ...}
+          advance
+          skip_newlines
+          pairs = []
+          until at?(:rbrace)
+            pairs << [parse_hash_key, (expect(:colon); expression)]
+            skip_newlines
+            break unless accept(:comma)
+            skip_newlines
+          end
+          expect(:rbrace)
+          HashLit.new(pairs)
         else
           raise "Bada parse error: unexpected #{kind} (#{peek.value.inspect}) line #{peek.line}"
         end

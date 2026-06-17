@@ -29,6 +29,10 @@ module Bada
         interp.register_native("range") { |n| (0...n.to_i).to_a }
         interp.register_native("push") { |arr, x| arr << x; arr }
         interp.register_native("at") { |arr, i| arr[i.to_i] }
+        interp.register_native("keys") { |h| h.is_a?(Hash) ? h.keys : [] }
+        interp.register_native("values") { |h| h.is_a?(Hash) ? h.values : [] }
+        # p(x): print-and-return alias (locals named `p` still shadow it)
+        interp.register_native("p") { |x| interp.print_value(x) }
         interp.register_native("set_at") { |arr, i, v| arr[i.to_i] = v; arr }
         interp.register_native("fill") { |n, v| Array.new(n.to_i, v) }
         interp.register_native("abs") { |x| x.abs }
@@ -96,6 +100,8 @@ module Bada
         case x
         when Float then (x == x.round && x.abs < 1e15) ? x.to_i.to_s : format("%.6g", x)
         when Array then "[#{x.map { |e| stringify(e) }.join(', ')}]"
+        when Hash then "{#{x.map { |k, v| "#{stringify(k)}: #{stringify(v)}" }.join(', ')}}"
+        when Bada::Lang::Directive then "<| #{x.lanes.map { |e| stringify(e) }.join(', ')} |>"
         when nil then "nil"
         else x.to_s
         end

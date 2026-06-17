@@ -94,6 +94,14 @@ module Bada
         e.value
       end
 
+      # Print a value through this interpreter's output (used by the `p` builtin).
+      def print_value(v)
+        line = display(v)
+        @output << line
+        @out.puts(line)
+        v
+      end
+
       private
 
       def eval_node(node, env = @global)
@@ -104,6 +112,11 @@ module Bada
         when Bool     then node.value
         when Nil_     then nil
         when ListLit  then node.elems.map { |e| eval_node(e, env) }
+        when HashLit  then node.pairs.to_h { |k, v| [eval_node(k, env), eval_node(v, env)] }
+        when RangeLit then eval_range(node, env)
+        when Index    then eval_index(node, env)
+        when Decl     then eval_decl(node, env)
+        when Loop     then eval_loop(node, env)
         when Ident    then resolve_ident(node.name, env)
         when Assign   then env.set(node.name, eval_node(node.expr, env))
         when Print    then v = eval_node(node.expr, env); line = display(v); @output << line; @out.puts(line); v
@@ -132,6 +145,56 @@ module Bada
       end
 
       def callable?(v) = v.is_a?(Function) || v.is_a?(NativeFn)
+
+      # [a..b] -> inclusive integer range as an array
+      def eval_range(node, env)
+        a = eval_node(node.from, env).to_i
+        b = eval_node(node.to, env).to_i
+        (a..b).to_a
+      end
+
+      # x[i] : array by int, slice by range-array, hash by key, string by char
+      def eval_index(node, env)
+        obj = eval_node(node.obj, env)
+        idx = eval_node(node.index, env)
+        case obj
+        when Array
+          idx.is_a?(Array) ? idx.map { |i| obj[i.to_i] } : obj[idx.to_i]
+        when Hash then obj[idx]
+        when String then idx.is_a?(Array) ? idx.map { |i| obj[i.to_i] }.join : obj[idx.to_i]
+        when Directive then obj.lanes[idx.to_i]
+        else raise "Bada: cannot index #{obj.class}"
+        end
+      end
+
+      # typed / collection declaration; the type is a (loosely validated) hint
+      def eval_decl(node, env)
+        v = eval_node(node.expr, env)
+        case node.type
+        when "arr" then raise "Bada: arr expects an array" unless v.is_a?(Array)
+        when "has" then raise "Bada: has expects a hash" unless v.is_a?(Hash)
+        end
+        env.define(node.name, v)
+        v
+      end
+
+      # loop x in expr -> body : iterate over an array/range/hash/directive
+      def eval_loop(node, env)
+        iter = eval_node(node.iter, env)
+        items =
+          case iter
+          when Array then iter
+          when Hash then iter.map { |k, val| [k, val] }
+          when Directive then iter.lanes
+          else [iter]
+          end
+        last = nil
+        items.each do |item|
+          env.define(node.var, item)
+          node.body.each { |s| last = eval_node(s, env) } # ReturnSignal propagates if `return`
+        end
+        last
+      end
 
       def define_function(node, env)
         fn = Function.new(node.name, node.params, node.body, env)
@@ -203,7 +266,14 @@ module Bada
       end
 
       # ---- directive-oriented object operators ----
-      def as_directive(v) = v.is_a?(Directive) ? v : Directive.new([v])
+      # an Array is a flow of its elements; a Directive is itself; else 1 lane
+      def as_directive(v)
+        case v
+        when Directive then v
+        when Array then Directive.new(v.dup)
+        else Directive.new([v])
+        end
+      end
 
       # <-  代入: load the right value into a directive object (assignment).
       def directive_assign(l, r)
@@ -331,6 +401,7 @@ module Bada
         case v
         when Float then format_float(v)
         when Array then "[#{v.map { |x| display(x) }.join(', ')}]"
+        when Hash then "{#{v.map { |k, val| "#{display(k)}: #{display(val)}" }.join(', ')}}"
         when Directive then "<| #{v.lanes.map { |x| display(x) }.join(', ')} |>"
         when nil then "nil"
         else v.to_s
