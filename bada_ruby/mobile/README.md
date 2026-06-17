@@ -6,7 +6,20 @@ Bada XP（ChatGPT 分派）を**スマホアプリ**として持ち運べるよ�
 **バージョン・ダウングレード**（Fable 5 → ムートス → Opus 4.7 → … → ローカル分派）と、
 **任意の本物 LLM 接続**（Anthropic／端末内に鍵を保存）を備えています。
 
-入手方法は 2 つあります。
+入手方法は 3 つあります。
+
+## 0. URL から APK を直接ダウンロード（GitHub Releases）
+
+GitHub Actions が APK を自動ビルドして Releases に公開します。**安定 URL**:
+
+```
+https://github.com/masaaki-avnturle/Bada/releases/latest/download/bada-xp.apk
+```
+
+この URL を Android 端末のブラウザで開けば `bada-xp.apk` がダウンロードされます
+（「提供元不明のアプリ」を許可してインストール）。リリースは、`v*` タグの push、または
+GitHub の Actions タブで **「Build Bada XP APK」→ Run workflow** を実行すると生成されます
+（`.github/workflows/build-apk.yml`）。
 
 ## 1. すぐ使う：PWA としてインストール（最短）
 

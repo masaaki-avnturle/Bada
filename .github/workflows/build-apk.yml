@@ -1,0 +1,64 @@
+name: Build Bada XP APK
+
+# Builds the Bada XP ChatGPT app (mobile/) into an installable Android APK and
+# publishes it to GitHub Releases, so it can be downloaded from a stable URL:
+#
+#   https://github.com/masaaki-avnturle/Bada/releases/latest/download/bada-xp.apk
+#
+# Triggers:
+#   - push a tag like v0.1.0    -> a versioned release (marked "latest")
+#   - manual "Run workflow"     -> updates a rolling "app-latest" release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to create/update the Release and upload the APK
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required SDK packages
+        run: sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+
+      - name: Build debug APK
+        run: bash bada_ruby/mobile/build_apk.sh
+
+      - name: Stage APK as bada-xp.apk
+        run: cp bada_ruby/mobile/android/app/build/outputs/apk/debug/app-debug.apk bada-xp.apk
+
+      - name: Upload as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-xp-apk
+          path: bada-xp.apk
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'app-latest' }}
+          name: ${{ github.ref_type == 'tag' && github.ref_name || 'Bada XP (latest build)' }}
+          body: |
+            Bada XP — ChatGPT 分派 Android アプリ。
+
+            **ダウンロード**: 下の `bada-xp.apk` を Android 端末に入れて
+            （「提供元不明のアプリ」を許可して）インストールしてください。
+
+            安定 URL:
+            `https://github.com/${{ github.repository }}/releases/latest/download/bada-xp.apk`
+          files: bada-xp.apk
+          make_latest: true
