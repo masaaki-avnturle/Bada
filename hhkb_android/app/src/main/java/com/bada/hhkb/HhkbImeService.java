@@ -87,7 +87,7 @@ public class HhkbImeService extends InputMethodService
 
     // ---- Japanese input --------------------------------------------------
     private final JapaneseInputEngine jp = new JapaneseInputEngine();
-    private int inputMode = MODE_EN;
+    private int inputMode = MODE_KANA;         // start in hiragana so 日本語 works out of the box
     private boolean fullWidth = false;        // 全角(true) / 半角(false)
     private boolean japaneseLayout = true;    // 日本語(true) / US(false) layout
     private Button modeButton;
@@ -399,7 +399,11 @@ public class HhkbImeService extends InputMethodService
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) jp.commitIfComposing(ic);
         japaneseLayout = !japaneseLayout;
-        if (!japaneseLayout) {
+        if (japaneseLayout) {
+            // 日本語 layout: start typing kana immediately (romaji → ひらがな).
+            inputMode = MODE_KANA;
+            jp.setKatakana(false);
+        } else {
             // US mode: pure English, no kana / conversion, half-width.
             inputMode = MODE_EN;
             fullWidth = false;
