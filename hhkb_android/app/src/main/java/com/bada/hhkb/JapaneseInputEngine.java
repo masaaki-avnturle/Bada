@@ -48,8 +48,25 @@ final class JapaneseInputEngine {
         if (d != null) dict = d;
     }
 
+    private boolean katakana = false;          // カタカナ direct-input mode
+
     void setPreferFullWidth(boolean full) {
         preferFullWidth = full;
+    }
+
+    void setKatakana(boolean k) {
+        katakana = k;
+    }
+
+    /** Re-render the current composition (e.g. after a 全角/半角 toggle). */
+    void refreshComposing(InputConnection ic) {
+        if (raw.length() > 0 && !converting) render(ic);
+    }
+
+    /** How the current reading should be shown while typing, per mode + width. */
+    private String display(String hira) {
+        if (katakana) return preferFullWidth ? toKatakana(hira) : toHalfWidthKatakana(hira);
+        return hira;
     }
 
     void setListener(Listener l) {
@@ -80,7 +97,7 @@ final class JapaneseInputEngine {
         converting = false;
         candIndex = -1;
         cands.clear();
-        ic.setComposingText(toHiragana(raw.toString()), 1);
+        ic.setComposingText(display(toHiragana(raw.toString())), 1);
         hideBar();
     }
 
@@ -108,14 +125,23 @@ final class JapaneseInputEngine {
         String latinHalf = raw.toString();
 
         LinkedHashSet<String> set = new LinkedHashSet<>();
-        List<String> kanji = dict.get(hira);
-        if (kanji != null) set.addAll(kanji);
-        set.add(hira);
-        // Order the width variants by the current 全角/半角 preference.
-        if (preferFullWidth) {
-            set.add(kataFull); set.add(latinFull); set.add(kataHalf); set.add(latinHalf);
+        if (katakana) {
+            // Katakana mode: katakana first (preferred width first), then the rest.
+            if (preferFullWidth) { set.add(kataFull); set.add(kataHalf); }
+            else { set.add(kataHalf); set.add(kataFull); }
+            set.add(hira);
+            if (preferFullWidth) { set.add(latinFull); set.add(latinHalf); }
+            else { set.add(latinHalf); set.add(latinFull); }
         } else {
-            set.add(kataHalf); set.add(latinHalf); set.add(kataFull); set.add(latinFull);
+            List<String> kanji = dict.get(hira);
+            if (kanji != null) set.addAll(kanji);
+            set.add(hira);
+            // Order the width variants by the current 全角/半角 preference.
+            if (preferFullWidth) {
+                set.add(kataFull); set.add(latinFull); set.add(kataHalf); set.add(latinHalf);
+            } else {
+                set.add(kataHalf); set.add(latinHalf); set.add(kataFull); set.add(latinFull);
+            }
         }
         cands.addAll(set);
     }
@@ -131,7 +157,7 @@ final class JapaneseInputEngine {
     // -- 無変換 ------------------------------------------------------------
     boolean muhenkan(InputConnection ic) {
         if (raw.length() == 0) return false;
-        ic.setComposingText(toHiragana(raw.toString()), 1);
+        ic.setComposingText(display(toHiragana(raw.toString())), 1);
         commit(ic);
         return true;
     }
@@ -143,7 +169,7 @@ final class JapaneseInputEngine {
             converting = false;
             candIndex = -1;
             cands.clear();
-            ic.setComposingText(toHiragana(raw.toString()), 1);
+            ic.setComposingText(display(toHiragana(raw.toString())), 1);
             hideBar();
             return true;
         }

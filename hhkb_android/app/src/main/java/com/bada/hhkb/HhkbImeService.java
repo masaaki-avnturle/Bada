@@ -56,8 +56,9 @@ public class HhkbImeService extends InputMethodService
     // ---- Japanese key actions / input modes ------------------------------
     private static final int JP_HENKAN   = 1;   // 変換
     private static final int JP_MUHENKAN = 2;   // 無変換
-    private static final int MODE_EN   = 0;
-    private static final int MODE_KANA = 1;
+    private static final int MODE_EN   = 0;   // A   英数
+    private static final int MODE_KANA = 1;   // あ ひらがな
+    private static final int MODE_KATA = 2;   // ア カタカナ
 
     // ---- modifier ids ----------------------------------------------------
     private static final int MOD_SHIFT = 0;
@@ -522,26 +523,31 @@ public class HhkbImeService extends InputMethodService
     }
 
     // ---- Japanese mode ---------------------------------------------------
-    private boolean kana() { return inputMode == MODE_KANA; }
+    /** True when romaji→kana composition is active (hiragana or katakana mode). */
+    private boolean kana() { return inputMode != MODE_EN; }
 
     private void toggleMode() {
         InputConnection ic = getCurrentInputConnection();
         if (ic != null) jp.commitIfComposing(ic);
-        inputMode = (inputMode == MODE_EN) ? MODE_KANA : MODE_EN;
+        inputMode = (inputMode + 1) % 3;        // A → あ → ア → A
+        jp.setKatakana(inputMode == MODE_KATA);
         updateModeButton();
     }
 
     private void updateModeButton() {
         if (modeButton == null) return;
-        boolean k = kana();
-        modeButton.setText(k ? "あ" : "A");
-        modeButton.setBackground(keyBackground(k ? COL_GOLD : colFill(true)));
-        modeButton.setTextColor(k ? COL_LOCK_TXT : colText());
+        String label = inputMode == MODE_KATA ? "ア" : (inputMode == MODE_KANA ? "あ" : "A");
+        boolean jpOn = inputMode != MODE_EN;
+        modeButton.setText(label);
+        modeButton.setBackground(keyBackground(jpOn ? COL_GOLD : colFill(true)));
+        modeButton.setTextColor(jpOn ? COL_LOCK_TXT : colText());
     }
 
     private void toggleWidth() {
         fullWidth = !fullWidth;
         jp.setPreferFullWidth(fullWidth);
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) jp.refreshComposing(ic);   // live-update katakana width
         updateWidthButton();
     }
 
@@ -679,6 +685,12 @@ public class HhkbImeService extends InputMethodService
                 if (jp.backspace(ic)) return;
             }
             jp.commitIfComposing(ic);  // Esc / Tab: confirm first, then fall through
+        }
+
+        // 全角モードのスペースは全角スペース（　）を入力。
+        if (k.keyCode == KeyEvent.KEYCODE_SPACE && fullWidth && !ctrlAltMeta && !fnActive()) {
+            ic.commitText("　", 1);
+            return;
         }
 
         int code = (fnActive() && k.fnKeyCode != 0) ? k.fnKeyCode : k.keyCode;
