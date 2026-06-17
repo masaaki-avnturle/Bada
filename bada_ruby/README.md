@@ -342,6 +342,28 @@ bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
 > 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
 > その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
 
+## 生成AI — FPGA の Bada ソース → ChatGPT 分派 → 次候補のソースコード
+
+`bada/std/genai.bada` ＋ `bada/app/genai_fpga.bada` は、上の **FPGA 微小管回路の Bada
+ソース**を **ChatGPT 分派**（`Chat` モジュール → `Bada::OmegaChat`）に接続し、
+**次候補のソースコードを生成する生成AI**です。
+
+```bash
+bin/bada genai    # 実行
+```
+
+1. **入力**: このFPGAの Bada ソースが生成する Verilog（量子振動微小管アレイ）。
+2. **理解**: 多様体エントロピー不変量 Ξ で計測（＝AI の理解）。
+3. **接続**: ChatGPT 分派（`Chat.ask` / `Chat.line`）にソースを解説・命名・評価させる。
+4. **次候補生成**: Ξ で回路規模 N を進化させ（12→17→23→29…）、各世代で
+   **次候補のソースコード**（`candidate_N.bada`）＋ **Verilog**（`candidate_N.v`）＋
+   **テストベンチ**（`candidate_N_tb.v`）を生成。前候補を入力に次世代へ**連鎖**。
+5. 生成された `candidate_N.bada` は**そのまま実行可能な Bada ソース**で、合成可能な
+   Verilog を再生成します。
+
+カーネルに `Chat`（ChatGPT 分派橋渡し）モジュールを追加し、Bada から
+`Chat.ask("…")` で 分派エンジンの生成応答を得られます。
+
 ## 量子振動微小管の意識アプリ — Orch-OR → 意識の言語 → FPGA 中枢知能
 
 `bada/std/microtubule.bada` ＋ `bada/std/fpga.bada` ＋ `bada/app/consciousness.bada` は、
