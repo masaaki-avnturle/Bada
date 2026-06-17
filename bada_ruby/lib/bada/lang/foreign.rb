@@ -50,9 +50,16 @@ module Bada
         interp.register_module(alias_name, "__call__" => bridge)
       end
 
-      # A global `Ruby` module with eval, always available.
+      # Global helper modules, always available:
+      #   Ruby.eval("expr")
+      #   Python.call("math", "isclose", [100, 101], [["rel_tol", 0.02]])  # kwargs
+      #   C.call("c", "strlen", "int", ["string"], ["hello"])              # typed
       def install(interp)
         interp.register_module("Ruby", "eval" => ->(code) { to_bada(::Kernel.eval(code.to_s)) }) # rubocop:disable Security/Eval
+        interp.register_module("Python",
+          "call" => ->(mod, fn, args, kwargs = []) { python_call(mod, fn, args, kwargs) })
+        interp.register_module("C",
+          "call" => ->(lib, fn, ret, argtypes, args) { c_call(lib, fn, ret, argtypes, args) })
       end
 
       # --- Ruby bridge ---------------------------------------------------
@@ -90,18 +97,26 @@ module Bada
         p = json.load(sys.stdin)
         mod = importlib.import_module(p["mod"])
         fn = getattr(mod, p["fn"])
-        res = fn(*p["args"])
+        kwargs = dict(p.get("kwargs", []))
+        res = fn(*p["args"], **kwargs)
         sys.stdout.write(json.dumps([res]))
       PY
 
+      def run_python(module_name, fn, args, kwargs)
+        payload = JSON.generate("mod" => module_name.to_s, "fn" => fn.to_s,
+                                "args" => from_bada(args), "kwargs" => from_bada(kwargs))
+        out, err, st = Open3.capture3("python3", "-c", PY_DRIVER, stdin_data: payload)
+        raise "Bada python error (#{module_name}.#{fn}): #{err.strip}" unless st.success?
+        to_bada(JSON.parse(out).first)
+      end
+
       def python_module(module_name)
-        lambda do |method, args|
-          payload = JSON.generate("mod" => module_name, "fn" => method,
-                                  "args" => args.map { |a| from_bada(a) })
-          out, err, st = Open3.capture3("python3", "-c", PY_DRIVER, stdin_data: payload)
-          raise "Bada python error (#{module_name}.#{method}): #{err.strip}" unless st.success?
-          to_bada(JSON.parse(out).first)
-        end
+        ->(method, args) { run_python(module_name, method, args, []) }
+      end
+
+      # Python.call with positional + keyword arguments ([[key, value], ...]).
+      def python_call(module_name, fn, args, kwargs = [])
+        run_python(module_name, fn, args, kwargs)
       end
 
       # --- C bridge (Fiddle / dlopen) ------------------------------------
@@ -117,14 +132,58 @@ module Bada
       end
 
       def open_c_lib(name)
+        @c_cache ||= {}
+        return @c_cache[name] if @c_cache.key?(name)
         ["lib#{name}.so.6", "lib#{name}.so", "#{name}.so", name].each do |cand|
           begin
-            return Fiddle.dlopen(cand)
+            return @c_cache[name] = Fiddle.dlopen(cand)
           rescue StandardError
             next
           end
         end
         raise "Bada: cannot open C library '#{name}'"
+      end
+
+      # Typed C call: C.call("c", "strlen", "int", ["string"], ["hello"]) -> 5.
+      # Types: "double"/"float", "int"/"long", "string"/"char*", "void".
+      def c_call(lib, fn, ret, argtypes, args)
+        require "fiddle"
+        handle = open_c_lib(lib.to_s)
+        ftypes = argtypes.map { |t| fiddle_type(t) }
+        f = Fiddle::Function.new(handle[fn.to_s], ftypes, fiddle_type(ret))
+        cargs = args.each_with_index.map { |a, i| coerce_c_arg(a, argtypes[i]) }
+        coerce_c_ret(f.call(*cargs), ret)
+      end
+
+      def fiddle_type(t)
+        case t.to_s
+        when "double", "float" then Fiddle::TYPE_DOUBLE
+        when "int", "long" then Fiddle::TYPE_LONG
+        when "string", "char*", "voidp" then Fiddle::TYPE_VOIDP
+        when "void" then Fiddle::TYPE_VOID
+        else raise "Bada: unknown C type '#{t}'"
+        end
+      end
+
+      def coerce_c_arg(a, t)
+        case t.to_s
+        when "double", "float" then from_bada(a).to_f
+        when "int", "long" then from_bada(a).to_i
+        when "string", "char*", "voidp" then from_bada(a).to_s
+        else from_bada(a)
+        end
+      end
+
+      def coerce_c_ret(res, ret)
+        case ret.to_s
+        when "double", "float" then res.to_f
+        when "int", "long" then res.to_i
+        when "string", "char*"
+          addr = res.respond_to?(:to_i) ? res.to_i : res
+          addr.zero? ? nil : Fiddle::Pointer.new(addr).to_s.force_encoding("UTF-8")
+        when "void" then nil
+        else to_bada(res)
+        end
       end
     end
   end

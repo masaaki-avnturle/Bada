@@ -63,6 +63,31 @@ class TestForeignImport < Minitest::Test
     assert_in_delta 1.0, v, 1e-9
   end
 
+  # --- typed C calls (int / string returns) ---
+  def test_c_call_int_return
+    skip "fiddle/libm not available" unless fiddle?
+    assert_equal ["5"], out('print str(C.call("c", "strlen", "int", ["string"], ["hello"]))')
+    assert_equal ["7"], out('print str(C.call("c", "abs", "int", ["int"], [0 - 7]))')
+  end
+
+  def test_c_call_string_return
+    skip "fiddle/libm not available" unless fiddle?
+    v = out('print str(C.call("c", "getenv", "string", ["string"], ["HOME"]))').first
+    assert(v.is_a?(String) && !v.empty?)
+  end
+
+  def test_c_call_double_return
+    skip "fiddle/libm not available" unless fiddle?
+    assert_equal ["1024"], out('print str(C.call("m", "pow", "double", ["double", "double"], [2, 10]))')
+  end
+
+  # --- Python keyword arguments ---
+  def test_python_call_with_kwargs
+    skip "python3 not available" unless python?
+    assert_equal ["true"], out('print str(Python.call("math", "isclose", [100, 101], [["rel_tol", 0.02]]))')
+    assert_equal ["false"], out('print str(Python.call("math", "isclose", [100, 101], []))')
+  end
+
   # --- coercion ---
   def test_value_coercion_roundtrip
     # Ruby Array -> Bada list -> back

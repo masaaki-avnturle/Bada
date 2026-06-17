@@ -18,6 +18,7 @@
 #include <math.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <dlfcn.h>
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
@@ -501,6 +502,43 @@ static Val* bi_append(Val** a,int n){ (void)n; /* append item to end -> new list
 static Val* bi_directive(Val** a,int n){ (void)n; return mk_directive(cons(a[0],NIL)); }
 static Val* bi_lanes(Val** a,int n){ (void)n; return dir_lanes(a[0]); }
 
+/* ---- C FFI: dlopen/dlsym a shared library and call by signature ---- */
+static void* c_sym(const char* lib, const char* fn){
+  const char* pats[]={"lib%s.so.6","lib%s.so","%s.so","%s"};
+  char buf[256]; void* h=NULL;
+  for(int i=0;i<4 && !h;i++){ snprintf(buf,sizeof buf,pats[i],lib); h=dlopen(buf,RTLD_LAZY); }
+  if(!h){ fprintf(stderr,"Bada C-FFI: cannot dlopen '%s'\n",lib); exit(1); }
+  void* s=dlsym(h,fn);
+  if(!s){ fprintf(stderr,"Bada C-FFI: no symbol '%s' in '%s'\n",fn,lib); exit(1); }
+  return s;
+}
+/* cfn(lib, fn, ...nums) -> double  (0..3 double args; e.g. libm cos/pow/tgamma) */
+static Val* bi_cfn(Val** a,int n){
+  if(n<2) die("cfn(lib, fn, args...)");
+  void* s=c_sym(a[0]->str,a[1]->str); int argc=n-2; double r;
+  if(argc==0){ double(*f)(void)=(double(*)(void))s; r=f(); }
+  else if(argc==1){ double(*f)(double)=(double(*)(double))s; r=f(as_num(a[2])); }
+  else if(argc==2){ double(*f)(double,double)=(double(*)(double,double))s; r=f(as_num(a[2]),as_num(a[3])); }
+  else if(argc==3){ double(*f)(double,double,double)=(double(*)(double,double,double))s; r=f(as_num(a[2]),as_num(a[3]),as_num(a[4])); }
+  else { die("cfn: up to 3 args"); return NIL; }
+  return mk_num(r);
+}
+/* cint(lib, fn, arg) -> int.  string arg -> size_t fn(const char*) [strlen];
+ *                              number arg -> int fn(int) [abs] */
+static Val* bi_cint(Val** a,int n){
+  if(n!=3) die("cint(lib, fn, arg)");
+  void* s=c_sym(a[0]->str,a[1]->str);
+  if(a[2]->tag==T_STR){ unsigned long(*f)(const char*)=(unsigned long(*)(const char*))s; return mk_num((double)f(a[2]->str)); }
+  int(*f)(int)=(int(*)(int))s; return mk_num((double)f((int)as_num(a[2])));
+}
+/* cstr(lib, fn, str) -> string.  char* fn(const char*) [getenv] */
+static Val* bi_cstr(Val** a,int n){
+  if(n!=3) die("cstr(lib, fn, str)");
+  void* s=c_sym(a[0]->str,a[1]->str);
+  char*(*f)(const char*)=(char*(*)(const char*))s;
+  char* r=f(a[2]->str); return r? mk_str(r): NIL;
+}
+
 /* math / manifold */
 static Val* bi_gamma(Val** a,int n){ (void)n; return mk_num(tgamma(as_num(a[0]))); }
 static Val* bi_beta (Val** a,int n){ (void)n; double p=as_num(a[0]),q=as_num(a[1]); return mk_num(tgamma(p)*tgamma(q)/tgamma(p+q)); }
@@ -586,6 +624,7 @@ static Env* global_env(){
   def_bi(g,"cons",bi_cons); def_bi(g,"car",bi_car); def_bi(g,"cdr",bi_cdr);
   def_bi(g,"list",bi_list); def_bi(g,"append",bi_append);
   def_bi(g,"directive",bi_directive); def_bi(g,"lanes",bi_lanes);
+  def_bi(g,"cfn",bi_cfn); def_bi(g,"cint",bi_cint); def_bi(g,"cstr",bi_cstr);
   def_bi(g,"gamma",bi_gamma); def_bi(g,"beta",bi_beta); def_bi(g,"xlogx",bi_xlogx);
   def_bi(g,"element",bi_element); def_bi(g,"zeta_gauge",bi_zeta_gauge);
   def_bi(g,"entropy",bi_entropy); def_bi(g,"xi",bi_xi); def_bi(g,"thermal",bi_thermal);
@@ -637,7 +676,7 @@ static int build_exe(const char* srcfile, const char* outfile, const char* argv0
   for(unsigned char* p=(unsigned char*)src; *p; p++) fprintf(f,"%u,", *p);
   fprintf(f,"0};\nint main(){return bada_run_source((const char*)SRC);}\n");
   fclose(f);
-  char cmd[8192]; snprintf(cmd,sizeof cmd,"cc -O2 \"%s\" -lm -o \"%s\"", mainc, outfile);
+  char cmd[8192]; snprintf(cmd,sizeof cmd,"cc -O2 \"%s\" -lm -ldl -o \"%s\"", mainc, outfile);
   int rc=system(cmd);
   unlink(mainc);
   if(rc==0) fprintf(stderr,"compiled -> %s (native executable)\n", outfile);

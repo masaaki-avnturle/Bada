@@ -12,7 +12,7 @@ check() { # check <description> <expected-substring> <actual>
 }
 
 echo "== building =="
-cc -O2 -std=c11 bada.c -lm -o bada
+cc -O2 -std=c11 bada.c -lm -ldl -o bada
 echo "ok   - compiles"
 
 echo "== interpreter =="
@@ -41,6 +41,13 @@ OUT="$(./bada run examples/lanes.bada)"
 check "filter conditional lanes" "filter even sum = 12" "$OUT"
 check "route conditional branch" "route 7 = 70" "$OUT"
 check "named lanes pluck" "pluck b = 20" "$OUT"
+
+echo "== C FFI (dlopen) =="
+OUT="$(./bada run examples/cffi.bada)"
+check "cfn double tgamma" "C tgamma(5)     = 24" "$OUT"
+check "cint string strlen" "C strlen(hello) = 5" "$OUT"
+check "cint int abs" "C abs(-7)       = 7" "$OUT"
+check "cstr getenv" "C getenv(HOME)  = " "$OUT"
 
 echo "== objects (classes/objects are cons-lists) =="
 OUT="$(./bada run examples/objects.bada)"

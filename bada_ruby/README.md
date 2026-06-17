@@ -480,13 +480,18 @@ bin/bada foreign     # Ruby/Python/C を import するデモ
 | `import "ruby:Math as RMath"` | Ruby 定数（Module/Class）に直結 | `RMath.sqrt(2)` |
 | `import "ruby:JSON as J"` | 自動 `require` 後に直結 | `J.generate([1,2,3])` |
 | `import "python:math as P"` | python3 サブプロセス + JSON | `P.gcd(12,8)` |
-| `import "c:m as LibM"` | C 共有ライブラリ（Fiddle/dlopen） | `LibM.cos(1.0)` |
+| `import "c:m as LibM"` | C 共有ライブラリ（Fiddle/dlopen, double 既定） | `LibM.cos(1.0)` |
+| `C.call(lib, fn, ret, argtypes, args)` | **型付き C 呼び出し**（int/string/double/void） | `C.call("c","strlen","int",["string"],["hi"])` |
+| `Python.call(mod, fn, args, kwargs)` | **Python キーワード引数**対応 | `Python.call("math","isclose",[100,101],[["rel_tol",0.02]])` |
 
 ```
 import "ruby:Math as RMath"      # → RMath.hypot(3,4) = 5
 import "python:statistics as S"  # → S.mean([10,20,30,40]) = 25
 import "c:m as LibM"             # → LibM.tgamma(5) = 24
 print str(Ruby.eval("(1..100).sum"))   # 任意 Ruby 式 → 5050
+# 型付き C（int/string 戻り値）と Python kwargs
+print str(C.call("c", "getenv", "string", ["string"], ["HOME"]))         # → /root
+print str(Python.call("math", "isclose", [100, 101], [["rel_tol", 0.02]])) # → true
 
 # 外部ライブラリ × 指示指向オブジェクト
 import "std/flow.bada"
