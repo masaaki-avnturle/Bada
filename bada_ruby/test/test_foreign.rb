@@ -88,6 +88,50 @@ class TestForeignImport < Minitest::Test
     assert_equal ["false"], out('print str(Python.call("math", "isclose", [100, 101], []))')
   end
 
+  # --- first-class foreign functions as directive directives ---
+  def test_builtin_is_first_class_directive
+    # builtin sqrt used directly as a branch directive (no lambda wrapper)
+    src = <<~BADA
+      import "std/flow.bada"
+      def add(a, b) return a + b end
+      print str(Flow.seed([1, 4, 9, 16]) -< sqrt >- add)
+    BADA
+    assert_equal ["10"], out(src) # 1+2+3+4
+  end
+
+  def test_ruby_method_as_directive
+    src = <<~BADA
+      import "ruby:Math as M"
+      import "std/flow.bada"
+      def add(a, b) return a + b end
+      print str(Flow.seed([1, 4, 9, 16]) -< M.sqrt >- add)
+    BADA
+    assert_equal ["10"], out(src)
+  end
+
+  def test_python_method_as_directive
+    skip "python3 not available" unless python?
+    src = <<~BADA
+      import "python:math as P"
+      import "std/flow.bada"
+      def add(a, b) return a + b end
+      print str(Flow.seed([1, 2, 3, 4]) -< P.factorial >- add)
+    BADA
+    assert_equal ["33"], out(src) # 1!+2!+3!+4!
+  end
+
+  def test_fanout_to_multiple_foreign_functions
+    skip "fiddle/libm not available" unless fiddle?
+    src = <<~BADA
+      import "ruby:Math as M"
+      import "c:m as LibM"
+      import "std/flow.bada"
+      def add(a, b) return a + b end
+      print str(Flow.seed([4]) -< [M.sqrt, LibM.tgamma] >- add)
+    BADA
+    assert_equal ["8"], out(src) # sqrt(4)+tgamma(4) = 2+6
+  end
+
   # --- coercion ---
   def test_value_coercion_roundtrip
     # Ruby Array -> Bada list -> back
