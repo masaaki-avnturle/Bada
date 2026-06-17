@@ -1,7 +1,7 @@
 # Makefile for Bada-in-C (interpreter + compiler)
 CC      ?= cc
 CFLAGS  ?= -O2 -std=c11
-LDLIBS  ?= -lm
+LDLIBS  ?= -lm -ldl
 PREFIX  ?= /usr/local
 
 bada: bada.c

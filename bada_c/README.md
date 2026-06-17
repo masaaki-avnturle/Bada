@@ -48,6 +48,8 @@ print "fib(10) = " + str(fib(10))
 - リスト構造: `list car cdr cons at len append`
 - 指示指向オブジェクト: 演算子 `<- -< >-`、`directive lanes`（指示オブジェクトは `(directive ...)`）
   例: `(0 <- 0) -< [1,2,3,4,5] -< def(x) return x*x end >- def(a,b) return a+b end` → 55
+- C FFI（dlopen/dlsym）: `cfn(lib,fn,...nums)`→double、`cint(lib,fn,arg)`→int、`cstr(lib,fn,str)`→string
+  例: `cfn("m","tgamma",5)`→24、`cint("c","strlen","hi")`→2、`cstr("c","getenv","HOME")`
 - 多様体トリガー: `gamma beta xlogx element zeta_gauge entropy xi thermal`
 - 数学: `exp log sqrt sin cos pow mod floor abs pi`
 - オブジェクト（リスト上）: `class new method send get_slot set_slot class_name`
