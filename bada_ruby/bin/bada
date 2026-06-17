@@ -14,6 +14,8 @@
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a legacy operator script (<- -< >-)
 #   bin/bada lang [app.bada]            run a Bada-language program (libs + app)
+#   bin/bada gpt "要求..."             マルチ ChatGPT (方程式/論文/アプリ/証明/回路/対話)
+#   bin/bada llm "質問..."             real LLM API (鍵があれば本物) else ローカル分派
 #   bin/bada dialects                   language branching system: fork variants (亜種)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
@@ -76,6 +78,19 @@ when "evolve", "self-evolve"
   # Self-evolving ChatGPT-variant: quantum BIOS + NPU FPGA SoC that evolves its
   # own source code across telomere-bounded (Hayflick) generations.
   Bada::Lang.run_file(File.expand_path("../bada/app/self_evolve.bada", __dir__))
+when "llm"
+  # Ask through a real LLM API (Anthropic / OpenAI-compatible) when a key is
+  # configured in the environment, otherwise fall back to the local 分派.
+  q = ARGV.join(" ")
+  q = "意識とは何か" if q.empty?
+  backend = Bada::Lang::LLM.backend
+  if backend
+    warn "[llm backend: #{backend} / model: #{Bada::Lang::LLM.model}]"
+  else
+    warn "[llm backend: local (no ANTHROPIC_API_KEY / OPENAI_API_KEY) — フォールバック]"
+  end
+  src = %(import "std/multigpt.bada"\nprint Chat.llm(#{q.inspect})\n)
+  Bada::Lang.run(src, base_dir: File.expand_path("../bada", __dir__))
 when "gpt"
   # Multi ChatGPT: one request -> equation / paper / app source / proof / circuit / chat.
   req = ARGV.join(" ")
@@ -193,6 +208,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | gpt | foreign | dialects | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | gpt | llm | foreign | dialects | learn | xi | neural | train | version"
   exit 1
 end

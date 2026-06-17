@@ -77,6 +77,12 @@ library MultiGPT
     if kind == "application"
       return [kind, application(req)]
     end
-    return [kind, Chat.ask(req)]
+    # 対話は、本物の LLM API（環境に鍵があれば）を優先し、無ければローカル分派へ。
+    return [kind, Chat.llm(req)]
+  end
+
+  # 現在どのエンジンが対話に応答するか（"anthropic"/"openai"/"local"）。
+  def engine()
+    return Chat.backend()
   end
 end

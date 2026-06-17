@@ -369,6 +369,35 @@ bin/bada gpt                                         # 全モードのデモ
 `MultiGPT.respond(req)` は `[種別, 出力]` を返し、生成された論文は `multigpt_paper.md`、
 生成アプリのソースはそのまま `bada lang` で実行できます。
 
+## 本物の LLM への接続（任意・グレースフルフォールバック）
+
+正直に言うと、ここまでの「ChatGPT 分派」はすべて**ローカルの `Bada::OmegaChat`
+エンジン**（純 Ruby）であり、本物の大規模 LLM ではありません。`lib/bada/lang/llm.rb`
+（`Bada::Lang::LLM`）は、**環境変数に API キーがあるときだけ本物の LLM API に接続**し、
+無ければ自動的にローカル分派へフォールバックする橋です（Ruby 標準ライブラリのみ・外部 gem 不要）。
+
+```bash
+# 鍵が無ければローカル分派（フォールバック）— ネットワーク不要
+bin/bada llm "意識とは何か"
+
+# Anthropic Messages API に接続（鍵は環境変数のみ・リポジトリには保存しない）
+export ANTHROPIC_API_KEY=sk-ant-...      # OPENAI_API_KEY でも可
+export BADA_LLM_MODEL=claude-opus-4-8    # 任意（既定: claude-opus-4-8）
+bin/bada llm "意識とは何か"
+```
+
+| バックエンド | 条件 | 既定モデル |
+|:--|:--|:--|
+| Anthropic | `ANTHROPIC_API_KEY` あり | `claude-opus-4-8` |
+| OpenAI 互換 | `OPENAI_API_KEY` あり（`OPENAI_BASE_URL` で差替可） | `gpt-4o-mini` |
+| ローカル分派 | 鍵なし／通信失敗 | `Bada::OmegaChat` |
+
+Bada からは `Chat.llm("…")`（本物優先・自動フォールバック）、`Chat.backend()`
+（`"anthropic"/"openai"/"local"`）、`Chat.live()` で利用できます。`MultiGPT` の対話モード
+（`MultiGPT.respond`）もこの経路を使い、`MultiGPT.engine()` で現在のバックエンドを確認できます。
+通信エラー・JSON 解析失敗・安全分類器の拒否（`stop_reason: "refusal"`）はすべて `nil` に
+丸められ、言語はローカル分派で動き続けます。キーは環境変数からのみ読み、保存・出力しません。
+
 ## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
 
 `bada/std/quantum_npu.bada` ＋ `bada/std/telomere.bada` ＋ `bada/std/evolver.bada`
