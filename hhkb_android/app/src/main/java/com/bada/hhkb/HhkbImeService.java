@@ -204,20 +204,23 @@ public class HhkbImeService extends InputMethodService
         if (japaneseLayout) {
             // 日本語: ◇ Alt 無変換 Space 変換 あ/A 全/半
             r5.add(mod("◇", MOD_META, 1.5f));
-            r5.add(mod("Alt", MOD_ALT, 1.5f));
-            r5.add(jpKey("無変換", JP_MUHENKAN, 2f));
-            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 4f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
-            r5.add(jpKey("変換", JP_HENKAN, 2f));
-            r5.add(modeKey(2f));
-            r5.add(widthKey(2f));
+            r5.add(jpKey("無変換", JP_MUHENKAN, 1.8f));
+            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 3.5f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+            r5.add(jpKey("変換", JP_HENKAN, 1.8f));
+            r5.add(modeKey(1.6f));
+            r5.add(widthKey(1.4f));
         } else {
             // US: ◇ Alt [        Space        ] Alt ◇
-            r5.add(mod("◇", MOD_META, 2f));
-            r5.add(mod("Alt", MOD_ALT, 2f));
-            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 7f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
-            r5.add(mod("Alt", MOD_ALT, 2f));
-            r5.add(mod("◇", MOD_META, 2f));
+            r5.add(mod("◇", MOD_META, 1.6f));
+            r5.add(mod("Alt", MOD_ALT, 1.6f));
+            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 6f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+            r5.add(mod("Alt", MOD_ALT, 1.6f));
         }
+        // Dedicated arrow keys (← ↑ ↓ →) on both layouts.
+        r5.add(func("←", KeyEvent.KEYCODE_DPAD_LEFT, 1f));
+        r5.add(func("↑", KeyEvent.KEYCODE_DPAD_UP, 1f));
+        r5.add(func("↓", KeyEvent.KEYCODE_DPAD_DOWN, 1f));
+        r5.add(func("→", KeyEvent.KEYCODE_DPAD_RIGHT, 1f));
         rows.add(r5);
 
         return rows;
@@ -443,6 +446,7 @@ public class HhkbImeService extends InputMethodService
         layoutButton = barButton(japaneseLayout ? "日本語" : "US", v -> toggleLayout());
         bar.addView(layoutButton);
         bar.addView(barButton("辞", v -> doDictLookup()));
+        bar.addView(barButton("🔐", v -> applySecurity()));
         bar.addView(barButton("Holo", v -> toggleHolo()));
         bar.addView(barButton("Dock", v -> dockToBottom()));
         return bar;
@@ -911,6 +915,59 @@ public class HhkbImeService extends InputMethodService
         dictView.setText(text);
         dictScroll.setVisibility(View.VISIBLE);
         dictScroll.scrollTo(0, 0);
+    }
+
+    // =====================================================================
+    //  Jones-manifold text security (🔐)
+    // =====================================================================
+    private static final String SEC_MARK = "🔐";
+
+    /** Encrypt the selected/preceding text, or decrypt it if already 🔐-marked. */
+    private void applySecurity() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        jp.commitIfComposing(ic);
+
+        CharSequence sel = ic.getSelectedText(0);
+        boolean hasSel = sel != null && sel.length() > 0;
+        String target;
+        if (hasSel) {
+            target = sel.toString();
+        } else {
+            CharSequence before = ic.getTextBeforeCursor(4000, 0);
+            if (before == null || before.length() == 0) {
+                showDict("🔐 暗号化する文字を選択するか、カーソル前に入力してください。");
+                return;
+            }
+            target = before.toString();
+        }
+
+        String result;
+        boolean decrypting = target.startsWith(SEC_MARK);
+        if (decrypting) {
+            String plain = JonesCipher.decrypt(target.substring(SEC_MARK.length()));
+            if (plain == null) {
+                showDict("🔐 復号できませんでした（データが壊れているか鍵が一致しません）。");
+                return;
+            }
+            result = plain;
+        } else {
+            String enc = JonesCipher.encrypt(target);
+            if (enc == null) {
+                showDict("🔐 暗号化に失敗しました。");
+                return;
+            }
+            result = SEC_MARK + enc;
+        }
+
+        if (hasSel) {
+            ic.commitText(result, 1);           // replaces the selection
+        } else {
+            ic.deleteSurroundingText(target.length(), 0);
+            ic.commitText(result, 1);
+        }
+        showDict(decrypting ? "🔓 復号しました（Jones多様体鍵）。"
+                            : "🔐 暗号化しました（Jones多様体鍵で保護）。");
     }
 
     // =====================================================================
