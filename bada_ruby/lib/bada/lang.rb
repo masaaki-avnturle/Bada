@@ -12,6 +12,7 @@ require_relative "lang/nodes"
 require_relative "lang/parser"
 require_relative "lang/interpreter"
 require_relative "lang/kernel"
+require_relative "lang/foreign"
 require_relative "lang/dialect"
 require_relative "lang/reviser"
 
@@ -36,6 +37,7 @@ module Bada
       end
       interp = Interpreter.new(loader: loader, out: out)
       Kernel.install(interp)
+      Foreign.install(interp)
       interp
     end
 

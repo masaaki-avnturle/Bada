@@ -446,6 +446,37 @@ ja2.diff_from_parent                          # 親との差分（この枝の�
 プレリュードを独立に保持）。系譜は `lineage`/`descendants`/`render_tree`/`diff_from_parent`
 で参照できます。
 
+## 外部ライブラリの import — Ruby / Python / C を Bada から使う
+
+Bada の `import` は **Ruby・Python・C のライブラリ**を取り込めます（外部関数インター
+フェース）。取り込んだライブラリは動的モジュールになり、未知メンバ呼び出しは各言語の
+ランタイムへ転送、戻り値は Bada の値（数値/文字列/真偽/nil/リスト、Hash は `[k,v]`）へ
+自動変換されます。
+
+```bash
+bin/bada foreign     # Ruby/Python/C を import するデモ
+```
+
+| import 文 | 仕組み | 例 |
+|:--|:--|:--|
+| `import "ruby:Math as RMath"` | Ruby 定数（Module/Class）に直結 | `RMath.sqrt(2)` |
+| `import "ruby:JSON as J"` | 自動 `require` 後に直結 | `J.generate([1,2,3])` |
+| `import "python:math as P"` | python3 サブプロセス + JSON | `P.gcd(12,8)` |
+| `import "c:m as LibM"` | C 共有ライブラリ（Fiddle/dlopen） | `LibM.cos(1.0)` |
+
+```
+import "ruby:Math as RMath"      # → RMath.hypot(3,4) = 5
+import "python:statistics as S"  # → S.mean([10,20,30,40]) = 25
+import "c:m as LibM"             # → LibM.tgamma(5) = 24
+print str(Ruby.eval("(1..100).sum"))   # 任意 Ruby 式 → 5050
+
+# 外部ライブラリ × 指示指向オブジェクト
+import "std/flow.bada"
+Flow.mapreduce([1,2,3,4], def(k) return P.sqrt(k) end, def(a,b) return a+b end)  # Σ√k
+```
+
+> 注: FFI は外部コードをローカルで実行します（任意の FFI と同様）。信頼できるライブラリで利用してください。
+
 ## Bada 言語そのもの — ライブラリもアプリも Bada で記述
 
 これまでの機能は Ruby で実装した「エンジン（カーネル）」です。`Bada::Lang` はその上に
@@ -541,6 +572,7 @@ lib/bada/lang/lexer.rb       Bada 言語 字句解析
 lib/bada/lang/parser.rb      Bada 言語 構文解析（Pratt）+ AST
 lib/bada/lang/interpreter.rb Bada 言語 インタプリタ（関数/モジュール/演算子）
 lib/bada/lang/kernel.rb      ネイティブ橋渡し（エンジンを Bada へ公開）
+lib/bada/lang/foreign.rb     外部FFI（Ruby/Python/C を import で取り込む）
 lib/bada/lang/dialect.rb     言語の亜種（キーワード写像/組込み/系譜/Ξ）
 lib/bada/lang/reviser.rb     リバイザー（亜種を派生する分岐システム + DSL）
 lib/bada/lang.rb             Bada 言語 Facade（run/run_file/import/fork）
