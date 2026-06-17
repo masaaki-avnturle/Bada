@@ -45,6 +45,9 @@ module Bada
         interp.register_native("tan") { |x| Math.tan(x) }
         interp.register_native("acos") { |x| Math.acos(x.clamp(-1.0, 1.0)) }
         interp.register_native("atan") { |x| Math.atan(x) }
+        interp.register_native("atan2") { |y, x| Math.atan2(y, x) }
+        interp.register_native("write_file") { |path, content| File.write(path.to_s, content.to_s); true }
+        interp.register_native("read_file") { |path| File.exist?(path.to_s) ? File.read(path.to_s, encoding: "UTF-8") : nil }
         interp.register_native("floor") { |x| x.floor }
         interp.register_native("ceil") { |x| x.ceil }
         interp.register_native("pow") { |a, b| a**b }
