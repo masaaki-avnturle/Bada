@@ -89,8 +89,10 @@ public class HhkbImeService extends InputMethodService
     private final JapaneseInputEngine jp = new JapaneseInputEngine();
     private int inputMode = MODE_EN;
     private boolean fullWidth = false;        // 全角(true) / 半角(false)
+    private boolean japaneseLayout = true;    // 日本語(true) / US(false) layout
     private Button modeButton;
     private Button widthButton;
+    private Button layoutButton;
     private HorizontalScrollView candidateScroll;
     private LinearLayout candidateBar;
 
@@ -233,15 +235,25 @@ public class HhkbImeService extends InputMethodService
         r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
         rows.add(r4);
 
-        // Row 5 (JIS-style): ◇ Alt 無変換 Space 変換 あ/A 全/半
+        // Row 5 — depends on the US / 日本語 layout mode.
         List<KeyDef> r5 = new ArrayList<>();
-        r5.add(mod("◇", MOD_META, 1.5f));
-        r5.add(mod("Alt", MOD_ALT, 1.5f));
-        r5.add(jpKey("無変換", JP_MUHENKAN, 2f));
-        r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 4f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
-        r5.add(jpKey("変換", JP_HENKAN, 2f));
-        r5.add(modeKey(2f));
-        r5.add(widthKey(2f));
+        if (japaneseLayout) {
+            // 日本語: ◇ Alt 無変換 Space 変換 あ/A 全/半
+            r5.add(mod("◇", MOD_META, 1.5f));
+            r5.add(mod("Alt", MOD_ALT, 1.5f));
+            r5.add(jpKey("無変換", JP_MUHENKAN, 2f));
+            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 4f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+            r5.add(jpKey("変換", JP_HENKAN, 2f));
+            r5.add(modeKey(2f));
+            r5.add(widthKey(2f));
+        } else {
+            // US: ◇ Alt [        Space        ] Alt ◇
+            r5.add(mod("◇", MOD_META, 2f));
+            r5.add(mod("Alt", MOD_ALT, 2f));
+            r5.add(func("Space", KeyEvent.KEYCODE_SPACE, 7f).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+            r5.add(mod("Alt", MOD_ALT, 2f));
+            r5.add(mod("◇", MOD_META, 2f));
+        }
         rows.add(r5);
 
         return rows;
@@ -374,10 +386,30 @@ public class HhkbImeService extends InputMethodService
         attachDrag(handle);
         bar.addView(handle);
 
+        layoutButton = barButton(japaneseLayout ? "日本語" : "US", v -> toggleLayout());
+        bar.addView(layoutButton);
         bar.addView(barButton("辞", v -> doDictLookup()));
         bar.addView(barButton("Holo", v -> toggleHolo()));
         bar.addView(barButton("Dock", v -> dockToBottom()));
         return bar;
+    }
+
+    /** Switch the whole keyboard between US (English) and 日本語 layouts. */
+    private void toggleLayout() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic != null) jp.commitIfComposing(ic);
+        japaneseLayout = !japaneseLayout;
+        if (!japaneseLayout) {
+            // US mode: pure English, no kana / conversion, half-width.
+            inputMode = MODE_EN;
+            fullWidth = false;
+            jp.setKatakana(false);
+            jp.setPreferFullWidth(false);
+            onHideCandidates();
+            if (dictScroll != null) dictScroll.setVisibility(View.GONE);
+        }
+        if (layoutButton != null) layoutButton.setText(japaneseLayout ? "日本語" : "US");
+        buildKeyRows();
     }
 
     private Button barButton(String label, View.OnClickListener l) {
