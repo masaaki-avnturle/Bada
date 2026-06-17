@@ -431,6 +431,18 @@ ruby bin/bada lang bada/app/llm_versions.bada  # ダウングルード/復帰の
 `MultiGPT.version()` / `MultiGPT.downgrade()` / `MultiGPT.upgrade()` からも操作できます。
 版の選択はプロセス内で保持され、`Chat.llm` が現在の版で応答します（鍵なし時はローカル分派）。
 
+### モバイルアプリ（ダウンロード／APK）— `mobile/`
+
+Bada XP をスマホアプリとして持ち運べます（`mobile/`）。中身は自己完結 PWA で、Ξ 計算は
+Ruby 実装と 6 桁一致、版ダウングレードと任意の本物 LLM 接続を備えます。
+
+```bash
+bin/bada serve            # PWA を配信 → スマホで開き「ホーム画面に追加」でインストール
+bin/bada apk              # Android APK を生成（JDK+Gradle+Android SDK が必要）
+```
+
+詳細は [`mobile/README.md`](mobile/README.md)。
+
 ## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
 
 `bada/std/quantum_npu.bada` ＋ `bada/std/telomere.bada` ＋ `bada/std/evolver.bada`

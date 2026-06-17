@@ -1,0 +1,63 @@
+# Bada XP — ChatGPT モバイルアプリ（ダウンロード／APK）
+
+Bada XP（ChatGPT 分派）を**スマホアプリ**として持ち運べるようにしたものです。中身は
+`www/` の自己完結 PWA（HTML/JS）で、Ruby 版 `OmegaChat` の中核（シャノン不変量
+Ξ＝β(H+1,M+1)/log(N+1)、大域的部分積分多様体、理論テンプレート）を**忠実に移植**し、
+**バージョン・ダウングレード**（Fable 5 → ムートス → Opus 4.7 → … → ローカル分派）と、
+**任意の本物 LLM 接続**（Anthropic／端末内に鍵を保存）を備えています。
+
+入手方法は 2 つあります。
+
+## 1. すぐ使う：PWA としてインストール（最短）
+
+サーバ不要の純 Ruby 配信を使います。PC とスマホを**同じ Wi-Fi** に繋いで:
+
+```bash
+cd bada_ruby
+bin/bada serve            # 例: http://192.168.x.x:8787/ が表示される
+```
+
+表示された URL をスマホのブラウザ（Android Chrome / iOS Safari）で開き、
+メニューから **「ホーム画面に追加」** を選ぶと、アプリとしてインストールされます
+（オフラインでもローカル分派で動作）。
+
+> どこでも配るなら、`www/` をそのまま静的ホスティング（GitHub Pages 等）に置けば
+> URL を共有するだけでインストール可能な Web アプリになります（HTTPS 推奨）。
+
+## 2. APK を生成する（Android インストーラ）
+
+`www/` を WebView でくるむ Android プロジェクト（`android/`）を同梱しています。
+
+必要なもの: **JDK 17+** / **Gradle 8.7+**（または Android Studio）/ **Android SDK**
+（platform-34＋build-tools、`ANDROID_HOME` を設定）。
+
+```bash
+cd bada_ruby
+bin/bada apk             # = bash mobile/build_apk.sh
+# 出力: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Android Studio を使う場合は `mobile/android` を開いて Run するだけです。生成された
+`app-debug.apk` を端末に転送し（「提供元不明のアプリ」を許可して）インストールします。
+
+## 構成
+
+| パス | 役割 |
+|:--|:--|
+| `www/index.html` | アプリ本体（エンジン＋UI＋版台帳＋本物LLM、自己完結） |
+| `www/manifest.webmanifest` / `service-worker.js` | PWA（インストール・オフライン） |
+| `www/icon.svg` | アイコン（不変量 Ξ のグリフ） |
+| `android/` | WebView ラッパー（Gradle）→ APK |
+| `build_apk.sh` | `www` を assets に同梱して `assembleDebug` |
+
+## 本物の LLM 接続について（正直な注意）
+
+「設定」で Anthropic API キーを入れると、選択中の版（`local` 以外）で本物の Claude に
+接続します。キーは**その端末の localStorage にのみ**保存され、ブラウザから直接
+`api.anthropic.com` に送られます（`anthropic-dangerous-direct-browser-access`）。
+これは**個人利用向け**で、共有端末や配布ビルドに鍵を埋め込まないでください。鍵が無い／
+通信失敗／`refusal` のときは自動でローカル分派にフォールバックします。
+
+Ξ の計算は Ruby 実装と 6 桁まで一致することを確認済みです（`node` で相互検証）。
+APK のコンパイル自体は Android SDK のある環境で行ってください。

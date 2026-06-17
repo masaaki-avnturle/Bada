@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1a">
+<title>Bada XP — ChatGPT</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#0b0f1a; --panel:#141a2b; --line:#243049; --me:#1f6feb; --bot:#1b2336;
+          --txt:#e7ecf5; --dim:#9fb0cc; --accent:#5fd0c4; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--txt);
+              font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif; }
+  body { display:flex; flex-direction:column; }
+  header { padding:env(safe-area-inset-top) 12px 8px; padding-top:max(10px,env(safe-area-inset-top));
+           background:var(--panel); border-bottom:1px solid var(--line); }
+  .brand { display:flex; align-items:center; gap:10px; }
+  .brand img { width:30px; height:30px; }
+  .brand h1 { font-size:17px; margin:0; font-weight:700; letter-spacing:.5px; }
+  .brand .tag { font-size:11px; color:var(--dim); }
+  .verbar { display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .chip { font-size:12px; background:var(--bot); border:1px solid var(--line); color:var(--txt);
+          padding:4px 8px; border-radius:999px; }
+  .chip b { color:var(--accent); }
+  button { font:inherit; color:var(--txt); background:var(--bot); border:1px solid var(--line);
+           border-radius:8px; padding:6px 10px; cursor:pointer; }
+  button:active { transform:translateY(1px); }
+  button.small { font-size:12px; padding:4px 8px; }
+  #log { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .msg { max-width:88%; padding:10px 12px; border-radius:14px; line-height:1.5; white-space:pre-wrap;
+         word-break:break-word; font-size:15px; }
+  .msg.me  { align-self:flex-end; background:var(--me); border-bottom-right-radius:4px; }
+  .msg.bot { align-self:flex-start; background:var(--bot); border:1px solid var(--line);
+             border-bottom-left-radius:4px; }
+  .msg .meta { display:block; font-size:11px; color:var(--dim); margin-top:6px; }
+  footer { padding:10px 10px max(10px,env(safe-area-inset-bottom)); background:var(--panel);
+           border-top:1px solid var(--line); }
+  .row { display:flex; gap:8px; }
+  #q { flex:1; resize:none; max-height:120px; background:var(--bot); color:var(--txt);
+       border:1px solid var(--line); border-radius:10px; padding:10px; font:inherit; }
+  #send { background:var(--me); border-color:var(--me); font-weight:600; min-width:64px; }
+  dialog { background:var(--panel); color:var(--txt); border:1px solid var(--line); border-radius:14px;
+           width:min(92vw,420px); padding:16px; }
+  dialog::backdrop { background:rgba(0,0,0,.6); }
+  dialog h3 { margin:0 0 10px; }
+  dialog label { font-size:13px; color:var(--dim); display:block; margin:10px 0 4px; }
+  dialog input, dialog select { width:100%; background:var(--bot); color:var(--txt);
+           border:1px solid var(--line); border-radius:8px; padding:8px; font:inherit; }
+  .ladder { list-style:none; margin:8px 0 0; padding:0; }
+  .ladder li { display:flex; justify-content:space-between; align-items:center; gap:8px;
+               padding:7px 8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; font-size:13px; }
+  .ladder li.cur { border-color:var(--accent); }
+  .ladder .note { color:var(--dim); font-size:11px; }
+  .hint { font-size:11px; color:var(--dim); margin-top:8px; line-height:1.5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <img src="icon.svg" alt="">
+    <div>
+      <h1>Bada XP <span class="tag">— ChatGPT 分派</span></h1>
+      <div class="tag">大域的部分積分多様体 × シャノン不変量 Ξ</div>
+    </div>
+    <div style="margin-left:auto; display:flex; gap:6px;">
+      <button class="small" id="btnVer">バージョン</button>
+      <button class="small" id="btnSet">設定</button>
+    </div>
+  </div>
+  <div class="verbar">
+    <span class="chip">版: <b id="verName">—</b></span>
+    <span class="chip">engine: <b id="engName">local</b></span>
+    <button class="small" id="btnDown">▼ ダウングレード</button>
+    <button class="small" id="btnUp">▲ アップグレード</button>
+  </div>
+</header>
+
+<div id="log"></div>
+
+<footer>
+  <div class="row">
+    <textarea id="q" rows="1" placeholder="質問を入力…（例：意識とは何か）"></textarea>
+    <button id="send">送信</button>
+  </div>
+</footer>
+
+<dialog id="verDlg">
+  <h3>ChatGPT バージョン台帳</h3>
+  <div class="tag" style="font-size:12px;color:var(--dim)">上＝高性能 ／ 下＝ローカル分派。前のバージョンへダウングレードできます。</div>
+  <ul class="ladder" id="ladderUl"></ul>
+  <div class="row" style="margin-top:8px">
+    <button id="btnReset">既定（ムートス）に戻す</button>
+    <button id="verClose" style="margin-left:auto">閉じる</button>
+  </div>
+</dialog>
+
+<dialog id="setDlg">
+  <h3>設定 — 本物の LLM へ接続（任意）</h3>
+  <label>Anthropic API キー（端末内のみ保存・送信先は api.anthropic.com）</label>
+  <input id="apiKey" type="password" placeholder="sk-ant-...（空ならローカル分派）" autocomplete="off">
+  <p class="hint">キーを入れると、選択中の版（local 以外）で本物の Claude に接続します。失敗・未設定・
+  ローカル版のときは自動でローカル分派にフォールバックします。キーはこの端末の localStorage にのみ
+  保存され、ブラウザから直接 Anthropic に送られます（個人利用向け。共有端末では入れないでください）。</p>
+  <div class="row" style="margin-top:10px">
+    <button id="setClear">キーを消去</button>
+    <button id="setSave" style="margin-left:auto;background:var(--me);border-color:var(--me)">保存</button>
+  </div>
+</dialog>
+
+<script>
+"use strict";
+// ===== Bada XP engine (faithful standalone port of the Ruby OmegaChat core) =====
+const LANCZOS_G = 7;
+const LANCZOS_C = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+  771.32342877765313,-176.61502916214059,12.507343278686905,-0.13857109526572012,
+  9.9843695780195716e-6,1.5056327351493116e-7];
+function gamma(x){
+  if (x === 0) return Infinity;
+  if (x < 0.5) return Math.PI/(Math.sin(Math.PI*x)*gamma(1-x));
+  x -= 1; let a = LANCZOS_C[0]; const t = x + LANCZOS_G + 0.5;
+  for (let i=1;i<LANCZOS_G+2;i++) a += LANCZOS_C[i]/(x+i);
+  return Math.sqrt(2*Math.PI)*Math.pow(t,x+0.5)*Math.exp(-t)*a;
+}
+const logGamma = x => Math.log(Math.abs(gamma(x)));
+const beta = (p,q) => Math.exp(logGamma(p)+logGamma(q)-logGamma(p+q));
+function zetaGauge(p,q,x){ const lx = Math.log(x); return Math.abs(lx)<1e-15?Infinity:beta(p,q)/lx; }
+function xLogX(x){ return x<=0?0:x*Math.log(x); }
+const TOKEN_RE = /[A-Za-z0-9_]+|[一-鿿぀-ゟ゠-ヿ]/g;
+const tokenize = s => (String(s).match(TOKEN_RE) || []);
+function shannon(tokens){
+  if (!tokens.length) return 0;
+  const f = {}; tokens.forEach(t => f[t]=(f[t]||0)+1);
+  const n = tokens.length; let h = 0;
+  for (const k in f){ const p=f[k]/n; h -= p*Math.log2(p); }
+  return h;
+}
+function distribution(tokens){
+  const f={}; tokens.forEach(t=>f[t]=(f[t]||0)+1); const n=tokens.length;
+  return Object.entries(f).map(([t,c])=>[t,c/n]).sort((a,b)=>b[1]-a[1]);
+}
+function manifoldElement(x){ if(x<=1)return 1; const xl=xLogX(x); return Math.abs(xl)<1e-9?1:1/(xl*xl); }
+function integral(dist){ return dist.reduce((s,[,p],i)=>s+p*manifoldElement(i+2),0); }
+function xi(text){
+  const tk = tokenize(text), h = shannon(tk), m = integral(distribution(tk)), n = tk.length;
+  return zetaGauge(h+1, m+1, n+1);
+}
+const ofEntropy = s => shannon(tokenize(s));
+
+const THEORY = [
+  "大域的部分積分多様体 M 上で、エントロピー不変量 Ξ は複素回転体 e^{iθ} の下で保存される。",
+  "ガンマ関数 Γ(γ) の部分積分により β(p,q) が現れ、これが ζ(s)=x·log x のゲージを与える。",
+  "シャノンのエントロピー H を多様体線素 1/(x·log x)² で重み付け積分すると不変量 Ξ を得る。",
+  "特殊相対性理論のコマ幾何の可積分系がエラーを修正し、Ξ を閉軌道 ∮ 上で安定化させる。",
+  "未知エンジンは質問のエントロピー値 H_q を多様体不変量 Ξ_q に写し、近傍の知識を生成する。"
+];
+const EQUATIONS = [
+  "ζ(s) = β(p,q)/log x = x·log x","β(p,q) = Γ(p)Γ(q)/Γ(p+q)",
+  "∬ 1/(x·log x)² dx_m = π(χ,x)∇ d∇","□ = 2(sin(ix·log x) + cos(ix·log x))",
+  "∮ e^{-□} d□ = π e,  e^π ≅ π^e","H = -Σ p·log₂ p,  Ξ = β(H+1, M+1)/log(N+1)",
+  "⊕(iℏ∇)^⊕L = e^{-x·log x}","Γ′(γ) dx_m = T,  ζ(s) e^{-f} dV = β(p,q)/log x"
+];
+function localReply(question){
+  const target = ofEntropy(question);
+  const body = THEORY.slice().sort((a,b)=>Math.abs(ofEntropy(a)-target)-Math.abs(ofEntropy(b)-target))
+                     .slice(0,3).join(" ");
+  return `${body} (Ξ=${xi(question).toFixed(4)})`;
+}
+function localEquation(question){
+  const target = ofEntropy(question);
+  return EQUATIONS.slice().sort((a,b)=>Math.abs(ofEntropy(a)-target)-Math.abs(ofEntropy(b)-target))[0];
+}
+
+// ===== version ladder (mirrors lib/bada/lang/llm.rb) =====
+const CODENAME = "Bada XP";
+const LADDER = [
+  {id:"claude-fable-5",   label:"Fable 5",       model:"claude-fable-5",   note:"最上位（最も高性能）"},
+  {id:"mythos",           label:"ムートス",       model:"claude-opus-4-8",  note:"既定・Opus 4.8 と同等"},
+  {id:"claude-opus-4-7",  label:"Opus 4.7",      model:"claude-opus-4-7",  note:"前世代"},
+  {id:"claude-opus-4-6",  label:"Opus 4.6",      model:"claude-opus-4-6",  note:"前々世代"},
+  {id:"claude-sonnet-4-6",label:"Sonnet 4.6",    model:"claude-sonnet-4-6",note:"軽量・高速"},
+  {id:"claude-haiku-4-5", label:"Haiku 4.5",     model:"claude-haiku-4-5", note:"最小・最速"},
+  {id:"local",            label:"OmegaChat 分派", model:null,               note:"ローカル（鍵不要）"}
+];
+const DEFAULT_INDEX = LADDER.findIndex(e=>e.id==="mythos");
+let selIndex = (function(){
+  const s = localStorage.getItem("bada_xp_version");
+  const i = s ? LADDER.findIndex(e=>e.id===s) : -1;
+  return i>=0 ? i : DEFAULT_INDEX;
+})();
+const cur = () => LADDER[selIndex];
+function setVersion(i){ selIndex = Math.max(0,Math.min(LADDER.length-1,i));
+  localStorage.setItem("bada_xp_version", cur().id); renderVersion(); }
+const apiKey = () => localStorage.getItem("bada_xp_key") || "";
+const isLive = () => !!apiKey() && cur().id !== "local";
+
+// ===== real LLM (Anthropic Messages API from the browser) =====
+async function anthropic(prompt){
+  try{
+    const r = await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{ "content-type":"application/json", "x-api-key":apiKey(),
+                "anthropic-version":"2023-06-01",
+                "anthropic-dangerous-direct-browser-access":"true" },
+      body:JSON.stringify({ model:cur().model, max_tokens:1024,
+                            messages:[{role:"user",content:prompt}] })
+    });
+    if(!r.ok) return null;
+    const j = await r.json();
+    if(j.stop_reason === "refusal") return null;
+    const t = (j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+    return t || null;
+  }catch(e){ return null; }
+}
+async function answer(question){
+  if(isLive()){ const real = await anthropic(question); if(real) return {text:real, engine:cur().model}; }
+  return { text: localReply(question), engine: cur().id==="local" ? "local" : (apiKey()? "fallback":"local") };
+}
+
+// ===== UI =====
+const $ = s => document.querySelector(s);
+const log = $("#log");
+function bubble(text, who, meta){
+  const d = document.createElement("div");
+  d.className = "msg " + who;
+  d.textContent = text;
+  if(meta){ const m=document.createElement("span"); m.className="meta"; m.textContent=meta; d.appendChild(m); }
+  log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+}
+function renderVersion(){
+  $("#verName").textContent = cur().label;
+  $("#engName").textContent = isLive() ? cur().model : "local";
+}
+function renderLadder(){
+  const ul = $("#ladderUl"); ul.innerHTML = "";
+  LADDER.forEach((e,i)=>{
+    const li = document.createElement("li"); if(i===selIndex) li.className="cur";
+    const left = document.createElement("div");
+    left.innerHTML = `<div>${e.label}${i===selIndex?" ・現在":""}</div><div class="note">${e.id} — ${e.note}</div>`;
+    const b = document.createElement("button"); b.className="small"; b.textContent="選択";
+    b.onclick = ()=>{ setVersion(i); renderLadder(); };
+    li.append(left,b); ul.appendChild(li);
+  });
+}
+async function send(){
+  const q = $("#q").value.trim(); if(!q) return;
+  $("#q").value=""; $("#q").style.height="auto";
+  bubble(q,"me");
+  const typing = bubble("…","bot");
+  const res = await answer(q);
+  typing.firstChild.textContent = res.text;
+  const m=document.createElement("span"); m.className="meta";
+  m.textContent = `${cur().label} · ${res.engine==="local"?"ローカル分派":res.engine==="fallback"?"鍵あり→フォールバック":"本物のLLM"}`;
+  typing.appendChild(m); log.scrollTop=log.scrollHeight;
+}
+
+$("#send").onclick = send;
+$("#q").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }});
+$("#q").addEventListener("input", e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(120,e.target.scrollHeight)+"px"; });
+$("#btnDown").onclick = ()=>{ setVersion(selIndex+1); };
+$("#btnUp").onclick   = ()=>{ setVersion(selIndex-1); };
+$("#btnVer").onclick  = ()=>{ renderLadder(); $("#verDlg").showModal(); };
+$("#verClose").onclick= ()=> $("#verDlg").close();
+$("#btnReset").onclick= ()=>{ setVersion(DEFAULT_INDEX); renderLadder(); };
+$("#btnSet").onclick  = ()=>{ $("#apiKey").value = apiKey(); $("#setDlg").showModal(); };
+$("#setSave").onclick = ()=>{ localStorage.setItem("bada_xp_key", $("#apiKey").value.trim()); renderVersion(); $("#setDlg").close(); };
+$("#setClear").onclick= ()=>{ localStorage.removeItem("bada_xp_key"); $("#apiKey").value=""; renderVersion(); };
+
+renderVersion();
+bubble(`こんにちは。Bada XP（ChatGPT 分派）です。\n現在の版: ${cur().label}。`+
+       `「バージョン」から前の版へダウングレードできます。\n鍵が無くてもローカル分派で動きます。`, "bot",
+       "Ξ = β(H+1, M+1) / log(N+1)");
+
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
