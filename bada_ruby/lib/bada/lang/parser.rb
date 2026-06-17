@@ -240,10 +240,13 @@ module Bada
 
       def parse_args
         expect(:lparen)
+        skip_newlines
         args = []
         until at?(:rparen)
           args << expression
+          skip_newlines
           break unless accept(:comma)
+          skip_newlines
         end
         expect(:rparen)
         args
@@ -270,10 +273,13 @@ module Bada
           e
         when :lbracket
           advance
+          skip_newlines
           elems = []
           until at?(:rbracket)
             elems << expression
+            skip_newlines
             break unless accept(:comma)
+            skip_newlines
           end
           expect(:rbracket)
           ListLit.new(elems)

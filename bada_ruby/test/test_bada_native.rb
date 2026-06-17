@@ -87,6 +87,23 @@ class TestBadaStdLib < Minitest::Test
     assert_equal 1, v
   end
 
+  def test_flow_mapreduce_directive
+    # Σ k^2 (k=1..5) via branch (-<) then merge (>-) = 55
+    src = <<~BADA
+      import "std/flow.bada"
+      print str(Flow.mapreduce([1, 2, 3, 4, 5],
+        def(x) return x * x end,
+        def(a, b) return a + b end))
+    BADA
+    assert_equal ["55"], out(src)
+  end
+
+  def test_std_entropy_uses_directives
+    # the directive-rewritten Entropy still computes H correctly
+    v = with("std/entropy.bada", "Entropy.shannon([0.25, 0.25, 0.25, 0.25])").to_f
+    assert_in_delta 2.0, v, 1e-9
+  end
+
   def test_full_native_engine_app
     app = File.expand_path("../bada/app/native_engine.bada", __dir__)
     joined = Bada::Lang.run_file(app, out: StringIO.new).output.join("\n")
@@ -94,5 +111,6 @@ class TestBadaStdLib < Minitest::Test
     assert_match(/証明完了/, joined)
     assert_match(/反証 \(反例 n=2\)/, joined)
     assert_match(/選択チャネル 1/, joined)
+    assert_match(/Σ k\^2 \(k=1\.\.5\) を分岐→合流で = 55/, joined)
   end
 end

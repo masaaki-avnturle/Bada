@@ -1,8 +1,9 @@
-# std/manifold.bada — ガンマ関数における大域的部分積分多様体を Bada 言語で実装
-# 多様体線素 1/(x log x)^2、∬、エントロピー不変量 Ξ = β(H+1,M+1)/log(N+1)
+# std/manifold.bada — ガンマ関数における大域的部分積分多様体を指示指向で実装。
+# ∬ 1/(x log x)^2 を「ランク座標の分岐(-<)→重み付き和の合流(>-)」で計算する。
 
 import "std/special.bada"
 import "std/entropy.bada"
+import "std/flow.bada"
 
 library Mani
   def x_log_x(x)
@@ -21,16 +22,15 @@ library Mani
     return 1 / (xl * xl)
   end
 
-  # ∬ 1/(x log x)^2 dμ を確率分布のランク座標で離散積分
+  # ∬ 1/(x log x)^2 dμ を、ランク添字の分岐→重み付き和の合流で計算
   def integral(ps)
-    let m = 0
-    let i = 0
-    while i < len(ps)
-      let x = i + 2
-      m = m + at(ps, i) * element(x)
-      i = i + 1
+    let n = len(ps)
+    if n == 0
+      return 0
     end
-    return m
+    return Flow.mapreduce(range(n),
+      def(i) return at(ps, i) * Mani.element(i + 2) end,
+      def(a, b) return a + b end)
   end
 
   # 大域的部分積分多様体のエントロピー不変量 Ξ

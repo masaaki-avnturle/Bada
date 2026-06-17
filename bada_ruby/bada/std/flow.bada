@@ -1,0 +1,37 @@
+# std/flow.bada — 指示指向オブジェクトのコンビネータ（Bada 言語）
+#   <- 代入 / -< 分岐 / >- 合流 だけで map / reduce / find を組み立てる。
+
+library Flow
+  # リスト xs をレーンに載せた指示オブジェクトを作る（代入 <- ＋ 分岐 -<）
+  def seed(xs)
+    return (0 <- 0) -< xs
+  end
+
+  # 各レーンを写像（分岐 -<）
+  def map(d, f)
+    return d -< f
+  end
+
+  # レーンを合流（マージ >-）
+  def reduce(d, f)
+    return d >- f
+  end
+
+  # map → reduce のパイプライン：seed -< mf >- rf
+  def mapreduce(xs, mf, rf)
+    return Flow.seed(xs) -< mf >- rf
+  end
+
+  # 合流：左から最初の非ゼロを返す（探索のエンコードに使う）
+  def first_positive(a, b)
+    if a > 0
+      return a
+    end
+    return b
+  end
+
+  # 合流：和
+  def add(a, b)
+    return a + b
+  end
+end
