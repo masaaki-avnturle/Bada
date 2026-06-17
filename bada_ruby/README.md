@@ -336,6 +336,60 @@ bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
 > 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
 > その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
 
+## リバイザーによる言語分岐システム — Bada の亜種を派生
+
+`Bada::Lang::Reviser` は、ベースの Bada 言語を**改訂（revise）して亜種（variant/方言）を
+派生**し、親→子の**系譜（branch tree）**を成す「言語分岐システム」です。各亜種は実際に
+動く独立した言語で、**キーワード別名・改名（日本語キーワード可）・組込みの追加/上書き・
+プレリュード**を持ち、自身のスペックの**多様体エントロピー不変量 Ξ**を分岐の同一性
+トリガーとして帯びます。
+
+```bash
+bin/bada dialects     # 亜種を派生して実行し、分岐系譜を表示
+```
+
+```ruby
+# 日本語キーワードの亜種を派生
+ja = Bada::Lang.fork(name: "bada-ja") do
+  rename :def, "関数"
+  rename :end, "終"
+  rename :print, "表示"
+  rename :return, "返す"
+  builtin("二乗") { |x| x * x }
+end
+
+Bada::Lang.run(<<~BADA, dialect: ja)
+  関数 sq(x)
+    返す 二乗(x)
+  終
+  表示 str(sq(9))     # => 81
+BADA
+
+# さらに分岐（子の亜種は親の改訂を継承）
+ja2 = Bada::Lang.fork(name: "bada-ja-π", parent: ja) do
+  builtin("円周率") { Math::PI }
+  note "adds 円周率"
+end
+
+puts Bada::Lang::Dialect.base.render_tree   # 分岐系譜（各枝に Ξ）
+ja2.lineage.map(&:name)                       # ["bada","bada-ja","bada-ja-π"]
+ja2.diff_from_parent                          # 親との差分（この枝の改訂のみ）
+```
+
+改訂操作（`Reviser.fork { ... }` の DSL）:
+
+| 操作 | 意味 |
+|:--|:--|
+| `rename :def, "関数"` | 役割の表層語を改名（旧語は無効化） |
+| `keyword "func", :def` | 表層語の**別名**を追加（旧語も有効） |
+| `builtin("二乗") { ... }` | 組込み関数を追加/上書き |
+| `prelude "..."` | その亜種の構文で先に走るプレリュード |
+| `note "..."` | 系譜に改訂メモを記録 |
+
+ベース言語と他の亜種は互いに影響しません（各 `Dialect` はキーワード写像・組込み・
+プレリュードを独立に保持）。系譜は `lineage`/`descendants`/`render_tree`/`diff_from_parent`
+で参照できます。
+
 ## Bada 言語そのもの — ライブラリもアプリも Bada で記述
 
 これまでの機能は Ruby で実装した「エンジン（カーネル）」です。`Bada::Lang` はその上に
@@ -431,7 +485,9 @@ lib/bada/lang/lexer.rb       Bada 言語 字句解析
 lib/bada/lang/parser.rb      Bada 言語 構文解析（Pratt）+ AST
 lib/bada/lang/interpreter.rb Bada 言語 インタプリタ（関数/モジュール/演算子）
 lib/bada/lang/kernel.rb      ネイティブ橋渡し（エンジンを Bada へ公開）
-lib/bada/lang.rb             Bada 言語 Facade（run/run_file/import）
+lib/bada/lang/dialect.rb     言語の亜種（キーワード写像/組込み/系譜/Ξ）
+lib/bada/lang/reviser.rb     リバイザー（亜種を派生する分岐システム + DSL）
+lib/bada/lang.rb             Bada 言語 Facade（run/run_file/import/fork）
 bada/lib/*.bada · bada/app/*.bada  Bada 言語で書いたライブラリとアプリ
 bada/std/*.bada              純 Bada 実装の標準ライブラリ（特殊関数〜証明〜基底核）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）

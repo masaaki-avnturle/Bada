@@ -14,6 +14,7 @@
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a legacy operator script (<- -< >-)
 #   bin/bada lang [app.bada]            run a Bada-language program (libs + app)
+#   bin/bada dialects                   language branching system: fork variants (亜種)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
 
@@ -57,6 +58,26 @@ when "lang"
   # import, native bridge). Defaults to the unknown-engine app.
   path = ARGV.shift || File.expand_path("../bada/app/unknown_engine.bada", __dir__)
   Bada::Lang.run_file(path)
+when "dialects"
+  # Language branching system: fork variants (亜種) with the Reviser, run a
+  # program in each, and show the branch genealogy.
+  ja = Bada::Lang.fork(name: "bada-ja") do
+    rename :def, "関数"; rename :end, "終"; rename :print, "表示"; rename :return, "返す"
+    builtin("二乗") { |x| x * x }
+  end
+  ja_pi = Bada::Lang.fork(name: "bada-ja-π", parent: ja) do
+    builtin("円周率") { Math::PI }
+    note "adds 円周率 (pi)"
+  end
+  puts "── 言語分岐システム (Reviser / 亜種) ──"
+  prog = "関数 sq(x)\n  返す 二乗(x)\n終\n表示 \"sq(9) = \" + str(sq(9))"
+  puts "[bada-ja で実行]"
+  Bada::Lang.run(prog, dialect: ja)
+  puts
+  puts "[分岐の系譜]"
+  puts Bada::Lang::Dialect.base.render_tree
+  puts
+  puts "lineage(bada-ja-π): " + ja_pi.lineage.map(&:name).join(" → ")
 when "info"
   # Information generation: Thurston-Perelman placement + catastrophe branching
   # + millennium theory decomposition for a question.
@@ -127,6 +148,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | dialects | learn | xi | neural | train | version"
   exit 1
 end
