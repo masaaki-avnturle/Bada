@@ -1,0 +1,93 @@
+# engine.bada — リポジトリの Bada コアアルゴリズムを、C実装の Bada で実行する版。
+# 特殊関数（ガンマ/ベータ/不変量はランタイム組込み）、健全な整除性証明、
+# 大脳基底核の行動選択を、すべて cons リスト構造の上で記述する。
+
+def section(label)
+  print "──── " + label + " ────"
+end
+
+# ホーナー法で多項式（係数 cons リスト）を整数評価
+def poly_eval(coeffs, n)
+  let acc = 0
+  let i = len(coeffs) - 1
+  while i >= 0
+    acc = acc * n + at(coeffs, i)
+    i = i - 1
+  end
+  return acc
+end
+
+# 未知事前エンジン：m | E(n) を剰余系の全数検査で健全に証明
+# 返り値 -1 = 証明完了、 r>=0 = 反例
+def divides_all(coeffs, m)
+  let r = 0
+  while r < m
+    if mod(poly_eval(coeffs, r), m) != 0
+      return r
+    end
+    r = r + 1
+  end
+  return -1
+end
+
+def verdict(coeffs, m, label)
+  let r = divides_all(coeffs, m)
+  if r < 0
+    print label + " : 証明完了 (剰余系の全数検査)"
+  else
+    print label + " : 反証 (反例 n=" + str(r) + ")"
+  end
+end
+
+def relu(x)
+  if x > 0
+    return x
+  end
+  return 0
+end
+
+# 大脳基底核の選択（Go/NoGo→GPi→視床の脱抑制）
+def bg_select(sal)
+  let da = 0.3
+  let s = 0
+  let i = 0
+  while i < len(sal)
+    s = s + at(sal, i)
+    i = i + 1
+  end
+  let stn = s / len(sal)
+  let best = 0
+  let bestv = 0 - 1
+  let j = 0
+  while j < len(sal)
+    let c = at(sal, j)
+    let d1 = relu((1 + da) * c)
+    let d2 = relu((1 - da) * c)
+    let gpe = relu(1 + 0.5 * stn - d2)
+    let gpi = relu(1 + 0.5 * stn - d1 - 0.5 * gpe)
+    let thal = relu(1 - gpi)
+    if thal > bestv
+      bestv = thal
+      best = j
+    end
+    j = j + 1
+  end
+  return best
+end
+
+print "======== Bada(C) コアエンジン ========"
+
+section("特殊関数（組込みランタイム）")
+print "gamma(5)  = " + str(gamma(5))
+print "beta(2,3) = " + str(beta(2, 3))
+print "xi trigger= " + str(xi([0.5, 0.25, 0.25]))
+
+section("未知事前エンジン：健全な証明")
+verdict([0, -1, 0, 0, 0, 0, 0, 1], 7, "7 | n^7 - n (フェルマー)")
+verdict([0, -1, 1], 5, "5 | n^2 - n")
+verdict([0, -1, 0, 1], 6, "6 | n^3 - n")
+
+section("大脳基底核ゲーティング")
+let sal = list(0.2, 0.9, 0.5, 0.1)
+print "顕著性 " + str(sal) + " -> 選択チャネル " + str(bg_select(sal))
+print "====================================="

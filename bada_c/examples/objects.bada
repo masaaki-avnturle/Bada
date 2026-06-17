@@ -1,0 +1,41 @@
+# objects.bada — オブジェクト指向（クラスとオブジェクトはすべて cons リスト）
+# 各オブジェクトのクラス・ネットワークの「熱エントロピー」を多様体不変量で計算し、
+# それを言語の中枢トリガーとして用いる。
+
+# クラスを作る（リスト構造そのもの）
+let Particle = class("Particle")
+
+# メソッド（第一引数 self）。スロットは get_slot/set_slot で操作。
+method(Particle, "energy", def(self)
+  return get_slot(self, "mass") * pow(get_slot(self, "speed"), 2)
+end)
+
+method(Particle, "describe", def(self)
+  return class_name(get_slot(self, "class_ref")) + " E=" + str(self.energy())
+end)
+
+def make(mass, speed)
+  let p = new(Particle)
+  set_slot(p, "mass", mass)
+  set_slot(p, "speed", speed)
+  set_slot(p, "class_ref", Particle)
+  return p
+end
+
+let a = make(2, 3)
+let b = make(5, 1)
+print "a.energy = " + str(a.energy())
+print "b.energy = " + str(b.energy())
+
+# オブジェクト・クラス・ネットワークの熱エントロピー（多様体不変量がトリガー）
+let network = list(a.energy(), b.energy(), 4)
+print "network = " + str(network)
+print "thermal entropy (trigger Xi) = " + str(thermal(network))
+
+# トリガー：不変量がしきい値を超えたら高エネルギー側を選ぶ
+let t = thermal(network)
+if t > 0.1
+  print "trigger fired: high-energy object selected"
+else
+  print "trigger idle"
+end
