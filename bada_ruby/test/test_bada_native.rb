@@ -109,6 +109,32 @@ class TestBadaStdLib < Minitest::Test
     assert_equal ["32"], out(src)
   end
 
+  def test_flow_filter_conditional_lanes
+    src = <<~BADA
+      import "std/flow.bada"
+      print str(Flow.filter([1, 2, 3, 4, 5, 6], def(x) return mod(x, 2) == 0 end) >- def(a, b) return a + b end)
+    BADA
+    assert_equal ["12"], out(src) # 2+4+6
+  end
+
+  def test_flow_route_conditional_branch
+    src = <<~BADA
+      import "std/flow.bada"
+      let r = Flow.route(7, [[def(x) return mod(x, 2) == 0 end, def(x) return x + 1 end], [def(x) return mod(x, 2) == 1 end, def(x) return x * 10 end]])
+      print str(r >- def(a, b) return a end)
+    BADA
+    assert_equal ["70"], out(src) # 7 is odd -> *10
+  end
+
+  def test_flow_named_lanes
+    src = <<~BADA
+      import "std/flow.bada"
+      let lab = Flow.label([10, 20, 30], ["a", "b", "c"])
+      print str(Flow.pluck(lab, "b"))
+    BADA
+    assert_equal ["20"], out(src)
+  end
+
   def test_gamma_still_exact_after_flow_lanczos
     assert_in_delta 24.0, with("std/special.bada", "Special.gamma(5)").to_f, 1e-4
     assert_in_delta 1.0 / 12.0, with("std/special.bada", "Special.beta(2, 3)").to_f, 1e-6

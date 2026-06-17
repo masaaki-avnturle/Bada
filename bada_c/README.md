@@ -77,6 +77,8 @@ print thermal(list(18, 5, 4))
 
 - `examples/engine.bada` — リポジトリのコア（ガンマ/不変量・健全な整除性証明・基底核選択）を C版 Bada で
 - `examples/objects.bada` — クラス/オブジェクト（リスト）と熱エントロピー・トリガー
+- `examples/directive.bada` — 指示指向オブジェクト（`<- -< >-`）
+- `examples/lanes.bada` — 名前付きレーン(label/pluck)・条件分岐レーン(filter/route)
 - `examples/evolve.bada` — 自己進化
 
 ## 正直な範囲
