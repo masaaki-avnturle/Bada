@@ -256,7 +256,13 @@ module Bada
 
       def call_module(mod, fn, args)
         table = @modules[mod] or raise "Bada: unknown module #{mod}"
-        target = table[fn] or raise "Bada: #{mod} has no member #{fn}"
+        target = table[fn]
+        if target.nil?
+          # dynamic module (foreign import): forward unknown members
+          dyn = table["__call__"]
+          return dyn.call(fn, args) if dyn
+          raise "Bada: #{mod} has no member #{fn}"
+        end
         target.is_a?(Function) ? call_function(target, args) : target.call(*args)
       end
 
@@ -278,10 +284,25 @@ module Bada
 
       # ---- import ----
       def do_import(path)
+        # foreign imports:  import "ruby:Math as M" / "python:math" / "c:m"
+        if (m = path.match(/\A(ruby|python|c)\s*:\s*(.+)\z/m))
+          scheme = m[1]
+          target, al = m[2].split(/\s+as\s+/, 2)
+          target = target.strip
+          alias_name = (al || default_foreign_alias(target)).strip
+          Foreign.import_into(self, scheme, target, alias_name)
+          return
+        end
         raise "Bada: no loader configured for import" unless @loader
         src = @loader.call(path)
         ast = Bada::Lang::Parser.parse(src)
         ast.stmts.each { |s| eval_node(s, @global) }
+      end
+
+      # default Bada alias for a foreign target ("math" -> "Math", "JSON" -> "JSON")
+      def default_foreign_alias(target)
+        base = target.split(/::|\./).last
+        base[0].upcase + base[1..].to_s
       end
 
       # ---- helpers ----

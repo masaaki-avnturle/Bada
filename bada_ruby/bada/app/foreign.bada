@@ -1,0 +1,34 @@
+# foreign.bada — Bada から Ruby・Python・C のライブラリを import して使うデモ。
+#   import "ruby:Const as Alias" / "python:module as Alias" / "c:lib as Alias"
+
+def section(s)
+  print "──── " + s + " ────"
+end
+
+section("Ruby ライブラリ")
+import "ruby:Math as RMath"
+print "Math.sqrt(2)   = " + str(RMath.sqrt(2))
+print "Math.hypot(3,4)= " + str(RMath.hypot(3, 4))
+import "ruby:JSON as J"
+print "JSON.generate  = " + J.generate([1, 2, 3])
+print "Ruby.eval sum  = " + str(Ruby.eval("(1..100).sum"))
+
+section("Python ライブラリ（サブプロセス + JSON）")
+import "python:math as PyMath"
+print "math.gcd(48,36)= " + str(PyMath.gcd(48, 36))
+print "math.factorial = " + str(PyMath.factorial(6))
+import "python:statistics as Stat"
+print "statistics.mean= " + str(Stat.mean([10, 20, 30, 40]))
+
+section("C ライブラリ libm（Fiddle / dlopen）")
+import "c:m as LibM"
+print "cos(0)         = " + str(LibM.cos(0))
+print "pow(2,16)      = " + str(LibM.pow(2, 16))
+print "tgamma(5)      = " + str(LibM.tgamma(5))
+
+section("外部ライブラリと指示指向オブジェクトを併用")
+import "std/flow.bada"
+# Python の sqrt を各レーンに分岐し、和で合流
+print "Σ√k (k=1..4)   = " + str(Flow.mapreduce([1, 2, 3, 4],
+  def(k) return PyMath.sqrt(k) end,
+  def(a, b) return a + b end))
