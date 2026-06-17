@@ -46,6 +46,18 @@ module Bada
       def initialize(value) = (@value = value; super("return"))
     end
 
+    # A directive-oriented object: a flow carrying one or more "lanes". The
+    # three Bada operators act on it:
+    #   <-  代入 (assign)  : load a value into the object
+    #   -<  分岐 (branch)  : split lanes through branch directives
+    #   >-  合流 (merge)   : join lanes back into one
+    class Directive
+      attr_accessor :lanes
+      def initialize(lanes) = (@lanes = lanes)
+      def value = @lanes.length == 1 ? @lanes[0] : @lanes
+      def to_s = "<| #{@lanes.join(', ')} |>"
+    end
+
     # Tree-walking interpreter for the Bada language.
     class Interpreter
       include AST
@@ -90,6 +102,7 @@ module Bada
         when Print    then v = eval_node(node.expr, env); line = display(v); @output << line; @out.puts(line); v
         when Return   then raise ReturnSignal.new(node.expr ? eval_node(node.expr, env) : nil)
         when Def      then define_function(node, env); nil
+        when Lambda   then Function.new(nil, node.params, node.body, env)
         when Library  then define_library(node); nil
         when Import   then do_import(node.path); nil
         when If       then eval_if(node, env)
@@ -171,11 +184,57 @@ module Bada
         when :le then l <= r
         when :gt then l > r
         when :ge then l >= r
-        when :larrow then Ops.left_act(l, r)
-        when :integ then Ops.manifold_integral(l, r)
-        when :rarrow then Ops.right_act(l, r)
+        when :larrow then directive_assign(l, r)   # 代入オブジェクト
+        when :integ  then directive_branch(l, r)    # 分岐オブジェクト
+        when :rarrow then directive_merge(l, r)     # 合流オブジェクト
         else raise "Bada: bad operator #{node.op}"
         end
+      end
+
+      # ---- directive-oriented object operators ----
+      def as_directive(v) = v.is_a?(Directive) ? v : Directive.new([v])
+
+      # <-  代入: load the right value into a directive object (assignment).
+      def directive_assign(l, r)
+        if l.is_a?(Directive)
+          l.lanes = [r]
+          l
+        else
+          Directive.new([r])
+        end
+      end
+
+      # -<  分岐: split each lane through the branch directive(s).
+      #   d -< fn          map every lane through fn
+      #   d -< [fn1, fn2]  fan each lane out through every fn (lanes multiply)
+      #   d -< [v1, v2]    replace lanes with the explicit branch values
+      #   d -< n           duplicate each lane n times
+      def directive_branch(l, r)
+        d = as_directive(l)
+        lanes =
+          if r.is_a?(Function)
+            d.lanes.map { |x| call_function(r, [x]) }
+          elsif r.is_a?(Array) && !r.empty? && r.all? { |e| e.is_a?(Function) }
+            d.lanes.flat_map { |x| r.map { |f| call_function(f, [x]) } }
+          elsif r.is_a?(Array)
+            r.dup
+          elsif r.is_a?(Numeric)
+            d.lanes.flat_map { |x| Array.new(r.to_i, x) }
+          else
+            d.lanes.map { |_| r }
+          end
+        Directive.new(lanes)
+      end
+
+      # >-  合流: merge the lanes back into one value via a 2-arg combiner.
+      #   d >- fn   reduce lanes with fn(acc, lane); returns the merged value
+      #   d >- nil  returns the lanes as a list
+      def directive_merge(l, r)
+        d = as_directive(l)
+        return d.lanes.dup if r.nil?
+        raise "Bada: >- needs a 2-arg merge directive" unless r.is_a?(Function)
+        return nil if d.lanes.empty?
+        d.lanes.reduce { |acc, x| call_function(r, [acc, x]) }
       end
 
       def eval_call(node, env)
@@ -232,6 +291,7 @@ module Bada
         case v
         when Float then format_float(v)
         when Array then "[#{v.map { |x| display(x) }.join(', ')}]"
+        when Directive then "<| #{v.lanes.map { |x| display(x) }.join(', ')} |>"
         when nil then "nil"
         else v.to_s
         end

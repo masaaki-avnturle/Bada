@@ -81,17 +81,26 @@ class TestLangBasics < Minitest::Test
   end
 end
 
-class TestLangBadaOps < Minitest::Test
+class TestLangDirectiveOps < Minitest::Test
   def out(src) = Bada::Lang.run(src, out: StringIO.new).output
 
-  def test_operators_are_finite_numbers
-    # <-  -<  >-  must evaluate to finite numbers
+  def test_assign_branch_merge
+    # <- 代入, -< 分岐, >- 合流
     src = <<~BADA
-      print str(2.5 <- "manifold")
-      print str(3.0 -< 2.0)
-      print str(1.0 >- 1.0)
+      let f = 0 <- 5
+      let b = f -< [def(x) return x * 2 end, def(x) return x + 100 end]
+      let m = b >- def(a, b) return a + b end
+      print str(m)
     BADA
-    out(src).each { |line| assert Float(line).finite? }
+    assert_equal ["115"], out(src) # (5*2) + (5+100)
+  end
+
+  def test_branch_duplicate_then_merge
+    assert_equal ["30"], out("print str((1 <- 10) -< 3 >- def(a, b) return a + b end)")
+  end
+
+  def test_manifold_math_still_available_as_functions
+    out("print str(right_act(1.0, 1.0))").each { |l| assert Float(l).finite? }
   end
 end
 

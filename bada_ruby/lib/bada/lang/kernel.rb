@@ -48,6 +48,13 @@ module Bada
         interp.register_native("int") { |x| x.to_i }
         interp.register_native("pi") { Math::PI }
         interp.register_native("euler") { Math::E }
+        # directive-oriented objects
+        interp.register_native("directive") { |v| Bada::Lang::Directive.new([v]) }
+        interp.register_native("lanes") { |d| d.is_a?(Bada::Lang::Directive) ? d.lanes : [d] }
+        # the original manifold operator math, kept available as functions
+        interp.register_native("left_act") { |a, b| Bada::Lang::Ops.left_act(a, b) }
+        interp.register_native("right_act") { |a, b| Bada::Lang::Ops.right_act(a, b) }
+        interp.register_native("manifold_integral") { |a, b| Bada::Lang::Ops.manifold_integral(a, b) }
       end
 
       def install_engine_modules(interp)
