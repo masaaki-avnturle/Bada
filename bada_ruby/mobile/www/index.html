@@ -53,6 +53,14 @@
                padding:7px 8px; border:1px solid var(--line); border-radius:8px; margin-bottom:6px; font-size:13px; }
   .ladder li.cur { border-color:var(--accent); }
   .ladder .note { color:var(--dim); font-size:11px; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; }
+  .chips .f { font-size:12px; background:var(--bot); border:1px solid var(--line);
+              border-radius:999px; padding:3px 9px; display:flex; gap:6px; align-items:center; }
+  .chips .f .x { color:var(--dim); cursor:pointer; font-weight:700; }
+  .msg pre { margin:8px 0 0; padding:8px; background:#0c1120; border:1px solid var(--line);
+             border-radius:8px; overflow-x:auto; font-size:12px; line-height:1.45; white-space:pre; }
+  .msg .dl { margin-top:8px; font-size:12px; background:var(--accent); color:#04211d;
+             border:none; border-radius:8px; padding:6px 10px; font-weight:700; }
   .hint { font-size:11px; color:var(--dim); margin-top:8px; line-height:1.5; }
 </style>
 </head>
@@ -80,10 +88,17 @@
 <div id="log"></div>
 
 <footer>
+  <div id="chips" class="chips"></div>
   <div class="row">
-    <textarea id="q" rows="1" placeholder="質問を入力…（例：意識とは何か）"></textarea>
+    <button id="attach" class="small" title="ファイルを添付（OneDrive/ドライブ/端末）">📎</button>
+    <textarea id="q" rows="1" placeholder="質問を入力…（例：意識とは何か / 添付から要約・アプリ生成）"></textarea>
     <button id="send">送信</button>
   </div>
+  <div class="row" style="margin-top:6px; align-items:center;">
+    <button id="gen" class="small">⚙ アプリ生成</button>
+    <span class="hint" id="attachHint" style="margin:0 0 0 auto"></span>
+  </div>
+  <input id="file" type="file" multiple hidden>
 </footer>
 
 <dialog id="verDlg">
@@ -171,6 +186,48 @@ function localEquation(question){
   const target = ofEntropy(question);
   return EQUATIONS.slice().sort((a,b)=>Math.abs(ofEntropy(a)-target)-Math.abs(ofEntropy(b)-target))[0];
 }
+// Intent classification (mirrors std/multigpt.bada classify()).
+function classifyReq(req){
+  const has = s => req.includes(s);
+  if(has("方程式")||has("equation")) return "equation";
+  if(has("論文")||has("paper")) return "paper";
+  if(has("証明")||has("prove")||has("予想")) return "proof";
+  if(has("回路")||has("FPGA")||has("Verilog")||has("verilog")) return "circuit";
+  if(has("アプリ")||has("ソース")||has("コード")||has("app")||has("code")) return "application";
+  return "chat";
+}
+// Stats of a text (token count, Shannon H, invariant Ξ, top tokens).
+function fileStats(text){
+  const tk = tokenize(text);
+  const top = distribution(tk).slice(0,5);
+  return { n: tk.length, h: shannon(tk), xi: xi(text), top };
+}
+// Generate a runnable Bada app whose numbers come from the uploaded file(s).
+function generateApp(req, atts){
+  const names = atts.length ? atts.map(a=>a.name).join(", ") : "(添付なし)";
+  const all = atts.map(a=>a.text).join("\n");
+  const st = fileStats(all || req);
+  const probs = (st.top.length ? st.top : [["·",1]]).map(([,p])=>p.toFixed(4)).join(", ");
+  const q = '"';
+  const L = [];
+  L.push("# 生成アプリ (Bada XP): " + req);
+  L.push("# 添付ファイル: " + names);
+  L.push('import "std/special.bada"');
+  L.push('import "std/manifold.bada"');
+  L.push("");
+  L.push("def main()");
+  L.push("  print " + q + "=== " + req + " ===" + q);
+  L.push("  print " + q + "添付: " + names + q);
+  L.push("  print " + q + "Γ(5) = " + q + " + str(Special.gamma(5))");
+  L.push("  arr ps <- [" + probs + "]");
+  L.push("  print " + q + "Ξ(添付分布) = " + q + " + str(Mani.invariant(ps))");
+  L.push("  print " + q + "H = " + st.h.toFixed(4) + " bits / N = " + st.n + " tokens / Ξ = " + st.xi.toFixed(4) + q);
+  L.push("  print " + q + "完了: 添付ファイルから生成したアプリが実行されました" + q);
+  L.push("end");
+  L.push("");
+  L.push("main()");
+  return L.join("\n");
+}
 
 // ===== version ladder (mirrors lib/bada/lang/llm.rb) =====
 const CODENAME = "Bada XP";
@@ -213,9 +270,26 @@ async function anthropic(prompt){
     return t || null;
   }catch(e){ return null; }
 }
+// ===== uploaded files (OneDrive / Drive / device via the system picker) =====
+const MAX_CHARS = 20000; // per-file cap for the LLM prompt
+let attachments = []; // { name, size, text, stats }
+function contextBlock(){
+  if(!attachments.length) return "";
+  return "【添付ファイル】\n" + attachments.map(a=>{
+    const body = a.text.length > MAX_CHARS ? a.text.slice(0,MAX_CHARS) + "\n…(truncated)" : a.text;
+    return `--- ${a.name} (${a.size} bytes, N=${a.stats.n}, H=${a.stats.h.toFixed(3)}bits, Ξ=${a.stats.xi.toFixed(4)}) ---\n${body}`;
+  }).join("\n\n");
+}
+function localAnswer(question){
+  if(!attachments.length) return localReply(question);
+  const head = attachments.map(a=>`添付『${a.name}』: N=${a.stats.n} トークン, H=${a.stats.h.toFixed(3)} bits, Ξ=${a.stats.xi.toFixed(4)}`).join("\n");
+  const sample = attachments.map(a=>a.text.slice(0,300)).join(" ");
+  return head + "\n" + localReply(question + " " + sample);
+}
 async function answer(question){
-  if(isLive()){ const real = await anthropic(question); if(real) return {text:real, engine:cur().model}; }
-  return { text: localReply(question), engine: cur().id==="local" ? "local" : (apiKey()? "fallback":"local") };
+  const prompt = attachments.length ? (contextBlock() + "\n\n質問: " + question) : question;
+  if(isLive()){ const real = await anthropic(prompt); if(real) return {text:real, engine:cur().model}; }
+  return { text: localAnswer(question), engine: cur().id==="local" ? "local" : (apiKey()? "fallback":"local") };
 }
 
 // ===== UI =====
@@ -255,7 +329,64 @@ async function send(){
   typing.appendChild(m); log.scrollTop=log.scrollHeight;
 }
 
+// add a bot bubble containing generated source + a download button
+function codeBubble(text, filename, meta){
+  const d = document.createElement("div"); d.className="msg bot";
+  d.textContent = meta ? "" : "";
+  const head = document.createElement("div"); head.textContent = `生成: ${filename}`;
+  const pre = document.createElement("pre"); pre.textContent = text;
+  const dl = document.createElement("button"); dl.className="dl"; dl.textContent="⬇ ダウンロード";
+  dl.onclick = ()=> download(filename, text);
+  d.append(head, pre, dl);
+  if(meta){ const m=document.createElement("span"); m.className="meta"; m.textContent=meta; d.appendChild(m); }
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+}
+function download(filename, text){
+  const blob = new Blob([text], {type:"text/plain;charset=utf-8"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+}
+function renderChips(){
+  const c = $("#chips"); c.innerHTML = "";
+  attachments.forEach((a,i)=>{
+    const f = document.createElement("div"); f.className="f";
+    const s = document.createElement("span"); s.textContent = `📄 ${a.name} (${a.size}B)`;
+    const x = document.createElement("span"); x.className="x"; x.textContent="×";
+    x.onclick = ()=>{ attachments.splice(i,1); renderChips(); };
+    f.append(s,x); c.appendChild(f);
+  });
+  $("#attachHint").textContent = attachments.length ? `添付 ${attachments.length} 件を文脈に使用` : "📎 で OneDrive/任意ファイルを添付";
+}
+async function addFiles(fileList){
+  for(const f of fileList){
+    let text = "";
+    try { text = await f.text(); } catch(e){ text = ""; }
+    attachments.push({ name: f.name, size: f.size, text, stats: fileStats(text) });
+  }
+  renderChips();
+}
+// generate an app from the request + attachments (real LLM if live, else local)
+async function generate(){
+  const q = $("#q").value.trim() || "添付ファイルからアプリを生成して";
+  const kind = classifyReq(q);
+  bubble(q + (attachments.length ? ` 〔添付 ${attachments.length} 件〕` : ""), "me");
+  const typing = bubble("…","bot");
+  if(isLive()){
+    const real = await anthropic(contextBlock() + "\n\n要求: " + q +
+      "\n\n上記の添付があれば踏まえて、実行可能な小さなアプリのソースコードを1つだけ生成してください。コードのみ。");
+    if(real){ typing.remove(); codeBubble(real, "bada_xp_app.txt", `${cur().model} · ${kind}`); $("#q").value=""; return; }
+  }
+  typing.remove();
+  codeBubble(generateApp(q, attachments), "bada_xp_app.bada", `ローカル生成 · ${kind}`);
+  $("#q").value="";
+}
+
 $("#send").onclick = send;
+$("#gen").onclick = generate;
+$("#attach").onclick = ()=> $("#file").click();
+$("#file").addEventListener("change", e=>{ addFiles(e.target.files); e.target.value=""; });
 $("#q").addEventListener("keydown", e=>{ if(e.key==="Enter" && !e.shiftKey){ e.preventDefault(); send(); }});
 $("#q").addEventListener("input", e=>{ e.target.style.height="auto"; e.target.style.height=Math.min(120,e.target.scrollHeight)+"px"; });
 $("#btnDown").onclick = ()=>{ setVersion(selIndex+1); };
@@ -268,8 +399,11 @@ $("#setSave").onclick = ()=>{ localStorage.setItem("bada_xp_key", $("#apiKey").v
 $("#setClear").onclick= ()=>{ localStorage.removeItem("bada_xp_key"); $("#apiKey").value=""; renderVersion(); };
 
 renderVersion();
+renderChips();
 bubble(`こんにちは。Bada XP（ChatGPT 分派）です。\n現在の版: ${cur().label}。`+
-       `「バージョン」から前の版へダウングレードできます。\n鍵が無くてもローカル分派で動きます。`, "bot",
+       `\n\n📎 で OneDrive・ドライブ・端末の任意ファイルを添付できます。`+
+       `添付した内容について「送信」で質問、「⚙ アプリ生成」でソースコードを生成・ダウンロードできます。`+
+       `\n「バージョン」から前の版へダウングレードでき、鍵が無くてもローカル分派で動きます。`, "bot",
        "Ξ = β(H+1, M+1) / log(N+1)");
 
 if("serviceWorker" in navigator){
