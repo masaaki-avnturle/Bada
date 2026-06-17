@@ -398,6 +398,36 @@ Bada からは `Chat.llm("…")`（本物優先・自動フォールバック）
 通信エラー・JSON 解析失敗・安全分類器の拒否（`stop_reason: "refusal"`）はすべて `nil` に
 丸められ、言語はローカル分派で動き続けます。キーは環境変数からのみ読み、保存・出力しません。
 
+### ChatGPT のバージョンを前のバージョンへダウングレード
+
+ChatGPT は**バージョン台帳**（上＝高性能、下＝ローカル分派）から版を選びます。
+前のバージョンへ**ダウングレード**したり、復帰（アップグレード）したり、特定の版へ固定できます。
+台帳の最下段「`local`」へダウングレードすると、API キーがあっても**ローカル分派に固定**されます。
+
+```
+Fable 5 → Opus 4.8（既定）→ Opus 4.7 → Opus 4.6 → Sonnet 4.6 → Haiku 4.5 → local（分派）
+```
+
+```bash
+bin/bada llm versions                       # 台帳を表示（現在地つき）
+bin/bada llm --downgrade 2 "意識とは何か"    # 2段ダウングレード（Opus 4.6）して質問
+bin/bada llm --model claude-opus-4-7 "…"     # 特定の前バージョンへ固定して質問
+export BADA_LLM_MODEL=claude-opus-4-7        # 起動時の初期バージョンを指定
+ruby bin/bada lang bada/app/llm_versions.bada  # ダウングルード/復帰のデモ
+```
+
+| Bada API | 動作 |
+|:--|:--|
+| `Chat.version()` | 現在のバージョン名（例 `"Opus 4.8"`） |
+| `Chat.model()` / `Chat.versions()` | 現在のモデルID / 台帳一覧 |
+| `Chat.downgrade([n])` | 前のバージョンへ n 段下げる（新バージョン名を返す） |
+| `Chat.upgrade([n])` | 新しいバージョンへ n 段上げる |
+| `Chat.use(id)` | 特定の版へ固定（例 `Chat.use("local")`） |
+| `Chat.reset()` / `Chat.history()` | 既定へ復帰 / 変更履歴 |
+
+`MultiGPT.version()` / `MultiGPT.downgrade()` / `MultiGPT.upgrade()` からも操作できます。
+版の選択はプロセス内で保持され、`Chat.llm` が現在の版で応答します（鍵なし時はローカル分派）。
+
 ## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
 
 `bada/std/quantum_npu.bada` ＋ `bada/std/telomere.bada` ＋ `bada/std/evolver.bada`

@@ -1,0 +1,41 @@
+# llm_versions.bada — ChatGPT のバージョンを前のバージョンへダウングレード／復帰する。
+# 鍵が無くてもバージョン台帳の操作は動き、応答はローカル分派にフォールバックする。
+
+import "std/multigpt.bada"
+
+def show_answer(tag)
+  print "  [" + tag + " = " + Chat.version() + " / backend=" + Chat.backend() + "]"
+  print "  " + Chat.llm("意識とは何か")
+  print ""
+end
+
+def main()
+  print "============ ChatGPT バージョン・ダウングレード (Bada) ============"
+  print ""
+
+  print "■ 利用可能なバージョン台帳（上=高性能 / 下=ローカル分派）:"
+  arr vs <- Chat.versions()
+  loop v in vs
+    print "    - " + v
+  end
+  print ""
+
+  print "■ 現在のバージョン: " + Chat.version() + "（" + Chat.model() + "）"
+  show_answer("現在")
+
+  print "■ 前のバージョンへダウングレード → " + Chat.downgrade()
+  print "■ もう一段ダウングレード      → " + Chat.downgrade()
+  show_answer("ダウングレード後")
+
+  print "■ ローカル分派まで一気に固定 → " + Chat.use("local")
+  show_answer("ローカル固定")
+
+  print "■ 既定へ復帰（reset）        → " + Chat.reset()
+  print "■ アップグレード（最上位へ） → " + Chat.upgrade(9)
+  print "■ 現在のバージョン: " + Chat.version()
+  print ""
+
+  print "■ 変更履歴: " + str(Chat.history())
+end
+
+main()
