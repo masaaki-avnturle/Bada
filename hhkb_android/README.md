@@ -15,9 +15,10 @@ Fn レイヤーで矢印・ファンクションキー・ナビゲーション�
 - **HHKB Pro (US) 配列を忠実に再現**（60キー / 5段）。
 - **特殊キー一式**：`Esc` `Tab` `Control` `Shift` `Alt` `◇(Meta/Super)` `Fn`
   `Return` `Delete` `Space`。
-- **US / 日本語 レイアウト切替**：上部バーの `US`/`日本語` ボタンで、純粋な英語配列
-  （かな無効・最下段は ◇ Alt Space Alt ◇）と、日本語配列（無変換/変換/あ-ア/全半キー＋
-  かな漢字変換）をワンタップで切り替え。
+- **US / 日本語(JIS) レイアウト切替**：上部バーの `US`/`日本語` ボタンで、
+  **HHKB Pro (US/ANSI) 配列** と **HHKB Professional JP (JIS) 配列** を物理配列ごと切替。
+  JIS では `¥` `^` `@` `:` `\(ろ)` キーと JIS のシフト記号（`2→"`,`6→&`,`7→'` …）になり、
+  無変換/変換/あ-ア/全半キー＋かな漢字変換が有効。
   **日本語に切り替えると即ひらがな入力**になり、ローマ字がそのまま かな に変換されます
   （`A` を押せば日本語配列のまま英数入力も可能）。起動時の既定もひらがなです。
 - **日本語入力キー**：`無変換` `変換`、`あ/A/ア`（英数⇔ひらがな⇔カタカナ）、`全/半`。
@@ -80,14 +81,24 @@ cd hhkb_android
 
 ---
 
-## キー配列（HHKB Pro US）
+## キー配列
 
+### US（ANSI）
 ```
  Esc  1! 2@ 3# 4$ 5% 6^ 7& 8* 9( 0) -_ =+ \| `~
  Tab    Q  W  E  R  T  Y  U  I  O  P  [{ ]}   Delete
  Ctrl     A  S  D  F  G  H  J  K  L  ;: '"      Return
  Shift      Z  X  C  V  B  N  M  ,< .> /?    Shift  Fn
- ◇  Alt  無変換   [   Space   ]   変換   あ/A   ◇
+ ◇  Alt        [        Space        ]   Alt   ◇
+```
+
+### 日本語（JIS / HHKB Professional JP）
+```
+ Esc  1! 2" 3# 4$ 5% 6& 7' 8( 9) 0  -= ^~ ¥|  Delete
+ Tab    Q  W  E  R  T  Y  U  I  O  P  @` [{
+ Ctrl     A  S  D  F  G  H  J  K  L  ;+ :* ]}   Return
+ Shift      Z  X  C  V  B  N  M  ,< .> /? \_  Shift Fn
+ ◇  Alt  無変換   [   Space   ]   変換   あ/A   全/半
 ```
 
 ### 日本語入力（変換 / 無変換 / 日英切り替え）

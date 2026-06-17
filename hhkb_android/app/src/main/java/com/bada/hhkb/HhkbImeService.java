@@ -196,44 +196,8 @@ public class HhkbImeService extends InputMethodService
     private List<List<KeyDef>> buildLayout() {
         List<List<KeyDef>> rows = new ArrayList<>();
 
-        // Row 1: Esc 1..0 - = \ `
-        List<KeyDef> r1 = new ArrayList<>();
-        r1.add(func("Esc", KeyEvent.KEYCODE_ESCAPE, 1f));
-        addDigits(r1);                                              // 1..0 + F1..F10 via Fn
-        r1.add(c("-", "_", KeyEvent.KEYCODE_MINUS).fn(KeyEvent.KEYCODE_F11));
-        r1.add(c("=", "+", KeyEvent.KEYCODE_EQUALS).fn(KeyEvent.KEYCODE_F12));
-        r1.add(c("\\", "|", KeyEvent.KEYCODE_BACKSLASH).fn(KeyEvent.KEYCODE_INSERT));
-        r1.add(c("`", "~", KeyEvent.KEYCODE_GRAVE));
-        rows.add(r1);
-
-        // Row 2: Tab Q..P [ ] Delete
-        List<KeyDef> r2 = new ArrayList<>();
-        r2.add(func("Tab", KeyEvent.KEYCODE_TAB, 1.5f).fn(KeyEvent.KEYCODE_CAPS_LOCK));
-        addLetters(r2, "QWERTYUIOP");
-        r2.add(c("[", "{", KeyEvent.KEYCODE_LEFT_BRACKET).fn(KeyEvent.KEYCODE_DPAD_UP));
-        r2.add(c("]", "}", KeyEvent.KEYCODE_RIGHT_BRACKET).fn(KeyEvent.KEYCODE_PAGE_UP));
-        r2.add(func("Delete", KeyEvent.KEYCODE_DEL, 1.5f).fn(KeyEvent.KEYCODE_FORWARD_DEL));
-        rows.add(r2);
-
-        // Row 3: Control A..L ; ' Return
-        List<KeyDef> r3 = new ArrayList<>();
-        r3.add(mod("Ctrl", MOD_CTRL, 1.75f));
-        addLetters(r3, "ASDFGHJKL");
-        r3.add(c(";", ":", KeyEvent.KEYCODE_SEMICOLON).fn(KeyEvent.KEYCODE_DPAD_LEFT));
-        r3.add(c("'", "\"", KeyEvent.KEYCODE_APOSTROPHE).fn(KeyEvent.KEYCODE_DPAD_RIGHT));
-        r3.add(func("Return", KeyEvent.KEYCODE_ENTER, 2.25f));
-        rows.add(r3);
-
-        // Row 4: Shift Z..M , . / Shift Fn
-        List<KeyDef> r4 = new ArrayList<>();
-        r4.add(mod("Shift", MOD_SHIFT, 2.25f));
-        addLetters(r4, "ZXCVBNM");
-        r4.add(c(",", "<", KeyEvent.KEYCODE_COMMA).fn(KeyEvent.KEYCODE_MOVE_HOME));
-        r4.add(c(".", ">", KeyEvent.KEYCODE_PERIOD).fn(KeyEvent.KEYCODE_MOVE_END));
-        r4.add(c("/", "?", KeyEvent.KEYCODE_SLASH).fn(KeyEvent.KEYCODE_DPAD_DOWN));
-        r4.add(mod("Shift", MOD_SHIFT, 1.75f));
-        r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
-        rows.add(r4);
+        // Rows 1–4: US (ANSI) or JP (JIS) arrangement.
+        if (japaneseLayout) addJpRows(rows); else addUsRows(rows);
 
         // Row 5 — depends on the US / 日本語 layout mode.
         List<KeyDef> r5 = new ArrayList<>();
@@ -257,6 +221,96 @@ public class HhkbImeService extends InputMethodService
         rows.add(r5);
 
         return rows;
+    }
+
+    /** HHKB Pro (US/ANSI) rows 1–4. */
+    private void addUsRows(List<List<KeyDef>> rows) {
+        List<KeyDef> r1 = new ArrayList<>();
+        r1.add(func("Esc", KeyEvent.KEYCODE_ESCAPE, 1f));
+        addDigits(r1);
+        r1.add(c("-", "_", KeyEvent.KEYCODE_MINUS).fn(KeyEvent.KEYCODE_F11));
+        r1.add(c("=", "+", KeyEvent.KEYCODE_EQUALS).fn(KeyEvent.KEYCODE_F12));
+        r1.add(c("\\", "|", KeyEvent.KEYCODE_BACKSLASH).fn(KeyEvent.KEYCODE_INSERT));
+        r1.add(c("`", "~", KeyEvent.KEYCODE_GRAVE));
+        rows.add(r1);
+
+        List<KeyDef> r2 = new ArrayList<>();
+        r2.add(func("Tab", KeyEvent.KEYCODE_TAB, 1.5f).fn(KeyEvent.KEYCODE_CAPS_LOCK));
+        addLetters(r2, "QWERTYUIOP");
+        r2.add(c("[", "{", KeyEvent.KEYCODE_LEFT_BRACKET).fn(KeyEvent.KEYCODE_DPAD_UP));
+        r2.add(c("]", "}", KeyEvent.KEYCODE_RIGHT_BRACKET).fn(KeyEvent.KEYCODE_PAGE_UP));
+        r2.add(func("Delete", KeyEvent.KEYCODE_DEL, 1.5f).fn(KeyEvent.KEYCODE_FORWARD_DEL));
+        rows.add(r2);
+
+        List<KeyDef> r3 = new ArrayList<>();
+        r3.add(mod("Ctrl", MOD_CTRL, 1.75f));
+        addLetters(r3, "ASDFGHJKL");
+        r3.add(c(";", ":", KeyEvent.KEYCODE_SEMICOLON).fn(KeyEvent.KEYCODE_DPAD_LEFT));
+        r3.add(c("'", "\"", KeyEvent.KEYCODE_APOSTROPHE).fn(KeyEvent.KEYCODE_DPAD_RIGHT));
+        r3.add(func("Return", KeyEvent.KEYCODE_ENTER, 2.25f));
+        rows.add(r3);
+
+        List<KeyDef> r4 = new ArrayList<>();
+        r4.add(mod("Shift", MOD_SHIFT, 2.25f));
+        addLetters(r4, "ZXCVBNM");
+        r4.add(c(",", "<", KeyEvent.KEYCODE_COMMA).fn(KeyEvent.KEYCODE_MOVE_HOME));
+        r4.add(c(".", ">", KeyEvent.KEYCODE_PERIOD).fn(KeyEvent.KEYCODE_MOVE_END));
+        r4.add(c("/", "?", KeyEvent.KEYCODE_SLASH).fn(KeyEvent.KEYCODE_DPAD_DOWN));
+        r4.add(mod("Shift", MOD_SHIFT, 1.75f));
+        r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
+        rows.add(r4);
+    }
+
+    /** HHKB Professional JP (JIS) rows 1–4: ¥ ^ @ : \ keys and JIS symbols. */
+    private void addJpRows(List<List<KeyDef>> rows) {
+        int UNK = KeyEvent.KEYCODE_UNKNOWN;
+        List<KeyDef> r1 = new ArrayList<>();
+        r1.add(func("Esc", KeyEvent.KEYCODE_ESCAPE, 1f));
+        addDigitsJis(r1);
+        r1.add(c("-", "=", KeyEvent.KEYCODE_MINUS).fn(KeyEvent.KEYCODE_F11));
+        r1.add(c("^", "~", UNK).fn(KeyEvent.KEYCODE_F12));
+        r1.add(c("¥", "|", KeyEvent.KEYCODE_YEN).fn(KeyEvent.KEYCODE_INSERT));
+        r1.add(func("Delete", KeyEvent.KEYCODE_DEL, 1.5f).fn(KeyEvent.KEYCODE_FORWARD_DEL));
+        rows.add(r1);
+
+        List<KeyDef> r2 = new ArrayList<>();
+        r2.add(func("Tab", KeyEvent.KEYCODE_TAB, 1.5f).fn(KeyEvent.KEYCODE_CAPS_LOCK));
+        addLetters(r2, "QWERTYUIOP");
+        r2.add(c("@", "`", KeyEvent.KEYCODE_AT).fn(KeyEvent.KEYCODE_PAGE_UP));
+        r2.add(c("[", "{", KeyEvent.KEYCODE_LEFT_BRACKET).fn(KeyEvent.KEYCODE_DPAD_UP));
+        rows.add(r2);
+
+        List<KeyDef> r3 = new ArrayList<>();
+        r3.add(mod("Ctrl", MOD_CTRL, 1.75f));
+        addLetters(r3, "ASDFGHJKL");
+        r3.add(c(";", "+", KeyEvent.KEYCODE_SEMICOLON).fn(KeyEvent.KEYCODE_DPAD_LEFT));
+        r3.add(c(":", "*", UNK).fn(KeyEvent.KEYCODE_DPAD_RIGHT));
+        r3.add(c("]", "}", KeyEvent.KEYCODE_RIGHT_BRACKET).fn(KeyEvent.KEYCODE_PAGE_DOWN));
+        r3.add(func("Return", KeyEvent.KEYCODE_ENTER, 2f));
+        rows.add(r3);
+
+        List<KeyDef> r4 = new ArrayList<>();
+        r4.add(mod("Shift", MOD_SHIFT, 2f));
+        addLetters(r4, "ZXCVBNM");
+        r4.add(c(",", "<", KeyEvent.KEYCODE_COMMA).fn(KeyEvent.KEYCODE_MOVE_HOME));
+        r4.add(c(".", ">", KeyEvent.KEYCODE_PERIOD).fn(KeyEvent.KEYCODE_MOVE_END));
+        r4.add(c("/", "?", KeyEvent.KEYCODE_SLASH).fn(KeyEvent.KEYCODE_DPAD_DOWN));
+        r4.add(c("\\", "_", KeyEvent.KEYCODE_BACKSLASH));   // JIS ろ key
+        r4.add(mod("Shift", MOD_SHIFT, 1.5f));
+        r4.add(new KeyDef("Fn", "Fn", 0, T_FN, 1f));
+        rows.add(r4);
+    }
+
+    private void addDigitsJis(List<KeyDef> row) {
+        // JIS shifted symbols for 1..9; 0 has no shifted char.
+        String[] sh = {"", "!", "\"", "#", "$", "%", "&", "'", "(", ")"};
+        for (int d = 1; d <= 10; d++) {
+            int digit = d % 10;                 // 1..9 then 0
+            String shift = sh[digit].isEmpty() ? String.valueOf(digit) : sh[digit];
+            KeyDef k = c(String.valueOf(digit), shift, KeyEvent.KEYCODE_0 + digit);
+            k.fn(KeyEvent.KEYCODE_F1 + (d - 1));
+            row.add(k);
+        }
     }
 
     private void addDigits(List<KeyDef> row) {
