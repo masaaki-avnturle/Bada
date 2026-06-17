@@ -7,6 +7,7 @@ require_relative "../info_engine"
 require_relative "../prover"
 require_relative "../basal"
 require_relative "../penrose"
+require_relative "../chat"
 
 module Bada
   module Lang
@@ -65,6 +66,24 @@ module Bada
       end
 
       def install_engine_modules(interp)
+        # the ChatGPT branch (分派), reachable from Bada as Chat.ask / Chat.line
+        chat = nil # lazily created, shared across calls
+        interp.register_module("Chat",
+          "ask" => lambda { |q|
+            chat ||= Bada::OmegaChat.new
+            r = chat.reply(q.to_s)
+            "#{r[:theory][:theory]} (Ξ=#{format('%.4f', r[:question_invariant])})"
+          },
+          "line" => lambda { |q|
+            chat ||= Bada::OmegaChat.new
+            chat.reply(q.to_s)[:theory][:theory]
+          },
+          "generate" => lambda { |q|
+            chat ||= Bada::OmegaChat.new
+            chat.reply(q.to_s)[:generated_text][:text]
+          },
+          "xi" => ->(t) { Bada::Manifold.xi(t.to_s) })
+
         interp.register_module("Manifold",
           "xi" => ->(t) { Bada::Manifold.xi(t.to_s) },
           "entropy" => ->(t) { Bada::Entropy.of(t.to_s) },

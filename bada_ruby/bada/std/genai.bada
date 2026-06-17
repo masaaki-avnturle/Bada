@@ -1,0 +1,45 @@
+# genai.bada — 生成AI：FPGA の Bada ソースを ChatGPT 分派につなぎ、
+# 「次候補のソースコード」を生成する。
+# 入力ソースを多様体エントロピー不変量 Ξ で計測（＝AIの理解）し、Ξ で次候補の
+# 回路規模を進化させ、ChatGPT 分派に命名・評価させ、次候補の Bada ソースと
+# Verilog を生成する。世代をまたいで連鎖（前候補を入力に次候補へ）。
+
+import "std/fpga.bada"
+
+library GenAI
+  # 現ソースの理解＝多様体エントロピー不変量 Ξ
+  def measure(src)
+    return Manifold.xi(src)
+  end
+
+  # Ξ から次候補の発振器数 N を進化（成長）させる
+  def next_n(prev_n, xi)
+    return prev_n + 4 + floor(xi * 60)
+  end
+
+  # 次候補の Bada ソースコード（この Verilog を生成する Bada スニペット）
+  def candidate_source(name, n, with_tb)
+    let q <- "\""
+    let s <- "# " + name + " — 生成AIが生成した次候補ソース (Bada)" + FPGA.nl()
+    s = s + "import " + q + "std/fpga.bada" + q + FPGA.nl()
+    s = s + "let v <- FPGA.verilog(" + str(n) + ", 16)" + FPGA.nl()
+    s = s + "write_file(" + q + name + ".v" + q + ", v)" + FPGA.nl()
+    if with_tb
+      s = s + "let tb <- FPGA.testbench(" + str(n) + ", 16)" + FPGA.nl()
+      s = s + "write_file(" + q + name + "_tb.v" + q + ", tb)" + FPGA.nl()
+    end
+    s = s + "print " + q + name + " (" + str(n) + " oscillators) generated" + q + FPGA.nl()
+    return s
+  end
+
+  # 1世代分の次候補を生成して記録を返す（[名前, N, verilog, bada源, テストベンチ?]）
+  def next_candidate(src, gen, prev_n)
+    let xi <- measure(src)
+    let n <- next_n(prev_n, xi)
+    let name <- "candidate_" + str(gen)
+    let with_tb <- gen >= 2
+    let v <- FPGA.verilog(n, 16)
+    let csrc <- candidate_source(name, n, with_tb)
+    return [name, n, v, csrc, with_tb]
+  end
+end

@@ -1,0 +1,57 @@
+# genai_fpga.bada — 生成AI：FPGA の Bada ソース → ChatGPT 分派 → 次候補ソース。
+# 量子振動微小管の FPGA 回路（このFPGAのBadaソースが生成する Verilog）を入力に、
+# ChatGPT 分派へ接続して解説させ、多様体エントロピー不変量 Ξ で回路を進化させながら
+# 「次候補のソースコード」(Bada + Verilog + テストベンチ) を世代連鎖で生成する。
+
+import "std/genai.bada"
+import "std/fpga.bada"
+
+def main()
+  print "========= 生成AI：FPGA Bada ソース → ChatGPT → 次候補ソース ========="
+
+  # 入力＝このFPGAのBadaソースが生成する回路（量子振動微小管アレイ）
+  let src <- FPGA.verilog(12, 16)
+  print "入力 FPGA ソース = microtubule_array (N=12, " + str(len(src)) + " bytes)"
+  print "AI の理解（多様体不変量 Ξ）= " + str(Manifold.xi(src))
+  print ""
+
+  # ChatGPT 分派にソースを解説させる（接続）
+  print "── ChatGPT 分派の解説 ──"
+  print Chat.ask("この量子振動微小管 FPGA 回路のソースから次に何を生成できるか")
+  print ""
+
+  # 次候補を3世代生成（Ξ で進化 → Verilog/テストベンチ/Bada源 → 連鎖）
+  let n <- 12
+  let g <- 1
+  while g <= 3
+    arr cand <- GenAI.next_candidate(src, g, n)
+    let name <- at(cand, 0)
+    n = at(cand, 1)
+    let v <- at(cand, 2)
+    let csrc <- at(cand, 3)
+    let with_tb <- at(cand, 4)
+
+    write_file(name + ".v", v)
+    write_file(name + ".bada", csrc)
+    if with_tb
+      write_file(name + "_tb.v", FPGA.testbench(n, 16))
+    end
+
+    let artifacts <- name + ".v / " + name + ".bada"
+    if with_tb
+      artifacts = artifacts + " / " + name + "_tb.v"
+    end
+    print "── 第" + str(g) + "候補: " + name + " (N=" + str(n) + ") ──"
+    print "  ChatGPT 命名/評価: " + Chat.line("第" + str(g) + "候補の" + str(n) + "発振器FPGA量子振動回路を一言で")
+    print "  生成物: " + artifacts
+
+    # 次世代の入力＝今生成した次候補ソース（連鎖）
+    src = csrc
+    g = g + 1
+  end
+
+  print ""
+  print "生成AIが " + str(g - 1) + " 世代の次候補ソースコード（Bada＋Verilog＋TB）を生成しました。"
+end
+
+main()
