@@ -371,6 +371,18 @@ print (0 <- 5) -< [def(x) return x+1 end,
                    def(x) return x+3 end] >- def(a,b) return a+b end   # 21
 ```
 
+### 名前付きレーン・条件分岐レーン（`std/flow.bada`）
+
+- `Flow.filter(xs, pred)` … 述語を満たすレーンだけ残す（**条件分岐レーン**）
+- `Flow.route(x, pairs)` … `[[述語, 変換], ...]` の最初に合致する変換を適用（条件ルーティング）
+- `Flow.label(values, names)` / `Flow.pluck(labeled, name)` … **名前付きレーン**
+
+```
+Flow.filter([1,2,3,4,5,6], def(x) return mod(x,2)==0 end) >- 和   # 12
+Flow.route(7, [[偶?, +1], [奇?, ×10]]) >- first                    # 70
+Flow.pluck(Flow.label([10,20,30], ["a","b","c"]), "b")            # 20
+```
+
 分岐ディレクティブ `-<` の右辺:
 - 関数 → 各レーンを写像
 - 関数のリスト → 各レーンを全関数にファンアウト（レーンが増える）

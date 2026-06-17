@@ -45,4 +45,60 @@ library Flow
   def zipreduce(xs, ys, f, rf)
     return Flow.zip(xs, ys, f) >- rf
   end
+
+  # ── 条件分岐レーン ──
+  # 述語 pred を満たすレーンだけ残した指示オブジェクトを返す
+  def filter(xs, pred)
+    let kept = []
+    let i = 0
+    while i < len(xs)
+      let x = at(xs, i)
+      if pred(x)
+        kept = push(kept, x)
+      end
+      i = i + 1
+    end
+    return Flow.seed(kept)
+  end
+
+  # 条件ルーティング：pairs = [[述語, 変換], ...]。最初に述語が真になる変換を適用し、
+  # その結果を単一レーンの指示オブジェクトとして返す（条件分岐レーン）。
+  def route(x, pairs)
+    let i = 0
+    while i < len(pairs)
+      let pr = at(pairs, i)
+      let pred = at(pr, 0)
+      let fn = at(pr, 1)
+      if pred(x)
+        return 0 <- fn(x)
+      end
+      i = i + 1
+    end
+    return 0 <- x
+  end
+
+  # ── 名前付きレーン ──
+  # 値リストに名前を付けた [名前, 値] のレーン列を作る
+  def label(values, names)
+    let out = []
+    let i = 0
+    while i < len(values)
+      out = push(out, [at(names, i), at(values, i)])
+      i = i + 1
+    end
+    return out
+  end
+
+  # 名前でレーンの値を取り出す
+  def pluck(labeled, name)
+    let i = 0
+    while i < len(labeled)
+      let pr = at(labeled, i)
+      if at(pr, 0) == name
+        return at(pr, 1)
+      end
+      i = i + 1
+    end
+    return nil
+  end
 end

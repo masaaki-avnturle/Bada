@@ -1,0 +1,73 @@
+# lanes.bada — 指示オブジェクトの名前付きレーン＆条件分岐レーン（C実装の Bada）
+#   filter/route = 条件分岐レーン、 label/pluck = 名前付きレーン。
+
+def add(a, b)
+  return a + b
+end
+def first(a, b)
+  return a
+end
+def plus1(x)
+  return x + 1
+end
+def times10(x)
+  return x * 10
+end
+
+# 条件分岐：述語を満たすレーンだけ残す（リストを組み立ててから seed）
+def filter(xs, pred)
+  let kept = []
+  let i = 0
+  while i < len(xs)
+    let x = at(xs, i)
+    if pred(x)
+      kept = append(kept, x)
+    end
+    i = i + 1
+  end
+  return (0 <- 0) -< kept
+end
+
+# 条件ルーティング：最初に述語が真になる [述語, 変換] を適用し単一レーンに
+def route(x, pairs)
+  let i = 0
+  while i < len(pairs)
+    let pr = at(pairs, i)
+    let pred = at(pr, 0)
+    let fn = at(pr, 1)
+    if pred(x)
+      return 0 <- fn(x)
+    end
+    i = i + 1
+  end
+  return 0 <- x
+end
+
+# 名前付きレーン
+def label(values, names)
+  let out = []
+  let i = 0
+  while i < len(values)
+    out = append(out, [at(names, i), at(values, i)])
+    i = i + 1
+  end
+  return out
+end
+def pluck(labeled, name)
+  let i = 0
+  while i < len(labeled)
+    let pr = at(labeled, i)
+    if at(pr, 0) == name
+      return at(pr, 1)
+    end
+    i = i + 1
+  end
+  return nil
+end
+
+print "filter even sum = " + str(filter([1, 2, 3, 4, 5, 6], def(x) return mod(x, 2) == 0 end) >- add)
+let r = route(7, [[def(x) return mod(x, 2) == 0 end, plus1], [def(x) return mod(x, 2) == 1 end, times10]])
+print "route 7 = " + str(r >- first)
+let lab = label([10, 20, 30], ["a", "b", "c"])
+print "named lanes = " + str(lab)
+print "pluck b = " + str(pluck(lab, "b"))
