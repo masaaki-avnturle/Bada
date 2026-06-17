@@ -1,19 +1,22 @@
-# std/entropy.bada — シャノンのエントロピーを Bada 言語で実装
-# 確率分布（リスト）H = -Σ p log2 p
+# std/entropy.bada — シャノンのエントロピーを「指示指向の map-reduce」で実装
+#   各確率レーンを項 -p log2 p に分岐(-<)し、和で合流(>-)する。
 
 import "std/math.bada"
+import "std/flow.bada"
 
 library Entropy
-  def shannon(ps)
-    let h = 0
-    let i = 0
-    while i < len(ps)
-      let p = at(ps, i)
-      if p > 0
-        h = h - p * M.log2(p)
-      end
-      i = i + 1
+  def term(p)
+    if p > 0
+      return 0 - p * M.log2(p)
     end
-    return h
+    return 0
+  end
+
+  def shannon(ps)
+    if len(ps) == 0
+      return 0
+    end
+    # 確率リストをレーンに載せ、項に分岐し、和で合流
+    return Flow.mapreduce(ps, def(p) return Entropy.term(p) end, def(a, b) return a + b end)
   end
 end

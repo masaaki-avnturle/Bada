@@ -1,28 +1,36 @@
-# std/prover.bada — 未知事前エンジンの「整除性の健全な証明」を Bada 言語で実装
-# 整数係数多項式 E について m | E(n) を、剰余系 0..m-1 の全数検査で判定する
-# （E(n) mod m は n mod m のみに依存するので、これは完全・健全な証明）。
+# std/prover.bada — 未知事前エンジンの「整除性の健全な証明」を指示指向で実装。
+# 剰余系 0..m-1 を分岐(-<)して各剰余を検査し、合流(>-)で最初の反例を取り出す。
+#   返り値 -1 = 証明完了、 r>=0 = 反例の剰余 r（剰余を r+1 にエンコードして合流）
 
 import "std/polynomial.bada"
+import "std/flow.bada"
 
 library Prove
-  # m | E(n) を全 n について判定。
-  # 返り値 -1 = 証明完了、 r>=0 = 反例の剰余 r
   def divides_all(coeffs, m)
-    let r = 0
-    while r < m
-      if mod(Poly.eval(coeffs, r), m) != 0
-        return r
-      end
-      r = r + 1
+    # 各剰余 r を「失敗なら r+1, 成功なら 0」に分岐し、左から最初の非ゼロを合流
+    let marked = Flow.mapreduce(range(m),
+      def(r)
+        if mod(Poly.eval(coeffs, r), m) != 0
+          return r + 1
+        end
+        return 0
+      end,
+      def(a, b)
+        if a > 0
+          return a
+        end
+        return b
+      end)
+    if marked > 0
+      return marked - 1
     end
     return -1
   end
 
-  # 判定結果を文字列で返す
   def verdict(coeffs, m, label)
     let r = divides_all(coeffs, m)
     if r < 0
-      return label + " : 証明完了 (剰余系の全数検査で m|E(n))"
+      return label + " : 証明完了 (剰余系の全数検査)"
     end
     return label + " : 反証 (反例 n=" + str(r) + ")"
   end

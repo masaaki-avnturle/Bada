@@ -1,40 +1,34 @@
-# std/basal.bada — 大脳基底核の行動選択を Bada 言語で実装
-# 直接路(Go)・間接路(NoGo)・ハイパー直接路(STN)→GPi→視床の選択的脱抑制。
-# 最も顕著なチャネル（Go が GPi を最も下げる）が選ばれる。
+# std/basal.bada — 大脳基底核の行動選択を指示指向で実装。
+# 全チャネルを [添字, 視床活性] のレーンに分岐(-<)し、視床活性が最大のレーンを
+# 合流(>-)で選ぶ（＝選択的脱抑制の argmax）。
 
 import "std/math.bada"
+import "std/flow.bada"
 
 library BG
-  def mean(sal)
-    let s = 0
-    let i = 0
-    while i < len(sal)
-      s = s + at(sal, i)
-      i = i + 1
-    end
-    return s / len(sal)
+  # 1チャネルの視床活性（Go/NoGo→GPi→視床）
+  def thalamus(sal, da, stn, j)
+    let c = at(sal, j)
+    let d1 = M.relu((1 + da) * c)
+    let d2 = M.relu((1 - da) * c)
+    let gpe = M.relu(1 + 0.5 * stn - d2)
+    let gpi = M.relu(1 + 0.5 * stn - d1 - 0.5 * gpe)
+    return M.relu(1 - gpi)
   end
 
-  # 顕著性リストから選択チャネルの添字を返す
   def select(sal)
     let da = 0.3
-    let stn = mean(sal)
-    let best = 0
-    let bestv = -1
-    let j = 0
-    while j < len(sal)
-      let c = at(sal, j)
-      let d1 = M.relu((1 + da) * c)
-      let d2 = M.relu((1 - da) * c)
-      let gpe = M.relu(1 + 0.5 * stn - d2)
-      let gpi = M.relu(1 + 0.5 * stn - d1 - 0.5 * gpe)
-      let thal = M.relu(1 - gpi)
-      if thal > bestv
-        bestv = thal
-        best = j
-      end
-      j = j + 1
-    end
-    return best
+    # STN 大域興奮 = 平均（分岐→和の合流→個数で割る）
+    let stn = Flow.mapreduce(sal, def(x) return x end, def(a, b) return a + b end) / len(sal)
+    # 各チャネルを [添字, 視床活性] に分岐し、視床活性最大のレーンへ合流
+    let best = Flow.mapreduce(range(len(sal)),
+      def(j) return [j, thalamus(sal, da, stn, j)] end,
+      def(a, b)
+        if at(a, 1) >= at(b, 1)
+          return a
+        end
+        return b
+      end)
+    return at(best, 0)
   end
 end
