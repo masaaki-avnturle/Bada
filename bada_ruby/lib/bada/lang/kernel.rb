@@ -32,6 +32,8 @@ module Bada
         interp.register_native("at") { |arr, i| arr[i.to_i] }
         interp.register_native("keys") { |h| h.is_a?(Hash) ? h.keys : [] }
         interp.register_native("values") { |h| h.is_a?(Hash) ? h.values : [] }
+        interp.register_native("contains") { |s, sub| s.to_s.include?(sub.to_s) }
+        interp.register_native("upcase") { |s| s.to_s.upcase }
         # p(x): print-and-return alias (locals named `p` still shadow it)
         interp.register_native("p") { |x| interp.print_value(x) }
         interp.register_native("set_at") { |arr, i, v| arr[i.to_i] = v; arr }
@@ -77,6 +79,10 @@ module Bada
           "line" => lambda { |q|
             chat ||= Bada::OmegaChat.new
             chat.reply(q.to_s)[:theory][:theory]
+          },
+          "equation" => lambda { |q|
+            chat ||= Bada::OmegaChat.new
+            chat.reply(q.to_s)[:equation][:equation]
           },
           "generate" => lambda { |q|
             chat ||= Bada::OmegaChat.new

@@ -76,6 +76,17 @@ when "evolve", "self-evolve"
   # Self-evolving ChatGPT-variant: quantum BIOS + NPU FPGA SoC that evolves its
   # own source code across telomere-bounded (Hayflick) generations.
   Bada::Lang.run_file(File.expand_path("../bada/app/self_evolve.bada", __dir__))
+when "gpt"
+  # Multi ChatGPT: one request -> equation / paper / app source / proof / circuit / chat.
+  req = ARGV.join(" ")
+  if req.empty?
+    Bada::Lang.run_file(File.expand_path("../bada/app/multigpt.bada", __dir__))
+  else
+    src = %(import "std/multigpt.bada"\n) +
+          %(arr r <- MultiGPT.respond(#{req.inspect})\n) +
+          %(print "[種別: " + at(r, 0) + "]"\nprint at(r, 1)\n)
+    Bada::Lang.run(src, base_dir: File.expand_path("../bada", __dir__))
+  end
 when "foreign"
   # Import Ruby / Python / C libraries from Bada.
   Bada::Lang.run_file(File.expand_path("../bada/app/foreign.bada", __dir__))
@@ -182,6 +193,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | foreign | dialects | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | gpt | foreign | dialects | learn | xi | neural | train | version"
   exit 1
 end
