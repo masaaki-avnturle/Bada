@@ -8,6 +8,7 @@ require_relative "../prover"
 require_relative "../basal"
 require_relative "../penrose"
 require_relative "../chat"
+require_relative "llm"
 
 module Bada
   module Lang
@@ -88,6 +89,19 @@ module Bada
             chat ||= Bada::OmegaChat.new
             chat.reply(q.to_s)[:generated_text][:text]
           },
+          # llm(q): reach a *real* LLM API when one is configured in the
+          # environment (ANTHROPIC_API_KEY / OPENAI_API_KEY); otherwise fall
+          # back gracefully to the local OmegaChat 分派. Always returns text.
+          "llm" => lambda { |q|
+            answer = Bada::Lang::LLM.ask(q.to_s)
+            next answer if answer
+            chat ||= Bada::OmegaChat.new
+            r = chat.reply(q.to_s)
+            "#{r[:theory][:theory]} (Ξ=#{format('%.4f', r[:question_invariant])})"
+          },
+          # backend(): which engine answers llm() — "anthropic"/"openai"/"local".
+          "backend" => lambda { Bada::Lang::LLM.backend&.to_s || "local" },
+          "live" => lambda { Bada::Lang::LLM.available? },
           "xi" => ->(t) { Bada::Manifold.xi(t.to_s) })
 
         interp.register_module("Manifold",
