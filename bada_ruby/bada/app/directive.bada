@@ -1,0 +1,44 @@
+# directive.bada — 指示指向オブジェクト（directive-oriented objects）のデモ。
+# 3つの指示演算子だけでデータフローを書く：
+#   <-  代入オブジェクト（assign）：値を指示オブジェクトに代入
+#   -<  分岐オブジェクト（branch）：各レーンを分岐ディレクティブで分岐
+#   >-  合流オブジェクト（merge） ：レーンを1つに合流（マージ）
+
+def section(s)
+  print "──── " + s + " ────"
+end
+
+# 合流ディレクティブ（2引数のマージ関数）
+def add(a, b)
+  return a + b
+end
+def maxd(a, b)
+  if a > b
+    return a
+  end
+  return b
+end
+
+section("代入 <-")
+let flow = 0 <- 7
+print "flow = " + str(flow)
+
+section("分岐 -<（複数の分岐ディレクティブにファンアウト）")
+let three = flow -< [def(x) return x end, def(x) return x * x end, def(x) return x * x * x end]
+print "powers of 7 = " + str(three)        # <| 7, 49, 343 |>
+
+section("合流 >-（マージ）")
+print "sum    = " + str(three >- add)       # 399
+print "max    = " + str(three >- maxd)      # 343
+
+section("指示指向パイプライン（代入→分岐→合流を連鎖）")
+# 1..? の代わりに、種を分岐で複製してから二乗し合流
+let pipe = (0 <- 5) -< [def(x) return x + 1 end, def(x) return x + 2 end, def(x) return x + 3 end] >- add
+print "5 を3分岐(+1,+2,+3)して合流 = " + str(pipe)   # 6+7+8 = 21
+
+section("ガンマ多様体トリガーを分岐で測る")
+# 種の文字列を分岐し、各レーンで多様体不変量とエントロピーを測って合流
+let q = 0 <- "大域的部分積分多様体"
+let measured = q -< [def(s) return Manifold.xi(s) end, def(s) return Manifold.entropy(s) end]
+print "branch [Xi, H] = " + str(measured)
+print "merged (sum)   = " + str(measured >- add)

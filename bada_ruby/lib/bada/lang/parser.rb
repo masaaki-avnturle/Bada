@@ -251,6 +251,12 @@ module Bada
 
       def parse_primary
         case kind
+        when :def       # anonymous function (directive):  def(params) ... end
+          advance
+          params = parse_params
+          body = block(%i[end])
+          expect(:end)
+          Lambda.new(params, body)
         when :number then Num.new(advance.value)
         when :string then Str.new(advance.value)
         when :true then advance; Bool.new(true)
