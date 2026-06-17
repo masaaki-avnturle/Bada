@@ -11,7 +11,13 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.io.BufferedReader;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Downloads and queries two FREE, openly-licensed dictionaries from the web:
@@ -34,9 +40,13 @@ final class DictionaryRepository {
             "https://raw.githubusercontent.com/davidluzgouveia/kanji-data/master/kanji.json";
     static final String EN_URL =
             "https://raw.githubusercontent.com/adambom/dictionary/master/dictionary.json";
+    /** SKK dictionary (reading→kanji candidates), GPL, EUC-JP — the free converter. */
+    static final String SKK_URL =
+            "https://raw.githubusercontent.com/skk-dev/dict/master/SKK-JISYO.ML";
 
     private final File kanjiFile;
     private final File enFile;
+    private final File skkFile;
     private volatile boolean downloading = false;
 
     /** Simple error callback (avoids java.util.function.Consumer so minSdk can be 21). */
@@ -47,6 +57,7 @@ final class DictionaryRepository {
     DictionaryRepository(File filesDir) {
         kanjiFile = new File(filesDir, "kanji.json");
         enFile = new File(filesDir, "dictionary_en.json");
+        skkFile = new File(filesDir, "skk_conv.euc");
     }
 
     boolean isReady() {
@@ -163,5 +174,56 @@ final class DictionaryRepository {
             }
         } catch (Exception ignored) { }
         return null;
+    }
+
+    // =====================================================================
+    //  SKK conversion dictionary (reading → kanji candidates)
+    // =====================================================================
+    boolean isConvReady() {
+        return skkFile.length() > 1024;
+    }
+
+    /** Download the SKK dictionary if not present (call on a background thread). */
+    void downloadConvIfNeeded() throws Exception {
+        if (skkFile.length() <= 1024) download(SKK_URL, skkFile);
+    }
+
+    /**
+     * Parse the SKK dictionary into a reading→candidates map (okuri-nasi entries
+     * with pure-hiragana readings). EUC-JP encoded. Returns an empty map if absent.
+     */
+    Map<String, List<String>> loadConvDictionary() {
+        Map<String, List<String>> m = new HashMap<>();
+        if (!skkFile.exists()) return m;
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(
+                new FileInputStream(skkFile), Charset.forName("EUC-JP")))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.isEmpty() || line.charAt(0) == ';') continue;
+                int sp = line.indexOf(' ');
+                if (sp <= 0) continue;
+                String reading = line.substring(0, sp);
+                if (!isHiragana(reading)) continue;        // skip okuri-ari / latin
+                List<String> cands = new ArrayList<>();
+                for (String part : line.substring(sp + 1).split("/")) {
+                    if (part.isEmpty()) continue;
+                    int semi = part.indexOf(';');           // drop ;annotation
+                    String cand = semi >= 0 ? part.substring(0, semi) : part;
+                    if (!cand.isEmpty()) cands.add(cand);
+                    if (cands.size() >= 12) break;
+                }
+                if (!cands.isEmpty()) m.put(reading, cands);
+            }
+        } catch (Exception ignored) { }
+        return m;
+    }
+
+    private static boolean isHiragana(String s) {
+        if (s.isEmpty()) return false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!((c >= 0x3041 && c <= 0x3096) || c == 0x30FC)) return false;
+        }
+        return true;
     }
 }

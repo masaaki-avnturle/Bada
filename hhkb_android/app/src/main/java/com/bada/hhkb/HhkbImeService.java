@@ -116,9 +116,29 @@ public class HhkbImeService extends InputMethodService
     @Override
     public void onCreate() {
         super.onCreate();
-        jp.setDictionary(loadDictionary());
+        jp.setDictionary(loadDictionary());     // small bundled dict — works offline immediately
         jp.setListener(this);
         dictRepo = new DictionaryRepository(getFilesDir());
+        upgradeConverterDictionary();           // upgrade to the big free SKK dict in background
+    }
+
+    /** Download (once) and load the free SKK dictionary for richer kanji conversion. */
+    private void upgradeConverterDictionary() {
+        new Thread(() -> {
+            try {
+                dictRepo.downloadConvIfNeeded();
+                Map<String, List<String>> big = dictRepo.loadConvDictionary();
+                if (big != null && !big.isEmpty()) {
+                    // keep the curated bundled entries where SKK lacks them
+                    for (Map.Entry<String, List<String>> e : loadDictionary().entrySet()) {
+                        if (!big.containsKey(e.getKey())) big.put(e.getKey(), e.getValue());
+                    }
+                    jp.setDictionary(big);
+                }
+            } catch (Exception ignored) {
+                // offline / failed → keep the bundled dictionary
+            }
+        }, "skk-load").start();
     }
 
     /** Load the bundled reading→kanji dictionary from assets/jadict.tsv. */
