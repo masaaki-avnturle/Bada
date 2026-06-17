@@ -47,6 +47,7 @@ module Bada
     def run(source, base_dir: nil, out: $stdout, dialect: Dialect.base)
       interp = interpreter(base_dir: base_dir, out: out)
       dialect.builtins.each { |name, callable| interp.register_native(name, &callable) }
+      dialect.foreign.each { |scheme, target, al| Foreign.import_into(interp, scheme, target, al) }
       km = dialect.keyword_map
       pre = dialect.full_prelude
       interp.run(Parser.parse(pre, keyword_map: km)) unless pre.strip.empty?

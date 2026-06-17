@@ -80,6 +80,43 @@ class TestDialectReviser < Minitest::Test
     refute_equal a.signature, b.signature
   end
 
+  def python?
+    system("python3", "--version", out: File::NULL, err: File::NULL)
+  end
+
+  def test_dialect_bakes_in_ruby_library
+    d = Bada::Lang.fork(name: "sci-rb") { ruby "Math", as: "M" }
+    # program needs no import; the library is pre-loaded by the dialect
+    assert_equal ["3"], out("print str(M.sqrt(9))", dialect: d)
+  end
+
+  def test_dialect_foreign_recorded_and_inherited
+    parent = Bada::Lang.fork(name: "p-frn") { ruby "Math", as: "RM" }
+    child = Bada::Lang.fork(name: "c-frn", parent: parent) { ruby "Comparable", as: "Cmp" }
+    assert_includes parent.foreign, %w[ruby Math RM]
+    # child inherits parent's foreign + its own
+    assert_includes child.foreign, %w[ruby Math RM]
+    assert_includes child.foreign, %w[ruby Comparable Cmp]
+    assert_equal ["4"], out("print str(RM.sqrt(16))", dialect: child) # inherited lib works
+  end
+
+  def test_dialect_generic_foreign_spec
+    d = Bada::Lang.fork(name: "gen-frn") { foreign "ruby:Math as MM" }
+    assert_equal ["5"], out("print str(MM.hypot(3, 4))", dialect: d)
+  end
+
+  def test_dialect_bakes_in_python_library
+    skip "python3 not available" unless python?
+    d = Bada::Lang.fork(name: "sci-py") { python "statistics", as: "S" }
+    assert_equal ["20"], out("print str(S.mean([10, 20, 30]))", dialect: d)
+  end
+
+  def test_foreign_changes_dialect_signature
+    a = Bada::Lang.fork(name: "siga") { ruby "Math", as: "M" }
+    b = Bada::Lang.fork(name: "sigb") { ruby "Comparable", as: "M" }
+    refute_equal a.signature, b.signature
+  end
+
   def test_base_dialect_unaffected_by_forks
     Bada::Lang.fork(name: "throwaway") { rename :def, "関数" }
     # base still uses 'def'
