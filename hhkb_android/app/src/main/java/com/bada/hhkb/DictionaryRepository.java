@@ -39,6 +39,11 @@ final class DictionaryRepository {
     private final File enFile;
     private volatile boolean downloading = false;
 
+    /** Simple error callback (avoids java.util.function.Consumer so minSdk can be 21). */
+    interface ErrCallback {
+        void onError(String message);
+    }
+
     DictionaryRepository(File filesDir) {
         kanjiFile = new File(filesDir, "kanji.json");
         enFile = new File(filesDir, "dictionary_en.json");
@@ -53,7 +58,7 @@ final class DictionaryRepository {
     }
 
     /** Download both dictionaries on a background thread; runs onDone on completion. */
-    void ensureDownloaded(final Runnable onDone, final java.util.function.Consumer<String> onError) {
+    void ensureDownloaded(final Runnable onDone, final ErrCallback onError) {
         if (isReady() || downloading) return;
         downloading = true;
         new Thread(() -> {
@@ -64,7 +69,7 @@ final class DictionaryRepository {
                 if (onDone != null) onDone.run();
             } catch (Exception e) {
                 downloading = false;
-                if (onError != null) onError.accept(String.valueOf(e.getMessage()));
+                if (onError != null) onError.onError(String.valueOf(e.getMessage()));
             }
         }, "dict-download").start();
     }

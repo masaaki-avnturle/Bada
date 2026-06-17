@@ -49,8 +49,14 @@ jobs:
           path: hhkb_android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
 
-      - name: Attach APK to release (on tag/release)
-        if: github.event_name == 'release'
+      - name: Publish Release with the raw APK (on tag / release)
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          name: Bada HHKB Keyboard
+          body: |
+            Bada HHKB ホログラム・キーボード（デバッグ署名）。
+            下の `app-debug.apk` を直接ダウンロードしてインストールしてください
+            （Actions の Artifacts と違い ZIP ではありません）。
+            初回のみ：旧バージョンが入っている場合はアンインストールしてからどうぞ。
           files: hhkb_android/app/build/outputs/apk/debug/*.apk
