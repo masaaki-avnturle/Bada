@@ -34,4 +34,15 @@ library Flow
   def add(a, b)
     return a + b
   end
+
+  # 並列レーン結合：2つのリストをレーンごとに f で結合した指示オブジェクトを返す。
+  # 各レーン i は f(xs[i], ys[i]) として独立に評価される（並列レーン）。
+  def zip(xs, ys, f)
+    return Flow.seed(range(len(xs))) -< def(i) return f(at(xs, i), at(ys, i)) end
+  end
+
+  # 並列結合してから合流まで一気に行う（zip → reduce）
+  def zipreduce(xs, ys, f, rf)
+    return Flow.zip(xs, ys, f) >- rf
+  end
 end

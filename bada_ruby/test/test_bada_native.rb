@@ -98,6 +98,22 @@ class TestBadaStdLib < Minitest::Test
     assert_equal ["55"], out(src)
   end
 
+  def test_flow_zip_parallel_lanes
+    # dot product via parallel lane combine (zip) then merge (sum) = 32
+    src = <<~BADA
+      import "std/flow.bada"
+      print str(Flow.zipreduce([1, 2, 3], [4, 5, 6],
+        def(a, b) return a * b end,
+        def(a, b) return a + b end))
+    BADA
+    assert_equal ["32"], out(src)
+  end
+
+  def test_gamma_still_exact_after_flow_lanczos
+    assert_in_delta 24.0, with("std/special.bada", "Special.gamma(5)").to_f, 1e-4
+    assert_in_delta 1.0 / 12.0, with("std/special.bada", "Special.beta(2, 3)").to_f, 1e-6
+  end
+
   def test_std_entropy_uses_directives
     # the directive-rewritten Entropy still computes H correctly
     v = with("std/entropy.bada", "Entropy.shannon([0.25, 0.25, 0.25, 0.25])").to_f

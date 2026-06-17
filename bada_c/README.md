@@ -13,6 +13,7 @@ executable files**, and it implements the requested ideas concretely:
 | オブジェクト指向のクラス | `class/new/method/send`（クラスもオブジェクトも cons リスト） |
 | 多様体の熱エントロピー × クラス・ネットワーク | `thermal(weights)` がクラス網の不変量を返し選択を駆動 |
 | リスト構造と同じデザインパターン | **すべてが cons リスト**（コード=データ、ホモイコニック） |
+| 指示指向オブジェクト | `<-` 代入 / `-<` 分岐 / `>-` 合流（指示オブジェクトも cons リスト `(directive ...)`） |
 | 自己進化 | `evolve.bada` が Xi トリガーで新しい Bada ソースを生成→実行→コンパイル |
 
 ## ビルドと実行
@@ -45,6 +46,8 @@ print "fib(10) = " + str(fib(10))
 ### 組込み（ランタイム）
 
 - リスト構造: `list car cdr cons at len append`
+- 指示指向オブジェクト: 演算子 `<- -< >-`、`directive lanes`（指示オブジェクトは `(directive ...)`）
+  例: `(0 <- 0) -< [1,2,3,4,5] -< def(x) return x*x end >- def(a,b) return a+b end` → 55
 - 多様体トリガー: `gamma beta xlogx element zeta_gauge entropy xi thermal`
 - 数学: `exp log sqrt sin cos pow mod floor abs pi`
 - オブジェクト（リスト上）: `class new method send get_slot set_slot class_name`

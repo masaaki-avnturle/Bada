@@ -2,26 +2,26 @@
 # Lanczos 近似（g=7, n=9）をそのまま Bada のループで計算する。
 
 import "std/math.bada"
+import "std/flow.bada"
 
 library Special
   def lanczos()
     return [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]
   end
 
-  # ガンマ関数 Γ(x)（Lanczos 近似 + 反射公式）
+  # ガンマ関数 Γ(x)（Lanczos 近似 + 反射公式）。
+  # Lanczos 和 a = c[0] + Σ_{i=1..8} c[i]/(xx+i) を「添字に分岐→和で合流」で計算。
   def gamma(x)
     if x < 0.5
       return pi() / (sin(pi() * x) * gamma(1 - x))
     end
     let xx = x - 1
     let c = lanczos()
-    let a = at(c, 0)
     let t = xx + 7 + 0.5
-    let i = 1
-    while i < 9
-      a = a + at(c, i) / (xx + i)
-      i = i + 1
-    end
+    let s = Flow.mapreduce(range(8),
+      def(k) return at(c, k + 1) / (xx + (k + 1)) end,
+      def(p, q) return p + q end)
+    let a = at(c, 0) + s
     return sqrt(M.two_pi()) * pow(t, xx + 0.5) * exp(-t) * a
   end
 
