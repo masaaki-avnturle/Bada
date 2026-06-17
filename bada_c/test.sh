@@ -23,6 +23,14 @@ print "fib=" + str(fib(10)) + " g=" + str(gamma(5))')"
 check "beta identity" "0.0833333" "$(./bada eval 'print str(beta(2,3))')"
 check "cons lists" "[2, 3]" "$(./bada eval 'print str(cdr(list(1,2,3)))')"
 check "xi trigger" "0.185528" "$(./bada eval 'print str(xi([0.5,0.25,0.25]))')"
+check "long-string concat (no overflow)" "len = 5000" "$(./bada eval '
+let s = ""
+let i = 0
+while i < 5000
+  s = s + "x"
+  i = i + 1
+end
+print "len = " + str(len(s))')"
 
 echo "== objects (classes/objects are cons-lists) =="
 OUT="$(./bada run examples/objects.bada)"

@@ -334,12 +334,21 @@ static Val* call_fun(Val* fn, Val** args, int n){
 static double as_num(Val* v){ return v->tag==T_NUM? v->num : 0; }
 static void val_print(Val* v, FILE* f);
 
+/* Render any value to a fresh heap C-string (grows dynamically; no overflow). */
+static char* val_to_cstr(Val* v){
+  char* buf=NULL; size_t sz=0;
+  FILE* f=open_memstream(&buf,&sz);
+  val_print(v,f); fclose(f);
+  return buf; /* caller owns; leaked like all Bada values (no GC) */
+}
+
 static Val* eval_binop(const char* op, Val* a, Val* b){
   if(!strcmp(op,"+")){
-    if(a->tag==T_STR||b->tag==T_STR){ char buf[8192]; char l[4096],r[4096];
-      FILE*fl=fmemopen(l,sizeof l,"w"); val_print(a,fl); fclose(fl);
-      FILE*fr=fmemopen(r,sizeof r,"w"); val_print(b,fr); fclose(fr);
-      snprintf(buf,sizeof buf,"%s%s",l,r); return mk_str(buf); }
+    if(a->tag==T_STR||b->tag==T_STR){
+      char* l=val_to_cstr(a); char* r=val_to_cstr(b);
+      size_t n=strlen(l)+strlen(r)+1; char* buf=malloc(n);
+      snprintf(buf,n,"%s%s",l,r); free(l); free(r);
+      Val* res=mk_str(buf); free(buf); return res; }
     return mk_num(as_num(a)+as_num(b)); }
   if(!strcmp(op,"-")) return mk_num(as_num(a)-as_num(b));
   if(!strcmp(op,"*")) return mk_num(as_num(a)*as_num(b));
@@ -433,7 +442,7 @@ static void val_print(Val* v, FILE* f){
 }
 
 /* ----------------------------------------------------------------- builtins */
-static Val* bi_str(Val** a,int n){ (void)n; char buf[8192]; FILE*f=fmemopen(buf,sizeof buf,"w"); val_print(a[0],f); fclose(f); return mk_str(buf); }
+static Val* bi_str(Val** a,int n){ (void)n; char* s=val_to_cstr(a[0]); Val* v=mk_str(s); free(s); return v; }
 static Val* bi_len(Val** a,int n){ (void)n; Val* v=a[0]; if(v->tag==T_STR) return mk_num(strlen(v->str)); return mk_num(list_len(v)); }
 static Val* bi_at(Val** a,int n){ (void)n; return nth(a[0], (int)as_num(a[1])); }
 static Val* bi_cons(Val** a,int n){ (void)n; return cons(a[0],a[1]); }
