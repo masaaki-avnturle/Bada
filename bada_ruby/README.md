@@ -441,6 +441,9 @@ bin/bada serve            # PWA を配信 → スマホで開き「ホーム画�
 bin/bada apk              # Android APK を生成（JDK+Gradle+Android SDK が必要）
 ```
 
+GitHub Actions が APK を自動ビルドして Releases に公開するので、**URL から直接ダウンロード**
+できます: `https://github.com/masaaki-avnturle/Bada/releases/latest/download/bada-xp.apk`
+
 詳細は [`mobile/README.md`](mobile/README.md)。
 
 ## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
