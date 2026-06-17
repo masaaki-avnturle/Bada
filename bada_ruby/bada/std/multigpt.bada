@@ -1,0 +1,82 @@
+# multigpt.bada — マルチ ChatGPT：1つの要求から、方程式・論文・アプリ(ソースコード)・
+# 証明・FPGA回路・対話 を分類して生成・ルーティングする統合 ChatGPT アプリ。
+# これまでの全エンジン（Chat分派 / Manifold / Info / Prover / QNPU / 生成AI）を束ねる。
+
+import "std/quantum_npu.bada"
+
+library MultiGPT
+  def nl()
+    return "
+"
+  end
+
+  # 要求の意図を分類（方程式/論文/証明/回路/アプリ/対話）
+  def classify(req)
+    if contains(req, "方程式") or contains(req, "equation")
+      return "equation"
+    end
+    if contains(req, "論文") or contains(req, "paper")
+      return "paper"
+    end
+    if contains(req, "証明") or contains(req, "prove") or contains(req, "予想")
+      return "proof"
+    end
+    if contains(req, "回路") or contains(req, "FPGA") or contains(req, "Verilog") or contains(req, "verilog")
+      return "circuit"
+    end
+    if contains(req, "アプリ") or contains(req, "ソース") or contains(req, "コード") or contains(req, "app") or contains(req, "code")
+      return "application"
+    end
+    return "chat"
+  end
+
+  # 論文（Markdown + LaTeX）を生成
+  def paper(topic)
+    let s <- "# " + topic + nl() + nl()
+    s = s + "**著者**: Bada MultiGPT（自動生成）  ·  **不変量 Ξ = " + str(Manifold.xi(topic)) + "**" + nl() + nl()
+    s = s + "## 要旨 (Abstract)" + nl() + Chat.line(topic) + nl() + nl()
+    s = s + "## 方程式 (Equation)" + nl() + "$$" + Chat.equation(topic) + "$$" + nl() + nl()
+    s = s + "## 理論的分解 (Theory)" + nl() + Info.render(topic) + nl()
+    return s
+  end
+
+  # アプリ（実行可能な Bada ソースコード）を生成
+  def application(req)
+    let q <- "\""
+    let s <- "# 生成アプリ (MultiGPT): " + req + nl()
+    s = s + "import " + q + "std/special.bada" + q + nl()
+    s = s + "import " + q + "std/manifold.bada" + q + nl()
+    s = s + "print " + q + "=== " + req + " ===" + q + nl()
+    s = s + "print " + q + "Γ(5) = " + q + " + str(Special.gamma(5))" + nl()
+    s = s + "arr ps <- [0.5, 0.25, 0.25]" + nl()
+    s = s + "print " + q + "Ξ(分布) = " + q + " + str(Mani.invariant(ps))" + nl()
+    s = s + "print " + q + "完了: 生成アプリが実行されました" + q + nl()
+    return s
+  end
+
+  # FPGA 回路（Verilog SoC）を生成
+  def circuit(req)
+    return QNPU.soc(4, 8)
+  end
+
+  # 要求に応答（マルチ・ディスパッチ）。返り値 [種別, 出力]
+  def respond(req)
+    let kind <- classify(req)
+    if kind == "equation"
+      return [kind, Chat.equation(req)]
+    end
+    if kind == "paper"
+      return [kind, paper(req)]
+    end
+    if kind == "proof"
+      return [kind, Prover.render(req, 3)]
+    end
+    if kind == "circuit"
+      return [kind, circuit(req)]
+    end
+    if kind == "application"
+      return [kind, application(req)]
+    end
+    return [kind, Chat.ask(req)]
+  end
+end

@@ -342,6 +342,33 @@ bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
 > 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
 > その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
 
+## マルチ ChatGPT — 方程式・論文・アプリ・証明・回路・対話を1つの入口で
+
+`bada/std/multigpt.bada` ＋ `bada/app/multigpt.bada` は、これまでの全エンジン
+（ChatGPT分派・Manifold・Info・Prover・QNPU・生成AI）を束ねた **マルチ ChatGPT** です。
+1つの要求を分類して、適切な生成器へルーティングします。
+
+```bash
+bin/bada gpt "ガンマ関数の方程式を生成して"          # → 方程式
+bin/bada gpt "大域的部分積分多様体について証明して"   # → 健全な証明
+bin/bada gpt "微小管のFPGA回路を生成して"            # → Verilog SoC
+bin/bada gpt "エントロピーを計算するアプリのコードを書いて"  # → 実行可能な Bada ソース
+bin/bada gpt "意識とは何か"                          # → 対話
+bin/bada gpt                                         # 全モードのデモ
+```
+
+| 要求の種別 | 出力 | エンジン |
+|:--|:--|:--|
+| 方程式 / equation | 数式（LaTeX） | `Chat.equation`（OmegaChat 分派） |
+| 論文 / paper | Markdown+LaTeX 論文 | `Chat`＋`Info`（多様体/カタストロフィ/ミレニアム）＋`Manifold` |
+| 証明 / 予想 | 健全な証明・反証 | `Prover`（未知事前エンジン） |
+| 回路 / FPGA / Verilog | 量子BIOS+NPU SoC | `QNPU.soc` |
+| アプリ / ソース / コード | **実行可能な Bada ソース** | `MultiGPT.application` |
+| その他 | 対話応答 | `Chat.ask`（OmegaChat 分派） |
+
+`MultiGPT.respond(req)` は `[種別, 出力]` を返し、生成された論文は `multigpt_paper.md`、
+生成アプリのソースはそのまま `bada lang` で実行できます。
+
 ## 自己進化する亜種ChatGPT — 量子BIOS+NPU FPGA / テロメア分裂で自己進化
 
 `bada/std/quantum_npu.bada` ＋ `bada/std/telomere.bada` ＋ `bada/std/evolver.bada`
