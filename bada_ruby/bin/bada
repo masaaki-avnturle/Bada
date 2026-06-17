@@ -18,6 +18,8 @@
 #   bin/bada llm "質問..."             real LLM API (鍵があれば本物) else ローカル分派
 #   bin/bada llm versions              バージョン台帳を表示
 #   bin/bada llm --downgrade [N] "..."  前のバージョンへN段ダウングレードして質問
+#   bin/bada serve [port]              Bada XP アプリ(PWA)を配信（スマホで「ホーム画面に追加」）
+#   bin/bada apk                       Bada XP を Android APK にパッケージ
 #   bin/bada dialects                   language branching system: fork variants (亜種)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
@@ -241,10 +243,52 @@ when "train"
   chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
   chat.save(out)
   puts "saved checkpoint -> #{out}"
+when "serve"
+  # Serve the Bada XP mobile app (PWA) over HTTP so you can open it on a phone
+  # (same Wi-Fi) and "ホーム画面に追加" to install it as an app. Pure stdlib.
+  #   bada serve [port]   (default 8787)
+  require "socket"
+  port = (ARGV.shift || "8787").to_i
+  root = File.expand_path("../mobile/www", __dir__)
+  mime = { ".html" => "text/html; charset=utf-8", ".js" => "text/javascript; charset=utf-8",
+           ".webmanifest" => "application/manifest+json; charset=utf-8",
+           ".svg" => "image/svg+xml", ".json" => "application/json; charset=utf-8",
+           ".css" => "text/css; charset=utf-8" }
+  server = TCPServer.new("0.0.0.0", port)
+  ip = Socket.ip_address_list.find { |a| a.ipv4? && !a.ipv4_loopback? }&.ip_address || "localhost"
+  puts "Bada XP app: http://#{ip}:#{port}/  (端末で開いて「ホーム画面に追加」)"
+  puts "停止: Ctrl-C"
+  loop do
+    sock = server.accept
+    begin
+      req = sock.gets.to_s
+      path = req.split(" ")[1] || "/"
+      path = "/index.html" if path == "/"
+      path = path.split("?").first
+      file = File.expand_path(File.join(root, path))
+      if file.start_with?(root) && File.file?(file)
+        body = File.binread(file)
+        ext = File.extname(file)
+        sock.print "HTTP/1.1 200 OK\r\nContent-Type: #{mime[ext] || 'application/octet-stream'}\r\n" \
+                   "Content-Length: #{body.bytesize}\r\nCache-Control: no-cache\r\n\r\n"
+        sock.write(body)
+      else
+        sock.print "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
+      end
+    rescue StandardError
+      nil
+    ensure
+      sock.close
+    end
+  end
+when "apk"
+  # Package the mobile app into an Android APK (needs JDK + Gradle + Android SDK).
+  script = File.expand_path("../mobile/build_apk.sh", __dir__)
+  exec("bash", script, *ARGV)
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION} — codename #{Bada::Lang::LLM.codename}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | gpt | llm | foreign | dialects | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | prove | basal | penrose | palette | run | lang | directive | syntax | consciousness | genai | evolve | gpt | llm | serve | apk | foreign | dialects | learn | xi | neural | train | version"
   exit 1
 end
