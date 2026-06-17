@@ -112,12 +112,25 @@
 </dialog>
 
 <dialog id="setDlg">
-  <h3>設定 — 本物の LLM へ接続（任意）</h3>
-  <label>Anthropic API キー（端末内のみ保存・送信先は api.anthropic.com）</label>
-  <input id="apiKey" type="password" placeholder="sk-ant-...（空ならローカル分派）" autocomplete="off">
-  <p class="hint">キーを入れると、選択中の版（local 以外）で本物の Claude に接続します。失敗・未設定・
-  ローカル版のときは自動でローカル分派にフォールバックします。キーはこの端末の localStorage にのみ
-  保存され、ブラウザから直接 Anthropic に送られます（個人利用向け。共有端末では入れないでください）。</p>
+  <h3>設定 — 本物の ChatGPT に接続</h3>
+  <p class="hint" style="margin-top:0">本物の AI 応答には API キーが必要です（あなたのキー）。未設定だと
+  オフラインの<b>デモ・エンジン（定型文）</b>になります。キーは<b>この端末内だけ</b>に保存され、
+  ブラウザから選んだ提供元へ直接送られます（共有端末では入れないでください）。</p>
+  <label>提供元 (Provider)</label>
+  <select id="provider">
+    <option value="anthropic">Anthropic（Claude）— 推奨</option>
+    <option value="openai">OpenAI（ChatGPT）/ 互換</option>
+  </select>
+  <label>API キー</label>
+  <input id="apiKey" type="password" placeholder="sk-ant-... / sk-..." autocomplete="off">
+  <label>モデル（任意・空欄で既定）</label>
+  <input id="modelOverride" type="text" placeholder="例: claude-opus-4-8 / gpt-4o-mini" autocomplete="off">
+  <label id="baseLabel" style="display:none">OpenAI 互換のベース URL（任意）</label>
+  <input id="openaiBase" type="text" placeholder="https://api.openai.com/v1" autocomplete="off" style="display:none">
+  <div class="row" style="margin-top:10px; align-items:center">
+    <button id="setTest">接続テスト</button>
+    <span class="hint" id="setResult" style="margin:0 0 0 auto"></span>
+  </div>
   <div class="row" style="margin-top:10px">
     <button id="setClear">キーを消去</button>
     <button id="setSave" style="margin-left:auto;background:var(--me);border-color:var(--me)">保存</button>
@@ -249,26 +262,53 @@ let selIndex = (function(){
 const cur = () => LADDER[selIndex];
 function setVersion(i){ selIndex = Math.max(0,Math.min(LADDER.length-1,i));
   localStorage.setItem("bada_xp_version", cur().id); renderVersion(); }
-const apiKey = () => localStorage.getItem("bada_xp_key") || "";
+// ===== real-LLM configuration (kept on-device only) =====
+const apiKey   = () => (localStorage.getItem("bada_xp_key") || "").trim();
+const provider = () => localStorage.getItem("bada_xp_provider") || "anthropic";
+const openaiBase = () => (localStorage.getItem("bada_xp_openai_base") || "https://api.openai.com/v1").trim();
+// model actually sent: explicit override > ladder model (Anthropic) / default (OpenAI)
+function activeModel(){
+  const ov = (localStorage.getItem("bada_xp_model") || "").trim();
+  if (ov) return ov;
+  if (provider() === "openai") return "gpt-4o-mini";
+  return cur().model || "claude-opus-4-8";
+}
+// A real LLM answers when a key is set AND we're not pinned to the local rung.
 const isLive = () => !!apiKey() && cur().id !== "local";
 
-// ===== real LLM (Anthropic Messages API from the browser) =====
-async function anthropic(prompt){
-  try{
-    const r = await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{ "content-type":"application/json", "x-api-key":apiKey(),
-                "anthropic-version":"2023-06-01",
-                "anthropic-dangerous-direct-browser-access":"true" },
-      body:JSON.stringify({ model:cur().model, max_tokens:1024,
-                            messages:[{role:"user",content:prompt}] })
-    });
-    if(!r.ok) return null;
-    const j = await r.json();
-    if(j.stop_reason === "refusal") return null;
-    const t = (j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
-    return t || null;
-  }catch(e){ return null; }
+// ===== real LLM call (returns {ok, text} or {ok:false, error}) =====
+async function callLLM(prompt){
+  if (!apiKey()) return { ok:false, error:"API キー未設定（設定で入力してください）" };
+  try {
+    if (provider() === "openai") {
+      const r = await fetch(openaiBase() + "/chat/completions", {
+        method:"POST",
+        headers:{ "content-type":"application/json", "authorization":"Bearer " + apiKey() },
+        body:JSON.stringify({ model:activeModel(), max_tokens:1024,
+                              messages:[{role:"user",content:prompt}] })
+      });
+      if (!r.ok) return { ok:false, error:`HTTP ${r.status} ${(await r.text()).slice(0,160)}` };
+      const j = await r.json();
+      const t = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      return t ? { ok:true, text:t } : { ok:false, error:"空の応答" };
+    } else {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{ "content-type":"application/json", "x-api-key":apiKey(),
+                  "anthropic-version":"2023-06-01",
+                  "anthropic-dangerous-direct-browser-access":"true" },
+        body:JSON.stringify({ model:activeModel(), max_tokens:1024,
+                              messages:[{role:"user",content:prompt}] })
+      });
+      if (!r.ok) return { ok:false, error:`HTTP ${r.status} ${(await r.text()).slice(0,160)}` };
+      const j = await r.json();
+      if (j.stop_reason === "refusal") return { ok:false, error:"安全分類器による拒否 (refusal)" };
+      const t = (j.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("");
+      return t ? { ok:true, text:t } : { ok:false, error:"空の応答" };
+    }
+  } catch(e) {
+    return { ok:false, error:"通信エラー（ネットワーク/CORS）: " + (e && e.message ? e.message : e) };
+  }
 }
 // ===== uploaded files (OneDrive / Drive / device via the system picker) =====
 const MAX_CHARS = 20000; // per-file cap for the LLM prompt
@@ -288,8 +328,13 @@ function localAnswer(question){
 }
 async function answer(question){
   const prompt = attachments.length ? (contextBlock() + "\n\n質問: " + question) : question;
-  if(isLive()){ const real = await anthropic(prompt); if(real) return {text:real, engine:cur().model}; }
-  return { text: localAnswer(question), engine: cur().id==="local" ? "local" : (apiKey()? "fallback":"local") };
+  if(isLive()){
+    const r = await callLLM(prompt);
+    if(r.ok) return { text:r.text, engine: activeModel() };
+    // Don't silently fall back to templates — tell the user WHY, then offer the demo.
+    return { text:`⚠ 本物のAIに接続できませんでした（${r.error}）\n設定でキー・提供元・モデルをご確認ください。\n\n— 以下はオフラインのデモ応答（定型）—\n` + localAnswer(question), engine:"error" };
+  }
+  return { text: localAnswer(question), engine:"demo" };
 }
 
 // ===== UI =====
@@ -304,7 +349,7 @@ function bubble(text, who, meta){
 }
 function renderVersion(){
   $("#verName").textContent = cur().label;
-  $("#engName").textContent = isLive() ? cur().model : "local";
+  $("#engName").textContent = isLive() ? ("本物:" + activeModel()) : (apiKey() ? "デモ(local版)" : "デモ(テンプレート)");
 }
 function renderLadder(){
   const ul = $("#ladderUl"); ul.innerHTML = "";
@@ -325,7 +370,8 @@ async function send(){
   const res = await answer(q);
   typing.firstChild.textContent = res.text;
   const m=document.createElement("span"); m.className="meta";
-  m.textContent = `${cur().label} · ${res.engine==="local"?"ローカル分派":res.engine==="fallback"?"鍵あり→フォールバック":"本物のLLM"}`;
+  const tag = res.engine==="demo" ? "デモ(テンプレート)" : res.engine==="error" ? "接続失敗→デモ" : "本物のAI:"+res.engine;
+  m.textContent = `${cur().label} · ${tag}`;
   typing.appendChild(m); log.scrollTop=log.scrollHeight;
 }
 
@@ -374,12 +420,13 @@ async function generate(){
   bubble(q + (attachments.length ? ` 〔添付 ${attachments.length} 件〕` : ""), "me");
   const typing = bubble("…","bot");
   if(isLive()){
-    const real = await anthropic(contextBlock() + "\n\n要求: " + q +
+    const r = await callLLM(contextBlock() + "\n\n要求: " + q +
       "\n\n上記の添付があれば踏まえて、実行可能な小さなアプリのソースコードを1つだけ生成してください。コードのみ。");
-    if(real){ typing.remove(); codeBubble(real, "bada_xp_app.txt", `${cur().model} · ${kind}`); $("#q").value=""; return; }
+    if(r.ok){ typing.remove(); codeBubble(r.text, "bada_xp_app.txt", `本物のAI:${activeModel()} · ${kind}`); $("#q").value=""; return; }
+    typing.firstChild.textContent = `⚠ 接続失敗（${r.error}）。デモ生成にフォールバックします。`;
   }
   typing.remove();
-  codeBubble(generateApp(q, attachments), "bada_xp_app.bada", `ローカル生成 · ${kind}`);
+  codeBubble(generateApp(q, attachments), "bada_xp_app.bada", `デモ生成 · ${kind}`);
   $("#q").value="";
 }
 
@@ -394,17 +441,50 @@ $("#btnUp").onclick   = ()=>{ setVersion(selIndex-1); };
 $("#btnVer").onclick  = ()=>{ renderLadder(); $("#verDlg").showModal(); };
 $("#verClose").onclick= ()=> $("#verDlg").close();
 $("#btnReset").onclick= ()=>{ setVersion(DEFAULT_INDEX); renderLadder(); };
-$("#btnSet").onclick  = ()=>{ $("#apiKey").value = apiKey(); $("#setDlg").showModal(); };
-$("#setSave").onclick = ()=>{ localStorage.setItem("bada_xp_key", $("#apiKey").value.trim()); renderVersion(); $("#setDlg").close(); };
+function loadSettingsForm(){
+  $("#provider").value = provider();
+  $("#apiKey").value = apiKey();
+  $("#modelOverride").value = localStorage.getItem("bada_xp_model") || "";
+  $("#openaiBase").value = localStorage.getItem("bada_xp_openai_base") || "";
+  toggleOpenaiBase();
+  $("#setResult").textContent = "";
+}
+function saveSettingsForm(){
+  localStorage.setItem("bada_xp_provider", $("#provider").value);
+  localStorage.setItem("bada_xp_key", $("#apiKey").value.trim());
+  const mo = $("#modelOverride").value.trim();
+  mo ? localStorage.setItem("bada_xp_model", mo) : localStorage.removeItem("bada_xp_model");
+  const ob = $("#openaiBase").value.trim();
+  ob ? localStorage.setItem("bada_xp_openai_base", ob) : localStorage.removeItem("bada_xp_openai_base");
+}
+function toggleOpenaiBase(){
+  const on = $("#provider").value === "openai";
+  $("#baseLabel").style.display = on ? "block" : "none";
+  $("#openaiBase").style.display = on ? "block" : "none";
+}
+$("#provider").addEventListener("change", toggleOpenaiBase);
+$("#btnSet").onclick  = ()=>{ loadSettingsForm(); $("#setDlg").showModal(); };
+$("#setSave").onclick = ()=>{ saveSettingsForm(); renderVersion(); $("#setDlg").close(); };
 $("#setClear").onclick= ()=>{ localStorage.removeItem("bada_xp_key"); $("#apiKey").value=""; renderVersion(); };
+$("#setTest").onclick = async ()=>{
+  saveSettingsForm();
+  $("#setResult").textContent = "接続中…";
+  const r = await callLLM("接続テストです。日本語で『接続OK』とだけ短く返答してください。");
+  $("#setResult").textContent = r.ok ? ("✓ 成功: " + r.text.slice(0,40)) : ("✗ " + r.error);
+  renderVersion();
+};
 
 renderVersion();
 renderChips();
-bubble(`こんにちは。Bada XP（ChatGPT 分派）です。\n現在の版: ${cur().label}。`+
-       `\n\n📎 で OneDrive・ドライブ・端末の任意ファイルを添付できます。`+
-       `添付した内容について「送信」で質問、「⚙ アプリ生成」でソースコードを生成・ダウンロードできます。`+
-       `\n「バージョン」から前の版へダウングレードでき、鍵が無くてもローカル分派で動きます。`, "bot",
-       "Ξ = β(H+1, M+1) / log(N+1)");
+if(!isLive()){
+  bubble(`こんにちは。Bada XP です。\n\n⚠ 現在は API キー未設定のため、応答は『デモ・エンジン（定型文＝テンプレート）』です。`+
+    `\n\n本物の ChatGPT（Claude / OpenAI）にするには：\n① 右上「設定」を開く\n② 提供元を選び、ご自身の API キーを入力\n③「接続テスト」で確認 → 保存\n`+
+    `これで実在の AI が応答します（鍵はこの端末内だけに保存）。\n\n📎 でファイル添付、「⚙ アプリ生成」でコード生成もできます。`,
+    "bot", "本物の応答には API キーが必要です");
+}else{
+  bubble(`こんにちは。Bada XP です。本物の AI（${activeModel()}）に接続済みです。`+
+    `\n📎 で OneDrive・任意ファイルを添付して質問やアプリ生成ができます。`, "bot", `本物のAI:${activeModel()}`);
+}
 
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("service-worker.js").catch(()=>{});
