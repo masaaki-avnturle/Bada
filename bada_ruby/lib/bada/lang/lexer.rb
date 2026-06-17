@@ -7,7 +7,8 @@ module Bada
     # Lexer for the Bada scripting language. Produces a flat token stream;
     # NEWLINE tokens act as statement separators (multiple/blank lines collapse).
     class Lexer
-      KEYWORDS = %w[let def end if elsif else while return print import library true false and or not nil].freeze
+      KEYWORDS = %w[let def end if elsif else while return print import library true false and or not nil
+                    arr has loop in].freeze
 
       # Default surface-keyword -> canonical-role map (identity). A dialect
       # supplies an extended map so an aliased surface word (e.g. "関数") lexes
@@ -87,9 +88,18 @@ module Bada
 
       def number
         buf = +""
-        while !eof? && (digit?(cur) || cur == ".")
+        while !eof? && digit?(cur)
           buf << cur
           advance
+        end
+        # a decimal point only if followed by a digit (so 1..5 is NOT a number)
+        if !eof? && cur == "." && digit?(nxt)
+          buf << cur
+          advance
+          while !eof? && digit?(cur)
+            buf << cur
+            advance
+          end
         end
         # scientific notation: e / E with optional sign
         if !eof? && (cur == "e" || cur == "E") && (digit?(nxt) || nxt == "+" || nxt == "-")
@@ -122,9 +132,10 @@ module Bada
 
       MULTI = { "<-" => :larrow, "-<" => :integ, ">-" => :rarrow,
                 "==" => :eq, "!=" => :neq, "<=" => :le, ">=" => :ge,
-                "::" => :colcol }.freeze
+                "::" => :colcol, ".." => :dotdot, "->" => :arrow }.freeze
       SINGLE = { "+" => :plus, "-" => :minus, "*" => :star, "/" => :slash,
                  "(" => :lparen, ")" => :rparen, "[" => :lbracket, "]" => :rbracket,
+                 "{" => :lbrace, "}" => :rbrace, ":" => :colon,
                  "," => :comma, "." => :dot, "=" => :assign, "<" => :lt, ">" => :gt }.freeze
 
       def operator

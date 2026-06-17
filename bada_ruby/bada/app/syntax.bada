@@ -1,0 +1,41 @@
+# syntax.bada — 指示指向オブジェクトに基づく構文オブジェクトのデモ。
+#   配列  arr x <- [1..5]   /  添字 x[0]  /  スライス x[1..3]
+#   ハッシュ has h <- {a: 1} /  添字 h["a"]
+#   型付き let int n <- 42   /  let str s <- "..."
+#   分岐ループ  arr r <- [..] / r -< fn / loop v in ... -> p(v)
+
+def section(s)
+  print "──── " + s + " ────"
+end
+
+section("配列 arr ＋ 範囲 [a..b] ＋ 添字/スライス")
+arr x <- [1..5]
+print "x          = " + str(x)
+print "x[0], x[4] = " + str(x[0]) + ", " + str(x[4])
+print "x[1..3]    = " + str(x[1..3])
+
+section("ハッシュ has ＋ キー添字")
+has cfg <- {width: 80, height: 24, name: "bada"}
+print "cfg          = " + str(cfg)
+print "cfg[width]   = " + str(cfg["width"])
+print "keys         = " + str(keys(cfg))
+
+section("型付き宣言（型はヒント、<- は代入オブジェクト）")
+let int n <- 42
+let str greeting <- "hello,world"
+print "int n      = " + str(n)
+print "str greet  = " + greeting
+
+section("分岐ループ：配列を分岐(-<)して loop で出力")
+arr r <- [1..5]
+let squared <- r -< def(x) return x * x end
+print "squared    = " + str(squared)
+loop v in squared -> p(v)
+
+section("配列はそのまま指示オブジェクト（分岐→合流）")
+print "Σk^2(1..5) = " + str([1..5] -< def(x) return x * x end >- def(a, b) return a + b end)
+
+section("ハッシュ走査ループ")
+loop kv in cfg
+  print "  " + str(kv[0]) + " => " + str(kv[1])
+end
