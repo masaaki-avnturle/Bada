@@ -103,11 +103,18 @@ class TestLLM < Minitest::Test
     end
   end
 
-  # --- version ladder (downgrade / upgrade) ---------------------------
+  # --- codename & version ladder (downgrade / upgrade) ----------------
 
-  def test_default_version_is_opus_48
+  def test_codename_is_bada_xp
+    assert_equal "Bada XP", LLM.codename
+    assert_equal ["Bada XP"], out(%(print Chat.codename()))
+  end
+
+  def test_default_version_is_mythos_equivalent_to_opus_48
+    assert_equal "mythos", LLM.version_id
+    assert_equal "ムートス", LLM.version_label
+    # ムートス is equivalent to Opus 4.8 (same underlying API model)
     assert_equal "claude-opus-4-8", LLM.current_model
-    assert_equal "Opus 4.8", LLM.version_label
   end
 
   def test_downgrade_walks_to_previous_versions
@@ -118,19 +125,22 @@ class TestLLM < Minitest::Test
 
   def test_downgrade_clamps_at_local
     LLM.downgrade(100)
-    assert_equal "local", LLM.current_model
+    assert LLM.local?
+    assert_nil LLM.current_model
     # cannot go below local
     assert_equal "local", LLM.downgrade[:id]
   end
 
   def test_upgrade_clamps_at_top
     LLM.upgrade(100)
-    assert_equal "claude-fable-5", LLM.current_model
+    assert_equal "claude-fable-5", LLM.version_id
   end
 
-  def test_use_by_id_and_label
+  def test_use_by_id_label_and_model
     assert_equal "claude-opus-4-6", LLM.use("claude-opus-4-6")[:id]
     assert_equal "claude-haiku-4-5", LLM.use("Haiku 4.5")[:id]
+    # the Opus 4.8 model id resolves to its equivalent version, ムートス
+    assert_equal "mythos", LLM.use("claude-opus-4-8")[:id]
     assert_nil LLM.use("no-such-model")
   end
 
@@ -152,19 +162,19 @@ class TestLLM < Minitest::Test
 
   def test_chat_version_controls_from_bada
     without_keys do
-      assert_equal ["Opus 4.8"], out(%(print Chat.version()))
+      assert_equal ["ムートス"], out(%(print Chat.version()))
       assert_equal ["Opus 4.7"], out(%(print Chat.downgrade()))
-      assert_equal ["Opus 4.8"], out(%(print Chat.upgrade()))
+      assert_equal ["ムートス"], out(%(print Chat.upgrade()))
       assert_equal ["Sonnet 4.6"], out(%(print Chat.use("claude-sonnet-4-6")))
       assert_equal ["7"], out(%(print str(len(Chat.versions()))))
     end
   end
 
-  def test_history_records_changes
+  def test_history_records_version_changes
     LLM.reset!
     LLM.downgrade
     LLM.downgrade
-    assert_equal %w[claude-opus-4-8 claude-opus-4-7 claude-opus-4-6], LLM.history
+    assert_equal %w[mythos claude-opus-4-7 claude-opus-4-6], LLM.history
   end
 
   def test_multigpt_chat_uses_fallback

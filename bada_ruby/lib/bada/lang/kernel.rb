@@ -103,8 +103,9 @@ module Bada
           "backend" => lambda { Bada::Lang::LLM.backend&.to_s || "local" },
           "live" => lambda { Bada::Lang::LLM.live? },
           # --- version ladder: downgrade / upgrade the ChatGPT version ----
-          "version" => lambda { Bada::Lang::LLM.version_label },  # e.g. "Opus 4.8"
-          "model" => lambda { Bada::Lang::LLM.current_model },    # e.g. "claude-opus-4-8"
+          "codename" => lambda { Bada::Lang::LLM.codename },      # "Bada XP"
+          "version" => lambda { Bada::Lang::LLM.version_label },  # e.g. "ムートス"
+          "model" => lambda { Bada::Lang::LLM.current_model || "local" }, # e.g. "claude-opus-4-8"
           "versions" => lambda { Bada::Lang::LLM.ladder },        # the full ladder (ids)
           # downgrade([n]): step to a previous (less capable) version; returns label
           "downgrade" => lambda { |*n| Bada::Lang::LLM.downgrade(n.first || 1)[:label] },

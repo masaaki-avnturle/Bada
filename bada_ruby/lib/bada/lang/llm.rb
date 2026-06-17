@@ -28,6 +28,9 @@ module Bada
     module LLM
       module_function
 
+      # Build / system codename for the Bada ChatGPT.
+      CODENAME = "Bada XP"
+
       DEFAULT_MAX_TOKENS = 1024
       ANTHROPIC_VERSION = "2023-06-01"
       ANTHROPIC_DEFAULT_MODEL = "claude-opus-4-8"
@@ -35,19 +38,27 @@ module Bada
       OPEN_TIMEOUT = 10
       READ_TIMEOUT = 60
       LOCAL = "local"
+      DEFAULT_VERSION_ID = "mythos"
 
-      # The version ladder for the Anthropic "ChatGPT" line, ordered from most to
-      # least capable. The final rung is the local OmegaChat 分派 (no key needed).
-      # Downgrade walks toward the bottom; upgrade walks back up.
+      # The version ladder for the Bada XP "ChatGPT" line, ordered from most to
+      # least capable. Each entry has a selection `id`, a display `label`, the
+      # underlying API `model` id, and a note. The default is ムートス (Mythos),
+      # which is equivalent to Opus 4.8 (same underlying model). The final rung
+      # is the local OmegaChat 分派 (no key needed). Downgrade walks toward the
+      # bottom; upgrade walks back up.
       LADDER = [
-        { id: "claude-fable-5",    label: "Fable 5",          note: "最上位（最も高性能）" },
-        { id: "claude-opus-4-8",   label: "Opus 4.8",         note: "既定" },
-        { id: "claude-opus-4-7",   label: "Opus 4.7",         note: "前世代" },
-        { id: "claude-opus-4-6",   label: "Opus 4.6",         note: "前々世代" },
-        { id: "claude-sonnet-4-6", label: "Sonnet 4.6",       note: "軽量・高速" },
-        { id: "claude-haiku-4-5",  label: "Haiku 4.5",        note: "最小・最速" },
-        { id: LOCAL,               label: "OmegaChat 分派",   note: "ローカル（鍵不要）" }
+        { id: "claude-fable-5",    label: "Fable 5",        model: "claude-fable-5",    note: "最上位（最も高性能）" },
+        { id: "mythos",            label: "ムートス",        model: "claude-opus-4-8",   note: "既定・Opus 4.8 と同等（Project Glasswing）" },
+        { id: "claude-opus-4-7",   label: "Opus 4.7",       model: "claude-opus-4-7",   note: "前世代" },
+        { id: "claude-opus-4-6",   label: "Opus 4.6",       model: "claude-opus-4-6",   note: "前々世代" },
+        { id: "claude-sonnet-4-6", label: "Sonnet 4.6",     model: "claude-sonnet-4-6", note: "軽量・高速" },
+        { id: "claude-haiku-4-5",  label: "Haiku 4.5",      model: "claude-haiku-4-5",  note: "最小・最速" },
+        { id: LOCAL,               label: "OmegaChat 分派", model: nil,                 note: "ローカル（鍵不要）" }
       ].freeze
+
+      def codename
+        CODENAME
+      end
 
       # --- version selection (mutable, in-process) -------------------------
 
@@ -55,11 +66,12 @@ module Bada
         LADDER.map { |e| e[:id] }
       end
 
-      # Index in LADDER that BADA_LLM_MODEL points at, else the default model.
+      # Index in LADDER that BADA_LLM_MODEL points at (by id or model), else the
+      # default version (ムートス).
       def default_index
         want = ENV["BADA_LLM_MODEL"]
-        (want && LADDER.index { |e| e[:id] == want }) ||
-          LADDER.index { |e| e[:id] == ANTHROPIC_DEFAULT_MODEL }
+        (want && LADDER.index { |e| e[:id] == want || e[:model] == want }) ||
+          LADDER.index { |e| e[:id] == DEFAULT_VERSION_ID }
       end
 
       # Lazily initialise selection + history together so the starting version
@@ -69,6 +81,7 @@ module Bada
         @selected_index = default_index
         @history = [LADDER[@selected_index][:id]]
       end
+      private_class_method :ensure_state!
 
       def selected_index
         ensure_state!
@@ -79,14 +92,25 @@ module Bada
         LADDER[selected_index]
       end
 
-      # The model id currently selected (may be "local").
-      def current_model
+      # The selection id of the current version, e.g. "mythos".
+      def version_id
         current[:id]
       end
 
-      # Human label, e.g. "Opus 4.8".
+      # The underlying API model id of the current version (nil when local),
+      # e.g. ムートス -> "claude-opus-4-8".
+      def current_model
+        current[:model]
+      end
+
+      # Human label, e.g. "ムートス".
       def version_label
         current[:label]
+      end
+
+      # Is the current version the local (no-API) rung?
+      def local?
+        current[:id] == LOCAL
       end
 
       # Move toward a *previous* (less capable) version. Clamped at "local".
@@ -103,11 +127,12 @@ module Bada
         current
       end
 
-      # Pin a specific version by ladder id or (case-insensitive) label.
-      # Returns the entry, or nil if unknown.
+      # Pin a specific version by ladder id, (case-insensitive) label, or
+      # underlying model id. Returns the entry, or nil if unknown.
       def use(id_or_label)
         key = id_or_label.to_s
         i = LADDER.index { |e| e[:id] == key || e[:label].casecmp?(key) }
+        i ||= LADDER.index { |e| e[:model] == key }
         return nil unless i
         @selected_index = i
         record!
@@ -117,7 +142,7 @@ module Bada
       # Reset selection to the environment default and restart history.
       def reset!
         @selected_index = default_index
-        @history = [current_model]
+        @history = [version_id]
         current
       end
 
@@ -127,7 +152,7 @@ module Bada
       end
 
       def record!
-        @history << current_model unless @history.last == current_model
+        @history << version_id unless @history.last == version_id
       end
       private_class_method :record!
 
@@ -141,7 +166,7 @@ module Bada
       # Will an `ask` actually reach a real model? (key configured AND not
       # downgraded to the local rung)
       def live?
-        available? && current_model != LOCAL
+        available? && !local?
       end
 
       # Which backend would be used: :anthropic, :openai, or nil.
@@ -153,7 +178,6 @@ module Bada
 
       # The concrete model id sent to the API for the active backend.
       def model
-        return OPENAI_MODEL_FALLBACK if backend == :openai && current_model == LOCAL
         if backend == :openai
           # The ladder is the Anthropic line; for OpenAI honour BADA_LLM_MODEL.
           ENV.fetch("BADA_LLM_MODEL", OPENAI_DEFAULT_MODEL)
@@ -161,7 +185,6 @@ module Bada
           current_model
         end
       end
-      OPENAI_MODEL_FALLBACK = OPENAI_DEFAULT_MODEL
 
       def max_tokens
         Integer(ENV.fetch("BADA_LLM_MAX_TOKENS", DEFAULT_MAX_TOKENS))
@@ -175,7 +198,7 @@ module Bada
       # String, or nil if downgraded to local, no backend is configured, or the
       # call/parse failed (so callers can fall back to the local engine).
       def ask(prompt, system: nil)
-        return nil if current_model == LOCAL
+        return nil if local?
         case backend
         when :anthropic then anthropic(prompt.to_s, system: system)
         when :openai then openai(prompt.to_s, system: system)

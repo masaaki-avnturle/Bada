@@ -1,4 +1,4 @@
-# Bada (Ruby) — Bada 言語 + OmegaChat 分派
+# Bada (Ruby) — Bada 言語 + OmegaChat 分派（ChatGPT コードネーム **Bada XP**）
 
 山口フレームワーク（TupleSpace / 大域的微分・積分多様体理論）の **Bada 言語を元から
 Ruby で再構築**し、その上に **ChatGPT の分派（branch）= OmegaChat** を作ったライブラリです。
@@ -369,7 +369,7 @@ bin/bada gpt                                         # 全モードのデモ
 `MultiGPT.respond(req)` は `[種別, 出力]` を返し、生成された論文は `multigpt_paper.md`、
 生成アプリのソースはそのまま `bada lang` で実行できます。
 
-## 本物の LLM への接続（任意・グレースフルフォールバック）
+## 本物の LLM への接続 — ChatGPT **Bada XP**（任意・グレースフルフォールバック）
 
 正直に言うと、ここまでの「ChatGPT 分派」はすべて**ローカルの `Bada::OmegaChat`
 エンジン**（純 Ruby）であり、本物の大規模 LLM ではありません。`lib/bada/lang/llm.rb`
@@ -398,14 +398,16 @@ Bada からは `Chat.llm("…")`（本物優先・自動フォールバック）
 通信エラー・JSON 解析失敗・安全分類器の拒否（`stop_reason: "refusal"`）はすべて `nil` に
 丸められ、言語はローカル分派で動き続けます。キーは環境変数からのみ読み、保存・出力しません。
 
-### ChatGPT のバージョンを前のバージョンへダウングレード
+### ChatGPT のバージョンを前のバージョンへダウングレード（コードネーム **Bada XP**）
 
-ChatGPT は**バージョン台帳**（上＝高性能、下＝ローカル分派）から版を選びます。
-前のバージョンへ**ダウングレード**したり、復帰（アップグレード）したり、特定の版へ固定できます。
-台帳の最下段「`local`」へダウングレードすると、API キーがあっても**ローカル分派に固定**されます。
+ChatGPT（コードネーム **Bada XP**）は**バージョン台帳**（上＝高性能、下＝ローカル分派）から
+版を選びます。既定バージョンは **ムートス（Mythos）= Opus 4.8 と同等**（同一の基盤モデル
+`claude-opus-4-8`）です。前のバージョンへ**ダウングレード**したり、復帰（アップグレード）したり、
+特定の版へ固定できます。台帳の最下段「`local`」へダウングレードすると、API キーがあっても
+**ローカル分派に固定**されます。
 
 ```
-Fable 5 → Opus 4.8（既定）→ Opus 4.7 → Opus 4.6 → Sonnet 4.6 → Haiku 4.5 → local（分派）
+Fable 5 → ムートス（既定 = Opus 4.8 同等）→ Opus 4.7 → Opus 4.6 → Sonnet 4.6 → Haiku 4.5 → local（分派）
 ```
 
 ```bash
@@ -418,7 +420,8 @@ ruby bin/bada lang bada/app/llm_versions.bada  # ダウングルード/復帰の
 
 | Bada API | 動作 |
 |:--|:--|
-| `Chat.version()` | 現在のバージョン名（例 `"Opus 4.8"`） |
+| `Chat.codename()` | コードネーム（`"Bada XP"`） |
+| `Chat.version()` | 現在のバージョン名（既定 `"ムートス"`） |
 | `Chat.model()` / `Chat.versions()` | 現在のモデルID / 台帳一覧 |
 | `Chat.downgrade([n])` | 前のバージョンへ n 段下げる（新バージョン名を返す） |
 | `Chat.upgrade([n])` | 新しいバージョンへ n 段上げる |
