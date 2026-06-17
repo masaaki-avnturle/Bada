@@ -129,7 +129,8 @@ static void lex(const char* src){
     }
     /* operators */
     char two[3]={c, (i+1<len)?src[i+1]:0, 0};
-    if(!strcmp(two,"==")||!strcmp(two,"!=")||!strcmp(two,"<=")||!strcmp(two,">=")){
+    if(!strcmp(two,"==")||!strcmp(two,"!=")||!strcmp(two,"<=")||!strcmp(two,">=")||
+       !strcmp(two,"<-")||!strcmp(two,"-<")||!strcmp(two,">-")){  /* directive ops */
       push_tok(TK_OP,two,0); i+=2; continue;
     }
     char one[2]={c,0};
@@ -239,8 +240,11 @@ static Val* parse_mul(){ Val* l=parse_unary();
   while(at_op("*")||at_op("/")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_unary()); } return l; }
 static Val* parse_add(){ Val* l=parse_mul();
   while(at_op("+")||at_op("-")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_mul()); } return l; }
-static Val* parse_cmp(){ Val* l=parse_add();
-  while(at_op("<")||at_op(">")||at_op("<=")||at_op(">=")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_add()); } return l; }
+/* directive-oriented operators: <- 代入, -< 分岐, >- 合流 (between cmp and add) */
+static Val* parse_dir(){ Val* l=parse_add();
+  while(at_op("<-")||at_op("-<")||at_op(">-")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_add()); } return l; }
+static Val* parse_cmp(){ Val* l=parse_dir();
+  while(at_op("<")||at_op(">")||at_op("<=")||at_op(">=")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_dir()); } return l; }
 static Val* parse_eq(){ Val* l=parse_cmp();
   while(at_op("==")||at_op("!=")){ char* o=strdup(cur()->s); adv(); l=binop(o,l,parse_cmp()); } return l; }
 static Val* parse_and(){ Val* l=parse_eq();
@@ -342,7 +346,46 @@ static char* val_to_cstr(Val* v){
   return buf; /* caller owns; leaked like all Bada values (no GC) */
 }
 
+/* ---- directive-oriented objects (built on the cons-list structure) ----
+ * A directive is the list  (directive lane1 lane2 ...) — homoiconic. */
+static int is_directive(Val* v){ return is_cons(v) && sym_is(CAR(v),"directive"); }
+static Val* mk_directive(Val* lanes){ return cons(mk_sym("directive"), lanes); }
+static Val* dir_lanes(Val* v){ return is_directive(v)? CDR(v) : cons(v,NIL); }
+static int all_funcs(Val* lst){ if(!is_cons(lst)) return 0;
+  for(Val* p=lst; is_cons(p); p=CDR(p)){ Tag t=CAR(p)->tag; if(t!=T_FUN&&t!=T_BUILTIN) return 0; } return 1; }
+static Val* lane_append(Val* out, Val** tail, Val* x){ Val* c=cons(x,NIL);
+  if(out==NIL){ *tail=c; return c; } (*tail)->cons.cdr=c; *tail=c; return out; }
+
 static Val* eval_binop(const char* op, Val* a, Val* b){
+  /* <- 代入: load b into a directive object */
+  if(!strcmp(op,"<-")) return mk_directive(cons(b,NIL));
+  /* -< 分岐: split each lane through the branch directive(s) */
+  if(!strcmp(op,"-<")){
+    Val* lanes=dir_lanes(a); Val* out=NIL; Val* tail=NIL;
+    if(b->tag==T_FUN||b->tag==T_BUILTIN){
+      for(Val* p=lanes; is_cons(p); p=CDR(p)){ Val* arg=CAR(p); out=lane_append(out,&tail,call_fun(b,&arg,1)); }
+    } else if(is_cons(b)&&!is_directive(b)&&all_funcs(b)){
+      for(Val* p=lanes; is_cons(p); p=CDR(p)){ Val* arg=CAR(p);
+        for(Val* f=b; is_cons(f); f=CDR(f)){ Val* fn=CAR(f); out=lane_append(out,&tail,call_fun(fn,&arg,1)); } }
+    } else if(is_cons(b)&&!is_directive(b)){
+      for(Val* p=b; is_cons(p); p=CDR(p)) out=lane_append(out,&tail,CAR(p));
+    } else if(b->tag==T_NUM){
+      int k=(int)b->num;
+      for(Val* p=lanes; is_cons(p); p=CDR(p)) for(int i=0;i<k;i++) out=lane_append(out,&tail,CAR(p));
+    } else {
+      for(Val* p=lanes; is_cons(p); p=CDR(p)) out=lane_append(out,&tail,b);
+    }
+    return mk_directive(out);
+  }
+  /* >- 合流: merge the lanes back into one value via a 2-arg combiner */
+  if(!strcmp(op,">-")){
+    Val* lanes=dir_lanes(a);
+    if(!is_cons(lanes)) return NIL;
+    if(!(b->tag==T_FUN||b->tag==T_BUILTIN)) die(">- needs a 2-arg merge directive");
+    Val* acc=CAR(lanes);
+    for(Val* p=CDR(lanes); is_cons(p); p=CDR(p)){ Val* args[2]={acc,CAR(p)}; acc=call_fun(b,args,2); }
+    return acc;
+  }
   if(!strcmp(op,"+")){
     if(a->tag==T_STR||b->tag==T_STR){
       char* l=val_to_cstr(a); char* r=val_to_cstr(b);
@@ -434,7 +477,10 @@ static void val_print(Val* v, FILE* f){
       if(d==floor(d) && fabs(d)<1e15) fprintf(f,"%lld",(long long)d);
       else fprintf(f,"%.6g",d);
     } break;
-    case T_CONS: { fputc('[',f); int first=1;
+    case T_CONS: {
+      if(is_directive(v)){ fputs("<| ",f); int first=1;
+        for(Val* p=CDR(v); is_cons(p); p=CDR(p)){ if(!first) fputs(", ",f); first=0; val_print(CAR(p),f);} fputs(" |>",f); break; }
+      fputc('[',f); int first=1;
       for(Val* p=v; is_cons(p); p=CDR(p)){ if(!first) fputs(", ",f); first=0; val_print(CAR(p),f);} fputc(']',f);
     } break;
     default: fputs("<fn>",f);
@@ -452,6 +498,8 @@ static Val* bi_list(Val** a,int n){ Val* h=NIL; for(int i=n-1;i>=0;i--) h=cons(a
 static Val* bi_append(Val** a,int n){ (void)n; /* append item to end -> new list */
   Val* h=NIL; Val* t=NIL; for(Val* p=a[0]; is_cons(p); p=CDR(p)){ Val* c=cons(CAR(p),NIL); if(h==NIL){h=t=c;}else{t->cons.cdr=c;t=c;} }
   Val* c=cons(a[1],NIL); if(h==NIL) return c; t->cons.cdr=c; return h; }
+static Val* bi_directive(Val** a,int n){ (void)n; return mk_directive(cons(a[0],NIL)); }
+static Val* bi_lanes(Val** a,int n){ (void)n; return dir_lanes(a[0]); }
 
 /* math / manifold */
 static Val* bi_gamma(Val** a,int n){ (void)n; return mk_num(tgamma(as_num(a[0]))); }
@@ -537,6 +585,7 @@ static Env* global_env(){
   def_bi(g,"str",bi_str); def_bi(g,"len",bi_len); def_bi(g,"at",bi_at);
   def_bi(g,"cons",bi_cons); def_bi(g,"car",bi_car); def_bi(g,"cdr",bi_cdr);
   def_bi(g,"list",bi_list); def_bi(g,"append",bi_append);
+  def_bi(g,"directive",bi_directive); def_bi(g,"lanes",bi_lanes);
   def_bi(g,"gamma",bi_gamma); def_bi(g,"beta",bi_beta); def_bi(g,"xlogx",bi_xlogx);
   def_bi(g,"element",bi_element); def_bi(g,"zeta_gauge",bi_zeta_gauge);
   def_bi(g,"entropy",bi_entropy); def_bi(g,"xi",bi_xi); def_bi(g,"thermal",bi_thermal);

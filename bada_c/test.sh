@@ -32,6 +32,12 @@ while i < 5000
 end
 print "len = " + str(len(s))')"
 
+echo "== directive-oriented objects (<- -< >-) =="
+OUT="$(./bada run examples/directive.bada)"
+check "branch lanes" "<| 7, 49, 343 |>" "$OUT"
+check "merge sum" "399" "$OUT"
+check "map-reduce Σk^2" "55" "$OUT"
+
 echo "== objects (classes/objects are cons-lists) =="
 OUT="$(./bada run examples/objects.bada)"
 check "object method dispatch" "a.energy = 18" "$OUT"
