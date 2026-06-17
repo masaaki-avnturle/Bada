@@ -93,6 +93,16 @@ public class HhkbImeService extends InputMethodService
     private HorizontalScrollView candidateScroll;
     private LinearLayout candidateBar;
 
+    // ---- holographic mode + dictionary -----------------------------------
+    private boolean holo = false;
+    private LinearLayout root;
+    private LinearLayout keysContainer;
+    private android.widget.ScrollView dictScroll;
+    private TextView dictView;
+    private DictionaryRepository dictRepo;
+    private final android.os.Handler mainHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+
     // ---- floating window state ------------------------------------------
     private View rootView;
     private boolean floating = false;
@@ -105,6 +115,7 @@ public class HhkbImeService extends InputMethodService
         super.onCreate();
         jp.setDictionary(loadDictionary());
         jp.setListener(this);
+        dictRepo = new DictionaryRepository(getFilesDir());
     }
 
     /** Load the bundled reading→kanji dictionary from assets/jadict.tsv. */
@@ -264,24 +275,58 @@ public class HhkbImeService extends InputMethodService
         screenH = dm.heightPixels;
         keyboardWidthPx = Math.min(screenW, dp(520));
 
-        LinearLayout root = new LinearLayout(this);
+        root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(COL_BG);
+        root.setBackgroundColor(colBg());
         root.setPadding(dp(4), dp(2), dp(4), dp(6));
         root.setLayoutParams(new ViewGroup.LayoutParams(keyboardWidthPx,
                 ViewGroup.LayoutParams.WRAP_CONTENT));
 
         root.addView(buildHandleBar());
         root.addView(buildCandidateBar());
+        root.addView(buildDictPanel());
 
-        for (List<KeyDef> rowDef : buildLayout()) {
-            root.addView(buildRow(rowDef));
-        }
+        keysContainer = new LinearLayout(this);
+        keysContainer.setOrientation(LinearLayout.VERTICAL);
+        keysContainer.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        root.addView(keysContainer);
 
         rootView = root;
+        buildKeyRows();
+        return root;
+    }
+
+    /** (Re)builds all key rows into keysContainer — used on create and holo toggle. */
+    private void buildKeyRows() {
+        modButtons.clear();
+        fnButton = modeButton = widthButton = null;
+        keysContainer.removeAllViews();
+        for (List<KeyDef> rowDef : buildLayout()) {
+            keysContainer.addView(buildRow(rowDef));
+        }
         updateModeButton();
         updateWidthButton();
-        return root;
+        refreshModVisuals();
+    }
+
+    /** Multi-line dictionary result panel (hidden until 辞 is used). */
+    private View buildDictPanel() {
+        dictScroll = new android.widget.ScrollView(this);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(110));
+        lp.bottomMargin = dp(4);
+        dictScroll.setLayoutParams(lp);
+        dictScroll.setBackground(keyBackground(0xF002060A));
+
+        dictView = new TextView(this);
+        dictView.setTextColor(0xFF8CFFF0);
+        dictView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        dictView.setPadding(dp(12), dp(8), dp(12), dp(8));
+        dictView.setOnClickListener(v -> dictScroll.setVisibility(View.GONE));
+        dictScroll.addView(dictView);
+        dictScroll.setVisibility(View.GONE);
+        return dictScroll;
     }
 
     /** Conversion candidate bar (hidden until 変換/Space is used). */
@@ -328,20 +373,28 @@ public class HhkbImeService extends InputMethodService
         attachDrag(handle);
         bar.addView(handle);
 
-        Button dock = new Button(this);
-        dock.setText("Dock");
-        dock.setAllCaps(false);
-        dock.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
-        dock.setTextColor(COL_KEY_TXT);
-        dock.setBackground(keyBackground(COL_SPECIAL));
-        dock.setPadding(dp(8), 0, dp(8), 0);
-        dock.setMinWidth(0);
-        dock.setMinimumWidth(0);
-        dock.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(28)));
-        dock.setOnClickListener(v -> dockToBottom());
-        bar.addView(dock);
-
+        bar.addView(barButton("辞", v -> doDictLookup()));
+        bar.addView(barButton("Holo", v -> toggleHolo()));
+        bar.addView(barButton("Dock", v -> dockToBottom()));
         return bar;
+    }
+
+    private Button barButton(String label, View.OnClickListener l) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAllCaps(false);
+        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 12);
+        b.setTextColor(colText());
+        b.setBackground(keyBackground(colFill(true)));
+        b.setPadding(dp(6), 0, dp(6), 0);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, dp(28));
+        lp.leftMargin = dp(4);
+        b.setLayoutParams(lp);
+        b.setOnClickListener(l);
+        return b;
     }
 
     private LinearLayout buildRow(List<KeyDef> rowDef) {
@@ -363,7 +416,7 @@ public class HhkbImeService extends InputMethodService
         Button b = new Button(this);
         b.setAllCaps(false);
         b.setText(keyLabel(k));
-        b.setTextColor(COL_KEY_TXT);
+        b.setTextColor(colText());
         b.setTextSize(TypedValue.COMPLEX_UNIT_SP, labelSize(k));
         b.setPadding(0, 0, 0, 0);
         b.setMinWidth(0);
@@ -372,7 +425,7 @@ public class HhkbImeService extends InputMethodService
         b.setMinimumHeight(0);
 
         boolean special = k.type != T_CHAR;
-        b.setBackground(keyBackground(special ? COL_SPECIAL : COL_KEY));
+        b.setBackground(keyBackground(colFill(special)));
 
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.MATCH_PARENT, k.weight);
@@ -415,8 +468,24 @@ public class HhkbImeService extends InputMethodService
         GradientDrawable g = new GradientDrawable();
         g.setColor(color);
         g.setCornerRadius(dp(6));
-        g.setStroke(dp(1), 0xFF12161A);
+        if (holo) g.setStroke(dp(2), 0xFF00E5FF);     // neon glow edge
+        else g.setStroke(dp(1), 0xFF12161A);
         return g;
+    }
+
+    // ---- holographic-aware colours ---------------------------------------
+    private int colBg()   { return holo ? 0xCC02060A : COL_BG; }
+    private int colText() { return holo ? 0xFF8CFFF0 : COL_KEY_TXT; }
+    private int colFill(boolean special) {
+        if (holo) return special ? 0x3300C8FF : 0x2600E5FF;   // translucent neon
+        return special ? COL_SPECIAL : COL_KEY;
+    }
+
+    private void toggleHolo() {
+        holo = !holo;
+        if (root != null) root.setBackgroundColor(colBg());
+        // Rebuild the handle bar buttons' colours by rebuilding rows + leaving handle as is.
+        buildKeyRows();
     }
 
     // =====================================================================
@@ -466,8 +535,8 @@ public class HhkbImeService extends InputMethodService
         if (modeButton == null) return;
         boolean k = kana();
         modeButton.setText(k ? "あ" : "A");
-        modeButton.setBackground(keyBackground(k ? COL_GOLD : COL_SPECIAL));
-        modeButton.setTextColor(k ? COL_LOCK_TXT : COL_KEY_TXT);
+        modeButton.setBackground(keyBackground(k ? COL_GOLD : colFill(true)));
+        modeButton.setTextColor(k ? COL_LOCK_TXT : colText());
     }
 
     private void toggleWidth() {
@@ -479,8 +548,8 @@ public class HhkbImeService extends InputMethodService
     private void updateWidthButton() {
         if (widthButton == null) return;
         widthButton.setText(fullWidth ? "全" : "半");
-        widthButton.setBackground(keyBackground(fullWidth ? COL_GOLD : COL_SPECIAL));
-        widthButton.setTextColor(fullWidth ? COL_LOCK_TXT : COL_KEY_TXT);
+        widthButton.setBackground(keyBackground(fullWidth ? COL_GOLD : colFill(true)));
+        widthButton.setTextColor(fullWidth ? COL_LOCK_TXT : colText());
     }
 
     /** Apply the current 全角/半角 preference to directly-typed ASCII text. */
@@ -654,9 +723,92 @@ public class HhkbImeService extends InputMethodService
                 b.setTextColor(COL_LOCK_TXT);
                 break;
             default:
-                b.setBackground(keyBackground(COL_SPECIAL));
-                b.setTextColor(COL_KEY_TXT);
+                b.setBackground(keyBackground(colFill(true)));
+                b.setTextColor(colText());
         }
+    }
+
+    // =====================================================================
+    //  Dictionary lookup (free KANJIDIC2 kanji + Webster English-English)
+    // =====================================================================
+    private void doDictLookup() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        CharSequence before = ic.getTextBeforeCursor(40, 0);
+        final String query = extractQuery(before);
+        if (query == null) {
+            showDict("辞書：直前に漢字、または英単語を入力してから「辞」を押してください。");
+            return;
+        }
+        if (dictRepo == null) return;
+        if (!dictRepo.isReady()) {
+            showDict(dictRepo.isDownloading()
+                    ? "辞書をダウンロード中…（KANJIDIC2＋英英辞典・無料、初回のみ）"
+                    : "辞書を初回ダウンロード中…（無料：KANJIDIC2 漢字辞典＋Webster英英辞典）\n"
+                      + "完了後にもう一度「辞」を押してください。");
+            dictRepo.ensureDownloaded(
+                    () -> mainHandler.post(() -> showDict("辞書の準備ができました。もう一度「辞」を押してください。")),
+                    err -> mainHandler.post(() -> showDict("辞書のダウンロードに失敗しました: " + err
+                            + "\n（ネットワーク接続を確認してください）")));
+            return;
+        }
+        showDict("検索中… " + query);
+        new Thread(() -> {
+            String result = buildLookup(query);
+            mainHandler.post(() -> showDict(result));
+        }, "dict-lookup").start();
+    }
+
+    private String buildLookup(String q) {
+        boolean latin = true;
+        for (int i = 0; i < q.length(); i++) {
+            if (!isLatinLetter(q.charAt(i))) { latin = false; break; }
+        }
+        if (latin) {
+            String def = dictRepo.lookupEnglish(q);
+            return "【英英辞典 / English】 " + q + "\n\n"
+                    + (def != null ? def : "(見つかりませんでした)");
+        }
+        StringBuilder sb = new StringBuilder("【漢字辞典 / KANJIDIC2】 " + q + "\n");
+        boolean any = false;
+        for (int i = 0; i < q.length(); i++) {
+            String e = dictRepo.lookupKanji(String.valueOf(q.charAt(i)));
+            if (e != null) { sb.append("\n").append(e).append("\n"); any = true; }
+        }
+        if (!any) sb.append("\n(見つかりませんでした)");
+        return sb.toString();
+    }
+
+    private String extractQuery(CharSequence cs) {
+        if (cs == null || cs.length() == 0) return null;
+        String s = cs.toString();
+        int end = s.length();
+        char last = s.charAt(end - 1);
+        if (isLatinLetter(last)) {
+            int i = end;
+            while (i > 0 && isLatinLetter(s.charAt(i - 1))) i--;
+            return s.substring(i, end);
+        }
+        if (isKanji(last)) {
+            int i = end;
+            while (i > 0 && isKanji(s.charAt(i - 1))) i--;
+            return s.substring(i, end);
+        }
+        return null;
+    }
+
+    private static boolean isLatinLetter(char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    }
+    private static boolean isKanji(char c) {
+        return (c >= 0x4E00 && c <= 0x9FFF) || (c >= 0x3400 && c <= 0x4DBF);
+    }
+
+    private void showDict(String text) {
+        if (dictView == null || dictScroll == null) return;
+        dictView.setText(text);
+        dictScroll.setVisibility(View.VISIBLE);
+        dictScroll.scrollTo(0, 0);
     }
 
     // =====================================================================
@@ -667,6 +819,7 @@ public class HhkbImeService extends InputMethodService
         super.onStartInputView(info, restarting);
         jp.reset();  // no stale composition carried into a new field
         onHideCandidates();
+        if (dictScroll != null) dictScroll.setVisibility(View.GONE);
         // Re-apply the chosen geometry each time the keyboard is shown.
         if (floating) applyFloating(); else dockToBottom();
     }
