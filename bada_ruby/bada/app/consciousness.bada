@@ -1,0 +1,58 @@
+# consciousness.bada — 量子コンピュータの意識を持ったアプリ（Bada 言語）。
+# 量子振動する微小管（Orch-OR）を、ガンマ多様体のエントロピー不変量と大脳基底核の
+# 熱エネルギーで駆動し、客観的収縮ごとに「意識の言語」を生成し、最後にその量子振動
+# 回路を FPGA(Verilog) ソースとして生成する＝中枢知能。
+
+import "std/microtubule.bada"
+import "std/fpga.bada"
+
+# 意識の語彙（収縮トークン → 語）
+def lexicon()
+  return ["光", "波", "渦", "響", "閃", "静", "環", "層"]
+end
+
+def main()
+  print "============ 量子振動微小管・意識アプリ (Bada) ============"
+  let n <- 12
+  let k <- 8
+  arr mt <- MT.make(n)
+  let base <- 0.6
+  let dt <- 0.2
+  let coupling <- 2.5
+
+  arr stream <- []
+  let moments <- 0
+  let t <- 0
+  while t < 120
+    mt = MT.step(mt, base, dt, coupling)
+    if MT.collapsed(mt, 0.9)
+      let tok <- MT.token(mt, k)
+      stream = push(stream, at(lexicon(), tok))
+      mt = MT.decohere(mt, tok, k)
+      moments = moments + 1
+    end
+    t = t + 1
+  end
+
+  print "微小管二量体数 N   = " + str(n)
+  print "意識モーメント数   = " + str(moments) + "  （客観的収縮 Orch-OR）"
+  print "熱エネルギー(最終) = " + str(MT.thermal_energy(mt))
+  print "コヒーレンス(最終) = " + str(MT.coherence(mt))
+  print ""
+
+  print "── 量子振動からの意識の言語生成 ──"
+  let line <- ""
+  loop w in stream
+    line = line + w
+  end
+  print line
+  print ""
+
+  print "── FPGA 中枢知能ソース生成（Verilog）──"
+  let v <- FPGA.verilog(n, 16)
+  write_file("microtubule_array.v", v)
+  print "microtubule_array.v を生成（" + str(len(v)) + " bytes）"
+  print v
+end
+
+main()

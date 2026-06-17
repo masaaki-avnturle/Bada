@@ -1,0 +1,117 @@
+# microtubule.bada — 量子振動する微小管（ペンローズ＝ハメロフ Orch-OR 風モデル）。
+# ガンマ関数における大域的部分積分多様体のエントロピー不変量 Ξ と、大脳基底核の
+# 熱エントロピーから生じる熱エネルギーで、チュブリン二量体の量子振動を駆動し、
+# コヒーレンスがしきい値を超えると客観的収縮（意識モーメント）を起こす。
+
+import "std/entropy.bada"
+import "std/manifold.bada"
+import "std/flow.bada"
+
+library MT
+  # N 個のチュブリン二量体の位相（配列）。初期位相は微小なばらつき。
+  def make(n)
+    arr s <- []
+    let i <- 0
+    while i < n
+      s = push(s, sin(i) * 0.3)
+      i = i + 1
+    end
+    return s
+  end
+
+  # 各二量体の振幅 |cos θ|（量子振動の射影）
+  def amplitudes(phases)
+    return lanes(phases -< def(th) return abs(cos(th)) end)
+  end
+
+  # 振幅を正規化した確率分布（多様体・エントロピーの測度）
+  def probs(phases)
+    let a <- amplitudes(phases)
+    let s <- a >- def(x, y) return x + y end
+    if s <= 0
+      return a
+    end
+    return lanes(a -< def(x) return x / s end)
+  end
+
+  # 大脳基底核の熱エントロピーが生む熱エネルギー（シャノンエントロピー）
+  def thermal_energy(phases)
+    return Entropy.shannon(probs(phases))
+  end
+
+  # 各二量体の固有量子振動周波数（不均一）：ω_i = base·(1+0.18 i)·(1+Ξ)·(1+熱E)
+  #   Ξ = ガンマ関数の大域的部分積分多様体のエントロピー不変量
+  #   不均一周波数によりクラモト的に同期↔脱同期し、収縮が間欠的に起こる。
+  def frequencies(phases, base)
+    let xi <- Mani.invariant(probs(phases))
+    let e <- thermal_energy(phases)
+    let n <- len(phases)
+    arr fs <- []
+    let i <- 0
+    while i < n
+      fs = push(fs, base * (1 + 0.18 * i) * (1 + xi) * (1 + e * 0.05))
+      i = i + 1
+    end
+    return fs
+  end
+
+  # 1ステップの量子振動：dθ_i = ω_i + K·sin(平均位相 − θ_i)（平均場クラモト結合）。
+  # 結合により脱同期↔同期を繰り返し、同期ピークで客観的収縮が間欠的に起こる。
+  def oscillate(phases, freqs, dt, coupling)
+    let mp <- mean_phase(phases)
+    let n <- len(phases)
+    arr out <- []
+    let i <- 0
+    while i < n
+      let th <- at(phases, i)
+      let dth <- at(freqs, i) + coupling * sin(mp - th)
+      out = push(out, th + dth * dt)
+      i = i + 1
+    end
+    return out
+  end
+
+  def step(phases, base, dt, coupling)
+    return oscillate(phases, frequencies(phases, base), dt, coupling)
+  end
+
+  # クラモト秩序変数 r（コヒーレンス）：同期度＝重ね合わせの度合い
+  def coherence(phases)
+    let sc <- 0
+    let ss <- 0
+    loop th in phases
+      sc = sc + cos(th)
+      ss = ss + sin(th)
+    end
+    return sqrt(sc * sc + ss * ss) / len(phases)
+  end
+
+  # 平均位相
+  def mean_phase(phases)
+    let sc <- 0
+    let ss <- 0
+    loop th in phases
+      sc = sc + cos(th)
+      ss = ss + sin(th)
+    end
+    return atan2(ss, sc)
+  end
+
+  # 客観的収縮（Orch-OR）：コヒーレンスがしきい値を超えたか
+  def collapsed(phases, threshold)
+    return coherence(phases) > threshold
+  end
+
+  # 収縮時の意識トークン：平均位相を K 個の記号にバケツ化
+  def token(phases, k)
+    let frac <- mean_phase(phases) / (2 * pi())
+    let b <- floor((frac + 1) * k)
+    return mod(b, k)
+  end
+
+  # 収縮後のデコヒーレンス：位相を散らして同期を一旦崩し、再出発させる
+  def decohere(phases, tok, k)
+    let center <- tok * 2 * pi() / k
+    return lanes(phases -< def(th) return center + sin(th * 7 + tok) * 2 end)
+  end
+end
