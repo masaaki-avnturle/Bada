@@ -1,0 +1,45 @@
+# std/special.bada — ガンマ/ベータ/ゼータ ゲージを Bada 言語で実装
+# Lanczos 近似（g=7, n=9）をそのまま Bada のループで計算する。
+
+import "std/math.bada"
+
+library Special
+  def lanczos()
+    return [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7]
+  end
+
+  # ガンマ関数 Γ(x)（Lanczos 近似 + 反射公式）
+  def gamma(x)
+    if x < 0.5
+      return pi() / (sin(pi() * x) * gamma(1 - x))
+    end
+    let xx = x - 1
+    let c = lanczos()
+    let a = at(c, 0)
+    let t = xx + 7 + 0.5
+    let i = 1
+    while i < 9
+      a = a + at(c, i) / (xx + i)
+      i = i + 1
+    end
+    return sqrt(M.two_pi()) * pow(t, xx + 0.5) * exp(-t) * a
+  end
+
+  # ベータ関数 B(p,q) = Γ(p)Γ(q)/Γ(p+q)
+  def beta(p, q)
+    return gamma(p) * gamma(q) / gamma(p + q)
+  end
+
+  # x log x （ネイピア円ステップ）
+  def x_log_x(x)
+    if x <= 0
+      return 0
+    end
+    return x * log(x)
+  end
+
+  # ζ(s) = β(p,q)/log x （ヤマグチ・ゲージ）
+  def zeta_gauge(p, q, x)
+    return beta(p, q) / log(x)
+  end
+end

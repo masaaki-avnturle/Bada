@@ -309,6 +309,33 @@ GPi の緊張性抑制を Go 路が下げて視床を**脱抑制**＝最も顕�
 - `Bada::Basal::AprioriEngine` … 未知事前エンジンが命題を「想像」→ 大脳基底核が**取り組む
   順序を顕著性で選択**→ 健全に証明→ 結果でドーパミン学習。`OmegaChat#deliberate` から利用可。
 
+## 純 Bada 実装 — コアアルゴリズムを Bada 言語自身で記述
+
+`bada/std/*.bada` は、アプリの**中核アルゴリズムを（薄いラッパではなく）Bada 言語自身で
+実装**したものです。算術プリミティブ（`exp/sin/log/...`）だけをネイティブに借り、残りは
+すべて Bada のループ・関数・リストで書いています。
+
+```bash
+bin/bada lang bada/app/native_engine.bada   # 純 Bada のエンジンを実行
+```
+
+| Bada ライブラリ | 実装内容（Bada 言語） |
+|:--|:--|
+| `std/special.bada` | **ガンマ関数（Lanczos 近似）**・ベータ・ζ ゲージ |
+| `std/entropy.bada` | シャノンのエントロピー H = -Σ p log₂ p |
+| `std/manifold.bada` | 多様体線素 `1/(x log x)²`・∬・**エントロピー不変量 Ξ** |
+| `std/catastrophe.bada` | **三次方程式の実根（Cardano/三角法）**・カスプ判別式 |
+| `std/polynomial.bada` | 多項式（係数リスト）の整数評価 |
+| `std/prover.bada` | **未知事前エンジンの健全な証明**（剰余系の全数検査で `m\|E(n)`） |
+| `std/basal.bada` | **大脳基底核の行動選択**（Go/NoGo→GPi→視床の脱抑制） |
+
+検証済み（テスト）: `Γ(5)=24`、`β(2,3)=1/12`、`x³−3x` の実根 `±√3,0`、フェルマーの
+小定理 `7|n⁷−n` を Bada で証明、`5|n²−n` を n=2 で反証、基底核が最強チャネルを選択。
+
+> 注: Bada の**ランタイム**（字句/構文解析・インタプリタ）は Ruby のままです。言語は
+> 自分自身を解釈できない（ネイティブ実行系が必要）ため、ここは原理的に Ruby が担います。
+> その上で、**アプリのアルゴリズムは Bada 言語で記述**しています。
+
 ## Bada 言語そのもの — ライブラリもアプリも Bada で記述
 
 これまでの機能は Ruby で実装した「エンジン（カーネル）」です。`Bada::Lang` はその上に
@@ -406,6 +433,7 @@ lib/bada/lang/interpreter.rb Bada 言語 インタプリタ（関数/モジュ�
 lib/bada/lang/kernel.rb      ネイティブ橋渡し（エンジンを Bada へ公開）
 lib/bada/lang.rb             Bada 言語 Facade（run/run_file/import）
 bada/lib/*.bada · bada/app/*.bada  Bada 言語で書いたライブラリとアプリ
+bada/std/*.bada              純 Bada 実装の標準ライブラリ（特殊関数〜証明〜基底核）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
