@@ -12,7 +12,7 @@ module Bada
     # of its spec, used as its branch identity ("trigger").
     class Dialect
       attr_reader :name, :parent, :keyword_map, :builtins, :prelude_parts,
-                  :children, :revisions
+                  :foreign, :children, :revisions
 
       def initialize(name:, parent: nil)
         @name = name
@@ -20,6 +20,7 @@ module Bada
         @keyword_map = parent ? parent.keyword_map.dup : Lexer.base_keyword_map
         @builtins = parent ? parent.builtins.dup : {}        # name -> proc overlay
         @prelude_parts = parent ? parent.prelude_parts.dup : []
+        @foreign = parent ? parent.foreign.dup : []          # [scheme, target, alias]
         @revisions = parent ? parent.revisions.dup : []
         @children = []
         parent.children << self if parent
@@ -59,6 +60,14 @@ module Bada
         self
       end
 
+      # Bake a foreign library import into the dialect (ruby/python/c). Every
+      # program run in this variant gets the module pre-loaded under `alias`.
+      def add_foreign(scheme, target, alias_name)
+        @foreign << [scheme.to_s, target.to_s, alias_name.to_s]
+        @revisions << "foreign #{scheme}:#{target} as #{alias_name}"
+        self
+      end
+
       def note(text)
         @revisions << text.to_s
         self
@@ -71,7 +80,8 @@ module Bada
 
       def signature
         kws = @keyword_map.sort.map { |s, r| "#{s}:#{r}" }.join(",")
-        "#{@name}|#{kws}|#{@builtins.keys.sort.join(',')}"
+        frn = @foreign.map { |sc, t, a| "#{sc}:#{t}>#{a}" }.sort.join(",")
+        "#{@name}|#{kws}|#{@builtins.keys.sort.join(',')}|#{frn}"
       end
 
       # Manifold entropy invariant of the spec = the branch's identity trigger.

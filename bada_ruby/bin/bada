@@ -75,15 +75,25 @@ when "dialects"
     builtin("円周率") { Math::PI }
     note "adds 円周率 (pi)"
   end
+  # a science variant with Ruby/Python/C libraries baked in (no import needed)
+  sci = Bada::Lang.fork(name: "bada-ja-sci", parent: ja) do
+    ruby "Math", as: "M"
+    python "statistics", as: "Stat"
+    c "m", as: "LibM"
+  end
   puts "── 言語分岐システム (Reviser / 亜種) ──"
   prog = "関数 sq(x)\n  返す 二乗(x)\n終\n表示 \"sq(9) = \" + str(sq(9))"
   puts "[bada-ja で実行]"
   Bada::Lang.run(prog, dialect: ja)
   puts
+  puts "[bada-ja-sci で実行（Ruby/Python/C を最初から内蔵）]"
+  Bada::Lang.run("表示 \"M.sqrt2=\" + str(M.sqrt(2)) + \" Stat.mean=\" + str(Stat.mean([2,4,6])) + \" LibM.tgamma5=\" + str(LibM.tgamma(5))", dialect: sci)
+  puts
   puts "[分岐の系譜]"
   puts Bada::Lang::Dialect.base.render_tree
   puts
   puts "lineage(bada-ja-π): " + ja_pi.lineage.map(&:name).join(" → ")
+  puts "bada-ja-sci の外部ライブラリ: " + sci.foreign.map { |s, t, a| "#{s}:#{t}>#{a}" }.join(", ")
 when "info"
   # Information generation: Thurston-Perelman placement + catastrophe branching
   # + millennium theory decomposition for a question.

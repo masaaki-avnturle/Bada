@@ -440,7 +440,25 @@ ja2.diff_from_parent                          # 親との差分（この枝の�
 | `keyword "func", :def` | 表層語の**別名**を追加（旧語も有効） |
 | `builtin("二乗") { ... }` | 組込み関数を追加/上書き |
 | `prelude "..."` | その亜種の構文で先に走るプレリュード |
+| `ruby "Math", as: "M"` | **外部ライブラリを亜種に内蔵**（Ruby） |
+| `python "statistics", as: "Stat"` | 〃（Python） |
+| `c "m", as: "LibM"` | 〃（C / Fiddle） |
+| `foreign "ruby:Math as M"` | 汎用の外部 import 指定 |
 | `note "..."` | 系譜に改訂メモを記録 |
+
+外部ライブラリを内蔵した亜種では、プログラム側で `import` せずに直接使えます。子の亜種は
+親の内蔵ライブラリを**継承**します。
+
+```ruby
+sci = Bada::Lang.fork(name: "bada-sci") do
+  rename :print, "表示"
+  ruby "Math", as: "M"
+  python "statistics", as: "Stat"
+  c "m", as: "LibM"
+end
+Bada::Lang.run('表示 str(M.sqrt(2)) + " " + str(Stat.mean([2,4,6])) + " " + str(LibM.tgamma(5))', dialect: sci)
+# → 1.41421 4 24   （import 不要、亜種が最初から内蔵）
+```
 
 ベース言語と他の亜種は互いに影響しません（各 `Dialect` はキーワード写像・組込み・
 プレリュードを独立に保持）。系譜は `lineage`/`descendants`/`render_tree`/`diff_from_parent`
