@@ -16,6 +16,8 @@
 #   bin/bada lang [app.bada]            run a Bada-language program (libs + app)
 #   bin/bada gpt "要求..."             マルチ ChatGPT (方程式/論文/アプリ/証明/回路/対話)
 #   bin/bada llm "質問..."             real LLM API (鍵があれば本物) else ローカル分派
+#   bin/bada llm versions              バージョン台帳を表示
+#   bin/bada llm --downgrade [N] "..."  前のバージョンへN段ダウングレードして質問
 #   bin/bada dialects                   language branching system: fork variants (亜種)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
@@ -80,17 +82,52 @@ when "evolve", "self-evolve"
   Bada::Lang.run_file(File.expand_path("../bada/app/self_evolve.bada", __dir__))
 when "llm"
   # Ask through a real LLM API (Anthropic / OpenAI-compatible) when a key is
-  # configured in the environment, otherwise fall back to the local 分派.
-  q = ARGV.join(" ")
-  q = "意識とは何か" if q.empty?
-  backend = Bada::Lang::LLM.backend
-  if backend
-    warn "[llm backend: #{backend} / model: #{Bada::Lang::LLM.model}]"
+  # configured, otherwise fall back to the local 分派. The model is chosen from
+  # a version ladder you can downgrade/upgrade/pin.
+  #
+  #   bada llm versions                    list the version ladder
+  #   bada llm "質問"                      ask at the current version
+  #   bada llm --model claude-opus-4-7 "質問"   pin a specific previous version
+  #   bada llm --downgrade [N] "質問"      step down N versions, then ask
+  if ARGV[0] == "versions"
+    cur = Bada::Lang::LLM.current_model
+    puts "ChatGPT バージョン台帳（上=高性能 / 下=ローカル）:"
+    Bada::Lang::LLM::LADDER.each do |e|
+      mark = e[:id] == cur ? " ← 現在" : ""
+      puts format("  %-18s %-14s %s%s", e[:id], e[:label], e[:note], mark)
+    end
   else
-    warn "[llm backend: local (no ANTHROPIC_API_KEY / OPENAI_API_KEY) — フォールバック]"
+    # parse optional version flags before the question text
+    until ARGV.empty?
+      case ARGV[0]
+      when "--model", "--use"
+        ARGV.shift
+        v = ARGV.shift
+        warn "[unknown version: #{v}]" unless Bada::Lang::LLM.use(v)
+      when "--downgrade"
+        ARGV.shift
+        n = ARGV[0] =~ /\A\d+\z/ ? ARGV.shift.to_i : 1
+        Bada::Lang::LLM.downgrade(n)
+      when "--upgrade"
+        ARGV.shift
+        n = ARGV[0] =~ /\A\d+\z/ ? ARGV.shift.to_i : 1
+        Bada::Lang::LLM.upgrade(n)
+      else
+        break
+      end
+    end
+    q = ARGV.join(" ")
+    q = "意識とは何か" if q.empty?
+    if Bada::Lang::LLM.live?
+      warn "[llm: #{Bada::Lang::LLM.version_label} (#{Bada::Lang::LLM.model}) / backend: #{Bada::Lang::LLM.backend}]"
+    elsif Bada::Lang::LLM.current_model == "local"
+      warn "[llm: ローカル分派にダウングレード済み（#{Bada::Lang::LLM.version_label}）]"
+    else
+      warn "[llm: #{Bada::Lang::LLM.version_label} 選択中だが鍵なし → ローカル分派にフォールバック]"
+    end
+    src = %(import "std/multigpt.bada"\nprint Chat.llm(#{q.inspect})\n)
+    Bada::Lang.run(src, base_dir: File.expand_path("../bada", __dir__))
   end
-  src = %(import "std/multigpt.bada"\nprint Chat.llm(#{q.inspect})\n)
-  Bada::Lang.run(src, base_dir: File.expand_path("../bada", __dir__))
 when "gpt"
   # Multi ChatGPT: one request -> equation / paper / app source / proof / circuit / chat.
   req = ARGV.join(" ")

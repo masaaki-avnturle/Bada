@@ -101,7 +101,19 @@ module Bada
           },
           # backend(): which engine answers llm() — "anthropic"/"openai"/"local".
           "backend" => lambda { Bada::Lang::LLM.backend&.to_s || "local" },
-          "live" => lambda { Bada::Lang::LLM.available? },
+          "live" => lambda { Bada::Lang::LLM.live? },
+          # --- version ladder: downgrade / upgrade the ChatGPT version ----
+          "version" => lambda { Bada::Lang::LLM.version_label },  # e.g. "Opus 4.8"
+          "model" => lambda { Bada::Lang::LLM.current_model },    # e.g. "claude-opus-4-8"
+          "versions" => lambda { Bada::Lang::LLM.ladder },        # the full ladder (ids)
+          # downgrade([n]): step to a previous (less capable) version; returns label
+          "downgrade" => lambda { |*n| Bada::Lang::LLM.downgrade(n.first || 1)[:label] },
+          # upgrade([n]): step back to a newer version; returns label
+          "upgrade" => lambda { |*n| Bada::Lang::LLM.upgrade(n.first || 1)[:label] },
+          # use(id_or_label): pin a specific version; returns label or "?" if unknown
+          "use" => lambda { |v| (e = Bada::Lang::LLM.use(v)) ? e[:label] : "?" },
+          "reset" => lambda { Bada::Lang::LLM.reset![:label] },
+          "history" => lambda { Bada::Lang::LLM.history },
           "xi" => ->(t) { Bada::Manifold.xi(t.to_s) })
 
         interp.register_module("Manifold",
