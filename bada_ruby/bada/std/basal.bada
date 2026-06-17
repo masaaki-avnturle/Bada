@@ -1,0 +1,40 @@
+# std/basal.bada — 大脳基底核の行動選択を Bada 言語で実装
+# 直接路(Go)・間接路(NoGo)・ハイパー直接路(STN)→GPi→視床の選択的脱抑制。
+# 最も顕著なチャネル（Go が GPi を最も下げる）が選ばれる。
+
+import "std/math.bada"
+
+library BG
+  def mean(sal)
+    let s = 0
+    let i = 0
+    while i < len(sal)
+      s = s + at(sal, i)
+      i = i + 1
+    end
+    return s / len(sal)
+  end
+
+  # 顕著性リストから選択チャネルの添字を返す
+  def select(sal)
+    let da = 0.3
+    let stn = mean(sal)
+    let best = 0
+    let bestv = -1
+    let j = 0
+    while j < len(sal)
+      let c = at(sal, j)
+      let d1 = M.relu((1 + da) * c)
+      let d2 = M.relu((1 - da) * c)
+      let gpe = M.relu(1 + 0.5 * stn - d2)
+      let gpi = M.relu(1 + 0.5 * stn - d1 - 0.5 * gpe)
+      let thal = M.relu(1 - gpi)
+      if thal > bestv
+        bestv = thal
+        best = j
+      end
+      j = j + 1
+    end
+    return best
+  end
+end

@@ -29,9 +29,25 @@ module Bada
         interp.register_native("range") { |n| (0...n.to_i).to_a }
         interp.register_native("push") { |arr, x| arr << x; arr }
         interp.register_native("at") { |arr, i| arr[i.to_i] }
+        interp.register_native("set_at") { |arr, i, v| arr[i.to_i] = v; arr }
+        interp.register_native("fill") { |n, v| Array.new(n.to_i, v) }
         interp.register_native("abs") { |x| x.abs }
         interp.register_native("sqrt") { |x| Math.sqrt(x) }
         interp.register_native("log") { |x| Math.log(x) }
+        interp.register_native("log2") { |x| Math.log2(x) }
+        interp.register_native("exp") { |x| Math.exp(x) }
+        interp.register_native("sin") { |x| Math.sin(x) }
+        interp.register_native("cos") { |x| Math.cos(x) }
+        interp.register_native("tan") { |x| Math.tan(x) }
+        interp.register_native("acos") { |x| Math.acos(x.clamp(-1.0, 1.0)) }
+        interp.register_native("atan") { |x| Math.atan(x) }
+        interp.register_native("floor") { |x| x.floor }
+        interp.register_native("ceil") { |x| x.ceil }
+        interp.register_native("pow") { |a, b| a**b }
+        interp.register_native("mod") { |a, b| a % b }
+        interp.register_native("int") { |x| x.to_i }
+        interp.register_native("pi") { Math::PI }
+        interp.register_native("euler") { Math::E }
       end
 
       def install_engine_modules(interp)

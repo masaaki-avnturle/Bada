@@ -1,0 +1,29 @@
+# std/prover.bada — 未知事前エンジンの「整除性の健全な証明」を Bada 言語で実装
+# 整数係数多項式 E について m | E(n) を、剰余系 0..m-1 の全数検査で判定する
+# （E(n) mod m は n mod m のみに依存するので、これは完全・健全な証明）。
+
+import "std/polynomial.bada"
+
+library Prove
+  # m | E(n) を全 n について判定。
+  # 返り値 -1 = 証明完了、 r>=0 = 反例の剰余 r
+  def divides_all(coeffs, m)
+    let r = 0
+    while r < m
+      if mod(Poly.eval(coeffs, r), m) != 0
+        return r
+      end
+      r = r + 1
+    end
+    return -1
+  end
+
+  # 判定結果を文字列で返す
+  def verdict(coeffs, m, label)
+    let r = divides_all(coeffs, m)
+    if r < 0
+      return label + " : 証明完了 (剰余系の全数検査で m|E(n))"
+    end
+    return label + " : 反証 (反例 n=" + str(r) + ")"
+  end
+end

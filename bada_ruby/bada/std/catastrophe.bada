@@ -1,0 +1,38 @@
+# std/catastrophe.bada — カタストロフィ理論の三次方程式の実根を Bada 言語で実装
+# depressed cubic x^3 + p x + q = 0 の実根（Cardano / 三角法）
+
+import "std/math.bada"
+
+library Cat
+  # 判別式 -(4 p^3 + 27 q^2)。 >0 で実根3つ
+  def disc(p, q)
+    return -(4 * pow(p, 3) + 27 * pow(q, 2))
+  end
+
+  # 実根3つ（三角法）
+  def roots3(p, q)
+    let m = 2 * sqrt(-p / 3)
+    let theta = acos((3 * q) / (p * m)) / 3
+    let r0 = m * cos(theta)
+    let r1 = m * cos(theta - 2 * pi() / 3)
+    let r2 = m * cos(theta - 4 * pi() / 3)
+    return [r0, r1, r2]
+  end
+
+  # 実根（disc>0,p<0 なら3つ、それ以外は1つ）
+  def roots(p, q)
+    if disc(p, q) > 0 and p < 0
+      return roots3(p, q)
+    end
+    let d = pow(q / 2, 2) + pow(p / 3, 3)
+    let sq = sqrt(d)
+    let u = M.cbrt(-q / 2 + sq)
+    let v = M.cbrt(-q / 2 - sq)
+    return [u + v]
+  end
+
+  # カスプ分岐点集合の判別式 4a^3 + 27b^2 （=0 で分岐点上）
+  def cusp_disc(a, b)
+    return 4 * pow(a, 3) + 27 * pow(b, 2)
+  end
+end

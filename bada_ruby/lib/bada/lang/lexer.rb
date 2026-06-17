@@ -81,6 +81,19 @@ module Bada
           buf << cur
           advance
         end
+        # scientific notation: e / E with optional sign
+        if !eof? && (cur == "e" || cur == "E") && (digit?(nxt) || nxt == "+" || nxt == "-")
+          buf << cur; advance
+          if cur == "+" || cur == "-"
+            buf << cur; advance
+          end
+          while !eof? && digit?(cur)
+            buf << cur
+            advance
+          end
+          push(:number, buf.to_f)
+          return
+        end
         push(:number, buf.include?(".") ? buf.to_f : buf.to_i)
       end
 
