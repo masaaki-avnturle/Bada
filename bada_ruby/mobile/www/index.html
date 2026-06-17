@@ -242,6 +242,167 @@ function generateApp(req, atts){
   return L.join("\n");
 }
 
+// ===== offline practical engine (works with NO API key) =====
+// A real on-device assistant: calculator, summarizer, keyword/counts,
+// entropy/Ξ, a small Bada/math knowledge base, and app generation.
+
+// --- safe math evaluator (recursive descent; no eval) ---
+function mathEval(input){
+  let s = input
+    .replace(/Γ/g,"gamma").replace(/π/g,"pi").replace(/√/g,"sqrt")
+    .replace(/[×]/g,"*").replace(/[÷]/g,"/")
+    .replace(/[−–—]/g,"-").replace(/[（]/g,"(").replace(/[）]/g,")")
+    .replace(/[，]/g,",");
+  let i = 0;
+  const FUNC = {
+    sqrt:Math.sqrt, cbrt:Math.cbrt, abs:Math.abs, exp:Math.exp,
+    ln:Math.log, log:Math.log10, log2:Math.log2, log10:Math.log10,
+    sin:Math.sin, cos:Math.cos, tan:Math.tan, asin:Math.asin, acos:Math.acos, atan:Math.atan,
+    floor:Math.floor, ceil:Math.ceil, round:Math.round, sign:Math.sign,
+    gamma:gamma, fact:x=>gamma(x+1), factorial:x=>gamma(x+1),
+    beta:beta, pow:Math.pow, atan2:Math.atan2, max:Math.max, min:Math.min, hypot:Math.hypot
+  };
+  const CONST = { pi:Math.PI, e:Math.E, euler:Math.E, tau:2*Math.PI };
+  const ws = ()=>{ while(i<s.length && /\s/.test(s[i])) i++; };
+  const pk = ()=>{ ws(); return s[i]; };
+  function expr(){ let v=term(); for(;;){ const c=pk(); if(c==="+"){i++; v+=term();} else if(c==="-"){i++; v-=term();} else break; } return v; }
+  function term(){ let v=unary(); for(;;){ const c=pk(); if(c==="*"){i++; v*=unary();} else if(c==="/"){i++; v/=unary();} else if(c==="%"){i++; v%=unary();} else break; } return v; }
+  function unary(){ const c=pk(); if(c==="-"){i++; return -unary();} if(c==="+"){i++; return unary();} return pow(); }
+  function pow(){ let b=postfix(); if(pk()==="^"){ i++; return Math.pow(b, unary()); } return b; }
+  function postfix(){ let v=atom(); while(pk()==="!"){ i++; v=gamma(v+1); } return v; }
+  function atom(){
+    ws();
+    if(s[i]==="("){ i++; const v=expr(); ws(); if(s[i]!==")") throw new Error("paren"); i++; return v; }
+    const num = /^\d*\.?\d+([eE][+\-]?\d+)?/.exec(s.slice(i));
+    if(num){ i+=num[0].length; return parseFloat(num[0]); }
+    const nm = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i));
+    if(nm){
+      const name = nm[0].toLowerCase(); i+=nm[0].length; ws();
+      if(s[i]==="("){ i++; const args=[expr()]; ws(); while(s[i]===","){ i++; args.push(expr()); ws(); }
+        if(s[i]!==")") throw new Error("paren"); i++;
+        if(FUNC[name]) return FUNC[name](...args);
+        throw new Error("unknown function "+name);
+      }
+      if(name in CONST) return CONST[name];
+      if(FUNC[name]) throw new Error(name+" needs ( )");
+      throw new Error("unknown name "+name);
+    }
+    throw new Error("unexpected '"+(s[i]||"end")+"'");
+  }
+  const v = expr(); ws();
+  if(i < s.length) throw new Error("trailing '"+s.slice(i)+"'");
+  return v;
+}
+function fmtNum(v){
+  if(!isFinite(v)) return String(v);
+  if(Number.isInteger(v)) return String(v);
+  return String(Math.round(v*1e10)/1e10);
+}
+// Convert a Japanese/plain math question into an expression, or null.
+function asMath(q){
+  let s = q.replace(/[？?＝]/g,"").replace(/(は|を計算|を求めて|計算して|the value of|value of)/gi,"").trim();
+  s = s.replace(/([0-9.]+)\s*の\s*階乗/g,"factorial($1)")
+       .replace(/([0-9.]+)\s*の\s*平方根/g,"sqrt($1)")
+       .replace(/([0-9.]+)\s*の\s*二乗/g,"($1)^2")
+       .replace(/([0-9.]+)\s*の\s*三乗/g,"($1)^3")
+       .replace(/たす/g,"+").replace(/ひく/g,"-").replace(/かける/g,"*").replace(/わる/g,"/");
+  if(!/[0-9]/.test(s)) return null;
+  if(!/^[\s0-9+\-*/^%().!,A-Za-z_Γπ×÷√（），]+$/.test(s)) return null;
+  return s;
+}
+// Strip a leading command word so the rest is the operand text.
+function stripCmd(q){
+  return q.replace(/^(要約して?|まとめて?|要約|キーワード(抽出)?|文字数|単語数|トークン数|カウント|エントロピー|不変量|summarize|summary|keywords?|count|entropy)\s*[:：]?\s*/i,"").trim();
+}
+function splitSentences(t){ return t.split(/[。．.!?！？\n]+/).map(x=>x.trim()).filter(x=>x.length>1); }
+function summarize(text, k){
+  k = k||3;
+  const sents = splitSentences(text);
+  if(sents.length <= k) return text.trim();
+  const freq = {}; tokenize(text).forEach(w=> freq[w]=(freq[w]||0)+1);
+  const scored = sents.map((sen,idx)=>{ const tk=tokenize(sen); const sc=tk.reduce((a,w)=>a+(freq[w]||0),0)/(tk.length||1); return {sen,idx,sc}; });
+  const top = scored.slice().sort((a,b)=>b.sc-a.sc).slice(0,k).sort((a,b)=>a.idx-b.idx);
+  return top.map(x=>x.sen).join("。 ") + "。";
+}
+const STOP = new Set("の に は を が と で て た し も へ や か な this that the a an of to and is in for on at it です ます する いる ある こと これ それ".split(" "));
+function keywords(text, k){
+  k=k||8; const freq={};
+  tokenize(text).forEach(w=>{ if(STOP.has(w)) return; freq[w]=(freq[w]||0)+1; });
+  return Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,k);
+}
+function counts(text){
+  return { chars:[...text].length, tokens:tokenize(text).length, lines:(text.split(/\n/).length) };
+}
+function capabilities(){
+  return "【Bada XP — 鍵なしでも使える実用機能】\n"+
+  "・計算機: 「2+2」「sqrt(2)」「Γ(7)」「5!」「log2(8)」「beta(2,3)」「(3^4-1)/5」\n"+
+  "・要約: 「要約 <文章>」 または 📎添付して「要約」\n"+
+  "・キーワード: 「キーワード <文章/添付>」\n"+
+  "・文字数/トークン数: 「文字数 <文章/添付>」\n"+
+  "・エントロピー/不変量Ξ: 「エントロピー <文章/添付>」\n"+
+  "・アプリ生成: 「⚙ アプリ生成」で実行可能な Bada コードを生成・ダウンロード\n"+
+  "・本物のAI: 「設定」でAPIキーを入れると Claude/ChatGPT に切替";
+}
+const KB = [
+  { k:["ξ","不変量","invariant"], a:"Ξ は大域的部分積分多様体のエントロピー不変量で、Ξ = β(H+1, M+1) / log(N+1)。H はシャノンエントロピー、M は多様体線素 1/(x·log x)² の積分、N はトークン数です。" },
+  { k:["エントロピー","entropy","シャノン","shannon"], a:"シャノンのエントロピー H = −Σ p·log₂ p（bit）。テキストを送ると実際に計算します。例: 「エントロピー こんにちは世界」" },
+  { k:["ガンマ","gamma","Γ","階乗","factorial"], a:"ガンマ関数 Γ(n)=(n−1)!（自然数で）。「Γ(5)」「gamma(5)」「5!」で実計算できます。" },
+  { k:["bada","バダ","ばだ","ばーだ"], a:"Bada は大域的部分積分多様体理論とシャノン不変量に基づく言語/エンジン。このアプリ Bada XP はその ChatGPT 分派で、鍵なしでも計算・要約・解析・アプリ生成ができます。" },
+  { k:["円周率","pi","π"], a:"π ≒ 3.141592653589793。「pi*2」などで計算に使えます。" }
+];
+function attachedText(){ return attachments.length ? attachments.map(a=>a.text).join("\n") : ""; }
+// The offline assistant entry point (used whenever no real LLM is active).
+function offlineAnswer(question){
+  const q = (question||"").trim();
+  if(!q && !attachments.length) return capabilities();
+  if(/help|ヘルプ|使い方|つかいかた|何ができ|できること/i.test(q)) return capabilities();
+
+  // 1) calculator
+  const expr = asMath(q);
+  if(expr !== null){ try{ const v = mathEval(expr); if(isFinite(v)) return `${q}\n= ${fmtNum(v)}`; }catch(e){} }
+
+  // operand: attachment(s), else the text after the command word (ignoring
+  // bare definitional particles like 「とは」「何」so "Ξとは" reaches the KB).
+  const after = stripCmd(q);
+  const realOperand = (after && after !== q && !/^(とは|って|何|の意味|を教え|\?|？)/.test(after)) ? after : "";
+  const src = attachments.length ? attachedText() : realOperand;
+  const hasOperand = attachments.length > 0 || !!realOperand;
+  const hasCmd = after !== q; // a leading command word was present
+
+  // 2) summarize
+  if(/要約|まとめ|summary|summarize/i.test(q) && (hasCmd || attachments.length)){
+    return src ? "【要約】\n"+summarize(src,3) : "要約する文章を「要約 …」の形で送るか、📎でファイルを添付してください。";
+  }
+  // 3) keywords
+  if(/キーワード|keyword|頻出/i.test(q) && (hasCmd || attachments.length)){
+    return src ? "【キーワード】\n"+keywords(src).map(([w,c])=>`${w}(${c})`).join(", ")
+               : "キーワードを抽出する文章を送るか、📎で添付してください。";
+  }
+  // 4) counts
+  if(/文字数|何文字|単語数|トークン数|カウント|count|word count/i.test(q) && (hasCmd || attachments.length)){
+    const c = counts(src || q);
+    return `文字数 ${c.chars} / トークン ${c.tokens} / 行 ${c.lines}`;
+  }
+  // 5) entropy / invariant — only when an operand is given (else KB explains it)
+  if(/エントロピー|entropy|不変量|Ξ|ξ|\bxi\b/i.test(q) && hasOperand){
+    const t = src;
+    return `H = ${ofEntropy(t).toFixed(4)} bits / Ξ = ${xi(t).toFixed(4)} / N = ${tokenize(t).length} tokens`;
+  }
+  // 6) knowledge base
+  const ql = q.toLowerCase();
+  for(const e of KB){ if(e.k.some(kk=> ql.includes(kk.toLowerCase()))) return e.a; }
+
+  // 7) attachment present but no explicit command → analyze + offer actions
+  if(attachments.length){
+    const st = fileStats(attachedText());
+    return `添付 ${attachments.length} 件を解析: N=${st.n} トークン, H=${st.h.toFixed(3)} bits, Ξ=${st.xi.toFixed(4)}。\n`+
+           `「要約」「キーワード」「文字数」で詳しく、または「⚙ アプリ生成」でコード化できます。`;
+  }
+  // 8) helpful default (not a canned template): show what it can do + indices
+  return `『${q}』への登録知識はありませんが、オフラインで次ができます。\n`+capabilities()+
+         `\n\n参考指標 → H=${ofEntropy(q).toFixed(3)} bits / Ξ=${xi(q).toFixed(4)}`;
+}
+
 // ===== version ladder (mirrors lib/bada/lang/llm.rb) =====
 const CODENAME = "Bada XP";
 const LADDER = [
@@ -321,10 +482,9 @@ function contextBlock(){
   }).join("\n\n");
 }
 function localAnswer(question){
-  if(!attachments.length) return localReply(question);
-  const head = attachments.map(a=>`添付『${a.name}』: N=${a.stats.n} トークン, H=${a.stats.h.toFixed(3)} bits, Ξ=${a.stats.xi.toFixed(4)}`).join("\n");
-  const sample = attachments.map(a=>a.text.slice(0,300)).join(" ");
-  return head + "\n" + localReply(question + " " + sample);
+  // The offline practical engine (calculator / summary / keywords / counts /
+  // entropy / KB / file analysis). Genuinely useful with no API key.
+  return offlineAnswer(question);
 }
 async function answer(question){
   const prompt = attachments.length ? (contextBlock() + "\n\n質問: " + question) : question;
@@ -349,7 +509,7 @@ function bubble(text, who, meta){
 }
 function renderVersion(){
   $("#verName").textContent = cur().label;
-  $("#engName").textContent = isLive() ? ("本物:" + activeModel()) : (apiKey() ? "デモ(local版)" : "デモ(テンプレート)");
+  $("#engName").textContent = isLive() ? ("本物:" + activeModel()) : "オフライン(計算/解析)";
 }
 function renderLadder(){
   const ul = $("#ladderUl"); ul.innerHTML = "";
@@ -370,7 +530,7 @@ async function send(){
   const res = await answer(q);
   typing.firstChild.textContent = res.text;
   const m=document.createElement("span"); m.className="meta";
-  const tag = res.engine==="demo" ? "デモ(テンプレート)" : res.engine==="error" ? "接続失敗→デモ" : "本物のAI:"+res.engine;
+  const tag = res.engine==="demo" ? "オフライン" : res.engine==="error" ? "接続失敗→オフライン" : "本物のAI:"+res.engine;
   m.textContent = `${cur().label} · ${tag}`;
   typing.appendChild(m); log.scrollTop=log.scrollHeight;
 }
@@ -477,10 +637,10 @@ $("#setTest").onclick = async ()=>{
 renderVersion();
 renderChips();
 if(!isLive()){
-  bubble(`こんにちは。Bada XP です。\n\n⚠ 現在は API キー未設定のため、応答は『デモ・エンジン（定型文＝テンプレート）』です。`+
-    `\n\n本物の ChatGPT（Claude / OpenAI）にするには：\n① 右上「設定」を開く\n② 提供元を選び、ご自身の API キーを入力\n③「接続テスト」で確認 → 保存\n`+
-    `これで実在の AI が応答します（鍵はこの端末内だけに保存）。\n\n📎 でファイル添付、「⚙ アプリ生成」でコード生成もできます。`,
-    "bot", "本物の応答には API キーが必要です");
+  bubble(`こんにちは。Bada XP です（鍵なしで動くオフライン実用モード）。\n\n`+capabilities()+
+    `\n\n例:「Γ(7)」「(3^4-1)/5」「要約 …」「キーワード …」。📎でファイルも解析できます。\n`+
+    `本物の Claude/ChatGPT にしたい時は右上「設定」で API キーを入れてください。`,
+    "bot", "オフラインでも計算・要約・解析ができます");
 }else{
   bubble(`こんにちは。Bada XP です。本物の AI（${activeModel()}）に接続済みです。`+
     `\n📎 で OneDrive・任意ファイルを添付して質問やアプリ生成ができます。`, "bot", `本物のAI:${activeModel()}`);
