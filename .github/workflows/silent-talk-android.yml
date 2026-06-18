@@ -1,0 +1,84 @@
+name: Build Silent Talk APK
+
+# タグ push (v*) で Release を作成し APK を公開。手動実行も可能。
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: silent_talk_app
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Generate signing keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore release.keystore \
+            -alias silenttalk \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass silenttalk -keypass silenttalk \
+            -dname "CN=Silent Talk, OU=omega, O=omega, L=., ST=., C=JP"
+
+      - name: Build release APK
+        run: |
+          ./gradlew :app:assembleRelease \
+            -Pandroid.injected.signing.store.file=$PWD/release.keystore \
+            -Pandroid.injected.signing.store.password=silenttalk \
+            -Pandroid.injected.signing.key.alias=silenttalk \
+            -Pandroid.injected.signing.key.password=silenttalk \
+            --no-daemon --stacktrace
+
+      - name: Locate APK
+        id: apk
+        run: |
+          path=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          echo "Found APK: $path"
+          cp "$path" "$GITHUB_WORKSPACE/SilentTalk.apk"
+          echo "apk=$GITHUB_WORKSPACE/SilentTalk.apk" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SilentTalk-APK
+          path: ${{ steps.apk.outputs.apk }}
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.apk }}
+          name: Silent Talk ${{ github.ref_name }}
+          body: |
+            **Silent Talk** — neurothermal ベースの無音通信アプリ (APK)
+
+            ガンマ熱多様体 `T' = ∫ Γ(γ)' dx_m` を搬送波に、テキストを
+            熱・神経パルス列へ符号化して “言葉を使わず信号で伝える” Android アプリ。
+            画面上部に赤外線センサー + 温度計の常設ライブバーを備えます。
+
+            下の `SilentTalk.apk` をスマホにダウンロードし、提供元不明アプリの
+            インストールを許可してインストールしてください。
+
+            ※ 教育・可視化シミュレーションです。医療機器ではありません。
