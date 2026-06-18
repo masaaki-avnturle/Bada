@@ -31,8 +31,30 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # ubuntu-latest ランナーには Android SDK がプリインストールされている。
+      # 外部アクションの ZIP 取得失敗(不安定)を避け、プリインストール SDK を使う。
+      # 必要パッケージはリトライ付きで sdkmanager から取得する。
+      - name: Prepare Android SDK (preinstalled + retry)
+        run: |
+          set -e
+          if [ -z "$ANDROID_HOME" ]; then
+            export ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager | head -1)
+          echo "Using sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
+          install_pkg() {
+            for attempt in 1 2 3 4 5; do
+              echo "Installing '$1' (attempt $attempt)"
+              if yes | "$SDKMANAGER" "$1"; then return 0; fi
+              echo "retry in $((attempt*10))s"; sleep $((attempt*10))
+            done
+            return 1
+          }
+          install_pkg "platform-tools"
+          install_pkg "platforms;android-34"
+          install_pkg "build-tools;34.0.0"
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
