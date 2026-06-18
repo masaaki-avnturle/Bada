@@ -1,10 +1,14 @@
 name: Build Silent Talk APK
 
-# タグ push (v*) で Release を作成し APK を公開。手動実行も可能。
+# silent_talk_app/ への push でビルドし、APK を GitHub Release (固定タグ
+# silent-talk-latest) として公開する。手動実行(workflow_dispatch)も可能。
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - "**"
+    paths:
+      - "silent_talk_app/**"
+      - ".github/workflows/silent-talk-android.yml"
   workflow_dispatch:
 
 permissions:
@@ -66,11 +70,11 @@ jobs:
           path: ${{ steps.apk.outputs.apk }}
 
       - name: Publish to GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: silent-talk-latest
+          name: Silent Talk (latest)
           files: ${{ steps.apk.outputs.apk }}
-          name: Silent Talk ${{ github.ref_name }}
           body: |
             **Silent Talk** — neurothermal ベースの無音通信アプリ (APK)
 
