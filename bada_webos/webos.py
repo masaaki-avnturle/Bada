@@ -39,6 +39,7 @@ from ultranet import UltraNetwork                              # noqa: E402
 from android.installer import Android12Installer, AndroidManifest  # noqa
 from terminal import Terminal                                  # noqa: E402
 from qcrypto import QuantumCryptoApp                            # noqa: E402
+from al import AlOS                                             # noqa: E402
 from render.desktop import render_desktop                      # noqa: E402
 
 _APP_DIR = os.path.join(_HERE, "apps")
@@ -61,6 +62,7 @@ class BadaWebOS:
         self.ultranet = UltraNetwork()
         self.terminal = Terminal()
         self.qcrypto = QuantumCryptoApp()
+        self.al = AlOS()
 
     # ----------------------------------------------------------------
     def boot(self) -> dict:
@@ -111,6 +113,11 @@ class BadaWebOS:
         w_qc = self.wm.new_window("Quantum Crypto (Jones)", 70, 70, 470, 250)
         self.window_content[w_qc.wid] = self.qcrypto.render_html()
 
+        # 5d. AL — Laevatein AI / machine OS (all libraries written in Bada)
+        al_report = self.al.boot()
+        w_al = self.wm.new_window("AL — Laevatein AI OS", 300, 200, 500, 270)
+        self.window_content[w_al.wid] = self.al.render_html()
+
         # 6. Android 12 app installed + launched onto screen 2
         manifest = AndroidManifest(
             package="com.bada.notes", label="Bada Notes",
@@ -137,6 +144,12 @@ class BadaWebOS:
                 "activated": qc_report["activation"]["activated"],
                 "jones": qc_report["activation"].get("jones"),
                 "broken_key": qc_report["activation"].get("broken_key"),
+            },
+            "al": {
+                "online": al_report["online"],
+                "resonance_mode": al_report["resonance_mode"],
+                "consciousness": al_report["consciousness"],
+                "meltdown": al_report["meltdown"],
             },
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
@@ -228,4 +241,8 @@ if __name__ == "__main__":
           f"{report['terminal']['editors']}")
     print(f"  quantum crypto: activated={report['quantum_crypto']['activated']}"
           f" Jones {report['quantum_crypto']['jones']}")
+    print(f"  AL OS: online={report['al']['online']} "
+          f"mode={report['al']['resonance_mode']} "
+          f"consciousness={report['al']['consciousness']} "
+          f"meltdown={report['al']['meltdown']}")
     print(f"  desktop written to {out}")

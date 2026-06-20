@@ -250,13 +250,54 @@ class Shell:
                 + f"Jones V(t) = {act.get('jones')}\n"
                 + "Jones-polynomial quantum cryptography ACTIVATED\n")
 
+    def _al(self, args, stdin):
+        # AL — the Laevatein AI/machine OS (libraries written in Bada).
+        from al import bridge
+        sub = args[0] if args else "boot"
+        if sub == "grover":
+            nq = int(args[1]) if len(args) > 1 else 4
+            mk = int(args[2]) if len(args) > 2 else 11
+            return f"Grover resonance mode = {bridge.grover(nq, mk)}\n"
+        if sub == "cool":
+            steps = int(args[1]) if len(args) > 1 else 120
+            q = float(args[2]) if len(args) > 2 else 220
+            sc = float(args[3]) if len(args) > 3 else 0.8
+            r = bridge.cooling_sim(steps, q, sc)
+            return (f"Lambda Driver cooling: maxT={r[0]:.1f} finalT={r[1]:.1f} "
+                    f"meltdown={'YES' if r[2] else 'no'}\n")
+        if sub == "mind":
+            k = int(args[1]) if len(args) > 1 else 8
+            g = int(args[2]) if len(args) > 2 else 60
+            s = int(args[3]) if len(args) > 3 else 1234
+            return f"machine consciousness = {bridge.consciousness(k, g, s)} ignited neurons\n"
+        if sub == "robot":
+            sensors = [int(x) for x in args[1:4]] or [1, 0, 1]
+            return f"robot FPGA motors [L,R] = {bridge.robot_fpga(sensors)}\n"
+        if sub == "gen":
+            seed = int(args[1]) if len(args) > 1 else 77
+            lines = int(args[2]) if len(args) > 2 else 3
+            return bridge.apriori(seed, lines) + "\n"
+        # default: concise boot summary
+        from al import AlOS
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        buf = _io.StringIO()
+        with _rs(buf):
+            r = AlOS().boot()
+        return (f"AL :: Laevatein AI OS  [{'ONLINE' if r['online'] else 'down'}]\n"
+                f"  Grover mode      : {r['resonance_mode']}\n"
+                f"  consciousness    : {r['consciousness']} ignited neurons\n"
+                f"  Lambda cooling   : maxT {r['cooling_maxT']:.1f}, "
+                f"meltdown {'YES' if r['meltdown'] else 'no'}\n")
+
     def _help(self, args, stdin):
         names = " ".join(sorted(self.BUILTINS))
         return ("BadaWebOS terminal — available apps:\n"
                 f"  {names}\n"
                 "  editors: vim FILE, emacs FILE\n"
                 "  run Bada: bada FILE.bada\n"
-                "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n")
+                "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n"
+                "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -264,5 +305,5 @@ class Shell:
         "head": _head, "grep": _grep, "wc": _wc, "env": _env,
         "export": _export, "whoami": _whoami, "clear": _clear,
         "bada": _bada, "vim": _vim, "emacs": _emacs, "qcrypto": _qcrypto,
-        "help": _help,
+        "al": _al, "help": _help,
     }
