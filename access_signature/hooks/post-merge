@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+# access-signature post-merge hook.
+# Git runs this after a successful `git pull` (merge). Record a pull access
+# request so the owner is notified of who pulled.
+set -euo pipefail
+
+REPO="$(basename -s .git "$(git config --get remote.origin.url || echo unknown)")"
+ACTOR="$(git config user.email || echo unknown)"
+if command -v access-signature >/dev/null 2>&1; then
+  access-signature on-access --actor "$ACTOR" --repo "$REPO" --op pull --email "$ACTOR" || true
+else
+  python3 -m access_signature.cli on-access --actor "$ACTOR" --repo "$REPO" --op pull --email "$ACTOR" || true
+fi

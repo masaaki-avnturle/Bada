@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# access-signature pre-push hook.
+# Blocks a push to a protected repo unless the pusher holds a valid
+# digital-signature password; otherwise it requests access (emailing the owner)
+# and aborts so the owner can approve and issue a password.
+#
+# Provide your password (after approval) via either:
+#   export ACCESS_SIGNATURE_PASSWORD=...        (and the matching signed token)
+#   git config access.signature.password ...
+set -euo pipefail
+
+REMOTE_NAME="${1:-origin}"
+REPO="$(basename -s .git "$(git config --get "remote.${REMOTE_NAME}.url" || echo unknown)")"
+ACTOR="$(git config user.email || echo unknown)"
+PW="${ACCESS_SIGNATURE_PASSWORD:-$(git config --get access.signature.password || true)}"
+
+# Resolve the CLI (installed entrypoint or the module).
+ASIG() { if command -v access-signature >/dev/null 2>&1; then access-signature "$@"; else python3 -m access_signature.cli "$@"; fi; }
+
+if [ -n "$PW" ] && ASIG verify --actor "$ACTOR" --repo "$REPO" --password "$PW" >/dev/null 2>&1; then
+  echo "access-signature: $ACTOR authorised to push $REPO."
+  exit 0
+fi
+
+echo "access-signature: $ACTOR is not authorised to push '$REPO'."
+ASIG on-access --actor "$ACTOR" --repo "$REPO" --op push --email "$ACTOR" || true
+echo "A request was emailed to the owner. After approval you'll receive a"
+echo "digital-signature password; set ACCESS_SIGNATURE_PASSWORD and push again."
+exit 1
