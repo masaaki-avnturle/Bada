@@ -277,6 +277,30 @@ class Shell:
             seed = int(args[1]) if len(args) > 1 else 77
             lines = int(args[2]) if len(args) > 2 else 3
             return bridge.apriori(seed, lines) + "\n"
+        if sub == "gamma":
+            amp = float(args[1]) if len(args) > 1 else 1.5
+            return f"pilot gamma power = {bridge.gamma_power(amp):.4f}\n"
+        if sub == "atfield":
+            eff = float(args[1]) if len(args) > 1 else 1.2
+            res = float(args[2]) if len(args) > 2 else 0.25
+            sc = float(args[3]) if len(args) > 3 else 0.8
+            ld = bridge.lambda_driver(eff, res, sc)
+            return f"Lambda Driver: AT-field={ld[0]:.2f} anti-gravity={ld[1]:.2f}\n"
+        if sub == "pilot":
+            from al import AlOS
+            import io as _io
+            from contextlib import redirect_stdout as _rs
+            buf = _io.StringIO()
+            with _rs(buf):
+                r = AlOS().boot()
+            return ("AL :: pilot resonance link  "
+                    f"[{'AT-FIELD ONLINE' if r['atfield_online'] else 'down'}]\n"
+                    f"  gamma topography : region {r['pilot_region']}, "
+                    f"power {r['gamma_power']:.3f}\n"
+                    f"  haloperidol bio  : {r['haloperidol']:.2f} -> "
+                    f"resonance {r['resonance']:.3f}\n"
+                    f"  Lambda Driver    : AT-field {r['at_field']:.2f}, "
+                    f"anti-gravity {r['anti_gravity']:.2f}\n")
         # default: concise boot summary
         from al import AlOS
         import io as _io
@@ -297,7 +321,8 @@ class Shell:
                 "  editors: vim FILE, emacs FILE\n"
                 "  run Bada: bada FILE.bada\n"
                 "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n"
-                "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n")
+                "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
+                "  pilot/ATfield:  al [pilot|gamma|atfield]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,

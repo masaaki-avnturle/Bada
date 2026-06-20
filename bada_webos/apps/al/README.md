@@ -16,7 +16,16 @@ the artificial intelligence and machine-circuit OS of the ARX-8 Laevatein.
 | `neuro.bada` | **self-evolving consciousness** — a recurrent palladium-reactor neural net (quantum-microtubule seeded) that hill-climbs to maximise global-workspace ignition. |
 | `apriori.bada` | **unknown a-priori engine** — generates new source code from the AI's state seed (the engine that writes the engine). |
 | `fpga.bada` | **robot neural FPGA** — sensor→motor reflexes synthesised to lookup tables (obstacle avoidance). |
-| `mathx.bada`, `rng.bada` | Bada math (`fsqrt`) and a reproducible PRNG. |
+| `eeg.bada` | **brain electromagnetic waves → gamma power** — synthesises an EEG and extracts gamma-band power by DFT-at-frequency (Goertzel style). |
+| `fmri_topo.bada` | **fMRI / brain topography** — gamma power per cortical channel; locates the dominant gamma source region. |
+| `resonance.bada` | **resonance device** — a driven damped oscillator that peaks when the pilot's gamma drive matches its natural frequency. |
+| `biofeedback.bada` | **haloperidol biofeedback** (simulated suppression parameter, *not medical advice*) — holds the gamma-driven resonance in a safe band so the Lambda Driver can't run away. |
+| `lambda_drive.bada` | **Lambda Driver** — pilot gamma × resonance → **AT field**; supercooled-metal coupling → **anti-gravity** lift. |
+| `mathx.bada`, `rng.bada` | Bada math (`fsqrt`, `fsin`, `fcos`) and a reproducible PRNG. |
+
+`al_pilot.bada` runs the pilot link: acquire brain data → gamma topography →
+haloperidol biofeedback → Lambda Driver AT field + anti-gravity → neural
+self-evolution, recording `Omega::DATABASE[pilot]`.
 
 `al_laevatein.bada` boots all of them on the Bada VM and records the AL state in
 the `Omega::DATABASE[al]` Akashic TupleSpace.
@@ -34,7 +43,21 @@ al cool 120 220 0.8
 al mind 8 60 1234  # evolve machine consciousness
 al robot 1 0 1     # robot FPGA motor command
 al gen 77 3        # a-priori engine source generation
+al pilot           # pilot gamma -> AT field + anti-gravity (full link)
+al gamma 1.5       # gamma-band power from brain EM waves
+al atfield 1.2 0.25 0.8   # Lambda Driver AT-field + anti-gravity
 ```
+
+## Pilot resonance link (gamma → AT field)
+The pilot's brain **gamma waves** drive the Lambda Driver:
+```
+brain EM waves ─▶ gamma power (eeg) ─▶ topography hotspot (fmri_topo)
+   ─▶ resonance device ─▶ haloperidol biofeedback (stabilise)
+   ─▶ Lambda Driver ─▶ AT field + anti-gravity
+```
+Verified: gamma power rises with arousal; the haloperidol loop engages for high
+gamma and holds resonance near its safe target; the Lambda Driver then projects
+a positive AT field and anti-gravity lift.
 
 ## Verified
 - Grover returns the marked mode for several `(n, marked)` (e.g. `grover(4,11)=11`).
