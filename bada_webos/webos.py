@@ -38,6 +38,7 @@ from cloud.settings_bridge import (Bridge, CloudStore,         # noqa: E402
 from ultranet import UltraNetwork                              # noqa: E402
 from android.installer import Android12Installer, AndroidManifest  # noqa
 from terminal import Terminal                                  # noqa: E402
+from qcrypto import QuantumCryptoApp                            # noqa: E402
 from render.desktop import render_desktop                      # noqa: E402
 
 _APP_DIR = os.path.join(_HERE, "apps")
@@ -59,6 +60,7 @@ class BadaWebOS:
         self.panel = SettingsPanel(self.bridge)
         self.ultranet = UltraNetwork()
         self.terminal = Terminal()
+        self.qcrypto = QuantumCryptoApp()
 
     # ----------------------------------------------------------------
     def boot(self) -> dict:
@@ -98,6 +100,13 @@ class BadaWebOS:
                                     540, 320)
         self.window_content[w_term.wid] = self.terminal.render_html()
 
+        # 5c. Quantum crypto: cryptanalyse a signature -> activate Jones crypto
+        qc_report = self.qcrypto.boot()
+        self.kernel.run_app_file(
+            "quantum_crypto", os.path.join(_APP_DIR, "quantum_crypto.bada"))
+        w_qc = self.wm.new_window("Quantum Crypto (Jones)", 70, 70, 470, 250)
+        self.window_content[w_qc.wid] = self.qcrypto.render_html()
+
         # 6. Android 12 app installed + launched onto screen 2
         manifest = AndroidManifest(
             package="com.bada.notes", label="Bada Notes",
@@ -120,6 +129,11 @@ class BadaWebOS:
                           for p in self.kernel.processes],
             "rails_app": osapp.name,
             "ultranetwork": un_report,
+            "quantum_crypto": {
+                "activated": qc_report["activation"]["activated"],
+                "jones": qc_report["activation"].get("jones"),
+                "broken_key": qc_report["activation"].get("broken_key"),
+            },
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
             "android": [a.package for a in self.installer.list_apps()],
@@ -208,4 +222,6 @@ if __name__ == "__main__":
     print(f"  android installed: {report['android']}")
     print(f"  terminal apps: bash builtins + "
           f"{report['terminal']['editors']}")
+    print(f"  quantum crypto: activated={report['quantum_crypto']['activated']}"
+          f" Jones {report['quantum_crypto']['jones']}")
     print(f"  desktop written to {out}")

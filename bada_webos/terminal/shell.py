@@ -18,7 +18,8 @@ from .vfs import VFS, VFSError
 
 # the Bada VM (application language)
 _ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-for _p in (_ROOT, os.path.join(_ROOT, "bada_silent_vim")):
+_WEBOS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # bada_webos/
+for _p in (_ROOT, _WEBOS, os.path.join(_ROOT, "bada_silent_vim")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 from bada import run_source  # noqa: E402
@@ -224,17 +225,39 @@ class Shell:
         self.launch_request = LaunchRequest("emacs", args[0] if args else None)
         return ""
 
+    def _qcrypto(self, args, stdin):
+        # Jones-polynomial quantum cryptography app, runnable from the terminal.
+        from qcrypto.app import QuantumCryptoApp
+        sub = args[0] if args else "demo"
+        if sub == "jones":
+            braid = [int(x) for x in args[1:]] or [1, 1, 1]
+            d = QuantumCryptoApp(braid=braid).jones(braid)
+            return (f"braid {d['braid']}\nJones V(t) = {d['jones']}\n"
+                    f"key {d['key_fingerprint']}\n")
+        # default: full activation demo
+        r = QuantumCryptoApp().boot()
+        act = r["activation"]
+        return ("quantum signature: "
+                + ("VALID\n" if r["signature_valid"] else "INVALID\n")
+                + f"cryptanalysis: broke key {act.get('broken_key')} "
+                  f"in {act.get('tried')} tries\n"
+                + f"recovered braid: {act.get('recovered_braid')}\n"
+                + f"Jones V(t) = {act.get('jones')}\n"
+                + "Jones-polynomial quantum cryptography ACTIVATED\n")
+
     def _help(self, args, stdin):
         names = " ".join(sorted(self.BUILTINS))
         return ("BadaWebOS terminal — available apps:\n"
                 f"  {names}\n"
                 "  editors: vim FILE, emacs FILE\n"
-                "  run Bada: bada FILE.bada\n")
+                "  run Bada: bada FILE.bada\n"
+                "  quantum crypto: qcrypto [demo|jones N...]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
         "mkdir": _mkdir, "touch": _touch, "rm": _rm, "cp": _cp, "mv": _mv,
         "head": _head, "grep": _grep, "wc": _wc, "env": _env,
         "export": _export, "whoami": _whoami, "clear": _clear,
-        "bada": _bada, "vim": _vim, "emacs": _emacs, "help": _help,
+        "bada": _bada, "vim": _vim, "emacs": _emacs, "qcrypto": _qcrypto,
+        "help": _help,
     }
