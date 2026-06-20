@@ -48,11 +48,19 @@ class QuantumCryptoApp:
             roundtrip = act.decrypt(blob) == payload
             ct_prefix = blob[:16].hex()
 
+        # the Jones polynomial computed natively by the Bada library
+        try:
+            from qcrypto.bada_jones import bada_jones_show
+            jones_in_bada = bada_jones_show(self.braid)
+        except Exception as exc:                      # pragma: no cover
+            jones_in_bada = f"(error: {exc})"
+
         self.report = {
             "signature_valid": valid,
             "activation": rep,
             "roundtrip_ok": roundtrip,
             "ciphertext_prefix": ct_prefix,
+            "jones_in_bada": jones_in_bada,
         }
         return self.report
 
@@ -70,6 +78,7 @@ class QuantumCryptoApp:
                               f"in {act.get('tried')} tries"),
             ("recovered braid", str(act.get("recovered_braid"))),
             ("Jones V(t)", act.get("jones", "")),
+            ("Jones V(t) in Bada", r.get("jones_in_bada", "")),
             ("Jones cipher key", act.get("key_fingerprint", "")),
             ("encrypt/decrypt", "ok" if r["roundtrip_ok"] else "—"),
         ]

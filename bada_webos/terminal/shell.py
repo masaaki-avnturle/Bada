@@ -234,6 +234,11 @@ class Shell:
             d = QuantumCryptoApp(braid=braid).jones(braid)
             return (f"braid {d['braid']}\nJones V(t) = {d['jones']}\n"
                     f"key {d['key_fingerprint']}\n")
+        if sub == "badajones":
+            # the Jones polynomial computed natively by the Bada library
+            from qcrypto.bada_jones import bada_jones_show
+            braid = [int(x) for x in args[1:]] or [1, 1, 1]
+            return f"V(t) = {bada_jones_show(braid)}  (computed in Bada)\n"
         # default: full activation demo
         r = QuantumCryptoApp().boot()
         act = r["activation"]
@@ -251,7 +256,7 @@ class Shell:
                 f"  {names}\n"
                 "  editors: vim FILE, emacs FILE\n"
                 "  run Bada: bada FILE.bada\n"
-                "  quantum crypto: qcrypto [demo|jones N...]\n")
+                "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,

@@ -104,6 +104,10 @@ class BadaWebOS:
         qc_report = self.qcrypto.boot()
         self.kernel.run_app_file(
             "quantum_crypto", os.path.join(_APP_DIR, "quantum_crypto.bada"))
+        # the Jones polynomial computed natively in Bada (libraries on the VM)
+        self.kernel.run_program_file(
+            "quantum_crypto_jones",
+            os.path.join(_APP_DIR, "quantum_crypto_jones.bada"))
         w_qc = self.wm.new_window("Quantum Crypto (Jones)", 70, 70, 470, 250)
         self.window_content[w_qc.wid] = self.qcrypto.render_html()
 
