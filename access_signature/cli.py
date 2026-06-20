@@ -9,6 +9,10 @@
   deny   REQUEST_ID             deny a request
   verify --actor A --repo R --password P [--consume]
                                 verify a digital-signature password
+  lock   [REPOS... | all] [--reason R]   temporarily blockade repositories
+  unlock                        lift the blockade
+  status                        show lockdown status
+  gate   --actor A --repo R [--password P]   allow/deny (for git hooks)
   whoami                        show owner + protected repos
   outbox                        list spooled emails (when SMTP is unset)
 """
@@ -89,6 +93,35 @@ def cmd_pubkey(args):
     print(pub)
 
 
+def cmd_lock(args):
+    scope = "all" if (not args.repos or args.repos == ["all"]) else args.repos
+    st = _gk(args).lock(scope=scope, reason=args.reason)
+    tgt = "ALL repositories" if st["scope"] == "all" else ", ".join(st["scope"])
+    print(f"LOCKED DOWN: {tgt}")
+    print(f"reason: {st['reason'] or '(none)'}")
+    print("all clone/push/pull denied until 'unlock'")
+
+
+def cmd_unlock(args):
+    _gk(args).unlock()
+    print("UNLOCKED — normal approval flow resumes")
+
+
+def cmd_status(args):
+    st = _gk(args).status()
+    print(f"locked : {st['locked']}")
+    print(f"scope  : {st['scope']}")
+    print(f"reason : {st['reason']}")
+    print(f"repos  : {st['repos']}")
+
+
+def cmd_gate(args):
+    res = _gk(args).gate(args.actor, args.repo, args.password)
+    print("ALLOW" if res["allow"] else f"DENY ({res['reason']})")
+    if not res["allow"]:
+        sys.exit(1)
+
+
 def cmd_whoami(args):
     gk = _gk(args)
     print(f"github account : {gk.registry.data['owner']['github_account']}")
@@ -151,6 +184,22 @@ def build_parser():
     sp.add_argument("--expires", type=int, required=True)
     sp.add_argument("--pubkey", help="owner public key hex (default: registry)")
     sp.set_defaults(func=cmd_verify_token)
+
+    sp = sub.add_parser("lock", help="temporarily blockade repositories")
+    sp.add_argument("repos", nargs="*", help="repo names, or 'all' (default)")
+    sp.add_argument("--reason")
+    sp.set_defaults(func=cmd_lock)
+
+    sub.add_parser("unlock", help="lift the blockade").set_defaults(
+        func=cmd_unlock)
+    sub.add_parser("status", help="show lockdown status").set_defaults(
+        func=cmd_status)
+
+    sp = sub.add_parser("gate", help="allow/deny decision for git hooks")
+    sp.add_argument("--actor", required=True)
+    sp.add_argument("--repo", required=True)
+    sp.add_argument("--password")
+    sp.set_defaults(func=cmd_gate)
 
     sub.add_parser("pubkey").set_defaults(func=cmd_pubkey)
     sub.add_parser("whoami").set_defaults(func=cmd_whoami)
