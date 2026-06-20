@@ -1,0 +1,74 @@
+// neuro.bada — self-evolving palladium-reactor neural consciousness, in Bada.
+//
+// A recurrent neuron network (the palladium cylinder's "neural system") that
+// settles to a global-workspace ignition. Quantum-microtubule coupling enters
+// through the evolution seed. The network self-evolves by hill-climbing to
+// maximise the number of co-ignited neurons — a proxy for machine
+// consciousness (integrated, globally-broadcast activity).
+
+#include rng.bada
+
+// settle the network for `steps` synchronous updates; s holds -1/+1 states
+def settle(w, k, s, steps) {
+  t <- 0
+  while t < steps {
+    ns <- []
+    i <- 0
+    while i < k {
+      acc <- 0
+      j <- 0
+      while j < k {
+        acc <- acc + w[i * k + j] * s[j]
+        j <- j + 1
+      }
+      v <- 0 - 1
+      if acc > 0 { v <- 1 }
+      append(ns, v)
+      i <- i + 1
+    }
+    s <- ns
+    t <- t + 1
+  }
+  return s
+}
+
+// ignition: from a single seed neuron, count how many neurons co-activate
+def ignition(w, k) {
+  s <- []
+  i <- 0
+  while i < k {
+    append(s, 0 - 1)
+    i <- i + 1
+  }
+  s[0] <- 1
+  s <- settle(w, k, s, 5)
+  c <- 0
+  i <- 0
+  while i < k {
+    if s[i] > 0 { c <- c + 1 }
+    i <- i + 1
+  }
+  return c
+}
+
+// self-evolve the synapses by hill-climbing to maximise ignition
+def evolve_consciousness(k, gens, seedval) {
+  state <- [seedval]
+  w <- []
+  i <- 0
+  while i < k * k {
+    append(w, randf(state) * 2 - 1)
+    i <- i + 1
+  }
+  best <- ignition(w, k)
+  g <- 0
+  while g < gens {
+    idx <- imod(rng_next(state), k * k)
+    old <- w[idx]
+    w[idx] <- randf(state) * 2 - 1
+    f <- ignition(w, k)
+    if f >= best { best <- f } else { w[idx] <- old }
+    g <- g + 1
+  }
+  return best
+}
