@@ -1,0 +1,28 @@
+// fpga.bada — robot neural FPGA control, in Bada.
+//
+// The robot's reflex layer is synthesised to lookup tables (LUTs), the way a
+// neural control law is mapped onto FPGA logic. Here 3 sensor bits
+// [front, left, right] drive two motor LUTs (8 entries each) implementing
+// obstacle avoidance.
+
+def bits_to_index(inputs) {
+  idx <- 0
+  i <- 0
+  while i < len(inputs) {
+    idx <- idx * 2 + inputs[i]
+    i <- i + 1
+  }
+  return idx
+}
+
+def lut_eval(lut, inputs) {
+  return lut[bits_to_index(inputs)]
+}
+
+// returns [left_motor, right_motor] (1 = forward, 0 = stop/turn)
+def robot_fpga(sensors) {
+  //               FLR: 000 001 010 011 100 101 110 111
+  lm_lut <- [1,  1,  1,  1,  0,  0,  1,  1]
+  rm_lut <- [1,  1,  1,  1,  1,  1,  0,  0]
+  return [lut_eval(lm_lut, sensors), lut_eval(rm_lut, sensors)]
+}
