@@ -1,0 +1,179 @@
+// jones.bada — the Jones polynomial of a braid closure, in the Bada language.
+//
+// Kauffman bracket state sum: every crossing is resolved into its A- and
+// B-smoothings; loops are counted with a union-find; the writhe normalises the
+// result to the Jones polynomial V(t).  Verified: trefoil -> t + t^3 - t^4.
+
+#include laurent.bada
+
+// ---- union-find over diagram points (parent array) ----
+def uf_fresh(parent) {
+  nid <- len(parent)
+  append(parent, nid)
+  return nid
+}
+
+def uf_find(parent, x) {
+  while parent[x] != x {
+    parent[x] <- parent[parent[x]]
+    x <- parent[x]
+  }
+  return x
+}
+
+def uf_union(parent, a, b) {
+  ra <- uf_find(parent, a)
+  rb <- uf_find(parent, b)
+  if ra != rb { parent[ra] <- rb }
+  return 0
+}
+
+def zeros(k) {
+  z <- []
+  i <- 0
+  while i < k {
+    append(z, 0)
+    i <- i + 1
+  }
+  return z
+}
+
+// number of connected components = number of loops in the smoothing state
+def uf_components(parent) {
+  seen <- zeros(len(parent))
+  count <- 0
+  i <- 0
+  while i < len(parent) {
+    r <- uf_find(parent, i)
+    if seen[r] == 0 {
+      seen[r] <- 1
+      count <- count + 1
+    }
+    i <- i + 1
+  }
+  return count
+}
+
+// strand count of a braid = max |generator| + 1
+def nstrands(braid) {
+  m <- 0
+  i <- 0
+  while i < len(braid) {
+    a <- abs(braid[i])
+    if a > m { m <- a }
+    i <- i + 1
+  }
+  return m + 1
+}
+
+// ---- Kauffman bracket <L> as a Laurent polynomial in A ----
+def kauffman(braid, n) {
+  c <- len(braid)
+  total <- []
+  states <- pow2(c)
+  d <- [[2, -1], [-2, -1]]          // loop value  d = -A^2 - A^-2
+
+  s <- 0
+  while s < states {
+    parent <- []
+    bottom <- []
+    cur <- []
+    i <- 0
+    while i < n {
+      id <- uf_fresh(parent)
+      append(bottom, id)
+      append(cur, id)
+      i <- i + 1
+    }
+
+    a_exp <- 0
+    k <- 0
+    while k < c {
+      g <- braid[k]
+      pos <- abs(g)
+      aa <- pos - 1
+      bb <- pos
+      choice <- imod(idiv(s, pow2(k)), 2)        // 0 = A-smoothing, 1 = B
+      if choice == 0 { a_exp <- a_exp + 1 } else { a_exp <- a_exp - 1 }
+
+      // which smoothing is the e_i (cup-cap)?
+      is_e <- 0
+      if g > 0 {
+        if choice == 1 { is_e <- 1 }
+      } else {
+        if choice == 0 { is_e <- 1 }
+      }
+
+      if is_e == 1 {
+        uf_union(parent, cur[aa], cur[bb])
+        na <- uf_fresh(parent)
+        nb <- uf_fresh(parent)
+        uf_union(parent, na, nb)
+        cur[aa] <- na
+        cur[bb] <- nb
+      }
+      k <- k + 1
+    }
+
+    // close the braid: top of strand i joins its bottom
+    i <- 0
+    while i < n {
+      uf_union(parent, cur[i], bottom[i])
+      i <- i + 1
+    }
+
+    loops <- uf_components(parent)
+    term <- lt_mul([[a_exp, 1]], lt_pow(d, loops - 1))
+    total <- lt_add(total, term)
+    s <- s + 1
+  }
+  return total
+}
+
+def writhe(braid) {
+  w <- 0
+  i <- 0
+  while i < len(braid) {
+    if braid[i] > 0 { w <- w + 1 } else { w <- w - 1 }
+    i <- i + 1
+  }
+  return w
+}
+
+// normalized bracket  X(A) = (-A^3)^{-w} <L>  (a knot/link invariant)
+def normalized(braid, n) {
+  br <- kauffman(braid, n)
+  w <- writhe(braid)
+  signv <- 1
+  if imod(abs(w), 2) == 1 { signv <- -1 }
+  factor <- [[0 - 3 * w, signv]]
+  return lt_mul(factor, br)
+}
+
+// Jones polynomial V(t):  A = t^{-1/4}, so A^e -> t^{-e/4}
+def jones_t(braid, n) {
+  x <- normalized(braid, n)
+  out <- []
+  i <- 0
+  while i < len(x) {
+    e <- x[i][0]
+    append(out, [idiv(0 - e, 4), x[i][1]])
+    i <- i + 1
+  }
+  return lt_sort(out)
+}
+
+// render V(t) as a string like "+1*t^1 +1*t^3 -1*t^4"
+def jones_show(braid, n) {
+  v <- jones_t(braid, n)
+  line <- ""
+  i <- 0
+  while i < len(v) {
+    c <- v[i][1]
+    sign <- "+"
+    if c < 0 { sign <- "" }
+    line <- line + sign + c + "*t^" + v[i][0] + " "
+    i <- i + 1
+  }
+  return line
+}

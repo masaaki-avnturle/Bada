@@ -36,6 +36,25 @@ machine. The five manifold operators from the report carry runtime meaning:
 Plus `Omega::DATABASE[space] { push(x) pop() }` (the Akashic store),
 `print`/`say`, `if/else`, `while`, `repeat`, arrays and arithmetic.
 
+**Functions, arrays & libraries.** Bada is now expressive enough to write real
+libraries in Bada itself:
+
+```
+def fib(n) {                 // functions + recursion
+  if n < 2 { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+xs <- [10, 20, 30]           // arrays: index read/write, len, append
+xs[1] <- 99
+append(xs, fib(10))          // -> [10, 99, 30, 55]
+```
+
+Builtins: `len`, `append`, `idiv`, `imod`, `abs`, `pow2`, `str`. Source files
+compose via `#include path` directives (`bada.load_program` / `run_program`).
+A full worked example is the **Jones polynomial implemented in Bada** at
+`../bada_webos/apps/lib/{laurent,jones}.bada` (Laurent-polynomial algebra +
+the Kauffman-bracket state sum), verified against a reference implementation.
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a

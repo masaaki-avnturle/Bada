@@ -14,10 +14,15 @@ class CompileError(Exception):
     pass
 
 
+# builtin functions implemented directly by the VM
+BUILTINS = {"len", "append", "idiv", "imod", "abs", "str", "pow2"}
+
+
 class Compiler:
     def __init__(self):
         self.code: list[tuple] = []
-        self._rep = 0   # counter for unique repeat-loop variables
+        self._rep = 0          # counter for unique repeat-loop variables
+        self.func_names: set = set()
 
     # -- emit helpers ------------------------------------------------------
     def emit(self, *instr) -> int:
@@ -30,9 +35,22 @@ class Compiler:
 
     # -- program -----------------------------------------------------------
     def compile_program(self, stmts: list) -> list[tuple]:
-        for s in stmts:
+        defs = [s for s in stmts if s[0] == "def"]
+        body = [s for s in stmts if s[0] != "def"]
+        self.func_names = {d[1] for d in defs}
+
+        for s in body:
             self.stmt(s)
         self.emit("HALT")
+
+        # function bodies live after HALT; reached only via CALL.  Each is
+        # preceded by a FUNC marker the VM scans to build its dispatch table.
+        for _, name, params, fbody in defs:
+            self.emit("FUNC", name, params)     # entry = this index + 1
+            for s in fbody:
+                self.stmt(s)
+            self.emit("CONST", None)            # default return value
+            self.emit("RET")
         return self.code
 
     # -- statements --------------------------------------------------------
@@ -57,6 +75,18 @@ class Compiler:
             self.while_stmt(node)
         elif tag == "repeat":
             self.repeat_stmt(node)
+        elif tag == "return":
+            if node[1] is None:
+                self.emit("CONST", None)
+            else:
+                self.expr(node[1])
+            self.emit("RET")
+        elif tag == "setindex":
+            _, base, idx, val = node
+            self.expr(base)
+            self.expr(idx)
+            self.expr(val)
+            self.emit("SETINDEX")
         else:
             raise CompileError(f"unknown statement {tag!r}")
 
@@ -140,6 +170,21 @@ class Compiler:
             for e in node[1]:
                 self.expr(e)
             self.emit("ARRAY", len(node[1]))
+        elif tag == "index":
+            _, base, idx = node
+            self.expr(base)
+            self.expr(idx)
+            self.emit("INDEX")
+        elif tag == "call":
+            _, name, args = node
+            for a in args:
+                self.expr(a)
+            if name in BUILTINS:
+                self.emit("CALLB", name, len(args))
+            elif name in self.func_names:
+                self.emit("CALL", name, len(args))
+            else:
+                raise CompileError(f"call to unknown function {name!r}")
         else:
             raise CompileError(f"unknown expression {tag!r}")
 

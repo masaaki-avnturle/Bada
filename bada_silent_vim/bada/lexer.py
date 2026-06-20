@@ -26,6 +26,7 @@ class Token:
 KEYWORDS = {
     "print", "say", "if", "else", "while", "repeat",
     "push", "pop", "true", "false", "nil",
+    "def", "return",
     "Omega",  # part of Omega::DATABASE
 }
 
