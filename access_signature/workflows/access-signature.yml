@@ -1,0 +1,34 @@
+# GitHub Action: enforce access-signature on push (github.com).
+#
+# github.com cannot run server-side pre-receive hooks, so push enforcement is
+# done here as a required status check. Copy this file to
+#   .github/workflows/access-signature.yml
+# in masaaki-avnturle/tuplenetwork and masaaki-avnturle/Bada, commit the
+# owner's public key as access_signature/owner_pubkey.txt, and make this check
+# "required" in branch protection.
+#
+# The pusher must include a signed token trailer in the head commit message:
+#   Access-Signature: <actor>|<repo>|<password>|<expires>|<signature>
+name: access-signature
+on: [push]
+
+jobs:
+  verify-signature:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify digital-signature token
+        run: |
+          REPO="${GITHUB_REPOSITORY##*/}"
+          PUBKEY="$(cat access_signature/owner_pubkey.txt)"
+          TRAILER="$(git log -1 --format=%B | grep -m1 '^Access-Signature:' | cut -d' ' -f2- || true)"
+          if [ -z "$TRAILER" ]; then
+            echo "::error::no Access-Signature trailer in head commit"; exit 1
+          fi
+          IFS='|' read -r ACTOR R PW EXP SIG <<< "$TRAILER"
+          python3 -m access_signature.cli verify-token \
+            --actor "$ACTOR" --repo "$REPO" --password "$PW" \
+            --signature "$SIG" --expires "$EXP" --pubkey "$PUBKEY"
