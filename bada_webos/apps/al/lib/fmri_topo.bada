@@ -1,0 +1,34 @@
+// fmri_topo.bada — fMRI / brain-topography data acquisition, in Bada.
+//
+// Each cortical channel has its own gamma activation; we compute the gamma
+// power per channel (the topographic map / fMRI-like activation field) and
+// locate the dominant gamma source region.
+
+#include eeg.bada
+
+// gamma power per channel -> the topographic activation map
+def topo_map(channel_gammas, fs, state) {
+  out <- []
+  i <- 0
+  while i < len(channel_gammas) {
+    sig <- gen_eeg(channel_gammas[i], 48, fs, state)
+    append(out, gamma_power(sig, fs))
+    i <- i + 1
+  }
+  return out
+}
+
+// index of the strongest gamma source (the hotspot region)
+def peak_region(topo) {
+  best <- 0 - 1
+  bi <- 0
+  i <- 0
+  while i < len(topo) {
+    if topo[i] > best {
+      best <- topo[i]
+      bi <- i
+    }
+    i <- i + 1
+  }
+  return bi
+}

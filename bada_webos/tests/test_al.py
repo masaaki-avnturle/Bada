@@ -63,6 +63,29 @@ class TestAprioriEngine(unittest.TestCase):
         self.assertEqual(bridge.apriori(5, 4), bridge.apriori(5, 4))
 
 
+class TestPilotBrainwave(unittest.TestCase):
+    def test_gamma_power_increases_with_amplitude(self):
+        self.assertLess(bridge.gamma_power(0.2), bridge.gamma_power(2.0))
+
+    def test_topography_peak_is_strongest_channel(self):
+        self.assertEqual(bridge.topo_peak([0.2, 0.4, 1.9, 0.3, 0.1]), 2)
+
+    def test_haloperidol_engages_for_high_gamma(self):
+        res, halo, eff = bridge.biofeedback(4.0, 0.25)
+        self.assertGreater(halo, 0)          # suppression engaged
+        self.assertLess(eff, 4.0)            # effective gamma reduced
+        self.assertLess(abs(res - 0.25), 0.15)  # held near target
+
+    def test_low_gamma_needs_no_suppression(self):
+        res, halo, eff = bridge.biofeedback(0.1, 0.25)
+        self.assertEqual(halo, 0)
+
+    def test_lambda_driver_projects_field_and_lift(self):
+        at, lift = bridge.lambda_driver(1.2, 0.25, 0.8)
+        self.assertGreater(at, 0)
+        self.assertGreater(lift, 0)
+
+
 class TestAlOS(unittest.TestCase):
     def test_boot_report(self):
         import io
@@ -73,6 +96,11 @@ class TestAlOS(unittest.TestCase):
         self.assertEqual(r["resonance_mode"], 11)
         self.assertFalse(r["meltdown"])
         self.assertGreaterEqual(r["consciousness"], 0)
+        # pilot resonance link
+        self.assertTrue(r["atfield_online"])
+        self.assertGreater(r["at_field"], 0)
+        self.assertGreater(r["anti_gravity"], 0)
+        self.assertGreater(r["haloperidol"], 0)
 
     def test_app_records_to_tuplespace(self):
         import io

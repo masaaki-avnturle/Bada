@@ -20,7 +20,7 @@ for p in (_ROOT, _PKG, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from bada import run_program                          # noqa: E402
-from al.bridge import APP                             # noqa: E402
+from al.bridge import APP, PILOT_APP                  # noqa: E402
 
 
 class AlOS:
@@ -39,7 +39,26 @@ class AlOS:
             "online": "AL-online" in store,
             "generated_code": self._generated_code(),
         }
+        self.report.update(self._boot_pilot())
         return self.report
+
+    def _boot_pilot(self) -> dict:
+        """Run the pilot resonance link: gamma waves -> AT field + anti-gravity."""
+        vm = run_program(PILOT_APP)
+        p = vm.tuplespace.get("pilot", [])
+        region_gp = p[0] if p else [None, None]
+        bf = p[1] if len(p) > 1 else [None, None, None]
+        ld = p[2] if len(p) > 2 else [None, None]
+        return {
+            "pilot_region": region_gp[0],
+            "gamma_power": region_gp[1],
+            "resonance": bf[0],
+            "haloperidol": bf[1],
+            "eff_gamma": bf[2],
+            "at_field": ld[0],
+            "anti_gravity": ld[1],
+            "atfield_online": "AT-field-online" in p,
+        }
 
     def _generated_code(self) -> list:
         code = []
@@ -65,6 +84,13 @@ class AlOS:
             ("Lambda Driver cooling",
              f"maxT {r['cooling_maxT']:.1f} / final "
              f"{r['cooling_finalT']:.1f} — {melt}"),
+            ("pilot gamma power", f"{r['gamma_power']:.3f} "
+             f"(region {r['pilot_region']})"),
+            ("haloperidol biofeedback",
+             f"{r['haloperidol']:.2f} → resonance {r['resonance']:.3f}"),
+            ("Lambda Driver output",
+             f"AT-field {r['at_field']:.2f}, anti-gravity "
+             f"{r['anti_gravity']:.2f}"),
         ]
         body = "".join(f"<dt>{escape(k)}</dt><dd>{escape(str(v))}</dd>"
                        for k, v in rows)
