@@ -24,6 +24,7 @@ from bada import load_program, run_source           # noqa: E402
 
 _LIB = os.path.join(_PKG, "apps", "al", "lib")
 APP = os.path.join(_PKG, "apps", "al", "al_laevatein.bada")
+PILOT_APP = os.path.join(_PKG, "apps", "al", "al_pilot.bada")
 
 
 def _run(libfile: str, extra: str) -> list[str]:
@@ -78,3 +79,34 @@ def apriori(seed: int, lines: int) -> str:
     out = _run("apriori.bada",
                f"say apriori_generate([{seed}], {lines})")
     return "\n".join(out)
+
+
+# -- pilot brainwave -> Lambda Driver ---------------------------------------
+def gamma_power(gamma_amp: float) -> float:
+    out = _run("eeg.bada",
+               f"st <- [1]\n"
+               f"print gamma_power(gen_eeg({gamma_amp}, 48, 96, st), 96)")
+    return float(out[-1])
+
+
+def topo_peak(channel_gammas: list[float]) -> int:
+    out = _run("fmri_topo.bada",
+               f"st <- [1]\n"
+               f"print peak_region(topo_map({_arr(channel_gammas)}, 96, st))")
+    return int(out[-1])
+
+
+def biofeedback(gamma0: float, target: float) -> list:
+    """returns [resonance, haloperidol_level, effective_gamma]"""
+    return _parse_list(
+        _run("biofeedback.bada",
+             f"print biofeedback({gamma0}, {target}, 40)")[-1])
+
+
+def lambda_driver(eff_gamma: float, resonance: float,
+                  supercool: float) -> list:
+    """returns [at_field, anti_gravity]"""
+    return _parse_list(
+        _run("lambda_drive.bada",
+             f"print lambda_driver({eff_gamma}, {resonance}, "
+             f"{supercool})")[-1])

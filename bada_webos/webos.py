@@ -150,6 +150,10 @@ class BadaWebOS:
                 "resonance_mode": al_report["resonance_mode"],
                 "consciousness": al_report["consciousness"],
                 "meltdown": al_report["meltdown"],
+                "atfield_online": al_report["atfield_online"],
+                "at_field": al_report["at_field"],
+                "anti_gravity": al_report["anti_gravity"],
+                "haloperidol": al_report["haloperidol"],
             },
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
@@ -245,4 +249,8 @@ if __name__ == "__main__":
           f"mode={report['al']['resonance_mode']} "
           f"consciousness={report['al']['consciousness']} "
           f"meltdown={report['al']['meltdown']}")
+    print(f"  AL pilot: AT-field online={report['al']['atfield_online']} "
+          f"AT={report['al']['at_field']:.2f} "
+          f"anti-gravity={report['al']['anti_gravity']:.2f} "
+          f"haloperidol={report['al']['haloperidol']:.2f}")
     print(f"  desktop written to {out}")

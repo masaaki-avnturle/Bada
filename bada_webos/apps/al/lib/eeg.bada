@@ -1,0 +1,58 @@
+// eeg.bada — brain electromagnetic waves -> gamma-band power, in Bada.
+//
+// Generates a synthetic EEG (sum of delta/theta/alpha/beta/gamma rhythms) and
+// extracts band power by evaluating the DFT magnitude at each frequency
+// (a Goertzel-style estimator). The pilot's gamma amplitude models mental
+// focus / combat arousal that drives the Lambda Driver.
+
+#include mathx.bada
+#include rng.bada
+
+def gen_eeg(gamma_amp, n, fs, state) {
+  sig <- []
+  i <- 0
+  while i < n {
+    tt <- i / fs
+    v <- 1.0 * fsin(two_pi() * 2 * tt)
+    v <- v + 0.8 * fsin(two_pi() * 6 * tt)
+    v <- v + 0.6 * fsin(two_pi() * 10 * tt)
+    v <- v + 0.5 * fsin(two_pi() * 20 * tt)
+    v <- v + gamma_amp * fsin(two_pi() * 40 * tt)
+    v <- v + (randf(state) - 0.5) * 0.2
+    append(sig, v)
+    i <- i + 1
+  }
+  return sig
+}
+
+// DFT magnitude-squared of `signal` at frequency f
+def bin_mag(signal, fs, f) {
+  n <- len(signal)
+  re <- 0
+  im <- 0
+  i <- 0
+  while i < n {
+    ang <- two_pi() * f * i / fs
+    re <- re + signal[i] * fcos(ang)
+    im <- im + signal[i] * fsin(ang)
+    i <- i + 1
+  }
+  re <- re / n
+  im <- im / n
+  return re * re + im * im
+}
+
+def band_power(signal, fs, flo, fhi) {
+  p <- 0
+  f <- flo
+  while f <= fhi {
+    p <- p + bin_mag(signal, fs, f)
+    f <- f + 2
+  }
+  return p
+}
+
+// gamma band ~ 30..46 Hz
+def gamma_power(signal, fs) {
+  return band_power(signal, fs, 30, 46)
+}
