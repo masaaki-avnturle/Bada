@@ -27,7 +27,7 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from quantum.shor9 import Shor9                     # noqa: E402
-from bada import run_source                         # noqa: E402
+from bada import run_source, load_program           # noqa: E402
 
 
 @dataclass
@@ -127,3 +127,7 @@ class QuantumKernel:
     def run_app_file(self, name: str, path: str) -> Process:
         with open(path) as f:
             return self.run_app(name, f.read())
+
+    def run_program_file(self, name: str, path: str) -> Process:
+        """Run a Bada program with ``#include`` directives resolved (libraries)."""
+        return self.run_app(name, load_program(path))
