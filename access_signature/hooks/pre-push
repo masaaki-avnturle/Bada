@@ -17,7 +17,13 @@ PW="${ACCESS_SIGNATURE_PASSWORD:-$(git config --get access.signature.password ||
 # Resolve the CLI (installed entrypoint or the module).
 ASIG() { if command -v access-signature >/dev/null 2>&1; then access-signature "$@"; else python3 -m access_signature.cli "$@"; fi; }
 
-if [ -n "$PW" ] && ASIG verify --actor "$ACTOR" --repo "$REPO" --password "$PW" >/dev/null 2>&1; then
+# Lockdown overrides everything: a blockaded repo refuses all pushes.
+if ! ASIG gate --actor "$ACTOR" --repo "$REPO" ${PW:+--password "$PW"} >/dev/null 2>&1; then
+  if ASIG status 2>/dev/null | grep -q 'locked : True'; then
+    echo "access-signature: '$REPO' is temporarily LOCKED DOWN. Push refused." >&2
+    exit 1
+  fi
+else
   echo "access-signature: $ACTOR authorised to push $REPO."
   exit 0
 fi

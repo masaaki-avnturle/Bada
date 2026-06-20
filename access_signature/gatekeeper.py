@@ -56,9 +56,51 @@ class Gatekeeper:
     def _authority(self) -> ca.SignatureAuthority:
         return ca.SignatureAuthority.load(self.key_path)
 
+    # -- lockdown: temporarily blockade the repositories ------------------
+    def lock(self, scope="all", reason: str | None = None,
+             by: str | None = None) -> dict:
+        self.registry.set_lockdown(True, scope=scope, reason=reason,
+                                   by=by or self.registry.owner_email)
+        self.registry.save()
+        if self.registry.owner_email:
+            tgt = "ALL repositories" if scope == "all" else ", ".join(scope)
+            self.mailer.send(
+                self.registry.owner_email,
+                "[access-signature] repositories LOCKED DOWN",
+                f"A temporary blockade is now ACTIVE for {tgt}.\n"
+                f"reason: {reason or '(none)'}\n"
+                f"All clone/push/pull access is denied until 'unlock'.\n")
+        return self.status()
+
+    def unlock(self) -> dict:
+        self.registry.set_lockdown(False)
+        self.registry.save()
+        if self.registry.owner_email:
+            self.mailer.send(
+                self.registry.owner_email,
+                "[access-signature] repositories UNLOCKED",
+                "The temporary blockade has been lifted; normal "
+                "approval flow resumes.\n")
+        return self.status()
+
+    def status(self) -> dict:
+        lk = self.registry.lockdown
+        return {
+            "locked": bool(lk.get("active")),
+            "scope": lk.get("scope"),
+            "reason": lk.get("reason"),
+            "since": lk.get("since"),
+            "repos": self.registry.data["repos"],
+        }
+
     # -- 1. access attempt -> request + email owner -----------------------
     def on_access(self, actor: str, repo: str, operation: str,
                   actor_email: str | None = None) -> dict:
+        # lockdown overrides everything — even valid credentials are blocked.
+        if self.registry.is_locked(repo):
+            return {"status": "blocked", "repo": repo,
+                    "reason": "repository temporarily locked down"}
+
         if not self.registry.is_protected(repo):
             return {"status": "ignored", "reason": f"{repo} not protected"}
 
@@ -98,6 +140,10 @@ class Gatekeeper:
             raise KeyError(f"no such request {request_id}")
         if req["status"] != "pending":
             raise ValueError(f"request {request_id} is {req['status']}")
+        if self.registry.is_locked(req["repo"]):
+            raise ValueError(
+                f"cannot approve while {req['repo']} is locked down — "
+                f"run 'unlock' first")
 
         password = secrets.token_urlsafe(18)
         expires_at = int(time.time()) + ttl_days * 86400
@@ -184,6 +230,17 @@ class Gatekeeper:
 
     def owner_public_pem(self) -> str | None:
         return self.registry.owner_public_pem
+
+    def gate(self, actor: str, repo: str, password: str | None = None,
+             operation: str = "push") -> dict:
+        """Single allow/deny decision for git hooks.
+        Lockdown denies unconditionally; otherwise a valid password allows."""
+        if self.registry.is_locked(repo):
+            return {"allow": False, "reason": "locked-down"}
+        if password and self.verify(actor, repo, password)["ok"]:
+            return {"allow": True, "reason": "authorized"}
+        self.on_access(actor, repo, operation, actor)
+        return {"allow": False, "reason": "access-requested"}
 
     def has_valid_credential(self, actor: str, repo: str) -> bool:
         now = int(time.time())

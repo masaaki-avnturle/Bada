@@ -136,5 +136,56 @@ class TestGatekeeperFlow(unittest.TestCase):
         self.assertTrue(gk2.verify("dev", "Bada", r["password"])["ok"])
 
 
+class TestLockdown(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.gk = Gatekeeper(state_dir=self.tmp)
+        self.gk.init_owner("masaaki.tabu4@gmail.com")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_lock_all_blocks_every_repo(self):
+        self.gk.lock(scope="all", reason="temporary")
+        self.assertTrue(self.gk.status()["locked"])
+        self.assertEqual(self.gk.on_access("d", "Bada", "clone")["status"],
+                         "blocked")
+        # even a repo not in the protected list is blocked under 'all'
+        self.assertEqual(self.gk.on_access("d", "anything", "push")["status"],
+                         "blocked")
+
+    def test_gate_denies_when_locked(self):
+        self.gk.lock(scope="all")
+        self.assertFalse(self.gk.gate("d", "Bada")["allow"])
+
+    def test_approve_refused_during_lockdown(self):
+        req = self.gk.on_access("d", "Bada", "push", "d@x")["request"]
+        self.gk.lock(scope="all")
+        with self.assertRaises(ValueError):
+            self.gk.approve(req["id"])
+
+    def test_unlock_restores_flow(self):
+        self.gk.lock(scope="all")
+        self.gk.unlock()
+        self.assertFalse(self.gk.status()["locked"])
+        self.assertEqual(self.gk.on_access("d", "Bada", "clone", "d@x")
+                         ["status"], "pending")
+
+    def test_scoped_lock_only_affects_listed_repos(self):
+        self.gk.lock(scope=["Bada"])
+        self.assertEqual(self.gk.on_access("d", "Bada", "push")["status"],
+                         "blocked")
+        # tuplenetwork is protected but not in the lock scope -> normal flow
+        self.assertEqual(self.gk.on_access("d", "tuplenetwork", "pull", "d@x")
+                         ["status"], "pending")
+
+    def test_lockdown_persists_across_instances(self):
+        self.gk.lock(scope="all", reason="maintenance")
+        gk2 = Gatekeeper(state_dir=self.tmp)
+        self.assertTrue(gk2.status()["locked"])
+        self.assertEqual(gk2.status()["reason"], "maintenance")
+
+
 if __name__ == "__main__":
     unittest.main()

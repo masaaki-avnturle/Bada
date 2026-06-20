@@ -25,6 +25,8 @@ class Registry:
             "owner": {"email": None, "public_key_pem": None,
                       "github_account": "masaaki-avnturle"},
             "repos": list(PROTECTED_REPOS),
+            "lockdown": {"active": False, "scope": "all", "reason": None,
+                         "since": None, "by": None},
             "requests": {},
             "credentials": {},
         }
@@ -58,6 +60,27 @@ class Registry:
 
     def is_protected(self, repo: str) -> bool:
         return repo in self.data["repos"]
+
+    # -- lockdown ----------------------------------------------------------
+    def set_lockdown(self, active: bool, scope="all", reason: str | None = None,
+                     by: str | None = None):
+        self.data.setdefault("lockdown", {})
+        self.data["lockdown"] = {
+            "active": active, "scope": scope, "reason": reason,
+            "since": _now() if active else None, "by": by,
+        }
+
+    @property
+    def lockdown(self) -> dict:
+        return self.data.get("lockdown",
+                             {"active": False, "scope": "all"})
+
+    def is_locked(self, repo: str) -> bool:
+        lk = self.lockdown
+        if not lk.get("active"):
+            return False
+        scope = lk.get("scope", "all")
+        return scope == "all" or repo in scope
 
     # -- requests ----------------------------------------------------------
     def add_request(self, actor: str, actor_email: str, repo: str,
