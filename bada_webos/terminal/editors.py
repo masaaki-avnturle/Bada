@@ -147,5 +147,16 @@ class EmacsSession:
     def text(self) -> str:
         return "\n".join(self.lines)
 
+    # -- Bada language tooling: grammar check + completion -----------------
+    def lint(self):
+        from bada import lint as _lint
+        return _lint(self.text())
+
+    def complete(self, kind: str = "all"):
+        from bada import Completer, prefix_at
+        line = self.lines[self.cy] if 0 <= self.cy < len(self.lines) else ""
+        pre = prefix_at(line, self.cx)
+        return Completer().complete(self.text(), pre, kind), pre
+
     def status(self) -> str:
         return f'emacs "{self.filename}" ({self.cy + 1},{self.cx + 1})'
