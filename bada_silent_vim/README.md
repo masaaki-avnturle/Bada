@@ -87,6 +87,31 @@ python3 -m bada.reviser --check FILE.bada    # verify equivalence
 All of `../bada_webos/apps/**/*.bada` are written in this dialect via the
 reviser.
 
+**Editor tooling — grammar check, completion, parsers.** The `bada` package and
+the `badatools` package provide IDE-style tooling:
+
+* **grammar checker** — `bada.lint(src)` returns `Diagnostic(line, col, ...)`;
+  `bada.is_valid(src)`. (Terminal: `check FILE.bada`.)
+* **reserved words** — `bada.RESERVED`, `bada.BUILTIN_FUNCS`, `bada.DIRECTIVES`,
+  `is_reserved/is_builtin`.
+* **word + functional-word completion** — `bada.Completer`:
+  `complete_functional(prefix)` (機能語: keywords+builtins) and
+  `complete_words(src, prefix)` (buffer symbols: def/var names). The vim and
+  emacs editors gain `.lint()` and `.complete()`.
+* **Emacs and vim parsers** — `badatools.VimParser` / `EmacsParser` turn modal
+  keystrokes / chords into one normalized command stream.
+* **silent-talk + keyboard parser** — `badatools.UnifiedInputParser` parses
+  *either* silent-talk visemes *or* keyboard keys into the same commands, and
+  recognises **passphrases (合言葉)** via `badatools.PassphraseParser`
+  (e.g. silently spelling `AI UO` → `UNLOCK`, `OA OA` → `RUN-SECRET`).
+
+```python
+from badatools import UnifiedInputParser
+u = UnifiedInputParser()
+u.from_silent_words(["AI", "EA", "UO", "OA"])  # -> insert, "say ", normal, run
+u.from_keyboard(["i", "ESC", "!"], "vim")        # same command shape
+```
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a
