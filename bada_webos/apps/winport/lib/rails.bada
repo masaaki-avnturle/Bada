@@ -1,0 +1,57 @@
+// rails.bada — generate functioning Ruby on Rails source code, in Bada.
+// (instruction-oriented dialect: <- assign, -< branch, >- merge, -> transition)
+
+// ActiveRecord model
+def rails_model(name, fields) {
+  code <- "class " + name + " < ApplicationRecord\n"
+  i <- 0
+  -> i < len(fields) {
+    code <- code + "  # t." + fields[i] + "\n"
+    i <- i + 1
+  }
+  -< len(fields) > 0 {
+    code <- code + "  validates :" + fields[0] + ", presence: true\n"
+  }
+  code <- code + "end\n"
+  return code
+}
+
+// RESTful controller (the 7 standard actions)
+def rails_controller(name) {
+  actions <- ["index", "show", "new", "create", "edit", "update", "destroy"]
+  code <- "class " + name + "sController < ApplicationController\n"
+  i <- 0
+  -> i < len(actions) {
+    code <- code + "  def " + actions[i] + "\n  end\n"
+    i <- i + 1
+  }
+  code <- code + "end\n"
+  return code
+}
+
+// config/routes.rb
+def rails_routes(name) {
+  return "Rails.application.routes.draw do\n  resources :" + name + "s\nend\n"
+}
+
+// db migration
+def rails_migration(name, fields) {
+  code <- "class Create" + name + "s < ActiveRecord::Migration[7.1]\n"
+  code <- code + "  def change\n    create_table :" + name + "s do |t|\n"
+  i <- 0
+  -> i < len(fields) {
+    code <- code + "      t.string :" + fields[i] + "\n"
+    i <- i + 1
+  }
+  code <- code + "      t.timestamps\n    end\n  end\nend\n"
+  return code
+}
+
+// a full scaffold
+def rails_scaffold(name, fields) {
+  out <- rails_model(name, fields)
+  out <- out + "\n" + rails_controller(name)
+  out <- out + "\n" + rails_routes(name)
+  out <- out + "\n" + rails_migration(name, fields)
+  return out
+}
