@@ -1,0 +1,52 @@
+// hpsi.bada — pattern finder for  H.Psi = (+)(i.hbar.grad)^(+)L , in Bada.
+//
+// Plug arbitrary numbers x = (hbar.grad) into the operator and study the
+// partial spectrum  S(x,L) = sum_{k=1..L} (i x)^k  (a complex number).
+// The app discovers: the phase period (4), the values of L where the spectrum
+// is real (im = 0), and the geometric growth law.
+
+#include disclib.bada
+
+// S(x, L) = sum_{k=1..L} (i x)^k  as [re, im]
+def hpsi_spectrum(x, L) {
+  z    <- [0.0, x]        // i * x
+  term <- [1.0, 0.0]
+  sum  <- [0.0, 0.0]
+  k <- 0
+  -> k < L {
+    term <- cmul(term, z)
+    sum  <- cadd(sum, term)
+    k <- k + 1
+  }
+  return sum
+}
+
+// L values (1..M) where the spectrum is real  (a real eigenvalue)
+def find_real_eigen(x, M) {
+  out <- []
+  L <- 1
+  -> L <= M {
+    s <- hpsi_spectrum(x, L)
+    -< fabs(s[1]) < 0.000001 { append(out, L) }
+    L <- L + 1
+  }
+  return out
+}
+
+// phase period of (i x)^k  (i^4 = 1, so period 4)
+def detect_period() {
+  i <- [0.0, 1.0]
+  p <- cmul(cmul(cmul(i, i), i), i)
+  -< fabs(p[0] - 1) < 0.000001 {
+    -< fabs(p[1]) < 0.000001 { return 4 }
+  }
+  return 0
+}
+
+// geometric growth ratio |S(x,L+1)| / |S(x,L)|  ->  x
+def growth_ratio(x, L) {
+  a <- fsqrt(cabs2(hpsi_spectrum(x, L)))
+  -< a <-> 0 { return 0 }
+  b <- fsqrt(cabs2(hpsi_spectrum(x, L + 1)))
+  return b / a
+}
