@@ -11,6 +11,12 @@
 // before / after (the four faces of the reflection pyramid).  The light field is
 // a *complex* amplitude — a "reality" surface (re) and an "imaginary" surface
 // (im) — exactly the "camera mechanism of imaginary and reality surfaces".
+//
+// The image floats up out of a conductive-plastic tablet: the light "mounds up"
+// (盛る) following the Jones polynomial V(t) of a knot, and the tablet's power
+// draw is modelled so the display can be run inside a power budget.
+
+#include ../../lib/jones.bada
 
 // --- small math (exp / log / trig) -----------------------------------------
 def fabs(v) { -< v < 0 { return 0 - v }  return v }
@@ -166,4 +172,89 @@ def metric_ds2(v, c) {
 def hologram_mass(p, c, V, S) {
   g <- 0.00000000006674
   return 8.0 * 3.141592653589793 * g * (p / (c * c * c) + V / S)
+}
+
+// --- Jones-polynomial relief: the light "mounds up" (盛る) ------------------
+// Jones polynomial of the trefoil (braid sigma_1^3 on 2 strands): t + t^3 - t^4
+def jones_trefoil() { return jones_t([1, 1, 1], 2) }
+
+// real base^e for a (possibly negative) integer exponent e
+def realpow(base, e) {
+  -< e < 0 {
+    p <- 1.0
+    k <- 0
+    -> k < 0 - e { p <- p * base  k <- k + 1 }
+    return 1.0 / p
+  }
+  p <- 1.0
+  k <- 0
+  -> k < e { p <- p * base  k <- k + 1 }
+  return p
+}
+
+// evaluate a Laurent polynomial [[exp,coeff],...] at real t
+def poly_eval(poly, t) {
+  s <- 0.0
+  i <- 0
+  -> i < len(poly) {
+    s <- s + poly[i][1] * realpow(t, poly[i][0])
+    i <- i + 1
+  }
+  return s
+}
+
+// relief height (0..~1) at radius r, time-phase ph: |V(t)| of the trefoil swept
+// across the display radius — the height the light is raised out of the tablet.
+def jones_relief(r, ph) {
+  -< r > 1.0 { r <- 1.0 }
+  poly <- jones_trefoil()
+  tt <- 0.3 + 1.3 * r
+  v <- poly_eval(poly, tt)
+  -< v < 0 { v <- 0 - v }
+  return v * (0.6 + 0.4 * fcos(6.283185307179586 * ph))
+}
+
+// flat n*n grid of the Jones relief over [-1,1]^2 at phase ph
+def relief_flat(n, ph) {
+  poly <- jones_trefoil()
+  shim <- 0.6 + 0.4 * fcos(6.283185307179586 * ph)
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      u <- 0 - 1 + 2.0 * i / (n - 1)
+      v <- 0 - 1 + 2.0 * j / (n - 1)
+      r <- fsqrt(u * u + v * v)
+      -< r > 1.0 { r <- 1.0 }
+      tt <- 0.3 + 1.3 * r
+      val <- poly_eval(poly, tt)
+      -< val < 0 { val <- 0 - val }
+      append(out, val * shim)
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
+
+// --- conductive-plastic tablet power model ---------------------------------
+// The conductive-plastic layer drives light out of a panel of `area` cm^2 at a
+// power density `pdens` (W/cm^2); raising the light higher (more relief) costs
+// more.  Power in watts at mean brightness `bright` (0..1), mean relief `elev`.
+def tablet_power(bright, elev, area) {
+  pdens <- 0.03
+  return pdens * area * bright * (1.0 + elev) * 0.5
+}
+
+// scale (<=1) to dim the display so it fits a power budget (watts)
+def power_scale(power, budget) {
+  -< power <= budget { return 1.0 }
+  return budget / power
+}
+
+// runtime in minutes from a battery of `wh` watt-hours at this power draw
+def battery_minutes(power, wh) {
+  -< power <= 0 { return 0.0 }
+  return wh / power * 60.0
 }

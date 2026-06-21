@@ -24,7 +24,9 @@ for p in (_ROOT, os.path.join(_ROOT, "bada_silent_vim")):
 from bada import load_program, run_source           # noqa: E402
 
 _LIB = os.path.join(_PKG, "apps", "hologram", "lib", "hologram.bada")
+_KBD = os.path.join(_PKG, "apps", "hologram", "lib", "keyboard.bada")
 _SRC = None
+_KSRC = None
 
 
 def _run(extra: str):
@@ -34,6 +36,16 @@ def _run(extra: str):
     buf = io.StringIO()
     with redirect_stdout(buf):
         run_source(_SRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def _krun(extra: str):
+    global _KSRC
+    if _KSRC is None:
+        _KSRC = load_program(_KBD)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_KSRC + "\n" + extra)
     return buf.getvalue().splitlines()
 
 
@@ -64,3 +76,46 @@ def metric_ds2(v: float, c: float) -> float:
 
 def hologram_mass(p: float, c: float, V: float, S: float) -> float:
     return float(_run(f"print hologram_mass({p}, {c}, {V}, {S})")[-1])
+
+
+# --- Jones-polynomial relief (the light "mounds up") -----------------------
+def jones_polynomial() -> list:
+    """Trefoil Jones polynomial V(t) as [[exp, coeff], ...] (computed in Bada)."""
+    return ast.literal_eval(_run("print jones_trefoil()")[-1])
+
+
+def relief_grid(n: int, ph: float) -> list:
+    flat = ast.literal_eval(_run(f"print relief_flat({n}, {ph})")[-1])
+    return [flat[r * n:(r + 1) * n] for r in range(n)]
+
+
+def relief_frames(n: int = 16, T: int = 16) -> list:
+    """T frames of the Jones relief height field, each an n x n grid (in Bada)."""
+    return [relief_grid(n, k / T) for k in range(T)]
+
+
+# --- conductive-plastic tablet power model ---------------------------------
+def tablet_power(bright: float, elev: float, npix: int) -> float:
+    return float(_run(f"print tablet_power({bright}, {elev}, {npix})")[-1])
+
+
+def power_scale(power: float, budget: float) -> float:
+    return float(_run(f"print power_scale({power}, {budget})")[-1])
+
+
+def battery_minutes(power: float, wh: float) -> float:
+    return float(_run(f"print battery_minutes({power}, {wh})")[-1])
+
+
+# --- HHKB keyboard layout --------------------------------------------------
+def hhkb_keys() -> list:
+    """The HHKB layout as [[x, y, w, code], ...] (computed in Bada)."""
+    return ast.literal_eval(_krun("print hhkb_keys()")[-1])
+
+
+def hhkb_width() -> int:
+    return int(float(_krun("print hhkb_width()")[-1]))
+
+
+def hhkb_rows() -> int:
+    return int(float(_krun("print hhkb_rows()")[-1]))

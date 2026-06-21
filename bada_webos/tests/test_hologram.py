@@ -14,8 +14,10 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from hologram import HologramApp, html_hologram
+from hologram import (HologramApp, HoloKeyboardApp, html_hologram,
+                      html_keyboard)
 from hologram import bridge
+from hologram.keyboard import code_label
 
 
 class TestHologramBada(unittest.TestCase):
@@ -84,6 +86,94 @@ class TestHologramApp(unittest.TestCase):
         html = html_hologram(frames, light, 2, cat, quads, free=True)
         self.assertIn("Holo X", html)
         self.assertIn("FREE=true", html)
+
+
+class TestJonesReliefAndPower(unittest.TestCase):
+    """The light mounds up via the Jones polynomial; conductive-plastic power."""
+
+    def test_jones_polynomial_is_trefoil(self):
+        # V(t) = t + t^3 - t^4 from the Bada Jones-polynomial library
+        self.assertEqual(bridge.jones_polynomial(), [[1, 1], [3, 1], [4, -1]])
+
+    def test_relief_grid_normalized(self):
+        g = bridge.relief_grid(6, 0.0)
+        flat = [v for row in g for v in row]
+        self.assertEqual(len(flat), 36)
+        self.assertTrue(all(0.0 <= v <= 1.05 for v in flat))   # disk-clamped
+        self.assertTrue(max(flat) > 0.3)
+
+    def test_power_model(self):
+        half = bridge.tablet_power(0.5, 0.5, 200.0)
+        full = bridge.tablet_power(1.0, 1.0, 200.0)
+        self.assertAlmostEqual(half, 2.25, places=3)
+        self.assertAlmostEqual(full, 6.0, places=3)
+        self.assertGreater(full, half)               # more light/relief = more W
+        # power budget dims the panel; battery time grows as power falls
+        self.assertAlmostEqual(bridge.power_scale(6.0, 3.0), 0.5, places=6)
+        self.assertEqual(bridge.power_scale(2.0, 3.0), 1.0)
+        self.assertGreater(bridge.battery_minutes(2.0, 40.0),
+                           bridge.battery_minutes(4.0, 40.0))
+
+    def test_floatup_html(self):
+        app = HologramApp(n=8, frames=4, names=["fermat", "abelian"])
+        app.boot()
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_floatup(os.path.join(d, "f.html"))).read()
+        self.assertIn("FLOAT-UP HOLOGRAM", h)
+        self.assertIn("Jones V(t)=", h)
+        self.assertIn("RELIEF=", h)                  # Jones relief data
+        self.assertIn("POWER=", h)                   # per-frame tablet power
+        self.assertIn("budget", h)
+        self.assertEqual(len(app.power), 4)
+        self.assertTrue(all(p > 0 for p in app.power))
+
+
+class TestHoloKeyboard(unittest.TestCase):
+    """The Happy Hacking Keyboard layout in Bada, floating as a hologram."""
+
+    def test_layout_from_bada(self):
+        keys = bridge.hhkb_keys()
+        self.assertEqual(len(keys), 60)              # HHKB = 60 keys
+        self.assertEqual(bridge.hhkb_width(), 15)    # 15U wide (60%)
+        self.assertEqual(bridge.hhkb_rows(), 5)
+        # rows 0..3 tile to a full 15U
+        right = {}
+        for x, y, w, c in keys:
+            right[y] = max(right.get(y, 0), x + w)
+        for y in (0, 1, 2, 3):
+            self.assertAlmostEqual(right[y], 15.0, places=3)
+
+    def test_control_left_of_a(self):
+        # the signature HHKB trait: Control where Caps Lock sits (left of A)
+        keys = bridge.hhkb_keys()
+        row2 = sorted((x, int(c)) for x, y, w, c in keys if y == 2)
+        self.assertEqual(row2[0][1], 258)            # Ctrl
+        self.assertEqual(row2[1][1], 65)             # 'A'
+
+    def test_code_labels(self):
+        self.assertEqual(code_label(65), "A")
+        self.assertEqual(code_label(258), "ctrl")
+        self.assertEqual(code_label(260), "⏎")
+        self.assertEqual(code_label(263), "◇")
+
+    def test_keyboard_html(self):
+        app = HoloKeyboardApp()
+        r = app.boot()
+        self.assertEqual(r["keys"], 60)
+        self.assertGreater(r["power"], 0)
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "k.html"))).read()
+        self.assertIn("HAPPY HACKING KEYBOARD", h)
+        self.assertIn("HHKB Professional", h)
+        for glyph in ("ctrl", "shift", "esc", "fn"):
+            self.assertIn(glyph, h)
+        self.assertIn("Jones V(t)=", h)
+
+    def test_render_direct(self):
+        keys = [[0, 0, 1.0, 65], [1, 0, 1.5, 258]]
+        h = html_keyboard(keys, 15, 5, 1.35, "t + t^3 - t^4")
+        self.assertIn('"label": "A"', h)
+        self.assertIn('"label": "ctrl"', h)
 
 
 if __name__ == "__main__":
