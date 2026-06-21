@@ -68,3 +68,21 @@ def gamma(K: int = 20, N: int = 1500) -> float:
 def monster_denoms(N: int = 1500, maxmult: int = 120) -> list:
     return _val(_run("moonshine.bada",
                      f"print numerator_seq({N}, {maxmult})"))
+
+
+# -- sqrt(2) quantization a-priori engine -----------------------------------
+def sqrt2_approx(n: int = 20) -> float:
+    return float(_run("sqrt2.bada", f"print sqrt2_approx({n})")[-1])
+
+
+def pell_denoms(n: int = 8) -> list:
+    return _val(_run("sqrt2.bada", f"print pell_denoms({n})"))
+
+
+def silver_ratios(n: int = 10) -> list:
+    return _val(_run("sqrt2.bada", f"print silver_ratios({n})"))
+
+
+def pell_seq(N: int = 1500, n: int = 14, maxmult: int = 200) -> list:
+    return _val(_run("sqrt2.bada",
+                     f"print pell_numerator_seq({N}, {n}, {maxmult})"))

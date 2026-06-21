@@ -1,0 +1,56 @@
+// mobius.bada — Mobius transformations  z -> (a z + b)/(c z + d), in Bada.
+// A Mobius map is [a, b, c, d]. Used to test whether the Beta/Zeta equations
+// and the Jones-polynomial mirror are Mobius equations.
+
+def mfabs(v) {
+  -< v < 0 { return 0 - v }
+  return v
+}
+
+def mobius_apply(M, z) {
+  return (M[0] * z + M[1]) / (M[2] * z + M[3])
+}
+
+// matrix product of two Mobius maps
+def mobius_compose(M, N) {
+  return [M[0] * N[0] + M[1] * N[2], M[0] * N[1] + M[1] * N[3],
+          M[2] * N[0] + M[3] * N[2], M[2] * N[1] + M[3] * N[3]]
+}
+
+// is M an involution?  (M . M proportional to the identity)
+def mobius_is_involution(M) {
+  c <- mobius_compose(M, M)
+  -< mfabs(c[1]) < 0.000001 {
+    -< mfabs(c[2]) < 0.000001 {
+      -< mfabs(c[0] - c[3]) < 0.000001 { return 1 }
+    }
+  }
+  return 0
+}
+
+// classify a Mobius map -> code:
+//   1 = identity, 2 = scaling, 3 = translation, 4 = inversion, 5 = general
+def mobius_class(M) {
+  a <- M[0]
+  b <- M[1]
+  c <- M[2]
+  d <- M[3]
+  -< mfabs(c) < 0.000001 {
+    -< mfabs(b) < 0.000001 {
+      -< mfabs(a - d) < 0.000001 { return 1 }   // identity (scaling by 1)
+      return 2                                    // scaling
+    }
+    -< mfabs(a - d) < 0.000001 { return 3 }       // translation
+    return 5
+  }
+  -< mfabs(a) < 0.000001 {
+    -< mfabs(d) < 0.000001 { return 4 }           // inversion z -> b/(c z)
+  }
+  return 5
+}
+
+// does the Mobius map M carry src to dst?  (the equation is Mobius)
+def mobius_links(M, src, dst) {
+  -< mfabs(mobius_apply(M, src) - dst) < 0.000001 { return 1 }
+  return 0
+}

@@ -25,10 +25,21 @@ reports the **numerator p** taking-rule. Euler's constant γ is tied to the
 zetas (including ζ(3)) through the alternating series `γ = Σ_{k≥2} (−1)^k ζ(k)/k`,
 which anchors the search.
 
+## 4. √2 quantization a-priori engine (`sqrt2.bada`, `sqrt2_app.bada`)
+> **Exploratory / heuristic** (same status as #3).
+
+Adapts the irrational **√2** to a differential-geometry **quantization**: the
+continued fraction `√2 = [1; 2,2,2,…]` gives lattice (**Pell**) levels
+`q_k = 2q_{k-1} + q_{k-2}` (1,2,5,12,29,70,…). The **causal-relationship
+regularity** is `q_{k+1}/q_k → 1+√2` (the **silver ratio**, ≈ 2.4142). These
+quantized Pell levels are then used as the **denominators** for the odd-zeta
+general-form search (the numerator rule is read off the fit).
+
 ```
 discover hpsi        # operator pattern finder
 discover zeta        # odd-zeta 1/4 regularity
 discover moonshine   # Monster-denominator a-priori engine
+discover sqrt2       # √2 / Pell-lattice quantization a-priori engine
 ```
 
 All three run on the Bada VM; their results are recorded in

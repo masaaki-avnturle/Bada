@@ -69,6 +69,29 @@ class TestMoonshineEngine(unittest.TestCase):
                                places=5)
 
 
+class TestSqrt2Quantization(unittest.TestCase):
+    def test_sqrt2_value(self):
+        import math
+        self.assertAlmostEqual(bridge.sqrt2_approx(20), math.sqrt(2),
+                               places=9)
+
+    def test_pell_lattice_levels(self):
+        self.assertEqual(bridge.pell_denoms(8),
+                         [1, 2, 5, 12, 29, 70, 169, 408])
+
+    def test_silver_ratio_causal_regularity(self):
+        import math
+        sr = bridge.silver_ratios(12)
+        self.assertAlmostEqual(sr[-1], 1 + math.sqrt(2), delta=1e-4)
+
+    def test_odd_zeta_general_form(self):
+        seq = bridge.pell_seq(1500, 14, 200)
+        self.assertEqual(len(seq), 4)
+        for p, q, err in seq:
+            self.assertGreater(p, 0)
+            self.assertLess(err, 1e-6)
+
+
 class TestDiscoverAppsRun(unittest.TestCase):
     def _ts(self, app):
         import io
@@ -88,6 +111,11 @@ class TestDiscoverAppsRun(unittest.TestCase):
         self.assertIn("moonshine", ts)
         self.assertTrue(any("EXPLORATORY" in str(x)
                             for x in ts["moonshine"]))
+
+    def test_sqrt2_app_records(self):
+        ts = self._ts("sqrt2_app.bada")
+        self.assertIn("sqrt2", ts)
+        self.assertTrue(any("EXPLORATORY" in str(x) for x in ts["sqrt2"]))
 
 
 if __name__ == "__main__":
