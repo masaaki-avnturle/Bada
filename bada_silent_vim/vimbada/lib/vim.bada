@@ -1,0 +1,131 @@
+// vim.bada — a modal vim editor (NORMAL / INSERT / command modes) in Bada.
+//
+// State is an array  [lines, cy, cx, mode, lastcmd]  where lines is an array of
+// strings, cy/cx the cursor, mode "N"|"I", lastcmd the last : command.
+// vim_key(state, key) processes one keystroke; vim_feed(state, keys) a script.
+
+#include vimlib.bada
+
+def vim_new() {
+  return [[""], 0, 0, "N", ""]
+}
+
+def lines_insert_after(lines, idx, val) {
+  out <- []
+  i <- 0
+  -> i < len(lines) {
+    append(out, lines[i])
+    -< i <-> idx { append(out, val) }
+    i <- i + 1
+  }
+  return out
+}
+
+def lines_remove(lines, idx) {
+  out <- []
+  i <- 0
+  -> i < len(lines) {
+    -< i != idx { append(out, lines[i]) }
+    i <- i + 1
+  }
+  -< len(out) <-> 0 { append(out, "") }
+  return out
+}
+
+def vim_clampcur(state) {
+  lines <- state[0]
+  state[1] <- clamp(state[1], 0, len(lines) - 1)
+  line <- lines[state[1]]
+  hi <- len(line)
+  -< state[3] <-> "N" { hi <- hi - 1 }
+  -< hi < 0 { hi <- 0 }
+  state[2] <- clamp(state[2], 0, hi)
+  return 0
+}
+
+def vim_key(state, key) {
+  mode <- state[3]
+  cy <- state[1]
+  cx <- state[2]
+  handled <- 0
+
+  -< mode <-> "N" {
+    -< key <-> "i" { state[3] <- "I" }
+    -< key <-> "a" { state[2] <- cx + 1  state[3] <- "I" }
+    -< key <-> "h" { state[2] <- cx - 1 }
+    -< key <-> "l" { state[2] <- cx + 1 }
+    -< key <-> "j" { state[1] <- cy + 1 }
+    -< key <-> "k" { state[1] <- cy - 1 }
+    -< key <-> "0" { state[2] <- 0 }
+    -< key <-> "$" { state[2] <- len(state[0][cy]) - 1 }
+    -< key <-> "x" { state[0][cy] <- str_delete(state[0][cy], cx) }
+    -< key <-> "o" {
+      state[0] <- lines_insert_after(state[0], cy, "")
+      state[1] <- cy + 1
+      state[2] <- 0
+      state[3] <- "I"
+    }
+    -< key <-> "dd" { state[0] <- lines_remove(state[0], cy) }
+    -< key <-> ":w"  { state[4] <- "w" }
+    -< key <-> ":q"  { state[4] <- "q" }
+    -< key <-> ":wq" { state[4] <- "wq" }
+  } >- {
+    // INSERT mode
+    -< key <-> "ESC" { state[3] <- "N"  handled <- 1 }
+    -< key <-> "RET" {
+      line <- state[0][cy]
+      left <- substr(line, 0, cx)
+      right <- substr(line, cx, len(line))
+      state[0][cy] <- left
+      state[0] <- lines_insert_after(state[0], cy, right)
+      state[1] <- cy + 1
+      state[2] <- 0
+      handled <- 1
+    }
+    -< key <-> "BS" {
+      -< cx > 0 {
+        state[0][cy] <- str_delete(state[0][cy], cx - 1)
+        state[2] <- cx - 1
+      } >- {
+        -< cy > 0 {
+          prev <- state[0][cy - 1]
+          state[2] <- len(prev)
+          state[0][cy - 1] <- prev + state[0][cy]
+          state[0] <- lines_remove(state[0], cy)
+          state[1] <- cy - 1
+        }
+      }
+      handled <- 1
+    }
+    -< handled <-> 0 {
+      state[0][cy] <- str_insert(state[0][cy], cx, key)
+      state[2] <- cx + len(key)
+    }
+  }
+  vim_clampcur(state)
+  return 0
+}
+
+def vim_feed(state, keys) {
+  i <- 0
+  -> i < len(keys) {
+    vim_key(state, keys[i])
+    i <- i + 1
+  }
+  return state
+}
+
+def vim_text(state) {
+  lines <- state[0]
+  out <- ""
+  i <- 0
+  -> i < len(lines) {
+    -< i > 0 { out <- out + "\n" }
+    out <- out + lines[i]
+    i <- i + 1
+  }
+  return out
+}
+
+def vim_mode(state) { return state[3] }
+def vim_lastcmd(state) { return state[4] }
