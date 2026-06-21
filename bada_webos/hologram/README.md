@@ -57,6 +57,23 @@ corners — is computed in Bada (`apps/hologram/lib/keyboard.bada`, as
 `[x, y, w, code]`). The keycaps mound up off the conductive-plastic plane with a
 holographic ripple sweeping across them; hover/click lights a key.
 
+## Mirror app — aerial image between tablet & phone
+Hold a smartphone **face-down over the tablet** with its mirror facing down: by
+the **eyeglass-lens focal principle** a real aerial image forms *in the gap*,
+realizing the holographic display and the HHKB keyboard in midair.
+
+* `apps/hologram/lib/mirror.bada` computes, in Bada:
+  * `lens_image(do, f)` — the thin-lens / concave-mirror law `1/f = 1/do + 1/di`;
+  * `lorentz(v, c)` — the **special-relativity** factor `γ = 1/√(1−(v/c)²)`;
+  * `focal_jones(d, v, c, ph)` — the focal length set by the **special-relativity
+    Jones polynomial** (|V(t)| of the trefoil ÷ γ);
+  * `focus_z(d, v, c, ph)` — the height of the aerial focus in the gap `[0, d]`,
+    which shifts relativistically (≈3.9 cm at rest → ≈9.5 cm near 0.9c).
+* `hologram/mirror.py` + `MirrorApp` draws the side cross-section (tablet, phone
+  mirror, rays converging to the focal point) with a **v/c slider** that moves
+  the focus, and the front view of the **realized floating image** — toggle
+  between the equation-group display and the HHKB keyboard.
+
 ## Use
 ```
 hologram list                  # the videos + mirrors + light field
@@ -65,16 +82,23 @@ hologram html out.html free    # free-view reconstruction
 hologram html out.html float   # float-up display (Jones relief + power)
 holokbd  list                  # the HHKB layout + power
 holokbd  html kbd.html         # the floating holographic HHKB
+holomirror list                # the mirror-app aerial focus (rest → 0.9c)
+holomirror html m.html         # mirror app realizing the display
+holomirror html m.html keyboard  # mirror app realizing the HHKB
 ```
 or in Python:
 ```python
-from hologram import HologramApp, HoloKeyboardApp
+from hologram import HologramApp, HoloKeyboardApp, MirrorApp
 app = HologramApp(); app.boot()
 app.save_html("hologram.html")        # reflection pyramid
 app.save_floatup("floatup.html")      # float-up (Jones relief + power)
 HoloKeyboardApp().boot(); HoloKeyboardApp().save_html("holokbd.html")
+m = MirrorApp(); m.boot()
+m.save_html("holomirror.html")            # aerial display
+m.save_html("holomirror_kbd.html", True)  # aerial HHKB keyboard
 ```
 
-The surfaces, the β(p,q) light field, the Jones relief, the power model and the
-HHKB layout are all computed in Bada; the reflection / float-up / keyboard
-compositing is done in the canvas renderer.
+The surfaces, the β(p,q) light field, the Jones relief, the power model, the
+HHKB layout and the mirror/lens aerial optics are all computed in Bada; the
+reflection / float-up / keyboard / aerial compositing is done in the canvas
+renderer.

@@ -25,8 +25,10 @@ from bada import load_program, run_source           # noqa: E402
 
 _LIB = os.path.join(_PKG, "apps", "hologram", "lib", "hologram.bada")
 _KBD = os.path.join(_PKG, "apps", "hologram", "lib", "keyboard.bada")
+_MIR = os.path.join(_PKG, "apps", "hologram", "lib", "mirror.bada")
 _SRC = None
 _KSRC = None
+_MSRC = None
 
 
 def _run(extra: str):
@@ -46,6 +48,16 @@ def _krun(extra: str):
     buf = io.StringIO()
     with redirect_stdout(buf):
         run_source(_KSRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def _mrun(extra: str):
+    global _MSRC
+    if _MSRC is None:
+        _MSRC = load_program(_MIR)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_MSRC + "\n" + extra)
     return buf.getvalue().splitlines()
 
 
@@ -119,3 +131,29 @@ def hhkb_width() -> int:
 
 def hhkb_rows() -> int:
     return int(float(_krun("print hhkb_rows()")[-1]))
+
+
+# --- smartphone-mirror + eyeglass-lens aerial image ------------------------
+def lens_image(do: float, f: float) -> float:
+    return float(_mrun(f"print lens_image({do}, {f})")[-1])
+
+
+def lorentz(v: float, c: float) -> float:
+    return float(_mrun(f"print lorentz({v}, {c})")[-1])
+
+
+def focal_jones(d: float, v: float, c: float, ph: float) -> float:
+    return float(_mrun(f"print focal_jones({d}, {v}, {c}, {ph})")[-1])
+
+
+def focus_z(d: float, v: float, c: float, ph: float) -> float:
+    """Height (cm) of the aerial focus in the tablet↔mirror gap [0, d]."""
+    return float(_mrun(f"print focus_z({d}, {v}, {c}, {ph})")[-1])
+
+
+def focus_mag(d: float, v: float, c: float, ph: float) -> float:
+    return float(_mrun(f"print focus_mag({d}, {v}, {c}, {ph})")[-1])
+
+
+def focus_frames(d: float, v: float, c: float, T: int) -> list:
+    return ast.literal_eval(_mrun(f"print focus_flat({d}, {v}, {c}, {T})")[-1])

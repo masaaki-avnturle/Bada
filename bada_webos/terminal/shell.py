@@ -451,6 +451,28 @@ class Shell:
             return f"wrote holographic HHKB keyboard to {path}\n"
         return "holokbd: usage: holokbd [list|html PATH]\n"
 
+    def _holomirror(self, args, stdin):
+        # smartphone mirror over the tablet: an eyeglass-lens aerial image forms
+        # in the gap (focus from the special-relativity Jones polynomial).
+        from hologram import MirrorApp
+        sub = args[0] if args else "list"
+        app = MirrorApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Mirror App — aerial hologram between tablet & phone:\n"
+                    f"  gap: {r['gap_cm']} cm · eyeglass-lens focal point\n"
+                    f"  focus z: {r['focus_rest_cm']} cm at rest -> "
+                    f"{r['focus_fast_cm']} cm near {r['vmax']}c "
+                    "(special-relativity Jones polynomial)\n"
+                    f"  realizes: holographic display + HHKB ({r['keys']} keys)\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "holomirror.html"
+            kbd = len(args) > 2 and args[2] == "keyboard"
+            app.save_html(path, kbd)
+            return (f"wrote mirror-app aerial hologram to {path}"
+                    f"{' (HHKB keyboard)' if kbd else ' (display)'}\n")
+        return "holomirror: usage: holomirror [list|html PATH [keyboard]]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -629,7 +651,8 @@ class Shell:
                 "  slideshow:      slideshow [list|html PATH]\n"
                 "  2D top-down:    topdown [list|html PATH [fold]]\n"
                 "  hologram:       hologram [list|html PATH [free|float]]\n"
-                "  holo keyboard:  holokbd [list|html PATH]\n")
+                "  holo keyboard:  holokbd [list|html PATH]\n"
+                "  mirror app:     holomirror [list|html PATH [keyboard]]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -642,5 +665,6 @@ class Shell:
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
         "kaleido": _kaleido, "superpose": _superpose,
         "slideshow": _slideshow, "topdown": _topdown,
-        "hologram": _hologram, "holokbd": _holokbd, "help": _help,
+        "hologram": _hologram, "holokbd": _holokbd,
+        "holomirror": _holomirror, "help": _help,
     }

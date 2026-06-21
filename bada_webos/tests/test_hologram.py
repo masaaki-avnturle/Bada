@@ -14,7 +14,7 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from hologram import (HologramApp, HoloKeyboardApp, html_hologram,
+from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, html_hologram,
                       html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
@@ -174,6 +174,56 @@ class TestHoloKeyboard(unittest.TestCase):
         h = html_keyboard(keys, 15, 5, 1.35, "t + t^3 - t^4")
         self.assertIn('"label": "A"', h)
         self.assertIn('"label": "ctrl"', h)
+
+
+class TestMirrorAerial(unittest.TestCase):
+    """Smartphone mirror + eyeglass lens -> aerial focus from the SR Jones poly."""
+
+    def test_lens_law(self):
+        # 1/f = 1/do + 1/di  =>  do=12, f=4 -> di=6
+        self.assertAlmostEqual(bridge.lens_image(12.0, 4.0), 6.0, places=4)
+
+    def test_lorentz_factor(self):
+        self.assertAlmostEqual(bridge.lorentz(0.0, 1.0), 1.0, places=6)
+        self.assertAlmostEqual(bridge.lorentz(0.6, 1.0), 1.25, places=6)
+        self.assertGreater(bridge.lorentz(0.9, 1.0), bridge.lorentz(0.6, 1.0))
+
+    def test_focus_in_gap_and_shifts_with_velocity(self):
+        d = 12.0
+        z_rest = bridge.focus_z(d, 0.0, 1.0, 0.0)
+        z_fast = bridge.focus_z(d, 0.9, 1.0, 0.0)
+        # the aerial focus stays strictly inside the tablet↔mirror gap
+        for z in (z_rest, z_fast):
+            self.assertGreater(z, 0.0)
+            self.assertLess(z, d)
+        # and moves relativistically (different focal height)
+        self.assertNotAlmostEqual(z_rest, z_fast, places=2)
+
+    def test_focus_frames_and_mag(self):
+        fr = bridge.focus_frames(12.0, 0.3, 1.0, 5)
+        self.assertEqual(len(fr), 5)
+        self.assertTrue(all(0.0 < z < 12.0 for z in fr))
+        self.assertGreater(bridge.focus_mag(12.0, 0.3, 1.0, 0.0), 0.0)
+
+    def test_app_boot_and_html(self):
+        app = MirrorApp(n=8, frames=4, display="fermat", nv=5)
+        r = app.boot()
+        self.assertEqual(r["gap_cm"], 12.0)
+        self.assertEqual(r["keys"], 60)
+        self.assertNotAlmostEqual(r["focus_rest_cm"], r["focus_fast_cm"],
+                                  places=2)
+        self.assertEqual(len(app.focus_table), 6)         # nv + 1 rows
+        with tempfile.TemporaryDirectory() as d:
+            disp = open(app.save_html(os.path.join(d, "m.html"), False)).read()
+            kbd = open(app.save_html(os.path.join(d, "k.html"), True)).read()
+        self.assertIn("KB=false", disp)
+        self.assertIn("KB=true", kbd)
+        for h in (disp, kbd):
+            self.assertIn("MIRROR APP", h)
+            self.assertIn("SMARTPHONE", h)               # phone mirror
+            self.assertIn("aerial focus", h)             # the floating image
+            self.assertIn("special-relativity Jones", h)
+            self.assertIn("FOCUS=", h)                   # Bada focal table
 
 
 if __name__ == "__main__":

@@ -12,10 +12,13 @@ from . import bridge
 from .render import html_hologram
 from .floatup import html_floatup
 from .keyboard import html_keyboard
+from .mirror import html_mirror
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
 DEFAULT_BUDGET_W = 5.0    # power budget for the float-up display
+GAP_CM = 12.0             # tablet ↔ phone-mirror gap
+VMAX = 0.9                # max v/c on the relativity slider
 
 
 def _grid_mean(g):
@@ -125,4 +128,58 @@ class HoloKeyboardApp:
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:
             f.write(self.html())
+        return path
+
+
+class MirrorApp:
+    """The smartphone mirror over the tablet: an eyeglass-lens aerial image
+    forms in the gap (focal point from the special-relativity Jones polynomial),
+    realizing the holographic display and the HHKB keyboard."""
+
+    def __init__(self, n: int = 14, frames: int = 16, display: str = "fermat",
+                 nv: int = 10):
+        self.n = n
+        self.frames = frames
+        self.display = display
+        self.nv = nv
+
+    def boot(self) -> dict:
+        from eqvideo import bridge as ev
+        from eqvideo.render import CATALOG as EV_CAT
+        from transport import bridge as tr
+        from transport.app import CATALOG as TR_CAT
+
+        # source video for the realized display (computed in Bada)
+        if self.display in ev.names():
+            self.display_frames = ev.frames(self.display, self.n, self.frames)
+        else:
+            self.display_frames = tr.frames(self.display, self.n, self.frames)
+        self.light_frames = bridge.light_frames("mag", self.n, self.frames)
+
+        # the HHKB keyboard layout (computed in Bada)
+        self.keys = bridge.hhkb_keys()
+        self.kbd_width = bridge.hhkb_width()
+
+        # the eyeglass-lens focal height across velocity (rows) and phase (cols)
+        self.focus_table = [
+            bridge.focus_frames(GAP_CM, (i / self.nv) * VMAX, 1.0, self.frames)
+            for i in range(self.nv + 1)]
+        self.jones_poly = bridge.jones_polynomial()
+
+        z_rest = self.focus_table[0][0]
+        z_fast = self.focus_table[-1][0]
+        return {"gap_cm": GAP_CM, "display": self.display,
+                "focus_rest_cm": round(z_rest, 2),
+                "focus_fast_cm": round(z_fast, 2),
+                "vmax": VMAX, "keys": len(self.keys)}
+
+    def html(self, keyboard: bool = False) -> str:
+        return html_mirror(self.display, self.display_frames,
+                           self.light_frames, self.n, self.keys,
+                           self.kbd_width, self.focus_table, GAP_CM, VMAX,
+                           self.jones_poly, keyboard)
+
+    def save_html(self, path: str, keyboard: bool = False) -> str:
+        with open(path, "w") as f:
+            f.write(self.html(keyboard))
         return path
