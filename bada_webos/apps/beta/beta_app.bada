@@ -1,0 +1,49 @@
+// beta_app.bada — Beta(p=2,q=2), difference-equation factorization, and the
+// zeta adaptation, in Bada.
+
+#include lib/betalib.bada
+
+say "=== Beta function: p=2, q=2 ==="
+b22 <- beta(2, 2)
+say "B(2,2) (= 1/6):"
+print b22
+
+say "difference-equation factorization (Pascal): B(2,2) == B(3,2)+B(2,3) ?"
+lhs <- pascal_lhs(2, 2)
+rhs <- pascal_rhs(2, 2)
+-< fabs_eq(lhs, rhs) {
+  say "verified"
+} >- {
+  say "FAILED"
+}
+
+say "exact zeta link: zeta(2) = pi^2 * B(2,2):"
+print zeta2_from_beta()
+
+z3 <- zeta3(20000)
+say "zeta(3):"
+print z3
+say "report-heuristic adaptation x with B(2,2)/ln x = zeta(3):"
+xa <- adapt_x_for_zeta(z3)
+print xa
+say "check B(2,2)/ln(x) (should equal zeta(3)):"
+print b22 / fln(xa)
+
+rels <- generate_relations()
+say "generated equations [p, q, B(p,q)] from the B(2,2) seed:"
+print rels
+
+Omega::DATABASE[beta] {
+  push(b22)
+  push(zeta2_from_beta())
+  push(rels)
+  push("exact: zeta(2)=pi^2*B(2,2); HEURISTIC: zeta(3)=B(2,2)/ln x (report)")
+}
+say "done (zeta(2) link exact; zeta(3) adaptation is the report heuristic)"
+
+// helper: float equality within tolerance
+def fabs_eq(a, b) {
+  d <- a - b
+  -< d < 0 { d <- 0 - d }
+  return d < 0.000000001
+}
