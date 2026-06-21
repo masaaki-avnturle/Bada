@@ -56,3 +56,28 @@ def lint(src: str) -> list[Diagnostic]:
 
 def is_valid(src: str) -> bool:
     return not lint(src)
+
+
+def main(argv=None):
+    """CLI grammar checker: prints  FILE:LINE:COL: error: MSG  (quickfix-
+    friendly), exits non-zero if any file has errors."""
+    import argparse
+    p = argparse.ArgumentParser(prog="bada-lint",
+                                description="Bada grammar checker")
+    p.add_argument("files", nargs="+")
+    args = p.parse_args(argv)
+    rc = 0
+    for path in args.files:
+        with open(path) as f:
+            ds = lint(f.read())
+        if not ds:
+            print(f"{path}: OK")
+        else:
+            rc = 1
+            for d in ds:
+                print(f"{path}:{d.line}:{d.col}: {d.severity}: {d.message}")
+    raise SystemExit(rc)
+
+
+if __name__ == "__main__":
+    main()
