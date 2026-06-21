@@ -1,0 +1,71 @@
+// spatial.bada — the Vision-Pro-equivalent spatial layer, in Bada.
+//
+// When the holographic display is launched on the tablet, the tablet turns
+// transparent (passthrough) and its applications float out as spatial windows,
+// anchored at the mirror-state lens focal depth (mirror.bada).  This library
+// computes, in Bada, the 3D window layout on a concave shell around the viewer,
+// the head-parallax of each window by depth, the depth scaling, and the tablet
+// passthrough transparency.
+
+#include mirror.bada
+
+// n app windows placed on a concave arc facing the viewer: [[x, y, z], ...]
+// (centre window is deepest, side windows wrap toward you — like visionOS).
+def window_arc(n, radius, spread) {
+  out <- []
+  i <- 0
+  -> i < n {
+    frac <- 0.0
+    -< n > 1 { frac <- 1.0 * i / (n - 1) }
+    ang <- (frac - 0.5) * spread
+    x <- radius * fsin(ang)
+    z <- radius * fcos(ang)
+    append(out, [x, 0.0, z])
+    i <- i + 1
+  }
+  return out
+}
+
+// head-parallax screen offset for a window at depth z (nearer = moves more)
+def parallax(z, head, refz) {
+  -< z < 0.01 { z <- 0.01 }
+  return head * refz / z
+}
+
+// on-screen scale of a window at depth z (nearer = bigger), within [near, far]
+def depth_scale(z, near, far) {
+  span <- far - near
+  -< span < 0.0001 { span <- 0.0001 }
+  t <- (z - near) / span
+  -< t < 0 { t <- 0 }
+  -< t > 1 { t <- 1 }
+  return 1.0 - 0.45 * t
+}
+
+// tablet passthrough transparency as the display "boots": launch in [0,1],
+// 0 = opaque tablet, 1 = fully transparent (you see through to the world).
+def passthrough_alpha(launch) {
+  -< launch < 0 { launch <- 0 }
+  -< launch > 1 { launch <- 1 }
+  return 1.0 - 0.85 * launch
+}
+
+// the focal depth (cm) the spatial windows are anchored to, from the
+// mirror-state lens + special-relativity Jones polynomial (mirror.bada)
+def spatial_focus(d, v, c, ph) {
+  return focus_z(d, v, c, ph)
+}
+
+// flat layout: n windows, returned as a flat list [x0,y0,z0, x1,y1,z1, ...]
+def window_flat(n, radius, spread) {
+  arc <- window_arc(n, radius, spread)
+  out <- []
+  i <- 0
+  -> i < len(arc) {
+    append(out, arc[i][0])
+    append(out, arc[i][1])
+    append(out, arc[i][2])
+    i <- i + 1
+  }
+  return out
+}

@@ -13,6 +13,7 @@ from .render import html_hologram
 from .floatup import html_floatup
 from .keyboard import html_keyboard
 from .mirror import html_mirror
+from .spatial import html_vision
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -182,4 +183,53 @@ class MirrorApp:
     def save_html(self, path: str, keyboard: bool = False) -> str:
         with open(path, "w") as f:
             f.write(self.html(keyboard))
+        return path
+
+
+class VisionApp:
+    """Vision-Pro-equivalent: launch the display and the tablet turns
+    transparent (passthrough) while its apps float out as spatial windows,
+    anchored at the mirror-state lens focus (all geometry computed in Bada)."""
+
+    # the tablet's applications that float out as spatial windows
+    APPS = [
+        {"title": "Hologram", "kind": "display", "glyph": "🔮"},
+        {"title": "Terminal", "kind": "card", "glyph": "▶_"},
+        {"title": "Slideshow", "kind": "card", "glyph": "▦"},
+        {"title": "Kaleido", "kind": "card", "glyph": "✲"},
+        {"title": "Files", "kind": "card", "glyph": "🗀"},
+    ]
+    RADIUS = 10.0
+    SPREAD = 2.0944          # ±60° concave shell
+    DISPLAY = "fermat"
+
+    def __init__(self, n: int = 14, frames: int = 16):
+        self.n = n
+        self.frames = frames
+
+    def boot(self) -> dict:
+        from eqvideo import bridge as ev
+
+        self.display_frames = ev.frames(self.DISPLAY, self.n, self.frames)
+        self.light_frames = bridge.light_frames("mag", self.n, self.frames)
+        self.keys = bridge.hhkb_keys()
+        self.kbd_width = bridge.hhkb_width()
+
+        # spatial window layout + tablet passthrough + focal anchor (all Bada)
+        self.positions = bridge.window_positions(len(self.APPS),
+                                                 self.RADIUS, self.SPREAD)
+        self.focus_cm = bridge.focus_z(GAP_CM, 0.3, 1.0, 0.0)
+        self.passthrough = bridge.passthrough_alpha(1.0)
+        return {"windows": len(self.APPS), "focus_cm": round(self.focus_cm, 2),
+                "passthrough_alpha": round(self.passthrough, 2),
+                "gap_cm": GAP_CM, "keys": len(self.keys)}
+
+    def html(self) -> str:
+        return html_vision(self.APPS, self.positions, self.display_frames,
+                          self.light_frames, self.n, self.keys, self.kbd_width,
+                          self.focus_cm, GAP_CM)
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
         return path

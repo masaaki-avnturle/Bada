@@ -74,8 +74,29 @@ realizing the holographic display and the HHKB keyboard in midair.
   the focus, and the front view of the **realized floating image** — toggle
   between the equation-group display and the HHKB keyboard.
 
+## Spatial display (Vision-Pro-equivalent passthrough)
+Launch the hologram on the tablet and the **tablet turns transparent**
+(passthrough), while its applications **float out as spatial windows** — the
+Apple-Vision-Pro-equivalent feature.
+
+* `apps/hologram/lib/spatial.bada` (`#include`s mirror.bada) computes, in Bada:
+  * `window_arc(n, radius, spread)` / `window_flat` — the app windows on a
+    **concave shell** facing the viewer (centre deepest, edges wrap toward you);
+  * `passthrough_alpha(launch)` — the tablet transparency as the display boots
+    (1 = opaque → 0.15 = see-through);
+  * `parallax(z, head, refz)` and `depth_scale(z, near, far)` — head-parallax
+    and depth sizing of each window;
+  * `spatial_focus(d, v, c, ph)` — the focal depth the windows are anchored to,
+    via the mirror-state lens + special-relativity Jones polynomial.
+* `hologram/spatial.py` + `VisionApp` render the passthrough scene: the
+  transparent tablet, the apps flying out to the arc on launch (with the live
+  holographic display in the centre window), the **spatial HHKB keyboard**
+  floating in front, head-parallax and gaze-to-focus on mouse move.
+
 ## Use
 ```
+holovision list                # the spatial passthrough summary
+holovision html v.html         # the Vision-Pro-equivalent spatial display
 hologram list                  # the videos + mirrors + light field
 hologram html out.html         # reflection-pyramid display
 hologram html out.html free    # free-view reconstruction

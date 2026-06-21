@@ -14,8 +14,8 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, html_hologram,
-                      html_keyboard)
+from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
+                      html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -224,6 +224,45 @@ class TestMirrorAerial(unittest.TestCase):
             self.assertIn("aerial focus", h)             # the floating image
             self.assertIn("special-relativity Jones", h)
             self.assertIn("FOCUS=", h)                   # Bada focal table
+
+
+class TestSpatialVision(unittest.TestCase):
+    """Vision-Pro-equivalent passthrough: tablet transparent, apps float out."""
+
+    def test_window_arc_is_concave_shell(self):
+        pos = bridge.window_positions(5, 10.0, 2.0944)
+        self.assertEqual(len(pos), 5)
+        zs = [p[2] for p in pos]
+        # centre window is deepest, edges wrap toward the viewer
+        self.assertGreater(zs[2], zs[0])
+        self.assertGreater(zs[2], zs[4])
+        self.assertAlmostEqual(zs[0], zs[4], places=3)   # symmetric
+
+    def test_passthrough_and_depth(self):
+        # launching makes the tablet transparent
+        self.assertAlmostEqual(bridge.passthrough_alpha(0.0), 1.0, places=6)
+        self.assertLess(bridge.passthrough_alpha(1.0), 0.2)
+        # nearer windows are larger and parallax more
+        self.assertGreater(bridge.depth_scale(5.0, 5.0, 10.0),
+                           bridge.depth_scale(10.0, 5.0, 10.0))
+        self.assertGreater(abs(bridge.parallax(5.0, 0.5, 10.0)),
+                           abs(bridge.parallax(10.0, 0.5, 10.0)))
+
+    def test_app_boot_and_html(self):
+        app = VisionApp(n=8, frames=4)
+        r = app.boot()
+        self.assertEqual(r["windows"], len(VisionApp.APPS))
+        self.assertEqual(r["keys"], 60)
+        self.assertLess(r["passthrough_alpha"], 0.2)     # transparent on launch
+        self.assertGreater(r["focus_cm"], 0.0)
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "v.html"))).read()
+        self.assertIn("SPATIAL HOLOGRAM", h)
+        self.assertIn("passthrough", h)
+        self.assertIn("transparent", h)                  # tablet see-through
+        self.assertIn("POS=", h)                         # Bada window layout
+        self.assertIn("Hologram", h)                     # the display window
+        self.assertIn("Terminal", h)                     # a floated tablet app
 
 
 if __name__ == "__main__":

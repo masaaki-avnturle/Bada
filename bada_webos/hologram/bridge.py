@@ -26,9 +26,11 @@ from bada import load_program, run_source           # noqa: E402
 _LIB = os.path.join(_PKG, "apps", "hologram", "lib", "hologram.bada")
 _KBD = os.path.join(_PKG, "apps", "hologram", "lib", "keyboard.bada")
 _MIR = os.path.join(_PKG, "apps", "hologram", "lib", "mirror.bada")
+_SPA = os.path.join(_PKG, "apps", "hologram", "lib", "spatial.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
+_SSRC = None
 
 
 def _run(extra: str):
@@ -58,6 +60,16 @@ def _mrun(extra: str):
     buf = io.StringIO()
     with redirect_stdout(buf):
         run_source(_MSRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def _srun(extra: str):
+    global _SSRC
+    if _SSRC is None:
+        _SSRC = load_program(_SPA)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_SSRC + "\n" + extra)
     return buf.getvalue().splitlines()
 
 
@@ -157,3 +169,23 @@ def focus_mag(d: float, v: float, c: float, ph: float) -> float:
 
 def focus_frames(d: float, v: float, c: float, T: int) -> list:
     return ast.literal_eval(_mrun(f"print focus_flat({d}, {v}, {c}, {T})")[-1])
+
+
+# --- Vision-Pro-equivalent spatial layer -----------------------------------
+def window_positions(n: int, radius: float, spread: float) -> list:
+    """n app windows on a concave shell facing the viewer: [[x, y, z], ...]."""
+    flat = ast.literal_eval(_srun(f"print window_flat({n}, {radius}, {spread})")[-1])
+    return [flat[i:i + 3] for i in range(0, len(flat), 3)]
+
+
+def parallax(z: float, head: float, refz: float) -> float:
+    return float(_srun(f"print parallax({z}, {head}, {refz})")[-1])
+
+
+def depth_scale(z: float, near: float, far: float) -> float:
+    return float(_srun(f"print depth_scale({z}, {near}, {far})")[-1])
+
+
+def passthrough_alpha(launch: float) -> float:
+    """Tablet transparency as the display boots (1=opaque, 0.15=see-through)."""
+    return float(_srun(f"print passthrough_alpha({launch})")[-1])
