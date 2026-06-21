@@ -125,6 +125,30 @@ Vim: `:BadaCheck` (grammar check → quickfix), `:BadaRun`, `<C-x><C-u>` complet
 Emacs: `C-c C-c` (`bada-check`), `C-c C-r` (`bada-run`),
 `completion-at-point`.
 
+**Self-hosting (Bada built in Bada) + C backend.** Starting from the Reviser,
+the rewrite logic and the language's word lists are themselves written in Bada
+(`bootstrap/reviser.bada`, `bootstrap/lang.bada`, `bootstrap/commands.bada`):
+
+```python
+import bootstrap
+bootstrap.bada_revise_tokens(["if", "a", "==", "b"])  # -> ['-<','a','<->','b']
+bootstrap.command_manifest()  # the method-command list, produced BY Bada
+```
+The Bada reviser reproduces the Python reviser's mapping exactly.
+
+The **C backend** turns every reserved word / builtin / operator into a real
+executable — the command manifest comes *from Bada*, and `cbackend` emits one
+`cmd_<name>.c` per command plus a runtime and a Makefile:
+
+```bash
+python3 -m cbackend.gen --out generated/cbackend --build
+generated/cbackend/bin/idiv 17 5     # -> 3
+generated/cbackend/bin/mul 6 7       # -> 42
+generated/cbackend/bin/eq 5 5        # -> true
+generated/cbackend/bin/if            # -> branch object: -<
+```
+All 29 commands compile to ELF executables and are exercised in the tests.
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a
