@@ -10,6 +10,16 @@ from __future__ import annotations
 
 from . import bridge
 from .render import html_hologram
+from .floatup import html_floatup
+from .keyboard import html_keyboard
+
+TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
+BATTERY_WH = 40.0         # tablet battery
+DEFAULT_BUDGET_W = 5.0    # power budget for the float-up display
+
+
+def _grid_mean(g):
+    return sum(v for row in g for v in row) / (len(g) * len(g[0]))
 
 
 class HologramApp:
@@ -57,4 +67,62 @@ class HologramApp:
     def save_html(self, path: str, free: bool = False) -> str:
         with open(path, "w") as f:
             f.write(self.html(free))
+        return path
+
+    # --- float-up display: Jones relief + conductive-plastic power ----------
+    def _float_data(self):
+        """Jones relief frames + per-frame tablet power (all from Bada)."""
+        if not hasattr(self, "relief_frames"):
+            self.relief_frames = bridge.relief_frames(self.n, self.frames)
+            self.jones_poly = bridge.jones_polynomial()
+            self.mean_relief, self.power = [], []
+            for k in range(self.frames):
+                mb = _grid_mean(self.light_frames[k]) / 0.5      # 0..1
+                me = _grid_mean(self.relief_frames[k])           # 0..1
+                self.mean_relief.append(me)
+                self.power.append(
+                    bridge.tablet_power(mb, me, TABLET_AREA_CM2))
+
+    def html_float(self, budget: float = DEFAULT_BUDGET_W) -> str:
+        self._float_data()
+        return html_floatup(self.frames_by_name, self.light_frames,
+                            self.relief_frames, self.n, self.catalog,
+                            self.jones_poly, self.power, self.mean_relief,
+                            budget, BATTERY_WH)
+
+    def save_floatup(self, path: str, budget: float = DEFAULT_BUDGET_W) -> str:
+        with open(path, "w") as f:
+            f.write(self.html_float(budget))
+        return path
+
+
+class HoloKeyboardApp:
+    """The Happy Hacking Keyboard floating as a hologram (layout from Bada)."""
+
+    KBD_AREA_CM2 = 120.0   # ~60% keyboard footprint
+
+    def boot(self) -> dict:
+        self.keys = bridge.hhkb_keys()
+        self.width = bridge.hhkb_width()
+        self.rows = bridge.hhkb_rows()
+        self.jones = bridge.jones_polynomial()
+        # power to light the floating keycaps out of the conductive plastic
+        self.power = bridge.tablet_power(0.5, 0.5, self.KBD_AREA_CM2)
+        return {"keys": len(self.keys), "width": self.width,
+                "rows": self.rows, "power": self.power}
+
+    def _poly_str(self) -> str:
+        parts = []
+        for e, c in self.jones:
+            parts.append(f"{'+' if c >= 0 else '-'} {abs(c)}t^{e}")
+        s = " ".join(parts)
+        return s[2:] if s.startswith("+ ") else s
+
+    def html(self) -> str:
+        return html_keyboard(self.keys, self.width, self.rows,
+                             self.power, self._poly_str())
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
         return path

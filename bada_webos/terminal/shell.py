@@ -423,11 +423,33 @@ class Shell:
         if sub == "html":
             app.boot()
             path = args[1] if len(args) > 1 else "hologram.html"
-            free = len(args) > 2 and args[2] == "free"
+            mode = args[2] if len(args) > 2 else ""
+            if mode == "float":
+                app.save_floatup(path)
+                return (f"wrote float-up hologram to {path} "
+                        "(Jones relief, conductive-plastic power)\n")
+            free = mode == "free"
             app.save_html(path, free)
             return (f"wrote hologram display to {path}"
                     f"{' (free view)' if free else ' (reflection pyramid)'}\n")
-        return "hologram: usage: hologram [list|html PATH [free]]\n"
+        return "hologram: usage: hologram [list|html PATH [free|float]]\n"
+
+    def _holokbd(self, args, stdin):
+        # the Happy Hacking Keyboard floating as a hologram (layout from Bada).
+        from hologram import HoloKeyboardApp
+        sub = args[0] if args else "list"
+        app = HoloKeyboardApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Holographic Happy Hacking Keyboard:\n"
+                    f"  layout: HHKB Professional (US), {r['keys']} keys, "
+                    f"{r['width']}U x {r['rows']} rows (computed in Bada)\n"
+                    f"  power: {r['power']:.2f} W (conductive-plastic float-up)\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "holokbd.html"
+            app.save_html(path)
+            return f"wrote holographic HHKB keyboard to {path}\n"
+        return "holokbd: usage: holokbd [list|html PATH]\n"
 
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
@@ -606,7 +628,8 @@ class Shell:
                 "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n"
                 "  slideshow:      slideshow [list|html PATH]\n"
                 "  2D top-down:    topdown [list|html PATH [fold]]\n"
-                "  hologram:       hologram [list|html PATH [free]]\n")
+                "  hologram:       hologram [list|html PATH [free|float]]\n"
+                "  holo keyboard:  holokbd [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -619,5 +642,5 @@ class Shell:
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
         "kaleido": _kaleido, "superpose": _superpose,
         "slideshow": _slideshow, "topdown": _topdown,
-        "hologram": _hologram, "help": _help,
+        "hologram": _hologram, "holokbd": _holokbd, "help": _help,
     }

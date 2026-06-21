@@ -31,18 +31,50 @@ onto the four mirrors of the pyramid. Put a transparent pyramid on the screen
 and a single floating image is reconstructed; or switch to **free view** for the
 reconstruction shown directly (with the imaginary/reality phase shimmer).
 
+## Float-up display (Jones relief + conductive-plastic power)
+The video can **float up out of a conductive-plastic tablet**: the light "mounds
+up" (盛る) following the **Jones polynomial** of a knot, and the tablet's power
+draw is modelled so the display runs inside a power budget.
+
+* `apps/hologram/lib/hologram.bada` now `#include`s the Jones-polynomial library
+  (`apps/lib/jones.bada`) and computes, in Bada:
+  * `jones_trefoil()` → `V(t) = t + t³ − t⁴` (Kauffman state sum),
+    `poly_eval`, and `relief_flat(n, ph)` — the per-pixel **relief height** the
+    light is raised to (swept across the display radius, disk-clamped);
+  * `tablet_power(bright, elev, area)` — the **conductive-plastic** power in
+    watts (raising the relief higher costs more), `power_scale(power, budget)`
+    (dim to fit a budget) and `battery_minutes(power, wh)`.
+* `hologram/floatup.py` raises the surface off a conductive-plastic plane with a
+  contact shadow and a lift driven by the relief, so the image **floats up**; a
+  HUD shows V(t), the live power draw and a budget slider (the panel dims to
+  stay within it — it works *even with* power consumption, 電力消費でもできる).
+
+## Holographic Happy Hacking Keyboard
+`holokbd` floats the **HHKB Professional (US)** keyboard as a hologram. The
+layout — all 60 keys, their positions/widths, **Control left of A**, the split
+right Shift + Fn, the 1U Delete, the 6U spacebar and the iconic sparse bottom
+corners — is computed in Bada (`apps/hologram/lib/keyboard.bada`, as
+`[x, y, w, code]`). The keycaps mound up off the conductive-plastic plane with a
+holographic ripple sweeping across them; hover/click lights a key.
+
 ## Use
 ```
-hologram list                 # the videos + mirrors + light field
-hologram html out.html        # reflection-pyramid display
-hologram html out.html free   # free-view reconstruction
+hologram list                  # the videos + mirrors + light field
+hologram html out.html         # reflection-pyramid display
+hologram html out.html free    # free-view reconstruction
+hologram html out.html float   # float-up display (Jones relief + power)
+holokbd  list                  # the HHKB layout + power
+holokbd  html kbd.html         # the floating holographic HHKB
 ```
 or in Python:
 ```python
-from hologram import HologramApp
-app = HologramApp(); app.boot(); app.save_html("hologram.html")
+from hologram import HologramApp, HoloKeyboardApp
+app = HologramApp(); app.boot()
+app.save_html("hologram.html")        # reflection pyramid
+app.save_floatup("floatup.html")      # float-up (Jones relief + power)
+HoloKeyboardApp().boot(); HoloKeyboardApp().save_html("holokbd.html")
 ```
 
-Open `out.html`: pick which equation group to project, toggle pyramid ↔ free
-view, pause. The surfaces and the β(p,q) light field are computed in Bada; the
-reflection compositing is done in the canvas renderer.
+The surfaces, the β(p,q) light field, the Jones relief, the power model and the
+HHKB layout are all computed in Bada; the reflection / float-up / keyboard
+compositing is done in the canvas renderer.
