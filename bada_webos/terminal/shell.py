@@ -389,6 +389,28 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _superpose(self, args, stdin):
+        # overlay all the manifold animations into one combined video.
+        from superpose import SuperposeApp
+        sub = args[0] if args else "stats"
+        app = SuperposeApp()
+        if sub == "stats":
+            r = app.boot()
+            return (f"superposition of {r['n_sources']} videos: "
+                    f"{r['sources']}\n"
+                    f"combined-field displacement: {r['displacement']}\n")
+        if sub == "html":
+            app.boot()
+            path = args[1] if len(args) > 1 else "superpose.html"
+            app.save_3d(path)
+            return f"wrote 3D superposition video to {path}\n"
+        if sub == "kaleido":
+            app.boot()
+            path = args[1] if len(args) > 1 else "superpose_kaleido.html"
+            app.save_kaleido(path, 8)
+            return f"wrote superposition kaleidoscope to {path}\n"
+        return "superpose: usage: superpose [stats|html PATH|kaleido PATH]\n"
+
     def _kaleido(self, args, stdin):
         # top-down kaleidoscope of the equation-group manifold animations.
         from kaleido import KaleidoApp
@@ -523,7 +545,8 @@ class Shell:
                 "  equation gen:   eqgen  (generate equations from zeta&beta)\n"
                 "  video dict:     eqvideo [list|view NAME|html PATH]\n"
                 "  transport:      transport [gen|list|view NAME|html PATH]\n"
-                "  kaleidoscope:   kaleido [list|html PATH [segments]]\n")
+                "  kaleidoscope:   kaleido [list|html PATH [segments]]\n"
+                "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -534,5 +557,5 @@ class Shell:
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
-        "kaleido": _kaleido, "help": _help,
+        "kaleido": _kaleido, "superpose": _superpose, "help": _help,
     }
