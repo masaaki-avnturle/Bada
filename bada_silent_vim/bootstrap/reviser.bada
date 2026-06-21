@@ -1,0 +1,32 @@
+// reviser.bada — the Bada Reviser, written in Bada (self-hosting seed).
+// Maps a classic token to its instruction-oriented directive object:
+//   if -> -<   else -> >-   while -> ->   == -> <->   = -> <-
+// Everything else is returned unchanged. This is the rewrite logic of the
+// Python reviser, re-expressed in Bada itself.
+
+#include lang.bada
+
+def directive_of(w) {
+  -< w <-> "if"    { return "-<" }
+  -< w <-> "else"  { return ">-" }
+  -< w <-> "while" { return "->" }
+  -< w <-> "=="    { return "<->" }
+  -< w <-> "="     { return "<-" }
+  return w
+}
+
+def revise_token(tok) {
+  return directive_of(tok)
+}
+
+// rewrite an array of token strings, joined by `sep` into one string
+def revise_join(arr, sep) {
+  out <- ""
+  i <- 0
+  -> i < len(arr) {
+    -< i > 0 { out <- out + sep }
+    out <- out + directive_of(arr[i])
+    i <- i + 1
+  }
+  return out
+}
