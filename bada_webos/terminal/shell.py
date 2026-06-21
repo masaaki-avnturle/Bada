@@ -473,6 +473,27 @@ class Shell:
                     f"{' (HHKB keyboard)' if kbd else ' (display)'}\n")
         return "holomirror: usage: holomirror [list|html PATH [keyboard]]\n"
 
+    def _holovision(self, args, stdin):
+        # Vision-Pro-equivalent: launch the display, the tablet turns
+        # transparent and its apps float out as spatial windows.
+        from hologram import VisionApp
+        sub = args[0] if args else "list"
+        app = VisionApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Spatial Hologram (Vision-Pro-equivalent):\n"
+                    f"  launch -> tablet transparent (passthrough alpha "
+                    f"{r['passthrough_alpha']})\n"
+                    f"  {r['windows']} app windows float out on a concave shell\n"
+                    f"  anchored at the mirror-lens focus z={r['focus_cm']} cm "
+                    f"(gap {r['gap_cm']} cm)\n"
+                    f"  spatial HHKB input ({r['keys']} keys)\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "holovision.html"
+            app.save_html(path)
+            return f"wrote spatial passthrough hologram to {path}\n"
+        return "holovision: usage: holovision [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -652,7 +673,8 @@ class Shell:
                 "  2D top-down:    topdown [list|html PATH [fold]]\n"
                 "  hologram:       hologram [list|html PATH [free|float]]\n"
                 "  holo keyboard:  holokbd [list|html PATH]\n"
-                "  mirror app:     holomirror [list|html PATH [keyboard]]\n")
+                "  mirror app:     holomirror [list|html PATH [keyboard]]\n"
+                "  spatial (VP):   holovision [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -666,5 +688,5 @@ class Shell:
         "kaleido": _kaleido, "superpose": _superpose,
         "slideshow": _slideshow, "topdown": _topdown,
         "hologram": _hologram, "holokbd": _holokbd,
-        "holomirror": _holomirror, "help": _help,
+        "holomirror": _holomirror, "holovision": _holovision, "help": _help,
     }
