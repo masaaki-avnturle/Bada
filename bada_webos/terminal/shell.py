@@ -371,6 +371,23 @@ class Shell:
                 f"  VM bridge      : delivered "
                 f"{r['vm_bridge']['delivered']}\n")
 
+    def _discover(self, args, stdin):
+        # Math-discovery apps written in Bada (HPsi / odd-zeta / moonshine).
+        import os as _os
+        from bada import run_program
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        sub = args[0] if args else "zeta"
+        app = {"hpsi": "hpsi_app.bada", "zeta": "zeta_app.bada",
+               "moonshine": "moonshine_app.bada"}.get(sub)
+        if app is None:
+            return "discover: usage: discover [hpsi|zeta|moonshine]\n"
+        path = _os.path.join(_WEBOS, "apps", "discover", app)
+        buf = _io.StringIO()
+        with _rs(buf):
+            run_program(path)
+        return buf.getvalue()
+
     def _help(self, args, stdin):
         names = " ".join(sorted(self.BUILTINS))
         return ("BadaWebOS terminal — available apps:\n"
@@ -380,7 +397,8 @@ class Shell:
                 "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n"
                 "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
                 "  pilot/ATfield:  al [pilot|gamma|atfield]\n"
-                "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n")
+                "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n"
+                "  discovery:      discover [hpsi|zeta|moonshine]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -388,5 +406,6 @@ class Shell:
         "head": _head, "grep": _grep, "wc": _wc, "env": _env,
         "export": _export, "whoami": _whoami, "clear": _clear,
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
-        "qcrypto": _qcrypto, "al": _al, "winport": _winport, "help": _help,
+        "qcrypto": _qcrypto, "al": _al, "winport": _winport,
+        "discover": _discover, "help": _help,
     }
