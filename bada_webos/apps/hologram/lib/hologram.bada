@@ -1,0 +1,169 @@
+// hologram.bada — the Hologram Display light field, in Bada.
+//
+// From the report "Hologram Display" (Yamaguchi):
+//   1/e^(x log x) + 1/e^(-x log x) = 1/y           (light position)
+//   (e^(x log x)+e^(-x log x))/(e^(x log x)·e^(-x log x)) = beta(p,q)
+//   beta(p,q) = 2(cos(i x log x) + i sin(i x log x)) = (Γ(p)+Γ(q))/(Γ(p)Γ(q))
+//   ||ds^2|| = ∫ ( v/√(1+(v/c)^2) + i v/√(1+(v/c)^2) ) dvol
+//   ||ds^2|| = 8πG (p/c^3 + V/S)
+//
+// The light of the hologram is reflected by SiO2 mirrors arranged left / right /
+// before / after (the four faces of the reflection pyramid).  The light field is
+// a *complex* amplitude — a "reality" surface (re) and an "imaginary" surface
+// (im) — exactly the "camera mechanism of imaginary and reality surfaces".
+
+// --- small math (exp / log / trig) -----------------------------------------
+def fabs(v) { -< v < 0 { return 0 - v }  return v }
+
+def fpow(base, n) {
+  r <- 1.0
+  k <- 0
+  -> k < n { r <- r * base  k <- k + 1 }
+  return r
+}
+
+def fexp(x) {
+  term <- 1.0
+  sum <- 1.0
+  n <- 1
+  -> n < 18 { term <- term * x / n  sum <- sum + term  n <- n + 1 }
+  return sum
+}
+
+// natural log via  ln x = 2 atanh((x-1)/(x+1)),  x > 0
+def flog(x) {
+  -< x <= 0 { return 0 - 30.0 }
+  w <- (x - 1.0) / (x + 1.0)
+  w2 <- w * w
+  term <- w
+  sum <- w
+  n <- 1
+  -> n < 24 { term <- term * w2  sum <- sum + term / (2 * n + 1)  n <- n + 1 }
+  return 2.0 * sum
+}
+
+def fsin(theta) {
+  tp <- 6.283185307179586
+  pi <- 3.141592653589793
+  m <- idiv(theta / tp, 1)
+  x <- theta - m * tp
+  -> x > pi { x <- x - tp }
+  -> x < 0 - pi { x <- x + tp }
+  x2 <- x * x
+  term <- x
+  sum <- x
+  n <- 1
+  -> n < 9 {
+    d <- (2 * n) * (2 * n + 1)
+    term <- 0 - term * x2 / d
+    sum <- sum + term
+    n <- n + 1
+  }
+  return sum
+}
+
+def fcos(theta) { return fsin(theta + 1.5707963267948966) }
+
+def fsqrt(v) {
+  -< v <= 0 { return 0.0 }
+  g <- v
+  k <- 0
+  -> k < 24 { g <- 0.5 * (g + v / g)  k <- k + 1 }
+  return g
+}
+
+// --- the report's light functions ------------------------------------------
+
+// x log x  for a positive coordinate x
+def xlogx(x) {
+  -< x <= 0.0001 { x <- 0.0001 }
+  return x * flog(x)
+}
+
+// light position:  1/y = e^(-s) + e^(s) = 2 cosh(s),   y = 1/(2 cosh(s))
+// (peaks where s = 0, i.e. x = 1) — the bright hologram light ridge.
+def light_pos(s) {
+  return 1.0 / (fexp(s) + fexp(0 - s))
+}
+
+// beta(p,q) magnitude in the trig/position form: 2 cosh(s)
+def beta_mag(s) {
+  return fexp(s) + fexp(0 - s)
+}
+
+// map domain (u,v) in [-1,1]^2 to the radial light coordinate x in (0, ~1.6]
+def light_x(u, v) {
+  r <- fsqrt(u * u + v * v)
+  return 0.2 + r
+}
+
+// complex light amplitude at (u,v) and animation time t.
+// re = reality surface, im = imaginary surface; phase rotates with t.
+def light_re(u, v, t) {
+  x <- light_x(u, v)
+  s <- xlogx(x)
+  phi <- 6.283185307179586 * (s + t)
+  return light_pos(s) * fcos(phi)
+}
+
+def light_im(u, v, t) {
+  x <- light_x(u, v)
+  s <- xlogx(x)
+  phi <- 6.283185307179586 * (s + t)
+  return light_pos(s) * fsin(phi)
+}
+
+// |amplitude| — the displayed hologram brightness (0..0.5)
+def light_mag(u, v, t) {
+  re <- light_re(u, v, t)
+  im <- light_im(u, v, t)
+  return fsqrt(re * re + im * im)
+}
+
+// flat n*n grids over [-1,1]^2 at time t  (re / im / magnitude)
+def light_flat(name, n, t) {
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      u <- 0 - 1 + 2.0 * i / (n - 1)
+      v <- 0 - 1 + 2.0 * j / (n - 1)
+      -< name <-> "re"  { append(out, light_re(u, v, t)) }
+      -< name <-> "im"  { append(out, light_im(u, v, t)) }
+      -< name <-> "mag" { append(out, light_mag(u, v, t)) }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
+
+// --- the reflection pyramid: four SiO2 mirrors -----------------------------
+// before (top), after (bottom), left, right — each a reflected, rotated copy.
+def quad_names() { return ["before", "after", "left", "right"] }
+
+// rotation (degrees) that aims each mirror's copy toward the centre, so a
+// transparent pyramid reconstructs a single floating image.
+def quad_rot(name) {
+  -< name <-> "before" { return 0 }
+  -< name <-> "right"  { return 90 }
+  -< name <-> "after"  { return 180 }
+  -< name <-> "left"   { return 270 }
+  return 0
+}
+
+def quad_count() { return 4 }
+
+// --- the metric / material balance (informational) -------------------------
+// complex line element  v/√(1+(v/c)^2)  (reality == imaginary part magnitude)
+def metric_ds2(v, c) {
+  rr <- v / c
+  return v / fsqrt(1.0 + rr * rr)
+}
+
+// ||ds^2|| = 8πG (p/c^3 + V/S)  — hologram material mass balance
+def hologram_mass(p, c, V, S) {
+  g <- 0.00000000006674
+  return 8.0 * 3.141592653589793 * g * (p / (c * c * c) + V / S)
+}
