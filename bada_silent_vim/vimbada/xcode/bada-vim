@@ -1,0 +1,51 @@
+#!/bin/sh
+# bada-vim — launch the Bada-aware vim, and the Bada/​C vim toolchain.
+#
+# This is the entry point Xcode's "BadaVim" external-build target invokes to
+# embed the Bada vim into the IDE.  It works the same from a plain shell.
+#
+# Usage:
+#   bada-vim edit FILE        open FILE in vim with the bada.vim plugin loaded
+#   bada-vim build            build the C receiver + class-method binaries
+#   bada-vim run KEY...       run the modal vim *written in Bada* over a script
+#   bada-vim check FILE       grammar-check a .bada file
+#
+# BADA_HOME is inferred from this script's location if unset.
+
+set -eu
+
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)        # vimbada/xcode
+vimbada=$(dirname -- "$here")                            # vimbada
+: "${BADA_HOME:=$(dirname -- "$vimbada")}"               # bada_silent_vim
+export BADA_HOME
+
+plugin="$vimbada/bada.vim"
+
+cmd=${1:-edit}
+[ $# -gt 0 ] && shift || true
+
+case "$cmd" in
+  edit)
+    file=${1:-untitled.bada}
+    exec vim -c "source $plugin" -- "$file"
+    ;;
+  build)
+    exec python3 -W ignore -c "import sys; sys.path.insert(0, '$BADA_HOME'); \
+from vimbada import cbackend_vim as c; o = '$vimbada/generated'; \
+c.generate(o); print('built:', c.build(o))"
+    ;;
+  run)
+    py="import sys; sys.path.insert(0, '$BADA_HOME'); from vimbada import bridge"
+    args=""
+    for k in "$@"; do args="$args '$k',"; done
+    exec python3 -W ignore -c "$py; r = bridge.run([$args]); print(r['text'])"
+    ;;
+  check)
+    file=${1:?usage: bada-vim check FILE}
+    exec python3 -W ignore -m bada.lint "$file"
+    ;;
+  *)
+    echo "usage: bada-vim {edit FILE|build|run KEY...|check FILE}" >&2
+    exit 2
+    ;;
+esac

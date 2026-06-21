@@ -1,0 +1,34 @@
+// vimlib.bada — string/buffer helpers for the Bada vim, in Bada.
+// Bada strings support len(s), s[i] (1-char) and + ; lines are strings in an
+// array, edited by rebuilding.
+
+// substring s[a:b]
+def substr(s, a, b) {
+  out <- ""
+  i <- a
+  -> i < b {
+    out <- out + s[i]
+    i <- i + 1
+  }
+  return out
+}
+
+// insert text `ins` into line `s` at column `col`
+def str_insert(s, col, ins) {
+  -< col > len(s) { col <- len(s) }
+  return substr(s, 0, col) + ins + substr(s, col, len(s))
+}
+
+// delete the character at column `col`
+def str_delete(s, col) {
+  -< col >= len(s) { return s }
+  -< col < 0 { return s }
+  return substr(s, 0, col) + substr(s, col + 1, len(s))
+}
+
+// clamp v into [lo, hi]
+def clamp(v, lo, hi) {
+  -< v < lo { return lo }
+  -< v > hi { return hi }
+  return v
+}
