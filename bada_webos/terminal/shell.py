@@ -388,6 +388,17 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _beta(self, args, stdin):
+        # Beta-function difference-equation factorization + zeta links (Bada).
+        import os as _os
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        from bada import run_program
+        buf = _io.StringIO()
+        with _rs(buf):
+            run_program(_os.path.join(_WEBOS, "apps", "beta", "beta_app.bada"))
+        return buf.getvalue()
+
     def _help(self, args, stdin):
         names = " ".join(sorted(self.BUILTINS))
         return ("BadaWebOS terminal — available apps:\n"
@@ -398,7 +409,8 @@ class Shell:
                 "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
                 "  pilot/ATfield:  al [pilot|gamma|atfield]\n"
                 "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n"
-                "  discovery:      discover [hpsi|zeta|moonshine]\n")
+                "  discovery:      discover [hpsi|zeta|moonshine]\n"
+                "  beta:           beta  (Beta factorization + zeta links)\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -407,5 +419,5 @@ class Shell:
         "export": _export, "whoami": _whoami, "clear": _clear,
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
-        "discover": _discover, "help": _help,
+        "discover": _discover, "beta": _beta, "help": _help,
     }
