@@ -112,6 +112,19 @@ u.from_silent_words(["AI", "EA", "UO", "OA"])  # -> insert, "say ", normal, run
 u.from_keyboard(["i", "ESC", "!"], "vim")        # same command shape
 ```
 
+**Editor config files.** `.vimrc` and `.emacs` add Bada support to Vim and
+Emacs: `*.bada` filetype, syntax highlighting for keywords/builtins/directive
+operators, `//` comments, keyword + buffer completion, and a grammar-check /
+run command (backed by `python3 -m bada.lint`).
+```bash
+export BADA_HOME=/path/to/Bada/bada_silent_vim   # point editors at the toolchain
+ln -s "$BADA_HOME/.vimrc" ~/.vimrc               # (or :source it)
+ln -s "$BADA_HOME/.emacs" ~/.emacs
+```
+Vim: `:BadaCheck` (grammar check → quickfix), `:BadaRun`, `<C-x><C-u>` complete.
+Emacs: `C-c C-c` (`bada-check`), `C-c C-r` (`bada-run`),
+`completion-at-point`.
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a

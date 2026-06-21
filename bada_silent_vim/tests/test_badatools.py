@@ -119,5 +119,32 @@ class TestUnifiedParser(unittest.TestCase):
         self.assertEqual(r["commands"][0], ("mode", "INSERT"))
 
 
+class TestLintCLI(unittest.TestCase):
+    """The grammar-check backend used by .vimrc :BadaCheck / .emacs bada-check."""
+
+    def _run(self, src: str):
+        # exactly what .vimrc :BadaCheck / .emacs bada-check invoke
+        import subprocess
+        import tempfile
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with tempfile.NamedTemporaryFile("w", suffix=".bada",
+                                         delete=False) as f:
+            f.write(src)
+            path = f.name
+        try:
+            env = dict(os.environ, PYTHONPATH=root)
+            return subprocess.run(
+                [sys.executable, "-W", "ignore", "-m", "bada.lint", path],
+                env=env, capture_output=True, text=True).returncode
+        finally:
+            os.remove(path)
+
+    def test_ok_exit_zero(self):
+        self.assertEqual(self._run("x <- 1\nprint x * 7"), 0)
+
+    def test_error_exit_one(self):
+        self.assertEqual(self._run("x <- \nprint 1"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
