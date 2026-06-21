@@ -3,7 +3,9 @@
 Takes the manifold animations from `eqvideo` and `transport` (10 surfaces,
 computed in Bada), views each **from directly above** (z → colour), and folds a
 single angular **wedge** into radial **mirror symmetry**, spinning it over the
-animation frames — a true kaleidoscope of the equation group.
+animation frames. The page is a **gallery**: each animation has its own
+kaleidoscope tile, a **checkbox per animation** turns any subset on/off
+(individual, arbitrary selection), and **clicking a tile enlarges** it.
 
 ## Sources (all selectable in the kaleidoscope)
 `eqgen`, `fermat`, `covariant`, `trigbeta`, `abelian` (from eqvideo) and
@@ -26,6 +28,7 @@ or in Python:
 from kaleido import KaleidoApp
 app = KaleidoApp(); app.boot(); app.save_html("kaleido.html", segments=8)
 ```
-Open `examples/kaleido.html` in a browser: pick a source from the dropdown,
-drag the **segments** slider (3–16 mirrors), ⏸ to pause. The maths is Bada;
-the top-down kaleidoscope fold is done in the canvas renderer.
+Open `examples/kaleido.html` in a browser: tick/untick any animation's
+**checkbox** to show it individually (or `all`/`none`), **click a tile** to
+enlarge it, drag the **segments** slider (3–16 mirrors), ⏸ to pause. The maths
+is Bada; the top-down kaleidoscope fold is done in the canvas renderer.
