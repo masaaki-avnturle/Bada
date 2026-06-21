@@ -1,0 +1,76 @@
+// eqgen.bada — generate the equation group from Euler's zeta & beta, in Bada.
+//
+// From the report (middle pages):  Gamma = Beta = pi-operator (p.15), and the
+// generator relation  O(x) = zeta(s) / sum_{k>=0} a_k f^k  (p.16).  So zeta(s)
+// generates the equation group through the power series, and the "flow-in"
+// number is the f that lets a target value flow into the series.  Euler
+// continued fractions (p.13) give the same value in another equation form.
+
+#include ../../beta/lib/betalib.bada
+#include ../../discover/lib/zeta.bada
+
+// power series  sum_{k=0}^{len-1} a[k] f^k   (Horner)
+def power_series(a, f) {
+  r <- 0.0
+  k <- len(a) - 1
+  -> k >= 0 {
+    r <- r * f + a[k]
+    k <- k - 1
+  }
+  return r
+}
+
+// the operator generated from zeta:  O(x) = zeta(s) / sum a_k f^k
+def o_from_zeta(zval, a, f) {
+  s <- power_series(a, f)
+  -< fabs(s) < 0.000000000001 { return 0 }
+  return zval / s
+}
+
+// regenerate the zeta-value (equation) from the series:  zeta = O * series
+def zeta_from_series(o, a, f) {
+  return o * power_series(a, f)
+}
+
+// flow-in: scan f in [flo,fhi] for the value that makes O(x) hit `target`
+// (target = 1 means zeta(s) = sum a_k f^k flows into the equation group)
+def flow_in(zval, a, flo, fhi, steps, target) {
+  bestf <- flo
+  beste <- 1000000.0
+  besto <- 0.0
+  i <- 0
+  -> i <= steps {
+    f <- flo + (fhi - flo) * i / steps
+    o <- o_from_zeta(zval, a, f)
+    e <- fabs(o - target)
+    -< e < beste {
+      beste <- e
+      bestf <- f
+      besto <- o
+    }
+    i <- i + 1
+  }
+  return [bestf, besto, beste]
+}
+
+// generate the equation group: O(x) for each f in fs  ([f, O] pairs)
+def generate_equations(zval, a, fs) {
+  out <- []
+  i <- 0
+  -> i < len(fs) {
+    append(out, [fs[i], o_from_zeta(zval, a, fs[i])])
+    i <- i + 1
+  }
+  return out
+}
+
+// Euler continued fraction  b0 + c0/(b1 + c1/(b2 + ...))   (p.13)
+def euler_cf(b0, c, b) {
+  acc <- 0.0
+  k <- len(c) - 1
+  -> k >= 0 {
+    acc <- c[k] / (b[k] + acc)
+    k <- k - 1
+  }
+  return b0 + acc
+}

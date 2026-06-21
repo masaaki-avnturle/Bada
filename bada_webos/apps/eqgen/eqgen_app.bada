@@ -1,0 +1,40 @@
+// eqgen_app.bada — generate the equation group from Euler's zeta & beta, in Bada.
+
+#include lib/eqgen.bada
+
+say "=== equation generator from Euler zeta & beta ==="
+say "report relation: O(x) = zeta(s) / sum a_k f^k ;  Gamma = Beta = pi-operator"
+
+say "Beta operator B(2,2):"
+print beta(2, 2)
+
+z3 <- zeta(3, 2000)
+a <- [1, 1, 1, 1, 1, 1, 1, 1]
+
+o <- o_from_zeta(z3, a, 0.5)
+say "O(x) = zeta(3) / (sum a_k f^k), a_k=1, f=0.5:"
+print o
+say "inverse generation: O * series regenerates zeta(3):"
+print zeta_from_series(o, a, 0.5)
+
+fl <- flow_in(z3, a, 0.0, 0.9, 900, 1)
+say "flow-in number f making zeta(3) flow into the series (O=1) [f, O, err]:"
+print fl
+
+fs <- [0.1, 0.3, 0.5, 0.7]
+say "generated equation group from zeta(3) over f-set [f, O(x)]:"
+print generate_equations(z3, a, fs)
+
+say "beta-zeta variable regularity: s=2 <-> (p,q)=(2,2): pi^2*B(2,2) vs zeta(2):"
+print 9.869604401089358 * beta(2, 2)
+print zeta(2, 2000)
+
+say "Euler continued fraction form of an equation (b0=1, c=[1,1], b=[1,1]):"
+print euler_cf(1, [1, 1], [1, 1])
+
+Omega::DATABASE[eqgen] {
+  push(o)
+  push(fl)
+  push("zeta generates the equation group via O(x)=zeta(s)/sum a_k f^k")
+}
+say "done: zeta(s) generates the equation group; f is the flow-in number"
