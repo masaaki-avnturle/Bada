@@ -1,0 +1,37 @@
+// transport_app.bada — equation generator + manifold dictionary, in Bada.
+
+#include lib/transport.bada
+
+say "=== Integrate of theorem: zeta generates the equation group ==="
+say "report: zeta(s) = P^2n * sum a_k f^k, a_k = C(n,r) (binomial)"
+
+say "binomial series sum C(2,r) (0.5)^r = (1+0.5)^2:"
+print series_binom(2, 0.5)
+
+say "flow-in f making (1+f)^2 = zeta(3) [f, err]:"
+print flow_in(3, 2, 1500, 0.0, 1.0, 1000)
+
+say "P^2n factor from zeta(3) = P^4 * (1+0.5)^2:"
+print generate_P(3, 2, 0.5, 1500)
+
+say "AM-GM gap (a+b)/2 - sqrt(ab) for (1,4):"
+print amgm_gap(1, 4)
+
+names <- catalog_names()
+say "manifold dictionary entries:"
+print names
+disp <- []
+i <- 0
+-> i < len(names) {
+  append(disp, [names[i], displacement(names[i], 16)])
+  i <- i + 1
+}
+say "displacement per manifold:"
+print disp
+
+Omega::DATABASE[transport] {
+  push(names)
+  push(disp)
+  push("zeta(s)=P^2n*sum C(n,r) f^r; Seifert/Kaluza-Klein/critline/AM-GM/binom")
+}
+say "done: equation group generated from zeta; 5 report manifolds in dictionary"
