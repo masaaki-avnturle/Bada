@@ -389,6 +389,18 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _eqgen(self, args, stdin):
+        # generate the equation group from Euler zeta & beta (Bada).
+        import os as _os
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        from bada import run_program
+        buf = _io.StringIO()
+        with _rs(buf):
+            run_program(_os.path.join(_WEBOS, "apps", "eqgen",
+                                      "eqgen_app.bada"))
+        return buf.getvalue()
+
     def _mobius(self, args, stdin):
         # Jones-Mobius causal analyzer (Bada): are the equations Mobius eqs?
         import os as _os
@@ -424,7 +436,8 @@ class Shell:
                 "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n"
                 "  discovery:      discover [hpsi|zeta|moonshine|sqrt2]\n"
                 "  beta:           beta  (Beta factorization + zeta links)\n"
-                "  causal:         mobius  (Jones-Mobius causal analyzer)\n")
+                "  causal:         mobius  (Jones-Mobius causal analyzer)\n"
+                "  equation gen:   eqgen  (generate equations from zeta&beta)\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -434,5 +447,5 @@ class Shell:
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
-        "help": _help,
+        "eqgen": _eqgen, "help": _help,
     }
