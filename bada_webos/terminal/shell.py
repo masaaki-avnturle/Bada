@@ -217,6 +217,16 @@ class Shell:
             return f"{type(e).__name__}: {e}\n"
         return buf.getvalue()
 
+    def _check(self, args, stdin):
+        # Bada grammar checker over a VFS file.
+        from bada import lint
+        if not args:
+            return "check: usage: check FILE.bada\n"
+        ds = lint(self.vfs.read(args[0]))
+        if not ds:
+            return f"{args[0]}: OK (no syntax errors)\n"
+        return "".join(f"{args[0]}:{d}\n" for d in ds)
+
     def _vim(self, args, stdin):
         self.launch_request = LaunchRequest("vim", args[0] if args else None)
         return ""
@@ -366,7 +376,7 @@ class Shell:
         return ("BadaWebOS terminal — available apps:\n"
                 f"  {names}\n"
                 "  editors: vim FILE, emacs FILE\n"
-                "  run Bada: bada FILE.bada\n"
+                "  run Bada: bada FILE.bada   grammar check: check FILE.bada\n"
                 "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n"
                 "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
                 "  pilot/ATfield:  al [pilot|gamma|atfield]\n"
@@ -377,6 +387,6 @@ class Shell:
         "mkdir": _mkdir, "touch": _touch, "rm": _rm, "cp": _cp, "mv": _mv,
         "head": _head, "grep": _grep, "wc": _wc, "env": _env,
         "export": _export, "whoami": _whoami, "clear": _clear,
-        "bada": _bada, "vim": _vim, "emacs": _emacs, "qcrypto": _qcrypto,
-        "al": _al, "winport": _winport, "help": _help,
+        "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
+        "qcrypto": _qcrypto, "al": _al, "winport": _winport, "help": _help,
     }
