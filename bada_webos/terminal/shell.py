@@ -389,6 +389,33 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _eqvideo(self, args, stdin):
+        # equation-group 3D animation video dictionary (Bada manifolds).
+        from eqvideo import EqVideoApp, CATALOG
+        sub = args[0] if args else "list"
+        if sub == "list":
+            out = "equation-group 3D animation dictionary:\n"
+            for nm, (title, desc) in CATALOG.items():
+                out += f"  {nm:10} {title} -- {desc}\n"
+            return out
+        if sub == "view":
+            name = args[1] if len(args) > 1 else "fermat"
+            app = EqVideoApp(n=12, frames=8)
+            app.boot()
+            frames = app.ascii(name)
+            # a compact flip-book: a few frames
+            out = f"== {name} ({CATALOG[name][0]}) ==\n"
+            for idx in (0, len(frames) // 2, len(frames) - 1):
+                out += f"-- frame {idx} --\n" + frames[idx] + "\n"
+            return out
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "eqvideo.html"
+            app = EqVideoApp()
+            app.boot()
+            app.save_html(path)
+            return f"wrote animated video dictionary to {path}\n"
+        return "eqvideo: usage: eqvideo [list|view NAME|html PATH]\n"
+
     def _eqgen(self, args, stdin):
         # generate the equation group from Euler zeta & beta (Bada).
         import os as _os
@@ -437,7 +464,8 @@ class Shell:
                 "  discovery:      discover [hpsi|zeta|moonshine|sqrt2]\n"
                 "  beta:           beta  (Beta factorization + zeta links)\n"
                 "  causal:         mobius  (Jones-Mobius causal analyzer)\n"
-                "  equation gen:   eqgen  (generate equations from zeta&beta)\n")
+                "  equation gen:   eqgen  (generate equations from zeta&beta)\n"
+                "  video dict:     eqvideo [list|view NAME|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -447,5 +475,5 @@ class Shell:
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
-        "eqgen": _eqgen, "help": _help,
+        "eqgen": _eqgen, "eqvideo": _eqvideo, "help": _help,
     }
