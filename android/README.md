@@ -5,6 +5,9 @@ self-contained HTML/canvas (the Bada-computed frames are embedded as JSON), so
 they run **offline in a WebView** — no server, no network permission.
 
 Bundled apps (launcher menu = `assets/holograms/index.html`):
+- **Transparent + Japanese HHKB** — the display and Happy Hacking keyboard as
+  glass over a **camera passthrough** (see the world behind the tablet, no
+  video), with romaji→kana Japanese input
 - **Spatial Hologram** — Vision-Pro-equivalent passthrough (apps float out of the
   transparent tablet)
 - **Hologram Display** — reflection pyramid / free view
@@ -22,6 +25,8 @@ workflow) builds the APK and publishes it:
 - as a **workflow artifact** (`bada-hologram-apk`) on the Actions run.
 
 Install it on Android (enable *Install unknown apps* for your browser/files app).
+The transparent app asks for the **camera** so the world shows through the glass;
+deny it and it falls back to a soft gradient.
 
 ## Build it yourself
 ```
