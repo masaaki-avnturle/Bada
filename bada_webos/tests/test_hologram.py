@@ -15,7 +15,7 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      html_hologram, html_keyboard)
+                      GlassApp, html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -263,6 +263,43 @@ class TestSpatialVision(unittest.TestCase):
         self.assertIn("POS=", h)                         # Bada window layout
         self.assertIn("Hologram", h)                     # the display window
         self.assertIn("Terminal", h)                     # a floated tablet app
+
+
+class TestTransparentJapanese(unittest.TestCase):
+    """Transparent glass display + Japanese (romaji->kana) HHKB, no video."""
+
+    def test_romaji_to_kana(self):
+        cases = {
+            "konnichiwa": "こんにちわ", "arigatou": "ありがとう",
+            "nippon": "にっぽん", "sensei": "せんせい",
+            "kya": "きゃ", "matte": "まって", "nihongo": "にほんご",
+        }
+        for r, expect in cases.items():
+            self.assertEqual(bridge.romaji_to_kana(r), expect, r)
+
+    def test_kana_table(self):
+        t = bridge.kana_table()
+        self.assertGreater(len(t), 100)
+        self.assertEqual(t["ka"], "か")
+        self.assertEqual(t["shi"], "し")
+        self.assertEqual(t["kya"], "きゃ")
+
+    def test_glass_app_html(self):
+        app = GlassApp()
+        r = app.boot()
+        self.assertEqual(r["keys"], 60)
+        self.assertGreater(r["kana_entries"], 100)
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "g.html"))).read()
+        # transparent (glass) + camera passthrough + no embedded video frames
+        self.assertIn("getUserMedia", h)                 # see the world behind
+        self.assertIn("透過", h)                          # transparent
+        self.assertNotIn("putImageData", h)              # no video heatmap
+        # Japanese input wired in, table embedded (unescaped unicode)
+        self.assertIn("toHira", h)
+        self.assertIn("か", h)
+        self.assertIn("きゃ", h)
+        self.assertIn("Happy Hacking Keyboard", h)
 
 
 if __name__ == "__main__":
