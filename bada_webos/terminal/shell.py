@@ -407,6 +407,28 @@ class Shell:
                     f"{' (kaleidoscope fold)' if fold else ''}\n")
         return "topdown: usage: topdown [list|html PATH [fold]]\n"
 
+    def _hologram(self, args, stdin):
+        # project the equation-group videos onto a Hologram Display
+        # (four-mirror reflection pyramid + Bada beta(p,q) light field).
+        from hologram import HologramApp
+        sub = args[0] if args else "list"
+        app = HologramApp()
+        if sub == "list":
+            r = app.boot()
+            return ("Hologram Display:\n"
+                    f"  projecting {r['n_sources']} equation-group videos\n"
+                    f"  {r['sources']}\n"
+                    f"  mirrors: {r['mirrors']}\n"
+                    f"  light field: {r['light']}\n")
+        if sub == "html":
+            app.boot()
+            path = args[1] if len(args) > 1 else "hologram.html"
+            free = len(args) > 2 and args[2] == "free"
+            app.save_html(path, free)
+            return (f"wrote hologram display to {path}"
+                    f"{' (free view)' if free else ' (reflection pyramid)'}\n")
+        return "hologram: usage: hologram [list|html PATH [free]]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -583,7 +605,8 @@ class Shell:
                 "  kaleidoscope:   kaleido [list|html PATH [segments]]\n"
                 "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n"
                 "  slideshow:      slideshow [list|html PATH]\n"
-                "  2D top-down:    topdown [list|html PATH [fold]]\n")
+                "  2D top-down:    topdown [list|html PATH [fold]]\n"
+                "  hologram:       hologram [list|html PATH [free]]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -595,5 +618,6 @@ class Shell:
         "discover": _discover, "beta": _beta, "mobius": _mobius,
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
         "kaleido": _kaleido, "superpose": _superpose,
-        "slideshow": _slideshow, "topdown": _topdown, "help": _help,
+        "slideshow": _slideshow, "topdown": _topdown,
+        "hologram": _hologram, "help": _help,
     }
