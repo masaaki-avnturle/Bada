@@ -379,13 +379,26 @@ class Shell:
         from contextlib import redirect_stdout as _rs
         sub = args[0] if args else "zeta"
         app = {"hpsi": "hpsi_app.bada", "zeta": "zeta_app.bada",
-               "moonshine": "moonshine_app.bada"}.get(sub)
+               "moonshine": "moonshine_app.bada",
+               "sqrt2": "sqrt2_app.bada"}.get(sub)
         if app is None:
-            return "discover: usage: discover [hpsi|zeta|moonshine]\n"
+            return "discover: usage: discover [hpsi|zeta|moonshine|sqrt2]\n"
         path = _os.path.join(_WEBOS, "apps", "discover", app)
         buf = _io.StringIO()
         with _rs(buf):
             run_program(path)
+        return buf.getvalue()
+
+    def _mobius(self, args, stdin):
+        # Jones-Mobius causal analyzer (Bada): are the equations Mobius eqs?
+        import os as _os
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        from bada import run_program
+        buf = _io.StringIO()
+        with _rs(buf):
+            run_program(_os.path.join(_WEBOS, "apps", "jonesmobius",
+                                      "jonesmobius_app.bada"))
         return buf.getvalue()
 
     def _beta(self, args, stdin):
@@ -409,8 +422,9 @@ class Shell:
                 "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
                 "  pilot/ATfield:  al [pilot|gamma|atfield]\n"
                 "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n"
-                "  discovery:      discover [hpsi|zeta|moonshine]\n"
-                "  beta:           beta  (Beta factorization + zeta links)\n")
+                "  discovery:      discover [hpsi|zeta|moonshine|sqrt2]\n"
+                "  beta:           beta  (Beta factorization + zeta links)\n"
+                "  causal:         mobius  (Jones-Mobius causal analyzer)\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -419,5 +433,6 @@ class Shell:
         "export": _export, "whoami": _whoami, "clear": _clear,
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
-        "discover": _discover, "beta": _beta, "help": _help,
+        "discover": _discover, "beta": _beta, "mobius": _mobius,
+        "help": _help,
     }
