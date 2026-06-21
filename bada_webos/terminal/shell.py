@@ -389,6 +389,42 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _transport(self, args, stdin):
+        # Integrate-of-theorem: binomial equation generator + manifold video.
+        from transport import TransportApp, CATALOG
+        sub = args[0] if args else "gen"
+        if sub == "gen":
+            import os as _os
+            import io as _io
+            from contextlib import redirect_stdout as _rs
+            from bada import run_program
+            buf = _io.StringIO()
+            with _rs(buf):
+                run_program(_os.path.join(_WEBOS, "apps", "transport",
+                                          "transport_app.bada"))
+            return buf.getvalue()
+        if sub == "list":
+            out = "Integrate-of-theorem manifold dictionary:\n"
+            for nm, (title, desc) in CATALOG.items():
+                out += f"  {nm:9} {title} -- {desc}\n"
+            return out
+        if sub == "view":
+            name = args[1] if len(args) > 1 else "seifert"
+            app = TransportApp(n=12, frames=8)
+            app.boot()
+            fr = app.ascii(name)
+            out = f"== {name} ({CATALOG[name][0]}) ==\n"
+            for idx in (0, len(fr) // 2, len(fr) - 1):
+                out += f"-- frame {idx} --\n" + fr[idx] + "\n"
+            return out
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "transport.html"
+            app = TransportApp()
+            app.boot()
+            app.save_html(path)
+            return f"wrote transport video dictionary to {path}\n"
+        return "transport: usage: transport [gen|list|view NAME|html PATH]\n"
+
     def _eqvideo(self, args, stdin):
         # equation-group 3D animation video dictionary (Bada manifolds).
         from eqvideo import EqVideoApp, CATALOG
@@ -465,7 +501,8 @@ class Shell:
                 "  beta:           beta  (Beta factorization + zeta links)\n"
                 "  causal:         mobius  (Jones-Mobius causal analyzer)\n"
                 "  equation gen:   eqgen  (generate equations from zeta&beta)\n"
-                "  video dict:     eqvideo [list|view NAME|html PATH]\n")
+                "  video dict:     eqvideo [list|view NAME|html PATH]\n"
+                "  transport:      transport [gen|list|view NAME|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -475,5 +512,6 @@ class Shell:
         "bada": _bada, "check": _check, "vim": _vim, "emacs": _emacs,
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
-        "eqgen": _eqgen, "eqvideo": _eqvideo, "help": _help,
+        "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
+        "help": _help,
     }
