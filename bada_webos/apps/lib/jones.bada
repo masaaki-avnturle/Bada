@@ -14,7 +14,7 @@ def uf_fresh(parent) {
 }
 
 def uf_find(parent, x) {
-  while parent[x] != x {
+  -> parent[x] != x {
     parent[x] <- parent[parent[x]]
     x <- parent[x]
   }
@@ -24,14 +24,14 @@ def uf_find(parent, x) {
 def uf_union(parent, a, b) {
   ra <- uf_find(parent, a)
   rb <- uf_find(parent, b)
-  if ra != rb { parent[ra] <- rb }
+  -< ra != rb { parent[ra] <- rb }
   return 0
 }
 
 def zeros(k) {
   z <- []
   i <- 0
-  while i < k {
+  -> i < k {
     append(z, 0)
     i <- i + 1
   }
@@ -43,9 +43,9 @@ def uf_components(parent) {
   seen <- zeros(len(parent))
   count <- 0
   i <- 0
-  while i < len(parent) {
+  -> i < len(parent) {
     r <- uf_find(parent, i)
-    if seen[r] == 0 {
+    -< seen[r] <-> 0 {
       seen[r] <- 1
       count <- count + 1
     }
@@ -58,9 +58,9 @@ def uf_components(parent) {
 def nstrands(braid) {
   m <- 0
   i <- 0
-  while i < len(braid) {
+  -> i < len(braid) {
     a <- abs(braid[i])
-    if a > m { m <- a }
+    -< a > m { m <- a }
     i <- i + 1
   }
   return m + 1
@@ -74,12 +74,12 @@ def kauffman(braid, n) {
   d <- [[2, -1], [-2, -1]]          // loop value  d = -A^2 - A^-2
 
   s <- 0
-  while s < states {
+  -> s < states {
     parent <- []
     bottom <- []
     cur <- []
     i <- 0
-    while i < n {
+    -> i < n {
       id <- uf_fresh(parent)
       append(bottom, id)
       append(cur, id)
@@ -88,23 +88,23 @@ def kauffman(braid, n) {
 
     a_exp <- 0
     k <- 0
-    while k < c {
+    -> k < c {
       g <- braid[k]
       pos <- abs(g)
       aa <- pos - 1
       bb <- pos
       choice <- imod(idiv(s, pow2(k)), 2)        // 0 = A-smoothing, 1 = B
-      if choice == 0 { a_exp <- a_exp + 1 } else { a_exp <- a_exp - 1 }
+      -< choice <-> 0 { a_exp <- a_exp + 1 } >- { a_exp <- a_exp - 1 }
 
       // which smoothing is the e_i (cup-cap)?
       is_e <- 0
-      if g > 0 {
-        if choice == 1 { is_e <- 1 }
-      } else {
-        if choice == 0 { is_e <- 1 }
+      -< g > 0 {
+        -< choice <-> 1 { is_e <- 1 }
+      } >- {
+        -< choice <-> 0 { is_e <- 1 }
       }
 
-      if is_e == 1 {
+      -< is_e <-> 1 {
         uf_union(parent, cur[aa], cur[bb])
         na <- uf_fresh(parent)
         nb <- uf_fresh(parent)
@@ -117,7 +117,7 @@ def kauffman(braid, n) {
 
     // close the braid: top of strand i joins its bottom
     i <- 0
-    while i < n {
+    -> i < n {
       uf_union(parent, cur[i], bottom[i])
       i <- i + 1
     }
@@ -133,8 +133,8 @@ def kauffman(braid, n) {
 def writhe(braid) {
   w <- 0
   i <- 0
-  while i < len(braid) {
-    if braid[i] > 0 { w <- w + 1 } else { w <- w - 1 }
+  -> i < len(braid) {
+    -< braid[i] > 0 { w <- w + 1 } >- { w <- w - 1 }
     i <- i + 1
   }
   return w
@@ -145,7 +145,7 @@ def normalized(braid, n) {
   br <- kauffman(braid, n)
   w <- writhe(braid)
   signv <- 1
-  if imod(abs(w), 2) == 1 { signv <- -1 }
+  -< imod(abs(w), 2) <-> 1 { signv <- -1 }
   factor <- [[0 - 3 * w, signv]]
   return lt_mul(factor, br)
 }
@@ -155,7 +155,7 @@ def jones_t(braid, n) {
   x <- normalized(braid, n)
   out <- []
   i <- 0
-  while i < len(x) {
+  -> i < len(x) {
     e <- x[i][0]
     append(out, [idiv(0 - e, 4), x[i][1]])
     i <- i + 1
@@ -168,10 +168,10 @@ def jones_show(braid, n) {
   v <- jones_t(braid, n)
   line <- ""
   i <- 0
-  while i < len(v) {
+  -> i < len(v) {
     c <- v[i][1]
     sign <- "+"
-    if c < 0 { sign <- "" }
+    -< c < 0 { sign <- "" }
     line <- line + sign + c + "*t^" + v[i][0] + " "
     i <- i + 1
   }
