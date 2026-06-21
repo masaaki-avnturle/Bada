@@ -314,6 +314,53 @@ class Shell:
                 f"  Lambda cooling   : maxT {r['cooling_maxT']:.1f}, "
                 f"meltdown {'YES' if r['meltdown'] else 'no'}\n")
 
+    def _winport(self, args, stdin):
+        # WinPort: Rails-in-Bada, Win10/11 reviser port to quantum, VM bridge.
+        sub = args[0] if args else "boot"
+        if sub == "rails":
+            from winport.rails_bada import generate_rails
+            name = args[1] if len(args) > 1 else "Article"
+            return generate_rails(name, args[2:] or ["title", "body"])
+        if sub == "win11":
+            from winport.reviser_rules import WindowsReviser
+            from winport.quantum_port import WIN10_FEATURES
+            rev = WindowsReviser()
+            out = ""
+            for n, s in WIN10_FEATURES.items():
+                out += f"{n}: {rev.to_win11(s)}\n"
+            return out
+        if sub == "port":
+            from winport.quantum_port import port_all
+            out = ""
+            for p in port_all():
+                out += (f"{p['feature']}: {p['quantum']}  "
+                        f"[Shor-9 {'ok' if p['qec_ok'] else 'FAIL'}]\n")
+            return out
+        if sub == "bridge":
+            from winport.vm_bridge import VMBridge
+            b = VMBridge().migrate(4)
+            return (f"VM bridge {b['path']}\n"
+                    f"delivered to quantum: {b['delivered']} "
+                    f"(strength {b['delivered_strength']})\n")
+        # default: boot summary
+        from winport import WinPortApp
+        import io as _io
+        from contextlib import redirect_stdout as _rs
+        buf = _io.StringIO()
+        with _rs(buf):
+            r = WinPortApp().boot()
+        cp = r["control_panel"]
+        return ("WinPort :: Windows -> quantum\n"
+                f"  Rails (Bada)   : {r['rails_lines']} lines "
+                f"({'ok' if r['rails_ok'] else 'FAIL'})\n"
+                f"  Win10->Win11   : {r['win11_changes']} tokens rewritten\n"
+                f"  control panel  : {cp['symlinks']} symlinks, "
+                f"{cp['hardlinks']} hardlinks (inode shared "
+                f"{cp['hardlinks_share_inode']})\n"
+                f"  quantum port   : Shor-9 {'ok' if r['qec_ok'] else 'FAIL'}\n"
+                f"  VM bridge      : delivered "
+                f"{r['vm_bridge']['delivered']}\n")
+
     def _help(self, args, stdin):
         names = " ".join(sorted(self.BUILTINS))
         return ("BadaWebOS terminal — available apps:\n"
@@ -322,7 +369,8 @@ class Shell:
                 "  run Bada: bada FILE.bada\n"
                 "  quantum crypto: qcrypto [demo|jones N...|badajones N...]\n"
                 "  Laevatein AI:   al [boot|grover|cool|mind|robot|gen]\n"
-                "  pilot/ATfield:  al [pilot|gamma|atfield]\n")
+                "  pilot/ATfield:  al [pilot|gamma|atfield]\n"
+                "  Windows->QC:    winport [boot|rails|win11|port|bridge]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -330,5 +378,5 @@ class Shell:
         "head": _head, "grep": _grep, "wc": _wc, "env": _env,
         "export": _export, "whoami": _whoami, "clear": _clear,
         "bada": _bada, "vim": _vim, "emacs": _emacs, "qcrypto": _qcrypto,
-        "al": _al, "help": _help,
+        "al": _al, "winport": _winport, "help": _help,
     }

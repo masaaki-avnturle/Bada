@@ -40,6 +40,7 @@ from android.installer import Android12Installer, AndroidManifest  # noqa
 from terminal import Terminal                                  # noqa: E402
 from qcrypto import QuantumCryptoApp                            # noqa: E402
 from al import AlOS                                             # noqa: E402
+from winport import WinPortApp                                  # noqa: E402
 from render.desktop import render_desktop                      # noqa: E402
 
 _APP_DIR = os.path.join(_HERE, "apps")
@@ -63,6 +64,7 @@ class BadaWebOS:
         self.terminal = Terminal()
         self.qcrypto = QuantumCryptoApp()
         self.al = AlOS()
+        self.winport = WinPortApp()
 
     # ----------------------------------------------------------------
     def boot(self) -> dict:
@@ -118,6 +120,13 @@ class BadaWebOS:
         w_al = self.wm.new_window("AL — Laevatein AI OS", 300, 200, 500, 270)
         self.window_content[w_al.wid] = self.al.render_html()
 
+        # 5e. WinPort — Rails-in-Bada, reviser port of Windows to the quantum
+        #     computer, symlink/hardlink control panel, VM bridge + repeater
+        wp_report = self.winport.boot()
+        w_wp = self.wm.new_window("WinPort — VM Bridge → Quantum",
+                                  150, 120, 520, 280)
+        self.window_content[w_wp.wid] = self.winport.render_html()
+
         # 6. Android 12 app installed + launched onto screen 2
         manifest = AndroidManifest(
             package="com.bada.notes", label="Bada Notes",
@@ -154,6 +163,13 @@ class BadaWebOS:
                 "at_field": al_report["at_field"],
                 "anti_gravity": al_report["anti_gravity"],
                 "haloperidol": al_report["haloperidol"],
+            },
+            "winport": {
+                "rails_ok": wp_report["rails_ok"],
+                "win11_changes": wp_report["win11_changes"],
+                "control_panel": wp_report["control_panel"],
+                "qec_ok": wp_report["qec_ok"],
+                "vm_delivered": wp_report["vm_bridge"]["delivered"],
             },
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
@@ -253,4 +269,9 @@ if __name__ == "__main__":
           f"AT={report['al']['at_field']:.2f} "
           f"anti-gravity={report['al']['anti_gravity']:.2f} "
           f"haloperidol={report['al']['haloperidol']:.2f}")
+    wp = report['winport']
+    print(f"  WinPort: rails_ok={wp['rails_ok']} "
+          f"win11_changes={wp['win11_changes']} "
+          f"symlinks={wp['control_panel']['symlinks']} "
+          f"qec_ok={wp['qec_ok']} vm_delivered={wp['vm_delivered']}")
     print(f"  desktop written to {out}")
