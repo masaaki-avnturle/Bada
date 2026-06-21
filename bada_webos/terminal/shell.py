@@ -389,6 +389,23 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _slideshow(self, args, stdin):
+        # all equation-group graphs as a PowerPoint-style flash slideshow.
+        from slideshow import SlideshowApp
+        sub = args[0] if args else "list"
+        app = SlideshowApp()
+        if sub == "list":
+            r = app.boot()
+            return (f"slideshow of {r['n_slides']} equation-group graphs:\n"
+                    f"  {r['slides']}\n"
+                    f"  flash effects: {r['effects']}\n")
+        if sub == "html":
+            app.boot()
+            path = args[1] if len(args) > 1 else "slideshow.html"
+            app.save_html(path)
+            return f"wrote equation-group slideshow to {path}\n"
+        return "slideshow: usage: slideshow [list|html PATH]\n"
+
     def _superpose(self, args, stdin):
         # overlay all the manifold animations into one combined video.
         from superpose import SuperposeApp
@@ -546,7 +563,8 @@ class Shell:
                 "  video dict:     eqvideo [list|view NAME|html PATH]\n"
                 "  transport:      transport [gen|list|view NAME|html PATH]\n"
                 "  kaleidoscope:   kaleido [list|html PATH [segments]]\n"
-                "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n")
+                "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n"
+                "  slideshow:      slideshow [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -557,5 +575,6 @@ class Shell:
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
-        "kaleido": _kaleido, "superpose": _superpose, "help": _help,
+        "kaleido": _kaleido, "superpose": _superpose,
+        "slideshow": _slideshow, "help": _help,
     }

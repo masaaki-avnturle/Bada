@@ -1,0 +1,54 @@
+// reports.bada — extra equation-group surfaces from the report corpus, in Bada.
+//   caustic   : cusp-catastrophe surface (caostics.pdf)
+//   dalembert : d'Alembertian wave  []psi = 0  (zeta_dalanversian.pdf)
+
+def two_pi() { return 6.283185307179586 }
+def fabs(v) { -< v < 0 { return 0 - v }  return v }
+def fpow(b, n) { r <- 1.0  k <- 0  -> k < n { r <- r * b  k <- k + 1 } return r }
+def fsin(theta) {
+  tp <- 6.283185307179586  pi <- 3.141592653589793
+  m <- idiv(theta / tp, 1)  x <- theta - m * tp
+  -> x > pi { x <- x - tp }
+  -> x < 0 - pi { x <- x + tp }
+  x2 <- x * x  term <- x  sum <- x  n <- 1
+  -> n < 8 { d <- (2 * n) * (2 * n + 1)  term <- 0 - term * x2 / d
+    sum <- sum + term  n <- n + 1 }
+  return sum
+}
+def fcos(theta) { return fsin(theta + 1.5707963267948966) }
+
+// cusp catastrophe: V(x) = x^4 - a x^2 + b ; control a sweeps double->single well
+def surf_caustic(x, y, t) {
+  a <- 1.6 - 1.6 * t
+  return fpow(x, 4) - a * x * x + 0.4 * y
+}
+
+// d'Alembert solution: standing wave = left- + right-travelling waves
+def surf_dalembert(x, y, t) {
+  pi <- 3.141592653589793
+  w <- fsin(pi * x - two_pi() * t) + fsin(pi * x + two_pi() * t)
+  return w * fcos(1.5707963267948966 * y)
+}
+
+def surf(name, x, y, t) {
+  -< name <-> "caustic"   { return surf_caustic(x, y, t) }
+  -< name <-> "dalembert" { return surf_dalembert(x, y, t) }
+  return 0
+}
+
+def catalog_names() { return ["caustic", "dalembert"] }
+
+def frame_flat(name, n, t) {
+  out <- []  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      x <- 0 - 1 + 2.0 * i / (n - 1)
+      y <- 0 - 1 + 2.0 * j / (n - 1)
+      append(out, surf(name, x, y, t))
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
