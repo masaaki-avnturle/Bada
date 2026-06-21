@@ -389,6 +389,26 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _kaleido(self, args, stdin):
+        # top-down kaleidoscope of the equation-group manifold animations.
+        from kaleido import KaleidoApp
+        from eqvideo.render import CATALOG as EVC
+        from transport.app import CATALOG as TRC
+        sub = args[0] if args else "list"
+        if sub == "list":
+            out = "kaleidoscope sources (top-down manifold animations):\n"
+            for nm, (title, _) in {**EVC, **TRC}.items():
+                out += f"  {nm:9} {title}\n"
+            return out
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "kaleido.html"
+            seg = int(args[2]) if len(args) > 2 else 8
+            app = KaleidoApp()
+            app.boot()
+            app.save_html(path, seg)
+            return f"wrote kaleidoscope to {path} ({seg} segments)\n"
+        return "kaleido: usage: kaleido [list|html PATH [segments]]\n"
+
     def _transport(self, args, stdin):
         # Integrate-of-theorem: binomial equation generator + manifold video.
         from transport import TransportApp, CATALOG
@@ -502,7 +522,8 @@ class Shell:
                 "  causal:         mobius  (Jones-Mobius causal analyzer)\n"
                 "  equation gen:   eqgen  (generate equations from zeta&beta)\n"
                 "  video dict:     eqvideo [list|view NAME|html PATH]\n"
-                "  transport:      transport [gen|list|view NAME|html PATH]\n")
+                "  transport:      transport [gen|list|view NAME|html PATH]\n"
+                "  kaleidoscope:   kaleido [list|html PATH [segments]]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -513,5 +534,5 @@ class Shell:
         "qcrypto": _qcrypto, "al": _al, "winport": _winport,
         "discover": _discover, "beta": _beta, "mobius": _mobius,
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
-        "help": _help,
+        "kaleido": _kaleido, "help": _help,
     }
