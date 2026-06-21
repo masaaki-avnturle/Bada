@@ -389,6 +389,24 @@ class Shell:
             run_program(path)
         return buf.getvalue()
 
+    def _topdown(self, args, stdin):
+        # each equation group's domain as a flat 2D top-down video.
+        from topdown import TopDownApp
+        sub = args[0] if args else "list"
+        app = TopDownApp()
+        if sub == "list":
+            r = app.boot()
+            return (f"2D top-down domains of {r['n_domains']} equation "
+                    f"groups:\n  {r['domains']}\n")
+        if sub == "html":
+            app.boot()
+            path = args[1] if len(args) > 1 else "topdown.html"
+            fold = len(args) > 2 and args[2] == "fold"
+            app.save_html(path, fold)
+            return (f"wrote 2D top-down domain video to {path}"
+                    f"{' (kaleidoscope fold)' if fold else ''}\n")
+        return "topdown: usage: topdown [list|html PATH [fold]]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -564,7 +582,8 @@ class Shell:
                 "  transport:      transport [gen|list|view NAME|html PATH]\n"
                 "  kaleidoscope:   kaleido [list|html PATH [segments]]\n"
                 "  superpose all:  superpose [stats|html PATH|kaleido PATH]\n"
-                "  slideshow:      slideshow [list|html PATH]\n")
+                "  slideshow:      slideshow [list|html PATH]\n"
+                "  2D top-down:    topdown [list|html PATH [fold]]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -576,5 +595,5 @@ class Shell:
         "discover": _discover, "beta": _beta, "mobius": _mobius,
         "eqgen": _eqgen, "eqvideo": _eqvideo, "transport": _transport,
         "kaleido": _kaleido, "superpose": _superpose,
-        "slideshow": _slideshow, "help": _help,
+        "slideshow": _slideshow, "topdown": _topdown, "help": _help,
     }
