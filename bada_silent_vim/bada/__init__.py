@@ -13,9 +13,11 @@ from .parser import parse
 from .compiler import compile_source, disassemble
 from .vm import BadaVM, run_source, to_text
 from .loader import load_program, run_program
+from .reviser import revise, revise_file
 
 __all__ = [
     "tokenize", "parse", "compile_source", "disassemble",
     "BadaVM", "run_source", "to_text",
     "load_program", "run_program",
+    "revise", "revise_file",
 ]

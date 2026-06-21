@@ -15,18 +15,18 @@ def cooling_sim(steps, q_in, supercool) {
   meltdown <- 0
 
   i <- 0
-  while i < steps {
+  -> i < steps {
     // feedback: open the coolant valve when above set-point, close below
-    if t > setp { flow <- flow + 0.05 } else { flow <- flow - 0.03 }
-    if flow < 0 { flow <- 0 }
-    if flow > 1 { flow <- 1 }
+    -< t > setp { flow <- flow + 0.05 } >- { flow <- flow - 0.03 }
+    -< flow < 0 { flow <- 0 }
+    -< flow > 1 { flow <- 1 }
 
     // anti-gravity supercooled-metal cooling power
     cool <- flow * (0.3 + supercool) * (t - tcool) * 0.05
     t <- t + q_in * 0.05 - cool
 
-    if t > maxt { maxt <- t }
-    if t > crit { meltdown <- 1 }
+    -< t > maxt { maxt <- t }
+    -< t > crit { meltdown <- 1 }
     i <- i + 1
   }
   return [maxt, t, meltdown]

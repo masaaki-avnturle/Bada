@@ -32,8 +32,9 @@ KEYWORDS = {
 
 # Multi-character operators, longest first so the scanner is greedy.
 OPERATORS = [
+    "<->",         # comparison object  (instruction-oriented dialect: ==)
     "::",          # namespace
-    "<-", "-<", ">-", ">>", "=>",   # the five Bada manifold operators
+    "<-", "-<", "->", ">-", ">>", "=>",   # Bada manifold / directive operators
     "==", "!=", "<=", ">=",
     "+", "-", "*", "/", "%",
     "<", ">", "=",

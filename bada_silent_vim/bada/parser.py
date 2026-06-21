@@ -40,7 +40,7 @@ class ParseError(SyntaxError):
 
 
 PIPE_OPS = {">>", "=>", ">-", "-<"}
-CMP_OPS = {"==", "!=", "<", ">", "<=", ">="}
+CMP_OPS = {"==", "!=", "<", ">", "<=", ">=", "<->"}
 
 
 class Parser:
@@ -118,6 +118,15 @@ class Parser:
             count = self.expr()
             body = self.block()
             return ("repeat", count, body)
+
+        # instruction-oriented dialect: branch (-<) and transition (->)
+        if t.kind == "OP" and t.value == "-<":
+            return self.branch_stmt()
+        if t.kind == "OP" and t.value == "->":
+            self.eat("OP", "->")
+            cond = self.expr()
+            body = self.block()
+            return ("while", cond, body)
 
         # assignment to an lvalue (a variable or an indexed element).
         # `<-` and `=` are assignment-only (never expression operators), so a
@@ -199,6 +208,17 @@ class Parser:
             else_block = self.block()
         return ("if", cond, then_block, else_block)
 
+    def branch_stmt(self):
+        # -< cond { ... }  [ >- { ... } ]    (branch object / merge object)
+        self.eat("OP", "-<")
+        cond = self.expr()
+        then_block = self.block()
+        else_block = None
+        if self.at("OP", ">-"):
+            self.eat("OP", ">-")
+            else_block = self.block()
+        return ("if", cond, then_block, else_block)
+
     def block(self):
         self.eat("OP", "{")
         stmts = []
@@ -214,6 +234,11 @@ class Parser:
     def pipe(self):
         node = self.compare()
         while self.cur.kind == "OP" and self.cur.value in PIPE_OPS:
+            # `-<` and `>-` double as the branch/merge directive objects.
+            # A pipe operator that begins a new line is a statement directive,
+            # not an expression continuation, so stop here.
+            if self.cur.line != self.toks[self.pos - 1].line:
+                break
             op = self.eat("OP").value
             rhs = self.compare()
             node = ("bin", op, node, rhs)
@@ -223,6 +248,8 @@ class Parser:
         node = self.add()
         while self.cur.kind == "OP" and self.cur.value in CMP_OPS:
             op = self.eat("OP").value
+            if op == "<->":          # comparison object == equality
+                op = "=="
             rhs = self.add()
             node = ("bin", op, node, rhs)
         return node

@@ -55,6 +55,38 @@ A full worked example is the **Jones polynomial implemented in Bada** at
 `../bada_webos/apps/lib/{laurent,jones}.bada` (Laurent-polynomial algebra +
 the Kauffman-bracket state sum), verified against a reference implementation.
 
+**Instruction-oriented ("directive object") dialect.** Control flow can be
+written as directive objects instead of keywords:
+
+| directive object | meaning | classic |
+|:--|:--|:--|
+| `<-` | assignment object | `=` |
+| `<->` | comparison object | `==` |
+| `-<` | branch object | `if` |
+| `>-` | merge object | `else` |
+| `->` | transition object | `while` |
+
+```
+-< x * y <-> 42 {          // if x*y == 42
+  say "branch-merge works"
+} >- {                     // else
+  say "no"
+}
+-> n > 0 { n <- n - 1 }    // while n > 0
+```
+(`-<` / `>-` keep their expression meanings — manifold spawn / emit — within a
+line; a pipe operator that *begins a line* is a directive.) Both dialects run.
+
+**The reviser** rewrites classic Bada into this dialect, preserving comments,
+strings and layout, and provably semantics-preserving (same bytecode):
+```bash
+python3 -m bada.reviser FILE.bada            # print revised
+python3 -m bada.reviser --write FILE.bada    # rewrite in place
+python3 -m bada.reviser --check FILE.bada    # verify equivalence
+```
+All of `../bada_webos/apps/**/*.bada` are written in this dialect via the
+reviser.
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a
