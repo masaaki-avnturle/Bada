@@ -20,7 +20,8 @@ for p in (PKG, ROOT, os.path.join(ROOT, "bada_silent_vim")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
-from hologram import HologramApp, HoloKeyboardApp, MirrorApp, VisionApp  # noqa
+from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,  # noqa
+                      GlassApp)
 
 OUT = os.path.join(HERE, "app", "src", "main", "assets", "holograms")
 
@@ -37,6 +38,12 @@ def main():
     print("rendering hologram assets ...")
     h = HologramApp(n=14, frames=16)
     h.boot()
+
+    g = GlassApp()
+    g.boot()
+    emit("hologlass.html", "Transparent + Japanese HHKB",
+         "see-through display & HHKB over the camera — romaji→kana input",
+         g.save_html)
 
     v = VisionApp(n=14, frames=16)
     v.boot()

@@ -494,6 +494,24 @@ class Shell:
             return f"wrote spatial passthrough hologram to {path}\n"
         return "holovision: usage: holovision [list|html PATH]\n"
 
+    def _hologlass(self, args, stdin):
+        # fully transparent display + Japanese HHKB over camera passthrough.
+        from hologram import GlassApp
+        sub = args[0] if args else "list"
+        app = GlassApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Transparent Hologram (see-through):\n"
+                    f"  display + HHKB rendered as glass over camera passthrough\n"
+                    f"  no video — the world behind the tablet shows through\n"
+                    f"  Japanese input: {r['input']} "
+                    f"({r['kana_entries']} kana, from Bada)\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "hologlass.html"
+            app.save_html(path)
+            return f"wrote transparent JP-keyboard hologram to {path}\n"
+        return "hologlass: usage: hologlass [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -674,7 +692,8 @@ class Shell:
                 "  hologram:       hologram [list|html PATH [free|float]]\n"
                 "  holo keyboard:  holokbd [list|html PATH]\n"
                 "  mirror app:     holomirror [list|html PATH [keyboard]]\n"
-                "  spatial (VP):   holovision [list|html PATH]\n")
+                "  spatial (VP):   holovision [list|html PATH]\n"
+                "  transparent JP: hologlass [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -688,5 +707,6 @@ class Shell:
         "kaleido": _kaleido, "superpose": _superpose,
         "slideshow": _slideshow, "topdown": _topdown,
         "hologram": _hologram, "holokbd": _holokbd,
-        "holomirror": _holomirror, "holovision": _holovision, "help": _help,
+        "holomirror": _holomirror, "holovision": _holovision,
+        "hologlass": _hologlass, "help": _help,
     }

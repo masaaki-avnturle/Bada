@@ -93,8 +93,25 @@ Apple-Vision-Pro-equivalent feature.
   holographic display in the centre window), the **spatial HHKB keyboard**
   floating in front, head-parallax and gaze-to-focus on mouse move.
 
+## Transparent display + Japanese HHKB (see-through, no video)
+`hologlass` renders the holographic display **and** the Happy Hacking keyboard
+as **glass** over a **camera passthrough** background — no video content, so you
+see straight through them to the world behind the tablet, even while running.
+
+* `apps/hologram/lib/romaji_kana.bada` is the **Japanese input** for the
+  keyboard: a romaji→hiragana table + converter (gojuon, dakuten/handakuten,
+  youon, sokuon, syllabic n), e.g. `konnichiwa → こんにちわ`, `nippon → にっぽん`.
+  The table is the authoritative source (verified by tests) and is exported to
+  the renderer, which converts the romaji preedit live (hiragana / katakana
+  toggle).
+* `hologram/glass.py` + `GlassApp` draw the transparent glass display panel and
+  the glass HHKB over the rear camera (`getUserMedia`, graceful fallback to a
+  room gradient); type with the on-screen keys or a physical keyboard.
+
 ## Use
 ```
+hologlass list                 # the transparent / Japanese-input summary
+hologlass html g.html          # transparent display + JP HHKB (camera behind)
 holovision list                # the spatial passthrough summary
 holovision html v.html         # the Vision-Pro-equivalent spatial display
 hologram list                  # the videos + mirrors + light field

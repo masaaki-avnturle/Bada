@@ -1,0 +1,138 @@
+// romaji_kana.bada — Japanese input for the holographic HHKB, in Bada.
+//
+// Romaji -> hiragana conversion (the table is the authoritative source; the
+// keyboard's live preedit uses the same table exported to the renderer, and the
+// rules here are verified by tests).  Handles the gojuon + dakuten/handakuten,
+// the youon (kya / sha / cha ...), the sokuon (double consonant -> small tsu)
+// and the syllabic n.
+
+def substr(s, a, b) {
+  out <- ""
+  i <- a
+  -> i < b {
+    out <- out + s[i]
+    i <- i + 1
+  }
+  return out
+}
+
+// the romaji -> hiragana table as [romaji, kana] pairs
+def kana_pairs() {
+  return [
+    ["kya","きゃ"],["kyu","きゅ"],["kyo","きょ"],
+    ["sha","しゃ"],["shu","しゅ"],["sho","しょ"],["shi","し"],
+    ["cha","ちゃ"],["chu","ちゅ"],["cho","ちょ"],["chi","ち"],["tsu","つ"],
+    ["nya","にゃ"],["nyu","にゅ"],["nyo","にょ"],
+    ["hya","ひゃ"],["hyu","ひゅ"],["hyo","ひょ"],
+    ["mya","みゃ"],["myu","みゅ"],["myo","みょ"],
+    ["rya","りゃ"],["ryu","りゅ"],["ryo","りょ"],
+    ["gya","ぎゃ"],["gyu","ぎゅ"],["gyo","ぎょ"],
+    ["jya","じゃ"],["jyu","じゅ"],["jyo","じょ"],
+    ["bya","びゃ"],["byu","びゅ"],["byo","びょ"],
+    ["pya","ぴゃ"],["pyu","ぴゅ"],["pyo","ぴょ"],
+    ["ja","じゃ"],["ju","じゅ"],["jo","じょ"],
+    ["ka","か"],["ki","き"],["ku","く"],["ke","け"],["ko","こ"],
+    ["sa","さ"],["si","し"],["su","す"],["se","せ"],["so","そ"],
+    ["ta","た"],["ti","ち"],["tu","つ"],["te","て"],["to","と"],
+    ["na","な"],["ni","に"],["nu","ぬ"],["ne","ね"],["no","の"],
+    ["ha","は"],["hi","ひ"],["hu","ふ"],["fu","ふ"],["he","へ"],["ho","ほ"],
+    ["ma","ま"],["mi","み"],["mu","む"],["me","め"],["mo","も"],
+    ["ya","や"],["yu","ゆ"],["yo","よ"],
+    ["ra","ら"],["ri","り"],["ru","る"],["re","れ"],["ro","ろ"],
+    ["wa","わ"],["wo","を"],["wi","うぃ"],["we","うぇ"],
+    ["ga","が"],["gi","ぎ"],["gu","ぐ"],["ge","げ"],["go","ご"],
+    ["za","ざ"],["zi","じ"],["ji","じ"],["zu","ず"],["ze","ぜ"],["zo","ぞ"],
+    ["da","だ"],["di","ぢ"],["du","づ"],["de","で"],["do","ど"],
+    ["ba","ば"],["bi","び"],["bu","ぶ"],["be","べ"],["bo","ぼ"],
+    ["pa","ぱ"],["pi","ぴ"],["pu","ぷ"],["pe","ぺ"],["po","ぽ"],
+    ["a","あ"],["i","い"],["u","う"],["e","え"],["o","お"],
+    ["-","ー"]
+  ]
+}
+
+def kana_get(pairs, key) {
+  i <- 0
+  -> i < len(pairs) {
+    -< pairs[i][0] <-> key { return pairs[i][1] }
+    i <- i + 1
+  }
+  return ""
+}
+
+def is_vowel(ch) {
+  -< ch <-> "a" { return 1 }
+  -< ch <-> "i" { return 1 }
+  -< ch <-> "u" { return 1 }
+  -< ch <-> "e" { return 1 }
+  -< ch <-> "o" { return 1 }
+  return 0
+}
+
+// sokuon: a non-n consonant immediately doubled -> small tsu
+def is_sokuon(s, i) {
+  ch <- substr(s, i, i + 1)
+  -< ch <-> "n" { return 0 }
+  -< is_vowel(ch) <-> 1 { return 0 }
+  -< i + 1 >= len(s) { return 0 }
+  nx <- substr(s, i + 1, i + 2)
+  -< nx <-> ch { return 1 }
+  return 0
+}
+
+// convert a romaji string to hiragana
+def romaji_to_kana(s) {
+  pairs <- kana_pairs()
+  out <- ""
+  i <- 0
+  -> i < len(s) {
+    matched <- 0
+    L <- 3
+    -> L > 0 {
+      -< matched <-> 0 {
+        -< i + L <= len(s) {
+          sub <- substr(s, i, i + L)
+          k <- kana_get(pairs, sub)
+          -< len(k) > 0 {
+            out <- out + k
+            i <- i + L
+            matched <- 1
+          }
+        }
+      }
+      L <- L - 1
+    }
+    -< matched <-> 0 {
+      -< is_sokuon(s, i) <-> 1 {
+        out <- out + "っ"
+        i <- i + 1
+        matched <- 1
+      }
+    }
+    -< matched <-> 0 {
+      ch <- substr(s, i, i + 1)
+      -< ch <-> "n" {
+        out <- out + "ん"
+        i <- i + 1
+        matched <- 1
+      }
+    }
+    -< matched <-> 0 {
+      out <- out + substr(s, i, i + 1)
+      i <- i + 1
+    }
+  }
+  return out
+}
+
+// dump the table as  romaji<TAB>kana  lines (for the renderer to embed)
+def kana_dump() {
+  pairs <- kana_pairs()
+  i <- 0
+  -> i < len(pairs) {
+    print pairs[i][0] + "\t" + pairs[i][1]
+    i <- i + 1
+  }
+  return 0
+}
+
+def kana_count() { return len(kana_pairs()) }

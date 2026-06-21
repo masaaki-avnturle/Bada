@@ -14,6 +14,7 @@ from .floatup import html_floatup
 from .keyboard import html_keyboard
 from .mirror import html_mirror
 from .spatial import html_vision
+from .glass import html_glass
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -228,6 +229,28 @@ class VisionApp:
         return html_vision(self.APPS, self.positions, self.display_frames,
                           self.light_frames, self.n, self.keys, self.kbd_width,
                           self.focus_cm, GAP_CM)
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class GlassApp:
+    """Fully transparent holographic display + Japanese HHKB over a camera
+    passthrough: no video, everything see-through to the world behind the
+    tablet.  Romaji->kana from the Bada conversion table."""
+
+    def boot(self) -> dict:
+        self.keys = bridge.hhkb_keys()
+        self.kbd_width = bridge.hhkb_width()
+        self.kana = bridge.kana_table()
+        return {"keys": len(self.keys), "kana_entries": len(self.kana),
+                "input": "romaji->kana (hiragana/katakana)",
+                "background": "camera passthrough (see-through)"}
+
+    def html(self) -> str:
+        return html_glass(self.keys, self.kbd_width, self.kana)
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:

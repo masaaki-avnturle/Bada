@@ -27,10 +27,12 @@ _LIB = os.path.join(_PKG, "apps", "hologram", "lib", "hologram.bada")
 _KBD = os.path.join(_PKG, "apps", "hologram", "lib", "keyboard.bada")
 _MIR = os.path.join(_PKG, "apps", "hologram", "lib", "mirror.bada")
 _SPA = os.path.join(_PKG, "apps", "hologram", "lib", "spatial.bada")
+_JPN = os.path.join(_PKG, "apps", "hologram", "lib", "romaji_kana.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
 _SSRC = None
+_JSRC = None
 
 
 def _run(extra: str):
@@ -189,3 +191,29 @@ def depth_scale(z: float, near: float, far: float) -> float:
 def passthrough_alpha(launch: float) -> float:
     """Tablet transparency as the display boots (1=opaque, 0.15=see-through)."""
     return float(_srun(f"print passthrough_alpha({launch})")[-1])
+
+
+# --- Japanese input for the HHKB (romaji -> kana) --------------------------
+def _jrun(extra: str):
+    global _JSRC
+    if _JSRC is None:
+        _JSRC = load_program(_JPN)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_JSRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def kana_table() -> dict:
+    """The romaji -> hiragana table (authoritative, defined in Bada)."""
+    out = {}
+    for line in _jrun("kana_dump()"):
+        if "\t" in line:
+            k, v = line.split("\t", 1)
+            out[k] = v
+    return out
+
+
+def romaji_to_kana(s: str) -> str:
+    """Convert a romaji string to hiragana (computed in Bada)."""
+    return _jrun(f'print romaji_to_kana("{s}")')[-1]
