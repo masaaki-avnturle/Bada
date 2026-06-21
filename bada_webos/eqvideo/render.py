@@ -39,12 +39,13 @@ def ascii_animation(grids: list) -> list[str]:
     return out
 
 
-def html_video(frames_by_name: dict, n: int) -> str:
+def html_video(frames_by_name: dict, n: int, catalog: dict = None) -> str:
+    catalog = catalog or CATALOG
     data = {name: [[[round(v, 3) for v in row] for row in g] for g in frames]
             for name, frames in frames_by_name.items()}
-    meta = {name: {"title": CATALOG[name][0], "desc": CATALOG[name][1]}
+    meta = {name: {"title": catalog[name][0], "desc": catalog[name][1]}
             for name in frames_by_name}
-    options = "".join(f'<option value="{nm}">{CATALOG[nm][0]}</option>'
+    options = "".join(f'<option value="{nm}">{catalog[nm][0]}</option>'
                       for nm in frames_by_name)
     data_json = json.dumps(data)
     meta_json = json.dumps(meta)
