@@ -28,11 +28,13 @@ _KBD = os.path.join(_PKG, "apps", "hologram", "lib", "keyboard.bada")
 _MIR = os.path.join(_PKG, "apps", "hologram", "lib", "mirror.bada")
 _SPA = os.path.join(_PKG, "apps", "hologram", "lib", "spatial.bada")
 _JPN = os.path.join(_PKG, "apps", "hologram", "lib", "romaji_kana.bada")
+_FRF = os.path.join(_PKG, "apps", "hologram", "lib", "freeform.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
 _SSRC = None
 _JSRC = None
+_FSRC = None
 
 
 def _run(extra: str):
@@ -217,3 +219,46 @@ def kana_table() -> dict:
 def romaji_to_kana(s: str) -> str:
     """Convert a romaji string to hiragana (computed in Bada)."""
     return _jrun(f'print romaji_to_kana("{s}")')[-1]
+
+
+# --- Freeform multi-window manager -----------------------------------------
+def _frun(extra: str):
+    global _FSRC
+    if _FSRC is None:
+        _FSRC = load_program(_FRF)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_FSRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def wm_catalog() -> list:
+    """The launchable apps as [{title, file, glyph}, ...] (from Bada)."""
+    out = []
+    for line in _frun("app_dump()"):
+        parts = line.split("\t")
+        if len(parts) == 3:
+            out.append({"title": parts[0], "file": parts[1], "glyph": parts[2]})
+    return out
+
+
+def tb_height() -> int:
+    return int(float(_frun("print tb_height()")[-1]))
+
+
+def maximize_rect(sw: int, sh: int) -> list:
+    return ast.literal_eval(_frun(f"print maximize_rect({sw}, {sh})")[-1])
+
+
+def snap_rect(side: int, sw: int, sh: int) -> list:
+    return ast.literal_eval(_frun(f"print snap_rect({side}, {sw}, {sh})")[-1])
+
+
+def cascade(n: int, sw: int, sh: int) -> list:
+    flat = ast.literal_eval(_frun(f"print cascade({n}, {sw}, {sh})")[-1])
+    return [flat[i:i + 4] for i in range(0, len(flat), 4)]
+
+
+def clamp_rect(x, y, w, h, sw, sh) -> list:
+    return ast.literal_eval(
+        _frun(f"print clamp_rect({x}, {y}, {w}, {h}, {sw}, {sh})")[-1])

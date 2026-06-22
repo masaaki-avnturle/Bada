@@ -15,6 +15,7 @@ from .keyboard import html_keyboard
 from .mirror import html_mirror
 from .spatial import html_vision
 from .glass import html_glass
+from .freeform import html_freeform
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -251,6 +252,28 @@ class GlassApp:
 
     def html(self) -> str:
         return html_glass(self.keys, self.kbd_width, self.kana)
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class FreeformApp:
+    """A Samsung-Freeform-style multi-window desktop: the tablet's apps open in
+    draggable/resizable freeform windows with close/minimize/maximize buttons
+    and a Play-Store-style taskbar (Start button + tasks + clock).  The window
+    geometry and app catalog come from Bada (apps/hologram/lib/freeform.bada)."""
+
+    def boot(self) -> dict:
+        self.catalog = bridge.wm_catalog()
+        self.tb = bridge.tb_height()
+        return {"apps": len(self.catalog), "taskbar_h": self.tb,
+                "features": "freeform windows · close/min/max · split-snap · "
+                            "Start button · taskbar"}
+
+    def html(self) -> str:
+        return html_freeform(self.catalog, self.tb)
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:

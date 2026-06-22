@@ -15,7 +15,7 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      GlassApp, html_hologram, html_keyboard)
+                      GlassApp, FreeformApp, html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -300,6 +300,51 @@ class TestTransparentJapanese(unittest.TestCase):
         self.assertIn("か", h)
         self.assertIn("きゃ", h)
         self.assertIn("Happy Hacking Keyboard", h)
+
+
+class TestFreeformWM(unittest.TestCase):
+    """Samsung-Freeform-style multi-window manager + taskbar (geometry in Bada)."""
+
+    def test_wm_geometry(self):
+        self.assertEqual(bridge.tb_height(), 56)
+        # maximize sits above the taskbar
+        self.assertEqual(bridge.maximize_rect(1200, 800), [0, 0, 1200, 744])
+        # split-snap: left + right halves tile the width
+        l = bridge.snap_rect(0, 1200, 800)
+        r = bridge.snap_rect(1, 1200, 800)
+        self.assertEqual(l, [0, 0, 600, 744])
+        self.assertEqual(r, [600, 0, 600, 744])
+        self.assertEqual(l[2] + r[2], 1200)
+        # cascade offsets successive windows
+        c = bridge.cascade(3, 1200, 800)
+        self.assertEqual(len(c), 3)
+        self.assertLess(c[0][0], c[1][0])
+        self.assertLess(c[1][1], c[2][1])
+        # clamp keeps an off-screen window reachable
+        cl = bridge.clamp_rect(2000, 900, 480, 340, 1200, 800)
+        self.assertLessEqual(cl[0], 1200 - 80)
+
+    def test_catalog(self):
+        cat = bridge.wm_catalog()
+        self.assertGreaterEqual(len(cat), 5)
+        files = [a["file"] for a in cat]
+        self.assertIn("hologlass.html", files)       # the transparent JP app
+        self.assertIn("holovision.html", files)
+        self.assertTrue(all(a["title"] and a["glyph"] for a in cat))
+
+    def test_freeform_html(self):
+        app = FreeformApp()
+        r = app.boot()
+        self.assertEqual(r["apps"], len(bridge.wm_catalog()))
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "f.html"))).read()
+        self.assertIn("Bada Freeform", h)
+        self.assertIn('id="start"', h)              # Start button
+        self.assertIn('id="taskbar"', h)            # taskbar
+        self.assertIn("b cls", h)                   # window close button
+        self.assertIn("function snap", h)           # split-snap
+        self.assertIn("<iframe src=", h)            # windows host the real apps
+        self.assertIn("hologlass.html", h)
 
 
 if __name__ == "__main__":

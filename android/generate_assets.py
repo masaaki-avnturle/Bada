@@ -21,7 +21,7 @@ for p in (PKG, ROOT, os.path.join(ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,  # noqa
-                      GlassApp)
+                      GlassApp, FreeformApp)
 
 OUT = os.path.join(HERE, "app", "src", "main", "assets", "holograms")
 
@@ -38,6 +38,12 @@ def main():
     print("rendering hologram assets ...")
     h = HologramApp(n=14, frames=16)
     h.boot()
+
+    fw = FreeformApp()
+    fw.boot()
+    emit("freeform.html", "Freeform マルチウィンドウ",
+         "Samsung-Freeform 風のマルチウィンドウ + タスクバー（Start／終了ボタン）",
+         fw.save_html)
 
     g = GlassApp()
     g.boot()
