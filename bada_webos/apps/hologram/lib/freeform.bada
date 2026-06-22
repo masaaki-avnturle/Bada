@@ -1,0 +1,96 @@
+// freeform.bada — a Samsung-Freeform-style multi-window manager, in Bada.
+//
+// Computes the window-manager geometry and the app catalog for the freeform
+// desktop: cascade placement of new windows, maximize / split-snap rectangles
+// (Samsung freeform left|right split), on-screen clamping, and the Android /
+// Play-Store-style taskbar layout (Start button + app buttons + clock).  The
+// renderer mirrors these rules for live drag / resize.
+
+def tb_height() { return 56 }
+
+// full-screen maximize (above the taskbar)
+def maximize_rect(sw, sh) {
+  return [0, 0, sw, sh - tb_height()]
+}
+
+// Samsung-freeform split-snap: side 0 = left half, 1 = right half
+def snap_rect(side, sw, sh) {
+  half <- idiv(sw, 2)
+  -< side <-> 0 { return [0, 0, half, sh - tb_height()] }
+  return [half, 0, sw - half, sh - tb_height()]
+}
+
+// cascade placement for n freshly-opened windows: flat [x,y,w,h, x,y,w,h, ...]
+def cascade(n, sw, sh) {
+  out <- []
+  i <- 0
+  -> i < n {
+    append(out, 40 + i * 34)
+    append(out, 40 + i * 30)
+    append(out, 480)
+    append(out, 340)
+    i <- i + 1
+  }
+  return out
+}
+
+// keep a window on screen (title bar reachable, above the taskbar)
+def clamp_rect(x, y, w, h, sw, sh) {
+  maxx <- sw - 80
+  maxy <- sh - tb_height() - 36
+  -< x < 0 - w + 120 { x <- 0 - w + 120 }
+  -< y < 0 { y <- 0 }
+  -< x > maxx { x <- maxx }
+  -< y > maxy { y <- maxy }
+  return [x, y, w, h]
+}
+
+// Android/Play-Store-style taskbar layout, flat:
+//   [tb, startX,startY,startW,startH,  (app i) X,Y,W,H ...,  clockX]
+def taskbar_layout(sw, sh, n) {
+  tb <- tb_height()
+  out <- []
+  append(out, tb)
+  by <- sh - tb + 8
+  append(out, 8)
+  append(out, by)
+  append(out, 48)
+  append(out, 40)
+  bx <- 66
+  i <- 0
+  -> i < n {
+    append(out, bx)
+    append(out, by)
+    append(out, 44)
+    append(out, 40)
+    bx <- bx + 50
+    i <- i + 1
+  }
+  append(out, sw - 96)
+  return out
+}
+
+// the apps that can be launched into freeform windows
+def app_catalog() {
+  return [
+    ["透過＋日本語HHKB", "hologlass.html", "&#9000;"],
+    ["空間ホログラム",   "holovision.html", "&#128302;"],
+    ["ホログラム表示",   "hologram_pyramid.html", "&#9638;"],
+    ["フロートアップ",   "hologram_floatup.html", "&#10548;"],
+    ["HHKBキーボード",   "holokbd.html", "&#9000;"],
+    ["ミラー空中像",     "holomirror.html", "&#9707;"]
+  ]
+}
+
+def app_count() { return len(app_catalog()) }
+
+// dump catalog as  title<TAB>file<TAB>glyph  lines (for the renderer)
+def app_dump() {
+  cat <- app_catalog()
+  i <- 0
+  -> i < len(cat) {
+    print cat[i][0] + "\t" + cat[i][1] + "\t" + cat[i][2]
+    i <- i + 1
+  }
+  return 0
+}

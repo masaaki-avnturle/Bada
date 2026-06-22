@@ -512,6 +512,22 @@ class Shell:
             return f"wrote transparent JP-keyboard hologram to {path}\n"
         return "hologlass: usage: hologlass [list|html PATH]\n"
 
+    def _freeform(self, args, stdin):
+        # Samsung-Freeform-style multi-window desktop + Play-Store taskbar.
+        from hologram import FreeformApp
+        sub = args[0] if args else "list"
+        app = FreeformApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Freeform multi-window desktop:\n"
+                    f"  {r['apps']} apps · taskbar {r['taskbar_h']}px\n"
+                    f"  {r['features']}\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "freeform.html"
+            app.save_html(path)
+            return f"wrote freeform multi-window desktop to {path}\n"
+        return "freeform: usage: freeform [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -693,7 +709,8 @@ class Shell:
                 "  holo keyboard:  holokbd [list|html PATH]\n"
                 "  mirror app:     holomirror [list|html PATH [keyboard]]\n"
                 "  spatial (VP):   holovision [list|html PATH]\n"
-                "  transparent JP: hologlass [list|html PATH]\n")
+                "  transparent JP: hologlass [list|html PATH]\n"
+                "  freeform WM:    freeform [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -708,5 +725,5 @@ class Shell:
         "slideshow": _slideshow, "topdown": _topdown,
         "hologram": _hologram, "holokbd": _holokbd,
         "holomirror": _holomirror, "holovision": _holovision,
-        "hologlass": _hologlass, "help": _help,
+        "hologlass": _hologlass, "freeform": _freeform, "help": _help,
     }
