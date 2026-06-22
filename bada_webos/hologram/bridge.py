@@ -267,3 +267,17 @@ def clamp_rect(x, y, w, h, sw, sh) -> list:
 def start_sections() -> list:
     """The Start-menu section titles (installed apps + Bada apps), from Bada."""
     return [s for s in _frun("section_dump()") if s.strip()]
+
+
+def size_presets() -> list:
+    """Launch-size presets as [{label, key}, ...] (携帯型 / 中 / 大), from Bada."""
+    out = []
+    for line in _frun("preset_dump()"):
+        if "\t" in line:
+            label, key = line.split("\t", 1)
+            out.append({"label": label, "key": key})
+    return out
+
+
+def window_size(preset: str, sw: int, sh: int) -> list:
+    return ast.literal_eval(_frun(f'print window_size("{preset}", {sw}, {sh})')[-1])

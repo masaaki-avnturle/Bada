@@ -337,6 +337,18 @@ class TestFreeformWM(unittest.TestCase):
         self.assertEqual(len(secs), 2)
         self.assertIn("インストール済みアプリ", secs)   # installed device apps
 
+    def test_size_presets(self):
+        ps = bridge.size_presets()
+        self.assertEqual([p["key"] for p in ps], ["mobile", "medium", "large"])
+        self.assertEqual([p["label"] for p in ps], ["携帯型", "中", "大"])
+        mob = bridge.window_size("mobile", 1200, 800)
+        med = bridge.window_size("medium", 1200, 800)
+        lar = bridge.window_size("large", 1200, 800)
+        self.assertLess(mob[0], mob[1])              # 携帯型: tall & narrow
+        self.assertGreater(lar[0], med[0])           # 大 > 中 (width)
+        self.assertGreater(lar[1], med[1])           # 大 > 中 (height)
+        self.assertLessEqual(lar[1], 800 - 56)       # fits above the taskbar
+
     def test_freeform_html(self):
         app = FreeformApp()
         r = app.boot()
@@ -355,6 +367,10 @@ class TestFreeformWM(unittest.TestCase):
         self.assertIn("listApps", h)
         self.assertIn("launchApp", h)
         self.assertIn("インストール済みアプリ", h)
+        # launch-size selector (携帯型 / 中 / 大)
+        self.assertIn("sizeFor", h)
+        self.assertIn("launchSize", h)
+        self.assertIn("携帯型", h)
 
 
 if __name__ == "__main__":

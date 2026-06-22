@@ -269,13 +269,16 @@ class FreeformApp:
         self.catalog = bridge.wm_catalog()
         self.tb = bridge.tb_height()
         self.sections = bridge.start_sections()
+        self.sizes = bridge.size_presets()
         return {"apps": len(self.catalog), "taskbar_h": self.tb,
                 "sections": self.sections,
+                "sizes": [s["label"] for s in self.sizes],
                 "features": "freeform windows · close/min/max · split-snap · "
-                            "Start button (installed + Bada apps) · taskbar"}
+                            "size presets (携帯型/中/大) · Start button "
+                            "(installed + Bada apps) · taskbar"}
 
     def html(self) -> str:
-        return html_freeform(self.catalog, self.tb, self.sections)
+        return html_freeform(self.catalog, self.tb, self.sections, self.sizes)
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:
