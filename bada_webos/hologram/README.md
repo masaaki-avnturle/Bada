@@ -108,8 +108,25 @@ see straight through them to the world behind the tablet, even while running.
   the glass HHKB over the rear camera (`getUserMedia`, graceful fallback to a
   room gradient); type with the on-screen keys or a physical keyboard.
 
+## Freeform multi-window desktop (Samsung-Freeform style)
+`freeform` is a multi-window desktop: the tablet's apps open in **draggable,
+resizable freeform windows** (each hosting the real bundled app in an iframe)
+with window **close / minimize / maximize** buttons and **edge split-snap**
+(left|right halves), plus a Play-Store/Android-style **taskbar** with a **Start
+button**, running-app buttons and a clock.
+
+* `apps/hologram/lib/freeform.bada` computes the window-manager geometry —
+  `maximize_rect`, `snap_rect` (split-snap), `cascade` (new-window placement),
+  `clamp_rect` (keep on screen), `taskbar_layout` — and the launchable
+  `app_catalog` (title / file / glyph). The renderer mirrors these for live
+  drag / resize.
+* `hologram/freeform.py` + `FreeformApp` render the desktop (DOM windows, pointer
+  drag/resize for mouse + touch, Start menu, taskbar, close/min/max).
+
 ## Use
 ```
+freeform list                  # the multi-window desktop summary
+freeform html f.html           # the freeform window manager + taskbar
 hologlass list                 # the transparent / Japanese-input summary
 hologlass html g.html          # transparent display + JP HHKB (camera behind)
 holovision list                # the spatial passthrough summary
