@@ -268,12 +268,14 @@ class FreeformApp:
     def boot(self) -> dict:
         self.catalog = bridge.wm_catalog()
         self.tb = bridge.tb_height()
+        self.sections = bridge.start_sections()
         return {"apps": len(self.catalog), "taskbar_h": self.tb,
+                "sections": self.sections,
                 "features": "freeform windows · close/min/max · split-snap · "
-                            "Start button · taskbar"}
+                            "Start button (installed + Bada apps) · taskbar"}
 
     def html(self) -> str:
-        return html_freeform(self.catalog, self.tb)
+        return html_freeform(self.catalog, self.tb, self.sections)
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:

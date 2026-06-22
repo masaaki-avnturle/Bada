@@ -7,7 +7,9 @@ they run **offline in a WebView** — no server, no network permission.
 Bundled apps (launcher menu = `assets/holograms/index.html`):
 - **Freeform マルチウィンドウ** — a Samsung-Freeform-style multi-window desktop
   hosting the other apps in draggable/resizable windows (close/min/max,
-  split-snap) with a Play-Store-style taskbar (Start button + tasks + clock)
+  split-snap) with a Play-Store-style taskbar (Start button + tasks + clock).
+  The **Start menu lists the device's installed apps** (via a native
+  PackageManager bridge) and launches them on tap.
 - **Transparent + Japanese HHKB** — the display and Happy Hacking keyboard as
   glass over a **camera passthrough** (see the world behind the tablet, no
   video), with romaji→kana Japanese input

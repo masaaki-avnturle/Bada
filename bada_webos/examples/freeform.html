@@ -45,14 +45,23 @@
    padding:12px;background:#08131fef;border:1px solid #24506e;border-radius:14px;
    box-shadow:0 12px 50px #000c}
  #menu h4{margin:0 0 10px;color:#6fe;font-size:13px}
- #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+ #menu{max-height:74vh;overflow:auto}
+ #installedSec{display:none;margin-bottom:14px}
+ #grid,#installed{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
  .app{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;
    border-radius:10px;cursor:pointer;background:#0d2034;border:1px solid #1c3a52}
  .app:hover{background:#143a56;border-color:#3fd9}
- .app .g{font-size:26px;color:#7fe}.app .n{font-size:11px;color:#bfe;text-align:center}
+ .app .g{font-size:26px;color:#7fe}.app .n{font-size:11px;color:#bfe;text-align:center;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:84px}
+ .app img{width:38px;height:38px;border-radius:9px}
+ #note{color:#789;font-size:11px;margin-top:8px}
 </style></head><body>
 <div id="wp"><div class="t">Bada Freeform — Start を押してアプリを開く / ウィンドウは移動・リサイズ・分割スナップ</div></div>
-<div id="menu"><h4>アプリ &#9638;</h4><div id="grid"></div></div>
+<div id="menu">
+ <div id="installedSec"><h4>"インストール済みアプリ"</h4><div id="installed"></div></div>
+ <h4>"Bada アプリ" &#9638;</h4><div id="grid"></div>
+ <div id="note"></div>
+</div>
 <div id="taskbar">
  <div id="start" title="Start">&#8862;</div>
  <div id="tasks"></div>
@@ -69,7 +78,27 @@ CATALOG.forEach((a,i)=>{const d=document.createElement('div');d.className='app';
  d.innerHTML='<div class="g">'+a.glyph+'</div><div class="n">'+a.title+'</div>';
  d.onclick=()=>{launch(i);toggleMenu(false);};grid.appendChild(d);});
 const menu=document.getElementById('menu');
-function toggleMenu(s){menu.style.display=(s===undefined?(menu.style.display==='none'?'block':'none'):(s?'block':'none'));}
+// installed device apps (via the native AndroidApps bridge in the APK)
+let installedLoaded=false;
+function loadInstalled(){ if(installedLoaded)return; installedLoaded=true;
+ const note=document.getElementById('note');
+ if(!(window.AndroidApps&&AndroidApps.listApps)){
+  note.textContent='※ 端末のインストール済みアプリは APK 版（Androidブリッジ）で表示されます。';
+  return; }
+ let apps=[];
+ try{ apps=JSON.parse(AndroidApps.listApps()); }catch(e){ note.textContent='アプリ取得エラー: '+e; return; }
+ const box=document.getElementById('installed');
+ apps.forEach(a=>{ const d=document.createElement('div'); d.className='app';
+  d.innerHTML=(a.icon?'<img src="'+a.icon+'">':'<div class="g">&#128241;</div>')
+   +'<div class="n">'+a.label+'</div>';
+  d.onclick=()=>{ try{AndroidApps.launchApp(a.pkg);}catch(e){} toggleMenu(false); };
+  box.appendChild(d); });
+ if(apps.length){ document.getElementById('installedSec').style.display='block';
+  note.textContent='端末のインストール済みアプリ '+apps.length+' 件 — タップで起動。'; }
+}
+function toggleMenu(s){const show=(s===undefined?(menu.style.display==='none'||menu.style.display===''):s);
+ if(show)loadInstalled();
+ menu.style.display=show?'block':'none';}
 document.getElementById('start').onclick=e=>{e.stopPropagation();toggleMenu();};
 document.addEventListener('pointerdown',e=>{ if(!menu.contains(e.target)&&e.target.id!=='start') toggleMenu(false); });
 
