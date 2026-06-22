@@ -50,6 +50,8 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> request.grant(request.getResources()));
             }
         });
+        // expose the device's installed apps to the Freeform Start menu
+        web.addJavascriptInterface(new AppsBridge(this), "AndroidApps");
 
         setContentView(web);
 
