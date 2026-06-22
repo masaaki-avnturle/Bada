@@ -332,6 +332,11 @@ class TestFreeformWM(unittest.TestCase):
         self.assertIn("holovision.html", files)
         self.assertTrue(all(a["title"] and a["glyph"] for a in cat))
 
+    def test_start_sections(self):
+        secs = bridge.start_sections()
+        self.assertEqual(len(secs), 2)
+        self.assertIn("インストール済みアプリ", secs)   # installed device apps
+
     def test_freeform_html(self):
         app = FreeformApp()
         r = app.boot()
@@ -345,6 +350,11 @@ class TestFreeformWM(unittest.TestCase):
         self.assertIn("function snap", h)           # split-snap
         self.assertIn("<iframe src=", h)            # windows host the real apps
         self.assertIn("hologlass.html", h)
+        # the Start menu lists the device's installed apps via the native bridge
+        self.assertIn("AndroidApps", h)
+        self.assertIn("listApps", h)
+        self.assertIn("launchApp", h)
+        self.assertIn("インストール済みアプリ", h)
 
 
 if __name__ == "__main__":

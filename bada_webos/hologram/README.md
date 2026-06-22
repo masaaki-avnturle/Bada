@@ -122,6 +122,10 @@ button**, running-app buttons and a clock.
   drag / resize.
 * `hologram/freeform.py` + `FreeformApp` render the desktop (DOM windows, pointer
   drag/resize for mouse + touch, Start menu, taskbar, close/min/max).
+* The **Start menu lists the device's installed apps** (in the APK): a native
+  `AndroidApps` bridge (PackageManager) feeds `listApps()` / `launchApp(pkg)`,
+  so installed apps appear above the bundled Bada apps and launch on tap. In a
+  plain browser (no bridge) only the bundled apps show.
 
 ## Use
 ```

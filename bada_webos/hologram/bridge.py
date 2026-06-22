@@ -262,3 +262,8 @@ def cascade(n: int, sw: int, sh: int) -> list:
 def clamp_rect(x, y, w, h, sw, sh) -> list:
     return ast.literal_eval(
         _frun(f"print clamp_rect({x}, {y}, {w}, {h}, {sw}, {sh})")[-1])
+
+
+def start_sections() -> list:
+    """The Start-menu section titles (installed apps + Bada apps), from Bada."""
+    return [s for s in _frun("section_dump()") if s.strip()]
