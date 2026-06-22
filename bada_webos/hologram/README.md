@@ -126,6 +126,9 @@ button**, running-app buttons and a clock.
   `AndroidApps` bridge (PackageManager) feeds `listApps()` / `launchApp(pkg)`,
   so installed apps appear above the bundled Bada apps and launch on tap. In a
   plain browser (no bridge) only the bundled apps show.
+* A **launch-size selector** (`size_presets` in Bada: 携帯型 / 中 / 大) picks the
+  size of the next opened window — `window_size` returns a tall narrow phone
+  window, a medium window, or a large window (mirrored in the renderer).
 
 ## Use
 ```

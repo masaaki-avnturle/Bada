@@ -12,10 +12,15 @@ from __future__ import annotations
 import json
 
 
-def html_freeform(catalog: list, tb: int, sections: list = None) -> str:
+def html_freeform(catalog: list, tb: int, sections: list = None,
+                  sizes: list = None) -> str:
     sections = sections or ["インストール済みアプリ", "Bada アプリ"]
+    sizes = sizes or [{"label": "携帯型", "key": "mobile"},
+                      {"label": "中", "key": "medium"},
+                      {"label": "大", "key": "large"}]
     return _TEMPLATE \
         .replace("__CATALOG__", json.dumps(catalog, ensure_ascii=False)) \
+        .replace("__SIZES__", json.dumps(sizes, ensure_ascii=False)) \
         .replace("__SEC_INSTALLED__", json.dumps(sections[0], ensure_ascii=False)) \
         .replace("__SEC_BUNDLED__", json.dumps(sections[-1], ensure_ascii=False)) \
         .replace("__TB__", str(tb))
@@ -78,9 +83,14 @@ _TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8">
    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:84px}
  .app img{width:38px;height:38px;border-radius:9px}
  #note{color:#789;font-size:11px;margin-top:8px}
+ #sizes{display:flex;gap:6px;align-items:center;margin-bottom:12px;font-size:12px;color:#8fd}
+ #sizes .sz{padding:4px 12px;border-radius:8px;cursor:pointer;background:#0d2034;
+   border:1px solid #1c3a52;color:#cfe}
+ #sizes .sz.sel{background:#16486a;border-color:#3fd;color:#dff}
 </style></head><body>
 <div id="wp"><div class="t">Bada Freeform — Start を押してアプリを開く / ウィンドウは移動・リサイズ・分割スナップ</div></div>
 <div id="menu">
+ <div id="sizes">ウィンドウサイズ:</div>
  <div id="installedSec"><h4>__SEC_INSTALLED__</h4><div id="installed"></div></div>
  <h4>__SEC_BUNDLED__ &#9638;</h4><div id="grid"></div>
  <div id="note"></div>
@@ -91,9 +101,23 @@ _TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8">
  <div id="clock"></div>
 </div>
 <script>
-const CATALOG=__CATALOG__, TB=__TB__;
-let z=10, wins=[], idCounter=0, dragLock=false;
+const CATALOG=__CATALOG__, SIZES=__SIZES__, TB=__TB__;
+let z=10, wins=[], idCounter=0, dragLock=false, launchSize='medium';
 const desk={get W(){return innerWidth;},get H(){return innerHeight-TB;}};
+
+// window-size presets (携帯型 / 中 / 大) — mirrors Bada window_size()
+function sizeFor(preset){const W=innerWidth, avail=innerHeight-TB;
+ if(preset==='mobile'){let h=Math.min(720,avail-20);
+  let w=Math.min(W-40,Math.floor(h*46/100));return {w,h};}
+ if(preset==='large'){return {w:Math.floor(W*7/10),h:Math.floor(avail*8/10)};}
+ return {w:Math.min(W-40,520),h:Math.min(avail-20,380)};}
+// size selector in the start menu
+const sizesBar=document.getElementById('sizes');
+SIZES.forEach(s=>{const b=document.createElement('span');b.className='sz'+(s.key===launchSize?' sel':'');
+ b.textContent=s.label;b.onclick=e=>{e.stopPropagation();launchSize=s.key;
+  for(const el of sizesBar.querySelectorAll('.sz'))el.classList.remove('sel');
+  b.classList.add('sel');};
+ sizesBar.appendChild(b);});
 
 // --- taskbar / start menu --------------------------------------------------
 const grid=document.getElementById('grid');
@@ -132,8 +156,10 @@ function clock(){const d=new Date();
 setInterval(clock,1000);clock();
 
 // --- windows ---------------------------------------------------------------
-function cascade(n){return {x:40+(n%8)*34, y:40+(n%8)*30, w:Math.min(480,innerWidth-60),
-  h:Math.min(340,desk.H-60)};}
+function placeAt(n,sz){
+ const x=Math.max(4,Math.min(40+(n%8)*30, desk.W-sz.w-8));
+ const y=Math.max(8,Math.min(40+(n%8)*26, desk.H-sz.h-8));
+ return {x,y,w:sz.w,h:sz.h};}
 function maximize(){return {x:0,y:0,w:desk.W,h:desk.H};}      // mirrors Bada maximize_rect
 function snap(side){const half=Math.floor(desk.W/2);
   return side===0?{x:0,y:0,w:half,h:desk.H}:{x:half,y:0,w:desk.W-half,h:desk.H};}
@@ -156,7 +182,7 @@ function launch(idx){
   +'<div class="body"><iframe src="'+a.file+'" allow="camera"></iframe></div>'
   +'<div class="rs"></div>';
  document.body.appendChild(el);
- const r=cascade(wins.length);
+ const r=placeAt(wins.length, sizeFor(launchSize));   // size from 携帯型/中/大
  const win={id,el,app:a,z:0,rect:r,prev:null,min:false,max:false,task:null};
  setRect(win,r); wins.push(win);
  // taskbar task button
