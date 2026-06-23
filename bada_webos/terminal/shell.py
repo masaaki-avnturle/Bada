@@ -570,6 +570,26 @@ class Shell:
             return f"wrote self-evolving quantum algorithm to {path}\n"
         return "qevolve: usage: qevolve [list|source|html PATH]\n"
 
+    def _jcrypto(self, args, stdin):
+        # quantum cryptography solved by the Jones polynomial (all in Bada).
+        from hologram import JCryptoApp
+        sub = args[0] if args else "list"
+        app = JCryptoApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Quantum crypto · Jones:\n"
+                    "  暗号 f(s)=m·π/(1−π) , π(χ,x)=Vχ(x) , 解=f(s)/π(χ,x)−f(s)\n"
+                    f"  π(χ,x)={r['pi']} · plaintext '{r['plaintext']}'\n"
+                    f"  necessary condition: correct={r['necessary_ok']} "
+                    f"wrong={r['necessary_bad']}\n"
+                    f"  pull (Omega::DATABASE): '{r['recovered']}' "
+                    f"{'OK' if r['solved_ok'] else 'FAIL'}\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "jcrypto.html"
+            app.save_html(path)
+            return f"wrote quantum-crypto (Jones) solver to {path}\n"
+        return "jcrypto: usage: jcrypto [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -754,7 +774,8 @@ class Shell:
                 "  transparent JP: hologlass [list|html PATH]\n"
                 "  freeform WM:    freeform [list|html PATH]\n"
                 "  quantum cache:  qcache [list|html PATH]\n"
-                "  q self-evolve:  qevolve [list|source|html PATH]\n")
+                "  q self-evolve:  qevolve [list|source|html PATH]\n"
+                "  q crypto·Jones: jcrypto [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -770,5 +791,6 @@ class Shell:
         "hologram": _hologram, "holokbd": _holokbd,
         "holomirror": _holomirror, "holovision": _holovision,
         "hologlass": _hologlass, "freeform": _freeform,
-        "qcache": _qcache, "qevolve": _qevolve, "help": _help,
+        "qcache": _qcache, "qevolve": _qevolve, "jcrypto": _jcrypto,
+        "help": _help,
     }

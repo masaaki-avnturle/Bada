@@ -1,0 +1,70 @@
+<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quantum Crypto · Jones — Bada</title>
+<style>
+ body{margin:0;background:#04070e;color:#cfe;font-family:monospace}
+ .bar{padding:9px 12px;background:#070c18;border-bottom:2px solid #2a8;
+   display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+ .bar b{color:#5fe;letter-spacing:1px}
+ .formula{padding:10px 14px;color:#fe7;font-size:15px;text-align:center;
+   background:#0a1322;border-bottom:1px solid #21406a}
+ .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+   gap:12px;padding:12px}
+ .card{background:#0a1322;border:1px solid #21406a;border-radius:12px;padding:12px}
+ .card h3{margin:0 0 8px;color:#6fe;font-size:13px}
+ table{width:100%;border-collapse:collapse;font-size:12px}
+ td,th{border:1px solid #1c3a52;padding:3px 6px;text-align:center}
+ th{color:#7cd}
+ .ok{color:#6f9;font-weight:bold}.bad{color:#f87;font-weight:bold}
+ .txt{font-size:20px;letter-spacing:2px}
+ .pull{background:#070d18;border:1px solid #2a8;border-radius:8px;padding:8px;
+   color:#6fe;margin-top:6px;word-break:break-all}
+ .s{color:#9ab;font-size:11px}.k{color:#fe7}
+</style></head><body>
+<div class="bar"><b>&#128273; QUANTUM CRYPTO · JONES</b>
+ <span class="s">暗号=f(s) ／ Jones=π(χ,x) ／ 解=f(s)/π(χ,x)−f(s) ／ pull＋必要条件（計算はBada）</span></div>
+<div class="formula">暗号 f(s)=m·π/(1−π) , π(χ,x)=V<sub>χ</sub>(x) ⟹
+ 解 = <span class="k">f(s) / π(χ,x) − f(s) = m</span></div>
+<div class="wrap">
+ <div class="card"><h3>鍵：Jones多項式 π(χ,x)</h3>
+   <div class="s">χ = 三葉結び目ブレイド <span id="braid"></span> ·
+     x = <span id="x"></span></div>
+   <div style="margin-top:6px">π(χ,x) = <span class="k" id="pi"></span></div>
+   <div class="s">V<sub>χ</sub>(t)=t+t³−t⁴（量子結び目不変量）</div></div>
+ <div class="card" style="grid-column:1/-1"><h3>暗号化と解読（f(s)/π−f(s)）</h3>
+   <table id="tbl"><tr><th>平文 m</th><th>文字</th><th>暗号 f(s)</th>
+     <th>f(s)/π−f(s)（正しい鍵）</th><th>誤った鍵</th></tr></table></div>
+ <div class="card"><h3>必要条件（鍵のπ一致）</h3>
+   <div style="margin-top:4px">正しい鍵: <span id="ncok"></span></div>
+   <div style="margin-top:4px">誤った鍵 (x=<span id="wx"></span>): <span id="ncbad"></span></div>
+   <div class="s" style="margin-top:6px">必要条件 π(χe,xe)=π(χd,xd) を満たすときのみ解読可能</div></div>
+ <div class="card"><h3>pull：Omega::DATABASE から平文を取り出す</h3>
+   <div class="s">正しい鍵で解いて push → pull</div>
+   <div class="pull" id="pullok"></div>
+   <div class="s" style="margin-top:8px">誤った鍵（必要条件を満たさない）</div>
+   <div class="pull" id="pullbad"></div></div>
+</div>
+<script>
+const D={"chi": [1, 1, 1], "x": 0.5, "wx": 0.7, "pi": 0.5625, "msg": [66, 65, 68, 65, 32, 81, 67, 33], "cipher": [84.85714285714286, 83.57142857142857, 87.42857142857143, 83.57142857142857, 41.142857142857146, 104.14285714285714, 86.14285714285714, 42.42857142857143], "solved": [66, 64.99999999999999, 68.00000000000001, 64.99999999999999, 32.00000000000001, 81, 67, 33], "wrong": [20.83116559614257, 20.515541874988884, 21.46241303844991, 20.515541874988884, 10.099959076917607, 25.565521413447698, 21.14678931729624, 10.415582798071284], "nc_ok": true, "nc_bad": false, "pull_ok": [66, 65, 68, 65, 32, 81, 67, 33], "pull_bad": []};
+document.getElementById('braid').textContent='['+D.chi.join(',')+']';
+document.getElementById('x').textContent=D.x;
+document.getElementById('wx').textContent=D.wx;
+document.getElementById('pi').textContent=D.pi.toFixed(4);
+const tbl=document.getElementById('tbl');
+for(let i=0;i<D.msg.length;i++){const tr=document.createElement('tr');
+ tr.innerHTML='<td>'+D.msg[i]+'</td><td>'+String.fromCharCode(D.msg[i])
+  +'</td><td>'+D.cipher[i].toFixed(3)+'</td>'
+  +'<td class="ok">'+Math.round(D.solved[i])+'</td>'
+  +'<td class="bad">'+D.wrong[i].toFixed(2)+'</td>';
+ tbl.appendChild(tr);}
+document.getElementById('ncok').innerHTML=D.nc_ok
+ ?'<span class="ok">満たす ✓ → 解読可能</span>':'<span class="bad">不一致</span>';
+document.getElementById('ncbad').innerHTML=D.nc_bad
+ ?'<span class="ok">満たす</span>':'<span class="bad">満たさない ✗ → 解読不可</span>';
+const txt=D.pull_ok.map(c=>String.fromCharCode(c)).join('');
+document.getElementById('pullok').innerHTML=
+ 'pulled = ['+D.pull_ok.join(', ')+']  →  <span class="txt ok">'+txt+'</span>';
+document.getElementById('pullbad').textContent=
+ D.pull_bad.length? 'pulled = ['+D.pull_bad.join(', ')+']'
+                  : 'pulled = [] （何も取り出せない＝暗号は解けない）';
+</script></body></html>

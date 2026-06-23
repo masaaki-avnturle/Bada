@@ -165,8 +165,24 @@ prototype**, all in Bada (`apps/hologram/lib/qevolve.bada`):
 `hologram/qevolve.py` + `QEvolveApp` render the evolution curve, the evolved
 gene, and the self-generated, self-validated Bada source.
 
+## Quantum cryptography solved by the Jones polynomial
+`jcrypto` solves a quantum cipher with the Jones polynomial, all in Bada
+(`apps/hologram/lib/jcrypto.bada`):
+* **encryption = f(s)**, with `f(s) = m·π/(1−π)` (m = plaintext);
+* **Jones polynomial = π(χ,x)** = `V_χ(x)` (the quantum knot invariant, key);
+* the cipher is **solved by `f(s)/π(χ,x) − f(s)`**, which equals m exactly;
+* decryption succeeds only under the **necessary condition** that the decrypt
+  key reproduces the encryption's π(χ,x) (a wrong braid χ or point x fails);
+* the recovered plaintext is **pulled** out of `Omega::DATABASE` (push then
+  pull) — non-empty only when the condition holds.
+
+`hologram/jcrypto.py` + `JCryptoApp` render the formula, the encrypt/solve
+table, the necessary-condition check and the pull from the tuplespace.
+
 ## Use
 ```
+jcrypto list                   # the f(s)/π−f(s) solver + pull summary
+jcrypto html jc.html           # the quantum-crypto (Jones) dashboard
 qevolve list                   # evolution summary + self-validation
 qevolve source                 # print the self-generated Bada source
 qevolve html qe.html           # the self-evolving quantum-algorithm dashboard
