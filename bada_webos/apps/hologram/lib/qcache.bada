@@ -1,0 +1,173 @@
+// qcache.bada — the Quantum Cache Disk, in Bada.
+//
+// Treats a personal computer's hard disk as a quantum cache: the disk's bit
+// patterns become qubit amplitudes (the hard disk "becomes a quantum
+// computer"), a Reviser rewrites von-Neumann cache instructions into quantum
+// gates, an FPGA-style quantum algorithm (Grover) is the a-priori prediction
+// engine that amplifies the marked "thought pattern" derived from the target's
+// DNA-telomere division process, the Jones polynomial of the trefoil gives a
+// thermal network (t = e^-beta), the Gamma function's integration-by-parts
+// recurrence is the global manifold weighting, and the semiconductor
+// uncertainty principle bounds simultaneous address/data precision.
+//
+// Reuses fsqrt / fexp / jones_trefoil / poly_eval from hologram.bada.
+
+#include hologram.bada
+
+// --- Gamma: global integration-by-parts manifold ---------------------------
+def fact(n) {
+  r <- 1
+  k <- 2
+  -> k <= n { r <- r * k  k <- k + 1 }
+  return r
+}
+
+// Gamma(n) = (n-1)!   (integer)
+def gamma_int(n) { return fact(n - 1) }
+
+// the integration-by-parts identity  Gamma(z+1) = z * Gamma(z)
+// (this IS the IBP of the integral defining Gamma); returns z*Gamma(z)
+def gamma_ibp(z) { return z * gamma_int(z) }
+
+// --- Jones-polynomial thermal network --------------------------------------
+// thermal weight at inverse temperature beta: |V(t)| of the trefoil, t=e^-beta
+def jones_thermal(beta) {
+  t <- fexp(0 - beta)
+  v <- poly_eval(jones_trefoil(), t)
+  -< v < 0 { v <- 0 - v }
+  return v
+}
+
+// --- hard-disk bit patterns -> qubit amplitudes ----------------------------
+def popcount(p, nbits) {
+  c <- 0
+  i <- 0
+  -> i < nbits {
+    -< imod(idiv(p, pow2(i)), 2) <-> 1 { c <- c + 1 }
+    i <- i + 1
+  }
+  return c
+}
+
+// the disk's blocks become a normalized quantum state (sum of squares = 1)
+def disk_state(patterns, nbits) {
+  n <- len(patterns)
+  raw <- []
+  ssum <- 0.0
+  i <- 0
+  -> i < n {
+    w <- 1.0 + popcount(patterns[i], nbits)
+    append(raw, w)
+    ssum <- ssum + w * w
+    i <- i + 1
+  }
+  norm <- fsqrt(ssum)
+  -< norm <-> 0 { norm <- 1.0 }
+  out <- []
+  i <- 0
+  -> i < n {
+    append(out, raw[i] / norm)
+    i <- i + 1
+  }
+  return out
+}
+
+// cache hit probability of a block = |amplitude|^2
+def cache_hit_prob(state, idx) {
+  return state[idx] * state[idx]
+}
+
+// --- Reviser: von-Neumann cache op -> quantum gate -------------------------
+def revise_op(op) {
+  -< op <-> "READ"   { return "MEASURE" }
+  -< op <-> "WRITE"  { return "NOT" }
+  -< op <-> "FETCH"  { return "HADAMARD" }
+  -< op <-> "EVICT"  { return "RESET" }
+  -< op <-> "SEARCH" { return "GROVER" }
+  return op
+}
+
+// rewrite a von-Neumann program (token<TAB>token...) — dump quantum gates
+def revise_dump(ops) {
+  i <- 0
+  -> i < len(ops) {
+    print ops[i] + "\t" + revise_op(ops[i])
+    i <- i + 1
+  }
+  return 0
+}
+
+// --- FPGA quantum algorithm: Grover prediction engine ----------------------
+// Grover amplitude amplification over 2^nq modes; returns the amplitude array.
+def grover(nq, marked) {
+  bign <- pow2(nq)
+  amp <- []
+  a0 <- 1.0 / fsqrt(bign)
+  i <- 0
+  -> i < bign { append(amp, a0)  i <- i + 1 }
+  iters <- idiv(3.141592653589793 / 4.0 * fsqrt(bign), 1)
+  t <- 0
+  -> t < iters {
+    amp[marked] <- 0 - amp[marked]
+    s <- 0.0
+    i <- 0
+    -> i < bign { s <- s + amp[i]  i <- i + 1 }
+    mean <- s / bign
+    i <- 0
+    -> i < bign { amp[i] <- 2.0 * mean - amp[i]  i <- i + 1 }
+    t <- t + 1
+  }
+  return amp
+}
+
+// the target's DNA-telomere length shortens each division step t
+def telomere(L0, t) {
+  v <- L0 - t
+  -< v < 0 { v <- 0 }
+  return v
+}
+
+// the marked "thought pattern" index derived from the telomere dynamics
+def thought_marked(nq, L0, t) {
+  bign <- pow2(nq)
+  return imod(telomere(L0, t) * 7 + 3, bign)
+}
+
+// the predicted (prefetched) block, and its amplified hit probability
+def predict_block(nq, L0, t) {
+  m <- thought_marked(nq, L0, t)
+  amp <- grover(nq, m)
+  best <- 0
+  bestp <- 0 - 1.0
+  i <- 0
+  -> i < len(amp) {
+    p <- amp[i] * amp[i]
+    -< p > bestp { bestp <- p  best <- i }
+    i <- i + 1
+  }
+  return best
+}
+
+def predict_prob(nq, L0, t) {
+  m <- thought_marked(nq, L0, t)
+  amp <- grover(nq, m)
+  return amp[m] * amp[m]
+}
+
+// flat list of the per-step amplified hit probability over T division steps
+def predict_curve(nq, L0, T) {
+  out <- []
+  t <- 0
+  -> t < T {
+    append(out, predict_prob(nq, L0, t))
+    t <- t + 1
+  }
+  return out
+}
+
+// --- semiconductor uncertainty principle -----------------------------------
+// Delta(addr) * Delta(data) >= hbar/2 : min data precision for an address one
+def uncertainty_bound(d_addr, hbar) {
+  -< d_addr <= 0 { d_addr <- 0.0001 }
+  return hbar / (2.0 * d_addr)
+}

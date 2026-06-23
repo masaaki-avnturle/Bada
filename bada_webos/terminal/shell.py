@@ -528,6 +528,26 @@ class Shell:
             return f"wrote freeform multi-window desktop to {path}\n"
         return "freeform: usage: freeform [list|html PATH]\n"
 
+    def _qcache(self, args, stdin):
+        # the Quantum Cache Disk: hard disk -> quantum cache (all computed in Bada).
+        from hologram import QCacheApp
+        sub = args[0] if args else "list"
+        app = QCacheApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Quantum Cache Disk:\n"
+                    f"  {r['blocks']} disk blocks -> {r['qubits']}-qubit state\n"
+                    f"  Reviser von-Neumann->quantum: {r['reviser']}\n"
+                    f"  telomere thought prediction: block #{r['predicted_first']}"
+                    f" @ hit {r['hit_prob']*100:.1f}% (Grover)\n"
+                    f"  Gamma integration-by-parts manifold: "
+                    f"{'OK' if r['gamma_ibp_ok'] else 'FAIL'}\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "qcache.html"
+            app.save_html(path)
+            return f"wrote quantum cache disk to {path}\n"
+        return "qcache: usage: qcache [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -710,7 +730,8 @@ class Shell:
                 "  mirror app:     holomirror [list|html PATH [keyboard]]\n"
                 "  spatial (VP):   holovision [list|html PATH]\n"
                 "  transparent JP: hologlass [list|html PATH]\n"
-                "  freeform WM:    freeform [list|html PATH]\n")
+                "  freeform WM:    freeform [list|html PATH]\n"
+                "  quantum cache:  qcache [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -725,5 +746,6 @@ class Shell:
         "slideshow": _slideshow, "topdown": _topdown,
         "hologram": _hologram, "holokbd": _holokbd,
         "holomirror": _holomirror, "holovision": _holovision,
-        "hologlass": _hologlass, "freeform": _freeform, "help": _help,
+        "hologlass": _hologlass, "freeform": _freeform,
+        "qcache": _qcache, "help": _help,
     }
