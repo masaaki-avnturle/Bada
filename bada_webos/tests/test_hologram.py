@@ -15,7 +15,7 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      GlassApp, FreeformApp, QCacheApp, QEvolveApp,
+                      GlassApp, FreeformApp, QCacheApp, QEvolveApp, JCryptoApp,
                       html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
@@ -466,6 +466,54 @@ class TestSelfEvolvingQuantum(unittest.TestCase):
         self.assertIn("自己検証", h)                 # self-validation
         files = [a["file"] for a in bridge.wm_catalog()]
         self.assertIn("qevolve.html", files)
+
+
+class TestQuantumCryptoJones(unittest.TestCase):
+    """Cipher f(s) solved by f(s)/π(χ,x)−f(s); pull + necessary condition."""
+
+    KEY = ([1, 1, 1], 2, 0.5)
+    WRONG = ([1, 1, 1], 2, 0.7)
+
+    def test_solver_inverts_with_correct_key(self):
+        # f(s)/π−f(s) exactly recovers the plaintext m under the right key
+        msg = [72, 73, 33]
+        cipher = bridge.encrypt_msg(msg, *self.KEY)
+        solved = [round(v) for v in bridge.solve_msg(cipher, *self.KEY)]
+        self.assertEqual(solved, msg)
+
+    def test_wrong_key_does_not_break(self):
+        msg = [72, 73, 33]
+        cipher = bridge.encrypt_msg(msg, *self.KEY)
+        wrong = [round(v) for v in bridge.solve_msg(cipher, *self.WRONG)]
+        self.assertNotEqual(wrong, msg)              # cipher not broken
+
+    def test_necessary_condition(self):
+        self.assertTrue(bridge.necessary_condition(*self.KEY, *self.KEY))
+        self.assertFalse(bridge.necessary_condition(*self.KEY, *self.WRONG))
+
+    def test_pull_from_tuplespace(self):
+        msg = [66, 65, 68, 65]                       # "BADA"
+        # correct key -> plaintext pulled from Omega::DATABASE
+        self.assertEqual(bridge.pull_decrypt(msg, *self.KEY, *self.KEY), msg)
+        # wrong key -> necessary condition fails -> nothing pulled
+        self.assertEqual(bridge.pull_decrypt(msg, *self.KEY, *self.WRONG), [])
+
+    def test_app_html(self):
+        app = JCryptoApp()
+        r = app.boot()
+        self.assertTrue(r["solved_ok"])
+        self.assertEqual(r["recovered"], app.PLAINTEXT)
+        self.assertTrue(r["necessary_ok"])
+        self.assertFalse(r["necessary_bad"])
+        self.assertEqual(r["pulled_wrong"], [])
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "jc.html"))).read()
+        self.assertIn("QUANTUM CRYPTO", h)
+        self.assertIn("f(s)/π(χ,x)", h)              # the solver formula
+        self.assertIn("Omega::DATABASE", h)          # pull
+        self.assertIn("必要条件", h)                 # necessary condition
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("jcrypto.html", files)
 
 
 if __name__ == "__main__":
