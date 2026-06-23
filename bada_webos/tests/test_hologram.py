@@ -498,6 +498,16 @@ class TestQuantumCryptoJones(unittest.TestCase):
         # wrong key -> necessary condition fails -> nothing pulled
         self.assertEqual(bridge.pull_decrypt(msg, *self.KEY, *self.WRONG), [])
 
+    def test_unlock_bound_to_the_puller(self):
+        # identity-bound: encrypted to Alice, only Alice can pull/unlock — and
+        # the unlock uses the SAME condition as pull (person_condition)
+        msg = [66, 65, 68, 65]                        # "BADA"
+        self.assertTrue(bridge.person_condition([1, 1, 1], 2, "Alice", "Alice"))
+        self.assertFalse(bridge.person_condition([1, 1, 1], 2, "Alice", "Bob"))
+        self.assertEqual(bridge.pull_as(msg, [1, 1, 1], 2, "Alice", "Alice"),
+                         msg)
+        self.assertEqual(bridge.pull_as(msg, [1, 1, 1], 2, "Alice", "Bob"), [])
+
     def test_app_html(self):
         app = JCryptoApp()
         r = app.boot()
@@ -512,6 +522,9 @@ class TestQuantumCryptoJones(unittest.TestCase):
         self.assertIn("f(s)/π(χ,x)", h)              # the solver formula
         self.assertIn("Omega::DATABASE", h)          # pull
         self.assertIn("必要条件", h)                 # necessary condition
+        self.assertIn("Pullした人に基づく解除", h)   # per-puller unlock
+        self.assertEqual(r["unlock_self"], app.PLAINTEXT)
+        self.assertFalse(r["unlock_other_ok"])
         files = [a["file"] for a in bridge.wm_catalog()]
         self.assertIn("jcrypto.html", files)
 
