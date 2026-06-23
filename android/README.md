@@ -13,7 +13,8 @@ Bundled apps (launcher menu = `assets/holograms/index.html`):
   (携帯型 / 中 / 大)** chooses the opened window's size.
 - **Quantum Crypto · Jones** — a cipher f(s) solved by f(s)/π(χ,x)−f(s) where
   π is the Jones polynomial; decryptable only under the necessary condition
-  (matching key), the plaintext pulled from Omega::DATABASE
+  (matching key), the plaintext pulled from Omega::DATABASE, with the unlock
+  bound to the person who pulls (identity-bound key)
 - **Self-Evolving Quantum Algorithm** — a genetic algorithm evolves a quantum
   algorithm toward Grover amplification and writes it back out as Bada source
   code, self-validated by re-running the emitted source

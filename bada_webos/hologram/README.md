@@ -174,7 +174,11 @@ gene, and the self-generated, self-validated Bada source.
 * decryption succeeds only under the **necessary condition** that the decrypt
   key reproduces the encryption's π(χ,x) (a wrong braid χ or point x fails);
 * the recovered plaintext is **pulled** out of `Omega::DATABASE` (push then
-  pull) — non-empty only when the condition holds.
+  pull) — non-empty only when the condition holds;
+* the unlock is **bound to the puller**: each person's identity maps to their
+  own Jones point `person_x(id)`, so the cipher is encrypted *to a person* and
+  the **same necessary condition** lets only that person (`pull_as`) unlock /
+  pull the plaintext — another person fails (`person_condition` false).
 
 `hologram/jcrypto.py` + `JCryptoApp` render the formula, the encrypt/solve
 table, the necessary-condition check and the pull from the tuplespace.

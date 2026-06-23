@@ -90,3 +90,49 @@ def pull_decrypt(cph, chi_e, n_e, x_e, chi_d, n_d, x_d) {
   }
   return len(cph)
 }
+
+// --- identity-bound decryption: the unlock is based on WHO pulls -----------
+// each person's identity maps to their own Jones evaluation point x, so π — and
+// therefore the key — depends on the puller; only the intended person matches.
+def person_x(pid) {
+  return 0.30 + 0.035 * imod(pid, 11)
+}
+
+def encrypt_to(m, chi, n, target) {
+  return encrypt(m, chi, n, person_x(target))
+}
+
+def encrypt_msg_to(msg, chi, n, target) {
+  return encrypt_msg(msg, chi, n, person_x(target))
+}
+
+def solve_as(c, chi, n, puller) {
+  return solve(c, chi, n, person_x(puller))
+}
+
+def solve_msg_as(cph, chi, n, puller) {
+  return solve_msg(cph, chi, n, person_x(puller))
+}
+
+// the SAME necessary condition, now identity-bound: the puller must be the
+// intended target (same person -> same π(χ, x_person)).
+def person_condition(chi, n, target, puller) {
+  return necessary_condition(chi, n, person_x(target),
+                             chi, n, person_x(puller))
+}
+
+// pull bound to the puller: the unlock uses the same condition as pull, so only
+// the person it was encrypted to can pull the plaintext out of Omega::DATABASE.
+def pull_as(cph, chi, n, target, puller) {
+  ok <- person_condition(chi, n, target, puller)
+  -< ok <-> 0 { return 0 }
+  i <- 0
+  -> i < len(cph) {
+    sym <- iround(solve(cph[i], chi, n, person_x(puller)))
+    Omega::DATABASE[crypto] {
+      push(sym)
+    }
+    i <- i + 1
+  }
+  return len(cph)
+}

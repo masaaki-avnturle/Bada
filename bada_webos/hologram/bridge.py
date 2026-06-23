@@ -455,3 +455,29 @@ def pull_decrypt(msg, chi_e, n_e, x_e, chi_d, n_d, x_d) -> list:
             f"{_braid(chi_d)}, {n_d}, {x_d})\n")
     vm = run_source(prog)
     return list(vm.tuplespace.get("crypto", []))
+
+
+# --- identity-bound decryption: the unlock is based on WHO pulls ------------
+def person_id(name) -> int:
+    """A stable integer identity for a person (name -> id)."""
+    if isinstance(name, int):
+        return name
+    return sum(ord(c) for c in str(name))
+
+
+def person_condition(chi, n, target, puller) -> bool:
+    out = _jcrun(f"print person_condition({_braid(chi)}, {n}, "
+                 f"{person_id(target)}, {person_id(puller)})")[-1]
+    return int(float(out)) == 1
+
+
+def pull_as(msg, chi, n, target, puller) -> list:
+    """Encrypt to `target`, then PULL as `puller` — the plaintext comes out only
+    when the puller IS the intended person (same identity-bound Jones key)."""
+    prog = (_jc_src()
+            + f"\nc <- encrypt_msg_to({_msg(msg)}, {_braid(chi)}, {n}, "
+            f"{person_id(target)})\n"
+            f"n <- pull_as(c, {_braid(chi)}, {n}, "
+            f"{person_id(target)}, {person_id(puller)})\n")
+    vm = run_source(prog)
+    return list(vm.tuplespace.get("crypto", []))
