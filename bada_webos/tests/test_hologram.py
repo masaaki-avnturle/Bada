@@ -15,8 +15,8 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      GlassApp, FreeformApp, QCacheApp, html_hologram,
-                      html_keyboard)
+                      GlassApp, FreeformApp, QCacheApp, QEvolveApp,
+                      html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -425,6 +425,47 @@ class TestQuantumCacheDisk(unittest.TestCase):
     def test_in_freeform_catalog(self):
         files = [a["file"] for a in bridge.wm_catalog()]
         self.assertIn("qcache.html", files)          # opens in a freeform window
+
+
+class TestSelfEvolvingQuantum(unittest.TestCase):
+    """A GA evolves a quantum algorithm and emits it as Bada source (qevolve)."""
+
+    def test_gates_grover(self):
+        # the hand-built Grover gene amplifies; identity-only stays at 1/N
+        amp = bridge.fitness(4, 10, [1, 2, 1, 2, 1, 2])
+        self.assertGreater(amp, 0.9)
+        self.assertAlmostEqual(bridge.fitness(4, 10, [0, 0, 0, 0, 0, 0]),
+                               1.0 / 16, places=6)
+
+    def test_evolution_improves(self):
+        curve = bridge.evolve_curve(4, 10, 8, 16, 18, 5)
+        # best-so-far is non-decreasing and strictly rises (self-evolution)
+        for i in range(len(curve) - 1):
+            self.assertGreaterEqual(curve[i + 1], curve[i])
+        self.assertGreater(curve[-1], curve[0])
+        self.assertGreater(curve[-1], 0.5)           # well past uniform 1/16
+
+    def test_emitted_source_self_validates(self):
+        prog = bridge.evolve_best(4, 10, 8, 16, 18, 5)
+        src = bridge.emit_source(4, 10, prog)
+        self.assertIn("def evolved_amp()", src)      # it is Bada source code
+        self.assertIn("apply_oracle", src)
+        # re-running the emitted source reproduces the evolved fitness
+        self.assertAlmostEqual(bridge.verify_emitted(4, 10, prog),
+                               bridge.fitness(4, 10, prog), places=9)
+
+    def test_app_html(self):
+        app = QEvolveApp()
+        r = app.boot()
+        self.assertTrue(r["evolved"])
+        self.assertTrue(r["source_ok"])
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "qe.html"))).read()
+        self.assertIn("SELF-EVOLVING QUANTUM ALGORITHM", h)
+        self.assertIn("evolved_amp", h)              # the emitted source
+        self.assertIn("自己検証", h)                 # self-validation
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("qevolve.html", files)
 
 
 if __name__ == "__main__":

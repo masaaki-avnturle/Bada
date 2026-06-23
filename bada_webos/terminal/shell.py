@@ -548,6 +548,28 @@ class Shell:
             return f"wrote quantum cache disk to {path}\n"
         return "qcache: usage: qcache [list|html PATH]\n"
 
+    def _qevolve(self, args, stdin):
+        # self-evolving quantum-algorithm source-code prototype (Bada).
+        from hologram import QEvolveApp
+        sub = args[0] if args else "list"
+        app = QEvolveApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Self-evolving quantum algorithm:\n"
+                    f"  fitness {r['start']*100:.1f}% -> {r['final']*100:.1f}% "
+                    f"over {app.GENS} generations (evolved: {r['evolved']})\n"
+                    f"  evolved gene: {r['gates']}\n"
+                    f"  emitted Bada source self-validated: "
+                    f"{'OK' if r['source_ok'] else 'FAIL'} "
+                    f"({r['verified']*100:.1f}%)\n")
+        if sub == "source":
+            return app.source + "\n"
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "qevolve.html"
+            app.save_html(path)
+            return f"wrote self-evolving quantum algorithm to {path}\n"
+        return "qevolve: usage: qevolve [list|source|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -731,7 +753,8 @@ class Shell:
                 "  spatial (VP):   holovision [list|html PATH]\n"
                 "  transparent JP: hologlass [list|html PATH]\n"
                 "  freeform WM:    freeform [list|html PATH]\n"
-                "  quantum cache:  qcache [list|html PATH]\n")
+                "  quantum cache:  qcache [list|html PATH]\n"
+                "  q self-evolve:  qevolve [list|source|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -747,5 +770,5 @@ class Shell:
         "hologram": _hologram, "holokbd": _holokbd,
         "holomirror": _holomirror, "holovision": _holovision,
         "hologlass": _hologlass, "freeform": _freeform,
-        "qcache": _qcache, "help": _help,
+        "qcache": _qcache, "qevolve": _qevolve, "help": _help,
     }

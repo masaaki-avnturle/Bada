@@ -1,0 +1,94 @@
+"""Self-evolving quantum-algorithm source-code prototype — dashboard.
+
+Shows the genetic algorithm (in Bada) evolving a real-amplitude quantum program
+toward Grover amplification, the evolved gene, and — the point of the prototype
+— the evolved algorithm written back out *as Bada source code*, self-validated
+by re-running the emitted source.
+"""
+
+from __future__ import annotations
+
+import json
+
+
+def html_qevolve(data: dict) -> str:
+    return _TEMPLATE \
+        .replace("__DATA__", json.dumps(data, ensure_ascii=False)) \
+        .replace("__SRC__", json.dumps(data["source"], ensure_ascii=False))
+
+
+_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Self-Evolving Quantum Algorithm — Bada</title>
+<style>
+ body{margin:0;background:#04070e;color:#cfe;font-family:monospace}
+ .bar{padding:9px 12px;background:#070c18;border-bottom:2px solid #2a8;
+   display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+ .bar b{color:#5fe;letter-spacing:1px}
+ .wrap{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+   gap:12px;padding:12px}
+ .card{background:#0a1322;border:1px solid #21406a;border-radius:12px;padding:12px}
+ .card h3{margin:0 0 8px;color:#6fe;font-size:13px}
+ canvas{display:block;width:100%;background:#0a1322;border-radius:8px}
+ .gene{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+ .g{padding:3px 8px;border-radius:6px;font-size:11px}
+ .g0{background:#152232;color:#789} .g1{background:#3a2030;color:#fb8;border:1px solid #b46}
+ .g2{background:#10303a;color:#6fe;border:1px solid #2a8}
+ pre{background:#070d18;border:1px solid #1c3a52;border-radius:8px;padding:10px;
+   font-size:12px;color:#bfe;overflow:auto;max-height:280px}
+ .ok{color:#6f9;font-weight:bold} .s{color:#9ab;font-size:11px}
+ .big{font-size:22px;color:#fe7}
+</style></head><body>
+<div class="bar"><b>&#129516; SELF-EVOLVING QUANTUM ALGORITHM</b>
+ <span class="s">遺伝的アルゴリズムで量子アルゴリズムを自己進化 → Bada ソースコード化（計算はBada）</span></div>
+<div class="wrap">
+ <div class="card"><h3>進化（世代ごとの最良適応度 = 振幅増幅）</h3>
+   <canvas id="curve" width="320" height="150"></canvas>
+   <div class="s" id="cap"></div></div>
+ <div class="card"><h3>進化した量子アルゴリズム（遺伝子＝ゲート列）</h3>
+   <div class="gene" id="gene"></div>
+   <div style="margin-top:10px">適応度 <span class="big" id="fit"></span>
+     <span class="s">（一様 1/N=<span id="unif"></span> から増幅）</span></div>
+   <div class="s" style="margin-top:8px">凡例:
+     <span class="g g1">ORACLE</span> 位相反転 ·
+     <span class="g g2">DIFFUSE</span> 平均反転 ·
+     <span class="g g0">IDENTITY</span></div></div>
+ <div class="card" style="grid-column:1/-1"><h3>自己生成された Bada ソースコード（原型）</h3>
+   <pre id="src"></pre>
+   <div>自己検証: 生成ソースを再実行した <span class="s">evolved_fitness()</span> =
+     <span class="ok" id="verify"></span>
+     <span class="s">（進化結果と一致 → ソースコードが正しく自己進化）</span></div></div>
+</div>
+<script>
+const D=__DATA__, SRC=__SRC__;
+document.getElementById('src').textContent=SRC;
+document.getElementById('verify').textContent=(D.verified*100).toFixed(2)+'%';
+document.getElementById('fit').textContent=(D.fitness*100).toFixed(1)+'%';
+document.getElementById('unif').textContent=(1/Math.pow(2,D.nq)*100).toFixed(1)+'%';
+// gene chips
+const gene=document.getElementById('gene');
+const NM={0:'I',1:'ORACLE',2:'DIFFUSE'};
+D.prog.forEach(g=>{const s=document.createElement('span');s.className='g g'+g;
+ s.textContent=NM[g];gene.appendChild(s);});
+// evolution curve, animated generation marker
+const c=document.getElementById('curve'),x=c.getContext('2d');
+let t=0;
+function frame(){
+ const C=D.curve,n=C.length;x.clearRect(0,0,c.width,c.height);
+ // axes
+ x.strokeStyle='#1c3a52';x.beginPath();x.moveTo(28,6);x.lineTo(28,c.height-18);
+ x.lineTo(c.width-6,c.height-18);x.stroke();
+ x.fillStyle='#789';x.font='9px monospace';
+ x.fillText('1.0',6,12);x.fillText('0',12,c.height-18);x.fillText('gen',c.width-26,c.height-6);
+ const px=i=>28+i/(n-1)*(c.width-36), py=v=>c.height-18-v*(c.height-26);
+ x.strokeStyle='#6fe';x.lineWidth=2;x.beginPath();
+ C.forEach((v,i)=>{i?x.lineTo(px(i),py(v)):x.moveTo(px(i),py(v));});x.stroke();
+ const k=t%n; x.fillStyle='#fe7';
+ x.beginPath();x.arc(px(k),py(C[k]),4,0,7);x.fill();
+ document.getElementById('cap').textContent=
+  'gen '+k+'/'+(n-1)+'  適応度 '+(C[k]*100).toFixed(1)+'%   （開始 '
+  +(C[0]*100).toFixed(1)+'% → 最終 '+(C[n-1]*100).toFixed(1)+'%）';
+ t++;
+}
+setInterval(frame,650);frame();
+</script></body></html>"""

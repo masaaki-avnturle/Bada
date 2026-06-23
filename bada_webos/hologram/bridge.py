@@ -30,6 +30,7 @@ _SPA = os.path.join(_PKG, "apps", "hologram", "lib", "spatial.bada")
 _JPN = os.path.join(_PKG, "apps", "hologram", "lib", "romaji_kana.bada")
 _FRF = os.path.join(_PKG, "apps", "hologram", "lib", "freeform.bada")
 _QCA = os.path.join(_PKG, "apps", "hologram", "lib", "qcache.bada")
+_QEV = os.path.join(_PKG, "apps", "hologram", "lib", "qevolve.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
@@ -37,6 +38,7 @@ _SSRC = None
 _JSRC = None
 _FSRC = None
 _QSRC = None
+_QESRC = None
 
 
 def _run(extra: str):
@@ -347,3 +349,51 @@ def _plain(x: float) -> str:
 def uncertainty_bound(d_addr: float, hbar: float) -> float:
     return float(_qrun(
         f"print uncertainty_bound({_plain(d_addr)}, {_plain(hbar)})")[-1])
+
+
+# --- Self-evolving quantum-algorithm source code (qevolve) ------------------
+def _qe_src():
+    global _QESRC
+    if _QESRC is None:
+        _QESRC = load_program(_QEV)
+    return _QESRC
+
+
+def _qerun(extra: str):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_qe_src() + "\n" + extra)
+    return buf.getvalue()
+
+
+GATE_NAMES = {0: "IDENTITY", 1: "ORACLE", 2: "DIFFUSE"}
+
+
+def evolve_best(nq, marked, L, pop, gens, seed) -> list:
+    return ast.literal_eval(_qerun(
+        f"print evolve_best({nq}, {marked}, {L}, {pop}, {gens}, {seed})")
+        .splitlines()[-1])
+
+
+def evolve_curve(nq, marked, L, pop, gens, seed) -> list:
+    return ast.literal_eval(_qerun(
+        f"print evolve_curve({nq}, {marked}, {L}, {pop}, {gens}, {seed})")
+        .splitlines()[-1])
+
+
+def fitness(nq, marked, prog) -> float:
+    arr = "[" + ", ".join(str(int(g)) for g in prog) + "]"
+    return float(_qerun(f"print fitness({nq}, {marked}, {arr})").splitlines()[-1])
+
+
+def emit_source(nq, marked, prog) -> str:
+    """The evolved quantum algorithm written back out as Bada source code."""
+    arr = "[" + ", ".join(str(int(g)) for g in prog) + "]"
+    return _qerun(f"emit_source({nq}, {marked}, {arr})").rstrip("\n")
+
+
+def verify_emitted(nq, marked, prog) -> float:
+    """Run the *emitted* Bada source and return its evolved_fitness()."""
+    src = emit_source(nq, marked, prog)
+    out = _qerun(src + "\nprint evolved_fitness()")
+    return float(out.splitlines()[-1])

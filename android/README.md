@@ -11,6 +11,9 @@ Bundled apps (launcher menu = `assets/holograms/index.html`):
   The **Start menu lists the device's installed apps** (via a native
   PackageManager bridge) and launches them on tap, and a **size selector
   (携帯型 / 中 / 大)** chooses the opened window's size.
+- **Self-Evolving Quantum Algorithm** — a genetic algorithm evolves a quantum
+  algorithm toward Grover amplification and writes it back out as Bada source
+  code, self-validated by re-running the emitted source
 - **Quantum Cache Disk** — the hard disk reinterpreted as a quantum cache:
   bit patterns → qubit amplitudes, a Reviser rewriting von-Neumann ops to
   quantum gates, a Grover telomere-thought prediction engine, the Jones thermal
