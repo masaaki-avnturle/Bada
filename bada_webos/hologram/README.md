@@ -130,8 +130,29 @@ button**, running-app buttons and a clock.
   size of the next opened window — `window_size` returns a tall narrow phone
   window, a medium window, or a large window (mirrored in the renderer).
 
+## Quantum Cache Disk
+`qcache` reinterprets a PC's hard disk as a **quantum cache**, all computed in
+Bada (`apps/hologram/lib/qcache.bada`):
+* the disk's **bit patterns become a normalized qubit state** (`disk_state`) —
+  the hard disk "becomes a quantum computer";
+* a **Reviser** rewrites von-Neumann cache ops into quantum gates (`revise_op`:
+  READ→MEASURE, WRITE→NOT, FETCH→HADAMARD, EVICT→RESET, SEARCH→GROVER);
+* an FPGA-style **Grover a-priori engine** (`grover`) amplifies the marked
+  "thought pattern" derived from the target's **DNA-telomere** division
+  (`telomere` / `predict_block`);
+* the **Jones polynomial** gives a thermal network (`jones_thermal`, t=e^−β);
+* the **Gamma integration-by-parts manifold** Γ(z+1)=z·Γ(z) (`gamma_ibp`) is the
+  global weighting; and
+* the **semiconductor uncertainty principle** Δaddr·Δdata ≥ ħ/2
+  (`uncertainty_bound`).
+
+`hologram/qcache.py` + `QCacheApp` render the dashboard (disk grid, Reviser
+table, prediction engine, thermal/Gamma curves, uncertainty).
+
 ## Use
 ```
+qcache list                    # the quantum cache disk summary
+qcache html q.html             # the quantum cache disk dashboard
 freeform list                  # the multi-window desktop summary
 freeform html f.html           # the freeform window manager + taskbar
 hologlass list                 # the transparent / Japanese-input summary

@@ -29,12 +29,14 @@ _MIR = os.path.join(_PKG, "apps", "hologram", "lib", "mirror.bada")
 _SPA = os.path.join(_PKG, "apps", "hologram", "lib", "spatial.bada")
 _JPN = os.path.join(_PKG, "apps", "hologram", "lib", "romaji_kana.bada")
 _FRF = os.path.join(_PKG, "apps", "hologram", "lib", "freeform.bada")
+_QCA = os.path.join(_PKG, "apps", "hologram", "lib", "qcache.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
 _SSRC = None
 _JSRC = None
 _FSRC = None
+_QSRC = None
 
 
 def _run(extra: str):
@@ -281,3 +283,67 @@ def size_presets() -> list:
 
 def window_size(preset: str, sw: int, sh: int) -> list:
     return ast.literal_eval(_frun(f'print window_size("{preset}", {sw}, {sh})')[-1])
+
+
+# --- Quantum Cache Disk ----------------------------------------------------
+def _qrun(extra: str):
+    global _QSRC
+    if _QSRC is None:
+        _QSRC = load_program(_QCA)
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_QSRC + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def gamma_int(n: int) -> int:
+    return int(float(_qrun(f"print gamma_int({n})")[-1]))
+
+
+def gamma_ibp(z: int) -> int:
+    """The integration-by-parts value z*Gamma(z) ( == Gamma(z+1) )."""
+    return int(float(_qrun(f"print gamma_ibp({z})")[-1]))
+
+
+def jones_thermal(beta: float) -> float:
+    return float(_qrun(f"print jones_thermal({beta})")[-1])
+
+
+def disk_state(patterns: list, nbits: int) -> list:
+    """The disk's bit patterns as a normalized quantum state (amplitudes)."""
+    arr = "[" + ", ".join(str(int(p)) for p in patterns) + "]"
+    return ast.literal_eval(_qrun(f"print disk_state({arr}, {nbits})")[-1])
+
+
+def revise_program(ops: list) -> list:
+    """Rewrite von-Neumann cache ops to quantum gates: [(op, gate), ...]."""
+    arr = "[" + ", ".join(f'"{o}"' for o in ops) + "]"
+    out = []
+    for line in _qrun(f"revise_dump({arr})"):
+        if "\t" in line:
+            a, b = line.split("\t", 1)
+            out.append((a, b))
+    return out
+
+
+def predict_block(nq: int, l0: int, t: int) -> int:
+    return int(float(_qrun(f"print predict_block({nq}, {l0}, {t})")[-1]))
+
+
+def predict_curve(nq: int, l0: int, T: int) -> list:
+    return ast.literal_eval(_qrun(f"print predict_curve({nq}, {l0}, {T})")[-1])
+
+
+def predict_blocks(nq: int, l0: int, T: int) -> list:
+    return [predict_block(nq, l0, t) for t in range(T)]
+
+
+def _plain(x: float) -> str:
+    # Bada's lexer has no exponent notation; render without 'e'
+    s = f"{x:.60f}".rstrip("0")
+    return s + "0" if s.endswith(".") else s
+
+
+def uncertainty_bound(d_addr: float, hbar: float) -> float:
+    return float(_qrun(
+        f"print uncertainty_bound({_plain(d_addr)}, {_plain(hbar)})")[-1])

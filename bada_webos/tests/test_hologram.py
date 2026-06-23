@@ -15,7 +15,8 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      GlassApp, FreeformApp, html_hologram, html_keyboard)
+                      GlassApp, FreeformApp, QCacheApp, html_hologram,
+                      html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -371,6 +372,59 @@ class TestFreeformWM(unittest.TestCase):
         self.assertIn("sizeFor", h)
         self.assertIn("launchSize", h)
         self.assertIn("携帯型", h)
+
+
+class TestQuantumCacheDisk(unittest.TestCase):
+    """Hard disk -> quantum cache: Reviser, Grover prediction, Γ-IBP, Jones."""
+
+    def test_gamma_integration_by_parts(self):
+        # the IBP identity Gamma(z+1) = z*Gamma(z), computed in Bada
+        for z in range(1, 8):
+            self.assertEqual(bridge.gamma_ibp(z), bridge.gamma_int(z + 1))
+
+    def test_disk_state_is_normalized(self):
+        amps = bridge.disk_state([3, 7, 1, 15], 4)
+        self.assertAlmostEqual(sum(a * a for a in amps), 1.0, places=6)
+
+    def test_reviser_von_neumann_to_quantum(self):
+        rev = dict(bridge.revise_program(
+            ["READ", "WRITE", "FETCH", "EVICT", "SEARCH"]))
+        self.assertEqual(rev["READ"], "MEASURE")
+        self.assertEqual(rev["FETCH"], "HADAMARD")
+        self.assertEqual(rev["SEARCH"], "GROVER")
+
+    def test_grover_prediction_amplifies(self):
+        # the a-priori engine amplifies the telomere thought pattern well past
+        # the uniform 1/N probability
+        p = bridge.predict_curve(4, 20, 4)
+        self.assertTrue(all(x > 0.5 for x in p))     # >> 1/16
+        blocks = bridge.predict_blocks(4, 20, 4)
+        self.assertEqual(len(blocks), 4)
+        self.assertTrue(all(0 <= b < 16 for b in blocks))
+
+    def test_uncertainty_bound(self):
+        # Delta(addr)*Delta(data) >= hbar/2 ; at d_addr=0.5 the bound is hbar
+        hbar = 1.054571817e-34
+        self.assertAlmostEqual(bridge.uncertainty_bound(0.5, hbar) / hbar,
+                               1.0, places=3)
+
+    def test_app_html(self):
+        app = QCacheApp()
+        r = app.boot()
+        self.assertEqual(r["blocks"], 16)
+        self.assertTrue(r["gamma_ibp_ok"])
+        self.assertGreater(r["hit_prob"], 0.5)
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "q.html"))).read()
+        self.assertIn("QUANTUM CACHE DISK", h)
+        self.assertIn("HADAMARD", h)                 # Reviser output
+        self.assertIn("GROVER", h)
+        self.assertIn("大域的部分積分", h)           # Gamma IBP manifold
+        self.assertIn("不確定性原理", h)             # uncertainty principle
+
+    def test_in_freeform_catalog(self):
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("qcache.html", files)          # opens in a freeform window
 
 
 if __name__ == "__main__":

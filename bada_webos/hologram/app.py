@@ -16,6 +16,7 @@ from .mirror import html_mirror
 from .spatial import html_vision
 from .glass import html_glass
 from .freeform import html_freeform
+from .qcache import html_qcache
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -279,6 +280,59 @@ class FreeformApp:
 
     def html(self) -> str:
         return html_freeform(self.catalog, self.tb, self.sections, self.sizes)
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class QCacheApp:
+    """The Quantum Cache Disk: the hard disk's bit patterns become a quantum
+    state, the Reviser rewrites von-Neumann cache ops to quantum gates, a Grover
+    a-priori engine predicts the DNA-telomere thought pattern, with the Jones
+    thermal network, the Gamma integration-by-parts manifold and the
+    semiconductor uncertainty bound — all computed in Bada."""
+
+    NBITS = 4
+    NQ = 4                              # 2^4 = 16 blocks
+    L0 = 20                             # initial telomere length
+    STEPS = 8                           # telomere division steps
+    HBAR = 1.054571817e-34
+    PATTERNS = [3, 12, 7, 1, 15, 9, 6, 10, 5, 0, 14, 11, 8, 2, 13, 4]
+    OPS = ["READ", "WRITE", "FETCH", "SEARCH", "EVICT"]
+
+    def boot(self) -> dict:
+        self.amps = bridge.disk_state(self.PATTERNS, self.NBITS)
+        self.reviser = bridge.revise_program(self.OPS)
+        self.predicted = bridge.predict_blocks(self.NQ, self.L0, self.STEPS)
+        self.curve = bridge.predict_curve(self.NQ, self.L0, self.STEPS)
+        self.thermal = [[round(b, 2), bridge.jones_thermal(b)]
+                        for b in [i * 0.4 for i in range(8)]]
+        self.gamma = [[z, bridge.gamma_int(z), bridge.gamma_ibp(z)]
+                      for z in range(1, 8)]
+        self.bound = bridge.uncertainty_bound(0.5, self.HBAR)
+        return {
+            "blocks": len(self.PATTERNS), "qubits": self.NQ,
+            "reviser": self.reviser,
+            "predicted_first": self.predicted[0],
+            "hit_prob": round(self.curve[0], 4),
+            "gamma_ibp_ok": self.gamma[4][1] * 5 == self.gamma[5][1],
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "amps"):
+            self.boot()
+        return {
+            "nbits": self.NBITS, "patterns": self.PATTERNS, "amps": self.amps,
+            "reviser": [list(r) for r in self.reviser],
+            "predicted": self.predicted, "curve": self.curve,
+            "teloMax": self.L0, "thermal": self.thermal, "gamma": self.gamma,
+            "unc": {"d_addr": 0.5, "hbar": self.HBAR, "bound": self.bound},
+        }
+
+    def html(self) -> str:
+        return html_qcache(self.data())
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:
