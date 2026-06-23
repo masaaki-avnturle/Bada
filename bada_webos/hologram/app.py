@@ -17,6 +17,7 @@ from .spatial import html_vision
 from .glass import html_glass
 from .freeform import html_freeform
 from .qcache import html_qcache
+from .qevolve import html_qevolve
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -333,6 +334,54 @@ class QCacheApp:
 
     def html(self) -> str:
         return html_qcache(self.data())
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class QEvolveApp:
+    """Self-evolving quantum-algorithm source-code prototype: a genetic
+    algorithm (in Bada) evolves a real-amplitude quantum program toward Grover
+    amplification, then writes the evolved algorithm back out as Bada source
+    code — self-validated by re-running the emitted source."""
+
+    NQ = 4
+    MARKED = 10
+    L = 8                   # gene length (gate slots)
+    POP = 16
+    GENS = 18
+    SEED = 5
+
+    def boot(self) -> dict:
+        self.prog = bridge.evolve_best(self.NQ, self.MARKED, self.L,
+                                       self.POP, self.GENS, self.SEED)
+        self.curve = bridge.evolve_curve(self.NQ, self.MARKED, self.L,
+                                         self.POP, self.GENS, self.SEED)
+        self.fitness = bridge.fitness(self.NQ, self.MARKED, self.prog)
+        self.source = bridge.emit_source(self.NQ, self.MARKED, self.prog)
+        self.verified = bridge.verify_emitted(self.NQ, self.MARKED, self.prog)
+        return {
+            "gene": self.prog,
+            "gates": [bridge.GATE_NAMES[g] for g in self.prog],
+            "start": round(self.curve[0], 4),
+            "final": round(self.curve[-1], 4),
+            "fitness": round(self.fitness, 4),
+            "verified": round(self.verified, 4),
+            "evolved": self.curve[-1] > self.curve[0],
+            "source_ok": abs(self.verified - self.fitness) < 1e-9,
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "prog"):
+            self.boot()
+        return {"nq": self.NQ, "marked": self.MARKED, "prog": self.prog,
+                "curve": self.curve, "fitness": self.fitness,
+                "verified": self.verified, "source": self.source}
+
+    def html(self) -> str:
+        return html_qevolve(self.data())
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:

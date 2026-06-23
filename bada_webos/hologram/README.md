@@ -149,8 +149,27 @@ Bada (`apps/hologram/lib/qcache.bada`):
 `hologram/qcache.py` + `QCacheApp` render the dashboard (disk grid, Reviser
 table, prediction engine, thermal/Gamma curves, uncertainty).
 
+## Self-evolving quantum algorithm (source-code prototype)
+`qevolve` turns the quantum machinery into a **self-evolving source-code
+prototype**, all in Bada (`apps/hologram/lib/qevolve.bada`):
+* a quantum program is a **gene** — a sequence of real-amplitude meta-gates
+  (IDENTITY / ORACLE / DIFFUSE);
+* a **genetic algorithm** (deterministic LCG PRNG, tournament selection,
+  crossover, mutation, elitism) evolves the gene to maximize the amplitude on
+  the marked state — **rediscovering Grover amplification by selection** (e.g.
+  fitness 0.47 → 0.91 over generations);
+* `emit_source` writes the evolved program back out **as Bada source code**
+  (`def evolved_amp() { … }`), and the renderer **re-runs that emitted source**
+  to confirm `evolved_fitness()` matches — the self-evolving source-code seed.
+
+`hologram/qevolve.py` + `QEvolveApp` render the evolution curve, the evolved
+gene, and the self-generated, self-validated Bada source.
+
 ## Use
 ```
+qevolve list                   # evolution summary + self-validation
+qevolve source                 # print the self-generated Bada source
+qevolve html qe.html           # the self-evolving quantum-algorithm dashboard
 qcache list                    # the quantum cache disk summary
 qcache html q.html             # the quantum cache disk dashboard
 freeform list                  # the multi-window desktop summary
