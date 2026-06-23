@@ -60,6 +60,11 @@ _TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8">
    <div class="pull" id="pullok"></div>
    <div class="s" style="margin-top:8px">誤った鍵（必要条件を満たさない）</div>
    <div class="pull" id="pullbad"></div></div>
+ <div class="card" style="grid-column:1/-1"><h3>Pullした人に基づく解除（同じ必要条件）</h3>
+   <div class="s">暗号は <span class="k" id="tgt"></span> 宛に暗号化。解除条件 =
+     pullの必要条件（本人の π(χ, x_person) が一致）</div>
+   <table id="ptbl" style="margin-top:6px">
+     <tr><th>Pullした人</th><th>x_person</th><th>必要条件</th><th>pull結果（解除）</th></tr></table></div>
 </div>
 <script>
 const D=__DATA__;
@@ -84,4 +89,17 @@ document.getElementById('pullok').innerHTML=
 document.getElementById('pullbad').textContent=
  D.pull_bad.length? 'pulled = ['+D.pull_bad.join(', ')+']'
                   : 'pulled = [] （何も取り出せない＝暗号は解けない）';
+// per-puller unlock (identity-bound, same condition as pull)
+document.getElementById('tgt').textContent=D.target;
+function pid(name){let s=0;for(const c of name)s+=c.charCodeAt(0);return s;}
+function px(name){return (0.30+0.035*(pid(name)%11)).toFixed(3);}
+const ptbl=document.getElementById('ptbl');
+[[D.target,D.cond_self,D.pull_self],[D.other,D.cond_other,D.pull_other]].forEach(r=>{
+ const tr=document.createElement('tr');
+ const txt=r[2].length?r[2].map(c=>String.fromCharCode(c)).join(''):'—';
+ tr.innerHTML='<td>'+r[0]+(r[0]===D.target?'（宛先）':'（別人）')+'</td>'
+  +'<td>'+px(r[0])+'</td>'
+  +'<td>'+(r[1]?'<span class="ok">満たす ✓</span>':'<span class="bad">満たさない ✗</span>')+'</td>'
+  +'<td>'+(r[2].length?'<span class="txt ok">'+txt+'</span>':'<span class="bad">解除不可（pull空）</span>')+'</td>';
+ ptbl.appendChild(tr);});
 </script></body></html>"""

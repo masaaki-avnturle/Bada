@@ -401,6 +401,8 @@ class JCryptoApp:
     X = 0.5                 # Jones evaluation point (the key)
     WX = 0.7                # a wrong key (different evaluation point)
     PLAINTEXT = "BADA QC!"
+    TARGET = "Alice"        # the intended puller (encrypted to Alice)
+    OTHER = "Bob"           # another person (cannot unlock)
 
     def boot(self) -> dict:
         self.msg = [ord(c) for c in self.PLAINTEXT]
@@ -414,12 +416,25 @@ class JCryptoApp:
         self.nc_bad = bridge.necessary_condition(*key, *wrong)
         self.pull_ok = bridge.pull_decrypt(self.msg, *key, *key)
         self.pull_bad = bridge.pull_decrypt(self.msg, *key, *wrong)
+
+        # identity-bound: the unlock is based on WHO pulls (same condition)
+        self.cond_self = bridge.person_condition(self.CHI, self.N,
+                                                 self.TARGET, self.TARGET)
+        self.cond_other = bridge.person_condition(self.CHI, self.N,
+                                                  self.TARGET, self.OTHER)
+        self.pull_self = bridge.pull_as(self.msg, self.CHI, self.N,
+                                        self.TARGET, self.TARGET)
+        self.pull_other = bridge.pull_as(self.msg, self.CHI, self.N,
+                                         self.TARGET, self.OTHER)
         return {
             "plaintext": self.PLAINTEXT, "pi": round(self.pi, 4),
             "recovered": "".join(chr(round(v)) for v in self.solved),
             "necessary_ok": self.nc_ok, "necessary_bad": self.nc_bad,
             "pulled": self.pull_ok, "pulled_wrong": self.pull_bad,
             "solved_ok": [round(v) for v in self.solved] == self.msg,
+            "target": self.TARGET, "other": self.OTHER,
+            "unlock_self": "".join(chr(c) for c in self.pull_self),
+            "unlock_other_ok": bool(self.pull_other),
         }
 
     def data(self) -> dict:
@@ -428,7 +443,10 @@ class JCryptoApp:
         return {"chi": self.CHI, "x": self.X, "wx": self.WX, "pi": self.pi,
                 "msg": self.msg, "cipher": self.cipher, "solved": self.solved,
                 "wrong": self.wrong, "nc_ok": self.nc_ok, "nc_bad": self.nc_bad,
-                "pull_ok": self.pull_ok, "pull_bad": self.pull_bad}
+                "pull_ok": self.pull_ok, "pull_bad": self.pull_bad,
+                "target": self.TARGET, "other": self.OTHER,
+                "cond_self": self.cond_self, "cond_other": self.cond_other,
+                "pull_self": self.pull_self, "pull_other": self.pull_other}
 
     def html(self) -> str:
         return html_jcrypto(self.data())
