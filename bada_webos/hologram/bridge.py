@@ -31,6 +31,7 @@ _JPN = os.path.join(_PKG, "apps", "hologram", "lib", "romaji_kana.bada")
 _FRF = os.path.join(_PKG, "apps", "hologram", "lib", "freeform.bada")
 _QCA = os.path.join(_PKG, "apps", "hologram", "lib", "qcache.bada")
 _QEV = os.path.join(_PKG, "apps", "hologram", "lib", "qevolve.bada")
+_JCR = os.path.join(_PKG, "apps", "hologram", "lib", "jcrypto.bada")
 _SRC = None
 _KSRC = None
 _MSRC = None
@@ -39,6 +40,7 @@ _JSRC = None
 _FSRC = None
 _QSRC = None
 _QESRC = None
+_JCSRC = None
 
 
 def _run(extra: str):
@@ -397,3 +399,59 @@ def verify_emitted(nq, marked, prog) -> float:
     src = emit_source(nq, marked, prog)
     out = _qerun(src + "\nprint evolved_fitness()")
     return float(out.splitlines()[-1])
+
+
+# --- Quantum cryptography solved by the Jones polynomial (jcrypto) ----------
+def _jc_src():
+    global _JCSRC
+    if _JCSRC is None:
+        _JCSRC = load_program(_JCR)
+    return _JCSRC
+
+
+def _jcrun(extra: str):
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        run_source(_jc_src() + "\n" + extra)
+    return buf.getvalue().splitlines()
+
+
+def _braid(chi):
+    return "[" + ", ".join(str(int(g)) for g in chi) + "]"
+
+
+def _msg(m):
+    return "[" + ", ".join(str(int(v)) for v in m) + "]"
+
+
+def jones_pi(chi, n, x) -> float:
+    return float(_jcrun(f"print jones_pi({_braid(chi)}, {n}, {x})")[-1])
+
+
+def encrypt_msg(msg, chi, n, x) -> list:
+    return ast.literal_eval(
+        _jcrun(f"print encrypt_msg({_msg(msg)}, {_braid(chi)}, {n}, {x})")[-1])
+
+
+def solve_msg(cph, chi, n, x) -> list:
+    arr = "[" + ", ".join(repr(float(c)) for c in cph) + "]"
+    return ast.literal_eval(
+        _jcrun(f"print solve_msg({arr}, {_braid(chi)}, {n}, {x})")[-1])
+
+
+def necessary_condition(chi_e, n_e, x_e, chi_d, n_d, x_d) -> bool:
+    out = _jcrun(
+        f"print necessary_condition({_braid(chi_e)}, {n_e}, {x_e}, "
+        f"{_braid(chi_d)}, {n_d}, {x_d})")[-1]
+    return int(float(out)) == 1
+
+
+def pull_decrypt(msg, chi_e, n_e, x_e, chi_d, n_d, x_d) -> list:
+    """Encrypt msg with key E, then PULL the plaintext from Omega::DATABASE
+    using decrypt key D — non-empty only if the necessary condition holds."""
+    prog = (_jc_src()
+            + f"\nc <- encrypt_msg({_msg(msg)}, {_braid(chi_e)}, {n_e}, {x_e})\n"
+            f"n <- pull_decrypt(c, {_braid(chi_e)}, {n_e}, {x_e}, "
+            f"{_braid(chi_d)}, {n_d}, {x_d})\n")
+    vm = run_source(prog)
+    return list(vm.tuplespace.get("crypto", []))

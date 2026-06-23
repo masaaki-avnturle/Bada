@@ -18,6 +18,7 @@ from .glass import html_glass
 from .freeform import html_freeform
 from .qcache import html_qcache
 from .qevolve import html_qevolve
+from .jcrypto import html_jcrypto
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -382,6 +383,55 @@ class QEvolveApp:
 
     def html(self) -> str:
         return html_qevolve(self.data())
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class JCryptoApp:
+    """Quantum cryptography solved by the Jones polynomial: encryption f(s),
+    Jones π(χ,x), the cipher solved by f(s)/π(χ,x)−f(s), decryptable only under
+    the necessary condition (matching Jones key), with the plaintext pulled from
+    Omega::DATABASE — all computed in Bada."""
+
+    CHI = [1, 1, 1]         # trefoil braid (sigma_1^3)
+    N = 2                   # strands
+    X = 0.5                 # Jones evaluation point (the key)
+    WX = 0.7                # a wrong key (different evaluation point)
+    PLAINTEXT = "BADA QC!"
+
+    def boot(self) -> dict:
+        self.msg = [ord(c) for c in self.PLAINTEXT]
+        key = (self.CHI, self.N, self.X)
+        wrong = (self.CHI, self.N, self.WX)
+        self.pi = bridge.jones_pi(*key)
+        self.cipher = bridge.encrypt_msg(self.msg, *key)
+        self.solved = bridge.solve_msg(self.cipher, *key)
+        self.wrong = bridge.solve_msg(self.cipher, *wrong)
+        self.nc_ok = bridge.necessary_condition(*key, *key)
+        self.nc_bad = bridge.necessary_condition(*key, *wrong)
+        self.pull_ok = bridge.pull_decrypt(self.msg, *key, *key)
+        self.pull_bad = bridge.pull_decrypt(self.msg, *key, *wrong)
+        return {
+            "plaintext": self.PLAINTEXT, "pi": round(self.pi, 4),
+            "recovered": "".join(chr(round(v)) for v in self.solved),
+            "necessary_ok": self.nc_ok, "necessary_bad": self.nc_bad,
+            "pulled": self.pull_ok, "pulled_wrong": self.pull_bad,
+            "solved_ok": [round(v) for v in self.solved] == self.msg,
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "msg"):
+            self.boot()
+        return {"chi": self.CHI, "x": self.X, "wx": self.WX, "pi": self.pi,
+                "msg": self.msg, "cipher": self.cipher, "solved": self.solved,
+                "wrong": self.wrong, "nc_ok": self.nc_ok, "nc_bad": self.nc_bad,
+                "pull_ok": self.pull_ok, "pull_bad": self.pull_bad}
+
+    def html(self) -> str:
+        return html_jcrypto(self.data())
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:
