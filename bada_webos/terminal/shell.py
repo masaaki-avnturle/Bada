@@ -528,6 +528,68 @@ class Shell:
             return f"wrote freeform multi-window desktop to {path}\n"
         return "freeform: usage: freeform [list|html PATH]\n"
 
+    def _qcache(self, args, stdin):
+        # the Quantum Cache Disk: hard disk -> quantum cache (all computed in Bada).
+        from hologram import QCacheApp
+        sub = args[0] if args else "list"
+        app = QCacheApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Quantum Cache Disk:\n"
+                    f"  {r['blocks']} disk blocks -> {r['qubits']}-qubit state\n"
+                    f"  Reviser von-Neumann->quantum: {r['reviser']}\n"
+                    f"  telomere thought prediction: block #{r['predicted_first']}"
+                    f" @ hit {r['hit_prob']*100:.1f}% (Grover)\n"
+                    f"  Gamma integration-by-parts manifold: "
+                    f"{'OK' if r['gamma_ibp_ok'] else 'FAIL'}\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "qcache.html"
+            app.save_html(path)
+            return f"wrote quantum cache disk to {path}\n"
+        return "qcache: usage: qcache [list|html PATH]\n"
+
+    def _qevolve(self, args, stdin):
+        # self-evolving quantum-algorithm source-code prototype (Bada).
+        from hologram import QEvolveApp
+        sub = args[0] if args else "list"
+        app = QEvolveApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Self-evolving quantum algorithm:\n"
+                    f"  fitness {r['start']*100:.1f}% -> {r['final']*100:.1f}% "
+                    f"over {app.GENS} generations (evolved: {r['evolved']})\n"
+                    f"  evolved gene: {r['gates']}\n"
+                    f"  emitted Bada source self-validated: "
+                    f"{'OK' if r['source_ok'] else 'FAIL'} "
+                    f"({r['verified']*100:.1f}%)\n")
+        if sub == "source":
+            return app.source + "\n"
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "qevolve.html"
+            app.save_html(path)
+            return f"wrote self-evolving quantum algorithm to {path}\n"
+        return "qevolve: usage: qevolve [list|source|html PATH]\n"
+
+    def _jcrypto(self, args, stdin):
+        # quantum cryptography solved by the Jones polynomial (all in Bada).
+        from hologram import JCryptoApp
+        sub = args[0] if args else "list"
+        app = JCryptoApp()
+        r = app.boot()
+        if sub == "list":
+            return ("Quantum crypto · Jones:\n"
+                    "  暗号 f(s)=m·π/(1−π) , π(χ,x)=Vχ(x) , 解=f(s)/π(χ,x)−f(s)\n"
+                    f"  π(χ,x)={r['pi']} · plaintext '{r['plaintext']}'\n"
+                    f"  necessary condition: correct={r['necessary_ok']} "
+                    f"wrong={r['necessary_bad']}\n"
+                    f"  pull (Omega::DATABASE): '{r['recovered']}' "
+                    f"{'OK' if r['solved_ok'] else 'FAIL'}\n")
+        if sub == "html":
+            path = args[1] if len(args) > 1 else "jcrypto.html"
+            app.save_html(path)
+            return f"wrote quantum-crypto (Jones) solver to {path}\n"
+        return "jcrypto: usage: jcrypto [list|html PATH]\n"
+
     def _slideshow(self, args, stdin):
         # all equation-group graphs as a PowerPoint-style flash slideshow.
         from slideshow import SlideshowApp
@@ -710,7 +772,10 @@ class Shell:
                 "  mirror app:     holomirror [list|html PATH [keyboard]]\n"
                 "  spatial (VP):   holovision [list|html PATH]\n"
                 "  transparent JP: hologlass [list|html PATH]\n"
-                "  freeform WM:    freeform [list|html PATH]\n")
+                "  freeform WM:    freeform [list|html PATH]\n"
+                "  quantum cache:  qcache [list|html PATH]\n"
+                "  q self-evolve:  qevolve [list|source|html PATH]\n"
+                "  q crypto·Jones: jcrypto [list|html PATH]\n")
 
     BUILTINS = {
         "pwd": _pwd, "cd": _cd, "ls": _ls, "echo": _echo, "cat": _cat,
@@ -725,5 +790,7 @@ class Shell:
         "slideshow": _slideshow, "topdown": _topdown,
         "hologram": _hologram, "holokbd": _holokbd,
         "holomirror": _holomirror, "holovision": _holovision,
-        "hologlass": _hologlass, "freeform": _freeform, "help": _help,
+        "hologlass": _hologlass, "freeform": _freeform,
+        "qcache": _qcache, "qevolve": _qevolve, "jcrypto": _jcrypto,
+        "help": _help,
     }

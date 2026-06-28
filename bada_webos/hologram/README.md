@@ -130,8 +130,68 @@ button**, running-app buttons and a clock.
   size of the next opened window — `window_size` returns a tall narrow phone
   window, a medium window, or a large window (mirrored in the renderer).
 
+## Quantum Cache Disk
+`qcache` reinterprets a PC's hard disk as a **quantum cache**, all computed in
+Bada (`apps/hologram/lib/qcache.bada`):
+* the disk's **bit patterns become a normalized qubit state** (`disk_state`) —
+  the hard disk "becomes a quantum computer";
+* a **Reviser** rewrites von-Neumann cache ops into quantum gates (`revise_op`:
+  READ→MEASURE, WRITE→NOT, FETCH→HADAMARD, EVICT→RESET, SEARCH→GROVER);
+* an FPGA-style **Grover a-priori engine** (`grover`) amplifies the marked
+  "thought pattern" derived from the target's **DNA-telomere** division
+  (`telomere` / `predict_block`);
+* the **Jones polynomial** gives a thermal network (`jones_thermal`, t=e^−β);
+* the **Gamma integration-by-parts manifold** Γ(z+1)=z·Γ(z) (`gamma_ibp`) is the
+  global weighting; and
+* the **semiconductor uncertainty principle** Δaddr·Δdata ≥ ħ/2
+  (`uncertainty_bound`).
+
+`hologram/qcache.py` + `QCacheApp` render the dashboard (disk grid, Reviser
+table, prediction engine, thermal/Gamma curves, uncertainty).
+
+## Self-evolving quantum algorithm (source-code prototype)
+`qevolve` turns the quantum machinery into a **self-evolving source-code
+prototype**, all in Bada (`apps/hologram/lib/qevolve.bada`):
+* a quantum program is a **gene** — a sequence of real-amplitude meta-gates
+  (IDENTITY / ORACLE / DIFFUSE);
+* a **genetic algorithm** (deterministic LCG PRNG, tournament selection,
+  crossover, mutation, elitism) evolves the gene to maximize the amplitude on
+  the marked state — **rediscovering Grover amplification by selection** (e.g.
+  fitness 0.47 → 0.91 over generations);
+* `emit_source` writes the evolved program back out **as Bada source code**
+  (`def evolved_amp() { … }`), and the renderer **re-runs that emitted source**
+  to confirm `evolved_fitness()` matches — the self-evolving source-code seed.
+
+`hologram/qevolve.py` + `QEvolveApp` render the evolution curve, the evolved
+gene, and the self-generated, self-validated Bada source.
+
+## Quantum cryptography solved by the Jones polynomial
+`jcrypto` solves a quantum cipher with the Jones polynomial, all in Bada
+(`apps/hologram/lib/jcrypto.bada`):
+* **encryption = f(s)**, with `f(s) = m·π/(1−π)` (m = plaintext);
+* **Jones polynomial = π(χ,x)** = `V_χ(x)` (the quantum knot invariant, key);
+* the cipher is **solved by `f(s)/π(χ,x) − f(s)`**, which equals m exactly;
+* decryption succeeds only under the **necessary condition** that the decrypt
+  key reproduces the encryption's π(χ,x) (a wrong braid χ or point x fails);
+* the recovered plaintext is **pulled** out of `Omega::DATABASE` (push then
+  pull) — non-empty only when the condition holds;
+* the unlock is **bound to the puller**: each person's identity maps to their
+  own Jones point `person_x(id)`, so the cipher is encrypted *to a person* and
+  the **same necessary condition** lets only that person (`pull_as`) unlock /
+  pull the plaintext — another person fails (`person_condition` false).
+
+`hologram/jcrypto.py` + `JCryptoApp` render the formula, the encrypt/solve
+table, the necessary-condition check and the pull from the tuplespace.
+
 ## Use
 ```
+jcrypto list                   # the f(s)/π−f(s) solver + pull summary
+jcrypto html jc.html           # the quantum-crypto (Jones) dashboard
+qevolve list                   # evolution summary + self-validation
+qevolve source                 # print the self-generated Bada source
+qevolve html qe.html           # the self-evolving quantum-algorithm dashboard
+qcache list                    # the quantum cache disk summary
+qcache html q.html             # the quantum cache disk dashboard
 freeform list                  # the multi-window desktop summary
 freeform html f.html           # the freeform window manager + taskbar
 hologlass list                 # the transparent / Japanese-input summary

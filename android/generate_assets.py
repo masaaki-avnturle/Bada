@@ -21,7 +21,7 @@ for p in (PKG, ROOT, os.path.join(ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,  # noqa
-                      GlassApp, FreeformApp)
+                      GlassApp, FreeformApp, QCacheApp, QEvolveApp, JCryptoApp)
 
 OUT = os.path.join(HERE, "app", "src", "main", "assets", "holograms")
 
@@ -50,6 +50,24 @@ def main():
     emit("hologlass.html", "Transparent + Japanese HHKB",
          "see-through display & HHKB over the camera — romaji→kana input",
          g.save_html)
+
+    qc = QCacheApp()
+    qc.boot()
+    emit("qcache.html", "Quantum Cache Disk",
+         "hard disk → quantum cache: Reviser, Grover prediction, Γ/Jones (Bada)",
+         qc.save_html)
+
+    qe = QEvolveApp()
+    qe.boot()
+    emit("qevolve.html", "Self-Evolving Quantum Algorithm",
+         "a GA evolves a quantum algorithm and emits it as Bada source (Bada)",
+         qe.save_html)
+
+    jc = JCryptoApp()
+    jc.boot()
+    emit("jcrypto.html", "Quantum Crypto · Jones",
+         "cipher f(s) solved by f(s)/π(χ,x)−f(s); pull + necessary condition (Bada)",
+         jc.save_html)
 
     v = VisionApp(n=14, frames=16)
     v.boot()

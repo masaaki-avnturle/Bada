@@ -15,7 +15,8 @@ for p in (_PKG, _ROOT, os.path.join(_ROOT, "bada_silent_vim")):
         sys.path.insert(0, p)
 
 from hologram import (HologramApp, HoloKeyboardApp, MirrorApp, VisionApp,
-                      GlassApp, FreeformApp, html_hologram, html_keyboard)
+                      GlassApp, FreeformApp, QCacheApp, QEvolveApp, JCryptoApp,
+                      html_hologram, html_keyboard)
 from hologram import bridge
 from hologram.keyboard import code_label
 
@@ -371,6 +372,161 @@ class TestFreeformWM(unittest.TestCase):
         self.assertIn("sizeFor", h)
         self.assertIn("launchSize", h)
         self.assertIn("携帯型", h)
+
+
+class TestQuantumCacheDisk(unittest.TestCase):
+    """Hard disk -> quantum cache: Reviser, Grover prediction, Γ-IBP, Jones."""
+
+    def test_gamma_integration_by_parts(self):
+        # the IBP identity Gamma(z+1) = z*Gamma(z), computed in Bada
+        for z in range(1, 8):
+            self.assertEqual(bridge.gamma_ibp(z), bridge.gamma_int(z + 1))
+
+    def test_disk_state_is_normalized(self):
+        amps = bridge.disk_state([3, 7, 1, 15], 4)
+        self.assertAlmostEqual(sum(a * a for a in amps), 1.0, places=6)
+
+    def test_reviser_von_neumann_to_quantum(self):
+        rev = dict(bridge.revise_program(
+            ["READ", "WRITE", "FETCH", "EVICT", "SEARCH"]))
+        self.assertEqual(rev["READ"], "MEASURE")
+        self.assertEqual(rev["FETCH"], "HADAMARD")
+        self.assertEqual(rev["SEARCH"], "GROVER")
+
+    def test_grover_prediction_amplifies(self):
+        # the a-priori engine amplifies the telomere thought pattern well past
+        # the uniform 1/N probability
+        p = bridge.predict_curve(4, 20, 4)
+        self.assertTrue(all(x > 0.5 for x in p))     # >> 1/16
+        blocks = bridge.predict_blocks(4, 20, 4)
+        self.assertEqual(len(blocks), 4)
+        self.assertTrue(all(0 <= b < 16 for b in blocks))
+
+    def test_uncertainty_bound(self):
+        # Delta(addr)*Delta(data) >= hbar/2 ; at d_addr=0.5 the bound is hbar
+        hbar = 1.054571817e-34
+        self.assertAlmostEqual(bridge.uncertainty_bound(0.5, hbar) / hbar,
+                               1.0, places=3)
+
+    def test_app_html(self):
+        app = QCacheApp()
+        r = app.boot()
+        self.assertEqual(r["blocks"], 16)
+        self.assertTrue(r["gamma_ibp_ok"])
+        self.assertGreater(r["hit_prob"], 0.5)
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "q.html"))).read()
+        self.assertIn("QUANTUM CACHE DISK", h)
+        self.assertIn("HADAMARD", h)                 # Reviser output
+        self.assertIn("GROVER", h)
+        self.assertIn("大域的部分積分", h)           # Gamma IBP manifold
+        self.assertIn("不確定性原理", h)             # uncertainty principle
+
+    def test_in_freeform_catalog(self):
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("qcache.html", files)          # opens in a freeform window
+
+
+class TestSelfEvolvingQuantum(unittest.TestCase):
+    """A GA evolves a quantum algorithm and emits it as Bada source (qevolve)."""
+
+    def test_gates_grover(self):
+        # the hand-built Grover gene amplifies; identity-only stays at 1/N
+        amp = bridge.fitness(4, 10, [1, 2, 1, 2, 1, 2])
+        self.assertGreater(amp, 0.9)
+        self.assertAlmostEqual(bridge.fitness(4, 10, [0, 0, 0, 0, 0, 0]),
+                               1.0 / 16, places=6)
+
+    def test_evolution_improves(self):
+        curve = bridge.evolve_curve(4, 10, 8, 16, 18, 5)
+        # best-so-far is non-decreasing and strictly rises (self-evolution)
+        for i in range(len(curve) - 1):
+            self.assertGreaterEqual(curve[i + 1], curve[i])
+        self.assertGreater(curve[-1], curve[0])
+        self.assertGreater(curve[-1], 0.5)           # well past uniform 1/16
+
+    def test_emitted_source_self_validates(self):
+        prog = bridge.evolve_best(4, 10, 8, 16, 18, 5)
+        src = bridge.emit_source(4, 10, prog)
+        self.assertIn("def evolved_amp()", src)      # it is Bada source code
+        self.assertIn("apply_oracle", src)
+        # re-running the emitted source reproduces the evolved fitness
+        self.assertAlmostEqual(bridge.verify_emitted(4, 10, prog),
+                               bridge.fitness(4, 10, prog), places=9)
+
+    def test_app_html(self):
+        app = QEvolveApp()
+        r = app.boot()
+        self.assertTrue(r["evolved"])
+        self.assertTrue(r["source_ok"])
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "qe.html"))).read()
+        self.assertIn("SELF-EVOLVING QUANTUM ALGORITHM", h)
+        self.assertIn("evolved_amp", h)              # the emitted source
+        self.assertIn("自己検証", h)                 # self-validation
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("qevolve.html", files)
+
+
+class TestQuantumCryptoJones(unittest.TestCase):
+    """Cipher f(s) solved by f(s)/π(χ,x)−f(s); pull + necessary condition."""
+
+    KEY = ([1, 1, 1], 2, 0.5)
+    WRONG = ([1, 1, 1], 2, 0.7)
+
+    def test_solver_inverts_with_correct_key(self):
+        # f(s)/π−f(s) exactly recovers the plaintext m under the right key
+        msg = [72, 73, 33]
+        cipher = bridge.encrypt_msg(msg, *self.KEY)
+        solved = [round(v) for v in bridge.solve_msg(cipher, *self.KEY)]
+        self.assertEqual(solved, msg)
+
+    def test_wrong_key_does_not_break(self):
+        msg = [72, 73, 33]
+        cipher = bridge.encrypt_msg(msg, *self.KEY)
+        wrong = [round(v) for v in bridge.solve_msg(cipher, *self.WRONG)]
+        self.assertNotEqual(wrong, msg)              # cipher not broken
+
+    def test_necessary_condition(self):
+        self.assertTrue(bridge.necessary_condition(*self.KEY, *self.KEY))
+        self.assertFalse(bridge.necessary_condition(*self.KEY, *self.WRONG))
+
+    def test_pull_from_tuplespace(self):
+        msg = [66, 65, 68, 65]                       # "BADA"
+        # correct key -> plaintext pulled from Omega::DATABASE
+        self.assertEqual(bridge.pull_decrypt(msg, *self.KEY, *self.KEY), msg)
+        # wrong key -> necessary condition fails -> nothing pulled
+        self.assertEqual(bridge.pull_decrypt(msg, *self.KEY, *self.WRONG), [])
+
+    def test_unlock_bound_to_the_puller(self):
+        # identity-bound: encrypted to Alice, only Alice can pull/unlock — and
+        # the unlock uses the SAME condition as pull (person_condition)
+        msg = [66, 65, 68, 65]                        # "BADA"
+        self.assertTrue(bridge.person_condition([1, 1, 1], 2, "Alice", "Alice"))
+        self.assertFalse(bridge.person_condition([1, 1, 1], 2, "Alice", "Bob"))
+        self.assertEqual(bridge.pull_as(msg, [1, 1, 1], 2, "Alice", "Alice"),
+                         msg)
+        self.assertEqual(bridge.pull_as(msg, [1, 1, 1], 2, "Alice", "Bob"), [])
+
+    def test_app_html(self):
+        app = JCryptoApp()
+        r = app.boot()
+        self.assertTrue(r["solved_ok"])
+        self.assertEqual(r["recovered"], app.PLAINTEXT)
+        self.assertTrue(r["necessary_ok"])
+        self.assertFalse(r["necessary_bad"])
+        self.assertEqual(r["pulled_wrong"], [])
+        with tempfile.TemporaryDirectory() as d:
+            h = open(app.save_html(os.path.join(d, "jc.html"))).read()
+        self.assertIn("QUANTUM CRYPTO", h)
+        self.assertIn("f(s)/π(χ,x)", h)              # the solver formula
+        self.assertIn("Omega::DATABASE", h)          # pull
+        self.assertIn("必要条件", h)                 # necessary condition
+        self.assertIn("Pullした人に基づく解除", h)   # per-puller unlock
+        self.assertEqual(r["unlock_self"], app.PLAINTEXT)
+        self.assertFalse(r["unlock_other_ok"])
+        files = [a["file"] for a in bridge.wm_catalog()]
+        self.assertIn("jcrypto.html", files)
 
 
 if __name__ == "__main__":

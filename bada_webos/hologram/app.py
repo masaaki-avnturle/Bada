@@ -16,6 +16,9 @@ from .mirror import html_mirror
 from .spatial import html_vision
 from .glass import html_glass
 from .freeform import html_freeform
+from .qcache import html_qcache
+from .qevolve import html_qevolve
+from .jcrypto import html_jcrypto
 
 TABLET_AREA_CM2 = 200.0   # ~10" tablet panel
 BATTERY_WH = 40.0         # tablet battery
@@ -279,6 +282,174 @@ class FreeformApp:
 
     def html(self) -> str:
         return html_freeform(self.catalog, self.tb, self.sections, self.sizes)
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class QCacheApp:
+    """The Quantum Cache Disk: the hard disk's bit patterns become a quantum
+    state, the Reviser rewrites von-Neumann cache ops to quantum gates, a Grover
+    a-priori engine predicts the DNA-telomere thought pattern, with the Jones
+    thermal network, the Gamma integration-by-parts manifold and the
+    semiconductor uncertainty bound — all computed in Bada."""
+
+    NBITS = 4
+    NQ = 4                              # 2^4 = 16 blocks
+    L0 = 20                             # initial telomere length
+    STEPS = 8                           # telomere division steps
+    HBAR = 1.054571817e-34
+    PATTERNS = [3, 12, 7, 1, 15, 9, 6, 10, 5, 0, 14, 11, 8, 2, 13, 4]
+    OPS = ["READ", "WRITE", "FETCH", "SEARCH", "EVICT"]
+
+    def boot(self) -> dict:
+        self.amps = bridge.disk_state(self.PATTERNS, self.NBITS)
+        self.reviser = bridge.revise_program(self.OPS)
+        self.predicted = bridge.predict_blocks(self.NQ, self.L0, self.STEPS)
+        self.curve = bridge.predict_curve(self.NQ, self.L0, self.STEPS)
+        self.thermal = [[round(b, 2), bridge.jones_thermal(b)]
+                        for b in [i * 0.4 for i in range(8)]]
+        self.gamma = [[z, bridge.gamma_int(z), bridge.gamma_ibp(z)]
+                      for z in range(1, 8)]
+        self.bound = bridge.uncertainty_bound(0.5, self.HBAR)
+        return {
+            "blocks": len(self.PATTERNS), "qubits": self.NQ,
+            "reviser": self.reviser,
+            "predicted_first": self.predicted[0],
+            "hit_prob": round(self.curve[0], 4),
+            "gamma_ibp_ok": self.gamma[4][1] * 5 == self.gamma[5][1],
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "amps"):
+            self.boot()
+        return {
+            "nbits": self.NBITS, "patterns": self.PATTERNS, "amps": self.amps,
+            "reviser": [list(r) for r in self.reviser],
+            "predicted": self.predicted, "curve": self.curve,
+            "teloMax": self.L0, "thermal": self.thermal, "gamma": self.gamma,
+            "unc": {"d_addr": 0.5, "hbar": self.HBAR, "bound": self.bound},
+        }
+
+    def html(self) -> str:
+        return html_qcache(self.data())
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class QEvolveApp:
+    """Self-evolving quantum-algorithm source-code prototype: a genetic
+    algorithm (in Bada) evolves a real-amplitude quantum program toward Grover
+    amplification, then writes the evolved algorithm back out as Bada source
+    code — self-validated by re-running the emitted source."""
+
+    NQ = 4
+    MARKED = 10
+    L = 8                   # gene length (gate slots)
+    POP = 16
+    GENS = 18
+    SEED = 5
+
+    def boot(self) -> dict:
+        self.prog = bridge.evolve_best(self.NQ, self.MARKED, self.L,
+                                       self.POP, self.GENS, self.SEED)
+        self.curve = bridge.evolve_curve(self.NQ, self.MARKED, self.L,
+                                         self.POP, self.GENS, self.SEED)
+        self.fitness = bridge.fitness(self.NQ, self.MARKED, self.prog)
+        self.source = bridge.emit_source(self.NQ, self.MARKED, self.prog)
+        self.verified = bridge.verify_emitted(self.NQ, self.MARKED, self.prog)
+        return {
+            "gene": self.prog,
+            "gates": [bridge.GATE_NAMES[g] for g in self.prog],
+            "start": round(self.curve[0], 4),
+            "final": round(self.curve[-1], 4),
+            "fitness": round(self.fitness, 4),
+            "verified": round(self.verified, 4),
+            "evolved": self.curve[-1] > self.curve[0],
+            "source_ok": abs(self.verified - self.fitness) < 1e-9,
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "prog"):
+            self.boot()
+        return {"nq": self.NQ, "marked": self.MARKED, "prog": self.prog,
+                "curve": self.curve, "fitness": self.fitness,
+                "verified": self.verified, "source": self.source}
+
+    def html(self) -> str:
+        return html_qevolve(self.data())
+
+    def save_html(self, path: str) -> str:
+        with open(path, "w") as f:
+            f.write(self.html())
+        return path
+
+
+class JCryptoApp:
+    """Quantum cryptography solved by the Jones polynomial: encryption f(s),
+    Jones π(χ,x), the cipher solved by f(s)/π(χ,x)−f(s), decryptable only under
+    the necessary condition (matching Jones key), with the plaintext pulled from
+    Omega::DATABASE — all computed in Bada."""
+
+    CHI = [1, 1, 1]         # trefoil braid (sigma_1^3)
+    N = 2                   # strands
+    X = 0.5                 # Jones evaluation point (the key)
+    WX = 0.7                # a wrong key (different evaluation point)
+    PLAINTEXT = "BADA QC!"
+    TARGET = "Alice"        # the intended puller (encrypted to Alice)
+    OTHER = "Bob"           # another person (cannot unlock)
+
+    def boot(self) -> dict:
+        self.msg = [ord(c) for c in self.PLAINTEXT]
+        key = (self.CHI, self.N, self.X)
+        wrong = (self.CHI, self.N, self.WX)
+        self.pi = bridge.jones_pi(*key)
+        self.cipher = bridge.encrypt_msg(self.msg, *key)
+        self.solved = bridge.solve_msg(self.cipher, *key)
+        self.wrong = bridge.solve_msg(self.cipher, *wrong)
+        self.nc_ok = bridge.necessary_condition(*key, *key)
+        self.nc_bad = bridge.necessary_condition(*key, *wrong)
+        self.pull_ok = bridge.pull_decrypt(self.msg, *key, *key)
+        self.pull_bad = bridge.pull_decrypt(self.msg, *key, *wrong)
+
+        # identity-bound: the unlock is based on WHO pulls (same condition)
+        self.cond_self = bridge.person_condition(self.CHI, self.N,
+                                                 self.TARGET, self.TARGET)
+        self.cond_other = bridge.person_condition(self.CHI, self.N,
+                                                  self.TARGET, self.OTHER)
+        self.pull_self = bridge.pull_as(self.msg, self.CHI, self.N,
+                                        self.TARGET, self.TARGET)
+        self.pull_other = bridge.pull_as(self.msg, self.CHI, self.N,
+                                         self.TARGET, self.OTHER)
+        return {
+            "plaintext": self.PLAINTEXT, "pi": round(self.pi, 4),
+            "recovered": "".join(chr(round(v)) for v in self.solved),
+            "necessary_ok": self.nc_ok, "necessary_bad": self.nc_bad,
+            "pulled": self.pull_ok, "pulled_wrong": self.pull_bad,
+            "solved_ok": [round(v) for v in self.solved] == self.msg,
+            "target": self.TARGET, "other": self.OTHER,
+            "unlock_self": "".join(chr(c) for c in self.pull_self),
+            "unlock_other_ok": bool(self.pull_other),
+        }
+
+    def data(self) -> dict:
+        if not hasattr(self, "msg"):
+            self.boot()
+        return {"chi": self.CHI, "x": self.X, "wx": self.WX, "pi": self.pi,
+                "msg": self.msg, "cipher": self.cipher, "solved": self.solved,
+                "wrong": self.wrong, "nc_ok": self.nc_ok, "nc_bad": self.nc_bad,
+                "pull_ok": self.pull_ok, "pull_bad": self.pull_bad,
+                "target": self.TARGET, "other": self.OTHER,
+                "cond_self": self.cond_self, "cond_other": self.cond_other,
+                "pull_self": self.pull_self, "pull_other": self.pull_other}
+
+    def html(self) -> str:
+        return html_jcrypto(self.data())
 
     def save_html(self, path: str) -> str:
         with open(path, "w") as f:
