@@ -291,6 +291,68 @@ lib/bada/evos/vehicle.rb         車両全体を束ねる Facade
 lib/bada/evos.rb                 BadaOS-EV エントリポイント
 ```
 
+## BadaOS-HEV — ハイブリッド車のオペレーティングシステム
+
+`Bada::HEVOS` は、**Bada 言語でハイブリッド車（シリーズ・パラレル方式）の OS を構築**
+したものです。BadaOS-EV のリアルタイムカーネル・エラー修正センサ・バッテリ管理・熱
+管理・Ω::DATABASE レコーダを**再利用**し、ハイブリッド特有の中核 — **内燃機関（ICE）**、
+**燃料系**、**e-CVT 動力分割**、そして頭脳となる **適応 ECMS エネルギー管理** を加えます。
+
+| HEV の機能 | 使う Bada プリミティブ |
+|:--|:--|
+| ECMS 等価係数 s の安定化（SOC 帰還の平滑化） | `Bada::ErrorCorrection`（相対論的コマの可積分系） |
+| 走行パターン判定（Ξ）と異常検知 | `Bada::Manifold` / `Bada::Entropy`（エントロピー不変量 Ξ） |
+| エンジン BSFC（熱効率）マップ | `Bada::Special.x_log_x`（ネイピア円） |
+| ブラックボックス（フライトレコーダ） | `Bada::TupleSpace`（Ω::DATABASE / アカシック） |
+
+```bash
+bin/bada hev 30                   # BadaOS-HEV を起動し走行サイクルを実行
+ruby examples/hev_os_demo.rb      # EV発進→合流ブースト→巡航→回生
+ruby -Ilib test/test_hevos.rb     # HEV OS テスト（17 件）
+bin/bada run examples/hev_os.bada # Bada 言語そのものでエネルギー配分を記述
+```
+
+```ruby
+require "bada"
+
+hev = Bada::HEVOS::Vehicle.new(battery_kwh: 1.6, fuel_l: 40.0).boot
+hev.drive(0.5)         # アクセル（throttle ∈ [-1,1]、負は回生ブレーキ）
+hev.run(ticks: 40)     # ECMS がエンジン／バッテリを毎サイクル裁定
+puts hev.dashboard     # 計器クラスタ + エネルギーフロー表示
+```
+
+### エネルギー管理戦略（ECMS）— ハイブリッドの頭脳
+
+エネルギーマネージャは毎サイクル、運転者の要求出力を満たす配分のうち、
+**等価燃料コスト `J = 燃料パワー + s · バッテリパワー`** を最小化する
+エンジン／バッテリ分担を選びます（`s` は電力を等価燃料へ換算する係数）。
+
+| モード | 動作 |
+|:--|:--|
+| **EV** | 低負荷・SOC 十分 → エンジン停止、モーターのみ |
+| **ENGINE** | 巡航 → エンジンが効率の良い動作点で車輪を駆動 |
+| **BOOST** | 高負荷 → エンジン + バッテリで加勢 |
+| **CHARGE** | SOC 下限 → エンジンが路面負荷より高出力で運転し発電（チャージサステイン、ヒステリシス付） |
+| **REGEN** | 制動 → モーター発電でパックへ回収 |
+
+`s` は SOC 帰還で適応し、**Bada エラー修正**で平滑化されるため、エンジンの
+ON/OFF がチャタリング（リミットサイクル）しません。直近の要求出力の
+**エントロピー不変量 Ξ** を測って走行パターン（穏やか／激しい）を判定し、配分に反映します。
+
+### モジュール構成（`Bada::HEVOS`）
+
+```
+lib/bada/hevos/engine.rb            内燃機関（ICE）+ BSFC 熱効率マップ
+lib/bada/hevos/fuel.rb              燃料タンク + 燃料流量の積分
+lib/bada/hevos/strategy.rb         適応 ECMS エネルギー管理（頭脳）
+lib/bada/hevos/hybrid_powertrain.rb エンジン + モーター + e-CVT 動力分割 + 運動モデル
+lib/bada/hevos/diagnostics.rb      故障マネージャ（燃料／エンジン／SOC + Ξ 異常）
+lib/bada/hevos/dashboard.rb        テキスト HMI（エネルギーフロー表示付）
+lib/bada/hevos/vehicle.rb          車両全体を束ねる Facade
+lib/bada/hevos.rb                  BadaOS-HEV エントリポイント
+（バッテリ管理・熱管理・センサ・カーネル・レコーダは Bada::EVOS を再利用）
+```
+
 ## モジュール構成
 
 ```

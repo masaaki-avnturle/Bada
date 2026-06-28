@@ -28,6 +28,7 @@
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
 #   Bada::EVOS             BadaOS-EV — operating system for an electric vehicle
+#   Bada::HEVOS            BadaOS-HEV — operating system for a hybrid vehicle
 
 require_relative "bada/version"
 require_relative "bada/special"
@@ -47,6 +48,7 @@ require_relative "bada/penrose"
 require_relative "bada/chat"
 require_relative "bada/nn"
 require_relative "bada/evos"
+require_relative "bada/hevos"
 
 module Bada
 end

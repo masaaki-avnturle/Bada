@@ -43,7 +43,7 @@ module Bada
       attr_reader :cells, :series, :parallel, :capacity_kwh
       attr_accessor :cooling_kw
 
-      def initialize(series: 96, parallel: 4, capacity_kwh: 60.0, seed_spread: true)
+      def initialize(series: 96, parallel: 4, capacity_kwh: 60.0, soc0: 0.85, seed_spread: true)
         @series = series
         @parallel = [parallel.to_i, 1].max
         @capacity_kwh = capacity_kwh.to_f
@@ -51,11 +51,11 @@ module Bada
         @cells = Array.new(series) do |i|
           # Deterministic small spread so balancing has something to correct.
           if seed_spread
-            soc = 0.85 + 0.01 * Math.sin(i * 0.7)
+            soc = soc0 + 0.01 * Math.sin(i * 0.7)
             cap = 1.0 + 0.03 * Math.cos(i * 0.9)
-            Cell.new(soc: soc, cap_factor: cap)
+            Cell.new(soc: soc.clamp(0.0, 1.0), cap_factor: cap)
           else
-            Cell.new
+            Cell.new(soc: soc0)
           end
         end
       end
