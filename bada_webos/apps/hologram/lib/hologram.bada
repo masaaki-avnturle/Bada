@@ -1,0 +1,260 @@
+// hologram.bada — the Hologram Display light field, in Bada.
+//
+// From the report "Hologram Display" (Yamaguchi):
+//   1/e^(x log x) + 1/e^(-x log x) = 1/y           (light position)
+//   (e^(x log x)+e^(-x log x))/(e^(x log x)·e^(-x log x)) = beta(p,q)
+//   beta(p,q) = 2(cos(i x log x) + i sin(i x log x)) = (Γ(p)+Γ(q))/(Γ(p)Γ(q))
+//   ||ds^2|| = ∫ ( v/√(1+(v/c)^2) + i v/√(1+(v/c)^2) ) dvol
+//   ||ds^2|| = 8πG (p/c^3 + V/S)
+//
+// The light of the hologram is reflected by SiO2 mirrors arranged left / right /
+// before / after (the four faces of the reflection pyramid).  The light field is
+// a *complex* amplitude — a "reality" surface (re) and an "imaginary" surface
+// (im) — exactly the "camera mechanism of imaginary and reality surfaces".
+//
+// The image floats up out of a conductive-plastic tablet: the light "mounds up"
+// (盛る) following the Jones polynomial V(t) of a knot, and the tablet's power
+// draw is modelled so the display can be run inside a power budget.
+
+#include ../../lib/jones.bada
+
+// --- small math (exp / log / trig) -----------------------------------------
+def fabs(v) { -< v < 0 { return 0 - v }  return v }
+
+def fpow(base, n) {
+  r <- 1.0
+  k <- 0
+  -> k < n { r <- r * base  k <- k + 1 }
+  return r
+}
+
+def fexp(x) {
+  term <- 1.0
+  sum <- 1.0
+  n <- 1
+  -> n < 18 { term <- term * x / n  sum <- sum + term  n <- n + 1 }
+  return sum
+}
+
+// natural log via  ln x = 2 atanh((x-1)/(x+1)),  x > 0
+def flog(x) {
+  -< x <= 0 { return 0 - 30.0 }
+  w <- (x - 1.0) / (x + 1.0)
+  w2 <- w * w
+  term <- w
+  sum <- w
+  n <- 1
+  -> n < 24 { term <- term * w2  sum <- sum + term / (2 * n + 1)  n <- n + 1 }
+  return 2.0 * sum
+}
+
+def fsin(theta) {
+  tp <- 6.283185307179586
+  pi <- 3.141592653589793
+  m <- idiv(theta / tp, 1)
+  x <- theta - m * tp
+  -> x > pi { x <- x - tp }
+  -> x < 0 - pi { x <- x + tp }
+  x2 <- x * x
+  term <- x
+  sum <- x
+  n <- 1
+  -> n < 9 {
+    d <- (2 * n) * (2 * n + 1)
+    term <- 0 - term * x2 / d
+    sum <- sum + term
+    n <- n + 1
+  }
+  return sum
+}
+
+def fcos(theta) { return fsin(theta + 1.5707963267948966) }
+
+def fsqrt(v) {
+  -< v <= 0 { return 0.0 }
+  g <- v
+  k <- 0
+  -> k < 24 { g <- 0.5 * (g + v / g)  k <- k + 1 }
+  return g
+}
+
+// --- the report's light functions ------------------------------------------
+
+// x log x  for a positive coordinate x
+def xlogx(x) {
+  -< x <= 0.0001 { x <- 0.0001 }
+  return x * flog(x)
+}
+
+// light position:  1/y = e^(-s) + e^(s) = 2 cosh(s),   y = 1/(2 cosh(s))
+// (peaks where s = 0, i.e. x = 1) — the bright hologram light ridge.
+def light_pos(s) {
+  return 1.0 / (fexp(s) + fexp(0 - s))
+}
+
+// beta(p,q) magnitude in the trig/position form: 2 cosh(s)
+def beta_mag(s) {
+  return fexp(s) + fexp(0 - s)
+}
+
+// map domain (u,v) in [-1,1]^2 to the radial light coordinate x in (0, ~1.6]
+def light_x(u, v) {
+  r <- fsqrt(u * u + v * v)
+  return 0.2 + r
+}
+
+// complex light amplitude at (u,v) and animation time t.
+// re = reality surface, im = imaginary surface; phase rotates with t.
+def light_re(u, v, t) {
+  x <- light_x(u, v)
+  s <- xlogx(x)
+  phi <- 6.283185307179586 * (s + t)
+  return light_pos(s) * fcos(phi)
+}
+
+def light_im(u, v, t) {
+  x <- light_x(u, v)
+  s <- xlogx(x)
+  phi <- 6.283185307179586 * (s + t)
+  return light_pos(s) * fsin(phi)
+}
+
+// |amplitude| — the displayed hologram brightness (0..0.5)
+def light_mag(u, v, t) {
+  re <- light_re(u, v, t)
+  im <- light_im(u, v, t)
+  return fsqrt(re * re + im * im)
+}
+
+// flat n*n grids over [-1,1]^2 at time t  (re / im / magnitude)
+def light_flat(name, n, t) {
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      u <- 0 - 1 + 2.0 * i / (n - 1)
+      v <- 0 - 1 + 2.0 * j / (n - 1)
+      -< name <-> "re"  { append(out, light_re(u, v, t)) }
+      -< name <-> "im"  { append(out, light_im(u, v, t)) }
+      -< name <-> "mag" { append(out, light_mag(u, v, t)) }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
+
+// --- the reflection pyramid: four SiO2 mirrors -----------------------------
+// before (top), after (bottom), left, right — each a reflected, rotated copy.
+def quad_names() { return ["before", "after", "left", "right"] }
+
+// rotation (degrees) that aims each mirror's copy toward the centre, so a
+// transparent pyramid reconstructs a single floating image.
+def quad_rot(name) {
+  -< name <-> "before" { return 0 }
+  -< name <-> "right"  { return 90 }
+  -< name <-> "after"  { return 180 }
+  -< name <-> "left"   { return 270 }
+  return 0
+}
+
+def quad_count() { return 4 }
+
+// --- the metric / material balance (informational) -------------------------
+// complex line element  v/√(1+(v/c)^2)  (reality == imaginary part magnitude)
+def metric_ds2(v, c) {
+  rr <- v / c
+  return v / fsqrt(1.0 + rr * rr)
+}
+
+// ||ds^2|| = 8πG (p/c^3 + V/S)  — hologram material mass balance
+def hologram_mass(p, c, V, S) {
+  g <- 0.00000000006674
+  return 8.0 * 3.141592653589793 * g * (p / (c * c * c) + V / S)
+}
+
+// --- Jones-polynomial relief: the light "mounds up" (盛る) ------------------
+// Jones polynomial of the trefoil (braid sigma_1^3 on 2 strands): t + t^3 - t^4
+def jones_trefoil() { return jones_t([1, 1, 1], 2) }
+
+// real base^e for a (possibly negative) integer exponent e
+def realpow(base, e) {
+  -< e < 0 {
+    p <- 1.0
+    k <- 0
+    -> k < 0 - e { p <- p * base  k <- k + 1 }
+    return 1.0 / p
+  }
+  p <- 1.0
+  k <- 0
+  -> k < e { p <- p * base  k <- k + 1 }
+  return p
+}
+
+// evaluate a Laurent polynomial [[exp,coeff],...] at real t
+def poly_eval(poly, t) {
+  s <- 0.0
+  i <- 0
+  -> i < len(poly) {
+    s <- s + poly[i][1] * realpow(t, poly[i][0])
+    i <- i + 1
+  }
+  return s
+}
+
+// relief height (0..~1) at radius r, time-phase ph: |V(t)| of the trefoil swept
+// across the display radius — the height the light is raised out of the tablet.
+def jones_relief(r, ph) {
+  -< r > 1.0 { r <- 1.0 }
+  poly <- jones_trefoil()
+  tt <- 0.3 + 1.3 * r
+  v <- poly_eval(poly, tt)
+  -< v < 0 { v <- 0 - v }
+  return v * (0.6 + 0.4 * fcos(6.283185307179586 * ph))
+}
+
+// flat n*n grid of the Jones relief over [-1,1]^2 at phase ph
+def relief_flat(n, ph) {
+  poly <- jones_trefoil()
+  shim <- 0.6 + 0.4 * fcos(6.283185307179586 * ph)
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      u <- 0 - 1 + 2.0 * i / (n - 1)
+      v <- 0 - 1 + 2.0 * j / (n - 1)
+      r <- fsqrt(u * u + v * v)
+      -< r > 1.0 { r <- 1.0 }
+      tt <- 0.3 + 1.3 * r
+      val <- poly_eval(poly, tt)
+      -< val < 0 { val <- 0 - val }
+      append(out, val * shim)
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
+
+// --- conductive-plastic tablet power model ---------------------------------
+// The conductive-plastic layer drives light out of a panel of `area` cm^2 at a
+// power density `pdens` (W/cm^2); raising the light higher (more relief) costs
+// more.  Power in watts at mean brightness `bright` (0..1), mean relief `elev`.
+def tablet_power(bright, elev, area) {
+  pdens <- 0.03
+  return pdens * area * bright * (1.0 + elev) * 0.5
+}
+
+// scale (<=1) to dim the display so it fits a power budget (watts)
+def power_scale(power, budget) {
+  -< power <= budget { return 1.0 }
+  return budget / power
+}
+
+// runtime in minutes from a battery of `wh` watt-hours at this power draw
+def battery_minutes(power, wh) {
+  -< power <= 0 { return 0.0 }
+  return wh / power * 60.0
+}

@@ -1,0 +1,94 @@
+// betalib.bada — the Beta function, its difference-equation factorization, and
+// the zeta relations, written in Bada.
+//
+//   B(p,q) = G(p)G(q)/G(p+q),  G(n) = (n-1)!   (integer p,q)
+//   B(2,2) = 1/6.
+// The recurrences below are the "difference-equation factorization": every
+// related Beta value is generated from a neighbour.
+
+def fact(n) {
+  r <- 1
+  k <- 2
+  -> k <= n {
+    r <- r * k
+    k <- k + 1
+  }
+  return r
+}
+
+def gamma_int(n) {
+  return fact(n - 1)
+}
+
+def beta(p, q) {
+  return gamma_int(p) * gamma_int(q) / gamma_int(p + q)
+}
+
+// --- difference-equation factorization (exact recurrences) ---
+// Pascal:  B(p,q) = B(p+1,q) + B(p,q+1)
+def pascal_lhs(p, q) { return beta(p, q) }
+def pascal_rhs(p, q) { return beta(p + 1, q) + beta(p, q + 1) }
+
+// step relations:  B(p,q+1) = B(p,q) * q/(p+q) ;  B(p+1,q) = B(p,q) * p/(p+q)
+def step_q(p, q) { return beta(p, q) * q / (p + q) }
+def step_p(p, q) { return beta(p, q) * p / (p + q) }
+
+// --- exp / log (series) for the zeta adaptation ---
+def fexp(x) {
+  term <- 1.0
+  sum <- 1.0
+  k <- 1
+  -> k < 40 {
+    term <- term * x / k
+    sum <- sum + term
+    k <- k + 1
+  }
+  return sum
+}
+
+def fln(x) {
+  y <- (x - 1.0) / (x + 1.0)
+  y2 <- y * y
+  term <- y
+  sum <- y
+  k <- 1
+  -> k < 40 {
+    term <- term * y2
+    sum <- sum + term / (2 * k + 1)
+    k <- k + 1
+  }
+  return 2 * sum
+}
+
+def zeta3(N) {
+  s <- 0.0
+  k <- 1
+  -> k <= N {
+    s <- s + 1.0 / (k * k * k)
+    k <- k + 1
+  }
+  return s
+}
+
+// exact link:  zeta(2) = pi^2 * B(2,2)   (both carry the 1/6)
+def zeta2_from_beta() {
+  pi <- 3.141592653589793
+  return pi * pi * beta(2, 2)
+}
+
+// report heuristic:  zeta(s) = B(p,q)/ln x  =>  x = exp(B(2,2)/zeta(s))
+// the x that adapts B(2,2) to zeta(3)
+def adapt_x_for_zeta(zval) {
+  return fexp(beta(2, 2) / zval)
+}
+
+// generate the family of related equations from the B(2,2) seed
+def generate_relations() {
+  out <- []
+  append(out, [2, 2, beta(2, 2)])
+  append(out, [2, 3, beta(2, 3)])
+  append(out, [3, 2, beta(3, 2)])
+  append(out, [2, 4, beta(2, 4)])
+  append(out, [3, 3, beta(3, 3)])
+  return out
+}

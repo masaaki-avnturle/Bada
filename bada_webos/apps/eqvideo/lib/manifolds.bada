@@ -1,0 +1,135 @@
+// manifolds.bada — 3D animated surfaces for the equation-group video
+// dictionary, computed in Bada.  Each surf_* returns z(x,y; t), x,y in [-1,1],
+// t in [0,1) the animation parameter (the surface "displaces" with t).
+//
+// Entries: eqgen (zeta/beta equation generator), fermat (Fermat complex
+// manifold), covariant (complex covariant integral manifold), trigbeta
+// (trigonometric Beta-function integrand), abelian (Abelian/torus manifold).
+
+// --- small math ---
+def two_pi() { return 6.283185307179586 }
+
+def fabs(v) {
+  -< v < 0 { return 0 - v }
+  return v
+}
+
+def fpow(base, n) {
+  r <- 1.0
+  k <- 0
+  -> k < n {
+    r <- r * base
+    k <- k + 1
+  }
+  return r
+}
+
+def fsin(theta) {
+  tp <- 6.283185307179586
+  pi <- 3.141592653589793
+  m <- idiv(theta / tp, 1)
+  x <- theta - m * tp
+  -> x > pi { x <- x - tp }
+  -> x < 0 - pi { x <- x + tp }
+  x2 <- x * x
+  term <- x
+  sum <- x
+  n <- 1
+  -> n < 8 {
+    d <- (2 * n) * (2 * n + 1)
+    term <- 0 - term * x2 / d
+    sum <- sum + term
+    n <- n + 1
+  }
+  return sum
+}
+
+def fcos(theta) {
+  return fsin(theta + 1.5707963267948966)
+}
+
+// --- the manifolds ---
+
+// zeta/beta equation generator: z = zeta(3) / (1 + g + g^2 + g^3),
+// g rotates with t (the equation group displaces)
+def surf_eqgen(x, y, t) {
+  g <- 0.4 * (x * fcos(two_pi() * t) + y * fsin(two_pi() * t))
+  ser <- 1 + g + g * g + g * g * g
+  -< fabs(ser) < 0.0001 { ser <- 0.0001 }
+  return 1.202 / ser
+}
+
+// Fermat complex manifold level surface  z = 1 - |x|^n - |y|^n,
+// n = 2,3,4 morphing with t  (Fermat hypersurface deformation)
+def surf_fermat(x, y, t) {
+  n <- 2 + idiv(t * 3, 1)
+  return 1.0 - fpow(fabs(x), n) - fpow(fabs(y), n)
+}
+
+// complex covariant integral manifold: a traveling-wave field
+def surf_covariant(x, y, t) {
+  return fsin(3.141592653589793 * x + two_pi() * t) *
+         fcos(3.141592653589793 * y)
+}
+
+// trigonometric Beta-function integrand  sin^p . cos^q  over [0,pi],
+// p = 1,2,3,4 with t  (the Beta exponential in trig form)
+def surf_trigbeta(x, y, t) {
+  p <- 1 + idiv(t * 4, 1)
+  q <- 2
+  sx <- fabs(fsin(1.5707963267948966 * (x + 1)))
+  cy <- fabs(fcos(1.5707963267948966 * (y + 1)))
+  return fpow(sx, p) * fpow(cy, q)
+}
+
+// Abelian manifold (complex torus): doubly-periodic, displaced by t
+def surf_abelian(x, y, t) {
+  return fsin(two_pi() * (x + t)) * fcos(two_pi() * (y - t))
+}
+
+// dispatch by name
+def surf(name, x, y, t) {
+  -< name <-> "eqgen"     { return surf_eqgen(x, y, t) }
+  -< name <-> "fermat"    { return surf_fermat(x, y, t) }
+  -< name <-> "covariant" { return surf_covariant(x, y, t) }
+  -< name <-> "trigbeta"  { return surf_trigbeta(x, y, t) }
+  -< name <-> "abelian"   { return surf_abelian(x, y, t) }
+  return 0
+}
+
+def catalog_names() {
+  return ["eqgen", "fermat", "covariant", "trigbeta", "abelian"]
+}
+
+// flat n*n grid of z over [-1,1]^2 at animation time t
+def frame_flat(name, n, t) {
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- 0
+    -> j < n {
+      x <- 0 - 1 + 2.0 * i / (n - 1)
+      y <- 0 - 1 + 2.0 * j / (n - 1)
+      append(out, surf(name, x, y, t))
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return out
+}
+
+// total displacement of a sample point (0.3,0.2) over T frames
+def displacement(name, T) {
+  prev <- surf(name, 0.3, 0.2, 0.0)
+  total <- 0.0
+  k <- 1
+  -> k < T {
+    cur <- surf(name, 0.3, 0.2, 1.0 * k / T)
+    d <- cur - prev
+    -< d < 0 { d <- 0 - d }
+    total <- total + d
+    prev <- cur
+    k <- k + 1
+  }
+  return total
+}

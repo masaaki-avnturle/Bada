@@ -1,0 +1,26 @@
+// biofeedback.bada — haloperidol biofeedback control, in Bada.
+//
+// SIMULATION ONLY (not medical advice). In this Full-Metal-Panic-themed model,
+// "haloperidol" is an abstract suppression parameter [0,1] that damps the
+// gamma-driven resonance so the Lambda Driver cannot run away. A feedback loop
+// raises suppression when the resonance exceeds a safe target and lowers it
+// otherwise, holding the AT-field generation in a stable band.
+
+#include resonance.bada
+
+// returns [resonance, haloperidol_level, effective_gamma]
+def biofeedback(gamma0, target, steps) {
+  halo <- 0.0
+  res <- 0.0
+  eff <- gamma0
+  i <- 0
+  -> i < steps {
+    eff <- gamma0 * (1 - halo)
+    res <- resonate(eff, 5.0, 5.0, 0.1, 600)
+    -< res > target { halo <- halo + 0.05 } >- { halo <- halo - 0.03 }
+    -< halo < 0 { halo <- 0 }
+    -< halo > 1 { halo <- 1 }
+    i <- i + 1
+  }
+  return [res, halo, eff]
+}

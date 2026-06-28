@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# access-signature post-checkout hook.
+# Git runs this after `git clone` and `git checkout`. The third argument is 1
+# for a branch checkout; on a fresh clone the previous HEAD ($1) is all-zeros.
+# We use that to detect a clone and record a clone access request.
+set -euo pipefail
+
+PREV_HEAD="${1:-}"
+IS_BRANCH="${3:-0}"
+
+ZERO="0000000000000000000000000000000000000000"
+if [ "$IS_BRANCH" = "1" ] && [ "$PREV_HEAD" = "$ZERO" ]; then
+  REPO="$(basename -s .git "$(git config --get remote.origin.url || echo unknown)")"
+  ACTOR="$(git config user.email || echo unknown)"
+  if command -v access-signature >/dev/null 2>&1; then
+    access-signature on-access --actor "$ACTOR" --repo "$REPO" --op clone --email "$ACTOR" || true
+  else
+    python3 -m access_signature.cli on-access --actor "$ACTOR" --repo "$REPO" --op clone --email "$ACTOR" || true
+  fi
+fi

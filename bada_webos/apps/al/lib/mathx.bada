@@ -1,0 +1,49 @@
+// mathx.bada — real-number math helpers for AL, in Bada.
+
+// square root by Newton's method
+def fsqrt(x) {
+  -< x <= 0 { return 0 }
+  g <- x
+  i <- 0
+  -> i < 40 {
+    g <- (g + x / g) / 2
+    i <- i + 1
+  }
+  return g
+}
+
+// floor of a non-negative float (truncation toward zero)
+def ffloor(x) {
+  return idiv(x, 1)
+}
+
+// 2*pi
+def two_pi() {
+  return 6.283185307179586
+}
+
+// sine via range reduction + Taylor series
+def fsin(theta) {
+  tp <- 6.283185307179586
+  pi <- 3.141592653589793
+  k <- idiv(theta / tp, 1)
+  x <- theta - k * tp
+  -> x > pi { x <- x - tp }
+  -> x < 0 - pi { x <- x + tp }
+  x2 <- x * x
+  term <- x
+  sum <- x
+  n <- 1
+  -> n < 8 {
+    d <- (2 * n) * (2 * n + 1)
+    term <- 0 - term * x2 / d
+    sum <- sum + term
+    n <- n + 1
+  }
+  return sum
+}
+
+def fcos(theta) {
+  return fsin(theta + 1.5707963267948966)
+}
+

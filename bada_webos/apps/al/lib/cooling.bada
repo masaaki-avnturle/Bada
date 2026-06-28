@@ -1,0 +1,33 @@
+// cooling.bada — Lambda Driver cooling control simulation, in Bada.
+//
+// Models the Laevatein palladium reactor's Lambda Driver heat load and the
+// supercooled-metal anti-gravity coolant. A simple feedback controller raises
+// coolant flow as the reactor approaches its critical (meltdown) temperature.
+// Returns [maxT, finalT, meltdown(0/1)].
+
+def cooling_sim(steps, q_in, supercool) {
+  t    <- 300.0       // reactor temperature
+  crit <- 500.0       // meltdown threshold
+  setp <- 350.0       // control set-point
+  tcool <- 20.0       // supercooled coolant baseline temperature
+  flow <- 0.0
+  maxt <- t
+  meltdown <- 0
+
+  i <- 0
+  -> i < steps {
+    // feedback: open the coolant valve when above set-point, close below
+    -< t > setp { flow <- flow + 0.05 } >- { flow <- flow - 0.03 }
+    -< flow < 0 { flow <- 0 }
+    -< flow > 1 { flow <- 1 }
+
+    // anti-gravity supercooled-metal cooling power
+    cool <- flow * (0.3 + supercool) * (t - tcool) * 0.05
+    t <- t + q_in * 0.05 - cool
+
+    -< t > maxt { maxt <- t }
+    -< t > crit { meltdown <- 1 }
+    i <- i + 1
+  }
+  return [maxt, t, meltdown]
+}
