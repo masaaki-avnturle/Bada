@@ -11,6 +11,7 @@
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a Bada language script
+#   bin/bada evos [ticks]               boot BadaOS-EV and run a drive cycle
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
 
@@ -49,6 +50,20 @@ when "run"
   path = ARGV.shift or abort("usage: bada run script.bada")
   interp = Bada::Interpreter.new
   interp.run(File.read(path)).each { |line| puts line }
+when "evos"
+  # Boot BadaOS-EV (the electric-vehicle operating system) and run a drive
+  # cycle: launch -> cruise -> regen braking -> DC fast charge.
+  ticks = (ARGV.shift || "30").to_i
+  ev = Bada::EVOS::Vehicle.new(capacity_kwh: 60.0).boot
+  puts "BadaOS-EV booted — 60 kWh pack, #{ev.battery.series}s#{ev.battery.parallel}p"
+  ev.drive(0.9); ev.run(ticks: 6)
+  ev.drive(0.12); ev.run(ticks: ticks)
+  puts ev.dashboard
+  ev.brake(0.6); ev.run(ticks: 12)
+  ev.plug_in(:dc); ev.run(ticks: 40)
+  puts ev.dashboard
+  puts "\nΩ::DATABASE flight recorder (last 6 events):"
+  ev.recorder.tail(n: 6).each { |l| puts "  #{l}" }
 when "info"
   # Information generation: Thurston-Perelman placement + catastrophe branching
   # + millennium theory decomposition for a question.
@@ -107,6 +122,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | evos | learn | xi | neural | train | version"
   exit 1
 end

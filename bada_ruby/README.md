@@ -227,6 +227,70 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
 ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
 
+## BadaOS-EV — 電気自動車のオペレーティングシステム
+
+`Bada::EVOS` は、**Bada 言語（演算子代数フレームワーク）で電気自動車の OS を元から
+構築**したものです（純 Ruby・外部依存なし）。EV の OS は本質的に**ソフトリアルタイム
+の制御ループ**であり、優先度／周期スケジューラが毎制御サイクルに全サブシステムを実行
+します。Bada フレームワーク自身のプリミティブが中核を担います。
+
+| EV の機能 | 使う Bada プリミティブ |
+|:--|:--|
+| センサ融合（電流・電圧・温度の外れ値除去） | `Bada::ErrorCorrection`（相対論的コマの可積分系） |
+| ブラックボックス（フライトレコーダ） | `Bada::TupleSpace`（Ω::DATABASE / アカシック） |
+| 異常検知・状態監視 | `Bada::Manifold` / `Bada::Entropy`（エントロピー不変量 Ξ） |
+| 冷却ランプ則 e^{-x log x} | `Bada::BadaNode` の `>-` 量子右作用 |
+| 駆動系効率マップ（ネイピア円） | `Bada::Special.x_log_x` |
+
+```bash
+bin/bada evos 30                  # BadaOS-EV を起動し走行サイクルを実行
+ruby examples/ev_os_demo.rb       # 発進→巡航→回生→急速充電のシナリオ
+ruby -Ilib test/test_evos.rb      # EV OS テスト（19 件）
+bin/bada run examples/ev_os.bada  # Bada 言語そのものでバッテリ信号を整形
+```
+
+```ruby
+require "bada"
+
+ev = Bada::EVOS::Vehicle.new(capacity_kwh: 60.0).boot
+ev.drive(0.6)          # アクセル（throttle ∈ [-1,1]、負は回生ブレーキ）
+ev.run(ticks: 30)      # リアルタイム制御ループを 30 サイクル実行
+puts ev.dashboard      # 計器クラスタ（HMI）を描画
+ev.plug_in(:dc)        # DC 急速充電（CC/CV）
+ev.run(ticks: 40)
+puts ev.recorder.tail  # Ω::DATABASE ブラックボックスの読み出し
+```
+
+### リアルタイム・カーネルのタスク表（優先度順に毎サイクル実行）
+
+| 優先度 | タスク | 役割 |
+|:--|:--|:--|
+| 100 | `sensors` | 物理量をサンプリングし **Bada エラー修正**で整形 |
+| 90 | `powertrain` | ペダル → 電力、縦方向運動モデルで車速を積分（最高速ガバナー付） |
+| 85 | `bms` | クーロンカウント SOC・I²R 自己発熱・**セルバランシング** |
+| 80 | `charger` | プラグイン時の CC/CV 充電 |
+| 70 | `thermal` | パック／キャビンの熱管理（`>-` で冷却需要を算出） |
+| 50 | `diagnostics` | 安全限界 + **Ξ 不変量による情報論的異常検知**。重大故障で走行を停止 |
+| 30 | `range` | 消費電力と航続距離の推定 |
+| 10 | `recorder` | テレメトリを Ω::DATABASE へ記録 |
+
+### モジュール構成（`Bada::EVOS`）
+
+```
+lib/bada/evos/kernel.rb          リアルタイム優先度／周期スケジューラ
+lib/bada/evos/sensor.rb          エラー修正付き物理センサ
+lib/bada/evos/battery.rb         BMS（SOC・電圧・自己発熱・セルバランシング）
+lib/bada/evos/powertrain.rb      モーター／インバータ制御 + 縦方向運動モデル
+lib/bada/evos/thermal.rb         バッテリ／キャビン熱管理
+lib/bada/evos/charger.rb         CC/CV 充電コントローラ
+lib/bada/evos/range_estimator.rb 消費・航続距離推定
+lib/bada/evos/diagnostics.rb     故障マネージャ + Ξ 異常検知
+lib/bada/evos/recorder.rb        Ω::DATABASE ブラックボックス
+lib/bada/evos/dashboard.rb       テキスト HMI（計器クラスタ）
+lib/bada/evos/vehicle.rb         車両全体を束ねる Facade
+lib/bada/evos.rb                 BadaOS-EV エントリポイント
+```
+
 ## モジュール構成
 
 ```

@@ -27,6 +27,7 @@
 #   Bada::Penrose          Penrose graphical notation: draw -> compute -> paper/code
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
+#   Bada::EVOS             BadaOS-EV — operating system for an electric vehicle
 
 require_relative "bada/version"
 require_relative "bada/special"
@@ -45,6 +46,7 @@ require_relative "bada/info_engine"
 require_relative "bada/penrose"
 require_relative "bada/chat"
 require_relative "bada/nn"
+require_relative "bada/evos"
 
 module Bada
 end
