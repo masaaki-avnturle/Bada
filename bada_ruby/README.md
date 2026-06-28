@@ -227,6 +227,70 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
 ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
 
+## Bada::Web — Ruby on Rails と同じ機能の Web システム
+
+`Bada::Web` は、**Ruby on Rails と同じ機能を持つ MVC Web フレームワーク**を、
+**純 Ruby（標準ライブラリのみ・Rails / Rack / WEBrick なし）で元から再構築**したものです。
+データベースは Bada の **Ω::DATABASE（TupleSpace / アカシックレコード）**で、保存した
+各レコードは多様体点としてアカシックにも書き込まれ、キーワードでもエントロピー不変量でも
+検索できます。
+
+| Rails の構成要素 | Bada::Web | ファイル |
+|:--|:--|:--|
+| Routing（`resources` / 名前付きパス） | `Bada::Web::Router` | `lib/bada/web/router.rb` |
+| ActiveRecord（ORM） | `Bada::Web::Model`（Ω::DATABASE 連動） | `lib/bada/web/model.rb` |
+| ActionController | `Bada::Web::Controller`（params / render / redirect / before_action） | `lib/bada/web/controller.rb` |
+| ActionView（ERB + レイアウト + ヘルパー） | `Bada::Web::View` / `ViewHelpers` | `lib/bada/web/view.rb`, `helpers.rb` |
+| Migration | `Bada::Web::Migration` | `lib/bada/web/migration.rb` |
+| Rails アプリ本体 | `Bada::Web::Application` | `lib/bada/web/application.rb` |
+| WEBrick/Puma | `Bada::Web::Server`（純 stdlib HTTP/1.1） | `lib/bada/web/server.rb` |
+| `rails new` / `rails generate scaffold` | `Bada::Web::Generator` | `lib/bada/web/generator.rb` |
+
+### CLI
+
+```bash
+bin/bada web [port]                          # Rails 相当のデモブログを起動（http://127.0.0.1:3000）
+bin/bada new blog                            # 新規 Bada::Web アプリを生成（rails new 相当）
+bin/bada generate scaffold Post title body   # リソースを scaffold（rails g scaffold 相当）
+ruby -Ilib examples/web_demo.rb              # リクエストをプロセス内で処理して確認
+ruby -Ilib examples/web_demo.rb serve        # HTTP サーバとして起動
+```
+
+### ライブラリとして
+
+```ruby
+require "bada"
+
+class Post < Bada::Web::Model
+  attribute :title
+  attribute :body
+  validates  :title, presence: true
+end
+
+class PostsController < Bada::Web::Controller
+  def index = (@posts = Post.all)
+  def create
+    @post = Post.new(params["post"])
+    @post.save ? redirect_to(post_path(@post)) : render(:new)
+  end
+end
+
+app = Bada::Web::Application.new do
+  routes { root "posts#index"; resources :posts }
+  controller "posts", PostsController
+  layout "<html><body><%= yield %></body></html>"
+  template "posts/index", "<% @posts.each do |p| %><li><%= h p.title %></li><% end %>"
+end
+
+app.get("/").status                          # => 200（router→controller→ORM→ERB）
+Bada::Web::Server.new(app, port: 3000).start # 本番同様にソケットで配信
+```
+
+Rails 同様に、RESTful な 7 ルート（index/show/new/create/edit/update/destroy）、
+`_method` による PATCH/PUT/DELETE オーバーライド、ネストした params（`post[title]`）、
+名前付きパスヘルパー（`posts_path` / `post_path(p)` / `new_post_path` / `edit_post_path(p)`）、
+`before_action`、flash、レイアウトの `<%= yield %>` をすべてサポートします。
+
 ## モジュール構成
 
 ```
@@ -265,6 +329,18 @@ lib/bada/nn/sampler.rb       デコード戦略 + UnknownEngineSampler（Decorat
 lib/bada/nn/generator.rb     NeuralGenerator（自己回帰生成）
 lib/bada/nn/pipeline.rb      推論パイプライン（Chain of Responsibility）+ Akashic（Singleton）
 lib/bada/nn/chat.rb          NeuralOmegaChat（Facade）
+
+lib/bada/web.rb              Bada::Web 入口（urlencoded パーサ + demo_app）
+lib/bada/web/router.rb       ルータ（resources / 名前付きパス / マッチング）
+lib/bada/web/model.rb        ActiveRecord 相当 ORM（Ω::DATABASE 連動）
+lib/bada/web/controller.rb   ActionController（params / render / redirect / before_action）
+lib/bada/web/view.rb         ERB ビュー + レイアウト（<%= yield %>）
+lib/bada/web/helpers.rb      ビューヘルパー（h / link_to / button_to / *_tag）
+lib/bada/web/migration.rb    マイグレーション / スキーマ DSL
+lib/bada/web/application.rb  Application（route→controller→view のディスパッチ）
+lib/bada/web/server.rb       純 stdlib の HTTP/1.1 サーバ（socket）
+lib/bada/web/generator.rb    new アプリ + scaffold ジェネレータ
+lib/bada/web/demo.rb         動作するデモブログ（Bada::Web.demo_app）
 ```
 
 ---

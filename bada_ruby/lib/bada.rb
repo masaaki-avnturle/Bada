@@ -27,6 +27,7 @@
 #   Bada::Penrose          Penrose graphical notation: draw -> compute -> paper/code
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
+#   Bada::Web              Ruby-on-Rails-equivalent MVC web framework (Ω::DATABASE)
 
 require_relative "bada/version"
 require_relative "bada/special"
@@ -45,6 +46,7 @@ require_relative "bada/info_engine"
 require_relative "bada/penrose"
 require_relative "bada/chat"
 require_relative "bada/nn"
+require_relative "bada/web"
 
 module Bada
 end

@@ -13,6 +13,9 @@
 #   bin/bada run script.bada            run a Bada language script
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
+#   bin/bada web [port]                 serve the Rails-equivalent demo blog (Bada::Web)
+#   bin/bada new <app>                  generate a new Bada::Web application
+#   bin/bada generate scaffold Name f1 f2 ...   scaffold a resource (Bada::Web)
 
 Encoding.default_external = Encoding::UTF_8
 Encoding.default_internal = Encoding::UTF_8
@@ -103,10 +106,27 @@ when "train"
   chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
   chat.save(out)
   puts "saved checkpoint -> #{out}"
+when "web"
+  # Serve the Rails-equivalent demo blog over the pure-Ruby HTTP server.
+  port = (ARGV.shift || 3000).to_i
+  app  = Bada::Web.demo_app
+  Bada::Web::Server.new(app, port: port).start
+when "new"
+  # Generate a new Bada::Web application skeleton.
+  name = ARGV.shift or abort("usage: bada new <app_name>")
+  Bada::Web::Generator.new(Dir.pwd).new_app(name)
+when "generate", "g"
+  # Scaffold a resource: bada generate scaffold Post title body
+  kind = ARGV.shift
+  abort("usage: bada generate scaffold <Name> <field...>") unless kind == "scaffold"
+  model  = ARGV.shift or abort("usage: bada generate scaffold <Name> <field...>")
+  fields = ARGV.dup
+  Bada::Web::Generator.new(Dir.pwd).generate_scaffold(model, fields)
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | " \
+       "neural | train | web | new | generate | version"
   exit 1
 end
