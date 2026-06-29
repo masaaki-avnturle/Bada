@@ -5,6 +5,10 @@
 #
 #   bin/bada repl                       start the chat REPL
 #   bin/bada ask "質問..."              one-shot question (incl. info block)
+#   bin/bada precog ["質問..."]         未知事前予知エンジン (Precog): REPL / one-shot
+#   bin/bada millennium "質問..."       Millennium analysis (Yamaguchi framework)
+#   bin/bada quantum                    quantum sublanguage probe (Hadamard + Bell)
+#   bin/bada engine                     verify the Unknown-Prior Engine theorems
 #   bin/bada info "質問..."             Thurston/catastrophe/millennium info gen
 #   bin/bada palette                    show the Penrose graphical-notation palette
 #   bin/bada penrose draw.penrose       draw -> auto-compute -> answer + paper + code
@@ -103,10 +107,61 @@ when "train"
   chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
   chat.save(out)
   puts "saved checkpoint -> #{out}"
+when "precog"
+  # 未知事前予知エンジン — the Unknown-Prior Precognition Engine (ChatGPT evolution).
+  precog = Bada::Precog.new(seed: 42)
+  if Dir.exist?(CORPUS_DIR)
+    Dir.glob(File.join(CORPUS_DIR, "*.txt")).sort.each { |f| precog.learn_file(f) }
+  end
+  if ARGV.empty?
+    precog.repl
+  else
+    puts precog.ask(ARGV.join(" "))
+  end
+when "millennium", "mill"
+  # Analyse a question across the seven Clay Millennium problems via the
+  # Yamaguchi framework, scored by the Unknown-Prior Engine.
+  r = Bada::Millennium.analyze(ARGV.join(" "))
+  puts "── ミレニアム予想分析 (Yamaguchi Framework) ──"
+  puts "枠組: #{r[:framework]}"
+  puts format("質問 H=%.4f · Ξ=%.4f · 起点: %s", r[:question_entropy], r[:question_invariant], r[:origin])
+  puts "主予知先: #{r[:dominant]}"
+  puts "→ #{r[:dominant_resolution]}"
+  puts ""
+  r[:posterior].each do |p|
+    puts format("  %-34s P=%.4f (base %.4f)  Ξ=%.3f", p[:name], p[:posterior], p[:base_probability], p[:invariant])
+  end
+  puts format("エンジン定理: |ψ|²=a 偏差 %.2e (ユニタリ=%s) · 確信ゼロ保存=%s",
+              r[:engine][:max_prob_deviation], r[:engine][:unitary], r[:engine][:zeros_preserved])
+when "quantum"
+  # Probe the Q#-style quantum sublanguage on the engine's phase core.
+  db = Bada::TupleSpace.new
+  reg = Bada::Quantum.qubit(1); reg.h(0)
+  m = Bada::Quantum.measure(reg, ledger: db)
+  puts "H|0>  probabilities    : #{m[:probabilities].map { |p| format('%.5f', p) }.join(' ')}"
+  puts format("      |psi|^2 sum (==a)  : %.16f", m[:norm])
+  bell = Bada::Quantum.qubit(2); bell.h(0); bell.cnot(0, 1)
+  mb = Bada::Quantum.measure(bell, ledger: db)
+  puts "Bell  probabilities    : #{mb[:probabilities].map { |p| format('%.5f', p) }.join(' ')}"
+  puts "      forbidden (zeros): #{mb[:forbidden].inspect}  (no-resurrection)"
+  puts "Ω::DATABASE measurements committed: #{db.size}"
+when "engine"
+  # Verify the Unknown-Prior Engine's two theorems.
+  base = Bada::Engine.softmax([2.0, -50.0, 1.0, 0.5]) # outcome 1 is a confident zero
+  mod = Bada::Engine::Module.new(name: "loud", dist: [0.1, 0.7, 0.1, 0.1], gain: 5.0)
+  v = Bada::Engine.verify(base, [mod])
+  puts "── Unknown-Prior Engine — theorem verification ──"
+  puts "base distribution a    : #{base.map { |p| format('%.6f', p) }.join(' ')}"
+  puts format("Theorem 2 |psi|^2 = a  : max deviation %.2e (unitary=%s)", v[:max_prob_deviation], v[:unitary])
+  puts "Theorem 1 zero-preserve: #{v[:zeros_preserved]} (a confident zero stays zero under any phase)"
+  inf = Bada::Engine::Inference.new(4, forbidden: [1])
+  h0 = inf.entropy
+  30.times { inf.observe(2) }
+  puts format("prior entropy %.4f -> %.4f bits after 30 commits (sharpens monotonically)", h0, inf.entropy)
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | precog | millennium | quantum | engine | info | penrose | palette | run | learn | xi | neural | train | version"
   exit 1
 end

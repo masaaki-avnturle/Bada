@@ -32,11 +32,111 @@ OmegaChat は質問ごとに次を実行します。
    （`Bada::Generator`）。検索だけでなく、不変量近傍で**新情報を生成**する。
 5. **記録** — 対話を `Ω::DATABASE`（`Bada::TupleSpace`）に書き込む。
 
+## 🔮 未知事前予知エンジン — Bada::Precog（ChatGPT の進化系）
+
+提出レポート（**Unknown-Prior Engine** / **Reviser-Extensible Grammars** /
+**Self-hosting Bada** / **Yamaguchi Millennium Problems**）を実装に落とし込んだ、
+**ChatGPT の進化系 = 未知事前予知エンジン**です。次のトークンを学習済み事後分布から
+予測するのではなく、**未知の事前分布そのものを予知**します — 最大エントロピーの無知から
+出発し、証拠で鋭化させ、**確信ゼロを決して復活させない**エンジンの上で動きます。
+
+```bash
+bin/bada precog "リーマン予想とゼータ関数の素数分布を予知して"   # 一発予知
+bin/bada precog                                              # 予知REPL（corpus自動学習）
+bin/bada millennium "ポアンカレ予想 サーストン ペレルマン"        # ミレニアム7問分析
+bin/bada engine                                              # エンジン2定理の検証
+bin/bada quantum                                             # 量子サブ言語の検証
+bin/bada run examples/quantum.bada                           # @reviserで量子文法を学習→実行
+```
+
+```ruby
+require "bada"
+precog = Bada::Precog.new(seed: 42)
+Dir["corpus/*.txt"].each { |f| precog.learn_file(f) }
+puts precog.ask("ゼータ関数の素数分布を予知して")
+
+r = precog.foresee("量子計算とエントロピー")
+r[:engine][:max_prob_deviation]   # |ψ|²=a の偏差（~1e-16, 定理2）
+r[:engine][:zeros_preserved]      # 確信ゼロ保存（定理1）
+r[:revision][:entropy_decreased]  # リバイザ学習ループで事前が単調に鋭化
+r[:millennium][:dominant]         # ミレニアム7問の主予知先
+```
+
+foresee() の 1 ターンは Bada スタック全体を走らせます：
+
+1. **計測** — 質問のシャノンエントロピー `H_q` と多様体不変量 `Ξ_q`。
+2. **仮説空間** — コーパスから候補方向を検索（無ければミレニアム7問を未知空間に）。
+3. **エンジン** — `softmax(検索スコア)` を未知事前 `a` とし、エントロピー位相認知モジュールが
+   振幅 `ψ_i=√a_i·e^{iθ_i}` を回転（確率 `q` も確信ゼロも不変：定理1・2）。
+4. **リバイザ** — `@reviser` 学習ループ。事後を証拠として append-only に書き戻し、事前を鋭化。
+5. **量子** — 上位仮説を位相コア上で重ね合わせ（qubit/H）、`Measure()` が `|ψ|²` を
+   `Ω::DATABASE` にコミット（証拠トレースの fold としての予知）。
+6. **ミレニアム** — ヤマグチ枠組で 7 つのクレイ予想に分解・分析。
+7. **生成** — 誤差修正した目標エントロピーで理論・方程式・言語を生成。
+8. **記録** — アカシック TupleSpace に対話を書き込む。
+
+### ① Unknown-Prior Engine — `Bada::Engine`
+
+エンジンのコア方程式（レポート Appendix C）をそのまま実装：
+
+```
+a_i = softmax(z)_i                       基底分布
+θ_i = Σ_m β_m · H_m · φ_m^(i)            累積位相
+ψ_i = √a_i · exp(i·θ_i)                  ネイティブ位相振幅
+q_i = |ψ_i|² / Σ_j |ψ_j|²  =  a_i        事後（|e^{iθ}|=1）
+```
+
+| 定理 | 内容 | 量子的読み |
+|:--|:--|:--|
+| **定理1** 零保存 | `a_i=0 ⇒ q_i=0` | 確信ゼロ（禁制基底）は復活不能 |
+| **定理2** `|ψ|²=a` | 位相ステップは確率を変えない | 純位相ゲートはユニタリ |
+
+`Bada::Engine.verify` で両定理を検証（偏差 ~5.55e-17＝レポートの数値と一致）。
+`Bada::Engine::Inference` は append-only 台帳で最大エントロピー事前を鋭化します。
+
+### ② リバイザ — `Bada::Reviser`（文法拡張トランザクション）
+
+`@reviser` を値レベルの学習ループから**文法拡張トランザクション**へ一般化。生成規則を
+**台帳の事実**としてコミットします：`rule := [ "rule", name, head, pattern, denotation ]`。
+
+```
+@reviser : grammar {
+  rule "hadamard" postfix [ 'H' '(' expr ')' ]       => phase_uniform(_1)
+  rule "measure"  stmt    [ 'Measure' '(' expr ')' ] => commit_measurement(_1)
+}
+```
+
+- **単調性** — 規則は追加のみ（上書きしない）。後の規則は優先度で前を覆うが、履歴は残る。
+- **スコープ** — 規則はコミットした reviser 以降の入力にのみ適用。
+- 規則は `Ω::DATABASE[grammar]` に append-only で記録され、パーサがそれを参照します。
+  `Bada::Interpreter` が拡張規則（stmt / expr / postfix）を組み込み規則より先に照合します。
+
+### ③ 量子サブ言語 — `Bada::Quantum`（Q# 風・位相コア上）
+
+エンジンのネイティブ位相振幅 `ψ_i=√a_i·e^{iθ_i}` は量子振幅そのもの。新たな数値カーネル
+無しで Q# 風の `qubit / H / X / Z / S / T / Rz / CNOT / Measure` を位相コア上に実現：
+ゲートは位相コミット、測定は最大エントロピー事前を鋭化する台帳コミット。
+`Omega::Quantum`（`Bada::Quantum::Inference`）は `prepare_unknown / observe / estimate /
+forbidden` を提供し、繰り返し測定をベイズ証拠として扱います。
+
+### ④ ミレニアム予想分析 — `Bada::Millennium`（ヤマグチ枠組）
+
+クレイ 7 問（リーマン / P vs NP / ホッジ / ポアンカレ / ヤン–ミルズ / ナビエ–ストークス /
+BSD）を単一枠組 `Y = (M_glob, ζ, β, Γ, J, T, H_Δ)` の 7 つの顔として分析。
+`Bada::Millennium.analyze` は関連スコアを logits としてエンジンに通し、各予想への
+**事後確率**・**解決スケッチ**・**定理検証**を返します。
+
+---
+
 ## インストール / 実行
 
 ```bash
 cd bada_ruby
 ruby -Ilib test/test_bada.rb      # テスト（20 件）
+ruby -Ilib test/test_engine.rb    # Unknown-Prior Engine 定理テスト
+ruby -Ilib test/test_quantum.rb   # 量子サブ言語テスト
+ruby -Ilib test/test_reviser.rb   # リバイザ文法拡張テスト
+ruby -Ilib test/test_precog.rb    # 未知事前予知エンジン + ミレニアム分析テスト
 
 bin/bada repl                     # チャット REPL（corpus/*.txt を自動学習）
 bin/bada ask "このレポートから何ができるか？"
@@ -235,7 +335,11 @@ lib/bada/entropy.rb          シャノンエントロピー + トークン化
 lib/bada/manifold.rb         大域的部分積分多様体エントロピー不変量 Ξ
 lib/bada/error_correction.rb 複素回転・特殊相対性・可積分系エラー修正
 lib/bada/tuplespace.rb       Ω::DATABASE（アカシックレコード）
-lib/bada/language.rb         Bada 言語（BadaNode + Interpreter）
+lib/bada/engine.rb           Unknown-Prior Engine（最大エントロピー事前 + 位相コア + 2定理）
+lib/bada/reviser.rb          @reviser 文法拡張トランザクション（規則台帳）
+lib/bada/quantum.rb          Q# 風量子サブ言語 + Omega::Quantum 推論ライブラリ
+lib/bada/precog.rb           未知事前予知エンジン（ChatGPT 進化系 Facade）
+lib/bada/language.rb         Bada 言語（BadaNode + Interpreter + リバイザ文法拡張）
 lib/bada/knowledge.rb        レポート/Web 取り込み → 計測済みコーパス
 lib/bada/generator.rb        エントロピー駆動の文章/方程式/理論生成
 lib/bada/qa_engine.rb        エントロピー駆動の質問応答

@@ -1,0 +1,26 @@
+# quantum.bada — teach Bada a Q#-style quantum sublanguage with @reviser,
+# then run it. (run with: bin/bada run examples/quantum.bada)
+#
+# Per "Reviser-Extensible Grammars": @reviser is a grammar-extension
+# transaction. Each `rule` is appended as a fact to Omega::DATABASE[grammar];
+# the parser then consults that ledger. The denotations are ordinary engine
+# calls on the phase core — gates become phase commits, Measure becomes a
+# ledger commit that sharpens a maximum-entropy prior.
+
+@reviser : grammar {
+  rule "qubit_n"  expr    [ 'qubit' '(' expr ')' ]    => qubit(_1)
+  rule "hadamard" postfix [ 'H' '(' expr ')' ]        => phase_uniform(_1)
+  rule "entangle" postfix [ 'CNOT' '(' expr ')' ]     => cnot(_1)
+  rule "measure"  stmt    [ 'Measure' '(' expr ')' ]  => commit_measurement(_1)
+}
+
+# A single qubit Hadamard: |0> -> uniform superposition.
+reg := qubit(1)
+reg := H(reg)
+Measure(reg)            # commits |psi|^2 = [0.5, 0.5] to the ledger
+
+# A Bell pair: H on qubit 0, then CNOT entangles -> (|00> + |11>)/sqrt(2).
+bell := qubit(2)
+bell := H(bell)
+bell := CNOT(bell)
+Measure(bell)           # P(|00>) = P(|11>) = 0.5 ; |01>,|10> are forbidden zeros

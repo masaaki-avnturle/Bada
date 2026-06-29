@@ -26,6 +26,10 @@
 #   Bada::InfoEngine       information-generation facade (the three above)
 #   Bada::Penrose          Penrose graphical notation: draw -> compute -> paper/code
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
+#   Bada::Engine           the Unknown-Prior Engine (max-ent prior + phase core)
+#   Bada::Reviser          @reviser grammar-extension transactions (rule ledger)
+#   Bada::Quantum          Q#-style quantum sublanguage on the phase core
+#   Bada::Precog           未知事前予知エンジン (the ChatGPT evolution)
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
 
 require_relative "bada/version"
@@ -34,6 +38,9 @@ require_relative "bada/entropy"
 require_relative "bada/manifold"
 require_relative "bada/error_correction"
 require_relative "bada/tuplespace"
+require_relative "bada/engine"
+require_relative "bada/reviser"
+require_relative "bada/quantum"
 require_relative "bada/language"
 require_relative "bada/knowledge"
 require_relative "bada/generator"
@@ -44,6 +51,7 @@ require_relative "bada/millennium"
 require_relative "bada/info_engine"
 require_relative "bada/penrose"
 require_relative "bada/chat"
+require_relative "bada/precog"
 require_relative "bada/nn"
 
 module Bada

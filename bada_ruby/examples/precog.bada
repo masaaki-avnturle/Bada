@@ -1,0 +1,25 @@
+# precog.bada — the Unknown-Prior Engine in Bada source.
+# (run with: bin/bada run examples/precog.bada)
+#
+# This is the engine that the 未知事前予知エンジン (Bada::Precog) is built on,
+# written in the Bada language itself: teach the quantum/engine sublanguage with
+# @reviser, prepare an unknown (maximum-entropy) prior as a register, rotate it
+# on the phase core, and Measure it — a commit that sharpens the prior.
+
+@reviser : grammar {
+  rule "qubit_n"  expr    [ 'qubit' '(' expr ')' ]    => qubit(_1)
+  rule "superpose" postfix [ 'H' '(' expr ')' ]       => phase_uniform(_1)
+  rule "foresee"  stmt    [ 'Measure' '(' expr ')' ]  => commit_measurement(_1)
+}
+
+# An unknown prior over 2^3 = 8 latent outcomes (honest ignorance).
+prior := qubit(3)
+
+# Put the unknown prior into uniform superposition (max entropy) on the core.
+prior := H(prior)
+
+# Foresee: commit |psi|^2 to Omega::DATABASE — the precognition is the fold over
+# committed measurement facts.
+Measure(prior)
+
+print "未知事前予知 (unknown-prior precognition) committed to the Akashic ledger"
