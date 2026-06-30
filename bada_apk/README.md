@@ -17,6 +17,34 @@ Android アプリ版です。**複数ファイルを一括アップロード**�
 - ⚛️ **量子予知** — qubit/H/Measure を位相コア上で実行し `Ω::DATABASE` にコミット。
 - 🏆 **ミレニアム予想分析** — ヤマグチ枠組で 7 つのクレイ予想への事後確率を算出。
 
+## GitHub から APK をダウンロード
+
+GitHub Actions（`.github/workflows/build-apk.yml`）が、GitHub のランナー上で APK を
+自動ビルドし、ダウンロードできるようにします。**2 つの入手方法**があります。
+
+### A. Actions の成果物（Artifact）から — タグ不要・最速
+
+1. GitHub リポジトリの **Actions** タブを開く。
+2. **Build Bada Precog APK** ワークフローの最新の成功した実行（緑チェック）を開く。
+3. ページ下部の **Artifacts** から **`bada-precog-debug-apk`** をダウンロード
+   （`bada-precog-debug.apk` を含む zip）。
+
+`bada_apk/**` への push で自動実行されます。手動実行は Actions タブの
+**Run workflow**（`workflow_dispatch`）からも可能です。
+
+### B. Releases から — 安定した URL（タグを push）
+
+`v` で始まるタグを push すると、APK が **Releases** に添付されます。
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+# -> Releases ページに bada-precog-debug.apk が添付される
+```
+
+> ダウンロードした `.apk` は **デバッグ署名済み**でそのままインストールできます
+> （Android 端末側で「提供元不明のアプリ / 不明なソース」を許可してください）。
+
 ## ビルド方法（APK の作成）
 
 このリポジトリは **そのままビルド可能な Android Studio / Gradle プロジェクト**です。
