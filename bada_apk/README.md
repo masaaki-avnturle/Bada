@@ -32,15 +32,17 @@ GitHub Actions（`.github/workflows/build-apk.yml`）が、GitHub のランナ�
 `bada_apk/**` への push で自動実行されます。手動実行は Actions タブの
 **Run workflow**（`workflow_dispatch`）からも可能です。
 
-### B. Releases から — 安定した URL（タグを push）
+### B. Releases から — 安定した URL（ログイン不要・無期限）
 
-`v` で始まるタグを push すると、APK が **Releases** に添付されます。
+次のいずれかで APK が **Releases** に添付されます（公開URLで誰でもDL可）。
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-# -> Releases ページに bada-precog-debug.apk が添付される
-```
+- **GitHub の UI から**（git 権限不要）：リポジトリの **Releases** → **Draft a new
+  release** → タグに `v0.2.0` を入力（`Create new tag`）→ **Publish release**。
+  公開と同時にワークフローが APK をビルドしてその Release に添付します。
+- **コマンドラインから**（タグ push 権限がある場合）：
+  ```bash
+  git tag v0.2.0 && git push origin v0.2.0
+  ```
 
 > ダウンロードした `.apk` は **デバッグ署名済み**でそのままインストールできます
 > （Android 端末側で「提供元不明のアプリ / 不明なソース」を許可してください）。
