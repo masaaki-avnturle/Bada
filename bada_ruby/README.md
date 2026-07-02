@@ -82,6 +82,10 @@ r[:equation][:equation]   # 生成された方程式
 対応言語は Ruby / Python / JavaScript(TS) / C 系ブレース言語。よくある破損
 （括弧の不均衡・未終端文字列・Ruby の `end` の過不足）を実際に修正します。
 
+> **Android アプリ（APK）** — この修正エンジンを Kotlin に移植したスマホアプリを
+> [`../android/`](../android/) に用意しています。GitHub Actions が APK をビルドし、
+> Actions の Artifacts / タグ push 時の Releases からダウンロードできます。
+
 **複数投稿（Repository）** — 多数のソースを一度に投稿してまとめて修正し、
 すべての投稿と修正結果をアカシック TupleSpace に保存します。
 
