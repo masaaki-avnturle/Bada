@@ -61,6 +61,54 @@ r[:theory][:theory]       # 生成された理論
 r[:equation][:equation]   # 生成された方程式
 ```
 
+## ソースコード・エラー修正アプリ — 複素回転体の可積分コマ幾何（複数投稿対応）
+
+**「複素回転体の特殊相対性理論・可積分系のコマ（独楽）幾何」** をエンジンにして、
+ソースコードの構文エラーを検出・修正するアプリです（`Bada::CodeFix`）。
+
+**考え方** — ソースコードを 1 つの *回転体* とみなします。開き括弧・閉じ括弧
+（`() [] {}`）、引用符、Ruby の `def…end` は回転軌道上の角度マーカーです。
+
+- 構文が正しいコードとは、**軌道が閉じる**コード。すべての開きが閉じに戻る状態で、
+  これは可積分系の閉軌道条件 `∮ e^{-□} d□ = π e` に対応します。符号付きの括弧
+  バランスがコマの**保存量（可積分不変量）**です。
+- 構文エラーとは、コマが閉軌道から**落ちる**こと（保存量が壊れる）。修正とは、
+  足りない閉じの追加・余分な閉じの除去・開いた文字列の終端で保存量を戻し、
+  **軌道を再び閉じる**こと。
+- 修正の信頼度は、修正前後の多様体エントロピー不変量 `Ξ` の保存度合い
+  （`Bada::ErrorCorrection` のローレンツ減衰・軌道平均）から読み取ります。小さく
+  軌道を戻す修正なら `Ξ` はほぼ不変（信頼度 ≈ 1）、乱暴な書き換えなら下がります。
+
+対応言語は Ruby / Python / JavaScript(TS) / C 系ブレース言語。よくある破損
+（括弧の不均衡・未終端文字列・Ruby の `end` の過不足）を実際に修正します。
+
+**複数投稿（Repository）** — 多数のソースを一度に投稿してまとめて修正し、
+すべての投稿と修正結果をアカシック TupleSpace に保存します。
+
+```bash
+bin/badafix --demo                     # わざと壊した一群を投稿して修正（デモ）
+bin/badafix file1.rb file2.py file3.js # 複数ファイルを一括投稿・修正（複数投稿）
+bin/badafix --write broken.rb          # 修正版を broken.rb.fixed に書き出す
+bin/badafix --stdin --lang ruby        # 標準入力から 1 件
+bin/bada  fix file1.rb file2.rb        # bada 本体からも呼べる
+```
+
+```ruby
+require "bada"
+
+repo = Bada::CodeFix::Repository.new
+repo.submit("def greet(name\n  puts name\nend\n", name: "a.rb")   # 括弧が未閉
+repo.submit("x = [1, 2, 3",                        name: "b.rb")   # 配列が未閉
+repo.submit_many(["lib/foo.rb", "lib/bar.py"])                     # ファイルを一括投稿
+puts repo.report                                                    # 一括修正レポート
+
+r = Bada::CodeFix.fix("def a\n  1\n", name: "c.rb")               # 単体修正
+r.ok          # 軌道が閉じているか
+r.issues      # 検出した問題（行・種類・メッセージ）
+r.fixed       # 修正後ソース
+r.confidence  # Ξ 保存度（可積分系の保証）
+```
+
 ## Bada 言語
 
 演算子代数言語。値は `Ω::DATABASE`（TupleSpace）上に存在します。
@@ -233,7 +281,8 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 lib/bada/special.rb          gamma / beta / zeta / 円（回転）演算子
 lib/bada/entropy.rb          シャノンエントロピー + トークン化
 lib/bada/manifold.rb         大域的部分積分多様体エントロピー不変量 Ξ
-lib/bada/error_correction.rb 複素回転・特殊相対性・可積分系エラー修正
+lib/bada/error_correction.rb 複素回転・特殊相対性・可積分系エラー修正（数値）
+lib/bada/code_fix.rb         ソースコード・エラー修正 + 複数投稿ボード（複素回転コマ幾何）
 lib/bada/tuplespace.rb       Ω::DATABASE（アカシックレコード）
 lib/bada/language.rb         Bada 言語（BadaNode + Interpreter）
 lib/bada/knowledge.rb        レポート/Web 取り込み → 計測済みコーパス

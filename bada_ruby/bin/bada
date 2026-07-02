@@ -103,10 +103,36 @@ when "train"
   chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
   chat.save(out)
   puts "saved checkpoint -> #{out}"
+when "fix"
+  # Source-code error correction on the complex-rotation integrable top.
+  # Post one or many sources and print the multi-submission repair report.
+  #   bada fix file1.rb file2.py ...     fix many files (複数投稿)
+  #   bada fix --write file.rb           also write <name>.fixed
+  write = ARGV.delete("--write") || ARGV.delete("-w")
+  repo = Bada::CodeFix::Repository.new
+  if ARGV.empty?
+    abort "usage: bada fix [--write] file1 file2 ..."
+  else
+    ARGV.each do |p|
+      if File.file?(p)
+        repo.submit(File.read(p), name: File.basename(p))
+      else
+        warn "skip (not a file): #{p}"
+      end
+    end
+  end
+  puts repo.report
+  if write
+    repo.submissions.each do |s|
+      next unless s.result.changed
+      File.write("#{s.name}.fixed", s.result.fixed)
+      puts "  → wrote #{s.name}.fixed"
+    end
+  end
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | fix | neural | train | version"
   exit 1
 end

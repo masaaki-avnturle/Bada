@@ -1,0 +1,94 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# badafix — the source-code error-fixing application built on the integrable
+# system of a complex rotational body ("the spinning-top / koma geometry of
+# special relativity"). It corrects unbalanced brackets, unterminated strings,
+# and missing/extra Ruby `end`, and accepts MANY sources at once (複数投稿).
+#
+#   bin/badafix file1.rb file2.py file3.js ...   fix many files, print report
+#   bin/badafix --write file1.rb ...             fix in place (writes *.fixed)
+#   bin/badafix --stdin --lang ruby              read one source from stdin
+#   bin/badafix --demo                           run the built-in demo batch
+#
+# Options:
+#   --write / -w     write each corrected source next to the original as
+#                    <name>.fixed (never overwrites the input)
+#   --lang L         force language (ruby|python|javascript|c|generic)
+#   --stdin          read a single source from standard input
+#   --demo           post a batch of deliberately-broken samples and fix them
+
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "bada"
+
+write = false
+lang = nil
+stdin = false
+demo = false
+paths = []
+
+until ARGV.empty?
+  arg = ARGV.shift
+  case arg
+  when "--write", "-w" then write = true
+  when "--lang", "-l"  then lang = ARGV.shift&.to_sym
+  when "--stdin"       then stdin = true
+  when "--demo"        then demo = true
+  when "-h", "--help"
+    puts File.read(__FILE__)[/#(.*?)\n\n/m, 1].to_s.gsub(/^# ?/, "")
+    exit 0
+  else paths << arg
+  end
+end
+
+repo = Bada::CodeFix::Repository.new
+
+if demo
+  repo.submit(<<~'RB', name: "broken1.rb", language: :ruby)
+    def greet(name
+      puts "hello, #{name}
+    end
+  RB
+  repo.submit(<<~'PY', name: "broken2.py", language: :python)
+    def area(w, h:
+        return (w * h
+  PY
+  repo.submit(<<~'JS', name: "broken3.js", language: :javascript)
+    function f(x) {
+      return [x, x * 2
+    }
+  JS
+  repo.submit(<<~'RB', name: "clean.rb", language: :ruby)
+    def ok(x)
+      x * 2
+    end
+  RB
+elsif stdin
+  repo.submit($stdin.read, name: "stdin", language: lang)
+elsif paths.empty?
+  warn "usage: badafix [--write] [--lang L] file1 file2 ... | --stdin | --demo"
+  exit 1
+else
+  paths.each do |p|
+    unless File.file?(p)
+      warn "skip (not a file): #{p}"
+      next
+    end
+    repo.submit(File.read(p), name: File.basename(p), language: lang)
+  end
+end
+
+puts repo.report
+
+if write
+  repo.submissions.each do |s|
+    next unless s.result.changed
+    out = "#{s.name}.fixed"
+    File.write(out, s.result.fixed)
+    puts "  → wrote #{out}"
+  end
+end
