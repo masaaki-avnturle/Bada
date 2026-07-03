@@ -3,9 +3,9 @@ package io.bada.codefix
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.EditText
@@ -14,9 +14,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.util.concurrent.Executors
 
 /**
@@ -48,7 +45,6 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        PDFBoxResourceLoader.init(applicationContext)
 
         container = findViewById(R.id.submissionsContainer)
         result = findViewById(R.id.resultText)
@@ -62,6 +58,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.fixButton).setOnClickListener { fixAll() }
         findViewById<Button>(R.id.demoButton).setOnClickListener { loadDemo() }
         findViewById<Button>(R.id.copyButton).setOnClickListener { copyResult() }
+        findViewById<Button>(R.id.agiButton).setOnClickListener {
+            startActivity(Intent(this, AgiActivity::class.java))
+        }
 
         // start with one empty submission card
         addSubmission()
@@ -90,9 +89,9 @@ class MainActivity : AppCompatActivity() {
         io.execute {
             var ok = 0
             for (uri in uris) {
-                val name = queryName(uri) ?: (uri.lastPathSegment ?: "uploaded")
+                val name = FileIntake.displayName(this, uri)
                 val text = try {
-                    extractText(uri, name)
+                    FileIntake.extractText(this, uri, name)
                 } catch (e: Exception) {
                     "// 読み込み失敗 (${name}): ${e.message}"
                 }
@@ -107,31 +106,6 @@ class MainActivity : AppCompatActivity() {
                 ).show()
             }
         }
-    }
-
-    /** Read a picked file as fixable text: PDFs are text-extracted, everything
-     *  else is decoded as UTF-8. */
-    private fun extractText(uri: Uri, name: String): String {
-        val type = contentResolver.getType(uri) ?: ""
-        val isPdf = name.lowercase().endsWith(".pdf") || type == "application/pdf"
-        contentResolver.openInputStream(uri).use { input ->
-            requireNotNull(input) { "ストリームを開けません" }
-            return if (isPdf) {
-                PDDocument.load(input).use { doc ->
-                    PDFTextStripper().getText(doc)
-                }
-            } else {
-                input.readBytes().toString(Charsets.UTF_8)
-            }
-        }
-    }
-
-    private fun queryName(uri: Uri): String? {
-        contentResolver.query(uri, null, null, null, null)?.use { c ->
-            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && c.moveToFirst()) return c.getString(idx)
-        }
-        return null
     }
 
     // ---- fixing ----------------------------------------------------------
