@@ -3,36 +3,61 @@ package io.bada.codefix
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.view.LayoutInflater
-import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
+import java.util.concurrent.Executors
 
 /**
  * The source-code error-fixing application — complex-rotation / special-
  * relativity integrable koma geometry — with multi-submission (複数投稿).
  *
- * Post many sources into the board, tap "すべて修正" (Fix all), and the
- * CodeFixEngine closes each source's spin orbit and prints a batch report
- * plus every corrected source.
+ * Sources enter the board three ways:
+ *   * 投稿を追加   — paste code into a new card,
+ *   * ファイルをアップロード — pick MANY files at once (source code AND PDFs);
+ *                    PDFs have their text extracted, source files are read
+ *                    as UTF-8, each becomes a submission card,
+ *   * デモ         — load deliberately-broken samples.
+ *
+ * Tap すべて修正 (Fix all) and the CodeFixEngine closes each source's spin
+ * orbit and prints a batch report plus every corrected source.
  */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var container: LinearLayout
     private lateinit var result: TextView
+    private val io = Executors.newSingleThreadExecutor()
+
+    // Multi-file picker (Storage Access Framework — no storage permission needed).
+    private val pickFiles =
+        registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            if (!uris.isNullOrEmpty()) onFilesPicked(uris)
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        PDFBoxResourceLoader.init(applicationContext)
 
         container = findViewById(R.id.submissionsContainer)
         result = findViewById(R.id.resultText)
 
+        findViewById<Button>(R.id.uploadButton).setOnClickListener {
+            // Accept anything — many source files report an octet-stream / unknown
+            // MIME type, so we filter by content ourselves after picking.
+            pickFiles.launch(arrayOf("*/*"))
+        }
         findViewById<Button>(R.id.addButton).setOnClickListener { addSubmission() }
         findViewById<Button>(R.id.fixButton).setOnClickListener { fixAll() }
         findViewById<Button>(R.id.demoButton).setOnClickListener { loadDemo() }
@@ -40,6 +65,11 @@ class MainActivity : AppCompatActivity() {
 
         // start with one empty submission card
         addSubmission()
+    }
+
+    override fun onDestroy() {
+        io.shutdownNow()
+        super.onDestroy()
     }
 
     private fun addSubmission(name: String = "", code: String = "") {
@@ -52,6 +82,59 @@ class MainActivity : AppCompatActivity() {
         }
         container.addView(card)
     }
+
+    // ---- file upload -----------------------------------------------------
+
+    private fun onFilesPicked(uris: List<Uri>) {
+        Toast.makeText(this, "${uris.size} 件を読み込み中…", Toast.LENGTH_SHORT).show()
+        io.execute {
+            var ok = 0
+            for (uri in uris) {
+                val name = queryName(uri) ?: (uri.lastPathSegment ?: "uploaded")
+                val text = try {
+                    extractText(uri, name)
+                } catch (e: Exception) {
+                    "// 読み込み失敗 (${name}): ${e.message}"
+                }
+                ok++
+                runOnUiThread { addSubmission(name, text) }
+            }
+            runOnUiThread {
+                Toast.makeText(
+                    this,
+                    "$ok 件を読み込みました。「すべて修正」を押してください",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+    }
+
+    /** Read a picked file as fixable text: PDFs are text-extracted, everything
+     *  else is decoded as UTF-8. */
+    private fun extractText(uri: Uri, name: String): String {
+        val type = contentResolver.getType(uri) ?: ""
+        val isPdf = name.lowercase().endsWith(".pdf") || type == "application/pdf"
+        contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "ストリームを開けません" }
+            return if (isPdf) {
+                PDDocument.load(input).use { doc ->
+                    PDFTextStripper().getText(doc)
+                }
+            } else {
+                input.readBytes().toString(Charsets.UTF_8)
+            }
+        }
+    }
+
+    private fun queryName(uri: Uri): String? {
+        contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && c.moveToFirst()) return c.getString(idx)
+        }
+        return null
+    }
+
+    // ---- fixing ----------------------------------------------------------
 
     private fun fixAll() {
         val repo = CodeFixEngine.Repository()
@@ -66,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             posted++
         }
         if (posted == 0) {
-            Toast.makeText(this, "ソースコードを入力してください", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "ソースコードを入力またはアップロードしてください", Toast.LENGTH_SHORT).show()
             result.text = ""
             return
         }
