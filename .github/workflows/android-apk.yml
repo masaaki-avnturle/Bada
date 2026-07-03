@@ -2,8 +2,13 @@ name: Build Android APK
 
 # Builds the Bada CodeFix Android app and publishes the APK so it can be
 # downloaded from the repo:
-#   * every build      -> as a workflow "Artifacts" download
-#   * every v* tag     -> attached to a GitHub Release (Assets)
+#   * every build          -> as a workflow "Artifacts" download
+#   * a v* tag              -> attached to a GitHub Release (Assets)
+#   * manual "Run workflow" -> creates/updates a Release (tag published
+#                              server-side by GITHUB_TOKEN) with the APK
+#
+# The manual path exists because tag pushes may be blocked by the hosting
+# proxy; softprops/action-gh-release creates the tag on the server side.
 
 on:
   push:
@@ -20,6 +25,11 @@ on:
       - "android/**"
       - ".github/workflows/android-apk.yml"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a Release with this tag and attach the APK (leave blank to only build the artifact)"
+        required: false
+        default: "v0.1.0"
 
 permissions:
   contents: write
@@ -65,8 +75,23 @@ jobs:
           path: android/bada-codefix-debug.apk
           if-no-files-found: error
 
-      - name: Attach APK to Release (tags only)
+      - name: Publish Release with APK (tag push)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: android/bada-codefix-debug.apk
+
+      - name: Publish Release with APK (manual dispatch)
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: Bada CodeFix ${{ inputs.release_tag }}
+          body: |
+            Bada CodeFix — 複素回転体・特殊相対性の可積分コマ幾何による
+            ソースコード・エラー修正 Android アプリ（複数投稿対応）。
+
+            `bada-codefix-debug.apk` をダウンロードして端末にインストールしてください
+            （デバッグ署名。提供元不明アプリの許可が必要）。
+          files: android/bada-codefix-debug.apk
+          make_latest: "true"
