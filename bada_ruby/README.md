@@ -113,6 +113,45 @@ r.fixed       # 修正後ソース
 r.confidence  # Ξ 保存度（可積分系の保証）
 ```
 
+## 量子暗号 USB ファイル金庫 — QuantumCrypto（暗号を解く / 解読）
+
+山口フレームワークの量子暗号方式（`omega_jones_crypto_pkg`）を Bada（純 Ruby）で
+再構築した、**USB スティックの暗号を解く（復号する）**アプリです（`Bada::QuantumCrypto`）。
+
+> **安全に関する注意** — これは *自分の* USB ファイルを施錠／解錠する個人用金庫です。
+> **このツールが暗号化したファイルを、あなたが保有するパスフレーズで**復号（解く）します。
+> BitLocker / LUKS / VeraCrypt やハードウェア暗号化ドライブを破る機能、未知の鍵を
+> 復元する機能はありません（＝「解読」＝自分の鍵での復号）。
+
+**方式**
+1. **BB84 量子鍵配送（QKD）** をパスフレーズから決定論的にシミュレートし、
+   ふるい鍵（sifted key）を生成。同時に QBER を測り**盗聴者を検知**します（clean≈0、
+   intercept-resend≈25%）。
+2. **ジョーンズ多項式（カウフマン括弧）** で結び目図から鍵材料を加算（`jones_key.c` を移植）。
+3. ふるい鍵＋カウフマン標本＋パスフレーズを **PBKDF2-HMAC-SHA256（20万回）** で
+   256bit 鍵に伸長し、**認証付き AES-256-GCM** で封緘。誤鍵は GCM タグ検証で確実に失敗し、
+   「解読失敗」と報告します（ゴミを出しません）。
+
+```bash
+bin/badaqc demo                                  # 自己完結の往復デモ
+bin/badaqc qkd   --pass P                         # BB84 盗聴検知デモ
+bin/badaqc lock   /path/to/USB --pass P [--diagram trefoil.txt] [--shred]
+bin/badaqc unlock /path/to/USB --pass P [--diagram trefoil.txt]   # 暗号を解く
+bin/badaqc key    --pass P [--diagram d]          # 鍵フィンガープリント
+```
+
+```ruby
+require "bada"
+QC = Bada::QuantumCrypto
+blob = QC.encrypt("機密", "pass", diagram: "trefoil.txt")   # 施錠
+QC.decrypt(blob, "pass", diagram: "trefoil.txt")            # 解錠（解く）
+QC.qkd_channel_report("pass")   # {clean_qber:, eavesdrop_qber:, eavesdropper_detected:, secure:}
+```
+
+`--diagram` に結び目図（各行 `id e0 e1 e2 e3 sign`）を渡すと、その図がなければ復号できません
+（ジョーンズ鍵が第 2 要素になる）。`unlock`（解く）はこのツールが作った `*.qenc` のみ、
+正しいパスフレーズ（＋図）でのみ復号します。
+
 ## Bada 言語
 
 演算子代数言語。値は `Ω::DATABASE`（TupleSpace）上に存在します。
@@ -287,6 +326,7 @@ lib/bada/entropy.rb          シャノンエントロピー + トークン化
 lib/bada/manifold.rb         大域的部分積分多様体エントロピー不変量 Ξ
 lib/bada/error_correction.rb 複素回転・特殊相対性・可積分系エラー修正（数値）
 lib/bada/code_fix.rb         ソースコード・エラー修正 + 複数投稿ボード（複素回転コマ幾何）
+lib/bada/quantum_crypto.rb   量子暗号 USB金庫（BB84 QKD + ジョーンズ鍵 + AES-256-GCM）
 lib/bada/tuplespace.rb       Ω::DATABASE（アカシックレコード）
 lib/bada/language.rb         Bada 言語（BadaNode + Interpreter）
 lib/bada/knowledge.rb        レポート/Web 取り込み → 計測済みコーパス
