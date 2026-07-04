@@ -154,10 +154,28 @@ module Bada
 
     # ---- key derivation --------------------------------------------------
 
-    # Derive the 256-bit AES key from passphrase + BB84 sifted bits + optional
-    # Kauffman key material, stretched with PBKDF2-HMAC-SHA256 over `salt`.
+    # The QKD seed: the passphrase if given, otherwise the Jones polynomial of
+    # the knot diagram alone (keyfile mode — the diagram *is* the key). At least
+    # one of the two must identify the key.
+    def key_seed(passphrase, diagram)
+      return passphrase.to_s unless passphrase.to_s.empty?
+      if diagram && File.file?(diagram.to_s)
+        jk = kauffman_key(diagram)
+        return "JONES:#{Digest::SHA256.hexdigest(jk)}" unless jk.empty?
+      end
+      raise ArgumentError, "パスフレーズまたは有効な結び目図（Jones多項式）が必要です"
+    end
+
+    # Derive the 256-bit AES key from (passphrase and/or the Jones polynomial) +
+    # BB84 sifted bits, stretched with PBKDF2-HMAC-SHA256 over `salt`.
+    #
+    # Keyed three ways:
+    #   * passphrase only            (BB84 seeded by the passphrase)
+    #   * Jones polynomial only      (the knot diagram file is the keyfile)
+    #   * passphrase + Jones polynomial (both required to decrypt)
     def derive_key(passphrase, salt, diagram: nil)
-      qkd = bb84(passphrase)[:sifted]
+      seed = key_seed(passphrase, diagram)
+      qkd = bb84(seed)[:sifted]
       material = +"#{passphrase}\x00#{qkd}"
       material << "\x00" << kauffman_key(diagram) if diagram && File.file?(diagram.to_s)
       OpenSSL::PKCS5.pbkdf2_hmac(material, salt, PBKDF2_ITERS, KEY_LEN, OpenSSL::Digest::SHA256.new)

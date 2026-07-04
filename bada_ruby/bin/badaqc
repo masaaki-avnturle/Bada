@@ -10,8 +10,11 @@
 #   hold. It does NOT break BitLocker / LUKS / VeraCrypt / hardware-encrypted
 #   drives and cannot recover unknown keys.
 #
-#   bin/badaqc lock   <path> --pass P [--diagram d] [--shred]
-#   bin/badaqc unlock <path> --pass P [--diagram d] [--remove]
+#   bin/badaqc lock   <path> [--pass P] [--diagram jones.txt] [--shred]
+#   bin/badaqc unlock <path> [--pass P] [--diagram jones.txt] [--remove]
+#     The Jones polynomial (a knot-diagram file) can be the key by itself:
+#       bin/badaqc lock   <path> --diagram trefoil.txt      # lock with the knot
+#       bin/badaqc unlock <path> --diagram trefoil.txt      # 解読: present the knot
 #   bin/badaqc qkd            --pass P        # BB84 eavesdropper-detection demo
 #   bin/badaqc key            --pass P [--diagram d]   # key fingerprint + check digit
 #   bin/badaqc check          --pass P [--diagram d] [--verify CODE] [--jones d]
@@ -40,8 +43,9 @@ cmd = ARGV.shift || "help"
 
 case cmd
 when "lock"
-  pass = opt("--pass") or abort("usage: badaqc lock <path> --pass P [--diagram d] [--shred]")
   diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc lock <path> [--pass P] [--diagram jones.txt] [--shred]  (要 --pass か --diagram)") unless pass || diagram
   shred = flag?("--shred")
   path = ARGV.shift or abort("missing <path>")
   res = QC.lock_usb(path, pass, diagram: diagram, remove_original: shred)
@@ -51,8 +55,9 @@ when "lock"
   puts "  ⚠ 平文を削除しました（--shred）" if shred
 
 when "unlock"
-  pass = opt("--pass") or abort("usage: badaqc unlock <path> --pass P [--diagram d] [--remove]")
   diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc unlock <path> [--pass P] [--diagram jones.txt] [--remove]  (要 --pass か --diagram)") unless pass || diagram
   remove = flag?("--remove")
   path = ARGV.shift or abort("missing <path>")
   res = QC.unlock_usb(path, pass, diagram: diagram, remove_encrypted: remove)
@@ -70,23 +75,26 @@ when "qkd"
   puts "  鍵は安全に共有可能        : #{r[:secure] ? 'yes' : 'no'}"
 
 when "key"
-  pass = opt("--pass") or abort("usage: badaqc key --pass P [--diagram d]")
   diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc key [--pass P] [--diagram jones.txt]  (要 --pass か --diagram)") unless pass || diagram
   puts "鍵フィンガープリント: #{QC.key_fingerprint(pass, diagram: diagram)}"
   cd = QC.check_digit(pass, diagram: diagram)
   puts "チェックデジット    : #{cd[:code]}  (KCV #{cd[:kcv]} / mod97 #{cd[:mod97]} / Luhn #{cd[:luhn]})"
 
 when "check"
   # Show the check digit for a passphrase (+diagram), or verify a given code.
-  pass = opt("--pass") or abort("usage: badaqc check --pass P [--diagram d] [--verify CODE] [--jones d]")
   diagram = opt("--diagram")
   expect = opt("--verify")
   jones = opt("--jones")
+  pass = opt("--pass")
+  abort("usage: badaqc check [--pass P] [--diagram jones.txt] [--verify CODE] [--jones d]  (要 --pass か --diagram)") unless pass || diagram || jones
   if jones
     jd = QC.jones_check_digit(jones)
     abort("結び目図が読めません: #{jones}") unless jd
     puts "Jones多項式チェックデジット: KCV #{jd[:kcv]} / mod97 #{jd[:mod97]} / Luhn #{jd[:luhn]}"
   end
+  exit 0 unless pass || diagram # --jones only: nothing more to do
   cd = QC.check_digit(pass, diagram: diagram)
   if expect
     ok = QC.verify_check_digit(pass, expect, diagram: diagram)

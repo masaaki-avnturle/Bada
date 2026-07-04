@@ -170,6 +170,25 @@ QC.qkd_channel_report("pass")   # {clean_qber:, eavesdrop_qber:, eavesdropper_de
 （ジョーンズ鍵が第 2 要素になる）。`unlock`（解く）はこのツールが作った `*.qenc` のみ、
 正しいパスフレーズ（＋図）でのみ復号します。
 
+### ジョーンズ多項式だけを鍵にして解読する（keyfile モード）
+
+パスフレーズを省き、**結び目図（ジョーンズ多項式）そのものを鍵**にできます。正しい結び目を
+提示したときだけ `unlock`（解読）が成功します。結び目が違えばチェックデジット不一致で失敗します。
+
+```bash
+bin/badaqc lock   /path/to/USB --diagram trefoil.txt      # 三葉結び目で施錠（パス不要）
+bin/badaqc unlock /path/to/USB --diagram trefoil.txt      # 解読: 同じ結び目を提示
+bin/badaqc unlock /path/to/USB --diagram figure8.txt      # ✗ 別の結び目 → 解読失敗
+```
+
+```ruby
+blob = Bada::QuantumCrypto.encrypt("秘密", "", diagram: "trefoil.txt") # Jones鍵のみで施錠
+Bada::QuantumCrypto.decrypt(blob, "", diagram: "trefoil.txt")          # 正しい結び目で解読
+```
+
+鍵の与え方は 3 通り：**パスフレーズのみ / ジョーンズ多項式のみ / 両方（AND）**。いずれも
+「このツールが自分の鍵で施錠したデータ」を、その鍵で解読するための仕組みです。
+
 ## Bada 言語
 
 演算子代数言語。値は `Ω::DATABASE`（TupleSpace）上に存在します。

@@ -106,6 +106,28 @@ class TestQuantumCrypto < Minitest::Test
     assert_match(/チェックデジット/, err.message)
   end
 
+  def test_jones_polynomial_only_keyfile
+    Dir.mktmpdir do |d|
+      trefoil = File.join(d, "trefoil.txt")
+      fig8 = File.join(d, "fig8.txt")
+      File.write(trefoil, "1 0 1 2 3 1\n2 2 3 4 5 1\n3 4 5 0 1 1\n")
+      File.write(fig8, "1 0 1 2 3 1\n2 2 3 4 5 -1\n3 4 5 6 7 1\n4 6 7 0 1 -1\n")
+
+      # lock with the knot's Jones polynomial alone (no passphrase)
+      blob = QC.encrypt("解読 with the knot".b, "", diagram: trefoil)
+      # the correct knot decrypts (解読)
+      assert_equal "解読 with the knot".b, QC.decrypt(blob, "", diagram: trefoil)
+      # a different knot does not
+      assert_raises(QC::DecryptError) { QC.decrypt(blob, "", diagram: fig8) }
+      # and neither does no key at all
+      assert_raises(ArgumentError) { QC.decrypt(blob, "") }
+    end
+  end
+
+  def test_requires_passphrase_or_diagram
+    assert_raises(ArgumentError) { QC.encrypt("x".b, "") }
+  end
+
   def test_luhn_and_mod97_are_self_consistent
     assert_equal QC.luhn_digit("123456"), QC.luhn_digit("123456")
     assert (0..9).include?(QC.luhn_digit("7890"))
