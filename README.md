@@ -39,6 +39,23 @@
 
 ---
 
+## 📱 Bada IQ 判定器 — Android アプリ (APK ダウンロード)
+
+これまでの Bada バイオ医療アプリ（**fMRI・MRI・脳トポグラフィ・DNA解析・血液検査**）の
+生体信号から対象者の IQ を計測し、**ミラー統計・ベイズ推定・ウィスパード判定器**で評価する
+Android アプリ（`android/`）。ロジックは純 Ruby の `Bada::IQ` を Kotlin へ移植したものです。
+
+**APK のダウンロード（ビルド不要）**: GitHub Actions が APK を自動ビルドして **Releases** に
+公開します。リポジトリの **Releases → `Bada IQ APK (latest)`（タグ `apk-latest`）** から
+`bada-iq.apk` を取得し、「提供元不明のアプリ」を許可してインストールしてください。
+（各 Actions 実行の Artifacts `bada-iq-apk` からも取得可能。`v*` タグ push でバージョン別
+Release も作成されます。）
+
+> ⚠️ 教育的モデルであり、医療機器・診断ではありません (not a medical diagnosis)。
+> 詳細は [`android/README.md`](android/README.md)。
+
+---
+
 ## 🔤 Bada Language — 設計原理
 
 山口フレームワークの作用素環プログラミングを実現するために設計された独自OOP言語。
