@@ -42,7 +42,36 @@ bin/bada repl                     # チャット REPL（corpus/*.txt を自動�
 bin/bada ask "このレポートから何ができるか？"
 bin/bada xi  "大域的部分積分多様体のエントロピー不変量"   # 計測のみ
 bin/bada run examples/demo.bada   # Bada 言語スクリプト実行
+bin/bada iq                       # 対象者 IQ 評価（デモ対象者）
+bin/bada iq examples/subject.json # 生体信号 JSON から IQ 評価
 ```
+
+## 🧠 対象者 IQ 評価 — `Bada::IQ`
+
+これまでの Bada バイオ医療アプリ（**fMRI・MRI・脳トポグラフィ・DNA解析・血液検査**）の
+標準化された生体信号（z スコア）を入力に、対象者の IQ を計測して評価します。
+
+```bash
+bin/bada iq examples/subject.json
+```
+
+| 段階 | 内容 | 実装 |
+|:----|:----|:----|
+| **① IQ 計測** | 各生体信号を信頼度 ρ で IQ 尺度へ回帰（`y = 100 + 15·z/ρ`, `σ² = 15²(1−ρ²)/ρ²`） | `Bada::IQ.observe` |
+| **② ミラー統計** | 中央枢軸まわりの反射対称（`x' = 2p − x`, 複素共役 `z ↦ z̄`）でロバスト要約 | `Bada::IQ.mirror_stats` |
+| **③ ベイズ推定** | 母集団事前 `N(100,15²)` とガウス共役融合。精度が加算され事後 `N(μ*,σ*²)` | `Bada::IQ.bayes` |
+| **④ ウィスパード判定器** | 事後のバンド分布から、TupleSpace 不変量 `Ξ` でゲートした「囁き」判定 | `Bada::IQ.whispered` |
+
+```ruby
+require "bada"
+
+a = Bada::IQ.assess(fmri: 2.1, mri: 1.7, topography: 1.9, dna: 1.2, blood: 0.6)
+a.iq            # => 事後平均 IQ（総合判定）
+puts a.report   # 4 段階の日本語/英語レポート
+```
+
+> ⚠️ **免責**: これは山口フレームワークの**教育的モデル**であり、医療機器・診断ではありません。
+> 信頼度 ρ 等はフレームワークの較正定数で、臨床測定値ではありません。
 
 ## ライブラリとして
 

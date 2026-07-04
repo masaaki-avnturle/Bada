@@ -25,6 +25,7 @@
 #   Bada::Millennium       7 Clay problems, gamma-manifold theory decomposition
 #   Bada::InfoEngine       information-generation facade (the three above)
 #   Bada::Penrose          Penrose graphical notation: draw -> compute -> paper/code
+#   Bada::IQ               biosignal IQ assessment: mirror stats / Bayes / whisper
 #   Bada::OmegaChat        the ChatGPT branch tying it all together
 #   Bada::NN               from-scratch neural-network LLM (unknown engine)
 
@@ -43,6 +44,7 @@ require_relative "bada/catastrophe"
 require_relative "bada/millennium"
 require_relative "bada/info_engine"
 require_relative "bada/penrose"
+require_relative "bada/iq"
 require_relative "bada/chat"
 require_relative "bada/nn"
 

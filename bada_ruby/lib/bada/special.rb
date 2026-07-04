@@ -114,5 +114,33 @@ module Bada
     def gravity_dual
       { e_pi: Math.exp(Math::PI), pi_e: Math::PI**Math::E }
     end
+
+    # Gauss error function erf(x), Abramowitz & Stegun 7.1.26 rational
+    # approximation (|error| < 1.5e-7). Needed for the Gaussian tail masses of
+    # the Bayesian IQ posterior (Bada::IQ).
+    def erf(x)
+      sign = x.negative? ? -1.0 : 1.0
+      z = x.abs
+      t = 1.0 / (1.0 + 0.3275911 * z)
+      poly = t * (0.254829592 +
+             t * (-0.284496736 +
+             t * (1.421413741 +
+             t * (-1.453152027 +
+             t * 1.061405429))))
+      sign * (1.0 - poly * Math.exp(-z * z))
+    end
+
+    # Standard-normal pdf  φ(x) = e^{-x²/2}/√(2π).
+    def normal_pdf(x, mean: 0.0, sd: 1.0)
+      return 0.0 if sd <= 0.0
+      z = (x - mean) / sd
+      Math.exp(-0.5 * z * z) / (sd * Math.sqrt(2 * Math::PI))
+    end
+
+    # Standard-normal cdf  Φ(x) = ½(1 + erf(x/√2)).
+    def normal_cdf(x, mean: 0.0, sd: 1.0)
+      return x >= mean ? 1.0 : 0.0 if sd <= 0.0
+      0.5 * (1.0 + erf((x - mean) / (sd * Math.sqrt(2.0))))
+    end
   end
 end
