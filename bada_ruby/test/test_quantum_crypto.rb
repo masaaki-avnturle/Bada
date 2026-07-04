@@ -79,4 +79,36 @@ class TestQuantumCrypto < Minitest::Test
     # a diagram with zero crossings evaluates to the empty-state bracket 1.0
     assert_equal 1.0, QC.kauffman_bracket([], 1.0)
   end
+
+  def test_check_digit_is_stable_and_verifiable
+    a = QC.check_digit("pw")
+    b = QC.check_digit("pw")
+    assert_equal a[:code], b[:code]
+    assert_match(/\A[0-9a-f]{6}-\d{2}-\d\z/, a[:code])
+    assert QC.verify_check_digit("pw", a[:code])
+    assert QC.verify_check_digit("pw", a[:code].upcase) # case-insensitive
+    refute QC.verify_check_digit("different", a[:code])
+  end
+
+  def test_check_digit_changes_with_diagram
+    Dir.mktmpdir do |d|
+      dia = File.join(d, "k.txt")
+      File.write(dia, "1 0 1 2 3 1\n2 2 3 4 5 1\n3 4 5 0 1 1\n")
+      refute_equal QC.check_digit("pw")[:code], QC.check_digit("pw", diagram: dia)[:code]
+      assert QC.jones_check_digit(dia)
+      assert_nil QC.jones_check_digit(File.join(d, "missing.txt"))
+    end
+  end
+
+  def test_wrong_passphrase_reports_check_digit_mismatch
+    blob = QC.encrypt("data".b, "right")
+    err = assert_raises(QC::DecryptError) { QC.decrypt(blob, "wrong") }
+    assert_match(/チェックデジット/, err.message)
+  end
+
+  def test_luhn_and_mod97_are_self_consistent
+    assert_equal QC.luhn_digit("123456"), QC.luhn_digit("123456")
+    assert (0..9).include?(QC.luhn_digit("7890"))
+    assert_match(/\A\d{2}\z/, QC.mod97_digits("123456789"))
+  end
 end

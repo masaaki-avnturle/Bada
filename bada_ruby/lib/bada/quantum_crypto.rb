@@ -33,11 +33,12 @@ module Bada
   module QuantumCrypto
     module_function
 
-    MAGIC = "BQC1"          # Bada Quantum Crypto, format v1
+    MAGIC = "BQC2"          # Bada Quantum Crypto, format v2 (with KCV)
     ENC_SUFFIX = ".qenc"
     PBKDF2_ITERS = 200_000
     KEY_LEN = 32
     SIFTED_BITS = 256       # target length of the BB84 sifted key
+    KCV_LEN = 3             # embedded Key Check Value (check-digit source)
 
     # ---- BB84 quantum key distribution (simulation) ---------------------
     #
@@ -168,38 +169,107 @@ module Bada
       Digest::SHA256.hexdigest(k)[0, 16]
     end
 
+    # ---- check digit / Key Check Value (KCV) ----------------------------
+    #
+    # A short, non-reversible verification value. It lets you confirm that a
+    # passphrase (+ knot diagram) is the RIGHT one BEFORE running a long unlock,
+    # and detects a corrupted key/diagram — WITHOUT revealing the key and
+    # WITHOUT any ability to recover an unknown key. This is the standard
+    # "Key Check Value" idea, here rendered as human-readable check digits.
+
+    # KCV bytes from a concrete AES key (used inside the file header).
+    def kcv_bytes(key)
+      Digest::SHA256.digest(key.b + "\x00KCV")[0, KCV_LEN]
+    end
+
+    # Luhn (mod-10) check digit over a decimal string.
+    def luhn_digit(num)
+      sum = 0
+      alt = true
+      num.to_s.reverse.each_char do |c|
+        d = c.to_i
+        if alt
+          d *= 2
+          d -= 9 if d > 9
+        end
+        sum += d
+        alt = !alt
+      end
+      (10 - (sum % 10)) % 10
+    end
+
+    # ISO 7064 MOD 97-10 two-digit check over a decimal string.
+    def mod97_digits(num)
+      r = 0
+      num.to_s.each_char { |c| r = (r * 10 + c.to_i) % 97 }
+      format("%02d", (r * 100) % 97)
+    end
+
+    # Human-verifiable check code for a passphrase (+ diagram), independent of
+    # any file (fixed salt). Returns { kcv:, luhn:, mod97:, code: }.
+    def check_digit(passphrase, diagram: nil)
+      key = derive_key(passphrase, "BQC-KCV", diagram: diagram)
+      b = kcv_bytes(key)
+      hex = b.unpack1("H*")           # 6 hex chars
+      dec = b.unpack1("H*").to_i(16).to_s
+      { kcv: hex, luhn: luhn_digit(dec), mod97: mod97_digits(dec),
+        code: "#{hex}-#{mod97_digits(dec)}-#{luhn_digit(dec)}" }
+    end
+
+    # Verify a passphrase (+ diagram) against a previously shown check code.
+    def verify_check_digit(passphrase, code, diagram: nil)
+      check_digit(passphrase, diagram: diagram)[:code].casecmp?(code.to_s.strip)
+    end
+
+    # Check digit of the Jones polynomial (Kauffman bracket) of a knot diagram
+    # alone — verifies the diagram key file's integrity.
+    def jones_check_digit(diagram)
+      material = kauffman_key(diagram)
+      return nil if material.empty?
+      b = Digest::SHA256.digest(material)[0, KCV_LEN]
+      dec = b.unpack1("H*").to_i(16).to_s
+      { kcv: b.unpack1("H*"), luhn: luhn_digit(dec), mod97: mod97_digits(dec) }
+    end
+
     # ---- authenticated encryption (lock / unlock) ------------------------
 
     # Encrypt (lock) a file. Output layout:
-    #   MAGIC(4) | salt_len(1) | salt | iv(12) | tag(16) | ciphertext
+    #   MAGIC(4) | kcv(3) | salt_len(1) | salt | iv(12) | tag(16) | ciphertext
     def encrypt(plaintext, passphrase, diagram: nil)
       salt = SecureRandom.random_bytes(16)
       key = derive_key(passphrase, salt, diagram: diagram)
+      kcv = kcv_bytes(key)
       cipher = OpenSSL::Cipher.new("aes-256-gcm").encrypt
       cipher.key = key
       iv = cipher.random_iv
-      cipher.auth_data = MAGIC
+      cipher.auth_data = MAGIC + kcv
       ct = cipher.update(plaintext.b) + cipher.final
       tag = cipher.auth_tag
-      "#{MAGIC}#{[salt.bytesize].pack('C')}#{salt}#{iv}#{tag}#{ct}".b
+      "#{MAGIC}#{kcv}#{[salt.bytesize].pack('C')}#{salt}#{iv}#{tag}#{ct}".b
     end
 
-    # Decrypt (unlock / 解く). Raises on wrong passphrase or tampering.
+    # Decrypt (unlock / 解く). Raises on wrong passphrase or tampering. The
+    # embedded KCV (check digit) is verified first, so a wrong passphrase is
+    # reported as a check-digit mismatch before the AES-GCM step.
     def decrypt(blob, passphrase, diagram: nil)
       blob = blob.b
       raise ArgumentError, "not a Bada quantum-crypto file (bad magic)" unless blob[0, 4] == MAGIC
       i = 4
+      kcv = blob[i, KCV_LEN]; i += KCV_LEN
       salt_len = blob[i].unpack1("C"); i += 1
       salt = blob[i, salt_len]; i += salt_len
       iv = blob[i, 12]; i += 12
       tag = blob[i, 16]; i += 16
       ct = blob[i..] || ""
       key = derive_key(passphrase, salt, diagram: diagram)
+      unless kcv_bytes(key) == kcv
+        raise DecryptError, "解読失敗: チェックデジット不一致（パスフレーズ/結び目図が違います）"
+      end
       cipher = OpenSSL::Cipher.new("aes-256-gcm").decrypt
       cipher.key = key
       cipher.iv = iv
       cipher.auth_tag = tag
-      cipher.auth_data = MAGIC
+      cipher.auth_data = MAGIC + kcv
       cipher.update(ct) + cipher.final
     rescue OpenSSL::Cipher::CipherError
       raise DecryptError, "解読失敗: パスフレーズが違うか、ファイルが破損/改竄されています"

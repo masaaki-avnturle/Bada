@@ -137,7 +137,25 @@ bin/badaqc demo                                  # 自己完結の往復デモ
 bin/badaqc qkd   --pass P                         # BB84 盗聴検知デモ
 bin/badaqc lock   /path/to/USB --pass P [--diagram trefoil.txt] [--shred]
 bin/badaqc unlock /path/to/USB --pass P [--diagram trefoil.txt]   # 暗号を解く
-bin/badaqc key    --pass P [--diagram d]          # 鍵フィンガープリント
+bin/badaqc key    --pass P [--diagram d]          # 鍵フィンガープリント＋チェックデジット
+bin/badaqc check  --pass P [--diagram d] [--verify CODE] [--jones d]
+```
+
+### チェックデジット（KCV）— 鍵の正しさを事前検証
+
+ジョーンズ多項式の量子暗号鍵に**チェックデジット（Key Check Value）**を付けました。
+鍵そのものは明かさず、**パスフレーズ／結び目図が正しいかを解錠前に確認**でき、鍵ファイルの
+破損も検出できます（未知の鍵を復元する機能ではありません）。
+
+- `check_digit(pass, diagram:)` → `{ kcv: "3a2a93", mod97: "49", luhn: 1, code: "3a2a93-49-1" }`
+  （KCV=SHA256鍵の3バイト、ISO 7064 MOD 97-10 と Luhn の検査数字）
+- `verify_check_digit(pass, code, diagram:)` → 控えたコードと照合（大文字小文字無視）
+- `jones_check_digit(diagram)` → 結び目図（ジョーンズ多項式）単体の検査数字
+- `*.qenc` にも KCV を埋め込み、`unlock` はまず**チェックデジット不一致**で誤鍵を即座に報告
+
+```bash
+bin/badaqc check --pass P            # 例: チェックデジット: 3a2a93-49-1
+bin/badaqc check --pass P --verify 3a2a93-49-1   # ✔ 一致 / ✗ 不一致（exit code も返す）
 ```
 
 ```ruby

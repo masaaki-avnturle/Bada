@@ -13,7 +13,8 @@
 #   bin/badaqc lock   <path> --pass P [--diagram d] [--shred]
 #   bin/badaqc unlock <path> --pass P [--diagram d] [--remove]
 #   bin/badaqc qkd            --pass P        # BB84 eavesdropper-detection demo
-#   bin/badaqc key            --pass P [--diagram d]   # key fingerprint
+#   bin/badaqc key            --pass P [--diagram d]   # key fingerprint + check digit
+#   bin/badaqc check          --pass P [--diagram d] [--verify CODE] [--jones d]
 #   bin/badaqc demo                            # self-contained round-trip demo
 #
 #   <path> may be a single file or a directory (e.g. your USB mount point).
@@ -72,6 +73,31 @@ when "key"
   pass = opt("--pass") or abort("usage: badaqc key --pass P [--diagram d]")
   diagram = opt("--diagram")
   puts "鍵フィンガープリント: #{QC.key_fingerprint(pass, diagram: diagram)}"
+  cd = QC.check_digit(pass, diagram: diagram)
+  puts "チェックデジット    : #{cd[:code]}  (KCV #{cd[:kcv]} / mod97 #{cd[:mod97]} / Luhn #{cd[:luhn]})"
+
+when "check"
+  # Show the check digit for a passphrase (+diagram), or verify a given code.
+  pass = opt("--pass") or abort("usage: badaqc check --pass P [--diagram d] [--verify CODE] [--jones d]")
+  diagram = opt("--diagram")
+  expect = opt("--verify")
+  jones = opt("--jones")
+  if jones
+    jd = QC.jones_check_digit(jones)
+    abort("結び目図が読めません: #{jones}") unless jd
+    puts "Jones多項式チェックデジット: KCV #{jd[:kcv]} / mod97 #{jd[:mod97]} / Luhn #{jd[:luhn]}"
+  end
+  cd = QC.check_digit(pass, diagram: diagram)
+  if expect
+    ok = QC.verify_check_digit(pass, expect, diagram: diagram)
+    puts(ok ? "✔ 一致: パスフレーズ#{diagram ? '＋図' : ''}は正しい鍵です" :
+              "✗ 不一致: パスフレーズ#{diagram ? '/図' : ''}が違います")
+    exit(ok ? 0 : 1)
+  else
+    puts "チェックデジット: #{cd[:code]}"
+    puts "  KCV=#{cd[:kcv]}  ISO7064mod97=#{cd[:mod97]}  Luhn=#{cd[:luhn]}"
+    puts "  （このコードを控えておけば、次回 --verify で鍵の正しさを確認できます）"
+  end
 
 when "demo"
   require "tmpdir"
