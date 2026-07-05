@@ -27,6 +27,22 @@ object IqEngine {
     const val POP_MEAN = 100.0
     const val POP_SD = 15.0
 
+    // The Bada-language VM, loaded with the .bada engine libraries (shipped as
+    // Android assets special.bada + iq.bada). The whole numeric core below runs
+    // *through this VM*, so the app is built on the Bada-language library.
+    private var vm: BadaVM.VM? = null
+
+    fun isVmReady(): Boolean = vm != null
+
+    fun initVm(specialSrc: String, iqSrc: String) {
+        vm = BadaVM.VM().load(specialSrc).load(iqSrc)
+    }
+
+    private fun requireVm(): BadaVM.VM =
+        vm ?: throw IllegalStateException(
+            "Bada VM 未初期化: IqEngine.initVm(special.bada, iq.bada) を呼んでください"
+        )
+
     data class Modality(val key: String, val rho: Double, val label: String)
 
     // The five biosignal modalities of the earlier Bada bio-medical apps.
@@ -167,10 +183,12 @@ object IqEngine {
         return buildObs(modality, m.label, m.rho, z)
     }
 
-    // Build one IQ observation from a standardized reading z at reliability rho.
+    // Build one IQ observation — computed by the Bada library (observe_estimate
+    // / observe_variance).
     fun buildObs(modality: String, label: String, rho: Double, z: Double): Observation {
-        val y = POP_MEAN + POP_SD * z / rho
-        val varc = (POP_SD * POP_SD) * (1.0 - rho * rho) / (rho * rho)
+        val v = requireVm()
+        val y = v.callNum("observe_estimate", listOf(rho, z))
+        val varc = v.callNum("observe_variance", listOf(rho))
         return Observation(modality, label, rho, z, y, varc, sqrt(varc), 1.0 / varc)
     }
 
@@ -212,31 +230,36 @@ object IqEngine {
         val bitsGained: Double, val pAboveAverage: Double
     )
 
+    // Gaussian conjugate fusion — computed by the Bada library (bayes_mean /
+    // bayes_sd / bayes_bits over the estimate & precision arrays).
     fun bayes(
         obs: List<Observation>, priorMean: Double = POP_MEAN, priorSd: Double = POP_SD
     ): Posterior {
-        val priorPrec = 1.0 / (priorSd * priorSd)
-        val prec = priorPrec + obs.sumOf { it.precision }
-        val weighted = priorPrec * priorMean + obs.sumOf { it.estimate * it.precision }
-        val mean = weighted / prec
-        val sd = sqrt(1.0 / prec)
+        val v = requireVm()
+        val estimates: List<Any?> = obs.map { it.estimate }
+        val precisions: List<Any?> = obs.map { it.precision }
+        val mean = v.callNum("bayes_mean", listOf(estimates, precisions))
+        val sd = v.callNum("bayes_sd", listOf(precisions))
         return Posterior(
             mean = mean,
             sd = sd,
             ci95 = Pair(mean - 1.96 * sd, mean + 1.96 * sd),
-            bitsGained = log2(priorSd / sd),
-            pAboveAverage = 1.0 - normalCdf(POP_MEAN, mean, sd)
+            bitsGained = v.callNum("bayes_bits", listOf(precisions)),
+            pAboveAverage = 1.0 - v.callNum("normal_cdf", listOf(POP_MEAN, mean, sd))
         )
     }
 
     data class BandProb(val band: Band, val p: Double)
 
-    fun bandProbabilities(mean: Double, sd: Double): List<BandProb> =
-        BANDS.map { b ->
-            val lo = if (b.lo == Double.NEGATIVE_INFINITY) 0.0 else normalCdf(b.lo, mean, sd)
-            val hi = if (b.hi == Double.POSITIVE_INFINITY) 1.0 else normalCdf(b.hi, mean, sd)
-            BandProb(b, (hi - lo).coerceIn(0.0, 1.0))
+    // Posterior mass in each Wechsler band — computed by the Bada band_prob.
+    fun bandProbabilities(mean: Double, sd: Double): List<BandProb> {
+        val v = requireVm()
+        return BANDS.map { b ->
+            val lo = if (b.lo == Double.NEGATIVE_INFINITY) -1.0e9 else b.lo
+            val hi = if (b.hi == Double.POSITIVE_INFINITY) 1.0e9 else b.hi
+            BandProb(b, v.callNum("band_prob", listOf(lo, hi, mean, sd)))
         }
+    }
 
     // ── [4] Whispered judge ──────────────────────────────────────────────────
 
@@ -251,8 +274,8 @@ object IqEngine {
         val top = probs.maxByOrNull { it.p }!!
         val maxP = top.p
         val ent = -probs.sumOf { if (it.p <= 0.0) 0.0 else it.p * log2(it.p) }
-        val gate = abs(xiGate) / (1.0 + abs(xiGate))
-        val confidence = (maxP * (0.85 + 0.30 * gate)).coerceIn(0.0, 1.0)
+        // confidence gated by Ξ — computed by the Bada whisper_confidence.
+        val confidence = requireVm().callNum("whisper_confidence", listOf(maxP, xiGate))
         return Verdict(
             bandJa = top.band.ja, bandEn = top.band.en, probability = maxP,
             confidence = confidence, whisperEntropy = ent, xiGate = xiGate,
@@ -317,7 +340,16 @@ object IqEngine {
     fun assess(subject: Map<String, Double>, id: String? = null): Assessment {
         val obs = observations(subject)
         require(obs.isNotEmpty()) { "生体信号の読み値がありません (no biosignal readings)" }
-        return assemble(obs, xi(signature(obs)), id)
+        return assemble(obs, signatureXi(obs), id)
+    }
+
+    // Biosignal TupleSpace invariant Ξ: host tokenizes the signature and measures
+    // (H, M, N); the gamma/beta manifold gauge is the Bada manifold_invariant.
+    private fun signatureXi(obs: List<Observation>): Double {
+        val tokens = tokenize(signature(obs))
+        val h = shannon(tokens)
+        val m = manifoldIntegral(distribution(tokens))
+        return requireVm().callNum("manifold_invariant", listOf(h, m, tokens.size.toDouble()))
     }
 
     // ── 赤外線センサー + 温度計 モード (thermal / infrared) ────────────────────
@@ -339,35 +371,23 @@ object IqEngine {
         ThermalChannel("metabolic_ratio", 0.25, 0.5, 0.15, "ratio", "代謝比 Δ / T_ambient")
     )
 
-    // Thermal manifold invariant Ξ_T from the (ir, temp) sensor pair.
-    fun thermalInvariant(ir: Double, temp: Double): Double {
-        val a = maxOf(ir, 1e-6)
-        val b = maxOf(temp, 1e-6)
-        val s = a + b
-        val probs = doubleArrayOf(a / s, b / s)
-        val h = -probs.sumOf { if (it <= 0.0) 0.0 else it * log2(it) }
-        var m = 0.0
-        probs.forEachIndexed { i, q -> m += q * manifoldElement(i + 2.0) }
-        return zetaGauge(h + 1.0, m + 1.0, 3.0)   // β(H+1,M+1)/log 3  (gamma gauge)
+    // Thermal manifold invariant Ξ_T — computed by the Bada thermal_invariant
+    // (the gamma-function global partial integral manifold).
+    fun thermalInvariant(ir: Double, temp: Double): Double =
+        requireVm().callNum("thermal_invariant", listOf(ir, temp))
+
+    private fun kindIndex(kind: String): Double = when (kind) {
+        "gradient" -> 0.0
+        "emissivity" -> 1.0
+        else -> 2.0
     }
 
-    fun thermalFeature(kind: String, ir: Double, temp: Double): Double {
-        val delta = ir - temp
-        return when (kind) {
-            "gradient" -> delta
-            "emissivity" -> ir
-            "ratio" -> delta / maxOf(abs(temp), 1e-6)
-            else -> 0.0
-        }
-    }
-
+    // Thermal sub-channels; each z is standardized and manifold-gauged inside the
+    // Bada thermal_z.
     fun thermalChannels(ir: Double, temp: Double): List<Observation> {
-        val xiT = thermalInvariant(ir, temp)
-        val xiRef = thermalInvariant(35.0, 23.0)   // neutral operating point
-        val gain = if (abs(xiRef) < 1e-12) 1.0 else xiT / xiRef
+        val v = requireVm()
         return THERMAL_CHANNELS.map { c ->
-            val f = thermalFeature(c.kind, ir, temp)
-            val z = ((f - c.ref) / c.sd) * gain
+            val z = v.callNum("thermal_z", listOf(kindIndex(c.kind), ir, temp, c.ref, c.sd))
             buildObs(c.key, c.label, c.rho, z)
         }
     }
@@ -379,12 +399,11 @@ object IqEngine {
         ir: Double, temp: Double,
         samples: List<Pair<Double, Double>> = emptyList(), id: String? = "THERMAL"
     ): Assessment {
+        val v = requireVm()
         val obs = thermalChannels(ir, temp).toMutableList()
         val c0 = THERMAL_CHANNELS[0]
-        val ref = thermalInvariant(35.0, 23.0)
         for ((sir, stemp) in samples) {
-            val gain = thermalInvariant(sir, stemp) / ref
-            val z = ((thermalFeature("gradient", sir, stemp) - c0.ref) / c0.sd) * gain
+            val z = v.callNum("thermal_z", listOf(0.0, sir, stemp, c0.ref, c0.sd))
             obs.add(buildObs("ir_gradient_t", "IR 勾配(時系列サンプル)", c0.rho, z))
         }
         val xi = thermalInvariant(ir, temp)

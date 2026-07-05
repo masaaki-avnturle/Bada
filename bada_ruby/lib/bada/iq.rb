@@ -3,6 +3,7 @@
 require_relative "special"
 require_relative "entropy"
 require_relative "manifold"
+require_relative "lang"
 
 module Bada
   # Bada::IQ — subject intelligence (IQ) assessment on the Yamaguchi /
@@ -68,17 +69,31 @@ module Bada
     # so a high-reliability biosignal (ρ→1) gives a tight, trustworthy readout
     # and a low-reliability one (ρ→0) a wide, near-useless one. Combining them
     # is left to the Bayesian stage (no double counting of the prior here).
+    # The Bada-language VM, loaded with the .bada engine libraries. The entire
+    # numeric core below runs *through this VM* — i.e. the app is built on the
+    # Bada-language library (lib/bada_src/*.bada), not on hand-written Ruby math.
+    BADA_SRC_DIR = File.expand_path("../bada_src", __dir__)
+
+    def vm
+      @vm ||= begin
+        v = Bada::Lang::VM.new
+        v.load(File.read(File.join(BADA_SRC_DIR, "special.bada"), encoding: "UTF-8"))
+        v.load(File.read(File.join(BADA_SRC_DIR, "iq.bada"), encoding: "UTF-8"))
+        v
+      end
+    end
+
     def observe(modality, z)
       m = MODALITIES.fetch(modality)
       build_obs(modality, m[:label], m[:rho], z)
     end
 
     # Build one IQ observation from a standardized reading z at reliability rho.
-    #   y   = 100 + 15 z / rho ,   var = 15² (1 − rho²) / rho²
+    # Computed by the Bada library:  observe_estimate / observe_variance.
     def build_obs(modality, label, rho, z)
       zf = z.to_f
-      y = POP_MEAN + POP_SD * zf / rho
-      var = (POP_SD**2) * (1.0 - rho**2) / (rho**2)
+      y = vm.call("observe_estimate", [rho, zf])
+      var = vm.call("observe_variance", [rho])
       {
         modality: modality,
         label: label,
@@ -149,33 +164,34 @@ module Bada
     #
     # Precision adds; the estimate is the precision-weighted mean of the prior
     # and every biosignal readout.
+    # Gaussian conjugate fusion — computed by the Bada library (bayes_mean /
+    # bayes_sd / bayes_bits over the estimate & precision arrays; prior N(100,15²)).
     def bayes(obs, prior_mean: POP_MEAN, prior_sd: POP_SD)
-      prior_prec = 1.0 / (prior_sd**2)
-      prec = prior_prec + obs.sum { |o| o[:precision] }
-      weighted = prior_prec * prior_mean + obs.sum { |o| o[:estimate] * o[:precision] }
-      mean = weighted / prec
-      var = 1.0 / prec
-      sd = Math.sqrt(var)
+      estimates = obs.map { |o| o[:estimate] }
+      precisions = obs.map { |o| o[:precision] }
+      mean = vm.call("bayes_mean", [estimates, precisions])
+      sd = vm.call("bayes_sd", [precisions])
       {
         prior_mean: prior_mean,
         prior_sd: prior_sd,
         posterior_mean: mean,
         posterior_sd: sd,
-        posterior_var: var,
+        posterior_var: sd * sd,
         # 95% credible interval (±1.96σ):
         ci95: [mean - 1.96 * sd, mean + 1.96 * sd],
         # information gained over the prior, in bits (Gaussian KL / entropy drop):
-        bits_gained: Math.log2(prior_sd / sd),
-        p_above_average: 1.0 - Special.normal_cdf(POP_MEAN, mean: mean, sd: sd)
+        bits_gained: vm.call("bayes_bits", [precisions]),
+        p_above_average: 1.0 - vm.call("normal_cdf", [POP_MEAN, mean, sd])
       }
     end
 
     # Posterior probability mass in each Wechsler band.
+    # Posterior mass in each Wechsler band — computed by the Bada band_prob.
     def band_probabilities(mean, sd)
       BANDS.map do |b|
-        lo = b[:lo] == -Float::INFINITY ? 0.0 : Special.normal_cdf(b[:lo], mean: mean, sd: sd)
-        hi = b[:hi] ==  Float::INFINITY ? 1.0 : Special.normal_cdf(b[:hi], mean: mean, sd: sd)
-        { band: b, p: (hi - lo).clamp(0.0, 1.0) }
+        lo = b[:lo] == -Float::INFINITY ? -1.0e9 : b[:lo]
+        hi = b[:hi] ==  Float::INFINITY ?  1.0e9 : b[:hi]
+        { band: b, p: vm.call("band_prob", [lo, hi, mean, sd]) }
       end
     end
 
@@ -200,8 +216,8 @@ module Bada
       # Ξ invariant acting as a small ± modulation (the framework gate). Band
       # granularity (10-pt bands vs an ~11-pt posterior sd) caps a single band
       # near ~0.5, so the whisper stays honestly hedged.
-      gate = (xi_gate.abs / (1.0 + xi_gate.abs)) # squash Ξ into (0,1)
-      confidence = (max_p * (0.85 + 0.30 * gate)).clamp(0.0, 1.0)
+      # confidence carried by the top-band mass, gated by Ξ (Bada whisper_confidence).
+      confidence = vm.call("whisper_confidence", [max_p, xi_gate])
 
       {
         band_ja: top[:band][:ja],
@@ -231,6 +247,15 @@ module Bada
       obs.map { |o| format("%s:%.2f", o[:modality], o[:z]) }.join(" ")
     end
 
+    # Biosignal TupleSpace invariant Ξ: host tokenizes the signature and measures
+    # (H, M, N); the gamma/beta manifold gauge itself is the Bada manifold_invariant.
+    def signature_xi(obs)
+      tokens = Bada::Entropy.tokenize(signature(obs))
+      h = Bada::Entropy.shannon(tokens)
+      m = Bada::Manifold.integral(Bada::Entropy.distribution(tokens))
+      vm.call("manifold_invariant", [h, m, tokens.length.to_f])
+    end
+
     # ── Assessment facade ───────────────────────────────────────────────────
     #
     # Runs the full pipeline for a subject and renders a report, in the style of
@@ -243,7 +268,7 @@ module Bada
       def self.from_subject(subject)
         obs = IQ.observations(subject)
         raise ArgumentError, "no biosignal readings given" if obs.empty?
-        xi = Bada::Manifold.xi(IQ.signature(obs))
+        xi = IQ.signature_xi(obs)
         new(obs, xi: xi, id: subject[:id] || subject["id"])
       end
 
@@ -397,37 +422,20 @@ module Bada
         label: "代謝比 Δ / T_ambient" }
     ].freeze
 
-    # Thermal manifold invariant Ξ_T from the (ir, temp) sensor pair.
+    # Thermal manifold invariant Ξ_T — computed by the Bada library
+    # (thermal_invariant: the gamma-function global partial integral manifold).
     def thermal_invariant(ir, temp)
-      a = [ir.to_f, 1e-6].max
-      b = [temp.to_f, 1e-6].max
-      s = a + b
-      probs = [a / s, b / s]
-      h = -probs.sum { |q| q <= 0 ? 0.0 : q * Math.log2(q) }
-      m = probs.each_with_index.sum { |q, i| q * Manifold.element(i + 2.0) }
-      Special.zeta_gauge(h + 1.0, m + 1.0, 3.0)  # β(H+1,M+1)/log 3  (gamma gauge)
+      vm.call("thermal_invariant", [ir.to_f, temp.to_f])
     end
 
-    # Raw feature value for a thermal channel from the (ir, temp) pair.
-    def thermal_feature(kind, ir, temp)
-      delta = ir.to_f - temp.to_f
-      case kind
-      when :gradient   then delta
-      when :emissivity then ir.to_f
-      when :ratio      then delta / [temp.to_f.abs, 1e-6].max
-      else 0.0
-      end
-    end
+    # Kind index for the Bada thermal_z: 0=gradient, 1=emissivity, 2=ratio.
+    THERMAL_KIND = { gradient: 0.0, emissivity: 1.0, ratio: 2.0 }.freeze
 
-    # The thermal sub-channel observations from one (ir, temp) reading, each
-    # standardized then curved by the manifold gauge Ξ_T / Ξ_ref.
+    # The thermal sub-channel observations from one (ir, temp) reading; each z is
+    # standardized and curved by the manifold gauge inside the Bada thermal_z.
     def thermal_channels(ir, temp)
-      xi_t = thermal_invariant(ir, temp)
-      xi_ref = thermal_invariant(35.0, 23.0)   # neutral operating point
-      gain = xi_ref.abs < 1e-12 ? 1.0 : xi_t / xi_ref
       THERMAL_CHANNELS.map do |c|
-        f = thermal_feature(c[:kind], ir, temp)
-        z = ((f - c[:ref]) / c[:sd]) * gain     # manifold-gauged cognitive z
+        z = vm.call("thermal_z", [THERMAL_KIND[c[:kind]], ir.to_f, temp.to_f, c[:ref], c[:sd]])
         build_obs(c[:key], c[:label], c[:rho], z)
       end
     end
@@ -441,9 +449,7 @@ module Bada
         sir, stemp = pair
         next if sir.nil? || stemp.nil?
         c = THERMAL_CHANNELS[0] # gradient channel per time-sample
-        xi_t = thermal_invariant(sir, stemp)
-        gain = xi_t / thermal_invariant(35.0, 23.0)
-        z = ((thermal_feature(:gradient, sir, stemp) - c[:ref]) / c[:sd]) * gain
+        z = vm.call("thermal_z", [THERMAL_KIND[:gradient], sir.to_f, stemp.to_f, c[:ref], c[:sd]])
         obs << build_obs(:ir_gradient_t, "IR 勾配(時系列サンプル)", c[:rho], z)
       end
       xi = thermal_invariant(ir, temp)

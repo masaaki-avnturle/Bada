@@ -47,6 +47,12 @@ Android アプリ（`android/`）。ロジックは純 Ruby の `Bada::IQ` を K
 さらに **赤外線センサー + 温度計モード**を搭載し、端末の温度計・赤外線近接センサーから
 **ガンマ関数の大域的部分積分多様体**（`Ξ_T = β(H+1,M+1)/log 3`）を通して IQ を推定します。
 
+**Bada 言語で再構築**: 4 段階＋サーマルモードの数式は Bada 言語ライブラリ
+（`bada_ruby/lib/bada_src/special.bada` / `iq.bada`）として記述され、Ruby の Bada VM
+（`Bada::Lang`）と Android の Bada VM（`BadaVM.kt`）の両方が同じ `.bada` を実行します
+（両者の数値一致を検証済み）。アプリは手書きの Kotlin 数式ではなく、この Bada 言語ライブラリの
+上に構築されています。
+
 **APK のダウンロード（ビルド不要）**: GitHub Actions が APK を自動ビルドして **Releases** に
 公開します。リポジトリの **Releases → `Bada IQ APK (latest)`（タグ `apk-latest`）** から
 `bada-iq.apk` を取得し、「提供元不明のアプリ」を許可してインストールしてください。

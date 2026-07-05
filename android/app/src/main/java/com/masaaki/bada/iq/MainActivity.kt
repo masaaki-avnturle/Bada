@@ -21,6 +21,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        BadaAssets.ensureLoaded(this)   // load the .bada engine library
 
         fields = mapOf(
             "fmri" to findViewById<EditText>(R.id.inFmri),

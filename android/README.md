@@ -1,9 +1,13 @@
 # Bada IQ 判定器 — Android アプリ (APK)
 
 これまでの Bada バイオ医療アプリ（**fMRI・MRI・脳トポグラフィ・DNA解析・血液検査**）の
-生体信号から、対象者の IQ を計測して評価する Android アプリです。ロジックは純 Ruby の
-`Bada::IQ`（`bada_ruby/lib/bada/iq.rb`）を Kotlin へ**逐語移植**しており、`bin/bada iq` と
-同じ数値を出力します。
+生体信号から、対象者の IQ を計測して評価する Android アプリです。
+
+**このアプリは Bada 言語で書かれたライブラリ（`bada_ruby/lib/bada_src/*.bada`）の上に
+再構築されています。** 4 段階＋サーマルモードの数式はすべて Bada 言語で記述され
+（`special.bada` / `iq.bada`）、アプリは Kotlin 実装の Bada VM（`BadaVM.kt`）でその
+`.bada` ライブラリを**実行**します（APK に asset としてバンドル）。同じ `.bada` を Ruby CLI
+（`bin/bada iq`）でも実行し、Kotlin VM と Ruby VM が同一の数値を出力することを検証済みです。
 
 - **① IQ 計測** — 各生体信号を信頼度 ρ で IQ 尺度へ回帰
 - **② ミラー統計** — 中央枢軸まわりの反射対称ロバスト要約
@@ -64,7 +68,10 @@ cd android
 
 | ファイル | 内容 |
 |:--------|:----|
-| `app/src/main/java/com/masaaki/bada/iq/IqEngine.kt` | `Bada::IQ` の Kotlin 移植（4 段階 + サーマルモード） |
+| `bada_ruby/lib/bada_src/special.bada` | Bada 言語の特殊関数（β/ζ ゲージ・多様体要素・Φ） |
+| `bada_ruby/lib/bada_src/iq.bada` | Bada 言語の IQ エンジン（4 段階＋サーマル数式） |
+| `app/src/main/java/com/masaaki/bada/iq/BadaVM.kt` | Bada 言語 VM（字句・構文・評価）。`.bada` を実行 |
+| `app/src/main/java/com/masaaki/bada/iq/IqEngine.kt` | 入出力の橋渡し（数式は VM 経由で `.bada` を呼ぶ） |
 | `app/src/main/java/com/masaaki/bada/iq/MainActivity.kt` | 生体信号 z スコア入力 UI と評価の実行 |
 | `app/src/main/java/com/masaaki/bada/iq/ThermalActivity.kt` | 赤外線 + 温度計センサー読み取りと評価 |
 | `app/src/main/res/layout/activity_main.xml` | 5 モダリティの z スコア入力フォーム |

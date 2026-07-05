@@ -34,6 +34,7 @@ class ThermalActivity : AppCompatActivity(), SensorEventListener {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_thermal)
+        BadaAssets.ensureLoaded(this)   // load the .bada engine library
 
         inIr = findViewById(R.id.inIr)
         inTemp = findViewById(R.id.inTemp)

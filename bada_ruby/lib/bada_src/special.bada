@@ -1,0 +1,54 @@
+# special.bada — Bada-language special functions.
+#
+# The gamma-function global partial integral manifold, written in the Bada
+# language itself. Host builtins supply the primitives gamma / erf / ln / exp /
+# sqrt / abs / pow / floor / min / max / len / push / sort / sum / pi / inf.
+
+def log2(x)
+  return ln(x) / ln(2)
+end
+
+# Euler beta B(p,q) = Γ(p)Γ(q)/Γ(p+q)  — the heart of the manifold gauge.
+def beta(p, q)
+  return gamma(p) * gamma(q) / gamma(p + q)
+end
+
+# Framework gauge  ζ(s) = β(p,q)/log x.
+def zeta_gauge(p, q, x)
+  set lx = ln(x)
+  if abs(lx) < 0.000000000000001
+    return inf()
+  end
+  return beta(p, q) / lx
+end
+
+# x log x — the Napier ("neipa") circle step.
+def x_log_x(x)
+  if x <= 0
+    return 0
+  end
+  return x * ln(x)
+end
+
+# Manifold line element  dμ(x) = 1 / (x log x)^2.
+def manifold_element(x)
+  if x <= 1
+    return 1
+  end
+  set xl = x_log_x(x)
+  if abs(xl) < 0.000000001
+    return 1
+  end
+  return 1 / (xl * xl)
+end
+
+# Standard-normal cdf  Φ(x) = ½(1 + erf((x-μ)/(σ√2))).
+def normal_cdf(x, mean, sd)
+  if sd <= 0
+    if x >= mean
+      return 1
+    end
+    return 0
+  end
+  return 0.5 * (1 + erf((x - mean) / (sd * sqrt(2))))
+end

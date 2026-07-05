@@ -1,0 +1,190 @@
+# iq.bada — the Bada IQ engine, authored in the Bada language.
+#
+# Numeric core of the four-stage assessment. The host (Ruby CLI / Android APK)
+# supplies inputs as numbers and arrays, calls these functions through the Bada
+# VM, and formats the report; ALL of the mathematics lives here in Bada.
+#
+#   [1] IQ measurement   observe_estimate / observe_variance
+#   [2] Mirror statistics mirror_pivot / mirror_sd / mirror_mad / mirror_asym
+#   [3] Bayesian estimate bayes_precision / bayes_mean / bayes_bits
+#   [4] Whispered judge   band_prob / whisper_confidence
+#   + 赤外線+温度計         thermal_invariant / thermal_gain / thermal_z
+#   (uses special.bada: beta, zeta_gauge, manifold_element, normal_cdf, log2)
+
+def pop_mean()
+  return 100
+end
+
+def pop_sd()
+  return 15
+end
+
+# ── [1] IQ measurement ──────────────────────────────────────────────────────
+# Unbiased single-modality readout  y = 100 + 15 z / ρ  and its variance.
+def observe_estimate(rho, z)
+  return pop_mean() + pop_sd() * z / rho
+end
+
+def observe_variance(rho)
+  return pop_sd() * pop_sd() * (1 - rho * rho) / (rho * rho)
+end
+
+# ── [3] Bayesian estimation ─────────────────────────────────────────────────
+# precisions[i] = 1 / var_i ; prior N(100, 15^2).
+def bayes_precision(precisions)
+  set pr = 1 / (pop_sd() * pop_sd())
+  set i = 0
+  set n = len(precisions)
+  while i < n
+    set pr = pr + precisions[i]
+    set i = i + 1
+  end
+  return pr
+end
+
+def bayes_mean(estimates, precisions)
+  set w = pop_mean() / (pop_sd() * pop_sd())
+  set i = 0
+  set n = len(estimates)
+  while i < n
+    set w = w + estimates[i] * precisions[i]
+    set i = i + 1
+  end
+  return w / bayes_precision(precisions)
+end
+
+def bayes_sd(precisions)
+  return sqrt(1 / bayes_precision(precisions))
+end
+
+# information gained over the prior, in bits.
+def bayes_bits(precisions)
+  return log2(pop_sd() / bayes_sd(precisions))
+end
+
+# posterior probability mass in the Wechsler band [lo, hi).
+def band_prob(lo, hi, mean, sd)
+  set a = 0
+  if lo > -1000000
+    set a = normal_cdf(lo, mean, sd)
+  end
+  set b = 1
+  if hi < 1000000
+    set b = normal_cdf(hi, mean, sd)
+  end
+  set p = b - a
+  if p < 0
+    set p = 0
+  end
+  return p
+end
+
+# ── [2] Mirror statistics ───────────────────────────────────────────────────
+def mirror_pivot(xs)
+  set s = sort(xs)
+  set n = len(s)
+  set h = floor(n / 2)
+  if n % 2 == 1
+    return s[h]
+  end
+  return 0.5 * (s[h - 1] + s[h])
+end
+
+def mirror_mean(xs)
+  return sum(xs) / len(xs)
+end
+
+# sd of the sample together with its reflection about the pivot.
+def mirror_sd(xs)
+  set p = mirror_pivot(xs)
+  set i = 0
+  set n = len(xs)
+  set acc = 0
+  while i < n
+    set d = xs[i] - p
+    set acc = acc + d * d
+    set r = 2 * p - xs[i]
+    set dr = r - p
+    set acc = acc + dr * dr
+    set i = i + 1
+  end
+  return sqrt(acc / (2 * n))
+end
+
+# median absolute deviation (robust scale).
+def mirror_mad(xs)
+  set p = mirror_pivot(xs)
+  set i = 0
+  set n = len(xs)
+  set fold = []
+  while i < n
+    set fold = push(fold, abs(xs[i] - p))
+    set i = i + 1
+  end
+  return mirror_pivot(fold)
+end
+
+# signed reflection asymmetry in scale units.
+def mirror_asym(xs)
+  set sc = mirror_sd(xs)
+  if sc < 0.000000000001
+    return 0
+  end
+  return (mirror_mean(xs) - mirror_pivot(xs)) / sc
+end
+
+def mirror_symmetry(xs)
+  return 1 / (1 + abs(mirror_asym(xs)))
+end
+
+# ── [4] Whispered judge ─────────────────────────────────────────────────────
+def whisper_confidence(maxp, xi)
+  set gate = abs(xi) / (1 + abs(xi))
+  set c = maxp * (0.85 + 0.30 * gate)
+  if c > 1
+    set c = 1
+  end
+  if c < 0
+    set c = 0
+  end
+  return c
+end
+
+# manifold invariant Ξ from a token measure summary (H, M, N) — the gamma gauge.
+def manifold_invariant(h, m, n)
+  return zeta_gauge(h + 1, m + 1, n + 1)
+end
+
+# ── 赤外線センサー + 温度計 (gamma-function global partial integral manifold) ──
+# Ξ_T from the 2-point warmth measure of (ir, temp).
+def thermal_invariant(ir, temp)
+  set a = max(ir, 0.000001)
+  set b = max(temp, 0.000001)
+  set s = a + b
+  set p0 = a / s
+  set p1 = b / s
+  set h = 0 - (p0 * log2(p0) + p1 * log2(p1))
+  set m = p0 * manifold_element(2) + p1 * manifold_element(3)
+  return zeta_gauge(h + 1, m + 1, 3)
+end
+
+def thermal_gain(ir, temp)
+  return thermal_invariant(ir, temp) / thermal_invariant(35, 23)
+end
+
+# standardized cognitive z for thermal channel `kind` (0=gradient,1=emissivity,
+# 2=metabolic ratio), gauged by the manifold gain.
+def thermal_z(kind, ir, temp, ref, sd)
+  set delta = ir - temp
+  set f = 0
+  if kind == 0
+    set f = delta
+  end
+  if kind == 1
+    set f = ir
+  end
+  if kind == 2
+    set f = delta / max(abs(temp), 0.000001)
+  end
+  return ((f - ref) / sd) * thermal_gain(ir, temp)
+end
