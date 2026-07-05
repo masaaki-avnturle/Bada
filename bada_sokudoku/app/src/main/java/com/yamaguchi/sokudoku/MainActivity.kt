@@ -1,5 +1,6 @@
 package com.yamaguchi.sokudoku
 
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,7 +10,12 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.RadioGroup
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlin.math.max
 import kotlin.random.Random
 
@@ -33,12 +39,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeGroup: RadioGroup
     private lateinit var startBtn: Button
     private lateinit var stopBtn: Button
+    private lateinit var pdfBtn: Button
     private lateinit var displayArea: FrameLayout
     private lateinit var display: TextView
     private lateinit var status: TextView
 
     private val handler = Handler(Looper.getMainLooper())
     private var running = false
+
+    // PDF picker: only .pdf documents
+    private val pickPdf = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> if (uri != null) extractPdf(uri) }
 
     private data class Unit(val text: String, val page: Int)
 
@@ -53,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        PDFBoxResourceLoader.init(applicationContext)
 
         input = findViewById(R.id.input)
         cpmIn = findViewById(R.id.cpm)
@@ -61,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         modeGroup = findViewById(R.id.modeGroup)
         startBtn = findViewById(R.id.startBtn)
         stopBtn = findViewById(R.id.stopBtn)
+        pdfBtn = findViewById(R.id.pdfBtn)
         displayArea = findViewById(R.id.displayArea)
         display = findViewById(R.id.display)
         status = findViewById(R.id.status)
@@ -78,6 +92,57 @@ class MainActivity : AppCompatActivity() {
 
         startBtn.setOnClickListener { start() }
         stopBtn.setOnClickListener { stop("停止しました / stopped") }
+        pdfBtn.setOnClickListener { pickPdf.launch(arrayOf("application/pdf")) }
+    }
+
+    /** Extract text from a user-picked PDF (off the main thread) and load it. */
+    private fun extractPdf(uri: Uri) {
+        stop(null)
+        pdfBtn.isEnabled = false
+        status.text = "PDF読み込み中… / reading PDF…"
+        Thread {
+            var text = ""
+            var pages = 0
+            var err: String? = null
+            try {
+                contentResolver.openInputStream(uri).use { ins ->
+                    PDDocument.load(ins).use { doc ->
+                        pages = doc.numberOfPages
+                        val stripper = PDFTextStripper()
+                        val sb = StringBuilder()
+                        for (p in 1..pages) {          // per page -> form-feed = SRS page break
+                            stripper.startPage = p
+                            stripper.endPage = p
+                            sb.append(stripper.getText(doc))
+                            if (p < pages) sb.append('\u000C')
+                        }
+                        text = sb.toString()
+                    }
+                }
+            } catch (e: Exception) {
+                err = e.message ?: e.javaClass.simpleName
+            }
+            val finalText = text
+            val finalPages = pages
+            val finalErr = err
+            runOnUiThread {
+                pdfBtn.isEnabled = true
+                if (finalErr != null) {
+                    status.text = "PDF読み込み失敗: $finalErr"
+                    Toast.makeText(this, "PDFを読み込めませんでした", Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                if (finalText.isBlank()) {
+                    status.text = "テキストを抽出できませんでした（画像PDFの可能性）"
+                    Toast.makeText(this, "文字が見つかりません（画像化されたPDFはOCRが必要）",
+                        Toast.LENGTH_LONG).show()
+                    return@runOnUiThread
+                }
+                input.setText(finalText)
+                val chars = finalText.codePointCount(0, finalText.length)
+                status.text = "PDF読込完了: $finalPages ページ / 約 $chars 文字。開始を押してください"
+            }
+        }.start()
     }
 
     override fun onPause() {
