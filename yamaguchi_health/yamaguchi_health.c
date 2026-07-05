@@ -291,6 +291,230 @@ static void breathing_menu(void)
 }
 
 /* ----------------------------------------------------------------------- */
+/* 3.5  SRS speed reading  (block-flash, page-by-page, with speed-up)       */
+/*      Loads a report, splits it into pages and blocks, then shows each     */
+/*      block -> clears it -> shows the next, accelerating each page.        */
+/* ----------------------------------------------------------------------- */
+
+static void msleep(long ms)
+{
+    if (ms <= 0) return;
+    struct timespec ts;
+    ts.tv_sec  = ms / 1000;
+    ts.tv_nsec = (ms % 1000) * 1000000L;
+    nanosleep(&ts, NULL);
+}
+
+static void clear_screen(void)
+{
+    /* ANSI clear + scrollback + home; works on xterm / Termux / most terms */
+    printf("\033[2J\033[3J\033[H");
+    fflush(stdout);
+}
+
+/* decode one UTF-8 codepoint at s[i]; return codepoint, set *adv = byte width */
+static unsigned utf8_next(const char *s, size_t i, size_t len, int *adv)
+{
+    unsigned char c = (unsigned char)s[i];
+    if (c < 0x80) { *adv = 1; return c; }
+    if ((c >> 5) == 0x6 && i + 1 < len) {
+        *adv = 2; return ((c & 0x1Fu) << 6) | ((unsigned char)s[i+1] & 0x3Fu);
+    }
+    if ((c >> 4) == 0xE && i + 2 < len) {
+        *adv = 3; return ((c & 0x0Fu) << 12) | (((unsigned char)s[i+1] & 0x3Fu) << 6)
+                          | ((unsigned char)s[i+2] & 0x3Fu);
+    }
+    if ((c >> 3) == 0x1E && i + 3 < len) {
+        *adv = 4; return ((c & 0x07u) << 18) | (((unsigned char)s[i+1] & 0x3Fu) << 12)
+                          | (((unsigned char)s[i+2] & 0x3Fu) << 6) | ((unsigned char)s[i+3] & 0x3Fu);
+    }
+    *adv = 1; return c;   /* invalid byte -> treat as single */
+}
+
+static int is_break_cp(unsigned cp)
+{
+    switch (cp) {
+        case 0x20: case 0x09: case 0x0A: case 0x0D:  /* whitespace */
+        case '.': case ',': case '!': case '?': case ';': case ':':
+        case 0x3000:  /* 　 */ case 0x3002: /* 。 */ case 0x3001: /* 、 */
+        case 0xFF01:  /* ！ */ case 0xFF1F: /* ？ */
+        case 0xFF0C:  /* ， */ case 0xFF0E: /* ． */
+        case 0xFF1B:  /* ； */ case 0xFF1A: /* ： */
+            return 1;
+        default: return 0;
+    }
+}
+
+/* count codepoints (for timing that works with Japanese and English) */
+static int cp_len(const char *s)
+{
+    int n = 0; size_t len = strlen(s), i = 0;
+    while (i < len) { int adv; utf8_next(s, i, len, &adv); i += adv; n++; }
+    return n;
+}
+
+typedef struct { char *text; int page; } SrsBlock;
+
+/* split text into page-tagged blocks. returns block count, sets *pages. */
+static int srs_build(const char *text, int block_chars, int page_blocks,
+                     SrsBlock **out, int *pages)
+{
+    size_t len = strlen(text);
+    size_t cap = 64, n = 0;
+    SrsBlock *arr = malloc(cap * sizeof *arr);
+    char *bb = malloc(len + 1);           /* block byte buffer */
+    if (!arr || !bb) { free(arr); free(bb); *out = NULL; *pages = 0; return 0; }
+
+    int    seen_ff  = 0;
+    int    cur_page = 1;
+    size_t bl = 0;                         /* bytes in current block */
+    int    cp_count = 0;
+    int    prev_nl = 0;
+
+    #define SRS_FLUSH()                                                        \
+        do {                                                                   \
+            if (bl > 0) {                                                      \
+                bb[bl] = '\0';                                                 \
+                if (n == cap) {                                                \
+                    cap *= 2;                                                  \
+                    SrsBlock *t = realloc(arr, cap * sizeof *arr);             \
+                    if (!t) break;                                             \
+                    arr = t;                                                   \
+                }                                                              \
+                arr[n].text = strdup(bb); arr[n].page = cur_page;              \
+                if (arr[n].text) n++;                                          \
+                bl = 0; cp_count = 0;                                          \
+            }                                                                  \
+        } while (0)
+
+    size_t i = 0;
+    while (i < len) {
+        int adv = 1;
+        unsigned cp = utf8_next(text, i, len, &adv);
+
+        if (cp == 0x0C) {                  /* form feed = page break */
+            seen_ff = 1;
+            SRS_FLUSH();
+            cur_page++;
+            i += adv; prev_nl = 0;
+            continue;
+        }
+        if (cp == 0x0A && prev_nl) {       /* blank line = paragraph break */
+            SRS_FLUSH();
+            i += adv; prev_nl = 1;
+            continue;
+        }
+        prev_nl = (cp == 0x0A);
+
+        for (int k = 0; k < adv; k++) bb[bl++] = text[i + k];
+        cp_count++;
+        i += adv;
+
+        if (cp_count >= block_chars &&
+            (is_break_cp(cp) || cp_count >= block_chars + 24)) {
+            SRS_FLUSH();
+        }
+    }
+    SRS_FLUSH();
+    #undef SRS_FLUSH
+    free(bb);
+
+    if (!seen_ff && page_blocks > 0) {     /* no form feeds -> synthesize pages */
+        for (size_t j = 0; j < n; j++)
+            arr[j].page = (int)(j / (size_t)page_blocks) + 1;
+    }
+    *pages = n ? arr[n - 1].page : 0;
+    *out = arr;
+    return (int)n;
+}
+
+static const char SAMPLE_REPORT[] =
+    "SRS速読 サンプルレポート\n\n"
+    "これはSRS速読モードの動作確認用サンプルです。文章はブロックに分割され、"
+    "一つずつ表示されては消え、次のブロックへ進みます。ページが変わるたびに"
+    "表示速度は少しずつ加速していきます。\n\n"
+    "速読は、視線の停留を減らし、意味のまとまり（ブロック）単位で情報を"
+    "受け取る練習です。無理のない速度から始め、慣れてきたら加速しましょう。\n"
+    "\f"
+    "2ページ目です。フォームフィード文字でページを区切っています。\n\n"
+    "This block-flash reader also works with English text. Each chunk appears, "
+    "then clears, then the next chunk follows, all the way to the end.\n\n"
+    "自分のレポートを読むときは、メニューでテキストファイルのパスを指定して"
+    "ください。最後のブロックまで表示すると自動的に終了します。\n";
+
+static void srs_speed_read(void)
+{
+    char buf[LINE_MAX_LEN];
+
+    printf("\n============ SRS速読 / Speed Reading (block flash) ============\n");
+    printf("  レポートを1ページ毎・ブロック毎に 表示→消去→次へ と流し、\n");
+    printf("  最後まで加速しながら読み進める速読モードです。\n");
+    printf("  レポートのテキストファイルのパス (空Enter=サンプル): ");
+    fflush(stdout);
+    read_line(buf, sizeof buf);
+
+    char *text = NULL;
+    if (buf[0]) {
+        FILE *f = fopen(buf, "rb");
+        if (!f) { printf("  ファイルを開けません: %s\n", buf); pause_enter(); return; }
+        fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
+        if (sz < 0) sz = 0;
+        text = malloc((size_t)sz + 1);
+        if (text) { size_t rd = fread(text, 1, (size_t)sz, f); text[rd] = '\0'; }
+        fclose(f);
+    } else {
+        text = strdup(SAMPLE_REPORT);
+    }
+    if (!text) { printf("  読み込みに失敗しました。\n"); pause_enter(); return; }
+
+    int cpm = 600, accel = 150, block_chars = 40, page_blocks = 6;
+    printf("  開始速度 CPM(文字/分, 既定600): "); fflush(stdout);
+    if (read_line(buf, sizeof buf) && buf[0]) { int v = atoi(buf); if (v >= 60) cpm = v; }
+    printf("  ページ毎の加速 CPM(既定150): "); fflush(stdout);
+    if (read_line(buf, sizeof buf) && buf[0]) { int v = atoi(buf); if (v >= 0)  accel = v; }
+    printf("  1ブロックの文字数(既定40): "); fflush(stdout);
+    if (read_line(buf, sizeof buf) && buf[0]) { int v = atoi(buf); if (v >= 8)  block_chars = v; }
+
+    SrsBlock *blocks = NULL; int pages = 0;
+    int nb = srs_build(text, block_chars, page_blocks, &blocks, &pages);
+    if (nb <= 0) {
+        printf("  表示できるテキストがありません。\n");
+        free(text); free(blocks); pause_enter(); return;
+    }
+
+    printf("\n  総ブロック=%d  総ページ=%d  開始=%d CPM (+%d/ページ)\n",
+           nb, pages, cpm, accel);
+    printf("  Enter で開始 (Ctrl-C で中断)… "); fflush(stdout); flush_stdin();
+
+    int cur_page = blocks[0].page;
+    int cur_cpm  = cpm;
+    for (int b = 0; b < nb; b++) {
+        if (blocks[b].page != cur_page) {  /* new page -> speed up */
+            cur_page = blocks[b].page;
+            cur_cpm += accel;
+        }
+        clear_screen();
+        printf("== Page %d/%d  block %d/%d  %d CPM ==\n\n",
+               blocks[b].page, pages, b + 1, nb, cur_cpm);
+        printf("%s\n", blocks[b].text);
+        fflush(stdout);
+
+        int  cps = cp_len(blocks[b].text);
+        long ms  = (long)cps * 60000L / (cur_cpm > 0 ? cur_cpm : 1);
+        if (ms < 120) ms = 120;            /* keep each block at least glancable */
+        msleep(ms);
+    }
+    clear_screen();
+    printf("== 速読終了 / done ==  全 %d ブロック・%d ページを表示しました。\n",
+           nb, pages);
+
+    for (int b = 0; b < nb; b++) free(blocks[b].text);
+    free(blocks);
+    free(text);
+    pause_enter();
+}
+
+/* ----------------------------------------------------------------------- */
 /* 4. Wellness / nutrition info  (information only -- no medical claims)     */
 /* ----------------------------------------------------------------------- */
 
@@ -349,8 +573,9 @@ int main(void)
         printf("  1) センサー ダッシュボード (SIMULATED)\n");
         printf("  2) サイレントトーク (start/stop/record メモ記録)\n");
         printf("  3) 呼吸誘導 / 瞑想 (秘伝功・養生功・SRS・クジラ瞑想)\n");
-        printf("  4) ウェルネス情報 (リシン 等)\n");
-        printf("  5) About / 免責事項\n");
+        printf("  4) SRS速読 / block-flash speed reading\n");
+        printf("  5) ウェルネス情報 (リシン 等)\n");
+        printf("  6) About / 免責事項\n");
         printf("  0) 終了 / quit\n");
         printf("  選択 / select: ");
         fflush(stdout);
@@ -362,10 +587,11 @@ int main(void)
             case 1: sensor_dashboard(); break;
             case 2: silent_talk();      break;
             case 3: breathing_menu();   break;
-            case 4: wellness_info();    break;
-            case 5: about();            break;
+            case 4: srs_speed_read();   break;
+            case 5: wellness_info();    break;
+            case 6: about();            break;
             case 0: printf("  おつかれさまでした。\n"); return 0;
-            default: printf("  1-5 または 0 を入力してください。\n"); break;
+            default: printf("  1-6 または 0 を入力してください。\n"); break;
         }
     }
     return 0;
