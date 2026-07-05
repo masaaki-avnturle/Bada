@@ -42,6 +42,15 @@ Jones-polynomial **telomere splitting** process, drive it with the tablet's
 
 ---
 
+## ダウンロード / Download
+
+- **GitHub Release**（推奨）: リポジトリの **Releases** ページから `bada_iq.apk` をダウンロード
+  → https://github.com/masaaki-avnturle/Bada/releases
+  `bada-iq-*` タグを push すると、GitHub Actions（`.github/workflows/release-apk.yml`）が
+  テストを実行し apk をビルドして Release にアセットとして添付する。Actions タブから手動実行も可能。
+- **直リンク**（このブランチのコミット済み apk）:
+  https://github.com/masaaki-avnturle/Bada/raw/claude/jones-polynomial-telomere-py9vra/omega_iq_telomere_pkg/dist/bada_iq.apk
+
 ## 実行 / Run
 
 ```sh
