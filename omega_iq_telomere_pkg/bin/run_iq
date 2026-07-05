@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Bada IQ launcher — the "activity main" the APK runs on start.
+# Usage: run_iq [app.bada]   (defaults to app/main.bada)
+Encoding.default_external = Encoding::UTF_8
+$LOAD_PATH.unshift File.expand_path("../lib", __dir__)
+require "omega_iq"
+
+# Resolve assets relative to whichever dir holds them: the current dir when
+# launched from an unpacked APK, otherwise the package root.
+pkg_root = File.expand_path("..", __dir__)
+root = File.directory?(File.join(Dir.pwd, "assets")) ? Dir.pwd : pkg_root
+Dir.chdir(root)
+
+app = ARGV[0] || "app/main.bada"
+if File.exist?(app)
+  rt = OmegaIQ::BadaRuntime.new(base_dir: root)
+  puts rt.run(File.read(app))
+else
+  # Fallback: run the pipeline directly.
+  r = OmegaIQ::Pipeline.new(
+    diagram_path: "assets/diagram_arrows.txt",
+    thermal_path: "assets/thermal_frame.pgm"
+  ).run
+  puts OmegaIQ::Pipeline.render(r)
+end
