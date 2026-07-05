@@ -1,5 +1,6 @@
 package com.masaaki.bada.iq
 
+import android.content.Intent
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -49,6 +50,9 @@ class ThermalActivity : AppCompatActivity(), SensorEventListener {
         findViewById<Button>(R.id.btnThermalAssess).setOnClickListener { runAssessment(false) }
         findViewById<Button>(R.id.btnThermalDerived).setOnClickListener { runAssessment(true) }
         findViewById<Button>(R.id.btnThermalDemo).setOnClickListener { fillDemo() }
+        findViewById<Button>(R.id.btnCameraMode).setOnClickListener {
+            startActivity(Intent(this, CameraActivity::class.java))
+        }
 
         val avail = buildString {
             append(if (tempSensor != null) "温度計センサー: 有" else "温度計センサー: 無(手動)")
