@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bada 赤外線IQ・テロメア分裂</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Noto Sans JP", system-ui, sans-serif;
+         background: #0b0e14; color: #e6e9ef; padding: 16px 14px 40px; }
+  h1 { font-size: 17px; font-weight: 700; margin: 0 0 2px; }
+  .sub { color: #8b94a7; font-size: 12px; margin-bottom: 16px; }
+  .iqcard { text-align: center; background: linear-gradient(160deg,#141b2b,#0e1420);
+            border: 1px solid #223; border-radius: 18px; padding: 20px 14px; margin-bottom: 14px; }
+  .iqnum { font-size: 60px; font-weight: 800; line-height: 1; letter-spacing: -1px;
+           background: linear-gradient(90deg,#5ad1c8,#7aa2ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .iqlabel { color: #8b94a7; font-size: 12px; margin-top: 6px; }
+  .band { display: inline-block; margin-top: 8px; font-size: 12px; color: #b7c3dc;
+          background: #1b2334; border: 1px solid #2a3550; border-radius: 999px; padding: 3px 12px; }
+  .row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .mini { flex: 1; background: #111725; border: 1px solid #202a40; border-radius: 12px; padding: 10px 12px; text-align: center; }
+  .mini .v { font-size: 22px; font-weight: 700; }
+  .mini .k { font-size: 11px; color: #8b94a7; margin-top: 2px; }
+  .sec { background: #0f1420; border: 1px solid #1c2438; border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .sec h2 { font-size: 13px; margin: 0 0 8px; color: #9fb0d0; }
+  .kv { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; border-bottom: 1px dashed #1b2333; }
+  .kv:last-child { border-bottom: none; }
+  .kv .k { color: #8b94a7; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; color: #cdd6e6; word-break: break-all; }
+  .bar { height: 7px; background: #1a2233; border-radius: 6px; overflow: hidden; margin-top: 3px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg,#5ad1c8,#7aa2ff); }
+  button { width: 100%; margin-top: 10px; padding: 13px; font-size: 15px; font-weight: 700;
+           color: #051018; background: linear-gradient(90deg,#5ad1c8,#7aa2ff); border: none; border-radius: 12px; }
+  ul { margin: 4px 0 0; padding-left: 18px; } li { font-size: 12px; color: #b7c3dc; margin: 2px 0; }
+  .gen { font-family: ui-monospace, monospace; font-size: 11px; color: #9fb0d0; }
+</style>
+</head>
+<body>
+  <h1>Bada 赤外線IQ・テロメア分裂測定</h1>
+  <div class="sub">絵の方程式化 → Jones多項式 → テロメア分裂 → 赤外線/温度計 → IQ (順 + 真逆)</div>
+  <div id="app"></div>
+  <button onclick="measure()">再測定 / Measure</button>
+
+<script src="iq_engine.js"></script>
+<script>
+// 上の写真の絵を、赤の矢印の順に読んだ bond-line（五芒星 = cinquefoil 5_1）
+var DRAWING = {
+  segments: [
+    [0, 0.0, 1.0, 0.5878, -0.8090],
+    [1, 0.5878, -0.8090, -0.9511, 0.3090],
+    [2, -0.9511, 0.3090, 0.9511, 0.3090],
+    [3, 0.9511, 0.3090, -0.5878, -0.8090],
+    [4, -0.5878, -0.8090, 0.0, 1.0]
+  ],
+  arrow: [0, 1, 2, 3, 4]
+};
+// タブレットの赤外線カメラのサンプルフレーム (8x8) — 端末の温度センサがあれば AndroidThermal で上書き
+var THERMAL = [
+  142,151,160,166,166,160,151,142, 151,166,179,187,187,179,166,151,
+  160,179,195,206,206,195,179,160, 166,187,206,217,217,206,187,166,
+  166,187,206,217,217,206,187,166, 160,179,195,206,206,195,179,160,
+  151,166,179,187,187,179,166,151, 142,151,160,166,166,160,151,142
+];
+
+function bar(v){ return '<div class="bar"><i style="width:'+(v*100).toFixed(0)+'%"></i></div>'; }
+
+function measure(){
+  var pixels = THERMAL.slice();
+  // 実機に周囲温度センサがあれば、その値でフレーム全体をスケールして反映
+  try {
+    if (window.AndroidThermal && typeof AndroidThermal.ambientC === "function") {
+      var c = AndroidThermal.ambientC();
+      if (c > -50 && c < 100) { var g = Math.round(((c-20)/25)*255); pixels = pixels.map(function(p){ return Math.max(0,Math.min(255, Math.round(p*(g/187)))); }); }
+    }
+  } catch(e){}
+
+  var r = BadaIQ.run(DRAWING, pixels);
+  var c = r.components;
+  var html = ''
+    + '<div class="iqcard"><div class="iqnum">'+r.iq+'</div>'
+    + '<div class="iqlabel">IQ (順) · 平均100 / SD15</div>'
+    + '<div class="band">'+r.band+'</div></div>'
+    + '<div class="row">'
+    +   '<div class="mini"><div class="v">'+r.mirrorIq+'</div><div class="k">IQ 真逆 (mirror)</div></div>'
+    +   '<div class="mini"><div class="v">'+r.divergence+'</div><div class="k">真逆 divergence</div></div>'
+    + '</div>'
+    + '<div class="sec"><h2>[2] Jones多項式</h2>'
+    +   '<div class="kv"><span class="k">crossings / writhe</span><span>'+r.crossings.length+' / '+r.writhe+'</span></div>'
+    +   '<div class="kv"><span class="k">V(t)</span><span class="mono">'+r.jones.toString("t",4)+'</span></div>'
+    +   '<div class="kv"><span class="k">真逆 V(1/t)</span><span class="mono">'+r.mirrorJones.toString("t",4)+'</span></div></div>'
+    + '<div class="sec"><h2>[3] テロメア分裂 (Hayflick '+r.telomere.hayflick+')</h2><div class="gen">'
+    +   r.telomere.generations.map(function(g){ return 'gen '+g.generation+': length='+g.length+' daughters='+g.daughters+(g.senescent?'  ← senescence':''); }).join('<br>')
+    +   '</div><div class="kv" style="margin-top:6px"><span class="k">split entropy</span><span>'+r.telomere.entropy.toFixed(4)+' bits</span></div></div>'
+    + '<div class="sec"><h2>[4] 赤外線カメラ + 温度計</h2>'
+    +   '<div class="kv"><span class="k">mean temp</span><span>'+r.thermal.meanC.toFixed(2)+' °C</span></div>'
+    +   '<div class="kv"><span class="k">coherence</span><span>'+r.thermal.coherence.toFixed(4)+'</span></div>'
+    +   '<div class="kv"><span class="k">t_eval (Boltzmann)</span><span>'+r.thermal.tEval.toFixed(6)+'</span></div></div>'
+    + '<div class="sec"><h2>[5] IQ 成分</h2>'
+    +   Object.keys(c).map(function(k){ return '<div class="kv"><span class="k">'+k+'</span><span>'+c[k].toFixed(4)+'</span></div>'+bar(c[k]); }).join('')
+    +   '</div>'
+    + '<div class="sec"><h2>[1] 絵の方程式化 (赤矢印順 '+JSON.stringify(r.order)+')</h2><ul>'
+    +   r.equations.map(function(e){ return '<li class="mono">'+e+'</li>'; }).join('')
+    +   '</ul></div>';
+  document.getElementById("app").innerHTML = html;
+}
+measure();
+</script>
+</body>
+</html>

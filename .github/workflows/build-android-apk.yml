@@ -1,0 +1,74 @@
+name: Build Bada IQ Android APK
+
+# Build a REAL, installable, debug-signed Android APK for the Bada IQ /
+# Jones-telomere app (omega_iq_telomere_pkg/android) and publish it as a
+# downloadable artifact + GitHub Release asset. This apk installs on a device
+# (unlike the Bada-runtime bada_iq.apk); the whole IQ pipeline runs on-device in
+# a WebView (assets/iq_engine.js).
+on:
+  push:
+    branches:
+      - 'claude/jones-polynomial-telomere-py9vra'
+    paths:
+      - 'omega_iq_telomere_pkg/android/**'
+      - '.github/workflows/build-android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: omega_iq_telomere_pkg/android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: yes | sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" >/dev/null
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
+
+      - name: Verify it is a real Android APK (has classes.dex)
+        run: |
+          APK=app/build/outputs/apk/debug/app-debug.apk
+          file "$APK"
+          unzip -l "$APK" | grep -E 'classes\.dex|AndroidManifest\.xml|resources\.arsc'
+          cp "$APK" bada_iq-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada_iq-android-debug-apk
+          path: omega_iq_telomere_pkg/android/bada_iq-debug.apk
+          if-no-files-found: error
+
+      - name: Publish release with installable APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="bada-iq-android-v0.1.0"
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" bada_iq-debug.apk --clobber
+          else
+            gh release create "$TAG" bada_iq-debug.apk \
+              --title "Bada 赤外線IQ — 端末インストール用APK $TAG" \
+              --notes "端末にインストールできる本物の Android APK（デバッグ署名）。**bada_iq-debug.apk** をダウンロードし、提供元不明アプリの許可を有効にしてインストールしてください。絵の方程式化 → Jones多項式 → テロメア分裂 → 温度計 → IQ (順 + 真逆) を端末上で計算します。"
+          fi
