@@ -1,10 +1,16 @@
 name: Release Bada IQ APK
 
-# Build omega_iq_telomere_pkg into dist/bada_iq.apk and publish it as a
-# downloadable GitHub Release asset. Triggers on a bada-iq-* tag push, and can
-# also be run manually from the Actions tab (workflow_dispatch).
+# Build omega_iq_telomere_pkg into dist/bada_iq.apk and make it downloadable two
+# ways: as a workflow ARTIFACT (from the run page) and as a GitHub RELEASE asset.
+# Runs on pushes to the dev branch that touch the package, on a bada-iq-* tag, or
+# manually from the Actions tab.
 on:
   push:
+    branches:
+      - 'claude/jones-polynomial-telomere-py9vra'
+    paths:
+      - 'omega_iq_telomere_pkg/**'
+      - '.github/workflows/release-apk.yml'
     tags:
       - 'bada-iq-*'
   workflow_dispatch:
@@ -15,7 +21,7 @@ on:
         default: 'bada-iq-v0.1.0'
 
 permissions:
-  contents: write   # required to create the release and upload the asset
+  contents: write   # required to push the tag and create the release
 
 jobs:
   build-and-release:
@@ -40,13 +46,24 @@ jobs:
           file omega_iq_telomere_pkg/dist/bada_iq.apk
           unzip -l omega_iq_telomere_pkg/dist/bada_iq.apk
 
+      # Always-available download: the run page's Artifacts section.
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada_iq_apk
+          path: omega_iq_telomere_pkg/dist/bada_iq.apk
+          if-no-files-found: error
+
+      # Proper Releases-page download (best effort; needs contents:write).
       - name: Resolve tag name
         id: tag
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "tag" ]; then
             echo "name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "name=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=bada-iq-v0.1.0" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish release with APK asset
@@ -54,13 +71,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.tag.outputs.name }}"
-          # create the tag if this was a manual dispatch (tag pushes already have it)
           if ! git rev-parse "$TAG" >/dev/null 2>&1; then
             git tag "$TAG"
             git push origin "$TAG"
           fi
-          gh release create "$TAG" \
-            omega_iq_telomere_pkg/dist/bada_iq.apk \
-            --title "Bada 赤外線IQ・テロメア分裂測定 $TAG" \
-            --notes "絵の方程式化 → Jones多項式 → テロメア分裂 → 赤外線カメラ/温度計 → IQ測定 (順 + 真逆) を行う Bada 言語アプリの APK パッケージ。下の Assets から **bada_iq.apk** をダウンロードできます。" \
-            || gh release upload "$TAG" omega_iq_telomere_pkg/dist/bada_iq.apk --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" omega_iq_telomere_pkg/dist/bada_iq.apk --clobber
+          else
+            gh release create "$TAG" \
+              omega_iq_telomere_pkg/dist/bada_iq.apk \
+              --title "Bada 赤外線IQ・テロメア分裂測定 $TAG" \
+              --notes "絵の方程式化 → Jones多項式 → テロメア分裂 → 赤外線カメラ/温度計 → IQ測定 (順 + 真逆) を行う Bada 言語アプリの APK パッケージ。下の Assets から **bada_iq.apk** をダウンロードできます。"
+          fi
