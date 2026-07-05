@@ -70,14 +70,20 @@ module Bada
     # is left to the Bayesian stage (no double counting of the prior here).
     def observe(modality, z)
       m = MODALITIES.fetch(modality)
-      rho = m[:rho]
-      y = POP_MEAN + POP_SD * z.to_f / rho
+      build_obs(modality, m[:label], m[:rho], z)
+    end
+
+    # Build one IQ observation from a standardized reading z at reliability rho.
+    #   y   = 100 + 15 z / rho ,   var = 15² (1 − rho²) / rho²
+    def build_obs(modality, label, rho, z)
+      zf = z.to_f
+      y = POP_MEAN + POP_SD * zf / rho
       var = (POP_SD**2) * (1.0 - rho**2) / (rho**2)
       {
         modality: modality,
-        label: m[:label],
+        label: label,
         rho: rho,
-        z: z.to_f,
+        z: zf,
         estimate: y,   # unbiased single-modality IQ readout
         variance: var, # measurement variance (IQ²)
         sigma: Math.sqrt(var),
@@ -230,19 +236,29 @@ module Bada
     # Runs the full pipeline for a subject and renders a report, in the style of
     # Bada::Thurston / Bada::InfoEngine.
     class Assessment
-      attr_reader :subject, :obs, :mirror, :posterior, :bands, :verdict, :xi
+      attr_reader :id, :obs, :mirror, :posterior, :bands, :verdict, :xi, :meta
 
-      # subject: { id:, fmri:, mri:, topography:, dna:, blood: } — each biosignal
-      # value is a standardized (z-score) reading; any modality may be omitted.
-      def initialize(subject)
-        @subject = subject
-        @obs = IQ.observations(subject)
-        raise ArgumentError, "no biosignal readings given" if @obs.empty?
+      # Build an assessment from a subject hash of standardized biosignal
+      # readings { id:, fmri:, mri:, topography:, dna:, blood: }.
+      def self.from_subject(subject)
+        obs = IQ.observations(subject)
+        raise ArgumentError, "no biosignal readings given" if obs.empty?
+        xi = Bada::Manifold.xi(IQ.signature(obs))
+        new(obs, xi: xi, id: subject[:id] || subject["id"])
+      end
 
+      # obs: array of observation hashes (see IQ.observe); xi: the TupleSpace
+      # invariant used to gate the whispered judge; meta: optional extra context
+      # (e.g. the thermal / infrared block) rendered in the report.
+      def initialize(obs, xi:, id: nil, meta: {})
+        raise ArgumentError, "no observations given" if obs.nil? || obs.empty?
+        @obs = obs
+        @xi = xi
+        @id = id
+        @meta = meta
         @mirror    = IQ.mirror_stats(@obs.map { |o| o[:estimate] })
         @posterior = IQ.bayes(@obs)
         @bands     = IQ.band_probabilities(@posterior[:posterior_mean], @posterior[:posterior_sd])
-        @xi        = Bada::Manifold.xi(IQ.signature(@obs))
         @verdict   = IQ.whispered(@posterior[:posterior_mean], @posterior[:posterior_sd], xi_gate: @xi)
       end
 
@@ -253,13 +269,14 @@ module Bada
 
       def to_h
         {
-          id: @subject[:id] || @subject["id"],
+          id: @id,
           observations: @obs,
           mirror: @mirror,
           posterior: @posterior,
           bands: @bands,
           xi: @xi,
           verdict: @verdict,
+          meta: @meta,
           iq: iq
         }
       end
@@ -270,12 +287,25 @@ module Bada
         lines = []
         lines << "═══════════════════════════════════════════════════════════════"
         lines << " Bada::IQ  対象者 知能評価レポート / Subject IQ Assessment"
-        id = @subject[:id] || @subject["id"]
-        lines << "  対象者 ID: #{id}" if id
+        lines << "  対象者 ID: #{@id}" if @id
         lines << "═══════════════════════════════════════════════════════════════"
 
+        if @meta[:thermal]
+          t = @meta[:thermal]
+          lines << ""
+          lines << "【0】赤外線センサー + 温度計 — ガンマ関数 大域的部分積分多様体"
+          lines << format("   赤外線 IR体表温  : %.2f ℃", t[:ir])
+          lines << format("   温度計 環境温    : %.2f ℃", t[:temp])
+          lines << format("   体表-環境勾配 Δ  : %+.2f ℃", t[:delta])
+          lines << format("   多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t[:xi_t])
+        end
+
         lines << ""
-        lines << "【1】生体信号 IQ 計測 — fMRI/MRI/脳トポグラフィ/DNA/血液"
+        lines << if @meta[:thermal]
+                   "【1】IQ 計測 — 赤外線/温度計 由来 サーマルチャネル"
+                 else
+                   "【1】生体信号 IQ 計測 — fMRI/MRI/脳トポグラフィ/DNA/血液"
+                 end
         lines << format("   %-30s %6s %8s %8s %8s", "modality", "z", "ρ", "IQ推定", "σ")
         @obs.each do |o|
           lines << format("   %-30s %+6.2f %8.2f %8.1f %8.1f",
@@ -325,7 +355,7 @@ module Bada
 
     # Convenience: assess a subject hash and return the Assessment.
     def assess(subject)
-      Assessment.new(subject)
+      Assessment.from_subject(subject)
     end
 
     # A built-in demo subject (a cognitively above-average profile) so the CLI
@@ -339,6 +369,92 @@ module Bada
         dna: 0.8,         # favourable cognitive polygenic score
         blood: 0.5        # healthy metabolic / BDNF profile
       }
+    end
+
+    # ── 赤外線センサー + 温度計 モード (thermal / infrared) ───────────────────
+    #
+    # Estimate IQ from just two physical sensors — an infrared body-surface
+    # reading (IR °C) and an ambient thermometer (°C) — by routing them through
+    # the GAMMA-FUNCTION global partial integral manifold.
+    #
+    # The two readings form a 2-point warmth measure p on the manifold; its
+    # Shannon entropy H and the global partial integral M = Σ p·(1/(x log x)²)
+    # are coupled through the beta/zeta gauge (β = Γ·Γ/Γ) into a thermal manifold
+    # invariant
+    #
+    #   Ξ_T = β(H+1, M+1) / log 3            (N = 2 sensor points, log(N+1)=log 3)
+    #
+    # Ξ_T then *gauges* the standardized cognitive readouts derived from the
+    # body–ambient gradient, and gates the whispered judge. Physiologically this
+    # is an educational proxy for cerebral metabolic throughput (a warmer head
+    # relative to ambient). NOT a medical measurement.
+    THERMAL_CHANNELS = [
+      { key: :ir_gradient,     rho: 0.30, ref: 12.0, sd: 3.0,  kind: :gradient,
+        label: "IR 体表−環境 温度勾配 Δ" },
+      { key: :ir_emissivity,   rho: 0.22, ref: 34.0, sd: 2.5,  kind: :emissivity,
+        label: "IR 体表放射(前頭部) 温" },
+      { key: :metabolic_ratio, rho: 0.25, ref: 0.5,  sd: 0.15, kind: :ratio,
+        label: "代謝比 Δ / T_ambient" }
+    ].freeze
+
+    # Thermal manifold invariant Ξ_T from the (ir, temp) sensor pair.
+    def thermal_invariant(ir, temp)
+      a = [ir.to_f, 1e-6].max
+      b = [temp.to_f, 1e-6].max
+      s = a + b
+      probs = [a / s, b / s]
+      h = -probs.sum { |q| q <= 0 ? 0.0 : q * Math.log2(q) }
+      m = probs.each_with_index.sum { |q, i| q * Manifold.element(i + 2.0) }
+      Special.zeta_gauge(h + 1.0, m + 1.0, 3.0)  # β(H+1,M+1)/log 3  (gamma gauge)
+    end
+
+    # Raw feature value for a thermal channel from the (ir, temp) pair.
+    def thermal_feature(kind, ir, temp)
+      delta = ir.to_f - temp.to_f
+      case kind
+      when :gradient   then delta
+      when :emissivity then ir.to_f
+      when :ratio      then delta / [temp.to_f.abs, 1e-6].max
+      else 0.0
+      end
+    end
+
+    # The thermal sub-channel observations from one (ir, temp) reading, each
+    # standardized then curved by the manifold gauge Ξ_T / Ξ_ref.
+    def thermal_channels(ir, temp)
+      xi_t = thermal_invariant(ir, temp)
+      xi_ref = thermal_invariant(35.0, 23.0)   # neutral operating point
+      gain = xi_ref.abs < 1e-12 ? 1.0 : xi_t / xi_ref
+      THERMAL_CHANNELS.map do |c|
+        f = thermal_feature(c[:kind], ir, temp)
+        z = ((f - c[:ref]) / c[:sd]) * gain     # manifold-gauged cognitive z
+        build_obs(c[:key], c[:label], c[:rho], z)
+      end
+    end
+
+    # Full assessment from the infrared sensor + thermometer alone. Optional
+    # `samples` is a list of extra [ir, temp] time-readings whose gradient
+    # channel is appended (giving the mirror statistics a richer sample).
+    def assess_thermal(ir, temp, samples: [], id: "THERMAL")
+      obs = thermal_channels(ir, temp)
+      Array(samples).each do |pair|
+        sir, stemp = pair
+        next if sir.nil? || stemp.nil?
+        c = THERMAL_CHANNELS[0] # gradient channel per time-sample
+        xi_t = thermal_invariant(sir, stemp)
+        gain = xi_t / thermal_invariant(35.0, 23.0)
+        z = ((thermal_feature(:gradient, sir, stemp) - c[:ref]) / c[:sd]) * gain
+        obs << build_obs(:ir_gradient_t, "IR 勾配(時系列サンプル)", c[:rho], z)
+      end
+      xi = thermal_invariant(ir, temp)
+      Assessment.new(obs, xi: xi, id: id,
+                     meta: { thermal: { ir: ir.to_f, temp: temp.to_f,
+                                        delta: ir.to_f - temp.to_f, xi_t: xi } })
+    end
+
+    # A built-in demo sensor reading (warm forehead vs cool room).
+    def demo_thermal
+      { ir: 36.4, temp: 23.0 }
     end
 
     # ── internal helpers ────────────────────────────────────────────────────

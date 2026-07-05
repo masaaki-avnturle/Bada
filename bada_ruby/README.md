@@ -44,6 +44,8 @@ bin/bada xi  "大域的部分積分多様体のエントロピー不変量"   # 
 bin/bada run examples/demo.bada   # Bada 言語スクリプト実行
 bin/bada iq                       # 対象者 IQ 評価（デモ対象者）
 bin/bada iq examples/subject.json # 生体信号 JSON から IQ 評価
+bin/bada iq-thermal               # 赤外線+温度計モード（デモ: 36.4℃ / 23.0℃）
+bin/bada iq-thermal 37.5 22.0     # IR体表温 と 環境温度 から IQ 評価
 ```
 
 ## 🧠 対象者 IQ 評価 — `Bada::IQ`
@@ -61,6 +63,10 @@ bin/bada iq examples/subject.json
 | **② ミラー統計** | 中央枢軸まわりの反射対称（`x' = 2p − x`, 複素共役 `z ↦ z̄`）でロバスト要約 | `Bada::IQ.mirror_stats` |
 | **③ ベイズ推定** | 母集団事前 `N(100,15²)` とガウス共役融合。精度が加算され事後 `N(μ*,σ*²)` | `Bada::IQ.bayes` |
 | **④ ウィスパード判定器** | 事後のバンド分布から、TupleSpace 不変量 `Ξ` でゲートした「囁き」判定 | `Bada::IQ.whispered` |
+
+**赤外線センサー + 温度計モード**: 赤外線体表温と環境温度の 2 値を、ガンマ関数の
+大域的部分積分多様体（`Ξ_T = β(H+1,M+1)/log 3`）に通して IQ を推定します
+（`Bada::IQ.assess_thermal(ir, temp)`）。Android アプリでは端末センサーから取得できます。
 
 ```ruby
 require "bada"

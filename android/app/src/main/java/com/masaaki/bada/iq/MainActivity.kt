@@ -1,5 +1,6 @@
 package com.masaaki.bada.iq
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
@@ -32,6 +33,9 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnAssess).setOnClickListener { runAssessment() }
         findViewById<Button>(R.id.btnDemo).setOnClickListener { fillDemo() }
+        findViewById<Button>(R.id.btnThermalMode).setOnClickListener {
+            startActivity(Intent(this, ThermalActivity::class.java))
+        }
     }
 
     private fun fillDemo() {

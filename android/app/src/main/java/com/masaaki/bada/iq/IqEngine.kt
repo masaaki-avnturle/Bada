@@ -164,10 +164,14 @@ object IqEngine {
 
     fun observe(modality: String, z: Double): Observation {
         val m = MODALITIES.getValue(modality)
-        val rho = m.rho
+        return buildObs(modality, m.label, m.rho, z)
+    }
+
+    // Build one IQ observation from a standardized reading z at reliability rho.
+    fun buildObs(modality: String, label: String, rho: Double, z: Double): Observation {
         val y = POP_MEAN + POP_SD * z / rho
         val varc = (POP_SD * POP_SD) * (1.0 - rho * rho) / (rho * rho)
-        return Observation(modality, m.label, rho, z, y, varc, sqrt(varc), 1.0 / varc)
+        return Observation(modality, label, rho, z, y, varc, sqrt(varc), 1.0 / varc)
     }
 
     // subject: modality-key -> z-score; missing keys are skipped.
@@ -276,6 +280,9 @@ object IqEngine {
 
     // ── Assessment facade ────────────────────────────────────────────────────
 
+    // Optional thermal (infrared + thermometer) context rendered in the report.
+    data class Thermal(val ir: Double, val temp: Double, val delta: Double, val xiT: Double)
+
     data class Assessment(
         val id: String?,
         val obs: List<Observation>,
@@ -283,21 +290,108 @@ object IqEngine {
         val posterior: Posterior,
         val bands: List<BandProb>,
         val xi: Double,
-        val verdict: Verdict
+        val verdict: Verdict,
+        val meta: Thermal? = null
     ) {
         val iq: Double get() = posterior.mean
+    }
+
+    // Assemble an assessment from a prebuilt observation list and Xi gate.
+    private fun assemble(
+        obs: List<Observation>, xi: Double, id: String?, meta: Thermal? = null
+    ): Assessment {
+        require(obs.isNotEmpty()) { "観測がありません (no observations)" }
+        val posterior = bayes(obs)
+        return Assessment(
+            id = id,
+            obs = obs,
+            mirror = mirrorStats(obs.map { it.estimate }),
+            posterior = posterior,
+            bands = bandProbabilities(posterior.mean, posterior.sd),
+            xi = xi,
+            verdict = whispered(posterior.mean, posterior.sd, xi),
+            meta = meta
+        )
     }
 
     fun assess(subject: Map<String, Double>, id: String? = null): Assessment {
         val obs = observations(subject)
         require(obs.isNotEmpty()) { "生体信号の読み値がありません (no biosignal readings)" }
-        val mirror = mirrorStats(obs.map { it.estimate })
-        val posterior = bayes(obs)
-        val bands = bandProbabilities(posterior.mean, posterior.sd)
-        val xi = xi(signature(obs))
-        val verdict = whispered(posterior.mean, posterior.sd, xi)
-        return Assessment(id, obs, mirror, posterior, bands, xi, verdict)
+        return assemble(obs, xi(signature(obs)), id)
     }
+
+    // ── 赤外線センサー + 温度計 モード (thermal / infrared) ────────────────────
+    //
+    // Estimate IQ from an infrared body-surface reading (IR °C) and an ambient
+    // thermometer (°C) by routing them through the GAMMA-FUNCTION global partial
+    // integral manifold: the two readings form a 2-point warmth measure whose
+    // Shannon entropy H and manifold integral M = Σ p·(1/(x log x)²) couple via
+    // the beta gauge (β = Γ·Γ/Γ) into  Ξ_T = β(H+1,M+1)/log 3.  Ξ_T gauges the
+    // cognitive z-readouts and gates the whispered judge. Educational proxy only.
+    data class ThermalChannel(
+        val key: String, val rho: Double, val ref: Double, val sd: Double,
+        val kind: String, val label: String
+    )
+
+    val THERMAL_CHANNELS: List<ThermalChannel> = listOf(
+        ThermalChannel("ir_gradient", 0.30, 12.0, 3.0, "gradient", "IR 体表−環境 温度勾配 Δ"),
+        ThermalChannel("ir_emissivity", 0.22, 34.0, 2.5, "emissivity", "IR 体表放射(前頭部) 温"),
+        ThermalChannel("metabolic_ratio", 0.25, 0.5, 0.15, "ratio", "代謝比 Δ / T_ambient")
+    )
+
+    // Thermal manifold invariant Ξ_T from the (ir, temp) sensor pair.
+    fun thermalInvariant(ir: Double, temp: Double): Double {
+        val a = maxOf(ir, 1e-6)
+        val b = maxOf(temp, 1e-6)
+        val s = a + b
+        val probs = doubleArrayOf(a / s, b / s)
+        val h = -probs.sumOf { if (it <= 0.0) 0.0 else it * log2(it) }
+        var m = 0.0
+        probs.forEachIndexed { i, q -> m += q * manifoldElement(i + 2.0) }
+        return zetaGauge(h + 1.0, m + 1.0, 3.0)   // β(H+1,M+1)/log 3  (gamma gauge)
+    }
+
+    fun thermalFeature(kind: String, ir: Double, temp: Double): Double {
+        val delta = ir - temp
+        return when (kind) {
+            "gradient" -> delta
+            "emissivity" -> ir
+            "ratio" -> delta / maxOf(abs(temp), 1e-6)
+            else -> 0.0
+        }
+    }
+
+    fun thermalChannels(ir: Double, temp: Double): List<Observation> {
+        val xiT = thermalInvariant(ir, temp)
+        val xiRef = thermalInvariant(35.0, 23.0)   // neutral operating point
+        val gain = if (abs(xiRef) < 1e-12) 1.0 else xiT / xiRef
+        return THERMAL_CHANNELS.map { c ->
+            val f = thermalFeature(c.kind, ir, temp)
+            val z = ((f - c.ref) / c.sd) * gain
+            buildObs(c.key, c.label, c.rho, z)
+        }
+    }
+
+    // Full assessment from the infrared sensor + thermometer. `samples` is an
+    // optional list of extra (ir, temp) time-readings whose gradient channel is
+    // appended to enrich the mirror-statistics sample.
+    fun assessThermal(
+        ir: Double, temp: Double,
+        samples: List<Pair<Double, Double>> = emptyList(), id: String? = "THERMAL"
+    ): Assessment {
+        val obs = thermalChannels(ir, temp).toMutableList()
+        val c0 = THERMAL_CHANNELS[0]
+        val ref = thermalInvariant(35.0, 23.0)
+        for ((sir, stemp) in samples) {
+            val gain = thermalInvariant(sir, stemp) / ref
+            val z = ((thermalFeature("gradient", sir, stemp) - c0.ref) / c0.sd) * gain
+            obs.add(buildObs("ir_gradient_t", "IR 勾配(時系列サンプル)", c0.rho, z))
+        }
+        val xi = thermalInvariant(ir, temp)
+        return assemble(obs, xi, id, Thermal(ir, temp, ir - temp, xi))
+    }
+
+    fun demoThermal(): Pair<Double, Double> = Pair(36.4, 23.0)
 
     // A built-in demo subject (a cognitively above-average profile).
     fun demoSubject(): LinkedHashMap<String, Double> = linkedMapOf(
@@ -312,9 +406,23 @@ object IqEngine {
         sb.appendLine(" Bada::IQ 対象者 知能評価レポート")
         if (a.id != null) sb.appendLine("  対象者 ID: ${a.id}")
         sb.appendLine("═══════════════════════════════════════════════")
+        val t = a.meta
+        if (t != null) {
+            sb.appendLine()
+            sb.appendLine("【0】赤外線センサー + 温度計")
+            sb.appendLine("  ガンマ関数 大域的部分積分多様体")
+            sb.appendLine(fmt("  赤外線 IR体表温  : %.2f ℃", t.ir))
+            sb.appendLine(fmt("  温度計 環境温    : %.2f ℃", t.temp))
+            sb.appendLine(fmt("  体表-環境勾配 Δ  : %+.2f ℃", t.delta))
+            sb.appendLine(fmt("  多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t.xiT))
+        }
         sb.appendLine()
-        sb.appendLine("【1】生体信号 IQ 計測")
-        sb.appendLine("  fMRI/MRI/脳トポグラフィ/DNA/血液")
+        if (t != null) {
+            sb.appendLine("【1】IQ 計測 — 赤外線/温度計 サーマルチャネル")
+        } else {
+            sb.appendLine("【1】生体信号 IQ 計測")
+            sb.appendLine("  fMRI/MRI/脳トポグラフィ/DNA/血液")
+        }
         for (o in a.obs) {
             sb.appendLine(
                 fmt("  ・%-22s z=%+.2f ρ=%.2f → IQ %.1f (σ%.1f)",

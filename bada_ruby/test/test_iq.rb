@@ -112,6 +112,43 @@ class TestIQWhispered < Minitest::Test
   end
 end
 
+class TestIQThermal < Minitest::Test
+  def test_neutral_point_reads_population_mean
+    # neutral operating point (Δ = 12, ratio = 0.5, ir = 35) -> all z ~ 0
+    ch = Bada::IQ.thermal_channels(35.0, 23.0)
+    grad = ch.find { |o| o[:modality] == :ir_gradient }
+    assert_in_delta 0.0, grad[:z], 1e-9
+    assert_in_delta 100.0, grad[:estimate], 1e-6
+  end
+
+  def test_invariant_uses_gamma_gauge_and_is_finite
+    xi = Bada::IQ.thermal_invariant(36.4, 23.0)
+    assert xi.finite?
+    assert_operator xi, :>, 0.0
+  end
+
+  def test_warmer_gradient_raises_iq
+    cool = Bada::IQ.assess_thermal(34.0, 24.0).iq
+    warm = Bada::IQ.assess_thermal(37.5, 22.0).iq
+    assert_operator warm, :>, cool
+  end
+
+  def test_assess_thermal_full_report
+    a = Bada::IQ.assess_thermal(36.4, 23.0, id: "T1")
+    assert_equal 3, a.obs.length            # three thermal sub-channels
+    assert_includes a.report, "赤外線センサー + 温度計"
+    assert_includes a.report, "ガンマ関数"
+    assert_includes a.report, "ウィスパード判定器"
+    assert_in_delta a.xi, a.meta[:thermal][:xi_t], 1e-12
+    assert a.iq.finite?
+  end
+
+  def test_time_samples_enrich_mirror_sample
+    a = Bada::IQ.assess_thermal(36.4, 23.0, samples: [[36.6, 23.1], [36.2, 22.9]])
+    assert_equal 5, a.obs.length            # 3 base + 2 time-sample gradients
+  end
+end
+
 class TestIQAssessment < Minitest::Test
   def test_full_pipeline_report
     a = Bada::IQ.assess(Bada::IQ.demo_subject)

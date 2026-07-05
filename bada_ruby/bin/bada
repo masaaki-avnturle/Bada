@@ -14,6 +14,7 @@
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
 #   bin/bada iq [subject.json]          IQ assessment: mirror stats / Bayes / whisper
+#   bin/bada iq-thermal [ir temp]       IQ from infrared sensor + thermometer (gamma manifold)
 
 Encoding.default_external = Encoding::UTF_8
 Encoding.default_internal = Encoding::UTF_8
@@ -119,10 +120,23 @@ when "iq"
       Bada::IQ.demo_subject
     end
   puts Bada::IQ.assess(subject).report
+when "iq-thermal"
+  # IQ assessment from an infrared sensor + thermometer alone, routed through
+  # the gamma-function global partial integral manifold.
+  #   bada iq-thermal              demo reading (warm forehead vs cool room)
+  #   bada iq-thermal 36.4 23.0    IR body-surface °C and ambient °C
+  ir = ARGV.shift
+  temp = ARGV.shift
+  if ir && temp
+    puts Bada::IQ.assess_thermal(ir.to_f, temp.to_f, id: "THERMAL").report
+  else
+    d = Bada::IQ.demo_thermal
+    puts Bada::IQ.assess_thermal(d[:ir], d[:temp], id: "THERMAL-DEMO").report
+  end
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | iq | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | iq | iq-thermal | neural | train | version"
   exit 1
 end
