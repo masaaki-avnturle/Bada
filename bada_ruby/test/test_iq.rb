@@ -175,6 +175,27 @@ class TestIQTabletDerived < Minitest::Test
     assert_includes r, "推定した生体信号"
     assert_includes r, "血液"
   end
+
+  def test_core_body_temp_neutral_is_37
+    # neutral surface (ir=33, Δ=10) -> normal core 37.0 °C
+    assert_in_delta 37.0, Bada::IQ.vm.call("core_body_temp", [33.0, 23.0]), 1e-9
+  end
+
+  def test_core_body_temp_rises_with_surface_and_clamps
+    assert_operator Bada::IQ.vm.call("core_body_temp", [38.0, 22.0]), :>, 37.0
+    assert_operator Bada::IQ.vm.call("core_body_temp", [99.0, 0.0]), :<=, 40.5   # clamp
+  end
+
+  def test_neutral_core_gives_population_mean
+    # core = 37 -> excess 0 -> all derived z = 0 -> posterior at the prior mean
+    a = Bada::IQ.assess_thermal_derived(33.0, 23.0)
+    assert_in_delta 100.0, a.iq, 1e-6
+    assert_in_delta 37.0, a.meta[:thermal][:t_core], 1e-9
+  end
+
+  def test_report_shows_core_body_temp
+    assert_includes Bada::IQ.assess_thermal_derived(36.6, 23.0).report, "体内温度 T_core"
+  end
 end
 
 class TestIQAssessment < Minitest::Test

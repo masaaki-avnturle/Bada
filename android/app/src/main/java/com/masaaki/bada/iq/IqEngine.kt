@@ -308,7 +308,7 @@ object IqEngine {
     // ganglia thermal entropy (tablet mode) rather than measured directly.
     data class Thermal(
         val ir: Double, val temp: Double, val delta: Double, val xiT: Double,
-        val derived: Boolean = false
+        val tCore: Double, val derived: Boolean = false
     )
 
     data class Assessment(
@@ -412,7 +412,8 @@ object IqEngine {
             obs.add(buildObs("ir_gradient_t", "IR 勾配(時系列サンプル)", c0.rho, z))
         }
         val xi = thermalInvariant(ir, temp)
-        return assemble(obs, xi, id, Thermal(ir, temp, ir - temp, xi))
+        val core = v.callNum("core_body_temp", listOf(ir, temp))
+        return assemble(obs, xi, id, Thermal(ir, temp, ir - temp, xi, core))
     }
 
     // Thermal coupling: how strongly the basal-ganglia thermal entropy predicts
@@ -428,12 +429,13 @@ object IqEngine {
         val v = requireVm()
         val obs = MODALITIES.keys.map { k ->
             val coeff = DERIVED_COUPLING.getValue(k)
-            val z = v.callNum("derived_z", listOf(coeff, 12.0, 3.0, ir, temp))
+            val z = v.callNum("derived_z", listOf(coeff, ir, temp))
             val m = MODALITIES.getValue(k)
             buildObs(k, "${m.label} (推定)", m.rho, z)
         }
         val bg = v.callNum("bg_thermal_entropy", listOf(ir, temp))
-        return assemble(obs, bg, id, Thermal(ir, temp, ir - temp, bg, derived = true))
+        val core = v.callNum("core_body_temp", listOf(ir, temp))
+        return assemble(obs, bg, id, Thermal(ir, temp, ir - temp, bg, core, derived = true))
     }
 
     fun demoThermal(): Pair<Double, Double> = Pair(36.4, 23.0)
@@ -461,8 +463,9 @@ object IqEngine {
                 sb.appendLine("【0】赤外線センサー + 温度計")
                 sb.appendLine("  ガンマ関数 大域的部分積分多様体")
             }
-            sb.appendLine(fmt("  赤外線 IR体表温  : %.2f ℃", t.ir))
+            sb.appendLine(fmt("  赤外線 IR体表温  : %.2f ℃ (表面)", t.ir))
             sb.appendLine(fmt("  温度計 環境温    : %.2f ℃", t.temp))
+            sb.appendLine(fmt("  体内温度 T_core  : %.2f ℃ (核心温)", t.tCore))
             sb.appendLine(fmt("  体表-環境勾配 Δ  : %+.2f ℃", t.delta))
             if (t.derived) {
                 sb.appendLine(fmt("  大脳基底核 熱H_bg: %.4f  (β(H+1,M+1)/log 4)", t.xiT))

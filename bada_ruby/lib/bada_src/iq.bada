@@ -189,22 +189,44 @@ def thermal_z(kind, ir, temp, ref, sd)
   return ((f - ref) / sd) * thermal_gain(ir, temp)
 end
 
-# ── 大脳基底核 熱エントロピー → 血液/DNA/fMRI/MRI/脳トポ の推定 ────────────────
-# From the tablet's IR + thermometer, model the deep-brain (basal ganglia)
-# temperature and compute its thermal entropy value through the gamma-function
-# global partial integral manifold, then infer each biosignal modality's z-score.
+# ── 体内温度(核心温) core body temperature ────────────────────────────────────
+# The IR camera reads the SURFACE (skin) temperature. Estimate the INTERNAL
+# (core) body temperature from the surface reading and the ambient temperature:
+# skin sits below core, and the skin↔core gap widens as the room cools.
+# Calibrated so a neutral surface (ir=33, Δ=10) maps to a normal core of 37.0 °C.
+def core_body_temp(ir, temp)
+  set c = 37.0 + 0.35 * (ir - 33.0) + 0.06 * ((ir - temp) - 10.0)
+  if c < 34.5
+    set c = 34.5
+  end
+  if c > 40.5
+    set c = 40.5
+  end
+  return c
+end
 
-# basal ganglia sit deeper than the cortical surface the IR sensor reads.
-def basal_ganglia_temp(ir)
-  return ir + 0.8
+# deviation of core body temperature from the normal 37.0 °C.
+def core_excess(ir, temp)
+  return core_body_temp(ir, temp) - 37.0
+end
+
+# ── 大脳基底核 熱エントロピー → 血液/DNA/fMRI/MRI/脳トポ の推定 ────────────────
+# Model the deep-brain (basal ganglia) temperature from the CORE (internal) body
+# temperature — not the external surface — and compute its thermal entropy value
+# through the gamma-function global partial integral manifold, then infer each
+# biosignal modality's z-score.
+
+# basal ganglia sit ~0.5 °C above core (deep brain runs warmer than the body).
+def basal_ganglia_temp(ir, temp)
+  return core_body_temp(ir, temp) + 0.5
 end
 
 # thermal entropy value from the basal ganglia: the 3-point warmth measure
-# (ambient, cortical IR, deep basal ganglia) coupled through the β/ζ gauge.
+# (ambient, core body temp, deep basal ganglia) coupled through the β/ζ gauge.
 def bg_thermal_entropy(ir, temp)
   set a = max(temp, 0.000001)
-  set b = max(ir, 0.000001)
-  set c = max(basal_ganglia_temp(ir), 0.000001)
+  set b = max(core_body_temp(ir, temp), 0.000001)
+  set c = max(basal_ganglia_temp(ir, temp), 0.000001)
   set s = a + b + c
   set p0 = a / s
   set p1 = b / s
@@ -219,9 +241,8 @@ def bg_drive(ir, temp)
   return bg_thermal_entropy(ir, temp) / bg_thermal_entropy(35, 23)
 end
 
-# infer a modality's standardized z from the basal-ganglia thermal entropy,
-# scaled by that modality's thermal coupling coefficient.
-def derived_z(coeff, ref, sd, ir, temp)
-  set delta = ir - temp
-  return ((delta - ref) / sd) * bg_drive(ir, temp) * coeff
+# infer a modality's standardized z from the CORE body temperature excess
+# (体内温度 − 37 °C), scaled by the manifold gain and the modality's coupling.
+def derived_z(coeff, ir, temp)
+  return core_excess(ir, temp) * bg_drive(ir, temp) * coeff
 end

@@ -324,8 +324,9 @@ module Bada
                    else
                      "【0】赤外線センサー + 温度計 — ガンマ関数 大域的部分積分多様体"
                    end
-          lines << format("   赤外線 IR体表温  : %.2f ℃", t[:ir])
+          lines << format("   赤外線 IR体表温  : %.2f ℃ (表面)", t[:ir])
           lines << format("   温度計 環境温    : %.2f ℃", t[:temp])
+          lines << format("   体内温度 T_core  : %.2f ℃ (核心温, 37±)", t[:t_core]) if t[:t_core]
           lines << format("   体表-環境勾配 Δ  : %+.2f ℃", t[:delta])
           if derived
             lines << format("   大脳基底核 熱H_bg: %.4f  (β(H+1,M+1)/log 4, 3点測度)", t[:xi_t])
@@ -464,9 +465,10 @@ module Bada
         obs << build_obs(:ir_gradient_t, "IR 勾配(時系列サンプル)", c[:rho], z)
       end
       xi = thermal_invariant(ir, temp)
+      core = vm.call("core_body_temp", [ir.to_f, temp.to_f])
       Assessment.new(obs, xi: xi, id: id,
                      meta: { thermal: { ir: ir.to_f, temp: temp.to_f, mode: :thermal,
-                                        delta: ir.to_f - temp.to_f, xi_t: xi } })
+                                        delta: ir.to_f - temp.to_f, xi_t: xi, t_core: core } })
     end
 
     # Thermal coupling coefficient — how strongly the basal-ganglia thermal
@@ -486,14 +488,15 @@ module Bada
       irf = ir.to_f
       tf = temp.to_f
       obs = MODALITIES.keys.map do |k|
-        z = vm.call("derived_z", [DERIVED_COUPLING.fetch(k), 12.0, 3.0, irf, tf])
+        z = vm.call("derived_z", [DERIVED_COUPLING.fetch(k), irf, tf])
         m = MODALITIES[k]
         build_obs(k, "#{m[:label]} (推定)", m[:rho], z)
       end
       bg = vm.call("bg_thermal_entropy", [irf, tf])
+      core = vm.call("core_body_temp", [irf, tf])
       Assessment.new(obs, xi: bg, id: id,
                      meta: { thermal: { ir: irf, temp: tf, mode: :derived,
-                                        delta: irf - tf, xi_t: bg } })
+                                        delta: irf - tf, xi_t: bg, t_core: core } })
     end
 
     # A built-in demo sensor reading (warm forehead vs cool room).
