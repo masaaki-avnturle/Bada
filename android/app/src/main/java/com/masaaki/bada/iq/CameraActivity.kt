@@ -41,6 +41,9 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     @Volatile private var currentTemp: Double = 23.0
     private var tempFromSensor = false
 
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var lensFacing = CameraSelector.LENS_FACING_BACK   // 裏(背面) / 表(前面)
+
     private lateinit var previewView: PreviewView
     private lateinit var status: TextView
     private lateinit var inIr: EditText
@@ -78,6 +81,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
         findViewById<Button>(R.id.btnCapture).setOnClickListener { capture() }
         findViewById<Button>(R.id.btnCamAssess).setOnClickListener { runAssessment(false) }
         findViewById<Button>(R.id.btnCamDerived).setOnClickListener { runAssessment(true) }
+        findViewById<Button>(R.id.btnFlipCamera).setOnClickListener { flipCamera() }
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
             == PackageManager.PERMISSION_GRANTED
@@ -91,26 +95,55 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
     private fun startCamera() {
         val future = ProcessCameraProvider.getInstance(this)
         future.addListener({
-            val provider = future.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(previewView.surfaceProvider)
-            }
-            val analysis = ImageAnalysis.Builder()
-                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
-                .build()
-            analysis.setAnalyzer(analysisExecutor) { image -> analyze(image) }
-            try {
-                provider.unbindAll()
-                provider.bindToLifecycle(
-                    this, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis
-                )
-                status.text = getString(R.string.camera_scanning)
-            } catch (e: Exception) {
-                status.text = "カメラ起動エラー: ${e.message}"
-            }
+            cameraProvider = future.get()
+            bindUseCases()
         }, ContextCompat.getMainExecutor(this))
     }
+
+    // Bind preview + analysis to the currently selected lens (裏=背面 / 表=前面).
+    private fun bindUseCases() {
+        val provider = cameraProvider ?: return
+        val preview = Preview.Builder().build().also {
+            it.setSurfaceProvider(previewView.surfaceProvider)
+        }
+        val analysis = ImageAnalysis.Builder()
+            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+            .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+            .build()
+        analysis.setAnalyzer(analysisExecutor) { image -> analyze(image) }
+        val selector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
+        try {
+            provider.unbindAll()
+            provider.bindToLifecycle(this, selector, preview, analysis)
+            status.text = getString(R.string.camera_scanning, facingLabel())
+        } catch (e: Exception) {
+            status.text = "カメラ起動エラー: ${e.message}"
+        }
+    }
+
+    // Flip between the back (裏) and front (表) camera.
+    private fun flipCamera() {
+        val provider = cameraProvider ?: return
+        val target = if (lensFacing == CameraSelector.LENS_FACING_BACK) {
+            CameraSelector.LENS_FACING_FRONT
+        } else {
+            CameraSelector.LENS_FACING_BACK
+        }
+        val ok = try {
+            provider.hasCamera(CameraSelector.Builder().requireLensFacing(target).build())
+        } catch (e: Exception) {
+            false
+        }
+        if (!ok) {
+            Toast.makeText(this, getString(R.string.camera_no_other), Toast.LENGTH_SHORT).show()
+            return
+        }
+        lensFacing = target
+        bindUseCases()
+    }
+
+    private fun facingLabel(): String =
+        if (lensFacing == CameraSelector.LENS_FACING_BACK) "背面(裏)" else "前面(表)"
 
     // Mean red-channel warmth over the central ROI → an IR body-surface proxy
     // mapped into [30, 37] °C.
@@ -142,9 +175,7 @@ class CameraActivity : AppCompatActivity(), SensorEventListener {
             currentIrProxy = 30.0 + (meanR / 255.0) * 7.0
             runOnUiThread {
                 status.text = getString(
-                    R.string.camera_live,
-                    currentIrProxy,
-                    if (tempFromSensor) currentTemp else currentTemp
+                    R.string.camera_live, currentIrProxy, currentTemp, facingLabel()
                 )
             }
         } finally {
