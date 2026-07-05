@@ -44,12 +44,26 @@ Jones-polynomial **telomere splitting** process, drive it with the tablet's
 
 ## ダウンロード / Download
 
-- **GitHub Release**（推奨）: リポジトリの **Releases** ページから `bada_iq.apk` をダウンロード
-  → https://github.com/masaaki-avnturle/Bada/releases
-  `bada-iq-*` タグを push すると、GitHub Actions（`.github/workflows/release-apk.yml`）が
-  テストを実行し apk をビルドして Release にアセットとして添付する。Actions タブから手動実行も可能。
-- **直リンク**（このブランチのコミット済み apk）:
-  https://github.com/masaaki-avnturle/Bada/raw/claude/jones-polynomial-telomere-py9vra/omega_iq_telomere_pkg/dist/bada_iq.apk
+APK は 2 種類あります。**端末にインストールしたい場合は ① を使ってください。**
+
+### ① 端末インストール用 Android APK（推奨・実機で動く）
+- Release: https://github.com/masaaki-avnturle/Bada/releases/tag/bada-iq-android-v0.1.0
+- 直リンク: **https://github.com/masaaki-avnturle/Bada/releases/download/bada-iq-android-v0.1.0/bada_iq-debug.apk**
+- 本物の署名付き Android APK（`classes.dex` + APK Signing Block）。ダウンロード後、
+  「提供元不明のアプリ」を許可してインストール。IQ 計算は WebView 内の JavaScript
+  （`android/app/src/main/assets/iq_engine.js`＝Ruby エンジンの移植・数値一致を検証済み）で
+  端末上実行。周囲温度センサがあれば温度計として使用、無ければ内蔵フレーム。
+- ソース: `omega_iq_telomere_pkg/android/`、ビルド: `.github/workflows/build-android-apk.yml`
+  （`gradle assembleDebug` → デバッグ署名 apk を Release / Artifact に公開）。
+
+> ⚠️ 以前の `bada_iq.apk`（下記②）は「不具合で使えません」になります。あれは Bada
+> ランタイム(zip)を APK 形式にしただけで `classes.dex`・署名が無く、Android が
+> インストールできないためです。**アプリ名の問題ではありません。** ① をお使いください。
+
+### ② Bada ランタイム APK（デスクトップ/BadaOS 用・端末インストール不可）
+- Release: https://github.com/masaaki-avnturle/Bada/releases/tag/bada-iq-v0.1.0
+- 直リンク: https://github.com/masaaki-avnturle/Bada/releases/download/bada-iq-v0.1.0/bada_iq.apk
+- `run.sh`（`bin/run_iq`）で実行する Ruby 実装版。`.github/workflows/release-apk.yml` で公開。
 
 ## 実行 / Run
 
