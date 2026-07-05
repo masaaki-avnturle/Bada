@@ -1,0 +1,65 @@
+name: Build YamaguchiHealth APK
+
+# Builds the Android speed-reading app and publishes the APK so it can be
+# downloaded from this repository:
+#   - every build uploads the APK as a workflow "Artifact"
+#     (Actions run page -> Artifacts -> YamaguchiHealth-apk)
+#   - pushing a tag like v1.0 also attaches the APK to a GitHub Release
+#     (Releases page -> download YamaguchiHealth-debug.apk)
+
+on:
+  push:
+    branches: [ "main", "claude/biomedical-monitoring-app-SNqVR" ]
+    paths:
+      - "yamaguchi_health/android/**"
+      - ".github/workflows/android-apk.yml"
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: yamaguchi_health/android
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Stage APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk YamaguchiHealth-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YamaguchiHealth-apk
+          path: yamaguchi_health/android/YamaguchiHealth-debug.apk
+          if-no-files-found: error
+
+      - name: Attach APK to Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: yamaguchi_health/android/YamaguchiHealth-debug.apk

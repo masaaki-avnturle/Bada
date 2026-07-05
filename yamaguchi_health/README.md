@@ -50,6 +50,17 @@ clearly-labelled simulated demo data.
 
 ---
 
+## Android アプリ / APK （速読モード）
+
+Android 版（Kotlin GUI）は `android/` にあります。**SRS速読（ブロック）** と
+**瞬読（ランダム位置フラッシュ）** の2つの速読モードを搭載。
+**APK はこのリポジトリからダウンロードできます** — GitHub Actions が
+ビルドし、Actions のアーティファクト、またはタグ push で Releases に添付します。
+手順は [`android/README.md`](android/README.md) を参照してください。
+
+（この開発環境では `dl.google.com` がブロックされているためローカルビルド
+不可。APK 生成は CI 上で行います。）
+
 ## ビルドと実行 / Build & Run (Linux / macOS)
 
 ```sh
