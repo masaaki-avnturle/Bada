@@ -50,16 +50,15 @@ clearly-labelled simulated demo data.
 
 ---
 
-## Android アプリ / APK （速読モード）
+## 速読 Android アプリ（別アプリ）
 
-Android 版（Kotlin GUI）は `android/` にあります。**SRS速読（ブロック）** と
-**瞬読（ランダム位置フラッシュ）** の2つの速読モードを搭載。
-**APK はこのリポジトリからダウンロードできます** — GitHub Actions が
-ビルドし、Actions のアーティファクト、またはタグ push で Releases に添付します。
-手順は [`android/README.md`](android/README.md) を参照してください。
+速読の Android アプリ（**SRS速読** ＋ **瞬読**、Kotlin GUI）は、名称の競合を
+避けるため独立したアプリ **BadaSokudoku** として、リポジトリ直下の
+[`bada_sokudoku/`](../bada_sokudoku/) に分離しました。APK のダウンロード手順は
+[`bada_sokudoku/README.md`](../bada_sokudoku/README.md) を参照してください。
 
-（この開発環境では `dl.google.com` がブロックされているためローカルビルド
-不可。APK 生成は CI 上で行います。）
+（この `yamaguchi_health` は、呼吸・瞑想ガイドのヘルスケア系デモです。上表の
+SRS速読は、このコンソールアプリ内の簡易機能です。）
 
 ## ビルドと実行 / Build & Run (Linux / macOS)
 

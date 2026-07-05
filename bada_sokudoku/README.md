@@ -1,7 +1,8 @@
-# YamaguchiHealth (Android) — SRS速読 / 瞬読
+# BadaSokudoku (Android) — SRS速読 / 瞬読
 
 速読トレーニング用の Android アプリ（Kotlin）。レポート本文を貼り付けて、
 2つのモードで高速表示します。読書トレーニング用で、医療機器ではありません。
+（ヘルスケア系アプリ **YamaguchiHealth** とは別の独立したアプリです。）
 
 | モード | 動作 |
 |:--|:--|
@@ -9,6 +10,9 @@
 | **瞬読 (ランダム)** | 本文を小さな **単語(ぶ)単位** に分割し、画面の **ランダムな位置** に一瞬ずつ表示。ページが進むと加速 |
 
 操作: 本文を貼り付け → モード選択 → 開始CPM / 加速 / 単位文字数 を設定 → **開始 / 停止**。
+
+- アプリ表示名: **BadaSokudoku 速読**
+- パッケージ / applicationId: `com.yamaguchi.sokudoku`
 
 ---
 
@@ -19,15 +23,15 @@ APK は **GitHub Actions** がビルドして、このリポジトリから入�
 ビルドできません。CI 上でビルドします。）
 
 **方法A — Actions のアーティファクト（毎ビルド）**
-1. GitHub の **Actions** タブ → 「Build YamaguchiHealth APK」ワークフローの最新実行
-2. 下部の **Artifacts** → `YamaguchiHealth-apk` をダウンロード（zip内に `.apk`）
+1. GitHub の **Actions** タブ → 「Build BadaSokudoku APK」ワークフローの最新実行
+2. 下部の **Artifacts** → `BadaSokudoku-apk` をダウンロード（zip内に `.apk`）
 
 **方法B — Release（タグを付けたとき）**
 1. `v` で始まるタグを push（例）:
    ```sh
    git tag v1.0 && git push origin v1.0
    ```
-2. GitHub の **Releases** ページから `YamaguchiHealth-debug.apk` をダウンロード
+2. GitHub の **Releases** ページから `BadaSokudoku-debug.apk` をダウンロード
 
 **インストール**: 端末の「提供元不明のアプリ / 不明なアプリのインストール」を
 許可してから APK を開きます。これは署名済みの **debug APK** です。
@@ -37,7 +41,7 @@ APK は **GitHub Actions** がビルドして、このリポジトリから入�
 ## ローカルでビルドする場合（Android SDK がある環境）
 
 ```sh
-cd yamaguchi_health/android
+cd bada_sokudoku
 ./gradlew assembleDebug
 # 出力: app/build/outputs/apk/debug/app-debug.apk
 ```

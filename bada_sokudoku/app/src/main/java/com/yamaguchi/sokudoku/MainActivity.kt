@@ -1,4 +1,4 @@
-package com.yamaguchi.health
+package com.yamaguchi.sokudoku
 
 import android.os.Bundle
 import android.os.Handler
@@ -14,7 +14,7 @@ import kotlin.math.max
 import kotlin.random.Random
 
 /**
- * YamaguchiHealth speed-reading.
+ * BadaSokudoku speed-reading.
  *
  *  - SRS速読 (block flash): the report is split page-by-page and into blocks;
  *    each block is shown centered, then cleared, then the next follows.

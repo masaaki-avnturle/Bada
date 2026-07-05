@@ -1,17 +1,17 @@
-name: Build YamaguchiHealth APK
+name: Build BadaSokudoku APK
 
-# Builds the Android speed-reading app and publishes the APK so it can be
+# Builds the BadaSokudoku speed-reading app and publishes the APK so it can be
 # downloaded from this repository:
 #   - every build uploads the APK as a workflow "Artifact"
-#     (Actions run page -> Artifacts -> YamaguchiHealth-apk)
+#     (Actions run page -> Artifacts -> BadaSokudoku-apk)
 #   - pushing a tag like v1.0 also attaches the APK to a GitHub Release
-#     (Releases page -> download YamaguchiHealth-debug.apk)
+#     (Releases page -> download BadaSokudoku-debug.apk)
 
 on:
   push:
     branches: [ "main", "claude/biomedical-monitoring-app-SNqVR" ]
     paths:
-      - "yamaguchi_health/android/**"
+      - "bada_sokudoku/**"
       - ".github/workflows/android-apk.yml"
     tags:
       - "v*"
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: yamaguchi_health/android
+        working-directory: bada_sokudoku
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,17 +49,17 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Stage APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk YamaguchiHealth-debug.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk BadaSokudoku-debug.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: YamaguchiHealth-apk
-          path: yamaguchi_health/android/YamaguchiHealth-debug.apk
+          name: BadaSokudoku-apk
+          path: bada_sokudoku/BadaSokudoku-debug.apk
           if-no-files-found: error
 
       - name: Attach APK to Release (on tag)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: yamaguchi_health/android/YamaguchiHealth-debug.apk
+          files: bada_sokudoku/BadaSokudoku-debug.apk
