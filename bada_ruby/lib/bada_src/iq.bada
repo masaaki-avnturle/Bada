@@ -188,3 +188,40 @@ def thermal_z(kind, ir, temp, ref, sd)
   end
   return ((f - ref) / sd) * thermal_gain(ir, temp)
 end
+
+# ── 大脳基底核 熱エントロピー → 血液/DNA/fMRI/MRI/脳トポ の推定 ────────────────
+# From the tablet's IR + thermometer, model the deep-brain (basal ganglia)
+# temperature and compute its thermal entropy value through the gamma-function
+# global partial integral manifold, then infer each biosignal modality's z-score.
+
+# basal ganglia sit deeper than the cortical surface the IR sensor reads.
+def basal_ganglia_temp(ir)
+  return ir + 0.8
+end
+
+# thermal entropy value from the basal ganglia: the 3-point warmth measure
+# (ambient, cortical IR, deep basal ganglia) coupled through the β/ζ gauge.
+def bg_thermal_entropy(ir, temp)
+  set a = max(temp, 0.000001)
+  set b = max(ir, 0.000001)
+  set c = max(basal_ganglia_temp(ir), 0.000001)
+  set s = a + b + c
+  set p0 = a / s
+  set p1 = b / s
+  set p2 = c / s
+  set hh = 0 - (p0 * log2(p0) + p1 * log2(p1) + p2 * log2(p2))
+  set m = p0 * manifold_element(2) + p1 * manifold_element(3) + p2 * manifold_element(4)
+  return zeta_gauge(hh + 1, m + 1, 4)
+end
+
+# gain vs the neutral operating point.
+def bg_drive(ir, temp)
+  return bg_thermal_entropy(ir, temp) / bg_thermal_entropy(35, 23)
+end
+
+# infer a modality's standardized z from the basal-ganglia thermal entropy,
+# scaled by that modality's thermal coupling coefficient.
+def derived_z(coeff, ref, sd, ir, temp)
+  set delta = ir - temp
+  return ((delta - ref) / sd) * bg_drive(ir, temp) * coeff
+end

@@ -317,16 +317,27 @@ module Bada
 
         if @meta[:thermal]
           t = @meta[:thermal]
+          derived = t[:mode] == :derived
           lines << ""
-          lines << "【0】赤外線センサー + 温度計 — ガンマ関数 大域的部分積分多様体"
+          lines << if derived
+                     "【0】赤外線+温度計 → 大脳基底核 熱エントロピー (ガンマ関数 多様体)"
+                   else
+                     "【0】赤外線センサー + 温度計 — ガンマ関数 大域的部分積分多様体"
+                   end
           lines << format("   赤外線 IR体表温  : %.2f ℃", t[:ir])
           lines << format("   温度計 環境温    : %.2f ℃", t[:temp])
           lines << format("   体表-環境勾配 Δ  : %+.2f ℃", t[:delta])
-          lines << format("   多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t[:xi_t])
+          if derived
+            lines << format("   大脳基底核 熱H_bg: %.4f  (β(H+1,M+1)/log 4, 3点測度)", t[:xi_t])
+          else
+            lines << format("   多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t[:xi_t])
+          end
         end
 
         lines << ""
-        lines << if @meta[:thermal]
+        lines << if @meta[:thermal] && @meta[:thermal][:mode] == :derived
+                   "【1】IQ 計測 — 赤外線/温度計から推定した生体信号(血液/DNA/fMRI/MRI/脳トポ)"
+                 elsif @meta[:thermal]
                    "【1】IQ 計測 — 赤外線/温度計 由来 サーマルチャネル"
                  else
                    "【1】生体信号 IQ 計測 — fMRI/MRI/脳トポグラフィ/DNA/血液"
@@ -454,8 +465,35 @@ module Bada
       end
       xi = thermal_invariant(ir, temp)
       Assessment.new(obs, xi: xi, id: id,
-                     meta: { thermal: { ir: ir.to_f, temp: temp.to_f,
+                     meta: { thermal: { ir: ir.to_f, temp: temp.to_f, mode: :thermal,
                                         delta: ir.to_f - temp.to_f, xi_t: xi } })
+    end
+
+    # Thermal coupling coefficient — how strongly the basal-ganglia thermal
+    # entropy predicts each biosignal modality (framework calibration constants).
+    DERIVED_COUPLING = {
+      fmri: 1.0,        # functional / metabolic — strongly thermal
+      blood: 0.9,       # metabolic / BDNF / inflammation markers
+      topography: 0.8,  # EEG neural conduction speed
+      mri: 0.5,         # structural volume — weakly thermal
+      dna: 0.3          # genetic — only indirectly thermal
+    }.freeze
+
+    # Estimate ALL five biosignal modalities (blood / DNA / fMRI / MRI /
+    # topography) from just the tablet's infrared + thermometer, via the
+    # basal-ganglia thermal entropy, then run the full biosignal assessment.
+    def assess_thermal_derived(ir, temp, id: "TABLET-THERMAL")
+      irf = ir.to_f
+      tf = temp.to_f
+      obs = MODALITIES.keys.map do |k|
+        z = vm.call("derived_z", [DERIVED_COUPLING.fetch(k), 12.0, 3.0, irf, tf])
+        m = MODALITIES[k]
+        build_obs(k, "#{m[:label]} (推定)", m[:rho], z)
+      end
+      bg = vm.call("bg_thermal_entropy", [irf, tf])
+      Assessment.new(obs, xi: bg, id: id,
+                     meta: { thermal: { ir: irf, temp: tf, mode: :derived,
+                                        delta: irf - tf, xi_t: bg } })
     end
 
     # A built-in demo sensor reading (warm forehead vs cool room).

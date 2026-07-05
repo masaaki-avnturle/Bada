@@ -149,6 +149,34 @@ class TestIQThermal < Minitest::Test
   end
 end
 
+class TestIQTabletDerived < Minitest::Test
+  def test_basal_ganglia_entropy_finite
+    bg = Bada::IQ.vm.call("bg_thermal_entropy", [36.6, 23.0])
+    assert bg.finite?
+    assert_operator bg, :>, 0.0
+  end
+
+  def test_derives_all_five_modalities
+    a = Bada::IQ.assess_thermal_derived(36.6, 23.0)
+    assert_equal %i[fmri mri topography dna blood], a.obs.map { |o| o[:modality] }
+    assert_equal :derived, a.meta[:thermal][:mode]
+    assert a.iq.finite?
+  end
+
+  def test_warmer_reading_raises_derived_iq
+    cool = Bada::IQ.assess_thermal_derived(34.0, 24.0).iq
+    warm = Bada::IQ.assess_thermal_derived(38.0, 22.0).iq
+    assert_operator warm, :>, cool
+  end
+
+  def test_report_labels_basal_ganglia_and_derived
+    r = Bada::IQ.assess_thermal_derived(36.6, 23.0).report
+    assert_includes r, "大脳基底核 熱"
+    assert_includes r, "推定した生体信号"
+    assert_includes r, "血液"
+  end
+end
+
 class TestIQAssessment < Minitest::Test
   def test_full_pipeline_report
     a = Bada::IQ.assess(Bada::IQ.demo_subject)

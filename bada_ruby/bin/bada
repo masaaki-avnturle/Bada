@@ -15,6 +15,7 @@
 #   bin/bada xi "text"                  show entropy + manifold invariant
 #   bin/bada iq [subject.json]          IQ assessment: mirror stats / Bayes / whisper
 #   bin/bada iq-thermal [ir temp]       IQ from infrared sensor + thermometer (gamma manifold)
+#   bin/bada iq-tablet  [ir temp]       estimate blood/DNA/fMRI/MRI/topo from IR+temp (basal ganglia)
 
 Encoding.default_external = Encoding::UTF_8
 Encoding.default_internal = Encoding::UTF_8
@@ -132,6 +133,19 @@ when "iq-thermal"
   else
     d = Bada::IQ.demo_thermal
     puts Bada::IQ.assess_thermal(d[:ir], d[:temp], id: "THERMAL-DEMO").report
+  end
+when "iq-tablet"
+  # Estimate ALL biosignal modalities (blood/DNA/fMRI/MRI/topography) from the
+  # tablet's IR + thermometer via the basal-ganglia thermal entropy, then assess.
+  #   bada iq-tablet              demo reading
+  #   bada iq-tablet 36.6 23.0    IR body-surface °C and ambient °C
+  ir = ARGV.shift
+  temp = ARGV.shift
+  if ir && temp
+    puts Bada::IQ.assess_thermal_derived(ir.to_f, temp.to_f).report
+  else
+    d = Bada::IQ.demo_thermal
+    puts Bada::IQ.assess_thermal_derived(d[:ir], d[:temp], id: "TABLET-DEMO").report
   end
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"

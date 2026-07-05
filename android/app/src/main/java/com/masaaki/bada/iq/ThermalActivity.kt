@@ -46,7 +46,8 @@ class ThermalActivity : AppCompatActivity(), SensorEventListener {
         proximity = sm.getDefaultSensor(Sensor.TYPE_PROXIMITY)
 
         findViewById<Button>(R.id.btnReadSensors).setOnClickListener { readSensors() }
-        findViewById<Button>(R.id.btnThermalAssess).setOnClickListener { runAssessment() }
+        findViewById<Button>(R.id.btnThermalAssess).setOnClickListener { runAssessment(false) }
+        findViewById<Button>(R.id.btnThermalDerived).setOnClickListener { runAssessment(true) }
         findViewById<Button>(R.id.btnThermalDemo).setOnClickListener { fillDemo() }
 
         val avail = buildString {
@@ -103,10 +104,12 @@ class ThermalActivity : AppCompatActivity(), SensorEventListener {
         val (ir, temp) = IqEngine.demoThermal()
         inIr.setText(ir.toString())
         inTemp.setText(temp.toString())
-        runAssessment()
+        runAssessment(false)
     }
 
-    private fun runAssessment() {
+    // derived = estimate all five biosignal modalities from the basal-ganglia
+    // thermal entropy (tablet mode); otherwise the direct thermal channels.
+    private fun runAssessment(derived: Boolean) {
         val ir = inIr.text.toString().trim().toDoubleOrNull()
         val temp = inTemp.text.toString().trim().toDoubleOrNull()
         if (ir == null || temp == null) {
@@ -114,7 +117,9 @@ class ThermalActivity : AppCompatActivity(), SensorEventListener {
             return
         }
         result.text = try {
-            IqEngine.report(IqEngine.assessThermal(ir, temp, id = "THERMAL"))
+            val a = if (derived) IqEngine.assessThermalDerived(ir, temp)
+            else IqEngine.assessThermal(ir, temp, id = "THERMAL")
+            IqEngine.report(a)
         } catch (ex: Exception) {
             "エラー: ${ex.message}"
         }

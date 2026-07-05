@@ -304,7 +304,12 @@ object IqEngine {
     // ── Assessment facade ────────────────────────────────────────────────────
 
     // Optional thermal (infrared + thermometer) context rendered in the report.
-    data class Thermal(val ir: Double, val temp: Double, val delta: Double, val xiT: Double)
+    // `derived` = the five biosignal modalities were inferred from the basal-
+    // ganglia thermal entropy (tablet mode) rather than measured directly.
+    data class Thermal(
+        val ir: Double, val temp: Double, val delta: Double, val xiT: Double,
+        val derived: Boolean = false
+    )
 
     data class Assessment(
         val id: String?,
@@ -410,6 +415,27 @@ object IqEngine {
         return assemble(obs, xi, id, Thermal(ir, temp, ir - temp, xi))
     }
 
+    // Thermal coupling: how strongly the basal-ganglia thermal entropy predicts
+    // each biosignal modality (framework calibration constants).
+    val DERIVED_COUPLING: LinkedHashMap<String, Double> = linkedMapOf(
+        "fmri" to 1.0, "mri" to 0.5, "topography" to 0.8, "dna" to 0.3, "blood" to 0.9
+    )
+
+    // Estimate ALL five biosignal modalities (blood / DNA / fMRI / MRI /
+    // topography) from just the tablet's IR + thermometer, via the basal-ganglia
+    // thermal entropy, then run the full biosignal assessment.
+    fun assessThermalDerived(ir: Double, temp: Double, id: String? = "TABLET-THERMAL"): Assessment {
+        val v = requireVm()
+        val obs = MODALITIES.keys.map { k ->
+            val coeff = DERIVED_COUPLING.getValue(k)
+            val z = v.callNum("derived_z", listOf(coeff, 12.0, 3.0, ir, temp))
+            val m = MODALITIES.getValue(k)
+            buildObs(k, "${m.label} (推定)", m.rho, z)
+        }
+        val bg = v.callNum("bg_thermal_entropy", listOf(ir, temp))
+        return assemble(obs, bg, id, Thermal(ir, temp, ir - temp, bg, derived = true))
+    }
+
     fun demoThermal(): Pair<Double, Double> = Pair(36.4, 23.0)
 
     // A built-in demo subject (a cognitively above-average profile).
@@ -428,19 +454,33 @@ object IqEngine {
         val t = a.meta
         if (t != null) {
             sb.appendLine()
-            sb.appendLine("【0】赤外線センサー + 温度計")
-            sb.appendLine("  ガンマ関数 大域的部分積分多様体")
+            if (t.derived) {
+                sb.appendLine("【0】赤外線+温度計 → 大脳基底核 熱エントロピー")
+                sb.appendLine("  ガンマ関数 大域的部分積分多様体 (3点測度)")
+            } else {
+                sb.appendLine("【0】赤外線センサー + 温度計")
+                sb.appendLine("  ガンマ関数 大域的部分積分多様体")
+            }
             sb.appendLine(fmt("  赤外線 IR体表温  : %.2f ℃", t.ir))
             sb.appendLine(fmt("  温度計 環境温    : %.2f ℃", t.temp))
             sb.appendLine(fmt("  体表-環境勾配 Δ  : %+.2f ℃", t.delta))
-            sb.appendLine(fmt("  多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t.xiT))
+            if (t.derived) {
+                sb.appendLine(fmt("  大脳基底核 熱H_bg: %.4f  (β(H+1,M+1)/log 4)", t.xiT))
+            } else {
+                sb.appendLine(fmt("  多様体不変量 Ξ_T : %.4f  (β(H+1,M+1)/log 3)", t.xiT))
+            }
         }
         sb.appendLine()
-        if (t != null) {
-            sb.appendLine("【1】IQ 計測 — 赤外線/温度計 サーマルチャネル")
-        } else {
-            sb.appendLine("【1】生体信号 IQ 計測")
-            sb.appendLine("  fMRI/MRI/脳トポグラフィ/DNA/血液")
+        when {
+            t?.derived == true -> {
+                sb.appendLine("【1】IQ 計測 — 赤外線/温度計から推定した生体信号")
+                sb.appendLine("  血液/DNA/fMRI/MRI/脳トポグラフィ (推定)")
+            }
+            t != null -> sb.appendLine("【1】IQ 計測 — 赤外線/温度計 サーマルチャネル")
+            else -> {
+                sb.appendLine("【1】生体信号 IQ 計測")
+                sb.appendLine("  fMRI/MRI/脳トポグラフィ/DNA/血液")
+            }
         }
         for (o in a.obs) {
             sb.appendLine(
