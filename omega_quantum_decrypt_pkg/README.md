@@ -94,6 +94,56 @@ python3 tests/test_all.py
 
 ---
 
+## Windows10 / Android12 アプリのダウンロード (downloadable exe & apk)
+
+同じ Kivy GUI（`main.py`）から Windows の `.exe` と Android の `.apk` を生成します。
+**バイナリは GitHub Actions が本物のランナー上でビルドし、リポジトリの Releases から
+ダウンロードできます**（偽のバイナリはコミットしていません）。
+
+### ダウンロード手順
+
+1. リポジトリの **Releases** ページを開く。
+2. 最新リリースの Assets から取得：
+   - `omega_quantum_decrypt.exe` … Windows 10（64bit）用。ダブルクリックで起動。
+   - `omega_quantum_decrypt.apk` … Android 12（arm64-v8a / armeabi-v7a）用。
+     「提供元不明のアプリ」を許可してインストール。
+
+### リリース（バイナリ）を発行する方法
+
+タグを push すると CI が両方をビルドし、Release に自動添付します：
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+- ワークフロー: `.github/workflows/build-release.yml`
+- `windows-latest` ランナー ＋ **PyInstaller**（`packaging/omega_qdecrypt.spec`）→ `.exe`
+- `ubuntu-latest` ランナー ＋ **Buildozer / python-for-android**（`packaging/buildozer.spec`、
+  `android.api=31` = Android 12）→ `.apk`
+- タグでない push や手動実行（Actions → Run workflow）では、Release ではなく
+  **Artifacts**（各 Actions 実行ページ）としてダウンロードできます。
+
+### ローカルでビルドする場合（任意）
+
+```sh
+# Windows 上で:
+pip install "kivy[base]==2.3.1" kivy_deps.sdl2 kivy_deps.glew pyinstaller
+pyinstaller --noconfirm packaging/omega_qdecrypt.spec      # -> dist/omega_quantum_decrypt.exe
+
+# Linux 上で（Android SDK/NDK は Buildozer が取得）:
+pip install buildozer cython
+cd omega_quantum_decrypt_pkg && buildozer -v android debug  # -> bin/*.apk
+
+# デスクトップで GUI を試す:
+pip install kivy && python main.py
+```
+
+> 注: Windows の `.exe` は Windows 上で、Android の `.apk` は Linux + Android SDK/NDK 上で
+> しかビルドできません（クロスコンパイル不可）。そのため CI の各ランナーでビルドしています。
+
+---
+
 ## 構成 (layout)
 
 ```
@@ -107,9 +157,15 @@ omega_quantum_decrypt_pkg/
     rsa_toy.py       # 復号対象を作るためのトイ RSA
     pipeline.py      # 6 段パイプラインの統合
     cli.py           # コマンドライン
+  main.py            # Kivy GUI（exe / apk 共通エントリ）
+  app_controller.py  # GUI から呼ぶ純粋ロジック（テスト可能）
+  packaging/
+    omega_qdecrypt.spec  # PyInstaller（Windows .exe）
+    buildozer.spec       # Buildozer（Android .apk, API 31 = Android 12）
   examples/trefoil_braid.txt
-  tests/test_all.py
+  tests/test_all.py  tests/test_app.py
   run_demo.sh
+(.github/workflows/build-release.yml — exe/apk を CI でビルドし Release に添付)
 ```
 
 関連: 同リポジトリの `omega_jones_crypto_pkg`（C 実装の Jones→AES-256-GCM 鍵導出）と同じ
