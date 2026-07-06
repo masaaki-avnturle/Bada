@@ -1,41 +1,49 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec for the Windows build.
-# Build (on Windows):  pyinstaller packaging/omega_qdecrypt.spec
-# Produces:  dist/omega_quantum_decrypt.exe  (one-file, windowed)
 #
-# Paths are resolved relative to this spec file (via SPECPATH) so the build
-# works no matter which directory pyinstaller is invoked from.
+# Builds the Tkinter GUI (gui_tk.py) into a single windowed .exe.  Tkinter is
+# part of CPython and needs no OpenGL, so this builds reliably on the headless
+# windows-latest runner (Kivy does not -- it aborts without a GL>=2.0 context).
+#
+# Build (on Windows):  pyinstaller --noconfirm packaging/omega_qdecrypt.spec
+# Produces:  dist/omega_quantum_decrypt.exe
+#
+# Paths resolve relative to this spec file (SPECPATH) so the working directory
+# does not matter.
 
 import os
-from kivy_deps import sdl2, glew   # provided by kivy on Windows
+from PyInstaller.utils.hooks import collect_submodules
 
-block_cipher = None
-PKG = os.path.abspath(os.path.join(SPECPATH, '..'))   # the package root (holds main.py)
+PKG = os.path.abspath(os.path.join(SPECPATH, '..'))   # the package root
 
 a = Analysis(
-    [os.path.join(PKG, 'main.py')],
+    [os.path.join(PKG, 'gui_tk.py')],
     pathex=[PKG],
     binaries=[],
-    datas=[(os.path.join(PKG, 'omega_qdecrypt'), 'omega_qdecrypt')],
-    hiddenimports=['app_controller'],
+    datas=[],
+    hiddenimports=collect_submodules('omega_qdecrypt') + ['app_controller'],
     hookspath=[],
     runtime_hooks=[],
-    excludes=[],
-    cipher=block_cipher,
+    excludes=['kivy'],          # the desktop build does not use Kivy
+    noarchive=False,
 )
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
-    a.zipfiles,
     a.datas,
-    *[Tree(p) for p in (sdl2.dep_bins + glew.dep_bins)],
+    [],
     name='omega_quantum_decrypt',
     debug=False,
+    bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,          # windowed GUI app
-    onefile=True,
+    runtime_tmpdir=None,
+    console=False,              # windowed GUI (no console window)
+    disable_windowed_traceback=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
 )

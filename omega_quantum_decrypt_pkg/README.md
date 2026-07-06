@@ -127,17 +127,20 @@ git push origin v0.1.0
 ### ローカルでビルドする場合（任意）
 
 ```sh
-# Windows 上で:
-pip install "kivy[base]==2.3.1" kivy_deps.sdl2 kivy_deps.glew pyinstaller
+# Windows 上で（.exe は Tkinter 版。OpenGL 不要でビルドが安定）:
+pip install pyinstaller
 pyinstaller --noconfirm packaging/omega_qdecrypt.spec      # -> dist/omega_quantum_decrypt.exe
+# デスクトップGUIを直接試す:  python gui_tk.py
 
-# Linux 上で（Android SDK/NDK は Buildozer が取得）:
-pip install buildozer cython
+# Linux 上で（.apk は Kivy 版。Android SDK/NDK は Buildozer が取得）:
+pip install "cython<3.0" buildozer
 cd omega_quantum_decrypt_pkg && buildozer -v android debug  # -> bin/*.apk
-
-# デスクトップで GUI を試す:
-pip install kivy && python main.py
+# モバイルGUIをデスクトップで試す:  pip install kivy && python main.py
 ```
+
+> GUI は 2 種類あります: Windows の `.exe` は **Tkinter**（`gui_tk.py`, 標準ライブラリ・GL不要）、
+> Android の `.apk` は **Kivy**（`main.py`）。両者は `app_controller.py` の同じロジックを共有します。
+> Windows CI で Kivy を使うと GPU 無しの GL 1.1 でビルドが止まるため、`.exe` は Tkinter にしています。
 
 > 注: Windows の `.exe` は Windows 上で、Android の `.apk` は Linux + Android SDK/NDK 上で
 > しかビルドできません（クロスコンパイル不可）。そのため CI の各ランナーでビルドしています。

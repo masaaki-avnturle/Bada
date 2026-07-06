@@ -24,8 +24,9 @@ fullscreen = 0
 # Target Android 12 (API 31) as requested; min API 24 for broad coverage.
 android.api = 31
 android.minapi = 24
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
 android.allow_backup = 1
+android.accept_sdk_license = True
 
 [buildozer]
 log_level = 2
