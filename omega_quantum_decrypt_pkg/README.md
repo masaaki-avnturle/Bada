@@ -119,7 +119,7 @@ git push origin v0.1.0
 
 - ワークフロー: `.github/workflows/build-release.yml`
 - `windows-latest` ランナー ＋ **PyInstaller**（`packaging/omega_qdecrypt.spec`）→ `.exe`
-- `ubuntu-latest` ランナー ＋ **Buildozer / python-for-android**（`packaging/buildozer.spec`、
+- `ubuntu-latest` ランナー ＋ **Buildozer / python-for-android**（`buildozer.spec`、
   `android.api=31` = Android 12）→ `.apk`
 - タグでない push や手動実行（Actions → Run workflow）では、Release ではなく
   **Artifacts**（各 Actions 実行ページ）としてダウンロードできます。
@@ -162,9 +162,9 @@ omega_quantum_decrypt_pkg/
     cli.py           # コマンドライン
   main.py            # Kivy GUI（exe / apk 共通エントリ）
   app_controller.py  # GUI から呼ぶ純粋ロジック（テスト可能）
+  buildozer.spec       # Buildozer（Android .apk, API 31 = Android 12）※buildozerの仕様上ここに置く
   packaging/
-    omega_qdecrypt.spec  # PyInstaller（Windows .exe）
-    buildozer.spec       # Buildozer（Android .apk, API 31 = Android 12）
+    omega_qdecrypt.spec  # PyInstaller（Windows .exe, Tkinter）
   examples/trefoil_braid.txt
   tests/test_all.py  tests/test_app.py
   run_demo.sh

@@ -1,19 +1,20 @@
 [app]
 # Android build config for Buildozer / python-for-android.
+# NOTE: buildozer requires this file to sit in the directory it is run from,
+# so it lives at the package root (next to main.py), NOT under packaging/.
 # Build:  cd omega_quantum_decrypt_pkg && buildozer -v android debug
-# Produces:  bin/omega_quantum_decrypt-<version>-arm64-v8a-debug.apk
+# Produces:  bin/omegaqdecrypt-<version>-arm64-v8a-debug.apk
 
 title = omega_quantum_decrypt
 package.name = omegaqdecrypt
 package.domain = io.github.masaaki_avnturle
 
-# App sources live one level up (the package root that holds main.py).
-source.dir = ..
-source.include_exts = py,txt,md
-source.include_patterns = omega_qdecrypt/*.py, examples/*.txt
-# Exclude host-only bits from the APK.
-source.exclude_dirs = tests, packaging, __pycache__
-source.exclude_patterns = run_demo.sh, .gitignore
+# App sources = this directory (holds the Kivy entry point main.py).
+source.dir = .
+source.include_exts = py
+# Keep host-only bits out of the APK.
+source.exclude_dirs = tests, packaging, __pycache__, examples
+source.exclude_patterns = run_demo.sh, .gitignore, gui_tk.py
 
 version = 0.1.0
 requirements = python3,kivy==2.3.1
