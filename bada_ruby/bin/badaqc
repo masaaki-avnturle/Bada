@@ -1,0 +1,131 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# badaqc — Bada quantum-cryptography USB file vault.
+#
+#   Lock (encrypt) and unlock (decrypt / 解く) YOUR OWN files on a USB stick
+#   with a BB84 QKD-derived, Jones-knot-keyed, AES-256-GCM authenticated cipher.
+#
+#   SAFETY: This unlocks only files THIS tool encrypted, with the passphrase YOU
+#   hold. It does NOT break BitLocker / LUKS / VeraCrypt / hardware-encrypted
+#   drives and cannot recover unknown keys.
+#
+#   bin/badaqc lock   <path> [--pass P] [--diagram jones.txt] [--shred]
+#   bin/badaqc unlock <path> [--pass P] [--diagram jones.txt] [--remove]
+#     The Jones polynomial (a knot-diagram file) can be the key by itself:
+#       bin/badaqc lock   <path> --diagram trefoil.txt      # lock with the knot
+#       bin/badaqc unlock <path> --diagram trefoil.txt      # 解読: present the knot
+#   bin/badaqc qkd            --pass P        # BB84 eavesdropper-detection demo
+#   bin/badaqc key            --pass P [--diagram d]   # key fingerprint + check digit
+#   bin/badaqc check          --pass P [--diagram d] [--verify CODE] [--jones d]
+#   bin/badaqc demo                            # self-contained round-trip demo
+#
+#   <path> may be a single file or a directory (e.g. your USB mount point).
+
+Encoding.default_external = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "bada"
+
+def opt(flag)
+  i = ARGV.index(flag)
+  return nil unless i
+  ARGV.delete_at(i)
+  ARGV.delete_at(i)
+end
+
+def flag?(name)
+  !ARGV.delete(name).nil?
+end
+
+QC = Bada::QuantumCrypto
+cmd = ARGV.shift || "help"
+
+case cmd
+when "lock"
+  diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc lock <path> [--pass P] [--diagram jones.txt] [--shred]  (要 --pass か --diagram)") unless pass || diagram
+  shred = flag?("--shred")
+  path = ARGV.shift or abort("missing <path>")
+  res = QC.lock_usb(path, pass, diagram: diagram, remove_original: shred)
+  ok = res.count { |r| r[:ok] }
+  puts "🔒 lock: #{ok}/#{res.length} 件を暗号化"
+  res.each { |r| puts(r[:ok] ? "  ✔ #{r[:file]} → #{r[:output]}" : "  ✗ #{r[:file]}: #{r[:error]}") }
+  puts "  ⚠ 平文を削除しました（--shred）" if shred
+
+when "unlock"
+  diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc unlock <path> [--pass P] [--diagram jones.txt] [--remove]  (要 --pass か --diagram)") unless pass || diagram
+  remove = flag?("--remove")
+  path = ARGV.shift or abort("missing <path>")
+  res = QC.unlock_usb(path, pass, diagram: diagram, remove_encrypted: remove)
+  ok = res.count { |r| r[:ok] }
+  puts "🔓 unlock（解く）: #{ok}/#{res.length} 件を復号"
+  res.each { |r| puts(r[:ok] ? "  ✔ #{r[:file]} → #{r[:output]}" : "  ✗ #{r[:file]}: #{r[:error]}") }
+
+when "qkd"
+  pass = opt("--pass") || "demo-passphrase"
+  r = QC.qkd_channel_report(pass)
+  puts "BB84 量子鍵配送 — 盗聴検知レポート"
+  puts format("  クリーン通信路 QBER      : %.4f", r[:clean_qber])
+  puts format("  盗聴あり(intercept)QBER  : %.4f", r[:eavesdrop_qber])
+  puts "  盗聴者を検知              : #{r[:eavesdropper_detected] ? 'YES（鍵を破棄）' : 'no'}"
+  puts "  鍵は安全に共有可能        : #{r[:secure] ? 'yes' : 'no'}"
+
+when "key"
+  diagram = opt("--diagram")
+  pass = opt("--pass")
+  abort("usage: badaqc key [--pass P] [--diagram jones.txt]  (要 --pass か --diagram)") unless pass || diagram
+  puts "鍵フィンガープリント: #{QC.key_fingerprint(pass, diagram: diagram)}"
+  cd = QC.check_digit(pass, diagram: diagram)
+  puts "チェックデジット    : #{cd[:code]}  (KCV #{cd[:kcv]} / mod97 #{cd[:mod97]} / Luhn #{cd[:luhn]})"
+
+when "check"
+  # Show the check digit for a passphrase (+diagram), or verify a given code.
+  diagram = opt("--diagram")
+  expect = opt("--verify")
+  jones = opt("--jones")
+  pass = opt("--pass")
+  abort("usage: badaqc check [--pass P] [--diagram jones.txt] [--verify CODE] [--jones d]  (要 --pass か --diagram)") unless pass || diagram || jones
+  if jones
+    jd = QC.jones_check_digit(jones)
+    abort("結び目図が読めません: #{jones}") unless jd
+    puts "Jones多項式チェックデジット: KCV #{jd[:kcv]} / mod97 #{jd[:mod97]} / Luhn #{jd[:luhn]}"
+  end
+  exit 0 unless pass || diagram # --jones only: nothing more to do
+  cd = QC.check_digit(pass, diagram: diagram)
+  if expect
+    ok = QC.verify_check_digit(pass, expect, diagram: diagram)
+    puts(ok ? "✔ 一致: パスフレーズ#{diagram ? '＋図' : ''}は正しい鍵です" :
+              "✗ 不一致: パスフレーズ#{diagram ? '/図' : ''}が違います")
+    exit(ok ? 0 : 1)
+  else
+    puts "チェックデジット: #{cd[:code]}"
+    puts "  KCV=#{cd[:kcv]}  ISO7064mod97=#{cd[:mod97]}  Luhn=#{cd[:luhn]}"
+    puts "  （このコードを控えておけば、次回 --verify で鍵の正しさを確認できます）"
+  end
+
+when "demo"
+  require "tmpdir"
+  Dir.mktmpdir("badaqc") do |dir|
+    secret = File.join(dir, "secret.txt")
+    File.write(secret, "USB上の機密データ — quantum locked by Bada.\n")
+    puts "平文     : #{File.read(secret).strip}"
+    enc = QC.encrypt_file(secret, "correct horse battery staple")
+    File.delete(secret)
+    puts "暗号化   : #{File.basename(enc)}（AES-256-GCM, BB84鍵）"
+    # wrong passphrase fails cleanly
+    begin
+      QC.decrypt_file(enc, "wrong-pass", out_path: File.join(dir, "x"))
+    rescue QC::DecryptError => e
+      puts "誤鍵解読 : ✗ #{e.message}"
+    end
+    dec = QC.decrypt_file(enc, "correct horse battery staple")
+    puts "正鍵解読 : ✔ #{File.read(dec).strip}"
+  end
+
+else
+  puts File.read(__FILE__)[/#(.*?)\n\n/m, 1].to_s.gsub(/^# ?/, "")
+end

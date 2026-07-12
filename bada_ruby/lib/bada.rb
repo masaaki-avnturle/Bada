@@ -14,6 +14,8 @@
 #   Bada::Entropy          Shannon entropy + tokenization
 #   Bada::Manifold         global partial integral manifold entropy invariant Ξ
 #   Bada::ErrorCorrection  complex-rotation / special-relativity integrable fix
+#   Bada::CodeFix          source-code error fixer + multi-submission board (複数投稿)
+#   Bada::QuantumCrypto    BB84 QKD + Jones key USB file vault (lock / unlock 解く)
 #   Bada::TupleSpace       Omega::DATABASE (Akashic Record)
 #   Bada::BadaNode         Bada operator runtime ( <-  -<  >- )
 #   Bada::Interpreter      Bada language source evaluator
@@ -33,6 +35,8 @@ require_relative "bada/special"
 require_relative "bada/entropy"
 require_relative "bada/manifold"
 require_relative "bada/error_correction"
+require_relative "bada/code_fix"
+require_relative "bada/quantum_crypto"
 require_relative "bada/tuplespace"
 require_relative "bada/language"
 require_relative "bada/knowledge"

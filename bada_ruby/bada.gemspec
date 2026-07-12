@@ -27,6 +27,6 @@ Gem::Specification.new do |spec|
     "LICENSE"
   ]
   spec.bindir      = "bin"
-  spec.executables = ["bada"]
+  spec.executables = ["bada", "badafix", "badaqc"]
   spec.require_paths = ["lib"]
 end
