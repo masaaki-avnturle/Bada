@@ -1,0 +1,75 @@
+// mirror.bada — the smartphone-mirror + eyeglass-lens aerial image, in Bada.
+//
+// A tablet lies face-up showing the hologram source; a smartphone is held above
+// it with its MIRROR facing DOWN.  By the eyeglass-lens focal principle (the
+// thin-lens / concave-mirror equation), a REAL aerial image forms *between* the
+// tablet and the phone mirror — that floating focus is where the holographic
+// display and the Happy Hacking keyboard appear.
+//
+// The focal point is set by the special-relativity Jones polynomial: the focal
+// length is modulated by |V(t)| of the trefoil and divided by the Lorentz
+// factor gamma = 1/sqrt(1-(v/c)^2), so the focus shifts relativistically.
+
+#include hologram.bada
+
+// thin-lens / concave-mirror law:  1/f = 1/do + 1/di  ->  di
+def lens_image(do, f) {
+  denom <- 1.0 / f - 1.0 / do
+  -< fabs(denom) < 0.0001 { denom <- 0.0001 }
+  return 1.0 / denom
+}
+
+// transverse magnification  m = -di/do
+def magnification(di, do) { return 0 - di / do }
+
+// Lorentz factor  gamma = 1/sqrt(1-(v/c)^2)   (special relativity)
+def lorentz(v, c) {
+  b <- v / c
+  -< b > 0.999 { b <- 0.999 }
+  -< b < 0 - 0.999 { b <- 0 - 0.999 }
+  return 1.0 / fsqrt(1.0 - b * b)
+}
+
+// focal length (cm) set by the special-relativity Jones polynomial:
+// the eyeglass-lens focus is scaled by |V(t)| and shrunk by the Lorentz factor.
+def focal_jones(d, v, c, ph) {
+  poly <- jones_trefoil()
+  tt <- 0.6 + 0.6 * (0.5 + 0.5 * fcos(6.283185307179586 * ph))   // t in [0.6,1.2]
+  jv <- poly_eval(poly, tt)
+  -< jv < 0 { jv <- 0 - jv }
+  g <- lorentz(v, c)
+  return d * (0.30 + 0.12 * jv) / g
+}
+
+// height z (cm) of the aerial focal image in the gap [0, d]
+// (0 = tablet surface, d = phone mirror facing down)
+def focus_z(d, v, c, ph) {
+  f <- focal_jones(d, v, c, ph)
+  di <- lens_image(d, f)
+  -< di < 0 { di <- 0 - di }
+  z <- d - di
+  -< z < 0.05 * d { z <- 0.05 * d }
+  -< z > 0.95 * d { z <- 0.95 * d }
+  return z
+}
+
+// magnification of the aerial image for the current focus
+def focus_mag(d, v, c, ph) {
+  f <- focal_jones(d, v, c, ph)
+  di <- lens_image(d, f)
+  -< di < 0 { di <- 0 - di }
+  m <- magnification(di, d)
+  -< m < 0 { m <- 0 - m }
+  return m
+}
+
+// T frames of the focal height as the relativistic phase advances
+def focus_flat(d, v, c, T) {
+  out <- []
+  k <- 0
+  -> k < T {
+    append(out, focus_z(d, v, c, 1.0 * k / T))
+    k <- k + 1
+  }
+  return out
+}

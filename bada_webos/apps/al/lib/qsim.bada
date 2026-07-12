@@ -1,0 +1,60 @@
+// qsim.bada — a quantum algorithm in Bada: Grover's search.
+//
+// Real-amplitude state-vector simulator. AL uses Grover to amplitude-amplify
+// the marked "resonance mode" of the Lambda Driver out of N unknown modes —
+// a quantum search over the unknown a-priori space.
+
+#include mathx.bada
+
+// Grover search over 2^nq modes; returns the most probable index.
+def grover(nq, marked) {
+  bign <- pow2(nq)
+
+  // uniform superposition: amplitude 1/sqrt(N) on every basis state
+  amp <- []
+  a0 <- 1 / fsqrt(bign)
+  i <- 0
+  -> i < bign {
+    append(amp, a0)
+    i <- i + 1
+  }
+
+  // optimal number of iterations ~ (pi/4) * sqrt(N)
+  pi <- 3.14159265358979
+  iters <- ffloor(pi / 4 * fsqrt(bign))
+
+  t <- 0
+  -> t < iters {
+    // oracle: phase-flip the marked amplitude
+    amp[marked] <- 0 - amp[marked]
+
+    // diffusion: inversion about the mean
+    s <- 0
+    i <- 0
+    -> i < bign {
+      s <- s + amp[i]
+      i <- i + 1
+    }
+    mean <- s / bign
+    i <- 0
+    -> i < bign {
+      amp[i] <- 2 * mean - amp[i]
+      i <- i + 1
+    }
+    t <- t + 1
+  }
+
+  // measurement: argmax of probability amp^2
+  best <- 0
+  bestp <- 0 - 1
+  i <- 0
+  -> i < bign {
+    p <- amp[i] * amp[i]
+    -< p > bestp {
+      bestp <- p
+      best <- i
+    }
+    i <- i + 1
+  }
+  return best
+}

@@ -38,6 +38,9 @@ from cloud.settings_bridge import (Bridge, CloudStore,         # noqa: E402
 from ultranet import UltraNetwork                              # noqa: E402
 from android.installer import Android12Installer, AndroidManifest  # noqa
 from terminal import Terminal                                  # noqa: E402
+from qcrypto import QuantumCryptoApp                            # noqa: E402
+from al import AlOS                                             # noqa: E402
+from winport import WinPortApp                                  # noqa: E402
 from render.desktop import render_desktop                      # noqa: E402
 
 _APP_DIR = os.path.join(_HERE, "apps")
@@ -59,6 +62,9 @@ class BadaWebOS:
         self.panel = SettingsPanel(self.bridge)
         self.ultranet = UltraNetwork()
         self.terminal = Terminal()
+        self.qcrypto = QuantumCryptoApp()
+        self.al = AlOS()
+        self.winport = WinPortApp()
 
     # ----------------------------------------------------------------
     def boot(self) -> dict:
@@ -98,6 +104,29 @@ class BadaWebOS:
                                     540, 320)
         self.window_content[w_term.wid] = self.terminal.render_html()
 
+        # 5c. Quantum crypto: cryptanalyse a signature -> activate Jones crypto
+        qc_report = self.qcrypto.boot()
+        self.kernel.run_app_file(
+            "quantum_crypto", os.path.join(_APP_DIR, "quantum_crypto.bada"))
+        # the Jones polynomial computed natively in Bada (libraries on the VM)
+        self.kernel.run_program_file(
+            "quantum_crypto_jones",
+            os.path.join(_APP_DIR, "quantum_crypto_jones.bada"))
+        w_qc = self.wm.new_window("Quantum Crypto (Jones)", 70, 70, 470, 250)
+        self.window_content[w_qc.wid] = self.qcrypto.render_html()
+
+        # 5d. AL — Laevatein AI / machine OS (all libraries written in Bada)
+        al_report = self.al.boot()
+        w_al = self.wm.new_window("AL — Laevatein AI OS", 300, 200, 500, 270)
+        self.window_content[w_al.wid] = self.al.render_html()
+
+        # 5e. WinPort — Rails-in-Bada, reviser port of Windows to the quantum
+        #     computer, symlink/hardlink control panel, VM bridge + repeater
+        wp_report = self.winport.boot()
+        w_wp = self.wm.new_window("WinPort — VM Bridge → Quantum",
+                                  150, 120, 520, 280)
+        self.window_content[w_wp.wid] = self.winport.render_html()
+
         # 6. Android 12 app installed + launched onto screen 2
         manifest = AndroidManifest(
             package="com.bada.notes", label="Bada Notes",
@@ -120,6 +149,28 @@ class BadaWebOS:
                           for p in self.kernel.processes],
             "rails_app": osapp.name,
             "ultranetwork": un_report,
+            "quantum_crypto": {
+                "activated": qc_report["activation"]["activated"],
+                "jones": qc_report["activation"].get("jones"),
+                "broken_key": qc_report["activation"].get("broken_key"),
+            },
+            "al": {
+                "online": al_report["online"],
+                "resonance_mode": al_report["resonance_mode"],
+                "consciousness": al_report["consciousness"],
+                "meltdown": al_report["meltdown"],
+                "atfield_online": al_report["atfield_online"],
+                "at_field": al_report["at_field"],
+                "anti_gravity": al_report["anti_gravity"],
+                "haloperidol": al_report["haloperidol"],
+            },
+            "winport": {
+                "rails_ok": wp_report["rails_ok"],
+                "win11_changes": wp_report["win11_changes"],
+                "control_panel": wp_report["control_panel"],
+                "qec_ok": wp_report["qec_ok"],
+                "vm_delivered": wp_report["vm_bridge"]["delivered"],
+            },
             "settings": dict(self.panel.settings),
             "cloud_version": self.cloud.version,
             "android": [a.package for a in self.installer.list_apps()],
@@ -208,4 +259,19 @@ if __name__ == "__main__":
     print(f"  android installed: {report['android']}")
     print(f"  terminal apps: bash builtins + "
           f"{report['terminal']['editors']}")
+    print(f"  quantum crypto: activated={report['quantum_crypto']['activated']}"
+          f" Jones {report['quantum_crypto']['jones']}")
+    print(f"  AL OS: online={report['al']['online']} "
+          f"mode={report['al']['resonance_mode']} "
+          f"consciousness={report['al']['consciousness']} "
+          f"meltdown={report['al']['meltdown']}")
+    print(f"  AL pilot: AT-field online={report['al']['atfield_online']} "
+          f"AT={report['al']['at_field']:.2f} "
+          f"anti-gravity={report['al']['anti_gravity']:.2f} "
+          f"haloperidol={report['al']['haloperidol']:.2f}")
+    wp = report['winport']
+    print(f"  WinPort: rails_ok={wp['rails_ok']} "
+          f"win11_changes={wp['win11_changes']} "
+          f"symlinks={wp['control_panel']['symlinks']} "
+          f"qec_ok={wp['qec_ok']} vm_delivered={wp['vm_delivered']}")
     print(f"  desktop written to {out}")

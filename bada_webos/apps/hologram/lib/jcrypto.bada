@@ -1,0 +1,138 @@
+// jcrypto.bada — quantum cryptography solved by the Jones polynomial, in Bada.
+//
+//   encryption        f(s)        : the cipher, a function of the secret s
+//   Jones polynomial  π(χ, x)     : V_χ(x), the quantum knot invariant (key)
+//   solve the cipher  f(s)/π(χ,x) − f(s)
+//
+// The scheme is built so the requested solver inverts exactly: with
+//   f(s) = m · π/(1 − π)      (m = plaintext)
+//   f(s)/π − f(s) = m·(1−π)/(1−π) = m.
+// Decryption therefore succeeds only under the NECESSARY CONDITION that the
+// decrypt key reproduces the encryption's Jones value π(χ,x); the recovered
+// plaintext is then PULLed out of Omega::DATABASE.
+//
+// Reuses jones_t / poly_eval / fabs via qcache.bada (-> hologram.bada -> jones).
+
+#include qcache.bada
+
+// π(χ, x) = V_χ(x): the Jones polynomial of braid χ (n strands), evaluated at x
+def jones_pi(chi, n, x) {
+  return poly_eval(jones_t(chi, n), x)
+}
+def pi_trefoil(x) { return poly_eval(jones_trefoil(), x) }
+
+// encryption  c = f(s) = m · π / (1 − π)
+def encrypt(m, chi, n, x) {
+  p <- jones_pi(chi, n, x)
+  d <- 1.0 - p
+  -< fabs(d) < 0.0000001 { d <- 0.0000001 }
+  return m * p / d
+}
+
+// the requested solver:  f(s)/π(χ,x) − f(s)
+def solve(c, chi, n, x) {
+  p <- jones_pi(chi, n, x)
+  -< fabs(p) < 0.0000001 { p <- 0.0000001 }
+  return c / p - c
+}
+
+// NECESSARY CONDITION: the decrypt key must reproduce the encryption's π.
+// returns 1 if π(χe,xe) == π(χd,xd) (within tolerance), else 0.
+def necessary_condition(chi_e, n_e, x_e, chi_d, n_d, x_d) {
+  pe <- jones_pi(chi_e, n_e, x_e)
+  pd <- jones_pi(chi_d, n_d, x_d)
+  diff <- pe - pd
+  -< diff < 0 { diff <- 0 - diff }
+  -< diff < 0.000001 { return 1 }
+  return 0
+}
+
+// --- message level ---------------------------------------------------------
+def encrypt_msg(msg, chi, n, x) {
+  out <- []
+  i <- 0
+  -> i < len(msg) {
+    append(out, encrypt(msg[i], chi, n, x))
+    i <- i + 1
+  }
+  return out
+}
+
+def solve_msg(cph, chi, n, x) {
+  out <- []
+  i <- 0
+  -> i < len(cph) {
+    append(out, solve(cph[i], chi, n, x))
+    i <- i + 1
+  }
+  return out
+}
+
+// round to nearest integer (plaintext symbols are integers)
+def iround(v) {
+  -< v < 0 { return 0 - idiv(0 - v + 0.5, 1) }
+  return idiv(v + 0.5, 1)
+}
+
+// --- pull: solve, then PULL the plaintext out of Omega::DATABASE -----------
+// Solves the cipher with the given key and, only if the necessary condition
+// holds, pushes each recovered symbol into the tuplespace to be pulled.
+def pull_decrypt(cph, chi_e, n_e, x_e, chi_d, n_d, x_d) {
+  ok <- necessary_condition(chi_e, n_e, x_e, chi_d, n_d, x_d)
+  -< ok <-> 0 { return 0 }
+  i <- 0
+  -> i < len(cph) {
+    sym <- iround(solve(cph[i], chi_d, n_d, x_d))
+    Omega::DATABASE[crypto] {
+      push(sym)
+    }
+    i <- i + 1
+  }
+  return len(cph)
+}
+
+// --- identity-bound decryption: the unlock is based on WHO pulls -----------
+// each person's identity maps to their own Jones evaluation point x, so π — and
+// therefore the key — depends on the puller; only the intended person matches.
+def person_x(pid) {
+  return 0.30 + 0.035 * imod(pid, 11)
+}
+
+def encrypt_to(m, chi, n, target) {
+  return encrypt(m, chi, n, person_x(target))
+}
+
+def encrypt_msg_to(msg, chi, n, target) {
+  return encrypt_msg(msg, chi, n, person_x(target))
+}
+
+def solve_as(c, chi, n, puller) {
+  return solve(c, chi, n, person_x(puller))
+}
+
+def solve_msg_as(cph, chi, n, puller) {
+  return solve_msg(cph, chi, n, person_x(puller))
+}
+
+// the SAME necessary condition, now identity-bound: the puller must be the
+// intended target (same person -> same π(χ, x_person)).
+def person_condition(chi, n, target, puller) {
+  return necessary_condition(chi, n, person_x(target),
+                             chi, n, person_x(puller))
+}
+
+// pull bound to the puller: the unlock uses the same condition as pull, so only
+// the person it was encrypted to can pull the plaintext out of Omega::DATABASE.
+def pull_as(cph, chi, n, target, puller) {
+  ok <- person_condition(chi, n, target, puller)
+  -< ok <-> 0 { return 0 }
+  i <- 0
+  -> i < len(cph) {
+    sym <- iround(solve(cph[i], chi, n, person_x(puller)))
+    Omega::DATABASE[crypto] {
+      push(sym)
+    }
+    i <- i + 1
+  }
+  return len(cph)
+}

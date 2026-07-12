@@ -1,0 +1,30 @@
+// resonance.bada — the resonance device, in Bada.
+//
+// A driven, damped harmonic oscillator. The pilot's gamma rhythm drives it;
+// the response amplitude peaks when the drive frequency matches the device's
+// natural frequency (resonance), amplifying the mental signal for the Lambda
+// Driver.
+
+#include mathx.bada
+
+// returns the peak response amplitude over the simulation
+def resonate(drive_amp, drive_freq, natural_freq, damping, steps) {
+  w0 <- natural_freq
+  wd <- drive_freq
+  x <- 0.0
+  v <- 0.0
+  dt <- 0.01
+  maxa <- 0.0
+  t <- 0.0
+  i <- 0
+  -> i < steps {
+    f <- drive_amp * fsin(wd * t)
+    a <- f - 2 * damping * w0 * v - w0 * w0 * x
+    v <- v + a * dt
+    x <- x + v * dt
+    -< x > maxa { maxa <- x }
+    t <- t + dt
+    i <- i + 1
+  }
+  return maxa
+}

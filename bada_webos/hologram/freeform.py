@@ -1,0 +1,235 @@
+"""Freeform multi-window desktop (Samsung-Freeform / Android-taskbar style).
+
+Renders a desktop where the tablet's apps open in draggable, resizable freeform
+windows (each hosting the real bundled app in an iframe), with window close /
+minimize / maximize buttons, edge split-snap, and a Play-Store-style taskbar
+with a Start button, running-app buttons and a clock.  The window-manager
+geometry and the app catalog come from Bada (apps/hologram/lib/freeform.bada).
+"""
+
+from __future__ import annotations
+
+import json
+
+
+def html_freeform(catalog: list, tb: int, sections: list = None,
+                  sizes: list = None) -> str:
+    sections = sections or ["インストール済みアプリ", "Bada アプリ"]
+    sizes = sizes or [{"label": "携帯型", "key": "mobile"},
+                      {"label": "中", "key": "medium"},
+                      {"label": "大", "key": "large"}]
+    return _TEMPLATE \
+        .replace("__CATALOG__", json.dumps(catalog, ensure_ascii=False)) \
+        .replace("__SIZES__", json.dumps(sizes, ensure_ascii=False)) \
+        .replace("__SEC_INSTALLED__", json.dumps(sections[0], ensure_ascii=False)) \
+        .replace("__SEC_BUNDLED__", json.dumps(sections[-1], ensure_ascii=False)) \
+        .replace("__TB__", str(tb))
+
+
+_TEMPLATE = r"""<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Bada Freeform — マルチウィンドウ</title>
+<style>
+ *{box-sizing:border-box}
+ html,body{margin:0;height:100%;overflow:hidden;font-family:monospace;
+   color:#dff;user-select:none;
+   background:linear-gradient(135deg,#0a1426,#0c1a2e 50%,#071018);}
+ #wp{position:fixed;inset:0;z-index:0;
+   background:radial-gradient(circle at 30% 25%,#13496022,transparent 60%),
+              radial-gradient(circle at 75% 70%,#0c6a5522,transparent 55%)}
+ #wp .t{position:absolute;top:40%;left:0;right:0;text-align:center;color:#2a5d6e;
+   font-size:13px}
+ .win{position:absolute;display:flex;flex-direction:column;min-width:200px;
+   min-height:140px;background:#0b1422ee;border:1px solid #2a4a6a;border-radius:10px;
+   box-shadow:0 10px 40px #000a, 0 0 18px #0c6a5533;overflow:hidden}
+ .win.active{border-color:#3fd9;box-shadow:0 12px 46px #000c,0 0 24px #1aa07a66}
+ .tb{height:30px;display:flex;align-items:center;gap:6px;padding:0 6px;cursor:move;
+   background:linear-gradient(#16314e,#0e2236);touch-action:none}
+ .tb .ti{flex:1;font-size:12px;color:#bfe;white-space:nowrap;overflow:hidden;
+   text-overflow:ellipsis}
+ .tb .b{width:22px;height:20px;border-radius:5px;text-align:center;line-height:20px;
+   cursor:pointer;color:#cfe;background:#0a1a2a}
+ .tb .b:hover{background:#1c3a52}.tb .cls:hover{background:#b23;color:#fff}
+ .body{flex:1;background:#04070c;position:relative}
+ .body iframe{width:100%;height:100%;border:0;background:#02060c}
+ .rs{position:absolute;right:0;bottom:0;width:18px;height:18px;cursor:nwse-resize;
+   touch-action:none;background:
+     linear-gradient(135deg,transparent 50%,#3fd8 50%)}
+ #taskbar{position:fixed;left:0;right:0;bottom:0;height:__TB__px;z-index:9000;
+   display:flex;align-items:center;gap:6px;padding:0 8px;
+   background:#06101cee;border-top:1px solid #1c3a52;backdrop-filter:blur(6px)}
+ #start{width:48px;height:40px;border-radius:10px;font-size:20px;cursor:pointer;
+   display:flex;align-items:center;justify-content:center;color:#04121e;
+   background:linear-gradient(#5fe,#1aa);box-shadow:0 0 14px #3fd8}
+ #start:active{transform:scale(.94)}
+ #tasks{flex:1;display:flex;gap:6px;align-items:center;overflow:hidden}
+ .task{height:40px;min-width:44px;max-width:160px;padding:0 10px;border-radius:8px;
+   background:#0e2236;border:1px solid #24506e;cursor:pointer;display:flex;
+   align-items:center;gap:6px;font-size:12px;color:#cfe;white-space:nowrap;
+   overflow:hidden;text-overflow:ellipsis}
+ .task.active{background:#16486a;border-color:#3fd9}
+ #clock{font-size:13px;color:#8fd;min-width:78px;text-align:right;padding-right:6px}
+ #menu{position:fixed;left:8px;bottom:__TB__px;z-index:9500;width:300px;display:none;
+   padding:12px;background:#08131fef;border:1px solid #24506e;border-radius:14px;
+   box-shadow:0 12px 50px #000c}
+ #menu h4{margin:0 0 10px;color:#6fe;font-size:13px}
+ #menu{max-height:74vh;overflow:auto}
+ #installedSec{display:none;margin-bottom:14px}
+ #grid,#installed{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+ .app{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;
+   border-radius:10px;cursor:pointer;background:#0d2034;border:1px solid #1c3a52}
+ .app:hover{background:#143a56;border-color:#3fd9}
+ .app .g{font-size:26px;color:#7fe}.app .n{font-size:11px;color:#bfe;text-align:center;
+   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:84px}
+ .app img{width:38px;height:38px;border-radius:9px}
+ #note{color:#789;font-size:11px;margin-top:8px}
+ #sizes{display:flex;gap:6px;align-items:center;margin-bottom:12px;font-size:12px;color:#8fd}
+ #sizes .sz{padding:4px 12px;border-radius:8px;cursor:pointer;background:#0d2034;
+   border:1px solid #1c3a52;color:#cfe}
+ #sizes .sz.sel{background:#16486a;border-color:#3fd;color:#dff}
+</style></head><body>
+<div id="wp"><div class="t">Bada Freeform — Start を押してアプリを開く / ウィンドウは移動・リサイズ・分割スナップ</div></div>
+<div id="menu">
+ <div id="sizes">ウィンドウサイズ:</div>
+ <div id="installedSec"><h4>__SEC_INSTALLED__</h4><div id="installed"></div></div>
+ <h4>__SEC_BUNDLED__ &#9638;</h4><div id="grid"></div>
+ <div id="note"></div>
+</div>
+<div id="taskbar">
+ <div id="start" title="Start">&#8862;</div>
+ <div id="tasks"></div>
+ <div id="clock"></div>
+</div>
+<script>
+const CATALOG=__CATALOG__, SIZES=__SIZES__, TB=__TB__;
+let z=10, wins=[], idCounter=0, dragLock=false, launchSize='medium';
+const desk={get W(){return innerWidth;},get H(){return innerHeight-TB;}};
+
+// window-size presets (携帯型 / 中 / 大) — mirrors Bada window_size()
+function sizeFor(preset){const W=innerWidth, avail=innerHeight-TB;
+ if(preset==='mobile'){let h=Math.min(720,avail-20);
+  let w=Math.min(W-40,Math.floor(h*46/100));return {w,h};}
+ if(preset==='large'){return {w:Math.floor(W*7/10),h:Math.floor(avail*8/10)};}
+ return {w:Math.min(W-40,520),h:Math.min(avail-20,380)};}
+// size selector in the start menu
+const sizesBar=document.getElementById('sizes');
+SIZES.forEach(s=>{const b=document.createElement('span');b.className='sz'+(s.key===launchSize?' sel':'');
+ b.textContent=s.label;b.onclick=e=>{e.stopPropagation();launchSize=s.key;
+  for(const el of sizesBar.querySelectorAll('.sz'))el.classList.remove('sel');
+  b.classList.add('sel');};
+ sizesBar.appendChild(b);});
+
+// --- taskbar / start menu --------------------------------------------------
+const grid=document.getElementById('grid');
+CATALOG.forEach((a,i)=>{const d=document.createElement('div');d.className='app';
+ d.innerHTML='<div class="g">'+a.glyph+'</div><div class="n">'+a.title+'</div>';
+ d.onclick=()=>{launch(i);toggleMenu(false);};grid.appendChild(d);});
+const menu=document.getElementById('menu');
+// installed device apps (via the native AndroidApps bridge in the APK)
+let installedLoaded=false;
+function loadInstalled(){ if(installedLoaded)return; installedLoaded=true;
+ const note=document.getElementById('note');
+ if(!(window.AndroidApps&&AndroidApps.listApps)){
+  note.textContent='※ 端末のインストール済みアプリは APK 版（Androidブリッジ）で表示されます。';
+  return; }
+ let apps=[];
+ try{ apps=JSON.parse(AndroidApps.listApps()); }catch(e){ note.textContent='アプリ取得エラー: '+e; return; }
+ const box=document.getElementById('installed');
+ apps.forEach(a=>{ const d=document.createElement('div'); d.className='app';
+  d.innerHTML=(a.icon?'<img src="'+a.icon+'">':'<div class="g">&#128241;</div>')
+   +'<div class="n">'+a.label+'</div>';
+  d.onclick=()=>{ try{AndroidApps.launchApp(a.pkg);}catch(e){} toggleMenu(false); };
+  box.appendChild(d); });
+ if(apps.length){ document.getElementById('installedSec').style.display='block';
+  note.textContent='端末のインストール済みアプリ '+apps.length+' 件 — タップで起動。'; }
+}
+function toggleMenu(s){const show=(s===undefined?(menu.style.display==='none'||menu.style.display===''):s);
+ if(show)loadInstalled();
+ menu.style.display=show?'block':'none';}
+document.getElementById('start').onclick=e=>{e.stopPropagation();toggleMenu();};
+document.addEventListener('pointerdown',e=>{ if(!menu.contains(e.target)&&e.target.id!=='start') toggleMenu(false); });
+
+function clock(){const d=new Date();
+ document.getElementById('clock').textContent=
+  String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')+':'
+  +String(d.getSeconds()).padStart(2,'0');}
+setInterval(clock,1000);clock();
+
+// --- windows ---------------------------------------------------------------
+function placeAt(n,sz){
+ const x=Math.max(4,Math.min(40+(n%8)*30, desk.W-sz.w-8));
+ const y=Math.max(8,Math.min(40+(n%8)*26, desk.H-sz.h-8));
+ return {x,y,w:sz.w,h:sz.h};}
+function maximize(){return {x:0,y:0,w:desk.W,h:desk.H};}      // mirrors Bada maximize_rect
+function snap(side){const half=Math.floor(desk.W/2);
+  return side===0?{x:0,y:0,w:half,h:desk.H}:{x:half,y:0,w:desk.W-half,h:desk.H};}
+
+function iframesPointer(on){for(const w of wins)w.el.querySelector('iframe').style.pointerEvents=on?'auto':'none';}
+function raise(win){z++;win.el.style.zIndex=z;win.z=z;
+ wins.forEach(w=>{w.el.classList.toggle('active',w===win);
+  if(w.task)w.task.classList.toggle('active',w===win);});}
+function setRect(win,r){win.el.style.left=r.x+'px';win.el.style.top=r.y+'px';
+ win.el.style.width=r.w+'px';win.el.style.height=r.h+'px';}
+
+function launch(idx){
+ const a=CATALOG[idx]; const id=++idCounter;
+ const el=document.createElement('div');el.className='win';
+ el.innerHTML=
+  '<div class="tb"><span class="ti">'+a.glyph+' '+a.title+'</span>'
+  +'<span class="b min" title="最小化">&#8211;</span>'
+  +'<span class="b max" title="最大化">&#9633;</span>'
+  +'<span class="b cls" title="終了">&#10005;</span></div>'
+  +'<div class="body"><iframe src="'+a.file+'" allow="camera"></iframe></div>'
+  +'<div class="rs"></div>';
+ document.body.appendChild(el);
+ const r=placeAt(wins.length, sizeFor(launchSize));   // size from 携帯型/中/大
+ const win={id,el,app:a,z:0,rect:r,prev:null,min:false,max:false,task:null};
+ setRect(win,r); wins.push(win);
+ // taskbar task button
+ const task=document.createElement('div');task.className='task';
+ task.innerHTML='<span>'+a.glyph+'</span><span>'+a.title+'</span>';
+ task.onclick=()=>{ if(win.min){win.min=false;el.style.display='flex';} raise(win); };
+ document.getElementById('tasks').appendChild(task);win.task=task;
+ // window controls
+ el.querySelector('.cls').onclick=e=>{e.stopPropagation();close(win);};
+ el.querySelector('.min').onclick=e=>{e.stopPropagation();win.min=true;el.style.display='none';};
+ el.querySelector('.max').onclick=e=>{e.stopPropagation();toggleMax(win);};
+ el.addEventListener('pointerdown',()=>raise(win),true);
+ dragify(win); resizify(win);
+ raise(win);
+ return win;
+}
+function close(win){win.el.remove();if(win.task)win.task.remove();
+ wins=wins.filter(w=>w!==win);}
+function toggleMax(win){ if(win.max){setRect(win,win.prev);win.max=false;}
+ else{win.prev={x:win.el.offsetLeft,y:win.el.offsetTop,w:win.el.offsetWidth,h:win.el.offsetHeight};
+  setRect(win,maximize());win.max=true;} }
+
+// drag by titlebar (pointer events = mouse + touch), with edge split-snap
+function dragify(win){const tb=win.el.querySelector('.tb');let sx,sy,ox,oy,drag=false;
+ tb.addEventListener('pointerdown',e=>{ if(e.target.classList.contains('b'))return;
+  drag=true;raise(win);tb.setPointerCapture(e.pointerId);
+  sx=e.clientX;sy=e.clientY;ox=win.el.offsetLeft;oy=win.el.offsetTop;
+  iframesPointer(false); });
+ tb.addEventListener('pointermove',e=>{ if(!drag)return;
+  let nx=ox+(e.clientX-sx),ny=oy+(e.clientY-sy);
+  ny=Math.max(0,Math.min(ny,desk.H-30));
+  win.el.style.left=nx+'px';win.el.style.top=ny+'px';
+  win.el.style.outline=(e.clientX<24)?'2px solid #3fd':(e.clientX>desk.W-24)?'2px solid #3fd':''; });
+ tb.addEventListener('pointerup',e=>{ if(!drag)return;drag=false;iframesPointer(true);
+  win.el.style.outline='';win.max=false;
+  if(e.clientX<24){setRect(win,snap(0));} else if(e.clientX>desk.W-24){setRect(win,snap(1));} });}
+
+// resize from the bottom-right handle
+function resizify(win){const h=win.el.querySelector('.rs');let sx,sy,ow,oh,rz=false;
+ h.addEventListener('pointerdown',e=>{rz=true;raise(win);h.setPointerCapture(e.pointerId);
+  sx=e.clientX;sy=e.clientY;ow=win.el.offsetWidth;oh=win.el.offsetHeight;
+  iframesPointer(false);e.stopPropagation();});
+ h.addEventListener('pointermove',e=>{ if(!rz)return;
+  win.el.style.width=Math.max(200,ow+(e.clientX-sx))+'px';
+  win.el.style.height=Math.max(140,oh+(e.clientY-sy))+'px';});
+ h.addEventListener('pointerup',()=>{rz=false;iframesPointer(true);});}
+
+// open the first app so the desktop isn't empty
+launch(0);
+</script></body></html>"""

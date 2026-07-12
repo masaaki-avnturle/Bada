@@ -26,13 +26,15 @@ class Token:
 KEYWORDS = {
     "print", "say", "if", "else", "while", "repeat",
     "push", "pop", "true", "false", "nil",
+    "def", "return",
     "Omega",  # part of Omega::DATABASE
 }
 
 # Multi-character operators, longest first so the scanner is greedy.
 OPERATORS = [
+    "<->",         # comparison object  (instruction-oriented dialect: ==)
     "::",          # namespace
-    "<-", "-<", ">-", ">>", "=>",   # the five Bada manifold operators
+    "<-", "-<", "->", ">-", ">>", "=>",   # Bada manifold / directive operators
     "==", "!=", "<=", ">=",
     "+", "-", "*", "/", "%",
     "<", ">", "=",

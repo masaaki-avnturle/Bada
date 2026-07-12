@@ -5,8 +5,12 @@ Produces a small AST of tuples consumed by :mod:`bada.compiler`.
 Grammar (informal)::
 
     program    := stmt*
-    stmt       := assign | print | tuplespace | if | while | repeat | exprstmt
-    assign     := IDENT ('<-' | '=') expr
+    stmt       := def | return | assign | print | tuplespace
+                | if | while | repeat | exprstmt
+    def        := 'def' IDENT '(' [IDENT (',' IDENT)*] ')' block
+    return     := 'return' [expr]
+    assign     := lvalue ('<-' | '=') expr
+    lvalue     := IDENT ('[' expr ']')*
     print      := ('print' | 'say') expr
     tuplespace := 'Omega' '::' 'DATABASE' '[' IDENT ']' '{' tstmt* '}'
     tstmt      := 'push' '(' expr ')' | 'pop' '(' ')'
@@ -19,9 +23,11 @@ Grammar (informal)::
     compare    := add (('==' | '!=' | '<' | '>' | '<=' | '>=') add)*
     add        := mul (('+' | '-') mul)*
     mul        := unary (('*' | '/' | '%') unary)*
-    unary      := '-'? primary
-    primary    := NUMBER | STRING | IDENT | bool | nil
+    unary      := '-'? postfix
+    postfix    := atom ('[' expr ']')*
+    atom       := NUMBER | STRING | IDENT | call | bool | nil
                 | '[' (expr (',' expr)*)? ']' | '(' expr ')'
+    call       := IDENT '(' [expr (',' expr)*] ')'
 """
 
 from __future__ import annotations
@@ -34,7 +40,7 @@ class ParseError(SyntaxError):
 
 
 PIPE_OPS = {">>", "=>", ">-", "-<"}
-CMP_OPS = {"==", "!=", "<", ">", "<=", ">="}
+CMP_OPS = {"==", "!=", "<", ">", "<=", ">=", "<->"}
 
 
 class Parser:
@@ -82,6 +88,19 @@ class Parser:
             self.accept("OP", ";")
             return ("print", t.value, e)
 
+        if t.kind == "KW" and t.value == "def":
+            return self.def_stmt()
+
+        if t.kind == "KW" and t.value == "return":
+            self.eat("KW")
+            if (self.at("OP", "}") or self.at("OP", ";")
+                    or self.at("EOF")):
+                e = None
+            else:
+                e = self.expr()
+            self.accept("OP", ";")
+            return ("return", e)
+
         if t.kind == "KW" and t.value == "Omega":
             return self.tuplespace()
 
@@ -100,19 +119,55 @@ class Parser:
             body = self.block()
             return ("repeat", count, body)
 
-        # assignment: IDENT ('<-' | '=') expr   (lookahead)
+        # instruction-oriented dialect: branch (-<) and transition (->)
+        if t.kind == "OP" and t.value == "-<":
+            return self.branch_stmt()
+        if t.kind == "OP" and t.value == "->":
+            self.eat("OP", "->")
+            cond = self.expr()
+            body = self.block()
+            return ("while", cond, body)
+
+        # assignment to an lvalue (a variable or an indexed element).
+        # `<-` and `=` are assignment-only (never expression operators), so a
+        # successful lvalue followed by one of them is unambiguously assignment.
         if t.kind == "IDENT":
-            nxt = self.toks[self.pos + 1]
-            if nxt.kind == "OP" and nxt.value in ("<-", "="):
-                name = self.eat("IDENT").value
-                self.eat("OP")  # <- or =
-                e = self.expr()
+            save = self.pos
+            target = self.lvalue()
+            if self.cur.kind == "OP" and self.cur.value in ("<-", "="):
+                self.eat("OP")
+                rhs = self.expr()
                 self.accept("OP", ";")
-                return ("assign", name, e)
+                if target[0] == "var":
+                    return ("assign", target[1], rhs)
+                return ("setindex", target[1], target[2], rhs)
+            self.pos = save        # not an assignment; reparse as expression
 
         e = self.expr()
         self.accept("OP", ";")
         return ("exprstmt", e)
+
+    def def_stmt(self):
+        self.eat("KW", "def")
+        name = self.eat("IDENT").value
+        self.eat("OP", "(")
+        params = []
+        if not self.at("OP", ")"):
+            params.append(self.eat("IDENT").value)
+            while self.accept("OP", ","):
+                params.append(self.eat("IDENT").value)
+        self.eat("OP", ")")
+        body = self.block()
+        return ("def", name, params, body)
+
+    def lvalue(self):
+        node = ("var", self.eat("IDENT").value)
+        while self.at("OP", "["):
+            self.eat("OP", "[")
+            idx = self.expr()
+            self.eat("OP", "]")
+            node = ("index", node, idx)
+        return node
 
     def tuplespace(self):
         self.eat("KW", "Omega")
@@ -153,6 +208,17 @@ class Parser:
             else_block = self.block()
         return ("if", cond, then_block, else_block)
 
+    def branch_stmt(self):
+        # -< cond { ... }  [ >- { ... } ]    (branch object / merge object)
+        self.eat("OP", "-<")
+        cond = self.expr()
+        then_block = self.block()
+        else_block = None
+        if self.at("OP", ">-"):
+            self.eat("OP", ">-")
+            else_block = self.block()
+        return ("if", cond, then_block, else_block)
+
     def block(self):
         self.eat("OP", "{")
         stmts = []
@@ -168,6 +234,11 @@ class Parser:
     def pipe(self):
         node = self.compare()
         while self.cur.kind == "OP" and self.cur.value in PIPE_OPS:
+            # `-<` and `>-` double as the branch/merge directive objects.
+            # A pipe operator that begins a new line is a statement directive,
+            # not an expression continuation, so stop here.
+            if self.cur.line != self.toks[self.pos - 1].line:
+                break
             op = self.eat("OP").value
             rhs = self.compare()
             node = ("bin", op, node, rhs)
@@ -177,6 +248,8 @@ class Parser:
         node = self.add()
         while self.cur.kind == "OP" and self.cur.value in CMP_OPS:
             op = self.eat("OP").value
+            if op == "<->":          # comparison object == equality
+                op = "=="
             rhs = self.add()
             node = ("bin", op, node, rhs)
         return node
@@ -201,9 +274,18 @@ class Parser:
         if self.at("OP", "-"):
             self.eat("OP")
             return ("neg", self.unary())
-        return self.primary()
+        return self.postfix()
 
-    def primary(self):
+    def postfix(self):
+        node = self.atom()
+        while self.at("OP", "["):
+            self.eat("OP", "[")
+            idx = self.expr()
+            self.eat("OP", "]")
+            node = ("index", node, idx)
+        return node
+
+    def atom(self):
         t = self.cur
         if t.kind == "NUMBER":
             self.eat("NUMBER")
@@ -219,8 +301,17 @@ class Parser:
             self.eat("KW")
             return ("nil",)
         if t.kind == "IDENT":
-            self.eat("IDENT")
-            return ("var", t.value)
+            name = self.eat("IDENT").value
+            if self.at("OP", "("):          # function call
+                self.eat("OP", "(")
+                args = []
+                if not self.at("OP", ")"):
+                    args.append(self.expr())
+                    while self.accept("OP", ","):
+                        args.append(self.expr())
+                self.eat("OP", ")")
+                return ("call", name, args)
+            return ("var", name)
         if self.at("OP", "["):
             self.eat("OP", "[")
             elems = []

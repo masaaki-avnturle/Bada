@@ -1,0 +1,34 @@
+// quantum_crypto_jones.bada
+// The Jones-polynomial quantum cryptography application, computed natively in
+// the Bada language (the maths runs on the Bada VM via the Bada libraries).
+
+#include lib/jones.bada
+
+say "=== Jones-polynomial quantum cryptography (in Bada) ==="
+
+// the secret braid concealed in the quantum digital signature:
+//   trefoil = sigma_1^3
+braid <- [1, 1, 1]
+n <- nstrands(braid)
+
+// cryptanalysis decoded the signature -> the braid is recovered.
+say "signature cryptanalysed -- secret braid recovered"
+print braid
+
+// compute the Jones polynomial V(t) entirely in Bada
+v <- jones_show(braid, n)
+say "Jones polynomial V(t):"
+say v
+
+// the topological invariant becomes the quantum-cipher key seed,
+// recorded in the Akashic TupleSpace
+x <- normalized(braid, n)
+key_seed <- lt_get(x, -4) + 7 * lt_get(x, -12) + 13 * lt_get(x, -16)
+Omega::DATABASE[jones] {
+  push(braid -< key_seed)
+  push(v)
+  push("jones-quantum-cryptography-activated")
+}
+
+print key_seed
+say "Jones polynomial quantum cryptography ACTIVATED"

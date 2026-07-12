@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# access-signature SERVER-SIDE pre-receive hook (authoritative enforcement).
+#
+# Place this as `hooks/pre-receive` on a self-hosted git server (GitHub
+# Enterprise, Gitea, gitolite, bare mirror, ...). github.com does NOT run
+# custom server hooks, so for github.com use the GitHub Action in
+# ../workflows/access-signature.yml instead.
+#
+# It rejects a push unless the pusher provides a valid digital-signature token
+# in the latest commit's `Access-Signature:` trailer:
+#   Access-Signature: <actor>|<repo>|<password>|<expires>|<signature>
+set -euo pipefail
+
+REPO="${GIT_REPO_NAME:-$(basename -s .git "$(pwd)")}"
+PUBKEY="$(cat "${ACCESS_SIGNATURE_PUBKEY_FILE:-owner_pubkey.txt}" 2>/dev/null || true)"
+
+while read -r oldrev newrev refname; do
+  [ "$newrev" = "0000000000000000000000000000000000000000" ] && continue
+  TRAILER="$(git log -1 --format=%B "$newrev" | grep -m1 '^Access-Signature:' | cut -d' ' -f2-)"
+  IFS='|' read -r ACTOR R PW EXP SIG <<< "$TRAILER"
+  if [ -z "${SIG:-}" ] || ! python3 -m access_signature.cli verify-token \
+        --actor "$ACTOR" --repo "$REPO" --password "$PW" \
+        --signature "$SIG" --expires "$EXP" --pubkey "$PUBKEY" >/dev/null 2>&1; then
+    echo "access-signature: rejected — no valid digital-signature token for $REPO" >&2
+    exit 1
+  fi
+done
+exit 0

@@ -1,0 +1,71 @@
+// moonshine.bada — the odd-zeta "unknown a-priori engine", in Bada.
+//
+// EXPLORATORY / HEURISTIC: closed forms for zeta(odd) are an open problem.
+// This engine analogises a *general form* p/q for the odd zetas where the
+// DENOMINATOR q is drawn from Monster numbers (the 15 supersingular primes
+// dividing the Monster group order, plus the moonshine numbers 24 and 196884),
+// and reports the NUMERATOR p taking-rule it finds.  Euler's constant gamma is
+// tied to the zetas (including zeta(3)) through an alternating zeta series,
+// anchoring the search.
+
+#include zeta.bada
+
+// Monster numbers: supersingular primes + moonshine 24, 196884
+def monster_numbers() {
+  return [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 41, 47, 59, 71, 24, 196884]
+}
+
+// distance of x from the nearest integer
+def frac_dist(x) {
+  return fabs(x - fround(x))
+}
+
+// best Monster denominator q = q0*m (m = 1..maxmult) for value zval;
+// returns [p, q, approx_error]  with p = round(zval*q)
+def best_monster_denom(zval, maxmult) {
+  cands <- monster_numbers()
+  bestq <- 1
+  bestp <- fround(zval)
+  beste <- frac_dist(zval)
+  ci <- 0
+  -> ci < len(cands) {
+    m <- 1
+    -> m <= maxmult {
+      q <- cands[ci] * m
+      e <- frac_dist(zval * q) / q
+      -< e < beste {
+        beste <- e
+        bestq <- q
+        bestp <- fround(zval * q)
+      }
+      m <- m + 1
+    }
+    ci <- ci + 1
+  }
+  return [bestp, bestq, beste]
+}
+
+// Euler's constant via the alternating zeta series
+//   gamma = sum_{k>=2} (-1)^k zeta(k)/k     (ties gamma <-> zeta, incl zeta(3))
+def gamma_via_zeta(K, N) {
+  g <- 0.0
+  sign <- 1
+  k <- 2
+  -> k <= K {
+    g <- g + sign * zeta(k, N) / k
+    sign <- 0 - sign
+    k <- k + 1
+  }
+  return g
+}
+
+// numerator taking-rule analogy: [p, q, err] for s = 3,5,7,9
+def numerator_seq(N, maxmult) {
+  out <- []
+  s <- 3
+  -> s <= 9 {
+    append(out, best_monster_denom(zeta(s, N), maxmult))
+    s <- s + 2
+  }
+  return out
+}

@@ -30,7 +30,11 @@ Pure **Python 3 (stdlib only)** + Bada programs running on the Bada VM
 | `cloud/` | **Settings panel** synced to a **CloudStore** through a **Bridge + Repeater**, and `adapt_to_hardware` to fit the design to the device (dpi→font, size→layout, touch→hit-target). |
 | `ultranet/` | the **ultranetwork**: TupleSpace + arrow-syntax eval (on the Bada VM), neural **XOR learning**, **gravity-port** gates, **bridge/repeater** propagation. |
 | `android/` | **Android 12** installer — verify manifest (targetSdk 31), resolve runtime permissions, install, launch as a window. |
-| `terminal/` | a **terminal** that bundles **bash** (20+ builtins, pipes, redirection), **vim** (the modal BadaVim) and **emacs** (C-x C-s / C-k / C-y …) over one in-memory **VFS** — files made with bash are edited by either editor and run with `bada`. |
+| `terminal/` | a **terminal** that bundles **bash** (20+ builtins, pipes, redirection), **vim** (the modal BadaVim) and **emacs** (C-x C-s / C-k / C-y …) over one in-memory **VFS** — files made with bash are edited by either editor and run with `bada`. Also exposes the `qcrypto` command. |
+| `qcrypto/` | **quantum-crypto app** wrapping the repo's `jones_quantum_crypto` engine: cryptanalysing a quantum (Ed25519) digital signature recovers a secret braid and **activates Jones-polynomial quantum cryptography**. A desktop window + the terminal `qcrypto` command + `apps/quantum_crypto.bada` on the VM. |
+| `apps/lib/` | the **Jones polynomial implemented in the Bada language itself** — `laurent.bada` (Laurent-polynomial algebra) + `jones.bada` (Kauffman-bracket state sum, union-find, writhe normalisation). `apps/quantum_crypto_jones.bada` computes `V(t)` on the Bada VM; cross-checked against the Python reference (trefoil → `t+t³−t⁴`, figure-eight, Hopf, …). |
+| `winport/` + `apps/winport/` | **WinPort — Windows → Quantum via the Reviser**: **Rails** source generated in **Bada** (`rails.bada`), **Win10→Win11** and **Windows→quantum** rewriting with the Reviser, a **symlink/hardlink hardware control panel**, **Shor-9-protected** porting of Windows features to the quantum computer, and a **VM bridge + repeater**. Desktop window + terminal `winport` command. |
+| `al/` + `apps/al/` | **AL — Laevatein AI / machine OS** (Full-Metal-Panic-themed simulation), with **all libraries written in Bada**: a **quantum algorithm** (Grover, `qsim.bada`), Lambda Driver **cooling** control (`cooling.bada`), **self-evolving neural consciousness** (`neuro.bada`), the **a-priori code engine** (`apriori.bada`), **robot FPGA** control (`fpga.bada`), and the **pilot resonance link** — EEG **gamma** extraction (`eeg.bada`), **fMRI/topography** (`fmri_topo.bada`), a **resonance device** (`resonance.bada`), **haloperidol biofeedback** (`biofeedback.bada`) and the **Lambda Driver** projecting an **AT field + anti-gravity** from the pilot's gamma waves (`lambda_drive.bada`). Desktop window + terminal `al` command. |
 | `render/` | renders the whole desktop to one HTML page (the "HTML-template OS frame"). |
 | `apps/` | Bada applications (`ultranetwork.bada`). |
 
@@ -50,8 +54,31 @@ python3 cli.py term              # terminal demo: bash + vim + emacs + bada
 python3 cli.py term -i           # interactive terminal — type into vim/emacs
 python3 cli.py term -i --line    # interactive, line-input editors (no curses)
 python3 cli.py run apps/ultranetwork.bada   # run a Bada app through the kernel
+python3 cli.py run apps/quantum_crypto.bada # the quantum-crypto flow in Bada
 
-make test                        # 36 tests
+make test                        # 42 tests
+```
+
+### Quantum crypto app (Jones-polynomial quantum cryptography)
+Cryptanalysing the quantum digital signature activates the Jones cipher. From
+the terminal:
+```
+bada@webos:~$ qcrypto                 # break the signature -> activate
+quantum signature: VALID
+cryptanalysis: broke key 0042 in 43 tries
+recovered braid: [1, 1, 1]
+Jones V(t) = +1*t^1 +1*t^3 -1*t^4
+Jones-polynomial quantum cryptography ACTIVATED
+bada@webos:~$ qcrypto jones 1 1 1     # Jones polynomial (reference engine)
+bada@webos:~$ qcrypto badajones 1 1 1 # Jones polynomial computed IN BADA
+V(t) = +1*t^1 +1*t^3 -1*t^4  (computed in Bada)
+```
+The full engine lives in `../jones_quantum_crypto/` (also a standalone CLI).
+The **Jones polynomial is also implemented natively in Bada** under
+`apps/lib/` and run on the VM:
+```bash
+python3 -c "import sys; sys.path.insert(0,'../bada_silent_vim'); \
+  from bada import run_program; run_program('apps/quantum_crypto_jones.bada')"
 ```
 
 ### Terminal — bash · vim · emacs in one place

@@ -36,6 +36,119 @@ machine. The five manifold operators from the report carry runtime meaning:
 Plus `Omega::DATABASE[space] { push(x) pop() }` (the Akashic store),
 `print`/`say`, `if/else`, `while`, `repeat`, arrays and arithmetic.
 
+**Functions, arrays & libraries.** Bada is now expressive enough to write real
+libraries in Bada itself:
+
+```
+def fib(n) {                 // functions + recursion
+  if n < 2 { return n }
+  return fib(n - 1) + fib(n - 2)
+}
+xs <- [10, 20, 30]           // arrays: index read/write, len, append
+xs[1] <- 99
+append(xs, fib(10))          // -> [10, 99, 30, 55]
+```
+
+Builtins: `len`, `append`, `idiv`, `imod`, `abs`, `pow2`, `str`. Source files
+compose via `#include path` directives (`bada.load_program` / `run_program`).
+A full worked example is the **Jones polynomial implemented in Bada** at
+`../bada_webos/apps/lib/{laurent,jones}.bada` (Laurent-polynomial algebra +
+the Kauffman-bracket state sum), verified against a reference implementation.
+
+**Instruction-oriented ("directive object") dialect.** Control flow can be
+written as directive objects instead of keywords:
+
+| directive object | meaning | classic |
+|:--|:--|:--|
+| `<-` | assignment object | `=` |
+| `<->` | comparison object | `==` |
+| `-<` | branch object | `if` |
+| `>-` | merge object | `else` |
+| `->` | transition object | `while` |
+
+```
+-< x * y <-> 42 {          // if x*y == 42
+  say "branch-merge works"
+} >- {                     // else
+  say "no"
+}
+-> n > 0 { n <- n - 1 }    // while n > 0
+```
+(`-<` / `>-` keep their expression meanings — manifold spawn / emit — within a
+line; a pipe operator that *begins a line* is a directive.) Both dialects run.
+
+**The reviser** rewrites classic Bada into this dialect, preserving comments,
+strings and layout, and provably semantics-preserving (same bytecode):
+```bash
+python3 -m bada.reviser FILE.bada            # print revised
+python3 -m bada.reviser --write FILE.bada    # rewrite in place
+python3 -m bada.reviser --check FILE.bada    # verify equivalence
+```
+All of `../bada_webos/apps/**/*.bada` are written in this dialect via the
+reviser.
+
+**Editor tooling — grammar check, completion, parsers.** The `bada` package and
+the `badatools` package provide IDE-style tooling:
+
+* **grammar checker** — `bada.lint(src)` returns `Diagnostic(line, col, ...)`;
+  `bada.is_valid(src)`. (Terminal: `check FILE.bada`.)
+* **reserved words** — `bada.RESERVED`, `bada.BUILTIN_FUNCS`, `bada.DIRECTIVES`,
+  `is_reserved/is_builtin`.
+* **word + functional-word completion** — `bada.Completer`:
+  `complete_functional(prefix)` (機能語: keywords+builtins) and
+  `complete_words(src, prefix)` (buffer symbols: def/var names). The vim and
+  emacs editors gain `.lint()` and `.complete()`.
+* **Emacs and vim parsers** — `badatools.VimParser` / `EmacsParser` turn modal
+  keystrokes / chords into one normalized command stream.
+* **silent-talk + keyboard parser** — `badatools.UnifiedInputParser` parses
+  *either* silent-talk visemes *or* keyboard keys into the same commands, and
+  recognises **passphrases (合言葉)** via `badatools.PassphraseParser`
+  (e.g. silently spelling `AI UO` → `UNLOCK`, `OA OA` → `RUN-SECRET`).
+
+```python
+from badatools import UnifiedInputParser
+u = UnifiedInputParser()
+u.from_silent_words(["AI", "EA", "UO", "OA"])  # -> insert, "say ", normal, run
+u.from_keyboard(["i", "ESC", "!"], "vim")        # same command shape
+```
+
+**Editor config files.** `.vimrc` and `.emacs` add Bada support to Vim and
+Emacs: `*.bada` filetype, syntax highlighting for keywords/builtins/directive
+operators, `//` comments, keyword + buffer completion, and a grammar-check /
+run command (backed by `python3 -m bada.lint`).
+```bash
+export BADA_HOME=/path/to/Bada/bada_silent_vim   # point editors at the toolchain
+ln -s "$BADA_HOME/.vimrc" ~/.vimrc               # (or :source it)
+ln -s "$BADA_HOME/.emacs" ~/.emacs
+```
+Vim: `:BadaCheck` (grammar check → quickfix), `:BadaRun`, `<C-x><C-u>` complete.
+Emacs: `C-c C-c` (`bada-check`), `C-c C-r` (`bada-run`),
+`completion-at-point`.
+
+**Self-hosting (Bada built in Bada) + C backend.** Starting from the Reviser,
+the rewrite logic and the language's word lists are themselves written in Bada
+(`bootstrap/reviser.bada`, `bootstrap/lang.bada`, `bootstrap/commands.bada`):
+
+```python
+import bootstrap
+bootstrap.bada_revise_tokens(["if", "a", "==", "b"])  # -> ['-<','a','<->','b']
+bootstrap.command_manifest()  # the method-command list, produced BY Bada
+```
+The Bada reviser reproduces the Python reviser's mapping exactly.
+
+The **C backend** turns every reserved word / builtin / operator into a real
+executable — the command manifest comes *from Bada*, and `cbackend` emits one
+`cmd_<name>.c` per command plus a runtime and a Makefile:
+
+```bash
+python3 -m cbackend.gen --out generated/cbackend --build
+generated/cbackend/bin/idiv 17 5     # -> 3
+generated/cbackend/bin/mul 6 7       # -> 42
+generated/cbackend/bin/eq 5 5        # -> true
+generated/cbackend/bin/if            # -> branch object: -<
+```
+All 29 commands compile to ELF executables and are exercised in the tests.
+
 ### 2. Silent-talk recognition from images (`silenttalk/`)
 Each frame is a grayscale PGM where the mouth is a dark ellipse.
 `lipfeatures` recovers mouth **aperture** and **spread** and classifies a
