@@ -227,6 +227,44 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
 ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
 
+## 量子もつれ・汎用電信通信機 — `Bada::Quantum`（宇宙 Space Telegraph）
+
+`caostics` / `quantum_computer` / `badasource1` の3レポートから、**量子もつれの
+ベルの実験**を土台に、**宇宙での汎用電信通信機能**を1つのアプリにまとめたものです。
+ご依頼の7要素を、動くコードとして接続しています。
+
+```bash
+bin/bada quantum "HELLO SPACE"                 # 証明 + 送信の一括レポート
+bin/bada quantum "SOS" --material GaAs --temp 4 --redundancy 5
+ruby -Ilib examples/quantum_telegraph_demo.rb  # デモ（証明・送信・5次求解）
+```
+
+```ruby
+require "bada"
+
+tg = Bada::Quantum::SpaceTelegraph.new(material: "GaAs", temp_k: 4.0, redundancy: 3)
+puts tg.render("QUANTUM HELLO")   # ①〜⑦ を1画面で
+tg.prove[:qed]                    # 物理の証明（全証明書が真なら true）
+tg.transmit("SOS")[:recovered]    # 超密度符号化で実際にメッセージを送受信
+```
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| もつれ**ペアー** / ベルの実験 | `Bada::Quantum::Qubit2`（2量子ビット状態ベクトル・Bell 状態） |
+| **不気味な遠隔作用** | `Bada::Quantum::Bell` — CHSH 不等式の量子違反（Tsirelson `2√2`）を確率・統計で実証 |
+| **5次方程式の解の公式** | `Bada::Quantum::Quintic` — Durand–Kerner 数値解 + 1の5乗根（周期 `2π/5`） |
+| 方程式の**周期に合わせた非線形**カリア | `Quintic.carrier_phase` — もつれ相関で位相を非線形に歪める五値搬送波 |
+| **Jones多項式の相関** | `Bada::Quantum::Jones` — Kauffman ブラケット状態和（Hopf 絡み目 ↔ もつれ） |
+| **確率・統計 / 不確定性理論** | `Bada::Quantum::Uncertainty` — Robertson `Δσx·Δσz ≥ |⟨σy⟩|` + Born 統計 |
+| **半導体で使える原理** | `Bada::Quantum::Semiconductor` — Fermi–Dirac / バンドギャップ / トンネル確率 |
+| **証明する機能** | `SpaceTelegraph#prove` — 上記すべてを証明書化し `QED` を判定 |
+| **宇宙・汎用電信通信** | `Bada::Quantum::Channel` — 超密度符号化・反復符号・複素回転誤り訂正で本文送受信 |
+
+> 物理的誠実性：もつれは**超光速通信を許しません**。本機は no-signaling 定理
+> （Bob の周辺分布が Alice の操作に依存しない）を証明書に含み、もつれを *assist*
+> とする正当な古典チャネル（1ペアあたり2ビットの超密度符号化）として通信します。
+> 送受信ログは `Ω::DATABASE`（アカシック TupleSpace）に多様体不変量 `Ξ` 付きで記録。
+
 ## モジュール構成
 
 ```
@@ -251,6 +289,14 @@ lib/bada/penrose/evaluator.rb 図式の自動計算（縮約・積分・(反)対
 lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
 lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
 lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
+lib/bada/quantum/qubit.rb        2量子ビット状態ベクトル・Bell 状態・ゲート
+lib/bada/quantum/bell.rb         CHSH 不等式・Tsirelson・不気味な遠隔作用の証明
+lib/bada/quantum/quintic.rb      5次方程式 Durand–Kerner 解 + 周期非線形カリア
+lib/bada/quantum/jones.rb        Kauffman ブラケット → Jones 多項式相関
+lib/bada/quantum/uncertainty.rb  Robertson 不確定性 + Born 確率統計
+lib/bada/quantum/semiconductor.rb Fermi–Dirac / バンドギャップ / トンネル
+lib/bada/quantum/channel.rb      超密度符号化・反復符号・誤り訂正の通信路
+lib/bada/quantum/telegraph.rb    SpaceTelegraph（証明+送信の Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）
