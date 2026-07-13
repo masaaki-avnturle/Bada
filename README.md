@@ -36,6 +36,30 @@
 | **`main/`** | Bada v3 ソースコード · BadaOS · TupleSpace全体インデックス · 4000+ LOC | [→ 開く](https://masaaki-avnturle.github.io/Bada/) |
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
+| **`bada_ruby/`** | Bada 言語（Ruby 再構築）· OmegaChat · **量子もつれ汎用電信通信 `Bada::Quantum`** | [→ 開く](bada_ruby/) |
+| **`apps/`** | 量子もつれ電信通信機の **Android APK ＋ Windows EXE** 配布アプリ | [→ 開く](apps/) |
+
+---
+
+## 📲 ダウンロード — Android APK ＋ Windows EXE
+
+`bada_ruby` の量子もつれ・汎用電信通信機（Space Telegraph）を、**Android の APK** と
+**Windows の EXE** としてダウンロードできます。物理エンジンは共有の純 Java コアに
+移植してあり、両プラットフォームで同一コードが動きます（`apps/` 参照）。
+
+| 配布物 | 内容 |
+|:--|:--|
+| `BadaTelegraph.apk` | Android アプリ（提供元不明のアプリを許可してインストール） |
+| `BadaTelegraph-windows-x64.zip` | 展開して `BadaTelegraph.exe` を実行（ポータブル） |
+| `BadaTelegraph-1.0.exe` | Windows インストーラ（スタートメニュー登録） |
+
+**入手方法**：タグを push すると GitHub Actions がビルドし、**Releases** に自動添付します。
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0     # -> Releases に APK / EXE が並ぶ
+```
+
+手動ビルドや詳細は [`apps/README.md`](apps/README.md) を参照。
 
 ---
 
