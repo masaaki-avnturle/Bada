@@ -227,6 +227,46 @@ Bada::OmegaChat.new.penrose("i-[A]-[B]-j",
 論文・解答は、結果を**ガンマ関数の大域的部分積分多様体**の不変量と**サーストン・
 ペレルマン多様体**配置、**ミレニアム7問**への分解で意味づけします（既存の理論層と接続）。
 
+### パレット＋ダイアログで組み立てるアプリ（清書方程式＋計算方程式）
+
+`Bada::Penrose::Builder` は、**パレットから絵記号の部品を選び**、**ダイアログで
+組み合わせる**と、**清書した方程式（LaTeX + Unicode 表示形）**と、**組み合わせに
+よる計算した方程式（アインシュタイン縮約の数値解）**の両方を生成する対話型アプリです。
+
+```bash
+bin/bada studio            # 対話ダイアログ（パレット→部品選択→組み合わせ→清書＋計算）
+bin/bada html app.html     # 同じものをクリック操作のブラウザGUIとして書き出し
+```
+
+対話ダイアログの例（`bin/bada studio`）:
+
+```
+penrose> place A 2 [[1,2],[3,4]]      # テンソル箱 A を配置（成分つき）
+penrose> place B 2 [[5,6],[7,8]]      # テンソル箱 B を配置
+penrose> wire A.1 B.0                  # A の脚1 と B の脚0 を縮約（つなぐ）
+penrose> free A.0 i                    # 自由添字 i
+penrose> free B.1 j                    # 自由添字 j
+penrose> combine
+  清書した方程式:  R_{ij} = Σ_{k₁} A_{ik₁} B_{k₁j}
+  計算した方程式:  R[i j] = [[19.0, 22.0], [43.0, 50.0]]
+```
+
+プログラムからも同じ：
+
+```ruby
+b = Bada::Penrose::Builder.new
+b.place("A", legs: 2, value: [[1,2],[3,4]])
+b.place("B", legs: 2, value: [[5,6],[7,8]])
+b.wire("A.1", "B.0"); b.free("A.0", "i"); b.free("B.1", "j")
+r = b.combine
+r[:latex]   # => "R_{ij} \\;=\\; \\sum_{k_{1}} A_{ik_{1}} \\, B_{k_{1}j}"  （清書）
+r[:result]  # => [[19.0, 22.0], [43.0, 50.0]]                              （計算）
+```
+
+`bin/bada html` で書き出す HTML は外部依存ゼロ（オフライン動作・CSP 安全）。左に
+ペンローズ絵記号のパレット、中央にダイアログボックスとキャンバス、右に清書方程式と
+計算方程式が並び、純 JavaScript の einsum エンジンがブラウザ内で縮約を計算します。
+
 ## モジュール構成
 
 ```
@@ -248,8 +288,11 @@ lib/bada/penrose/palette.rb  ペンローズ絵記号パレット
 lib/bada/penrose/diagram.rb  図式モデル + DSL ビルダー
 lib/bada/penrose/canvas.rb   絵記号パーサ（描画→図式）+ レンダラ
 lib/bada/penrose/evaluator.rb 図式の自動計算（縮約・積分・(反)対称化・微分）
+lib/bada/penrose/latex.rb    清書方程式フォーマッタ（LaTeX 総和形 + Unicode 表示）
+lib/bada/penrose/builder.rb  パレット＋ダイアログ対話アプリ（部品選択→組み合わせ）
 lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
 lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
+lib/bada/penrose/webapp.rb   ブラウザGUI書き出し（パレット＋ダイアログの自己完結HTML）
 lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
