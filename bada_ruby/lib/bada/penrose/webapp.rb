@@ -4,19 +4,22 @@ require_relative "palette"
 
 module Bada
   module Penrose
-    # WebApp — emit a single self-contained HTML file that is the visual version
-    # of the Penrose 絵記号 studio: a clickable PALETTE of picture-symbols, a
-    # DIALOG BOX to configure each part, a canvas listing the combined parts,
-    # and a live-generated 清書した方程式 (typeset) plus the 計算した方程式
-    # (Einstein summation, computed in the browser).
+    # WebApp — a single self-contained HTML file that is the *visual* Penrose
+    # 絵記号 studio:
     #
-    # The einsum kernel is reimplemented compactly in JavaScript so the page has
-    # no external dependencies (works offline; matches Bada::Penrose::Einsum).
+    #   * a clickable PALETTE of Penrose picture-symbols (rendered as SVG),
+    #   * a real DRAWING CANVAS where selecting a symbol places its glyph; you
+    #     drag the glyphs, click their legs to wire (contract) them or mark a
+    #     free index, and wrap them with ∇/∂/∫ and (anti)symmetriser decorators,
+    #   * live generation of the 清書した方程式 (typeset) and the 計算した方程式
+    #     (Einstein summation, computed in the browser).
+    #
+    # The einsum kernel mirrors Bada::Penrose::Einsum so a drawn diagram computes
+    # with no external dependencies (works offline).
     module WebApp
       module_function
 
       def render
-        palette_json = palette_data
         <<~HTML
           <!DOCTYPE html>
           <html lang="ja">
@@ -29,26 +32,29 @@ module Bada
           <body>
           <header>
             <h1>ロジャー・ペンローズ 絵記号スタジオ</h1>
-            <p>パレットで絵記号を選び、ダイアログで組み合わせると、清書した方程式と計算した方程式が生成されます。<span class="tag">Bada / Penrose</span></p>
+            <p>パレットの絵記号を選ぶとキャンバスに描かれます。脚どうしをクリックで結線（縮約）して組み合わせると、清書した方程式と計算した方程式が生成されます。<span class="tag">Bada / Penrose</span></p>
           </header>
 
           <main>
             <section class="pane palette">
-              <h2>パレット（絵記号の部品）</h2>
+              <h2>パレット（絵記号を選ぶ）</h2>
               <div id="palette"></div>
             </section>
 
-            <section class="pane dialog">
-              <h2>ダイアログボックス（部品を選んで組み合わせ）</h2>
-              <div id="dialog"></div>
-
-              <h3>キャンバス（配置した部品）</h3>
-              <ul id="parts"></ul>
-              <div class="row">
-                <button id="combine" class="primary">組み合わせて方程式を生成</button>
-                <button id="reset">リセット</button>
-                <button id="sample">行列積の例</button>
+            <section class="pane stage">
+              <h2>キャンバス（絵記号を描く・組み合わせる）</h2>
+              <div id="toolbar">
+                <span id="hint" class="hint">パレットの記号をクリックして配置 → 脚(●)を2つクリックで結線</span>
               </div>
+              <svg id="canvas" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
+              <div class="row">
+                <button id="btnFree">選択した脚を自由添字に</button>
+                <button id="btnDelete">選択ノードを削除</button>
+                <button id="btnClearSel">選択解除</button>
+                <button id="sample">行列積の例</button>
+                <button id="reset">リセット</button>
+              </div>
+              <div id="props"></div>
             </section>
 
             <section class="pane output">
@@ -63,7 +69,7 @@ module Bada
           <footer>© Bada — Penrose graphical-notation studio · 純JS Einstein-summation engine</footer>
 
           <script>
-          const PALETTE = #{palette_json};
+          const PALETTE = #{palette_data};
           #{js}
           </script>
           </body>
@@ -82,7 +88,7 @@ module Bada
         require "json"
         data = Palette.glyphs.map do |key, g|
           { key: key.to_s, name: g[:name], token: g[:token], math: g[:math],
-            svg: g[:svg], glyph: g[:glyph].join("\n"), meaning: g[:meaning] }
+            svg: g[:svg], meaning: g[:meaning] }
         end
         JSON.generate(data)
       end
@@ -90,307 +96,363 @@ module Bada
       # ---- assets ------------------------------------------------------
       def css
         <<~CSS
-          :root{--bg:#0b0e14;--panel:#141a24;--edge:#26303f;--ink:#e6ecf3;--dim:#8b9bb0;--gold:#c8a44a;--blue:#4a80d0;--cyan:#40b8c0}
+          :root{--bg:#0b0e14;--panel:#141a24;--edge:#26303f;--ink:#e6ecf3;--dim:#8b9bb0;--gold:#c8a44a;--blue:#4a80d0;--cyan:#40b8c0;--red:#c05a5a}
           *{box-sizing:border-box}
           body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}
-          header{padding:20px 24px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#101622,#0b0e14)}
+          header{padding:18px 22px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#101622,#0b0e14)}
           header h1{margin:0 0 6px;font-size:20px;color:var(--gold)}
-          header p{margin:0;color:#9fb0c3;font-size:13px}
-          .tag{margin-left:10px;padding:2px 8px;border:1px solid var(--edge);border-radius:10px;color:var(--cyan);font-size:11px}
-          main{display:grid;grid-template-columns:280px 1fr 1fr;gap:14px;padding:16px;align-items:start}
-          @media(max-width:1000px){main{grid-template-columns:1fr}}
+          header p{margin:0;color:#9fb0c3;font-size:13px;max-width:1000px}
+          .tag{margin-left:10px;padding:2px 8px;border:1px solid var(--edge);border-radius:10px;color:var(--cyan);font-size:11px;white-space:nowrap}
+          main{display:grid;grid-template-columns:250px 1fr 340px;gap:14px;padding:16px;align-items:start}
+          @media(max-width:1100px){main{grid-template-columns:1fr}}
           .pane{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:14px}
           .pane h2{margin:0 0 10px;font-size:14px;color:var(--cyan);letter-spacing:.03em}
-          .pane h3{margin:14px 0 6px;font-size:12px;color:#9fb0c3}
-          #palette{display:flex;flex-direction:column;gap:6px}
-          .sym{display:flex;align-items:center;gap:10px;padding:7px 10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
+          #palette{display:flex;flex-direction:column;gap:5px;max-height:78vh;overflow-y:auto}
+          .sym{display:flex;align-items:center;gap:9px;padding:6px 9px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
           .sym:hover{border-color:var(--gold);transform:translateX(2px)}
-          .sym .gl{flex:0 0 46px;height:46px;display:flex;align-items:center;justify-content:center}
-          .sym .gl svg{width:46px;height:46px}
-          .sym .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
-          .sym .nm{font-size:12px;line-height:1.25}
+          .sym.active{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset}
+          .sym .gl{flex:0 0 40px;height:40px}
+          .sym .gl svg{width:40px;height:40px}
+          .sym .txt{display:flex;flex-direction:column;gap:1px;min-width:0}
+          .sym .nm{font-size:12px;line-height:1.2}
           .sym .mt{font-size:11px;color:var(--gold);font-family:"SFMono-Regular",Consolas,monospace}
-          .preview{display:flex;gap:12px;align-items:center;padding:10px;margin-bottom:10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px}
-          .preview .pv-glyph{flex:0 0 80px;height:80px}
-          .preview .pv-glyph svg{width:80px;height:80px}
-          .preview .pv-txt{font-size:12px}
-          .preview .mt{color:var(--gold);font-family:"SFMono-Regular",Consolas,monospace}
-          .dfield{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
-          .dfield label{font-size:11px;color:#9fb0c3}
-          input,select{background:#0f1420;border:1px solid var(--edge);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:13px}
+          #toolbar{margin-bottom:8px;min-height:20px}
+          .hint{font-size:12px;color:#9fb0c3}
+          #canvas{width:100%;height:auto;aspect-ratio:900/560;background:
+            radial-gradient(circle at 1px 1px,#1c2735 1px,transparent 0) 0 0/26px 26px,#0d121b;
+            border:1px solid var(--edge);border-radius:8px;touch-action:none}
           .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-          button{background:#182234;border:1px solid var(--edge);color:var(--ink);border-radius:7px;padding:8px 12px;font-size:13px;cursor:pointer}
+          button{background:#182234;border:1px solid var(--edge);color:var(--ink);border-radius:7px;padding:7px 11px;font-size:12px;cursor:pointer}
           button:hover{border-color:var(--blue)}
           button.primary{background:var(--gold);color:#0b0e14;border-color:var(--gold);font-weight:600}
-          #parts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:20px}
-          #parts li{font-size:12px;padding:5px 8px;background:#0f1420;border:1px solid var(--edge);border-radius:6px;display:flex;justify-content:space-between}
-          #parts li .x{color:#c05a5a;cursor:pointer;padding:0 4px}
-          .equation{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:16px;font-size:18px;min-height:26px;overflow-x:auto;font-family:"Times New Roman",Georgia,serif}
-          .equation .op{color:var(--cyan)}
-          .equation sub{font-size:.7em;color:var(--gold)}
-          .equation .sum{color:var(--blue);font-weight:600}
+          #props{margin-top:10px}
+          #props .card{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:10px}
+          #props .grid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:12px}
+          #props label{color:#9fb0c3}
+          input{background:#0f1420;border:1px solid var(--edge);color:var(--ink);border-radius:6px;padding:5px 7px;font-size:12px;width:100%}
+          .equation{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:15px;font-size:18px;min-height:26px;overflow-x:auto;font-family:"Times New Roman",Georgia,serif}
+          .equation .op{color:var(--cyan)} .equation sub{font-size:.7em;color:var(--gold)} .equation .sum{color:var(--blue);font-weight:600}
           .notes{margin-top:10px;font-size:12px;color:#c8a44a}
-          .hint{font-size:11px;color:#8391a6;margin:6px 0 0}
-          footer{padding:14px 24px;border-top:1px solid var(--edge);color:#6c7a8d;font-size:11px;text-align:center}
+          footer{padding:12px 22px;border-top:1px solid var(--edge);color:#6c7a8d;font-size:11px;text-align:center}
         CSS
       end
 
       def js
         <<~'JS'
-          // ---------- state ----------
-          const state = { nodes: {}, wires: [], frees: [], decos: [] };
-          const $ = (id) => document.getElementById(id);
+          const SVGNS='http://www.w3.org/2000/svg';
+          const GOLD='#c8a44a',UP='#40b8c0',DOWN='#4a80d0',INK='#e6ecf3',RED='#c05a5a';
+          const W=90,H=46,LEG=30;                 // node box + leg length
+          const $=id=>document.getElementById(id);
 
-          // ---------- palette ----------
+          // preset (upperLegs, lowerLegs, shape, defaultName) per palette symbol
+          const TENSORS={
+            tensor:[1,1,'box','T'], matrix:[1,1,'box','M'], matmul:[1,1,'box','A'],
+            vector:[1,0,'box','v'], metric:[0,2,'box','g'], epsilon:[0,3,'tri','ε'],
+            riemann:[1,3,'boxbar','R'], torsion:[1,2,'tribar','T'], delta:[1,1,'box','δ']
+          };
+
+          // ---------- state ----------
+          let nodes=[], wires=[], frees=[], decos=[];
+          let uid=1, sel=null, selNode=null, activeKey=null;
+
+          // ================= palette =================
           function buildPalette(){
-            const box = $('palette');
-            PALETTE.forEach(p => {
-              const el = document.createElement('div');
-              el.className = 'sym';
-              el.innerHTML = `<span class="gl">${p.svg}</span>`+
-                             `<span class="txt"><span class="nm">${p.name}</span>`+
-                             `<span class="mt">${p.math}</span></span>`;
-              el.title = p.meaning;
-              el.onclick = () => pick(p);
+            const box=$('palette');
+            PALETTE.forEach(p=>{
+              const el=document.createElement('div');
+              el.className='sym'; el.dataset.key=p.key;
+              el.innerHTML=`<span class="gl">${p.svg}</span><span class="txt"><span class="nm">${p.name}</span><span class="mt">${p.math}</span></span>`;
+              el.title=p.meaning;
+              el.onclick=()=>pickSymbol(p,el);
               box.appendChild(el);
             });
           }
+          function setHint(t){ $('hint').textContent=t; }
 
-          function preview(p){
-            return `<div class="preview"><div class="pv-glyph">${p.svg}</div>`+
-                   `<div class="pv-txt"><b>${p.name}</b><br><span class="mt">${p.math}</span>`+
-                   `<div class="hint">${p.meaning}</div></div></div>`;
-          }
-
-          // ---------- dialog ----------
-          function pick(p){
-            const k = p.key;
-            // tensors (shapes with legs) — place a box with preset rank/name
-            if(k==='tensor')  return dialogTensor(p, 'T', 2);
-            if(k==='matrix')  return dialogTensor(p, 'M', 2);
-            if(k==='matmul')  return dialogTensor(p, 'A', 2);
-            if(k==='vector')  return dialogTensor(p, 'v', 1);
-            if(k==='metric')  return dialogTensor(p, 'g', 2);
-            if(k==='epsilon') return dialogTensor(p, 'E', 3);
-            if(k==='riemann') return dialogTensor(p, 'R', 4);
-            if(k==='torsion') return dialogTensor(p, 'T', 3);
-            if(k==='delta')   return dialogTensor(p, 'd', 2);
-            // wiring
-            if(['contraction','wire','cup','cap'].includes(k)) return dialogWire(p);
-            // differential operators
-            if(['nabla','partial'].includes(k)) return dialogDeriv(p);
-            if(k==='integral')                  return dialogIntegral(p);
-            if(['symmetrize','antisymmetrize'].includes(k)) return dialogSym(p);
-            // reference-only symbols (notation, no numeric part)
-            if(['swap','lie'].includes(k))      return dialogInfo(p);
+          function pickSymbol(p,el){
+            document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active'));
+            const k=p.key;
+            if(TENSORS[k]){ addNode(k); setHint(`${p.name} を配置しました。ドラッグで移動、脚(●)を2つクリックで結線。`); }
+            else if(['contraction','wire','cup','cap'].includes(k)){ el.classList.add('active'); setHint('2つの脚(●)をクリックすると結線（縮約）します。'); }
+            else if(['nabla','partial'].includes(k)){ applyDeriv(k,p); }
+            else if(k==='integral'){ applyIntegral(p); }
+            else if(['symmetrize','antisymmetrize'].includes(k)){ applySym(k,p); }
+            else { setHint(`${p.name}: ${p.meaning}`); }
+            update();
           }
 
-          function dialogInfo(p){
-            $('dialog').innerHTML = preview(p) +
-              `<div class="hint">これは記法の参照用シンボルです（数値計算の部品にはなりません）。`+
-              (p.key==='swap' ? '反対称化は「反対称化バー」で表現できます。' :
-               'リー微分 £ は記号表示のみに対応します。')+`</div>`;
+          // ================= nodes =================
+          function addNode(key){
+            const [up,down,shape,name]=TENSORS[key];
+            const i=nodes.length;
+            const n={id:uid++, key, name, up, down, shape,
+                     x:70+(i%4)*195, y:110+Math.floor(i/4)*180, val:null};
+            nodes.push(n); selNode=n; sel=null;
+            return n;
+          }
+          function nodeById(id){ return nodes.find(n=>n.id===id); }
+
+          // leg geometry
+          function legX(n,side,i){ const c=side==='up'?n.up:n.down; return n.x + W*(i+1)/(c+1); }
+          function legTipY(n,side){ return side==='up'? n.y-LEG : n.y+H+LEG; }
+          function legBaseY(n,side){ return side==='up'? n.y : n.y+H; }
+          function slotIndex(n,side,i){ return side==='up'? i : n.up+i; }
+          function sameLeg(a,b){ return a&&b&&a.id===b.id&&a.side===b.side&&a.i===b.i; }
+          function legUsed(ref){
+            const w=wires.some(w=>sameLeg(w.a,ref)||sameLeg(w.b,ref));
+            const f=frees.some(f=>f.id===ref.id&&f.side===ref.side&&f.i===ref.i);
+            return w||f;
           }
 
-          function field(label, id, val, ph){
-            return `<div class="dfield"><label>${label}</label><input id="${id}" value="${val||''}" placeholder="${ph||''}"></div>`;
-          }
-          function nodeOptions(){ return Object.keys(state.nodes).map(n=>`<option>${n}</option>`).join(''); }
-
-          function dialogTensor(p, def, legs){
-            def = def || 'A'; legs = legs || 2;
-            const sampleVal = p.key==='metric' ? '[[1,0],[0,1]]' : (legs===1 ? '[1,2]' : '');
-            $('dialog').innerHTML = preview(p) +
-              field('名前 (1文字)','d_name',def)+
-              field('脚の数 (階数)','d_legs',String(legs))+
-              field('成分値 JSON（任意）','d_val', sampleVal, legs===1?'[1,2]':'[[1,2],[3,4]]')+
-              `<div class="row"><button class="primary" onclick="addTensor()">配置する</button></div>`;
-          }
-          function addTensor(){
-            const name=$('d_name').value.trim();
-            const legs=parseInt($('d_legs').value,10);
-            const raw=$('d_val').value.trim();
-            if(!name){alert('名前が必要です');return;}
-            if(state.nodes[name]){alert('同名の部品があります');return;}
-            let val=null; if(raw){try{val=JSON.parse(raw);}catch(e){alert('JSONが不正です');return;}}
-            state.nodes[name]={legs,val,next:0};
-            log(`テンソル箱 [${name}]（脚${legs}${val?'・成分あり':''}）`);
-            $('dialog').innerHTML=''; render();
+          function clickLeg(ref){
+            if(legUsed(ref)){ // clicking a used leg removes its wire/free
+              wires=wires.filter(w=>!(sameLeg(w.a,ref)||sameLeg(w.b,ref)));
+              frees=frees.filter(f=>!(f.id===ref.id&&f.side===ref.side&&f.i===ref.i));
+              sel=null; setHint('結線/自由添字を解除しました。'); update(); return;
+            }
+            if(!sel){ sel=ref; setHint('もう一方の脚(●)をクリックで結線、または「自由添字に」ボタン。'); update(); return; }
+            if(sameLeg(sel,ref)){ sel=null; update(); return; }
+            if(sel.id===ref.id){ setHint('同じノードの脚どうしも縮約(トレース)できます。'); }
+            wires.push({a:sel,b:ref}); sel=null; setHint('結線（縮約）しました。'); update();
           }
 
-          function dialogWire(p){
-            if(Object.keys(state.nodes).length<1){$('dialog').innerHTML='<div class="hint">先にテンソル箱を配置してください。</div>';return;}
-            $('dialog').innerHTML =
-              `<div class="hint">${p.name}: 2本の脚をつなぐ（縮約）か、自由添字にします。</div>`+
-              `<div class="dfield"><label>部品A</label><select id="w_a">${nodeOptions()}</select></div>`+
-              field('Aの脚番号','w_al','0')+
-              `<div class="dfield"><label>相手（部品Bを選ぶと縮約 / 空で自由添字）</label><select id="w_b"><option value="">— 自由添字 —</option>${nodeOptions()}</select></div>`+
-              field('Bの脚番号 / 自由添字名','w_bl','')+
-              `<div class="row"><button class="primary" onclick="addWire()">組み合わせる</button></div>`;
-          }
-          function addWire(){
-            const a=$('w_a').value, al=parseInt($('w_al').value,10);
-            const b=$('w_b').value, bl=$('w_bl').value.trim();
-            if(b){ state.wires.push([[a,al],[b,parseInt(bl,10)]]); log(`縮約線 ${a}[${al}] ─ ${b}[${bl}]`); }
-            else { state.frees.push([[a,al], bl||('x'+state.frees.length)]); log(`自由添字 ${a}[${al}] → ${bl}`); }
-            $('dialog').innerHTML=''; render();
+          function makeFree(){
+            if(!sel){ setHint('先に脚(●)を1つクリックしてください。'); return; }
+            const label=prompt('自由添字の名前（例 i, j, μ）','');
+            if(label){ frees.push({id:sel.id,side:sel.side,i:sel.i,label:label.trim()}); setHint('自由添字を設定しました。'); }
+            sel=null; update();
           }
 
-          function dialogDeriv(p){
-            const sym = p.key==='nabla'?'∇':'∂';
-            $('dialog').innerHTML =
-              `<div class="hint">${p.name}</div>`+
-              `<div class="dfield"><label>対象</label><select id="dv_t">${nodeOptions()}</select></div>`+
-              field('微分の添字','dv_l','μ')+
-              `<div class="row"><button class="primary" onclick="addDeriv('${p.key}','${sym}')">付ける</button></div>`;
+          // ================= decorators =================
+          function applyDeriv(type,p){
+            if(!selNode){ setHint('先にノードを選択してください（∇/∂ の対象）。'); return; }
+            const l=prompt(`${p.name} の微分の添字（例 e, μ）`,'μ'); if(l===null) return;
+            decos.push({type, target:selNode.id, label:(l.trim()||'μ')});
+            setHint(`${type==='nabla'?'∇':'∂'}_${l} を付けました。`);
           }
-          function addDeriv(key,sym){
-            const t=$('dv_t').value, l=$('dv_l').value.trim()||'μ';
-            state.decos.push({type:key,target:t,label:l});
-            log(`${sym}_${l}（対象 ${t}）`); $('dialog').innerHTML=''; render();
+          function applyIntegral(p){
+            const l=prompt('積分の添字（測度 dμ）','μ'); if(l===null) return;
+            decos.push({type:'integral', label:(l.trim()||'μ')});
+            setHint('∫ … dμ を付けました。');
           }
-
-          function dialogIntegral(p){
-            $('dialog').innerHTML = `<div class="hint">${p.name}</div>`+
-              field('積分の添字（測度）','ig_l','μ')+
-              `<div class="row"><button class="primary" onclick="addIntegral()">付ける</button></div>`;
-          }
-          function addIntegral(){
-            const l=$('ig_l').value.trim()||'μ';
-            state.decos.push({type:'integral',label:l});
-            log(`∫ d${l}`); $('dialog').innerHTML=''; render();
+          function applySym(type,p){
+            const l=prompt('(反)対称化する出力添字（空白区切り 例: i j）','i j'); if(l===null) return;
+            const labels=l.trim().split(/\s+/).filter(Boolean);
+            decos.push({type:type==='symmetrize'?'sym':'antisym', labels});
+            setHint(`${type==='symmetrize'?'Sym':'Asym'}(${labels.join(',')}) を付けました。`);
           }
 
-          function dialogSym(p){
-            $('dialog').innerHTML = `<div class="hint">${p.name}: 出力添字の(反)対称化</div>`+
-              field('対象の出力添字（空白区切り）','sy_l','i j')+
-              `<div class="row"><button class="primary" onclick="addSym('${p.key}')">付ける</button></div>`;
-          }
-          function addSym(key){
-            const labels=$('sy_l').value.trim().split(/\s+/).filter(Boolean);
-            state.decos.push({type:key==='symmetrize'?'sym':'antisym',target:labels});
-            log(`${key==='symmetrize'?'Sym':'Asym'}(${labels.join(',')})`); $('dialog').innerHTML=''; render();
+          function deleteNode(){
+            if(!selNode){ setHint('削除するノードを選択してください。'); return; }
+            const id=selNode.id;
+            nodes=nodes.filter(n=>n.id!==id);
+            wires=wires.filter(w=>w.a.id!==id&&w.b.id!==id);
+            frees=frees.filter(f=>f.id!==id);
+            decos=decos.filter(d=>d.target!==id);
+            selNode=null; sel=null; setHint('ノードを削除しました。'); update();
           }
 
-          // ---------- parts list ----------
-          let logLines=[];
-          function log(s){ logLines.push(s); }
+          // ================= rendering =================
+          function E(tag,attrs,kids){ const e=document.createElementNS(SVGNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); (kids||[]).forEach(c=>e.appendChild(c)); return e; }
+          function txt(x,y,s,attrs){ const t=E('text',Object.assign({x,y,'text-anchor':'middle'},attrs||{})); t.textContent=s; return t; }
+
           function render(){
-            const ul=$('parts'); ul.innerHTML='';
-            logLines.forEach((s,i)=>{
-              const li=document.createElement('li');
-              li.innerHTML=`<span>${i+1}. ${s}</span>`;
-              ul.appendChild(li);
+            const c=$('canvas'); c.innerHTML='';
+            // decorator hoops (∇/∂) behind nodes
+            decos.filter(d=>d.type==='nabla'||d.type==='partial').forEach(d=>{
+              const n=nodeById(d.target); if(!n) return;
+              c.appendChild(E('ellipse',{cx:n.x+W/2,cy:n.y+H/2,rx:W/2+16,ry:H/2+16,fill:'none',stroke:GOLD,'stroke-width':2,'stroke-dasharray':d.type==='partial'?'4 3':'none'}));
+              c.appendChild(txt(n.x-6,n.y-2,d.type==='nabla'?'∇':'∂',{fill:GOLD,'font-size':16}));
+              c.appendChild(txt(n.x+W+14,n.y+H+14,d.label,{fill:DOWN,'font-size':12}));
+              c.appendChild(E('line',{x1:n.x+W,y1:n.y+H,x2:n.x+W+22,y2:n.y+H+22,stroke:DOWN,'stroke-width':2}));
             });
+            // wires
+            wires.forEach(w=>{
+              const a=nodeById(w.a.id),b=nodeById(w.b.id); if(!a||!b) return;
+              const ax=legX(a,w.a.side,w.a.i),ay=legTipY(a,w.a.side);
+              const bx=legX(b,w.b.side,w.b.i),by=legTipY(b,w.b.side);
+              const my=(ay+by)/2 + (w.a.id===w.b.id?-40:0);
+              c.appendChild(E('path',{d:`M${ax} ${ay} C ${ax} ${my} ${bx} ${my} ${bx} ${by}`,fill:'none',stroke:GOLD,'stroke-width':2.5}));
+            });
+            // integral badge
+            const ig=decos.find(d=>d.type==='integral');
+            if(ig){ c.appendChild(txt(30,300,'∫',{fill:GOLD,'font-size':64})); c.appendChild(txt(46,330,'d'+ig.label,{fill:DOWN,'font-size':13})); }
+            // sym/antisym badge
+            const sy=decos.find(d=>d.type==='sym'||d.type==='antisym');
+            if(sy){ c.appendChild(txt(760,30,(sy.type==='sym'?'Sym':'Asym')+'('+sy.labels.join(',')+')',{fill:INK,'font-size':13})); }
+            // nodes
+            nodes.forEach(n=>drawNode(c,n));
           }
 
-          // ---------- resolve indices (mirror of Diagram#resolve) ----------
+          function drawNode(c,n){
+            const g=E('g',{});
+            const selected = selNode&&selNode.id===n.id;
+            // legs (draw first so endpoints sit above)
+            for(let i=0;i<n.up;i++) drawLeg(g,n,'up',i);
+            for(let i=0;i<n.down;i++) drawLeg(g,n,'down',i);
+            // shape
+            if(n.shape==='tri'||n.shape==='tribar'){
+              g.appendChild(E('polygon',{points:`${n.x+8},${n.y} ${n.x+W-8},${n.y} ${n.x+W/2},${n.y+H}`,fill:'#0f1420',stroke:selected?INK:GOLD,'stroke-width':selected?3:2.5}));
+            } else {
+              g.appendChild(E('rect',{x:n.x,y:n.y,width:W,height:H,rx:7,fill:'#0f1420',stroke:selected?INK:GOLD,'stroke-width':selected?3:2.5}));
+            }
+            if(n.shape==='boxbar'||n.shape==='tribar'){ // antisymmetric leg bars
+              if(n.up>1) g.appendChild(E('line',{x1:n.x+14,y1:n.y-12,x2:n.x+W-14,y2:n.y-12,stroke:INK,'stroke-width':2.5}));
+              g.appendChild(E('line',{x1:n.x+14,y1:n.y+H+12,x2:n.x+W-14,y2:n.y+H+12,stroke:INK,'stroke-width':2.5}));
+            }
+            const label=txt(n.x+W/2,n.y+H/2+6,n.name,{fill:GOLD,'font-size':18,'font-style':'italic'});
+            label.style.pointerEvents='none';
+            g.appendChild(label);
+            const hit=E('rect',{x:n.x,y:n.y,width:W,height:H,rx:7,fill:'transparent',cursor:'move'});
+            hit.addEventListener('pointerdown',ev=>startDrag(ev,n));
+            g.appendChild(hit);
+            c.appendChild(g);
+          }
+
+          function drawLeg(g,n,side,i){
+            const x=legX(n,side,i), y0=legBaseY(n,side), y1=legTipY(n,side);
+            const ref={id:n.id,side,i};
+            const used=legUsed(ref), seld=sameLeg(sel,ref);
+            g.appendChild(E('line',{x1:x,y1:y0,x2:x,y2:y1,stroke:side==='up'?UP:DOWN,'stroke-width':2.5}));
+            const dot=E('circle',{cx:x,cy:y1,r:6,fill:seld?INK:(used?GOLD:'#0d121b'),stroke:side==='up'?UP:DOWN,'stroke-width':2,cursor:'pointer'});
+            dot.addEventListener('pointerdown',ev=>{ev.stopPropagation();});
+            dot.addEventListener('click',ev=>{ev.stopPropagation(); clickLeg(ref);});
+            g.appendChild(dot);
+            // free-index label
+            const f=frees.find(f=>f.id===n.id&&f.side===side&&f.i===i);
+            if(f){ g.appendChild(txt(x+(side==='up'?12:12),y1+(side==='up'?-4:16),f.label,{fill:INK,'font-size':13})); }
+          }
+
+          // ---------- drag ----------
+          let drag=null;
+          function svgPt(ev){ const c=$('canvas'); const pt=c.createSVGPoint(); pt.x=ev.clientX; pt.y=ev.clientY; return pt.matrixTransform(c.getScreenCTM().inverse()); }
+          function startDrag(ev,n){ ev.preventDefault(); selNode=n; sel=null; const p=svgPt(ev); drag={n,dx:p.x-n.x,dy:p.y-n.y,moved:false}; update(); }
+          window.addEventListener('pointermove',ev=>{ if(!drag) return; const p=svgPt(ev); drag.n.x=Math.max(0,Math.min(810,p.x-drag.dx)); drag.n.y=Math.max(30,Math.min(500,p.y-drag.dy)); drag.moved=true; render(); });
+          window.addEventListener('pointerup',()=>{ drag=null; });
+
+          // ================= props panel =================
+          function renderProps(){
+            const box=$('props');
+            if(!selNode){ box.innerHTML=''; return; }
+            const n=selNode;
+            box.innerHTML=`<div class="card"><div class="grid">
+              <label>名前</label><input id="p_name" value="${n.name}">
+              <label>上付き脚</label><input id="p_up" type="number" min="0" max="4" value="${n.up}">
+              <label>下付き脚</label><input id="p_down" type="number" min="0" max="4" value="${n.down}">
+              <label>成分値 JSON</label><input id="p_val" value="${n.val?JSON.stringify(n.val):''}" placeholder="[[1,2],[3,4]]">
+              </div><div class="row"><button class="primary" id="p_apply">適用</button></div></div>`;
+            $('p_apply').onclick=applyProps;
+          }
+          function applyProps(){
+            const n=selNode; if(!n) return;
+            n.name=($('p_name').value.trim()||n.name).slice(0,3);
+            const up=parseInt($('p_up').value,10), down=parseInt($('p_down').value,10);
+            if(up!==n.up||down!==n.down){ // legs changed: drop this node's wires/frees to stay consistent
+              wires=wires.filter(w=>w.a.id!==n.id&&w.b.id!==n.id);
+              frees=frees.filter(f=>f.id!==n.id);
+              n.up=Math.max(0,Math.min(4,up)); n.down=Math.max(0,Math.min(4,down));
+            }
+            const raw=$('p_val').value.trim();
+            if(raw){ try{ n.val=JSON.parse(raw); }catch(e){ alert('JSONが不正です'); return; } } else n.val=null;
+            setHint('ノードを更新しました。'); update();
+          }
+
+          // ================= resolve / compute =================
           function resolve(){
-            const assign={}; for(const n in state.nodes) assign[n]=new Array(state.nodes[n].legs).fill(null);
-            state.wires.forEach((w,i)=>{ const k='k'+(i+1); assign[w[0][0]][w[0][1]]=k; assign[w[1][0]][w[1][1]]=k; });
+            const assign={}; nodes.forEach(n=>assign[n.id]=new Array(n.up+n.down).fill(null));
+            wires.forEach((w,idx)=>{ const k='k'+(idx+1);
+              assign[w.a.id][slotIndex(nodeById(w.a.id),w.a.side,w.a.i)]=k;
+              assign[w.b.id][slotIndex(nodeById(w.b.id),w.b.side,w.b.i)]=k; });
             const output=[];
-            state.frees.forEach(f=>{ assign[f[0][0]][f[0][1]]=f[1]; output.push(f[1]); });
-            let auto=0;
-            for(const n in assign) assign[n].forEach((v,k)=>{ if(v===null){auto++; const nm='f'+auto; assign[n][k]=nm; output.push(nm);} });
-            const integral = state.decos.filter(d=>d.type==='integral').map(d=>d.label);
-            const out = output.filter(o=>!integral.includes(o));
-            return {assign, output:out, integral};
+            frees.forEach(f=>{ assign[f.id][slotIndex(nodeById(f.id),f.side,f.i)]=f.label; output.push(f.label); });
+            let auto=0; nodes.forEach(n=>assign[n.id].forEach((v,k)=>{ if(v===null){auto++; const nm='f'+auto; assign[n.id][k]=nm; output.push(nm);} }));
+            const integral=decos.filter(d=>d.type==='integral').map(d=>d.label);
+            return {assign, output:output.filter(o=>!integral.includes(o)), integral};
           }
 
-          // ---------- fair copy (清書) ----------
-          function texName(n){ return (n==='E'||n==='ε')?'ε':n; }
           function idx(a){ return a.map(t=>{ const m=/^([A-Za-z])(\d+)$/.exec(t); return m?`${m[1]}<sub>${m[2]}</sub>`:t; }).join(' '); }
           function fairCopy(){
+            if(!nodes.length) return '—';
             const r=resolve();
-            const counts={}; for(const n in r.assign) r.assign[n].forEach(x=>counts[x]=(counts[x]||0)+1);
+            const counts={}; for(const id in r.assign) r.assign[id].forEach(x=>counts[x]=(counts[x]||0)+1);
             let dummies=Object.keys(counts).filter(x=>counts[x]>1);
             r.integral.forEach(x=>{ if(!dummies.includes(x)) dummies.push(x); });
-            let factors=Object.keys(state.nodes).map(n=>`${texName(n)}<sub>${idx(r.assign[n])}</sub>`);
+            const factors=nodes.map(n=>`${n.name}<sub>${idx(r.assign[n.id])}</sub>`);
             let pre='',post='';
-            state.decos.forEach(d=>{
+            decos.forEach(d=>{
               if(d.type==='nabla')   pre=`<span class="op">∇</span><sub>${d.label}</sub> `+pre;
               if(d.type==='partial') pre=`<span class="op">∂</span><sub>${d.label}</sub> `+pre;
               if(d.type==='integral'){ pre=`<span class="op">∫</span> `+pre; post+=` d${d.label}`; }
             });
-            const symd=state.decos.find(d=>d.type==='sym'||d.type==='antisym');
-            let lhsIdx=idx(r.output);
-            if(symd&&symd.type==='sym') lhsIdx=`(${lhsIdx})`;
-            if(symd&&symd.type==='antisym') lhsIdx=`[${lhsIdx}]`;
-            const lhs = r.output.length? `R<sub>${lhsIdx}</sub>` : 'R';
-            const sum = dummies.length? `<span class="sum">∑<sub>${dummies.map(d=>idx([d])).join(' ')}</sub></span> `:'';
+            const symd=decos.find(d=>d.type==='sym'||d.type==='antisym');
+            let li=idx(r.output); if(symd&&symd.type==='sym') li=`(${li})`; if(symd&&symd.type==='antisym') li=`[${li}]`;
+            const lhs=r.output.length?`R<sub>${li}</sub>`:'R';
+            const sum=dummies.length?`<span class="sum">∑<sub>${dummies.map(d=>idx([d])).join(' ')}</sub></span> `:'';
             return `${lhs} = ${sum}${pre}${factors.join(' ')}${post}`;
           }
 
-          // ---------- einsum (計算) — mirror of Bada::Penrose::Einsum ----------
-          function strides(shape){ const s=shape.map(()=>1); for(let k=shape.length-2;k>=0;k--) s[k]=s[k+1]*shape[k+1]; return s; }
-          function flatten(x){ return Array.isArray(x)? x.flat(Infinity):[x]; }
+          // einsum (mirror of Bada::Penrose::Einsum)
+          function strides(sh){ const s=sh.map(()=>1); for(let k=sh.length-2;k>=0;k--) s[k]=s[k+1]*sh[k+1]; return s; }
+          function flat(x){ return Array.isArray(x)?x.flat(Infinity):[x]; }
           function shapeOf(x){ const sh=[]; let p=x; while(Array.isArray(p)){ sh.push(p.length); p=p[0]; } return sh; }
-          function at(flat, idxNames, shape, a){ const st=strides(shape); let off=0; idxNames.forEach((n,k)=>off+=a[n]*st[k]); return flat[off]; }
-          function unflatten(flat, shape){
-            if(shape.length===0) return flat[0];
-            const st=strides(shape);
-            const build=(dim,base)=>{ if(dim===shape.length-1) return Array.from({length:shape[dim]},(_,i)=>flat[base+i*st[dim]]);
-              return Array.from({length:shape[dim]},(_,i)=>build(dim+1,base+i*st[dim])); };
-            return build(0,0);
-          }
+          function unflatten(fl,sh){ if(!sh.length) return fl[0]; const st=strides(sh);
+            const b=(d,base)=> d===sh.length-1? Array.from({length:sh[d]},(_,i)=>fl[base+i*st[d]]) : Array.from({length:sh[d]},(_,i)=>b(d+1,base+i*st[d])); return b(0,0); }
           function einsum(){
+            if(!nodes.length) return {ok:false,note:''};
             const r=resolve();
-            // need every node to have a value
-            for(const n in state.nodes){ if(state.nodes[n].val==null) return {ok:false, note:'成分値が未指定 — value を与えると数値計算されます'}; }
-            const dims={}; const tensors=[];
-            for(const n of Object.keys(state.nodes)){
-              const node=state.nodes[n]; const names=r.assign[n]; const sh=shapeOf(node.val); const fl=flatten(node.val);
-              if(sh.length!==names.length) return {ok:false, note:`[${n}] の階数(${sh.length})が脚数(${names.length})と一致しません`};
-              names.forEach((nm,k)=>{ if(dims[nm]!=null && dims[nm]!==sh[k]) return; dims[nm]=sh[k]; });
-              tensors.push({fl,names,sh});
-            }
-            const allNames=Object.keys(dims);
-            const outShape=r.output.map(n=>dims[n]);
-            const outSt=strides(outShape);
+            for(const n of nodes){ if(n.val==null) return {ok:false,note:'成分値が未指定のノードがあります（ノードを選び「成分値 JSON」を入力）'}; }
+            const dims={},tensors=[];
+            for(const n of nodes){ const names=r.assign[n.id]; const sh=shapeOf(n.val); const fl=flat(n.val);
+              if(sh.length!==names.length) return {ok:false,note:`[${n.name}] の階数(${sh.length})が脚数(${names.length})と一致しません`};
+              names.forEach((nm,k)=>{ if(dims[nm]!=null&&dims[nm]!==sh[k]) {} dims[nm]=sh[k]; }); tensors.push({fl,names,sh}); }
+            const all=Object.keys(dims); const outShape=r.output.map(n=>dims[n]); const os=strides(outShape);
             const res=new Array(outShape.reduce((a,b)=>a*b,1)).fill(0);
-            const ranges=allNames.map(n=>[...Array(dims[n]).keys()]);
-            const rec=(i,a)=>{
-              if(i===allNames.length){
-                let prod=1; tensors.forEach(t=>prod*=at(t.fl,t.names,t.sh,a));
-                if(prod!==0){ let off=0; r.output.forEach((n,k)=>off+=a[n]*outSt[k]); res[off]+=prod; }
-                return;
-              }
-              for(const v of ranges[i]){ a[allNames[i]]=v; rec(i+1,a); }
-            };
-            if(allNames.length) rec(0,{}); else res[0]=tensors.reduce((m,t)=>m*t.fl[0],1);
-            let nested=unflatten(res,outShape);
-            // symmetrise result over 2 output indices
-            const symd=state.decos.find(d=>d.type==='sym'||d.type==='antisym');
-            return {ok:true, output:r.output, shape:outShape, nested, scalar: outShape.length===0?res[0]:null, symd};
+            const ranges=all.map(n=>[...Array(dims[n]).keys()]);
+            const at=(t,a)=>{ const st=strides(t.sh); let off=0; t.names.forEach((n,k)=>off+=a[n]*st[k]); return t.fl[off]; };
+            const rec=(i,a)=>{ if(i===all.length){ let pr=1; tensors.forEach(t=>pr*=at(t,a)); if(pr!==0){ let off=0; r.output.forEach((n,k)=>off+=a[n]*os[k]); res[off]+=pr; } return; }
+              for(const v of ranges[i]){ a[all[i]]=v; rec(i+1,a); } };
+            if(all.length) rec(0,{}); else res[0]=tensors.reduce((m,t)=>m*t.fl[0],1);
+            return {ok:true, output:r.output, scalar: outShape.length===0?res[0]:null, nested:unflatten(res,outShape)};
           }
 
-          // ---------- run ----------
+          // ================= combine =================
           function combine(){
-            $('fair').innerHTML = Object.keys(state.nodes).length? fairCopy() : '—';
+            $('fair').innerHTML=fairCopy();
             const e=einsum();
-            if(!e){$('numeric').textContent='—';return;}
             if(!e.ok){ $('numeric').textContent='—'; $('notes').textContent=e.note||''; return; }
-            $('notes').textContent='';
-            const lhs = e.output.length? 'R['+e.output.join(' ')+']' : 'R';
-            const val = e.scalar!=null? (Math.round(e.scalar*1e6)/1e6) : JSON.stringify(e.nested);
-            $('numeric').textContent = `${lhs} = ${val}`;
+            $('notes').textContent = decos.some(d=>d.type==='nabla'||d.type==='partial') ? '∇/∂ は記号として保持（数値評価は記号のまま）。' : '';
+            const lhs=e.output.length?'R['+e.output.join(' ')+']':'R';
+            const val=e.scalar!=null?(Math.round(e.scalar*1e6)/1e6):JSON.stringify(e.nested);
+            $('numeric').textContent=`${lhs} = ${val}`;
           }
-          function resetAll(){ state.nodes={};state.wires=[];state.frees=[];state.decos=[];logLines=[]; render(); $('fair').textContent='—';$('numeric').textContent='—';$('notes').textContent='';$('dialog').innerHTML=''; }
+
+          function update(){ render(); renderProps(); combine(); }
+
+          // ================= samples / controls =================
+          function resetAll(){ nodes=[];wires=[];frees=[];decos=[];uid=1;sel=null;selNode=null;
+            document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active'));
+            setHint('リセットしました。パレットの記号をクリックして配置してください。'); update(); }
           function sample(){
             resetAll();
-            state.nodes['A']={legs:2,val:[[1,2],[3,4]],next:0};
-            state.nodes['B']={legs:2,val:[[5,6],[7,8]],next:0};
-            state.wires.push([['A',1],['B',0]]);
-            state.frees.push([['A',0],'i']); state.frees.push([['B',1],'j']);
-            log('テンソル箱 [A]（脚2・成分あり）'); log('テンソル箱 [B]（脚2・成分あり）');
-            log('縮約線 A[1] ─ B[0]'); log('自由添字 A[0] → i'); log('自由添字 B[1] → j');
-            render(); combine();
+            const A={id:uid++,key:'matrix',name:'A',up:1,down:1,shape:'box',x:120,y:110,val:[[1,2],[3,4]]};
+            const B={id:uid++,key:'matrix',name:'B',up:1,down:1,shape:'box',x:120,y:330,val:[[5,6],[7,8]]};
+            nodes.push(A,B);
+            // contract A's lower leg with B's upper leg
+            wires.push({a:{id:A.id,side:'down',i:0},b:{id:B.id,side:'up',i:0}});
+            frees.push({id:A.id,side:'up',i:0,label:'i'});
+            frees.push({id:B.id,side:'down',i:0,label:'j'});
+            selNode=null; setHint('行列積の例：A の下脚と B の上脚を結線（縮約）。'); update();
           }
 
+          // ================= boot =================
           buildPalette();
-          $('combine').onclick=combine;
-          $('reset').onclick=resetAll;
+          $('btnFree').onclick=makeFree;
+          $('btnDelete').onclick=deleteNode;
+          $('btnClearSel').onclick=()=>{ sel=null; selNode=null; document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active')); update(); };
           $('sample').onclick=sample;
+          $('reset').onclick=resetAll;
+          $('canvas').addEventListener('pointerdown',ev=>{ if(ev.target.id==='canvas'){ selNode=null; sel=null; update(); } });
+          update();
         JS
       end
     end

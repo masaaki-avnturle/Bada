@@ -281,9 +281,15 @@ r[:latex]   # => "R_{ij} \\;=\\; \\sum_{k_{1}} A_{ik_{1}} \\, B_{k_{1}j}"  （�
 r[:result]  # => [[19.0, 22.0], [43.0, 50.0]]                              （計算）
 ```
 
-`bin/bada html` で書き出す HTML は外部依存ゼロ（オフライン動作・CSP 安全）。左に
-ペンローズ絵記号のパレット、中央にダイアログボックスとキャンバス、右に清書方程式と
-計算方程式が並び、純 JavaScript の einsum エンジンがブラウザ内で縮約を計算します。
+`bin/bada html` で書き出す HTML は外部依存ゼロ（オフライン動作・CSP 安全）で、
+**実際に絵記号を描いて組み合わせる図式エディタ**です:
+
+- 左の**パレットで絵記号を選ぶ**とキャンバスにその図形（絵記号）が**描かれる**。
+- ノードは**ドラッグで移動**でき、各脚の●を**2つクリックすると結線（縮約）**、
+  脚を選んで「自由添字に」で出力添字を付ける。
+- ∇/∂ はノードを囲むフープ、∫・(反)対称化はデコレータとして図に付く。
+- 右に**清書した方程式**と**計算した方程式**がリアルタイムに生成され、純 JavaScript の
+  einsum エンジンがブラウザ内で縮約を計算します（`Bada::Penrose::Einsum` と同等）。
 
 ## モジュール構成
 
@@ -311,7 +317,7 @@ lib/bada/penrose/latex.rb    清書方程式フォーマッタ（LaTeX 総和形
 lib/bada/penrose/builder.rb  パレット＋ダイアログ対話アプリ（部品選択→組み合わせ）
 lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
 lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
-lib/bada/penrose/webapp.rb   ブラウザGUI書き出し（パレット＋ダイアログの自己完結HTML）
+lib/bada/penrose/webapp.rb   図式エディタ書き出し（絵記号を描いて結線する自己完結HTML）
 lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
