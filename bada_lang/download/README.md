@@ -4,6 +4,16 @@ Emacs **and** vim key bindings, written in the **Bada** language, registered
 into the **Windows Registry**, and editable by you. Download the files in this
 folder and run the installer.
 
+## Download (one click)
+
+Grab the packaged `.zip` from the repository's **Releases** page:
+
+> **https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/madotsukai_windows.zip**
+
+(Or browse <https://github.com/masaaki-avnturle/Bada/releases> and pick
+*窓使いの憂鬱 mayu — Windows 10/11 keybindings*.) Unzip and run `install.bat`.
+Every file below is also attached to that release individually.
+
 This package registers key combinations into the registry two ways:
 
 | where | what | needs admin? | applied by |
