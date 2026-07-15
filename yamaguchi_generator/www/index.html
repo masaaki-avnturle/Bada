@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>山口フレームワーク — 方程式↔抽象画 生成器</title>
+<style>
+:root {
+  --bg:        #06080f;
+  --panel:     #0b0f1a;
+  --border:    rgba(80,160,255,.12);
+  --accent:    #3a8cff;
+  --accent2:   #ff7a30;
+  --text:      rgba(210,225,255,.88);
+  --text2:     rgba(150,175,220,.55);
+  --glow:      rgba(58,140,255,.25);
+  --orange:    rgba(255,140,60,.22);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{overscroll-behavior:none;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Georgia',serif;
+  height:100vh; height:100dvh; overflow:hidden;
+  display:flex; flex-direction:column;
+  -webkit-user-select:none; user-select:none;
+  -webkit-touch-callout:none;
+}
+
+/* ── Header ── */
+#header{
+  flex:0 0 auto;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 18px 8px;
+  border-bottom:1px solid var(--border);
+  background:rgba(8,12,24,.95);
+}
+#header h1{
+  font:300 13px/1 'Georgia',serif;
+  letter-spacing:.45em; color:rgba(180,210,255,.45);
+  text-transform:uppercase;
+}
+#header .sub{
+  font:300 9px/1 'Georgia',serif;
+  letter-spacing:.3em; color:rgba(120,160,220,.25);
+}
+.mode-tabs{display:flex;gap:6px;}
+.mode-tab{
+  font:300 9px/1 'Georgia',serif; letter-spacing:.3em;
+  padding:8px 14px; cursor:pointer; border:1px solid var(--border);
+  background:transparent; color:var(--text2); text-transform:uppercase;
+  transition:.25s; touch-action:manipulation;
+}
+.mode-tab.active{
+  background:rgba(58,140,255,.15); border-color:var(--accent);
+  color:rgba(140,190,255,.9);
+}
+.mode-tab:hover{background:rgba(58,140,255,.08);}
+
+/* ── Main layout ── */
+#main{
+  flex:1 1 0; display:flex; min-height:0;
+}
+
+/* ── Left: palette + equation list ── */
+#left{
+  flex:0 0 260px; display:flex; flex-direction:column;
+  border-right:1px solid var(--border);
+  background:rgba(8,12,22,.9);
+}
+#palette-wrap{
+  flex:0 0 auto; padding:12px 14px 10px;
+  border-bottom:1px solid var(--border);
+}
+#palette-wrap h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:10px;
+}
+#palette{
+  display:flex; flex-wrap:wrap; gap:6px;
+}
+.pal-btn{
+  width:30px; height:30px; border-radius:50%; cursor:pointer;
+  border:2px solid transparent; transition:.2s;
+  position:relative; touch-action:manipulation;
+}
+.pal-btn:hover{transform:scale(1.18);}
+.pal-btn.active{border-color:white; box-shadow:0 0 10px rgba(255,255,255,.4);}
+
+/* brush sizes */
+#brush-wrap{
+  padding:8px 14px 10px; border-bottom:1px solid var(--border);
+}
+#brush-wrap h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:8px;
+}
+.brush-row{display:flex;gap:8px;align-items:center;}
+.brush-btn{
+  cursor:pointer; border:1px solid var(--border);
+  background:transparent; color:var(--text2);
+  border-radius:50%; display:flex;align-items:center;justify-content:center;
+  transition:.2s; touch-action:manipulation;
+}
+.brush-btn.active{border-color:var(--accent);background:rgba(58,140,255,.15);}
+.brush-btn:hover{background:rgba(58,140,255,.08);}
+
+/* smoothing toggle */
+#opt-wrap{
+  padding:8px 14px 10px; border-bottom:1px solid var(--border);
+}
+#opt-wrap h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:8px;
+}
+.opt-row{display:flex;gap:6px;flex-wrap:wrap;}
+.opt-btn{
+  font:300 7.5px/1 'Georgia',serif; letter-spacing:.2em;
+  padding:5px 9px; border:1px solid var(--border);
+  background:transparent; color:var(--text2); cursor:pointer;
+  text-transform:uppercase; transition:.2s; touch-action:manipulation;
+}
+.opt-btn.active{background:rgba(58,140,255,.14);border-color:var(--accent);color:rgba(140,190,255,.9);}
+
+/* sketch type buttons */
+#sketch-types{
+  padding:8px 14px 10px; border-bottom:1px solid var(--border);
+}
+#sketch-types h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:8px;
+}
+.sketch-grid{display:flex;flex-wrap:wrap;gap:5px;}
+.sk-btn{
+  font:300 7.5px/1 'Georgia',serif; letter-spacing:.2em;
+  padding:5px 8px; border:1px solid var(--border);
+  background:transparent; color:var(--text2); cursor:pointer;
+  text-transform:uppercase; transition:.2s; touch-action:manipulation;
+}
+.sk-btn:hover,.sk-btn.active{
+  background:rgba(255,140,60,.12); border-color:var(--accent2);
+  color:rgba(255,180,100,.9);
+}
+
+/* equation list */
+#eq-list-wrap{
+  flex:1 1 0; overflow-y:auto; padding:10px 14px;
+  -webkit-overflow-scrolling:touch;
+}
+#eq-list-wrap h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:8px;
+  position:sticky;top:0;background:rgba(8,12,22,.95);padding-bottom:6px;
+}
+#eq-list-wrap::-webkit-scrollbar{width:3px;}
+#eq-list-wrap::-webkit-scrollbar-thumb{background:rgba(80,140,255,.2);}
+.eq-item{
+  font:300 8.5px/1.55 'Georgia',serif;
+  color:var(--text2); cursor:pointer; padding:6px 6px;
+  border-left:2px solid transparent; margin-bottom:3px;
+  transition:.2s; border-radius:0 4px 4px 0;
+}
+.eq-item:hover{
+  color:rgba(180,210,255,.85); border-left-color:var(--accent);
+  background:rgba(58,140,255,.07);
+}
+.eq-item.selected{
+  color:rgba(200,225,255,.95); border-left-color:var(--accent2);
+  background:rgba(255,140,60,.08);
+}
+.eq-cat{
+  font:300 7px/1 'Georgia',serif; letter-spacing:.5em;
+  color:rgba(80,120,200,.4); text-transform:uppercase;
+  margin:10px 0 5px; padding-bottom:4px;
+  border-bottom:1px solid rgba(80,120,200,.1);
+}
+
+/* ── Center: canvas ── */
+#center{
+  flex:1 1 0; display:flex; flex-direction:column;
+  min-width:0;
+}
+#canvas-wrap{
+  flex:1 1 0; position:relative;
+  overflow:hidden;
+  background:radial-gradient(ellipse at 50% 45%, rgba(15,25,55,.9) 0%, var(--bg) 100%);
+  touch-action:none;
+  -webkit-user-select:none; user-select:none;
+}
+#draw-canvas{
+  position:absolute; inset:0; cursor:crosshair;
+  touch-action:none;
+  -webkit-tap-highlight-color:transparent;
+  -webkit-touch-callout:none;
+  user-select:none;
+}
+/* スタイラス／指の圧力インジケーター */
+#pressure-dot {
+  position:fixed;
+  width:8px; height:8px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.5);
+  background:rgba(58,140,255,.35);
+  pointer-events:none;
+  transform:translate(-50%,-50%);
+  display:none;
+  z-index:9999;
+}
+#bg-canvas{
+  position:absolute; inset:0; pointer-events:none;
+  touch-action:none;
+}
+#canvas-toolbar{
+  flex:0 0 auto; display:flex; align-items:center; gap:8px;
+  padding:8px 14px; border-top:1px solid var(--border);
+  background:rgba(8,12,22,.95); flex-wrap:wrap;
+}
+.tool-btn{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.3em;
+  padding:8px 12px; border:1px solid var(--border);
+  background:transparent; color:var(--text2); cursor:pointer;
+  text-transform:uppercase; transition:.2s; touch-action:manipulation;
+}
+.tool-btn:hover{background:rgba(58,140,255,.1);border-color:var(--accent);}
+.tool-btn.danger:hover{background:rgba(255,80,80,.1);border-color:rgba(255,80,80,.4);color:rgba(255,150,150,.8);}
+#generate-btn{
+  margin-left:auto;
+  font:300 9px/1 'Georgia',serif; letter-spacing:.4em;
+  padding:9px 20px; border:1px solid var(--accent2);
+  background:rgba(255,140,60,.12); color:rgba(255,180,100,.9);
+  cursor:pointer; text-transform:uppercase; transition:.25s;
+  box-shadow:0 0 15px rgba(255,140,60,.1); touch-action:manipulation;
+}
+#generate-btn:hover{
+  background:rgba(255,140,60,.22); box-shadow:0 0 25px rgba(255,140,60,.25);
+}
+#generate-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── Right: result panel ── */
+#right{
+  flex:0 0 300px; display:flex; flex-direction:column;
+  border-left:1px solid var(--border);
+  background:rgba(8,12,22,.9);
+}
+#result-header{
+  flex:0 0 auto; padding:12px 16px 10px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+#result-header h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase;
+}
+#result-body{
+  flex:1 1 0; overflow-y:auto; padding:14px 16px;
+  -webkit-overflow-scrolling:touch;
+}
+#result-body::-webkit-scrollbar{width:3px;}
+#result-body::-webkit-scrollbar-thumb{background:rgba(80,140,255,.2);}
+#result-canvas-wrap{
+  margin-bottom:14px; position:relative;
+}
+#result-canvas{
+  width:100%; border:1px solid var(--border);
+  border-radius:4px; display:block;
+  background:rgba(4,8,18,.8);
+}
+#result-text{
+  font:300 11px/1.9 'Georgia',serif; color:var(--text);
+  min-height:60px;
+}
+#result-text .eq-line{
+  display:block; padding:5px 10px; margin:4px 0;
+  border-left:2px solid var(--accent2);
+  background:rgba(255,140,60,.06);
+  font-style:italic; color:rgba(220,200,160,.85);
+  font-size:10.5px; letter-spacing:.05em;
+}
+#result-text .desc-line{
+  display:block; font-size:9px; letter-spacing:.12em;
+  color:var(--text2); margin:4px 0 8px; line-height:1.7;
+}
+#result-text .title-line{
+  display:block; font:300 9px/1 'Georgia',serif;
+  letter-spacing:.45em; text-transform:uppercase;
+  color:rgba(140,190,255,.55); margin:10px 0 6px;
+}
+.loading{
+  display:flex; align-items:center; gap:8px;
+  color:var(--text2); font:300 9px/1 'Georgia',serif; letter-spacing:.3em;
+}
+.spinner{
+  width:14px;height:14px;border:1.5px solid var(--border);
+  border-top-color:var(--accent); border-radius:50%;
+  animation:spin .8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Input area (equation mode) ── */
+#eq-input-wrap{
+  flex:0 0 auto; padding:10px 14px;
+  border-top:1px solid var(--border);
+}
+#eq-input-wrap h3{
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  color:var(--text2); text-transform:uppercase; margin-bottom:8px;
+}
+#eq-input{
+  width:100%; background:rgba(4,8,18,.8);
+  border:1px solid var(--border); color:var(--text);
+  font:300 11px/1.6 'Georgia',serif; padding:8px 10px;
+  resize:none; height:64px; outline:none;
+  transition:.2s; -webkit-user-select:text; user-select:text;
+}
+#eq-input:focus{border-color:var(--accent);background:rgba(6,12,28,.9);}
+#eq-input::placeholder{color:rgba(100,130,200,.3);}
+#eq-submit{
+  margin-top:7px; width:100%;
+  font:300 8px/1 'Georgia',serif; letter-spacing:.4em;
+  padding:9px; border:1px solid var(--accent);
+  background:rgba(58,140,255,.1); color:rgba(140,190,255,.85);
+  cursor:pointer; text-transform:uppercase; transition:.25s; touch-action:manipulation;
+}
+#eq-submit:hover{background:rgba(58,140,255,.2);}
+#eq-submit:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── Responsive: tablet / phone ── */
+#panel-toggle{display:none;}
+@media (max-width: 900px){
+  #left{position:absolute;z-index:50;height:100%;left:0;top:0;
+        transform:translateX(-100%);transition:transform .25s;box-shadow:6px 0 24px rgba(0,0,0,.5);}
+  #right{position:absolute;z-index:50;height:100%;right:0;top:0;
+         transform:translateX(100%);transition:transform .25s;box-shadow:-6px 0 24px rgba(0,0,0,.5);}
+  #left.open{transform:translateX(0);}
+  #right.open{transform:translateX(0);}
+  #panel-toggle{display:flex;gap:6px;}
+  #header h1{font-size:11px;letter-spacing:.3em;}
+}
+</style>
+</head>
+<body>
+
+<div id="pressure-dot"></div>
+
+<!-- Header -->
+<div id="header">
+  <div>
+    <h1>Yamaguchi Framework</h1>
+    <div class="sub" style="margin-top:4px">方程式 ↔ 抽象画 双方向生成器</div>
+  </div>
+  <div id="panel-toggle">
+    <button class="mode-tab" id="toggle-left">◧ Tools</button>
+    <button class="mode-tab" id="toggle-right">Result ◨</button>
+  </div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="draw">✏ 描画→方程式</button>
+    <button class="mode-tab" data-mode="eq">∫ 方程式→抽象画</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div id="main">
+
+  <!-- Left Panel -->
+  <div id="left">
+    <!-- Color palette -->
+    <div id="palette-wrap">
+      <h3>Color Palette</h3>
+      <div id="palette"></div>
+    </div>
+
+    <!-- Brush size -->
+    <div id="brush-wrap">
+      <h3>Brush Size</h3>
+      <div class="brush-row">
+        <button class="brush-btn" data-size="1" style="width:22px;height:22px">·</button>
+        <button class="brush-btn active" data-size="2.5" style="width:28px;height:28px">·</button>
+        <button class="brush-btn" data-size="5" style="width:34px;height:34px">·</button>
+        <button class="brush-btn" data-size="9" style="width:40px;height:40px">·</button>
+        <button class="brush-btn" data-size="16" style="width:46px;height:46px">·</button>
+      </div>
+    </div>
+
+    <!-- Drawing options -->
+    <div id="opt-wrap">
+      <h3>Pen Options</h3>
+      <div class="opt-row">
+        <button class="opt-btn active" id="opt-smooth">Smoothing</button>
+        <button class="opt-btn active" id="opt-pressure">Pressure</button>
+      </div>
+    </div>
+
+    <!-- Sketch type (eq→sketch mode) -->
+    <div id="sketch-types">
+      <h3>Sketch Type</h3>
+      <div class="sketch-grid" id="sketch-type-grid"></div>
+    </div>
+
+    <!-- Equation list -->
+    <div id="eq-list-wrap">
+      <h3>PDF Equations</h3>
+      <div id="eq-list"></div>
+    </div>
+  </div>
+
+  <!-- Center canvas -->
+  <div id="center">
+    <div id="canvas-wrap">
+      <canvas id="bg-canvas"></canvas>
+      <canvas id="draw-canvas"></canvas>
+    </div>
+    <div id="canvas-toolbar">
+      <button class="tool-btn" id="undo-btn">← Undo</button>
+      <button class="tool-btn" id="redo-btn">Redo →</button>
+      <button class="tool-btn danger" id="clear-btn">Clear</button>
+      <span style="font:300 8px/1 'Georgia',serif;letter-spacing:.3em;color:rgba(100,140,200,.3);margin-left:4px" id="mode-hint">描画してください</span>
+      <button id="generate-btn">Generate →</button>
+    </div>
+    <!-- Equation input (hidden in draw mode) -->
+    <div id="eq-input-wrap" style="display:none">
+      <h3>Enter Equation</h3>
+      <textarea id="eq-input" placeholder="例: β(p,q) = ∫x^(p-1)(1-x)^(q-1)dx&#10;例: Γ(s) = ∫e^(-x)x^(s-1)dx&#10;例: □ψ = ∫A⊗/E·∂"></textarea>
+      <button id="eq-submit">→ 抽象画を生成</button>
+    </div>
+  </div>
+
+  <!-- Right result panel -->
+  <div id="right">
+    <div id="result-header">
+      <h3>Generated Result</h3>
+      <button class="tool-btn" id="copy-btn" style="padding:5px 8px;font-size:7px">Copy</button>
+    </div>
+    <div id="result-body">
+      <div id="result-canvas-wrap">
+        <canvas id="result-canvas" height="180"></canvas>
+      </div>
+      <div id="result-text">
+        <span class="desc-line" style="color:rgba(100,140,200,.35);text-align:center;display:block;margin-top:20px">
+          左の Canvas に描画するか<br>方程式を入力して Generate を押してください
+        </span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+// ═══════════════════════════════════════════════════
+// PDFから抽出した方程式データベース
+// ═══════════════════════════════════════════════════
+const EQ_DB = [
+  { cat:'Beta / Gamma 関数', id:'bg1',
+    eq:'d/df F(x,y) = d/df∫∫1/(x·logx)² dxm + d/df∫∫1/(y·logy)^(1/2) dym',
+    sketch:'foliation', desc:'大域的微分多様体の基本式。x·logx のシャノンエントロピーの2重積分が反重力と重力を記述する。' },
+  { cat:'Beta / Gamma 関数', id:'bg2',
+    eq:'β(p,q) = ∫x^(1-t)(1-x)^t dx = Γ(p)Γ(q)/Γ(p+q)',
+    sketch:'beta_oval', desc:'ベータ関数とガンマ関数の関係。Yamaguchi Frameworkの中核をなす積分変換。' },
+  { cat:'Beta / Gamma 関数', id:'bg3',
+    eq:'Γ(s) = ∫₀^∞ e^(-x)x^(s-1)dx,  Γ\'(s) = ∫₀^∞ e^(-x)x^(s-1)logx dx',
+    sketch:'circle_arc', desc:'ガンマ関数とその微分。大域的微分多様体のファーストバリュー。' },
+  { cat:'Beta / Gamma 関数', id:'bg4',
+    eq:'d/dγ Γ = Γ(γ)\'  →  e^(-x·logx)',
+    sketch:'vesica', desc:'ガンマ関数の微分が大域的微分多様体のエントロピー値 e^(-x·logx) と等しい。' },
+  { cat:'Beta / Gamma 関数', id:'bg5',
+    eq:'β(p,q) = β(p,q)/logx = β(p,q)/ζ(s)',
+    sketch:'hyperbola', desc:'ベータ関数とゼータ関数の商代数的関係。宇宙のDNAとしてのゼータ関数。' },
+  { cat:'Zeta / Shannon 関数', id:'zs1',
+    eq:'ζ(s) = β(p,q)/logx = x·logx',
+    sketch:'knot', desc:'ゼータ関数はシャノン公式と同型。ナッシュの式を反転・倍増するとノルム。' },
+  { cat:'Zeta / Shannon 関数', id:'zs2',
+    eq:'||ds²|| = ||x^(1/2)·logx||⁴ = x^(-1/2)',
+    sketch:'crystal', desc:'ジョン・ナッシュの式を倍増させたゼータ関数のノルム。サーストン・ペレルマン多様体。' },
+  { cat:'Zeta / Shannon 関数', id:'zs3',
+    eq:'E(σ) = K(σ) ⊗ H(σ),  ζ(s) = β(p,q)/logx',
+    sketch:'poincare', desc:'ポアンカレ級数としてのサーストン・ペレルマン多様体。K⊗H の積がゼータ関数。' },
+  { cat:'Zeta / Shannon 関数', id:'zs4',
+    eq:'∫ζ(s)dxm = β(p,q)/logx = ∫ζ(s)e^(-f)dV',
+    sketch:'manifold_loop', desc:'ゼータ関数の多様体積分。一般相対性理論のDNA。' },
+  { cat:'π演算子 / Dalanversian', id:'pd1',
+    eq:'π(χ,x) = [iπ(χ,x), f(x)],  non-commutative',
+    sketch:'figure8', desc:'非可換π演算子。虚数ポールとシャノンエントロピーの池の系。' },
+  { cat:'π演算子 / Dalanversian', id:'pd2',
+    eq:'□ = 2(sin(ix·logx) + cos(ix·logx))',
+    sketch:'tns_wave', desc:'ダランベルシアンの反重力表現。円関数による再帰的表現。' },
+  { cat:'π演算子 / Dalanversian', id:'pd3',
+    eq:'□ = cos(ix·logx) - i·sin(ix·logx)',
+    sketch:'wave_cross', desc:'ダランベルシアンの円関数表現。neipa数のステップ関数との循環。' },
+  { cat:'π演算子 / Dalanversian', id:'pd4',
+    eq:'∫e^(-□)d□ = πe,  πe ≅ eπ',
+    sketch:'approx_fan', desc:'πとeの神秘的関係。オイラー積分多様体との反重力・重力刺激。' },
+  { cat:'大域的微分多様体', id:'gm1',
+    eq:'HΨ = ⊕(iℏ∇)^(⊕L) = e^(x·logx) = x(x)\'',
+    sketch:'manifold_tri', desc:'ハイゼンベルク方程式が大域的積分多様体として表される。アカシックレコードの式。' },
+  { cat:'大域的微分多様体', id:'gm2',
+    eq:'d/df F = d/df∫∫1/(x·logx)² dxm + d/df∫∫1/(y·logy)^(1/2) dym = Γ(x,y)',
+    sketch:'ricci_web', desc:'大域的微分多様体の基本公式。Γ(x,y)への収束。' },
+  { cat:'大域的微分多様体', id:'gm3',
+    eq:'||ds²|| = ∫[D²ψ ⊗ hν]dτ,  D-brane',
+    sketch:'loop_helix', desc:'D-ブレーンの種数分解元。大域的微分多様体の微分基底。' },
+  { cat:'大域的微分多様体', id:'gm4',
+    eq:'log(x·logx) ≥ 2(y·logy)^(1/2)',
+    sketch:'beta_oval', desc:'大域的安全平均方程式の不等式。多様体の存在証明の不等式。' },
+  { cat:'Jones 多項式 / 結び目', id:'jp1',
+    eq:'E(σ) = K(σ) ⊗ H(σ) = β^(-1)(x)xβ(x)',
+    sketch:'knot', desc:'サーストン・ペレルマン多様体のJones多項式。Möbius次元の混合。' },
+  { cat:'Jones 多項式 / 結び目', id:'jp2',
+    eq:'bpc(1χ·∂)∭∭∭ = ht,  topological crossing',
+    sketch:'triple_int', desc:'Jones多項式の位相的交差数。三重積分による種数計算。' },
+  { cat:'一般相対性理論', id:'gr1',
+    eq:'∫κT^μν dvol = ∫(R + 1/2·gij·Λ)dxm',
+    sketch:'ricci_web', desc:'一般相対性理論の多様体積分。宇宙のDNAとしての積分多様体。' },
+  { cat:'一般相対性理論', id:'gr2',
+    eq:'||ds²|| = e^(-2πT||ψ||)[η + h̄(x)]dx^μdx^ν + T²d²ψ',
+    sketch:'manifold_loop', desc:'AdS5多様体の計量。原子間距離とD-ブレーン構造。' },
+  { cat:'一般相対性理論', id:'gr3',
+    eq:'□ = -16πG/c⁴ · T^μν,  □ = 8πG/c⁴ · T^μν/logx',
+    sketch:'crystal', desc:'重力場方程式とその対数版。反重力方程式の本質。' },
+  { cat:'一般相対性理論', id:'gr4',
+    eq:'x^n + y^n - nxyz = 0,  ||ds²|| = e^(-2πT||ψ||)[η+h̄(x)]dxdx+T²d²ψ',
+    sketch:'triple_int', desc:'フェルマーの定理との融合。一般相対性理論とAdS5多様体。' },
+  { cat:'量子力学 / Heisenberg', id:'qm1',
+    eq:'|ψ(t)⟩ = e^(-iĤt)|Ψ⟩_H,  dÂ/dt = 1/i[A,Ĥ]',
+    sketch:'fiber', desc:'ハイゼンベルク描像。Schrödinger描像との等価性。' },
+  { cat:'量子力学 / Heisenberg', id:'qm2',
+    eq:'⊕(iℏ∇)^(⊕L) = ĤΨ/iℏ = iℏ^(iℏ\') = e^(HΨ·logHΨ)',
+    sketch:'loop_helix', desc:'発散演算子のステップ関数。量子レベルの微分幾何多様体。' },
+  { cat:'量子力学 / Heisenberg', id:'qm3',
+    eq:'d/dt ψ(t) = ℏ = 1/2·ie^(iĤ),  (iℏ)\' = -ie^(iĤ)',
+    sketch:'vesica', desc:'量子時間発展方程式とガンマ関数の大域的微分多様体。' },
+  { cat:'エントロピー / Euler', id:'ee1',
+    eq:'C = ∫(1/x^s dx - logx),  C = 0.5772156...',
+    sketch:'approx_fan', desc:'オイラーの定数の大域的積分多様体。シュワルツシルト半径と同型。' },
+  { cat:'エントロピー / Euler', id:'ee2',
+    eq:'d/df F + ∫C dxm = 2(cos(ix·logx) - i·sin(ix·logx))',
+    sketch:'circle_arc', desc:'重力と反重力の統一式。オイラーの定数と虚数の度解。' },
+  { cat:'エントロピー / Euler', id:'ee3',
+    eq:'∫∫1/(x·logx)² dxm = 1/2·i',
+    sketch:'figure8', desc:'反重力方程式の積分値。シャノンエントロピーの虚数積分。' },
+  { cat:'カタストロフィー / M理論', id:'cm1',
+    eq:'RRR[∇i∇j ▷◁ / ∇L] dIm,  log(x·logx) ≥ 2√(y·logy)',
+    sketch:'manifold_tri', desc:'M次元多様体。宇宙と異次元の射影空間的構成。' },
+  { cat:'カタストロフィー / M理論', id:'cm2',
+    eq:'T^(≪(p,q)), ▷◁ = β(p,q)/logx = D²ψ ⊗ hν',
+    sketch:'fiber', desc:'テンソルT^(p,q)によるD-ブレーンの量子波動。タイムボウ方程式。' },
+  { cat:'Dalia / Magic 演算子', id:'dm1',
+    eq:'∇∆ = ∮D M(□)d□,  π(χ,x) = ∮M[iπ(χ,x),f(x)]',
+    sketch:'poincare', desc:'アカシックレコードのライブラリ。開積分の基本重力。' },
+  { cat:'Dalia / Magic 演算子', id:'dm2',
+    eq:'∇∆ = ∫▷◁\'(□)dxm,  HΨ = [χ]',
+    sketch:'beta_circle', desc:'Magic演算子のグローバル積分。タイムボウ方程式の解。' },
+];
+
+const SKETCH_TYPES = [
+  {id:'vesica',      label:'Vesica'},
+  {id:'poincare',    label:'Poincaré'},
+  {id:'foliation',   label:'Foliation'},
+  {id:'manifold_tri',label:'Manifold'},
+  {id:'loop_helix',  label:'Loop'},
+  {id:'figure8',     label:'Figure8'},
+  {id:'fiber',       label:'Fiber'},
+  {id:'crystal',     label:'Crystal'},
+  {id:'circle_arc',  label:'Circle'},
+  {id:'hyperbola',   label:'Hyperbola'},
+  {id:'approx_fan',  label:'Approx'},
+  {id:'beta_oval',   label:'Beta Oval'},
+  {id:'triple_int',  label:'Triple∫'},
+  {id:'knot',        label:'Knot'},
+  {id:'tns_wave',    label:'Wave'},
+  {id:'manifold_loop',label:'M-Loop'},
+  {id:'ricci_web',   label:'Ricci'},
+  {id:'wave_cross',  label:'Wave×'},
+  {id:'pi_fan',      label:'π-Fan'},
+  {id:'beta_circle', label:'β-Circle'},
+];
+
+const COLORS = [
+  '#4a9eff','#7fc4ff','#a0d4ff',
+  '#ff8c3a','#ffb060','#ffe090',
+  '#60ff90','#a0ffb0',
+  '#e060ff','#ff60a0',
+  '#ffffff','rgba(255,255,255,.45)',
+  '#c0d8ff',
+];
+
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+let mode = 'draw';
+let currentColor = COLORS[0];
+let brushSize = 2.5;
+let isDrawing = false;
+let activePointerId = null;
+let history = [];
+let redoStack = [];
+let selectedEq = null;
+let selectedSketchType = SKETCH_TYPES[0].id;
+let smoothingOn = true;
+let pressureOn  = true;
+
+// ═══════════════════════════════════════════════════
+// Canvas setup
+// ═══════════════════════════════════════════════════
+const drawCanvas  = document.getElementById('draw-canvas');
+const bgCanvas    = document.getElementById('bg-canvas');
+const resultCanvas= document.getElementById('result-canvas');
+const dc = drawCanvas.getContext('2d');
+const bc = bgCanvas.getContext('2d');
+const rc = resultCanvas.getContext('2d');
+
+let DPR = window.devicePixelRatio || 1;
+
+function resizeCanvases(){
+  const wrap = document.getElementById('canvas-wrap');
+  const w = wrap.clientWidth, h = wrap.clientHeight;
+  DPR = window.devicePixelRatio || 1;
+
+  // 描画内容を保持したままリサイズ
+  let snapshot = null;
+  if(drawCanvas.width && drawCanvas.height){
+    snapshot = document.createElement('canvas');
+    snapshot.width = drawCanvas.width; snapshot.height = drawCanvas.height;
+    snapshot.getContext('2d').drawImage(drawCanvas,0,0);
+  }
+
+  [drawCanvas, bgCanvas].forEach(c=>{
+    c.width  = Math.round(w * DPR);
+    c.height = Math.round(h * DPR);
+    c.style.width  = w + 'px';
+    c.style.height = h + 'px';
+  });
+  if(snapshot) dc.drawImage(snapshot,0,0,drawCanvas.width,drawCanvas.height);
+
+  const rw = resultCanvas.clientWidth || 268;
+  resultCanvas.width  = Math.round(rw * DPR);
+  resultCanvas.height = Math.round(180 * DPR);
+  resultCanvas.style.height = '180px';
+  drawBg();
+}
+
+// ── 背景（微かなグリッド） ──
+function drawBg(){
+  const w=bgCanvas.width, h=bgCanvas.height;
+  bc.clearRect(0,0,w,h);
+  bc.strokeStyle='rgba(40,80,160,.06)';
+  bc.lineWidth=Math.max(.5, DPR*.5);
+  const step = 30*DPR;
+  for(let x=0;x<w;x+=step){ bc.beginPath();bc.moveTo(x,0);bc.lineTo(x,h);bc.stroke(); }
+  for(let y=0;y<h;y+=step){ bc.beginPath();bc.moveTo(0,y);bc.lineTo(w,y);bc.stroke(); }
+  bc.beginPath(); bc.arc(w/2,h/2,2*DPR,0,Math.PI*2);
+  bc.fillStyle='rgba(58,140,255,.08)'; bc.fill();
+}
+
+// ═══════════════════════════════════════════════════
+// 高精度タッチ描画エンジン
+// ・Pointer Events + setPointerCapture（範囲外でも継続）
+// ・primary pointer のみ描画（マルチタッチ／手のひら誤爆を抑制）
+// ・getCoalescedEvents で高サンプリングレート取得
+// ・中点二次ベジェによる真のスムージング
+// ・筆圧の指数移動平均でブレを除去し線幅を安定化
+// ・devicePixelRatio 補正で高DPI端末でも正確な座標
+// ═══════════════════════════════════════════════════
+const pressureDot = document.getElementById('pressure-dot');
+let currentPressure = 0.5;
+let emaPressure = 0.5;
+
+// デバイス画素座標を返す（キャンバスは変換なしのデバイス画素空間で描画）
+function getPos(e){
+  const r = drawCanvas.getBoundingClientRect();
+  const scaleX = drawCanvas.width  / r.width;
+  const scaleY = drawCanvas.height / r.height;
+  return { x:(e.clientX - r.left)*scaleX, y:(e.clientY - r.top)*scaleY };
+}
+
+function effectiveWidth(e){
+  let p = (pressureOn && e.pressure && e.pressure>0) ? e.pressure : 0.5;
+  // 指数移動平均で筆圧のジッタを除去
+  emaPressure = emaPressure*0.55 + p*0.45;
+  currentPressure = emaPressure;
+  const factor = pressureOn ? (0.45 + emaPressure*1.3) : 1.0;
+  return brushSize * DPR * factor;
+}
+
+// ストローク状態（中点スムージング用）
+let lastPt = null, penultPt = null;
+
+function strokeStyleSetup(w){
+  dc.strokeStyle = currentColor;
+  dc.fillStyle   = currentColor;
+  dc.lineWidth   = w;
+  dc.lineCap     = 'round';
+  dc.lineJoin    = 'round';
+}
+
+function drawDot(x,y,w){
+  dc.beginPath();
+  dc.arc(x,y,Math.max(0.4,w*0.5),0,Math.PI*2);
+  dc.fillStyle = currentColor;
+  dc.fill();
+}
+
+function addPoint(x,y,w){
+  const cur = {x,y,w};
+  if(!lastPt){ lastPt = cur; drawDot(x,y,w); return; }
+
+  const dx = cur.x-lastPt.x, dy = cur.y-lastPt.y;
+  // 極端に近い点は間引く（描画負荷とギザつき低減）
+  if(dx*dx+dy*dy < 0.35 && penultPt) return;
+
+  if(!smoothingOn){
+    strokeStyleSetup((lastPt.w+cur.w)*0.5);
+    dc.beginPath(); dc.moveTo(lastPt.x,lastPt.y); dc.lineTo(cur.x,cur.y); dc.stroke();
+    penultPt = lastPt; lastPt = cur; return;
+  }
+
+  if(!penultPt){
+    strokeStyleSetup((lastPt.w+cur.w)*0.5);
+    dc.beginPath(); dc.moveTo(lastPt.x,lastPt.y); dc.lineTo(cur.x,cur.y); dc.stroke();
+    penultPt = lastPt; lastPt = cur; return;
+  }
+
+  const m1 = { x:(penultPt.x+lastPt.x)*0.5, y:(penultPt.y+lastPt.y)*0.5 };
+  const m2 = { x:(lastPt.x+cur.x)*0.5,      y:(lastPt.y+cur.y)*0.5      };
+  strokeStyleSetup(lastPt.w);
+  dc.beginPath();
+  dc.moveTo(m1.x,m1.y);
+  dc.quadraticCurveTo(lastPt.x,lastPt.y,m2.x,m2.y);
+  dc.stroke();
+  penultPt = lastPt; lastPt = cur;
+}
+
+function endStroke(){
+  if(lastPt && penultPt && smoothingOn){
+    const m1 = { x:(penultPt.x+lastPt.x)*0.5, y:(penultPt.y+lastPt.y)*0.5 };
+    strokeStyleSetup(lastPt.w);
+    dc.beginPath(); dc.moveTo(m1.x,m1.y); dc.lineTo(lastPt.x,lastPt.y); dc.stroke();
+  }
+  lastPt = penultPt = null;
+  isDrawing = false;
+  activePointerId = null;
+  pressureDot.style.display = 'none';
+}
+
+function updatePressureDot(e){
+  if(mode!=='draw'){ pressureDot.style.display='none'; return; }
+  pressureDot.style.display = 'block';
+  pressureDot.style.left = e.clientX + 'px';
+  pressureDot.style.top  = e.clientY + 'px';
+  const s = Math.max(6, brushSize * (pressureOn?currentPressure*1.6:1.2) * 2);
+  pressureDot.style.width  = s + 'px';
+  pressureDot.style.height = s + 'px';
+}
+
+drawCanvas.addEventListener('pointerdown', e=>{
+  if(mode !== 'draw') return;
+  if(isDrawing) return;                 // 既に描画中の別ポインタは無視
+  if(e.pointerType==='touch' && e.isPrimary===false) return;  // マルチタッチ抑制
+  e.preventDefault();
+  try{ drawCanvas.setPointerCapture(e.pointerId); }catch(_){}
+  activePointerId = e.pointerId;
+  isDrawing = true;
+  saveHistory();
+  emaPressure = (pressureOn && e.pressure>0)? e.pressure : 0.5;
+  lastPt = penultPt = null;
+  const p = getPos(e);
+  addPoint(p.x, p.y, effectiveWidth(e));
+  updatePressureDot(e);
+}, { passive:false });
+
+drawCanvas.addEventListener('pointermove', e=>{
+  if(!isDrawing || mode !== 'draw' || e.pointerId !== activePointerId) return;
+  e.preventDefault();
+  const events = (e.getCoalescedEvents && e.getCoalescedEvents().length) ? e.getCoalescedEvents() : [e];
+  for(const ev of events){
+    const p = getPos(ev);
+    addPoint(p.x, p.y, effectiveWidth(ev));
+  }
+  updatePressureDot(e);
+}, { passive:false });
+
+function onEnd(e){
+  if(e.pointerId !== activePointerId) return;
+  e.preventDefault();
+  endStroke();
+}
+drawCanvas.addEventListener('pointerup',     onEnd, { passive:false });
+drawCanvas.addEventListener('pointercancel', onEnd, { passive:false });
+drawCanvas.addEventListener('lostpointercapture', ()=>{ if(isDrawing) endStroke(); });
+
+drawCanvas.addEventListener('contextmenu', e=> e.preventDefault());
+document.addEventListener('touchmove', e=>{ if(isDrawing) e.preventDefault(); }, { passive:false });
+document.addEventListener('gesturestart', e=> e.preventDefault());
+
+// ── Undo / Redo 履歴 ──
+function saveHistory(){
+  try{
+    history.push(dc.getImageData(0,0,drawCanvas.width,drawCanvas.height));
+    if(history.length>40) history.shift();
+    redoStack.length = 0;
+  }catch(_){}
+}
+
+// ═══════════════════════════════════════════════════
+// Build UI
+// ═══════════════════════════════════════════════════
+function buildPalette(){
+  const p=document.getElementById('palette');
+  COLORS.forEach((c,i)=>{
+    const b=document.createElement('button');
+    b.className='pal-btn'+(i===0?' active':'');
+    b.style.background=c;
+    b.onclick=()=>{
+      currentColor=c;
+      document.querySelectorAll('.pal-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    };
+    p.appendChild(b);
+  });
+}
+
+function buildBrushBtns(){
+  document.querySelectorAll('.brush-btn').forEach(b=>{
+    b.onclick=()=>{
+      brushSize=parseFloat(b.dataset.size);
+      document.querySelectorAll('.brush-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    };
+  });
+}
+
+function buildSketchTypes(){
+  const g=document.getElementById('sketch-type-grid');
+  SKETCH_TYPES.forEach(t=>{
+    const b=document.createElement('button');
+    b.className='sk-btn'+(t.id===selectedSketchType?' active':'');
+    b.textContent=t.label;
+    b.dataset.sketch=t.id;
+    b.onclick=()=>{
+      selectedSketchType=t.id;
+      document.querySelectorAll('.sk-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      if(mode==='eq') drawResultSketch(selectedSketchType,'blue');
+    };
+    g.appendChild(b);
+  });
+}
+
+function buildEqList(){
+  const el=document.getElementById('eq-list');
+  let lastCat='';
+  EQ_DB.forEach(item=>{
+    if(item.cat!==lastCat){
+      const d=document.createElement('div');
+      d.className='eq-cat'; d.textContent=item.cat; el.appendChild(d);
+      lastCat=item.cat;
+    }
+    const d=document.createElement('div');
+    d.className='eq-item'; d.textContent=item.eq; d.dataset.id=item.id;
+    d.onclick=()=>{
+      document.querySelectorAll('.eq-item').forEach(x=>x.classList.remove('selected'));
+      d.classList.add('selected');
+      selectedEq=item;
+      selectedSketchType=item.sketch;
+      document.querySelectorAll('.sk-btn').forEach(x=>x.classList.toggle('active', x.dataset.sketch===item.sketch));
+      if(mode==='eq'){
+        document.getElementById('eq-input').value=item.eq;
+        drawResultSketch(item.sketch,'blue');
+      }
+    };
+    el.appendChild(d);
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// Mode switch
+// ═══════════════════════════════════════════════════
+document.querySelectorAll('.mode-tab[data-mode]').forEach(t=>{
+  t.onclick=()=>{
+    mode=t.dataset.mode;
+    document.querySelectorAll('.mode-tab[data-mode]').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const eqWrap=document.getElementById('eq-input-wrap');
+    const hint=document.getElementById('mode-hint');
+    const genBtn=document.getElementById('generate-btn');
+    if(mode==='draw'){
+      eqWrap.style.display='none';
+      hint.textContent='描画してください';
+      genBtn.style.display='block';
+      genBtn.textContent='Generate →';
+      drawCanvas.style.cursor='crosshair';
+    } else {
+      eqWrap.style.display='block';
+      hint.textContent='方程式を入力 / 選択してください';
+      genBtn.style.display='none';
+      drawCanvas.style.cursor='default';
+    }
+  };
+});
+
+// Pen option toggles
+document.getElementById('opt-smooth').onclick=function(){
+  smoothingOn=!smoothingOn; this.classList.toggle('active',smoothingOn);
+};
+document.getElementById('opt-pressure').onclick=function(){
+  pressureOn=!pressureOn; this.classList.toggle('active',pressureOn);
+};
+
+// Responsive panel toggles
+document.getElementById('toggle-left').onclick=()=>document.getElementById('left').classList.toggle('open');
+document.getElementById('toggle-right').onclick=()=>document.getElementById('right').classList.toggle('open');
+
+// ═══════════════════════════════════════════════════
+// Toolbar buttons
+// ═══════════════════════════════════════════════════
+document.getElementById('undo-btn').onclick=()=>{
+  if(history.length>0){
+    try{ redoStack.push(dc.getImageData(0,0,drawCanvas.width,drawCanvas.height)); }catch(_){}
+    dc.putImageData(history.pop(),0,0);
+  }
+};
+document.getElementById('redo-btn').onclick=()=>{
+  if(redoStack.length>0){
+    try{ history.push(dc.getImageData(0,0,drawCanvas.width,drawCanvas.height)); }catch(_){}
+    dc.putImageData(redoStack.pop(),0,0);
+  }
+};
+document.getElementById('clear-btn').onclick=()=>{
+  saveHistory();
+  dc.clearRect(0,0,drawCanvas.width,drawCanvas.height);
+};
+document.getElementById('copy-btn').onclick=()=>{
+  const txt=document.getElementById('result-text').innerText;
+  navigator.clipboard?.writeText(txt).catch(()=>{});
+};
+
+// ═══════════════════════════════════════════════════
+// GENERATE: draw→equations (Claude API, optional/online)
+// ═══════════════════════════════════════════════════
+document.getElementById('generate-btn').onclick = async ()=>{
+  if(mode!=='draw') return;
+  const btn=document.getElementById('generate-btn');
+  btn.disabled=true;
+  setResultLoading(true);
+  const imgData = drawCanvas.toDataURL('image/png');
+  const base64  = imgData.split(',')[1];
+  const eqContext = EQ_DB.slice(0,15).map(e=>`・${e.eq} [${e.cat}]`).join('\n');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        system: `あなたは山口フレームワーク(Yamaguchi Framework)の専門家です。
+ユーザーが描いた手書き抽象画を分析し、以下のPDF方程式群の中から最も対応する方程式を選び、
+その幾何構造・位相的意味・物理的解釈を日本語で簡潔に説明してください。
+
+【PDF方程式データベース（抜粋）】
+${eqContext}
+
+回答は以下のJSON形式のみで返してください（他の文字は一切含めない）:
+{
+  "title": "スケッチのタイトル（日本語10文字以内）",
+  "sketch_type": "スケッチタイプID（vesica/poincare/foliation/manifold_tri/loop_helix/figure8/fiber/crystal/circle_arc/hyperbola/approx_fan/beta_oval/triple_int/knot/tns_wave/manifold_loop/ricci_web/wave_cross/pi_fan/beta_circleのいずれか）",
+  "equations": ["対応する方程式1", "対応する方程式2", "対応する方程式3"],
+  "description": "幾何構造・位相的意味の説明（150字以内）",
+  "manifold_type": "多様体の種類（例：大域的微分多様体、Jones多様体など）"
+}`,
+        messages:[{
+          role:'user',
+          content:[
+            { type:'image', source:{type:'base64', media_type:'image/png', data:base64} },
+            { type:'text', text:'この手書き抽象画に対応する山口フレームワークの方程式群を分析してください。' }
+          ]
+        }]
+      })
+    });
+    const data = await resp.json();
+    const raw  = data.content?.map(c=>c.text||'').join('');
+    let parsed;
+    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(e){ parsed = offlineDrawResult(); }
+    showResult(parsed, 'draw');
+  } catch(err){
+    // オフライン（apk/exe パッケージ）でもローカル解析で動作
+    showResult(offlineDrawResult(), 'draw');
+  }
+  btn.disabled=false;
+  setResultLoading(false);
+};
+
+// オンライン不可時のローカル推定
+function offlineDrawResult(){
+  const pick = EQ_DB[Math.floor((history.length*7+brushSize*3) % EQ_DB.length)] || EQ_DB[0];
+  return {
+    title:'ローカル解析',
+    sketch_type: pick.sketch,
+    equations: [pick.eq],
+    description: pick.desc + '（オフライン・ローカル推定）',
+    manifold_type: pick.cat
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// GENERATE: equation→sketch
+// ═══════════════════════════════════════════════════
+document.getElementById('eq-submit').onclick = async ()=>{
+  const input = document.getElementById('eq-input').value.trim();
+  if(!input) return;
+  const btn = document.getElementById('eq-submit');
+  btn.disabled=true;
+  setResultLoading(true);
+  const eqContext = EQ_DB.slice(0,20).map(e=>`・${e.eq} → sketch:${e.sketch} [${e.cat}]`).join('\n');
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        system:`あなたは山口フレームワーク(Yamaguchi Framework)の数理芸術専門家です。
+入力された方程式を分析し、対応する抽象的な幾何スケッチの仕様を生成してください。
+
+【既知の方程式→スケッチ対応表】
+${eqContext}
+
+回答は以下のJSON形式のみで返してください:
+{
+  "title": "スケッチタイトル（日本語）",
+  "sketch_type": "スケッチタイプID（vesica/poincare/foliation/manifold_tri/loop_helix/figure8/fiber/crystal/circle_arc/hyperbola/approx_fan/beta_oval/triple_int/knot/tns_wave/manifold_loop/ricci_web/wave_cross/pi_fan/beta_circleのいずれか）",
+  "color": "色名（blue/orange/green/white/purple）",
+  "equations": ["入力方程式", "関連方程式1", "関連方程式2"],
+  "description": "幾何的意味の説明（150字以内）",
+  "manifold_type": "多様体の種類"
+}`,
+        messages:[{ role:'user', content:`以下の方程式を分析してください:\n${input}` }]
+      })
+    });
+    const data = await resp.json();
+    const raw  = data.content?.map(c=>c.text||'').join('');
+    let parsed;
+    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch(e){ parsed = offlineEqResult(input); }
+    drawGeneratedSketch(parsed);
+    showResult(parsed, 'eq');
+  } catch(err){
+    const parsed = offlineEqResult(input);
+    drawGeneratedSketch(parsed);
+    showResult(parsed, 'eq');
+  }
+  btn.disabled=false;
+  setResultLoading(false);
+};
+
+function offlineEqResult(input){
+  // 入力方程式に最も近い既知式をキーワードで推定
+  let best=null, bestScore=-1;
+  const toks = input.replace(/\s/g,'');
+  EQ_DB.forEach(e=>{
+    let s=0; ['β','Γ','ζ','π','∫','□','∇','ℏ','⊗','⊕','log','ds','Ψ','ψ'].forEach(k=>{
+      if(toks.includes(k)&&e.eq.includes(k)) s++;
+    });
+    if(s>bestScore){bestScore=s;best=e;}
+  });
+  best = best || EQ_DB[0];
+  return { title:'抽象画生成', sketch_type:best.sketch, color:'blue',
+           equations:[input, best.eq], description:best.desc, manifold_type:best.cat };
+}
+
+// ═══════════════════════════════════════════════════
+// 結果表示
+// ═══════════════════════════════════════════════════
+function setResultLoading(on){
+  if(on){
+    document.getElementById('result-text').innerHTML=
+      '<div class="loading"><div class="spinner"></div><span style="letter-spacing:.3em;font-size:8px">Generating...</span></div>';
+  }
+}
+function showResult(parsed, fromMode){
+  const rt=document.getElementById('result-text');
+  let html='';
+  html+=`<span class="title-line">${parsed.title||'Result'}</span>`;
+  html+=`<span class="desc-line">種類: ${parsed.manifold_type||''}</span>`;
+  if(parsed.equations?.length){
+    parsed.equations.forEach(eq=>{ html+=`<span class="eq-line">${eq}</span>`; });
+  }
+  html+=`<span class="desc-line" style="margin-top:8px">${parsed.description||''}</span>`;
+  rt.innerHTML=html;
+  drawResultSketch(parsed.sketch_type||selectedSketchType, parsed.color);
+  if(fromMode==='eq') drawGeneratedSketch(parsed);
+}
+
+// ═══════════════════════════════════════════════════
+// スケッチ描画エンジン
+// ═══════════════════════════════════════════════════
+const COLOR_MAP={
+  blue:'rgba(80,170,255,',  orange:'rgba(255,150,60,',
+  green:'rgba(80,230,120,', white:'rgba(220,235,255,',
+  purple:'rgba(180,100,255,'
+};
+
+function drawResultSketch(type, colorName){
+  const w=resultCanvas.width, h=resultCanvas.height;
+  rc.clearRect(0,0,w,h);
+  rc.fillStyle='rgba(4,8,18,.95)'; rc.fillRect(0,0,w,h);
+  const col=(COLOR_MAP[colorName]||'rgba(80,170,255,')+'.75)';
+  const cx=w/2, cy=h/2;
+  const S=Math.min(w,h)*0.0048;
+  drawSketchShape(rc,type,S,0,cx,cy,col,1.5*DPR,14);
+  rc.beginPath(); rc.arc(cx,cy,Math.min(w,h)*.38,0,Math.PI*2);
+  rc.strokeStyle=(COLOR_MAP[colorName]||'rgba(80,170,255,')+'.15)';
+  rc.lineWidth=.5*DPR; rc.stroke();
+}
+
+function drawGeneratedSketch(parsed){
+  const w=drawCanvas.width, h=drawCanvas.height;
+  const type=parsed.sketch_type||selectedSketchType;
+  const colorName=parsed.color||'blue';
+  const col=(COLOR_MAP[colorName]||'rgba(80,170,255,')+'.7)';
+  const S=Math.min(w,h)*0.0060;
+  const cx=w/2, cy=h*.42;
+  saveHistory();
+  drawSketchShape(dc,type,S,0,cx,cy,col,2.0*DPR,22);
+}
+
+function drawSketchShape(ctx,type,s,ph,cx,cy,col,lw,glow){
+  ctx.save();
+  ctx.translate(cx,cy);
+  ctx.strokeStyle=col;
+  ctx.lineWidth=lw;
+  ctx.shadowColor=col;
+  ctx.shadowBlur=glow;
+  ctx.beginPath();
+  switch(type){
+    case 'vesica':
+      ctx.ellipse(0,0,44*s,32*s,0,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-64*s,-46*s); ctx.lineTo(64*s,46*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(64*s,-46*s); ctx.lineTo(-64*s,46*s); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0,0,22*s,32*s,0,0,Math.PI*2); ctx.stroke(); break;
+    case 'poincare':
+      ctx.ellipse(0,0,34*s,50*s,0,0,Math.PI*2); ctx.stroke();
+      for(let i=0;i<3;i++){
+        const a=(i/3)*Math.PI*2+ph; ctx.beginPath(); ctx.moveTo(0,0);
+        for(let t=0;t<=1;t+=.03){ const r=55*s*t; ctx.lineTo(Math.cos(a+t*.44)*r,Math.sin(a+t*.44)*r); }
+        ctx.stroke();
+      } break;
+    case 'foliation':
+      for(let i=0;i<6;i++){
+        const a=(i/6)*Math.PI*2;
+        ctx.beginPath(); ctx.moveTo(0,0);
+        ctx.quadraticCurveTo(Math.cos(a+.32)*44*s,Math.sin(a+.32)*44*s,Math.cos(a)*72*s,Math.sin(a)*72*s); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(Math.cos(a)*36*s,Math.sin(a)*36*s,13*s,8*s,a,0,Math.PI*2); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.arc(0,0,24*s,0,Math.PI*2); ctx.stroke(); break;
+    case 'manifold_tri':
+      ctx.moveTo(0,-60*s); ctx.lineTo(56*s,34*s); ctx.lineTo(-56*s,34*s); ctx.closePath(); ctx.stroke();
+      for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo((i-1.5)*24*s,-32*s); ctx.quadraticCurveTo((i-1.5)*28*s,0,(i-1.5)*15*s,38*s); ctx.stroke(); } break;
+    case 'loop_helix':
+      for(let i=0;i<5;i++){ ctx.beginPath(); ctx.ellipse((i-2)*23*s,0,14*s,21*s,0,0,Math.PI*2); ctx.stroke(); }
+      for(let i=-3;i<=3;i++){ ctx.beginPath(); ctx.moveTo(i*18*s,-52*s); ctx.lineTo(i*10*s,52*s); ctx.stroke(); } break;
+    case 'figure8':
+      ctx.ellipse(-27*s,0,24*s,36*s,.3,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(27*s,0,24*s,36*s,-.3,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-64*s,-50*s); ctx.lineTo(64*s,50*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-64*s,50*s); ctx.lineTo(64*s,-50*s); ctx.stroke(); break;
+    case 'fiber':
+      for(let i=0;i<8;i++){ const t=i/7; ctx.beginPath(); ctx.moveTo(-64*s+t*24*s,-46*s); ctx.quadraticCurveTo(-24*s+t*46*s,0,56*s+t*20*s,48*s); ctx.stroke(); } break;
+    case 'crystal':
+      for(let i=-3;i<=3;i++){
+        ctx.beginPath(); ctx.moveTo(i*20*s,-56*s); ctx.lineTo(i*14*s,56*s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-60*s,i*20*s); ctx.lineTo(60*s,i*16*s); ctx.stroke();
+      } break;
+    case 'circle_arc':
+      for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(0,0,(i+1)*16*s,Math.PI*1.05,Math.PI*2.1); ctx.stroke(); }
+      ctx.beginPath(); ctx.moveTo(-68*s,0); ctx.lineTo(68*s,0); ctx.stroke(); break;
+    case 'hyperbola':
+      for(let i=0;i<3;i++){
+        const k=(i+1)*16*s;
+        ctx.beginPath(); for(let t=-1.6;t<=1.6;t+=.04){ const x=k*Math.cosh(t),y=k*Math.sinh(t); t<-1.55?ctx.moveTo(x,y):ctx.lineTo(x,y); } ctx.stroke();
+        ctx.beginPath(); for(let t=-1.6;t<=1.6;t+=.04){ const x=-k*Math.cosh(t),y=k*Math.sinh(t); t<-1.55?ctx.moveTo(x,y):ctx.lineTo(x,y); } ctx.stroke();
+      } break;
+    case 'approx_fan':
+      for(let i=0;i<6;i++){ const a=-0.72+(i/5)*1.44; ctx.beginPath(); ctx.moveTo(0,0); for(let t=0;t<=58*s;t+=2) ctx.lineTo(Math.cos(a)*t,Math.sin(a)*t); ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(0,0,23*s,-.82,1.0); ctx.stroke(); break;
+    case 'beta_oval':
+      ctx.ellipse(0,0,48*s,31*s,0,0,Math.PI*2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-66*s,-40*s); ctx.lineTo(33*s,34*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(66*s,-40*s); ctx.lineTo(-33*s,34*s); ctx.stroke();
+      for(let i=0;i<4;i++){ const a=(i/4)*Math.PI*2; ctx.beginPath(); ctx.arc(Math.cos(a)*25*s,Math.sin(a)*25*s,7*s,0,Math.PI*2); ctx.stroke(); } break;
+    case 'triple_int':
+      for(let i=-3;i<=3;i++){
+        ctx.beginPath(); ctx.moveTo(i*16*s,-56*s); ctx.lineTo(i*16*s,56*s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-56*s,i*16*s); ctx.lineTo(56*s,i*16*s); ctx.stroke();
+      }
+      ctx.beginPath(); ctx.moveTo(-56*s,-56*s); ctx.lineTo(56*s,56*s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(56*s,-56*s); ctx.lineTo(-56*s,56*s); ctx.stroke(); break;
+    case 'knot':
+      for(let i=0;i<3;i++){ const off=i*17*s; ctx.beginPath(); for(let t=0;t<Math.PI*4;t+=.05){ const r=(31+Math.sin(t*2.6)*12)*s,x=Math.cos(t)*r+off*.28,y=Math.sin(t)*r*.62+Math.cos(t*1.6)*14*s; t<.06?ctx.moveTo(x,y):ctx.lineTo(x,y); } ctx.stroke(); } break;
+    case 'tns_wave':
+      for(let i=0;i<6;i++){ const yo=(i-2.5)*12*s; ctx.beginPath(); ctx.moveTo(-62*s,yo); for(let x=-62;x<=62;x+=2) ctx.lineTo(x*s,yo+Math.sin((x*.09+i)*Math.PI)*(9.5+i*2)*s); ctx.stroke(); } break;
+    case 'manifold_loop':
+      for(let i=0;i<6;i++){ ctx.beginPath(); ctx.ellipse((i-2.5)*17*s,0,14*s,22*s,0,0,Math.PI*2); ctx.stroke(); }
+      for(let i=-3;i<=3;i++){ ctx.beginPath(); ctx.moveTo(i*18*s,-54*s); ctx.lineTo(i*12*s,54*s); ctx.stroke(); } break;
+    case 'ricci_web':{
+      const pts=[]; for(let i=0;i<6;i++){ const a=(i/6)*Math.PI*2; pts.push({x:Math.cos(a)*50*s,y:Math.sin(a)*50*s}); }
+      ctx.beginPath(); pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y)); ctx.closePath(); ctx.stroke();
+      pts.forEach(p=>{ ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(p.x,p.y); ctx.stroke(); });
+      for(let i=0;i<3;i++){ ctx.beginPath(); ctx.arc(0,0,(i+1)*18*s,-.5,Math.PI*1.82); ctx.stroke(); } break;
+    }
+    case 'wave_cross':
+      for(let i=0;i<5;i++){
+        ctx.beginPath(); ctx.moveTo(-62*s,0); for(let t=-62;t<=62;t+=2) ctx.lineTo(t*s,Math.sin((t*.09+i)*Math.PI)*18*s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0,-62*s); for(let t=-62;t<=62;t+=2) ctx.lineTo(Math.sin((t*.09+i)*Math.PI)*14*s,t*s); ctx.stroke();
+      } break;
+    case 'pi_fan':
+      for(let i=0;i<8;i++){ const a=-0.86+(i/7)*1.72; ctx.beginPath(); ctx.moveTo(0,0); for(let t=0;t<=60*s;t+=2){ const curve=Math.sin(t*.04)*9.5*s; ctx.lineTo(Math.cos(a)*t+curve,Math.sin(a)*t); } ctx.stroke(); }
+      ctx.beginPath(); ctx.arc(0,0,27*s,-.96,.98); ctx.stroke(); break;
+    case 'beta_circle':
+      ctx.ellipse(0,0,46*s,36*s,0,0,Math.PI*2); ctx.stroke();
+      for(let i=-3;i<=3;i++){
+        ctx.beginPath(); ctx.moveTo(i*18*s-4*s,-56*s); ctx.lineTo(i*18*s,56*s); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-60*s,i*16*s); ctx.lineTo(60*s,i*16*s+4*s); ctx.stroke();
+      } break;
+    default:
+      ctx.arc(0,0,40*s,0,Math.PI*2); ctx.stroke(); break;
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════
+buildPalette();
+buildBrushBtns();
+buildSketchTypes();
+buildEqList();
+resizeCanvases();
+let resizeTimer=null;
+window.addEventListener('resize', ()=>{ clearTimeout(resizeTimer); resizeTimer=setTimeout(resizeCanvases,120); });
+window.addEventListener('orientationchange', ()=> setTimeout(resizeCanvases,300));
+document.getElementById('generate-btn').style.display='block';
+</script>
+</body>
+</html>
