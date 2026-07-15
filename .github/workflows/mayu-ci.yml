@@ -1,0 +1,37 @@
+name: mayu CI
+
+on:
+  push:
+    paths:
+      - "mayu/**"
+  pull_request:
+    paths:
+      - "mayu/**"
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.11", "3.12"]
+    defaults:
+      run:
+        working-directory: mayu
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          pip install -e .
+      - name: Run tests
+        run: python -m pytest tests/ -q
+      - name: Smoke-test CLI
+        run: |
+          python -m mayu.cli check examples/emacs.mayu
+          python -m mayu.cli simulate examples/emacs.mayu --keys "C-b C-f C-a C-e"
