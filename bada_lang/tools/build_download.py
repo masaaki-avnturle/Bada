@@ -26,7 +26,8 @@ BADA = os.path.join(ROOT, "bada.py")
 GENERATED = ["keybindings.mayu", "windows11.reg", "windows10.reg",
              "scancode-capslock-ctrl.reg", "uninstall.reg"]
 # hand-written, already in download/
-STATIC = ["README.md", "install.bat", "install.ps1", "uninstall.bat"]
+STATIC = ["README.md", "install.bat", "install.ps1", "uninstall.bat",
+          "mayu_agent.py", "run_mayu.bat"]
 
 
 def main():
@@ -61,6 +62,10 @@ def main():
     if os.path.exists(out_zip):
         os.remove(out_zip)
     members = STATIC + GENERATED + ["mayu.pyz"]
+    # mayu.exe is produced by the Windows CI job and merged into the zip there;
+    # include it locally too if a build happens to be present.
+    if os.path.isfile(os.path.join(DOWNLOAD, "mayu.exe")):
+        members.append("mayu.exe")
     with zipfile.ZipFile(out_zip, "w", zipfile.ZIP_DEFLATED) as z:
         for nm in members:
             full = os.path.join(DOWNLOAD, nm)

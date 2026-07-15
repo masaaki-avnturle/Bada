@@ -27,6 +27,27 @@ if %errorlevel%==0 (
   echo   Right-click install.bat -^> "Run as administrator" to enable it.
 )
 echo.
-echo Edit keybindings.mayu and re-run to change your bindings.
+
+echo Starting the mayu remapper ^(this is what makes the keys actually work^)...
+set LAUNCH=
+if exist "%~dp0mayu.exe" set LAUNCH="%~dp0mayu.exe"
+if not defined LAUNCH (
+  where python >nul 2>&1 && set LAUNCH=python "%~dp0mayu_agent.py"
+)
+if defined LAUNCH (
+  start "mayu" %LAUNCH%
+  echo   mayu is running - Emacs/vim keys now work in every app.
+  echo.
+  choice /m "Start mayu automatically when you sign in"
+  if not errorlevel 2 (
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v mayu /t REG_SZ /d %LAUNCH% /f
+    echo   autostart enabled ^(HKCU\...\Run\mayu^).
+  )
+) else (
+  echo   Could not find mayu.exe or Python. Download mayu.exe from the
+  echo   Releases page, put it in this folder, and run it.
+)
+echo.
+echo Edit keybindings.mayu and restart mayu to change your bindings.
 echo Run uninstall.bat to remove everything.
 pause

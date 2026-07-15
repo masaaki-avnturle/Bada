@@ -1,14 +1,14 @@
 name: Build madotsukai keybindings (Windows 10/11)
 
-# Produces a downloadable package for the 窓使いの憂鬱 (mayu) Emacs + vim
-# keybinding tool: the editable .mayu config, the Windows 10/11 registry
-# .reg files, the genuine CapsLock->Ctrl Scancode Map remap, and the portable
-# mayu tool.
+# Produces a downloadable, WORKING 窓使いの憂鬱 (mayu) keyboard remapper for
+# Windows 10 / 11:
+#   * mayu.exe                - the resident remapper (double-click, no Python).
+#                               Installs a low-level keyboard hook and rewrites
+#                               Emacs/vim chords into real keystrokes live.
+#   * madotsukai_windows.zip  - installer + editable config + .reg files + tool.
 #
-# * Push the feature branch, run manually (Actions -> "Run workflow"), or push
-#   a tag like  mayu-v0.1.0  -> builds the package AND publishes a GitHub
-#   Release with the .zip + .reg files attached (download from the repo's
-#   Releases page).
+# Push the feature branch, run manually, or push a tag like mayu-v0.1.0 ->
+# builds everything AND publishes a GitHub Release with the files attached.
 
 on:
   push:
@@ -22,80 +22,127 @@ on:
 permissions:
   contents: write        # needed to create the Release
 
-defaults:
-  run:
-    working-directory: bada_lang
-
 jobs:
-  build-and-release:
-    runs-on: ubuntu-latest
+  # --------------------------------------------------------------- Windows .exe
+  windows-exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: bada_lang
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Verify the remapper's config parsing / translation
+        run: python download/mayu_agent.py --selftest
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+      - name: Build mayu.exe (standalone keyboard remapper)
+        run: pyinstaller --onefile --name mayu --console download/mayu_agent.py
+      - name: Upload mayu.exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mayu-exe
+          path: bada_lang/dist/mayu.exe
+          if-no-files-found: error
 
+  # ------------------------------------------------------------- package (.zip)
+  package:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bada_lang
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Run the Bada test suite
         run: python tests/run_tests.py
-
+      - name: Verify the remapper's config parsing / translation
+        run: python download/mayu_agent.py --selftest
       - name: Build the downloadable keybinding package
         run: |
           python tools/build_exe.py
           python tools/build_download.py
-
-      - name: Upload package as a workflow artifact
+      - name: Upload package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: madotsukai-windows-keybindings
+          name: package
           path: |
             bada_lang/dist/madotsukai_windows.zip
             bada_lang/download/
           if-no-files-found: error
 
-      # Publishes a downloadable GitHub Release. The tag is created server-side
-      # by action-gh-release using GITHUB_TOKEN, so no local tag push is needed.
-      # Fires on a mayu-v* tag, on this feature branch, or on a manual dispatch.
-      - name: Publish Release with the keybinding package
-        if: >-
-          startsWith(github.ref, 'refs/tags/mayu-v') ||
-          github.ref_name == 'claude/bada-compiler-interpreter-zGQ9S' ||
-          github.event_name == 'workflow_dispatch'
+  # ------------------------------------------------------------------- Release
+  release:
+    needs: [windows-exe, package]
+    if: >-
+      startsWith(github.ref, 'refs/tags/mayu-v') ||
+      github.ref_name == 'claude/bada-compiler-interpreter-zGQ9S' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Stage release files
+        run: |
+          mkdir -p release
+          cp artifacts/mayu-exe/mayu.exe release/
+          cp artifacts/package/dist/madotsukai_windows.zip release/
+          cp artifacts/package/download/keybindings.mayu release/
+          cp artifacts/package/download/windows11.reg release/
+          cp artifacts/package/download/windows10.reg release/
+          cp artifacts/package/download/scancode-capslock-ctrl.reg release/
+          cp artifacts/package/download/uninstall.reg release/
+          ls -l release
+      - name: Repack the zip so it includes mayu.exe
+        run: |
+          cd artifacts/package/download
+          cp ../../mayu-exe/mayu.exe .
+          zip -j ../../../release/madotsukai_windows.zip mayu.exe
+      - name: Publish Release with the working remapper
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/mayu-v') && github.ref_name || 'mayu-latest' }}
           name: ${{ startsWith(github.ref, 'refs/tags/mayu-v') && github.ref_name || '窓使いの憂鬱 mayu — Windows 10/11 keybindings (latest)' }}
           body: |
-            # 窓使いの憂鬱 (mayu) — Emacs + vim keybindings for Windows 10 / 11
+            # 窓使いの憂鬱 (mayu) — a WORKING Emacs + vim remapper for Windows 10 / 11
 
-            Written in the **Bada** language. Registers key combinations into the
-            **Windows Registry**, with Emacs and vim key bindings, editable by you.
+            Written in the **Bada** language + a pure-`ctypes` keyboard hook.
+            **`mayu.exe` is the resident program that actually makes the keys
+            work** — it hooks the keyboard and rewrites Emacs/vim chords into real
+            keystrokes in every application. No Python, no admin needed.
 
-            ## Download
-            - **`madotsukai_windows.zip`** — the whole package (installer + config + tool).
+            ## Quick start
+            1. Download **`mayu.exe`** and **`keybindings.mayu`** into the same folder.
+            2. Double-click **`mayu.exe`**. A console says *"mayu is running"*.
+            3. Open Notepad and try it: **C-a**=line start, **C-e**=line end,
+               **C-f/C-b/C-n/C-p**=arrows, **C-k**=kill line, **C-y**=yank,
+               **C-x C-s**=save. Close the console window to stop.
 
-            Unzip, then double-click **`install.bat`** (Windows 11) or run
-            `install.bat win10` (Windows 10). Right-click → *Run as administrator*
-            to also apply the genuine **CapsLock → Ctrl** physical remap
-            (`Scancode Map`); sign out and back in for it to take effect.
+            Prefer the bundle? Download **`madotsukai_windows.zip`**, unzip, and run
+            **`install.bat`** — it registers the `.reg` bindings, starts `mayu.exe`,
+            and offers to auto-start it at sign-in.
 
-            ## What it registers
-            - `HKCU\Software\Mayu\<os>` — the Emacs/vim chord map (`C-k → kill-line`,
-              `dd → delete-line`, per-application bindings, …). Edit
-              `keybindings.mayu` and re-run to change them.
-            - `HKLM\...\Keyboard Layout` → `Scancode Map` — a real physical remap
-              that **Windows itself** applies at the driver level, no program running.
+            ## What each file is
+            - **`mayu.exe`** — the working remapper (double-click). *This is the one you run.*
+            - `keybindings.mayu` — the **editable** Emacs/vim config. Edit and restart mayu.
+            - `madotsukai_windows.zip` — everything (exe + installer + config + .reg).
+            - `windows11.reg` / `windows10.reg` — store the bindings in the registry.
+            - `scancode-capslock-ctrl.reg` — genuine physical **CapsLock → Ctrl**
+              remap applied by Windows itself (import + sign out; needs admin).
+            - `uninstall.reg` — removes the registry entries.
 
-            ## Also attached (individually downloadable)
-            - `keybindings.mayu` — the editable config (Emacs + vim + per-app)
-            - `windows11.reg` / `windows10.reg` — the registry key bindings
-            - `scancode-capslock-ctrl.reg` — the physical remap
-            - `uninstall.reg` — removes everything
-
-            Built with the Bada language (a custom compiler + VM). Educational tool.
+            Educational tool built with the Bada language (a custom compiler + VM).
           files: |
-            bada_lang/dist/madotsukai_windows.zip
-            bada_lang/download/keybindings.mayu
-            bada_lang/download/windows11.reg
-            bada_lang/download/windows10.reg
-            bada_lang/download/scancode-capslock-ctrl.reg
-            bada_lang/download/uninstall.reg
+            release/mayu.exe
+            release/madotsukai_windows.zip
+            release/keybindings.mayu
+            release/windows11.reg
+            release/windows10.reg
+            release/scancode-capslock-ctrl.reg
+            release/uninstall.reg

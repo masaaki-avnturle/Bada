@@ -4,40 +4,56 @@ Emacs **and** vim key bindings, written in the **Bada** language, registered
 into the **Windows Registry**, and editable by you. Download the files in this
 folder and run the installer.
 
-## Download (one click)
+## Download & run (this is the part that actually works)
 
-Grab the packaged `.zip` from the repository's **Releases** page:
+**`mayu.exe` is the resident program that makes the keys work.** It installs a
+low-level keyboard hook and rewrites your Emacs/vim chords into real keystrokes
+in every application. No Python, no admin.
+
+1. Download **`mayu.exe`** and **`keybindings.mayu`** into the same folder:
+   - <https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/mayu.exe>
+   - <https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/keybindings.mayu>
+2. Double-click **`mayu.exe`** — a console shows *"mayu is running"*.
+3. Open Notepad and try: **C-a** = line start, **C-e** = line end,
+   **C-f/C-b/C-n/C-p** = arrows, **C-k** = kill line, **C-y** = yank,
+   **C-x C-s** = save. Close the console to stop.
+
+Prefer the bundle? Grab the zip and run `install.bat` (it starts mayu.exe and
+offers to auto-start it at sign-in):
 
 > **https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/madotsukai_windows.zip**
 
-(Or browse <https://github.com/masaaki-avnturle/Bada/releases> and pick
-*窓使いの憂鬱 mayu — Windows 10/11 keybindings*.) Unzip and run `install.bat`.
-Every file below is also attached to that release individually.
+No Python? `mayu.exe` needs none. With Python installed you can instead run
+`python mayu_agent.py` (or `run_mayu.bat`) — same remapper, from source.
 
 This package registers key combinations into the registry two ways:
 
 | where | what | needs admin? | applied by |
 |-------|------|--------------|------------|
-| `HKEY_CURRENT_USER\Software\Mayu\<os>` | the Emacs/vim **key-binding config** (chord → command, per application) | no | a mayu-style agent / the Bada tool |
+| **`mayu.exe`** (the keyboard hook) | the Emacs/vim **chord map** (C-a → line start, C-k → kill line, C-x C-s → save, …) | no | **`mayu.exe`** — a resident keyboard hook |
+| `HKEY_CURRENT_USER\Software\Mayu\<os>` | the same config, also stored in the registry | no | `mayu.exe` / the Bada tool |
 | `HKEY_LOCAL_MACHINE\...\Keyboard Layout` → **`Scancode Map`** | a **genuine physical remap** (CapsLock → Ctrl) | yes | **Windows itself**, at the driver level |
 
-The `Scancode Map` part is the real mechanism Windows 10 and 11 use to remap
-keys from the registry — after you import it and sign out, the OS obeys it with
-no program running. The `HKCU\Software\Mayu` part is the full Emacs/vim chord
-map (C-a, C-k, C-x C-s, dd, yy, …) that the Bada mayu tool reads.
+`mayu.exe` is the working remapper: it hooks the keyboard and rewrites chords
+live, so the Emacs/vim keys work in any app. The `Scancode Map` is the real
+mechanism Windows 10/11 use to remap whole physical keys from the registry
+(import + sign out; no program running). The `HKCU\Software\Mayu` keys are the
+same chord map stored in the registry for reference / other agents.
 
 ## Files
 
 | file | what it is |
 |------|-----------|
-| `keybindings.mayu` | the **editable** key-binding config (Emacs + vim + per-app). Edit this. |
-| `windows11.reg` | the key bindings compiled for Windows 11 (`HKCU\Software\Mayu\win11`) |
-| `windows10.reg` | the same for Windows 10 (`HKCU\Software\Mayu\win10`) |
+| **`mayu.exe`** | **the working remapper — double-click to run.** Hooks the keyboard and rewrites Emacs/vim chords into real keystrokes. No Python. |
+| `keybindings.mayu` | the **editable** config (Emacs + vim + per-app). Edit, then restart `mayu.exe`. |
+| `mayu_agent.py` | the same remapper as source (run with `python mayu_agent.py` if you have Python) |
+| `run_mayu.bat` | convenience launcher (uses `mayu.exe` if present, else Python) |
+| `windows11.reg` / `windows10.reg` | the bindings stored in `HKCU\Software\Mayu\<os>` |
 | `scancode-capslock-ctrl.reg` | the genuine physical remap **CapsLock → Left Ctrl** (`HKLM`) |
-| `uninstall.reg` | removes both of the above |
-| `install.bat` / `install.ps1` | import the right files for your Windows version |
-| `uninstall.bat` | undo everything |
-| `mayu.pyz` | the portable mayu tool (compile the config, print the registry tree, export `.reg`) — needs Python 3 |
+| `uninstall.reg` | removes the registry entries |
+| `install.bat` / `install.ps1` | import the `.reg` files, start `mayu.exe`, offer auto-start |
+| `uninstall.bat` | stop mayu, remove autostart, undo the registry entries |
+| `mayu.pyz` | the Bada config tool (compile the config, print the registry tree, export `.reg`) — needs Python 3 |
 
 ## Install
 
@@ -112,15 +128,24 @@ uninstall.bat
 
 or import `uninstall.reg`. Sign out and back in to drop the physical remap.
 
-## Scope / honesty
+## How it works (and honest scope)
 
-- The **physical remap** (`Scancode Map`) is applied by Windows itself and needs
-  no running program — but it can only swap whole physical keys (CapsLock→Ctrl,
-  Esc↔CapsLock, disable a key, …), not chords.
-- The **Emacs/vim chord map** (`C-k → kill-line`, `dd → delete-line`, …) lives in
-  `HKCU\Software\Mayu` and is interpreted by the mayu tool / a resident agent —
-  the same division of labour as the original 窓使いの憂鬱 / yamy.
+- **`mayu.exe`** installs a Windows low-level keyboard hook (`WH_KEYBOARD_LL`)
+  and, for each chord it recognises, suppresses the original key and injects the
+  mapped keystrokes with `SendInput` — exactly how AutoHotkey / yamy work. Each
+  Emacs/vim command maps to the Windows keystroke that performs it
+  (`C-a`→Home, `C-k`→Shift+End then Cut, `M-f`→Ctrl+Right, …), so the bindings
+  work in ordinary apps like Notepad, browsers and editors. Per-application
+  bindings match the focused window's class.
+- The **physical remap** (`Scancode Map`) is applied by Windows itself with no
+  program running — but it can only swap whole physical keys (CapsLock→Ctrl,
+  Esc↔CapsLock, disable a key), not chords. Use it together with `mayu.exe`.
+- The `HKCU\Software\Mayu` registry keys store the same chord map for reference.
 
-Built with the Bada language (a custom compiler + VM). See the repository root
-for the full source, the mayu GUI editor (`apps/mayu.bada`), and the yamy
-`.mayu` engine (`apps/yamy.bada`).
+Limitations: `mayu.exe` translates chords to standard editing keystrokes, so a
+binding works wherever that keystroke works (most text fields). Modal vim
+insert/normal switching is best-effort. Edit `keybindings.mayu` to customise.
+
+Built with the Bada language (a custom compiler + VM) plus a pure-`ctypes`
+keyboard hook. See the repository root for the full source, the mayu GUI editor
+(`apps/mayu.bada`), and the yamy `.mayu` engine (`apps/yamy.bada`).
