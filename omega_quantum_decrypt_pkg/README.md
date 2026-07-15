@@ -137,8 +137,14 @@ python3 -m omega_qdecrypt.cli quarantine remove  <id>    # 完全削除
 1. リポジトリの **Releases** ページを開く。
 2. 最新リリースの Assets から取得：
    - `omega_quantum_decrypt.exe` … Windows 10（64bit）用。ダブルクリックで起動。
-   - `omega_quantum_decrypt.apk` … Android 12（arm64-v8a / armeabi-v7a）用。
+   - `omega_quantum_decrypt.apk` … Android 12（arm64-v8a）用。
      「提供元不明のアプリ」を許可してインストール。
+
+> **インストール時に「アプリ名／パッケージが競合する」と出る場合**：以前のバージョンが
+> 既にインストールされていると、署名が異なるため Android が更新を拒否します。**一度だけ
+> 旧バージョンをアンインストール**してから入れ直してください。v0.5.1 以降は
+> リポジトリ同梱の**固定デバッグ鍵**（`packaging/debug.keystore`）で常に同じ署名になるため、
+> 以後の更新は競合せずインストールできます。
 
 ### リリース（バイナリ）を発行する方法
 

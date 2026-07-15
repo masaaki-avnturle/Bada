@@ -70,6 +70,10 @@ jobs:
         run: |
           python tests/test_all.py
           python tests/test_app.py
+      - name: Use the repo's stable debug keystore (consistent APK signature)
+        run: |
+          mkdir -p ~/.android
+          cp packaging/debug.keystore ~/.android/debug.keystore
       - name: Build .apk with Buildozer
         run: buildozer android debug
         env:
@@ -105,8 +109,8 @@ jobs:
       - name: Publish Release with exe + apk
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.5.0' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'omega_quantum_decrypt v0.5.0' }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.5.1' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'omega_quantum_decrypt v0.5.1' }}
           body: |
             **omega_quantum_decrypt** — Jones × Burau × Shor decryption demo,
             now with a **defensive virus-removal** module.
@@ -115,6 +119,12 @@ jobs:
             - `omega_quantum_decrypt.exe` — Windows 10/11 (64-bit). Double-click to run.
             - `omega_quantum_decrypt.apk` — Android 12+ (arm64-v8a). Allow "install
               from unknown sources", then install.
+
+            > **Android install conflict?** If a previous version is already
+            > installed and Android refuses with a package/name conflict, **uninstall
+            > the old version once**, then install this one. From this release on, all
+            > builds are signed with the same stable debug key, so future updates
+            > install cleanly without conflicts.
 
             ### Features
             - **Decrypt** tab: knot-theory (Jones/Kauffman) key + Shor factorization
