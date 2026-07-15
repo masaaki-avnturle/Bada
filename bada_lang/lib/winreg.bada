@@ -88,9 +88,11 @@ class Registry {
                 for name in keys(vmap) {
                     let v <- vmap[name]
                     if v[0] == "REG_DWORD" {
-                        out <- out + "\"" + name + "\"=dword:" + v[1] + "\n"
+                        out <- out + "\"" + reg_escape(name) + "\"=dword:" + v[1] + "\n"
+                    } else if v[0] == "REG_BINARY" {
+                        out <- out + "\"" + reg_escape(name) + "\"=hex:" + v[1] + "\n"
                     } else {
-                        out <- out + "\"" + name + "\"=\"" + v[1] + "\"\n"
+                        out <- out + "\"" + reg_escape(name) + "\"=\"" + reg_escape(v[1]) + "\"\n"
                     }
                 }
             }
@@ -100,6 +102,11 @@ class Registry {
 }
 
 // ---- helpers --------------------------------------------------------------
+
+// escape a string for a quoted .reg value: backslash and double-quote
+fun reg_escape(s) {
+    return replace(replace(s, "\\", "\\\\"), "\"", "\\\"")
+}
 
 fun starts(s, p) {
     if len(s) < len(p) { return false }

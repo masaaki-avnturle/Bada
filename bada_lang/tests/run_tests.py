@@ -560,6 +560,34 @@ expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
        "reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Explorer\", \"j\")",
        "5 0 Down\n", "compile_file loads .mayu with includes from disk")
 
+# --- scancode: genuine Windows physical remap (HKLM Scancode Map) -----------
+
+expect("import scancode\nlet m <- scancode.build([[\"CapsLock\", \"LCtrl\"]])\n"
+       "print m[\"count\"], m[\"bytes\"], len(m[\"errors\"])",
+       "1 20 0\n", "scancode map: one remap = 20 bytes")
+expect("import scancode\nlet m <- scancode.build([[\"CapsLock\", \"LCtrl\"]])\n"
+       "print m[\"hex\"]",
+       "00,00,00,00,00,00,00,00,02,00,00,00,1d,00,3a,00,00,00,00,00\n",
+       "scancode map bytes: CapsLock(3a) -> LCtrl(1d), count 2, null term")
+expect("import scancode\nlet m <- scancode.build([[\"Esc\", \"CapsLock\"]])\n"
+       "print contains(m[\"reg\"], \"HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Keyboard Layout\")",
+       "true\n", "scancode .reg targets the HKLM Keyboard Layout key")
+expect("import scancode\nlet m <- scancode.build([[\"RCtrl\", \"LCtrl\"]])\n"
+       "print m[\"hex\"]",
+       "00,00,00,00,00,00,00,00,02,00,00,00,1d,00,1d,e0,00,00,00,00\n",
+       "extended key (RCtrl) carries the 0xe0 prefix byte")
+expect("import scancode\nlet m <- scancode.build([[\"Bogus\", \"LCtrl\"]])\n"
+       "print m[\"count\"], len(m[\"errors\"])",
+       "0 1\n", "unknown key name is reported and skipped")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_LOCAL_MACHINE\\\\X\", \"Scancode Map\", \"REG_BINARY\", \"00,1d\")\n"
+       "print contains(r.export_reg(), \"\\\"Scancode Map\\\"=hex:00,1d\")",
+       "true\n", "registry exports REG_BINARY as hex:")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\X\", \"k\", \"REG_SZ\", \"x\\\"y\")\n"
+       "print contains(r.export_reg(), \"\\\\\")",
+       "true\n", "REG_SZ values escape embedded double-quotes")
+
 # --- mayu: keymap registry & editor (Emacs / vim) --------------------------
 
 expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
