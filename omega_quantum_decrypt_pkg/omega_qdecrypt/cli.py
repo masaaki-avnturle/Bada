@@ -5,6 +5,9 @@
     python -m omega_qdecrypt.cli invmat  "3: 1 2 1 2 1 2"
     python -m omega_qdecrypt.cli crack   --e 65537 --N 120204077 --cipher 3,141,59
     python -m omega_qdecrypt.cli solve   --braid "3: 1 1 1" --message "SECRET"
+    python -m omega_qdecrypt.cli scan       ./some/folder
+    python -m omega_qdecrypt.cli disinfect  ./some/folder
+    python -m omega_qdecrypt.cli quarantine list
 """
 
 from __future__ import annotations
@@ -12,7 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from . import jones, rsa_toy, shor
+from . import antivirus, jones, rsa_toy, shor
 from .matrix import PolyMatrix, inverse_exists
 from .pipeline import run_pipeline
 
@@ -99,10 +102,65 @@ def cmd_solve(args):
     return 0 if rep.success else 1
 
 
+def _default_quarantine_dir():
+    import os
+    return os.environ.get("OMEGA_QUARANTINE_DIR",
+                          os.path.join(os.path.expanduser("~"), ".omega_quarantine"))
+
+
+def cmd_scan(args):
+    detections, scanned = antivirus.scan_path(args.path, antivirus.SignatureDB.default())
+    print(f"scanned {scanned} file(s) under {args.path}")
+    if not detections:
+        print("no threats found. (clean)")
+        return 0
+    for d in detections:
+        print(d.line())
+    print(f"\n{len(detections)} detection(s).")
+    return 0
+
+
+def cmd_disinfect(args):
+    db = antivirus.SignatureDB.default()
+    detections, scanned = antivirus.scan_path(args.path, db)
+    targets = [d for d in detections
+               if d.severity == "malicious" or (args.suspicious and d.severity == "suspicious")]
+    print(f"scanned {scanned} file(s); {len(targets)} to quarantine.")
+    if not targets:
+        return 0
+    q = antivirus.Quarantine(args.quarantine or _default_quarantine_dir())
+    for d in targets:
+        item = q.quarantine(d)
+        print(f"  quarantined {d.threat}: {d.path} -> {item.qid} (locked/encrypted)")
+    print(f"\nquarantine store: {q.dir}")
+    return 0
+
+
+def cmd_quarantine(args):
+    q = antivirus.Quarantine(args.quarantine or _default_quarantine_dir())
+    if args.action == "list":
+        items = q.list_items()
+        if not items:
+            print("quarantine is empty.")
+            return 0
+        for it in items:
+            print(f"  {it.qid}  {it.severity:9} {it.threat:20} {it.original_path}")
+        return 0
+    if args.action == "restore":
+        print(f"restored (decrypted) -> {q.restore(args.qid)}")
+        return 0
+    if args.action == "remove":
+        q.remove(args.qid)
+        print(f"permanently removed {args.qid}")
+        return 0
+    print("usage: quarantine {list|restore <id>|remove <id>}")
+    return 1
+
+
 def build_parser():
     p = argparse.ArgumentParser(
         prog="omega_qdecrypt",
-        description="Jones/Burau/Shor decryption toolkit (secretdata.pdf pipeline).",
+        description="Jones/Burau/Shor decryption toolkit + defensive virus scanner.",
     )
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -129,6 +187,22 @@ def build_parser():
     s.add_argument("--braid", default="3: 1 1 1")
     s.add_argument("--message", default=None)
     s.set_defaults(func=cmd_solve)
+
+    sc = sub.add_parser("scan", help="scan a file/folder for threats (read-only)")
+    sc.add_argument("path")
+    sc.set_defaults(func=cmd_scan)
+
+    di = sub.add_parser("disinfect", help="scan then quarantine (encrypt away) threats")
+    di.add_argument("path")
+    di.add_argument("--suspicious", action="store_true", help="also quarantine heuristic hits")
+    di.add_argument("--quarantine", default=None, help="quarantine store dir")
+    di.set_defaults(func=cmd_disinfect)
+
+    qz = sub.add_parser("quarantine", help="list/restore/remove quarantined files")
+    qz.add_argument("action", choices=["list", "restore", "remove"])
+    qz.add_argument("qid", nargs="?", default=None)
+    qz.add_argument("--quarantine", default=None, help="quarantine store dir")
+    qz.set_defaults(func=cmd_quarantine)
     return p
 
 

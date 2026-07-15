@@ -78,6 +78,38 @@ python3 tests/test_all.py
 
 ---
 
+## ウイルス駆除アプリ (defensive virus removal)
+
+「量子暗号の復号アプリ」を拡張した**防御的なウイルス検出・駆除**機能。マルウェアを
+**作る**機能は一切なく、**検出して無害化・除去する**側のみです。復号アプリとの接続は
+自然です — 検出したファイルを**暗号化して隔離（無害化）**し、**復元＝復号**します。
+
+```sh
+python3 -m omega_qdecrypt.cli scan       ./folder        # 検査（読み取りのみ）
+python3 -m omega_qdecrypt.cli disinfect  ./folder        # 検査→隔離（暗号化して除去）
+python3 -m omega_qdecrypt.cli quarantine list            # 隔離一覧
+python3 -m omega_qdecrypt.cli quarantine restore <id>    # 復元（復号）
+python3 -m omega_qdecrypt.cli quarantine remove  <id>    # 完全削除
+```
+
+- **検出**: ① SHA-256 シグネチャ ② 業界標準 **EICAR** テスト（無害な検査用文字列）
+  ③ ヒューリスティック（エントロピー・疑わしいパターン）④ **Jones フィンガープリント**
+  （本プロジェクトの Kauffman ブラケットで計算する構造ハッシュ）
+- **隔離**: キー付き SHA-256 CTR キーストリーム XOR ＋ HMAC-SHA256（標準ライブラリのみ、
+  exe/apk で追加依存なし）でファイルを実行不能化し、元ファイルは上書き削除。
+- **復元/削除**: 隔離ファイルを復号して元に戻す／恒久削除。
+- GUI: exe・apk とも「Virus scan」でフォルダを選んで Scan / Scan+Quarantine / 一覧。
+
+検証: `python3 tests/test_antivirus.py`（8 件）。EICAR の SHA-256 一致・検出・隔離往復
+（暗号化→復号で完全一致）を単体テストで固定。
+
+> **これは実在の脅威を網羅する本物のアンチウイルスではありません。** シグネチャDBと
+> ヒューリスティックが対象とするものだけを検出するデモ級ツールで、Windows Defender や
+> ClamAV の代替にはなりません。Android はサンドボックスのため端末全体ではなくアプリが
+> アクセスできる領域のみ検査します。
+
+---
+
 ## 正直な但し書き (honest disclaimer)
 
 このアプリは **実在の暗号（2048bit RSA や AES-256）を破りません**。破れるものは一切含まれていません。

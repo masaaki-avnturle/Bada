@@ -16,7 +16,7 @@ source.include_exts = py
 source.exclude_dirs = tests, packaging, __pycache__, examples
 source.exclude_patterns = run_demo.sh, .gitignore, gui_tk.py
 
-version = 0.1.0
+version = 0.5.0
 requirements = python3,kivy==2.3.1
 
 orientation = portrait
