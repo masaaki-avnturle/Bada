@@ -36,6 +36,28 @@
 | **`main/`** | Bada v3 ソースコード · BadaOS · TupleSpace全体インデックス · 4000+ LOC | [→ 開く](https://masaaki-avnturle.github.io/Bada/) |
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
+| **`penrose_app/`** | ペンローズ絵記号スタジオの Windows(.exe) / Android(.apk) パッケージ | [→ 開く](penrose_app/) |
+
+---
+
+## ⬇️ ダウンロード — Penrose Studio アプリ
+
+ロジャー・ペンローズの**絵記号**をパレットで選び、ダイアログで組み合わせると、
+**清書した方程式**と**計算した方程式**を生成するアプリを、Windows と Android
+向けにダウンロードできます。
+
+| プラットフォーム | ファイル | 備考 |
+|:--|:--|:--|
+| **Windows 10 / 11** | `PenroseStudio-Setup-x.y.z.exe` | インストーラ（Electron） |
+| **Windows（ポータブル）** | `PenroseStudio-x.y.z-portable.exe` | インストール不要 |
+| **Android** | `PenroseStudio-vX.Y.Z.apk` | 「提供元不明のアプリ」を許可してインストール |
+
+**[→ Releases ページから最新版をダウンロード](../../releases/latest)**
+
+ビルドは GitHub Actions（[`.github/workflows/release.yml`](.github/workflows/release.yml)）が
+自動化しており、`vX.Y.Z` タグを push すると Windows の `.exe` と Android の `.apk` を
+ビルドして Release に添付します。詳細・ローカルビルド手順は
+[`penrose_app/README.md`](penrose_app/README.md)。
 
 ---
 

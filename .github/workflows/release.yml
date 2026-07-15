@@ -1,0 +1,113 @@
+name: Build & Release Penrose Studio (EXE + APK)
+
+# Produces downloadable installers:
+#   * Windows 10/11 .exe  (Electron / electron-builder — NSIS installer + portable)
+#   * Android .apk        (Capacitor + Gradle — debug-signed, installs directly)
+# and attaches them to a GitHub Release.
+#
+# Trigger:
+#   * push a tag like  v1.0.0   -> builds and publishes a Release with the assets
+#   * or run manually (Actions ▸ this workflow ▸ Run workflow) -> uploads artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: penrose_app
+
+jobs:
+  # ---------------- Windows 10/11 EXE ----------------
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer + portable (.exe)
+        run: npm run dist:win
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp dist/*.exe out/ || true
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PenroseStudio-windows-exe
+          path: penrose_app/out/*.exe
+          if-no-files-found: error
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: penrose_app/out/*.exe
+          fail_on_unmatched_files: false
+
+  # ---------------- Android APK ----------------
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform (generate native project)
+        run: npx cap add android
+
+      - name: Sync web assets into the Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             out/PenroseStudio-${GITHUB_REF_NAME:-dev}.apk
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PenroseStudio-android-apk
+          path: penrose_app/out/*.apk
+          if-no-files-found: error
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: penrose_app/out/*.apk
+          fail_on_unmatched_files: false

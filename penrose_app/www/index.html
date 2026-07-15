@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ペンローズ絵記号スタジオ — Bada</title>
+<style>:root{--bg:#0b0e14;--panel:#141a24;--edge:#26303f;--ink:#e6ecf3;--dim:#8b9bb0;--gold:#c8a44a;--blue:#4a80d0;--cyan:#40b8c0}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:20px 24px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#101622,#0b0e14)}
+header h1{margin:0 0 6px;font-size:20px;color:var(--gold)}
+header p{margin:0;color:#9fb0c3;font-size:13px}
+.tag{margin-left:10px;padding:2px 8px;border:1px solid var(--edge);border-radius:10px;color:var(--cyan);font-size:11px}
+main{display:grid;grid-template-columns:280px 1fr 1fr;gap:14px;padding:16px;align-items:start}
+@media(max-width:1000px){main{grid-template-columns:1fr}}
+.pane{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:14px}
+.pane h2{margin:0 0 10px;font-size:14px;color:var(--cyan);letter-spacing:.03em}
+.pane h3{margin:14px 0 6px;font-size:12px;color:#9fb0c3}
+#palette{display:flex;flex-direction:column;gap:6px}
+.sym{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
+.sym:hover{border-color:var(--gold);transform:translateX(2px)}
+.sym .nm{font-size:12px}
+.sym .mt{font-size:11px;color:var(--gold);font-family:"SFMono-Regular",Consolas,monospace}
+.dfield{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
+.dfield label{font-size:11px;color:#9fb0c3}
+input,select{background:#0f1420;border:1px solid var(--edge);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+button{background:#182234;border:1px solid var(--edge);color:var(--ink);border-radius:7px;padding:8px 12px;font-size:13px;cursor:pointer}
+button:hover{border-color:var(--blue)}
+button.primary{background:var(--gold);color:#0b0e14;border-color:var(--gold);font-weight:600}
+#parts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-height:20px}
+#parts li{font-size:12px;padding:5px 8px;background:#0f1420;border:1px solid var(--edge);border-radius:6px;display:flex;justify-content:space-between}
+#parts li .x{color:#c05a5a;cursor:pointer;padding:0 4px}
+.equation{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:16px;font-size:18px;min-height:26px;overflow-x:auto;font-family:"Times New Roman",Georgia,serif}
+.equation .op{color:var(--cyan)}
+.equation sub{font-size:.7em;color:var(--gold)}
+.equation .sum{color:var(--blue);font-weight:600}
+.notes{margin-top:10px;font-size:12px;color:#c8a44a}
+.hint{font-size:11px;color:#8391a6;margin:6px 0 0}
+footer{padding:14px 24px;border-top:1px solid var(--edge);color:#6c7a8d;font-size:11px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>ロジャー・ペンローズ 絵記号スタジオ</h1>
+  <p>パレットで絵記号を選び、ダイアログで組み合わせると、清書した方程式と計算した方程式が生成されます。<span class="tag">Bada / Penrose</span></p>
+</header>
+
+<main>
+  <section class="pane palette">
+    <h2>パレット（絵記号の部品）</h2>
+    <div id="palette"></div>
+  </section>
+
+  <section class="pane dialog">
+    <h2>ダイアログボックス（部品を選んで組み合わせ）</h2>
+    <div id="dialog"></div>
+
+    <h3>キャンバス（配置した部品）</h3>
+    <ul id="parts"></ul>
+    <div class="row">
+      <button id="combine" class="primary">組み合わせて方程式を生成</button>
+      <button id="reset">リセット</button>
+      <button id="sample">行列積の例</button>
+    </div>
+  </section>
+
+  <section class="pane output">
+    <h2>清書した方程式</h2>
+    <div id="fair" class="equation">—</div>
+    <h2>組み合わせによる計算した方程式</h2>
+    <div id="numeric" class="equation">—</div>
+    <div id="notes" class="notes"></div>
+  </section>
+</main>
+
+<footer>© Bada — Penrose graphical-notation studio · 純JS Einstein-summation engine</footer>
+
+<script>
+const PALETTE = [{"key":"tensor","name":"テンソル (tensor box)","token":"[T]","math":"T^{..}_{..}","glyph":"┌───┐\n│ T │\n└───┘","meaning":"箱から出る線が添字。線の本数 = 階数。"},{"key":"wire","name":"添字線 (index wire)","token":"-","math":"index","glyph":"─────","meaning":"1本の線は1つの添字。"},{"key":"contraction","name":"縮約 (contraction)","token":"[A]-[B]","math":"A^{.k} B_{k.} = Σ_k","glyph":"[A]─[B]","meaning":"2つの線を繋ぐと、その添字で総和（縮約）。"},{"key":"metric","name":"計量 (metric)","token":"[g]","math":"g_{μν}","glyph":"┌───┐\n│ g │\n└───┘","meaning":"添字の上げ下げに使う対称テンソル。"},{"key":"cup","name":"カップ (raise index)","token":"U","math":"g^{μν}","glyph":"╰───╯","meaning":"線を折り返して添字を上げる。"},{"key":"cap","name":"キャップ (lower index)","token":"N","math":"g_{μν}","glyph":"╭───╮","meaning":"線を折り返して添字を下げる。"},{"key":"delta","name":"クロネッカー δ (identity wire)","token":"=","math":"δ^μ_ν","glyph":"──δ──","meaning":"まっすぐな線は恒等（クロネッカーのデルタ）。"},{"key":"epsilon","name":"レヴィ・チヴィタ ε (antisymmetric)","token":"[E]","math":"ε_{μνρ...}","glyph":"┌───┐\n│ ε │\n└─╲─┘","meaning":"完全反対称テンソル。"},{"key":"nabla","name":"共変微分 ∇ (covariant derivative ring)","token":"(D X)","math":"∇_μ T","glyph":"  ╭─∇─╮ \n  │ ▢ │ \n  ╰───╯ \n    │   ","meaning":"オペランドを囲む輪。下に出る1本の線が微分の添字 μ。"},{"key":"partial","name":"偏微分 ∂","token":"(d X)","math":"∂_μ f","glyph":"  ╭─∂─╮ \n  │ ▢ │ \n  ╰───╯ \n    │   ","meaning":"輪に ∂ を入れた偏微分。数値は有限差分で計算。"},{"key":"integral","name":"積分 ∫","token":"(I X dμ)","math":"∫ T dμ","glyph":"⌠      \n⎮ ▢ dμ \n⌡      ","meaning":"オペランドを積分記号で囲む。添字 μ を縮約的に積む。"},{"key":"symmetrize","name":"対称化 (symmetriser bar)","token":"S{...}","math":"T_{(μν)}","glyph":"═════\n[ T ]","meaning":"線束を横切る太いバー = 添字の対称化。"},{"key":"antisymmetrize","name":"反対称化 (antisymmetriser bar)","token":"A{...}","math":"T_{[μν]}","glyph":"≋≋≋≋≋\n[ T ]","meaning":"波線のバー = 添字の反対称化。"}];
+// ---------- state ----------
+const state = { nodes: {}, wires: [], frees: [], decos: [] };
+const $ = (id) => document.getElementById(id);
+
+// ---------- palette ----------
+function buildPalette(){
+  const box = $('palette');
+  PALETTE.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'sym';
+    el.innerHTML = `<span class="nm">${p.name}</span><span class="mt">${p.math}</span>`;
+    el.title = p.meaning + "\n" + p.glyph;
+    el.onclick = () => pick(p);
+    box.appendChild(el);
+  });
+}
+
+// ---------- dialog ----------
+function pick(p){
+  const k = p.key;
+  if(['tensor','metric','epsilon','delta'].includes(k)) return dialogTensor(p);
+  if(['contraction','wire','cup','cap'].includes(k))   return dialogWire(p);
+  if(['nabla','partial'].includes(k))                   return dialogDeriv(p);
+  if(k==='integral')                                    return dialogIntegral(p);
+  if(['symmetrize','antisymmetrize'].includes(k))       return dialogSym(p);
+}
+
+function field(label, id, val, ph){
+  return `<div class="dfield"><label>${label}</label><input id="${id}" value="${val||''}" placeholder="${ph||''}"></div>`;
+}
+function nodeOptions(){ return Object.keys(state.nodes).map(n=>`<option>${n}</option>`).join(''); }
+
+function dialogTensor(p){
+  const def = p.key==='metric' ? 'g' : (p.key==='epsilon' ? 'E' : 'A');
+  $('dialog').innerHTML =
+    `<div class="hint">${p.name} を配置します。</div>`+
+    field('名前 (1文字)','d_name',def)+
+    field('脚の数 (階数)','d_legs','2')+
+    field('成分値 JSON（任意）','d_val', p.key==='metric'?'[[1,0],[0,1]]':'', '[[1,2],[3,4]]')+
+    `<div class="row"><button class="primary" onclick="addTensor()">配置する</button></div>`;
+}
+function addTensor(){
+  const name=$('d_name').value.trim();
+  const legs=parseInt($('d_legs').value,10);
+  const raw=$('d_val').value.trim();
+  if(!name){alert('名前が必要です');return;}
+  if(state.nodes[name]){alert('同名の部品があります');return;}
+  let val=null; if(raw){try{val=JSON.parse(raw);}catch(e){alert('JSONが不正です');return;}}
+  state.nodes[name]={legs,val,next:0};
+  log(`テンソル箱 [${name}]（脚${legs}${val?'・成分あり':''}）`);
+  $('dialog').innerHTML=''; render();
+}
+
+function dialogWire(p){
+  if(Object.keys(state.nodes).length<1){$('dialog').innerHTML='<div class="hint">先にテンソル箱を配置してください。</div>';return;}
+  $('dialog').innerHTML =
+    `<div class="hint">${p.name}: 2本の脚をつなぐ（縮約）か、自由添字にします。</div>`+
+    `<div class="dfield"><label>部品A</label><select id="w_a">${nodeOptions()}</select></div>`+
+    field('Aの脚番号','w_al','0')+
+    `<div class="dfield"><label>相手（部品Bを選ぶと縮約 / 空で自由添字）</label><select id="w_b"><option value="">— 自由添字 —</option>${nodeOptions()}</select></div>`+
+    field('Bの脚番号 / 自由添字名','w_bl','')+
+    `<div class="row"><button class="primary" onclick="addWire()">組み合わせる</button></div>`;
+}
+function addWire(){
+  const a=$('w_a').value, al=parseInt($('w_al').value,10);
+  const b=$('w_b').value, bl=$('w_bl').value.trim();
+  if(b){ state.wires.push([[a,al],[b,parseInt(bl,10)]]); log(`縮約線 ${a}[${al}] ─ ${b}[${bl}]`); }
+  else { state.frees.push([[a,al], bl||('x'+state.frees.length)]); log(`自由添字 ${a}[${al}] → ${bl}`); }
+  $('dialog').innerHTML=''; render();
+}
+
+function dialogDeriv(p){
+  const sym = p.key==='nabla'?'∇':'∂';
+  $('dialog').innerHTML =
+    `<div class="hint">${p.name}</div>`+
+    `<div class="dfield"><label>対象</label><select id="dv_t">${nodeOptions()}</select></div>`+
+    field('微分の添字','dv_l','μ')+
+    `<div class="row"><button class="primary" onclick="addDeriv('${p.key}','${sym}')">付ける</button></div>`;
+}
+function addDeriv(key,sym){
+  const t=$('dv_t').value, l=$('dv_l').value.trim()||'μ';
+  state.decos.push({type:key,target:t,label:l});
+  log(`${sym}_${l}（対象 ${t}）`); $('dialog').innerHTML=''; render();
+}
+
+function dialogIntegral(p){
+  $('dialog').innerHTML = `<div class="hint">${p.name}</div>`+
+    field('積分の添字（測度）','ig_l','μ')+
+    `<div class="row"><button class="primary" onclick="addIntegral()">付ける</button></div>`;
+}
+function addIntegral(){
+  const l=$('ig_l').value.trim()||'μ';
+  state.decos.push({type:'integral',label:l});
+  log(`∫ d${l}`); $('dialog').innerHTML=''; render();
+}
+
+function dialogSym(p){
+  $('dialog').innerHTML = `<div class="hint">${p.name}: 出力添字の(反)対称化</div>`+
+    field('対象の出力添字（空白区切り）','sy_l','i j')+
+    `<div class="row"><button class="primary" onclick="addSym('${p.key}')">付ける</button></div>`;
+}
+function addSym(key){
+  const labels=$('sy_l').value.trim().split(/\s+/).filter(Boolean);
+  state.decos.push({type:key==='symmetrize'?'sym':'antisym',target:labels});
+  log(`${key==='symmetrize'?'Sym':'Asym'}(${labels.join(',')})`); $('dialog').innerHTML=''; render();
+}
+
+// ---------- parts list ----------
+let logLines=[];
+function log(s){ logLines.push(s); }
+function render(){
+  const ul=$('parts'); ul.innerHTML='';
+  logLines.forEach((s,i)=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<span>${i+1}. ${s}</span>`;
+    ul.appendChild(li);
+  });
+}
+
+// ---------- resolve indices (mirror of Diagram#resolve) ----------
+function resolve(){
+  const assign={}; for(const n in state.nodes) assign[n]=new Array(state.nodes[n].legs).fill(null);
+  state.wires.forEach((w,i)=>{ const k='k'+(i+1); assign[w[0][0]][w[0][1]]=k; assign[w[1][0]][w[1][1]]=k; });
+  const output=[];
+  state.frees.forEach(f=>{ assign[f[0][0]][f[0][1]]=f[1]; output.push(f[1]); });
+  let auto=0;
+  for(const n in assign) assign[n].forEach((v,k)=>{ if(v===null){auto++; const nm='f'+auto; assign[n][k]=nm; output.push(nm);} });
+  const integral = state.decos.filter(d=>d.type==='integral').map(d=>d.label);
+  const out = output.filter(o=>!integral.includes(o));
+  return {assign, output:out, integral};
+}
+
+// ---------- fair copy (清書) ----------
+function texName(n){ return (n==='E'||n==='ε')?'ε':n; }
+function idx(a){ return a.map(t=>{ const m=/^([A-Za-z])(\d+)$/.exec(t); return m?`${m[1]}<sub>${m[2]}</sub>`:t; }).join(' '); }
+function fairCopy(){
+  const r=resolve();
+  const counts={}; for(const n in r.assign) r.assign[n].forEach(x=>counts[x]=(counts[x]||0)+1);
+  let dummies=Object.keys(counts).filter(x=>counts[x]>1);
+  r.integral.forEach(x=>{ if(!dummies.includes(x)) dummies.push(x); });
+  let factors=Object.keys(state.nodes).map(n=>`${texName(n)}<sub>${idx(r.assign[n])}</sub>`);
+  let pre='',post='';
+  state.decos.forEach(d=>{
+    if(d.type==='nabla')   pre=`<span class="op">∇</span><sub>${d.label}</sub> `+pre;
+    if(d.type==='partial') pre=`<span class="op">∂</span><sub>${d.label}</sub> `+pre;
+    if(d.type==='integral'){ pre=`<span class="op">∫</span> `+pre; post+=` d${d.label}`; }
+  });
+  const symd=state.decos.find(d=>d.type==='sym'||d.type==='antisym');
+  let lhsIdx=idx(r.output);
+  if(symd&&symd.type==='sym') lhsIdx=`(${lhsIdx})`;
+  if(symd&&symd.type==='antisym') lhsIdx=`[${lhsIdx}]`;
+  const lhs = r.output.length? `R<sub>${lhsIdx}</sub>` : 'R';
+  const sum = dummies.length? `<span class="sum">∑<sub>${dummies.map(d=>idx([d])).join(' ')}</sub></span> `:'';
+  return `${lhs} = ${sum}${pre}${factors.join(' ')}${post}`;
+}
+
+// ---------- einsum (計算) — mirror of Bada::Penrose::Einsum ----------
+function strides(shape){ const s=shape.map(()=>1); for(let k=shape.length-2;k>=0;k--) s[k]=s[k+1]*shape[k+1]; return s; }
+function flatten(x){ return Array.isArray(x)? x.flat(Infinity):[x]; }
+function shapeOf(x){ const sh=[]; let p=x; while(Array.isArray(p)){ sh.push(p.length); p=p[0]; } return sh; }
+function at(flat, idxNames, shape, a){ const st=strides(shape); let off=0; idxNames.forEach((n,k)=>off+=a[n]*st[k]); return flat[off]; }
+function unflatten(flat, shape){
+  if(shape.length===0) return flat[0];
+  const st=strides(shape);
+  const build=(dim,base)=>{ if(dim===shape.length-1) return Array.from({length:shape[dim]},(_,i)=>flat[base+i*st[dim]]);
+    return Array.from({length:shape[dim]},(_,i)=>build(dim+1,base+i*st[dim])); };
+  return build(0,0);
+}
+function einsum(){
+  const r=resolve();
+  // need every node to have a value
+  for(const n in state.nodes){ if(state.nodes[n].val==null) return {ok:false, note:'成分値が未指定 — value を与えると数値計算されます'}; }
+  const dims={}; const tensors=[];
+  for(const n of Object.keys(state.nodes)){
+    const node=state.nodes[n]; const names=r.assign[n]; const sh=shapeOf(node.val); const fl=flatten(node.val);
+    if(sh.length!==names.length) return {ok:false, note:`[${n}] の階数(${sh.length})が脚数(${names.length})と一致しません`};
+    names.forEach((nm,k)=>{ if(dims[nm]!=null && dims[nm]!==sh[k]) return; dims[nm]=sh[k]; });
+    tensors.push({fl,names,sh});
+  }
+  const allNames=Object.keys(dims);
+  const outShape=r.output.map(n=>dims[n]);
+  const outSt=strides(outShape);
+  const res=new Array(outShape.reduce((a,b)=>a*b,1)).fill(0);
+  const ranges=allNames.map(n=>[...Array(dims[n]).keys()]);
+  const rec=(i,a)=>{
+    if(i===allNames.length){
+      let prod=1; tensors.forEach(t=>prod*=at(t.fl,t.names,t.sh,a));
+      if(prod!==0){ let off=0; r.output.forEach((n,k)=>off+=a[n]*outSt[k]); res[off]+=prod; }
+      return;
+    }
+    for(const v of ranges[i]){ a[allNames[i]]=v; rec(i+1,a); }
+  };
+  if(allNames.length) rec(0,{}); else res[0]=tensors.reduce((m,t)=>m*t.fl[0],1);
+  let nested=unflatten(res,outShape);
+  // symmetrise result over 2 output indices
+  const symd=state.decos.find(d=>d.type==='sym'||d.type==='antisym');
+  return {ok:true, output:r.output, shape:outShape, nested, scalar: outShape.length===0?res[0]:null, symd};
+}
+
+// ---------- run ----------
+function combine(){
+  $('fair').innerHTML = Object.keys(state.nodes).length? fairCopy() : '—';
+  const e=einsum();
+  if(!e){$('numeric').textContent='—';return;}
+  if(!e.ok){ $('numeric').textContent='—'; $('notes').textContent=e.note||''; return; }
+  $('notes').textContent='';
+  const lhs = e.output.length? 'R['+e.output.join(' ')+']' : 'R';
+  const val = e.scalar!=null? (Math.round(e.scalar*1e6)/1e6) : JSON.stringify(e.nested);
+  $('numeric').textContent = `${lhs} = ${val}`;
+}
+function resetAll(){ state.nodes={};state.wires=[];state.frees=[];state.decos=[];logLines=[]; render(); $('fair').textContent='—';$('numeric').textContent='—';$('notes').textContent='';$('dialog').innerHTML=''; }
+function sample(){
+  resetAll();
+  state.nodes['A']={legs:2,val:[[1,2],[3,4]],next:0};
+  state.nodes['B']={legs:2,val:[[5,6],[7,8]],next:0};
+  state.wires.push([['A',1],['B',0]]);
+  state.frees.push([['A',0],'i']); state.frees.push([['B',1],'j']);
+  log('テンソル箱 [A]（脚2・成分あり）'); log('テンソル箱 [B]（脚2・成分あり）');
+  log('縮約線 A[1] ─ B[0]'); log('自由添字 A[0] → i'); log('自由添字 B[1] → j');
+  render(); combine();
+}
+
+buildPalette();
+$('combine').onclick=combine;
+$('reset').onclick=resetAll;
+$('sample').onclick=sample;
+
+</script>
+</body>
+</html>
