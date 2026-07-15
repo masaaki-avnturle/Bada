@@ -1,0 +1,916 @@
+#!/usr/bin/env python3
+"""Test suite for the Bada language.
+
+Runs a set of programs through the full pipeline (lex -> parse -> compile ->
+VM) and checks captured output or raised errors.  Run with:
+
+    python3 tests/run_tests.py
+"""
+
+import io
+import os
+import sys
+import contextlib
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from badalang.compiler import compile_source
+from badalang.vm import VM
+from badalang.errors import BadaError, BadaImmutableError, BadaTypeError
+
+PASSED = 0
+FAILED = 0
+
+
+def run(src):
+    """Compile and run a fresh program, returning its captured stdout."""
+    code = compile_source(src)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        VM().run_main(code)
+    return buf.getvalue()
+
+
+def expect(src, output, label):
+    global PASSED, FAILED
+    try:
+        got = run(src)
+    except Exception as e:  # noqa
+        FAILED += 1
+        print(f"FAIL  {label}: raised {type(e).__name__}: {e}")
+        return
+    if got == output:
+        PASSED += 1
+        print(f"ok    {label}")
+    else:
+        FAILED += 1
+        print(f"FAIL  {label}\n   expected: {output!r}\n   got:      {got!r}")
+
+
+def expect_error(src, error_type, label):
+    global PASSED, FAILED
+    try:
+        run(src)
+    except error_type:
+        PASSED += 1
+        print(f"ok    {label}")
+        return
+    except Exception as e:  # noqa
+        FAILED += 1
+        print(f"FAIL  {label}: raised {type(e).__name__}, expected {error_type.__name__}")
+        return
+    FAILED += 1
+    print(f"FAIL  {label}: no error raised, expected {error_type.__name__}")
+
+
+# --- arithmetic & variables ------------------------------------------------
+
+expect("print 1 + 2 * 3", "7\n", "arithmetic precedence")
+expect("print (1 + 2) * 3", "9\n", "parentheses")
+expect("let x <- 10\nx <- x + 5\nprint x", "15\n", "reassignment")
+expect("print 10 / 4", "2.5\n", "float division")
+expect("print 17 % 5", "2\n", "modulo")
+expect("print -5 + 3", "-2\n", "unary minus")
+expect('print "a" + "b" + "c"', "abc\n", "string concat")
+expect('print "ab" * 3', "ababab\n", "string repeat")
+
+# --- comparison & logic ----------------------------------------------------
+
+expect("print 3 < 5", "true\n", "less than")
+expect("print 5 == 5", "true\n", "equality")
+expect("print 5 != 5", "false\n", "inequality")
+expect("print true and false", "false\n", "and")
+expect("print true or false", "true\n", "or")
+expect("print not true", "false\n", "not")
+expect("print 1 < 2 and 2 < 3", "true\n", "chained logic")
+
+# --- collections -----------------------------------------------------------
+
+expect("let a <- [1, 2, 3]\nprint a[1]", "2\n", "list index")
+expect("let a <- [1, 2, 3]\npush(a, 4)\nprint len(a)", "4\n", "list push/len")
+expect('let m <- {"a": 1}\nm["b"] <- 2\nprint m["b"]', "2\n", "map set/get")
+expect("let a <- [10, 20]\na[0] <- 99\nprint a[0]", "99\n", "list index assign")
+
+# --- control flow ----------------------------------------------------------
+
+expect("if 1 < 2 { print \"yes\" } else { print \"no\" }", "yes\n", "if true")
+expect("if 1 > 2 { print \"yes\" } else { print \"no\" }", "no\n", "if false")
+expect("let s <- 0\nfor i in range(5) { s <- s + i }\nprint s", "10\n", "for range")
+expect("let i <- 0\nwhile i < 3 { i <- i + 1 }\nprint i", "3\n", "while")
+expect("for i in range(10) { if i == 3 { break } print i }",
+       "0\n1\n2\n", "break")
+expect("for i in range(5) { if i % 2 == 0 { continue } print i }",
+       "1\n3\n", "continue")
+
+# --- functions & closures --------------------------------------------------
+
+expect("fun sq(x) { return x * x }\nprint sq(7)", "49\n", "function")
+expect("fun f(n) { if n <= 1 { return 1 } return n * f(n - 1) }\nprint f(5)",
+       "120\n", "recursion")
+expect("fun mk(n) { fun add(x) { return x + n } return add }\n"
+       "let a <- mk(100)\nprint a(1)", "101\n", "closure")
+
+# --- OOP -------------------------------------------------------------------
+
+expect(
+    "class C { field v\n method init(v) { self.v <- v }\n"
+    " method get() { return self.v } }\n"
+    "let c <- C.new(42)\nprint c.get()",
+    "42\n", "class fields/methods")
+
+expect(
+    "class A { method who() { return \"A\" } }\n"
+    "class B <- A { method who() { return \"B/\" + super.who() } }\n"
+    "print B.new().who()",
+    "B/A\n", "inheritance + super")
+
+expect(
+    "class V { field x\n method init(x) { self.x <- x }\n"
+    " operator + (o) { return V.new(self.x + o.x) } }\n"
+    "let r <- V.new(2) + V.new(3)\nprint r.x",
+    "5\n", "operator overloading")
+
+# --- TupleSpace ------------------------------------------------------------
+
+expect(
+    'let db <- TupleSpace.new()\ndb.push("k", 7)\nprint db.get("k")',
+    "7\n", "tuplespace push/get")
+expect_error(
+    'let db <- TupleSpace.new()\ndb.push("k", 1)\ndb.push("k", 2)',
+    BadaImmutableError, "tuplespace write-once")
+expect(
+    'let db <- Omega::DATABASE.new("ak")\ndb.push("a", 1)\nprint db.has("a")',
+    "true\n", "Omega::DATABASE namespace")
+
+# --- operator-algebra ------------------------------------------------------
+
+expect("print gamma(5)", "24.0\n", "gamma")
+expect("print beta(2, 3)", "0.08333333333333333\n", "beta")
+expect("print 2 -< 3", "0.08333333333333333\n", "manifold branch operator")
+
+# --- reviser ---------------------------------------------------------------
+
+expect(
+    'reviser { word "表示" => "print" }\n表示 "hi"',
+    "hi\n", "reviser word rewrite")
+expect(
+    'reviser { op "←" => "<-" }\nlet x ← 9\nprint x',
+    "9\n", "reviser operator rewrite")
+expect(
+    'reviser { word "fun" => "fun" }\nprint "kept literal: 表示"',
+    "kept literal: 表示\n", "reviser leaves strings untouched")
+expect(
+    'reviser { word "F" => "fun" }\nF g() { return 5 }\nprint g()',
+    "5\n", "reviser custom keyword")
+
+# --- garbage collection ----------------------------------------------------
+
+expect(
+    "class N { method init() {} }\n"
+    "let keep <- N.new()\nN.new()\nN.new()\n"
+    "print gc_collect() >= 2",
+    "true\n", "gc reclaims unreachable instances")
+expect(
+    "class N { field tag\n method init(t) { self.tag <- t }\n"
+    " method __finalize__() { print \"bye\", self.tag } }\n"
+    "N.new(7)\ngc_collect()",
+    "bye 7\n", "gc runs finalizer")
+expect(
+    "let a <- [1, 2, 3]\ngc_collect()\nprint a[2]",
+    "3\n", "gc keeps reachable list")
+expect(
+    "gc_disable()\nlet s <- gc_stats()\nprint s[\"enabled\"]",
+    "false\n", "gc enable/disable")
+
+# --- exceptions ------------------------------------------------------------
+
+expect(
+    'try { throw "x" } catch (e) { print "caught", e }',
+    "caught x\n", "throw/catch")
+expect(
+    'try { print 1 } catch (e) { print 2 } finally { print 3 }',
+    "1\n3\n", "finally on normal path")
+expect(
+    'try { throw "e" } catch (x) { print "c" } finally { print "f" }',
+    "c\nf\n", "finally on caught path")
+expect(
+    'try { let a <- [1]\nprint a[9] } catch (e) { print e["type"] }',
+    "RuntimeError\n", "catch builtin error as map")
+expect(
+    'try { try { throw "boom" } finally { print "inner" } } '
+    'catch (e) { print "outer", e }',
+    "inner\nouter boom\n", "nested try reraise through finally")
+expect(
+    'fun f() { try { throw 42 } catch (e) { return e } }\nprint f()',
+    "42\n", "throw non-string value")
+
+# --- file I/O --------------------------------------------------------------
+
+expect(
+    'let p <- "/tmp/_bada_test_io.txt"\n'
+    'write_file(p, "hello")\nappend_file(p, " world")\n'
+    'print read_file(p)\ndelete_file(p)',
+    "hello world\n", "write/append/read file")
+expect(
+    'let p <- "/tmp/_bada_test_lines.txt"\n'
+    'write_file(p, "a\\nb\\nc")\nprint len(read_lines(p))\ndelete_file(p)',
+    "3\n", "read_lines")
+expect(
+    'let p <- "/tmp/_bada_test_h.txt"\n'
+    'let f <- open(p, "w")\nf.write("xyz")\nf.close()\n'
+    'let g <- open(p, "r")\nprint g.read()\ng.close()\ndelete_file(p)',
+    "xyz\n", "file handle write/read")
+expect_error(
+    'read_file("/no/such/path/here.txt")',
+    BadaError, "read_file missing -> error")
+
+# --- import / libraries ----------------------------------------------------
+
+expect("import mathx\nprint mathx.gcd(12, 18)", "6\n", "import library function")
+expect("import collections\n"
+       "let s <- collections.Stack.new()\ns.push(5)\nprint s.pop()",
+       "5\n", "import library class")
+expect("import mathx as M\nprint M.is_prime(13)", "true\n", "import as alias")
+expect("import Omega::DATABASE as DB\n"
+       "let d <- DB.new()\nd.push(\"k\", 1)\nprint d.get(\"k\")",
+       "1\n", "import builtin namespace member")
+expect_error("import no_such_library_xyz", BadaError, "missing module -> error")
+
+# --- regular expressions ---------------------------------------------------
+
+expect('let r <- regex("[0-9]+")\nprint r.test("abc123")', "true\n", "regex test")
+expect('let r <- regex("[0-9]+")\nprint r.find_all("a1 b22 c3")',
+       '["1", "22", "3"]\n', "regex find_all")
+expect('let r <- regex("\\\\s+")\nprint r.replace("a b  c", "_")',
+       "a_b_c\n", "regex replace")
+expect('let r <- regex("(\\\\d+)-(\\\\d+)")\nprint r.match("12-34")[1]',
+       "12\n", "regex capture group")
+expect('print re_test("^\\\\d+$", "999")', "true\n", "re_test builtin")
+expect('print re_replace("[aeiou]", "cat", "*")', "c*t\n", "re_replace builtin")
+
+# --- calculus / differential equations -------------------------------------
+
+expect("fun f(x) { return x * x }\nprint round(derivative(f, 3), 3)",
+       "6.0\n", "numerical derivative")
+expect("fun f(x) { return x * x }\nprint round(integrate(f, 0, 1, 1000), 4)",
+       "0.3333\n", "definite integral (Simpson)")
+expect("fun one(x, y) { return 1 }\nprint round(integrate2(one, 0, 2, 0, 3), 4)",
+       "6.0\n", "double integral over a patch")
+expect("fun g(x) { return x * x - 2 }\nprint round(newton(g, 1), 6)",
+       "1.414214\n", "newton root finding")
+expect("fun dy(t, y) { return y }\n"
+       "let s <- solve_ode(dy, 1, 0, 1, 200)\n"
+       "print round(s[len(s)-1][1], 4)",
+       "2.7183\n", "ODE solver (RK4) -> e")
+expect("fun gg(p) { return p[0]*p[0] + 3*p[1] }\n"
+       "let g <- gradient(gg, [2, 5])\nprint round(g[0], 3), round(g[1], 3)",
+       "4.0 3.0\n", "gradient (approx)")
+
+# --- threading -------------------------------------------------------------
+
+expect("fun sq(n) { return n * n }\nlet t <- spawn(sq, 7)\nprint t.join()",
+       "49\n", "spawn + join returns result")
+expect("let ch <- Channel.new()\n"
+       "fun send_it(x) { ch.send(x * 2) }\n"
+       "spawn(send_it, 21)\nprint ch.receive()",
+       "42\n", "channel send/receive across threads")
+expect("let lock <- Mutex.new()\nlet box <- {\"n\": 0}\n"
+       "fun add(k) { let i <- 0\n while i < k { lock.lock()\n"
+       " box[\"n\"] <- box[\"n\"] + 1\n lock.unlock()\n i <- i + 1 } }\n"
+       "let a <- spawn(add, 500)\nlet b <- spawn(add, 500)\n"
+       "a.join()\nb.join()\nprint box[\"n\"]",
+       "1000\n", "mutex protects shared state")
+
+# --- manifolds & topology (advanced math overloading) ----------------------
+
+expect("import manifold\n"
+       "let a <- manifold.Vector.new([1,2,2])\nprint a.norm()",
+       "3.0\n", "manifold vector norm")
+expect("import manifold\n"
+       "let a <- manifold.Vector.new([1,2,3])\n"
+       "let b <- manifold.Vector.new([4,5,6])\nprint a -< b",
+       "32\n", "manifold vector dot via -< operator")
+expect("import topology\n"
+       "let c <- topology.Complex.new(4, 6, 4)\nprint c.euler()",
+       "2\n", "euler characteristic of tetrahedron")
+expect("import topology\n"
+       "let a <- topology.Loop.new(\"a\")\n"
+       "print (a * a.inverse()).is_identity()",
+       "true\n", "fundamental group: a * a^-1 = identity")
+expect("import topology\n"
+       "let a <- topology.Loop.new(\"a\")\nlet b <- topology.Loop.new(\"b\")\n"
+       "print (a * b).show()",
+       "ab\n", "fundamental group composition")
+expect("import topology\n"
+       "let p <- topology.Loop.new(\"abB\")\nlet a <- topology.Loop.new(\"a\")\n"
+       "print p == a",
+       "true\n", "loop homotopy via free reduction")
+
+# --- media: images, gif, x-ray --------------------------------------------
+
+expect('let im <- image(8, 8, "L", 0)\nim.set(3, 3, 200)\nprint im.get(3, 3)',
+       "200\n", "image set/get pixel")
+expect('let im <- image(4, 4, "L", 0)\nim.fill(99)\nprint im.get(0, 0), im.get(3, 3)',
+       "99 99\n", "image fill")
+expect('let im <- image(6, 6, "L", 7)\nprint im.save("/tmp/_bada_t.pgm")\n'
+       'print read_file("/tmp/_bada_t.pgm")[0]\ndelete_file("/tmp/_bada_t.pgm")',
+       "/tmp/_bada_t.pgm\nP\n", "image saves a PGM file")
+expect('let g <- gif("/tmp/_bada_t.gif", 8, 8, 5, 0)\n'
+       'g.add(image(8, 8, "L", 10))\ng.add(image(8, 8, "L", 250))\n'
+       'g.save()\nprint g.frame_count\ndelete_file("/tmp/_bada_t.gif")',
+       "2\n", "gif collects frames and saves")
+expect("import xray\n"
+       "let s <- xray.chest_phantom(40, 48)\ns.expose()\n"
+       "let surf <- s.surface()\n"
+       "print surf.get(20, 24) > surf.get(7, 24)",
+       "true\n", "x-ray: bone attenuates more than lung")
+expect("import xray\n"
+       "let s <- xray.chest_phantom(30, 30)\n"
+       "print round(s.ray_intensity(15, 30), 0) <= 255",
+       "true\n", "x-ray Beer-Lambert ray intensity bounded")
+
+# --- brain imaging: thermal entropy & modalities ---------------------------
+
+expect("print round(gamma_entropy(1, 1), 4)", "1.0\n", "gamma entropy at k=1,theta=1")
+expect("print gamma_entropy(3, 2) > gamma_entropy(3, 1)", "true\n",
+       "entropy grows with theta")
+expect("let im <- image(20, 20, \"L\", 0)\n"
+       "field_project(im, [[10, 10, 4, 1, 2]], 0, 200, false)\n"
+       "print im.get(10, 10) > im.get(0, 0)",
+       "true\n", "field_project peaks at the source")
+expect("let im <- image(16, 16, \"L\", 0)\n"
+       "field_project(im, [[8, 8, 3, 1, 2]], 0, 100, true)\n"
+       "let plain <- image(16, 16, \"L\", 0)\n"
+       "field_project(plain, [[8, 8, 3, 1, 2]], 0, 100, false)\n"
+       "print im.get(8, 8) >= plain.get(8, 8)",
+       "true\n", "entropy weighting raises activation")
+expect("import neuro\n"
+       "let b <- neuro.default_brain(40, 40)\n"
+       "b.render_mri(\"/tmp/_bt_mri.pgm\")\n"
+       "print file_exists(\"/tmp/_bt_mri.pgm\")\ndelete_file(\"/tmp/_bt_mri.pgm\")",
+       "true\n", "neuro MRI renders a file")
+expect("import neuro\n"
+       "let b <- neuro.default_brain(40, 40)\n"
+       "let ch <- b.eeg([[20, 30], [20, 10]], 1, 32)\n"
+       "print len(ch), len(ch[0])",
+       "2 32\n", "neuro EEG channels and samples")
+
+# --- audio & haptic biofeedback --------------------------------------------
+
+expect("import audio\n"
+       "let t <- audio.note(440, 1, 8000, 0.5)\nprint len(t)",
+       "8000\n", "audio note sample count")
+expect("import audio\n"
+       "let s <- audio.relief_soundscape(1, 1, 8000)\n"
+       "audio.save(\"/tmp/_bt.wav\", s, 8000)\n"
+       "print file_exists(\"/tmp/_bt.wav\")\ndelete_file(\"/tmp/_bt.wav\")",
+       "true\n", "audio writes a WAV file")
+expect("import haptic\n"
+       "let a <- haptic.Actuator.new(\"chest\", 0, 0)\n"
+       "a.soothe(1, 1, 100)\nprint a.delivered() > 0",
+       "true\n", "haptic soothe delivers signal")
+expect("import haptic\n"
+       "let a <- haptic.Actuator.new(\"chest\", 0, 0)\n"
+       "let hi <- a.soothe(1, 1, 100)\nlet d1 <- a.delivered()\n"
+       "a.soothe(0.2, 1, 100)\nprint d1 > a.delivered()",
+       "true\n", "haptic intensity scales delivery")
+
+# --- YamaguchiHealth medication biofeedback --------------------------------
+
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"striatum\", 1)\n"
+       "let e <- c.administer(\"risperidone\", 1)\nprint e[\"relief\"] > 0",
+       "true\n", "risperidone produces relief")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"vasomotor\", 1)\n"
+       "let e <- c.administer(\"amlodipine\", 1)\nprint e[\"haptic_region\"]",
+       "chest\n", "antihypertensive haptic targets the chest")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"striatum\", 1)\n"
+       "let before <- c.total_tension()\nc.administer(\"risperidone\", 1)\n"
+       "print c.total_tension() < before",
+       "true\n", "treatment lowers total tension")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\n"
+       "try { c.administer(\"aspirin\", 1) } catch (e) { print \"caught\" }",
+       "caught\n", "unknown drug throws")
+expect("import yamaguchi_health as yh\n"
+       "let c <- yh.Clinic.new(40, 40)\nc.symptom(\"gut_myenteric\", 1)\n"
+       "let e <- c.administer(\"sennoside\", 1)\nprint e[\"haptic_region\"]",
+       "abdomen\n", "sennoside targets the abdomen")
+
+# --- binaural audio & psychotropic biofeedback -----------------------------
+
+expect("import audio\n"
+       "let bb <- audio.binaural(200, 10, 1, 8000, 0.5)\n"
+       "print len(bb), len(bb[0]), len(bb[1])",
+       "2 8000 8000\n", "binaural returns two channels")
+expect("import audio\nprint audio.band_beat(\"delta\"), audio.band_beat(\"alpha\")",
+       "2.5 10\n", "EEG band beat frequencies")
+expect("let s <- binaural_soundscape(180, 6, 0.8, 1, 8000)\n"
+       "print len(s[0]) == 8000 and len(s[1]) == 8000",
+       "true\n", "native binaural soundscape length")
+expect("let s <- binaural_soundscape(180, 6, 0.5, 1, 8000)\n"
+       "write_wav_stereo(\"/tmp/_bt2.wav\", s[0], s[1], 8000)\n"
+       "print file_exists(\"/tmp/_bt2.wav\")\ndelete_file(\"/tmp/_bt2.wav\")",
+       "true\n", "stereo WAV writes a file")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\nprint len(c.names())",
+       "10\n", "psychotropic formulary size")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "let e <- c.dose(\"flunitrazepam\", 1, 1, \"/tmp/_bt3.wav\")\n"
+       "print e[\"band\"]\ndelete_file(\"/tmp/_bt3.wav\")",
+       "delta\n", "hypnotic targets the delta band")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "let hyp <- c.relief_of(c.drugs[\"flunitrazepam\"], 1)\n"
+       "let ad <- c.relief_of(c.drugs[\"snri\"], 1)\n"
+       "print hyp > ad",
+       "true\n", "hypnotic gives more relief than SNRI")
+expect("import psychotropic as ps\n"
+       "let c <- ps.SoundClinic.new()\n"
+       "try { c.dose(\"aspirin\", 1, 1, \"/tmp/x.wav\") } catch (e) { print \"caught\" }",
+       "caught\n", "unknown psychotropic throws")
+
+# --- CT / labtest / genomics / basal ganglia -------------------------------
+
+expect("let im <- image(32,32,\"L\",0)\nim.set(16,16,200)\n"
+       "let s <- ct_sinogram(im, 30)\nprint s.height",
+       "30\n", "CT sinogram angle count")
+expect("let im <- image(24,24,\"L\",0)\nim.fill(50)\n"
+       "let r <- ct_reconstruct(im, 40, true)\nprint r.width",
+       "24\n", "CT reconstruct size")
+expect("import labtest\nlet a <- labtest.Analyzer.new()\n"
+       "let e <- a.measure(\"glucose\", 200)\nprint e[\"flag\"]",
+       "HIGH\n", "blood panel flags high glucose")
+expect("import labtest\nlet a <- labtest.Analyzer.new()\n"
+       "a.measure(\"glucose\", 90)\nprint a.results[0][\"flag\"]",
+       "normal\n", "blood panel normal in range")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"ATGTGA\")\n"
+       "print g.transcribe()",
+       "AUGUGA\n", "DNA transcribes to RNA")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"ATGGCCTGA\")\n"
+       "print g.translate()",
+       "MA\n", "RNA translates and stops at stop codon")
+expect("import genomics\nlet g <- genomics.Sequencer.new(\"GGCCGGCC\")\n"
+       "print round(g.gc_content()*100, 0)",
+       "100.0\n", "GC content")
+expect("import basal_ganglia\nlet b <- basal_ganglia.Gate.new(0.8)\n"
+       "b.input(\"CT\", 2)\nb.input(\"MRI\", 0.2)\nprint b.select()[0]",
+       "CT\n", "basal ganglia selects the most salient")
+expect("import ct\nlet s <- ct.body_slice(40, \"thorax\")\n"
+       "print s.get(20, 20) >= 0",
+       "true\n", "CT body slice phantom builds")
+expect("let im <- image(8,8,\"RGB\",0)\nim.set_rgb(1,1,200,100,50)\n"
+       "let u <- im.data_uri()\nprint u[0],u[1],u[2],u[3]",
+       "d a t a\n", "image data URI for HTML embedding")
+
+# --- mayu: Windows registry + config DSL -----------------------------------
+
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print r.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\")",
+       "beg\n", "registry stores and reads a value")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\A\", \"x\", \"REG_SZ\", \"1\")\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\B\", \"y\", \"REG_SZ\", \"2\")\n"
+       "print r.subkeys(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\")",
+       "[\"A\", \"B\"]\n", "registry enumerates subkeys")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\emacs\", \"C-a\", \"REG_SZ\", \"beg\")\n"
+       "print contains(r.export_reg(), \"Windows Registry Editor Version 5.00\")",
+       "true\n", "registry exports .reg format")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"os win10\\nkeymap emacs {\\n key C-a -> beg\\n}\", reg)\n"
+       "print res[\"os\"], res[\"bindings\"], len(res[\"errors\"])",
+       "win10 1 0\n", "DSL compiles bindings for the target OS")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"define M = C\\nkeymap e {\\n key $M-k -> kill\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\e\", \"C-k\")",
+       "kill\n", "DSL substitutes $variables and registers")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let res <- mayucfg.compile(\"window \\\"Files\\\" : base {\\n key / -> search\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\Files\", \"(inherits)\")",
+       "base\n", "DSL window inheritance is recorded")
+
+# --- mayu: installed-application remaps (shell-script actions) --------------
+
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n exe notepad.exe\\n class Notepad\\n base emacs\\n"
+       " key C-s -> send C-s\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(exe)\")",
+       "notepad.exe\n", "app block registers exe under apps\\<name>")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n class Notepad\\n key C-s -> send C-s\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(class)\")",
+       "Notepad\n", "app block records the window class")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "mayucfg.compile(\"app \\\"Notepad\\\" {\\n base emacs\\n key F5 -> type \\\"x\\\"\\n}\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\Mayu\\\\win11\\\\apps\\\\Notepad\", \"(inherits)\")",
+       "emacs\n", "app block base map becomes (inherits)")
+expect("import winreg\nimport mayucfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- mayucfg.compile(\"app \\\"Notepad\\\" {\\n key C-s -> send C-s\\n}\", reg)\n"
+       "print has(r[\"appmeta\"], \"Notepad\")",
+       "true\n", "compile result exposes appmeta")
+expect("import mayucfg\n"
+       "print mayucfg.action_kind(\"send C-s\"), mayucfg.action_kind(\"exec cmd\"), "
+       "mayucfg.action_kind(\"type x\"), mayucfg.action_kind(\"kill-line\")",
+       "send-keys shell-exec type-text command\n", "shell-script action kinds classified")
+expect("import winapps\nprint len(winapps.catalog()) >= 10",
+       "true\n", "installed-apps catalog is populated")
+expect("import winapps\nlet a <- winapps.by_name(\"Notepad\")\n"
+       "print a[\"exe\"], a[\"class\"], a[\"style\"]",
+       "notepad.exe Notepad emacs\n", "catalog lookup by name")
+
+# --- yamy: genuine .mayu engine (file -> registry) -------------------------
+
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print r[\"sections\"], r[\"windows\"], r[\"bindings\"], len(r[\"errors\"])",
+       "2 1 2 0\n", "parses keymap + window section")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Notepad\", \"(class)\")",
+       "Notepad\n", "window class registered under HKCU\\Software\\yamy")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window Notepad /Notepad/ : Global\\n key C-k = S-End Delete\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Notepad\", \"C-k\")",
+       "S-End Delete\n", "key sequence value registered")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "yamycfg.compile(\"window VSCode /Chrome_WidgetWin_1:Visual Studio Code/ : Global\\n"
+       " key C-p = C-p\", reg)\n"
+       "print reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\VSCode\", \"(title)\")",
+       "Visual Studio Code\n", "window matched by class:title")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = kill\", reg)\n"
+       "print yamycfg.investigate(r[\"parsed\"], \"Notepad\", \"C-a\")",
+       "C-a -> Home  [Notepad]\n", "investigation resolves an inherited binding")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile(\"keymap Global\\n key C-a = Home\\n"
+       "window Notepad /Notepad/ : Global\\n key C-k = kill\", reg)\n"
+       "let e <- yamycfg.effective(r[\"parsed\"], \"Notepad\")\n"
+       "print e[\"C-a\"], e[\"C-k\"]",
+       "Home kill\n", "effective keymap merges inherited + own bindings")
+expect("import winreg\nimport yamycfg\nlet reg <- winreg.Registry.new()\n"
+       "let r <- yamycfg.compile_file(\"config/default.mayu\", reg)\n"
+       "print r[\"windows\"], len(r[\"errors\"]), "
+       "reg.get(\"HKEY_CURRENT_USER\\\\Software\\\\yamy\\\\Explorer\", \"j\")",
+       "5 0 Down\n", "compile_file loads .mayu with includes from disk")
+
+# --- scancode: genuine Windows physical remap (HKLM Scancode Map) -----------
+
+expect("import scancode\nlet m <- scancode.build([[\"CapsLock\", \"LCtrl\"]])\n"
+       "print m[\"count\"], m[\"bytes\"], len(m[\"errors\"])",
+       "1 20 0\n", "scancode map: one remap = 20 bytes")
+expect("import scancode\nlet m <- scancode.build([[\"CapsLock\", \"LCtrl\"]])\n"
+       "print m[\"hex\"]",
+       "00,00,00,00,00,00,00,00,02,00,00,00,1d,00,3a,00,00,00,00,00\n",
+       "scancode map bytes: CapsLock(3a) -> LCtrl(1d), count 2, null term")
+expect("import scancode\nlet m <- scancode.build([[\"Esc\", \"CapsLock\"]])\n"
+       "print contains(m[\"reg\"], \"HKEY_LOCAL_MACHINE\\\\SYSTEM\\\\CurrentControlSet\\\\Control\\\\Keyboard Layout\")",
+       "true\n", "scancode .reg targets the HKLM Keyboard Layout key")
+expect("import scancode\nlet m <- scancode.build([[\"RCtrl\", \"LCtrl\"]])\n"
+       "print m[\"hex\"]",
+       "00,00,00,00,00,00,00,00,02,00,00,00,1d,00,1d,e0,00,00,00,00\n",
+       "extended key (RCtrl) carries the 0xe0 prefix byte")
+expect("import scancode\nlet m <- scancode.build([[\"Bogus\", \"LCtrl\"]])\n"
+       "print m[\"count\"], len(m[\"errors\"])",
+       "0 1\n", "unknown key name is reported and skipped")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_LOCAL_MACHINE\\\\X\", \"Scancode Map\", \"REG_BINARY\", \"00,1d\")\n"
+       "print contains(r.export_reg(), \"\\\"Scancode Map\\\"=hex:00,1d\")",
+       "true\n", "registry exports REG_BINARY as hex:")
+expect("import winreg\nlet r <- winreg.Registry.new()\n"
+       "r.set(\"HKEY_CURRENT_USER\\\\X\", \"k\", \"REG_SZ\", \"x\\\"y\")\n"
+       "print contains(r.export_reg(), \"\\\\\")",
+       "true\n", "REG_SZ values escape embedded double-quotes")
+
+# --- mayu: keymap registry & editor (Emacs / vim) --------------------------
+
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"emacs\", \"C-a\")",
+       "move-beginning-of-line\n", "registry resolves an Emacs binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_vim(\"Editor\")\n"
+       "print r.lookup(\"Editor\", \"vim-normal\", \"d d\")",
+       "delete-line\n", "registry resolves a vim binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "r.bind(\"Files\", \"vim-normal\", \"/\", \"search\")\n"
+       "print r.lookup(\"Files\", \"vim-normal\", \"/\")",
+       "search\n", "per-application binding registered")
+expect("import keymap\nlet r <- keymap.Registry.new()\nr.load_emacs(\"Editor\")\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"C-k\")",
+       "C-k -> kill-line  [Editor/emacs]\n", "investigation key reports the binding")
+expect("import keymap\nlet r <- keymap.Registry.new()\n"
+       "print r.investigate(\"Editor\", \"emacs\", \"Z\")",
+       "Z -> (unbound)\n", "investigation key reports unbound")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello world\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"move-beginning-of-line\", \"\")\n"
+       "b.act(\"forward-word\", \"\")\nb.act(\"kill-line\", \"\")\nprint b.line()",
+       "hello\n", "Emacs kill-line after forward-word")
+expect("import editor\nlet b <- editor.Buffer.new([\"hello\"])\n"
+       "b.act(\"move-end-of-line\", \"\")\nb.act(\"kill-line\", \"\")\nb.act(\"kill-line\", \"\")\n"
+       "b.act(\"move-beginning-of-line\", \"\")\nb.act(\"yank\", \"\")\nprint b.line()",
+       "hello\n", "kill then yank restores text")
+expect("import editor\nlet b <- editor.Buffer.new([\"aaa\", \"bbb\", \"ccc\"])\n"
+       "b.act(\"delete-line\", \"\")\nprint b.text()",
+       "bbb\nccc\n", "vim dd deletes the current line")
+expect("import editor\nlet b <- editor.Buffer.new([\"x\"])\n"
+       "b.act(\"insert-mode\", \"\")\nprint b.mode",
+       "vim-insert\n", "vim i enters insert mode")
+
+# --- Bada OS shell (CLI + GUI terminal engine) -----------------------------
+
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"pwd\")",
+       "/home/user\n", "shell pwd")
+expect("import shell\nlet sh <- shell.Shell.new()\nprint sh.exec(\"ls\")",
+       "Documents/  Pictures/  hello.bada\n", "shell ls lists directory")
+expect("import shell\nlet sh <- shell.Shell.new()\nsh.exec(\"cd Documents\")\n"
+       "print sh.cwd",
+       "/home/user/Documents\n", "shell cd changes the working directory")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print sh.exec(\"cat Documents/readme.txt\")[0]",
+       "W\n", "shell cat reads a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"mkdir Projects\")\nsh.exec(\"write Projects/a.txt hi there\")\n"
+       "print sh.exec(\"cat Projects/a.txt\")",
+       "hi there\n", "shell mkdir + write + cat")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "print contains(sh.exec(\"bada hello.bada\"), \"compiles OK\")",
+       "true\n", "shell runs the Bada compiler on a file")
+expect("import shell\nlet sh <- shell.Shell.new()\n"
+       "sh.exec(\"cd ..\")\nprint sh.cwd",
+       "/home\n", "shell cd .. goes up a level")
+expect("import shell\nprint shell.basename(\"/home/user/x.txt\")",
+       "x.txt\n", "shell basename")
+
+# --- Bada Quantum OS: multi-qubit simulator & algorithms -------------------
+
+expect("let r <- qreg(3)\nprint qn(r), len(qprobs(r))",
+       "3 8\n", "quantum register has 2^n amplitudes")
+expect("let r <- qreg(2)\nqgate(r, \"H\", 0)\nqcnot(r, 0, 1)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[3], 3)",
+       "0.5 0.5\n", "Bell state has equal |00> and |11> weight")
+expect("let r <- qreg(1)\nqgate(r, \"X\", 0)\nprint round(qprobs(r)[1], 3)",
+       "1.0\n", "X gate flips |0> to |1>")
+expect("import qalgo\nlet r <- qalgo.grover(3, 5)\n"
+       "let p <- qprobs(r)\nlet top <- 0\nlet i <- 0\n"
+       "while i < len(p) { if p[i] > p[top] { top <- i }\n i <- i + 1 }\nprint top",
+       "5\n", "Grover amplifies the marked item")
+expect("import qalgo\nlet r <- qalgo.bernstein_vazirani(4, 11)\nprint qmeasure(r)",
+       "11\n", "Bernstein-Vazirani recovers the secret in one query")
+expect("import qalgo\nlet r <- qalgo.ghz(3)\n"
+       "let p <- qprobs(r)\nprint round(p[0], 3), round(p[7], 3)",
+       "0.5 0.5\n", "GHZ state is (|000>+|111>)/sqrt2")
+expect("import qos\nlet k <- qos.Kernel.new()\nk.boot()\n"
+       "let p <- k.run(\"grover\", [3, 6])\nprint p[\"top\"], p[\"prob\"] > 0.9",
+       "6 true\n", "quantum OS runs Grover and finds the answer")
+expect("import qos\nprint qos.to_ket(6, 3)",
+       "110\n", "kernel formats a measurement as a ket")
+
+# --- compounding (drug mixing / interactions) ------------------------------
+
+expect("import compounding\n"
+       "let r <- compounding.compound([\"risperidone\", \"flunitrazepam\"])\n"
+       "print r[\"sedating\"], len(r[\"warnings\"]) > 0",
+       "2 true\n", "compounding flags additive CNS depression")
+expect("import compounding\n"
+       "let r <- compounding.compound([\"amlodipine\"])\nprint len(r[\"warnings\"])",
+       "0\n", "single drug has no interaction warning")
+expect("import compounding\n"
+       "let r <- compounding.compound([\"sennoside\"])\n"
+       "print has(r[\"regions\"], \"gut_myenteric\")",
+       "true\n", "compound carries the drug target region")
+
+# --- Quantum_Bada: single-qubit simulator ----------------------------------
+
+expect("import quantum\nprint quantum.bloch(quantum.zero())",
+       "[0, 0, 1]\n", "qubit |0> points to the north pole")
+expect("import quantum\nprint quantum.bloch(quantum.x(quantum.zero()))",
+       "[0, 0, -1]\n", "X gate flips |0> to the south pole")
+expect("import quantum\nprint quantum.bloch(quantum.h(quantum.zero()))",
+       "[1.0, 0.0, 0.0]\n", "H gate makes the |+> equatorial state")
+expect("import quantum\nlet q <- quantum.ry(quantum.zero(), PI/2)\n"
+       "print round(quantum.prob0(q), 3)",
+       "0.5\n", "RY(pi/2) gives equal superposition")
+expect("import quantum\nlet n <- quantum.rx(quantum.zero(), 0.4)\n"
+       "print quantum.bloch(quantum.correct(n))",
+       "[0, 0, 1]\n", "error correction snaps back to |0>")
+expect("import quantum\nprint quantum.fidelity(quantum.h(quantum.zero()), quantum.h(quantum.zero()))",
+       "1.0\n", "fidelity of a state with itself is 1")
+
+# --- Project Forge: zip / project completion -------------------------------
+
+expect('let f <- {"a.txt": "hi", "b.txt": "yo"}\n'
+       'zip_write("/tmp/_pf.zip", f)\n'
+       'let g <- zip_read("/tmp/_pf.zip")\nprint g["a.txt"], g["b.txt"]\n'
+       'delete_file("/tmp/_pf.zip")',
+       "hi yo\n", "zip write/read round-trip")
+expect("import project\n"
+       "let html <- \"<link href=\\\"style.css\\\"><script src=\\\"app.js\\\">\"\n"
+       "let r <- project.referenced_assets(html)\nprint len(r)",
+       "2\n", "referenced-asset extraction from HTML")
+expect("import project\n"
+       "let files <- {\"index.html\": \"<link href=\\\"style.css\\\">\"}\n"
+       "let r <- project.complete(files)\nprint has(r[\"files\"], \"style.css\")",
+       "true\n", "project generates a referenced-but-missing file")
+expect("import project\n"
+       "let files <- {\"app.js\": \"function f(){ return (1\"}\n"
+       "let r <- project.complete(files)\nprint r[\"files\"][\"app.js\"]",
+       "function f(){ return (1)}\n", "project auto-fixes a broken file")
+expect("import project\n"
+       "let r <- project.complete({})\n"
+       "print has(r[\"files\"], \"index.html\"), has(r[\"files\"], \"README.md\")",
+       "true true\n", "empty project gets scaffolding")
+expect("import project\nprint project.ends(\"app.js\", \".js\")",
+       "true\n", "filename suffix test")
+
+# --- Bada Forge: source auto-correction ------------------------------------
+
+expect('print bada_check("let x <- 5")', "\n", "bada_check passes valid source")
+expect('print bada_check("let x <- (") == ""', "false\n", "bada_check reports invalid source")
+expect("import forge\nprint forge.defect(\"a(b[c{d\")", "3\n",
+       "invariant defect counts unbalanced brackets")
+expect("import forge\nprint forge.defect(\"f(x) { return x }\")", "0\n",
+       "balanced source has zero defect")
+expect("import forge\nlet r <- forge.autofix(\"fun f(r) { return r * r\")\n"
+       "print r[\"ok\"], r[\"defect_after\"]",
+       "true 0\n", "forge fixes missing brace -> valid")
+expect("import forge\nlet r <- forge.autofix(\"let x = (3 + 4\")\nprint r[\"fixed\"]",
+       "let x <- (3 + 4)\n", "forge fixes = to <- and balances parens")
+expect("import forge\nprint forge.valid(\"let y <- 1\\nprint y\")",
+       "true\n", "forge.valid accepts good source")
+expect("import forge\nlet r <- forge.autofix(\"print \\\"hi\")\nprint r[\"ok\"]",
+       "true\n", "forge closes an unterminated string")
+
+# --- silent talk (subvocal BCI) --------------------------------------------
+
+expect("import silenttalk\nprint len(silenttalk.vocabulary())",
+       "8\n", "silent-talk vocabulary size")
+expect("import silenttalk\nlet a <- silenttalk.signature(\"STOP\")\n"
+       "let b <- silenttalk.signature(\"PAIN\")\nprint silenttalk.dot(a,b) < 0.99",
+       "true\n", "distinct words have distinct signatures")
+expect("import silenttalk\nlet s <- silenttalk.signature(\"YES\")\n"
+       "print round(silenttalk.dot(s, s), 3)",
+       "1.0\n", "signature is unit-normalised")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "let r <- st.think(\"HELP\")\nprint r[\"decoded\"], r[\"correct\"]",
+       "HELP true\n", "silent talk decodes the imagined word")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "let correct <- 0\nfor w in st.words() { if st.think(w)[\"correct\"] { correct <- correct + 1 } }\n"
+       "print correct",
+       "8\n", "silent talk decodes the whole vocabulary")
+expect("import silenttalk\nlet st <- silenttalk.SilentTalk.new()\n"
+       "st.speak([\"YES\", \"NO\"])\nprint contains(st.transcript, \"YES\")",
+       "true\n", "silent talk assembles a transcript")
+expect("print ord(\"A\"), chr(66), char_at(\"hello\", 1)",
+       "65 B e\n", "ord / chr / char_at builtins")
+
+# --- thermometer & infrared sensor -----------------------------------------
+
+expect("import sensors\nlet t <- sensors.Thermometer.new()\nprint t.read_k(1.5)",
+       "36.5\n", "thermometer reads normal at calm baseline")
+expect("import sensors\nlet t <- sensors.Thermometer.new()\n"
+       "print t.classify(t.read_k(6.0))",
+       "fever\n", "thermometer classifies fever from high gamma shape")
+expect("import sensors\nlet t <- sensors.Thermometer.new()\nprint t.classify(34.0)",
+       "hypothermia\n", "thermometer flags hypothermia")
+expect("import sensors\nlet ir <- sensors.Infrared.new(40)\n"
+       "let im <- ir.thermal_image(sensors.body_sources(40, 1.0))\nprint im.mode",
+       "RGB\n", "infrared thermal image is RGB")
+expect("import sensors\nlet ir <- sensors.Infrared.new(48)\n"
+       "let f <- ir.heat_field(sensors.body_sources(48, 1.2))\n"
+       "print ir.peak(f, 33, 9) > ir.spot(f, 0, 0, 33, 9)",
+       "true\n", "IR peak exceeds a cold corner spot")
+
+# --- 3-D volume rendering --------------------------------------------------
+
+expect("let v <- ct_head_volume(24)\nprint v.nx, v.ny, v.nz",
+       "24 24 24\n", "CT head volume dimensions")
+expect("let v <- ct_head_volume(24)\nprint v.get(12, 12, 12) >= 0",
+       "true\n", "volume voxel access")
+expect("let s <- []\nfor i in range(3) { push(s, image(8, 8, \"L\", i * 50)) }\n"
+       "let v <- volume_from_slices(s)\nprint v.nz, v.get(4, 4, 1)",
+       "3 50\n", "volume from image slices")
+expect("import volume\nlet tf <- volume.bone_tissue_tf()\n"
+       "print len(tf), len(tf[0])",
+       "4 256\n", "transfer function shape")
+expect("import volume\nlet v <- ct_head_volume(28)\n"
+       "let tf <- volume.bone_tissue_tf()\n"
+       "let img <- volume.render(v, 0.5, 0.3, tf, 40)\nprint img.mode, img.width",
+       "RGB 40\n", "volume render produces an RGB image")
+expect("import volume\nlet v <- ct_head_volume(24)\n"
+       "let tf <- volume.xray_tf()\nlet fr <- volume.turntable(v, tf, 30, 4)\n"
+       "print len(fr)",
+       "4\n", "volume turntable frame count")
+
+# --- fusion / report / 4D cardiac ------------------------------------------
+
+expect("import fusion\nimport ct\nimport pet\n"
+       "let a <- ct.body_slice(40, \"head\")\nlet u <- pet.uptake_map(40, [[20,20,5,1,5]])\n"
+       "let f <- fusion.pet_ct(a, u, 0.6)\nprint f.mode",
+       "RGB\n", "PET-CT fusion produces RGB")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "r.add(\"PET\", \"hot focus\", 1.2, \"abnormal\")\n"
+       "r.add(\"Echo\", \"normal\", 0.3, \"normal\")\n"
+       "print r.ranked()[0][\"modality\"]",
+       "PET\n", "report ranks findings by salience")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "r.add(\"PET\", \"focus\", 1.2, \"abnormal\")\n"
+       "let t <- r.generate(\"PET\", 0.9)\nprint contains(t, \"IMPRESSION\")",
+       "true\n", "report generates an impression section")
+expect("import report\nlet r <- report.Reporter.new()\n"
+       "print contains(r.recommendation(\"PET\"), \"biopsy\")",
+       "true\n", "report recommends per leading modality")
+expect("import echo\nlet fr <- echo.loop_frames(40, 6)\nprint len(fr)",
+       "6\n", "4D cardiac loop frame count")
+expect("import echo\nlet g <- echo.loop_gif(40, 4, \"/tmp/_c.gif\", 10)\n"
+       "g.save()\nprint file_exists(\"/tmp/_c.gif\")\ndelete_file(\"/tmp/_c.gif\")",
+       "true\n", "4D cardiac GIF saves")
+expect("let g <- gif(\"/tmp/_u.gif\", 8, 8, 5, 0)\ng.add(image(8,8,\"L\",10))\n"
+       "let u <- g.data_uri()\nprint u[0],u[1],u[2],u[3]",
+       "d a t a\n", "gif data URI for embedding animation")
+
+# --- thermography / DEXA / echo / endoscope / monitor / ct3d ---------------
+
+expect("import thermography\nlet im <- thermography.body(40)\nprint im.mode",
+       "RGB\n", "thermography renders an RGB IR map")
+expect("import thermography\nlet c <- thermography.iron(255)\nprint c[0]",
+       "255\n", "iron palette hot end is red-saturated")
+expect("import dexa\nlet s <- dexa.spine(40)\nprint s[\"dx\"]",
+       "osteopenia\n", "DEXA classifies T-score")
+expect("import dexa\nlet sc <- dexa.scores(0.6)\nprint sc[\"dx\"]",
+       "osteoporosis\n", "DEXA flags osteoporosis at low BMD")
+expect("import echo\nlet im <- echo.four_chamber(48, 0)\nprint im.width",
+       "48\n", "echocardiography 4-chamber view")
+expect("import echo\nprint echo.ejection_fraction() > 0",
+       "true\n", "echo ejection fraction")
+expect("import endoscope\nlet im <- endoscope.view(40)\n"
+       "print im.mode, im.get(20, 20) >= 0",
+       "RGB true\n", "endoscope tunnel view")
+expect("let im <- image(30,30,\"RGB\",0)\nendoscope_view(im, 5)\n"
+       "print im.get(0,0)",
+       "0\n", "endoscope masks outside the circular field")
+expect("import monitor\nlet m <- monitor.Patient.new()\n"
+       "let v <- m.vitals()\nprint v[\"hr\"], v[\"spo2\"]",
+       "78 97\n", "monitor reports vitals")
+expect("import monitor\nlet m <- monitor.Patient.new()\n"
+       "let im <- m.strip(120, 2, 100)\nprint im.width",
+       "120\n", "monitor strip image")
+expect("import ct3d\nimport ct\n"
+       "let sl <- [[\"a\", ct.body_slice(30, \"head\")], [\"b\", ct.body_slice(30, \"thorax\")]]\n"
+       "let im <- ct3d.stack(sl)\nprint im.mode, im.width > 30",
+       "RGB true\n", "CT 3D isometric stack")
+
+# --- PET / ultrasound / ECG ------------------------------------------------
+
+expect("import pet\nlet s <- pet.brain_fdg(48)\n"
+       "print s[\"fused\"].mode, s[\"suv\"] > 0",
+       "RGB true\n", "PET produces a fused colour image with SUV")
+expect("import ultrasound\nlet ph <- ultrasound.abdomen_phantom(60)\n"
+       "let im <- ultrasound.scan(ph, 30, 2, 56, 0.6)\nprint im.width, im.height",
+       "60 60\n", "ultrasound B-mode scan size")
+expect("let src <- image(40,40,\"L\",0)\nsrc.fill(120)\n"
+       "let out <- image(40,40,\"L\",0)\n"
+       "ultrasound_bmode(src, out, 20, 2, 38, 0.6, 1.5708, 0.01, 5)\n"
+       "print out.get(20, 38) >= 0 and out.get(0, 0) == 0",
+       "true\n", "ultrasound kernel masks outside the sector")
+expect("import ecg\nlet t <- ecg.lead(60, 2, 100)\nprint len(t)",
+       "200\n", "ECG sample count")
+expect("import ecg\nlet a <- ecg.analyze(120)\nprint a[\"flag\"]",
+       "tachycardia\n", "ECG flags tachycardia")
+expect("import ecg\nlet a <- ecg.analyze(50)\nprint a[\"flag\"]",
+       "bradycardia\n", "ECG flags bradycardia")
+expect("import ecg\nlet ls <- ecg.three_leads(70, 1, 100)\nprint len(ls)",
+       "3\n", "ECG three-lead set")
+
+# --- GUI toolkit & text rendering ------------------------------------------
+
+expect("import gui\nprint gui.h1(\"Hi\")", "<h1>Hi</h1>\n", "gui element builder")
+expect("import gui\nprint gui.button(\"b\", \"Go\", \"f()\")",
+       "<button id=\"b\" onclick=\"f()\">Go</button>\n", "gui button")
+expect("import gui\n"
+       "let a <- gui.App.new(\"T\")\na.add(gui.h1(\"X\"))\n"
+       "let h <- a.render()\nprint contains(h, \"<!DOCTYPE html>\"), contains(h, \"<h1>X</h1>\")",
+       "true true\n", "gui App renders a document")
+expect("import gui\n"
+       "let a <- gui.App.new(\"T\")\na.save(\"/tmp/_g.html\")\n"
+       "print file_exists(\"/tmp/_g.html\")\ndelete_file(\"/tmp/_g.html\")",
+       "true\n", "gui App saves an HTML file")
+expect("let im <- image(60, 12, \"L\", 0)\n"
+       "text_draw(im, 1, 2, \"AB\", 255, 1)\nprint im.get(3, 2) > 0",
+       "true\n", "bitmap text draws pixels")
+expect("print text_width(\"ABCD\", 2)", "48\n", "text width measurement")
+
+# --- errors ----------------------------------------------------------------
+
+expect_error("print undefined_var", BadaError, "undefined name")
+expect_error("print 1 + \"a\"", BadaError, "type error on bad +")
+expect_error("let a <- [1]\nprint a[5]", BadaError, "index out of range")
+
+# --- summary ---------------------------------------------------------------
+
+print(f"\n{PASSED} passed, {FAILED} failed")
+sys.exit(1 if FAILED else 0)

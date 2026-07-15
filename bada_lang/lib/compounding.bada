@@ -1,0 +1,78 @@
+// compounding — 薬の調合: combine drugs, check interactions, total relief.
+//
+//   import compounding
+//   let r <- compounding.compound(["risperidone", "flunitrazepam"])
+//   print r["warnings"], r["total_relief"]
+//
+// A compounding pharmacy on the gamma manifold: each drug lowers the thermal
+// entropy of its target regions; a compound sums those effects, detects
+// pharmacological INTERACTIONS (additive CNS depression, class duplication)
+// and reports the combined relief profile and any warnings.
+
+import yamaguchi_health as yh
+
+let SEDATING <- ["hypnotic-benzo", "anxiolytic-benzo", "antipsychotic", "hypnotic"]
+
+fun is_sedating(cls) {
+    for s in SEDATING { if s == cls { return true } }
+    return false
+}
+
+fun catalog() { return yh.drug_table() }
+
+// combine a list of drug keys (each at full dose) into one compound
+fun compound(names) {
+    let table <- yh.drug_table()
+    let regions <- {}        // region -> summed entropy-reduction gain
+    let classes <- {}        // class -> count
+    let labels <- []
+    let sedating <- 0
+
+    for name in names {
+        if not has(table, name) { throw "unknown drug: " + name }
+        let d <- table[name]
+        push(labels, d["label"])
+        let cls <- d["class"]
+        if has(classes, cls) { classes[cls] <- classes[cls] + 1 } else { classes[cls] <- 1 }
+        if is_sedating(cls) { sedating <- sedating + 1 }
+        let targets <- d["targets"]
+        for region in keys(targets) {
+            if has(regions, region) {
+                regions[region] <- regions[region] + targets[region]
+            } else {
+                regions[region] <- targets[region]
+            }
+        }
+    }
+
+    // interaction warnings
+    let warnings <- []
+    if sedating >= 2 {
+        push(warnings, "ADDITIVE CNS DEPRESSION: " + str(sedating)
+            + " sedating agents - risk of over-sedation / respiratory depression")
+    }
+    for cls in keys(classes) {
+        if classes[cls] >= 2 {
+            push(warnings, "DUPLICATE CLASS: " + str(classes[cls]) + " x " + cls)
+        }
+    }
+
+    // total relief: summed region effect, saturating at 1.0 per region
+    let total <- 0
+    let over <- []
+    for region in keys(regions) {
+        let g <- regions[region]
+        if g > 1.0 {
+            push(over, region)
+            g <- 1.0
+        }
+        total <- total + g
+    }
+    if len(over) > 0 {
+        push(warnings, "SATURATED targets (effect capped): " + join(over, ", "))
+    }
+
+    return {"drugs": labels, "regions": regions, "classes": classes,
+            "warnings": warnings, "total_relief": round(total, 3),
+            "sedating": sedating}
+}

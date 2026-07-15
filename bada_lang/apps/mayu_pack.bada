@@ -1,0 +1,129 @@
+// ============================================================================
+//  mayu_pack — generate the downloadable 窓使いの憂鬱 keybinding package.
+//
+//  Produces, in the current directory, everything a user needs to register
+//  Emacs + vim key bindings into the Windows registry and remap physical keys
+//  on Windows 10 / 11:
+//
+//    keybindings.mayu             the editable key-binding config (DSL)
+//    windows11.reg                HKCU\Software\Mayu\win11 key bindings
+//    windows10.reg                HKCU\Software\Mayu\win10 key bindings
+//    scancode-capslock-ctrl.reg   GENUINE physical remap (HKLM Scancode Map)
+//    uninstall.reg                removes both of the above
+//
+//  Run:  ./bada run apps/mayu_pack.bada
+// ============================================================================
+
+import mayucfg
+import winreg
+import scancode
+
+// --- the editable key-binding configuration (Emacs + vim + per-app) ---------
+let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT ME.\n"
+    + "#\n"
+    + "# Compiled into the Windows registry under HKCU\\Software\\Mayu\\<os>.\n"
+    + "# Change 'os win11' to 'os win10' for Windows 10, add your own\n"
+    + "# 'key CHORD -> action' lines, then re-run the installer.\n"
+    + "\n"
+    + "os win11\n"
+    + "define MOD = C\n"
+    + "\n"
+    + "# ---- Emacs -------------------------------------------------------------\n"
+    + "keymap emacs {\n"
+    + "  key $MOD-a -> move-beginning-of-line\n"
+    + "  key $MOD-e -> move-end-of-line\n"
+    + "  key C-f -> forward-char\n"
+    + "  key C-b -> backward-char\n"
+    + "  key C-n -> next-line\n"
+    + "  key C-p -> previous-line\n"
+    + "  key C-d -> delete-char\n"
+    + "  key C-k -> kill-line\n"
+    + "  key C-y -> yank\n"
+    + "  key C-w -> kill-region\n"
+    + "  key M-w -> copy-region\n"
+    + "  key C-s -> isearch-forward\n"
+    + "  key C-r -> isearch-backward\n"
+    + "  key M-f -> forward-word\n"
+    + "  key M-b -> backward-word\n"
+    + "  key C-SPC -> set-mark-command\n"
+    + "  key C-g -> keyboard-quit\n"
+    + "  key C-slash -> undo\n"
+    + "  key C-x C-s -> save-buffer\n"
+    + "}\n"
+    + "\n"
+    + "# ---- vim ---------------------------------------------------------------\n"
+    + "keymap vim-normal {\n"
+    + "  key h -> cursor-left\n"
+    + "  key j -> cursor-down\n"
+    + "  key k -> cursor-up\n"
+    + "  key l -> cursor-right\n"
+    + "  key 0 -> line-start\n"
+    + "  key $ -> line-end\n"
+    + "  key w -> word-forward\n"
+    + "  key b -> word-back\n"
+    + "  key x -> delete-char\n"
+    + "  key d d -> delete-line\n"
+    + "  key y y -> yank-line\n"
+    + "  key p -> paste\n"
+    + "  key i -> insert-mode\n"
+    + "  key a -> append\n"
+    + "  key o -> open-line\n"
+    + "  key / -> search\n"
+    + "}\n"
+    + "\n"
+    + "keymap vim-insert {\n"
+    + "  key ESC -> normal-mode\n"
+    + "  key RET -> newline\n"
+    + "}\n"
+    + "\n"
+    + "# ---- per-application remaps (target by exe / window class) -------------\n"
+    + "# Notepad uses the full Emacs keymap (mayu.exe).  For vim in Notepad run\n"
+    + "# mayu.exe --vim (or run_mayu_vim.bat).\n"
+    + "app \"Notepad\" {\n"
+    + "  exe notepad.exe\n"
+    + "  class Notepad\n"
+    + "  base emacs\n"
+    + "  key F5 -> type \"%date% %time%\"\n"
+    + "}\n"
+    + "\n"
+    + "app \"Explorer\" {\n"
+    + "  exe explorer.exe\n"
+    + "  class CabinetWClass\n"
+    + "  base vim-normal\n"
+    + "  key j -> send Down\n"
+    + "  key k -> send Up\n"
+    + "}\n"
+
+write_file("keybindings.mayu", DSL)
+print "wrote keybindings.mayu"
+
+// --- compile the DSL into HKCU\Software\Mayu for Windows 11 and Windows 10 --
+let reg11 <- winreg.Registry.new()
+let r11 <- mayucfg.compile(DSL, reg11)
+write_file("windows11.reg", reg11.export_reg())
+print "wrote windows11.reg  (" + str(r11["bindings"]) + " bindings, "
+    + str(len(r11["errors"])) + " errors)"
+
+let dsl10 <- replace(DSL, "os win11", "os win10")
+let reg10 <- winreg.Registry.new()
+let r10 <- mayucfg.compile(dsl10, reg10)
+write_file("windows10.reg", reg10.export_reg())
+print "wrote windows10.reg  (" + str(r10["bindings"]) + " bindings)"
+
+// --- genuine physical remap applied by Windows 10/11 (Scancode Map) ---------
+let sc <- scancode.build([["CapsLock", "LCtrl"]])
+write_file("scancode-capslock-ctrl.reg", sc["reg"])
+print "wrote scancode-capslock-ctrl.reg  (CapsLock -> Left Ctrl, "
+    + str(sc["count"]) + " remap)"
+
+// --- uninstall: remove the physical remap and the whole Mayu config tree ----
+let un <- "Windows Registry Editor Version 5.00\n\n"
+    + "; Undo the mayu key bindings and the physical remap.\n"
+    + "; Sign out and back in after importing to drop the Scancode Map.\n\n"
+    + "[HKEY_LOCAL_MACHINE\\SYSTEM\\CurrentControlSet\\Control\\Keyboard Layout]\n"
+    + "\"Scancode Map\"=-\n\n"
+    + "[-HKEY_CURRENT_USER\\Software\\Mayu]\n"
+write_file("uninstall.reg", un)
+print "wrote uninstall.reg"
+
+print "done - the downloadable package files are in the current directory."

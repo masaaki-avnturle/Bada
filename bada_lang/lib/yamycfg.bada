@@ -1,0 +1,296 @@
+// yamycfg — Yet Another Madotsukai no Yuuutsu (yamy), the genuine .mayu engine.
+//
+//   import yamycfg
+//   let reg <- winreg.Registry.new()
+//   let res <- yamycfg.compile_file("config/default.mayu", reg)  // file -> registry
+//   print res["bindings"], reg.export_reg()
+//
+// This follows the REAL yamy / 窓使いの憂鬱 configuration model: a line-based
+// `.mayu` file (NOT brace blocks) with
+//
+//   include "file.mayu"                 # pull in another config file
+//   def key NAME = 0xNN                 # scan-code key definition (109.mayu)
+//   keymap Global                       # a keymap; following `key` lines join it
+//     key C-a = Home                    #   FROM = TO  (TO may be a key sequence)
+//   keymap2 Prefix : Global             # a prefix keymap inheriting Global
+//   window Notepad /Notepad/ : Global   # window keymap matched by window class
+//   window VSCode /Chrome_WidgetWin_1:Visual Studio Code/ : Global   # class:title
+//     key C-k = S-End Delete            # the right side is a key sequence
+//
+// Modifiers follow yamy: C- Ctrl, A-/M- Alt, S- Shift, W- Win, and a leading
+// `*` means "any other modifiers".  Each window/keymap inherits its base.
+//
+// REGISTRY-OPERATION PRINCIPLE: every keymap/window section is registered under
+//   HKEY_CURRENT_USER\Software\yamy\<Name>
+// with values (kind)/(class)/(title)/(inherits) and one value per binding
+// (<FROM> = <TO>).  That is how these per-application key bindings reach the
+// Windows registry — the same principle the mayu app uses.
+
+import winreg
+
+// ---- parse a .mayu text into sections -------------------------------------
+
+fun parse(text) {
+    let sections <- []          // [{name,kind,class,title,base,binds,order}]
+    let order <- []             // section names in file order
+    let defs <- {}              // def key NAME -> code
+    let errors <- []
+    let cur <- 0 - 1
+    let lines <- split(text, "\n")
+    let ln <- 0
+    while ln < len(lines) {
+        let line <- trim(strip_comment(lines[ln]))
+        ln <- ln + 1
+        if line == "" {
+        } else if starts_w(line, "include ") {
+            // includes are expanded by load(); a stray one here is just noted
+        } else if starts_w(line, "def ") {
+            parse_def(slice_from2(line, 4), defs)
+        } else if starts_w(line, "keymap2 ") {
+            cur <- start_keymap(sections, order, slice_from2(line, 8), "keymap2")
+        } else if starts_w(line, "keymap ") {
+            cur <- start_keymap(sections, order, slice_from2(line, 7), "keymap")
+        } else if starts_w(line, "window ") {
+            cur <- start_window(sections, order, slice_from2(line, 7), errors, ln)
+        } else if starts_w(line, "key ") {
+            if cur < 0 {
+                push(errors, "line " + str(ln) + ": 'key' outside a keymap/window")
+            } else {
+                parse_key(sections[cur], slice_from2(line, 4), errors, ln)
+            }
+        } else {
+            push(errors, "line " + str(ln) + ": unknown directive: " + line)
+        }
+    }
+    return {"sections": sections, "order": order, "defs": defs, "errors": errors}
+}
+
+fun parse_def(body, defs) {
+    // def key NAME = code   (alias/subst/mod are accepted and ignored)
+    if starts_w(body, "key ") {
+        let rest <- slice_from2(body, 4)
+        let eq <- find_char(rest, "=")
+        if eq >= 0 {
+            defs[trim(slice_to(rest, eq))] <- trim(slice_from2(rest, eq + 1))
+        }
+    }
+}
+
+fun start_keymap(sections, order, rest, kind) {
+    let name <- rest
+    let base <- ""
+    let colon <- find_char(rest, ":")
+    if colon >= 0 {
+        name <- slice_to(rest, colon)
+        base <- trim(slice_from2(rest, colon + 1))
+    }
+    let sec <- {"name": trim(name), "kind": kind, "class": "", "title": "",
+                "base": base, "binds": {}, "order": []}
+    push(sections, sec)
+    push(order, trim(name))
+    return len(sections) - 1
+}
+
+fun start_window(sections, order, rest, errors, ln) {
+    // NAME /CLASS[:TITLE]/ [ : BASE ]
+    let s1 <- find_char(rest, "/")
+    if s1 < 0 {
+        push(errors, "line " + str(ln) + ": window needs a /class/ regex")
+        return 0 - 1
+    }
+    let name <- trim(slice_to(rest, s1))
+    let after <- slice_from2(rest, s1 + 1)
+    let s2 <- find_char(after, "/")
+    let spec <- after
+    let tail <- ""
+    if s2 >= 0 {
+        spec <- slice_to(after, s2)
+        tail <- slice_from2(after, s2 + 1)
+    }
+    let klass <- spec
+    let title <- ""
+    let cc <- find_char(spec, ":")
+    if cc >= 0 {
+        klass <- slice_to(spec, cc)
+        title <- trim(slice_from2(spec, cc + 1))
+    }
+    let base <- ""
+    let bcolon <- find_char(tail, ":")
+    if bcolon >= 0 { base <- trim(slice_from2(tail, bcolon + 1)) }
+    let sec <- {"name": name, "kind": "window", "class": trim(klass),
+                "title": title, "base": base, "binds": {}, "order": []}
+    push(sections, sec)
+    push(order, name)
+    return len(sections) - 1
+}
+
+fun parse_key(sec, body, errors, ln) {
+    let eq <- find_char(body, "=")
+    if eq < 0 {
+        push(errors, "line " + str(ln) + ": expected 'key FROM = TO'")
+        return
+    }
+    let from <- trim(slice_to(body, eq))
+    let to <- trim(slice_from2(body, eq + 1))
+    if not has(sec["binds"], from) { push(sec["order"], from) }
+    sec["binds"][from] <- to
+}
+
+// ---- include expansion (read .mayu files relative to each other) ----------
+
+fun load(path) { return expand(path, {}) }
+
+fun expand(path, visited) {
+    if has(visited, path) { return "" }
+    visited[path] <- true
+    let text <- read_file(path)
+    let dir <- dirname(path)
+    let out <- ""
+    let lines <- split(text, "\n")
+    let i <- 0
+    while i < len(lines) {
+        let t <- trim(strip_comment(lines[i]))
+        if starts_w(t, "include ") {
+            let inc <- extract_quoted(slice_from2(t, 8))
+            let p2 <- joinpath(dir, inc)
+            out <- out + "# >>> include " + inc + "\n"
+            out <- out + expand(p2, visited)
+            out <- out + "# <<< end " + inc + "\n"
+        } else {
+            out <- out + lines[i] + "\n"
+        }
+        i <- i + 1
+    }
+    return out
+}
+
+// ---- compile parsed sections into the Windows registry --------------------
+
+fun compile(text, reg) {
+    let p <- parse(text)
+    let base <- "HKEY_CURRENT_USER\\Software\\yamy"
+    reg.ensure(base)
+    let nb <- 0
+    let nw <- 0
+    for sec in p["sections"] {
+        let path <- base + "\\" + sec["name"]
+        reg.set(path, "(kind)", "REG_SZ", sec["kind"])
+        if sec["class"] != "" { reg.set(path, "(class)", "REG_SZ", sec["class"]) }
+        if sec["title"] != "" { reg.set(path, "(title)", "REG_SZ", sec["title"]) }
+        if sec["base"] != "" { reg.set(path, "(inherits)", "REG_SZ", sec["base"]) }
+        if sec["kind"] == "window" { nw <- nw + 1 }
+        for ch in sec["order"] {
+            reg.set(path, ch, "REG_SZ", sec["binds"][ch])
+            nb <- nb + 1
+        }
+    }
+    return {"parsed": p, "registry": reg, "sections": len(p["sections"]),
+            "windows": nw, "bindings": nb, "errors": p["errors"]}
+}
+
+fun compile_file(path, reg) { return compile(load(path), reg) }
+
+// ---- resolution with keymap inheritance (for the 調査キー) ----------------
+
+fun section_by_name(p, name) {
+    for sec in p["sections"] { if sec["name"] == name { return sec } }
+    return {}
+}
+
+fun lookup(p, name, chord) {
+    let sec <- section_by_name(p, name)
+    let guard <- 0
+    while len(sec) > 0 and guard < 64 {
+        if has(sec["binds"], chord) { return sec["binds"][chord] }
+        if sec["base"] == "" { return "" }
+        sec <- section_by_name(p, sec["base"])
+        guard <- guard + 1
+    }
+    return ""
+}
+
+// effective bindings of a section, with inherited base keys merged in
+fun effective(p, name) {
+    let chain <- []
+    let sec <- section_by_name(p, name)
+    let guard <- 0
+    while len(sec) > 0 and guard < 64 {
+        push(chain, sec)
+        if sec["base"] == "" { sec <- {} } else { sec <- section_by_name(p, sec["base"]) }
+        guard <- guard + 1
+    }
+    // apply base-first so the most-derived section wins
+    let out <- {}
+    let i <- len(chain) - 1
+    while i >= 0 {
+        let s <- chain[i]
+        for ch in s["order"] { out[ch] <- s["binds"][ch] }
+        i <- i - 1
+    }
+    return out
+}
+
+fun investigate(p, name, chord) {
+    let to <- lookup(p, name, chord)
+    if to == "" { return chord + " -> (unbound)  [" + name + "]" }
+    return chord + " -> " + to + "  [" + name + "]"
+}
+
+// ---- string / path helpers ------------------------------------------------
+
+fun strip_comment(line) {
+    let i <- 0
+    let q <- false
+    while i < len(line) {
+        let c <- line[i]
+        if c == "\"" { q <- not q }
+        else if not q and c == "#" { return slice_to(line, i) }
+        else if not q and c == "/" and i + 1 < len(line) and line[i + 1] == "/" {
+            return slice_to(line, i)
+        }
+        i <- i + 1
+    }
+    return line
+}
+fun starts_w(s, p) {
+    if len(s) < len(p) { return false }
+    let i <- 0
+    while i < len(p) { if s[i] != p[i] { return false }  i <- i + 1 }
+    return true
+}
+fun slice_to(s, end) {
+    let out <- ""
+    let i <- 0
+    while i < end { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun slice_from2(s, start) {
+    let out <- ""
+    let i <- start
+    while i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun find_char(s, c) {
+    let i <- 0
+    while i < len(s) { if s[i] == c { return i }  i <- i + 1 }
+    return 0 - 1
+}
+fun extract_quoted(s) {
+    let i <- find_char(s, "\"")
+    if i < 0 { return "" }
+    let j <- i + 1
+    let out <- ""
+    while j < len(s) and s[j] != "\"" { out <- out + s[j]  j <- j + 1 }
+    return out
+}
+fun dirname(path) {
+    let idx <- 0 - 1
+    let i <- 0
+    while i < len(path) { if path[i] == "/" { idx <- i }  i <- i + 1 }
+    if idx < 0 { return "." }
+    return slice_to(path, idx)
+}
+fun joinpath(dir, name) {
+    if dir == "" or dir == "." { return name }
+    return dir + "/" + name
+}

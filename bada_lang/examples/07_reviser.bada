@@ -1,0 +1,36 @@
+// 07 — The Reviser (リバイザ): rewriting Bada's own grammar.
+//
+// A `reviser { ... }` block defines source-rewrite rules that run BEFORE the
+// lexer, so they can introduce custom keywords and brand-new operators.
+// The rules are kept in an immutable `Reviser` tuplespace.
+//
+//   word "X" => "Y"   rewrite the whole word/keyword X into Y
+//   op   "X" => "Y"   rewrite an operator / symbol X into Y
+//   text "X" => "Y"   rewrite any literal substring X into Y
+
+reviser {
+    word "関数"   => "fun"      // define a function
+    word "もし"   => "if"        // if
+    word "表示"   => "print"     // print
+    word "返す"   => "return"    // return
+    op   "←"      => "<-"        // assignment arrow
+    op   "≤"      => "<="        // less-or-equal
+}
+
+// From here on we may write Bada in the revised (localized) grammar:
+
+関数 階乗(n) {
+    もし n ≤ 1 {
+        返す 1
+    }
+    返す n * 階乗(n - 1)
+}
+
+let result ← 階乗(5)
+表示 "階乗(5) =", result
+
+// String contents are never rewritten, so this prints literally:
+表示 "the word 関数 inside a string is untouched"
+
+// The applied rules are visible as an immutable tuplespace:
+表示 "reviser rules in effect:", len(Reviser)
