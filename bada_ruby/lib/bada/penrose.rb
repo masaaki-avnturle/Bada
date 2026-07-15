@@ -14,6 +14,7 @@
 #   puts studio.code                     # ソースコード
 
 require_relative "penrose/tensor"
+require_relative "penrose/glyph_svg"
 require_relative "penrose/palette"
 require_relative "penrose/diagram"
 require_relative "penrose/canvas"

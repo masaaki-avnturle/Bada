@@ -77,12 +77,12 @@ module Bada
         path
       end
 
-      # Palette data (symbol -> glyph/name/math) as a JSON literal for the page.
+      # Palette data (symbol -> faithful SVG glyph/name/math) as a JSON literal.
       def palette_data
         require "json"
         data = Palette.glyphs.map do |key, g|
-          { key: key.to_s, name: g[:name], token: g[:token],
-            math: g[:math], glyph: g[:glyph].join("\n"), meaning: g[:meaning] }
+          { key: key.to_s, name: g[:name], token: g[:token], math: g[:math],
+            svg: g[:svg], glyph: g[:glyph].join("\n"), meaning: g[:meaning] }
         end
         JSON.generate(data)
       end
@@ -103,10 +103,18 @@ module Bada
           .pane h2{margin:0 0 10px;font-size:14px;color:var(--cyan);letter-spacing:.03em}
           .pane h3{margin:14px 0 6px;font-size:12px;color:#9fb0c3}
           #palette{display:flex;flex-direction:column;gap:6px}
-          .sym{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
+          .sym{display:flex;align-items:center;gap:10px;padding:7px 10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
           .sym:hover{border-color:var(--gold);transform:translateX(2px)}
-          .sym .nm{font-size:12px}
+          .sym .gl{flex:0 0 46px;height:46px;display:flex;align-items:center;justify-content:center}
+          .sym .gl svg{width:46px;height:46px}
+          .sym .txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+          .sym .nm{font-size:12px;line-height:1.25}
           .sym .mt{font-size:11px;color:var(--gold);font-family:"SFMono-Regular",Consolas,monospace}
+          .preview{display:flex;gap:12px;align-items:center;padding:10px;margin-bottom:10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px}
+          .preview .pv-glyph{flex:0 0 80px;height:80px}
+          .preview .pv-glyph svg{width:80px;height:80px}
+          .preview .pv-txt{font-size:12px}
+          .preview .mt{color:var(--gold);font-family:"SFMono-Regular",Consolas,monospace}
           .dfield{display:flex;flex-direction:column;gap:4px;margin-bottom:8px}
           .dfield label{font-size:11px;color:#9fb0c3}
           input,select{background:#0f1420;border:1px solid var(--edge);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:13px}
@@ -139,21 +147,49 @@ module Bada
             PALETTE.forEach(p => {
               const el = document.createElement('div');
               el.className = 'sym';
-              el.innerHTML = `<span class="nm">${p.name}</span><span class="mt">${p.math}</span>`;
-              el.title = p.meaning + "\n" + p.glyph;
+              el.innerHTML = `<span class="gl">${p.svg}</span>`+
+                             `<span class="txt"><span class="nm">${p.name}</span>`+
+                             `<span class="mt">${p.math}</span></span>`;
+              el.title = p.meaning;
               el.onclick = () => pick(p);
               box.appendChild(el);
             });
           }
 
+          function preview(p){
+            return `<div class="preview"><div class="pv-glyph">${p.svg}</div>`+
+                   `<div class="pv-txt"><b>${p.name}</b><br><span class="mt">${p.math}</span>`+
+                   `<div class="hint">${p.meaning}</div></div></div>`;
+          }
+
           // ---------- dialog ----------
           function pick(p){
             const k = p.key;
-            if(['tensor','metric','epsilon','delta'].includes(k)) return dialogTensor(p);
-            if(['contraction','wire','cup','cap'].includes(k))   return dialogWire(p);
-            if(['nabla','partial'].includes(k))                   return dialogDeriv(p);
-            if(k==='integral')                                    return dialogIntegral(p);
-            if(['symmetrize','antisymmetrize'].includes(k))       return dialogSym(p);
+            // tensors (shapes with legs) — place a box with preset rank/name
+            if(k==='tensor')  return dialogTensor(p, 'T', 2);
+            if(k==='matrix')  return dialogTensor(p, 'M', 2);
+            if(k==='matmul')  return dialogTensor(p, 'A', 2);
+            if(k==='vector')  return dialogTensor(p, 'v', 1);
+            if(k==='metric')  return dialogTensor(p, 'g', 2);
+            if(k==='epsilon') return dialogTensor(p, 'E', 3);
+            if(k==='riemann') return dialogTensor(p, 'R', 4);
+            if(k==='torsion') return dialogTensor(p, 'T', 3);
+            if(k==='delta')   return dialogTensor(p, 'd', 2);
+            // wiring
+            if(['contraction','wire','cup','cap'].includes(k)) return dialogWire(p);
+            // differential operators
+            if(['nabla','partial'].includes(k)) return dialogDeriv(p);
+            if(k==='integral')                  return dialogIntegral(p);
+            if(['symmetrize','antisymmetrize'].includes(k)) return dialogSym(p);
+            // reference-only symbols (notation, no numeric part)
+            if(['swap','lie'].includes(k))      return dialogInfo(p);
+          }
+
+          function dialogInfo(p){
+            $('dialog').innerHTML = preview(p) +
+              `<div class="hint">これは記法の参照用シンボルです（数値計算の部品にはなりません）。`+
+              (p.key==='swap' ? '反対称化は「反対称化バー」で表現できます。' :
+               'リー微分 £ は記号表示のみに対応します。')+`</div>`;
           }
 
           function field(label, id, val, ph){
@@ -161,13 +197,13 @@ module Bada
           }
           function nodeOptions(){ return Object.keys(state.nodes).map(n=>`<option>${n}</option>`).join(''); }
 
-          function dialogTensor(p){
-            const def = p.key==='metric' ? 'g' : (p.key==='epsilon' ? 'E' : 'A');
-            $('dialog').innerHTML =
-              `<div class="hint">${p.name} を配置します。</div>`+
+          function dialogTensor(p, def, legs){
+            def = def || 'A'; legs = legs || 2;
+            const sampleVal = p.key==='metric' ? '[[1,0],[0,1]]' : (legs===1 ? '[1,2]' : '');
+            $('dialog').innerHTML = preview(p) +
               field('名前 (1文字)','d_name',def)+
-              field('脚の数 (階数)','d_legs','2')+
-              field('成分値 JSON（任意）','d_val', p.key==='metric'?'[[1,0],[0,1]]':'', '[[1,2],[3,4]]')+
+              field('脚の数 (階数)','d_legs',String(legs))+
+              field('成分値 JSON（任意）','d_val', sampleVal, legs===1?'[1,2]':'[[1,2],[3,4]]')+
               `<div class="row"><button class="primary" onclick="addTensor()">配置する</button></div>`;
           }
           function addTensor(){

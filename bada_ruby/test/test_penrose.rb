@@ -254,4 +254,46 @@ class TestPenroseWebApp < Minitest::Test
   ensure
     FileUtils.remove_entry(dir) if dir
   end
+
+  def test_palette_embeds_faithful_svg_glyphs
+    html = WebApp.render
+    # each palette symbol carries an inline SVG in the embedded PALETTE data
+    assert_includes html, "<svg viewBox=\\\"0 0 120 120"
+    # the covariant-derivative hoop and the (anti)symmetriser must be present
+    assert_includes html, "ellipse" # ∇ hoop
+    assert_includes html, "行列 (matrix"
+    assert_includes html, "積分"
+  end
+end
+
+# ---- GlyphSVG (faithful Penrose picture-symbols) ---------------------
+class TestPenroseGlyphSVG < Minitest::Test
+  def test_every_palette_key_has_svg
+    Palette::GLYPHS.each_key do |key|
+      svg = GlyphSVG.for(key)
+      assert_match(/\A<svg /, svg, "#{key} should render an SVG")
+      assert_match(%r{</svg>\z}, svg)
+    end
+  end
+
+  def test_new_real_notation_symbols_exist
+    keys = Palette::GLYPHS.keys
+    # matrix + integral supplements, plus real Penrose symbols from the notes
+    %i[matrix matmul vector integral nabla riemann torsion swap symmetrize antisymmetrize].each do |k|
+      assert_includes keys, k
+    end
+  end
+
+  def test_glyphs_carry_svg_field
+    g = Palette.glyphs
+    assert g[:tensor][:svg].start_with?("<svg ")
+    assert g[:nabla][:svg].include?("ellipse") # ∇ drawn as a hoop
+    assert g[:integral][:svg].include?("∫")
+  end
+
+  def test_conventions_documented_upper_lower_legs
+    # tensor meaning must state upper=top line, lower=bottom line
+    assert_match(/上に出る線/, Palette::GLYPHS[:tensor][:meaning])
+    assert_match(/下に出る線/, Palette::GLYPHS[:tensor][:meaning])
+  end
 end
