@@ -26,6 +26,39 @@ offers to auto-start it at sign-in):
 No Python? `mayu.exe` needs none. With Python installed you can instead run
 `python mayu_agent.py` (or `run_mayu.bat`) — same remapper, from source.
 
+## Notepad — Emacs or vim
+
+Both work in Notepad (and any text field). Pick one:
+
+**Emacs** (default): run `mayu.exe`.
+
+| key | does | key | does |
+|-----|------|-----|------|
+| C-a / C-e | line start / end | C-k | kill (cut) to end of line |
+| C-f / C-b | char right / left | C-y | yank (paste) |
+| C-n / C-p | line down / up | C-SPC | set mark, then move to select |
+| M-f / M-b | word right / left | C-w / M-w | cut / copy region |
+| C-d | delete char | C-x C-s | save |
+
+`C-SPC` sets the mark; then `C-f/C-n/…` **select** text, and `C-w` cuts /
+`M-w` copies it — real Emacs region editing inside Notepad.
+
+**vim** (modal): run `mayu.exe --vim` (or double-click `run_mayu_vim.bat`).
+Starts in NORMAL mode:
+
+| key | does | key | does |
+|-----|------|-----|------|
+| h j k l | move | i / a | insert before / after |
+| w / b | word fwd / back | o / O | open line below / above |
+| 0 / $ | line start / end | x | delete char |
+| gg / G | top / bottom | dd | delete (cut) line |
+| yy / p | copy line / paste | u | undo |
+| **ESC** | back to NORMAL | A / I | append-EOL / insert-BOL |
+
+The console window shows `-- INSERT --` / `-- NORMAL --` as you switch. Close
+it to stop. (Run either mode — they can't both be active at once, since both
+remap the same keys.)
+
 This package registers key combinations into the registry two ways:
 
 | where | what | needs admin? | applied by |

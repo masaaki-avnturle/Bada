@@ -27,7 +27,7 @@ GENERATED = ["keybindings.mayu", "windows11.reg", "windows10.reg",
              "scancode-capslock-ctrl.reg", "uninstall.reg"]
 # hand-written, already in download/
 STATIC = ["README.md", "install.bat", "install.ps1", "uninstall.bat",
-          "mayu_agent.py", "run_mayu.bat"]
+          "mayu_agent.py", "run_mayu.bat", "run_mayu_vim.bat"]
 
 
 def main():

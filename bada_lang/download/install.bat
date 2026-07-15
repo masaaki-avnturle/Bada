@@ -35,12 +35,16 @@ if not defined LAUNCH (
   where python >nul 2>&1 && set LAUNCH=python "%~dp0mayu_agent.py"
 )
 if defined LAUNCH (
-  start "mayu" %LAUNCH%
-  echo   mayu is running - Emacs/vim keys now work in every app.
+  echo.
+  choice /c EV /m "Keybinding style - [E]macs or [V]im"
+  set MODE=
+  if errorlevel 2 set MODE=--vim
+  start "mayu" %LAUNCH% %MODE%
+  echo   mayu is running - the keys now work in every app ^(incl. Notepad^).
   echo.
   choice /m "Start mayu automatically when you sign in"
   if not errorlevel 2 (
-    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v mayu /t REG_SZ /d %LAUNCH% /f
+    reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v mayu /t REG_SZ /d "%LAUNCH% %MODE%" /f
     echo   autostart enabled ^(HKCU\...\Run\mayu^).
   )
 ) else (
