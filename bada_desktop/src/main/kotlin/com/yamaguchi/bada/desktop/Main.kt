@@ -23,13 +23,13 @@ import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 
 /**
- * Bada HHKB Pro — 未知事前予知 予測入力 (Windows desktop app).
+ * NoemaKey — 未知事前予知 予測入力 (Windows desktop app).
  *
- * A Happy-Hacking-Keyboard-Professional-style on-screen keyboard with an
- * English/Japanese word-completion + next-word look-ahead bar driven by the
- * Unknown-Prior Engine (com.yamaguchi.bada.engine.Predictor). Load any number
- * of text files to train the predictor; it also learns online from what you
- * type (the append-only reviser loop).
+ * A compact 60% on-screen keyboard with an English/Japanese word-completion +
+ * next-word look-ahead bar driven by the Unknown-Prior Engine
+ * (com.yamaguchi.bada.engine.Predictor). Load any number of text files to train
+ * the predictor; it also learns online from what you type (the append-only
+ * reviser loop).
  */
 object Theme {
     val BG = Color(0x04, 0x06, 0x0A)
@@ -42,7 +42,7 @@ object Theme {
     val MUTED = Color(0x8A, 0x94, 0xA4)
 }
 
-class HhkbApp {
+class NoemaKeyApp {
     private val predictor = Predictor()
     private val editor = JTextArea()
     private val suggestionBar = JPanel(FlowLayout(FlowLayout.LEFT, 6, 4))
@@ -52,7 +52,7 @@ class HhkbApp {
     fun show() {
         seedCorpus()
 
-        val frame = JFrame("Bada HHKB Pro — 未知事前予知 予測入力")
+        val frame = JFrame("NoemaKey — 未知事前予知 予測入力")
         frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
         frame.background = Theme.BG
         frame.jMenuBar = buildMenu(frame)
@@ -62,7 +62,7 @@ class HhkbApp {
         root.border = BorderFactory.createEmptyBorder(10, 10, 10, 10)
 
         // Header
-        val header = JLabel("Bada HHKB Pro  ·  未知事前予知エンジン 単語補完・先読み (英語 / 日本語)")
+        val header = JLabel("NoemaKey  ·  未知事前予知エンジン 単語補完・先読み (英語 / 日本語)")
         header.foreground = Theme.GOLD
         header.font = Font(Font.SANS_SERIF, Font.BOLD, 15)
         root.add(header, BorderLayout.NORTH)
@@ -88,7 +88,7 @@ class HhkbApp {
         center.add(suggestionBar, BorderLayout.SOUTH)
         root.add(center, BorderLayout.CENTER)
 
-        // South: HHKB keyboard + status
+        // South: compact keyboard + status
         val south = JPanel(BorderLayout(0, 4))
         south.background = Theme.BG
         south.add(buildKeyboard(), BorderLayout.CENTER)
@@ -202,7 +202,7 @@ class HhkbApp {
         statusLabel.text = "未知事前予知エンジン 予測入力 ·" + statusText()
     }
 
-    // ---- HHKB keyboard -----------------------------------------------------
+    // ---- compact keyboard --------------------------------------------------
 
     private val rows = listOf(
         "Esc 1 2 3 4 5 6 7 8 9 0 - = \\ `",
@@ -300,7 +300,7 @@ fun main(args: Array<String>) {
         selfTest()
         return
     }
-    SwingUtilities.invokeLater { HhkbApp().show() }
+    SwingUtilities.invokeLater { NoemaKeyApp().show() }
 }
 
 /** Headless verification of the EN/JA predictor (used in CI and locally). */

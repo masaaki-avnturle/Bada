@@ -12,9 +12,9 @@ import android.widget.TextView
 import com.yamaguchi.bada.engine.Predictor
 
 /**
- * Bada HHKB IME — a Happy-Hacking-Keyboard-Professional-style soft keyboard for
- * Android whose suggestion strip is driven by the Unknown-Prior Engine's
- * English/Japanese word-completion + next-word look-ahead (engine.Predictor).
+ * NoemaKey IME — a compact 60% soft keyboard for Android whose suggestion strip
+ * is driven by the Unknown-Prior Engine's English/Japanese word-completion +
+ * next-word look-ahead (engine.Predictor).
  *
  * The keyboard commits characters through the InputConnection; after each edit
  * it reads the text before the cursor and shows completions (for a partial
@@ -22,13 +22,13 @@ import com.yamaguchi.bada.engine.Predictor
  * replaces the partial word and folds the choice back into the model (the
  * append-only reviser learning loop).
  */
-class HhkbImeService : InputMethodService() {
+class NoemaKeyImeService : InputMethodService() {
 
     private val predictor = Predictor()
     private var shift = false
     private lateinit var suggestionStrip: LinearLayout
 
-    // HHKB-style US layout (compact 60%, Control at the caps-lock row).
+    // Compact 60% US layout (Control at the caps-lock row).
     private val rows = listOf(
         "1 2 3 4 5 6 7 8 9 0",
         "q w e r t y u i o p",

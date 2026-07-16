@@ -1,9 +1,9 @@
-name: Build Bada Apps (APK + Windows EXE)
+name: Build Noema Apps (APK + Windows EXE)
 
-# Builds both downloadable packages of the 未知事前予知エンジン / HHKB predictive
+# Builds both downloadable packages of the 未知事前予知エンジン / NoemaKey predictive
 # keyboard on GitHub's runners:
-#   * android-apk   — bada_apk    -> app-debug.apk        (ubuntu-latest)
-#   * windows-exe   — bada_desktop -> BadaHhkb.exe (+ .msi) (windows-latest)
+#   * android-apk   — bada_apk     -> app-debug.apk       (ubuntu-latest)
+#   * windows-exe   — bada_desktop -> NoemaKey.exe (+ .msi) (windows-latest)
 # Both are uploaded as workflow artifacts. On a pushed tag `v*` (or a Release),
 # both are attached to the GitHub Release for stable download URLs.
 
@@ -52,20 +52,20 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/debug/app-debug.apk out/bada-precog-hhkb.apk
+          cp app/build/outputs/apk/debug/app-debug.apk out/noema-precog.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: bada-precog-hhkb-apk
-          path: bada_apk/out/bada-precog-hhkb.apk
+          name: noema-precog-apk
+          path: bada_apk/out/noema-precog.apk
           if-no-files-found: error
 
       - name: Attach APK to Release (on tag or release)
         if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: bada_apk/out/bada-precog-hhkb.apk
+          files: bada_apk/out/noema-precog.apk
           generate_release_notes: true
 
   windows-exe:
@@ -90,10 +90,10 @@ jobs:
       - name: Package Windows app-image (.exe) with jpackage
         run: |
           jpackage --type app-image \
-            --input build/install/BadaHhkb/lib \
-            --main-jar BadaHhkb.jar \
+            --input build/install/NoemaKey/lib \
+            --main-jar NoemaKey.jar \
             --main-class com.yamaguchi.bada.desktop.MainKt \
-            --name BadaHhkb \
+            --name NoemaKey \
             --app-version 0.2.0 \
             --dest build/jpackage
 
@@ -101,27 +101,27 @@ jobs:
         continue-on-error: true
         run: |
           jpackage --type msi \
-            --input build/install/BadaHhkb/lib \
-            --main-jar BadaHhkb.jar \
+            --input build/install/NoemaKey/lib \
+            --main-jar NoemaKey.jar \
             --main-class com.yamaguchi.bada.desktop.MainKt \
-            --name BadaHhkb \
+            --name NoemaKey \
             --app-version 0.2.0 \
             --win-menu --win-shortcut --win-dir-chooser \
             --dest build/installer
 
-      - name: Zip the portable app-image (contains BadaHhkb.exe)
+      - name: Zip the portable app-image (contains NoemaKey.exe)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path out | Out-Null
-          Compress-Archive -Path build/jpackage/BadaHhkb -DestinationPath out/bada-hhkb-windows.zip -Force
+          Compress-Archive -Path build/jpackage/NoemaKey -DestinationPath out/noemakey-windows.zip -Force
           if (Test-Path build/installer) { Copy-Item build/installer/*.msi out/ -ErrorAction SilentlyContinue }
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: bada-hhkb-windows-exe
+          name: noemakey-windows-exe
           path: |
-            bada_desktop/out/bada-hhkb-windows.zip
+            bada_desktop/out/noemakey-windows.zip
             bada_desktop/out/*.msi
           if-no-files-found: error
 
@@ -130,6 +130,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            bada_desktop/out/bada-hhkb-windows.zip
+            bada_desktop/out/noemakey-windows.zip
             bada_desktop/out/*.msi
           generate_release_notes: true
