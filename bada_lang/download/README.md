@@ -6,17 +6,25 @@ folder and run the installer.
 
 ## Download & run (this is the part that actually works)
 
-**`mayu.exe` is the resident program that makes the keys work.** It installs a
-low-level keyboard hook and rewrites your Emacs/vim chords into real keystrokes
-in every application. No Python, no admin.
+**`mayu.exe` is the resident program that makes the keys work.** When you run
+it, it (1) reads the `.mayu` config files, (2) **detects Windows 10 vs 11 and
+registers every key binding into the Windows registry** at
+`HKCU\Software\Mayu\<os>`, then (3) installs a low-level keyboard hook and
+rewrites your Emacs/vim chords into real keystrokes in every application. No
+Python, no admin.
 
-1. Download **`mayu.exe`** and **`keybindings.mayu`** into the same folder:
-   - <https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/mayu.exe>
-   - <https://github.com/masaaki-avnturle/Bada/releases/download/mayu-latest/keybindings.mayu>
-2. Double-click **`mayu.exe`** — a console shows *"mayu is running"*.
+1. Download **`mayu.exe`** and the config files (`keybindings.mayu`,
+   `emacs.mayu`, `vim.mayu`, `apps.mayu`) into the same folder — or just the
+   `.zip`, which has them all.
+2. Double-click **`mayu.exe`**. It prints
+   *"registered N values into HKEY_CURRENT_USER\Software\Mayu\win11"* and
+   *"mayu is running"*.
 3. Open Notepad and try: **C-a** = line start, **C-e** = line end,
    **C-f/C-b/C-n/C-p** = arrows, **C-k** = kill line, **C-y** = yank,
    **C-x C-s** = save. Close the console to stop.
+
+Options: `mayu.exe --vim` (vim mode), `mayu.exe --register` (only write the
+registry, don't remap), `mayu.exe --os win10` (force the Windows 10 subtree).
 
 Prefer the bundle? Grab the zip and run `install.bat` (it starts mayu.exe and
 offers to auto-start it at sign-in):
@@ -77,8 +85,11 @@ same chord map stored in the registry for reference / other agents.
 
 | file | what it is |
 |------|-----------|
-| **`mayu.exe`** | **the working remapper — double-click to run.** Hooks the keyboard and rewrites Emacs/vim chords into real keystrokes. No Python. |
-| `keybindings.mayu` | the **editable** config (Emacs + vim + per-app). Edit, then restart `mayu.exe`. |
+| **`mayu.exe`** | **the working remapper — double-click to run.** Reads the config, registers it into the registry (auto-detecting Win10/11), then hooks the keyboard and rewrites Emacs/vim chords. No Python. |
+| `keybindings.mayu` | the **main** config — `os win11` + `include` of the three files below. Edit, then restart `mayu.exe`. |
+| `emacs.mayu` | the Emacs keymap (included) |
+| `vim.mayu` | the vim keymaps (included) |
+| `apps.mayu` | per-application remaps: Notepad, Explorer (included) |
 | `mayu_agent.py` | the same remapper as source (run with `python mayu_agent.py` if you have Python) |
 | `run_mayu.bat` | convenience launcher (uses `mayu.exe` if present, else Python) |
 | `windows11.reg` / `windows10.reg` | the bindings stored in `HKCU\Software\Mayu\<os>` |

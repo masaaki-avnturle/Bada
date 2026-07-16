@@ -18,17 +18,12 @@ import mayucfg
 import winreg
 import scancode
 
-// --- the editable key-binding configuration (Emacs + vim + per-app) ---------
-let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT ME.\n"
-    + "#\n"
-    + "# Compiled into the Windows registry under HKCU\\Software\\Mayu\\<os>.\n"
-    + "# Change 'os win11' to 'os win10' for Windows 10, add your own\n"
-    + "# 'key CHORD -> action' lines, then re-run the installer.\n"
-    + "\n"
-    + "os win11\n"
+// --- the editable key-binding configuration, split across several files -----
+// Each file holds one keymap; keybindings.mayu includes them all.  Running
+// mayu.exe reads these files and registers every binding into the registry.
+
+let EMACS <- "# emacs.mayu - Emacs key bindings (included by keybindings.mayu).\n"
     + "define MOD = C\n"
-    + "\n"
-    + "# ---- Emacs -------------------------------------------------------------\n"
     + "keymap emacs {\n"
     + "  key $MOD-a -> move-beginning-of-line\n"
     + "  key $MOD-e -> move-end-of-line\n"
@@ -50,8 +45,8 @@ let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT M
     + "  key C-slash -> undo\n"
     + "  key C-x C-s -> save-buffer\n"
     + "}\n"
-    + "\n"
-    + "# ---- vim ---------------------------------------------------------------\n"
+
+let VIM <- "# vim.mayu - vim key bindings (included by keybindings.mayu).\n"
     + "keymap vim-normal {\n"
     + "  key h -> cursor-left\n"
     + "  key j -> cursor-down\n"
@@ -70,13 +65,12 @@ let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT M
     + "  key o -> open-line\n"
     + "  key / -> search\n"
     + "}\n"
-    + "\n"
     + "keymap vim-insert {\n"
     + "  key ESC -> normal-mode\n"
     + "  key RET -> newline\n"
     + "}\n"
-    + "\n"
-    + "# ---- per-application remaps (target by exe / window class) -------------\n"
+
+let APPS <- "# apps.mayu - per-application remaps (target by exe / window class).\n"
     + "# Notepad uses the full Emacs keymap (mayu.exe).  For vim in Notepad run\n"
     + "# mayu.exe --vim (or run_mayu_vim.bat).\n"
     + "app \"Notepad\" {\n"
@@ -85,7 +79,6 @@ let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT M
     + "  base emacs\n"
     + "  key F5 -> type \"%date% %time%\"\n"
     + "}\n"
-    + "\n"
     + "app \"Explorer\" {\n"
     + "  exe explorer.exe\n"
     + "  class CabinetWClass\n"
@@ -94,8 +87,27 @@ let DSL <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) key bindings.  EDIT M
     + "  key k -> send Up\n"
     + "}\n"
 
-write_file("keybindings.mayu", DSL)
-print "wrote keybindings.mayu"
+let MAIN <- "# keybindings.mayu - 窓使いの憂鬱 (mayu) main config.  EDIT ME.\n"
+    + "#\n"
+    + "# Running mayu.exe reads this file (and its includes) and registers every\n"
+    + "# binding into the Windows registry under HKCU\\Software\\Mayu\\<os>, then\n"
+    + "# starts the remapper.  Change 'os win11' to 'os win10' by hand if the\n"
+    + "# auto-detection ever guesses wrong.\n"
+    + "\n"
+    + "os win11\n"
+    + "\n"
+    + "include \"emacs.mayu\"\n"
+    + "include \"vim.mayu\"\n"
+    + "include \"apps.mayu\"\n"
+
+write_file("emacs.mayu", EMACS)
+write_file("vim.mayu", VIM)
+write_file("apps.mayu", APPS)
+write_file("keybindings.mayu", MAIN)
+print "wrote keybindings.mayu + emacs.mayu + vim.mayu + apps.mayu"
+
+// combined view (the .reg generator's mayucfg does not expand includes)
+let DSL <- "os win11\n" + EMACS + VIM + APPS
 
 // --- compile the DSL into HKCU\Software\Mayu for Windows 11 and Windows 10 --
 let reg11 <- winreg.Registry.new()

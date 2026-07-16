@@ -165,6 +165,8 @@ def parse_mayu(text):
             cur = curapp = None
         elif line.startswith("os "):
             continue
+        elif line.startswith("include "):
+            continue                                  # expanded before parsing
         elif line.startswith("define "):
             body = line[7:]
             if "=" in body:
@@ -576,8 +578,93 @@ def run_windows(cfg, keymap):
 
 
 # --------------------------------------------------------------------------
-# config loading + entry point
+# Windows-version detection + registry registration.
 # --------------------------------------------------------------------------
+def detect_os():
+    """Return 'win11' or 'win10' (build 22000+ is Windows 11)."""
+    if sys.platform == "win32":
+        try:
+            v = sys.getwindowsversion()
+            return "win11" if v.build >= 22000 else "win10"
+        except Exception:
+            return "win11"
+    return "win11"
+
+
+def registry_plan(cfg, os_name):
+    """The list of (subkey_path, value_name, value_data) to write under HKCU.
+
+    Mirrors lib/mayucfg.bada: keymap/window scopes go to
+      Software\\Mayu\\<os>\\<scope>
+    and installed-app scopes to
+      Software\\Mayu\\<os>\\apps\\<AppName>  with (exe)/(class)/(inherits).
+    """
+    base = "Software\\Mayu\\" + os_name
+    plan = []
+    for scope, binds in cfg["scopes"].items():
+        if scope in cfg["apps"]:
+            path = base + "\\apps\\" + scope
+            meta = cfg["apps"][scope]
+            if meta.get("exe"):
+                plan.append((path, "(exe)", meta["exe"]))
+            if meta.get("class"):
+                plan.append((path, "(class)", meta["class"]))
+            if meta.get("base"):
+                plan.append((path, "(inherits)", meta["base"]))
+        else:
+            path = base + "\\" + scope
+            inh = cfg["inherits"].get(scope, "")
+            if inh:
+                plan.append((path, "(inherits)", inh))
+        for chord, action in binds.items():
+            plan.append((path, chord, action))
+    return plan
+
+
+def register_to_registry(cfg, os_name):
+    """Write the key bindings into HKCU\\Software\\Mayu\\<os>.  Returns count."""
+    plan = registry_plan(cfg, os_name)
+    if sys.platform != "win32":
+        return len(plan)
+    import winreg
+    for path, name, data in plan:
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, path)
+        try:
+            winreg.SetValueEx(key, name, 0, winreg.REG_SZ, data)
+        finally:
+            winreg.CloseKey(key)
+    return len(plan)
+
+
+# --------------------------------------------------------------------------
+# config loading (with `include`) + entry point
+# --------------------------------------------------------------------------
+def expand_includes(path, seen=None):
+    """Read a .mayu file and inline any `include "other.mayu"` files."""
+    import os
+    if seen is None:
+        seen = set()
+    ap = os.path.abspath(path)
+    if ap in seen:
+        return ""
+    seen.add(ap)
+    with open(path, "r", encoding="utf-8") as f:
+        text = f.read()
+    base = os.path.dirname(ap)
+    out = []
+    for line in text.split("\n"):
+        t = _strip_comment(line).strip()
+        if t.startswith("include "):
+            inc = _quoted(t[8:]) or t[8:].strip()
+            try:
+                out.append(expand_includes(os.path.join(base, inc), seen))
+            except OSError:
+                out.append("# (missing include: %s)" % inc)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
 def load_config(path):
     import os
     candidates = []
@@ -586,11 +673,11 @@ def load_config(path):
     here = os.path.dirname(os.path.abspath(sys.argv[0]))
     candidates += [os.path.join(here, "keybindings.mayu"), "keybindings.mayu"]
     for c in candidates:
-        try:
-            with open(c, "r", encoding="utf-8") as f:
-                return parse_mayu(f.read()), c
-        except OSError:
-            continue
+        if os.path.isfile(c):
+            try:
+                return parse_mayu(expand_includes(c)), c
+            except OSError:
+                continue
     return parse_mayu(DEFAULT_MAYU), "(built-in default)"
 
 
@@ -653,6 +740,16 @@ def selftest():
           "vim NORMAL swallows bare unbound keys (no typing)")
     check(vim_step("normal", "C-s", None) == (None, "normal", None, False),
           "vim NORMAL passes Ctrl chords through (C-s save)")
+    # registry registration plan (what running the .exe writes)
+    check(detect_os() in ("win10", "win11"), "OS detection returns win10/win11")
+    plan = registry_plan(cfg, "win11")
+    check(("Software\\Mayu\\win11\\emacs", "C-a", "move-beginning-of-line")
+          in plan, "registry plan: emacs C-a under HKCU\\Software\\Mayu\\win11")
+    check(any(p[0] == "Software\\Mayu\\win11\\apps\\Notepad" and p[1] == "(class)"
+              and p[2] == "Notepad" for p in plan),
+          "registry plan: Notepad app under apps\\Notepad with (class)")
+    check(("Software\\Mayu\\win10\\emacs", "C-a", "move-beginning-of-line")
+          in registry_plan(cfg, "win10"), "registry plan honours win10 subtree")
     print("SELFTEST", "PASSED" if ok[0] else "FAILED")
     return 0 if ok[0] else 1
 
@@ -663,6 +760,12 @@ def main(argv):
     ap.add_argument("--keymap", default="emacs",
                     help="emacs (default) or vim")
     ap.add_argument("--vim", action="store_true", help="shortcut for --keymap vim")
+    ap.add_argument("--os", default="", choices=["", "win10", "win11"],
+                    help="target registry subtree (default: auto-detect)")
+    ap.add_argument("--register", action="store_true",
+                    help="only register the bindings into the registry, then exit")
+    ap.add_argument("--no-register", action="store_true",
+                    help="skip writing the registry; just run the remapper")
     ap.add_argument("--selftest", action="store_true")
     ap.add_argument("--list", action="store_true")
     args = ap.parse_args(argv)
@@ -671,6 +774,7 @@ def main(argv):
         return selftest()
 
     keymap = "vim" if args.vim else args.keymap
+    os_name = args.os or detect_os()
     cfg, src = load_config(args.config)
     if not keymap.startswith("vim") and keymap not in cfg["scopes"]:
         keymaps = [k for k in cfg["scopes"] if k not in cfg["apps"]]
@@ -681,9 +785,23 @@ def main(argv):
         print_map(cfg, keymap)
         return 0
 
+    # Register the config's key bindings into the Windows registry.  Running the
+    # executable IS what writes HKCU\Software\Mayu\<os> - no separate .reg import.
+    if not args.no_register:
+        n = register_to_registry(cfg, os_name)
+        where = "HKEY_CURRENT_USER\\Software\\Mayu\\" + os_name
+        if sys.platform == "win32":
+            print("mayu: registered %d values into %s (%s)" % (n, where, os_name))
+        else:
+            print("mayu: would register %d values into %s "
+                  "(run on Windows to write the registry)" % (n, where))
+
+    if args.register:
+        return 0
+
     if sys.platform != "win32":
         print("mayu: the live remapper runs on Windows only.")
-        print("      use --selftest / --list on this platform.")
+        print("      use --selftest / --list / --register on this platform.")
         print_map(cfg, keymap)
         return 0
 
