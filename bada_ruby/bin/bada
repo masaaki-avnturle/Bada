@@ -103,10 +103,52 @@ when "train"
   chat.train!(epochs: 8, lr: 0.01, max_samples: 4000)
   chat.save(out)
   puts "saved checkpoint -> #{out}"
+when "foundry"
+  # アプリを作るアプリ: 方程式ネットワーク -> 未知事前予知エンジンで意味付け
+  # -> Bada ソース + 実行可能な子アプリ(HTML) を生成。
+  #   bada foundry "eq1" "eq2" ...            方程式を直接指定
+  #   bada foundry --file network.txt         1行1方程式のファイル
+  #   bada foundry ... --name MyApp --out dir 生成物の出力先
+  require "json"
+  eqs = []
+  name = nil
+  outdir = "."
+  until ARGV.empty?
+    case (a = ARGV.shift)
+    when "--file" then eqs.concat(File.readlines(ARGV.shift, chomp: true))
+    when "--name" then name = ARGV.shift
+    when "--out"  then outdir = ARGV.shift
+    else eqs << a
+    end
+  end
+  eqs = eqs.map(&:strip).reject(&:empty?)
+  abort("usage: bada foundry \"eq1\" \"eq2\" ... [--name N] [--out dir]") if eqs.empty?
+  forged = Bada::Foundry.forge(eqs, app_name: name)
+  s = forged[:spec]
+  base = s[:name].gsub(/[^A-Za-z0-9]+/, "_")
+  Dir.mkdir(outdir) unless Dir.exist?(outdir)
+  bada_path = File.join(outdir, "#{base}.bada")
+  html_path = File.join(outdir, "#{base}.html")
+  spec_path = File.join(outdir, "#{base}.spec.json")
+  File.write(bada_path, forged[:bada_source])
+  File.write(html_path, forged[:app_html])
+  File.write(spec_path, JSON.pretty_generate(s))
+  puts "── Bada Foundry: アプリを作るアプリ ──"
+  puts "生成アプリ名 : #{s[:name]}"
+  puts "モジュール数 : #{s[:module_count]} · Ξ_total=#{format('%.4f', s[:xi_total])}"
+  s[:modules].each do |m|
+    puts format("  #%d [%s / %s] Ξ=%.4f archetype=%s", m[:index], m[:role], m[:geometry], m[:xi], m[:archetype])
+  end
+  puts "── 生成 Bada プログラムの実行（意味の実行証跡）──"
+  Bada::Foundry.run_bada(forged[:bada_source]).each { |line| puts "  #{line}" }
+  puts "── 出力ファイル ──"
+  puts "  Bada ソース : #{bada_path}"
+  puts "  子アプリ    : #{html_path}   ← これがダウンロード可能な生成アプリ"
+  puts "  仕様(JSON)  : #{spec_path}"
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | foundry | version"
   exit 1
 end

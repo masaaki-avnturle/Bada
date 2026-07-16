@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Bada Foundry — アプリを作るアプリ</title>
+<style>
+:root{--bg:#06080f;--border:rgba(80,160,255,.14);--accent:#3a8cff;--accent2:#ff7a30;
+--text:rgba(210,225,255,.9);--text2:rgba(150,175,220,.55);}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:var(--bg);color:var(--text);font-family:Georgia,serif;height:100vh;height:100dvh;
+overflow:hidden;display:flex;flex-direction:column;-webkit-user-select:none;user-select:none}
+#header{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;
+padding:10px 18px;border-bottom:1px solid var(--border);background:rgba(8,12,24,.95)}
+#header h1{font:300 13px/1 Georgia,serif;letter-spacing:.35em;color:rgba(180,210,255,.6);text-transform:uppercase}
+#header .sub{font:300 8.5px/1 Georgia,serif;letter-spacing:.28em;color:rgba(120,160,220,.4);margin-top:5px}
+#forge-btn{font:300 10px/1 Georgia,serif;letter-spacing:.35em;padding:10px 22px;border:1px solid var(--accent2);
+background:rgba(255,140,60,.14);color:rgba(255,185,110,.95);cursor:pointer;text-transform:uppercase;
+transition:.25s;box-shadow:0 0 16px rgba(255,140,60,.12);touch-action:manipulation}
+#forge-btn:hover{background:rgba(255,140,60,.26);box-shadow:0 0 26px rgba(255,140,60,.3)}
+#forge-btn:disabled{opacity:.45;cursor:not-allowed}
+#main{flex:1 1 0;display:flex;min-height:0}
+/* left: equation network builder */
+#left{flex:0 0 300px;display:flex;flex-direction:column;border-right:1px solid var(--border);background:rgba(8,12,22,.9)}
+.panel-h{font:300 8px/1 Georgia,serif;letter-spacing:.4em;color:var(--text2);text-transform:uppercase;
+padding:12px 14px 8px;position:sticky;top:0;background:rgba(8,12,22,.97)}
+#eq-picker{flex:1 1 0;overflow-y:auto;padding:0 12px 10px;-webkit-overflow-scrolling:touch}
+#eq-picker::-webkit-scrollbar{width:3px}#eq-picker::-webkit-scrollbar-thumb{background:rgba(80,140,255,.2)}
+.eq-cat{font:300 7px/1 Georgia,serif;letter-spacing:.45em;color:rgba(80,120,200,.45);text-transform:uppercase;
+margin:10px 0 5px;padding-bottom:3px;border-bottom:1px solid rgba(80,120,200,.1)}
+.eq-item{font:300 8.5px/1.5 Georgia,serif;color:var(--text2);cursor:pointer;padding:6px 8px;margin-bottom:3px;
+border-left:2px solid transparent;border-radius:0 4px 4px 0;transition:.18s;display:flex;gap:6px;align-items:flex-start}
+.eq-item:hover{color:rgba(180,210,255,.9);background:rgba(58,140,255,.07);border-left-color:var(--accent)}
+.eq-item.on{color:rgba(255,200,150,.95);background:rgba(255,140,60,.1);border-left-color:var(--accent2)}
+.eq-item .chk{flex:0 0 auto;width:12px;height:12px;border:1px solid var(--text2);border-radius:2px;margin-top:2px;font-size:9px;line-height:11px;text-align:center}
+.eq-item.on .chk{background:var(--accent2);border-color:var(--accent2);color:#111}
+#name-wrap{flex:0 0 auto;padding:10px 14px;border-top:1px solid var(--border)}
+#name-wrap label{font:300 7.5px/1 Georgia,serif;letter-spacing:.35em;color:var(--text2);text-transform:uppercase}
+#app-name{width:100%;margin-top:7px;background:rgba(4,8,18,.8);border:1px solid var(--border);color:var(--text);
+font:300 11px/1.4 Georgia,serif;padding:7px 9px;outline:none;-webkit-user-select:text;user-select:text}
+#app-name:focus{border-color:var(--accent)}
+/* center: network graph + precognition */
+#center{flex:1 1 0;display:flex;flex-direction:column;min-width:0}
+#net-wrap{flex:1 1 60%;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,rgba(15,25,55,.9),var(--bg))}
+#net-canvas{position:absolute;inset:0;touch-action:none}
+#precog{flex:1 1 40%;overflow-y:auto;border-top:1px solid var(--border);padding:10px 14px;background:rgba(6,10,20,.85)}
+#precog::-webkit-scrollbar{width:3px}#precog::-webkit-scrollbar-thumb{background:rgba(80,140,255,.2)}
+.mod-row{font:300 9px/1.6 Georgia,serif;padding:6px 8px;margin-bottom:5px;border-left:2px solid var(--accent);
+background:rgba(58,140,255,.06);border-radius:0 4px 4px 0}
+.mod-row b{color:rgba(150,200,255,.95);letter-spacing:.15em}
+.mod-row .eq{color:rgba(224,200,128,.85);font-style:italic;word-break:break-all}
+.mod-row .tag{color:var(--text2);letter-spacing:.1em}
+.hint{color:rgba(100,140,200,.4);font:300 9px/1.7 Georgia,serif;letter-spacing:.1em;text-align:center;margin-top:24px}
+/* right: generated app */
+#right{flex:0 0 380px;display:flex;flex-direction:column;border-left:1px solid var(--border);background:rgba(8,12,22,.9)}
+#tabs{flex:0 0 auto;display:flex;border-bottom:1px solid var(--border)}
+.tab{flex:1;font:300 8px/1 Georgia,serif;letter-spacing:.25em;padding:10px 4px;text-align:center;cursor:pointer;
+color:var(--text2);text-transform:uppercase;transition:.2s;touch-action:manipulation;border-bottom:2px solid transparent}
+.tab.active{color:rgba(150,200,255,.95);border-bottom-color:var(--accent)}
+#tab-body{flex:1 1 0;overflow:auto;position:relative}
+#preview-frame{width:100%;height:100%;border:0;background:#06080f;display:block}
+#src-view,#spec-view{display:none;padding:12px;font:300 9.5px/1.5 'Courier New',monospace;color:rgba(190,215,255,.85);white-space:pre-wrap;word-break:break-word}
+#dl-bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid var(--border);background:rgba(8,12,22,.96)}
+.dl-btn{flex:1 1 auto;font:300 8px/1 Georgia,serif;letter-spacing:.2em;padding:9px 6px;border:1px solid var(--accent);
+background:rgba(58,140,255,.1);color:rgba(150,200,255,.9);cursor:pointer;text-transform:uppercase;transition:.2s;
+text-align:center;touch-action:manipulation}
+.dl-btn:hover{background:rgba(58,140,255,.22)}
+.dl-btn.warn{border-color:var(--accent2);color:rgba(255,185,110,.95);background:rgba(255,140,60,.1)}
+.dl-btn.warn:hover{background:rgba(255,140,60,.22)}
+.dl-btn:disabled{opacity:.4;cursor:not-allowed}
+#panel-toggle{display:none;gap:6px}
+.pt-btn{font:300 8px/1 Georgia,serif;letter-spacing:.2em;padding:8px 10px;border:1px solid var(--border);
+background:transparent;color:var(--text2);text-transform:uppercase;cursor:pointer}
+@media(max-width:920px){
+#left{position:absolute;z-index:40;height:100%;left:0;top:0;transform:translateX(-100%);transition:.25s;box-shadow:6px 0 24px rgba(0,0,0,.5)}
+#right{position:absolute;z-index:40;height:100%;right:0;top:0;transform:translateX(100%);transition:.25s;box-shadow:-6px 0 24px rgba(0,0,0,.5)}
+#left.open{transform:translateX(0)}#right.open{transform:translateX(0)}
+#panel-toggle{display:flex}#header h1{font-size:11px;letter-spacing:.2em}
+}
+</style>
+</head>
+<body>
+<div id="header">
+  <div>
+    <h1>Bada Foundry</h1>
+    <div class="sub">アプリを作るアプリ · 方程式ネットワーク → 未知事前予知エンジン → 生成アプリ</div>
+  </div>
+  <div id="panel-toggle">
+    <button class="pt-btn" id="tg-left">◧ 方程式</button>
+    <button class="pt-btn" id="tg-right">生成 ◨</button>
+  </div>
+  <button id="forge-btn">⚙ Forge App →</button>
+</div>
+
+<div id="main">
+  <div id="left">
+    <div class="panel-h">Equation Network</div>
+    <div id="eq-picker"></div>
+    <div id="name-wrap">
+      <label>App Name (任意)</label>
+      <input id="app-name" placeholder="Bada::… (自動命名)" spellcheck="false">
+    </div>
+  </div>
+
+  <div id="center">
+    <div id="net-wrap"><canvas id="net-canvas"></canvas></div>
+    <div id="precog">
+      <div class="panel-h" style="padding-left:0">Precognition Readout — 未知事前予知エンジン</div>
+      <div id="precog-body"><div class="hint">左で方程式を選び、ネットワークを構成してください。<br>各方程式は Ξ 不変量・サーストン幾何・カタストロフィ分岐で<br>意味付けされ、アプリのモジュールになります。</div></div>
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="tabs">
+      <div class="tab active" data-tab="preview">Preview</div>
+      <div class="tab" data-tab="src">Bada Source</div>
+      <div class="tab" data-tab="spec">Spec</div>
+    </div>
+    <div id="tab-body">
+      <iframe id="preview-frame" sandbox="allow-scripts"></iframe>
+      <pre id="src-view"></pre>
+      <pre id="spec-view"></pre>
+    </div>
+    <div id="dl-bar">
+      <button class="dl-btn warn" id="dl-app" disabled>⬇ 生成アプリ (.html)</button>
+      <button class="dl-btn" id="dl-bada" disabled>⬇ Bada (.bada)</button>
+      <button class="dl-btn" id="dl-spec" disabled>⬇ Spec (.json)</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 方程式データベース（山口フレームワーク）
+// ═══════════════════════════════════════════════════════════════
+const EQ_DB=[
+ {cat:'Beta / Gamma',eq:'β(p,q) = Γ(p)Γ(q)/Γ(p+q)'},
+ {cat:'Beta / Gamma',eq:'Γ(s) = ∫e^(-x)x^(s-1)dx, Γ\'(s)=∫e^(-x)x^(s-1)logx dx'},
+ {cat:'Beta / Gamma',eq:'d/dγ Γ = Γ(γ)\' → e^(-x·logx)'},
+ {cat:'Beta / Gamma',eq:'β(p,q) = β(p,q)/logx = β(p,q)/ζ(s)'},
+ {cat:'Zeta / Shannon',eq:'ζ(s) = β(p,q)/logx = x·logx'},
+ {cat:'Zeta / Shannon',eq:'||ds²|| = ||x^(1/2)·logx||⁴ = x^(-1/2)'},
+ {cat:'Zeta / Shannon',eq:'E(σ) = K(σ) ⊗ H(σ), ζ(s)=β(p,q)/logx'},
+ {cat:'Zeta / Shannon',eq:'∫ζ(s)dxm = β(p,q)/logx = ∫ζ(s)e^(-f)dV'},
+ {cat:'π演算子 / Dalanversian',eq:'π(χ,x) = [iπ(χ,x), f(x)] non-commutative'},
+ {cat:'π演算子 / Dalanversian',eq:'□ = 2(sin(ix·logx) + cos(ix·logx))'},
+ {cat:'π演算子 / Dalanversian',eq:'□ = cos(ix·logx) - i·sin(ix·logx)'},
+ {cat:'π演算子 / Dalanversian',eq:'∫e^(-□)d□ = πe, πe ≅ eπ'},
+ {cat:'大域的微分多様体',eq:'HΨ = ⊕(iℏ∇)^(⊕L) = e^(x·logx) = x(x)\''},
+ {cat:'大域的微分多様体',eq:'d/df F = ∬1/(x·logx)² dxm + ∬1/(y·logy)^(1/2) dym = Γ(x,y)'},
+ {cat:'大域的微分多様体',eq:'||ds²|| = ∫[D²ψ ⊗ hν]dτ, D-brane'},
+ {cat:'大域的微分多様体',eq:'log(x·logx) ≥ 2(y·logy)^(1/2)'},
+ {cat:'Jones 多項式',eq:'E(σ) = K(σ) ⊗ H(σ) = β^(-1)(x)xβ(x)'},
+ {cat:'Jones 多項式',eq:'bpc(1χ·∂)∭∭∭ = ht, topological crossing'},
+ {cat:'一般相対性理論',eq:'∫κT^μν dvol = ∫(R + 1/2·gij·Λ)dxm'},
+ {cat:'一般相対性理論',eq:'□ = -16πG/c⁴·T^μν, □ = 8πG/c⁴·T^μν/logx'},
+ {cat:'量子力学 / Heisenberg',eq:'|ψ(t)⟩ = e^(-iĤt)|Ψ⟩_H, dÂ/dt = 1/i[A,Ĥ]'},
+ {cat:'量子力学 / Heisenberg',eq:'⊕(iℏ∇)^(⊕L) = ĤΨ/iℏ = iℏ^(iℏ\') = e^(HΨ·logHΨ)'},
+ {cat:'エントロピー / Euler',eq:'C = ∫(1/x^s dx - logx), C = 0.5772156...'},
+ {cat:'エントロピー / Euler',eq:'∬1/(x·logx)² dxm = 1/2·i'},
+ {cat:'カタストロフィー / M理論',eq:'RRR[∇i∇j ▷◁ / ∇L] dIm, log(x·logx) ≥ 2√(y·logy)'},
+ {cat:'Dalia / Magic 演算子',eq:'∇∆ = ∮D M(□)d□, π(χ,x)=∮M[iπ(χ,x),f(x)]'},
+];
+
+// ═══════════════════════════════════════════════════════════════
+// Bada 数理エンジンの JS 移植（bada_ruby/lib/bada と同一の Ξ / 幾何）
+// ═══════════════════════════════════════════════════════════════
+const Bada=(()=>{
+ // ── Entropy ──
+ const TOKEN_RE=/[A-Za-z0-9_]+|[一-鿿぀-ゟ゠-ヿ]/g;
+ const tokenize=s=>String(s).match(TOKEN_RE)||[];
+ function shannon(t){if(!t.length)return 0;const f={};t.forEach(x=>f[x]=(f[x]||0)+1);const n=t.length;let h=0;
+   for(const k in f){const p=f[k]/n;h-=p*Math.log2(p);}return h;}
+ function distribution(t){if(!t.length)return[];const f={};t.forEach(x=>f[x]=(f[x]||0)+1);const n=t.length;
+   return Object.keys(f).map(k=>[k,f[k]/n]).sort((a,b)=>b[1]-a[1]);}
+ function normalized(t){if(!t.length)return 0;const v=new Set(t).size;if(v<=1)return 0;return shannon(t)/Math.log2(v);}
+ // ── Special functions (Lanczos gamma / beta / zeta gauge) ──
+ const G=7,C=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+   -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+ function gamma(x){if(x===0)return Infinity;if(x<0.5)return Math.PI/(Math.sin(Math.PI*x)*gamma(1-x));
+   x-=1;let a=C[0];const t=x+G+0.5;for(let i=1;i<G+2;i++)a+=C[i]/(x+i);
+   return Math.sqrt(2*Math.PI)*Math.pow(t,x+0.5)*Math.exp(-t)*a;}
+ const logGamma=x=>Math.log(Math.abs(gamma(x)));
+ const beta=(p,q)=>Math.exp(logGamma(p)+logGamma(q)-logGamma(p+q));
+ const xLogX=x=>x<=0?0:x*Math.log(x);
+ function element(x){if(x<=1)return 1;const xl=xLogX(x);if(Math.abs(xl)<1e-9)return 1;return 1/(xl*xl);}
+ function mIntegral(dist){if(!dist.length)return 0;let s=0;dist.forEach((d,i)=>{s+=d[1]*element(i+2);});return s;}
+ function zetaGauge(p,q,x){const lx=Math.log(x);if(Math.abs(lx)<1e-12)return beta(p,q);return beta(p,q)/lx;}
+ function invariant(text){const t=tokenize(text);const h=shannon(t);const m=mIntegral(distribution(t));
+   const n=t.length;return{entropy:h,manifold:m,extent:n,xi:zetaGauge(h+1,m+1,n+1)};}
+ // ── Thurston geometries ──
+ const GEOM=[
+   {name:'S^3',curv:1.0,kind:'spherical'},{name:'H^1×E^1',curv:-0.5,kind:'mixed'},
+   {name:'E^1',curv:0.0,kind:'flat'},{name:'S^1×E^1',curv:0.3,kind:'mixed'},
+   {name:'S^2×E^1',curv:0.6,kind:'mixed'},{name:'H^1×S^1',curv:-0.3,kind:'mixed'},
+   {name:'H^1',curv:-1.0,kind:'hyperbolic'},{name:'S^2×E',curv:0.5,kind:'mixed'}];
+ function perelmanF(dist,curv){if(!dist.length)return 0;const ps=dist.map(d=>d[1]);const fs=ps.map(p=>-Math.log(p));
+   let f=0;for(let i=0;i<ps.length;i++){const g=i<ps.length-1?(fs[i+1]-fs[i])**2:0;f+=(curv+g)*ps[i]*element(i+2);}return f;}
+ function placeEntropy(text){const t=tokenize(text);const dist=distribution(t);const hn=normalized(t);
+   const idx=Math.min(GEOM.length-1,Math.max(0,Math.floor(hn*GEOM.length)));const g=GEOM[idx];
+   return{geometry:g.name,curvature:g.curv,kind:g.kind,perelmanF:perelmanF(dist,g.curv),hnorm:hn};}
+ // ── Catastrophe branch count (cusp V'(x)=x³+ax+b real roots) ──
+ function branchCount(h,m,xi){const a=-Math.min(2,h*0.5),b=(xi-0.4);
+   const disc=-(4*a*a*a+27*b*b);let roots=(disc>1e-9&&a<0)?3:1;return Math.min(6,Math.max(1,roots));}
+ return{tokenize,shannon,normalized,invariant,placeEntropy,branchCount,GEOM};
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// Foundry — 意味付け + Bada ソース + 子アプリ生成（Ruby 版と同一原型）
+// ═══════════════════════════════════════════════════════════════
+const ARCHETYPES={
+ 'S^3':{archetype:'pulse_rings',role:'共鳴コア',hue:205},
+ 'H^1×E^1':{archetype:'hyper_fan',role:'分岐ファン',hue:28},
+ 'E^1':{archetype:'lattice',role:'格子場',hue:150},
+ 'S^1×E^1':{archetype:'orbit',role:'軌道系',hue:265},
+ 'S^2×E^1':{archetype:'sphere_wave',role:'球面波',hue:190},
+ 'H^1×S^1':{archetype:'spiral',role:'対数螺旋',hue:320},
+ 'H^1':{archetype:'tessellation',role:'双曲網',hue:12},
+ 'S^2×E':{archetype:'bloom',role:'放射ブルーム',hue:95}};
+const DEF_ARCH={archetype:'lattice',role:'格子場',hue:150};
+
+function meaning(eq,i){
+ const inv=Bada.invariant(eq),pl=Bada.placeEntropy(eq);
+ const arch=ARCHETYPES[pl.geometry]||DEF_ARCH;
+ const br=Bada.branchCount(inv.entropy,inv.manifold,inv.xi);
+ return{i,eq,xi:inv.xi,h:inv.entropy,m:inv.manifold,ext:inv.extent,
+   geom:pl.geometry,curv:pl.curvature,kind:pl.kind,pf:pl.perelmanF,
+   branches:br,arch:arch.archetype,role:arch.role,hue:arch.hue};}
+
+function deriveName(mods){
+ if(!mods.length)return'Bada::EmptyApp';
+ const byG={};mods.forEach(m=>{byG[m.geom]=(byG[m.geom]||0)+m.xi;});
+ const dom=Object.keys(byG).sort((a,b)=>byG[b]-byG[a])[0];
+ const a=ARCHETYPES[dom]||DEF_ARCH;
+ return'Bada::'+a.archetype.split('_').map(s=>s[0].toUpperCase()+s.slice(1)).join('')+'App';}
+
+function buildSpec(eqs,name){
+ const mods=eqs.filter(e=>e&&e.trim()).map((e,i)=>meaning(e,i));
+ const xt=mods.reduce((s,m)=>s+m.xi,0);
+ return{name:(name&&name.trim())||deriveName(mods),xi_total:xt,module_count:mods.length,modules:mods};}
+
+function badaSource(spec){
+ const L=[];L.push('# '+spec.name+' — auto-generated Bada program');
+ L.push('# forged by Bada Foundry from an equation network');
+ L.push('# modules='+spec.module_count+'  Xi_total='+spec.xi_total.toFixed(4));L.push('');
+ spec.modules.forEach(m=>{
+  L.push('# module #'+m.i+' ['+m.role+' / '+m.geom+'] archetype='+m.arch);
+  L.push('set m'+m.i+' = '+m.xi.toFixed(6));
+  L.push('m'+m.i+' <- '+JSON.stringify(m.eq));
+  L.push('m'+m.i+' -< '+(m.m+1).toFixed(6));
+  L.push('m'+m.i+' >- m'+m.i);
+  L.push('Omega::push m'+m.i+' as '+m.arch+'_'+m.i);
+  L.push('print m'+m.i);L.push('');});
+ return L.join('\n');}
+
+// 子アプリの共通レンダラ（Ruby 版 child_render_js と同一挙動）
+const CHILD_RENDER_JS=`
+const grid=document.getElementById('grid');
+function mkModule(m){
+ const wrap=document.createElement('div');wrap.className='mod';
+ const cv=document.createElement('canvas');const meta=document.createElement('div');meta.className='meta';
+ meta.innerHTML='<span class="role">'+m.role+' · '+m.geom+'</span><br><span class="eq">'+m.eq+'</span><br>Ξ='+m.xi.toFixed(4)+' · H='+m.h.toFixed(3)+' · 分岐'+m.branches;
+ wrap.appendChild(cv);wrap.appendChild(meta);grid.appendChild(wrap);
+ const ctx=cv.getContext('2d');
+ function size(){const dpr=window.devicePixelRatio||1;cv.width=cv.clientWidth*dpr;cv.height=180*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+ size();window.addEventListener('resize',size);
+ const hue=m.hue,sp=0.4+Math.min(2,m.xi)*0.8,n=Math.max(2,m.branches+2);
+ const col=a=>'hsla('+hue+',80%,65%,'+a+')';let t=0;
+ function frame(){
+  const w=cv.clientWidth,h=180,cx=w/2,cy=h/2;ctx.clearRect(0,0,w,h);
+  ctx.lineWidth=1.2;ctx.strokeStyle=col(.8);ctx.fillStyle=col(.8);ctx.shadowColor=col(.6);ctx.shadowBlur=8;
+  const s=Math.min(w,h)*0.4;
+  switch(m.arch){
+   case 'pulse_rings':for(let i=0;i<n;i++){const r=s*(0.2+0.8*i/n)*(0.85+0.15*Math.sin(t*sp+i));ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();}break;
+   case 'hyper_fan':for(let i=0;i<n*2;i++){const a=-1+(i/(n*2-1))*2;ctx.beginPath();ctx.moveTo(cx,cy);for(let u=0;u<=s;u+=3){const y=Math.sinh(u/s*1.4)*14;ctx.lineTo(cx+Math.cos(a+t*sp*.1)*u,cy+Math.sin(a)*u+y);}ctx.stroke();}break;
+   case 'lattice':{const g=s/n;ctx.globalAlpha=.9;for(let i=-n;i<=n;i++){const off=Math.sin(t*sp+i)*6;ctx.beginPath();ctx.moveTo(cx+i*g+off,cy-s);ctx.lineTo(cx+i*g,cy+s);ctx.stroke();ctx.beginPath();ctx.moveTo(cx-s,cy+i*g+off);ctx.lineTo(cx+s,cy+i*g);ctx.stroke();}ctx.globalAlpha=1;}break;
+   case 'orbit':for(let i=0;i<n;i++){const a=t*sp*(1+i*.2)+i,r=s*(0.3+0.6*i/n);const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r*.6;ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.globalAlpha=.25;ctx.stroke();ctx.globalAlpha=1;ctx.beginPath();ctx.arc(x,y,4,0,7);ctx.fill();}break;
+   case 'sphere_wave':for(let i=0;i<n+3;i++){const ph=i/(n+3);ctx.beginPath();for(let a=0;a<=6.3;a+=.1){const rr=s*(0.3+0.5*ph)*(1+0.12*Math.sin(a*3+t*sp));ctx.lineTo(cx+Math.cos(a)*rr,cy+Math.sin(a)*rr*(0.4+0.5*ph));}ctx.closePath();ctx.globalAlpha=.5;ctx.stroke();ctx.globalAlpha=1;}break;
+   case 'spiral':ctx.beginPath();for(let a=0;a<n*6.3;a+=.08){const r=s*a/(n*6.3);ctx.lineTo(cx+Math.cos(a+t*sp)*r,cy+Math.sin(a+t*sp)*r);}ctx.stroke();break;
+   case 'tessellation':{const pts=[];for(let i=0;i<n+2;i++){const a=i/(n+2)*6.3+t*sp*.2;pts.push([cx+Math.cos(a)*s,cy+Math.sin(a)*s]);}for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){ctx.globalAlpha=.4;ctx.beginPath();ctx.moveTo(pts[i][0],pts[i][1]);ctx.lineTo(pts[j][0],pts[j][1]);ctx.stroke();}ctx.globalAlpha=1;}break;
+   case 'bloom':for(let i=0;i<n*2;i++){const a=i/(n*2)*6.3;ctx.beginPath();for(let u=0;u<=1;u+=.05){const rr=s*u,pet=Math.sin(u*Math.PI)*20*Math.sin(t*sp+i);ctx.lineTo(cx+Math.cos(a)*rr-Math.sin(a)*pet,cy+Math.sin(a)*rr+Math.cos(a)*pet);}ctx.stroke();}break;
+   default:ctx.beginPath();ctx.arc(cx,cy,s*.6,0,7);ctx.stroke();
+  }
+  t+=0.03;requestAnimationFrame(frame);
+ }
+ frame();
+}
+MODULES.forEach(mkModule);`;
+
+function appHtml(spec){
+ const mods=spec.modules.map(m=>({i:m.i,eq:m.eq,xi:m.xi,h:m.h,geom:m.geom,curv:m.curv,role:m.role,arch:m.arch,hue:m.hue,branches:m.branches}));
+ const title=spec.name;
+ return `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>${title}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#06080f;color:#cfe0ff;font-family:Georgia,serif;overflow-x:hidden}
+header{padding:16px 20px;border-bottom:1px solid rgba(80,160,255,.15)}
+h1{font-weight:300;letter-spacing:.25em;font-size:16px;color:#8fb8ff}
+.sub{font-size:9px;letter-spacing:.3em;color:#5a7ec0;margin-top:6px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;padding:18px}
+.mod{border:1px solid rgba(80,160,255,.15);border-radius:6px;background:rgba(8,14,28,.7);overflow:hidden}
+.mod canvas{width:100%;height:180px;display:block;background:radial-gradient(ellipse at 50% 45%,rgba(15,25,55,.9),#06080f)}
+.mod .meta{padding:8px 10px;font-size:9px;letter-spacing:.08em;line-height:1.7;color:#9ab4e0}
+.mod .eq{color:#e0c080;font-style:italic;font-size:9.5px;word-break:break-all}
+.mod .role{color:#7fb0ff;letter-spacing:.2em;text-transform:uppercase;font-size:8px}
+footer{padding:14px 20px;font-size:8px;letter-spacing:.25em;color:#4a6ba0;border-top:1px solid rgba(80,160,255,.12)}
+</style></head><body>
+<header><h1>${title}</h1>
+<div class="sub">FORGED BY BADA FOUNDRY · ${spec.module_count} MODULES · Ξ=${spec.xi_total.toFixed(3)}</div></header>
+<div id="grid"></div>
+<footer>Bada language child-application · 山口フレームワーク 方程式ネットワーク由来 · © Masaaki Yamaguchi</footer>
+<script>const MODULES=${JSON.stringify(mods)};</`+`script>
+<script>${CHILD_RENDER_JS}</`+`script>
+</body></html>`;}
+
+// ═══════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════
+const selected=new Set();
+let currentForge=null;
+
+function buildPicker(){
+ const el=document.getElementById('eq-picker');let last='';
+ EQ_DB.forEach((it,idx)=>{
+  if(it.cat!==last){const c=document.createElement('div');c.className='eq-cat';c.textContent=it.cat;el.appendChild(c);last=it.cat;}
+  const d=document.createElement('div');d.className='eq-item';d.dataset.idx=idx;
+  d.innerHTML='<span class="chk"></span><span>'+it.eq+'</span>';
+  d.onclick=()=>{if(selected.has(idx)){selected.delete(idx);d.classList.remove('on');d.querySelector('.chk').textContent='';}
+   else{selected.add(idx);d.classList.add('on');d.querySelector('.chk').textContent='✓';}drawNetwork();};
+  el.appendChild(d);});
+}
+
+// ── network graph ──
+const netCanvas=document.getElementById('net-canvas'),nctx=netCanvas.getContext('2d');
+let nodes=[];
+function sharedSymbols(a,b){const syms=['β','Γ','ζ','π','□','∇','ℏ','⊗','⊕','∫','∬','∭','ψ','Ψ','logx','ds','T^','∆'];
+ let c=0;syms.forEach(s=>{if(a.includes(s)&&b.includes(s))c++;});return c;}
+function resizeNet(){const dpr=window.devicePixelRatio||1,w=netCanvas.clientWidth,h=netCanvas.clientHeight;
+ netCanvas.width=w*dpr;netCanvas.height=h*dpr;nctx.setTransform(dpr,0,0,dpr,0,0);drawNetwork();}
+function drawNetwork(){
+ const w=netCanvas.clientWidth,h=netCanvas.clientHeight;nctx.clearRect(0,0,w,h);
+ const sel=[...selected];const cx=w/2,cy=h/2,R=Math.min(w,h)*0.36;
+ nodes=sel.map((idx,k)=>{const a=(k/Math.max(1,sel.length))*Math.PI*2-Math.PI/2;
+  return{idx,eq:EQ_DB[idx].eq,x:cx+Math.cos(a)*R,y:cy+Math.sin(a)*R};});
+ // edges
+ for(let i=0;i<nodes.length;i++)for(let j=i+1;j<nodes.length;j++){
+  const c=sharedSymbols(nodes[i].eq,nodes[j].eq);if(c>0){
+   nctx.strokeStyle='rgba(90,150,255,'+Math.min(.5,.12+c*.12)+')';nctx.lineWidth=Math.min(3,c);
+   nctx.beginPath();nctx.moveTo(nodes[i].x,nodes[i].y);nctx.lineTo(nodes[j].x,nodes[j].y);nctx.stroke();}}
+ // nodes
+ nodes.forEach(nd=>{const inv=Bada.invariant(nd.eq),pl=Bada.placeEntropy(nd.eq);
+  const arch=ARCHETYPES[pl.geometry]||DEF_ARCH;const r=8+Math.min(16,inv.xi*10);
+  nctx.beginPath();nctx.arc(nd.x,nd.y,r,0,7);nctx.fillStyle='hsla('+arch.hue+',80%,60%,.85)';
+  nctx.shadowColor='hsla('+arch.hue+',80%,60%,.7)';nctx.shadowBlur=12;nctx.fill();nctx.shadowBlur=0;
+  nctx.fillStyle='rgba(200,225,255,.75)';nctx.font='8px Georgia';nctx.textAlign='center';
+  nctx.fillText(pl.geometry,nd.x,nd.y+r+11);});
+ if(!nodes.length){nctx.fillStyle='rgba(100,140,200,.35)';nctx.font='11px Georgia';nctx.textAlign='center';
+  nctx.fillText('方程式を選ぶとネットワークが構成されます',cx,cy);}
+}
+
+// ── forge ──
+document.getElementById('forge-btn').onclick=()=>{
+ const eqs=[...selected].map(i=>EQ_DB[i].eq);
+ if(!eqs.length){flashPrecog('方程式を1つ以上選んでください。');return;}
+ const name=document.getElementById('app-name').value;
+ const spec=buildSpec(eqs,name);
+ currentForge={spec,bada:badaSource(spec),html:appHtml(spec)};
+ renderPrecog(spec);
+ document.getElementById('preview-frame').srcdoc=currentForge.html;
+ document.getElementById('src-view').textContent=currentForge.bada;
+ document.getElementById('spec-view').textContent=JSON.stringify(spec,null,2);
+ ['dl-app','dl-bada','dl-spec'].forEach(id=>document.getElementById(id).disabled=false);
+ if(window.innerWidth<=920)document.getElementById('right').classList.add('open');
+};
+function flashPrecog(msg){document.getElementById('precog-body').innerHTML='<div class="hint">'+msg+'</div>';}
+function renderPrecog(spec){
+ let html='<div class="mod-row" style="border-left-color:#ff7a30;background:rgba(255,140,60,.08)">'+
+  '<b>'+spec.name+'</b> <span class="tag">· '+spec.module_count+' modules · Ξ_total='+spec.xi_total.toFixed(4)+'</span></div>';
+ spec.modules.forEach(m=>{html+='<div class="mod-row"><b>#'+m.i+' '+m.role+'</b> '+
+  '<span class="tag">'+m.geom+' (κ='+m.curv+') · archetype='+m.arch+' · 分岐'+m.branches+'</span><br>'+
+  '<span class="eq">'+m.eq+'</span><br><span class="tag">Ξ='+m.xi.toFixed(4)+' · H='+m.h.toFixed(3)+' · M='+m.m.toFixed(3)+' · Perelman F='+m.pf.toFixed(3)+'</span></div>';});
+ document.getElementById('precog-body').innerHTML=html;
+}
+
+// ── downloads ──
+function download(filename,content,mime){
+ const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);
+ const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+ setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},400);}
+function safeName(){return (currentForge?currentForge.spec.name:'BadaApp').replace(/[^A-Za-z0-9]+/g,'_');}
+document.getElementById('dl-app').onclick=()=>{if(currentForge)download(safeName()+'.html',currentForge.html,'text/html');};
+document.getElementById('dl-bada').onclick=()=>{if(currentForge)download(safeName()+'.bada',currentForge.bada,'text/plain');};
+document.getElementById('dl-spec').onclick=()=>{if(currentForge)download(safeName()+'.spec.json',JSON.stringify(currentForge.spec,null,2),'application/json');};
+
+// ── tabs ──
+document.querySelectorAll('.tab').forEach(tb=>{tb.onclick=()=>{
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));tb.classList.add('active');
+ const t=tb.dataset.tab;
+ document.getElementById('preview-frame').style.display=t==='preview'?'block':'none';
+ document.getElementById('src-view').style.display=t==='src'?'block':'none';
+ document.getElementById('spec-view').style.display=t==='spec'?'block':'none';};});
+
+// ── responsive toggles ──
+document.getElementById('tg-left').onclick=()=>document.getElementById('left').classList.toggle('open');
+document.getElementById('tg-right').onclick=()=>document.getElementById('right').classList.toggle('open');
+
+// ── init ──
+buildPicker();
+resizeNet();
+window.addEventListener('resize',resizeNet);
+</script>
+</body>
+</html>
