@@ -295,6 +295,11 @@ r[:result]  # => [[19.0, 22.0], [43.0, 50.0]]                              （�
   恒等δ・共変微分・レヴィ・チヴィタ外積・積分）。
 - 計算結果を保存して **＋ − × ÷（加減乗除）** で組み合わせられます（同形は成分ごと、
   数値はスカラー倍）。
+- **アプリを作るアプリ**: 保存した方程式(R1,R2…)と加減乗除が**方程式ネットワーク**に
+  なり、**未知事前予知エンジン**（多様体不変量Ξ・サーストン幾何・ミレニアム主理論）で
+  各方程式を**意味付け**して、**ソースコードと実行できる生成アプリ**を作ります。
+  **生成アプリ自体もその場でダウンロード**できます（`Bada::Penrose::AppFactory` /
+  `bin/bada appfactory`）。
 
 ## モジュール構成
 
@@ -323,6 +328,7 @@ lib/bada/penrose/builder.rb  パレット＋ダイアログ対話アプリ（部
 lib/bada/penrose/paper.rb    論文生成（Markdown+LaTeX）
 lib/bada/penrose/codegen.rb  ソースコード生成（Ruby）
 lib/bada/penrose/webapp.rb   図式エディタ書き出し（絵記号を描いて結線する自己完結HTML）
+lib/bada/penrose/app_factory.rb アプリを作るアプリ（方程式ネットワーク→ソース+意味付け+生成アプリ）
 lib/bada/penrose/studio.rb   Studio（描画→計算→解答→論文→コードの Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 

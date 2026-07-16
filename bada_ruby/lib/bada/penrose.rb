@@ -24,6 +24,7 @@ require_relative "penrose/builder"
 require_relative "penrose/paper"
 require_relative "penrose/codegen"
 require_relative "penrose/webapp"
+require_relative "penrose/app_factory"
 require_relative "penrose/studio"
 
 module Bada

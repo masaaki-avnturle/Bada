@@ -302,6 +302,61 @@ class TestPenroseWebApp < Minitest::Test
     assert_match(/function ew\(/, html)
     assert_match(/saveReg|registers/, html)
   end
+
+  def test_has_app_factory_meta_app
+    html = WebApp.render
+    assert_includes html, "アプリを作るアプリ"
+    assert_match(/function generateApp/, html)      # 方程式ネットワーク → ソース
+    assert_match(/未知事前予知エンジン/, html)         # 意味付け
+    assert_match(/function meaning\(/, html)         # Ξ/geometry/theory engine
+    assert_match(/function downloadApp/, html)       # 生成アプリのダウンロード
+    # the generated app must not prematurely close the outer page script
+    refute_includes html, "<script>${src}</script>"
+  end
+end
+
+# ---- AppFactory (アプリを作るアプリ — meta-application) ----------------
+class TestPenroseAppFactory < Minitest::Test
+  def net
+    {
+      name: "NetDemo",
+      steps: [
+        { name: "R1", equation: "R1_{ij} = A_{ik} B_{kj}", value: [[19, 22], [43, 50]] },
+        { name: "R2", equation: "R2 = A_{ii}", value: 5 },
+        { name: "R3", equation: "R3 = R1 ÷ R2", inputs: %w[R1 R2], op: "÷" }
+      ]
+    }
+  end
+
+  def test_generate_returns_source_html_meaning
+    r = AppFactory.generate(net)
+    assert_match(/STEPS/, r[:source])
+    assert_match(/\A<!DOCTYPE html>/, r[:html])
+    assert_equal 3, r[:meaning].length
+  end
+
+  def test_generated_source_is_runnable_ruby
+    code = AppFactory.generate(net)[:source]
+    # must compile as valid Ruby (the network program)
+    assert RubyVM::InstructionSequence.compile(code)
+    assert_match(/def ew/, code)                    # 加減乗除 kernel
+    assert_match(/STEPS\["R3"\] = ew/, code)        # the network edge
+  end
+
+  def test_meaning_annotates_each_equation
+    m = AppFactory.generate(net)[:meaning].first
+    # 未知事前予知エンジン: invariant Ξ, Thurston geometry, dominant theory
+    assert m[:invariant].is_a?(Float)
+    assert m[:geometry].is_a?(String)
+    assert m[:dominant].is_a?(String)
+  end
+
+  def test_generated_app_is_self_contained_html
+    html = AppFactory.generate(net)[:html]
+    assert_includes html, "生成アプリ"
+    assert_includes html, "未知事前予知エンジン"
+    refute_match(%r{https?://[^"']+\.(js|css)}, html)  # no external assets
+  end
 end
 
 # ---- GlyphSVG (faithful Penrose picture-symbols) ---------------------

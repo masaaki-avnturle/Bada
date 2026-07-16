@@ -70,6 +70,31 @@ when "html"
   Bada::Penrose::WebApp.write(out)
   puts "ペンローズ絵記号スタジオを書き出しました -> #{out}"
   puts "ブラウザで開いてください（外部依存なし・オフライン動作）。"
+when "appfactory"
+  # アプリを作るアプリ: 方程式ネットワーク -> ソースコード + 意味付け + 生成アプリ.
+  #   bada appfactory [out.html]
+  out = ARGV.shift || "generated_app.html"
+  network = {
+    name: "Penrose-Net Demo",
+    steps: [
+      { name: "R1", equation: "R1_{ij} = A_{ik} B_{kj}", value: [[19, 22], [43, 50]] },
+      { name: "R2", equation: "R2 = A_{ii} (trace)", value: 5 },
+      { name: "R3", equation: "R3 = R1 ÷ R2", inputs: %w[R1 R2], op: "÷" }
+    ]
+  }
+  result = Bada::Penrose::AppFactory.generate(network)
+  File.write(out, result[:html])
+  puts "════ 生成ソースコード (Ruby) ════"
+  puts result[:source]
+  puts ""
+  puts "════ 未知事前予知エンジンによる意味付け ════"
+  result[:meaning].each do |m|
+    puts format("  %-4s Ξ=%.4f  幾何=%s  主理論=%s", m[:name], m[:invariant], m[:geometry], m[:dominant])
+  end
+  puts format("  全体: Ξ=%.4f  幾何=%s  主理論=%s",
+              result[:overall][:invariant], result[:overall][:geometry], result[:overall][:dominant])
+  puts ""
+  puts "生成アプリを書き出しました -> #{out}（ブラウザで開けます・ダウンロード可）"
 when "penrose"
   # Draw -> auto-compute -> answer + paper + source code.
   #   bada penrose <drawing-file> [--values vals.json] [--q "question"]
@@ -119,6 +144,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | studio | html | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | studio | html | appfactory | run | learn | xi | neural | train | version"
   exit 1
 end
