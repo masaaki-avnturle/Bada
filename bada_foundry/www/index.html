@@ -41,6 +41,22 @@ border-left:2px solid transparent;border-radius:0 4px 4px 0;transition:.18s;disp
 #app-name{width:100%;margin-top:7px;background:rgba(4,8,18,.8);border:1px solid var(--border);color:var(--text);
 font:300 11px/1.4 Georgia,serif;padding:7px 9px;outline:none;-webkit-user-select:text;user-select:text}
 #app-name:focus{border-color:var(--accent)}
+/* custom equation input */
+#custom-wrap{flex:0 0 auto;padding:10px 14px 8px;border-bottom:1px solid var(--border)}
+#custom-wrap label{font:300 7.5px/1 Georgia,serif;letter-spacing:.35em;color:var(--text2);text-transform:uppercase}
+#custom-eq{width:100%;margin-top:7px;background:rgba(4,8,18,.8);border:1px solid var(--border);color:var(--text);
+font:300 11px/1.5 Georgia,serif;padding:7px 9px;outline:none;resize:none;height:52px;-webkit-user-select:text;user-select:text}
+#custom-eq:focus{border-color:var(--accent);background:rgba(6,12,28,.9)}
+#custom-eq::placeholder{color:rgba(100,130,200,.3)}
+#add-eq{margin-top:7px;width:100%;font:300 8px/1 Georgia,serif;letter-spacing:.35em;padding:9px;
+border:1px solid var(--accent2);background:rgba(255,140,60,.1);color:rgba(255,185,110,.95);cursor:pointer;
+text-transform:uppercase;transition:.2s;touch-action:manipulation}
+#add-eq:hover{background:rgba(255,140,60,.22)}
+/* toast */
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:9999;pointer-events:none;
+background:rgba(10,18,34,.96);border:1px solid var(--accent);color:rgba(190,220,255,.95);
+font:300 10px/1.4 Georgia,serif;letter-spacing:.05em;padding:10px 16px;border-radius:5px;max-width:80vw;
+box-shadow:0 6px 24px rgba(0,0,0,.5);opacity:0;transition:opacity .3s}
 /* center: network graph + precognition */
 #center{flex:1 1 0;display:flex;flex-direction:column;min-width:0}
 #net-wrap{flex:1 1 60%;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 42%,rgba(15,25,55,.9),var(--bg))}
@@ -97,6 +113,11 @@ background:transparent;color:var(--text2);text-transform:uppercase;cursor:pointe
 <div id="main">
   <div id="left">
     <div class="panel-h">Equation Network</div>
+    <div id="custom-wrap">
+      <label>自分の方程式から生成</label>
+      <textarea id="custom-eq" placeholder="方程式を入力… 例: β(p,q) = Γ(p)Γ(q)/Γ(p+q)" spellcheck="false"></textarea>
+      <button id="add-eq">＋ 方程式を追加してネットワークへ</button>
+    </div>
     <div id="eq-picker"></div>
     <div id="name-wrap">
       <label>App Name (任意)</label>
@@ -324,16 +345,44 @@ footer{padding:14px 20px;font-size:8px;letter-spacing:.25em;color:#4a6ba0;border
 const selected=new Set();
 let currentForge=null;
 
+function escapeHtml(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function toggleItem(idx,el){
+ if(selected.has(idx)){selected.delete(idx);el.classList.remove('on');el.querySelector('.chk').textContent='';}
+ else{selected.add(idx);el.classList.add('on');el.querySelector('.chk').textContent='✓';}
+ drawNetwork();}
+function makeItem(idx,eq,on){
+ const d=document.createElement('div');d.className='eq-item'+(on?' on':'');d.dataset.idx=idx;
+ d.innerHTML='<span class="chk">'+(on?'✓':'')+'</span><span>'+escapeHtml(eq)+'</span>';
+ d.onclick=()=>toggleItem(idx,d);return d;}
 function buildPicker(){
  const el=document.getElementById('eq-picker');let last='';
  EQ_DB.forEach((it,idx)=>{
   if(it.cat!==last){const c=document.createElement('div');c.className='eq-cat';c.textContent=it.cat;el.appendChild(c);last=it.cat;}
-  const d=document.createElement('div');d.className='eq-item';d.dataset.idx=idx;
-  d.innerHTML='<span class="chk"></span><span>'+it.eq+'</span>';
-  d.onclick=()=>{if(selected.has(idx)){selected.delete(idx);d.classList.remove('on');d.querySelector('.chk').textContent='';}
-   else{selected.add(idx);d.classList.add('on');d.querySelector('.chk').textContent='✓';}drawNetwork();};
-  el.appendChild(d);});
+  el.appendChild(makeItem(idx,it.eq,false));});
 }
+// 自作方程式をネットワークへ追加（方程式から生成する機能）
+function addCustomEquation(text){
+ text=String(text).trim();if(!text)return;
+ const idx=EQ_DB.length;
+ EQ_DB.push({cat:'自作 / Custom',eq:text,custom:true});
+ const picker=document.getElementById('eq-picker');
+ let host=document.getElementById('custom-list');
+ if(!host){
+  host=document.createElement('div');host.id='custom-list';
+  const cat=document.createElement('div');cat.className='eq-cat';cat.textContent='自作 / Custom';
+  picker.insertBefore(host,picker.firstChild);
+  picker.insertBefore(cat,host);
+ }
+ host.appendChild(makeItem(idx,text,true));
+ selected.add(idx);
+ drawNetwork();
+ toast('方程式を追加しました（ネットワークに反映）');
+}
+document.getElementById('add-eq').onclick=()=>{
+ const ta=document.getElementById('custom-eq');
+ if(ta.value.trim()){addCustomEquation(ta.value);ta.value='';}
+ else toast('方程式を入力してください');
+};
 
 // ── network graph ──
 const netCanvas=document.getElementById('net-canvas'),nctx=netCanvas.getContext('2d');
@@ -388,14 +437,50 @@ function renderPrecog(spec){
 }
 
 // ── downloads ──
-function download(filename,content,mime){
- const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);
- const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();
- setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},400);}
+function toast(msg){let t=document.getElementById('toast');if(!t){t=document.createElement('div');t.id='toast';document.body.appendChild(t);}
+ t.textContent=msg;t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(()=>{t.style.opacity='0';},2800);}
+function anchorDownload(filename,content,mime){
+ try{
+  const blob=new Blob([content],{type:mime});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;a.rel='noopener';
+  document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},600);
+  toast('保存しました: '+filename);
+ }catch(e){
+  // 最終フォールバック: 新規タブで開いて手動保存
+  const w=window.open();
+  if(w){w.document.open();w.document.write('<pre style="white-space:pre-wrap;word-break:break-word">'+
+    escapeHtml(content)+'</pre>');w.document.title=filename;w.document.close();}
+  toast('新規タブで開きました（手動保存してください）');
+ }}
+// Android/iOS(Capacitor) では blob の <a download> が効かないため、
+// Filesystem に書き出して Share（保存/送信）する。Electron/デスクトップは通常のダウンロード。
+async function download(filename,content,mime){
+ const cap=window.Capacitor;
+ if(cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem){
+  try{
+   const FS=cap.Plugins.Filesystem, SH=cap.Plugins.Share;
+   await FS.writeFile({path:filename,data:content,directory:'CACHE',encoding:'utf8',recursive:true});
+   const uri=await FS.getUri({path:filename,directory:'CACHE'});
+   if(SH && SH.share){
+    await SH.share({title:filename,text:filename,url:uri.uri});
+    toast('保存/共有しました: '+filename);
+   }else{
+    toast('保存しました: '+uri.uri);
+   }
+   return;
+  }catch(e){
+   if((''+e).indexOf('canceled')>=0||(''+e).indexOf('cancel')>=0){return;} // ユーザーが共有をキャンセル
+   toast('端末保存に失敗、通常DLを試行: '+(e&&e.message||e));
+   // フォールスルーして anchor を試す
+  }
+ }
+ anchorDownload(filename,content,mime);
+}
 function safeName(){return (currentForge?currentForge.spec.name:'BadaApp').replace(/[^A-Za-z0-9]+/g,'_');}
-document.getElementById('dl-app').onclick=()=>{if(currentForge)download(safeName()+'.html',currentForge.html,'text/html');};
-document.getElementById('dl-bada').onclick=()=>{if(currentForge)download(safeName()+'.bada',currentForge.bada,'text/plain');};
-document.getElementById('dl-spec').onclick=()=>{if(currentForge)download(safeName()+'.spec.json',JSON.stringify(currentForge.spec,null,2),'application/json');};
+document.getElementById('dl-app').onclick=()=>{if(currentForge)download(safeName()+'.html',currentForge.html,'text/html');else toast('先に Forge してください');};
+document.getElementById('dl-bada').onclick=()=>{if(currentForge)download(safeName()+'.bada',currentForge.bada,'text/plain');else toast('先に Forge してください');};
+document.getElementById('dl-spec').onclick=()=>{if(currentForge)download(safeName()+'.spec.json',JSON.stringify(currentForge.spec,null,2),'application/json');else toast('先に Forge してください');};
 
 // ── tabs ──
 document.querySelectorAll('.tab').forEach(tb=>{tb.onclick=()=>{
