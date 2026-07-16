@@ -17,9 +17,9 @@
 2. 最新リリースの **Assets** から選ぶ
    - `PenroseStudio-Setup-x.y.z.exe` … Windows 用インストーラ
    - `PenroseStudio-x.y.z-portable.exe` … インストール不要のポータブル版
-   - `PenroseStudio-vX.Y.Z.apk` … Android 用（設定で「提供元不明のアプリ」を許可してインストール）
+   - `PenroseStudio-penrose-vX.Y.Z.apk` … Android 用（設定で「提供元不明のアプリ」を許可してインストール）
 
-> リリースは、メンテナが `vX.Y.Z` のタグを push すると GitHub Actions が
+> リリースは、メンテナが `penrose-vX.Y.Z` のタグを push すると GitHub Actions が
 > 自動でビルドして添付します（下記「リリース手順」）。
 
 ## 🚀 リリース手順（メンテナ向け）
@@ -27,8 +27,8 @@
 タグを打つだけで、Windows と Android のビルドが走り Release に添付されます。
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag penrose-v1.0.0
+git push origin penrose-v1.0.0
 ```
 
 - ワークフロー: [`.github/workflows/release.yml`](../.github/workflows/release.yml)

@@ -50,12 +50,12 @@
 |:--|:--|:--|
 | **Windows 10 / 11** | `PenroseStudio-Setup-x.y.z.exe` | インストーラ（Electron） |
 | **Windows（ポータブル）** | `PenroseStudio-x.y.z-portable.exe` | インストール不要 |
-| **Android** | `PenroseStudio-vX.Y.Z.apk` | 「提供元不明のアプリ」を許可してインストール |
+| **Android** | `PenroseStudio-penrose-vX.Y.Z.apk` | 「提供元不明のアプリ」を許可してインストール |
 
 **[→ Releases ページから最新版をダウンロード](../../releases/latest)**
 
 ビルドは GitHub Actions（[`.github/workflows/release.yml`](.github/workflows/release.yml)）が
-自動化しており、`vX.Y.Z` タグを push すると Windows の `.exe` と Android の `.apk` を
+自動化しており、`penrose-vX.Y.Z` タグを push すると Windows の `.exe` と Android の `.apk` を
 ビルドして Release に添付します。詳細・ローカルビルド手順は
 [`penrose_app/README.md`](penrose_app/README.md)。
 
