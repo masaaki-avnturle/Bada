@@ -1,8 +1,12 @@
 package com.yamaguchi.bada
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -61,6 +65,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         foreseeBtn.setOnClickListener { runForesee() }
+
+        findViewById<Button>(R.id.enableKbBtn).setOnClickListener {
+            // Open system IME settings to enable "Bada HHKB", then show the picker.
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
+            (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.showInputMethodPicker()
+        }
 
         refreshStatus()
     }

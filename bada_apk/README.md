@@ -16,18 +16,22 @@ Android アプリ版です。**複数ファイルを一括アップロード**�
 - ♻️ **リバイザ学習ループ** — append-only に証拠をコミットし事前を単調に鋭化。
 - ⚛️ **量子予知** — qubit/H/Measure を位相コア上で実行し `Ω::DATABASE` にコミット。
 - 🏆 **ミレニアム予想分析** — ヤマグチ枠組で 7 つのクレイ予想への事後確率を算出。
+- ⌨ **HHKB 予測キーボード（IME）** — Happy Hacking Keyboard 風のソフトキーボード。
+  英語・日本語の**単語補完＋次単語の先読み**を候補バーに表示（未知事前予知エンジン駆動）。
+  アプリ内の「予測キーボードを有効化」ボタン → システム設定で有効化・切替します。
 
 ## GitHub から APK をダウンロード
 
 GitHub Actions（`.github/workflows/build-apk.yml`）が、GitHub のランナー上で APK を
 自動ビルドし、ダウンロードできるようにします。**2 つの入手方法**があります。
+（同じワークフローが Windows EXE も同時にビルドします → `bada_desktop/README.md`）
 
 ### A. Actions の成果物（Artifact）から — タグ不要・最速
 
 1. GitHub リポジトリの **Actions** タブを開く。
-2. **Build Bada Precog APK** ワークフローの最新の成功した実行（緑チェック）を開く。
-3. ページ下部の **Artifacts** から **`bada-precog-debug-apk`** をダウンロード
-   （`bada-precog-debug.apk` を含む zip）。
+2. **Build Bada Apps (APK + Windows EXE)** ワークフローの最新の成功した実行（緑チェック）を開く。
+3. ページ下部の **Artifacts** から **`bada-precog-hhkb-apk`** をダウンロード
+   （`bada-precog-hhkb.apk` を含む zip）。Windows 版は **`bada-hhkb-windows-exe`**。
 
 `bada_apk/**` への push で自動実行されます。手動実行は Actions タブの
 **Run workflow**（`workflow_dispatch`）からも可能です。
