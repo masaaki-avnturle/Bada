@@ -189,7 +189,9 @@ class Precog(seed: Long? = 42L) {
         sb.appendLine("  エンジン定理: |ψ|²=a 偏差 %.2e · ゼロ保存=%s".format(r.millennium.maxProbDeviation, r.millennium.zerosPreserved))
         sb.appendLine()
         sb.appendLine("Ω::DATABASE へ %d 件記録 · 文法規則 %d 件（@reviser, append-only）".format(db.size, rules.size))
-        return sb.toString().trimEnd()
+        // Seal the output with the quantum-crypto credit protection so authorship
+        // cannot be silently taken (BB84-derived key + HMAC-SHA256).
+        return CreditGuard.stamp(sb.toString().trimEnd())
     }
 
     private fun truncate(s: String, n: Int): String = if (s.length > n) s.substring(0, n) + "…" else s

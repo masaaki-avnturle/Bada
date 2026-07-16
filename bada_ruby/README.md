@@ -126,6 +126,23 @@ BSD）を単一枠組 `Y = (M_glob, ζ, β, Γ, J, T, H_Δ)` の 7 つの顔と�
 `Bada::Millennium.analyze` は関連スコアを logits としてエンジンに通し、各予想への
 **事後確率**・**解決スケッチ**・**定理検証**を返します。
 
+### ⑤ 量子暗号クレジット保護 — `Bada::CreditGuard`
+
+クレジット（著者性・来歴）を**改ざん検知可能に封印**します。**BB84 量子鍵配送**を位相コア
+（`Bada::Quantum`）上で実行して鍵を導出し、著者証明書＋コンテンツハッシュを **HMAC-SHA256**
+で署名した「量子暗号シール」を全出力（`Bada::Precog#ask`）に刻印します。`verify` で改ざんを検知。
+秘密シード `NOEMA_CREDIT_SEED` を注入すれば第三者はシールを偽造できません。
+
+```bash
+bin/bada credit    # 証明書・BB84 統計(QBER)・鍵指紋・検証結果を表示
+```
+
+```ruby
+seal = Bada::CreditGuard.seal("私の生成文")
+Bada::CreditGuard.verify("私の生成文", seal)   # => true（改ざんで false）
+Bada::CreditGuard.fingerprint                   # 著者鍵指紋
+```
+
 ---
 
 ## インストール / 実行

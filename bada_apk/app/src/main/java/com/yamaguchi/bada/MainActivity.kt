@@ -72,6 +72,10 @@ class MainActivity : AppCompatActivity() {
             (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.showInputMethodPicker()
         }
 
+        // Quantum-crypto credit protection badge (BB84 + HMAC-SHA256).
+        findViewById<TextView>(R.id.creditLabel).text =
+            "${com.yamaguchi.bada.engine.CreditGuard.badge()}\n${com.yamaguchi.bada.engine.CreditGuard.notice()}"
+
         refreshStatus()
     }
 

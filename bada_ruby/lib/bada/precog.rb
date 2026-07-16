@@ -11,6 +11,7 @@ require_relative "quantum"
 require_relative "reviser"
 require_relative "millennium"
 require_relative "info_engine"
+require_relative "credit_guard"
 
 module Bada
   # Precog — 未知事前予知エンジン (the Unknown-Prior Precognition Engine).
@@ -139,7 +140,9 @@ module Bada
       out << ""
       out << format("Ω::DATABASE へ %d 件記録 · 文法規則 %d 件（@reviser, append-only）",
                     @db.size, @rules.size)
-      out.join("\n")
+      # Seal with quantum-crypto credit protection (BB84 + HMAC-SHA256) so
+      # authorship cannot be silently taken.
+      CreditGuard.stamp(out.join("\n"))
     end
 
     # Interactive REPL.
