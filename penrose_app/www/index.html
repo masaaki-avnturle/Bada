@@ -592,13 +592,34 @@ function buildGenApp(anns, src){
     '<scr'+'ipt>'+src+'</scr'+'ipt></body></html>';
 }
 
-function downloadApp(){
+// Cross-platform save of the generated app: works in a browser, in the
+// Electron .exe (via a save dialog handled in main.js), AND in the
+// Android .apk (Capacitor Filesystem + Share — a WebView cannot save a
+// blob download by itself, which is why it failed in the packaged app).
+async function downloadApp(){
   if(!genAppHtml){ setHint('先に「🧠 アプリを生成」を押してください。'); return; }
+  const fname='bada_generated_app.html';
+  const cap=window.Capacitor;
+  if(cap && cap.isNativePlatform && cap.isNativePlatform()){
+    try{
+      const Filesystem=cap.Plugins && cap.Plugins.Filesystem;
+      if(!Filesystem) throw new Error('Filesystem プラグイン未検出');
+      const res=await Filesystem.writeFile({ path:fname, data:genAppHtml, directory:'DOCUMENTS', encoding:'utf8', recursive:true });
+      const uri=(res && res.uri) || fname;
+      setHint('生成アプリを保存しました: '+uri);
+      if(cap.Plugins && cap.Plugins.Share){
+        try{ await cap.Plugins.Share.share({ title:'Bada 生成アプリ', text:'方程式ネットワークから生成したアプリ', url:uri }); }catch(e){}
+      }
+    }catch(e){ setHint('保存に失敗しました: '+e.message); }
+    return;
+  }
+  // browser + Electron (.exe): anchor download of a Blob
   const blob=new Blob([genAppHtml],{type:'text/html'});
   const url=URL.createObjectURL(blob);
-  const a=document.createElement('a'); a.href=url; a.download='bada_generated_app.html';
-  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  setHint('生成アプリをダウンロードしました（bada_generated_app.html）。');
+  const a=document.createElement('a'); a.href=url; a.download=fname;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+  setHint('生成アプリをダウンロードしました（'+fname+'）。');
 }
 
 function update(){ render(); renderProps(); combine(); }

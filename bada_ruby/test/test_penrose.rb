@@ -313,6 +313,15 @@ class TestPenroseWebApp < Minitest::Test
     # the generated app must not prematurely close the outer page script
     refute_includes html, "<script>${src}</script>"
   end
+
+  def test_generated_app_download_works_in_packaged_apps
+    html = WebApp.render
+    # Android WebView / Electron cannot save a plain blob download, so the code
+    # must branch: Capacitor Filesystem on native, blob anchor on browser/Electron.
+    assert_match(/isNativePlatform/, html)
+    assert_match(/Filesystem/, html)
+    assert_match(/Blob/, html)                        # browser/Electron fallback kept
+  end
 end
 
 # ---- AppFactory (アプリを作るアプリ — meta-application) ----------------

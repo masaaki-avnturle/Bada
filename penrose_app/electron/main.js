@@ -1,8 +1,29 @@
 // Electron main process for the Penrose 絵記号 studio (Windows 10/11 .exe).
 // Loads the self-contained studio (www/index.html) into a native window.
 // No network is used — the app works fully offline.
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, session, dialog } = require('electron');
 const path = require('path');
+
+// Make in-app downloads (the generated app from the equation network) prompt a
+// Save As dialog and actually write the file. Without this, an anchor/blob
+// download inside the window would not save anywhere in the packaged .exe.
+function enableDownloads() {
+  session.defaultSession.on('will-download', (event, item) => {
+    const savePath = dialog.showSaveDialogSync({
+      title: '生成アプリを保存',
+      defaultPath: item.getFilename() || 'bada_generated_app.html',
+      filters: [{ name: 'HTML', extensions: ['html'] }]
+    });
+    if (savePath) {
+      item.setSavePath(savePath);
+      item.once('done', (_e, state) => {
+        if (state === 'completed') shell.showItemInFolder(savePath);
+      });
+    } else {
+      item.cancel();
+    }
+  });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -57,6 +78,7 @@ function buildMenu() {
 
 app.whenReady().then(() => {
   buildMenu();
+  enableDownloads();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
