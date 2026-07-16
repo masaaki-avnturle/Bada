@@ -284,6 +284,24 @@ class TestPenroseWebApp < Minitest::Test
     assert_includes html, "function mkNode"
     assert_match(/loadPreset/, html)
   end
+
+  def test_has_freehand_drawing_mode
+    html = WebApp.render
+    assert_includes html, "手描き"                 # freehand toggle
+    assert_match(/function togglePen/, html)
+    assert_match(/penStroke/, html)               # ink stroke capture
+    assert_match(/polyline/, html)                # ink rendered as polylines
+  end
+
+  def test_has_arithmetic_add_sub_mul_div
+    html = WebApp.render
+    assert_includes html, "加減乗除"
+    # the four operators must be offered
+    ["＋", "−", "×", "÷"].each { |op| assert_includes html, op }
+    # elementwise op with scalar broadcast + register save
+    assert_match(/function ew\(/, html)
+    assert_match(/saveReg|registers/, html)
+  end
 end
 
 # ---- GlyphSVG (faithful Penrose picture-symbols) ---------------------
