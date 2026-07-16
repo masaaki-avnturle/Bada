@@ -140,9 +140,53 @@
   footer{ border-top:1px solid var(--line); text-align:center; color:var(--dim);
     padding:2rem 1rem; font-size:.85rem; }
   .mono{ font-family:ui-monospace,Menlo,monospace; }
+
+  /* ── 起動スプラッシュ画面（"フラッシュ"＝閃光演出） ── */
+  #splash{ position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; background:#04060a; color:#e8eefc;
+    transition:opacity .8s ease, visibility .8s; }
+  #splash.gone{ opacity:0; visibility:hidden; pointer-events:none; }
+  #splash canvas{ position:absolute; inset:0; width:100%; height:100%; }
+  .splash-core{ position:relative; z-index:2; text-align:center; }
+  .splash-mark{ font-size:clamp(3rem,12vw,7rem); font-weight:800; letter-spacing:.06em;
+    background:linear-gradient(100deg,var(--gold),var(--cyan),var(--violet));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    opacity:0; transform:scale(.86); animation:splashIn 1s .15s cubic-bezier(.2,.9,.2,1) forwards; }
+  .splash-sub{ color:#93a4c4; letter-spacing:.35em; text-transform:uppercase;
+    font-size:.8rem; margin-top:.6rem; opacity:0; animation:splashIn .8s .55s forwards; }
+  .splash-bar{ width:min(240px,60vw); height:3px; margin:1.4rem auto 0; border-radius:3px;
+    background:rgba(255,255,255,.08); overflow:hidden; opacity:0; animation:splashIn .5s .5s forwards; }
+  .splash-bar i{ display:block; height:100%; width:0;
+    background:linear-gradient(90deg,var(--gold),var(--cyan),var(--violet));
+    animation:load 1.7s .5s ease-out forwards; }
+  .splash-skip{ position:absolute; bottom:1.6rem; left:0; right:0; text-align:center;
+    color:#5b6c8c; font-size:.75rem; letter-spacing:.1em; }
+  /* 画面全体を白く飛ばす閃光レイヤー */
+  #flash{ position:fixed; inset:0; z-index:9998; background:#fff; opacity:0;
+    pointer-events:none; mix-blend-mode:screen; }
+  #flash.burst{ animation:flashBurst .55s ease-out; }
+  @keyframes splashIn{ to{ opacity:1; transform:none; } }
+  @keyframes load{ to{ width:100%; } }
+  @keyframes flashBurst{ 0%{ opacity:0; } 12%{ opacity:.9; } 100%{ opacity:0; } }
+  @media (prefers-reduced-motion: reduce){
+    .splash-mark,.splash-sub,.splash-bar,.splash-bar i{ animation:none; opacity:1; }
+    #flash{ display:none; }
+  }
 </style>
 </head>
 <body>
+
+<!-- ═══════════ 起動スプラッシュ画面（"フラッシュ"＝閃光） ═══════════ -->
+<div id="splash" onclick="dismissSplash()">
+  <canvas id="splashfx"></canvas>
+  <div class="splash-core">
+    <div class="splash-mark">◈ BADA</div>
+    <div class="splash-sub">Applications Hub</div>
+    <div class="splash-bar"><i></i></div>
+  </div>
+  <div class="splash-skip">クリックでスキップ / click to skip</div>
+</div>
+<div id="flash"></div>
 
 <!-- ═══════════ ヒーロー（アニメーション "フラッシュ" 演出） ═══════════ -->
 <header class="hero">
@@ -242,8 +286,61 @@
   window.addEventListener("resize", resize); resize(); tick();
 })();
 
+/* ─────────── 起動スプラッシュ画面（閃光バースト） ─────────── */
+(function(){
+  var c=document.getElementById("splashfx");
+  if(!c) return;
+  var x=c.getContext("2d"), DPR=Math.min(window.devicePixelRatio||1,2), w,h,rays=[],t0=0;
+  var COLORS=["#c8a44a","#40b8c0","#9060d0","#4a80d0","#e8eefc"];
+  function size(){ w=c.clientWidth; h=c.clientHeight; c.width=w*DPR; c.height=h*DPR; x.setTransform(DPR,0,0,DPR,0,0); }
+  size();
+  for(var i=0;i<120;i++){ var a=Math.random()*6.283;
+    rays.push({a:a, s:Math.random()*.7+.3, len:Math.random()*.5+.2, c:COLORS[i%COLORS.length]}); }
+  function frame(ts){
+    if(!t0) t0=ts; var p=Math.min((ts-t0)/1700,1); // 0→1
+    x.clearRect(0,0,w,h); x.save(); x.translate(w/2,h/2);
+    // 中心から放射する閃光の筋
+    for(var i=0;i<rays.length;i++){ var r=rays[i];
+      var reach=Math.max(w,h)*r.len*p*1.6, x2=Math.cos(r.a)*reach, y2=Math.sin(r.a)*reach;
+      x.globalAlpha=(1-p)*.8*r.s; x.strokeStyle=r.c; x.lineWidth=1.4;
+      x.beginPath(); x.moveTo(0,0); x.lineTo(x2,y2); x.stroke();
+    }
+    // 中心の光球
+    var gr=x.createRadialGradient(0,0,0,0,0,120*(1+p));
+    gr.addColorStop(0,"rgba(255,255,255,"+(.9*(1-p*.6))+")");
+    gr.addColorStop(1,"rgba(200,164,74,0)");
+    x.globalAlpha=1; x.fillStyle=gr; x.beginPath(); x.arc(0,0,120*(1+p),0,6.283); x.fill();
+    x.restore();
+    if(p<1 && !splashDone) requestAnimationFrame(frame);
+  }
+  window.addEventListener("resize", size);
+  requestAnimationFrame(frame);
+})();
+
+var splashDone=false;
+function dismissSplash(){
+  if(splashDone) return; splashDone=true;
+  triggerFlash();
+  var s=document.getElementById("splash");
+  if(s) s.classList.add("gone");
+}
+/* 自動で消える（アニメーション完了後） */
+if(matchMedia("(prefers-reduced-motion: reduce)").matches){
+  addEventListener("load", function(){ setTimeout(dismissSplash, 400); });
+}else{
+  addEventListener("load", function(){ setTimeout(dismissSplash, 2200); });
+}
+
+/* ─────────── 画面フラッシュ（閃光トランジション） ─────────── */
+function triggerFlash(){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  var f=document.getElementById("flash"); if(!f) return;
+  f.classList.remove("burst"); void f.offsetWidth; f.classList.add("burst");
+}
+
 /* ─────────── タブ切り替え ─────────── */
 function showTab(t){
+  triggerFlash();
   document.querySelectorAll(".panel").forEach(function(p){ p.classList.toggle("active", p.id===t); });
   document.querySelectorAll(".tab").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===t); });
   if(t==="md" && !document.getElementById("mdsrc").value){ loadMd(); }
