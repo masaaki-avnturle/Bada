@@ -48,6 +48,7 @@ module Bada
               </div>
               <svg id="canvas" viewBox="0 0 900 560" preserveAspectRatio="xMidYMid meet"></svg>
               <div class="row">
+                <button id="gen" class="primary">▶ 方程式を生成 (Generator)</button>
                 <button id="btnFree">選択した脚を自由添字に</button>
                 <button id="btnDelete">選択ノードを削除</button>
                 <button id="btnClearSel">選択解除</button>
@@ -58,11 +59,16 @@ module Bada
             </section>
 
             <section class="pane output">
-              <h2>清書した方程式</h2>
+              <h2>① 描画 → 方程式（Generator 出力）</h2>
+              <div class="sub">清書した方程式</div>
               <div id="fair" class="equation">—</div>
-              <h2>組み合わせによる計算した方程式</h2>
+              <div class="sub">組み合わせによる計算した方程式</div>
               <div id="numeric" class="equation">—</div>
               <div id="notes" class="notes"></div>
+
+              <h2 style="margin-top:16px">② 規定の方程式を選ぶ → 絵記号を生成</h2>
+              <p class="hint">既定の方程式を選ぶと、その組み合わせに対応するペンローズの絵記号がキャンバスに描かれます。</p>
+              <div id="presets"></div>
             </section>
           </main>
 
@@ -130,9 +136,15 @@ module Bada
           #props .grid{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:12px}
           #props label{color:#9fb0c3}
           input{background:#0f1420;border:1px solid var(--edge);color:var(--ink);border-radius:6px;padding:5px 7px;font-size:12px;width:100%}
-          .equation{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:15px;font-size:18px;min-height:26px;overflow-x:auto;font-family:"Times New Roman",Georgia,serif}
+          .sub{font-size:11px;color:#9fb0c3;margin:8px 0 4px}
+          .equation{background:#0f1420;border:1px solid var(--edge);border-radius:8px;padding:15px;font-size:18px;min-height:26px;overflow-x:auto;font-family:"Times New Roman",Georgia,serif;transition:box-shadow .1s,border-color .1s}
+          .equation.flash{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold) inset}
           .equation .op{color:var(--cyan)} .equation sub{font-size:.7em;color:var(--gold)} .equation .sum{color:var(--blue);font-weight:600}
           .notes{margin-top:10px;font-size:12px;color:#c8a44a}
+          #presets{display:flex;flex-direction:column;gap:5px}
+          .preset{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 10px;background:#0f1420;border:1px solid var(--edge);border-radius:8px;cursor:pointer;transition:.12s}
+          .preset:hover{border-color:var(--gold);transform:translateX(2px)}
+          .preset .pn{font-size:12px} .preset .pe{font-size:12px;color:var(--gold);font-family:"Times New Roman",Georgia,serif}
           footer{padding:12px 22px;border-top:1px solid var(--edge);color:#6c7a8d;font-size:11px;text-align:center}
         CSS
       end
@@ -428,6 +440,79 @@ module Bada
 
           function update(){ render(); renderProps(); combine(); }
 
+          function flash(id){ const e=$(id); e.classList.add('flash'); setTimeout(()=>e.classList.remove('flash'),160); }
+          function generate(){ combine(); flash('fair'); flash('numeric'); setHint('描いた絵記号から方程式を生成しました。'); }
+
+          // ================= ② 規定の方程式 → 絵記号を生成 =================
+          // Each preset is a known equation; selecting it draws the corresponding
+          // Penrose picture-symbols (nodes/wires/frees/decorators) on the canvas.
+          function mkNode(name,up,down,x,y,val,shape){
+            return {id:uid++,key:'tensor',name,up,down,shape:shape||'box',x,y,val:val||null};
+          }
+          const PRESETS=[
+            {name:'行列積', eq:'R^i_j = A^i_k B^k_j', build(){
+              const A=mkNode('A',1,1,150,110,[[1,2],[3,4]]);
+              const B=mkNode('B',1,1,150,330,[[5,6],[7,8]]);
+              nodes=[A,B];
+              wires=[{a:{id:A.id,side:'down',i:0},b:{id:B.id,side:'up',i:0}}];
+              frees=[{id:A.id,side:'up',i:0,label:'i'},{id:B.id,side:'down',i:0,label:'j'}];
+            }},
+            {name:'トレース', eq:'R = A^i_i', build(){
+              const A=mkNode('A',1,1,380,210,[[1,2],[3,4]]);
+              nodes=[A]; wires=[{a:{id:A.id,side:'up',i:0},b:{id:A.id,side:'down',i:0}}]; frees=[];
+            }},
+            {name:'内積', eq:'R = v_i w^i', build(){
+              const v=mkNode('v',0,1,230,140,[3,4]); const w=mkNode('w',1,0,230,340,[3,4]);
+              nodes=[v,w]; wires=[{a:{id:v.id,side:'down',i:0},b:{id:w.id,side:'up',i:0}}]; frees=[];
+            }},
+            {name:'外積 (テンソル積)', eq:'R_{ij} = v_i w_j', build(){
+              const v=mkNode('v',0,1,150,210,[1,2]); const w=mkNode('w',0,1,430,210,[3,4]);
+              nodes=[v,w]; wires=[];
+              frees=[{id:v.id,side:'down',i:0,label:'i'},{id:w.id,side:'down',i:0,label:'j'}];
+            }},
+            {name:'添字を上げる', eq:'v^i = g^{ij} v_j', build(){
+              const g=mkNode('g',2,0,180,140,[[1,0],[0,1]]); const v=mkNode('v',0,1,210,350,[3,4]);
+              nodes=[g,v]; wires=[{a:{id:g.id,side:'up',i:1},b:{id:v.id,side:'down',i:0}}];
+              frees=[{id:g.id,side:'up',i:0,label:'i'}];
+            }},
+            {name:'恒等 (クロネッカーδ)', eq:'R^i_j = δ^i_j', build(){
+              const d=mkNode('δ',1,1,380,210,[[1,0],[0,1]]); nodes=[d];
+              frees=[{id:d.id,side:'up',i:0,label:'i'},{id:d.id,side:'down',i:0,label:'j'}];
+            }},
+            {name:'共変微分', eq:'∇_a T^b', build(){
+              const T=mkNode('T',1,0,380,240,null); nodes=[T];
+              frees=[{id:T.id,side:'up',i:0,label:'b'}]; decos=[{type:'nabla',target:T.id,label:'a'}];
+            }},
+            {name:'外積 (レヴィ・チヴィタ)', eq:'w_i = ε_{ijk} u^j v^k', build(){
+              const e=mkNode('ε',0,3,320,110,null,'tri');
+              const u=mkNode('u',1,0,180,360,null); const v=mkNode('v',1,0,430,360,null);
+              nodes=[e,u,v];
+              wires=[{a:{id:e.id,side:'down',i:1},b:{id:u.id,side:'up',i:0}},
+                     {a:{id:e.id,side:'down',i:2},b:{id:v.id,side:'up',i:0}}];
+              frees=[{id:e.id,side:'down',i:0,label:'i'}];
+            }},
+            {name:'積分', eq:'R = ∫ T_μ dμ', build(){
+              const T=mkNode('T',0,1,380,210,null); nodes=[T];
+              frees=[{id:T.id,side:'down',i:0,label:'μ'}]; decos=[{type:'integral',label:'μ'}];
+            }}
+          ];
+          function buildPresets(){
+            const box=$('presets');
+            PRESETS.forEach((p,idx)=>{
+              const el=document.createElement('div'); el.className='preset';
+              el.innerHTML=`<span class="pn">${p.name}</span><span class="pe">${p.eq}</span>`;
+              el.onclick=()=>loadPreset(idx);
+              box.appendChild(el);
+            });
+          }
+          function loadPreset(idx){
+            nodes=[];wires=[];frees=[];decos=[];uid=1;sel=null;selNode=null;
+            document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active'));
+            PRESETS[idx].build();
+            setHint(`「${PRESETS[idx].name}」の方程式 ${PRESETS[idx].eq} に対応する絵記号を生成しました。`);
+            update(); flash('fair');
+          }
+
           // ================= samples / controls =================
           function resetAll(){ nodes=[];wires=[];frees=[];decos=[];uid=1;sel=null;selNode=null;
             document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active'));
@@ -446,6 +531,8 @@ module Bada
 
           // ================= boot =================
           buildPalette();
+          buildPresets();
+          $('gen').onclick=generate;
           $('btnFree').onclick=makeFree;
           $('btnDelete').onclick=deleteNode;
           $('btnClearSel').onclick=()=>{ sel=null; selNode=null; document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active')); update(); };

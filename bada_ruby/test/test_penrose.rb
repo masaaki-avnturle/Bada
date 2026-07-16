@@ -264,6 +264,26 @@ class TestPenroseWebApp < Minitest::Test
     assert_includes html, "行列 (matrix"
     assert_includes html, "積分"
   end
+
+  def test_has_generator_button_and_drawing_canvas
+    html = WebApp.render
+    assert_includes html, "Generator"           # 描画→方程式 の生成ボタン
+    assert_includes html, "id=\"canvas\""         # 描くキャンバス
+    assert_includes html, "id=\"palette\""        # 絵記号を選ぶパレット
+    assert_match(/clickLeg|makeFree/, html)       # 脚を結線/自由添字にする対話
+  end
+
+  def test_has_preset_equations_that_build_diagrams
+    html = WebApp.render
+    # ② 規定の方程式 → 絵記号 の逆方向
+    assert_includes html, "const PRESETS"
+    assert_includes html, "規定の方程式を選ぶ"
+    # a few known equations must be offered
+    ["行列積", "トレース", "内積", "共変微分", "積分"].each { |eq| assert_includes html, eq }
+    # each preset builds picture-symbols (nodes) via mkNode
+    assert_includes html, "function mkNode"
+    assert_match(/loadPreset/, html)
+  end
 end
 
 # ---- GlyphSVG (faithful Penrose picture-symbols) ---------------------
