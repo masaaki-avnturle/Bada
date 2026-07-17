@@ -89,6 +89,25 @@ body{background:#05070e;color:var(--txt);font-family:-apple-system,'Hiragino Kak
 .nurl input{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(180,210,255,.2);border-radius:8px;
  color:#dff0ff;font-size:9.5px;padding:5px 7px;min-width:0;outline:none}
 .nnote{font-size:7.5px;color:rgba(150,175,215,.6);margin-top:5px;line-height:1.4}
+/* トランスポート（早送り/巻き戻し/シーク/速度）— Bada 言語で駆動 */
+.ntime{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:9px;color:var(--txt2);font-variant-numeric:tabular-nums}
+.nseek{flex:1;accent-color:#8fd0ff;height:4px;min-width:0}
+.ntrans{display:flex;gap:7px;margin-top:8px;align-items:center;justify-content:center}
+.tb{width:34px;height:34px;border-radius:50%;background:rgba(30,42,70,.6);border:1px solid rgba(180,210,255,.2);
+ color:#dfeaff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;position:relative}
+.tb:hover{background:rgba(50,84,150,.6)}
+.tb.play{width:42px;height:42px;font-size:15px;background:rgba(143,208,255,.22);border-color:rgba(143,208,255,.5)}
+.tb small{position:absolute;bottom:-2px;font-size:6px;opacity:.8}
+.tb:disabled{opacity:.3;cursor:not-allowed}
+.trate{font-size:9px;padding:5px 8px;border-radius:8px;background:rgba(30,42,70,.6);border:1px solid rgba(180,210,255,.2);color:#dfeaff;cursor:pointer;flex:0 0 auto}
+.nplay-ov{position:absolute;inset:0;z-index:4;display:none;align-items:center;justify-content:center;cursor:pointer;background:rgba(3,6,14,.28)}
+.nplay-ov.show{display:flex}
+.nplay-ov .big{width:54px;height:54px;border-radius:50%;background:rgba(143,208,255,.92);color:#05203a;font-size:22px;
+ display:flex;align-items:center;justify-content:center;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+.bconsole{margin-top:7px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:7.5px;line-height:1.55;color:rgba(150,200,255,.75);
+ background:rgba(0,0,0,.3);border:1px solid rgba(120,170,255,.16);border-radius:8px;padding:6px 8px;max-height:46px;overflow:auto;white-space:pre-wrap}
+.bconsole b{color:#8fd0ff;letter-spacing:.1em}
+.win.newswin .wb{overflow-y:auto}
 
 /* 上部ステータス */
 #status{position:fixed;top:16px;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
@@ -151,6 +170,27 @@ body{background:#05070e;color:var(--txt);font-family:-apple-system,'Hiragino Kak
 <div id="toast"></div>
 <div id="note">※ Apple Vision Pro / visionOS の空間UIを参考にしたオリジナルデザインです（Apple のロゴ・商標・製品名は不使用、Apple とは無関係）。</div>
 
+<!-- 実写プレーヤーのトランスポート制御プログラム（Bada 言語）。内蔵インタプリタが実行する。 -->
+<script type="application/x-bada" id="bada-src">
+# player.bada — Bada 言語で書いた実写動画プレーヤーの制御プログラム
+# bada_ruby の Interpreter と同じ演算子・名前空間文法。
+set fwd    = 10
+set back   = -10
+set rate   = 1.0
+set cursor = 0
+
+# 実行証跡：進行位置に大域的部分積分多様体の不変量を効かせる
+cursor <- "global manifold transport"
+cursor -< 1.0
+cursor >- cursor
+Omega::push cursor as transport_node
+print cursor
+
+# トランスポート命令（各ボタンのタップで1行ずつ実行される）
+#   ▶ Media::play   ⏸ Media::pause   ⏩ Media::seek fwd   ⏪ Media::seek back
+#   ⏭ Media::channel next   ⏮ Media::channel prev   速度 Media::rate rate
+</script>
+
 <script>
 // ═══════════════════════════════════════════════════════════════
 // 環境（空間の背景）
@@ -201,7 +241,7 @@ const WINDOWS=[
  {id:'photo',  title:'写真',      w:300,h:200, dx:-0.26,dy:0.20, depth:0.8, open:true},
  {id:'browser',title:'ブラウザ',   w:320,h:220, dx:0.28, dy:0.22, depth:0.5, open:true},
  {id:'weather',title:'天気',      w:250,h:180, dx:-0.04,dy:-0.28, depth:1.2, open:true},
- {id:'news',   title:'ニュース LIVE',w:372,h:308, dx:0.04, dy:0.03, depth:0.7, open:true},
+ {id:'news',   title:'実写プレーヤー',w:388,h:454, dx:0.05, dy:0.0, depth:0.7, open:true},
  {id:'object', title:'3D オブジェクト',w:230,h:200, dx:-0.34,dy:0.30, depth:1.4, open:false}
 ];
 const APPS=[
@@ -212,7 +252,7 @@ const APPS=[
 const byId={};
 function buildWindows(){
  WINDOWS.forEach(w=>{
-  const el=document.createElement('div');el.className='win';el.style.width=w.w+'px';el.style.height=w.h+'px';
+  const el=document.createElement('div');el.className='win'+(w.id==='news'?' newswin':'');el.style.width=w.w+'px';el.style.height=w.h+'px';
   el.innerHTML='<div class="close">✕</div><div class="wb" id="wb-'+w.id+'"></div><div class="grab"></div>';
   space.appendChild(el);w.el=el;byId[w.id]=w;
   el.querySelector('.close').onclick=(e)=>{e.stopPropagation();w.open=false;el.style.display='none';if(w.id==='news')nCleanup();};
@@ -237,16 +277,28 @@ function renderContent(w){
  else if(w.id==='browser'){b.innerHTML='<div class="wtitle">ブラウザ</div><div class="badr"><span class="dot"></span>bada.space/spatial</div>'+
    '<div class="bpage"><h3>空間コンピューティングへようこそ</h3><div class="bline" style="width:96%"></div><div class="bline" style="width:88%"></div><div class="bline" style="width:92%"></div><div class="bline" style="width:70%"></div></div>';}
  else if(w.id==='weather'){b.innerHTML='<div class="wtitle">天気 · 東京</div><div class="wtemp">22°</div><div class="wcond">晴れ時々くもり</div><div class="whrs" id="whrs"></div>';}
- else if(w.id==='news'){b.innerHTML='<div class="wtitle">ニュース · インターネットTV</div>'+
-   '<div class="nv"><div class="nlive"><span class="d"></span>LIVE</div>'+
+ else if(w.id==='news'){b.innerHTML='<div class="wtitle">実写プレーヤー · Bada 言語駆動</div>'+
+   '<div class="nv"><div class="nlive" id="nlive"><span class="d"></span>LIVE</div>'+
      '<video id="nplayer" playsinline muted></video>'+
      '<div class="nlower" id="nlower">—</div>'+
+     '<div class="nplay-ov" id="nplay-ov"><div class="big">▶</div></div>'+
      '<div class="nstat show" id="nstat"><div><div class="spin"></div><span id="nstat-msg">接続中…</span></div></div>'+
+   '</div>'+
+   '<div class="ntime"><span id="ncur">0:00</span>'+
+     '<input class="nseek" id="nseek" type="range" min="0" max="1000" value="0"><span id="ndur">--:--</span></div>'+
+   '<div class="ntrans">'+
+     '<div class="tb" id="t-prev" title="前のチャンネル">⏮</div>'+
+     '<div class="tb" id="t-rw" title="巻き戻し">⏪<small>10</small></div>'+
+     '<div class="tb play" id="t-play" title="再生/一時停止">▶</div>'+
+     '<div class="tb" id="t-ff" title="早送り">⏩<small>10</small></div>'+
+     '<div class="tb" id="t-next" title="次のチャンネル">⏭</div>'+
+     '<div class="trate" id="t-rate" title="再生速度">1.0×</div>'+
    '</div>'+
    '<div class="nctl" id="nch-list"></div>'+
    '<div class="nctl"><div class="nbtn" id="naudio">🔇 ミュート</div><div class="nbtn" id="nfull">⛶ 全画面</div></div>'+
-   '<div class="nurl"><input id="ncust" placeholder="正規の配信URL（HLS .m3u8 / MP4）" spellcheck="false"><div class="nbtn" id="nadd">追加</div></div>'+
-   '<div class="nnote">各局公式・無料のライブ配信。フジ/NHK 国内の速報配信は権利上未収録（権利があれば「追加」から）。視聴には接続が必要です。</div>';}
+   '<div class="nurl"><input id="ncust" placeholder="実写動画/配信URL（MP4 / HLS .m3u8）" spellcheck="false"><div class="nbtn" id="nadd">追加</div></div>'+
+   '<div class="bconsole" id="bconsole"><b>BADA ▸</b> player.bada 実行待ち…</div>'+
+   '<div class="nnote">実写のパブリックドメイン動画は早送り/巻き戻し（シーク）可。ライブ配信はシーク不可。各局のライブは公式・無料配信。フジ/NHK 国内速報は権利上未収録（権利があれば「追加」から）。</div>';}
  else if(w.id==='object'){b.innerHTML='<div class="wtitle">3D オブジェクト</div><canvas class="obj" id="obj"></canvas>';}
  if(w.id==='music')initMusic();
  if(w.id==='photo')initPhoto();
@@ -308,8 +360,57 @@ addEventListener('pointermove',e=>{
 addEventListener('pointerup',()=>{drag=null;});
 
 // ═══════════════════════════════════════════════════════════════
-// 実物のインターネットTVニュース動画（各局公式・無料のライブ配信）
+// 実写プレーヤー — トランスポートを「Bada 言語」で駆動
+//   ・実写のパブリックドメイン動画（シーク可＝早送り/巻き戻し）＋各局ライブ
+//   ・内蔵 Bada インタプリタ（bada_ruby と同じ演算子/名前空間文法）が
+//     player.bada を実行し、Media:: 命令で <video> を制御する
 // ═══════════════════════════════════════════════════════════════
+
+// ── Bada 数理（language.rb の Special/Manifold を JS に移植）──
+function bXLogX(x){return x<=0?0:x*Math.log(x);}
+function bManifoldElement(x){const d=bXLogX(x);const dd=d*d;return dd>1e-12?1/dd:0;}
+function bXi(str){ // 文字列の大域的部分積分多様体不変量（シャノン基準）
+ const toks=String(str).match(/[A-Za-z0-9_]+|[぀-ヿ㐀-鿿]/g)||['_'];
+ const f={};toks.forEach(t=>f[t]=(f[t]||0)+1);const n=toks.length;let H=0;
+ Object.values(f).forEach(c=>{const p=c/n;H-=p*Math.log2(p);});
+ return H/Math.log(n+1)+bManifoldElement(n+2);
+}
+// ── BadaNode：<- / -< / >- 演算子 ──
+function BadaNode(v){this.value=v||0;this.history=[];}
+BadaNode.prototype.coerce=function(v){return typeof v==='number'?v:(v instanceof BadaNode?v.value:bXi(v));};
+BadaNode.prototype.leftAct=function(inp){const chi=this.coerce(inp);const x=(Math.abs(this.value)<1e-9?1:Math.abs(this.value))+1;
+ this.value=Math.abs(Math.PI*chi*Math.log(x));this.history.push(['<-',inp]);return this;};
+BadaNode.prototype.manifoldIntegral=function(s){const v=s==null?this.value:this.coerce(s);const x=Math.abs(v)+2;
+ this.value=bXLogX(x)*bManifoldElement(x)+bManifoldElement(x);this.history.push(['-<',s]);return this;};
+BadaNode.prototype.rightAct=function(o){const v=o==null?this.value:this.coerce(o);const x=Math.abs(v)+1e-6;
+ this.value=Math.exp(-bXLogX(x));this.history.push(['>-',o]);return this;};
+
+// ── Bada インタプリタ（set / <- / -< / >- / Omega::push / print / Media::）──
+function BadaInterp(onMedia){this.env={};this.out=[];this.onMedia=onMedia;}
+BadaInterp.prototype.evalExpr=function(s){s=s.trim();let m;
+ if((m=s.match(/^"(.*)"$/)))return m[1];
+ if(/^[-+]?\d+(?:\.\d+)?$/.test(s))return parseFloat(s);
+ if(this.env.hasOwnProperty(s))return this.env[s];
+ return s;};
+BadaInterp.prototype.valOf=function(x){return x instanceof BadaNode?x.value:x;};
+BadaInterp.prototype.nodef=function(n){if(!(this.env[n] instanceof BadaNode))this.env[n]=new BadaNode(typeof this.env[n]==='number'?this.env[n]:0);return this.env[n];};
+BadaInterp.prototype.exec=function(line){let m;
+ if((m=line.match(/^set\s+(\w+)\s*=\s*(.+)$/))){const v=this.evalExpr(m[2]);this.env[m[1]]=(typeof v==='number')?v:new BadaNode(bXi(v));return;}
+ if((m=line.match(/^(\w+)\s*<-\s*(.+)$/))){this.nodef(m[1]).leftAct(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*-<\s*(.+)$/))){this.nodef(m[1]).manifoldIntegral(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*>-\s*(.+)$/))){this.nodef(m[1]).rightAct(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(?:Omega|Ω)::push\s+(\w+)(?:\s+as\s+(\w+))?$/))){const n=this.nodef(m[1]);
+  this.out.push('Ω::push '+(m[2]||'node')+' (Ξ='+n.value.toFixed(4)+')');return;}
+ if((m=line.match(/^print\s+(.+)$/))){const v=this.evalExpr(m[1]);this.out.push(String(this.valOf(v)));return;}
+ if((m=line.match(/^Media::(\w+)(?:\s+(.+))?$/))){const cmd=m[1];const arg=m[2]?m[2].trim():null;
+  let val=null;if(arg!=null){const e=this.evalExpr(arg);val=(e==='next'||e==='prev')?e:this.valOf(e);}
+  if(this.onMedia)this.onMedia(cmd,val);this.out.push('Media::'+cmd+(arg!=null?' '+arg:''));return;}
+ throw new Error('Bada syntax error: '+line);};
+BadaInterp.prototype.run=function(src){String(src).split('\n').forEach(raw=>{
+ const line=raw.replace(/#.*$/,'').trim();if(line)this.exec(line);});return this.out;};
+
+// ── 実写プレーヤーのチャンネル ──
+const GBK='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
 let hlsLoading=false;
 function ensureHls(cb){
  if(window.Hls){cb(window.Hls);return;}
@@ -319,46 +420,110 @@ function ensureHls(cb){
  s.onload=()=>cb(window.Hls||null);s.onerror=()=>cb(null);document.head.appendChild(s);
 }
 const NEWS_CHANNELS=[
- {name:'NHK WORLD',   desc:'NHK公式・無料の国際英語ニュース', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', hls:true},
- {name:'DW English',  desc:'ドイチェ・ヴェレ 公式無料ライブ', url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', hls:true},
- {name:'France 24',   desc:'フランス24 公式無料ライブ',     url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', hls:true},
- {name:'Al Jazeera',  desc:'アルジャジーラ英語 公式無料ライブ', url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', hls:true},
- {name:'NASA TV',     desc:'NASA 宇宙・地球のライブ（実写）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true},
- {name:'DEMO',        desc:'オフライン確認用の実写クリップ', url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', hls:false}
+ // 実写VOD（パブリックドメイン／サンプル・実写）→ 早送り/巻き戻し（シーク）可
+ {name:'実写① 消防', desc:'実写クリップ（シーク可）', url:GBK+'ForBiggerBlazes.mp4',    kind:'vod'},
+ {name:'実写② 脱出', desc:'実写クリップ（シーク可）', url:GBK+'ForBiggerEscapes.mp4',   kind:'vod'},
+ {name:'実写③ 走行', desc:'実写クリップ（シーク可）', url:GBK+'ForBiggerJoyrides.mp4',  kind:'vod'},
+ {name:'実写④ 決壊', desc:'実写クリップ（シーク可）', url:GBK+'ForBiggerMeltdowns.mp4', kind:'vod'},
+ // 各局ライブ（HLS）→ 実映像・ニュース。ライブはシーク不可
+ {name:'NHK WORLD', desc:'NHK公式・無料の国際英語ニュース（ライブ）', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', kind:'live'},
+ {name:'DW English', desc:'ドイチェ・ヴェレ 公式無料ライブ',       url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', kind:'live'},
+ {name:'France 24',  desc:'フランス24 公式無料ライブ',           url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', kind:'live'},
+ {name:'Al Jazeera', desc:'アルジャジーラ英語 公式無料ライブ',   url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', kind:'live'},
+ {name:'NASA TV',    desc:'NASA 宇宙・地球のライブ（実写）',     url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', kind:'live'}
 ];
-let nplayer=null,nHls=null,nIndex=-1,nAudio=false,nTimer=null,newsWired=false;
+let nplayer=null,nHls=null,nIndex=-1,nAudio=false,nTimer=null,newsWired=false,nRate=1,nBada=null;
+const NRATES=[1,1.5,2,0.5];
+function isLive(){const ch=NEWS_CHANNELS[nIndex];return ch&&ch.kind==='live';}
+function fmtT(t){if(!isFinite(t)||t<0)return '--:--';const m=Math.floor(t/60),s=Math.floor(t%60);return m+':'+String(s).padStart(2,'0');}
+function bLog(){const c=document.getElementById('bconsole');if(!c||!nBada)return;
+ const tail=nBada.out.slice(-5).join('\n');c.innerHTML='<b>BADA ▸</b> '+tail.replace(/[&<]/g,x=>x==='&'?'&amp;':'&lt;');
+ c.scrollTop=c.scrollHeight;}
 function nStat(msg,spin){const s=document.getElementById('nstat');if(!s)return;s.classList.add('show');
  const m=document.getElementById('nstat-msg');if(m)m.textContent=msg;const sp=s.querySelector('.spin');if(sp)sp.style.display=spin?'block':'none';}
 function nHide(){const s=document.getElementById('nstat');if(s)s.classList.remove('show');}
+function nOverlay(show){const o=document.getElementById('nplay-ov');if(o)o.classList.toggle('show',show);}
 function nBuildList(){const el=document.getElementById('nch-list');if(!el)return;el.innerHTML='';
  NEWS_CHANNELS.forEach((ch,i)=>{const d=document.createElement('div');d.className='nch'+(i===nIndex?' on':'');
   d.textContent=ch.name;d.onclick=()=>nSelect(i);el.appendChild(d);});}
+function nUpdateTransport(){const live=isLive();
+ ['t-ff','t-rw'].forEach(id=>{const b=document.getElementById(id);if(b)b.disabled=live;});
+ const sk=document.getElementById('nseek');if(sk)sk.disabled=live;
+ const lv=document.getElementById('nlive');if(lv)lv.style.display=live?'flex':'none';}
 function nCleanup(){if(nHls){try{nHls.destroy();}catch(e){}nHls=null;}
  if(nplayer){try{nplayer.pause();}catch(e){}nplayer.removeAttribute('src');nplayer.load&&nplayer.load();}
  if(nTimer){clearTimeout(nTimer);nTimer=null;}}
 function nSelect(i){nplayer=document.getElementById('nplayer');if(!nplayer)return;
- nIndex=i;const ch=NEWS_CHANNELS[i];nBuildList();
+ if(i<0)i=NEWS_CHANNELS.length-1;if(i>=NEWS_CHANNELS.length)i=0;
+ nIndex=i;const ch=NEWS_CHANNELS[i];nBuildList();nUpdateTransport();
  const lo=document.getElementById('nlower');if(lo)lo.textContent=ch.name+' — '+ch.desc;
- nCleanup();nStat('接続中… '+ch.name,true);
- nTimer=setTimeout(()=>{if(nplayer.readyState<3)nStat('現在再生できません（別チャンネル、または「追加」で正規URLをお試しください）',false);},9000);
+ nCleanup();nStat('接続中… '+ch.name,true);nOverlay(false);
+ nTimer=setTimeout(()=>{if(nplayer.readyState<3){nStat('現在再生できません（別チャンネル、または「追加」で正規URLをお試しください）',false);nOverlay(true);}},9000);
  try{
-  if(ch.hls && !nplayer.canPlayType('application/vnd.apple.mpegurl')){
+  if(ch.kind==='live' && !nplayer.canPlayType('application/vnd.apple.mpegurl')){
    ensureHls(Hls=>{
     if(Hls && Hls.isSupported()){const h=new Hls({lowLatencyMode:true});nHls=h;
-     h.on(Hls.Events.ERROR,(e,data)=>{if(data&&data.fatal)nStat('現在再生できません（別チャンネル/URLをお試しください）',false);});
-     h.loadSource(ch.url);h.attachMedia(nplayer);nplayer.play().catch(()=>{});}
+     h.on(Hls.Events.ERROR,(e,data)=>{if(data&&data.fatal){nStat('現在再生できません（別チャンネル/URLをお試しください）',false);nOverlay(true);}});
+     h.loadSource(ch.url);h.attachMedia(nplayer);nplayer.play().catch(()=>nOverlay(true));}
     else{nStat('この端末では HLS 再生に非対応です（対応ブラウザ、または MP4/URL追加をお試しください）',false);}
    });
-  }else{nplayer.src=ch.url;nplayer.play().catch(()=>{});}
+  }else{nplayer.src=ch.url;nplayer.play().catch(()=>nOverlay(true));}
  }catch(e){nStat('再生できませんでした',false);}
- nplayer.muted=!nAudio;
+ nplayer.muted=!nAudio;nplayer.playbackRate=nRate;
 }
+// Bada の Media:: 命令を <video> に適用（＝早送り/巻き戻し等の実体）
+function applyMedia(cmd,val,vid){vid=vid||nplayer;if(!vid)return;
+ switch(cmd){
+  case 'play': if(vid.play){const p=vid.play();if(p&&p.catch)p.catch(()=>{});}else{vid.paused=false;} break;
+  case 'pause': if(vid.pause)vid.pause();else vid.paused=true; break;
+  case 'toggle': (vid.paused?applyMedia('play',null,vid):applyMedia('pause',null,vid)); break;
+  case 'seek': if(typeof val==='number'){let t=(vid.currentTime||0)+val;t=Math.max(0,t);
+    if(isFinite(vid.duration)&&vid.duration>0)t=Math.min(t,vid.duration-0.2);try{vid.currentTime=t;}catch(e){}} break;
+  case 'rate': if(typeof val==='number'){nRate=val;vid.playbackRate=val;} break;
+  case 'channel': if(val==='next')nSelect(nIndex+1);else if(val==='prev')nSelect(nIndex-1);
+    else if(typeof val==='number')nSelect(val|0); break;
+ }
+}
+// 1行の Bada を実行（トランスポート命令はここを通って動画に効く）
+function badaRun(line){if(!nBada)return;try{nBada.exec(line);}catch(e){nBada.out.push('! '+e.message);}bLog();}
+
+const BADA_PROGRAM=(document.getElementById('bada-src')||{}).textContent||
+ "set fwd = 10\nset back = -10\nset rate = 1.0\nset cursor = 0\n"+
+ "cursor <- \"global manifold transport\"\ncursor -< 1.0\ncursor >- cursor\n"+
+ "Omega::push cursor as transport_node\nprint cursor";
+
 function initNews(){
  nplayer=document.getElementById('nplayer');if(!nplayer)return;
+ // Bada プログラムを実行（アプリ内蔵インタプリタで player.bada を解釈）
+ nBada=new BadaInterp((cmd,val)=>applyMedia(cmd,val,nplayer));
+ try{nBada.run(BADA_PROGRAM);}catch(e){nBada.out.push('! '+e.message);}
+ nRate=(typeof nBada.env.rate==='number')?nBada.env.rate:1;bLog();
  if(!newsWired){newsWired=true;
-  nplayer.addEventListener('playing',nHide);nplayer.addEventListener('canplay',nHide);
+  nplayer.addEventListener('playing',()=>{nHide();nOverlay(false);document.getElementById('t-play').textContent='⏸';});
+  nplayer.addEventListener('canplay',nHide);
+  nplayer.addEventListener('pause',()=>{const b=document.getElementById('t-play');if(b)b.textContent='▶';});
+  nplayer.addEventListener('play',()=>{const b=document.getElementById('t-play');if(b)b.textContent='⏸';});
   nplayer.addEventListener('waiting',()=>nStat('バッファ中…',true));
-  nplayer.addEventListener('error',()=>nStat('現在再生できません（別チャンネル/URLをお試しください）',false));
+  nplayer.addEventListener('error',()=>{nStat('現在再生できません（別チャンネル/URLをお試しください）',false);nOverlay(true);});
+  nplayer.addEventListener('loadedmetadata',()=>{const d=document.getElementById('ndur');if(d)d.textContent=fmtT(nplayer.duration);nUpdateTransport();});
+  nplayer.addEventListener('timeupdate',()=>{const c=document.getElementById('ncur'),sk=document.getElementById('nseek');
+   if(c)c.textContent=fmtT(nplayer.currentTime);
+   if(sk&&!sk._drag&&isFinite(nplayer.duration)&&nplayer.duration>0)sk.value=Math.round(nplayer.currentTime/nplayer.duration*1000);});
+ }
+ // トランスポート・ボタン → それぞれ対応する Bada 行を実行
+ const wire=(id,line)=>{const b=document.getElementById(id);if(b)b.onclick=()=>badaRun(line);};
+ wire('t-ff','Media::seek fwd');       // 早送り +10s
+ wire('t-rw','Media::seek back');       // 巻き戻し −10s
+ wire('t-prev','Media::channel prev');
+ wire('t-next','Media::channel next');
+ const play=document.getElementById('t-play');if(play)play.onclick=()=>badaRun('Media::toggle');
+ const rateBtn=document.getElementById('t-rate');if(rateBtn)rateBtn.onclick=()=>{
+  const i=(NRATES.indexOf(nRate)+1)%NRATES.length;const r=NRATES[i];
+  nBada.env.rate=r;badaRun('Media::rate rate');rateBtn.textContent=r.toFixed(1)+'×';};
+ const ov=document.getElementById('nplay-ov');if(ov)ov.onclick=()=>{nOverlay(false);badaRun('Media::play');};
+ const sk=document.getElementById('nseek');if(sk){
+  sk.oninput=()=>{sk._drag=true;};
+  sk.onchange=()=>{sk._drag=false;if(isFinite(nplayer.duration)&&nplayer.duration>0){try{nplayer.currentTime=sk.value/1000*nplayer.duration;}catch(e){}}};
  }
  const au=document.getElementById('naudio');if(au)au.onclick=()=>{nAudio=!nAudio;au.classList.toggle('on',nAudio);
   au.textContent=nAudio?'🔊 音声 ON':'🔇 ミュート';if(nplayer){nplayer.muted=!nAudio;nplayer.play().catch(()=>{});}};
@@ -366,10 +531,11 @@ function initNews(){
   if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();}
   else{(wrap.requestFullscreen||wrap.webkitRequestFullscreen||nplayer.webkitEnterFullscreen||function(){}).call(wrap);}};
  const add=document.getElementById('nadd');if(add)add.onclick=()=>{const inp=document.getElementById('ncust');const u=inp.value.trim();if(!u)return;
-  const hls=/\.m3u8(\?|#|$)/i.test(u);NEWS_CHANNELS.push({name:'追加'+(NEWS_CHANNELS.length),desc:'あなたが貼り付けたURL',url:u,hls});
+  const kind=/\.m3u8(\?|#|$)/i.test(u)?'live':'vod';
+  NEWS_CHANNELS.push({name:'追加'+(NEWS_CHANNELS.length),desc:'あなたが貼り付けたURL（'+(kind==='vod'?'シーク可':'ライブ')+'）',url:u,kind});
   inp.value='';nBuildList();nSelect(NEWS_CHANNELS.length-1);};
  nBuildList();
- nSelect(nIndex>=0?nIndex:0); // 先頭チャンネルへ自動接続（実映像をすぐ表示）
+ nSelect(nIndex>=0?nIndex:0); // 先頭＝実写VOD へ自動接続（実映像＋シーク可）
 }
 
 // ═══════════════════════════════════════════════════════════════
