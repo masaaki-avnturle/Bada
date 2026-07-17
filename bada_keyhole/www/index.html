@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>BADA KEYHOLE — P2P インターネットTV</title>
+<style>
+:root{--bg:#0a0d14;--panel:rgba(16,22,34,.6);--line:rgba(120,160,230,.16);--red:#ff3b46;--acc:#4a9eff;--ok:#39d98a;
+ --txt:rgba(232,240,252,.96);--txt2:rgba(155,178,216,.62);}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:radial-gradient(ellipse at 50% -20%,#111a30,#0a0d14 60%);color:var(--txt);
+ font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,system-ui,sans-serif;height:100vh;height:100dvh;
+ overflow:hidden;display:flex;flex-direction:column;-webkit-user-select:none;user-select:none}
+#top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;
+ background:linear-gradient(180deg,#101726,#0a0d16);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .k{font-weight:800;font-size:15px;letter-spacing:.02em;background:var(--red);color:#fff;padding:4px 9px;border-radius:6px;box-shadow:0 0 14px rgba(255,59,70,.4)}
+.brand .nm{font-weight:700;letter-spacing:.14em;font-size:12px}
+.brand .nm small{display:block;font-weight:400;letter-spacing:.2em;color:var(--txt2);font-size:7.5px;margin-top:2px}
+.live{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.16em;color:#ff6a72}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.25}}
+#tabs{flex:0 0 auto;display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid var(--line);background:rgba(10,14,24,.5)}
+.tab{flex:1;text-align:center;font-size:12px;padding:9px 6px;border-radius:10px;cursor:pointer;color:var(--txt2);
+ border:1px solid transparent;transition:.15s}
+.tab.on{background:rgba(74,158,255,.16);border-color:rgba(74,158,255,.5);color:#dcecff}
+#body{flex:1 1 0;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px}
+.panel{display:none} .panel.on{display:block}
+/* watch */
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:9px 10px;cursor:pointer;transition:.15s}
+.card.on{border-color:rgba(74,158,255,.6);background:rgba(74,158,255,.12)}
+.card .t{font-size:12px;font-weight:600}.card .d{font-size:8.5px;color:var(--txt2);margin-top:3px;line-height:1.4}
+.videowrap{position:relative;width:100%;background:#000;border-radius:12px;overflow:hidden;border:1px solid var(--line);aspect-ratio:16/9}
+.videowrap video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.vlive{position:absolute;top:8px;left:8px;z-index:2;display:flex;align-items:center;gap:5px;font-size:9px;font-weight:700;letter-spacing:.1em;
+ background:rgba(206,42,52,.9);padding:3px 7px;border-radius:5px;color:#fff}
+.vlive .d{width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
+.vstat{position:absolute;inset:0;z-index:3;display:none;align-items:center;justify-content:center;text-align:center;padding:16px;
+ font-size:11px;color:#cfe0ff;background:rgba(4,7,14,.8)}
+.vstat.show{display:flex}
+.vstat .spin{width:22px;height:22px;border:2px solid rgba(74,158,255,.3);border-top-color:var(--acc);border-radius:50%;margin:0 auto 10px;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.rowbtns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{font-size:12px;padding:9px 13px;border-radius:10px;cursor:pointer;border:1px solid var(--line);background:rgba(30,44,72,.6);color:#dfeaff;transition:.15s}
+.btn:hover{background:rgba(50,84,150,.6)} .btn.on{background:rgba(74,158,255,.24);border-color:rgba(74,158,255,.6)}
+.btn.primary{background:linear-gradient(90deg,#4a9eff,#39d98a);color:#04121f;font-weight:700;border:none}
+.btn.red{background:linear-gradient(90deg,#ff5a63,#ff9a6b);color:#210a0a;font-weight:700;border:none}
+.urlrow{display:flex;gap:6px;margin-top:8px}
+.urlrow input{flex:1;background:rgba(0,0,0,.32);border:1px solid var(--line);border-radius:9px;color:#eaf4ff;font-size:11px;padding:8px 10px;min-width:0;outline:none}
+label{display:block;font-size:9px;letter-spacing:.12em;color:var(--txt2);margin:12px 0 5px}
+textarea{width:100%;background:rgba(0,0,0,.34);border:1px solid var(--line);border-radius:10px;color:#bfe3ff;
+ font-family:ui-monospace,Menlo,Consolas,monospace;font-size:9.5px;padding:9px;min-height:66px;resize:vertical;outline:none;word-break:break-all}
+.hint{font-size:9px;color:var(--txt2);line-height:1.8;margin:6px 0}
+.hint b{color:#8fd0ff}
+.stat{font-size:10px;color:var(--txt2);margin-top:8px}
+.stat.ok{color:var(--ok)} .stat.err{color:#ff8a8a}
+.qgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.tile{background:rgba(10,16,30,.6);border:1px solid var(--line);border-radius:10px;padding:8px 9px}
+.tile .k{font-size:7.5px;letter-spacing:.12em;color:var(--txt2);text-transform:uppercase}
+.tile .v{font-size:13px;margin-top:3px;color:#eaf4ff}
+.bconsole{margin:12px 0 4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:8px;line-height:1.6;color:rgba(150,200,255,.78);
+ background:rgba(0,0,0,.32);border:1px solid rgba(120,170,255,.16);border-radius:9px;padding:8px 10px;max-height:80px;overflow:auto;white-space:pre-wrap}
+.bconsole b{color:#8fd0ff}
+.note{font-size:8px;color:rgba(140,165,210,.55);line-height:1.7;margin:12px 4px 20px;text-align:center}
+</style>
+</head>
+<body>
+<div id="top">
+ <div class="brand"><span class="k">▶</span><span class="nm">BADA KEYHOLE<small>P2P インターネットTV · Bada 言語駆動</small></span></div>
+ <div class="live"><span class="dot"></span>LIVE P2P</div>
+</div>
+
+<div id="tabs">
+ <div class="tab on" data-p="watch">📺 視聴</div>
+ <div class="tab" data-p="cast">📡 放送する</div>
+ <div class="tab" data-p="peer">🔗 P2P受信</div>
+</div>
+
+<div id="body">
+ <!-- 視聴 -->
+ <div class="panel on" id="p-watch">
+  <div id="grid"></div>
+  <div class="videowrap"><div class="vlive" id="w-live"><span class="d"></span>LIVE</div>
+   <video id="w-video" playsinline></video>
+   <div class="vstat show" id="w-stat"><div><div class="spin"></div><span id="w-stat-msg">チャンネルを選択</span></div></div>
+  </div>
+  <div class="rowbtns"><div class="btn" id="w-audio">🔇 ミュート</div><div class="btn" id="w-full">⛶ 全画面</div></div>
+  <div class="urlrow"><input id="w-url" placeholder="配信URL（HLS .m3u8 / MP4）を追加" spellcheck="false"><div class="btn" id="w-add">追加</div></div>
+  <div class="hint">各局公式・無料のライブ配信を視聴。あなたが正規に利用できる配信URLは「追加」から。</div>
+ </div>
+
+ <!-- 放送 -->
+ <div class="panel" id="p-cast">
+  <div class="videowrap"><div class="vlive" id="c-live" style="display:none"><span class="d"></span>ON AIR</div>
+   <video id="c-video" playsinline muted></video>
+   <div class="vstat show" id="c-stat"><div><span id="c-stat-msg">「放送開始」でカメラを起動</span></div></div>
+  </div>
+  <div class="qgrid">
+   <div class="tile"><div class="k">状態</div><div class="v" id="c-state" style="font-size:11px">停止</div></div>
+   <div class="tile"><div class="k">視聴ピア</div><div class="v" id="c-peers">0</div></div>
+   <div class="tile"><div class="k">画質</div><div class="v" id="c-quality" style="font-size:11px">低ビットレート</div></div>
+  </div>
+  <div class="rowbtns">
+   <div class="btn primary" id="c-start">📡 放送開始（カメラ）</div>
+   <div class="btn on" id="c-lowbr">低ビットレート</div>
+   <div class="btn red" id="c-stop">停止</div>
+  </div>
+  <label>① 招待コード（この放送のオファー）— 視聴者に渡す</label>
+  <textarea id="c-offer" readonly placeholder="放送開始すると招待コードが生成されます"></textarea>
+  <div class="rowbtns"><div class="btn" id="c-copyoffer">📋 招待コードをコピー</div></div>
+  <label>③ 視聴者からの応答コードを貼り付け → 接続確立</label>
+  <textarea id="c-answer" placeholder="視聴者が「P2P受信」で作った応答コードをここに貼付"></textarea>
+  <div class="rowbtns"><div class="btn primary" id="c-accept">接続を確立</div></div>
+  <div class="stat" id="c-stat2">待機中</div>
+  <div class="hint">P2P（WebRTC・サーバー不要）でカメラ映像を配信します。<b>KeyHole TV を参考にしたオリジナル方式</b>。招待/応答コードを1回だけ相手と交換すれば、以後は端末どうしが直接（インターネット/NTT回線を介して）つながります。</div>
+ </div>
+
+ <!-- P2P受信 -->
+ <div class="panel" id="p-peer">
+  <div class="videowrap"><div class="vlive" id="v-live" style="display:none"><span class="d"></span>RECEIVING</div>
+   <video id="v-video" playsinline></video>
+   <div class="vstat show" id="v-stat"><div><span id="v-stat-msg">招待コードを貼り付けて接続</span></div></div>
+  </div>
+  <label>① 放送者の招待コードを貼り付け</label>
+  <textarea id="v-offer" placeholder="放送者から受け取った招待コードをここに貼付"></textarea>
+  <div class="rowbtns"><div class="btn primary" id="v-connect">🔗 接続（応答コード生成）</div><div class="btn" id="v-audio">🔊 音声</div></div>
+  <label>② 生成された応答コード — 放送者に渡す</label>
+  <textarea id="v-answer" readonly placeholder="接続すると応答コードが生成されます"></textarea>
+  <div class="rowbtns"><div class="btn" id="v-copyanswer">📋 応答コードをコピー</div><div class="btn red" id="v-stop">切断</div></div>
+  <div class="stat" id="v-stat2">待機中</div>
+  <div class="hint">放送者の招待コードから応答コードを作り、それを放送者に返すと、直接 P2P で放送を受信します。</div>
+ </div>
+
+ <div class="bconsole" id="bconsole"><b>BADA ▸</b> keyhole.bada 実行待ち…</div>
+ <div class="note">※ 「BADA KEYHOLE」は KeyHole TV（P2P インターネットTV）の仕組みを参考にした<b>オリジナルアプリ</b>です。KeyHole TV の名称・ロゴ・ソフトウェアは使用しておらず、無関係です。視聴チャンネルは各局公式の無料ライブ配信。P2P 放送/受信は WebRTC によりサーバーを介さず端末間で直接接続します。<br>© 2025 Masaaki Yamaguchi · 山口 雅旭 · Global Differential Manifold Research</div>
+</div>
+
+<!-- P2P配信の制御プログラム（Bada 言語）。内蔵インタプリタが実行する。 -->
+<script type="application/x-bada" id="bada-src">
+# keyhole.bada — P2P インターネットTV の制御（Bada 言語）
+set channel = 0
+set peers   = 0
+set node    = 0
+node <- "peer to peer internet television relay"
+node -< 1.0
+node >- node
+Omega::push node as relay_node
+print node
+# Ch::tune / Ch::broadcast / Ch::connect / Ch::accept / Ch::stop
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Bada 数理（language.rb の Special/Manifold を JS 移植）
+// ═══════════════════════════════════════════════════════════════
+function bXLogX(x){return x<=0?0:x*Math.log(x);}
+function bME(x){const d=bXLogX(x),dd=d*d;return dd>1e-12?1/dd:0;}
+function shannon(str){const t=Array.from(String(str));if(!t.length)return 0;const f={};t.forEach(c=>f[c]=(f[c]||0)+1);
+ let H=0;const n=t.length;Object.values(f).forEach(c=>{const p=c/n;H-=p*Math.log2(p);});return H;}
+function bXi(str){const H=shannon(str),n=Array.from(String(str)).length||1;return (H/Math.log(n+2))+bME(n+2);}
+function BadaNode(v){this.value=v||0;}
+BadaNode.prototype.co=function(v){return typeof v==='number'?v:(v instanceof BadaNode?v.value:bXi(v));};
+BadaNode.prototype.leftAct=function(i){const c=this.co(i),x=(Math.abs(this.value)<1e-9?1:Math.abs(this.value))+1;this.value=Math.abs(Math.PI*c*Math.log(x));return this;};
+BadaNode.prototype.mInt=function(s){const v=s==null?this.value:this.co(s),x=Math.abs(v)+2;this.value=bXLogX(x)*bME(x)+bME(x);return this;};
+BadaNode.prototype.rAct=function(o){const v=o==null?this.value:this.co(o),x=Math.abs(v)+1e-6;this.value=Math.exp(-bXLogX(x));return this;};
+function BadaInterp(onCh){this.env={};this.out=[];this.onCh=onCh;}
+BadaInterp.prototype.ev=function(s){s=s.trim();let m;if((m=s.match(/^"(.*)"$/)))return m[1];
+ if(/^[-+]?\d+(?:\.\d+)?$/.test(s))return parseFloat(s);if(this.env.hasOwnProperty(s))return this.env[s];return s;};
+BadaInterp.prototype.vo=function(x){return x instanceof BadaNode?x.value:x;};
+BadaInterp.prototype.nd=function(n){if(!(this.env[n] instanceof BadaNode))this.env[n]=new BadaNode(typeof this.env[n]==='number'?this.env[n]:0);return this.env[n];};
+BadaInterp.prototype.exec=function(line){let m;
+ if((m=line.match(/^set\s+(\w+)\s*=\s*(.+)$/))){const v=this.ev(m[2]);this.env[m[1]]=(typeof v==='number')?v:new BadaNode(bXi(v));return;}
+ if((m=line.match(/^(\w+)\s*<-\s*(.+)$/))){this.nd(m[1]).leftAct(this.ev(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*-<\s*(.+)$/))){this.nd(m[1]).mInt(this.ev(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*>-\s*(.+)$/))){this.nd(m[1]).rAct(this.ev(m[2]));return;}
+ if((m=line.match(/^(?:Omega|Ω)::push\s+(\w+)(?:\s+as\s+(\w+))?$/))){const n=this.nd(m[1]);this.out.push('Ω::push '+(m[2]||'node')+' (Ξ='+n.value.toFixed(4)+')');return;}
+ if((m=line.match(/^print\s+(.+)$/))){this.out.push(String(this.vo(this.ev(m[1]))));return;}
+ if((m=line.match(/^Ch::(\w+)(?:\s+(.+))?$/))){const cmd=m[1],arg=m[2]?m[2].trim():null;const val=arg!=null?this.vo(this.ev(arg)):null;
+  this.out.push('Ch::'+cmd+(arg!=null?' '+arg:''));if(this.onCh)this.onCh(cmd,val);return;}
+ throw new Error('Bada syntax error: '+line);};
+BadaInterp.prototype.run=function(src){String(src).split('\n').forEach(r=>{const l=r.replace(/#.*$/,'').trim();if(l)this.exec(l);});return this.out;};
+
+const $=id=>document.getElementById(id);
+let nBada=null;
+function bLog(){const c=$('bconsole');if(!c||!nBada)return;c.innerHTML='<b>BADA ▸</b> '+nBada.out.slice(-8).join('\n').replace(/[&<]/g,x=>x==='&'?'&amp;':'&lt;');c.scrollTop=c.scrollHeight;}
+function chExec(line){if(!nBada)nBada=new BadaInterp(chHandler);try{nBada.exec(line);}catch(e){nBada.out.push('! '+e.message);}bLog();}
+
+// ═══════════════════════════════════════════════════════════════
+// 視聴（HLS チャンネル・実写インターネットTV）
+// ═══════════════════════════════════════════════════════════════
+let hlsLoading=false;
+function ensureHls(cb){if(window.Hls){cb(window.Hls);return;}if(hlsLoading){setTimeout(()=>ensureHls(cb),300);return;}
+ hlsLoading=true;const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js';
+ s.onload=()=>cb(window.Hls||null);s.onerror=()=>cb(null);document.head.appendChild(s);}
+const GBK='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
+const CHANNELS=[
+ {name:'NHK WORLD', desc:'公式・無料 国際英語ニュース', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', hls:true},
+ {name:'DW English', desc:'ドイチェ・ヴェレ 無料ライブ', url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', hls:true},
+ {name:'France 24', desc:'フランス24 無料ライブ', url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', hls:true},
+ {name:'Al Jazeera', desc:'アルジャジーラ英語 無料', url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', hls:true},
+ {name:'NASA TV', desc:'NASA ライブ（実写）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true},
+ {name:'実写デモ', desc:'オフライン確認用の実写', url:GBK+'ForBiggerEscapes.mp4', hls:false}
+];
+const wv=$('w-video');let wHls=null,wIdx=-1,wAudio=false,wTimer=null;
+function wStat(m,sp){const s=$('w-stat');s.classList.add('show');$('w-stat-msg').textContent=m;s.querySelector('.spin').style.display=sp?'block':'none';}
+function wHide(){$('w-stat').classList.remove('show');}
+function buildGrid(){const g=$('grid');g.innerHTML='';CHANNELS.forEach((c,i)=>{const d=document.createElement('div');
+ d.className='card'+(i===wIdx?' on':'');d.innerHTML='<div class="t">'+esc(c.name)+'</div><div class="d">'+esc(c.desc)+'</div>';
+ d.onclick=()=>chExec('Ch::tune '+i);g.appendChild(d);});}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function wClean(){if(wHls){try{wHls.destroy();}catch(e){}wHls=null;}try{wv.pause();}catch(e){}wv.removeAttribute('src');wv.load&&wv.load();if(wTimer){clearTimeout(wTimer);wTimer=null;}}
+function tune(i){if(i<0||i>=CHANNELS.length)return;wIdx=i;const c=CHANNELS[i];buildGrid();wClean();wStat('接続中… '+c.name,true);
+ wTimer=setTimeout(()=>{if(wv.readyState<3)wStat('現在再生できません（別チャンネル/URLをお試しください）',false);},9000);
+ try{if(c.hls&&!wv.canPlayType('application/vnd.apple.mpegurl')){ensureHls(Hls=>{if(Hls&&Hls.isSupported()){const h=new Hls();wHls=h;
+   h.on(Hls.Events.ERROR,(e,d)=>{if(d&&d.fatal)wStat('現在再生できません',false);});h.loadSource(c.url);h.attachMedia(wv);wv.play().catch(()=>{});}
+   else wStat('この端末では HLS 非対応（対応ブラウザ/MP4 をお試しください）',false);});}
+  else{wv.src=c.url;wv.play().catch(()=>{});}}catch(e){wStat('再生できませんでした',false);}wv.muted=!wAudio;}
+wv.addEventListener('playing',wHide);wv.addEventListener('canplay',wHide);
+wv.addEventListener('error',()=>wStat('現在再生できません',false));
+$('w-audio').onclick=function(){wAudio=!wAudio;this.classList.toggle('on',wAudio);this.textContent=wAudio?'🔊 音声 ON':'🔇 ミュート';wv.muted=!wAudio;wv.play().catch(()=>{});};
+$('w-full').onclick=()=>{const w=wv.parentElement;if(document.fullscreenElement)document.exitFullscreen&&document.exitFullscreen();
+ else (w.requestFullscreen||w.webkitRequestFullscreen||wv.webkitEnterFullscreen||function(){}).call(w);};
+$('w-add').onclick=()=>{const u=$('w-url').value.trim();if(!u)return;const hls=/\.m3u8(\?|#|$)/i.test(u);
+ CHANNELS.push({name:'追加'+CHANNELS.length,desc:'あなたが追加した配信',url:u,hls});$('w-url').value='';buildGrid();chExec('Ch::tune '+(CHANNELS.length-1));};
+
+// ═══════════════════════════════════════════════════════════════
+// P2P（WebRTC・サーバー不要）— 放送 / 受信
+// ═══════════════════════════════════════════════════════════════
+const ICE=[{urls:'stun:stun.l.google.com:19302'}];
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(String(s).trim()))));
+function waitIce(pc){return new Promise(res=>{if(pc.iceGatheringState==='complete')return res();
+ const t=setTimeout(res,1800);const chk=()=>{if(pc.iceGatheringState==='complete'){clearTimeout(t);pc.removeEventListener('icegatheringstatechange',chk);res();}};
+ pc.addEventListener('icegatheringstatechange',chk);});}
+let lowBr=true;
+// 放送
+let castPc=null, castStream=null;
+async function startBroadcast(){
+ try{
+  const q=lowBr?{width:{ideal:320},height:{ideal:240},frameRate:{ideal:15}}:{width:{ideal:640},height:{ideal:480},frameRate:{ideal:24}};
+  castStream=await navigator.mediaDevices.getUserMedia({video:q,audio:true});
+  $('c-video').srcObject=castStream;$('c-video').play().catch(()=>{});$('c-stat').classList.remove('show');$('c-live').style.display='flex';
+  castPc=new RTCPeerConnection({iceServers:ICE});
+  castStream.getTracks().forEach(t=>castPc.addTrack(t,castStream));
+  if(lowBr)castPc.getSenders().forEach(s=>{if(s.track&&s.track.kind==='video'){const p=s.getParameters();p.encodings=[{maxBitrate:120000}];s.setParameters(p).catch(()=>{});}});
+  castPc.onconnectionstatechange=()=>{$('c-state').textContent=jpState(castPc.connectionState);
+   if(castPc.connectionState==='connected'){$('c-peers').textContent='1';$('c-stat2').textContent='視聴者と接続しました';$('c-stat2').className='stat ok';}};
+  const offer=await castPc.createOffer();await castPc.setLocalDescription(offer);await waitIce(castPc);
+  $('c-offer').value=enc(castPc.localDescription);$('c-state').textContent='放送中（応答待ち）';
+  $('c-stat2').textContent='招待コードを視聴者に渡してください';$('c-stat2').className='stat';
+ }catch(e){$('c-stat2').textContent='カメラを起動できません：'+e.message;$('c-stat2').className='stat err';}
+}
+async function acceptAnswer(){try{const ans=dec($('c-answer').value);await castPc.setRemoteDescription(ans);
+ $('c-stat2').textContent='応答を取り込みました。接続確立中…';$('c-stat2').className='stat';}catch(e){$('c-stat2').textContent='応答コードが不正です';$('c-stat2').className='stat err';}}
+function stopBroadcast(){try{castStream&&castStream.getTracks().forEach(t=>t.stop());castPc&&castPc.close();}catch(e){}
+ castPc=null;castStream=null;$('c-video').srcObject=null;$('c-live').style.display='none';$('c-stat').classList.add('show');
+ $('c-state').textContent='停止';$('c-peers').textContent='0';$('c-offer').value='';$('c-answer').value='';}
+// 受信
+let viewPc=null;
+async function connectAsViewer(){
+ try{const offer=dec($('v-offer').value);
+  viewPc=new RTCPeerConnection({iceServers:ICE});
+  viewPc.ontrack=e=>{$('v-video').srcObject=e.streams[0];$('v-video').play().catch(()=>{});$('v-stat').classList.remove('show');$('v-live').style.display='flex';};
+  viewPc.onconnectionstatechange=()=>{$('v-stat2').textContent='接続: '+jpState(viewPc.connectionState);
+   $('v-stat2').className='stat'+(viewPc.connectionState==='connected'?' ok':'');};
+  await viewPc.setRemoteDescription(offer);const ans=await viewPc.createAnswer();await viewPc.setLocalDescription(ans);await waitIce(viewPc);
+  $('v-answer').value=enc(viewPc.localDescription);$('v-stat2').textContent='応答コードを放送者に渡してください';$('v-stat2').className='stat';
+ }catch(e){$('v-stat2').textContent='招待コードが不正です：'+e.message;$('v-stat2').className='stat err';}
+}
+function stopViewer(){try{viewPc&&viewPc.close();}catch(e){}viewPc=null;$('v-video').srcObject=null;$('v-live').style.display='none';
+ $('v-stat').classList.add('show');$('v-answer').value='';$('v-stat2').textContent='切断しました';$('v-stat2').className='stat';}
+function jpState(s){return {connected:'接続',connecting:'接続中',disconnected:'切断',failed:'失敗',closed:'終了',new:'待機'}[s]||s;}
+
+// ═══════════════════════════════════════════════════════════════
+// Ch:: ハンドラ（Bada から呼ばれる）
+// ═══════════════════════════════════════════════════════════════
+function chHandler(cmd,val){
+ if(cmd==='tune'){tune((val|0)||0);}
+ else if(cmd==='broadcast'){startBroadcast();}
+ else if(cmd==='connect'){connectAsViewer();}
+ else if(cmd==='accept'){acceptAnswer();}
+ else if(cmd==='stop'){stopBroadcast();stopViewer();}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI 配線
+// ═══════════════════════════════════════════════════════════════
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{
+ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');
+ document.querySelectorAll('.panel').forEach(x=>x.classList.remove('on'));$('p-'+t.dataset.p).classList.add('on');});
+$('c-start').onclick=()=>chExec('Ch::broadcast');
+$('c-accept').onclick=()=>chExec('Ch::accept');
+$('c-stop').onclick=()=>chExec('Ch::stop');
+$('c-lowbr').onclick=function(){lowBr=!lowBr;this.classList.toggle('on',lowBr);this.textContent=lowBr?'低ビットレート':'標準画質';$('c-quality').textContent=lowBr?'低ビットレート':'標準画質';};
+$('c-lowbr').classList.add('on');
+$('v-connect').onclick=()=>chExec('Ch::connect');
+$('v-stop').onclick=()=>chExec('Ch::stop');
+$('c-copyoffer').onclick=()=>copyTa('c-offer');
+$('v-copyanswer').onclick=()=>copyTa('v-answer');
+$('v-audio').onclick=function(){const v=$('v-video');v.muted=!v.muted;this.classList.toggle('on',!v.muted);this.textContent=v.muted?'🔊 音声':'🔊 音声 ON';};
+function copyTa(id){const t=$(id);t.select();try{document.execCommand('copy');}catch(e){}
+ if(navigator.clipboard)navigator.clipboard.writeText(t.value).catch(()=>{});}
+
+// Bada プログラムを起動時に実行
+const BADA_SRC=($('bada-src')||{}).textContent||'set node = 0\nnode <- "relay"\nOmega::push node as relay_node\nprint node';
+nBada=new BadaInterp(chHandler);try{nBada.run(BADA_SRC);}catch(e){nBada.out.push('! '+e.message);}bLog();
+buildGrid();
+</script>
+</body>
+</html>
