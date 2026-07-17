@@ -82,6 +82,8 @@ body.stereo #b-exit{display:block}
 <div id="toolbar">
   <input id="q" placeholder="Ch.T 速報を検索してホログラムに流し込む（例: 地震 / 経済 / 宇宙）" spellcheck="false">
   <button id="go" class="tbtn2">検索</button>
+  <button id="b-video" class="tbtn2 on">📺 実映像 ON</button>
+  <button id="b-audio" class="tbtn2">🔊 音声 OFF</button>
   <button id="b-motion" class="tbtn2">🎛 モーション</button>
   <button id="b-stereo" class="tbtn2">◨◧ 立体視</button>
 </div>
@@ -170,13 +172,67 @@ let px=0,py=0,tpx=0,tpy=0;   // parallax (smoothed)
 let stereo=false, motionOn=false; const EYE=0.34;   // 立体視 / ジャイロ
 buildEvents('');
 
+// ═══════════════════════════════════════════════════════════════
+// インターネットTV：本当の動画（無料/CC 配信）をホログラムに流し込む
+// 海賊版・他者放送は使わず、自由に利用できる公開動画のみ。
+// オフライン/読み込み不可時はエンジン映像へ自動フォールバック。
+// ═══════════════════════════════════════════════════════════════
+const GTV='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
+const CHANNELS=[
+ {name:'NATURE', title:'Big Buck Bunny (Blender/CC)',  url:GTV+'BigBuckBunny.mp4'},
+ {name:'FANTASY',title:'Sintel (Blender/CC)',          url:GTV+'Sintel.mp4'},
+ {name:'SCI-FI', title:'Tears of Steel (Blender/CC)',  url:GTV+'TearsOfSteel.mp4'},
+ {name:'DREAM',  title:'Elephants Dream (Blender/CC)', url:GTV+'ElephantsDream.mp4'},
+ {name:'BLAZE',  title:'For Bigger Blazes',            url:GTV+'ForBiggerBlazes.mp4'},
+ {name:'RIDE',   title:'For Bigger Joyrides',          url:GTV+'ForBiggerJoyrides.mp4'},
+ {name:'ESCAPE', title:'For Bigger Escapes',           url:GTV+'ForBiggerEscapes.mp4'},
+ {name:'FUN',    title:'For Bigger Fun',               url:GTV+'ForBiggerFun.mp4'}
+];
+let useVideo=true, audioOn=false;
+const VIDS=[];
+for(let i=0;i<NEV;i++){
+ const ch=CHANNELS[i%CHANNELS.length];
+ const v=document.createElement('video');
+ v.src=ch.url; v.muted=true; v.loop=true; v.autoplay=true; v.playsInline=true;
+ v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');
+ v.preload='auto'; v.style.display='none';
+ v.channelName=ch.name; v.channelTitle=ch.title;
+ v.addEventListener('error',()=>{},{once:true});
+ document.body.appendChild(v); v.play().catch(()=>{});
+ VIDS.push(v);
+}
+let lastFc=-1;
+function updateAudio(){const fc=Math.round(Math.max(0,Math.min(NEV-1,playhead)));
+ VIDS.forEach((v,i)=>{if(v)v.muted=!(audioOn&&useVideo&&i===fc);});}
+
 function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
 
-// パネル内の「映像」（動画）
-function footage(x,y,w,h,hue,foot,phase,intensity){
+// パネル内の「映像」— インターネットTVの本当の動画、無ければエンジン映像
+function footage(x,y,w,h,ev,phase,intensity){
+ const hue=ev.hue, foot=ev.foot;
  ctx.save();rr(x,y,w,h,10);ctx.clip();
  const cx=x+w/2,cy=y+h/2;const col=(a)=>'hsla('+hue+',85%,68%,'+a+')';
+ // ── 本当の動画（読み込み済みなら実映像を cover-fit で描画）──
+ const vid=VIDS[ev.i];
+ let videoDrawn=false;
+ if(useVideo && vid && vid.readyState>=2 && vid.videoWidth>0){
+  try{
+   const vw=vid.videoWidth, vh=vid.videoHeight, ar=vw/vh, pr=w/h;
+   let sw,sh,sx,sy; if(ar>pr){sh=vh;sw=vh*pr;sx=(vw-sw)/2;sy=0;} else {sw=vw;sh=vw/pr;sx=0;sy=(vh-sh)/2;}
+   ctx.drawImage(vid,sx,sy,sw,sh,x,y,w,h);
+   // ホログラム色調のティント
+   ctx.globalAlpha=0.14*intensity+0.05;ctx.fillStyle='hsla('+hue+',80%,50%,1)';ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;
+   videoDrawn=true;
+  }catch(e){videoDrawn=false;}
+ }
+ if(videoDrawn){
+  // 走査線のみ重ねて restore
+  ctx.globalAlpha=0.06*intensity;ctx.fillStyle='rgba(180,220,255,1)';
+  for(let sy2=y;sy2<y+h;sy2+=3)ctx.fillRect(x,sy2,w,1);
+  ctx.globalAlpha=1;ctx.restore();return;
+ }
+ // ── フォールバック：エンジン映像 ──
  // 背景グロー
  const g=ctx.createRadialGradient(cx,cy,0,cx,cy,w*0.6);
  g.addColorStop(0,'hsla('+hue+',70%,40%,'+(0.28*intensity)+')');g.addColorStop(1,'rgba(6,10,20,0)');
@@ -225,8 +281,8 @@ function drawPanel(ev,delta,eyePx){
  ctx.save();ctx.globalAlpha=alpha*flick;
  // グラス地
  rr(x,y,w,h,10);ctx.fillStyle='rgba(12,20,40,0.5)';ctx.fill();
- // 映像
- footage(x,y,w,h,ev.hue,ev.foot,animT*(0.6+focus*1.1)+ev.seed,intensity);
+ // 映像（本当の動画 or エンジン映像）
+ footage(x,y,w,h,ev,animT*(0.6+focus*1.1)+ev.seed,intensity);
  // 枠グロー
  ctx.shadowColor='hsla('+ev.hue+',85%,65%,'+(0.6*intensity)+')';ctx.shadowBlur=18*focus+6;
  rr(x,y,w,h,10);ctx.lineWidth=1.4;ctx.strokeStyle='hsla('+ev.hue+',85%,72%,'+(0.5+0.4*focus)+')';ctx.stroke();
@@ -242,8 +298,14 @@ function drawPanel(ev,delta,eyePx){
  // 時刻 / RECドット
  ctx.fillStyle=ev.timeOffset>0?'rgba(255,176,112,.9)':'rgba(140,200,255,.85)';
  ctx.font=(8.5*Math.max(0.8,scale))+'px system-ui';ctx.fillText(timeLabel(ev.timeOffset),x+12,y+16);
- if(focus>0.6){ctx.fillStyle='#ff4a54';ctx.beginPath();ctx.arc(x+w-16,y+14,3.4,0,7);ctx.fill();
-  ctx.fillStyle='rgba(255,120,130,.9)';ctx.font='7px system-ui';ctx.textAlign='right';ctx.fillText('REC',x+w-24,y+17);ctx.textAlign='left';}
+ // チャンネル名（インターネットTV）
+ const vid=VIDS[ev.i];
+ if(vid){ctx.textAlign='right';const live=(useVideo&&vid.readyState>=2);
+  ctx.fillStyle=live?'rgba(120,230,150,.95)':'rgba(150,180,225,.7)';
+  ctx.font=(8*Math.max(0.8,scale))+'px system-ui';
+  ctx.fillText((live?'● ':'○ ')+'CH '+vid.channelName,x+w-12,y+16);ctx.textAlign='left';}
+ if(focus>0.6){ctx.fillStyle='#ff4a54';ctx.beginPath();ctx.arc(x+w-16,y+h-14,3.4,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,120,130,.9)';ctx.font='7px system-ui';ctx.textAlign='right';ctx.fillText('LIVE',x+w-24,y+h-11);ctx.textAlign='left';}
  ctx.restore();
 }
 
@@ -276,6 +338,11 @@ function loop(ts){
  animT+=dt;
  px+=(tpx-px)*0.06;py+=(tpy-py)*0.06;
  if(playing){playhead+=dt*0.35*speed;if(playhead>NEV-1){playhead=0;}}
+ // 動画のデコード負荷管理：焦点付近のみ再生、遠方は一時停止。音声は焦点chのみ。
+ const fc=Math.round(Math.max(0,Math.min(NEV-1,playhead)));
+ if(fc!==lastFc){lastFc=fc;updateAudio();}
+ VIDS.forEach((v,i)=>{if(!v)return;const near=Math.abs(i-fc)<=1;
+  if(useVideo&&near){if(v.paused)v.play().catch(()=>{});}else{if(!v.paused)v.pause();}});
  if(stereo){
   // 左右2眼のサイドバイサイド（SBS / カードボードVR）— 眼間視差 EYE
   ctx.save();ctx.beginPath();ctx.rect(0,0,W/2,Hh);ctx.clip();ctx.scale(0.5,1);drawScene(px-EYE);ctx.restore();
@@ -357,6 +424,18 @@ function setStereo(on){stereo=on;document.body.classList.toggle('stereo',on);ret
  if(on){playing=true;setPlay();flash('立体視ON：端末をVRゴーグルに入れてご覧ください（モーション推奨）');}}
 document.getElementById('b-stereo').onclick=()=>setStereo(true);
 document.getElementById('b-exit').onclick=()=>setStereo(false);
+
+// 実映像 / エンジン映像の切替
+document.getElementById('b-video').onclick=function(){useVideo=!useVideo;this.classList.toggle('on',useVideo);
+ this.textContent=useVideo?'📺 実映像 ON':'📺 エンジン映像';
+ VIDS.forEach(v=>{if(v){if(useVideo)v.play().catch(()=>{});else v.pause();}});updateAudio();
+ flash(useVideo?'インターネットTVの本当の動画を表示します':'エンジン生成映像に切替えました');};
+// 音声（焦点チャンネルのみ・ユーザー操作で解除）
+document.getElementById('b-audio').onclick=function(){audioOn=!audioOn;this.classList.toggle('on',audioOn);
+ this.textContent=audioOn?'🔊 音声 ON':'🔊 音声 OFF';
+ // ユーザー操作のうちに再生（自動再生ポリシー対策）
+ VIDS.forEach(v=>{if(v&&!v.paused)v.play().catch(()=>{});});
+ updateAudio();flash(audioOn?'焦点チャンネルの音声を再生します':'ミュートしました');};
 
 // WebXR 対応端末では表記を VR に（描画は互換性の高い SBS 方式）
 if(navigator.xr&&navigator.xr.isSessionSupported){
