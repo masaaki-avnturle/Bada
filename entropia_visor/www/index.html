@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>ENTROPIA VISOR — 大域予知ゴーグル</title>
+<style>
+:root{--warm:#ffb070;--cool:#7fd0ff;--txt:rgba(224,238,255,.92);--txt2:rgba(150,180,225,.6);}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:#04060d;color:var(--txt);font-family:'Georgia',serif;height:100vh;height:100dvh;overflow:hidden;
+ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#scene{position:fixed;inset:0;display:block;touch-action:none}
+
+/* ── ゴーグル(バイザー)オーバーレイ ── */
+#visor{position:fixed;inset:0;pointer-events:none;z-index:5}
+#visor .vignette{position:absolute;inset:0;
+ background:radial-gradient(120% 90% at 30% 45%, transparent 42%, rgba(2,4,10,.55) 72%, rgba(2,4,10,.95) 100%),
+            radial-gradient(120% 90% at 70% 45%, transparent 42%, rgba(2,4,10,.55) 72%, rgba(2,4,10,.95) 100%);}
+#visor .bezel{position:absolute;inset:14px;border-radius:38px;
+ box-shadow:0 0 0 2px rgba(120,180,255,.10), inset 0 0 60px rgba(10,20,45,.9), inset 0 0 140px rgba(4,8,18,.9);
+ border:1px solid rgba(140,190,255,.08);}
+#visor .glint{position:absolute;width:40%;height:28%;border-radius:50%;filter:blur(30px);opacity:.14}
+#visor .glint.l{top:5%;left:6%;background:radial-gradient(circle,var(--cool),transparent 70%)}
+#visor .glint.r{top:5%;right:6%;background:radial-gradient(circle,#a0b8ff,transparent 70%)}
+#visor .scan{position:absolute;inset:14px;border-radius:38px;opacity:.06;
+ background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(150,200,255,.5) 3px 4px)}
+
+/* ── HUD ── */
+.hud{position:fixed;z-index:8;pointer-events:none;font-weight:300;letter-spacing:.16em}
+#hud-title{top:26px;left:0;right:0;text-align:center}
+#hud-title h1{font:300 15px/1 'Georgia',serif;letter-spacing:.5em;color:rgba(190,215,255,.7);text-transform:uppercase}
+#hud-title .sub{font-size:8.5px;letter-spacing:.4em;color:var(--txt2);margin-top:6px}
+#hud-tl{top:70px;left:34px;font-size:9px;line-height:1.9;color:var(--txt2)}
+#hud-tl b{color:rgba(180,215,255,.9);letter-spacing:.1em}
+#hud-tr{top:70px;right:34px;text-align:right;font-size:9px;line-height:1.9;color:var(--txt2)}
+#hud-tr b{color:rgba(255,190,130,.92);letter-spacing:.1em}
+#caption{bottom:150px;left:0;right:0;text-align:center;font-size:10px;letter-spacing:.34em;color:rgba(200,220,255,.4);
+ font-style:italic;transition:opacity 1.4s}
+
+/* ── フォーカス中の出来事 (グラスパネル) ── */
+#event-card{position:fixed;z-index:9;right:40px;top:50%;transform:translateY(-50%);width:270px;
+ background:rgba(12,20,40,.42);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+ border:1px solid rgba(150,190,255,.16);border-radius:18px;padding:16px 18px;
+ box-shadow:0 12px 40px rgba(0,0,0,.5), inset 0 0 30px rgba(60,110,200,.06);opacity:0;transition:opacity .5s, transform .5s}
+#event-card.show{opacity:1}
+#event-card .etime{font:300 8px/1 'Georgia',serif;letter-spacing:.35em;text-transform:uppercase;color:var(--txt2)}
+#event-card .etime.future{color:var(--warm)}
+#event-card .edesc{font:300 15px/1.6 'Georgia',serif;color:rgba(225,238,255,.96);margin:9px 0 12px}
+#event-card canvas{width:100%;height:96px;display:block;border-radius:10px;background:rgba(4,8,18,.6);margin-bottom:11px}
+#event-card .erow{font:300 8.5px/1.8 'Georgia',serif;letter-spacing:.08em;color:var(--txt2)}
+#event-card .erow b{color:rgba(180,215,255,.9)}
+
+/* ── コントロール ── */
+#controls{position:fixed;z-index:10;left:0;right:0;bottom:34px;display:flex;flex-direction:column;align-items:center;gap:12px}
+#timeline-hint{font:300 8px/1 'Georgia',serif;letter-spacing:.3em;color:var(--txt2);text-transform:uppercase}
+.ctl-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:center;padding:0 14px}
+.gbtn{font:300 9px/1 'Georgia',serif;letter-spacing:.2em;padding:11px 16px;border-radius:12px;
+ border:1px solid rgba(150,190,255,.2);background:rgba(14,22,44,.5);backdrop-filter:blur(10px);
+ -webkit-backdrop-filter:blur(10px);color:rgba(200,222,255,.9);cursor:pointer;transition:.2s;text-transform:uppercase;
+ touch-action:manipulation}
+.gbtn:hover{background:rgba(40,70,140,.5);border-color:rgba(150,190,255,.4)}
+.gbtn.warm{border-color:rgba(255,160,90,.35);color:var(--warm)}
+.gbtn.warm:hover{background:rgba(120,70,30,.4)}
+.ent-wrap{display:flex;align-items:center;gap:9px;background:rgba(14,22,44,.5);backdrop-filter:blur(10px);
+ -webkit-backdrop-filter:blur(10px);border:1px solid rgba(150,190,255,.18);border-radius:12px;padding:9px 14px}
+.ent-wrap label{font:300 8px/1 'Georgia',serif;letter-spacing:.2em;color:var(--txt2);text-transform:uppercase}
+#ent-slider{width:150px;accent-color:#ff9a50}
+@media(max-width:760px){
+ #event-card{right:14px;left:14px;width:auto;top:auto;bottom:150px;transform:none}
+ #event-card.show{transform:none}
+ #hud-tl,#hud-tr{font-size:8px}
+ #caption{bottom:250px}
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="visor">
+  <div class="vignette"></div>
+  <div class="scan"></div>
+  <div class="bezel"></div>
+  <div class="glint l"></div>
+  <div class="glint r"></div>
+</div>
+
+<div class="hud" id="hud-title">
+  <h1>Entropia Visor</h1>
+  <div class="sub">大域予知ゴーグル · ガンマ関数 大域的部分積分多様体 × 世界熱エントロピー</div>
+</div>
+<div class="hud" id="hud-tl">
+  <div>世界熱エントロピー <b id="hud-E">—</b></div>
+  <div>大域積分多様体 M <b id="hud-M">—</b></div>
+  <div>ガンマ Γ(Ξ+1) <b id="hud-G">—</b></div>
+</div>
+<div class="hud" id="hud-tr">
+  <div>時相 <b id="hud-time">—</b></div>
+  <div>予知不変量 Ξ <b id="hud-xi">—</b></div>
+  <div>多様体幾何 <b id="hud-geo">—</b></div>
+</div>
+<div class="hud" id="caption">— エンジニアの少女は、ゴーグル越しに世界のすべてを振り返る —</div>
+
+<div id="event-card">
+  <div class="etime" id="ev-time">—</div>
+  <div class="edesc" id="ev-desc">—</div>
+  <canvas id="ev-canvas" height="96"></canvas>
+  <div class="erow">領域: <b id="ev-domain">—</b></div>
+  <div class="erow">Ξ=<b id="ev-xi">—</b> · 幾何=<b id="ev-geo">—</b> · 熱E=<b id="ev-energy">—</b></div>
+</div>
+
+<div id="controls">
+  <div id="timeline-hint">◀ 過去（振り返る） · 今 · 予知（未来）▶ — タイムラインをタップ / ドラッグ</div>
+  <div class="ctl-row">
+    <button class="gbtn" id="btn-rewind">◀◀ 振り返る</button>
+    <button class="gbtn" id="btn-now">今 / NOW</button>
+    <button class="gbtn" id="btn-play">⏸ 停止</button>
+    <button class="gbtn warm" id="btn-predict">予知 ▶▶</button>
+    <div class="ent-wrap">
+      <label>世界の熱エントロピー</label>
+      <input type="range" id="ent-slider" min="0.6" max="3.2" step="0.01" value="1.5">
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Bada 数理エンジン（ガンマ / ベータ / ζ ゲージ / 大域的部分積分多様体 Ξ）
+// ═══════════════════════════════════════════════════════════════
+const Bada=(()=>{
+ const G=7,C=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+  -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+ function gamma(x){if(x===0)return Infinity;if(x<0.5)return Math.PI/(Math.sin(Math.PI*x)*gamma(1-x));
+  x-=1;let a=C[0];const t=x+G+0.5;for(let i=1;i<G+2;i++)a+=C[i]/(x+i);
+  return Math.sqrt(2*Math.PI)*Math.pow(t,x+0.5)*Math.exp(-t)*a;}
+ const logGamma=x=>Math.log(Math.abs(gamma(x)));
+ const beta=(p,q)=>Math.exp(logGamma(p)+logGamma(q)-logGamma(p+q));
+ const xLogX=x=>x<=0?0:x*Math.log(x);
+ // 大域的部分積分多様体の線素 dμ = 1/(x·logx)²
+ function element(x){if(x<=1)return 1;const xl=xLogX(x);if(Math.abs(xl)<1e-9)return 1;return 1/(xl*xl);}
+ // ζ(s)=β(p,q)/log x ゲージ（Ξ 不変量の生成）
+ function zetaGauge(p,q,x){const lx=Math.log(x);if(Math.abs(lx)<1e-12)return beta(p,q);return beta(p,q)/lx;}
+ const GEOM=[
+  {name:'S^3',curv:1.0},{name:'H^1×E^1',curv:-0.5},{name:'E^1',curv:0.0},{name:'S^1×E^1',curv:0.3},
+  {name:'S^2×E^1',curv:0.6},{name:'H^1×S^1',curv:-0.3},{name:'H^1',curv:-1.0},{name:'S^2×E',curv:0.5}];
+ return{gamma,beta,element,zetaGauge,xLogX,GEOM};
+})();
+
+// 幾何 → 色相・現象語（世界の出来事の様相）
+const GEO_HUE={'S^3':205,'H^1×E^1':28,'E^1':150,'S^1×E^1':265,'S^2×E^1':190,'H^1×S^1':320,'H^1':12,'S^2×E':95};
+const GEO_PHEN={
+ 'S^3':'共鳴して脈動する','H^1×E^1':'分岐し枝分かれする','E^1':'格子状に静止する',
+ 'S^1×E^1':'軌道を描いて巡る','S^2×E^1':'球面波として拡がる','H^1×S^1':'対数螺旋を巻き上げる',
+ 'H^1':'双曲的に発散する','S^2×E':'放射状に開花する'};
+const DOMAINS=['大気圏','海洋','都市網','情報圏','生態系','経済圏','量子場','極圏','磁気圏','群衆','電力網','森林','海流','氷床','砂漠','星々'];
+
+// ═══════════════════════════════════════════════════════════════
+// 世界の熱エントロピーによる出来事の生成／予知
+// 時相 d（日）: 負=過去（振り返り） / 0=今 / 正=予知（未来）
+// ═══════════════════════════════════════════════════════════════
+let worldEntropy=1.5;
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function worldEvent(d){
+ const H=hashStr('event|'+d+'|'+worldEntropy.toFixed(2));
+ const frac=(H%100000)/100000;
+ // 世界熱エントロピー由来のシャノン量 H_d と 大域積分多様体 M_d
+ const hd=0.6+frac*3.2 + Math.max(0,d)*0.012;         // 未来ほどエントロピー増大（第二法則）
+ const md=Bada.element(2 + ((H>>>7)%60)/12);           // 大域的部分積分多様体の線素
+ // Ξ = ζ ゲージ = β(H+1, M+1)/log(N+1)  ← ガンマ関数（β）に基づく予知不変量
+ const xi=Bada.zetaGauge(hd+1, md+1, 6+((H>>>11)%50));
+ const gi=Math.floor(frac*Bada.GEOM.length)%Bada.GEOM.length;
+ const geo=Bada.GEOM[gi];
+ const domain=DOMAINS[(H>>>3)%DOMAINS.length];
+ const phen=GEO_PHEN[geo.name]||'変容する';
+ const energy=worldEntropy*(0.7+md*0.5)*(1+0.22*Math.sin(d*0.5+frac*6));
+ return {d,xi,hd,md,geo:geo.name,curv:geo.curv,hue:GEO_HUE[geo.name]||200,domain,phen,energy,future:d>0};
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 3Dシーン（熱エントロピーの球体・大域的多様体の光線）
+// ═══════════════════════════════════════════════════════════════
+const cv=document.getElementById('scene'),ctx=cv.getContext('2d');
+let W=0,Hh=0,DPR=1;
+function resize(){DPR=window.devicePixelRatio||1;W=window.innerWidth;Hh=window.innerHeight;
+ cv.width=W*DPR;cv.height=Hh*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+resize();window.addEventListener('resize',resize);
+
+// フィボナッチ球の点（世界=熱エントロピー場）
+const NPT=280, SPH=[];
+for(let i=0;i<NPT;i++){const y=1-(i/(NPT-1))*2;const r=Math.sqrt(1-y*y);const th=i*2.399963;
+ SPH.push([Math.cos(th)*r,y,Math.sin(th)*r]);}
+const STARS=[];for(let i=0;i<160;i++)STARS.push({x:Math.random(),y:Math.random(),z:Math.random()*.7+.3,s:Math.random()*1.4+.3});
+
+let rot=0, focusD=-3, playing=true, driftDir=1;
+const RANGE=60, STEP=3;                      // ±60日、3日刻み
+function clampD(d){return Math.max(-RANGE,Math.min(RANGE,d));}
+
+function drawScene(foc){
+ ctx.clearRect(0,0,W,Hh);
+ const cx=W*0.42, cy=Hh*0.46, R=Math.min(W,Hh)*0.24;
+ const hue=foc.hue, warm=foc.future;
+ // 熱エントロピーの放射ヘイズ
+ const g=ctx.createRadialGradient(cx,cy,0,cx,cy,R*3.2);
+ const inten=Math.min(.5,0.12+worldEntropy*0.12);
+ g.addColorStop(0,'hsla('+hue+',70%,55%,'+inten+')');
+ g.addColorStop(0.5,'hsla('+(hue+20)+',60%,30%,'+(inten*0.4)+')');
+ g.addColorStop(1,'rgba(4,6,13,0)');
+ ctx.fillStyle=g;ctx.fillRect(0,0,W,Hh);
+ // 星々
+ ctx.save();
+ STARS.forEach(s=>{const x=s.x*W,y=s.y*Hh;const tw=0.5+0.5*Math.sin(rot*3+s.x*30);
+  ctx.globalAlpha=0.25+tw*0.4*s.z;ctx.fillStyle='rgba(200,225,255,1)';
+  ctx.beginPath();ctx.arc(x,y,s.s*s.z,0,7);ctx.fill();});
+ ctx.restore();
+ // 世界（球体）: 回転投影
+ const pulse=1+0.07*Math.sin(rot*2.2)+Math.min(0.25,foc.xi*0.5);
+ const cosb=Math.cos(rot),sinb=Math.sin(rot),tilt=0.42;
+ const proj=SPH.map(p=>{
+  let x=p[0]*cosb - p[2]*sinb, z=p[0]*sinb + p[2]*cosb, y=p[1];
+  const y2=y*Math.cos(tilt)-z*Math.sin(tilt), z2=y*Math.sin(tilt)+z*Math.cos(tilt);
+  return {x:cx+x*R*pulse, y:cy+y2*R*pulse, z:z2};
+ });
+ // 光線（近接点の弧）= 大域的多様体の結線
+ ctx.lineWidth=0.6;
+ for(let i=0;i<proj.length;i+=2){const a=proj[i],b=proj[(i*7+13)%proj.length];
+  const depth=(a.z+1)/2;if(depth<0.35)continue;
+  ctx.strokeStyle='hsla('+hue+',80%,70%,'+(0.05*depth)+')';
+  ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+ // 点
+ proj.sort((p,q)=>p.z-q.z);
+ proj.forEach(p=>{const depth=(p.z+1)/2;const sz=0.6+depth*2.4;
+  ctx.globalAlpha=0.25+depth*0.75;
+  ctx.fillStyle='hsla('+hue+','+(60+depth*30)+'%,'+(45+depth*35)+'%,1)';
+  ctx.beginPath();ctx.arc(p.x,p.y,sz,0,7);ctx.fill();});
+ ctx.globalAlpha=1;
+ // 中心グロー
+ const cg=ctx.createRadialGradient(cx,cy,0,cx,cy,R*0.5);
+ cg.addColorStop(0,'hsla('+hue+',90%,80%,0.5)');cg.addColorStop(1,'transparent');
+ ctx.fillStyle=cg;ctx.beginPath();ctx.arc(cx,cy,R*0.5,0,7);ctx.fill();
+ // 現在の時相リング
+ ctx.strokeStyle=warm?'rgba(255,170,90,.5)':'hsla('+hue+',80%,70%,.35)';
+ ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(cx,cy,R*1.15*pulse,0,7);ctx.stroke();
+ drawTimeline(foc);
+}
+
+function drawTimeline(foc){
+ const y=Hh-120, x0=W*0.10, x1=W*0.90, mid=(x0+x1)/2;
+ // 軸
+ ctx.strokeStyle='rgba(150,190,255,.2)';ctx.lineWidth=1;
+ ctx.beginPath();ctx.moveTo(x0,y);ctx.lineTo(x1,y);ctx.stroke();
+ // 未来側の温色
+ const fg=ctx.createLinearGradient(mid,0,x1,0);
+ fg.addColorStop(0,'rgba(255,160,90,0)');fg.addColorStop(1,'rgba(255,160,90,.25)');
+ ctx.strokeStyle=fg;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(mid,y);ctx.lineTo(x1,y);ctx.stroke();
+ // イベントの目盛り
+ for(let d=-RANGE;d<=RANGE;d+=STEP){const e=worldEvent(d);
+  const fx=x0+((d+RANGE)/(2*RANGE))*(x1-x0);
+  const h=6+Math.min(22,e.energy*5);
+  ctx.strokeStyle='hsla('+e.hue+',80%,65%,'+(d>0?.7:.5)+')';ctx.lineWidth=d>0?2:1.4;
+  ctx.beginPath();ctx.moveTo(fx,y-h);ctx.lineTo(fx,y+h*0.4);ctx.stroke();}
+ // 今
+ ctx.fillStyle='rgba(200,225,255,.8)';ctx.font='9px Georgia';ctx.textAlign='center';
+ ctx.fillText('今',mid,y+26);ctx.fillText('過去',x0,y+26);ctx.fillText('予知',x1,y+26);
+ ctx.strokeStyle='rgba(200,225,255,.35)';ctx.setLineDash([2,3]);
+ ctx.beginPath();ctx.moveTo(mid,y-30);ctx.lineTo(mid,y+16);ctx.stroke();ctx.setLineDash([]);
+ // フォーカス位置マーカー
+ const cxp=x0+((clampD(focusD)+RANGE)/(2*RANGE))*(x1-x0);
+ ctx.fillStyle=foc.future?'#ffb070':'#7fd0ff';
+ ctx.beginPath();ctx.arc(cxp,y,5,0,7);ctx.fill();
+ ctx.strokeStyle=foc.future?'rgba(255,176,112,.5)':'rgba(127,208,255,.5)';ctx.lineWidth=1.5;
+ ctx.beginPath();ctx.arc(cxp,y,10,0,7);ctx.stroke();
+ tl={x0,x1,y};
+}
+let tl={x0:0,x1:0,y:0};
+
+// ═══════════════════════════════════════════════════════════════
+// 出来事カード / HUD 更新
+// ═══════════════════════════════════════════════════════════════
+const evc=document.getElementById('ev-canvas'),ectx=evc.getContext('2d');
+function evGlyph(e){const w=evc.clientWidth,h=96;evc.width=w*DPR;evc.height=h*DPR;ectx.setTransform(DPR,0,0,DPR,0,0);
+ ectx.clearRect(0,0,w,h);const cx=w/2,cy=h/2,s=Math.min(w,h)*0.4;const col='hsla('+e.hue+',80%,65%,.9)';
+ ectx.strokeStyle=col;ectx.fillStyle=col;ectx.lineWidth=1.4;ectx.shadowColor=col;ectx.shadowBlur=8;
+ const n=4+Math.round(e.xi*4);
+ switch(e.geo){
+  case 'S^3':for(let i=0;i<n;i++){ectx.beginPath();ectx.arc(cx,cy,s*(0.3+0.7*i/n),0,7);ectx.stroke();}break;
+  case 'H^1':case 'H^1×E^1':case 'H^1×S^1':for(let i=0;i<n;i++){const a=i/n*6.3;ectx.beginPath();ectx.moveTo(cx,cy);ectx.lineTo(cx+Math.cos(a)*s,cy+Math.sin(a)*s);ectx.stroke();}break;
+  case 'S^2×E':for(let i=0;i<n*2;i++){const a=i/(n*2)*6.3;ectx.beginPath();for(let u=0;u<=1;u+=.06){const r=s*u,p=Math.sin(u*Math.PI)*16;ectx.lineTo(cx+Math.cos(a)*r-Math.sin(a)*p,cy+Math.sin(a)*r+Math.cos(a)*p);}ectx.stroke();}break;
+  case 'S^1×E^1':for(let i=0;i<n;i++){const r=s*(0.3+0.6*i/n);ectx.beginPath();ectx.arc(cx,cy,r,0,7);ectx.stroke();}break;
+  default:{ectx.beginPath();for(let a=0;a<n*6.3;a+=.1){const r=s*a/(n*6.3);ectx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}ectx.stroke();}
+ }
+ ectx.shadowBlur=0;
+}
+function timeLabel(d){if(d===0)return'今 / NOW';return d<0?(Math.abs(d)+' 日前 · 振り返り'):('予知: '+d+' 日後');}
+let lastCardD=null;
+const card=document.getElementById('event-card');
+function updateCard(e){
+ const rd=Math.round(e.d);
+ document.getElementById('hud-E').textContent=worldEntropy.toFixed(3)+' k';
+ document.getElementById('hud-M').textContent=e.md.toFixed(4);
+ document.getElementById('hud-G').textContent=Bada.gamma(Math.min(8,e.xi+1)).toFixed(3);
+ document.getElementById('hud-time').textContent=timeLabel(rd);
+ document.getElementById('hud-xi').textContent=e.xi.toFixed(4);
+ document.getElementById('hud-geo').textContent=e.geo;
+ if(rd===lastCardD)return; lastCardD=rd;
+ const t=document.getElementById('ev-time');t.textContent=timeLabel(rd);t.className='etime'+(e.future?' future':'');
+ document.getElementById('ev-desc').textContent=e.domain+'に、'+e.phen+'。';
+ document.getElementById('ev-domain').textContent=e.domain;
+ document.getElementById('ev-xi').textContent=e.xi.toFixed(4);
+ document.getElementById('ev-geo').textContent=e.geo;
+ document.getElementById('ev-energy').textContent=e.energy.toFixed(3);
+ card.classList.add('show');
+ evGlyph(e);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ループ & 操作
+// ═══════════════════════════════════════════════════════════════
+function loop(){
+ rot+=0.0016;
+ if(playing){focusD+=driftDir*0.05;
+  if(focusD>=RANGE){focusD=RANGE;driftDir=-1;} if(focusD<=-RANGE){focusD=-RANGE;driftDir=1;}}
+ const foc=worldEvent(Math.round(clampD(focusD)));
+ drawScene(foc);
+ updateCard(foc);
+ requestAnimationFrame(loop);
+}
+loop();
+
+// キャプションのゆらぎ
+setInterval(()=>{const c=document.getElementById('caption');c.style.opacity=c.style.opacity==='0.15'?'0.4':'0.15';},4200);
+
+function setFocus(d){focusD=clampD(d);}
+document.getElementById('btn-rewind').onclick=()=>{playing=false;setPlayLabel();setFocus(focusD-STEP*2);};
+document.getElementById('btn-predict').onclick=()=>{playing=false;setPlayLabel();setFocus(focusD+STEP*2);};
+document.getElementById('btn-now').onclick=()=>{setFocus(0);};
+document.getElementById('btn-play').onclick=()=>{playing=!playing;setPlayLabel();};
+function setPlayLabel(){document.getElementById('btn-play').textContent=playing?'⏸ 停止':'▶ 再生';}
+document.getElementById('ent-slider').oninput=e=>{worldEntropy=parseFloat(e.target.value);lastCardD=null;};
+
+// タイムラインのタップ/ドラッグで時相を選ぶ
+let dragging=false;
+function pickFromX(clientX){const r=(clientX)/1;const frac=(r-tl.x0)/(tl.x1-tl.x0);
+ if(frac<-0.05||frac>1.05)return;setFocus(Math.round((frac*2-1)*RANGE));playing=false;setPlayLabel();}
+function nearTimeline(clientY){return Math.abs(clientY-tl.y)<60;}
+cv.addEventListener('pointerdown',e=>{if(nearTimeline(e.clientY)){dragging=true;pickFromX(e.clientX);}});
+cv.addEventListener('pointermove',e=>{if(dragging)pickFromX(e.clientX);});
+window.addEventListener('pointerup',()=>{dragging=false;});
+</script>
+</body>
+</html>
