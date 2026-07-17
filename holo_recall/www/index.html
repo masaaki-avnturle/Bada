@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>HOLO RECALL — 空間ホログラム再生</title>
+<style>
+:root{--txt:rgba(228,240,255,.94);--txt2:rgba(160,185,225,.6);--accent:#7fd0ff;--warm:#ffb070;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:#05070e;color:var(--txt);font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;
+ height:100vh;height:100dvh;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#stage{position:fixed;inset:0;display:block;touch-action:none}
+
+/* 視線レティクル（Vision Pro 参考の注視カーソル） */
+#reticle{position:fixed;width:26px;height:26px;border-radius:50%;border:1.5px solid rgba(180,220,255,.5);
+ transform:translate(-50%,-50%);pointer-events:none;z-index:8;transition:width .12s,height .12s,opacity .3s;
+ box-shadow:0 0 14px rgba(127,208,255,.4);mix-blend-mode:screen}
+#reticle::after{content:'';position:absolute;inset:10px;border-radius:50%;background:rgba(200,230,255,.7)}
+
+/* 上部ステータス */
+#status{position:fixed;top:16px;left:0;right:0;z-index:7;display:flex;align-items:center;justify-content:space-between;
+ padding:0 24px;pointer-events:none;font-weight:300}
+#status .app{font-size:12px;letter-spacing:.4em;color:rgba(190,220,255,.75)}
+#status .app small{display:block;font-size:7.5px;letter-spacing:.3em;color:var(--txt2);margin-top:3px}
+#status .mid{font-variant-numeric:tabular-nums;font-size:13px;letter-spacing:.1em;color:rgba(200,225,255,.85)}
+#status .rt{font-size:9px;letter-spacing:.2em;color:var(--txt2);text-align:right;line-height:1.7}
+#status .rt b{color:rgba(180,215,255,.9)}
+
+/* 再生トランスポート（動画で振り返る） */
+#transport{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);z-index:9;width:min(680px,92vw);
+ background:rgba(16,24,44,.42);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+ border:1px solid rgba(160,200,255,.18);border-radius:22px;padding:14px 18px 16px;
+ box-shadow:0 20px 60px rgba(0,0,0,.55), inset 0 0 40px rgba(70,120,210,.06)}
+#tl-label{display:flex;justify-content:space-between;font-size:9px;letter-spacing:.18em;color:var(--txt2);margin-bottom:9px}
+#tl-label b{color:rgba(190,220,255,.92);font-size:11px}
+#tl-label .future{color:var(--warm)}
+#scrub{width:100%;height:26px;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+#scrub::-webkit-slider-runnable-track{height:4px;border-radius:3px;
+ background:linear-gradient(90deg,rgba(127,208,255,.6),rgba(180,200,255,.3),rgba(255,176,112,.6))}
+#scrub::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;margin-top:-7px;
+ background:#eaf4ff;box-shadow:0 0 14px rgba(127,208,255,.8)}
+#scrub::-moz-range-track{height:4px;border-radius:3px;background:rgba(127,208,255,.5)}
+#scrub::-moz-range-thumb{width:18px;height:18px;border:0;border-radius:50%;background:#eaf4ff}
+.tbtns{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px}
+.tb{width:44px;height:44px;border-radius:50%;border:1px solid rgba(160,200,255,.2);background:rgba(20,30,54,.5);
+ color:rgba(210,232,255,.92);font-size:15px;cursor:pointer;transition:.18s;display:flex;align-items:center;justify-content:center;
+ backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);touch-action:manipulation}
+.tb:hover{background:rgba(50,84,150,.6);border-color:rgba(160,200,255,.45)}
+.tb.play{width:54px;height:54px;font-size:19px;border-color:rgba(127,208,255,.5)}
+.tb.speed{width:auto;padding:0 14px;font-size:12px;letter-spacing:.08em}
+
+/* ホームインジケータ（visionOS 参考） */
+#home{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:120px;height:5px;border-radius:3px;
+ background:rgba(200,225,255,.35);z-index:9}
+#note{position:fixed;left:0;right:0;bottom:2px;text-align:center;font-size:8px;color:rgba(120,150,195,.45);z-index:6;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="reticle"></div>
+
+<div id="status">
+  <div class="app">HOLO RECALL<small>空間ホログラム再生 · visionOS 参考</small></div>
+  <div class="mid" id="clock">--:--</div>
+  <div class="rt"><div>世界熱エントロピー <b id="st-E">—</b></div><div>再生 <b id="st-mode">▶</b> · 焦点 Ξ <b id="st-xi">—</b></div></div>
+</div>
+
+<div id="transport">
+  <div id="tl-label"><span>◀ 過去（振り返り）</span><b id="tl-focus">—</b><span class="future">予知（未来）▶</span></div>
+  <input type="range" id="scrub" min="0" max="1000" value="0">
+  <div class="tbtns">
+    <button class="tb" id="b-first" title="先頭">⏮</button>
+    <button class="tb" id="b-prev" title="前">◀◀</button>
+    <button class="tb play" id="b-play" title="再生/一時停止">⏸</button>
+    <button class="tb" id="b-next" title="次">▶▶</button>
+    <button class="tb" id="b-last" title="最後">⏭</button>
+    <button class="tb speed" id="b-speed" title="速度">1.0x</button>
+  </div>
+</div>
+<div id="home"></div>
+<div id="note">※ ホログラム内の映像・速報は Bada 熱エントロピー多様体エンジンが生成する架空のものです（実在の報道・団体・人物とは関係ありません）。</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Bada 数理（ガンマ / ζ ゲージ / 大域的部分積分多様体）— 焦点 Ξ
+// ═══════════════════════════════════════════════════════════════
+const Bada=(()=>{
+ const G=7,C=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+  -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+ function gamma(x){if(x===0)return Infinity;if(x<0.5)return Math.PI/(Math.sin(Math.PI*x)*gamma(1-x));
+  x-=1;let a=C[0];const t=x+G+0.5;for(let i=1;i<G+2;i++)a+=C[i]/(x+i);
+  return Math.sqrt(2*Math.PI)*Math.pow(t,x+0.5)*Math.exp(-t)*a;}
+ const lg=x=>Math.log(Math.abs(gamma(x)));const beta=(p,q)=>Math.exp(lg(p)+lg(q)-lg(p+q));
+ const xLogX=x=>x<=0?0:x*Math.log(x);
+ function element(x){if(x<=1)return 1;const xl=xLogX(x);return Math.abs(xl)<1e-9?1:1/(xl*xl);}
+ function zetaGauge(p,q,x){const lx=Math.log(x);return Math.abs(lx)<1e-12?beta(p,q):beta(p,q)/lx;}
+ const GEOM=[['S^3',1],['H^1×E^1',-0.5],['E^1',0],['S^1×E^1',0.3],['S^2×E^1',0.6],['H^1×S^1',-0.3],['H^1',-1],['S^2×E',0.5]];
+ return{element,zetaGauge,GEOM};
+})();
+const GEO_HUE={'S^3':205,'H^1×E^1':28,'E^1':150,'S^1×E^1':265,'S^2×E^1':190,'H^1×S^1':320,'H^1':12,'S^2×E':95};
+const GEO_FOOT={'S^3':'globe','H^1×E^1':'bloom','E^1':'grid','S^1×E^1':'scan','S^2×E^1':'wave','H^1×S^1':'globe','H^1':'bloom','S^2×E':'wave'};
+const SUBJ=['政府','中央銀行','研究チーム','気象当局','宇宙機関','市当局','大手企業','電力会社','国際機関','医療機関'];
+const ACT=['が緊急会見','が記録を更新','に警報を発令','が新発見を報告','で異常を観測','が合意に到達','が対応を強化','が再開を決定'];
+const PLACE=['首都圏','沿岸部','全国','国際市場','上空','地下網','情報圏','極地','広域','都市中枢'];
+const TOPIC=['大域積分多様体','熱エントロピー','ゼータ変動','ガンマ収束','量子場','気候','経済指標','宇宙観測'];
+
+function hashStr(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+const NEV=7;
+let worldEntropy=1.6;
+function genEvent(i){
+ const H=hashStr('holo|'+i);
+ const frac=(H%100000)/100000;
+ const g=Bada.GEOM[Math.floor(frac*8)%8];const geo=g[0];
+ const subj=SUBJ[(H>>>3)%SUBJ.length], act=ACT[(H>>>7)%ACT.length], place=PLACE[(H>>>11)%PLACE.length], topic=TOPIC[(H>>>15)%TOPIC.length];
+ const hd=0.8+frac*3, md=Bada.element(2+((H>>>5)%50)/10);
+ const xi=Bada.zetaGauge(hd+1,md+1,6+((H>>>9)%40));
+ const timeOffset=Math.round((i-(NEV-1)/2)*36 + ((H>>>17)%18-9)); // 分。負=過去, 正=未来
+ return {i,geo,hue:GEO_HUE[geo],foot:GEO_FOOT[geo],xi,timeOffset,seed:frac*10,
+  headline:`${place}の${subj}、「${topic}」${act}`};
+}
+const EVENTS=[];for(let i=0;i<NEV;i++)EVENTS.push(genEvent(i));
+function timeLabel(m){if(Math.abs(m)<1)return'今 · LIVE';return m<0?(Math.abs(m)+'分前 · 振り返り'):('予知 +'+m+'分');}
+
+// ═══════════════════════════════════════════════════════════════
+// 空間シーン（ホログラム浮遊ディスプレイ）
+// ═══════════════════════════════════════════════════════════════
+const cv=document.getElementById('stage'),ctx=cv.getContext('2d');
+let W=0,Hh=0,DPR=1;
+function resize(){DPR=window.devicePixelRatio||1;W=innerWidth;Hh=innerHeight;cv.width=W*DPR;cv.height=Hh*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+resize();addEventListener('resize',resize);
+
+const DUST=[];for(let i=0;i<70;i++)DUST.push({x:Math.random(),y:Math.random(),z:Math.random(),s:Math.random()*1.6+.3});
+const GLOBEPTS=[];for(let i=0;i<44;i++){const y=1-(i/43)*2;const r=Math.sqrt(1-y*y);const th=i*2.399963;GLOBEPTS.push([Math.cos(th)*r,y,Math.sin(th)*r]);}
+
+let playhead=(NEV-1)/2, playing=true, speed=1.0, animT=0;
+let px=0,py=0,tpx=0,tpy=0;   // parallax (smoothed)
+
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+ ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+// パネル内の「映像」（動画）
+function footage(x,y,w,h,hue,foot,phase,intensity){
+ ctx.save();rr(x,y,w,h,10);ctx.clip();
+ const cx=x+w/2,cy=y+h/2;const col=(a)=>'hsla('+hue+',85%,68%,'+a+')';
+ // 背景グロー
+ const g=ctx.createRadialGradient(cx,cy,0,cx,cy,w*0.6);
+ g.addColorStop(0,'hsla('+hue+',70%,40%,'+(0.28*intensity)+')');g.addColorStop(1,'rgba(6,10,20,0)');
+ ctx.fillStyle=g;ctx.fillRect(x,y,w,h);
+ ctx.lineWidth=1.1;ctx.strokeStyle=col(0.85*intensity);ctx.fillStyle=col(0.85*intensity);
+ if(foot==='wave'){
+  for(let k=0;k<5;k++){const yo=y+h*(0.25+k*0.13);ctx.beginPath();
+   for(let sx=0;sx<=w;sx+=4){const yy=yo+Math.sin((sx*0.05)+(phase*1.6)+k)*h*0.06*intensity;sx===0?ctx.moveTo(x+sx,yy):ctx.lineTo(x+sx,yy);}ctx.stroke();}
+ }else if(foot==='globe'){
+  const R=Math.min(w,h)*0.32,cb=Math.cos(phase),sb=Math.sin(phase),tl=0.4;
+  const pr=GLOBEPTS.map(p=>{let X=p[0]*cb-p[2]*sb,Z=p[0]*sb+p[2]*cb,Y=p[1];const Y2=Y*Math.cos(tl)-Z*Math.sin(tl),Z2=Y*Math.sin(tl)+Z*Math.cos(tl);return{x:cx+X*R,y:cy+Y2*R,z:Z2};});
+  pr.sort((a,b)=>a.z-b.z);pr.forEach(p=>{const d=(p.z+1)/2;ctx.globalAlpha=(0.2+d*0.7)*intensity;
+   ctx.beginPath();ctx.arc(p.x,p.y,0.5+d*2,0,7);ctx.fill();});ctx.globalAlpha=1;
+ }else if(foot==='scan'){
+  for(let i=1;i<=3;i++){ctx.globalAlpha=0.3*intensity;ctx.beginPath();ctx.arc(cx,cy,Math.min(w,h)*0.12*i,0,7);ctx.stroke();}
+  ctx.globalAlpha=1;const a=phase*1.4;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+Math.cos(a)*w*0.4,cy+Math.sin(a)*h*0.4);ctx.stroke();
+  for(let b=0;b<4;b++){const ba=phase*0.7+b*1.7,br=Math.min(w,h)*(0.12+0.1*b);ctx.beginPath();ctx.arc(cx+Math.cos(ba)*br,cy+Math.sin(ba)*br,2.2,0,7);ctx.fill();}
+ }else if(foot==='bloom'){
+  const n=10;for(let i=0;i<n;i++){const a=i/n*6.3;ctx.beginPath();
+   for(let u=0;u<=1;u+=.08){const rr2=Math.min(w,h)*0.4*u,pet=Math.sin(u*Math.PI)*w*0.06*Math.sin(phase*1.5+i)*intensity;
+    ctx.lineTo(cx+Math.cos(a)*rr2-Math.sin(a)*pet,cy+Math.sin(a)*rr2+Math.cos(a)*pet);}ctx.stroke();}
+ }else{ // grid（データ流）
+  const gs=w/9;ctx.globalAlpha=0.5*intensity;
+  for(let i=0;i<10;i++){const xx=x+((i*gs+phase*24)%w);ctx.beginPath();ctx.moveTo(xx,y);ctx.lineTo(xx,y+h);ctx.stroke();}
+  for(let j=0;j<7;j++){const yy=y+((j*gs+phase*16)%h);ctx.beginPath();ctx.moveTo(x,yy);ctx.lineTo(x+w,yy);ctx.stroke();}
+  ctx.globalAlpha=1;
+ }
+ // 走査線（ホログラム）
+ ctx.globalAlpha=0.06*intensity;ctx.fillStyle='rgba(180,220,255,1)';
+ for(let sy=y;sy<y+h;sy+=3)ctx.fillRect(x,sy,w,1);
+ ctx.globalAlpha=1;ctx.restore();
+}
+
+function drawPanel(ev,delta){
+ const focus=1-Math.min(1,Math.abs(delta));
+ const scale=1/(1+0.34*Math.abs(delta));
+ const baseW=Math.min(W,Hh)*0.42, w=baseW*scale, h=w*0.62;
+ const spacing=baseW*0.72;
+ const par=(1+Math.abs(delta)*0.4);
+ const cx=W*0.5 + delta*spacing + px*26*par;
+ const cy=Hh*0.44 + Math.abs(delta)*Hh*0.02 + py*18*par - focus*Hh*0.02;
+ const x=cx-w/2, y=cy-h/2;
+ const alpha=Math.max(0.22,1-0.3*Math.abs(delta));
+ const intensity=0.5+focus*0.5;
+ const flick=0.94+0.06*Math.sin(animT*8+ev.seed*3);
+ ctx.save();ctx.globalAlpha=alpha*flick;
+ // グラス地
+ rr(x,y,w,h,10);ctx.fillStyle='rgba(12,20,40,0.5)';ctx.fill();
+ // 映像
+ footage(x,y,w,h,ev.hue,ev.foot,animT*(0.6+focus*1.1)+ev.seed,intensity);
+ // 枠グロー
+ ctx.shadowColor='hsla('+ev.hue+',85%,65%,'+(0.6*intensity)+')';ctx.shadowBlur=18*focus+6;
+ rr(x,y,w,h,10);ctx.lineWidth=1.4;ctx.strokeStyle='hsla('+ev.hue+',85%,72%,'+(0.5+0.4*focus)+')';ctx.stroke();
+ ctx.shadowBlur=0;
+ // タイトルバー
+ ctx.globalAlpha=alpha;
+ ctx.fillStyle='rgba(230,242,255,'+(0.55+0.4*focus)+')';
+ ctx.font=(11*Math.max(0.8,scale))+'px system-ui, sans-serif';ctx.textAlign='left';
+ let head=ev.headline;const maxw=w-58;
+ while(ctx.measureText(head).width>maxw && head.length>4)head=head.slice(0,-1);
+ if(head!==ev.headline)head+='…';
+ ctx.fillText(head,x+12,y+h-16);
+ // 時刻 / RECドット
+ ctx.fillStyle=ev.timeOffset>0?'rgba(255,176,112,.9)':'rgba(140,200,255,.85)';
+ ctx.font=(8.5*Math.max(0.8,scale))+'px system-ui';ctx.fillText(timeLabel(ev.timeOffset),x+12,y+16);
+ if(focus>0.6){ctx.fillStyle='#ff4a54';ctx.beginPath();ctx.arc(x+w-16,y+14,3.4,0,7);ctx.fill();
+  ctx.fillStyle='rgba(255,120,130,.9)';ctx.font='7px system-ui';ctx.textAlign='right';ctx.fillText('REC',x+w-24,y+17);ctx.textAlign='left';}
+ ctx.restore();
+}
+
+function drawScene(){
+ ctx.clearRect(0,0,W,Hh);
+ // 空間の環境グラデーション
+ const g=ctx.createRadialGradient(W*0.5+px*40,Hh*0.4,0,W*0.5,Hh*0.5,Math.max(W,Hh)*0.8);
+ g.addColorStop(0,'rgba(16,26,52,.9)');g.addColorStop(1,'rgba(5,7,14,1)');ctx.fillStyle=g;ctx.fillRect(0,0,W,Hh);
+ // 床グリッド（奥行き / 視差）
+ ctx.strokeStyle='rgba(90,140,220,.10)';ctx.lineWidth=1;
+ const hy=Hh*0.66, vanx=W*0.5+px*60;
+ for(let i=-10;i<=10;i++){const fx=vanx+i*W*0.11;ctx.beginPath();ctx.moveTo(vanx+(fx-vanx)*0.12,hy);ctx.lineTo(fx+px*30,Hh+10);ctx.stroke();}
+ for(let j=1;j<=8;j++){const t=j/8,yy=hy+(Hh-hy)*t*t;ctx.globalAlpha=0.10*(1-t*0.6);ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(W,yy);ctx.stroke();}
+ ctx.globalAlpha=1;
+ // 浮遊ダスト
+ DUST.forEach(d=>{const x=((d.x+animT*0.004*d.z)%1)*W+px*20*d.z, y=d.y*Hh+py*14*d.z;
+  ctx.globalAlpha=0.12+0.4*d.z*(0.5+0.5*Math.sin(animT*2+d.x*30));ctx.fillStyle='rgba(180,215,255,1)';
+  ctx.beginPath();ctx.arc(x,y,d.s*d.z,0,7);ctx.fill();});ctx.globalAlpha=1;
+ // パネルを奥→手前
+ const order=EVENTS.map((ev,i)=>({ev,delta:i-playhead})).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+ order.forEach(o=>drawPanel(o.ev,o.delta));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ループ & HUD
+// ═══════════════════════════════════════════════════════════════
+let last=0;
+function loop(ts){
+ const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;
+ animT+=dt;
+ px+=(tpx-px)*0.06;py+=(tpy-py)*0.06;
+ if(playing){playhead+=dt*0.35*speed;if(playhead>NEV-1){playhead=0;}}
+ drawScene();
+ const foc=EVENTS[Math.round(Math.max(0,Math.min(NEV-1,playhead)))];
+ document.getElementById('scrub').value=Math.round(playhead/(NEV-1)*1000);
+ const t=document.getElementById('tl-focus');t.textContent=timeLabel(foc.timeOffset);t.className=foc.timeOffset>0?'future':'';
+ document.getElementById('st-xi').textContent=foc.xi.toFixed(3);
+ document.getElementById('st-mode').textContent=playing?'▶':'⏸';
+ document.getElementById('st-E').textContent=worldEntropy.toFixed(2)+' k';
+ requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// 時計
+function clk(){const d=new Date(),p=n=>String(n).padStart(2,'0');document.getElementById('clock').textContent=p(d.getHours())+':'+p(d.getMinutes());}
+setInterval(clk,1000);clk();
+
+// トランスポート
+const scrub=document.getElementById('scrub');
+scrub.addEventListener('input',()=>{playing=false;setPlay();playhead=parseFloat(scrub.value)/1000*(NEV-1);});
+function setPlay(){document.getElementById('b-play').textContent=playing?'⏸':'▶';}
+document.getElementById('b-play').onclick=()=>{playing=!playing;setPlay();};
+document.getElementById('b-prev').onclick=()=>{playing=false;setPlay();playhead=Math.max(0,Math.round(playhead)-1);};
+document.getElementById('b-next').onclick=()=>{playing=false;setPlay();playhead=Math.min(NEV-1,Math.round(playhead)+1);};
+document.getElementById('b-first').onclick=()=>{playing=false;setPlay();playhead=0;};
+document.getElementById('b-last').onclick=()=>{playing=false;setPlay();playhead=NEV-1;};
+const SPEEDS=[0.5,1.0,2.0,4.0];let si=1;
+document.getElementById('b-speed').onclick=()=>{si=(si+1)%SPEEDS.length;speed=SPEEDS[si];document.getElementById('b-speed').textContent=speed.toFixed(1)+'x';};
+
+// 視線レティクル + 視差 + パネル選択（Vision Pro 参考の注視/ピンチ選択）
+const ret=document.getElementById('reticle');
+function moveGaze(cx,cy){ret.style.left=cx+'px';ret.style.top=cy+'px';tpx=(cx/W*2-1);tpy=(cy/Hh*2-1);
+ // 注視中のパネルに近いと拡大
+ const near=nearestPanel(cx,cy);ret.style.width=near?'34px':'26px';ret.style.height=near?'34px':'26px';}
+function nearestPanel(cx,cy){let best=null,bd=1e9;EVENTS.forEach((ev,i)=>{const delta=i-playhead;
+ const scale=1/(1+0.34*Math.abs(delta)),baseW=Math.min(W,Hh)*0.42,spacing=baseW*0.72;
+ const x=W*0.5+delta*spacing+px*26*(1+Math.abs(delta)*0.4),y=Hh*0.44+Math.abs(delta)*Hh*0.02;
+ const d=Math.hypot(cx-x,cy-y);if(d<baseW*scale*0.5&&d<bd){bd=d;best=i;}});return best;}
+addEventListener('pointermove',e=>moveGaze(e.clientX,e.clientY));
+addEventListener('pointerdown',e=>{const i=nearestPanel(e.clientX,e.clientY);
+ if(i!==null){playing=false;setPlay();playhead=i;}});
+setPlay();
+</script>
+</body>
+</html>
