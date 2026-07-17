@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>BADA グラビトン電信 — GRAVITON TELEGRAPH</title>
+<style>
+:root{--txt:rgba(232,242,255,.96);--txt2:rgba(168,190,228,.66);--acc:#8fd0ff;--acc2:#b98cff;--ok:#5cd08a;--warn:#ff9a6b;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:radial-gradient(ellipse at 50% -10%,#122046,#080b14 60%,#05070e);color:var(--txt);
+ font-family:-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;min-height:100vh;
+ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;padding:14px 14px 40px}
+.wrap{max-width:760px;margin:0 auto}
+header{text-align:center;padding:6px 0 14px}
+h1{font-weight:300;letter-spacing:.16em;font-size:19px;background:linear-gradient(90deg,#8fd0ff,#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:8.5px;letter-spacing:.24em;color:var(--txt2);margin-top:6px;line-height:1.7}
+.card{background:rgba(18,26,46,.55);border:1px solid rgba(150,190,255,.16);border-radius:16px;padding:14px;margin-bottom:12px;
+ box-shadow:0 18px 50px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06)}
+.card h2{font-size:10px;letter-spacing:.2em;color:var(--acc);text-transform:uppercase;margin-bottom:10px;font-weight:600}
+label{display:block;font-size:9px;letter-spacing:.14em;color:var(--txt2);margin:8px 0 4px}
+input[type=tel],textarea{width:100%;background:rgba(0,0,0,.3);border:1px solid rgba(150,190,255,.2);border-radius:10px;
+ color:#eaf4ff;font-size:14px;padding:10px 12px;outline:none;font-family:inherit}
+textarea{resize:vertical;min-height:62px;line-height:1.5}
+input:focus,textarea:focus{border-color:rgba(143,208,255,.6)}
+.phtype{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 11px;border-radius:20px;margin-top:8px;
+ background:rgba(143,208,255,.14);border:1px solid rgba(143,208,255,.35);color:#dbeeffe;letter-spacing:.06em}
+.sendbtn{width:100%;margin-top:14px;padding:14px;border:none;border-radius:12px;cursor:pointer;font-size:15px;font-weight:600;letter-spacing:.1em;
+ color:#04121f;background:linear-gradient(90deg,#8fd0ff,#7be0c0);box-shadow:0 10px 30px rgba(120,200,255,.3);transition:.15s}
+.sendbtn:active{transform:scale(.985)}
+.sendbtn:disabled{opacity:.5;cursor:wait}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+.tile{background:rgba(10,16,30,.6);border:1px solid rgba(130,170,240,.14);border-radius:11px;padding:9px 10px;min-height:56px}
+.tile .k{font-size:7.5px;letter-spacing:.14em;color:var(--txt2);text-transform:uppercase}
+.tile .v{font-size:15px;font-weight:400;margin-top:4px;font-variant-numeric:tabular-nums;color:#eaf4ff;word-break:break-all}
+.tile .v small{font-size:9px;color:var(--txt2)}
+.tile.acc .v{color:var(--acc)} .tile.acc2 .v{color:var(--acc2)} .tile.ok .v{color:var(--ok)}
+#stage{width:100%;height:250px;display:block;border-radius:12px;background:radial-gradient(ellipse at 50% 40%,#0b1430,#06090f);border:1px solid rgba(130,170,240,.14)}
+.morse{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;letter-spacing:2px;color:#8fe0ff;word-break:break-all;line-height:1.7;
+ background:rgba(0,0,0,.3);border-radius:9px;padding:9px 11px;margin-top:4px;max-height:70px;overflow:auto}
+.recv{display:flex;gap:14px;align-items:stretch}
+.phone{flex:0 0 96px;display:flex;flex-direction:column;align-items:center;gap:7px;justify-content:center;
+ background:rgba(8,14,28,.6);border:1px solid rgba(130,170,240,.16);border-radius:14px;padding:10px}
+.phone .ic{font-size:34px;filter:drop-shadow(0 0 10px rgba(143,208,255,.5))}
+.phone .lb{font-size:8.5px;letter-spacing:.1em;color:var(--txt2);text-align:center}
+.phone .sig{display:flex;gap:3px;margin-top:2px}
+.phone .sig i{width:4px;border-radius:2px;background:rgba(143,208,255,.3);height:6px}
+.phone.live .sig i{background:var(--ok);animation:sigp 1s infinite}
+.phone .sig i:nth-child(2){height:10px} .phone .sig i:nth-child(3){height:14px} .phone .sig i:nth-child(4){height:18px}
+@keyframes sigp{0%,100%{opacity:.4}50%{opacity:1}}
+.recvbody{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(130,170,240,.14);border-radius:12px;padding:11px 13px;min-height:96px}
+.recvbody .meta{font-size:8.5px;letter-spacing:.1em;color:var(--txt2);margin-bottom:7px}
+.recvbody .txt{font-size:15px;line-height:1.6;color:#eafff4;min-height:24px;white-space:pre-wrap}
+.recvbody .cursor{display:inline-block;width:8px;height:15px;background:var(--ok);vertical-align:-2px;animation:bl .7s step-end infinite}
+@keyframes bl{50%{opacity:0}}
+.bconsole{margin-top:4px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:8px;line-height:1.6;color:rgba(150,200,255,.78);
+ background:rgba(0,0,0,.32);border:1px solid rgba(120,170,255,.16);border-radius:9px;padding:8px 10px;max-height:88px;overflow:auto;white-space:pre-wrap}
+.bconsole b{color:#8fd0ff}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.chip{font-size:10px;padding:6px 11px;border-radius:9px;background:rgba(30,42,70,.6);border:1px solid rgba(150,190,255,.2);color:#dfeaff;cursor:pointer}
+.chip.on{background:rgba(143,208,255,.22);border-color:rgba(143,208,255,.5)}
+.note{font-size:8px;color:rgba(140,165,210,.55);line-height:1.7;margin-top:10px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+ <h1>BADA グラビトン電信</h1>
+ <div class="sub">GRAVITON TELEGRAPH · ガンマ関数の大域的部分積分多様体 × Jones多項式の量子テレポーテーション × 不確定性原理<br>グラビトン↔電磁波 変換で携帯電話・固定電話へ電信通信 · Bada 言語駆動</div>
+</header>
+
+<div class="card">
+ <h2>① 送信 — 宛先と本文</h2>
+ <label>宛先電話番号（携帯 070/080/090・固定 03… など）</label>
+ <input type="tel" id="num" inputmode="tel" placeholder="090-1234-5678 または 03-1234-5678" value="090-1234-5678">
+ <span class="phtype" id="phtype">📱 携帯電話</span>
+ <label style="margin-top:12px">メッセージ本文</label>
+ <textarea id="msg" placeholder="電信で送るメッセージを入力…">HELLO WORLD グラビトン電信 テスト</textarea>
+ <div class="row" style="margin-top:8px">
+  <div class="chip on" id="c-audio">🔊 モールス音 ON</div>
+  <div class="chip" id="c-pol">重力波 偏光 +</div>
+ </div>
+ <button class="sendbtn" id="send">⚡ 送信（Bada 実行）</button>
+</div>
+
+<div class="card">
+ <h2>② 符号化・不変量（Bada エンジン）</h2>
+ <div class="grid">
+  <div class="tile acc"><div class="k">H エントロピー</div><div class="v" id="t-h">—</div></div>
+  <div class="tile acc2"><div class="k">Ξ 多様体不変量</div><div class="v" id="t-xi">—</div></div>
+  <div class="tile"><div class="k">Jones 交差数 n</div><div class="v" id="t-n">—</div></div>
+  <div class="tile"><div class="k">⟨K⟩ Kauffman</div><div class="v" id="t-k" style="font-size:11px">—</div></div>
+  <div class="tile"><div class="k">V(2) Jones値</div><div class="v" id="t-v">—</div></div>
+  <div class="tile ok"><div class="k">テレポート忠実度</div><div class="v" id="t-fid">—</div></div>
+  <div class="tile"><div class="k">Δx·Δp 不確定性</div><div class="v" id="t-unc" style="font-size:12px">—</div></div>
+  <div class="tile acc"><div class="k">搬送波（EM）</div><div class="v" id="t-car" style="font-size:12px">—</div></div>
+  <div class="tile"><div class="k">重力波 ひずみ h</div><div class="v" id="t-h0" style="font-size:11px">—</div></div>
+ </div>
+ <label style="margin-top:10px">モールス符号</label>
+ <div class="morse" id="morse">—</div>
+</div>
+
+<div class="card">
+ <h2>③ 量子テレポーテーション ＋ グラビトン→電磁波</h2>
+ <canvas id="stage" width="720" height="250"></canvas>
+</div>
+
+<div class="card">
+ <h2>④ 受信 — 相手の電話</h2>
+ <div class="recv">
+  <div class="phone" id="rphone"><div class="ic" id="rphone-ic">📱</div><div class="lb" id="rphone-lb">携帯電話</div>
+   <div class="sig"><i></i><i></i><i></i><i></i></div></div>
+  <div class="recvbody"><div class="meta" id="recv-meta">待機中…</div><div class="txt" id="recv-txt"></div></div>
+ </div>
+</div>
+
+<div class="card">
+ <h2>⑤ BADA コンソール（実行トレース）</h2>
+ <div class="bconsole" id="bconsole"><b>BADA ▸</b> telegraph.bada 実行待ち…</div>
+</div>
+
+<div class="note">
+ ※ 本アプリは山口フレームワークに基づく<b>創作・思考実験</b>のシミュレーションです。グラビトン↔電磁波変換や量子テレポーテーションによる通信は現実の通信網・電話回線には接続せず、実際の送信は行いません。数式（ガンマ/ベータ・Jones多項式・不確定性関係）は可視化のために計算しています。<br>© 2025 Masaaki Yamaguchi · 山口 雅旭 · Global Differential Manifold Research
+</div>
+</div>
+
+<!-- グラビトン電信の送信プログラム（Bada 言語）。内蔵インタプリタが実行する。 -->
+<script type="application/x-bada" id="bada-src">
+# telegraph.bada — グラビトン電信の送信プログラム（Bada 言語）
+set entropy   = 3.20
+set crossings = 5
+set line      = 0
+line <- "graviton electromagnetic teletransport"
+line -< 1.0
+line >- line
+Omega::push line as channel_node
+print line
+Tele::encode
+Tele::knot crossings
+Tele::teleport
+Tele::graviton
+Tele::send
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Bada 数理（language.rb の Special/Manifold を JS 移植）＋ ガンマ/ベータ
+// ═══════════════════════════════════════════════════════════════
+function bXLogX(x){return x<=0?0:x*Math.log(x);}
+function bManifoldElement(x){const d=bXLogX(x),dd=d*d;return dd>1e-12?1/dd:0;}
+function gammaln(x){const c=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+ -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+ if(x<0.5)return Math.log(Math.PI/Math.sin(Math.PI*x))-gammaln(1-x);
+ x-=1;let a=c[0];const g=7,t=x+g+0.5;for(let i=1;i<9;i++)a+=c[i]/(x+i);
+ return 0.5*Math.log(2*Math.PI)+(x+0.5)*Math.log(t)-t+Math.log(a);}
+function betaFn(p,q){return Math.exp(gammaln(p)+gammaln(q)-gammaln(p+q));}
+function shannon(str){const toks=Array.from(String(str));if(!toks.length)return 0;
+ const f={};toks.forEach(t=>f[t]=(f[t]||0)+1);let H=0;const n=toks.length;
+ Object.values(f).forEach(c=>{const p=c/n;H-=p*Math.log2(p);});return H;}
+function bXi(str){const H=shannon(str),n=Array.from(String(str)).length||1,M=bManifoldElement(n+2);
+ return betaFn(H+1,M+1)/Math.log(n+1+1);}
+
+// BadaNode：<- / -< / >- 演算子（language.rb 準拠）
+function BadaNode(v){this.value=v||0;this.history=[];}
+BadaNode.prototype.coerce=function(v){return typeof v==='number'?v:(v instanceof BadaNode?v.value:bXi(v));};
+BadaNode.prototype.leftAct=function(inp){const chi=this.coerce(inp);const x=(Math.abs(this.value)<1e-9?1:Math.abs(this.value))+1;
+ this.value=Math.abs(Math.PI*chi*Math.log(x));return this;};
+BadaNode.prototype.manifoldIntegral=function(s){const v=s==null?this.value:this.coerce(s);const x=Math.abs(v)+2;
+ this.value=bXLogX(x)*bManifoldElement(x)+bManifoldElement(x);return this;};
+BadaNode.prototype.rightAct=function(o){const v=o==null?this.value:this.coerce(o);const x=Math.abs(v)+1e-6;
+ this.value=Math.exp(-bXLogX(x));return this;};
+
+// Bada インタプリタ（set / <- / -< / >- / Omega::push / print / Tele::）
+function BadaInterp(onTele){this.env={};this.out=[];this.onTele=onTele;}
+BadaInterp.prototype.evalExpr=function(s){s=s.trim();let m;
+ if((m=s.match(/^"(.*)"$/)))return m[1];
+ if(/^[-+]?\d+(?:\.\d+)?$/.test(s))return parseFloat(s);
+ if(this.env.hasOwnProperty(s))return this.env[s];
+ return s;};
+BadaInterp.prototype.valOf=function(x){return x instanceof BadaNode?x.value:x;};
+BadaInterp.prototype.nodef=function(n){if(!(this.env[n] instanceof BadaNode))this.env[n]=new BadaNode(typeof this.env[n]==='number'?this.env[n]:0);return this.env[n];};
+BadaInterp.prototype.exec=function(line){let m;
+ if((m=line.match(/^set\s+(\w+)\s*=\s*(.+)$/))){const v=this.evalExpr(m[2]);this.env[m[1]]=(typeof v==='number')?v:new BadaNode(bXi(v));return;}
+ if((m=line.match(/^(\w+)\s*<-\s*(.+)$/))){this.nodef(m[1]).leftAct(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*-<\s*(.+)$/))){this.nodef(m[1]).manifoldIntegral(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(\w+)\s*>-\s*(.+)$/))){this.nodef(m[1]).rightAct(this.evalExpr(m[2]));return;}
+ if((m=line.match(/^(?:Omega|Ω)::push\s+(\w+)(?:\s+as\s+(\w+))?$/))){const n=this.nodef(m[1]);
+  this.out.push('Ω::push '+(m[2]||'node')+' (Ξ='+n.value.toFixed(4)+')');return;}
+ if((m=line.match(/^print\s+(.+)$/))){const v=this.evalExpr(m[1]);this.out.push(String(this.valOf(v)));return;}
+ if((m=line.match(/^Tele::(\w+)(?:\s+(.+))?$/))){const cmd=m[1],arg=m[2]?m[2].trim():null;
+  const val=arg!=null?this.valOf(this.evalExpr(arg)):null;
+  this.out.push('Tele::'+cmd+(arg!=null?' '+arg:''));if(this.onTele)this.onTele(cmd,val);return;}
+ throw new Error('Bada syntax error: '+line);};
+BadaInterp.prototype.run=function(src){String(src).split('\n').forEach(raw=>{const l=raw.replace(/#.*$/,'').trim();if(l)this.exec(l);});return this.out;};
+
+// ═══════════════════════════════════════════════════════════════
+// Jones 多項式（(2,n) トーラス結び目）— Kauffman 括弧 TL2（jones_lens 準拠）
+// ═══════════════════════════════════════════════════════════════
+const Jones=(()=>{
+ const addTo=(m,e,c)=>{const v=(m.get(e)||0)+c;if(v===0)m.delete(e);else m.set(e,v);};
+ function build(n){let b=new Map();
+  for(let k=0;k<n;k++){const nb=new Map();addTo(nb,k-1,1);b.forEach((c,e)=>addTo(nb,e-3,-c));b=nb;}
+  const norm=new Map();addTo(norm,n+2,-1);addTo(norm,n-2,-1);b.forEach((c,e)=>addTo(norm,e,c));
+  const VA=new Map();const s=(n%2===0)?1:-1;norm.forEach((c,e)=>addTo(VA,e-3*n,s*c));return {norm,VA};}
+ const cache={};const get=n=>cache[n]||(cache[n]=build(n));
+ function evalReal(map,A){let s=0;map.forEach((c,e)=>s+=c*Math.pow(A,e));return s;}
+ function sup(n){return String(n).split('').map(d=>d==='-'?'⁻':'⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]).join('');}
+ function polyStr(map,limit){const es=[...map.keys()].sort((a,b)=>b-a).slice(0,limit||3);
+  return es.map(e=>{const c=map.get(e);const sign=c<0?'−':'+';const ac=Math.abs(c);
+   return sign+(ac===1?'':ac)+'A'+(e<0?('⁻'+sup(-e)):sup(e));}).join('').replace(/^\+/,'')||'0';}
+ return {bracketStr:n=>polyStr(get(n).norm,3),Vreal:(n,t)=>evalReal(get(n).VA,Math.pow(t,-0.25))};
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// モールス符号
+// ═══════════════════════════════════════════════════════════════
+const MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',
+ M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',
+ '0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.',
+ '.':'.-.-.-',',':'--..--','?':'..--..','!':'-.-.--','/':'-..-.','@':'.--.-.',' ':'/'};
+function bitsMorse(ch){const b=ch.codePointAt(0)%32;let o='';for(let i=4;i>=0;i--)o+=((b>>i)&1)?'-':'.';return o;}
+function toMorse(s){return Array.from(String(s).toUpperCase()).map(ch=>MORSE[ch]||bitsMorse(ch)).join(' ');}
+
+// ═══════════════════════════════════════════════════════════════
+// 電話番号 → 種別（日本の番号計画）
+// ═══════════════════════════════════════════════════════════════
+function phoneType(raw){const d=String(raw).replace(/[^0-9]/g,'');
+ if(/^(070|080|090)/.test(d))return {ic:'📱',lb:'携帯電話',kind:'mobile'};
+ if(/^050/.test(d))return {ic:'🌐',lb:'IP電話',kind:'ip'};
+ if(/^(0120|0800)/.test(d))return {ic:'📞',lb:'フリーダイヤル',kind:'free'};
+ if(/^0/.test(d))return {ic:'☎️',lb:'固定電話',kind:'landline'};
+ return {ic:'📟',lb:'端末',kind:'device'};}
+
+// ═══════════════════════════════════════════════════════════════
+// 状態・可視化
+// ═══════════════════════════════════════════════════════════════
+const $=id=>document.getElementById(id);
+let audioOn=true, polPlus=true;
+let anim={active:false, t:0, prog:0, n:5, carrier:1.9e9, kind:'mobile', H:3, teleport:0};
+let nBada=null;
+function bLog(){const c=$('bconsole');if(!c||!nBada)return;
+ c.innerHTML='<b>BADA ▸</b> '+nBada.out.slice(-8).join('\n').replace(/[&<]/g,x=>x==='&'?'&amp;':'&lt;');c.scrollTop=c.scrollHeight;}
+
+// WebAudio モールス音（送信=ユーザー操作なので許可される）
+let AC=null;
+function beep(dur,freq){if(!audioOn)return;try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+ const o=AC.createOscillator(),g=AC.createGain();o.frequency.value=freq||620;o.type='sine';
+ o.connect(g);g.connect(AC.destination);const t0=AC.currentTime;g.gain.setValueAtTime(0.0001,t0);
+ g.gain.exponentialRampToValueAtTime(0.16,t0+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+ o.start(t0);o.stop(t0+dur+0.02);}catch(e){}}
+function playMorse(code){if(!audioOn)return;let t=0;const unit=0.07;
+ Array.from(code).forEach(sym=>{if(sym==='.'){setTimeout(()=>beep(unit),t*1000);t+=unit*2;}
+  else if(sym==='-'){setTimeout(()=>beep(unit*3),t*1000);t+=unit*4;}else{t+=unit*2;}});}
+
+// ── 送信パイプライン（Bada の Tele:: 命令が各段を呼ぶ）──
+let pipe={};
+function teleHandler(cmd,val){
+ if(cmd==='encode'){
+  const morse=toMorse(pipe.msg);pipe.morse=morse;$('morse').textContent=morse||'—';
+  $('t-h').textContent=pipe.H.toFixed(3)+' bit';
+  $('t-xi').textContent=pipe.xi.toFixed(4);
+  if(audioOn)playMorse(morse.replace(/\//g,' ').slice(0,90));
+ } else if(cmd==='knot'){
+  const n=Math.max(2,Math.min(12, (val|0)||pipe.n));pipe.n=n;anim.n=n;
+  $('t-n').textContent=n;
+  $('t-k').textContent=Jones.bracketStr(n);
+  const v2=Jones.Vreal(n,2);pipe.v2=v2;$('t-v').textContent=v2.toFixed(3);
+ } else if(cmd==='teleport'){
+  const fid=Math.max(0.5,Math.min(0.9999, 1-Math.exp(-(Math.abs(pipe.v2)+pipe.xi))));pipe.fid=fid;
+  $('t-fid').textContent=(fid*100).toFixed(2)+'%';
+  // 不確定性原理 Δx·Δp ≥ ħ/2（ħ=1 単位）。符号化スプレッドから。
+  const dx=1/(1+pipe.H), dp=0.5*(1+pipe.H)/1; const prod=dx*dp; pipe.unc=prod;
+  $('t-unc').innerHTML='Δx·Δp = '+prod.toFixed(3)+' <small>ħ</small> ≥ ½ħ';
+  anim.teleport=1;
+ } else if(cmd==='graviton'){
+  // グラビトン（重力波ひずみ h）→ 電磁波搬送波へ変換
+  const h0=1e-21*(1+pipe.H);pipe.h0=h0;$('t-h0').innerHTML=h0.toExponential(2).replace('e','×10^');
+  let car,txt;const frac=(pipe.xi%1+1)%1;
+  if(pipe.kind==='mobile'||pipe.kind==='ip'){car=0.7e9+frac*2.4e9;txt=(car/1e9).toFixed(3)+' GHz';}
+  else{car=300+frac*3100;txt=Math.round(car)+' Hz';} // 固定電話：音声帯域
+  pipe.carrier=car;anim.carrier=car;$('t-car').textContent=txt;
+ } else if(cmd==='send'){
+  startTransmit();
+ }
+}
+
+function doSend(){
+ const num=$('num').value, msg=$('msg').value;
+ if(!msg.trim()){flashRecv('本文を入力してください');return;}
+ const pt=phoneType(num);
+ pipe={msg:msg, H:shannon(msg), xi:bXi(msg), kind:pt.kind, n:0, v2:0, fid:0, carrier:0};
+ pipe.n=Math.max(2,Math.min(12, 3+Math.floor(pipe.H*1.6)+(Array.from(msg).length%4)));
+ anim.kind=pt.kind;
+ // 受信側電話の見た目
+ $('rphone-ic').textContent=pt.ic;$('rphone-lb').textContent=pt.lb;
+ $('recv-meta').textContent=num+' へ送信中… ('+pt.lb+')';$('recv-txt').innerHTML='';
+ $('rphone').classList.remove('live');
+ $('send').disabled=true;$('send').textContent='送信中…';
+ // Bada プログラムを実行：交差数とエントロピーを注入
+ nBada=new BadaInterp(teleHandler);
+ const inject='set entropy = '+pipe.H.toFixed(4)+'\nset crossings = '+pipe.n+'\n';
+ const body=(BADA_SRC.replace(/^\s*set\s+entropy\s*=.*$/mi,'').replace(/^\s*set\s+crossings\s*=.*$/mi,''));
+ try{nBada.run(inject+body);}catch(e){nBada.out.push('! '+e.message);}
+ bLog();
+}
+
+const BADA_SRC=($('bada-src')||{}).textContent||
+ 'set line = 0\nline <- "graviton electromagnetic teletransport"\nline -< 1.0\nline >- line\n'+
+ 'Omega::push line as channel_node\nprint line\nTele::encode\nTele::knot crossings\nTele::teleport\nTele::graviton\nTele::send';
+
+// ── 送信アニメ → 受信 ──
+let transmitTimer=null;
+function startTransmit(){anim.active=true;anim.prog=0;
+ clearInterval(transmitTimer);
+ transmitTimer=setInterval(()=>{anim.prog+=0.02;
+  if(anim.prog>=1){anim.prog=1;clearInterval(transmitTimer);deliver();}
+ },30);
+}
+function deliver(){
+ $('rphone').classList.add('live');
+ $('recv-meta').textContent=$('num').value+' が受信 · '+ (anim.carrier>=1e6?(anim.carrier/1e9).toFixed(3)+' GHz':Math.round(anim.carrier)+' Hz')+' 搬送波';
+ const txt=pipe.msg;let i=0;const el=$('recv-txt');el.innerHTML='<span class="cursor"></span>';
+ const iv=setInterval(()=>{i++;el.innerHTML=txt.slice(0,i).replace(/[&<]/g,c=>c==='&'?'&amp;':'&lt;')+'<span class="cursor"></span>';
+  if(audioOn && i<=60){const ch=txt[i-1]||'';beep(0.03, 480+ (ch.charCodeAt(0)||0)%400);}
+  if(i>=txt.length){clearInterval(iv);el.innerHTML=txt.replace(/[&<]/g,c=>c==='&'?'&amp;':'&lt;');
+   $('send').disabled=false;$('send').textContent='⚡ 送信（Bada 実行）';
+   nBada.out.push('✓ delivered to '+$('num').value);bLog();}
+ },55);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Canvas：量子テレポーテーション ＋ グラビトン→電磁波
+// ═══════════════════════════════════════════════════════════════
+const cv=$('stage'),cx=cv.getContext('2d');let DPR=1,CW=720,CH=250;
+function resize(){DPR=window.devicePixelRatio||1;CW=cv.clientWidth;CH=250;cv.width=CW*DPR;cv.height=CH*DPR;cx.setTransform(DPR,0,0,DPR,0,0);}
+addEventListener('resize',resize);
+function draw(){anim.t+=0.03;const t=anim.t;
+ cx.clearRect(0,0,CW,CH);
+ const sx=54, rx=CW-54, my=CH*0.5;
+ // 送信/受信ノード
+ function node(x,y,ic,live){cx.save();cx.shadowColor='rgba(143,208,255,.7)';cx.shadowBlur=16;
+  cx.fillStyle=live?'rgba(92,208,138,.9)':'rgba(143,208,255,.85)';cx.beginPath();cx.arc(x,y,9,0,7);cx.fill();cx.restore();}
+ // 中央：Jones ブレイド結び目（量子チャンネル）
+ const mx=CW*0.5;
+ cx.save();cx.translate(mx,my);cx.lineWidth=1.6;
+ const n=anim.n,R=40;
+ for(let k=0;k<n;k++){const a0=k/n*Math.PI*2, a1=(k+2)/n*Math.PI*2;
+  const hue=200+ (k*40)%140;cx.strokeStyle='hsla('+hue+',85%,68%,.85)';cx.shadowColor='hsla('+hue+',85%,60%,.6)';cx.shadowBlur=6;
+  cx.beginPath();for(let u=0;u<=1;u+=0.05){const a=a0+(a1-a0)*u;const rr=R*(1+0.18*Math.sin(u*Math.PI*2+t*2+k));
+   const x=Math.cos(a)*rr, y=Math.sin(a)*rr*0.62;u===0?cx.moveTo(x,y):cx.lineTo(x,y);}cx.stroke();}
+ cx.shadowBlur=0;cx.restore();
+ // 量子もつれリンク（点線・鼓動）
+ cx.strokeStyle='rgba(185,140,255,'+(0.4+0.3*Math.sin(t*3))+')';cx.lineWidth=1.2;cx.setLineDash([2,5]);
+ cx.beginPath();cx.moveTo(sx,my);cx.lineTo(mx-46,my);cx.moveTo(mx+46,my);cx.lineTo(rx,my);cx.stroke();cx.setLineDash([]);
+ // グラビトン重力波（+/× 偏光の横波）左→中
+ const pol=polPlus?1:0;
+ cx.strokeStyle='rgba(120,200,255,.5)';cx.lineWidth=1.1;
+ for(let s=-1;s<=1;s+=2){cx.beginPath();for(let x=sx;x<mx-46;x+=4){const ph=(x-sx)/46;
+  const amp=10*Math.exp(-ph*0.05)*Math.sin(ph*2-t*4);const y=my+s*amp*(pol?1:Math.cos(ph));cx.lineTo(x,y);}cx.stroke();}
+ // 電磁波（正弦・搬送波）中→右：周波数は搬送波に依存
+ const fscale=(anim.kind==='mobile'||anim.kind==='ip')?0.9:0.45;
+ cx.strokeStyle='rgba(123,224,192,.85)';cx.lineWidth=1.4;cx.shadowColor='rgba(123,224,192,.5)';cx.shadowBlur=5;
+ cx.beginPath();for(let x=mx+46;x<rx;x+=2){const ph=(x-(mx+46));
+  const y=my+16*Math.sin(ph*fscale*0.25 - t*6)*Math.exp(-ph*0.002);cx.lineTo(x,y);}cx.stroke();cx.shadowBlur=0;
+ // 送信パルス（テレポート信号）
+ if(anim.active){const px=sx+(rx-sx)*anim.prog;const py=my - 34*Math.sin(anim.prog*Math.PI);
+  cx.save();cx.shadowColor='rgba(255,220,140,.9)';cx.shadowBlur=14;cx.fillStyle='rgba(255,230,160,.95)';
+  cx.beginPath();cx.arc(px,py,5.5,0,7);cx.fill();cx.restore();
+  cx.strokeStyle='rgba(255,220,150,.25)';cx.lineWidth=1;cx.beginPath();
+  for(let u=0;u<=anim.prog;u+=0.02){const x=sx+(rx-sx)*u,y=my-34*Math.sin(u*Math.PI);u===0?cx.moveTo(x,y):cx.lineTo(x,y);}cx.stroke();}
+ node(sx,my,'📡',false);node(rx,my,'📶',anim.prog>=1);
+ // ラベル
+ cx.fillStyle='rgba(168,190,228,.7)';cx.font='9px system-ui';cx.textAlign='center';
+ cx.fillText('送信（重力波）',sx,my+30);cx.fillText('Jones 量子チャンネル',mx,my+CH*0.34);
+ cx.fillText('電磁波 搬送波',(mx+rx)/2,my-34);cx.fillText('受信（電話）',rx,my+30);
+ requestAnimationFrame(draw);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI 配線
+// ═══════════════════════════════════════════════════════════════
+function updatePhType(){const pt=phoneType($('num').value);$('phtype').textContent=pt.ic+' '+pt.lb;}
+$('num').addEventListener('input',updatePhType);
+$('c-audio').onclick=function(){audioOn=!audioOn;this.classList.toggle('on',audioOn);this.textContent=audioOn?'🔊 モールス音 ON':'🔇 モールス音 OFF';};
+$('c-pol').onclick=function(){polPlus=!polPlus;this.textContent='重力波 偏光 '+(polPlus?'+':'×');};
+$('send').onclick=doSend;
+function flashRecv(m){$('recv-meta').textContent=m;}
+resize();updatePhType();requestAnimationFrame(draw);
+</script>
+</body>
+</html>
