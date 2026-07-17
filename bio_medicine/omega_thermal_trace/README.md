@@ -20,10 +20,20 @@
 - 多数の種点から `−∇T` 方向へ積分する**ストリームライン追跡**（＝熱の流れ）。
 - 検証済み: 脳ファントムで基底核（熱源）≈4.67 vs 周辺≈0.000、場は安定・有限、`|∇T|>0` で流れが追跡可能。
 
-## 使い方
+## 使い方（ブラウザ）
 ```bash
-xdg-open index.html        # or: python3 -m http.server 8000 （カメラ疑似サーモは https/localhost が必要）
+xdg-open www/index.html    # or: python3 -m http.server 8000 （カメラ疑似サーモは https/localhost が必要）
 ```
+
+## APK / Windows EXE をダウンロード
+偽のバイナリは置いていません。実バイナリは CI（GitHub Actions）がビルドします。
+- **Actions** タブ →「Ω apps build (APK + Windows EXE)」→ **Run workflow** → 成果物
+  `omega_thermal_trace-android`(APK) / `omega_thermal_trace-windows`(EXE) をダウンロード。
+- タグ `apps-v1.0.0` を push すると **Releases** に APK/EXE が添付されます。
+- 構成: `www/`（アプリ） · `electron/`（EXE） · `cordova/config.xml`（APK） ·
+  `../../.github/workflows/omega-apps-build.yml`（ビルド）。
+- 注: 疑似サーモのカメラは、パッケージ版 WebView では権限/実装により動作しない場合があります
+  （シミュレーション本体はカメラ無しで動作します）。
 - 対象（脳断面/体幹断面）、Γ熱核 κ、拡散ステップ、ストリーム本数を設定し「熱拡散を解いて流れをトレース」。
 - 色＝温度場、白線＝熱流束ストリームライン（熱源→末端）。
 - 「📷 カメラで疑似サーモ観測」で外部観測ビュー（疑似カラー、実温度ではない）。
