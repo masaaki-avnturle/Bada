@@ -88,11 +88,16 @@ body.stereo #b-exit{display:block}
   <button class="b" id="b-motion">🎛 モーション</button>
   <button class="b" id="b-stereo">◨◧ 立体視</button>
  </div>
+ <div class="chrow" style="margin-top:10px;gap:8px">
+  <input id="cust-url" placeholder="正規のニュース/動画URLを貼付（HLS .m3u8 / MP4）— 権利のある配信のみ" spellcheck="false"
+   style="flex:1;min-width:120px;background:rgba(6,10,20,.85);border:1px solid rgba(160,200,255,.18);color:var(--txt);border-radius:10px;padding:9px 11px;font-size:11px;outline:none;-webkit-user-select:text;user-select:text">
+  <button class="b" id="cust-add">＋ URL追加</button>
+ </div>
 </div>
 <button id="b-exit">× 立体視を終了</button>
 <div id="toast"></div>
 <div id="home"></div>
-<div id="note">※ 汎用アイウェアのコンセプトです（実在の眼鏡店・ブランドとは無関係）。映像は自由に使える公開動画（CC/サンプル）。オフライン時はエンジン映像に自動切替。</div>
+<div id="note">※ ニュースは合法に自由視聴できる公式無料ライブ（NHK WORLD-JAPAN / DW / France 24 / Al Jazeera / NASA）。フジテレビ・NHK国内の速報配信は著作権・規約上組み込めません（正規に利用できる配信は「URL追加」から）。汎用アイウェアのコンセプト（実在の眼鏡店と無関係）。不達時はエンジン映像に自動切替。</div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
@@ -131,17 +136,18 @@ const Jones=(()=>{
 // ═══════════════════════════════════════════════════════════════
 // インターネットTV：本当の動画（無料/CC）。オフライン時はエンジン映像。
 // ═══════════════════════════════════════════════════════════════
-// 実際の世の中の映像（実写・ライブアクション）。抽象CGは使わない。
+// 実際のニュース速報＝合法に自由視聴できる公式の無料ニュースライブ（HLS）。
+// フジテレビ/NHK 国内の速報配信は著作権・規約上ここには組み込めません。
+// 正規に利用できる配信は下の「URL追加」で各自貼り付けてください。
 const GTV='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
 const CHANNELS=[
- {name:'ROAD',   title:'公道の旅・実写',            url:GTV+'WeAreGoingOnBullrun.mp4'},
- {name:'CAR',    title:'自動車レビュー・実写',      url:GTV+'VolkswagenGTIReview.mp4'},
- {name:'DRIVE',  title:'ストリート&ダート・実写',  url:GTV+'SubaruOutbackOnStreetAndDirt.mp4'},
- {name:'MARKET', title:'中古車マーケット・実写',    url:GTV+'WhatCarCanYouGetForAGrand.mp4'},
- {name:'RIDE',   title:'ジョイライド・実写',        url:GTV+'ForBiggerJoyrides.mp4'},
- {name:'HOME',   title:'リビング・実写',            url:GTV+'ForBiggerBlazes.mp4'},
- {name:'OUT',    title:'アウトドア・実写',          url:GTV+'ForBiggerEscapes.mp4'},
- {name:'LIVE',   title:'NASA ライブ（宇宙・地球の実写／対応端末）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true}
+ {name:'NHK WORLD', title:'NHK WORLD-JAPAN 公式無料・英語ニュース（対応時ライブ）', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', hls:true, news:true},
+ {name:'DW',        title:'DW English 公式無料ニュースライブ（対応時）', url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', hls:true, news:true},
+ {name:'FRANCE24',  title:'France 24 English 公式無料ライブ（対応時）', url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', hls:true, news:true},
+ {name:'AJE',       title:'Al Jazeera English 公式無料ライブ（対応時）', url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', hls:true, news:true},
+ {name:'NASA',      title:'NASA ライブ 宇宙・地球の実写（対応時）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true, news:true},
+ {name:'ROAD',      title:'公道の旅・実写（サンプル）', url:GTV+'WeAreGoingOnBullrun.mp4'},
+ {name:'DRIVE',     title:'ストリート&ダート・実写（サンプル）', url:GTV+'SubaruOutbackOnStreetAndDirt.mp4'}
 ];
 let channelIndex=0, useVideo=true, audioOn=false;
 // HLS(.m3u8) 対応：ネイティブ or hls.js を遅延ロード（不可時はエンジン映像へ）
@@ -311,6 +317,21 @@ function setChannel(i){channelIndex=(i+CHANNELS.length)%CHANNELS.length;const ch
 document.getElementById('ch-prev').onclick=()=>setChannel(channelIndex-1);
 document.getElementById('ch-next').onclick=()=>setChannel(channelIndex+1);
 setChannel(0);
+// 正規に利用できる配信URLを自分で追加（フジ/NHK 国内も権利があればここに貼付）
+function addCustom(){
+ const u=document.getElementById('cust-url').value.trim();if(!u)return;
+ const hls=/\.m3u8(\?|#|$)/i.test(u);
+ CHANNELS.push({name:'CUSTOM'+(CHANNELS.length),title:'追加ソース（あなたのURL）',url:u,hls,news:true});
+ const v=document.createElement('video');if(!hls)v.src=u;
+ v.muted=true;v.loop=!hls;v.autoplay=true;v.playsInline=true;
+ v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.preload='auto';v.style.display='none';
+ v.addEventListener('error',()=>{},{once:true});document.body.appendChild(v);VIDS.push(v);
+ document.getElementById('cust-url').value='';
+ setChannel(CHANNELS.length-1);
+ flash('追加ソースに切替えました（対応形式・権利のある配信のみ再生されます）');
+}
+document.getElementById('cust-add').onclick=addCustom;
+document.getElementById('cust-url').addEventListener('keydown',e=>{if(e.key==='Enter')addCustom();});
 
 document.getElementById('s-beta').oninput=e=>{beta=parseFloat(e.target.value);setTxt('lb-beta',beta.toFixed(2));};
 document.getElementById('s-focal').oninput=e=>{focal=parseFloat(e.target.value);setTxt('lb-focal',focal.toFixed(2));};
