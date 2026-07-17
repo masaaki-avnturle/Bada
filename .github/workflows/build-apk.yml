@@ -100,12 +100,18 @@ jobs:
       - name: Package Windows installer (.msi) with jpackage
         continue-on-error: true
         run: |
+          # --win-upgrade-uuid is a FIXED UpgradeCode so a new version upgrades
+          # the previous install instead of failing with "another version is
+          # already installed". --win-per-user-install avoids elevation/system
+          # conflicts.
           jpackage --type msi \
             --input build/install/NoemaKey/lib \
             --main-jar NoemaKey.jar \
             --main-class com.yamaguchi.bada.desktop.MainKt \
             --name NoemaKey \
             --app-version 0.2.0 \
+            --win-upgrade-uuid 8b1e5c2a-3d4f-4a6b-9c8d-1e2f3a4b5c6d \
+            --win-per-user-install \
             --win-menu --win-shortcut --win-dir-chooser \
             --dest build/installer
 

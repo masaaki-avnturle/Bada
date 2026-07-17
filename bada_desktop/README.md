@@ -30,6 +30,15 @@ GitHub Actions（`.github/workflows/build-apk.yml`）の **windows-exe** ジョ�
 - **Releases**：`v` で始まるタグを push、または GitHub UI で Release を発行すると、
   Windows パッケージが Release に添付されます。
 
+### 「競合してインストールできない」ときは
+
+- **一番簡単＝インストール不要**：`noemakey-windows.zip` を解凍し、`NoemaKey/NoemaKey.exe`
+  を直接ダブルクリックで起動できます（**ポータブル版**。インストール不要なので競合しません）。
+- **MSI で「別バージョンが既にインストール済み」と出る場合**：MSI は**固定 UpgradeCode**と
+  **ユーザー単位インストール**にしたので、新しい MSI は前の版を**上書き更新**します。それでも
+  競合するときは、いったん「アプリと機能」から旧 **NoemaKey** をアンインストール →
+  新しい MSI を実行してください。
+
 ## 手元でビルド／実行
 
 ```bash
