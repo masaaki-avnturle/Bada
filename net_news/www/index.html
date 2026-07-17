@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>NET NEWS LIVE — インターネットTVニュース</title>
+<style>
+:root{--bg:#0a0d14;--panel:#0e131d;--line:rgba(120,160,230,.14);--red:#ff3b46;--accent:#4a9eff;
+ --txt:rgba(230,238,250,.95);--txt2:rgba(150,172,210,.6);}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:var(--bg);color:var(--txt);font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,system-ui,sans-serif;
+ height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;-webkit-user-select:none;user-select:none}
+/* header */
+#top{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+ padding:9px 16px;background:linear-gradient(180deg,#0f1522,#0a0d16);border-bottom:1px solid var(--line)}
+.bug{display:flex;align-items:center;gap:9px}
+.bug .b{font-weight:800;background:var(--red);color:#fff;padding:4px 10px;border-radius:5px;font-size:13px;letter-spacing:.02em;box-shadow:0 0 14px rgba(255,59,70,.4)}
+.bug .nm{font-weight:700;letter-spacing:.16em;font-size:12px;color:rgba(215,228,255,.92)}
+.bug .nm small{display:block;font-weight:400;letter-spacing:.24em;color:var(--txt2);font-size:8px;margin-top:2px}
+#clock{font-variant-numeric:tabular-nums;font-size:13px;letter-spacing:.08em;color:rgba(200,220,255,.85)}
+.live{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:700;letter-spacing:.18em;color:#ff6a72}
+.live .dot{width:8px;height:8px;border-radius:50%;background:var(--red);animation:blink 1.1s infinite}
+@keyframes blink{50%{opacity:.25}}
+/* body */
+#main{flex:1 1 0;display:flex;min-height:0}
+#list{flex:0 0 260px;overflow-y:auto;border-right:1px solid var(--line);background:rgba(10,14,24,.7);-webkit-overflow-scrolling:touch}
+#list h2{font-size:10px;letter-spacing:.28em;color:var(--txt2);padding:12px 14px 8px;font-weight:600}
+.ch{display:flex;gap:10px;align-items:flex-start;padding:11px 14px;cursor:pointer;border-left:3px solid transparent;transition:.15s}
+.ch:hover{background:rgba(30,44,72,.6)}
+.ch.on{background:rgba(74,158,255,.12);border-left-color:var(--accent)}
+.ch .dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:#5a6b85;margin-top:4px}
+.ch.on .dot{background:var(--red);box-shadow:0 0 8px rgba(255,59,70,.7)}
+.ch .t{font-size:13px;font-weight:700;color:rgba(230,240,255,.96);line-height:1.35}
+.ch .d{font-size:10px;color:var(--txt2);margin-top:3px;line-height:1.4}
+/* player */
+#stage{flex:1 1 0;display:flex;flex-direction:column;min-width:0;position:relative;background:#000}
+#video-wrap{flex:1 1 0;position:relative;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#player{width:100%;height:100%;object-fit:contain;background:#000}
+#lower{position:absolute;left:16px;bottom:66px;z-index:3;pointer-events:none;max-width:80%}
+#lower .tag{display:inline-block;background:var(--red);color:#fff;font-size:10px;font-weight:800;letter-spacing:.12em;padding:3px 9px;border-radius:4px}
+#lower .txt{font-size:16px;font-weight:700;margin-top:7px;color:#fff;text-shadow:0 2px 10px rgba(0,0,0,.8);line-height:1.35}
+#status{position:absolute;inset:0;z-index:4;display:none;align-items:center;justify-content:center;flex-direction:column;gap:12px;
+ background:rgba(6,9,16,.55);pointer-events:none}
+#status.show{display:flex}
+#status .spin{width:34px;height:34px;border:3px solid rgba(120,160,255,.25);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#status .msg{font-size:13px;letter-spacing:.06em;color:rgba(210,225,255,.9);text-align:center;padding:0 20px}
+#bar{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(10,14,24,.95);border-top:1px solid var(--line);flex-wrap:wrap}
+.pbtn{background:rgba(20,30,54,.6);border:1px solid var(--line);color:rgba(210,232,255,.92);border-radius:9px;
+ padding:9px 12px;font-size:12px;cursor:pointer;transition:.15s;touch-action:manipulation;white-space:nowrap}
+.pbtn:hover{background:rgba(50,84,150,.6)}
+.pbtn.on{background:rgba(74,158,255,.2);border-color:var(--accent)}
+#cust-url{flex:1 1 200px;min-width:130px;background:rgba(6,10,20,.9);border:1px solid var(--line);color:var(--txt);
+ border-radius:9px;padding:9px 11px;font-size:12px;outline:none;-webkit-user-select:text;user-select:text}
+#cust-url:focus{border-color:var(--accent)}
+#note{flex:0 0 auto;padding:5px 14px;font-size:9px;color:rgba(120,145,190,.5);background:#070910;text-align:center;letter-spacing:.03em}
+@media(max-width:760px){#list{flex:0 0 150px}#list .d{display:none}.ch .t{font-size:11px}}
+</style>
+</head>
+<body>
+<div id="top">
+  <div class="bug"><span class="b">NET</span><span class="nm">NEWS LIVE<small>インターネットTVニュース</small></span></div>
+  <div id="clock">--:--:--</div>
+  <div class="live"><span class="dot"></span>LIVE</div>
+</div>
+<div id="main">
+  <div id="list"><h2>チャンネル</h2><div id="ch-list"></div></div>
+  <div id="stage">
+    <div id="video-wrap">
+      <video id="player" playsinline webkit-playsinline autoplay muted></video>
+      <div id="lower"><span class="tag">LIVE</span><div class="txt" id="lower-txt">—</div></div>
+      <div id="status"><div class="spin"></div><div class="msg" id="status-msg">接続中…</div></div>
+    </div>
+    <div id="bar">
+      <button class="pbtn" id="b-audio">🔊 音声 ON</button>
+      <button class="pbtn" id="b-full">⛶ 全画面</button>
+      <input id="cust-url" placeholder="正規のニュース/動画URLを貼付（HLS .m3u8 / MP4）— 権利のある配信のみ" spellcheck="false">
+      <button class="pbtn" id="cust-add">＋ URL追加</button>
+    </div>
+  </div>
+</div>
+<div id="note">※ 収録は各局が公式に無料公開しているライブ配信（NHK WORLD-JAPAN / DW / France 24 / Al Jazeera / NASA）。フジテレビ・NHK国内の速報配信は著作権・規約上組み込めません（正規に利用できる配信は「URL追加」から）。</div>
+
+<script>
+// HLS(.m3u8) 対応：ネイティブ or hls.js を遅延ロード
+let hlsLoading=false;
+function ensureHls(cb){
+ if(window.Hls){cb(window.Hls);return;}
+ if(hlsLoading){setTimeout(()=>ensureHls(cb),300);return;}
+ hlsLoading=true;const s=document.createElement('script');
+ s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js';
+ s.onload=()=>cb(window.Hls||null);s.onerror=()=>cb(null);document.head.appendChild(s);
+}
+
+// 本物のインターネットTVニュース（各局の公式・無料ライブ）
+const GTV='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
+const CHANNELS=[
+ {name:'NHK WORLD-JAPAN', desc:'NHK公式・無料の国際英語ニュース', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', hls:true},
+ {name:'DW English',      desc:'ドイチェ・ヴェレ 公式無料ライブ', url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', hls:true},
+ {name:'France 24 English',desc:'フランス24 公式無料ライブ',     url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', hls:true},
+ {name:'Al Jazeera English',desc:'アルジャジーラ 公式無料ライブ', url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', hls:true},
+ {name:'NASA TV',         desc:'NASA 宇宙・地球のライブ（実写）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true},
+ {name:'DEMO（実写サンプル）',desc:'オフライン確認用の実写クリップ', url:GTV+'ForBiggerEscapes.mp4', hls:false}
+];
+
+const player=document.getElementById('player');
+const statusEl=document.getElementById('status'), statusMsg=document.getElementById('status-msg');
+let curHls=null, curIndex=-1, connectTimer=null, audioOn=false;
+
+function showStatus(msg,spin){statusEl.classList.add('show');statusMsg.textContent=msg;
+ statusEl.querySelector('.spin').style.display=spin?'block':'none';}
+function hideStatus(){statusEl.classList.remove('show');}
+
+function buildList(){const el=document.getElementById('ch-list');el.innerHTML='';
+ CHANNELS.forEach((ch,i)=>{const d=document.createElement('div');d.className='ch'+(i===curIndex?' on':'');d.dataset.i=i;
+  d.innerHTML='<span class="dot"></span><div><div class="t">'+esc(ch.name)+'</div><div class="d">'+esc(ch.desc)+'</div></div>';
+  d.onclick=()=>selectChannel(i);el.appendChild(d);});}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+
+function cleanup(){if(curHls){try{curHls.destroy();}catch(e){}curHls=null;}
+ try{player.pause();}catch(e){}player.removeAttribute('src');player.load&&player.load();
+ if(connectTimer){clearTimeout(connectTimer);connectTimer=null;}}
+
+function selectChannel(i){
+ curIndex=i;const ch=CHANNELS[i];buildList();
+ document.getElementById('lower-txt').textContent=ch.name;
+ cleanup();
+ showStatus('接続中… '+ch.name,true);
+ connectTimer=setTimeout(()=>{if(player.readyState<3)showStatus('このチャンネルは現在再生できません（別チャンネル、または「URL追加」で正規の配信URLをお試しください）',false);},9000);
+ try{
+  if(ch.hls && !player.canPlayType('application/vnd.apple.mpegurl')){
+   ensureHls(Hls=>{
+    if(Hls && Hls.isSupported()){
+     const h=new Hls({lowLatencyMode:true});curHls=h;
+     h.on(Hls.Events.ERROR,(e,data)=>{if(data&&data.fatal)showStatus('このチャンネルは現在再生できません（別チャンネル/URLをお試しください）',false);});
+     h.loadSource(ch.url);h.attachMedia(player);player.play().catch(()=>{});
+    }else{ // hls.js 不可
+     showStatus('この端末では HLS 再生に非対応です（Safari/対応ブラウザ、または MP4/URL追加をお試しください）',false);
+    }
+   });
+  }else{
+   player.src=ch.url;player.play().catch(()=>{});
+  }
+ }catch(e){showStatus('再生できませんでした',false);}
+ updateAudio();
+}
+
+player.addEventListener('playing',hideStatus);
+player.addEventListener('canplay',hideStatus);
+player.addEventListener('waiting',()=>showStatus('バッファ中…',true));
+player.addEventListener('error',()=>showStatus('このチャンネルは現在再生できません（別チャンネル/URLをお試しください）',false));
+
+function updateAudio(){player.muted=!audioOn;}
+document.getElementById('b-audio').onclick=function(){audioOn=!audioOn;this.classList.toggle('on',audioOn);
+ this.textContent=audioOn?'🔊 音声 ON':'🔇 ミュート';updateAudio();player.play().catch(()=>{});};
+document.getElementById('b-full').onclick=()=>{const w=document.getElementById('video-wrap');
+ if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();}
+ else{(w.requestFullscreen||w.webkitRequestFullscreen||player.webkitEnterFullscreen||function(){}).call(w);}};
+
+// 正規に利用できる配信URLを追加（フジ/NHK 国内も権利があればここに）
+function addCustom(){const u=document.getElementById('cust-url').value.trim();if(!u)return;
+ const hls=/\.m3u8(\?|#|$)/i.test(u);
+ CHANNELS.push({name:'追加ソース '+(CHANNELS.length),desc:'あなたが貼り付けたURL',url:u,hls});
+ document.getElementById('cust-url').value='';buildList();selectChannel(CHANNELS.length-1);}
+document.getElementById('cust-add').onclick=addCustom;
+document.getElementById('cust-url').addEventListener('keydown',e=>{if(e.key==='Enter')addCustom();});
+
+// 時計
+function clk(){const d=new Date(),p=n=>String(n).padStart(2,'0');
+ document.getElementById('clock').textContent=p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());}
+setInterval(clk,1000);clk();
+
+// init
+buildList();selectChannel(0);
+</script>
+</body>
+</html>
