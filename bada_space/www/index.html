@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>BADA SPACE — 空間コンピューティング</title>
+<style>
+:root{--txt:rgba(240,246,255,.96);--txt2:rgba(180,198,230,.66);--accent:#8fd0ff;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:#05070e;color:var(--txt);font-family:-apple-system,'Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;
+ height:100vh;height:100dvh;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#env{position:fixed;inset:0;display:block;touch-action:none;z-index:0}
+#space{position:fixed;inset:0;z-index:1;touch-action:none}
+
+/* 視線レティクル（gaze） */
+#gaze{position:fixed;width:22px;height:22px;border-radius:50%;border:1.5px solid rgba(200,230,255,.55);
+ transform:translate(-50%,-50%);pointer-events:none;z-index:60;box-shadow:0 0 14px rgba(143,208,255,.5);mix-blend-mode:screen;transition:width .12s,height .12s}
+#gaze::after{content:'';position:absolute;inset:8px;border-radius:50%;background:rgba(210,235,255,.75)}
+
+/* グラス・ウィンドウ（visionOS 参考） */
+.win{position:absolute;z-index:10;border-radius:26px;overflow:hidden;
+ background:rgba(20,28,48,.42);backdrop-filter:blur(26px) saturate(1.3);-webkit-backdrop-filter:blur(26px) saturate(1.3);
+ border:1px solid rgba(180,210,255,.18);
+ box-shadow:0 30px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 60px rgba(80,130,220,.05);
+ transition:box-shadow .2s;will-change:transform}
+.win.hover{box-shadow:0 40px 100px rgba(0,0,0,.6), 0 0 0 1.5px rgba(160,210,255,.55), inset 0 1px 0 rgba(255,255,255,.2)}
+.win .wb{width:100%;height:100%;padding:16px 18px;display:flex;flex-direction:column;overflow:hidden}
+.win .close{position:absolute;top:12px;left:12px;width:22px;height:22px;border-radius:50%;
+ background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.18);color:rgba(230,240,255,.85);
+ font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:3;opacity:0;transition:.15s}
+.win.hover .close{opacity:1}
+.win .grab{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);width:74px;height:6px;border-radius:4px;
+ background:rgba(210,225,255,.35);cursor:grab;z-index:3}
+.win .grab:active{cursor:grabbing}
+.wtitle{font-size:12px;letter-spacing:.14em;color:var(--txt2);text-transform:uppercase;margin-bottom:8px;font-weight:600}
+
+/* clock */
+.clock-t{font-size:52px;font-weight:250;letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1}
+.clock-d{font-size:13px;color:var(--txt2);margin-top:8px;letter-spacing:.1em}
+/* photo */
+.photo{flex:1;border-radius:14px;background-size:cover;filter:saturate(1.1)}
+/* music */
+.mrow{display:flex;gap:12px;align-items:center}
+.mart{width:56px;height:56px;border-radius:12px;flex:0 0 auto;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.mtitle{font-size:15px;font-weight:600}.martist{font-size:11px;color:var(--txt2);margin-top:3px}
+.mwave{flex:1;height:44px;margin-top:12px}
+.mbtn{margin-top:10px;display:flex;gap:10px;align-items:center;justify-content:center}
+.mb{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+ color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.mb.play{width:46px;height:46px;font-size:17px;background:rgba(143,208,255,.22);border-color:rgba(143,208,255,.5)}
+/* browser */
+.badr{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.12);
+ border-radius:11px;padding:7px 11px;font-size:11px;color:var(--txt2);margin-bottom:10px}
+.badr .dot{width:8px;height:8px;border-radius:50%;background:#5cd08a}
+.bpage{flex:1;overflow:hidden}
+.bpage h3{font-size:16px;font-weight:700;margin-bottom:8px;color:rgba(235,244,255,.97)}
+.bline{height:8px;border-radius:4px;background:rgba(200,220,255,.14);margin:7px 0}
+/* weather */
+.wtemp{font-size:44px;font-weight:250;line-height:1}
+.wcond{font-size:12px;color:var(--txt2);margin-top:4px;letter-spacing:.08em}
+.whrs{display:flex;gap:8px;margin-top:14px;align-items:flex-end;flex:1}
+.whr{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.whr .bar{width:70%;border-radius:4px 4px 0 0;background:linear-gradient(180deg,#8fd0ff,#5a7bff)}
+.whr .h{font-size:9px;color:var(--txt2)}
+/* 3d */
+.obj{flex:1}
+
+/* 上部ステータス */
+#status{position:fixed;top:16px;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
+ padding:0 22px;pointer-events:none;font-weight:300}
+#status .l{font-size:12px;letter-spacing:.3em;color:rgba(200,225,255,.7)}
+#status .l small{display:block;font-size:7.5px;letter-spacing:.28em;color:var(--txt2);margin-top:3px}
+#status .c{font-variant-numeric:tabular-nums;font-size:13px;letter-spacing:.1em;color:rgba(210,230,255,.85)}
+#status .r{font-size:9px;letter-spacing:.2em;color:var(--txt2);text-align:right;line-height:1.7}
+#status .r b{color:rgba(190,220,255,.9)}
+
+/* 下部コントロール（Digital Crown 相当の没入ダイヤル / Home / 環境） */
+#dock{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:14px;
+ background:rgba(16,24,44,.42);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+ border:1px solid rgba(180,210,255,.18);border-radius:22px;padding:12px 18px;box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.dbtn{width:46px;height:46px;border-radius:50%;border:1px solid rgba(180,210,255,.22);background:rgba(24,34,58,.55);
+ color:rgba(220,235,255,.92);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;touch-action:manipulation}
+.dbtn:hover{background:rgba(50,84,150,.6)}
+.imm{display:flex;flex-direction:column;gap:3px;min-width:150px}
+.imm label{font-size:8px;letter-spacing:.2em;color:var(--txt2);text-transform:uppercase}
+.imm input{width:100%;accent-color:#8fd0ff}
+#env-name{font-size:11px;color:var(--txt2);letter-spacing:.1em;min-width:96px;text-align:center}
+
+/* ホームビュー（アプリグリッド） */
+#home{position:fixed;inset:0;z-index:55;display:none;align-items:center;justify-content:center;
+ background:rgba(6,9,16,.35);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+#home.show{display:flex}
+#home .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;max-width:520px;padding:24px}
+.appi{display:flex;flex-direction:column;align-items:center;gap:9px;cursor:pointer;transition:.18s}
+.appi:hover{transform:scale(1.12)}
+.appi .ic{width:74px;height:74px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:32px;
+ background:rgba(30,42,70,.6);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+ border:1px solid rgba(180,210,255,.2);box-shadow:0 14px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.16)}
+.appi .nm{font-size:10px;letter-spacing:.08em;color:rgba(210,225,255,.85)}
+#toast{position:fixed;top:96px;left:50%;transform:translateX(-50%);z-index:70;pointer-events:none;
+ background:rgba(10,18,34,.95);border:1px solid rgba(143,208,255,.5);color:#dff0ff;font-size:12px;padding:9px 15px;border-radius:9px;opacity:0;transition:opacity .3s}
+#note{position:fixed;left:0;right:0;bottom:3px;text-align:center;font-size:8px;color:rgba(120,150,195,.5);z-index:5;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="env"></canvas>
+<div id="space"></div>
+<div id="gaze"></div>
+
+<div id="status">
+  <div class="l">BADA SPACE<small>空間コンピューティング · visionOS 参考</small></div>
+  <div class="c" id="clock">--:--</div>
+  <div class="r"><div>環境 <b id="st-env">—</b></div><div>没入 <b id="st-imm">—</b></div></div>
+</div>
+
+<div id="home"><div class="grid" id="home-grid"></div></div>
+
+<div id="dock">
+  <button class="dbtn" id="d-home" title="ホーム">⌂</button>
+  <button class="dbtn" id="d-env" title="環境切替">◑</button>
+  <span id="env-name">—</span>
+  <div class="imm"><label>没入 / IMMERSION</label><input type="range" id="imm" min="0" max="1" step="0.01" value="0.35"></div>
+  <button class="dbtn" id="d-reset" title="ウィンドウ整列">▦</button>
+</div>
+
+<div id="toast"></div>
+<div id="note">※ Apple Vision Pro / visionOS の空間UIを参考にしたオリジナルデザインです（Apple のロゴ・商標・製品名は不使用、Apple とは無関係）。</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 環境（空間の背景）
+// ═══════════════════════════════════════════════════════════════
+const env=document.getElementById('env'),ex=env.getContext('2d');
+let W=0,H=0,DPR=1;
+function resize(){DPR=window.devicePixelRatio||1;W=innerWidth;H=innerHeight;env.width=W*DPR;env.height=H*DPR;ex.setTransform(DPR,0,0,DPR,0,0);layoutIfNeeded();}
+addEventListener('resize',resize);
+const ENVS=[
+ {name:'Dawn Peak', a:[255,154,107], b:[106,123,255], c:[10,16,48]},
+ {name:'Aurora',    a:[58,255,192],  b:[106,91,255],  c:[5,16,26]},
+ {name:'Deep Space',a:[42,58,106],   b:[16,20,38],    c:[4,6,13]},
+ {name:'Sunset Bay',a:[255,120,90],  b:[150,80,200],  c:[12,8,26]}
+];
+let envIdx=0, immersion=0.35;
+const BOKEH=[];for(let i=0;i<46;i++)BOKEH.push({x:Math.random(),y:Math.random(),z:Math.random(),r:Math.random()*40+10});
+let animT=0, tpx=0,tpy=0,px=0,py=0;
+function mix(a,b,t){return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t,a[2]+(b[2]-a[2])*t];}
+function rgb(c,al){return 'rgba('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+','+al+')';}
+function drawEnv(){
+ const e=ENVS[envIdx];
+ // 没入で暗い c 側へ寄せる
+ const top=mix(e.a, e.c, immersion*0.85), midc=mix(e.b, e.c, immersion*0.7), bot=e.c;
+ const g=ex.createLinearGradient(0,0,0,H);
+ g.addColorStop(0,rgb(top,1));g.addColorStop(0.55,rgb(midc,1));g.addColorStop(1,rgb(bot,1));
+ ex.fillStyle=g;ex.fillRect(0,0,W,H);
+ // ボケ（bokeh）粒子
+ BOKEH.forEach(b=>{const x=((b.x+animT*0.005*b.z)%1.1-0.05)*W+px*40*b.z, y=b.y*H+py*30*b.z;
+  const rr=b.r*(0.5+b.z);const gg=ex.createRadialGradient(x,y,0,x,y,rr);
+  const col=mix(e.a,e.b,b.x);gg.addColorStop(0,rgb(col,(0.05+0.10*b.z)*(0.4+immersion)));gg.addColorStop(1,rgb(col,0));
+  ex.fillStyle=gg;ex.beginPath();ex.arc(x,y,rr,0,7);ex.fill();});
+ // 没入時の星
+ if(immersion>0.4){ex.fillStyle='rgba(230,240,255,'+((immersion-0.4)*0.5)+')';
+  for(let i=0;i<80;i++){const x=((i*97+animT*3)%W), y=(i*53)%H;ex.fillRect(x,y,1.3,1.3);}}
+ // ヴィネット
+ const v=ex.createRadialGradient(W/2,H*0.5,H*0.3,W/2,H*0.5,Math.max(W,H)*0.75);
+ v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,'+(0.25+immersion*0.4)+')');
+ ex.fillStyle=v;ex.fillRect(0,0,W,H);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 浮遊ウィンドウ
+// ═══════════════════════════════════════════════════════════════
+const space=document.getElementById('space');
+const WINDOWS=[
+ {id:'clock',  title:'時計',      w:250,h:150, dx:-0.30,dy:-0.16, depth:0.6, open:true},
+ {id:'music',  title:'ミュージック',w:280,h:210, dx:0.24, dy:-0.10, depth:1.0, open:true},
+ {id:'photo',  title:'写真',      w:300,h:200, dx:-0.26,dy:0.20, depth:0.8, open:true},
+ {id:'browser',title:'ブラウザ',   w:320,h:220, dx:0.28, dy:0.22, depth:0.5, open:true},
+ {id:'weather',title:'天気',      w:250,h:180, dx:0.02, dy:-0.26, depth:1.2, open:true},
+ {id:'object', title:'3D オブジェクト',w:230,h:200, dx:0.0, dy:0.16, depth:1.4, open:false}
+];
+const APPS=[
+ {id:'clock',ic:'🕐',nm:'時計'},{id:'music',ic:'🎵',nm:'ミュージック'},{id:'photo',ic:'🏔',nm:'写真'},
+ {id:'browser',ic:'🌐',nm:'ブラウザ'},{id:'weather',ic:'⛅',nm:'天気'},{id:'object',ic:'🧊',nm:'3D'}
+];
+const byId={};
+function buildWindows(){
+ WINDOWS.forEach(w=>{
+  const el=document.createElement('div');el.className='win';el.style.width=w.w+'px';el.style.height=w.h+'px';
+  el.innerHTML='<div class="close">✕</div><div class="wb" id="wb-'+w.id+'"></div><div class="grab"></div>';
+  space.appendChild(el);w.el=el;byId[w.id]=w;
+  el.querySelector('.close').onclick=(e)=>{e.stopPropagation();w.open=false;el.style.display='none';};
+  el.addEventListener('pointerenter',()=>{w.hover=true;el.classList.add('hover');bringFront(w);});
+  el.addEventListener('pointerleave',()=>{w.hover=false;el.classList.remove('hover');});
+  const grab=el.querySelector('.grab');
+  grab.addEventListener('pointerdown',e=>{e.preventDefault();startDrag(w,e);grab.setPointerCapture(e.pointerId);});
+  renderContent(w);
+ });
+ layout();
+}
+let zTop=10;
+function bringFront(w){zTop++;w.el.style.zIndex=zTop;}
+
+function renderContent(w){
+ const b=w.el.querySelector('.wb');
+ if(w.id==='clock'){b.innerHTML='<div class="wtitle">時計</div><div class="clock-t" id="ck-t">--:--</div><div class="clock-d" id="ck-d"></div>';}
+ else if(w.id==='music'){b.innerHTML='<div class="wtitle">再生中</div><div class="mrow"><div class="mart" id="mart"></div>'+
+   '<div><div class="mtitle">Global Manifold</div><div class="martist">Bada Sound · β(p,q)</div></div></div>'+
+   '<canvas class="mwave" id="mwave"></canvas><div class="mbtn"><div class="mb">⏮</div><div class="mb play" id="mplay">▶</div><div class="mb">⏭</div></div>';}
+ else if(w.id==='photo'){b.innerHTML='<div class="wtitle">写真</div><div class="photo" id="photo"></div>';}
+ else if(w.id==='browser'){b.innerHTML='<div class="wtitle">ブラウザ</div><div class="badr"><span class="dot"></span>bada.space/spatial</div>'+
+   '<div class="bpage"><h3>空間コンピューティングへようこそ</h3><div class="bline" style="width:96%"></div><div class="bline" style="width:88%"></div><div class="bline" style="width:92%"></div><div class="bline" style="width:70%"></div></div>';}
+ else if(w.id==='weather'){b.innerHTML='<div class="wtitle">天気 · 東京</div><div class="wtemp">22°</div><div class="wcond">晴れ時々くもり</div><div class="whrs" id="whrs"></div>';}
+ else if(w.id==='object'){b.innerHTML='<div class="wtitle">3D オブジェクト</div><canvas class="obj" id="obj"></canvas>';}
+ if(w.id==='music')initMusic();
+ if(w.id==='photo')initPhoto();
+ if(w.id==='weather')initWeather();
+ if(w.id==='clock')updateClock();
+}
+function initPhoto(){const p=document.getElementById('photo');if(p)p.style.background='linear-gradient(135deg,#7db0ff,#b98cff 45%,#ff9a6b)';}
+function initWeather(){const c=document.getElementById('whrs');if(!c)return;const hh=['12','13','14','15','16'];const vv=[70,85,60,75,50];
+ c.innerHTML=hh.map((h,i)=>'<div class="whr"><div class="bar" style="height:'+vv[i]+'%"></div><div class="h">'+h+'</div></div>').join('');}
+
+// music waveform
+let mplaying=true;
+function initMusic(){const art=document.getElementById('mart');if(art)art.style.background='conic-gradient(from 30deg,#6a5bff,#3affc0,#ff9a6b,#6a5bff)';
+ const pb=document.getElementById('mplay');if(pb)pb.onclick=()=>{mplaying=!mplaying;pb.textContent=mplaying?'▶':'⏸';};}
+function drawWave(){const cv=document.getElementById('mwave');if(!cv)return;const ctx=cv.getContext('2d');
+ const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==w*DPR){cv.width=w*DPR;cv.height=h*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+ ctx.clearRect(0,0,w,h);const n=30,bw=w/n;
+ for(let i=0;i<n;i++){const a=mplaying?(0.3+0.7*Math.abs(Math.sin(animT*3+i*0.6))):(0.2+0.1*Math.sin(i));
+  const bh=h*a;ctx.fillStyle='rgba(143,208,255,'+(0.5+a*0.5)+')';ctx.fillRect(i*bw+bw*0.2,(h-bh)/2,bw*0.6,bh);}}
+// 3D wireframe (rotating cube)
+const CUBE=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+const EDG=[[0,1],[1,2],[2,3],[3,0],[4,5],[5,6],[6,7],[7,4],[0,4],[1,5],[2,6],[3,7]];
+function drawObject(){const cv=document.getElementById('obj');if(!cv)return;const ctx=cv.getContext('2d');
+ const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==w*DPR){cv.width=w*DPR;cv.height=h*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+ ctx.clearRect(0,0,w,h);const cx=w/2,cy=h/2,s=Math.min(w,h)*0.28,rot=animT*0.7;
+ const pr=CUBE.map(p=>{let x=p[0]*Math.cos(rot)-p[2]*Math.sin(rot),z=p[0]*Math.sin(rot)+p[2]*Math.cos(rot),y=p[1];
+  const y2=y*Math.cos(rot*0.6)-z*Math.sin(rot*0.6),z2=y*Math.sin(rot*0.6)+z*Math.cos(rot*0.6);const f=2.4/(2.4+z2);
+  return[cx+x*s*f,cy+y2*s*f];});
+ ctx.strokeStyle='rgba(143,208,255,.85)';ctx.lineWidth=1.6;ctx.shadowColor='rgba(143,208,255,.6)';ctx.shadowBlur=8;
+ EDG.forEach(e=>{ctx.beginPath();ctx.moveTo(pr[e[0]][0],pr[e[0]][1]);ctx.lineTo(pr[e[1]][0],pr[e[1]][1]);ctx.stroke();});ctx.shadowBlur=0;}
+
+function updateClock(){const d=new Date(),p=n=>String(n).padStart(2,'0');
+ const t=p(d.getHours())+':'+p(d.getMinutes());
+ const ck=document.getElementById('ck-t');if(ck)ck.textContent=t;
+ const cd=document.getElementById('ck-d');if(cd)cd.textContent=(d.getMonth()+1)+'月'+d.getDate()+'日 ('+'日月火水木金土'[d.getDay()]+')';
+ const c=document.getElementById('clock');if(c)c.textContent=t;}
+setInterval(updateClock,1000);
+
+// レイアウト & 変形（視差 + ドラッグ + ホバー拡大）
+function layout(){WINDOWS.forEach(w=>{w.baseX=W/2+w.dx*Math.min(W,1100)-w.w/2;w.baseY=H*0.46+w.dy*Math.min(H,780)-w.h/2;});}
+let laidOut=false;function layoutIfNeeded(){if(WINDOWS[0].el){layout();laidOut=true;}}
+function apply(){WINDOWS.forEach(w=>{if(!w.el||w.open===false)return;
+ const par=w.depth;const sc=w.hover?1.035:1;
+ const x=w.baseX+px*30*par, y=w.baseY+py*22*par;
+ w.el.style.transform='translate('+x+'px,'+y+'px) scale('+sc+')';
+ w.el.style.opacity=(0.9-immersion*0.12).toFixed(2);
+ if(w.open&&w.el.style.display==='none')w.el.style.display='';
+});}
+
+// ドラッグ
+let drag=null;
+function startDrag(w,e){drag={w,sx:e.clientX,sy:e.clientY,bx:w.baseX,by:w.baseY};bringFront(w);}
+addEventListener('pointermove',e=>{
+ document.getElementById('gaze').style.left=e.clientX+'px';document.getElementById('gaze').style.top=e.clientY+'px';
+ if(!motionOn){tpx=(e.clientX/W*2-1);tpy=(e.clientY/H*2-1);}
+ if(drag){drag.w.baseX=drag.bx+(e.clientX-drag.sx);drag.w.baseY=drag.by+(e.clientY-drag.sy);}
+});
+addEventListener('pointerup',()=>{drag=null;});
+
+// ═══════════════════════════════════════════════════════════════
+// ループ
+// ═══════════════════════════════════════════════════════════════
+function loop(){animT+=0.016;px+=(tpx-px)*0.06;py+=(tpy-py)*0.06;
+ drawEnv();apply();drawWave();drawObject();
+ document.getElementById('st-env').textContent=ENVS[envIdx].name;
+ document.getElementById('st-imm').textContent=Math.round(immersion*100)+'%';
+ document.getElementById('env-name').textContent=ENVS[envIdx].name;
+ requestAnimationFrame(loop);}
+
+// ═══════════════════════════════════════════════════════════════
+// ホームビュー・コントロール
+// ═══════════════════════════════════════════════════════════════
+function buildHome(){const g=document.getElementById('home-grid');
+ APPS.forEach(a=>{const d=document.createElement('div');d.className='appi';
+  d.innerHTML='<div class="ic">'+a.ic+'</div><div class="nm">'+a.nm+'</div>';
+  d.onclick=()=>{const w=byId[a.id];w.open=true;w.el.style.display='';bringFront(w);
+   document.getElementById('home').classList.remove('show');flash(a.nm+' を開きました');};
+  g.appendChild(d);});}
+document.getElementById('d-home').onclick=()=>document.getElementById('home').classList.toggle('show');
+document.getElementById('home').addEventListener('pointerdown',e=>{if(e.target.id==='home')e.currentTarget.classList.remove('show');});
+document.getElementById('d-env').onclick=()=>{envIdx=(envIdx+1)%ENVS.length;flash('環境: '+ENVS[envIdx].name);};
+document.getElementById('d-reset').onclick=()=>{layout();flash('ウィンドウを整列しました');};
+document.getElementById('imm').oninput=e=>{immersion=parseFloat(e.target.value);};
+function flash(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2000);}
+
+// ジャイロ（任意）：端末の傾きで視差
+let motionOn=false;
+window.addEventListener('deviceorientation',e=>{if(e.gamma==null&&e.beta==null)return;motionOn=true;
+ tpx=Math.max(-1,Math.min(1,(e.gamma||0)/40));tpy=Math.max(-1,Math.min(1,((e.beta||0)-40)/40));});
+
+// init
+resize();buildWindows();buildHome();updateClock();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
