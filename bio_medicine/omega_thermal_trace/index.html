@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<!--
+  Ω-Thermal Trace — Γ大域的部分積分多様体による体内/脳の熱エネルギー流トレース (概念シミュレーション)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_thermal_trace
+
+  合成した体/脳ファントム上で熱伝導方程式 ∂T/∂t = ∇·(k∇T)+S を解き、Γカーネル e^{-x log x} で
+  伝導/源を変調し、熱流束 q = -k∇T のストリームラインを追跡して「熱エネルギーの流れ」を可視化する。
+  任意で Web カメラの疑似サーモ(実温度ではない疑似カラー)による外部観測ビューも表示できる。
+
+  ⚠ 概念シミュレーション/アート・非医療。実在の人体温度は計測しません。
+     普通のカメラは温度を測れません(疑似サーモは明るさ/動きの疑似カラー化です)。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Thermal Trace</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--txt:#e6ecf5;--dim:#8794a8;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:16px 18px 8px}h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12.5px;margin-top:6px}
+  .disc{margin:12px 18px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:12px}
+  main{display:flex;gap:16px;flex-wrap:wrap;padding:16px 18px 50px}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto;image-rendering:pixelated}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}select{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+  .cap{font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Thermal Trace — 体内/脳 熱エネルギー流トレース</h1>
+  <div class="sub">Γ Global Partial-Integration Manifold · Heat-Flux Streamline Tracing · Bada/bio_medicine</div>
+  <div class="eq">∂T/∂t = ∇·(k∇T)+S &nbsp;·&nbsp; k(r)=k₀(½+½e<sup>−κ·r log r</sup>) &nbsp;·&nbsp; q = −k∇T</div>
+</header>
+<div class="disc">⚠ <b>概念シミュレーション/アート・非医療</b>:
+  合成ファントム上で熱伝導を解き、Γカーネルで変調した<b>熱流束 q=−k∇T のストリームライン</b>を追跡して
+  「熱エネルギーの流れ」を可視化します。<b>実在の人体温度は計測しません</b>。疑似サーモは普通のカメラ映像の
+  明るさ/動きを疑似カラー化したもので、実温度ではありません。</div>
+
+<main>
+  <div class="col" style="flex:0 0 280px">
+    <div class="card">
+      <h3>ファントム & 設定</h3>
+      <label>対象</label>
+      <select id="phantom"><option value="brain">脳断面 (大脳基底核が熱源)</option><option value="torso">体幹断面 (体幹コアが熱源)</option></select>
+      <label>Γ熱核 κ (大域的多様体): <span class="val" id="kappa_v">1.00</span></label>
+      <input type="range" id="kappa" min="0" max="250" value="100"/>
+      <label>拡散ステップ: <span class="val" id="steps_v">160</span></label>
+      <input type="range" id="steps" min="40" max="400" step="20" value="160"/>
+      <label>熱流ストリーム本数: <span class="val" id="streams_v">220</span></label>
+      <input type="range" id="streams" min="40" max="500" step="20" value="220"/>
+      <button id="run">▶ 熱拡散を解いて流れをトレース</button>
+      <div class="cap" id="status">準備完了</div>
+    </div>
+    <div class="card">
+      <h3>外部観測 (任意・疑似サーモ)</h3>
+      <button class="sec" id="cam">📷 カメラで疑似サーモ観測</button>
+      <video id="video" playsinline style="display:none"></video>
+      <canvas id="thermcam" width="240" height="180"></canvas>
+      <div class="cap">実温度ではありません。明るさ+動きエネルギーの疑似カラー化です。</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3>熱エネルギー場 + 流れトレース</h3>
+      <canvas id="field" width="180" height="180"></canvas>
+      <div class="cap">色=温度場 T (熱源→周辺への拡散) ／ 白線=熱流束 q=−k∇T のストリームライン（基底核/コアから末端へ）</div>
+    </div>
+    <div class="card">
+      <h3>原理</h3>
+      <p style="font-size:12.5px;margin:6px 0">
+      レポートの大域的部分積分多様体 <code>∫Γ(γ)′dx_m = 2e^{−x log x}</code> を、熱伝導率
+      <code>k(r)=k₀(½+½e^{−κ·r log r})</code> として空間変調し、熱伝導方程式
+      <code>∂T/∂t=∇·(k∇T)+S</code> を陽解法で反復。定常に近づいた温度場から
+      <b>熱流束 q=−k∇T</b> を求め、多数の種点から <code>−∇T</code> 方向にストリームラインを積分して
+      「体内/脳の熱エネルギーの流れ」を外部観測ビューとしてトレース・可視化します。
+      これらは合成モデル上の実際の熱物理計算です（人体計測ではありません）。</p>
+      <div class="stat"><span>格子</span><b id="s_grid">—</b></div>
+      <div class="stat"><span>平均温度 / 最大流束</span><b id="s_stat">—</b></div>
+    </div>
+  </div>
+</main>
+<footer>Ω-Thermal Trace · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念シミュレーション/アート・非医療</footer>
+
+<script>
+"use strict";
+var N=90;
+function gammaKernel(x,k){if(x<=0)return 1;return Math.exp(-k*x*Math.log(x+1e-9));}
+function inEll(x,y,cx,cy,a,b){var dx=(x-cx)/a,dy=(y-cy)/b;return dx*dx+dy*dy<=1;}
+
+/* ファントム: inside(0/1), source(0..1), cond(0..1) */
+function phantom(name,kappa){
+ var inside=new Float32Array(N*N),src=new Float32Array(N*N),cond=new Float32Array(N*N);
+ for(var j=0;j<N;j++)for(var i=0;i<N;i++){
+  var X=2*(i+.5)/N-1,Y=1-2*(j+.5)/N,id=j*N+i,ins=0,s=0,c=0;
+  if(name==="brain"){
+   if(inEll(X,Y,0,0,0.78,0.9)){ins=1;c=1;}
+   // 側脳室(低伝導)
+   if(inEll(X,Y,-0.16,0.28,0.10,0.16)||inEll(X,Y,0.16,0.28,0.10,0.16))c=0.5;
+   // 大脳基底核(熱源)
+   if(inEll(X,Y,-0.12,0.06,0.09,0.11)||inEll(X,Y,0.12,0.06,0.09,0.11))s=1.0;
+   if(inEll(X,Y,0,-0.02,0.05,0.07))s=0.6; // 視床
+  } else {
+   if(inEll(X,Y,0,0,0.85,0.68)){ins=1;c=1;}
+   if(inEll(X,Y,0,-0.02,0.30,0.26))s=1.0; // 体幹コア
+  }
+  var r=Math.sqrt(X*X+Y*Y);
+  var kmod=0.5+0.5*gammaKernel(r+0.12,kappa); // Γ多様体で伝導変調
+  inside[id]=ins;src[id]=s;cond[id]=ins?c*kmod:0;
+ }
+ return {inside:inside,src:src,cond:cond};
+}
+
+/* 熱伝導 陽解法 (可変伝導) */
+function solveHeat(ph,steps){
+ var T=new Float32Array(N*N),k=ph.cond,S=ph.src,ins=ph.inside;
+ var dt=0.18;
+ for(var it=0;it<steps;it++){
+  var Tn=new Float32Array(N*N);
+  for(var j=1;j<N-1;j++)for(var i=1;i<N-1;i++){var id=j*N+i;
+   if(!ins[id]){Tn[id]=0;continue;}
+   // 面伝導(調和平均)で ∇·(k∇T)
+   var kC=k[id];
+   function face(a){return 2*kC*k[a]/(kC+k[a]+1e-6);}
+   var l=id-1,r=id+1,u=id-N,d=id+N;
+   var flux=face(l)*(T[l]-T[id])+face(r)*(T[r]-T[id])+face(u)*(T[u]-T[id])+face(d)*(T[d]-T[id]);
+   Tn[id]=T[id]+dt*(flux + S[id]*0.5) - dt*0.02*T[id]; // 微小放熱
+  }
+  T=Tn;
+ }
+ return T;
+}
+function grad(T,i,j){ // 中心差分 ∇T
+ var l=T[j*N+Math.max(0,i-1)],r=T[j*N+Math.min(N-1,i+1)],u=T[Math.max(0,j-1)*N+i],d=T[Math.min(N-1,j+1)*N+i];
+ return [(r-l)*0.5,(d-u)*0.5];
+}
+
+/* 描画 */
+function cmapThermal(t){t=Math.min(1,Math.max(0,t));var r=Math.min(1,t*1.7),g=Math.min(1,Math.max(0,t*1.7-0.55)),b=Math.min(1,Math.max(0,t*2-1.45));return[r*255|0,g*255|0,b*255|0];}
+function render(T,ph,nStream){
+ var c=document.getElementById("field");c.width=N;c.height=N;var ctx=c.getContext("2d");
+ var mn=Infinity,mx=-Infinity;for(var q=0;q<N*N;q++)if(ph.inside[q]){if(T[q]<mn)mn=T[q];if(T[q]>mx)mx=T[q];}
+ var rng=(mx-mn)||1,img=ctx.createImageData(N,N);
+ for(var p=0;p<N*N;p++){var col=ph.inside[p]?cmapThermal((T[p]-mn)/rng):[6,8,14];
+  img.data[p*4]=col[0];img.data[p*4+1]=col[1];img.data[p*4+2]=col[2];img.data[p*4+3]=255;}
+ ctx.putImageData(img,0,0);
+ // ストリームライン (熱流 q=-k∇T → -∇T方向へ積分)
+ ctx.save();ctx.strokeStyle="rgba(230,240,255,0.5)";ctx.lineWidth=0.35;
+ var maxFlux=0;
+ for(var sN=0;sN<nStream;sN++){
+  var i=1+(Math.random()*(N-2))|0,j=1+(Math.random()*(N-2))|0;if(!ph.inside[j*N+i])continue;
+  ctx.beginPath();ctx.moveTo(i,j);var found=false;
+  for(var step=0;step<40;step++){var g=grad(T,i,j);var gx=-g[0],gy=-g[1];var m=Math.hypot(gx,gy);
+   if(m<1e-4)break;var fl=m*ph.cond[j*N+i];if(fl>maxFlux)maxFlux=fl;
+   i+=gx/m;j+=gy/m;var ii=i|0,jj=j|0;if(ii<0||jj<0||ii>=N||jj>=N||!ph.inside[jj*N+ii])break;
+   ctx.lineTo(i,j);found=true;}
+  if(found)ctx.stroke();
+ }
+ ctx.restore();
+ document.getElementById("s_grid").textContent=N+"×"+N;
+ var avg=0,cnt=0;for(var z=0;z<N*N;z++)if(ph.inside[z]){avg+=T[z];cnt++;}
+ document.getElementById("s_stat").textContent=(avg/cnt).toFixed(3)+" / "+maxFlux.toFixed(3);
+}
+
+function run(){
+ var name=document.getElementById("phantom").value,kappa=+document.getElementById("kappa").value/100,
+     steps=+document.getElementById("steps").value,nStream=+document.getElementById("streams").value;
+ document.getElementById("status").textContent="計算中…";
+ setTimeout(function(){var t0=performance.now();var ph=phantom(name,kappa);var T=solveHeat(ph,steps);render(T,ph,nStream);
+  document.getElementById("status").textContent="完了 ("+((performance.now()-t0)/1000).toFixed(2)+"s)";},20);
+}
+["kappa","steps","streams"].forEach(function(id){var f={kappa:v=>(v/100).toFixed(2),steps:v=>v,streams:v=>v}[id];
+ document.getElementById(id).oninput=function(e){document.getElementById(id+"_v").textContent=f(+e.target.value);};});
+document.getElementById("run").onclick=run;
+
+/* ===== 外部観測: 疑似サーモ (Webカメラ) ===== */
+var camOn=false,prevGray=null;
+document.getElementById("cam").onclick=async function(){
+ if(camOn){return;}
+ try{var stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user"},audio:false});
+  var v=document.getElementById("video");v.srcObject=stream;await v.play();camOn=true;
+  document.getElementById("cam").textContent="🟢 疑似サーモ観測中";thermLoop();}
+ catch(e){document.getElementById("cam").textContent="カメラ不可: "+e.name+" (https/localhost必要)";}
+};
+function thermLoop(){requestAnimationFrame(thermLoop);if(!camOn)return;
+ var v=document.getElementById("video"),c=document.getElementById("thermcam"),ctx=c.getContext("2d"),W=c.width,H=c.height;
+ if(v.readyState<2)return;
+ ctx.drawImage(v,0,0,W,H);var d=ctx.getImageData(0,0,W,H),px=d.data,gray=new Float32Array(W*H);
+ for(var i=0;i<W*H;i++){var r=px[i*4],g=px[i*4+1],b=px[i*4+2];gray[i]=(0.299*r+0.587*g+0.114*b)/255;}
+ for(var i2=0;i2<W*H;i2++){var mot=prevGray?Math.abs(gray[i2]-prevGray[i2]):0;
+  var e=Math.min(1,gray[i2]*0.8+mot*3.0); // 明るさ+動きエネルギー
+  var col=cmapThermal(e);px[i2*4]=col[0];px[i2*4+1]=col[1];px[i2*4+2]=col[2];}
+ ctx.putImageData(d,0,0);prevGray=gray;
+}
+
+run();
+</script>
+</body>
+</html>
