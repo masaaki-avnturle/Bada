@@ -48,11 +48,20 @@ class NoemaKeyApp {
     private val suggestionBar = JPanel(FlowLayout(FlowLayout.LEFT, 6, 4))
     private val statusLabel = JLabel()
     private var shift = false
+    lateinit var frame: JFrame
+        private set
+
+    /** Test hook: fill the editor so the candidate row renders (screenshots). */
+    fun demoFill(text: String) {
+        editor.text = text
+        editor.caretPosition = text.length
+        refreshSuggestions()
+    }
 
     fun show() {
         seedCorpus()
 
-        val frame = JFrame("NoemaKey — 未知事前予知 予測入力")
+        frame = JFrame("NoemaKey — 未知事前予知 予測入力")
         frame.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
         frame.background = Theme.BG
         frame.jMenuBar = buildMenu(frame)
@@ -67,7 +76,7 @@ class NoemaKeyApp {
         header.font = Font(Font.SANS_SERIF, Font.BOLD, 15)
         root.add(header, BorderLayout.NORTH)
 
-        // Center: editor + suggestion bar
+        // Center: the editor.
         val center = JPanel(BorderLayout(0, 6))
         center.background = Theme.BG
         editor.background = Theme.PANEL
@@ -78,19 +87,15 @@ class NoemaKeyApp {
         editor.wrapStyleWord = true
         editor.border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
         val scroll = JScrollPane(editor)
-        scroll.preferredSize = Dimension(820, 220)
+        scroll.preferredSize = Dimension(820, 200)
         scroll.border = BorderFactory.createLineBorder(Theme.KEY)
         center.add(scroll, BorderLayout.CENTER)
-
-        suggestionBar.background = Theme.PANEL
-        suggestionBar.border = BorderFactory.createEmptyBorder(2, 4, 2, 4)
-        suggestionBar.preferredSize = Dimension(820, 40)
-        center.add(suggestionBar, BorderLayout.SOUTH)
         root.add(center, BorderLayout.CENTER)
 
-        // South: compact keyboard + status
+        // South: [ candidate row (directly above the keyboard) ] + keyboard + status
         val south = JPanel(BorderLayout(0, 4))
         south.background = Theme.BG
+        south.add(buildCandidateRow(), BorderLayout.NORTH)
         south.add(buildKeyboard(), BorderLayout.CENTER)
         statusLabel.foreground = Theme.MUTED
         statusLabel.font = Font(Font.SANS_SERIF, Font.PLAIN, 12)
@@ -109,6 +114,35 @@ class NoemaKeyApp {
         frame.isVisible = true
         refreshStatus()
         refreshSuggestions()
+    }
+
+    /**
+     * The word-completion candidate row that sits directly on top of the
+     * keyboard. Candidates are clickable to insert them.
+     */
+    private fun buildCandidateRow(): JPanel {
+        val row = JPanel(BorderLayout())
+        row.background = Theme.PANEL
+        // a thin gold rule separates the candidate row from the keys below
+        row.border = BorderFactory.createMatteBorder(1, 0, 1, 0, Theme.GOLD)
+
+        val caption = JLabel("  単語補完候補（クリックで入力）")
+        caption.foreground = Theme.BLUE
+        caption.font = Font(Font.SANS_SERIF, Font.BOLD, 11)
+        row.add(caption, BorderLayout.WEST)
+
+        suggestionBar.background = Theme.PANEL
+        suggestionBar.border = BorderFactory.createEmptyBorder(2, 4, 2, 4)
+        val scroll = JScrollPane(
+            suggestionBar,
+            JScrollPane.VERTICAL_SCROLLBAR_NEVER,
+            JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+        )
+        scroll.border = null
+        scroll.background = Theme.PANEL
+        scroll.preferredSize = Dimension(820, 46)
+        row.add(scroll, BorderLayout.CENTER)
+        return row
     }
 
     // ---- prediction --------------------------------------------------------
@@ -317,6 +351,21 @@ fun main(args: Array<String>) {
     if (args.contains("--selftest")) {
         selfTest()
         return
+    }
+    val demoIdx = args.indexOf("--demo")
+    if (demoIdx >= 0) {
+        val out = args.getOrNull(demoIdx + 1) ?: "noemakey.png"
+        val app = NoemaKeyApp()
+        javax.swing.SwingUtilities.invokeAndWait {
+            app.show()
+            app.demoFill("the global man")
+        }
+        Thread.sleep(1200)
+        val b = app.frame.bounds
+        val img = java.awt.Robot().createScreenCapture(b)
+        javax.imageio.ImageIO.write(img, "png", java.io.File(out))
+        println("wrote $out (${b.width}x${b.height})")
+        kotlin.system.exitProcess(0)
     }
     SwingUtilities.invokeLater { NoemaKeyApp().show() }
 }
