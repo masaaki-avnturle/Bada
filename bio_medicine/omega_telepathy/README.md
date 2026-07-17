@@ -25,10 +25,13 @@ cd www && python3 -m http.server 8000     # http://localhost:8000/
 # または www/index.html を直接開く
 ```
 
-## APK / Windows EXE 化
-`omega_biofeedback` と同じ方式で配布ビルドできます（Electron で EXE、Cordova で APK）。
-`www/` を各ラッパーに差し込み、GitHub Actions でビルドして Releases から配布してください。
-（本アプリも娯楽/シミュレーション用途に限ります。）
+## APK / Windows EXE をダウンロード
+偽のバイナリは置いていません。実バイナリは CI（GitHub Actions）がビルドします。
+- **Actions** タブ →「Ω apps build (APK + Windows EXE)」→ **Run workflow** → 成果物
+  `omega_telepathy-android`(APK) / `omega_telepathy-windows`(EXE) をダウンロード。
+- タグ `apps-v1.0.0` を push すると **Releases** に APK/EXE が添付されます。
+- 構成: `www/`（アプリ） · `electron/`（EXE） · `cordova/config.xml`（APK） ·
+  `../../.github/workflows/omega-apps-build.yml`（ビルド）。本アプリもシミュレーション用途に限ります。
 
 ---
 

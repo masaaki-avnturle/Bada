@@ -32,14 +32,14 @@ cd www && python3 -m http.server 8000    # http://localhost:8000/
 
 **偽のバイナリはリポジトリに置いていません。** 実際の APK/EXE は CI がビルドします。
 
-1. GitHub の **Actions** タブ → 「Ω-Biofeedback build (APK + Windows EXE)」→ **Run workflow**（手動実行）。
-   完了後、Actions の成果物（Artifacts）から `omega-biofeedback-android`(APK) と
-   `omega-biofeedback-windows`(EXE) をダウンロードできます。
+1. GitHub の **Actions** タブ → 「Ω apps build (APK + Windows EXE)」→ **Run workflow**（手動実行）。
+   完了後、Actions の成果物（Artifacts）から `omega_biofeedback-android`(APK) と
+   `omega_biofeedback-windows`(EXE) をダウンロードできます（他アプリも同時ビルドされます）。
 2. リリースに添付したい場合はタグを push:
    ```bash
-   git tag biofeedback-v1.0.0 && git push origin biofeedback-v1.0.0
+   git tag apps-v1.0.0 && git push origin apps-v1.0.0
    ```
-   ワークフローが APK と EXE を **Releases** に添付します（Releases ページからダウンロード可能）。
+   ワークフローが 3アプリ分の APK と EXE を **Releases** に添付します（Releases ページからダウンロード可能）。
 
 ビルドの内訳:
 - **Windows EXE**: `electron/`（Electron + electron-builder, `windows-latest` で nsis/portable を生成）

@@ -1,0 +1,89 @@
+name: Ω apps build (APK + Windows EXE)
+
+# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
+# Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
+# → リポジトリの Actions / Releases からダウンロード可能。
+#
+# ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
+#    実在の人体計測・予知・読心・思考送信は行いません。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'apps-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: bio_medicine/${{ matrix.app }}/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-windows
+          path: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+
+  android-apk:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Build debug APK (Cordova)
+        run: |
+          npm install -g cordova
+          APP="bio_medicine/${{ matrix.app }}"
+          cordova create cordova-build com.example.tmp TmpApp
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android
+          cordova build android
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          find cordova-build/platforms/android -name '*.apk' -exec sh -c 'cp "$1" "out/${{ matrix.app }}-$(basename "$1")"' _ {} \;
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
