@@ -2,10 +2,8 @@ name: Ω apps build (APK + Windows EXE)
 
 # bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
 # Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
-# → リポジトリの Actions / Releases からダウンロード可能。
 #
 # ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
-#    実在の人体計測・予知・読心・思考送信は行いません。
 
 on:
   workflow_dispatch:
@@ -55,27 +53,32 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 17
+          java-version: '17'
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-      - name: Build debug APK (Cordova)
+      - name: Install Android SDK packages (+ accept licenses)
         run: |
-          npm install -g cordova
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
           APP="bio_medicine/${{ matrix.app }}"
-          cordova create cordova-build com.example.tmp TmpApp
+          cordova create cordova-build com.bada.omega TmpApp
           rm -rf cordova-build/www
           cp -r "$APP/www" cordova-build/www
           cp "$APP/cordova/config.xml" cordova-build/config.xml
           cd cordova-build
-          cordova platform add android
-          cordova build android
+          cordova platform add android@12.0.1
+          cordova build android --verbose
       - name: Collect APK
         run: |
           mkdir -p out
-          find cordova-build/platforms/android -name '*.apk' -exec sh -c 'cp "$1" "out/${{ matrix.app }}-$(basename "$1")"' _ {} \;
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk "out/${{ matrix.app }}-debug.apk"
           ls -la out
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
