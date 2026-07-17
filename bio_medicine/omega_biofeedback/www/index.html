@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<!--
+  Ω-Biofeedback Oracle — 生成的バイオフィードバック・サウンドアート (娯楽/非医療/非予知)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_biofeedback
+
+  未知事前エンジン(Γ大域的部分積分多様体のLUTファブリック)が、入力(意図テキスト/日時)から
+  決定論的に「バイオフィードバック音・映像・生成詩」を生み出す瞑想向けアート作品。
+
+  ⚠⚠ 重要 ⚠⚠
+  本アプリは実際にアカシックレコードへアクセスしません。未来を予知しません。
+  誰かに未来情報を送受信することもありません。医療・健康・投資・意思決定に使えません。
+  出力はすべてエンジンによる決定論的な生成物(アート/娯楽)です。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Ω-Biofeedback Oracle</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--txt:#e6ecf5;--dim:#8794a8;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:radial-gradient(1200px 800px at 50% -10%,#0a1020,#04060a);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    display:flex;flex-direction:column;min-height:100%}
+  header{padding:16px 18px 8px;text-align:center}
+  h1{margin:0;font-size:20px;letter-spacing:1px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12px;margin-top:2px}
+  .disc{margin:10px 14px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:11.5px;line-height:1.5}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;gap:14px;padding:14px}
+  canvas{background:#05070d;border:1px solid var(--line);border-radius:14px;max-width:100%;touch-action:none}
+  .ctl{width:100%;max-width:460px}
+  label{display:block;font-size:12px;color:var(--dim);margin:10px 0 4px}
+  input[type=text]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:14px}
+  input[type=range]{width:100%}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:10px;padding:13px;cursor:pointer;font-weight:700;font-size:15px;width:100%}
+  button:active{background:#1f2f4a}button.sec{color:var(--cyan);border-color:var(--cyan)}
+  .reading{max-width:460px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-height:80px}
+  .reading h3{margin:0 0 8px;font-size:13px;color:var(--gold)}
+  .poem{font-size:15px;line-height:1.9;white-space:pre-wrap}
+  .meta{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:8px;word-break:break-all}
+  footer{color:var(--dim);font-size:11px;padding:12px;text-align:center;border-top:1px solid var(--line)}
+  .val{color:var(--cyan);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Biofeedback Oracle</h1>
+  <div class="sub">生成的バイオフィードバック・サウンドアート — Yamaguchi Theory / Bada</div>
+</header>
+<div class="disc">
+  ⚠ <b>アート/娯楽・非医療・非予知</b>:
+  本アプリは<b>アカシックレコードへアクセスせず、未来を予知せず、誰にも未来情報を送受信しません</b>。
+  出力音・映像・詩はすべて未知事前エンジンの<b>決定論的な生成物(アート)</b>です。
+  医療・健康・投資・意思決定には使用できません。娯楽・瞑想目的でお楽しみください。
+</div>
+
+<main>
+  <canvas id="mandala" width="320" height="320"></canvas>
+  <div class="ctl">
+    <label>意図 / キーワード (種になります)</label>
+    <input type="text" id="intent" value="静けさ / stillness" maxlength="80"/>
+    <label>共鳴の基音: <span class="val" id="base_v">180</span> Hz &nbsp;/&nbsp; バイノーラル差: <span class="val" id="beat_v">7.0</span> Hz</label>
+    <input type="range" id="base" min="90" max="320" value="180"/>
+    <input type="range" id="beat" min="10" max="120" value="70"/>
+    <div class="row" style="margin-top:12px">
+      <button id="play">▶ 共鳴を再生 (60秒)</button>
+      <button id="stop" class="sec">■ 停止</button>
+    </div>
+    <button id="reading" class="sec" style="margin-top:10px">✦ 生成リーディングを引く</button>
+  </div>
+  <div class="reading">
+    <h3>生成リーディング（アート・非予知）</h3>
+    <div class="poem" id="poem">「共鳴を再生」または「生成リーディングを引く」を押してください。</div>
+    <div class="meta" id="meta"></div>
+  </div>
+</main>
+<footer>Ω-Biofeedback Oracle · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · アート/娯楽・非医療・非予知</footer>
+
+<script>
+"use strict";
+/* ===== 未知事前エンジン (LUTファブリック) ===== */
+var CFG={inbits:6,layers:3,width:8,outbits:3},CB=6;
+var GENOME="a3b77311438a66c00cbbae927e1ca5ea6061348e00fe47f075f2e1bdd444c082000a5287d5b76843d76f21afcfb2af3b6d7c5e325c8600ad63b36df86724dc9f950461b3cd15bf114b60be96a3f7704aa105b5d3e85ba2c72d74c845e3c01e47d0a79a8659a44375b56919af8b4d545bf54243c677820cbce313b79716de80e68ddb055c7804e4294017664276afb05e";
+function h2b(h){var n=h.length>>1,b=new Uint8Array(n);for(var i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+var G=h2b(GENOME);
+function infer(x){var prev=x&((1<<CFG.inbits)-1),src=CFG.inbits,cur=0;
+ for(var L=0;L<CFG.layers;L++){cur=0;for(var w=0;w<CFG.width;w++){var cl=L*CFG.width+w,p=cl*CB,a=0;
+  for(var k=0;k<4;k++){var se=G[p+k]%Math.max(1,(L===0?CFG.inbits:CFG.width));if(se>=src)se=src?se%src:0;a|=((prev>>se)&1)<<k;}
+  cur|=(((G[p+4]|(G[p+5]<<8))>>a)&1)<<w;}prev=cur;src=CFG.width;}return cur&((1<<CFG.outbits)-1);}
+function fnv(s){var h=2166136261>>>0;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+/* 決定論的シーケンス: 種から infer を連鎖 */
+function seq(seedStr,n){var x=fnv(seedStr)&63,out=[];for(var i=0;i<n;i++){var y=infer(x);out.push(y);x=((x<<1)^y^(i*13))&63;}return out;}
+
+/* ===== 生成リーディング(語彙合成・アート) ===== */
+var W1=["静寂の","巡る","遠い","内なる","目覚める","古い","澄んだ","結ばれる","ほどける","満ちる"];
+var W2=["水面","星図","呼吸","螺旋","余白","記憶","地平","共鳴","種子","羅針"];
+var W3=["がひらく","を辿る","に還る","が響く","を手放す","へ傾く","が芽吹く","を編む"];
+var W4=["今日は歩みを緩めてよい。","問いは答えより温かい。","小さな一歩が円環を閉じる。","沈黙が次の音を選ぶ。","焦らず、根を伸ばす時。","手放したものが戻る道を作る。"];
+function reading(seedStr){var s=seq(seedStr+"|read",8);
+ var line1=W1[s[0]%W1.length]+W2[s[1]%W2.length]+W3[s[2]%W3.length];
+ var line2=W1[s[3]%W1.length]+W2[s[4]%W2.length]+W3[s[5]%W3.length];
+ var line3=W4[s[6]%W4.length];
+ return line1+"、\n"+line2+"。\n\n"+line3;}
+
+/* ===== Web Audio: バイオフィードバック音 ===== */
+var AC=null,nodes=[],playing=false,rafId=0,tStart=0,curSeq=[];
+function ensureAC(){if(!AC)AC=new (window.AudioContext||window.webkitAudioContext)();if(AC.state==="suspended")AC.resume();return AC;}
+function stopAll(){playing=false;if(rafId)cancelAnimationFrame(rafId);nodes.forEach(function(n){try{n.stop&&n.stop();n.disconnect&&n.disconnect();}catch(e){}});nodes=[];}
+function play(){
+ stopAll();var ac=ensureAC();var base=+document.getElementById("base").value,beat=+document.getElementById("beat").value/10;
+ var intent=document.getElementById("intent").value||"stillness";curSeq=seq(intent,64);
+ var master=ac.createGain();master.gain.value=0.0;master.connect(ac.destination);
+ var pL=ac.createStereoPanner?ac.createStereoPanner():null,pR=ac.createStereoPanner?ac.createStereoPanner():null;
+ if(pL){pL.pan.value=-1;pR.pan.value=1;pL.connect(master);pR.connect(master);}
+ // バイノーラル2音
+ var oL=ac.createOscillator(),oR=ac.createOscillator();oL.type="sine";oR.type="sine";
+ oL.frequency.value=base;oR.frequency.value=base+beat;
+ var gL=ac.createGain(),gR=ac.createGain();gL.gain.value=0.5;gR.gain.value=0.5;
+ oL.connect(gL);oR.connect(gR);if(pL){gL.connect(pL);gR.connect(pR);}else{gL.connect(master);gR.connect(master);}
+ oL.start();oR.start();nodes.push(oL,oR);
+ // 倍音レイヤ(エンジン出力で断続)
+ var oH=ac.createOscillator();oH.type="triangle";var gH=ac.createGain();gH.gain.value=0;oH.connect(gH);gH.connect(master);oH.start();nodes.push(oH);
+ nodes.push(master);
+ // フェードイン
+ master.gain.setValueAtTime(0,ac.currentTime);master.gain.linearRampToValueAtTime(0.28,ac.currentTime+3);
+ playing=true;tStart=ac.currentTime;
+ // シーケンスで倍音周波数/音量を変調
+ var step=0;
+ function schedule(){if(!playing)return;var t=ac.currentTime-tStart;if(t>60){master.gain.linearRampToValueAtTime(0,ac.currentTime+2);setTimeout(stopAll,2200);return;}
+  var v=curSeq[step%curSeq.length];var f=base*(1+ (v/7)*0.5); // 出力で倍音を選ぶ
+  oH.frequency.setValueAtTime(f*2,ac.currentTime);
+  gH.gain.linearRampToValueAtTime(0.04+(v%3)*0.03,ac.currentTime+0.15);
+  gH.gain.linearRampToValueAtTime(0.0,ac.currentTime+0.55);
+  step++;setTimeout(schedule,650);}
+ schedule();
+ document.getElementById("poem").textContent=reading(intent);
+ document.getElementById("meta").textContent="seed="+intent+" · UID=OAE-"+(fnv(intent)>>>0).toString(36).toUpperCase()+" · base="+base+"Hz beat="+beat.toFixed(1)+"Hz";
+ animate();
+}
+/* ===== マンダラ可視化(呼吸ペーサ+波形) ===== */
+function animate(){var c=document.getElementById("mandala"),ctx=c.getContext("2d"),W=c.width,H=c.height;
+ function frame(){rafId=requestAnimationFrame(frame);var t=(AC?AC.currentTime-tStart:performance.now()/1000);
+  ctx.fillStyle="rgba(5,7,13,0.28)";ctx.fillRect(0,0,W,H);ctx.save();ctx.translate(W/2,H/2);
+  var breath=0.5+0.5*Math.sin(t*2*Math.PI/8); // 8秒呼吸
+  var petals=6+ (curSeq[Math.floor(t)%Math.max(1,curSeq.length)]||3);
+  for(var i=0;i<petals;i++){ctx.rotate(2*Math.PI/petals);var r=60+breath*70+ (curSeq[i%curSeq.length]||0)*6;
+   ctx.beginPath();ctx.moveTo(0,0);ctx.quadraticCurveTo(r*0.4,r*0.5,0,r);ctx.quadraticCurveTo(-r*0.4,r*0.5,0,0);
+   var hue=200+ (curSeq[i%curSeq.length]||0)*8;ctx.strokeStyle="hsla("+hue+",60%,60%,0.5)";ctx.lineWidth=1.4;ctx.stroke();}
+  ctx.beginPath();ctx.arc(0,0,10+breath*8,0,7);ctx.fillStyle="rgba(200,164,74,"+(0.4+breath*0.4)+")";ctx.fill();
+  ctx.restore();
+  if(!playing&&t>0){ /* 停止後もしばらく描画 */ }
+ }frame();}
+
+document.getElementById("base").oninput=function(e){document.getElementById("base_v").textContent=e.target.value;};
+document.getElementById("beat").oninput=function(e){document.getElementById("beat_v").textContent=(e.target.value/10).toFixed(1);};
+document.getElementById("play").onclick=play;
+document.getElementById("stop").onclick=function(){stopAll();var m=document.querySelector(".reading");};
+document.getElementById("reading").onclick=function(){var intent=document.getElementById("intent").value||"stillness";
+ document.getElementById("poem").textContent=reading(intent);
+ document.getElementById("meta").textContent="seed="+intent+" · UID=OAE-"+(fnv(intent)>>>0).toString(36).toUpperCase()+" (生成物・非予知)";};
+</script>
+</body>
+</html>

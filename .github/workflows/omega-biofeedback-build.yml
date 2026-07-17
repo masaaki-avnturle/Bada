@@ -1,0 +1,81 @@
+name: Ω-Biofeedback build (APK + Windows EXE)
+
+# 手動実行 or タグ push (biofeedback-v*) でビルドし、成果物を Actions アーティファクト
+# および (タグ時) GitHub Release に添付します。→ リポジトリの Releases からダウンロード可能。
+#
+# ⚠ 本アプリは娯楽/非医療/非予知。アカシックレコードへのアクセスも未来予知も行いません。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'biofeedback-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: bio_medicine/omega_biofeedback/electron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install & build Windows EXE (Electron)
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-biofeedback-windows
+          path: |
+            bio_medicine/omega_biofeedback/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bio_medicine/omega_biofeedback/electron/dist/*.exe
+
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Build debug APK (Cordova)
+        run: |
+          npm install -g cordova
+          cordova create cordova-build io.github.masaaki_avnturle.omega_biofeedback Omega-Biofeedback-Oracle
+          rm -rf cordova-build/www
+          cp -r bio_medicine/omega_biofeedback/www cordova-build/www
+          cp bio_medicine/omega_biofeedback/cordova/config.xml cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android
+          cordova build android
+      - name: Locate APK
+        run: |
+          mkdir -p out
+          find cordova-build/platforms/android -name '*.apk' -exec cp {} out/ \;
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-biofeedback-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
