@@ -120,8 +120,34 @@ input:focus,textarea:focus{border-color:rgba(143,208,255,.6)}
  <div class="bconsole" id="bconsole"><b>BADA ▸</b> telegraph.bada 実行待ち…</div>
 </div>
 
+<div class="card">
+ <h2>⑥ NTT回線・音響通信 — アプリ ⇄ スマフォ（実データ送受信）</h2>
+ <div style="font-size:9px;line-height:1.85;color:var(--txt2);margin-bottom:10px">
+  本アプリとスマフォは<b>音響カプラ方式（電信＝音）</b>で実際に文字データを送受信します。メッセージを
+  <b>FSK 変調音</b>（音声帯域の2周波）にして鳴らし、相手側はマイクで<b>復調</b>して文字に戻します。<br>
+  <b style="color:#8fd0ff">▶ NTT の回線を介す場合：</b>アプリのある端末とスマフォで、通常どおり <b>NTT の電話（音声通話）</b>を
+  つなぎ、両方をスピーカーホンにします。送信側で「音響送信」すると、変調音が <b>NTT の音声回線を通って</b>
+  相手のマイクへ届き、復調されます。<b>同室</b>ならスピーカー↔マイクで直接。<br>
+  （※ アプリ単体で NTT の電話網へ直接ダイヤルはしません＝通信事業者ゲートウェイが必要。本方式は実在の
+  NTT 通話の音声チャンネルにデータを載せる、実際に動作する音響電信です。）
+ </div>
+ <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+  <div class="tile"><div class="k">変調方式</div><div class="v" style="font-size:12px">FSK 2周波 · 100 baud</div></div>
+  <div class="tile"><div class="k">搬送周波数（音声帯域）</div><div class="v" style="font-size:12px" id="modem-info">space 1000 / mark 1600 Hz</div></div>
+ </div>
+ <button class="sendbtn" id="ntt-send" style="margin-top:10px">🔊 音響送信（本文を NTT 通話に流す）</button>
+ <div class="row" style="margin-top:8px">
+  <button class="sendbtn" id="ntt-listen" style="flex:1;margin:0;background:linear-gradient(90deg,#b98cff,#8fd0ff)">🎙 受信開始（マイク）</button>
+  <button class="chip" id="ntt-stop">⏹ 停止してデコード</button>
+ </div>
+ <canvas id="spectrum" width="720" height="86" style="width:100%;height:86px;margin-top:10px;border-radius:10px;background:#06090f;border:1px solid rgba(130,170,240,.14)"></canvas>
+ <label style="margin-top:8px">受信・復調結果</label>
+ <div class="recvbody" style="min-height:40px"><div class="txt" id="ntt-recv" style="font-size:14px;color:#eafff4">—</div></div>
+ <div style="font-size:9px;color:var(--txt2);margin-top:6px" id="ntt-stat">待機中（🎙で受信を開始、🔊で送信）</div>
+</div>
+
 <div class="note">
- ※ 本アプリは山口フレームワークに基づく<b>創作・思考実験</b>のシミュレーションです。グラビトン↔電磁波変換や量子テレポーテーションによる通信は現実の通信網・電話回線には接続せず、実際の送信は行いません。数式（ガンマ/ベータ・Jones多項式・不確定性関係）は可視化のために計算しています。<br>© 2025 Masaaki Yamaguchi · 山口 雅旭 · Global Differential Manifold Research
+ ※ 本アプリの物理・数式（グラビトン↔電磁波変換／量子テレポーテーション／ガンマ・ベータ／Jones多項式／不確定性関係）は山口フレームワークに基づく<b>創作・思考実験の可視化</b>です。一方、<b>⑥ の音響通信は実際に動作</b>し、NTT の音声通話（またはスピーカー↔マイク）を介してアプリとスマフォ間で文字データを送受信します。<br>© 2025 Masaaki Yamaguchi · 山口 雅旭 · Global Differential Manifold Research
 </div>
 </div>
 
@@ -141,6 +167,10 @@ Tele::knot crossings
 Tele::teleport
 Tele::graviton
 Tele::send
+# ── NTT回線・音響通信（アプリ ⇄ スマフォ の実データ送受信）──
+#   Tele::modulate   本文を FSK 変調音にして送信（NTT 通話へ流す）
+#   Tele::listen     マイクで受信・復調を開始
+#   Tele::hangup     受信停止してデコード
 </script>
 
 <script>
@@ -282,6 +312,12 @@ function teleHandler(cmd,val){
   pipe.carrier=car;anim.carrier=car;$('t-car').textContent=txt;
  } else if(cmd==='send'){
   startTransmit();
+ } else if(cmd==='modulate'){
+  acousticSend();
+ } else if(cmd==='listen'){
+  acousticListen();
+ } else if(cmd==='hangup'){
+  acousticStop();
  }
 }
 
@@ -378,6 +414,101 @@ function draw(){anim.t+=0.03;const t=anim.t;
 }
 
 // ═══════════════════════════════════════════════════════════════
+// NTT回線・音響モデム（FSK）— アプリ ⇄ スマフォ の実データ送受信
+//   電信＝音：メッセージを FSK 変調音にして鳴らし、相手のマイクで復調。
+//   NTT の音声通話（スピーカーホン）に流せば、NTT 回線を介して通信できる。
+// ═══════════════════════════════════════════════════════════════
+const F_SPACE=1000, F_MARK=1600, BAUD=100;   // 音声帯域(300-3400Hz)内の2周波
+function getCtx(){AC=AC||new (window.AudioContext||window.webkitAudioContext)();return AC;}
+// フレーム：[preamble mark] + 各バイト(start0 + 8bit LSB先頭 + stop1)、SOF=0x7E・長さ・チェックサム
+function frameBytes(text){const payload=new TextEncoder().encode(text);
+ const body=[0x7E, payload.length&0xFF];for(const b of payload)body.push(b);
+ let sum=0;body.forEach(b=>sum=(sum+b)&0xFF);body.push(sum);return body;}
+function textToBits(text){const bytes=frameBytes(text);const bits=[];
+ for(let k=0;k<12;k++)bits.push(1);                       // アイドル(mark)＝プリアンブル
+ bytes.forEach(b=>{bits.push(0);for(let i=0;i<8;i++)bits.push((b>>i)&1);bits.push(1);});
+ for(let k=0;k<8;k++)bits.push(1);                        // 末尾 mark
+ return bits;}
+function modulate(text,sr){const bits=textToBits(text);const spb=Math.round(sr/BAUD);
+ const out=new Float32Array(bits.length*spb);let ph=0,idx=0;
+ for(const bit of bits){const f=bit?F_MARK:F_SPACE,dp=2*Math.PI*f/sr;
+  for(let i=0;i<spb;i++){out[idx++]=Math.sin(ph)*0.9;ph+=dp;if(ph>2*Math.PI)ph-=2*Math.PI;}}
+ return out;}
+function goertzelPow(s,start,n,f,sr){const w=2*Math.PI*f/sr,coeff=2*Math.cos(w);let s1=0,s2=0;
+ for(let i=0;i<n;i++){const s0=(s[start+i]||0)+coeff*s1-s2;s2=s1;s1=s0;}return s1*s1+s2*s2-coeff*s1*s2;}
+function demodulate(s,sr){const spb=Math.round(sr/BAUD),N=s.length;if(N<14*spb)return '';
+ const diffC=c=>{const st=Math.round(c-spb/2);if(st<0||st+spb>N)return 0;
+  const m=goertzelPow(s,st,spb,F_MARK,sr),sp=goertzelPow(s,st,spb,F_SPACE,sr);return (m-sp)/(m+sp+1e-12);};
+ const bitAt=c=>{const st=Math.round(c-spb/2);if(st<0||st+spb>N)return -1;
+  const m=goertzelPow(s,st,spb,F_MARK,sr),sp=goertzelPow(s,st,spb,F_SPACE,sr);return m>sp?1:0;};
+ let i=spb;const bytes=[];
+ while(i+11*spb<N){
+  while(i+spb<N && diffC(i)<0.4)i++;               // アイドル mark まで進む
+  let b=i;while(b+spb<N && diffC(b)>0)b++;          // mark→space の境界＝start bit 先頭
+  if(b+11*spb>=N)break;
+  let byte=0,ok=true;
+  for(let k=0;k<8;k++){const v=bitAt(b+(k+1.5)*spb);if(v<0){ok=false;break;}byte|=v<<k;}
+  if(!ok)break;
+  bytes.push(byte);i=Math.round(b+9.5*spb);
+ }
+ const fi=bytes.indexOf(0x7E);
+ if(fi>=0 && fi+1<bytes.length){const len=bytes[fi+1],pay=bytes.slice(fi+2,fi+2+len);
+  if(pay.length===len){let sum=0x7E+len;pay.forEach(x=>sum=(sum+x)&0xFF);
+   try{return new TextDecoder().decode(new Uint8Array(pay));}catch(e){return '';}}}
+ return '';}
+
+// 送信：本文を FSK 変調して鳴らす（NTT 通話に流す or スピーカー出力）
+let acSource=null;
+function acousticSend(){const text=($('msg').value||'').trim();if(!text){nttStat('本文が空です');return;}
+ const ctx=getCtx();if(ctx.state==='suspended')ctx.resume();
+ const samples=modulate(text,ctx.sampleRate);
+ const buf=ctx.createBuffer(1,samples.length,ctx.sampleRate);buf.getChannelData(0).set(samples);
+ const src=ctx.createBufferSource();src.buffer=buf;src.connect(ctx.destination);src.start();acSource=src;
+ const secs=(samples.length/ctx.sampleRate).toFixed(1);
+ nttStat('🔊 音響送信中… '+secs+'秒（'+text.length+'文字を FSK 変調）');
+ drawSendSpectrum(samples,ctx.sampleRate);
+ src.onended=()=>nttStat('送信完了（相手のマイクで受信してください）');
+}
+// 受信：マイクをキャプチャして復調
+let micStream=null, micProc=null, micSrc=null, recBuf=[], listening=false;
+async function acousticListen(){if(listening)return;
+ try{const ctx=getCtx();if(ctx.state==='suspended')ctx.resume();
+  const stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  micStream=stream;micSrc=ctx.createMediaStreamSource(stream);
+  micProc=ctx.createScriptProcessor(4096,1,1);recBuf=[];listening=true;
+  let live=0;
+  micProc.onaudioprocess=e=>{const d=e.inputBuffer.getChannelData(0);recBuf.push(new Float32Array(d));
+   drawWave(d);live++;if(live%10===0)tryLiveDecode(ctx.sampleRate);};
+  micSrc.connect(micProc);micProc.connect(ctx.destination);
+  nttStat('🎙 受信中… 相手の変調音を待っています（⏹ で停止してデコード）');
+ }catch(err){nttStat('マイクを開始できません（許可が必要）: '+err.message);}
+}
+function bufMerge(){let n=0;recBuf.forEach(a=>n+=a.length);const out=new Float32Array(n);let o=0;
+ recBuf.forEach(a=>{out.set(a,o);o+=a.length;});return out;}
+function tryLiveDecode(sr){const all=bufMerge();const tail=all.length>sr*8?all.subarray(all.length-sr*8):all;
+ const txt=demodulate(tail,sr);if(txt){$('ntt-recv').textContent=txt;nttStat('✓ 受信・復調成功（'+txt.length+'文字）');}}
+function acousticStop(){if(!listening){nttStat('受信していません');return;}
+ listening=false;const sr=(AC&&AC.sampleRate)||44100;
+ try{micProc&&micProc.disconnect();micSrc&&micSrc.disconnect();micStream&&micStream.getTracks().forEach(t=>t.stop());}catch(e){}
+ const all=bufMerge();const txt=demodulate(all,sr);
+ if(txt){$('ntt-recv').textContent=txt;nttStat('✓ デコード完了：「'+txt+'」');}
+ else{nttStat('復調できませんでした（音量・距離・雑音を確認して再試行）');}
+}
+function nttStat(m){const e=$('ntt-stat');if(e)e.textContent=m;}
+// スペクトル/波形の簡易表示
+const spec=$('spectrum'),sctx=spec?spec.getContext('2d'):null;let SW=720,SH=86;
+function specSize(){if(!spec)return;const d=window.devicePixelRatio||1;SW=spec.clientWidth;SH=86;spec.width=SW*d;spec.height=SH*d;sctx.setTransform(d,0,0,d,0,0);}
+function drawWave(data){if(!sctx)return;sctx.clearRect(0,0,SW,SH);sctx.strokeStyle='rgba(123,224,192,.85)';sctx.lineWidth=1;
+ sctx.beginPath();const step=Math.max(1,Math.floor(data.length/SW));for(let x=0;x<SW;x++){const v=data[x*step]||0;const y=SH/2-v*SH*0.45;x===0?sctx.moveTo(x,y):sctx.lineTo(x,y);}sctx.stroke();
+ // mark/space エネルギー
+ const sr=(AC&&AC.sampleRate)||44100,n=Math.min(data.length,Math.round(sr/BAUD));
+ const m=goertzelPow(data,0,n,F_MARK,sr),sp=goertzelPow(data,0,n,F_SPACE,sr),tot=m+sp+1e-9;
+ sctx.fillStyle='rgba(143,208,255,.8)';sctx.fillRect(0,SH-6,SW*(m/tot),6);
+ sctx.fillStyle='rgba(185,140,255,.8)';sctx.fillRect(0,SH-12,SW*(sp/tot),5);}
+function drawSendSpectrum(samples,sr){if(!sctx)return;let i=0;const chunk=Math.round(sr*0.05);
+ const iv=setInterval(()=>{if(i+chunk>=samples.length){clearInterval(iv);return;}drawWave(samples.subarray(i,i+chunk));i+=chunk;},50);}
+
+// ═══════════════════════════════════════════════════════════════
 // UI 配線
 // ═══════════════════════════════════════════════════════════════
 function updatePhType(){const pt=phoneType($('num').value);$('phtype').textContent=pt.ic+' '+pt.lb;}
@@ -386,7 +517,14 @@ $('c-audio').onclick=function(){audioOn=!audioOn;this.classList.toggle('on',audi
 $('c-pol').onclick=function(){polPlus=!polPlus;this.textContent='重力波 偏光 '+(polPlus?'+':'×');};
 $('send').onclick=doSend;
 function flashRecv(m){$('recv-meta').textContent=m;}
-resize();updatePhType();requestAnimationFrame(draw);
+// NTT音響通信ボタン：Bada 言語（Tele:: 命令）を通して実行
+function badaExec(line){if(!nBada)nBada=new BadaInterp(teleHandler);
+ try{nBada.exec(line);}catch(e){nBada.out.push('! '+e.message);}bLog();}
+$('ntt-send').onclick=()=>badaExec('Tele::modulate');
+$('ntt-listen').onclick=()=>badaExec('Tele::listen');
+$('ntt-stop').onclick=()=>badaExec('Tele::hangup');
+resize();specSize();updatePhType();requestAnimationFrame(draw);
+addEventListener('resize',specSize);
 </script>
 </body>
 </html>
