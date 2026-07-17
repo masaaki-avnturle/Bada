@@ -77,7 +77,17 @@ color:var(--text2);text-transform:uppercase;transition:.2s;touch-action:manipula
 .tab.active{color:rgba(150,200,255,.95);border-bottom-color:var(--accent)}
 #tab-body{flex:1 1 0;overflow:auto;position:relative}
 #preview-frame{width:100%;height:100%;border:0;background:#06080f;display:block}
-#src-view,#spec-view{display:none;padding:12px;font:300 9.5px/1.5 'Courier New',monospace;color:rgba(190,215,255,.85);white-space:pre-wrap;word-break:break-word}
+#src-view,#spec-view,#explain-view{display:none;padding:12px;font:300 9.5px/1.5 'Courier New',monospace;color:rgba(190,215,255,.85);white-space:pre-wrap;word-break:break-word}
+#explain-view{font-family:Georgia,serif;font-size:10.5px;line-height:1.75;letter-spacing:.03em;color:rgba(200,220,255,.9)}
+#lang-row{flex:0 0 auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:7px 10px;border-bottom:1px solid var(--border);background:rgba(6,10,20,.7)}
+.lang-label{font:300 7.5px/1 Georgia,serif;letter-spacing:.2em;color:var(--text2);text-transform:uppercase;margin-right:2px}
+.lang-btn{font:300 8px/1 'Courier New',monospace;letter-spacing:.05em;padding:6px 9px;border:1px solid var(--border);
+background:transparent;color:var(--text2);cursor:pointer;transition:.2s;touch-action:manipulation}
+.lang-btn.active{background:rgba(58,140,255,.16);border-color:var(--accent);color:rgba(160,205,255,.95)}
+#req-input{width:100%;margin-top:7px;background:rgba(4,8,18,.8);border:1px solid var(--border);color:var(--text);
+font:300 11px/1.5 Georgia,serif;padding:7px 9px;outline:none;resize:none;height:56px;-webkit-user-select:text;user-select:text}
+#req-input:focus{border-color:var(--accent2);background:rgba(14,10,6,.9)}
+#req-input::placeholder{color:rgba(100,130,200,.3)}
 #dl-bar{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px;border-top:1px solid var(--border);background:rgba(8,12,22,.96)}
 .dl-btn{flex:1 1 auto;font:300 8px/1 Georgia,serif;letter-spacing:.2em;padding:9px 6px;border:1px solid var(--accent);
 background:rgba(58,140,255,.1);color:rgba(150,200,255,.9);cursor:pointer;text-transform:uppercase;transition:.2s;
@@ -120,8 +130,10 @@ background:transparent;color:var(--text2);text-transform:uppercase;cursor:pointe
     </div>
     <div id="eq-picker"></div>
     <div id="name-wrap">
-      <label>App Name (任意)</label>
-      <input id="app-name" placeholder="Bada::… (自動命名)" spellcheck="false">
+      <label>要求: 作りたいアプリ (説明可能に取り込み)</label>
+      <textarea id="req-input" placeholder="例: エントロピーを可視化する瞑想アプリ。呼吸に合わせて波が脈動する。" spellcheck="false"></textarea>
+      <label style="margin-top:9px;display:block">App Name (任意)</label>
+      <input id="app-name" placeholder="Bada::… (要求と方程式から自動命名)" spellcheck="false">
     </div>
   </div>
 
@@ -136,17 +148,27 @@ background:transparent;color:var(--text2);text-transform:uppercase;cursor:pointe
   <div id="right">
     <div id="tabs">
       <div class="tab active" data-tab="preview">Preview</div>
-      <div class="tab" data-tab="src">Bada Source</div>
+      <div class="tab" data-tab="explain">説明</div>
+      <div class="tab" data-tab="src">Source</div>
       <div class="tab" data-tab="spec">Spec</div>
+    </div>
+    <div id="lang-row">
+      <span class="lang-label">方程式群 → 言語:</span>
+      <button class="lang-btn active" data-lang="bada">Bada</button>
+      <button class="lang-btn" data-lang="javascript">JavaScript</button>
+      <button class="lang-btn" data-lang="python">Python</button>
+      <button class="lang-btn" data-lang="ruby">Ruby</button>
     </div>
     <div id="tab-body">
       <iframe id="preview-frame" sandbox="allow-scripts"></iframe>
+      <pre id="explain-view"></pre>
       <pre id="src-view"></pre>
       <pre id="spec-view"></pre>
     </div>
     <div id="dl-bar">
-      <button class="dl-btn warn" id="dl-app" disabled>⬇ 生成アプリ (.html)</button>
-      <button class="dl-btn" id="dl-bada" disabled>⬇ Bada (.bada)</button>
+      <button class="dl-btn warn" id="dl-project" disabled>⬇ APK/EXEプロジェクト (.zip)</button>
+      <button class="dl-btn" id="dl-app" disabled>⬇ アプリ (.html)</button>
+      <button class="dl-btn" id="dl-src" disabled>⬇ 言語ソース</button>
       <button class="dl-btn" id="dl-spec" disabled>⬇ Spec (.json)</button>
     </div>
   </div>
@@ -257,10 +279,14 @@ function deriveName(mods){
  const a=ARCHETYPES[dom]||DEF_ARCH;
  return'Bada::'+a.archetype.split('_').map(s=>s[0].toUpperCase()+s.slice(1)).join('')+'App';}
 
-function buildSpec(eqs,name){
+function buildSpec(eqs,name,req){
  const mods=eqs.filter(e=>e&&e.trim()).map((e,i)=>meaning(e,i));
  const xt=mods.reduce((s,m)=>s+m.xi,0);
- return{name:(name&&name.trim())||deriveName(mods),xi_total:xt,module_count:mods.length,modules:mods};}
+ // 要求を説明可能に取り込み: 要求文自体を Ξ/幾何で解析
+ const reqA=(req&&req.trim())?(()=>{const inv=Bada.invariant(req),pl=Bada.placeEntropy(req);
+   const arch=ARCHETYPES[pl.geometry]||DEF_ARCH;
+   return{text:req,xi:inv.xi,h:inv.entropy,geom:pl.geometry,curv:pl.curvature,role:arch.role,arch:arch.archetype};})():null;
+ return{name:(name&&name.trim())||deriveName(mods),xi_total:xt,module_count:mods.length,modules:mods,requirement:reqA};}
 
 function badaSource(spec){
  const L=[];L.push('# '+spec.name+' — auto-generated Bada program');
@@ -332,12 +358,283 @@ h1{font-weight:300;letter-spacing:.25em;font-size:16px;color:#8fb8ff}
 footer{padding:14px 20px;font-size:8px;letter-spacing:.25em;color:#4a6ba0;border-top:1px solid rgba(80,160,255,.12)}
 </style></head><body>
 <header><h1>${title}</h1>
-<div class="sub">FORGED BY BADA FOUNDRY · ${spec.module_count} MODULES · Ξ=${spec.xi_total.toFixed(3)}</div></header>
+<div class="sub">FORGED BY BADA FOUNDRY · ${spec.module_count} MODULES · Ξ=${spec.xi_total.toFixed(3)}</div>
+${spec.requirement?`<div class="sub" style="color:#c8925a;margin-top:5px">要求: ${escapeHtml(spec.requirement.text)}</div>`:''}</header>
 <div id="grid"></div>
 <footer>Bada language child-application · 山口フレームワーク 方程式ネットワーク由来 · © Masaaki Yamaguchi</footer>
 <script>const MODULES=${JSON.stringify(mods)};</`+`script>
 <script>${CHILD_RENDER_JS}</`+`script>
 </body></html>`;}
+
+// ═══════════════════════════════════════════════════════════════
+// 説明可能な取り込み — 要求 + 方程式群 → 生成物の根拠
+// ═══════════════════════════════════════════════════════════════
+function explain(spec,req){
+ const L=[];
+ L.push('■ 生成アプリ: '+spec.name+'  ('+spec.module_count+' モジュール / Ξ_total='+spec.xi_total.toFixed(4)+')');
+ L.push('');
+ if(spec.requirement){
+  const r=spec.requirement;
+  L.push('■ 要求の取り込み（説明可能）');
+  L.push('  要求文: 「'+r.text+'」');
+  L.push('  未知事前予知エンジンで要求文を解析 → Ξ='+r.xi.toFixed(4)+' / H='+r.h.toFixed(3)+' / サーストン幾何='+r.geom+'（原型: '+r.role+'）。');
+  L.push('  要求はこの幾何に配置され、同系の幾何を持つ方程式モジュールが要求の中核挙動を担います。');
+ }else{
+  L.push('■ 要求文は未入力（方程式ネットワークのみから構成）。');
+ }
+ L.push('');
+ L.push('■ 方程式群 → モジュールの意味付け（なぜその挙動になるか）');
+ spec.modules.forEach(m=>{
+  L.push('  ● '+m.eq);
+  L.push('     H='+m.h.toFixed(3)+' により サーストン8幾何のうち '+m.geom+'（曲率κ='+m.curv+'）に配置。');
+  L.push('     → 曲率が原型「'+m.role+'」('+m.arch+') を決定。カタストロフィ分岐数='+m.branches+' 個の要素を描画。');
+  L.push('     → Ξ='+m.xi.toFixed(4)+' が動作速度、M='+m.m.toFixed(3)+'（∬1/(x·logx)²）が空間スケールに対応。');
+  if(spec.requirement && spec.requirement.geom===m.geom) L.push('     ★ 要求の幾何と一致 → 要求の中核挙動を担うモジュール。');
+ });
+ L.push('');
+ L.push('■ 生成物（すべてダウンロード可能）');
+ L.push('  1) 方程式群 → 言語変換（Bada / JavaScript / Python / Ruby。Source タブで切替）。');
+ L.push('  2) 実行可能な子アプリ（自己完結 HTML、各モジュールが上記の意味で駆動）。');
+ L.push('  3) APK/EXE 化プロジェクト一式（.zip）— 展開し GitHub Actions で APK と Windows10/11 EXE をビルド可能。');
+ L.push('');
+ L.push('■ 結論');
+ L.push('  '+(spec.requirement?('要求「'+spec.requirement.text+'」を、'):'')+
+   spec.module_count+' 本の方程式を意味付けした '+spec.module_count+' モジュール構成のアプリ '+spec.name+' として実体化しました。');
+ return L.join('\n');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 方程式群 → プログラミング言語への変換（Bada / JS / Python / Ruby）
+// ═══════════════════════════════════════════════════════════════
+function langJS(spec){
+ const L=[];
+ L.push('// '+spec.name+' — 方程式群 → JavaScript (generated by Bada Foundry)');
+ if(spec.requirement)L.push('// 要求: '+spec.requirement.text);
+ L.push('// modules='+spec.module_count+'  Xi_total='+spec.xi_total.toFixed(4));
+ L.push('');
+ L.push('// Bada operators as functions:');
+ L.push('const xLogX    = x => x<=0 ? 0 : x*Math.log(x);');
+ L.push('const leftAct  = chi => Math.abs(Math.PI*chi*Math.log(Math.abs(chi)+2)); // <- π(χ,x)');
+ L.push('const manifold = m => 1/((xLogX(m+2)**2) || 1);                          // -< ∬1/(x·logx)²');
+ L.push('const rightAct = x => Math.exp(-xLogX(Math.abs(x)+1e-6));                // >- e^{-x·logx}');
+ L.push('');
+ L.push('const MODULES = [');
+ spec.modules.forEach(m=>{
+  L.push('  { id:'+m.i+', equation:'+JSON.stringify(m.eq)+', role:'+JSON.stringify(m.role)+
+    ', geometry:'+JSON.stringify(m.geom)+', archetype:'+JSON.stringify(m.arch)+
+    ', xi:'+m.xi.toFixed(6)+', H:'+m.h.toFixed(6)+', M:'+m.m.toFixed(6)+', branches:'+m.branches+' },');
+ });
+ L.push('];');
+ L.push('');
+ L.push('for (const m of MODULES) {');
+ L.push('  const act = rightAct(manifold(m.M));');
+ L.push('  console.log(`#${m.id} [${m.role}/${m.geometry}] ${m.archetype}  Ξ=${m.xi.toFixed(4)}  act=${act.toExponential(4)}`);');
+ L.push('}');
+ L.push('console.log("app:", '+JSON.stringify(spec.name)+', "modules:", MODULES.length);');
+ return L.join('\n');
+}
+function langPY(spec){
+ const L=[];
+ L.push('# '+spec.name+' — 方程式群 → Python (generated by Bada Foundry)');
+ if(spec.requirement)L.push('# 要求: '+spec.requirement.text);
+ L.push('import math');
+ L.push('');
+ L.push('def x_log_x(x): return 0.0 if x <= 0 else x*math.log(x)');
+ L.push('def left_act(chi): return abs(math.pi*chi*math.log(abs(chi)+2))   # <- π(χ,x)');
+ L.push('def manifold(m):  return 1.0/((x_log_x(m+2)**2) or 1.0)           # -< ∬1/(x·logx)²');
+ L.push('def right_act(x): return math.exp(-x_log_x(abs(x)+1e-6))          # >- e^{-x·logx}');
+ L.push('');
+ L.push('MODULES = [');
+ spec.modules.forEach(m=>{
+  L.push('    {"id": '+m.i+', "equation": '+JSON.stringify(m.eq)+', "role": '+JSON.stringify(m.role)+
+    ', "geometry": '+JSON.stringify(m.geom)+', "archetype": '+JSON.stringify(m.arch)+
+    ', "xi": '+m.xi.toFixed(6)+', "H": '+m.h.toFixed(6)+', "M": '+m.m.toFixed(6)+', "branches": '+m.branches+'},');
+ });
+ L.push(']');
+ L.push('');
+ L.push('for m in MODULES:');
+ L.push('    act = right_act(manifold(m["M"]))');
+ L.push('    print(f\'#{m["id"]} [{m["role"]}/{m["geometry"]}] {m["archetype"]}  Xi={m["xi"]:.4f}  act={act:.4e}\')');
+ L.push('print("app:", '+JSON.stringify(spec.name)+', "modules:", len(MODULES))');
+ return L.join('\n');
+}
+function langRB(spec){
+ const L=[];
+ L.push('# '+spec.name+' — 方程式群 → Ruby (generated by Bada Foundry)');
+ if(spec.requirement)L.push('# 要求: '+spec.requirement.text);
+ L.push('');
+ L.push('def x_log_x(x) = x <= 0 ? 0.0 : x*Math.log(x)');
+ L.push('def left_act(chi) = (Math::PI*chi*Math.log(chi.abs+2)).abs      # <- π(χ,x)');
+ L.push('def manifold(m)   = 1.0 / (((x_log_x(m+2)**2)).nonzero? || 1.0) # -< ∬1/(x·logx)²');
+ L.push('def right_act(x)  = Math.exp(-x_log_x(x.abs+1e-6))              # >- e^{-x·logx}');
+ L.push('');
+ L.push('MODULES = [');
+ spec.modules.forEach(m=>{
+  L.push('  {id: '+m.i+', equation: '+JSON.stringify(m.eq)+', role: '+JSON.stringify(m.role)+
+    ', geometry: '+JSON.stringify(m.geom)+', archetype: '+JSON.stringify(m.arch)+
+    ', xi: '+m.xi.toFixed(6)+', h: '+m.h.toFixed(6)+', m: '+m.m.toFixed(6)+', branches: '+m.branches+'},');
+ });
+ L.push(']');
+ L.push('');
+ L.push('MODULES.each do |mod|');
+ L.push('  act = right_act(manifold(mod[:m]))');
+ L.push('  puts format("#%d [%s/%s] %s  Xi=%.4f  act=%.4e", mod[:id], mod[:role], mod[:geometry], mod[:archetype], mod[:xi], act)');
+ L.push('end');
+ L.push('puts "app: '+spec.name+', modules: #{MODULES.length}"');
+ return L.join('\n');
+}
+function toLanguage(spec,lang){
+ if(lang==='javascript')return langJS(spec);
+ if(lang==='python')return langPY(spec);
+ if(lang==='ruby')return langRB(spec);
+ return badaSource(spec);
+}
+function langExt(lang){return {javascript:'.js',python:'.py',ruby:'.rb',bada:'.bada'}[lang]||'.txt';}
+
+// ═══════════════════════════════════════════════════════════════
+// APK/EXE 化プロジェクト一式の生成（子アプリを APK/EXE にできる）
+// ═══════════════════════════════════════════════════════════════
+function childElectronMain(safe){
+ return "const { app, BrowserWindow, Menu, shell } = require('electron');\n"+
+ "const path = require('path');\n"+
+ "let win=null;\n"+
+ "function create(){\n"+
+ "  win=new BrowserWindow({width:1280,height:860,backgroundColor:'#06080f',title:'"+safe+"',\n"+
+ "    autoHideMenuBar:true,webPreferences:{contextIsolation:true,nodeIntegration:false}});\n"+
+ "  win.loadFile(path.join(__dirname,'..','www','index.html'));\n"+
+ "  win.webContents.setWindowOpenHandler(({url})=>{shell.openExternal(url);return {action:'deny'};});\n"+
+ "}\n"+
+ "app.whenReady().then(()=>{Menu.setApplicationMenu(null);create();\n"+
+ "  app.on('activate',()=>{if(BrowserWindow.getAllWindows().length===0)create();});});\n"+
+ "app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit();});\n";
+}
+const CHILD_WORKFLOW =
+"name: Build App (APK + Windows EXE)\n"+
+"on:\n"+
+"  workflow_dispatch:\n"+
+"  push:\n"+
+"    tags: [ 'v*' ]\n"+
+"permissions:\n"+
+"  contents: write\n"+
+"jobs:\n"+
+"  windows:\n"+
+"    runs-on: windows-latest\n"+
+"    steps:\n"+
+"      - uses: actions/checkout@v4\n"+
+"      - uses: actions/setup-node@v4\n"+
+"        with: { node-version: '20' }\n"+
+"      - run: npm install\n"+
+"      - run: npm run dist:win\n"+
+"      - uses: actions/upload-artifact@v4\n"+
+"        with: { name: windows-exe, path: dist/*.exe }\n"+
+"      - if: startsWith(github.ref, 'refs/tags/')\n"+
+"        uses: softprops/action-gh-release@v2\n"+
+"        with: { files: dist/*.exe }\n"+
+"  android:\n"+
+"    runs-on: ubuntu-latest\n"+
+"    steps:\n"+
+"      - uses: actions/checkout@v4\n"+
+"      - uses: actions/setup-node@v4\n"+
+"        with: { node-version: '20' }\n"+
+"      - uses: actions/setup-java@v4\n"+
+"        with: { distribution: 'temurin', java-version: '17' }\n"+
+"      - uses: android-actions/setup-android@v3\n"+
+"      - run: npm install\n"+
+"      - run: npx cap add android\n"+
+"      - run: npx cap sync android\n"+
+"      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon\n"+
+"      - uses: actions/upload-artifact@v4\n"+
+"        with: { name: android-apk, path: android/app/build/outputs/apk/debug/app-debug.apk }\n"+
+"      - if: startsWith(github.ref, 'refs/tags/')\n"+
+"        uses: softprops/action-gh-release@v2\n"+
+"        with: { files: android/app/build/outputs/apk/debug/app-debug.apk }\n";
+function childReadme(spec,safe){
+ return "# "+spec.name+"\n\n"+
+ "Bada Foundry が方程式群から生成したアプリです。APK と Windows 10/11 EXE にビルドできます。\n\n"+
+ (spec.requirement?("**要求**: "+spec.requirement.text+"\n\n"):"")+
+ "## ビルド\n\n"+
+ "```bash\nnpm install\nnpm start            # デスクトップ起動\nnpm run dist:win     # Windows 10/11 EXE を dist/ に生成\n\n"+
+ "npx cap add android\nnpx cap sync android\ncd android && ./gradlew assembleDebug   # app-debug.apk\n```\n\n"+
+ "## GitHub Actions で自動ビルド\n\n"+
+ "このプロジェクトを GitHub リポジトリに置くと `.github/workflows/build.yml` が APK と EXE を自動生成します。\n"+
+ "タグ `v1.0.0` を push すると Releases に添付されます。\n\n"+
+ "*Generated by Bada Foundry · 山口フレームワーク*\n";
+}
+function projectFiles(spec){
+ const safe=(spec.name.replace(/[^A-Za-z0-9]+/g,'')||'BadaChildApp');
+ const appId='io.github.masaaki.'+safe.toLowerCase();
+ const pkg={
+  name:safe.toLowerCase(),productName:safe,version:'1.0.0',
+  description:'Generated by Bada Foundry from an equation network',main:'electron/main.js',
+  scripts:{start:'electron .','dist:win':'electron-builder --win --x64 --publish never',
+    'cap:add':'cap add android','cap:sync':'cap sync android','apk:debug':'cd android && ./gradlew assembleDebug'},
+  devDependencies:{'@capacitor/cli':'^6.2.0',electron:'^31.7.7','electron-builder':'^24.13.3'},
+  dependencies:{'@capacitor/android':'^6.2.0','@capacitor/core':'^6.2.0'},
+  build:{appId:appId,productName:safe,directories:{output:'dist'},publish:null,files:['electron/**/*','www/**/*'],
+    win:{target:[{target:'nsis',arch:['x64']},{target:'portable',arch:['x64']}]},
+    nsis:{oneClick:false,allowToChangeInstallationDirectory:true}}
+ };
+ const cap={appId:appId,appName:safe,webDir:'www',server:{androidScheme:'https'}};
+ return [
+  {name:'www/index.html',text:appHtml(spec)},
+  {name:'package.json',text:JSON.stringify(pkg,null,2)},
+  {name:'electron/main.js',text:childElectronMain(safe)},
+  {name:'capacitor.config.json',text:JSON.stringify(cap,null,2)},
+  {name:'.github/workflows/build.yml',text:CHILD_WORKFLOW},
+  {name:'README.md',text:childReadme(spec,safe)},
+  {name:spec.name.replace(/[^A-Za-z0-9]+/g,'_')+'.bada',text:badaSource(spec)},
+  {name:'spec.json',text:JSON.stringify(spec,null,2)}
+ ];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 純JS ZIP ライタ（store方式 + CRC32）— 外部ライブラリ不要
+// ═══════════════════════════════════════════════════════════════
+const CRC_TABLE=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;
+ for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}return t;})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC_TABLE[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function _u16(n){return [n&0xFF,(n>>8)&0xFF];}
+function _u32(n){return [n&0xFF,(n>>8)&0xFF,(n>>16)&0xFF,(n>>>24)&0xFF];}
+function buildZip(files){
+ const enc=new TextEncoder();const chunks=[];const central=[];let offset=0;
+ files.forEach(f=>{
+  const nameU8=enc.encode(f.name);const dataU8=enc.encode(f.text);const crc=crc32(dataU8);
+  const local=new Uint8Array([].concat(_u32(0x04034b50),_u16(20),_u16(0),_u16(0),_u16(0),_u16(0),
+    _u32(crc),_u32(dataU8.length),_u32(dataU8.length),_u16(nameU8.length),_u16(0)));
+  chunks.push(local,nameU8,dataU8);
+  central.push(new Uint8Array([].concat(_u32(0x02014b50),_u16(20),_u16(20),_u16(0),_u16(0),_u16(0),_u16(0),
+    _u32(crc),_u32(dataU8.length),_u32(dataU8.length),_u16(nameU8.length),_u16(0),_u16(0),_u16(0),_u16(0),
+    _u32(0),_u32(offset))),nameU8);
+  offset+=local.length+nameU8.length+dataU8.length;
+ });
+ let cdSize=0;central.forEach(c=>cdSize+=c.length);
+ const end=new Uint8Array([].concat(_u32(0x06054b50),_u16(0),_u16(0),_u16(files.length),_u16(files.length),
+   _u32(cdSize),_u32(offset),_u16(0)));
+ const all=chunks.concat(central,[end]);
+ let total=0;all.forEach(p=>total+=p.length);
+ const out=new Uint8Array(total);let pos=0;all.forEach(p=>{out.set(p,pos);pos+=p.length;});
+ return out;
+}
+function base64FromU8(u8){let s='';const CH=0x8000;for(let i=0;i<u8.length;i+=CH)s+=String.fromCharCode.apply(null,u8.subarray(i,i+CH));return btoa(s);}
+async function downloadBinary(filename,u8,mime){
+ const cap=window.Capacitor;
+ if(cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem){
+  try{
+   const FS=cap.Plugins.Filesystem, SH=cap.Plugins.Share;
+   await FS.writeFile({path:filename,data:base64FromU8(u8),directory:'CACHE',recursive:true});
+   const uri=await FS.getUri({path:filename,directory:'CACHE'});
+   if(SH && SH.share){await SH.share({title:filename,url:uri.uri});toast('保存/共有しました: '+filename);}
+   else toast('保存しました: '+uri.uri);
+   return;
+  }catch(e){if((''+e).indexOf('cancel')>=0)return;toast('端末保存に失敗、通常DLを試行: '+(e&&e.message||e));}
+ }
+ try{
+  const blob=new Blob([u8],{type:mime});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();
+  setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},700);
+  toast('保存しました: '+filename);
+ }catch(e){toast('ダウンロード失敗: '+(e&&e.message||e));}
+}
 
 // ═══════════════════════════════════════════════════════════════
 // UI
@@ -413,19 +710,35 @@ function drawNetwork(){
 }
 
 // ── forge ──
+let targetLang='bada';
 document.getElementById('forge-btn').onclick=()=>{
  const eqs=[...selected].map(i=>EQ_DB[i].eq);
  if(!eqs.length){flashPrecog('方程式を1つ以上選んでください。');return;}
+ const req=document.getElementById('req-input').value.trim();
  const name=document.getElementById('app-name').value;
- const spec=buildSpec(eqs,name);
- currentForge={spec,bada:badaSource(spec),html:appHtml(spec)};
+ const spec=buildSpec(eqs,name,req);
+ currentForge={spec,req,html:appHtml(spec),explanation:explain(spec,req)};
  renderPrecog(spec);
  document.getElementById('preview-frame').srcdoc=currentForge.html;
- document.getElementById('src-view').textContent=currentForge.bada;
+ document.getElementById('explain-view').textContent=currentForge.explanation;
+ refreshSource();
  document.getElementById('spec-view').textContent=JSON.stringify(spec,null,2);
- ['dl-app','dl-bada','dl-spec'].forEach(id=>document.getElementById(id).disabled=false);
+ ['dl-project','dl-app','dl-src','dl-spec'].forEach(id=>document.getElementById(id).disabled=false);
  if(window.innerWidth<=920)document.getElementById('right').classList.add('open');
 };
+function refreshSource(){
+ if(!currentForge)return;
+ currentForge.source=toLanguage(currentForge.spec,targetLang);
+ document.getElementById('src-view').textContent=currentForge.source;
+}
+// language selector
+document.querySelectorAll('.lang-btn').forEach(b=>{b.onclick=()=>{
+ targetLang=b.dataset.lang;
+ document.querySelectorAll('.lang-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');
+ refreshSource();
+ // jump to Source tab so the change is visible
+ document.querySelector('.tab[data-tab="src"]').click();
+};});
 function flashPrecog(msg){document.getElementById('precog-body').innerHTML='<div class="hint">'+msg+'</div>';}
 function renderPrecog(spec){
  let html='<div class="mod-row" style="border-left-color:#ff7a30;background:rgba(255,140,60,.08)">'+
@@ -478,8 +791,13 @@ async function download(filename,content,mime){
  anchorDownload(filename,content,mime);
 }
 function safeName(){return (currentForge?currentForge.spec.name:'BadaApp').replace(/[^A-Za-z0-9]+/g,'_');}
+document.getElementById('dl-project').onclick=()=>{
+ if(!currentForge){toast('先に Forge してください');return;}
+ try{const zip=buildZip(projectFiles(currentForge.spec));downloadBinary(safeName()+'_project.zip',zip,'application/zip');}
+ catch(e){toast('プロジェクト生成失敗: '+(e&&e.message||e));}
+};
 document.getElementById('dl-app').onclick=()=>{if(currentForge)download(safeName()+'.html',currentForge.html,'text/html');else toast('先に Forge してください');};
-document.getElementById('dl-bada').onclick=()=>{if(currentForge)download(safeName()+'.bada',currentForge.bada,'text/plain');else toast('先に Forge してください');};
+document.getElementById('dl-src').onclick=()=>{if(currentForge)download(safeName()+langExt(targetLang),currentForge.source||toLanguage(currentForge.spec,targetLang),'text/plain');else toast('先に Forge してください');};
 document.getElementById('dl-spec').onclick=()=>{if(currentForge)download(safeName()+'.spec.json',JSON.stringify(currentForge.spec,null,2),'application/json');else toast('先に Forge してください');};
 
 // ── tabs ──
@@ -487,6 +805,7 @@ document.querySelectorAll('.tab').forEach(tb=>{tb.onclick=()=>{
  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));tb.classList.add('active');
  const t=tb.dataset.tab;
  document.getElementById('preview-frame').style.display=t==='preview'?'block':'none';
+ document.getElementById('explain-view').style.display=t==='explain'?'block':'none';
  document.getElementById('src-view').style.display=t==='src'?'block':'none';
  document.getElementById('spec-view').style.display=t==='spec'?'block':'none';};});
 

@@ -39,6 +39,26 @@ if defined?(Minitest)
       f = Bada::Foundry.forge(EQS)
       assert_match(/\ABada::/, f[:spec][:name])
     end
+
+    def test_requirement_incorporated_and_explained
+      f = Bada::Foundry.forge(EQS, requirement: "エントロピーを可視化する瞑想アプリ")
+      assert f[:spec][:requirement], "requirement analysis should be present"
+      assert f[:spec][:requirement][:geometry]
+      assert_includes f[:explanation], "要求の取り込み"
+      assert_includes f[:explanation], "瞑想"
+    end
+
+    def test_equation_to_language_conversion
+      s = Bada::Foundry.spec(EQS, app_name: "LangApp")
+      js = Bada::Foundry.to_language(s, "javascript")
+      py = Bada::Foundry.to_language(s, "python")
+      rb = Bada::Foundry.to_language(s, "ruby")
+      assert_includes js, "const MODULES="
+      assert_includes py, "MODULES=["
+      assert_includes rb, "MODULES=["
+      # generated Ruby must be syntactically valid
+      assert RubyVM::InstructionSequence.compile(rb), "generated Ruby should compile"
+    end
   end
 else
   # Fallback assertions (no minitest available).

@@ -70,12 +70,23 @@ module Bada
     end
 
     # 方程式ネットワーク（文字列配列）全体をアプリ仕様へ意味付け。
-    def spec(equations, app_name: nil)
+    # requirement: 作りたいアプリの要求文（説明可能に取り込む）。
+    def spec(equations, app_name: nil, requirement: nil)
       mods = equations.reject { |e| e.to_s.strip.empty? }
                       .each_with_index.map { |eq, i| meaning(eq, index: i) }
       xi_total = mods.sum { |m| m[:xi] }
       name = app_name || derive_name(mods)
-      { name: name, xi_total: xi_total, module_count: mods.length, modules: mods }
+      req = requirement.to_s.strip.empty? ? nil : requirement_analysis(requirement)
+      { name: name, xi_total: xi_total, module_count: mods.length, modules: mods, requirement: req }
+    end
+
+    # 要求文自体を未知事前予知エンジンで解析（説明可能な取り込み）。
+    def requirement_analysis(text)
+      inv = Manifold.invariant(text)
+      place = Thurston.place_entropy(text)
+      arch = ARCHETYPES.fetch(place[:geometry], DEFAULT_ARCH)
+      { text: text, xi: inv[:invariant], entropy: inv[:entropy],
+        geometry: place[:geometry], curvature: place[:curvature], role: arch[:role] }
     end
 
     # ネットワークの支配的幾何からアプリ名を導出。
@@ -195,13 +206,103 @@ module Bada
       JS
     end
 
-    # 一括生成: 仕様・Bada ソース・子アプリ HTML をまとめて返す。
-    def forge(equations, app_name: nil)
-      s = spec(equations, app_name: app_name)
+    # 方程式群 → プログラミング言語への変換（:bada / :javascript / :python / :ruby）。
+    def to_language(spec, lang)
+      case lang.to_s
+      when "javascript", "js" then lang_js(spec)
+      when "python", "py"     then lang_py(spec)
+      when "ruby", "rb"       then lang_rb(spec)
+      else bada_source(spec)
+      end
+    end
+
+    def lang_js(spec)
+      out = []
+      out << "// #{spec[:name]} — 方程式群 → JavaScript (Bada Foundry)"
+      out << "// 要求: #{spec[:requirement][:text]}" if spec[:requirement]
+      out << "const xLogX=x=>x<=0?0:x*Math.log(x);"
+      out << "const manifold=m=>1/((xLogX(m+2)**2)||1);   // -< ∬1/(x·logx)²"
+      out << "const rightAct=x=>Math.exp(-xLogX(Math.abs(x)+1e-6)); // >- e^{-x·logx}"
+      out << "const MODULES=["
+      spec[:modules].each do |m|
+        out << "  {id:#{m[:index]}, equation:#{m[:equation].inspect}, archetype:#{m[:archetype].inspect}, " \
+               "xi:#{format('%.6f', m[:xi])}, M:#{format('%.6f', m[:manifold])}},"
+      end
+      out << "];"
+      out << "for(const m of MODULES){const a=rightAct(manifold(m.M));" \
+             "console.log(`#${m.id} ${m.archetype} Ξ=${m.xi.toFixed(4)} act=${a.toExponential(4)}`);}"
+      out.join("\n")
+    end
+
+    def lang_py(spec)
+      out = []
+      out << "# #{spec[:name]} — 方程式群 → Python (Bada Foundry)"
+      out << "# 要求: #{spec[:requirement][:text]}" if spec[:requirement]
+      out << "import math"
+      out << "def x_log_x(x): return 0.0 if x<=0 else x*math.log(x)"
+      out << "def manifold(m): return 1.0/((x_log_x(m+2)**2) or 1.0)   # -< ∬1/(x·logx)²"
+      out << "def right_act(x): return math.exp(-x_log_x(abs(x)+1e-6)) # >- e^{-x·logx}"
+      out << "MODULES=["
+      spec[:modules].each do |m|
+        out << "    {\"id\":#{m[:index]}, \"equation\":#{m[:equation].inspect}, \"archetype\":#{m[:archetype].inspect}, " \
+               "\"xi\":#{format('%.6f', m[:xi])}, \"M\":#{format('%.6f', m[:manifold])}},"
+      end
+      out << "]"
+      out << "for m in MODULES:"
+      out << "    a=right_act(manifold(m[\"M\"]))"
+      out << "    print(f'#{'#'}{m[\"id\"]} {m[\"archetype\"]} Xi={m[\"xi\"]:.4f} act={a:.4e}')"
+      out.join("\n")
+    end
+
+    def lang_rb(spec)
+      out = []
+      out << "# #{spec[:name]} — 方程式群 → Ruby (Bada Foundry)"
+      out << "# 要求: #{spec[:requirement][:text]}" if spec[:requirement]
+      out << "def x_log_x(x) = x<=0 ? 0.0 : x*Math.log(x)"
+      out << "def manifold(m) = 1.0/(((x_log_x(m+2)**2)).nonzero? || 1.0)   # -< ∬1/(x·logx)²"
+      out << "def right_act(x) = Math.exp(-x_log_x(x.abs+1e-6))             # >- e^{-x·logx}"
+      out << "MODULES=["
+      spec[:modules].each do |m|
+        out << "  {id: #{m[:index]}, equation: #{m[:equation].inspect}, archetype: #{m[:archetype].inspect}, " \
+               "xi: #{format('%.6f', m[:xi])}, m: #{format('%.6f', m[:manifold])}},"
+      end
+      out << "]"
+      out << "MODULES.each { |mod| puts format(\"#%d %s Xi=%.4f act=%.4e\", mod[:id], mod[:archetype], mod[:xi], right_act(manifold(mod[:m]))) }"
+      out.join("\n")
+    end
+
+    # 説明可能: 要求 + 方程式群 → 生成物の根拠を日本語で説明。
+    def explanation(spec)
+      out = []
+      out << "■ 生成アプリ: #{spec[:name]} (#{spec[:module_count]} モジュール / Ξ_total=#{format('%.4f', spec[:xi_total])})"
+      if spec[:requirement]
+        r = spec[:requirement]
+        out << "■ 要求の取り込み（説明可能）"
+        out << "  要求文: 「#{r[:text]}」"
+        out << format("  解析 → Ξ=%.4f / H=%.3f / サーストン幾何=%s（原型: %s）。同系幾何のモジュールが要求の中核挙動を担う。",
+                      r[:xi], r[:entropy], r[:geometry], r[:role])
+      else
+        out << "■ 要求文は未入力（方程式ネットワークのみから構成）。"
+      end
+      out << "■ 方程式群 → モジュールの意味付け"
+      spec[:modules].each do |m|
+        out << "  ● #{m[:equation]}"
+        out << format("     H=%.3f → 幾何 %s (κ=%s) → 原型「%s」(%s), 分岐%d, Ξ=%.4f",
+                      m[:entropy], m[:geometry], m[:curvature], m[:role], m[:archetype], m[:branches], m[:xi])
+        out << "     ★ 要求の幾何と一致" if spec[:requirement] && spec[:requirement][:geometry] == m[:geometry]
+      end
+      out << "■ 生成物: (1) 4言語へ変換 (2) 実行可能な子アプリ HTML (3) APK/EXE 化プロジェクト一式"
+      out.join("\n")
+    end
+
+    # 一括生成: 仕様・Bada ソース・子アプリ HTML・説明をまとめて返す。
+    def forge(equations, app_name: nil, requirement: nil)
+      s = spec(equations, app_name: app_name, requirement: requirement)
       {
         spec: s,
         bada_source: bada_source(s),
-        app_html: app_html(s)
+        app_html: app_html(s),
+        explanation: explanation(s)
       }
     end
   end

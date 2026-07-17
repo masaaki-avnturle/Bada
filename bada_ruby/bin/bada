@@ -113,38 +113,47 @@ when "foundry"
   eqs = []
   name = nil
   outdir = "."
+  requirement = nil
+  lang = "bada"
   until ARGV.empty?
     case (a = ARGV.shift)
     when "--file" then eqs.concat(File.readlines(ARGV.shift, chomp: true))
     when "--name" then name = ARGV.shift
     when "--out"  then outdir = ARGV.shift
+    when "--requirement", "--req" then requirement = ARGV.shift
+    when "--lang" then lang = ARGV.shift
     else eqs << a
     end
   end
   eqs = eqs.map(&:strip).reject(&:empty?)
-  abort("usage: bada foundry \"eq1\" \"eq2\" ... [--name N] [--out dir]") if eqs.empty?
-  forged = Bada::Foundry.forge(eqs, app_name: name)
+  abort("usage: bada foundry \"eq1\" ... [--name N] [--requirement R] [--lang bada|javascript|python|ruby] [--out dir]") if eqs.empty?
+  forged = Bada::Foundry.forge(eqs, app_name: name, requirement: requirement)
   s = forged[:spec]
   base = s[:name].gsub(/[^A-Za-z0-9]+/, "_")
+  ext = { "javascript" => ".js", "js" => ".js", "python" => ".py", "py" => ".py",
+          "ruby" => ".rb", "rb" => ".rb" }.fetch(lang, ".bada")
   Dir.mkdir(outdir) unless Dir.exist?(outdir)
   bada_path = File.join(outdir, "#{base}.bada")
   html_path = File.join(outdir, "#{base}.html")
   spec_path = File.join(outdir, "#{base}.spec.json")
+  lang_path = File.join(outdir, "#{base}#{ext}")
   File.write(bada_path, forged[:bada_source])
   File.write(html_path, forged[:app_html])
   File.write(spec_path, JSON.pretty_generate(s))
+  File.write(lang_path, Bada::Foundry.to_language(s, lang))
   puts "── Bada Foundry: アプリを作るアプリ ──"
   puts "生成アプリ名 : #{s[:name]}"
+  puts "要求         : #{requirement}" if requirement
   puts "モジュール数 : #{s[:module_count]} · Ξ_total=#{format('%.4f', s[:xi_total])}"
-  s[:modules].each do |m|
-    puts format("  #%d [%s / %s] Ξ=%.4f archetype=%s", m[:index], m[:role], m[:geometry], m[:xi], m[:archetype])
-  end
+  puts "── 説明（説明可能な取り込み）──"
+  puts forged[:explanation]
   puts "── 生成 Bada プログラムの実行（意味の実行証跡）──"
   Bada::Foundry.run_bada(forged[:bada_source]).each { |line| puts "  #{line}" }
   puts "── 出力ファイル ──"
-  puts "  Bada ソース : #{bada_path}"
-  puts "  子アプリ    : #{html_path}   ← これがダウンロード可能な生成アプリ"
-  puts "  仕様(JSON)  : #{spec_path}"
+  puts "  Bada ソース   : #{bada_path}"
+  puts "  #{lang} ソース : #{lang_path}   ← 方程式群 → 言語変換"
+  puts "  子アプリ      : #{html_path}   ← ダウンロード可能な生成アプリ"
+  puts "  仕様(JSON)    : #{spec_path}"
 when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
