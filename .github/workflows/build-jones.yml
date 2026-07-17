@@ -1,0 +1,93 @@
+name: Build Jones Lens (APK + Windows EXE)
+
+# 実行方法:
+#   1) 手動:  Actions → "Build Jones Lens" → Run workflow
+#   2) ブランチ push: 下記ブランチへ push すると自動ビルド。Artifacts から取得。
+#   3) タグ push: タグ  jones-v1.0.0  等を push すると Release に成果物を添付。
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+      - 'claude/touch-sensitivity-app-packaging-ep1xmm'
+    tags:
+      - 'jones-v*'
+    paths:
+      - 'jones_lens/**'
+      - '.github/workflows/build-jones.yml'
+
+defaults:
+  run:
+    working-directory: jones_lens
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Build Windows EXE (electron-builder)
+        run: npm run dist:win
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp dist/*.exe out/ 2>/dev/null || true
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jones-windows-exe
+          path: jones_lens/out/*.exe
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: jones_lens/out/*.exe
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install dependencies
+        run: npm install
+      - name: Add Android platform
+        run: npx cap add android
+      - name: Sync web assets
+        run: npx cap sync android
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          VER=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "out/JonesLens-${VER}-debug.apk"
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jones-android-apk
+          path: jones_lens/out/*.apk
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: jones_lens/out/*.apk

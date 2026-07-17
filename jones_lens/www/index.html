@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>JONES LENS — ホログラフィック・アイウェア</title>
+<style>
+:root{--txt:rgba(226,238,255,.94);--txt2:rgba(160,185,225,.6);--accent:#7fd0ff;--warm:#ffb070;}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{overscroll-behavior:none}
+body{background:#04060d;color:var(--txt);font-family:'Hiragino Kaku Gothic ProN','Yu Gothic',system-ui,sans-serif;
+ height:100vh;height:100dvh;overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#stage{position:fixed;inset:0;display:block;touch-action:none}
+#reticle{position:fixed;width:24px;height:24px;border-radius:50%;border:1.5px solid rgba(180,220,255,.5);
+ transform:translate(-50%,-50%);pointer-events:none;z-index:8;box-shadow:0 0 12px rgba(127,208,255,.4);mix-blend-mode:screen}
+#reticle::after{content:'';position:absolute;inset:9px;border-radius:50%;background:rgba(200,230,255,.7)}
+.hud{position:fixed;z-index:7;pointer-events:none;font-weight:300}
+#hud-title{top:22px;left:0;right:0;text-align:center}
+#hud-title h1{font:300 15px/1 system-ui;letter-spacing:.45em;color:rgba(190,220,255,.75)}
+#hud-title .sub{font-size:8px;letter-spacing:.28em;color:var(--txt2);margin-top:6px}
+#hud-l{top:64px;left:24px;font-size:9px;line-height:1.9;color:var(--txt2)}
+#hud-l b{color:rgba(180,215,255,.92)}
+#hud-r{top:64px;right:24px;text-align:right;font-size:9px;line-height:1.9;color:var(--txt2)}
+#hud-r b{color:rgba(255,190,130,.92)}
+/* コントロール */
+#panel{position:fixed;left:50%;bottom:34px;transform:translateX(-50%);z-index:9;width:min(760px,94vw);
+ background:rgba(14,22,44,.44);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+ border:1px solid rgba(160,200,255,.18);border-radius:22px;padding:13px 18px 15px;
+ box-shadow:0 20px 60px rgba(0,0,0,.55)}
+.chrow{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:11px}
+.chrow .cur{font-size:13px;letter-spacing:.08em;color:rgba(210,232,255,.95);min-width:210px;text-align:center}
+.chrow .cur b{color:#8fe0a0}
+.sliders{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;margin-bottom:11px}
+.sl{display:flex;flex-direction:column;gap:4px;min-width:150px;flex:1 1 150px}
+.sl label{font-size:8.5px;letter-spacing:.12em;color:var(--txt2)}
+.sl label b{color:rgba(180,215,255,.92)}
+.sl input[type=range]{width:100%;accent-color:#7fd0ff}
+.btns{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+.b{border:1px solid rgba(160,200,255,.2);background:rgba(20,30,54,.55);color:rgba(210,232,255,.92);
+ border-radius:11px;padding:9px 13px;font-size:12px;cursor:pointer;transition:.18s;touch-action:manipulation;white-space:nowrap}
+.b:hover{background:rgba(50,84,150,.6)}
+.b.on{background:rgba(127,208,255,.2);border-color:var(--accent);color:#dff0ff}
+.b.rd{width:44px;height:44px;border-radius:50%;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0}
+#b-exit{position:fixed;top:16px;right:18px;z-index:11;display:none;background:rgba(20,30,54,.6);
+ border:1px solid rgba(160,200,255,.3);color:#eaf4ff;border-radius:12px;padding:10px 16px;font-size:13px;cursor:pointer}
+#toast{position:fixed;top:104px;left:50%;transform:translateX(-50%);z-index:12;pointer-events:none;max-width:90vw;text-align:center;
+ background:rgba(10,18,34,.95);border:1px solid rgba(127,208,255,.5);color:#dff0ff;font-size:12px;padding:9px 15px;border-radius:8px;opacity:0;transition:opacity .3s}
+#home{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);width:120px;height:5px;border-radius:3px;background:rgba(200,225,255,.35);z-index:9}
+#note{position:fixed;left:0;right:0;bottom:2px;text-align:center;font-size:8px;color:rgba(120,150,195,.45);z-index:6;pointer-events:none}
+body.stereo #hud-title,body.stereo #hud-l,body.stereo #hud-r,body.stereo #panel,body.stereo #home,body.stereo #note{opacity:0;pointer-events:none}
+body.stereo #b-exit{display:block}
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="reticle"></div>
+
+<div class="hud" id="hud-title"><h1>JONES LENS</h1>
+ <div class="sub">ホログラフィック・アイウェア · Jones多項式 × 特殊相対性理論のレンズ焦点 · インターネットTV投影 · visionOS 参考</div></div>
+<div class="hud" id="hud-l">
+ <div>チャンネル <b id="h-ch">—</b></div>
+ <div>β = v/c <b id="h-beta">—</b></div>
+ <div>光行差 cosθ′ <b id="h-ab">—</b></div>
+ <div>焦点 f <b id="h-focal">—</b></div>
+</div>
+<div class="hud" id="hud-r">
+ <div>Jones 交差数 n <b id="h-n">—</b></div>
+ <div>⟨K⟩ <b id="h-br">—</b></div>
+ <div>V(2) <b id="h-v">—</b></div>
+ <div>焦点変調 |V| <b id="h-vm">—</b></div>
+</div>
+
+<div id="panel">
+ <div class="chrow">
+  <button class="b rd" id="ch-prev">◀</button>
+  <div class="cur">CH <b id="ch-name">—</b> · <span id="ch-title">—</span></div>
+  <button class="b rd" id="ch-next">▶</button>
+ </div>
+ <div class="sliders">
+  <div class="sl"><label>特殊相対性 β = v/c <b id="lb-beta">0.30</b></label><input type="range" id="s-beta" min="0" max="0.9" step="0.01" value="0.30"></div>
+  <div class="sl"><label>レンズ焦点 f <b id="lb-focal">0.00</b></label><input type="range" id="s-focal" min="-1" max="1" step="0.01" value="0"></div>
+  <div class="sl"><label>Jones 交差数 n <b id="lb-n">5</b></label><input type="range" id="s-n" min="2" max="9" step="1" value="5"></div>
+ </div>
+ <div class="btns">
+  <button class="b on" id="b-video">📺 実映像 ON</button>
+  <button class="b" id="b-audio">🔊 音声 OFF</button>
+  <button class="b" id="b-motion">🎛 モーション</button>
+  <button class="b" id="b-stereo">◨◧ 立体視</button>
+ </div>
+</div>
+<button id="b-exit">× 立体視を終了</button>
+<div id="toast"></div>
+<div id="home"></div>
+<div id="note">※ 汎用アイウェアのコンセプトです（実在の眼鏡店・ブランドとは無関係）。映像は自由に使える公開動画（CC/サンプル）。オフライン時はエンジン映像に自動切替。</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Jones 多項式（(2,n) トーラス結び目）— Kauffman 括弧の TL2 計算
+//   twist = A·1 + A⁻¹·u,  δ = -A²-A⁻²,  A+A⁻¹δ = -A⁻³
+//   b_{k+1} = A^{k-1} - A⁻³·b_k,  a_n=A^n
+//   ⟨K⟩_norm = -A^{n+2} - A^{n-2} + b_n
+//   V(A) = (-1)^n A^{-3n} ⟨K⟩_norm ,  A = t^{-1/4}
+// ═══════════════════════════════════════════════════════════════
+const Jones=(()=>{
+ const addTo=(m,e,c)=>{const v=(m.get(e)||0)+c;if(v===0)m.delete(e);else m.set(e,v);};
+ function build(n){
+  let b=new Map();
+  for(let k=0;k<n;k++){const nb=new Map();addTo(nb,k-1,1);b.forEach((c,e)=>addTo(nb,e-3,-c));b=nb;}
+  const norm=new Map();addTo(norm,n+2,-1);addTo(norm,n-2,-1);b.forEach((c,e)=>addTo(norm,e,c));
+  const VA=new Map();const s=(n%2===0)?1:-1;norm.forEach((c,e)=>addTo(VA,e-3*n,s*c));
+  return {norm,VA};
+ }
+ const cache={};
+ const get=n=>cache[n]||(cache[n]=build(n));
+ // 実数 A で評価
+ function evalReal(map,A){let s=0;map.forEach((c,e)=>s+=c*Math.pow(A,e));return s;}
+ // 複素 A=e^{iφ} で評価（|.|）
+ function evalCabs(map,phi){let re=0,im=0;map.forEach((c,e)=>{re+=c*Math.cos(e*phi);im+=c*Math.sin(e*phi);});return Math.hypot(re,im);}
+ function polyStr(map,limit){const es=[...map.keys()].sort((a,b)=>b-a).slice(0,limit||4);
+  return es.map(e=>{const c=map.get(e);const sign=c<0?'−':'+';const ac=Math.abs(c);
+   return sign+(ac===1?'':ac)+'A'+(e<0?('⁻'+sup(-e)):sup(e));}).join('').replace(/^\+/,'');}
+ function sup(n){return String(n).split('').map(d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[+d]).join('');}
+ return {
+  bracketStr:n=>polyStr(get(n).norm,3),
+  Vreal:(n,t)=>evalReal(get(n).VA, Math.pow(t,-0.25)),
+  Vabs:(n,theta)=>evalCabs(get(n).VA, -theta/4)
+ };
+})();
+
+// ═══════════════════════════════════════════════════════════════
+// インターネットTV：本当の動画（無料/CC）。オフライン時はエンジン映像。
+// ═══════════════════════════════════════════════════════════════
+const GTV='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
+const CHANNELS=[
+ {name:'NATURE', title:'Big Buck Bunny (Blender/CC)',  url:GTV+'BigBuckBunny.mp4'},
+ {name:'FANTASY',title:'Sintel (Blender/CC)',          url:GTV+'Sintel.mp4'},
+ {name:'SCI-FI', title:'Tears of Steel (Blender/CC)',  url:GTV+'TearsOfSteel.mp4'},
+ {name:'DREAM',  title:'Elephants Dream (Blender/CC)', url:GTV+'ElephantsDream.mp4'},
+ {name:'BLAZE',  title:'For Bigger Blazes',            url:GTV+'ForBiggerBlazes.mp4'},
+ {name:'RIDE',   title:'For Bigger Joyrides',          url:GTV+'ForBiggerJoyrides.mp4'}
+];
+let channelIndex=0, useVideo=true, audioOn=false;
+const VIDS=CHANNELS.map(ch=>{
+ const v=document.createElement('video');
+ v.src=ch.url;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;
+ v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.preload='auto';v.style.display='none';
+ v.addEventListener('error',()=>{},{once:true});
+ document.body.appendChild(v);
+ return v;
+});
+function updateChannelPlayback(){VIDS.forEach((v,i)=>{const act=(i===channelIndex&&useVideo);
+ if(act){if(v.paused)v.play().catch(()=>{});}else{if(!v.paused)v.pause();}
+ v.muted=!(audioOn&&act);});}
+VIDS[0].play().catch(()=>{});
+
+// ═══════════════════════════════════════════════════════════════
+// 描画
+// ═══════════════════════════════════════════════════════════════
+const cv=document.getElementById('stage'),ctx=cv.getContext('2d');
+let W=0,Hh=0,DPR=1;
+function resize(){DPR=window.devicePixelRatio||1;W=innerWidth;Hh=innerHeight;cv.width=W*DPR;cv.height=Hh*DPR;ctx.setTransform(DPR,0,0,DPR,0,0);}
+resize();addEventListener('resize',resize);
+const DUST=[];for(let i=0;i<60;i++)DUST.push({x:Math.random(),y:Math.random(),z:Math.random(),s:Math.random()*1.5+.3});
+
+let beta=0.30, focal=0.0, jonesN=5, animT=0, stereo=false, motionOn=false;
+let px=0,py=0,tpx=0,tpy=0; const EYE=0.3;
+
+function drawVideoCover(v,x,y,w,h,alpha){const vw=v.videoWidth,vh=v.videoHeight;if(!vw||!vh)return;
+ const ar=vw/vh,pr=w/h;let sw,sh,sx,sy;if(ar>pr){sh=vh;sw=vh*pr;sx=(vw-sw)/2;sy=0;}else{sw=vw;sh=vw/pr;sx=0;sy=(vh-sh)/2;}
+ ctx.globalAlpha=alpha;try{ctx.drawImage(v,sx,sy,sw,sh,x,y,w,h);}catch(e){}ctx.globalAlpha=1;}
+
+// (2,n) トーラス結び目のホログラム・ブレイド
+function drawJones(cx,cy,R,n,hue,phase){
+ ctx.strokeStyle='hsla('+hue+',90%,72%,.5)';ctx.lineWidth=1.2;
+ ctx.beginPath();
+ for(let t=0;t<=Math.PI*2+0.02;t+=0.02){
+  const rr=R*(0.62+0.30*Math.cos(n*t));
+  const x=cx+Math.cos(2*t+phase)*rr, y=cy+Math.sin(2*t+phase)*rr*0.82;
+  t===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+ }
+ ctx.stroke();
+}
+
+// 相対論的レンズ焦点でレンズに投影
+function renderLens(cx,cy,rx,ry,eye){
+ const minR=Math.min(rx,ry);
+ const hue=200+channelIndex*20;
+ const v=VIDS[channelIndex];
+ const ready=useVideo && v && v.readyState>=2 && v.videoWidth>0;
+ const fx=cx+focal*rx*0.55 + eye*rx*0.05, fy=cy;         // 焦点位置（f と眼で移動）
+ const vmag=Jones.Vabs(jonesN, animT*1.1);               // Jones による焦点変調
+ const rd=(0.5*(1-beta)+0.20)*minR;                      // 焦点円（β大→縮む）
+ ctx.save();ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.clip();
+ if(ready){
+  drawVideoCover(v,cx-rx,cy-ry,rx*2,ry*2,0.5);           // 全体（やや暗く）
+  // 相対論的焦点：焦点円内を拡大投影（前方集束）
+  const mag=1+beta*1.7;
+  ctx.save();ctx.beginPath();ctx.ellipse(fx,fy,rd,rd,0,0,7);ctx.clip();
+  drawVideoCover(v,fx-rx*mag,fy-ry*mag,rx*2*mag,ry*2*mag,0.95);
+  ctx.restore();
+  // ドップラー色収差（中心=青方偏移 / 周縁=赤方偏移）
+  const g=ctx.createRadialGradient(fx,fy,0,fx,fy,Math.max(rx,ry));
+  g.addColorStop(0,'rgba(120,175,255,'+(beta*0.30)+')');g.addColorStop(1,'rgba(255,110,80,'+(beta*0.24)+')');
+  ctx.fillStyle=g;ctx.fillRect(cx-rx,cy-ry,rx*2,ry*2);
+ }else{
+  ctx.fillStyle='rgba(10,16,32,0.9)';ctx.fillRect(cx-rx,cy-ry,rx*2,ry*2);
+  const g=ctx.createRadialGradient(fx,fy,0,fx,fy,minR);
+  g.addColorStop(0,'hsla('+hue+',70%,45%,.4)');g.addColorStop(1,'rgba(6,10,20,0)');ctx.fillStyle=g;ctx.fillRect(cx-rx,cy-ry,rx*2,ry*2);
+ }
+ // Jones ブレイド
+ drawJones(cx,cy,minR,jonesN,hue,animT*0.6);
+ // 焦点リング（|V| で強度変調）
+ const ringA=0.28+0.55*Math.min(1,vmag/(jonesN+1));
+ ctx.strokeStyle='hsla('+hue+',92%,78%,'+ringA+')';ctx.lineWidth=1.7;
+ ctx.beginPath();ctx.ellipse(fx,fy,rd,rd,0,0,7);ctx.stroke();
+ // 焦点レティクル
+ ctx.strokeStyle='rgba(230,245,255,.7)';ctx.lineWidth=1;
+ ctx.beginPath();ctx.moveTo(fx-7,fy);ctx.lineTo(fx+7,fy);ctx.moveTo(fx,fy-7);ctx.lineTo(fx,fy+7);ctx.stroke();
+ // 走査線
+ ctx.globalAlpha=0.06;ctx.fillStyle='rgba(180,220,255,1)';
+ for(let sy=cy-ry;sy<cy+ry;sy+=3)ctx.fillRect(cx-rx,sy,rx*2,1);ctx.globalAlpha=1;
+ ctx.restore();
+ // レンズ枠グロー
+ ctx.shadowColor='hsla('+hue+',90%,65%,.7)';ctx.shadowBlur=16;
+ ctx.strokeStyle='hsla('+hue+',90%,72%,.75)';ctx.lineWidth=2;
+ ctx.beginPath();ctx.ellipse(cx,cy,rx,ry,0,0,7);ctx.stroke();ctx.shadowBlur=0;
+}
+
+function drawGlasses(eyePx){
+ const cx=W*0.5+eyePx*24, cy=Hh*0.46+py*16;
+ const rx=Math.min(W,Hh)*0.20, ry=rx*0.72, gap=rx*1.28;
+ // テンプル（つる）とブリッジ
+ ctx.strokeStyle='rgba(150,190,255,.4)';ctx.lineWidth=3;
+ ctx.beginPath();ctx.moveTo(cx-gap-rx*0.9,cy-ry*0.2);ctx.lineTo(cx-gap*1.9,cy-ry*0.7);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(cx+gap+rx*0.9,cy-ry*0.2);ctx.lineTo(cx+gap*1.9,cy-ry*0.7);ctx.stroke();
+ ctx.beginPath();ctx.moveTo(cx-gap+rx*0.85,cy-ry*0.1);ctx.quadraticCurveTo(cx,cy-ry*0.55,cx+gap-rx*0.85,cy-ry*0.1);ctx.stroke();
+ renderLens(cx-gap,cy,rx,ry,-1);
+ renderLens(cx+gap,cy,rx,ry,+1);
+}
+
+function drawScene(eyePx){
+ ctx.clearRect(0,0,W,Hh);
+ const g=ctx.createRadialGradient(W*0.5+eyePx*40,Hh*0.42,0,W*0.5,Hh*0.5,Math.max(W,Hh)*0.85);
+ g.addColorStop(0,'rgba(16,26,52,.9)');g.addColorStop(1,'rgba(4,6,13,1)');ctx.fillStyle=g;ctx.fillRect(0,0,W,Hh);
+ // 床グリッド
+ ctx.strokeStyle='rgba(90,140,220,.10)';ctx.lineWidth=1;const hy=Hh*0.7,vanx=W*0.5+eyePx*60;
+ for(let i=-10;i<=10;i++){const fx=vanx+i*W*0.11;ctx.beginPath();ctx.moveTo(vanx+(fx-vanx)*0.12,hy);ctx.lineTo(fx+eyePx*30,Hh+10);ctx.stroke();}
+ // ダスト
+ DUST.forEach(d=>{const x=((d.x+animT*0.004*d.z)%1)*W+eyePx*20*d.z,y=d.y*Hh+py*14*d.z;
+  ctx.globalAlpha=0.12+0.4*d.z*(0.5+0.5*Math.sin(animT*2+d.x*30));ctx.fillStyle='rgba(180,215,255,1)';
+  ctx.beginPath();ctx.arc(x,y,d.s*d.z,0,7);ctx.fill();});ctx.globalAlpha=1;
+ drawGlasses(eyePx);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ループ & HUD
+// ═══════════════════════════════════════════════════════════════
+let last=0;
+function loop(ts){
+ const dt=Math.min(0.05,(ts-last)/1000||0.016);last=ts;animT+=dt;
+ px+=(tpx-px)*0.06;py+=(tpy-py)*0.06;
+ if(stereo){
+  ctx.save();ctx.beginPath();ctx.rect(0,0,W/2,Hh);ctx.clip();ctx.scale(0.5,1);drawScene(px-EYE);ctx.restore();
+  ctx.save();ctx.beginPath();ctx.rect(W/2,0,W/2,Hh);ctx.clip();ctx.translate(W/2,0);ctx.scale(0.5,1);drawScene(px+EYE);ctx.restore();
+  ctx.strokeStyle='rgba(0,0,0,.7)';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,Hh);ctx.stroke();
+ }else drawScene(px);
+ // HUD
+ const ch=CHANNELS[channelIndex];
+ const cosT=Math.SQRT1_2; // θ=45°
+ const ab=(cosT+beta)/(1+beta*cosT);
+ const vm=Jones.Vabs(jonesN,animT*1.1);
+ setTxt('h-ch',ch.name);setTxt('h-beta',beta.toFixed(2));setTxt('h-ab',ab.toFixed(3));setTxt('h-focal',focal.toFixed(2));
+ setTxt('h-n',jonesN);setTxt('h-br',Jones.bracketStr(jonesN));setTxt('h-v',Jones.Vreal(jonesN,2).toFixed(3));setTxt('h-vm',vm.toFixed(3));
+ requestAnimationFrame(loop);
+}
+function setTxt(id,v){const e=document.getElementById(id);if(e)e.textContent=v;}
+requestAnimationFrame(loop);
+
+// ═══════════════════════════════════════════════════════════════
+// コントロール
+// ═══════════════════════════════════════════════════════════════
+function flash(m){const t=document.getElementById('toast');t.textContent=m;t.style.opacity='1';clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',2400);}
+function setChannel(i){channelIndex=(i+CHANNELS.length)%CHANNELS.length;const ch=CHANNELS[channelIndex];
+ setTxt('ch-name',ch.name);setTxt('ch-title',ch.title);updateChannelPlayback();}
+document.getElementById('ch-prev').onclick=()=>setChannel(channelIndex-1);
+document.getElementById('ch-next').onclick=()=>setChannel(channelIndex+1);
+setChannel(0);
+
+document.getElementById('s-beta').oninput=e=>{beta=parseFloat(e.target.value);setTxt('lb-beta',beta.toFixed(2));};
+document.getElementById('s-focal').oninput=e=>{focal=parseFloat(e.target.value);setTxt('lb-focal',focal.toFixed(2));};
+document.getElementById('s-n').oninput=e=>{jonesN=parseInt(e.target.value);setTxt('lb-n',jonesN);};
+
+document.getElementById('b-video').onclick=function(){useVideo=!useVideo;this.classList.toggle('on',useVideo);
+ this.textContent=useVideo?'📺 実映像 ON':'📺 エンジン映像';updateChannelPlayback();
+ flash(useVideo?'インターネットTVの本当の動画をレンズに投影します':'エンジン生成映像に切替えました');};
+document.getElementById('b-audio').onclick=function(){audioOn=!audioOn;this.classList.toggle('on',audioOn);
+ this.textContent=audioOn?'🔊 音声 ON':'🔊 音声 OFF';VIDS.forEach(v=>{if(!v.paused)v.play().catch(()=>{});});updateChannelPlayback();
+ flash(audioOn?'選択チャンネルの音声を再生します':'ミュートしました');};
+
+// ジャイロ
+function onOrient(e){if(e.gamma==null&&e.beta==null)return;
+ tpx=Math.max(-1,Math.min(1,(e.gamma||0)/40));tpy=Math.max(-1,Math.min(1,((e.beta||0)-40)/40));}
+document.getElementById('b-motion').onclick=()=>{const DOE=window.DeviceOrientationEvent;
+ if(DOE&&typeof DOE.requestPermission==='function'){DOE.requestPermission().then(s=>{
+   if(s==='granted'){addEventListener('deviceorientation',onOrient);motionOn=true;document.getElementById('b-motion').classList.add('on');flash('モーション有効：端末を傾けると視点が動きます');}
+   else flash('モーションが許可されませんでした');}).catch(()=>flash('モーション取得に失敗'));
+ }else if(DOE){addEventListener('deviceorientation',onOrient);motionOn=true;document.getElementById('b-motion').classList.add('on');flash('モーション有効：端末を傾けると視点が動きます');}
+ else flash('この端末はモーション非対応です（PCはポインタで視差）');};
+
+// 立体視
+const ret=document.getElementById('reticle');
+function setStereo(on){stereo=on;document.body.classList.toggle('stereo',on);ret.style.display=on?'none':'';
+ if(on)flash('立体視ON：端末をVRゴーグルに入れてご覧ください（モーション推奨）');}
+document.getElementById('b-stereo').onclick=()=>setStereo(true);
+document.getElementById('b-exit').onclick=()=>setStereo(false);
+
+// 視線レティクル + 視差
+addEventListener('pointermove',e=>{ret.style.left=e.clientX+'px';ret.style.top=e.clientY+'px';
+ if(!motionOn&&!stereo){tpx=(e.clientX/W*2-1);tpy=(e.clientY/Hh*2-1);}});
+
+if(navigator.xr&&navigator.xr.isSessionSupported){navigator.xr.isSessionSupported('immersive-vr').then(ok=>{if(ok)document.getElementById('b-stereo').textContent='◨◧ 立体視 / VR';}).catch(()=>{});}
+</script>
+</body>
+</html>
