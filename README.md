@@ -65,6 +65,19 @@ Bada `.bada` プロトコル駆動の発生生物学シミュレーション And
 
 ---
 
+## 🔮 Bada Oracle — `bada_oracle_app/` (APK) + `bada_oracle_desktop/` (Windows EXE)
+
+Bada / Omega の「Akashic」モチーフに沿った **手続き的な託宣ジェネレーター**。ガンマ関数と
+熱エントロピーで駆動する決定論的ハッシュで詩的フラグメントを合成し、柔らかいチャイム音を
+添えます。**Android APK** と **Windows 10/11 .exe** を GitHub Actions がビルドし、タグ push /
+手動実行で **Release から両方ダウンロード**できます（`git tag oracle-v1 && git push origin oracle-v1`）。
+
+> ⚠️ **免責**: アカシックレコードへのアクセスや未来予知ではありません。乱数的に合成した
+> **娯楽・内省用の生成アート**で、重要な判断の根拠には使えません。
+> 詳細は [`bada_oracle_app/README.md`](./bada_oracle_app/README.md)。
+
+---
+
 ## 🔤 Bada Language — 設計原理
 
 山口フレームワークの作用素環プログラミングを実現するために設計された独自OOP言語。
