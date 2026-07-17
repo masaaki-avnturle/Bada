@@ -66,6 +66,29 @@ body{background:#05070e;color:var(--txt);font-family:-apple-system,'Hiragino Kak
 .whr .h{font-size:9px;color:var(--txt2)}
 /* 3d */
 .obj{flex:1}
+/* news（実物のインターネットTVニュース動画） */
+.nv{position:relative;flex:1;border-radius:14px;overflow:hidden;background:#000;min-height:96px}
+.nv video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+.nlive{position:absolute;top:8px;left:8px;z-index:2;display:flex;align-items:center;gap:5px;font-size:9px;letter-spacing:.14em;
+ background:rgba(206,42,52,.9);padding:3px 7px;border-radius:5px;color:#fff;font-weight:700}
+.nlive .d{width:6px;height:6px;border-radius:50%;background:#fff;animation:blink 1.2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.nlower{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 10px 7px;font-size:10px;color:#fff;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent)}
+.nstat{position:absolute;inset:0;z-index:3;display:none;align-items:center;justify-content:center;text-align:center;
+ padding:14px;font-size:10.5px;line-height:1.5;color:#dbeaff;background:rgba(3,6,14,.8)}
+.nstat.show{display:flex}
+.nstat .spin{width:22px;height:22px;border:2px solid rgba(143,208,255,.3);border-top-color:#8fd0ff;border-radius:50%;
+ margin:0 auto 10px;animation:nspin .9s linear infinite}
+@keyframes nspin{to{transform:rotate(360deg)}}
+.nctl{display:flex;gap:6px;margin-top:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch}
+.nch,.nbtn{font-size:9.5px;padding:5px 9px;border-radius:8px;cursor:pointer;white-space:nowrap;flex:0 0 auto;
+ background:rgba(30,42,70,.6);border:1px solid rgba(180,210,255,.2);color:rgba(215,230,255,.85);transition:.12s}
+.nch.on,.nbtn.on{background:rgba(143,208,255,.25);border-color:rgba(143,208,255,.55);color:#fff}
+.nurl{display:flex;gap:5px;margin-top:6px}
+.nurl input{flex:1;background:rgba(0,0,0,.3);border:1px solid rgba(180,210,255,.2);border-radius:8px;
+ color:#dff0ff;font-size:9.5px;padding:5px 7px;min-width:0;outline:none}
+.nnote{font-size:7.5px;color:rgba(150,175,215,.6);margin-top:5px;line-height:1.4}
 
 /* 上部ステータス */
 #status{position:fixed;top:16px;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
@@ -177,10 +200,12 @@ const WINDOWS=[
  {id:'music',  title:'ミュージック',w:280,h:210, dx:0.24, dy:-0.10, depth:1.0, open:true},
  {id:'photo',  title:'写真',      w:300,h:200, dx:-0.26,dy:0.20, depth:0.8, open:true},
  {id:'browser',title:'ブラウザ',   w:320,h:220, dx:0.28, dy:0.22, depth:0.5, open:true},
- {id:'weather',title:'天気',      w:250,h:180, dx:0.02, dy:-0.26, depth:1.2, open:true},
- {id:'object', title:'3D オブジェクト',w:230,h:200, dx:0.0, dy:0.16, depth:1.4, open:false}
+ {id:'weather',title:'天気',      w:250,h:180, dx:-0.04,dy:-0.28, depth:1.2, open:true},
+ {id:'news',   title:'ニュース LIVE',w:372,h:308, dx:0.04, dy:0.03, depth:0.7, open:true},
+ {id:'object', title:'3D オブジェクト',w:230,h:200, dx:-0.34,dy:0.30, depth:1.4, open:false}
 ];
 const APPS=[
+ {id:'news',ic:'📺',nm:'ニュース'},
  {id:'clock',ic:'🕐',nm:'時計'},{id:'music',ic:'🎵',nm:'ミュージック'},{id:'photo',ic:'🏔',nm:'写真'},
  {id:'browser',ic:'🌐',nm:'ブラウザ'},{id:'weather',ic:'⛅',nm:'天気'},{id:'object',ic:'🧊',nm:'3D'}
 ];
@@ -190,7 +215,7 @@ function buildWindows(){
   const el=document.createElement('div');el.className='win';el.style.width=w.w+'px';el.style.height=w.h+'px';
   el.innerHTML='<div class="close">✕</div><div class="wb" id="wb-'+w.id+'"></div><div class="grab"></div>';
   space.appendChild(el);w.el=el;byId[w.id]=w;
-  el.querySelector('.close').onclick=(e)=>{e.stopPropagation();w.open=false;el.style.display='none';};
+  el.querySelector('.close').onclick=(e)=>{e.stopPropagation();w.open=false;el.style.display='none';if(w.id==='news')nCleanup();};
   el.addEventListener('pointerenter',()=>{w.hover=true;el.classList.add('hover');bringFront(w);});
   el.addEventListener('pointerleave',()=>{w.hover=false;el.classList.remove('hover');});
   const grab=el.querySelector('.grab');
@@ -212,10 +237,21 @@ function renderContent(w){
  else if(w.id==='browser'){b.innerHTML='<div class="wtitle">ブラウザ</div><div class="badr"><span class="dot"></span>bada.space/spatial</div>'+
    '<div class="bpage"><h3>空間コンピューティングへようこそ</h3><div class="bline" style="width:96%"></div><div class="bline" style="width:88%"></div><div class="bline" style="width:92%"></div><div class="bline" style="width:70%"></div></div>';}
  else if(w.id==='weather'){b.innerHTML='<div class="wtitle">天気 · 東京</div><div class="wtemp">22°</div><div class="wcond">晴れ時々くもり</div><div class="whrs" id="whrs"></div>';}
+ else if(w.id==='news'){b.innerHTML='<div class="wtitle">ニュース · インターネットTV</div>'+
+   '<div class="nv"><div class="nlive"><span class="d"></span>LIVE</div>'+
+     '<video id="nplayer" playsinline muted></video>'+
+     '<div class="nlower" id="nlower">—</div>'+
+     '<div class="nstat show" id="nstat"><div><div class="spin"></div><span id="nstat-msg">接続中…</span></div></div>'+
+   '</div>'+
+   '<div class="nctl" id="nch-list"></div>'+
+   '<div class="nctl"><div class="nbtn" id="naudio">🔇 ミュート</div><div class="nbtn" id="nfull">⛶ 全画面</div></div>'+
+   '<div class="nurl"><input id="ncust" placeholder="正規の配信URL（HLS .m3u8 / MP4）" spellcheck="false"><div class="nbtn" id="nadd">追加</div></div>'+
+   '<div class="nnote">各局公式・無料のライブ配信。フジ/NHK 国内の速報配信は権利上未収録（権利があれば「追加」から）。視聴には接続が必要です。</div>';}
  else if(w.id==='object'){b.innerHTML='<div class="wtitle">3D オブジェクト</div><canvas class="obj" id="obj"></canvas>';}
  if(w.id==='music')initMusic();
  if(w.id==='photo')initPhoto();
  if(w.id==='weather')initWeather();
+ if(w.id==='news')initNews();
  if(w.id==='clock')updateClock();
 }
 function initPhoto(){const p=document.getElementById('photo');if(p)p.style.background='linear-gradient(135deg,#7db0ff,#b98cff 45%,#ff9a6b)';}
@@ -272,6 +308,71 @@ addEventListener('pointermove',e=>{
 addEventListener('pointerup',()=>{drag=null;});
 
 // ═══════════════════════════════════════════════════════════════
+// 実物のインターネットTVニュース動画（各局公式・無料のライブ配信）
+// ═══════════════════════════════════════════════════════════════
+let hlsLoading=false;
+function ensureHls(cb){
+ if(window.Hls){cb(window.Hls);return;}
+ if(hlsLoading){setTimeout(()=>ensureHls(cb),300);return;}
+ hlsLoading=true;const s=document.createElement('script');
+ s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js';
+ s.onload=()=>cb(window.Hls||null);s.onerror=()=>cb(null);document.head.appendChild(s);
+}
+const NEWS_CHANNELS=[
+ {name:'NHK WORLD',   desc:'NHK公式・無料の国際英語ニュース', url:'https://nhkwlive-ojp.akamaized.net/hls/live/2003459/nhkwlive-ojp-en/index.m3u8', hls:true},
+ {name:'DW English',  desc:'ドイチェ・ヴェレ 公式無料ライブ', url:'https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8', hls:true},
+ {name:'France 24',   desc:'フランス24 公式無料ライブ',     url:'https://static.france24.com/live/F24_EN_HI_HLS/live_web.m3u8', hls:true},
+ {name:'Al Jazeera',  desc:'アルジャジーラ英語 公式無料ライブ', url:'https://live-hls-web-aje.getaj.net/AJE/01.m3u8', hls:true},
+ {name:'NASA TV',     desc:'NASA 宇宙・地球のライブ（実写）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true},
+ {name:'DEMO',        desc:'オフライン確認用の実写クリップ', url:'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4', hls:false}
+];
+let nplayer=null,nHls=null,nIndex=-1,nAudio=false,nTimer=null,newsWired=false;
+function nStat(msg,spin){const s=document.getElementById('nstat');if(!s)return;s.classList.add('show');
+ const m=document.getElementById('nstat-msg');if(m)m.textContent=msg;const sp=s.querySelector('.spin');if(sp)sp.style.display=spin?'block':'none';}
+function nHide(){const s=document.getElementById('nstat');if(s)s.classList.remove('show');}
+function nBuildList(){const el=document.getElementById('nch-list');if(!el)return;el.innerHTML='';
+ NEWS_CHANNELS.forEach((ch,i)=>{const d=document.createElement('div');d.className='nch'+(i===nIndex?' on':'');
+  d.textContent=ch.name;d.onclick=()=>nSelect(i);el.appendChild(d);});}
+function nCleanup(){if(nHls){try{nHls.destroy();}catch(e){}nHls=null;}
+ if(nplayer){try{nplayer.pause();}catch(e){}nplayer.removeAttribute('src');nplayer.load&&nplayer.load();}
+ if(nTimer){clearTimeout(nTimer);nTimer=null;}}
+function nSelect(i){nplayer=document.getElementById('nplayer');if(!nplayer)return;
+ nIndex=i;const ch=NEWS_CHANNELS[i];nBuildList();
+ const lo=document.getElementById('nlower');if(lo)lo.textContent=ch.name+' — '+ch.desc;
+ nCleanup();nStat('接続中… '+ch.name,true);
+ nTimer=setTimeout(()=>{if(nplayer.readyState<3)nStat('現在再生できません（別チャンネル、または「追加」で正規URLをお試しください）',false);},9000);
+ try{
+  if(ch.hls && !nplayer.canPlayType('application/vnd.apple.mpegurl')){
+   ensureHls(Hls=>{
+    if(Hls && Hls.isSupported()){const h=new Hls({lowLatencyMode:true});nHls=h;
+     h.on(Hls.Events.ERROR,(e,data)=>{if(data&&data.fatal)nStat('現在再生できません（別チャンネル/URLをお試しください）',false);});
+     h.loadSource(ch.url);h.attachMedia(nplayer);nplayer.play().catch(()=>{});}
+    else{nStat('この端末では HLS 再生に非対応です（対応ブラウザ、または MP4/URL追加をお試しください）',false);}
+   });
+  }else{nplayer.src=ch.url;nplayer.play().catch(()=>{});}
+ }catch(e){nStat('再生できませんでした',false);}
+ nplayer.muted=!nAudio;
+}
+function initNews(){
+ nplayer=document.getElementById('nplayer');if(!nplayer)return;
+ if(!newsWired){newsWired=true;
+  nplayer.addEventListener('playing',nHide);nplayer.addEventListener('canplay',nHide);
+  nplayer.addEventListener('waiting',()=>nStat('バッファ中…',true));
+  nplayer.addEventListener('error',()=>nStat('現在再生できません（別チャンネル/URLをお試しください）',false));
+ }
+ const au=document.getElementById('naudio');if(au)au.onclick=()=>{nAudio=!nAudio;au.classList.toggle('on',nAudio);
+  au.textContent=nAudio?'🔊 音声 ON':'🔇 ミュート';if(nplayer){nplayer.muted=!nAudio;nplayer.play().catch(()=>{});}};
+ const fl=document.getElementById('nfull');if(fl)fl.onclick=()=>{const wrap=nplayer.parentElement;
+  if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();}
+  else{(wrap.requestFullscreen||wrap.webkitRequestFullscreen||nplayer.webkitEnterFullscreen||function(){}).call(wrap);}};
+ const add=document.getElementById('nadd');if(add)add.onclick=()=>{const inp=document.getElementById('ncust');const u=inp.value.trim();if(!u)return;
+  const hls=/\.m3u8(\?|#|$)/i.test(u);NEWS_CHANNELS.push({name:'追加'+(NEWS_CHANNELS.length),desc:'あなたが貼り付けたURL',url:u,hls});
+  inp.value='';nBuildList();nSelect(NEWS_CHANNELS.length-1);};
+ nBuildList();
+ nSelect(nIndex>=0?nIndex:0); // 先頭チャンネルへ自動接続（実映像をすぐ表示）
+}
+
+// ═══════════════════════════════════════════════════════════════
 // ループ
 // ═══════════════════════════════════════════════════════════════
 function loop(){animT+=0.016;px+=(tpx-px)*0.06;py+=(tpy-py)*0.06;
@@ -288,6 +389,7 @@ function buildHome(){const g=document.getElementById('home-grid');
  APPS.forEach(a=>{const d=document.createElement('div');d.className='appi';
   d.innerHTML='<div class="ic">'+a.ic+'</div><div class="nm">'+a.nm+'</div>';
   d.onclick=()=>{const w=byId[a.id];w.open=true;w.el.style.display='';bringFront(w);
+   if(a.id==='news')nSelect(nIndex>=0?nIndex:0);
    document.getElementById('home').classList.remove('show');flash(a.nm+' を開きました');};
   g.appendChild(d);});}
 document.getElementById('d-home').onclick=()=>document.getElementById('home').classList.toggle('show');
