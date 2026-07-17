@@ -131,28 +131,53 @@ const Jones=(()=>{
 // ═══════════════════════════════════════════════════════════════
 // インターネットTV：本当の動画（無料/CC）。オフライン時はエンジン映像。
 // ═══════════════════════════════════════════════════════════════
+// 実際の世の中の映像（実写・ライブアクション）。抽象CGは使わない。
 const GTV='https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/';
 const CHANNELS=[
- {name:'NATURE', title:'Big Buck Bunny (Blender/CC)',  url:GTV+'BigBuckBunny.mp4'},
- {name:'FANTASY',title:'Sintel (Blender/CC)',          url:GTV+'Sintel.mp4'},
- {name:'SCI-FI', title:'Tears of Steel (Blender/CC)',  url:GTV+'TearsOfSteel.mp4'},
- {name:'DREAM',  title:'Elephants Dream (Blender/CC)', url:GTV+'ElephantsDream.mp4'},
- {name:'BLAZE',  title:'For Bigger Blazes',            url:GTV+'ForBiggerBlazes.mp4'},
- {name:'RIDE',   title:'For Bigger Joyrides',          url:GTV+'ForBiggerJoyrides.mp4'}
+ {name:'ROAD',   title:'公道の旅・実写',            url:GTV+'WeAreGoingOnBullrun.mp4'},
+ {name:'CAR',    title:'自動車レビュー・実写',      url:GTV+'VolkswagenGTIReview.mp4'},
+ {name:'DRIVE',  title:'ストリート&ダート・実写',  url:GTV+'SubaruOutbackOnStreetAndDirt.mp4'},
+ {name:'MARKET', title:'中古車マーケット・実写',    url:GTV+'WhatCarCanYouGetForAGrand.mp4'},
+ {name:'RIDE',   title:'ジョイライド・実写',        url:GTV+'ForBiggerJoyrides.mp4'},
+ {name:'HOME',   title:'リビング・実写',            url:GTV+'ForBiggerBlazes.mp4'},
+ {name:'OUT',    title:'アウトドア・実写',          url:GTV+'ForBiggerEscapes.mp4'},
+ {name:'LIVE',   title:'NASA ライブ（宇宙・地球の実写／対応端末）', url:'https://ntv1.akamaihd.net/hls/live/2014075/NASA-NTV1-HD/master.m3u8', hls:true}
 ];
 let channelIndex=0, useVideo=true, audioOn=false;
+// HLS(.m3u8) 対応：ネイティブ or hls.js を遅延ロード（不可時はエンジン映像へ）
+let hlsLoading=false;
+function ensureHls(cb){
+ if(window.Hls){cb(window.Hls);return;}
+ if(hlsLoading){setTimeout(()=>ensureHls(cb),300);return;}
+ hlsLoading=true;
+ const s=document.createElement('script');
+ s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js';
+ s.onload=()=>cb(window.Hls||null); s.onerror=()=>cb(null);
+ document.head.appendChild(s);
+}
 const VIDS=CHANNELS.map(ch=>{
  const v=document.createElement('video');
- v.src=ch.url;v.muted=true;v.loop=true;v.autoplay=true;v.playsInline=true;
+ if(!ch.hls)v.src=ch.url;
+ v.muted=true;v.loop=!ch.hls;v.autoplay=true;v.playsInline=true;
  v.setAttribute('playsinline','');v.setAttribute('webkit-playsinline','');v.preload='auto';v.style.display='none';
  v.addEventListener('error',()=>{},{once:true});
  document.body.appendChild(v);
  return v;
 });
-function updateChannelPlayback(){VIDS.forEach((v,i)=>{const act=(i===channelIndex&&useVideo);
- if(act){if(v.paused)v.play().catch(()=>{});}else{if(!v.paused)v.pause();}
+function attachChannel(i){const ch=CHANNELS[i],v=VIDS[i];if(v._attached)return;
+ try{
+  if(ch.hls){
+   if(v.canPlayType('application/vnd.apple.mpegurl')){v.src=ch.url;v._attached=true;} // Safari/iOS ネイティブ
+   else ensureHls(Hls=>{try{if(Hls&&Hls.isSupported()){const h=new Hls({lowLatencyMode:true});h.on(Hls.Events.ERROR,()=>{});h.loadSource(ch.url);h.attachMedia(v);v._hls=h;v._attached=true;v.play().catch(()=>{});}}catch(e){}});
+  }else{ if(!v.src)v.src=ch.url; v._attached=true; }
+ }catch(e){}
+}
+function detachChannel(i){const v=VIDS[i];if(v._hls){try{v._hls.destroy();}catch(e){}v._hls=null;v._attached=false;}}
+function updateChannelPlayback(){VIDS.forEach((v,i)=>{const act=(i===channelIndex&&useVideo);const ch=CHANNELS[i];
+ if(act){attachChannel(i);if(v.paused)v.play().catch(()=>{});}
+ else{if(!v.paused)v.pause();if(ch.hls)detachChannel(i);}
  v.muted=!(audioOn&&act);});}
-VIDS[0].play().catch(()=>{});
+attachChannel(0);VIDS[0].play().catch(()=>{});
 
 // ═══════════════════════════════════════════════════════════════
 // 描画
