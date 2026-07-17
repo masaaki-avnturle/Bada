@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<!--
+  Ω-Attach Station — 上のアプリ群を「任意のアプリ」へ付加する統合アーティファクト生成器
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_attach_station
+
+  未知事前エンジン+プラグイン(8種)を ECDSA 署名付きバンドルにし、対象アプリの種別ごとに
+  「貼るだけ/置くだけ」で付加できる成果物を生成する:
+    userscript / ブックマークレット / DevToolsコンソール / HTML埋め込み(署名検証) / Node / Electron preload
+  これにより omega_apriori_injector・host_app・self_evolve 等を任意アプリへ付加できる。
+
+  推奨起動: python3 -m http.server （runtime/plugins を相対読込するため）
+  ⚠ 概念実証・教育用／非医療。付加は自分が管理/許諾されたアプリに対してのみ。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Attach Station</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:20px 20px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 3px;font-size:21px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12.5px}
+  .disc{margin:12px 20px 0;padding:9px 13px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12px}
+  main{padding:16px 20px 50px;display:flex;gap:16px;flex-wrap:wrap}.col{flex:1;min-width:310px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:12px;margin-right:6px}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  .chk{display:flex;align-items:center;gap:7px;font-size:12.5px;margin:4px 0}
+  select,input[type=text]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px;font-family:var(--mono)}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700;font-size:13px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a}button.dl{border-color:var(--cyan);color:var(--cyan)}button:disabled{opacity:.4;cursor:not-allowed}
+  .tabs{display:flex;flex-wrap:wrap;gap:3px}.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:6px 10px;border-radius:7px 7px 0 0;cursor:pointer;font-size:12px}
+  .tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:10.5px;font-family:var(--mono);color:var(--cyan);max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-all;margin:0}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.ok{color:var(--good)}.ng{color:var(--bad)}
+  .howto{font-size:11.5px;color:var(--dim);margin-top:8px}
+  footer{color:var(--dim);font-size:11px;padding:18px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Attach Station — 上のアプリを「任意のアプリ」へ付加</h1>
+  <div class="sub">Universal Attach Generator · userscript / bookmarklet / console / HTML / Node / Electron · Bada/bio_medicine</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>:
+  未知事前エンジン+プラグインを ECDSA 署名付きバンドルにし、<b>対象アプリの種別ごとに「貼るだけ」で付加できる成果物</b>を生成します。
+  付加は<b>自分が管理する／明示的に許諾されたアプリ</b>に対してのみ行ってください。<span id="warn"></span></div>
+
+<main>
+  <div class="col" style="flex:0 0 330px">
+    <div class="card">
+      <h3><span class="step">1</span>付加する機能 (プラグイン)</h3>
+      <div id="plglist"></div>
+      <label>ゲノム取得</label>
+      <button class="act" id="evolve">進化(popcount)</button>
+      <button class="act" id="loadspec">spec.json読込</button>
+      <input type="file" id="specfile" accept=".json" style="display:none"/>
+      <input type="text" id="genome" placeholder="または16進ゲノム貼付" style="margin-top:6px"/>
+      <div class="stat"><span>ソース</span><b id="srcstat">…</b></div>
+      <div class="stat"><span>ゲノム</span><b id="genstat">未設定</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="step">2</span>署名＆バンドル生成</h3>
+      <label>ホスティングURL (userscript/bookmarklet用)</label>
+      <input type="text" id="baseurl" value="https://example.com/omega/"/>
+      <button class="act" id="build">⚙ 署名付きバンドル生成</button>
+      <div class="stat"><span>公開鍵</span><b id="kstat">—</b></div>
+      <div class="stat"><span>署名 sha256</span><b id="sigstat">—</b></div>
+    </div>
+    <div class="card">
+      <h3>共通ファイル DL</h3>
+      <button class="act dl" id="dl_plugin" disabled>plugin.js</button>
+      <button class="act dl" id="dl_manifest" disabled>manifest.json</button>
+      <button class="act dl" id="dl_loader" disabled>verify_and_load.js</button>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3><span class="step">3</span>対象アプリ別 付加アーティファクト</h3>
+      <div class="tabs">
+        <button class="on" data-t="userscript">userscript</button>
+        <button data-t="bookmarklet">ブックマークレット</button>
+        <button data-t="console">DevToolsコンソール</button>
+        <button data-t="html">HTML埋め込み(署名検証)</button>
+        <button data-t="node">Node</button>
+        <button data-t="electron">Electron preload</button>
+      </div>
+      <pre id="art">（バンドルを生成してください）</pre>
+      <button class="act dl" id="dl_art" disabled>この成果物をダウンロード</button>
+      <div class="howto" id="howto"></div>
+    </div>
+    <div class="card">
+      <h3>付加先での使い方 (共通)</h3>
+      <p style="font-size:12px;margin:4px 0">付加後、対象アプリ内で <code>window.omegaApriori</code> が利用可能:</p>
+      <pre style="border-radius:6px">omegaApriori.capabilities()                 // 付加機能一覧
+omegaApriori.call("word_complete","co",{k:8}) // 単語補完
+omegaApriori.call("self_evolve","uid")        // 一意ID
+omegaApriori.call("codegen","verilog")        // FPGAソース表出</pre>
+    </div>
+  </div>
+</main>
+<footer>Ω-Attach Station · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+const INJ="../omega_apriori_injector/";
+const PLUGINS=["go_lookahead","overview","completion","integrable_top","codegen","patternmatch","word_complete","self_evolve"];
+const PLABEL={go_lookahead:"囲碁先読み",overview:"俯瞰",completion:"系列補完",integrable_top:"可積分系エラー修正",codegen:"ソース生成",patternmatch:"パターンマッチ",word_complete:"単語補完",self_evolve:"自己進化+一意ID"};
+let SRC={runtime:null,plugins:{},loader:null};
+let STATE={genomeHex:null,cfg:{inbits:6,layers:3,width:8,outbits:3},bundle:null,manifest:null,keys:null,pubJwk:null,target:"userscript"};
+const CELL_BYTES=6;
+
+/* plugin checkboxes */
+document.getElementById("plglist").innerHTML=PLUGINS.map(n=>
+ '<label class="chk"><input type="checkbox" class="plg" value="'+n+'" checked> '+PLABEL[n]+' <small style="color:#8794a8">'+n+'</small></label>').join("");
+
+/* fetch sources */
+async function loadSrc(){try{
+ SRC.runtime=await (await fetch(INJ+"apriori_runtime.js")).text();
+ SRC.loader=await (await fetch(INJ+"verify_and_load.js")).text();
+ for(const n of PLUGINS)SRC.plugins[n]=await (await fetch(INJ+"plugins/"+n+".js")).text();
+ document.getElementById("srcstat").textContent="runtime+"+PLUGINS.length+"plugins ✓";
+ document.getElementById("dl_loader").disabled=false;
+}catch(e){document.getElementById("srcstat").innerHTML='<span class="ng">取得失敗</span>';
+ document.getElementById("warn").innerHTML=' <b style="color:#d0506a">※ python3 -m http.server 経由で開いてください。</b>';}}
+
+/* quick evolve (popcount) */
+function evalFab(cfg,g,x){let prev=x&((1<<cfg.inbits)-1),src=cfg.inbits,cur=0;
+ for(let L=0;L<cfg.layers;L++){cur=0;for(let w=0;w<cfg.width;w++){const cell=L*cfg.width+w,p=cell*CELL_BYTES;let addr=0;
+  for(let k=0;k<4;k++){let sel=g[p+k]%Math.max(1,(L===0?cfg.inbits:cfg.width));if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+  cur|=(((g[p+4]|(g[p+5]<<8))>>addr)&1)<<w;}prev=cur;src=cfg.width;}return cur&((1<<cfg.outbits)-1);}
+function fit(cfg,g){let m=0,t=0;for(let x=0;x<64;x++){let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;const d=evalFab(cfg,g,x)^(c&((1<<cfg.outbits)-1));for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+function evolve(cfg){const gs=cfg.layers*cfg.width*CELL_BYTES;let P=[];for(let i=0;i<60;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push(g);}
+ let best=null,bf=-1;for(let gen=0;gen<100;gen++){const sc=P.map(g=>({g,f:fit(cfg,g)})).sort((a,b)=>b.f-a.f);if(sc[0].f>bf){bf=sc[0].f;best=sc[0].g.slice();}
+  const nx=[sc[0].g.slice(),sc[1].g.slice()];while(nx.length<60){const a=sc[Math.random()*8|0].g,b=sc[Math.random()*8|0].g,cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);
+   c.set(a.subarray(0,cut));c.set(b.subarray(cut),cut);for(let j=0;j<gs;j++)if(Math.random()<0.04)c[j]=Math.random()*256|0;nx.push(c);}P=nx;}return{genome:best,fit:bf};}
+function bytesHex(b){return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function setGenome(hex,lbl){STATE.genomeHex=hex;document.getElementById("genome").value=hex;
+ document.getElementById("genstat").innerHTML='<span class="ok">'+lbl+' ('+hex.length/2+'B)</span>';}
+
+/* build signed bundle */
+function chosen(){return [...document.querySelectorAll(".plg:checked")].map(c=>c.value);}
+function buildBundle(){const cfg=STATE.cfg,pl=chosen();const manifest={cfg,genome_hex:STATE.genomeHex,plugins:pl};
+ let parts=["/* Ω-Apriori signed bundle (attach-station) — conceptual/educational only */",SRC.runtime];
+ for(const n of pl)parts.push(SRC.plugins[n]);
+ parts.push("\n(function(){var G=(typeof window!=='undefined')?window:globalThis;var M="+JSON.stringify(manifest)+
+  ";var e=new G.OmegaApriori(M);var P=G.OMEGA_PLUGINS||{};(M.plugins||[]).forEach(function(n){if(P[n])e.register(P[n]);});G.omegaApriori=e;"+
+  "if(typeof console!=='undefined')console.log('Ω-Apriori attached:',e.capabilities());})();");
+ return {bundle:parts.join("\n"),manifest};}
+const ALG={name:"ECDSA",namedCurve:"P-256"},SIGN={name:"ECDSA",hash:"SHA-256"};
+async function sha256hex(t){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function ab2b64(b){let s="",a=new Uint8Array(b);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s);}
+
+async function build(){
+ if(!STATE.genomeHex){alert("ゲノムを設定してください(手順1)");return;}
+ if(!SRC.runtime){alert("ソース未取得。http.server 経由で開いてください");return;}
+ STATE.keys=await crypto.subtle.generateKey(ALG,true,["sign","verify"]);
+ STATE.pubJwk=await crypto.subtle.exportKey("jwk",STATE.keys.publicKey);
+ const {bundle,manifest}=buildBundle();
+ const sig=await crypto.subtle.sign(SIGN,STATE.keys.privateKey,new TextEncoder().encode(bundle));
+ manifest.engine="Omega-Apriori";manifest.alg="ECDSA-P256-SHA256";manifest.bundle_file="omega-apriori.plugin.js";
+ manifest.bundle_sha256=await sha256hex(bundle);manifest.signature_b64=ab2b64(sig);manifest.pubkey_jwk=STATE.pubJwk;
+ manifest.created=new Date().toISOString();
+ STATE.bundle=bundle;STATE.manifest=manifest;
+ document.getElementById("kstat").textContent=(STATE.pubJwk.x||"").slice(0,14)+"…";
+ document.getElementById("sigstat").textContent=manifest.bundle_sha256.slice(0,18)+"…";
+ ["dl_plugin","dl_manifest","dl_art"].forEach(id=>document.getElementById(id).disabled=false);
+ renderArt();}
+
+/* per-target artifacts */
+function artifact(t){if(!STATE.bundle)return "（バンドル未生成）";
+ const base=document.getElementById("baseurl").value.replace(/\/?$/,"/");
+ if(t==="userscript")return "// ==UserScript==\n// @name Ω-Apriori Attach\n// @namespace omega-apriori-bada\n// @version 1.0\n// @match *://*/*\n// @grant none\n// ==/UserScript==\n/* 任意のWebアプリへ付加。Tampermonkey等に貼り付け。 */\n(function(){\n"+STATE.bundle+"\n})();";
+ if(t==="bookmarklet"){const code="(function(){var s=document.createElement('script');s.src='"+base+"omega-apriori.plugin.js';s.onload=function(){console.log('Ω付加:',window.omegaApriori.capabilities());};document.body.appendChild(s);})();";
+  return "javascript:"+encodeURIComponent(code)+"\n\n/* ↑をブックマークのURL欄に。"+base+"omega-apriori.plugin.js を事前に配置 */";}
+ if(t==="console")return "/* 任意Webアプリの DevTools コンソールに貼り付けて Enter */\n(function(){\n"+STATE.bundle+"\n})();\nomegaApriori.capabilities();";
+ if(t==="html")return "<!-- 自前アプリに配置 (署名検証してから付加) -->\n<script src=\""+base+"verify_and_load.js\"></"+"script>\n<script>\n  omegaVerifyAndLoad(\""+base+"omega-apriori.plugin.js\",\""+base+"omega-apriori.manifest.json\")\n    .then(function(e){ console.log('付加完了',e.capabilities()); })\n    .catch(function(err){ console.error('署名検証失敗:',err.message); });\n</"+"script>";
+ if(t==="node")return "// Node (CommonJS)。omega-apriori.plugin.js を同梱\nrequire('./omega-apriori.plugin.js');\nconst eng = global.omegaApriori;\nconsole.log(eng.capabilities());\nconsole.log(eng.call('self_evolve','uid'));\n// 署名検証付きで実行する場合: node ../omega_apriori_injector/run_plugin.js run omega-apriori.plugin.js omega-apriori.manifest.json";
+ if(t==="electron")return "// Electron preload.js (contextBridge で付加機能を公開)\nconst { contextBridge } = require('electron');\nrequire('./omega-apriori.plugin.js');         // globalThis.omegaApriori を生成\nconst eng = global.omegaApriori;\ncontextBridge.exposeInMainWorld('omegaApriori', {\n  capabilities: () => eng.capabilities(),\n  call: (...a) => eng.call(...a),\n  infer: (x) => eng.infer(x)\n});";
+ return "";}
+const HOWTO={userscript:"Tampermonkey/Violentmonkey に新規スクリプトとして貼り付け→保存。対象サイトで自動付加。",
+ bookmarklet:"ブックマークを新規作成しURL欄に貼り付け。plugin.js をホスティングURLに配置。対象ページでクリック。",
+ console:"対象Webアプリを開き F12 → Console に貼り付けて Enter。即時付加(その場限り)。",
+ html:"自前アプリの HTML に貼り付け。plugin.js / manifest.json / verify_and_load.js をホスティングURLに配置。署名検証OKのみ実行。",
+ node:"plugin.js を同梱し require。署名検証込みなら run_plugin.js run を使用。",
+ electron:"preload.js に記述し BrowserWindow の webPreferences.preload に指定。"};
+function renderArt(){document.getElementById("art").textContent=artifact(STATE.target);
+ document.getElementById("howto").textContent="付加方法: "+HOWTO[STATE.target];}
+
+function download(name,text,type){const b=new Blob([text],{type:type||"text/plain"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+
+/* events */
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");STATE.target=b.dataset.t;renderArt();});
+document.getElementById("evolve").onclick=()=>{document.getElementById("genstat").textContent="進化中…";setTimeout(()=>{const r=evolve(STATE.cfg);setGenome(bytesHex(r.genome),"進化 fit="+r.fit.toFixed(3));},20);};
+document.getElementById("genome").oninput=e=>{const h=e.target.value.replace(/[^0-9a-fA-F]/g,"");if(h.length>=2)setGenome(h,"貼付");};
+document.getElementById("loadspec").onclick=()=>document.getElementById("specfile").click();
+document.getElementById("specfile").onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();fr.onload=()=>{try{const d=JSON.parse(fr.result);
+ if(d.cfg)STATE.cfg=d.cfg;setGenome(d.genome_hex,"spec.json");if(d.plugins)document.querySelectorAll(".plg").forEach(c=>c.checked=d.plugins.includes(c.value));}catch(err){alert("JSON解析失敗");}};fr.readAsText(f);};
+document.getElementById("build").onclick=build;
+document.getElementById("dl_plugin").onclick=()=>download("omega-apriori.plugin.js",STATE.bundle,"text/javascript");
+document.getElementById("dl_manifest").onclick=()=>download("omega-apriori.manifest.json",JSON.stringify(STATE.manifest,null,1),"application/json");
+document.getElementById("dl_loader").onclick=()=>download("verify_and_load.js",SRC.loader,"text/javascript");
+document.getElementById("dl_art").onclick=()=>{const ext={userscript:"user.js",bookmarklet:"bookmarklet.txt",console:"console.js",html:"embed.html",node:"node.js",electron:"preload.js"}[STATE.target];
+ download("omega-attach."+ext,artifact(STATE.target),"text/plain");};
+
+loadSrc();
+</script>
+</body>
+</html>

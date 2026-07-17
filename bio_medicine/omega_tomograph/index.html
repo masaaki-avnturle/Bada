@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<!--
+  Ω-Tomograph — Γ大域的部分積分多様体 概念トモグラフ・アプリ
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_tomograph
+
+  根拠レポート: analyze/GammaFunction.pdf
+      ∫ Γ(γ)' dx_m = 2 e^{-x log x}      (ガンマ関数の大域的部分積分多様体)
+      x^x = e^{x log x}                  (M理論の絡み合い)
+      π(χ,x) = cos θ + i sin θ
+
+  ─────────────────────────────────────────────────────────────────
+  ⚠ 重要 / IMPORTANT
+  本アプリは「概念実証・教育・可視化」専用のシミュレータです。
+  実在の人体を撮像する装置ではありません。実際のMRI/CT/X線は磁場・X線管・
+  検出器など物理ハードウェアと検証済み物理を必要とします。
+  本アプリは合成ファントム(数式モデル)に対し、CTの真の数学的原理である
+  ラドン変換・フィルタ補正逆投影(FBP)を実行し、それをレポートの
+  Γカーネル e^{-x log x} に結びつけて可視化するものです。
+  診断・医療・臨床判断には一切使用できません。
+  This is a CONCEPTUAL SIMULATION for education/visualization only.
+  NOT a medical device. NOT for diagnostic or clinical use.
+  ─────────────────────────────────────────────────────────────────
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Tomograph · Γ大域的部分積分多様体トモグラフ</title>
+<style>
+  :root{
+    --bg:#04060a; --panel:#0a0e16; --panel2:#0d1320; --line:#1b2638;
+    --gold:#c8a44a; --cyan:#40b8c0; --blue:#4a80d0; --violet:#9060d0;
+    --txt:#d8e0ec; --dim:#8794a8; --warn:#e0b020; --bad:#d0506a; --good:#48c08a;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    line-height:1.55;}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,#070b12,#04060a);}
+  h1{margin:0 0 4px;font-size:22px;letter-spacing:.5px}
+  h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:13px;margin-top:8px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;
+    background:#1a1304;border-radius:8px;color:var(--warn);font-size:12.5px}
+  nav{display:flex;gap:4px;padding:14px 20px 0;flex-wrap:wrap}
+  nav button{background:var(--panel);color:var(--dim);border:1px solid var(--line);
+    border-bottom:none;padding:10px 16px;border-radius:8px 8px 0 0;cursor:pointer;
+    font-size:13.5px;font-weight:600}
+  nav button.active{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  main{padding:0 20px 60px}
+  .tab{display:none;background:var(--panel2);border:1px solid var(--line);
+    border-radius:0 10px 10px 10px;padding:18px}
+  .tab.active{display:block}
+  .row{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1;min-width:280px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);
+    border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;
+    image-rendering:pixelated;width:100%;height:auto;display:block}
+  .cap{font-size:11.5px;color:var(--dim);margin-top:5px;text-align:center}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:10px 0 4px}
+  input[type=range]{width:100%}
+  select,input[type=text]{width:100%;background:#06090f;color:var(--txt);
+    border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);
+    border:1px solid var(--gold);border-radius:8px;padding:10px 18px;cursor:pointer;
+    font-weight:700;font-size:13.5px;margin-top:12px}
+  button.act:hover{background:#1f2f4a}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .bar{height:14px;background:#06090f;border:1px solid var(--line);border-radius:7px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan))}
+  .pct{font-family:var(--mono);font-size:13px}
+  .big{font-size:46px;font-weight:800;font-family:var(--mono);text-align:center;margin:6px 0}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--dim);font-weight:600}
+  .legend{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Tomograph — Γ大域的部分積分多様体 概念トモグラフ</h1>
+  <div class="sub">Global Partial-Integration Manifold Tomograph · Yamaguchi Theory · Bada / bio_medicine</div>
+  <div class="eq">∫ Γ(γ)′ dx_m = 2·e<sup>−x log x</sup> &nbsp;·&nbsp; x<sup>x</sup> = e<sup>x log x</sup> &nbsp;·&nbsp; π(χ,x)=cosθ+i sinθ</div>
+</header>
+
+<div class="disc">
+  ⚠ <b>概念実証シミュレータ／非医療</b>:
+  本アプリは実在の人体を撮像しません。合成ファントム(数式モデル)に対し、CTの真の数学的原理である
+  <b>ラドン変換・フィルタ補正逆投影(FBP)</b> を実行し、レポートの Γカーネル <code>e^{-x log x}</code>
+  に結びつけて可視化する教育用デモです。<b>診断・臨床判断には使用できません。</b>
+</div>
+
+<nav>
+  <button class="active" data-tab="tomo">① Γ多様体トモグラフ (CT/MRI原理)</button>
+  <button data-tab="xray">② Γ X線投影 (肺X線風)</button>
+  <button data-tab="whisper">③ Whispered 合致率</button>
+  <button data-tab="telomere">④ Γ-テロメア寿命シミュレータ</button>
+  <button data-tab="theory">理論メモ</button>
+</nav>
+
+<main>
+<!-- ================= TAB 1 : TOMOGRAPH ================= -->
+<section id="tomo" class="tab active">
+  <div class="row">
+    <div class="col" style="flex:0 0 280px">
+      <div class="card">
+        <h3>スキャン設定</h3>
+        <label>断面ファントム</label>
+        <select id="t_phantom">
+          <option value="brain">脳断面 (大脳基底核モデル)</option>
+          <option value="thorax">胸部断面 (肺・脊柱モデル)</option>
+          <option value="shepp">Shepp-Logan ファントム</option>
+        </select>
+        <label>投影角数 (views): <span class="val" id="t_views_v">120</span></label>
+        <input type="range" id="t_views" min="12" max="360" step="12" value="120"/>
+        <label>Γカーネル熱パラメータ κ: <span class="val" id="t_kappa_v">1.00</span></label>
+        <input type="range" id="t_kappa" min="0" max="200" value="100"/>
+        <label>解像度 N</label>
+        <select id="t_res"><option>96</option><option selected>128</option><option>160</option></select>
+        <button class="act" id="t_run">スキャン実行 ▶</button>
+        <div class="cap" id="t_status">準備完了</div>
+      </div>
+      <div class="card">
+        <h3>Γ熱エネルギー核 e<sup>−x log x</sup></h3>
+        <canvas id="t_kern" width="240" height="120"></canvas>
+        <div class="cap">大脳基底核→末端への熱流の重み関数として適用</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="grid3">
+        <div><canvas id="t_obj" width="128" height="128"></canvas><div class="cap">原断面 μ(x,y)<br>(熱流場ファントム)</div></div>
+        <div><canvas id="t_sino" width="180" height="128"></canvas><div class="cap">サイノグラム<br>R[μ](θ,s) = X線投影群</div></div>
+        <div><canvas id="t_recon" width="128" height="128"></canvas><div class="cap">FBP再構成<br>= CT/MRI断面像</div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>原理</h3>
+        <p style="font-size:12.5px;margin:6px 0">
+        各角度θで断面を貫く線積分 <code>R[μ](θ,s)=∫μ dℓ</code>（=X線投影）を取り、ランプフィルタを掛けて
+        逆投影することで断面 μ(x,y) を復元します（フィルタ補正逆投影）。これがCTの数学的本体です。
+        レポートの大域的部分積分多様体 <code>∫Γ(γ)′dx_m = 2e^{−x log x}</code> を、
+        基底核から末端へ拡散する「熱エネルギー流」の重み <code>w=e^{−κ·d·log d}</code> として密度場に適用し、
+        投影・再構成しています。MRIも投影データの逆問題（k空間→画像）であり、ここでは同一の逆投影原理で統合表示します。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TAB 2 : XRAY ================= -->
+<section id="xray" class="tab">
+  <div class="row">
+    <div class="col" style="flex:0 0 280px">
+      <div class="card">
+        <h3>X線投影設定</h3>
+        <label>被写体</label>
+        <select id="x_phantom">
+          <option value="chest">胸部 (肺野・心陰影・脊柱・肋骨)</option>
+          <option value="hand">手部 (骨格)</option>
+        </select>
+        <label>投影方向</label>
+        <select id="x_dir"><option value="0">正面 PA</option><option value="90">側面 LAT</option></select>
+        <label>線質 (Γエネルギー) κ: <span class="val" id="x_kappa_v">1.00</span></label>
+        <input type="range" id="x_kappa" min="20" max="240" value="100"/>
+        <label>コントラスト γ: <span class="val" id="x_gamma_v">1.4</span></label>
+        <input type="range" id="x_gamma" min="60" max="260" value="140"/>
+        <button class="act" id="x_run">撮影 ▶</button>
+        <div class="cap" id="x_status">準備完了</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="grid2">
+        <div><canvas id="x_obj" width="160" height="160"></canvas><div class="cap">減弱係数マップ μ(x,y)</div></div>
+        <div><canvas id="x_film" width="160" height="160"></canvas><div class="cap">X線写真風 (Beer–Lambert: I=I₀·e<sup>−∫μ dℓ</sup>)</div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <h3>原理</h3>
+        <p style="font-size:12.5px;margin:6px 0">
+        肺X線写真は <code>I = I₀·exp(−∫μ(ℓ)dℓ)</code>（Beer–Lambert 減弱則）で形成される投影像です。
+        ここでは合成胸部ファントムの減弱係数を、レポートの <code>e^{−x log x}</code> でエネルギー依存に重み付けし、
+        前方ラドン変換（線積分）でフィルム面の濃淡を生成します。肺野は低密度＝高透過で黒く、骨・脊柱は高吸収で白く写ります。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TAB 3 : WHISPERED ================= -->
+<section id="whisper" class="tab">
+  <div class="row">
+    <div class="col" style="flex:0 0 320px">
+      <div class="card">
+        <h3>Whispered 個体署名</h3>
+        <label>個体A 署名ID (whispered seed)</label>
+        <input type="text" id="w_a" value="MASAAKI-YAMAGUCHI-01"/>
+        <label>参照B 署名ID</label>
+        <input type="text" id="w_b" value="REFERENCE-PROFILE-01"/>
+        <label>モダリティ重み</label>
+        <div class="legend" id="w_weights"></div>
+        <button class="act" id="w_run">合致率を測定 ▶</button>
+        <div class="cap">同一文字列を入れると100%（自己同一）になります。</div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>個体Whispered 合致率</h3>
+        <div class="big" id="w_total" style="color:var(--good)">— %</div>
+        <div class="cap">ミラー統計＋6モダリティの加重一致度</div>
+        <table id="w_table" style="margin-top:10px">
+          <thead><tr><th>モダリティ</th><th>合致</th><th>重み</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <canvas id="w_radar" width="360" height="300" style="margin-top:14px"></canvas>
+        <div class="cap">レーダー: 各モダリティ特徴ベクトルのコサイン一致 ＋ ミラー対称統計</div>
+      </div>
+    </div>
+  </div>
+  <div class="disc" style="margin:0">
+    ⚠ 本タブは各モダリティ(MRI/fMRI脳トポグラフィ/血液/全身CT/脳波/DNA)の特徴ベクトルを
+    署名IDから決定論的に合成し、コサイン類似度＋ミラー統計で「概念的な一致度%」を算出するデモです。
+    実検査データの取り込み・本人同定・医療判定の機能ではありません。
+  </div>
+</section>
+
+<!-- ================= TAB 4 : TELOMERE / LIFESPAN ================= -->
+<section id="telomere" class="tab">
+  <div class="row">
+    <div class="col" style="flex:0 0 320px">
+      <div class="card">
+        <h3>赤外線・体温センサー入力</h3>
+        <label>体温 T (赤外線/体温計): <span class="val" id="l_temp_v">37.0</span> ℃</label>
+        <input type="range" id="l_temp" min="355" max="390" value="370"/>
+        <canvas id="l_ir" width="280" height="40"></canvas>
+        <div class="cap">赤外線サーモ読み取り（代謝率→テロメア減衰に反映, Q10=2.5）</div>
+      </div>
+      <div class="card">
+        <h3>テロメア / DNA パラメータ</h3>
+        <label>初期テロメア長 L₀: <span class="val" id="l_l0_v">10000</span> bp</label>
+        <input type="range" id="l_l0" min="6000" max="15000" step="250" value="10000"/>
+        <label>Hayflick 臨界長 L_c: <span class="val" id="l_lc_v">5000</span> bp</label>
+        <input type="range" id="l_lc" min="3000" max="6000" step="100" value="5000"/>
+        <label>分裂あたり基本減衰 δ₀: <span class="val" id="l_d0_v">80</span> bp</label>
+        <input type="range" id="l_d0" min="40" max="200" value="80"/>
+        <label>TTAGGG 反復→ノット交差数 n(奇数): <span class="val" id="l_n_v">7</span></label>
+        <input type="range" id="l_n" min="3" max="21" step="2" value="7"/>
+        <label>Γ熱核 κ (大域的多様体): <span class="val" id="l_kappa_v">1.00</span></label>
+        <input type="range" id="l_kappa" min="0" max="200" value="100"/>
+        <button class="act" id="l_run">寿命を計算 ▶</button>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>推定寿命レンジ（概念モデル）</h3>
+        <div class="grid3">
+          <div><div class="cap">最低寿命 (高体温・低忠実度)</div><div class="big" id="l_min" style="color:var(--bad);font-size:30px">— 年</div></div>
+          <div><div class="cap">推定中央値 (現在設定)</div><div class="big" id="l_med" style="color:var(--cyan);font-size:34px">— 年</div></div>
+          <div><div class="cap">最大寿命 (低体温・高忠実度)</div><div class="big" id="l_max" style="color:var(--good);font-size:30px">— 年</div></div>
+        </div>
+        <div class="cap" id="l_detail" style="margin-top:8px"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <h3>テロメア減衰曲線 L(年)</h3>
+          <canvas id="l_curve" width="340" height="200"></canvas>
+          <div class="cap">Γ大域的多様体核 e<sup>−κ·x log x</sup> で変調した減衰。点線=線形, 実線=Γ多様体</div>
+        </div>
+        <div class="card">
+          <h3>Jones多項式 V(t) — RNA転写トポロジー</h3>
+          <canvas id="l_jones" width="340" height="200"></canvas>
+          <div class="cap" id="l_jpoly" style="font-family:var(--mono);font-size:11px;color:var(--violet)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>原理</h3>
+        <p style="font-size:12.5px;margin:6px 0">
+        テロメア(TTAGGG反復)はテロメラーゼRNA(TERC)鋳型から転写・伸長されますが、細胞分裂ごとに
+        <code>δ</code> bp ずつ短縮し、Hayflick臨界長 <code>L_c</code> で複製老化に至ります。本タブは
+        TTAGGG反復鎖を <b>(2,n)トーラスノット</b> として捉え、その <b>Jones多項式</b>
+        <code>V_{T(2,n)}(t)=t^{(n−1)/2}(1−t³−t^{n+1}+t^{n+2})/(1−t²)</code> を計算し、
+        <code>|V(e^{2πi/5})|</code> から「転写トポロジー忠実度 φ」を導きます。
+        赤外線/体温計の体温 T は代謝率(Q10則)として減衰速度を変調します。
+        減衰は大域的部分積分多様体核 <code>e^{−κ·x log x}</code> で曲げ、
+        可能分裂数 <code>D=(L₀−L_c)/δ_eff</code> から最大寿命・最低寿命を算出します。</p>
+      </div>
+    </div>
+  </div>
+  <div class="disc" style="margin:0">
+    ⚠ 寿命は実際には遺伝・環境・確率に強く依存し、テロメアや体温から個人の寿命を測定することはできません。
+    本タブはレポートの数式・Jonesノット理論・テロメア生物学の数値を組み合わせた<b>概念モデル</b>であり、
+    実際の余命予測・医療判定ではありません。
+  </div>
+</section>
+
+<!-- ================= TAB 5 : THEORY ================= -->
+<section id="theory" class="tab">
+  <div class="card">
+    <h3>レポート方程式とアプリ機能の対応 (analyze/GammaFunction.pdf)</h3>
+    <table>
+      <thead><tr><th>レポートの方程式</th><th>本アプリでの実装</th></tr></thead>
+      <tbody>
+        <tr><td><code>∫Γ(γ)′ dx_m = 2e<sup>−x log x</sup></code> (大域的部分積分多様体)</td>
+            <td>熱エネルギー流の重み核 <code>w(d)=e<sup>−κ·d·log d</sup></code>。基底核(中心)から末端(辺縁)へ密度場を変調。</td></tr>
+        <tr><td>X線投影 (肺写真の原理)</td>
+            <td>Beer–Lambert <code>I=I₀e<sup>−∫μ dℓ</sup></code> による前方ラドン変換。タブ②。</td></tr>
+        <tr><td>CT/MRI = 投影の逆問題</td>
+            <td>ランプフィルタ補正逆投影(FBP)で μ(x,y) を復元。タブ①。</td></tr>
+        <tr><td><code>π(χ,x)=cosθ+i sinθ</code> 回転作用素 R(α)</td>
+            <td>各投影角θの回転サンプリングに使用。</td></tr>
+        <tr><td>Whispered言語 / ミラー統計</td>
+            <td>署名IDから合成した特徴ベクトルのコサイン一致＋鏡映対称統計。タブ③。</td></tr>
+        <tr><td>Jones多項式 V_{T(2,n)}(t)（テロメアRNA転写）</td>
+            <td>TTAGGG反復鎖を(2,n)トーラスノット化し Jones多項式を計算、|V(e<sup>2πi/5</sup>)| を転写忠実度φに。タブ④。</td></tr>
+        <tr><td>赤外線/体温（代謝Q10則）＋ Hayflick限界</td>
+            <td>体温→減衰速度変調、可能分裂数 D=(L₀−L_c)/δ_eff から最大/最低寿命を算出。タブ④。</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h3>数学的に「本物」の部分／「概念」の部分</h3>
+    <p style="font-size:13px">
+    <b style="color:var(--good)">本物（実装が正しい数学）:</b> ラドン変換、フィルタ補正逆投影、Beer–Lambert 減弱則、
+    コサイン類似度。これらはCT再構成・X線濃淡・パターン照合の実際の数学です。<br>
+    <b style="color:var(--warn)">概念（理論的解釈）:</b> Γカーネルを「熱エネルギー流」と解釈する部分、
+    Whispered／ミラー統計の意味づけは山口理論に基づく概念モデルであり、実在の医療計測ではありません。</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  Ω-Tomograph · © 2025 Masaaki Yamaguchi · Bada / bio_medicine ·
+  概念実証シミュレータ（非医療・診断不可） · 根拠: analyze/GammaFunction.pdf
+</footer>
+
+<script>
+"use strict";
+/* ===================== 共通: タブ ===================== */
+document.querySelectorAll('nav button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    document.getElementById(b.dataset.tab).classList.add('active');
+  };
+});
+
+/* ===================== 共通: Γカーネル ===================== */
+// レポート: ∫Γ(γ)' dx_m = 2 e^{-x log x}  →  熱流重み核
+function gammaKernel(x, kappa){
+  // x in (0, ~), e^{-kappa * x * log x}; x*log x -> 0 as x->0
+  if(x<=0) return 1.0;
+  return Math.exp(-kappa * x * Math.log(x + 1e-9));
+}
+
+/* ===================== 共通: ファントム ===================== */
+// ellipse: {cx,cy,a,b,ang,val}  座標は [-1,1]
+function phantomEllipses(name){
+  if(name==='shepp'){ // 簡易Shepp-Logan
+    return [
+      {cx:0,cy:0,a:.69,b:.92,ang:0,val:1.0},
+      {cx:0,cy:-.0184,a:.6624,b:.874,ang:0,val:-.8},
+      {cx:.22,cy:0,a:.11,b:.31,ang:-18,val:-.2},
+      {cx:-.22,cy:0,a:.16,b:.41,ang:18,val:-.2},
+      {cx:0,cy:.35,a:.21,b:.25,ang:0,val:.1},
+      {cx:0,cy:.1,a:.046,b:.046,ang:0,val:.1},
+      {cx:0,cy:-.1,a:.046,b:.046,ang:0,val:.1},
+      {cx:-.08,cy:-.605,a:.046,b:.023,ang:0,val:.1},
+      {cx:0,cy:-.605,a:.023,b:.023,ang:0,val:.1},
+      {cx:.06,cy:-.605,a:.023,b:.046,ang:0,val:.1},
+    ];
+  }
+  if(name==='brain'){ // 脳断面: 頭蓋/灰白/白質/側脳室/基底核
+    return [
+      {cx:0,cy:0,a:.82,b:.92,ang:0,val:.45},     // 頭蓋骨外縁(高)
+      {cx:0,cy:0,a:.76,b:.86,ang:0,val:-.15},    // 頭蓋内(やや低)
+      {cx:0,cy:.03,a:.70,b:.80,ang:0,val:.20},   // 灰白質
+      {cx:0,cy:.05,a:.58,b:.68,ang:0,val:-.05},  // 白質
+      {cx:-.16,cy:.30,a:.10,b:.16,ang:0,val:-.30},// 側脳室L
+      {cx:.16,cy:.30,a:.10,b:.16,ang:0,val:-.30}, // 側脳室R
+      {cx:-.12,cy:.08,a:.09,b:.11,ang:0,val:.30}, // 基底核L
+      {cx:.12,cy:.08,a:.09,b:.11,ang:0,val:.30},  // 基底核R
+      {cx:0,cy:-.02,a:.05,b:.07,ang:0,val:.15},   // 視床
+    ];
+  }
+  if(name==='thorax'||name==='chest'){ // 胸部: 体幹/肺/心/脊柱/肋骨
+    let e=[
+      {cx:0,cy:0,a:.88,b:.70,ang:0,val:.30},      // 軟部組織
+      {cx:-.34,cy:.02,a:.30,b:.45,ang:0,val:-.85},// 左肺(低)
+      {cx:.34,cy:.02,a:.30,b:.45,ang:0,val:-.85}, // 右肺
+      {cx:.06,cy:-.10,a:.22,b:.24,ang:-15,val:.25},// 心陰影
+      {cx:0,cy:.0,a:.07,b:.10,ang:0,val:1.0},     // 脊柱(高)
+    ];
+    // 肋骨(高吸収の弧)を点列ellipseで近似
+    for(let i=0;i<6;i++){
+      let y=.45-i*.16;
+      e.push({cx:0,cy:y,a:.80,b:.045,ang:0,val:.55});
+    }
+    return e;
+  }
+  if(name==='hand'){ // 手: 中手骨/指骨
+    let e=[{cx:0,cy:0,a:.55,b:.78,ang:0,val:.12}]; // 軟部
+    for(let f=0;f<5;f++){
+      let x=-.4+f*.2;
+      e.push({cx:x,cy:.0,a:.04,b:.35,ang:0,val:.9});   // 中手骨
+      e.push({cx:x,cy:.42,a:.035,b:.18,ang:0,val:.9}); // 基節骨
+      e.push({cx:x,cy:.66,a:.03,b:.12,ang:0,val:.9});  // 末節骨
+    }
+    return e;
+  }
+  return [];
+}
+
+// ファントムをNxN密度グリッドへ。Γ熱流重みを適用。
+function rasterize(name, N, kappa){
+  const E=phantomEllipses(name);
+  const g=new Float32Array(N*N);
+  for(let j=0;j<N;j++){
+    for(let i=0;i<N;i++){
+      const x=2*(i+.5)/N-1, y=1-2*(j+.5)/N;
+      let v=0;
+      for(const e of E){
+        const ca=Math.cos(e.ang*Math.PI/180), sa=Math.sin(e.ang*Math.PI/180);
+        const xp=(x-e.cx)*ca+(y-e.cy)*sa, yp=-(x-e.cx)*sa+(y-e.cy)*ca;
+        if((xp*xp)/(e.a*e.a)+(yp*yp)/(e.b*e.b)<=1) v+=e.val;
+      }
+      // Γ熱流重み: 中心(基底核)からの距離dで e^{-κ d log d}
+      const d=Math.sqrt(x*x+y*y);
+      const w=0.5+0.5*gammaKernel(d+0.15, kappa); // 0.5..1 で変調
+      g[j*N+i]=v*w;
+    }
+  }
+  return g;
+}
+
+/* ===================== ラドン変換(前方投影) ===================== */
+function forwardProject(img, N, views){
+  // 出力: sinogram[views][N], detector s in [-1,1]
+  const nDet=N;
+  const sino=new Float32Array(views*nDet);
+  const cx=(N-1)/2;
+  for(let v=0;v<views;v++){
+    const th=Math.PI*v/views;
+    const ct=Math.cos(th), st=Math.sin(th);
+    for(let s=0;s<nDet;s++){
+      // 検出位置 (中心からの符号付き距離) -1..1 → ピクセル
+      const sPos=(2*(s+.5)/nDet-1);
+      let sum=0;
+      // ray: 直交方向に積分
+      for(let t=0;t<nDet;t++){
+        const tPos=(2*(t+.5)/nDet-1);
+        // (sPos along detector, tPos along ray)
+        const x=sPos*ct - tPos*st;
+        const y=sPos*st + tPos*ct;
+        const ix=Math.round((x+1)/2*N-.5), iy=Math.round((1-y)/2*N-.5);
+        if(ix>=0&&ix<N&&iy>=0&&iy<N) sum+=img[iy*N+ix];
+      }
+      sino[v*nDet+s]=sum*(2/nDet);
+    }
+  }
+  return {sino, views, nDet};
+}
+
+/* ===================== ランプフィルタ(空間領域 Ram-Lak) ===================== */
+function rampFilter(line, nDet){
+  // 離散ランプ核 h[0]=1/4, h[even]=0, h[odd]=-1/(n^2 pi^2)
+  const out=new Float32Array(nDet);
+  for(let i=0;i<nDet;i++){
+    let acc=0;
+    for(let j=0;j<nDet;j++){
+      const n=i-j; let h;
+      if(n===0) h=0.25;
+      else if(n%2===0) h=0;
+      else h=-1/(n*n*Math.PI*Math.PI);
+      acc+=line[j]*h;
+    }
+    out[i]=acc;
+  }
+  return out;
+}
+
+/* ===================== フィルタ補正逆投影(FBP) ===================== */
+function fbp(sino, views, nDet, N){
+  // フィルタ
+  const filt=new Float32Array(views*nDet);
+  for(let v=0;v<views;v++){
+    const line=sino.subarray(v*nDet,(v+1)*nDet);
+    const f=rampFilter(line,nDet);
+    filt.set(f, v*nDet);
+  }
+  const out=new Float32Array(N*N);
+  for(let v=0;v<views;v++){
+    const th=Math.PI*v/views;
+    const ct=Math.cos(th), st=Math.sin(th);
+    const base=v*nDet;
+    for(let j=0;j<N;j++){
+      const y=1-2*(j+.5)/N;
+      for(let i=0;i<N;i++){
+        const x=2*(i+.5)/N-1;
+        const sPos=x*ct+y*st; // 投影座標
+        const s=(sPos+1)/2*nDet-.5;
+        const s0=Math.floor(s), fr=s-s0;
+        let val=0;
+        if(s0>=0&&s0<nDet-1) val=filt[base+s0]*(1-fr)+filt[base+s0+1]*fr;
+        else if(s0>=0&&s0<nDet) val=filt[base+s0];
+        out[j*N+i]+=val;
+      }
+    }
+  }
+  const k=Math.PI/views;
+  for(let i=0;i<N*N;i++) out[i]*=k;
+  return out;
+}
+
+/* ===================== 描画ユーティリティ ===================== */
+function drawField(canvas, data, w, h, cmap){
+  canvas.width=w; canvas.height=h;
+  const ctx=canvas.getContext('2d');
+  const id=ctx.createImageData(w,h);
+  let mn=Infinity,mx=-Infinity;
+  for(let i=0;i<data.length;i++){ if(data[i]<mn)mn=data[i]; if(data[i]>mx)mx=data[i]; }
+  const rng=(mx-mn)||1;
+  for(let i=0;i<w*h;i++){
+    const t=(data[i]-mn)/rng;
+    const c=cmap(t);
+    id.data[i*4]=c[0]; id.data[i*4+1]=c[1]; id.data[i*4+2]=c[2]; id.data[i*4+3]=255;
+  }
+  ctx.putImageData(id,0,0);
+}
+const cmapGray=t=>{const v=Math.round(255*t);return[v,v,v];};
+const cmapXray=t=>{const v=Math.round(255*Math.min(1,Math.max(0,t)));return[v,v,Math.round(v*0.98)];};
+const cmapThermal=t=>{ // 熱エネルギー流: 黒→赤→橙→黄→白
+  t=Math.min(1,Math.max(0,t));
+  const r=Math.min(1,t*1.8), g=Math.min(1,Math.max(0,t*1.8-0.6)), b=Math.min(1,Math.max(0,t*2-1.4));
+  return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];
+};
+
+/* ===================== TAB1 制御 ===================== */
+function drawKernel(){
+  const c=document.getElementById('t_kern'),ctx=c.getContext('2d');
+  const kappa=document.getElementById('t_kappa').value/100;
+  ctx.clearRect(0,0,c.width,c.height);
+  ctx.strokeStyle='#1b2638'; ctx.beginPath();ctx.moveTo(0,c.height-1);ctx.lineTo(c.width,c.height-1);ctx.stroke();
+  ctx.strokeStyle='#40b8c0'; ctx.lineWidth=2; ctx.beginPath();
+  for(let i=0;i<c.width;i++){
+    const x=i/c.width*2; // 0..2
+    const y=gammaKernel(x+0.05,kappa);
+    const py=c.height-2-y*(c.height-8);
+    i===0?ctx.moveTo(i,py):ctx.lineTo(i,py);
+  }
+  ctx.stroke();
+}
+document.getElementById('t_kappa').oninput=e=>{
+  document.getElementById('t_kappa_v').textContent=(e.target.value/100).toFixed(2);
+  drawKernel();
+};
+document.getElementById('t_views').oninput=e=>{
+  document.getElementById('t_views_v').textContent=e.target.value;
+};
+document.getElementById('t_run').onclick=()=>{
+  const st=document.getElementById('t_status');
+  st.textContent='計算中…';
+  setTimeout(()=>{
+    const N=parseInt(document.getElementById('t_res').value);
+    const views=parseInt(document.getElementById('t_views').value);
+    const kappa=document.getElementById('t_kappa').value/100;
+    const name=document.getElementById('t_phantom').value;
+    const t0=performance.now();
+    const img=rasterize(name,N,kappa);
+    drawField(document.getElementById('t_obj'),img,N,N,cmapThermal);
+    const {sino,nDet}=forwardProject(img,N,views);
+    drawField(document.getElementById('t_sino'),sino,nDet,views,cmapGray);
+    const rec=fbp(sino,views,nDet,N);
+    drawField(document.getElementById('t_recon'),rec,N,N,cmapGray);
+    st.textContent='完了 ('+((performance.now()-t0)/1000).toFixed(2)+'s, '+views+'views, N='+N+')';
+  },30);
+};
+
+/* ===================== TAB2 制御 ===================== */
+document.getElementById('x_kappa').oninput=e=>document.getElementById('x_kappa_v').textContent=(e.target.value/100).toFixed(2);
+document.getElementById('x_gamma').oninput=e=>document.getElementById('x_gamma_v').textContent=(e.target.value/100).toFixed(2);
+document.getElementById('x_run').onclick=()=>{
+  const st=document.getElementById('x_status'); st.textContent='撮影中…';
+  setTimeout(()=>{
+    const N=160;
+    const kappa=document.getElementById('x_kappa').value/100;
+    const gma=document.getElementById('x_gamma').value/100;
+    const name=document.getElementById('x_phantom').value;
+    const dir=parseInt(document.getElementById('x_dir').value);
+    let img=rasterize(name,N,kappa);
+    // 減弱マップ表示 (正値のみ)
+    const disp=new Float32Array(N*N);
+    for(let i=0;i<N*N;i++) disp[i]=Math.max(0,img[i]);
+    drawField(document.getElementById('x_obj'),disp,N,N,cmapGray);
+    // Beer-Lambert 前方投影 (1方向)。dir=0:縦に積分(PA), 90:横(LAT)
+    const film=new Float32Array(N*N);
+    const proj=new Float32Array(N);
+    if(dir===0){
+      for(let i=0;i<N;i++){let s=0;for(let j=0;j<N;j++)s+=Math.max(0,img[j*N+i]); proj[i]=s;}
+      const mx=Math.max(...proj)||1;
+      for(let i=0;i<N;i++){
+        const I=Math.exp(-2.2*proj[i]/mx); // 透過強度(0..1) 高密度→暗→白反転
+        const val=Math.pow(I,gma);
+        for(let j=0;j<N;j++) film[j*N+i]=1-val; // フィルム: 高吸収=白
+      }
+    } else {
+      for(let j=0;j<N;j++){let s=0;for(let i=0;i<N;i++)s+=Math.max(0,img[j*N+i]); proj[j]=s;}
+      const mx=Math.max(...proj)||1;
+      for(let j=0;j<N;j++){
+        const I=Math.exp(-2.2*proj[j]/mx); const val=Math.pow(I,gma);
+        for(let i=0;i<N;i++) film[j*N+i]=1-val;
+      }
+    }
+    drawField(document.getElementById('x_film'),film,N,N,cmapXray);
+    st.textContent='撮影完了';
+  },30);
+};
+
+/* ===================== TAB3 Whispered ===================== */
+const MODS=[
+  {key:'mri', label:'MRI',            w:1.0},
+  {key:'fmri',label:'fMRI脳トポグラフィ', w:1.2},
+  {key:'blood',label:'血液検査',        w:0.9},
+  {key:'ct',  label:'全身CTスキャン',    w:1.0},
+  {key:'eeg', label:'脳波計(EEG)',      w:1.1},
+  {key:'dna', label:'DNA検査',         w:1.5},
+];
+const DIM=48;
+// 文字列→決定論PRNG (mulberry32)
+function hashStr(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function featureVec(seed,modKey){
+  const rnd=mulberry32(hashStr(seed+'::'+modKey));
+  const v=new Float32Array(DIM);
+  for(let i=0;i<DIM;i++) v[i]=rnd()*2-1;
+  return v;
+}
+function cosine(a,b){let d=0,na=0,nb=0;for(let i=0;i<a.length;i++){d+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}return d/(Math.sqrt(na*nb)+1e-9);}
+// ミラー統計: ベクトルの鏡映対称度 (前半 vs 反転後半)
+function mirrorStat(v){
+  const n=v.length, h=n>>1; let d=0,na=0,nb=0;
+  for(let i=0;i<h;i++){const a=v[i],b=v[n-1-i]; d+=a*b; na+=a*a; nb+=b*b;}
+  return d/(Math.sqrt(na*nb)+1e-9);
+}
+function renderWeights(){
+  document.getElementById('w_weights').innerHTML=
+    MODS.map(m=>m.label+' ×'+m.w.toFixed(1)).join(' · ')+' · ミラー統計 ×1.0';
+}
+renderWeights();
+document.getElementById('w_run').onclick=()=>{
+  const A=document.getElementById('w_a').value.trim()||'A';
+  const B=document.getElementById('w_b').value.trim()||'B';
+  const rows=[]; let wsum=0, acc=0;
+  const radar=[];
+  for(const m of MODS){
+    const va=featureVec(A,m.key), vb=featureVec(B,m.key);
+    let c=cosine(va,vb);                 // -1..1
+    let pct=Math.max(0,Math.min(100,(c*0.5+0.5)*100));
+    rows.push({label:m.label,pct,w:m.w});
+    radar.push(pct/100);
+    acc+=pct*m.w; wsum+=m.w;
+  }
+  // ミラー統計: A,B各モダリティ平均ベクトルの鏡映対称一致
+  let mA=new Float32Array(DIM), mB=new Float32Array(DIM);
+  for(const m of MODS){const va=featureVec(A,m.key),vb=featureVec(B,m.key);for(let i=0;i<DIM;i++){mA[i]+=va[i];mB[i]+=vb[i];}}
+  const msA=mirrorStat(mA), msB=mirrorStat(mB);
+  const mirrorMatch=Math.max(0,Math.min(100,(1-Math.abs(msA-msB)*0.5)*100));
+  rows.push({label:'ミラー統計(鏡映対称)',pct:mirrorMatch,w:1.0});
+  radar.push(mirrorMatch/100);
+  acc+=mirrorMatch*1.0; wsum+=1.0;
+  const total=acc/wsum;
+  // 表
+  const tb=document.querySelector('#w_table tbody'); tb.innerHTML='';
+  for(const r of rows){
+    tb.innerHTML+=`<tr><td>${r.label}</td>
+      <td class="pct">${r.pct.toFixed(1)}%</td>
+      <td>${r.w.toFixed(1)}</td>
+      <td style="width:120px"><div class="bar"><i style="width:${r.pct.toFixed(0)}%"></i></div></td></tr>`;
+  }
+  const tEl=document.getElementById('w_total');
+  tEl.textContent=total.toFixed(1)+' %';
+  tEl.style.color = total>80?'var(--good)':total>50?'var(--cyan)':'var(--bad)';
+  drawRadar(radar, rows.map(r=>r.label));
+};
+function drawRadar(vals,labels){
+  const c=document.getElementById('w_radar'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cx=c.width/2, cy=c.height/2+6, R=110, n=vals.length;
+  // grid
+  ctx.strokeStyle='#1b2638';
+  for(let g=1;g<=4;g++){ctx.beginPath();for(let i=0;i<=n;i++){const a=-Math.PI/2+2*Math.PI*i/n;const r=R*g/4;const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();}
+  ctx.strokeStyle='#243248';
+  for(let i=0;i<n;i++){const a=-Math.PI/2+2*Math.PI*i/n;ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+R*Math.cos(a),cy+R*Math.sin(a));ctx.stroke();}
+  // polygon
+  ctx.beginPath();
+  for(let i=0;i<=n;i++){const k=i%n;const a=-Math.PI/2+2*Math.PI*k/n;const r=R*vals[k];const x=cx+r*Math.cos(a),y=cy+r*Math.sin(a);i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.closePath(); ctx.fillStyle='rgba(64,184,192,.25)'; ctx.fill();
+  ctx.strokeStyle='#40b8c0'; ctx.lineWidth=2; ctx.stroke();
+  // labels
+  ctx.fillStyle='#8794a8'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  for(let i=0;i<n;i++){const a=-Math.PI/2+2*Math.PI*i/n;const x=cx+(R+16)*Math.cos(a),y=cy+(R+16)*Math.sin(a);
+    const lab=labels[i].length>8?labels[i].slice(0,7)+'…':labels[i];ctx.fillText(lab,x,y);}
+}
+
+/* ===================== TAB4 テロメア寿命 ===================== */
+// Jones多項式 V_{T(2,n)}(t) (n奇数=ノット): t^{(n-1)/2}(1-t^3-t^{n+1}+t^{n+2})/(1-t^2)
+function jonesT2n(n){
+  let r={0:1,3:-1}; r[n+1]=(r[n+1]||0)-1; r[n+2]=(r[n+2]||0)+1;
+  let q={};
+  for(let p=0;p<=n;p++){const c=r[p]||0;if(c!==0){q[p]=(q[p]||0)+c;r[p]-=c;r[p+2]=(r[p+2]||0)+c;}}
+  const shift=(n-1)/2; let out={};
+  for(const k in q){if(Math.abs(q[k])>1e-9) out[(+k)+shift]=q[k];}
+  return out;
+}
+function jonesAbs(poly,theta){let re=0,im=0;for(const k in poly){const a=poly[k];re+=a*Math.cos(theta*k);im+=a*Math.sin(theta*k);}return Math.hypot(re,im);}
+function fmtPoly(p){return Object.keys(p).map(Number).sort((a,b)=>a-b)
+  .map(k=>`${p[k]>0?"+":"−"}t^${k}`).join(" ").replace(/\+t\^0/,"+1");}
+
+// 1セットのパラメータから可能分裂数→寿命(年)
+function lifespan(L0,Lc,d0,phi,tempC,kappa){
+  const Q10=2.5;
+  const m=Math.pow(Q10,(tempC-37)/10);      // 代謝率(体温依存)
+  const dEff=d0*m/phi;                        // 実効減衰 bp/分裂
+  const D=Math.max(0,(L0-Lc)/dEff);           // 可能分裂数
+  // Γ多様体核で年/分裂を変調: 健康な核(高φ)で寿命延伸
+  const Ypd=1.6*phi*(0.8+0.4*gammaKernel(0.6,kappa)); // 年/分裂(概念係数)
+  return {years:D*Ypd, D, dEff, Ypd, m};
+}
+
+function ircolor(t){const c=cmapThermal(t);return`rgb(${c[0]},${c[1]},${c[2]})`;}
+function drawIR(tempC){
+  const c=document.getElementById('l_ir'),ctx=c.getContext('2d');
+  const t=(tempC-35.5)/(39-35.5);
+  for(let i=0;i<c.width;i++){const tt=Math.min(1,Math.max(0,t+ (i/c.width-0.5)*0.25));
+    ctx.fillStyle=ircolor(tt);ctx.fillRect(i,0,1,c.height);}
+  ctx.fillStyle='#fff';ctx.font='bold 16px monospace';ctx.textAlign='center';
+  ctx.fillText(tempC.toFixed(1)+' ℃',c.width/2,26);
+}
+
+function drawDecay(L0,Lc,curMed,curMax,curMin,kappa){
+  const c=document.getElementById('l_curve'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const W=c.width,H=c.height,pad=24;
+  const maxYr=curMax.years*1.05||100;
+  function X(yr){return pad+(W-2*pad)*yr/maxYr;}
+  function Y(len){return H-pad-(H-2*pad)*(len-Lc*0.6)/(L0-Lc*0.6);}
+  // axes
+  ctx.strokeStyle='#1b2638';ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+  // Lc line
+  ctx.strokeStyle='#5a3a12';ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(pad,Y(Lc));ctx.lineTo(W-pad,Y(Lc));ctx.stroke();ctx.setLineDash([]);
+  ctx.fillStyle='#8794a8';ctx.font='10px monospace';ctx.textAlign='left';
+  ctx.fillText('L_c='+Lc+'bp',pad+4,Y(Lc)-3);
+  ctx.fillText('0',pad-2,H-pad+12);ctx.fillText(Math.round(maxYr)+'yr',W-pad-22,H-pad+12);
+  const sets=[[curMin,'#d0506a'],[curMed,'#40b8c0'],[curMax,'#48c08a']];
+  for(const [s,col] of sets){
+    const yr=s.years;
+    // linear (dotted)
+    ctx.strokeStyle=col;ctx.globalAlpha=.4;ctx.setLineDash([3,3]);ctx.beginPath();
+    ctx.moveTo(X(0),Y(L0));ctx.lineTo(X(yr),Y(Lc));ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+    // gamma-manifold curved
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();
+    for(let i=0;i<=60;i++){const x=i/60;const g=gammaKernel(0.05+x*0.95,kappa);
+      const frac=Math.pow(x,0.7+0.6*(1-g/2)); // 多様体で曲げる
+      const len=L0-(L0-Lc)*frac;
+      i===0?ctx.moveTo(X(x*yr),Y(len)):ctx.lineTo(X(x*yr),Y(len));}
+    ctx.stroke();ctx.lineWidth=1;
+  }
+}
+
+function drawJones(poly){
+  const c=document.getElementById('l_jones'),ctx=c.getContext('2d');
+  ctx.clearRect(0,0,c.width,c.height);
+  const cx=c.width/2,cy=c.height/2,R=78;
+  ctx.strokeStyle='#1b2638';ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.stroke();
+  // |V(e^{i theta})| polar curve
+  let mx=0;for(let d=0;d<360;d++){const v=jonesAbs(poly,d*Math.PI/180);if(v>mx)mx=v;}
+  ctx.strokeStyle='#9060d0';ctx.lineWidth=2;ctx.beginPath();
+  for(let d=0;d<=360;d++){const th=d*Math.PI/180;const v=jonesAbs(poly,th)/(mx||1);
+    const r=10+R*0.9*v;const x=cx+r*Math.cos(th),y=cy+r*Math.sin(th);
+    d===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}
+  ctx.closePath();ctx.stroke();ctx.lineWidth=1;
+  ctx.fillStyle='#8794a8';ctx.font='10px monospace';ctx.textAlign='center';
+  ctx.fillText('|V(e^{iθ})|  span='+ (Math.max(...Object.keys(poly).map(Number))-Math.min(...Object.keys(poly).map(Number))) ,cx,c.height-4);
+}
+
+function runTelomere(){
+  const L0=+document.getElementById('l_l0').value;
+  const Lc=+document.getElementById('l_lc').value;
+  const d0=+document.getElementById('l_d0').value;
+  const n=+document.getElementById('l_n').value;
+  const kappa=document.getElementById('l_kappa').value/100;
+  const tempC=+document.getElementById('l_temp').value/10;
+  // Jones → 転写忠実度 φ
+  const poly=jonesT2n(n);
+  const vabs=jonesAbs(poly,2*Math.PI/5);     // |V(e^{2pi i/5})|
+  const phi=Math.min(1,Math.max(0.55, 0.6 + 0.12*vabs)); // 0.55..1
+  // 現在/最大/最低
+  const med=lifespan(L0,Lc,d0,phi,tempC,kappa);
+  const max=lifespan(L0,Lc,d0,Math.min(1,phi*1.1),36.0,kappa);
+  const min=lifespan(L0,Lc,d0,phi*0.9,38.5,kappa);
+  document.getElementById('l_med').textContent=med.years.toFixed(0)+' 年';
+  document.getElementById('l_max').textContent=max.years.toFixed(0)+' 年';
+  document.getElementById('l_min').textContent=min.years.toFixed(0)+' 年';
+  document.getElementById('l_detail').textContent=
+    `Jones |V(e^{2πi/5})|=${vabs.toFixed(3)} → 転写忠実度 φ=${(phi*100).toFixed(1)}% ｜ `+
+    `実効減衰 δ_eff=${med.dEff.toFixed(1)}bp/分裂 ｜ 可能分裂数 D=${med.D.toFixed(1)} ｜ 代謝率×${med.m.toFixed(2)}`;
+  document.getElementById('l_jpoly').textContent='V_{T(2,'+n+')}(t) = '+fmtPoly(poly);
+  drawIR(tempC);
+  drawDecay(L0,Lc,med,max,min,kappa);
+  drawJones(poly);
+}
+[['l_temp','l_temp_v',v=>(v/10).toFixed(1)],['l_l0','l_l0_v',v=>v],['l_lc','l_lc_v',v=>v],
+ ['l_d0','l_d0_v',v=>v],['l_n','l_n_v',v=>v],['l_kappa','l_kappa_v',v=>(v/100).toFixed(2)]]
+ .forEach(([id,vid,f])=>{const el=document.getElementById(id);el.oninput=()=>{document.getElementById(vid).textContent=f(+el.value);};});
+document.getElementById('l_run').onclick=runTelomere;
+
+/* ===================== 初期描画 ===================== */
+drawKernel();
+document.getElementById('t_run').click();
+document.getElementById('x_run').click();
+document.getElementById('w_run').click();
+runTelomere();
+</script>
+</body>
+</html>

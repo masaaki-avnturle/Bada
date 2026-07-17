@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!--
+  Ω-Telomere Forge — Γ大域的部分積分多様体に基づく統合パイプライン (自己完結)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_telomere_forge
+
+  Γカーネル e^{-x log x} で駆動するテロメア分裂・自己進化 → 未知事前エンジン(FPGA)を鍛造 →
+  Verilog/C のソースコードに表出 → 任意アプリへ付加するための spec.json を出力。
+  全工程を1画面・依存なし・ダブルクリックで実行。
+
+  根拠: analyze/GammaFunction.pdf  ∫Γ(γ)' dx_m = 2 e^{-x log x}
+  関連: omega_apriori_cpu(C/Python) · omega_codegen · omega_apriori_injector
+
+  ⚠ 概念実証・教育用／非医療。テロメア/人類進化は遺伝的アルゴリズムのメタファ。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Telomere Forge</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 4px;font-size:22px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}.eq{font-family:var(--mono);color:var(--cyan);font-size:13px;margin-top:8px}
+  .flow{font-family:var(--mono);font-size:11.5px;color:var(--violet);margin-top:6px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12.5px}
+  main{padding:18px 20px 60px}.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:12px;margin-right:6px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}.val{color:var(--cyan);font-family:var(--mono)}
+  select,input[type=text]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px;font-family:var(--mono)}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 15px;cursor:pointer;font-weight:700;font-size:13.5px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a}button.dl{border-color:var(--cyan);color:var(--cyan)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block;width:100%;height:auto}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:6px 11px;border-radius:7px 7px 0 0;cursor:pointer;font-size:12px}
+  .tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:11px;font-family:var(--mono);color:var(--cyan);max-height:300px;overflow:auto;white-space:pre;margin:0}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Telomere Forge — Γ多様体テロメア自己進化 → FPGA鍛造 → 付加</h1>
+  <div class="sub">Global Partial-Integration Manifold · Telomere Self-Evolution · Unknown-A-Priori FPGA · Bada/bio_medicine</div>
+  <div class="eq">∫ Γ(γ)′ dx_m = 2·e<sup>−x log x</sup> &nbsp;→&nbsp; テロメア分裂進化 &nbsp;→&nbsp; 未知事前エンジン FPGA</div>
+  <div class="flow">テロメア分裂・自己進化 → 未知事前エンジン(LUTファブリック) → Verilog/C 表出 → 任意アプリ付加(機能拡張)</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>:
+  Γカーネル <code>e^{−x log x}</code> で変調したテロメア分裂(Hayflick/テロメラーゼ)を遺伝的アルゴリズムの
+  メタファとして自己進化させ、未知事前エンジン(LUTファブリック=FPGA構成)を鍛造し、Verilog/C ソースに表出します。
+  生成 <code>spec.json</code> は <code>omega_apriori_injector</code> で署名付きプラグイン化し任意アプリへ付加できます。
+  テロメア/人類進化は比喩であり実在の医療・人体とは無関係です。</div>
+
+<main>
+<div class="row">
+  <div class="col" style="flex:0 0 320px">
+    <div class="card">
+      <h3><span class="step">1</span>テロメア自己進化 設定</h3>
+      <label>未知事前 目標 (隠れ a-priori)</label>
+      <select id="target"><option value="popcount">popcount(情報量)</option><option value="parity">parity</option></select>
+      <label>個体数(人口): <span class="val" id="pop_v">70</span></label>
+      <input type="range" id="pop" min="20" max="140" step="10" value="70"/>
+      <label>世代数: <span class="val" id="gens_v">160</span></label>
+      <input type="range" id="gens" min="40" max="400" step="20" value="160"/>
+      <label>初期テロメア/Hayflick: <span class="val" id="telo_v">1000 / 200</span></label>
+      <input type="range" id="telo" min="400" max="2000" step="100" value="1000"/>
+      <label>世代あたり短縮(attrition): <span class="val" id="attr_v">18</span></label>
+      <input type="range" id="attr" min="4" max="60" step="2" value="18"/>
+      <label>Γ熱核 κ (大域的多様体): <span class="val" id="kappa_v">1.00</span></label>
+      <input type="range" id="kappa" min="0" max="200" value="100"/>
+      <button class="act" id="run">▶ 分裂・自己進化を実行</button>
+      <div class="stat"><span>状態</span><b id="status">準備完了</b></div>
+    </div>
+    <div class="card">
+      <h3>進化統計</h3>
+      <div class="stat"><span>best 適合度</span><b id="s_best">—</b></div>
+      <div class="stat"><span>平均テロメア</span><b id="s_telo">—</b></div>
+      <div class="stat"><span>複製老化率</span><b id="s_sen">—</b></div>
+      <div class="stat"><span>ゲノム(FPGA)長</span><b id="s_gs">144 B</b></div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3><span class="step">2</span>自己進化の世代推移</h3>
+      <canvas id="chart" width="520" height="220"></canvas>
+      <div style="font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px">緑=適合度 / 橙=平均テロメア / 赤=複製老化率</div>
+    </div>
+    <div class="card">
+      <h3><span class="step">3</span>鍛造された未知事前エンジン → ソースコード表出</h3>
+      <div class="tabs">
+        <button class="on" data-t="verilog">Verilog (FPGA)</button>
+        <button data-t="c">C</button>
+        <button data-t="python">Python</button>
+      </div>
+      <pre id="code">（自己進化を実行してください）</pre>
+      <div class="stat"><span>生成行数</span><b id="lines">—</b></div>
+    </div>
+    <div class="card">
+      <h3><span class="step">4</span>任意アプリへ付加 (機能拡張)</h3>
+      <button class="act dl" id="dl_spec" disabled>spec.json (付加用)</button>
+      <button class="act dl" id="dl_v" disabled>FPGA .v</button>
+      <button class="act dl" id="dl_c" disabled>engine .c</button>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:8px">
+      生成 <code>spec.json</code> を <code>omega_apriori_injector</code> へ:
+      <code>node run_plugin.js build spec.json plugin.js</code> →
+      <code>sign</code> → 署名付きプラグインとして任意アプリへ付加。
+      付加先では <code>codegen</code> プラグインでこのFPGAソースを実行時に再出力でき、
+      囲碁先読み・俯瞰・補完・可積分系エラー修正などの機能も同梱可能。</p>
+    </div>
+  </div>
+</div>
+</main>
+<footer>Ω-Telomere Forge · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療) · 根拠: analyze/GammaFunction.pdf</footer>
+
+<script>
+"use strict";
+const CELL_BYTES=6, cfg={inbits:6,layers:3,width:8,outbits:3};
+let STATE={genome:null,hist:[],target:"popcount"};
+
+/* Γ大域的部分積分多様体核 e^{-x log x} */
+function gammaKernel(x,k){if(x<=0)return 1;return Math.exp(-k*x*Math.log(x+1e-9));}
+
+/* LUTファブリック評価 (apriori_cpu/runtime と一致) */
+function evalFab(g,x){let prev=x&((1<<cfg.inbits)-1),src=cfg.inbits,cur=0;
+ for(let L=0;L<cfg.layers;L++){cur=0;for(let w=0;w<cfg.width;w++){const cell=L*cfg.width+w,p=cell*CELL_BYTES;let addr=0;
+  for(let k=0;k<4;k++){let sel=g[p+k]%Math.max(1,(L===0?cfg.inbits:cfg.width));if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+  cur|=(((g[p+4]|(g[p+5]<<8))>>addr)&1)<<w;}prev=cur;src=cfg.width;}return cur&((1<<cfg.outbits)-1);}
+const TARGETS={popcount:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;},parity:x=>{let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c&1;}};
+function fit(g){const tf=TARGETS[STATE.target];let m=0,t=0,n=1<<cfg.inbits;
+ for(let x=0;x<n;x++){const d=evalFab(g,x)^(tf(x)&((1<<cfg.outbits)-1));for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+
+/* テロメア分裂・自己進化 (Hayflick/テロメラーゼ, Γ変調変異) — apriori_engine.py と同一動態 */
+async function evolve(gens,pop,teloInit,attrition,kappa){
+ const hayflick=Math.round(teloInit*0.2),gs=cfg.layers*cfg.width*CELL_BYTES;
+ let P=[];for(let i=0;i<pop;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push({g,telo:teloInit});}
+ let best=null,bf=-1,hist=[];
+ for(let gen=0;gen<gens;gen++){
+  P.forEach(o=>o.f=fit(o.g));P.sort((a,b)=>b.f-a.f);
+  if(P[0].f>bf){bf=P[0].f;best=P[0].g.slice();}
+  const teloMean=P.reduce((s,o)=>s+o.telo,0)/pop, sen=P.filter(o=>o.telo<=hayflick).length/pop;
+  hist.push({gen,best:P[0].f,telo:teloMean,sen});
+  const eN=Math.max(2,pop/10|0),next=[];
+  for(let i=0;i<eN;i++)next.push({g:P[i].g.slice(),telo:teloInit}); /* テロメラーゼ再活性化 */
+  while(next.length<pop){const a=P[Math.random()*8|0],b=P[Math.random()*8|0];
+   const ct=Math.max(hayflick,Math.min(a.telo,b.telo)-attrition);  /* 分裂=短縮 */
+   const cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);c.set(a.g.subarray(0,cut));c.set(b.g.subarray(cut),cut);
+   if(ct>hayflick){const frac=(ct-hayflick)/(teloInit-hayflick),rate=0.01+0.06*frac*(0.5+0.5*gammaKernel(0.6,kappa));
+    for(let j=0;j<gs;j++)if(Math.random()<rate)c[j]=Math.random()*256|0;}        /* 老化=可塑性喪失 */
+   next.push({g:c,telo:ct});}
+  P=next;
+  if(gen%4===0||gen===gens-1){STATE.hist=hist;drawChart(teloInit);
+   document.getElementById("status").textContent="進化中 "+(gen+1)+"/"+gens;
+   document.getElementById("s_best").textContent=bf.toFixed(4);
+   document.getElementById("s_telo").textContent=teloMean.toFixed(0)+" / "+teloInit;
+   document.getElementById("s_sen").textContent=(sen*100).toFixed(0)+"%";
+   await new Promise(r=>setTimeout(r,0));}
+ }
+ return{genome:best,fit:bf,hist};
+}
+
+/* コード生成 (codegen.js と同一論理) */
+function h16(v){return(v&0xFFFF).toString(16).toUpperCase().padStart(4,"0");}
+function cellsOf(g){const o=[];let idx=0;for(let L=0;L<cfg.layers;L++){const src=L===0?cfg.inbits:cfg.width;
+ for(let w=0;w<cfg.width;w++){const p=idx*CELL_BYTES,sel=[];for(let k=0;k<4;k++)sel.push(g[p+k]%Math.max(1,src));
+  o.push({L,w,sel,lut:(g[p+4]|(g[p+5]<<8))&0xFFFF});idx++;}}return o;}
+function toVerilog(g){const C=cellsOf(g),s=[];let prev="din";
+ s.push("// omega_apriori — telomere-forged unknown-a-priori engine (FPGA). conceptual/educational only.");
+ s.push("module omega_apriori (input ["+(cfg.inbits-1)+":0] din, output ["+(cfg.outbits-1)+":0] dout);");
+ for(let L=0;L<cfg.layers;L++){const wn="s"+L;s.push("  wire ["+(cfg.width-1)+":0] "+wn+";");
+  for(let w=0;w<cfg.width;w++){const c=C[L*cfg.width+w],lp="LUT_"+L+"_"+w;s.push("  localparam [15:0] "+lp+" = 16'h"+h16(c.lut)+";");
+   const sl=c.sel.map(x=>prev+"["+x+"]");s.push("  assign "+wn+"["+w+"] = "+lp+"[{"+sl[3]+","+sl[2]+","+sl[1]+","+sl[0]+"}];");}prev=wn;}
+ s.push("  assign dout = "+prev+"["+(cfg.outbits-1)+":0];");s.push("endmodule");return s.join("\n");}
+function toClike(g,lang){const C=cellsOf(g),s=[],inM=(1<<cfg.inbits)-1,outM=(1<<cfg.outbits)-1,px=lang==="py"?"    ":"  ";
+ if(lang==="c"){s.push("#include <stdint.h>");s.push("uint32_t omega_infer(uint32_t din){");s.push("  uint32_t prev=din&0x"+inM.toString(16)+"u,cur=0;int addr;");}
+ else{s.push("def omega_infer(din):");s.push("    prev = din & "+inM);}
+ for(let L=0;L<cfg.layers;L++){s.push(lang==="py"?"    cur = 0":px+"cur = 0;");
+  for(let w=0;w<cfg.width;w++){const c=C[L*cfg.width+w];
+   const a="((prev>>"+c.sel[0]+")&1)|(((prev>>"+c.sel[1]+")&1)<<1)|(((prev>>"+c.sel[2]+")&1)<<2)|(((prev>>"+c.sel[3]+")&1)<<3)";
+   if(lang==="py"){s.push("    addr = "+a);s.push("    cur |= ((0x"+h16(c.lut)+">>addr)&1)<<"+w);}
+   else{s.push(px+"addr="+a+";");s.push(px+"cur|=((0x"+h16(c.lut)+">>addr)&1)<<"+w+";");}}
+  s.push(lang==="py"?"    prev = cur":px+"prev = cur;");}
+ if(lang==="py")s.push("    return cur & "+outM);else{s.push(px+"return cur & "+outM+";");s.push("}");}
+ return s.join("\n");}
+function renderCode(){if(!STATE.genome)return;const t=document.querySelector(".tabs button.on").dataset.t;
+ const code=t==="verilog"?toVerilog(STATE.genome):toClike(STATE.genome,t==="c"?"c":"py");
+ document.getElementById("code").textContent=code;document.getElementById("lines").textContent=code.split("\n").length+" 行";}
+
+/* チャート */
+function drawChart(teloInit){const c=document.getElementById("chart"),ctx=c.getContext("2d");
+ ctx.clearRect(0,0,c.width,c.height);const W=c.width,H=c.height,pad=26,h=STATE.hist;
+ ctx.strokeStyle="#1b2638";ctx.beginPath();ctx.moveTo(pad,pad);ctx.lineTo(pad,H-pad);ctx.lineTo(W-pad,H-pad);ctx.stroke();
+ if(!h.length)return;const n=h.length,X=i=>pad+(W-2*pad)*i/Math.max(1,n-1),Y=v=>H-pad-(H-2*pad)*v;
+ const line=(f,col)=>{ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();h.forEach((d,i)=>{const v=f(d);i?ctx.lineTo(X(i),Y(v)):ctx.moveTo(X(i),Y(v));});ctx.stroke();};
+ line(d=>d.best,"#48c08a");line(d=>d.telo/teloInit,"#e0b020");line(d=>d.sen,"#d0506a");ctx.lineWidth=1;}
+
+/* DL */
+function download(name,text,type){const b=new Blob([text],{type:type||"text/plain"});const a=document.createElement("a");
+ a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function genomeHex(){return Array.from(STATE.genome).map(b=>b.toString(16).padStart(2,"0")).join("");}
+
+/* events */
+const bind=(id,vid,f)=>{const e=document.getElementById(id);e.oninput=()=>document.getElementById(vid).textContent=f(+e.value);};
+bind("pop","pop_v",v=>v);bind("gens","gens_v",v=>v);bind("telo","telo_v",v=>v+" / "+Math.round(v*0.2));
+bind("attr","attr_v",v=>v);bind("kappa","kappa_v",v=>(v/100).toFixed(2));
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderCode();});
+let busy=false;
+document.getElementById("run").onclick=async()=>{if(busy)return;busy=true;
+ STATE.target=document.getElementById("target").value;
+ const r=await evolve(+document.getElementById("gens").value,+document.getElementById("pop").value,
+   +document.getElementById("telo").value,+document.getElementById("attr").value,document.getElementById("kappa").value/100);
+ STATE.genome=r.genome;renderCode();
+ ["dl_spec","dl_v","dl_c"].forEach(id=>document.getElementById(id).disabled=false);
+ document.getElementById("status").innerHTML='<span style="color:#48c08a">鍛造完了 fit='+r.fit.toFixed(4)+'</span>';
+ busy=false;};
+document.getElementById("dl_spec").onclick=()=>download("omega_apriori.spec.json",
+  JSON.stringify({cfg,genome_hex:genomeHex(),plugins:["codegen","go_lookahead","overview","completion","integrable_top"],source:"telomere_forge"},null,1),"application/json");
+document.getElementById("dl_v").onclick=()=>download("omega_apriori.v",toVerilog(STATE.genome),"text/plain");
+document.getElementById("dl_c").onclick=()=>download("omega_apriori.c",toClike(STATE.genome,"c"),"text/plain");
+drawChart(1000);
+</script>
+</body>
+</html>

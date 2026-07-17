@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<!--
+  Ω-Apriori CodeGen Studio — AIソースコード生成器 (Verilog/FPGA・C・Python・JS)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_codegen
+
+  未知事前エンジン(進化LUTファブリック)を各言語ソースに表出し、量子囲碁/量子将棋から
+  FPGA(ゲノム)を生成してダウンロードする。生成物は omega_apriori_injector で任意アプリへ付加可能。
+
+  ⚠ 概念実証・教育用。推奨起動: python3 -m http.server （相対JS読込のため）
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Apriori CodeGen Studio</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 4px;font-size:22px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12.5px}
+  main{padding:18px 20px 60px}.row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:10px 0 4px}
+  select,input[type=text],textarea{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:13px;font-family:var(--mono)}
+  textarea{resize:vertical}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700;font-size:13px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a} button.dl{border-color:var(--cyan);color:var(--cyan)}
+  .tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);padding:7px 12px;border-radius:7px 7px 0 0;cursor:pointer;font-size:12.5px}
+  .tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:11px;font-family:var(--mono);color:var(--cyan);max-height:420px;overflow:auto;white-space:pre;margin:0}
+  canvas{background:#0c0a06;border:1px solid var(--line);border-radius:6px;display:block}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.ok{color:var(--good)}.ng{color:var(--bad)}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Apriori CodeGen Studio — AIソースコード生成器</h1>
+  <div class="sub">未知事前エンジン → Verilog(FPGA)/C/Python/JS 表出 ・ 量子囲碁/量子将棋でFPGA生成 (Bada/bio_medicine)</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>: 進化LUTファブリックを各言語の<b>ソースコードに表出</b>し、
+  <b>量子囲碁/量子将棋</b>(重ね合わせ・エンタングルの簡易モデル)の測定結果から<b>FPGA構成(ゲノム)を生成</b>します。
+  生成物は <code>omega_apriori_injector</code> で任意アプリへ付加できます。<span id="srcwarn"></span></div>
+
+<main>
+<div class="row">
+  <!-- 左: 生成元 -->
+  <div class="col" style="flex:0 0 340px">
+    <div class="card">
+      <h3>① ファブリック構成</h3>
+      <input type="text" id="cfg" value='{"inbits":6,"layers":3,"width":8,"outbits":3}'/>
+    </div>
+    <div class="card">
+      <h3>② ゲノム(FPGA)の生成元</h3>
+      <button class="act" id="g_evolve">進化 (popcount)</button>
+      <button class="act" id="g_go">⚛ 量子囲碁</button>
+      <button class="act" id="g_shogi">⚛ 量子将棋</button>
+      <label>量子ゲームの種(seed)</label>
+      <input type="text" id="seed" value="game-A"/>
+      <label>または ゲノム16進を貼付</label>
+      <textarea id="genome" style="height:54px" placeholder="288桁の16進…"></textarea>
+      <div class="stat"><span>状態</span><b id="gstat">未設定</b></div>
+    </div>
+    <div class="card">
+      <h3>量子測定 (盤)</h3>
+      <canvas id="qboard" width="150" height="150"></canvas>
+      <div style="font-size:11.5px;color:var(--dim);margin-top:6px" id="qmsg">量子囲碁/量子将棋で生成すると測定状態を表示</div>
+    </div>
+  </div>
+
+  <!-- 右: コード生成 -->
+  <div class="col">
+    <div class="card">
+      <h3>③ AIソースコード表出</h3>
+      <div class="tabs">
+        <button class="on" data-t="verilog">Verilog (FPGA)</button>
+        <button data-t="c">C</button>
+        <button data-t="python">Python</button>
+        <button data-t="js">JavaScript</button>
+      </div>
+      <pre id="code">（生成元を選んでください）</pre>
+      <button class="act dl" id="dl">この言語をダウンロード</button>
+      <button class="act dl" id="dl_all">全形式＋spec.jsonをダウンロード</button>
+      <div class="stat"><span>生成行数</span><b id="lines">—</b></div>
+    </div>
+    <div class="card">
+      <h3>付加への連携</h3>
+      <p style="font-size:12.5px;margin:6px 0">生成した <code>.spec.json</code> を
+        <code>omega_apriori_injector</code> の Studio / <code>run_plugin.js build</code> に渡すと、
+        署名付きプラグインとして任意アプリへ付加できます。付加先では <code>codegen</code> プラグインにより
+        AIが実行時に自分の Verilog/C を出力します(<code>eng.call("codegen","verilog")</code>)。</p>
+    </div>
+  </div>
+</div>
+</main>
+<footer>Ω-Apriori CodeGen Studio · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script src="codegen.js"></script>
+<script src="quantum_games.js"></script>
+<script>
+"use strict";
+let STATE={cfg:null,bytes:null,genomeHex:null,target:"verilog",last:null};
+const CELL_BYTES=6;
+
+/* fetch の代わりに同梱scriptでcodegen/quantumを読込済み。runtimeのevalは内蔵 */
+function getCfg(){try{return JSON.parse(document.getElementById("cfg").value);}catch(e){alert("cfg JSON不正");return null;}}
+function setGenome(hex,label){STATE.genomeHex=hex;STATE.bytes=OmegaCodegen.hexToBytes(hex);
+  document.getElementById("genome").value=hex;
+  document.getElementById("gstat").innerHTML='<span class="ok">'+label+' ('+STATE.bytes.length+'B)</span>';
+  render();}
+
+/* 進化器(popcount, 自己完結) */
+function evalFab(cfg,g,x){let prev=x&((1<<cfg.inbits)-1),src=cfg.inbits,cur=0;
+  for(let L=0;L<cfg.layers;L++){cur=0;for(let w=0;w<cfg.width;w++){const cell=L*cfg.width+w,p=cell*CELL_BYTES;let addr=0;
+    for(let k=0;k<4;k++){let sel=g[p+k]%Math.max(1,(L===0?cfg.inbits:cfg.width));if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+    const lv=g[p+4]|(g[p+5]<<8);cur|=((lv>>addr)&1)<<w;}prev=cur;src=cfg.width;}return cur&((1<<cfg.outbits)-1);}
+function pc(x){let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;}
+function fit(cfg,g){let m=0,t=0,n=1<<cfg.inbits;for(let x=0;x<n;x++){const y=evalFab(cfg,g,x),tt=pc(x)&((1<<cfg.outbits)-1),d=y^tt;
+  for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+function evolve(cfg){const gs=cfg.layers*cfg.width*CELL_BYTES;let P=[];
+  for(let i=0;i<70;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push(g);}
+  let best=null,bf=-1;
+  for(let gen=0;gen<110;gen++){const sc=P.map(g=>({g,f:fit(cfg,g)})).sort((a,b)=>b.f-a.f);
+    if(sc[0].f>bf){bf=sc[0].f;best=sc[0].g.slice();}const nx=[sc[0].g.slice(),sc[1].g.slice()];
+    while(nx.length<70){const a=sc[Math.random()*8|0].g,b=sc[Math.random()*8|0].g,cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);
+      c.set(a.subarray(0,cut));c.set(b.subarray(cut),cut);for(let j=0;j<gs;j++)if(Math.random()<0.04)c[j]=Math.random()*256|0;nx.push(c);}
+    P=nx;}
+  return{genome:best,fit:bf};}
+function bytesHex(b){return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join("");}
+
+/* 量子盤描画 */
+function drawBoard(board){const c=document.getElementById("qboard"),ctx=c.getContext("2d");
+  ctx.fillStyle="#0c0a06";ctx.fillRect(0,0,150,150);if(!board){return;}
+  const n=board.length,S=150/n;ctx.strokeStyle="#5a4a2a";
+  for(let i=0;i<n;i++){ctx.beginPath();ctx.moveTo(S/2,S/2+i*S);ctx.lineTo(150-S/2,S/2+i*S);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(S/2+i*S,S/2);ctx.lineTo(S/2+i*S,150-S/2);ctx.stroke();}
+  for(let r=0;r<n;r++)for(let cc=0;cc<n;cc++)if(board[r][cc]){ctx.beginPath();ctx.arc(S/2+cc*S,S/2+r*S,S*0.32,0,7);
+    ctx.fillStyle="#c8a44a";ctx.fill();}}
+
+/* コード生成＆表示 */
+function render(){
+  if(!STATE.bytes){return;}
+  const cfg=STATE.cfg||getCfg();STATE.cfg=cfg;
+  let code;const t=STATE.target;
+  if(t==="verilog")code=OmegaCodegen.toVerilog(cfg,STATE.bytes,"omega_apriori");
+  else if(t==="c")code=OmegaCodegen.toC(cfg,STATE.bytes);
+  else if(t==="python")code=OmegaCodegen.toPython(cfg,STATE.bytes);
+  else code=OmegaCodegen.toJS(cfg,STATE.bytes);
+  STATE.last=code;document.getElementById("code").textContent=code;
+  document.getElementById("lines").textContent=code.split("\n").length+" 行";
+}
+
+/* DL */
+function download(name,text,type){const b=new Blob([text],{type:type||"text/plain"});const a=document.createElement("a");
+  a.href=URL.createObjectURL(b);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+
+/* events */
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
+  document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");
+  STATE.target=b.dataset.t;render();});
+document.getElementById("g_evolve").onclick=()=>{const cfg=getCfg();if(!cfg)return;STATE.cfg=cfg;
+  document.getElementById("gstat").textContent="進化中…";document.getElementById("qmsg").textContent="(進化生成)";drawBoard(null);
+  setTimeout(()=>{const r=evolve(cfg);setGenome(bytesHex(r.genome),"進化 fitness="+r.fit.toFixed(4));},20);};
+function quantum(kind){const cfg=getCfg();if(!cfg)return;STATE.cfg=cfg;
+  const r=QuantumGames.quantumGenerate(kind,{cfg,seed:document.getElementById("seed").value,qubits:9,shots:256});
+  drawBoard(r.board);document.getElementById("qmsg").textContent=r.summary;
+  setGenome(r.genome_hex,(kind==="shogi"?"量子将棋":"量子囲碁")+" 生成");}
+document.getElementById("g_go").onclick=()=>quantum("go");
+document.getElementById("g_shogi").onclick=()=>quantum("shogi");
+document.getElementById("genome").oninput=e=>{const h=e.target.value.replace(/[^0-9a-fA-F]/g,"");
+  if(h.length>=2){STATE.cfg=getCfg();setGenome(h,"貼付");}};
+document.getElementById("dl").onclick=()=>{if(!STATE.last)return;
+  const ext={verilog:"v",c:"c",python:"py",js:"js"}[STATE.target];
+  download("omega_apriori."+ext,STATE.last,"text/plain");};
+document.getElementById("dl_all").onclick=()=>{if(!STATE.bytes)return;const cfg=STATE.cfg;
+  download("omega_apriori.v",OmegaCodegen.toVerilog(cfg,STATE.bytes),"text/plain");
+  download("omega_apriori.c",OmegaCodegen.toC(cfg,STATE.bytes),"text/plain");
+  download("omega_apriori.py",OmegaCodegen.toPython(cfg,STATE.bytes),"text/plain");
+  download("omega_apriori.js",OmegaCodegen.toJS(cfg,STATE.bytes),"text/javascript");
+  download("omega_apriori.spec.json",JSON.stringify({cfg,genome_hex:STATE.genomeHex},null,1),"application/json");};
+
+/* 初期: 量子囲碁で1つ生成 */
+STATE.cfg=getCfg();
+if(window.QuantumGames&&window.OmegaCodegen) quantum("go");
+else document.getElementById("srcwarn").innerHTML=' <b style="color:#d0506a">※ python3 -m http.server 経由で開いてください。</b>';
+</script>
+</body>
+</html>

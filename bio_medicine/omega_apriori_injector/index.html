@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<!--
+  Ω-Apriori Injector Studio — 未知事前エンジンAIを任意アプリへ付加する署名付きプラグイン生成器
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_apriori_injector
+
+  omega_apriori_cpu の進化エンジン(ゲノム)を、ECDSA 電子署名を付した自己完結 JS バンドルに
+  パッケージし、対象アプリへ付加可能な「userscript / standalone HTML / plugin.js / manifest」を
+  ダウンロード生成する。付加先には囲碁先読み・俯瞰・補完などのプラグインを同梱できる。
+
+  ⚠ 概念実証・教育用。付加は「自分が管理する／許諾されたアプリ」に対してのみ行うこと。
+  推奨起動: python3 -m http.server （相対パスで runtime/plugins を読み込むため）
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Apriori Injector Studio</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 4px;font-size:22px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:13px}
+  .disc{margin:14px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12.5px}
+  main{padding:18px 20px 60px}
+  .row{display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+  .card h3{margin:0 0 10px;font-size:14px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;
+    background:var(--gold);color:#000;font-weight:700;font-size:12px;margin-right:6px}
+  label{display:block;font-size:12.5px;color:var(--dim);margin:10px 0 4px}
+  select,input[type=text],textarea{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);
+    border-radius:6px;padding:7px 9px;font-size:13px;font-family:var(--mono)}
+  textarea{height:64px;resize:vertical}
+  input[type=range]{width:100%}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);
+    border-radius:8px;padding:9px 14px;cursor:pointer;font-weight:700;font-size:13px;margin:8px 6px 0 0}
+  button.act:hover{background:#1f2f4a}
+  button.dl{border-color:var(--cyan);color:var(--cyan)}
+  .chk{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0;color:var(--txt)}
+  .chk small{color:var(--dim)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:6px;padding:10px;font-size:11px;
+    font-family:var(--mono);color:var(--dim);max-height:160px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}
+  .ok{color:var(--good)}.ng{color:var(--bad)}
+  canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block}
+  footer{color:var(--dim);font-size:11.5px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Apriori Injector Studio</h1>
+  <div class="sub">未知事前エンジンAI → 電子署名付きプラグイン → 任意アプリへ付加 (Bada / bio_medicine)</div>
+</header>
+<div class="disc">
+  ⚠ <b>概念実証・教育用／非医療</b>: 本ツールは「自分が管理する／明示的に許諾されたアプリ」に
+  AI機能を付加するための<b>署名付きプラグイン</b>を生成します。他者のソフトへ無断で注入する目的には使用しないでください。
+  生成バンドルは ECDSA(P-256) 電子署名で真正性を保証し、付加先は署名検証に通った場合のみ実行します。
+  <span id="srcwarn"></span>
+</div>
+
+<main>
+<div class="row">
+  <!-- 左: 生成パイプライン -->
+  <div class="col">
+    <div class="card">
+      <h3><span class="step">1</span>未知事前エンジン (ゲノム)</h3>
+      <label>ファブリック構成 (apriori_cpu と一致)</label>
+      <div class="row" style="gap:8px">
+        <input type="text" id="cfg" value='{"inbits":6,"layers":3,"width":8,"outbits":3}'/>
+      </div>
+      <label>ゲノム取得方法</label>
+      <button class="act" id="evolve">▶ ブラウザ内で進化させる (popcount)</button>
+      <button class="act" id="loadrun">run.json を読み込む</button>
+      <input type="file" id="runfile" accept=".json" style="display:none"/>
+      <label>または ゲノム16進を貼り付け</label>
+      <textarea id="genome" placeholder="144バイト=288桁の16進…"></textarea>
+      <div class="stat"><span>状態</span><b id="genstat">未設定</b></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="step">2</span>同梱するプラグイン (補完機能)</h3>
+      <label class="chk"><input type="checkbox" class="plg" value="go_lookahead" checked> 囲碁 先読み <small>alpha-beta 最善手</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="overview" checked> 俯瞰 <small>ヒートマップ・要点抽出</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="completion" checked> 補完 <small>系列の次要素予測</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="integrable_top" checked> 可積分系エラー修正 <small>相対論的コマ(複素回転体)の保存量訂正</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="codegen" checked> ソースコード生成 <small>AIを Verilog(FPGA)/C/Python/JS に表出</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="patternmatch" checked> パターンマッチ生成 <small>中枢知能FPGAをマッチャ化＋ソース生成</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="word_complete" checked> 単語補完 <small>接頭辞＋語彙＋FPGA推論で候補ランク</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="self_evolve" checked> 自己進化＋一意ID <small>実行時テロメア自己進化・UID・自己進化ソース生成</small></label>
+      <label class="chk"><input type="checkbox" class="plg" value="fpga_functions" checked> FPGA関数ライブラリ <small>自己進化FPGAから任意の名前付き関数を実行/表出</small></label>
+      <div class="stat"><span>読込済みソース</span><b id="srcstat">…</b></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="step">3</span>電子署名 (ECDSA P-256 / SHA-256)</h3>
+      <button class="act" id="keygen">🔑 鍵ペア生成</button>
+      <button class="act" id="build">⚙ バンドル生成＆署名</button>
+      <div class="stat"><span>公開鍵</span><b id="kstat">未生成</b></div>
+      <div class="stat"><span>署名 sha256</span><b id="sigstat">—</b></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="step">4</span>ダウンロード (付加用ファイル)</h3>
+      <button class="act dl" id="dl_plugin" disabled>plugin.js</button>
+      <button class="act dl" id="dl_manifest" disabled>manifest.json</button>
+      <button class="act dl" id="dl_user" disabled>user.js (userscript)</button>
+      <button class="act dl" id="dl_html" disabled>bundle.html (実行形式)</button>
+      <button class="act dl" id="dl_keys" disabled>keys.jwk.json</button>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:8px">
+        <b>付加方法</b>: ① <code>user.js</code> を Tampermonkey 等に入れると任意Webアプリへ付加。
+        ② <code>bundle.html</code> はダブルクリックで動く実行形式。
+        ③ <code>plugin.js</code>+<code>manifest.json</code> を自前アプリに置き、<code>verify_and_load.js</code> で署名検証してから読込。
+        ④ Node: <code>node run_plugin.js run plugin.js manifest.json</code></p>
+    </div>
+  </div>
+
+  <!-- 右: プレビュー & 検証 -->
+  <div class="col">
+    <div class="card">
+      <h3>署名検証 & ライブ実行テスト</h3>
+      <button class="act" id="verify" disabled>✓ 署名を検証して実行</button>
+      <div class="stat"><span>検証結果</span><b id="vstat">—</b></div>
+      <div class="stat"><span>capabilities</span><b id="caps">—</b></div>
+      <div id="demo" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h3>囲碁 先読みデモ (3x3, ●=黒手番)</h3>
+      <canvas id="goban" width="180" height="180"></canvas>
+      <div style="font-size:12px;color:var(--dim);margin-top:6px" id="gomsg">「署名を検証して実行」後にクリックで先読み手を表示</div>
+    </div>
+    <div class="card">
+      <h3>生成バンドル (先頭)</h3>
+      <pre id="preview">（未生成）</pre>
+    </div>
+  </div>
+</div>
+</main>
+<footer>Ω-Apriori Injector Studio · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+const PLUGIN_NAMES = ["go_lookahead","overview","completion","integrable_top","codegen","patternmatch","word_complete","self_evolve","fpga_functions"];
+let SRC = { runtime:null, plugins:{} };       // 取得したソース
+let STATE = { genomeHex:null, cfg:null, bundle:null, manifest:null, keys:null, pubJwk:null, engine:null };
+
+/* ---- ソース取得 (runtime + plugins) ---- */
+async function loadSources(){
+  try{
+    SRC.runtime = await (await fetch("apriori_runtime.js")).text();
+    for(const n of PLUGIN_NAMES) SRC.plugins[n] = await (await fetch("plugins/"+n+".js")).text();
+    document.getElementById("srcstat").textContent = "runtime + "+PLUGIN_NAMES.length+" plugins ✓";
+  }catch(e){
+    document.getElementById("srcstat").innerHTML = '<span class="ng">取得失敗</span>';
+    document.getElementById("srcwarn").innerHTML =
+      ' <b style="color:#d0506a">※ローカルで開く場合は <code>python3 -m http.server</code> 経由で開いてください（相対JS読込のため）。</b>';
+  }
+}
+
+/* ---- 軽量進化器 (apriori_cpu/engine と同一仕様, popcount) ---- */
+const CELL_BYTES=6, LUT_INPUTS=4;
+function evalFabric(cfg,g,x){
+  let prev=x&((1<<cfg.inbits)-1),src=cfg.inbits,cur=0,idx,insel,lut;
+  for(let L=0;L<cfg.layers;L++){cur=0;
+    for(let w=0;w<cfg.width;w++){const cell=L*cfg.width+w,p=cell*CELL_BYTES;let addr=0;
+      for(let k=0;k<LUT_INPUTS;k++){let sel=g[p+k]%Math.max(1,(L===0?cfg.inbits:cfg.width));
+        if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+      const lv=g[p+4]|(g[p+5]<<8);cur|=((lv>>addr)&1)<<w;}
+    prev=cur;src=cfg.width;}
+  return cur&((1<<cfg.outbits)-1);
+}
+function popcount(x){let c=0;for(let i=0;i<6;i++)c+=(x>>i)&1;return c;}
+function fitness(cfg,g){let m=0,t=0,n=1<<cfg.inbits;for(let x=0;x<n;x++){const y=evalFabric(cfg,g,x);
+  const tt=popcount(x)&((1<<cfg.outbits)-1),d=y^tt;for(let b=0;b<cfg.outbits;b++){t++;if(!((d>>b)&1))m++;}}return m/t;}
+function evolve(cfg,gens=120,pop=80){
+  const gs=cfg.layers*cfg.width*CELL_BYTES;
+  let P=[];for(let i=0;i<pop;i++){const g=new Uint8Array(gs);for(let j=0;j<gs;j++)g[j]=Math.random()*256|0;P.push(g);}
+  let best=null,bf=-1;
+  for(let gen=0;gen<gens;gen++){
+    const sc=P.map(g=>({g,f:fitness(cfg,g)})).sort((a,b)=>b.f-a.f);
+    if(sc[0].f>bf){bf=sc[0].f;best=sc[0].g.slice();}
+    const next=[sc[0].g.slice(),sc[1].g.slice()];
+    while(next.length<pop){const a=sc[(Math.random()*8|0)].g,b=sc[(Math.random()*8|0)].g;
+      const cut=1+(Math.random()*(gs-1)|0),c=new Uint8Array(gs);c.set(a.subarray(0,cut));c.set(b.subarray(cut),cut);
+      for(let j=0;j<gs;j++)if(Math.random()<0.04)c[j]=Math.random()*256|0;next.push(c);}
+    P=next;
+  }
+  return {genome:best,fit:bf};
+}
+function bytesToHex(b){return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function hexToBytes(h){h=h.replace(/[^0-9a-fA-F]/g,"");const n=h.length>>1,b=new Uint8Array(n);
+  for(let i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+
+/* ---- バンドル生成 (Node run_plugin.js buildBundle と同一構成) ---- */
+function buildBundle(){
+  const cfg=JSON.parse(document.getElementById("cfg").value);
+  STATE.cfg=cfg;
+  const chosen=[...document.querySelectorAll(".plg:checked")].map(c=>c.value);
+  const manifest={cfg,genome_hex:STATE.genomeHex,plugins:chosen};
+  let parts=["/* Ω-Apriori signed bundle — conceptual/educational only */",SRC.runtime];
+  for(const n of chosen) parts.push(SRC.plugins[n]);
+  parts.push(`
+/* bootstrap: instantiate engine and attach plugins to host */
+(function(){
+  var G=(typeof window!=='undefined')?window:globalThis;
+  var M=${JSON.stringify(manifest)};
+  var eng=new G.OmegaApriori(M);
+  var P=G.OMEGA_PLUGINS||{};
+  (M.plugins||[]).forEach(function(n){ if(P[n]) eng.register(P[n]); });
+  G.omegaApriori=eng;
+  if(typeof console!=='undefined') console.log("Ω-Apriori attached. capabilities:",eng.capabilities());
+})();`);
+  return {bundle:parts.join("\n"),manifest};
+}
+
+/* ---- Web Crypto: 署名/検証 ---- */
+const ALG={name:"ECDSA",namedCurve:"P-256"}, SIGN={name:"ECDSA",hash:"SHA-256"};
+async function sha256hex(text){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function ab2b64(buf){let s="",a=new Uint8Array(buf);for(let i=0;i<a.length;i++)s+=String.fromCharCode(a[i]);return btoa(s);}
+function b642ab(b){const s=atob(b),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
+
+async function doKeygen(){
+  STATE.keys=await crypto.subtle.generateKey(ALG,true,["sign","verify"]);
+  STATE.pubJwk=await crypto.subtle.exportKey("jwk",STATE.keys.publicKey);
+  document.getElementById("kstat").textContent=(STATE.pubJwk.x||"").slice(0,16)+"…";
+  document.getElementById("dl_keys").disabled=false;
+}
+
+/* ---- 各種ダウンロード生成 ---- */
+function download(name,text,type){const blob=new Blob([text],{type:type||"text/plain"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);}
+function userscript(bundle,manifest){
+  return `// ==UserScript==
+// @name        Ω-Apriori AI (signed)
+// @namespace   omega-apriori-bada
+// @version     1.0
+// @description 未知事前エンジンAIを付加 (ECDSA署名付き / 概念実証)
+// @match       *://*/*
+// @grant       none
+// ==/UserScript==
+/* signature(b64): ${manifest.signature_b64}
+   bundle sha256 : ${manifest.bundle_sha256}
+   ⚠ 付加は自分が管理/許諾されたアプリに対してのみ */
+(function(){
+${bundle}
+})();`;
+}
+function standaloneHtml(bundle,manifest){
+  return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><title>Ω-Apriori bundle (実行形式)</title>
+<style>body{background:#04060a;color:#d8e0ec;font-family:monospace;padding:20px}b{color:#c8a44a}</style></head>
+<body><h2><b>Ω</b>-Apriori bundle</h2>
+<p>署名 sha256: ${manifest.bundle_sha256.slice(0,32)}…</p>
+<div id="out"></div>
+<script>
+${bundle}
+var o=document.getElementById("out"),e=window.omegaApriori;
+o.innerHTML="capabilities: "+e.capabilities().join(", ")+"<br>infer(0b101101)="+e.infer(45);
+if(e.plugins.completion)o.innerHTML+="<br>completion('AI',4)="+e.call("completion","AI",4).predicted;
+<\/script></body></html>`;
+}
+
+async function doBuild(){
+  if(!STATE.genomeHex){alert("先にゲノムを設定してください(手順1)");return;}
+  if(!STATE.keys) await doKeygen();
+  const {bundle,manifest}=buildBundle();
+  const data=new TextEncoder().encode(bundle);
+  const sig=await crypto.subtle.sign(SIGN,STATE.keys.privateKey,data);
+  manifest.engine="Omega-Apriori";manifest.note="conceptual/educational only";
+  manifest.alg="ECDSA-P256-SHA256";manifest.bundle_file="omega-apriori.plugin.js";
+  manifest.bundle_sha256=await sha256hex(bundle);
+  manifest.signature_b64=ab2b64(sig);manifest.pubkey_jwk=STATE.pubJwk;
+  manifest.created=new Date().toISOString();
+  STATE.bundle=bundle;STATE.manifest=manifest;
+  document.getElementById("sigstat").textContent=manifest.bundle_sha256.slice(0,20)+"…";
+  document.getElementById("preview").textContent=bundle.slice(0,900)+"\n…("+bundle.length+" bytes)";
+  ["dl_plugin","dl_manifest","dl_user","dl_html","verify"].forEach(id=>document.getElementById(id).disabled=false);
+}
+
+/* ---- 検証して実行 (verify_and_load 相当) ---- */
+async function doVerify(){
+  const m=STATE.manifest;
+  const ok=await crypto.subtle.verify(SIGN,
+    await crypto.subtle.importKey("jwk",m.pubkey_jwk,ALG,true,["verify"]),
+    b642ab(m.signature_b64), new TextEncoder().encode(STATE.bundle));
+  const v=document.getElementById("vstat");
+  v.innerHTML=ok?'<span class="ok">✓ VALID — 実行許可</span>':'<span class="ng">✗ INVALID — 実行拒否</span>';
+  if(!ok)return;
+  (0,eval)(STATE.bundle);          // 検証済みのみ実行
+  const eng=window.omegaApriori;STATE.engine=eng;
+  document.getElementById("caps").textContent=eng.capabilities().join(", ");
+  let html="";
+  html+="infer(0b101101) = <b>"+eng.infer(45)+"</b><br>";
+  if(eng.plugins.completion)html+="completion('AI',6) = <b>"+eng.call("completion","AI",6).predicted+"</b><br>";
+  if(eng.plugins.overview){const grid=[[1,2,3,4],[2,9,8,1],[0,1,7,2],[3,1,0,1]];
+    html+="overview: "+eng.call("overview",grid,{rows:2,cols:2}).summary+"<br>";}
+  if(eng.plugins.integrable_top){
+    // ノイズ付き相対論的コマの姿勢列を生成して誤り訂正
+    function qm(a,b){return[a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]];}
+    function nz(q){const n=Math.hypot(q[0],q[1],q[2],q[3])||1;return[q[0]/n,q[1]/n,q[2]/n,q[3]/n];}
+    let q=[1,0,0,0];const w=[1.0,0.3,0.2],dt=0.05,seq=[q.slice()];
+    for(let i=0;i<40;i++){const d=qm(q,[0,w[0],w[1],w[2]]).map(x=>0.5*x);q=nz([q[0]+d[0]*dt,q[1]+d[1]*dt,q[2]+d[2]*dt,q[3]+d[3]*dt]);
+      seq.push(nz(q.map(x=>x+(Math.random()-0.5)*0.25)));}
+    html+="integrable_top: "+eng.call("integrable_top",seq,{omega:w,dt,velocity:0.6,ai:true}).summary+"<br>";}
+  if(eng.plugins.codegen){const v=eng.call("codegen","verilog");
+    html+="codegen→Verilog: <b>"+v.split("\n").length+"行</b> 生成 (AIが自分のFPGAソースを表出)<br>";}
+  if(eng.plugins.patternmatch){const s=eng.call("patternmatch","source","js");
+    html+="patternmatch→マッチャJS: <b>"+s.split("\n").length+"行</b> 生成 (pattern_match()付き)<br>";}
+  if(eng.plugins.word_complete){const wc=eng.call("word_complete","comp",{k:4});
+    html+="word_complete('comp'): "+wc.map(c=>c.word).join(", ")+"<br>";}
+  if(eng.plugins.self_evolve){const uid=eng.call("self_evolve","uid");
+    html+="self_evolve UID(一意の機能): <b>"+uid+"</b><br>";}
+  if(eng.plugins.fpga_functions){const fns=eng.call("fpga_functions","list");
+    html+="fpga_functions: "+(fns.length?fns.join(", "):"(fn_library未設定 — Function Foundryで生成)")+"<br>";}
+  document.getElementById("demo").innerHTML=html;
+  document.getElementById("gomsg").textContent="盤をクリックして黒の先読み手を表示";
+  drawGoban();
+}
+
+/* ---- 囲碁デモ ---- */
+let GO=[[0,0,0],[0,1,2],[0,0,0]];
+function drawGoban(best){
+  const c=document.getElementById("goban"),ctx=c.getContext("2d"),S=60;
+  ctx.fillStyle="#1a1206";ctx.fillRect(0,0,180,180);ctx.strokeStyle="#5a4a2a";
+  for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(30,30+i*S);ctx.lineTo(150,30+i*S);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(30+i*S,30);ctx.lineTo(30+i*S,150);ctx.stroke();}
+  for(let r=0;r<3;r++)for(let cc=0;cc<3;cc++)if(GO[r][cc]){ctx.beginPath();
+    ctx.arc(30+cc*S,30+r*S,22,0,7);ctx.fillStyle=GO[r][cc]===1?"#111":"#eee";ctx.fill();ctx.strokeStyle="#888";ctx.stroke();}
+  if(best){ctx.beginPath();ctx.arc(30+best[1]*S,30+best[0]*S,10,0,7);ctx.fillStyle="#c8a44a";ctx.fill();}
+}
+document.getElementById("goban").onclick=(e)=>{
+  if(!STATE.engine||!STATE.engine.plugins.go_lookahead)return;
+  const res=STATE.engine.call("go_lookahead",GO,1,2);
+  drawGoban(res.move);
+  document.getElementById("gomsg").innerHTML="先読み最善手(黒): <b>"+JSON.stringify(res.move)+"</b> score="+res.score;
+};
+
+/* ---- イベント結線 ---- */
+document.getElementById("evolve").onclick=()=>{
+  const cfg=JSON.parse(document.getElementById("cfg").value);
+  document.getElementById("genstat").textContent="進化中…";
+  setTimeout(()=>{const r=evolve(cfg);STATE.genomeHex=bytesToHex(r.genome);
+    document.getElementById("genome").value=STATE.genomeHex;
+    document.getElementById("genstat").innerHTML='<span class="ok">進化完了 fitness='+r.fit.toFixed(4)+'</span>';},20);
+};
+document.getElementById("genome").oninput=e=>{const h=e.target.value.replace(/[^0-9a-fA-F]/g,"");
+  if(h.length>=2){STATE.genomeHex=h;document.getElementById("genstat").textContent=(h.length/2)+" bytes 設定";}};
+document.getElementById("loadrun").onclick=()=>document.getElementById("runfile").click();
+document.getElementById("runfile").onchange=e=>{const f=e.target.files[0];if(!f)return;
+  const fr=new FileReader();fr.onload=()=>{try{const d=JSON.parse(fr.result);
+    STATE.genomeHex=d.best_genome_hex;document.getElementById("genome").value=d.best_genome_hex;
+    document.getElementById("cfg").value=JSON.stringify({inbits:d.params.inbits,layers:d.params.layers,width:d.params.width,outbits:d.params.outbits});
+    document.getElementById("genstat").innerHTML='<span class="ok">run.json 読込 fitness='+d.best_fitness+'</span>';
+  }catch(err){alert("JSON解析失敗: "+err.message);}};fr.readAsText(f);};
+document.getElementById("keygen").onclick=doKeygen;
+document.getElementById("build").onclick=doBuild;
+document.getElementById("verify").onclick=doVerify;
+document.getElementById("dl_plugin").onclick=()=>download("omega-apriori.plugin.js",STATE.bundle,"text/javascript");
+document.getElementById("dl_manifest").onclick=()=>download("omega-apriori.manifest.json",JSON.stringify(STATE.manifest,null,1),"application/json");
+document.getElementById("dl_user").onclick=()=>download("omega-apriori.user.js",userscript(STATE.bundle,STATE.manifest),"text/javascript");
+document.getElementById("dl_html").onclick=()=>download("omega-apriori.bundle.html",standaloneHtml(STATE.bundle,STATE.manifest),"text/html");
+document.getElementById("dl_keys").onclick=async()=>{
+  const priv=await crypto.subtle.exportKey("jwk",STATE.keys.privateKey);
+  download("omega-apriori.keys.jwk.json",JSON.stringify({privateKey:priv,publicKey:STATE.pubJwk},null,1),"application/json");};
+
+loadSources();
+drawGoban();
+</script>
+</body>
+</html>

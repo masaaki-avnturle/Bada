@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<!--
+  Ω-Host App — 未知事前エンジンFPGAを付加して機能拡張する「任意アプリ」デモ (自己完結)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_host_app
+
+  普通のメモ帳/エディタ(=任意アプリの代表)に、生成FPGA(未知事前エンジン)を付加し、
+  単語補完(word completion)をはじめ俯瞰・系列補完・パターンマッチ・ソース生成などの
+  機能をライブで付加・拡張する。組み込みエンジンで即動作し、omega_apriori_injector が
+  出力した署名付きバンドル(plugin.js + manifest.json)を検証して付加することもできる。
+
+  ⚠ 概念実証・教育用／非医療。付加は自分が管理/許諾されたアプリに対してのみ。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Host App — メモ帳 + 付加AI</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;--txt:#d8e0ec;--dim:#8794a8;
+    --good:#48c08a;--bad:#d0506a;--warn:#e0b020;--mono:Consolas,Menlo,monospace;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);line-height:1.5;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif}
+  header{padding:18px 20px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b12,#04060a)}
+  h1{margin:0 0 3px;font-size:20px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12.5px}
+  .disc{margin:12px 20px 0;padding:9px 13px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12px}
+  main{padding:16px 20px 50px;display:flex;gap:16px;flex-wrap:wrap}
+  .editorCol{flex:1;min-width:340px}.sideCol{flex:0 0 320px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  .bar{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--dim);margin-bottom:8px}
+  #editor{width:100%;height:300px;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:8px;
+    padding:12px;font-size:14px;font-family:var(--mono);resize:vertical;line-height:1.6}
+  #sugg{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;min-height:30px}
+  .chip{background:#0e1626;border:1px solid var(--line);border-radius:14px;padding:4px 11px;cursor:pointer;font-size:13px;font-family:var(--mono)}
+  .chip:hover{border-color:var(--cyan);color:var(--cyan)}
+  .chip b{color:var(--gold)}.chip.top{border-color:var(--gold)}
+  .chip small{color:var(--dim)}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:8px 12px;cursor:pointer;font-weight:700;font-size:12.5px;margin:6px 6px 0 0}
+  button.act:hover{background:#1f2f4a}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0}
+  input[type=file]{font-size:11.5px;color:var(--dim)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:6px;padding:9px;font-size:11px;font-family:var(--mono);color:var(--cyan);max-height:200px;overflow:auto;white-space:pre-wrap;margin:6px 0 0}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan)}.ok{color:var(--good)}.ng{color:var(--bad)}
+  .kbd{font-family:var(--mono);background:#0e1626;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px;color:var(--gold)}
+  footer{color:var(--dim);font-size:11px;padding:18px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Host App — 「任意アプリ」(メモ帳) + 付加AI</h1>
+  <div class="sub">生成FPGA(未知事前エンジン)を付加 → 単語補完ほか各種機能で機能拡張 · Bada/bio_medicine</div>
+</header>
+<div class="disc">⚠ <b>概念実証・教育用／非医療</b>:
+  これは普通のメモ帳(=任意アプリの代表)に、生成FPGA(未知事前エンジン)を<b>付加</b>して
+  <b>単語補完</b>等の機能を拡張するデモです。組み込みエンジンで即動作し、
+  <code>omega_apriori_injector</code> の署名付きバンドルを検証して付加もできます。付加は自分が管理/許諾されたアプリにのみ。</div>
+
+<main>
+  <div class="editorCol">
+    <div class="card">
+      <h3>📝 エディタ (付加AIで機能拡張中)</h3>
+      <div class="bar">
+        <span>付加エンジン: <b id="engname" style="color:var(--cyan)">組み込み (popcount FPGA)</b></span>
+        <span style="margin-left:auto">単語補完: <span class="kbd">Tab</span>で採用</span>
+      </div>
+      <textarea id="editor" spellcheck="false" placeholder="ここに入力… 単語を打つと付加AIが補完候補を出します。例: con / man / gen / app …">the gamma manifold engine can complete words. type a pre</textarea>
+      <div id="sugg"></div>
+    </div>
+    <div class="card">
+      <h3>🔧 付加機能パレット (このアプリに付加された関数)</h3>
+      <button class="act" id="f_overview">俯瞰 (文書要約)</button>
+      <button class="act" id="f_completion">系列補完 (選択)</button>
+      <button class="act" id="f_pattern">パターンマッチ (選択数値)</button>
+      <button class="act" id="f_codegen">FPGAソース表出</button>
+      <button class="act" id="f_caps">付加機能一覧</button>
+      <pre id="out">（付加機能の出力がここに表示されます）</pre>
+    </div>
+  </div>
+
+  <div class="sideCol">
+    <div class="card">
+      <h3>🔌 生成FPGAバンドルを付加</h3>
+      <p style="font-size:11.5px;color:var(--dim);margin:4px 0">
+      <code>omega_apriori_injector</code> / <code>omega_patternforge</code> 等が出力した
+      署名付き <code>plugin.js</code> + <code>manifest.json</code> を読み込むと、署名検証(ECDSA)に通った場合のみ
+      実行してこのアプリへ付加します。</p>
+      <label>plugin.js</label><input type="file" id="bundleFile" accept=".js"/>
+      <label>manifest.json</label><input type="file" id="manifestFile" accept=".json"/>
+      <button class="act" id="attach">署名検証して付加</button>
+      <div class="stat"><span>検証</span><b id="vstat">組み込みエンジン使用中</b></div>
+      <div class="stat"><span>付加機能数</span><b id="capn">—</b></div>
+    </div>
+    <div class="card">
+      <h3>⚙ 単語補完 設定</h3>
+      <div class="toggle"><input type="checkbox" id="wcOn" checked> 単語補完を有効化</div>
+      <label>候補数 k: <span id="kv" style="color:var(--cyan)">8</span></label>
+      <input type="range" id="k" min="3" max="12" value="8" style="width:100%"/>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:6px">
+      語彙 = 既定辞書 ＋ 文書中の既出語(適応学習)。順位は接頭辞被覆率＋頻度＋
+      付加FPGAの推論バイアスで決まります。</p>
+    </div>
+  </div>
+</main>
+<footer>Ω-Host App · © 2025 Masaaki Yamaguchi · Bada / bio_medicine · 概念実証(非医療)</footer>
+
+<script>
+"use strict";
+/* ===== 組み込み未知事前エンジン (fabric eval, popcount genome) ===== */
+const CELL_BYTES=6, CFG={inbits:6,layers:3,width:8,outbits:3};
+const BUILTIN_GENOME="a3b77311438a66c00cbbae927e1ca5ea6061348e00fe47f075f2e1bdd444c082000a5287d5b76843d76f21afcfb2af3b6d7c5e325c8600ad63b36df86724dc9f950461b3cd15bf114b60be96a3f7704aa105b5d3e85ba2c72d74c845e3c01e47d0a79a8659a44375b56919af8b4d545bf54243c677820cbce313b79716de80e68ddb055c7804e4294017664276afb05e";
+function hexToBytes(h){h=h.replace(/[^0-9a-fA-F]/g,"");const n=h.length>>1,b=new Uint8Array(n);for(let i=0;i<n;i++)b[i]=parseInt(h.substr(i*2,2),16);return b;}
+function Fabric(cfg,bytes){this.cfg=cfg;const n=cfg.layers*cfg.width;this.lut=new Int32Array(n);this.insel=[];
+  for(let i=0;i<n;i++)this.insel.push([0,0,0,0]);let idx=0;
+  for(let L=0;L<cfg.layers;L++){const src=L===0?cfg.inbits:cfg.width;for(let w=0;w<cfg.width;w++){const p=idx*CELL_BYTES;
+    for(let k=0;k<4;k++)this.insel[idx][k]=bytes[p+k]%Math.max(1,src);this.lut[idx]=bytes[p+4]|(bytes[p+5]<<8);idx++;}}}
+Fabric.prototype.eval=function(x){const c=this.cfg;let prev=x&((1<<c.inbits)-1),src=c.inbits,cur=0;
+  for(let L=0;L<c.layers;L++){cur=0;for(let w=0;w<c.width;w++){const cell=L*c.width+w;let addr=0;
+    for(let k=0;k<4;k++){let sel=this.insel[cell][k];if(sel>=src)sel=src?sel%src:0;addr|=((prev>>sel)&1)<<k;}
+    cur|=((this.lut[cell]>>addr)&1)<<w;}prev=cur;src=c.width;}return cur&((1<<c.outbits)-1);};
+
+/* engine: infer + plugin host (組み込み or 付加バンドルの window.omegaApriori) */
+let ENGINE=null;
+function makeBuiltin(){const fab=new Fabric(CFG,hexToBytes(BUILTIN_GENOME));
+  return {cfg:CFG,meta:{genome_hex:BUILTIN_GENOME},plugins:{},infer:x=>fab.eval(x),
+    call:function(n){const p=this.plugins[n];if(!p)throw new Error("no plugin "+n);return p.run.apply(p,[this].concat([].slice.call(arguments,1)));},
+    register:function(p){this.plugins[p.name]=p;return this;},capabilities:function(){return Object.keys(this.plugins);}};}
+
+/* ===== 組み込みプラグイン群 ===== */
+function hashStr(s){let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;}
+const DEFAULT_VOCAB=["function","return","const","let","var","class","import","export","async","await",
+ "value","vector","matrix","manifold","gamma","integral","telomere","evolution","engine","apriori",
+ "pattern","complete","completion","overview","quantum","fabric","genome","verilog","application",
+ "attach","plugin","signature","source","module","compute","calculate","generate","analyze","network",
+ "neural","learning","model","the","this","that","with","words","can","type","prefix"];
+const wordComplete={name:"word_complete",run:function(eng,prefix,opt){opt=opt||{};const p=String(prefix||"").toLowerCase();
+ const vocab=opt.vocab&&opt.vocab.length?opt.vocab:DEFAULT_VOCAB,k=opt.k||8,freq=opt.freq||{},ctx=(opt.context||"").toLowerCase();
+ const im=(1<<eng.cfg.inbits)-1,om=(1<<eng.cfg.outbits)-1,seen={},c=[];
+ for(const w of vocab){if(typeof w!=="string")continue;const wl=w.toLowerCase();
+  if(p&&wl.indexOf(p)!==0)continue;if(wl===p)continue;if(seen[wl])continue;seen[wl]=1;
+  const cover=p.length?p.length/wl.length:0.1,fr=freq[w]||freq[wl]||0,bias=(eng.infer(hashStr(ctx+">"+wl)&im)&om)/(om||1);
+  c.push({word:w,score:Math.round((cover*2+Math.log(1+fr)+bias*0.8)*1e3)/1e3});}
+ c.sort((a,b)=>b.score-a.score);return c.slice(0,k);}};
+const overview={name:"overview",run:function(eng,grid,opt){opt=opt||{};/* grid=数値2次元 or 文書語頻度 */
+ // ここでは文書語頻度配列 [{w,c}] を受ける簡易版
+ return grid;}};
+const completion={name:"completion",run:function(eng,seq,k){k=k||4;const im=(1<<eng.cfg.inbits)-1,om=(1<<eng.cfg.outbits)-1;
+ let codes=typeof seq==="string"?Array.from(seq).map(c=>c.charCodeAt(0)):seq.slice(),out=[];
+ for(let s=0;s<k;s++){const n=codes.length,ctx=((codes[n-1]||0)^((codes[n-2]||0)<<1))&im,pred=eng.infer(ctx)&om;
+  let nx=((codes[n-1]||0)+pred+1)&0x7f;if(nx<32)nx=32+(nx%95);codes.push(nx);out.push(String.fromCharCode(nx));}
+ return {predicted:out.join("")};}};
+const patternmatch={name:"patternmatch",run:function(eng,mode,arg){if(Array.isArray(arg))return arg.map(x=>eng.infer(x));return eng.infer(arg|0);}};
+const codegen={name:"codegen",run:function(eng,target){const by=hexToBytes(eng.meta.genome_hex),cfg=eng.cfg;
+ let idx=0,prev="din",s=["module omega_apriori (input ["+(cfg.inbits-1)+":0] din, output ["+(cfg.outbits-1)+":0] dout);"];
+ for(let L=0;L<cfg.layers;L++){const wn="s"+L;s.push("  wire ["+(cfg.width-1)+":0] "+wn+";");const src=L===0?cfg.inbits:cfg.width;
+  for(let w=0;w<cfg.width;w++){const p=idx*CELL_BYTES,sel=[];for(let k=0;k<4;k++)sel.push(by[p+k]%Math.max(1,src));
+   const lut=((by[p+4]|(by[p+5]<<8))&0xFFFF).toString(16).toUpperCase().padStart(4,"0");
+   s.push("  localparam [15:0] LUT_"+L+"_"+w+" = 16'h"+lut+";");
+   s.push("  assign "+wn+"["+w+"] = LUT_"+L+"_"+w+"[{"+prev+"["+sel[3]+"],"+prev+"["+sel[2]+"],"+prev+"["+sel[1]+"],"+prev+"["+sel[0]+"}];");idx++;}prev=wn;}
+ s.push("  assign dout = "+prev+"["+(cfg.outbits-1)+":0];");s.push("endmodule");return s.join("\n");}};
+function registerBuiltins(eng){[wordComplete,overview,completion,patternmatch,codegen].forEach(p=>eng.register(p));}
+
+/* ===== 単語補完 UI ===== */
+function docVocabFreq(text){const freq={},words=(text.toLowerCase().match(/[a-z]+/g)||[]);
+ for(const w of words)if(w.length>=2)freq[w]=(freq[w]||0)+1;return freq;}
+function currentPrefix(ta){const pos=ta.selectionStart,before=ta.value.slice(0,pos),m=before.match(/[A-Za-z]+$/);
+ return m?{prefix:m[0],start:pos-m[0].length,end:pos}:null;}
+function lastWord(text,upto){const m=text.slice(0,upto).match(/([A-Za-z]+)\s+[A-Za-z]*$/);return m?m[1]:"";}
+let SUGG=[];
+function updateSuggest(){const ta=document.getElementById("editor"),box=document.getElementById("sugg");
+ if(!document.getElementById("wcOn").checked){box.innerHTML="";SUGG=[];return;}
+ const cp=currentPrefix(ta);if(!cp||cp.prefix.length<1){box.innerHTML="";SUGG=[];return;}
+ const freq=docVocabFreq(ta.value),vocab=DEFAULT_VOCAB.concat(Object.keys(freq));
+ const k=+document.getElementById("k").value,ctx=lastWord(ta.value,cp.start);
+ SUGG=ENGINE.call("word_complete",cp.prefix,{vocab,freq,context:ctx,k});
+ box.innerHTML=SUGG.length?SUGG.map((s,i)=>'<span class="chip'+(i===0?' top':'')+'" data-i="'+i+'"><b>'+
+   cp.prefix+'</b>'+s.word.slice(cp.prefix.length)+' <small>'+s.score.toFixed(2)+'</small></span>').join(""):
+   '<span style="color:#8794a8;font-size:12px">候補なし</span>';
+ box.querySelectorAll(".chip").forEach(c=>c.onclick=()=>accept(+c.dataset.i));}
+function accept(i){const ta=document.getElementById("editor"),cp=currentPrefix(ta);if(!cp||!SUGG[i])return;
+ const w=SUGG[i].word,v=ta.value;ta.value=v.slice(0,cp.start)+w+v.slice(cp.end);
+ const np=cp.start+w.length;ta.setSelectionRange(np,np);ta.focus();updateSuggest();}
+document.getElementById("editor").addEventListener("input",updateSuggest);
+document.getElementById("editor").addEventListener("keydown",e=>{
+ if(e.key==="Tab"&&SUGG.length&&document.getElementById("wcOn").checked){e.preventDefault();accept(0);}});
+document.getElementById("editor").addEventListener("click",updateSuggest);
+document.getElementById("k").oninput=e=>{document.getElementById("kv").textContent=e.target.value;updateSuggest();};
+document.getElementById("wcOn").onchange=updateSuggest;
+
+/* ===== 機能パレット ===== */
+const out=document.getElementById("out");
+document.getElementById("f_overview").onclick=()=>{const ta=document.getElementById("editor");
+ const freq=docVocabFreq(ta.value),top=Object.keys(freq).sort((a,b)=>freq[b]-freq[a]).slice(0,8);
+ const words=(ta.value.match(/[A-Za-z]+/g)||[]).length;
+ out.textContent="俯瞰: 総語数="+words+" 異なり語="+Object.keys(freq).length+"\n頻出: "+top.map(w=>w+"("+freq[w]+")").join(", ");};
+document.getElementById("f_completion").onclick=()=>{const ta=document.getElementById("editor");
+ const sel=ta.value.slice(ta.selectionStart,ta.selectionEnd)||ta.value.slice(-12);
+ out.textContent="系列補完: \""+sel+"\" → +\""+ENGINE.call("completion",sel,6).predicted+"\"";};
+document.getElementById("f_pattern").onclick=()=>{const ta=document.getElementById("editor");
+ const sel=ta.value.slice(ta.selectionStart,ta.selectionEnd).match(/\d+/);const x=sel?(+sel[0]&63):42;
+ out.textContent="パターンマッチ: infer("+x+") = クラス "+ENGINE.call("patternmatch","classify",x);};
+document.getElementById("f_codegen").onclick=()=>{out.textContent=ENGINE.call("codegen","verilog");};
+document.getElementById("f_caps").onclick=()=>{out.textContent="付加機能: "+ENGINE.capabilities().join(", ");};
+
+/* ===== 外部署名バンドルの検証＆付加 (ECDSA P-256) ===== */
+function b642ab(b){const s=atob(b),a=new Uint8Array(s.length);for(let i=0;i<s.length;i++)a[i]=s.charCodeAt(i);return a;}
+async function sha256hex(t){const d=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));
+ return Array.from(new Uint8Array(d)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+function readFile(inp){return new Promise((res,rej)=>{const f=inp.files[0];if(!f){rej("no file");return;}
+ const r=new FileReader();r.onload=()=>res(r.result);r.readAsText(f);});}
+document.getElementById("attach").onclick=async()=>{const vs=document.getElementById("vstat");
+ try{const bundle=await readFile(document.getElementById("bundleFile"));
+  const manifest=JSON.parse(await readFile(document.getElementById("manifestFile")));
+  if(manifest.bundle_sha256&&(await sha256hex(bundle))!==manifest.bundle_sha256){vs.innerHTML='<span class="ng">✗ sha256不一致</span>';return;}
+  const pub=await crypto.subtle.importKey("jwk",manifest.pubkey_jwk,{name:"ECDSA",namedCurve:"P-256"},true,["verify"]);
+  const ok=await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},pub,b642ab(manifest.signature_b64),new TextEncoder().encode(bundle));
+  if(!ok){vs.innerHTML='<span class="ng">✗ 署名INVALID — 付加せず</span>';return;}
+  (0,eval)(bundle);                         /* 検証済みのみ実行 */
+  ENGINE=window.omegaApriori;
+  if(!ENGINE.plugins.word_complete)ENGINE.register(wordComplete); /* 単語補完が無ければ補う */
+  vs.innerHTML='<span class="ok">✓ 署名VALID — 付加完了</span>';
+  document.getElementById("engname").textContent="付加バンドル ("+ENGINE.meta.genome_hex.length/2+"B FPGA)";
+  refreshCaps();updateSuggest();
+ }catch(e){vs.innerHTML='<span class="ng">エラー: '+e+'</span>';}};
+function refreshCaps(){document.getElementById("capn").textContent=ENGINE.capabilities().length+" ("+ENGINE.capabilities().join(",")+")";}
+
+/* ===== 起動 ===== */
+ENGINE=makeBuiltin();registerBuiltins(ENGINE);refreshCaps();updateSuggest();
+</script>
+</body>
+</html>
