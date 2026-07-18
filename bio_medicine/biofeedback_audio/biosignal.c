@@ -9,6 +9,9 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#if defined(_WIN32)
+#include <windows.h>
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -19,9 +22,13 @@ static const double BAND_HZ[BIO_BAND_COUNT]   = { 2.5, 6.0, 10.0, 20.0, 35.0 };
 static const char  *BAND_NAME[BIO_BAND_COUNT] = { "delta", "theta", "alpha", "beta", "gamma" };
 
 static long now_ms(void) {
+#if defined(_WIN32)
+    return (long)GetTickCount64();   /* Windows: 単調増加のミリ秒 */
+#else
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (long)ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+#endif
 }
 
 static double frand(unsigned *seed) {

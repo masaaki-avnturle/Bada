@@ -46,10 +46,18 @@ ifeq ($(strip $(NCURSES_LIBS)),)
   NCURSES_LIBS := -lncursesw
 endif
 
-CORE := audio_core.c sensors.c rt_audio.c biosignal.c
-HDRS := audio_core.h sensors.h rt_audio.h biosignal.h
+CORE := audio_core.c sensors.c rt_audio.c biosignal.c oracle.c
+HDRS := audio_core.h sensors.h rt_audio.h biosignal.h oracle.h
 
-.PHONY: all cli tui gui gtk clean demo selftest info
+# Windows(.exe) は rt_audio(ALSA)を使わず WinMM を gui_win32.c 内で使うため CORE から外す
+WCORE := audio_core.c sensors.c biosignal.c oracle.c
+# クロスコンパイラ(mingw-w64)。無ければ 'make windows' はスキップ扱いにする
+MINGW64 ?= x86_64-w64-mingw32-gcc
+MINGW32 ?= i686-w64-mingw32-gcc
+WFLAGS  := -std=c99 -O2 -municode -mwindows -static -static-libgcc
+WLIBS   := -lgdi32 -luser32 -lwinmm -lm
+
+.PHONY: all cli tui gui gtk clean demo selftest info windows windows64 windows32
 
 all: biofeedback_audio bfa_tui bfa_gui gtk
 
@@ -59,6 +67,23 @@ gui: bfa_gui
 
 biofeedback_audio: biofeedback_audio.c $(CORE) $(HDRS)
 	$(CC) $(CFLAGS) -o $@ biofeedback_audio.c $(CORE) $(ALSA_LIBS) $(LDM)
+
+# ---- Windows クロスビルド(.exe) ----
+# Linux 上で mingw-w64 を使い Windows 10/11 用 exe を生成する。
+#   sudo apt-get install gcc-mingw-w64-x86-64 gcc-mingw-w64-i686
+windows: windows64 windows32
+
+windows64: gui_win32.c $(WCORE) $(HDRS) oracle.h
+	@command -v $(MINGW64) >/dev/null 2>&1 && { \
+	  $(MINGW64) $(WFLAGS) -o BadaBiofeedback-x64.exe gui_win32.c $(WCORE) $(WLIBS) && \
+	  echo "built BadaBiofeedback-x64.exe"; } || \
+	  echo "[skip] $(MINGW64) が無いため x64 exe はスキップ (sudo apt-get install gcc-mingw-w64-x86-64)"
+
+windows32: gui_win32.c $(WCORE) $(HDRS) oracle.h
+	@command -v $(MINGW32) >/dev/null 2>&1 && { \
+	  $(MINGW32) $(WFLAGS) -o BadaBiofeedback-x86.exe gui_win32.c $(WCORE) $(WLIBS) && \
+	  echo "built BadaBiofeedback-x86.exe"; } || \
+	  echo "[skip] $(MINGW32) が無いため x86 exe はスキップ (sudo apt-get install gcc-mingw-w64-i686)"
 
 bfa_tui: gui_ncurses.c $(CORE) $(HDRS)
 	$(CC) $(CFLAGS) $(NCURSES_CFLAGS) -o $@ gui_ncurses.c $(CORE) $(NCURSES_LIBS) $(ALSA_LIBS) $(LDM)
@@ -97,4 +122,5 @@ info:
 
 clean:
 	rm -f biofeedback_audio bfa_tui bfa_gui bfa_gtk
+	rm -f BadaBiofeedback-x64.exe BadaBiofeedback-x86.exe
 	rm -rf ./out

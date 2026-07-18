@@ -186,9 +186,24 @@ double bfa_ecg_carrier(double base_carrier, double bpm) {
     return c;
 }
 
+/* 大文字小文字を無視した部分一致(strcasestr は GNU 拡張で MinGW に無いため自前実装)。 */
+static int contains_ci(const char *hay, const char *needle) {
+    if (!hay || !needle) return 0;
+    size_t nl = strlen(needle);
+    if (nl == 0) return 1;
+    for (const char *p = hay; *p; p++) {
+        size_t i = 0;
+        while (i < nl && p[i] &&
+               tolower((unsigned char)p[i]) == tolower((unsigned char)needle[i]))
+            i++;
+        if (i == nl) return 1;
+    }
+    return 0;
+}
+
 static int locale_is_utf8(const char *s) {
     if (!s) return 0;
-    return strcasestr(s, "utf-8") != NULL || strcasestr(s, "utf8") != NULL;
+    return contains_ci(s, "utf-8") || contains_ci(s, "utf8");
 }
 
 const char *bfa_enable_utf8_locale(void) {

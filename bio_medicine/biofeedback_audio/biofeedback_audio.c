@@ -17,7 +17,9 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "audio_core.h"
+#include "sensors.h"
 #include "biosignal.h"
+#include "oracle.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -137,6 +139,33 @@ static int cmd_bio(int argc, char **argv) {
     return 0;
 }
 
+/* 娯楽オラクル(お告げ)。乱数で定型メッセージを選び、連動プリセットを表示。 */
+static int cmd_oracle(int argc, char **argv) {
+    int draws = (argc >= 3) ? atoi(argv[2]) : 1;
+    if (draws <= 0) draws = 1;
+
+    /* 種はセンサー/生体値 + 時刻で合成(娯楽演出) */
+    SensorCtx sc; sensor_init(&sc); SensorReading sr;
+    BioCtx bc; bio_init(&bc); BioReading brd;
+    for (int i = 0; i < 20; i++) { sensor_read(&sc, &sr); bio_read(&bc, &brd); }
+
+    printf("🔮 オラクル(お告げ)  %s\n\n", oracle_disclaimer_jp());
+    for (int d = 0; d < draws; d++) {
+        unsigned long seed = (unsigned long)time(NULL)
+            ^ ((unsigned long)d << 3)
+            ^ (unsigned long)(sr.ir_object_c * 1000)
+            ^ ((unsigned long)brd.bpm << 8);
+        const OracleCard *c = oracle_draw(seed, BFA_PRESET_COUNT);
+        int pr = c->preset;
+        if (pr < 0 || pr >= (int)BFA_PRESET_COUNT) pr = 0;
+        printf("  [%s] %s\n", oracle_mood_jp(c->mood), c->jp);
+        printf("     連動音: %s (carrier=%.1fHz beat=%.1fHz)\n\n",
+               BFA_PRESETS[pr].jp, BFA_PRESETS[pr].carrier, BFA_PRESETS[pr].beat);
+        sensor_read(&sc, &sr); bio_read(&bc, &brd);
+    }
+    return 0;
+}
+
 static void usage(const char *prog) {
     printf("バイオフィードバック 音(サイン波)ジェネレータ — CLI\n\n");
     printf("Usage:\n");
@@ -144,7 +173,8 @@ static void usage(const char *prog) {
     printf("  %s gen <preset|all> [seconds] [outdir]\n", prog);
     printf("  %s play <preset> [seconds]\n", prog);
     printf("  %s custom <carrier_hz> <beat_hz> <seconds> <out.wav>\n", prog);
-    printf("  %s bio [frames]   (脳波計EEG + 心電図ECG ライブモニタ)\n\n", prog);
+    printf("  %s bio [frames]     (脳波計EEG + 心電図ECG ライブモニタ)\n", prog);
+    printf("  %s oracle [draws]   (娯楽オラクル/お告げ。予知ではありません)\n\n", prog);
     printf("注意: 音響トーン発生器です。プリセット名はラベルであり、薬剤や\n");
     printf("      治療効果を再現・代替するものではありません。\n");
     printf("GUI 版: ./bfa_tui (ncurses) / ./bfa_gui (X11) / ./bfa_gtk (GTK)\n");
@@ -157,6 +187,7 @@ int main(int argc, char **argv) {
     if (!strcmp(argv[1], "play"))   return cmd_play(argc, argv);
     if (!strcmp(argv[1], "custom")) return cmd_custom(argc, argv);
     if (!strcmp(argv[1], "bio"))    return cmd_bio(argc, argv);
+    if (!strcmp(argv[1], "oracle")) return cmd_oracle(argc, argv);
     if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) { usage(argv[0]); return 0; }
     fprintf(stderr, "未知のコマンド '%s'\n\n", argv[1]);
     usage(argv[0]);
