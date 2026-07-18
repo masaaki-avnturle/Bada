@@ -1,0 +1,92 @@
+name: Build Bada Biofeedback (Android APK)
+
+# bio_medicine/biofeedback_audio/www (+ cordova/config.xml) を Cordova で
+# Android APK(デバッグ署名)にビルドし、
+#  - Actions の Artifacts (どのブランチでも)
+#  - workflow_dispatch で release_tag を指定、または biofeedback-android-v* タグ push 時は Release
+# として公開する。リポジトリ実績のある omega-apps-build.yml と同じ手順。
+#
+# ⚠️ このアプリは音・センサー可視化・娯楽オラクルです。
+#    未来予知やアカシックレコード等の主張はしません。
+
+on:
+  push:
+    tags:
+      - "biofeedback-android-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release を作成する場合のタグ名(例: biofeedback-android-v1.0.0)。空なら Artifacts のみ。"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          APP="bio_medicine/biofeedback_audio"
+          cordova create cordova-build io.github.masaaki_avnturle.bada_biofeedback BadaBiofeedback
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk \
+             out/BadaBiofeedback-debug.apk
+          ls -la out
+
+      - name: Upload APK artifact (download from Actions tab)
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadaBiofeedback-android
+          path: out/*.apk
+
+      - name: Attach APK to Release (tag push or manual dispatch with release_tag)
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+          name: "Bada Biofeedback (APK) ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}"
+          body: |
+            Android 用デバッグ署名 APK。
+
+            端末にインストールするには `BadaBiofeedback-debug.apk` をダウンロードし、
+            「提供元不明のアプリ」を許可してインストールしてください。
+
+            機能: プリセット選択・センサー/EEG/ECG のライブ表示・波形・音再生
+            （Web Audio によるバイノーラルビート）・娯楽オラクル・脳波/心電フィードバック。
+
+            ⚠️ 音・センサー可視化・娯楽オラクルのアプリです。未来予知・アカシック
+            レコード・医療診断などの主張はしません。
+          files: out/*.apk

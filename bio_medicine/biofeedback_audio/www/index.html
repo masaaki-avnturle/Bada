@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bada Biofeedback</title>
+<style>
+  :root{ --bg:#181a20; --panel:#262a34; --fg:#dce0e6; --mut:#9aa3b2;
+         --temp:#5ac878; --ir:#f0c850; --wave:#78c8f0; --warn:#e65a5a; --sel:#325a8c; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{ margin:0; background:var(--bg); color:var(--fg);
+        font-family:-apple-system,"Noto Sans JP","Hiragino Sans",sans-serif; font-size:15px; }
+  header{ padding:10px 12px 4px; }
+  h1{ font-size:17px; margin:0 0 2px; }
+  .note{ color:var(--mut); font-size:11px; line-height:1.4; }
+  .wrap{ padding:8px 12px 24px; }
+  .panel{ background:var(--panel); border-radius:10px; padding:10px 12px; margin:8px 0; }
+  .row{ display:flex; align-items:center; gap:8px; margin:5px 0; }
+  .row .lbl{ width:78px; color:var(--mut); font-size:12px; flex:none; }
+  .bar{ flex:1; height:12px; background:#3a4150; border-radius:6px; overflow:hidden; }
+  .bar > i{ display:block; height:100%; width:0%; background:var(--temp); transition:width .12s linear; }
+  .val{ width:74px; text-align:right; font-variant-numeric:tabular-nums; font-size:12px; }
+  select{ width:100%; padding:10px; font-size:16px; background:#2f3542; color:var(--fg);
+          border:1px solid #3a4150; border-radius:8px; }
+  canvas{ width:100%; height:90px; background:#1f2530; border-radius:8px; display:block; }
+  .eegbars{ display:flex; gap:6px; align-items:flex-end; height:64px; }
+  .eegbars .col{ flex:1; text-align:center; }
+  .eegbars .cbar{ height:48px; background:#3a4150; border-radius:4px; position:relative; overflow:hidden; }
+  .eegbars .cbar > i{ position:absolute; bottom:0; left:0; right:0; background:var(--ir); height:0%; transition:height .12s; }
+  .eegbars .col.dom .cbar > i{ background:var(--temp); }
+  .eegbars .nm{ font-size:10px; color:var(--mut); margin-top:2px; }
+  .btns{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+  button{ padding:12px; font-size:15px; border:none; border-radius:8px; background:#39414f; color:var(--fg); }
+  button.on{ background:var(--sel); }
+  button:active{ opacity:.7; }
+  .oracle{ min-height:44px; font-size:15px; line-height:1.5; }
+  .mood{ color:var(--ir); font-size:12px; }
+  .bpm{ font-variant-numeric:tabular-nums; }
+  .heart{ color:var(--warn); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Bada Biofeedback</h1>
+  <div class="note">音・センサー可視化・娯楽オラクル。プリセット名は薬剤の薬効を再現しません。
+  EEG/ECG は医療機器ではありません。オラクルは<b>娯楽</b>で、未来予知・アカシックレコードではありません。</div>
+</header>
+<div class="wrap">
+
+  <div class="panel">
+    <div style="color:var(--mut);font-size:12px;margin-bottom:4px;">プリセット</div>
+    <select id="preset"></select>
+    <div class="row" style="margin-top:8px;">
+      <div class="lbl">周波数</div>
+      <div class="val" id="freqInfo" style="width:auto;flex:1;text-align:left;color:var(--fg);"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div style="color:var(--mut);font-size:12px;margin-bottom:6px;">センサー(シミュレーション)</div>
+    <div class="row"><div class="lbl">温度計</div><div class="bar"><i id="bTemp" style="background:var(--temp)"></i></div><div class="val" id="vTemp">-</div></div>
+    <div class="row"><div class="lbl">IR対象温</div><div class="bar"><i id="bIr" style="background:var(--ir)"></i></div><div class="val" id="vIr">-</div></div>
+    <div class="row"><div class="lbl">IR生値</div><div class="bar"><i id="bRaw" style="background:var(--ir)"></i></div><div class="val" id="vRaw">-</div></div>
+    <div class="row"><div class="lbl">IR近接</div><div class="val" id="vPresent" style="width:auto;text-align:left;">-</div></div>
+  </div>
+
+  <div class="panel">
+    <div style="color:var(--mut);font-size:12px;margin-bottom:6px;">脳波計(EEG)</div>
+    <div class="eegbars" id="eeg"></div>
+    <div class="row" style="margin-top:8px;">
+      <div class="lbl">心電図(ECG)</div>
+      <div class="val bpm" id="vBpm" style="width:auto;flex:1;text-align:left;">-</div>
+    </div>
+    <canvas id="ecg" width="600" height="90"></canvas>
+  </div>
+
+  <div class="panel">
+    <div style="color:var(--mut);font-size:12px;margin-bottom:6px;">音声波形 (L=carrier)</div>
+    <canvas id="wave" width="600" height="90"></canvas>
+  </div>
+
+  <div class="panel">
+    <div style="color:var(--mut);font-size:12px;margin-bottom:6px;">🔮 オラクル(お告げ) — 娯楽・非予知</div>
+    <div class="oracle" id="oracleMsg">下の「オラクル」でメッセージを表示します。</div>
+  </div>
+
+  <div class="btns">
+    <button id="btnPlay">▶ 再生</button>
+    <button id="btnStop">■ 停止</button>
+    <button id="btnOracle">🔮 オラクル</button>
+    <button id="btnNeuro">脳波/心電FB</button>
+  </div>
+  <div class="note" style="margin-top:10px;">再生は端末のスピーカー/イヤホンから鳴ります。バイノーラルビートはイヤホン推奨。</div>
+</div>
+
+<script>
+/* ===== プリセット(C版 audio_core.c と同一) ===== */
+const PRESETS = [
+  ["risperdal","リスパダール",174.0,3.0],["zyprexa","ジプレキサ",185.0,3.5],
+  ["silece","サイレース",110.0,1.5],["depas","デパス",210.0,6.0],
+  ["etizolam","エチゾラム",216.0,6.5],["brotizolam","ブロチゾラム",128.0,2.0],
+  ["rohypnol","ロヒプノール",120.0,1.0],["sancoba","サンコバ",396.0,10.0],
+  ["hyaluronic","ヒアルロン酸",417.0,10.5],["lendormin","レンドルミン",132.0,2.5],
+  ["luran","ルーラン",198.0,4.5],["saphris","シクレスト",222.0,5.0],
+  ["sennoside","センノサイド",288.0,9.0],["akineton","アキネトン",256.0,8.0],
+  ["biperiden","ビペリデン",264.0,8.5],["amel","アメル",333.0,9.5],
+  ["benzalin","ベンザリン",144.0,2.0],["levotomin","レボトミン",160.0,4.0],
+];
+const BANDS = ["delta","theta","alpha","beta","gamma"];
+const BAND_HZ = [2.5,6.0,10.0,20.0,35.0];
+function bandName(beat){ return beat<4?"delta":beat<8?"theta":beat<13?"alpha":"beta"; }
+function eegBeat(d){ return BAND_HZ[Math.max(0,Math.min(4,d))]; }
+function ecgCarrier(base,bpm){ return Math.max(80,Math.min(1200, base+(bpm-60))); }
+
+/* ===== オラクル(C版 oracle.c と同一の文面) ===== */
+const CARDS = [
+  ["今日は小さな一歩が流れを変える。",2],["焦らず呼吸を整えると視界が開ける。",0],
+  ["耳を澄ませば、答えはもうそばにある。",0],["手放すことで、次の余白が生まれる。",3],
+  ["静けさの中に、あなたの軸が見える。",0],["巡り合わせは、準備した人に微笑む。",2],
+  ["今の集中が、明日の景色をつくる。",1],["休むことも前進のうち。",3],
+  ["小さな親切が、思わぬ縁を結ぶ。",2],["迷いは選択肢が豊かな証。",1],
+  ["波に逆らわず、リズムに乗る。",0],["灯りは、暗さを知る者に価値を持つ。",2],
+  ["整えた足元が、遠くへ運ぶ。",1],["深い息が、こわばりをほどく。",3],
+  ["縁は急がず、しかし確かに近づく。",0],["今日の穏やかさを、明日への種に。",3],
+];
+const MOODS = ["静穏","集中","高揚","休息"];
+function mix(x){ /* splitmix 風 */
+  x = (x + 0x9e3779b9) >>> 0;
+  x = Math.imul(x ^ (x>>>16), 0x85ebca6b) >>> 0;
+  x = Math.imul(x ^ (x>>>13), 0xc2b2ae35) >>> 0;
+  return (x ^ (x>>>16)) >>> 0;
+}
+
+/* ===== 状態 ===== */
+let sel=0, neuro=false, playing=false, t=0, ecgSampleNo=0, lastPeak=-1, refractory=0, bpm=72;
+let seed=(Date.now()>>>0);
+const eegBuf=new Float32Array(256); let eegHead=0;
+const ecgWave=new Float32Array(256);
+
+/* ===== センサー/生体信号 シミュレーション ===== */
+function rnd(){ seed=(Math.imul(seed,1103515245)+12345)>>>0; return ((seed>>>16)&0x7fff)/32767; }
+let sim={t:0, ambient:24, ir:36.5, present:1, band:[0,0,0,0,0], dom:2, beat:false};
+function stepSim(){
+  sim.t += 0.12;
+  sim.ambient = 24 + 1.5*Math.sin(sim.t*0.05) + (rnd()-0.5)*0.3;
+  sim.ir = 36.5 + 0.4*Math.sin(sim.t*0.8) + (rnd()-0.5)*0.2;
+  sim.present = Math.sin(sim.t*0.13) > -0.5;
+  /* EEG 帯域(擬似): alpha/beta がゆっくり優勢入れ替わり */
+  const aAlpha=0.8+0.6*Math.sin(sim.t*0.07), aBeta=0.5+0.4*Math.cos(sim.t*0.05);
+  let p=[0.6,0.5,aAlpha,aBeta,0.3].map(v=>Math.max(0,v+(rnd()-0.5)*0.15));
+  const tot=p.reduce((a,b)=>a+b,0)||1; sim.band=p.map(v=>v/tot);
+  sim.dom=sim.band.indexOf(Math.max(...sim.band));
+  /* ECG: 心拍に同期した簡易 QRS を 8 サンプル進める + R 検出 */
+  sim.beat=false;
+  for(let i=0;i<8;i++){
+    const hr = 72 + 4*Math.sin(sim.t*0.25);
+    const period=60/hr, ph=(sim.t*8/ECGFS + i/ECGFS)%period/period;
+    const g=(c,w,a)=>a*Math.exp(-((ph-c)*(ph-c))/(2*w*w));
+    let v=g(0.15,0.025,0.12)+g(0.33,0.012,-0.18)+g(0.38,0.010,1.0)+g(0.43,0.012,-0.25)+g(0.65,0.045,0.30);
+    for(let k=0;k<ecgWave.length-1;k++) ecgWave[k]=ecgWave[k+1];
+    ecgWave[ecgWave.length-1]=v;
+    ecgSampleNo++;
+    if(refractory>0){refractory--;continue;}
+    if(v>0.6){
+      if(lastPeak>=0){ const d=ecgSampleNo-lastPeak; if(d>0){ const ib=60*ECGFS/d; if(ib>30&&ib<220) bpm=0.85*bpm+0.15*ib; } }
+      lastPeak=ecgSampleNo; refractory=Math.floor(0.25*ECGFS); sim.beat=true;
+    }
+  }
+}
+const ECGFS=256;
+
+/* ===== Web Audio: バイノーラルビート ===== */
+let ac=null, oscL=null, oscR=null, gN=null;
+function audioStart(){
+  if(playing) return;
+  ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+  if(ac.state==="suspended") ac.resume();
+  const {carrier,beat}=curFreq();
+  oscL=ac.createOscillator(); oscR=ac.createOscillator();
+  const pL=ac.createStereoPanner? ac.createStereoPanner():null;
+  const pR=ac.createStereoPanner? ac.createStereoPanner():null;
+  gN=ac.createGain(); gN.gain.value=0.18;
+  oscL.frequency.value=carrier; oscR.frequency.value=carrier+beat;
+  if(pL){pL.pan.value=-1; pR.pan.value=1; oscL.connect(pL).connect(gN); oscR.connect(pR).connect(gN);}
+  else { oscL.connect(gN); oscR.connect(gN); }
+  gN.connect(ac.destination);
+  oscL.start(); oscR.start(); playing=true;
+}
+function audioStop(){
+  if(!playing) return;
+  try{oscL.stop();oscR.stop();}catch(e){}
+  playing=false;
+}
+function audioUpdate(){
+  if(playing&&oscL&&oscR){ const {carrier,beat}=curFreq();
+    oscL.frequency.setTargetAtTime(carrier, ac.currentTime, 0.05);
+    oscR.frequency.setTargetAtTime(carrier+beat, ac.currentTime, 0.05); }
+}
+function curFreq(){
+  const p=PRESETS[sel];
+  if(neuro) return {carrier:ecgCarrier(p[2],bpm), beat:eegBeat(sim.dom)};
+  return {carrier:p[2], beat:p[3]};
+}
+
+/* ===== UI 構築 ===== */
+const selEl=document.getElementById("preset");
+PRESETS.forEach((p,i)=>{ const o=document.createElement("option");
+  o.value=i; o.textContent=`${p[1]}  ${p[2].toFixed(0)}Hz / ${p[3].toFixed(1)}Hz (${bandName(p[3])})`;
+  selEl.appendChild(o); });
+selEl.addEventListener("change",()=>{ sel=+selEl.value; audioUpdate(); });
+
+const eegEl=document.getElementById("eeg");
+BANDS.forEach((b,i)=>{ const c=document.createElement("div"); c.className="col"; c.dataset.i=i;
+  c.innerHTML=`<div class="cbar"><i></i></div><div class="nm">${b}</div>`; eegEl.appendChild(c); });
+
+document.getElementById("btnPlay").onclick=()=>{ audioStart(); };
+document.getElementById("btnStop").onclick=()=>{ audioStop(); };
+document.getElementById("btnNeuro").onclick=(e)=>{ neuro=!neuro;
+  e.target.classList.toggle("on",neuro); audioUpdate(); };
+document.getElementById("btnOracle").onclick=()=>{
+  const s = mix((seed ^ (Math.round(sim.ir*1000)) ^ ((bpm|0)<<8) ^ (sim.dom<<16))>>>0);
+  const c = CARDS[s % CARDS.length];
+  const pr = s % PRESETS.length;
+  sel=pr; selEl.value=pr; audioUpdate();
+  document.getElementById("oracleMsg").innerHTML =
+    `<span class="mood">[${MOODS[c[1]]}]</span> ${c[0]}<br>`+
+    `<span style="color:var(--mut);font-size:12px;">連動音: ${PRESETS[pr][1]}</span>`;
+};
+
+/* ===== 描画ループ ===== */
+const wave=document.getElementById("wave"), wc=wave.getContext("2d");
+const ecg=document.getElementById("ecg"), ec=ecg.getContext("2d");
+function draw(){
+  const {carrier,beat}=curFreq();
+  document.getElementById("freqInfo").textContent =
+    `carrier ${carrier.toFixed(1)}Hz / beat ${beat.toFixed(1)}Hz (${bandName(beat)})${neuro?"  [脳波/心電FB]":""}`;
+  /* センサー */
+  set("bTemp","vTemp",(sim.ambient-10)/30, sim.ambient.toFixed(2)+" C");
+  set("bIr","vIr",(sim.ir-20)/20, sim.ir.toFixed(2)+" C");
+  const raw=Math.max(0,Math.min(1,(sim.ir-20)/20));
+  set("bRaw","vRaw",raw, raw.toFixed(2));
+  const pe=document.getElementById("vPresent");
+  pe.textContent=sim.present?"●検知":"○なし"; pe.style.color=sim.present?"var(--temp)":"var(--warn)";
+  /* EEG */
+  [...eegEl.children].forEach((c,i)=>{ c.querySelector("i").style.height=(sim.band[i]*100)+"%";
+    c.classList.toggle("dom", i===sim.dom); });
+  document.getElementById("vBpm").innerHTML =
+    `${bpm.toFixed(1)} bpm ${sim.beat?'<span class="heart">♥</span>':''}  支配:${BANDS[sim.dom]}`;
+  /* 波形 */
+  drawWave(wc,wave,(x,W)=>{ const tt=t + x/W*(3/carrier);
+    return Math.sin(2*Math.PI*carrier*tt); }, "#78c8f0");
+  /* ECG */
+  drawArr(ec,ecg,ecgWave, sim.beat?"#e65a5a":"#78c8f0");
+  t+=0.03;
+}
+function set(bar,val,frac,txt){ document.getElementById(bar).style.width=Math.max(0,Math.min(1,frac))*100+"%";
+  document.getElementById(val).textContent=txt; }
+function drawWave(ctx,cv,fn,color){
+  const W=cv.width,H=cv.height; ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=color; ctx.lineWidth=2; ctx.beginPath();
+  for(let x=0;x<W;x++){ const v=fn(x,W); const y=(1-v)*0.5*(H-6)+3;
+    x?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+}
+function drawArr(ctx,cv,arr,color){
+  const W=cv.width,H=cv.height; ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.beginPath();
+  for(let x=0;x<W;x++){ const v=arr[Math.floor(x/W*(arr.length-1))]; const y=(1-v)*0.5*(H-6)+3;
+    x?ctx.lineTo(x,y):ctx.moveTo(x,y); } ctx.stroke();
+}
+
+function loop(){ stepSim(); audioUpdate(); draw(); requestAnimationFrame(loop); }
+document.addEventListener("deviceready", loop);   /* Cordova */
+if(!window.cordova) loop();                        /* ブラウザ確認用 */
+</script>
+</body>
+</html>

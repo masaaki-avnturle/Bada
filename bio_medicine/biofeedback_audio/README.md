@@ -68,6 +68,23 @@ cd bio_medicine/biofeedback_audio
 make windows          # BadaBiofeedback-x64.exe / -x86.exe を生成
 ```
 
+## Android 版（APK）のダウンロードと実行
+
+Android 用の APK（デバッグ署名）を配布します。中身は `www/`（HTML/JS）を Cordova で
+APK 化したもので、音は **Web Audio API のバイノーラルビート**で鳴ります。
+
+- **GitHub Releases** から: `BadaBiofeedback-debug.apk`
+- **または Actions から**: 「Actions」→ *Build Bada Biofeedback (Android APK)*
+  → Artifacts の `BadaBiofeedback-android`
+
+インストール: `.apk` を端末に転送 →「提供元不明のアプリ」を許可 → タップしてインストール。
+
+- `www/index.html` … Android アプリ本体（プリセット/センサー/EEG/ECG/オラクル、C版と同一データ）
+- `cordova/config.xml` … Cordova 設定
+- CI: `.github/workflows/biofeedback-android.yml`（Android SDK + Cordova でビルド）
+
+> ⚠️ デバッグ署名のため Google Play 配布はできません（サイドロード用）。
+
 ## 構成
 
 | ファイル | 役割 |
