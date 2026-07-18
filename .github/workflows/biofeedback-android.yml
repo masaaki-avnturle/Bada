@@ -48,6 +48,13 @@ jobs:
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
+      # cordova-android@12 は Gradle 9 で削除された XmlParser を使うためビルドが壊れる。
+      # ランナー既定の Gradle 9.x ではなく 8.x を PATH に置いて回避する。
+      - name: Pin Gradle 8.x (cordova-android 12 compatibility)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+
       - name: Build debug APK (Cordova, pinned versions)
         run: |
           set -e
