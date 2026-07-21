@@ -1,0 +1,96 @@
+// sensors — clinical thermometer & infrared (IR) sensor on the gamma manifold.
+//
+//   import sensors
+//   let th <- sensors.Thermometer.new()
+//   print th.read(0.8)              // body temperature from a heat-entropy load
+//   let ir <- sensors.Infrared.new(120)
+//   let img <- ir.thermal_image(sources)
+//
+// Body heat is the THERMAL ENTROPY of the gamma operator's manifold (the
+// report's heat-entropy value).  A region's gamma shape k raises its entropy,
+// which the thermometer converts to a temperature, and the IR sensor renders
+// as a false-colour heat image with a spot reading.
+
+import thermography
+
+// ---- contact / tympanic thermometer --------------------------------------
+
+class Thermometer {
+    field baseline <- 36.5         // normal core temperature (deg C)
+    field gain <- 3.2              // entropy -> temperature scaling
+
+    method init() {}
+
+    // read temperature from an entropy "load" (excess over the calm baseline)
+    method read(entropy_load) {
+        return round(self.baseline + entropy_load * self.gain, 1)
+    }
+
+    // read directly from a gamma manifold state of shape k (excess over the
+    // calm baseline k0=1.5 drives the fever)
+    method read_k(k) {
+        let excess <- k - 1.5
+        if excess < 0 { excess <- 0 }
+        return round(self.baseline + excess * 0.8, 1)
+    }
+
+    method classify(temp) {
+        if temp >= 38.0 { return "fever" }
+        if temp >= 37.5 { return "low-grade fever" }
+        if temp < 35.0 { return "hypothermia" }
+        return "normal"
+    }
+}
+
+// ---- infrared sensor / thermal camera -------------------------------------
+
+class Infrared {
+    field n
+    field emissivity <- 0.98
+
+    method init(n) { self.n <- n }
+
+    // raw heat field (grayscale, entropy-weighted) from IR sources
+    method heat_field(sources) {
+        let im <- image(self.n, self.n, "L", 0)
+        field_project(im, sources, 25, 130, true)
+        return im
+    }
+
+    // false-colour IR thermal image (iron palette)
+    method thermal_image(sources) {
+        return thermography.render(self.n, sources)
+    }
+
+    // spot temperature at pixel (x,y): map IR intensity to degrees C
+    method spot(fld, x, y, ambient, span) {
+        let v <- fld.get(x, y) / 255
+        return round(ambient + v * span, 1)
+    }
+
+    // peak (hottest) temperature in the field
+    method peak(fld, ambient, span) {
+        let mx <- 0
+        let y <- 0
+        while y < self.n {
+            let x <- 0
+            while x < self.n {
+                let v <- fld.get(x, y)
+                if v > mx { mx <- v }
+                x <- x + 1
+            }
+            y <- y + 1
+        }
+        return round(ambient + (mx / 255) * span, 1)
+    }
+}
+
+// a heat-source list for a body region at a given inflammation intensity
+fun body_sources(n, intensity) {
+    let cx <- n / 2
+    let cy <- n / 2
+    return [
+        [cx, cy, n * 0.30, 0.7, 2.5],                          // warm core
+        [cx + n * 0.10, cy - n * 0.05, n * 0.07, intensity, 5.0]  // hot focus
+    ]
+}

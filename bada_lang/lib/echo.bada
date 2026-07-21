@@ -1,0 +1,83 @@
+// echo — echocardiography (cardiac ultrasound, M-mode and a beating loop).
+//
+//   import echo
+//   let view <- echo.four_chamber(120, 0.0)   // phase 0..1 of the cycle
+//
+// A sector ultrasound of the heart.  The four-chamber phantom's ventricles
+// contract and dilate across the cardiac cycle; sweeping the phase produces a
+// beating loop, and a single scan line sampled over time gives the M-mode
+// trace used to measure wall motion and ejection.
+
+import ultrasound
+
+// build a 4-chamber cardiac phantom at cycle phase p in [0,1]
+// (p=0 diastole/filled, p=0.5 systole/contracted)
+fun heart_phantom(n, p) {
+    let im <- image(n, n, "L", 0)
+    let cx <- n / 2
+    let cy <- n * 0.55
+    // contraction factor: ventricles shrink at systole
+    let contract <- 1 - 0.32 * (1 - cos(p * 2 * PI)) / 2
+    // myocardium (echogenic muscle)
+    ultrasound.blob(im, cx, cy, n * 0.30, n * 0.34, 130)
+    // left ventricle (anechoic blood pool, contracts)
+    ultrasound.blob(im, cx - n * 0.08, cy + n * 0.02, n * 0.12 * contract, n * 0.16 * contract, 20)
+    // right ventricle
+    ultrasound.blob(im, cx + n * 0.12, cy, n * 0.09 * contract, n * 0.13 * contract, 25)
+    // left atrium (fills as ventricle empties)
+    ultrasound.blob(im, cx - n * 0.06, cy - n * 0.20, n * 0.08, n * 0.07, 22)
+    // valve leaflets (bright, flicker with phase)
+    let vb <- 180 + floor(60 * sin(p * 2 * PI))
+    ultrasound.blob(im, cx - n * 0.04, cy - n * 0.10, n * 0.05, n * 0.012, vb)
+    return im
+}
+
+// a 2-D four-chamber B-mode view at the given phase
+fun four_chamber(n, p) {
+    let ph <- heart_phantom(n, p)
+    return ultrasound.scan(ph, n / 2, 2, n * 0.95, 0.6)
+}
+
+// M-mode: one vertical scan column sampled across the cardiac cycle.
+// Returns an image whose x-axis is time and y-axis is depth (wall motion).
+fun mmode(n, frames) {
+    let mm <- image(frames, n, "L", 0)
+    let col <- n / 2
+    let f <- 0
+    while f < frames {
+        let p <- f / frames
+        let view <- four_chamber(n, p)
+        let y <- 0
+        while y < n {
+            mm.set(f, y, view.get(col, y))
+            y <- y + 1
+        }
+        f <- f + 1
+    }
+    return mm
+}
+
+// 4-D cardiac loop: list of B-mode frames over one cardiac cycle
+fun loop_frames(n, frames) {
+    let imgs <- []
+    let f <- 0
+    while f < frames {
+        push(imgs, four_chamber(n, f / frames))
+        f <- f + 1
+    }
+    return imgs
+}
+
+// write a beating-heart animated GIF and return its path
+fun loop_gif(n, frames, path, delay_cs) {
+    let g <- gif(path, n, n, delay_cs, 0)
+    for fr in loop_frames(n, frames) { g.add(fr) }
+    return g
+}
+
+// estimate ejection fraction proxy from the contraction model
+fun ejection_fraction() {
+    let edv <- 1.0                 // end-diastolic (relative)
+    let esv <- (1 - 0.32) * (1 - 0.32)   // end-systolic (area ~ r^2)
+    return round((edv - esv) / edv * 100, 0)
+}

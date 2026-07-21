@@ -14,12 +14,17 @@
 #   puts studio.code                     # ソースコード
 
 require_relative "penrose/tensor"
+require_relative "penrose/glyph_svg"
 require_relative "penrose/palette"
 require_relative "penrose/diagram"
 require_relative "penrose/canvas"
 require_relative "penrose/evaluator"
+require_relative "penrose/latex"
+require_relative "penrose/builder"
 require_relative "penrose/paper"
 require_relative "penrose/codegen"
+require_relative "penrose/webapp"
+require_relative "penrose/app_factory"
 require_relative "penrose/studio"
 
 module Bada

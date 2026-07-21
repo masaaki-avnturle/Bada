@@ -1,0 +1,124 @@
+// qos — the Bada Quantum OS kernel.
+//
+//   import qos
+//   let k <- qos.Kernel.new()
+//   k.boot()
+//   let r <- k.run("grover", [3, 5])
+//   k.report()
+//
+// A tiny operating system whose "processes" are quantum programs and whose
+// CPU is the native multi-qubit simulator.  The kernel manages qubit-register
+// memory, dispatches syscalls (qalloc / qgate / qmeasure), schedules programs
+// and logs everything - the Hamiltonian evolution H|Psi> = (+)(i hbar grad)^L
+// being the system clock that ticks each unitary gate.
+
+import qalgo
+
+class Kernel {
+    field log <- []
+    field next_pid <- 1
+    field history <- []         // finished processes
+    field calls <- 0            // syscall counter
+
+    method init() {}
+
+    method klog(msg) { push(self.log, msg) }
+    method syscall(name) { self.calls <- self.calls + 1  self.klog("  syscall: " + name) }
+
+    method boot() {
+        self.log <- []
+        self.klog("Bada Quantum OS v1.0 - booting")
+        self.klog("  CPU: native state-vector simulator")
+        self.klog("  clock: Hamiltonian evolution e^{-iHt}")
+        self.klog("  kernel ready.")
+        return self
+    }
+
+    // run a quantum program; returns {pid, program, qubits, result, top, prob, state}
+    method run(program, args) {
+        let pid <- self.next_pid
+        self.next_pid <- self.next_pid + 1
+        self.klog("[pid " + str(pid) + "] exec " + program + " " + str(args))
+
+        let r <- nil
+        let desc <- ""
+        if program == "bell" {
+            self.syscall("qalloc 2"); self.syscall("qgate H,CNOT")
+            r <- qalgo.bell()
+            desc <- "entangle 2 qubits -> (|00>+|11>)/sqrt2"
+        } else if program == "ghz" {
+            self.syscall("qalloc " + str(args[0])); self.syscall("qgate H,CNOT*")
+            r <- qalgo.ghz(args[0])
+            desc <- str(args[0]) + "-qubit GHZ entanglement"
+        } else if program == "grover" {
+            self.syscall("qalloc " + str(args[0])); self.syscall("oracle+diffusion")
+            r <- qalgo.grover(args[0], args[1])
+            desc <- "search " + str(qalgo.pow2(args[0])) + " states for item " + str(args[1])
+        } else if program == "deutsch_jozsa" {
+            self.syscall("qalloc " + str(args[0])); self.syscall("oracle query x1")
+            r <- qalgo.deutsch_jozsa(args[0], args[1])
+            desc <- "decide constant vs balanced (" + args[1] + ")"
+        } else if program == "bernstein_vazirani" {
+            self.syscall("qalloc " + str(args[0])); self.syscall("oracle query x1")
+            r <- qalgo.bernstein_vazirani(args[0], args[1])
+            desc <- "recover hidden string " + str(args[1])
+        } else if program == "qft" {
+            self.syscall("qalloc " + str(args[0]))
+            r <- qreg(args[0])
+            qgate(r, "X", 0)
+            qalgo.qft(r)
+            desc <- "quantum Fourier transform on " + str(args[0]) + " qubits"
+        } else {
+            throw "unknown quantum program: " + program
+        }
+
+        // observe the result
+        let probs <- qprobs(r)
+        let top <- 0
+        let bestp <- 0
+        let i <- 0
+        while i < len(probs) {
+            if probs[i] > bestp { bestp <- probs[i]  top <- i }
+            i <- i + 1
+        }
+        self.syscall("qmeasure")
+        let outcome <- qmeasure(r)
+        let n <- qn(r)
+
+        let proc <- {"pid": pid, "program": program, "qubits": n, "desc": desc,
+                     "probs": probs, "top": top, "prob": round(bestp, 4),
+                     "measured": outcome, "ket": to_ket(top, n)}
+        push(self.history, proc)
+        self.klog("[pid " + str(pid) + "] done -> |" + proc["ket"] + "> (P="
+            + str(round(bestp, 3)) + ", measured " + str(outcome) + ")")
+        return proc
+    }
+
+    // run a batch of jobs (the scheduler)
+    method schedule(jobs) {
+        for j in jobs { self.run(j[0], j[1]) }
+        return self.history
+    }
+
+    method report() {
+        for l in self.log { print l }
+    }
+}
+
+// integer -> binary ket string of width n
+fun to_ket(v, n) {
+    let s <- ""
+    let i <- n - 1
+    while i >= 0 {
+        let bit <- floor(v / pow2i(i)) % 2
+        s <- s + str(bit)
+        i <- i - 1
+    }
+    return s
+}
+fun pow2i(k) {
+    let p <- 1
+    let i <- 0
+    while i < k { p <- p * 2  i <- i + 1 }
+    return p
+}

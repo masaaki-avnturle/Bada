@@ -1,0 +1,69 @@
+// pet — Positron Emission Tomography on the gamma-manifold.
+//
+//   import pet
+//   let scan <- pet.brain_fdg(120)
+//   ... scan["overlay"] is a colour PET/CT fusion image
+//
+// PET measures METABOLIC activity: an FDG tracer concentrates where glucose
+// uptake is high.  We model uptake as a field of gamma-manifold sources whose
+// thermal entropy sets their intensity (the report's heat-entropy of the
+// gamma operator).  The emission field is projected (line integrals of the
+// activity manifold) and reconstructed exactly like CT, then fused with the
+// anatomy as a hot-metabolic overlay.
+
+import imaging
+import ct
+
+// build an FDG metabolic-uptake map (grayscale) from hot-spot sources
+fun uptake_map(n, spots) {
+    let im <- image(n, n, "L", 0)
+    // sources: [cx, cy, sigma, amp, k]  (k -> gamma thermal-entropy weight)
+    field_project(im, spots, 0, 1.0, true)
+    return im
+}
+
+// reconstruct the PET emission image via the CT (Radon) kernel, then fuse
+// the hot metabolic map over a grey anatomy backdrop.
+fun reconstruct_fused(uptake, anatomy, n_angles) {
+    let emission <- ct_reconstruct(uptake, n_angles, true)
+    let n <- emission.width
+    let rgb <- image(n, n, "RGB", 0)
+    let y <- 0
+    while y < n {
+        let x <- 0
+        while x < n {
+            let g <- anatomy.get(x, y)
+            let a <- emission.get(x, y)
+            // only genuine uptake (above the FBP streak floor) shows hot;
+            // everything else is the dim grey anatomy backdrop.
+            if a > 150 {
+                let c <- imaging.hot_colormap(a)
+                rgb.set_rgb(x, y, c[0], c[1], c[2])
+            } else {
+                let d <- floor(g * 0.55)
+                rgb.set_rgb(x, y, d, d, d)
+            }
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+    return rgb
+}
+
+// a ready-made brain FDG-PET: high uptake in grey matter + a hypermetabolic
+// focus (e.g. a lesion), low uptake elsewhere.
+fun brain_fdg(n) {
+    let cx <- n / 2
+    let cy <- n / 2
+    let spots <- [
+        [cx, cy, n * 0.30, 0.7, 3.0],                  // cortical grey matter
+        [cx - n * 0.10, cy - n * 0.05, n * 0.06, 1.0, 5.0],  // hot focus (lesion)
+        [cx + n * 0.14, cy + n * 0.08, n * 0.05, 0.6, 4.0]   // basal ganglia uptake
+    ]
+    let uptake <- uptake_map(n, spots)
+    let anatomy <- ct.body_slice(n, "head")
+    let fused <- reconstruct_fused(uptake, anatomy, 100)
+    // peak standardised-uptake proxy (SUV-like) from the gamma entropy
+    let suv <- gamma_entropy(5.0, 1) + 1
+    return {"uptake": uptake, "fused": fused, "suv": suv}
+}

@@ -1,0 +1,32 @@
+// 10 — File I/O.
+
+let path <- "/tmp/bada_demo.txt"
+
+// convenience functions
+write_file(path, "first line\nsecond line\n")
+append_file(path, "third line\n")
+
+print "exists?", file_exists(path)
+print "--- whole file ---"
+print read_file(path)
+
+print "--- by lines ---"
+let lines <- read_lines(path)
+let i <- 0
+for line in lines {
+    i <- i + 1
+    print i, ":", line
+}
+
+// streaming handle API: open(path, mode) -> file object with methods
+let f <- open(path, "a")
+f.write("fourth line (streamed)\n")
+f.close()
+
+let r <- open(path, "r")
+print "--- reopened, total lines ---", len(r.lines())
+r.close()
+
+// clean up (and demonstrate delete)
+delete_file(path)
+print "exists after delete?", file_exists(path)

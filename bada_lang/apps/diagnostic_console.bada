@@ -1,0 +1,185 @@
+// ============================================================================
+//  DIAGNOSTIC CONSOLE — an interactive Bada GUI application
+//
+//  Builds on the medical workstation with four interactive features driven by
+//  in-browser controls:
+//
+//    * PET-CT FUSION   — an alpha slider blends the hot PET overlay over CT
+//    * 4-D CARDIAC      — a beating-heart echo loop (animated GIF) + a phase
+//                         scrubber that steps through systole/diastole frames
+//    * BASAL-GANGLIA    — a dopamine slider that re-runs the gate live in JS,
+//      GATE               updating the bars and the selected diagnosis
+//    * AI REPORT        — a structured diagnostic note whose impression updates
+//                         live with the gated winner
+//
+//  Run:  ./bada run apps/diagnostic_console.bada   ->  diagnostic_console.html
+// ============================================================================
+
+import ct
+import pet
+import fusion
+import echo
+import labtest
+import genomics
+import basal_ganglia
+import report
+import gui
+
+let N <- 104
+print "=== Bada Diagnostic Console ==="
+
+// wrap content in a styled card
+fun cardw(c) { return gui.div("card", c) }
+
+// ---- PET-CT fusion --------------------------------------------------------
+
+print "[1] PET-CT fusion ..."
+let pet_scan <- pet.brain_fdg(N)
+let ct_head <- ct_reconstruct(ct.body_slice(N, "head"), 90, true)
+let fused0  <- fusion.pet_ct(ct_head, pet_scan["uptake"], 0.0)
+let fused6  <- fusion.pet_ct(ct_head, pet_scan["uptake"], 0.6)
+let fused10 <- fusion.pet_ct(ct_head, pet_scan["uptake"], 1.0)
+
+// ---- 4-D cardiac loop -----------------------------------------------------
+
+print "[2] 4-D cardiac loop ..."
+let nframes <- 10
+let frames <- echo.loop_frames(N, nframes)
+let cardiac_gif <- echo.loop_gif(N, nframes, "cardiac_4d.gif", 10)
+let ef <- echo.ejection_fraction()
+
+// ---- findings + basal-ganglia gate ---------------------------------------
+
+print "[3] findings & gate ..."
+let lab <- labtest.Analyzer.new()
+lab.measure("glucose", 188)
+lab.measure("crp", 3.1)
+lab.measure("hb", 11.0)
+let seq <- genomics.Sequencer.new("ATGGCCATTGTAATGGGCCGCTGTAGC")
+seq.translate()
+
+// salience table feeding the gate (also embedded into JS for live re-gating)
+let sal <- {}
+sal["PET"] <- round(pet_scan["suv"], 3)
+sal["CT"] <- 0.8
+sal["Echo"] <- 0.55
+sal["Blood"] <- round(lab.total_salience(), 3)
+sal["DNA-RNA"] <- round(seq.expression_weight(), 3)
+
+let bg <- basal_ganglia.Gate.new(0.65)
+for k in keys(sal) { bg.input(k, sal[k]) }
+let winner <- bg.select()
+
+// ---- AI report ------------------------------------------------------------
+
+print "[4] AI diagnostic report ..."
+let rep <- report.Reporter.new()
+rep.add("PET", "focal hypermetabolic uptake (SUV " + str(round(pet_scan["suv"], 2)) + ")", sal["PET"], "abnormal")
+rep.add("CT", "no acute haemorrhage; focal lesion correlate", sal["CT"], "abnormal")
+rep.add("Echo", "EF " + str(ef) + "%, normal wall motion", sal["Echo"], "normal")
+rep.add("Blood", "elevated glucose & CRP, low Hb", sal["Blood"], "abnormal")
+rep.add("DNA-RNA", "GC " + str(round(seq.gc_content() * 100, 0)) + "%, no truncation", sal["DNA-RNA"], "normal")
+let report_text <- rep.generate(winner[0], winner[1])
+print ""
+print report_text
+
+// ---- build the interactive GUI -------------------------------------------
+
+print "rendering interactive console ..."
+let app <- gui.App.new("Bada Diagnostic Console")
+app.style(gui.dark_theme())
+app.style(".scan img{width:100%;image-rendering:pixelated;border-radius:8px;background:#000}
+.fuse{position:relative}.fuse img{position:absolute;left:0;top:0;width:100%}
+.fuse .wrap{position:relative;width:100%;padding-top:100%}
+pre{white-space:pre-wrap;font-size:11px;color:#cfe0f5;background:#0c121d;padding:12px;border-radius:8px;line-height:1.45}
+.big{font-size:20px;font-weight:800;color:#5fd0a0}")
+
+app.add(gui.h1("Bada Diagnostic Console"))
+app.add(gui.h2("interactive PET-CT fusion, 4-D cardiac, live basal-ganglia gate & AI report"))
+
+// --- PET-CT fusion card with alpha slider ---
+let fuse_card <- gui.div("name", "PET-CT Fusion")
+    + gui.div("tag", "blend metabolic PET over anatomical CT")
+    + "<div class=\"fuse\"><div class=\"wrap\">"
+    + "<img src=\"" + ct_head.data_uri() + "\">"
+    + "<img id=\"petlayer\" style=\"opacity:0.6\" src=\"" + pet_scan["fused"].data_uri() + "\">"
+    + "</div></div>"
+    + "<div class=\"row\"><label>PET alpha</label>"
+    + gui.slider("alpha", 0, 100, 1, 60, "document.getElementById('petlayer').style.opacity=this.value/100")
+    + "</div>"
+
+// --- 4-D cardiac card: animated GIF + frame scrubber ---
+let frames_js <- "["
+let i <- 0
+while i < len(frames) {
+    if i > 0 { frames_js <- frames_js + "," }
+    frames_js <- frames_js + "'" + frames[i].data_uri() + "'"
+    i <- i + 1
+}
+frames_js <- frames_js + "]"
+
+let cardiac_card <- gui.div("name", "4-D Cardiac (echo)")
+    + gui.div("tag", "beating heart loop  -  EF " + str(ef) + "%")
+    + "<div class=\"scan\"><img id=\"cineimg\" src=\"" + cardiac_gif.data_uri() + "\"></div>"
+    + "<div class=\"row\"><label>Phase</label>"
+    + gui.slider("phase", 0, str(len(frames) - 1), 1, 0,
+        "document.getElementById('cineimg').src=FRAMES[this.value]")
+    + "<span class=\"val\" id=\"phv\">live</span></div>"
+
+app.add(gui.div("grid", cardw(fuse_card) + cardw(cardiac_card)))
+
+// --- live basal-ganglia gate with dopamine slider ---
+let sal_js <- "["
+let first <- true
+for k in keys(sal) {
+    if not first { sal_js <- sal_js + "," }
+    sal_js <- sal_js + "{name:'" + k + "',s:" + str(sal[k]) + "}"
+    first <- false
+}
+sal_js <- sal_js + "]"
+
+let gate_card <- gui.div("name", "Basal-Ganglia Diagnostic Gate")
+    + gui.div("tag", "drag dopamine to sharpen the selection")
+    + "<div class=\"row\"><label>Dopamine</label>"
+    + gui.slider("dop", 0, 100, 1, 65, "regate(this.value/100)")
+    + "<span class=\"val\" id=\"dopv\">0.65</span></div>"
+    + "<div id=\"gatebars\"></div>"
+    + "<div class=\"big\" id=\"winner\">&#9658; ...</div>"
+
+// --- AI report card ---
+let report_card <- gui.div("name", "AI Diagnostic Report")
+    + "<pre id=\"report\">" + report_text + "</pre>"
+
+app.add(gui.div("grid", cardw(gate_card) + cardw(report_card)))
+
+// ---- JavaScript: live gate + scrubber data -------------------------------
+
+let js <- [
+    "var FRAMES = " + frames_js + ";",
+    "var SAL = " + sal_js + ";",
+    "function regate(dop){",
+    "  document.getElementById('dopv').textContent=dop.toFixed(2);",
+    "  var gain=1+dop*4, mx=0;",
+    "  SAL.forEach(function(c){ if(c.s>mx) mx=c.s; });",
+    "  var tot=0, ex=[];",
+    "  SAL.forEach(function(c){ var e=Math.exp((c.s-mx)*gain); ex.push(e); tot+=e; });",
+    "  var html='', best=-1, bestw=0, bestn='';",
+    "  for(var i=0;i<SAL.length;i++){",
+    "    var w=ex[i]/tot;",
+    "    if(w>bestw){bestw=w;bestn=SAL[i].name;}",
+    "    html+='<div class=\"row\"><label>'+SAL[i].name+'</label>'+",
+    "      '<div class=\"meter\"><div class=\"bar\" style=\"width:'+(w*100).toFixed(0)+",
+    "      '%;background:#4a80d0\"></div></div><span class=\"val\">'+(w*100).toFixed(1)+'%</span></div>';",
+    "  }",
+    "  document.getElementById('gatebars').innerHTML=html;",
+    "  document.getElementById('winner').innerHTML='&#9658; '+bestn+' ('+(bestw*100).toFixed(1)+'%)';",
+    "  var imp=document.getElementById('report');",
+    "  imp.textContent=imp.textContent.replace(/primary abnormality on [^:]+:/, 'primary abnormality on '+bestn+':');",
+    "}",
+    "regate(0.65);"
+]
+app.script(join(js, "\n"))
+
+app.save("diagnostic_console.html")
+print "wrote diagnostic_console.html  (and cardiac_4d.gif)"
+print "done. open diagnostic_console.html in a browser and drag the sliders."

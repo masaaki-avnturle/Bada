@@ -1,0 +1,151 @@
+name: Build & Release Penrose Studio (EXE + APK)
+
+# Produces downloadable installers and publishes them to a GitHub Release:
+#   * Windows 10/11 .exe  (Electron / electron-builder — NSIS installer + portable)
+#   * Android .apk        (Capacitor + Gradle — debug-signed, installs directly)
+#
+# Triggers (any of these builds + publishes the `penrose-v*` Release):
+#   * push a tag  penrose-v1.2.3           -> Release named after the tag
+#   * push to the penrose dev branch       -> Release `penrose-v1.0.0` (tag created
+#       when penrose_app/ or this workflow changes; server-side via GITHUB_TOKEN)
+#   * manual run (Actions ▸ Run workflow)  -> Release from the `release_tag` input
+#
+# A dedicated `penrose-v*` tag prefix keeps this separate from the repo's other
+# apps that release on bare `v*` tags. action-gh-release creates the tag at the
+# built commit if it does not already exist.
+
+on:
+  push:
+    tags:
+      - 'penrose-v*'
+    branches:
+      - 'claude/penrose-diagram-builder-sd0c31'
+    paths:
+      - 'penrose_app/**'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to publish (e.g. penrose-v1.0.0)'
+        required: false
+        default: 'penrose-v1.0.0'
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    working-directory: penrose_app
+
+jobs:
+  # ---------------- Windows 10/11 EXE ----------------
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}";
+          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then TAG="${{ github.event.inputs.release_tag }}";
+          else TAG="penrose-v1.0.0"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer + portable (.exe)
+        run: npm run dist:win
+
+      - name: Collect artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp dist/*.exe out/ || true
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PenroseStudio-windows-exe
+          path: penrose_app/out/*.exe
+          if-no-files-found: error
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Penrose Studio ${{ steps.tag.outputs.tag }}
+          body: |
+            ペンローズ絵記号スタジオ — 双方向 (絵記号 ⇄ 方程式)。
+            - Windows 10/11: `PenroseStudio-Setup-*.exe`（インストーラ）/ `*-portable.exe`（不要）
+            - Android: `PenroseStudio-*.apk`（「提供元不明のアプリ」を許可してインストール）
+          files: penrose_app/out/*.exe
+          fail_on_unmatched_files: false
+
+  # ---------------- Android APK ----------------
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then TAG="${GITHUB_REF_NAME}";
+          elif [ -n "${{ github.event.inputs.release_tag }}" ]; then TAG="${{ github.event.inputs.release_tag }}";
+          else TAG="penrose-v1.0.0"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Add Android platform (generate native project)
+        run: npx cap add android
+
+      - name: Sync web assets into the Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK
+        run: |
+          mkdir -p out
+          cp android/app/build/outputs/apk/debug/app-debug.apk \
+             "out/PenroseStudio-${{ steps.tag.outputs.tag }}.apk"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PenroseStudio-android-apk
+          path: penrose_app/out/*.apk
+          if-no-files-found: error
+
+      - name: Publish to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Penrose Studio ${{ steps.tag.outputs.tag }}
+          files: penrose_app/out/*.apk
+          fail_on_unmatched_files: false
