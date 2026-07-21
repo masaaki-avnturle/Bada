@@ -293,6 +293,15 @@ class TestPenroseWebApp < Minitest::Test
     assert_match(/polyline/, html)                # ink rendered as polylines
   end
 
+  def test_placed_symbols_get_default_values_so_they_compute
+    html = WebApp.render
+    # a picture-symbol placed from the palette must carry a default numeric value
+    # so drawing/selecting it computes immediately (no hand-typed JSON needed).
+    assert_match(/function defaultValue/, html)
+    assert_match(/val:defaultValue\(up\+down\)/, html)   # addNode assigns it
+    refute_match(/x:70\+\(i%4\)\*195[^}]*val:null/, html) # no more null-valued placement
+  end
+
   def test_has_arithmetic_add_sub_mul_div
     html = WebApp.render
     assert_includes html, "加減乗除"

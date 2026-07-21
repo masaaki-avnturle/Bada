@@ -221,7 +221,7 @@ module Bada
           function pickSymbol(p,el){
             document.querySelectorAll('.sym').forEach(s=>s.classList.remove('active'));
             const k=p.key;
-            if(TENSORS[k]){ addNode(k); setHint(`${p.name} を配置しました。ドラッグで移動、脚(●)を2つクリックで結線。`); }
+            if(TENSORS[k]){ addNode(k); setHint(`${p.name} を配置（既定値で即計算）。脚(●)を2つクリックで結線、値はノードを選んで編集。`); }
             else if(['contraction','wire','cup','cap'].includes(k)){ el.classList.add('active'); setHint('2つの脚(●)をクリックすると結線（縮約）します。'); }
             else if(['nabla','partial'].includes(k)){ applyDeriv(k,p); }
             else if(k==='integral'){ applyIntegral(p); }
@@ -231,11 +231,19 @@ module Bada
           }
 
           // ================= nodes =================
+          // A sensible default value (dimension 2) so a placed symbol computes
+          // immediately — no need to hand-type JSON. Rank = up+down legs.
+          function defaultValue(rank){
+            if(rank<=0) return 1;
+            let c=1;
+            const build=r=> r===1 ? [c++, c++] : [build(r-1), build(r-1)];
+            return build(rank);
+          }
           function addNode(key){
             const [up,down,shape,name]=TENSORS[key];
             const i=nodes.length;
             const n={id:uid++, key, name, up, down, shape,
-                     x:70+(i%4)*195, y:110+Math.floor(i/4)*180, val:null};
+                     x:70+(i%4)*195, y:110+Math.floor(i/4)*180, val:defaultValue(up+down)};
             nodes.push(n); selNode=n; sel=null;
             return n;
           }
@@ -418,7 +426,8 @@ module Bada
               n.up=Math.max(0,Math.min(4,up)); n.down=Math.max(0,Math.min(4,down));
             }
             const raw=$('p_val').value.trim();
-            if(raw){ try{ n.val=JSON.parse(raw); }catch(e){ alert('JSONが不正です'); return; } } else n.val=null;
+            if(raw){ try{ n.val=JSON.parse(raw); }catch(e){ alert('JSONが不正です'); return; } }
+            else { n.val=defaultValue(n.up+n.down); }   // keep a value so it always computes
             setHint('ノードを更新しました。'); update();
           }
 
