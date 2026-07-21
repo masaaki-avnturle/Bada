@@ -1,0 +1,193 @@
+// ============================================================================
+//  BADA OS — desktop with switchable window managers (Bada GUI)
+//
+//  One desktop, three window managers you can switch live (top-right selector,
+//  the Settings app, or the terminal command `wm <name>`):
+//    * w9wm        Plan 9 9wm + virtual desktops: borderless windows, the
+//                  root button-3 menu, New > sweep a rectangle, desktops 1-4.
+//    * WindowMaker NeXTSTEP look: a Dock of app tiles on the right edge, a Clip
+//                  workspace widget, beveled titlebars (miniaturise + close),
+//                  miniwindows on the desktop.
+//    * Windows 11  centred taskbar with running-window buttons, a Start menu,
+//                  acrylic windows with minimise / maximise / close.
+//
+//  Built-in apps (shared by all three): Terminal (bada-sh), File Explorer,
+//  Settings, Notepad, Calculator, This PC, Bada Apps.
+//
+//  Run:  ./bada run apps/bada_os.bada   ->  bada_os.html
+// ============================================================================
+
+import gui
+
+let app <- gui.App.new("Bada OS")
+
+app.style("
+*{margin:0;padding:0;box-sizing:border-box;font-family:'DejaVu Sans Mono',Consolas,monospace}
+html,body{height:100%;overflow:hidden;user-select:none}
+#root{position:fixed;inset:0;background:#7d8a99}
+body.wm-win11 #root{background:radial-gradient(120% 120% at 30% 20%,#2a6cf0,#1a3a8a 35%,#10204a 70%,#0a0e1e)}
+body.wm-wmaker #root{background:#3a3a3a;background-image:repeating-linear-gradient(45deg,#333 0 2px,#3a3a3a 2px 4px)}
+body.wm-w9wm #root{background:#7d8a99}
+#wmsel{position:fixed;top:4px;right:8px;z-index:10000;display:flex;gap:4px;background:rgba(0,0,0,.55);border-radius:6px;padding:3px}
+#wmsel button{font-size:11px;padding:3px 8px;border:0;border-radius:4px;background:#2a2f3a;color:#cfe9d8;cursor:pointer}
+#wmsel button.on{background:#5fd0a0;color:#04130c}
+.win{position:absolute;background:#1c1f26;display:flex;flex-direction:column;overflow:hidden;color:#eaeef7}
+body.wm-w9wm .win{border:2px solid #000;outline:1px solid #c8c8b8;box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+body.wm-w9wm .win.focus{outline:2px solid #5fd0a0}
+body.wm-wmaker .win{border:1px solid #000;box-shadow:3px 3px 6px rgba(0,0,0,.5)}
+body.wm-win11 .win{border:1px solid rgba(255,255,255,.12);border-radius:10px;background:rgba(32,34,42,.94);backdrop-filter:blur(24px);box-shadow:0 18px 60px rgba(0,0,0,.55)}
+body.wm-win11 .win.focus{border-color:rgba(95,160,255,.5)}
+.titlebar{display:flex;align-items:center;cursor:move;flex:none}
+.titlebar .ico{padding:0 6px;font-size:12px}.titlebar .ttl{flex:1;font-size:12px;font-weight:600;padding:0 4px}
+.tb-min,.tb-max,.tb-close{width:30px;text-align:center;cursor:pointer;font-size:12px}
+body.wm-w9wm .titlebar{height:14px;background:#000}
+body.wm-w9wm .titlebar .ttl{color:#9fb6d6;font-size:10px}
+body.wm-w9wm .tb-min,body.wm-w9wm .tb-max{display:none}
+body.wm-w9wm .tb-close{color:#e06a6a}
+body.wm-wmaker .titlebar{height:20px;background:linear-gradient(#9a9a9a,#6e6e6e);border-bottom:1px solid #000;color:#111}
+body.wm-wmaker .win.focus .titlebar{background:linear-gradient(#5b78b0,#33507f);color:#fff}
+body.wm-wmaker .titlebar .ttl{text-align:center;font-size:11px}
+body.wm-wmaker .tb-min{order:-2;background:#888;border-right:1px solid #000;color:#111}
+body.wm-wmaker .ico{order:-1}
+body.wm-wmaker .tb-max{display:none}
+body.wm-wmaker .tb-close{background:#888;border-left:1px solid #000;color:#111}
+body.wm-win11 .titlebar{height:34px;background:rgba(255,255,255,.04)}
+body.wm-win11 .tb-close:hover{background:#e81123;color:#fff}
+body.wm-win11 .tb-min:hover,body.wm-win11 .tb-max:hover{background:rgba(255,255,255,.12)}
+.wbody{flex:1;overflow:auto;padding:10px;background:#1c1f26}
+body.wm-win11 .wbody{background:transparent}
+#bar{position:fixed;top:0;left:0;right:0;height:20px;background:#000;color:#cfe9d8;font-size:12px;display:none;align-items:center;gap:12px;padding:0 8px;z-index:9000}
+body.wm-w9wm #bar{display:flex}#bar b{color:#5fd0a0}
+#menu{position:fixed;z-index:9500;background:#ffffea;color:#000;border:1px solid #000;font-size:13px;display:none;min-width:120px;box-shadow:2px 2px 0 rgba(0,0,0,.4)}
+#menu .mi{padding:3px 14px 3px 10px;cursor:pointer;position:relative;white-space:nowrap}
+#menu .mi:hover{background:#000;color:#ffffea}#menu .sep{height:1px;background:#888;margin:2px 0}
+#menu .sub{position:absolute;left:100%;top:-1px;background:#ffffea;border:1px solid #000;display:none;min-width:130px}
+#menu .mi.has:hover .sub{display:block}#menu .sub .mi{color:#000}
+#rubber{position:fixed;border:2px dashed #5fd0a0;background:rgba(95,208,160,.12);display:none;z-index:9400;pointer-events:none}
+#hint{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);background:#000;color:#5fd0a0;font-size:12px;padding:4px 12px;display:none;z-index:9600}
+#dock{position:fixed;top:60px;right:6px;display:none;flex-direction:column;gap:4px;z-index:9000}
+body.wm-wmaker #dock{display:flex}
+.docktile{width:56px;height:56px;background:linear-gradient(#8a8a8a,#5a5a5a);border:2px solid #222;outline:1px solid #aaa;display:flex;align-items:center;justify-content:center;font-size:26px;cursor:pointer}
+.docktile:hover{outline:1px solid #5fd0a0}
+#clip{position:fixed;top:6px;left:6px;width:56px;height:56px;background:linear-gradient(#8a8a8a,#5a5a5a);border:2px solid #222;outline:1px solid #aaa;display:none;flex-direction:column;align-items:center;justify-content:center;color:#111;font-size:10px;cursor:pointer;z-index:9000}
+body.wm-wmaker #clip{display:flex}#clip b{font-size:16px}
+#miniwins{position:fixed;left:6px;bottom:6px;display:flex;gap:6px;z-index:9000}
+.miniwin{width:56px;height:56px;background:linear-gradient(#8a8a8a,#5a5a5a);border:2px solid #222;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;cursor:pointer;color:#111}
+.miniwin small{font-size:8px}
+#taskbar{position:fixed;left:0;right:0;bottom:0;height:48px;display:none;align-items:center;justify-content:center;gap:6px;background:rgba(24,26,33,.82);backdrop-filter:blur(28px);border-top:1px solid rgba(255,255,255,.08);z-index:9000}
+body.wm-win11 #taskbar{display:flex}
+.tk{height:40px;min-width:40px;padding:0 8px;border-radius:8px;display:flex;align-items:center;gap:6px;font-size:18px;cursor:pointer;color:#eaeef7}.tk:hover{background:rgba(255,255,255,.12)}
+.tk .lab{font-size:12px}.tk.run{background:rgba(255,255,255,.08)}
+#tray{position:fixed;right:10px;bottom:0;height:48px;display:none;align-items:center;color:#eaeef7;font-size:12px;z-index:9001}
+body.wm-win11 #tray{display:flex}
+#start{position:fixed;left:50%;transform:translateX(-50%);bottom:58px;width:540px;max-width:94vw;background:rgba(36,38,46,.96);backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:20px;display:none;z-index:9002;color:#eaeef7}
+#start.open{display:block}
+#start input{width:100%;padding:9px 12px;border-radius:18px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);color:#fff;margin-bottom:14px}
+.sgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sapp{text-align:center;padding:10px 4px;border-radius:8px;cursor:pointer;font-size:11px}.sapp:hover{background:rgba(255,255,255,.12)}.sapp .g{font-size:26px;display:block;margin-bottom:4px}
+.term{background:#0c0c12;color:#cfe9d8;font-size:13px;height:100%;padding:8px;white-space:pre-wrap;overflow:auto}
+.term .pin{display:flex}.term .pin span{color:#5fd0a0}.term input{flex:1;background:transparent;border:0;color:#cfe9d8;font-family:inherit;font-size:13px;outline:none}
+.exp{display:grid;grid-template-columns:150px 1fr;height:100%}
+.exp .nav{background:rgba(0,0,0,.2);padding:8px;font-size:12px}.exp .nav div{padding:4px 6px;cursor:pointer}.exp .nav div:hover{background:rgba(255,255,255,.1)}
+.exp .main{padding:10px}.crumb{font-size:11px;color:#9fb6d6;margin-bottom:8px}
+.files{display:grid;grid-template-columns:repeat(auto-fill,84px);gap:8px}
+.fitem{text-align:center;padding:6px 2px;cursor:pointer;font-size:11px;word-break:break-all}.fitem:hover{background:rgba(255,255,255,.1)}.fitem .g{font-size:26px;display:block}
+.calc{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;max-width:260px}
+.calc .disp{grid-column:1/5;background:#0c0c12;padding:12px;text-align:right;font-size:22px}
+.calc button{padding:12px;border:0;background:rgba(255,255,255,.08);color:#fff;cursor:pointer}.calc button:hover{background:rgba(255,255,255,.18)}.calc .eq{background:#2a6cf0}
+textarea.note{width:100%;height:100%;min-height:200px;background:#0c0c12;color:#eaeef7;border:0;padding:10px;font-size:14px;resize:none}
+.setrow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+pre{font-size:12px;line-height:1.5}a{color:#5aa0ff}
+")
+
+app.add("<div id=\"wmsel\"><button id=\"wm_w9wm\" onclick=\"setWM('w9wm')\">w9wm</button>"
+    + "<button id=\"wm_wmaker\" onclick=\"setWM('wmaker')\">WindowMaker</button>"
+    + "<button id=\"wm_win11\" onclick=\"setWM('win11')\">Windows 11</button></div>"
+    + "<div id=\"root\">"
+    + "<div id=\"bar\"><b>Bada OS</b> &middot; w9wm &middot; <span id=\"deskind\">desktop 1</span>"
+    + "<span style=\"flex:1\"></span><span style=\"color:#9fb6d6\">button-3 = menu</span></div>"
+    + "<div id=\"menu\"></div><div id=\"rubber\"></div><div id=\"hint\"></div>"
+    + "<div id=\"clip\"><b>1</b>workspc</div><div id=\"dock\"></div><div id=\"miniwins\"></div>"
+    + "<div id=\"taskbar\"></div><div id=\"tray\"><span style=\"margin-right:12px\">&#128246; &#128266;</span><div id=\"clock\"></div></div>"
+    + "<div id=\"start\"></div>"
+    + "</div>")
+
+let js <- [
+    "var APPS={terminal:{name:'Terminal',icon:'\\uD83D\\uDDA5'},explorer:{name:'Files',icon:'\\uD83D\\uDCC1'},",
+    "  settings:{name:'Settings',icon:'\\u2699'},notepad:{name:'Notepad',icon:'\\uD83D\\uDCDD'},",
+    "  calc:{name:'Calculator',icon:'\\uD83E\\uDDEE'},thispc:{name:'This PC',icon:'\\uD83D\\uDCBB'},apps:{name:'Bada Apps',icon:'\\uD83C\\uDFE0'}};",
+    "var wins={}, seq=0, zTop=10, curDesk=1, NDESK=4, mode='', modeApp='', focusId='', WM='w9wm';",
+    "var FS={'/':'dir','/home':'dir','/home/user':'dir','/home/user/Documents':'dir',",
+    "  '/home/user/Documents/readme.txt':'Welcome to Bada OS!\\nThree window managers: w9wm, WindowMaker, Windows 11.',",
+    "  '/home/user/Documents/notes.md':'# Notes','/home/user/Pictures':'dir','/home/user/hello.bada':'print \"hi\"',",
+    "  '/apps':'dir','/apps/quantum_os.html':'Bada Quantum OS'};",
+    "function children(dir){var pre=dir==='/'?'/':dir+'/',out=[];for(var k in FS){if(k===dir)continue;if(k.indexOf(pre)===0){var r=k.slice(pre.length);if(r&&r.indexOf('/')<0)out.push(r);}}return out.sort();}",
+    "function isDir(p){return FS[p]==='dir';}",
+    "function raise(id){var w=wins[id];if(!w)return;w.el.style.zIndex=++zTop;if(focusId&&wins[focusId])wins[focusId].el.classList.remove('focus');focusId=id;w.el.classList.add('focus');}",
+    "function createWin(appId,x,y,w,h){var id='w'+(++seq),a=APPS[appId];",
+    "  var el=document.createElement('div');el.className='win';el.id=id;el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';el.style.height=h+'px';el.style.zIndex=++zTop;",
+    "  el.innerHTML='<div class=\"titlebar\" onmousedown=\"gripDown(event,\\''+id+'\\')\">'+",
+    "    '<span class=\"tb-min\" onclick=\"miniaturize(event,\\''+id+'\\')\">\\u2013</span>'+",
+    "    '<span class=\"ico\">'+a.icon+'</span><span class=\"ttl\">'+a.name+'</span>'+",
+    "    '<span class=\"tb-max\" onclick=\"maxWin(event,\\''+id+'\\')\">\\u25A1</span>'+",
+    "    '<span class=\"tb-close\" onclick=\"delWin(event,\\''+id+'\\')\">\\u2715</span></div>'+",
+    "    '<div class=\"wbody\" id=\"body_'+id+'\"></div>';",
+    "  el.onmousedown=function(){raise(id);};document.getElementById('root').appendChild(el);",
+    "  wins[id]={el:el,app:appId,desk:curDesk};document.getElementById('body_'+id).innerHTML=render(appId,id);",
+    "  if(appId==='terminal')initTerm(id);raise(id);refreshChrome();return id;}",
+    "function openApp(appId){createWin(appId,80+Object.keys(wins).length*24,60+Object.keys(wins).length*20,560,360);closeStart();}",
+    "function delWin(e,id){if(e)e.stopPropagation();if(wins[id]){wins[id].el.remove();delete wins[id];}clearMini(id);refreshChrome();}",
+    "function maxWin(e,id){if(e)e.stopPropagation();var w=wins[id].el;if(w.dataset.max){w.style.left=w.dataset.l;w.style.top=w.dataset.t;w.style.width=w.dataset.w;w.style.height=w.dataset.h;w.dataset.max='';}else{w.dataset.l=w.style.left;w.dataset.t=w.style.top;w.dataset.w=w.style.width;w.dataset.h=w.style.height;w.style.left='0';w.style.top='22px';w.style.width='100vw';w.style.height='calc(100vh - 70px)';w.dataset.max='1';}}",
+    "function miniaturize(e,id){if(e)e.stopPropagation();wins[id].el.style.display='none';wins[id].mini=true;",
+    "  if(WM==='wmaker'){var mw=document.createElement('div');mw.className='miniwin';mw.id='mini_'+id;mw.innerHTML=APPS[wins[id].app].icon+'<small>'+APPS[wins[id].app].name+'</small>';mw.ondblclick=function(){restore(id);};document.getElementById('miniwins').appendChild(mw);}refreshChrome();}",
+    "function restore(id){wins[id].el.style.display='flex';wins[id].mini=false;clearMini(id);raise(id);refreshChrome();}",
+    "function clearMini(id){var m=document.getElementById('mini_'+id);if(m)m.remove();}",
+    "function gripDown(e,id){raise(id);var w=wins[id].el,r=w.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;function mv(ev){w.style.left=(ev.clientX-dx)+'px';w.style.top=Math.max(22,ev.clientY-dy)+'px';}function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);e.stopPropagation();}",
+    "function winAt(x,y){var best=null,bz=-1;for(var id in wins){if(wins[id].mini||wins[id].desk!==curDesk)continue;var r=wins[id].el.getBoundingClientRect();if(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom){var z=+wins[id].el.style.zIndex;if(z>bz){bz=z;best=id;}}}return best;}",
+    "function setWM(name){WM=name;document.body.className='wm-'+name;['w9wm','wmaker','win11'].forEach(function(n){document.getElementById('wm_'+n).classList.toggle('on',n===name);});for(var id in wins){wins[id].el.style.display=(wins[id].desk===curDesk&&!wins[id].mini)?'flex':'none';}refreshChrome();}",
+    "function refreshChrome(){if(WM==='win11')renderTask();if(WM==='wmaker')renderDock();}",
+    "function showMenu(x,y){var m=document.getElementById('menu');var sub='';for(var a in APPS)sub+='<div class=\"mi\" onclick=\"startNew(\\''+a+'\\')\">'+APPS[a].icon+' '+APPS[a].name+'</div>';",
+    "  var hid='';for(var id in wins)if(wins[id].mini)hid+='<div class=\"mi\" onclick=\"restore(\\''+id+'\\')\">'+APPS[wins[id].app].name+'</div>';",
+    "  var desks='';for(var d=1;d<=NDESK;d++)desks+='<div class=\"mi\" onclick=\"switchDesk('+d+')\">'+(d===curDesk?'\\u2713 ':'   ')+'Desktop '+d+'</div>';",
+    "  m.innerHTML='<div class=\"mi has\">New \\u25B8<div class=\"sub\">'+sub+'</div></div><div class=\"mi\" onclick=\"setMode(\\'reshape-pick\\')\">Reshape</div><div class=\"mi\" onclick=\"setMode(\\'move-pick\\')\">Move</div><div class=\"mi\" onclick=\"setMode(\\'delete-pick\\')\">Delete</div><div class=\"mi\" onclick=\"setMode(\\'hide-pick\\')\">Hide</div>'+(hid?'<div class=\"sep\"></div>'+hid:'')+'<div class=\"sep\"></div>'+desks;",
+    "  m.style.left=Math.min(x,innerWidth-160)+'px';m.style.top=Math.min(y,innerHeight-220)+'px';m.style.display='block';}",
+    "function hideMenu(){document.getElementById('menu').style.display='none';}",
+    "function setHint(t){var h=document.getElementById('hint');if(t){h.textContent=t;h.style.display='block';}else h.style.display='none';}",
+    "function setMode(m){mode=m;hideMenu();var t={'reshape-pick':'click a window to reshape','move-pick':'click a window, then drag','delete-pick':'click a window to delete','hide-pick':'click a window to hide'};setHint(t[m]||'');}",
+    "function startNew(a){modeApp=a;mode='sweep-new';hideMenu();setHint('sweep a rectangle to place '+APPS[a].name);}",
+    "function switchDesk(n){curDesk=n;hideMenu();document.getElementById('deskind').textContent='desktop '+n;document.querySelector('#clip b').textContent=n;for(var id in wins){wins[id].el.style.display=(wins[id].desk===n&&!wins[id].mini)?'flex':'none';}}",
+    "var sw=null;",
+    "function rootDown(e){if(e.button===2)return;hideMenu();if(mode==='sweep-new'||mode.indexOf('reshape-sweep')===0){sw={x:e.clientX,y:e.clientY};var rb=document.getElementById('rubber');rb.style.display='block';rb.style.left=e.clientX+'px';rb.style.top=e.clientY+'px';rb.style.width='0';rb.style.height='0';document.addEventListener('mousemove',rootMove);document.addEventListener('mouseup',rootUp);return;}",
+    "  if(mode.indexOf('pick')>0){var id=winAt(e.clientX,e.clientY);if(!id){mode='';setHint('');return;}if(mode==='delete-pick'){delWin(null,id);mode='';setHint('');}else if(mode==='hide-pick'){miniaturize(null,id);mode='';setHint('');}else if(mode==='reshape-pick'){mode='reshape-sweep:'+id;setHint('sweep the new geometry');}else if(mode==='move-pick'){mode='';setHint('');var w=wins[id].el,r=w.getBoundingClientRect(),dx=e.clientX-r.left,dy=e.clientY-r.top;raise(id);function mv(ev){w.style.left=(ev.clientX-dx)+'px';w.style.top=Math.max(22,ev.clientY-dy)+'px';}function up(){document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up);}document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);}return;}}",
+    "function rootMove(e){if(!sw)return;var rb=document.getElementById('rubber'),x=Math.min(sw.x,e.clientX),y=Math.min(sw.y,e.clientY);rb.style.left=x+'px';rb.style.top=y+'px';rb.style.width=Math.abs(e.clientX-sw.x)+'px';rb.style.height=Math.abs(e.clientY-sw.y)+'px';}",
+    "function rootUp(e){document.removeEventListener('mousemove',rootMove);document.removeEventListener('mouseup',rootUp);document.getElementById('rubber').style.display='none';if(!sw)return;var x=Math.min(sw.x,e.clientX),y=Math.max(22,Math.min(sw.y,e.clientY)),w=Math.max(220,Math.abs(e.clientX-sw.x)),h=Math.max(140,Math.abs(e.clientY-sw.y));sw=null;if(mode==='sweep-new')createWin(modeApp,x,y,w,h);else if(mode.indexOf('reshape-sweep')===0){var id=mode.split(':')[1];if(wins[id]){var el=wins[id].el;el.style.left=x+'px';el.style.top=y+'px';el.style.width=w+'px';el.style.height=h+'px';}}mode='';modeApp='';setHint('');}",
+    "function renderDock(){var d=document.getElementById('dock');var h='<div class=\"docktile\" title=\"WindowMaker\">\\uD83C\\uDF10</div>';for(var a in APPS)h+='<div class=\"docktile\" title=\"'+APPS[a].name+'\" ondblclick=\"openApp(\\''+a+'\\')\">'+APPS[a].icon+'</div>';d.innerHTML=h;}",
+    "function renderTask(){var tb=document.getElementById('taskbar');var h='<div class=\"tk\" onclick=\"toggleStart()\" style=\"color:#5aa0ff;font-size:22px\">\\u229E</div>';for(var id in wins){h+='<div class=\"tk run\" onclick=\"taskClick(\\''+id+'\\')\">'+APPS[wins[id].app].icon+'<span class=\"lab\">'+APPS[wins[id].app].name+'</span></div>';}tb.innerHTML=h;}",
+    "function taskClick(id){if(wins[id].mini)restore(id);else if(focusId===id)miniaturize(null,id);else raise(id);}",
+    "function toggleStart(){document.getElementById('start').classList.toggle('open');}function closeStart(){document.getElementById('start').classList.remove('open');}",
+    "function renderStart(){var g='';for(var a in APPS)g+='<div class=\"sapp\" onclick=\"openApp(\\''+a+'\\')\"><span class=\"g\">'+APPS[a].icon+'</span>'+APPS[a].name+'</div>';document.getElementById('start').innerHTML='<input placeholder=\"Search\"><div class=\"sgrid\">'+g+'</div>';}",
+    "function render(id,wid){if(id==='explorer')return explorerHTML('/home/user',wid);if(id==='terminal')return '<div class=\"term\" id=\"termout_'+wid+'\"></div>';if(id==='settings')return settingsHTML();if(id==='notepad')return '<textarea class=\"note\"></textarea>';if(id==='calc')return calcHTML(wid);if(id==='thispc')return thispcHTML();if(id==='apps')return appsHTML();return '';}",
+    "function explorerHTML(dir,wid){var items='';children(dir).forEach(function(n){var full=dir==='/'?'/'+n:dir+'/'+n;items+='<div class=\"fitem\" ondblclick=\"expOpen(\\''+full+'\\',\\''+wid+'\\')\"><span class=\"g\">'+(isDir(full)?'\\uD83D\\uDCC1':'\\uD83D\\uDCC4')+'</span>'+n+'</div>';});return '<div class=\"exp\"><div class=\"nav\"><div onclick=\"expGo(\\'/home/user\\',\\''+wid+'\\')\">\\uD83C\\uDFE0 Home</div><div onclick=\"expGo(\\'/home/user/Documents\\',\\''+wid+'\\')\">\\uD83D\\uDCC1 Documents</div><div onclick=\"expGo(\\'/\\',\\''+wid+'\\')\">\\uD83D\\uDCBB This PC</div></div><div class=\"main\"><div class=\"crumb\">'+dir+'</div><div class=\"files\">'+(items||'(empty)')+'</div></div></div>';}",
+    "function expGo(d,wid){document.getElementById('body_'+wid).innerHTML=explorerHTML(d,wid);}",
+    "function expOpen(p,wid){if(isDir(p))expGo(p,wid);else{var id=createWin('notepad',120,80,460,320);setTimeout(function(){var t=document.querySelector('#body_'+id+' textarea');if(t)t.value=FS[p]||'';},30);}}",
+    "function resolve(cwd,p){if(!p)return cwd;var abs=p[0]==='/'?p:(cwd==='/'?'/'+p:cwd+'/'+p),st=[];abs.split('/').forEach(function(s){if(s===''||s==='.')return;if(s==='..')st.pop();else st.push(s);});return '/'+st.join('/');}",
+    "var NEO='   ___    user@bada-os\\n  | _ )   OS: Bada OS 1.0\\n  | _ \\\\   WM: switchable (w9wm/WindowMaker/Win11)\\n  |___/   Shell: bada-sh';",
+    "function shexec(S,line){var t=line.trim();if(!t)return'';var a=t.split(/\\s+/),c=a[0],ar=a.slice(1);if(c==='help')return 'ls cd pwd cat mkdir echo clear neofetch date open <app> wm <name> help';if(c==='pwd')return S.cwd;if(c==='ls'){var d=ar[0]?resolve(S.cwd,ar[0]):S.cwd;if(!isDir(d))return 'not a dir';return children(d).map(function(n){return isDir((d==='/'?'/':d+'/')+n)?n+'/':n;}).join('  ');}if(c==='cd'){if(!ar[0]){S.cwd='/home/user';return'';}var p=resolve(S.cwd,ar[0]);if(isDir(p)){S.cwd=p;return'';}return 'no such dir';}if(c==='cat'){var p=resolve(S.cwd,ar[0]||'');return FS[p]&&FS[p]!=='dir'?FS[p]:'no such file';}if(c==='echo')return ar.join(' ');if(c==='mkdir'){FS[resolve(S.cwd,ar[0])]='dir';return'';}if(c==='clear')return null;if(c==='whoami')return 'user';if(c==='date')return new Date().toString();if(c==='wm'){if(['w9wm','wmaker','win11'].indexOf(ar[0])>=0){setWM(ar[0]);return 'window manager: '+ar[0];}return 'wm: w9wm|wmaker|win11';}if(c==='open'){if(APPS[ar[0]]){openApp(ar[0]);return 'opening '+ar[0];}return 'no such app';}if(c==='neofetch'||c==='about')return NEO;return c+': command not found';}",
+    "function initTerm(wid){var o=document.getElementById('termout_'+wid);o._S={cwd:'/home/user'};o.innerHTML='<div>bada-sh 1.0 - type help (try: wm wmaker)</div>';tline(o);}",
+    "function tline(o){var d=document.createElement('div');d.className='pin';d.innerHTML='<span>'+o._S.cwd+' $</span>&nbsp;';var inp=document.createElement('input');d.appendChild(inp);o.appendChild(d);inp.focus();inp.onkeydown=function(e){if(e.key==='Enter'){var v=inp.value;inp.disabled=true;var r=shexec(o._S,v);if(r===null)o.innerHTML='';else if(r!==''){var p=document.createElement('div');p.textContent=r;o.appendChild(p);}tline(o);o.scrollTop=o.scrollHeight;}};}",
+    "function settingsHTML(){return '<h3>Settings</h3><div class=\"setrow\"><span>Window manager</span><span><a href=# onclick=\"setWM(\\'w9wm\\');return false\">w9wm</a> | <a href=# onclick=\"setWM(\\'wmaker\\');return false\">WindowMaker</a> | <a href=# onclick=\"setWM(\\'win11\\');return false\">Windows 11</a></span></div><div class=\"setrow\"><span>Version</span><span>Bada OS 1.0</span></div>';}",
+    "var calcE={};function calcHTML(wid){var b=['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+'],g='';b.forEach(function(k){g+='<button class=\"'+(k==='='?'eq':'')+'\" onclick=\"ck(\\''+wid+'\\',\\''+k+'\\')\">'+k+'</button>';});calcE[wid]='';return '<div class=\"calc\"><div class=\"disp\" id=\"cd_'+wid+'\">0</div><button style=\"grid-column:1/5;background:#444\" onclick=\"cc(\\''+wid+'\\')\">C</button>'+g+'</div>';}",
+    "function ck(wid,k){if(k==='='){try{calcE[wid]=String(Function('return '+calcE[wid])());}catch(e){calcE[wid]='Error';}}else{if(calcE[wid]==='Error')calcE[wid]='';calcE[wid]+=k;}document.getElementById('cd_'+wid).textContent=calcE[wid]||'0';}function cc(wid){calcE[wid]='';document.getElementById('cd_'+wid).textContent='0';}",
+    "function thispcHTML(){return '<pre>'+NEO+'\\n\\nStorage: C: Bada VM   Memory: GC-managed\\nTests: 200+ passing</pre>';}",
+    "function appsHTML(){var L=[['Quantum OS','quantum_os.html','\\u269B'],['Medical Workstation','medical_workstation.html','\\uD83E\\uDE7A'],['Bada Brain','bada_brain.html','\\uD83E\\uDDE0'],['Bada Forge','bada_forge.html','\\u2699'],['Project Forge','project_forge.html','\\uD83D\\uDCE6']];var h='<div class=\"files\">';L.forEach(function(a){h+='<div class=\"fitem\" onclick=\"window.open(\\''+a[1]+'\\',\\'_blank\\')\"><span class=\"g\">'+a[2]+'</span>'+a[0]+'</div>';});return h+'</div>';}",
+    "var root=document.getElementById('root');",
+    "root.addEventListener('contextmenu',function(e){if(WM==='w9wm'){e.preventDefault();showMenu(e.clientX,e.clientY);}});",
+    "document.addEventListener('mousedown',function(e){if(WM==='w9wm'&&mode){e.preventDefault();e.stopPropagation();rootDown(e);}},true);",
+    "document.addEventListener('mousedown',function(e){var m=document.getElementById('menu');if(m.style.display==='block'&&!m.contains(e.target))hideMenu();var s=document.getElementById('start');if(WM==='win11'&&s.classList.contains('open')&&!s.contains(e.target)&&!(e.target.closest&&e.target.closest('.tk')))closeStart();});",
+    "function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}tick();setInterval(tick,1000);",
+    "renderDock();renderStart();setWM('w9wm');createWin('terminal',90,60,520,300);createWin('explorer',640,60,500,320);"
+]
+app.script(join(js, "\n"))
+
+app.save("bada_os.html")
+print "wrote bada_os.html"

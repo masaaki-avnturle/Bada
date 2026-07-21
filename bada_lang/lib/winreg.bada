@@ -1,0 +1,122 @@
+// winreg — a Windows Registry model (HKEY hives, keys, typed values, .reg export).
+//
+//   import winreg
+//   let r <- winreg.Registry.new()
+//   r.set("HKEY_CURRENT_USER\\Software\\Mayu\\win11\\emacs", "C-a", "REG_SZ", "move-beginning-of-line")
+//   print r.export_reg()
+//
+// Models the real Windows registry: hives (HKCU/HKLM/...), nested keys joined
+// by backslashes, and typed values (REG_SZ / REG_DWORD / REG_BINARY).  This is
+// where 窓使いの憂鬱 registers its key bindings on Windows 10 and 11.
+
+let HIVES <- ["HKEY_CLASSES_ROOT", "HKEY_CURRENT_USER", "HKEY_LOCAL_MACHINE",
+              "HKEY_USERS", "HKEY_CURRENT_CONFIG"]
+
+class Registry {
+    field keys        // set of key paths that exist (map path -> true)
+    field vals        // map path -> map(name -> [type, data])
+
+    method init() {
+        self.keys <- {}
+        self.vals <- {}
+    }
+
+    // ensure a key and all its ancestors exist
+    method ensure(path) {
+        let parts <- split(path, "\\")
+        let cur <- ""
+        let i <- 0
+        while i < len(parts) {
+            if cur == "" { cur <- parts[i] } else { cur <- cur + "\\" + parts[i] }
+            self.keys[cur] <- true
+            if not has(self.vals, cur) { self.vals[cur] <- {} }
+            i <- i + 1
+        }
+    }
+
+    // register a typed value at a key
+    method set(path, name, type, data) {
+        self.ensure(path)
+        self.vals[path][name] <- [type, data]
+        return self
+    }
+
+    method get(path, name) {
+        if has(self.vals, path) and has(self.vals[path], name) {
+            return self.vals[path][name][1]
+        }
+        return ""
+    }
+
+    method has_key(path) { return has(self.keys, path) }
+
+    // immediate subkeys of a path
+    method subkeys(path) {
+        let pre <- path + "\\"
+        let out <- []
+        for k in keys(self.keys) {
+            if starts(k, pre) {
+                let rest <- slice_from(k, len(pre))
+                if not contains(rest, "\\") { push(out, rest) }
+            }
+        }
+        out.sort()
+        return out
+    }
+
+    method values_at(path) {
+        if has(self.vals, path) { return self.vals[path] }
+        return {}
+    }
+
+    // count of registered values across the whole registry
+    method count() {
+        let n <- 0
+        for p in keys(self.vals) { n <- n + len(self.vals[p]) }
+        return n
+    }
+
+    // export to Windows .reg file format
+    method export_reg() {
+        let out <- "Windows Registry Editor Version 5.00\n"
+        let paths <- keys(self.vals)
+        paths.sort()
+        for p in paths {
+            let vmap <- self.vals[p]
+            if len(vmap) > 0 {
+                out <- out + "\n[" + p + "]\n"
+                for name in keys(vmap) {
+                    let v <- vmap[name]
+                    if v[0] == "REG_DWORD" {
+                        out <- out + "\"" + reg_escape(name) + "\"=dword:" + v[1] + "\n"
+                    } else if v[0] == "REG_BINARY" {
+                        out <- out + "\"" + reg_escape(name) + "\"=hex:" + v[1] + "\n"
+                    } else {
+                        out <- out + "\"" + reg_escape(name) + "\"=\"" + reg_escape(v[1]) + "\"\n"
+                    }
+                }
+            }
+        }
+        return out
+    }
+}
+
+// ---- helpers --------------------------------------------------------------
+
+// escape a string for a quoted .reg value: backslash and double-quote
+fun reg_escape(s) {
+    return replace(replace(s, "\\", "\\\\"), "\"", "\\\"")
+}
+
+fun starts(s, p) {
+    if len(s) < len(p) { return false }
+    let i <- 0
+    while i < len(p) { if s[i] != p[i] { return false }  i <- i + 1 }
+    return true
+}
+fun slice_from(s, start) {
+    let out <- ""
+    let i <- start
+    while i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}

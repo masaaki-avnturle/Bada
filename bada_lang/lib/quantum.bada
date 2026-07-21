@@ -1,0 +1,110 @@
+// quantum — a single-qubit simulator (complex rotation body on the Bloch sphere).
+//
+//   import quantum
+//   let q <- quantum.zero()
+//   q <- quantum.h(q)            // Hadamard -> superposition
+//   print quantum.bloch(q)       // [x, y, z] on the Bloch sphere
+//
+// A qubit state a|0> + b|1> is the complex amplitude vector [aRe,aIm,bRe,bIm].
+// Quantum gates are SU(2) rotations - the report's "complex rotation body":
+// each gate rotates the Bloch vector, and the rotation generators RX/RY/RZ are
+// the integrable spinning-top's; error correction projects a perturbed state
+// back onto the nearest valid (basis) state, the classical analogue of
+// stabiliser quantum error correction.
+
+// --- complex helpers (pairs [re, im]) --------------------------------------
+
+fun cmul(ar, ai, br, bi) { return [ar * br - ai * bi, ar * bi + ai * br] }
+
+// apply a 2x2 complex gate m=[m00r,m00i,m01r,m01i,m10r,m10i,m11r,m11i]
+fun apply(q, m) {
+    let ar <- q[0]
+    let ai <- q[1]
+    let br <- q[2]
+    let bi <- q[3]
+    let t0 <- cmul(m[0], m[1], ar, ai)
+    let t1 <- cmul(m[2], m[3], br, bi)
+    let t2 <- cmul(m[4], m[5], ar, ai)
+    let t3 <- cmul(m[6], m[7], br, bi)
+    return [t0[0] + t1[0], t0[1] + t1[1], t2[0] + t3[0], t2[1] + t3[1]]
+}
+
+// --- basis states ----------------------------------------------------------
+
+fun zero() { return [1, 0, 0, 0] }       // |0>
+fun one()  { return [0, 0, 1, 0] }       // |1>
+
+// --- gates ------------------------------------------------------------------
+
+fun h(q) {
+    let s <- 1 / sqrt(2)
+    return apply(q, [s, 0, s, 0, s, 0, 0 - s, 0])
+}
+fun x(q) { return apply(q, [0, 0, 1, 0, 1, 0, 0, 0]) }
+fun y(q) { return apply(q, [0, 0, 0, 0 - 1, 0, 1, 0, 0]) }
+fun z(q) { return apply(q, [1, 0, 0, 0, 0, 0, 0 - 1, 0]) }
+fun s_gate(q) { return apply(q, [1, 0, 0, 0, 0, 0, 0, 1]) }
+fun t_gate(q) {
+    let c <- cos(PI / 4)
+    let sn <- sin(PI / 4)
+    return apply(q, [1, 0, 0, 0, 0, 0, c, sn])
+}
+
+// rotation gates (SU(2) generators - the complex rotation body)
+fun rx(q, th) {
+    let c <- cos(th / 2)
+    let s <- sin(th / 2)
+    return apply(q, [c, 0, 0, 0 - s, 0, 0 - s, c, 0])
+}
+fun ry(q, th) {
+    let c <- cos(th / 2)
+    let s <- sin(th / 2)
+    return apply(q, [c, 0, 0 - s, 0, s, 0, c, 0])
+}
+fun rz(q, th) {
+    let c <- cos(th / 2)
+    let s <- sin(th / 2)
+    return apply(q, [c, 0 - s, 0, 0, 0, 0, c, s])
+}
+
+// --- observables ------------------------------------------------------------
+
+fun prob0(q) { return q[0] * q[0] + q[1] * q[1] }
+fun prob1(q) { return q[2] * q[2] + q[3] * q[3] }
+
+// Bloch vector [x, y, z]
+fun bloch(q) {
+    let ar <- q[0]
+    let ai <- q[1]
+    let br <- q[2]
+    let bi <- q[3]
+    let x <- 2 * (ar * br + ai * bi)
+    let y <- 2 * (ar * bi - ai * br)
+    let zc <- (ar * ar + ai * ai) - (br * br + bi * bi)
+    return [round(x, 6), round(y, 6), round(zc, 6)]
+}
+
+fun normalize(q) {
+    let n <- sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3])
+    if n == 0 { return q }
+    return [q[0] / n, q[1] / n, q[2] / n, q[3] / n]
+}
+
+// --- error correction (project a perturbed qubit back to a basis state) ----
+//
+// A small rotation error nudges the Bloch vector off the poles; correction
+// snaps it back to the nearer computational basis state |0>/|1> - the
+// stabiliser-code projection that keeps the logical qubit on its code space.
+fun correct(q) {
+    if prob0(q) >= prob1(q) { return zero() }
+    return one()
+}
+
+// fidelity with a target state (|<target|q>|^2)
+fun fidelity(q, target) {
+    let r <- cmul(target[0], 0 - target[1], q[0], q[1])
+    let s <- cmul(target[2], 0 - target[3], q[2], q[3])
+    let re <- r[0] + s[0]
+    let im <- r[1] + s[1]
+    return round(re * re + im * im, 6)
+}

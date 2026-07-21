@@ -1,0 +1,115 @@
+// gui — a small HTML5 GUI toolkit for Bada.
+//
+//   import gui
+//   let app <- gui.App.new("My App")
+//   app.style("body{background:#111}")
+//   app.add(gui.h1("Hello"))
+//   app.add(gui.button("go", "Play", "play()"))
+//   app.save("app.html")
+//
+// Bada has no native window system in this environment, so the GUI is emitted
+// as a self-contained HTML document (CSS + optional JavaScript) that runs in
+// any browser.  Combined with the Web Audio API this gives a fully
+// interactive application — sliders, buttons and live sound — generated
+// entirely from Bada.
+
+// ---- element helpers (return HTML strings) -------------------------------
+
+fun attrs_to_str(m) {
+    let s <- ""
+    for k in keys(m) {
+        s <- s + " " + k + "=\"" + str(m[k]) + "\""
+    }
+    return s
+}
+
+fun el(tag, attr_map, content) {
+    return "<" + tag + attrs_to_str(attr_map) + ">" + content + "</" + tag + ">"
+}
+
+fun div(cls, content) { return el("div", {"class": cls}, content) }
+fun span(cls, content) { return el("span", {"class": cls}, content) }
+fun h1(text) { return el("h1", {}, text) }
+fun h2(text) { return el("h2", {}, text) }
+fun p(text) { return el("p", {}, text) }
+
+fun button(id, label, onclick) {
+    return el("button", {"id": id, "onclick": onclick}, label)
+}
+
+// a labelled range slider that calls `oninput` (JS) as it moves
+fun slider(id, lo, hi, step, value, oninput) {
+    return "<input type=\"range\" id=\"" + id + "\" min=\"" + str(lo)
+        + "\" max=\"" + str(hi) + "\" step=\"" + str(step) + "\" value=\""
+        + str(value) + "\" oninput=\"" + oninput + "\">"
+}
+
+// a horizontal meter bar (0..1) for showing a value such as relief
+fun meter(id, frac, color) {
+    let pct <- floor(frac * 100)
+    let inner <- "<div class=\"bar\" id=\"" + id + "\" style=\"width:"
+        + str(pct) + "%;background:" + color + "\"></div>"
+    return el("div", {"class": "meter"}, inner)
+}
+
+// ---- the application document --------------------------------------------
+
+class App {
+    field title
+    field css <- ""
+    field js <- ""
+    field body <- ""
+
+    method init(title) { self.title <- title }
+
+    method style(c) { self.css <- self.css + c + "\n" }
+    method script(s) { self.js <- self.js + s + "\n" }
+    method add(html) { self.body <- self.body + html + "\n" }
+
+    method render() {
+        let doc <- "<!DOCTYPE html>\n<html lang=\"ja\">\n<head>\n"
+        doc <- doc + "<meta charset=\"utf-8\">\n"
+        doc <- doc + "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+        doc <- doc + "<title>" + self.title + "</title>\n"
+        doc <- doc + "<style>\n" + self.css + "</style>\n</head>\n<body>\n"
+        doc <- doc + self.body
+        doc <- doc + "<script>\n" + self.js + "</script>\n"
+        doc <- doc + "</body>\n</html>\n"
+        return doc
+    }
+
+    method save(path) {
+        write_file(path, self.render())
+        return path
+    }
+}
+
+// a reasonable dark default stylesheet for biofeedback dashboards
+fun dark_theme() {
+    return "
+:root{--bg:#0a0e16;--card:#141b27;--ink:#e8eef7;--muted:#8aa0bd;--accent:#4a80d0;}
+*{box-sizing:border-box;font-family:-apple-system,Segoe UI,Roboto,sans-serif}
+body{margin:0;background:var(--bg);color:var(--ink);padding:24px}
+h1{font-weight:700;font-size:24px;margin:0 0 4px}
+h2{font-weight:600;font-size:15px;color:var(--muted);margin:0 0 20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid #1f2a3a;border-radius:14px;padding:16px;
+      box-shadow:0 4px 18px rgba(0,0,0,.35)}
+.name{font-size:16px;font-weight:700;margin-bottom:2px}
+.cls{font-size:12px;color:var(--muted);margin-bottom:10px}
+.band{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;
+      font-weight:700;color:#06101f;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.row label{font-size:12px;color:var(--muted);min-width:46px}
+input[type=range]{flex:1;accent-color:var(--accent)}
+button{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:9px 14px;
+       font-weight:700;cursor:pointer;width:100%;margin-top:8px}
+button.stop{background:#33405a}
+.meter{height:10px;background:#0c121d;border-radius:6px;overflow:hidden;margin-top:6px}
+.bar{height:100%;border-radius:6px;transition:width .15s}
+.val{font-size:12px;color:var(--muted);min-width:54px;text-align:right}
+.master{position:sticky;top:0;background:var(--bg);padding:8px 0 16px;z-index:5}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 18px;font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+"
+}

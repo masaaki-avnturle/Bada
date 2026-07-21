@@ -1,0 +1,90 @@
+// ct — full-body CT (Computed Tomography) from the gamma-manifold Radon transform.
+//
+//   import ct
+//   let slice <- ct.body_slice(128, "thorax")
+//   let recon <- ct_reconstruct(slice, 120, true)
+//
+// A CT slice is recovered from its projections: for every angle the scanner
+// records the LINE INTEGRAL of tissue attenuation along each ray (the Radon
+// transform).  Over all angles this is the report's global partial-integral
+// manifold of the gamma operator across the cross-section; filtered
+// back-projection inverts it to reconstruct the slice.
+
+import imaging
+
+// draw a filled ellipse of attenuation `mu` into image `im`
+fun ellipse(im, cx, cy, rx, ry, mu) {
+    let y <- cy - ry
+    while y <= cy + ry {
+        let x <- cx - rx
+        while x <= cx + rx {
+            let nx <- (x - cx) / rx
+            let ny <- (y - cy) / ry
+            if nx * nx + ny * ny <= 1 {
+                im.set(x, y, mu)
+            }
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+}
+
+// a body cross-section ("head","thorax","abdomen","pelvis") as a mu map.
+fun body_slice(n, region) {
+    let im <- image(n, n, "L", 0)
+    let cx <- n / 2
+    let cy <- n / 2
+    if region == "head" {
+        ellipse(im, cx, cy, n * 0.30, n * 0.34, 70)       // brain soft tissue
+        ellipse(im, cx, cy - n * 0.04, n * 0.26, n * 0.28, 55)
+        ellipse(im, cx, cy, n * 0.33, n * 0.37, 70)
+        // skull bone ring
+        let y <- 0
+        while y < n { let x <- 0
+            while x < n {
+                let dx <- (x - cx) / (n * 0.36)
+                let dy <- (y - cy) / (n * 0.40)
+                let r <- sqrt(dx * dx + dy * dy)
+                if r < 1 and r > 0.9 { im.set(x, y, 240) }
+                x <- x + 1 }
+            y <- y + 1 }
+    } else if region == "thorax" {
+        ellipse(im, cx, cy, n * 0.40, n * 0.32, 60)        // chest wall
+        ellipse(im, cx - n * 0.16, cy, n * 0.13, n * 0.20, 15)  // lung (air)
+        ellipse(im, cx + n * 0.16, cy, n * 0.13, n * 0.20, 15)  // lung
+        ellipse(im, cx - n * 0.04, cy + n * 0.06, n * 0.11, n * 0.12, 110) // heart
+        ellipse(im, cx, cy, n * 0.03, n * 0.05, 245)       // spine/vertebra
+        // ribs
+        let i <- 0
+        while i < 5 {
+            let ry <- cy - n * 0.18 + i * (n * 0.09)
+            ellipse(im, cx - n * 0.30, ry, n * 0.02, n * 0.012, 230)
+            ellipse(im, cx + n * 0.30, ry, n * 0.02, n * 0.012, 230)
+            i <- i + 1
+        }
+    } else if region == "abdomen" {
+        ellipse(im, cx, cy, n * 0.42, n * 0.34, 65)
+        ellipse(im, cx - n * 0.14, cy - n * 0.04, n * 0.12, n * 0.13, 95)  // liver
+        ellipse(im, cx + n * 0.16, cy - n * 0.02, n * 0.08, n * 0.09, 90)  // spleen/kidney
+        ellipse(im, cx - n * 0.14, cy + n * 0.10, n * 0.07, n * 0.07, 90)  // kidney
+        ellipse(im, cx, cy + n * 0.04, n * 0.10, n * 0.08, 30)  // bowel gas
+        ellipse(im, cx, cy + n * 0.02, n * 0.03, n * 0.05, 245) // spine
+    } else {  // pelvis
+        ellipse(im, cx, cy, n * 0.44, n * 0.30, 65)
+        ellipse(im, cx, cy, n * 0.18, n * 0.12, 40)        // bladder/bowel
+        ellipse(im, cx - n * 0.30, cy, n * 0.07, n * 0.10, 235)  // iliac bone
+        ellipse(im, cx + n * 0.30, cy, n * 0.07, n * 0.10, 235)  // iliac bone
+        ellipse(im, cx, cy + n * 0.12, n * 0.05, n * 0.06, 235)  // sacrum
+    }
+    return im
+}
+
+let REGIONS <- ["head", "thorax", "abdomen", "pelvis"]
+
+// reconstruct one region's slice via CT; returns [phantom, sinogram, recon]
+fun scan_region(n, region, n_angles) {
+    let phantom <- body_slice(n, region)
+    let sino <- ct_sinogram(phantom, n_angles)
+    let recon <- ct_reconstruct(phantom, n_angles, true)
+    return [phantom, sino, recon]
+}
