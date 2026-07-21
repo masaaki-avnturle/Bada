@@ -1,0 +1,224 @@
+// shell — a command-line shell engine for Bada OS (GUI terminal & CLI both use it).
+//
+//   import shell
+//   let sh <- shell.Shell.new()
+//   print sh.exec("ls")
+//
+// A small Unix-like shell over a virtual filesystem.  The engine is a pure
+// function of (state, command line) -> output text, so the same shell drives
+// the interactive CLI (apps/bada_shell.bada) and the GUI Terminal window.
+
+fun seed_fs() {
+    let fs <- {}
+    fs["/"] <- "dir"
+    fs["/home"] <- "dir"
+    fs["/home/user"] <- "dir"
+    fs["/home/user/Documents"] <- "dir"
+    fs["/home/user/Documents/readme.txt"] <- "Welcome to Bada OS!\nA tiny OS written in the Bada language."
+    fs["/home/user/Documents/notes.md"] <- "# Notes\n- build the desktop\n- ship it"
+    fs["/home/user/Pictures"] <- "dir"
+    fs["/home/user/hello.bada"] <- "print \"Hello from Bada OS\"\nlet x <- 6 * 7\nprint \"answer:\", x"
+    fs["/apps"] <- "dir"
+    fs["/apps/quantum_os.html"] <- "Bada Quantum OS"
+    fs["/apps/medical_workstation.html"] <- "Medical Workstation"
+    return fs
+}
+
+class Shell {
+    field fs
+    field cwd <- "/home/user"
+    field history <- []
+
+    method init() { self.fs <- seed_fs() }
+
+    // resolve a (possibly relative) path against cwd into an absolute path
+    method resolve(p) {
+        if p == "" { return self.cwd }
+        let abs <- p
+        if not (p[0] == "/") {
+            if self.cwd == "/" { abs <- "/" + p } else { abs <- self.cwd + "/" + p }
+        }
+        // collapse "." and ".." segments
+        let parts <- split(abs, "/")
+        let stack <- []
+        for seg in parts {
+            if seg == "" or seg == "." {
+            } else if seg == ".." {
+                if len(stack) > 0 { pop(stack) }
+            } else {
+                push(stack, seg)
+            }
+        }
+        return "/" + join(stack, "/")
+    }
+
+    method is_dir(path) { return has(self.fs, path) and self.fs[path] == "dir" }
+    method is_file(path) { return has(self.fs, path) and self.fs[path] != "dir" }
+
+    // immediate children names of a directory
+    method children(dir) {
+        let out <- []
+        let prefix <- dir
+        if not (dir == "/") { prefix <- dir + "/" } else { prefix <- "/" }
+        for k in keys(self.fs) {
+            if k == dir { } else if starts_with(k, prefix) {
+                let rest <- substr(k, len(prefix))
+                if not contains(rest, "/") and rest != "" {
+                    push(out, rest)
+                }
+            }
+        }
+        return out
+    }
+
+    // ---- the command dispatcher ----
+    method exec(line) {
+        let trimmed <- trim(line)
+        if trimmed == "" { return "" }
+        push(self.history, trimmed)
+        let parts <- split(trimmed, " ")
+        let cmd <- parts[0]
+        let args <- []
+        let i <- 1
+        while i < len(parts) { if parts[i] != "" { push(args, parts[i]) }  i <- i + 1 }
+
+        if cmd == "help" { return self.help() }
+        if cmd == "pwd" { return self.cwd }
+        if cmd == "ls" or cmd == "dir" { return self.ls(args) }
+        if cmd == "cd" { return self.cd(args) }
+        if cmd == "cat" or cmd == "type" { return self.cat(args) }
+        if cmd == "echo" { return join(args, " ") }
+        if cmd == "mkdir" { return self.mkdir(args) }
+        if cmd == "touch" { return self.touch(args) }
+        if cmd == "write" { return self.write_file_cmd(args) }
+        if cmd == "rm" or cmd == "del" { return self.rm(args) }
+        if cmd == "tree" { return self.tree(self.cwd, "") }
+        if cmd == "whoami" { return "user" }
+        if cmd == "date" { return "Bada OS time: tick " + str(floor(clock())) }
+        if cmd == "clear" or cmd == "cls" { return "\\f" }
+        if cmd == "neofetch" or cmd == "about" { return self.neofetch() }
+        if cmd == "history" { return join(self.history, "\n") }
+        if cmd == "bada" { return self.run_bada(args) }
+        return cmd + ": command not found (try 'help')"
+    }
+
+    method help() {
+        return "Bada OS shell - commands:\n"
+            + "  ls [dir]   cd <dir>   pwd   cat <file>   tree\n"
+            + "  mkdir <d>  touch <f>  write <f> <text>   rm <f>\n"
+            + "  echo <x>   date   whoami   history   clear\n"
+            + "  neofetch   bada <file>   help"
+    }
+
+    method ls(args) {
+        let dir <- self.cwd
+        if len(args) > 0 { dir <- self.resolve(args[0]) }
+        if not self.is_dir(dir) { return "ls: not a directory: " + dir }
+        let names <- self.children(dir)
+        names.sort()
+        let out <- []
+        for n in names {
+            let full <- dir + "/" + n
+            if dir == "/" { full <- "/" + n }
+            if self.is_dir(full) { push(out, n + "/") } else { push(out, n) }
+        }
+        return join(out, "  ")
+    }
+
+    method cd(args) {
+        if len(args) == 0 { self.cwd <- "/home/user"  return "" }
+        let path <- self.resolve(args[0])
+        if self.is_dir(path) { self.cwd <- path  return "" }
+        return "cd: no such directory: " + args[0]
+    }
+
+    method cat(args) {
+        if len(args) == 0 { return "cat: missing file" }
+        let path <- self.resolve(args[0])
+        if self.is_file(path) { return self.fs[path] }
+        return "cat: no such file: " + args[0]
+    }
+
+    method mkdir(args) {
+        if len(args) == 0 { return "mkdir: missing name" }
+        self.fs[self.resolve(args[0])] <- "dir"
+        return ""
+    }
+    method touch(args) {
+        if len(args) == 0 { return "touch: missing name" }
+        self.fs[self.resolve(args[0])] <- ""
+        return ""
+    }
+    method write_file_cmd(args) {
+        if len(args) < 2 { return "write: usage: write <file> <text>" }
+        let rest <- []
+        let i <- 1
+        while i < len(args) { push(rest, args[i])  i <- i + 1 }
+        self.fs[self.resolve(args[0])] <- join(rest, " ")
+        return ""
+    }
+    method rm(args) {
+        if len(args) == 0 { return "rm: missing name" }
+        let path <- self.resolve(args[0])
+        if has(self.fs, path) { map_remove(self.fs, path)  return "" }
+        return "rm: no such file: " + args[0]
+    }
+
+    method tree(dir, indent) {
+        let out <- indent + basename(dir) + "/\n"
+        let names <- self.children(dir)
+        names.sort()
+        for n in names {
+            let full <- dir + "/" + n
+            if dir == "/" { full <- "/" + n }
+            if self.is_dir(full) {
+                out <- out + self.tree(full, indent + "  ")
+            } else {
+                out <- out + indent + "  " + n + "\n"
+            }
+        }
+        return out
+    }
+
+    method neofetch() {
+        return "        _____         user@bada-os\n"
+            + "       | __  |        -------------\n"
+            + "       | |__|        OS: Bada OS 1.0 (Windows 11 style)\n"
+            + "       | __  |       Kernel: Bada VM\n"
+            + "       | |__|        Shell: bada-sh\n"
+            + "       |_____|       CPU: Bada bytecode interpreter\n"
+            + "                     Apps: 30+ (medical, quantum, forge)"
+    }
+
+    method run_bada(args) {
+        if len(args) == 0 { return "bada: usage: bada <file>" }
+        let path <- self.resolve(args[0])
+        if not self.is_file(path) { return "bada: no such file: " + args[0] }
+        let err <- bada_check(self.fs[path])
+        if err == "" { return "bada: " + args[0] + " compiles OK (on the valid manifold)" }
+        return "bada: " + err
+    }
+}
+
+// ---- small string/map helpers --------------------------------------------
+
+fun starts_with(s, p) {
+    if len(s) < len(p) { return false }
+    return substr3(s, 0, len(p)) == p
+}
+fun substr(s, start) { return substr3(s, start, len(s)) }
+fun substr3(s, start, end) {
+    let out <- ""
+    let i <- start
+    while i < end and i < len(s) { out <- out + s[i]  i <- i + 1 }
+    return out
+}
+fun basename(path) {
+    if path == "/" { return "" }
+    let parts <- split(path, "/")
+    return parts[len(parts) - 1]
+}
+fun map_remove(m, key) {
+    // rebuild without key (no native delete needed)
+    return m.remove(key)
+}

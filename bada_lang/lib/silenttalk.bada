@@ -1,0 +1,150 @@
+// silenttalk — silent-speech / subvocal brain-computer interface.
+//
+//   import silenttalk
+//   let st <- silenttalk.SilentTalk.new()
+//   let result <- st.think("HELP")     // imagine a word -> decode it back
+//   print result["decoded"], result["confidence"]
+//
+// A locked-in patient cannot speak, but imagining a word still drives a
+// reproducible pattern of cortical activity.  Each vocabulary word has a
+// NEURAL SIGNATURE - a vector of activation across the EEG electrodes, read
+// off the gamma manifold.  "Thinking" a word emits that signature (plus
+// measurement noise); the decoder matches the measured features against every
+// signature and a BASAL-GANGLIA gate selects the most likely word, exactly as
+// the brain selects an intended action.
+
+import basal_ganglia
+import plot
+
+let CHANNELS <- 6        // EEG electrodes (Fp1 Fp2 C3 C4 O1 O2)
+
+fun vocabulary() {
+    return ["YES", "NO", "HELLO", "HELP", "WATER", "PAIN", "STOP", "THANKS"]
+}
+
+// deterministic neural signature: a CHANNELS-long activation vector for a word.
+// A distinct prime per channel decorrelates the channels so different words
+// map to well-separated (near-orthogonal) signatures.
+fun signature(word) {
+    // a distinct polynomial-rolling-hash base per channel decorrelates them;
+    // a large prime modulus avoids collisions between distinct words.
+    let bases <- [131, 137, 139, 149, 151, 157]
+    let v <- []
+    let i <- 0
+    while i < CHANNELS {
+        let h <- (len(word) + i * 7 + 1)
+        let j <- 0
+        while j < len(word) {
+            let code <- ord(char_at(word, j))
+            h <- (h * bases[i] + code) % 100003
+            j <- j + 1
+        }
+        // map to [0.1, 1.0]
+        push(v, 0.1 + (h % 9973) / 9973 * 0.9)
+        i <- i + 1
+    }
+    return normalize_vec(v)
+}
+
+fun normalize_vec(v) {
+    let mag <- 0
+    for x in v { mag <- mag + x * x }
+    mag <- sqrt(mag)
+    if mag == 0 { return v }
+    let out <- []
+    for x in v { push(out, x / mag) }
+    return out
+}
+
+fun dot(a, b) {
+    let s <- 0
+    let i <- 0
+    while i < len(a) { s <- s + a[i] * b[i]  i <- i + 1 }
+    return s
+}
+
+class SilentTalk {
+    field vocab
+    field gate_dopamine <- 0.9
+    field noise <- 0.04
+    field seed <- 20260531
+    field transcript <- ""
+
+    method init() { self.vocab <- vocabulary() }
+
+    method words() { return self.vocab }
+
+    // simple LCG noise in [-1,1]
+    method rand() {
+        self.seed <- (self.seed * 1103515245 + 12345) % 2147483648
+        return self.seed / 1073741824 - 1
+    }
+
+    // emit the measured feature vector for an imagined word (signature+noise)
+    method emit(word) {
+        let sig <- signature(word)
+        let feat <- []
+        for x in sig {
+            push(feat, x + self.rand() * self.noise)
+        }
+        return normalize_vec(feat)
+    }
+
+    // synthesise EEG channels for an imagined word (for display)
+    method eeg(word, duration, rate) {
+        let sig <- signature(word)
+        let bands <- [3, 6, 10, 11, 18, 10]      // per-electrode rhythm (Hz)
+        let channels <- []
+        let c <- 0
+        while c < CHANNELS {
+            let n <- floor(duration * rate)
+            let series <- []
+            let i <- 0
+            while i < n {
+                let t <- i / rate
+                let amp <- sig[c]
+                push(series, amp * sin(2 * PI * bands[c] * t) + self.rand() * 0.05)
+                i <- i + 1
+            }
+            push(channels, series)
+            c <- c + 1
+        }
+        return channels
+    }
+
+    // decode a measured feature vector -> ranked candidates via the gate
+    method decode(feat) {
+        let gate <- basal_ganglia.Gate.new(self.gate_dopamine)
+        for w in self.vocab {
+            // similarity in [0,1]; scale up so the gate can separate them
+            let sim <- dot(feat, signature(w))
+            if sim < 0 { sim <- 0 }
+            gate.input(w, sim * 6)
+        }
+        return gate
+    }
+
+    // full round trip: imagine `word`, decode it back
+    method think(word) {
+        let feat <- self.emit(word)
+        let gate <- self.decode(feat)
+        let win <- gate.select()
+        let entry <- {"intended": word, "decoded": win[0],
+                      "confidence": win[1], "correct": win[0] == word}
+        if win[1] > 0.4 { self.transcript <- self.transcript + win[0] + " " }
+        return entry
+    }
+
+    // decode a sequence of imagined words into a phrase
+    method speak(words) {
+        self.transcript <- ""
+        let out <- []
+        for w in words { push(out, self.think(w)) }
+        return out
+    }
+
+    // render the candidate scores as a bar image (for the GUI)
+    method eeg_image(word, width, row_h) {
+        return plot.signals_image(self.eeg(word, 2, 120), width, row_h)
+    }
+}

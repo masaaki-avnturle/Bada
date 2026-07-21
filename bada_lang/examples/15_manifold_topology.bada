@@ -1,0 +1,47 @@
+// 15 — Manifolds, integral manifolds & topology (advanced math overloading).
+
+import manifold
+import topology
+
+print "=== Vectors (overloaded + - * -<) ==="
+let u <- manifold.Vector.new([1, 0, 0])
+let v <- manifold.Vector.new([0, 1, 0])
+print "u + v      :", (u + v).show()
+print "u -< v dot :", u -< v
+let w <- manifold.Vector.new([3, 4, 0])
+print "|w|        :", w.norm()
+print "3 * w      :", (w * 3).show()
+
+print "=== Integral manifold of a surface ==="
+// hemisphere-ish patch: r(u,v) = (cos u sin v, sin u sin v, cos v)
+fun SX(uu, vv) { return cos(uu) * sin(vv) }
+fun SY(uu, vv) { return sin(uu) * sin(vv) }
+fun SZ(uu, vv) { return cos(vv) }
+let sphere <- manifold.Surface.new(SX, SY, SZ)
+// area of full sphere = 4 pi ~ 12.566
+print "sphere area (~4pi):", sphere.area(0, 6.283185307, 0, 3.141592653)
+print "metric at (0,1):", sphere.metric(0, 1)
+
+print "=== Integral curve / flow ==="
+fun rotate_field(t, y) { return cos(t) }    // dy/dt = cos t -> y = sin t + C
+let curve <- manifold.IntegralCurve.new(rotate_field)
+curve.flow(0, 0, 3.14159265, 300)
+print "y(pi) ~ sin(pi)+0 = 0:", curve.endpoint()
+
+print "=== Topology: Euler characteristic ==="
+let cube <- topology.Complex.new(8, 12, 6)     // V-E+F = 2 (sphere)
+let torus <- topology.Complex.new(9, 27, 18)   // chi = 0 (genus 1)
+print "cube  chi:", cube.euler(), " genus:", cube.genus()
+print "torus chi:", torus.euler(), " genus:", torus.genus()
+
+print "=== Fundamental group pi_1 (overloaded * ~> ==) ==="
+let a <- topology.Loop.new("a")
+let b <- topology.Loop.new("b")
+let comm <- (a * b) * ((a.inverse()) * (b.inverse()))   // commutator [a,b]
+print "commutator [a,b]   :", comm.show()
+print "a * a^-1 = identity :", (a * a.inverse()).is_identity()
+// conjugation b a b^-1  via the right-action operator  a ~> b
+print "a ~> b (conjugate) :", (a ~> b).show()
+// homotopy equality (free reduction)
+let p <- topology.Loop.new("abB")     // reduces to "a"
+print "abB == a (homotopic):", p == a

@@ -1,0 +1,150 @@
+// qalgo — quantum algorithms for the Bada Quantum OS.
+//
+//   import qalgo
+//   let r <- qalgo.grover(3, 5)      // search 8-state space for marked item 5
+//   print qmeasure(r)
+//
+// Built on the native multi-qubit simulator (qreg/qgate/qcnot/...).  Each
+// algorithm is unitary Schrodinger evolution toward an answer, in the spirit
+// of the report's H|Psi> = (+)(i hbar grad)^(+)L Hamiltonian dynamics.
+
+// Hadamard on every qubit (prepare uniform superposition)
+fun hadamard_all(r) {
+    let i <- 0
+    while i < qn(r) { qgate(r, "H", i)  i <- i + 1 }
+    return r
+}
+
+// --- Bell / GHZ entanglement -----------------------------------------------
+
+fun bell() {
+    let r <- qreg(2)
+    qgate(r, "H", 0)
+    qcnot(r, 0, 1)
+    return r
+}
+
+fun ghz(n) {
+    let r <- qreg(n)
+    qgate(r, "H", 0)
+    let i <- 0
+    while i < n - 1 { qcnot(r, i, i + 1)  i <- i + 1 }
+    return r
+}
+
+// --- Grover search ----------------------------------------------------------
+//
+// find a marked item in an unstructured space of 2^n with ~ (pi/4) sqrt(2^n)
+// iterations.  Oracle = phase-flip the marked basis state; diffusion = inversion
+// about the mean (H-all, flip |0>, H-all).
+
+fun grover_diffusion(r) {
+    let n <- qn(r)
+    hadamard_all(r)
+    // flip phase of |0...0>: X-all, multi-controlled-Z, X-all  (use phase_flip on 0 after X-all == phase flip of all-ones)
+    let i <- 0
+    while i < n { qgate(r, "X", i)  i <- i + 1 }
+    // controlled-Z across all qubits implemented as phase flip of the all-ones state
+    qphase_flip(r, pow2(n) - 1)
+    i <- 0
+    while i < n { qgate(r, "X", i)  i <- i + 1 }
+    hadamard_all(r)
+    return r
+}
+
+fun pow2(n) {
+    let p <- 1
+    let i <- 0
+    while i < n { p <- p * 2  i <- i + 1 }
+    return p
+}
+
+fun grover(n, target) {
+    let r <- qreg(n)
+    hadamard_all(r)
+    let iters <- floor(PI / 4 * sqrt(pow2(n)))
+    if iters < 1 { iters <- 1 }
+    let k <- 0
+    while k < iters {
+        qphase_flip(r, target)        // oracle marks the target
+        grover_diffusion(r)           // amplitude amplification
+        k <- k + 1
+    }
+    return r
+}
+
+// --- Deutsch-Jozsa ----------------------------------------------------------
+//
+// decide whether a boolean function on n bits is CONSTANT or BALANCED with a
+// single query.  Oracle modelled by phase kickback on the marked set.
+//   kind: "constant" -> output |0...0> with certainty; "balanced" -> never |0>
+
+fun deutsch_jozsa(n, kind) {
+    let r <- qreg(n)
+    hadamard_all(r)
+    if kind == "balanced" {
+        // phase-flip half the states (a balanced oracle): flip odd-parity states
+        let i <- 0
+        while i < pow2(n) {
+            if popcount(i) % 2 == 1 { qphase_flip(r, i) }
+            i <- i + 1
+        }
+    }
+    // constant oracle does nothing (global phase)
+    hadamard_all(r)
+    return r            // measure: |0..0> => constant, else balanced
+}
+
+fun popcount(x) {
+    let c <- 0
+    let v <- x
+    while v > 0 { c <- c + (v % 2)  v <- floor(v / 2) }
+    return c
+}
+
+// --- Bernstein-Vazirani -----------------------------------------------------
+//
+// recover a hidden n-bit string s in ONE query: H-all, oracle phase-flips
+// states whose dot product with s is odd, H-all -> measure yields s.
+
+fun bernstein_vazirani(n, secret) {
+    let r <- qreg(n)
+    hadamard_all(r)
+    let i <- 0
+    while i < pow2(n) {
+        if dot_parity(i, secret) == 1 { qphase_flip(r, i) }
+        i <- i + 1
+    }
+    hadamard_all(r)
+    return r
+}
+
+fun dot_parity(x, s) {
+    let p <- 0
+    let a <- x
+    let b <- s
+    while a > 0 or b > 0 {
+        p <- p + (a % 2) * (b % 2)
+        a <- floor(a / 2)
+        b <- floor(b / 2)
+    }
+    return p % 2
+}
+
+// --- Quantum Fourier Transform ----------------------------------------------
+
+fun qft(r) {
+    let n <- qn(r)
+    let i <- 0
+    while i < n {
+        qgate(r, "H", i)
+        let j <- i + 1
+        while j < n {
+            let angle <- PI / pow2(j - i)
+            qcphase(r, j, i, angle)
+            j <- j + 1
+        }
+        i <- i + 1
+    }
+    return r
+}

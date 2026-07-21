@@ -1,0 +1,38 @@
+// fusion — PET-CT image fusion.
+//
+//   import fusion
+//   let img <- fusion.pet_ct(ct_recon, pet_uptake, 0.6)
+//
+// PET shows metabolism, CT shows anatomy.  Fusion overlays the hot metabolic
+// map (alpha-blended) onto the grey CT slice so a hypermetabolic focus is
+// seen in its precise anatomical location.
+
+import imaging
+
+// ct_img: grayscale anatomy (e.g. ct_reconstruct output)
+// pet_img: grayscale metabolic uptake (e.g. pet uptake map)
+// alpha in [0,1]: PET overlay opacity
+fun pet_ct(ct_img, pet_img, alpha) {
+    let n <- ct_img.width
+    let out <- image(n, ct_img.height, "RGB", 0)
+    let y <- 0
+    while y < ct_img.height {
+        let x <- 0
+        while x < n {
+            let g <- floor(ct_img.get(x, y) * 0.7)     // dim grey anatomy
+            let p <- pet_img.get(x, y)
+            if p > 110 {
+                let c <- imaging.hot_colormap(p)
+                let r <- floor(g * (1 - alpha) + c[0] * alpha)
+                let gg <- floor(g * (1 - alpha) + c[1] * alpha)
+                let b <- floor(g * (1 - alpha) + c[2] * alpha)
+                out.set_rgb(x, y, r, gg, b)
+            } else {
+                out.set_rgb(x, y, g, g, g)
+            }
+            x <- x + 1
+        }
+        y <- y + 1
+    }
+    return out
+}

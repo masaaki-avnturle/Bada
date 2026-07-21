@@ -1,0 +1,80 @@
+// basal_ganglia — diagnostic gating controller on the basal-ganglia principle.
+//
+//   import basal_ganglia
+//   let bg <- basal_ganglia.Gate.new(0.6)   // dopamine level
+//   bg.input("CT", salience)
+//   let winner <- bg.select()
+//
+// PRINCIPLE.  The basal ganglia select actions by competition between a
+// "direct" (Go) pathway that facilitates the strongest cortical input and an
+// "indirect" (NoGo) pathway that suppresses the rest, with DOPAMINE setting
+// the gain of the competition.  Here each diagnostic modality sends a
+// salience (its gamma-manifold abnormality entropy) into the striatum; the
+// gate facilitates the most salient findings and suppresses noise, producing
+// a softmax-like selection that decides which results drive the diagnosis.
+
+class Gate {
+    field dopamine     // [0,1]: higher -> sharper, more decisive selection
+    field channels <- []   // [name, salience]
+
+    method init(dopamine) { self.dopamine <- dopamine }
+
+    method input(name, salience) {
+        push(self.channels, [name, salience])
+    }
+
+    // direct/indirect competition: gain = 1 + dopamine*4 sharpens a softmax
+    method weights() {
+        let gain <- 1 + self.dopamine * 4
+        // numerically stable softmax over salience * gain
+        let mx <- 0
+        for c in self.channels {
+            if c[1] > mx { mx <- c[1] }
+        }
+        let total <- 0
+        let exps <- []
+        for c in self.channels {
+            // direct (Go) drive minus a baseline indirect (NoGo) suppression
+            let drive <- (c[1] - mx) * gain
+            let e <- exp(drive)
+            push(exps, e)
+            total <- total + e
+        }
+        let out <- []
+        let i <- 0
+        while i < len(self.channels) {
+            let w <- 0
+            if total > 0 { w <- exps[i] / total }
+            push(out, [self.channels[i][0], w, self.channels[i][1]])
+            i <- i + 1
+        }
+        return out
+    }
+
+    // the gated winner: the modality the basal ganglia release to the thalamus
+    method select() {
+        let ws <- self.weights()
+        let best <- ["none", 0, 0]
+        for w in ws {
+            if w[1] > best[1] { best <- w }
+        }
+        return best
+    }
+
+    // overall "thalamic drive" = how decisively any abnormality is gated
+    method confidence() {
+        let s <- self.select()
+        return s[1]
+    }
+
+    method report() {
+        print "=== Basal-ganglia diagnostic gate (dopamine=" + str(self.dopamine) + ") ==="
+        let ws <- self.weights()
+        for w in ws {
+            print " ", w[0], "  gate", round(w[1] * 100, 1), "%  (salience",
+                  round(w[2], 3) + ")"
+        }
+        let win <- self.select()
+        print "  -> SELECTED:", win[0], "(" + str(round(win[1] * 100, 1)) + "%)"
+    }
+}
