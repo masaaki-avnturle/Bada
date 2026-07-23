@@ -63,9 +63,20 @@ jobs:
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 8.7 (cordova-android 12 needs Groovy 3; runner ships Gradle 9/Groovy 4)
+        run: |
+          set -e
+          # The hosted runner ships Gradle 9.x (Groovy 4), where cordova-android 12's
+          # cordova.gradle fails: "unable to resolve class XmlParser" (no longer auto-imported).
+          # Pin Gradle 8.7 (Groovy 3) and put it first on PATH so Cordova uses it.
+          curl -sSL https://services.gradle.org/distributions/gradle-8.7-bin.zip -o /tmp/gradle.zip
+          sudo unzip -q -o /tmp/gradle.zip -d /opt
+          echo "GRADLE_HOME=/opt/gradle-8.7" >> "$GITHUB_ENV"
+          echo "/opt/gradle-8.7/bin" >> "$GITHUB_PATH"
       - name: Build debug APK (Cordova, pinned versions)
         run: |
           set -e
+          echo "Using gradle: $(which gradle)"; gradle --version | head -5
           npm install -g cordova@12.0.0
           APP="bio_medicine/${{ matrix.app }}"
           cordova create cordova-build com.bada.omega TmpApp
