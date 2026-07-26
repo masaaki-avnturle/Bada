@@ -1,0 +1,193 @@
+%% bluebird_ev_paper.tex
+%% Compile with XeLaTeX or LuaLaTeX (Japanese support):
+%%   xelatex bluebird_ev_paper.tex
+%% CONCEPTUAL / SIMULATION REPORT. The entropy/manifold/Jones mathematics is
+%% genuine; the "source-code generation from an entropy invariant" is a small
+%% deterministic program synthesizer, NOT a trained large language model, and
+%% the driving policy MUST NOT be used in a real vehicle.
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}\geometry{a4paper,margin=25mm}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage{CJKutf8}
+  \newcommand{\jp}[1]{\begin{CJK}{UTF8}{min}#1\end{CJK}}
+\else
+  \usepackage{xeCJK}
+  \setCJKmainfont{Noto Serif CJK JP}[AutoFakeSlant]
+  \newcommand{\jp}[1]{#1}
+\fi
+\usepackage{tcolorbox}
+\lstset{basicstyle=\ttfamily\small,frame=single,breaklines=true,columns=fullflexible}
+
+\title{\textbf{Bada Source-Code Generation for an Autonomous Electric Car:}\\
+A Gamma-Manifold Entropy Equation and the Jones Polynomial of a
+Thermal-Energy Body for Policy Synthesis and Audio-Visual Rendering}
+\author{Masaaki Yamaguchi \;(\jp{山口 雅旭})\\
+Global Differential Manifold Research\\
+\texttt{omega\_bluebird\_ev\_pkg}}
+\date{2026}
+
+\begin{document}
+\maketitle
+
+\begin{tcolorbox}[colback=yellow!8!white,colframe=orange!70!black,title=\textbf{Scope / Honesty Note}]
+This is a \emph{conceptual / simulation} report. The entropy, manifold and Jones
+mathematics is genuine (Shannon entropy, Lanczos $\Gamma$, Kauffman bracket).
+The ``source-code generation from an entropy invariant'' is a small
+\emph{deterministic program synthesizer} --- a generative grammar seeded by an
+invariant --- \textbf{not} a trained large language model. The generated driving
+policy is illustrative and \textbf{must not be deployed in a real vehicle}: it
+has no sensor stack, no validation, and no safety case.
+\end{tcolorbox}
+
+\begin{abstract}
+\noindent\textbf{\jp{要旨}.}\;
+\jp{本稿は、Bluebird 車体の自動走行電気自動車のオペレーティングシステムとしての生成AIを、
+Bada 言語で記述し、ガンマ関数の大域的部分積分多様体のエントロピー方程式で
+Bada ソースコードを生成し、熱エネルギー体の Jones 多項式で周囲の映像化と音の映像化を
+行う実装 \texttt{omega\_bluebird\_ev\_pkg} を報告する。}
+We present a generative-AI operating system for a Bluebird-styled electric car.
+Its headline capability is a \emph{source-code generator}: the entropy of the
+gamma-function global partial-integral manifold is measured over a percept
+stream and used to synthesize a Bada autonomous-driving policy, while the Jones
+polynomial of a thermal-energy body drives an environment \emph{image} (PPM) and
+an engine \emph{sound} (WAV). We define the entropy equation
+$\Xi=\beta(H{+}1,M{+}1)/\log(N{+}2)$, show the synthesizer is deterministic and
+context-sensitive, and report measured invariants and generated parameters.
+\end{abstract}
+
+\section{Introduction}
+Program synthesis conditioned on a scalar invariant is a compact model of
+``generative'' behaviour: identical context regenerates identical code, and a
+changed context yields a different but valid program. We apply this to an
+autonomous-driving ``operating system'' written in the Bada language, seeding
+the synthesis with an entropy functional on the project's global
+partial-integral manifold, and rendering the surroundings and engine note from a
+knot-theoretic thermal invariant. The physical driving here is a toy; the
+contribution is the honest, reproducible pipeline from an invariant to source
+code, image and sound.
+
+\section{The gamma-manifold entropy equation}
+Let a percept file define a byte measure $p_1\ge p_2\ge\cdots\ge p_m$ with $m$
+distinct symbols over $N$ bytes. Define the Shannon entropy and the global
+partial-integral of the manifold element,
+\begin{equation}
+H=-\sum_i p_i\log_2 p_i,\qquad
+d\mu(x)=\frac{1}{(x\log x)^2},\qquad
+M=\sum_{i=1}^{m} p_i\,\frac{1}{(x_i\log x_i)^2},\;\; x_i=i+1 .
+\end{equation}
+The entropy equation output is the zeta-gauge scalar
+\begin{equation}
+\boxed{\;\Xi=\frac{\beta(H+1,\,M+1)}{\log(N+2)}\;},\qquad
+\beta(a,b)=\frac{\Gamma(a)\Gamma(b)}{\Gamma(a+b)},
+\label{eq:xi}
+\end{equation}
+with $\Gamma$ evaluated by the Lanczos approximation. $\Xi$ is the seed for all
+downstream generation.
+
+\section{Jones polynomial of the thermal-energy body}
+The battery/inverter heat flow is encoded as a knot diagram $D$; its Kauffman
+bracket and temperature-weighted thermal invariant are
+\begin{equation}
+\langle D\rangle=\sum_{s} A^{a(s)-b(s)} d^{|s|-1},\quad d=-A^2-A^{-2},\qquad
+J_{\text{th}}=\langle D\rangle\,\beta\!\left(1+\tfrac{T}{300},1+\tfrac{300}{T}\right).
+\end{equation}
+
+\section{Bada source-code generation}
+The generator seeds an \texttt{xorshift} stream from the mantissa/exponent of
+$\Xi$ and $J_{\text{th}}$ and emits a Bada policy in which every literal is a
+function of the invariants:
+\begin{align}
+v_{\text{cap}} &= 8 + \text{rnd}[0,14] + 6\,\Xi, &
+d_{\text{brake}} &= 6 + \text{rnd}[0,10] + 20\,M,\\
+k_{\text{steer}} &= 0.15 + 0.25\,(H/8), &
+\text{caution} &= \begin{cases}1.0 & J_{\text{th}}<0\\0.6 & \text{otherwise,}\end{cases}
+\end{align}
+and the order of the two safety rules is chosen by $\Xi\bmod 2$. Because the
+seed is a pure function of the context, the map
+\emph{context} $\to$ \emph{source} is deterministic; different contexts produce
+different valid programs. A representative fragment
+(\texttt{bada/generated\_policy.bada}):
+\begin{lstlisting}
+class BluebirdAutopilot <- TupleSpace {
+  set v_cap   = 16.236   # from Xi
+  set brake_d = 12.626   # from M
+  set steer_k = 0.301    # from H
+  set caution = 1.00     # from sign of Jones(thermal)
+  operator -< (scene) {
+    if scene.obstacle_dist < brake_d * caution { return DRV_BRAKE; }
+    if abs(scene.lane_offset) > 0.20 {
+      return scene.lane_offset > 0 ? DRV_STEER_LEFT : DRV_STEER_RIGHT; }
+    if scene.speed < v_cap { return DRV_ACCEL; }
+    return DRV_HOLD_LANE;
+  }
+}
+\end{lstlisting}
+
+\section{Environment and sound visualization}
+\textbf{\jp{周りの映像化}} (image): a top-down scene is rasterized to a binary
+PPM; the manifold entropy $\Xi$ and $H$ modulate road texture and lane-marking
+cadence. \textbf{\jp{音の映像化}} (sound): a 16-bit PCM WAV is synthesized by
+additive synthesis whose fundamental and timbre come from the thermal
+invariants,
+\begin{equation}
+f_0 = 110 + \bigl(|\langle D\rangle|\cdot 37 \bmod 550\bigr)\,\text{Hz},\qquad
+\text{spread}=1+\tfrac12|J_{\text{th}}|,
+\end{equation}
+with an ASCII spectrogram printed alongside. For the trefoil at $A=1.2$,
+$T=320\,$K: $f_0=368\,$Hz, tremolo $8.8\,$Hz.
+
+\section{The autonomous-driving kernel}
+A $\pi$-softmax policy over $\{$hold, steer-left, steer-right, brake, accel$\}$
+scores actions from lane offset, obstacle distance and a braking envelope
+$d_{\text{env}}=8+0.6\,v$, selecting $\arg\max$ and pushing telemetry to the
+Akashic TupleSpace.
+
+\section{Results}
+Program output for \texttt{examples/road\_scene.txt}:
+\begin{center}
+\begin{tabular}{l l}
+\hline
+Quantity & Value\\\hline
+Shannon entropy $H$ & $4.8400$ bits\\
+Manifold integral $M$ & $0.09212$\\
+Symbol extent $m$ & $60$\\
+Entropy invariant $\Xi$ & $0.03338$\\
+Thermal $\langle D\rangle$ / $J_{\text{th}}$ & $-6.9737$ / $-1.1632$\\
+Generated $v_{\text{cap}}$ / $d_{\text{brake}}$ & $16.236$ / $12.626$\\
+Env image / sound & $320{\times}180$ PPM / $44.1\,$kHz WAV\\
+\hline
+\end{tabular}
+\end{center}
+Regenerating from the same file yields byte-identical source (determinism); a
+lower-entropy percept file produces different literals (context sensitivity).
+
+\section{Scope and limitations}
+The entropy equation~\eqref{eq:xi}, the Kauffman bracket, and the PPM/WAV
+renderers are genuine. The synthesizer is a seeded generative grammar, not a
+learned model. The driving policy is a toy with no perception, validation or
+safety case and \textbf{must not be used in a real car}.
+
+\section{Conclusion}
+We demonstrated a reproducible pipeline that turns a gamma-manifold entropy
+invariant into Bada source code, and a thermal knot invariant into image and
+sound, all under one Bada-language operating system. The construction is
+transparent and deterministic, which makes the ``generative'' behaviour easy to
+audit --- and easy to keep honestly separated from any physical claim.
+
+\begin{thebibliography}{9}
+\bibitem{shannon} C.~E.~Shannon, \emph{A mathematical theory of communication},
+Bell Syst.\ Tech.\ J.\ \textbf{27} (1948) 379--423.
+\bibitem{lanczos} C.~Lanczos, \emph{A precision approximation of the gamma
+function}, SIAM J.\ Numer.\ Anal.\ \textbf{1} (1964) 86--96.
+\bibitem{kauffman} L.~H.~Kauffman, \emph{State models and the Jones polynomial},
+Topology \textbf{26} (1987) 395--407.
+\bibitem{yamaguchi} M.~Yamaguchi, \emph{Bada Language, BadaOS and the TupleSpace
+framework}, Global Differential Manifold Research, 2025.
+\end{thebibliography}
+
+\end{document}

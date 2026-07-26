@@ -1,0 +1,219 @@
+%% maglev_os_paper.tex
+%% Compile with XeLaTeX or LuaLaTeX (Japanese support):
+%%   xelatex maglev_os_paper.tex
+%% CONCEPTUAL / SIMULATION REPORT. The electromagnetic, aerodynamic and
+%% thermal parts are physically grounded; the anti-gravity / gravity-resistance
+%% cancellation layer is a conceptual model and is NOT a claim of new physics.
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}\geometry{a4paper,margin=25mm}
+\usepackage{hyperref}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage{CJKutf8}
+  \newcommand{\jp}[1]{\begin{CJK}{UTF8}{min}#1\end{CJK}}
+\else
+  \usepackage{xeCJK}
+  \setCJKmainfont{Noto Serif CJK JP}[AutoFakeSlant]
+  \newcommand{\jp}[1]{#1}
+\fi
+\usepackage{tcolorbox}
+
+\title{\textbf{A Generative-AI Operating System for a Maglev
+(``Linear Shinkansen'') in the Bada Quantum Language:}\\
+Electromagnetic Levitation, a General-Relativity Manifold Layer,
+and the Jones Polynomial of a Thermal-Energy Body}
+\author{Masaaki Yamaguchi \;(\jp{山口 雅旭})\\
+Global Differential Manifold Research\\
+\texttt{omega\_maglev\_os\_pkg}}
+\date{2026}
+
+\begin{document}
+\maketitle
+
+\begin{tcolorbox}[colback=yellow!8!white,colframe=orange!70!black,title=\textbf{Scope / Honesty Note}]
+This is a \emph{conceptual / simulation} report in the house style of the
+\texttt{Bada} repository. The electromagnetic levitation, the coil power budget,
+and the aerodynamic drag are ordinary, physically grounded models with correct
+SI numbers. The ``anti-gravity field'' is only the balancing magnetic field
+that holds the car up; a maglev does not switch gravity off. The
+``gravity-resistance cancellation via a general-relativity manifold integral''
+and the ``Jones polynomial of the thermal-energy body'' are the Yamaguchi
+TupleSpace motif used as control-gain and telemetry constructs. \textbf{Nothing
+here is a claim of new physics.}
+\end{tcolorbox}
+
+\begin{abstract}
+\noindent\textbf{\jp{要旨}.}\;
+\jp{本稿は、リニア新幹線のオペレーティングシステムとしての生成AIを、量子コンピューター
+の Bada 言語で記述した実装 \texttt{omega\_maglev\_os\_pkg} を報告する。}
+We present a small generative-AI kernel, written in the conceptual \texttt{Bada}
+operator language and lowered to C, that acts as the operating system of a
+magnetically levitated train. Each control tick the kernel (i)~commands an
+electromagnetic (EMS) levitation field so the lift force equals the car weight,
+(ii)~budgets the coil Ohmic power as a normal-conductor \emph{alternative to
+superconductivity}, (iii)~models an evacuated-tube ``no air resistance''
+running mode, (iv)~trims a residual ``gravity resistance'' through the global
+partial-integral manifold element $1/(x\log x)^2$, and (v)~tracks the Jones
+polynomial of a thermal-energy body via a Kauffman-bracket state sum weighted by
+a gamma-function factor. A $\pi$-softmax policy selects the control action and
+writes telemetry to an Akashic TupleSpace. We report the measured operating
+point (flux $B=2.106\,$T, amp-turns $NI=16{,}761$, lift $=441{,}299\,$N matching
+the weight of a $45\,$t car) and state precisely which components are physical
+and which are conceptual.
+\end{abstract}
+
+\section{Introduction}
+Magnetically levitated ground transport replaces wheel--rail contact with a
+servo-controlled magnetic force. We ask a deliberately playful question in the
+project's idiom: \emph{what would an ``operating system'' for such a vehicle look
+like if it were written as a generative controller in the Bada quantum
+language?} The answer is a five-subsystem kernel whose physical core (levitation,
+power, drag) is real and whose speculative shell (a manifold ``gravity
+resistance'' term, a knot-theoretic thermal invariant) is the repository's
+conceptual motif. We keep the two layers explicitly separated (see the note
+above and \S\ref{sec:scope}).
+
+\section{The Bada operator algebra}
+Bada expresses operator-algebra programs with four constructs used throughout
+this work:
+\[
+\begin{array}{ll}
+\texttt{<-} & \text{left non-commutative act } \pi(\chi,x)=[\,i\pi,\,f(x)\,]\\
+\texttt{-<} & \text{manifold integral } \displaystyle\iint \frac{1}{(x\log x)^2}\,dx_m\\
+\texttt{>-} & \text{quantum right act } e^{-x\log x}\\
+\Omega\text{::push} & \text{write to the Akashic TupleSpace }\Omega\text{::DATABASE}
+\end{array}
+\]
+The kernel \texttt{bada/maglev\_os.bada} instantiates one class per subsystem and
+runs a single control tick \verb|BadaOS <- shinkansen|.
+
+\section{Electromagnetic levitation (real physics)}
+An EMS pole develops an attractive force across the air gap $g$. With $N I$
+amp-turns,
+\begin{equation}
+B=\frac{\mu_0\,N I}{g},\qquad
+F=\frac{B^2 A}{2\mu_0}=\frac{\mu_0 (N I)^2 A}{2 g^2},
+\label{eq:lev}
+\end{equation}
+where $A$ is the pole area and $\mu_0=1.2566\times10^{-6}\,$H/m. The controller
+solves $F=m g_0$ for the commanded amp-turns,
+\begin{equation}
+N I = g\sqrt{\frac{2 m g_0}{\mu_0 A}}.
+\label{eq:ni}
+\end{equation}
+This is the honest core of what the marketing layer calls the ``anti-gravity
+field'': the field simply balances weight so the car floats.
+
+\section{A superconductor alternative}
+Rather than a superconducting coil ($R\to0$), the kernel reports the Ohmic
+power a \emph{normal} winding of $T$ turns would dissipate,
+\begin{equation}
+P = I^2 R = \left(\frac{N I}{T}\right)^{\!2} R,
+\end{equation}
+so an operating point can be chosen that keeps $P$ within the on-board power
+budget. For the reference car ($NI=16{,}761$, $T=400$, $R=0.02\,\Omega$) we find
+$P\approx 35\,$W per module.
+
+\section{Aerodynamics and the ``no air resistance'' mode}
+Drag is the textbook
+\begin{equation}
+F_{\text{drag}}=\tfrac12\,\rho\,C_d\,A_f\,v^2 .
+\end{equation}
+The only physical route to zero drag is to remove the air: an evacuated tube
+drops $\rho\to0$. We report the removed fraction
+$r=1-\rho/\rho_{\text{air}}$; at $500\,$km/h in vacuum, $F_{\text{drag}}=0$ and
+$r=100\%$ versus sea level ($42{,}541\,$N).
+
+\section{The general-relativity manifold layer (conceptual)}
+\label{sec:manifold}
+In real general relativity a free body follows a geodesic and there is no
+``gravity resistance'' for a field to cancel. As a control-gain construct we
+integrate the global partial-integral manifold element
+\begin{equation}
+d\mu(x)=\frac{1}{(x\log x)^2},\qquad
+M=\iint\frac{1}{(x\log x)^2}\,dx_m\;\approx\;\sum_{i=2}^{n+1}\frac{1}{(i\log i)^2},
+\end{equation}
+and define a dimensionless cancellation ratio $c\in[0,1)$; the residual vertical
+acceleration reported to the OS is $a_{\text{res}}=g_0(1-c)$. For $64$ steps
+$M\approx 0.692$. \emph{This term is a knob, not new physics.}
+
+\section{Jones polynomial of the thermal-energy body}
+The recirculating coolant / eddy-heat loop of a levitation module is represented
+as a knot diagram $D$. The Kauffman bracket is the state sum
+\begin{equation}
+\langle D\rangle=\sum_{s\in\{A,B\}^{n}} A^{\,a(s)-b(s)}\,d^{\,|s|-1},
+\qquad d=-A^2-A^{-2},
+\end{equation}
+over all smoothings $s$ of the $n$ crossings, with $|s|$ the loop count. We fold
+in a gamma-function global-partial (beta) weight depending on body temperature
+$T$,
+\begin{equation}
+\beta(a,b)=\frac{\Gamma(a)\Gamma(b)}{\Gamma(a+b)},\qquad
+J_{\text{th}}=\langle D\rangle\,\beta\!\left(1+\tfrac{T}{300},\,1+\tfrac{300}{T}\right).
+\end{equation}
+For the trefoil model at $A=1.2$, $T=320\,$K we obtain
+$\langle D\rangle=-6.9737$ and $J_{\text{th}}=-1.1623$.
+
+\section{The generative-AI OS kernel}
+The kernel scores five actions
+$\{$raise, lower field; evacuate tube; trim manifold; hold$\}$ from the physics
+error signals, normalises them to a common scale, and forms a policy with the
+$\pi$-softmax
+\begin{equation}
+p_i=\frac{\exp(\ell_i\,\hbar_{\text{eff}}\,\pi)}{\sum_j\exp(\ell_j\,\hbar_{\text{eff}}\,\pi)},
+\qquad \hbar_{\text{eff}}=0.35,
+\end{equation}
+selecting $\arg\max_i p_i$. Applying the action updates the gap, ambient density,
+or cancellation ratio, and the tick's telemetry is pushed to
+$\Omega$::\texttt{DATABASE}.
+
+\section{Implementation and results}
+The package builds to a single \texttt{bin/launcher} (C99, \texttt{-lm}). Table
+values are direct program output.
+\begin{center}
+\begin{tabular}{l l}
+\hline
+Quantity & Value\\\hline
+Car mass & $45{,}000\,$kg\\
+Commanded amp-turns $NI$ & $16{,}761$\\
+Flux density $B$ & $2.1063\,$T\\
+Lift force $F$ & $441{,}299\,$N ($=m g_0$)\\
+Coil Ohmic power & $35.1\,$W / module\\
+Drag @ $500\,$km/h, vacuum & $0\,$N ($100\%$ removed)\\
+Manifold integral $M$ (64 steps) & $0.6920$\\
+Kauffman $\langle D\rangle$ @ $A{=}1.2$ & $-6.9737$\\
+Thermal invariant $J_{\text{th}}$ @ $320\,$K & $-1.1623$\\
+\hline
+\end{tabular}
+\end{center}
+The boot loop drives the residual-gravity trim first (largest error) and
+evacuates the tube once drag dominates, then holds a balanced state.
+
+\section{Scope and limitations}
+\label{sec:scope}
+Physical and correct: Eqs.~\eqref{eq:lev}--\eqref{eq:ni}, the power budget, and
+the drag model. Conceptual / metaphorical: the manifold ``gravity resistance''
+term (\S\ref{sec:manifold}) and the mapping of heat flow to a knot. The
+$\pi$-softmax kernel is a simulated autopilot, not a validated safety system and
+not a trained large model. No hardware claim is made.
+
+\section{Conclusion}
+We packaged a maglev ``operating system'' as a small generative controller in
+the Bada language, combining a correct electromagnetic-levitation core with the
+project's manifold and knot-theoretic motifs, and reported a self-consistent
+operating point. The value of the exercise is expository: it shows how far a
+physically honest core can be wrapped in the Bada operator idiom while keeping
+the speculative layer clearly labelled.
+
+\begin{thebibliography}{9}
+\bibitem{kauffman} L.~H.~Kauffman, \emph{State models and the Jones polynomial},
+Topology \textbf{26} (1987) 395--407.
+\bibitem{jones} V.~F.~R.~Jones, \emph{A polynomial invariant for knots via von
+Neumann algebras}, Bull. AMS \textbf{12} (1985) 103--111.
+\bibitem{yamaguchi} M.~Yamaguchi, \emph{Bada Language, BadaOS and the TupleSpace
+framework}, Global Differential Manifold Research, 2025.
+\end{thebibliography}
+
+\end{document}
