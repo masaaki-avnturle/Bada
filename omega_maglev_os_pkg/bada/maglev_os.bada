@@ -1,0 +1,70 @@
+# maglev_os.bada — Linear Shinkansen operating system in the Bada language.
+#
+# This is the conceptual Bada-language surface for the C kernel in ../lib.
+# Bada operators (see repo README):
+#   <-   left non-commutative act   pi(chi,x) = [i*pi, f(x)]
+#   -<   manifold integral          ∬ 1/(x log x)^2 dx_m
+#   >-   quantum right act          e^{-x log x}
+#   Omega::push                     write to the Akashic TupleSpace
+#
+# The kernel is a generative-AI controller: it senses vehicle state, generates
+# a control policy with pi-softmax, and drives four subsystems each tick.
+
+class LevitationField <- TupleSpace {
+  # EM levitation — the honest core of the "anti-gravity field".
+  operator <- (state) {
+    # command amp-turns so lift force equals weight  =>  the car floats
+    return sqrt(2.0 * state.mass * g0 / state.coil_area) * state.gap;
+  }
+}
+
+class GravityManifold <- TupleSpace {
+  # General-relativity manifold layer (conceptual/simulation).
+  operator -< (curvature) {
+    # ∬ 1/(x log x)^2 dx_m  — global partial-integral manifold element
+    return manifold_integral(curvature) / log(curvature + 1.0);
+  }
+}
+
+class ThermalBody <- TupleSpace {
+  # Jones polynomial of the thermal-energy body, gamma-global-partial weighted.
+  operator >- (diagram) {
+    # <D> at A, folded with beta(a,b) = Gamma(a)Gamma(b)/Gamma(a+b)
+    return kauffman_bracket(diagram) * gamma_global_partial(a, b);
+  }
+}
+
+class Aerodynamics <- TupleSpace {
+  # "no air resistance" running mode via evacuated tube (rho -> 0).
+  operator <- (env) {
+    return 0.5 * env.rho * env.cd * env.area * env.speed * env.speed;
+  }
+}
+
+# ---- generative-AI OS boot loop -------------------------------------------
+class BadaOS <- TupleSpace {
+  operator <- (train) {
+    set field   = LevitationField <- train;      # balance weight with EM field
+    set drag    = Aerodynamics    <- train.env;   # measure air resistance
+    set cancel  = GravityManifold -< train.kappa; # trim residual gravity
+    set thermal = ThermalBody     >- train.knot;  # thermal-body invariant
+
+    # pi-softmax policy over {raise, lower, evacuate, trim, hold}
+    set action = pi_softmax([field, drag, cancel, thermal], hbar_eff);
+
+    Omega::push field   as levitation_force;
+    Omega::push drag    as air_drag;
+    Omega::push cancel  as gravity_cancel_ratio;
+    Omega::push thermal as thermal_jones_invariant;
+    Omega::push action  as policy;
+    return action;
+  }
+}
+
+# ---- run -------------------------------------------------------------------
+set shinkansen = { mass: 45000, gap: 0.010, coil_area: 0.25,
+                   env: { rho: 1.225, cd: 0.30, area: 12.0, speed: 138.9 },
+                   kappa: 64, knot: "examples/thermal_body.knot",
+                   a: 2.0, b: 1.5 }
+
+BadaOS <- shinkansen        # one control tick; loop this every 10 ms in service
