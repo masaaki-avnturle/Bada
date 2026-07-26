@@ -1,0 +1,171 @@
+// ============================================================================
+//  passthrough_scene.om  —  風景透過 & 情景認識 (World::Scene)
+//
+//  デバイスのカメラ (または内蔵の光学シースルー) を通して目の前の実風景を
+//  取り込み、その情景の種類 (森・水辺・山・都市・空・火山・雪原…) を
+//  推定する。推定結果に応じて、その風景に「棲む」式獣が呼び出される。
+// ============================================================================
+
+import Omega::DATABASE
+import Omega::Tuplespace
+
+// ---- 情景の種類 ----
+type SceneKind := Enum {
+  FOREST,      // 森・木立     → くさ / むし系の式獣
+  WATER,       // 川・海・湖   → みず系
+  MOUNTAIN,    // 山・岩場     → いわ / じめん系
+  CITY,        // 街・室内     → はがね / でんき系
+  SKY,         // 空・高所     → ひこう系
+  VOLCANO,     // 火山・炎     → ほのお系
+  GRASS,       // 草原         → ノーマル / くさ系
+  SNOW,        // 雪原         → こおり系
+  NIGHT        // 夜・暗所     → ゴースト / あく系
+}
+
+// ---- 認識された風景 ----
+type Scene := Record {
+  kind       : SceneKind,
+  confidence : Float,        // 推定確度 0..1
+  hue        : Float,        // 主要色相
+  brightness : Float,        // 明るさ
+  greenRatio : Float,        // 緑被覆率
+  blueRatio  : Float,        // 青(空/水)率
+  motion     : Float         // 動きの量
+}
+
+// ============================================================================
+//  Camera — 透過像の取得 (内蔵光学 / 外部カメラ 共通)
+// ============================================================================
+class PassthroughCamera {
+
+  def initialize() {
+    @online := false
+  }
+
+  def open() {
+    @cam := Device::Camera.open("rear")
+    @online := (@cam != nil)
+    if @online {
+      print("[透過] 背面カメラを起動。目の前の風景を取り込みます。")
+    }
+    return @online
+  }
+
+  def frame() := block {
+    if not @online { return nil }
+    return @cam.grab()      // RGB フレーム
+  }
+
+  // 内蔵ディスプレイ用: 現実をそのまま素通しする光学シースルー像
+  def opticalSeeThrough() := block {
+    return Device::Waveguide.background()
+  }
+
+  // 外部ディスプレイ用: カメラ像をテクスチャ化して背面へ回す
+  def captureTexture() := block {
+    return frame()
+  }
+}
+
+// ============================================================================
+//  SceneClassifier — フレームから情景の種類を推定する
+//  omega の π-softmax でスコアを正規化し、最尤の情景を返す。
+// ============================================================================
+class SceneClassifier {
+
+  def initialize() {
+    // 過去の推定を Akashic Record に貯め、場所ごとの傾向を学習する
+    @memory := Omega::DATABASE[TupleSpace].new
+  }
+
+  // フレームの色・明度・動きから特徴量を抽出
+  def features(frame) := block {
+    hist := frame.colorHistogram()
+    return Scene {
+      kind:       SceneKind.GRASS,        // 仮 (後で確定)
+      confidence: 0.0,
+      hue:        hist.dominantHue,
+      brightness: frame.averageLuma(),
+      greenRatio: hist.ratio("green"),
+      blueRatio:  hist.ratio("blue"),
+      motion:     frame.opticalFlowMagnitude()
+    }
+  }
+
+  // 各情景のスコアを計算 → π-softmax → 最尤を採用
+  def classify(frame) := block {
+    f := features(frame)
+
+    scores := []
+    scores[SceneKind.FOREST]   := f.greenRatio * 2.0 + darkGreenBias(f)
+    scores[SceneKind.WATER]    := f.blueRatio * 1.6 + f.motion * 0.4
+    scores[SceneKind.MOUNTAIN] := rockBias(f)
+    scores[SceneKind.CITY]     := grayBias(f) + edgeDensity(frame)
+    scores[SceneKind.SKY]      := f.blueRatio * 1.2 + f.brightness * 0.8
+    scores[SceneKind.VOLCANO]  := redOrangeBias(f) + f.brightness * 0.3
+    scores[SceneKind.GRASS]    := f.greenRatio * 1.4 + f.brightness * 0.5
+    scores[SceneKind.SNOW]     := whiteBias(f)
+    scores[SceneKind.NIGHT]    := darkBias(f)
+
+    // π-softmax による正規化 (omega_math.c 由来)
+    probs := piSoftmax(scores)
+    best  := argmax(probs)
+
+    f.kind       := best
+    f.confidence := probs[best]
+
+    // 推定を記録 (同じ場所での再訪で確度が上がる)
+    @memory.push([best, f.hue, f.brightness, f.confidence])
+    return f
+  }
+
+  // --- 情景バイアスの補助関数 (色特徴の粗い規則) ---
+  def darkGreenBias(f) := block { return (f.hue > 80 and f.hue < 160) ? 0.8 : 0.0 }
+  def rockBias(f)      := block { return (f.brightness < 0.5 and f.greenRatio < 0.2) ? 1.0 : 0.0 }
+  def grayBias(f)      := block { return (f.greenRatio < 0.15 and f.blueRatio < 0.25) ? 0.9 : 0.0 }
+  def redOrangeBias(f) := block { return (f.hue < 40 or f.hue > 340) ? 1.5 : 0.0 }
+  def whiteBias(f)     := block { return (f.brightness > 0.85) ? 1.3 : 0.0 }
+  def darkBias(f)      := block { return (f.brightness < 0.2) ? 1.4 : 0.0 }
+  def edgeDensity(frame) := block { return frame.edges() * 0.5 }
+
+  // π-softmax : exp(s·ℏ_eff·π) を正規化
+  def piSoftmax(scores) := block {
+    hbar := 0.62
+    pi   := 3.14159265358979
+    sum  := 0.0
+    out  := []
+    for k in scores.keys() do {
+      e := exp(scores[k] * hbar * pi)
+      out[k] := e
+      sum := sum + e
+    }
+    for k in out.keys() do { out[k] := out[k] / sum }
+    return out
+  }
+
+  def argmax(probs) := block {
+    best := nil
+    bestv := -1.0
+    for k in probs.keys() do {
+      if probs[k] > bestv { bestv := probs[k]; best := k }
+    }
+    return best
+  }
+}
+
+// ============================================================================
+//  Scene ヘルパ : 情景名 (日本語)
+// ============================================================================
+func sceneName(kind) := block {
+  match kind {
+  | SceneKind.FOREST   => return "森"
+  | SceneKind.WATER    => return "水辺"
+  | SceneKind.MOUNTAIN => return "山岳"
+  | SceneKind.CITY     => return "街"
+  | SceneKind.SKY      => return "大空"
+  | SceneKind.VOLCANO  => return "火山"
+  | SceneKind.GRASS    => return "草原"
+  | SceneKind.SNOW     => return "雪原"
+  | SceneKind.NIGHT    => return "夜闇"
+  }
+}

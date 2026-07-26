@@ -1,0 +1,176 @@
+// ============================================================================
+//  hologram_display.om  —  ホログラフィーディスプレイ・ドライバ
+//  ポケットモンスター AR ゲーム / Bada言語 (Omega方言)
+//
+//  デバイス内蔵ディスプレイ (device-embedded) と 外部ディスプレイ (external)
+//  の 2 系統に、同一の式獣ホログラムを投影する。
+//
+//  内蔵 : スマートデバイスの導波路 (waveguide) 越しに、目の前の風景へ
+//         重ねて式獣を結像させる (シースルー / passthrough AR)。
+//  外部 : 空中結像プレート・体積走査ディスプレイ等の外部機器へ、
+//         同じ光線場 (light field) をストリーミングする。
+//
+//  光線場の生成は caustics_field.om のコースティクス方程式に委ねる。
+// ============================================================================
+
+import Omega::DATABASE
+import Omega::Tuplespace
+import Hologram::Caustics      // caustics_field.om
+import Sensor::Tilt            // tilt_balance.om
+
+// ---- 投影先の種別 ---------------------------------------------------------
+type DisplayKind := Enum {
+  INTERNAL,     // デバイス内蔵の導波路ディスプレイ
+  EXTERNAL      // 外部の空中結像 / 体積ディスプレイ
+}
+
+// Voxel / LightField 型は Hologram::Caustics (caustics_field.om) で定義され、
+// import 経由でこのモジュールから参照できる。
+
+// ============================================================================
+//  HologramDisplay — 1 系統の投影器を表すクラス
+// ============================================================================
+class HologramDisplay {
+
+  def initialize(kind, width, height, depth) {
+    @kind    := kind
+    @width   := width
+    @height  := height
+    @depth   := depth
+    @online  := false
+    // コースティクス・レンダラ (光の集光模様で式獣を描く)
+    @caustic := Caustics::Renderer.new(width, height, depth)
+    // 投影履歴を Akashic Record (TupleSpace) に残す
+    @record  := Omega::DATABASE[TupleSpace].new
+  }
+
+  // ---- 投影器の起動 ----
+  def boot() {
+    if @kind == DisplayKind.INTERNAL {
+      print("[内蔵] 導波路ディスプレイを初期化… シースルー結像 ON")
+      calibrateWaveguide()
+    } else {
+      print("[外部] 空中結像ディスプレイへ接続中…")
+      if not linkExternalDevice() {
+        print("[外部] 外部機器が見つかりません。内蔵のみで続行します。")
+        return false
+      }
+    }
+    @online := true
+    return true
+  }
+
+  // 内蔵ディスプレイ: 導波路の位相ズレを補正して風景と式獣を一致させる
+  def calibrateWaveguide() {
+    for layer from 0 to @depth do {
+      phase := Caustics::wavefrontPhase(layer, @depth)
+      @caustic.setLayerPhase(layer, phase)
+    }
+  }
+
+  // 外部ディスプレイ: BadaOS の空中結像プロトコルで機器を探索・接続
+  def linkExternalDevice() := block {
+    dev := Omega::Tuplespace.discover("aerial-display")
+    if dev == nil { return false }
+    @external_dev := dev
+    return true
+  }
+
+  // ========================================================================
+  //  投影本体
+  //  scene    : 透過している実風景 (passthrough_scene.om)
+  //  creature : 表示する式獣マスコット (shikijuu.om)
+  //  tilt     : 平行感覚センサの傾き (tilt_balance.om)
+  // ========================================================================
+  def project(scene, creature, tilt) := block {
+    if not @online { return nil }
+
+    // 1) 実風景を透過 —— 内蔵は光学シースルー、外部は風景テクスチャを合成
+    background := passthrough(scene)
+
+    // 2) 傾きに連動してマスコットの姿勢・位置をずらす (視差 parallax)
+    pose := Tilt::applyToPose(creature.pose, tilt)
+
+    // 3) コースティクス方程式で式獣の光線場を生成
+    field := @caustic.renderCreature(creature, pose, background)
+
+    // 4) 投影先ごとに出力
+    if @kind == DisplayKind.INTERNAL {
+      emitWaveguide(field)
+    } else {
+      streamExternal(field)
+    }
+
+    // 5) 投影イベントを Akashic Record に記録
+    @record.push([creature.name, scene.kind, tilt.pitch, tilt.roll])
+    return field
+  }
+
+  // 実風景の透過処理
+  def passthrough(scene) := block {
+    if @kind == DisplayKind.INTERNAL {
+      // 光学的シースルー: 背景は現実そのもの。輝度分だけ加算合成する。
+      return scene.opticalSeeThrough()
+    } else {
+      // 外部機器: カメラ透過像をテクスチャとして光線場の背面に置く
+      return scene.captureTexture()
+    }
+  }
+
+  // 内蔵導波路へ光線場を射出
+  def emitWaveguide(field) {
+    for v in field.voxels do {
+      // 導波路は 2.5D。奥行き z は視差で近似投影する。
+      waveguide.write(v.x, v.y, v.z, v.r, v.g, v.b, v.lum)
+    }
+  }
+
+  // 外部空中結像機器へ光線場をストリーミング
+  def streamExternal(field) {
+    packet := encodeLightField(field)
+    @external_dev.stream(packet)
+  }
+
+  def encodeLightField(field) := block {
+    return Omega::Tuplespace.pack(field.voxels)
+  }
+
+  def shutdown() {
+    @online := false
+    print("[" + displayName() + "] ホログラム投影を停止")
+  }
+
+  def displayName() := block {
+    if @kind == DisplayKind.INTERNAL { return "内蔵" } else { return "外部" }
+  }
+}
+
+// ============================================================================
+//  DualHologram — 内蔵と外部を束ねて同時投影するファサード
+// ============================================================================
+class DualHologram {
+
+  def initialize(width, height, depth) {
+    @internal := HologramDisplay.new(DisplayKind.INTERNAL, width, height, depth)
+    @external := HologramDisplay.new(DisplayKind.EXTERNAL, width, height, depth)
+    @has_external := false
+  }
+
+  def boot() {
+    @internal.boot()
+    @has_external := @external.boot()
+  }
+
+  // 内蔵と外部へ同一の式獣を投影する
+  def show(scene, creature, tilt) {
+    @internal.project(scene, creature, tilt)
+    if @has_external {
+      @external.project(scene, creature, tilt)
+    }
+  }
+
+  def shutdown() {
+    @internal.shutdown()
+    if @has_external { @external.shutdown() }
+  }
+}

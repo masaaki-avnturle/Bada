@@ -1,0 +1,175 @@
+// ============================================================================
+//  main.om  —  『式獣ホログラム — ポケットモンスター物語』
+//  エントリポイント / ゲームループ  (Bada言語 / Omega方言)
+//
+//  ■ 何をするゲームか
+//   1. デバイス内蔵 + 外部 の 2系統ホログラフィーディスプレイを起動する。
+//   2. カメラ (または光学シースルー) で目の前の実風景を「透過」する。
+//   3. その風景の種類を認識し、風景に宿る「式獣 (ポケモン型マスコット)」を
+//      コースティクス・ホログラムとして空中に結像させる。
+//   4. デバイス内蔵の平行感覚センサ (傾き) に、式獣マスコットが連動して動く。
+//   5. ポケットモンスターの物語に沿って、式獣バトルで旅を進める。
+//
+//  ■ モジュール構成
+//   hologram/hologram_display.om  … 内蔵+外部の投影ドライバ (DualHologram)
+//   hologram/caustics_field.om    … 光の集光でマスコットを描くレンダラ
+//   sensor/tilt_balance.om        … 平行感覚センサ → 姿勢連動
+//   world/passthrough_scene.om    … 風景透過 + 情景認識
+//   creatures/shikijuu.om         … 式獣図鑑 + アカシック召喚
+//   battle/battle_system.om       … 傾き連動ターン制バトル
+//   story/story.om                … 物語の章立て
+// ============================================================================
+
+import Omega::DATABASE
+import Hologram::Display          // DualHologram
+import Sensor::Tilt              // BalanceSensor
+import World::Scene              // PassthroughCamera, SceneClassifier, sceneName
+import Creatures::Shikijuu       // Dex, Shikijuu
+import Battle::System            // Battle
+import Story::Chapters           // Story
+
+// ---- 画面/光線場の解像度 ----
+const HOLO_W := 128
+const HOLO_H := 128
+const HOLO_D := 32          // 空中結像の奥行きレイヤ数
+
+// ============================================================================
+//  Game — ゲーム全体をまとめる
+// ============================================================================
+class Game {
+
+  def initialize() {
+    @holo   := DualHologram.new(HOLO_W, HOLO_H, HOLO_D)   // 内蔵+外部
+    @sensor := BalanceSensor.new                          // 平行感覚
+    @camera := PassthroughCamera.new                      // 風景透過
+    @vision := SceneClassifier.new                        // 情景認識
+    @dex    := Dex.new                                    // 式獣図鑑
+    @story  := Story.new                                  // 物語
+    @save   := Omega::DATABASE[TupleSpace].new            // セーブ (アカシック)
+  }
+
+  // ---- 起動 ----
+  def boot() {
+    print("========================================================")
+    print(" 式獣ホログラム — ポケットモンスター物語")
+    print("========================================================")
+    @holo.boot()          // 内蔵ディスプレイ + (あれば)外部ディスプレイ
+    @sensor.calibrate()   // 平行感覚のゼロ点校正
+    @camera.open()        // 背面カメラ / 光学シースルー
+  }
+
+  // ------------------------------------------------------------------------
+  //  探索フェーズ: 風景を透過して式獣を出現させる
+  // ------------------------------------------------------------------------
+  def explore(chapter) := block {
+    print("")
+    print("― 第" + chapter.no + "章 『" + chapter.title + "』 ―")
+    print(chapter.intro)
+    print("")
+    print(">> デバイスを『" + sceneName(chapter.place) + "』へ向けてください…")
+
+    // 実風景を透過 → 情景を認識
+    frame := @camera.frame()
+    scene := @vision.classify(frame)
+
+    // 物語上の想定情景と食い違っても、実際に写った風景を優先する
+    print("[透過] 認識した情景: " + sceneName(scene.kind)
+          + " (確度 " + floor(scene.confidence * 100) + "%)")
+
+    // 情景に宿る式獣を召喚し、内蔵+外部ホログラムに結像
+    creature := @dex.summon(scene)
+    tilt := @sensor.sample()
+    @holo.show(scene, creature, tilt)
+    print("[結像] 式獣が空中に浮かびました。デバイスを傾けると連動して動きます。")
+
+    return [scene, creature]
+  }
+
+  // ------------------------------------------------------------------------
+  //  1章 = 探索 → バトル
+  // ------------------------------------------------------------------------
+  def playChapter(chapter) := block {
+    result := explore(chapter)
+    scene    := result[0]
+    partner  := result[1]      // 味方となる式獣
+
+    // 敵 = 章のライバルが率いる、その情景の式獣
+    enemy := @dex.summon(scene)
+    print("")
+    print("！ " + chapter.rival + " が勝負を仕掛けてきた！")
+
+    battle := Battle.new(partner, enemy, @sensor, @holo, scene)
+    outcome := battle.run(chooseMoveUI)
+
+    if outcome == "WIN" {
+      print("")
+      print(chapter.outro)
+      @save.push([chapter.no, "cleared", partner.name()])
+      return true
+    } else {
+      print("")
+      print("… もう一度 挑戦しよう。デバイスを水平に保って狙いを定めて！")
+      return false
+    }
+  }
+
+  // ---- コマンド選択UI (傾きで候補を選び、水平で決定する想定) ----
+  //  ここでは先頭のわざを既定選択とする簡易実装。
+  def chooseMoveUI(actor) := block {
+    print("  [コマンド] わざを選択:")
+    i := 0
+    for m in actor.moves() do {
+      print("    " + i + ") " + m.name + " (威力" + m.power + ")")
+      i := i + 1
+    }
+    // 実機では傾き(roll)でカーソル移動 → 水平保持で決定。
+    tilt := @sensor.sample()
+    idx  := selectByTilt(tilt, actor.moves().length)
+    return idx
+  }
+
+  // 端末の左右傾き(roll)でわざカーソルを動かす
+  def selectByTilt(tilt, n) := block {
+    // roll を [0, n) にマッピング
+    norm := (tilt.roll + 1.0) / 2.0        // -1..1 → 0..1
+    if norm < 0.0 { norm := 0.0 }
+    if norm > 0.999 { norm := 0.999 }
+    return floor(norm * n)
+  }
+
+  // ------------------------------------------------------------------------
+  //  メインループ: 物語を最初から最後まで
+  // ------------------------------------------------------------------------
+  def run() {
+    boot()
+    while not @story.isFinished() do {
+      chapter := @story.current()
+      cleared := playChapter(chapter)
+      if cleared {
+        @story.advance()
+      }
+      // 未クリアなら同じ章を再挑戦
+    }
+    ending()
+    shutdown()
+  }
+
+  def ending() {
+    print("")
+    print("========================================================")
+    print(" 全 " + @story.total() + " 章 クリア！")
+    print(" きみは風景と式獣をつなぐ、真の式獣使いになった。")
+    print(" —— 式獣ホログラム / 完 ——")
+    print("========================================================")
+  }
+
+  def shutdown() {
+    @holo.shutdown()
+  }
+}
+
+// ============================================================================
+//  起動
+// ============================================================================
+game := Game.new
+game.run()

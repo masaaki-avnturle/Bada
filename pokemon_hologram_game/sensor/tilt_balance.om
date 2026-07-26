@@ -1,0 +1,118 @@
+// ============================================================================
+//  tilt_balance.om  —  平行感覚センサ (Sensor::Tilt)
+//
+//  デバイス内蔵のジャイロ + 加速度計 (IMU) から「平行感覚 = 水平に対する
+//  傾き」を読み取り、式獣マスコットの姿勢へ連動させる。
+//
+//  デバイスを傾けると、マスコットもその動きに追従して揺れ・傾き・視差で
+//  動く。戦闘中は傾きが「回避」「溜め」「必殺の照準」にも使われる。
+// ============================================================================
+
+import Omega::DATABASE
+
+const DEG := 3.14159265358979 / 180.0
+const G   := 9.80665                 // 重力加速度 (平行 = 重力ベクトルに直交)
+
+// ---- 生の傾き ----
+type Tilt := Record {
+  pitch : Float,      // 前後の傾き (rad)  端末を手前/奥へ倒す
+  roll  : Float,      // 左右の傾き (rad)  端末を左右へ傾ける
+  yaw   : Float,      // 水平回転 (rad)
+  ax    : Float,      // 加速度 x (振る動き)
+  ay    : Float,
+  az    : Float
+}
+
+// ---- マスコットの姿勢 ----
+type Pose := Record {
+  pitch : Float,
+  roll  : Float,
+  yaw   : Float,
+  tx    : Float, ty : Float, tz : Float,   // 平行移動 (視差)
+  scale : Float
+}
+
+// ============================================================================
+//  BalanceSensor — IMU を読み、平滑化した傾きを返す
+// ============================================================================
+class BalanceSensor {
+
+  def initialize() {
+    @pitch := 0.0
+    @roll  := 0.0
+    @yaw   := 0.0
+    @alpha := 0.15          // 相補フィルタ係数 (揺れを滑らかに)
+    @zero_pitch := 0.0      // ゼロ点 (キャリブレーション基準)
+    @zero_roll  := 0.0
+  }
+
+  // 起動時に「今の持ち方」を水平の基準にする
+  def calibrate() {
+    raw := readIMU()
+    @zero_pitch := raw.pitch
+    @zero_roll  := raw.roll
+    print("[平行感覚] ゼロ点校正 完了 — 現在の傾きを水平と見なします")
+  }
+
+  // 加速度計から重力ベクトルの向き → pitch / roll を導出
+  def readIMU() := block {
+    a := Device::IMU.read()          // 内蔵IMUドライバ
+    pitch := atan2(a.ay, sqrt(a.ax * a.ax + a.az * a.az))
+    roll  := atan2(-a.ax, a.az)
+    return Tilt {
+      pitch: pitch, roll: roll, yaw: a.yaw,
+      ax: a.ax, ay: a.ay, az: a.az
+    }
+  }
+
+  // 毎フレーム呼ぶ : ジャイロと加速度を相補フィルタで融合し平滑化
+  def sample() := block {
+    raw := readIMU()
+    p := raw.pitch - @zero_pitch
+    r := raw.roll  - @zero_roll
+    // 相補フィルタ : 前回値へ少しずつ寄せてブレを消す
+    @pitch := (1.0 - @alpha) * @pitch + @alpha * p
+    @roll  := (1.0 - @alpha) * @roll  + @alpha * r
+    @yaw   := raw.yaw
+    return Tilt {
+      pitch: @pitch, roll: @roll, yaw: @yaw,
+      ax: raw.ax, ay: raw.ay, az: raw.az
+    }
+  }
+
+  // 端末を素早く振った? (戦闘の「振り攻撃」判定)
+  def isShaken(tilt) := block {
+    mag := sqrt(tilt.ax*tilt.ax + tilt.ay*tilt.ay + tilt.az*tilt.az)
+    return mag > 2.2 * G
+  }
+}
+
+// ============================================================================
+//  自由関数 : 傾きをマスコットの姿勢へ写す (連動の中核)
+// ============================================================================
+
+// applyToPose — 傾き tilt を式獣の基準姿勢 base へ反映する。
+//   ・端末を傾けた向きへマスコットが傾く
+//   ・傾いた方向へマスコットが少しスライドする (視差 parallax)
+//   ・前傾で近づき、後傾で遠ざかる (奥行き z)
+func applyToPose(base, tilt) := block {
+  // 傾きへの追従係数 (揺れの誇張ぶん)
+  followRoll  := 1.20
+  followPitch := 1.10
+  parallax    := 0.35        // 視差移動量
+
+  return Pose {
+    // 端末の傾きへ姿勢を連動
+    roll:  base.roll  + tilt.roll  * followRoll,
+    pitch: base.pitch + tilt.pitch * followPitch,
+    yaw:   base.yaw   + tilt.yaw,
+
+    // 傾いた向きへ視差スライド (背景の風景に対して浮遊感を出す)
+    tx: base.tx + sin(tilt.roll)  * parallax,
+    ty: base.ty - sin(tilt.pitch) * parallax,
+    // 前傾 (pitch>0) で手前へ、後傾で奥へ
+    tz: base.tz - tilt.pitch * 0.5,
+
+    scale: base.scale
+  }
+}

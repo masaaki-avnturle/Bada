@@ -1,0 +1,142 @@
+// ============================================================================
+//  caustics_field.om  —  コースティクス光線場レンダラ
+//  Hologram::Caustics
+//
+//  ホログラムの実体は「光の集光模様 (caustics)」である。
+//  水面や結晶を通った光が一点に集まって明線を描くのと同じ原理で、
+//  空中の各ボクセルへ光を集光させ、式獣の像を結ぶ。
+//
+//  参照: caostics.pdf (山口フレームワーク) のコースティクス積分と、
+//        omega の π-softmax / ℏ_eff 集光カーネルを流用する。
+// ============================================================================
+
+import Omega::DATABASE
+
+const PI     := 3.14159265358979
+const HBAR   := 1.054571817e-34     // ℏ
+const HBAR_EFF := 0.62              // ℏ_eff : 集光の鋭さ (omega注意スケール)
+
+// ---- 3次元の光点 (voxel) : 空中結像の最小単位 ----
+type Voxel := Record {
+  x : Float, y : Float, z : Float,   // z = 風景に対する空中結像の奥行き
+  r : Float, g : Float, b : Float,
+  lum : Float                        // 輝度 (コースティクスの集光率)
+}
+
+// ---- 光線場フレーム : 1フレーム分の光点群 ----
+type LightField := Record {
+  voxels : List<Voxel>,
+  width  : Int, height : Int, depth : Int
+}
+
+// ============================================================================
+//  自由関数 : 波面位相とコースティクス強度
+// ============================================================================
+
+// 導波路レイヤ layer の波面位相 φ = 2π·layer/depth
+func wavefrontPhase(layer, depth) := block {
+  return 2.0 * PI * layer / depth
+}
+
+// コースティクス強度 (光の集光率)
+//   I(x) = |∂²Φ/∂x²|^{-1}   (光線密度のヤコビアン逆数)
+// を π-softmax で正規化して安定化させる。
+func causticIntensity(curvature) := block {
+  denom := abs(curvature)
+  if denom < 1e-6 { denom := 1e-6 }        // 焦線 (無限大) をクランプ
+  raw := 1.0 / denom
+  // ℏ_eff で集光を鋭くする (omega の π-softmax カーネル)
+  return exp(raw * HBAR_EFF * PI) / (1.0 + exp(raw * HBAR_EFF * PI))
+}
+
+// 波面 Φ の 2階微分 (曲率) を数値的に近似
+func waveCurvature(phaseL, phaseC, phaseR) := block {
+  return phaseR - 2.0 * phaseC + phaseL
+}
+
+// ============================================================================
+//  Renderer — 式獣を光線場へ焼き込むレンダラ
+// ============================================================================
+class Renderer {
+
+  def initialize(width, height, depth) {
+    @w := width
+    @h := height
+    @d := depth
+    @phase := []          // レイヤごとの基準位相
+    for i from 0 to depth do { @phase[i] := 0.0 }
+  }
+
+  def setLayerPhase(layer, phase) {
+    @phase[layer] := phase
+  }
+
+  // ------------------------------------------------------------------------
+  //  renderCreature — 式獣 creature を、姿勢 pose で、背景 background に
+  //  重ねてコースティクス光線場 LightField を生成する。
+  // ------------------------------------------------------------------------
+  def renderCreature(creature, pose, background) := block {
+    voxels := []
+
+    // 式獣の外形サンプル点 (体・光紋のシルエット)
+    silhouette := creature.silhouette()
+
+    for pt in silhouette do {
+      // pose (傾き連動の姿勢) で点を回転・平行移動
+      p := transform(pt, pose)
+
+      // 各点まわりの波面曲率からコースティクス強度を算出
+      phaseL := @phase[clampLayer(p.z - 1)]
+      phaseC := @phase[clampLayer(p.z)]
+      phaseR := @phase[clampLayer(p.z + 1)]
+      curv   := waveCurvature(phaseL, phaseC, phaseR)
+      lum    := causticIntensity(curv) * pt.glow
+
+      // 式獣の属性色 (森=緑, 水=青…) を集光輝度で変調
+      col := creature.elementColor()
+
+      voxels.push(Voxel {
+        x:   p.x,
+        y:   p.y,
+        z:   p.z,
+        r:   col.r * lum,
+        g:   col.g * lum,
+        b:   col.b * lum,
+        lum: lum
+      })
+    }
+
+    return LightField {
+      voxels: voxels,
+      width:  @w,
+      height: @h,
+      depth:  @d
+    }
+  }
+
+  // 姿勢変換 : スケール → 回転(pitch,roll,yaw) → 平行移動
+  def transform(pt, pose) := block {
+    // roll (画面奥行き軸まわり)
+    cr := cos(pose.roll)
+    sr := sin(pose.roll)
+    x1 := pt.x * cr - pt.y * sr
+    y1 := pt.x * sr + pt.y * cr
+    // pitch (左右軸まわり) — 奥行きへ写す
+    cp := cos(pose.pitch)
+    z1 := pt.z * cp - y1 * sin(pose.pitch)
+    y2 := y1 * cp + pt.z * sin(pose.pitch)
+
+    return Voxel {
+      x: x1 * pose.scale + pose.tx,
+      y: y2 * pose.scale + pose.ty,
+      z: z1 * pose.scale + pose.tz,
+      r: 0, g: 0, b: 0, lum: 0
+    }
+  }
+
+  def clampLayer(z) := block {
+    if z < 0     { return 0 }
+    if z >= @d   { return @d - 1 }
+    return z
+  }
+}

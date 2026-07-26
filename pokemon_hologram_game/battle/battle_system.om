@@ -1,0 +1,171 @@
+// ============================================================================
+//  battle_system.om  —  式獣バトル・エンジン (Battle::System)
+//
+//  ターン制バトル。プレイヤーの式獣 vs 野生/敵トレーナーの式獣。
+//  平行感覚センサ (端末の傾き・振り) がコマンドの威力・命中に影響する:
+//    ・端末を傾けて「照準」を合わせる → 命中率アップ
+//    ・端末を振る → 溜めた必殺 (チャージ) を解放
+//  戦闘中の式獣はホログラムとして空中に浮かび、傾きに連動して構える。
+// ============================================================================
+
+import Omega::DATABASE
+import Creatures::Shikijuu       // Element, Shikijuu
+import Sensor::Tilt              // BalanceSensor
+
+// ---- 相性表 (攻撃属性 → 防御属性 → 倍率) ----
+//  簡易版: 主要な相性のみ定義し、未定義は 1.0 (等倍)。
+func typeMultiplier(atkEl, defEl) := block {
+  match [atkEl, defEl] {
+  | [Element.MIZU,  Element.HONOO] => return 2.0
+  | [Element.MIZU,  Element.IWA]   => return 2.0
+  | [Element.HONOO, Element.KUSA]  => return 2.0
+  | [Element.HONOO, Element.KOORI] => return 2.0
+  | [Element.HONOO, Element.HAGANE]=> return 2.0
+  | [Element.KUSA,  Element.MIZU]  => return 2.0
+  | [Element.KUSA,  Element.IWA]   => return 2.0
+  | [Element.IWA,   Element.HIKOU] => return 2.0
+  | [Element.IWA,   Element.HONOO] => return 2.0
+  | [Element.HIKOU, Element.KUSA]  => return 2.0
+  | [Element.KOORI, Element.HIKOU] => return 2.0
+  | [Element.GHOST, Element.GHOST] => return 2.0
+  | [Element.HONOO, Element.MIZU]  => return 0.5
+  | [Element.KUSA,  Element.HONOO] => return 0.5
+  | [Element.MIZU,  Element.KUSA]  => return 0.5
+  | [Element.HAGANE, Element.KOORI]=> return 2.0
+  | _                              => return 1.0
+  }
+}
+
+func effectivenessText(mult) := block {
+  if mult >= 2.0 { return "こうかは ばつぐんだ!" }
+  if mult <= 0.5 { return "こうかは いまひとつのようだ…" }
+  return ""
+}
+
+// ============================================================================
+//  Battle — 1回のバトル
+// ============================================================================
+class Battle {
+
+  def initialize(player, enemy, sensor, hologram, scene) {
+    @player   := player       // Shikijuu (プレイヤー)
+    @enemy    := enemy        // Shikijuu (敵)
+    @sensor   := sensor       // BalanceSensor
+    @holo     := hologram     // DualHologram
+    @scene    := scene        // Scene (背景の風景)
+    @charge   := 0.0          // 溜め (振ると増える)
+    @turn     := 0
+    @log      := Omega::DATABASE[TupleSpace].new
+  }
+
+  // ---- ダメージ計算 (ポケモン準拠の簡易式) ----
+  //  dmg = ((2·Lv/5+2)·power·Atk/Def)/50 + 2, ×相性 ×傾き命中 ×乱数
+  def computeDamage(attacker, defender, move, tilt) := block {
+    if move.power == 0 { return 0 }        // 補助わざ
+    base := ((2.0 * attacker.level() / 5.0 + 2.0)
+             * move.power * attacker.atk() / defender.def()) / 50.0 + 2.0
+
+    mult := typeMultiplier(move.element, defender.element())
+
+    // 平行感覚: 傾きが小さい (端末が水平で安定) ほど照準が定まり命中補正↑
+    aim  := aimBonus(tilt)
+
+    // 溜め (振り) の解放でボーナス
+    chargeBonus := 1.0 + @charge
+
+    rand := 0.85 + Omega::randf() * 0.15    // 0.85〜1.00
+    dmg  := base * mult * aim * chargeBonus * rand
+    return floor(dmg)
+  }
+
+  // 端末が水平に近いほど命中補正が高い (平行感覚で狙いを定める)
+  def aimBonus(tilt) := block {
+    off := abs(tilt.pitch) + abs(tilt.roll)
+    // off=0 → 1.15倍, 傾くほど 1.0 へ低下
+    b := 1.15 - off * 0.5
+    if b < 0.85 { b := 0.85 }
+    return b
+  }
+
+  // ---- プレイヤーのターン ----
+  def playerTurn(moveIndex) {
+    tilt := @sensor.sample()
+
+    // 端末を振っていたら必殺を溜める
+    if @sensor.isShaken(tilt) {
+      @charge := @charge + 0.20
+      if @charge > 1.0 { @charge := 1.0 }
+      print("⚡ 端末を振った! 必殺ゲージ 溜め " + floor(@charge * 100) + "%")
+    }
+
+    move := @player.moves()[moveIndex]
+    print("▶ " + @player.name() + " の『" + move.name + "』! (" + move.desc + ")")
+
+    dmg  := computeDamage(@player, @enemy, move, tilt)
+    mult := typeMultiplier(move.element, @enemy.element())
+    @enemy.takeDamage(dmg)
+
+    txt := effectivenessText(mult)
+    if txt != "" { print("  " + txt) }
+    print("  " + @enemy.name() + " に " + dmg + " ダメージ (残HP " + @enemy.hp() + ")")
+
+    // 必殺を撃ったら溜めをリセット
+    if @charge >= 1.0 { @charge := 0.0 }
+
+    // ホログラム更新: 傾きに連動して式獣が構える
+    @holo.show(@scene, @player, tilt)
+    @log.push([@turn, "player", move.name, dmg])
+  }
+
+  // ---- 敵のターン ----
+  def enemyTurn() {
+    tilt := @sensor.sample()
+    move := @enemy.randomMove()
+    print("◀ 敵の " + @enemy.name() + " の『" + move.name + "』!")
+
+    dmg  := computeDamage(@enemy, @player, move, tilt)
+    mult := typeMultiplier(move.element, @player.element())
+    @player.takeDamage(dmg)
+
+    txt := effectivenessText(mult)
+    if txt != "" { print("  " + txt) }
+    print("  " + @player.name() + " は " + dmg + " ダメージ (残HP " + @player.hp() + ")")
+
+    @holo.show(@scene, @enemy, tilt)
+    @log.push([@turn, "enemy", move.name, dmg])
+  }
+
+  // ---- バトルのメインループ ----
+  //  chooseMove : プレイヤーの入力を返すコールバック (UI)
+  def run(chooseMove) := block {
+    print("── 野生の " + @enemy.name() + " との バトル 開始! ──")
+
+    while (not @player.isFainted()) and (not @enemy.isFainted()) do {
+      @turn := @turn + 1
+      print("")
+      print("【ターン " + @turn + "】")
+
+      // 素早さで先攻を決める
+      if @player.spd() >= @enemy.spd() {
+        idx := chooseMove(@player)
+        playerTurn(idx)
+        if @enemy.isFainted() { break }
+        enemyTurn()
+      } else {
+        enemyTurn()
+        if @player.isFainted() { break }
+        idx := chooseMove(@player)
+        playerTurn(idx)
+      }
+    }
+
+    print("")
+    if @enemy.isFainted() {
+      print("★ " + @enemy.name() + " を たおした! " + @player.name() + " の勝利!")
+      return "WIN"
+    } else {
+      print("… " + @player.name() + " は たおれてしまった …")
+      return "LOSE"
+    }
+  }
+}

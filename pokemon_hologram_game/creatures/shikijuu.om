@@ -1,0 +1,273 @@
+// ============================================================================
+//  shikijuu.om  —  式獣 (しきじゅう) 図鑑と召喚
+//  Creatures::Shikijuu
+//
+//  「式獣」= 情景 (風景) に宿るポケットモンスター型のマスコット。
+//  透過した風景の種類 (SceneKind) に対応する式獣が、コースティクス・
+//  ホログラムとして空中に結像し、傾きに連動して動く。
+//
+//  すべての式獣は Omega::DATABASE (アカシックレコード) の式獣図鑑に
+//  登録され、そこから召喚される。
+// ============================================================================
+
+import Omega::DATABASE
+import Omega::Tuplespace
+import World::Scene            // passthrough_scene.om (SceneKind)
+
+// ---- 属性 (タイプ) ----
+type Element := Enum {
+  KUSA,     // くさ
+  MIZU,     // みず
+  IWA,      // いわ
+  HAGANE,   // はがね
+  HIKOU,    // ひこう
+  HONOO,    // ほのお
+  NORMAL,   // ノーマル
+  KOORI,    // こおり
+  GHOST     // ゴースト
+}
+
+// ---- 色 ----
+type Color := Record { r : Float, g : Float, b : Float }
+
+// ---- シルエット点 (体の形と発光量) ----
+type SilPoint := Record { x : Float, y : Float, z : Float, glow : Float }
+
+// ---- わざ ----
+type Move := Record {
+  name    : String,
+  element : Element,
+  power   : Int,
+  desc    : String
+}
+
+// ============================================================================
+//  Shikijuu — 1体の式獣
+// ============================================================================
+class Shikijuu {
+
+  def initialize(name, element, scene, hp, atk, def, spd) {
+    @name    := name
+    @element := element
+    @scene   := scene          // 宿る情景 (SceneKind)
+    @maxhp   := hp
+    @hp      := hp
+    @atk     := atk
+    @def     := def
+    @spd     := spd
+    @level   := 5
+    @moves   := []
+    // 基準姿勢 (傾きセンサがこれを起点に動かす)
+    @pose    := Pose { pitch:0, roll:0, yaw:0, tx:0, ty:0, tz:4.0, scale:1.0 }
+  }
+
+  def pose()  := block { return @pose }
+  def name()  := block { return @name }
+  def hp()    := block { return @hp }
+  def isFainted() := block { return @hp <= 0 }
+
+  def learn(move) { @moves.push(move) }
+
+  // 属性色 (コースティクスの発色) —— 情景の色と響き合う
+  def elementColor() := block {
+    match @element {
+    | Element.KUSA   => return Color { r:0.30, g:0.90, b:0.35 }
+    | Element.MIZU   => return Color { r:0.25, g:0.60, b:1.00 }
+    | Element.IWA    => return Color { r:0.70, g:0.55, b:0.35 }
+    | Element.HAGANE => return Color { r:0.70, g:0.75, b:0.85 }
+    | Element.HIKOU  => return Color { r:0.75, g:0.90, b:1.00 }
+    | Element.HONOO  => return Color { r:1.00, g:0.45, b:0.15 }
+    | Element.NORMAL => return Color { r:0.90, g:0.88, b:0.70 }
+    | Element.KOORI  => return Color { r:0.70, g:0.95, b:1.00 }
+    | Element.GHOST  => return Color { r:0.55, g:0.35, b:0.85 }
+    }
+  }
+
+  // 式獣の外形サンプル (簡易プロシージャル・シルエット)
+  // 実装ではモデルデータを読むが、ここでは体+光紋のリングを生成する。
+  def silhouette() := block {
+    pts := []
+    n := 48
+    for i from 0 to n do {
+      t   := 2.0 * 3.14159265 * i / n
+      // 体 (楕円) + 属性ごとの光紋のうねり
+      rad := 1.0 + 0.25 * sin(3.0 * t + elementPhase())
+      pts.push(SilPoint { x: cos(t)*rad, y: sin(t)*rad, z: 0.0, glow: 1.0 })
+      // 内側のコア (強く光る中心)
+      pts.push(SilPoint { x: cos(t)*rad*0.4, y: sin(t)*rad*0.4, z: 0.2, glow: 1.6 })
+    }
+    return pts
+  }
+
+  def elementPhase() := block { return @element * 0.7 }
+
+  // ダメージを受ける
+  def takeDamage(dmg) {
+    @hp := @hp - dmg
+    if @hp < 0 { @hp := 0 }
+  }
+
+  def heal(amount) {
+    @hp := @hp + amount
+    if @hp > @maxhp { @hp := @maxhp }
+  }
+
+  def randomMove() := block {
+    if @moves.length == 0 { return nil }
+    idx := Omega::rand(@moves.length)
+    return @moves[idx]
+  }
+
+  // getters for battle
+  def atk() := block { return @atk }
+  def def() := block { return @def }
+  def spd() := block { return @spd }
+  def element() := block { return @element }
+  def moves() := block { return @moves }
+  def level() := block { return @level }
+}
+
+// ============================================================================
+//  Dex — 式獣図鑑 (アカシックレコードに登録)
+// ============================================================================
+class Dex {
+
+  def initialize() {
+    @db      := Omega::DATABASE[TupleSpace].new
+    @byScene := []          // SceneKind -> [Shikijuu prototypes]
+    register()
+  }
+
+  // 図鑑の登録
+  def register() {
+    // --- 森 : くさ / むし ---
+    add(SceneKind.FOREST, forest_MOKUREN())
+    add(SceneKind.FOREST, forest_HAORICHO())
+    // --- 水辺 : みず ---
+    add(SceneKind.WATER,  water_MIZUCHI())
+    add(SceneKind.WATER,  water_NAMIgame())
+    // --- 山岳 : いわ ---
+    add(SceneKind.MOUNTAIN, mountain_IWAKAMUY())
+    // --- 街 : はがね / でんき ---
+    add(SceneKind.CITY,   city_HAGANEMARU())
+    // --- 大空 : ひこう ---
+    add(SceneKind.SKY,    sky_SORAWASHI())
+    // --- 火山 : ほのお ---
+    add(SceneKind.VOLCANO, volcano_HONOKAGURA())
+    // --- 草原 : ノーマル ---
+    add(SceneKind.GRASS,  grass_KUSAmochi())
+    // --- 雪原 : こおり ---
+    add(SceneKind.SNOW,   snow_YUKINKO())
+    // --- 夜闇 : ゴースト ---
+    add(SceneKind.NIGHT,  night_YOInoKAGE())
+
+    print("[図鑑] " + @db.count() + " 体の式獣をアカシックレコードに登録")
+  }
+
+  def add(scene, proto) {
+    if @byScene[scene] == nil { @byScene[scene] := [] }
+    @byScene[scene].push(proto)
+    @db.push([proto.name(), scene, "registered"])
+  }
+
+  // ------------------------------------------------------------------------
+  //  summon — 透過した情景 scene に対応する式獣をアカシックから呼び出す。
+  //  確度と情景記憶から 1 体を選び、その複製 (個体) を返す。
+  // ------------------------------------------------------------------------
+  def summon(scene) := block {
+    candidates := @byScene[scene.kind]
+    if candidates == nil or candidates.length == 0 {
+      // 未知の情景 → ノーマルの式獣で受ける
+      candidates := @byScene[SceneKind.GRASS]
+    }
+    // 情景の色相を種にして 1 体を選ぶ (同じ風景では同じ式獣が出やすい)
+    idx  := (scene.hue * candidates.length) mod candidates.length
+    proto := candidates[idx]
+    print("[召喚] " + sceneName(scene.kind) + " より 式獣『" + proto.name() + "』が現れた!")
+    return proto.clone()
+  }
+}
+
+// ============================================================================
+//  式獣プロトタイプ定義
+// ============================================================================
+
+func mv(name, el, power, desc) := block {
+  return Move { name: name, element: el, power: power, desc: desc }
+}
+
+func forest_MOKUREN() := block {
+  s := Shikijuu.new("モクレン", Element.KUSA, SceneKind.FOREST, 45, 49, 49, 45)
+  s.learn(mv("はっぱカッター", Element.KUSA, 55, "葉の刃で切り裂く"))
+  s.learn(mv("やどりぎのうた", Element.KUSA, 20, "相手のHPを吸う"))
+  return s
+}
+
+func forest_HAORICHO() := block {
+  s := Shikijuu.new("ハオリチョウ", Element.HIKOU, SceneKind.FOREST, 40, 45, 40, 56)
+  s.learn(mv("かぜおこし", Element.HIKOU, 40, "羽ばたきの突風"))
+  return s
+}
+
+func water_MIZUCHI() := block {
+  s := Shikijuu.new("ミズチ", Element.MIZU, SceneKind.WATER, 50, 52, 48, 50)
+  s.learn(mv("みずでっぽう", Element.MIZU, 40, "水流を撃ち出す"))
+  s.learn(mv("うずしお", Element.MIZU, 35, "渦で相手を捕らえる"))
+  return s
+}
+
+func water_NAMIgame() := block {
+  s := Shikijuu.new("ナミガメ", Element.MIZU, SceneKind.WATER, 60, 48, 65, 33)
+  s.learn(mv("こうらぼうぎょ", Element.MIZU, 0, "甲羅で守りを固める"))
+  s.learn(mv("なみのり", Element.MIZU, 60, "大波で押し流す"))
+  return s
+}
+
+func mountain_IWAKAMUY() := block {
+  s := Shikijuu.new("イワカムイ", Element.IWA, SceneKind.MOUNTAIN, 65, 60, 70, 30)
+  s.learn(mv("いわおとし", Element.IWA, 50, "岩を落とす"))
+  s.learn(mv("がんせきふうじ", Element.IWA, 40, "岩で足止め"))
+  return s
+}
+
+func city_HAGANEMARU() := block {
+  s := Shikijuu.new("ハガネマル", Element.HAGANE, SceneKind.CITY, 55, 55, 80, 30)
+  s.learn(mv("メタルクロー", Element.HAGANE, 50, "鋼の爪で斬る"))
+  s.learn(mv("てっぺき", Element.HAGANE, 0, "防御を大きく上げる"))
+  return s
+}
+
+func sky_SORAWASHI() := block {
+  s := Shikijuu.new("ソラワシ", Element.HIKOU, SceneKind.SKY, 48, 58, 42, 68)
+  s.learn(mv("つばさでうつ", Element.HIKOU, 60, "翼で強打"))
+  s.learn(mv("そらをとぶ", Element.HIKOU, 70, "上空から急降下"))
+  return s
+}
+
+func volcano_HONOKAGURA() := block {
+  s := Shikijuu.new("ホノカグラ", Element.HONOO, SceneKind.VOLCANO, 50, 65, 45, 55)
+  s.learn(mv("ひのこ", Element.HONOO, 40, "火の粉を飛ばす"))
+  s.learn(mv("かえんほうしゃ", Element.HONOO, 65, "灼熱の炎を吐く"))
+  return s
+}
+
+func grass_KUSAmochi() := block {
+  s := Shikijuu.new("クサモチ", Element.NORMAL, SceneKind.GRASS, 52, 50, 50, 48)
+  s.learn(mv("たいあたり", Element.NORMAL, 40, "体ごとぶつかる"))
+  s.learn(mv("でんこうせっか", Element.NORMAL, 40, "先制の一撃"))
+  return s
+}
+
+func snow_YUKINKO() := block {
+  s := Shikijuu.new("ユキンコ", Element.KOORI, SceneKind.SNOW, 46, 48, 50, 52)
+  s.learn(mv("こなゆき", Element.KOORI, 40, "冷たい粉雪"))
+  s.learn(mv("こおりのつぶて", Element.KOORI, 40, "氷の礫で先制"))
+  return s
+}
+
+func night_YOInoKAGE() := block {
+  s := Shikijuu.new("ヨイノカゲ", Element.GHOST, SceneKind.NIGHT, 44, 62, 44, 60)
+  s.learn(mv("したでなめる", Element.GHOST, 30, "影で舐め麻痺させる"))
+  s.learn(mv("シャドーボール", Element.GHOST, 65, "影の弾を放つ"))
+  return s
+}

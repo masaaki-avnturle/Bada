@@ -1,0 +1,92 @@
+// ============================================================================
+//  story.om  —  物語 (Story::Chapters)
+//
+//  ポケットモンスターの物語仕立てのストーリー。プレイヤーは「式獣使い」と
+//  なり、現実の風景に宿る式獣を透過ホログラムで呼び出しながら旅をする。
+//  各章は、透過すべき情景 (SceneKind) と、そこで起こる戦いを持つ。
+// ============================================================================
+
+import World::Scene            // SceneKind
+
+// ---- 物語の 1 章 ----
+type Chapter := Record {
+  no      : Int,
+  title   : String,
+  place   : SceneKind,     // その章で訪れる (透過すべき) 情景
+  intro   : String,        // 導入テキスト
+  rival   : String,        // ライバル / 敵トレーナー名
+  outro   : String         // 章クリア後テキスト
+}
+
+// ============================================================================
+//  Story — 章の連なり
+// ============================================================================
+class Story {
+
+  def initialize() {
+    @chapters := []
+    build()
+    @cursor := 0
+  }
+
+  def build() {
+    @chapters.push(Chapter {
+      no: 1,
+      title: "はじまりの森",
+      place: SceneKind.FOREST,
+      intro: "きみは式獣使いの見習い。まずは近くの森にデバイスをかざそう。\n"
+           + "レンズ越しの木立から、みどりの式獣が姿を現すはずだ。",
+      rival: "しんりんの番人 コダマ",
+      outro: "森の式獣がきみを認めた。旅の相棒が仲間になった!"
+    })
+
+    @chapters.push(Chapter {
+      no: 2,
+      title: "せせらぎの水辺",
+      place: SceneKind.WATER,
+      intro: "川のほとりへ。水面の照り返し (コースティクス) が式獣の器になる。\n"
+           + "デバイスを傾け、水の式獣と呼吸を合わせよう。",
+      rival: "みなもの釣り人 セキ",
+      outro: "水の式獣が波間から力を分けてくれた。"
+    })
+
+    @chapters.push(Chapter {
+      no: 3,
+      title: "岩嶺のいただき",
+      place: SceneKind.MOUNTAIN,
+      intro: "険しい山道。岩肌に宿る硬き式獣が道をふさぐ。\n"
+           + "端末を水平に保ち、狙いを定めて挑め。",
+      rival: "岩石使い ガンテツ",
+      outro: "山の式獣が地の力をきみに託した。"
+    })
+
+    @chapters.push(Chapter {
+      no: 4,
+      title: "ネオンの街",
+      place: SceneKind.CITY,
+      intro: "人工の光に満ちた街。鋼の式獣が路地に潜む。\n"
+           + "外部の空中結像ディスプレイと連動すれば、より大きく式獣を呼べる。",
+      rival: "はがねの技師 クロガネ",
+      outro: "街の式獣がシステムへの鍵を渡してくれた。"
+    })
+
+    @chapters.push(Chapter {
+      no: 5,
+      title: "火口の対決",
+      place: SceneKind.VOLCANO,
+      intro: "物語は火山へ。宿敵『影の式獣使い』が炎の式獣を従えて待つ。\n"
+           + "溜めた必殺 (端末を振れ!) で、最後の戦いに決着を。",
+      rival: "影の式獣使い ヤミト",
+      outro: "影の式獣使いは敗れ、世界に平穏が戻った。きみは真の式獣使いとなった!"
+    })
+  }
+
+  def current() := block {
+    if @cursor >= @chapters.length { return nil }
+    return @chapters[@cursor]
+  }
+
+  def advance() { @cursor := @cursor + 1 }
+  def isFinished() := block { return @cursor >= @chapters.length }
+  def total() := block { return @chapters.length }
+}
