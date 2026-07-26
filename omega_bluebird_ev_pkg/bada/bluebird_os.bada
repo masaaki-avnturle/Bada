@@ -1,0 +1,65 @@
+# bluebird_os.bada — autonomous-driving OS for the Bluebird EV, in Bada.
+#
+# The generative-AI kernel: perceive -> measure gamma-manifold entropy ->
+# GENERATE the driving policy source -> render surroundings + engine sound ->
+# actuate. Bada operators (repo README):
+#   <-   left non-commutative act   pi(chi,x) = [i*pi, f(x)]
+#   -<   manifold integral          ∬ 1/(x log x)^2 dx_m
+#   >-   quantum right act          e^{-x log x}
+#   Omega::push                     write to the Akashic TupleSpace
+
+class EntropyEngine <- TupleSpace {
+  # gamma-function global partial-integral manifold entropy equation
+  operator -< (percept) {
+    set H  = shannon(percept);                 # information content
+    set M  = manifold_integral(percept);       # ∬ 1/(x log x)^2 dx_m
+    set N  = extent(percept);
+    return beta(H + 1, M + 1) / log(N + 2);     # Xi — the entropy invariant
+  }
+}
+
+class ThermalBody <- TupleSpace {
+  # Jones polynomial of the thermal-energy body -> image + sound seed
+  operator >- (knot) {
+    return kauffman_bracket(knot) * gamma_global_partial(a, b);
+  }
+}
+
+class CodeGen <- TupleSpace {
+  # SOURCE-CODE GENERATION: emit a Bada driving policy from Xi + Jones
+  operator <- (seed) {
+    set xi    = seed.xi;
+    set jones = seed.jones;
+    return synthesize_bada([                    # literals derived from Xi/Jones
+      v_cap   : 8 + 6 * xi,
+      brake_d : 6 + 20 * seed.M,
+      steer_k : 0.15 + 0.25 * (seed.H / 8),
+      caution : jones < 0 ? 1.0 : 0.6
+    ]);
+  }
+}
+
+# ---- generative-AI OS: one perception-to-actuation tick --------------------
+class BluebirdOS <- TupleSpace {
+  operator <- (car) {
+    set xi     = EntropyEngine -< car.percept;      # entropy equation
+    set jones  = ThermalBody   >- car.knot;         # thermal Jones invariant
+    set policy = CodeGen       <- { xi: xi, jones: jones,
+                                    H: car.H, M: car.M };  # GENERATED source
+    render_env(xi);                                 # 周りの映像化 (image)
+    render_sound(jones);                            # 音の映像化 (sound)
+    set action = eval(policy, car.percept);         # run the generated policy
+    Omega::push xi     as entropy_invariant;
+    Omega::push jones  as thermal_jones;
+    Omega::push policy as generated_source;
+    Omega::push action as drive_action;
+    return action;
+  }
+}
+
+set bluebird = { body: "Bluebird EV 4.60x1.69x1.40",
+                 percept: "examples/road_scene.txt",
+                 knot: "examples/thermal_body.knot",
+                 H: 0, M: 0 }
+
+BluebirdOS <- bluebird     # loop this every 20 ms in service

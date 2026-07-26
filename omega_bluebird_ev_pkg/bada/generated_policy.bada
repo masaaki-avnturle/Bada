@@ -1,0 +1,49 @@
+# generated_policy.bada — SAMPLE output of `launcher codegen`.
+# Regenerate with:  ./bin/launcher codegen examples/road_scene.txt bada/generated_policy.bada
+# Every literal below was synthesized from the gamma-manifold entropy invariant
+# Xi and the Jones polynomial of the thermal-energy body (see header comments).
+
+# GENERATED Bada source — autonomous-driving policy for the Bluebird EV.
+# Synthesized by omega_bluebird codegen from the gamma-manifold entropy
+# equation and the Jones polynomial of the thermal-energy body.
+#   Xi (entropy invariant) = 0.033384
+#   H  (Shannon entropy)   = 4.839972
+#   M  (manifold integral) = 0.092117
+#   Jones(thermal body)    = -1.163171
+#   body design            = Bluebird 4.60x1.69x1.40 m, 110 kW, 62 kWh
+
+class BluebirdAutopilot <- TupleSpace {
+  set v_cap    = 16.236      # top speed [m/s] from Xi
+  set brake_d  = 12.626      # braking distance trigger [m] from M
+  set steer_k  = 0.301      # steering gain from H
+  set caution  = 1.00      # risk posture from sign of Jones(thermal)
+
+  operator <- (percept) {
+    # left non-commutative act: fuse perception into the manifold
+    return pi(chi, percept) -< brake_d;
+  }
+
+  operator -< (scene) {
+    if scene.obstacle_dist < brake_d * caution {
+      return DRV_BRAKE;                 # obstacle inside braking envelope
+    }
+    if abs(scene.lane_offset) > 0.20 {
+      return scene.lane_offset > 0 ? DRV_STEER_LEFT : DRV_STEER_RIGHT;
+    }
+    if scene.speed < v_cap { return DRV_ACCEL; }
+    return DRV_HOLD_LANE;
+  }
+
+  operator >- (state) {
+    # quantum right act: commit steering with gain steer_k
+    return state.steer + steer_k * state.lane_offset * e(-state.speed);
+  }
+}
+
+# drive loop — regenerated whenever the entropy/thermal context shifts
+set car = BluebirdAutopilot
+loop every 20ms {
+  set a = car -< perceive()
+  Omega::push a as drive_action
+  actuate(a)
+}
