@@ -84,11 +84,15 @@ node test_bada.js         # 34 件（interp==VM 差分テスト・量子・コ�
 
 GUI 版を各プラットフォームのネイティブアプリとして配布します（中身は同じ `www/`）。
 
-| プラットフォーム | 形式 | ビルド元 |
-|:--|:--|:--|
-| **Windows 10 / 11** | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
-| **Ubuntu / Linux** | `.AppImage`（そのまま実行）+ `.deb`（`sudo dpkg -i`） | `electron/`（`npm run dist:linux`） |
-| **Android 12+** | `.apk`（minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
+| プラットフォーム | 形態 | 形式 | ビルド元 |
+|:--|:--|:--|:--|
+| **Windows 10 / 11** | GUI（IDE） | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
+| **Ubuntu / Linux** | **CLI（コンパイラ/インタープリタ）** | `bada-cli-linux-x64`（単体実行）+ `bada-cli_*_amd64.deb`（`sudo dpkg -i` → `/usr/bin/bada`） | `cli/build-linux-cli.sh`（Node SEA） |
+| **Android 12+** | GUI（IDE） | `.apk`（minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
+
+> **Ubuntu は GUI ではなく CLI** です。`bada-cli-linux-x64` は Node を含む**単体実行
+> ファイル**（依存なし）で、`bada run|vm|dis|qasm|check` がそのまま使えます。
+> `.deb` を入れると `bada` コマンドが `/usr/bin` に入ります。
 
 ### 入手方法
 
@@ -104,9 +108,18 @@ GUI 版を各プラットフォームのネイティブアプリとして配布�
    ブラウザだけで IDE が動きます。
 
 各プラットフォームでの起動:
-- **Windows**: `.exe` を実行（インストーラ or portable）。
-- **Ubuntu**: `chmod +x Omega-Bada-Studio-1.0.0-x86_64.AppImage && ./Omega-Bada-Studio-1.0.0-x86_64.AppImage`、または `sudo dpkg -i Omega-Bada-Studio-1.0.0-amd64.deb` → `omega-bada-studio`。
-- **Android 12+**: `.apk` をインストール（提供元不明のアプリを許可）。
+- **Windows**: `.exe` を実行（インストーラ or portable）→ IDE。
+- **Ubuntu（CLI）**:
+  ```bash
+  chmod +x bada-cli-linux-x64
+  ./bada-cli-linux-x64 run  prog.bada     # インタープリタ
+  ./bada-cli-linux-x64 vm   prog.bada     # コンパイル→VM
+  ./bada-cli-linux-x64 qasm prog.bada     # 量子回路 OpenQASM
+  # または deb をインストール:
+  sudo dpkg -i bada-cli_1.0.0_amd64.deb   # → bada コマンド
+  bada check prog.bada
+  ```
+- **Android 12+**: `.apk` をインストール（提供元不明のアプリを許可）→ IDE。
 
 ---
 

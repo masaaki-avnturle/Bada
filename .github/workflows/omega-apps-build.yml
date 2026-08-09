@@ -1,11 +1,12 @@
 name: Ω apps build (APK + Windows EXE)
 
-# 各アプリ(www + electron + cordova)から Android APK・Windows EXE・Ubuntu/Linux
-# (AppImage + deb) をビルドし、Actions アーティファクトに保存、release_tag を持つ
-# アプリは rolling GitHub Release に添付します(タグはワークフローが GITHUB_TOKEN で生成)。
+# 各アプリ(www + electron + cordova)から Windows EXE・Android APK・Ubuntu 版を
+# ビルドし、Actions アーティファクトに保存、release_tag を持つアプリは rolling
+# GitHub Release に添付します(タグはワークフローが GITHUB_TOKEN で生成)。
 #
-# アプリ本体の場所が bio_medicine/ 配下と リポジトリ直下 の両方にあるため、
-# matrix は {app, dir, [release_tag, release_name]} の include 形式でパスを明示します。
+# Ubuntu 版の形態はアプリごとに異なります:
+#   - omega_usb_resume : Electron GUI (AppImage + deb)  … linux-app ジョブ
+#   - omega_bada_lang  : CLI コンパイラ/インタープリタ (Node SEA 単体バイナリ + deb) … linux-cli ジョブ
 
 on:
   workflow_dispatch:
@@ -26,8 +27,8 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
-          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
+          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)", release_body: "Ω-Bada Studio — Bada 言語のコンパイラ＋インタープリタ＋量子。`*.exe`=Windows 10/11 GUI、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(→ `/usr/bin/bada`)=Ubuntu CLI (`bada run|vm|dis|qasm|check`)、`*.apk`=Android 12+ GUI。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,24 +49,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.dir }}/electron/dist/*.exe
-      # Rolling Release so the EXE is permanently downloadable from the repo's
-      # Releases page (the Action creates the tag server-side via GITHUB_TOKEN).
       - name: Publish EXE to rolling Release
         if: ${{ matrix.release_tag != '' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.release_tag }}
           name: ${{ matrix.release_name }}
+          body: ${{ matrix.release_body }}
           files: ${{ matrix.dir }}/electron/dist/*.exe
-          body: |
-            **${{ matrix.release_name }}**
 
-            - `*.exe` … **Windows 10 / 11**（NSIS インストーラ + portable）
-            - `*.AppImage` / `*.deb` … **Ubuntu / Linux**（AppImage は `chmod +x` して実行、deb は `sudo dpkg -i`）
-            - `*.apk` … **Android 12+**（minSdk 24 / target 33）
-
-            概念/教育用シミュレーションを含みます。詳細は各アプリの README を参照。
-
+  # Ubuntu/Linux GUI (Electron AppImage + deb) — omega_usb_resume only.
   linux-app:
     runs-on: ubuntu-latest
     strategy:
@@ -73,7 +66,6 @@ jobs:
       matrix:
         include:
           - { app: omega_usb_resume, dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
-          - { app: omega_bada_lang,  dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,15 +83,6 @@ jobs:
           path: |
             ${{ matrix.dir }}/electron/dist/*.AppImage
             ${{ matrix.dir }}/electron/dist/*.deb
-      - name: Attach Linux app to Release (apps-v* tag)
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            ${{ matrix.dir }}/electron/dist/*.AppImage
-            ${{ matrix.dir }}/electron/dist/*.deb
-      # Rolling Release so the Ubuntu app (AppImage + deb) is permanently
-      # downloadable from the repo's Releases page (same tag as EXE/APK).
       - name: Publish Linux app to rolling Release
         if: ${{ matrix.release_tag != '' }}
         uses: softprops/action-gh-release@v2
@@ -110,6 +93,41 @@ jobs:
             ${{ matrix.dir }}/electron/dist/*.AppImage
             ${{ matrix.dir }}/electron/dist/*.deb
 
+  # Ubuntu/Linux CLI (Node SEA standalone binary + deb) — omega_bada_lang.
+  # This REPLACES the Electron GUI for the Bada language on Ubuntu with a
+  # command-line compiler + interpreter (+ quantum). No Node needed to run it.
+  linux-cli:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu CLI (Node SEA standalone binary + deb)
+        run: bash omega_bada_lang/cli/build-linux-cli.sh
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_bada_lang-linux-cli
+          path: |
+            omega_bada_lang/cli/build/bada-cli-linux-x64
+            omega_bada_lang/cli/build/bada-cli_*_amd64.deb
+      - name: Remove stale Bada GUI Linux assets from the rolling Release
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        run: |
+          gh release delete-asset bada-lang-latest Omega-Bada-Studio-1.0.0-x86_64.AppImage -y || true
+          gh release delete-asset bada-lang-latest Omega-Bada-Studio-1.0.0-amd64.deb -y || true
+      - name: Publish CLI to rolling Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: bada-lang-latest
+          name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)"
+          files: |
+            omega_bada_lang/cli/build/bada-cli-linux-x64
+            omega_bada_lang/cli/build/bada-cli_*_amd64.deb
+
   android-apk:
     runs-on: ubuntu-latest
     strategy:
@@ -119,8 +137,8 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
-          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
+          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)", release_body: "Ω-Bada Studio — Bada 言語のコンパイラ＋インタープリタ＋量子。`*.exe`=Windows 10/11 GUI、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(→ `/usr/bin/bada`)=Ubuntu CLI (`bada run|vm|dis|qasm|check`)、`*.apk`=Android 12+ GUI。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -167,12 +185,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*.apk
-      # Rolling Release so the APK is permanently downloadable from the repo's
-      # Releases page (attaches to the same tag as the EXE job).
       - name: Publish APK to rolling Release
         if: ${{ matrix.release_tag != '' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.release_tag }}
           name: ${{ matrix.release_name }}
+          body: ${{ matrix.release_body }}
           files: out/*.apk
