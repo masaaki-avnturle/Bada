@@ -84,18 +84,31 @@ JavaScript 移植）で、Electron が Windows 実行ファイルに、Cordova �
 | **Windows 10 / 11** | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
 | **Android** | `.apk`（debug） | `cordova/config.xml` + `www/` |
 
-### 入手方法
+### 入手方法（3 通り）
 
-1. **GitHub Actions アーティファクト** — リポジトリの **Actions → 「Ω apps build
-   (APK + Windows EXE)」** を開き、`Run workflow` を押す（`workflow_dispatch`）。
-   完了後、成果物 `omega_usb_resume-windows`（EXE）と `omega_usb_resume-android`
-   （APK）をダウンロード。
-2. **GitHub Release** — `apps-v*` タグ（例 `apps-v1.0.0`）を push すると、EXE と
-   APK が自動で Release に添付されます。
+**① いますぐ・ビルド不要 — 単一 HTML をそのままダウンロード**
+GUI は完全に自己完結した 1 ファイル（外部依存なし）です。GitHub 上で
+[`omega_usb_resume/www/index.html`](www/index.html) を開き **「Download raw file」**
+で保存 → そのままブラウザ（Windows / Android / どれでも）で開けば動くオフライン
+アプリになります。インストール不要。
+
+**② GitHub Actions アーティファクト（ネイティブ EXE / APK・ビルド環境不要）**
+リポジトリの **Actions → 「Ω apps build (APK + Windows EXE)」→ Run workflow**
+（`Use workflow from` にこのブランチを選択）。完了後、成果物
+`omega_usb_resume-windows`（EXE）と `omega_usb_resume-android`（APK）を
+ダウンロードできます。
+
+**③ GitHub Release（恒久リンクで EXE + APK を公開）**
+バージョンタグを push すると、専用ワークフロー `build-usb-resume.yml` が EXE と
+APK を付けた Release を自動作成します（Releases ページから誰でもダウンロード可）。
 
    ```bash
-   git tag apps-v1.0.0 && git push origin apps-v1.0.0
+   git push origin usb-resume-v1.0.0    # ← タグは用意済み。これで Release 発行
    ```
+
+   ※ ③ は既定ブランチにワークフローが必要です。このブランチを `main` に取り込むか、
+   `git tag` を push できる環境から実行してください（自動セッションはタグを push
+   できないため、この 1 手だけ手元で実行が必要です）。
 
 ### 自分でビルドする
 
