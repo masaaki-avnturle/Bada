@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+/* bada — command-line runner for the Bada language (uses www/bada.js).
+ *
+ *   ./bada run  prog.bada      run with the tree-walking interpreter (default)
+ *   ./bada vm   prog.bada      compile to bytecode and run on the stack VM
+ *   ./bada dis  prog.bada      show the compiled bytecode (disassembly)
+ *   ./bada qasm prog.bada      run and print the lowered OpenQASM 2.0 circuit
+ *   ./bada check prog.bada     verify interpreter and VM agree
+ *   echo 'print 2+2' | ./bada run -
+ */
+"use strict";
+var fs = require("fs");
+var Bada = require("./www/bada.js");
+
+function read(p) { return p === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(p, "utf8"); }
+var cmd = process.argv[2] || "run";
+var file = process.argv[3];
+if (!file) { console.error("usage: bada <run|vm|dis|qasm|check> <file.bada|->"); process.exit(2); }
+
+try {
+  var src = read(file);
+  if (cmd === "run") { Bada.interpret(src).output.forEach(function (l) { console.log(l); }); }
+  else if (cmd === "vm") { Bada.execVM(src).output.forEach(function (l) { console.log(l); }); }
+  else if (cmd === "dis") { console.log(Bada.disassemble(src)); }
+  else if (cmd === "qasm") {
+    var r = Bada.interpret(src);
+    console.log(r.qubits > 0 ? r.qasm : "; (no quantum instructions in this program)");
+  } else if (cmd === "check") {
+    var a = Bada.interpret(src).output, b = Bada.execVM(src).output;
+    var same = JSON.stringify(a) === JSON.stringify(b);
+    console.log(same ? "OK: interpreter and VM agree (" + a.length + " lines)" : "MISMATCH");
+    process.exit(same ? 0 : 1);
+  } else { console.error("unknown command: " + cmd); process.exit(2); }
+} catch (e) {
+  console.error(e && e.message ? e.message : String(e));
+  process.exit(1);
+}

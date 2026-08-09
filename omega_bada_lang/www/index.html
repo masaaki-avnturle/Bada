@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!--
+  Ω-Bada Studio — the Bada language: compiler + interpreter + quantum backend.
+  Masaaki Yamaguchi / Bada — omega_bada_lang
+
+  A self-contained IDE for the Bada language (bada.js). Write Bada, then:
+    ▶ Interpret   — tree-walking interpreter
+    ⚙ Compile+VM  — compile to bytecode and run on the stack VM (shows disassembly)
+    ⚛ Quantum     — lower the quantum standard library to an OpenQASM 2.0 circuit
+                    and simulate the state vector (probabilities).
+  The interpreter and the VM are cross-checked: their output must agree.
+
+  ⚠ 実機の量子コンピュータではなく、状態ベクトルのシミュレータです（概念/教育用）。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Bada Studio</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--green:#3fd07a;--red:#e0604a;--txt:#e6ecf5;--dim:#8794a8;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}html,body{height:100%}
+  body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:12px 16px 8px}h1{margin:0;font-size:19px}h1 .om{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12px;margin-top:5px}
+  .disc{margin:8px 16px 0;padding:7px 11px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:11.5px}
+  main{display:flex;gap:14px;flex-wrap:wrap;padding:12px 16px 40px;align-items:flex-start}
+  .col{flex:1;min-width:340px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+  .card h3{margin:0 0 8px;font-size:13px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px;display:flex;justify-content:space-between}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  select,textarea{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:8px;font-family:var(--mono);font-size:13px}
+  textarea{height:300px;resize:vertical;line-height:1.45;white-space:pre;overflow:auto}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:9px 13px;cursor:pointer;font-weight:700;font-size:13px}
+  button.cyan{color:var(--cyan);border-color:var(--cyan)}button.violet{color:var(--violet);border-color:var(--violet)}
+  .tabs{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+  .tab{padding:6px 11px;border:1px solid var(--line);border-radius:7px;cursor:pointer;font-size:12px;color:var(--dim)}
+  .tab.on{color:var(--gold);border-color:var(--gold);background:#12172180}
+  pre{margin:0;font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;word-break:break-word;max-height:420px;overflow:auto}
+  .agree{font-family:var(--mono);font-size:12px}.ok{color:var(--green)}.bad{color:var(--red)}
+  .bars{display:flex;flex-direction:column;gap:3px;font-family:var(--mono);font-size:11.5px}
+  .bar{display:flex;align-items:center;gap:6px}.bar .lbl{width:70px;color:var(--dim)}
+  .bar .track{flex:1;background:#0e1626;border:1px solid var(--line);border-radius:4px;height:14px;overflow:hidden}
+  .bar .fill{height:100%;background:linear-gradient(90deg,#40b8c0,#9060d0)}
+  .cap{font-size:11px;color:var(--dim);margin-top:5px}
+  code{font-family:var(--mono);color:var(--violet)}
+  footer{color:var(--dim);font-size:11px;padding:12px 16px;text-align:center;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Bada Studio — Bada 言語 コンパイラ＆インタープリタ（＋量子）</h1>
+  <div class="sub">Lexer → Parser → AST → tree-walk Interpreter ＆ Bytecode Compiler + Stack VM · Quantum (OpenQASM) · Bada v4</div>
+  <div class="eq">&lt;- π(χ,x)=π·|χ|·ln(x+1) &nbsp; -&lt; ∬1/(x log x)² &nbsp; &gt;- e^{-x log x} &nbsp; Ω::push &nbsp;·&nbsp; if / while / fn / return / 量子 qreg,H,X,Z,RY,CNOT,measure</div>
+</header>
+<div class="disc">⚠ Bada は本物の言語です（このページ内で完全に動く字句解析→構文解析→AST→<b>インタープリタ</b>と<b>バイトコードVM</b>）。
+  「量子」は<b>状態ベクトルのシミュレータ</b>で、実機の量子コンピュータではありません（概念/教育用）。</div>
+
+<main>
+  <div class="col">
+    <div class="card">
+      <h3>エディタ <span class="agree" id="agree">—</span></h3>
+      <div class="row" style="margin-bottom:8px">
+        <select id="examples" style="flex:1"></select>
+      </div>
+      <textarea id="src" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:9px">
+        <button id="runI">▶ Interpret</button>
+        <button class="cyan" id="runV">⚙ Compile + VM</button>
+        <button class="violet" id="runQ">⚛ Quantum</button>
+      </div>
+      <div class="cap">「▶」= tree-walk インタープリタ ／ 「⚙」= バイトコードにコンパイルして VM 実行（逆アセンブルを表示）／ 「⚛」= 量子回路(QASM)＋状態を表示。両実行系の出力一致も検証します。</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <div class="tabs" id="tabs">
+        <div class="tab on" data-t="out">出力</div>
+        <div class="tab" data-t="bc">バイトコード</div>
+        <div class="tab" data-t="q">量子 (QASM+確率)</div>
+        <div class="tab" data-t="ast">AST</div>
+      </div>
+      <div id="panel-out"><pre id="out">Ready.</pre></div>
+      <div id="panel-bc" style="display:none"><pre id="bc">「⚙ Compile + VM」でバイトコードを表示します。</pre></div>
+      <div id="panel-q" style="display:none">
+        <pre id="qasm">「⚛ Quantum」で量子回路(OpenQASM 2.0)を生成します。</pre>
+        <div class="bars" id="qbars" style="margin-top:10px"></div>
+      </div>
+      <div id="panel-ast" style="display:none"><pre id="ast"></pre></div>
+    </div>
+  </div>
+</main>
+<footer>Ω-Bada Studio · © 2025 Masaaki Yamaguchi · Bada / omega_bada_lang · コンパイラ＋インタープリタ＋量子シミュレータ（概念/教育）</footer>
+
+<script src="bada.js"></script>
+<script>
+"use strict";
+var EXAMPLES = {
+  "Hello / 算術": 'set a = 2 + 3 * 4\nprint "a = " + a\nprint "hello Bada"',
+  "階乗 (再帰 fn)": 'fn fact(n) {\n  if n <= 1 { return 1 }\n  return n * fact(n - 1)\n}\nprint "5! = " + fact(5)\nprint "10! = " + fact(10)',
+  "フィボナッチ (while)": 'set a = 0\nset b = 1\nset i = 0\nwhile i < 12 {\n  set t = a + b\n  a = b\n  b = t\n  i = i + 1\n}\nprint "fib(12) = " + a',
+  "Bada 演算子": '# <- 左作用, -< 多様体積分, >- 量子右作用, Ω::push\nset g = 2.5\ng <- "global differential manifold"\nprint g\ng -< 3\nprint g\ng >- g\nprint g\nOmega::push g as manifold_node',
+  "エントロピー不変量 Ξ": 'print "H = " + entropy("bada quantum manifold entropy")\nprint "Ξ = " + xi("bada quantum manifold entropy")\nprint "β(2,3) = " + beta(2,3)\nprint "Γ(5) = " + gamma(5)',
+  "量子: Bell 状態": '# H を 0 番目に、CNOT(0->1) → もつれ (00 と 11 が各 0.5)\nset q = qreg(2)\nh(q, 0)\ncnot(q, 0, 1)\nprint "probs = " + probs(q)',
+  "量子: GHZ 3-qubit": 'set q = qreg(3)\nh(q, 0)\ncnot(q, 0, 1)\ncnot(q, 1, 2)\nprint probs(q)   # 000 と 111 が各 0.5',
+  "量子: 重ね合わせ+回転": 'set q = qreg(2)\nh(q, 0)\nry(q, 1, 1.0471975512)   # π/3 回転\nprint probs(q)'
+};
+
+var Q = function (id) { return document.getElementById(id); };
+function setTab(t) {
+  ["out", "bc", "q", "ast"].forEach(function (k) { Q("panel-" + k).style.display = k === t ? "" : "none"; });
+  [].forEach.call(document.querySelectorAll(".tab"), function (el) { el.classList.toggle("on", el.dataset.t === t); });
+}
+[].forEach.call(document.querySelectorAll(".tab"), function (el) { el.onclick = function () { setTab(el.dataset.t); }; });
+
+var sel = Q("examples");
+Object.keys(EXAMPLES).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = k; sel.appendChild(o); });
+sel.onchange = function () { Q("src").value = EXAMPLES[sel.value]; };
+Q("src").value = EXAMPLES[Object.keys(EXAMPLES)[0]];
+
+function fmt(err) { return "⨯ " + (err && err.message ? err.message : String(err)); }
+
+function checkAgree(src) {
+  try {
+    var a = Bada.interpret(src).output, b = Bada.execVM(src).output;
+    var same = JSON.stringify(a) === JSON.stringify(b);
+    Q("agree").innerHTML = same ? '<span class="ok">✓ interp==VM</span>' : '<span class="bad">✗ 不一致</span>';
+  } catch (e) { Q("agree").innerHTML = '<span class="bad">✗ ' + fmt(e) + '</span>'; }
+}
+
+Q("runI").onclick = function () {
+  var src = Q("src").value;
+  try { var r = Bada.interpret(src); Q("out").textContent = r.output.join("\n") || "(no output)"; }
+  catch (e) { Q("out").textContent = fmt(e); }
+  checkAgree(src); setTab("out");
+};
+Q("runV").onclick = function () {
+  var src = Q("src").value;
+  try {
+    Q("bc").textContent = Bada.disassemble(src);
+    var r = Bada.execVM(src);
+    Q("out").textContent = "[VM] \n" + (r.output.join("\n") || "(no output)");
+  } catch (e) { Q("bc").textContent = fmt(e); Q("out").textContent = fmt(e); }
+  checkAgree(src); setTab("bc");
+};
+Q("runQ").onclick = function () {
+  var src = Q("src").value;
+  try {
+    var r = Bada.interpret(src);
+    Q("out").textContent = r.output.join("\n") || "(no output)";
+    Q("qasm").textContent = r.qubits > 0 ? r.qasm : "この program は量子命令(qreg/h/x/z/ry/cnot/measure)を使っていません。";
+    renderBars(r);
+  } catch (e) { Q("qasm").textContent = fmt(e); Q("qbars").innerHTML = ""; }
+  checkAgree(src); setTab("q");
+};
+
+function renderBars(r) {
+  var bars = Q("qbars"); bars.innerHTML = "";
+  if (!r.qubits) return;
+  // recompute the register probabilities by re-running and reading `probs` is
+  // not exposed; instead parse the last probs() print if present, else skip.
+  var probsLine = r.output.filter(function (l) { return /^(probs = |[0-9.]+ )/.test(l) || /probs/.test(l); }).pop();
+  var vals = null;
+  if (probsLine) { var m = probsLine.replace(/^.*?=\s*/, "").trim().split(/\s+/).map(Number); if (m.every(function (x) { return !isNaN(x); })) vals = m; }
+  if (!vals) { bars.innerHTML = '<span class="cap">確率バーは probs(q) を print すると表示されます。</span>'; return; }
+  var n = Math.round(Math.log2(vals.length));
+  vals.forEach(function (p, i) {
+    var b = document.createElement("div"); b.className = "bar";
+    b.innerHTML = '<span class="lbl">|' + i.toString(2).padStart(n, "0") + '&#10217;</span>' +
+      '<span class="track"><span class="fill" style="width:' + (p * 100).toFixed(1) + '%"></span></span>' +
+      '<span>' + p.toFixed(3) + '</span>';
+    bars.appendChild(b);
+  });
+}
+
+Q("runI").onclick();
+</script>
+</body>
+</html>
