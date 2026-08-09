@@ -27,7 +27,7 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,6 +48,22 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.dir }}/electron/dist/*.exe
+      # Rolling Release so the EXE is permanently downloadable from the repo's
+      # Releases page (the Action creates the tag server-side via GITHUB_TOKEN).
+      - name: Publish EXE to rolling Release
+        if: ${{ matrix.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.release_tag }}
+          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK)
+          files: ${{ matrix.dir }}/electron/dist/*.exe
+          body: |
+            **Ω-USB Resume** — 死んだUSBポートを Bada の複素回転体・可積分系の n進数ズレ訂正で蘇生する概念シミュレーション。
+
+            - `*.exe` … **Windows 10 / 11**（NSIS インストーラ + portable）
+            - `*.apk` … **Android 12+**（minSdk 24 / target 33。この Release の android ジョブが添付）
+
+            GUI はホスト/端末の実USBには触れません（表示・数理シミュレーション）。実機の再認可・再列挙は Linux 版 CLI `bin/bada usb --apply`。
 
   android-apk:
     runs-on: ubuntu-latest
@@ -58,7 +74,7 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -104,4 +120,13 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          files: out/*.apk
+      # Rolling Release so the APK is permanently downloadable from the repo's
+      # Releases page (attaches to the same tag as the EXE job).
+      - name: Publish APK to rolling Release
+        if: ${{ matrix.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.release_tag }}
+          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK)
           files: out/*.apk
