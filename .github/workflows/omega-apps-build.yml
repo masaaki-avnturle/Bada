@@ -55,15 +55,59 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.release_tag }}
-          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK)
+          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK + Ubuntu/Linux)
           files: ${{ matrix.dir }}/electron/dist/*.exe
           body: |
             **Ω-USB Resume** — 死んだUSBポートを Bada の複素回転体・可積分系の n進数ズレ訂正で蘇生する概念シミュレーション。
 
             - `*.exe` … **Windows 10 / 11**（NSIS インストーラ + portable）
+            - `*.AppImage` / `*.deb` … **Ubuntu / Linux**（AppImage は chmod +x して実行、deb は `sudo dpkg -i`）
             - `*.apk` … **Android 12+**（minSdk 24 / target 33。この Release の android ジョブが添付）
 
             GUI はホスト/端末の実USBには触れません（表示・数理シミュレーション）。実機の再認可・再列挙は Linux 版 CLI `bin/bada usb --apply`。
+
+  linux-app:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { app: omega_usb_resume, dir: omega_usb_resume, release_tag: usb-resume-latest }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu/Linux app (Electron — AppImage + deb)
+        working-directory: ${{ matrix.dir }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-linux
+          path: |
+            ${{ matrix.dir }}/electron/dist/*.AppImage
+            ${{ matrix.dir }}/electron/dist/*.deb
+      - name: Attach Linux app to Release (apps-v* tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.dir }}/electron/dist/*.AppImage
+            ${{ matrix.dir }}/electron/dist/*.deb
+      # Rolling Release so the Ubuntu app (AppImage + deb) is permanently
+      # downloadable from the repo's Releases page (same tag as EXE/APK).
+      - name: Publish Linux app to rolling Release
+        if: ${{ matrix.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ matrix.release_tag }}
+          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK + Ubuntu/Linux)
+          files: |
+            ${{ matrix.dir }}/electron/dist/*.AppImage
+            ${{ matrix.dir }}/electron/dist/*.deb
 
   android-apk:
     runs-on: ubuntu-latest
@@ -128,5 +172,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ matrix.release_tag }}
-          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK)
+          name: Ω-USB Resume (latest — Windows 10/11 EXE + Android 12 APK + Ubuntu/Linux)
           files: out/*.apk

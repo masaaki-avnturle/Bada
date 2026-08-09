@@ -82,7 +82,8 @@ JavaScript 移植）で、Electron が Windows 実行ファイルに、Cordova �
 | プラットフォーム | 形式 | ビルド元 |
 |:--|:--|:--|
 | **Windows 10 / 11** | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
-| **Android** | `.apk`（debug） | `cordova/config.xml` + `www/` |
+| **Ubuntu / Linux** | `.AppImage`（そのまま実行）+ `.deb`（`sudo dpkg -i`） | `electron/`（`npm run dist:linux`） |
+| **Android 12+** | `.apk`（debug、minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
 
 ### 入手方法（3 通り）
 
@@ -113,6 +114,13 @@ APK を付けた Release を自動作成します（Releases ページから誰�
 ### 自分でビルドする
 
 ```bash
+# Ubuntu / Linux (要 Node 20)
+cd omega_usb_resume/electron
+npm install
+npm run dist:linux    # dist/Omega-USB-Resume-1.0.0-x86_64.AppImage + *-amd64.deb
+#   AppImage:  chmod +x Omega-USB-Resume-1.0.0-x86_64.AppImage && ./Omega-USB-Resume-1.0.0-x86_64.AppImage
+#   deb:       sudo dpkg -i Omega-USB-Resume-1.0.0-amd64.deb   # → omega-usb-resume で起動
+
 # Windows EXE (要 Windows + Node 20)
 cd omega_usb_resume/electron
 npm install
