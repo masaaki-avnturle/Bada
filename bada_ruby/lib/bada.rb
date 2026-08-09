@@ -17,6 +17,7 @@
 #   Bada::TupleSpace       Omega::DATABASE (Akashic Record)
 #   Bada::BadaNode         Bada operator runtime ( <-  -<  >- )
 #   Bada::Interpreter      Bada language source evaluator
+#   Bada::UsbResume        USB device resume via n進数 drift correction
 #   Bada::Knowledge        report/web ingestion -> measured corpus
 #   Bada::Generator        entropy-driven text / equation / theory generation
 #   Bada::QAEngine         entropy-driven question answering
@@ -35,6 +36,7 @@ require_relative "bada/manifold"
 require_relative "bada/error_correction"
 require_relative "bada/tuplespace"
 require_relative "bada/language"
+require_relative "bada/usb_resume"
 require_relative "bada/knowledge"
 require_relative "bada/generator"
 require_relative "bada/qa_engine"

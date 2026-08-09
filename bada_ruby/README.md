@@ -42,7 +42,19 @@ bin/bada repl                     # チャット REPL（corpus/*.txt を自動�
 bin/bada ask "このレポートから何ができるか？"
 bin/bada xi  "大域的部分積分多様体のエントロピー不変量"   # 計測のみ
 bin/bada run examples/demo.bada   # Bada 言語スクリプト実行
+bin/bada usb                      # 死んだUSBポートを復旧（n進数ズレ訂正・simulation）
+bin/bada run examples/usb_resume.bada  # 復旧手順を Bada 言語で記述したもの
 ```
+
+## Ω-USB Resume — 死んだUSBポートの復旧
+
+`bin/bada usb` は、USB コネクターが「許可なく（`authorized=0`）・プラグプレイなく
+（未バインド）・接触不良（記述子バイトの化け）」で使えない状態を、複素回転体・
+可積分系のエラー訂正（`Bada::ErrorCorrection`）で復旧します。接触不良は機械語
+バイト列の **n進数のズレ** として現れ、同じ記述子の複数読み取りを回転体 `e^{iθ}` の
+閉軌道で平均して真値を復元（Ξ 保存で認証）した後、`authorize→power/control=on→
+unbind/bind` でデバイスをレジュームします。既定はシミュレーション、Linux/root で
+`--apply` を付けると実 sysfs に反映します。詳細は `omega_usb_resume/README.md`。
 
 ## ライブラリとして
 

@@ -11,6 +11,7 @@
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a Bada language script
+#   bin/bada usb [scan|--apply]         resume dead USB ports (n進数 drift fix)
 #   bin/bada learn file1 file2 ...      ingest then start REPL
 #   bin/bada xi "text"                  show entropy + manifold invariant
 
@@ -49,6 +50,40 @@ when "run"
   path = ARGV.shift or abort("usage: bada run script.bada")
   interp = Bada::Interpreter.new
   interp.run(File.read(path)).each { |line| puts line }
+when "usb"
+  # Resume USB devices whose ports went dead (許可なく / プラグプレイなく /
+  # 接触不良) by correcting the machine-language n進数 drift on the complex
+  # rotational body, then walking the device back through the resume state
+  # machine.
+  #
+  #   bada usb                 scan + resume all faulted devices (simulation)
+  #   bada usb scan            list USB devices only
+  #   bada usb --apply         write the resume steps to real sysfs (Linux, root)
+  #   bada usb --base 8        model the drift in base-8 (default 16)
+  #   bada usb --device 2-3    resume only the given device id
+  sub = ARGV.first && !ARGV.first.start_with?("-") ? ARGV.shift : nil
+  apply = ARGV.delete("--apply") ? true : false
+  base = (i = ARGV.index("--base")) ? ARGV[i + 1].to_i : 16
+  want = (i = ARGV.index("--device")) ? ARGV[i + 1] : nil
+
+  db = Bada::TupleSpace.new
+  devices = Bada::UsbResume.scan
+  devices = devices.select { |d| d.id == want } if want
+
+  if sub == "scan"
+    puts "USB devices (#{devices.length}):"
+    devices.each do |d|
+      h = d.to_h
+      puts format("  %-6s %s:%s  %-34s [%s]", h[:id], h[:vendor], h[:product], h[:name], h[:status])
+    end
+  else
+    puts apply ? "Resuming USB devices — APPLYING to sysfs…" : "Resuming USB devices — simulation…"
+    puts
+    results = Bada::UsbResume.resume_all(devices, apply: apply, db: db, base: base)
+    results.each { |r| puts Bada::UsbResume.render(r); puts }
+    resumed = results.count { |r| r[:resumed] }
+    puts "#{resumed}/#{results.length} device(s) resumed. Ω::DATABASE tuples: #{db.size}"
+  end
 when "info"
   # Information generation: Thurston-Perelman placement + catastrophe branching
   # + millennium theory decomposition for a question.
@@ -107,6 +142,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | run | usb | learn | xi | neural | train | version"
   exit 1
 end
