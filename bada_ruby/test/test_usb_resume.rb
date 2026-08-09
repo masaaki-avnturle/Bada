@@ -39,6 +39,17 @@ class TestUsbResume < Minitest::Test
            "recovered only #{rec[:bytes_recovered]}/#{rec[:bytes_total]} bytes"
   end
 
+  def test_per_digit_recovery_handles_every_base
+    # Per-digit base-n correction must fully recover the descriptor for coarse
+    # and fine bases alike (this is the "fix the n進数のズレ" guarantee).
+    dev = U.synthetic_fleet.last
+    [2, 8, 10, 16].each do |base|
+      rec = U.recover_descriptor_adaptive(dev.descriptor, base: base, reads: 9, p: 0.35, seed: 7)
+      assert rec[:checksum_ok], "base-#{base} failed to checksum (#{rec[:bytes_recovered]}/#{rec[:bytes_total]})"
+      assert_equal 0, rec[:bit_errors_out], "base-#{base} left #{rec[:bit_errors_out]} bit errors"
+    end
+  end
+
   def test_scan_returns_devices
     devices = U.scan
     refute_empty devices

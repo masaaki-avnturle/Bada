@@ -210,13 +210,27 @@ module Bada
       { value: value, residual: c[:residual], samples: c[:samples] }
     end
 
+    # Recover one true byte by correcting each base-n *digit* independently and
+    # reassembling — this is literally "fixing the n進数のズレ". Because contact
+    # drift walks each digit by ±1 about its true value, the rotation-body
+    # integrable corrector converges on every digit far faster than on the whole
+    # byte (whose value jumps by base^k when a high digit slips).
+    def recover_byte_basen(samples, base)
+      w = byte_width(base)
+      digits = (0...w).map do |k|
+        col = samples.map { |s| to_base(s & 0xff, base, width: w)[k].to_f }
+        ErrorCorrection.correct(col)[:value].round.clamp(0, base - 1)
+      end
+      from_base(digits, base) & 0xff
+    end
+
     # Recover a whole descriptor from `reads` faulted copies of it.
     # Returns the corrected byte array plus a per-byte residual and a
     # checksum-verified flag (the base-n consistency check).
     def recover_descriptor(truth, base: 16, reads: 9, p: 0.35, seed: 7)
       noisy = (0...reads).map { |t| drift(truth, base: base, p: p, seed: seed, trial: t) }
       corrected = truth.each_index.map do |i|
-        recover_byte(noisy.map { |copy| copy[i] })[:value]
+        recover_byte_basen(noisy.map { |copy| copy[i] }, base)
       end
       residual = truth.each_index.sum { |i| (corrected[i] - truth[i]).abs }
       body = corrected[0...-1]

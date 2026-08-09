@@ -72,6 +72,52 @@ bin/bada usb            # 同じ復旧を実エンジンで実行
 
 ---
 
+## 📦 ダウンロード — Windows 10/11 EXE ＆ Android APK
+
+GUI 版（同じ復旧を可視化・アニメーションするアプリ）を **Windows の EXE** と
+**Android の APK** として配布します。中身は `www/index.html`（Bada エンジンの
+JavaScript 移植）で、Electron が Windows 実行ファイルに、Cordova が Android
+パッケージに包みます。
+
+| プラットフォーム | 形式 | ビルド元 |
+|:--|:--|:--|
+| **Windows 10 / 11** | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
+| **Android** | `.apk`（debug） | `cordova/config.xml` + `www/` |
+
+### 入手方法
+
+1. **GitHub Actions アーティファクト** — リポジトリの **Actions → 「Ω apps build
+   (APK + Windows EXE)」** を開き、`Run workflow` を押す（`workflow_dispatch`）。
+   完了後、成果物 `omega_usb_resume-windows`（EXE）と `omega_usb_resume-android`
+   （APK）をダウンロード。
+2. **GitHub Release** — `apps-v*` タグ（例 `apps-v1.0.0`）を push すると、EXE と
+   APK が自動で Release に添付されます。
+
+   ```bash
+   git tag apps-v1.0.0 && git push origin apps-v1.0.0
+   ```
+
+### 自分でビルドする
+
+```bash
+# Windows EXE (要 Windows + Node 20)
+cd omega_usb_resume/electron
+npm install
+npm run dist          # dist/Omega-USB-Resume-1.0.0-x64.exe
+
+# Android APK (要 JDK17 + Android SDK + Cordova 12)
+npm install -g cordova@12.0.0
+cordova create build com.bada.omega TmpApp
+cp -r omega_usb_resume/www build/www
+cp omega_usb_resume/cordova/config.xml build/config.xml
+cd build && cordova platform add android@12.0.1 && cordova build android
+```
+
+> APK/EXE の GUI はホスト/端末の**実 USB には触れません**（表示・数理シミュレーション）。
+> 実機の再認可・再列挙は Linux 版 CLI `bin/bada usb --apply` が行います。
+
+---
+
 ## 中身
 
 | ファイル | 役割 |
@@ -79,16 +125,21 @@ bin/bada usb            # 同じ復旧を実エンジンで実行
 | `../bada_ruby/lib/bada/usb_resume.rb` | 中核エンジン `Bada::UsbResume`：デバイス列挙 / n進数ズレ模型・訂正 / 復旧ステートマシン |
 | `../bada_ruby/examples/usb_resume.bada` | **Bada 言語**による記述（`<- / -< / >- / Ω::push`） |
 | `../bada_ruby/bin/bada usb` | CLI サブコマンド |
-| `../bada_ruby/test/test_usb_resume.rb` | テスト（8 件） |
-| `./usb_resume` | このフォルダから直接動かすラッパー |
+| `../bada_ruby/test/test_usb_resume.rb` | テスト（9 件） |
+| `./usb_resume` | このフォルダから直接動かすラッパー（CLI） |
+| `www/index.html` | GUI（Bada エンジンの JavaScript 移植・EXE/APK 共通の画面） |
+| `electron/` | Windows 10/11 EXE 化（Electron） |
+| `cordova/config.xml` | Android APK 化（Cordova） |
 
 ### 復旧アルゴリズム（`Bada::UsbResume`）
 
 1. **測定** — ポート状態（`UNAUTHORIZED` / `UNBOUND` / `SUSPENDED`）を読む。
 2. **n進数補正** — 接触不良で化けた記述子を、同じ記述子の複数読み取り（制御転送
-   リトライ）として扱い、各読み取りを複素回転体 `e^{iθ}` 上のサンプルとみなす。
-   `ErrorCorrection.correct`（相対論的な外れ値減衰＝コマの歳差）で閉軌道平均を
-   取り真値を復元。base-n チェックサムが通るまでリトライ数を自動増加。
+   リトライ）として扱う。各バイトを **base-n の桁に分解し、桁ごとに独立して**
+   複素回転体 `e^{iθ}` 上で `ErrorCorrection.correct`（相対論的な外れ値減衰＝コマの
+   歳差）の閉軌道平均を取り、真の桁へ収束させて再合成する（＝機械語の n進数のズレを
+   直接直す）。base-n チェックサムが通るまでリトライ数を自動増加。桁単位なので
+   二進〜十六進のどの基数でも完全復元します。
 3. **可積分認証** — 復元後のエントロピー不変量 Ξ が回転軌道上で保存されることを
    `certify_invariant` で確認（可積分系の保存則＝復旧の証明）。
 4. **レジューム** — `authorized`→1、`power/control`→on、ドライバ `unbind`→`bind`
