@@ -84,15 +84,31 @@ node test_bada.js         # 34 件（interp==VM 差分テスト・量子・コ�
 
 GUI 版を各プラットフォームのネイティブアプリとして配布します（中身は同じ `www/`）。
 
-| プラットフォーム | 形態 | 形式 | ビルド元 |
-|:--|:--|:--|:--|
-| **Windows 10 / 11** | GUI（IDE） | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
-| **Ubuntu / Linux** | **CLI（コンパイラ/インタープリタ）** | `bada-cli-linux-x64`（単体実行）+ `bada-cli_*_amd64.deb`（`sudo dpkg -i` → `/usr/bin/bada`） | `cli/build-linux-cli.sh`（Node SEA） |
-| **Android 12+** | GUI（IDE） | `.apk`（minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
+**CLI（コンパイラ/インタープリタ）を全プラットフォームで配布します。** GUI も併せて配布します。
 
-> **Ubuntu は GUI ではなく CLI** です。`bada-cli-linux-x64` は Node を含む**単体実行
-> ファイル**（依存なし）で、`bada run|vm|dis|qasm|check` がそのまま使えます。
-> `.deb` を入れると `bada` コマンドが `/usr/bin` に入ります。
+| プラットフォーム | **CLI** | GUI |
+|:--|:--|:--|
+| **Windows 10 / 11** | `bada-cli-win-x64.exe`（単体実行・Node同梱） | `Omega-Bada-Studio-*-x64.exe`（IDE） |
+| **Ubuntu / Linux** | `bada-cli-linux-x64`（単体実行）+ `bada-cli_*_amd64.deb`（`sudo dpkg -i` → `/usr/bin/bada`） | —（Ubuntu は CLI のみ） |
+| **Android 12+** | `bada-cli.js`（Termux で `node bada-cli.js …`） | `omega_bada_lang-debug.apk`（IDE） |
+| **任意（Node あり）** | `bada-cli.js`（`node bada-cli.js run x.bada`） | — |
+
+CLI は 5 コマンド共通: `run`（インタープリタ）/ `vm`（コンパイル→VM）/ `dis`（バイトコード）/ `qasm`（量子回路）/ `check`（interp==VM 検証）。
+
+- **Windows CLI**: `bada-cli-win-x64.exe` は Node を同梱した**単体 exe**（依存なし）。
+  ```bat
+  bada-cli-win-x64.exe run  prog.bada
+  bada-cli-win-x64.exe qasm prog.bada
+  echo print 2+2 | bada-cli-win-x64.exe run -
+  ```
+- **Android 12 CLI**: [Termux](https://f-droid.org/packages/com.termux/) を入れて:
+  ```bash
+  pkg install nodejs
+  node bada-cli.js run  prog.bada
+  node bada-cli.js vm   prog.bada
+  node bada-cli.js qasm prog.bada
+  ```
+  （`bada-cli.js` は Node があればどの OS でも動く可搬版です。）
 
 ### 入手方法
 

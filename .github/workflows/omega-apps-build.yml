@@ -28,7 +28,7 @@ jobs:
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
           - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
-          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)", release_body: "Ω-Bada Studio — Bada 言語のコンパイラ＋インタープリタ＋量子。`*.exe`=Windows 10/11 GUI、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(→ `/usr/bin/bada`)=Ubuntu CLI (`bada run|vm|dis|qasm|check`)、`*.apk`=Android 12+ GUI。量子は状態ベクトルシミュレータ。" }
+          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)", release_body: "Ω-Bada Studio — Bada 言語 コンパイラ＋インタープリタ＋量子。CLI: `bada-cli-win-x64.exe`(Windows 10/11)、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(Ubuntu → `/usr/bin/bada`)、`bada-cli.js`(Android/Termux: `node bada-cli.js run x.bada`／任意の Node)。GUI: `*.exe`(Windows)・`*.apk`(Android)。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -114,19 +114,44 @@ jobs:
           path: |
             omega_bada_lang/cli/build/bada-cli-linux-x64
             omega_bada_lang/cli/build/bada-cli_*_amd64.deb
+            omega_bada_lang/cli/build/bada-cli.js
       - name: Remove stale Bada GUI Linux assets from the rolling Release
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
         run: |
           gh release delete-asset bada-lang-latest Omega-Bada-Studio-1.0.0-x86_64.AppImage -y || true
           gh release delete-asset bada-lang-latest Omega-Bada-Studio-1.0.0-amd64.deb -y || true
-      - name: Publish CLI to rolling Release
+      - name: Publish CLI to rolling Release (Ubuntu binary/deb + portable/Android bada-cli.js)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: bada-lang-latest
-          name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)"
+          name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)"
           files: |
             omega_bada_lang/cli/build/bada-cli-linux-x64
             omega_bada_lang/cli/build/bada-cli_*_amd64.deb
+            omega_bada_lang/cli/build/bada-cli.js
+
+  # Windows 10/11 CLI (Node SEA standalone .exe) — omega_bada_lang.
+  windows-cli:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows CLI (Node SEA standalone exe)
+        shell: bash
+        run: bash omega_bada_lang/cli/build-win-cli.sh
+      - name: Upload Windows CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_bada_lang-windows-cli
+          path: omega_bada_lang/cli/build/bada-cli-win-x64.exe
+      - name: Publish Windows CLI to rolling Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: bada-lang-latest
+          name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)"
+          files: omega_bada_lang/cli/build/bada-cli-win-x64.exe
 
   android-apk:
     runs-on: ubuntu-latest
@@ -138,7 +163,7 @@ jobs:
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
           - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
-          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada compiler+interpreter+quantum · Windows EXE + Ubuntu CLI + Android 12 APK)", release_body: "Ω-Bada Studio — Bada 言語のコンパイラ＋インタープリタ＋量子。`*.exe`=Windows 10/11 GUI、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(→ `/usr/bin/bada`)=Ubuntu CLI (`bada run|vm|dis|qasm|check`)、`*.apk`=Android 12+ GUI。量子は状態ベクトルシミュレータ。" }
+          - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)", release_body: "Ω-Bada Studio — Bada 言語 コンパイラ＋インタープリタ＋量子。CLI: `bada-cli-win-x64.exe`(Windows 10/11)、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(Ubuntu → `/usr/bin/bada`)、`bada-cli.js`(Android/Termux: `node bada-cli.js run x.bada`／任意の Node)。GUI: `*.exe`(Windows)・`*.apk`(Android)。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

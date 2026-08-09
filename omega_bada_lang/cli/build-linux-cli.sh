@@ -14,6 +14,8 @@ rm -rf "$build"; mkdir -p "$build"
 
 # 1) bundle the engine + the CLI into a single self-contained CommonJS file.
 cat "$app/www/bada.js" "$here/cli.js" > "$build/bada-bundle.js"
+# portable CLI: runs anywhere Node is present (incl. Android/Termux: `node bada-cli.js run x.bada`)
+cp "$build/bada-bundle.js" "$build/bada-cli.js"
 
 # 2) generate the SEA blob.
 cat > "$build/sea-config.json" <<JSON
