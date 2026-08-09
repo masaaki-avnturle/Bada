@@ -15,9 +15,21 @@ Ubuntu / Android** で同じように動きます。
 ## 言語仕様（Bada v4）
 
 ```bada
-# 変数・算術・文字列
+# 数値・文字列・真偽・配列・オブジェクト一式
 set a = 2 + 3 * 4
 print "a = " + a
+
+set xs = [1, 2, 3]          # 配列
+xs = push(xs, 4)            # 末尾に追加
+xs[0] = 10                  # 添字代入
+print xs[-1]                # 負の添字 → 4
+print len(xs)               # 4
+
+set o = { name: "bada", tags: ["lang", "quantum"] }   # オブジェクト
+o.n = 5                     # メンバ代入
+print o.name                # bada
+print o["tags"][1]          # quantum
+print keys(o)               # [name, tags, n]
 
 # 制御構文と関数（再帰）
 fn fact(n) {
@@ -93,7 +105,23 @@ GUI 版を各プラットフォームのネイティブアプリとして配布�
 | **Android 12+** | `bada-cli.js`（Termux で `node bada-cli.js …`） | `omega_bada_lang-debug.apk`（IDE） |
 | **任意（Node あり）** | `bada-cli.js`（`node bada-cli.js run x.bada`） | — |
 
-CLI は 5 コマンド共通: `run`（インタープリタ）/ `vm`（コンパイル→VM）/ `dis`（バイトコード）/ `qasm`（量子回路）/ `check`（interp==VM 検証）。
+CLI は共通コマンド: `run`（インタープリタ）/ `vm`（コンパイル→VM）/ `dis`（バイトコード）/ `qasm`（量子回路）/ `check`（interp==VM 検証）/ **`usb`（接触不良USBの復旧）**。
+
+### `bada usb` — 接触不良の USB メモリを復旧
+Bada の複素回転体・可積分系の **n進数（base-n）ズレ訂正**で機械語記述子を復元し、
+`authorize(0→1) → power/control=on → unbind→bind`（プラグプレイ再列挙）で
+デバイスをレジュームします。既定はシミュレーション、**Linux/root で `--apply`** を
+付けると実 sysfs に書き込みます。
+
+```bash
+bada usb                 # スキャン＋不良ポートを全部復旧（シミュレーション）
+bada usb scan            # USB デバイス一覧
+sudo bada usb --apply    # 実機（Linux）: 再認可・電源復帰・再列挙を sysfs に反映
+bada usb --base 8        # ズレを 8 進数でモデル化（既定 16）
+bada usb --device 2-3    # 指定 id のデバイスだけ
+```
+> 効くのは「再認可・電源復帰・再列挙」です。断線・端子破損など真の物理故障は直せません
+> （その場合は正直に `NOT resumed ⚠` を返します）。
 
 - **Windows CLI**: `bada-cli-win-x64.exe` は Node を同梱した**単体 exe**（依存なし）。
   ```bat

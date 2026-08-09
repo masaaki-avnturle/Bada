@@ -50,11 +50,36 @@
 
   /* --------------------------------------------------------------- values */
   function isQReg(v) { return v && v.__qreg === true; }
+  function isArr(v) { return Array.isArray(v); }
+  function isObj(v) { return v && v.__obj === true; }
+  function makeObj() { return { __obj: true, m: Object.create(null), keys: [] }; }
+  function objSet(o, k, v) { k = String(k); if (!(k in o.m)) o.keys.push(k); o.m[k] = v; return v; }
+  function objGet(o, k) { k = String(k); return k in o.m ? o.m[k] : null; }
+  // index / member get+set, shared by the interpreter and the VM.
+  function rtIndexGet(o, i) {
+    if (isArr(o)) { var idx = Math.trunc(num(i)); if (idx < 0) idx += o.length; return (idx >= 0 && idx < o.length) ? o[idx] : null; }
+    if (isObj(o)) return objGet(o, i);
+    if (typeof o === "string") { var s = Math.trunc(num(i)); if (s < 0) s += o.length; return o[s] !== undefined ? o[s] : null; }
+    return null;
+  }
+  function rtIndexSet(o, i, v) {
+    if (isArr(o)) { var idx = Math.trunc(num(i)); if (idx < 0) idx += o.length; if (idx < 0) idx = 0; o[idx] = v; return v; }
+    if (isObj(o)) return objSet(o, i, v);
+    throw new BadaError("cannot index-assign into " + (o === null ? "null" : typeof o));
+  }
+  function rtMemberGet(o, k) {
+    if (isObj(o)) return objGet(o, k);
+    if ((isArr(o) || typeof o === "string") && k === "length") return o.length;
+    return null;
+  }
+  function rtMemberSet(o, k, v) { if (isObj(o)) return objSet(o, k, v); throw new BadaError("cannot set ." + k + " on " + (o === null ? "null" : typeof o)); }
   function num(v) { // coerce any Bada value to a number (the Ω-lattice projection)
     if (typeof v === "number") return v;
     if (typeof v === "boolean") return v ? 1 : 0;
     if (typeof v === "string") return xiOf(v);
     if (v == null) return 0;
+    if (isArr(v)) return v.length;
+    if (isObj(v)) return v.keys.length;
     if (isQReg(v)) return v.n;
     return 0;
   }
@@ -62,12 +87,16 @@
     if (typeof v === "boolean") return v;
     if (typeof v === "number") return v !== 0;
     if (typeof v === "string") return v.length > 0;
+    if (isArr(v)) return v.length > 0;
+    if (isObj(v)) return v.keys.length > 0;
     return v != null;
   }
   function show(v) {
     if (v == null) return "null";
     if (typeof v === "number") return (Number.isInteger(v) ? String(v) : String(v));
     if (typeof v === "boolean") return v ? "true" : "false";
+    if (isArr(v)) return "[" + v.map(show).join(", ") + "]";
+    if (isObj(v)) return "{" + v.keys.map(function (k) { return k + ": " + show(v.m[k]); }).join(", ") + "}";
     if (isQReg(v)) return "<qreg " + v.n + " qubits>";
     if (typeof v === "object" && v.__fn) return "<fn " + (v.name || "anon") + ">";
     return String(v);
@@ -163,8 +192,16 @@
     max: function (a) { return Math.max.apply(Math, a.map(num)); },
     pi: function () { return Math.PI; },
     e: function () { return Math.E; },
-    len: function (a) { return typeof a[0] === "string" ? a[0].length : (isQReg(a[0]) ? a[0].n : 0); },
+    len: function (a) { var v = a[0]; if (typeof v === "string") return v.length; if (isArr(v)) return v.length; if (isObj(v)) return v.keys.length; if (isQReg(v)) return v.n; return 0; },
     str: function (a) { return show(a[0]); },
+    // arrays & objects
+    push: function (a) { if (isArr(a[0])) a[0].push(a[1]); return a[0]; },
+    pop: function (a) { return (isArr(a[0]) && a[0].length) ? a[0].pop() : null; },
+    keys: function (a) { return isObj(a[0]) ? a[0].keys.slice() : []; },
+    has: function (a) { return isObj(a[0]) ? (String(a[1]) in a[0].m) : false; },
+    get: function (a) { return rtIndexGet(a[0], a[1]); },
+    put: function (a) { return rtIndexSet(a[0], a[1], a[2]); },
+    range: function (a) { var n = Math.trunc(num(a[0])), r = []; for (var i = 0; i < n; i++) r.push(i); return r; },
     // Bada special functions
     gamma: function (a) { return gamma(num(a[0])); },
     beta: function (a) { return beta(num(a[0]), num(a[1])); },
@@ -191,7 +228,7 @@
     function push(type, value) { toks.push({ type: type, value: value, line: line, col: col }); }
     function isIdStart(c) { return /[A-Za-z_Ͱ-Ͽ]/.test(c); }
     function isId(c) { return /[A-Za-z0-9_]/.test(c); }
-    var KW = { set: 1, print: 1, "if": 1, "else": 1, "while": 1, fn: 1, "return": 1, "true": 1, "false": 1, and: 1, or: 1, not: 1, as: 1, push: 1 };
+    var KW = { set: 1, print: 1, "if": 1, "else": 1, "while": 1, fn: 1, "return": 1, "true": 1, "false": 1, and: 1, or: 1, not: 1, as: 1 };
     while (i < n) {
       var c = src[i];
       if (c === "\n") { push("NL"); i++; line++; col = 1; continue; }
@@ -219,7 +256,7 @@
       var two = src.substr(i, 2);
       if (two === "<-" || two === "-<" || two === ">-" || two === "==" || two === "!=" ||
         two === "<=" || two === ">=" || two === "::") { push("OP", two); i += 2; col += 2; continue; }
-      if ("+-*/%()<>{},=".indexOf(c) >= 0) { push("OP", c); i++; col++; continue; }
+      if ("+-*/%()<>{}[],=.:".indexOf(c) >= 0) { push("OP", c); i++; col++; continue; }
       throw new BadaError("Lex error: unexpected '" + c + "'", line, col);
     }
     push("EOF");
@@ -270,14 +307,20 @@
       if (at("KW", "return")) { next(); if (at("NL") || at("OP", ";") || at("OP", "}") || at("EOF")) return { type: "Return", value: null }; return { type: "Return", value: parseExpr() }; }
       // Omega::push EXPR as NAME
       if (at("IDENT", "Omega") && toks[pos + 1] && toks[pos + 1].type === "OP" && toks[pos + 1].value === "::") {
-        next(); eat("OP", "::"); eat("KW", "push"); var ex = parseExpr(); var as = null;
+        next(); eat("OP", "::"); eat("IDENT", "push"); var ex = parseExpr(); var as = null;
         if (at("KW", "as")) { next(); as = eat("IDENT").value; } return { type: "Push", value: ex, as: as };
       }
-      // assignment: IDENT '=' expr  (lookahead)
-      if (at("IDENT") && toks[pos + 1] && toks[pos + 1].type === "OP" && toks[pos + 1].value === "=") {
-        var nm = eat("IDENT").value; eat("OP", "="); return { type: "Assign", name: nm, value: parseExpr() };
+      // general: an expression, optionally an assignment to an lvalue
+      // (Var, Index a[i], or Member a.k).
+      var lhs = parseExpr();
+      if (at("OP", "=")) {
+        next(); var value = parseExpr();
+        if (lhs.type === "Var") return { type: "Assign", name: lhs.name, value: value };
+        if (lhs.type === "Index") return { type: "SetIndex", obj: lhs.obj, index: lhs.index, value: value };
+        if (lhs.type === "Member") return { type: "SetMember", obj: lhs.obj, key: lhs.key, value: value };
+        throw new BadaError("invalid assignment target");
       }
-      return { type: "ExprStmt", value: parseExpr() };
+      return { type: "ExprStmt", value: lhs };
     }
     function parseIf() {
       eat("KW", "if"); var cond = parseExpr(); skipNL(); var cons = parseBlock(); var alt = null;
@@ -302,14 +345,21 @@
     function parseUnary() {
       if (at("OP", "-")) { next(); return { type: "Unary", op: "-", operand: parseUnary() }; }
       if (at("KW", "not")) { next(); return { type: "Unary", op: "not", operand: parseUnary() }; }
-      return parseCall();
+      return parsePostfix();
     }
-    function parseCall() {
+    // postfix chain: call f(...), index a[i], member a.k
+    function parsePostfix() {
       var e = parsePrimary();
-      while (at("OP", "(")) {
-        next(); var args = [];
-        if (!at("OP", ")")) { args.push(parseExpr()); while (at("OP", ",")) { next(); args.push(parseExpr()); } }
-        eat("OP", ")"); e = { type: "Call", callee: e, args: args };
+      while (true) {
+        if (at("OP", "(")) {
+          next(); var args = [];
+          if (!at("OP", ")")) { args.push(parseExpr()); while (at("OP", ",")) { next(); args.push(parseExpr()); } }
+          eat("OP", ")"); e = { type: "Call", callee: e, args: args };
+        } else if (at("OP", "[")) {
+          next(); var idx = parseExpr(); eat("OP", "]"); e = { type: "Index", obj: e, index: idx };
+        } else if (at("OP", ".")) {
+          next(); var key = eat("IDENT").value; e = { type: "Member", obj: e, key: key };
+        } else break;
       }
       return e;
     }
@@ -320,6 +370,22 @@
       if (t.type === "KW" && (t.value === "true" || t.value === "false")) { next(); return { type: "Bool", value: t.value === "true" }; }
       if (t.type === "IDENT") { next(); return { type: "Var", name: t.value }; }
       if (t.type === "OP" && t.value === "(") { next(); var e = parseExpr(); eat("OP", ")"); return e; }
+      // array literal  [e1, e2, ...]
+      if (t.type === "OP" && t.value === "[") {
+        next(); var elts = []; skipNL();
+        while (!at("OP", "]")) { elts.push(parseExpr()); skipNL(); if (at("OP", ",")) { next(); skipNL(); } else break; }
+        eat("OP", "]"); return { type: "Array", elements: elts };
+      }
+      // object literal  { key: v, "str": v, ... }
+      if (t.type === "OP" && t.value === "{") {
+        next(); var pairs = []; skipNL();
+        while (!at("OP", "}")) {
+          var k = at("STRING") ? eat("STRING").value : eat("IDENT").value;
+          eat("OP", ":"); var val = parseExpr(); pairs.push({ key: k, value: val }); skipNL();
+          if (at("OP", ",")) { next(); skipNL(); } else break;
+        }
+        eat("OP", "}"); return { type: "Object", pairs: pairs };
+      }
       throw new BadaError("Parse error: unexpected '" + (t.value != null ? t.value : t.type) + "'", t.line);
     }
     return parseProgram();
@@ -367,6 +433,10 @@
           return node.op === "-" ? -num(v) : !truthy(v);
         }
         case "Binary": return evalBinary(node, scope);
+        case "Array": return node.elements.map(function (e) { return evalNode(e, scope); });
+        case "Object": { var o = makeObj(); node.pairs.forEach(function (p) { objSet(o, p.key, evalNode(p.value, scope)); }); return o; }
+        case "Index": return rtIndexGet(evalNode(node.obj, scope), evalNode(node.index, scope));
+        case "Member": return rtMemberGet(evalNode(node.obj, scope), node.key);
         case "Call": {
           var callee = node.callee.type === "Var" ? (BUILTINS[node.callee.name] || scope.get(node.callee.name)) : evalNode(node.callee, scope);
           var args = node.args.map(function (a) { return evalNode(a, scope); });
@@ -405,6 +475,8 @@
     function execStmt(node, scope) {
       switch (node.type) {
         case "Assign": scope.set(node.name, evalNode(node.value, scope)); return;
+        case "SetIndex": rtIndexSet(evalNode(node.obj, scope), evalNode(node.index, scope), evalNode(node.value, scope)); return;
+        case "SetMember": rtMemberSet(evalNode(node.obj, scope), node.key, evalNode(node.value, scope)); return;
         case "Print": out.push(show(evalNode(node.value, scope))); return;
         case "ExprStmt": evalNode(node.value, scope); return;
         case "If": if (truthy(evalNode(node.cond, scope))) execBlock(node.cons, scope); else if (node.alt) { node.alt.type === "If" ? execStmt(node.alt, scope) : execBlock(node.alt, scope); } return;
@@ -436,6 +508,10 @@
           case "Str": emit("PUSH", node.value); return;
           case "Bool": emit("PUSH", node.value); return;
           case "Var": emit("LOAD", node.name); return;
+          case "Array": node.elements.forEach(cExpr); emit("MKARR", node.elements.length); return;
+          case "Object": node.pairs.forEach(function (p) { emit("PUSH", p.key); cExpr(p.value); }); emit("MKOBJ", node.pairs.length); return;
+          case "Index": cExpr(node.obj); cExpr(node.index); emit("INDEX"); return;
+          case "Member": cExpr(node.obj); emit("MEMBER", node.key); return;
           case "Unary": cExpr(node.operand); emit(node.op === "-" ? "NEG" : "NOT"); return;
           case "Call": {
             var name = node.callee.type === "Var" ? node.callee.name : null;
@@ -459,6 +535,8 @@
       function cStmt(node) {
         switch (node.type) {
           case "Assign": cExpr(node.value); emit("STORE", node.name); return;
+          case "SetIndex": cExpr(node.obj); cExpr(node.index); cExpr(node.value); emit("SETIDX"); return;
+          case "SetMember": cExpr(node.obj); cExpr(node.value); emit("SETMEM", node.key); return;
           case "Print": cExpr(node.value); emit("PRINT"); return;
           case "ExprStmt": cExpr(node.value); emit("POP"); return;
           case "Return": if (node.value) cExpr(node.value); else emit("PUSH", null); emit("RET"); return;
@@ -531,6 +609,12 @@
           case "MKFUN": stack.push({ __fn: true, __idx: a, name: program.functions[a].name, params: program.functions[a].params }); break;
           case "PUSHΩ": { var pv = stack.pop(), xi = xiOf(show(pv)); out.push("Ω::push " + (a || ("Ω" + out.length)) + " (Ξ=" + xi.toFixed(4) + ")"); } break;
           case "BIN": { var rgt = stack.pop(), lft = stack.pop(); stack.push(binOp(a, lft, rgt)); } break;
+          case "MKARR": { var arr = new Array(a); for (var q = a - 1; q >= 0; q--) arr[q] = stack.pop(); stack.push(arr); } break;
+          case "MKOBJ": { var o = makeObj(), tmp = []; for (var q = 0; q < a; q++) { var vv = stack.pop(), kk = stack.pop(); tmp.push([kk, vv]); } for (var q = tmp.length - 1; q >= 0; q--) objSet(o, tmp[q][0], tmp[q][1]); stack.push(o); } break;
+          case "INDEX": { var ii = stack.pop(), oo = stack.pop(); stack.push(rtIndexGet(oo, ii)); } break;
+          case "MEMBER": { var om = stack.pop(); stack.push(rtMemberGet(om, a)); } break;
+          case "SETIDX": { var sv = stack.pop(), si = stack.pop(), so = stack.pop(); rtIndexSet(so, si, sv); } break;
+          case "SETMEM": { var mv = stack.pop(), mo = stack.pop(); rtMemberSet(mo, a, mv); } break;
           case "BADA": {
             var R = stack.pop(), L = stack.pop();
             var res = a.op === "<-" ? badaLeft(num(L), R) : a.op === "-<" ? badaIntegral(num(L), R) : badaRight(num(L), R);

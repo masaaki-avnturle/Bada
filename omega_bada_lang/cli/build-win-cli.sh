@@ -12,7 +12,7 @@ build="$here/build"
 rm -rf "$build"; mkdir -p "$build"
 
 # 1) bundle engine + CLI into one self-contained file.
-cat "$app/www/bada.js" "$here/cli.js" > "$build/bada-bundle.js"
+cat "$app/www/bada.js" "$here/usb.js" "$here/cli.js" > "$build/bada-bundle.js"
 
 # 2) generate the SEA blob.
 cat > "$build/sea-config.json" <<JSON

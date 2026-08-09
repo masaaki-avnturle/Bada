@@ -23,15 +23,20 @@
   function usage() {
     process.stderr.write(
       "Bada " + Bada.VERSION + " — command-line compiler & interpreter\n" +
-      "usage: bada <run|vm|dis|qasm|check|version> <file.bada|->\n" +
+      "usage: bada <run|vm|dis|qasm|check|usb|version> [file.bada|-]\n" +
       "  run   tree-walking interpreter (default)\n" +
       "  vm    compile to bytecode and run on the stack VM\n" +
       "  dis   print the compiled bytecode (disassembly)\n" +
       "  qasm  run and print the lowered OpenQASM 2.0 circuit\n" +
-      "  check verify the interpreter and the VM produce the same output\n");
+      "  check verify the interpreter and the VM produce the same output\n" +
+      "  usb   revive a contact-faulty USB device (bada usb [scan|--apply|--base N|--device ID])\n");
   }
   if (cmd === "version" || cmd === "-v" || cmd === "--version") { process.stdout.write("bada " + Bada.VERSION + "\n"); return; }
   if (cmd === "help" || cmd === "-h" || cmd === "--help") { usage(); return; }
+  if (cmd === "usb") { // revive a contact-faulty USB device (n進数 drift fix + resume)
+    if (!Bada.usb) { process.stderr.write("usb support not bundled\n"); process.exit(2); }
+    process.exit(Bada.usb.main(argv.slice(1)));
+  }
   if (!file) { usage(); process.exit(2); }
 
   try {

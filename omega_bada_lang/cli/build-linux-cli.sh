@@ -13,7 +13,7 @@ build="$here/build"
 rm -rf "$build"; mkdir -p "$build"
 
 # 1) bundle the engine + the CLI into a single self-contained CommonJS file.
-cat "$app/www/bada.js" "$here/cli.js" > "$build/bada-bundle.js"
+cat "$app/www/bada.js" "$here/usb.js" "$here/cli.js" > "$build/bada-bundle.js"
 # portable CLI: runs anywhere Node is present (incl. Android/Termux: `node bada-cli.js run x.bada`)
 cp "$build/bada-bundle.js" "$build/bada-cli.js"
 

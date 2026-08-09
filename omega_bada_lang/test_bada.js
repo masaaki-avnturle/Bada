@@ -20,7 +20,13 @@ var PROGRAMS = {
   "builtins_math": 'print sqrt(16)\nprint floor(3.9)\nprint pow(2,10)\nprint max(3,9,2)',
   "bada_ops": 'set g = 2.5\ng <- "global manifold"\nprint g\ng -< 3\nprint g\ng >- g\nprint g',
   "push": 'set g = 1.5\ng <- "entropy"\nOmega::push g as node1',
-  "nested_calls": 'fn sq(x){ return x*x }\nprint sq(sq(3))'
+  "nested_calls": 'fn sq(x){ return x*x }\nprint sq(sq(3))',
+  "arrays": 'set a = [1, 2, 3, 4]\nprint a\nprint a[0] + a[3]\nprint len(a)\npush(a, 99)\nprint a\nprint a[-1]',
+  "array_index_assign": 'set a = [10, 20, 30]\na[1] = 200\nprint a\nprint a[1]',
+  "objects": 'set o = { name: "bada", n: 4 }\nprint o.name\nprint o["n"]\no.n = 5\nprint o.n\nprint keys(o)\nprint has(o, "name")',
+  "object_in_array": 'set xs = [ {v: 1}, {v: 2}, {v: 3} ]\nset s = 0\nset i = 0\nwhile i < len(xs) { s = s + xs[i].v\ni = i + 1 }\nprint "sum = " + s',
+  "range_sum": 'set r = range(5)\nset s = 0\nset i = 0\nwhile i < len(r) { s = s + r[i]\ni = i + 1 }\nprint r\nprint s',
+  "nested_struct": 'set db = { users: ["alice", "bob"], count: 2 }\nprint db.users[1]\nprint db.count\ndb.count = db.count + 1\nprint db.count'
 };
 
 console.log("== differential: interpret == execVM ==");
@@ -40,6 +46,21 @@ check("2+3*4=14", Bada.interpret('print 2+3*4').output[0] === "14");
 check("(2+3)*4=20", Bada.interpret('print (2+3)*4').output[0] === "20");
 check("string concat", Bada.interpret('print "a"+"b"+"c"').output[0] === "abc");
 check("vm string concat", Bada.execVM('print "a"+"b"+"c"').output[0] === "abc");
+
+/* Arrays & objects: specific outputs. */
+console.log("== arrays & objects ==");
+check("array literal + index", Bada.interpret('set a=[5,6,7]\nprint a[0]+a[2]').output[0] === "12");
+check("array show", Bada.interpret('print [1,2,3]').output[0] === "[1, 2, 3]");
+check("array negative index", Bada.interpret('print [1,2,3][-1]').output[0] === "3");
+check("push mutates", Bada.interpret('set a=[1]\npush(a,2)\npush(a,3)\nprint len(a)').output[0] === "3");
+check("index assign", Bada.interpret('set a=[1,2,3]\na[1]=9\nprint a').output[0] === "[1, 9, 3]");
+check("object member", Bada.interpret('set o={x:1,y:2}\nprint o.x + o.y').output[0] === "3");
+check("object bracket + assign", Bada.interpret('set o={x:1}\no["y"]=2\nprint o["y"]').output[0] === "2");
+check("object show", Bada.interpret('print {a:1,b:2}').output[0] === "{a: 1, b: 2}");
+check("keys", Bada.interpret('print keys({a:1,b:2,c:3})').output[0] === "[a, b, c]");
+check("nested obj/array", Bada.interpret('set d={xs:[10,20,30]}\nprint d.xs[2]').output[0] === "30");
+check("VM arrays == interp", eq(Bada.interpret(PROGRAMS.array_index_assign).output, Bada.execVM(PROGRAMS.array_index_assign).output));
+check("VM objects == interp", eq(Bada.interpret(PROGRAMS.nested_struct).output, Bada.execVM(PROGRAMS.nested_struct).output));
 
 /* Bada operators vs. direct formula. */
 console.log("== Bada operator math ==");
@@ -76,6 +97,23 @@ check("bytecode has MKFUN", dis.indexOf("MKFUN") >= 0);
 console.log("== errors ==");
 var threw = false; try { Bada.interpret('print (1 + '); } catch (e) { threw = e instanceof Bada.BadaError; }
 check("parse error is BadaError", threw);
+
+/* USB resume engine (bada usb). */
+console.log("== usb resume ==");
+require("./cli/usb.js");
+var U = Bada.usb._test;
+[2, 8, 10, 16].forEach(function (base) {
+  var t = U.defaultDescriptor(0x0781, 0x5581);
+  var r = U.recoverAdaptive(t, base, 9, 193, 0.35, 7);
+  check("usb base-" + base + " recovers descriptor", r.checksumOk && r.bitOut === 0);
+});
+(function () {
+  var faulted = U.syntheticFleet()[2];
+  check("faulted device starts UNAUTHORIZED", Bada.usb.statusOf(faulted) === "UNAUTHORIZED");
+  var res = Bada.usb.resume(faulted, { base: 16, apply: false });
+  check("usb resume brings device to RESUMED", res.resumed && res.after === "RESUMED");
+  check("usb resume is simulation (no sysfs write)", res.applied === false);
+})();
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
