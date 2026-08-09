@@ -79,11 +79,29 @@ GUI 版（同じ復旧を可視化・アニメーションするアプリ）を 
 JavaScript 移植）で、Electron が Windows 実行ファイルに、Cordova が Android
 パッケージに包みます。
 
-| プラットフォーム | 形式 | ビルド元 |
-|:--|:--|:--|
-| **Windows 10 / 11** | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
-| **Ubuntu / Linux** | `.AppImage`（そのまま実行）+ `.deb`（`sudo dpkg -i`） | `electron/`（`npm run dist:linux`） |
-| **Android 12+** | `.apk`（debug、minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
+| プラットフォーム | 形態 | 形式 | ビルド元 |
+|:--|:--|:--|:--|
+| **Windows 10 / 11** | GUI | `.exe`（NSIS インストーラ + portable） | `electron/`（`npm run dist`） |
+| **Ubuntu / Linux** | GUI | `.AppImage` + `Omega-USB-Resume*.deb` | `electron/`（`npm run dist:linux`） |
+| **Ubuntu / Linux** | **CLI アプリ** | `usb-resume-linux-x64`（単体実行）+ `usb-resume-cli_*_amd64.deb`（→ `/usr/bin/usb-resume`） | `cli/build-linux-cli.sh`（Node SEA） |
+| **Android 12+** | GUI | `.apk`（debug、minSdk 24 / target 33） | `cordova/config.xml` + `www/` |
+
+### 🐧 Ubuntu 向け CLI アプリ `usb-resume`（接触不良USBメモリ修復・実機対応）
+Node を同梱した**単体実行ファイル**（依存なし）。ターミナルから接触不良のUSBメモリを
+復旧します。既定はシミュレーション、**`sudo … --apply` で実 sysfs に書き込み**ます。
+```bash
+chmod +x usb-resume-linux-x64
+./usb-resume-linux-x64 scan          # USB デバイス一覧
+./usb-resume-linux-x64               # 不良ポートを復旧（シミュレーション）
+sudo ./usb-resume-linux-x64 --apply  # 実機: 再認可・電源復帰・再列挙を sysfs へ
+./usb-resume-linux-x64 --device 2-3 --base 8
+# deb でインストール:
+sudo dpkg -i usb-resume-cli_1.0.0_amd64.deb   # → usb-resume コマンド
+sudo usb-resume --apply
+```
+やること: 機械語記述子の **n進数ズレ**を複素回転体・可積分系で桁ごとに訂正（Ξ保存）→
+`authorized(0→1) → power/control=on → unbind→bind`（プラグプレイ再列挙）。
+断線・端子破損など真の物理故障は直せず、その場合は `NOT resumed ⚠` を返します。
 
 ### 入手方法（3 通り）
 

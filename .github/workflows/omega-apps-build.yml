@@ -27,7 +27,7 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu GUI(AppImage/deb) & CLI(usb-resume) + Android 12 APK)", release_body: "Ω-USB Resume — 接触不良USBの復旧。`*.exe`=Windows 10/11 GUI、Ubuntu=GUI(`*.AppImage`/`Omega-USB-Resume*.deb`) と CLI(`usb-resume-linux-x64` ＋ `usb-resume-cli_*_amd64.deb`→`/usr/bin/usb-resume`、`--apply`で実sysfs)、`*.apk`=Android 12+ GUI。" }
           - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)", release_body: "Ω-Bada Studio — Bada 言語 コンパイラ＋インタープリタ＋量子。CLI: `bada-cli-win-x64.exe`(Windows 10/11)、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(Ubuntu → `/usr/bin/bada`)、`bada-cli.js`(Android/Termux: `node bada-cli.js run x.bada`／任意の Node)。GUI: `*.exe`(Windows)・`*.apk`(Android)。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { app: omega_usb_resume, dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)" }
+          - { app: omega_usb_resume, dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu GUI(AppImage/deb) & CLI(usb-resume) + Android 12 APK)" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -92,6 +92,34 @@ jobs:
           files: |
             ${{ matrix.dir }}/electron/dist/*.AppImage
             ${{ matrix.dir }}/electron/dist/*.deb
+
+  # Ubuntu/Linux CLI application (Node SEA standalone binary + deb) —
+  # omega_usb_resume: revive a contact-faulty USB memory stick from the terminal
+  # (n進数 drift fix + re-authorize/power/rebind; --apply writes real sysfs).
+  usb-resume-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu USB-resume CLI (Node SEA standalone binary + deb)
+        run: bash omega_usb_resume/cli/build-linux-cli.sh
+      - name: Upload USB-resume CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_usb_resume-linux-cli
+          path: |
+            omega_usb_resume/cli/build/usb-resume-linux-x64
+            omega_usb_resume/cli/build/usb-resume-cli_*_amd64.deb
+      - name: Publish USB-resume CLI to rolling Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: usb-resume-latest
+          name: "Ω-USB Resume (latest — Windows EXE + Ubuntu GUI(AppImage/deb) & CLI(usb-resume) + Android 12 APK)"
+          files: |
+            omega_usb_resume/cli/build/usb-resume-linux-x64
+            omega_usb_resume/cli/build/usb-resume-cli_*_amd64.deb
 
   # Ubuntu/Linux CLI (Node SEA standalone binary + deb) — omega_bada_lang.
   # This REPLACES the Electron GUI for the Bada language on Ubuntu with a
@@ -162,7 +190,7 @@ jobs:
           - { app: omega_biofeedback,   dir: bio_medicine/omega_biofeedback }
           - { app: omega_thermal_trace, dir: bio_medicine/omega_thermal_trace }
           - { app: omega_telepathy,     dir: bio_medicine/omega_telepathy }
-          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu AppImage/deb + Android 12 APK)", release_body: "Ω-USB Resume — 概念シミュレーション。`*.exe`=Windows 10/11、`*.AppImage`/`*.deb`=Ubuntu、`*.apk`=Android 12+。" }
+          - { app: omega_usb_resume,    dir: omega_usb_resume, release_tag: usb-resume-latest, release_name: "Ω-USB Resume (latest — Windows EXE + Ubuntu GUI(AppImage/deb) & CLI(usb-resume) + Android 12 APK)", release_body: "Ω-USB Resume — 接触不良USBの復旧。`*.exe`=Windows 10/11 GUI、Ubuntu=GUI(`*.AppImage`/`Omega-USB-Resume*.deb`) と CLI(`usb-resume-linux-x64` ＋ `usb-resume-cli_*_amd64.deb`→`/usr/bin/usb-resume`、`--apply`で実sysfs)、`*.apk`=Android 12+ GUI。" }
           - { app: omega_bada_lang,     dir: omega_bada_lang,  release_tag: bada-lang-latest,  release_name: "Ω-Bada Studio (latest — Bada CLI for Windows/Ubuntu/Android + GUI · compiler+interpreter+quantum)", release_body: "Ω-Bada Studio — Bada 言語 コンパイラ＋インタープリタ＋量子。CLI: `bada-cli-win-x64.exe`(Windows 10/11)、`bada-cli-linux-x64` ＋ `bada-cli_*_amd64.deb`(Ubuntu → `/usr/bin/bada`)、`bada-cli.js`(Android/Termux: `node bada-cli.js run x.bada`／任意の Node)。GUI: `*.exe`(Windows)・`*.apk`(Android)。量子は状態ベクトルシミュレータ。" }
     steps:
       - uses: actions/checkout@v4
