@@ -52,7 +52,7 @@ GitHub Actions の **Actions アーティファクト**、または `ovim-gui-v*
 
 | プラットフォーム | 成果物 | 入手・実行 |
 |:--|:--|:--|
-| **Android** | `omega-vim-debug.apk` | 端末にコピーしてインストール（提供元不明アプリを許可） |
+| **Android** | `omega-vim-debug.apk`（artifact `omega-vim-apk`、専用WF `omega-vim-apk.yml`） | 端末にコピーしてインストール（提供元不明アプリを許可） |
 | **Windows 10/11** | `Omega-Vim-1.0.0-x64.exe`（NSIS インストーラ＋ポータブル） | ダブルクリックで実行 |
 | **Linux/Ubuntu** | `Omega-Vim-1.0.0-x86_64.AppImage` / `Omega-Vim-1.0.0-amd64.deb` | `chmod +x *.AppImage && ./*.AppImage` もしくは `sudo apt install ./Omega-Vim-1.0.0-amd64.deb` |
 
@@ -78,8 +78,16 @@ npm start             # デスクトップで起動（開発）
 ```
 
 ### Android APK（Cordova）
-CI と同じ手順（`cordova create` → `www` と `config.xml` を投入 → `cordova build android`）。
-詳細は `.github/workflows/omega-vim-gui.yml` を参照。
+専用ワークフロー **`.github/workflows/omega-vim-apk.yml`** が、ピン留めした版で APK をビルドします
+（JDK 17 · cordova 12.0.0 · cordova-android 12.0.1 · platform 33 · build-tools 33.0.2）。
+Actions タブから手動実行（**Run workflow**）でき、成果物 **`omega-vim-apk`** をダウンロードできます。
+
+ローカル（インターネット接続のあるマシン）で再現するには、同じ手順の**スクリプト**を使います：
+```sh
+bash omega_vim_gui/cordova/build-apk.sh     # -> omega_vim_gui/dist/omega-vim-debug.apk
+```
+> ℹ️ APK のビルドには Android SDK（`dl.google.com` から取得）が必須です。SDK 取得が
+> ブロックされる環境ではビルドできないため、その場合は上記の GitHub Actions をご利用ください。
 
 ---
 

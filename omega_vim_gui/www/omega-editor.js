@@ -266,12 +266,40 @@
 
   // ---- file open / save --------------------------------------------------
   function doSave() {
-    var blob = new Blob([code.value], { type: "text/plain" });
-    var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+    // Desktop / modern browsers: trigger a real download.
+    var downloaded = false;
+    try {
+      var blob = new Blob([code.value], { type: "text/plain" });
+      var a = document.createElement("a");
+      if (typeof a.download !== "undefined") {
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        document.body.appendChild(a); a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+        downloaded = true;
+      }
+    } catch (e) { downloaded = false; }
+
+    // Android WebView (Cordova) often blocks blob downloads — fall back to the
+    // clipboard so the user can paste into their target app.
+    var inWebView = !!(window.cordova || window._cordovaNative ||
+      /; wv\)/.test(navigator.userAgent) || /Android/.test(navigator.userAgent));
+    if (!downloaded || inWebView) {
+      var copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code.value); copied = true;
+        } else {
+          code.focus(); code.select();
+          copied = document.execCommand && document.execCommand("copy");
+          setPos(pos());
+        }
+      } catch (e2) { copied = false; }
+      setStatus(copied ? "copied to clipboard (" + filename + ") — paste into your target app" :
+        (downloaded ? "saved (downloaded): " + filename :
+         "select-all is active — long-press to copy the text"));
+      return;
+    }
     setStatus("saved (downloaded): " + filename);
   }
 

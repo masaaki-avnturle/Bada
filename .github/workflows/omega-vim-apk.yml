@@ -1,0 +1,96 @@
+name: Ω-Vim Android APK
+
+# Dedicated, reproducible Android APK build for the Ω-Vim GUI (Bada-language
+# editor: grammar checker, parser completion, indent completion, spinning-top
+# code fix). Builds from www/ + cordova/config.xml with pinned versions:
+#   JDK 17 · cordova 12.0.0 · cordova-android 12.0.1 · platform 33 · build-tools 33.0.2
+#
+# The APK is downloadable from the Actions run (artifact "omega-vim-apk"), and
+# attached to a GitHub Release on an 'ovim-apk-v*' (or 'ovim-gui-v*') tag.
+#
+# Run it manually from the Actions tab (workflow_dispatch), or it runs on any
+# push that touches the GUI app.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/**'
+    paths:
+      - 'omega_vim_gui/www/**'
+      - 'omega_vim_gui/cordova/**'
+      - '.github/workflows/omega-vim-apk.yml'
+    tags:
+      - 'ovim-apk-v*'
+      - 'ovim-gui-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    env:
+      CORDOVA_VERSION: "12.0.0"
+      CORDOVA_ANDROID: "12.0.1"
+      ANDROID_PLATFORM: "android-33"
+      ANDROID_BUILDTOOLS: "33.0.2"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17 (required by cordova-android 12)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILDTOOLS}"
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-omega-vim-${{ runner.os }}-${{ hashFiles('omega_vim_gui/cordova/config.xml') }}
+          restore-keys: gradle-omega-vim-${{ runner.os }}-
+
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g "cordova@${CORDOVA_VERSION}"
+          cordova create cordova-build io.github.masaaki_avnturle.omega_vim OmegaVim
+          rm -rf cordova-build/www
+          cp -r omega_vim_gui/www cordova-build/www
+          cp omega_vim_gui/cordova/config.xml cordova-build/config.xml
+          cd cordova-build
+          cordova platform add "android@${CORDOVA_ANDROID}"
+          cordova build android --verbose
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega-vim-debug.apk
+          ls -la out
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-vim-apk
+          path: out/omega-vim-debug.apk
+
+      - name: Attach APK to Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/omega-vim-debug.apk

@@ -1,10 +1,10 @@
-name: Ω-Vim GUI (APK + Windows EXE + Linux)
+name: Ω-Vim GUI (Windows EXE + Linux)
 
 # Builds the Ω-Vim GUI (Bada-language editor: grammar checker, parser completion,
-# indent completion, spinning-top code fix) from www + electron + cordova into:
+# indent completion, spinning-top code fix) from www + electron into:
 #   - Windows 10/11  : NSIS installer .exe + portable .exe   (electron)
 #   - Linux/Ubuntu   : .AppImage + .deb                       (electron)
-#   - Android        : debug .apk                             (cordova)
+# The Android APK is built by its own workflow: omega-vim-apk.yml.
 # Artifacts are downloadable from the Actions run, and attached to a GitHub
 # Release on an 'ovim-gui-v*' tag. The editor engine is self-contained in www/.
 
@@ -73,47 +73,3 @@ jobs:
             omega_vim_gui/electron/dist/*.AppImage
             omega_vim_gui/electron/dist/*.deb
 
-  android-apk:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install Android SDK packages (+ accept licenses)
-        run: |
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
-      - name: Build debug APK (Cordova, pinned versions)
-        run: |
-          set -e
-          npm install -g cordova@12.0.0
-          APP="omega_vim_gui"
-          cordova create cordova-build io.github.masaaki_avnturle.omega_vim OmegaVim
-          rm -rf cordova-build/www
-          cp -r "$APP/www" cordova-build/www
-          cp "$APP/cordova/config.xml" cordova-build/config.xml
-          cd cordova-build
-          cordova platform add android@12.0.1
-          cordova build android --verbose
-      - name: Collect APK
-        run: |
-          mkdir -p out
-          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega-vim-debug.apk
-          ls -la out
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: omega-vim-android
-          path: out/*.apk
-      - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: out/*.apk
