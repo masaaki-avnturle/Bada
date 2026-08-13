@@ -31,6 +31,7 @@ end
 require "bada"
 require "bada/vim_interpreter"
 require "bada/code_fix"
+require "bada/grammar"
 
 PROGRAM = File.join(ROOT, "src", "omega_vim.bada")
 VERSION = "1.0.0"  # Ω-Vim application version
@@ -46,15 +47,19 @@ case cmd
 when nil, "help", "-h", "--help"
   puts <<~USAGE
     Ω-Vim #{VERSION} — Vim editor written in the Bada language
-      omega-vim FILE               edit FILE (modal vi/vim editor)
-      omega-vim fix FILE [-o OUT]   close the code orbit (integrable fix)
+      omega-vim FILE                edit FILE (modal vi/vim editor)
+      omega-vim fix FILE [-o OUT]    close the code orbit (integrable fix)
+      omega-vim check FILE          grammar checker (defects, unclosed blocks)
+      omega-vim complete FILE       parser completion (expected next tokens)
+      omega-vim reindent FILE [-o O] indent completion (re-indent from parse)
       omega-vim analyze FILE        orbit / winding / Ξ report (no changes)
       omega-vim run PROG.bada FILE  run a Bada editor program on FILE
       omega-vim demo [FILE]         headless scripted demo
       omega-vim version | help
 
-    In the editor:  hjkl move · i/a/o insert · x/dd delete · ESC normal
-                    =  or  :fix   correct source (any language) · :w :q :wq
+    In the editor:  hjkl move · i/a/o insert(auto-indent) · x/dd delete · ESC
+                    =/:fix correct+indent · :check grammar · :indent · Tab complete
+                    :w :q :wq
   USAGE
 
 when "version", "-v", "--version"
@@ -74,6 +79,40 @@ when "fix"
          "residual #{format('%.3e', res[:report][:rotation_residual])}"
   else
     puts "∮ orbit already closed — no structural errors in #{path}"
+  end
+
+when "check"
+  path = ARGV[1] or die("usage: omega-vim check FILE")
+  chk = Bada::Grammar.check(File.read(path), filename: path)
+  if chk[:ok]
+    puts "✓ grammar OK — #{path} [#{chk[:lang]}] (orbit closed, Ξ #{format('%.4f', chk[:certified_invariant])})"
+  else
+    puts "✗ #{chk[:diagnostics].length} issue(s) — #{path} [#{chk[:lang]}]:"
+    chk[:diagnostics].each { |d| puts "  #{d[:line]}:#{d[:col]} [#{d[:kind]}] #{d[:message]} — #{d[:suggestion]}" }
+    exit 1
+  end
+
+when "complete"
+  path = ARGV[1] or die("usage: omega-vim complete FILE")
+  res = Bada::Grammar.complete(File.read(path), filename: path)
+  if res[:candidates].empty?
+    puts "parser: nothing open — orbit closed (#{path})"
+  else
+    puts "parser expects (innermost first): #{res[:candidates].join('  ')}"
+    s = res[:suggestion]
+    puts "top suggestion: #{s[:type]} #{s[:text].inspect}" if s
+  end
+
+when "reindent"
+  path = ARGV[1] or die("usage: omega-vim reindent FILE [-o OUT]")
+  out = (i = ARGV.index("-o")) ? ARGV[i + 1] : path
+  before = File.read(path)
+  after = Bada::Grammar.reindent(before, filename: path)
+  if after != before
+    File.write(out, after)
+    puts "indent completion applied → #{out} [#{Bada::Grammar.for_filename(path)}]"
+  else
+    puts "indentation already normal (#{path})"
   end
 
 when "analyze"

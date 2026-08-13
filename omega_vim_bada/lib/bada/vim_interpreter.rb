@@ -3,6 +3,7 @@
 require "bada"
 require "bada/omega_vim"
 require "bada/code_fix"
+require "bada/grammar"
 
 module Bada
   # VimInterpreter — the Bada language, extended with an editor sublanguage so
@@ -39,7 +40,7 @@ module Bada
       @script = script
       @out = out
       @buffers = {}
-      @editor_config = { keymap: :vim, binds: [] }
+      @editor_config = { keymap: :vim, binds: [], grammar: true, indent: nil }
       @last_editor = nil
     end
 
@@ -72,6 +73,18 @@ module Bada
         txt = txt.value if txt.is_a?(BadaNode)
         @buffers[$1] = OmegaVim::Buffer.new(txt.to_s)
         @output << "buffer #{$1} = text (#{@buffers[$1].lines.length} lines)"
+      when /\Agrammar\s+(on|off)\z/
+        @editor_config[:grammar] = ($1 == "on")
+        @output << "grammar: #{$1}"
+      when /\Aindent\s+(\d+)\z/
+        @editor_config[:indent] = $1.to_i
+        @output << "indent width: #{$1}"
+      when /\Acheck\s+(\w+)\z/
+        do_check($1)
+      when /\Areindent\s+(\w+)\z/
+        do_reindent($1)
+      when /\Acomplete\s+(\w+)\z/
+        do_complete($1)
       when /\Afix\s+(\w+)\z/
         do_fix($1)
       when /\A(\w+)\s*-<\s*integrable_fix\z/
@@ -107,9 +120,46 @@ module Bada
       res
     end
 
+    def do_check(name)
+      buf = @buffers[name] or (@output << "no such buffer: #{name}"; return)
+      chk = Bada::Grammar.check(buf.text, filename: buf.filename)
+      if chk[:ok]
+        @output << "check #{name}: ✓ grammar OK [#{chk[:lang]}] — orbit closed"
+      else
+        @output << "check #{name}: ✗ #{chk[:diagnostics].length} issue(s) [#{chk[:lang]}]"
+        chk[:diagnostics].each { |d| @output << "  #{d[:line]}:#{d[:col]} [#{d[:kind]}] #{d[:message]}" }
+      end
+      chk
+    end
+
+    def do_reindent(name)
+      buf = @buffers[name] or (@output << "no such buffer: #{name}"; return)
+      before = buf.text
+      after = Bada::Grammar.reindent(before, filename: buf.filename)
+      if after != before
+        buf.replace_source!(after)
+        @output << "reindent #{name}: indent completion applied [#{Bada::Grammar.for_filename(buf.filename)}]"
+      else
+        @output << "reindent #{name}: indentation already normal"
+      end
+      after
+    end
+
+    def do_complete(name)
+      buf = @buffers[name] or (@output << "no such buffer: #{name}"; return)
+      res = Bada::Grammar.complete(buf.text, filename: buf.filename)
+      if res[:candidates].empty?
+        @output << "complete #{name}: parser has nothing open (orbit closed)"
+      else
+        @output << "complete #{name}: parser expects → #{res[:candidates].join(' ')}"
+      end
+      res
+    end
+
     def launch_editor(name)
       buf = @buffers[name] or (@output << "no such buffer: #{name}"; return)
-      ed = OmegaVim::Editor.new(buf, out: @out)
+      ed = OmegaVim::Editor.new(buf, out: @out, indent: @editor_config[:indent])
+      ed.grammar!(@editor_config[:grammar])
       # apply Bada-defined key bindings that map to editor actions
       apply_binds(ed)
       @last_editor = ed

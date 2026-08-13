@@ -6,12 +6,18 @@
 #  which loads this program in the Bada VimInterpreter, binds FILE to Ω::arg,
 #  and launches the modal editor.
 #
-#  Error correction feature (any programming language):
-#      the complex-rotation spinning-top (コマ) integrable system of special
-#      relativity.  Source delimiters are a walk on the rotational body
-#      □ = cos(i x log x) − i sin(i x log x) = e^{-i(x log x)} ; correct code is
-#      a CLOSED orbit ( ∮ e^{-□} d□ = πe ).  The fix closes an open orbit with
-#      the minimum rotation defect, conserving the entropy invariant Ξ.
+#  Features written into this program:
+#    * modal vi/vim editing            (keymap vim)
+#    * grammar checker                 (check main / editor ':check')
+#    * parser completion               (complete main / editor Tab)
+#    * indent completion               (reindent main / editor auto-indent, ':indent')
+#    * source error correction         (main -< integrable_fix / editor '=' ':fix')
+#
+#  The corrector is the complex-rotation spinning-top (コマ) integrable system of
+#  special relativity.  Source delimiters are a walk on the rotational body
+#  □ = cos(i x log x) − i sin(i x log x) = e^{-i(x log x)} ; correct code is a
+#  CLOSED orbit ( ∮ e^{-□} d□ = πe ).  The open-token stack of that orbit is
+#  also what drives the grammar check, the parser completion and the indent.
 # ============================================================================
 
 # --- title / status ---------------------------------------------------------
@@ -19,23 +25,37 @@ set title = "Omega-Vim"
 print title
 
 # --- load the classic vi/vim modal keymap -----------------------------------
-#   normal:  h j k l  0 ^ $  w b  gg G  x dd J  i a A I o O  : =
-#   insert:  <printable>  ESC  Enter  Backspace  arrows
-#   command: :w  :q  :q!  :wq  :fix  :help
+#   normal:  h j k l  0 ^ $  w b  gg G  x dd J  i a A I o O  Tab  : =
+#   insert:  <printable>  ESC  Enter(auto-indent)  Tab(parser-complete)  BS
+#   command: :w :q :q! :wq  :fix  :check  :indent  :complete  :set  :help
 keymap vim
 
+# --- enable the grammar/indent engine ---------------------------------------
+grammar on
+
 # --- bind the spinning-top integrable corrector -----------------------------
-#   normal-mode '='   and   command-mode ':fix'   both close the code orbit.
+#   normal-mode '='   and   command-mode ':fix'   close the code orbit AND
+#   run the indent completion pass.
 bind normal  "=" -> integrable_fix
 bind command "fix" -> integrable_fix
 
 # --- open the buffer from the launch argument (Ω::arg) -----------------------
 buffer main = open Omega::arg
 
-# --- pre-flight: run one integrable pass so a freshly opened file is left on a
-#     closed orbit.  The `-<` manifold-integral operator IS the closed-orbit
-#     average of the complex rotational body — i.e. the code fix.
+# --- grammar check: report any parser defects (unclosed blocks, delimiters) --
+check main
+
+# --- parser completion: what tokens does the parser still expect? ------------
+complete main
+
+# --- pre-flight #1: close the delimiter rotation orbit (error correction).
+#     The `-<` manifold-integral operator IS the closed-orbit average of the
+#     complex rotational body — i.e. the code fix.
 main -< integrable_fix
+
+# --- pre-flight #2: indent completion — normalise indentation from the parse
+#     depth so a freshly opened file is both closed AND well-indented.
+reindent main
 
 # --- record the buffer's entropy invariant Ξ to the Akashic TupleSpace -------
 Omega::push main as opened_buffer

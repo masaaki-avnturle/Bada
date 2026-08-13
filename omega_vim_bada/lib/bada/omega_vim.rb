@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "bada/code_fix"
+require "bada/grammar"
 
 module Bada
   # OmegaVim — a modal (vi/vim-style) text editor that is part of the Bada
@@ -147,20 +148,32 @@ module Bada
     class Editor
       MODES = %i[normal insert command].freeze
 
-      attr_reader :buffer, :mode, :message
+      attr_reader :buffer, :mode, :message, :lang
 
-      def initialize(buffer, out: $stdout, rows: nil, cols: nil)
+      def initialize(buffer, out: $stdout, rows: nil, cols: nil, lang: nil, indent: nil)
         @buffer = buffer
         @out = out
         @mode = :normal
-        @message = "Ω-Vim — Bada language editor.  :help  :fix  :wq"
+        @message = "Ω-Vim — Bada language editor.  :help  :fix  :check  :indent  Tab=complete"
         @command = ""
         @pending = ""          # multi-key normal command (e.g. 'gg', 'dd')
         @quit = false
         @rows = rows
         @cols = cols
         @last_fix = nil
+        @last_check = nil
+        # grammar / indent configuration
+        @lang = lang || Bada::Grammar.for_filename(buffer.filename)
+        @indent_width = indent || Bada::Grammar.indent_width(@lang)
+        @grammar_on = true
       end
+
+      # accessors for tests / .bada reporting
+      attr_reader :last_check, :indent_width
+      def grammar_on?; @grammar_on; end
+      def grammar!(on); @grammar_on = on; end
+      def indent_width=(n); @indent_width = n; end
+      def lang=(l); @lang = l; @indent_width = Bada::Grammar.indent_width(l); end
 
       # Run headlessly over a scripted key string (for tests / .bada demos).
       # Recognised escapes in the script: \e = ESC, \r or \n = Enter,
@@ -232,11 +245,12 @@ module Bada
         when "a"         then b.col += 1; enter_insert
         when "A"         then b.col = b.line.length; enter_insert
         when "I"         then b.col = (b.line[/\A\s*/] || "").length; enter_insert
-        when "o"         then b.open_below; enter_insert
-        when "O"         then b.open_above; enter_insert
+        when "o"         then open_below_indented; enter_insert
+        when "O"         then open_above_indented; enter_insert
+        when "\t", :tab  then reindent_current_line   # indent completion (line)
         when ":"         then @mode = :command; @command = ""
-        when "="         then integrable_fix   # <-- spinning-top code fix
-        when "\x06"    then integrable_fix   # Ctrl-F alias
+        when "="         then integrable_fix(reindent: true) # fix + indent
+        when "\x06"    then integrable_fix(reindent: true)  # Ctrl-F alias
         when :esc, "\e"  then @message = ""
         else
           # ignore unknown keys / partial combos
@@ -251,7 +265,8 @@ module Bada
           @mode = :normal
           b.col -= 1
           b.clamp!
-        when :enter, "\r", "\n" then b.newline
+        when :enter, "\r", "\n" then newline_indented
+        when "\t", :tab then parser_complete   # parser/indent completion
         when :backspace, "\b", "\x7f" then b.backspace
         when :left  then b.col -= 1; b.clamp!
         when :right then b.col += 1; b.clamp!
@@ -289,11 +304,17 @@ module Bada
         when "q"  then do_quit
         when "q!" then @quit = true
         when "wq", "x" then do_save && (@quit = true)
-        when "fix", "correct" then integrable_fix
-        when "fix!" then integrable_fix(save: true)
+        when "fix", "correct" then integrable_fix(reindent: true)
+        when "fix!" then integrable_fix(save: true, reindent: true)
+        when "check", "grammar" then grammar_check
+        when "indent", "reindent" then reindent_buffer
+        when "complete", "comp" then show_completion
+        when /\Aset\s+indent\s*=\s*(\d+)\z/ then @indent_width = $1.to_i; @message = "indent width = #{@indent_width}"
+        when /\Aset\s+ft\s*=\s*(\w+)\z/, /\Aset\s+filetype\s*=\s*(\w+)\z/
+          self.lang = $1.to_sym; @message = "filetype = #{@lang} (indent #{@indent_width})"
         when /\Aw\s+(.+)\z/ then do_save($1.strip)
         when /\Awq\s+(.+)\z/ then do_save($1.strip) && (@quit = true)
-        when "help" then @message = "hjkl move · i/a insert · x/dd delete · o/O open · = or :fix correct · :w :q :wq"
+        when "help" then @message = "hjkl move · i/a/o insert · x/dd delete · = fix+indent · :check grammar · :indent · Tab complete · :w :q :wq"
         when "" then @message = ""
         else @message = "not an editor command: #{cmd}"
         end
@@ -323,29 +344,157 @@ module Bada
       end
 
       # ---- THE spinning-top integrable-system code fix -----------------------
-      def integrable_fix(save: false)
+      def integrable_fix(save: false, reindent: false)
         res = Bada::CodeFix.fix(@buffer.text, filename: @buffer.filename)
         @last_fix = res
         if res[:changed]
           @buffer.replace_source!(res[:source])
           n = res[:applied].length
           consv = res[:invariant_conserved] ? "conserved" : "DRIFT"
+          tail = ""
+          if reindent && @grammar_on
+            did = reindent_buffer(quiet: true)
+            tail = did ? " · indent completed" : ""
+          end
           @message = "∮ orbit closed: #{n} fix(es) · Ξ #{consv} " \
                      "(#{format('%.4f', res[:certified_invariant])}) · " \
-                     "residual #{format('%.3e', res[:report][:rotation_residual])}"
+                     "residual #{format('%.3e', res[:report][:rotation_residual])}#{tail}"
           do_save if save
         else
           ok = res[:report][:orbit_closed]
-          @message = ok ? "∮ orbit already closed — no structural errors" :
-                          "no automatic fix found (winding=#{res[:report][:winding]})"
+          if ok && reindent && @grammar_on && reindent_buffer(quiet: true)
+            @message = "∮ orbit already closed — indent completed"
+          else
+            @message = ok ? "∮ orbit already closed — no structural errors" :
+                            "no automatic fix found (winding=#{res[:report][:winding]})"
+          end
         end
         res
       end
 
-      # last fix result (for tests / .bada reporting)
+      # ---- grammar checker ---------------------------------------------------
+      def grammar_check
+        chk = Bada::Grammar.check(@buffer.text, lang: @lang, filename: @buffer.filename)
+        @last_check = chk
+        if chk[:ok]
+          @message = "✓ grammar OK (#{@lang}) — orbit closed, Ξ #{format('%.4f', chk[:certified_invariant])}"
+        else
+          d = chk[:diagnostics].first
+          more = chk[:diagnostics].length - 1
+          @message = "✗ #{chk[:diagnostics].length} issue(s) [#{@lang}]  " \
+                     "#{d[:line]}:#{d[:col]} #{d[:message]}" + (more > 0 ? "  (+#{more} more)" : "")
+        end
+        chk
+      end
+
+      # ---- indent completion: whole buffer -----------------------------------
+      def reindent_buffer(quiet: false)
+        before = @buffer.text
+        after = Bada::Grammar.reindent(before, lang: @lang, width: @indent_width)
+        changed = after != before
+        if changed
+          row, col = @buffer.row, @buffer.col
+          @buffer.replace_source!(after)
+          @buffer.row = [row, @buffer.lines.length - 1].min
+          @buffer.col = col
+          @buffer.clamp!
+        end
+        @message = changed ? "indent completed (#{@lang}, width #{@indent_width})" :
+                             "indentation already normal (#{@lang})" unless quiet
+        changed
+      end
+
+      # ---- indent completion: current line -----------------------------------
+      def reindent_current_line
+        row = @buffer.row
+        after = Bada::Grammar.reindent(@buffer.text, lang: @lang, width: @indent_width)
+        newlines = after.split("\n", -1)
+        if newlines[row] && newlines[row] != @buffer.lines[row]
+          @buffer.lines[row] = newlines[row]
+          @buffer.col = (newlines[row][/\A\s*/] || "").length
+          @buffer.dirty = true
+          @message = "line indent completed"
+        else
+          @message = "line indent already normal"
+        end
+      end
+
+      # ---- auto-indent on new lines ------------------------------------------
+      def open_below_indented
+        ref = @buffer.row
+        @buffer.open_below
+        apply_indent_from(ref)
+      end
+
+      def open_above_indented
+        @buffer.open_above
+        # base O on the line now below (the original current line): match it
+        below = @buffer.lines[@buffer.row + 1] || ""
+        ind = @grammar_on ? (below[/\A[ \t]*/] || "") : ""
+        @buffer.lines[@buffer.row] = ind
+        @buffer.col = ind.length
+      end
+
+      def newline_indented
+        @buffer.newline
+        return unless @grammar_on
+        ref = @buffer.row - 1
+        ind = Bada::Grammar.indent_for_new_line(@buffer.lines, ref, lang: @lang, width: @indent_width)
+        tail = @buffer.line
+        @buffer.lines[@buffer.row] = ind + tail.lstrip
+        @buffer.col = ind.length
+      end
+
+      def apply_indent_from(ref_row)
+        return unless @grammar_on
+        ind = Bada::Grammar.indent_for_new_line(@buffer.lines, ref_row, lang: @lang, width: @indent_width)
+        @buffer.lines[@buffer.row] = ind
+        @buffer.col = ind.length
+      end
+
+      # ---- parser completion (Tab in insert mode) ----------------------------
+      def parser_complete
+        before = text_before_cursor
+        res = Bada::Grammar.complete(before, lang: @lang, width: @indent_width)
+        sug = res[:suggestion]
+        cand = res[:candidates]
+        if sug.nil?
+          @indent_width.times { @buffer.insert_char(" ") }
+          @message = "Tab: no parse expectation — inserted #{@indent_width}-space indent"
+        elsif sug[:type] == :bracket
+          @buffer.insert_char(sug[:text])
+          @message = "parser completion → #{cand.join(' ')}"
+        elsif sug[:type] == :indent
+          sug[:text].each_char { |c| @buffer.insert_char(c) }
+          @message = "indent completion (colon block)"
+        elsif sug[:type] == :keyword
+          @buffer.newline
+          ind = sug[:indent] || ""
+          @buffer.lines[@buffer.row] = ind + sug[:text]
+          @buffer.col = (ind + sug[:text]).length
+          @buffer.dirty = true
+          @message = "parser completion → inserted '#{sug[:text]}'"
+        end
+      end
+
+      def show_completion
+        before = text_before_cursor
+        res = Bada::Grammar.complete(before, lang: @lang, width: @indent_width)
+        @message = res[:candidates].empty? ? "parser: nothing open (orbit closed)" :
+                   "parser expects: #{res[:candidates].join(' ')}"
+        res
+      end
+
+      def text_before_cursor
+        b = @buffer
+        (b.lines[0...b.row] + [b.line[0...b.col]]).join("\n")
+      end
+
+      # results for tests / .bada reporting
       public
-      def last_fix
-        @last_fix
+      def last_fix; @last_fix; end
+      def complete_at_cursor
+        Bada::Grammar.complete(text_before_cursor, lang: @lang, width: @indent_width)
       end
       private
 

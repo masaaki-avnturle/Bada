@@ -9,6 +9,7 @@ Encoding.default_internal = Encoding::UTF_8
 require "tmpdir"
 require "bada"
 require "bada/code_fix"
+require "bada/grammar"
 require "bada/omega_vim"
 require "bada/vim_interpreter"
 
@@ -171,6 +172,118 @@ check("base Bada operators still work through VimInterpreter") do
   interp = VimInterpreter.new
   out = interp.run("set g = 2.5\nprint g\n")
   out.include?("2.5")
+end
+
+puts "== Bada::Grammar — checker / parser completion / indent =="
+
+check("grammar check flags an unclosed Ruby block (missing end)") do
+  chk = Grammar.check("def f\n  puts 1\n", lang: :ruby)
+  !chk[:ok] && chk[:diagnostics].any? { |d| d[:kind] == :unclosed_block }
+end
+
+check("grammar check passes clean code") do
+  Grammar.check("def f\n  puts 1\nend\n", lang: :ruby)[:ok]
+end
+
+check("parser completion returns expected closers innermost-first (Ruby)") do
+  c = Grammar.complete("def f(x)\n  if x > 0\n    g(a[1", lang: :ruby)[:candidates]
+  c == ["]", ")", "end", "end"]
+end
+
+check("parser completion suggests block terminator keyword") do
+  s = Grammar.complete("def f\n  x = 1\n", lang: :ruby)[:suggestion]
+  s && s[:type] == :keyword && s[:text] == "end"
+end
+
+check("strings/comments are masked — inner brackets not counted") do
+  c = Grammar.complete("a = \"(\" + foo(bar", lang: :ruby)[:candidates]
+  c == [")"]   # only the real foo( is open; the "(" in the string is ignored
+end
+
+check("reindent normalises C nesting") do
+  src = "int main(){\nprintf(1);\nif(x){\ny=1;\n}\n}\n"
+  out = Grammar.reindent(src, lang: :c, width: 4)
+  out == "int main(){\n    printf(1);\n    if(x){\n        y=1;\n    }\n}\n"
+end
+
+check("reindent handles Ruby keyword blocks incl. else/do") do
+  src = "def f\nif x\na\nelse\nb\nend\nend\n"
+  out = Grammar.reindent(src, lang: :ruby, width: 2)
+  out == "def f\n  if x\n    a\n  else\n    b\n  end\nend\n"
+end
+
+check("reindent leaves Python indentation semantic (trim only)") do
+  src = "def f():\n        return 1\n"   # weird indent, but semantic
+  out = Grammar.reindent(src, lang: :python)
+  out == "def f():\n        return 1\n"   # unchanged except trailing ws
+end
+
+check("indent_for_new_line adds a level after a block opener") do
+  Grammar.indent_for_new_line(["def f(x)", "  if x"], 1, lang: :ruby, width: 2) == "    "
+end
+
+check("indent_for_new_line keeps level when no block opens") do
+  Grammar.indent_for_new_line(["  x = 1"], 0, lang: :ruby, width: 2) == "  "
+end
+
+puts "== editor: grammar / completion / indent wiring =="
+
+check("auto-indent on 'o' after a Ruby block opener") do
+  b = OmegaVim::Buffer.new("def f(x)", filename: "t.rb")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script("oputs x\e")
+  b.lines == ["def f(x)", "  puts x"]
+end
+
+check("auto-indent chains through Enter in insert mode (C)") do
+  b = OmegaVim::Buffer.new("", filename: "t.c")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script("iif (x) {\rreturn 0;\e")
+  b.lines[0] == "if (x) {" && b.lines[1] == "    return 0;"
+end
+
+check("Tab parser-completes the expected closer (JS)") do
+  b = OmegaVim::Buffer.new("", filename: "t.js")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script("ifoo(bar[1\t\t")
+  b.line == "foo(bar[1])"
+end
+
+check(":check reports grammar issues in the message line") do
+  b = OmegaVim::Buffer.new("def f\n  puts 1\n", filename: "t.rb")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script(":check\r")
+  ed.last_check && !ed.last_check[:ok]
+end
+
+check(":indent reindents the whole buffer") do
+  b = OmegaVim::Buffer.new("int main(){\nprintf(1);\n}\n", filename: "t.c")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script(":indent\r")
+  b.lines[1] == "    printf(1);"
+end
+
+check("= performs fix AND indent completion together") do
+  b = OmegaVim::Buffer.new("int main(){\nprintf(1);\nreturn 0;\n", filename: "t.c")
+  ed = OmegaVim::Editor.new(b, rows: 20, cols: 60)
+  ed.run_script("=")
+  CodeFix.analyze(b.text)[:orbit_closed] && b.lines[1] == "    printf(1);"
+end
+
+puts "== Bada program: grammar statements =="
+
+check("omega_vim.bada 'check' + 'reindent' + 'complete' statements run") do
+  tmp = File.join(Dir.tmpdir, "ov_gram_#{Process.pid}.c")
+  File.write(tmp, "int main(){\nprintf(1);\nreturn 0;\n")
+  prog = File.join(File.expand_path("..", __dir__), "src", "omega_vim.bada")
+  interp = VimInterpreter.new(arg: tmp, headless: true, script: ":q\r")
+  out = interp.run(File.read(prog))
+  out.any? { |l| l.start_with?("check main:") } &&
+    out.any? { |l| l.start_with?("complete main:") } &&
+    out.any? { |l| l.start_with?("reindent main:") } &&
+    CodeFix.analyze(interp.buffer("main").text)[:orbit_closed]
+ensure
+  File.delete(tmp) if defined?(tmp) && tmp && File.exist?(tmp)
 end
 
 puts
