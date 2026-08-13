@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!--
+  Ω-Vim GUI — the Bada-language Vim editor as a graphical app.
+  Masaaki Yamaguchi / Bada — omega_vim_gui  (Android APK / Windows EXE / Linux)
+
+  A modal editor with a grammar checker, parser completion and indent completion.
+  The source-error corrector is the complex-rotation spinning-top (koma)
+  integrable system of special relativity: delimiter nesting is a rotation orbit,
+  correct code is a CLOSED orbit ( ∮ e^{-□} d□ = πe ), and the same open-token
+  stack drives the fix, the check, the completion and the indentation.
+  Fully self-contained — the whole engine runs in this page (no server, no Ruby).
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>Ω-Vim</title>
+<style>
+  :root{
+    --bg:#04060a;--panel:#0a0e16;--panel2:#070b12;--line:#1b2638;--gold:#c8a44a;
+    --cyan:#40b8c0;--violet:#9060d0;--green:#5fbf7f;--red:#e06060;--txt:#e6ecf5;
+    --dim:#8794a8;--mono:"SFMono-Regular",Consolas,Menlo,monospace
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);
+    color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;
+    line-height:1.45;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  header{padding:9px 12px 7px;border-bottom:1px solid var(--line);flex:0 0 auto}
+  h1{margin:0;font-size:16px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:11px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:11px;margin-top:2px;opacity:.9}
+  .toolbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 12px;
+    border-bottom:1px solid var(--line);flex:0 0 auto;background:var(--panel2)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);
+    border:1px solid var(--gold);border-radius:7px;padding:7px 11px;cursor:pointer;
+    font-weight:700;font-size:12.5px;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+  button:active{transform:translateY(1px)}
+  button.sec{color:var(--cyan);border-color:#2b6a70}
+  button.gho{color:var(--dim);border-color:var(--line);background:#0a0e16;font-weight:600}
+  button.on{background:linear-gradient(180deg,#2a3f22,#16260e);color:var(--green);border-color:#3a7a3a}
+  select{background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:7px;padding:7px}
+  .spacer{flex:1}
+  .badge{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .editor{flex:1 1 auto;display:flex;min-height:0;position:relative;background:var(--panel)}
+  .gutter{flex:0 0 auto;padding:10px 6px 10px 10px;text-align:right;color:#3f4d63;
+    font-family:var(--mono);font-size:13px;line-height:1.5;user-select:none;overflow:hidden;
+    background:var(--panel2);border-right:1px solid var(--line);white-space:pre}
+  #code{flex:1;border:0;outline:0;resize:none;background:transparent;color:var(--txt);
+    font-family:var(--mono);font-size:13px;line-height:1.5;padding:10px 12px;white-space:pre;
+    overflow:auto;tab-size:4;-moz-tab-size:4;caret-color:var(--gold)}
+  .modewrap{position:absolute;top:8px;right:12px;pointer-events:none}
+  .mode{font-family:var(--mono);font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;
+    border:1px solid;letter-spacing:.5px}
+  .mode.normal{color:var(--gold);border-color:var(--gold);background:#1a1304aa}
+  .mode.insert{color:var(--green);border-color:#3a7a3a;background:#12220caa}
+  .mode.command{color:var(--cyan);border-color:#2b6a70;background:#08191baa}
+  .mode.off{display:none}
+  .status{flex:0 0 auto;font-family:var(--mono);font-size:12px;padding:7px 12px;
+    border-top:1px solid var(--line);background:var(--panel2);color:var(--txt);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .status .ok{color:var(--green)}.status .bad{color:var(--red)}.status .k{color:var(--cyan)}
+  .cmdline{flex:0 0 auto;font-family:var(--mono);font-size:13px;padding:6px 12px;
+    border-top:1px solid var(--line);background:#06090f;color:var(--gold);display:none}
+  .cmdline.show{display:block}
+  .diag{flex:0 0 auto;max-height:26vh;overflow:auto;border-top:1px solid var(--line);
+    background:#06090f;display:none}
+  .diag.show{display:block}
+  .diag h4{margin:0;padding:7px 12px;font-size:12px;color:var(--gold);
+    border-bottom:1px solid var(--line);position:sticky;top:0;background:#06090f}
+  .diag ul{margin:0;padding:4px 0;list-style:none}
+  .diag li{padding:5px 12px;font-family:var(--mono);font-size:12px;cursor:pointer;border-bottom:1px solid #0f1622}
+  .diag li:hover{background:#0e1626}
+  .diag li .loc{color:var(--cyan)}.diag li .kind{color:var(--violet)}
+  .disc{font-size:11px;color:#e0b020;padding:5px 12px;background:#160f02;border-top:1px solid #3a2a08;flex:0 0 auto}
+  input[type=file]{display:none}
+  @media (max-width:560px){
+    .eq{display:none}.sub{display:none}button{padding:8px 9px;font-size:12px}
+    .toolbar{gap:5px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Vim — Bada language editor</h1>
+  <div class="sub">modal editor · grammar checker · parser completion · indent completion · spinning-top code fix</div>
+  <div class="eq">□ = e<sup>−i(x log x)</sup> &nbsp; ∮ e<sup>−□</sup> d□ = πe &nbsp;·&nbsp; correct code = closed orbit · |ψ|²=a</div>
+</header>
+
+<div class="toolbar">
+  <button id="btnFix" title="Fix + indent (close the rotation orbit)">∮ Fix</button>
+  <button id="btnCheck" class="sec" title="Grammar checker">Check</button>
+  <button id="btnComplete" class="sec" title="Parser completion at cursor (Tab)">▸ Complete</button>
+  <button id="btnIndent" class="sec" title="Indent completion (reindent buffer)">⇥ Indent</button>
+  <span class="spacer"></span>
+  <select id="lang" title="Language">
+    <option value="auto">auto</option>
+    <option value="c">C</option><option value="js">JavaScript</option>
+    <option value="python">Python</option><option value="ruby">Ruby</option>
+    <option value="shell">Shell</option><option value="lisp">Lisp</option>
+    <option value="json">JSON</option><option value="text">text</option>
+  </select>
+  <button id="btnVim" class="gho" title="Toggle vim modal keys">vim: off</button>
+  <button id="btnOpen" class="gho">Open</button>
+  <button id="btnSave" class="gho">Save</button>
+  <button id="btnSample" class="gho">Sample</button>
+  <input type="file" id="file"/>
+</div>
+
+<div class="editor">
+  <div class="gutter" id="gutter">1</div>
+  <textarea id="code" spellcheck="false" autocapitalize="off" autocorrect="off" wrap="off"
+    placeholder="// Ω-Vim — type or Open a file.  ∮ Fix closes the code orbit; Tab completes; Enter auto-indents."></textarea>
+  <div class="modewrap"><span class="mode off" id="modeBadge">NORMAL</span></div>
+</div>
+
+<div class="cmdline" id="cmdline">:</div>
+<div class="status" id="status">Ω-Vim ready — self-contained (engine runs in this page).</div>
+<div class="diag" id="diag"><h4>Grammar diagnostics</h4><ul id="diagList"></ul></div>
+<div class="disc">⚠ 研究・概念実装 (proof-of-concept). 括弧・引用符・コメント・空白・ブロック構造を普遍原理で扱います。</div>
+
+<script src="omega-engine.js"></script>
+<script src="omega-editor.js"></script>
+</body>
+</html>
