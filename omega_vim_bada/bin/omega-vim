@@ -1,0 +1,123 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# omega-vim — launcher for the Bada-language Vim editor (Ω-Vim).
+#
+#   omega-vim FILE               open FILE in the modal editor (runs omega_vim.bada)
+#   omega-vim fix FILE [-o OUT]  run the spinning-top integrable code fix, no UI
+#   omega-vim analyze FILE       report orbit/winding/Ξ without changing FILE
+#   omega-vim run PROG.bada FILE run an arbitrary Bada editor program on FILE
+#   omega-vim demo [FILE]        headless scripted demo (used by tests)
+#   omega-vim version | help
+#
+# The editor is *written in the Bada language* (src/omega_vim.bada); this
+# launcher just wires the Bada VimInterpreter to the terminal.
+
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+
+HERE = File.expand_path(__dir__)
+ROOT = File.expand_path("..", HERE)
+$LOAD_PATH.unshift(File.join(ROOT, "lib"))
+# find the sibling bada_ruby library (the Bada language host)
+[File.join(ROOT, "..", "bada_ruby", "lib"),
+ File.join(ROOT, "vendor", "bada_ruby", "lib"),
+ "/usr/local/share/omega-vim/bada_ruby/lib",
+ "/usr/share/omega-vim/bada_ruby/lib"].each do |p|
+  $LOAD_PATH.unshift(File.expand_path(p)) if File.directory?(File.expand_path(p))
+end
+
+require "bada"
+require "bada/vim_interpreter"
+require "bada/code_fix"
+
+PROGRAM = File.join(ROOT, "src", "omega_vim.bada")
+VERSION = "1.0.0"  # Ω-Vim application version
+
+def die(msg)
+  warn msg
+  exit 1
+end
+
+cmd = ARGV.first
+
+case cmd
+when nil, "help", "-h", "--help"
+  puts <<~USAGE
+    Ω-Vim #{VERSION} — Vim editor written in the Bada language
+      omega-vim FILE               edit FILE (modal vi/vim editor)
+      omega-vim fix FILE [-o OUT]   close the code orbit (integrable fix)
+      omega-vim analyze FILE        orbit / winding / Ξ report (no changes)
+      omega-vim run PROG.bada FILE  run a Bada editor program on FILE
+      omega-vim demo [FILE]         headless scripted demo
+      omega-vim version | help
+
+    In the editor:  hjkl move · i/a/o insert · x/dd delete · ESC normal
+                    =  or  :fix   correct source (any language) · :w :q :wq
+  USAGE
+
+when "version", "-v", "--version"
+  puts "omega-vim #{VERSION}"
+
+when "fix"
+  path = ARGV[1] or die("usage: omega-vim fix FILE [-o OUT]")
+  out = (i = ARGV.index("-o")) ? ARGV[i + 1] : path
+  src = File.read(path)
+  res = Bada::CodeFix.fix(src, filename: path)
+  if res[:changed]
+    File.write(out, res[:source])
+    puts "∮ orbit closed — #{res[:applied].length} fix(es) written to #{out}:"
+    res[:applied].each { |a| puts "  * #{a}" }
+    puts "Ξ #{res[:invariant_conserved] ? 'conserved' : 'DRIFT'} " \
+         "(#{format('%.4f', res[:certified_invariant])}), " \
+         "residual #{format('%.3e', res[:report][:rotation_residual])}"
+  else
+    puts "∮ orbit already closed — no structural errors in #{path}"
+  end
+
+when "analyze"
+  path = ARGV[1] or die("usage: omega-vim analyze FILE")
+  rep = Bada::CodeFix.analyze(File.read(path), filename: path)
+  puts "Ω-Vim analyze — #{path}"
+  puts "  lines            : #{rep[:lines]}"
+  puts "  winding (depth)  : #{rep[:winding]}   (0 = closed orbit)"
+  puts "  max nesting      : #{rep[:max_depth]}"
+  puts "  orbit closed     : #{rep[:orbit_closed]}"
+  puts "  Ξ (certified)    : #{format('%.6f', rep[:certified_invariant])} " \
+       "(#{rep[:invariant_conserved] ? 'conserved' : 'drift'})"
+  unless rep[:defects].empty?
+    puts "  defects:"
+    rep[:defects].each { |d| puts "    #{d.line}:#{d.col} [#{d.kind}] #{d.message} — #{d.suggestion}" }
+  end
+
+when "run"
+  prog = ARGV[1] or die("usage: omega-vim run PROG.bada FILE")
+  file = ARGV[2]
+  interp = Bada::VimInterpreter.new(arg: file)
+  interp.run(File.read(prog)).each { |l| puts l }
+
+when "demo"
+  require "tmpdir"
+  orig = ARGV[1] || File.join(ROOT, "examples", "buggy.py")
+  # copy to a temp file so the demo never mutates the example source
+  file = File.join(Dir.tmpdir, "omega_vim_demo_#{File.basename(orig)}")
+  File.write(file, File.read(orig))
+  script = ENV["OMEGA_VIM_SCRIPT"] || "=:wq\r"
+  interp = Bada::VimInterpreter.new(arg: file, headless: true, script: script)
+  interp.run(File.read(PROGRAM)).each { |l| puts l }
+  puts "(demo worked on a temp copy: #{file}; original #{orig} untouched)"
+
+else
+  # default: treat the argument as a file to edit, via the Bada program
+  file = cmd
+  if !File.exist?(file) && file.start_with?("-")
+    die("unknown option: #{file} (try: omega-vim help)")
+  end
+  interp = Bada::VimInterpreter.new(arg: file, headless: false)
+  begin
+    interp.run(File.read(PROGRAM))
+  rescue Interrupt
+    puts "\nΩ-Vim interrupted."
+  end
+end
