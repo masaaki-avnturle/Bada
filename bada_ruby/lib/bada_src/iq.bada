@@ -150,6 +150,55 @@ def whisper_confidence(maxp, xi)
   return c
 end
 
+# ── [5] エキスパート分野判定 — 個体識別能力から ───────────────────────────────
+# dot product of two equal-length arrays.
+def dot(w, f)
+  set i = 0
+  set n = len(w)
+  set acc = 0
+  while i < n
+    set acc = acc + w[i] * f[i]
+    set i = i + 1
+  end
+  return acc
+end
+
+# 個体識別能力 (individual-identification / perceptual-individuation ability):
+# the fusiform/temporal perceptual-expertise trait — neural conduction speed +
+# functional integration + visual-cortex structure.
+def individuation_ability(fmri, mri, topo)
+  return 0.50 * topo + 0.35 * fmri + 0.15 * mri
+end
+
+# temperature-scaled softmax over a score array (max-shifted for stability).
+def softmax(scores, tau)
+  set n = len(scores)
+  set mx = scores[0]
+  set i = 1
+  while i < n
+    if scores[i] > mx
+      set mx = scores[i]
+    end
+    set i = i + 1
+  end
+  set i = 0
+  set total = 0
+  set ex = []
+  while i < n
+    set e = exp((scores[i] - mx) / tau)
+    set ex = push(ex, e)
+    set total = total + e
+    set i = i + 1
+  end
+  set i = 0
+  set out = []
+  while i < n
+    set out = push(out, ex[i] / total)
+    set i = i + 1
+  end
+  return out
+end
+
 # manifold invariant Ξ from a token measure summary (H, M, N) — the gamma gauge.
 def manifold_invariant(h, m, n)
   return zeta_gauge(h + 1, m + 1, n + 1)

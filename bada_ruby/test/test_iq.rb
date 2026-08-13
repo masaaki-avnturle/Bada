@@ -3,6 +3,48 @@
 require "minitest/autorun"
 require_relative "../lib/bada"
 
+class TestIQExpertise < Minitest::Test
+  def test_individuation_rises_with_topography
+    lo = Bada::IQ.vm.call("individuation_ability", [1.0, 1.0, 0.0])
+    hi = Bada::IQ.vm.call("individuation_ability", [1.0, 1.0, 2.0])
+    assert_operator hi, :>, lo
+  end
+
+  def test_distribution_is_a_probability_vector
+    a = Bada::IQ.assess(fmri: 1.4, mri: 1.1, topography: 1.6, dna: 0.8, blood: 0.5)
+    assert a.expertise
+    total = a.expertise[:distribution].sum { |d| d[:p] }
+    assert_in_delta 1.0, total, 1e-9
+    assert_equal Bada::IQ::EXPERT_DOMAINS.length, a.expertise[:distribution].length
+  end
+
+  def test_high_g_fmri_profile_is_analytic_domain
+    # high general intelligence + functional integration, low perceptual spread
+    a = Bada::IQ.assess(fmri: 2.6, mri: 0.1, topography: 0.2, dna: 0.2, blood: 0.0)
+    assert_includes ["数学・理論物理", "言語・通訳"], a.expertise[:top_ja]
+  end
+
+  def test_perceptual_profile_is_perceptual_domain
+    # high individuation (topography + structure), modest g
+    a = Bada::IQ.assess(fmri: 0.6, mri: 1.6, topography: 1.8, dna: 0.2, blood: 0.1)
+    perceptual = ["法医・顔認証・鑑識", "放射線科医・画像診断", "美術・デザイン", "音楽・演奏"]
+    assert_includes perceptual, a.expertise[:top_ja]
+  end
+
+  def test_thermal_mode_has_no_expertise_section
+    # direct thermal mode has 3 thermal channels, not the 5 biosignal modalities
+    a = Bada::IQ.assess_thermal(36.4, 23.0)
+    assert_nil a.expertise
+  end
+
+  def test_report_shows_expertise_section
+    r = Bada::IQ.assess(fmri: 1.4, mri: 1.1, topography: 1.6, dna: 0.8, blood: 0.5).report
+    assert_includes r, "エキスパート分野判定"
+    assert_includes r, "個体識別能力"
+    assert_includes r, "推定エキスパート分野"
+  end
+end
+
 class TestSpecialGaussian < Minitest::Test
   def test_erf_known_values
     assert_in_delta 0.0, Bada::Special.erf(0.0), 1e-6

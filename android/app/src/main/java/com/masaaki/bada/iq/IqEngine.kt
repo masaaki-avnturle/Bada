@@ -301,6 +301,70 @@ object IqEngine {
     private fun signature(obs: List<Observation>): String =
         obs.joinToString(" ") { fmt("%s:%.2f", it.modality, it.z) }
 
+    // ── [5] エキスパート分野判定 (whispered expert-domain classifier) ──────────
+    data class ExpertDomain(val ja: String, val en: String, val w: List<Double>)
+
+    // weight vectors over the feature order [g, ii, fmri, mri, topo, dna, blood].
+    val EXPERT_DOMAINS: List<ExpertDomain> = listOf(
+        ExpertDomain("放射線科医・画像診断", "Radiology / imaging", listOf(0.6, 1.2, 0.5, 0.3, 0.4, 0.0, 0.0)),
+        ExpertDomain("法医・顔認証・鑑識", "Forensics / face-ID", listOf(0.3, 1.5, 0.4, 0.6, 0.2, 0.0, 0.0)),
+        ExpertDomain("生物分類学・博物学", "Taxonomy / naturalist", listOf(0.4, 1.1, 0.2, 0.3, 0.3, 0.6, 0.2)),
+        ExpertDomain("数学・理論物理", "Mathematics / theory", listOf(1.4, 0.2, 0.9, 0.2, 0.3, 0.1, 0.0)),
+        ExpertDomain("音楽・演奏", "Music / performance", listOf(0.4, 0.5, 0.6, 0.2, 1.1, 0.1, 0.3)),
+        ExpertDomain("スポーツ・運動", "Athletics / motor", listOf(0.2, 0.3, 0.3, 0.2, 0.9, 0.2, 1.2)),
+        ExpertDomain("言語・通訳", "Linguistics / interpreting", listOf(1.0, 0.4, 0.8, 0.2, 0.7, 0.1, 0.1)),
+        ExpertDomain("美術・デザイン", "Visual art / design", listOf(0.5, 0.9, 0.6, 0.9, 0.4, 0.0, 0.2))
+    )
+
+    private val EXPERT_FEATURES = listOf("fmri", "mri", "topography", "dna", "blood")
+
+    data class DomainProb(val ja: String, val en: String, val p: Double)
+    data class Expertise(
+        val individuation: Double, val topJa: String, val topEn: String,
+        val probability: Double, val confidence: Double, val phrase: String,
+        val distribution: List<DomainProb>
+    )
+
+    // From the subject's 個体識別能力 + biosignal profile, whisper the most likely
+    // expert field. Available only when all five biosignal modalities are present.
+    fun expertise(zmap: Map<String, Double>, iq: Double, xi: Double): Expertise {
+        val v = requireVm()
+        val g = (iq - POP_MEAN) / POP_SD
+        val ii = v.callNum(
+            "individuation_ability",
+            listOf(zmap.getValue("fmri"), zmap.getValue("mri"), zmap.getValue("topography"))
+        )
+        val f: List<Any?> = listOf(
+            g, ii, zmap.getValue("fmri"), zmap.getValue("mri"),
+            zmap.getValue("topography"), zmap.getValue("dna"), zmap.getValue("blood")
+        )
+        val scores: List<Any?> = EXPERT_DOMAINS.map { v.callNum("dot", listOf(it.w, f)) }
+        @Suppress("UNCHECKED_CAST")
+        val probs = (v.call("softmax", listOf(scores, 0.6)) as List<*>).map { (it as Double) }
+        var topI = 0
+        for (i in probs.indices) if (probs[i] > probs[topI]) topI = i
+        val top = EXPERT_DOMAINS[topI]
+        val maxP = probs[topI]
+        val conf = v.callNum("whisper_confidence", listOf(maxP, xi))
+        return Expertise(
+            individuation = ii, topJa = top.ja, topEn = top.en,
+            probability = maxP, confidence = conf, phrase = expertPhrase(top, conf),
+            distribution = EXPERT_DOMAINS.indices.map {
+                DomainProb(EXPERT_DOMAINS[it].ja, EXPERT_DOMAINS[it].en, probs[it])
+            }
+        )
+    }
+
+    private fun expertPhrase(domain: ExpertDomain, confidence: Double): String {
+        val strength = when {
+            confidence >= 0.60 -> "— のエキスパートである、とほぼ確信を込めて囁く"
+            confidence >= 0.40 -> "— のエキスパートである、と囁く"
+            confidence >= 0.25 -> "— の適性がある、とかすかに囁く"
+            else -> "— の傾向がある、と判定を保留しながら囁く"
+        }
+        return "囁き判定器：この対象者は「${domain.ja}（${domain.en}）」$strength"
+    }
+
     // ── Assessment facade ────────────────────────────────────────────────────
 
     // Optional thermal (infrared + thermometer) context rendered in the report.
@@ -319,7 +383,8 @@ object IqEngine {
         val bands: List<BandProb>,
         val xi: Double,
         val verdict: Verdict,
-        val meta: Thermal? = null
+        val meta: Thermal? = null,
+        val expertise: Expertise? = null
     ) {
         val iq: Double get() = posterior.mean
     }
@@ -330,6 +395,10 @@ object IqEngine {
     ): Assessment {
         require(obs.isNotEmpty()) { "観測がありません (no observations)" }
         val posterior = bayes(obs)
+        val zmap = obs.associate { it.modality to it.z }
+        val exp = if (EXPERT_FEATURES.all { zmap.containsKey(it) }) {
+            expertise(zmap, posterior.mean, xi)
+        } else null
         return Assessment(
             id = id,
             obs = obs,
@@ -338,7 +407,8 @@ object IqEngine {
             bands = bandProbabilities(posterior.mean, posterior.sd),
             xi = xi,
             verdict = whispered(posterior.mean, posterior.sd, xi),
-            meta = meta
+            meta = meta,
+            expertise = exp
         )
     }
 
@@ -516,11 +586,28 @@ object IqEngine {
         }
         sb.appendLine()
         sb.appendLine("  ${a.verdict.phrase}")
+
+        val e = a.expertise
+        if (e != null) {
+            sb.appendLine()
+            sb.appendLine("【5】ウィスパード エキスパート分野判定 — 個体識別能力から")
+            sb.appendLine(fmt("  個体識別能力 II  : %+.2f", e.individuation))
+            sb.appendLine(fmt("  確信度           : %.1f%%", 100.0 * e.confidence))
+            sb.appendLine("  分野分布:")
+            for (d in e.distribution.sortedByDescending { it.p }) {
+                val bar = "█".repeat((d.p * 24).toInt())
+                sb.appendLine(fmt("   %-24s %5.1f%% %s", "${d.ja}(${d.en})", 100.0 * d.p, bar))
+            }
+            sb.appendLine()
+            sb.appendLine("  ${e.phrase}")
+        }
+
         sb.appendLine()
         sb.appendLine("───────────────────────────────────────────────")
         sb.appendLine(
             fmt(" 総合判定 IQ ≈ %.0f  [ %s / %s ]", a.iq, a.verdict.bandJa, a.verdict.bandEn)
         )
+        if (e != null) sb.appendLine(fmt(" 推定エキスパート分野: %s / %s", e.topJa, e.topEn))
         sb.appendLine(" ※ 教育的モデルであり医療診断ではありません")
         sb.appendLine("    (not a medical diagnosis)")
         sb.append("───────────────────────────────────────────────")

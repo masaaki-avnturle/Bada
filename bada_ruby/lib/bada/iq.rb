@@ -256,12 +256,78 @@ module Bada
       vm.call("manifold_invariant", [h, m, tokens.length.to_f])
     end
 
+    # ── [5] エキスパート分野判定 (whispered expert-domain classifier) ─────────
+    #
+    # From the observed subject's 個体識別能力 (individual-identification /
+    # perceptual-individuation ability) and the biosignal profile, whisper which
+    # field the person is most likely an expert in. Each domain has a weight
+    # vector over the feature order  [g, ii, fmri, mri, topo, dna, blood]:
+    #   g   = (IQ − 100)/15         general intelligence
+    #   ii  = individuation ability (fusiform/temporal perceptual expertise)
+    # (Framework calibration constants — an educational model, not a real
+    #  aptitude test.)
+    EXPERT_DOMAINS = [
+      { ja: "放射線科医・画像診断", en: "Radiology / imaging",
+        w: [0.6, 1.2, 0.5, 0.3, 0.4, 0.0, 0.0] },
+      { ja: "法医・顔認証・鑑識",   en: "Forensics / face-ID",
+        w: [0.3, 1.5, 0.4, 0.6, 0.2, 0.0, 0.0] },
+      { ja: "生物分類学・博物学",   en: "Taxonomy / naturalist",
+        w: [0.4, 1.1, 0.2, 0.3, 0.3, 0.6, 0.2] },
+      { ja: "数学・理論物理",       en: "Mathematics / theory",
+        w: [1.4, 0.2, 0.9, 0.2, 0.3, 0.1, 0.0] },
+      { ja: "音楽・演奏",           en: "Music / performance",
+        w: [0.4, 0.5, 0.6, 0.2, 1.1, 0.1, 0.3] },
+      { ja: "スポーツ・運動",       en: "Athletics / motor",
+        w: [0.2, 0.3, 0.3, 0.2, 0.9, 0.2, 1.2] },
+      { ja: "言語・通訳",           en: "Linguistics / interpreting",
+        w: [1.0, 0.4, 0.8, 0.2, 0.7, 0.1, 0.1] },
+      { ja: "美術・デザイン",       en: "Visual art / design",
+        w: [0.5, 0.9, 0.6, 0.9, 0.4, 0.0, 0.2] }
+    ].freeze
+
+    EXPERT_FEATURES = %i[fmri mri topography dna blood].freeze
+
+    # zmap: { fmri:, mri:, topography:, dna:, blood: } of z-scores; iq: posterior
+    # mean; xi: the TupleSpace invariant that gates the whisper.
+    def expertise(zmap, iq, xi)
+      g = (iq - POP_MEAN) / POP_SD
+      ii = vm.call("individuation_ability", [zmap[:fmri], zmap[:mri], zmap[:topography]])
+      f = [g, ii, zmap[:fmri], zmap[:mri], zmap[:topography], zmap[:dna], zmap[:blood]]
+      scores = EXPERT_DOMAINS.map { |d| vm.call("dot", [d[:w], f]) }
+      probs = vm.call("softmax", [scores, 0.6])
+      top_i = probs.each_index.max_by { |i| probs[i] }
+      top = EXPERT_DOMAINS[top_i]
+      max_p = probs[top_i]
+      conf = vm.call("whisper_confidence", [max_p, xi])
+      {
+        individuation: ii,
+        top_ja: top[:ja],
+        top_en: top[:en],
+        probability: max_p,
+        confidence: conf,
+        distribution: EXPERT_DOMAINS.each_index.map do |i|
+          { ja: EXPERT_DOMAINS[i][:ja], en: EXPERT_DOMAINS[i][:en], p: probs[i] }
+        end,
+        phrase: expert_phrase(top, conf)
+      }
+    end
+
+    def expert_phrase(domain, confidence)
+      strength =
+        if    confidence >= 0.60 then "— のエキスパートである、とほぼ確信を込めて囁く"
+        elsif confidence >= 0.40 then "— のエキスパートである、と囁く"
+        elsif confidence >= 0.25 then "— の適性がある、とかすかに囁く"
+        else                          "— の傾向がある、と判定を保留しながら囁く"
+        end
+      "囁き判定器：この対象者は「#{domain[:ja]}（#{domain[:en]}）」#{strength}"
+    end
+
     # ── Assessment facade ───────────────────────────────────────────────────
     #
     # Runs the full pipeline for a subject and renders a report, in the style of
     # Bada::Thurston / Bada::InfoEngine.
     class Assessment
-      attr_reader :id, :obs, :mirror, :posterior, :bands, :verdict, :xi, :meta
+      attr_reader :id, :obs, :mirror, :posterior, :bands, :verdict, :xi, :meta, :expertise
 
       # Build an assessment from a subject hash of standardized biosignal
       # readings { id:, fmri:, mri:, topography:, dna:, blood: }.
@@ -285,6 +351,12 @@ module Bada
         @posterior = IQ.bayes(@obs)
         @bands     = IQ.band_probabilities(@posterior[:posterior_mean], @posterior[:posterior_sd])
         @verdict   = IQ.whispered(@posterior[:posterior_mean], @posterior[:posterior_sd], xi_gate: @xi)
+        # Expert-domain judgement is available whenever the full biosignal profile
+        # (the five modalities) is present — i.e. biosignal or tablet-derived mode.
+        zmap = @obs.each_with_object({}) { |o, h| h[o[:modality]] = o[:z] }
+        @expertise = if EXPERT_FEATURES.all? { |k| zmap.key?(k) }
+                       IQ.expertise(zmap, iq, @xi)
+                     end
       end
 
       # The headline IQ point estimate (Bayesian posterior mean).
@@ -378,10 +450,26 @@ module Bada
         lines << ""
         lines << "   #{@verdict[:phrase]}"
 
+        if @expertise
+          e = @expertise
+          lines << ""
+          lines << "【5】ウィスパード エキスパート分野判定 — 個体識別能力から"
+          lines << format("   個体識別能力 II  : %+.2f  (神経速度+機能統合+視覚構造)", e[:individuation])
+          lines << format("   確信度(confidence): %.1f%%", 100.0 * e[:confidence])
+          lines << "   分野分布:"
+          e[:distribution].sort_by { |d| -d[:p] }.each do |d|
+            bar = "█" * (d[:p] * 40).round
+            lines << format("     %-26s %5.1f%% %s", "#{d[:ja]}(#{d[:en]})", 100.0 * d[:p], bar)
+          end
+          lines << ""
+          lines << "   #{e[:phrase]}"
+        end
+
         lines << ""
         lines << "───────────────────────────────────────────────────────────────"
         lines << format(" 総合判定 IQ ≈ %.0f  [ %s / %s ]",
                         iq, @verdict[:band_ja], @verdict[:band_en])
+        lines << format(" 推定エキスパート分野: %s / %s", @expertise[:top_ja], @expertise[:top_en]) if @expertise
         lines << " ※ 本レポートは山口フレームワークの教育的モデルであり、"
         lines << "    医療診断ではありません (not a medical diagnosis)。"
         lines << "───────────────────────────────────────────────────────────────"
