@@ -58,6 +58,24 @@ fi
 yes | "$SDKMANAGER" --licenses >/dev/null 2>&1 || true
 "$SDKMANAGER" "platform-tools" "platforms;$ANDROID_PLATFORM" "build-tools;$ANDROID_BUILDTOOLS"
 
+# --- Gradle (cordova-android 12 needs Gradle 8.x / Groovy 3; Gradle 9 breaks
+#     cordova.gradle's unqualified XmlParser). Provision 8.7 if needed. --------
+GRADLE_MAJOR="$(gradle -v 2>/dev/null | sed -n 's/^Gradle \([0-9]*\).*/\1/p' | head -1 || true)"
+if [ -z "$GRADLE_MAJOR" ] || [ "$GRADLE_MAJOR" -ge 9 ] 2>/dev/null; then
+  GV="${GRADLE_VERSION:-8.7}"
+  GHOME="${GRADLE_INSTALL:-$HOME/.omega-gradle/gradle-$GV}"
+  if [ ! -x "$GHOME/bin/gradle" ]; then
+    echo "    provisioning Gradle $GV (system gradle is ${GRADLE_MAJOR:-absent}/incompatible)"
+    mkdir -p "$(dirname "$GHOME")"
+    TZ="$(mktemp -u).zip"
+    curl -fsSL -o "$TZ" "https://services.gradle.org/distributions/gradle-$GV-bin.zip"
+    unzip -q "$TZ" -d "$(dirname "$GHOME")"
+    rm -f "$TZ"
+  fi
+  export PATH="$GHOME/bin:$PATH"
+fi
+echo "    gradle: $(gradle -v 2>/dev/null | sed -n 's/^Gradle /Gradle /p' | head -1)"
+
 # --- cordova --------------------------------------------------------------
 if ! command -v cordova >/dev/null || [ "$(cordova --version 2>/dev/null | cut -d. -f1)" != "12" ]; then
   echo "    installing cordova@$CORDOVA_VERSION"
