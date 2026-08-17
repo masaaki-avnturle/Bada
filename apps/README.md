@@ -1,19 +1,23 @@
 # Bada アプリ — ダウンロード用 (APK + Windows + Linux)
 
-`bada_ruby` の 2 つのエンジンを、そのまま **Android APK**・**Windows 10/11 アプリ**・
+`bada_ruby` の 3 つのエンジンを、そのまま **Android APK**・**Windows 10/11 アプリ**・
 **Ubuntu(Linux) アプリ** として配布できるようにしたものです。物理エンジンは Ruby では
 なく **共有の純 Java コア**（`apps/core`）に移植してあり、3 プラットフォームで**同一の
-コード**が動きます（Ruby ランタイム不要）。アプリは 2 画面（タブ／モード）構成：
+コード**が動きます（Ruby ランタイム不要）。アプリは 3 画面（タブ／モード）構成：
 
 - **① 宇宙電信 (Space Telegraph)** — 量子もつれ・汎用電信通信機
 - **② 擬似量子計算機 (Pseudo QC)** — ノイマン型・ディスク内蔵・半導体制御の擬似量子計算機
   （制御回路をモニタに投射、BadaQASM を実行、**半導体 Verilog ソース**を生成）
+- **③ 思考言語化 (Mind, simulation)** — 擬似QC で量子サンプリングし、ガンマ関数の大域的
+  部分積分多様体をゲージにした Bada 製トランスフォーマーで、入力信号から思考の言語化・
+  心像（ViT）・脳内アプリの Bada ソースを**合成**（実在の脳を読むものではありません）
 
 ```
 apps/
 ├── core/       共有 Java コア
 │   ├── bada/quantum/  Bell/CHSH・5次カリア・Jones・不確定性・半導体・通信（電信）
-│   └── bada/qc/       DiskMemory(HDD)・Logic(MOSFET)・CPU・Monitor・Verilog（擬似QC）
+│   ├── bada/qc/       DiskMemory(HDD)・Logic(MOSFET)・CPU・Monitor・Verilog（擬似QC）
+│   └── bada/mind/     Tensor・Encoder(多様体ゲージ注意)・Vision(ViT)・MindReader（思考言語化）
 ├── desktop/    Windows/Linux/デスクトップ front end（Swing タブ GUI ＋ CLI）
 └── android/    Android アプリ（Gradle プロジェクト）
 ```

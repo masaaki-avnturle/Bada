@@ -43,11 +43,12 @@
 
 ## 📲 ダウンロード — Android APK ＋ Windows 10/11 ＋ Ubuntu(Linux)
 
-`bada_ruby` の 2 エンジン ——**① 量子もつれ・汎用電信通信機（Space Telegraph）** と
+`bada_ruby` の 3 エンジン ——**① 量子もつれ・汎用電信通信機（Space Telegraph）**、
 **② ノイマン型・擬似量子計算機（Pseudo QC：ディスク内蔵・半導体制御・モニタ投射・
-Verilog 生成）**—— を、**Android APK**・**Windows 10/11 アプリ**・**Ubuntu(Linux) アプリ**
-としてダウンロードできます。エンジンは共有の純 Java コアに移植してあり、3 プラット
-フォームで同一コードが動きます（`apps/` 参照）。
+Verilog 生成）**、**③ 思考言語化（Mind：擬似QC＋多様体ゲージ・トランスフォーマーで思考の
+言語化・心像・脳内コードを合成する simulation）**—— を、**Android APK**・**Windows 10/11
+アプリ**・**Ubuntu(Linux) アプリ**としてダウンロードできます。エンジンは共有の純 Java コアに
+移植してあり、3 プラットフォームで同一コードが動きます（`apps/` 参照）。
 
 | 配布物 | 対応 |
 |:--|:--|

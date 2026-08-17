@@ -1,5 +1,6 @@
 package bada.desktop;
 
+import bada.mind.MindReader;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -36,6 +37,11 @@ public final class DesktopApp {
             }
             return;
         }
+        if (joined.startsWith("--mind")) {
+            String sig = joined.substring("--mind".length()).trim();
+            System.out.println(new MindReader().render(sig, "対象"));
+            return;
+        }
         if (headless || (!joined.isEmpty() && !joined.equals("--gui"))) {
             String message = joined.isEmpty() || joined.equals("--gui") ? "HELLO SPACE" : joined;
             System.out.println(new SpaceTelegraph("GaAs", 4.0, 3).render(message));
@@ -56,6 +62,7 @@ public final class DesktopApp {
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("① 宇宙電信 (Telegraph)", telegraphPanel());
         tabs.addTab("② 擬似量子計算機 (Pseudo QC)", qcPanel());
+        tabs.addTab("③ 思考言語化 (Mind)", mindPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -151,6 +158,49 @@ public final class DesktopApp {
         } catch (Throwable t) {
             output.setText("error: " + t.getMessage());
         }
+    }
+
+    // ------------------------------------------------------------------ Mind
+    private static JPanel mindPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+
+        JTextField subject = new JTextField("被験者A", 8);
+        JTextField signal = new JTextField("光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する");
+        JButton go = new JButton("言語化・心像・脳内コード (Read)");
+
+        JPanel inRow = new JPanel(new BorderLayout(6, 6));
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        left.add(new JLabel("対象:")); left.add(subject);
+        inRow.add(left, BorderLayout.WEST);
+        inRow.add(signal, BorderLayout.CENTER);
+        inRow.add(go, BorderLayout.EAST);
+
+        JLabel note = new JLabel("※ 生成シミュレーション（実在の脳を読むものではありません）");
+        note.setBorder(BorderFactory.createEmptyBorder(4, 2, 4, 2));
+
+        top.add(inRow, BorderLayout.NORTH);
+        top.add(note, BorderLayout.SOUTH);
+
+        JTextArea output = monospaceArea();
+        Runnable run = () -> {
+            try {
+                output.setText(new MindReader().render(signal.getText(), subject.getText().trim().isEmpty()
+                        ? "対象" : subject.getText().trim()));
+                output.setCaretPosition(0);
+            } catch (Throwable t) {
+                output.setText("error: " + t.getMessage());
+            }
+        };
+        go.addActionListener(e -> run.run());
+        signal.addActionListener(e -> run.run());
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        run.run();
+        return root;
     }
 
     private static JTextArea monospaceArea() {

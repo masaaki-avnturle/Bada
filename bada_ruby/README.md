@@ -300,6 +300,42 @@ m.close
 プログラムと状態ベクトルを**同一のディスクアドレス空間**に置きます（＝ノイマン型）。命令の
 デコードは `Bada::QC::Logic` の**半導体シミュレーション結果**でワンホット選択します。
 
+## 思考の言語化 — `Bada::Mind` ＋ `Bada::Transformer`
+
+> ⚠️ **これは生成シミュレーションです。** 実在の人物の脳から思考を取り出す BCI ではありません。
+> 入力信号（テキスト／EEG 風の特徴テキスト）と量子シードから、思考の言語化・心像・
+> 「脳内に浮かぶアプリのソースコード」を**合成**します。
+
+上の擬似量子コンピュータ（`Bada::QC`）を使って量子ブレイン状態をサンプリングし、**ガンマ関数
+の大域的部分積分多様体 `∬ 1/(x log x)²` をアテンションのゲージ**にした Bada 製トランスフォーマー
+（`Bada::Transformer`）で、対象の思考を言語化します。画像処理トランスフォーマー（ViT）で心像を
+描き、思考回路に浮かぶ**アプリのソースコードを Bada 言語で生成し、実際に実行**します。
+
+```bash
+bin/bada mind "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する" --subject 被験者A
+```
+
+```ruby
+require "bada"
+r = Bada::Mind::Reader.new.read("記憶 と 感情 の 波", subject: "被験者B")
+r[:verbalization]        # 言語化された思考
+r[:mental_image]         # 8x8 心像（ViT 再構成、Vision.ascii で表示）
+r[:source]               # 脳内に浮かぶ Bada プログラム
+r[:source_output]        # それを Bada::Interpreter で実行した結果
+r[:precision]            # simulated 精度（silent-talk 基準 0.92 と比較）
+r[:exceeds_silent_talk]  # 基準超えか
+```
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| 上の量子コンピュータを使う | `Bada::QC::Machine`（H＋測定で量子シードをサンプリング） |
+| ガンマ関数の大域的部分積分多様体の機知 | `Bada::Transformer::Encoder`（`∬1/(x log x)²` をアテンション距離カーネルに） |
+| silent talk 以上の精度で思考を言語化 | `Bada::Mind::Reader#verbalize`（weight-tying デコード）＋ simulated precision |
+| 画像処理のトランスフォーマー | `Bada::Transformer::Vision`（ViT：パッチ→符号化→心像再構成） |
+| 脳内に浮かぶアプリのソースコード | `Bada::Mind::Reader#generate_code`（Bada 言語を生成し `Interpreter` で実行） |
+
+決定的（同じ信号→同じ出力）で、外部依存はありません。
+
 ## モジュール構成
 
 ```
@@ -339,6 +375,10 @@ lib/bada/qc/cpu.rb           ノイマン型 fetch-decode-execute 制御ユニ�
 lib/bada/qc/monitor.rb       制御回路のモニタ投射
 lib/bada/qc/verilog.rb       半導体（RTL）ソースコード生成
 lib/bada/qc/machine.rb       擬似量子計算機 Machine（Facade）
+lib/bada/transformer/tensor.rb   純Ruby 行列演算 + 決定的 PRNG
+lib/bada/transformer/model.rb    多様体ゲージ・マルチヘッド注意 Encoder
+lib/bada/transformer/vision.rb   画像処理トランスフォーマー（ViT）
+lib/bada/mind.rb             思考の言語化・心像・脳内コード生成（simulation Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

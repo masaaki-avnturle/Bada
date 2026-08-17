@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import java.util.concurrent.Executors;
 
+import bada.mind.MindReader;
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
@@ -33,6 +34,7 @@ import bada.quantum.SpaceTelegraph;
 public class MainActivity extends Activity {
 
     private static final String QC_DEMO = "H 0; CX 0 1; HALT";
+    private static final String MIND_DEMO = "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する";
 
     private Spinner mode;
     private EditText input;
@@ -57,7 +59,8 @@ public class MainActivity extends Activity {
 
         mode = new Spinner(this);
         mode.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
-                new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射", "③ 半導体 Verilog 生成"}));
+                new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射",
+                        "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)"}));
         root.addView(mode);
 
         input = new EditText(this);
@@ -77,9 +80,13 @@ public class MainActivity extends Activity {
 
         mode.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> p, View v, int pos, long id) {
-                boolean qc = pos != 0;
-                material.setVisibility(qc ? View.GONE : View.VISIBLE);
-                input.setText(qc ? QC_DEMO : "QUANTUM HELLO FROM EARTH");
+                material.setVisibility(pos == 0 ? View.VISIBLE : View.GONE);
+                switch (pos) {
+                    case 0 -> input.setText("QUANTUM HELLO FROM EARTH");
+                    case 1, 2 -> input.setText(QC_DEMO);
+                    case 3 -> input.setText(MIND_DEMO);
+                    default -> { }
+                }
                 runSelected();
             }
             @Override public void onNothingSelected(AdapterView<?> p) { }
@@ -110,7 +117,11 @@ public class MainActivity extends Activity {
         Executors.newSingleThreadExecutor().execute(() -> {
             String result;
             try {
-                result = (m == 0) ? telegraph(text, mat) : pseudoQc(text, m == 2);
+                result = switch (m) {
+                    case 0 -> telegraph(text, mat);
+                    case 3 -> new MindReader().render(text, "対象");
+                    default -> pseudoQc(text, m == 2);
+                };
             } catch (Throwable t) {
                 result = "error: " + t;
             }

@@ -11,6 +11,7 @@
 #   bin/bada quantum "MESSAGE"          entangled-pair space telegraph (prove+send)
 #   bin/bada qc [bell|ghz|run f.qasm]   von-Neumann pseudo QC: monitor + statevector
 #   bin/bada qc verilog [ghz|f.qasm]    emit semiconductor (Verilog) control source
+#   bin/bada mind "信号..."             thought verbalization + image + code (sim)
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a Bada language script
@@ -128,6 +129,20 @@ when "qc"
     puts machine.report
   end
   machine.close
+when "mind"
+  # Thought verbalization simulation (uses the pseudo QC + manifold-gauge
+  # transformer): verbalize + mental image + the Bada-language "app in the mind".
+  #   bada mind "光 と 音 の 記憶"  [--subject 名前]
+  subject = "対象"
+  words = []
+  until ARGV.empty?
+    case (a = ARGV.shift)
+    when "--subject" then subject = ARGV.shift
+    else words << a
+    end
+  end
+  signal = words.join(" ")
+  puts Bada::Mind::Reader.new.render(signal, subject: subject)
 when "xi"
   text = ARGV.join(" ")
   s = Bada::Manifold.invariant(text)
@@ -160,6 +175,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | qc | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | run | learn | xi | neural | train | version"
   exit 1
 end
