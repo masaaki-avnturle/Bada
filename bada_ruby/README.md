@@ -348,6 +348,21 @@ r[:exceeds_silent_talk]  # 基準超えか
 ソースコードを合成**します（雛形ではありません）。**言語自動判定**・**予約語認識**・
 **コマンド機能で単語補完**つき。`Bada::Coder::Synth` が自然言語→AST→コード生成のコンパイラです。
 
+**目的を一文与えると完全なプログラムを生成**します（定番アルゴリズムの AST レシピを内蔵）:
+
+```bash
+bin/bada code "fibonacci 10"          # -> 0 1 1 2 3 5 8 13 21 34
+bin/bada code "fizzbuzz 15" -l python
+bin/bada code "並べ替え 5 2 9 1 7 3" -l java   # バブルソート -> 1 2 3 5 7 9
+bin/bada code "素数判定 29"            # is_prime(29) -> 1
+```
+
+対応レシピ：**fibonacci / fizzbuzz / factorial(階乗) / prime(素数) / gcd(最大公約数) /
+power(べき乗) / multiplication-table(九九) / bubble-sort(並べ替え) / sum**。
+生成した Ruby/Python/C/Java は実際に実行して正しく動くことを確認しています。
+
+手順を明示すればその通りに合成します（レシピより手順が優先）:
+
 ```bash
 bin/bada code "set total to 0; for i from 1 to 5 add i to total; print total"
 bin/bada code "function add with a and b returning a + b; print add(2, 3)" -l javascript
@@ -439,6 +454,7 @@ lib/bada/transformer/vision.rb   画像処理トランスフォーマー（ViT�
 lib/bada/mind.rb             思考の言語化・心像・脳内コード生成（simulation Facade）
 lib/bada/coder.rb            思考→コード：言語自動判定・単語補完・予約語認識（EN/JA）
 lib/bada/coder/synth.rb      自然言語→AST→コード合成コンパイラ（独自ソース生成）
+lib/bada/coder/recipes.rb    目的→完全プログラム（定番アルゴリズムの AST レシピ）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

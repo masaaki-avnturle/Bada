@@ -2,6 +2,7 @@
 
 require "set"
 require_relative "coder/synth"
+require_relative "coder/recipes"
 
 module Bada
   # Bada::Coder — thought-to-code (simulation). Bilingual (English + 日本語)
@@ -181,7 +182,21 @@ module Bada
       det = detect(intent)
       language ||= (det[:confidence] > 0.15 ? det[:language] : "ruby")
 
+      # Compile the described steps. If that yields a real program, use it. Only
+      # when it is trivial (a bare goal phrase like "fibonacci" that parses to a
+      # single stray expression) do we synthesise a whole program from a recipe.
       prog = Synth.compile(intent)
+      recipe = false
+      meaningful = prog[:items].length >= 2 ||
+                   (prog[:items].length == 1 && prog[:items][0][0] != :expr)
+      unless meaningful
+        r = Recipes.for(intent)
+        if r
+          prog = r
+          recipe = true
+        end
+      end
+
       code =
         if prog[:items].empty?
           # nothing parseable — emit a minimal program that prints the text
@@ -197,6 +212,7 @@ module Bada
         code: code,
         reserved_used: reserved_words(code, language: language),
         detected: det,
+        recipe: recipe,
         statements: prog[:items].length,
         valid: valid_syntax?(code, language),
         precision: precision(det, code, language)

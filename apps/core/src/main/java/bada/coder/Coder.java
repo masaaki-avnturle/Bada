@@ -142,6 +142,7 @@ public final class Coder {
         public List<String> reservedUsed;
         public double confidence, precision;
         public int statements;
+        public boolean recipe;
         public boolean valid = true;
     }
 
@@ -150,7 +151,17 @@ public final class Coder {
         Detection det = detect(intent);
         if (language == null) language = det.confidence > 0.15 ? det.language : "ruby";
 
+        // Compile the described steps. If trivial (a bare goal like "fibonacci"),
+        // synthesise a whole program from a recipe instead.
         Synth.Program prog = Synth.compile(intent);
+        boolean recipe = false;
+        boolean meaningful = prog.items().size() >= 2
+                || (prog.items().size() == 1 && !(prog.items().get(0) instanceof Synth.ExprStmt));
+        if (!meaningful) {
+            Synth.Program rp = Recipes.forGoal(intent);
+            if (rp != null) { prog = rp; recipe = true; }
+        }
+
         String code;
         if (prog.items().isEmpty()) {
             String msg = intent == null ? "" : intent.trim();
@@ -167,6 +178,7 @@ public final class Coder {
         r.code = code;
         r.reservedUsed = reservedWords(code, language);
         r.confidence = det.confidence;
+        r.recipe = recipe;
         r.statements = prog.items().size();
         r.precision = Math.max(0.90, Math.min(0.995, 0.90 + 0.095 * (0.6 * det.confidence + 0.4)));
         return r;

@@ -162,6 +162,60 @@ class TestCoderGenerate < Minitest::Test
     assert r[:valid]
     assert_includes r[:code], "print("
   end
+
+  # ---- goal → complete program (recipes) ----
+
+  def run_ruby(code)
+    f = "/tmp/bada_rec_#{rand(1 << 30)}.rb"
+    File.write(f, code)
+    out = `ruby #{f} 2>&1`
+    File.delete(f)
+    out
+  end
+
+  def test_recipe_fibonacci_runs
+    r = C.generate("fibonacci 10", language: "ruby")
+    assert r[:recipe]
+    assert r[:valid]
+    assert_equal %w[0 1 1 2 3 5 8 13 21 34], run_ruby(r[:code]).split
+  end
+
+  def test_recipe_factorial_value
+    r = C.generate("factorial 6", language: "ruby")
+    assert r[:recipe]
+    assert_equal "720", run_ruby(r[:code]).strip
+  end
+
+  def test_recipe_fizzbuzz_content
+    code = C.generate("fizzbuzz 15", language: "ruby")[:code]
+    out = run_ruby(code).split
+    assert_equal "Fizz", out[2]
+    assert_equal "Buzz", out[4]
+    assert_equal "FizzBuzz", out[14]
+  end
+
+  def test_recipe_prime_and_gcd
+    assert_equal "1", run_ruby(C.generate("is prime 29", language: "ruby")[:code]).strip
+    assert_equal "12", run_ruby(C.generate("gcd 48 36", language: "ruby")[:code]).strip
+  end
+
+  def test_recipe_bubble_sort_sorts
+    r = C.generate("bubble sort 5 2 9 1 7 3", language: "ruby")
+    assert r[:recipe]
+    assert_equal %w[1 2 3 5 7 9], run_ruby(r[:code]).split
+  end
+
+  def test_recipe_japanese_goal
+    r = C.generate("フィボナッチ 5", language: "python")
+    assert r[:recipe]
+    assert_includes r[:code], "def fib(n):"
+  end
+
+  def test_procedure_beats_recipe_when_meaningful
+    # a described procedure that happens to mention 合計 must NOT become the sum recipe
+    r = C.generate("合計 を 0 にする; 合計 を 表示", language: "ruby")
+    refute r[:recipe]
+  end
 end
 
 class TestCoderConsole < Minitest::Test

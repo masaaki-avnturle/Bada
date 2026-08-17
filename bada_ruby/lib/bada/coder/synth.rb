@@ -241,6 +241,12 @@ module Bada
         when :assign
           it[2] = resolve_expr(it[2], declared, funcs)
           declared << it[1]
+        when :arrdecl
+          it[2] = it[2].map { |x| resolve_expr(x, declared, funcs) }
+          declared << it[1]
+        when :idxset
+          it[2] = resolve_expr(it[2], declared, funcs)
+          it[3] = resolve_expr(it[3], declared, funcs)
         when :print, :return, :expr
           it[1] = resolve_expr(it[1], declared, funcs)
         when :for
@@ -270,6 +276,10 @@ module Bada
           [:neg, resolve_expr(e[1], declared, funcs)]
         when :call
           [:call, e[1], e[2].map { |a| resolve_expr(a, declared, funcs) }]
+        when :idx
+          [:idx, e[1], resolve_expr(e[2], declared, funcs)]
+        when :arr
+          [:arr, e[1].map { |x| resolve_expr(x, declared, funcs) }]
         else e
         end
       end
@@ -299,6 +309,13 @@ module Bada
         when :assign
           it[1] = ascii_name(it[1], map, counter)
           it[2] = asciify_expr(it[2], map, counter)
+        when :arrdecl
+          it[1] = ascii_name(it[1], map, counter)
+          it[2] = it[2].map { |x| asciify_expr(x, map, counter) }
+        when :idxset
+          it[1] = ascii_name(it[1], map, counter)
+          it[2] = asciify_expr(it[2], map, counter)
+          it[3] = asciify_expr(it[3], map, counter)
         when :print, :return, :expr
           it[1] = asciify_expr(it[1], map, counter)
         when :for
@@ -324,6 +341,8 @@ module Bada
         when :call then [:call, ascii_name(e[1], map, counter), e[2].map { |a| asciify_expr(a, map, counter) }]
         when :bin then [:bin, e[1], asciify_expr(e[2], map, counter), asciify_expr(e[3], map, counter)]
         when :neg then [:neg, asciify_expr(e[1], map, counter)]
+        when :idx then [:idx, ascii_name(e[1], map, counter), asciify_expr(e[2], map, counter)]
+        when :arr then [:arr, e[1].map { |x| asciify_expr(x, map, counter) }]
         else e
         end
       end
@@ -467,8 +486,11 @@ module Bada
         case it[0]
         when :assign
           types[it[1]] ||= infer_expr(it[2], types)
+        when :arrdecl
+          types[it[1]] = :array
         when :for
-          types[it[1]] ||= :int
+          # the loop variable is declared by the for-statement itself, so it is
+          # intentionally NOT added to the surrounding declaration block.
           it[4].each { |s| infer_item(s, types) }
         when :while then it[2].each { |s| infer_item(s, types) }
         when :if
@@ -482,6 +504,8 @@ module Bada
         when :num then e[1].is_a?(Float) ? :double : :int
         when :str then :string
         when :var then types[e[1]] || :int
+        when :idx then :int
+        when :arr then :array
         when :neg then infer_expr(e[1], types)
         when :bin
           return :int if %w[> < >= <= == != && ||].include?(e[1])
@@ -515,6 +539,8 @@ module Bada
         when :var then e[1]
         when :neg then "-#{expr_str(e[1], lang)}"
         when :call then "#{e[1]}(#{e[2].map { |a| expr_str(a, lang) }.join(', ')})"
+        when :idx then "#{e[1]}[#{expr_str(e[2], lang)}]"
+        when :arr then "[#{e[1].map { |x| expr_str(x, lang) }.join(', ')}]"
         when :bin
           "(#{expr_str(e[2], lang)} #{e[1]} #{expr_str(e[3], lang)})"
         else "0"
@@ -547,6 +573,8 @@ module Bada
           i = "  " * d
           case s[0]
           when :assign then ["#{i}#{s[1]} = #{S.expr_str(s[2])}"]
+          when :arrdecl then ["#{i}#{s[1]} = [#{s[2].map { |x| S.expr_str(x) }.join(', ')}]"]
+          when :idxset then ["#{i}#{s[1]}[#{S.expr_str(s[2])}] = #{S.expr_str(s[3])}"]
           when :print then ["#{i}puts #{S.expr_str(s[1])}"]
           when :return then ["#{i}return #{S.expr_str(s[1])}"]
           when :expr then ["#{i}#{S.expr_str(s[1])}"]
@@ -583,6 +611,8 @@ module Bada
           i = "    " * d
           case s[0]
           when :assign then ["#{i}#{s[1]} = #{S.expr_str(s[2])}"]
+          when :arrdecl then ["#{i}#{s[1]} = [#{s[2].map { |x| S.expr_str(x) }.join(', ')}]"]
+          when :idxset then ["#{i}#{s[1]}[#{S.expr_str(s[2])}] = #{S.expr_str(s[3])}"]
           when :print then ["#{i}print(#{S.expr_str(s[1])})"]
           when :return then ["#{i}return #{S.expr_str(s[1])}"]
           when :expr then ["#{i}#{S.expr_str(s[1])}"]
@@ -630,6 +660,10 @@ module Bada
               declared << s[1]
               ["#{i}let #{s[1]} = #{S.expr_str(s[2])};"]
             end
+          when :arrdecl
+            declared << s[1]
+            ["#{i}let #{s[1]} = [#{s[2].map { |x| S.expr_str(x) }.join(', ')}];"]
+          when :idxset then ["#{i}#{s[1]}[#{S.expr_str(s[2])}] = #{S.expr_str(s[3])};"]
           when :print then ["#{i}console.log(#{S.expr_str(s[1])});"]
           when :return then ["#{i}return #{S.expr_str(s[1])};"]
           when :expr then ["#{i}#{S.expr_str(s[1])};"]
@@ -651,7 +685,7 @@ module Bada
         end
 
         # ---- C ----
-        TYPE_C = { int: "int", double: "double", string: "const char*" }.freeze
+        TYPE_C = { int: "int", double: "double", string: "const char*", void: "void" }.freeze
 
         def c(prog, types)
           funcs = prog[:items].select { |i| i[0] == :func }
@@ -659,7 +693,11 @@ module Bada
           out = ["#include <stdio.h>", ""]
           funcs.each { |f| out.concat(c_func(f, types)); out << "" }
           out << "int main(void) {"
-          types.each { |v, t| out << "  #{TYPE_C[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};" }
+          types.each do |v, t|
+            next if t == :array
+
+            out << "  #{TYPE_C[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};"
+          end
           top.each { |s| out.concat(c_stmt(s, 1, types)) }
           out << "  return 0;" << "}"
           out.join("\n") + "\n"
@@ -668,16 +706,34 @@ module Bada
         def c_func(f, types)
           rt = TYPE_C[func_ret(f, types)] || "int"
           params = f[2].map { |p| "int #{p}" }.join(", ")
+          local = local_types(f[2], f[3])
+          merged = types.merge(local)
           out = ["#{rt} #{f[1]}(#{params.empty? ? 'void' : params}) {"]
-          f[3].each { |s| out.concat(c_stmt(s, 1, types)) }
+          local.each do |v, t|
+            next if t == :array
+
+            out << "  #{TYPE_C[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};"
+          end
+          f[3].each { |s| out.concat(c_stmt(s, 1, merged)) }
           out << "}"
           out
+        end
+
+        # Types of a function's local variables (assigns/arrdecls in its body),
+        # excluding parameters and loop variables. Needed for C/Java declarations.
+        def local_types(params, body)
+          t = {}
+          body.each { |s| S.infer_item(s, t) }
+          params.each { |p| t.delete(p) }
+          t
         end
 
         def c_stmt(s, d, types)
           i = "  " * d
           case s[0]
           when :assign then ["#{i}#{s[1]} = #{S.expr_str(s[2])};"]
+          when :arrdecl then ["#{i}int #{s[1]}[] = {#{s[2].map { |x| S.expr_str(x) }.join(', ')}};"]
+          when :idxset then ["#{i}#{s[1]}[#{S.expr_str(s[2])}] = #{S.expr_str(s[3])};"]
           when :print
             t = S.infer_expr(s[1], types)
             fmt = t == :string ? "%s" : (t == :double ? "%f" : "%d")
@@ -701,7 +757,7 @@ module Bada
         end
 
         # ---- Java ----
-        TYPE_J = { int: "int", double: "double", string: "String" }.freeze
+        TYPE_J = { int: "int", double: "double", string: "String", void: "void" }.freeze
 
         def java(prog, types)
           funcs = prog[:items].select { |i| i[0] == :func }
@@ -710,7 +766,11 @@ module Bada
           out = ["public class #{cls} {"]
           funcs.each { |f| out.concat(java_func(f, types).map { |l| "  #{l}" }); out << "" }
           out << "  public static void main(String[] args) {"
-          types.each { |v, t| out << "    #{TYPE_J[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};" }
+          types.each do |v, t|
+            next if t == :array
+
+            out << "    #{TYPE_J[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};"
+          end
           top.each { |s| out.concat(java_stmt(s, 2, types)) }
           out << "  }" << "}"
           out.join("\n") + "\n"
@@ -719,8 +779,15 @@ module Bada
         def java_func(f, types)
           rt = TYPE_J[func_ret(f, types)] || "int"
           params = f[2].map { |p| "int #{p}" }.join(", ")
+          local = local_types(f[2], f[3])
+          merged = types.merge(local)
           out = ["static #{rt} #{f[1]}(#{params}) {"]
-          f[3].each { |s| out.concat(java_stmt(s, 1, types)) }
+          local.each do |v, t|
+            next if t == :array
+
+            out << "  #{TYPE_J[t] || 'int'} #{v} = #{t == :string ? '""' : '0'};"
+          end
+          f[3].each { |s| out.concat(java_stmt(s, 1, merged)) }
           out << "}"
           out
         end
@@ -729,6 +796,8 @@ module Bada
           i = "  " * d
           case s[0]
           when :assign then ["#{i}#{s[1]} = #{S.expr_str(s[2])};"]
+          when :arrdecl then ["#{i}int[] #{s[1]} = {#{s[2].map { |x| S.expr_str(x) }.join(', ')}};"]
+          when :idxset then ["#{i}#{s[1]}[#{S.expr_str(s[2])}] = #{S.expr_str(s[3])};"]
           when :print then ["#{i}System.out.println(#{S.expr_str(s[1])});"]
           when :return then ["#{i}return #{S.expr_str(s[1])};"]
           when :expr then ["#{i}#{S.expr_str(s[1])};"]
@@ -750,7 +819,7 @@ module Bada
 
         def func_ret(f, types)
           ret = f[3].find { |s| s[0] == :return }
-          ret ? S.infer_expr(ret[1], types) : :int
+          ret ? S.infer_expr(ret[1], types) : :void
         end
 
         # ---- Bada (best effort) ----

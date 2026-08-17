@@ -21,15 +21,17 @@ import java.util.regex.Pattern;
 public final class Synth {
 
     // ===== AST =====
-    sealed interface Expr permits Num, Str, Var, Bin, Neg, Call {}
+    sealed interface Expr permits Num, Str, Var, Bin, Neg, Call, Idx, Arr {}
     record Num(double v, boolean isInt) implements Expr {}
     record Str(String v) implements Expr {}
     record Var(String name) implements Expr {}
     record Bin(String op, Expr l, Expr r) implements Expr {}
     record Neg(Expr e) implements Expr {}
     record Call(String name, List<Expr> args) implements Expr {}
+    record Idx(String name, Expr index) implements Expr {}
+    record Arr(List<Expr> elems) implements Expr {}
 
-    sealed interface Stmt permits Assign, Print, Ret, ExprStmt, For, While, If, Func {}
+    sealed interface Stmt permits Assign, Print, Ret, ExprStmt, For, While, If, Func, ArrDecl, IdxSet {}
     record Assign(String var, Expr e) implements Stmt {}
     record Print(Expr e) implements Stmt {}
     record Ret(Expr e) implements Stmt {}
@@ -38,10 +40,12 @@ public final class Synth {
     record While(Expr cond, List<Stmt> body) implements Stmt {}
     record If(Expr cond, List<Stmt> thenB, List<Stmt> elseB) implements Stmt {}
     record Func(String name, List<String> params, List<Stmt> body) implements Stmt {}
+    record ArrDecl(String name, List<Expr> elems) implements Stmt {}
+    record IdxSet(String name, Expr index, Expr value) implements Stmt {}
 
     public record Program(String name, List<Stmt> items) {}
 
-    enum Type { INT, DOUBLE, STRING }
+    enum Type { INT, DOUBLE, STRING, ARRAY, VOID }
 
     private static final String IDENT = "[A-Za-z_]\\w*|[一-鿿ァ-ヶー]+";
     private static final String BODY_VERB =
@@ -347,6 +351,13 @@ public final class Synth {
             Expr e = resolveExpr(a.e(), declared, funcs);
             declared.add(a.var());
             return new Assign(a.var(), e);
+        } else if (s instanceof ArrDecl ad) {
+            List<Expr> es = new ArrayList<>();
+            for (Expr x : ad.elems()) es.add(resolveExpr(x, declared, funcs));
+            declared.add(ad.name());
+            return new ArrDecl(ad.name(), es);
+        } else if (s instanceof IdxSet is) {
+            return new IdxSet(is.name(), resolveExpr(is.index(), declared, funcs), resolveExpr(is.value(), declared, funcs));
         } else if (s instanceof Print p) {
             return new Print(resolveExpr(p.e(), declared, funcs));
         } else if (s instanceof Ret r) {
@@ -383,6 +394,12 @@ public final class Synth {
             for (Expr a : c.args()) args.add(resolveExpr(a, declared, funcs));
             return new Call(c.name(), args);
         }
+        if (e instanceof Idx ix) return new Idx(ix.name(), resolveExpr(ix.index(), declared, funcs));
+        if (e instanceof Arr ar) {
+            List<Expr> es = new ArrayList<>();
+            for (Expr x : ar.elems()) es.add(resolveExpr(x, declared, funcs));
+            return new Arr(es);
+        }
         return e;
     }
 
@@ -407,6 +424,12 @@ public final class Synth {
             return new Func(asciiName(f.name(), map, counter), ps, asciifyBody(f.body(), map, counter));
         } else if (s instanceof Assign a) {
             return new Assign(asciiName(a.var(), map, counter), asciifyExpr(a.e(), map, counter));
+        } else if (s instanceof ArrDecl ad) {
+            List<Expr> es = new ArrayList<>();
+            for (Expr x : ad.elems()) es.add(asciifyExpr(x, map, counter));
+            return new ArrDecl(asciiName(ad.name(), map, counter), es);
+        } else if (s instanceof IdxSet is) {
+            return new IdxSet(asciiName(is.name(), map, counter), asciifyExpr(is.index(), map, counter), asciifyExpr(is.value(), map, counter));
         } else if (s instanceof Print p) {
             return new Print(asciifyExpr(p.e(), map, counter));
         } else if (s instanceof Ret r) {
@@ -440,6 +463,12 @@ public final class Synth {
         }
         if (e instanceof Bin b) return new Bin(b.op(), asciifyExpr(b.l(), map, counter), asciifyExpr(b.r(), map, counter));
         if (e instanceof Neg ng) return new Neg(asciifyExpr(ng.e(), map, counter));
+        if (e instanceof Idx ix) return new Idx(asciiName(ix.name(), map, counter), asciifyExpr(ix.index(), map, counter));
+        if (e instanceof Arr ar) {
+            List<Expr> es = new ArrayList<>();
+            for (Expr x : ar.elems()) es.add(asciifyExpr(x, map, counter));
+            return new Arr(es);
+        }
         return e;
     }
 
@@ -451,7 +480,9 @@ public final class Synth {
     }
     static void inferStmt(Stmt s, Map<String, Type> types) {
         if (s instanceof Assign a) { types.putIfAbsent(a.var(), inferExpr(a.e(), types)); }
-        else if (s instanceof For fo) { types.putIfAbsent(fo.var(), Type.INT); for (Stmt b : fo.body()) inferStmt(b, types); }
+        else if (s instanceof ArrDecl ad) { types.put(ad.name(), Type.ARRAY); }
+        // the loop variable is declared by the for-statement itself, so it is NOT typed here
+        else if (s instanceof For fo) { for (Stmt b : fo.body()) inferStmt(b, types); }
         else if (s instanceof While w) { for (Stmt b : w.body()) inferStmt(b, types); }
         else if (s instanceof If f) { for (Stmt b : f.thenB()) inferStmt(b, types); for (Stmt b : f.elseB()) inferStmt(b, types); }
     }
@@ -459,6 +490,8 @@ public final class Synth {
         if (e instanceof Num n) return n.isInt() ? Type.INT : Type.DOUBLE;
         if (e instanceof Str) return Type.STRING;
         if (e instanceof Var v) return types.getOrDefault(v.name(), Type.INT);
+        if (e instanceof Idx) return Type.INT;
+        if (e instanceof Arr) return Type.ARRAY;
         if (e instanceof Neg ng) return inferExpr(ng.e(), types);
         if (e instanceof Bin b) {
             if (List.of(">", "<", ">=", "<=", "==", "!=", "&&", "||").contains(b.op())) return Type.INT;
@@ -499,8 +532,23 @@ public final class Synth {
             for (Expr x : c.args()) a.add(expr(x));
             return c.name() + "(" + String.join(", ", a) + ")";
         }
+        if (e instanceof Idx ix) return ix.name() + "[" + expr(ix.index()) + "]";
+        if (e instanceof Arr ar) {
+            List<String> xs = new ArrayList<>();
+            for (Expr x : ar.elems()) xs.add(expr(x));
+            return "[" + String.join(", ", xs) + "]";
+        }
         if (e instanceof Bin b) return "(" + expr(b.l()) + " " + b.op() + " " + expr(b.r()) + ")";
         return "0";
+    }
+
+    // Types of a function's local variables (assigns/arrdecls), minus params and
+    // loop variables — needed for C/Java declarations inside a function body.
+    static Map<String, Type> localTypes(List<String> params, List<Stmt> body) {
+        Map<String, Type> t = new LinkedHashMap<>();
+        for (Stmt s : body) inferStmt(s, t);
+        for (String p : params) t.remove(p);
+        return t;
     }
 
     // helpers
