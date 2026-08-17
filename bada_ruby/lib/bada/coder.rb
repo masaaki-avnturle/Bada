@@ -178,6 +178,7 @@ module Bada
     LOOP_RE  = /\b(loop|for|while|repeat|iterate|each|times)\b|繰り返|反復|ループ|回/i
     COND_RE  = /\b(if|when|condition|check|unless)\b|もし|条件|なら|判定/i
     FUNC_RE  = /\b(function|func|def|define|method|procedure)\b|関数|定義|メソッド|手続き/i
+    ADD_RE   = /\b(add|sum|plus|total|accumulate|addition)\b|足し算|合計|加算|足す|総和|加算する/i
     STOP = %w[the a an to in of and or with please make create write program code
               い を に は が の と で た する して ください 回 times time].to_set
     JP_STOP = %w[もし 条件 なら 判定 回 度 表示 出力 印刷 プリント 繰り返し 繰り返す 反復
@@ -189,13 +190,17 @@ module Bada
       spec = LANGUAGES.fetch(language)
 
       toks = tokenize_code(intent)
-      count = (intent[/\d+/] || "3").to_i.clamp(1, 100)
+      arith = !!(intent =~ ADD_RE)
+      nums = intent.to_s.scan(/\d+/).map(&:to_i)
+      # for a sum "1..N" the upper bound is the largest number; else first count
+      count = (arith ? (nums.max || 10) : (nums.first || 3)).clamp(1, 1000)
       name = identifier(toks) || "task"
       message = message_of(intent, toks) || "hello"
       ir = {
         func: name,
         loop: !!(intent =~ LOOP_RE),
         cond: !!(intent =~ COND_RE),
+        arith: arith,
         count: count,
         message: message,
         want_func: !!(intent =~ FUNC_RE) || true # always wrap in a function
@@ -242,6 +247,9 @@ module Bada
     end
 
     def render_ruby(ir)
+      if ir[:arith]
+        return "def #{ir[:func]}\n  total = 0\n  (1..#{ir[:count]}).each { |i| total += i }\n  puts total\n  total\nend\n\n#{ir[:func]}\n"
+      end
       body = +"  puts \"#{ir[:message]}\""
       body = ir[:cond] ? "  if #{ir[:count]} > 0\n  #{body}\n  end" : body
       body = ir[:loop] ? "  #{ir[:count]}.times do\n  #{body}\n  end" : body
@@ -249,6 +257,9 @@ module Bada
     end
 
     def render_python(ir)
+      if ir[:arith]
+        return "def #{ir[:func]}():\n    total = 0\n    for i in range(1, #{ir[:count]} + 1):\n        total += i\n    print(total)\n    return total\n\n#{ir[:func]}()\n"
+      end
       inner = "print(\"#{ir[:message]}\")"
       inner = ir[:cond] ? "if #{ir[:count]} > 0:\n        #{inner}" : inner
       inner = ir[:loop] ? "for _ in range(#{ir[:count]}):\n        #{inner}" : inner
@@ -256,6 +267,9 @@ module Bada
     end
 
     def render_js(ir)
+      if ir[:arith]
+        return "function #{ir[:func]}() {\n  let total = 0;\n  for (let i = 1; i <= #{ir[:count]}; i++) { total += i; }\n  console.log(total);\n  return total;\n}\n\n#{ir[:func]}();\n"
+      end
       inner = "console.log(\"#{ir[:message]}\");"
       inner = ir[:cond] ? "if (#{ir[:count]} > 0) { #{inner} }" : inner
       inner = ir[:loop] ? "for (let i = 0; i < #{ir[:count]}; i++) { #{inner} }" : inner
@@ -263,6 +277,9 @@ module Bada
     end
 
     def render_c(ir)
+      if ir[:arith]
+        return "#include <stdio.h>\n\nint #{ir[:func]}(void) {\n  int total = 0;\n  for (int i = 1; i <= #{ir[:count]}; i++) { total += i; }\n  printf(\"%d\\n\", total);\n  return total;\n}\n\nint main(void) {\n  #{ir[:func]}();\n  return 0;\n}\n"
+      end
       inner = "printf(\"#{ir[:message]}\\n\");"
       inner = ir[:cond] ? "if (#{ir[:count]} > 0) { #{inner} }" : inner
       inner = ir[:loop] ? "for (int i = 0; i < #{ir[:count]}; i++) { #{inner} }" : inner
@@ -270,10 +287,13 @@ module Bada
     end
 
     def render_java(ir)
+      cls = ir[:func].sub(/\A[a-z]/, &:upcase)
+      if ir[:arith]
+        return "public class #{cls} {\n  static int #{ir[:func]}() {\n    int total = 0;\n    for (int i = 1; i <= #{ir[:count]}; i++) { total += i; }\n    System.out.println(total);\n    return total;\n  }\n  public static void main(String[] args) {\n    #{ir[:func]}();\n  }\n}\n"
+      end
       inner = "System.out.println(\"#{ir[:message]}\");"
       inner = ir[:cond] ? "if (#{ir[:count]} > 0) { #{inner} }" : inner
       inner = ir[:loop] ? "for (int i = 0; i < #{ir[:count]}; i++) { #{inner} }" : inner
-      cls = ir[:func].sub(/\A[a-z]/, &:upcase)
       "public class #{cls} {\n  static void #{ir[:func]}() {\n    #{inner}\n  }\n  public static void main(String[] args) {\n    #{ir[:func]}();\n  }\n}\n"
     end
 

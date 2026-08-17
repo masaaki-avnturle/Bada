@@ -59,6 +59,7 @@ public final class Coder {
         Pattern.compile("[A-Za-z_][A-Za-z0-9_]*|[一-鿿ぁ-んァ-ヶー]+");
     private static final Pattern LOOP = Pattern.compile("\\b(loop|for|while|repeat|iterate|each|times)\\b|繰り返|反復|ループ|回", Pattern.CASE_INSENSITIVE);
     private static final Pattern COND = Pattern.compile("\\b(if|when|condition|check|unless)\\b|もし|条件|なら|判定", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ADD = Pattern.compile("\\b(add|sum|plus|total|accumulate|addition)\\b|足し算|合計|加算|足す|総和", Pattern.CASE_INSENSITIVE);
     private static final java.util.Set<String> STOP = new java.util.HashSet<>(Arrays.asList(
         "the","a","an","to","in","of","and","or","with","please","make","create","write","program","code","times","time"));
     private static final java.util.Set<String> JP_STOP = new java.util.HashSet<>(Arrays.asList(
@@ -147,15 +148,24 @@ public final class Coder {
         Detection det = detect(intent);
         if (language == null) language = det.confidence > 0.15 ? det.language : "ruby";
         List<String> toks = tokenizeCode(intent);
-        int count = 3;
-        Matcher num = Pattern.compile("\\d+").matcher(intent == null ? "" : intent);
-        if (num.find()) count = Math.max(1, Math.min(100, Integer.parseInt(num.group())));
+        String safe = intent == null ? "" : intent;
+        boolean arith = ADD.matcher(safe).find();
+        boolean loop = LOOP.matcher(safe).find();
+        boolean cond = COND.matcher(safe).find();
+        // for a sum "1..N" the bound is the largest number; else the first count
+        Matcher num = Pattern.compile("\\d+").matcher(safe);
+        int first = -1, max = -1;
+        while (num.find()) {
+            int v = Integer.parseInt(num.group());
+            if (first < 0) first = v;
+            max = Math.max(max, v);
+        }
+        int count = arith ? (max < 0 ? 10 : max) : (first < 0 ? 3 : first);
+        count = Math.max(1, Math.min(1000, count));
         String name = identifier(toks);
         String message = messageOf(intent, toks);
-        boolean loop = LOOP.matcher(intent == null ? "" : intent).find();
-        boolean cond = COND.matcher(intent == null ? "" : intent).find();
 
-        String code = render(language, name, message, count, loop, cond);
+        String code = render(language, name, message, count, loop, cond, arith);
         GenResult r = new GenResult();
         r.language = language;
         r.code = code;
@@ -196,21 +206,35 @@ public final class Coder {
         return false;
     }
 
-    private static String render(String lang, String name, String msg, int n, boolean loop, boolean cond) {
+    private static String render(String lang, String name, String msg, int n,
+                                 boolean loop, boolean cond, boolean arith) {
         switch (lang) {
             case "python": {
+                if (arith) {
+                    return "def " + name + "():\n    total = 0\n    for i in range(1, " + n
+                            + " + 1):\n        total += i\n    print(total)\n    return total\n\n" + name + "()\n";
+                }
                 String inner = "print(\"" + msg + "\")";
                 if (cond) inner = "if " + n + " > 0:\n        " + inner;
                 if (loop) inner = "for _ in range(" + n + "):\n        " + inner;
                 return "def " + name + "():\n    " + inner + "\n\n" + name + "()\n";
             }
             case "javascript": {
+                if (arith) {
+                    return "function " + name + "() {\n  let total = 0;\n  for (let i = 1; i <= " + n
+                            + "; i++) { total += i; }\n  console.log(total);\n  return total;\n}\n\n" + name + "();\n";
+                }
                 String inner = "console.log(\"" + msg + "\");";
                 if (cond) inner = "if (" + n + " > 0) { " + inner + " }";
                 if (loop) inner = "for (let i = 0; i < " + n + "; i++) { " + inner + " }";
                 return "function " + name + "() {\n  " + inner + "\n}\n\n" + name + "();\n";
             }
             case "c": {
+                if (arith) {
+                    return "#include <stdio.h>\n\nint " + name + "(void) {\n  int total = 0;\n  for (int i = 1; i <= "
+                            + n + "; i++) { total += i; }\n  printf(\"%d\\n\", total);\n  return total;\n}\n\n"
+                            + "int main(void) {\n  " + name + "();\n  return 0;\n}\n";
+                }
                 String inner = "printf(\"" + msg + "\\n\");";
                 if (cond) inner = "if (" + n + " > 0) { " + inner + " }";
                 if (loop) inner = "for (int i = 0; i < " + n + "; i++) { " + inner + " }";
@@ -218,10 +242,15 @@ public final class Coder {
                         + "\n}\n\nint main(void) {\n  " + name + "();\n  return 0;\n}\n";
             }
             case "java": {
+                String cls = Character.toUpperCase(name.charAt(0)) + name.substring(1);
+                if (arith) {
+                    return "public class " + cls + " {\n  static int " + name + "() {\n    int total = 0;\n    for (int i = 1; i <= "
+                            + n + "; i++) { total += i; }\n    System.out.println(total);\n    return total;\n  }\n"
+                            + "  public static void main(String[] args) {\n    " + name + "();\n  }\n}\n";
+                }
                 String inner = "System.out.println(\"" + msg + "\");";
                 if (cond) inner = "if (" + n + " > 0) { " + inner + " }";
                 if (loop) inner = "for (int i = 0; i < " + n + "; i++) { " + inner + " }";
-                String cls = Character.toUpperCase(name.charAt(0)) + name.substring(1);
                 return "public class " + cls + " {\n  static void " + name + "() {\n    " + inner
                         + "\n  }\n  public static void main(String[] args) {\n    " + name + "();\n  }\n}\n";
             }
@@ -229,6 +258,10 @@ public final class Coder {
                 return "set " + name + " = " + n + "\n" + name + " <- \"" + msg + "\"\n"
                         + name + " -< 2.0\nOmega::push " + name + " as node0\nprint " + name + "\n";
             default: { // ruby
+                if (arith) {
+                    return "def " + name + "\n  total = 0\n  (1.." + n
+                            + ").each { |i| total += i }\n  puts total\n  total\nend\n\n" + name + "\n";
+                }
                 String body = "  puts \"" + msg + "\"";
                 if (cond) body = "  if " + n + " > 0\n  " + body + "\n  end";
                 if (loop) body = "  " + n + ".times do\n  " + body + "\n  end";

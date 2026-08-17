@@ -114,6 +114,34 @@ class TestCoderGenerate < Minitest::Test
     assert_operator r[:precision], :>=, 0.90
     assert_operator r[:precision], :<=, 0.995
   end
+
+  def test_arithmetic_ruby_sums_and_runs
+    r = C.generate("sum 1 to 5", language: "ruby")
+    assert r[:valid]
+    assert_includes r[:code], "(1..5)"
+    assert_includes r[:code], "total += i"
+    # the generated Ruby ends with the function call, returning the total
+    out, = capture_io { @sum = eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal 15, @sum # 1+2+3+4+5
+    assert_equal "15", out.strip
+  end
+
+  def test_arithmetic_python_uses_upper_bound
+    code = C.generate("sum 1 to 10", language: "python")[:code]
+    assert_includes code, "range(1, 10 + 1)"
+    assert_includes code, "total += i"
+  end
+
+  def test_arithmetic_japanese_intent
+    r = C.generate("1 から 10 の 合計 を 計算 する", language: "ruby")
+    assert r[:valid]
+    assert_includes r[:code], "(1..10)"
+  end
+
+  def test_non_arith_loop_uses_first_count
+    code = C.generate("print hi 3 times loop", language: "ruby")[:code]
+    assert_includes code, "3.times"
+  end
 end
 
 class TestCoderConsole < Minitest::Test
