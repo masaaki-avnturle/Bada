@@ -23,14 +23,36 @@ public final class MindReader {
         "コード", "画像", "波", "場", "夢", "声", "色", "形", "熱", "静寂",
         "流れ", "意味", "予感", "律動", "中心"
     };
+    // Built-in Japanese "inner-experience" prior — a generative prior, not data
+    // about any real person. Lets the verbalizer connect salient thought-tokens
+    // into readable thought instead of a bare token list.
+    private static final String[] MIND_CORPUS = {
+        "光が記憶の奥で静かに揺れている",
+        "音は波となって感情の底へ流れていく",
+        "望みと恐れが心の中で交錯する",
+        "意志は時間の流れに沿って形を変える",
+        "夢の中で声が色を帯びて響く",
+        "静寂の中に予感が生まれ律動が始まる",
+        "空間の中心へ意味が静かに集まっていく",
+        "記憶と感情が波のように寄せては返す",
+        "コードが画像となって思考の場に浮かぶ",
+        "熱をもった数が意志の律動を刻んでいく"
+    };
+    private static final java.util.Set<String> PARTICLES = new java.util.HashSet<>(java.util.Arrays.asList(
+        "が", "の", "と", "に", "を", "は", "へ", "も", "で", "や", "ね", "よ", "か", "た", "て", "る"));
     private static final Pattern TOKEN =
         Pattern.compile("[A-Za-z0-9_]+|[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}]");
+    private static final Pattern CJK = Pattern.compile("[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}]");
 
     private final int dModel, nHeads, nBlocks;
+    private final boolean useCorpus;
+    private Map<String, Map<String, Integer>> bigram = new HashMap<>();
+    private Map<String, Integer> unigram = new HashMap<>();
 
-    public MindReader() { this(24, 4, 2); }
-    public MindReader(int dModel, int nHeads, int nBlocks) {
-        this.dModel = dModel; this.nHeads = nHeads; this.nBlocks = nBlocks;
+    public MindReader() { this(24, 4, 2, true); }
+    public MindReader(boolean useCorpus) { this(24, 4, 2, useCorpus); }
+    public MindReader(int dModel, int nHeads, int nBlocks, boolean useCorpus) {
+        this.dModel = dModel; this.nHeads = nHeads; this.nBlocks = nBlocks; this.useCorpus = useCorpus;
     }
 
     public static final class Result {
@@ -47,6 +69,7 @@ public final class MindReader {
         signal = signal == null ? "" : signal;
         if (signal.trim().isEmpty()) signal = "静寂 の 中 の 光";
 
+        buildLanguageModel(signal);
         List<String> tokens = tokenize(signal);
         if (tokens.size() > 48) tokens = tokens.subList(0, 48);
         if (tokens.isEmpty()) { tokens = new ArrayList<>(); tokens.add("空"); tokens.add("白"); }
@@ -65,7 +88,7 @@ public final class MindReader {
         Encoder enc = new Encoder(vocab.size(), dModel, nHeads, nBlocks, 48, qseed);
         double[][] hidden = enc.forward(ids);
 
-        String verbal = verbalize(enc, hidden, vocab);
+        String verbal = verbalize(enc, hidden, vocab, tokens);
         List<String> salient = salientTokens(enc.lastAttention(), tokens, 4);
         double[][] image = new Vision(enc, 8, 2, qseed).process(baseImage(signal));
         String[] code = generateCode(salient, qseed);
@@ -142,7 +165,31 @@ public final class MindReader {
         return ((qint << 32) ^ sigSeed) & 0x7FFFFFFFFFFFFFFFL;
     }
 
-    private String verbalize(Encoder enc, double[][] hidden, List<String> vocab) {
+    private void buildLanguageModel(String signal) {
+        bigram = new HashMap<>();
+        unigram = new HashMap<>();
+        if (!useCorpus) return;
+        List<String> texts = new ArrayList<>(java.util.Arrays.asList(MIND_CORPUS));
+        texts.add(signal);
+        for (String text : texts) {
+            List<String> toks = new ArrayList<>();
+            for (String t : tokenize(text)) if (isCjk(t)) toks.add(t);
+            for (int i = 0; i < toks.size(); i++) {
+                unigram.merge(toks.get(i), 1, Integer::sum);
+                if (i + 1 < toks.size())
+                    bigram.computeIfAbsent(toks.get(i), x -> new HashMap<>())
+                          .merge(toks.get(i + 1), 1, Integer::sum);
+            }
+        }
+    }
+
+    private String verbalize(Encoder enc, double[][] hidden, List<String> vocab, List<String> tokens) {
+        if (!unigram.isEmpty()) return corpusVerbalize(enc, hidden, vocab, tokens);
+        return baseVerbalize(enc, hidden, vocab);
+    }
+
+    /** Raw transformer decode (weight-tying argmax) — used without a corpus. */
+    private String baseVerbalize(Encoder enc, double[][] hidden, List<String> vocab) {
         double[][] lg = enc.logits(hidden);
         Map<Integer, Integer> used = new HashMap<>();
         StringBuilder sb = new StringBuilder();
@@ -157,6 +204,63 @@ public final class MindReader {
             sb.append(vocab.get(best));
         }
         return sb.toString();
+    }
+
+    /** Corpus-guided decode: transformer salience + character-bigram fluency. */
+    private String corpusVerbalize(Encoder enc, double[][] hidden, List<String> vocab, List<String> tokens) {
+        double[] hmean = meanRows(hidden);
+        List<String> salient = salientTokens(enc.lastAttention(), tokens, tokens.size());
+        String cur = null;
+        for (String t : salient) if (isCjk(t) && !PARTICLES.contains(t)) { cur = t; break; }
+        if (cur == null) for (String t : salient) if (isCjk(t)) { cur = t; break; }
+        if (cur == null) cur = salient.isEmpty() ? tokens.get(0) : salient.get(0);
+
+        StringBuilder out = new StringBuilder(cur);
+        Map<String, Integer> used = new HashMap<>();
+        used.put(cur, 1);
+        int target = Math.min(Math.max(tokens.size(), 6), 18);
+        for (int step = 0; step < target - 1; step++) {
+            Map<String, Integer> cands = bigram.getOrDefault(cur, null);
+            if (cands == null || cands.isEmpty()) cands = topUnigram(40);
+            String best = null;
+            double bestScore = Double.NEGATIVE_INFINITY;
+            for (String tok : cands.keySet()) {
+                if (tok == null) continue;
+                int bc = bigram.getOrDefault(cur, java.util.Collections.emptyMap()).getOrDefault(tok, 0);
+                double score = Math.log(bc + 1.0) + affinity(tok, hmean, vocab, enc)
+                        + wordBonus(tok) - used.getOrDefault(tok, 0) * 1.5;
+                if (score > bestScore) { bestScore = score; best = tok; }
+            }
+            if (best == null) break;
+            out.append(best);
+            used.merge(best, 1, Integer::sum);
+            cur = best;
+        }
+        return out.toString();
+    }
+
+    private double affinity(String tok, double[] hmean, List<String> vocab, Encoder enc) {
+        int idx = vocab.indexOf(tok);
+        if (idx < 0) return 0.0;
+        return Tensor.cosine(enc.embedding()[idx], hmean) * 1.2;
+    }
+
+    private double wordBonus(String tok) {
+        if (tok.matches("[A-Za-z0-9_]+")) return -2.0;
+        double b = isCjk(tok) ? 0.8 : 0.0;
+        if (java.util.Arrays.asList(LEXICON).contains(tok)) b += 0.6;
+        return b;
+    }
+
+    private Map<String, Integer> topUnigram(int n) {
+        return unigram.entrySet().stream()
+                .sorted((a, b) -> b.getValue() - a.getValue())
+                .limit(n)
+                .collect(java.util.LinkedHashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), Map::putAll);
+    }
+
+    private static boolean isCjk(String tok) {
+        return CJK.matcher(tok).find();
     }
 
     private List<String> salientTokens(double[][] attn, List<String> tokens, int top) {

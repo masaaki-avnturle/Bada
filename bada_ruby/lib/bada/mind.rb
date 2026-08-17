@@ -33,14 +33,74 @@ module Bada
 
     SILENT_TALK_BASELINE = 0.92 # reference word-accuracy of subvocal "silent talk"
 
+    # A small built-in Japanese "inner-experience" prior. The verbalizer learns
+    # a character bigram from these (plus the input signal itself) so it can
+    # connect the transformer's salient thought-tokens into readable thought,
+    # rather than emit a bare token list. It is a generative prior, not data
+    # about any real person.
+    MIND_CORPUS = [
+      "光が記憶の奥で静かに揺れている",
+      "音は波となって感情の底へ流れていく",
+      "望みと恐れが心の中で交錯する",
+      "意志は時間の流れに沿って形を変える",
+      "夢の中で声が色を帯びて響く",
+      "静寂の中に予感が生まれ律動が始まる",
+      "空間の中心へ意味が静かに集まっていく",
+      "記憶と感情が波のように寄せては返す",
+      "コードが画像となって思考の場に浮かぶ",
+      "熱をもった数が意志の律動を刻んでいく"
+    ].freeze
+
     class Reader
       attr_reader :db
 
-      def initialize(d_model: 24, n_heads: 4, n_blocks: 2, db: TupleSpace.new)
+      # corpus_texts: :default -> built-in Japanese mind prior (recommended);
+      #               an array  -> use those texts; nil -> raw transformer decode.
+      def initialize(d_model: 24, n_heads: 4, n_blocks: 2, db: TupleSpace.new, corpus_texts: :default)
         @d_model = d_model
         @n_heads = n_heads
         @n_blocks = n_blocks
         @db = db
+        @base_corpus =
+          case corpus_texts
+          when :default then MIND_CORPUS
+          when nil then nil
+          else Array(corpus_texts)
+          end
+        @bigram = Hash.new { |h, k| h[k] = Hash.new(0) }
+        @unigram = Hash.new(0)
+      end
+
+      # Learn a bigram / unigram language model from corpus texts so the
+      # verbalizer can connect the transformer's salient thought-tokens into
+      # fluent language. Without a corpus the verbalizer falls back to the raw
+      # transformer decode.
+      def train_corpus(texts)
+        Array(texts).each do |text|
+          # keep only natural-language (CJK) tokens so the model verbalizes as
+          # thought/prose, not the corpus's dense LaTeX/math notation.
+          toks = Entropy.tokenize(text.to_s).select { |t| cjk?(t) }
+          toks.each_index do |i|
+            @unigram[toks[i]] += 1
+            @bigram[toks[i]][toks[i + 1]] += 1 if i + 1 < toks.length
+          end
+        end
+        self
+      end
+
+      def corpus?
+        !@unigram.empty?
+      end
+
+      # Build the character bigram fresh for this read: the built-in mind prior
+      # (or a user corpus) plus the input signal itself, so the thought's own
+      # words participate in the verbalization.
+      def build_language_model(signal)
+        @bigram = Hash.new { |h, k| h[k] = Hash.new(0) }
+        @unigram = Hash.new(0)
+        return if @base_corpus.nil?
+
+        train_corpus(@base_corpus + [signal])
       end
 
       # Read a signal and return the structured "thought". `signal` is text (or
@@ -49,6 +109,7 @@ module Bada
         signal = signal.to_s
         signal = "静寂 の 中 の 光" if signal.strip.empty?
 
+        build_language_model(signal)
         tokens = Entropy.tokenize(signal).first(48)
         tokens = %w[空 白] if tokens.empty?
         vocab = (tokens.uniq + LEXICON).uniq
@@ -63,7 +124,7 @@ module Bada
         )
         hidden = enc.forward(ids)
 
-        verbalization = verbalize(enc, hidden, vocab)
+        verbalization = verbalize(enc, hidden, vocab, tokens)
         salient = salient_tokens(enc.last_attention, tokens, top: 4)
         image = Transformer::Vision.new(encoder: enc, grid: 8, patch: 2, seed: qseed)
                                    .process(base_image(signal))
@@ -145,7 +206,15 @@ module Bada
         ((qint << 32) ^ sig_seed) & 0xFFFFFFFFFFFFFFFF
       end
 
-      def verbalize(enc, hidden, vocab)
+      def verbalize(enc, hidden, vocab, tokens)
+        return corpus_verbalize(enc, hidden, vocab, tokens) if corpus?
+
+        base_verbalize(enc, hidden, vocab)
+      end
+
+      # Raw transformer decode (weight-tying argmax) — used when no corpus is
+      # available. Produces a manifold-gauge re-expression of the thought tokens.
+      def base_verbalize(enc, hidden, vocab)
         lg = enc.logits(hidden)
         used = Hash.new(0)
         toks = lg.map do |row|
@@ -162,6 +231,75 @@ module Bada
           vocab[best]
         end
         toks.join
+      end
+
+      # Corpus-guided decode: the transformer picks salient thought-tokens and
+      # their affinity; the corpus bigram supplies fluent connective tissue. At
+      # each step choose the next token maximizing
+      #   log(bigram+1) + transformer_affinity(next) - repetition_penalty
+      # so the utterance reads like language while surfacing the thought.
+      def corpus_verbalize(enc, hidden, vocab, tokens)
+        hmean = mean_rows(hidden)
+        salient = salient_tokens(enc.last_attention, tokens, top: tokens.length)
+        cur = salient.find { |t| cjk?(t) && !particle?(t) } ||
+              salient.find { |t| cjk?(t) } || salient.first || tokens.first
+        out = [cur]
+        used = Hash.new(0)
+        used[cur] += 1
+        target = tokens.length.clamp(6, 18)
+
+        (target - 1).times do
+          cands = @bigram[cur]
+          cands = top_unigram(40) if cands.nil? || cands.empty?
+          best = nil
+          best_score = -Float::INFINITY
+          cands.each_key do |tok|
+            next if tok.nil?
+            score = Math.log(@bigram[cur][tok] + 1.0) +
+                    affinity(tok, hmean, vocab, enc) +
+                    word_bonus(tok) -
+                    used[tok] * 1.5
+            if score > best_score
+              best_score = score
+              best = tok
+            end
+          end
+          break if best.nil?
+          out << best
+          used[best] += 1
+          cur = best
+        end
+        out.join
+      end
+
+      # Prefer natural-language (CJK / lexicon) tokens over the corpus's dense
+      # math notation so the verbalization reads as thought, not LaTeX.
+      def word_bonus(tok)
+        return -2.0 if tok.match?(/\A[A-Za-z0-9_]+\z/)
+        b = cjk?(tok) ? 0.8 : 0.0
+        b += 0.6 if LEXICON.include?(tok)
+        b
+      end
+
+      def cjk?(tok)
+        tok.match?(/[一-鿿ぁ-んァ-ヶ]/)
+      end
+
+      PARTICLES = %w[が の と に を は へ も で や ね よ か た て で る].freeze
+      def particle?(tok)
+        PARTICLES.include?(tok)
+      end
+
+      # Transformer affinity of a candidate token: cosine of its manifold-gauge
+      # embedding with the mean thought context (0 for out-of-vocab corpus words).
+      def affinity(tok, hmean, vocab, enc)
+        idx = vocab.index(tok)
+        return 0.0 if idx.nil?
+        Transformer::Tensor.cosine(enc.embedding[idx], hmean) * 1.2
+      end
+
+      def top_unigram(n)
+        @unigram.sort_by { |_, c| -c }.first(n).to_h
       end
 
       # Tokens most attended-to (column sums of the last attention matrix).

@@ -313,7 +313,13 @@ m.close
 
 ```bash
 bin/bada mind "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する" --subject 被験者A
+bin/bada mind "記憶と感情の波" --raw   # コーパス prior を使わず素のトランスフォーマー復号
 ```
+
+言語化は、トランスフォーマーの多様体ゲージ注意が**重要語**を選び、内蔵の日本語
+「内的体験」prior（`MIND_CORPUS`）＋入力信号から学習した文字バイグラムが**自然な
+つなぎ**を与えるハイブリッドです（`--raw` で prior 無しの素の復号に切替）。`Reader.new`
+に `corpus_texts:` を渡せば任意の日本語コーパスで学習できます。
 
 ```ruby
 require "bada"

@@ -125,4 +125,31 @@ class TestMindReader < Minitest::Test
     r = @reader.read("望み と 恐れ が 交錯 する 意志 の 光")
     assert_equal (r[:precision] > Bada::Mind::SILENT_TALK_BASELINE), r[:exceeds_silent_talk]
   end
+
+  def test_default_verbalization_is_corpus_guided_japanese
+    # the default reader uses the built-in Japanese mind prior
+    r = @reader.read("光 と 音 の 記憶")
+    assert @reader.corpus?
+    assert(r[:verbalization].each_char.any? { |c| c.match?(/[一-鿿ぁ-んァ-ヶ]/) })
+  end
+
+  def test_raw_mode_falls_back_without_corpus
+    raw = Bada::Mind::Reader.new(corpus_texts: nil)
+    r = raw.read("光 と 音 の 記憶")
+    refute raw.corpus?
+    refute_empty r[:verbalization]
+  end
+
+  def test_custom_corpus_is_used
+    custom = Bada::Mind::Reader.new(corpus_texts: ["光が波になり音が色になる"])
+    r = custom.read("光 と 音")
+    assert custom.corpus?
+    refute_empty r[:verbalization]
+  end
+
+  def test_verbalization_does_not_start_on_a_particle
+    r = @reader.read("記憶 と 感情 の 波")
+    first = r[:verbalization][0]
+    refute_includes Bada::Mind::Reader::PARTICLES, first
+  end
 end

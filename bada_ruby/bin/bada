@@ -132,17 +132,21 @@ when "qc"
 when "mind"
   # Thought verbalization simulation (uses the pseudo QC + manifold-gauge
   # transformer): verbalize + mental image + the Bada-language "app in the mind".
-  #   bada mind "光 と 音 の 記憶"  [--subject 名前]
+  # The corpus/*.txt files train a bigram model so the verbalization is fluent.
+  #   bada mind "光 と 音 の 記憶"  [--subject 名前] [--raw]
   subject = "対象"
+  raw = false
   words = []
   until ARGV.empty?
     case (a = ARGV.shift)
     when "--subject" then subject = ARGV.shift
+    when "--raw" then raw = true # skip corpus, use raw transformer decode
     else words << a
     end
   end
   signal = words.join(" ")
-  puts Bada::Mind::Reader.new.render(signal, subject: subject)
+  reader = raw ? Bada::Mind::Reader.new(corpus_texts: nil) : Bada::Mind::Reader.new
+  puts reader.render(signal, subject: subject)
 when "xi"
   text = ARGV.join(" ")
   s = Bada::Manifold.invariant(text)
