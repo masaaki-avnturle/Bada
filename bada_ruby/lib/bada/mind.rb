@@ -51,6 +51,21 @@ module Bada
       "熱をもった数が意志の律動を刻んでいく"
     ].freeze
 
+    # English "inner-experience" prior — used when the input signal is English,
+    # so verbalization works in English too (英語も可能に).
+    MIND_CORPUS_EN = [
+      "light trembles quietly in the depth of memory",
+      "sound becomes a wave and flows to the floor of feeling",
+      "hope and fear cross within the center of the mind",
+      "will changes its form along the flow of time",
+      "in the dream a voice takes on color and resonates",
+      "in the silence a premonition is born and a rhythm begins",
+      "meaning gathers quietly toward the center of space",
+      "memory and emotion return like waves on a shore",
+      "code becomes an image and floats in the field of thought",
+      "a number carrying heat marks the rhythm of the will"
+    ].freeze
+
     class Reader
       attr_reader :db
 
@@ -61,14 +76,18 @@ module Bada
         @n_heads = n_heads
         @n_blocks = n_blocks
         @db = db
-        @base_corpus =
-          case corpus_texts
-          when :default then MIND_CORPUS
-          when nil then nil
-          else Array(corpus_texts)
-          end
+        @corpus_mode = corpus_texts # :default | nil | array
+        @base_corpus = corpus_texts == :default ? nil : (corpus_texts && Array(corpus_texts))
         @bigram = Hash.new { |h, k| h[k] = Hash.new(0) }
         @unigram = Hash.new(0)
+        @lang_en = false
+      end
+
+      # Detect whether the signal is (mostly) English vs Japanese.
+      def english?(text)
+        letters = text.scan(/[A-Za-z]/).length
+        cjk = text.scan(/[一-鿿ぁ-んァ-ヶ]/).length
+        letters > cjk
       end
 
       # Learn a bigram / unigram language model from corpus texts so the
@@ -77,15 +96,19 @@ module Bada
       # transformer decode.
       def train_corpus(texts)
         Array(texts).each do |text|
-          # keep only natural-language (CJK) tokens so the model verbalizes as
-          # thought/prose, not the corpus's dense LaTeX/math notation.
-          toks = Entropy.tokenize(text.to_s).select { |t| cjk?(t) }
+          # keep natural-language tokens for the detected language so output
+          # reads as thought/prose (CJK chars, or English words).
+          toks = Entropy.tokenize(text.to_s).select { |t| lang_token?(t) }
           toks.each_index do |i|
             @unigram[toks[i]] += 1
             @bigram[toks[i]][toks[i + 1]] += 1 if i + 1 < toks.length
           end
         end
         self
+      end
+
+      def lang_token?(tok)
+        @lang_en ? tok.match?(/\A[A-Za-z]+\z/) : cjk?(tok)
       end
 
       def corpus?
@@ -96,11 +119,18 @@ module Bada
       # (or a user corpus) plus the input signal itself, so the thought's own
       # words participate in the verbalization.
       def build_language_model(signal)
+        @lang_en = english?(signal)
         @bigram = Hash.new { |h, k| h[k] = Hash.new(0) }
         @unigram = Hash.new(0)
-        return if @base_corpus.nil?
+        corpus =
+          case @corpus_mode
+          when :default then (@lang_en ? MIND_CORPUS_EN : MIND_CORPUS)
+          when nil then nil
+          else @base_corpus
+          end
+        return if corpus.nil?
 
-        train_corpus(@base_corpus + [signal])
+        train_corpus(corpus + [signal])
       end
 
       # Read a signal and return the structured "thought". `signal` is text (or
@@ -241,8 +271,8 @@ module Bada
       def corpus_verbalize(enc, hidden, vocab, tokens)
         hmean = mean_rows(hidden)
         salient = salient_tokens(enc.last_attention, tokens, top: tokens.length)
-        cur = salient.find { |t| cjk?(t) && !particle?(t) } ||
-              salient.find { |t| cjk?(t) } || salient.first || tokens.first
+        cur = salient.find { |t| lang_token?(t) && !stopword?(t) } ||
+              salient.find { |t| lang_token?(t) } || salient.first || tokens.first
         out = [cur]
         used = Hash.new(0)
         used[cur] += 1
@@ -269,12 +299,16 @@ module Bada
           used[best] += 1
           cur = best
         end
-        out.join
+        @lang_en ? out.join(" ") : out.join
       end
 
-      # Prefer natural-language (CJK / lexicon) tokens over the corpus's dense
-      # math notation so the verbalization reads as thought, not LaTeX.
+      # Prefer natural-language tokens so the verbalization reads as thought.
+      # Language-aware: JA rewards CJK/lexicon; EN rewards non-stopword words.
       def word_bonus(tok)
+        if @lang_en
+          return -2.0 unless tok.match?(/\A[A-Za-z]+\z/)
+          return stopword?(tok) ? 0.1 : 0.8
+        end
         return -2.0 if tok.match?(/\A[A-Za-z0-9_]+\z/)
         b = cjk?(tok) ? 0.8 : 0.0
         b += 0.6 if LEXICON.include?(tok)
@@ -286,8 +320,9 @@ module Bada
       end
 
       PARTICLES = %w[が の と に を は へ も で や ね よ か た て で る].freeze
-      def particle?(tok)
-        PARTICLES.include?(tok)
+      EN_STOP = %w[the a an of and or to in on at is are be it as with for that this].freeze
+      def stopword?(tok)
+        @lang_en ? EN_STOP.include?(tok.downcase) : PARTICLES.include?(tok)
       end
 
       # Transformer affinity of a candidate token: cosine of its manifold-gauge

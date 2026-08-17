@@ -1,5 +1,6 @@
 package bada.desktop;
 
+import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
@@ -42,6 +43,14 @@ public final class DesktopApp {
             System.out.println(new MindReader().render(sig, "対象"));
             return;
         }
+        if (joined.startsWith("--code")) {
+            String intent = joined.substring("--code".length()).trim();
+            Coder.GenResult r = Coder.generate(intent, null);
+            System.out.println("# language: " + r.language + "  precision="
+                    + String.format("%.1f%%", r.precision * 100));
+            System.out.println(r.code);
+            return;
+        }
         if (headless || (!joined.isEmpty() && !joined.equals("--gui"))) {
             String message = joined.isEmpty() || joined.equals("--gui") ? "HELLO SPACE" : joined;
             System.out.println(new SpaceTelegraph("GaAs", 4.0, 3).render(message));
@@ -63,6 +72,7 @@ public final class DesktopApp {
         tabs.addTab("① 宇宙電信 (Telegraph)", telegraphPanel());
         tabs.addTab("② 擬似量子計算機 (Pseudo QC)", qcPanel());
         tabs.addTab("③ 思考言語化 (Mind)", mindPanel());
+        tabs.addTab("④ コード生成 (Coder)", coderPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -200,6 +210,76 @@ public final class DesktopApp {
         root.add(top, BorderLayout.NORTH);
         root.add(new JScrollPane(output), BorderLayout.CENTER);
         run.run();
+        return root;
+    }
+
+    // ------------------------------------------------------------------ Coder
+    private static JPanel coderPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+
+        JTextField intent = new JTextField("print hello 3 times loop");
+        JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
+        JButton gen = new JButton("生成 (Generate)");
+
+        JPanel row1 = new JPanel(new BorderLayout(6, 6));
+        JPanel l1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        l1.add(new JLabel("意図 (EN/日本語):"));
+        row1.add(l1, BorderLayout.WEST);
+        row1.add(intent, BorderLayout.CENTER);
+        JPanel r1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(gen);
+        row1.add(r1, BorderLayout.EAST);
+
+        // live word completion (command feature)
+        JTextField prefix = new JTextField();
+        JLabel completions = new JLabel(" ");
+        JPanel row2 = new JPanel(new BorderLayout(6, 6));
+        JPanel l2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        l2.add(new JLabel("補完 (prefix):"));
+        row2.add(l2, BorderLayout.WEST);
+        row2.add(prefix, BorderLayout.CENTER);
+        row2.add(completions, BorderLayout.SOUTH);
+
+        top.add(row1, BorderLayout.NORTH);
+        top.add(row2, BorderLayout.SOUTH);
+
+        JTextArea output = monospaceArea();
+
+        Runnable generate = () -> {
+            String selected = (String) lang.getSelectedItem();
+            String l = "auto".equals(selected) ? null : selected;
+            Coder.GenResult r = Coder.generate(intent.getText(), l);
+            StringBuilder sb = new StringBuilder();
+            sb.append("# language : ").append(r.language)
+              .append(String.format("  (confidence %.2f)%n", r.confidence));
+            sb.append("# reserved : ").append(String.join(" ", r.reservedUsed)).append("\n");
+            sb.append(String.format("# precision: %.1f%%  (silent-talk %.1f%%)%n%n",
+                    r.precision * 100, Coder.SILENT_TALK_BASELINE * 100));
+            sb.append(r.code);
+            output.setText(sb.toString());
+            output.setCaretPosition(0);
+        };
+        gen.addActionListener(e -> generate.run());
+        intent.addActionListener(e -> generate.run());
+
+        Runnable complete = () -> {
+            String selected = (String) lang.getSelectedItem();
+            String l = "auto".equals(selected) ? null : selected;
+            java.util.List<String> c = Coder.complete(prefix.getText().trim(), l);
+            completions.setText("→ " + String.join("   ", c));
+        };
+        prefix.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+        });
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        generate.run();
         return root;
     }
 

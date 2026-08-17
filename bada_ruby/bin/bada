@@ -12,6 +12,10 @@
 #   bin/bada qc [bell|ghz|run f.qasm]   von-Neumann pseudo QC: monitor + statevector
 #   bin/bada qc verilog [ghz|f.qasm]    emit semiconductor (Verilog) control source
 #   bin/bada mind "信号..."             thought verbalization + image + code (sim)
+#   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
+#   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
+#   bin/bada detect "code..."           auto-detect the programming language
+#   bin/bada coder                      interactive command console (completion)
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a Bada language script
@@ -147,6 +151,53 @@ when "mind"
   signal = words.join(" ")
   reader = raw ? Bada::Mind::Reader.new(corpus_texts: nil) : Bada::Mind::Reader.new
   puts reader.render(signal, subject: subject)
+when "code"
+  # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.
+  #   bada code "print hello 3 times" [--lang python]
+  lang = nil
+  words = []
+  until ARGV.empty?
+    case (a = ARGV.shift)
+    when "--lang", "-l" then lang = ARGV.shift
+    else words << a
+    end
+  end
+  r = Bada::Coder.generate(words.join(" "), language: lang)
+  puts format("# language : %s  (confidence %.2f)", r[:language], r[:detected][:confidence])
+  puts format("# reserved : %s", r[:reserved_used].join(" "))
+  puts format("# precision: %.1f%%  (silent-talk %.1f%%)  valid=%s",
+              r[:precision] * 100, Bada::Coder::SILENT_TALK_BASELINE * 100, r[:valid])
+  puts
+  puts r[:code]
+when "complete"
+  # Word completion (reserved words + builtins).  bada complete def [--lang ruby]
+  lang = nil
+  prefix = nil
+  until ARGV.empty?
+    case (a = ARGV.shift)
+    when "--lang", "-l" then lang = ARGV.shift
+    else prefix = a
+    end
+  end
+  puts Bada::Coder.complete(prefix.to_s, language: lang).join("\n")
+when "detect"
+  d = Bada::Coder.detect(ARGV.join(" "))
+  puts format("language  : %s", d[:language])
+  puts format("confidence: %.2f", d[:confidence])
+  puts format("scores    : %s", d[:scores].reject { |_, v| v.zero? })
+when "coder"
+  # Interactive command console: :lang :reserved :complete :gen :use, or plain intent.
+  console = Bada::Coder::Console.new
+  puts "Bada coder console — :lang :reserved :complete :gen :use <lang> | intent | 'exit'"
+  loop do
+    print "coder> "
+    line = $stdin.gets
+    break if line.nil?
+    line = line.chomp
+    break if %w[exit quit].include?(line)
+    out = console.run(line)
+    puts out unless out.empty?
+  end
 when "xi"
   text = ARGV.join(" ")
   s = Bada::Manifold.invariant(text)
@@ -179,6 +230,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | code | complete | detect | coder | run | learn | xi | neural | train | version"
   exit 1
 end

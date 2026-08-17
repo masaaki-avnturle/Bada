@@ -19,6 +19,7 @@ import android.widget.TextView;
 
 import java.util.concurrent.Executors;
 
+import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
@@ -35,6 +36,7 @@ public class MainActivity extends Activity {
 
     private static final String QC_DEMO = "H 0; CX 0 1; HALT";
     private static final String MIND_DEMO = "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する";
+    private static final String CODE_DEMO = "print hello 3 times loop";
 
     private Spinner mode;
     private EditText input;
@@ -60,7 +62,8 @@ public class MainActivity extends Activity {
         mode = new Spinner(this);
         mode.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
                 new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射",
-                        "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)"}));
+                        "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)",
+                        "⑤ コード生成 Coder (EN/JA)"}));
         root.addView(mode);
 
         input = new EditText(this);
@@ -85,6 +88,7 @@ public class MainActivity extends Activity {
                     case 0 -> input.setText("QUANTUM HELLO FROM EARTH");
                     case 1, 2 -> input.setText(QC_DEMO);
                     case 3 -> input.setText(MIND_DEMO);
+                    case 4 -> input.setText(CODE_DEMO);
                     default -> { }
                 }
                 runSelected();
@@ -120,6 +124,7 @@ public class MainActivity extends Activity {
                 result = switch (m) {
                     case 0 -> telegraph(text, mat);
                     case 3 -> new MindReader().render(text, "対象");
+                    case 4 -> coder(text);
                     default -> pseudoQc(text, m == 2);
                 };
             } catch (Throwable t) {
@@ -133,6 +138,18 @@ public class MainActivity extends Activity {
     private String telegraph(String text, String material) {
         String msg = text.trim().isEmpty() ? "HELLO SPACE" : text.trim();
         return new SpaceTelegraph(material, 4.0, 3).render(msg);
+    }
+
+    private String coder(String intent) {
+        Coder.GenResult r = Coder.generate(intent, null);
+        StringBuilder sb = new StringBuilder();
+        sb.append("# language : ").append(r.language)
+          .append(String.format("  (confidence %.2f)\n", r.confidence));
+        sb.append("# reserved : ").append(String.join(" ", r.reservedUsed)).append("\n");
+        sb.append(String.format("# precision: %.1f%%  (silent-talk %.1f%%)\n\n",
+                r.precision * 100, Coder.SILENT_TALK_BASELINE * 100));
+        sb.append(r.code);
+        return sb.toString();
     }
 
     private String pseudoQc(String text, boolean verilog) {

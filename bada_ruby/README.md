@@ -342,6 +342,36 @@ r[:exceeds_silent_talk]  # 基準超えか
 
 決定的（同じ信号→同じ出力）で、外部依存はありません。
 
+## 思考→コード — `Bada::Coder`（英語＋日本語・言語自動判定・補完・予約語認識）
+
+思考の言語化を**プログラミング**に拡張。**英語も日本語**も入力でき、**プログラミング言語を
+自動判定**し、**予約語を自動認識**、**コマンド機能で単語補完**、simulated 精度でコードを生成します。
+
+```bash
+bin/bada code "print hello 3 times loop"           # 言語自動判定して生成
+bin/bada code "メッセージ を 5 回 繰り返し 表示 する" -l ruby
+bin/bada detect "public class A { System.out.println(1); }"   # => java
+bin/bada complete def -l ruby                       # 予約語/組込みの単語補完
+bin/bada coder                                      # 対話コンソール（:lang :complete :gen …）
+```
+
+```ruby
+Bada::Coder.detect("def f():\n    print(1)")[:language]    # => "python"
+Bada::Coder.reserved_words("for i in range(3): pass", language: "python")  # => ["for","in"]
+Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
+Bada::Coder.generate("loop print hi 4 times", language: "python")[:code]
+```
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| 英語も可能に | `Bada::Coder`（EN/JA 両対応）・`Bada::Mind` の英語 verbalization（`MIND_CORPUS_EN`） |
+| プログラミング言語の自動認識 | `Coder.detect`（予約語・組込み・シグネチャで ruby/python/js/c/java/bada を判定） |
+| コマンド機能で単語補完 | `Coder::Console`（`:complete`）＋ `Coder.complete`（Trie 前方一致） |
+| 予約語の自動認識 | `Coder.reserved_words` / `Coder.annotate`（keyword/builtin/identifier 判別） |
+| silent talk 以上の精度でプログラミング | `Coder.generate`（意図→IR→各言語の正しい構文、Ruby は構文検証、simulated 精度） |
+
+対応言語：**Ruby / Python / JavaScript / C / Java / Bada**。生成 Ruby は `RubyVM` で構文検証します。
+
 ## モジュール構成
 
 ```
@@ -385,6 +415,7 @@ lib/bada/transformer/tensor.rb   純Ruby 行列演算 + 決定的 PRNG
 lib/bada/transformer/model.rb    多様体ゲージ・マルチヘッド注意 Encoder
 lib/bada/transformer/vision.rb   画像処理トランスフォーマー（ViT）
 lib/bada/mind.rb             思考の言語化・心像・脳内コード生成（simulation Facade）
+lib/bada/coder.rb            思考→コード：言語自動判定・単語補完・予約語認識・生成（EN/JA）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

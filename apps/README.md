@@ -11,13 +11,16 @@
 - **③ 思考言語化 (Mind, simulation)** — 擬似QC で量子サンプリングし、ガンマ関数の大域的
   部分積分多様体をゲージにした Bada 製トランスフォーマーで、入力信号から思考の言語化・
   心像（ViT）・脳内アプリの Bada ソースを**合成**（実在の脳を読むものではありません）
+- **④ コード生成 (Coder)** — 英語＋日本語の意図から、**プログラミング言語を自動判定**し、
+  **予約語認識**・**単語補完**・コード生成（Ruby/Python/JS/C/Java/Bada）
 
 ```
 apps/
 ├── core/       共有 Java コア
 │   ├── bada/quantum/  Bell/CHSH・5次カリア・Jones・不確定性・半導体・通信（電信）
 │   ├── bada/qc/       DiskMemory(HDD)・Logic(MOSFET)・CPU・Monitor・Verilog（擬似QC）
-│   └── bada/mind/     Tensor・Encoder(多様体ゲージ注意)・Vision(ViT)・MindReader（思考言語化）
+│   ├── bada/mind/     Tensor・Encoder(多様体ゲージ注意)・Vision(ViT)・MindReader（思考言語化）
+│   └── bada/coder/    Coder（言語自動判定・単語補完・予約語認識・コード生成 EN/JA）
 ├── desktop/    Windows/Linux/デスクトップ front end（Swing タブ GUI ＋ CLI）
 └── android/    Android アプリ（Gradle プロジェクト）
 ```

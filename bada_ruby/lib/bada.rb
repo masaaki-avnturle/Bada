@@ -48,6 +48,7 @@ require_relative "bada/quantum"
 require_relative "bada/qc"
 require_relative "bada/transformer"
 require_relative "bada/mind"
+require_relative "bada/coder"
 require_relative "bada/chat"
 require_relative "bada/nn"
 
