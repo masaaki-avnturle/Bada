@@ -1,8 +1,9 @@
-name: Build Bada Telegraph apps (APK + Windows EXE)
+name: Build Bada apps (APK + Windows + Linux)
 
-# Builds the downloadable native apps from apps/ :
-#   * Android  -> app-debug.apk        (installable, debug-signed)
-#   * Windows  -> BadaTelegraph.exe     (jpackage installer + portable zip)
+# Builds the downloadable native apps from apps/ (Space Telegraph + Pseudo QC):
+#   * Android       -> BadaTelegraph.apk            (installable, debug-signed)
+#   * Windows 10/11 -> BadaTelegraph.exe + zip       (jpackage installer + portable)
+#   * Ubuntu Linux  -> BadaTelegraph_*.deb + tar.gz  (jpackage .deb + portable)
 #
 # Triggers:
 #   * push a tag  vX.Y.Z   -> builds AND publishes them to a GitHub Release
@@ -112,3 +113,57 @@ jobs:
           files: |
             BadaTelegraph-windows-x64.zip
             build/installer/*.exe
+
+  # -------------------------------------------------------------------- Linux
+  linux-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (jpackage)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot binutils
+
+      - name: Compile core + desktop
+        run: |
+          mkdir -p build/classes build/jar
+          find apps/core/src apps/desktop/src -name '*.java' > sources.txt
+          javac -encoding UTF-8 -d build/classes @sources.txt
+          jar --create --file build/jar/BadaTelegraph.jar --main-class bada.desktop.DesktopApp -C build/classes .
+
+      - name: Build portable app-image (Linux)
+        run: |
+          jpackage --type app-image --name BadaTelegraph \
+            --input build/jar --main-jar BadaTelegraph.jar --main-class bada.desktop.DesktopApp \
+            --dest build/dist --java-options "-Dfile.encoding=UTF-8"
+          tar -C build/dist -czf BadaTelegraph-linux-x64.tar.gz BadaTelegraph
+
+      - name: Build .deb (Ubuntu)
+        continue-on-error: true
+        run: |
+          jpackage --type deb --name BadaTelegraph \
+            --input build/jar --main-jar BadaTelegraph.jar --main-class bada.desktop.DesktopApp \
+            --dest build/deb --app-version 1.0 --linux-shortcut \
+            --java-options "-Dfile.encoding=UTF-8"
+          ls -l build/deb
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: BadaTelegraph-linux
+          path: |
+            BadaTelegraph-linux-x64.tar.gz
+            build/deb/*.deb
+
+      - name: Attach Linux apps to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            BadaTelegraph-linux-x64.tar.gz
+            build/deb/*.deb

@@ -265,6 +265,41 @@ tg.transmit("SOS")[:recovered]    # 超密度符号化で実際にメッセー�
 > とする正当な古典チャネル（1ペアあたり2ビットの超密度符号化）として通信します。
 > 送受信ログは `Ω::DATABASE`（アカシック TupleSpace）に多様体不変量 `Ξ` 付きで記録。
 
+## 擬似量子計算機 — `Bada::QC`（ノイマン型・ディスク内蔵・半導体制御）
+
+量子コンピュータの**制御回路をモニタに投射**し、**PC のハードディスク内部に電子回路を
+シミュレーション**（ディスクメモリ内蔵シミュレーション）して、その結果で動く**ノイマン型
+の擬似量子コンピュータ**を Bada で実装。**量子コンピュータの半導体ソースコード（Verilog）**
+も生成します。
+
+```bash
+bin/bada qc                     # Bell デモ：モニタ投射＋状態ベクトル（ディスクから読戻し）
+bin/bada qc ghz                 # 3量子ビット GHZ デモ
+bin/bada qc run prog.qasm --n 3 # BadaQASM プログラムを実行
+bin/bada qc verilog ghz         # 半導体（Verilog）制御回路ソースを出力
+```
+
+```ruby
+require "bada"
+m = Bada::QC::Machine.new(n_qubits: 2).load("H 0\nCX 0 1\nHALT\n").run
+m.probabilities   # => [0.5, 0.0, 0.0, 0.5]  (Bell 状態、実ファイル＝HDD から読戻し)
+puts m.monitor    # 制御回路のモニタ投射（PC→DISK→半導体デコーダ→ゲート）
+puts m.verilog    # 半導体 RTL（NAND プリミティブ＋デコーダ＋ROM 制御）
+m.close
+```
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| 制御回路をモニタに投射する機知 | `Bada::QC::Monitor`（ノイマン型データパス＋量子回路タイムライン） |
+| HDD 内部に電子回路をシミュレーション | `Bada::QC::Logic`（CMOS/MOSFET NAND から作るワンホット・デコーダ） |
+| ディスクメモリ内蔵シミュレーション | `Bada::QC::DiskMemory`（状態ベクトルとプログラムを実ファイル＝HDD に格納） |
+| ノイマン型の擬似量子コンピュータ | `Bada::QC::CPU`（fetch→半導体デコード→実行のストアドプログラム機械） |
+| 量子コンピュータの半導体ソースコード | `Bada::QC::Verilog`（合成可能な RTL を自動生成） |
+
+`Bada::QC::ISA` は BadaQASM（`H X Y Z S T CX RX RZ MEASURE HALT`）を 4 ワード命令に符号化し、
+プログラムと状態ベクトルを**同一のディスクアドレス空間**に置きます（＝ノイマン型）。命令の
+デコードは `Bada::QC::Logic` の**半導体シミュレーション結果**でワンホット選択します。
+
 ## モジュール構成
 
 ```
@@ -297,6 +332,13 @@ lib/bada/quantum/uncertainty.rb  Robertson 不確定性 + Born 確率統計
 lib/bada/quantum/semiconductor.rb Fermi–Dirac / バンドギャップ / トンネル
 lib/bada/quantum/channel.rb      超密度符号化・反復符号・誤り訂正の通信路
 lib/bada/quantum/telegraph.rb    SpaceTelegraph（証明+送信の Facade）
+lib/bada/qc/disk_memory.rb   ディスク(HDD)内蔵メモリ：状態ベクトル＋プログラム
+lib/bada/qc/logic.rb         CMOS/MOSFET NAND 電子回路シミュレーション＋デコーダ
+lib/bada/qc/isa.rb           BadaQASM 命令セット＋ストアドプログラム符号化
+lib/bada/qc/cpu.rb           ノイマン型 fetch-decode-execute 制御ユニット
+lib/bada/qc/monitor.rb       制御回路のモニタ投射
+lib/bada/qc/verilog.rb       半導体（RTL）ソースコード生成
+lib/bada/qc/machine.rb       擬似量子計算機 Machine（Facade）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

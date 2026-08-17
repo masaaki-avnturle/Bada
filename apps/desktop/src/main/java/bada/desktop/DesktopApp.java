@@ -1,5 +1,6 @@
 package bada.desktop;
 
+import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
 import javax.swing.*;
@@ -8,24 +9,35 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Bada Space Telegraph — Windows/desktop front end.
+ * Bada — Windows/Linux/desktop front end. Two tabs:
+ *   ① Space Telegraph   (量子もつれ・汎用電信通信)
+ *   ② Pseudo QC          (ノイマン型・ディスク内蔵・半導体制御の擬似量子計算機)
  *
- * Run with no arguments to open the Swing GUI (this is how the packaged .exe
- * launches). Pass a message on the command line for a one-shot console report:
+ * Run with no arguments to open the Swing GUI (how the packaged app launches).
+ * Pass a message for a one-shot telegraph console report, or `--qc` for the
+ * pseudo QC console report:
  *
  *   BadaTelegraph "HELLO SPACE"
+ *   BadaTelegraph --qc
  */
 public final class DesktopApp {
 
     public static void main(String[] args) {
-        // Console output as UTF-8 so the Japanese report renders correctly.
         System.setOut(new PrintStream(System.out, true, StandardCharsets.UTF_8));
 
         boolean headless = GraphicsEnvironment.isHeadless();
-        String message = String.join(" ", args).trim();
+        String joined = String.join(" ", args).trim();
 
-        if (headless || (!message.isEmpty() && !message.equals("--gui"))) {
-            if (message.isEmpty() || message.equals("--gui")) message = "HELLO SPACE";
+        if (joined.equals("--qc")) {
+            try (PseudoQC m = PseudoQC.bell()) {
+                System.out.println(m.report());
+                System.out.println();
+                System.out.println(m.verilog());
+            }
+            return;
+        }
+        if (headless || (!joined.isEmpty() && !joined.equals("--gui"))) {
+            String message = joined.isEmpty() || joined.equals("--gui") ? "HELLO SPACE" : joined;
             System.out.println(new SpaceTelegraph("GaAs", 4.0, 3).render(message));
             return;
         }
@@ -37,61 +49,115 @@ public final class DesktopApp {
             UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
         } catch (Exception ignored) { }
 
-        JFrame frame = new JFrame("Bada 量子もつれ・汎用電信通信機 — Space Telegraph");
+        JFrame frame = new JFrame("Bada — 量子もつれ電信 ＋ 擬似量子計算機");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setSize(820, 640);
-        frame.setLayout(new BorderLayout(8, 8));
+        frame.setSize(900, 700);
 
-        // ---- controls -------------------------------------------------------
+        JTabbedPane tabs = new JTabbedPane();
+        tabs.addTab("① 宇宙電信 (Telegraph)", telegraphPanel());
+        tabs.addTab("② 擬似量子計算機 (Pseudo QC)", qcPanel());
+        frame.add(tabs);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+    }
+
+    // ---------------------------------------------------------------- Telegraph
+    private static JPanel telegraphPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
         JPanel top = new JPanel(new BorderLayout(6, 6));
         top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
-
-        JLabel prompt = new JLabel("メッセージ (message):");
         JTextField input = new JTextField("QUANTUM HELLO FROM EARTH");
-
-        JPanel opts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         JComboBox<String> material = new JComboBox<>(new String[]{"GaAs", "InAs", "InGaAs", "Si", "diamond(NV)"});
         JSpinner temp = new JSpinner(new SpinnerNumberModel(4.0, 0.1, 400.0, 1.0));
         JSpinner redundancy = new JSpinner(new SpinnerNumberModel(3, 1, 11, 2));
-        opts.add(new JLabel("材料:")); opts.add(material);
-        opts.add(new JLabel("温度K:")); opts.add(temp);
-        opts.add(new JLabel("冗長度:")); opts.add(redundancy);
-
         JButton send = new JButton("送信・証明 (Transmit & Prove)");
 
         JPanel inRow = new JPanel(new BorderLayout(6, 6));
-        inRow.add(prompt, BorderLayout.WEST);
+        inRow.add(new JLabel("メッセージ:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
         inRow.add(send, BorderLayout.EAST);
-
+        JPanel opts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        opts.add(new JLabel("材料:")); opts.add(material);
+        opts.add(new JLabel("温度K:")); opts.add(temp);
+        opts.add(new JLabel("冗長度:")); opts.add(redundancy);
         top.add(inRow, BorderLayout.NORTH);
         top.add(opts, BorderLayout.SOUTH);
 
-        // ---- output ---------------------------------------------------------
-        JTextArea output = new JTextArea();
-        output.setEditable(false);
-        output.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
-        output.setMargin(new Insets(10, 12, 10, 12));
-        JScrollPane scroll = new JScrollPane(output);
-        scroll.setBorder(BorderFactory.createEmptyBorder(8, 10, 10, 10));
-
+        JTextArea output = monospaceArea();
         Runnable run = () -> {
-            String msg = input.getText().trim();
-            if (msg.isEmpty()) msg = "HELLO SPACE";
-            SpaceTelegraph tg = new SpaceTelegraph(
-                    (String) material.getSelectedItem(),
-                    ((Number) temp.getValue()).doubleValue(),
-                    ((Number) redundancy.getValue()).intValue());
+            String msg = input.getText().trim().isEmpty() ? "HELLO SPACE" : input.getText().trim();
+            SpaceTelegraph tg = new SpaceTelegraph((String) material.getSelectedItem(),
+                    ((Number) temp.getValue()).doubleValue(), ((Number) redundancy.getValue()).intValue());
             output.setText(tg.render(msg));
             output.setCaretPosition(0);
         };
         send.addActionListener(e -> run.run());
         input.addActionListener(e -> run.run());
 
-        frame.add(top, BorderLayout.NORTH);
-        frame.add(scroll, BorderLayout.CENTER);
-        frame.setLocationRelativeTo(null);
-        frame.setVisible(true);
-        run.run(); // render once on startup
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        run.run();
+        return root;
+    }
+
+    // ---------------------------------------------------------------- Pseudo QC
+    private static JPanel qcPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+
+        JTextArea qasm = new JTextArea("H 0\nCX 0 1\nHALT\n", 5, 30);
+        qasm.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        qasm.setBorder(BorderFactory.createTitledBorder("BadaQASM プログラム（ディスクに格納）"));
+
+        JSpinner nq = new JSpinner(new SpinnerNumberModel(2, 1, 8, 1));
+        JButton run = new JButton("実行・モニタ投射 (Run)");
+        JButton verilog = new JButton("半導体ソース (Verilog)");
+        JComboBox<String> demo = new JComboBox<>(new String[]{"— デモ —", "Bell", "GHZ", "重ね合わせ+測定"});
+
+        JPanel ctl = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        ctl.add(new JLabel("量子ビット数:")); ctl.add(nq);
+        ctl.add(run); ctl.add(verilog); ctl.add(demo);
+
+        top.add(qasm, BorderLayout.CENTER);
+        top.add(ctl, BorderLayout.SOUTH);
+
+        JTextArea output = monospaceArea();
+
+        Runnable doRun = () -> runQc(qasm.getText(), ((Number) nq.getValue()).intValue(), output, false);
+        run.addActionListener(e -> doRun.run());
+        verilog.addActionListener(e -> runQc(qasm.getText(), ((Number) nq.getValue()).intValue(), output, true));
+        demo.addActionListener(e -> {
+            switch (demo.getSelectedIndex()) {
+                case 1 -> { qasm.setText("H 0\nCX 0 1\nHALT\n"); nq.setValue(2); }
+                case 2 -> { qasm.setText("H 0\nCX 0 1\nCX 1 2\nHALT\n"); nq.setValue(3); }
+                case 3 -> { qasm.setText("H 0\nMEASURE 0\nHALT\n"); nq.setValue(1); }
+                default -> { }
+            }
+        });
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        doRun.run();
+        return root;
+    }
+
+    private static void runQc(String qasm, int n, JTextArea output, boolean asVerilog) {
+        try (PseudoQC m = new PseudoQC(n).load(qasm).run()) {
+            output.setText(asVerilog ? m.verilog() : m.report());
+            output.setCaretPosition(0);
+        } catch (Throwable t) {
+            output.setText("error: " + t.getMessage());
+        }
+    }
+
+    private static JTextArea monospaceArea() {
+        JTextArea a = new JTextArea();
+        a.setEditable(false);
+        a.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        a.setMargin(new Insets(10, 12, 10, 12));
+        return a;
     }
 }

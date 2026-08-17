@@ -45,6 +45,7 @@ require_relative "bada/millennium"
 require_relative "bada/info_engine"
 require_relative "bada/penrose"
 require_relative "bada/quantum"
+require_relative "bada/qc"
 require_relative "bada/chat"
 require_relative "bada/nn"
 

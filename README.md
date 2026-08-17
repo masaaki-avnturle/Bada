@@ -41,22 +41,26 @@
 
 ---
 
-## 📲 ダウンロード — Android APK ＋ Windows EXE
+## 📲 ダウンロード — Android APK ＋ Windows 10/11 ＋ Ubuntu(Linux)
 
-`bada_ruby` の量子もつれ・汎用電信通信機（Space Telegraph）を、**Android の APK** と
-**Windows の EXE** としてダウンロードできます。物理エンジンは共有の純 Java コアに
-移植してあり、両プラットフォームで同一コードが動きます（`apps/` 参照）。
+`bada_ruby` の 2 エンジン ——**① 量子もつれ・汎用電信通信機（Space Telegraph）** と
+**② ノイマン型・擬似量子計算機（Pseudo QC：ディスク内蔵・半導体制御・モニタ投射・
+Verilog 生成）**—— を、**Android APK**・**Windows 10/11 アプリ**・**Ubuntu(Linux) アプリ**
+としてダウンロードできます。エンジンは共有の純 Java コアに移植してあり、3 プラット
+フォームで同一コードが動きます（`apps/` 参照）。
 
-| 配布物 | 内容 |
+| 配布物 | 対応 |
 |:--|:--|
-| `BadaTelegraph.apk` | Android アプリ（提供元不明のアプリを許可してインストール） |
-| `BadaTelegraph-windows-x64.zip` | 展開して `BadaTelegraph.exe` を実行（ポータブル） |
-| `BadaTelegraph-1.0.exe` | Windows インストーラ（スタートメニュー登録） |
+| `BadaTelegraph.apk` | **Android**（提供元不明のアプリを許可してインストール） |
+| `BadaTelegraph-windows-x64.zip` | **Windows 10/11** ポータブル（`BadaTelegraph.exe`） |
+| `BadaTelegraph-1.0.exe` | **Windows 10/11** インストーラ |
+| `BadaTelegraph-linux-x64.tar.gz` | **Ubuntu/Linux** ポータブル（`bin/BadaTelegraph`） |
+| `BadaTelegraph_1.0_amd64.deb` | **Ubuntu/Linux** インストーラ（`sudo dpkg -i`） |
 
 **入手方法**：タグを push すると GitHub Actions がビルドし、**Releases** に自動添付します。
 
 ```bash
-git tag v1.0.0 && git push origin v1.0.0     # -> Releases に APK / EXE が並ぶ
+git tag v1.0.0 && git push origin v1.0.0     # -> Releases に APK / EXE / DEB が並ぶ
 ```
 
 手動ビルドや詳細は [`apps/README.md`](apps/README.md) を参照。

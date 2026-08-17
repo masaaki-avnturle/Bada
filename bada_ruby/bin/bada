@@ -9,6 +9,8 @@
 #   bin/bada palette                    show the Penrose graphical-notation palette
 #   bin/bada penrose draw.penrose       draw -> auto-compute -> answer + paper + code
 #   bin/bada quantum "MESSAGE"          entangled-pair space telegraph (prove+send)
+#   bin/bada qc [bell|ghz|run f.qasm]   von-Neumann pseudo QC: monitor + statevector
+#   bin/bada qc verilog [ghz|f.qasm]    emit semiconductor (Verilog) control source
 #   bin/bada neural                     train the neural LLM, then REPL
 #   bin/bada train [model.json]         train and save a checkpoint
 #   bin/bada run script.bada            run a Bada language script
@@ -96,6 +98,36 @@ when "quantum", "telegraph"
   message ||= "HELLO SPACE"
   tg = Bada::Quantum::SpaceTelegraph.new(material: material, temp_k: temp, redundancy: redundancy)
   puts tg.render(message)
+when "qc"
+  # Von-Neumann pseudo quantum computer (disk-backed, semiconductor control):
+  #   bada qc                         run the Bell demo, project the monitor
+  #   bada qc ghz                     run the 3-qubit GHZ demo
+  #   bada qc run prog.qasm [--n N]   run a BadaQASM program
+  #   bada qc verilog [ghz|file]      emit the semiconductor (Verilog) source
+  sub = ARGV.shift || "bell"
+  emit_verilog = (sub == "verilog")
+  sub = ARGV.shift || "bell" if emit_verilog
+
+  machine =
+    case sub
+    when "bell" then Bada::QC::Machine.bell
+    when "ghz"  then Bada::QC::Machine.ghz
+    when "run"
+      path = ARGV.shift or abort("usage: bada qc run prog.qasm [--n N]")
+      n = 2
+      n = ARGV[ARGV.index("--n") + 1].to_i if ARGV.include?("--n")
+      Bada::QC::Machine.new(n_qubits: n).load(File.read(path)).run
+    else
+      # treat a bare token as a .qasm path
+      Bada::QC::Machine.new(n_qubits: 2).load(File.read(sub)).run
+    end
+
+  if emit_verilog
+    puts machine.verilog
+  else
+    puts machine.report
+  end
+  machine.close
 when "xi"
   text = ARGV.join(" ")
   s = Bada::Manifold.invariant(text)
@@ -128,6 +160,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | run | learn | xi | neural | train | version"
   exit 1
 end
