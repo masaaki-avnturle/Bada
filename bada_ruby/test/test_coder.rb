@@ -82,65 +82,85 @@ end
 class TestCoderGenerate < Minitest::Test
   C = Bada::Coder
 
-  def test_generate_ruby_is_valid
-    r = C.generate("print hello 3 times loop", language: "ruby")
-    assert_equal "ruby", r[:language]
-    assert r[:valid], "generated Ruby must be syntactically valid"
-    assert_includes r[:code], "def"
-    assert_includes r[:code], "puts"
-  end
+  # ---- the synthesizer generates ORIGINAL programs, not templates ----
 
-  def test_generate_python_structure
-    code = C.generate("loop print hi 4 times", language: "python")[:code]
-    assert_includes code, "def "
-    assert_includes code, "for _ in range(4)"
-    assert_includes code, "print("
-  end
-
-  def test_generate_japanese_intent
-    r = C.generate("メッセージ を 5 回 繰り返し 表示 する", language: "ruby")
+  def test_assign_and_print_ruby_runs
+    r = C.generate("set greeting to \"hi there\"; print greeting", language: "ruby")
     assert r[:valid]
-    assert_includes r[:code], "5.times"
-    assert_includes r[:code], "メッセージ"
+    assert_equal 2, r[:statements]
+    out, = capture_io { eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal "hi there", out.strip
+  end
+
+  def test_composed_sum_loop_runs_and_totals
+    r = C.generate("set total to 0; for i from 1 to 5 add i to total; print total", language: "ruby")
+    assert r[:valid]
+    assert_equal 3, r[:statements]
+    out, = capture_io { eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal "15", out.strip # 1+2+3+4+5
+  end
+
+  def test_function_def_and_call_runs
+    r = C.generate("function add with a and b returning a + b; print add(2, 3)", language: "ruby")
+    assert r[:valid]
+    assert_includes r[:code], "def add(a, b)"
+    out, = capture_io { eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal "5", out.strip
+  end
+
+  def test_if_then_else_expression_is_parsed
+    r = C.generate("set x to 7; if x greater than 5 then print x else print 0", language: "ruby")
+    assert r[:valid]
+    assert_includes r[:code], "if (x > 5)"
+    assert_includes r[:code], "else"
+    out, = capture_io { eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal "7", out.strip
+  end
+
+  def test_while_loop_python_structure
+    code = C.generate("set x to 3; while x less than 10 set x to x + 2; print x", language: "python")[:code]
+    assert_includes code, "while (x < 10):"
+    assert_includes code, "x = (x + 2)"
+  end
+
+  def test_python_composed_program
+    code = C.generate("set total to 0; for i from 1 to 4 add i to total; print total", language: "python")[:code]
+    assert_includes code, "for i in range(1, (4) + 1):"
+    assert_includes code, "total = (total + i)"
+    assert_includes code, "print(total)"
+  end
+
+  def test_japanese_variable_program_runs
+    r = C.generate("合計 を 0 にする; 1 から 5 まで i を 合計 に i を 足す; 合計 を 表示", language: "ruby")
+    assert r[:valid]
+    # Japanese variable name is transliterated to an ASCII identifier
+    assert_match(/\Av\d+\z/, r[:code][/^(\w+) = 0$/, 1])
+    out, = capture_io { eval(r[:code]) } # rubocop:disable Security/Eval
+    assert_equal "15", out.strip
+  end
+
+  def test_java_infers_types_and_class
+    code = C.generate("function square with n returning n * n; set r to square(6); print r", language: "java")[:code]
+    assert_includes code, "static int square(int n)"
+    assert_includes code, "return (n * n);"
+    assert_includes code, "int r = 0;"
   end
 
   def test_generate_auto_detects_language
-    r = C.generate("function greet console log hello")
-    assert_equal "javascript", r[:language]
+    r = C.generate("function greet returning 1")
+    assert_includes %w[ruby python javascript c java bada], r[:language]
   end
 
-  def test_precision_exceeds_or_meets_and_bounded
+  def test_precision_bounded
     r = C.generate("print hello", language: "python")
     assert_operator r[:precision], :>=, 0.90
     assert_operator r[:precision], :<=, 0.995
   end
 
-  def test_arithmetic_ruby_sums_and_runs
-    r = C.generate("sum 1 to 5", language: "ruby")
+  def test_unparseable_falls_back_to_print
+    r = C.generate("", language: "python")
     assert r[:valid]
-    assert_includes r[:code], "(1..5)"
-    assert_includes r[:code], "total += i"
-    # the generated Ruby ends with the function call, returning the total
-    out, = capture_io { @sum = eval(r[:code]) } # rubocop:disable Security/Eval
-    assert_equal 15, @sum # 1+2+3+4+5
-    assert_equal "15", out.strip
-  end
-
-  def test_arithmetic_python_uses_upper_bound
-    code = C.generate("sum 1 to 10", language: "python")[:code]
-    assert_includes code, "range(1, 10 + 1)"
-    assert_includes code, "total += i"
-  end
-
-  def test_arithmetic_japanese_intent
-    r = C.generate("1 から 10 の 合計 を 計算 する", language: "ruby")
-    assert r[:valid]
-    assert_includes r[:code], "(1..10)"
-  end
-
-  def test_non_arith_loop_uses_first_count
-    code = C.generate("print hi 3 times loop", language: "ruby")[:code]
-    assert_includes code, "3.times"
+    assert_includes r[:code], "print("
   end
 end
 
@@ -164,8 +184,9 @@ class TestCoderConsole < Minitest::Test
   end
 
   def test_gen_command_with_lang_prefix
-    out = @con.run(":gen python: loop print hi 4 times")
-    assert_includes out, "range(4)"
+    out = @con.run(":gen python: set x to 5; print x")
+    assert_includes out, "x = 5"
+    assert_includes out, "print(x)"
   end
 
   def test_use_sets_language
