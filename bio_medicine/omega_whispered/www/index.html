@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!--
-  Ω-Whispered — ウィスパード適性検査 (数学記号 × 方程式意味解析)
+  Ω-Whispered — ウィスパード適性検査 (瞬読 × 数学記号 × 方程式意味解析)
   Masaaki Yamaguchi / Bada — bio_medicine/omega_whispered
 
   第一次検査: 数学論文(PDF)に現れる方程式の記号 — その意味・専門分野を識別できるか。
@@ -9,6 +9,9 @@
               方程式の意味を読み解けるか(symbol_bank.js の ASSOC)。
   第三次検査: 数学適性分野の診断 — 思考スタイル(志向)と、第一次/第二次の分野別成績(実力)を
               合成して、10 分野のどこに適性があるかをプロファイル化する(APTITUDE/FIELD_PROFILE)。
+  第四次検査: 瞬読(フラッシュ) — 数学の専門用語・記号・バラバラにした方程式のトークンを、
+              ランダムな位置/角度/大きさで一瞬だけ一斉提示し、消えた後に問う(flash.js)。
+              露出時間は 2-down/1-up ステアケースで適応制御し、瞬読閾値(ms)を推定する。
 
   ⚠ 「フルメタル・パニック!」のウィスパード設定に着想を得た非公式のファン・オマージュです。
      原作・アニメの権利者とは一切関係がありません。結果は学習/娯楽目的の指標であり、
@@ -92,6 +95,16 @@
   th{color:var(--gold);font-weight:600}
   td.m{font-family:var(--mono)}
   .rv-ok{color:var(--ok)}.rv-ng{color:var(--ng)}
+  /* --- 瞬読(フラッシュ) --- */
+  .stage{position:relative;height:320px;background:#000;border:1px solid var(--line);border-radius:8px;
+         overflow:hidden;margin:8px 0}
+  .fl{position:absolute;font-family:var(--mono);color:#eef4ff;white-space:nowrap;
+      text-shadow:0 0 6px rgba(64,184,192,.35)}
+  .fl.item{color:#eef4ff}
+  .fl.fix{left:50%;top:50%;transform:translate(-50%,-50%);font-size:34px;color:var(--gold);text-shadow:none}
+  .fl.mask{color:#2b3850;text-shadow:none}
+  .flashline{font-family:var(--mono);color:var(--violet);font-size:12.5px;margin-top:4px;
+             word-break:break-word;overflow-wrap:anywhere}
   /* --- 適性分野プロファイル --- */
   .apt{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px}
   .apt .f{flex:0 0 130px;color:var(--txt)}
@@ -113,8 +126,8 @@
 <body>
 <header>
   <h1><span class="om">Ω</span>-Whispered — ウィスパード適性検査</h1>
-  <div class="sub">Mathematical Symbol &amp; Equation-Meaning Aptitude Test · Bada / bio_medicine</div>
-  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; 第三次: 数学適性分野の診断 &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
+  <div class="sub">Flash-Reading × Mathematical Symbol &amp; Equation-Meaning Aptitude Test · Bada / bio_medicine</div>
+  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; 第三次: 適性分野の診断 &nbsp;·&nbsp; 第四次: 瞬読(専門用語・記号・バラバラ方程式をランダム提示) &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
 </header>
 
 <div class="disc">⚠ <b>非公式のファン・オマージュ</b>:
@@ -135,6 +148,7 @@
         <option value="full">フル(記号 → 方程式 → 適性分野診断)</option>
         <option value="exam">記号 + 方程式のみ(Ω 判定)</option>
         <option value="aptitude">数学適性分野の診断のみ</option>
+        <option value="flash">瞬読(フラッシュ)検査のみ</option>
       </select>
       <label>第一次検査(記号)の問題数: <span class="val" id="n1_v">8</span></label>
       <input type="range" id="n1" min="4" max="20" value="8"/>
@@ -142,6 +156,12 @@
       <input type="range" id="n2" min="4" max="20" value="8"/>
       <label>第三次検査(適性分野)の設問数: <span class="val" id="n3_v">12</span></label>
       <input type="range" id="n3" min="6" max="20" value="12"/>
+      <label>第四次検査(瞬読)の設問数: <span class="val" id="n4_v">8</span></label>
+      <input type="range" id="n4" min="4" max="20" value="8"/>
+      <label>瞬読の初期露出時間: <span class="val" id="ms4_v">600</span> ms</label>
+      <input type="range" id="ms4" min="80" max="1200" step="20" value="600"/>
+      <label>瞬読の同時表示数: <span class="val" id="k4_v">5</span> 要素</label>
+      <input type="range" id="k4" min="3" max="10" value="5"/>
       <label>難度上限 (1=中高 / 3=学部 / 5=研究前線): <span class="val" id="lv_v">5</span></label>
       <input type="range" id="lvmax" min="1" max="5" value="5"/>
       <label>専門分野</label>
@@ -199,10 +219,19 @@
         作用素環・関数解析 / 表現論・群論 / 数理物理</code> の 10 分野の適性をプロファイル化します。
         上位分野には、思考の型・代表的な方程式と記号・隣接分野・<b>次に学ぶとよい主題</b>を提示します。
       </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第四次検査 — 瞬読(フラッシュ)</b>:
+        速読法の<b>瞬読</b>に倣い、<b>数学の専門用語</b>(100 語)・記号・<b>バラバラに分解した方程式のトークン</b>を、
+        画面上の<b>ランダムな位置・角度・大きさで一瞬だけ一斉提示</b>し、消えた直後に
+        「何が見えたか」「その用語の意味は」「どの方程式の断片か」「いくつ見えたか」を問います。
+        注視点 → 提示 → マスクの順で提示し、露出時間は <b>2-down/1-up ステアケース</b>で適応的に上下させて
+        <b>瞬読閾値(ms)</b>を推定します。
+      </p>
       <div class="stat"><span>記号銀行</span><b id="s_nsym">—</b></div>
       <div class="stat"><span>方程式銀行 (Lv1〜Lv5)</span><b id="s_neq">—</b></div>
       <div class="stat"><span>連想対応 (簡単 → 専門)</span><b id="s_nas">—</b></div>
       <div class="stat"><span>適性設問 / 分野プロファイル</span><b id="s_napt">—</b></div>
+      <div class="stat"><span>専門用語銀行 (瞬読)</span><b id="s_nterm">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -235,6 +264,13 @@
       <canvas id="radar" width="420" height="300" style="margin-top:12px"></canvas>
       <div class="cap" id="radarCap">分野別の正答率プロファイル(出題された分野のみ)。</div>
 
+      <div id="flashWrap" style="display:none">
+        <h3 style="margin-top:16px">第四次検査 — 瞬読(フラッシュ)プロファイル</h3>
+        <div id="flashStats"></div>
+        <div class="cap">閾値は 2-down/1-up ステアケース法の反転点の幾何平均で、
+          <b>約 70% 正答できる露出時間</b>の推定値です(反転が 2 回未満のときは参考値)。</div>
+      </div>
+
       <div id="aptWrap" style="display:none">
         <h3 style="margin-top:16px">第三次検査 — 数学適性分野の診断</h3>
         <div id="aptBars"></div>
@@ -265,11 +301,13 @@
   非公式ファン・オマージュ / 学習・娯楽目的 · PDF 解析は端末内で完結</footer>
 
 <script src="symbol_bank.js"></script>
+<script src="term_bank.js"></script>
+<script src="flash.js"></script>
 <script src="pdf_symbols.js"></script>
 <script>
 "use strict";
 (function () {
-  var B = window.SymbolBank, PS = window.PDFSymbols;
+  var B = window.SymbolBank, PS = window.PDFSymbols, TB = window.TermBank, FE = window.FlashEngine;
   var $ = function (id) { return document.getElementById(id); };
 
   /* ============================ 共通ユーティリティ ============================ */
@@ -427,6 +465,109 @@
     };
   }
 
+  /* ============ 第四次: 瞬読(フラッシュ) — バラバラにランダム提示 ============ */
+  /* 記号・専門用語・バラバラにした方程式トークンを、ランダムな位置/角度/大きさで
+     一斉に短時間だけ提示し、消えたあとに問う。露出時間はステアケースで適応的に変化。 */
+
+  function flashTerms() {
+    var f = $("field").value, lvMax = +$("lvmax").value;
+    var t = TB.TERMS.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
+    return t.length >= 8 ? t : TB.TERMS.slice();
+  }
+
+  /* 瞬読: 記号 — 表示された記号はどれか */
+  function qFlashSymbol(k) {
+    var pool = (state.pdfKnown.length >= k + 4)
+      ? shuffle(state.pdfKnown.map(function (p) { return p.sym; }))
+      : shuffle(B.SYMBOLS.filter(inScope).length >= k + 4 ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.ch].concat(shuffle(rest).slice(0, 3).map(function (s) { return s.ch; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(記号)", lv: Math.max(2, target.lv), field: target.field,
+      items: shown.map(function (s) { return s.ch; }),
+      text: "いま一瞬だけ表示された記号は、次のどれですか。",
+      opts: opts, correct: target.ch, mono: true,
+      why: target.ch + " = " + target.ja + " — " + target.mean
+    };
+  }
+
+  /* 瞬読: 専門用語 — 表示された用語はどれか */
+  function qFlashTerm(k) {
+    var pool = shuffle(flashTerms());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.t].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.t; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(専門用語)", lv: target.lv, field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま一瞬だけ表示された数学の専門用語は、次のどれですか。",
+      opts: opts, correct: target.t,
+      why: target.t + "(" + target.en + ", " + target.field + ") — " + target.def
+    };
+  }
+
+  /* 瞬読: 専門用語 → 意味(瞬読したうえで内容を答える) */
+  function qFlashTermMeaning(k) {
+    var pool = shuffle(flashTerms());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.def].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.def; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(用語→意味)", lv: Math.min(5, target.lv + 1), field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま表示された用語のうち 1 つの意味が下にあります。正しい説明はどれですか。",
+      opts: opts, correct: target.def,
+      why: "正解は「" + target.t + "」(" + target.field + ") の説明でした — " + target.def
+    };
+  }
+
+  /* 瞬読: 方程式をバラバラのトークンにして散らす → 元の方程式はどれか */
+  function qFlashEquation() {
+    var pool = B.EQUATIONS.filter(inScope);
+    if (pool.length < 4) pool = B.EQUATIONS.slice();
+    var target = pick(pool);
+    var others = shuffle(pool.filter(function (e) { return e.name !== target.name; })).slice(0, 3);
+    return {
+      phase: 4, flash: true, kind: "瞬読(方程式バラバラ)", lv: target.lv, field: target.field,
+      items: shuffle(FE.tokenize(target.eq)),
+      text: "いま<b>バラバラに散らして</b>表示されたのは、どの方程式の断片ですか。",
+      opts: shuffle([target.eq].concat(others.map(function (e) { return e.eq; }))),
+      correct: target.eq, mono: true,
+      why: "【" + target.name + "】" + target.mean
+    };
+  }
+
+  /* 瞬読: 個数把握(面的にいくつ見えたか) */
+  function qFlashCount(k) {
+    var pool = shuffle(B.SYMBOLS.filter(inScope).length >= k ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+    var shown = pool.slice(0, k);
+    var cands = {}; cands[k] = 1;
+    [k - 2, k - 1, k + 1, k + 2].forEach(function (v) { if (v >= 1) cands[v] = 1; });
+    var opts = shuffle(Object.keys(cands).map(Number)).slice(0, 4);
+    if (opts.indexOf(k) < 0) { opts[0] = k; opts = shuffle(opts); }
+    return {
+      phase: 4, flash: true, kind: "瞬読(個数把握)", lv: 3, field: pick(shown).field,
+      items: shown.map(function (s) { return s.ch; }),
+      text: "いま表示されていた記号は、全部でいくつでしたか。",
+      opts: opts.map(String), correct: String(k), mono: true,
+      why: "正解は " + k + " 個。個々を読まずに面として把握するのが瞬読の要点です。"
+    };
+  }
+
+  function buildFlash(n) {
+    var k = +$("k4").value, out = [];
+    for (var i = 0; i < n; i++) {
+      var r = Math.random();
+      if (r < 0.26) out.push(qFlashTerm(k));
+      else if (r < 0.48) out.push(qFlashEquation());
+      else if (r < 0.68) out.push(qFlashSymbol(k));
+      else if (r < 0.86) out.push(qFlashTermMeaning(k));
+      else out.push(qFlashCount(k));
+    }
+    return out;
+  }
+
   /* 分野が偏らないよう、分野ごとに1つずつ取り出して並べ替える */
   function spreadByField(list) {
     var by = {}, order = [];
@@ -449,6 +590,7 @@
   function buildExam() {
     var mode = $("mode").value;
     if (mode === "aptitude") return shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude);
+    if (mode === "flash") return buildFlash(+$("n4").value);
     var n1 = +$("n1").value, n2 = +$("n2").value, qs = [];
 
     /* 第一次: PDF 由来の記号を優先 */
@@ -503,8 +645,9 @@
     second.sort(function (x, y) { return x.lv - y.lv; });
     var all = qs.concat(second);
 
-    /* 第三次: 適性分野の診断(フルモードのみ、最後に実施) */
+    /* 第四次(瞬読) → 第三次(適性診断) の順で付け足す(フルモードのみ) */
     if (mode === "full") {
+      all = all.concat(buildFlash(+$("n4").value));
       all = all.concat(shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude));
     }
     return all;
@@ -515,6 +658,7 @@
     state.qs = buildExam();
     if (!state.qs.length) { $("setupStat").textContent = "条件に合う設問がありません。難度や分野を広げてください。"; return; }
     state.i = 0; state.answers = []; state.running = true;
+    state.stair = new FE.Staircase({ start: +$("ms4").value, min: 40, max: 2000, down: 2 });
     $("introCard").style.display = "none";
     $("dictCard").style.display = "none";
     $("resultCard").style.display = "none";
@@ -526,6 +670,7 @@
     var q = state.qs[state.i];
     $("q_phase").textContent = q.phase === 1 ? "第一次検査 — 記号適性"
                              : q.phase === 2 ? "第二次検査 — 方程式意味解析"
+                             : q.phase === 4 ? "第四次検査 — 瞬読(フラッシュ)"
                                              : "第三次検査 — 数学適性分野の診断";
     $("q_idx").textContent = "設問 " + (state.i + 1) + " / " + state.qs.length;
     var scored = state.answers.filter(function (a) { return !a.q.aptitude; });
@@ -533,16 +678,26 @@
     $("q_score").textContent = scored.length ? "正答 " + got + " / " + scored.length : "";
     $("q_bar").style.width = (100 * state.i / state.qs.length) + "%";
 
-    var head = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
-               (q.aptitude ? '<span class="tag">正誤なし</span>'
-                           : '<span class="tag">Lv' + q.lv + "</span>" +
-                             '<span class="tag">' + esc(q.field) + "</span>") +
-               (q.src ? '<span class="tag src">' + esc(q.src) + "</span>" : "") + "</div>";
+    q.tags = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
+             (q.aptitude ? '<span class="tag">正誤なし</span>'
+                         : '<span class="tag">Lv' + q.lv + "</span>" +
+                           '<span class="tag">' + esc(q.field) + "</span>") +
+             (q.src ? '<span class="tag src">' + esc(q.src) + "</span>" : "") + "</div>";
+
+    $("q_fb").style.display = "none";
+    $("next").style.display = "none";
+    if (q.flash) { showFlashPrep(q); return; }
+
+    var head = q.tags;
     if (q.sym) head += '<div class="qsym">' + esc(q.sym) + "</div>";
     if (q.eq) head += '<div class="qeq">' + esc(q.eq) + "</div>";
     head += '<div class="qtext">' + q.text + "</div>";
     $("q_body").innerHTML = head;
+    renderOptions(q);
+    state.t0 = Date.now();
+  }
 
+  function renderOptions(q) {
     var box = $("q_opts");
     box.innerHTML = "";
     q.opts.forEach(function (o) {
@@ -552,9 +707,33 @@
       b.onclick = function () { answer(o); };
       box.appendChild(b);
     });
-    $("q_fb").style.display = "none";
-    $("next").style.display = "none";
-    state.t0 = Date.now();
+  }
+
+  /* --- 瞬読: 提示前の待機画面 → バースト提示 → 設問 --- */
+  function showFlashPrep(q) {
+    q.ms = state.stair.current();
+    $("q_body").innerHTML = q.tags +
+      '<div class="stage" id="stage"></div>' +
+      '<div class="qtext">露出 <b>' + q.ms + " ms</b> ／ <b>" + q.items.length +
+      "</b> 要素をランダムな位置に一斉表示します。中央の <b>+</b> を見つめて待ってください。</div>";
+    var box = $("q_opts");
+    box.innerHTML = "";
+    var b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = "▶ 瞬読を開始する（" + q.ms + " ms）";
+    b.onclick = function () { b.disabled = true; runFlash(q); };
+    box.appendChild(b);
+  }
+
+  function runFlash(q) {
+    var stage = $("stage");
+    var items = shuffle(q.items.slice()).map(function (t) { return { text: t, cls: "item" }; });
+    FE.burst(stage, items, q.ms, { fix: 500, mask: 120 }).then(function (actual) {
+      q.actualMs = Math.round(actual);
+      $("q_body").innerHTML = q.tags + '<div class="qtext">' + q.text + "</div>";
+      renderOptions(q);
+      state.t0 = Date.now();
+    });
   }
 
   function answer(chosen) {
@@ -580,9 +759,16 @@
         '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
         '<div class="why">この選択が示す志向: <b>' + esc(lean || "—") + "</b></div>";
     } else {
+      var extra = "";
+      if (q.flash) {
+        var nextMs = state.stair.update(ok);       /* 2-down/1-up ステアケース */
+        extra = '<span class="tag" style="margin-left:4px">露出 ' + q.ms + " ms</span>" +
+                '<span class="tag">次は ' + nextMs + " ms</span>" +
+                '<div class="flashline">表示されていたもの: ' + esc(q.items.join("  ")) + "</div>";
+      }
       fb.innerHTML = '<span class="verdict ' + (ok ? "ok" : "ng") + '">' +
         (ok ? "◎ 共鳴 — 正答" : "× 非共鳴 — 誤答") + "</span>" +
-        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
+        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" + extra +
         (ok ? "" : '<div style="margin-top:5px">正答: <b>' + esc(q.correct) + "</b></div>") +
         '<div class="why">' + esc(q.why) + "</div>";
     }
@@ -628,6 +814,7 @@
       $("radar").style.display = "none";
       $("radarCap").style.display = "none";
       $("perfStats").style.display = "none";
+      renderFlash();
       renderAptitude(byField);
       renderReview();
       return;
@@ -658,6 +845,7 @@
     $("r_lv").textContent = maxLv ? "Lv" + maxLv : "—";
 
     drawRadar(byField);
+    renderFlash();
     renderAptitude(byField);
     renderReview();
 
@@ -717,6 +905,42 @@
       g.textAlign = Math.abs(Math.cos(th)) < 0.3 ? "center" : (Math.cos(th) > 0 ? "left" : "right");
       g.fillText(f, x, y + 3);
     });
+  }
+
+  /* ===================== 第四次: 瞬読プロファイル ===================== */
+  function renderFlash() {
+    var fl = state.answers.filter(function (a) { return a.q.flash; });
+    if (!fl.length) { $("flashWrap").style.display = "none"; return; }
+    $("flashWrap").style.display = "block";
+
+    var th = state.stair.threshold();
+    var ok = fl.filter(function (a) { return a.ok; });
+    var minOk = ok.length ? Math.min.apply(null, ok.map(function (a) { return a.q.ms; })) : null;
+    var avgItems = fl.reduce(function (t, a) { return t + a.q.items.length; }, 0) / fl.length;
+    var thr = avgItems / (th.ms / 1000);            /* 閾値露出での要素/秒 */
+    var grade, gdesc;
+    if (!ok.length) { grade = "判定不能"; gdesc = "正答がないため閾値を推定できません。露出時間を長くして再検査してください。"; }
+    else if (th.ms < 150) { grade = "瞬読 Class-S"; gdesc = "0.15 秒未満の一瞥で面として把握できています。"; }
+    else if (th.ms < 250) { grade = "瞬読 Class-A"; gdesc = "一瞥で複数要素を捉えられています。"; }
+    else if (th.ms < 400) { grade = "瞬読 Class-B"; gdesc = "短時間提示に適応できています。"; }
+    else if (th.ms < 700) { grade = "瞬読 Class-C"; gdesc = "まだ逐次的に読んでいる可能性があります。"; }
+    else { grade = "瞬読 Class-D"; gdesc = "同時表示数を減らし、露出時間を段階的に短くしていきましょう。"; }
+
+    var rows = [
+      ["瞬読閾値 (約70%正答の露出)", th.ms + " ms" + (th.reliable ? "" : "（参考値・反転 " + th.reversals + " 回）")],
+      ["最短で正答できた露出", minOk === null ? "—" : minOk + " ms"],
+      ["瞬読スループット", thr.toFixed(1) + " 要素/秒（平均 " + avgItems.toFixed(1) + " 要素同時）"],
+      ["瞬読の正答", ok.length + " / " + fl.length + " (" + (100 * ok.length / fl.length).toFixed(0) + "%)"],
+      ["ステアケース反転回数", th.reversals + " 回"],
+      ["瞬読段位", grade]
+    ];
+    $("flashStats").innerHTML = rows.map(function (r) {
+      return '<div class="stat"><span>' + esc(r[0]) + "</span><b>" + esc(r[1]) + "</b></div>";
+    }).join("") + '<div class="fp"><h4>' + esc(grade) + "</h4>" +
+      '<div class="row">' + esc(gdesc) + "</div>" +
+      '<div class="row"><span>露出の推移: </span><span class="m">' +
+      esc(state.stair.history.map(function (h) { return h.ms + (h.ok ? "◎" : "×"); }).join(" → ")) +
+      "</span></div></div>";
   }
 
   /* ===================== 第三次: 数学適性分野の診断 ===================== */
@@ -789,7 +1013,17 @@
              "<td>選択: <b>" + esc(a.chosen) + "</b><br/>志向: " + esc(lean || "—") + "</td></tr>";
         return;
       }
-      var subject = a.q.sym ? a.q.sym : (a.q.eq || "");
+      var subject = a.q.flash ? a.q.items.join(" ") : (a.q.sym ? a.q.sym : (a.q.eq || ""));
+      if (a.q.flash) {
+        h += "<tr><td>" + (i + 1) + "</td>" +
+             '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
+             '</span><span class="tag">Lv' + a.q.lv + '</span><span class="tag">' + a.q.ms + " ms</span></td>" +
+             '<td class="' + (a.ok ? "rv-ok" : "rv-ng") + '">' + (a.ok ? "◎" : "×") +
+             "<br/>" + a.sec.toFixed(1) + "s</td>" +
+             "<td>" + (a.ok ? "" : "正答: <b>" + esc(a.q.correct) + "</b><br/>") +
+             esc(a.q.why) + "</td></tr>";
+        return;
+      }
       h += "<tr><td>" + (i + 1) + "</td>" +
            '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
            "</span><span class=\"tag\">Lv" + a.q.lv + "</span></td>" +
@@ -872,21 +1106,25 @@
     $("s_nas").textContent = B.ASSOC.length + " 対応";
     $("s_napt").textContent = B.APTITUDE.length + " 設問 / " +
       Object.keys(B.FIELD_PROFILE).length + " 分野プロファイル";
+    $("s_nterm").textContent = TB.TERMS.length + " 語 (10 分野 × 10 語)";
     try {
       var best = localStorage.getItem("omega_whispered_best");
       $("s_best").textContent = best ? "Ω " + best : "未記録";
     } catch (e) { $("s_best").textContent = "未記録"; }
     $("setupStat").textContent = "準備完了。PDF なしでも検査できます。";
 
-    [["n1", "n1_v"], ["n2", "n2_v"], ["n3", "n3_v"], ["lvmax", "lv_v"]].forEach(function (p) {
+    [["n1", "n1_v"], ["n2", "n2_v"], ["n3", "n3_v"], ["n4", "n4_v"], ["ms4", "ms4_v"],
+     ["k4", "k4_v"], ["lvmax", "lv_v"]].forEach(function (p) {
       var el = $(p[0]);
       el.oninput = function () { $(p[1]).textContent = el.value; };
     });
     /* モードに応じて不要なスライダを無効化 */
     $("mode").onchange = function () {
       var m = $("mode").value;
-      ["n1", "n2", "lvmax", "field"].forEach(function (id) { $(id).disabled = (m === "aptitude"); });
-      $("n3").disabled = (m === "exam");
+      ["n1", "n2"].forEach(function (id) { $(id).disabled = (m === "aptitude" || m === "flash"); });
+      ["lvmax", "field"].forEach(function (id) { $(id).disabled = (m === "aptitude"); });
+      $("n3").disabled = (m !== "full" && m !== "aptitude");
+      ["n4", "ms4", "k4"].forEach(function (id) { $(id).disabled = (m !== "full" && m !== "flash"); });
     };
     $("start").onclick = startExam;
     $("again").onclick = function () {
