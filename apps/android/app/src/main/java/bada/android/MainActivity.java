@@ -1,6 +1,7 @@
 package bada.android;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -94,6 +95,11 @@ public class MainActivity extends Activity {
         think.setOnClickListener(v -> captureThought());
         root.addView(think);
 
+        Button whisperBtn = new Button(this);
+        whisperBtn.setText("🔉 ウィスパード英語 (Whisper EN)");
+        whisperBtn.setOnClickListener(v -> showWhisperInput());
+        root.addView(whisperBtn);
+
         Button go = new Button(this);
         go.setText("実行 (Run)");
         go.setOnClickListener(v -> runSelected());
@@ -155,6 +161,28 @@ public class MainActivity extends Activity {
             case 4 -> "intent";
             default -> "text";
         };
+    }
+
+    // Whisper English mode for ANY function: prompt whispered (vowel-reduced)
+    // English fragments and fill the current mode's field with reconstructed
+    // English, above silent-talk precision.
+    private void showWhisperInput() {
+        final EditText cue = new EditText(this);
+        cue.setInputType(InputType.TYPE_CLASS_TEXT);
+        cue.setHint("ウィスパード英語（母音を落として, 例: qntm lght wv）");
+        new AlertDialog.Builder(this)
+                .setTitle("🔉 ウィスパード英語 (Whisper EN)")
+                .setMessage("発声せず、母音を落としたウィスパード英語を入力してください。完全な英語に復元します。")
+                .setView(cue)
+                .setPositiveButton("復元", (d, w) -> {
+                    Whisper.Result r = Whisper.verbalizeEn(cue.getText().toString());
+                    input.setText(r.text);
+                    Toast.makeText(this, String.format("ウィスパード英語を復元 (precision %.1f%% > silent-talk %.1f%%)",
+                            r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
+                    runSelected();
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
     private void runSelected() {

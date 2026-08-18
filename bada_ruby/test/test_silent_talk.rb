@@ -361,6 +361,17 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes Bada::SilentTalk::MODES, :whisper
   end
 
+  def test_whisper_english_mode_always_returns_english
+    # the per-tab 🔉 ウィスパード英語 button forces English mode
+    r = Bada::SilentTalk::Whisper.verbalize_en("hll wrld")
+    assert_equal "en", r[:lang]
+    assert_equal "hello world", r[:text]
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    # even unknown script is coerced to English (never labelled unknown)
+    r2 = Bada::SilentTalk::Whisper.verbalize_en("φωτ κυμα")
+    assert_equal "en", r2[:lang]
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

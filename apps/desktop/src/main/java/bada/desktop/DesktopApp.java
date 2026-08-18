@@ -128,7 +128,7 @@ public final class DesktopApp {
         inRow.add(new JLabel("メッセージ:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
         JPanel tgEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        tgEast.add(thoughtButton(input, "text")); tgEast.add(send);
+        tgEast.add(thoughtButton(input, "text")); tgEast.add(whisperButton(input)); tgEast.add(send);
         inRow.add(tgEast, BorderLayout.EAST);
         JPanel opts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         opts.add(new JLabel("材料:")); opts.add(material);
@@ -172,7 +172,7 @@ public final class DesktopApp {
 
         JPanel ctl = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         ctl.add(new JLabel("量子ビット数:")); ctl.add(nq);
-        ctl.add(run); ctl.add(verilog); ctl.add(thoughtButton(qasm, "qasm")); ctl.add(demo);
+        ctl.add(run); ctl.add(verilog); ctl.add(thoughtButton(qasm, "qasm")); ctl.add(whisperButton(qasm)); ctl.add(demo);
 
         top.add(qasm, BorderLayout.CENTER);
         top.add(ctl, BorderLayout.SOUTH);
@@ -223,7 +223,7 @@ public final class DesktopApp {
         inRow.add(left, BorderLayout.WEST);
         inRow.add(signal, BorderLayout.CENTER);
         JPanel mindEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        mindEast.add(thoughtButton(signal, "text")); mindEast.add(go);
+        mindEast.add(thoughtButton(signal, "text")); mindEast.add(whisperButton(signal)); mindEast.add(go);
         inRow.add(mindEast, BorderLayout.EAST);
 
         JLabel note = new JLabel("※ 生成シミュレーション（実在の脳を読むものではありません）");
@@ -268,7 +268,7 @@ public final class DesktopApp {
         row1.add(l1, BorderLayout.WEST);
         row1.add(intent, BorderLayout.CENTER);
         JPanel r1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(thoughtButton(intent, "intent")); r1.add(gen);
+        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(thoughtButton(intent, "intent")); r1.add(whisperButton(intent)); r1.add(gen);
         row1.add(r1, BorderLayout.EAST);
 
         // live word completion (command feature)
@@ -482,6 +482,28 @@ public final class DesktopApp {
         root.add(new JScrollPane(output), BorderLayout.CENTER);
         run.run();
         return root;
+    }
+
+    // A reusable ウィスパード英語 (whisper English) button for every engine field.
+    // Prompts for whispered (voiceless, vowel-reduced) English fragments and fills
+    // the field with the reconstructed full English, above silent-talk precision.
+    private static JButton whisperButton(javax.swing.text.JTextComponent field) {
+        JButton b = new JButton("🔉 ウィスパード英語");
+        b.setToolTipText("発声せず、母音を落としたウィスパード英語を入力して完全な英語に復元します（silent-talk 超え精度）");
+        b.addActionListener(e -> {
+            String cue = (String) JOptionPane.showInputDialog(field,
+                    "ウィスパード英語（母音を落として, 例: qntm lght wv）:", "🔉 ウィスパード英語 (Whisper EN)",
+                    JOptionPane.PLAIN_MESSAGE, null, null, "");
+            if (cue == null) return; // cancelled
+            Whisper.Result r = Whisper.verbalizeEn(cue); // 英語モードに固定
+            field.setText(r.text);
+            field.setCaretPosition(0);
+            JOptionPane.showMessageDialog(field,
+                    String.format("ウィスパード英語を復元しました。%nprecision %.1f%%  >  silent-talk %.1f%%",
+                            r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100),
+                    "🔉 ウィスパード英語", JOptionPane.INFORMATION_MESSAGE);
+        });
+        return b;
     }
 
     private static JButton thoughtButton(javax.swing.text.JTextComponent field, String kind) {
