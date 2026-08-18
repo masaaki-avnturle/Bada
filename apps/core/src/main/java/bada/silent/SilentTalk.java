@@ -2,8 +2,12 @@ package bada.silent;
 
 import bada.mind.MindReader;
 import bada.coder.Coder;
+import bada.qc.PseudoQC;
+import bada.qc.Isa;
+import bada.quantum.SpaceTelegraph;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -22,7 +26,36 @@ import java.util.regex.Pattern;
 public final class SilentTalk {
     public static final double SILENT_TALK_BASELINE = MindReader.SILENT_TALK_BASELINE;
 
-    public enum Mode { TEXT, CODE }
+    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH }
+
+    /** Silent-cue -> engine parsers, mirrored from the Ruby Parse module. */
+    public static final class Parse {
+        /** [qasmSource, qubitCount] for a silent QC/Verilog cue. */
+        public static Object[] qc(String intent) {
+            String key = intent == null ? "" : intent.strip();
+            String low = key.toLowerCase();
+            if (low.contains("bell") || key.contains("ベル")) return new Object[]{"H 0\nCX 0 1\nHALT", 2};
+            if (low.contains("ghz")) return new Object[]{"H 0\nCX 0 1\nCX 1 2\nHALT", 3};
+
+            List<String> lines = new ArrayList<>();
+            for (String seg : key.split("[;\\n]+")) {
+                seg = seg.strip();
+                if (seg.isEmpty()) continue;
+                String mnem = seg.split("\\s+")[0].toUpperCase();
+                if (Isa.OPCODES.containsKey(mnem)) lines.add(seg);
+            }
+            if (lines.isEmpty()) { lines.add("H 0"); lines.add("CX 0 1"); } // default: entangle
+            int n = 1;
+            for (String l : lines) {
+                String[] tok = l.split("\\s+");
+                for (int i = 1; i < tok.length; i++) {
+                    if (tok[i].matches("\\d+")) n = Math.max(n, Integer.parseInt(tok[i]) + 1);
+                }
+            }
+            if (!lines.get(lines.size() - 1).toUpperCase().startsWith("HALT")) lines.add("HALT");
+            return new Object[]{String.join("\n", lines), n};
+        }
+    }
 
     /** A committed block of input -> expansion. */
     public static final class Block {
@@ -37,12 +70,14 @@ public final class SilentTalk {
 
     /** Result of feeding one line. */
     public static final class Feed {
-        public String kind;             // text | code | command | noop
+        public String kind;             // text | code | qc | verilog | telegraph | command | noop
         public String verbalization;    // text
-        public String code, language;   // code
+        public String code, language;   // code | qc | verilog | telegraph
+        public String source;           // qc | verilog (the QASM)
+        public int qubits;              // qc | verilog
         public boolean recipe;          // code
-        public double precision;        // text | code
-        public List<String> appended;   // text | code
+        public double precision;        // text | code | qc | verilog | telegraph
+        public List<String> appended;   // all engine kinds
         public String output;           // command
     }
 
@@ -66,7 +101,13 @@ public final class SilentTalk {
             Feed f = new Feed();
             if (line.isEmpty()) { f.kind = "noop"; return f; }
             if (line.startsWith(":")) return command(line);
-            return mode == Mode.CODE ? codeInput(line) : textInput(line);
+            switch (mode) {
+                case CODE: return codeInput(line);
+                case QC: return qcInput(line);
+                case VERILOG: return verilogInput(line);
+                case TELEGRAPH: return telegraphInput(line);
+                default: return textInput(line);
+            }
         }
 
         /** Verbalize a sparse cue into a sentence and append it. */
@@ -92,12 +133,60 @@ public final class SilentTalk {
             return f;
         }
 
+        /** Silent cue / pseudo-code -> QC source + disk-backed run report. */
+        public Feed qcInput(String intent) {
+            Object[] p = Parse.qc(intent);
+            String src = (String) p[0];
+            int n = (Integer) p[1];
+            String report; double prec;
+            try (PseudoQC m = new PseudoQC(n).load(src).run()) {
+                report = m.report();
+                double maxp = 0.5;
+                for (double v : m.probabilities()) maxp = Math.max(maxp, v);
+                prec = Math.max(0.90, Math.min(0.995, 0.93 + 0.06 * maxp));
+            }
+            List<String> lines = Arrays.asList(report.split("\n", -1));
+            blocks.add(new Block("qc", intent, lines, prec, "badaqasm"));
+            Feed f = new Feed();
+            f.kind = "qc"; f.code = report; f.source = src; f.qubits = n;
+            f.precision = prec; f.appended = lines;
+            return f;
+        }
+
+        /** Silent cue / pseudo-code -> semiconductor (Verilog RTL) source. */
+        public Feed verilogInput(String intent) {
+            Object[] p = Parse.qc(intent);
+            String src = (String) p[0];
+            int n = (Integer) p[1];
+            String rtl;
+            try (PseudoQC m = new PseudoQC(n).load(src)) {
+                rtl = m.verilog();
+            }
+            List<String> lines = Arrays.asList(rtl.split("\n", -1));
+            blocks.add(new Block("verilog", intent, lines, 0.95, "verilog"));
+            Feed f = new Feed();
+            f.kind = "verilog"; f.code = rtl; f.source = src; f.qubits = n;
+            f.precision = 0.95; f.appended = lines;
+            return f;
+        }
+
+        /** Silent message -> quantum-entanglement space telegraph. */
+        public Feed telegraphInput(String message) {
+            String report = new SpaceTelegraph().render(message);
+            List<String> lines = Arrays.asList(report.split("\n", -1));
+            blocks.add(new Block("telegraph", message, lines, 0.97, null));
+            Feed f = new Feed();
+            f.kind = "telegraph"; f.code = report; f.precision = 0.97; f.appended = lines;
+            return f;
+        }
+
         /** Word completion for the current mode. */
         public List<String> complete(String prefix, int limit) {
             if (prefix == null || prefix.isEmpty()) return new ArrayList<>();
             if (mode == Mode.CODE) return Coder.complete(prefix, language, limit);
+            List<String> vocab = (mode == Mode.QC || mode == Mode.VERILOG) ? qcVocab() : textVocab();
             List<String> out = new ArrayList<>();
-            for (String w : textVocab()) {
+            for (String w : vocab) {
                 if (w.startsWith(prefix) && !out.contains(w)) out.add(w);
                 if (out.size() >= limit) break;
             }
@@ -130,6 +219,12 @@ public final class SilentTalk {
                     return String.format("  ＋ 「%s」  (%.0f%%)", r.verbalization, r.precision * 100);
                 case "code":
                     return "  ＋ [" + r.language + "]" + (r.recipe ? " recipe" : "") + "\n" + indent(r.code);
+                case "qc":
+                    return String.format("  ＋ [QC %dqubit]  (%.0f%%)%n", r.qubits, r.precision * 100) + indent(r.code);
+                case "verilog":
+                    return "  ＋ [Verilog " + r.qubits + "qubit]\n" + indent(r.code);
+                case "telegraph":
+                    return "  ＋ [Telegraph]\n" + indent(r.code);
                 case "command":
                     return r.output;
                 default:
@@ -149,6 +244,12 @@ public final class SilentTalk {
             switch (cmd) {
                 case "text": mode = Mode.TEXT; f.output = "mode = text（言語化入力）"; break;
                 case "code": mode = Mode.CODE; f.output = "mode = code（コード入力）"; break;
+                case "qc": mode = Mode.QC; f.output = "mode = qc（QC ソース入力・実行）"; break;
+                case "verilog": case "semi": case "semiconductor":
+                    mode = Mode.VERILOG; f.output = "mode = verilog（半導体ソース入力）"; break;
+                case "telegraph": case "tg":
+                    mode = Mode.TELEGRAPH; f.output = "mode = telegraph（宇宙電信入力）"; break;
+                case "mode": f.output = "mode = " + mode.name().toLowerCase(); break;
                 case "lang":
                     language = rest.isEmpty() ? null : rest;
                     f.output = "language = " + (language == null ? "auto" : language); break;
@@ -169,13 +270,14 @@ public final class SilentTalk {
 
         public String intro() {
             return "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)\n"
-                 + "  発声せず、疎な手がかりを入力すると文章に言語化します。\n"
-                 + "  コマンド: :text :code :lang <l> :complete <prefix> :undo :clear :show :precision :help :quit";
+                 + "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。\n"
+                 + "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信\n"
+                 + "  コマンド: :lang <l> :complete <prefix> :undo :clear :show :mode :precision :help :quit";
         }
 
         private String help() {
-            return ":text 言語化入力 / :code コード入力 / :lang <ruby|python…> / "
-                 + ":complete <prefix> 補完 / :undo 取消 / :clear / :show / :precision / :quit";
+            return ":text 言語化 / :code コード / :qc QCソース＋実行 / :verilog 半導体 / :telegraph 宇宙電信 / "
+                 + ":lang <ruby|python…> / :complete <prefix> / :undo / :clear / :show / :precision / :quit";
         }
 
         private String indent(String code) {
@@ -197,6 +299,13 @@ public final class SilentTalk {
             Matcher m = WORD.matcher(text());
             while (m.find()) out.add(m.group());
             return new ArrayList<>(out);
+        }
+
+        // Candidate words for QC / Verilog mode: instruction mnemonics + presets.
+        private List<String> qcVocab() {
+            List<String> out = new ArrayList<>(Isa.OPCODES.keySet());
+            out.add("bell"); out.add("ghz");
+            return out;
         }
     }
 }

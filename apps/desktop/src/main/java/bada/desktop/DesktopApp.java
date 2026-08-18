@@ -317,7 +317,9 @@ public final class DesktopApp {
 
         // input row: the "silent" cue (no vocalization) + a mode toggle
         JTextField cue = new JTextField("光 記憶 波");
-        JComboBox<String> mode = new JComboBox<>(new String[]{"text（言語化）", "code（コード）"});
+        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph"};
+        JComboBox<String> mode = new JComboBox<>(new String[]{
+                "text（言語化）", "code（コード）", "qc（QCソース）", "verilog（半導体）", "telegraph（宇宙電信）"});
         JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
         JButton feed = new JButton("入力 (Feed)");
 
@@ -362,11 +364,13 @@ public final class DesktopApp {
                     session.precision() * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
                     session.exceedsSilentTalk() ? "EXCEEDS silent talk" : "below"));
         };
-        Runnable doFeed = () -> {
-            // sync mode + language into the session via commands
-            session.feed(mode.getSelectedIndex() == 1 ? ":code" : ":text");
+        Runnable syncMode = () -> {
+            session.feed(modeCmd[mode.getSelectedIndex()]);
             String selected = (String) lang.getSelectedItem();
             session.feed("auto".equals(selected) ? ":lang" : ":lang " + selected);
+        };
+        Runnable doFeed = () -> {
+            syncMode.run();
             session.feed(cue.getText());
             refresh.run();
         };
@@ -376,9 +380,7 @@ public final class DesktopApp {
         clear.addActionListener(e -> { session.feed(":clear"); refresh.run(); });
 
         Runnable complete = () -> {
-            session.feed(mode.getSelectedIndex() == 1 ? ":code" : ":text");
-            String selected = (String) lang.getSelectedItem();
-            session.feed("auto".equals(selected) ? ":lang" : ":lang " + selected);
+            syncMode.run();
             java.util.List<String> c = session.complete(prefix.getText().trim());
             completions.setText("→ " + String.join("   ", c));
         };

@@ -413,43 +413,57 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 
 > ⚠️ 生成シミュレーションです。実在の脳から思考を取り出す BCI ではありません。
 
-思考の言語化を**入力メソッド（IME）**に作り替えました。**発声せず**に入力した*疎な手がかり*
-（キーワード・略記・特徴テキスト）を、ガンマ関数の**大域的部分積分多様体**をゲージにした
-Mind トランスフォーマーが**文章に言語化**してドキュメントに追記します。**コマンド機能**で
-モード切替・単語補完・取り消しができ、`:code` モードでは**プログラミング言語トランスフォーマー**
-（`Bada::Coder`）が**ソースコードを入力**します。silent-talk 基準（0.92）を超える simulated 精度
-を報告します。
+思考の言語化を**入力メソッド（IME）**に作り替え、**全部の機能を発声せず文章で入力**できるように
+しました。**発声せず**に入力した*疎な手がかり*（キーワード・略記・特徴テキスト・擬似コード）を、
+ガンマ関数の**大域的部分積分多様体**をゲージにした Mind トランスフォーマーと各エンジンが
+**文章／ソースコードに言語化**してドキュメントに追記します。**コマンド機能**でモードを切替え、
+**半導体（Verilog）ソースも QC ソースも、発声せず文章で入力**できます。silent-talk 基準（0.92）
+を超える simulated 精度を報告します。
+
+**5 つの入力モード（発声せず文章で）:**
+
+| モード | コマンド | 入力するもの | 出力（ドキュメントに追記） |
+|:--|:--|:--|:--|
+| 言語化 | `:text` | 疎な手がかり | 思考を言語化した文章 |
+| コード | `:code` | 意図（EN/JA） | プログラミング言語のソース（Coder） |
+| QC | `:qc` | 手がかり／擬似コード | 擬似量子計算機の QC ソース＋ディスク実行の状態ベクトル |
+| 半導体 | `:verilog`（`:semi`） | 手がかり／擬似コード | 半導体（Verilog RTL）ソースコード |
+| 宇宙電信 | `:telegraph`（`:tg`） | 送信文 | 量子もつれ宇宙電信（物理証明つき） |
 
 ```bash
-bin/bada silent                                        # 対話 IME（発声せずに入力）
-bin/bada silent "光 記憶 波" ":code" "fibonacci 8"     # 手がかり→文章、:code→プログラム
+bin/bada silent                                          # 対話 IME（発声せずに入力）
+bin/bada silent "光 記憶 波" ":code" "fibonacci 8"       # 手がかり→文章、:code→プログラム
+bin/bada silent ":qc" "bell" ":verilog" "ghz"           # QC ソース実行 → 半導体 Verilog を入力
+bin/bada silent ":qc" "H 0; CX 0 1; MEASURE 0"          # 擬似コードを発声せず入力→ 実行
 ```
 
 ```ruby
 s = Bada::SilentTalk::Session.new
 s.feed("光 と 音 の 記憶")   # -> 文章を言語化して追記（発声なし）
-s.feed(":code")              # コード入力モードへ
-s.feed(":lang ruby")
-s.feed("fibonacci 10")       # -> ソースコードを言語化して追記
-s.complete("de")             # -> ["def", ...]（コマンド補完）
+s.feed(":qc"); s.feed("bell")     # -> QC ソースと状態ベクトルを追記（発声なし）
+s.feed(":verilog"); s.feed("ghz") # -> 半導体 Verilog ソースを追記（発声なし）
 s.text                       # 組み上がったドキュメント
 s.precision                  # 走行平均 precision（silent-talk 基準超え）
 ```
 
-コマンド：`:text`（言語化入力）/ `:code`（コード入力）/ `:lang <ruby|python…>` /
-`:complete <prefix>`（補完）/ `:undo`（取消）/ `:clear` / `:show` / `:precision` / `:help` / `:quit`。
+コマンド：`:text` / `:code` / `:qc` / `:verilog` / `:telegraph` / `:lang <ruby|python…>` /
+`:complete <prefix>`（補完）/ `:undo`（取消）/ `:clear` / `:show` / `:mode` / `:precision` / `:help` / `:quit`。
+QC/Verilog モードでは QASM ニーモニック（`H` `CX` `MEASURE` …）と preset（`bell` `ghz`）を補完します。
 
 | ご依頼の要素 | 実装 |
 |:--|:--|
 | 大域的部分積分多様体から思考を言語化 | `Bada::Mind::Reader`（多様体ゲージ注意）を入力エンジンに転用 |
 | 発声せず文章を入力する機能 | `SilentTalk::Session#text_input`（疎な手がかり→文章） |
+| 半導体のソースコードを発声せず文章で入力 | `:verilog` モード `#verilog_input`（手がかり→Verilog RTL） |
+| QC のソースコードを発声せず文章で入力 | `:qc` モード `#qc_input`（手がかり→QC ソース＋ディスク実行） |
+| 全部の機能を発声せず文章で入力 | `:text :code :qc :verilog :telegraph` の 5 エンジン一括 IME |
 | silent talk 以上の精度 | `#precision` 走行平均 ＞ 基準 0.92（`#exceeds_silent_talk?`） |
-| 独自の入力機能（雛形でない） | 手がかりごとに生成される文章／`Bada::Coder::Synth` の独自コード |
-| コマンド機能 | `:text :code :lang :complete :undo :clear :show :precision`（IME REPL） |
+| 独自の入力機能（雛形でない） | 手がかりごとに生成される文章／独自ソース（Synth・QASM・RTL） |
+| コマンド機能 | `:text :code :qc :verilog :telegraph :lang :complete :undo …`（IME REPL） |
 | プログラミング言語トランスフォーマー | `:code` モードで `Bada::Coder`（言語自動判定・補完・レシピ） |
 
-デスクトップは**⑤ サイレント入力**タブ、Android は**⑥ サイレント入力**モードで同じ機能を提供します
-（すべて共有 Java コア `bada.silent.SilentTalk`）。
+デスクトップは**⑤ サイレント入力**タブ（モード選択つき）、Android は**⑥ サイレント入力**モードで
+同じ 5 エンジンを提供します（すべて共有 Java コア `bada.silent.SilentTalk`）。
 
 ## モジュール構成
 

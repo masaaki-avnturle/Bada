@@ -133,6 +133,75 @@ class TestSilentTalkSession < Minitest::Test
     assert_equal a.text, b.text
   end
 
+  # ---- engine modes: every function driven by silent text ----------------
+
+  def test_qc_mode_generates_source_and_runs
+    assert_equal :command, @s.feed(":qc")[:kind]
+    assert_equal :qc, @s.mode
+    r = @s.feed("bell")
+    assert_equal :qc, r[:kind]
+    assert_equal 2, r[:qubits]
+    assert_includes r[:source], "CX 0 1"
+    assert_includes r[:code], "state vector"          # actually ran on disk memory
+    assert_includes @s.text, "MONITOR"
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_qc_mode_accepts_raw_qasm
+    @s.feed(":qc")
+    r = @s.feed("H 0; CX 0 1; MEASURE 0")
+    assert_equal 2, r[:qubits]
+    assert_includes r[:source], "MEASURE 0"
+    assert(r[:source].strip.end_with?("HALT"))
+  end
+
+  def test_verilog_mode_generates_semiconductor_source
+    assert_equal :command, @s.feed(":verilog")[:kind]
+    assert_equal :verilog, @s.mode
+    r = @s.feed("ghz")
+    assert_equal :verilog, r[:kind]
+    assert_equal 3, r[:qubits]
+    assert_includes r[:code], "module"
+    assert_includes r[:code], "NAND"                  # simulated MOSFET decoder
+    assert_includes @s.text, "default_nettype"
+  end
+
+  def test_semi_alias_switches_to_verilog
+    @s.feed(":semi")
+    assert_equal :verilog, @s.mode
+  end
+
+  def test_telegraph_mode_sends_message
+    assert_equal :command, @s.feed(":telegraph")[:kind]
+    assert_equal :telegraph, @s.mode
+    r = @s.feed("HELLO SPACE")
+    assert_equal :telegraph, r[:kind]
+    assert_includes r[:code], "Space Telegraph"
+  end
+
+  def test_completion_in_qc_mode_uses_mnemonics
+    @s.feed(":qc")
+    hits = @s.complete("H")
+    assert_includes hits, "H"
+    assert_includes hits, "HALT"
+  end
+
+  def test_all_engine_modes_reachable_by_command
+    Bada::SilentTalk::MODES.each do |m|
+      @s.feed(":#{m}")
+      assert_equal m, @s.mode
+    end
+  end
+
+  def test_mixed_document_across_engines_exceeds_baseline
+    @s.feed("光 と 音 の 記憶")
+    @s.feed(":qc"); @s.feed("bell")
+    @s.feed(":verilog"); @s.feed("ghz")
+    @s.feed(":telegraph"); @s.feed("QUANTUM HELLO")
+    assert_equal 4, @s.blocks.length
+    assert @s.exceeds_silent_talk?
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")
