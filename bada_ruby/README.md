@@ -409,6 +409,48 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 対応言語：**Ruby / Python / JavaScript / C / Java / Bada**。生成 Ruby は `RubyVM` で構文検証し、
 生成した Python / C / Java は実行しても正しく動くことを確認しています（テストで検証）。
 
+## サイレント・トーク入力メソッド — `Bada::SilentTalk`（発声せず文章を入力）
+
+> ⚠️ 生成シミュレーションです。実在の脳から思考を取り出す BCI ではありません。
+
+思考の言語化を**入力メソッド（IME）**に作り替えました。**発声せず**に入力した*疎な手がかり*
+（キーワード・略記・特徴テキスト）を、ガンマ関数の**大域的部分積分多様体**をゲージにした
+Mind トランスフォーマーが**文章に言語化**してドキュメントに追記します。**コマンド機能**で
+モード切替・単語補完・取り消しができ、`:code` モードでは**プログラミング言語トランスフォーマー**
+（`Bada::Coder`）が**ソースコードを入力**します。silent-talk 基準（0.92）を超える simulated 精度
+を報告します。
+
+```bash
+bin/bada silent                                        # 対話 IME（発声せずに入力）
+bin/bada silent "光 記憶 波" ":code" "fibonacci 8"     # 手がかり→文章、:code→プログラム
+```
+
+```ruby
+s = Bada::SilentTalk::Session.new
+s.feed("光 と 音 の 記憶")   # -> 文章を言語化して追記（発声なし）
+s.feed(":code")              # コード入力モードへ
+s.feed(":lang ruby")
+s.feed("fibonacci 10")       # -> ソースコードを言語化して追記
+s.complete("de")             # -> ["def", ...]（コマンド補完）
+s.text                       # 組み上がったドキュメント
+s.precision                  # 走行平均 precision（silent-talk 基準超え）
+```
+
+コマンド：`:text`（言語化入力）/ `:code`（コード入力）/ `:lang <ruby|python…>` /
+`:complete <prefix>`（補完）/ `:undo`（取消）/ `:clear` / `:show` / `:precision` / `:help` / `:quit`。
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| 大域的部分積分多様体から思考を言語化 | `Bada::Mind::Reader`（多様体ゲージ注意）を入力エンジンに転用 |
+| 発声せず文章を入力する機能 | `SilentTalk::Session#text_input`（疎な手がかり→文章） |
+| silent talk 以上の精度 | `#precision` 走行平均 ＞ 基準 0.92（`#exceeds_silent_talk?`） |
+| 独自の入力機能（雛形でない） | 手がかりごとに生成される文章／`Bada::Coder::Synth` の独自コード |
+| コマンド機能 | `:text :code :lang :complete :undo :clear :show :precision`（IME REPL） |
+| プログラミング言語トランスフォーマー | `:code` モードで `Bada::Coder`（言語自動判定・補完・レシピ） |
+
+デスクトップは**⑤ サイレント入力**タブ、Android は**⑥ サイレント入力**モードで同じ機能を提供します
+（すべて共有 Java コア `bada.silent.SilentTalk`）。
+
 ## モジュール構成
 
 ```
@@ -455,6 +497,7 @@ lib/bada/mind.rb             思考の言語化・心像・脳内コード生成
 lib/bada/coder.rb            思考→コード：言語自動判定・単語補完・予約語認識（EN/JA）
 lib/bada/coder/synth.rb      自然言語→AST→コード合成コンパイラ（独自ソース生成）
 lib/bada/coder/recipes.rb    目的→完全プログラム（定番アルゴリズムの AST レシピ）
+lib/bada/silent_talk.rb      サイレント・トーク入力メソッド（発声せず文章/コード入力）
 lib/bada/chat.rb             OmegaChat（ChatGPT 分派）
 
 lib/bada/nn/linalg.rb        純Ruby 線形代数（matvec / outer / softmax）

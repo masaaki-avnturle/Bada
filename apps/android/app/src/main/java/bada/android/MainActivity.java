@@ -21,22 +21,27 @@ import java.util.concurrent.Executors;
 
 import bada.coder.Coder;
 import bada.mind.MindReader;
+import bada.silent.SilentTalk;
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
 /**
- * Bada Android front end. One screen, three modes selected by a spinner:
+ * Bada Android front end. One screen, modes selected by a spinner:
  *   ① 宇宙電信 Telegraph   — quantum-entanglement space telegraph
  *   ② 擬似QC モニタ        — von-Neumann pseudo QC: control-circuit monitor
  *   ③ 半導体 Verilog       — the pseudo QC's semiconductor (Verilog) source
- * Both engines are the same shared pure-Java core, so the APK ships no Ruby.
+ *   ④ 思考言語化 Mind      — thought-verbalization simulation
+ *   ⑤ コード生成 Coder     — thought-to-code transformer (EN/JA)
+ *   ⑥ サイレント入力 IME   — silent-talk input method: cues -> text/code
+ * Every engine is the same shared pure-Java core, so the APK ships no Ruby.
  */
 public class MainActivity extends Activity {
 
     private static final String QC_DEMO = "H 0; CX 0 1; HALT";
     private static final String MIND_DEMO = "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する";
     private static final String CODE_DEMO = "print hello 3 times loop";
+    private static final String SILENT_DEMO = "光 記憶 波 | 望み と 恐れ が 交錯 | :code | :lang ruby | fibonacci 8";
 
     private Spinner mode;
     private EditText input;
@@ -63,7 +68,7 @@ public class MainActivity extends Activity {
         mode.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
                 new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射",
                         "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)",
-                        "⑤ コード生成 Coder (EN/JA)"}));
+                        "⑤ コード生成 Coder (EN/JA)", "⑥ サイレント入力 IME (sim)"}));
         root.addView(mode);
 
         input = new EditText(this);
@@ -89,6 +94,7 @@ public class MainActivity extends Activity {
                     case 1, 2 -> input.setText(QC_DEMO);
                     case 3 -> input.setText(MIND_DEMO);
                     case 4 -> input.setText(CODE_DEMO);
+                    case 5 -> input.setText(SILENT_DEMO);
                     default -> { }
                 }
                 runSelected();
@@ -125,6 +131,7 @@ public class MainActivity extends Activity {
                     case 0 -> telegraph(text, mat);
                     case 3 -> new MindReader().render(text, "対象");
                     case 4 -> coder(text);
+                    case 5 -> silent(text);
                     default -> pseudoQc(text, m == 2);
                 };
             } catch (Throwable t) {
@@ -149,6 +156,27 @@ public class MainActivity extends Activity {
         sb.append(String.format("# precision: %.1f%%  (silent-talk %.1f%%)\n\n",
                 r.precision * 100, Coder.SILENT_TALK_BASELINE * 100));
         sb.append(r.code);
+        return sb.toString();
+    }
+
+    // Silent-talk IME (simulation): each '|'-separated segment is a silently-typed
+    // cue or a :command; the Mind transformer verbalizes cues into a document and
+    // the Coder transformer generates source in :code mode.
+    private String silent(String text) {
+        SilentTalk.Session s = new SilentTalk.Session();
+        StringBuilder log = new StringBuilder();
+        for (String seg : text.split("\\|")) {
+            seg = seg.trim();
+            if (seg.isEmpty()) continue;
+            String out = s.render(s.feed(seg));
+            if (!out.isEmpty()) log.append(out).append("\n");
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== サイレント入力ログ ===\n").append(log);
+        sb.append("\n=== 入力結果 (document) ===\n").append(s.text()).append("\n\n");
+        sb.append(String.format("precision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                s.precision() * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                s.exceedsSilentTalk() ? "EXCEEDS" : "below"));
         return sb.toString();
     }
 

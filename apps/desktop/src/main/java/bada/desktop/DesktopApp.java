@@ -2,6 +2,7 @@ package bada.desktop;
 
 import bada.coder.Coder;
 import bada.mind.MindReader;
+import bada.silent.SilentTalk;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -43,6 +44,22 @@ public final class DesktopApp {
             System.out.println(new MindReader().render(sig, "対象"));
             return;
         }
+        if (joined.startsWith("--silent")) {
+            String rest = joined.substring("--silent".length()).trim();
+            SilentTalk.Session s = new SilentTalk.Session();
+            System.out.println(s.intro());
+            for (String line : rest.split("\\|")) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                String out = s.render(s.feed(line));
+                if (!out.isEmpty()) System.out.println(out);
+            }
+            System.out.println("\n--- 入力結果 (document) ---");
+            System.out.println(s.text());
+            System.out.printf("precision = %.1f%%  -> %s%n", s.precision() * 100,
+                    s.exceedsSilentTalk() ? "EXCEEDS silent talk" : "below");
+            return;
+        }
         if (joined.startsWith("--code")) {
             String intent = joined.substring("--code".length()).trim();
             Coder.GenResult r = Coder.generate(intent, null);
@@ -73,6 +90,7 @@ public final class DesktopApp {
         tabs.addTab("② 擬似量子計算機 (Pseudo QC)", qcPanel());
         tabs.addTab("③ 思考言語化 (Mind)", mindPanel());
         tabs.addTab("④ コード生成 (Coder)", coderPanel());
+        tabs.addTab("⑤ サイレント入力 (Silent IME)", silentPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -280,6 +298,94 @@ public final class DesktopApp {
         root.add(top, BorderLayout.NORTH);
         root.add(new JScrollPane(output), BorderLayout.CENTER);
         generate.run();
+        return root;
+    }
+
+    // ---------------------------------------------------------------- Silent IME
+    private static JPanel silentPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+        final SilentTalk.Session session = new SilentTalk.Session();
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+
+        // input row: the "silent" cue (no vocalization) + a mode toggle
+        JTextField cue = new JTextField("光 記憶 波");
+        JComboBox<String> mode = new JComboBox<>(new String[]{"text（言語化）", "code（コード）"});
+        JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
+        JButton feed = new JButton("入力 (Feed)");
+
+        JPanel row1 = new JPanel(new BorderLayout(6, 6));
+        JPanel l1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        l1.add(new JLabel("手がかり (発声せず):"));
+        row1.add(l1, BorderLayout.WEST);
+        row1.add(cue, BorderLayout.CENTER);
+        JPanel r1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        r1.add(new JLabel("mode:")); r1.add(mode);
+        r1.add(new JLabel("lang:")); r1.add(lang); r1.add(feed);
+        row1.add(r1, BorderLayout.EAST);
+
+        // completion row (command feature)
+        JTextField prefix = new JTextField();
+        JLabel completions = new JLabel(" ");
+        JPanel row2 = new JPanel(new BorderLayout(6, 6));
+        JPanel l2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        l2.add(new JLabel("補完 (prefix):"));
+        row2.add(l2, BorderLayout.WEST);
+        row2.add(prefix, BorderLayout.CENTER);
+        row2.add(completions, BorderLayout.SOUTH);
+
+        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JButton undo = new JButton("取消 (Undo)");
+        JButton clear = new JButton("クリア (Clear)");
+        btns.add(undo); btns.add(clear);
+
+        top.add(row1, BorderLayout.NORTH);
+        JPanel mid = new JPanel(new BorderLayout());
+        mid.add(row2, BorderLayout.NORTH);
+        mid.add(btns, BorderLayout.SOUTH);
+        top.add(mid, BorderLayout.SOUTH);
+
+        JTextArea doc = monospaceArea();
+        JLabel status = new JLabel(" ");
+
+        Runnable refresh = () -> {
+            doc.setText(session.text());
+            doc.setCaretPosition(0);
+            status.setText(String.format("  precision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                    session.precision() * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                    session.exceedsSilentTalk() ? "EXCEEDS silent talk" : "below"));
+        };
+        Runnable doFeed = () -> {
+            // sync mode + language into the session via commands
+            session.feed(mode.getSelectedIndex() == 1 ? ":code" : ":text");
+            String selected = (String) lang.getSelectedItem();
+            session.feed("auto".equals(selected) ? ":lang" : ":lang " + selected);
+            session.feed(cue.getText());
+            refresh.run();
+        };
+        feed.addActionListener(e -> doFeed.run());
+        cue.addActionListener(e -> doFeed.run());
+        undo.addActionListener(e -> { session.feed(":undo"); refresh.run(); });
+        clear.addActionListener(e -> { session.feed(":clear"); refresh.run(); });
+
+        Runnable complete = () -> {
+            session.feed(mode.getSelectedIndex() == 1 ? ":code" : ":text");
+            String selected = (String) lang.getSelectedItem();
+            session.feed("auto".equals(selected) ? ":lang" : ":lang " + selected);
+            java.util.List<String> c = session.complete(prefix.getText().trim());
+            completions.setText("→ " + String.join("   ", c));
+        };
+        prefix.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+        });
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(doc), BorderLayout.CENTER);
+        root.add(status, BorderLayout.SOUTH);
+        refresh.run();
         return root;
     }
 

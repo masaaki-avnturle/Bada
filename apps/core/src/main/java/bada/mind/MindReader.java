@@ -65,6 +65,17 @@ public final class MindReader {
         public boolean exceedsSilentTalk;
     }
 
+    /** Vocabulary for text-mode completion: the lexicon plus words drawn from the prior. */
+    public static List<String> vocab() {
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>(java.util.Arrays.asList(LEXICON));
+        Pattern word = Pattern.compile("[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}ー]+");
+        for (String s : MIND_CORPUS) {
+            java.util.regex.Matcher m = word.matcher(s);
+            while (m.find()) out.add(m.group());
+        }
+        return new ArrayList<>(out);
+    }
+
     public Result read(String signal, String subject) {
         signal = signal == null ? "" : signal;
         if (signal.trim().isEmpty()) signal = "静寂 の 中 の 光";

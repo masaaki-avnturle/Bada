@@ -12,6 +12,7 @@
 #   bin/bada qc [bell|ghz|run f.qasm]   von-Neumann pseudo QC: monitor + statevector
 #   bin/bada qc verilog [ghz|f.qasm]    emit semiconductor (Verilog) control source
 #   bin/bada mind "信号..."             thought verbalization + image + code (sim)
+#   bin/bada silent                     silent-talk IME: verbalize cues -> text/code
 #   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
 #   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
 #   bin/bada detect "code..."           auto-detect the programming language
@@ -151,6 +152,20 @@ when "mind"
   signal = words.join(" ")
   reader = raw ? Bada::Mind::Reader.new(corpus_texts: nil) : Bada::Mind::Reader.new
   puts reader.render(signal, subject: subject)
+when "silent"
+  # Silent-talk input method: verbalize sparse cues into text, :code to program.
+  #   bada silent                       interactive IME REPL
+  #   bada silent "光 記憶 波" ":code" "fibonacci 10"   feed lines then print doc
+  session = Bada::SilentTalk::Session.new
+  if ARGV.empty?
+    session.repl
+  else
+    ARGV.each { |line| out = session.render(session.feed(line)); puts out unless out.empty? }
+    puts "\n--- 入力結果 (document) ---"
+    puts session.text
+    puts format("precision = %.1f%%  -> %s", session.precision * 100,
+                session.exceeds_silent_talk? ? "EXCEEDS silent talk" : "below")
+  end
 when "code"
   # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.
   #   bada code "print hello 3 times" [--lang python]
@@ -230,6 +245,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | code | complete | detect | coder | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | silent | code | complete | detect | coder | run | learn | xi | neural | train | version"
   exit 1
 end
