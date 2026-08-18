@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 public final class SilentTalk {
     public static final double SILENT_TALK_BASELINE = MindReader.SILENT_TALK_BASELINE;
 
-    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH, BADA, WHISPER, REPORT, LATEX }
+    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH, BADA, WHISPER, REPORT, LATEX, MATH }
 
     /** Result of a one-shot thought-input (for the per-engine 思考入力 button). */
     public static final class Thought {
@@ -152,8 +152,9 @@ public final class SilentTalk {
         public String sourceLang;       // whisper | report (en | unknown)
         public int sentences;           // report
         public int blocks = 1;          // bada
-        public int sections;            // latex
-        public String title;            // latex
+        public int sections;            // latex | math
+        public String title;            // latex | math
+        public boolean badaValid;       // math
         public double precision;        // text | code | qc | verilog | telegraph | bada | whisper | report | latex
         public List<String> appended;   // all engine kinds
         public String output;           // command
@@ -190,8 +191,20 @@ public final class SilentTalk {
                 case WHISPER: return whisperInput(line);
                 case REPORT: return reportInput(line);
                 case LATEX: return latexInput(line);
+                case MATH: return mathInput(line);
                 default: return textInput(line);
             }
+        }
+
+        /** Silent cue -> a long-long MATH paper (pLaTeX amsthm + embedded Bada). */
+        public Feed mathInput(String cue) {
+            Platex.MathPaper p = Platex.mathPaper(cue, latexNonce++);
+            List<String> lines = new ArrayList<>(Arrays.asList(p.code.split("\n", -1)));
+            blocks.add(new Block("math", cue, lines, p.precision, "platex+bada"));
+            Feed f = new Feed();
+            f.kind = "math"; f.code = p.code; f.sections = p.sections; f.title = p.title;
+            f.valid = p.valid; f.badaValid = p.badaValid; f.precision = p.precision; f.appended = lines;
+            return f;
         }
 
         /** Silent cue -> a long-long pLaTeX 論文 source. */
@@ -318,6 +331,7 @@ public final class SilentTalk {
             else if (mode == Mode.BADA) vocab = BadaSyntax.reservedAll();
             else if (mode == Mode.WHISPER || mode == Mode.REPORT) { vocab = Whisper.vocab(); prefix = prefix.toLowerCase(); }
             else if (mode == Mode.LATEX) vocab = Arrays.asList(Platex.LATEX_WORDS);
+            else if (mode == Mode.MATH) vocab = Arrays.asList(Platex.MATH_WORDS);
             else vocab = textVocab();
             List<String> out = new ArrayList<>();
             for (String w : vocab) {
@@ -368,6 +382,8 @@ public final class SilentTalk {
                     return String.format("  ＋ [report:%s %d文]%n", r.sourceLang, r.sentences) + indent(r.code);
                 case "latex":
                     return String.format("  ＋ [pLaTeX %d節%s] %s%n", r.sections, r.valid ? "✓" : "✗", r.title) + indent(r.code);
+                case "math":
+                    return String.format("  ＋ [数学論文 pLaTeX+Bada %d節%s] %s%n", r.sections, r.valid ? "✓" : "✗", r.title) + indent(r.code);
                 case "command":
                     return r.output;
                 default:
@@ -399,6 +415,8 @@ public final class SilentTalk {
                     mode = Mode.REPORT; f.output = "mode = report（未知言語/ウィスパード → 長文レポート）"; break;
                 case "latex": case "platex": case "paper": case "tex":
                     mode = Mode.LATEX; f.output = "mode = latex（論文 pLaTeX 長長文ソース）"; break;
+                case "math": case "mathpaper": case "bmath":
+                    mode = Mode.MATH; f.output = "mode = math（数学論文 pLaTeX＋Bada 長長文）"; break;
                 case "reserved": case "r":
                     f.output = "予約語/構文語: " + (mode == Mode.BADA
                             ? String.join("  ", BadaSyntax.reservedAll())

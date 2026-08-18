@@ -70,6 +70,14 @@ public final class DesktopApp {
                     s.exceedsSilentTalk() ? "EXCEEDS silent talk" : "below");
             return;
         }
+        if (joined.startsWith("--math")) {
+            String cue = joined.substring("--math".length()).trim();
+            Platex.MathPaper p = Platex.mathPaper(cue, 0);
+            System.out.printf("%% math pLaTeX+Bada %d sections, valid=%s, bada=%s, precision=%.1f%%%n",
+                    p.sections, p.valid, p.badaValid, p.precision * 100);
+            System.out.println(p.code);
+            return;
+        }
         if (joined.startsWith("--latex")) {
             String cue = joined.substring("--latex".length()).trim();
             Platex.Paper p = Platex.paper(cue, 0);
@@ -340,10 +348,11 @@ public final class DesktopApp {
 
         // input row: the "silent" cue (no vocalization) + a mode toggle
         JTextField cue = new JTextField("光 記憶 波");
-        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph", ":bada", ":whisper", ":report", ":latex"};
+        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph", ":bada", ":whisper", ":report", ":latex", ":math"};
         JComboBox<String> mode = new JComboBox<>(new String[]{
                 "text（言語化）", "code（コード）", "qc（QCソース）", "verilog（半導体）", "telegraph（宇宙電信）",
-                "bada（Bada構文/長文）", "whisper（英ウィスパード/未知言語）", "report（長長文レポート）", "latex（論文pLaTeX）"});
+                "bada（Bada構文/長文）", "whisper（英ウィスパード/未知言語）", "report（長長文レポート）",
+                "latex（論文pLaTeX）", "math（数学論文pLaTeX+Bada）"});
         JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
         JButton feed = new JButton("入力 (Feed)");
 
@@ -440,12 +449,14 @@ public final class DesktopApp {
         badaBtn.setToolTipText("復元した語から、長長文の Bada 言語ソース（実行可）を生成します（発声なし）");
         JButton texBtn = new JButton("📝 pLaTeX論文");
         texBtn.setToolTipText("復元した語から、pLaTeX の長長文論文ソース（jsarticle）を生成します（発声なし）");
+        JButton mathBtn = new JButton("🧮 数学論文");
+        mathBtn.setToolTipText("復元した語から、数学論文（pLaTeX amsthm＋Bada 言語）の長長文ソースを生成します（発声なし）");
 
         JPanel inRow = new JPanel(new BorderLayout(6, 6));
         inRow.add(new JLabel("ウィスパード / 未知言語:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
         JPanel wEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        wEast.add(go); wEast.add(longBtn); wEast.add(badaBtn); wEast.add(texBtn);
+        wEast.add(go); wEast.add(longBtn); wEast.add(badaBtn); wEast.add(texBtn); wEast.add(mathBtn);
         inRow.add(wEast, BorderLayout.EAST);
 
         JTextField prefix = new JTextField();
@@ -503,11 +514,20 @@ public final class DesktopApp {
                     input.getText(), p.sections, p.valid ? "valid" : "invalid", p.code));
             output.setCaretPosition(0);
         };
+        Runnable mathPaper = () -> {
+            Whisper.Result w = Whisper.verbalize(input.getText());
+            Platex.MathPaper p = Platex.mathPaper(w.text, 0);
+            output.setText(String.format(
+                    "入力 (whispered/unknown):%n  %s%n%n数学論文 pLaTeX+Bada (%d 節, %s, Bada実行%s):%n%s",
+                    input.getText(), p.sections, p.valid ? "valid" : "invalid", p.badaValid ? "OK" : "NG", p.code));
+            output.setCaretPosition(0);
+        };
         go.addActionListener(e -> verbalize.run());
         input.addActionListener(e -> longReport.run());
         longBtn.addActionListener(e -> longReport.run());
         badaBtn.addActionListener(e -> badaLong.run());
         texBtn.addActionListener(e -> texPaper.run());
+        mathBtn.addActionListener(e -> mathPaper.run());
 
         Runnable complete = () -> {
             java.util.List<String> c = new java.util.ArrayList<>();

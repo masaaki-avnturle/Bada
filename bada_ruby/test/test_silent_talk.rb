@@ -495,6 +495,48 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes Bada::SilentTalk::MODES, :latex
   end
 
+  # ---- 数学論文 (:math) — pLaTeX amsthm + embedded Bada ---------------------
+
+  def test_math_mode_writes_theorem_paper_with_bada
+    assert_equal :command, @s.feed(":math")[:kind]
+    assert_equal :math, @s.mode
+    r = @s.feed("多様体 量子 もつれ")
+    assert_equal :math, r[:kind]
+    assert r[:valid]
+    assert r[:bada_valid]
+    assert_operator r[:code].split("\n").length, :>=, 60      # 長長文
+    assert_includes r[:code], "\\usepackage{amsmath,amssymb,amsthm}"
+    assert_includes r[:code], "\\newtheorem{theorem}"
+    assert_includes r[:code], "\\begin{theorem}"
+    assert_includes r[:code], "\\begin{proof}"
+    # the embedded Bada-language computation section
+    assert_includes r[:code], "\\begin{verbatim}"
+    assert_includes r[:code], "Omega::push"
+  end
+
+  def test_math_paper_begin_end_balanced
+    code = Bada::SilentTalk::Platex.math_paper("光 記憶 波", nonce: 1)[:code]
+    assert_equal code.scan(/\\begin\{/).length, code.scan(/\\end\{/).length
+  end
+
+  def test_math_paper_embeds_runnable_bada
+    r = Bada::SilentTalk::Platex.math_paper("光 記憶", nonce: 0)
+    # extract the verbatim Bada block and run it
+    body = r[:code][/\\begin\{verbatim\}\n(.*?)\\end\{verbatim\}/m, 1]
+    refute_nil body
+    refute_empty Bada::Interpreter.new.run(body)
+  end
+
+  def test_math_completion_offers_amsthm_words
+    @s.feed(":math")
+    assert_includes @s.complete("\\newtheorem"), "\\newtheorem"
+    assert_includes @s.complete("\\begin{th"), "\\begin{theorem}"
+  end
+
+  def test_math_is_a_declared_mode
+    assert_includes Bada::SilentTalk::MODES, :math
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

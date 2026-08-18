@@ -433,6 +433,7 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 | **ウィスパード** | **`:whisper`** | 英語ウィスパード／未知言語 | **母音の落ちた英語を完全文に復元／未知言語を英語へ言語化** |
 | **長文レポート** | **`:report`** | 未知言語／ウィスパード | **複数文の文章レポート（長文ドキュメント）を発声せず入力** |
 | **論文 pLaTeX** | **`:latex`** | 手がかり | **pLaTeX（jsarticle）の長長文論文ソースを発声せず生成（title/abstract/節/数式）** |
+| **数学論文** | **`:math`** | 手がかり | **数学論文（pLaTeX amsthm 定理/補題/定義/証明）＋ Bada 言語の計算を埋め込み、長長文で生成** |
 
 ```bash
 bin/bada silent                                          # 対話 IME（発声せずに入力）
@@ -485,6 +486,12 @@ silent[whisper]> φωτ μνημη κυμα      # 未知言語（ギリシャ�
 `\documentclass{jsarticle}`・`\title`・`\begin{abstract}`・複数の `\section`・`\begin{equation}`
 （∬1/(x log x)²、β(p,q)=Γ(p)Γ(q)/Γ(p+q)、S=2√2 など）を含む完全な論文骨子で、`\begin`/`\end` の
 対応を検証します。`bin/bada latex "多様体 量子 もつれ"` でも生成できます。
+
+**数学論文作成 pLaTeX＋Bada（`:math`）** — 発声せず、**数学論文の長長文ソース**を生成します。
+`amsthm` の **定理・補題・定義・証明**（`\newtheorem`／`\begin{theorem}`／`\begin{proof}`）と数式を
+各節に配置し、さらに末尾に **Bada 言語による構成的計算**を `\begin{verbatim}` で埋め込みます
+（埋め込んだ Bada プログラムは実際に実行検証）。`bin/bada math "多様体 量子 もつれ"`、デスクトップの
+**⑥ ウィスパードタブ**の「🧮 数学論文」ボタン、`:math` モードから生成できます。
 
 ```
 silent[report]> qntm lght mmry wv sgnl
