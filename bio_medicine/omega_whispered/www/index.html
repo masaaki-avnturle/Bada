@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<!--
+  Ω-Whispered — ウィスパード適性検査 (数学記号 × 方程式意味解析)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_whispered
+
+  第一次検査: 数学論文(PDF)に現れる方程式の記号 — その意味・専門分野を識別できるか。
+              PDF を読み込むと、その論文から実際に抽出した記号で出題する(pdf_symbols.js)。
+  第二次検査: 方程式の意味解析 — 簡単な方程式から、専門分野へ「連想(一般化)」された
+              方程式の意味を読み解けるか(symbol_bank.js の ASSOC)。
+
+  ⚠ 「フルメタル・パニック!」のウィスパード設定に着想を得た非公式のファン・オマージュです。
+     原作・アニメの権利者とは一切関係がありません。結果は学習/娯楽目的の指標であり、
+     実在の能力・適性を測定・診断するものではありません。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Whispered — ウィスパード適性検査</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;
+        --txt:#e6ecf5;--dim:#8794a8;--ok:#3fbf7f;--ng:#d05a5a;--mono:Consolas,Menlo,"DejaVu Sans Mono",monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.55}
+  header{padding:16px 18px 8px}
+  h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12.5px;margin-top:6px}
+  .disc{margin:12px 18px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;
+        color:#e0b020;font-size:12px}
+  main{padding:16px 18px 60px;max-width:1180px;margin:0 auto}
+  .grid{display:flex;gap:16px;flex-wrap:wrap}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}
+  select,input[type=file]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);
+        border-radius:6px;padding:7px;font-size:12.5px}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);
+         border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .cap{font-size:11.5px;color:var(--dim);margin-top:5px}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;
+        border-bottom:1px solid var(--line)}
+  .drop{border:1px dashed var(--line);border-radius:8px;padding:14px;text-align:center;color:var(--dim);
+        font-size:12px;background:#06090f}
+  .drop.hot{border-color:var(--cyan);color:var(--cyan)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font-family:var(--mono);font-size:13px;background:#0d1524;border:1px solid var(--line);border-radius:6px;
+        padding:3px 7px}
+  .chip b{color:var(--gold)}.chip small{color:var(--dim)}
+  .frag{font-family:var(--mono);font-size:12px;color:var(--violet);background:#06090f;border:1px solid var(--line);
+        border-radius:6px;padding:6px 8px;margin-top:6px;overflow-x:auto;white-space:nowrap}
+  /* --- 検査 --- */
+  #examCard{display:none}
+  .qhead{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px}
+  .phase{color:var(--violet);font-weight:700}
+  .bar{height:5px;background:#0d1524;border-radius:3px;overflow:hidden;margin-bottom:12px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan));width:0}
+  .qsym{font-family:var(--mono);font-size:64px;text-align:center;color:var(--gold);line-height:1.2;margin:6px 0}
+  .qeq{font-family:var(--mono);font-size:19px;text-align:center;color:var(--cyan);margin:12px 0;
+       word-break:break-word;overflow-wrap:anywhere}
+  .qtext{font-size:14px;margin:4px 0 10px}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{text-align:left;width:100%;background:#0d1524;border:1px solid var(--line);color:var(--txt);
+       border-radius:8px;padding:11px 13px;cursor:pointer;font-size:13.5px;margin:0;font-weight:400}
+  .opt:hover{border-color:var(--cyan)}
+  .opt.correct{border-color:var(--ok);background:#0d2018;color:#bdf0d5}
+  .opt.wrong{border-color:var(--ng);background:#200f10;color:#f0c0c0}
+  .opt .mono{font-family:var(--mono)}
+  .fb{margin-top:11px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#06090f;font-size:12.5px}
+  .fb .verdict{font-weight:700}
+  .fb .verdict.ok{color:var(--ok)}.fb .verdict.ng{color:var(--ng)}
+  .fb .why{color:var(--dim);margin-top:5px}
+  .tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+       color:var(--dim);margin-right:5px}
+  .tag.src{border-color:var(--violet);color:var(--violet)}
+  /* --- 結果 --- */
+  #resultCard{display:none}
+  .score{font-family:var(--mono);font-size:46px;color:var(--gold);text-align:center;line-height:1.1}
+  .rank{text-align:center;font-size:16px;font-weight:700;color:var(--cyan);margin-top:4px}
+  .rankdesc{text-align:center;font-size:12.5px;color:var(--dim);margin-top:4px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+  th{color:var(--gold);font-weight:600}
+  td.m{font-family:var(--mono)}
+  .rv-ok{color:var(--ok)}.rv-ng{color:var(--ng)}
+  details{margin-top:10px}summary{cursor:pointer;color:var(--cyan);font-size:12.5px}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Whispered — ウィスパード適性検査</h1>
+  <div class="sub">Mathematical Symbol &amp; Equation-Meaning Aptitude Test · Bada / bio_medicine</div>
+  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
+</header>
+
+<div class="disc">⚠ <b>非公式のファン・オマージュ</b>:
+  「フルメタル・パニック!」の<b>ウィスパード</b>という設定に着想を得た二次的創作であり、
+  原作・アニメの権利者とは一切関係がありません。<b>結果は学習・娯楽目的の指標</b>であり、
+  実在の能力・適性・知能を測定または診断するものではありません。
+  PDF の解析はすべて<b>あなたの端末内のみ</b>で行われ、外部へ送信されません。</div>
+
+<main>
+<div class="grid">
+
+  <!-- ===================== 左: 設定 + PDF ===================== -->
+  <div class="col" style="flex:0 0 340px">
+    <div class="card">
+      <h3>検査設定</h3>
+      <label>第一次検査(記号)の問題数: <span class="val" id="n1_v">8</span></label>
+      <input type="range" id="n1" min="4" max="20" value="8"/>
+      <label>第二次検査(方程式の意味)の問題数: <span class="val" id="n2_v">8</span></label>
+      <input type="range" id="n2" min="4" max="20" value="8"/>
+      <label>難度上限 (1=中高 / 3=学部 / 5=研究前線): <span class="val" id="lv_v">5</span></label>
+      <input type="range" id="lvmax" min="1" max="5" value="5"/>
+      <label>専門分野</label>
+      <select id="field"><option value="">すべての分野</option></select>
+      <button id="start">▶ 適性検査を開始</button>
+      <button class="sec" id="dict">📖 記号辞典を開く</button>
+      <div class="cap" id="setupStat">問題銀行を読み込み中…</div>
+    </div>
+
+    <div class="card">
+      <h3>数学論文 PDF (任意)</h3>
+      <div class="drop" id="drop">
+        ここに <b>数学論文の PDF</b> をドロップ<br/>または下から選択
+      </div>
+      <label>PDF を選択</label>
+      <input type="file" id="file" accept="application/pdf,.pdf"/>
+      <div class="cap" id="pdfStat">未読込。読み込むと、<b>その論文に実際に現れた記号</b>から出題します。</div>
+      <div id="pdfOut" style="display:none">
+        <div class="stat"><span>ページ / 抽出文字</span><b id="p_pages">—</b></div>
+        <div class="stat"><span>数式記号の種類 / 総出現</span><b id="p_syms">—</b></div>
+        <div class="stat"><span>辞典に一致した記号</span><b id="p_known">—</b></div>
+        <div class="chips" id="p_chips"></div>
+        <details>
+          <summary>抽出された数式断片・埋め込みフォント</summary>
+          <div id="p_frags"></div>
+          <div class="cap" id="p_fonts"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 右: 検査 / 結果 ===================== -->
+  <div class="col">
+    <div class="card" id="introCard">
+      <h3>検査の構成</h3>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第一次検査 — 記号適性</b>:
+        数学論文の PDF に現れる方程式の記号(<code>∫ ∂ ∇ ⊗ ⊢ 𝒪 𝔤 ℵ ⋆</code> など)について、
+        その<b>意味</b>・<b>専門分野</b>・<b>文脈による意味の変化</b>を識別します。
+        PDF を読み込んだ場合は、<b>その論文から実際に抽出された記号</b>が優先的に出題されます
+        (フォント埋め込み・ToUnicode CMap を解析した本物の抽出です)。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第二次検査 — 方程式の意味解析</b>:
+        方程式が<b>何を主張しているのか</b>を読み解きます。さらに
+        <b>連想検査</b>では、<code>a²+b²=c²</code> のような簡単な方程式が、専門分野で
+        <code>ds² = gᵢⱼdxⁱdxʲ</code> のようにどう一般化されるかを対応づけます
+        (簡単な方程式 → 専門分野の方程式への構造的連想)。
+      </p>
+      <div class="stat"><span>記号銀行</span><b id="s_nsym">—</b></div>
+      <div class="stat"><span>方程式銀行 (Lv1〜Lv5)</span><b id="s_neq">—</b></div>
+      <div class="stat"><span>連想対応 (簡単 → 専門)</span><b id="s_nas">—</b></div>
+      <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
+      <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
+        Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
+        Ω = 100·Σ lv·(0.7+0.3Γ<sub>k</sub>) / Σ lv で算出します。</p>
+    </div>
+
+    <div class="card" id="examCard">
+      <div class="qhead">
+        <span><span class="phase" id="q_phase">第一次検査</span> &nbsp;<span id="q_idx"></span></span>
+        <span id="q_score"></span>
+      </div>
+      <div class="bar"><i id="q_bar"></i></div>
+      <div id="q_body"></div>
+      <div class="opts" id="q_opts"></div>
+      <div class="fb" id="q_fb" style="display:none"></div>
+      <button class="sec" id="next" style="display:none">次の設問 →</button>
+    </div>
+
+    <div class="card" id="resultCard">
+      <h3>検査結果 — ウィスパード適性判定</h3>
+      <div class="score" id="r_score">—</div>
+      <div class="rank" id="r_rank"></div>
+      <div class="rankdesc" id="r_desc"></div>
+      <div class="stat" style="margin-top:10px"><span>正答 / 出題</span><b id="r_acc">—</b></div>
+      <div class="stat"><span>平均応答時間</span><b id="r_time">—</b></div>
+      <div class="stat"><span>共鳴分野 (最も正答した分野)</span><b id="r_field">—</b></div>
+      <div class="stat"><span>到達難度 (正答した最高 lv)</span><b id="r_lv">—</b></div>
+      <canvas id="radar" width="420" height="300" style="margin-top:12px"></canvas>
+      <div class="cap">分野別の正答率プロファイル(出題された分野のみ)。</div>
+      <details open>
+        <summary>全設問の講評(誤答の解説つき)</summary>
+        <div id="r_review"></div>
+      </details>
+      <button id="again">↻ もう一度検査する</button>
+    </div>
+
+    <div class="card" id="dictCard" style="display:none">
+      <h3>記号辞典 — 数学論文に現れる方程式の記号</h3>
+      <label>分野で絞り込む</label>
+      <select id="dfield"><option value="">すべての分野</option></select>
+      <div id="dictBody"></div>
+      <button class="sec" id="dictClose">閉じる</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer>Ω-Whispered · © 2025 Masaaki Yamaguchi · Bada / bio_medicine ·
+  非公式ファン・オマージュ / 学習・娯楽目的 · PDF 解析は端末内で完結</footer>
+
+<script src="symbol_bank.js"></script>
+<script src="pdf_symbols.js"></script>
+<script>
+"use strict";
+(function () {
+  var B = window.SymbolBank, PS = window.PDFSymbols;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ============================ 共通ユーティリティ ============================ */
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  /* Γ カーネル由来の応答時間係数: 速いほど 1 に近い(τ=0 で 1、単調減少) */
+  function gammaTime(sec) {
+    var tau = Math.max(0, sec) / 20;
+    return Math.exp(-tau * Math.log(1 + tau));
+  }
+
+  /* ============================== 状態 ============================== */
+  var state = {
+    pdf: null,          /* {symbols, fragments, ...} */
+    pdfKnown: [],       /* 辞典に一致した PDF 由来の記号 [{sym, count}] */
+    qs: [], i: 0, answers: [], t0: 0, running: false
+  };
+
+  /* ============================== 出題生成 ============================== */
+  function inScope(o) {
+    var lvMax = +$("lvmax").value, f = $("field").value;
+    return o.lv <= lvMax && (!f || o.field === f);
+  }
+
+  /* 選択肢: 正解 + 近傍誤答 + サンプリング誤答 */
+  function buildOptions(correct, nears, pool, n) {
+    var opts = [correct], seen = {};
+    seen[correct] = 1;
+    (nears || []).forEach(function (x) { if (!seen[x] && opts.length < n) { opts.push(x); seen[x] = 1; } });
+    var guard = 0;
+    while (opts.length < n && guard++ < 400) {
+      var c = pick(pool);
+      if (c && !seen[c]) { opts.push(c); seen[c] = 1; }
+    }
+    return shuffle(opts);
+  }
+
+  /* --- 第一次: 記号 → 意味 --- */
+  function qSymbolMeaning(sym, fromPdf) {
+    var siblings = B.SYMBOLS.filter(function (s) {
+      return s.ch !== sym.ch && Math.abs(s.lv - sym.lv) <= 1;
+    });
+    var nears = shuffle(siblings.filter(function (s) { return s.field === sym.field; }))
+                  .slice(0, 2).map(function (s) { return s.mean; });
+    var pool = B.SYMBOLS.filter(function (s) { return s.ch !== sym.ch; }).map(function (s) { return s.mean; });
+    return {
+      phase: 1, kind: "記号の意味", lv: sym.lv, field: sym.field, src: fromPdf || null,
+      sym: sym.ch,
+      text: "この記号は数学において何を表しますか。",
+      opts: buildOptions(sym.mean, nears, pool, 4),
+      correct: sym.mean,
+      why: sym.ja + " — " + sym.mean + "(主に " + sym.field + ")"
+    };
+  }
+
+  /* --- 第一次: 記号 → 専門分野 --- */
+  function qSymbolField(sym) {
+    var pool = B.FIELDS.filter(function (f) { return f !== sym.field; });
+    return {
+      phase: 1, kind: "記号の分野", lv: Math.max(2, sym.lv), field: sym.field, sym: sym.ch,
+      text: "この記号(" + sym.ja + ")が最も特徴的に用いられる分野はどれですか。",
+      opts: buildOptions(sym.field, null, pool, 4),
+      correct: sym.field,
+      why: sym.ch + " は " + sym.field + " の文脈で「" + sym.mean + "」を表すのが代表的。"
+    };
+  }
+
+  /* --- 第一次: 文脈依存(同じ記号・分野で意味が変わる) --- */
+  function qContext(ctx) {
+    var target = pick(ctx.items);
+    var opts = ctx.items.map(function (it) { return it.mean; });
+    return {
+      phase: 1, kind: "文脈依存記号", lv: 4, field: target.field, sym: ctx.ch,
+      text: "<b>" + esc(target.field) + "</b> の論文でこの記号が現れたとき、最も自然な読み方はどれですか。",
+      opts: shuffle(opts.slice()),
+      correct: target.mean,
+      why: ctx.ch + " は分野で意味が変わる記号です — " +
+           ctx.items.map(function (it) { return it.field + ": " + it.mean; }).join(" / ")
+    };
+  }
+
+  /* --- 第二次: 方程式 → 意味 --- */
+  function qEquationMeaning(eq) {
+    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.mean; });
+    return {
+      phase: 2, kind: "方程式の意味", lv: eq.lv, field: eq.field,
+      eq: eq.eq,
+      text: "この方程式は何を主張していますか。",
+      opts: buildOptions(eq.mean, eq.near, pool, 4),
+      correct: eq.mean,
+      why: "【" + eq.name + "】" + eq.why
+    };
+  }
+
+  /* --- 第二次: 方程式 → 名称 --- */
+  function qEquationName(eq) {
+    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.name; });
+    return {
+      phase: 2, kind: "方程式の同定", lv: eq.lv, field: eq.field,
+      eq: eq.eq,
+      text: "この方程式の名称はどれですか。",
+      opts: buildOptions(eq.name, null, pool, 4),
+      correct: eq.name,
+      why: "【" + eq.name + "】" + eq.mean + " — " + eq.why
+    };
+  }
+
+  /* --- 第二次: 連想(簡単な方程式 → 専門分野の方程式) --- */
+  function qAssoc(a) {
+    return {
+      phase: 2, kind: "連想(簡単→専門)", lv: a.lv, field: a.field,
+      eq: a.simple,
+      text: "この簡単な方程式(" + esc(a.simpleMean) + ")の構造を、<b>" + esc(a.field) +
+            "</b> へ一般化した方程式はどれですか。",
+      opts: buildOptions(a.adv, null, a.wrong.slice(), 4),
+      correct: a.adv, mono: true,
+      why: "【" + a.advName + "】" + a.why
+    };
+  }
+
+  /* --- 第二次: 逆向き連想(専門の方程式 → 元になった簡単な方程式) --- */
+  function qAssocReverse(a) {
+    var pool = B.ASSOC.filter(function (x) { return x.adv !== a.adv; }).map(function (x) { return x.simple; });
+    return {
+      phase: 2, kind: "連想(専門→簡単)", lv: a.lv, field: a.field,
+      eq: a.adv,
+      text: "<b>" + esc(a.advName) + "</b> の原型にあたる、最も基本的な方程式はどれですか。",
+      opts: buildOptions(a.simple, null, pool, 4),
+      correct: a.simple, mono: true,
+      why: "【" + a.advName + "】" + a.why
+    };
+  }
+
+  /* --- 検査全体の組み立て --- */
+  function buildExam() {
+    var n1 = +$("n1").value, n2 = +$("n2").value, qs = [];
+
+    /* 第一次: PDF 由来の記号を優先 */
+    var pdfSyms = shuffle(state.pdfKnown.slice()).filter(function (p) { return inScope(p.sym); });
+    var syms = shuffle(B.SYMBOLS.filter(inScope));
+    var ctxs = shuffle(B.CTX.filter(function (c) {
+      return c.items.some(function (it) { return !$("field").value || it.field === $("field").value; });
+    }));
+    var usedCh = {}, k = 0;
+
+    var nPdf = Math.min(pdfSyms.length, Math.ceil(n1 * 0.6));
+    for (var p = 0; p < nPdf; p++) {
+      var ps = pdfSyms[p];
+      usedCh[ps.sym.ch] = 1;
+      qs.push(qSymbolMeaning(ps.sym, "この論文に " + ps.count + " 回出現"));
+    }
+    while (qs.length < n1 && k < 400) {
+      k++;
+      var roll = Math.random();
+      if (roll < 0.18 && ctxs.length && +$("lvmax").value >= 4) {
+        qs.push(qContext(ctxs.pop() || pick(B.CTX)));
+      } else {
+        var s = syms.find(function (x) { return !usedCh[x.ch]; });
+        if (!s) { s = pick(B.SYMBOLS.filter(inScope) || B.SYMBOLS); if (!s) break; }
+        usedCh[s.ch] = 1;
+        qs.push(roll < 0.45 ? qSymbolField(s) : qSymbolMeaning(s));
+      }
+    }
+    qs = qs.slice(0, n1);
+
+    /* 第二次: 方程式の意味 + 同定 + 連想(簡単→専門 / 専門→簡単) */
+    var eqs = shuffle(B.EQUATIONS.filter(inScope));
+    var assoc = shuffle(B.ASSOC.filter(inScope));
+    var second = [], usedEq = {}, g = 0;
+    /* 連想問題を全体の約 4 割は必ず入れる(本検査の主眼) */
+    var nAssoc = Math.max(1, Math.min(assoc.length, Math.round(n2 * 0.4)));
+    for (var a = 0; a < nAssoc; a++) {
+      var it = assoc[a];
+      second.push(Math.random() < 0.65 ? qAssoc(it) : qAssocReverse(it));
+    }
+    while (second.length < n2 && g < 400) {
+      g++;
+      var e = eqs.find(function (x) { return !usedEq[x.name]; });
+      if (!e) { e = pick(B.EQUATIONS.filter(inScope) || B.EQUATIONS); if (!e) break; }
+      usedEq[e.name] = 1;
+      second.push(Math.random() < 0.72 ? qEquationMeaning(e) : qEquationName(e));
+    }
+    second = shuffle(second.slice(0, n2));
+
+    /* 難度の緩やかな昇順(簡単な方程式から専門へ) */
+    qs.sort(function (x, y) { return x.lv - y.lv; });
+    second.sort(function (x, y) { return x.lv - y.lv; });
+    return qs.concat(second);
+  }
+
+  /* ============================== 検査の進行 ============================== */
+  function startExam() {
+    state.qs = buildExam();
+    if (!state.qs.length) { $("setupStat").textContent = "条件に合う設問がありません。難度や分野を広げてください。"; return; }
+    state.i = 0; state.answers = []; state.running = true;
+    $("introCard").style.display = "none";
+    $("dictCard").style.display = "none";
+    $("resultCard").style.display = "none";
+    $("examCard").style.display = "block";
+    showQuestion();
+  }
+
+  function showQuestion() {
+    var q = state.qs[state.i];
+    $("q_phase").textContent = q.phase === 1 ? "第一次検査 — 記号適性" : "第二次検査 — 方程式意味解析";
+    $("q_idx").textContent = "設問 " + (state.i + 1) + " / " + state.qs.length;
+    var got = state.answers.filter(function (a) { return a.ok; }).length;
+    $("q_score").textContent = "正答 " + got + " / " + state.answers.length;
+    $("q_bar").style.width = (100 * state.i / state.qs.length) + "%";
+
+    var head = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
+               '<span class="tag">Lv' + q.lv + "</span>" +
+               '<span class="tag">' + esc(q.field) + "</span>" +
+               (q.src ? '<span class="tag src">' + esc(q.src) + "</span>" : "") + "</div>";
+    if (q.sym) head += '<div class="qsym">' + esc(q.sym) + "</div>";
+    if (q.eq) head += '<div class="qeq">' + esc(q.eq) + "</div>";
+    head += '<div class="qtext">' + q.text + "</div>";
+    $("q_body").innerHTML = head;
+
+    var box = $("q_opts");
+    box.innerHTML = "";
+    q.opts.forEach(function (o) {
+      var b = document.createElement("button");
+      b.className = "opt" + (q.mono ? " mono" : "");
+      b.textContent = o;
+      b.onclick = function () { answer(o); };
+      box.appendChild(b);
+    });
+    $("q_fb").style.display = "none";
+    $("next").style.display = "none";
+    state.t0 = Date.now();
+  }
+
+  function answer(chosen) {
+    var q = state.qs[state.i];
+    var sec = (Date.now() - state.t0) / 1000;
+    var ok = chosen === q.correct;
+    state.answers.push({ q: q, chosen: chosen, ok: ok, sec: sec });
+
+    var btns = $("q_opts").children;
+    for (var i = 0; i < btns.length; i++) {
+      var b = btns[i];
+      b.onclick = null;
+      if (b.textContent === q.correct) b.className += " correct";
+      else if (b.textContent === chosen) b.className += " wrong";
+    }
+    var fb = $("q_fb");
+    fb.innerHTML = '<span class="verdict ' + (ok ? "ok" : "ng") + '">' +
+      (ok ? "◎ 共鳴 — 正答" : "× 非共鳴 — 誤答") + "</span>" +
+      '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
+      (ok ? "" : '<div style="margin-top:5px">正答: <b>' + esc(q.correct) + "</b></div>") +
+      '<div class="why">' + esc(q.why) + "</div>";
+    fb.style.display = "block";
+    $("next").style.display = "block";
+    $("next").textContent = (state.i + 1 < state.qs.length) ? "次の設問 →" : "判定を見る →";
+  }
+
+  function nextQuestion() {
+    state.i++;
+    if (state.i < state.qs.length) showQuestion();
+    else finish();
+  }
+
+  /* ============================== 判定 ============================== */
+  function finish() {
+    state.running = false;
+    $("examCard").style.display = "none";
+    $("resultCard").style.display = "block";
+
+    var num = 0, den = 0, tsum = 0, maxLv = 0, byField = {};
+    state.answers.forEach(function (a) {
+      var w = a.q.lv;
+      den += w;
+      if (a.ok) { num += w * (0.7 + 0.3 * gammaTime(a.sec)); maxLv = Math.max(maxLv, a.q.lv); }
+      tsum += a.sec;
+      var f = byField[a.q.field] || (byField[a.q.field] = { n: 0, ok: 0 });
+      f.n++; if (a.ok) f.ok++;
+    });
+    var omega = den > 0 ? 100 * num / den : 0;
+    var got = state.answers.filter(function (a) { return a.ok; }).length;
+
+    var rank, desc;
+    if (omega >= 90) { rank = "Class-S — 完全共鳴"; desc = "記号と方程式の意味が即座に結びついています。ブラックボックス級の直観です。"; }
+    else if (omega >= 75) { rank = "Class-A — ウィスパード適性 高"; desc = "専門分野の方程式まで意味を追えています。連想の射程が広い。"; }
+    else if (omega >= 60) { rank = "Class-B — 適性あり"; desc = "基礎は堅牢。専門分野の記号を増やせば一段上がります。"; }
+    else if (omega >= 40) { rank = "Class-C — 訓練段階"; desc = "簡単な方程式の意味は取れています。記号辞典で語彙を増やしましょう。"; }
+    else { rank = "Class-D — 共鳴未達"; desc = "難度上限を下げ、Lv1〜2 から順に共鳴させていくのが近道です。"; }
+
+    $("r_score").textContent = "Ω " + omega.toFixed(1);
+    $("r_rank").textContent = rank;
+    $("r_desc").textContent = desc;
+    $("r_acc").textContent = got + " / " + state.answers.length +
+      " (" + (100 * got / Math.max(1, state.answers.length)).toFixed(0) + "%)";
+    $("r_time").textContent = (tsum / Math.max(1, state.answers.length)).toFixed(1) + " 秒 / 問";
+    var best = null;
+    Object.keys(byField).forEach(function (f) {
+      var r = byField[f].ok / byField[f].n;
+      if (!best || r > best.r || (r === best.r && byField[f].n > byField[best.f].n)) best = { f: f, r: r };
+    });
+    $("r_field").textContent = best ? best.f + " (" + (100 * best.r).toFixed(0) + "%)" : "—";
+    $("r_lv").textContent = maxLv ? "Lv" + maxLv : "—";
+
+    drawRadar(byField);
+    renderReview();
+
+    try {
+      var prev = parseFloat(localStorage.getItem("omega_whispered_best") || "0");
+      if (omega > prev) localStorage.setItem("omega_whispered_best", omega.toFixed(1));
+      $("s_best").textContent = "Ω " + Math.max(prev, omega).toFixed(1);
+    } catch (e) { /* localStorage 不可の環境は無視 */ }
+  }
+
+  function drawRadar(byField) {
+    var cv = $("radar"), g = cv.getContext("2d");
+    var W = cv.width, H = cv.height, cx = W / 2, cy = H / 2 + 6, R = Math.min(W, H) * 0.36;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    var fs = Object.keys(byField);
+    if (!fs.length) return;
+    if (fs.length < 3) {                       /* 2 分野以下は棒グラフの方が読める */
+      var bw = W / (fs.length * 2);
+      fs.forEach(function (f, i) {
+        var r = byField[f].ok / byField[f].n;
+        var x = W * (i + 0.5) / fs.length - bw / 2, h = (H - 60) * r;
+        g.fillStyle = "#40b8c0"; g.fillRect(x, H - 30 - h, bw, h);
+        g.fillStyle = "#8794a8"; g.font = "11px sans-serif"; g.textAlign = "center";
+        g.fillText(f, x + bw / 2, H - 14);
+        g.fillStyle = "#c8a44a"; g.fillText((100 * r).toFixed(0) + "%", x + bw / 2, H - 36 - h);
+      });
+      return;
+    }
+    var n = fs.length;
+    /* グリッド */
+    for (var ring = 1; ring <= 4; ring++) {
+      g.beginPath();
+      for (var i = 0; i <= n; i++) {
+        var th = -Math.PI / 2 + 2 * Math.PI * (i % n) / n, rr = R * ring / 4;
+        var x = cx + rr * Math.cos(th), y = cy + rr * Math.sin(th);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.strokeStyle = "#1b2638"; g.stroke();
+    }
+    /* データ */
+    g.beginPath();
+    fs.forEach(function (f, i) {
+      var r = byField[f].ok / byField[f].n;
+      var th = -Math.PI / 2 + 2 * Math.PI * i / n;
+      var x = cx + R * r * Math.cos(th), y = cy + R * r * Math.sin(th);
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    });
+    g.closePath();
+    g.fillStyle = "rgba(144,96,208,0.32)"; g.fill();
+    g.strokeStyle = "#40b8c0"; g.lineWidth = 2; g.stroke(); g.lineWidth = 1;
+    /* ラベル */
+    g.font = "10.5px sans-serif";
+    fs.forEach(function (f, i) {
+      var th = -Math.PI / 2 + 2 * Math.PI * i / n;
+      var x = cx + (R + 20) * Math.cos(th), y = cy + (R + 20) * Math.sin(th);
+      g.fillStyle = "#8794a8";
+      g.textAlign = Math.abs(Math.cos(th)) < 0.3 ? "center" : (Math.cos(th) > 0 ? "left" : "right");
+      g.fillText(f, x, y + 3);
+    });
+  }
+
+  function renderReview() {
+    var h = "<table><tr><th>#</th><th>設問</th><th>判定</th><th>解説</th></tr>";
+    state.answers.forEach(function (a, i) {
+      var subject = a.q.sym ? a.q.sym : (a.q.eq || "");
+      h += "<tr><td>" + (i + 1) + "</td>" +
+           '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
+           "</span><span class=\"tag\">Lv" + a.q.lv + "</span></td>" +
+           '<td class="' + (a.ok ? "rv-ok" : "rv-ng") + '">' + (a.ok ? "◎" : "×") +
+           "<br/>" + a.sec.toFixed(1) + "s</td>" +
+           "<td>" + (a.ok ? "" : "正答: <b>" + esc(a.q.correct) + "</b><br/>") +
+           esc(a.q.why) + "</td></tr>";
+    });
+    $("r_review").innerHTML = h + "</table>";
+  }
+
+  /* ============================== PDF 読み込み ============================== */
+  function handleFile(file) {
+    if (!file) return;
+    $("pdfStat").textContent = "「" + file.name + "」を解析中…";
+    var fr = new FileReader();
+    fr.onerror = function () { $("pdfStat").textContent = "ファイルを読み込めませんでした。"; };
+    fr.onload = function () {
+      var bytes = new Uint8Array(fr.result);
+      PS.extract(bytes, function (m) { $("pdfStat").textContent = file.name + " — " + m; })
+        .then(function (res) { showPdf(file.name, res); })
+        .catch(function (e) { $("pdfStat").textContent = "解析に失敗しました: " + e.message; });
+    };
+    fr.readAsArrayBuffer(file);
+  }
+
+  function showPdf(name, res) {
+    state.pdf = res;
+    var index = {};
+    B.SYMBOLS.forEach(function (s) { index[s.ch] = s; });
+    state.pdfKnown = res.symbols.filter(function (s) { return index[s.ch]; })
+      .map(function (s) { return { sym: index[s.ch], count: s.count }; });
+
+    $("pdfOut").style.display = "block";
+    var total = res.symbols.reduce(function (t, s) { return t + s.count; }, 0);
+    $("p_pages").textContent = res.pages + " ページ / " + res.glyphs.toLocaleString() + " 文字";
+    $("p_syms").textContent = res.symbols.length + " 種 / " + total + " 回";
+    $("p_known").textContent = state.pdfKnown.length + " 種(辞典と照合)";
+    $("p_chips").innerHTML = res.symbols.slice(0, 40).map(function (s) {
+      var k = index[s.ch];
+      return '<span class="chip" title="' + esc(k ? k.ja + " — " + k.mean : "辞典未登録") + '">' +
+             "<b>" + esc(s.ch) + "</b> <small>" + s.count + "</small></span>";
+    }).join("");
+    $("p_frags").innerHTML = res.fragments.slice(0, 12).map(function (f) {
+      return '<div class="frag">' + esc(f) + "</div>";
+    }).join("") || '<div class="cap">数式断片は取得できませんでした。</div>';
+    $("p_fonts").textContent = res.fonts.length ? "埋め込みフォント: " + res.fonts.slice(0, 12).join(" / ") : "";
+
+    if (!res.ok) {
+      $("pdfStat").textContent = name + " — " + res.note;
+    } else {
+      $("pdfStat").innerHTML = esc(name) + " — <b>" + state.pdfKnown.length +
+        "</b> 種の記号を辞典と照合しました。第一次検査で優先出題します。";
+    }
+  }
+
+  /* ============================== 記号辞典 ============================== */
+  function renderDict() {
+    var f = $("dfield").value;
+    var list = B.SYMBOLS.filter(function (s) { return !f || s.field === f; })
+                        .sort(function (a, b) { return a.lv - b.lv; });
+    var h = "<table><tr><th>記号</th><th>読み</th><th>意味</th><th>分野 / Lv</th></tr>";
+    list.forEach(function (s) {
+      h += '<tr><td class="m" style="font-size:18px;color:var(--gold)">' + esc(s.ch) + "</td>" +
+           "<td>" + esc(s.ja) + "</td><td>" + esc(s.mean) + "</td>" +
+           "<td>" + esc(s.field) + " / Lv" + s.lv + "</td></tr>";
+    });
+    $("dictBody").innerHTML = h + "</table>";
+  }
+
+  /* ============================== 初期化 ============================== */
+  function init() {
+    B.FIELDS.forEach(function (f) {
+      [$("field"), $("dfield")].forEach(function (sel) {
+        var o = document.createElement("option"); o.value = f; o.textContent = f; sel.appendChild(o);
+      });
+    });
+    $("s_nsym").textContent = B.SYMBOLS.length + " 記号 (+ 文脈依存 " + B.CTX.length + " 種)";
+    $("s_neq").textContent = B.EQUATIONS.length + " 式";
+    $("s_nas").textContent = B.ASSOC.length + " 対応";
+    try {
+      var best = localStorage.getItem("omega_whispered_best");
+      $("s_best").textContent = best ? "Ω " + best : "未記録";
+    } catch (e) { $("s_best").textContent = "未記録"; }
+    $("setupStat").textContent = "準備完了。PDF なしでも検査できます。";
+
+    [["n1", "n1_v"], ["n2", "n2_v"], ["lvmax", "lv_v"]].forEach(function (p) {
+      var el = $(p[0]);
+      el.oninput = function () { $(p[1]).textContent = el.value; };
+    });
+    $("start").onclick = startExam;
+    $("again").onclick = function () {
+      $("resultCard").style.display = "none";
+      $("introCard").style.display = "block";
+      window.scrollTo(0, 0);
+    };
+    $("next").onclick = nextQuestion;
+    $("dict").onclick = function () {
+      $("dictCard").style.display = "block"; $("introCard").style.display = "none";
+      $("resultCard").style.display = "none"; $("examCard").style.display = "none";
+      renderDict();
+    };
+    $("dictClose").onclick = function () {
+      $("dictCard").style.display = "none"; $("introCard").style.display = "block";
+    };
+    $("dfield").onchange = renderDict;
+    $("file").onchange = function (e) { handleFile(e.target.files[0]); };
+
+    var drop = $("drop");
+    ["dragenter", "dragover"].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("hot"); });
+    });
+    ["dragleave", "drop"].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("hot"); });
+    });
+    drop.addEventListener("drop", function (e) {
+      if (e.dataTransfer && e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    if (!window.DecompressionStream) {
+      $("pdfStat").textContent = "この環境では PDF の伸長(DecompressionStream)が使えません。PDF なしで検査できます。";
+      $("file").disabled = true;
+    }
+  }
+
+  /* テスト用にエンジンを公開(ヘッドレス検証で使用) */
+  window.OmegaWhispered = { buildExam: buildExam, gammaTime: gammaTime, state: state };
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>
