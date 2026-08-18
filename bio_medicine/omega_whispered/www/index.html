@@ -7,6 +7,8 @@
               PDF を読み込むと、その論文から実際に抽出した記号で出題する(pdf_symbols.js)。
   第二次検査: 方程式の意味解析 — 簡単な方程式から、専門分野へ「連想(一般化)」された
               方程式の意味を読み解けるか(symbol_bank.js の ASSOC)。
+  第三次検査: 数学適性分野の診断 — 思考スタイル(志向)と、第一次/第二次の分野別成績(実力)を
+              合成して、10 分野のどこに適性があるかをプロファイル化する(APTITUDE/FIELD_PROFILE)。
 
   ⚠ 「フルメタル・パニック!」のウィスパード設定に着想を得た非公式のファン・オマージュです。
      原作・アニメの権利者とは一切関係がありません。結果は学習/娯楽目的の指標であり、
@@ -90,6 +92,19 @@
   th{color:var(--gold);font-weight:600}
   td.m{font-family:var(--mono)}
   .rv-ok{color:var(--ok)}.rv-ng{color:var(--ng)}
+  /* --- 適性分野プロファイル --- */
+  .apt{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px}
+  .apt .f{flex:0 0 130px;color:var(--txt)}
+  .apt .track{flex:1;height:12px;background:#0d1524;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .apt .track>i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan))}
+  .apt .v{flex:0 0 168px;text-align:right;font-family:var(--mono);color:var(--dim);font-size:11.5px;white-space:nowrap}
+  .apt .v b{color:var(--gold);font-size:13px}
+  .apt.top1 .f{color:var(--gold);font-weight:700}
+  .fp{margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#06090f;padding:11px 13px}
+  .fp h4{margin:0 0 6px;font-size:14px;color:var(--gold)}
+  .fp .row{font-size:12.5px;margin:4px 0}
+  .fp .row span{color:var(--dim)}
+  .fp .m{font-family:var(--mono);color:var(--cyan)}
   details{margin-top:10px}summary{cursor:pointer;color:var(--cyan);font-size:12.5px}
   footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
   code{font-family:var(--mono);color:var(--violet)}
@@ -99,7 +114,7 @@
 <header>
   <h1><span class="om">Ω</span>-Whispered — ウィスパード適性検査</h1>
   <div class="sub">Mathematical Symbol &amp; Equation-Meaning Aptitude Test · Bada / bio_medicine</div>
-  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
+  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; 第三次: 数学適性分野の診断 &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
 </header>
 
 <div class="disc">⚠ <b>非公式のファン・オマージュ</b>:
@@ -115,10 +130,18 @@
   <div class="col" style="flex:0 0 340px">
     <div class="card">
       <h3>検査設定</h3>
+      <label>検査モード</label>
+      <select id="mode">
+        <option value="full">フル(記号 → 方程式 → 適性分野診断)</option>
+        <option value="exam">記号 + 方程式のみ(Ω 判定)</option>
+        <option value="aptitude">数学適性分野の診断のみ</option>
+      </select>
       <label>第一次検査(記号)の問題数: <span class="val" id="n1_v">8</span></label>
       <input type="range" id="n1" min="4" max="20" value="8"/>
       <label>第二次検査(方程式の意味)の問題数: <span class="val" id="n2_v">8</span></label>
       <input type="range" id="n2" min="4" max="20" value="8"/>
+      <label>第三次検査(適性分野)の設問数: <span class="val" id="n3_v">12</span></label>
+      <input type="range" id="n3" min="6" max="20" value="12"/>
       <label>難度上限 (1=中高 / 3=学部 / 5=研究前線): <span class="val" id="lv_v">5</span></label>
       <input type="range" id="lvmax" min="1" max="5" value="5"/>
       <label>専門分野</label>
@@ -168,9 +191,18 @@
         <code>ds² = gᵢⱼdxⁱdxʲ</code> のようにどう一般化されるかを対応づけます
         (簡単な方程式 → 専門分野の方程式への構造的連想)。
       </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第三次検査 — 数学適性分野の診断</b>:
+        正誤のない<b>思考スタイル設問</b>(無限の扱い方、同じとみなす基準、証明の好み、対称性を見たとき何をするか…)
+        への回答から <b>志向</b>を、第一次・第二次の<b>分野別成績</b>から <b>実力</b>を測り、両者を合成して
+        <code>解析学 / 微分幾何 / 位相幾何 / 代数・数論 / 代数幾何 / 圏論・論理 / 確率・統計 /
+        作用素環・関数解析 / 表現論・群論 / 数理物理</code> の 10 分野の適性をプロファイル化します。
+        上位分野には、思考の型・代表的な方程式と記号・隣接分野・<b>次に学ぶとよい主題</b>を提示します。
+      </p>
       <div class="stat"><span>記号銀行</span><b id="s_nsym">—</b></div>
       <div class="stat"><span>方程式銀行 (Lv1〜Lv5)</span><b id="s_neq">—</b></div>
       <div class="stat"><span>連想対応 (簡単 → 専門)</span><b id="s_nas">—</b></div>
+      <div class="stat"><span>適性設問 / 分野プロファイル</span><b id="s_napt">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -194,12 +226,23 @@
       <div class="score" id="r_score">—</div>
       <div class="rank" id="r_rank"></div>
       <div class="rankdesc" id="r_desc"></div>
-      <div class="stat" style="margin-top:10px"><span>正答 / 出題</span><b id="r_acc">—</b></div>
-      <div class="stat"><span>平均応答時間</span><b id="r_time">—</b></div>
-      <div class="stat"><span>共鳴分野 (最も正答した分野)</span><b id="r_field">—</b></div>
-      <div class="stat"><span>到達難度 (正答した最高 lv)</span><b id="r_lv">—</b></div>
+      <div class="stat" style="margin-top:10px"><span>平均応答時間</span><b id="r_time">—</b></div>
+      <div id="perfStats">
+        <div class="stat"><span>正答 / 出題</span><b id="r_acc">—</b></div>
+        <div class="stat"><span>共鳴分野 (最も正答した分野)</span><b id="r_field">—</b></div>
+        <div class="stat"><span>到達難度 (正答した最高 lv)</span><b id="r_lv">—</b></div>
+      </div>
       <canvas id="radar" width="420" height="300" style="margin-top:12px"></canvas>
-      <div class="cap">分野別の正答率プロファイル(出題された分野のみ)。</div>
+      <div class="cap" id="radarCap">分野別の正答率プロファイル(出題された分野のみ)。</div>
+
+      <div id="aptWrap" style="display:none">
+        <h3 style="margin-top:16px">第三次検査 — 数学適性分野の診断</h3>
+        <div id="aptBars"></div>
+        <div class="cap">総合 = 志向 55% + 実力 45%(実力が未測定の分野は志向のみ)。
+          志向は思考スタイル設問の重みを設問ごとの最大値で正規化した値、実力は難度 lv で重み付けした正答率です。</div>
+        <div id="aptTop"></div>
+      </div>
+
       <details open>
         <summary>全設問の講評(誤答の解説つき)</summary>
         <div id="r_review"></div>
@@ -368,13 +411,49 @@
     };
   }
 
+  /* --- 第三次: 数学適性分野(思考スタイル・正誤なし) --- */
+  function qAptitude(item) {
+    var wmap = {};
+    item.opts.forEach(function (o) { wmap[o.t] = o.w; });
+    var top = {};                                   /* 設問ごとの分野別最大重み(正規化用) */
+    item.opts.forEach(function (o) {
+      Object.keys(o.w).forEach(function (f) { top[f] = Math.max(top[f] || 0, o.w[f]); });
+    });
+    return {
+      phase: 3, kind: "適性(思考スタイル)", lv: 0, field: null, aptitude: true,
+      text: item.q,
+      opts: shuffle(item.opts.map(function (o) { return o.t; })),
+      wmap: wmap, wmax: top, correct: null
+    };
+  }
+
+  /* 分野が偏らないよう、分野ごとに1つずつ取り出して並べ替える */
+  function spreadByField(list) {
+    var by = {}, order = [];
+    list.forEach(function (x) {
+      var f = x.field || "—";
+      if (!by[f]) { by[f] = []; order.push(f); }
+      by[f].push(x);
+    });
+    var out = [], any = true;
+    while (any) {
+      any = false;
+      shuffle(order.slice()).forEach(function (f) {
+        if (by[f].length) { out.push(by[f].shift()); any = true; }
+      });
+    }
+    return out;
+  }
+
   /* --- 検査全体の組み立て --- */
   function buildExam() {
+    var mode = $("mode").value;
+    if (mode === "aptitude") return shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude);
     var n1 = +$("n1").value, n2 = +$("n2").value, qs = [];
 
     /* 第一次: PDF 由来の記号を優先 */
     var pdfSyms = shuffle(state.pdfKnown.slice()).filter(function (p) { return inScope(p.sym); });
-    var syms = shuffle(B.SYMBOLS.filter(inScope));
+    var syms = spreadByField(shuffle(B.SYMBOLS.filter(inScope)));
     var ctxs = shuffle(B.CTX.filter(function (c) {
       return c.items.some(function (it) { return !$("field").value || it.field === $("field").value; });
     }));
@@ -401,7 +480,7 @@
     qs = qs.slice(0, n1);
 
     /* 第二次: 方程式の意味 + 同定 + 連想(簡単→専門 / 専門→簡単) */
-    var eqs = shuffle(B.EQUATIONS.filter(inScope));
+    var eqs = spreadByField(shuffle(B.EQUATIONS.filter(inScope)));
     var assoc = shuffle(B.ASSOC.filter(inScope));
     var second = [], usedEq = {}, g = 0;
     /* 連想問題を全体の約 4 割は必ず入れる(本検査の主眼) */
@@ -422,7 +501,13 @@
     /* 難度の緩やかな昇順(簡単な方程式から専門へ) */
     qs.sort(function (x, y) { return x.lv - y.lv; });
     second.sort(function (x, y) { return x.lv - y.lv; });
-    return qs.concat(second);
+    var all = qs.concat(second);
+
+    /* 第三次: 適性分野の診断(フルモードのみ、最後に実施) */
+    if (mode === "full") {
+      all = all.concat(shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude));
+    }
+    return all;
   }
 
   /* ============================== 検査の進行 ============================== */
@@ -439,15 +524,19 @@
 
   function showQuestion() {
     var q = state.qs[state.i];
-    $("q_phase").textContent = q.phase === 1 ? "第一次検査 — 記号適性" : "第二次検査 — 方程式意味解析";
+    $("q_phase").textContent = q.phase === 1 ? "第一次検査 — 記号適性"
+                             : q.phase === 2 ? "第二次検査 — 方程式意味解析"
+                                             : "第三次検査 — 数学適性分野の診断";
     $("q_idx").textContent = "設問 " + (state.i + 1) + " / " + state.qs.length;
-    var got = state.answers.filter(function (a) { return a.ok; }).length;
-    $("q_score").textContent = "正答 " + got + " / " + state.answers.length;
+    var scored = state.answers.filter(function (a) { return !a.q.aptitude; });
+    var got = scored.filter(function (a) { return a.ok; }).length;
+    $("q_score").textContent = scored.length ? "正答 " + got + " / " + scored.length : "";
     $("q_bar").style.width = (100 * state.i / state.qs.length) + "%";
 
     var head = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
-               '<span class="tag">Lv' + q.lv + "</span>" +
-               '<span class="tag">' + esc(q.field) + "</span>" +
+               (q.aptitude ? '<span class="tag">正誤なし</span>'
+                           : '<span class="tag">Lv' + q.lv + "</span>" +
+                             '<span class="tag">' + esc(q.field) + "</span>") +
                (q.src ? '<span class="tag src">' + esc(q.src) + "</span>" : "") + "</div>";
     if (q.sym) head += '<div class="qsym">' + esc(q.sym) + "</div>";
     if (q.eq) head += '<div class="qeq">' + esc(q.eq) + "</div>";
@@ -471,22 +560,32 @@
   function answer(chosen) {
     var q = state.qs[state.i];
     var sec = (Date.now() - state.t0) / 1000;
-    var ok = chosen === q.correct;
+    var ok = q.aptitude ? null : (chosen === q.correct);
     state.answers.push({ q: q, chosen: chosen, ok: ok, sec: sec });
 
-    var btns = $("q_opts").children;
-    for (var i = 0; i < btns.length; i++) {
-      var b = btns[i];
+    var btns = $("q_opts").children, i, b;
+    for (i = 0; i < btns.length; i++) {
+      b = btns[i];
       b.onclick = null;
-      if (b.textContent === q.correct) b.className += " correct";
+      if (q.aptitude) { if (b.textContent === chosen) b.className += " correct"; }
+      else if (b.textContent === q.correct) b.className += " correct";
       else if (b.textContent === chosen) b.className += " wrong";
     }
     var fb = $("q_fb");
-    fb.innerHTML = '<span class="verdict ' + (ok ? "ok" : "ng") + '">' +
-      (ok ? "◎ 共鳴 — 正答" : "× 非共鳴 — 誤答") + "</span>" +
-      '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
-      (ok ? "" : '<div style="margin-top:5px">正答: <b>' + esc(q.correct) + "</b></div>") +
-      '<div class="why">' + esc(q.why) + "</div>";
+    if (q.aptitude) {
+      var w = q.wmap[chosen] || {};
+      var lean = Object.keys(w).sort(function (x, y) { return w[y] - w[x]; })
+        .map(function (f) { return f + " (+" + w[f] + ")"; }).join(" · ");
+      fb.innerHTML = '<span class="verdict" style="color:var(--violet)">▶ 志向を記録しました</span>' +
+        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
+        '<div class="why">この選択が示す志向: <b>' + esc(lean || "—") + "</b></div>";
+    } else {
+      fb.innerHTML = '<span class="verdict ' + (ok ? "ok" : "ng") + '">' +
+        (ok ? "◎ 共鳴 — 正答" : "× 非共鳴 — 誤答") + "</span>" +
+        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
+        (ok ? "" : '<div style="margin-top:5px">正答: <b>' + esc(q.correct) + "</b></div>") +
+        '<div class="why">' + esc(q.why) + "</div>";
+    }
     fb.style.display = "block";
     $("next").style.display = "block";
     $("next").textContent = (state.i + 1 < state.qs.length) ? "次の設問 →" : "判定を見る →";
@@ -505,16 +604,37 @@
     $("resultCard").style.display = "block";
 
     var num = 0, den = 0, tsum = 0, maxLv = 0, byField = {};
-    state.answers.forEach(function (a) {
+    var scored = state.answers.filter(function (a) { return !a.q.aptitude; });
+    state.answers.forEach(function (a) { tsum += a.sec; });
+    scored.forEach(function (a) {
       var w = a.q.lv;
       den += w;
       if (a.ok) { num += w * (0.7 + 0.3 * gammaTime(a.sec)); maxLv = Math.max(maxLv, a.q.lv); }
-      tsum += a.sec;
-      var f = byField[a.q.field] || (byField[a.q.field] = { n: 0, ok: 0 });
-      f.n++; if (a.ok) f.ok++;
+      var f = byField[a.q.field] || (byField[a.q.field] = { n: 0, ok: 0, lv: 0, lvOk: 0 });
+      f.n++; f.lv += w; if (a.ok) { f.ok++; f.lvOk += w; }
     });
     var omega = den > 0 ? 100 * num / den : 0;
-    var got = state.answers.filter(function (a) { return a.ok; }).length;
+    var got = scored.filter(function (a) { return a.ok; }).length;
+
+    /* 適性分野の診断のみのモード: Ω 判定は行わない */
+    if (!scored.length) {
+      $("r_score").textContent = "分野診断";
+      $("r_rank").textContent = "数学適性分野の診断のみ実施";
+      $("r_desc").textContent = "Ω 判定を行うには、検査モードを「フル」または「記号 + 方程式のみ」にしてください。";
+      $("r_acc").textContent = "—";
+      $("r_time").textContent = (tsum / Math.max(1, state.answers.length)).toFixed(1) + " 秒 / 問";
+      $("r_field").textContent = "—";
+      $("r_lv").textContent = "—";
+      $("radar").style.display = "none";
+      $("radarCap").style.display = "none";
+      $("perfStats").style.display = "none";
+      renderAptitude(byField);
+      renderReview();
+      return;
+    }
+    $("radar").style.display = "block";
+    $("radarCap").style.display = "block";
+    $("perfStats").style.display = "block";
 
     var rank, desc;
     if (omega >= 90) { rank = "Class-S — 完全共鳴"; desc = "記号と方程式の意味が即座に結びついています。ブラックボックス級の直観です。"; }
@@ -526,8 +646,8 @@
     $("r_score").textContent = "Ω " + omega.toFixed(1);
     $("r_rank").textContent = rank;
     $("r_desc").textContent = desc;
-    $("r_acc").textContent = got + " / " + state.answers.length +
-      " (" + (100 * got / Math.max(1, state.answers.length)).toFixed(0) + "%)";
+    $("r_acc").textContent = got + " / " + scored.length +
+      " (" + (100 * got / Math.max(1, scored.length)).toFixed(0) + "%)";
     $("r_time").textContent = (tsum / Math.max(1, state.answers.length)).toFixed(1) + " 秒 / 問";
     var best = null;
     Object.keys(byField).forEach(function (f) {
@@ -538,6 +658,7 @@
     $("r_lv").textContent = maxLv ? "Lv" + maxLv : "—";
 
     drawRadar(byField);
+    renderAptitude(byField);
     renderReview();
 
     try {
@@ -598,9 +719,76 @@
     });
   }
 
+  /* ===================== 第三次: 数学適性分野の診断 ===================== */
+  /* 志向: 思考スタイル設問の重みを、設問ごとの最大重みで正規化 (0〜1)
+     実力: 分野別に難度 lv で重み付けした正答率 (0〜1)
+     総合: 両方測れた分野は 0.55*志向 + 0.45*実力、片方のみならその値 */
+  function computeAptitude(byField) {
+    var got = {}, max = {};
+    state.answers.forEach(function (a) {
+      if (!a.q.aptitude) return;
+      var w = a.q.wmap[a.chosen] || {};
+      Object.keys(w).forEach(function (f) { got[f] = (got[f] || 0) + w[f]; });
+      Object.keys(a.q.wmax).forEach(function (f) { max[f] = (max[f] || 0) + a.q.wmax[f]; });
+    });
+    var rows = [];
+    B.FIELDS.forEach(function (f) {
+      var pref = (max[f] >= 2) ? Math.min(1, (got[f] || 0) / max[f]) : null;   /* 露出が少ない分野は未測定 */
+      var bf = byField[f];
+      var perf = (bf && bf.lv > 0) ? bf.lvOk / bf.lv : null;
+      if (pref === null && perf === null) return;
+      var total = (pref !== null && perf !== null) ? 0.55 * pref + 0.45 * perf
+                : (pref !== null ? pref : perf);
+      rows.push({ field: f, pref: pref, perf: perf, total: total, asked: bf ? bf.n : 0 });
+    });
+    rows.sort(function (a, b) { return b.total - a.total; });
+    return rows;
+  }
+
+  function renderAptitude(byField) {
+    var hasApt = state.answers.some(function (a) { return a.q.aptitude; });
+    if (!hasApt) { $("aptWrap").style.display = "none"; return; }
+    var rows = computeAptitude(byField);
+    $("aptWrap").style.display = "block";
+
+    $("aptBars").innerHTML = rows.map(function (r, i) {
+      var parts = [];
+      parts.push("志向 " + (r.pref === null ? "—" : (100 * r.pref).toFixed(0) + "%"));
+      parts.push("実力 " + (r.perf === null ? "—" : (100 * r.perf).toFixed(0) + "%"));
+      return '<div class="apt' + (i === 0 ? " top1" : "") + '">' +
+        '<span class="f">' + esc(r.field) + "</span>" +
+        '<span class="track"><i style="width:' + (100 * r.total).toFixed(1) + '%"></i></span>' +
+        '<span class="v"><b>' + (100 * r.total).toFixed(0) + "</b> " + esc(parts.join(" / ")) + "</span></div>";
+    }).join("");
+
+    var top = rows.slice(0, 3), html = "";
+    top.forEach(function (r, i) {
+      var p = B.FIELD_PROFILE[r.field];
+      if (!p) return;
+      html += '<div class="fp"><h4>' + (i === 0 ? "◎ 第一適性: " : "○ 第" + (i + 1) + "適性: ") +
+        esc(r.field) + " — " + esc(p.tag) + " (" + (100 * r.total).toFixed(0) + ")</h4>" +
+        '<div class="row"><span>思考の型: </span>' + esc(p.think) + "</div>" +
+        '<div class="row"><span>代表的な方程式: </span><span class="m">' + esc(p.eqs) + "</span></div>" +
+        '<div class="row"><span>代表的な記号: </span><span class="m">' + esc(p.syms) + "</span></div>" +
+        '<div class="row"><span>隣接分野: </span>' + esc(p.near.join(" · ")) + "</div>" +
+        '<div class="row"><span>次に学ぶとよい主題: </span><b>' + esc(p.next) + "</b></div></div>";
+    });
+    $("aptTop").innerHTML = html;
+  }
+
   function renderReview() {
     var h = "<table><tr><th>#</th><th>設問</th><th>判定</th><th>解説</th></tr>";
     state.answers.forEach(function (a, i) {
+      if (a.q.aptitude) {
+        var w = a.q.wmap[a.chosen] || {};
+        var lean = Object.keys(w).sort(function (x, y) { return w[y] - w[x]; })
+          .map(function (f) { return f + " +" + w[f]; }).join(" · ");
+        h += "<tr><td>" + (i + 1) + "</td>" +
+             "<td>" + esc(a.q.text) + '<br/><span class="tag">' + esc(a.q.kind) + "</span></td>" +
+             '<td style="color:var(--violet)">▶<br/>' + a.sec.toFixed(1) + "s</td>" +
+             "<td>選択: <b>" + esc(a.chosen) + "</b><br/>志向: " + esc(lean || "—") + "</td></tr>";
+        return;
+      }
       var subject = a.q.sym ? a.q.sym : (a.q.eq || "");
       h += "<tr><td>" + (i + 1) + "</td>" +
            '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
@@ -682,16 +870,24 @@
     $("s_nsym").textContent = B.SYMBOLS.length + " 記号 (+ 文脈依存 " + B.CTX.length + " 種)";
     $("s_neq").textContent = B.EQUATIONS.length + " 式";
     $("s_nas").textContent = B.ASSOC.length + " 対応";
+    $("s_napt").textContent = B.APTITUDE.length + " 設問 / " +
+      Object.keys(B.FIELD_PROFILE).length + " 分野プロファイル";
     try {
       var best = localStorage.getItem("omega_whispered_best");
       $("s_best").textContent = best ? "Ω " + best : "未記録";
     } catch (e) { $("s_best").textContent = "未記録"; }
     $("setupStat").textContent = "準備完了。PDF なしでも検査できます。";
 
-    [["n1", "n1_v"], ["n2", "n2_v"], ["lvmax", "lv_v"]].forEach(function (p) {
+    [["n1", "n1_v"], ["n2", "n2_v"], ["n3", "n3_v"], ["lvmax", "lv_v"]].forEach(function (p) {
       var el = $(p[0]);
       el.oninput = function () { $(p[1]).textContent = el.value; };
     });
+    /* モードに応じて不要なスライダを無効化 */
+    $("mode").onchange = function () {
+      var m = $("mode").value;
+      ["n1", "n2", "lvmax", "field"].forEach(function (id) { $(id).disabled = (m === "aptitude"); });
+      $("n3").disabled = (m === "exam");
+    };
     $("start").onclick = startExam;
     $("again").onclick = function () {
       $("resultCard").style.display = "none";
