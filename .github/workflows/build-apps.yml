@@ -6,8 +6,9 @@ name: Build Bada apps (APK + Windows + Linux)
 #   * Ubuntu Linux  -> BadaTelegraph_*.deb + tar.gz  (jpackage .deb + portable)
 #
 # Triggers:
-#   * push a tag  vX.Y.Z   -> builds AND publishes them to a GitHub Release
-#   * manual "Run workflow" -> builds and uploads them as workflow artifacts
+#   * push a tag  vX.Y.Z    -> builds AND publishes to a GitHub Release named vX.Y.Z
+#   * manual "Run workflow" -> builds, uploads workflow artifacts, AND publishes to
+#                              the rolling "latest" Release (permanent download URLs)
 on:
   push:
     tags:
@@ -51,9 +52,14 @@ jobs:
           path: dist/BadaTelegraph.apk
 
       - name: Attach APK to release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Bada apps — latest build' }}
+          body: |
+            Bada の5エンジン・ネイティブアプリ（自動ビルド）。
+            Android=APK / Windows 10-11=zip(+exe) / Ubuntu=tar.gz(+deb)。
+          fail_on_unmatched_files: false
           files: dist/BadaTelegraph.apk
 
   # ------------------------------------------------------------------ Windows
@@ -107,9 +113,11 @@ jobs:
             build/installer/*.exe
 
       - name: Attach Windows apps to release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Bada apps — latest build' }}
+          fail_on_unmatched_files: false
           files: |
             BadaTelegraph-windows-x64.zip
             build/installer/*.exe
@@ -161,9 +169,11 @@ jobs:
             build/deb/*.deb
 
       - name: Attach Linux apps to release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Bada apps — latest build' }}
+          fail_on_unmatched_files: false
           files: |
             BadaTelegraph-linux-x64.tar.gz
             build/deb/*.deb

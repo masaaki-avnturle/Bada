@@ -1,9 +1,9 @@
 # Bada アプリ — ダウンロード用 (APK + Windows + Linux)
 
-`bada_ruby` の 3 つのエンジンを、そのまま **Android APK**・**Windows 10/11 アプリ**・
+`bada_ruby` の 5 つのエンジンを、そのまま **Android APK**・**Windows 10/11 アプリ**・
 **Ubuntu(Linux) アプリ** として配布できるようにしたものです。物理エンジンは Ruby では
 なく **共有の純 Java コア**（`apps/core`）に移植してあり、3 プラットフォームで**同一の
-コード**が動きます（Ruby ランタイム不要）。アプリは 3 画面（タブ／モード）構成：
+コード**が動きます（Ruby ランタイム不要）。アプリは 5 画面（タブ／モード）構成：
 
 - **① 宇宙電信 (Space Telegraph)** — 量子もつれ・汎用電信通信機
 - **② 擬似量子計算機 (Pseudo QC)** — ノイマン型・ディスク内蔵・半導体制御の擬似量子計算機
@@ -13,6 +13,9 @@
   心像（ViT）・脳内アプリの Bada ソースを**合成**（実在の脳を読むものではありません）
 - **④ コード生成 (Coder)** — 英語＋日本語の意図から、**プログラミング言語を自動判定**し、
   **予約語認識**・**単語補完**・コード生成（Ruby/Python/JS/C/Java/Bada）
+- **⑤ サイレント入力 (Silent IME, simulation)** — **発声せず**入力した手がかりを各エンジンへ
+  言語化。`:text` 文章／`:code` ソース／`:qc` QCソース＋実行／`:verilog` 半導体ソース／
+  `:telegraph` 宇宙電信を、**全部発声せず文章で入力**（silent-talk 基準超え）
 
 ```
 apps/
@@ -27,25 +30,27 @@ apps/
 
 ## ⬇️ ダウンロード（配布物の入手）
 
-ビルド済みの APK / EXE / DEB は **GitHub Releases** から入手できます。
-バイナリはリポジトリの GitHub Actions（`.github/workflows/build-apps.yml`）が生成します。
+ビルド済みの APK / EXE / DEB は、あなたのリポジトリの **GitHub Releases** から
+**ログイン不要の恒久 URL**で入手できます。CI（`.github/workflows/build-apps.yml`）が
+ビルドのたびに **`latest` Release** を自動更新します。
 
-1. リポジトリで **タグを付けて push** すると、CI が自動でビルドし Release に添付します：
+**▶ Releases ページ:** <https://github.com/masaaki-avnturle/Bada/releases/latest>
 
-   ```bash
-   git tag v1.0.0
-   git push origin v1.0.0
-   ```
+| プラットフォーム | ファイル | 直リンク |
+|:--|:--|:--|
+| **Android** | `BadaTelegraph.apk` | [download](https://github.com/masaaki-avnturle/Bada/releases/download/latest/BadaTelegraph.apk) |
+| **Windows 10/11** ポータブル | `BadaTelegraph-windows-x64.zip` | [download](https://github.com/masaaki-avnturle/Bada/releases/download/latest/BadaTelegraph-windows-x64.zip) |
+| **Windows 10/11** インストーラ | `BadaTelegraph-1.0.exe`（WiX） | Releases ページ参照 |
+| **Ubuntu/Linux** ポータブル | `BadaTelegraph-linux-x64.tar.gz` | [download](https://github.com/masaaki-avnturle/Bada/releases/download/latest/BadaTelegraph-linux-x64.tar.gz) |
+| **Ubuntu/Linux** インストーラ | `badatelegraph_1.0_amd64.deb`（`sudo dpkg -i`） | Releases ページ参照 |
 
-2. しばらくすると **Releases ページ**に次が並びます：
-   - `BadaTelegraph.apk` — **Android**（提供元不明のアプリを許可してインストール）
-   - `BadaTelegraph-windows-x64.zip` — **Windows 10/11** ポータブル（展開して `BadaTelegraph.exe`）
-   - `BadaTelegraph-1.0.exe` — **Windows 10/11** インストーラ（WiX、スタートメニュー登録）
-   - `BadaTelegraph-linux-x64.tar.gz` — **Ubuntu/Linux** ポータブル（展開して `bin/BadaTelegraph`）
-   - `BadaTelegraph_1.0_amd64.deb` — **Ubuntu/Linux** インストーラ（`sudo dpkg -i`）
+- Android: 「提供元不明のアプリ」を許可してインストール（デバッグ署名済み）。
+- Windows: zip を展開して `BadaTelegraph.exe`、または `.exe` インストーラで導入。
+- Linux: tar.gz を展開して `bin/BadaTelegraph`、または `.deb` を導入。
 
-> 手動で回す場合は Actions タブ → **Build Bada apps** → *Run workflow*。
-> この場合は Release ではなく **Artifacts** に出力されます。
+> 手動ビルド：Actions タブ → **Build Bada apps** → *Run workflow*。実行すると成果物が
+> Actions Artifacts に加えて **`latest` Release** にも公開されます。
+> バージョン付き Release にするには `v*` タグを push してください（例 `v1.0.0`）。
 
 ## 🖥️ Windows EXE をローカルで作る
 
