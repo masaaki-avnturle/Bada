@@ -11,7 +11,10 @@ import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
 import javax.swing.*;
+import javax.swing.text.*;
 import java.awt.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 
@@ -23,7 +26,7 @@ import java.nio.charset.StandardCharsets;
  *   ④ Coder              (思考→コード transformer, EN/JA)
  *   ⑤ Silent IME         (サイレント入力: 発声せず文章/コードを入力, simulation)
  *   ⑥ Whisper            (英語ウィスパード復元／未知言語の言語化, simulation)
- *   ⑦ Bada Vim           (全画面モーダルエディタ: INSERT で長長文入力, :math で数学論文挿入)
+ *   ⑦ Bada Vim           (構文ハイライト付き全画面モーダルエディタ: INSERT 長長文入力, 予約語ボタン, :math 等)
  *
  * Run with no arguments to open the Swing GUI (how the packaged app launches).
  * Pass a message for a one-shot telegraph console report, or a flag for a
@@ -554,30 +557,136 @@ public final class DesktopApp {
     }
 
     // ---------------------------------------------------------------- Bada Vim
-    // A full modal editor: the whole screen is the long-long buffer. INSERT mode
-    // types directly into it; NORMAL mode runs commands (i a o O x dd h j k l 0 $
-    // gg G); ":" opens the ex command line (:math inserts a long-long math paper).
+    // A full-screen modal editor with SYNTAX HIGHLIGHTING (not just an ex inserter).
+    // INSERT types long-long text directly into the whole-screen buffer; NORMAL runs
+    // commands (i a o O x dd h j k l 0 $ gg G); ":" opens the ex line. Reserved words
+    // / syntax-rule words are highlighted and insertable by buttons, per filetype
+    // (bada / verilog(半導体) / qasm(QC) / latex / coder) — all voiceless.
+    private static final String[] VIM_FTS = {"auto", "bada", "verilog", "qasm", "latex", "coder"};
+
+    private static String[] vimReserved(String ft) {
+        switch (ft) {
+            case "bada": return new String[]{"set", "print", "as", "push", "Omega::", "<-", "-<", ">-", "="};
+            case "verilog": return new String[]{"module", "endmodule", "input", "output", "wire", "reg",
+                    "assign", "always", "begin", "end", "nand2", "inv", "`default_nettype", "none"};
+            case "qasm": return new String[]{"H", "X", "Y", "Z", "S", "T", "CX", "RX", "RZ", "MEASURE", "HALT", "NOP"};
+            case "latex": return new String[]{"\\documentclass", "\\usepackage", "\\begin", "\\end",
+                    "\\section", "\\newtheorem", "\\title", "\\maketitle", "\\equation"};
+            case "coder": return new String[]{"def", "end", "if", "else", "elsif", "while", "for", "return",
+                    "class", "print", "function", "var", "let", "const", "import", "then"};
+            default: return new String[]{"set", "print", "<-", "-<", ">-", "module", "wire", "H", "CX",
+                    "\\begin", "\\end", "def", "return"};
+        }
+    }
+
+    private static String vimDetectFt(String text) {
+        if (text.contains("\\documentclass") || text.contains("\\begin{")) return "latex";
+        if (text.contains("module ") || text.contains("endmodule")) return "verilog";
+        if (text.contains("Omega::push") || text.contains(" <- ") || text.contains(" -< ")) return "bada";
+        if (text.matches("(?s).*\\b(H|CX|MEASURE|HALT)\\b.*")) return "qasm";
+        return "coder";
+    }
+
+    private static void highlightVim(JTextPane pane, String ftSel) {
+        StyledDocument doc = pane.getStyledDocument();
+        String text = pane.getText().replace("\r", "");
+        int n = text.length();
+        String ft = "auto".equals(ftSel) ? vimDetectFt(text) : ftSel;
+
+        SimpleAttributeSet def = new SimpleAttributeSet();
+        StyleConstants.setForeground(def, new Color(0x20, 0x24, 0x2c));
+        SimpleAttributeSet kw = new SimpleAttributeSet();
+        StyleConstants.setForeground(kw, new Color(0x0b, 0x63, 0xa5)); StyleConstants.setBold(kw, true);
+        SimpleAttributeSet op = new SimpleAttributeSet();
+        StyleConstants.setForeground(op, new Color(0xb5, 0x5c, 0x00)); StyleConstants.setBold(op, true);
+        SimpleAttributeSet str = new SimpleAttributeSet();
+        StyleConstants.setForeground(str, new Color(0x0a, 0x7d, 0x33));
+        SimpleAttributeSet com = new SimpleAttributeSet();
+        StyleConstants.setForeground(com, new Color(0x6a, 0x73, 0x7d)); StyleConstants.setItalic(com, true);
+
+        doc.setCharacterAttributes(0, n, def, true);
+
+        // keywords / syntax-rule words for the filetype
+        for (String w : vimReserved(ft)) {
+            String q = Pattern.quote(w);
+            String rx = Character.isLetter(w.charAt(0)) ? "(?<![\\w])" + q + "(?![\\w])" : q;
+            Matcher m = Pattern.compile(rx).matcher(text);
+            SimpleAttributeSet sty = Character.isLetterOrDigit(w.charAt(0)) || w.charAt(0) == '\\' ? kw : op;
+            while (m.find()) doc.setCharacterAttributes(m.start(), m.end() - m.start(), sty, false);
+        }
+        // strings then comments win
+        Matcher ms = Pattern.compile("\"[^\"\\n]*\"").matcher(text);
+        while (ms.find()) doc.setCharacterAttributes(ms.start(), ms.end() - ms.start(), str, false);
+        String crx = "latex".equals(ft) ? "%.*" : ("verilog".equals(ft) || "coder".equals(ft) ? "//.*" : "#.*");
+        Matcher mc = Pattern.compile(crx).matcher(text);
+        while (mc.find()) doc.setCharacterAttributes(mc.start(), mc.end() - mc.start(), com, false);
+    }
+
+    private static int vimLineStart(String t, int pos) { int i = t.lastIndexOf('\n', Math.max(0, pos - 1)); return i < 0 ? 0 : i + 1; }
+    private static int vimLineEnd(String t, int pos) { int i = t.indexOf('\n', pos); return i < 0 ? t.length() : i; }
+
     private static JPanel vimPanel() {
         JPanel root = new JPanel(new BorderLayout(6, 6));
 
-        final JTextArea editor = new JTextArea();
+        final JTextPane editor = new JTextPane();
         editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         editor.setMargin(new Insets(10, 12, 10, 12));
-        editor.setText("% Bada Vim — i:挿入  Esc:ノーマル  ::コマンド  （画面全体が長長文バッファ）\n");
-        editor.setEditable(false); // start in NORMAL
+        editor.setText("% Bada Vim — i:挿入  Esc:ノーマル  ::コマンド  （syntax highlight・全画面長長文）\n");
+        editor.setEditable(false); // NORMAL
 
+        final String[] ft = { "auto" };
+        final JComboBox<String> ftBox = new JComboBox<>(VIM_FTS);
         final JLabel status = new JLabel();
         status.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
         final JTextField exLine = new JTextField();
         exLine.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
         exLine.setVisible(false);
 
-        final boolean[] pendingD = {false}, pendingG = {false};
-        final Runnable refresh = () -> status.setText(String.format("  %s | %d 行 | i:挿入 Esc:戻る ::コマンド",
-                editor.isEditable() ? "-- INSERT --" : "-- NORMAL --",
-                editor.getText().split("\n", -1).length));
+        final boolean[] busy = { false };
+        final Runnable rehl = () -> {
+            if (busy[0]) return;
+            busy[0] = true;
+            try { highlightVim(editor, ft[0]); } catch (Exception ignored) { }
+            busy[0] = false;
+        };
+        final Runnable refresh = () -> {
+            status.setText(String.format("  %s | ft=%s | %d 行 | i:挿入 Esc:戻る ::コマンド",
+                    editor.isEditable() ? "-- INSERT --" : "-- NORMAL --",
+                    "auto".equals(ft[0]) ? "auto(" + vimDetectFt(editor.getText()) + ")" : ft[0],
+                    editor.getText().split("\n", -1).length));
+        };
+        editor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { SwingUtilities.invokeLater(rehl); SwingUtilities.invokeLater(refresh); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { SwingUtilities.invokeLater(rehl); SwingUtilities.invokeLater(refresh); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { }
+        });
+        ftBox.addActionListener(e -> { ft[0] = (String) ftBox.getSelectedItem(); rehl.run(); refresh.run(); });
 
-        // ex command line (:math, :bada, :latex, :report, :whisper, :w, :q)
+        // reserved / syntax-rule word buttons (voiceless insertion), rebuilt per ft
+        final JPanel words = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        final Runnable rebuildWords = () -> {
+            words.removeAll();
+            words.add(new JLabel("予約語:"));
+            String f = "auto".equals(ft[0]) ? vimDetectFt(editor.getText()) : ft[0];
+            for (String w : vimReserved(f)) {
+                JButton b = new JButton(w);
+                b.setMargin(new Insets(1, 5, 1, 5));
+                b.setFocusable(false);
+                b.addActionListener(ev -> {
+                    try {
+                        int at = editor.getCaretPosition();
+                        editor.getDocument().insertString(at, w + " ", null);
+                        editor.setCaretPosition(at + w.length() + 1);
+                    } catch (BadLocationException ignored) { }
+                    editor.requestFocusInWindow();
+                });
+                words.add(b);
+            }
+            words.revalidate(); words.repaint();
+        };
+        ftBox.addActionListener(e -> rebuildWords.run());
+
+        // ex command line
         exLine.addActionListener(e -> {
             String line = exLine.getText().trim();
             exLine.setVisible(false);
@@ -586,101 +695,104 @@ public final class DesktopApp {
             String name = line, arg = "";
             int sp = line.indexOf(' ');
             if (sp >= 0) { name = line.substring(0, sp); arg = line.substring(sp + 1).trim(); }
-            String block = null;
-            switch (name) {
-                case "math": block = Platex.mathPaper(arg, 0).code; break;
-                case "bada": block = BadaSyntax.buildAuto(arg, 0).code; break;
-                case "latex": case "tex": block = Platex.paper(arg, 0).code; break;
-                case "report": block = Whisper.longReport(arg).text; break;
-                case "whisper": block = Whisper.verbalize(arg).text; break;
-                case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); return;
-                case "q": case "quit": status.setText("  （:q）"); return;
-                default: status.setText("  unknown ex: :" + name); return;
-            }
-            int at = editor.getCaretPosition();
-            String txt = editor.getText();
-            String insert = (at > 0 && at <= txt.length() && txt.charAt(at - 1) != '\n' ? "\n" : "") + block + "\n";
-            editor.insert(insert, at);
-            editor.setCaretPosition(Math.min(at + insert.length(), editor.getText().length()));
-            refresh.run();
+            String block = null, setFt = null;
+            try {
+                switch (name) {
+                    case "math": block = Platex.mathPaper(arg, 0).code; setFt = "latex"; break;
+                    case "latex": case "tex": block = Platex.paper(arg, 0).code; setFt = "latex"; break;
+                    case "bada": block = BadaSyntax.buildAuto(arg, 0).code; setFt = "bada"; break;
+                    case "qc": { Object[] p = SilentTalk.Parse.qc(arg); block = (String) p[0]; setFt = "qasm"; break; }
+                    case "verilog": { Object[] p = SilentTalk.Parse.qc(arg); int nq = (Integer) p[1];
+                        try (PseudoQC m = new PseudoQC(nq).load((String) p[0])) { block = m.verilog(); } setFt = "verilog"; break; }
+                    case "report": block = Whisper.longReport(arg).text; break;
+                    case "whisper": block = Whisper.verbalize(arg).text; break;
+                    case "set": if (arg.startsWith("ft=")) { ft[0] = arg.substring(3); ftBox.setSelectedItem(ft[0]); }
+                        status.setText("  " + arg); rehl.run(); refresh.run(); rebuildWords.run(); return;
+                    case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); return;
+                    case "q": case "quit": status.setText("  （:q）"); return;
+                    default: status.setText("  unknown ex: :" + name); return;
+                }
+                int at = editor.getCaretPosition();
+                String txt = editor.getText();
+                String pre = (at > 0 && at <= txt.length() && txt.charAt(at - 1) != '\n') ? "\n" : "";
+                editor.getDocument().insertString(at, pre + block + "\n", null);
+                if (setFt != null) { ft[0] = setFt; ftBox.setSelectedItem(setFt); rebuildWords.run(); }
+                rehl.run(); refresh.run();
+            } catch (Exception ex) { status.setText("  error: " + ex.getMessage()); }
         });
         exLine.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent e) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
-                    exLine.setVisible(false); editor.requestFocusInWindow(); refresh.run();
-                }
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) { exLine.setVisible(false); editor.requestFocusInWindow(); refresh.run(); }
             }
         });
 
-        // modal key handling on the editor
+        final boolean[] pendingD = {false}, pendingG = {false};
         editor.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent e) {
-                if (editor.isEditable()) { // INSERT: only intercept Esc
-                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
-                        editor.setEditable(false); refresh.run(); e.consume();
-                    }
+                if (editor.isEditable()) {
+                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) { editor.setEditable(false); refresh.run(); e.consume(); }
                     return;
                 }
-                // NORMAL: arrows still move; everything else handled in keyTyped
                 int c = e.getKeyCode();
                 if (c == java.awt.event.KeyEvent.VK_LEFT || c == java.awt.event.KeyEvent.VK_RIGHT
                         || c == java.awt.event.KeyEvent.VK_UP || c == java.awt.event.KeyEvent.VK_DOWN) return;
-                e.consume(); // swallow so NORMAL keys never type into the buffer
+                e.consume();
             }
             public void keyTyped(java.awt.event.KeyEvent e) {
-                if (editor.isEditable()) return; // INSERT types normally
-                char ch = e.getKeyChar();
-                try { normalKey(ch); } catch (Exception ignored) { }
+                if (editor.isEditable()) return;
+                try { normal(e.getKeyChar()); } catch (Exception ignored) { }
                 e.consume();
             }
             private void enterInsert() { editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
-            private void normalKey(char ch) throws javax.swing.text.BadLocationException {
-                int pos = editor.getCaretPosition();
-                int line = editor.getLineOfOffset(pos);
-                if (ch == 'd') { if (pendingD[0]) { deleteLine(line); pendingD[0] = false; } else pendingD[0] = true; return; }
+            private void normal(char ch) throws BadLocationException {
+                String t = editor.getText();
+                int pos = Math.min(editor.getCaretPosition(), t.length());
+                if (ch == 'd') { if (pendingD[0]) { deleteLine(t, pos); pendingD[0] = false; } else pendingD[0] = true; return; }
                 pendingD[0] = false;
                 if (ch == 'g') { if (pendingG[0]) { editor.setCaretPosition(0); pendingG[0] = false; } else pendingG[0] = true; return; }
                 pendingG[0] = false;
                 switch (ch) {
                     case 'i': enterInsert(); break;
-                    case 'a': editor.setCaretPosition(Math.min(pos + 1, editor.getText().length())); enterInsert(); break;
-                    case 'o': { int end = editor.getLineEndOffset(line); editor.insert("\n", Math.min(end, editor.getText().length())); editor.setCaretPosition(Math.min(end, editor.getText().length())); enterInsert(); break; }
-                    case 'O': { int st = editor.getLineStartOffset(line); editor.insert("\n", st); editor.setCaretPosition(st); enterInsert(); break; }
-                    case 'x': { String t = editor.getText(); if (pos < t.length() && t.charAt(pos) != '\n') editor.replaceRange("", pos, pos + 1); refresh.run(); break; }
+                    case 'a': editor.setCaretPosition(Math.min(pos + 1, t.length())); enterInsert(); break;
+                    case 'o': { int en = vimLineEnd(t, pos); editor.getDocument().insertString(en, "\n", null); editor.setCaretPosition(en + 1); enterInsert(); break; }
+                    case 'O': { int st = vimLineStart(t, pos); editor.getDocument().insertString(st, "\n", null); editor.setCaretPosition(st); enterInsert(); break; }
+                    case 'x': if (pos < t.length() && t.charAt(pos) != '\n') editor.getDocument().remove(pos, 1); break;
                     case 'h': if (pos > 0) editor.setCaretPosition(pos - 1); break;
-                    case 'l': if (pos < editor.getText().length()) editor.setCaretPosition(pos + 1); break;
-                    case 'j': moveLine(line + 1); break;
-                    case 'k': moveLine(line - 1); break;
-                    case '0': editor.setCaretPosition(editor.getLineStartOffset(line)); break;
-                    case '$': editor.setCaretPosition(Math.max(editor.getLineStartOffset(line), editor.getLineEndOffset(line) - 1)); break;
-                    case 'G': editor.setCaretPosition(editor.getText().length()); break;
+                    case 'l': if (pos < t.length()) editor.setCaretPosition(pos + 1); break;
+                    case 'j': { int ne = vimLineEnd(t, pos); editor.setCaretPosition(Math.min(ne + 1, t.length())); break; }
+                    case 'k': { int st = vimLineStart(t, pos); editor.setCaretPosition(Math.max(0, st - 1)); break; }
+                    case '0': editor.setCaretPosition(vimLineStart(t, pos)); break;
+                    case '$': editor.setCaretPosition(Math.max(vimLineStart(t, pos), vimLineEnd(t, pos))); break;
+                    case 'G': editor.setCaretPosition(t.length()); break;
                     case ':': exLine.setText(""); exLine.setVisible(true); exLine.requestFocusInWindow(); break;
                     default: break;
                 }
             }
-            private void moveLine(int target) throws javax.swing.text.BadLocationException {
-                int last = editor.getLineCount() - 1;
-                target = Math.max(0, Math.min(target, last));
-                editor.setCaretPosition(editor.getLineStartOffset(target));
-            }
-            private void deleteLine(int line) throws javax.swing.text.BadLocationException {
-                int st = editor.getLineStartOffset(line);
-                int en = editor.getLineEndOffset(line);
-                editor.replaceRange("", st, Math.min(en, editor.getText().length()));
-                refresh.run();
+            private void deleteLine(String t, int pos) throws BadLocationException {
+                int st = vimLineStart(t, pos);
+                int en = Math.min(vimLineEnd(t, pos) + 1, t.length());
+                editor.getDocument().remove(st, en - st);
             }
         });
 
-        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・Esc ノーマル・dd 行削除・x 文字削除・hjkl 0 $ gg G 移動・: で ex（:math 数学論文 / :bada / :latex / :report / :w / :q）");
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・Esc ノーマル・dd/x 削除・hjkl 0 $ gg G・: で ex（:math :bada :qc :verilog :latex :set ft= :w :q）");
         help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        topBar.add(new JLabel("filetype:")); topBar.add(ftBox);
+        JPanel top = new JPanel(new BorderLayout());
+        top.add(help, BorderLayout.NORTH);
+        top.add(topBar, BorderLayout.CENTER);
+        top.add(words, BorderLayout.SOUTH);
 
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(exLine, BorderLayout.NORTH);
         bottom.add(status, BorderLayout.SOUTH);
 
-        root.add(help, BorderLayout.NORTH);
+        root.add(top, BorderLayout.NORTH);
         root.add(new JScrollPane(editor), BorderLayout.CENTER);
         root.add(bottom, BorderLayout.SOUTH);
+        rebuildWords.run();
+        rehl.run();
         refresh.run();
         return root;
     }
