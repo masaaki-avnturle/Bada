@@ -6,13 +6,20 @@ name: Ω-Vim Android APK
 #   JDK 17 · cordova 12.0.0 · cordova-android 12.0.1 · platform 33 · build-tools 33.0.2
 #
 # The APK is downloadable from the Actions run (artifact "omega-vim-apk"), and
-# attached to a GitHub Release on an 'ovim-apk-v*' (or 'ovim-gui-v*') tag.
+# attached to a GitHub Release either on an 'ovim-apk-v*' / 'ovim-gui-v*' tag,
+# or on a manual (workflow_dispatch) run when a 'release_tag' input is given —
+# the run then creates that tag at the built commit and publishes the Release.
 #
 # Run it manually from the Actions tab (workflow_dispatch), or it runs on any
 # push that touches the GUI app.
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish a GitHub Release with this tag and attach the APK (e.g. ovim-apk-v1.0.0). Leave empty to only build the downloadable artifact."
+        required: false
+        default: ""
   push:
     branches:
       - 'claude/**'
@@ -93,8 +100,23 @@ jobs:
           name: omega-vim-apk
           path: out/omega-vim-debug.apk
 
-      - name: Attach APK to Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
+      # Publish a GitHub Release with the APK attached. Fires when the build was
+      # triggered by an 'ovim-apk-v*' / 'ovim-gui-v*' tag, or from a manual run
+      # that supplied a 'release_tag' input (the action then creates that tag at
+      # the built commit). Uses the runner's GITHUB_TOKEN (contents: write).
+      - name: Publish APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || inputs.release_tag }}
+          body: |
+            **Ω-Vim** — Android debug APK.
+
+            Bada-language modal editor (grammar checker · parser/indent completion ·
+            spinning-top code fix), packaged with Cordova.
+
+            - File: `omega-vim-debug.apk`
+            - Build: pinned JDK 17 · cordova ${{ env.CORDOVA_VERSION }} · cordova-android ${{ env.CORDOVA_ANDROID }} · ${{ env.ANDROID_PLATFORM }} · build-tools ${{ env.ANDROID_BUILDTOOLS }}
+            - This is a debug-signed APK: enable "install from unknown sources" on the device to install.
           files: out/omega-vim-debug.apk
