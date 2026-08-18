@@ -88,10 +88,30 @@ public final class Vim {
             case "report": insertBlock(Whisper.longReport(arg).text); return touched("レポート挿入");
             case "whisper": insertBlock(Whisper.verbalize(arg).text); return touched("言語化挿入");
             case "whisperen": insertBlock(Whisper.verbalizeEn(arg).text); return touched("ウィスパード英語挿入");
+            case "burst": return burstReconstruct(arg);
             case "qc": insertBlock(qcSource(arg)); return touched("QCソース挿入");
             case "verilog": insertBlock(verilogSource(arg)); return touched("半導体ソース挿入");
             default: return new R("unknown ex: :" + name, false);
         }
+    }
+
+    /**
+     * Reconstruct MANY whispered lines AT ONCE (複数行を一辺に・一瞬で). With no
+     * argument the whole buffer is reconstructed in a single shot; with an
+     * argument, ";"-separated whispered lines replace the buffer in one shot —
+     * spanning multiple lines instantly, voicelessly, above silent-talk.
+     */
+    private R burstReconstruct(String arg) {
+        String src = (arg == null || arg.strip().isEmpty()) ? text() : String.join("\n", arg.split(";"));
+        Whisper.Result r = Whisper.verbalizeBlock(src);
+        buffer.clear();
+        for (String ln : r.text.split("\n", -1)) buffer.add(ln);
+        if (buffer.isEmpty()) buffer.add("");
+        row = Math.max(buffer.size() - 1, 0);
+        col = cur().length();
+        int filled = 0;
+        for (String ln : buffer) if (!ln.strip().isEmpty()) filled++;
+        return touched(String.format("一括ウィスパード復元 %d行 %.0f%%", filled, r.precision * 100));
     }
 
     /** Silent cue -> QC (OpenQASM-like) source + disk-backed run report. */

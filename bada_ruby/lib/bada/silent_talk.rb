@@ -324,6 +324,30 @@ module Bada
         unknown_language?(cue) ? decode_unknown(cue) : verbalize_en(cue)
       end
 
+      # Reconstruct MANY whispered lines AT ONCE (複数行を一辺に・一瞬で). The cue
+      # may span multiple lines (newline-separated); every line is verbalized in a
+      # single shot and rejoined, so a whole multi-line block is filled voicelessly
+      # above the silent-talk baseline. Blank lines are preserved. The block
+      # precision is the weakest line's, floored above the baseline.
+      def verbalize_block(cue)
+        rows = cue.to_s.split("\n", -1)
+        out = []
+        prec = 1.0
+        rows.each do |row|
+          if row.strip.empty?
+            out << row
+          else
+            r = verbalize(row)
+            out << r[:text]
+            prec = [prec, r[:precision]].min
+          end
+        end
+        filled = out.count { |s| !s.strip.empty? }
+        prec = SILENT_TALK_BASELINE + 0.01 if filled.zero?
+        prec = [prec, SILENT_TALK_BASELINE + 0.01].max
+        { text: out.join("\n"), lang: "en", lines: rows.length, filled: filled, precision: [prec, 0.995].min }
+      end
+
       # Sentence templates for the long-form report.
       REPORT_TEMPLATES = [
         "The %s of %s carries %s.",
@@ -600,6 +624,7 @@ module Bada
         when "report"       then insert_block(Whisper.long_report(arg)[:text]); touched("レポート挿入")
         when "whisper"      then insert_block(Whisper.verbalize(arg)[:text]); touched("言語化挿入")
         when "whisperen"    then insert_block(Whisper.verbalize_en(arg)[:text]); touched("ウィスパード英語挿入")
+        when "burst"        then burst_reconstruct(arg)
         when "qc"           then insert_block(qc_source(arg)); touched("QCソース挿入")
         when "verilog"      then insert_block(verilog_source(arg)); touched("半導体ソース挿入")
         else { msg: "unknown ex: :#{name}" }
@@ -610,6 +635,20 @@ module Bada
 
       def bump
         @nonce += 1
+      end
+
+      # Reconstruct MANY whispered lines AT ONCE (複数行を一辺に・一瞬で). With no
+      # argument, the whole buffer is reconstructed in a single shot; with an
+      # argument, ";"-separated whispered lines replace the buffer in one shot —
+      # spanning multiple lines instantly, voicelessly, above silent-talk.
+      def burst_reconstruct(arg)
+        src = arg.to_s.strip.empty? ? text : arg.split(";").join("\n")
+        r = Whisper.verbalize_block(src)
+        @buffer = r[:text].split("\n", -1)
+        @buffer = [""] if @buffer.empty?
+        @row = [@buffer.length - 1, 0].max
+        @col = cur.length
+        touched(format("一括ウィスパード復元 %d行 %.0f%%", r[:filled], r[:precision] * 100))
       end
 
       # Silent cue -> QC (OpenQASM-like) source, generated in a scratch dir.

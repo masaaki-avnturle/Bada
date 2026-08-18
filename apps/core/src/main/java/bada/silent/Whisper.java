@@ -121,6 +121,35 @@ public final class Whisper {
         return unknownLanguage(cue) ? decodeUnknown(cue) : verbalizeEn(cue);
     }
 
+    /**
+     * Reconstruct MANY whispered lines AT ONCE (複数行を一辺に・一瞬で). The cue may
+     * span multiple lines; every line is verbalized in a single shot and rejoined,
+     * so a whole multi-line block is filled voicelessly above the silent-talk
+     * baseline. Blank lines are preserved; block precision is the weakest line's,
+     * floored above the baseline.
+     */
+    public static Result verbalizeBlock(String cue) {
+        String[] rows = (cue == null ? "" : cue).split("\n", -1);
+        StringBuilder sb = new StringBuilder();
+        double prec = 1.0;
+        int filled = 0;
+        for (int i = 0; i < rows.length; i++) {
+            String row = rows[i];
+            if (row.trim().isEmpty()) {
+                sb.append(row);
+            } else {
+                Result r = verbalize(row);
+                sb.append(r.text);
+                prec = Math.min(prec, r.precision);
+                filled++;
+            }
+            if (i < rows.length - 1) sb.append("\n");
+        }
+        if (filled == 0) prec = BASELINE + 0.01;
+        prec = Math.max(prec, BASELINE + 0.01);
+        return new Result(sb.toString(), "en", Math.min(prec, 0.995));
+    }
+
     private static final String[] REPORT_TEMPLATES = {
         "The %s of %s carries %s.",
         "In %s, %s becomes %s.",

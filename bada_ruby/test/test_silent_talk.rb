@@ -372,6 +372,18 @@ class TestSilentTalkSession < Minitest::Test
     assert_equal "en", r2[:lang]
   end
 
+  def test_verbalize_block_reconstructs_many_lines_at_once
+    cue = "qntm lght wv\nmmry sgnl fld\n\nbll ntngl"
+    r = Bada::SilentTalk::Whisper.verbalize_block(cue)
+    lines = r[:text].split("\n", -1)
+    assert_equal 4, lines.length            # 複数行を一辺に（空行も保持）
+    assert_equal 4, r[:lines]
+    assert_equal "", lines[2]               # blank line preserved
+    assert_includes lines[0], "quantum"
+    assert_includes lines[1], "memory"
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
   # ---- long-form: report (:report) + long Bada source (:bada) --------------
 
   def test_report_mode_writes_multi_sentence_document
@@ -582,6 +594,26 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes words, "quantum"
     assert_includes words, "light"
     refute v.saved
+  end
+
+  def test_vim_ex_burst_reconstructs_whole_buffer_at_once
+    # multiple whispered lines already in the buffer -> reconstruct all at once
+    v = Bada::SilentTalk::Vim.new("qntm lght wv\nmmry sgnl fld\nbll ntngl stt")
+    r = v.feed(":burst")
+    assert_includes r[:msg], "一括ウィスパード復元"
+    assert_equal 3, v.line_count                 # 複数行を跨いで一瞬で
+    lines = v.text.downcase.split("\n")
+    assert_includes lines[0], "quantum"
+    assert_includes lines[1], "memory"
+    refute v.saved
+  end
+
+  def test_vim_ex_burst_with_arg_replaces_buffer_in_one_shot
+    v = Bada::SilentTalk::Vim.new("keep")
+    v.feed(":burst qntm lght;mmry sgnl;bll ntngl")   # ; separates lines
+    assert_equal 3, v.line_count
+    assert_includes v.text.downcase, "quantum"
+    refute_includes v.text, "keep"
   end
 
   def test_vim_ex_qc_and_verilog_generate_source

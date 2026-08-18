@@ -635,8 +635,10 @@ public final class DesktopApp {
         editor.setEditable(false); // NORMAL
 
         final String[] ft = { "auto" };
-        // wIns[0] = whisper-insert mode active: typing is native, Esc reconstructs the line to full English
+        // wIns[0] = whisper-insert mode active: typing is native, Esc reconstructs
+        // the WHOLE multi-line region typed since wStart[0] into full English at once.
         final boolean[] wIns = { false };
+        final int[] wStart = { 0 };
         final JComboBox<String> ftBox = new JComboBox<>(VIM_FTS);
         final JLabel status = new JLabel();
         status.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
@@ -693,20 +695,39 @@ public final class DesktopApp {
         };
         ftBox.addActionListener(e -> rebuildWords.run());
 
-        // Reconstruct the caret line (whispered English -> full English) in place.
-        final Runnable expandWhisperLine = () -> {
+        // Reconstruct the WHOLE multi-line region typed in this whisper burst
+        // (from wStart's line through the caret's line) into full English AT ONCE
+        // — 複数行を一辺に・一瞬で, voicelessly, above the silent-talk baseline.
+        final Runnable expandWhisperRegion = () -> {
             try {
                 String t = editor.getText();
                 int pos = Math.min(editor.getCaretPosition(), t.length());
-                int st = vimLineStart(t, pos), en = vimLineEnd(t, pos);
-                String line = t.substring(st, en);
-                if (line.trim().isEmpty()) { rehl.run(); refresh.run(); return; }
-                Whisper.Result r = Whisper.verbalizeEn(line);
+                int anchor = Math.min(Math.max(wStart[0], 0), t.length());
+                int lo = Math.min(anchor, pos), hi = Math.max(anchor, pos);
+                int st = vimLineStart(t, lo), en = vimLineEnd(t, hi);
+                String region = t.substring(st, en);
+                if (region.trim().isEmpty()) { rehl.run(); refresh.run(); return; }
+                Whisper.Result r = Whisper.verbalizeBlock(region);  // 複数行を一括で復元
                 editor.getDocument().remove(st, en - st);
                 editor.getDocument().insertString(st, r.text, null);
                 editor.setCaretPosition(st + r.text.length());
-                status.setText(String.format("  ウィスパード英語を復元: precision %.1f%% > silent-talk %.1f%%",
-                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+                int lines = region.split("\n", -1).length;
+                status.setText(String.format("  一括ウィスパード復元 %d行を一瞬で: precision %.1f%% > silent-talk %.1f%%",
+                        lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+                rehl.run();
+            } catch (Exception ignored) { }
+        };
+        // Reconstruct the ENTIRE buffer at once (whole document burst).
+        final Runnable burstWholeBuffer = () -> {
+            try {
+                String t = editor.getText();
+                if (t.trim().isEmpty()) { refresh.run(); return; }
+                Whisper.Result r = Whisper.verbalizeBlock(t);
+                editor.setText(r.text);
+                editor.setCaretPosition(editor.getText().length());
+                int lines = r.text.split("\n", -1).length;
+                status.setText(String.format("  全バッファ一括ウィスパード復元 %d行を一瞬で: precision %.1f%% > silent-talk %.1f%%",
+                        lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
                 rehl.run();
             } catch (Exception ignored) { }
         };
@@ -730,6 +751,10 @@ public final class DesktopApp {
                         try (PseudoQC m = new PseudoQC(nq).load((String) p[0])) { block = m.verilog(); } setFt = "verilog"; break; }
                     case "report": block = Whisper.longReport(arg).text; break;
                     case "whisper": block = Whisper.verbalize(arg).text; break;
+                    case "whisperen": block = Whisper.verbalizeEn(arg).text; break;
+                    case "burst":
+                        if (arg.isEmpty()) { burstWholeBuffer.run(); return; }
+                        block = Whisper.verbalizeBlock(String.join("\n", arg.split(";"))).text; break;
                     case "set": if (arg.startsWith("ft=")) { ft[0] = arg.substring(3); ftBox.setSelectedItem(ft[0]); }
                         status.setText("  " + arg); rehl.run(); refresh.run(); rebuildWords.run(); return;
                     case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); return;
@@ -763,7 +788,7 @@ public final class DesktopApp {
             public void keyPressed(java.awt.event.KeyEvent e) {
                 if (editor.isEditable()) {
                     if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
-                        if (wIns[0]) { wIns[0] = false; expandWhisperLine.run(); }
+                        if (wIns[0]) { wIns[0] = false; expandWhisperRegion.run(); }
                         editor.setEditable(false); refresh.run(); e.consume();
                     }
                     return;
@@ -779,7 +804,7 @@ public final class DesktopApp {
                 e.consume();
             }
             private void enterInsert() { wIns[0] = false; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
-            private void enterWhisperInsert() { wIns[0] = true; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
+            private void enterWhisperInsert() { wIns[0] = true; wStart[0] = editor.getCaretPosition(); editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
             private void normal(char ch) throws BadLocationException {
                 String t = editor.getText();
                 int pos = Math.min(editor.getCaretPosition(), t.length());
@@ -816,12 +841,18 @@ public final class DesktopApp {
         final JPanel gen = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
         gen.add(new JLabel("生成:"));
         JButton bWhisper = new JButton("🔉 ウィスパード英語挿入");
-        bWhisper.setToolTipText("全画面に、母音を落としたウィスパード英語を直接入力し、Esc で完全な英語へ復元（silent-talk 超え精度・短文ではない）");
+        bWhisper.setToolTipText("全画面に、母音を落としたウィスパード英語を複数行そのまま直接入力し、Esc で複数行を一辺に完全な英語へ復元（silent-talk 超え精度・短文ではない）");
         bWhisper.setFocusable(false);
         bWhisper.addActionListener(ev -> {
-            wIns[0] = true; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run();
+            wIns[0] = true; wStart[0] = editor.getCaretPosition();
+            editor.setEditable(true); editor.requestFocusInWindow(); refresh.run();
         });
         gen.add(bWhisper);
+        JButton bBurst = new JButton("⚡ 一括ウィスパード（複数行一瞬）");
+        bBurst.setToolTipText("バッファの複数行を跨いで、発声せず一瞬で完全な英語へ一括復元（silent-talk 超え精度）");
+        bBurst.setFocusable(false);
+        bBurst.addActionListener(ev -> { burstWholeBuffer.run(); editor.requestFocusInWindow(); });
+        gen.add(bBurst);
         String[][] genBtns = {
             {"🔩 半導体ソース", "verilog", "semiconductor lattice qubit gate"},
             {"⚛ QCソース", "qc", "entangle bell superposition measure"},
@@ -844,7 +875,7 @@ public final class DesktopApp {
             gen.add(b);
         }
 
-        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入・Esc ノーマル/復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:math :bada :qc :verilog :latex :set ft= :w :q）");
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入(複数行を一辺に)・Esc ノーマル/一括復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:burst 全行一括 :whisperen :math :bada :qc :verilog :latex :set ft= :w :q）");
         help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
         topBar.add(new JLabel("filetype:")); topBar.add(ftBox);
