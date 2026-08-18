@@ -167,6 +167,13 @@ public final class Whisper {
 
     public static Report report(String cue) { return report(cue, 0); }
 
+    /** A VERY long report (長長文): 10-16 sentences. */
+    public static Report longReport(String cue) {
+        int toks = 0;
+        for (String t : (cue == null ? "" : cue).split("\\s+")) if (!t.isEmpty()) toks++;
+        return report(cue, Math.min(Math.max(toks * 3, 10), 16));
+    }
+
     public static List<String> vocab() { return Arrays.asList(VOCAB); }
 
     private Whisper() { }

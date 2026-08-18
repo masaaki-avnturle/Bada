@@ -247,12 +247,11 @@ public class MainActivity extends Activity {
         return sb.toString();
     }
 
-    // Whispered English reconstruction / unknown-language verbalization (発声せず).
+    // Whispered / unknown-language -> LONG-form report (長長文, not short), 発声せず.
     private String whisper(String text) {
-        Whisper.Result r = Whisper.verbalize(text);
-        String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
+        Whisper.Report r = Whisper.longReport(text);
         return "入力 (whispered/unknown):\n  " + text
-                + "\n\n言語化 (" + kind + ", source=" + r.lang + "):\n  " + r.text
+                + "\n\n長長文レポート (" + r.sentences + "文, source=" + r.lang + "):\n" + r.text
                 + String.format("%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
                         r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
                         r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS" : "below");

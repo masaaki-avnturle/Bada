@@ -176,12 +176,12 @@ when "silent"
                 session.exceeds_silent_talk? ? "EXCEEDS silent talk" : "below")
   end
 when "whisper"
-  # Whispered English reconstruction / unknown-language verbalization (発声せず).
-  #   bada whisper "qntm lght wv"     -> quantum light wave
-  #   bada whisper "φωτ μνημη"        -> (未知言語を英語へ言語化)
-  r = Bada::SilentTalk::Whisper.verbalize(ARGV.join(" "))
-  puts format("# whisper source=%s  precision=%.1f%%  (silent-talk %.1f%%)",
-              r[:lang], r[:precision] * 100, Bada::SilentTalk::SILENT_TALK_BASELINE * 100)
+  # Whispered / unknown-language -> LONG-form report (長長文・発声せず).
+  #   bada whisper "qntm lght mmry wv sgnl"   -> 長長文レポート
+  #   bada whisper "φωτ μνημη κυμα"           -> (未知言語を英語の長長文レポートへ)
+  r = Bada::SilentTalk::Whisper.long_report(ARGV.join(" "))
+  puts format("# whisper source=%s  sentences=%d  precision=%.1f%%  (silent-talk %.1f%%)",
+              r[:lang], r[:sentences], r[:precision] * 100, Bada::SilentTalk::SILENT_TALK_BASELINE * 100)
   puts r[:text]
 when "code"
   # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.

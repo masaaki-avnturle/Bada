@@ -181,7 +181,7 @@ module Bada
       # Write a LONG Bada program (長文ソースコード): `blocks` variable
       # lifecycles, each grammar-correct, then a print for every variable.
       def build_long(cue = "", blocks: 3, nonce: 0)
-        blocks = blocks.clamp(1, 8)
+        blocks = blocks.clamp(1, 16)
         s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
         nxt = lambda { s = (s * 1_103_515_245 + 12_345) & 0x7fffffff }
         cue_words = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
@@ -215,8 +215,14 @@ module Bada
       # Choose long or short by how many thought-tokens the cue carries.
       def build_auto(cue = "", nonce: 0)
         toks = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
-        toks.length >= 2 ? build_long(cue, blocks: toks.length.clamp(2, 6), nonce: nonce)
+        toks.length >= 2 ? build_long(cue, blocks: toks.length.clamp(2, 10), nonce: nonce)
                          : build(cue, nonce: nonce)
+      end
+
+      # A VERY long Bada program (長長文ソース): 8〜12 変数ライフサイクル。
+      def build_very_long(cue = "", nonce: 0)
+        toks = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
+        build_long(cue, blocks: [[toks.length * 2, 8].max, 12].min, nonce: nonce)
       end
 
       # A program is accepted only if the real Bada interpreter runs it.
@@ -354,6 +360,12 @@ module Bada
         { text: lines.join("\n"), lang: unknown ? "unknown" : "en", sentences: n,
           precision: [0.93, SILENT_TALK_BASELINE + 0.01].max }
       end
+
+      # A VERY long report (長長文): 10〜16 文のドキュメント。発声なし。
+      def long_report(cue)
+        toks = cue.to_s.split(/\s+/).reject(&:empty?).length
+        report(cue, sentences: [[toks * 3, 10].max, 16].min)
+      end
     end
 
     class Session
@@ -457,9 +469,9 @@ module Bada
           blocks: r[:blocks] || 1, precision: r[:precision], appended: lines }
       end
 
-      # Whispered / unknown input -> a long-form prose REPORT (文章のレポート・長文).
+      # Whispered / unknown input -> a long-long-form prose REPORT (長長文).
       def report_input(cue)
-        r = Whisper.report(cue)
+        r = Whisper.long_report(cue)
         lines = r[:text].split("\n")
         commit(:report, cue, lines, r[:precision], r[:lang])
         { kind: :report, text: r[:text], source_lang: r[:lang], sentences: r[:sentences],

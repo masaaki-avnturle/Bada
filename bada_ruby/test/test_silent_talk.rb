@@ -422,6 +422,34 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes Bada::SilentTalk::MODES, :report
   end
 
+  # ---- 長長文 (very long) whisper report + Bada source ----------------------
+
+  def test_long_report_is_not_short
+    r = Bada::SilentTalk::Whisper.long_report("qntm lght mmry wv sgnl")
+    assert_operator r[:sentences], :>=, 10        # 長長文, not a single line
+    assert_operator r[:text].split("\n").length, :>=, 11
+  end
+
+  def test_long_report_on_unknown_language
+    r = Bada::SilentTalk::Whisper.long_report("φωτ μνημη κυμα σημα")
+    assert_equal "unknown", r[:lang]
+    assert_operator r[:sentences], :>=, 10
+  end
+
+  def test_report_mode_now_outputs_long_long_form
+    @s.feed(":report")
+    r = @s.feed("qntm lght mmry wv sgnl")
+    assert_operator r[:sentences], :>=, 10
+  end
+
+  def test_build_very_long_bada_program
+    r = Bada::SilentTalk::BadaSyntax.build_very_long("光 記憶 波 音 場", nonce: 0)
+    assert r[:valid]
+    assert_operator r[:blocks], :>=, 8            # 長長文ソース
+    assert_operator r[:code].split("\n").length, :>=, 40
+    refute_empty Bada::Interpreter.new.run(r[:code])
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

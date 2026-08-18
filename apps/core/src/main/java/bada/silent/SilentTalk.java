@@ -190,9 +190,9 @@ public final class SilentTalk {
             }
         }
 
-        /** Whispered / unknown input -> a long-form prose REPORT. */
+        /** Whispered / unknown input -> a long-long-form prose REPORT (長長文). */
         public Feed reportInput(String cue) {
-            Whisper.Report r = Whisper.report(cue);
+            Whisper.Report r = Whisper.longReport(cue);
             List<String> lines = new ArrayList<>(Arrays.asList(r.text.split("\n", -1)));
             blocks.add(new Block("report", cue, lines, r.precision, r.lang));
             Feed f = new Feed();

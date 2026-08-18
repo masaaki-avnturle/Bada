@@ -4,6 +4,7 @@ import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.silent.SilentTalk;
 import bada.silent.Whisper;
+import bada.silent.BadaSyntax;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -70,8 +71,8 @@ public final class DesktopApp {
         }
         if (joined.startsWith("--whisper")) {
             String cue = joined.substring("--whisper".length()).trim();
-            Whisper.Result r = Whisper.verbalize(cue);
-            System.out.printf("# whisper source=%s  precision=%.1f%%%n", r.lang, r.precision * 100);
+            Whisper.Report r = Whisper.longReport(cue);   // 長長文（短文ではない）
+            System.out.printf("# whisper source=%s  sentences=%d  precision=%.1f%%%n", r.lang, r.sentences, r.precision * 100);
             System.out.println(r.text);
             return;
         }
@@ -424,15 +425,17 @@ public final class DesktopApp {
         top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
 
         JTextField input = new JTextField("qntm lght mmry wv sgnl");
-        JCheckBox reportMode = new JCheckBox("📄 長文レポート");
-        reportMode.setToolTipText("未知言語/ウィスパードを、複数文の長文レポートに言語化します");
-        JButton go = new JButton("言語化 (Verbalize)");
+        JButton go = new JButton("言語化");
+        JButton longBtn = new JButton("🔉 長長文レポート");
+        longBtn.setToolTipText("未知言語/ウィスパードを、10〜16 文の長長文レポートに言語化します（発声なし）");
+        JButton badaBtn = new JButton("📄 Bada長長文ソース");
+        badaBtn.setToolTipText("復元した語から、長長文の Bada 言語ソース（実行可）を生成します（発声なし）");
 
         JPanel inRow = new JPanel(new BorderLayout(6, 6));
         inRow.add(new JLabel("ウィスパード / 未知言語:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
         JPanel wEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        wEast.add(reportMode); wEast.add(go);
+        wEast.add(go); wEast.add(longBtn); wEast.add(badaBtn);
         inRow.add(wEast, BorderLayout.EAST);
 
         JTextField prefix = new JTextField();
@@ -444,7 +447,7 @@ public final class DesktopApp {
         row2.add(prefix, BorderLayout.CENTER);
         row2.add(completions, BorderLayout.SOUTH);
 
-        JLabel note = new JLabel("※ 発声せず、英語ウィスパード（母音欠落）を完全文へ／未知言語を英語へ言語化（simulation）");
+        JLabel note = new JLabel("※ 発声せず、英語ウィスパード（母音欠落）を完全文へ／未知言語を長長文レポート・Bada 長長文ソースへ（simulation）");
         note.setBorder(BorderFactory.createEmptyBorder(4, 2, 2, 2));
 
         top.add(inRow, BorderLayout.NORTH);
@@ -454,28 +457,38 @@ public final class DesktopApp {
         top.add(mid, BorderLayout.SOUTH);
 
         JTextArea output = monospaceArea();
-        Runnable run = () -> {
-            if (reportMode.isSelected()) {
-                Whisper.Report r = Whisper.report(input.getText());
-                output.setText(String.format(
-                        "入力 (whispered/unknown):%n  %s%n%n長文レポート (%d文, source=%s):%n%s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
-                        input.getText(), r.sentences, r.lang, r.text,
-                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
-                        r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
-            } else {
-                Whisper.Result r = Whisper.verbalize(input.getText());
-                String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
-                output.setText(String.format(
-                        "入力 (whispered/unknown):%n  %s%n%n言語化 (%s, source=%s):%n  %s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
-                        input.getText(), kind, r.lang, r.text,
-                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
-                        r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
-            }
+        Runnable verbalize = () -> {
+            Whisper.Result r = Whisper.verbalize(input.getText());
+            String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
+            output.setText(String.format(
+                    "入力 (whispered/unknown):%n  %s%n%n言語化 (%s, source=%s):%n  %s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                    input.getText(), kind, r.lang, r.text,
+                    r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                    r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
             output.setCaretPosition(0);
         };
-        go.addActionListener(e -> run.run());
-        input.addActionListener(e -> run.run());
-        reportMode.addActionListener(e -> run.run());
+        Runnable longReport = () -> {
+            Whisper.Report r = Whisper.longReport(input.getText());
+            output.setText(String.format(
+                    "入力 (whispered/unknown):%n  %s%n%n長長文レポート (%d文, source=%s):%n%s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                    input.getText(), r.sentences, r.lang, r.text,
+                    r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                    r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
+            output.setCaretPosition(0);
+        };
+        Runnable badaLong = () -> {
+            // decode the whispered/unknown input to words, then write long Bada source
+            Whisper.Result w = Whisper.verbalize(input.getText());
+            BadaSyntax.Program p = BadaSyntax.buildVeryLong(w.text, 0);
+            output.setText(String.format(
+                    "入力 (whispered/unknown):%n  %s%n%nBada 長長文ソース (%d ブロック, 実行%s):%n%s%n%nprecision = %.1f%%",
+                    input.getText(), p.blocks, p.valid ? "OK" : "NG", p.code, p.precision * 100));
+            output.setCaretPosition(0);
+        };
+        go.addActionListener(e -> verbalize.run());
+        input.addActionListener(e -> longReport.run());
+        longBtn.addActionListener(e -> longReport.run());
+        badaBtn.addActionListener(e -> badaLong.run());
 
         Runnable complete = () -> {
             java.util.List<String> c = new java.util.ArrayList<>();
@@ -494,7 +507,7 @@ public final class DesktopApp {
 
         root.add(top, BorderLayout.NORTH);
         root.add(new JScrollPane(output), BorderLayout.CENTER);
-        run.run();
+        longReport.run();   // 長長文 by default — the whisper function is not short
         return root;
     }
 

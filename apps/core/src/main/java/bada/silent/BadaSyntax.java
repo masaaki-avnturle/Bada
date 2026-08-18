@@ -95,7 +95,7 @@ public final class BadaSyntax {
 
     /** Write a LONG Bada program (長文ソースコード): `blocks` variable lifecycles. */
     public static Program buildLong(String cue, int blocks, int nonce) {
-        blocks = Math.max(1, Math.min(8, blocks));
+        blocks = Math.max(1, Math.min(16, blocks));
         final long[] s = { ((long) nonce * 2654435761L + 40503L) & 0xffffffffL };
         java.util.function.LongSupplier nxt = () -> (s[0] = (s[0] * 1103515245L + 12345L) & 0x7fffffffL);
 
@@ -139,11 +139,22 @@ public final class BadaSyntax {
 
     /** Choose long or short by how many thought-tokens the cue carries. */
     public static Program buildAuto(String cue, int nonce) {
+        int n = tokenCount(cue);
+        if (n >= 2) return buildLong(cue, Math.max(2, Math.min(10, n)), nonce);
+        return build(cue, nonce);
+    }
+
+    /** A VERY long Bada program (長長文ソース): 8-12 variable lifecycles. */
+    public static Program buildVeryLong(String cue, int nonce) {
+        int n = tokenCount(cue);
+        return buildLong(cue, Math.max(8, Math.min(12, n * 2)), nonce);
+    }
+
+    private static int tokenCount(String cue) {
         int n = 0;
         Matcher m = WORD.matcher(cue == null ? "" : cue);
         while (m.find()) n++;
-        if (n >= 2) return buildLong(cue, Math.max(2, Math.min(6, n)), nonce);
-        return build(cue, nonce);
+        return n;
     }
 
     // Match Ruby's Float#to_s for one-decimal values (7.9, 8.0).
