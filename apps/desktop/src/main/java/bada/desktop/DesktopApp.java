@@ -401,24 +401,22 @@ public final class DesktopApp {
         return root;
     }
 
-    // A reusable 思考入力 (thought-input) button: on click it asks for a silently
-    // typed cue and fills the given field via the manifold-gauge Mind transformer,
-    // above silent-talk precision. `kind`: "text"/"intent" verbalize; "qasm" -> program.
+    // A reusable 思考入力 (thought-input) button. It needs NO typed or spoken
+    // input: each press captures thought-tokens from the gamma-manifold prior and
+    // fills the field via the Mind transformer, above silent-talk precision.
+    // `kind`: "text"/"intent" verbalize a sentence; "qasm" -> a program.
     private static JButton thoughtButton(javax.swing.text.JTextComponent field, String kind) {
+        final int[] nonce = {0};
         JButton b = new JButton("🧠 思考入力");
-        b.setToolTipText("発声せず、思考の手がかり（キーワード/略記）を入力して欄を埋めます（silent-talk 超え精度）");
+        b.setToolTipText("発声もタイプもせず、ボタンだけで思考を捕捉して欄に入力します（silent-talk 超え精度）");
         b.addActionListener(e -> {
-            String cue = (String) JOptionPane.showInputDialog(field,
-                    "思考の手がかり（発声せず・キーワード/略記）:", "🧠 思考入力 (Thought Input)",
-                    JOptionPane.PLAIN_MESSAGE, null, null, "");
-            if (cue == null) return; // cancelled
-            SilentTalk.Thought t = SilentTalk.thoughtFill(cue, kind);
+            SilentTalk.Thought t = SilentTalk.thoughtCapture(kind, nonce[0]++);
             field.setText(t.text);
             field.setCaretPosition(0);
-            JOptionPane.showMessageDialog(field,
-                    String.format("思考を入力しました。%nprecision %.1f%%  >  silent-talk %.1f%%",
-                            t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100),
-                    "🧠 思考入力", JOptionPane.INFORMATION_MESSAGE);
+            b.setText(String.format("🧠 思考入力  ✓ %.0f%%", t.precision * 100));
+            Timer revert = new Timer(1600, ev -> b.setText("🧠 思考入力"));
+            revert.setRepeats(false);
+            revert.start();
         });
         return b;
     }

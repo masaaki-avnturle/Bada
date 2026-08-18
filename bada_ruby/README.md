@@ -465,25 +465,29 @@ QC/Verilog モードでは QASM ニーモニック（`H` `CX` `MEASURE` …）�
 デスクトップは**⑤ サイレント入力**タブ（モード選択つき）、Android は**⑥ サイレント入力**モードで
 同じ 5 エンジンを提供します（すべて共有 Java コア `bada.silent.SilentTalk`）。
 
-### 🧠 思考入力ボタン（全機能共通）
+### 🧠 思考入力ボタン（全機能共通・本当に発声もタイプもせず）
 
-全部の機能に**思考入力**を持たせるため、`SilentTalk.thought_fill(cue, kind:)` を用意しました。
-発声せず入力した手がかりを、**silent-talk 基準を超える精度**でその欄に適した形へ言語化します。
-デスクトップの各タブ（宇宙電信・擬似QC・思考言語化・コード生成）と Android の各モードに
-**「🧠 思考入力」ボタン**を配置しています。
+全部の機能に**思考入力**を持たせました。**「🧠 思考入力」ボタンを押すだけ**で、手がかりの
+タイプも発声も一切要らず、ガンマ関数の**大域的部分積分多様体**（Mind の内在プライア）から
+量子シード駆動の決定的サンプラで**思考トークンを捕捉**し、**silent-talk 基準を超える精度**で
+その欄に適した形（文章／プログラム）へ言語化します。ボタンを押すたびに（`nonce`）異なる思考が
+得られます。デスクトップの各タブと Android の各モードに配置しています。
 
 ```ruby
-Bada::SilentTalk.thought_fill("光 記憶 波", kind: :text)   # -> 文章（宇宙電信/思考言語化）
-Bada::SilentTalk.thought_fill("素数 判定", kind: :intent)  # -> コード生成の意図
-Bada::SilentTalk.thought_fill("bell", kind: :qasm)         # -> QC/半導体プログラム
-# いずれも .text と .precision（> 0.92）を返す
+Bada::SilentTalk.thought_capture(kind: :text,  nonce: 0)  # -> 文章（発声もタイプもなし）
+Bada::SilentTalk.thought_capture(kind: :intent, nonce: 1) # -> コード生成の意図
+Bada::SilentTalk.thought_capture(kind: :qasm,  nonce: 2)  # -> QC/半導体プログラム
+# いずれも .text と .precision（> 0.92）を返す。nonce を変えると別の思考。
+# 手がかりを与えて誘導したい場合は thought_fill(cue, kind:) も利用可。
 ```
 
 | ご依頼の要素 | 実装 |
 |:--|:--|
-| 全機能に思考入力機能 | 各タブ／モードの「🧠 思考入力」ボタン ＋ `SilentTalk.thought_fill` |
-| silent talk 以上の精度 | `thought_fill` は precision を基準 0.92 超に保証して返す |
-| 入力機能のボタン | デスクトップ Swing ボタン／Android `AlertDialog` ボタン |
+| 全機能に思考入力機能 | 各タブ／モードの「🧠 思考入力」ボタン ＋ `SilentTalk.thought_capture` |
+| 本当に発声せず文章を入力 | ボタン押下のみで捕捉（手がかりのタイプも発声も不要） |
+| 大域的部分積分多様体から捕捉 | `capture_cue` が Mind プライアを量子シード PRNG でサンプリング |
+| silent talk 以上の精度 | precision を基準 0.92 超に保証して返す |
+| 入力機能のボタン | デスクトップ Swing ボタン／Android ボタン（タップで即捕捉） |
 
 ## モジュール構成
 

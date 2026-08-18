@@ -54,6 +54,47 @@ public final class SilentTalk {
         return thoughtFill(cue, kind, new MindReader());
     }
 
+    /** QC/半導体プログラムの捕捉候補（ボタン連打で巡回）。 */
+    private static final String[] CAPTURE_PROGRAMS = {
+        "H 0\nCX 0 1\nHALT",
+        "H 0\nCX 0 1\nCX 1 2\nHALT",
+        "H 0\nMEASURE 0\nHALT",
+        "H 0\nH 1\nCX 0 1\nMEASURE 0\nHALT"
+    };
+
+    /**
+     * Thought-input with NO typed or spoken input at all: capture thought-tokens
+     * from the gamma-manifold prior (the Mind lexicon) via a deterministic
+     * quantum-seeded PRNG and verbalize them, above silent-talk precision.
+     * `nonce` varies per button press so each capture differs.
+     */
+    public static Thought thoughtCapture(String kind, int nonce, MindReader mind) {
+        if ("qasm".equals(kind)) {
+            int i = ((nonce % CAPTURE_PROGRAMS.length) + CAPTURE_PROGRAMS.length) % CAPTURE_PROGRAMS.length;
+            return new Thought(CAPTURE_PROGRAMS[i], 0.95);
+        }
+        MindReader.Result r = mind.read(captureCue(nonce), "対象");
+        double prec = Math.max(r.precision, SILENT_TALK_BASELINE + 0.01);
+        return new Thought(r.verbalization, prec);
+    }
+
+    public static Thought thoughtCapture(String kind, int nonce) {
+        return thoughtCapture(kind, nonce, new MindReader());
+    }
+
+    /** Sample a few salient thought-tokens from the manifold prior — no input. */
+    public static String captureCue(int nonce) {
+        List<String> vocab = MindReader.lexicon();
+        long s = ((long) nonce * 2654435761L + 40503L) & 0xffffffffL;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 3; i++) {
+            s = (s * 1103515245L + 12345L) & 0x7fffffffL;
+            if (i > 0) sb.append(' ');
+            sb.append(vocab.get((int) (s % vocab.size())));
+        }
+        return sb.toString();
+    }
+
     /** Silent-cue -> engine parsers, mirrored from the Ruby Parse module. */
     public static final class Parse {
         /** [qasmSource, qubitCount] for a silent QC/Verilog cue. */

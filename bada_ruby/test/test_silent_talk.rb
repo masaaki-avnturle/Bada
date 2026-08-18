@@ -231,6 +231,36 @@ class TestSilentTalkSession < Minitest::Test
     assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
   end
 
+  # ---- thought CAPTURE: no typed/spoken input at all -----------------------
+
+  def test_thought_capture_needs_no_input_and_exceeds_baseline
+    t = Bada::SilentTalk.thought_capture(kind: :text, nonce: 0)
+    refute_empty t.text
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_thought_capture_varies_per_press
+    texts = (0..3).map { |n| Bada::SilentTalk.thought_capture(kind: :text, nonce: n).text }
+    assert_operator texts.uniq.length, :>=, 3
+  end
+
+  def test_thought_capture_is_deterministic_for_same_nonce
+    a = Bada::SilentTalk.thought_capture(kind: :text, nonce: 7).text
+    b = Bada::SilentTalk.thought_capture(kind: :text, nonce: 7).text
+    assert_equal a, b
+  end
+
+  def test_thought_capture_qasm_cycles_programs
+    prog = Bada::SilentTalk.thought_capture(kind: :qasm, nonce: 1).text
+    assert(prog.end_with?("HALT"))
+    assert_includes prog, "CX"
+  end
+
+  def test_capture_cue_draws_from_lexicon
+    cue = Bada::SilentTalk.capture_cue(3)
+    cue.split(/\s+/).each { |w| assert_includes Bada::Mind::LEXICON, w }
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

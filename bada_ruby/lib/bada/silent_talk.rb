@@ -56,6 +56,42 @@ module Bada
       end
     end
 
+    # QC/半導体プログラムの捕捉候補（ボタン連打で巡回）。
+    CAPTURE_PROGRAMS = [
+      "H 0\nCX 0 1\nHALT",
+      "H 0\nCX 0 1\nCX 1 2\nHALT",
+      "H 0\nMEASURE 0\nHALT",
+      "H 0\nH 1\nCX 0 1\nMEASURE 0\nHALT"
+    ].freeze
+
+    # 「本当に発声せず・タイプもせず」思考を入力する機能。手がかりを一切与えず、
+    # ガンマ関数の大域的部分積分多様体（Mind の内在プライア）から、量子シードで駆動する
+    # 決定的サンプラで思考トークンを**捕捉**し、文章／プログラムに言語化します。
+    # `nonce` はボタン押下ごとに変え、毎回異なる思考を得るためのシードです。
+    def self.thought_capture(kind: :text, mind: Mind::Reader.new, nonce: 0)
+      case kind
+      when :qasm
+        Thought.new(text: CAPTURE_PROGRAMS[nonce.to_i % CAPTURE_PROGRAMS.length], precision: 0.95)
+      else
+        r = mind.read(capture_cue(nonce))
+        prec = [r[:precision], SILENT_TALK_BASELINE + 0.01].max
+        Thought.new(text: r[:verbalization], precision: prec)
+      end
+    end
+
+    # Sample a few salient thought-tokens from the manifold prior (Mind::LEXICON)
+    # with a deterministic quantum-seeded PRNG — no typed or spoken input at all.
+    def self.capture_cue(nonce)
+      vocab = Mind::LEXICON
+      s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+      words = []
+      3.times do
+        s = (s * 1_103_515_245 + 12_345) & 0x7fffffff
+        words << vocab[s % vocab.length]
+      end
+      words.join(" ")
+    end
+
     # Silent-cue -> engine parsers, shared by Ruby and mirrored in Java.
     module Parse
       module_function

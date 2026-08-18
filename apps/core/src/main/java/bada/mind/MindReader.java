@@ -65,6 +65,9 @@ public final class MindReader {
         public boolean exceedsSilentTalk;
     }
 
+    /** The manifold-prior lexicon (salient thought-tokens). */
+    public static List<String> lexicon() { return new ArrayList<>(java.util.Arrays.asList(LEXICON)); }
+
     /** Vocabulary for text-mode completion: the lexicon plus words drawn from the prior. */
     public static List<String> vocab() {
         java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>(java.util.Arrays.asList(LEXICON));

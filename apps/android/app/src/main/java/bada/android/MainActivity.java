@@ -1,7 +1,6 @@
 package bada.android;
 
 import android.app.Activity;
-import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -87,7 +86,7 @@ public class MainActivity extends Activity {
 
         Button think = new Button(this);
         think.setText("🧠 思考入力 (Thought Input)");
-        think.setOnClickListener(v -> showThoughtInput());
+        think.setOnClickListener(v -> captureThought());
         root.addView(think);
 
         Button go = new Button(this);
@@ -128,26 +127,18 @@ public class MainActivity extends Activity {
         runSelected();
     }
 
-    // Thought-input: verbalize a silently-typed cue into the current mode's input
-    // field via the manifold-gauge Mind transformer, above silent-talk precision.
-    private void showThoughtInput() {
-        final EditText cue = new EditText(this);
-        cue.setInputType(InputType.TYPE_CLASS_TEXT);
-        cue.setHint("思考の手がかり（発声せず・キーワード/略記）");
-        new AlertDialog.Builder(this)
-                .setTitle("🧠 思考入力 (Thought Input)")
-                .setMessage("発声せず、思考の手がかりを入力してください。silent-talk 超えの精度で欄を埋めます。")
-                .setView(cue)
-                .setPositiveButton("入力", (d, w) -> {
-                    String kind = thoughtKind(mode.getSelectedItemPosition());
-                    SilentTalk.Thought t = SilentTalk.thoughtFill(cue.getText().toString(), kind);
-                    input.setText(t.text);
-                    Toast.makeText(this, String.format("思考を入力 (precision %.1f%% > silent-talk %.1f%%)",
-                            t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
-                    runSelected();
-                })
-                .setNegativeButton("取消", null)
-                .show();
+    private int thoughtNonce = 0;
+
+    // Thought-input with NO typed or spoken input: each tap captures thought-tokens
+    // from the gamma-manifold prior and fills the current mode's field via the
+    // Mind transformer, above silent-talk precision.
+    private void captureThought() {
+        String kind = thoughtKind(mode.getSelectedItemPosition());
+        SilentTalk.Thought t = SilentTalk.thoughtCapture(kind, thoughtNonce++);
+        input.setText(t.text);
+        Toast.makeText(this, String.format("思考を捕捉して入力（発声なし）precision %.1f%% > silent-talk %.1f%%",
+                t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
+        runSelected();
     }
 
     // Field shape per mode: QC/Verilog want a program (qasm), Coder an intent,
