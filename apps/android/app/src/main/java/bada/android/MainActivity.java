@@ -173,22 +173,27 @@ public class MainActivity extends Activity {
         };
     }
 
-    // Whisper English mode for ANY function: prompt whispered (vowel-reduced)
-    // English fragments and fill the current mode's field with reconstructed
-    // English, above silent-talk precision.
+    // Whisper English mode for ANY function: a FULL-SCREEN, MULTI-LINE whisper
+    // editor (not a short one-line field). Type many whispered lines directly and
+    // reconstruct the whole block AT ONCE (複数行を一辺に・一瞬で), voicelessly,
+    // above silent-talk precision, then fill the current mode's field.
     private void showWhisperInput() {
         final EditText cue = new EditText(this);
-        cue.setInputType(InputType.TYPE_CLASS_TEXT);
-        cue.setHint("ウィスパード英語（母音を落として, 例: qntm lght wv）");
+        cue.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        cue.setMinLines(6);
+        cue.setGravity(android.view.Gravity.TOP | android.view.Gravity.START);
+        cue.setTypeface(android.graphics.Typeface.MONOSPACE);
+        cue.setHint("複数行のウィスパード英語（母音を落として）をそのまま入力\n例:\nqntm lght wv\nbll ntngl mesure");
         new AlertDialog.Builder(this)
-                .setTitle("🔉 ウィスパード英語 (Whisper EN)")
-                .setMessage("発声せず、母音を落としたウィスパード英語を入力してください。完全な英語に復元します。")
+                .setTitle("🔉 ウィスパード英語 — 全画面・複数行（発声せず・一瞬で）")
+                .setMessage("複数行のウィスパード英語を直接入力してください。複数行を一辺に、完全な英語へ一括復元します（短文入力ではありません）。")
                 .setView(cue)
-                .setPositiveButton("復元", (d, w) -> {
-                    Whisper.Result r = Whisper.verbalizeEn(cue.getText().toString());
+                .setPositiveButton("⚡ 一括復元", (d, w) -> {
+                    Whisper.Result r = Whisper.verbalizeBlock(cue.getText().toString());
                     input.setText(r.text);
-                    Toast.makeText(this, String.format("ウィスパード英語を復元 (precision %.1f%% > silent-talk %.1f%%)",
-                            r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
+                    int lines = r.text.split("\n", -1).length;
+                    Toast.makeText(this, String.format("一括ウィスパード復元 %d行を一瞬で (precision %.1f%% > silent-talk %.1f%%)",
+                            lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
                     runSelected();
                 })
                 .setNegativeButton("取消", null)

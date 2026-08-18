@@ -900,26 +900,82 @@ public final class DesktopApp {
         return root;
     }
 
-    // A reusable ウィスパード英語 (whisper English) button for every engine field.
-    // Prompts for whispered (voiceless, vowel-reduced) English fragments and fills
-    // the field with the reconstructed full English, above silent-talk precision.
+    // A reusable ウィスパード英語 (whisper English) button for EVERY engine field.
+    // Instead of a short single-line popup, it opens a FULL-SCREEN multi-line Bada
+    // Vim whisper editor: type many whispered lines directly and reconstruct the
+    // whole block AT ONCE (複数行を一辺に・一瞬で), voicelessly, above silent-talk.
     private static JButton whisperButton(javax.swing.text.JTextComponent field) {
         JButton b = new JButton("🔉 ウィスパード英語");
-        b.setToolTipText("発声せず、母音を落としたウィスパード英語を入力して完全な英語に復元します（silent-talk 超え精度）");
-        b.addActionListener(e -> {
-            String cue = (String) JOptionPane.showInputDialog(field,
-                    "ウィスパード英語（母音を落として, 例: qntm lght wv）:", "🔉 ウィスパード英語 (Whisper EN)",
-                    JOptionPane.PLAIN_MESSAGE, null, null, "");
-            if (cue == null) return; // cancelled
-            Whisper.Result r = Whisper.verbalizeEn(cue); // 英語モードに固定
+        b.setToolTipText("全画面の Bada Vim で、母音を落としたウィスパード英語を複数行そのまま入力し、一瞬で完全な英語へ一括復元してこの欄へ（silent-talk 超え精度・短文入力ではない）");
+        b.addActionListener(e -> openWhisperVim(field));
+        return b;
+    }
+
+    // Full-screen, multi-line, voiceless whisper editor shared by all functions.
+    // The user types whispered English across many lines (a real vim-style buffer,
+    // not a short field); "⚡ 一括復元" reconstructs every line at once and "確定"
+    // drops the reconstructed multi-line English straight into the engine's field.
+    private static void openWhisperVim(javax.swing.text.JTextComponent field) {
+        Window owner = SwingUtilities.getWindowAncestor(field);
+        final JDialog dlg = new JDialog(owner,
+                "🔉 ウィスパード英語 — 全画面 Bada Vim（複数行・発声せず・一瞬で・silent-talk 超え）",
+                Dialog.ModalityType.APPLICATION_MODAL);
+        dlg.setSize(780, 580);
+        dlg.setLocationRelativeTo(owner);
+
+        final JTextArea ed = new JTextArea();
+        ed.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
+        ed.setMargin(new Insets(10, 12, 10, 12));
+        ed.setLineWrap(false);
+        ed.setText("# 複数行のウィスパード英語（母音を落として）をそのまま入力し、⚡ で複数行を一辺に一括復元\n"
+                + "qntm lght wv mmry sgnl\nbll ntngl mesure stt\nsmcndctr lttce gate\n");
+
+        final JLabel st = new JLabel("  -- WHISPER INSERT --  発声なし  複数行を一辺に  ");
+        st.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+
+        final Runnable burst = () -> {
+            Whisper.Result r = Whisper.verbalizeBlock(ed.getText());
+            ed.setText(r.text);
+            ed.setCaretPosition(ed.getText().length());
+            int lines = r.text.split("\n", -1).length;
+            st.setText(String.format("  一括ウィスパード復元 %d行を一瞬で: precision %.1f%% > silent-talk %.1f%%",
+                    lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+        };
+
+        JButton bBurst = new JButton("⚡ 一括復元（複数行を一瞬で）");
+        bBurst.setToolTipText("入力した複数行のウィスパード英語を、発声せず一瞬で完全な英語へ一括復元します");
+        bBurst.addActionListener(ev -> burst.run());
+        JButton bOk = new JButton("確定してこの欄へ");
+        bOk.addActionListener(ev -> {
+            Whisper.Result r = Whisper.verbalizeBlock(ed.getText());
             field.setText(r.text);
             field.setCaretPosition(0);
-            JOptionPane.showMessageDialog(field,
-                    String.format("ウィスパード英語を復元しました。%nprecision %.1f%%  >  silent-talk %.1f%%",
-                            r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100),
-                    "🔉 ウィスパード英語", JOptionPane.INFORMATION_MESSAGE);
+            dlg.dispose();
         });
-        return b;
+        JButton bCancel = new JButton("キャンセル");
+        bCancel.addActionListener(ev -> dlg.dispose());
+
+        // Ctrl+Enter = 一括復元, Esc = 閉じる（vim らしい即時操作）
+        ed.getInputMap().put(KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ENTER,
+                java.awt.event.InputEvent.CTRL_DOWN_MASK), "burst");
+        ed.getActionMap().put("burst", new AbstractAction() {
+            public void actionPerformed(java.awt.event.ActionEvent e) { burst.run(); }
+        });
+
+        JLabel head = new JLabel("  全画面 Bada Vim：複数行のウィスパード英語を発声せず一瞬で完全な英語へ（短文入力ではありません）。Ctrl+Enter=一括復元");
+        head.setBorder(BorderFactory.createEmptyBorder(6, 4, 4, 4));
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        bar.add(bBurst); bar.add(bOk); bar.add(bCancel);
+        JPanel bottom = new JPanel(new BorderLayout());
+        bottom.add(bar, BorderLayout.NORTH);
+        bottom.add(st, BorderLayout.SOUTH);
+
+        dlg.setLayout(new BorderLayout());
+        dlg.add(head, BorderLayout.NORTH);
+        dlg.add(new JScrollPane(ed), BorderLayout.CENTER);
+        dlg.add(bottom, BorderLayout.SOUTH);
+        SwingUtilities.invokeLater(ed::requestFocusInWindow);
+        dlg.setVisible(true);
     }
 
     private static JButton thoughtButton(javax.swing.text.JTextComponent field, String kind) {
