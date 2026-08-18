@@ -331,10 +331,10 @@ public final class DesktopApp {
 
         // input row: the "silent" cue (no vocalization) + a mode toggle
         JTextField cue = new JTextField("光 記憶 波");
-        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph", ":bada", ":whisper"};
+        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph", ":bada", ":whisper", ":report"};
         JComboBox<String> mode = new JComboBox<>(new String[]{
                 "text（言語化）", "code（コード）", "qc（QCソース）", "verilog（半導体）", "telegraph（宇宙電信）",
-                "bada（Bada構文）", "whisper（英ウィスパード/未知言語）"});
+                "bada（Bada構文/長文）", "whisper（英ウィスパード/未知言語）", "report（長文レポート）"});
         JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
         JButton feed = new JButton("入力 (Feed)");
 
@@ -424,12 +424,16 @@ public final class DesktopApp {
         top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
 
         JTextField input = new JTextField("qntm lght mmry wv sgnl");
+        JCheckBox reportMode = new JCheckBox("📄 長文レポート");
+        reportMode.setToolTipText("未知言語/ウィスパードを、複数文の長文レポートに言語化します");
         JButton go = new JButton("言語化 (Verbalize)");
 
         JPanel inRow = new JPanel(new BorderLayout(6, 6));
         inRow.add(new JLabel("ウィスパード / 未知言語:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
-        inRow.add(go, BorderLayout.EAST);
+        JPanel wEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        wEast.add(reportMode); wEast.add(go);
+        inRow.add(wEast, BorderLayout.EAST);
 
         JTextField prefix = new JTextField();
         JLabel completions = new JLabel(" ");
@@ -451,17 +455,27 @@ public final class DesktopApp {
 
         JTextArea output = monospaceArea();
         Runnable run = () -> {
-            Whisper.Result r = Whisper.verbalize(input.getText());
-            String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
-            output.setText(String.format(
-                    "入力 (whispered/unknown):%n  %s%n%n言語化 (%s, source=%s):%n  %s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
-                    input.getText(), kind, r.lang, r.text,
-                    r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
-                    r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
+            if (reportMode.isSelected()) {
+                Whisper.Report r = Whisper.report(input.getText());
+                output.setText(String.format(
+                        "入力 (whispered/unknown):%n  %s%n%n長文レポート (%d文, source=%s):%n%s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                        input.getText(), r.sentences, r.lang, r.text,
+                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                        r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
+            } else {
+                Whisper.Result r = Whisper.verbalize(input.getText());
+                String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
+                output.setText(String.format(
+                        "入力 (whispered/unknown):%n  %s%n%n言語化 (%s, source=%s):%n  %s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                        input.getText(), kind, r.lang, r.text,
+                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                        r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
+            }
             output.setCaretPosition(0);
         };
         go.addActionListener(e -> run.run());
         input.addActionListener(e -> run.run());
+        reportMode.addActionListener(e -> run.run());
 
         Runnable complete = () -> {
             java.util.List<String> c = new java.util.ArrayList<>();

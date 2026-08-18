@@ -431,6 +431,7 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 | 宇宙電信 | `:telegraph`（`:tg`） | 送信文 | 量子もつれ宇宙電信（物理証明つき） |
 | **Bada構文** | **`:bada`** | 手がかり | **Bada言語のソース（予約語・構文規則で構成、実行検証つき）** |
 | **ウィスパード** | **`:whisper`** | 英語ウィスパード／未知言語 | **母音の落ちた英語を完全文に復元／未知言語を英語へ言語化** |
+| **長文レポート** | **`:report`** | 未知言語／ウィスパード | **複数文の文章レポート（長文ドキュメント）を発声せず入力** |
 
 ```bash
 bin/bada silent                                          # 対話 IME（発声せずに入力）
@@ -471,6 +472,22 @@ silent[whisper]> qntm lght mmry wv sgnl
   ＋ [whisper:en] 「quantum light memory wave signal」  (99%)
 silent[whisper]> φωτ μνημη κυμα      # 未知言語（ギリシャ文字）
   ＋ [whisper:unknown] 「form bell thought」  (93%)
+```
+
+**長文レポート（`:report`）と Bada 長文ソース** — 未知言語やウィスパードを、**複数文の文章
+レポート（長文ドキュメント）**に言語化して入力できます。また `:bada` は手がかりの語数に応じて
+**長文のソースコード**（複数の変数ライフサイクル）を生成します（すべて発声せず・実行検証つき）。
+
+```
+silent[report]> qntm lght mmry wv sgnl
+  ＋ [report:en 5文]
+    Report:
+    The quantum of light carries memory.
+    In light, memory becomes wave.
+    We observe memory as wave and signal.
+    A wave meets signal within quantum.
+    Here signal and quantum form light.
+silent[bada]> 光 記憶 波 音 場          # 5 トークン → 長文プログラム（25行, 実行可）
 ```
 
 ```ruby

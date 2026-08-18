@@ -121,6 +121,52 @@ public final class Whisper {
         return unknownLanguage(cue) ? decodeUnknown(cue) : verbalizeEn(cue);
     }
 
+    private static final String[] REPORT_TEMPLATES = {
+        "The %s of %s carries %s.",
+        "In %s, %s becomes %s.",
+        "We observe %s as %s and %s.",
+        "A %s meets %s within %s.",
+        "Here %s and %s form %s.",
+        "The %s turns %s into %s.",
+        "Through %s, %s reaches %s.",
+        "Then %s binds %s to %s."
+    };
+
+    public static final class Report {
+        public final String text, lang;
+        public final int sentences;
+        public final double precision;
+        Report(String text, String lang, int sentences, double precision) {
+            this.text = text; this.lang = lang; this.sentences = sentences; this.precision = precision;
+        }
+    }
+
+    /** Compose a long-form prose REPORT from whispered English or an unknown language. */
+    public static Report report(String cue, int sentences) {
+        List<String> toks = new ArrayList<>();
+        for (String t : (cue == null ? "" : cue).split("\\s+")) if (!t.isEmpty()) toks.add(t);
+        boolean unknown = unknownLanguage(cue);
+        List<String> words = new ArrayList<>();
+        if (unknown) {
+            for (String t : toks) words.add(VOCAB[(int) (stableHash(t) % VOCAB.length)]);
+        } else {
+            for (String t : toks) words.add((String) expand(t)[0]);
+        }
+        if (words.size() < 3) { words = new ArrayList<>(); words.add(VOCAB[0]); words.add(VOCAB[5]); words.add(VOCAB[3]); }
+
+        int n = sentences > 0 ? sentences : Math.min(Math.max(words.size(), 4), 8);
+        StringBuilder sb = new StringBuilder("Report:");
+        for (int k = 0; k < n; k++) {
+            String a = words.get(k % words.size());
+            String b = words.get((k + 1) % words.size());
+            String c = words.get((k + 2) % words.size());
+            sb.append('\n').append(String.format(REPORT_TEMPLATES[k % REPORT_TEMPLATES.length], a, b, c));
+        }
+        return new Report(sb.toString(), unknown ? "unknown" : "en", n, Math.max(0.93, BASELINE + 0.01));
+    }
+
+    public static Report report(String cue) { return report(cue, 0); }
+
     public static List<String> vocab() { return Arrays.asList(VOCAB); }
 
     private Whisper() { }

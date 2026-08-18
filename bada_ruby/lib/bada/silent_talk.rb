@@ -32,7 +32,7 @@ module Bada
   module SilentTalk
     SILENT_TALK_BASELINE = Mind::SILENT_TALK_BASELINE
 
-    MODES = %i[text code qc verilog telegraph bada whisper].freeze
+    MODES = %i[text code qc verilog telegraph bada whisper report].freeze
 
     # A committed block of input -> expansion.
     Block = Struct.new(:kind, :input, :lines, :precision, :language, keyword_init: true)
@@ -178,6 +178,47 @@ module Bada
         }
       end
 
+      # Write a LONG Bada program (長文ソースコード): `blocks` variable
+      # lifecycles, each grammar-correct, then a print for every variable.
+      def build_long(cue = "", blocks: 3, nonce: 0)
+        blocks = blocks.clamp(1, 8)
+        s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+        nxt = lambda { s = (s * 1_103_515_245 + 12_345) & 0x7fffffff }
+        cue_words = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
+
+        lines = []
+        vars = []
+        blocks.times do |bi|
+          words = (bi.zero? && !cue_words.empty?) ? cue_words :
+                  Array.new(2) { Mind::LEXICON[nxt.call % Mind::LEXICON.length] }
+          v = "#{VARS[nxt.call % VARS.length]}#{bi}"
+          vars << v
+          num1 = (nxt.call % 90 + 10) / 10.0
+          num2 = (nxt.call % 40 + 10) / 10.0
+          op = OPERATORS[nxt.call % OPERATORS.length]
+          lit = words.first(3).join(" ")
+          lines << "set #{v} = #{num1}"
+          lines << "#{v} <- \"#{lit}\""
+          lines << (op == ">-" ? "#{v} >- #{v}" : "#{v} #{op} #{num2}")
+          lines << "Omega::push #{v} as node#{bi + 1}"
+        end
+        vars.each { |v| lines << "print #{v}" }
+        code = lines.join("\n")
+        ok = valid?(code)
+        {
+          code: code, valid: ok, blocks: blocks,
+          reserved_used: (RESERVED + NAMESPACES + OPERATORS).select { |w| code.include?(w) },
+          precision: ok ? 0.96 : 0.90
+        }
+      end
+
+      # Choose long or short by how many thought-tokens the cue carries.
+      def build_auto(cue = "", nonce: 0)
+        toks = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
+        toks.length >= 2 ? build_long(cue, blocks: toks.length.clamp(2, 6), nonce: nonce)
+                         : build(cue, nonce: nonce)
+      end
+
       # A program is accepted only if the real Bada interpreter runs it.
       def valid?(code)
         Interpreter.new.run(code)
@@ -276,6 +317,43 @@ module Bada
       def verbalize(cue)
         unknown_language?(cue) ? decode_unknown(cue) : verbalize_en(cue)
       end
+
+      # Sentence templates for the long-form report.
+      REPORT_TEMPLATES = [
+        "The %s of %s carries %s.",
+        "In %s, %s becomes %s.",
+        "We observe %s as %s and %s.",
+        "A %s meets %s within %s.",
+        "Here %s and %s form %s.",
+        "The %s turns %s into %s.",
+        "Through %s, %s reaches %s.",
+        "Then %s binds %s to %s."
+      ].freeze
+
+      # Compose a long-form prose REPORT (文章のレポート・長文) from whispered
+      # English or an unknown language — a multi-sentence document, no voice.
+      def report(cue, sentences: nil)
+        toks = cue.to_s.split(/\s+/).reject(&:empty?)
+        unknown = unknown_language?(cue)
+        words =
+          if unknown
+            toks.map { |t| VOCAB[stable_hash(t) % VOCAB.length] }
+          else
+            toks.map { |t| expand(t).first }
+          end
+        words = [VOCAB[0], VOCAB[5], VOCAB[3]] if words.length < 3
+
+        n = sentences || [[words.length, 4].max, 8].min
+        lines = ["Report:"]
+        n.times do |k|
+          a = words[k % words.length]
+          b = words[(k + 1) % words.length]
+          c = words[(k + 2) % words.length]
+          lines << format(REPORT_TEMPLATES[k % REPORT_TEMPLATES.length], a, b, c)
+        end
+        { text: lines.join("\n"), lang: unknown ? "unknown" : "en", sentences: n,
+          precision: [0.93, SILENT_TALK_BASELINE + 0.01].max }
+      end
     end
 
     class Session
@@ -303,6 +381,7 @@ module Bada
         when :telegraph then telegraph_input(line)
         when :bada      then bada_input(line)
         when :whisper   then whisper_input(line)
+        when :report    then report_input(line)
         else text_input(line)
         end
       end
@@ -367,13 +446,23 @@ module Bada
       end
 
       # Silent cue -> a syntactically valid Bada-language program (予約語・構文規則を
-      # 使って発声せず入力). Verified to run in the Bada interpreter.
+      # 使って発声せず入力). More thought-tokens -> a LONGER program（長文ソース）.
+      # Verified to run in the Bada interpreter.
       def bada_input(cue)
-        r = BadaSyntax.build(cue, nonce: @bada_nonce)
+        r = BadaSyntax.build_auto(cue, nonce: @bada_nonce)
         @bada_nonce += 1
         lines = r[:code].split("\n")
         commit(:bada, cue, lines, r[:precision], "bada")
         { kind: :bada, code: r[:code], valid: r[:valid], reserved_used: r[:reserved_used],
+          blocks: r[:blocks] || 1, precision: r[:precision], appended: lines }
+      end
+
+      # Whispered / unknown input -> a long-form prose REPORT (文章のレポート・長文).
+      def report_input(cue)
+        r = Whisper.report(cue)
+        lines = r[:text].split("\n")
+        commit(:report, cue, lines, r[:precision], r[:lang])
+        { kind: :report, text: r[:text], source_lang: r[:lang], sentences: r[:sentences],
           precision: r[:precision], appended: lines }
       end
 
@@ -389,7 +478,7 @@ module Bada
           qc_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         when :bada
           BadaSyntax.reserved_all.select { |w| w.start_with?(prefix) }.uniq.first(limit)
-        when :whisper
+        when :whisper, :report
           Whisper::VOCAB.select { |w| w.start_with?(prefix.downcase) }.uniq.first(limit)
         else
           text_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
@@ -452,6 +541,7 @@ module Bada
         when :telegraph then "  ＋ [Telegraph]\n#{indent(r[:code])}"
         when :bada then "  ＋ [Bada構文#{r[:valid] ? '✓' : '✗'}]  予約語:#{r[:reserved_used].join(' ')}\n#{indent(r[:code])}"
         when :whisper then "  ＋ [whisper:#{r[:source_lang]}] 「#{r[:text]}」  (#{format('%.0f%%', r[:precision] * 100)})"
+        when :report then "  ＋ [report:#{r[:source_lang]} #{r[:sentences]}文]\n#{indent(r[:text])}"
         when :command then r[:output]
         when :noop then ""
         else r.inspect
@@ -486,6 +576,8 @@ module Bada
         when "bada"      then @mode = :bada; { kind: :command, output: "mode = bada（Bada言語 構文入力）" }
         when "whisper", "whspr", "w"
           @mode = :whisper; { kind: :command, output: "mode = whisper（英語ウィスパード／未知言語の言語化）" }
+        when "report", "rep"
+          @mode = :report; { kind: :command, output: "mode = report（未知言語/ウィスパード → 長文レポート）" }
         when "reserved", "r"
           list = @mode == :bada ? BadaSyntax.reserved_all : (@language ? Coder.reserved_words("", language: @language) : [])
           { kind: :command, output: "予約語/構文語: #{list.join('  ')}" }
@@ -509,7 +601,7 @@ module Bada
         [
           "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)",
           "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。",
-          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文 / :whisper 英語ウィスパード/未知言語",
+          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文(長文) / :whisper 英語ウィスパード/未知言語 / :report 長文レポート",
           "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit"
         ].join("\n")
       end

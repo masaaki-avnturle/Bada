@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 public final class SilentTalk {
     public static final double SILENT_TALK_BASELINE = MindReader.SILENT_TALK_BASELINE;
 
-    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH, BADA, WHISPER }
+    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH, BADA, WHISPER, REPORT }
 
     /** Result of a one-shot thought-input (for the per-engine 思考入力 button). */
     public static final class Thought {
@@ -149,8 +149,10 @@ public final class SilentTalk {
         public boolean recipe;          // code
         public boolean valid;           // bada (program runs)
         public List<String> reservedUsed; // bada
-        public String sourceLang;       // whisper (en | unknown)
-        public double precision;        // text | code | qc | verilog | telegraph | bada | whisper
+        public String sourceLang;       // whisper | report (en | unknown)
+        public int sentences;           // report
+        public int blocks = 1;          // bada
+        public double precision;        // text | code | qc | verilog | telegraph | bada | whisper | report
         public List<String> appended;   // all engine kinds
         public String output;           // command
     }
@@ -183,8 +185,20 @@ public final class SilentTalk {
                 case TELEGRAPH: return telegraphInput(line);
                 case BADA: return badaInput(line);
                 case WHISPER: return whisperInput(line);
+                case REPORT: return reportInput(line);
                 default: return textInput(line);
             }
+        }
+
+        /** Whispered / unknown input -> a long-form prose REPORT. */
+        public Feed reportInput(String cue) {
+            Whisper.Report r = Whisper.report(cue);
+            List<String> lines = new ArrayList<>(Arrays.asList(r.text.split("\n", -1)));
+            blocks.add(new Block("report", cue, lines, r.precision, r.lang));
+            Feed f = new Feed();
+            f.kind = "report"; f.code = r.text; f.sourceLang = r.lang; f.sentences = r.sentences;
+            f.precision = r.precision; f.appended = lines;
+            return f;
         }
 
         /** Whispered English / unknown-language verbalization (発声せず). */
@@ -199,14 +213,14 @@ public final class SilentTalk {
             return f;
         }
 
-        /** Silent cue -> a syntactically valid Bada-language program (verified). */
+        /** Silent cue -> a valid Bada-language program; more tokens -> LONGER source. */
         public Feed badaInput(String cue) {
-            BadaSyntax.Program p = BadaSyntax.build(cue, badaNonce++);
+            BadaSyntax.Program p = BadaSyntax.buildAuto(cue, badaNonce++);
             List<String> lines = new ArrayList<>(Arrays.asList(p.code.split("\n", -1)));
             blocks.add(new Block("bada", cue, lines, p.precision, "bada"));
             Feed f = new Feed();
             f.kind = "bada"; f.code = p.code; f.valid = p.valid;
-            f.reservedUsed = p.reservedUsed; f.precision = p.precision; f.appended = lines;
+            f.reservedUsed = p.reservedUsed; f.blocks = p.blocks; f.precision = p.precision; f.appended = lines;
             return f;
         }
 
@@ -287,7 +301,7 @@ public final class SilentTalk {
             List<String> vocab;
             if (mode == Mode.QC || mode == Mode.VERILOG) vocab = qcVocab();
             else if (mode == Mode.BADA) vocab = BadaSyntax.reservedAll();
-            else if (mode == Mode.WHISPER) { vocab = Whisper.vocab(); prefix = prefix.toLowerCase(); }
+            else if (mode == Mode.WHISPER || mode == Mode.REPORT) { vocab = Whisper.vocab(); prefix = prefix.toLowerCase(); }
             else vocab = textVocab();
             List<String> out = new ArrayList<>();
             for (String w : vocab) {
@@ -334,6 +348,8 @@ public final class SilentTalk {
                             + String.join(" ", r.reservedUsed) + "\n" + indent(r.code);
                 case "whisper":
                     return String.format("  ＋ [whisper:%s] 「%s」  (%.0f%%)", r.sourceLang, r.verbalization, r.precision * 100);
+                case "report":
+                    return String.format("  ＋ [report:%s %d文]%n", r.sourceLang, r.sentences) + indent(r.code);
                 case "command":
                     return r.output;
                 default:
@@ -361,6 +377,8 @@ public final class SilentTalk {
                 case "bada": mode = Mode.BADA; f.output = "mode = bada（Bada言語 構文入力）"; break;
                 case "whisper": case "whspr": case "w":
                     mode = Mode.WHISPER; f.output = "mode = whisper（英語ウィスパード／未知言語の言語化）"; break;
+                case "report": case "rep":
+                    mode = Mode.REPORT; f.output = "mode = report（未知言語/ウィスパード → 長文レポート）"; break;
                 case "reserved": case "r":
                     f.output = "予約語/構文語: " + (mode == Mode.BADA
                             ? String.join("  ", BadaSyntax.reservedAll())
@@ -387,7 +405,7 @@ public final class SilentTalk {
         public String intro() {
             return "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)\n"
                  + "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。\n"
-                 + "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文 / :whisper 英語ウィスパード/未知言語\n"
+                 + "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文(長文) / :whisper 英語ウィスパード/未知言語 / :report 長文レポート\n"
                  + "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit";
         }
 

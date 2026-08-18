@@ -372,6 +372,56 @@ class TestSilentTalkSession < Minitest::Test
     assert_equal "en", r2[:lang]
   end
 
+  # ---- long-form: report (:report) + long Bada source (:bada) --------------
+
+  def test_report_mode_writes_multi_sentence_document
+    assert_equal :command, @s.feed(":report")[:kind]
+    assert_equal :report, @s.mode
+    r = @s.feed("qntm lght mmry wv sgnl")
+    assert_equal :report, r[:kind]
+    assert_operator r[:sentences], :>=, 4
+    lines = r[:text].split("\n")
+    assert_equal "Report:", lines.first
+    assert_operator lines.length, :>=, 5          # a long document
+    assert(lines[1..].all? { |l| l.end_with?(".") })
+  end
+
+  def test_report_decodes_unknown_language_into_report
+    @s.feed(":report")
+    r = @s.feed("φωτ μνημη κυμα σημα")
+    assert_equal "unknown", r[:source_lang]
+    assert_includes r[:text], "Report:"
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_bada_long_source_scales_with_tokens
+    @s.feed(":bada")
+    r = @s.feed("光 記憶 波 音 場")     # 5 thought-tokens
+    assert r[:valid]
+    assert_operator r[:blocks], :>=, 2
+    assert_operator r[:code].split("\n").length, :>=, 10   # long program
+    refute_empty Bada::Interpreter.new.run(r[:code])
+    assert_includes r[:code], '"光 記憶 波"'                # cue kept in 1st block
+  end
+
+  def test_bada_single_token_stays_short
+    @s.feed(":bada")
+    r = @s.feed("波")
+    assert r[:valid]
+    assert_equal 1, (r[:blocks] || 1)
+  end
+
+  def test_build_long_program_runs
+    r = Bada::SilentTalk::BadaSyntax.build_long("光", blocks: 4, nonce: 3)
+    assert r[:valid]
+    assert_equal 4, r[:blocks]
+    refute_empty Bada::Interpreter.new.run(r[:code])
+  end
+
+  def test_report_and_bada_are_declared_modes
+    assert_includes Bada::SilentTalk::MODES, :report
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")
