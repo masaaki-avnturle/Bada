@@ -15,13 +15,19 @@ import java.nio.charset.StandardCharsets;
  * Bada — Windows/Linux/desktop front end. Two tabs:
  *   ① Space Telegraph   (量子もつれ・汎用電信通信)
  *   ② Pseudo QC          (ノイマン型・ディスク内蔵・半導体制御の擬似量子計算機)
+ *   ③ Mind               (思考言語化 simulation)
+ *   ④ Coder              (思考→コード transformer, EN/JA)
+ *   ⑤ Silent IME         (サイレント入力: 発声せず文章/コードを入力, simulation)
  *
  * Run with no arguments to open the Swing GUI (how the packaged app launches).
- * Pass a message for a one-shot telegraph console report, or `--qc` for the
- * pseudo QC console report:
+ * Pass a message for a one-shot telegraph console report, or a flag for a
+ * console report:
  *
  *   BadaTelegraph "HELLO SPACE"
  *   BadaTelegraph --qc
+ *   BadaTelegraph --mind "光 と 音 の 記憶"
+ *   BadaTelegraph --code "fibonacci 10"
+ *   BadaTelegraph --silent "光 記憶 波 | :code | fibonacci 8"   (| separates lines)
  */
 public final class DesktopApp {
 
