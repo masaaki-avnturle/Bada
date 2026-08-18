@@ -87,7 +87,28 @@ public final class Vim {
             case "latex": case "tex": insertBlock(Platex.paper(arg, bump()).code); return touched("論文挿入");
             case "report": insertBlock(Whisper.longReport(arg).text); return touched("レポート挿入");
             case "whisper": insertBlock(Whisper.verbalize(arg).text); return touched("言語化挿入");
+            case "whisperen": insertBlock(Whisper.verbalizeEn(arg).text); return touched("ウィスパード英語挿入");
+            case "qc": insertBlock(qcSource(arg)); return touched("QCソース挿入");
+            case "verilog": insertBlock(verilogSource(arg)); return touched("半導体ソース挿入");
             default: return new R("unknown ex: :" + name, false);
+        }
+    }
+
+    /** Silent cue -> QC (OpenQASM-like) source + disk-backed run report. */
+    private String qcSource(String intent) {
+        Object[] p = SilentTalk.Parse.qc(intent);
+        int n = (Integer) p[1];
+        try (bada.qc.PseudoQC m = new bada.qc.PseudoQC(n).load((String) p[0]).run()) {
+            return m.report();
+        }
+    }
+
+    /** Silent cue -> semiconductor (Verilog RTL) source. */
+    private String verilogSource(String intent) {
+        Object[] p = SilentTalk.Parse.qc(intent);
+        int n = (Integer) p[1];
+        try (bada.qc.PseudoQC m = new bada.qc.PseudoQC(n).load((String) p[0])) {
+            return m.verilog();
         }
     }
 

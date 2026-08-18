@@ -54,7 +54,10 @@ public class MainActivity extends Activity {
             + "| :latex | 多様体 量子 もつれ | :math | 多様体 量子 もつれ | :telegraph | QUANTUM HELLO";
     private static final String WHISPER_DEMO = "qntm lght mmry wv sgnl";
     // '|'-separated vi/ex commands driven through the embedded Bada Vim editor.
-    private static final String VIM_DEMO = "iタイトル：多様体研究 | o序論 | :math 多様体 量子 もつれ | :w paper.tex";
+    private static final String VIM_DEMO =
+            "iタイトル：多様体研究 | o序論 | :whisperen qntm lght wv mmry sgnl "
+            + "| :verilog semiconductor lattice qubit gate | :qc entangle bell measure "
+            + "| :math 多様体 量子 もつれ | :w paper.tex";
 
     private Spinner mode;
     private EditText input;

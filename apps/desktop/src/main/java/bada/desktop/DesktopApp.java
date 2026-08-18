@@ -631,10 +631,12 @@ public final class DesktopApp {
         final JTextPane editor = new JTextPane();
         editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         editor.setMargin(new Insets(10, 12, 10, 12));
-        editor.setText("% Bada Vim — i:挿入  Esc:ノーマル  ::コマンド  （syntax highlight・全画面長長文）\n");
+        editor.setText("% Bada Vim — i:挿入  W:ウィスパード英語挿入  Esc:ノーマル  ::コマンド  （syntax highlight・全画面長長文）\n");
         editor.setEditable(false); // NORMAL
 
         final String[] ft = { "auto" };
+        // wIns[0] = whisper-insert mode active: typing is native, Esc reconstructs the line to full English
+        final boolean[] wIns = { false };
         final JComboBox<String> ftBox = new JComboBox<>(VIM_FTS);
         final JLabel status = new JLabel();
         status.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
@@ -652,8 +654,10 @@ public final class DesktopApp {
         final Runnable refresh = () -> {
             // simulated voiceless-input precision, guaranteed above the silent-talk baseline
             double prec = Math.max(0.96, SilentTalk.SILENT_TALK_BASELINE + 0.01);
-            status.setText(String.format("  %s | ft=%s | %d 行 | 発声なし precision %.1f%% > silent-talk %.1f%% | i:挿入 Esc ::コマンド",
-                    editor.isEditable() ? "-- INSERT --" : "-- NORMAL --",
+            String mode = wIns[0] ? "-- WHISPER INSERT (英語復元) --"
+                    : (editor.isEditable() ? "-- INSERT --" : "-- NORMAL --");
+            status.setText(String.format("  %s | ft=%s | %d 行 | 発声なし precision %.1f%% > silent-talk %.1f%% | i:挿入 W:ウィスパード Esc ::コマンド",
+                    mode,
                     "auto".equals(ft[0]) ? "auto(" + vimDetectFt(editor.getText()) + ")" : ft[0],
                     editor.getText().split("\n", -1).length,
                     prec * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
@@ -689,11 +693,28 @@ public final class DesktopApp {
         };
         ftBox.addActionListener(e -> rebuildWords.run());
 
-        // ex command line
-        exLine.addActionListener(e -> {
-            String line = exLine.getText().trim();
-            exLine.setVisible(false);
-            editor.requestFocusInWindow();
+        // Reconstruct the caret line (whispered English -> full English) in place.
+        final Runnable expandWhisperLine = () -> {
+            try {
+                String t = editor.getText();
+                int pos = Math.min(editor.getCaretPosition(), t.length());
+                int st = vimLineStart(t, pos), en = vimLineEnd(t, pos);
+                String line = t.substring(st, en);
+                if (line.trim().isEmpty()) { rehl.run(); refresh.run(); return; }
+                Whisper.Result r = Whisper.verbalizeEn(line);
+                editor.getDocument().remove(st, en - st);
+                editor.getDocument().insertString(st, r.text, null);
+                editor.setCaretPosition(st + r.text.length());
+                status.setText(String.format("  ウィスパード英語を復元: precision %.1f%% > silent-talk %.1f%%",
+                        r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+                rehl.run();
+            } catch (Exception ignored) { }
+        };
+
+        // Shared ex-command executor so both the ":" line and the toolbar buttons drive it.
+        final java.util.function.Consumer<String> runEx = (line) -> {
+            if (line == null) return;
+            line = line.trim();
             if (line.isEmpty()) { refresh.run(); return; }
             String name = line, arg = "";
             int sp = line.indexOf(' ');
@@ -722,6 +743,14 @@ public final class DesktopApp {
                 if (setFt != null) { ft[0] = setFt; ftBox.setSelectedItem(setFt); rebuildWords.run(); }
                 rehl.run(); refresh.run();
             } catch (Exception ex) { status.setText("  error: " + ex.getMessage()); }
+        };
+
+        // ex command line
+        exLine.addActionListener(e -> {
+            String line = exLine.getText().trim();
+            exLine.setVisible(false);
+            editor.requestFocusInWindow();
+            runEx.accept(line);
         });
         exLine.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent e) {
@@ -733,7 +762,10 @@ public final class DesktopApp {
         editor.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyPressed(java.awt.event.KeyEvent e) {
                 if (editor.isEditable()) {
-                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) { editor.setEditable(false); refresh.run(); e.consume(); }
+                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
+                        if (wIns[0]) { wIns[0] = false; expandWhisperLine.run(); }
+                        editor.setEditable(false); refresh.run(); e.consume();
+                    }
                     return;
                 }
                 int c = e.getKeyCode();
@@ -746,7 +778,8 @@ public final class DesktopApp {
                 try { normal(e.getKeyChar()); } catch (Exception ignored) { }
                 e.consume();
             }
-            private void enterInsert() { editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
+            private void enterInsert() { wIns[0] = false; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
+            private void enterWhisperInsert() { wIns[0] = true; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
             private void normal(char ch) throws BadLocationException {
                 String t = editor.getText();
                 int pos = Math.min(editor.getCaretPosition(), t.length());
@@ -756,6 +789,7 @@ public final class DesktopApp {
                 pendingG[0] = false;
                 switch (ch) {
                     case 'i': enterInsert(); break;
+                    case 'W': enterWhisperInsert(); break;
                     case 'a': editor.setCaretPosition(Math.min(pos + 1, t.length())); enterInsert(); break;
                     case 'o': { int en = vimLineEnd(t, pos); editor.getDocument().insertString(en, "\n", null); editor.setCaretPosition(en + 1); enterInsert(); break; }
                     case 'O': { int st = vimLineStart(t, pos); editor.getDocument().insertString(st, "\n", null); editor.setCaretPosition(st); enterInsert(); break; }
@@ -778,14 +812,49 @@ public final class DesktopApp {
             }
         });
 
-        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・Esc ノーマル・dd/x 削除・hjkl 0 $ gg G・: で ex（:math :bada :qc :verilog :latex :set ft= :w :q）");
+        // Voiceless generator + whisper toolbar. Buttons drive the same ex engine at the caret.
+        final JPanel gen = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        gen.add(new JLabel("生成:"));
+        JButton bWhisper = new JButton("🔉 ウィスパード英語挿入");
+        bWhisper.setToolTipText("全画面に、母音を落としたウィスパード英語を直接入力し、Esc で完全な英語へ復元（silent-talk 超え精度・短文ではない）");
+        bWhisper.setFocusable(false);
+        bWhisper.addActionListener(ev -> {
+            wIns[0] = true; editor.setEditable(true); editor.requestFocusInWindow(); refresh.run();
+        });
+        gen.add(bWhisper);
+        String[][] genBtns = {
+            {"🔩 半導体ソース", "verilog", "semiconductor lattice qubit gate"},
+            {"⚛ QCソース", "qc", "entangle bell superposition measure"},
+            {"🧩 Badaソース", "bada", "quantum wave lattice signal"},
+            {"📄 数学論文", "math", "多様体 作用素 スペクトル"},
+            {"📝 レポート", "report", "quantum silent whisper lattice"},
+        };
+        for (String[] g : genBtns) {
+            JButton b = new JButton(g[0]);
+            b.setFocusable(false);
+            b.setToolTipText("発声せず、全機能のソース/長長文をカーソル位置に生成（silent-talk 超え精度）");
+            final String cmd = g[1], seed = g[2];
+            b.addActionListener(ev -> {
+                String arg = (String) JOptionPane.showInputDialog(root,
+                        "生成の主題（発声せず・種語）:", g[0], JOptionPane.PLAIN_MESSAGE, null, null, seed);
+                if (arg == null) return;
+                editor.requestFocusInWindow();
+                runEx.accept(cmd + " " + arg);
+            });
+            gen.add(b);
+        }
+
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入・Esc ノーマル/復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:math :bada :qc :verilog :latex :set ft= :w :q）");
         help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
         topBar.add(new JLabel("filetype:")); topBar.add(ftBox);
         JPanel top = new JPanel(new BorderLayout());
+        JPanel topInner = new JPanel(new BorderLayout());
+        topInner.add(topBar, BorderLayout.NORTH);
+        topInner.add(gen, BorderLayout.CENTER);
+        topInner.add(words, BorderLayout.SOUTH);
         top.add(help, BorderLayout.NORTH);
-        top.add(topBar, BorderLayout.CENTER);
-        top.add(words, BorderLayout.SOUTH);
+        top.add(topInner, BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(exLine, BorderLayout.NORTH);

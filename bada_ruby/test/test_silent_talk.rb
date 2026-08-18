@@ -574,6 +574,26 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes v.text, "\\documentclass"
   end
 
+  def test_vim_ex_whisperen_reconstructs_english
+    v = Bada::SilentTalk::Vim.new
+    r = v.feed(":whisperen qntm lght wv mmry sgnl")
+    assert_includes r[:msg], "ウィスパード英語"
+    words = v.text.downcase
+    assert_includes words, "quantum"
+    assert_includes words, "light"
+    refute v.saved
+  end
+
+  def test_vim_ex_qc_and_verilog_generate_source
+    v = Bada::SilentTalk::Vim.new
+    v.feed(":qc entangle bell measure")
+    assert_match(/QASM|qubit|OPENQASM|creg|qreg|H |CX/i, v.text)
+    before = v.line_count
+    v.feed(":verilog semiconductor lattice qubit gate")
+    assert_operator v.line_count, :>, before
+    assert_match(/module|always|reg |wire |endmodule/i, v.text)
+  end
+
   def test_vim_write_marks_saved
     v = Bada::SilentTalk::Vim.new("x")
     v.feed("odata")

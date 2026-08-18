@@ -599,6 +599,9 @@ module Bada
         when "latex", "tex" then insert_block(Platex.paper(arg, nonce: bump)[:code]); touched("論文挿入")
         when "report"       then insert_block(Whisper.long_report(arg)[:text]); touched("レポート挿入")
         when "whisper"      then insert_block(Whisper.verbalize(arg)[:text]); touched("言語化挿入")
+        when "whisperen"    then insert_block(Whisper.verbalize_en(arg)[:text]); touched("ウィスパード英語挿入")
+        when "qc"           then insert_block(qc_source(arg)); touched("QCソース挿入")
+        when "verilog"      then insert_block(verilog_source(arg)); touched("半導体ソース挿入")
         else { msg: "unknown ex: :#{name}" }
         end
       end
@@ -607,6 +610,30 @@ module Bada
 
       def bump
         @nonce += 1
+      end
+
+      # Silent cue -> QC (OpenQASM-like) source, generated in a scratch dir.
+      def qc_source(intent)
+        require "tmpdir"
+        src, n = Parse.qc(intent)
+        Dir.mktmpdir("bada-vim-qc") do |dir|
+          machine = QC::Machine.new(n_qubits: n, dir: dir).load(src).run
+          out = machine.report
+          machine.close
+          out
+        end
+      end
+
+      # Silent cue -> semiconductor (Verilog RTL) source.
+      def verilog_source(intent)
+        require "tmpdir"
+        src, n = Parse.qc(intent)
+        Dir.mktmpdir("bada-vim-verilog") do |dir|
+          machine = QC::Machine.new(n_qubits: n, dir: dir).load(src)
+          out = machine.verilog
+          machine.close
+          out
+        end
       end
 
       def cur
