@@ -14,6 +14,7 @@
 #   bin/bada mind "信号..."             thought verbalization + image + code (sim)
 #   bin/bada silent                     silent-talk IME: verbalize cues -> text/code
 #   bin/bada whisper "qntm lght wv"     whispered English / unknown-language verbalize
+#   bin/bada latex "多様体 量子"        論文作成: pLaTeX 長長文ソースを発声せず生成
 #   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
 #   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
 #   bin/bada detect "code..."           auto-detect the programming language
@@ -183,6 +184,13 @@ when "whisper"
   puts format("# whisper source=%s  sentences=%d  precision=%.1f%%  (silent-talk %.1f%%)",
               r[:lang], r[:sentences], r[:precision] * 100, Bada::SilentTalk::SILENT_TALK_BASELINE * 100)
   puts r[:text]
+when "latex", "platex", "paper"
+  # 論文作成: 発声せず pLaTeX（jsarticle）の長長文ソースを生成。
+  #   bada latex "多様体 量子 もつれ"
+  r = Bada::SilentTalk::Platex.paper(ARGV.join(" "))
+  puts format("%% pLaTeX %d sections, valid=%s, precision=%.1f%%",
+              r[:sections], r[:valid], r[:precision] * 100)
+  puts r[:code]
 when "code"
   # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.
   #   bada code "print hello 3 times" [--lang python]
@@ -262,6 +270,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | silent | whisper | code | complete | detect | coder | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | silent | whisper | latex | code | complete | detect | coder | run | learn | xi | neural | train | version"
   exit 1
 end

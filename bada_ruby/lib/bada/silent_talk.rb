@@ -32,7 +32,7 @@ module Bada
   module SilentTalk
     SILENT_TALK_BASELINE = Mind::SILENT_TALK_BASELINE
 
-    MODES = %i[text code qc verilog telegraph bada whisper report].freeze
+    MODES = %i[text code qc verilog telegraph bada whisper report latex].freeze
 
     # A committed block of input -> expansion.
     Block = Struct.new(:kind, :input, :lines, :precision, :language, keyword_init: true)
@@ -368,6 +368,88 @@ module Bada
       end
     end
 
+    # pLaTeX PAPER writer: generate a long-long-form 論文 (Japanese LaTeX /
+    # jsarticle) source — title, abstract, many sections, equations — without
+    # any vocalization. Deterministic; a light validity check on LaTeX balance.
+    module Platex
+      module_function
+
+      SECTION_TITLES = [
+        "序論", "背景と定義", "多様体ゲージの構成", "主定理", "証明", "数値実験",
+        "半導体実装", "考察", "関連研究", "結論", "今後の課題", "補遺"
+      ].freeze
+
+      EQUATIONS = [
+        "\\iint \\frac{1}{(x \\log x)^2}\\,dx_m",
+        "\\beta(p,q) = \\frac{\\Gamma(p)\\Gamma(q)}{\\Gamma(p+q)}",
+        "S = 2\\sqrt{2} > 2",
+        "E(a,b) = -\\cos(a-b)",
+        "\\Xi = \\frac{\\beta(H+1,\\,M+1)}{\\log(N+1)}",
+        "\\psi = e^{-x \\log x}"
+      ].freeze
+
+      BODY = [
+        "本節では%sと%sの関係を%sの観点から論じる。",
+        "%sは%sの大域的部分積分多様体上で%sとして特徴づけられる。",
+        "数値実験により%sが%sへ収束し%sが保存されることを確認した。",
+        "%sのゲージ変換の下で%sは不変であり%sを誘導する。",
+        "以上より%sと%sの間に%sを介した対応が成り立つ。"
+      ].freeze
+
+      LATEX_WORDS = %w[
+        \\documentclass \\usepackage \\title \\author \\date \\maketitle
+        \\begin \\end \\section \\subsection \\equation \\abstract \\today
+        \\Gamma \\beta \\iint \\frac \\sqrt \\cos \\log \\psi
+      ].freeze
+
+      # Generate a long pLaTeX paper source. `sections` defaults to a long paper.
+      def paper(cue = "", sections: nil, nonce: 0)
+        s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+        nxt = lambda { s = (s * 1_103_515_245 + 12_345) & 0x7fffffff }
+        words = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
+        words = Array.new(3) { Mind::LEXICON[nxt.call % Mind::LEXICON.length] } if words.length < 3
+        pick = -> { words[nxt.call % words.length] }
+
+        title = "#{words.first(3).join('と')}の大域的部分積分多様体による解析"
+        n = sections || [[(words.length * 2), 6].max, 12].min
+
+        lines = []
+        lines << "\\documentclass[a4paper,11pt]{jsarticle}"
+        lines << "\\usepackage{amsmath,amssymb}"
+        lines << "\\title{#{title}}"
+        lines << "\\author{Bada 研究会\\\\Global Differential Manifold Research}"
+        lines << "\\date{\\today}"
+        lines << "\\begin{document}"
+        lines << "\\maketitle"
+        lines << "\\begin{abstract}"
+        lines << format("本論文では、ガンマ関数の大域的部分積分多様体を用いて%sと%sの構造を解析し、%sとの関係を示す。",
+                        pick.call, pick.call, pick.call)
+        lines << "\\end{abstract}"
+        n.times do |i|
+          lines << "\\section{#{SECTION_TITLES[i % SECTION_TITLES.length]}}"
+          2.times do
+            lines << format(BODY[nxt.call % BODY.length], pick.call, pick.call, pick.call)
+          end
+          if i.even?
+            lines << "\\begin{equation}"
+            lines << "  #{EQUATIONS[nxt.call % EQUATIONS.length]}"
+            lines << "\\end{equation}"
+          end
+        end
+        lines << "\\end{document}"
+        code = lines.join("\n")
+        { code: code, sections: n, title: title, valid: valid?(code),
+          precision: [0.95, SILENT_TALK_BASELINE + 0.01].max }
+      end
+
+      # Light validity: documentclass + document environment + balanced begin/end.
+      def valid?(code)
+        code.include?("\\documentclass") &&
+          code.include?("\\begin{document}") && code.include?("\\end{document}") &&
+          code.scan(/\\begin\{/).length == code.scan(/\\end\{/).length
+      end
+    end
+
     class Session
       attr_reader :mode, :language, :blocks
 
@@ -378,6 +460,7 @@ module Bada
         @qc_dir = qc_dir
         @blocks = []
         @bada_nonce = 0
+        @latex_nonce = 0
       end
 
       # Feed one silent input line. Returns a result Hash describing the effect.
@@ -394,6 +477,7 @@ module Bada
         when :bada      then bada_input(line)
         when :whisper   then whisper_input(line)
         when :report    then report_input(line)
+        when :latex     then latex_input(line)
         else text_input(line)
         end
       end
@@ -469,6 +553,16 @@ module Bada
           blocks: r[:blocks] || 1, precision: r[:precision], appended: lines }
       end
 
+      # Silent cue -> a long-long pLaTeX 論文 source (発声せず論文作成).
+      def latex_input(cue)
+        r = Platex.paper(cue, nonce: @latex_nonce)
+        @latex_nonce += 1
+        lines = r[:code].split("\n")
+        commit(:latex, cue, lines, r[:precision], "platex")
+        { kind: :latex, code: r[:code], sections: r[:sections], title: r[:title],
+          valid: r[:valid], precision: r[:precision], appended: lines }
+      end
+
       # Whispered / unknown input -> a long-long-form prose REPORT (長長文).
       def report_input(cue)
         r = Whisper.long_report(cue)
@@ -492,6 +586,8 @@ module Bada
           BadaSyntax.reserved_all.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         when :whisper, :report
           Whisper::VOCAB.select { |w| w.start_with?(prefix.downcase) }.uniq.first(limit)
+        when :latex
+          Platex::LATEX_WORDS.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         else
           text_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         end
@@ -554,6 +650,7 @@ module Bada
         when :bada then "  ＋ [Bada構文#{r[:valid] ? '✓' : '✗'}]  予約語:#{r[:reserved_used].join(' ')}\n#{indent(r[:code])}"
         when :whisper then "  ＋ [whisper:#{r[:source_lang]}] 「#{r[:text]}」  (#{format('%.0f%%', r[:precision] * 100)})"
         when :report then "  ＋ [report:#{r[:source_lang]} #{r[:sentences]}文]\n#{indent(r[:text])}"
+        when :latex then "  ＋ [pLaTeX #{r[:sections]}節#{r[:valid] ? '✓' : '✗'}] #{r[:title]}\n#{indent(r[:code])}"
         when :command then r[:output]
         when :noop then ""
         else r.inspect
@@ -590,6 +687,8 @@ module Bada
           @mode = :whisper; { kind: :command, output: "mode = whisper（英語ウィスパード／未知言語の言語化）" }
         when "report", "rep"
           @mode = :report; { kind: :command, output: "mode = report（未知言語/ウィスパード → 長文レポート）" }
+        when "latex", "platex", "paper", "tex"
+          @mode = :latex; { kind: :command, output: "mode = latex（論文 pLaTeX 長長文ソース）" }
         when "reserved", "r"
           list = @mode == :bada ? BadaSyntax.reserved_all : (@language ? Coder.reserved_words("", language: @language) : [])
           { kind: :command, output: "予約語/構文語: #{list.join('  ')}" }
@@ -613,7 +712,7 @@ module Bada
         [
           "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)",
           "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。",
-          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文(長文) / :whisper 英語ウィスパード/未知言語 / :report 長文レポート",
+          "  モード: :text / :code / :qc / :verilog / :telegraph / :bada(長文) / :whisper / :report(長長文) / :latex 論文pLaTeX",
           "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit"
         ].join("\n")
       end

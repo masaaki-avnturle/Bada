@@ -450,6 +450,51 @@ class TestSilentTalkSession < Minitest::Test
     refute_empty Bada::Interpreter.new.run(r[:code])
   end
 
+  # ---- pLaTeX 論文作成 (:latex) --------------------------------------------
+
+  def test_latex_mode_writes_long_platex_paper
+    assert_equal :command, @s.feed(":latex")[:kind]
+    assert_equal :latex, @s.mode
+    r = @s.feed("多様体 量子 もつれ")
+    assert_equal :latex, r[:kind]
+    assert r[:valid]
+    assert_operator r[:sections], :>=, 6
+    assert_operator r[:code].split("\n").length, :>=, 30   # 長長文
+    assert_includes r[:code], "\\documentclass[a4paper,11pt]{jsarticle}"
+    assert_includes r[:code], "\\begin{document}"
+    assert_includes r[:code], "\\end{document}"
+    assert_includes r[:code], "\\begin{equation}"
+  end
+
+  def test_latex_begin_end_balanced
+    @s.feed(":latex")
+    code = @s.feed("光 記憶 波")[:code]
+    assert_equal code.scan(/\\begin\{/).length, code.scan(/\\end\{/).length
+  end
+
+  def test_latex_title_uses_cue
+    @s.feed(":latex")
+    r = @s.feed("光 音 記憶")
+    assert_includes r[:title], "光"
+    assert_includes r[:code], "\\title{"
+  end
+
+  def test_latex_completion_offers_latex_commands
+    @s.feed(":latex")
+    assert_includes @s.complete("\\sec"), "\\section"
+    assert_includes @s.complete("\\begin"), "\\begin"
+  end
+
+  def test_latex_paper_is_deterministic
+    a = Bada::SilentTalk::Platex.paper("多様体", nonce: 5)[:code]
+    b = Bada::SilentTalk::Platex.paper("多様体", nonce: 5)[:code]
+    assert_equal a, b
+  end
+
+  def test_latex_is_a_declared_mode
+    assert_includes Bada::SilentTalk::MODES, :latex
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

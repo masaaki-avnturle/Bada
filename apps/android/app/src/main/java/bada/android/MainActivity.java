@@ -48,7 +48,8 @@ public class MainActivity extends Activity {
     private static final String CODE_DEMO = "print hello 3 times loop";
     private static final String SILENT_DEMO =
             "光 記憶 波 | :code | :lang ruby | fibonacci 8 | :qc | bell | :verilog | ghz | :bada | 光 記憶 "
-            + "| :whisper | qntm lght wv | φωτ κυμα | :report | φωτ μνημη κυμα σημα | :telegraph | QUANTUM HELLO";
+            + "| :whisper | qntm lght wv | φωτ κυμα | :report | φωτ μνημη κυμα σημα "
+            + "| :latex | 多様体 量子 もつれ | :telegraph | QUANTUM HELLO";
     private static final String WHISPER_DEMO = "qntm lght mmry wv sgnl";
 
     private Spinner mode;
