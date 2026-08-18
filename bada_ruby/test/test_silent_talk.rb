@@ -537,6 +537,59 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes Bada::SilentTalk::MODES, :math
   end
 
+  # ---- Bada Vim embedded editor --------------------------------------------
+
+  def test_vim_insert_and_open_lines
+    v = Bada::SilentTalk::Vim.new
+    v.feed("iline one")
+    v.feed("o line two")
+    assert_equal "line one\n line two", v.text
+    assert_equal 2, v.line_count
+    refute v.saved
+  end
+
+  def test_vim_motions_and_delete
+    v = Bada::SilentTalk::Vim.new("a\nb\nc")
+    v.feed("G")
+    v.feed("dd")
+    assert_equal "a\nb", v.text
+    v.feed("gg")
+    v.feed("Otop")
+    assert_equal "top\na\nb", v.text
+  end
+
+  def test_vim_ex_math_inserts_long_paper
+    v = Bada::SilentTalk::Vim.new
+    v.feed(":math 多様体 量子 もつれ")
+    assert_operator v.line_count, :>=, 60          # 長長文, not short
+    assert_includes v.text, "\\begin{theorem}"
+    assert_includes v.text, "\\begin{verbatim}"    # embedded Bada
+  end
+
+  def test_vim_ex_bada_and_latex_insert
+    v = Bada::SilentTalk::Vim.new
+    v.feed(":bada 光 記憶 波")
+    assert_includes v.text, "Omega::push"
+    v.feed(":latex 光 音")
+    assert_includes v.text, "\\documentclass"
+  end
+
+  def test_vim_write_marks_saved
+    v = Bada::SilentTalk::Vim.new("x")
+    v.feed("odata")
+    refute v.saved
+    r = v.feed(":w paper.tex")
+    assert v.saved
+    assert_equal "paper.tex", v.filename
+    assert_includes r[:msg], "paper.tex"
+  end
+
+  def test_vim_delete_char
+    v = Bada::SilentTalk::Vim.new("abc")
+    v.feed("x")
+    assert_equal "bc", v.text
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

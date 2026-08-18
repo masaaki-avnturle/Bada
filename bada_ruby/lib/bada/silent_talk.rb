@@ -526,6 +526,154 @@ module Bada
       end
     end
 
+    # Bada Vim — an embedded vi-like modal editor over a multi-line buffer
+    # (NOT short-text). Normal-mode motions/edits (i a o O dd x h j k l 0 $ gg G)
+    # plus ex commands (:w :q :d :math :bada :latex :report :whisper :set) that
+    # embed the generators — e.g. `:math 多様体 量子` inserts a long-long math paper.
+    class Vim
+      attr_reader :buffer, :row, :col, :filename, :saved
+
+      def initialize(text = "")
+        @buffer = text.to_s.empty? ? [""] : text.to_s.split("\n", -1)
+        @row = 0
+        @col = 0
+        @filename = nil
+        @saved = true
+        @nonce = 0
+      end
+
+      def text
+        @buffer.join("\n")
+      end
+
+      def line_count
+        @buffer.length
+      end
+
+      def status
+        format("[%s] %s %d行 (%d,%d)%s", @filename || "[No Name]",
+               @saved ? "" : "[+]", line_count, @row + 1, @col + 1, "")
+      end
+
+      # Process one input line: ex command (":…") or a normal-mode command whose
+      # trailing text (for i/a/o/O) is inserted.
+      def feed(line)
+        line = line.to_s
+        return ex(line[1..]) if line.start_with?(":")
+        return { msg: "" } if line.empty?
+
+        cmd = line[0]
+        rest = line[1..]
+        case
+        when line == "dd" then delete_line; touched("削除")
+        when line == "gg" then @row = 0; @col = 0; { msg: "top" }
+        when cmd == "i"    then insert_text(rest); touched("挿入")
+        when cmd == "a"    then @col = [@col + 1, cur.length].min; insert_text(rest); touched("追記")
+        when cmd == "o"    then open_below(rest); touched("行追加")
+        when cmd == "O"    then open_above(rest); touched("行追加")
+        when cmd == "x"    then delete_char; touched("削除")
+        when cmd == "G"    then @row = @buffer.length - 1; @col = 0; { msg: "bottom" }
+        when cmd == "0"    then @col = 0; { msg: "" }
+        when cmd == "$"    then @col = [cur.length - 1, 0].max; { msg: "" }
+        when cmd == "h"    then @col = [@col - 1, 0].max; { msg: "" }
+        when cmd == "l"    then @col = [@col + 1, cur.length].min; { msg: "" }
+        when cmd == "j"    then @row = [@row + 1, @buffer.length - 1].min; clamp_col; { msg: "" }
+        when cmd == "k"    then @row = [@row - 1, 0].max; clamp_col; { msg: "" }
+        else { msg: "?#{cmd}" }
+        end
+      end
+
+      # Ex command handling (the ":" command line).
+      def ex(cmd)
+        name, arg = cmd.to_s.strip.split(/\s+/, 2)
+        arg = arg.to_s
+        case name
+        when "w", "write"   then @saved = true; @filename = arg unless arg.empty?; { msg: "written #{@filename}" }
+        when "q", "quit"    then { msg: "quit", quit: true }
+        when "wq", "x"      then @saved = true; { msg: "written", quit: true }
+        when "d", "delete"  then delete_line; touched("削除")
+        when "%d"           then @buffer = [""]; @row = 0; @col = 0; touched("全消去")
+        when "set"          then { msg: "set #{arg}" }
+        when "bada"         then insert_block(BadaSyntax.build_auto(arg, nonce: bump)[:code]); touched("Bada挿入")
+        when "math"         then insert_block(Platex.math_paper(arg, nonce: bump)[:code]); touched("数学論文挿入")
+        when "latex", "tex" then insert_block(Platex.paper(arg, nonce: bump)[:code]); touched("論文挿入")
+        when "report"       then insert_block(Whisper.long_report(arg)[:text]); touched("レポート挿入")
+        when "whisper"      then insert_block(Whisper.verbalize(arg)[:text]); touched("言語化挿入")
+        else { msg: "unknown ex: :#{name}" }
+        end
+      end
+
+      private
+
+      def bump
+        @nonce += 1
+      end
+
+      def cur
+        @buffer[@row] || ""
+      end
+
+      def clamp_col
+        @col = [@col, [cur.length - 1, 0].max].min
+      end
+
+      def touched(msg)
+        @saved = false
+        { msg: msg }
+      end
+
+      def insert_text(t)
+        head = cur[0...@col].to_s
+        tail = cur[@col..].to_s
+        parts = t.split("\n", -1)
+        if parts.length == 1
+          @buffer[@row] = head + t + tail
+          @col += t.length
+        else
+          new_lines = [head + parts.first] + parts[1..-2].to_a + [parts.last + tail]
+          @buffer[@row, 1] = new_lines
+          @row += parts.length - 1
+          @col = parts.last.length
+        end
+      end
+
+      def open_below(t)
+        @buffer.insert(@row + 1, "")
+        @row += 1
+        @col = 0
+        insert_text(t)
+      end
+
+      def open_above(t)
+        @buffer.insert(@row, "")
+        @col = 0
+        insert_text(t)
+      end
+
+      def delete_line
+        @buffer.delete_at(@row)
+        @buffer << "" if @buffer.empty?
+        @row = [@row, @buffer.length - 1].min
+        @col = 0
+      end
+
+      def delete_char
+        c = cur
+        return if c.empty?
+
+        @buffer[@row] = c[0...@col].to_s + c[(@col + 1)..].to_s
+        clamp_col
+      end
+
+      # Insert a generated block as new lines below the cursor (like reading a file).
+      def insert_block(block)
+        lines = block.to_s.split("\n", -1)
+        @buffer[@row + 1, 0] = lines
+        @row += lines.length
+        @col = (@buffer[@row] || "").length
+      end
+    end
+
     class Session
       attr_reader :mode, :language, :blocks
 

@@ -15,6 +15,7 @@
 #   bin/bada silent                     silent-talk IME: verbalize cues -> text/code
 #   bin/bada whisper "qntm lght wv"     whispered English / unknown-language verbalize
 #   bin/bada latex "多様体 量子"        論文作成: pLaTeX 長長文ソースを発声せず生成
+#   bin/bada vim [file]                 Bada vim 埋め込みエディタ（:math で論文挿入）
 #   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
 #   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
 #   bin/bada detect "code..."           auto-detect the programming language
@@ -191,6 +192,22 @@ when "latex", "platex", "paper"
   puts format("%% pLaTeX %d sections, valid=%s, precision=%.1f%%",
               r[:sections], r[:valid], r[:precision] * 100)
   puts r[:code]
+when "vim"
+  # Bada Vim: 埋め込み vi 風エディタ（発声せず・長長文）。ex コマンドで生成物を挿入。
+  #   i/a/o/O <text> 挿入 / dd 行削除 / x 文字削除 / hjkl 0 $ gg G 移動
+  #   :math <cue> 数学論文挿入 / :bada :latex :report :whisper / :w file / :q
+  vim = Bada::SilentTalk::Vim.new(ARGV.empty? ? "" : File.exist?(ARGV[0]) ? File.read(ARGV[0]) : "")
+  puts "Bada Vim — i/a/o 挿入, dd 削除, :math <cue> 数学論文挿入, :w file, :q 終了"
+  loop do
+    print "vim #{vim.status}> "
+    line = $stdin.gets
+    break if line.nil?
+    r = vim.feed(line.chomp)
+    break if r[:quit]
+    puts r[:msg] unless r[:msg].to_s.empty?
+  end
+  puts "\n--- buffer ---"
+  puts vim.text
 when "math", "mathpaper"
   # 数学論文作成: 発声せず pLaTeX(amsthm 定理/証明) ＋ Bada 言語の長長文ソースを生成。
   #   bada math "多様体 量子 もつれ"

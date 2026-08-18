@@ -25,6 +25,7 @@ import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.silent.SilentTalk;
 import bada.silent.Whisper;
+import bada.silent.Vim;
 // SilentTalk.Thought / thoughtFill drive the 🧠 思考入力 button
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
@@ -39,6 +40,7 @@ import bada.quantum.SpaceTelegraph;
  *   ⑤ コード生成 Coder     — thought-to-code transformer (EN/JA)
  *   ⑥ サイレント入力 IME   — silent-talk input method: cues -> text/code
  *   ⑦ ウィスパード Whisper — whispered English reconstruction / unknown language
+ *   ⑧ Bada Vim エディタ    — embedded vi-like editor; :math inserts a long math paper
  * Every engine is the same shared pure-Java core, so the APK ships no Ruby.
  */
 public class MainActivity extends Activity {
@@ -51,6 +53,8 @@ public class MainActivity extends Activity {
             + "| :whisper | qntm lght wv | φωτ κυμα | :report | φωτ μνημη κυμα σημα "
             + "| :latex | 多様体 量子 もつれ | :math | 多様体 量子 もつれ | :telegraph | QUANTUM HELLO";
     private static final String WHISPER_DEMO = "qntm lght mmry wv sgnl";
+    // '|'-separated vi/ex commands driven through the embedded Bada Vim editor.
+    private static final String VIM_DEMO = "iタイトル：多様体研究 | o序論 | :math 多様体 量子 もつれ | :w paper.tex";
 
     private Spinner mode;
     private EditText input;
@@ -78,7 +82,7 @@ public class MainActivity extends Activity {
                 new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射",
                         "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)",
                         "⑤ コード生成 Coder (EN/JA)", "⑥ サイレント入力 IME (sim)",
-                        "⑦ ウィスパード Whisper (sim)"}));
+                        "⑦ ウィスパード Whisper (sim)", "⑧ Bada Vim エディタ (sim)"}));
         root.addView(mode);
 
         input = new EditText(this);
@@ -116,6 +120,7 @@ public class MainActivity extends Activity {
                     case 4 -> input.setText(CODE_DEMO);
                     case 5 -> input.setText(SILENT_DEMO);
                     case 6 -> input.setText(WHISPER_DEMO);
+                    case 7 -> input.setText(VIM_DEMO);
                     default -> { }
                 }
                 runSelected();
@@ -200,6 +205,7 @@ public class MainActivity extends Activity {
                     case 4 -> coder(text);
                     case 5 -> silent(text);
                     case 6 -> whisper(text);
+                    case 7 -> vim(text);
                     default -> pseudoQc(text, m == 2);
                 };
             } catch (Throwable t) {
@@ -256,6 +262,16 @@ public class MainActivity extends Activity {
                 + String.format("%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
                         r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
                         r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS" : "below");
+    }
+
+    // Bada Vim embedded editor: run '|'-separated vi/ex commands over a buffer.
+    private String vim(String text) {
+        Vim v = new Vim("");
+        for (String seg : text.split("\\|")) {
+            seg = seg.trim();
+            if (!seg.isEmpty()) v.feed(seg);
+        }
+        return "=== Bada Vim " + v.status() + " ===\n" + v.text();
     }
 
     private String pseudoQc(String text, boolean verilog) {

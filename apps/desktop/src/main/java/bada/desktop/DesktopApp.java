@@ -6,6 +6,7 @@ import bada.silent.SilentTalk;
 import bada.silent.Whisper;
 import bada.silent.BadaSyntax;
 import bada.silent.Platex;
+import bada.silent.Vim;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -22,6 +23,7 @@ import java.nio.charset.StandardCharsets;
  *   ④ Coder              (思考→コード transformer, EN/JA)
  *   ⑤ Silent IME         (サイレント入力: 発声せず文章/コードを入力, simulation)
  *   ⑥ Whisper            (英語ウィスパード復元／未知言語の言語化, simulation)
+ *   ⑦ Bada Vim           (埋め込み vi 風エディタ: :math で長長文数学論文を挿入)
  *
  * Run with no arguments to open the Swing GUI (how the packaged app launches).
  * Pass a message for a one-shot telegraph console report, or a flag for a
@@ -124,6 +126,7 @@ public final class DesktopApp {
         tabs.addTab("④ コード生成 (Coder)", coderPanel());
         tabs.addTab("⑤ サイレント入力 (Silent IME)", silentPanel());
         tabs.addTab("⑥ ウィスパード (Whisper)", whisperPanel());
+        tabs.addTab("⑦ Bada Vim (エディタ)", vimPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -547,6 +550,64 @@ public final class DesktopApp {
         root.add(top, BorderLayout.NORTH);
         root.add(new JScrollPane(output), BorderLayout.CENTER);
         longReport.run();   // 長長文 by default — the whisper function is not short
+        return root;
+    }
+
+    // ---------------------------------------------------------------- Bada Vim
+    private static JPanel vimPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+        final Vim vim = new Vim("% Bada Vim 埋め込みエディタ (発声せず・長長文)\n");
+
+        JTextArea editor = new JTextArea();
+        editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        editor.setMargin(new Insets(10, 12, 10, 12));
+        editor.setText(vim.text());
+
+        JLabel status = new JLabel(" " + vim.status());
+        JTextField cmd = new JTextField();
+        cmd.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+        JLabel help = new JLabel("ex コマンド:  :math <cue> 数学論文 / :bada / :latex / :report / :whisper / :w file / :q");
+        top.add(help, BorderLayout.NORTH);
+        JPanel cmdRow = new JPanel(new BorderLayout(6, 6));
+        cmdRow.add(new JLabel("："), BorderLayout.WEST);
+        cmdRow.add(cmd, BorderLayout.CENTER);
+        top.add(cmdRow, BorderLayout.SOUTH);
+
+        // The editor area IS the buffer; ex commands run against its text and the
+        // generated block is inserted at the caret. (The Vim engine also powers the
+        // `bada vim` CLI.)
+        cmd.addActionListener(e -> {
+            String line = cmd.getText().trim();
+            if (line.isEmpty()) return;
+            String name = line, arg = "";
+            int sp = line.indexOf(' ');
+            if (sp >= 0) { name = line.substring(0, sp); arg = line.substring(sp + 1).trim(); }
+            String block = null;
+            switch (name) {
+                case "math": block = Platex.mathPaper(arg, 0).code; break;
+                case "bada": block = BadaSyntax.buildAuto(arg, 0).code; break;
+                case "latex": case "tex": block = Platex.paper(arg, 0).code; break;
+                case "report": block = Whisper.longReport(arg).text; break;
+                case "whisper": block = Whisper.verbalize(arg).text; break;
+                case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); cmd.setText(""); return;
+                case "q": case "quit": status.setText("  （:q）"); cmd.setText(""); return;
+                default: status.setText("  unknown ex: :" + name); cmd.setText(""); return;
+            }
+            int at = editor.getCaretPosition();
+            String insert = (at > 0 && editor.getText().charAt(Math.max(0, at - 1)) != '\n' ? "\n" : "") + block + "\n";
+            editor.insert(insert, at);
+            editor.setCaretPosition(at + insert.length());
+            int lines = editor.getText().split("\n", -1).length;
+            status.setText(String.format("  挿入: :%s（%d 行, 長長文）", name, lines));
+            cmd.setText("");
+        });
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(editor), BorderLayout.CENTER);
+        root.add(status, BorderLayout.SOUTH);
         return root;
     }
 
