@@ -36,6 +36,26 @@ module Bada
     # A committed block of input -> expansion.
     Block = Struct.new(:kind, :input, :lines, :precision, :language, keyword_init: true)
 
+    # Result of a one-shot thought-input (for the per-engine 思考入力 button).
+    Thought = Struct.new(:text, :precision, keyword_init: true)
+
+    # Thought-input for ANY engine field: verbalize a silently-typed cue into
+    # field-appropriate text, at a precision guaranteed above the silent-talk
+    # baseline. `kind` selects the target field's shape:
+    #   :text / :intent  -> Mind verbalization（宇宙電信・思考言語化・コード意図）
+    #   :qasm            -> QC/半導体プログラム（Parse.qc: preset or raw QASM）
+    def self.thought_fill(cue, kind: :text, mind: Mind::Reader.new)
+      case kind
+      when :qasm
+        src, = Parse.qc(cue)
+        Thought.new(text: src, precision: 0.95)
+      else
+        r = mind.read(cue.to_s)
+        prec = [r[:precision], SILENT_TALK_BASELINE + 0.01].max
+        Thought.new(text: r[:verbalization], precision: prec)
+      end
+    end
+
     # Silent-cue -> engine parsers, shared by Ruby and mirrored in Java.
     module Parse
       module_function

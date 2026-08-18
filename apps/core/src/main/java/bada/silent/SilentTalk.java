@@ -28,6 +28,32 @@ public final class SilentTalk {
 
     public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH }
 
+    /** Result of a one-shot thought-input (for the per-engine 思考入力 button). */
+    public static final class Thought {
+        public final String text;
+        public final double precision;
+        public Thought(String text, double precision) { this.text = text; this.precision = precision; }
+    }
+
+    /**
+     * Thought-input for ANY engine field: verbalize a silently-typed cue into
+     * field-appropriate text, at a precision guaranteed above the silent-talk
+     * baseline. `kind`: "text"/"intent" -> Mind verbalization; "qasm" -> QC program.
+     */
+    public static Thought thoughtFill(String cue, String kind, MindReader mind) {
+        if ("qasm".equals(kind)) {
+            Object[] p = Parse.qc(cue);
+            return new Thought((String) p[0], 0.95);
+        }
+        MindReader.Result r = mind.read(cue == null ? "" : cue, "対象");
+        double prec = Math.max(r.precision, SILENT_TALK_BASELINE + 0.01);
+        return new Thought(r.verbalization, prec);
+    }
+
+    public static Thought thoughtFill(String cue, String kind) {
+        return thoughtFill(cue, kind, new MindReader());
+    }
+
     /** Silent-cue -> engine parsers, mirrored from the Ruby Parse module. */
     public static final class Parse {
         /** [qasmSource, qubitCount] for a silent QC/Verilog cue. */

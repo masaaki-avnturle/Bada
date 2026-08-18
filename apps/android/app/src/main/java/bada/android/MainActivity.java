@@ -1,6 +1,7 @@
 package bada.android;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
@@ -16,12 +17,14 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.concurrent.Executors;
 
 import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.silent.SilentTalk;
+// SilentTalk.Thought / thoughtFill drive the 🧠 思考入力 button
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
@@ -82,6 +85,11 @@ public class MainActivity extends Activity {
                 new String[]{"GaAs", "InAs", "InGaAs", "Si", "diamond(NV)"}));
         root.addView(material);
 
+        Button think = new Button(this);
+        think.setText("🧠 思考入力 (Thought Input)");
+        think.setOnClickListener(v -> showThoughtInput());
+        root.addView(think);
+
         Button go = new Button(this);
         go.setText("実行 (Run)");
         go.setOnClickListener(v -> runSelected());
@@ -118,6 +126,38 @@ public class MainActivity extends Activity {
 
         setContentView(root);
         runSelected();
+    }
+
+    // Thought-input: verbalize a silently-typed cue into the current mode's input
+    // field via the manifold-gauge Mind transformer, above silent-talk precision.
+    private void showThoughtInput() {
+        final EditText cue = new EditText(this);
+        cue.setInputType(InputType.TYPE_CLASS_TEXT);
+        cue.setHint("思考の手がかり（発声せず・キーワード/略記）");
+        new AlertDialog.Builder(this)
+                .setTitle("🧠 思考入力 (Thought Input)")
+                .setMessage("発声せず、思考の手がかりを入力してください。silent-talk 超えの精度で欄を埋めます。")
+                .setView(cue)
+                .setPositiveButton("入力", (d, w) -> {
+                    String kind = thoughtKind(mode.getSelectedItemPosition());
+                    SilentTalk.Thought t = SilentTalk.thoughtFill(cue.getText().toString(), kind);
+                    input.setText(t.text);
+                    Toast.makeText(this, String.format("思考を入力 (precision %.1f%% > silent-talk %.1f%%)",
+                            t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
+                    runSelected();
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    // Field shape per mode: QC/Verilog want a program (qasm), Coder an intent,
+    // the rest plain verbalized text.
+    private static String thoughtKind(int mode) {
+        return switch (mode) {
+            case 1, 2 -> "qasm";
+            case 4 -> "intent";
+            default -> "text";
+        };
     }
 
     private void runSelected() {

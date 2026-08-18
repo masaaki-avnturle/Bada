@@ -202,6 +202,35 @@ class TestSilentTalkSession < Minitest::Test
     assert @s.exceeds_silent_talk?
   end
 
+  # ---- thought-input button (思考入力) ------------------------------------
+
+  def test_thought_fill_text_verbalizes_above_baseline
+    t = Bada::SilentTalk.thought_fill("光 記憶 波", kind: :text)
+    refute_empty t.text
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_thought_fill_qasm_returns_program
+    t = Bada::SilentTalk.thought_fill("bell", kind: :qasm)
+    assert_includes t.text, "CX 0 1"
+    assert(t.text.end_with?("HALT"))
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_thought_fill_intent_is_usable_by_coder
+    t = Bada::SilentTalk.thought_fill("数 を 表示", kind: :intent)
+    refute_empty t.text
+    # the verbalized intent can be fed straight to the code engine
+    r = Bada::Coder.generate(t.text)
+    refute_empty r[:code]
+  end
+
+  def test_thought_fill_empty_cue_is_safe
+    t = Bada::SilentTalk.thought_fill("", kind: :text)
+    refute_empty t.text
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

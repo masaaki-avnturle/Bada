@@ -465,6 +465,26 @@ QC/Verilog モードでは QASM ニーモニック（`H` `CX` `MEASURE` …）�
 デスクトップは**⑤ サイレント入力**タブ（モード選択つき）、Android は**⑥ サイレント入力**モードで
 同じ 5 エンジンを提供します（すべて共有 Java コア `bada.silent.SilentTalk`）。
 
+### 🧠 思考入力ボタン（全機能共通）
+
+全部の機能に**思考入力**を持たせるため、`SilentTalk.thought_fill(cue, kind:)` を用意しました。
+発声せず入力した手がかりを、**silent-talk 基準を超える精度**でその欄に適した形へ言語化します。
+デスクトップの各タブ（宇宙電信・擬似QC・思考言語化・コード生成）と Android の各モードに
+**「🧠 思考入力」ボタン**を配置しています。
+
+```ruby
+Bada::SilentTalk.thought_fill("光 記憶 波", kind: :text)   # -> 文章（宇宙電信/思考言語化）
+Bada::SilentTalk.thought_fill("素数 判定", kind: :intent)  # -> コード生成の意図
+Bada::SilentTalk.thought_fill("bell", kind: :qasm)         # -> QC/半導体プログラム
+# いずれも .text と .precision（> 0.92）を返す
+```
+
+| ご依頼の要素 | 実装 |
+|:--|:--|
+| 全機能に思考入力機能 | 各タブ／モードの「🧠 思考入力」ボタン ＋ `SilentTalk.thought_fill` |
+| silent talk 以上の精度 | `thought_fill` は precision を基準 0.92 超に保証して返す |
+| 入力機能のボタン | デスクトップ Swing ボタン／Android `AlertDialog` ボタン |
+
 ## モジュール構成
 
 ```

@@ -117,7 +117,9 @@ public final class DesktopApp {
         JPanel inRow = new JPanel(new BorderLayout(6, 6));
         inRow.add(new JLabel("メッセージ:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
-        inRow.add(send, BorderLayout.EAST);
+        JPanel tgEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        tgEast.add(thoughtButton(input, "text")); tgEast.add(send);
+        inRow.add(tgEast, BorderLayout.EAST);
         JPanel opts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         opts.add(new JLabel("材料:")); opts.add(material);
         opts.add(new JLabel("温度K:")); opts.add(temp);
@@ -160,7 +162,7 @@ public final class DesktopApp {
 
         JPanel ctl = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         ctl.add(new JLabel("量子ビット数:")); ctl.add(nq);
-        ctl.add(run); ctl.add(verilog); ctl.add(demo);
+        ctl.add(run); ctl.add(verilog); ctl.add(thoughtButton(qasm, "qasm")); ctl.add(demo);
 
         top.add(qasm, BorderLayout.CENTER);
         top.add(ctl, BorderLayout.SOUTH);
@@ -210,7 +212,9 @@ public final class DesktopApp {
         left.add(new JLabel("対象:")); left.add(subject);
         inRow.add(left, BorderLayout.WEST);
         inRow.add(signal, BorderLayout.CENTER);
-        inRow.add(go, BorderLayout.EAST);
+        JPanel mindEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        mindEast.add(thoughtButton(signal, "text")); mindEast.add(go);
+        inRow.add(mindEast, BorderLayout.EAST);
 
         JLabel note = new JLabel("※ 生成シミュレーション（実在の脳を読むものではありません）");
         note.setBorder(BorderFactory.createEmptyBorder(4, 2, 4, 2));
@@ -254,7 +258,7 @@ public final class DesktopApp {
         row1.add(l1, BorderLayout.WEST);
         row1.add(intent, BorderLayout.CENTER);
         JPanel r1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(gen);
+        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(thoughtButton(intent, "intent")); r1.add(gen);
         row1.add(r1, BorderLayout.EAST);
 
         // live word completion (command feature)
@@ -395,6 +399,28 @@ public final class DesktopApp {
         root.add(status, BorderLayout.SOUTH);
         refresh.run();
         return root;
+    }
+
+    // A reusable 思考入力 (thought-input) button: on click it asks for a silently
+    // typed cue and fills the given field via the manifold-gauge Mind transformer,
+    // above silent-talk precision. `kind`: "text"/"intent" verbalize; "qasm" -> program.
+    private static JButton thoughtButton(javax.swing.text.JTextComponent field, String kind) {
+        JButton b = new JButton("🧠 思考入力");
+        b.setToolTipText("発声せず、思考の手がかり（キーワード/略記）を入力して欄を埋めます（silent-talk 超え精度）");
+        b.addActionListener(e -> {
+            String cue = (String) JOptionPane.showInputDialog(field,
+                    "思考の手がかり（発声せず・キーワード/略記）:", "🧠 思考入力 (Thought Input)",
+                    JOptionPane.PLAIN_MESSAGE, null, null, "");
+            if (cue == null) return; // cancelled
+            SilentTalk.Thought t = SilentTalk.thoughtFill(cue, kind);
+            field.setText(t.text);
+            field.setCaretPosition(0);
+            JOptionPane.showMessageDialog(field,
+                    String.format("思考を入力しました。%nprecision %.1f%%  >  silent-talk %.1f%%",
+                            t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100),
+                    "🧠 思考入力", JOptionPane.INFORMATION_MESSAGE);
+        });
+        return b;
     }
 
     private static JTextArea monospaceArea() {
