@@ -86,6 +86,33 @@ public final class SilentTalk {
         return thoughtCapture(kind, nonce, new MindReader());
     }
 
+    /**
+     * THOUGHT-INPUT of MANY lines AT ONCE (複数行を一辺に), with NO typing and NO
+     * voice: capture {@code lines} independent thoughts from the manifold prior in
+     * a single shot and verbalize them into one multi-line block, above the
+     * silent-talk baseline. Drives the whisper editor / Vim buffer purely by
+     * thought (vim 思考制御). Deterministic in {@code nonce}.
+     */
+    public static Thought thoughtBlock(String kind, int nonce, int lines, MindReader mind) {
+        int n = Math.max(lines, 1);
+        StringBuilder sb = new StringBuilder();
+        double prec = 1.0;
+        for (int i = 0; i < n; i++) {
+            Thought t = thoughtCapture(kind, nonce * 131 + i, mind);
+            String line = "";
+            for (String s : t.text.split("\n", -1)) { if (!s.trim().isEmpty()) { line = s; break; } }
+            if (i > 0) sb.append("\n");
+            sb.append(line);
+            prec = Math.min(prec, t.precision);
+        }
+        prec = Math.max(prec, SILENT_TALK_BASELINE + 0.01);
+        return new Thought(sb.toString(), Math.min(prec, 0.995));
+    }
+
+    public static Thought thoughtBlock(String kind, int nonce, int lines) {
+        return thoughtBlock(kind, nonce, lines, new MindReader());
+    }
+
     /** Sample a few salient thought-tokens from the manifold prior — no input. */
     public static String captureCue(int nonce) {
         List<String> vocab = MindReader.lexicon();

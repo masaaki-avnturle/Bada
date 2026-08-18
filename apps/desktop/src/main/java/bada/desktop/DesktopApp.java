@@ -853,6 +853,25 @@ public final class DesktopApp {
         bBurst.setFocusable(false);
         bBurst.addActionListener(ev -> { burstWholeBuffer.run(); editor.requestFocusInWindow(); });
         gen.add(bBurst);
+        final int[] vimThoughtNonce = { 0 };
+        JButton bThink = new JButton("🧠 思考入力（複数行を一辺に）");
+        bThink.setToolTipText("直接打鍵せず・発声せず、思考から複数行を一辺に捕捉してバッファへ挿入（vim 思考制御・silent-talk 超え精度）");
+        bThink.setFocusable(false);
+        bThink.addActionListener(ev -> {
+            try {
+                SilentTalk.Thought t = SilentTalk.thoughtBlock("text", vimThoughtNonce[0]++, 6);
+                int at = editor.getCaretPosition();
+                String txt = editor.getText();
+                String pre = (at > 0 && at <= txt.length() && txt.charAt(at - 1) != '\n') ? "\n" : "";
+                editor.getDocument().insertString(at, pre + t.text + "\n", null);
+                int lines = t.text.split("\n", -1).length;
+                status.setText(String.format("  🧠 思考入力 %d行を一辺に捕捉: precision %.1f%% > silent-talk %.1f%%（発声・打鍵なし）",
+                        lines, t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+                rehl.run();
+            } catch (Exception ex) { status.setText("  error: " + ex.getMessage()); }
+            editor.requestFocusInWindow();
+        });
+        gen.add(bThink);
         String[][] genBtns = {
             {"🔩 半導体ソース", "verilog", "semiconductor lattice qubit gate"},
             {"⚛ QCソース", "qc", "entangle bell superposition measure"},
@@ -941,6 +960,18 @@ public final class DesktopApp {
             st.setText(String.format("  一括ウィスパード復元 %d行を一瞬で: precision %.1f%% > silent-talk %.1f%%",
                     lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
         };
+        final int[] tnonce = { 0 };
+
+        JButton bThink = new JButton("🧠 思考入力（複数行を一辺に）");
+        bThink.setToolTipText("直接打鍵せず、発声もせず、思考から複数行を一辺に捕捉して入力します（silent-talk 超え精度・vim 思考制御）");
+        bThink.addActionListener(ev -> {
+            SilentTalk.Thought t = SilentTalk.thoughtBlock("text", tnonce[0]++, 6);
+            ed.setText(t.text);
+            ed.setCaretPosition(ed.getText().length());
+            int lines = t.text.split("\n", -1).length;
+            st.setText(String.format("  🧠 思考入力 %d行を一辺に捕捉: precision %.1f%% > silent-talk %.1f%%（発声・打鍵なし）",
+                    lines, t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+        });
 
         JButton bBurst = new JButton("⚡ 一括復元（複数行を一瞬で）");
         bBurst.setToolTipText("入力した複数行のウィスパード英語を、発声せず一瞬で完全な英語へ一括復元します");
@@ -962,10 +993,10 @@ public final class DesktopApp {
             public void actionPerformed(java.awt.event.ActionEvent e) { burst.run(); }
         });
 
-        JLabel head = new JLabel("  全画面 Bada Vim：複数行のウィスパード英語を発声せず一瞬で完全な英語へ（短文入力ではありません）。Ctrl+Enter=一括復元");
+        JLabel head = new JLabel("  全画面 Bada Vim：🧠 思考入力（打鍵せず複数行を一辺に）／複数行のウィスパード英語を発声せず一瞬で完全な英語へ（短文入力ではありません）。Ctrl+Enter=一括復元");
         head.setBorder(BorderFactory.createEmptyBorder(6, 4, 4, 4));
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        bar.add(bBurst); bar.add(bOk); bar.add(bCancel);
+        bar.add(bThink); bar.add(bBurst); bar.add(bOk); bar.add(bCancel);
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(bar, BorderLayout.NORTH);
         bottom.add(st, BorderLayout.SOUTH);

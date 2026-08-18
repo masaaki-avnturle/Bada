@@ -83,6 +83,25 @@ module Bada
       end
     end
 
+    # THOUGHT-INPUT of MANY lines AT ONCE (複数行を一辺に), with NO typing and NO
+    # voice: capture `lines` independent thoughts from the manifold prior in a
+    # single shot and verbalize them into one multi-line block, above the
+    # silent-talk baseline. Used to drive the whisper editor / Vim buffer purely
+    # by thought (vim 思考制御). Deterministic in `nonce` so it is reproducible.
+    def self.thought_block(kind: :text, mind: Mind::Reader.new, nonce: 0, lines: 4)
+      n = [lines.to_i, 1].max
+      out = []
+      prec = 1.0
+      n.times do |i|
+        t = thought_capture(kind: kind, mind: mind, nonce: nonce.to_i * 131 + i)
+        line = t.text.to_s.split("\n").reject { |s| s.strip.empty? }.first.to_s
+        out << line
+        prec = [prec, t.precision].min
+      end
+      prec = [prec, SILENT_TALK_BASELINE + 0.01].max
+      Thought.new(text: out.join("\n"), precision: [prec, 0.995].min)
+    end
+
     # Sample a few salient thought-tokens from the manifold prior (Mind::LEXICON)
     # with a deterministic quantum-seeded PRNG — no typed or spoken input at all.
     def self.capture_cue(nonce)

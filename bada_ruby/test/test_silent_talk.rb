@@ -372,6 +372,19 @@ class TestSilentTalkSession < Minitest::Test
     assert_equal "en", r2[:lang]
   end
 
+  def test_thought_block_captures_many_lines_at_once
+    # 打鍵せず・発声せず、思考から複数行を一辺に捕捉
+    t = Bada::SilentTalk.thought_block(kind: :text, nonce: 0, lines: 6)
+    assert_equal 6, t.text.split("\n", -1).length          # 複数行を一辺に
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    # deterministic in nonce
+    t2 = Bada::SilentTalk.thought_block(kind: :text, nonce: 0, lines: 6)
+    assert_equal t.text, t2.text
+    # different nonce -> different capture
+    t3 = Bada::SilentTalk.thought_block(kind: :text, nonce: 1, lines: 6)
+    refute_equal t.text, t3.text
+  end
+
   def test_verbalize_block_reconstructs_many_lines_at_once
     cue = "qntm lght wv\nmmry sgnl fld\n\nbll ntngl"
     r = Bada::SilentTalk::Whisper.verbalize_block(cue)

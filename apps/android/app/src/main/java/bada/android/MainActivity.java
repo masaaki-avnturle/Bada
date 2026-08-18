@@ -150,6 +150,7 @@ public class MainActivity extends Activity {
     }
 
     private int thoughtNonce = 0;
+    private int whisperThoughtNonce = 0;
 
     // Thought-input with NO typed or spoken input: each tap captures thought-tokens
     // from the gamma-manifold prior and fills the current mode's field via the
@@ -194,6 +195,15 @@ public class MainActivity extends Activity {
                     int lines = r.text.split("\n", -1).length;
                     Toast.makeText(this, String.format("一括ウィスパード復元 %d行を一瞬で (precision %.1f%% > silent-talk %.1f%%)",
                             lines, r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
+                    runSelected();
+                })
+                .setNeutralButton("🧠 思考入力", (d, w) -> {
+                    // 打鍵せず・発声せず、思考から複数行を一辺に捕捉して入力
+                    SilentTalk.Thought t = SilentTalk.thoughtBlock("text", whisperThoughtNonce++, 6);
+                    input.setText(t.text);
+                    int lines = t.text.split("\n", -1).length;
+                    Toast.makeText(this, String.format("🧠 思考入力 %d行を一辺に捕捉 (precision %.1f%% > silent-talk %.1f%%)",
+                            lines, t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100), Toast.LENGTH_LONG).show();
                     runSelected();
                 })
                 .setNegativeButton("取消", null)
