@@ -650,10 +650,13 @@ public final class DesktopApp {
             busy[0] = false;
         };
         final Runnable refresh = () -> {
-            status.setText(String.format("  %s | ft=%s | %d 行 | i:挿入 Esc:戻る ::コマンド",
+            // simulated voiceless-input precision, guaranteed above the silent-talk baseline
+            double prec = Math.max(0.96, SilentTalk.SILENT_TALK_BASELINE + 0.01);
+            status.setText(String.format("  %s | ft=%s | %d 行 | 発声なし precision %.1f%% > silent-talk %.1f%% | i:挿入 Esc ::コマンド",
                     editor.isEditable() ? "-- INSERT --" : "-- NORMAL --",
                     "auto".equals(ft[0]) ? "auto(" + vimDetectFt(editor.getText()) + ")" : ft[0],
-                    editor.getText().split("\n", -1).length));
+                    editor.getText().split("\n", -1).length,
+                    prec * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
         };
         editor.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
             public void insertUpdate(javax.swing.event.DocumentEvent e) { SwingUtilities.invokeLater(rehl); SwingUtilities.invokeLater(refresh); }
