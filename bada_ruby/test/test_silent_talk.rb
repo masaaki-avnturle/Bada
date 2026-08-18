@@ -261,6 +261,58 @@ class TestSilentTalkSession < Minitest::Test
     cue.split(/\s+/).each { |w| assert_includes Bada::Mind::LEXICON, w }
   end
 
+  # ---- Bada-language silent syntax input (:bada) ---------------------------
+
+  def test_bada_mode_generates_runnable_program
+    assert_equal :command, @s.feed(":bada")[:kind]
+    assert_equal :bada, @s.mode
+    r = @s.feed("光 記憶 波")
+    assert_equal :bada, r[:kind]
+    assert r[:valid], "generated Bada must run in the interpreter"
+    # the cue becomes the string literal
+    assert_includes r[:code], '"光 記憶 波"'
+    # it really runs
+    out = Bada::Interpreter.new.run(r[:code])
+    refute_empty out
+  end
+
+  def test_bada_program_uses_reserved_and_syntax_words
+    @s.feed(":bada")
+    r = @s.feed("波")
+    assert_includes r[:reserved_used], "set"
+    assert_includes r[:reserved_used], "print"
+    assert(%w[<- -< >-].any? { |op| r[:reserved_used].include?(op) })
+  end
+
+  def test_bada_completion_offers_reserved_words
+    @s.feed(":bada")
+    assert_equal ["set"], @s.complete("se")
+    assert_includes @s.complete("<"), "<-"
+    assert_includes @s.complete("pr"), "print"
+  end
+
+  def test_reserved_command_lists_bada_words
+    @s.feed(":bada")
+    out = @s.feed(":reserved")[:output]
+    %w[set print as push <- -< >-].each { |w| assert_includes out, w }
+  end
+
+  def test_bada_capture_needs_no_input_and_runs
+    t = Bada::SilentTalk.thought_capture(kind: :bada, nonce: 2)
+    assert_includes t.text, "set"
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    refute_empty Bada::Interpreter.new.run(t.text)
+  end
+
+  def test_bada_syntax_reserved_recognition
+    line = 'g <- "x"'
+    assert_includes Bada::SilentTalk::BadaSyntax.reserved_words(line), "<-"
+  end
+
+  def test_bada_is_a_declared_mode
+    assert_includes Bada::SilentTalk::MODES, :bada
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

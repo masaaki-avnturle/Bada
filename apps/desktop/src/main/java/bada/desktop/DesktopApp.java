@@ -321,9 +321,9 @@ public final class DesktopApp {
 
         // input row: the "silent" cue (no vocalization) + a mode toggle
         JTextField cue = new JTextField("光 記憶 波");
-        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph"};
+        final String[] modeCmd = {":text", ":code", ":qc", ":verilog", ":telegraph", ":bada"};
         JComboBox<String> mode = new JComboBox<>(new String[]{
-                "text（言語化）", "code（コード）", "qc（QCソース）", "verilog（半導体）", "telegraph（宇宙電信）"});
+                "text（言語化）", "code（コード）", "qc（QCソース）", "verilog（半導体）", "telegraph（宇宙電信）", "bada（Bada構文）"});
         JComboBox<String> lang = new JComboBox<>(new String[]{"auto", "ruby", "python", "javascript", "c", "java", "bada"});
         JButton feed = new JButton("入力 (Feed)");
 

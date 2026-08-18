@@ -4,6 +4,7 @@ require_relative "mind"
 require_relative "coder"
 require_relative "qc"
 require_relative "quantum"
+require_relative "language"
 
 module Bada
   # Bada::SilentTalk — a silent-talk INPUT METHOD (発声せずに文章を入力する機能)
@@ -31,7 +32,7 @@ module Bada
   module SilentTalk
     SILENT_TALK_BASELINE = Mind::SILENT_TALK_BASELINE
 
-    MODES = %i[text code qc verilog telegraph].freeze
+    MODES = %i[text code qc verilog telegraph bada].freeze
 
     # A committed block of input -> expansion.
     Block = Struct.new(:kind, :input, :lines, :precision, :language, keyword_init: true)
@@ -72,6 +73,9 @@ module Bada
       case kind
       when :qasm
         Thought.new(text: CAPTURE_PROGRAMS[nonce.to_i % CAPTURE_PROGRAMS.length], precision: 0.95)
+      when :bada
+        r = BadaSyntax.build("", nonce: nonce)
+        Thought.new(text: r[:code], precision: r[:precision])
       else
         r = mind.read(capture_cue(nonce))
         prec = [r[:precision], SILENT_TALK_BASELINE + 0.01].max
@@ -119,6 +123,70 @@ module Bada
       end
     end
 
+    # Bada-language SILENT SYNTAX INPUT: reserved words, syntax-rule operators and
+    # statement templates of the Bada language, generated without any vocalization.
+    # Every produced program is verified to actually parse/run in Bada::Interpreter.
+    module BadaSyntax
+      module_function
+
+      RESERVED   = %w[set print as push].freeze                 # 予約語
+      NAMESPACES = %w[Omega:: Ω::].freeze                       # TupleSpace 名前空間
+      OPERATORS  = %w[<- -< >-].freeze                          # 構文規則の演算子
+      ASSIGN     = "="
+      VARS       = %w[g h m psi phi node xi].freeze
+
+      # All reserved / syntax-rule words (for completion & recognition).
+      def reserved_all
+        RESERVED + NAMESPACES + OPERATORS + [ASSIGN]
+      end
+
+      # Which reserved / syntax words appear in a line (予約語の自動認識).
+      def reserved_words(line)
+        toks = line.to_s.split(/\s+/)
+        toks.select { |t| reserved_all.include?(t) }
+      end
+
+      # Build a syntactically valid Bada program without voice. Any words in `cue`
+      # become the string literal; otherwise thought-tokens are sampled from the
+      # manifold prior with a deterministic quantum-seeded PRNG keyed by `nonce`.
+      def build(cue = "", nonce: 0)
+        s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+        nxt = lambda { s = (s * 1_103_515_245 + 12_345) & 0x7fffffff }
+        words = cue.to_s.scan(/[A-Za-z]+|[一-鿿ぁ-んァ-ヶー]+/)
+        words = Array.new(2) { Mind::LEXICON[nxt.call % Mind::LEXICON.length] } if words.empty?
+
+        v    = VARS[nxt.call % VARS.length]
+        num1 = (nxt.call % 90 + 10) / 10.0
+        num2 = (nxt.call % 40 + 10) / 10.0
+        op   = OPERATORS[nxt.call % OPERATORS.length]
+        key  = "node#{nxt.call % 9 + 1}"
+        lit  = words.first(3).join(" ")
+
+        lines = [
+          "set #{v} = #{num1}",
+          "#{v} <- \"#{lit}\"",
+          op == ">-" ? "#{v} >- #{v}" : "#{v} #{op} #{num2}",
+          "Omega::push #{v} as #{key}",
+          "print #{v}"
+        ]
+        code = lines.join("\n")
+        ok = valid?(code)
+        {
+          code: code, valid: ok,
+          reserved_used: (RESERVED + NAMESPACES + OPERATORS).select { |w| code.include?(w) },
+          precision: ok ? 0.96 : 0.90
+        }
+      end
+
+      # A program is accepted only if the real Bada interpreter runs it.
+      def valid?(code)
+        Interpreter.new.run(code)
+        true
+      rescue StandardError
+        false
+      end
+    end
+
     class Session
       attr_reader :mode, :language, :blocks
 
@@ -128,6 +196,7 @@ module Bada
         @mind = mind
         @qc_dir = qc_dir
         @blocks = []
+        @bada_nonce = 0
       end
 
       # Feed one silent input line. Returns a result Hash describing the effect.
@@ -141,6 +210,7 @@ module Bada
         when :qc        then qc_input(line)
         when :verilog   then verilog_input(line)
         when :telegraph then telegraph_input(line)
+        when :bada      then bada_input(line)
         else text_input(line)
         end
       end
@@ -195,6 +265,17 @@ module Bada
         { kind: :telegraph, code: report, precision: 0.97, appended: lines }
       end
 
+      # Silent cue -> a syntactically valid Bada-language program (予約語・構文規則を
+      # 使って発声せず入力). Verified to run in the Bada interpreter.
+      def bada_input(cue)
+        r = BadaSyntax.build(cue, nonce: @bada_nonce)
+        @bada_nonce += 1
+        lines = r[:code].split("\n")
+        commit(:bada, cue, lines, r[:precision], "bada")
+        { kind: :bada, code: r[:code], valid: r[:valid], reserved_used: r[:reserved_used],
+          precision: r[:precision], appended: lines }
+      end
+
       # Word completion for the current mode.
       def complete(prefix, limit: 8)
         prefix = prefix.to_s
@@ -205,6 +286,8 @@ module Bada
           Coder.complete(prefix, language: @language, limit: limit)
         when :qc, :verilog
           qc_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
+        when :bada
+          BadaSyntax.reserved_all.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         else
           text_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         end
@@ -264,6 +347,7 @@ module Bada
         when :qc then "  ＋ [QC #{r[:qubits]}qubit]  (#{format('%.0f%%', r[:precision] * 100)})\n#{indent(r[:code])}"
         when :verilog then "  ＋ [Verilog #{r[:qubits]}qubit]\n#{indent(r[:code])}"
         when :telegraph then "  ＋ [Telegraph]\n#{indent(r[:code])}"
+        when :bada then "  ＋ [Bada構文#{r[:valid] ? '✓' : '✗'}]  予約語:#{r[:reserved_used].join(' ')}\n#{indent(r[:code])}"
         when :command then r[:output]
         when :noop then ""
         else r.inspect
@@ -295,6 +379,10 @@ module Bada
           @mode = :verilog; { kind: :command, output: "mode = verilog（半導体ソース入力）" }
         when "telegraph", "tg"
           @mode = :telegraph; { kind: :command, output: "mode = telegraph（宇宙電信入力）" }
+        when "bada"      then @mode = :bada; { kind: :command, output: "mode = bada（Bada言語 構文入力）" }
+        when "reserved", "r"
+          list = @mode == :bada ? BadaSyntax.reserved_all : (@language ? Coder.reserved_words("", language: @language) : [])
+          { kind: :command, output: "予約語/構文語: #{list.join('  ')}" }
         when "lang"      then @language = rest.empty? ? nil : rest
                               { kind: :command, output: "language = #{@language || 'auto'}" }
         when "complete", "c"
@@ -315,14 +403,15 @@ module Bada
         [
           "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)",
           "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。",
-          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信",
-          "  コマンド: :lang <l> :complete <prefix> :undo :clear :show :mode :precision :help :quit"
+          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文",
+          "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit"
         ].join("\n")
       end
 
       def help
         ":text 言語化 / :code コード / :qc QCソース＋実行 / :verilog 半導体 / :telegraph 宇宙電信 / " \
-          ":lang <ruby|python…> / :complete <prefix> / :undo / :clear / :show / :precision / :quit"
+          ":bada Bada構文 / :lang <ruby|python…> / :complete <prefix> / :reserved 予約語 / " \
+          ":undo / :clear / :show / :precision / :quit"
       end
 
       def indent(code)

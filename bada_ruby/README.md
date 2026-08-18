@@ -429,12 +429,33 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 | QC | `:qc` | 手がかり／擬似コード | 擬似量子計算機の QC ソース＋ディスク実行の状態ベクトル |
 | 半導体 | `:verilog`（`:semi`） | 手がかり／擬似コード | 半導体（Verilog RTL）ソースコード |
 | 宇宙電信 | `:telegraph`（`:tg`） | 送信文 | 量子もつれ宇宙電信（物理証明つき） |
+| **Bada構文** | **`:bada`** | 手がかり | **Bada言語のソース（予約語・構文規則で構成、実行検証つき）** |
 
 ```bash
 bin/bada silent                                          # 対話 IME（発声せずに入力）
 bin/bada silent "光 記憶 波" ":code" "fibonacci 8"       # 手がかり→文章、:code→プログラム
 bin/bada silent ":qc" "bell" ":verilog" "ghz"           # QC ソース実行 → 半導体 Verilog を入力
 bin/bada silent ":qc" "H 0; CX 0 1; MEASURE 0"          # 擬似コードを発声せず入力→ 実行
+bin/bada silent ":bada" "光 記憶"                        # Bada言語の構文を発声せず入力（実行検証つき）
+```
+
+**Bada言語の構文入力（`:bada`）** — プログラミング言語 Bada の**予約語**（`set` `print` `as` `push`）・
+**構文規則の演算子**（`<-` 左作用 / `-<` 多様体積分 / `>-` 量子右作用）・名前空間（`Omega::` `Ω::`）を
+**発声せず**に入力します。生成した構文は**実際に Bada インタプリタで実行して妥当性を検証**します。
+`:complete` は予約語・演算子を前方一致補完し、`:reserved` は予約語一覧を表示します（コマンド機能）。
+
+```
+silent[bada]> :reserved
+予約語/構文語: set  print  as  push  Omega::  Ω::  <-  -<  >-  =
+silent[bada]> :complete se     -> set
+silent[bada]> :complete <      -> <-
+silent[bada]> 光 記憶
+  ＋ [Bada構文✓]  予約語:set print as push Omega:: <-
+    set g = 7.9
+    g <- "光 記憶"
+    g -< 1.2
+    Omega::push g as node1
+    print g
 ```
 
 ```ruby

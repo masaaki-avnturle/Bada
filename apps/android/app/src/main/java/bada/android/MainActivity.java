@@ -44,7 +44,7 @@ public class MainActivity extends Activity {
     private static final String MIND_DEMO = "光 と 音 の 記憶 が 波 の よう に 流れ 望み と 恐れ が 交錯 する";
     private static final String CODE_DEMO = "print hello 3 times loop";
     private static final String SILENT_DEMO =
-            "光 記憶 波 | :code | :lang ruby | fibonacci 8 | :qc | bell | :verilog | ghz | :telegraph | QUANTUM HELLO";
+            "光 記憶 波 | :code | :lang ruby | fibonacci 8 | :qc | bell | :verilog | ghz | :bada | 光 記憶 | :telegraph | QUANTUM HELLO";
 
     private Spinner mode;
     private EditText input;

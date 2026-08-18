@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 public final class SilentTalk {
     public static final double SILENT_TALK_BASELINE = MindReader.SILENT_TALK_BASELINE;
 
-    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH }
+    public enum Mode { TEXT, CODE, QC, VERILOG, TELEGRAPH, BADA }
 
     /** Result of a one-shot thought-input (for the per-engine 思考入力 button). */
     public static final class Thought {
@@ -72,6 +72,10 @@ public final class SilentTalk {
         if ("qasm".equals(kind)) {
             int i = ((nonce % CAPTURE_PROGRAMS.length) + CAPTURE_PROGRAMS.length) % CAPTURE_PROGRAMS.length;
             return new Thought(CAPTURE_PROGRAMS[i], 0.95);
+        }
+        if ("bada".equals(kind)) {
+            BadaSyntax.Program p = BadaSyntax.build("", nonce);
+            return new Thought(p.code, p.precision);
         }
         MindReader.Result r = mind.read(captureCue(nonce), "対象");
         double prec = Math.max(r.precision, SILENT_TALK_BASELINE + 0.01);
@@ -143,7 +147,9 @@ public final class SilentTalk {
         public String source;           // qc | verilog (the QASM)
         public int qubits;              // qc | verilog
         public boolean recipe;          // code
-        public double precision;        // text | code | qc | verilog | telegraph
+        public boolean valid;           // bada (program runs)
+        public List<String> reservedUsed; // bada
+        public double precision;        // text | code | qc | verilog | telegraph | bada
         public List<String> appended;   // all engine kinds
         public String output;           // command
     }
@@ -153,6 +159,7 @@ public final class SilentTalk {
         private String language = null;      // code language (null = auto)
         private final MindReader mind;
         private final List<Block> blocks = new ArrayList<>();
+        private int badaNonce = 0;
 
         public Session() { this(new MindReader()); }
         public Session(MindReader mind) { this.mind = mind; }
@@ -173,8 +180,20 @@ public final class SilentTalk {
                 case QC: return qcInput(line);
                 case VERILOG: return verilogInput(line);
                 case TELEGRAPH: return telegraphInput(line);
+                case BADA: return badaInput(line);
                 default: return textInput(line);
             }
+        }
+
+        /** Silent cue -> a syntactically valid Bada-language program (verified). */
+        public Feed badaInput(String cue) {
+            BadaSyntax.Program p = BadaSyntax.build(cue, badaNonce++);
+            List<String> lines = new ArrayList<>(Arrays.asList(p.code.split("\n", -1)));
+            blocks.add(new Block("bada", cue, lines, p.precision, "bada"));
+            Feed f = new Feed();
+            f.kind = "bada"; f.code = p.code; f.valid = p.valid;
+            f.reservedUsed = p.reservedUsed; f.precision = p.precision; f.appended = lines;
+            return f;
         }
 
         /** Verbalize a sparse cue into a sentence and append it. */
@@ -251,7 +270,10 @@ public final class SilentTalk {
         public List<String> complete(String prefix, int limit) {
             if (prefix == null || prefix.isEmpty()) return new ArrayList<>();
             if (mode == Mode.CODE) return Coder.complete(prefix, language, limit);
-            List<String> vocab = (mode == Mode.QC || mode == Mode.VERILOG) ? qcVocab() : textVocab();
+            List<String> vocab;
+            if (mode == Mode.QC || mode == Mode.VERILOG) vocab = qcVocab();
+            else if (mode == Mode.BADA) vocab = BadaSyntax.reservedAll();
+            else vocab = textVocab();
             List<String> out = new ArrayList<>();
             for (String w : vocab) {
                 if (w.startsWith(prefix) && !out.contains(w)) out.add(w);
@@ -292,6 +314,9 @@ public final class SilentTalk {
                     return "  ＋ [Verilog " + r.qubits + "qubit]\n" + indent(r.code);
                 case "telegraph":
                     return "  ＋ [Telegraph]\n" + indent(r.code);
+                case "bada":
+                    return "  ＋ [Bada構文" + (r.valid ? "✓" : "✗") + "]  予約語:"
+                            + String.join(" ", r.reservedUsed) + "\n" + indent(r.code);
                 case "command":
                     return r.output;
                 default:
@@ -316,6 +341,11 @@ public final class SilentTalk {
                     mode = Mode.VERILOG; f.output = "mode = verilog（半導体ソース入力）"; break;
                 case "telegraph": case "tg":
                     mode = Mode.TELEGRAPH; f.output = "mode = telegraph（宇宙電信入力）"; break;
+                case "bada": mode = Mode.BADA; f.output = "mode = bada（Bada言語 構文入力）"; break;
+                case "reserved": case "r":
+                    f.output = "予約語/構文語: " + (mode == Mode.BADA
+                            ? String.join("  ", BadaSyntax.reservedAll())
+                            : "（:complete を利用）"); break;
                 case "mode": f.output = "mode = " + mode.name().toLowerCase(); break;
                 case "lang":
                     language = rest.isEmpty() ? null : rest;
@@ -338,13 +368,13 @@ public final class SilentTalk {
         public String intro() {
             return "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)\n"
                  + "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。\n"
-                 + "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信\n"
-                 + "  コマンド: :lang <l> :complete <prefix> :undo :clear :show :mode :precision :help :quit";
+                 + "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文\n"
+                 + "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit";
         }
 
         private String help() {
             return ":text 言語化 / :code コード / :qc QCソース＋実行 / :verilog 半導体 / :telegraph 宇宙電信 / "
-                 + ":lang <ruby|python…> / :complete <prefix> / :undo / :clear / :show / :precision / :quit";
+                 + ":bada Bada構文 / :lang <ruby|python…> / :complete <prefix> / :reserved / :undo / :clear / :show / :precision / :quit";
         }
 
         private String indent(String code) {
