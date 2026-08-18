@@ -13,6 +13,7 @@
 #   bin/bada qc verilog [ghz|f.qasm]    emit semiconductor (Verilog) control source
 #   bin/bada mind "信号..."             thought verbalization + image + code (sim)
 #   bin/bada silent                     silent-talk IME: verbalize cues -> text/code
+#   bin/bada whisper "qntm lght wv"     whispered English / unknown-language verbalize
 #   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
 #   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
 #   bin/bada detect "code..."           auto-detect the programming language
@@ -173,6 +174,14 @@ when "silent"
     puts format("precision = %.1f%%  -> %s", session.precision * 100,
                 session.exceeds_silent_talk? ? "EXCEEDS silent talk" : "below")
   end
+when "whisper"
+  # Whispered English reconstruction / unknown-language verbalization (発声せず).
+  #   bada whisper "qntm lght wv"     -> quantum light wave
+  #   bada whisper "φωτ μνημη"        -> (未知言語を英語へ言語化)
+  r = Bada::SilentTalk::Whisper.verbalize(ARGV.join(" "))
+  puts format("# whisper source=%s  precision=%.1f%%  (silent-talk %.1f%%)",
+              r[:lang], r[:precision] * 100, Bada::SilentTalk::SILENT_TALK_BASELINE * 100)
+  puts r[:text]
 when "code"
   # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.
   #   bada code "print hello 3 times" [--lang python]
@@ -252,6 +261,6 @@ when "version", "-v", "--version"
   puts "bada #{Bada::VERSION}"
 else
   warn "unknown command: #{cmd}"
-  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | silent | code | complete | detect | coder | run | learn | xi | neural | train | version"
+  warn "commands: repl | ask | info | penrose | palette | quantum | qc | mind | silent | whisper | code | complete | detect | coder | run | learn | xi | neural | train | version"
   exit 1
 end

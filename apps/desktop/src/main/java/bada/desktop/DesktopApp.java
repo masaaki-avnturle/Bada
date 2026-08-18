@@ -3,6 +3,7 @@ package bada.desktop;
 import bada.coder.Coder;
 import bada.mind.MindReader;
 import bada.silent.SilentTalk;
+import bada.silent.Whisper;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
  *   ③ Mind               (思考言語化 simulation)
  *   ④ Coder              (思考→コード transformer, EN/JA)
  *   ⑤ Silent IME         (サイレント入力: 発声せず文章/コードを入力, simulation)
+ *   ⑥ Whisper            (英語ウィスパード復元／未知言語の言語化, simulation)
  *
  * Run with no arguments to open the Swing GUI (how the packaged app launches).
  * Pass a message for a one-shot telegraph console report, or a flag for a
@@ -66,6 +68,13 @@ public final class DesktopApp {
                     s.exceedsSilentTalk() ? "EXCEEDS silent talk" : "below");
             return;
         }
+        if (joined.startsWith("--whisper")) {
+            String cue = joined.substring("--whisper".length()).trim();
+            Whisper.Result r = Whisper.verbalize(cue);
+            System.out.printf("# whisper source=%s  precision=%.1f%%%n", r.lang, r.precision * 100);
+            System.out.println(r.text);
+            return;
+        }
         if (joined.startsWith("--code")) {
             String intent = joined.substring("--code".length()).trim();
             Coder.GenResult r = Coder.generate(intent, null);
@@ -97,6 +106,7 @@ public final class DesktopApp {
         tabs.addTab("③ 思考言語化 (Mind)", mindPanel());
         tabs.addTab("④ コード生成 (Coder)", coderPanel());
         tabs.addTab("⑤ サイレント入力 (Silent IME)", silentPanel());
+        tabs.addTab("⑥ ウィスパード (Whisper)", whisperPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -406,6 +416,74 @@ public final class DesktopApp {
     // input: each press captures thought-tokens from the gamma-manifold prior and
     // fills the field via the Mind transformer, above silent-talk precision.
     // `kind`: "text"/"intent" verbalize a sentence; "qasm" -> a program.
+    // ---------------------------------------------------------------- Whisper
+    private static JPanel whisperPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+
+        JTextField input = new JTextField("qntm lght mmry wv sgnl");
+        JButton go = new JButton("言語化 (Verbalize)");
+
+        JPanel inRow = new JPanel(new BorderLayout(6, 6));
+        inRow.add(new JLabel("ウィスパード / 未知言語:"), BorderLayout.WEST);
+        inRow.add(input, BorderLayout.CENTER);
+        inRow.add(go, BorderLayout.EAST);
+
+        JTextField prefix = new JTextField();
+        JLabel completions = new JLabel(" ");
+        JPanel row2 = new JPanel(new BorderLayout(6, 6));
+        JPanel l2 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        l2.add(new JLabel("補完 (prefix):"));
+        row2.add(l2, BorderLayout.WEST);
+        row2.add(prefix, BorderLayout.CENTER);
+        row2.add(completions, BorderLayout.SOUTH);
+
+        JLabel note = new JLabel("※ 発声せず、英語ウィスパード（母音欠落）を完全文へ／未知言語を英語へ言語化（simulation）");
+        note.setBorder(BorderFactory.createEmptyBorder(4, 2, 2, 2));
+
+        top.add(inRow, BorderLayout.NORTH);
+        JPanel mid = new JPanel(new BorderLayout());
+        mid.add(row2, BorderLayout.NORTH);
+        mid.add(note, BorderLayout.SOUTH);
+        top.add(mid, BorderLayout.SOUTH);
+
+        JTextArea output = monospaceArea();
+        Runnable run = () -> {
+            Whisper.Result r = Whisper.verbalize(input.getText());
+            String kind = "en".equals(r.lang) ? "英語ウィスパード復元" : "未知言語の言語化";
+            output.setText(String.format(
+                    "入力 (whispered/unknown):%n  %s%n%n言語化 (%s, source=%s):%n  %s%n%nprecision = %.1f%%  (silent-talk %.1f%%)  -> %s",
+                    input.getText(), kind, r.lang, r.text,
+                    r.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100,
+                    r.precision > SilentTalk.SILENT_TALK_BASELINE ? "EXCEEDS silent talk" : "below"));
+            output.setCaretPosition(0);
+        };
+        go.addActionListener(e -> run.run());
+        input.addActionListener(e -> run.run());
+
+        Runnable complete = () -> {
+            java.util.List<String> c = new java.util.ArrayList<>();
+            String p = prefix.getText().trim().toLowerCase();
+            if (!p.isEmpty()) for (String w : Whisper.VOCAB) {
+                if (w.startsWith(p) && !c.contains(w)) c.add(w);
+                if (c.size() >= 8) break;
+            }
+            completions.setText("→ " + String.join("   ", c));
+        };
+        prefix.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
+            public void insertUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void removeUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+            public void changedUpdate(javax.swing.event.DocumentEvent e) { complete.run(); }
+        });
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        run.run();
+        return root;
+    }
+
     private static JButton thoughtButton(javax.swing.text.JTextComponent field, String kind) {
         final int[] nonce = {0};
         JButton b = new JButton("🧠 思考入力");
