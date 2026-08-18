@@ -313,6 +313,54 @@ class TestSilentTalkSession < Minitest::Test
     assert_includes Bada::SilentTalk::MODES, :bada
   end
 
+  # ---- whispered / unknown-language verbalization (:whisper) ---------------
+
+  def test_whisper_reconstructs_vowel_dropped_english
+    assert_equal :command, @s.feed(":whisper")[:kind]
+    assert_equal :whisper, @s.mode
+    r = @s.feed("hll wrld")
+    assert_equal :whisper, r[:kind]
+    assert_equal "hello world", r[:text]
+    assert_equal "en", r[:source_lang]
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_whisper_expands_domain_words
+    @s.feed(":whisper")
+    r = @s.feed("qntm lght wv sgnl")
+    assert_equal "quantum light wave signal", r[:text]
+  end
+
+  def test_whisper_decodes_unknown_language
+    @s.feed(":whisper")
+    r = @s.feed("φωτ μνημη κυμα")   # non-Latin, non-Japanese script
+    assert_equal "unknown", r[:source_lang]
+    assert(r[:text].split(/\s+/).all? { |w| Bada::SilentTalk::Whisper::VOCAB.include?(w) })
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
+  def test_whisper_unknown_decode_is_deterministic
+    a = Bada::SilentTalk::Whisper.decode_unknown("φωτ κυμα")[:text]
+    b = Bada::SilentTalk::Whisper.decode_unknown("φωτ κυμα")[:text]
+    assert_equal a, b
+  end
+
+  def test_whisper_completion_offers_english_vocab
+    @s.feed(":whisper")
+    assert_includes @s.complete("qu"), "quantum"
+    assert_includes @s.complete("li"), "light"
+  end
+
+  def test_unknown_language_detection
+    assert Bada::SilentTalk::Whisper.unknown_language?("φωτ")
+    refute Bada::SilentTalk::Whisper.unknown_language?("hll wrld")
+    refute Bada::SilentTalk::Whisper.unknown_language?("光 記憶")
+  end
+
+  def test_whisper_is_a_declared_mode
+    assert_includes Bada::SilentTalk::MODES, :whisper
+  end
+
   def test_repl_reads_lines_and_prints_document
     require "stringio"
     input = StringIO.new("光 記憶\n:code\nfibonacci 6\n:quit\n")

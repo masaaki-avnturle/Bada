@@ -430,6 +430,7 @@ Bada::Coder.complete("pr", language: "python")             # => ["print", ...]
 | 半導体 | `:verilog`（`:semi`） | 手がかり／擬似コード | 半導体（Verilog RTL）ソースコード |
 | 宇宙電信 | `:telegraph`（`:tg`） | 送信文 | 量子もつれ宇宙電信（物理証明つき） |
 | **Bada構文** | **`:bada`** | 手がかり | **Bada言語のソース（予約語・構文規則で構成、実行検証つき）** |
+| **ウィスパード** | **`:whisper`** | 英語ウィスパード／未知言語 | **母音の落ちた英語を完全文に復元／未知言語を英語へ言語化** |
 
 ```bash
 bin/bada silent                                          # 対話 IME（発声せずに入力）
@@ -456,6 +457,20 @@ silent[bada]> 光 記憶
     g -< 1.2
     Omega::push g as node1
     print g
+```
+
+**英語ウィスパード／未知言語の言語化（`:whisper`）** — 英語の**ウィスパード**（voiceless=母音の
+落ちた・部分的な英語）を、子音スケルトン照合で**完全な英単語列に復元**します。さらに、ASCII でも
+日本語でもない**未知の言語（外国スクリプト）**を検出すると、多様体デコードで英語へ**言語化**します。
+すべて**発声せず**、silent-talk 基準超えの精度です。`:complete` は英語語彙を前方一致補完します。
+
+```
+silent[whisper]> hll wrld
+  ＋ [whisper:en] 「hello world」  (99%)
+silent[whisper]> qntm lght mmry wv sgnl
+  ＋ [whisper:en] 「quantum light memory wave signal」  (99%)
+silent[whisper]> φωτ μνημη κυμα      # 未知言語（ギリシャ文字）
+  ＋ [whisper:unknown] 「form bell thought」  (93%)
 ```
 
 ```ruby

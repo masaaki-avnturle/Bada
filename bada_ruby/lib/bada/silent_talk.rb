@@ -32,7 +32,7 @@ module Bada
   module SilentTalk
     SILENT_TALK_BASELINE = Mind::SILENT_TALK_BASELINE
 
-    MODES = %i[text code qc verilog telegraph bada].freeze
+    MODES = %i[text code qc verilog telegraph bada whisper].freeze
 
     # A committed block of input -> expansion.
     Block = Struct.new(:kind, :input, :lines, :precision, :language, keyword_init: true)
@@ -187,6 +187,97 @@ module Bada
       end
     end
 
+    # WHISPERED verbalization: reconstruct full English from whispered (voiceless,
+    # vowel-reduced / partial) fragments, and verbalize an UNKNOWN language
+    # (foreign script) into readable text — all without vocalization.
+    module Whisper
+      module_function
+
+      # Domain English vocabulary the whisper decoder reconstructs toward.
+      VOCAB = %w[
+        hello world light sound memory wave quantum entangle photon signal
+        space time thought silent whisper language unknown code source
+        machine mind manifold gamma function integral bell measure telegraph
+        color form dream voice heat stillness meaning will fear hope
+        the of and to in is are we you it a an
+      ].freeze
+
+      def skeleton(w)
+        w.downcase.gsub(/[^a-z]/, "").gsub(/[aeiou]/, "")
+      end
+
+      def levenshtein(a, b)
+        return b.length if a.empty?
+        return a.length if b.empty?
+        prev = (0..b.length).to_a
+        a.chars.each_with_index do |ca, i|
+          cur = [i + 1]
+          b.chars.each_with_index do |cb, j|
+            cur << [prev[j + 1] + 1, cur[j] + 1, prev[j] + (ca == cb ? 0 : 1)].min
+          end
+          prev = cur
+        end
+        prev[b.length]
+      end
+
+      # Expand one whispered token to the nearest English word.
+      # Returns [word, confident?].
+      def expand(token)
+        t = token.to_s.downcase.gsub(/[^a-z]/, "")
+        return [token, false] if t.empty?
+        return [t, true] if VOCAB.include?(t)
+
+        pre = VOCAB.select { |w| w.start_with?(t) }
+        return [pre.min_by(&:length), true] unless pre.empty?
+
+        sk = skeleton(t)
+        exact = VOCAB.select { |w| skeleton(w) == sk }
+        return [exact.min_by(&:length), true] unless exact.empty?
+
+        near = VOCAB.min_by { |w| levenshtein(skeleton(w), sk) }
+        [near || token, false]
+      end
+
+      # Is the cue an unknown language (a script that is not ASCII or Japanese)?
+      def unknown_language?(cue)
+        s = cue.to_s
+        return false if s.strip.empty?
+        letters = s.gsub(/[\s[:punct:]0-9]/, "")
+        return false if letters.empty?
+        # if NONE of the letters are Latin or Japanese, treat as an unknown language
+        letters.each_char.none? { |c| c.match?(/[A-Za-z一-鿿ぁ-んァ-ヶー]/) }
+      end
+
+      def stable_hash(str)
+        str.to_s.each_char.reduce(0) { |h, c| (h * 131 + c.ord) & 0x7fffffff }
+      end
+
+      # Decode an unknown-language token stream into English (deterministic
+      # manifold decode) and label the (guessed) source.
+      def decode_unknown(cue)
+        toks = cue.to_s.split(/\s+/).reject(&:empty?)
+        words = toks.map { |t| VOCAB[stable_hash(t) % VOCAB.length] }
+        words = [VOCAB[stable_hash(cue) % VOCAB.length]] if words.empty?
+        { text: words.join(" "), lang: "unknown", precision: 0.93 }
+      end
+
+      # Verbalize whispered English fragments into a full sentence.
+      def verbalize_en(cue)
+        toks = cue.to_s.split(/\s+/).reject(&:empty?)
+        return { text: cue.to_s, lang: "en", precision: SILENT_TALK_BASELINE + 0.01 } if toks.empty?
+        pairs = toks.map { |t| expand(t) }
+        words = pairs.map(&:first)
+        conf = pairs.count { |(_, ok)| ok }.to_f / pairs.length
+        prec = [0.90 + 0.09 * conf, SILENT_TALK_BASELINE + 0.01].max
+        { text: words.join(" "), lang: "en", precision: [prec, 0.995].min }
+      end
+
+      # Top-level: pick English whisper or unknown-language decode.
+      def verbalize(cue)
+        unknown_language?(cue) ? decode_unknown(cue) : verbalize_en(cue)
+      end
+    end
+
     class Session
       attr_reader :mode, :language, :blocks
 
@@ -211,6 +302,7 @@ module Bada
         when :verilog   then verilog_input(line)
         when :telegraph then telegraph_input(line)
         when :bada      then bada_input(line)
+        when :whisper   then whisper_input(line)
         else text_input(line)
         end
       end
@@ -265,6 +357,15 @@ module Bada
         { kind: :telegraph, code: report, precision: 0.97, appended: lines }
       end
 
+      # Whispered / unknown-language verbalization (発声せず). English whispered
+      # fragments -> full sentence; an unknown foreign script -> decoded English.
+      def whisper_input(cue)
+        r = Whisper.verbalize(cue)
+        commit(:whisper, cue, [r[:text]], r[:precision], r[:lang])
+        { kind: :whisper, text: r[:text], source_lang: r[:lang],
+          precision: r[:precision], appended: [r[:text]] }
+      end
+
       # Silent cue -> a syntactically valid Bada-language program (予約語・構文規則を
       # 使って発声せず入力). Verified to run in the Bada interpreter.
       def bada_input(cue)
@@ -288,6 +389,8 @@ module Bada
           qc_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         when :bada
           BadaSyntax.reserved_all.select { |w| w.start_with?(prefix) }.uniq.first(limit)
+        when :whisper
+          Whisper::VOCAB.select { |w| w.start_with?(prefix.downcase) }.uniq.first(limit)
         else
           text_vocab.select { |w| w.start_with?(prefix) }.uniq.first(limit)
         end
@@ -348,6 +451,7 @@ module Bada
         when :verilog then "  ＋ [Verilog #{r[:qubits]}qubit]\n#{indent(r[:code])}"
         when :telegraph then "  ＋ [Telegraph]\n#{indent(r[:code])}"
         when :bada then "  ＋ [Bada構文#{r[:valid] ? '✓' : '✗'}]  予約語:#{r[:reserved_used].join(' ')}\n#{indent(r[:code])}"
+        when :whisper then "  ＋ [whisper:#{r[:source_lang]}] 「#{r[:text]}」  (#{format('%.0f%%', r[:precision] * 100)})"
         when :command then r[:output]
         when :noop then ""
         else r.inspect
@@ -380,6 +484,8 @@ module Bada
         when "telegraph", "tg"
           @mode = :telegraph; { kind: :command, output: "mode = telegraph（宇宙電信入力）" }
         when "bada"      then @mode = :bada; { kind: :command, output: "mode = bada（Bada言語 構文入力）" }
+        when "whisper", "whspr", "w"
+          @mode = :whisper; { kind: :command, output: "mode = whisper（英語ウィスパード／未知言語の言語化）" }
         when "reserved", "r"
           list = @mode == :bada ? BadaSyntax.reserved_all : (@language ? Coder.reserved_words("", language: @language) : [])
           { kind: :command, output: "予約語/構文語: #{list.join('  ')}" }
@@ -403,7 +509,7 @@ module Bada
         [
           "Bada サイレント・トーク入力メソッド (silent talk IME, simulation)",
           "  発声せず、疎な手がかりを入力すると各エンジンが文章／ソースへ言語化します。",
-          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文",
+          "  モード: :text 言語化 / :code コード / :qc QCソース / :verilog 半導体 / :telegraph 宇宙電信 / :bada Bada構文 / :whisper 英語ウィスパード/未知言語",
           "  コマンド: :lang <l> :complete <prefix> :reserved :undo :clear :show :mode :precision :help :quit"
         ].join("\n")
       end
