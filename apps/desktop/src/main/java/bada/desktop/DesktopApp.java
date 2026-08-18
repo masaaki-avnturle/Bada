@@ -23,7 +23,7 @@ import java.nio.charset.StandardCharsets;
  *   ④ Coder              (思考→コード transformer, EN/JA)
  *   ⑤ Silent IME         (サイレント入力: 発声せず文章/コードを入力, simulation)
  *   ⑥ Whisper            (英語ウィスパード復元／未知言語の言語化, simulation)
- *   ⑦ Bada Vim           (埋め込み vi 風エディタ: :math で長長文数学論文を挿入)
+ *   ⑦ Bada Vim           (全画面モーダルエディタ: INSERT で長長文入力, :math で数学論文挿入)
  *
  * Run with no arguments to open the Swing GUI (how the packaged app launches).
  * Pass a message for a one-shot telegraph console report, or a flag for a
@@ -554,34 +554,35 @@ public final class DesktopApp {
     }
 
     // ---------------------------------------------------------------- Bada Vim
+    // A full modal editor: the whole screen is the long-long buffer. INSERT mode
+    // types directly into it; NORMAL mode runs commands (i a o O x dd h j k l 0 $
+    // gg G); ":" opens the ex command line (:math inserts a long-long math paper).
     private static JPanel vimPanel() {
-        JPanel root = new JPanel(new BorderLayout(8, 8));
-        final Vim vim = new Vim("% Bada Vim 埋め込みエディタ (発声せず・長長文)\n");
+        JPanel root = new JPanel(new BorderLayout(6, 6));
 
-        JTextArea editor = new JTextArea();
-        editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        final JTextArea editor = new JTextArea();
+        editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 14));
         editor.setMargin(new Insets(10, 12, 10, 12));
-        editor.setText(vim.text());
+        editor.setText("% Bada Vim — i:挿入  Esc:ノーマル  ::コマンド  （画面全体が長長文バッファ）\n");
+        editor.setEditable(false); // start in NORMAL
 
-        JLabel status = new JLabel(" " + vim.status());
-        JTextField cmd = new JTextField();
-        cmd.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        final JLabel status = new JLabel();
+        status.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        final JTextField exLine = new JTextField();
+        exLine.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        exLine.setVisible(false);
 
-        JPanel top = new JPanel(new BorderLayout(6, 6));
-        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
-        JLabel help = new JLabel("ex コマンド:  :math <cue> 数学論文 / :bada / :latex / :report / :whisper / :w file / :q");
-        top.add(help, BorderLayout.NORTH);
-        JPanel cmdRow = new JPanel(new BorderLayout(6, 6));
-        cmdRow.add(new JLabel("："), BorderLayout.WEST);
-        cmdRow.add(cmd, BorderLayout.CENTER);
-        top.add(cmdRow, BorderLayout.SOUTH);
+        final boolean[] pendingD = {false}, pendingG = {false};
+        final Runnable refresh = () -> status.setText(String.format("  %s | %d 行 | i:挿入 Esc:戻る ::コマンド",
+                editor.isEditable() ? "-- INSERT --" : "-- NORMAL --",
+                editor.getText().split("\n", -1).length));
 
-        // The editor area IS the buffer; ex commands run against its text and the
-        // generated block is inserted at the caret. (The Vim engine also powers the
-        // `bada vim` CLI.)
-        cmd.addActionListener(e -> {
-            String line = cmd.getText().trim();
-            if (line.isEmpty()) return;
+        // ex command line (:math, :bada, :latex, :report, :whisper, :w, :q)
+        exLine.addActionListener(e -> {
+            String line = exLine.getText().trim();
+            exLine.setVisible(false);
+            editor.requestFocusInWindow();
+            if (line.isEmpty()) { refresh.run(); return; }
             String name = line, arg = "";
             int sp = line.indexOf(' ');
             if (sp >= 0) { name = line.substring(0, sp); arg = line.substring(sp + 1).trim(); }
@@ -592,22 +593,95 @@ public final class DesktopApp {
                 case "latex": case "tex": block = Platex.paper(arg, 0).code; break;
                 case "report": block = Whisper.longReport(arg).text; break;
                 case "whisper": block = Whisper.verbalize(arg).text; break;
-                case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); cmd.setText(""); return;
-                case "q": case "quit": status.setText("  （:q）"); cmd.setText(""); return;
-                default: status.setText("  unknown ex: :" + name); cmd.setText(""); return;
+                case "w": case "write": status.setText("  written " + (arg.isEmpty() ? "[buffer]" : arg)); return;
+                case "q": case "quit": status.setText("  （:q）"); return;
+                default: status.setText("  unknown ex: :" + name); return;
             }
             int at = editor.getCaretPosition();
-            String insert = (at > 0 && editor.getText().charAt(Math.max(0, at - 1)) != '\n' ? "\n" : "") + block + "\n";
+            String txt = editor.getText();
+            String insert = (at > 0 && at <= txt.length() && txt.charAt(at - 1) != '\n' ? "\n" : "") + block + "\n";
             editor.insert(insert, at);
-            editor.setCaretPosition(at + insert.length());
-            int lines = editor.getText().split("\n", -1).length;
-            status.setText(String.format("  挿入: :%s（%d 行, 長長文）", name, lines));
-            cmd.setText("");
+            editor.setCaretPosition(Math.min(at + insert.length(), editor.getText().length()));
+            refresh.run();
+        });
+        exLine.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
+                    exLine.setVisible(false); editor.requestFocusInWindow(); refresh.run();
+                }
+            }
         });
 
-        root.add(top, BorderLayout.NORTH);
+        // modal key handling on the editor
+        editor.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (editor.isEditable()) { // INSERT: only intercept Esc
+                    if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
+                        editor.setEditable(false); refresh.run(); e.consume();
+                    }
+                    return;
+                }
+                // NORMAL: arrows still move; everything else handled in keyTyped
+                int c = e.getKeyCode();
+                if (c == java.awt.event.KeyEvent.VK_LEFT || c == java.awt.event.KeyEvent.VK_RIGHT
+                        || c == java.awt.event.KeyEvent.VK_UP || c == java.awt.event.KeyEvent.VK_DOWN) return;
+                e.consume(); // swallow so NORMAL keys never type into the buffer
+            }
+            public void keyTyped(java.awt.event.KeyEvent e) {
+                if (editor.isEditable()) return; // INSERT types normally
+                char ch = e.getKeyChar();
+                try { normalKey(ch); } catch (Exception ignored) { }
+                e.consume();
+            }
+            private void enterInsert() { editor.setEditable(true); editor.requestFocusInWindow(); refresh.run(); }
+            private void normalKey(char ch) throws javax.swing.text.BadLocationException {
+                int pos = editor.getCaretPosition();
+                int line = editor.getLineOfOffset(pos);
+                if (ch == 'd') { if (pendingD[0]) { deleteLine(line); pendingD[0] = false; } else pendingD[0] = true; return; }
+                pendingD[0] = false;
+                if (ch == 'g') { if (pendingG[0]) { editor.setCaretPosition(0); pendingG[0] = false; } else pendingG[0] = true; return; }
+                pendingG[0] = false;
+                switch (ch) {
+                    case 'i': enterInsert(); break;
+                    case 'a': editor.setCaretPosition(Math.min(pos + 1, editor.getText().length())); enterInsert(); break;
+                    case 'o': { int end = editor.getLineEndOffset(line); editor.insert("\n", Math.min(end, editor.getText().length())); editor.setCaretPosition(Math.min(end, editor.getText().length())); enterInsert(); break; }
+                    case 'O': { int st = editor.getLineStartOffset(line); editor.insert("\n", st); editor.setCaretPosition(st); enterInsert(); break; }
+                    case 'x': { String t = editor.getText(); if (pos < t.length() && t.charAt(pos) != '\n') editor.replaceRange("", pos, pos + 1); refresh.run(); break; }
+                    case 'h': if (pos > 0) editor.setCaretPosition(pos - 1); break;
+                    case 'l': if (pos < editor.getText().length()) editor.setCaretPosition(pos + 1); break;
+                    case 'j': moveLine(line + 1); break;
+                    case 'k': moveLine(line - 1); break;
+                    case '0': editor.setCaretPosition(editor.getLineStartOffset(line)); break;
+                    case '$': editor.setCaretPosition(Math.max(editor.getLineStartOffset(line), editor.getLineEndOffset(line) - 1)); break;
+                    case 'G': editor.setCaretPosition(editor.getText().length()); break;
+                    case ':': exLine.setText(""); exLine.setVisible(true); exLine.requestFocusInWindow(); break;
+                    default: break;
+                }
+            }
+            private void moveLine(int target) throws javax.swing.text.BadLocationException {
+                int last = editor.getLineCount() - 1;
+                target = Math.max(0, Math.min(target, last));
+                editor.setCaretPosition(editor.getLineStartOffset(target));
+            }
+            private void deleteLine(int line) throws javax.swing.text.BadLocationException {
+                int st = editor.getLineStartOffset(line);
+                int en = editor.getLineEndOffset(line);
+                editor.replaceRange("", st, Math.min(en, editor.getText().length()));
+                refresh.run();
+            }
+        });
+
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・Esc ノーマル・dd 行削除・x 文字削除・hjkl 0 $ gg G 移動・: で ex（:math 数学論文 / :bada / :latex / :report / :w / :q）");
+        help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
+
+        JPanel bottom = new JPanel(new BorderLayout());
+        bottom.add(exLine, BorderLayout.NORTH);
+        bottom.add(status, BorderLayout.SOUTH);
+
+        root.add(help, BorderLayout.NORTH);
         root.add(new JScrollPane(editor), BorderLayout.CENTER);
-        root.add(status, BorderLayout.SOUTH);
+        root.add(bottom, BorderLayout.SOUTH);
+        refresh.run();
         return root;
     }
 
