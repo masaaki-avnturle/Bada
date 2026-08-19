@@ -225,22 +225,57 @@ git clone --filter=blob:none --sparse https://github.com/masaaki-avnturle/Bada.g
 cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 ```
 
-### ZIP / APK / Windows EXE
+### Android APK / Windows 10・11 EXE / Linux (Ubuntu)
 
-偽のバイナリは置いていません。実バイナリは CI（GitHub Actions）がビルドします。
+偽のバイナリは置いていません。実パッケージは CI（GitHub Actions）がビルドします。
 
-| 成果物 | 中身 |
-|:--|:--|
-| `omega-whispered.html` | 単一ファイル版 |
-| `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
-| `omega_whispered-android` | Android APK（Cordova） |
-| `omega_whispered-windows` | Windows EXE（Electron / NSIS・portable） |
+| プラットフォーム | 成果物 | 形式 |
+|:--|:--|:--|
+| **Android** | `omega_whispered-android` | `omega_whispered-debug.apk`（Cordova 12 / minSdk 24 / AndroidX） |
+| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.0.0-win-x64.exe`（NSIS インストーラ + portable） |
+| **Linux (Ubuntu)** | `omega_whispered-linux` | `…-linux-amd64.deb` + `…-linux-x86_64.AppImage` |
+| 任意のOS | `omega-whispered.html` | 単一ファイル版 |
+| 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
 
-- **Actions** タブ →「Ω apps build (APK + Windows EXE)」→ **Run workflow** → 上表の成果物をダウンロード。
-- タグ `apps-v*` を push すると **Releases** に ZIP・単一 HTML・APK・EXE が添付されます。
-- 構成: `www/`（アプリ本体） · `download/`（配布物とダウンロードページ） · `electron/`（EXE） ·
-  `cordova/config.xml`（APK） · `build_single.js`（単一ファイル生成） ·
-  `../../.github/workflows/omega-apps-build.yml`（ビルド）。
+- **Actions** タブ →「Ω apps build (APK + Windows EXE + Linux deb/AppImage)」→ **Run workflow**。
+- タグ `apps-v*` を push すると **Releases** に APK・EXE・deb・AppImage・ZIP・単一 HTML が添付されます。
+
+#### Ubuntu へのインストール
+
+```bash
+# .deb（/opt/Omega-Whispered にインストールし、デスクトップエントリとアイコンを登録）
+sudo apt install ./Omega-Whispered-1.0.0-linux-amd64.deb
+omega-whispered                    # またはアプリ一覧から起動
+sudo apt remove omega-whispered    # アンインストール
+
+# AppImage（インストール不要・単体実行）
+chmod +x Omega-Whispered-1.0.0-linux-x86_64.AppImage
+./Omega-Whispered-1.0.0-linux-x86_64.AppImage
+# FUSE の無い環境では: ./Omega-…AppImage --appimage-extract-and-run
+```
+
+Ubuntu 22.04 / 24.04（x86_64）を想定。`.deb` の依存は
+`libgtk-3-0, libnotify4, libnss3, libxss1, libxtst6, xdg-utils, libatspi2.0-0, libuuid1, libsecret-1-0`。
+
+#### Android APK のインストール
+
+デバッグ署名の APK です。端末に転送して開き、「提供元不明のアプリのインストール」を許可してください。
+
+#### 自分でビルドする
+
+```bash
+cd bio_medicine/omega_whispered/electron && npm install
+npm run dist:linux     # .deb + .AppImage（Linux 上で実行）
+npm run dist:win       # Windows EXE（Windows 上で実行。Linux からは wine が必要）
+```
+
+APK は Android SDK + Cordova 12 が必要です（CI と同じ手順は
+`../../.github/workflows/omega-apps-build.yml` の `android-apk` ジョブを参照）。
+
+- 構成: `www/`（アプリ本体） · `download/`（配布物とダウンロードページ） ·
+  `electron/`（EXE・deb・AppImage） · `cordova/config.xml`（APK） ·
+  `build/icons/`（16〜512px のアイコン。APK でも使用） ·
+  `build_single.js`（単一ファイル生成） · `../../.github/workflows/omega-apps-build.yml`（ビルド）。
 
 ## ファイル
 

@@ -1,6 +1,7 @@
-name: Ω apps build (APK + Windows EXE)
+name: Ω apps build (APK + Windows EXE + Linux deb/AppImage)
 
-# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
+# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK・Windows EXE・
+# Linux(Ubuntu) 向け .deb / .AppImage をビルドし、
 # Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
 #
 # ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
@@ -72,6 +73,8 @@ jobs:
           rm -rf cordova-build/www
           cp -r "$APP/www" cordova-build/www
           cp "$APP/cordova/config.xml" cordova-build/config.xml
+          # アプリアイコン(あるアプリのみ)
+          if [ -f "$APP/build/icons/512x512.png" ]; then cp "$APP/build/icons/512x512.png" cordova-build/icon.png; fi
           cd cordova-build
           cordova platform add android@12.0.1
           cordova build android --verbose
@@ -90,6 +93,46 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*.apk
+
+  # ------------------------------------------------------------------
+  # Linux (Ubuntu) 向け: .deb と .AppImage
+  #   .deb     … sudo apt install ./Omega-Whispered-*.deb でインストール
+  #   .AppImage… chmod +x して実行するだけ(インストール不要)
+  # ------------------------------------------------------------------
+  linux-app:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [omega_whispered]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends fakeroot dpkg
+      - name: Build .deb and .AppImage (electron-builder)
+        working-directory: bio_medicine/${{ matrix.app }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: List artifacts
+        run: ls -la bio_medicine/${{ matrix.app }}/electron/dist
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-linux
+          path: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+      - name: Attach Linux packages to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
 
   # ------------------------------------------------------------------
   # Ω-Whispered: 単一ファイル HTML と ZIP を作って配布物にする
