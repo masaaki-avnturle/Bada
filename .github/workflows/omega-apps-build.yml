@@ -1,27 +1,92 @@
 name: Ω apps build (APK + Windows EXE + Linux deb/AppImage)
 
-# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK・Windows EXE・
-# Linux(Ubuntu) 向け .deb / .AppImage をビルドし、
-# Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
+# bio_medicine 配下の各アプリ(www + electron + cordova)から
+#   - Android APK
+#   - Windows 10/11 EXE (NSIS インストーラ + portable)
+#   - Linux(Ubuntu) .deb / .AppImage
+#   - 単一ファイル HTML と ZIP
+# をビルドし、**Actions の Artifacts** としてダウンロードできるようにします。
+# 手動実行で「publish_release」を有効にした場合、およびタグ apps-v* を push した場合
+# (omega-apps-release.yml がこのワークフローを呼び出します)は
+# GitHub Release にも添付します(Release はログイン不要で誰でもダウンロードできます)。
 #
-# ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
+# 実行される条件:
+#   - bio_medicine/** かこのワークフローを push したとき (既定: omega_whispered のみビルド)
+#   - Actions タブから手動実行したとき (対象アプリと Release 公開を選択可能)
+#   - タグ apps-v* を push したとき (omega-apps-release.yml 経由で全アプリ + Release)
+#
+# ⚠ いずれのアプリも 概念シミュレーション/アート・非医療、学習・娯楽目的です。
 
 on:
   workflow_dispatch:
+    inputs:
+      apps:
+        description: 'ビルド対象'
+        type: choice
+        default: omega_whispered
+        options:
+          - omega_whispered
+          - all
+      publish_release:
+        description: '成果物を GitHub Release として公開する(ログイン不要でDLできるようになる)'
+        type: boolean
+        default: false
+      release_tag:
+        description: 'Release のタグ名 (publish_release を有効にした場合)'
+        type: string
+        default: apps-v1.0.0
+  workflow_call:
+    inputs:
+      apps:
+        type: string
+        default: omega_whispered
+      publish_release:
+        type: boolean
+        default: false
+      release_tag:
+        type: string
+        default: ''
   push:
-    tags:
-      - 'apps-v*'
+    branches: ['**']
+    paths:
+      - 'bio_medicine/**'
+      - '.github/workflows/omega-apps-build.yml'
 
 permissions:
   contents: write
 
 jobs:
+  # ------------------------------------------------------------------
+  # ビルド対象アプリを決める
+  #   push(通常)          → omega_whispered のみ (CI 時間の節約)
+  #   手動実行で all      → 全アプリ
+  #   タグ apps-v*        → 全アプリ
+  # ------------------------------------------------------------------
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.pick.outputs.apps }}
+    steps:
+      - id: pick
+        run: |
+          ALL='["omega_biofeedback","omega_thermal_trace","omega_telepathy","omega_whispered"]'
+          ONE='["omega_whispered"]'
+          if [ "${{ inputs.apps }}" = "all" ]; then
+            echo "apps=$ALL" >> "$GITHUB_OUTPUT"
+          else
+            echo "apps=$ONE" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ------------------------------------------------------------------
+  # Windows 10 / 11 — NSIS インストーラ + portable EXE
+  # ------------------------------------------------------------------
   windows-exe:
+    needs: setup
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy, omega_whispered]
+        app: ${{ fromJSON(needs.setup.outputs.apps) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,18 +102,19 @@ jobs:
         with:
           name: ${{ matrix.app }}-windows
           path: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
-      - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+          if-no-files-found: error
+          retention-days: 90
 
+  # ------------------------------------------------------------------
+  # Android — デバッグ署名 APK (Cordova)
+  # ------------------------------------------------------------------
   android-apk:
+    needs: setup
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy, omega_whispered]
+        app: ${{ fromJSON(needs.setup.outputs.apps) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -88,14 +154,11 @@ jobs:
         with:
           name: ${{ matrix.app }}-android
           path: out/*.apk
-      - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: out/*.apk
+          if-no-files-found: error
+          retention-days: 90
 
   # ------------------------------------------------------------------
-  # Linux (Ubuntu) 向け: .deb と .AppImage
+  # Linux (Ubuntu) — .deb と .AppImage
   #   .deb     … sudo apt install ./Omega-Whispered-*.deb でインストール
   #   .AppImage… chmod +x して実行するだけ(インストール不要)
   # ------------------------------------------------------------------
@@ -126,17 +189,11 @@ jobs:
           path: |
             bio_medicine/${{ matrix.app }}/electron/dist/*.deb
             bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
-      - name: Attach Linux packages to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
-            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 90
 
   # ------------------------------------------------------------------
-  # Ω-Whispered: 単一ファイル HTML と ZIP を作って配布物にする
-  # (ダウンロードページ: bio_medicine/omega_whispered/download/)
+  # Ω-Whispered: 単一ファイル HTML と ZIP
   # ------------------------------------------------------------------
   whispered-bundle:
     runs-on: ubuntu-latest
@@ -170,10 +227,83 @@ jobs:
           path: |
             out/omega_whispered-app.zip
             out/omega-whispered.html
-      - name: Attach bundle to Release
-        if: startsWith(github.ref, 'refs/tags/')
+          if-no-files-found: error
+          retention-days: 90
+
+  # ------------------------------------------------------------------
+  # 成果物の一覧を Actions の実行ページ(Summary)に表示する
+  # ------------------------------------------------------------------
+  summary:
+    needs: [setup, windows-exe, android-apk, linux-app, whispered-bundle]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+        continue-on-error: true
+      - name: Write download summary
+        run: |
+          RUN="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          {
+            echo "## ⬇ ダウンロード (Artifacts)"
+            echo ""
+            echo "このページ下部の **Artifacts** から各ファイルをダウンロードできます。"
+            echo "（Artifacts のダウンロードには GitHub へのログインが必要です。"
+            echo "  ログイン不要で配布したい場合は、手動実行時に \`publish_release\` を有効にするか、"
+            echo "  タグ \`apps-v*\` を push して Release を作成してください。）"
+            echo ""
+            echo "実行ページ: $RUN"
+            echo ""
+            echo "| 成果物 | ファイル | サイズ |"
+            echo "|:--|:--|--:|"
+            if [ -d artifacts ]; then
+              find artifacts -type f | sort | while read -r f; do
+                NAME=$(echo "$f" | cut -d/ -f2)
+                BASE=$(basename "$f")
+                SIZE=$(du -h "$f" | cut -f1)
+                echo "| \`$NAME\` | $BASE | $SIZE |"
+              done
+            else
+              echo "| (成果物なし) | — | — |"
+            fi
+            echo ""
+            echo "### 導入方法"
+            echo "- **Android**: \`*-debug.apk\` を端末に転送して開く（提供元不明のアプリの許可が必要）"
+            echo "- **Windows 10/11**: \`*-win-x64.exe\`（NSIS インストーラ / portable）を実行"
+            echo "- **Ubuntu**: \`sudo apt install ./*-linux-amd64.deb\` または \`chmod +x *.AppImage && ./*.AppImage\`"
+            echo "- **任意のOS**: \`omega-whispered.html\` をブラウザで開くだけ（インストール不要・オフライン動作）"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ------------------------------------------------------------------
+  # 手動実行で publish_release を有効にしたとき、Release として公開する
+  # (Release の添付ファイルはログイン不要で誰でもダウンロードできる)
+  # ------------------------------------------------------------------
+  publish-release:
+    if: inputs.publish_release
+    needs: [windows-exe, android-apk, linux-app, whispered-bundle]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Flatten artifacts
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec cp {} release/ \;
+          ls -la release
+      - name: Create / update Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            out/omega_whispered-app.zip
-            out/omega-whispered.html
+          tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+          name: Ω apps ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
+          body: |
+            Ω-Whispered ほか bio_medicine アプリのビルド成果物です。
+
+            - Android: `*-debug.apk`（デバッグ署名。提供元不明のアプリの許可が必要）
+            - Windows 10/11: `*-win-x64.exe`（NSIS インストーラ / portable）
+            - Ubuntu: `*-linux-amd64.deb` / `*-linux-x86_64.AppImage`
+            - 任意のOS: `omega-whispered.html`（単一ファイル・オフライン動作） / `omega_whispered-app.zip`
+
+            ⚠ 非公式ファン・オマージュ / 学習・娯楽目的です。
+          files: release/*

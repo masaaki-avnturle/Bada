@@ -1,0 +1,21 @@
+name: Ω apps release (tag apps-v*)
+
+# タグ apps-v* を push すると、omega-apps-build.yml を全アプリ対象で実行し、
+# その成果物(APK / Windows EXE / Linux deb・AppImage / 単一HTML / ZIP)を
+# GitHub Release に添付します。Release の添付ファイルはログイン不要でダウンロードできます。
+
+on:
+  push:
+    tags:
+      - 'apps-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    uses: ./.github/workflows/omega-apps-build.yml
+    with:
+      apps: all
+      publish_release: true
+      release_tag: ${{ github.ref_name }}

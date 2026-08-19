@@ -237,8 +237,26 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | 任意のOS | `omega-whispered.html` | 単一ファイル版 |
 | 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
 
-- **Actions** タブ →「Ω apps build (APK + Windows EXE + Linux deb/AppImage)」→ **Run workflow**。
-- タグ `apps-v*` を push すると **Releases** に APK・EXE・deb・AppImage・ZIP・単一 HTML が添付されます。
+#### Actions からダウンロードする
+
+`bio_medicine/**` を更新して push すると、**ワークフローが自動で走り**、成果物が Actions に残ります。
+
+1. [Actions →「Ω apps build」](https://github.com/masaaki-avnturle/Bada/actions/workflows/omega-apps-build.yml)を開く
+2. 緑のチェックが付いた実行をクリック
+3. **Summary** に成果物一覧と導入方法が表示される
+4. ページ下部の **Artifacts** から `omega_whispered-android` / `-windows` / `-linux` / `-download` を取得
+
+任意のタイミングでビルドしたいときは **Run workflow**（手動実行）を使います。入力は次の 3 つです。
+
+| 入力 | 既定 | 内容 |
+|:--|:--|:--|
+| `apps` | `omega_whispered` | `all` にすると bio_medicine の 4 アプリすべてをビルド |
+| `publish_release` | `false` | `true` にすると成果物を **Release** として公開（ログイン不要でDL可） |
+| `release_tag` | `apps-v1.0.0` | 公開時のタグ名 |
+
+- Artifacts の**ダウンロードには GitHub ログインが必要**です（保持 90 日）。
+  ログイン不要で配布したい場合は `publish_release` を使うか、タグ `apps-v*` を push してください
+  （`omega-apps-release.yml` が全アプリをビルドして Release に添付します）。
 
 #### Ubuntu へのインストール
 
