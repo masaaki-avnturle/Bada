@@ -190,14 +190,56 @@ xdg-open www/index.html          # または: python3 -m http.server 8000
    → Ω 判定・瞬読閾値・分野プロファイル
 4. 「📖 記号辞典を開く」で 114 記号を分野別に閲覧できます
 
-## APK / Windows EXE をダウンロード
+## ダウンロード
+
+### 単一ファイル版（推奨・インストール不要）
+
+**[`download/omega-whispered.html`](download/omega-whispered.html)** をダウンロードして
+**ダブルクリックで開くだけ**で動きます。アプリ・問題銀行・PDF 解析器をすべて 1 ファイル（約 180 KB）に
+埋め込んであり、**サーバーもインターネット接続も不要**です（外部通信ゼロを実測で確認済み）。
+
+```bash
+# HEAD = デフォルトブランチ。マージ前のブランチから取りたいときは HEAD をブランチ名に置き換える
+curl -LO https://raw.githubusercontent.com/masaaki-avnturle/Bada/HEAD/bio_medicine/omega_whispered/download/omega-whispered.html
+```
+
+GitHub Pages で公開している場合は、ダウンロードページから直接取得できます:
+**`https://masaaki-avnturle.github.io/Bada/bio_medicine/omega_whispered/download/`**
+
+単一ファイルは `www/` から自動生成されるため、`www/` を編集したら再生成してコミットしてください
+（CI は `--check` で古いままになっていないか検証します）。
+
+```bash
+node bio_medicine/omega_whispered/build_single.js          # 生成
+node bio_medicine/omega_whispered/build_single.js --check  # 最新か検査
+```
+
+### リポジトリから取得する
+
+```bash
+git clone https://github.com/masaaki-avnturle/Bada.git
+cd Bada/bio_medicine/omega_whispered && xdg-open www/index.html
+
+# アプリのフォルダだけが欲しいとき
+git clone --filter=blob:none --sparse https://github.com/masaaki-avnturle/Bada.git
+cd Bada && git sparse-checkout set bio_medicine/omega_whispered
+```
+
+### ZIP / APK / Windows EXE
 
 偽のバイナリは置いていません。実バイナリは CI（GitHub Actions）がビルドします。
 
-- **Actions** タブ →「Ω apps build (APK + Windows EXE)」→ **Run workflow** → 成果物
-  `omega_whispered-android`(APK) / `omega_whispered-windows`(EXE) をダウンロード。
-- タグ `apps-v*` を push すると **Releases** に APK/EXE が添付されます。
-- 構成: `www/`（アプリ本体） · `electron/`（EXE） · `cordova/config.xml`（APK） ·
+| 成果物 | 中身 |
+|:--|:--|
+| `omega-whispered.html` | 単一ファイル版 |
+| `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
+| `omega_whispered-android` | Android APK（Cordova） |
+| `omega_whispered-windows` | Windows EXE（Electron / NSIS・portable） |
+
+- **Actions** タブ →「Ω apps build (APK + Windows EXE)」→ **Run workflow** → 上表の成果物をダウンロード。
+- タグ `apps-v*` を push すると **Releases** に ZIP・単一 HTML・APK・EXE が添付されます。
+- 構成: `www/`（アプリ本体） · `download/`（配布物とダウンロードページ） · `electron/`（EXE） ·
+  `cordova/config.xml`（APK） · `build_single.js`（単一ファイル生成） ·
   `../../.github/workflows/omega-apps-build.yml`（ビルド）。
 
 ## ファイル
@@ -209,6 +251,9 @@ xdg-open www/index.html          # または: python3 -m http.server 8000
 | `www/symbol_bank.js` | 記号 / 文脈依存記号 / 方程式 / 連想対応 / 適性設問 / 分野プロファイルの問題銀行 |
 | `www/term_bank.js` | 数学の専門用語 100 語（意味・英名・分野・難度） |
 | `www/flash.js` | 瞬読エンジン（ランダム配置バースト提示・マスク・方程式トークナイザ・ステアケース） |
+| `build_single.js` | `www/` を 1 ファイルの HTML にまとめるビルドスクリプト（依存ゼロ・`--check` 付き） |
+| `download/omega-whispered.html` | 生成された単一ファイル版（ダウンロード用・直接編集しない） |
+| `download/index.html` | ダウンロードページ（GitHub Pages 用） |
 
 `www/pdf_symbols.js` と `www/symbol_bank.js` は Node からも `require` できるため、
 他アプリへの組み込みや自動検証に再利用できます。

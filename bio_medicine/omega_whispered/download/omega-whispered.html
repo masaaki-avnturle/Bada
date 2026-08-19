@@ -1,0 +1,2859 @@
+<!DOCTYPE html>
+<!--
+  Ω-Whispered — 単一ファイル版 (自動生成)
+  このファイルは bio_medicine/omega_whispered/build_single.js が
+  www/index.html と www/*.js から生成したものです。直接編集しないでください。
+  ダウンロードしてブラウザで開くだけで動作します(インターネット接続・インストール不要)。
+  再生成: node build_single.js
+-->
+<!--
+  Ω-Whispered — ウィスパード適性検査 (瞬読 × 数学記号 × 方程式意味解析)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_whispered
+
+  第一次検査: 数学論文(PDF)に現れる方程式の記号 — その意味・専門分野を識別できるか。
+              PDF を読み込むと、その論文から実際に抽出した記号で出題する(pdf_symbols.js)。
+  第二次検査: 方程式の意味解析 — 簡単な方程式から、専門分野へ「連想(一般化)」された
+              方程式の意味を読み解けるか(symbol_bank.js の ASSOC)。
+  第三次検査: 数学適性分野の診断 — 思考スタイル(志向)と、第一次/第二次の分野別成績(実力)を
+              合成して、10 分野のどこに適性があるかをプロファイル化する(APTITUDE/FIELD_PROFILE)。
+  第四次検査: 瞬読(フラッシュ) — 数学の専門用語・記号・バラバラにした方程式のトークンを、
+              ランダムな位置/角度/大きさで一瞬だけ一斉提示し、消えた後に問う(flash.js)。
+              露出時間は 2-down/1-up ステアケースで適応制御し、瞬読閾値(ms)を推定する。
+
+  ⚠ 「フルメタル・パニック!」のウィスパード設定に着想を得た非公式のファン・オマージュです。
+     原作・アニメの権利者とは一切関係がありません。結果は学習/娯楽目的の指標であり、
+     実在の能力・適性を測定・診断するものではありません。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Whispered — ウィスパード適性検査</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;
+        --txt:#e6ecf5;--dim:#8794a8;--ok:#3fbf7f;--ng:#d05a5a;--mono:Consolas,Menlo,"DejaVu Sans Mono",monospace}
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.55}
+  header{padding:16px 18px 8px}
+  h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}
+  .sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12.5px;margin-top:6px}
+  .disc{margin:12px 18px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;
+        color:#e0b020;font-size:12px}
+  main{padding:16px 18px 60px;max-width:1180px;margin:0 auto}
+  .grid{display:flex;gap:16px;flex-wrap:wrap}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}
+  select,input[type=file]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);
+        border-radius:6px;padding:7px;font-size:12.5px}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);
+         border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .cap{font-size:11.5px;color:var(--dim);margin-top:5px}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;
+        border-bottom:1px solid var(--line)}
+  .drop{border:1px dashed var(--line);border-radius:8px;padding:14px;text-align:center;color:var(--dim);
+        font-size:12px;background:#06090f}
+  .drop.hot{border-color:var(--cyan);color:var(--cyan)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip{font-family:var(--mono);font-size:13px;background:#0d1524;border:1px solid var(--line);border-radius:6px;
+        padding:3px 7px}
+  .chip b{color:var(--gold)}.chip small{color:var(--dim)}
+  .frag{font-family:var(--mono);font-size:12px;color:var(--violet);background:#06090f;border:1px solid var(--line);
+        border-radius:6px;padding:6px 8px;margin-top:6px;overflow-x:auto;white-space:nowrap}
+  /* --- 検査 --- */
+  #examCard{display:none}
+  .qhead{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px}
+  .phase{color:var(--violet);font-weight:700}
+  .bar{height:5px;background:#0d1524;border-radius:3px;overflow:hidden;margin-bottom:12px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan));width:0}
+  .qsym{font-family:var(--mono);font-size:64px;text-align:center;color:var(--gold);line-height:1.2;margin:6px 0}
+  .qeq{font-family:var(--mono);font-size:19px;text-align:center;color:var(--cyan);margin:12px 0;
+       word-break:break-word;overflow-wrap:anywhere}
+  .qtext{font-size:14px;margin:4px 0 10px}
+  .opts{display:flex;flex-direction:column;gap:8px}
+  .opt{text-align:left;width:100%;background:#0d1524;border:1px solid var(--line);color:var(--txt);
+       border-radius:8px;padding:11px 13px;cursor:pointer;font-size:13.5px;margin:0;font-weight:400}
+  .opt:hover{border-color:var(--cyan)}
+  .opt.correct{border-color:var(--ok);background:#0d2018;color:#bdf0d5}
+  .opt.wrong{border-color:var(--ng);background:#200f10;color:#f0c0c0}
+  .opt .mono{font-family:var(--mono)}
+  .fb{margin-top:11px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#06090f;font-size:12.5px}
+  .fb .verdict{font-weight:700}
+  .fb .verdict.ok{color:var(--ok)}.fb .verdict.ng{color:var(--ng)}
+  .fb .why{color:var(--dim);margin-top:5px}
+  .tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+       color:var(--dim);margin-right:5px}
+  .tag.src{border-color:var(--violet);color:var(--violet)}
+  /* --- 結果 --- */
+  #resultCard{display:none}
+  .score{font-family:var(--mono);font-size:46px;color:var(--gold);text-align:center;line-height:1.1}
+  .rank{text-align:center;font-size:16px;font-weight:700;color:var(--cyan);margin-top:4px}
+  .rankdesc{text-align:center;font-size:12.5px;color:var(--dim);margin-top:4px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+  th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+  th{color:var(--gold);font-weight:600}
+  td.m{font-family:var(--mono)}
+  .rv-ok{color:var(--ok)}.rv-ng{color:var(--ng)}
+  /* --- 瞬読(フラッシュ) --- */
+  .stage{position:relative;height:320px;background:#000;border:1px solid var(--line);border-radius:8px;
+         overflow:hidden;margin:8px 0}
+  .fl{position:absolute;font-family:var(--mono);color:#eef4ff;white-space:nowrap;
+      text-shadow:0 0 6px rgba(64,184,192,.35)}
+  .fl.item{color:#eef4ff}
+  .fl.fix{left:50%;top:50%;transform:translate(-50%,-50%);font-size:34px;color:var(--gold);text-shadow:none}
+  .fl.mask{color:#2b3850;text-shadow:none}
+  .flashline{font-family:var(--mono);color:var(--violet);font-size:12.5px;margin-top:4px;
+             word-break:break-word;overflow-wrap:anywhere}
+  /* --- 適性分野プロファイル --- */
+  .apt{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12.5px}
+  .apt .f{flex:0 0 130px;color:var(--txt)}
+  .apt .track{flex:1;height:12px;background:#0d1524;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+  .apt .track>i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan))}
+  .apt .v{flex:0 0 168px;text-align:right;font-family:var(--mono);color:var(--dim);font-size:11.5px;white-space:nowrap}
+  .apt .v b{color:var(--gold);font-size:13px}
+  .apt.top1 .f{color:var(--gold);font-weight:700}
+  .fp{margin-top:12px;border:1px solid var(--line);border-radius:8px;background:#06090f;padding:11px 13px}
+  .fp h4{margin:0 0 6px;font-size:14px;color:var(--gold)}
+  .fp .row{font-size:12.5px;margin:4px 0}
+  .fp .row span{color:var(--dim)}
+  .fp .m{font-family:var(--mono);color:var(--cyan)}
+  details{margin-top:10px}summary{cursor:pointer;color:var(--cyan);font-size:12.5px}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Whispered — ウィスパード適性検査</h1>
+  <div class="sub">Flash-Reading × Mathematical Symbol &amp; Equation-Meaning Aptitude Test · Bada / bio_medicine</div>
+  <div class="eq">第一次: PDF 論文の方程式記号 ∫ ∂ ∇ ⊗ 𝒪 𝔤 ⊢ &nbsp;·&nbsp; 第二次: 簡単な方程式 → 専門分野への連想 &nbsp;·&nbsp; 第三次: 適性分野の診断 &nbsp;·&nbsp; 第四次: 瞬読(専門用語・記号・バラバラ方程式をランダム提示) &nbsp;·&nbsp; Ω = 100·Σ lv·Γ<sub>k</sub>(t) / Σ lv</div>
+</header>
+
+<div class="disc">⚠ <b>非公式のファン・オマージュ</b>:
+  「フルメタル・パニック!」の<b>ウィスパード</b>という設定に着想を得た二次的創作であり、
+  原作・アニメの権利者とは一切関係がありません。<b>結果は学習・娯楽目的の指標</b>であり、
+  実在の能力・適性・知能を測定または診断するものではありません。
+  PDF の解析はすべて<b>あなたの端末内のみ</b>で行われ、外部へ送信されません。</div>
+
+<main>
+<div class="grid">
+
+  <!-- ===================== 左: 設定 + PDF ===================== -->
+  <div class="col" style="flex:0 0 340px">
+    <div class="card">
+      <h3>検査設定</h3>
+      <label>検査モード</label>
+      <select id="mode">
+        <option value="full">フル(記号 → 方程式 → 適性分野診断)</option>
+        <option value="exam">記号 + 方程式のみ(Ω 判定)</option>
+        <option value="aptitude">数学適性分野の診断のみ</option>
+        <option value="flash">瞬読(フラッシュ)検査のみ</option>
+      </select>
+      <label>第一次検査(記号)の問題数: <span class="val" id="n1_v">8</span></label>
+      <input type="range" id="n1" min="4" max="20" value="8"/>
+      <label>第二次検査(方程式の意味)の問題数: <span class="val" id="n2_v">8</span></label>
+      <input type="range" id="n2" min="4" max="20" value="8"/>
+      <label>第三次検査(適性分野)の設問数: <span class="val" id="n3_v">12</span></label>
+      <input type="range" id="n3" min="6" max="20" value="12"/>
+      <label>第四次検査(瞬読)の設問数: <span class="val" id="n4_v">8</span></label>
+      <input type="range" id="n4" min="4" max="20" value="8"/>
+      <label>瞬読の初期露出時間: <span class="val" id="ms4_v">600</span> ms</label>
+      <input type="range" id="ms4" min="80" max="1200" step="20" value="600"/>
+      <label>瞬読の同時表示数: <span class="val" id="k4_v">5</span> 要素</label>
+      <input type="range" id="k4" min="3" max="10" value="5"/>
+      <label>難度上限 (1=中高 / 3=学部 / 5=研究前線): <span class="val" id="lv_v">5</span></label>
+      <input type="range" id="lvmax" min="1" max="5" value="5"/>
+      <label>専門分野</label>
+      <select id="field"><option value="">すべての分野</option></select>
+      <button id="start">▶ 適性検査を開始</button>
+      <button class="sec" id="dict">📖 記号辞典を開く</button>
+      <div class="cap" id="setupStat">問題銀行を読み込み中…</div>
+    </div>
+
+    <div class="card">
+      <h3>数学論文 PDF (任意)</h3>
+      <div class="drop" id="drop">
+        ここに <b>数学論文の PDF</b> をドロップ<br/>または下から選択
+      </div>
+      <label>PDF を選択</label>
+      <input type="file" id="file" accept="application/pdf,.pdf"/>
+      <div class="cap" id="pdfStat">未読込。読み込むと、<b>その論文に実際に現れた記号</b>から出題します。</div>
+      <div id="pdfOut" style="display:none">
+        <div class="stat"><span>ページ / 抽出文字</span><b id="p_pages">—</b></div>
+        <div class="stat"><span>数式記号の種類 / 総出現</span><b id="p_syms">—</b></div>
+        <div class="stat"><span>辞典に一致した記号</span><b id="p_known">—</b></div>
+        <div class="chips" id="p_chips"></div>
+        <details>
+          <summary>抽出された数式断片・埋め込みフォント</summary>
+          <div id="p_frags"></div>
+          <div class="cap" id="p_fonts"></div>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 右: 検査 / 結果 ===================== -->
+  <div class="col">
+    <div class="card" id="introCard">
+      <h3>検査の構成</h3>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第一次検査 — 記号適性</b>:
+        数学論文の PDF に現れる方程式の記号(<code>∫ ∂ ∇ ⊗ ⊢ 𝒪 𝔤 ℵ ⋆</code> など)について、
+        その<b>意味</b>・<b>専門分野</b>・<b>文脈による意味の変化</b>を識別します。
+        PDF を読み込んだ場合は、<b>その論文から実際に抽出された記号</b>が優先的に出題されます
+        (フォント埋め込み・ToUnicode CMap を解析した本物の抽出です)。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第二次検査 — 方程式の意味解析</b>:
+        方程式が<b>何を主張しているのか</b>を読み解きます。さらに
+        <b>連想検査</b>では、<code>a²+b²=c²</code> のような簡単な方程式が、専門分野で
+        <code>ds² = gᵢⱼdxⁱdxʲ</code> のようにどう一般化されるかを対応づけます
+        (簡単な方程式 → 専門分野の方程式への構造的連想)。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第三次検査 — 数学適性分野の診断</b>:
+        正誤のない<b>思考スタイル設問</b>(無限の扱い方、同じとみなす基準、証明の好み、対称性を見たとき何をするか…)
+        への回答から <b>志向</b>を、第一次・第二次の<b>分野別成績</b>から <b>実力</b>を測り、両者を合成して
+        <code>解析学 / 微分幾何 / 位相幾何 / 代数・数論 / 代数幾何 / 圏論・論理 / 確率・統計 /
+        作用素環・関数解析 / 表現論・群論 / 数理物理</code> の 10 分野の適性をプロファイル化します。
+        上位分野には、思考の型・代表的な方程式と記号・隣接分野・<b>次に学ぶとよい主題</b>を提示します。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>第四次検査 — 瞬読(フラッシュ)</b>:
+        速読法の<b>瞬読</b>に倣い、<b>数学の専門用語</b>(100 語)・記号・<b>バラバラに分解した方程式のトークン</b>を、
+        画面上の<b>ランダムな位置・角度・大きさで一瞬だけ一斉提示</b>し、消えた直後に
+        「何が見えたか」「その用語の意味は」「どの方程式の断片か」「いくつ見えたか」を問います。
+        注視点 → 提示 → マスクの順で提示し、露出時間は <b>2-down/1-up ステアケース</b>で適応的に上下させて
+        <b>瞬読閾値(ms)</b>を推定します。
+      </p>
+      <div class="stat"><span>記号銀行</span><b id="s_nsym">—</b></div>
+      <div class="stat"><span>方程式銀行 (Lv1〜Lv5)</span><b id="s_neq">—</b></div>
+      <div class="stat"><span>連想対応 (簡単 → 専門)</span><b id="s_nas">—</b></div>
+      <div class="stat"><span>適性設問 / 分野プロファイル</span><b id="s_napt">—</b></div>
+      <div class="stat"><span>専門用語銀行 (瞬読)</span><b id="s_nterm">—</b></div>
+      <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
+      <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
+        Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
+        Ω = 100·Σ lv·(0.7+0.3Γ<sub>k</sub>) / Σ lv で算出します。</p>
+    </div>
+
+    <div class="card" id="examCard">
+      <div class="qhead">
+        <span><span class="phase" id="q_phase">第一次検査</span> &nbsp;<span id="q_idx"></span></span>
+        <span id="q_score"></span>
+      </div>
+      <div class="bar"><i id="q_bar"></i></div>
+      <div id="q_body"></div>
+      <div class="opts" id="q_opts"></div>
+      <div class="fb" id="q_fb" style="display:none"></div>
+      <button class="sec" id="next" style="display:none">次の設問 →</button>
+    </div>
+
+    <div class="card" id="resultCard">
+      <h3>検査結果 — ウィスパード適性判定</h3>
+      <div class="score" id="r_score">—</div>
+      <div class="rank" id="r_rank"></div>
+      <div class="rankdesc" id="r_desc"></div>
+      <div class="stat" style="margin-top:10px"><span>平均応答時間</span><b id="r_time">—</b></div>
+      <div id="perfStats">
+        <div class="stat"><span>正答 / 出題</span><b id="r_acc">—</b></div>
+        <div class="stat"><span>共鳴分野 (最も正答した分野)</span><b id="r_field">—</b></div>
+        <div class="stat"><span>到達難度 (正答した最高 lv)</span><b id="r_lv">—</b></div>
+      </div>
+      <canvas id="radar" width="420" height="300" style="margin-top:12px"></canvas>
+      <div class="cap" id="radarCap">分野別の正答率プロファイル(出題された分野のみ)。</div>
+
+      <div id="flashWrap" style="display:none">
+        <h3 style="margin-top:16px">第四次検査 — 瞬読(フラッシュ)プロファイル</h3>
+        <div id="flashStats"></div>
+        <div class="cap">閾値は 2-down/1-up ステアケース法の反転点の幾何平均で、
+          <b>約 70% 正答できる露出時間</b>の推定値です(反転が 2 回未満のときは参考値)。</div>
+      </div>
+
+      <div id="aptWrap" style="display:none">
+        <h3 style="margin-top:16px">第三次検査 — 数学適性分野の診断</h3>
+        <div id="aptBars"></div>
+        <div class="cap">総合 = 志向 55% + 実力 45%(実力が未測定の分野は志向のみ)。
+          志向は思考スタイル設問の重みを設問ごとの最大値で正規化した値、実力は難度 lv で重み付けした正答率です。</div>
+        <div id="aptTop"></div>
+      </div>
+
+      <details open>
+        <summary>全設問の講評(誤答の解説つき)</summary>
+        <div id="r_review"></div>
+      </details>
+      <button id="again">↻ もう一度検査する</button>
+    </div>
+
+    <div class="card" id="dictCard" style="display:none">
+      <h3>記号辞典 — 数学論文に現れる方程式の記号</h3>
+      <label>分野で絞り込む</label>
+      <select id="dfield"><option value="">すべての分野</option></select>
+      <div id="dictBody"></div>
+      <button class="sec" id="dictClose">閉じる</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<footer>Ω-Whispered · © 2025 Masaaki Yamaguchi · Bada / bio_medicine ·
+  非公式ファン・オマージュ / 学習・娯楽目的 · PDF 解析は端末内で完結</footer>
+
+<script>
+/* ===== inlined: www/symbol_bank.js ===== */
+/*
+ * symbol_bank.js — ウィスパード適性検査の問題銀行
+ * Ω-Whispered — Masaaki Yamaguchi / Bada (bio_medicine/omega_whispered)
+ *
+ *   SYMBOLS  : 数学論文(PDF)に現れる方程式記号 — 読み・意味・専門分野・難度
+ *   CTX      : 「同じ記号が分野で意味を変える」文脈依存記号
+ *   EQUATIONS: 簡単な方程式(Lv1)から専門分野の方程式(Lv5)まで — 意味・分野・解説
+ *   ASSOC    : 簡単な方程式 → 専門分野の方程式への「連想(一般化)」対応
+ *
+ * lv: 1=中学/高校 2=大学教養 3=学部専門 4=大学院 5=研究前線
+ */
+(function (root) {
+  "use strict";
+
+  var FIELDS = ["解析学", "微分幾何", "位相幾何", "代数・数論", "代数幾何",
+                "圏論・論理", "確率・統計", "作用素環・関数解析", "表現論・群論", "数理物理"];
+
+  /* ============================== 記号 ============================== */
+  var SYMBOLS = [
+    /* --- 解析学 --- */
+    { ch: "∑", ja: "シグマ(総和)", mean: "有限個または無限個の項の和をとる", field: "解析学", lv: 1 },
+    { ch: "∏", ja: "パイ(総乗)", mean: "項の積をとる。オイラー積など乗法的構造に現れる", field: "解析学", lv: 1 },
+    { ch: "∫", ja: "インテグラル(積分)", mean: "連続的な和。面積・測度に関する積分", field: "解析学", lv: 1 },
+    { ch: "∮", ja: "周回積分", mean: "閉曲線に沿った線積分。留数定理・循環を表す", field: "解析学", lv: 3 },
+    { ch: "∂", ja: "ラウンドディー(偏微分)", mean: "多変数関数を1つの変数について微分する。また境界作用素 ∂M", field: "解析学", lv: 2 },
+    { ch: "∇", ja: "ナブラ", mean: "勾配 grad。発散・回転・共変微分(接続)にも用いる", field: "微分幾何", lv: 2 },
+    { ch: "Δ", ja: "デルタ(ラプラシアン)", mean: "ラプラス作用素 ∇·∇。差分・変化量の意味もある", field: "解析学", lv: 2 },
+    { ch: "∞", ja: "無限大", mean: "限りなく大きい。極限操作の対象", field: "解析学", lv: 1 },
+    { ch: "√", ja: "根号", mean: "平方根。2乗して元になる数", field: "解析学", lv: 1 },
+    { ch: "′", ja: "プライム", mean: "導関数 f′、または別の対象を表す添字", field: "解析学", lv: 1 },
+    { ch: "≪", ja: "十分小さい", mean: "桁違いに小さい。漸近評価 f ≪ g は f = O(g)", field: "解析学", lv: 3 },
+    { ch: "≫", ja: "十分大きい", mean: "桁違いに大きい(漸近的優越)", field: "解析学", lv: 3 },
+    { ch: "⌊", ja: "床関数(左)", mean: "床関数 ⌊x⌋ = x を超えない最大の整数", field: "代数・数論", lv: 2 },
+    { ch: "⌈", ja: "天井関数(左)", mean: "天井関数 ⌈x⌉ = x 以上の最小の整数", field: "代数・数論", lv: 2 },
+
+    /* --- 等号・不等号・関係 --- */
+    { ch: "≠", ja: "等しくない", mean: "両辺が等しくないことを表す", field: "解析学", lv: 1 },
+    { ch: "≤", ja: "以下", mean: "小さいか等しい", field: "解析学", lv: 1 },
+    { ch: "≥", ja: "以上", mean: "大きいか等しい", field: "解析学", lv: 1 },
+    { ch: "≈", ja: "近似的に等しい", mean: "おおよそ等しい(近似)", field: "解析学", lv: 1 },
+    { ch: "≡", ja: "合同・恒等的に等しい", mean: "法についての合同 a ≡ b (mod n)、または恒等式", field: "代数・数論", lv: 2 },
+    { ch: "∝", ja: "比例", mean: "定数倍を除いて等しい(比例関係)", field: "解析学", lv: 1 },
+    { ch: "∼", ja: "同値・漸近同値", mean: "同値関係、または f ∼ g (比が 1 に収束)", field: "解析学", lv: 2 },
+    { ch: "≃", ja: "ホモトピー同値", mean: "連続変形で移り合う(弱同値)。同型より弱い一致", field: "位相幾何", lv: 4 },
+    { ch: "≅", ja: "同型", mean: "構造を保つ全単射が存在する(群・環・空間の同型)", field: "代数・数論", lv: 3 },
+    { ch: "≺", ja: "先行する", mean: "半順序における順序関係", field: "圏論・論理", lv: 3 },
+    { ch: "⊑", ja: "情報順序", mean: "領域理論・束論での半順序(近似の順序)", field: "圏論・論理", lv: 4 },
+    { ch: "≔", ja: "定義する", mean: "左辺を右辺で定義する", field: "圏論・論理", lv: 2 },
+    { ch: "∎", ja: "証明終", mean: "証明の終わりを示す(Q.E.D.)", field: "圏論・論理", lv: 1 },
+    { ch: "∴", ja: "ゆえに", mean: "結論を導く接続記号", field: "圏論・論理", lv: 1 },
+    { ch: "∵", ja: "なぜならば", mean: "理由を述べる接続記号", field: "圏論・論理", lv: 1 },
+
+    /* --- 集合・論理 --- */
+    { ch: "∈", ja: "属する", mean: "元が集合に属する", field: "圏論・論理", lv: 1 },
+    { ch: "∉", ja: "属さない", mean: "元が集合に属さない", field: "圏論・論理", lv: 1 },
+    { ch: "⊂", ja: "真部分集合", mean: "部分集合(文脈により真部分集合)", field: "圏論・論理", lv: 1 },
+    { ch: "⊆", ja: "部分集合", mean: "等号を含む部分集合", field: "圏論・論理", lv: 2 },
+    { ch: "∪", ja: "和集合", mean: "少なくとも一方に属する元の全体", field: "圏論・論理", lv: 1 },
+    { ch: "∩", ja: "共通部分", mean: "両方に属する元の全体", field: "圏論・論理", lv: 1 },
+    { ch: "∅", ja: "空集合", mean: "元を1つも持たない集合", field: "圏論・論理", lv: 1 },
+    { ch: "∀", ja: "全称記号", mean: "すべての〜について(全称量化)", field: "圏論・論理", lv: 1 },
+    { ch: "∃", ja: "存在記号", mean: "〜が存在する(存在量化)", field: "圏論・論理", lv: 1 },
+    { ch: "¬", ja: "否定", mean: "命題の否定", field: "圏論・論理", lv: 2 },
+    { ch: "⊢", ja: "ターンスタイル", mean: "構文論的帰結。公理系から形式的に導出可能", field: "圏論・論理", lv: 4 },
+    { ch: "⊨", ja: "二重ターンスタイル", mean: "意味論的帰結。すべてのモデルで真", field: "圏論・論理", lv: 4 },
+    { ch: "⊣", ja: "随伴", mean: "関手の随伴 F ⊣ G(F が左随伴)", field: "圏論・論理", lv: 5 },
+    { ch: "⊤", ja: "真・終対象", mean: "恒真命題、または圏の終対象", field: "圏論・論理", lv: 4 },
+    { ch: "⊥", ja: "直交・矛盾", mean: "直交(内積 0)、矛盾、または始対象", field: "圏論・論理", lv: 3 },
+    { ch: "⋃", ja: "大和集合", mean: "族全体の和集合", field: "圏論・論理", lv: 2 },
+    { ch: "⋂", ja: "大共通部分", mean: "族全体の共通部分", field: "圏論・論理", lv: 2 },
+    { ch: "ℵ", ja: "アレフ", mean: "無限基数。ℵ₀ は可算無限の濃度", field: "圏論・論理", lv: 3 },
+
+    /* --- 代数・圏 --- */
+    { ch: "⊗", ja: "テンソル積", mean: "加群・ベクトル空間・表現のテンソル積(双線型写像の普遍対象)", field: "表現論・群論", lv: 3 },
+    { ch: "⊕", ja: "直和", mean: "加群・空間の直和分解", field: "表現論・群論", lv: 3 },
+    { ch: "⨂", ja: "大テンソル積", mean: "添字族全体のテンソル積", field: "表現論・群論", lv: 4 },
+    { ch: "⨁", ja: "大直和", mean: "添字族全体の直和(次数付き対象の分解)", field: "表現論・群論", lv: 4 },
+    { ch: "∐", ja: "余積", mean: "圏における余積(集合では非交和、加群では直和)", field: "圏論・論理", lv: 4 },
+    { ch: "⊴", ja: "正規部分群", mean: "N ⊴ G:N は G の正規部分群(商群が作れる)", field: "表現論・群論", lv: 4 },
+    { ch: "⋊", ja: "半直積", mean: "作用付きの積による群の構成", field: "表現論・群論", lv: 5 },
+    { ch: "≀", ja: "花輪積", mean: "置換群の作用を通じた群の構成(リース積)", field: "表現論・群論", lv: 5 },
+    { ch: "∘", ja: "合成", mean: "写像・射の合成 (g∘f)(x)=g(f(x))", field: "圏論・論理", lv: 2 },
+    { ch: "↦", ja: "写す", mean: "元の対応 x ↦ f(x)", field: "圏論・論理", lv: 2 },
+    { ch: "→", ja: "矢印(射)", mean: "写像・射・極限・含意", field: "圏論・論理", lv: 1 },
+    { ch: "↪", ja: "はめ込み矢印", mean: "単射(部分対象としての埋め込み)", field: "圏論・論理", lv: 3 },
+    { ch: "↠", ja: "二重頭矢印", mean: "全射(エピ射)", field: "圏論・論理", lv: 3 },
+    { ch: "⇒", ja: "ならば", mean: "含意。自然変換にも用いる", field: "圏論・論理", lv: 2 },
+    { ch: "⇔", ja: "同値", mean: "必要十分条件", field: "圏論・論理", lv: 2 },
+
+    /* --- 数体系・空間 --- */
+    { ch: "ℝ", ja: "実数体", mean: "実数全体のなす体", field: "解析学", lv: 2 },
+    { ch: "ℂ", ja: "複素数体", mean: "複素数全体のなす代数閉体", field: "解析学", lv: 2 },
+    { ch: "ℚ", ja: "有理数体", mean: "有理数全体のなす体", field: "代数・数論", lv: 2 },
+    { ch: "ℤ", ja: "有理整数環", mean: "整数全体のなす環", field: "代数・数論", lv: 2 },
+    { ch: "ℕ", ja: "自然数", mean: "自然数全体", field: "代数・数論", lv: 1 },
+    { ch: "𝔽", ja: "有限体", mean: "𝔽_q:q 元からなる有限体", field: "代数・数論", lv: 3 },
+    { ch: "𝔸", ja: "アフィン空間・アデール", mean: "アフィン空間 𝔸ⁿ、または数論のアデール環", field: "代数幾何", lv: 4 },
+    { ch: "ℙ", ja: "射影空間・確率測度", mean: "射影空間 ℙⁿ、確率論では確率測度 ℙ", field: "代数幾何", lv: 4 },
+    { ch: "𝒪", ja: "構造層・整数環", mean: "スキームの構造層 𝒪_X、代数体の整数環 𝒪_K、解析ではランダウ記号", field: "代数幾何", lv: 5 },
+    { ch: "𝔪", ja: "極大イデアル", mean: "局所環の唯一の極大イデアル", field: "代数幾何", lv: 4 },
+    { ch: "𝔭", ja: "素イデアル", mean: "素イデアル(素数の一般化)", field: "代数・数論", lv: 4 },
+    { ch: "𝔤", ja: "リー環(ゴシック g)", mean: "リー群 G のリー環(接空間に括弧積)", field: "表現論・群論", lv: 4 },
+    { ch: "𝔼", ja: "期待値作用素", mean: "確率変数の期待値 𝔼[X]", field: "確率・統計", lv: 3 },
+    { ch: "𝟙", ja: "指示関数", mean: "事象が起きたとき 1、起きないとき 0 をとる関数", field: "確率・統計", lv: 3 },
+    { ch: "ℓ", ja: "スクリプト l", mean: "長さ・ℓ進表現・数列空間 ℓᵖ", field: "解析学", lv: 3 },
+    { ch: "ℏ", ja: "エイチバー", mean: "換算プランク定数 h/2π。量子効果の尺度", field: "数理物理", lv: 3 },
+    { ch: "℘", ja: "ワイエルシュトラスのペー", mean: "楕円関数 ℘(z)。楕円曲線と複素トーラスを結ぶ", field: "代数幾何", lv: 5 },
+    { ch: "ℜ", ja: "実部", mean: "複素数の実部 Re(z)", field: "解析学", lv: 3 },
+    { ch: "ℑ", ja: "虚部", mean: "複素数の虚部 Im(z)", field: "解析学", lv: 3 },
+
+    /* --- 幾何・作用素 --- */
+    { ch: "∧", ja: "ウェッジ積・論理積", mean: "微分形式の外積(反対称)、論理では「かつ」", field: "微分幾何", lv: 4 },
+    { ch: "∨", ja: "論理和・ヴィー積", mean: "論理では「または」、位相では楔和 X∨Y", field: "圏論・論理", lv: 2 },
+    { ch: "⋆", ja: "ホッジスター", mean: "ホッジ双対。p 形式を (n−p) 形式へ移す", field: "微分幾何", lv: 5 },
+    { ch: "†", ja: "ダガー(随伴)", mean: "エルミート共役・随伴作用素 A†", field: "作用素環・関数解析", lv: 4 },
+    { ch: "∗", ja: "アスタリスク", mean: "畳み込み f∗g、C*代数の対合、双対空間", field: "作用素環・関数解析", lv: 4 },
+    { ch: "⟨", ja: "山括弧(左)", mean: "内積 ⟨x,y⟩、ブラケット ⟨ψ|、生成 ⟨S⟩", field: "作用素環・関数解析", lv: 3 },
+    { ch: "‖", ja: "二重縦線", mean: "ノルム ‖x‖(大きさの一般化)", field: "作用素環・関数解析", lv: 2 },
+    { ch: "⊔", ja: "非交和・上限", mean: "非交和、または束の結び(上限)", field: "圏論・論理", lv: 4 },
+    { ch: "⊓", ja: "交わり", mean: "束の交わり(下限)", field: "圏論・論理", lv: 4 },
+    { ch: "⊙", ja: "アダマール積", mean: "成分ごとの積、または円点作用", field: "解析学", lv: 3 },
+    { ch: "⊖", ja: "対称差・直差", mean: "対称差、または直和の差", field: "圏論・論理", lv: 3 },
+    { ch: "△", ja: "三角形・対称差", mean: "三角形、または集合の対称差 A△B", field: "圏論・論理", lv: 2 },
+
+    /* --- ギリシャ文字(数学的役割) --- */
+    { ch: "Γ", ja: "ガンマ", mean: "ガンマ関数 Γ(s)、接続係数(クリストッフェル記号)、離散群", field: "解析学", lv: 3 },
+    { ch: "ζ", ja: "ゼータ", mean: "リーマンゼータ関数 ζ(s)。素数分布を支配する", field: "代数・数論", lv: 3 },
+    { ch: "π", ja: "パイ", mean: "円周率、基本群 π₁、表現 π、射影 π、素数計数関数 π(x)", field: "位相幾何", lv: 2 },
+    { ch: "χ", ja: "カイ", mean: "オイラー標数 χ(M)、指標 χ(g)、カイ二乗統計量", field: "位相幾何", lv: 4 },
+    { ch: "σ", ja: "シグマ(小)", mean: "σ加法族、置換、標準偏差、パウリ行列、ブレイド生成元", field: "確率・統計", lv: 4 },
+    { ch: "μ", ja: "ミュー", mean: "測度 μ、平均、メビウス関数 μ(n)、化学ポテンシャル", field: "確率・統計", lv: 4 },
+    { ch: "λ", ja: "ラムダ", mean: "固有値、波長、ルベーグ測度、宇宙定数 Λ", field: "解析学", lv: 3 },
+    { ch: "φ", ja: "ファイ", mean: "オイラーのトーシェント関数 φ(n)、写像、位相", field: "代数・数論", lv: 3 },
+    { ch: "ψ", ja: "プサイ", mean: "波動関数 ψ、ディガンマ関数 ψ(s)", field: "数理物理", lv: 3 },
+    { ch: "ρ", ja: "ロー", mean: "表現 ρ:G→GL(V)、密度行列、密度", field: "表現論・群論", lv: 4 },
+    { ch: "ω", ja: "オメガ(小)", mean: "微分形式 ω、最小の無限順序数 ω、角振動数", field: "微分幾何", lv: 4 },
+    { ch: "θ", ja: "シータ", mean: "角度、テータ関数 θ(z,τ)、位相角", field: "解析学", lv: 2 },
+    { ch: "τ", ja: "タウ", mean: "捩率、ラマヌジャンのタウ関数、時定数", field: "微分幾何", lv: 3 },
+    { ch: "ε", ja: "イプシロン", mean: "任意に小さい正数(ε-δ 論法)、レヴィ・チヴィタ記号", field: "解析学", lv: 2 },
+    { ch: "δ", ja: "デルタ(小)", mean: "クロネッカーのデルタ δᵢⱼ、ディラックのデルタ δ(x)、変分 δS", field: "数理物理", lv: 3 },
+    { ch: "κ", ja: "カッパ", mean: "曲率 κ、熱伝導率、基数", field: "微分幾何", lv: 3 },
+    { ch: "Λ", ja: "ラムダ(大)", mean: "宇宙定数、外積代数 Λ*V、格子", field: "数理物理", lv: 4 },
+    { ch: "Ω", ja: "オメガ(大)", mean: "領域 Ω、標本空間、微分形式の層 Ω^p", field: "解析学", lv: 3 },
+    { ch: "Ψ", ja: "プサイ(大)", mean: "多体系の波動関数、場の演算子", field: "数理物理", lv: 3 },
+    { ch: "Σ", ja: "シグマ(大)", mean: "総和、または曲面 Σ(リーマン面)", field: "位相幾何", lv: 2 },
+    { ch: "Φ", ja: "ファイ(大)", mean: "スカラー場、フラックス、写像", field: "数理物理", lv: 2 }
+  ];
+
+  /* ==================== 文脈依存記号(分野で意味が変わる) ==================== */
+  var CTX = [
+    { ch: "π", items: [
+      { field: "初等幾何", mean: "円周率 3.14159…" },
+      { field: "位相幾何", mean: "基本群 π₁(X)(ループのホモトピー類)" },
+      { field: "表現論・群論", mean: "群の表現 π: G → GL(V)" },
+      { field: "代数・数論", mean: "素数計数関数 π(x)(x 以下の素数の個数)" }
+    ]},
+    { ch: "χ", items: [
+      { field: "位相幾何", mean: "オイラー標数 χ(M) = V − E + F" },
+      { field: "表現論・群論", mean: "表現の指標 χ(g) = Tr ρ(g)" },
+      { field: "確率・統計", mean: "カイ二乗統計量 χ²" },
+      { field: "代数・数論", mean: "ディリクレ指標 χ(n)" }
+    ]},
+    { ch: "σ", items: [
+      { field: "確率・統計", mean: "標準偏差 σ、σ加法族" },
+      { field: "表現論・群論", mean: "置換 σ ∈ Sₙ、ブレイド生成元 σᵢ" },
+      { field: "作用素環・関数解析", mean: "スペクトル σ(A)" },
+      { field: "数理物理", mean: "パウリ行列 σˣ, σʸ, σᶻ" }
+    ]},
+    { ch: "ℙ", items: [
+      { field: "代数幾何", mean: "射影空間 ℙⁿ" },
+      { field: "確率・統計", mean: "確率測度 ℙ(A)" },
+      { field: "圏論・論理", mean: "べき集合(記法により)" },
+      { field: "数理物理", mean: "射影作用素(記法により)" }
+    ]},
+    { ch: "∂", items: [
+      { field: "解析学", mean: "偏微分 ∂f/∂x" },
+      { field: "位相幾何", mean: "境界作用素 ∂(鎖複体の境界、∂∘∂ = 0)" },
+      { field: "微分幾何", mean: "多様体の境界 ∂M" },
+      { field: "代数・数論", mean: "微分作用素(記法により)" }
+    ]},
+    { ch: "𝒪", items: [
+      { field: "代数幾何", mean: "構造層 𝒪_X(スキーム上の正則関数の層)" },
+      { field: "代数・数論", mean: "代数体の整数環 𝒪_K" },
+      { field: "解析学", mean: "ランダウの O 記法(漸近的な上界)" },
+      { field: "作用素環・関数解析", mean: "キューンツ代数 𝒪ₙ" }
+    ]},
+    { ch: "∧", items: [
+      { field: "微分幾何", mean: "微分形式の外積(ウェッジ積、α∧β = −β∧α)" },
+      { field: "圏論・論理", mean: "論理積「かつ」" },
+      { field: "表現論・群論", mean: "外積代数 Λ*V の積" },
+      { field: "確率・統計", mean: "最小値 a∧b(束の交わり)" }
+    ]},
+    { ch: "Γ", items: [
+      { field: "解析学", mean: "ガンマ関数 Γ(s)(階乗の解析接続)" },
+      { field: "微分幾何", mean: "クリストッフェル記号 Γᵏᵢⱼ(接続係数)" },
+      { field: "表現論・群論", mean: "離散群 Γ ⊂ G(格子)" },
+      { field: "代数幾何", mean: "大域切断 Γ(X, ℱ)" }
+    ]},
+    { ch: "μ", items: [
+      { field: "確率・統計", mean: "測度 μ、または平均" },
+      { field: "代数・数論", mean: "メビウス関数 μ(n)" },
+      { field: "数理物理", mean: "化学ポテンシャル、時空添字 μ" },
+      { field: "作用素環・関数解析", mean: "スペクトル測度" }
+    ]}
+  ];
+
+  /* ============================== 方程式 ============================== */
+  /* near: 意味的に紛らわしい誤答(近傍distractor)。無い場合は同レベルから自動生成。 */
+  var EQUATIONS = [
+    /* ---------- Lv1 簡単な方程式 ---------- */
+    { eq: "a + b = b + a", name: "加法の交換法則", field: "代数・数論", lv: 1,
+      mean: "足す順序を変えても和は変わらない",
+      why: "可換性。行列や作用素では一般に成り立たず、非可換性が量子論の出発点になる。",
+      near: ["足す個数を変えても和は変わらない", "掛ける順序を変えても積は変わらない"] },
+    { eq: "a² + b² = c²", name: "三平方の定理(ピタゴラス)", field: "微分幾何", lv: 1,
+      mean: "直角三角形で斜辺の2乗は他の2辺の2乗の和に等しい",
+      why: "距離の測り方(計量)の最も素朴な形。曲がった空間では ds² = gᵢⱼdxⁱdxʲ に一般化される。",
+      near: ["任意の三角形で成り立つ辺の関係", "円の半径と円周の関係"] },
+    { eq: "y = ax + b", name: "一次関数", field: "解析学", lv: 1,
+      mean: "傾き a、切片 b の直線",
+      why: "局所的に見れば任意の滑らかな関数は一次関数で近似できる(微分の本質)。" },
+    { eq: "(a + b)² = a² + 2ab + b²", name: "展開公式", field: "代数・数論", lv: 1,
+      mean: "和の2乗の展開。交差項 2ab が現れる",
+      why: "非可換な対象では 2ab が ab + ba となり、交換子 [a,b] が姿を現す。" },
+    { eq: "∑_{k=1}^n k = n(n+1)/2", name: "自然数の和", field: "解析学", lv: 1,
+      mean: "1 から n までの整数の総和",
+      why: "有限和の閉じた表示。ゼータ関数の解析接続では「1+2+3+… = −1/12」という別の意味が現れる。" },
+    { eq: "S = πr²", name: "円の面積", field: "微分幾何", lv: 1,
+      mean: "半径 r の円の面積",
+      why: "面積=測度の最も基本的な例。曲面上では ∫√det g dx に一般化される。" },
+
+    /* ---------- Lv2 大学教養 ---------- */
+    { eq: "d/dx xⁿ = n x^n−1", name: "べき関数の微分", field: "解析学", lv: 2,
+      mean: "べき乗の導関数の公式",
+      why: "微分は「接線の傾き」= 局所的な一次近似。" },
+    { eq: "∫_a^b f′(x) dx = f(b) − f(a)", name: "微積分学の基本定理", field: "解析学", lv: 2,
+      mean: "導関数の積分は端点での値の差に等しい(微分と積分は逆操作)",
+      why: "「内部の微分 = 境界の値」という構造。ストークスの定理 ∫_M dω = ∮_∂M ω の 1 次元版。",
+      near: ["関数の平均値が区間の中点で達成される", "面積は上下からの近似の共通極限である"] },
+    { eq: "e^iθ = cos θ + i sin θ", name: "オイラーの公式", field: "解析学", lv: 2,
+      mean: "指数関数と三角関数を複素数で結ぶ",
+      why: "回転(円周 U(1))と指数(リー群の指数写像)が同じものであることの原型。",
+      near: ["複素数の絶対値が 1 であることの条件", "三角関数の加法定理"] },
+    { eq: "lim_n→∞ (1 + 1/n)ⁿ = e", name: "ネイピア数の定義", field: "解析学", lv: 2,
+      mean: "複利の極限として自然対数の底 e が定まる",
+      why: "連続的な増殖の極限。微分方程式 y′ = y の解の基礎。" },
+    { eq: "A𝐱 = 𝐛", name: "連立一次方程式", field: "代数・数論", lv: 2,
+      mean: "線型写像 A による方程式。解の存在と一意性は核と像で決まる",
+      why: "dim ker − dim coker という指数の考え方は、無限次元でアティヤ・シンガーの指数定理へ拡張される。" },
+    { eq: "det(A − λI) = 0", name: "固有方程式", field: "代数・数論", lv: 2,
+      mean: "固有値 λ を決める特性方程式",
+      why: "作用素の対角化=スペクトル分解。量子論の観測値はここから来る。" },
+    { eq: "∑_{n=0}^∞ rⁿ = 1/(1 − r), |r| < 1", name: "等比級数", field: "解析学", lv: 2,
+      mean: "公比 r の無限等比級数の和",
+      why: "この形の総和がオイラー積 ∏_p (1 − p^−s)^−1 を生み、素数と解析を結ぶ。" },
+    { eq: "∇f = (∂f/∂x, ∂f/∂y, ∂f/∂z)", name: "勾配", field: "微分幾何", lv: 2,
+      mean: "関数が最も急に増加する方向とその大きさ",
+      why: "外微分 df の成分表示。座標に依らない定式化が微分形式。" },
+
+    /* ---------- Lv3 学部専門 ---------- */
+    { eq: "∂u/∂t = k ∇²u", name: "熱伝導方程式", field: "解析学", lv: 3,
+      mean: "温度分布が時間とともに平滑化していく拡散を表す",
+      why: "放物型方程式。幾何学では計量そのものを拡散させるリッチフローに一般化される。",
+      near: ["波が一定速度で伝わる様子を表す", "定常状態で温度が調和関数になる条件"] },
+    { eq: "∇²φ = 0", name: "ラプラス方程式", field: "解析学", lv: 3,
+      mean: "調和関数の条件。源のない定常場を表す",
+      why: "平均値の性質・最大値原理。ホッジ理論では調和形式がコホモロジーを代表する。" },
+    { eq: "∮_C f(z) dz = 2πi ∑ Res(f, aₖ)", name: "留数定理", field: "解析学", lv: 3,
+      mean: "閉曲線上の積分は内部の特異点の留数の和で決まる",
+      why: "局所的な特異性(留数)が大域的な積分を決める。指数定理の原型的発想。",
+      near: ["正則関数の閉曲線積分は常に 0 である", "積分値は曲線の長さに比例する"] },
+    { eq: "ζ(s) = ∑_n≥1 n^−s = ∏_p (1 − p^−s)^−1", name: "オイラー積", field: "代数・数論", lv: 3,
+      mean: "ゼータ関数の和による表示と素数による積表示が一致する",
+      why: "「足し算の世界(整数)」と「掛け算の世界(素数)」を結ぶ。素数定理の出発点。",
+      near: ["すべての整数が素数の積に一意分解されることの言い換えにすぎない", "ζ(s) が s=1 で発散することの証明"] },
+    { eq: "iℏ ∂ψ/∂t = Ĥψ", name: "シュレーディンガー方程式", field: "数理物理", lv: 3,
+      mean: "量子状態の時間発展をハミルトニアンが生成する",
+      why: "ユニタリ群 e^{−iĤt/ℏ} の生成子が Ĥ。ストーンの定理(作用素環)と同じ構造。",
+      near: ["粒子の位置と運動量が同時に決まらないことを表す", "エネルギーが保存することを表す"] },
+    { eq: "[x̂, p̂] = iℏ", name: "正準交換関係", field: "数理物理", lv: 3,
+      mean: "位置と運動量は交換しない(非可換)",
+      why: "非可換性そのもの。ここから不確定性関係が導かれ、非可換幾何へ繋がる。",
+      near: ["位置と運動量の積が ℏ より大きいことを表す", "エネルギーと時間が共役であることを表す"] },
+    { eq: "∇·𝐄 = ρ/ε₀", name: "ガウスの法則", field: "数理物理", lv: 3,
+      mean: "電場の湧き出しは電荷密度で決まる",
+      why: "マクスウェル方程式の一つ。微分形式では dF = 0, d⋆F = J に統一される。" },
+    { eq: "f(x) = ∑_n∈ℤ cₙ e^inx", name: "フーリエ級数", field: "解析学", lv: 3,
+      mean: "周期関数を円周上の指標(振動)の重ね合わせで表す",
+      why: "円周群 U(1) の既約表現による分解。一般の群ではピーター・ワイルの定理に一般化。",
+      near: ["任意の関数を多項式で近似できることを表す", "関数の平均値が係数 c₀ で与えられること"] },
+    { eq: "P(A|B) = P(B|A)P(A)/P(B)", name: "ベイズの定理", field: "確率・統計", lv: 3,
+      mean: "観測 B を得たときに事前確率が事後確率へ更新される",
+      why: "条件付き確率の定義の書き換えだが、推論の更新則として絶大な射程を持つ。" },
+    { eq: "𝔼[X] = ∫_Ω X dℙ", name: "期待値の測度論的定義", field: "確率・統計", lv: 3,
+      mean: "確率変数の平均を確率測度による積分として定義する",
+      why: "確率論はルベーグ測度論の特別な場合(全測度 1)であるという視点。" },
+    { eq: "χ(M) = V − E + F", name: "オイラー標数", field: "位相幾何", lv: 3,
+      mean: "頂点・辺・面の交代和は分割の仕方によらない位相不変量",
+      why: "連続変形で不変。ガウス・ボネの定理で曲率の積分と等しくなる。" },
+    { eq: "y² = x³ + ax + b", name: "楕円曲線(ワイエルシュトラス形)", field: "代数幾何", lv: 3,
+      mean: "非特異三次曲線。点に群構造が入る",
+      why: "幾何(曲線)と代数(群)と数論(有理点)が交差する。フェルマー予想の証明の舞台。" },
+    { eq: "a^p−1 ≡ 1 (mod p)", name: "フェルマーの小定理", field: "代数・数論", lv: 3,
+      mean: "p が素数で a が p の倍数でなければ a^p−1 は p で 1 と合同",
+      why: "(ℤ/pℤ)* が位数 p−1 の群であることの帰結(ラグランジュの定理)。" },
+    { eq: "G/ker φ ≅ im φ", name: "準同型定理", field: "表現論・群論", lv: 3,
+      mean: "準同型の像は、核で割った商群と同型になる",
+      why: "「潰した情報 = 核」という普遍的な原理。環・加群・層でも同じ形で成り立つ。" },
+
+    /* ---------- Lv4 大学院 ---------- */
+    { eq: "∫_M dω = ∮_∂M ω", name: "ストークスの定理(一般形)", field: "微分幾何", lv: 4,
+      mean: "領域内部での外微分の積分は、境界上での積分に等しい",
+      why: "微分作用素 d と境界作用素 ∂ が随伴。微積分学の基本定理・グリーン・ガウス・ストークスを統一する。",
+      near: ["閉形式の積分は常に 0 になる", "境界のない多様体では積分が発散する"] },
+    { eq: "∫_M K dA = 2π χ(M)", name: "ガウス・ボネの定理", field: "微分幾何", lv: 4,
+      mean: "曲率の総和は位相不変量(オイラー標数)だけで決まる",
+      why: "局所的な曲がり(解析)を積分すると大域的な形(位相)になる。指数定理の 2 次元版。",
+      near: ["曲面の面積は曲率の積分で与えられる", "曲率が 0 なら曲面は平面と同相である"] },
+    { eq: "R_μν − ½R g_μν + Λ g_μν = (8πG/c⁴) T_μν", name: "アインシュタイン方程式", field: "数理物理", lv: 4,
+      mean: "時空の曲率が物質・エネルギーの分布によって決まる",
+      why: "幾何(左辺)= 物質(右辺)。ビアンキ恒等式が保存則 ∇_μT^μν=0 を保証する。",
+      near: ["重力が距離の 2 乗に反比例することを表す", "光速度が不変であることを表す"] },
+    { eq: "d ∘ d = 0", name: "外微分の冪零性", field: "位相幾何", lv: 4,
+      mean: "外微分を2回施すと必ず 0 になる",
+      why: "「完全形式は閉形式」。閉/完全の差を測るのが de Rham コホモロジー。∇×(∇φ)=0 の一般化。",
+      near: ["外微分は線型作用素であることを表す", "微分形式の積は反対称であることを表す"] },
+    { eq: "∂g/∂t = −2 Ric(g)", name: "リッチフロー", field: "微分幾何", lv: 4,
+      mean: "計量そのものをリッチ曲率に沿って拡散させる発展方程式",
+      why: "熱方程式の幾何版。ポアンカレ予想の解決(ペレルマン)の中心的道具。",
+      near: ["測地線が曲率に沿って変形することを表す", "体積が時間とともに保存されることを表す"] },
+    { eq: "σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁", name: "ブレイド関係式", field: "位相幾何", lv: 4,
+      mean: "紐の交差の入れ替えが従う基本関係(組み紐群の定義関係)",
+      why: "ヤン・バクスター方程式・量子群・結び目不変量(ジョーンズ多項式)へ直結する。",
+      near: ["置換が2回で元に戻ることを表す", "組み紐が可換であることを表す"] },
+    { eq: "π₁(S¹) ≅ ℤ", name: "円周の基本群", field: "位相幾何", lv: 4,
+      mean: "円周上のループは巻き数(整数)で完全に分類される",
+      why: "位相不変量が代数(群)で表される最初の例。被覆空間論の出発点。" },
+    { eq: "0 → A → B → C → 0", name: "短完全列", field: "圏論・論理", lv: 4,
+      mean: "A が B に埋め込まれ、その商が C であるという関係",
+      why: "「部分と商」の言語。長完全列を経てホモロジー代数の全体が展開する。" },
+    { eq: "df = (∂f/∂t + μ ∂f/∂x + ½σ² ∂²f/∂x²)dt + σ(∂f/∂x)dW", name: "伊藤の補題", field: "確率・統計", lv: 4,
+      mean: "確率過程に対する連鎖律。2階の項 ½σ²∂²f/∂x² が余分に現れる",
+      why: "ブラウン運動の 2 次変分が消えないため。ブラック・ショールズ方程式の導出の核。",
+      near: ["確率変数の期待値が線型であることを表す", "ブラウン運動が連続だが微分不可能であることを表す"] },
+    { eq: "∇_X Y − ∇_Y X − [X, Y] = T(X, Y)", name: "捩率テンソル", field: "微分幾何", lv: 4,
+      mean: "接続の非対称部分。レヴィ・チヴィタ接続では T = 0",
+      why: "「平行移動のねじれ」。曲率と並ぶ接続の基本不変量。" },
+    { eq: "Hom(A ⊗ B, C) ≅ Hom(A, Hom(B, C))", name: "テンソル・Hom 随伴", field: "圏論・論理", lv: 4,
+      mean: "テンソル積と Hom 関手が随伴の関係にある",
+      why: "「2変数の写像 = 1変数の写像を返す写像」。カリー化と同じ構造。" },
+    { eq: "Tr(ρ A) = ⟨A⟩", name: "密度行列による期待値", field: "作用素環・関数解析", lv: 4,
+      mean: "混合状態 ρ における観測量 A の期待値",
+      why: "状態=正で規格化された線型汎関数。C*代数の状態の概念に一般化される。" },
+    { eq: "Gal(L/K) の部分群 ↔ K ⊂ M ⊂ L の中間体", name: "ガロア対応", field: "代数・数論", lv: 4,
+      mean: "体の拡大の中間体と、ガロア群の部分群が反転して1対1に対応する",
+      why: "対称性(群)が解の構造(体)を完全に決める。被覆空間と基本群の対応と同型の思想。" },
+
+    /* ---------- Lv5 研究前線 ---------- */
+    { eq: "ind(D) = ∫_M ch(E) Td(TM)", name: "アティヤ・シンガーの指数定理", field: "微分幾何", lv: 5,
+      mean: "楕円型作用素の解析的指数(dim ker − dim coker)が位相的な特性類の積分に等しい",
+      why: "解析(方程式の解の数)= 位相(空間の形)。ガウス・ボネ、リーマン・ロッホを統一する。",
+      near: ["楕円型作用素が常に可逆であることを表す", "多様体の体積が特性類で決まることを表す"] },
+    { eq: "M″ = M", name: "フォン・ノイマンの二重可換子定理", field: "作用素環・関数解析", lv: 5,
+      mean: "作用素環が弱位相で閉じていることと、二重可換子に一致することが同値",
+      why: "「代数的条件 = 位相的条件」。フォン・ノイマン環論の出発点。",
+      near: ["すべての作用素が可換であることを表す", "自己共役作用素は対角化できることを表す"] },
+    { eq: "Z = ∫ 𝒟φ e^{iS[φ]/ℏ}", name: "経路積分(汎関数積分)", field: "数理物理", lv: 5,
+      mean: "すべての経路の位相因子の重ね合わせとして遷移振幅を表す",
+      why: "ℏ→0 で停留位相 δS=0(古典的最小作用の原理)が復元される。" },
+    { eq: "D_μ F^μν = J^ν", name: "ヤン・ミルズ方程式", field: "数理物理", lv: 5,
+      mean: "非可換ゲージ場の運動方程式。曲率 F の共変発散が流れに等しい",
+      why: "主束の接続の曲率。数学的には ⋆d_A ⋆ F_A = J。マクスウェル方程式の非可換版。",
+      near: ["電磁場が横波であることを表す", "ゲージ変換で場が不変であることを表す"] },
+    { eq: "∂_t u + 6u ∂_x u + ∂_x³ u = 0", name: "KdV 方程式", field: "数理物理", lv: 5,
+      mean: "浅水波のソリトンを記述する可積分な非線型偏微分方程式",
+      why: "無限個の保存量を持つ完全可積分系。逆散乱法・リー環と結びつく。" },
+    { eq: "Hⁿ(X,ℂ) = ⊕_{p+q=n} H^{p,q}(X)", name: "ホッジ分解", field: "代数幾何", lv: 5,
+      mean: "コンパクトケーラー多様体のコホモロジーが (p,q) 型に分解する",
+      why: "位相的な情報が複素構造で細分される。ホッジ予想の舞台。" },
+    { eq: "t^−1V(L₊) − t V(L₋) = (t^1/2 − t^−1/2) V(L₀)", name: "ジョーンズ多項式のスケイン関係式", field: "位相幾何", lv: 5,
+      mean: "結び目の交差を1箇所変えた3つの図式の不変量が満たす漸化関係",
+      why: "作用素環(部分因子環)から生まれた結び目不変量。TQFT・量子群と結ぶ。",
+      near: ["結び目の交点数が不変量であることを表す", "結び目が常に解けることを表す"] },
+    { eq: "ζ(s) = 0, 0 < Re(s) < 1 ⟹ Re(s) = 1/2", name: "リーマン予想", field: "代数・数論", lv: 5,
+      mean: "ゼータ関数の非自明な零点はすべて臨界線上にあるという未解決予想",
+      why: "素数の分布の誤差項の最良評価と同値。" },
+    { eq: "‖[D, a]‖ < ∞ (𝒜, ℋ, D)", name: "スペクトル三重(非可換幾何)", field: "作用素環・関数解析", lv: 5,
+      mean: "代数・ヒルベルト空間・ディラック作用素の組で「空間」を代数的に記述する",
+      why: "点の集合を使わずに幾何を定義する。距離は交換子のノルムから復元される。" },
+    { eq: "∫ Γ(γ)′ dx_m = 2e^{−x log x}", name: "Γ 大域的部分積分多様体(本リポジトリの枠組)", field: "解析学", lv: 5,
+      mean: "Γ カーネル e^{−x log x} を大域的な変調核として用いる、本リポジトリ独自の定式化",
+      why: "bio_medicine の各アプリ(熱流トレース等)で伝導率や重みの空間変調に使われている。" }
+  ];
+
+  /* ================= 連想: 簡単な方程式 → 専門分野の方程式 ================= */
+  var ASSOC = [
+    { simple: "a² + b² = c²", simpleMean: "平面での距離の測り方",
+      adv: "ds² = gᵢⱼ dxⁱ dxʲ", advName: "リーマン計量", field: "微分幾何", lv: 4,
+      why: "ピタゴラスの定理は「定数係数の計量」。係数を場所ごとに変えて gᵢⱼ(x) にすると曲がった空間の距離になる。",
+      wrong: ["e^iθ = cos θ + i sin θ", "ζ(s) = ∏_p (1 − p^−s)^−1", "[x̂, p̂] = iℏ"] },
+    { simple: "∫_a^b f′(x) dx = f(b) − f(a)", simpleMean: "微分したものを積分すると端点の差になる",
+      adv: "∫_M dω = ∮_∂M ω", advName: "ストークスの定理(一般形)", field: "微分幾何", lv: 4,
+      why: "区間[a,b]→多様体 M、端点{a,b}→境界 ∂M、f′dx→dω と読み替えた完全な一般化。",
+      wrong: ["∇²φ = 0", "det(A − λI) = 0", "P(A|B) = P(B|A)P(A)/P(B)"] },
+    { simple: "∇×(∇φ) = 0", simpleMean: "勾配場の回転は必ず 0",
+      adv: "d ∘ d = 0", advName: "外微分の冪零性(de Rham 複体)", field: "位相幾何", lv: 4,
+      why: "grad, rot, div はすべて外微分 d の次数違い。d²=0 が「閉形式/完全形式」の差=コホモロジーを生む。",
+      wrong: ["∂u/∂t = k∇²u", "Tr(ρA) = ⟨A⟩", "y² = x³ + ax + b"] },
+    { simple: "∑_n≥0 rⁿ = 1/(1−r)", simpleMean: "等比級数の和",
+      adv: "ζ(s) = ∏_p (1 − p^−s)^−1", advName: "オイラー積", field: "代数・数論", lv: 4,
+      why: "各素数 p ごとに公比 p^−s の等比級数を作り、掛け合わせると素因数分解の一意性から ∑n^−s になる。",
+      wrong: ["∫_M K dA = 2πχ(M)", "iℏ∂ψ/∂t = Ĥψ", "σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁"] },
+    { simple: "log(ab) = log a + log b", simpleMean: "積を和に変える性質",
+      adv: "ρ(gh) = ρ(g)ρ(h)", advName: "群の表現(準同型)", field: "表現論・群論", lv: 4,
+      why: "「構造を保つ写像」という一点で同じ。log は (ℝ_>0, ×) → (ℝ, +) の同型、表現は G → GL(V) の準同型。",
+      wrong: ["∇²φ = 0", "∂g/∂t = −2Ric(g)", "𝔼[X] = ∫ X dℙ"] },
+    { simple: "三角形の内角の和 = π", simpleMean: "平面幾何の基本性質",
+      adv: "∫_M K dA = 2π χ(M)", advName: "ガウス・ボネの定理", field: "微分幾何", lv: 4,
+      why: "内角の和のズレ(角超過)は曲率の積分に等しい。それを閉曲面全体で足し上げると位相不変量 χ になる。",
+      wrong: ["A𝐱 = 𝐛", "[x̂, p̂] = iℏ", "ind(D) = ∫_M ch(E)Td(TM)"] },
+    { simple: "∂u/∂t = k ∇²u", simpleMean: "熱が拡散して平滑化する",
+      adv: "∂g/∂t = −2 Ric(g)", advName: "リッチフロー", field: "微分幾何", lv: 5,
+      why: "拡散する対象を「温度」から「計量そのもの」へ置き換えた。形の凹凸が熱のようにならされる。",
+      wrong: ["∮_C f dz = 2πi∑Res", "Hom(A⊗B,C) ≅ Hom(A,Hom(B,C))", "M″ = M"] },
+    { simple: "∑ᵢ pᵢ = 1", simpleMean: "確率の総和は 1",
+      adv: "∫ |ψ(x)|² dx = 1", advName: "波動関数の規格化条件", field: "数理物理", lv: 3,
+      why: "確率分布が |ψ|² として振幅の2乗で与えられる点が量子論の飛躍。和は積分に、確率は振幅の2乗になる。",
+      wrong: ["det(A − λI) = 0", "χ(M) = V − E + F", "d ∘ d = 0"] },
+    { simple: "(fg)′ = f′g + fg′", simpleMean: "積の微分(ライプニッツ則)",
+      adv: "∇(f s) = df ⊗ s + f ∇s", advName: "接続のライプニッツ則", field: "微分幾何", lv: 4,
+      why: "「微分とは何か」を公理化するとライプニッツ則になる。ベクトル束の切断の微分=接続はこの規則で定義される。",
+      wrong: ["a^p−1 ≡ 1 (mod p)", "Z = ∫𝒟φ e^iS/ℏ", "π₁(S¹) ≅ ℤ"] },
+    { simple: "ab = ba", simpleMean: "数の掛け算は順序によらない",
+      adv: "[x̂, p̂] = iℏ", advName: "正準交換関係", field: "数理物理", lv: 4,
+      why: "可換性が壊れる度合い(交換子)そのものが物理量になる。非可換性の測り方が ℏ。",
+      wrong: ["∫_M dω = ∮_∂M ω", "y² = x³ + ax + b", "𝔼[X] = ∫X dℙ"] },
+    { simple: "n = p₁^e₁ ⋯ p_k^e_k", simpleMean: "整数の素因数分解",
+      adv: "(p) = 𝔭₁^e₁ ⋯ 𝔭_g^e_g", advName: "素イデアルの分解", field: "代数・数論", lv: 5,
+      why: "代数体の整数環では元の一意分解が壊れるが、イデアルに移せば一意分解が復活する。",
+      wrong: ["∇·E = ρ/ε₀", "σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁", "Hⁿ = ⊕H^{p,q}"] },
+    { simple: "隣り合う 2 本の入れ替え(あみだくじ)", simpleMean: "隣接互換で置換を作る",
+      adv: "σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁", advName: "ブレイド関係式", field: "位相幾何", lv: 5,
+      why: "置換群では σᵢ²=1 だが、紐の上下を記憶すると σᵢ²≠1 となり組み紐群になる。結び目不変量の源。",
+      wrong: ["∫_a^b f′dx = f(b)−f(a)", "R_μν − ½Rg_μν = 8πG T_μν", "P(A|B)P(B) = P(B|A)P(A)"] },
+    { simple: "x² + y² = 1 上の点の加法定理", simpleMean: "円周上の点に加法が入る",
+      adv: "P + Q + R = O (共線 ⟺ 和が単位元)", advName: "楕円曲線の群法則", field: "代数幾何", lv: 5,
+      why: "円(種数 0)を三次曲線(種数 1)に取り替えると、幾何的な「直線との交点」が群演算になる。",
+      wrong: ["∇²φ = 0", "Tr(ρA) = ⟨A⟩", "∂_t u + 6u∂_x u + ∂_x³u = 0"] },
+    { simple: "dy/dx (直線の傾き)", simpleMean: "1次近似としての傾き",
+      adv: "R^ρ_σμν = ∂_μΓ^ρ_νσ − ∂_νΓ^ρ_μσ + ⋯", advName: "リーマン曲率テンソル", field: "微分幾何", lv: 5,
+      why: "1階微分(接続 Γ)の非可換性=2階のズレが曲率。平行移動が経路に依存する度合いを測る。",
+      wrong: ["ζ(s) = ∑n^−s", "M″ = M", "0 → A → B → C → 0"] },
+    { simple: "f(x) = ∑ cₙ e^inx", simpleMean: "周期関数のフーリエ展開",
+      adv: "L²(G) ≅ ⊕_π (V_π ⊗ V_π*)", advName: "ピーター・ワイルの定理", field: "表現論・群論", lv: 5,
+      why: "e^inx は円周群 U(1) の既約表現。一般のコンパクト群では既約表現の行列成分が完全系をなす。",
+      wrong: ["∮_C f dz = 2πi ∑Res", "y² = x³+ax+b", "∂g/∂t = −2Ric(g)"] },
+    { simple: "A𝐱 = 𝐛 の解の個数", simpleMean: "核と像の次元で解の存在と一意性が決まる",
+      adv: "ind(D) = dim ker D − dim coker D = ∫_M ch(E)Td(TM)", advName: "アティヤ・シンガーの指数定理", field: "微分幾何", lv: 5,
+      why: "有限次元の rank-nullity を無限次元の楕円型作用素へ持ち上げると、指数が位相量だけで決まる。",
+      wrong: ["e^iθ = cosθ + i sinθ", "P(A|B) = P(B|A)P(A)/P(B)", "∇·E = ρ/ε₀"] },
+    { simple: "𝐚·𝐛 = ∑ aᵢbᵢ", simpleMean: "ベクトルの内積",
+      adv: "⟨ψ|φ⟩ = ∫ ψ̄(x)φ(x) dx", advName: "ヒルベルト空間の内積", field: "作用素環・関数解析", lv: 4,
+      why: "有限次元の成分和を無限次元の積分に置き換える。完備性を課すとヒルベルト空間になる。",
+      wrong: ["χ(M) = V − E + F", "a^p−1 ≡ 1 (mod p)", "d∘d = 0"] },
+    { simple: "面積 = 縦 × 横", simpleMean: "長方形の面積",
+      adv: "μ(E) = inf ∑ vol(Qₖ)", advName: "ルベーグ外測度", field: "確率・統計", lv: 4,
+      why: "「長方形の面積」を種にして、被覆による下限で任意の集合へ測度を拡張する。確率もこの枠組みの一例。",
+      wrong: ["iℏ∂ψ/∂t = Ĥψ", "Gal(L/K) ↔ 中間体", "σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁"] },
+    { simple: "A = PDP^−1 (対角化)", simpleMean: "行列を固有値の対角行列にする",
+      adv: "A = ∫_σ(A) λ dE(λ)", advName: "スペクトル分解定理", field: "作用素環・関数解析", lv: 5,
+      why: "固有値の有限和を、スペクトル測度による積分に置き換える。連続スペクトルもこれで扱える。",
+      wrong: ["∫_M K dA = 2πχ(M)", "0 → A → B → C → 0", "∂_t u + 6u ∂_x u + ∂_x³ u = 0"] },
+    { simple: "E[X] = ∑ xᵢ pᵢ", simpleMean: "離散確率変数の期待値",
+      adv: "df = (∂_t f + μ∂_x f + ½σ²∂_x²f)dt + σ∂_x f dW", advName: "伊藤の補題", field: "確率・統計", lv: 5,
+      why: "確率変数を時間発展させると、ブラウン運動の 2 次変分 (dW)² = dt が効いて 2 階の項が残る。",
+      wrong: ["∇×(∇φ) = 0", "Hom(A⊗B,C) ≅ Hom(A,Hom(B,C))", "ζ(s)=0 ⟹ Re(s)=1/2"] }
+  ];
+
+  /* ==================== 数学適性分野の検査(思考スタイル項目) ====================
+     正誤のない設問。各選択肢は「どの分野の思考法に近いか」の重みベクトルを持つ。
+     採点は、設問ごとの最大重みで正規化した志向スコア(0〜1)。 */
+  var APTITUDE = [
+    { q: "新しい数学的対象に出会ったとき、最初にしたくなることは？", opts: [
+      { t: "具体的な数値で計算し、まず様子を見る", w: { "解析学": 2, "確率・統計": 1.5, "数理物理": 1 } },
+      { t: "それを不変にする操作(対称性)を探す", w: { "表現論・群論": 2.5, "代数・数論": 1 } },
+      { t: "図や空間として描いてみる", w: { "位相幾何": 2, "微分幾何": 2 } },
+      { t: "定義と公理を厳密に書き下す", w: { "圏論・論理": 2.5, "作用素環・関数解析": 1 } }
+    ]},
+    { q: "「美しい」と感じる主張はどれですか。", opts: [
+      { t: "誤差を不等式で完全に押さえ込む評価", w: { "解析学": 2.5, "作用素環・関数解析": 1 } },
+      { t: "分類定理(条件を満たすものはこれで全部だ)", w: { "表現論・群論": 2, "代数幾何": 1.5, "位相幾何": 1 } },
+      { t: "無関係に見えた2つの分野が同型で結ばれる", w: { "圏論・論理": 2, "代数幾何": 1.5, "表現論・群論": 1 } },
+      { t: "個々はランダムなのに極限は決定的になる", w: { "確率・統計": 2.5, "数理物理": 1 } }
+    ]},
+    { q: "「無限」をどう扱いたいですか。", opts: [
+      { t: "極限・収束の評価として", w: { "解析学": 2.5 } },
+      { t: "濃度や順序数として", w: { "圏論・論理": 2.5 } },
+      { t: "無限次元空間の作用素として", w: { "作用素環・関数解析": 2.5, "数理物理": 1 } },
+      { t: "無限個の素数・無限級数として", w: { "代数・数論": 2.5 } }
+    ]},
+    { q: "計算が合わないとき、まずどうしますか。", opts: [
+      { t: "手を動かして具体例で検算する", w: { "解析学": 1.5, "確率・統計": 1.5, "代数・数論": 1 } },
+      { t: "図を描いて構造を見直す", w: { "位相幾何": 2, "微分幾何": 1.5 } },
+      { t: "定義に戻って仮定を点検する", w: { "圏論・論理": 2, "作用素環・関数解析": 1 } },
+      { t: "座標や定式化そのものを取り替える", w: { "微分幾何": 2, "数理物理": 1.5 } }
+    ]},
+    { q: "手になじむ道具はどれですか。", opts: [
+      { t: "不等式と評価", w: { "解析学": 2.5, "作用素環・関数解析": 1 } },
+      { t: "群・環・体", w: { "代数・数論": 2, "表現論・群論": 1.5 } },
+      { t: "圏・関手・普遍性", w: { "圏論・論理": 2.5, "代数幾何": 1 } },
+      { t: "測度と確率分布", w: { "確率・統計": 2.5, "解析学": 1 } }
+    ]},
+    { q: "2つの対象を「同じ」とみなす基準として自然なのは？", opts: [
+      { t: "連続変形で移り合えば同じ(ホモトピー同値)", w: { "位相幾何": 2.5, "微分幾何": 1 } },
+      { t: "構造を保つ全単射があれば同じ(同型)", w: { "代数・数論": 2, "表現論・群論": 1.5 } },
+      { t: "測度ゼロの違いは無視してよい(ほとんど至る所)", w: { "確率・統計": 2, "解析学": 1.5, "作用素環・関数解析": 1 } },
+      { t: "圏同値であれば同じ", w: { "圏論・論理": 2.5, "代数幾何": 1.5 } }
+    ]},
+    { q: "研究してみたい問いはどれですか。", opts: [
+      { t: "素数はどのように分布しているのか", w: { "代数・数論": 3 } },
+      { t: "空間の形はどう分類されるのか", w: { "位相幾何": 2.5, "微分幾何": 1 } },
+      { t: "量子系の状態はどんな代数で書けるのか", w: { "作用素環・関数解析": 2.5, "数理物理": 1.5 } },
+      { t: "ランダムな系の平均的な振る舞いはどうなるか", w: { "確率・統計": 3 } }
+    ]},
+    { q: "方程式を見たとき、まず知りたくなるのは？", opts: [
+      { t: "解の存在・一意性・安定性", w: { "解析学": 2.5, "数理物理": 1 } },
+      { t: "解全体がなす図形の形", w: { "代数幾何": 2.5 } },
+      { t: "方程式を不変にする変換群", w: { "表現論・群論": 2.5, "数理物理": 1 } },
+      { t: "時間発展で保存される量", w: { "数理物理": 2, "微分幾何": 1.5 } }
+    ]},
+    { q: "証明の進め方として好きなのは？", opts: [
+      { t: "対象を具体的に構成してみせる", w: { "解析学": 1.5, "代数幾何": 1.5, "確率・統計": 1 } },
+      { t: "図式追跡(diagram chase)", w: { "圏論・論理": 2.5 } },
+      { t: "評価を丁寧に積み上げる", w: { "解析学": 2.5, "作用素環・関数解析": 1 } },
+      { t: "対称性を使って一気に落とす", w: { "表現論・群論": 2.5 } }
+    ]},
+    { q: "「曲がった空間」と聞いて、まずしたいことは？", opts: [
+      { t: "計量と曲率テンソルを計算する", w: { "微分幾何": 3 } },
+      { t: "穴の数など変形不変量を数える", w: { "位相幾何": 3 } },
+      { t: "重力として物理法則を書く", w: { "数理物理": 2.5, "微分幾何": 1 } },
+      { t: "多項式の零点集合として書く", w: { "代数幾何": 2.5 } }
+    ]},
+    { q: "非可換性 (AB ≠ BA) に対する感覚は？", opts: [
+      { t: "量子論の本質であり、面白い", w: { "数理物理": 2, "作用素環・関数解析": 1.5 } },
+      { t: "作用素環として体系的に研究したい", w: { "作用素環・関数解析": 3 } },
+      { t: "群の構造として研究したい", w: { "表現論・群論": 2.5 } },
+      { t: "可換な世界の方が扱いやすくて好き", w: { "代数・数論": 1.5, "代数幾何": 1.5, "解析学": 1 } }
+    ]},
+    { q: "大きな数を扱うとき、頼りにする方法は？", opts: [
+      { t: "漸近評価(O 記法)で押さえる", w: { "解析学": 2, "代数・数論": 1.5 } },
+      { t: "合同式で有限の世界に落とす", w: { "代数・数論": 3 } },
+      { t: "乱数シミュレーションで近似する", w: { "確率・統計": 2.5 } },
+      { t: "安定な数値解法を設計する", w: { "解析学": 2, "数理物理": 1.5 } }
+    ]},
+    { q: "「良い定義」の条件はどれだと思いますか。", opts: [
+      { t: "普遍性によって特徴づけられること", w: { "圏論・論理": 3 } },
+      { t: "座標の取り方に依らないこと", w: { "微分幾何": 2.5, "数理物理": 1 } },
+      { t: "具体例が豊富に作れること", w: { "代数幾何": 2, "代数・数論": 1.5 } },
+      { t: "極限操作に対して閉じていること", w: { "解析学": 2, "作用素環・関数解析": 1.5 } }
+    ]},
+    { q: "挑むとしたら、どの未解決問題ですか。", opts: [
+      { t: "リーマン予想(ゼータ零点の位置)", w: { "代数・数論": 3 } },
+      { t: "ホッジ予想(コホモロジー類の代数性)", w: { "代数幾何": 3 } },
+      { t: "ナビエ・ストークス方程式の正則性", w: { "解析学": 2.5, "数理物理": 1.5 } },
+      { t: "ヤン・ミルズ理論の質量ギャップ", w: { "数理物理": 2.5, "作用素環・関数解析": 1.5 } }
+    ]},
+    { q: "現実の現象やデータを前にしたとき、したくなるのは？", opts: [
+      { t: "分布・推定・検定の言葉で語る", w: { "確率・統計": 3 } },
+      { t: "微分方程式でモデル化する", w: { "解析学": 2, "数理物理": 2 } },
+      { t: "変形しても変わらない不変量を取り出す", w: { "位相幾何": 2, "表現論・群論": 1 } },
+      { t: "圏と関手で構造化する", w: { "圏論・論理": 2.5 } }
+    ]},
+    { q: "自分の作業スタイルに近いのは？", opts: [
+      { t: "長い計算を最後まで丁寧に完遂する", w: { "解析学": 2, "微分幾何": 1.5, "数理物理": 1 } },
+      { t: "抽象化して一般論を作る", w: { "圏論・論理": 2.5, "代数幾何": 1 } },
+      { t: "具体例を大量に作って観察する", w: { "代数・数論": 2, "確率・統計": 1.5 } },
+      { t: "図と直観で当たりをつける", w: { "位相幾何": 2.5, "微分幾何": 1 } }
+    ]},
+    { q: "対称性を見つけたとき、次にすることは？", opts: [
+      { t: "既約表現に分解する", w: { "表現論・群論": 3 } },
+      { t: "保存量を導く(ネーターの定理)", w: { "数理物理": 2.5, "微分幾何": 1 } },
+      { t: "商空間を作って眺める", w: { "位相幾何": 2, "代数幾何": 1.5 } },
+      { t: "ガロア群として調べる", w: { "代数・数論": 2.5 } }
+    ]},
+    { q: "無限次元の空間で、最初に気になるのは？", opts: [
+      { t: "ノルム・完備性・有界性", w: { "作用素環・関数解析": 3, "解析学": 1 } },
+      { t: "スペクトル(固有値の一般化)", w: { "作用素環・関数解析": 2.5, "数理物理": 1.5 } },
+      { t: "可測性と測度の存在", w: { "確率・統計": 2.5, "解析学": 1 } },
+      { t: "収束の種類(位相)の違い", w: { "解析学": 2, "作用素環・関数解析": 1.5 } }
+    ]},
+    { q: "教科書を読むとき、心が動くのは？", opts: [
+      { t: "反例が示され、条件の必要性がわかった瞬間", w: { "解析学": 2, "圏論・論理": 1.5 } },
+      { t: "計算例が壮大な理論の入口だと気づいた瞬間", w: { "代数・数論": 2, "代数幾何": 1.5 } },
+      { t: "1枚の図で定理の意味が腑に落ちた瞬間", w: { "位相幾何": 2.5, "微分幾何": 1.5 } },
+      { t: "物理的な意味づけが与えられた瞬間", w: { "数理物理": 2.5, "確率・統計": 1 } }
+    ]},
+    { q: "1年かけて1つの主題を学ぶなら？", opts: [
+      { t: "ルベーグ積分と関数空間", w: { "解析学": 2.5, "確率・統計": 1, "作用素環・関数解析": 1 } },
+      { t: "多様体と微分形式", w: { "微分幾何": 2.5, "位相幾何": 1.5 } },
+      { t: "可換環論とスキーム", w: { "代数幾何": 2.5, "代数・数論": 1.5 } },
+      { t: "ヒルベルト空間と作用素論", w: { "作用素環・関数解析": 2.5, "数理物理": 1.5 } }
+    ]}
+  ];
+
+  /* ==================== 分野プロファイル(診断結果の解説) ==================== */
+  var FIELD_PROFILE = {
+    "解析学": {
+      tag: "極限と評価で対象を作り上げる分野",
+      think: "不等式で誤差を押さえ、極限操作で新しい対象を構成する。「どれだけ小さいか」を言い切る力が中心。",
+      eqs: "∫_a^b f′dx = f(b) − f(a) · ∂u/∂t = k∇²u · ∑ rⁿ = 1/(1−r)",
+      syms: "∫ ∂ Δ ≪ ε ℝ ℂ",
+      near: ["作用素環・関数解析", "確率・統計", "数理物理"],
+      next: "ルベーグ積分と L^p 空間 → 偏微分方程式・フーリエ解析"
+    },
+    "微分幾何": {
+      tag: "曲がった空間を微分で測る分野",
+      think: "座標に依らない量(テンソル・微分形式)で図形を記述し、局所の曲率から大域の形を導く。",
+      eqs: "ds² = gᵢⱼdxⁱdxʲ · ∫_M dω = ∮_∂M ω · ∫_M K dA = 2πχ(M)",
+      syms: "∇ ⋆ ∧ ω Γ κ",
+      near: ["位相幾何", "数理物理", "解析学"],
+      next: "多様体と微分形式 → 接続・曲率 → リーマン幾何"
+    },
+    "位相幾何": {
+      tag: "連続変形で変わらない形を捉える分野",
+      think: "距離を忘れ、穴・つながり方だけを見る。代数的不変量に翻訳して分類する。",
+      eqs: "χ(M) = V − E + F · π₁(S¹) ≅ ℤ · d ∘ d = 0",
+      syms: "≃ π ∂ ∨ χ",
+      near: ["微分幾何", "圏論・論理", "代数幾何"],
+      next: "基本群と被覆空間 → ホモロジー・コホモロジー"
+    },
+    "代数・数論": {
+      tag: "整数と対称性の構造を掘る分野",
+      think: "有限の世界(合同式)や群・環・体の構造に落として、素数や解の様子を支配する法則を探す。",
+      eqs: "ζ(s) = ∏_p (1 − p^−s)^−1 · a^{p−1} ≡ 1 (mod p) · ガロア対応",
+      syms: "≡ ζ φ 𝔭 ℤ 𝔽",
+      near: ["代数幾何", "表現論・群論", "解析学"],
+      next: "群・環・体 → ガロア理論 → 代数的整数論"
+    },
+    "代数幾何": {
+      tag: "方程式の解集合を図形として扱う分野",
+      think: "代数(多項式)と幾何(図形)を往復する。局所環・層で「場所ごとの関数」を管理する。",
+      eqs: "y² = x³ + ax + b · Hⁿ(X,ℂ) = ⊕_{p+q=n} H^{p,q}(X)",
+      syms: "𝒪 𝔸 ℙ 𝔪 ℘",
+      near: ["代数・数論", "位相幾何", "圏論・論理"],
+      next: "可換環論 → 代数曲線 → スキーム論"
+    },
+    "圏論・論理": {
+      tag: "構造そのものと、構造間の関係を扱う分野",
+      think: "対象の中身ではなく矢印(射)で語る。普遍性・随伴で「定義の必然性」を示す。",
+      eqs: "Hom(A⊗B, C) ≅ Hom(A, Hom(B,C)) · 0 → A → B → C → 0",
+      syms: "⊢ ⊨ ⊣ ∐ ∀ ∃",
+      near: ["代数幾何", "位相幾何", "作用素環・関数解析"],
+      next: "普遍性と随伴 → ホモロジー代数 → 圏論的論理"
+    },
+    "確率・統計": {
+      tag: "偶然の中の法則を測度で語る分野",
+      think: "個々の予測不能さを認めたうえで、分布・極限・条件付けによって確かなことを述べる。",
+      eqs: "𝔼[X] = ∫_Ω X dℙ · P(A|B) = P(B|A)P(A)/P(B) · 伊藤の補題",
+      syms: "𝔼 ℙ 𝟙 σ μ",
+      near: ["解析学", "数理物理", "作用素環・関数解析"],
+      next: "測度論的確率 → 確率過程(ブラウン運動) → 確率解析"
+    },
+    "作用素環・関数解析": {
+      tag: "無限次元の作用素と、その代数を研究する分野",
+      think: "関数を「空間の点」とみなし、作用素のスペクトルとノルムで構造を捉える。非可換性を正面から扱う。",
+      eqs: "A = ∫_σ(A) λ dE(λ) · M″ = M · Tr(ρA) = ⟨A⟩",
+      syms: "† ∗ ‖ ⟨ ⊗",
+      near: ["数理物理", "解析学", "圏論・論理"],
+      next: "ヒルベルト空間とスペクトル定理 → C*代数・フォン・ノイマン環"
+    },
+    "表現論・群論": {
+      tag: "対称性を線形代数に翻訳する分野",
+      think: "群の作用を行列で実現し、既約表現へ分解する。指標という数値で対称性を識別する。",
+      eqs: "ρ(gh) = ρ(g)ρ(h) · L²(G) ≅ ⊕_π (V_π ⊗ V_π*) · σᵢσᵢ₊₁σᵢ = σᵢ₊₁σᵢσᵢ₊₁",
+      syms: "⊗ ⊕ ρ χ 𝔤 ⋊",
+      near: ["代数・数論", "数理物理", "位相幾何"],
+      next: "有限群の表現論 → リー群・リー環 → 既約分解"
+    },
+    "数理物理": {
+      tag: "自然法則を方程式として定式化する分野",
+      think: "対称性・保存量・作用汎関数を軸に、物理の要請を数学的に厳密な形へ翻訳する。",
+      eqs: "iℏ ∂ψ/∂t = Ĥψ · R_μν − ½Rg_μν + Λg_μν = 8πG T_μν · D_μF^{μν} = J^ν",
+      syms: "ℏ ψ Λ δ ∇ ⋆",
+      near: ["微分幾何", "作用素環・関数解析", "解析学"],
+      next: "解析力学(ラグランジュ/ハミルトン) → 量子力学の数学的基礎 → ゲージ理論"
+    }
+  };
+
+  var API = { FIELDS: FIELDS, SYMBOLS: SYMBOLS, CTX: CTX, EQUATIONS: EQUATIONS, ASSOC: ASSOC,
+              APTITUDE: APTITUDE, FIELD_PROFILE: FIELD_PROFILE };
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  root.SymbolBank = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+/* ===== inlined: www/term_bank.js ===== */
+/*
+ * term_bank.js — 数学の専門用語銀行(瞬読検査用)
+ * Ω-Whispered — Masaaki Yamaguchi / Bada (bio_medicine/omega_whispered)
+ *
+ * 10 分野 × 10 語 = 100 語。瞬読(フラッシュ)でランダムに散らして提示し、
+ * 「何が見えたか」「その語の意味は何か」を問うために使う。
+ *
+ * t: 用語(日本語) / en: 英語 / field: 専門分野 / lv: 難度(2〜5) / def: 一行の意味
+ */
+(function (root) {
+  "use strict";
+
+  var TERMS = [
+    /* ---------------- 解析学 ---------------- */
+    { t: "一様連続", en: "uniformly continuous", field: "解析学", lv: 2, def: "δ の取り方が点によらず一様に選べる連続性" },
+    { t: "コーシー列", en: "Cauchy sequence", field: "解析学", lv: 2, def: "項どうしが限りなく近づく数列。完備空間では必ず収束する" },
+    { t: "完備性", en: "completeness", field: "解析学", lv: 2, def: "すべてのコーシー列が空間内で収束すること" },
+    { t: "優収束定理", en: "dominated convergence", field: "解析学", lv: 3, def: "可積分な優関数があれば極限と積分を交換してよい" },
+    { t: "稠密", en: "dense", field: "解析学", lv: 3, def: "閉包が全体に一致する。いくらでも近くに元がある" },
+    { t: "一様収束", en: "uniform convergence", field: "解析学", lv: 3, def: "収束の速さが点によらない収束。連続性・積分と両立する" },
+    { t: "ソボレフ空間", en: "Sobolev space", field: "解析学", lv: 4, def: "弱微分まで可積分な関数の空間。偏微分方程式の解の舞台" },
+    { t: "弱解", en: "weak solution", field: "解析学", lv: 4, def: "部分積分で微分を試験関数へ移して定義される、微分可能性を要さない解" },
+    { t: "楕円型作用素", en: "elliptic operator", field: "解析学", lv: 4, def: "主表象が退化しない作用素。解の滑らかさ(正則性)が保証される" },
+    { t: "漸近展開", en: "asymptotic expansion", field: "解析学", lv: 4, def: "収束しなくても有限項で良い近似を与える展開" },
+
+    /* ---------------- 微分幾何 ---------------- */
+    { t: "多様体", en: "manifold", field: "微分幾何", lv: 3, def: "局所的にユークリッド空間と同じに見える空間" },
+    { t: "接束", en: "tangent bundle", field: "微分幾何", lv: 3, def: "各点の接空間を束ねたベクトル束" },
+    { t: "微分形式", en: "differential form", field: "微分幾何", lv: 3, def: "積分される対象。反対称なテンソル場" },
+    { t: "外微分", en: "exterior derivative", field: "微分幾何", lv: 3, def: "微分形式の次数を1つ上げる作用素。d∘d=0 を満たす" },
+    { t: "接続", en: "connection", field: "微分幾何", lv: 4, def: "離れた点のベクトルを比べる規則。平行移動を定める" },
+    { t: "曲率テンソル", en: "curvature tensor", field: "微分幾何", lv: 4, def: "平行移動が経路に依存する度合い。接続の非可換性" },
+    { t: "測地線", en: "geodesic", field: "微分幾何", lv: 3, def: "曲がった空間での「まっすぐな線」。局所的な最短経路" },
+    { t: "ホロノミー", en: "holonomy", field: "微分幾何", lv: 5, def: "閉曲線に沿って一周したときに生じる平行移動のズレ" },
+    { t: "リッチ曲率", en: "Ricci curvature", field: "微分幾何", lv: 4, def: "曲率テンソルの縮約。体積の増減を測り、重力方程式に現れる" },
+    { t: "ケーラー多様体", en: "Kähler manifold", field: "微分幾何", lv: 5, def: "複素構造・計量・シンプレクティック形式が両立する多様体" },
+
+    /* ---------------- 位相幾何 ---------------- */
+    { t: "ホモトピー", en: "homotopy", field: "位相幾何", lv: 3, def: "写像を連続的に変形する道筋。連続変形の同値関係" },
+    { t: "ホモロジー", en: "homology", field: "位相幾何", lv: 3, def: "「穴」を代数的に数える不変量。閉じているが境界でない鎖" },
+    { t: "コホモロジー", en: "cohomology", field: "位相幾何", lv: 4, def: "双対側から穴を測る不変量。積構造(カップ積)を持つ" },
+    { t: "基本群", en: "fundamental group", field: "位相幾何", lv: 3, def: "基点を通るループのホモトピー類がなす群" },
+    { t: "被覆空間", en: "covering space", field: "位相幾何", lv: 4, def: "局所的に何枚も重なって射影される空間。基本群と対応する" },
+    { t: "ファイバー束", en: "fiber bundle", field: "位相幾何", lv: 4, def: "局所的には直積だが、大域的にはねじれている空間" },
+    { t: "CW複体", en: "CW complex", field: "位相幾何", lv: 4, def: "胞体を次元順に貼り合わせて作る空間。計算に適した構成" },
+    { t: "完全系列", en: "exact sequence", field: "位相幾何", lv: 4, def: "各点で像と核が一致する射の列。部分と商の関係を表す" },
+    { t: "スペクトル系列", en: "spectral sequence", field: "位相幾何", lv: 5, def: "近似を繰り返してホモロジーを計算する装置" },
+    { t: "種数", en: "genus", field: "位相幾何", lv: 3, def: "閉曲面の穴の数。オイラー標数と χ=2−2g で結ばれる" },
+
+    /* ---------------- 代数・数論 ---------------- */
+    { t: "イデアル", en: "ideal", field: "代数・数論", lv: 3, def: "環の中で吸収律を満たす部分集合。商環を作る核" },
+    { t: "素イデアル", en: "prime ideal", field: "代数・数論", lv: 3, def: "積が入れば因子のどれかが入るイデアル。素数の一般化" },
+    { t: "ガロア群", en: "Galois group", field: "代数・数論", lv: 4, def: "体の拡大の自己同型群。方程式の対称性そのもの" },
+    { t: "拡大次数", en: "degree of extension", field: "代数・数論", lv: 3, def: "拡大体を下の体上のベクトル空間と見たときの次元" },
+    { t: "円分体", en: "cyclotomic field", field: "代数・数論", lv: 4, def: "1 の冪根を添加した体。アーベル拡大の基本例" },
+    { t: "判別式", en: "discriminant", field: "代数・数論", lv: 3, def: "根の重複や分岐を検出する不変量" },
+    { t: "類数", en: "class number", field: "代数・数論", lv: 5, def: "イデアル類群の位数。一意分解が崩れる度合いを測る" },
+    { t: "L関数", en: "L-function", field: "代数・数論", lv: 5, def: "算術的対象に付随するディリクレ級数。零点が分布を支配する" },
+    { t: "合同式", en: "congruence", field: "代数・数論", lv: 2, def: "法 n で割った余りが等しいという関係" },
+    { t: "局所大域原理", en: "local-global principle", field: "代数・数論", lv: 5, def: "すべての局所体で解を持てば大域的にも解を持つ、という原理" },
+
+    /* ---------------- 代数幾何 ---------------- */
+    { t: "代数多様体", en: "algebraic variety", field: "代数幾何", lv: 3, def: "多項式の共通零点として定まる図形" },
+    { t: "スキーム", en: "scheme", field: "代数幾何", lv: 5, def: "可換環のスペクトルを貼り合わせた、代数幾何の一般的な空間" },
+    { t: "層", en: "sheaf", field: "代数幾何", lv: 4, def: "局所的なデータを貼り合わせ条件つきで管理する仕組み" },
+    { t: "連接層", en: "coherent sheaf", field: "代数幾何", lv: 5, def: "局所的に有限生成な関係で表される層。有限性の良い性質を持つ" },
+    { t: "因子", en: "divisor", field: "代数幾何", lv: 4, def: "余次元 1 の部分多様体の形式的な整数結合。零点と極を記述する" },
+    { t: "直線束", en: "line bundle", field: "代数幾何", lv: 4, def: "各点にの 1 次元ベクトル空間を割り当てた束。因子と対応する" },
+    { t: "特異点解消", en: "resolution of singularities", field: "代数幾何", lv: 5, def: "特異点を持つ多様体を、双有理な非特異多様体に置き換える操作" },
+    { t: "双有理同値", en: "birational equivalence", field: "代数幾何", lv: 5, def: "稠密開集合の上で同型になるという、緩い同値" },
+    { t: "モジュライ空間", en: "moduli space", field: "代数幾何", lv: 5, def: "対象の同型類そのものを点とする空間" },
+    { t: "リーマン・ロッホ", en: "Riemann-Roch", field: "代数幾何", lv: 5, def: "切断の次元差を種数と次数で与える定理。指数定理の原型" },
+
+    /* ---------------- 圏論・論理 ---------------- */
+    { t: "関手", en: "functor", field: "圏論・論理", lv: 3, def: "圏から圏への対応で、合成と恒等射を保つもの" },
+    { t: "自然変換", en: "natural transformation", field: "圏論・論理", lv: 4, def: "関手から関手への「一斉に整合する」射の族" },
+    { t: "随伴", en: "adjunction", field: "圏論・論理", lv: 4, def: "Hom(FA,B) ≅ Hom(A,GB) を自然に満たす関手の対" },
+    { t: "極限", en: "limit", field: "圏論・論理", lv: 4, def: "図式に対する最も普遍的な錐。積・引き戻しなどを統一する" },
+    { t: "普遍性", en: "universal property", field: "圏論・論理", lv: 3, def: "「一意に分解する」という条件で対象を特徴づける方法" },
+    { t: "米田の補題", en: "Yoneda lemma", field: "圏論・論理", lv: 5, def: "対象は、それが他の対象へどう見えるかで完全に決まる" },
+    { t: "モナド", en: "monad", field: "圏論・論理", lv: 5, def: "自己関手と単位・積からなる代数構造。計算の抽象化にも使う" },
+    { t: "トポス", en: "topos", field: "圏論・論理", lv: 5, def: "集合論的な操作が行える圏。幾何と論理の橋渡し" },
+    { t: "不完全性定理", en: "incompleteness theorem", field: "圏論・論理", lv: 4, def: "十分強い無矛盾な体系には証明も反証もできない命題がある" },
+    { t: "選択公理", en: "axiom of choice", field: "圏論・論理", lv: 3, def: "空でない集合族から一斉に元を選べるという公理" },
+
+    /* ---------------- 確率・統計 ---------------- */
+    { t: "確率空間", en: "probability space", field: "確率・統計", lv: 3, def: "標本空間・σ加法族・確率測度の三つ組" },
+    { t: "可測関数", en: "measurable function", field: "確率・統計", lv: 3, def: "逆像が可測集合になる関数。確率変数の定義そのもの" },
+    { t: "条件付き期待値", en: "conditional expectation", field: "確率・統計", lv: 4, def: "部分情報(σ加法族)のもとでの最良予測。射影として特徴づけられる" },
+    { t: "マルチンゲール", en: "martingale", field: "確率・統計", lv: 4, def: "将来の期待値が現在値に等しい確率過程。公正な賭けのモデル" },
+    { t: "ブラウン運動", en: "Brownian motion", field: "確率・統計", lv: 4, def: "連続だが至る所微分不可能な、独立増分をもつ確率過程" },
+    { t: "大数の法則", en: "law of large numbers", field: "確率・統計", lv: 2, def: "標本平均が母平均に収束するという法則" },
+    { t: "中心極限定理", en: "central limit theorem", field: "確率・統計", lv: 3, def: "和の分布が正規分布に近づくという普遍現象" },
+    { t: "伊藤積分", en: "Itô integral", field: "確率・統計", lv: 5, def: "ブラウン運動に関する確率積分。非有界変動でも定義できる" },
+    { t: "停止時刻", en: "stopping time", field: "確率・統計", lv: 4, def: "現在までの情報だけで判定できる、ランダムな時刻" },
+    { t: "エルゴード性", en: "ergodicity", field: "確率・統計", lv: 4, def: "時間平均と空間平均が一致する性質" },
+
+    /* ---------------- 作用素環・関数解析 ---------------- */
+    { t: "ヒルベルト空間", en: "Hilbert space", field: "作用素環・関数解析", lv: 3, def: "内積を持ち完備な空間。直交分解が使える" },
+    { t: "バナッハ空間", en: "Banach space", field: "作用素環・関数解析", lv: 3, def: "ノルムを持ち完備なベクトル空間" },
+    { t: "自己共役", en: "self-adjoint", field: "作用素環・関数解析", lv: 4, def: "A = A† を満たす作用素。実スペクトルを持ち観測量に対応する" },
+    { t: "コンパクト作用素", en: "compact operator", field: "作用素環・関数解析", lv: 4, def: "有界集合をコンパクト集合に近い像へ写す作用素。行列に近い振る舞い" },
+    { t: "スペクトル", en: "spectrum", field: "作用素環・関数解析", lv: 4, def: "A − λI が可逆にならない λ の集合。固有値の一般化" },
+    { t: "レゾルベント", en: "resolvent", field: "作用素環・関数解析", lv: 4, def: "(A − λI)^{−1}。スペクトルの外側で解析的に振る舞う" },
+    { t: "C*代数", en: "C*-algebra", field: "作用素環・関数解析", lv: 5, def: "‖a*a‖=‖a‖² を満たすノルム付き対合代数。非可換位相空間の代数" },
+    { t: "フォン・ノイマン環", en: "von Neumann algebra", field: "作用素環・関数解析", lv: 5, def: "弱位相で閉じた作用素環。M″ = M で特徴づけられる" },
+    { t: "GNS構成", en: "GNS construction", field: "作用素環・関数解析", lv: 5, def: "状態からヒルベルト空間と表現を作り出す構成法" },
+    { t: "閉グラフ定理", en: "closed graph theorem", field: "作用素環・関数解析", lv: 4, def: "グラフが閉ならば作用素は有界、というバナッハ空間の定理" },
+
+    /* ---------------- 表現論・群論 ---------------- */
+    { t: "既約表現", en: "irreducible representation", field: "表現論・群論", lv: 3, def: "自明でない不変部分空間を持たない表現。表現の原子" },
+    { t: "指標", en: "character", field: "表現論・群論", lv: 4, def: "表現行列のトレース。共役類上の関数で表現を決定する" },
+    { t: "シューアの補題", en: "Schur's lemma", field: "表現論・群論", lv: 4, def: "既約表現の間の絡作用素はゼロかスカラー倍しかない" },
+    { t: "誘導表現", en: "induced representation", field: "表現論・群論", lv: 5, def: "部分群の表現から全体の群の表現を作る操作。制限の左随伴" },
+    { t: "ルート系", en: "root system", field: "表現論・群論", lv: 5, def: "リー環の重みが作る対称的なベクトル配置。分類の骨格" },
+    { t: "リー環", en: "Lie algebra", field: "表現論・群論", lv: 4, def: "リー群の単位元での接空間に括弧積を入れた代数" },
+    { t: "カルタン部分代数", en: "Cartan subalgebra", field: "表現論・群論", lv: 5, def: "極大な可換部分代数。同時対角化の基準となる" },
+    { t: "完全可約性", en: "complete reducibility", field: "表現論・群論", lv: 4, def: "表現が既約表現の直和に分解できる性質" },
+    { t: "ヤング図形", en: "Young diagram", field: "表現論・群論", lv: 4, def: "分割を箱で表した図。対称群の既約表現を分類する" },
+    { t: "共役類", en: "conjugacy class", field: "表現論・群論", lv: 3, def: "g⁻¹xg で移り合う元の集まり。指標はこの上の関数" },
+
+    /* ---------------- 数理物理 ---------------- */
+    { t: "ハミルトニアン", en: "Hamiltonian", field: "数理物理", lv: 3, def: "系の全エネルギーを表す関数・作用素。時間発展の生成子" },
+    { t: "ラグランジアン", en: "Lagrangian", field: "数理物理", lv: 3, def: "運動エネルギーとポテンシャルの差。作用の被積分関数" },
+    { t: "作用汎関数", en: "action functional", field: "数理物理", lv: 4, def: "経路に数値を返す汎関数。停留点が運動方程式を与える" },
+    { t: "正準量子化", en: "canonical quantization", field: "数理物理", lv: 4, def: "ポアソン括弧を交換子 [·,·]/iℏ に置き換える手続き" },
+    { t: "ゲージ対称性", en: "gauge symmetry", field: "数理物理", lv: 4, def: "各点ごとに独立な内部対称性。接続として場を導く" },
+    { t: "くりこみ", en: "renormalization", field: "数理物理", lv: 5, def: "発散を有限個のパラメータに吸収し、スケール依存性を扱う枠組み" },
+    { t: "経路積分", en: "path integral", field: "数理物理", lv: 5, def: "すべての経路の位相因子を足し上げて振幅を得る定式化" },
+    { t: "対称性の自発的破れ", en: "spontaneous symmetry breaking", field: "数理物理", lv: 5, def: "法則は対称でも、基底状態が対称性を保たない現象" },
+    { t: "フォック空間", en: "Fock space", field: "数理物理", lv: 5, def: "粒子数が変化する系を記述する、対称積の直和空間" },
+    { t: "可積分系", en: "integrable system", field: "数理物理", lv: 5, def: "十分多くの保存量を持ち、厳密に解ける力学系" }
+  ];
+
+  var API = { TERMS: TERMS };
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  root.TermBank = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+/* ===== inlined: www/flash.js ===== */
+/*
+ * flash.js — 瞬読(フラッシュ)提示エンジン
+ * Ω-Whispered — Masaaki Yamaguchi / Bada (bio_medicine/omega_whispered)
+ *
+ * 速読法の「瞬読」に倣い、数学の専門用語・記号・バラバラにした方程式のトークンを
+ * 画面上のランダムな位置・角度・大きさで一斉に提示し、短時間で消す。
+ *
+ *   注視点(+) → バースト提示(可変 ms) → マスク(残像で読み取れないようにする) → 設問
+ *
+ * さらに 2-down/1-up ステアケース法で露出時間を適応的に上下させ、
+ * 反転(reversal)点の幾何平均として「瞬読閾値(ms)」を推定する。
+ * これは心理物理で標準的な閾値推定手続きで、収束先は約 70.7% 正答点にあたる。
+ */
+(function (root) {
+  "use strict";
+
+  /* ============================ 乱数・幾何補助 ============================ */
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function overlaps(r, list, pad) {
+    for (var i = 0; i < list.length; i++) {
+      var o = list[i];
+      if (r.x < o.x + o.w + pad && o.x < r.x + r.w + pad &&
+          r.y < o.y + o.h + pad && o.y < r.y + r.h + pad) return true;
+    }
+    return false;
+  }
+
+  /* ============================ バースト提示 ============================ */
+  /*
+   * stage : 提示領域の DOM(position:relative)
+   * items : [{text, cls}] 表示する要素(順序はここでシャッフル済みを想定)
+   * ms    : 露出時間(ミリ秒)
+   * opts  : {fix:注視点ms, mask:マスクms, minFont, maxFont, rotate}
+   * 戻り値: Promise(実測露出 ms を解決)
+   */
+  function burst(stage, items, ms, opts) {
+    opts = opts || {};
+    var fixMs = opts.fix === undefined ? 500 : opts.fix;
+    var maskMs = opts.mask === undefined ? 120 : opts.mask;
+    var minF = opts.minFont || 17, maxF = opts.maxFont || 30;
+    var rot = opts.rotate === undefined ? 22 : opts.rotate;
+
+    function clear() { while (stage.firstChild) stage.removeChild(stage.firstChild); }
+
+    function fixation() {
+      return new Promise(function (res) {
+        clear();
+        var f = document.createElement("div");
+        f.className = "fl fix";
+        f.textContent = "+";
+        stage.appendChild(f);
+        setTimeout(res, fixMs);
+      });
+    }
+
+    /* ランダム位置に散らす(できるだけ重ならないように試行) */
+    function scatter() {
+      clear();
+      var W = stage.clientWidth || 520, H = stage.clientHeight || 300, placed = [];
+      items.forEach(function (it) {
+        var el = document.createElement("span");
+        el.className = "fl " + (it.cls || "");
+        el.textContent = it.text;
+        el.style.fontSize = rnd(minF, maxF).toFixed(1) + "px";
+        el.style.visibility = "hidden";
+        stage.appendChild(el);
+        var w = el.offsetWidth, h = el.offsetHeight, r = null;
+        for (var tries = 0; tries < 60; tries++) {
+          var cand = { x: rnd(4, Math.max(5, W - w - 4)), y: rnd(4, Math.max(5, H - h - 4)), w: w, h: h };
+          if (!overlaps(cand, placed, 6)) { r = cand; break; }
+        }
+        if (!r) r = { x: rnd(4, Math.max(5, W - w - 4)), y: rnd(4, Math.max(5, H - h - 4)), w: w, h: h };
+        placed.push(r);
+        el.style.left = r.x + "px";
+        el.style.top = r.y + "px";
+        el.style.transform = "rotate(" + rnd(-rot, rot).toFixed(1) + "deg)";
+        el.style.visibility = "visible";
+      });
+    }
+
+    /* マスク: ランダムな記号片を薄く敷いて残像からの読み取りを防ぐ */
+    function mask() {
+      clear();
+      var chars = "∫∂∇⊗⊕∑∏≅≡⊢∈∀∃⋆†ℵ𝒪ΓζπχσμλωΩ√∞≪⌊⟨‖∅∪∩→↦⇒";
+      var W = stage.clientWidth || 520, H = stage.clientHeight || 300;
+      for (var i = 0; i < 70; i++) {
+        var m = document.createElement("span");
+        m.className = "fl mask";
+        m.textContent = chars.charAt(Math.floor(Math.random() * chars.length));
+        m.style.left = rnd(0, W - 14).toFixed(0) + "px";
+        m.style.top = rnd(0, H - 18).toFixed(0) + "px";
+        m.style.fontSize = rnd(13, 26).toFixed(0) + "px";
+        m.style.transform = "rotate(" + rnd(-40, 40).toFixed(0) + "deg)";
+        stage.appendChild(m);
+      }
+    }
+
+    return fixation().then(function () {
+      return new Promise(function (res) {
+        var t0 = (root.performance && performance.now) ? performance.now() : Date.now();
+        scatter();
+        /* 描画済みフレームから計時するため、次のフレームで待機を開始する */
+        var start = function () {
+          setTimeout(function () {
+            var t1 = (root.performance && performance.now) ? performance.now() : Date.now();
+            mask();
+            setTimeout(function () { clear(); res(t1 - t0); }, maskMs);
+          }, ms);
+        };
+        if (root.requestAnimationFrame) requestAnimationFrame(start); else start();
+      });
+    });
+  }
+
+  /* ====================== 方程式を「バラバラ」に分解 ====================== */
+  /*
+   * 方程式を、意味のある最小のかたまり(記号・数・添字つき変数)へ分割する。
+   * 例: "∫_M dω = ∮_∂M ω" → ["∫_M", "dω", "=", "∮_∂M", "ω"]
+   * 分割後は呼び出し側でシャッフルして散らす(＝バラバラにランダム提示)。
+   */
+  function tokenize(eq) {
+    var raw = String(eq).replace(/[{}]/g, "").split(/\s+/).filter(Boolean), out = [];
+    raw.forEach(function (tk) {
+      /* 長いかたまりだけを、演算子の直前で分割する(演算子は右側の断片に付ける) */
+      if (Array.from(tk).length > 7) {
+        tk.split(/(?=[=+−])/).filter(Boolean).forEach(function (p) { out.push(p); });
+      } else out.push(tk);
+    });
+    /* 1 文字だけの括弧など、意味を持たない断片は隣へ吸収する */
+    var merged = [];
+    out.forEach(function (t) {
+      t = t.trim();
+      if (!t) return;
+      if (/^[()\[\]]$/.test(t) && merged.length) merged[merged.length - 1] += t;
+      else merged.push(t);
+    });
+    return merged;
+  }
+
+  /* ========================= ステアケース(閾値推定) ========================= */
+  /*
+   * 2-down/1-up: 2 連続正答で露出時間を短くし、1 誤答で長くする。
+   * 反転点(短縮↔延長の切り替わり)の露出時間の幾何平均を閾値とする。
+   */
+  function Staircase(o) {
+    o = o || {};
+    this.ms = o.start || 600;
+    this.min = o.min || 40;
+    this.max = o.max || 2000;
+    this.down = o.down || 2;          /* 何連続正答で短縮するか */
+    this.fDown = o.factorDown || 0.78;
+    this.fUp = o.factorUp || 1.32;
+    this.run = 0;
+    this.lastDir = 0;
+    this.reversals = [];
+    this.history = [];
+  }
+  Staircase.prototype.current = function () { return Math.round(this.ms); };
+  Staircase.prototype.update = function (ok) {
+    var before = this.ms, dir = 0;
+    if (ok) {
+      this.run++;
+      if (this.run >= this.down) { this.run = 0; dir = -1; this.ms = Math.max(this.min, this.ms * this.fDown); }
+    } else {
+      this.run = 0; dir = 1; this.ms = Math.min(this.max, this.ms * this.fUp);
+    }
+    if (dir !== 0) {
+      if (this.lastDir !== 0 && dir !== this.lastDir) this.reversals.push(before);
+      this.lastDir = dir;
+    }
+    this.history.push({ ms: Math.round(before), ok: ok });
+    return this.current();
+  };
+  /* 閾値: 直近 6 反転点の幾何平均。反転が 2 未満なら正答した露出の幾何平均で代用 */
+  Staircase.prototype.threshold = function () {
+    var vals = this.reversals.slice(-6), reliable = vals.length >= 2;
+    if (!reliable) {
+      vals = this.history.filter(function (h) { return h.ok; }).map(function (h) { return h.ms; });
+    }
+    if (!vals.length) return { ms: this.current(), reliable: false, reversals: this.reversals.length };
+    var s = 0;
+    vals.forEach(function (v) { s += Math.log(Math.max(1, v)); });
+    return { ms: Math.round(Math.exp(s / vals.length)), reliable: reliable, reversals: this.reversals.length };
+  };
+
+  var API = { burst: burst, tokenize: tokenize, Staircase: Staircase };
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  root.FlashEngine = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+/* ===== inlined: www/pdf_symbols.js ===== */
+/*
+ * pdf_symbols.js — 数学論文 PDF から「方程式の記号」を実抽出するミニ PDF パーサ
+ * Ω-Whispered / ウィスパード適性検査 — Masaaki Yamaguchi / Bada (bio_medicine/omega_whispered)
+ *
+ * 依存ゼロ。ブラウザ(DecompressionStream)と Node 18+ の両方で動作する。
+ *
+ * 対応:
+ *   - 通常オブジェクト + 圧縮オブジェクトストリーム(/Type /ObjStm, PDF 1.5+)
+ *   - FlateDecode ストリームの伸長 (DecompressionStream 'deflate' / 'deflate-raw')
+ *   - /Type /Page の /Resources /Font と /Contents を辿ったページ単位のテキスト抽出
+ *   - フォント別デコード:
+ *       (1) /ToUnicode CMap (bfchar / bfrange)           ← 最も確実
+ *       (2) /Encoding /Differences のグリフ名 → Unicode  ← LaTeX サブセットフォント
+ *       (3) CM/AMS フォント (CMMI/CMSY/CMEX/CMR/MSBM/EUFM) の内蔵エンコーディング
+ *   - Type0(Identity-H 等) の 2 バイトコード
+ *
+ * 非対応(正直な限界): スキャン画像だけの PDF、暗号化 PDF、上記以外の特殊エンコーディング。
+ * 抽出できない場合は symbols が空で返る(偽の結果は返さない)。
+ */
+(function (root) {
+  "use strict";
+
+  /* ============================ グリフ名 → Unicode ============================ */
+  /* TeX/AGL でよく現れる数学グリフ名のみ。網羅ではなく「方程式の記号」に絞る。 */
+  var GLYPH = {
+    /* 演算子・関係子 */
+    integral: "∫", integraltext: "∫", integraldisplay: "∫", contourintegral: "∮",
+    summationtext: "∑", summationdisplay: "∑", summation: "∑",
+    producttext: "∏", productdisplay: "∏", product: "∏",
+    coproducttext: "∐", coproductdisplay: "∐", coproduct: "∐",
+    partialdiff: "∂", gradient: "∇", nabla: "∇", Delta: "Δ", increment: "Δ",
+    infinity: "∞", radical: "√", radicalbig: "√", surd: "√",
+    plusminus: "±", minusplus: "∓", minus: "−", multiply: "×", divide: "÷",
+    asteriskmath: "∗", periodcentered: "·", bullet: "∙", star: "⋆",
+    circleplus: "⊕", circlemultiply: "⊗", circleminus: "⊖", circledivide: "⊘",
+    circledot: "⊙", circlecopyrt: "○", bigcircle: "○", openbullet: "∘",
+    circleplusdisplay: "⨁", circlemultiplydisplay: "⨂", circledotdisplay: "⨀",
+    circleplustext: "⨁", circlemultiplytext: "⨂", circledottext: "⨀",
+    equivalence: "≡", similar: "∼", similarequal: "≃", approxequal: "≈",
+    congruent: "≅", asymptequal: "≍", notequal: "≠", proportional: "∝",
+    lessequal: "≤", greaterequal: "≥", muchless: "≪", muchgreater: "≫",
+    precedes: "≺", follows: "≻", precedesequal: "≼", followsequal: "≽",
+    /* 集合・論理 */
+    element: "∈", owner: "∋", notelement: "∉", propersubset: "⊂", propersuperset: "⊃",
+    reflexsubset: "⊆", reflexsuperset: "⊇", intersection: "∩", union: "∪",
+    unionmulti: "⊎", unionsq: "⊔", intersectionsq: "⊓", followsorcurly: "⊒",
+    precedesorcurly: "⊑", emptyset: "∅", universal: "∀", existential: "∃",
+    logicalnot: "¬", logicaland: "∧", logicalor: "∨",
+    logicalanddisplay: "⋀", logicalordisplay: "⋁", uniondisplay: "⋃", intersectiondisplay: "⋂",
+    turnstileleft: "⊢", turnstileright: "⊣", perpendicular: "⊥", tackdown: "⊤", tackup: "⊥",
+    /* 矢印 */
+    arrowleft: "←", arrowright: "→", arrowup: "↑", arrowdown: "↓", arrowboth: "↔",
+    arrowdblleft: "⇐", arrowdblright: "⇒", arrowdblboth: "⇔", arrowdblup: "⇑", arrowdbldown: "⇓",
+    arrownortheast: "↗", arrowsoutheast: "↘", arrownorthwest: "↖", arrowsouthwest: "↙",
+    mapsto: "↦", arrowhookleft: "↩", arrowhookright: "↪", arrowtailright: "↣",
+    /* 特殊文字 */
+    aleph: "ℵ", weierstrass: "℘", Ifraktur: "ℑ", Rfraktur: "ℜ", scriptl: "ℓ",
+    dagger: "†", daggerdbl: "‡", section: "§", paragraph: "¶", prime: "′", minute: "′",
+    angbracketleft: "⟨", angbracketright: "⟩", bardbl: "‖", bar: "|",
+    floorleft: "⌊", floorright: "⌋", ceilingleft: "⌈", ceilingright: "⌉",
+    braceleft: "{", braceright: "}", wreathproduct: "≀", amalg: "⨿",
+    ellipsis: "…", periodcentereddots: "⋯", ldots: "…", cdots: "⋯", vdots: "⋮", ddots: "⋱",
+    triangle: "△", triangleinv: "▽", triangleleft: "◁", triangleright: "▷",
+    trianglelefteq: "⊴", trianglerighteq: "⊵", ltimes: "⋉", rtimes: "⋊",
+    lessorequalslant: "⩽", greaterorequalslant: "⩾", squareimage: "⊏", squareoriginal: "⊐",
+    square: "□", filledsquare: "■", lozenge: "◊", hbar: "ℏ", hslash: "ℏ",
+    /* ギリシャ小文字 */
+    alpha: "α", beta: "β", gamma: "γ", delta: "δ", epsilon: "ε", epsilon1: "ε",
+    varepsilon: "ε", zeta: "ζ", eta: "η", theta: "θ", theta1: "ϑ", vartheta: "ϑ",
+    iota: "ι", kappa: "κ", lambda: "λ", mu: "μ", nu: "ν", xi: "ξ", omicron: "ο",
+    pi: "π", pi1: "ϖ", varpi: "ϖ", rho: "ρ", rho1: "ϱ", varrho: "ϱ",
+    sigma: "σ", sigma1: "ς", varsigma: "ς", tau: "τ", upsilon: "υ",
+    phi: "φ", phi1: "ϕ", varphi: "ϕ", chi: "χ", psi: "ψ", omega: "ω",
+    /* ギリシャ大文字 */
+    Gamma: "Γ", Theta: "Θ", Lambda: "Λ", Xi: "Ξ", Pi: "Π", Sigma: "Σ",
+    Upsilon: "Υ", Phi: "Φ", Psi: "Ψ", Omega: "Ω"
+  };
+
+  /* ==================== CM / AMS フォントの内蔵エンコーディング ==================== */
+  function fillStr(map, start, str) {
+    var arr = Array.from(str);
+    for (var i = 0; i < arr.length; i++) if (arr[i] !== " ") map[start + i] = arr[i];
+  }
+  function fillArr(map, start, arr) {
+    for (var i = 0; i < arr.length; i++) if (arr[i]) map[start + i] = arr[i];
+  }
+  function range(map, start, from, count) {
+    for (var i = 0; i < count; i++) map[start + i] = String.fromCharCode(from + i);
+  }
+
+  var SCRIPT = ["𝒜","ℬ","𝒞","𝒟","ℰ","ℱ","𝒢","ℋ","ℐ","𝒥","𝒦","ℒ","ℳ","𝒩","𝒪","𝒫","𝒬","ℛ","𝒮","𝒯","𝒰","𝒱","𝒲","𝒳","𝒴","𝒵"];
+  var BBOARD = ["𝔸","𝔹","ℂ","𝔻","𝔼","𝔽","𝔾","ℍ","𝕀","𝕁","𝕂","𝕃","𝕄","ℕ","𝕆","ℙ","ℚ","ℝ","𝕊","𝕋","𝕌","𝕍","𝕎","𝕏","𝕐","ℤ"];
+  var FRAK_U = ["𝔄","𝔅","ℭ","𝔇","𝔈","𝔉","𝔊","ℌ","ℑ","𝔍","𝔎","𝔏","𝔐","𝔑","𝔒","𝔓","𝔔","ℜ","𝔖","𝔗","𝔘","𝔙","𝔚","𝔛","𝔜","ℨ"];
+  var FRAK_L = ["𝔞","𝔟","𝔠","𝔡","𝔢","𝔣","𝔤","𝔥","𝔦","𝔧","𝔨","𝔩","𝔪","𝔫","𝔬","𝔭","𝔮","𝔯","𝔰","𝔱","𝔲","𝔳","𝔴","𝔵","𝔶","𝔷"];
+
+  /* CMMI (math italic): 大文字ギリシャ・小文字ギリシャ・∂ など */
+  var ENC_CMMI = {};
+  fillStr(ENC_CMMI, 0x00, "ΓΔΘΛΞΠΣΥΦΨΩ");
+  fillStr(ENC_CMMI, 0x0b, "αβγδεζηθικλμνξπρστυφχψω");
+  fillStr(ENC_CMMI, 0x22, "εϑϖϱςϕ");
+  fillStr(ENC_CMMI, 0x28, "↼↽⇀⇁");
+  range(ENC_CMMI, 0x30, 0x30, 10);            /* oldstyle digits */
+  fillStr(ENC_CMMI, 0x3a, ".,</>⋆∂");
+  range(ENC_CMMI, 0x41, 0x41, 26);            /* italic A-Z → A-Z */
+  fillStr(ENC_CMMI, 0x5b, "♭♮♯⌣⌢ℓ");
+  range(ENC_CMMI, 0x61, 0x61, 26);            /* italic a-z → a-z */
+  fillStr(ENC_CMMI, 0x7b, "ıȷ℘");
+
+  /* CMSY (math symbols) */
+  var ENC_CMSY = {};
+  fillStr(ENC_CMSY, 0x00, "−·×∗÷⋄±∓⊕⊖⊗⊘⊙○∘∙");
+  fillStr(ENC_CMSY, 0x10, "≍≡⊆⊇≤≥≼≽∼≈⊂⊃≪≫≺≻");
+  fillStr(ENC_CMSY, 0x20, "←→↑↓↔↗↘≃⇐⇒⇑⇓⇔↖↙∝");
+  fillStr(ENC_CMSY, 0x30, "′∞∈∋△▽ ↦∀∃¬∅ℜℑ⊤⊥");
+  ENC_CMSY[0x40] = "ℵ";
+  fillArr(ENC_CMSY, 0x41, SCRIPT);
+  fillStr(ENC_CMSY, 0x5b, "∪∩⊎∧∨⊢⊣⌊⌋⌈⌉{}⟨⟩|‖↕⇕\\≀√⨿∇∫⊔⊓⊑⊒§†‡¶♣♦♥♠");
+
+  /* CMEX (large operators): text サイズと display サイズ */
+  var ENC_CMEX = {};
+  fillStr(ENC_CMEX, 0x50, "∑∏∫∪∩⊎∧∨∑∏∫∪∩⊎∧∨");
+  fillStr(ENC_CMEX, 0x60, "∐∐");
+
+  /* CMR (roman): 0x00-0x0A に立体大文字ギリシャ */
+  var ENC_CMR = {};
+  fillStr(ENC_CMR, 0x00, "ΓΔΘΛΞΠΣΥΦΨΩ");
+  for (var cr = 0x21; cr <= 0x7a; cr++) ENC_CMR[cr] = String.fromCharCode(cr);
+
+  /* MSBM (AMS): 黒板太字 𝔸..ℤ */
+  var ENC_MSBM = {};
+  fillArr(ENC_MSBM, 0x41, BBOARD);
+
+  /* EUFM (Euler Fraktur): 𝔤, 𝔪, 𝔭 などリー環/イデアル記号 */
+  var ENC_EUFM = {};
+  fillArr(ENC_EUFM, 0x41, FRAK_U);
+  fillArr(ENC_EUFM, 0x61, FRAK_L);
+
+  function builtinEncoding(baseFont) {
+    var b = (baseFont || "").toUpperCase();
+    if (/CMMI|CMMIB|MATHITALIC/.test(b)) return ENC_CMMI;
+    if (/CMSY|CMBSY|MATHSYMBOL/.test(b)) return ENC_CMSY;
+    if (/CMEX|MATHEXTENSION/.test(b)) return ENC_CMEX;
+    if (/MSBM|BBOLD|BBM/.test(b)) return ENC_MSBM;
+    if (/EUFM|EUFB|FRAKTUR/.test(b)) return ENC_EUFM;
+    if (/CMR|CMB|CMTI|CMSS|CMTT|CMCSC/.test(b)) return ENC_CMR;
+    return null;
+  }
+
+  /* ================================ 低レベル補助 ================================ */
+
+  /* バイト列 → Latin1 文字列 (1 文字 = 1 バイト)。正規表現/indexOf で走査するため。 */
+  function toLatin1(bytes) {
+    var CH = 0x8000, out = [];
+    for (var i = 0; i < bytes.length; i += CH) {
+      out.push(String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + CH, bytes.length))));
+    }
+    return out.join("");
+  }
+  function toBytes(str) {
+    var b = new Uint8Array(str.length);
+    for (var i = 0; i < str.length; i++) b[i] = str.charCodeAt(i) & 0xff;
+    return b;
+  }
+
+  /* FlateDecode 伸長。zlib ヘッダ付き('deflate')→生('deflate-raw')の順で試す。 */
+  function inflate(bytes) {
+    var DS = root.DecompressionStream;
+    if (!DS) return Promise.resolve(null);
+    function attempt(fmt) {
+      try {
+        var ds = new DS(fmt);
+        var w = ds.writable.getWriter();
+        var noop = function () {};
+        w.write(bytes).catch(noop); w.close().catch(noop);   /* 末尾ゴミ等の拒否は握り潰す */
+        var reader = ds.readable.getReader(), chunks = [], total = 0;
+        function collect() {
+          var out = new Uint8Array(total), o = 0;
+          for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], o); o += chunks[i].length; }
+          return out;
+        }
+        return (function pump() {
+          return reader.read().then(function (r) {
+            if (r.done) return collect();
+            chunks.push(r.value); total += r.value.length;
+            return pump();
+          }, function (err) {
+            /* "trailing junk"/途中破損でも、そこまでに伸長できた分は使う */
+            if (total > 0) return collect();
+            throw err;
+          });
+        })();
+      } catch (e) { return Promise.reject(e); }
+    }
+    return attempt("deflate").catch(function () {
+      return attempt("deflate-raw").catch(function () { return null; });
+    });
+  }
+
+  /* << >> / [ ] / ( ) を数えながら 1 つの値トークンを読む */
+  function readValue(s, i) {
+    while (i < s.length && /\s/.test(s.charAt(i))) i++;
+    var c = s.charAt(i);
+    if (c === "<" && s.charAt(i + 1) === "<") {
+      var d = 0, j = i;
+      while (j < s.length) {
+        if (s.charAt(j) === "<" && s.charAt(j + 1) === "<") { d++; j += 2; continue; }
+        if (s.charAt(j) === ">" && s.charAt(j + 1) === ">") { d--; j += 2; if (!d) break; continue; }
+        j++;
+      }
+      return { value: s.slice(i, j), end: j };
+    }
+    if (c === "[") {
+      var dd = 0, k = i;
+      while (k < s.length) {
+        if (s.charAt(k) === "[") dd++;
+        else if (s.charAt(k) === "]") { dd--; if (!dd) { k++; break; } }
+        k++;
+      }
+      return { value: s.slice(i, k), end: k };
+    }
+    var m = /^(\d+\s+\d+\s+R\b|\/[^\s\/\[\]<>()]*|[-+]?[\d.]+|true|false|null|<[0-9A-Fa-f\s]*>)/.exec(s.slice(i, i + 256));
+    if (m) return { value: m[1], end: i + m[1].length };
+    return { value: "", end: i + 1 };
+  }
+
+  /* 辞書文字列から /Key の値を取り出す (トップレベルのみ) */
+  function dictGet(dict, key) {
+    if (!dict) return null;
+    var re = new RegExp("\\/" + key + "(?![A-Za-z0-9])", "g"), m;
+    while ((m = re.exec(dict))) {
+      /* ネストした辞書内のキーを拾わないよう、深さ 1 のものだけ採用 */
+      var depth = 0;
+      for (var i = 0; i < m.index; i++) {
+        if (dict.charAt(i) === "<" && dict.charAt(i + 1) === "<") { depth++; i++; }
+        else if (dict.charAt(i) === ">" && dict.charAt(i + 1) === ">") { depth--; i++; }
+      }
+      if (depth <= 1) return readValue(dict, m.index + m[0].length).value;
+    }
+    return null;
+  }
+
+  function isRef(v) { return !!v && /^\d+\s+\d+\s+R$/.test(v.trim()); }
+  function refNum(v) { return parseInt(v, 10); }
+
+  /* ============================== PDF ドキュメント ============================== */
+
+  function PDFDoc(raw) {
+    this.raw = raw;         /* Latin1 文字列 */
+    this.objs = {};         /* objnum -> {dict, sStart, sEnd} または {body} */
+  }
+
+  /* すべての "N G obj ... endobj" を走査 */
+  PDFDoc.prototype.scanObjects = function () {
+    var s = this.raw, re = /(\d+)\s+(\d+)\s+obj\b/g, m;
+    while ((m = re.exec(s))) {
+      var num = parseInt(m[1], 10), start = m.index + m[0].length;
+      var sIdx = s.indexOf("stream", start), eIdx = s.indexOf("endobj", start);
+      if (eIdx < 0) eIdx = s.length;
+      if (sIdx >= 0 && sIdx < eIdx) {
+        var dict = s.slice(start, sIdx);
+        var p = sIdx + 6;
+        if (s.charAt(p) === "\r") p++;
+        if (s.charAt(p) === "\n") p++;
+        var len = dictGet(dict, "Length"), endS = -1;
+        if (len && /^\d+$/.test(len.trim())) {
+          var cand = p + parseInt(len, 10);
+          if (s.slice(cand, cand + 20).indexOf("endstream") >= 0) endS = cand;
+        }
+        if (endS < 0) endS = s.indexOf("endstream", p);
+        if (endS < 0) endS = eIdx;
+        this.objs[num] = { dict: dict, sStart: p, sEnd: endS };
+        re.lastIndex = Math.max(re.lastIndex, endS);
+      } else {
+        this.objs[num] = { body: s.slice(start, eIdx) };
+      }
+    }
+  };
+
+  /* オブジェクトのストリームを (必要なら伸長して) 文字列で返す */
+  PDFDoc.prototype.streamText = function (o) {
+    if (!o || o.sStart === undefined) return Promise.resolve(null);
+    var bytes = toBytes(this.raw.slice(o.sStart, o.sEnd));
+    var f = dictGet(o.dict, "Filter") || "";
+    if (/FlateDecode/.test(f)) {
+      return inflate(bytes).then(function (out) { return out ? toLatin1(out) : null; });
+    }
+    if (/DCTDecode|JPXDecode|CCITTFaxDecode|JBIG2Decode|RunLengthDecode|LZWDecode/.test(f)) return Promise.resolve(null);
+    return Promise.resolve(toLatin1(bytes));
+  };
+
+  /* /Type /ObjStm を展開して this.objs に流し込む */
+  PDFDoc.prototype.expandObjStreams = function () {
+    var self = this, nums = Object.keys(this.objs), chain = Promise.resolve();
+    nums.forEach(function (n) {
+      var o = self.objs[n];
+      if (!o.dict || !/\/Type\s*\/ObjStm/.test(o.dict)) return;
+      chain = chain.then(function () {
+        return self.streamText(o).then(function (txt) {
+          if (!txt) return;
+          var N = parseInt(dictGet(o.dict, "N") || "0", 10);
+          var first = parseInt(dictGet(o.dict, "First") || "0", 10);
+          var head = txt.slice(0, first).trim().split(/\s+/);
+          for (var i = 0; i < N; i++) {
+            var onum = parseInt(head[2 * i], 10), off = parseInt(head[2 * i + 1], 10);
+            if (isNaN(onum) || isNaN(off)) continue;
+            var nextOff = (i + 1 < N) ? parseInt(head[2 * i + 3], 10) : (txt.length - first);
+            if (isNaN(nextOff)) nextOff = txt.length - first;
+            if (self.objs[onum] === undefined)
+              self.objs[onum] = { body: txt.slice(first + off, first + nextOff) };
+          }
+        });
+      });
+    });
+    return chain;
+  };
+
+  /* 参照を解決して辞書/本体文字列を返す */
+  PDFDoc.prototype.deref = function (v) {
+    if (!v) return null;
+    if (isRef(v)) {
+      var o = this.objs[refNum(v)];
+      if (!o) return null;
+      return o.body !== undefined ? o.body : o.dict;
+    }
+    return v;
+  };
+  PDFDoc.prototype.derefObj = function (v) {
+    if (isRef(v)) return this.objs[refNum(v)] || null;
+    return null;
+  };
+
+  /* =============================== CMap / フォント =============================== */
+
+  function hexToStr(h) {
+    h = h.replace(/[^0-9A-Fa-f]/g, "");
+    var out = "";
+    for (var i = 0; i < h.length; i += 4) {
+      var quad = h.substr(i, 4);
+      while (quad.length < 4) quad += "0";
+      out += String.fromCharCode(parseInt(quad, 16));
+    }
+    return out;
+  }
+
+  function parseToUnicode(txt) {
+    var map = {}, m;
+    var reChar = /beginbfchar([\s\S]*?)endbfchar/g;
+    while ((m = reChar.exec(txt))) {
+      var body = m[1], mm, re2 = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>/g;
+      while ((mm = re2.exec(body))) map[parseInt(mm[1], 16)] = hexToStr(mm[2]);
+    }
+    var reRange = /beginbfrange([\s\S]*?)endbfrange/g;
+    while ((m = reRange.exec(txt))) {
+      var b = m[1], r1 = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*(<[0-9A-Fa-f]+>|\[[^\]]*\])/g, x;
+      while ((x = r1.exec(b))) {
+        var lo = parseInt(x[1], 16), hi = parseInt(x[2], 16), dst = x[3];
+        if (hi < lo || hi - lo > 65535) continue;
+        if (dst.charAt(0) === "[") {
+          var items = dst.match(/<([0-9A-Fa-f]+)>/g) || [];
+          for (var i = 0; i < items.length && lo + i <= hi; i++) map[lo + i] = hexToStr(items[i].slice(1, -1));
+        } else {
+          var base = dst.slice(1, -1), baseVal = parseInt(base, 16);
+          for (var c = lo; c <= hi; c++) map[c] = String.fromCharCode(baseVal + (c - lo));
+        }
+      }
+    }
+    return map;
+  }
+
+  function parseDifferences(arrStr) {
+    var map = {}, cur = 0;
+    var re = /(\d+)|\/([^\s\/\[\]]+)/g, m;
+    while ((m = re.exec(arrStr))) {
+      if (m[1] !== undefined) cur = parseInt(m[1], 10);
+      else { map[cur] = m[2]; cur++; }
+    }
+    return map;
+  }
+
+  /* フォント辞書 → { twoByte, map: code→文字列 } のデコーダを作る */
+  PDFDoc.prototype.buildFont = function (fontDict) {
+    var self = this;
+    if (!fontDict) return Promise.resolve(null);
+    var baseFont = (dictGet(fontDict, "BaseFont") || "").replace(/^\//, "");
+    var subtype = (dictGet(fontDict, "Subtype") || "").replace(/^\//, "");
+    var twoByte = subtype === "Type0";
+    var font = { base: baseFont, twoByte: twoByte, map: {}, src: "none" };
+
+    var tuObj = this.derefObj(dictGet(fontDict, "ToUnicode") || "");
+    var step = tuObj ? this.streamText(tuObj).then(function (txt) {
+      if (txt) {
+        var m = parseToUnicode(txt);
+        if (Object.keys(m).length) { font.map = m; font.src = "ToUnicode"; }
+      }
+    }) : Promise.resolve();
+
+    return step.then(function () {
+      /* Differences (ToUnicode が無い/穴がある場合の補完) */
+      var encStr = self.deref(dictGet(fontDict, "Encoding"));
+      if (encStr && /\/Differences/.test(encStr)) {
+        var diffArr = dictGet(encStr, "Differences");
+        if (diffArr) {
+          var names = parseDifferences(diffArr), filled = 0;
+          for (var code in names) {
+            var name = names[code], u = GLYPH[name];
+            if (!u && /^uni([0-9A-Fa-f]{4})$/.test(name)) u = String.fromCharCode(parseInt(RegExp.$1, 16));
+            if (!u && /^[A-Za-z]$/.test(name)) u = name;
+            if (u && font.map[code] === undefined) { font.map[code] = u; filled++; }
+          }
+          if (filled && font.src === "none") font.src = "Differences";
+        }
+      }
+      /* CM/AMS 内蔵エンコーディング */
+      var be = builtinEncoding(baseFont);
+      if (be) {
+        var added = 0;
+        for (var c in be) if (font.map[c] === undefined) { font.map[c] = be[c]; added++; }
+        if (added && font.src === "none") font.src = "builtin:" + baseFont.replace(/^[A-Z]{6}\+/, "");
+      }
+      if (font.src === "none" && !twoByte) font.src = "latin1";
+      return font;
+    });
+  };
+
+  function decodeString(bytes, font) {
+    if (!font) return "";
+    var out = "";
+    if (font.twoByte) {
+      for (var i = 0; i + 1 < bytes.length; i += 2) {
+        var code = (bytes.charCodeAt(i) << 8) | bytes.charCodeAt(i + 1);
+        var v = font.map[code];
+        out += (v !== undefined) ? v : "";
+      }
+    } else {
+      for (var j = 0; j < bytes.length; j++) {
+        var c = bytes.charCodeAt(j), w = font.map[c];
+        if (w !== undefined) out += w;
+        else if (font.src === "latin1" && c >= 32 && c < 127) out += String.fromCharCode(c);
+      }
+    }
+    return out;
+  }
+
+  /* =========================== コンテンツストリーム走査 =========================== */
+
+  function readPdfString(s, i) {              /* i は '(' の位置 */
+    var depth = 0, out = "", j = i;
+    while (j < s.length) {
+      var c = s.charAt(j);
+      if (c === "\\") {
+        var n = s.charAt(j + 1);
+        if (/[0-7]/.test(n)) {
+          var oct = /^[0-7]{1,3}/.exec(s.slice(j + 1))[0];
+          out += String.fromCharCode(parseInt(oct, 8)); j += 1 + oct.length; continue;
+        }
+        var esc = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", "(": "(", ")": ")", "\\": "\\" }[n];
+        if (esc !== undefined) out += esc;
+        else if (n !== "\n" && n !== "\r") out += n;
+        j += 2; continue;
+      }
+      if (c === "(") { depth++; if (depth > 1) out += c; j++; continue; }
+      if (c === ")") { depth--; if (!depth) { j++; break; } out += c; j++; continue; }
+      out += c; j++;
+    }
+    return { str: out, end: j };
+  }
+
+  /* コンテンツからテキスト断片の配列を得る。fonts: リソース名→font */
+  function extractRuns(content, fonts) {
+    var runs = [], i = 0, n = content.length, cur = null, pending = [], lastName = null;
+    while (i < n) {
+      var c = content.charAt(i);
+      if (c === "(") { var r = readPdfString(content, i); pending.push(r.str); i = r.end; continue; }
+      if (c === "<" && content.charAt(i + 1) === "<") { i += 2; continue; }
+      if (c === "<") {
+        var e = content.indexOf(">", i);
+        if (e < 0) break;
+        var hex = content.slice(i + 1, e).replace(/[^0-9A-Fa-f]/g, "");
+        if (hex.length % 2) hex += "0";
+        var st = "";
+        for (var h = 0; h < hex.length; h += 2) st += String.fromCharCode(parseInt(hex.substr(h, 2), 16));
+        pending.push(st); i = e + 1; continue;
+      }
+      if (c === ">") { i++; continue; }
+      if (c === "/") {
+        var m = /^\/([^\s\/\[\]<>()]*)/.exec(content.slice(i, i + 128));
+        lastName = m ? m[1] : null;
+        i += m ? m[0].length : 1; continue;
+      }
+      if (/[A-Za-z'"]/.test(c)) {
+        var om = /^[A-Za-z'"*0-9]+/.exec(content.slice(i, i + 32));
+        var op = om ? om[0] : c;
+        i += op.length;
+        if (op === "Tf") { cur = fonts[lastName] || null; pending = []; }
+        else if (op === "Tj" || op === "TJ" || op === "'" || op === '"') {
+          var txt = "";
+          for (var p = 0; p < pending.length; p++) txt += decodeString(pending[p], cur);
+          if (txt) runs.push(txt);
+          pending = [];
+        } else pending = [];
+        continue;
+      }
+      i++;
+    }
+    return runs;
+  }
+
+  /* ============================== 記号フィルタ ============================== */
+
+  /* 「方程式の記号」として数える Unicode 範囲 */
+  function isMathSymbol(ch) {
+    var c = ch.codePointAt(0);
+    if (c >= 0x0391 && c <= 0x03c9) return true;                   /* ギリシャ */
+    if (c >= 0x03d0 && c <= 0x03f5) return true;                   /* ϑ ϖ ϱ ϕ など */
+    if (c >= 0x2100 && c <= 0x214f) return true;                   /* ℂ ℕ ℝ ℤ ℵ ℑ ℜ ℏ ℓ ℘ */
+    if (c >= 0x2190 && c <= 0x21ff) return true;                   /* 矢印 */
+    if (c >= 0x2200 && c <= 0x22ff) return true;                   /* 数学演算子 */
+    if (c >= 0x2308 && c <= 0x232a) return true;                   /* ⌈⌉⌊⌋⟨⟩ */
+    if (c >= 0x27c0 && c <= 0x27ef) return true;
+    if (c >= 0x2900 && c <= 0x297f) return true;                   /* 補助矢印 */
+    if (c >= 0x2a00 && c <= 0x2aff) return true;                   /* 補助演算子 ⨁ ⨂ */
+    if (c >= 0x1d400 && c <= 0x1d7ff) return true;                 /* 数学英数記号 𝒪 𝔤 𝕂 */
+    if (c === 0x00b1 || c === 0x00d7 || c === 0x00f7) return true; /* ± × ÷ */
+    if (c === 0x2032 || c === 0x2033) return true;                 /* ′ ″ */
+    if (c === 0x2020 || c === 0x2021) return true;                 /* † ‡ */
+    if (c === 0x00ac || c === 0x2016) return true;                 /* ¬ ‖ */
+    if (c === 0x25b3 || c === 0x25bd || c === 0x25a1) return true; /* △ ▽ □ */
+    return false;
+  }
+
+  /* ================================ 公開 API ================================ */
+
+  /**
+   * PDF バイト列から数式記号を抽出する。
+   * @param {Uint8Array} bytes
+   * @param {function(string)} [onProgress]
+   * @returns {Promise<{ok:boolean,symbols:Array,fragments:Array,pages:number,fonts:Array,glyphs:number,note:string}>}
+   */
+  function extract(bytes, onProgress) {
+    var report = function (m) { if (onProgress) { try { onProgress(m); } catch (e) {} } };
+    var doc = new PDFDoc(toLatin1(bytes));
+    report("オブジェクトを走査中…");
+    doc.scanObjects();
+
+    if (/trailer[\s\S]{0,600}\/Encrypt/.test(doc.raw)) {
+      return Promise.resolve({ ok: false, symbols: [], fragments: [], pages: 0, fonts: [], glyphs: 0,
+        note: "暗号化された PDF です(このアプリは復号しません)。" });
+    }
+
+    return doc.expandObjStreams().then(function () {
+      report("ページと埋め込みフォントを解析中…");
+      var pageNums = [];
+      for (var k in doc.objs) {
+        var o = doc.objs[k], d = o.dict !== undefined ? o.dict : o.body;
+        if (d && /\/Type\s*\/Page(?![sA-Za-z])/.test(d)) pageNums.push(k);
+      }
+      var counts = {}, fragments = [], fontsSeen = {}, stats = { glyphs: 0 };
+
+      function resourcesOf(pageDict, depth) {
+        var res = dictGet(pageDict, "Resources");
+        if (res) return doc.deref(res);
+        if (depth > 6) return null;
+        var pd = doc.deref(dictGet(pageDict, "Parent"));
+        return pd ? resourcesOf(pd, depth + 1) : null;
+      }
+
+      var chain = Promise.resolve();
+      pageNums.forEach(function (pn, idx) {
+        chain = chain.then(function () {
+          if (idx % 10 === 0) report("ページ解析 " + (idx + 1) + " / " + pageNums.length);
+          var po = doc.objs[pn], pd = po.dict !== undefined ? po.dict : po.body;
+          var res = resourcesOf(pd, 0);
+          if (!res) return;
+          var fontDictStr = doc.deref(dictGet(res, "Font"));
+          if (!fontDictStr) return;
+
+          /* リソース名 → フォント辞書 */
+          var fonts = {}, entries = [], re = /\/([^\s\/\[\]<>()]+)\s*(\d+\s+\d+\s+R|<<)/g, m;
+          while ((m = re.exec(fontDictStr))) {
+            var val = m[2] === "<<" ? readValue(fontDictStr, m.index + m[0].length - 2).value : m[2];
+            entries.push([m[1], val]);
+          }
+          var fchain = Promise.resolve();
+          entries.forEach(function (ent) {
+            fchain = fchain.then(function () {
+              var fd = isRef(ent[1]) ? doc.deref(ent[1]) : ent[1];
+              return doc.buildFont(fd).then(function (f) {
+                if (!f) return;
+                fonts[ent[0]] = f;
+                var key = (f.base.replace(/^[A-Z]{6}\+/, "") || "(no name)") + " [" + f.src + "]";
+                fontsSeen[key] = (fontsSeen[key] || 0) + 1;
+              });
+            });
+          });
+
+          return fchain.then(function () {
+            var contents = dictGet(pd, "Contents");
+            if (!contents) return;
+            var refs = [];
+            if (isRef(contents)) refs.push(contents);
+            else { var mm, r2 = /\d+\s+\d+\s+R/g; while ((mm = r2.exec(contents))) refs.push(mm[0]); }
+            var cchain = Promise.resolve(), pageText = [];
+            refs.forEach(function (rf) {
+              cchain = cchain.then(function () {
+                var co = doc.derefObj(rf);
+                if (!co) return;
+                return doc.streamText(co).then(function (txt) { if (txt) pageText.push(txt); });
+              });
+            });
+            return cchain.then(function () {
+              if (!pageText.length) return;
+              var runs = extractRuns(pageText.join("\n"), fonts);
+              for (var i = 0; i < runs.length; i++) {
+                var t = runs[i], hasSym = false, arr = Array.from(t);
+                for (var q = 0; q < arr.length; q++) {
+                  stats.glyphs++;
+                  if (isMathSymbol(arr[q])) { counts[arr[q]] = (counts[arr[q]] || 0) + 1; hasSym = true; }
+                }
+                if (hasSym && arr.length <= 80 && fragments.length < 400) {
+                  var tt = t.replace(/\s+/g, " ").trim();
+                  if (tt.length >= 2) fragments.push(tt);
+                }
+              }
+            });
+          });
+        });
+      });
+
+      return chain.then(function () {
+        var symbols = Object.keys(counts).map(function (ch) { return { ch: ch, count: counts[ch] }; });
+        symbols.sort(function (a, b) { return b.count - a.count; });
+        var fonts = Object.keys(fontsSeen).sort();
+        var ok = symbols.length > 0;
+        var note = ok ? "" :
+          (stats.glyphs === 0
+            ? "テキストを抽出できませんでした(スキャン画像のみの PDF、または未対応の圧縮方式の可能性があります)。"
+            : "テキストは抽出できましたが、数式記号は見つかりませんでした。");
+        report("完了");
+        return { ok: ok, symbols: symbols, fragments: fragments, pages: pageNums.length,
+                 fonts: fonts, glyphs: stats.glyphs, note: note };
+      });
+    });
+  }
+
+  var API = { extract: extract, isMathSymbol: isMathSymbol, GLYPH: GLYPH, _PDFDoc: PDFDoc };
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  root.PDFSymbols = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
+"use strict";
+(function () {
+  var B = window.SymbolBank, PS = window.PDFSymbols, TB = window.TermBank, FE = window.FlashEngine;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ============================ 共通ユーティリティ ============================ */
+  function shuffle(a) {
+    for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; }
+    return a;
+  }
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  /* Γ カーネル由来の応答時間係数: 速いほど 1 に近い(τ=0 で 1、単調減少) */
+  function gammaTime(sec) {
+    var tau = Math.max(0, sec) / 20;
+    return Math.exp(-tau * Math.log(1 + tau));
+  }
+
+  /* ============================== 状態 ============================== */
+  var state = {
+    pdf: null,          /* {symbols, fragments, ...} */
+    pdfKnown: [],       /* 辞典に一致した PDF 由来の記号 [{sym, count}] */
+    qs: [], i: 0, answers: [], t0: 0, running: false
+  };
+
+  /* ============================== 出題生成 ============================== */
+  function inScope(o) {
+    var lvMax = +$("lvmax").value, f = $("field").value;
+    return o.lv <= lvMax && (!f || o.field === f);
+  }
+
+  /* 選択肢: 正解 + 近傍誤答 + サンプリング誤答 */
+  function buildOptions(correct, nears, pool, n) {
+    var opts = [correct], seen = {};
+    seen[correct] = 1;
+    (nears || []).forEach(function (x) { if (!seen[x] && opts.length < n) { opts.push(x); seen[x] = 1; } });
+    var guard = 0;
+    while (opts.length < n && guard++ < 400) {
+      var c = pick(pool);
+      if (c && !seen[c]) { opts.push(c); seen[c] = 1; }
+    }
+    return shuffle(opts);
+  }
+
+  /* --- 第一次: 記号 → 意味 --- */
+  function qSymbolMeaning(sym, fromPdf) {
+    var siblings = B.SYMBOLS.filter(function (s) {
+      return s.ch !== sym.ch && Math.abs(s.lv - sym.lv) <= 1;
+    });
+    var nears = shuffle(siblings.filter(function (s) { return s.field === sym.field; }))
+                  .slice(0, 2).map(function (s) { return s.mean; });
+    var pool = B.SYMBOLS.filter(function (s) { return s.ch !== sym.ch; }).map(function (s) { return s.mean; });
+    return {
+      phase: 1, kind: "記号の意味", lv: sym.lv, field: sym.field, src: fromPdf || null,
+      sym: sym.ch,
+      text: "この記号は数学において何を表しますか。",
+      opts: buildOptions(sym.mean, nears, pool, 4),
+      correct: sym.mean,
+      why: sym.ja + " — " + sym.mean + "(主に " + sym.field + ")"
+    };
+  }
+
+  /* --- 第一次: 記号 → 専門分野 --- */
+  function qSymbolField(sym) {
+    var pool = B.FIELDS.filter(function (f) { return f !== sym.field; });
+    return {
+      phase: 1, kind: "記号の分野", lv: Math.max(2, sym.lv), field: sym.field, sym: sym.ch,
+      text: "この記号(" + sym.ja + ")が最も特徴的に用いられる分野はどれですか。",
+      opts: buildOptions(sym.field, null, pool, 4),
+      correct: sym.field,
+      why: sym.ch + " は " + sym.field + " の文脈で「" + sym.mean + "」を表すのが代表的。"
+    };
+  }
+
+  /* --- 第一次: 文脈依存(同じ記号・分野で意味が変わる) --- */
+  function qContext(ctx) {
+    var target = pick(ctx.items);
+    var opts = ctx.items.map(function (it) { return it.mean; });
+    return {
+      phase: 1, kind: "文脈依存記号", lv: 4, field: target.field, sym: ctx.ch,
+      text: "<b>" + esc(target.field) + "</b> の論文でこの記号が現れたとき、最も自然な読み方はどれですか。",
+      opts: shuffle(opts.slice()),
+      correct: target.mean,
+      why: ctx.ch + " は分野で意味が変わる記号です — " +
+           ctx.items.map(function (it) { return it.field + ": " + it.mean; }).join(" / ")
+    };
+  }
+
+  /* --- 第二次: 方程式 → 意味 --- */
+  function qEquationMeaning(eq) {
+    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.mean; });
+    return {
+      phase: 2, kind: "方程式の意味", lv: eq.lv, field: eq.field,
+      eq: eq.eq,
+      text: "この方程式は何を主張していますか。",
+      opts: buildOptions(eq.mean, eq.near, pool, 4),
+      correct: eq.mean,
+      why: "【" + eq.name + "】" + eq.why
+    };
+  }
+
+  /* --- 第二次: 方程式 → 名称 --- */
+  function qEquationName(eq) {
+    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.name; });
+    return {
+      phase: 2, kind: "方程式の同定", lv: eq.lv, field: eq.field,
+      eq: eq.eq,
+      text: "この方程式の名称はどれですか。",
+      opts: buildOptions(eq.name, null, pool, 4),
+      correct: eq.name,
+      why: "【" + eq.name + "】" + eq.mean + " — " + eq.why
+    };
+  }
+
+  /* --- 第二次: 連想(簡単な方程式 → 専門分野の方程式) --- */
+  function qAssoc(a) {
+    return {
+      phase: 2, kind: "連想(簡単→専門)", lv: a.lv, field: a.field,
+      eq: a.simple,
+      text: "この簡単な方程式(" + esc(a.simpleMean) + ")の構造を、<b>" + esc(a.field) +
+            "</b> へ一般化した方程式はどれですか。",
+      opts: buildOptions(a.adv, null, a.wrong.slice(), 4),
+      correct: a.adv, mono: true,
+      why: "【" + a.advName + "】" + a.why
+    };
+  }
+
+  /* --- 第二次: 逆向き連想(専門の方程式 → 元になった簡単な方程式) --- */
+  function qAssocReverse(a) {
+    var pool = B.ASSOC.filter(function (x) { return x.adv !== a.adv; }).map(function (x) { return x.simple; });
+    return {
+      phase: 2, kind: "連想(専門→簡単)", lv: a.lv, field: a.field,
+      eq: a.adv,
+      text: "<b>" + esc(a.advName) + "</b> の原型にあたる、最も基本的な方程式はどれですか。",
+      opts: buildOptions(a.simple, null, pool, 4),
+      correct: a.simple, mono: true,
+      why: "【" + a.advName + "】" + a.why
+    };
+  }
+
+  /* --- 第三次: 数学適性分野(思考スタイル・正誤なし) --- */
+  function qAptitude(item) {
+    var wmap = {};
+    item.opts.forEach(function (o) { wmap[o.t] = o.w; });
+    var top = {};                                   /* 設問ごとの分野別最大重み(正規化用) */
+    item.opts.forEach(function (o) {
+      Object.keys(o.w).forEach(function (f) { top[f] = Math.max(top[f] || 0, o.w[f]); });
+    });
+    return {
+      phase: 3, kind: "適性(思考スタイル)", lv: 0, field: null, aptitude: true,
+      text: item.q,
+      opts: shuffle(item.opts.map(function (o) { return o.t; })),
+      wmap: wmap, wmax: top, correct: null
+    };
+  }
+
+  /* ============ 第四次: 瞬読(フラッシュ) — バラバラにランダム提示 ============ */
+  /* 記号・専門用語・バラバラにした方程式トークンを、ランダムな位置/角度/大きさで
+     一斉に短時間だけ提示し、消えたあとに問う。露出時間はステアケースで適応的に変化。 */
+
+  function flashTerms() {
+    var f = $("field").value, lvMax = +$("lvmax").value;
+    var t = TB.TERMS.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
+    return t.length >= 8 ? t : TB.TERMS.slice();
+  }
+
+  /* 瞬読: 記号 — 表示された記号はどれか */
+  function qFlashSymbol(k) {
+    var pool = (state.pdfKnown.length >= k + 4)
+      ? shuffle(state.pdfKnown.map(function (p) { return p.sym; }))
+      : shuffle(B.SYMBOLS.filter(inScope).length >= k + 4 ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.ch].concat(shuffle(rest).slice(0, 3).map(function (s) { return s.ch; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(記号)", lv: Math.max(2, target.lv), field: target.field,
+      items: shown.map(function (s) { return s.ch; }),
+      text: "いま一瞬だけ表示された記号は、次のどれですか。",
+      opts: opts, correct: target.ch, mono: true,
+      why: target.ch + " = " + target.ja + " — " + target.mean
+    };
+  }
+
+  /* 瞬読: 専門用語 — 表示された用語はどれか */
+  function qFlashTerm(k) {
+    var pool = shuffle(flashTerms());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.t].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.t; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(専門用語)", lv: target.lv, field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま一瞬だけ表示された数学の専門用語は、次のどれですか。",
+      opts: opts, correct: target.t,
+      why: target.t + "(" + target.en + ", " + target.field + ") — " + target.def
+    };
+  }
+
+  /* 瞬読: 専門用語 → 意味(瞬読したうえで内容を答える) */
+  function qFlashTermMeaning(k) {
+    var pool = shuffle(flashTerms());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.def].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.def; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(用語→意味)", lv: Math.min(5, target.lv + 1), field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま表示された用語のうち 1 つの意味が下にあります。正しい説明はどれですか。",
+      opts: opts, correct: target.def,
+      why: "正解は「" + target.t + "」(" + target.field + ") の説明でした — " + target.def
+    };
+  }
+
+  /* 瞬読: 方程式をバラバラのトークンにして散らす → 元の方程式はどれか */
+  function qFlashEquation() {
+    var pool = B.EQUATIONS.filter(inScope);
+    if (pool.length < 4) pool = B.EQUATIONS.slice();
+    var target = pick(pool);
+    var others = shuffle(pool.filter(function (e) { return e.name !== target.name; })).slice(0, 3);
+    return {
+      phase: 4, flash: true, kind: "瞬読(方程式バラバラ)", lv: target.lv, field: target.field,
+      items: shuffle(FE.tokenize(target.eq)),
+      text: "いま<b>バラバラに散らして</b>表示されたのは、どの方程式の断片ですか。",
+      opts: shuffle([target.eq].concat(others.map(function (e) { return e.eq; }))),
+      correct: target.eq, mono: true,
+      why: "【" + target.name + "】" + target.mean
+    };
+  }
+
+  /* 瞬読: 個数把握(面的にいくつ見えたか) */
+  function qFlashCount(k) {
+    var pool = shuffle(B.SYMBOLS.filter(inScope).length >= k ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+    var shown = pool.slice(0, k);
+    var cands = {}; cands[k] = 1;
+    [k - 2, k - 1, k + 1, k + 2].forEach(function (v) { if (v >= 1) cands[v] = 1; });
+    var opts = shuffle(Object.keys(cands).map(Number)).slice(0, 4);
+    if (opts.indexOf(k) < 0) { opts[0] = k; opts = shuffle(opts); }
+    return {
+      phase: 4, flash: true, kind: "瞬読(個数把握)", lv: 3, field: pick(shown).field,
+      items: shown.map(function (s) { return s.ch; }),
+      text: "いま表示されていた記号は、全部でいくつでしたか。",
+      opts: opts.map(String), correct: String(k), mono: true,
+      why: "正解は " + k + " 個。個々を読まずに面として把握するのが瞬読の要点です。"
+    };
+  }
+
+  function buildFlash(n) {
+    var k = +$("k4").value, out = [];
+    for (var i = 0; i < n; i++) {
+      var r = Math.random();
+      if (r < 0.26) out.push(qFlashTerm(k));
+      else if (r < 0.48) out.push(qFlashEquation());
+      else if (r < 0.68) out.push(qFlashSymbol(k));
+      else if (r < 0.86) out.push(qFlashTermMeaning(k));
+      else out.push(qFlashCount(k));
+    }
+    return out;
+  }
+
+  /* 分野が偏らないよう、分野ごとに1つずつ取り出して並べ替える */
+  function spreadByField(list) {
+    var by = {}, order = [];
+    list.forEach(function (x) {
+      var f = x.field || "—";
+      if (!by[f]) { by[f] = []; order.push(f); }
+      by[f].push(x);
+    });
+    var out = [], any = true;
+    while (any) {
+      any = false;
+      shuffle(order.slice()).forEach(function (f) {
+        if (by[f].length) { out.push(by[f].shift()); any = true; }
+      });
+    }
+    return out;
+  }
+
+  /* --- 検査全体の組み立て --- */
+  function buildExam() {
+    var mode = $("mode").value;
+    if (mode === "aptitude") return shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude);
+    if (mode === "flash") return buildFlash(+$("n4").value);
+    var n1 = +$("n1").value, n2 = +$("n2").value, qs = [];
+
+    /* 第一次: PDF 由来の記号を優先 */
+    var pdfSyms = shuffle(state.pdfKnown.slice()).filter(function (p) { return inScope(p.sym); });
+    var syms = spreadByField(shuffle(B.SYMBOLS.filter(inScope)));
+    var ctxs = shuffle(B.CTX.filter(function (c) {
+      return c.items.some(function (it) { return !$("field").value || it.field === $("field").value; });
+    }));
+    var usedCh = {}, k = 0;
+
+    var nPdf = Math.min(pdfSyms.length, Math.ceil(n1 * 0.6));
+    for (var p = 0; p < nPdf; p++) {
+      var ps = pdfSyms[p];
+      usedCh[ps.sym.ch] = 1;
+      qs.push(qSymbolMeaning(ps.sym, "この論文に " + ps.count + " 回出現"));
+    }
+    while (qs.length < n1 && k < 400) {
+      k++;
+      var roll = Math.random();
+      if (roll < 0.18 && ctxs.length && +$("lvmax").value >= 4) {
+        qs.push(qContext(ctxs.pop() || pick(B.CTX)));
+      } else {
+        var s = syms.find(function (x) { return !usedCh[x.ch]; });
+        if (!s) { s = pick(B.SYMBOLS.filter(inScope) || B.SYMBOLS); if (!s) break; }
+        usedCh[s.ch] = 1;
+        qs.push(roll < 0.45 ? qSymbolField(s) : qSymbolMeaning(s));
+      }
+    }
+    qs = qs.slice(0, n1);
+
+    /* 第二次: 方程式の意味 + 同定 + 連想(簡単→専門 / 専門→簡単) */
+    var eqs = spreadByField(shuffle(B.EQUATIONS.filter(inScope)));
+    var assoc = shuffle(B.ASSOC.filter(inScope));
+    var second = [], usedEq = {}, g = 0;
+    /* 連想問題を全体の約 4 割は必ず入れる(本検査の主眼) */
+    var nAssoc = Math.max(1, Math.min(assoc.length, Math.round(n2 * 0.4)));
+    for (var a = 0; a < nAssoc; a++) {
+      var it = assoc[a];
+      second.push(Math.random() < 0.65 ? qAssoc(it) : qAssocReverse(it));
+    }
+    while (second.length < n2 && g < 400) {
+      g++;
+      var e = eqs.find(function (x) { return !usedEq[x.name]; });
+      if (!e) { e = pick(B.EQUATIONS.filter(inScope) || B.EQUATIONS); if (!e) break; }
+      usedEq[e.name] = 1;
+      second.push(Math.random() < 0.72 ? qEquationMeaning(e) : qEquationName(e));
+    }
+    second = shuffle(second.slice(0, n2));
+
+    /* 難度の緩やかな昇順(簡単な方程式から専門へ) */
+    qs.sort(function (x, y) { return x.lv - y.lv; });
+    second.sort(function (x, y) { return x.lv - y.lv; });
+    var all = qs.concat(second);
+
+    /* 第四次(瞬読) → 第三次(適性診断) の順で付け足す(フルモードのみ) */
+    if (mode === "full") {
+      all = all.concat(buildFlash(+$("n4").value));
+      all = all.concat(shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude));
+    }
+    return all;
+  }
+
+  /* ============================== 検査の進行 ============================== */
+  function startExam() {
+    state.qs = buildExam();
+    if (!state.qs.length) { $("setupStat").textContent = "条件に合う設問がありません。難度や分野を広げてください。"; return; }
+    state.i = 0; state.answers = []; state.running = true;
+    state.stair = new FE.Staircase({ start: +$("ms4").value, min: 40, max: 2000, down: 2 });
+    $("introCard").style.display = "none";
+    $("dictCard").style.display = "none";
+    $("resultCard").style.display = "none";
+    $("examCard").style.display = "block";
+    showQuestion();
+  }
+
+  function showQuestion() {
+    var q = state.qs[state.i];
+    $("q_phase").textContent = q.phase === 1 ? "第一次検査 — 記号適性"
+                             : q.phase === 2 ? "第二次検査 — 方程式意味解析"
+                             : q.phase === 4 ? "第四次検査 — 瞬読(フラッシュ)"
+                                             : "第三次検査 — 数学適性分野の診断";
+    $("q_idx").textContent = "設問 " + (state.i + 1) + " / " + state.qs.length;
+    var scored = state.answers.filter(function (a) { return !a.q.aptitude; });
+    var got = scored.filter(function (a) { return a.ok; }).length;
+    $("q_score").textContent = scored.length ? "正答 " + got + " / " + scored.length : "";
+    $("q_bar").style.width = (100 * state.i / state.qs.length) + "%";
+
+    q.tags = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
+             (q.aptitude ? '<span class="tag">正誤なし</span>'
+                         : '<span class="tag">Lv' + q.lv + "</span>" +
+                           '<span class="tag">' + esc(q.field) + "</span>") +
+             (q.src ? '<span class="tag src">' + esc(q.src) + "</span>" : "") + "</div>";
+
+    $("q_fb").style.display = "none";
+    $("next").style.display = "none";
+    if (q.flash) { showFlashPrep(q); return; }
+
+    var head = q.tags;
+    if (q.sym) head += '<div class="qsym">' + esc(q.sym) + "</div>";
+    if (q.eq) head += '<div class="qeq">' + esc(q.eq) + "</div>";
+    head += '<div class="qtext">' + q.text + "</div>";
+    $("q_body").innerHTML = head;
+    renderOptions(q);
+    state.t0 = Date.now();
+  }
+
+  function renderOptions(q) {
+    var box = $("q_opts");
+    box.innerHTML = "";
+    q.opts.forEach(function (o) {
+      var b = document.createElement("button");
+      b.className = "opt" + (q.mono ? " mono" : "");
+      b.textContent = o;
+      b.onclick = function () { answer(o); };
+      box.appendChild(b);
+    });
+  }
+
+  /* --- 瞬読: 提示前の待機画面 → バースト提示 → 設問 --- */
+  function showFlashPrep(q) {
+    q.ms = state.stair.current();
+    $("q_body").innerHTML = q.tags +
+      '<div class="stage" id="stage"></div>' +
+      '<div class="qtext">露出 <b>' + q.ms + " ms</b> ／ <b>" + q.items.length +
+      "</b> 要素をランダムな位置に一斉表示します。中央の <b>+</b> を見つめて待ってください。</div>";
+    var box = $("q_opts");
+    box.innerHTML = "";
+    var b = document.createElement("button");
+    b.className = "opt";
+    b.textContent = "▶ 瞬読を開始する（" + q.ms + " ms）";
+    b.onclick = function () { b.disabled = true; runFlash(q); };
+    box.appendChild(b);
+  }
+
+  function runFlash(q) {
+    var stage = $("stage");
+    var items = shuffle(q.items.slice()).map(function (t) { return { text: t, cls: "item" }; });
+    FE.burst(stage, items, q.ms, { fix: 500, mask: 120 }).then(function (actual) {
+      q.actualMs = Math.round(actual);
+      $("q_body").innerHTML = q.tags + '<div class="qtext">' + q.text + "</div>";
+      renderOptions(q);
+      state.t0 = Date.now();
+    });
+  }
+
+  function answer(chosen) {
+    var q = state.qs[state.i];
+    var sec = (Date.now() - state.t0) / 1000;
+    var ok = q.aptitude ? null : (chosen === q.correct);
+    state.answers.push({ q: q, chosen: chosen, ok: ok, sec: sec });
+
+    var btns = $("q_opts").children, i, b;
+    for (i = 0; i < btns.length; i++) {
+      b = btns[i];
+      b.onclick = null;
+      if (q.aptitude) { if (b.textContent === chosen) b.className += " correct"; }
+      else if (b.textContent === q.correct) b.className += " correct";
+      else if (b.textContent === chosen) b.className += " wrong";
+    }
+    var fb = $("q_fb");
+    if (q.aptitude) {
+      var w = q.wmap[chosen] || {};
+      var lean = Object.keys(w).sort(function (x, y) { return w[y] - w[x]; })
+        .map(function (f) { return f + " (+" + w[f] + ")"; }).join(" · ");
+      fb.innerHTML = '<span class="verdict" style="color:var(--violet)">▶ 志向を記録しました</span>' +
+        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" +
+        '<div class="why">この選択が示す志向: <b>' + esc(lean || "—") + "</b></div>";
+    } else {
+      var extra = "";
+      if (q.flash) {
+        var nextMs = state.stair.update(ok);       /* 2-down/1-up ステアケース */
+        extra = '<span class="tag" style="margin-left:4px">露出 ' + q.ms + " ms</span>" +
+                '<span class="tag">次は ' + nextMs + " ms</span>" +
+                '<div class="flashline">表示されていたもの: ' + esc(q.items.join("  ")) + "</div>";
+      }
+      fb.innerHTML = '<span class="verdict ' + (ok ? "ok" : "ng") + '">' +
+        (ok ? "◎ 共鳴 — 正答" : "× 非共鳴 — 誤答") + "</span>" +
+        '<span class="tag" style="margin-left:8px">' + sec.toFixed(1) + " 秒</span>" + extra +
+        (ok ? "" : '<div style="margin-top:5px">正答: <b>' + esc(q.correct) + "</b></div>") +
+        '<div class="why">' + esc(q.why) + "</div>";
+    }
+    fb.style.display = "block";
+    $("next").style.display = "block";
+    $("next").textContent = (state.i + 1 < state.qs.length) ? "次の設問 →" : "判定を見る →";
+  }
+
+  function nextQuestion() {
+    state.i++;
+    if (state.i < state.qs.length) showQuestion();
+    else finish();
+  }
+
+  /* ============================== 判定 ============================== */
+  function finish() {
+    state.running = false;
+    $("examCard").style.display = "none";
+    $("resultCard").style.display = "block";
+
+    var num = 0, den = 0, tsum = 0, maxLv = 0, byField = {};
+    var scored = state.answers.filter(function (a) { return !a.q.aptitude; });
+    state.answers.forEach(function (a) { tsum += a.sec; });
+    scored.forEach(function (a) {
+      var w = a.q.lv;
+      den += w;
+      if (a.ok) { num += w * (0.7 + 0.3 * gammaTime(a.sec)); maxLv = Math.max(maxLv, a.q.lv); }
+      var f = byField[a.q.field] || (byField[a.q.field] = { n: 0, ok: 0, lv: 0, lvOk: 0 });
+      f.n++; f.lv += w; if (a.ok) { f.ok++; f.lvOk += w; }
+    });
+    var omega = den > 0 ? 100 * num / den : 0;
+    var got = scored.filter(function (a) { return a.ok; }).length;
+
+    /* 適性分野の診断のみのモード: Ω 判定は行わない */
+    if (!scored.length) {
+      $("r_score").textContent = "分野診断";
+      $("r_rank").textContent = "数学適性分野の診断のみ実施";
+      $("r_desc").textContent = "Ω 判定を行うには、検査モードを「フル」または「記号 + 方程式のみ」にしてください。";
+      $("r_acc").textContent = "—";
+      $("r_time").textContent = (tsum / Math.max(1, state.answers.length)).toFixed(1) + " 秒 / 問";
+      $("r_field").textContent = "—";
+      $("r_lv").textContent = "—";
+      $("radar").style.display = "none";
+      $("radarCap").style.display = "none";
+      $("perfStats").style.display = "none";
+      renderFlash();
+      renderAptitude(byField);
+      renderReview();
+      return;
+    }
+    $("radar").style.display = "block";
+    $("radarCap").style.display = "block";
+    $("perfStats").style.display = "block";
+
+    var rank, desc;
+    if (omega >= 90) { rank = "Class-S — 完全共鳴"; desc = "記号と方程式の意味が即座に結びついています。ブラックボックス級の直観です。"; }
+    else if (omega >= 75) { rank = "Class-A — ウィスパード適性 高"; desc = "専門分野の方程式まで意味を追えています。連想の射程が広い。"; }
+    else if (omega >= 60) { rank = "Class-B — 適性あり"; desc = "基礎は堅牢。専門分野の記号を増やせば一段上がります。"; }
+    else if (omega >= 40) { rank = "Class-C — 訓練段階"; desc = "簡単な方程式の意味は取れています。記号辞典で語彙を増やしましょう。"; }
+    else { rank = "Class-D — 共鳴未達"; desc = "難度上限を下げ、Lv1〜2 から順に共鳴させていくのが近道です。"; }
+
+    $("r_score").textContent = "Ω " + omega.toFixed(1);
+    $("r_rank").textContent = rank;
+    $("r_desc").textContent = desc;
+    $("r_acc").textContent = got + " / " + scored.length +
+      " (" + (100 * got / Math.max(1, scored.length)).toFixed(0) + "%)";
+    $("r_time").textContent = (tsum / Math.max(1, state.answers.length)).toFixed(1) + " 秒 / 問";
+    var best = null;
+    Object.keys(byField).forEach(function (f) {
+      var r = byField[f].ok / byField[f].n;
+      if (!best || r > best.r || (r === best.r && byField[f].n > byField[best.f].n)) best = { f: f, r: r };
+    });
+    $("r_field").textContent = best ? best.f + " (" + (100 * best.r).toFixed(0) + "%)" : "—";
+    $("r_lv").textContent = maxLv ? "Lv" + maxLv : "—";
+
+    drawRadar(byField);
+    renderFlash();
+    renderAptitude(byField);
+    renderReview();
+
+    try {
+      var prev = parseFloat(localStorage.getItem("omega_whispered_best") || "0");
+      if (omega > prev) localStorage.setItem("omega_whispered_best", omega.toFixed(1));
+      $("s_best").textContent = "Ω " + Math.max(prev, omega).toFixed(1);
+    } catch (e) { /* localStorage 不可の環境は無視 */ }
+  }
+
+  function drawRadar(byField) {
+    var cv = $("radar"), g = cv.getContext("2d");
+    var W = cv.width, H = cv.height, cx = W / 2, cy = H / 2 + 6, R = Math.min(W, H) * 0.36;
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    var fs = Object.keys(byField);
+    if (!fs.length) return;
+    if (fs.length < 3) {                       /* 2 分野以下は棒グラフの方が読める */
+      var bw = W / (fs.length * 2);
+      fs.forEach(function (f, i) {
+        var r = byField[f].ok / byField[f].n;
+        var x = W * (i + 0.5) / fs.length - bw / 2, h = (H - 60) * r;
+        g.fillStyle = "#40b8c0"; g.fillRect(x, H - 30 - h, bw, h);
+        g.fillStyle = "#8794a8"; g.font = "11px sans-serif"; g.textAlign = "center";
+        g.fillText(f, x + bw / 2, H - 14);
+        g.fillStyle = "#c8a44a"; g.fillText((100 * r).toFixed(0) + "%", x + bw / 2, H - 36 - h);
+      });
+      return;
+    }
+    var n = fs.length;
+    /* グリッド */
+    for (var ring = 1; ring <= 4; ring++) {
+      g.beginPath();
+      for (var i = 0; i <= n; i++) {
+        var th = -Math.PI / 2 + 2 * Math.PI * (i % n) / n, rr = R * ring / 4;
+        var x = cx + rr * Math.cos(th), y = cy + rr * Math.sin(th);
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.strokeStyle = "#1b2638"; g.stroke();
+    }
+    /* データ */
+    g.beginPath();
+    fs.forEach(function (f, i) {
+      var r = byField[f].ok / byField[f].n;
+      var th = -Math.PI / 2 + 2 * Math.PI * i / n;
+      var x = cx + R * r * Math.cos(th), y = cy + R * r * Math.sin(th);
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+    });
+    g.closePath();
+    g.fillStyle = "rgba(144,96,208,0.32)"; g.fill();
+    g.strokeStyle = "#40b8c0"; g.lineWidth = 2; g.stroke(); g.lineWidth = 1;
+    /* ラベル */
+    g.font = "10.5px sans-serif";
+    fs.forEach(function (f, i) {
+      var th = -Math.PI / 2 + 2 * Math.PI * i / n;
+      var x = cx + (R + 20) * Math.cos(th), y = cy + (R + 20) * Math.sin(th);
+      g.fillStyle = "#8794a8";
+      g.textAlign = Math.abs(Math.cos(th)) < 0.3 ? "center" : (Math.cos(th) > 0 ? "left" : "right");
+      g.fillText(f, x, y + 3);
+    });
+  }
+
+  /* ===================== 第四次: 瞬読プロファイル ===================== */
+  function renderFlash() {
+    var fl = state.answers.filter(function (a) { return a.q.flash; });
+    if (!fl.length) { $("flashWrap").style.display = "none"; return; }
+    $("flashWrap").style.display = "block";
+
+    var th = state.stair.threshold();
+    var ok = fl.filter(function (a) { return a.ok; });
+    var minOk = ok.length ? Math.min.apply(null, ok.map(function (a) { return a.q.ms; })) : null;
+    var avgItems = fl.reduce(function (t, a) { return t + a.q.items.length; }, 0) / fl.length;
+    var thr = avgItems / (th.ms / 1000);            /* 閾値露出での要素/秒 */
+    var grade, gdesc;
+    if (!ok.length) { grade = "判定不能"; gdesc = "正答がないため閾値を推定できません。露出時間を長くして再検査してください。"; }
+    else if (th.ms < 150) { grade = "瞬読 Class-S"; gdesc = "0.15 秒未満の一瞥で面として把握できています。"; }
+    else if (th.ms < 250) { grade = "瞬読 Class-A"; gdesc = "一瞥で複数要素を捉えられています。"; }
+    else if (th.ms < 400) { grade = "瞬読 Class-B"; gdesc = "短時間提示に適応できています。"; }
+    else if (th.ms < 700) { grade = "瞬読 Class-C"; gdesc = "まだ逐次的に読んでいる可能性があります。"; }
+    else { grade = "瞬読 Class-D"; gdesc = "同時表示数を減らし、露出時間を段階的に短くしていきましょう。"; }
+
+    var rows = [
+      ["瞬読閾値 (約70%正答の露出)", th.ms + " ms" + (th.reliable ? "" : "（参考値・反転 " + th.reversals + " 回）")],
+      ["最短で正答できた露出", minOk === null ? "—" : minOk + " ms"],
+      ["瞬読スループット", thr.toFixed(1) + " 要素/秒（平均 " + avgItems.toFixed(1) + " 要素同時）"],
+      ["瞬読の正答", ok.length + " / " + fl.length + " (" + (100 * ok.length / fl.length).toFixed(0) + "%)"],
+      ["ステアケース反転回数", th.reversals + " 回"],
+      ["瞬読段位", grade]
+    ];
+    $("flashStats").innerHTML = rows.map(function (r) {
+      return '<div class="stat"><span>' + esc(r[0]) + "</span><b>" + esc(r[1]) + "</b></div>";
+    }).join("") + '<div class="fp"><h4>' + esc(grade) + "</h4>" +
+      '<div class="row">' + esc(gdesc) + "</div>" +
+      '<div class="row"><span>露出の推移: </span><span class="m">' +
+      esc(state.stair.history.map(function (h) { return h.ms + (h.ok ? "◎" : "×"); }).join(" → ")) +
+      "</span></div></div>";
+  }
+
+  /* ===================== 第三次: 数学適性分野の診断 ===================== */
+  /* 志向: 思考スタイル設問の重みを、設問ごとの最大重みで正規化 (0〜1)
+     実力: 分野別に難度 lv で重み付けした正答率 (0〜1)
+     総合: 両方測れた分野は 0.55*志向 + 0.45*実力、片方のみならその値 */
+  function computeAptitude(byField) {
+    var got = {}, max = {};
+    state.answers.forEach(function (a) {
+      if (!a.q.aptitude) return;
+      var w = a.q.wmap[a.chosen] || {};
+      Object.keys(w).forEach(function (f) { got[f] = (got[f] || 0) + w[f]; });
+      Object.keys(a.q.wmax).forEach(function (f) { max[f] = (max[f] || 0) + a.q.wmax[f]; });
+    });
+    var rows = [];
+    B.FIELDS.forEach(function (f) {
+      var pref = (max[f] >= 2) ? Math.min(1, (got[f] || 0) / max[f]) : null;   /* 露出が少ない分野は未測定 */
+      var bf = byField[f];
+      var perf = (bf && bf.lv > 0) ? bf.lvOk / bf.lv : null;
+      if (pref === null && perf === null) return;
+      var total = (pref !== null && perf !== null) ? 0.55 * pref + 0.45 * perf
+                : (pref !== null ? pref : perf);
+      rows.push({ field: f, pref: pref, perf: perf, total: total, asked: bf ? bf.n : 0 });
+    });
+    rows.sort(function (a, b) { return b.total - a.total; });
+    return rows;
+  }
+
+  function renderAptitude(byField) {
+    var hasApt = state.answers.some(function (a) { return a.q.aptitude; });
+    if (!hasApt) { $("aptWrap").style.display = "none"; return; }
+    var rows = computeAptitude(byField);
+    $("aptWrap").style.display = "block";
+
+    $("aptBars").innerHTML = rows.map(function (r, i) {
+      var parts = [];
+      parts.push("志向 " + (r.pref === null ? "—" : (100 * r.pref).toFixed(0) + "%"));
+      parts.push("実力 " + (r.perf === null ? "—" : (100 * r.perf).toFixed(0) + "%"));
+      return '<div class="apt' + (i === 0 ? " top1" : "") + '">' +
+        '<span class="f">' + esc(r.field) + "</span>" +
+        '<span class="track"><i style="width:' + (100 * r.total).toFixed(1) + '%"></i></span>' +
+        '<span class="v"><b>' + (100 * r.total).toFixed(0) + "</b> " + esc(parts.join(" / ")) + "</span></div>";
+    }).join("");
+
+    var top = rows.slice(0, 3), html = "";
+    top.forEach(function (r, i) {
+      var p = B.FIELD_PROFILE[r.field];
+      if (!p) return;
+      html += '<div class="fp"><h4>' + (i === 0 ? "◎ 第一適性: " : "○ 第" + (i + 1) + "適性: ") +
+        esc(r.field) + " — " + esc(p.tag) + " (" + (100 * r.total).toFixed(0) + ")</h4>" +
+        '<div class="row"><span>思考の型: </span>' + esc(p.think) + "</div>" +
+        '<div class="row"><span>代表的な方程式: </span><span class="m">' + esc(p.eqs) + "</span></div>" +
+        '<div class="row"><span>代表的な記号: </span><span class="m">' + esc(p.syms) + "</span></div>" +
+        '<div class="row"><span>隣接分野: </span>' + esc(p.near.join(" · ")) + "</div>" +
+        '<div class="row"><span>次に学ぶとよい主題: </span><b>' + esc(p.next) + "</b></div></div>";
+    });
+    $("aptTop").innerHTML = html;
+  }
+
+  function renderReview() {
+    var h = "<table><tr><th>#</th><th>設問</th><th>判定</th><th>解説</th></tr>";
+    state.answers.forEach(function (a, i) {
+      if (a.q.aptitude) {
+        var w = a.q.wmap[a.chosen] || {};
+        var lean = Object.keys(w).sort(function (x, y) { return w[y] - w[x]; })
+          .map(function (f) { return f + " +" + w[f]; }).join(" · ");
+        h += "<tr><td>" + (i + 1) + "</td>" +
+             "<td>" + esc(a.q.text) + '<br/><span class="tag">' + esc(a.q.kind) + "</span></td>" +
+             '<td style="color:var(--violet)">▶<br/>' + a.sec.toFixed(1) + "s</td>" +
+             "<td>選択: <b>" + esc(a.chosen) + "</b><br/>志向: " + esc(lean || "—") + "</td></tr>";
+        return;
+      }
+      var subject = a.q.flash ? a.q.items.join(" ") : (a.q.sym ? a.q.sym : (a.q.eq || ""));
+      if (a.q.flash) {
+        h += "<tr><td>" + (i + 1) + "</td>" +
+             '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
+             '</span><span class="tag">Lv' + a.q.lv + '</span><span class="tag">' + a.q.ms + " ms</span></td>" +
+             '<td class="' + (a.ok ? "rv-ok" : "rv-ng") + '">' + (a.ok ? "◎" : "×") +
+             "<br/>" + a.sec.toFixed(1) + "s</td>" +
+             "<td>" + (a.ok ? "" : "正答: <b>" + esc(a.q.correct) + "</b><br/>") +
+             esc(a.q.why) + "</td></tr>";
+        return;
+      }
+      h += "<tr><td>" + (i + 1) + "</td>" +
+           '<td class="m">' + esc(subject) + '<br/><span class="tag">' + esc(a.q.kind) +
+           "</span><span class=\"tag\">Lv" + a.q.lv + "</span></td>" +
+           '<td class="' + (a.ok ? "rv-ok" : "rv-ng") + '">' + (a.ok ? "◎" : "×") +
+           "<br/>" + a.sec.toFixed(1) + "s</td>" +
+           "<td>" + (a.ok ? "" : "正答: <b>" + esc(a.q.correct) + "</b><br/>") +
+           esc(a.q.why) + "</td></tr>";
+    });
+    $("r_review").innerHTML = h + "</table>";
+  }
+
+  /* ============================== PDF 読み込み ============================== */
+  function handleFile(file) {
+    if (!file) return;
+    $("pdfStat").textContent = "「" + file.name + "」を解析中…";
+    var fr = new FileReader();
+    fr.onerror = function () { $("pdfStat").textContent = "ファイルを読み込めませんでした。"; };
+    fr.onload = function () {
+      var bytes = new Uint8Array(fr.result);
+      PS.extract(bytes, function (m) { $("pdfStat").textContent = file.name + " — " + m; })
+        .then(function (res) { showPdf(file.name, res); })
+        .catch(function (e) { $("pdfStat").textContent = "解析に失敗しました: " + e.message; });
+    };
+    fr.readAsArrayBuffer(file);
+  }
+
+  function showPdf(name, res) {
+    state.pdf = res;
+    var index = {};
+    B.SYMBOLS.forEach(function (s) { index[s.ch] = s; });
+    state.pdfKnown = res.symbols.filter(function (s) { return index[s.ch]; })
+      .map(function (s) { return { sym: index[s.ch], count: s.count }; });
+
+    $("pdfOut").style.display = "block";
+    var total = res.symbols.reduce(function (t, s) { return t + s.count; }, 0);
+    $("p_pages").textContent = res.pages + " ページ / " + res.glyphs.toLocaleString() + " 文字";
+    $("p_syms").textContent = res.symbols.length + " 種 / " + total + " 回";
+    $("p_known").textContent = state.pdfKnown.length + " 種(辞典と照合)";
+    $("p_chips").innerHTML = res.symbols.slice(0, 40).map(function (s) {
+      var k = index[s.ch];
+      return '<span class="chip" title="' + esc(k ? k.ja + " — " + k.mean : "辞典未登録") + '">' +
+             "<b>" + esc(s.ch) + "</b> <small>" + s.count + "</small></span>";
+    }).join("");
+    $("p_frags").innerHTML = res.fragments.slice(0, 12).map(function (f) {
+      return '<div class="frag">' + esc(f) + "</div>";
+    }).join("") || '<div class="cap">数式断片は取得できませんでした。</div>';
+    $("p_fonts").textContent = res.fonts.length ? "埋め込みフォント: " + res.fonts.slice(0, 12).join(" / ") : "";
+
+    if (!res.ok) {
+      $("pdfStat").textContent = name + " — " + res.note;
+    } else {
+      $("pdfStat").innerHTML = esc(name) + " — <b>" + state.pdfKnown.length +
+        "</b> 種の記号を辞典と照合しました。第一次検査で優先出題します。";
+    }
+  }
+
+  /* ============================== 記号辞典 ============================== */
+  function renderDict() {
+    var f = $("dfield").value;
+    var list = B.SYMBOLS.filter(function (s) { return !f || s.field === f; })
+                        .sort(function (a, b) { return a.lv - b.lv; });
+    var h = "<table><tr><th>記号</th><th>読み</th><th>意味</th><th>分野 / Lv</th></tr>";
+    list.forEach(function (s) {
+      h += '<tr><td class="m" style="font-size:18px;color:var(--gold)">' + esc(s.ch) + "</td>" +
+           "<td>" + esc(s.ja) + "</td><td>" + esc(s.mean) + "</td>" +
+           "<td>" + esc(s.field) + " / Lv" + s.lv + "</td></tr>";
+    });
+    $("dictBody").innerHTML = h + "</table>";
+  }
+
+  /* ============================== 初期化 ============================== */
+  function init() {
+    B.FIELDS.forEach(function (f) {
+      [$("field"), $("dfield")].forEach(function (sel) {
+        var o = document.createElement("option"); o.value = f; o.textContent = f; sel.appendChild(o);
+      });
+    });
+    $("s_nsym").textContent = B.SYMBOLS.length + " 記号 (+ 文脈依存 " + B.CTX.length + " 種)";
+    $("s_neq").textContent = B.EQUATIONS.length + " 式";
+    $("s_nas").textContent = B.ASSOC.length + " 対応";
+    $("s_napt").textContent = B.APTITUDE.length + " 設問 / " +
+      Object.keys(B.FIELD_PROFILE).length + " 分野プロファイル";
+    $("s_nterm").textContent = TB.TERMS.length + " 語 (10 分野 × 10 語)";
+    try {
+      var best = localStorage.getItem("omega_whispered_best");
+      $("s_best").textContent = best ? "Ω " + best : "未記録";
+    } catch (e) { $("s_best").textContent = "未記録"; }
+    $("setupStat").textContent = "準備完了。PDF なしでも検査できます。";
+
+    [["n1", "n1_v"], ["n2", "n2_v"], ["n3", "n3_v"], ["n4", "n4_v"], ["ms4", "ms4_v"],
+     ["k4", "k4_v"], ["lvmax", "lv_v"]].forEach(function (p) {
+      var el = $(p[0]);
+      el.oninput = function () { $(p[1]).textContent = el.value; };
+    });
+    /* モードに応じて不要なスライダを無効化 */
+    $("mode").onchange = function () {
+      var m = $("mode").value;
+      ["n1", "n2"].forEach(function (id) { $(id).disabled = (m === "aptitude" || m === "flash"); });
+      ["lvmax", "field"].forEach(function (id) { $(id).disabled = (m === "aptitude"); });
+      $("n3").disabled = (m !== "full" && m !== "aptitude");
+      ["n4", "ms4", "k4"].forEach(function (id) { $(id).disabled = (m !== "full" && m !== "flash"); });
+    };
+    $("start").onclick = startExam;
+    $("again").onclick = function () {
+      $("resultCard").style.display = "none";
+      $("introCard").style.display = "block";
+      window.scrollTo(0, 0);
+    };
+    $("next").onclick = nextQuestion;
+    $("dict").onclick = function () {
+      $("dictCard").style.display = "block"; $("introCard").style.display = "none";
+      $("resultCard").style.display = "none"; $("examCard").style.display = "none";
+      renderDict();
+    };
+    $("dictClose").onclick = function () {
+      $("dictCard").style.display = "none"; $("introCard").style.display = "block";
+    };
+    $("dfield").onchange = renderDict;
+    $("file").onchange = function (e) { handleFile(e.target.files[0]); };
+
+    var drop = $("drop");
+    ["dragenter", "dragover"].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add("hot"); });
+    });
+    ["dragleave", "drop"].forEach(function (ev) {
+      drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove("hot"); });
+    });
+    drop.addEventListener("drop", function (e) {
+      if (e.dataTransfer && e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    if (!window.DecompressionStream) {
+      $("pdfStat").textContent = "この環境では PDF の伸長(DecompressionStream)が使えません。PDF なしで検査できます。";
+      $("file").disabled = true;
+    }
+  }
+
+  /* テスト用にエンジンを公開(ヘッドレス検証で使用) */
+  window.OmegaWhispered = { buildExam: buildExam, gammaTime: gammaTime, state: state };
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+</body>
+</html>

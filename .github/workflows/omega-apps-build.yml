@@ -90,3 +90,47 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*.apk
+
+  # ------------------------------------------------------------------
+  # Ω-Whispered: 単一ファイル HTML と ZIP を作って配布物にする
+  # (ダウンロードページ: bio_medicine/omega_whispered/download/)
+  # ------------------------------------------------------------------
+  whispered-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build single-file HTML
+        working-directory: bio_medicine/omega_whispered
+        run: node build_single.js
+      - name: Verify committed single-file is up to date
+        working-directory: bio_medicine/omega_whispered
+        run: node build_single.js --check
+      - name: Package ZIP
+        run: |
+          set -e
+          APP=bio_medicine/omega_whispered
+          mkdir -p out/omega_whispered
+          cp -r "$APP/www" out/omega_whispered/www
+          cp "$APP/README.md" out/omega_whispered/
+          cp "$APP/build_single.js" out/omega_whispered/
+          cp "$APP/download/omega-whispered.html" out/omega_whispered/
+          cp "$APP/download/omega-whispered.html" out/
+          (cd out && zip -qr omega_whispered-app.zip omega_whispered)
+          ls -la out
+      - name: Upload download bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_whispered-download
+          path: |
+            out/omega_whispered-app.zip
+            out/omega-whispered.html
+      - name: Attach bundle to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/omega_whispered-app.zip
+            out/omega-whispered.html
