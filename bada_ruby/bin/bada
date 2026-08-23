@@ -16,6 +16,7 @@
 #   bin/bada whisper "qntm lght wv"     whispered English / unknown-language verbalize
 #   bin/bada latex "多様体 量子"        論文作成: pLaTeX 長長文ソースを発声せず生成
 #   bin/bada vim [file]                 Bada vim 埋め込みエディタ（:math で論文挿入）
+#   bin/bada agi "質問..." [--gen 8]    ChatΩ: Jones多項式×多様体の AGI 自己進化チャット
 #   bin/bada code "intent" [-l python]  thought-to-code: auto lang detect (EN+JA)
 #   bin/bada complete def [-l ruby]     reserved-word / builtin word completion
 #   bin/bada detect "code..."           auto-detect the programming language
@@ -218,6 +219,24 @@ when "math", "mathpaper"
   puts format("%% math pLaTeX+Bada %d sections, valid=%s, bada=%s, precision=%.1f%%",
               r[:sections], r[:valid], r[:bada_valid], r[:precision] * 100)
   puts r[:code]
+when "agi", "chat", "chatomega"
+  # ChatΩ — chatGPT の進化版（simulation）。ガンマ関数の大域的部分積分多様体の
+  # 機知を Jones 多項式のフィットネスにした AGI 自己進化でプロンプトに応答します。
+  #   bada agi "量子もつれとは何ですか" [--gen 8] [--pop 12]
+  gens = 8
+  pops = 12
+  words = []
+  i = 0
+  while i < ARGV.length
+    case ARGV[i]
+    when "--gen" then gens = ARGV[i + 1].to_i; i += 2
+    when "--pop" then pops = ARGV[i + 1].to_i; i += 2
+    else words << ARGV[i]; i += 1
+    end
+  end
+  prompt = words.join(" ")
+  prompt = "量子もつれとは何ですか" if prompt.strip.empty?
+  puts Bada::AGI.render(prompt, generations: gens, population: pops, nonce: 0)
 when "code"
   # Thought-to-code (EN + 日本語). Auto-detects the language unless --lang given.
   #   bada code "print hello 3 times" [--lang python]

@@ -7,6 +7,7 @@ import bada.silent.Whisper;
 import bada.silent.BadaSyntax;
 import bada.silent.Platex;
 import bada.silent.Vim;
+import bada.agi.Agi;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
 
@@ -105,6 +106,13 @@ public final class DesktopApp {
             System.out.println(r.code);
             return;
         }
+        if (joined.startsWith("--agi") || joined.startsWith("--chat")) {
+            String flag = joined.startsWith("--agi") ? "--agi" : "--chat";
+            String p = joined.substring(flag.length()).trim();
+            if (p.isEmpty()) p = "量子もつれとは何ですか";
+            System.out.println(Agi.render(p, 8, 12, 0));
+            return;
+        }
         if (headless || (!joined.isEmpty() && !joined.equals("--gui"))) {
             String message = joined.isEmpty() || joined.equals("--gui") ? "HELLO SPACE" : joined;
             System.out.println(new SpaceTelegraph("GaAs", 4.0, 3).render(message));
@@ -130,6 +138,7 @@ public final class DesktopApp {
         tabs.addTab("⑤ サイレント入力 (Silent IME)", silentPanel());
         tabs.addTab("⑥ ウィスパード (Whisper)", whisperPanel());
         tabs.addTab("⑦ Bada Vim (エディタ)", vimPanel());
+        tabs.addTab("⑧ ChatΩ (AGI 自己進化)", agiPanel());
         frame.add(tabs);
         frame.setLocationRelativeTo(null);
         frame.setVisible(true);
@@ -916,6 +925,54 @@ public final class DesktopApp {
         rebuildWords.run();
         rehl.run();
         refresh.run();
+        return root;
+    }
+
+    // ---------------------------------------------------------------- ChatΩ (AGI)
+    // The culmination: an evolved chatGPT (simulation) whose reply is produced by
+    // an AGI self-evolution loop — candidates from the gamma-manifold prior scored
+    // by the Jones polynomial, evolved across generations, above silent-talk.
+    private static JPanel agiPanel() {
+        JPanel root = new JPanel(new BorderLayout(8, 8));
+
+        JPanel top = new JPanel(new BorderLayout(6, 6));
+        top.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
+        JTextField prompt = new JTextField("量子もつれとは何ですか");
+        JButton ask = new JButton("進化して応答 (Evolve & Reply)");
+        JSpinner gens = new JSpinner(new SpinnerNumberModel(8, 1, 40, 1));
+        JSpinner pops = new JSpinner(new SpinnerNumberModel(12, 2, 60, 1));
+
+        JPanel inRow = new JPanel(new BorderLayout(6, 6));
+        inRow.add(new JLabel("prompt:"), BorderLayout.WEST);
+        inRow.add(prompt, BorderLayout.CENTER);
+        JPanel east = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        east.add(new JLabel("世代")); east.add(gens);
+        east.add(new JLabel("個体")); east.add(pops);
+        east.add(thoughtButton(prompt, "text")); east.add(whisperButton(prompt)); east.add(ask);
+        inRow.add(east, BorderLayout.EAST);
+
+        JLabel note = new JLabel("※ chatGPT の進化版シミュレーション（ガンマ大域的部分積分多様体×Jones多項式の自己進化）。実在の AGI ではありません");
+        note.setBorder(BorderFactory.createEmptyBorder(4, 2, 4, 2));
+        top.add(inRow, BorderLayout.NORTH);
+        top.add(note, BorderLayout.SOUTH);
+
+        JTextArea output = monospaceArea();
+        final int[] nonce = { 0 };
+        Runnable run = () -> {
+            try {
+                output.setText(Agi.render(prompt.getText(),
+                        (Integer) gens.getValue(), (Integer) pops.getValue(), nonce[0]++));
+                output.setCaretPosition(0);
+            } catch (Throwable t) {
+                output.setText("error: " + t.getMessage());
+            }
+        };
+        ask.addActionListener(e -> run.run());
+        prompt.addActionListener(e -> run.run());
+
+        root.add(top, BorderLayout.NORTH);
+        root.add(new JScrollPane(output), BorderLayout.CENTER);
+        run.run();
         return root;
     }
 

@@ -30,6 +30,7 @@ import bada.silent.Vim;
 import bada.qc.Isa;
 import bada.qc.PseudoQC;
 import bada.quantum.SpaceTelegraph;
+import bada.agi.Agi;
 
 /**
  * Bada Android front end. One screen, modes selected by a spinner:
@@ -53,6 +54,7 @@ public class MainActivity extends Activity {
             + "| :whisper | qntm lght wv | φωτ κυμα | :report | φωτ μνημη κυμα σημα "
             + "| :latex | 多様体 量子 もつれ | :math | 多様体 量子 もつれ | :telegraph | QUANTUM HELLO";
     private static final String WHISPER_DEMO = "qntm lght mmry wv sgnl";
+    private static final String AGI_DEMO = "量子もつれとは何ですか";
     // '|'-separated vi/ex commands driven through the embedded Bada Vim editor.
     private static final String VIM_DEMO =
             "iタイトル：多様体研究 | o序論 | :whisperen qntm lght wv mmry sgnl "
@@ -86,7 +88,8 @@ public class MainActivity extends Activity {
                 new String[]{"① 宇宙電信 Telegraph", "② 擬似QC モニタ投射",
                         "③ 半導体 Verilog 生成", "④ 思考言語化 Mind (sim)",
                         "⑤ コード生成 Coder (EN/JA)", "⑥ サイレント入力 IME (sim)",
-                        "⑦ ウィスパード Whisper (sim)", "⑧ Bada Vim エディタ (sim)"}));
+                        "⑦ ウィスパード Whisper (sim)", "⑧ Bada Vim エディタ (sim)",
+                        "⑨ ChatΩ AGI 自己進化 (sim)"}));
         root.addView(mode);
 
         input = new EditText(this);
@@ -125,6 +128,7 @@ public class MainActivity extends Activity {
                     case 5 -> input.setText(SILENT_DEMO);
                     case 6 -> input.setText(WHISPER_DEMO);
                     case 7 -> input.setText(VIM_DEMO);
+                    case 8 -> input.setText(AGI_DEMO);
                     default -> { }
                 }
                 runSelected();
@@ -151,6 +155,7 @@ public class MainActivity extends Activity {
 
     private int thoughtNonce = 0;
     private int whisperThoughtNonce = 0;
+    private int agiNonce = 0;
 
     // Thought-input with NO typed or spoken input: each tap captures thought-tokens
     // from the gamma-manifold prior and fills the current mode's field via the
@@ -225,6 +230,7 @@ public class MainActivity extends Activity {
                     case 5 -> silent(text);
                     case 6 -> whisper(text);
                     case 7 -> vim(text);
+                    case 8 -> Agi.render(text, 8, 12, agiNonce++);
                     default -> pseudoQc(text, m == 2);
                 };
             } catch (Throwable t) {

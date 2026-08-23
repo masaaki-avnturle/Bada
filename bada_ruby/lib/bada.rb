@@ -50,6 +50,7 @@ require_relative "bada/transformer"
 require_relative "bada/mind"
 require_relative "bada/coder"
 require_relative "bada/silent_talk"
+require_relative "bada/agi"
 require_relative "bada/chat"
 require_relative "bada/nn"
 
