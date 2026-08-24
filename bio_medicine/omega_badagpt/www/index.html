@@ -222,6 +222,7 @@
 <script src="fileio.js"></script>
 <script src="claude.js"></script>
 <script src="silent.js"></script>
+<script src="respond.js"></script>
 <script>
 "use strict";
 const $ = s => document.querySelector(s);
@@ -401,8 +402,19 @@ async function generate() {
   $("#gen").disabled = false;
 }
 
-// ローカル解答: ζ予知テキスト + 生成された Bada/Python 実装コード
+// ローカル解答: 質問応答エンジン (respond.js) が資料を読んで
+// 質問・要望に応じた解答 (要約/論文/実行可能アプリ/コード/数式/レビュー…) を構成する
 function localAnswer(prompt, local) {
+  try {
+    return Responder.answer(prompt || "投稿資料の核心を要約してください。", state.files, local);
+  } catch (e) {
+    // 万一の失敗時は従来のテンプレート解答へフォールバック
+    return legacyAnswer(prompt, local);
+  }
+}
+
+// (旧テンプレート解答 — フォールバック用に保持)
+function legacyAnswer(prompt, local) {
   const t = local.telemetry;
   const pred = local.text;
   return (
@@ -478,11 +490,20 @@ function badaSystemPrompt(t) {
 
 function composeUserMessage(prompt, corpus, local) {
   const clipped = corpus.length > 24000 ? corpus.slice(0, 24000) + "\n…(以下省略)" : corpus;
+  // 資料から質問に関連する箇所を抽出して Claude に根拠として渡す
+  let evidence = "";
+  try {
+    const r = Responder.retrieve(state.files, prompt, 8);
+    if (r.hits.length)
+      evidence = `【資料中の関連箇所(自動抽出)】\n` +
+        r.hits.map(h => `- ${h.s} (${h.src})`).join("\n") + "\n\n";
+  } catch (e) {}
   return `【質問】\n${prompt || "投稿資料を要約し実装してください"}\n\n` +
+    evidence +
     (clipped ? `【投稿資料(PDF/ソースコード抽出テキスト)】\n${clipped}\n\n` : "") +
     `【ζ-Entropy エンジンの事前予知(種)】\n${local.text}\n\n` +
-    `上記の事前予知を出発点に、Bada 言語の作用素で言語生成する仕組みとして、` +
-    `明快な解説と実行可能な実装コードを提示してください。`;
+    `質問・要望に資料の内容へ根ざして答えてください。アプリや実装の要望には、` +
+    `実行可能な完全なコードを \`\`\` フェンス付きで提示してください。`;
 }
 
 // ---- レンダリング ----
@@ -571,7 +592,7 @@ function buildHtmlApp(answer) {
   const appSection = htmlBlock
     ? `<h2>▶ 生成アプリ (実行)</h2>
        <iframe id="genapp" style="width:100%;height:480px;border:1px solid #1b2740;border-radius:8px;background:#fff"></iframe>
-       <script>document.getElementById("genapp").srcdoc = ${JSON.stringify(htmlBlock.code)};<\/script>`
+       <script>document.getElementById("genapp").srcdoc = ${JSON.stringify(htmlBlock.code).replace(/<\//g, "<\\/")};<\/script>`
     : "";
   return `<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8">
