@@ -588,6 +588,54 @@ const FileIO = (() => {
     download(new Blob([text], { type: mime + ";charset=utf-8" }), filename);
   }
 
+  // ---- ZIP 生成 (無圧縮 STORE / 依存なし) ---------------------------------
+  // 複数の生成ソースコードを 1 ファイルで確実にダウンロードするために使う。
+  // (ブラウザ / WebView は 2 個目以降の自動ダウンロードをブロックするため、
+  //  複数ファイルの連続ダウンロードは不可 — ZIP 1 個にまとめる)
+  const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+  function crc32(u8) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  // files: [{name: string, data: string|Uint8Array}] → Blob(application/zip)
+  function makeZip(files) {
+    const enc = new TextEncoder();
+    const parts = [], central = [];
+    let offset = 0;
+    const u16 = v => new Uint8Array([v & 255, (v >> 8) & 255]);
+    const u32 = v => new Uint8Array([v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]);
+    for (const f of files) {
+      const nameB = enc.encode(f.name);
+      const data = typeof f.data === "string" ? enc.encode(f.data) : f.data;
+      const crc = crc32(data);
+      // local file header (method 0 = store, flag bit11 = UTF-8 name)
+      const local = [u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+                     u32(crc), u32(data.length), u32(data.length),
+                     u16(nameB.length), u16(0), nameB, data];
+      const localLen = local.reduce((a, p) => a + p.length, 0);
+      parts.push(...local);
+      central.push([u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+                    u32(crc), u32(data.length), u32(data.length),
+                    u16(nameB.length), u16(0), u16(0), u16(0), u16(0), u32(0),
+                    u32(offset), nameB]);
+      offset += localLen;
+    }
+    let cdSize = 0;
+    for (const c of central) { for (const p of c) { parts.push(p); cdSize += p.length; } }
+    parts.push(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length),
+               u32(cdSize), u32(offset), u16(0));
+    return new Blob(parts, { type: "application/zip" });
+  }
+
   // ---- 解答からソースコードを抽出 (```lang ... ``` ブロック) -------------
   const LANG_EXT = { python:"py", py:"py", javascript:"js", js:"js", typescript:"ts", ts:"ts",
     c:"c", cpp:"cpp", "c++":"cpp", csharp:"cs", cs:"cs", java:"java", ruby:"rb", go:"go",
@@ -607,7 +655,7 @@ const FileIO = (() => {
     return blocks;
   }
 
-  return { readFile, pdfToText, textToPdf, download, downloadText, extractCode, LANG_EXT };
+  return { readFile, pdfToText, textToPdf, download, downloadText, extractCode, makeZip, LANG_EXT };
 })();
 
 if (typeof module !== "undefined" && module.exports) module.exports = FileIO;

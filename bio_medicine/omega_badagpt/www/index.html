@@ -533,9 +533,20 @@ function renderAnswer(a) {
   $("#ansCard").style.display = "block";
   $("#answer").innerHTML = renderMarkdownish(a);
   const blocks = FileIO.extractCode(a);
-  $("#codeInfo").textContent = blocks.length
-    ? `検出コードブロック: ${blocks.length} 件 (${blocks.map(b=>b.lang).join(", ")})`
-    : "コードブロックは検出されませんでした(解答全文を .txt として保存できます)。";
+  const info = $("#codeInfo");
+  if (blocks.length) {
+    // ブロックごとの個別保存ボタン (各クリックが独立したユーザー操作)
+    info.innerHTML = `検出コードブロック: ${blocks.length} 件 — 個別保存: ` +
+      blocks.map((b, i) =>
+        `<button class="btn ghost" data-cb="${i}" style="font-size:11px;padding:5px 9px;margin:2px">` +
+        `block${i + 1}.${escapeHtml(b.ext)}</button>`).join("");
+    info.querySelectorAll("[data-cb]").forEach(btn => btn.onclick = () => {
+      const b = blocks[+btn.dataset.cb];
+      FileIO.downloadText(b.code, `badagpt_block${+btn.dataset.cb + 1}.${b.ext}`);
+    });
+  } else {
+    info.textContent = "コードブロックは検出されませんでした(解答全文を .txt として保存できます)。";
+  }
   $("#dlCode").disabled = false;
 }
 function renderMarkdownish(a) {
@@ -636,19 +647,23 @@ function copyCode(i){
 </body></html>`;
 }
 
+// ソースコードのダウンロード:
+// ブラウザ / WebView は 2 個目以降の自動ダウンロードをブロックするため、
+// 常に「1 クリック = 1 ダウンロード」にする。
+//   · ブロック 1 個 → そのままソースファイルとして保存
+//   · ブロック複数 → 全ブロックを 1 つの ZIP (無圧縮) にまとめて保存
+// 加えて、renderAnswer がブロックごとの個別保存ボタンを表示する
+// (それぞれ独立のユーザー操作なのでブロックされない)。
 $("#dlCode").addEventListener("click", () => {
   if (!state.answer) return;
   const blocks = FileIO.extractCode(state.answer);
-  if (!blocks.length) { FileIO.downloadText(state.answer, "BadaGPT_answer.txt"); return; }
+  if (!blocks.length) { FileIO.downloadText(state.answer, genName("txt")); return; }
   if (blocks.length === 1) {
-    FileIO.downloadText(blocks[0].code, `badagpt_generated.${blocks[0].ext}`);
+    FileIO.downloadText(blocks[0].code, genName(blocks[0].ext));
     return;
   }
-  // 複数: 連結した1ファイル + 個別も
-  let bundle = "";
-  blocks.forEach((b,i) => { bundle += `/* ===== block ${i+1} (${b.lang}) ===== */\n${b.code}\n\n`; });
-  FileIO.downloadText(bundle, "BadaGPT_generated_sources.txt");
-  blocks.forEach((b,i) => setTimeout(()=>FileIO.downloadText(b.code, `badagpt_block${i+1}.${b.ext}`), 200*(i+1)));
+  const files = blocks.map((b, i) => ({ name: `block${i + 1}.${b.ext}`, data: b.code }));
+  FileIO.download(FileIO.makeZip(files), genName("zip"));
 });
 
 // ---- utils ----
