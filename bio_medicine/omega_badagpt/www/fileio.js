@@ -528,12 +528,61 @@ const FileIO = (() => {
   }
 
   // ---- ダウンロード補助 --------------------------------------------------
-  function download(blob, filename) {
+  // 3 段構え:
+  //   1) Cordova (Android APK): WebView は <a download> を無視するため、
+  //      cordova-plugin-file でアプリの外部ストレージ領域へ直接書き込む。
+  //      保存後は "fileio-saved" イベントで保存先パスを通知する。
+  //   2) 通常ブラウザ / Electron: <a download> + blob URL。
+  //   3) それも失敗した場合: data: URI を新規タブで開く最終フォールバック。
+  function notifySaved(filename, where) {
+    try {
+      document.dispatchEvent(new CustomEvent("fileio-saved",
+        { detail: { filename, where } }));
+    } catch (e) {}
+  }
+
+  function cordovaSave(blob, filename) {
+    return new Promise((resolve, reject) => {
+      const cf = window.cordova && window.cordova.file;
+      if (!cf || !window.resolveLocalFileSystemURL) { reject(new Error("no file plugin")); return; }
+      // 優先順: 外部データ領域 (権限不要・ファイルアプリから閲覧可) → 内部データ → キャッシュ
+      const base = cf.externalDataDirectory || cf.dataDirectory || cf.cacheDirectory;
+      if (!base) { reject(new Error("no writable dir")); return; }
+      window.resolveLocalFileSystemURL(base, dir => {
+        dir.getFile(filename, { create: true, exclusive: false }, entry => {
+          entry.createWriter(writer => {
+            writer.onwriteend = () => { notifySaved(filename, entry.nativeURL || base + filename); resolve(entry); };
+            writer.onerror = reject;
+            writer.write(blob);
+          }, reject);
+        }, reject);
+      }, reject);
+    });
+  }
+
+  function anchorSave(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function dataUriFallback(blob, filename) {
+    const reader = new FileReader();
+    reader.onload = () => { try { window.open(reader.result, "_blank"); } catch (e) {} };
+    reader.readAsDataURL(blob);
+  }
+
+  function download(blob, filename) {
+    if (window.cordova) {
+      cordovaSave(blob, filename).catch(() => {
+        try { anchorSave(blob, filename); } catch (e) { dataUriFallback(blob, filename); }
+      });
+      return;
+    }
+    try { anchorSave(blob, filename); }
+    catch (e) { dataUriFallback(blob, filename); }
   }
   function downloadText(text, filename, mime = "text/plain") {
     download(new Blob([text], { type: mime + ";charset=utf-8" }), filename);

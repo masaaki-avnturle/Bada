@@ -4,8 +4,28 @@
  * PDF/ソースコード投稿 → Claude API キー入力 → 解答生成 → PDF/ソースコードでダウンロード。
  * 概念シミュレーション / 研究アート・非医療。
  */
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, session, dialog } = require("electron");
 const path = require("path");
+
+// 生成成果物 (PDF / HTML アプリ / コード / txt) のダウンロードを確実にする:
+// 保存ダイアログを必ず表示し (既定は「ダウンロード」フォルダ + 提案ファイル名)、
+// 保存完了後はフォルダ内でファイルを表示する。
+function installDownloadHandler() {
+  session.defaultSession.on("will-download", (event, item) => {
+    const target = dialog.showSaveDialogSync({
+      title: "保存先を選択",
+      defaultPath: path.join(app.getPath("downloads"), item.getFilename())
+    });
+    if (target) {
+      item.setSavePath(target);
+      item.once("done", (e, state) => {
+        if (state === "completed") { try { shell.showItemInFolder(target); } catch (err) {} }
+      });
+    } else {
+      item.cancel();
+    }
+  });
+}
 
 function indexPath() {
   return app.isPackaged
@@ -28,6 +48,6 @@ function createWindow() {
   win.loadFile(indexPath());
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => { installDownloadHandler(); createWindow(); });
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
