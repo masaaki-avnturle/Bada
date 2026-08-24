@@ -678,8 +678,9 @@ module Bada
         when "whisperen"    then insert_block(Whisper.verbalize_en(arg)[:text]); touched("ウィスパード英語挿入")
         when "burst"        then burst_reconstruct(arg)
         when "think"        then think
-        when "thinkprog"    then think_program(arg.empty? ? 8 : arg.to_i)
+        when "thinkprog"    then think_program_args(arg)
         when "kw"           then keyword_command(arg)
+        when "lang"         then set_think_lang(arg)
         when "qc"           then insert_block(qc_source(arg)); touched("QCソース挿入")
         when "verilog"      then insert_block(verilog_source(arg)); touched("半導体ソース挿入")
         else { msg: "unknown ex: :#{name}" }
@@ -696,7 +697,9 @@ module Bada
         "delete" => :delete, "削除" => :delete,
         "top" => :top, "先頭" => :top,
         "bottom" => :bottom, "末尾" => :bottom,
-        "save" => :save, "保存" => :save
+        "save" => :save, "保存" => :save,
+        "english" => :english, "英語" => :english,
+        "japanese" => :japanese, "日本語" => :japanese
       }.freeze
       # Program-writing actions the thought sampler draws from.
       THINK_ACTIONS = %i[set assign push print].freeze
@@ -718,6 +721,19 @@ module Bada
         apply_think(act, think_seed(nonce))
       end
 
+      # Parse ":thinkprog [steps] [en|ja]" arguments (順不同).
+      def think_program_args(arg)
+        steps = 8
+        arg.to_s.split(/\s+/).each do |tok|
+          if tok =~ /\A\d+\z/
+            steps = tok.to_i
+          elsif !tok.empty?
+            set_think_lang(tok)
+          end
+        end
+        think_program(steps)
+      end
+
       # 思考プログラミング: write a COMPLETE, grammar-verified Bada program by
       # thought-only commands operating this vim editor (no voice, no typing).
       def think_program(steps = 8)
@@ -736,10 +752,10 @@ module Bada
         @saved = true
         @filename = "thought.bada"
         ok = BadaSyntax.valid?(text)
-        { msg: format("思考プログラミング %d手 [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
-                      steps, kws.join(" "), ok ? "✓" : "✗",
+        { msg: format("思考プログラミング %d手 lang=%s [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
+                      steps, think_lang, kws.join(" "), ok ? "✓" : "✗",
                       prec * 100, SILENT_TALK_BASELINE * 100),
-          keywords: kws, valid: ok, precision: prec }
+          keywords: kws, lang: think_lang, valid: ok, precision: prec }
       end
 
       private
@@ -763,7 +779,30 @@ module Bada
 
       # Apply one thought/keyword command. Statement inserts append at the end of
       # the program; motions/edits act like normal vim commands.
+      # Thought-programming language mode (使い分け): reserved words are ALWAYS
+      # exact English (set/print/push/as/Omega::); the mode only decides the
+      # print-related string literals — :en = exact English words drawn straight
+      # from the English vocabulary (no reconstruction, 正確な英語), :ja = 日本語.
+      def think_lang
+        @think_lang ||= :en
+      end
+
+      def set_think_lang(arg)
+        case arg.to_s.strip.downcase
+        when "en", "english", "英語"
+          @think_lang = :en
+          { msg: "lang=en（英語モード: 予約語も文字列も正確な英語）", lang: :en }
+        when "ja", "japanese", "日本語"
+          @think_lang = :ja
+          { msg: "lang=ja（日本語モード: print文関係の文字列は日本語・予約語は英語）", lang: :ja }
+        else
+          { msg: "unknown lang: #{arg}（en / ja）" }
+        end
+      end
+
       def apply_think(act, s)
+        return set_think_lang("en").merge(keyword: "english", command: ":lang en", precision: 0.96) if act == :english
+        return set_think_lang("ja").merge(keyword: "japanese", command: ":lang ja", precision: 0.96) if act == :japanese
         p = 0.93 + ((s >> 7) % 60) / 1000.0
         vars = think_vars
         act = :set if vars.empty? && %i[assign push print].include?(act)
@@ -774,8 +813,16 @@ module Bada
             "oset #{v} = #{format('%.1f', ((s >> 3) % 90 + 10) / 10.0)}"
           when :assign
             v = vars[(s >> 13) % vars.length]
-            w1 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 11) % SilentTalk::EN_THOUGHT_VOCAB.length]
-            w2 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 17) % SilentTalk::EN_THOUGHT_VOCAB.length]
+            if think_lang == :ja
+              # print文関係の文字列だけ日本語（予約語・演算子は英語のまま）
+              w1 = Mind::LEXICON[(s >> 11) % Mind::LEXICON.length]
+              w2 = Mind::LEXICON[(s >> 17) % Mind::LEXICON.length]
+            else
+              # 正確な英語: exact words straight from the English vocabulary
+              w1 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 11) % SilentTalk::EN_THOUGHT_VOCAB.length]
+              w2 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 17) % SilentTalk::EN_THOUGHT_VOCAB.length]
+              p = [p, 0.96].max # exact-vocabulary English needs no reconstruction
+            end
             "o#{v} <- \"#{w1} #{w2}\""
           when :push
             "oOmega::push #{vars[(s >> 13) % vars.length]} as node#{(s >> 9) % 9 + 1}"

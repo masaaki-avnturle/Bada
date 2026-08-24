@@ -90,9 +90,10 @@ public final class Vim {
             case "whisperen": insertBlock(Whisper.verbalizeEn(arg).text); return touched("ウィスパード英語挿入");
             case "burst": return burstReconstruct(arg);
             case "think": { Think t = think(); return new R(t.msg, false); }
-            case "thinkprog": return thinkProgram(arg.isEmpty() ? 8 : parseIntOr(arg, 8));
+            case "thinkprog": return thinkProgramArgs(arg);
             case "kw": { Think t = keywordCommand(arg);
                 return new R(t == null ? "unknown keyword: " + arg : t.msg, false); }
+            case "lang": return setThinkLang(arg);
             case "qc": insertBlock(qcSource(arg)); return touched("QCソース挿入");
             case "verilog": insertBlock(verilogSource(arg)); return touched("半導体ソース挿入");
             default: return new R("unknown ex: :" + name, false);
@@ -146,7 +147,33 @@ public final class Vim {
             case "top": case "先頭": return "top";
             case "bottom": case "末尾": return "bottom";
             case "save": case "保存": return "save";
+            case "english": case "英語": return "english";
+            case "japanese": case "日本語": return "japanese";
             default: return null;
+        }
+    }
+
+    /**
+     * Thought-programming language mode (使い分け): reserved words are ALWAYS
+     * exact English (set/print/push/as/Omega::); the mode only decides the
+     * print-related string literals — "en" = exact English words drawn straight
+     * from the English vocabulary (正確な英語), "ja" = 日本語.
+     */
+    private String thinkLang = "en";
+
+    public String thinkLang() { return thinkLang; }
+
+    public R setThinkLang(String arg) {
+        String a = arg == null ? "" : arg.strip().toLowerCase();
+        switch (a) {
+            case "en": case "english": case "英語":
+                thinkLang = "en";
+                return new R("lang=en（英語モード: 予約語も文字列も正確な英語）", false);
+            case "ja": case "japanese": case "日本語":
+                thinkLang = "ja";
+                return new R("lang=ja（日本語モード: print文関係の文字列は日本語・予約語は英語）", false);
+            default:
+                return new R("unknown lang: " + arg + "（en / ja）", false);
         }
     }
 
@@ -173,6 +200,16 @@ public final class Vim {
         return applyThink(act, thinkSeed(nonce));
     }
 
+    /** Parse ":thinkprog [steps] [en|ja]" arguments (順不同). */
+    public R thinkProgramArgs(String arg) {
+        int steps = 8;
+        for (String tok : (arg == null ? "" : arg).split("\\s+")) {
+            if (tok.matches("\\d+")) steps = Integer.parseInt(tok);
+            else if (!tok.isEmpty()) setThinkLang(tok);
+        }
+        return thinkProgram(steps);
+    }
+
     /**
      * 思考プログラミング: write a COMPLETE, grammar-verified Bada program by
      * thought-only commands operating this vim editor (no voice, no typing).
@@ -192,8 +229,8 @@ public final class Vim {
         saved = true;
         filename = "thought.bada";
         boolean ok = BadaSyntax.valid(text());
-        return new R(String.format("思考プログラミング %d手 [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
-                steps, kws, ok ? "✓" : "✗", prec * 100, SilentTalk.SILENT_TALK_BASELINE * 100), false);
+        return new R(String.format("思考プログラミング %d手 lang=%s [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
+                steps, thinkLang, kws, ok ? "✓" : "✗", prec * 100, SilentTalk.SILENT_TALK_BASELINE * 100), false);
     }
 
     private static long thinkSeed(int nonce) {
@@ -214,6 +251,8 @@ public final class Vim {
 
     /** Apply one thought/keyword command (statement inserts append at the end). */
     private Think applyThink(String act, long s) {
+        if (act.equals("english")) { R r = setThinkLang("en"); return new Think(r.msg, "english", ":lang en", 0.96); }
+        if (act.equals("japanese")) { R r = setThinkLang("ja"); return new Think(r.msg, "japanese", ":lang ja", 0.96); }
         double p = 0.93 + ((s >> 7) % 60) / 1000.0;
         List<String> vars = thinkVars();
         if (vars.isEmpty() && (act.equals("assign") || act.equals("push") || act.equals("print"))) act = "set";
@@ -225,8 +264,18 @@ public final class Vim {
                 break;
             case "assign": {
                 String v = vars.get((int) ((s >> 13) % vars.size()));
-                String w1 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 11) % SilentTalk.EN_THOUGHT_VOCAB.length)];
-                String w2 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 17) % SilentTalk.EN_THOUGHT_VOCAB.length)];
+                String w1, w2;
+                if ("ja".equals(thinkLang)) {
+                    // print文関係の文字列だけ日本語（予約語・演算子は英語のまま）
+                    List<String> lex = bada.mind.MindReader.lexicon();
+                    w1 = lex.get((int) ((s >> 11) % lex.size()));
+                    w2 = lex.get((int) ((s >> 17) % lex.size()));
+                } else {
+                    // 正確な英語: exact words straight from the English vocabulary
+                    w1 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 11) % SilentTalk.EN_THOUGHT_VOCAB.length)];
+                    w2 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 17) % SilentTalk.EN_THOUGHT_VOCAB.length)];
+                    p = Math.max(p, 0.96); // exact-vocabulary English needs no reconstruction
+                }
                 cmd = "o" + v + " <- \"" + w1 + " " + w2 + "\"";
                 break;
             }

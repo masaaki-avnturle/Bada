@@ -518,6 +518,10 @@ Bada Vim を、**思っただけのコマンド**（発声もタイプもせず�
 プログラム**を書き上げます（変数の set → `<-` 束縛 → `Omega::push` → `print` の完全なライフサイクル）。
 **キーワードのコマンド入力機能** `:kw <キーワード>` は、`set/print/push/assign/delete/top/bottom/save`
 （日本語: 代入/表示/送出/束縛/削除/先頭/末尾/保存）のキーワードを vim コマンドへ写像します。
+**英語モード／日本語の使い分け**（`:lang en|ja`・`:kw english/英語`・`:kw japanese/日本語`・
+`:thinkprog 8 ja`）：**予約語（set/print/push/as/Omega::）は常に正確な英語**、**日本語は print文関係の
+文字列リテラルにだけ**使われます。`en` モードの文字列は `EN_THOUGHT_VOCAB` から**直接引いた正確な英語**
+（復元を経ないため precision 0.96 以上に底上げ）です。
 量子シード決定的（Ruby/Java でバッファがバイト一致）。デスクトップ ⑧ Bada Vim タブの
 **🧠 思考コマンド／🧠 思考プログラミング (Bada)／キーワードボタン**、Android ⑧ モード、
 CLI `bada vim` から使えます。

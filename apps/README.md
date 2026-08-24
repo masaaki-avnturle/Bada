@@ -52,7 +52,10 @@ vim を操作できます。**「🧠 思考コマンド」**は思考からコ�
 プログラム**を vim に書き上げます（`:thinkprog [n]`・set/束縛/Omega::push/print の完全なプログラム）。
 さらに**キーワードのコマンド入力機能**（`:kw <キーワード>`／キーワードボタン）を備え、
 `set/print/push/assign/delete/top/bottom/save`（日本語: 代入/表示/送出/束縛/削除/先頭/末尾/保存）を
-発声せずコマンドへ写像します。共有 Java コア `Vim.think/keywordCommand/thinkProgram`（Ruby/Java
+発声せずコマンドへ写像します。**英語モードと日本語の使い分け**（`:lang en/ja`・`:kw english/日本語`・
+lang セレクタ）：**予約語（set/print/push/as/Omega::）は常に正確な英語**のまま、**日本語は print文
+関係の文字列リテラルにだけ**現れます。`en` モードでは文字列も**英語語彙から直接引いた正確な英語**
+（復元不要・precision 0.96 以上）です。共有 Java コア `Vim.think/keywordCommand/thinkProgram`（Ruby/Java
 バイト一致・量子シード決定的）。Android ⑧ Bada Vim モードと CLI `bada vim` でも `:think`
 `:thinkprog` `:kw` が使えます。
 

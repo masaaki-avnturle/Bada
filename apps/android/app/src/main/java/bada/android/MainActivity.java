@@ -57,7 +57,7 @@ public class MainActivity extends Activity {
     private static final String AGI_DEMO = "量子もつれとは何ですか";
     // '|'-separated vi/ex commands driven through the embedded Bada Vim editor.
     private static final String VIM_DEMO =
-            ":thinkprog 6 | :think | :kw print | :kw 保存 "
+            ":thinkprog 6 en | :lang ja | :think | :kw print | :kw 保存 "
             + "| :whisperen qntm lght wv mmry sgnl "
             + "| :burst qntm lght wv;mmry sgnl fld;bll ntngl stt "
             + "| :verilog semiconductor lattice qubit gate | :qc entangle bell measure "

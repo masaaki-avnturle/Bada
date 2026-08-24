@@ -693,6 +693,40 @@ class TestSilentTalkSession < Minitest::Test
     assert_equal v.text, v2.text
   end
 
+  def test_vim_thinkprog_en_mode_is_exact_english_only
+    # 英語モード: 予約語も文字列も正確な英語（日本語を含まない）
+    v = Bada::SilentTalk::Vim.new
+    r = v.feed(":thinkprog 8 en")
+    assert_includes r[:msg], "lang=en"
+    refute_match(/[ぁ-んァ-ヶ一-鿿]/, v.text)
+    v.text.scan(/"([^"]+)"/).flatten.each do |lit|
+      lit.split.each { |w| assert_includes Bada::SilentTalk::EN_THOUGHT_VOCAB, w }
+    end
+    assert Bada::SilentTalk::BadaSyntax.valid?(v.text)
+  end
+
+  def test_vim_thinkprog_ja_mode_japanese_only_in_print_literals
+    # 日本語モード: print文関係の文字列だけ日本語・予約語は英語のまま
+    v = Bada::SilentTalk::Vim.new
+    v.feed(":lang ja")
+    r = v.feed(":thinkprog 8")
+    assert_includes r[:msg], "lang=ja"
+    assert_match(/"[^"]*[ぁ-んァ-ヶ一-鿿][^"]*"/, v.text)   # Japanese inside literals
+    v.text.each_line do |l|
+      stripped = l.gsub(/"[^"]*"/, "").strip                 # outside literals: English only
+      refute_match(/[ぁ-んァ-ヶ一-鿿]/, stripped, "reserved words must stay English: #{l}")
+    end
+    assert Bada::SilentTalk::BadaSyntax.valid?(v.text)
+  end
+
+  def test_vim_lang_keywords_switch_modes
+    v = Bada::SilentTalk::Vim.new
+    assert_includes v.feed(":kw 日本語")[:msg], "lang=ja"
+    assert_includes v.feed(":kw english")[:msg], "lang=en"
+    assert_includes v.feed(":lang ja")[:msg], "lang=ja"
+    assert_includes v.feed(":lang nope")[:msg], "unknown lang"
+  end
+
   def test_vim_ex_qc_and_verilog_generate_source
     v = Bada::SilentTalk::Vim.new
     v.feed(":qc entangle bell measure")

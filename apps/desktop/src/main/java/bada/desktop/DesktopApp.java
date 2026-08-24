@@ -743,10 +743,14 @@ public final class DesktopApp {
 
         // 思っただけのコマンド操作: route thought/keyword commands through the core
         // Vim engine (built from the on-screen buffer), then write the result back.
+        // 使い分け: en=予約語も文字列も正確な英語 / ja=print文関係の文字列だけ日本語。
         final int[] thinkN = { 0 };
+        final JComboBox<String> thinkLangBox = new JComboBox<>(new String[]{"en", "ja"});
+        thinkLangBox.setToolTipText("思考プログラミングの言語モード: en=正確な英語のみ / ja=print文関係の文字列は日本語（予約語は英語）");
         final java.util.function.Consumer<String> runThinkCmd = (cmd) -> {
             try {
                 Vim v = new Vim(editor.getText());
+                v.ex("lang " + thinkLangBox.getSelectedItem());
                 String msg;
                 if (cmd.startsWith("thinkprog")) {
                     msg = v.ex(cmd).msg;
@@ -931,6 +935,7 @@ public final class DesktopApp {
         // 思っただけのコマンド操作＋キーワードのコマンド入力 (voiceless, no typing)
         final JPanel thinkRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
         thinkRow.add(new JLabel("思考コマンド:"));
+        thinkRow.add(new JLabel("lang")); thinkRow.add(thinkLangBox);
         JButton bTc = new JButton("🧠 思考コマンド");
         bTc.setToolTipText("思っただけのコマンドを1手捕捉して、この vim に適用します（発声・打鍵なし・silent-talk 超え精度）");
         bTc.setFocusable(false);
@@ -951,7 +956,7 @@ public final class DesktopApp {
             thinkRow.add(b);
         }
 
-        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入(複数行を一辺に)・Esc ノーマル/一括復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:think 思考コマンド :thinkprog 思考プログラミング :kw キーワード :burst :whisperen :math :bada :qc :verilog :latex :set ft= :w :q）");
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入(複数行を一辺に)・Esc ノーマル/一括復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:think 思考コマンド :thinkprog 思考プログラミング :kw キーワード :lang en/ja 使い分け :burst :whisperen :math :bada :qc :verilog :latex :set ft= :w :q）");
         help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
         topBar.add(new JLabel("filetype:")); topBar.add(ftBox);
