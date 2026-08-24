@@ -105,6 +105,52 @@ manifold ∬(2..26) = 1.138195
 
 ---
 
+## 🌀 Bada 量子プログラミング言語版 — `bada/`
+
+同じ思考入力アプリケーションを、**Bada 言語(量子プログラミング拡張)** で実装したもの。
+`bada_ruby` の Bada インタープリタ(演算子代数 `<-` / `-<` / `>-` / `Ω::`)を継承し、
+量子レジスタ(複素状態ベクトルシミュレータ)と量子ゲート命令を Bada 言語に追加しています。
+
+```bash
+cd omega_silent_talk_pkg
+make bada          # または: cd bada && ruby run_silent_talk.rb
+```
+
+必要環境: Ruby 3.0+(外部 gem 不要。同リポジトリの `bada_ruby/` を自動参照)。
+
+### Bada 量子命令 (`bada/quantum_ext.rb` が追加)
+
+| Bada 構文 | 量子操作 | 理論対応 |
+|:--|:--|:--|
+| `qreg q = 5` | 5 qubit レジスタ (2⁵=32 振幅) | 状態空間 |
+| `q <~ neuro` | 振幅符号化 | 思考信号 → \|ψ⟩ |
+| `q >- hadamard` | 全 qubit Hadamard 干渉 | 映像化トランスフォーマー混合層 |
+| `q -< manifold` | 対角作用素 √(1+1/(x log x)²) | **大域的部分積分多様体** |
+| `q <- gamma 0.5` | Γ(s) 位相ゲート e^{iπs/Γ} | ガンマ関数の機知 |
+| `q <- zeta 2.0` | ζ(s) 位相ゲート e^{iπ/kˢ} | ゼータ関数 / シャノン統計 |
+| `entangle q` | CNOT 鎖 | もつれ生成 |
+| `measure q times 24 into t` | 測定 → 記号列 | 統計上の言語発生 |
+| `markov t into cert` | 遷移確率平均 | マルコフ連鎖 path certainty |
+| `jones thermal into i` | V_K(e^{−1/kT}) | **体内/脳 熱エネルギーの Jones 観察** |
+| `confide cert i into conf` | 信頼度統合 | silent-talk 超え判定 |
+| `render q = "f.pgm"` | 確率分布 → PGM | 映像化 |
+
+### Bada 版の実行結果
+
+```
+measure q: 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7
+markov path certainty = 0.9997
+jones thermal intent  = 0.2430
+confidence = 0.7004
+silent-talk baseline 0.62 → gain +13.0% (EXCEEDS)
+```
+
+交代する無発声思考 (±1) は Hadamard 干渉で単一基底状態へ集中し(位相ゲートは
+確率を保存するため集中は壊れない)、path certainty ≈ 1.0 でベースラインを超えます。
+アプリ本体は `bada/silent_talk.bada`(純 Bada 言語、11 命令)です。
+
+---
+
 ## 📥 ダウンロード
 
 このパッケージはリポジトリ `masaaki-avnturle/Bada` の

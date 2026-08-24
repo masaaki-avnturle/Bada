@@ -1,0 +1,59 @@
+# ============================================================================
+# silent_talk.bada — 思考入力アプリケーション (Bada 量子プログラミング言語版)
+#
+# ガンマ関数における大域的部分積分多様体の機知を利用した AGI 思考入力。
+# 発声せずに思考信号を量子状態へ符号化し、多様体作用素・Γ/ζ 位相ゲート・
+# 量子干渉を通して測定し、思考記号列として復号する。
+# 体内/脳の熱エネルギーは Jones 多項式 V_K(e^{-1/kT}) で観察する。
+#
+# 実行:  ruby run_silent_talk.rb          (このフォルダで)
+# ============================================================================
+
+# --- 入力: 無発声の思考信号と体内/脳 熱エネルギー時系列 -------------------
+load neuro   = "../examples/thought_signal.txt"
+load thermal = "../examples/thermal_signal.txt"
+
+# --- 量子レジスタ: 5 qubit = 32 振幅 ---------------------------------------
+qreg q = 5
+
+# (A) 振幅符号化 — 思考信号を量子状態 |ψ⟩ へ
+q <~ neuro
+
+# (B) 量子干渉 (映像化トランスフォーマーの混合層) —
+#     交代する無発声思考 (±1) は Hadamard 干渉で少数の基底状態に集中する
+q >- hadamard
+
+# (C) 大域的部分積分多様体 対角作用素  ∬ 1/(x log x)^2 dx_m
+q -< manifold
+
+# (D) Γ(s) 位相ゲート — ガンマ関数の機知 (部分積分アトラスの位相)
+q <- gamma 0.5
+
+# (E) ζ(s) 位相ゲート — ゼータ関数のシャノン統計位相
+#     (位相ゲートは確率を保存し、干渉で得た集中を壊さない)
+q <- zeta 2.0
+
+# (E') もつれ生成 — CNOT 鎖 (基底の置換)
+entangle q
+
+# (F) 測定 — 思考記号列の発生 (統計上の言語発生)
+measure q times 24 into thought
+
+# (G) マルコフ連鎖 path certainty — 言語発生の一貫性
+markov thought into cert
+
+# (H) Jones 多項式 — 体内/脳 熱エネルギーの意図性観察
+jones thermal into intent
+
+# (I) 信頼度統合 → silent-talk ベースライン (0.62) と比較
+confide cert intent into conf
+gain conf
+
+# (J) 確率分布を映像化 (PGM フレーム)
+render q = "../generated/bada_thought_frame.pgm"
+
+# (K) 従来の Bada 演算子代数で結果をアカシックへ記録
+conf -< 2.0
+conf >- conf
+Omega::push conf as silent_talk_confidence
+print conf

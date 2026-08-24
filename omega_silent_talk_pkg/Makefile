@@ -5,7 +5,7 @@ SRC     = lib/gamma_manifold.c lib/zeta_shannon.c lib/markov_morpho.c \
           lib/jones_thermal.c lib/transformer.c lib/silent_decode.c
 BIN     = bin/silent_talk
 
-.PHONY: all demo frame clean pyviz
+.PHONY: all demo frame clean pyviz bada
 
 all: $(BIN)
 
@@ -23,6 +23,9 @@ frame: $(BIN)
 
 pyviz: $(BIN)
 	python3 usr/pipeline.py
+
+bada:
+	ruby bada/run_silent_talk.rb
 
 clean:
 	@echo "Cleaning..."
