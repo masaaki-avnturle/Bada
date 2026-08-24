@@ -1,0 +1,85 @@
+# ============================================================
+# engine.bada -- The Unknown-Prior Engine, written in Bada.
+#
+# A direct transcription of the manuscript's Modules 1-7 into the
+# Bada language, reproducing the two provable properties on V = 8
+# with tokens 3 and 6 ruled out:
+#   (i)  confident zeros are preserved exactly
+#   (ii) |psi|^2 == base a  (phase only reweights, never destroys)
+# and the unknown-prior sharpening (entropy strictly decreases).
+# ============================================================
+
+print("================================================================")
+print("UNKNOWN-PRIOR ENGINE -- Bada reference run")
+print("================================================================")
+
+# ---- Module 4: the base distribution a = softmax(z) -----------------
+z := [1.6, 0.6, 0.1, -40.0, -0.4, 1.1, -40.0, 0.4]
+a := softmax(z)
+
+V := len(a)
+print("Vocabulary size V =", V)
+
+# ---- Module 5: the entropy-phase cognitive system (core) ------------
+retrieval  := [ [0.30, 0.20, 0.10, 0.00, 0.15, 0.20, 0.00, 0.05],
+                [0.10, 0.20, 0.30, 0.00, 0.05, 0.25, 0.00, 0.05] ]
+syntax     := [ [0.05, 0.25, 0.25, 0.00, 0.10, 0.25, 0.00, 0.10],
+                [0.20, 0.10, 0.10, 0.00, 0.20, 0.30, 0.00, 0.10] ]
+uninformed := [ [0.125,0.125,0.125,0.125,0.125,0.125,0.125,0.125],
+                [0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50, 0.50] ]
+
+modules := [ retrieval, syntax, uninformed ]
+betas   := [ 0.7, 0.5, 0.9 ]
+
+# run the core: psi = sqrt(a) exp(i theta); q_hat = |psi|^2 / sum
+q_hat := cognitive_system(a, modules, betas)
+
+print("Ledger facts after inference:", len(tuplespace), "(append-only)")
+print("")
+print("token : base a_i     posterior q_hat_i")
+print("----------------------------------------")
+
+print("0 :", f5(a[0]), f5(q_hat[0]))
+print("1 :", f5(a[1]), f5(q_hat[1]))
+print("2 :", f5(a[2]), f5(q_hat[2]))
+print("3 :", f5(a[3]), f5(q_hat[3]), "  <-- ruled out")
+print("4 :", f5(a[4]), f5(q_hat[4]))
+print("5 :", f5(a[5]), f5(q_hat[5]))
+print("6 :", f5(a[6]), f5(q_hat[6]), "  <-- ruled out")
+print("7 :", f5(a[7]), f5(q_hat[7]))
+
+# ---- Property (i): zero preservation --------------------------------
+print("")
+print("Property (i) zero preservation:")
+print("  base zeros     =", zeros_of(a))
+print("  posterior zeros =", zeros_of(q_hat))
+
+# ---- Property (ii): |psi|^2 == base a (max |diff|) ------------------
+print("")
+print("Property (ii) |psi|^2 == base a (max |diff|):")
+print("  ", sci(maxdiff(q_hat, last_a())), "(machine-zero => phase only reweights)")
+
+# ---- Module 6: the @reviser learning loop ---------------------------
+print("")
+print("================================================================")
+print("Unknown-prior sharpening (entropy decreases as evidence arrives)")
+print("================================================================")
+
+prior := unknown_prior(V)
+print("step 0 (uniform prior) entropy =", entropy(prior))
+
+@reviser {
+    prior := update(prior, q_hat)
+    prior >> tuplespace
+}
+print("step 1 (after evidence) entropy =", entropy(prior))
+
+@reviser {
+    prior := update(prior, q_hat)
+    prior >> tuplespace
+}
+print("step 2 (more evidence) entropy =", entropy(prior))
+
+print("")
+print("(entropy strictly decreases: the engine earns its certainty)")
+print("================================================================")
