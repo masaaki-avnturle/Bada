@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="dark" />
+<title>BadaGPT — ζ-Entropy 未知事前予知エンジン</title>
+<style>
+  :root{
+    --bg:#04060a; --panel:#0a0f18; --panel2:#0d1420; --edge:#1b2740;
+    --gold:#c8a44a; --cyan:#40b8c0; --blue:#4a80d0; --violet:#9060d0;
+    --txt:#e8eef8; --dim:#8ea0bc; --ok:#4ad08a; --err:#e06a6a;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;
+    -webkit-text-size-adjust:100%;}
+  a{color:var(--cyan)}
+  .wrap{max-width:920px;margin:0 auto;padding:16px 16px 60px;}
+  header{display:flex;align-items:center;gap:12px;padding:14px 0 10px;border-bottom:1px solid var(--edge);}
+  .logo{width:44px;height:44px;border-radius:12px;flex:0 0 auto;
+    background:radial-gradient(120% 120% at 30% 20%,var(--gold),#7a5f1e 60%,#241a05);
+    display:grid;place-items:center;font-weight:800;color:#04060a;font-size:20px;
+    box-shadow:0 0 22px rgba(200,164,74,.35)}
+  h1{font-size:18px;margin:0;letter-spacing:.3px}
+  h1 small{display:block;font-size:11px;color:var(--dim);font-weight:500;letter-spacing:.2px;margin-top:2px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--edge);
+    border-radius:14px;padding:14px;margin-top:14px}
+  .card h2{font-size:13px;margin:0 0 10px;color:var(--gold);letter-spacing:.4px;
+    text-transform:uppercase;display:flex;align-items:center;gap:8px}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+  input[type=text],input[type=password],textarea,select{width:100%;background:#05080e;
+    border:1px solid var(--edge);border-radius:9px;color:var(--txt);padding:10px 11px;
+    font-size:14px;font-family:inherit;outline:none}
+  input:focus,textarea:focus,select:focus{border-color:var(--cyan);box-shadow:0 0 0 2px rgba(64,184,192,.18)}
+  textarea{resize:vertical;min-height:80px;font-family:var(--mono);font-size:13px;line-height:1.5}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:120px}
+  .btn{appearance:none;border:none;border-radius:10px;padding:11px 16px;font-size:14px;
+    font-weight:700;cursor:pointer;letter-spacing:.3px;transition:.15s;color:#04060a}
+  .btn.primary{background:linear-gradient(90deg,var(--gold),#e0c56a)}
+  .btn.blue{background:linear-gradient(90deg,var(--blue),#6a9ce0);color:#04060a}
+  .btn.ghost{background:transparent;color:var(--dim);border:1px solid var(--edge)}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn:active{transform:translateY(1px)}
+  .drop{border:1.5px dashed #2a3a5c;border-radius:12px;padding:18px;text-align:center;
+    color:var(--dim);font-size:13px;cursor:pointer;transition:.15s;background:#05080e}
+  .drop.hot{border-color:var(--cyan);background:rgba(64,184,192,.06);color:var(--txt)}
+  .files{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+  .fchip{display:flex;align-items:center;gap:8px;background:#05080e;border:1px solid var(--edge);
+    border-radius:8px;padding:7px 10px;font-size:12px}
+  .fchip .k{font-size:10px;padding:1px 6px;border-radius:5px;background:#132038;color:var(--cyan);text-transform:uppercase}
+  .fchip .rm{margin-left:auto;color:var(--err);cursor:pointer;font-weight:700;padding:0 4px}
+  .fchip .sz{color:var(--dim)}
+  .tele{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:10px}
+  .kv{background:#05080e;border:1px solid var(--edge);border-radius:9px;padding:8px 10px}
+  .kv .k{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.3px}
+  .kv .v{font-size:15px;font-weight:700;font-family:var(--mono);color:var(--cyan);margin-top:2px;word-break:break-all}
+  .answer{white-space:pre-wrap;font-size:14px;line-height:1.65;background:#05080e;
+    border:1px solid var(--edge);border-radius:10px;padding:14px;min-height:60px;margin-top:6px}
+  .answer code,.answer pre{font-family:var(--mono);font-size:12.5px}
+  .muted{color:var(--dim);font-size:12px}
+  .note{font-size:11px;color:var(--dim);line-height:1.5;margin-top:8px}
+  .badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;border:1px solid var(--edge);color:var(--dim)}
+  .status{font-size:12px;margin-top:8px;min-height:16px}
+  .status.err{color:var(--err)} .status.ok{color:var(--ok)} .status.run{color:var(--gold)}
+  .seg{display:flex;background:#05080e;border:1px solid var(--edge);border-radius:9px;overflow:hidden}
+  .seg button{flex:1;background:transparent;border:none;color:var(--dim);padding:9px;font-size:12px;
+    font-weight:600;cursor:pointer}
+  .seg button.on{background:#132038;color:var(--txt)}
+  .foot{margin-top:22px;text-align:center;font-size:11px;color:var(--dim);line-height:1.6}
+  details{margin-top:8px} summary{cursor:pointer;font-size:12px;color:var(--gold)}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid rgba(200,164,74,.3);
+    border-top-color:var(--gold);border-radius:50%;animation:sp .7s linear infinite;vertical-align:-1px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .dlrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .dlrow .btn{flex:0 1 auto;font-size:12px;padding:9px 12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo">β</div>
+    <div>
+      <h1>BadaGPT
+        <small>ζ-Entropy 未知事前予知エンジン · Bada v3 作用素環 · 山口フレームワーク</small>
+      </h1>
+    </div>
+  </header>
+
+  <!-- 0. 思考入力 (Silent-Talk 超え) -->
+  <div class="card">
+    <h2>⓪ 思考入力 <span class="badge">Silent-Talk 超え · Γ多様体 + Bada 5-qubit</span></h2>
+    <label>思考する意図を選んで「思考をキャプチャ」(発声不要)</label>
+    <div class="row">
+      <select id="stIntent" style="flex:2"></select>
+      <button id="stCapture" class="btn primary" style="flex:0 0 auto">🧠 思考をキャプチャ</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <div class="seg" id="stMode" style="flex:2">
+        <button data-m="focus" class="on">集中した思考</button>
+        <button data-m="wander">散漫</button>
+        <button data-m="noise">雑念</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;flex:0 0 auto;margin:0">
+        <input type="checkbox" id="stQuantum" checked> 量子モード
+      </label>
+    </div>
+    <div class="tele" id="stTele" style="display:none"></div>
+    <div id="stStatus" class="status"></div>
+    <div class="note">Γ関数の大域的部分積分多様体 ∬1/(x·log x)²dx で重み付けした思考信号を、
+      Bada 5-qubit 量子デコード(Hadamard 干渉 + Γ/ζ 位相ゲート)またはマルコフ greedy 復号で
+      記号列化し、Jones 多項式 V_K(e^{−1/kT}) で体内/脳の熱意図性を観察。信頼度が
+      silent-talk 基準 0.62 を超えたときのみ質問欄へ入力されます。
+      ⚠ 概念シミュレーション(合成信号・非医療・非読心)。</div>
+  </div>
+
+  <!-- 1. 入力ファイル -->
+  <div class="card">
+    <h2>① 資料を投稿 <span class="badge">PDF / ソースコード / テキスト</span></h2>
+    <div id="drop" class="drop">
+      📄 ここに <b>PDF・ソースコード・テキスト</b> をドロップ、またはタップして選択<br>
+      <span class="muted">.pdf .txt .md .py .js .c .cpp .java .go .rs .html … (複数可)</span>
+      <input id="file" type="file" multiple accept=".pdf,.txt,.md,.markdown,.js,.ts,.jsx,.tsx,.py,.c,.h,.cpp,.hpp,.cc,.cs,.java,.rb,.go,.rs,.php,.swift,.kt,.scala,.sh,.lua,.r,.sql,.html,.htm,.css,.json,.yaml,.yml,.xml,.csv,.tex,.bada" style="display:none">
+    </div>
+    <div id="files" class="files"></div>
+  </div>
+
+  <!-- 2. 質問 + Claude APIキー -->
+  <div class="card">
+    <h2>② 質問と生成モード</h2>
+    <label>質問 / プロンプト</label>
+    <textarea id="prompt" placeholder="例: この論文のゼータ・エントロピー機構を要約し、Python で実装して。">投稿資料の核心を要約し、ゼータ関数のエントロピーから言語を生成する仕組みを説明し、実装コードを提示してください。</textarea>
+
+    <label style="margin-top:12px">生成エンジン</label>
+    <div class="seg" id="mode">
+      <button data-mode="local" class="on">ζ-Entropy ローカル (オフライン)</button>
+      <button data-mode="claude">Claude API + ζ-Entropy</button>
+    </div>
+
+    <div id="apiBox" style="display:none">
+      <label style="margin-top:12px">Claude API キー <span class="muted">(端末内のみ保存・Anthropicへのみ送信)</span></label>
+      <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
+      <div class="row" style="margin-top:8px">
+        <div style="flex:2">
+          <label>モデル (編集可)</label>
+          <input id="model" type="text" value="claude-sonnet-4-5">
+        </div>
+        <div>
+          <label>最大トークン</label>
+          <input id="maxTok" type="text" value="2048">
+        </div>
+      </div>
+      <div class="note">🔑 APIキーはこの端末の localStorage にのみ保存されます。サーバへは送りません。
+        モデル名はご自身のアカウントで利用可能な ID に編集してください。</div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="gen" class="btn primary">⚡ 解答を生成</button>
+      <button id="clear" class="btn ghost" style="flex:0 0 auto">クリア</button>
+    </div>
+    <div id="status" class="status"></div>
+  </div>
+
+  <!-- 3. ζテレメトリ -->
+  <div class="card" id="teleCard" style="display:none">
+    <h2>③ ζ-Entropy テレメトリ <span class="badge">ζ(s)=β(p,q)/log x</span></h2>
+    <div id="tele" class="tele"></div>
+    <details>
+      <summary>エンジン原理 (数式)</summary>
+      <div class="note">
+        ゼータ分布 P(n)=n<sup>−s</sup>/ζ(s) のシャノンエントロピー
+        <b>H(s)=s·(−ζ′(s)/ζ(s))+log ζ(s)</b> を温度 τ に写像し、
+        π-softmax(非可換 π(χ,x) 作用素)で投稿コーパスから次トークンを事前予知します。
+        語の a-priori 重みには Bada 中核演算子 β(p,q)/log x を用います。
+        γ=0.5772156649…(オイラー・マスケローニ定数)。
+      </div>
+    </details>
+  </div>
+
+  <!-- 4. 解答 + ダウンロード -->
+  <div class="card" id="ansCard" style="display:none">
+    <h2>④ 生成解答</h2>
+    <div id="answer" class="answer"></div>
+    <label style="margin-top:12px">ダウンロード</label>
+    <div class="dlrow">
+      <button id="dlPdf" class="btn blue">⬇ 解答を PDF</button>
+      <button id="dlApp" class="btn blue">⬇ アプリ (.html)</button>
+      <button id="dlTxt" class="btn ghost">⬇ 解答を .txt</button>
+      <button id="dlCode" class="btn ghost">⬇ ソースコード</button>
+      <button id="dlMd" class="btn ghost">⬇ .md</button>
+    </div>
+    <div id="codeInfo" class="note"></div>
+  </div>
+
+  <div class="foot">
+    <b>BadaGPT</b> · Bada 言語 ζ-Entropy 未知事前予知エンジン<br>
+    © Masaaki Yamaguchi — <a href="https://github.com/masaaki-avnturle/Bada">github.com/masaaki-avnturle/Bada</a><br>
+    <span class="badge">概念シミュレーション / 研究アート</span>
+    <div class="note">⚠ 本アプリは山口フレームワークの概念シミュレーションです。実在の予言・医療・投資助言ではありません。
+    ζ-Entropy コアは解析数論(ゼータ分布のエントロピー)を実装した決定論的言語生成器です。</div>
+  </div>
+</div>
+
+<script src="engine.js"></script>
+<script src="fileio.js"></script>
+<script src="claude.js"></script>
+<script src="silent.js"></script>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const state = { files: [], answer: "", telemetry: null, mode: "local" };
+
+// ---- ⓪ 思考入力 (Silent-Talk 超え) ----
+const stIntentSel = $("#stIntent");
+SilentTalk.INTENTS.forEach((p, i) => {
+  const o = document.createElement("option");
+  o.value = i; o.textContent = `意図 ${i} — ${p.slice(0, 30)}…`;
+  stIntentSel.appendChild(o);
+});
+let stMode = "focus";
+$("#stMode").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#stMode button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); stMode = b.dataset.m;
+});
+$("#stCapture").addEventListener("click", () => {
+  const r = SilentTalk.capture(stMode, +stIntentSel.value, $("#stQuantum").checked);
+  const tele = $("#stTele"); tele.style.display = "grid";
+  tele.innerHTML = [
+    ["信頼度", r.confidence.toFixed(4)],
+    ["基準 (silent-talk)", r.baseline.toFixed(2)],
+    ["ゲイン", (r.gain >= 0 ? "+" : "") + r.gain.toFixed(1) + "%"],
+    ["path certainty", r.cert.toFixed(4)],
+    ["Jones 熱意図", r.intent.toFixed(4)],
+    ["記号列", r.syms.slice(0, 12).join("")+"…"],
+  ].map(([k, v]) => `<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+  const st = $("#stStatus");
+  if (r.exceeds) {
+    $("#prompt").value = r.phrase;
+    st.className = "status ok";
+    st.textContent = `✓ silent-talk 基準を超過 (+${r.gain.toFixed(1)}%) — 意図 ${r.dominant} を質問欄へ入力しました。「⚡ 解答を生成」を押してください。`;
+    $("#prompt").scrollIntoView({ behavior: "smooth", block: "center" });
+  } else {
+    st.className = "status err";
+    st.textContent = `✗ 信頼度 ${r.confidence.toFixed(4)} は基準 0.62 未達 — 思考が散漫です。「集中した思考」でやり直してください。`;
+  }
+});
+
+// ---- ファイル投稿 ----
+const drop = $("#drop"), fileInput = $("#file");
+drop.addEventListener("click", () => fileInput.click());
+["dragover","dragenter"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.add("hot"); }));
+["dragleave","drop"].forEach(e => drop.addEventListener(e, ev => { ev.preventDefault(); drop.classList.remove("hot"); }));
+drop.addEventListener("drop", ev => handleFiles(ev.dataTransfer.files));
+fileInput.addEventListener("change", () => handleFiles(fileInput.files));
+
+async function handleFiles(list) {
+  for (const f of list) {
+    setStatus("run", `読込中: ${f.name} …`);
+    try {
+      const r = await FileIO.readFile(f);
+      state.files.push({ ...r, bytes: f.size });
+    } catch (e) { setStatus("err", `${f.name}: ${e.message}`); }
+  }
+  renderFiles();
+  setStatus("ok", `${state.files.length} 件のファイルを読み込みました`);
+  fileInput.value = "";
+}
+function renderFiles() {
+  const box = $("#files"); box.innerHTML = "";
+  state.files.forEach((f, i) => {
+    const d = document.createElement("div"); d.className = "fchip";
+    const chars = f.text ? f.text.length : 0;
+    d.innerHTML = `<span class="k">${f.kind}</span><b>${escapeHtml(f.name)}</b>
+      <span class="sz">${(f.bytes/1024).toFixed(1)}KB · ${chars.toLocaleString()}字</span>
+      <span class="rm" data-i="${i}">✕</span>`;
+    box.appendChild(d);
+  });
+  box.querySelectorAll(".rm").forEach(x => x.onclick = () => { state.files.splice(+x.dataset.i,1); renderFiles(); });
+}
+
+// ---- モード切替 ----
+$("#mode").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  document.querySelectorAll("#mode button").forEach(x => x.classList.remove("on"));
+  b.classList.add("on"); state.mode = b.dataset.mode;
+  $("#apiBox").style.display = state.mode === "claude" ? "block" : "none";
+});
+
+// APIキー永続化
+const apiKey = $("#apiKey"), model = $("#model");
+apiKey.value = localStorage.getItem("badagpt_key") || "";
+model.value = localStorage.getItem("badagpt_model") || "claude-sonnet-4-5";
+apiKey.addEventListener("input", () => localStorage.setItem("badagpt_key", apiKey.value));
+model.addEventListener("input", () => localStorage.setItem("badagpt_model", model.value));
+
+// ---- 生成 ----
+$("#gen").addEventListener("click", generate);
+$("#clear").addEventListener("click", () => {
+  state.files = []; renderFiles(); $("#prompt").value = "";
+  $("#ansCard").style.display = "none"; $("#teleCard").style.display = "none"; setStatus("","");
+});
+
+function buildCorpus() {
+  return state.files.map(f => `# ${f.name}\n${f.text}`).join("\n\n");
+}
+
+async function generate() {
+  const prompt = $("#prompt").value.trim();
+  const corpus = buildCorpus();
+  if (!corpus && !prompt) { setStatus("err","資料または質問を入力してください"); return; }
+  $("#gen").disabled = true;
+
+  // ローカル ζ-Entropy エンジンは常に実行(未知事前予知の種)
+  setStatus("run", '<span class="spin"></span> ζ-Entropy エンジン計算中…');
+  const local = Bada.generate(corpus, prompt || "未知事前予知", { maxTokens: 240 });
+  state.telemetry = local.telemetry;
+  renderTelemetry(local.telemetry);
+
+  let answer = "";
+  if (state.mode === "claude") {
+    try {
+      setStatus("run", '<span class="spin"></span> Claude API 呼び出し中…');
+      const sys = badaSystemPrompt(local.telemetry);
+      const userMsg = composeUserMessage(prompt, corpus, local);
+      const maxTok = Math.max(256, parseInt($("#maxTok").value) || 2048);
+      const res = await ClaudeAPI.complete({
+        apiKey: apiKey.value.trim(), model: model.value.trim(),
+        system: sys, user: userMsg, maxTokens: maxTok
+      });
+      answer = res.text;
+      if (res.usage) setStatus("ok", `完了 · Claude (${res.model}) · in ${res.usage.input_tokens}/out ${res.usage.output_tokens} tok`);
+      else setStatus("ok", "完了 · Claude");
+    } catch (e) {
+      setStatus("err", "Claude API 失敗: " + e.message + " — ローカル解答に切替");
+      answer = localAnswer(prompt, local);
+    }
+  } else {
+    answer = localAnswer(prompt, local);
+    setStatus("ok", "完了 · ζ-Entropy ローカルエンジン");
+  }
+
+  state.answer = answer;
+  renderAnswer(answer);
+  $("#gen").disabled = false;
+}
+
+// ローカル解答: ζ予知テキスト + 生成された Bada/Python 実装コード
+function localAnswer(prompt, local) {
+  const t = local.telemetry;
+  const pred = local.text;
+  return (
+`# BadaGPT ζ-Entropy 解答
+
+**質問:** ${prompt || "(未指定)"}
+
+## 未知事前予知 (a-priori prediction)
+ゼータ分布 P(n)=n^-s/ζ(s) のエントロピー H(s)=${t.entropy_nat} nat (${t.entropy_bit} bit) を
+温度 τ=${t.temperature} に写像し、投稿コーパス(語彙 ${t.vocab} 語)から π-softmax で
+以下の系列を事前予知しました:
+
+> ${pred}
+
+## ζ-Entropy テレメトリ
+- s = ${t.s},  ζ(s) = ${t.zeta}
+- H(s) = ${t.entropy_nat} nat / ${t.entropy_bit} bit
+- τ (温度) = ${t.temperature}
+- γ (Euler–Mascheroni) = ${t.gamma}
+- 種(seed) = ${t.seed}
+
+## 生成された実装コード (Bada 中核演算子)
+
+\`\`\`python
+import math
+
+GAMMA = 0.5772156649015329  # Euler-Mascheroni
+
+def zeta(s, N=64):
+    total = sum(n ** -s for n in range(1, N))
+    total += N ** (1 - s) / (s - 1) + 0.5 * N ** -s
+    return total + (s / 12) * N ** (-s - 1)
+
+def zeta_entropy(s, h=1e-4):
+    z = zeta(s)
+    zp = (zeta(s + h) - zeta(s - h)) / (2 * h)   # zeta'(s)
+    return s * (-zp / z) + math.log(z)           # H(s) [nat]
+
+# Bada core operator:  zeta(s) = beta(p,q) / log x
+def bada_core(p, q, x):
+    from math import lgamma, log, e
+    beta = math.exp(lgamma(p) + lgamma(q) - lgamma(p + q))
+    return beta / log(max(x, e))
+
+if __name__ == "__main__":
+    s = ${t.s}
+    print("zeta(s)      =", zeta(s))
+    print("H(s) [nat]   =", zeta_entropy(s))
+    print("bada_core    =", bada_core(2.5, 3.7, 10))
+\`\`\`
+
+\`\`\`bada
+// Bada v3 — ζ-Entropy 言語生成作用素
+class BadaGPT <- TupleSpace {
+  operator <- (corpus) { return zeta(s) / log(entropy(corpus)); }   // 事前予知の種
+  operator -< (state)  { return gamma(state) * exp(-state*log(state)); }
+  operator >- (token)  { return pi_softmax(chi, token, tau); }      // 非可換 π(χ,x)
+}
+\`\`\`
+
+---
+*ζ-Entropy ローカルエンジンによる決定論的生成。Claude API キーを入力すると、この予知を
+種として Claude が精緻化した解答に切り替わります。*`
+  );
+}
+
+function badaSystemPrompt(t) {
+  return `あなたは BadaGPT — 山口フレームワーク(Bada v3 作用素環)に基づく ζ-Entropy 未知事前予知エンジンです。
+リーマンゼータ関数から導かれるゼータ分布のエントロピー H(s)=s·(-ζ'(s)/ζ(s))+log ζ(s) を「事前予知の温度」として言語を生成します。
+中核演算子は ζ(s)=β(p,q)/log x (β はベータ関数)。回答は日本語で、要点→数式→実装コードの順に、実行可能なソースコードを \`\`\` フェンス付きで提示してください。
+現在の ζ テレメトリ: s=${t.s}, ζ(s)=${t.zeta}, H=${t.entropy_nat} nat, τ=${t.temperature}, γ=${t.gamma}。`;
+}
+
+function composeUserMessage(prompt, corpus, local) {
+  const clipped = corpus.length > 24000 ? corpus.slice(0, 24000) + "\n…(以下省略)" : corpus;
+  return `【質問】\n${prompt || "投稿資料を要約し実装してください"}\n\n` +
+    (clipped ? `【投稿資料(PDF/ソースコード抽出テキスト)】\n${clipped}\n\n` : "") +
+    `【ζ-Entropy エンジンの事前予知(種)】\n${local.text}\n\n` +
+    `上記の事前予知を出発点に、Bada 言語の作用素で言語生成する仕組みとして、` +
+    `明快な解説と実行可能な実装コードを提示してください。`;
+}
+
+// ---- レンダリング ----
+function renderTelemetry(t) {
+  if (!t) return;
+  $("#teleCard").style.display = "block";
+  const items = [
+    ["s (指数)", t.s], ["ζ(s)", t.zeta], ["H(s) nat", t.entropy_nat],
+    ["H(s) bit", t.entropy_bit], ["τ 温度", t.temperature], ["語彙", t.vocab],
+    ["コーパス語", t.corpusTokens], ["γ", t.gamma.toFixed(6)], ["seed", t.seed]
+  ];
+  $("#tele").innerHTML = items.map(([k,v]) =>
+    `<div class="kv"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+}
+function renderAnswer(a) {
+  $("#ansCard").style.display = "block";
+  $("#answer").innerHTML = renderMarkdownish(a);
+  const blocks = FileIO.extractCode(a);
+  $("#codeInfo").textContent = blocks.length
+    ? `検出コードブロック: ${blocks.length} 件 (${blocks.map(b=>b.lang).join(", ")})`
+    : "コードブロックは検出されませんでした(解答全文を .txt として保存できます)。";
+  $("#dlCode").disabled = false;
+}
+function renderMarkdownish(a) {
+  // 簡易: コードフェンスと見出し・強調だけ整形(安全のためエスケープ後)
+  let h = escapeHtml(a);
+  h = h.replace(/```[A-Za-z0-9_+#-]*\r?\n([\s\S]*?)```/g,
+    (m,code)=>`<pre style="background:#020409;border:1px solid #1b2740;border-radius:8px;padding:10px;overflow:auto"><code>${code}</code></pre>`);
+  h = h.replace(/^### (.*)$/gm,'<b style="color:#40b8c0">$1</b>')
+       .replace(/^## (.*)$/gm,'<b style="color:#c8a44a;font-size:15px">$1</b>')
+       .replace(/^# (.*)$/gm,'<b style="color:#c8a44a;font-size:16px">$1</b>')
+       .replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>')
+       .replace(/`([^`]+)`/g,'<code style="background:#132038;padding:1px 5px;border-radius:4px">$1</code>');
+  return h;
+}
+
+// ---- ダウンロード ----
+$("#dlPdf").addEventListener("click", () => {
+  if (!state.answer) return;
+  const blob = FileIO.textToPdf("BadaGPT — ζ-Entropy 解答", state.answer);
+  FileIO.download(blob, "BadaGPT_answer.pdf");
+});
+$("#dlTxt").addEventListener("click", () => {
+  if (!state.answer) return;
+  FileIO.downloadText(state.answer, "BadaGPT_answer.txt");
+});
+$("#dlMd").addEventListener("click", () => {
+  if (!state.answer) return;
+  FileIO.downloadText(state.answer, "BadaGPT_answer.md", "text/markdown");
+});
+$("#dlApp").addEventListener("click", () => {
+  if (!state.answer) return;
+  const html = buildHtmlApp(state.answer);
+  FileIO.download(new Blob([html], { type: "text/html;charset=utf-8" }), "BadaGPT_app.html");
+});
+
+// 生成解答を単一ファイルの HTML アプリに変換してタブレットへ保存できるようにする。
+// 解答中に ```html ブロックがあれば、それを「実行可能アプリ」として最上部に埋め込む。
+function buildHtmlApp(answer) {
+  const blocks = FileIO.extractCode(answer);
+  const htmlBlock = blocks.find(b => b.ext === "html");
+  const codeSections = blocks.map((b, i) =>
+    `<h2>コード ${i + 1} (${escapeHtml(b.lang)})</h2>
+     <pre><code id="code${i}">${escapeHtml(b.code)}</code></pre>
+     <button onclick="copyCode(${i})">コピー</button>`).join("\n");
+  const appSection = htmlBlock
+    ? `<h2>▶ 生成アプリ (実行)</h2>
+       <iframe id="genapp" style="width:100%;height:480px;border:1px solid #1b2740;border-radius:8px;background:#fff"></iframe>
+       <script>document.getElementById("genapp").srcdoc = ${JSON.stringify(htmlBlock.code)};<\/script>`
+    : "";
+  return `<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BadaGPT 生成アプリ</title>
+<style>
+ body{background:#04060a;color:#e8eef8;font-family:system-ui,"Noto Sans JP",sans-serif;
+      max-width:860px;margin:0 auto;padding:16px;line-height:1.65}
+ h1{color:#c8a44a;font-size:20px} h2{color:#40b8c0;font-size:15px;margin-top:24px}
+ pre{background:#05080e;border:1px solid #1b2740;border-radius:8px;padding:12px;overflow:auto;font-size:12.5px}
+ button{background:#132038;color:#e8eef8;border:1px solid #1b2740;border-radius:8px;padding:8px 14px;cursor:pointer}
+ .ans{white-space:pre-wrap;background:#05080e;border:1px solid #1b2740;border-radius:10px;padding:14px;font-size:14px}
+ .foot{margin-top:24px;font-size:11px;color:#8ea0bc;text-align:center}
+</style></head><body>
+<h1>β BadaGPT — 生成成果物</h1>
+${appSection}
+<h2>解答</h2>
+<div class="ans">${escapeHtml(answer)}</div>
+${codeSections}
+<div class="foot">Generated by BadaGPT (ζ-Entropy engine) · © Masaaki Yamaguchi ·
+概念シミュレーション/研究アート</div>
+<script>
+function copyCode(i){
+  const t = document.getElementById("code"+i).textContent;
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+    .catch(()=>{ const ta=document.createElement("textarea"); ta.value=t;
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); });
+}
+<\/script>
+</body></html>`;
+}
+
+$("#dlCode").addEventListener("click", () => {
+  if (!state.answer) return;
+  const blocks = FileIO.extractCode(state.answer);
+  if (!blocks.length) { FileIO.downloadText(state.answer, "BadaGPT_answer.txt"); return; }
+  if (blocks.length === 1) {
+    FileIO.downloadText(blocks[0].code, `badagpt_generated.${blocks[0].ext}`);
+    return;
+  }
+  // 複数: 連結した1ファイル + 個別も
+  let bundle = "";
+  blocks.forEach((b,i) => { bundle += `/* ===== block ${i+1} (${b.lang}) ===== */\n${b.code}\n\n`; });
+  FileIO.downloadText(bundle, "BadaGPT_generated_sources.txt");
+  blocks.forEach((b,i) => setTimeout(()=>FileIO.downloadText(b.code, `badagpt_block${i+1}.${b.ext}`), 200*(i+1)));
+});
+
+// ---- utils ----
+function setStatus(cls, html){ const s=$("#status"); s.className="status "+(cls||""); s.innerHTML=html; }
+function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+</script>
+</body>
+</html>
