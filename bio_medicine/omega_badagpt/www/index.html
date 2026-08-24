@@ -128,6 +128,10 @@
       <input id="file" type="file" multiple style="display:none">
     </div>
     <div id="files" class="files"></div>
+    <div class="dlrow" id="convRow" style="display:none">
+      <button id="dlAllTxt" class="btn blue">⬇ 変換テキストを一括 .txt</button>
+      <span class="muted" style="align-self:center">各ファイルの 👁 で変換結果を確認、⬇txt で個別保存</span>
+    </div>
   </div>
 
   <!-- 2. 質問 + Claude APIキー -->
@@ -286,11 +290,44 @@ function renderFiles() {
     const chars = f.text ? f.text.length : 0;
     d.innerHTML = `<span class="k">${f.kind}</span><b>${escapeHtml(f.name)}</b>
       <span class="sz">${(f.bytes/1024).toFixed(1)}KB · ${chars.toLocaleString()}字</span>
+      <span class="pv" data-i="${i}" title="変換テキストを表示" style="cursor:pointer">👁</span>
+      <span class="dl" data-i="${i}" title="変換テキストを .txt 保存" style="cursor:pointer;color:var(--cyan)">⬇txt</span>
       <span class="rm" data-i="${i}">✕</span>`;
     box.appendChild(d);
+    // 変換テキストのプレビュー (トグル)
+    const pre = document.createElement("pre");
+    pre.id = "fprev" + i;
+    pre.style.cssText = "display:none;background:#020409;border:1px solid var(--edge);border-radius:8px;" +
+      "padding:10px;max-height:220px;overflow:auto;font-size:11.5px;white-space:pre-wrap;margin:0";
+    pre.textContent = (f.text || "").slice(0, 8000) + ((f.text||"").length > 8000 ? "\n…(以下省略 — ⬇txt で全文保存)" : "");
+    box.appendChild(pre);
   });
   box.querySelectorAll(".rm").forEach(x => x.onclick = () => { state.files.splice(+x.dataset.i,1); renderFiles(); });
+  box.querySelectorAll(".pv").forEach(x => x.onclick = () => {
+    const p = $("#fprev" + x.dataset.i);
+    p.style.display = p.style.display === "none" ? "block" : "none";
+  });
+  box.querySelectorAll(".dl").forEach(x => x.onclick = () => {
+    const f = state.files[+x.dataset.i];
+    if (!f) return;
+    FileIO.downloadText(f.text || "", txtName(f.name));
+  });
+  $("#convRow").style.display = state.files.length ? "flex" : "none";
 }
+
+// 元ファイル名 → 変換テキストのファイル名 (report.pdf → report.txt)
+function txtName(name) {
+  const base = name.replace(/\.[A-Za-z0-9]{1,8}$/, "");
+  return (base || name) + ".txt";
+}
+
+// 全ファイルの変換テキストを 1 つの .txt に連結して保存
+$("#dlAllTxt").addEventListener("click", () => {
+  if (!state.files.length) return;
+  const bundle = state.files.map(f =>
+    `========== ${f.name} (${f.kind}) ==========\n${f.text || ""}`).join("\n\n");
+  FileIO.downloadText(bundle, "BadaGPT_converted_texts.txt");
+});
 
 // ---- モード切替 ----
 $("#mode").addEventListener("click", e => {
@@ -483,23 +520,43 @@ function renderMarkdownish(a) {
 }
 
 // ---- ダウンロード ----
+// 質問文から成果物のファイル名を作る (要望の種類を判別 + 内容ハッシュで一意化)。
+// Android WebView / Chromium は非 ASCII のダウンロード名を拒否することがあるため、
+// ASCII セーフな名前を生成する。
+function genName(ext) {
+  const p = ($("#prompt").value || "").trim();
+  let kind = "answer";
+  if (/論文|paper/i.test(p)) kind = "paper";
+  else if (/アプリ|application|app/i.test(p)) kind = "app";
+  else if (/コード|実装|code|implement/i.test(p)) kind = "code";
+  else if (/要約|summar/i.test(p)) kind = "summary";
+  else if (/予知|predict/i.test(p)) kind = "prediction";
+  else if (/レビュー|review/i.test(p)) kind = "review";
+  // ASCII 部分があればスラッグに残す
+  let slug = p.slice(0, 32).replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 20);
+  // プロンプトごとの一意ハッシュ (簡易 FNV-1a)
+  let h = 0x811c9dc5;
+  for (let i = 0; i < p.length; i++) { h ^= p.charCodeAt(i); h = (h * 0x01000193) >>> 0; }
+  const tag = h.toString(16).slice(0, 6);
+  return `BadaGPT_${kind}${slug ? "_" + slug : ""}_${tag}.${ext}`;
+}
 $("#dlPdf").addEventListener("click", () => {
   if (!state.answer) return;
   const blob = FileIO.textToPdf("BadaGPT — ζ-Entropy 解答", state.answer);
-  FileIO.download(blob, "BadaGPT_answer.pdf");
+  FileIO.download(blob, genName("pdf"));
 });
 $("#dlTxt").addEventListener("click", () => {
   if (!state.answer) return;
-  FileIO.downloadText(state.answer, "BadaGPT_answer.txt");
+  FileIO.downloadText(state.answer, genName("txt"));
 });
 $("#dlMd").addEventListener("click", () => {
   if (!state.answer) return;
-  FileIO.downloadText(state.answer, "BadaGPT_answer.md", "text/markdown");
+  FileIO.downloadText(state.answer, genName("md"), "text/markdown");
 });
 $("#dlApp").addEventListener("click", () => {
   if (!state.answer) return;
   const html = buildHtmlApp(state.answer);
-  FileIO.download(new Blob([html], { type: "text/html;charset=utf-8" }), "BadaGPT_app.html");
+  FileIO.download(new Blob([html], { type: "text/html;charset=utf-8" }), genName("html"));
 });
 
 // 生成解答を単一ファイルの HTML アプリに変換してタブレットへ保存できるようにする。
