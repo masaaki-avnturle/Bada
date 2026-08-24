@@ -9,6 +9,11 @@ name: Bada GUI IDE build (Windows EXE + Ubuntu + Android APK)
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: bada-ide-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
   push:
     tags:
       - 'bada-ide-v*'
@@ -56,9 +61,10 @@ jobs:
           name: bada-gui-ide-windows
           path: bada_gui_ide/electron/dist/*.exe
       - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag }}
           files: bada_gui_ide/electron/dist/*.exe
 
   linux-app:
@@ -82,9 +88,10 @@ jobs:
             bada_gui_ide/electron/dist/*.AppImage
             bada_gui_ide/electron/dist/*.deb
       - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag }}
           files: |
             bada_gui_ide/electron/dist/*.AppImage
             bada_gui_ide/electron/dist/*.deb
@@ -130,7 +137,8 @@ jobs:
           name: bada-gui-ide-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.release_tag }}
           files: out/*.apk
