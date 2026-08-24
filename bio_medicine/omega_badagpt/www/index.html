@@ -147,8 +147,14 @@
       <input id="apiKey" type="password" placeholder="sk-ant-..." autocomplete="off">
       <div class="row" style="margin-top:8px">
         <div style="flex:2">
-          <label>モデル (編集可)</label>
-          <input id="model" type="text" value="claude-sonnet-4-5">
+          <label>モデル (候補から選択 / 自由入力可)</label>
+          <input id="model" type="text" value="claude-fable-5" list="modelList">
+          <datalist id="modelList">
+            <option value="claude-fable-5">Claude Fable 5 — 最上位 (既定)</option>
+            <option value="claude-opus-5">Claude Opus 5</option>
+            <option value="claude-sonnet-5">Claude Sonnet 5</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+          </datalist>
         </div>
         <div>
           <label>最大トークン</label>
@@ -156,7 +162,9 @@
         </div>
       </div>
       <div class="note">🔑 APIキーはこの端末の localStorage にのみ保存されます。サーバへは送りません。
-        モデル名はご自身のアカウントで利用可能な ID に編集してください。</div>
+        既定は <b>Claude Fable 5</b> (<code>claude-fable-5</code>)。Fable 5 / Opus 5 では
+        安全上の拒否時にサーバ側フォールバック (fallbacks:"default") で自動的に代替モデルが
+        応答します。ご自身のアカウントで利用可能な ID に変更もできます。</div>
     </div>
 
     <div class="row" style="margin-top:14px">
@@ -295,7 +303,12 @@ $("#mode").addEventListener("click", e => {
 // APIキー永続化
 const apiKey = $("#apiKey"), model = $("#model");
 apiKey.value = localStorage.getItem("badagpt_key") || "";
-model.value = localStorage.getItem("badagpt_model") || "claude-sonnet-4-5";
+model.value = localStorage.getItem("badagpt_model") || ClaudeAPI.DEFAULT_MODEL;
+// 旧既定値 (retired) が保存されていたら Fable 5 へ移行
+if (model.value === "claude-sonnet-4-5") {
+  model.value = ClaudeAPI.DEFAULT_MODEL;
+  localStorage.setItem("badagpt_model", model.value);
+}
 apiKey.addEventListener("input", () => localStorage.setItem("badagpt_key", apiKey.value));
 model.addEventListener("input", () => localStorage.setItem("badagpt_model", model.value));
 
@@ -334,8 +347,9 @@ async function generate() {
         system: sys, user: userMsg, maxTokens: maxTok
       });
       answer = res.text;
-      if (res.usage) setStatus("ok", `完了 · Claude (${res.model}) · in ${res.usage.input_tokens}/out ${res.usage.output_tokens} tok`);
-      else setStatus("ok", "完了 · Claude");
+      const fb = res.fellBack ? ` · フォールバック応答 (${res.requested} → ${res.model})` : "";
+      if (res.usage) setStatus("ok", `完了 · Claude (${res.model})${fb} · in ${res.usage.input_tokens}/out ${res.usage.output_tokens} tok`);
+      else setStatus("ok", `完了 · Claude (${res.model})${fb}`);
     } catch (e) {
       setStatus("err", "Claude API 失敗: " + e.message + " — ローカル解答に切替");
       answer = localAnswer(prompt, local);

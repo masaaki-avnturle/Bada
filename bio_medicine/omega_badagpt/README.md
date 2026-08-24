@@ -34,7 +34,16 @@ Android **APK**・Windows 10/11 **EXE**・Ubuntu **AppImage/deb** をビルド�
 ### 🔑 Claude API キー
 - キーは**この端末の `localStorage` にのみ**保存され、送信先は **Anthropic API のみ**です。
 - ブラウザ直接呼び出しのため `anthropic-dangerous-direct-browser-access` ヘッダを付与します。
-- モデル名(既定 `claude-sonnet-4-5`)は、ご自身のアカウントで利用可能な ID に編集してください。
+- **既定モデルは Claude Fable 5 (`claude-fable-5`)** — Anthropic の最上位モデル。候補
+  (`claude-fable-5` / `claude-opus-5` / `claude-sonnet-5` / `claude-haiku-4-5`)から選択、
+  または自由入力で変更できます。旧既定値 `claude-sonnet-4-5` が保存されていた場合は
+  自動で Fable 5 へ移行します。
+- Fable 5 / Opus 5 では、安全分類器による拒否 (`stop_reason: "refusal"`) に備えて
+  **サーバ側フォールバック** `fallbacks: "default"`
+  (beta `server-side-fallback-2026-07-01`) を既定で有効化 — 拒否時はカテゴリに応じた
+  代替モデルが自動応答し、UI に「フォールバック応答 (要求 → 実際)」と表示されます。
+  代替も実行できなかった場合のみ拒否理由と推奨代替モデルをエラー表示します。
+- Fable 5 は thinking 常時オンのため `thinking` パラメータは送信しません。
 - キーを入力しなくても、**ローカル ζ-Entropy エンジン**だけで解答とコードを生成できます。
 
 ---
