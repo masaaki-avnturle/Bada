@@ -1,6 +1,7 @@
-name: Ω apps build (APK + Windows EXE)
+name: Ω apps build (APK + Windows EXE + Ubuntu)
 
-# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
+# 各アプリ(www + electron + cordova)から Android APK / Windows 10・11 EXE /
+# Ubuntu (AppImage + deb + ネイティブ CLI tar.gz) をビルドし、
 # Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
 #
 # ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
@@ -20,14 +21,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+        include:
+          - app: omega_biofeedback
+            dir: bio_medicine/omega_biofeedback
+          - app: omega_thermal_trace
+            dir: bio_medicine/omega_thermal_trace
+          - app: omega_telepathy
+            dir: bio_medicine/omega_telepathy
+          - app: omega_silent_talk
+            dir: omega_silent_talk_pkg
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - name: Build Windows EXE (Electron)
-        working-directory: bio_medicine/${{ matrix.app }}/electron
+        working-directory: ${{ matrix.dir }}/electron
         run: |
           npm install
           npm run dist
@@ -35,19 +44,27 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.app }}-windows
-          path: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+          path: ${{ matrix.dir }}/electron/dist/*.exe
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+          files: ${{ matrix.dir }}/electron/dist/*.exe
 
   android-apk:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+        include:
+          - app: omega_biofeedback
+            dir: bio_medicine/omega_biofeedback
+          - app: omega_thermal_trace
+            dir: bio_medicine/omega_thermal_trace
+          - app: omega_telepathy
+            dir: bio_medicine/omega_telepathy
+          - app: omega_silent_talk
+            dir: omega_silent_talk_pkg
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -67,7 +84,7 @@ jobs:
         run: |
           set -e
           npm install -g cordova@12.0.0
-          APP="bio_medicine/${{ matrix.app }}"
+          APP="${{ matrix.dir }}"
           cordova create cordova-build com.bada.omega TmpApp
           rm -rf cordova-build/www
           cp -r "$APP/www" cordova-build/www
@@ -90,3 +107,68 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*.apk
+
+  ubuntu-app:
+    # Ubuntu 向け GUI アプリ (Electron → AppImage + deb)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: omega_silent_talk
+            dir: omega_silent_talk_pkg
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: ${{ matrix.dir }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-ubuntu
+          path: |
+            ${{ matrix.dir }}/electron/dist/*.AppImage
+            ${{ matrix.dir }}/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.dir }}/electron/dist/*.AppImage
+            ${{ matrix.dir }}/electron/dist/*.deb
+
+  ubuntu-cli:
+    # Ubuntu 向けネイティブ CLI (C 実装 bin/silent_talk) の tar.gz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build native CLI (gcc)
+        working-directory: omega_silent_talk_pkg
+        run: |
+          make
+          ./bin/silent_talk --demo
+      - name: Package tar.gz
+        run: |
+          set -e
+          PKG=omega_silent_talk-cli-ubuntu-x64
+          mkdir -p "dist/$PKG"
+          cp omega_silent_talk_pkg/bin/silent_talk "dist/$PKG/"
+          cp -r omega_silent_talk_pkg/examples "dist/$PKG/examples"
+          cp omega_silent_talk_pkg/README.md omega_silent_talk_pkg/NOTE.txt "dist/$PKG/"
+          tar -C dist -czf "dist/$PKG.tar.gz" "$PKG"
+          ls -la dist
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_silent_talk-cli-ubuntu
+          path: dist/*.tar.gz
+      - name: Attach CLI to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ω Silent-Talk — 思考入力シミュレータ</title>
+<style>
+  :root{
+    --bg:#04060a; --panel:#0b111c; --edge:#1c2a42;
+    --gold:#c8a44a; --cyan:#40b8c0; --violet:#9060d0; --blue:#4a80d0;
+    --txt:#d8e2f2; --dim:#7285a3; --ok:#4ad08a; --warn:#d0704a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--txt);
+       font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
+       padding:16px;max-width:760px;margin:0 auto}
+  h1{font-size:1.25rem;color:var(--gold);letter-spacing:.06em;margin-bottom:2px}
+  .sub{color:var(--dim);font-size:.78rem;margin-bottom:12px}
+  .card{background:var(--panel);border:1px solid var(--edge);border-radius:10px;
+        padding:14px;margin-bottom:12px}
+  .card h2{font-size:.9rem;color:var(--cyan);margin-bottom:8px;letter-spacing:.05em}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button{background:#111a2b;color:var(--txt);border:1px solid var(--edge);
+         border-radius:8px;padding:9px 14px;font-size:.85rem;cursor:pointer}
+  button:hover{border-color:var(--gold);color:var(--gold)}
+  button.primary{background:var(--gold);color:#04060a;border-color:var(--gold);font-weight:700}
+  button.primary:hover{filter:brightness(1.1)}
+  label.tgl{display:flex;gap:6px;align-items:center;font-size:.82rem;color:var(--dim);cursor:pointer}
+  .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+  .m{background:#080d16;border:1px solid var(--edge);border-radius:8px;padding:10px}
+  .m .k{font-size:.68rem;color:var(--dim);letter-spacing:.05em}
+  .m .v{font-size:1.25rem;font-weight:700;margin-top:2px}
+  .v.gold{color:var(--gold)} .v.cyan{color:var(--cyan)} .v.violet{color:var(--violet)}
+  .v.ok{color:var(--ok)} .v.warn{color:var(--warn)} .v.blue{color:var(--blue)}
+  .gauge{height:14px;background:#080d16;border:1px solid var(--edge);border-radius:7px;
+         position:relative;overflow:hidden;margin-top:8px}
+  .gauge .fill{height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan),var(--gold));
+               width:0%;transition:width .5s}
+  .gauge .base{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--warn)}
+  .glab{display:flex;justify-content:space-between;font-size:.68rem;color:var(--dim);margin-top:3px}
+  .syms{font-family:Consolas,Menlo,monospace;font-size:1rem;letter-spacing:.25em;
+        color:var(--cyan);word-break:break-all;line-height:1.8}
+  canvas{width:100%;image-rendering:pixelated;border:1px solid var(--edge);border-radius:8px;
+         background:#000;display:block}
+  .duo{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.duo{grid-template-columns:1fr}}
+  .note{font-size:.7rem;color:var(--dim);line-height:1.6;border-left:3px solid var(--warn);
+        padding-left:10px}
+  .eq{font-family:Consolas,Menlo,monospace;font-size:.72rem;color:var(--dim);margin-top:6px}
+  .verdict{font-size:.95rem;font-weight:700;margin-top:8px}
+</style>
+</head>
+<body>
+<h1>Ω SILENT-TALK</h1>
+<div class="sub">ガンマ関数 大域的部分積分多様体 AGI 思考入力 — シミュレータ · © Masaaki Yamaguchi</div>
+
+<div class="card">
+  <h2>思考信号 (無発声)</h2>
+  <div class="row">
+    <button class="primary" id="bFocus">集中した思考</button>
+    <button id="bWander">散漫な思考</button>
+    <button id="bNoise">雑念 (ノイズ)</button>
+    <label class="tgl"><input type="checkbox" id="qmode" checked> 量子モード (Bada 5-qubit)</label>
+  </div>
+  <div style="margin-top:10px"><canvas id="sig" width="256" height="48"></canvas></div>
+</div>
+
+<div class="card">
+  <h2>復号結果 — 思考記号列</h2>
+  <div class="syms" id="syms">—</div>
+  <div class="gauge"><div class="fill" id="fill"></div><div class="base" style="left:62%"></div></div>
+  <div class="glab"><span>0.0</span><span style="color:var(--warn)">silent-talk 基準 0.62</span><span>1.0</span></div>
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<div class="card">
+  <h2>計測</h2>
+  <div class="metrics">
+    <div class="m"><div class="k">CONFIDENCE 信頼度</div><div class="v gold" id="mConf">—</div></div>
+    <div class="m"><div class="k">PATH CERTAINTY (Markov)</div><div class="v cyan" id="mCert">—</div></div>
+    <div class="m"><div class="k">JONES 熱意図性 V_K(e^{-1/kT})</div><div class="v violet" id="mIntent">—</div></div>
+    <div class="m"><div class="k">SHANNON エントロピー</div><div class="v blue" id="mEnt">—</div></div>
+    <div class="m"><div class="k">多様体質量 ∬1/(x log x)² dx</div><div class="v cyan" id="mMass">—</div></div>
+    <div class="m"><div class="k">ゲイン vs SILENT-TALK</div><div class="v" id="mGain">—</div></div>
+  </div>
+  <div class="eq">conf = 0.55·cert + 0.20·intent + 0.15·(1−e^{−M}) + 0.10·H/(H+1)</div>
+</div>
+
+<div class="duo">
+  <div class="card"><h2>思考フレーム (映像化 Transformer)</h2><canvas id="frame" width="64" height="64"></canvas></div>
+  <div class="card"><h2>体内/脳 熱エネルギー + Jones 交点</h2><canvas id="thermal" width="256" height="128"></canvas></div>
+</div>
+
+<div class="card note">
+  ⚠ 本アプリは<b>概念シミュレーション/アート</b>です(非医療)。実際の脳計測・思考読取・
+  発話解読は行いません。「思考信号」はボタンで生成される合成信号であり、表示される精度・
+  信頼度はこのシミュレーション内の指標です。医療機器/BCI 製品ではありません。
+</div>
+
+<script>
+"use strict";
+/* ============ 数理コア (lib/*.c の JavaScript 移植) ============ */
+
+/* Γ(s) — Lanczos */
+const LC=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+          -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,
+          1.5056327351493116e-7];
+function gamma(s){
+  if(s<0.5) return Math.PI/(Math.sin(Math.PI*s)*gamma(1-s));
+  s-=1; let a=LC[0], t=s+7.5;
+  for(let i=1;i<9;i++) a+=LC[i]/(s+i);
+  return Math.sqrt(2*Math.PI)*Math.pow(t,s+0.5)*Math.exp(-t)*a;
+}
+/* 大域的部分積分多様体 */
+const gpiKernel=x=>{ if(x<=1+1e-12) return 0; const l=Math.log(x); return 1/(x*l*l); };
+function gpiManifold(a,b,n){
+  if(a<=1) a=1+1e-6; if(b<=a) return 0;
+  const h=(b-a)/n; let acc=0;
+  for(let i=0;i<n;i++){
+    const x0=a+h*i, x1=x0+h, xm=(x0+x1)/2;
+    const local=(h/6)*(gpiKernel(x0)+4*gpiKernel(xm)+gpiKernel(x1));
+    const bnd=1/Math.log(Math.max(x0,1.000001))-1/Math.log(x1);
+    acc+=0.5*(local+bnd);
+  }
+  return acc;
+}
+/* ζ(s) */
+function zeta(s){ let z=0; for(let n=1;n<=200;n++) z+=Math.pow(n,-s);
+  return z+Math.pow(200,1-s)/(s-1)+0.5*Math.pow(200,-s); }
+/* Shannon H (記号列, bits) */
+function shannon(seq){
+  const c={}; seq.forEach(s=>c[s]=(c[s]||0)+1);
+  let H=0; const n=seq.length;
+  for(const k in c){ const p=c[k]/n; H-=p*Math.log2(p); }
+  return H;
+}
+/* マルコフ path certainty (ラプラス平滑化 1 次) */
+function markovCert(seq,vocab){
+  if(seq.length<2) return 0;
+  const t={},r={};
+  for(let i=0;i+1<seq.length;i++){
+    const k=seq[i]+","+seq[i+1];
+    t[k]=(t[k]||1e-3)+1; r[seq[i]]=(r[seq[i]]||1e-3*vocab)+1;
+  }
+  let s=0;
+  for(let i=0;i+1<seq.length;i++)
+    s+=(t[seq[i]+","+seq[i+1]]||1e-3)/(r[seq[i]]||1e-3*vocab);
+  return s/(seq.length-1);
+}
+/* Jones 多項式: 熱時系列 → 係数 → V_K(e^{-1/kT}) */
+function jonesFromThermal(T){
+  const deg=T.length-1, c=new Array(deg+1).fill(0); c[0]=1;
+  for(let i=0;i+1<T.length;i++){
+    const d=T[i+1]-T[i], sg=d>=0?1:-1, amp=1/(1+Math.abs(d)), k=i+1;
+    c[k]+=sg*amp; c[k-1]+=-sg*amp*0.5;
+  }
+  return c;
+}
+function jonesIntent(c,kT){
+  const t=Math.exp(-1/Math.max(kT,1e-6));
+  let v=0,tk=1; c.forEach(x=>{v+=x*tk; tk*=t;});
+  return Math.abs(v)/(1+(c.length-1)*0.1);
+}
+/* xorshift32 (再現的乱数) */
+function mkRng(seed){ let x=seed>>>0||0x9e3779b9;
+  return ()=>{ x^=x<<13; x^=x>>>17; x^=x<<5; x>>>=0; return (x&0xffffff)/0x1000000; }; }
+
+/* ===== 量子モード: Bada 5-qubit 状態ベクトル (quantum_ext.rb の移植) ===== */
+function quantumDecode(sig,times,vocab,rng){
+  const n=5, dim=32;
+  let re=new Array(dim).fill(0), im=new Array(dim).fill(0);
+  for(let k=0;k<dim;k++) re[k]=sig[k%sig.length];
+  const norm0=Math.hypot(...re); for(let k=0;k<dim;k++) re[k]/=norm0||1;
+  /* Hadamard 干渉 (交代思考を集中させる) */
+  for(let q=0;q<n;q++){
+    const b=1<<q, s=Math.SQRT1_2;
+    for(let k=0;k<dim;k++){
+      if(k&b) continue;
+      const ar=re[k],ai=im[k],br=re[k|b],bi=im[k|b];
+      re[k]=s*(ar+br); im[k]=s*(ai+bi);
+      re[k|b]=s*(ar-br); im[k|b]=s*(ai-bi);
+    }
+  }
+  /* 多様体対角作用素 + 正規化 */
+  let nn=0;
+  for(let k=0;k<dim;k++){ const w=Math.sqrt(1+gpiKernel(k+2)); re[k]*=w; im[k]*=w; nn+=re[k]*re[k]+im[k]*im[k]; }
+  nn=Math.sqrt(nn)||1;
+  for(let k=0;k<dim;k++){ re[k]/=nn; im[k]/=nn; }
+  /* Γ/ζ 位相ゲート (確率保存) */
+  for(let k=0;k<dim;k++){
+    const g=gamma(1+(k%8)*0.5/4)||1e-9;
+    const th=Math.PI*0.5/g + Math.PI/Math.pow(k+1,2);
+    const cr=Math.cos(th), ci=Math.sin(th), r0=re[k];
+    re[k]=r0*cr-im[k]*ci; im[k]=r0*ci+im[k]*cr;
+  }
+  const probs=re.map((r,k)=>r*r+im[k]*im[k]);
+  const syms=[];
+  for(let t=0;t<times;t++){
+    const r=rng(); let acc=0, idx=0;
+    for(let k=0;k<dim;k++){ acc+=probs[k]; if(r<=acc){ idx=k; break; } }
+    syms.push(idx%vocab);
+  }
+  return {syms,probs};
+}
+
+/* ===== 古典モード: silent_decode.c の greedy 復号移植 ===== */
+function classicDecode(sig,vocab){
+  const N=sig.length;
+  const w=sig.map((v,i)=>v*(1+gpiKernel(2+i)));
+  const lo=Math.min(...w), hi=Math.max(...w);
+  const q=w.map(v=>Math.min(vocab-1,Math.max(0,Math.floor((v-lo)/((hi-lo)||1)*vocab))));
+  /* マルコフ学習 */
+  const t={},r={};
+  for(let i=0;i+1<N;i++){ const k=q[i]+","+q[i+1];
+    t[k]=(t[k]||1e-3)+1; r[q[i]]=(r[q[i]]||1e-3*vocab)+1; }
+  const P=(a,b)=>((t[a+","+b]||1e-3)/(r[a]||1e-3*vocab));
+  const syms=[]; let st=q[0];
+  for(let i=0;i<N;i++){
+    let ml=0,best=-1;
+    for(let j=0;j<vocab;j++){ const p=P(st,j); if(p>best){best=p;ml=j;} }
+    const obs=q[i];
+    syms.push(obs===ml||best>0.45?ml:obs);
+    st=syms[i];
+  }
+  const probs=new Array(32).fill(0); syms.forEach(s=>probs[s]+=1/syms.length);
+  return {syms,probs};
+}
+
+/* ============ 信号生成 ============ */
+const N=24, VOCAB=8;
+function genSignal(mode,rng){
+  const s=[];
+  for(let i=0;i<N;i++){
+    if(mode==="focus")  s.push((i%2?1:-1)+0.03*((i*37)%5-2));
+    else if(mode==="wander") s.push(Math.sin(0.6*i)+0.4*Math.sin(1.9*i)+0.15*(rng()-0.5));
+    else s.push(2*rng()-1);
+  }
+  return s;
+}
+function genThermal(mode,rng){
+  const T=[];
+  for(let i=0;i<16;i++){
+    const base=36.9+0.15*Math.sin(0.5*i);
+    T.push(mode==="noise"?base+0.4*(rng()-0.5):base);
+  }
+  return T;
+}
+
+/* ============ 描画 ============ */
+function drawSignal(sig){
+  const cv=document.getElementById("sig"), g=cv.getContext("2d");
+  g.fillStyle="#000"; g.fillRect(0,0,cv.width,cv.height);
+  g.strokeStyle="#40b8c0"; g.lineWidth=1.5; g.beginPath();
+  sig.forEach((v,i)=>{
+    const x=i/(sig.length-1)*cv.width, y=cv.height/2-v*cv.height*0.4;
+    i?g.lineTo(x,y):g.moveTo(x,y);
+  });
+  g.stroke();
+}
+function drawFrame(probs,syms){
+  const cv=document.getElementById("frame"), g=cv.getContext("2d");
+  const img=g.createImageData(64,64);
+  const mx=Math.max(...probs)||1;
+  for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+    const k=(Math.floor(x*probs.length/64)+Math.floor(y*probs.length/64))%probs.length;
+    const v=probs[k]/mx, s=syms[(x+y)%syms.length]/VOCAB;
+    const o=(y*64+x)*4;
+    img.data[o]=v*200+s*40; img.data[o+1]=v*160+s*60; img.data[o+2]=v*80+s*150; img.data[o+3]=255;
+  }
+  g.putImageData(img,0,0);
+}
+function drawThermal(T){
+  const cv=document.getElementById("thermal"), g=cv.getContext("2d");
+  g.fillStyle="#000"; g.fillRect(0,0,cv.width,cv.height);
+  const lo=Math.min(...T)-0.05, hi=Math.max(...T)+0.05;
+  g.strokeStyle="#d0704a"; g.lineWidth=1.5; g.beginPath();
+  T.forEach((v,i)=>{
+    const x=i/(T.length-1)*cv.width, y=cv.height-(v-lo)/(hi-lo)*cv.height;
+    i?g.lineTo(x,y):g.moveTo(x,y);
+  });
+  g.stroke();
+  /* Jones 交点 = 符号変化点 */
+  g.fillStyle="#c8a44a";
+  for(let i=1;i+1<T.length;i++){
+    if((T[i]-T[i-1])*(T[i+1]-T[i])<0){
+      const x=i/(T.length-1)*cv.width, y=cv.height-(T[i]-lo)/(hi-lo)*cv.height;
+      g.beginPath(); g.arc(x,y,3,0,7); g.fill();
+    }
+  }
+}
+
+/* ============ パイプライン実行 ============ */
+let seedCounter=0x1234abcd;
+function run(mode){
+  const rng=mkRng(seedCounter+=0x9e37);
+  const sig=genSignal(mode,rng), thermal=genThermal(mode,rng);
+  drawSignal(sig); drawThermal(thermal);
+
+  const qm=document.getElementById("qmode").checked;
+  const {syms,probs}=qm?quantumDecode(sig,N,VOCAB,rng):classicDecode(sig,VOCAB);
+
+  const cert=markovCert(syms,VOCAB);
+  const intent=jonesIntent(jonesFromThermal(thermal),0.5);
+  const H=shannon(syms);
+  const M=gpiManifold(2,2+N,N);
+  const conf=Math.min(1,Math.max(0,
+    0.55*cert+0.20*intent+0.15*(1-Math.exp(-M))+0.10*(H/(H+1))));
+  const gain=(conf-0.62)/0.62*100;
+
+  document.getElementById("syms").textContent=syms.join(" ");
+  document.getElementById("mConf").textContent=conf.toFixed(4);
+  document.getElementById("mCert").textContent=cert.toFixed(4);
+  document.getElementById("mIntent").textContent=intent.toFixed(4);
+  document.getElementById("mEnt").textContent=H.toFixed(3)+" bit";
+  document.getElementById("mMass").textContent=M.toFixed(4);
+  const mg=document.getElementById("mGain");
+  mg.textContent=(gain>=0?"+":"")+gain.toFixed(1)+"%";
+  mg.className="v "+(gain>=0?"ok":"warn");
+  document.getElementById("fill").style.width=(conf*100)+"%";
+  const vd=document.getElementById("verdict");
+  if(gain>=0){ vd.style.color="var(--ok)"; vd.textContent="✓ silent-talk 基準 (0.62) を超過 — 思考入力成立"; }
+  else{ vd.style.color="var(--warn)"; vd.textContent="✗ 基準未達 — 思考が散漫です (集中してください)"; }
+  drawFrame(probs,syms);
+}
+
+document.getElementById("bFocus").onclick=()=>run("focus");
+document.getElementById("bWander").onclick=()=>run("wander");
+document.getElementById("bNoise").onclick=()=>run("noise");
+document.getElementById("qmode").onchange=()=>run("focus");
+run("focus");
+</script>
+</body>
+</html>

@@ -151,7 +151,39 @@ silent-talk baseline 0.62 → gain +13.0% (EXCEEDS)
 
 ---
 
-## 📥 ダウンロード
+## 📱 アプリ版ダウンロード — APK / Windows EXE / Ubuntu
+
+GUI アプリ版(`www/index.html`、量子モード付き)を CI が自動ビルドします
+(`.github/workflows/omega-apps-build.yml`)。**Actions アーティファクト**、および
+`apps-v*` タグ時は **GitHub Releases** からダウンロードできます:
+
+| プラットフォーム | 形式 | ビルド |
+|:--|:--|:--|
+| Android | `omega_silent_talk-debug.apk` | Cordova 12 / SDK 33 |
+| Windows 10 / 11 | `Omega-SilentTalk-*-x64.exe`(インストーラ + ポータブル)| Electron + electron-builder |
+| Ubuntu (GUI) | `Omega-SilentTalk-*-x64.AppImage` / `.deb` | Electron + electron-builder |
+| Ubuntu (CLI) | `omega_silent_talk-cli-ubuntu-x64.tar.gz`(ネイティブ C バイナリ + examples)| gcc |
+
+→ https://github.com/masaaki-avnturle/Bada/releases
+
+ローカルでのアプリ実行/ビルド:
+
+```bash
+# GUI をそのままブラウザで
+open omega_silent_talk_pkg/www/index.html
+
+# Windows EXE / Ubuntu AppImage+deb を手元でビルド
+cd omega_silent_talk_pkg/electron
+npm install
+npm run dist          # Windows (windows 上で)
+npm run dist:linux    # Ubuntu AppImage + deb
+```
+
+APK インストール時は「提供元不明のアプリ」を許可してください(debug 署名)。
+
+---
+
+## 📥 ソースからのダウンロード
 
 このパッケージはリポジトリ `masaaki-avnturle/Bada` の
 `omega_silent_talk_pkg/` フォルダとして取得できます。
