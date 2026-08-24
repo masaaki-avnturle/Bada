@@ -114,9 +114,19 @@ jobs:
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換
+      # (CordovaLib/cordova.gradle が Gradle 9 で削除された XmlParser を使用)。
+      # Gradle 7.6.4 を明示的に入れて PATH 先頭に置く。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
       - name: Build debug APK (Cordova, pinned versions)
         run: |
           set -e
+          gradle --version
           npm install -g cordova@12.0.0
           APP="bada_gui_ide"
           cordova create cordova-build io.github.masaaki_avnturle.bada_gui_ide TmpApp
