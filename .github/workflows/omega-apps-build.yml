@@ -80,6 +80,20 @@ jobs:
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー既定の Gradle 9 は Groovy 4 系のため、cordova-android 12 の
+      # cordova.gradle が使う groovy.util.XmlParser を解決できずビルドが落ちる。
+      # (unable to resolve class XmlParser) → Gradle 8 系を明示的に使う。
+      - name: Pin Gradle 8.x (cordova-android 12 is incompatible with Gradle 9)
+        run: |
+          set -e
+          GRADLE_VER=8.13
+          curl -sSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VER}-bin.zip"
+          sudo unzip -q -d /opt /tmp/gradle.zip
+          echo "/opt/gradle-${GRADLE_VER}/bin" >> "$GITHUB_PATH"
+          # cordova が生成する wrapper も同じ版を使うように固定する
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-${GRADLE_VER}-all.zip" >> "$GITHUB_ENV"
+      - name: Show Gradle version in use
+        run: gradle --version
       - name: Build debug APK (Cordova, pinned versions)
         run: |
           set -e
