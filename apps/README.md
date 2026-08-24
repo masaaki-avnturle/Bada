@@ -1,5 +1,7 @@
 # Bada アプリ — ダウンロード用 (APK + Windows + Linux)
 
+> 📖 **[取扱説明書 (MANUAL.md)](MANUAL.md)** — インストール手順・全機能の使い方・コマンド一覧
+
 `bada_ruby` の 6 つのエンジンを、そのまま **Android APK**・**Windows 10/11 アプリ**・
 **Ubuntu(Linux) アプリ** として配布できるようにしたものです。物理エンジンは Ruby では
 なく **共有の純 Java コア**（`apps/core`）に移植してあり、3 プラットフォームで**同一の
