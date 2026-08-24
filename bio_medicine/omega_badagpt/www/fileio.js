@@ -528,16 +528,16 @@ const FileIO = (() => {
   }
 
   // ---- ダウンロード補助 --------------------------------------------------
-  // 4 段構え:
-  //   1) Cordova (Android APK) 最優先: cordova-plugin-save-dialog で
-  //      Android 標準の「保存」ダイアログ (SAF) を開き、ユーザーが選んだ場所
-  //      (ダウンロード フォルダ等) に保存する。権限不要・全 Android 対応で、
-  //      保存したファイルがファイルアプリから必ず見える。
-  //   2) Cordova でダイアログ未対応: cordova-plugin-file でアプリの外部
-  //      ストレージ領域へ直接書き込み (Android 11+ ではファイルアプリから
-  //      見えないことがあるためあくまで代替)。
-  //   3) 通常ブラウザ / Electron: <a download> + blob URL。
-  //   4) それも失敗した場合: data: URI を新規タブで開く最終フォールバック。
+  // 5 段構え:
+  //   1) Cordova (Android APK) 最優先: cordova-plugin-saf-mediastore で
+  //      端末の共有「ダウンロード」フォルダへ MediaStore 経由で直接保存
+  //      (Android 10+、権限プロンプト不要、ファイルアプリの Download に即表示)。
+  //   2) 直接保存が使えない場合: cordova-plugin-save-dialog で Android 標準の
+  //      「保存」ダイアログ (SAF) を開き、ユーザーが選んだ場所に保存。
+  //   3) さらに代替: cordova-plugin-file でアプリの外部ストレージ領域へ直接
+  //      書き込み (Android 11+ ではファイルアプリから見えないことがある)。
+  //   4) 通常ブラウザ / Electron: <a download> + blob URL。
+  //   5) それも失敗した場合: data: URI を新規タブで開く最終フォールバック。
   //   保存成功時は "fileio-saved" イベントで保存先を通知する。
   function notifySaved(filename, where) {
     try {
@@ -579,6 +579,30 @@ const FileIO = (() => {
     reader.readAsDataURL(blob);
   }
 
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => {
+        const s = String(r.result);
+        resolve(s.slice(s.indexOf(",") + 1));
+      };
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  // 端末の共有「ダウンロード」フォルダへ直接保存 (cordova-plugin-saf-mediastore)
+  function mediastoreSave(blob, filename) {
+    const ms = window.cordova && window.cordova.plugins && window.cordova.plugins.safMediastore;
+    if (!ms || typeof ms.writeFile !== "function") return Promise.reject(new Error("no mediastore plugin"));
+    return blobToBase64(blob)
+      .then(b64 => ms.writeFile({ filename, data: b64 }))
+      .then(uri => {
+        notifySaved(filename, "📂 ダウンロード フォルダに保存しました" + (uri ? " (" + uri + ")" : ""));
+        return uri;
+      });
+  }
+
   // Android 標準の保存ダイアログ (cordova-plugin-save-dialog / SAF)
   function saveDialogSave(blob, filename) {
     const sd = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
@@ -591,7 +615,8 @@ const FileIO = (() => {
 
   function download(blob, filename) {
     if (window.cordova) {
-      saveDialogSave(blob, filename)
+      mediastoreSave(blob, filename)
+        .catch(() => saveDialogSave(blob, filename))
         .catch(() => cordovaSave(blob, filename))
         .catch(() => {
           try { anchorSave(blob, filename); } catch (e) { dataUriFallback(blob, filename); }
