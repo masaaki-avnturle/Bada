@@ -1,0 +1,136 @@
+name: Bada GUI IDE build (Windows EXE + Ubuntu + Android APK)
+
+# bada_gui_ide/ (www + electron + cordova) から
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+#   - Android 向け APK
+# をビルドし、Actions アーティファクト、および (bada-ide-v* タグ時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'bada-ide-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Interpreter + transpiler smoke test
+        run: |
+          set -e
+          cd bada_gui_ide
+          node cli/bada-cli.js run examples/hello.bada
+          node cli/bada-cli.js run examples/engine.bada | tee /tmp/engine.out
+          grep -q "base zeros     = \[3, 6\]" /tmp/engine.out
+          grep -q "5.55e-17" /tmp/engine.out
+          node cli/bada-cli.js run examples/quantum.bada | tee /tmp/quantum.out
+          grep -q "0.50000 0.50000" /tmp/quantum.out
+          node cli/bada-cli.js build examples/core.bada -o /tmp/core
+          /tmp/core | grep -q "compiled engine: V        = 8"
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_gui_ide/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-gui-ide-windows
+          path: bada_gui_ide/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bada_gui_ide/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_gui_ide/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-gui-ide-linux
+          path: |
+            bada_gui_ide/electron/dist/*.AppImage
+            bada_gui_ide/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bada_gui_ide/electron/dist/*.AppImage
+            bada_gui_ide/electron/dist/*.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          APP="bada_gui_ide"
+          cordova create cordova-build io.github.masaaki_avnturle.bada_gui_ide TmpApp
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-gui-ide-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-gui-ide-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk

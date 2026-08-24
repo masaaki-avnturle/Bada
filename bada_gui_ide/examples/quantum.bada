@@ -1,0 +1,70 @@
+# ============================================================
+# quantum.bada -- the Q#-style quantum sublanguage on the
+# Unknown-Prior Engine's phase core.
+#
+# From the paper "Reviser-Extensible Grammars": a @reviser :
+# grammar transaction commits production rules for the quantum
+# forms to the rule ledger; gates are phase commits, measurement
+# is an append-only ledger commit that sharpens a max-entropy
+# prior. The engine's theorems become the quantum semantics:
+#   zero-preservation  -> no-resurrection of forbidden states
+#   |psi|^2 == a       -> unitarity of the phase layer
+# ============================================================
+
+print("================================================================")
+print("QUANTUM BADA -- Q#-targeted front end on the phase core")
+print("================================================================")
+
+# ---- grammar transaction: teach the parser the quantum forms --------
+@reviser : grammar {
+    rule "hadamard" postfix [ 'Had' '(' expr ')' ] => phase_uniform(_1)
+    rule "measure"  stmt    [ 'Obs' '(' expr ')' ] => commit_measurement(_1)
+}
+print("grammar rules committed to the ledger:", len(tuplespace))
+
+# ---- 7.1 A Hadamard is a phase step ---------------------------------
+reg := qubit(1)          # |0>
+reg := Had(reg)          # reviser-committed rule => phase_uniform
+outcome := Measure(reg)  # commit |psi|^2 to the ledger
+
+print("")
+print("H|0> probabilities    :", f5(outcome[0]), f5(outcome[1]))
+print("measurement committed : ledger =", len(tuplespace), "facts")
+
+# ---- 7.2 A forbidden transition cannot be resurrected ---------------
+# Prepare a register in which basis state 1 has zero amplitude, then
+# apply a pure-phase step: the confident zero must survive.
+amp := cognitive_system([0.5, -40.0, 0.0],
+                        [ [ [0.6,0.0,0.4], [0.3,0.0,0.7] ] ],
+                        [0.8])
+print("")
+print("amplitudes^2 :", f5(amp[0]), f5(amp[1]), f5(amp[2]))
+print("forbidden basis states (zeros) :", zeros_of(amp))
+print("phase preserved the zero       :", amp[1] == 0)
+
+# ---- entangle: Bell pair via H + CNOT -------------------------------
+bell := qubit(2)
+bell := H(bell, 0)
+bell := CNOT(bell, 0, 1)
+print("")
+print("Bell state |psi|^2 :", Measure(bell))
+
+# ---- Omega::Quantum: tomography of an unknown state -----------------
+# Max-entropy start (Jaynes): the estimate sharpens monotonically as
+# append-only measurements arrive (entropy strictly decreases).
+print("")
+print("================================================================")
+print("Omega::Quantum -- append-only measurement inference")
+print("================================================================")
+est0 := prepare_unknown(1)
+print("prior (unknown state)  :", est0, " entropy =", entropy(est0))
+
+probe := qubit(1)               # the unknown state is |0>
+observe(probe)                  # measuring commit sharpens the prior
+print("after 1 observation    :", estimate(), " entropy =", entropy(estimate()))
+observe(probe)
+print("after 2 observations   :", estimate(), " entropy =", entropy(estimate()))
+print("certified-impossible states:", forbidden())
+print("")
+print("(measurement history == ledger trace: ", len(tuplespace), "facts)")
+print("================================================================")
