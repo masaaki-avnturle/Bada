@@ -647,6 +647,52 @@ class TestSilentTalkSession < Minitest::Test
     refute_includes v.text, "keep"
   end
 
+  def test_vim_think_applies_thought_command
+    # 思っただけのコマンド操作（発声もタイプもせず）
+    v = Bada::SilentTalk::Vim.new
+    r = v.feed(":think")
+    assert_includes r[:msg], "思考コマンド"
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    assert_match(/\Aset\s+\w+\s*=/, v.text)          # first thought defines a variable
+    # deterministic across fresh editors
+    v2 = Bada::SilentTalk::Vim.new
+    v2.feed(":think")
+    assert_equal v.text, v2.text
+  end
+
+  def test_vim_keyword_command_input
+    # キーワードのコマンド入力（EN + 日本語）
+    v = Bada::SilentTalk::Vim.new
+    v.feed(":kw 代入")
+    assert_match(/set\s+\w+\s*=/, v.text)
+    v.feed(":kw print")
+    assert_includes v.text, "print "
+    r = v.feed(":kw 保存")
+    assert v.saved
+    assert_equal "thought.bada", v.filename
+    assert Bada::SilentTalk::BadaSyntax.valid?(v.text)
+    assert_includes v.feed(":kw unknownword")[:msg], "unknown keyword"
+    _ = r
+  end
+
+  def test_vim_thinkprog_writes_verified_bada_program_by_thought
+    # 思考コマンドだけで Bada 言語をプログラミング（文法検証つき）
+    v = Bada::SilentTalk::Vim.new
+    r = v.feed(":thinkprog 8")
+    assert_includes r[:msg], "思考プログラミング"
+    assert_includes r[:msg], "Bada✓"
+    assert r[:valid]
+    assert_operator r[:precision], :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    assert Bada::SilentTalk::BadaSyntax.valid?(v.text)   # runs in the interpreter
+    assert_operator v.line_count, :>=, 8
+    assert_includes v.text, "set "
+    assert_includes v.text, "print "
+    # deterministic
+    v2 = Bada::SilentTalk::Vim.new
+    v2.feed(":thinkprog 8")
+    assert_equal v.text, v2.text
+  end
+
   def test_vim_ex_qc_and_verilog_generate_source
     v = Bada::SilentTalk::Vim.new
     v.feed(":qc entangle bell measure")

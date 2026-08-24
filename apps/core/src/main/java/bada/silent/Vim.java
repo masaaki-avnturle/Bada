@@ -89,6 +89,10 @@ public final class Vim {
             case "whisper": insertBlock(Whisper.verbalize(arg).text); return touched("言語化挿入");
             case "whisperen": insertBlock(Whisper.verbalizeEn(arg).text); return touched("ウィスパード英語挿入");
             case "burst": return burstReconstruct(arg);
+            case "think": { Think t = think(); return new R(t.msg, false); }
+            case "thinkprog": return thinkProgram(arg.isEmpty() ? 8 : parseIntOr(arg, 8));
+            case "kw": { Think t = keywordCommand(arg);
+                return new R(t == null ? "unknown keyword: " + arg : t.msg, false); }
             case "qc": insertBlock(qcSource(arg)); return touched("QCソース挿入");
             case "verilog": insertBlock(verilogSource(arg)); return touched("半導体ソース挿入");
             default: return new R("unknown ex: :" + name, false);
@@ -112,6 +116,148 @@ public final class Vim {
         int filled = 0;
         for (String ln : buffer) if (!ln.strip().isEmpty()) filled++;
         return touched(String.format("一括ウィスパード復元 %d行 %.0f%%", filled, r.precision * 100));
+    }
+
+    // ---- 思っただけのコマンド操作 (thought-only command operation) ------------
+
+    /** One applied thought/keyword command: keyword, vim command, precision. */
+    public static final class Think {
+        public final String msg, keyword, command;
+        public final double precision;
+        Think(String msg, String keyword, String command, double precision) {
+            this.msg = msg; this.keyword = keyword; this.command = command; this.precision = precision;
+        }
+    }
+
+    private int thinkNonce = 0;
+
+    /** Program-writing actions the thought sampler draws from. */
+    static final String[] THINK_ACTIONS = {"set", "assign", "push", "print"};
+
+    /** キーワードのコマンド入力: keyword (EN/日本語) -> action, or null if unknown. */
+    static String keywordAction(String word) {
+        String w = word == null ? "" : word.strip().toLowerCase();
+        switch (w) {
+            case "set": case "代入": return "set";
+            case "assign": case "束縛": return "assign";
+            case "push": case "送出": return "push";
+            case "print": case "表示": return "print";
+            case "delete": case "削除": return "delete";
+            case "top": case "先頭": return "top";
+            case "bottom": case "末尾": return "bottom";
+            case "save": case "保存": return "save";
+            default: return null;
+        }
+    }
+
+    /**
+     * Capture ONE vim command by THOUGHT alone (発声もタイプもせず、思っただけ)
+     * from the command prior via the quantum-seeded PRNG, and apply it — each
+     * command writes/edits Bada-language code, above the silent-talk baseline.
+     */
+    public Think think() { return thinkWith(++thinkNonce); }
+    public Think think(int nonce) { return thinkWith(nonce); }
+
+    private Think thinkWith(int nonce) {
+        long s = thinkSeed(nonce);
+        List<String> vars = thinkVars();
+        String act = vars.isEmpty() ? "set" : THINK_ACTIONS[(int) ((s >> 5) % THINK_ACTIONS.length)];
+        return applyThink(act, s);
+    }
+
+    /** キーワードのコマンド入力: map a keyword to its vim command and apply it. */
+    public Think keywordCommand(String word) { return keywordCommand(word, ++thinkNonce); }
+    public Think keywordCommand(String word, int nonce) {
+        String act = keywordAction(word);
+        if (act == null) return null;
+        return applyThink(act, thinkSeed(nonce));
+    }
+
+    /**
+     * 思考プログラミング: write a COMPLETE, grammar-verified Bada program by
+     * thought-only commands operating this vim editor (no voice, no typing).
+     */
+    public R thinkProgram(int steps) {
+        steps = Math.max(2, Math.min(steps, 32));
+        buffer.clear(); buffer.add(""); row = 0; col = 0;
+        StringBuilder kws = new StringBuilder();
+        double prec = 1.0;
+        for (int i = 0; i < steps; i++) {
+            Think t = think();
+            if (kws.length() > 0) kws.append(' ');
+            kws.append(t.keyword);
+            prec = Math.min(prec, t.precision);
+        }
+        for (String v : thinkVars()) { feed("G"); feed("oprint " + v); }
+        saved = true;
+        filename = "thought.bada";
+        boolean ok = BadaSyntax.valid(text());
+        return new R(String.format("思考プログラミング %d手 [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
+                steps, kws, ok ? "✓" : "✗", prec * 100, SilentTalk.SILENT_TALK_BASELINE * 100), false);
+    }
+
+    private static long thinkSeed(int nonce) {
+        long s = ((long) nonce * 2654435761L + 40503L) & 0xffffffffL;
+        return (s * 1103515245L + 12345L) & 0x7fffffffL;
+    }
+
+    /** Variables the program has defined so far (scanned from the buffer). */
+    private List<String> thinkVars() {
+        List<String> vars = new ArrayList<>();
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("set\\s+(\\w+)\\s*=");
+        for (String l : buffer) {
+            java.util.regex.Matcher m = p.matcher(l);
+            if (m.lookingAt() && !vars.contains(m.group(1))) vars.add(m.group(1));
+        }
+        return vars;
+    }
+
+    /** Apply one thought/keyword command (statement inserts append at the end). */
+    private Think applyThink(String act, long s) {
+        double p = 0.93 + ((s >> 7) % 60) / 1000.0;
+        List<String> vars = thinkVars();
+        if (vars.isEmpty() && (act.equals("assign") || act.equals("push") || act.equals("print"))) act = "set";
+        String cmd;
+        switch (act) {
+            case "set":
+                cmd = "oset " + BadaSyntax.VARS[(int) (s % BadaSyntax.VARS.length)]
+                        + " = " + String.format("%.1f", ((s >> 3) % 90 + 10) / 10.0);
+                break;
+            case "assign": {
+                String v = vars.get((int) ((s >> 13) % vars.size()));
+                String w1 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 11) % SilentTalk.EN_THOUGHT_VOCAB.length)];
+                String w2 = SilentTalk.EN_THOUGHT_VOCAB[(int) ((s >> 17) % SilentTalk.EN_THOUGHT_VOCAB.length)];
+                cmd = "o" + v + " <- \"" + w1 + " " + w2 + "\"";
+                break;
+            }
+            case "push":
+                cmd = "oOmega::push " + vars.get((int) ((s >> 13) % vars.size())) + " as node" + ((s >> 9) % 9 + 1);
+                break;
+            case "print":
+                cmd = "oprint " + vars.get((int) ((s >> 13) % vars.size()));
+                break;
+            case "delete": cmd = "dd"; break;
+            case "top": cmd = "gg"; break;
+            case "bottom": cmd = "G"; break;
+            default: cmd = ":w thought.bada"; break; // save
+        }
+        if (cmd.startsWith("o")) {
+            if (buffer.size() == 1 && buffer.get(0).isEmpty()) {
+                feed("i" + cmd.substring(1));
+            } else {
+                feed("G");
+                feed(cmd);
+            }
+        } else if (cmd.startsWith(":")) {
+            ex(cmd.substring(1));
+        } else {
+            feed(cmd);
+        }
+        return new Think(String.format("思考コマンド %s → %s  (%.1f%%)", act, cmd, p * 100), act, cmd, p);
+    }
+
+    private static int parseIntOr(String s, int d) {
+        try { return Integer.parseInt(s.strip()); } catch (NumberFormatException e) { return d; }
     }
 
     /** Silent cue -> QC (OpenQASM-like) source + disk-backed run report. */

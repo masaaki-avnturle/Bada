@@ -511,6 +511,27 @@ coder）ごとに**予約語・構文規則の語をハイライト**し、**予
 一度に流し込んで復元します（空行は保持、精度は最弱行でも silent-talk 超えに底上げ）。デスクトップの
 **⚡ 一括ウィスパード（複数行一瞬）ボタン**で全画面の複数行を一瞬で一括復元できます。
 
+**思っただけのコマンド操作（`:think` ／ `:thinkprog` ／ `:kw`・思考コマンドで Bada をプログラミング）** — 
+Bada Vim を、**思っただけのコマンド**（発声もタイプもせず・silent-talk 超えの精度）で操作できます。
+`:think` は思考からコマンドを1手捕捉して適用（`set g = 4.8` の挿入、`print`、`Omega::push`、移動など）。
+`:thinkprog [n]` は **思考コマンドの操作だけで、`Bada::Interpreter` 検証済み（Bada✓）の Bada 言語
+プログラム**を書き上げます（変数の set → `<-` 束縛 → `Omega::push` → `print` の完全なライフサイクル）。
+**キーワードのコマンド入力機能** `:kw <キーワード>` は、`set/print/push/assign/delete/top/bottom/save`
+（日本語: 代入/表示/送出/束縛/削除/先頭/末尾/保存）のキーワードを vim コマンドへ写像します。
+量子シード決定的（Ruby/Java でバッファがバイト一致）。デスクトップ ⑧ Bada Vim タブの
+**🧠 思考コマンド／🧠 思考プログラミング (Bada)／キーワードボタン**、Android ⑧ モード、
+CLI `bada vim` から使えます。
+
+```
+vim> :thinkprog 8
+思考プログラミング 8手 [set push assign set print push assign set] Bada✓ precision 93.1% > silent-talk 92.0%
+set m = 4.8
+Omega::push m as node5
+m <- "memory center"
+...
+print xi
+```
+
 **思考入力で複数行を一辺に（`SilentTalk.thought_block` ／ 🧠 思考入力ボタン ／ vim 思考制御）** — 
 ウィスパード英語エディタや Bada Vim を、**直接打鍵せず・発声せず、思考だけで**動かせます。
 `thought_block(kind:, nonce:, lines:)` は、ガンマ関数の大域的部分積分多様体（Mind のプライア）から

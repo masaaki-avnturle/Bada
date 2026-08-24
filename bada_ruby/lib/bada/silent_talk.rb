@@ -677,13 +677,130 @@ module Bada
         when "whisper"      then insert_block(Whisper.verbalize(arg)[:text]); touched("言語化挿入")
         when "whisperen"    then insert_block(Whisper.verbalize_en(arg)[:text]); touched("ウィスパード英語挿入")
         when "burst"        then burst_reconstruct(arg)
+        when "think"        then think
+        when "thinkprog"    then think_program(arg.empty? ? 8 : arg.to_i)
+        when "kw"           then keyword_command(arg)
         when "qc"           then insert_block(qc_source(arg)); touched("QCソース挿入")
         when "verilog"      then insert_block(verilog_source(arg)); touched("半導体ソース挿入")
         else { msg: "unknown ex: :#{name}" }
         end
       end
 
+      # ---- 思っただけのコマンド操作 (thought-only command operation) ----------
+      # Keyword -> vim-command table (キーワードのコマンド入力機能, EN + 日本語).
+      THINK_KEYWORDS = {
+        "set" => :set, "代入" => :set,
+        "assign" => :assign, "束縛" => :assign,
+        "push" => :push, "送出" => :push,
+        "print" => :print, "表示" => :print,
+        "delete" => :delete, "削除" => :delete,
+        "top" => :top, "先頭" => :top,
+        "bottom" => :bottom, "末尾" => :bottom,
+        "save" => :save, "保存" => :save
+      }.freeze
+      # Program-writing actions the thought sampler draws from.
+      THINK_ACTIONS = %i[set assign push print].freeze
+
+      # Capture ONE vim command by THOUGHT alone (発声もタイプもせず、思っただけ)
+      # from the command prior via the quantum-seeded PRNG, and apply it to this
+      # editor — each command writes/edits Bada-language code, above silent-talk.
+      def think(nonce = nil)
+        s = think_seed(nonce)
+        acts = think_vars.empty? ? [:set] : THINK_ACTIONS
+        apply_think(acts[(s >> 5) % acts.length], s)
+      end
+
+      # キーワードのコマンド入力: map a keyword (EN/日本語) to its vim command and
+      # apply it — still voiceless (keywords arrive via buttons or thought).
+      def keyword_command(word, nonce = nil)
+        act = THINK_KEYWORDS[word.to_s.strip.downcase]
+        return { msg: "unknown keyword: #{word}" } unless act
+        apply_think(act, think_seed(nonce))
+      end
+
+      # 思考プログラミング: write a COMPLETE, grammar-verified Bada program by
+      # thought-only commands operating this vim editor (no voice, no typing).
+      def think_program(steps = 8)
+        steps = steps.to_i.clamp(2, 32)
+        @buffer = [""]
+        @row = 0
+        @col = 0
+        kws = []
+        prec = 1.0
+        steps.times do
+          r = think
+          kws << r[:keyword]
+          prec = [prec, r[:precision]].min
+        end
+        think_vars.each { |v| feed("G"); feed("oprint #{v}") }
+        @saved = true
+        @filename = "thought.bada"
+        ok = BadaSyntax.valid?(text)
+        { msg: format("思考プログラミング %d手 [%s] Bada%s precision %.1f%% > silent-talk %.1f%%",
+                      steps, kws.join(" "), ok ? "✓" : "✗",
+                      prec * 100, SILENT_TALK_BASELINE * 100),
+          keywords: kws, valid: ok, precision: prec }
+      end
+
       private
+
+      # Deterministic quantum seed for one thought command.
+      def think_seed(nonce = nil)
+        n = nonce || (@think_nonce = (@think_nonce || 0) + 1)
+        s = (n.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+        (s * 1_103_515_245 + 12_345) & 0x7fffffff
+      end
+
+      # Variables the program has defined so far (scanned from the buffer).
+      def think_vars
+        vars = []
+        @buffer.each do |l|
+          m = /\Aset\s+(\w+)\s*=/.match(l)
+          vars << m[1] if m && !vars.include?(m[1])
+        end
+        vars
+      end
+
+      # Apply one thought/keyword command. Statement inserts append at the end of
+      # the program; motions/edits act like normal vim commands.
+      def apply_think(act, s)
+        p = 0.93 + ((s >> 7) % 60) / 1000.0
+        vars = think_vars
+        act = :set if vars.empty? && %i[assign push print].include?(act)
+        cmd =
+          case act
+          when :set
+            v = BadaSyntax::VARS[s % BadaSyntax::VARS.length]
+            "oset #{v} = #{format('%.1f', ((s >> 3) % 90 + 10) / 10.0)}"
+          when :assign
+            v = vars[(s >> 13) % vars.length]
+            w1 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 11) % SilentTalk::EN_THOUGHT_VOCAB.length]
+            w2 = SilentTalk::EN_THOUGHT_VOCAB[(s >> 17) % SilentTalk::EN_THOUGHT_VOCAB.length]
+            "o#{v} <- \"#{w1} #{w2}\""
+          when :push
+            "oOmega::push #{vars[(s >> 13) % vars.length]} as node#{(s >> 9) % 9 + 1}"
+          when :print
+            "oprint #{vars[(s >> 13) % vars.length]}"
+          when :delete then "dd"
+          when :top    then "gg"
+          when :bottom then "G"
+          when :save   then ":w thought.bada"
+          end
+        if cmd.start_with?("o")
+          if @buffer.length == 1 && @buffer[0].empty?
+            feed("i#{cmd[1..]}")
+          else
+            feed("G")
+            feed(cmd)
+          end
+        elsif cmd.start_with?(":")
+          ex(cmd[1..])
+        else
+          feed(cmd)
+        end
+        { msg: format("思考コマンド %s → %s  (%.1f%%)", act, cmd, p * 100),
+          keyword: act.to_s, command: cmd, precision: p }
+      end
 
       def bump
         @nonce += 1

@@ -19,7 +19,7 @@ public final class BadaSyntax {
     public static final String[] NAMESPACES = {"Omega::", "Ω::"};                  // TupleSpace 名前空間
     public static final String[] OPERATORS  = {"<-", "-<", ">-"};                  // 構文規則の演算子
     public static final String ASSIGN = "=";
-    private static final String[] VARS = {"g", "h", "m", "psi", "phi", "node", "xi"};
+    static final String[] VARS = {"g", "h", "m", "psi", "phi", "node", "xi"};
 
     // The Bada statement forms (what the interpreter accepts).
     private static final Pattern[] FORMS = {

@@ -741,6 +741,30 @@ public final class DesktopApp {
             } catch (Exception ignored) { }
         };
 
+        // 思っただけのコマンド操作: route thought/keyword commands through the core
+        // Vim engine (built from the on-screen buffer), then write the result back.
+        final int[] thinkN = { 0 };
+        final java.util.function.Consumer<String> runThinkCmd = (cmd) -> {
+            try {
+                Vim v = new Vim(editor.getText());
+                String msg;
+                if (cmd.startsWith("thinkprog")) {
+                    msg = v.ex(cmd).msg;
+                } else if (cmd.startsWith("kw")) {
+                    String w = cmd.length() > 2 ? cmd.substring(2).trim() : "";
+                    Vim.Think t = v.keywordCommand(w, ++thinkN[0]);
+                    msg = t == null ? "unknown keyword: " + w : t.msg;
+                } else {
+                    msg = v.think(++thinkN[0]).msg;
+                }
+                editor.setText(v.text());
+                editor.setCaretPosition(editor.getText().length());
+                ft[0] = "bada"; ftBox.setSelectedItem("bada");
+                rebuildWords.run(); rehl.run(); refresh.run();
+                status.setText("  " + msg + "（発声・打鍵なし）");
+            } catch (Exception ex2) { status.setText("  error: " + ex2.getMessage()); }
+        };
+
         // Shared ex-command executor so both the ":" line and the toolbar buttons drive it.
         final java.util.function.Consumer<String> runEx = (line) -> {
             if (line == null) return;
@@ -761,6 +785,7 @@ public final class DesktopApp {
                     case "report": block = Whisper.longReport(arg).text; break;
                     case "whisper": block = Whisper.verbalize(arg).text; break;
                     case "whisperen": block = Whisper.verbalizeEn(arg).text; break;
+                    case "think": case "thinkprog": case "kw": runThinkCmd.accept(line); return;
                     case "burst":
                         if (arg.isEmpty()) { burstWholeBuffer.run(); return; }
                         block = Whisper.verbalizeBlock(String.join("\n", arg.split(";"))).text; break;
@@ -903,15 +928,39 @@ public final class DesktopApp {
             gen.add(b);
         }
 
-        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入(複数行を一辺に)・Esc ノーマル/一括復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:burst 全行一括 :whisperen :math :bada :qc :verilog :latex :set ft= :w :q）");
+        // 思っただけのコマンド操作＋キーワードのコマンド入力 (voiceless, no typing)
+        final JPanel thinkRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        thinkRow.add(new JLabel("思考コマンド:"));
+        JButton bTc = new JButton("🧠 思考コマンド");
+        bTc.setToolTipText("思っただけのコマンドを1手捕捉して、この vim に適用します（発声・打鍵なし・silent-talk 超え精度）");
+        bTc.setFocusable(false);
+        bTc.addActionListener(ev -> runThinkCmd.accept("think"));
+        thinkRow.add(bTc);
+        JButton bTp = new JButton("🧠 思考プログラミング (Bada)");
+        bTp.setToolTipText("思っただけのコマンド操作だけで、文法検証済みの Bada 言語プログラムをこの vim に書きます（発声・打鍵なし）");
+        bTp.setFocusable(false);
+        bTp.addActionListener(ev -> runThinkCmd.accept("thinkprog 8"));
+        thinkRow.add(bTp);
+        thinkRow.add(new JLabel("キーワード:"));
+        for (String kwd : new String[]{"set", "print", "push", "assign", "delete", "top", "bottom", "save"}) {
+            JButton b = new JButton(kwd);
+            b.setMargin(new Insets(1, 5, 1, 5));
+            b.setFocusable(false);
+            b.setToolTipText("キーワードのコマンド入力（発声せず・:kw " + kwd + "）");
+            b.addActionListener(ev -> runThinkCmd.accept("kw " + kwd));
+            thinkRow.add(b);
+        }
+
+        JLabel help = new JLabel("  Bada Vim: i/a/o 挿入・W ウィスパード英語挿入(複数行を一辺に)・Esc ノーマル/一括復元・dd/x 削除・hjkl 0 $ gg G・: で ex（:think 思考コマンド :thinkprog 思考プログラミング :kw キーワード :burst :whisperen :math :bada :qc :verilog :latex :set ft= :w :q）");
         help.setBorder(BorderFactory.createEmptyBorder(6, 4, 0, 4));
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
         topBar.add(new JLabel("filetype:")); topBar.add(ftBox);
         JPanel top = new JPanel(new BorderLayout());
-        JPanel topInner = new JPanel(new BorderLayout());
-        topInner.add(topBar, BorderLayout.NORTH);
-        topInner.add(gen, BorderLayout.CENTER);
-        topInner.add(words, BorderLayout.SOUTH);
+        JPanel topInner = new JPanel(new GridLayout(0, 1));
+        topInner.add(topBar);
+        topInner.add(gen);
+        topInner.add(thinkRow);
+        topInner.add(words);
         top.add(help, BorderLayout.NORTH);
         top.add(topInner, BorderLayout.CENTER);
 
