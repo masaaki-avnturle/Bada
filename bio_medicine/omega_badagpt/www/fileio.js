@@ -528,12 +528,17 @@ const FileIO = (() => {
   }
 
   // ---- ダウンロード補助 --------------------------------------------------
-  // 3 段構え:
-  //   1) Cordova (Android APK): WebView は <a download> を無視するため、
-  //      cordova-plugin-file でアプリの外部ストレージ領域へ直接書き込む。
-  //      保存後は "fileio-saved" イベントで保存先パスを通知する。
-  //   2) 通常ブラウザ / Electron: <a download> + blob URL。
-  //   3) それも失敗した場合: data: URI を新規タブで開く最終フォールバック。
+  // 4 段構え:
+  //   1) Cordova (Android APK) 最優先: cordova-plugin-save-dialog で
+  //      Android 標準の「保存」ダイアログ (SAF) を開き、ユーザーが選んだ場所
+  //      (ダウンロード フォルダ等) に保存する。権限不要・全 Android 対応で、
+  //      保存したファイルがファイルアプリから必ず見える。
+  //   2) Cordova でダイアログ未対応: cordova-plugin-file でアプリの外部
+  //      ストレージ領域へ直接書き込み (Android 11+ ではファイルアプリから
+  //      見えないことがあるためあくまで代替)。
+  //   3) 通常ブラウザ / Electron: <a download> + blob URL。
+  //   4) それも失敗した場合: data: URI を新規タブで開く最終フォールバック。
+  //   保存成功時は "fileio-saved" イベントで保存先を通知する。
   function notifySaved(filename, where) {
     try {
       document.dispatchEvent(new CustomEvent("fileio-saved",
@@ -574,11 +579,23 @@ const FileIO = (() => {
     reader.readAsDataURL(blob);
   }
 
+  // Android 標準の保存ダイアログ (cordova-plugin-save-dialog / SAF)
+  function saveDialogSave(blob, filename) {
+    const sd = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
+    if (!sd || typeof sd.saveFile !== "function") return Promise.reject(new Error("no save dialog"));
+    return sd.saveFile(blob, filename).then(uri => {
+      notifySaved(filename, uri || "選択した場所に保存しました");
+      return uri;
+    });
+  }
+
   function download(blob, filename) {
     if (window.cordova) {
-      cordovaSave(blob, filename).catch(() => {
-        try { anchorSave(blob, filename); } catch (e) { dataUriFallback(blob, filename); }
-      });
+      saveDialogSave(blob, filename)
+        .catch(() => cordovaSave(blob, filename))
+        .catch(() => {
+          try { anchorSave(blob, filename); } catch (e) { dataUriFallback(blob, filename); }
+        });
       return;
     }
     try { anchorSave(blob, filename); }
