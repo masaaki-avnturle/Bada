@@ -223,6 +223,11 @@
   </div>
 </div>
 
+<!-- cordova.js: APK (Cordova) 実行時にビルドが実体を供給し、window.cordova と
+     保存プラグイン (saf-mediastore / save-dialog / file) を初期化する。
+     これが無いとプラグインが一切動かず、保存ボタンが APK 内で無反応になる。
+     ブラウザ / Electron では 404 になるだけで無害。 -->
+<script src="cordova.js"></script>
 <script src="engine.js"></script>
 <script src="fileio.js"></script>
 <script src="claude.js"></script>
@@ -675,6 +680,20 @@ document.addEventListener("fileio-saved", e => {
   setStatus("ok", `💾 保存しました: <b>${escapeHtml(d.filename || "")}</b><br>` +
     `<span class="muted">${escapeHtml(d.where || "")}</span>`);
 });
+
+// APK 起動時: 利用可能な保存方式をドロップ欄の下に表示 (動作診断用)
+document.addEventListener("deviceready", () => {
+  const p = (window.cordova && window.cordova.plugins) || {};
+  const mode = (p.safMediastore && p.safMediastore.writeFile) ? "ダウンロードフォルダ直接保存 (MediaStore)"
+    : (p.saveDialog && p.saveDialog.saveFile) ? "保存ダイアログ (SAF)"
+    : (window.cordova && window.cordova.file) ? "アプリ領域保存"
+    : "プラグインなし (要 APK 更新)";
+  const el = document.createElement("div");
+  el.className = "note";
+  el.textContent = "📱 APK 保存方式: " + mode;
+  const drop = document.getElementById("drop");
+  if (drop && drop.parentNode) drop.parentNode.insertBefore(el, drop);
+}, false);
 function escapeHtml(s){ return (s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 </script>
 </body>
