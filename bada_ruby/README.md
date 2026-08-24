@@ -597,6 +597,8 @@ Bada::SilentTalk.thought_capture(kind: :qasm,  nonce: 2)  # -> QC/半導体プ�
 | 大域的部分積分多様体から捕捉 | `capture_cue` が Mind プライアを量子シード PRNG でサンプリング |
 | silent talk 以上の精度 | precision を基準 0.92 超に保証して返す |
 | 入力機能のボタン | デスクトップ Swing ボタン／Android ボタン（タップで即捕捉） |
+| 英語モードの単語の思考入力 | `thought_capture(kind: :en)` / `thought_block(kind: :en)` が英語版多様体プライア `capture_cue_en` を量子シードで標本化（発声もタイプもせず・silent-talk 超え・Ruby/Java バイト一致） |
+| 全機能に英語思考入力ボタン | 各エンジンの「🧠 英語思考入力」ボタン（ウィスパード英語エディタは複数行一辺に） |
 
 ## ChatΩ — AGI 自己進化チャット（chatGPT の進化版） — `Bada::AGI`
 

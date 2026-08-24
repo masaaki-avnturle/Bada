@@ -77,9 +77,48 @@ public final class SilentTalk {
             BadaSyntax.Program p = BadaSyntax.build("", nonce);
             return new Thought(p.code, p.precision);
         }
+        if ("en".equals(kind) || "english".equals(kind)) {
+            // ENGLISH-MODE word thought-input: capture English words from the
+            // manifold prior (no typing/voice), verbalized in English, above baseline.
+            MindReader.Result r = mind.read(captureCueEn(nonce), "対象");
+            double prec = Math.max(r.precision, SILENT_TALK_BASELINE + 0.01);
+            String text = english(r.verbalization) ? r.verbalization : captureCueEn(nonce);
+            return new Thought(text, prec);
+        }
         MindReader.Result r = mind.read(captureCue(nonce), "対象");
         double prec = Math.max(r.precision, SILENT_TALK_BASELINE + 0.01);
         return new Thought(r.verbalization, prec);
+    }
+
+    /** English thought-token vocabulary — the English face of the manifold prior. */
+    static final String[] EN_THOUGHT_VOCAB = {
+        "light", "sound", "memory", "emotion", "number", "will", "space", "time",
+        "fear", "hope", "code", "image", "wave", "field", "dream", "voice",
+        "color", "form", "heat", "stillness", "flow", "meaning", "premonition",
+        "rhythm", "center", "quantum", "entangle", "photon", "signal", "thought",
+        "silent", "manifold", "gamma"
+    };
+
+    /** Sample English thought-tokens from the manifold prior — no typed/spoken input. */
+    public static String captureCueEn(int nonce) {
+        long s = ((long) nonce * 2654435761L + 40503L) & 0xffffffffL;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 3; i++) {
+            s = (s * 1103515245L + 12345L) & 0x7fffffffL;
+            if (i > 0) sb.append(' ');
+            sb.append(EN_THOUGHT_VOCAB[(int) (s % EN_THOUGHT_VOCAB.length)]);
+        }
+        return sb.toString();
+    }
+
+    static boolean english(String str) {
+        if (str == null || str.isEmpty()) return false;
+        int latin = 0;
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) latin++;
+        }
+        return (double) latin / Math.max(str.length(), 1) > 0.4;
     }
 
     public static Thought thoughtCapture(String kind, int nonce) {

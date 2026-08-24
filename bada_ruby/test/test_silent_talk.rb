@@ -385,6 +385,24 @@ class TestSilentTalkSession < Minitest::Test
     refute_equal t.text, t3.text
   end
 
+  def test_thought_capture_en_returns_english_above_baseline
+    # 英語モードの単語の思考入力（発声もタイプもせず）
+    t = Bada::SilentTalk.thought_capture(kind: :en, nonce: 0)
+    assert_match(/[A-Za-z]/, t.text)
+    refute_match(/[ぁ-んァ-ン一-龠]/, t.text)          # no Japanese in English mode
+    assert_operator t.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+    # deterministic
+    assert_equal t.text, Bada::SilentTalk.thought_capture(kind: :en, nonce: 0).text
+  end
+
+  def test_thought_block_en_captures_many_english_lines_at_once
+    b = Bada::SilentTalk.thought_block(kind: :en, nonce: 2, lines: 5)
+    lines = b.text.split("\n", -1)
+    assert_equal 5, lines.length
+    assert lines.all? { |l| l =~ /[A-Za-z]/ }, "every line must be English"
+    assert_operator b.precision, :>, Bada::SilentTalk::SILENT_TALK_BASELINE
+  end
+
   def test_verbalize_block_reconstructs_many_lines_at_once
     cue = "qntm lght wv\nmmry sgnl fld\n\nbll ntngl"
     r = Bada::SilentTalk::Whisper.verbalize_block(cue)

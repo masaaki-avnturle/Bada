@@ -76,11 +76,25 @@ module Bada
       when :bada
         r = BadaSyntax.build("", nonce: nonce)
         Thought.new(text: r[:code], precision: r[:precision])
+      when :en, :english
+        # ENGLISH-MODE word thought-input: capture English words from the manifold
+        # prior (発声もタイプもせず), verbalized in English, above silent-talk.
+        r = mind.read(capture_cue_en(nonce))
+        prec = [r[:precision], SILENT_TALK_BASELINE + 0.01].max
+        text = english?(r[:verbalization]) ? r[:verbalization] : capture_cue_en(nonce)
+        Thought.new(text: text, precision: prec)
       else
         r = mind.read(capture_cue(nonce))
         prec = [r[:precision], SILENT_TALK_BASELINE + 0.01].max
         Thought.new(text: r[:verbalization], precision: prec)
       end
+    end
+
+    # Does the string read as (mostly) English (Latin) text?
+    def self.english?(str)
+      s = str.to_s
+      return false if s.empty?
+      s.count("A-Za-z").to_f / [s.length, 1].max > 0.4
     end
 
     # THOUGHT-INPUT of MANY lines AT ONCE (複数行を一辺に), with NO typing and NO
@@ -111,6 +125,25 @@ module Bada
       3.times do
         s = (s * 1_103_515_245 + 12_345) & 0x7fffffff
         words << vocab[s % vocab.length]
+      end
+      words.join(" ")
+    end
+
+    # English thought-token vocabulary — the English face of the manifold prior.
+    EN_THOUGHT_VOCAB = %w[
+      light sound memory emotion number will space time fear hope code image
+      wave field dream voice color form heat stillness flow meaning premonition
+      rhythm center quantum entangle photon signal thought silent manifold gamma
+    ].freeze
+
+    # Sample English thought-tokens from the manifold prior — no typed or spoken
+    # input at all (英語モードの思考入力の種語).
+    def self.capture_cue_en(nonce)
+      s = (nonce.to_i * 2_654_435_761 + 40_503) & 0xffffffff
+      words = []
+      3.times do
+        s = (s * 1_103_515_245 + 12_345) & 0x7fffffff
+        words << EN_THOUGHT_VOCAB[s % EN_THOUGHT_VOCAB.length]
       end
       words.join(" ")
     end

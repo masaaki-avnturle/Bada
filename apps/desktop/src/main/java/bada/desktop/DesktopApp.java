@@ -160,7 +160,7 @@ public final class DesktopApp {
         inRow.add(new JLabel("メッセージ:"), BorderLayout.WEST);
         inRow.add(input, BorderLayout.CENTER);
         JPanel tgEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        tgEast.add(thoughtButton(input, "text")); tgEast.add(whisperButton(input)); tgEast.add(send);
+        tgEast.add(thoughtButton(input, "text")); tgEast.add(thoughtButtonEn(input)); tgEast.add(whisperButton(input)); tgEast.add(send);
         inRow.add(tgEast, BorderLayout.EAST);
         JPanel opts = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         opts.add(new JLabel("材料:")); opts.add(material);
@@ -204,7 +204,7 @@ public final class DesktopApp {
 
         JPanel ctl = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         ctl.add(new JLabel("量子ビット数:")); ctl.add(nq);
-        ctl.add(run); ctl.add(verilog); ctl.add(thoughtButton(qasm, "qasm")); ctl.add(whisperButton(qasm)); ctl.add(demo);
+        ctl.add(run); ctl.add(verilog); ctl.add(thoughtButton(qasm, "qasm")); ctl.add(thoughtButtonEn(qasm)); ctl.add(whisperButton(qasm)); ctl.add(demo);
 
         top.add(qasm, BorderLayout.CENTER);
         top.add(ctl, BorderLayout.SOUTH);
@@ -255,7 +255,7 @@ public final class DesktopApp {
         inRow.add(left, BorderLayout.WEST);
         inRow.add(signal, BorderLayout.CENTER);
         JPanel mindEast = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        mindEast.add(thoughtButton(signal, "text")); mindEast.add(whisperButton(signal)); mindEast.add(go);
+        mindEast.add(thoughtButton(signal, "text")); mindEast.add(thoughtButtonEn(signal)); mindEast.add(whisperButton(signal)); mindEast.add(go);
         inRow.add(mindEast, BorderLayout.EAST);
 
         JLabel note = new JLabel("※ 生成シミュレーション（実在の脳を読むものではありません）");
@@ -300,7 +300,7 @@ public final class DesktopApp {
         row1.add(l1, BorderLayout.WEST);
         row1.add(intent, BorderLayout.CENTER);
         JPanel r1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(thoughtButton(intent, "intent")); r1.add(whisperButton(intent)); r1.add(gen);
+        r1.add(new JLabel("言語:")); r1.add(lang); r1.add(thoughtButton(intent, "intent")); r1.add(thoughtButtonEn(intent)); r1.add(whisperButton(intent)); r1.add(gen);
         row1.add(r1, BorderLayout.EAST);
 
         // live word completion (command feature)
@@ -948,7 +948,7 @@ public final class DesktopApp {
         JPanel east = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         east.add(new JLabel("世代")); east.add(gens);
         east.add(new JLabel("個体")); east.add(pops);
-        east.add(thoughtButton(prompt, "text")); east.add(whisperButton(prompt)); east.add(ask);
+        east.add(thoughtButton(prompt, "text")); east.add(thoughtButtonEn(prompt)); east.add(whisperButton(prompt)); east.add(ask);
         inRow.add(east, BorderLayout.EAST);
 
         JLabel note = new JLabel("※ chatGPT の進化版シミュレーション（ガンマ大域的部分積分多様体×Jones多項式の自己進化）。実在の AGI ではありません");
@@ -1030,6 +1030,17 @@ public final class DesktopApp {
                     lines, t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
         });
 
+        JButton bThinkEn = new JButton("🧠 英語思考入力（単語・複数行）");
+        bThinkEn.setToolTipText("直接打鍵せず・発声せず、英語モードの単語を思考から複数行一辺に捕捉して入力します（silent-talk 超え精度）");
+        bThinkEn.addActionListener(ev -> {
+            SilentTalk.Thought t = SilentTalk.thoughtBlock("en", tnonce[0]++, 6);
+            ed.setText(t.text);
+            ed.setCaretPosition(ed.getText().length());
+            int lines = t.text.split("\n", -1).length;
+            st.setText(String.format("  🧠 英語思考入力 %d行を一辺に捕捉: precision %.1f%% > silent-talk %.1f%%（英語モード・発声打鍵なし）",
+                    lines, t.precision * 100, SilentTalk.SILENT_TALK_BASELINE * 100));
+        });
+
         JButton bBurst = new JButton("⚡ 一括復元（複数行を一瞬で）");
         bBurst.setToolTipText("入力した複数行のウィスパード英語を、発声せず一瞬で完全な英語へ一括復元します");
         bBurst.addActionListener(ev -> burst.run());
@@ -1053,7 +1064,7 @@ public final class DesktopApp {
         JLabel head = new JLabel("  全画面 Bada Vim：🧠 思考入力（打鍵せず複数行を一辺に）／複数行のウィスパード英語を発声せず一瞬で完全な英語へ（短文入力ではありません）。Ctrl+Enter=一括復元");
         head.setBorder(BorderFactory.createEmptyBorder(6, 4, 4, 4));
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        bar.add(bThink); bar.add(bBurst); bar.add(bOk); bar.add(bCancel);
+        bar.add(bThink); bar.add(bThinkEn); bar.add(bBurst); bar.add(bOk); bar.add(bCancel);
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(bar, BorderLayout.NORTH);
         bottom.add(st, BorderLayout.SOUTH);
@@ -1076,6 +1087,24 @@ public final class DesktopApp {
             field.setCaretPosition(0);
             b.setText(String.format("🧠 思考入力  ✓ %.0f%%", t.precision * 100));
             Timer revert = new Timer(1600, ev -> b.setText("🧠 思考入力"));
+            revert.setRepeats(false);
+            revert.start();
+        });
+        return b;
+    }
+
+    // English-mode WORD thought-input for EVERY engine field: capture English
+    // words from the manifold prior with no typing or voice, above silent-talk.
+    private static JButton thoughtButtonEn(javax.swing.text.JTextComponent field) {
+        final int[] nonce = {0};
+        JButton b = new JButton("🧠 英語思考入力");
+        b.setToolTipText("発声もタイプもせず、英語モードの単語を思考から捕捉してこの欄へ入力します（silent-talk 超え精度）");
+        b.addActionListener(e -> {
+            SilentTalk.Thought t = SilentTalk.thoughtCapture("en", nonce[0]++);
+            field.setText(t.text);
+            field.setCaretPosition(0);
+            b.setText(String.format("🧠 英語思考入力  ✓ %.0f%%", t.precision * 100));
+            Timer revert = new Timer(1600, ev -> b.setText("🧠 英語思考入力"));
             revert.setRepeats(false);
             revert.start();
         });
