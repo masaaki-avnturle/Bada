@@ -84,6 +84,8 @@
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Bada-GUI-IDE-*-x64.exe` |
 | **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Bada-GUI-IDE-*.AppImage` / `.deb` |
 | **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-gui-ide-debug.apk` |
+| **コマンドライン アプリ** (Windows) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-cli.exe` — 単一実行ファイル。`run` / `build` (Bada→C→gcc) / `emit` / `tokens` / `ast` / **対話 `repl`** / `examples` |
+| **コマンドライン アプリ** (Ubuntu) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-cli-linux-x64` — 同上 (`chmod +x` して実行) |
 
 ビルドは [`bada-ide-build.yml`](.github/workflows/bada-ide-build.yml) が自動実行します (`bada-ide-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) を参照。
 

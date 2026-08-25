@@ -1835,6 +1835,47 @@
       var p = parseProgram(src);
       var c = transpileToC(p.program);
       return { ok: p.errors.length === 0, c: c, errors: p.errors };
+    },
+    /* Interactive session (REPL): a persistent interpreter + a persistent
+       rule ledger, so bindings, the tuplespace, and @reviser : grammar
+       rules all survive across eval() calls. */
+    createSession: function (opts) {
+      opts = opts || {};
+      var outLines = [];
+      var interp = new Interp({
+        out: function (s) { outLines.push(s); if (opts.out) opts.out(s); },
+        maxSteps: opts.maxSteps
+      });
+      var ruleLedger = [];
+      return {
+        eval: function (src) {
+          outLines.length = 0;
+          var toks = tokenize(src);
+          var p = new Parser(toks);
+          p.ruleLedger = ruleLedger; /* grammar persists across lines */
+          var prog = node("PROGRAM", 1);
+          while (!p.check("EOF")) {
+            var d = p.parseDecl();
+            if (d) prog.kids.push(d);
+            if (p.errors.length > 50) break;
+          }
+          var result = { ok: true, errors: p.errors, output: "", value: null };
+          try {
+            var f = interp.exec(prog, interp.global);
+            if (f.val && f.val.t !== "nil") result.value = printValue(f.val);
+          } catch (e) {
+            result.ok = false;
+            result.errors = p.errors.concat(["[runtime error] " + String(e && e.message ? e.message : e)]);
+          }
+          result.ok = result.ok && p.errors.length === 0;
+          result.output = outLines.join("\n");
+          return result;
+        },
+        ledgerLen: function () { return interp.ledger.facts.length; },
+        rules: function () {
+          return ruleLedger.map(function (r) { return r.name + " (" + r.head + ")"; });
+        }
+      };
     }
   };
 });

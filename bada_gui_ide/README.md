@@ -163,6 +163,38 @@ Bell 状態 `[0.5, 0, 0, 0.5]` などを両経路で検証済み)。
 | Windows 10 / 11 | `Bada-GUI-IDE-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | Ubuntu | `Bada-GUI-IDE-*-x86_64.AppImage` / `bada-gui-ide_*_amd64.deb` |
 | Android | `bada-gui-ide-debug.apk` |
+| **CLI** Windows 10 / 11 | `bada-cli.exe` (単一実行ファイル・インストール不要) |
+| **CLI** Ubuntu | `bada-cli-linux-x64` (単一実行ファイル・インストール不要) |
+
+### 💻 コマンドライン アプリ (bada-cli)
+
+Node.js 不要の**単一実行ファイル** (Node SEA でパッケージ)。ダウンロードして
+すぐ使えます (Ubuntu は `chmod +x bada-cli-linux-x64` を一度実行):
+
+```sh
+bada-cli run      program.bada        # インタープリタ実行
+bada-cli build    program.bada -o p   # Bada -> C -> gcc でネイティブ化 (要 gcc)
+bada-cli emit     program.bada -o p.c # C を出力するだけ
+bada-cli tokens   program.bada        # トークン列
+bada-cli ast      program.bada        # AST
+bada-cli repl                         # 対話モード (量子ゲート/@reviser も使用可)
+bada-cli examples                     # 同梱サンプル一覧 (hello/engine/core/quantum/zone)
+bada-cli examples all -o samples/     # サンプルを .bada として書き出し
+bada-cli version
+```
+
+REPL では束縛・tuplespace・`@reviser : grammar` の文法拡張が行をまたいで
+持続します:
+
+```
+bada> reg := H(qubit(1))
+qreg[n=1] |psi|^2=[0.50000, 0.50000]
+bada> Measure(reg)
+dist[0.50000, 0.50000]
+bada> @reviser : grammar { rule "hadamard" postfix [ 'Had' '(' expr ')' ] => phase_uniform(_1) }
+bada> Measure(Had(qubit(1)))
+dist[0.50000, 0.50000]
+```
 
 ビルドは GitHub Actions (`.github/workflows/bada-ide-build.yml`) が行います。
 `bada-ide-v*` タグを push すると Release に自動添付、`workflow_dispatch`
@@ -183,7 +215,9 @@ bada_gui_ide/
   www/        IDE 本体 (index.html / app.js / bada.js 言語コア / examples.js)
   electron/   Windows EXE / Ubuntu AppImage・deb ラッパー (gcc ネイティブ経路)
   cordova/    Android APK 設定
-  cli/        Node.js CLI:  node cli/bada-cli.js run|build|emit|tokens|ast <f.bada>
+  cli/        CLI アプリ:  run|build|emit|tokens|ast|repl|examples|version
+              (node cli/bada-cli.js … で実行、Release では単一バイナリ
+               bada-cli.exe / bada-cli-linux-x64 として配布)
   examples/   hello / engine / core / quantum / zone の各 .bada
 ```
 
