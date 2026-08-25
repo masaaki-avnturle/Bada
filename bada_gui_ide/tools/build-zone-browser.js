@@ -320,3 +320,11 @@ var ZONE_SITE = ${JSON.stringify(site)};
 
 fs.writeFileSync(path.join(DIST, "zone-browser.html"), html);
 console.log("built dist/zone-browser.html (" + fs.statSync(path.join(DIST, "zone-browser.html")).size + " bytes)");
+
+/* also stage it as the ZoneBrowser app's www/index.html (Electron / Cordova) */
+const APPWWW = path.join(IDE, "zonebrowser-app", "www");
+if (fs.existsSync(path.join(IDE, "zonebrowser-app"))) {
+  fs.mkdirSync(APPWWW, { recursive: true });
+  fs.writeFileSync(path.join(APPWWW, "index.html"), html);
+  console.log("staged zonebrowser-app/www/index.html");
+}

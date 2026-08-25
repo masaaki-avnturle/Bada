@@ -117,6 +117,23 @@ GET "zone://url.or.jp/"
 サイト内容は [`browser/zone-site.json`](browser/zone-site.json) を編集して
 `node tools/build-zone-browser.js` で再生成できます。
 
+### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+ブラウザ不要のインストール型アプリとして、[`zonebrowser-app/`](zonebrowser-app/) を同梱しています
+([Releases](https://github.com/masaaki-avnturle/Bada/releases) から入手):
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `zonebrowser-debug.apk` |
+| **Windows 10 / 11** | `ZoneBrowser-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `ZoneBrowser-*-x86_64.AppImage` / `ZoneBrowser-*-amd64.deb` |
+
+ZoneBrowser 本体 (自己完結 HTML) を `node tools/build-zone-browser.js` で生成し、
+Electron (Windows/Ubuntu) と Cordova (Android) で包みます。ビルドは
+[`zonebrowser-app-build.yml`](../.github/workflows/zonebrowser-app-build.yml) が実行します
+(`zonebrowser-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+Ubuntu の AppImage / deb はローカルでのビルドも確認済みです。
+
 ### その他のダウンロード形態
 
 インストール不要で、**1 ファイルだけ**でどこでも動く自己完結版:
