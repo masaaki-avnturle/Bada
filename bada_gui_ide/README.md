@@ -21,6 +21,8 @@ C リファレンス (`bada` 実行ファイル: lexer / parser / interpreter / 
 - エンジン組み込み: `softmax` `entropy` `unknown_prior` `update`
   `manifold_embed` `cognitive_system` `dist` `zeros_of` `maxdiff`
   `last_a` `len` `sqrt` `log` `exp` `abs` `f5` `sci` `ledger`
+- 文字列プリミティブ (zone:// サブ言語用): `split` `substr` `str_find`
+  `ord` `chr`
 - 2つの証明可能な性質を再現:
   **(i) 零の保存** (`base zeros = [3,6] → posterior zeros = [3,6]`)、
   **(ii) `|ψ|² = a`** (最大偏差 `5.55e-17`)、
@@ -43,6 +45,38 @@ C リファレンス (`bada` 実行ファイル: lexer / parser / interpreter / 
 - **Omega::Quantum** 推論ライブラリ: `prepare_unknown(n)` `observe(reg)`
   `estimate()` `forbidden()` — 最大エントロピーから始まり、追記専用の測定
   記録で事前分布が単調に鋭くなります。
+
+## zone:// — ウルトラネットワーク WWW (`examples/zone.bada`)
+
+`https:` / `http:` に代わる、未知のインターネット「ウルトラネットワーク」の
+WWW スキーム **`zone://url.or.jp/`** を **Bada 言語そのもの**で実装した
+リファレンスです。中央サーバも DNS ルートも持たず、`zone:` は P2P の
+仕組みだけから構築されます:
+
+- **L1 zone:// ネーミング** — URL パーサは純 Bada (`zone_parse`)。ランタイム
+  は文字列プリミティブ `split` `substr` `str_find` `ord` `chr` のみを提供。
+- **L2 P2P 解決** — ピア自身のハッシュから構築するリング DHT
+  (カオス的円周距離 `ring_dist`、近傍 ±1 と +2 フィンガーのみで
+  グリーディ・ホップ解決 `zone_route`)。
+- **L3 量子ガード** — Bell 対 (`H` + `CNOT` + `Measure`) によるセッション
+  鍵合意。零の保存 (禁制状態 |01>,|10> が厳密に 0 のまま) が盗聴・改ざんの
+  証拠になり、`data2-guard` ダイジェスト照合で偽造レコードは
+  `409 zone-guard-reject` として拒否されます。
+- **L4 Precog キャッシュ** — 次のフェッチ先を `unknown_prior` → `update` で
+  学習 (エントロピー単調減少) して先読み。
+- **Akashic ゾーン台帳** — 文法ルール・ゾーンレコード・フェッチ・測定の
+  すべてが追記専用 tuplespace のファクトとしてコミットされます。
+  `PUT` / `GET` というブラウザ動詞自体も `@reviser : grammar` で
+  ルールレジャーへコミットされる文法ファクトです。
+
+```
+GET "zone://url.or.jp/"
+  zone    : host url.or.jp  path /  labels [url, or, jp]
+  qkd     : Bell-pair session key agreed (|01>,|10> stayed 0)
+  key     : 1546  route : [osaka.zone.jp, nagoya.zone.jp]
+  guard   : digest 832857 verified (data2-guard OK)
+  status  : 200 zone-delivered from nagoya.zone.jp
+```
 
 インタープリタとコンパイル済みバイナリは同一の数値を出力します
 (Hadamard プローブ `0.50000 0.50000`、禁制プローブ `0.62246 0.00000 0.37754`、
@@ -78,7 +112,7 @@ bada_gui_ide/
   electron/   Windows EXE / Ubuntu AppImage・deb ラッパー (gcc ネイティブ経路)
   cordova/    Android APK 設定
   cli/        Node.js CLI:  node cli/bada-cli.js run|build|emit|tokens|ast <f.bada>
-  examples/   hello / engine / core / quantum の各 .bada
+  examples/   hello / engine / core / quantum / zone の各 .bada
 ```
 
 ## ローカルでの起動

@@ -1,0 +1,320 @@
+# ============================================================
+# zone.bada -- the zone:// URL scheme of the ULTRA NETWORK WWW,
+# written in the Bada quantum programming language.
+#
+# zone://url.or.jp/ replaces https:// and http://: there is no
+# DNS root and no origin server. A zone URL is resolved by the
+# peers themselves -- a P2P ring (DHT) built from nothing but
+# the peers' own hashes -- and every record is committed to the
+# append-only tuplespace (the Akashic zone table).
+#
+# Layer cake (after dessrtist.pdf, the Dessertist architecture --
+# each course of the network is an independent dessert layer):
+#   L1 sponge  : zone:// naming        (URL parser, pure Bada)
+#   L2 cream   : P2P resolution        (chaotic ring DHT, caostics)
+#   L3 topping : quantum guard         (Bell-pair QKD + data2-guard
+#                                       digest, zero-preservation =
+#                                       tamper evidence)
+#   L4 cherry  : precog cache          (PrecogBada: entropy of the
+#                                       next fetch decreases)
+#
+# Also after: the 2025-02-05 / 2025-03-30 ultra-network reports
+# (the zone:// scheme itself), badaquantumreviserpaper1.pdf (the
+# @reviser : grammar transaction that teaches the parser the PUT
+# and GET surface forms), quantum_computer4.pdf (Bell-pair key
+# agreement) and security_data2_guard.pdf (content digest guard).
+# ============================================================
+
+print("================================================================")
+print("ZONE BADA -- zone:// ultra-network WWW on the phase core")
+print("================================================================")
+
+# ---- L0: the ring constant of the ultra network ---------------------
+RING := 4096
+
+# ---- grammar transaction: teach the parser the zone verbs -----------
+# After the reviser paper: the surface forms PUT / GET are committed
+# to the rule ledger, so the browser-verbs of the ultra network are
+# ordinary, auditable grammar facts.
+@reviser : grammar {
+    rule "zone-put" stmt [ 'PUT' expr expr ] => zone_publish(NET, _1, _2)
+    rule "zone-get" stmt [ 'GET' expr ]      => zone_get(NET, _1)
+}
+print("zone verbs committed to the grammar ledger:", len(tuplespace), "facts")
+
+# ---- L1 sponge: zone:// naming, in pure Bada ------------------------
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) {
+        h := (h * 31 + ord(s, i)) % 999983
+        i := i + 1
+    }
+    return h
+}
+
+def zone_id(s) {
+    return str_hash(s) % RING
+}
+
+# zone://host/path -> [host, path, labels]  ([] if not a zone URL)
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) {
+        return []
+    }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) {
+        return [rest, "/", split(rest, ".")]
+    }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+# ---- L2 cream: the P2P ring (chaotic circular manifold metric) ------
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+
+# a peer is [name, node-id, store, ring-index]
+def peer_new(name) {
+    return [name, zone_id("peer:" + name), [], 0]
+}
+
+# order the peers clockwise on the ring (insertion sort, pure Bada)
+def net_sort(net) {
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) {
+                if (p[1] < sorted[j][1]) {
+                    pos := j
+                    found := true
+                }
+            }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) {
+        sorted[m][3] = m
+        m := m + 1
+    }
+    return sorted
+}
+
+# each peer only knows its ring neighbours (+1, -1) and one finger (+2):
+# the net is built from the P2P mechanism alone, no central table.
+def peer_neighbors(net, p) {
+    n := len(net)
+    i := p[3]
+    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]
+}
+
+def dht_nearest(net, key) {
+    best := net[0]
+    bd := ring_dist(best[1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) {
+            best := net[i]
+            bd := d
+        }
+        i := i + 1
+    }
+    return best
+}
+
+# greedy hop-by-hop resolution over neighbour links only
+def zone_route(net, key) {
+    route := []
+    cur := net[0]
+    route <- cur[0]
+    hop := 0
+    moved := true
+    while (moved && hop < 16) {
+        moved := false
+        nb := peer_neighbors(net, cur)
+        best := cur
+        j := 0
+        while (j < 3) {
+            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) {
+                best := nb[j]
+            }
+            j := j + 1
+        }
+        if (best[1] != cur[1]) {
+            cur := best
+            route <- cur[0]
+            moved := true
+        }
+        hop := hop + 1
+    }
+    return route
+}
+
+def store_lookup(store, url) {
+    i := 0
+    while (i < len(store)) {
+        if (store[i][0] == url) { return store[i] }
+        i := i + 1
+    }
+    return []
+}
+
+# ---- L3 topping: the quantum guard ----------------------------------
+# Bell-pair session key: H + CNOT entangle, Measure commits |psi|^2 to
+# the ledger. Zero-preservation is the tamper evidence: the forbidden
+# anti-correlated outcomes |01>, |10> must stay exactly zero.
+def qkd_handshake() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    return (outcome[1] == 0) && (outcome[2] == 0)
+}
+
+# ---- publish / fetch ------------------------------------------------
+def zone_publish(net, url, content) {
+    p := zone_parse(url)
+    if (len(p) == 0) {
+        print("PUT", url, ": 400 not a zone:// URL")
+        return false
+    }
+    key := zone_id(url)
+    owner := dht_nearest(net, key)
+    digest := str_hash(content)
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) {
+        owner[2] <- [url, content, digest]
+    } else {
+        rec[1] = content
+        rec[2] = digest
+    }
+    ["zone-record", url, owner[0], key, digest] >> tuplespace
+    print("PUT", url, "-> node", owner[0], "(key", key, ", digest", digest, ")")
+    return true
+}
+
+def zone_get(net, url) {
+    print("")
+    print("GET", url)
+    p := zone_parse(url)
+    if (len(p) == 0) {
+        print("  status  : 400 not a zone:// URL")
+        return ""
+    }
+    print("  zone    : host", p[0], " path", p[1], " labels", p[2])
+    key := zone_id(url)
+    route := zone_route(net, key)
+    owner := dht_nearest(net, key)
+    if (qkd_handshake()) {
+        print("  qkd     : Bell-pair session key agreed (|01>,|10> stayed 0)")
+    } else {
+        print("  qkd     : channel compromised -- abort")
+        return ""
+    }
+    print("  key     :", key, " route :", route)
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) {
+        print("  status  : 404 zone-not-found on", owner[0])
+        return ""
+    }
+    ["zone-fetch", url, owner[0]] >> tuplespace
+    if (str_hash(rec[1]) == rec[2]) {
+        print("  guard   : digest", rec[2], "verified (data2-guard OK)")
+        print("  status  : 200 zone-delivered from", owner[0])
+        print("  body    :", rec[1])
+        return rec[1]
+    }
+    print("  guard   : DIGEST MISMATCH -- content rejected (tamper evidence)")
+    print("  status  : 409 zone-guard-reject")
+    return ""
+}
+
+# ---- boot the ultra network -----------------------------------------
+# Six peers, no server: the ring is derived from the peers' own hashes.
+raw := []
+raw <- peer_new("tokyo.zone.jp")
+raw <- peer_new("osaka.zone.jp")
+raw <- peer_new("nagoya.zone.jp")
+raw <- peer_new("sapporo.zone.jp")
+raw <- peer_new("fukuoka.zone.jp")
+raw <- peer_new("naha.zone.jp")
+NET := net_sort(raw)
+
+print("")
+print("ultra-network ring (RING =", RING, ", built from peer hashes):")
+for p in NET {
+    print("  node", p[3], ":", p[0], " id =", p[1])
+}
+
+# ---- publish the zone WWW -------------------------------------------
+print("")
+PUT "zone://url.or.jp/" "<zone-page>| Ultra Network home | a worldwide web with no http, no center, no single point of failure"
+PUT "zone://url.or.jp/labs/quantum" "<zone-page>| Bada quantum lab | qubits route the zone"
+PUT "zone://bada.or.jp/" "<zone-page>| Bada language portal | programs are ledger facts"
+
+# ---- browse it ------------------------------------------------------
+GET "zone://url.or.jp/"
+GET "zone://url.or.jp/labs/quantum"
+GET "zone://mist.or.jp/void"
+
+# ---- L3 in anger: a man-in-the-middle forges the home page ----------
+print("")
+print("================================================================")
+print("attack: a forged record is injected into the owner's store")
+print("================================================================")
+key := zone_id("zone://url.or.jp/")
+victim := dht_nearest(NET, key)
+rec := store_lookup(victim[2], "zone://url.or.jp/")
+rec[1] = "<zone-page>| intercepted | forged content injected in transit"
+GET "zone://url.or.jp/"
+
+# heal: republish -- the Akashic record is append-only, so the true
+# digest was never lost; the forged fact cannot be resurrected.
+print("")
+PUT "zone://url.or.jp/" "<zone-page>| Ultra Network home | restored from the append-only Akashic record"
+GET "zone://url.or.jp/"
+
+# ---- L4 cherry: precog prefetch (PrecogBada) ------------------------
+print("")
+print("================================================================")
+print("precog cache -- the network learns the next fetch (entropy drops)")
+print("================================================================")
+sites := ["zone://url.or.jp/", "zone://url.or.jp/labs/quantum", "zone://bada.or.jp/"]
+prior := unknown_prior(3)
+print("  prior over next fetch  :", prior, " entropy =", entropy(prior))
+prior := update(prior, [0.0, 1.0, 0.0])
+prior := update(prior, [0.0, 1.0, 0.0])
+prior >> tuplespace
+print("  after 2 observed hits  :", prior, " entropy =", entropy(prior))
+print("  prefetch decision      ->", sites[1])
+
+# ---- the Akashic zone table -----------------------------------------
+print("")
+print("Akashic zone table: ledger =", len(tuplespace), "append-only facts")
+print("(grammar rules + zone records + fetches + measurements + priors)")
+print("================================================================")

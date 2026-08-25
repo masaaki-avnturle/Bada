@@ -18,6 +18,10 @@
  *     an append-only ledger commit.
  *   - Omega::Quantum inference library: prepare_unknown, observe, estimate,
  *     forbidden (append-only measurement record, max-entropy start).
+ *   - Generic string primitives (split / substr / str_find / ord / chr) so
+ *     the zone:// URL scheme of the ultra-network WWW (examples/zone.bada)
+ *     can be written entirely in Bada itself: the runtime supplies only
+ *     character-level access, the parser, DHT and quantum guard are Bada.
  *
  * Exports (UMD): BadaLang.run / tokens / ast / emitC / VERSION
  * ==========================================================================*/
@@ -27,7 +31,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0";
 
   /* ------------------------------------------------------------------ *
    * Tokens
@@ -1010,6 +1014,41 @@
     nat("last_a", function (a, env) {
       var v = env.root().get("__last_a");
       return v === undefined ? Vnil() : v;
+    });
+
+    /* ============== string primitives (zone:// ultra-network) =========
+       Character-level access only: the zone:// URL parser, the P2P DHT
+       and the quantum guard themselves are written in Bada on top of
+       these (see examples/zone.bada). */
+    function wantStrv(v) { return v && v.t === "str" ? v.str : null; }
+    nat("split", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Varr([]);
+      var sep = a.length >= 2 ? wantStrv(a[1]) : null;
+      var parts = (sep == null || sep === "") ? s.split("") : s.split(sep);
+      return Varr(parts.map(Vstr));
+    });
+    nat("substr", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Vstr("");
+      var from = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (from < 0) from = 0;
+      var cnt = a.length >= 3 ? Math.trunc(asNum(a[2])) : s.length - from;
+      if (cnt < 0) cnt = 0;
+      return Vstr(s.substr(from, cnt));
+    });
+    nat("str_find", function (a) {
+      var s = wantStrv(a[0]);
+      var needle = a.length >= 2 ? wantStrv(a[1]) : null;
+      if (s == null || needle == null) return Vnum(-1);
+      return Vnum(s.indexOf(needle));
+    });
+    nat("ord", function (a) {
+      var s = wantStrv(a[0]); if (s == null || !s.length) return Vnum(0);
+      var i = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (i < 0 || i >= s.length) return Vnum(0);
+      return Vnum(s.charCodeAt(i));
+    });
+    nat("chr", function (a) {
+      return Vstr(String.fromCharCode(Math.trunc(asNum(a[0]))));
     });
 
     /* ============== the Q#-style quantum sublanguage ==================
