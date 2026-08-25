@@ -49,7 +49,17 @@
 | [`quantum-shark.html`](bada_gui_ide/dist/quantum-shark.html) | **QuantumShark** — 量子暗号つきパケット アナライザ(`.qcap` 復号。デモ: master `demo`) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
-**一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します(Actions アーティファクトとしても取得可)。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
+**一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
+
+#### 🟢 GitHub Actions からダウンロード
+
+このブランチ(および `main`)へ push すると [`apps-dist.yml`](.github/workflows/apps-dist.yml) が自動実行され、成果物が Actions に残ります:
+
+1. リポジトリの **Actions** タブ → 左の **「Ultra Network apps (downloadable bundle)」** を開く
+2. 最新の実行(緑チェック)をクリック
+3. 下部の **Artifacts** から **`bada-ultranetwork-apps`** をダウンロード(5つの単一HTML + `bada-ultranetwork-apps.zip` を含む zip)
+
+ネイティブ アプリ(APK / Windows EXE / Ubuntu)は **「ZoneBrowser app build」** の実行画面の Artifacts(`zonebrowser-windows` / `zonebrowser-linux` / `zonebrowser-android`)から取得できます。Release への添付が必要な場合は、各ワークフローを `workflow_dispatch` で実行し `release_tag`(例 `apps-v1.1.0`)を指定してください。
 
 各アプリに付属する CLI(自分のマシン/LAN対象)は [`bada_gui_ide/zoneimport/`](bada_gui_ide/zoneimport/) · [`modemvault/`](bada_gui_ide/modemvault/) · [`netcapture/`](bada_gui_ide/netcapture/) を参照。
 
