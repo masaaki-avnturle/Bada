@@ -65,12 +65,17 @@ const html = `<!DOCTYPE html>
             color:var(--ink); font-size:16px; cursor:pointer; }
   .navbtn:disabled { opacity:.4; cursor:default; }
   .navbtn:hover:not(:disabled) { filter:brightness(1.2); }
-  #addr { flex:1; display:flex; align-items:center; gap:8px; background:#020407; border:1px solid var(--line);
+  #addr { flex:2; display:flex; align-items:center; gap:8px; background:#020407; border:1px solid var(--line);
           border-radius:20px; padding:6px 14px; }
   #lock { font-size:14px; }
   #url { flex:1; background:transparent; border:0; outline:0; color:var(--ink); font-size:14px;
          font-family:"SFMono-Regular",Consolas,monospace; }
+  #searchbox { flex:1; display:flex; align-items:center; gap:6px; background:#020407; border:1px solid var(--line);
+               border-radius:20px; padding:6px 12px; min-width:180px; }
+  #q { flex:1; background:transparent; border:0; outline:0; color:var(--ink); font-size:13px; }
   #go { border:0; background:var(--green); color:#eafff0; border-radius:16px; padding:7px 16px; cursor:pointer; font-weight:600; }
+  #search { border:0; background:#2a3a4e; color:#eaf2ff; border-radius:16px; padding:7px 14px; cursor:pointer; }
+  @media (max-width:900px){ #searchbox,#search{ display:none; } }
   .brand { display:flex; align-items:center; gap:8px; margin-right:6px; }
   .brand .o { color:var(--gold); font-size:20px; font-weight:700; }
   .brand small { color:var(--dim); }
@@ -114,6 +119,11 @@ const html = `<!DOCTYPE html>
       <input id="url" spellcheck="false" autocomplete="off" value="zone://url.or.jp/"/>
     </div>
     <button id="go">開く</button>
+    <div id="searchbox">
+      <span style="opacity:.6">🔎</span>
+      <input id="q" spellcheck="false" autocomplete="off" placeholder="ゾーン全体を検索 (cognitive_system)"/>
+    </div>
+    <button id="search">検索</button>
   </div>
 </div>
 
@@ -168,7 +178,7 @@ var ZONE_SITE = ${JSON.stringify(site)};
   /* parse the @@ block emitted by zone_serve */
   function parseBlock(text) {
     var meta = { status: "?", host: "", path: "", key: "", route: "", node: "",
-                 qkd: "", cipher: "", tag: "", jones: "", body: "" };
+                 qkd: "", cipher: "", tag: "", jones: "", quorum: "", repaired: "", body: "" };
     var lines = text.split("\\n"), body = [], inBody = false;
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i];
@@ -189,6 +199,8 @@ var ZONE_SITE = ${JSON.stringify(site)};
       else if (key === "CIPHER") meta.cipher = val;
       else if (key === "TAG") meta.tag = val;
       else if (key === "JONESKEY") meta.jones = val;
+      else if (key === "QUORUM") meta.quorum = val;
+      else if (key === "REPAIRED") meta.repaired = val;
     }
     meta.body = body.join("\\n");
     return meta;
@@ -211,10 +223,13 @@ var ZONE_SITE = ${JSON.stringify(site)};
         renderBody(meta.body);
       return;
     }
+    var healPill = (meta.repaired && meta.repaired !== "0")
+      ? '<span class="pill ok">self-healed ' + esc(meta.repaired) + ' replica</span>' : '';
     pageEl.innerHTML =
       '<p class="doc"><span class="pill ok">🔒 200 zone-delivered</span>' +
       '<span class="pill ok">Jones-AEAD verified</span>' +
-      '<span class="pill ok">QKD ' + esc(meta.qkd) + '</span></p>' +
+      '<span class="pill ok">QKD ' + esc(meta.qkd) + '</span>' +
+      '<span class="pill ok">UltraDB quorum ' + esc(meta.quorum || "—") + '</span>' + healPill + '</p>' +
       renderBody(meta.body);
     /* wire up clickable zone links */
     var links = pageEl.querySelectorAll("a.zlink");
@@ -261,7 +276,54 @@ var ZONE_SITE = ${JSON.stringify(site)};
       kv("Jones key", meta.jones) +
       kv("AEAD tag", meta.tag) +
       kv("cipher[0..2]/len", meta.cipher) +
+      kv("UltraDB quorum", meta.quorum) +
+      kv("self-healed", meta.repaired) +
       kv("Akashic ledger", ledger + " facts");
+  }
+
+  /* ---- cognitive_system search over the whole zone ---- */
+  function runSearch(query) {
+    query = String(query).trim();
+    if (!query) return;
+    var urls = [];
+    for (var u in ZONE_SITE) if (Object.prototype.hasOwnProperty.call(ZONE_SITE, u)) urls.push(u);
+    var prog = ZONE_LIB + "\\nNET := zone_boot()\\n";
+    for (var k = 0; k < urls.length; k++)
+      prog += "zone_publish(NET, " + badaLiteral(urls[k]) + ", " + badaLiteral(ZONE_SITE[urls[k]]) + ")\\n";
+    var arr = "[" + urls.map(badaLiteral).join(", ") + "]";
+    prog += "zone_search(NET, " + arr + ", " + badaLiteral(query) + ")\\n";
+    var lines = [];
+    BadaLang.run(prog, { maxSteps: 20000000, out: function (s) { lines.push(s); } });
+    var out = lines.join("\\n");
+    rawEl.textContent = out;
+    var hits = [], entropy = "";
+    var ls = out.split("\\n");
+    for (var i = 0; i < ls.length; i++) {
+      if (ls[i].indexOf("@@SEARCH_ENTROPY ") === 0) entropy = ls[i].slice(17);
+      else if (ls[i].indexOf("@@HIT ") === 0) {
+        var rest = ls[i].slice(6), sp = rest.indexOf(" ");
+        hits.push({ rel: rest.slice(0, sp), url: rest.slice(sp + 1) });
+      }
+    }
+    var html = '<p class="doc"><span class="pill ok">cognitive_system 検索</span>' +
+      '<span class="pill ok">relevance entropy ' + esc(entropy) + '</span></p>' +
+      '<h1 class="doc">「' + esc(query) + '」の検索結果</h1>';
+    if (!hits.length) html += '<p class="doc">一致するゾーンページはありませんでした。</p>';
+    for (var h = 0; h < hits.length; h++) {
+      html += '<p class="doc"><a class="zlink" data-href="' + esc(hits[h].url) + '" href="#">' + esc(hits[h].url) + '</a> ' +
+              '<small style="color:var(--dim)">relevance ' + esc(hits[h].rel) + '</small></p>';
+    }
+    pageEl.innerHTML = html;
+    var links = pageEl.querySelectorAll("a.zlink");
+    for (var j = 0; j < links.length; j++)
+      links[j].addEventListener("click", function (e) { e.preventDefault(); navigate(this.getAttribute("data-href"), true); });
+    setLock(true);
+    secEl.innerHTML = '<div class="big status-200">cognitive_system 検索</div>' +
+      '<div class="kv"><b>query</b><span>' + esc(query) + '</span></div>' +
+      '<div class="kv"><b>relevance entropy</b><span>' + esc(entropy) + '</span></div>' +
+      '<div class="kv"><b>hits</b><span>' + hits.length + '</span></div>' +
+      '<div class="kv"><b>method</b><span>softmax = |psi|^2 (phase core)</span></div>';
+    pageEl.scrollTop = 0;
   }
 
   function setLock(ok) { $("lock").textContent = ok ? "🔒" : "⚠️"; }
@@ -308,6 +370,8 @@ var ZONE_SITE = ${JSON.stringify(site)};
   $("back").addEventListener("click", function () { if (hi > 0) { hi--; navigate(hist[hi], false); } });
   $("fwd").addEventListener("click", function () { if (hi < hist.length - 1) { hi++; navigate(hist[hi], false); } });
   $("reload").addEventListener("click", function () { navigate(urlInput.value, false); });
+  $("search").addEventListener("click", function () { runSearch($("q").value); });
+  $("q").addEventListener("keydown", function (e) { if (e.key === "Enter") runSearch($("q").value); });
 
   /* boot */
   buildSidebar();

@@ -95,6 +95,36 @@ GET "zone://url.or.jp/"
 を推測した盗聴者は AEAD タグ照合に失敗して復号不能 — いずれも
 `examples/zone.bada` の attack 1 / attack 2 で実証しています。
 
+### 🧬 進化版 UltraWeb — 以前のウルトラネットワークとの融合
+
+以前のウルトラネットワーク(Omega Script の **UltraDatabase** =
+`Omega.DATABASE[first, second, third, fourth]` 分散データベース +
+`cognitive_system` / `manifold_scan`)を zone:// に融合し、進化版
+[`examples/ultraweb.bada`](examples/ultraweb.bada) を追加しました
+(ZoneBrowser にも組み込み済み):
+
+- **UltraDatabase 4重レプリケーション** — 各ゾーンレコードをリング上の
+  最近傍 4 ピア(`Omega.DATABASE[1..4]`)に複製。GET はクォーラム読み取りで、
+  改ざんされた複製があっても健全な多数から配信し、**改ざん複製を自己修復**
+  (単一障害点なし・ビザンチン改ざん耐性)。2/4 改ざんでも `200`(quorum 2/4,
+  self-healed 2)、全複製改ざんで初めて `409`、発行元からの再発行で全回復。
+- **cognitive_system 検索**(emerge_equation / manifold_scan の融合)—
+  Akashic 索引を復号しキーワードスコアを **位相コアの softmax = |ψ|²** で
+  リウェイトして関連度分布を作り、ページを順位付け(関連度エントロピーも表示)。
+
+```
+$ node cli/bada-cli.js run examples/ultraweb.bada
+GET zone://url.or.jp/
+  200 zone-delivered  quorum 2/4  self-healed 2  jones-key 919492   # 2複製を改ざんしても健全
+search: "Jones"
+  0.84379  zone://url.or.jp/security     # 認知系が関連度で順位付け
+  0.11420  zone://url.or.jp/
+```
+
+ZoneBrowser では上部の検索窓(cognitive_system)でゾーン全体を検索でき、
+各ページのセキュリティパネルに **UltraDB quorum**(例 `4/4`)と
+**self-healed** 件数が表示されます。
+
 ### 🌐 ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `zone://` 専用のブラウザ [`bada_gui_ide/dist/zone-browser.html`](dist/zone-browser.html)
