@@ -76,6 +76,16 @@
 
 ビルドは [`zonebrowser-app-build.yml`](.github/workflows/zonebrowser-app-build.yml) が実行します(`zonebrowser-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/zonebrowser-app/`](bada_gui_ide/zonebrowser-app/) を参照。
 
+**NGN Quantum Grid**(zone:// を NTT NGN に投射)もネイティブ アプリを用意しています:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `ngn-quantum-grid-debug.apk` |
+| **Windows 10 / 11** | `NGN-Quantum-Grid-*-x64.exe` |
+| **Ubuntu** | `NGN-Quantum-Grid-*-x86_64.AppImage` / `NGN-Quantum-Grid-*-amd64.deb` |
+
+ビルドは [`ngngrid-app-build.yml`](.github/workflows/ngngrid-app-build.yml)([`bada_gui_ide/ngngrid-app/`](bada_gui_ide/ngngrid-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの

@@ -205,3 +205,11 @@ var NGN_RUNTIME = ${JSON.stringify(runtime)};
 `;
 fs.writeFileSync(path.join(IDE, "dist", "ngn-quantum.html"), html);
 console.log("built dist/ngn-quantum.html (" + fs.statSync(path.join(IDE, "dist", "ngn-quantum.html")).size + " bytes)");
+
+/* also stage it as the NGN Quantum Grid app's www/index.html (Electron / Cordova) */
+const APPWWW = path.join(IDE, "ngngrid-app", "www");
+if (fs.existsSync(path.join(IDE, "ngngrid-app"))) {
+  fs.mkdirSync(APPWWW, { recursive: true });
+  fs.writeFileSync(path.join(APPWWW, "index.html"), html);
+  console.log("staged ngngrid-app/www/index.html");
+}
