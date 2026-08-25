@@ -1,0 +1,712 @@
+# ============================================================
+# zone-lib.bada -- the zone:// ultra-network runtime as a Bada
+# LIBRARY (functions only, no demo output), so a dedicated
+# browser can drive one navigation at a time.
+#
+# The browser generates, per navigation:
+#     <this library>
+#     NET := zone_boot()
+#     zone_publish(NET, url, content)   # for every page of the site
+#     zone_serve(NET, requested_url)    # emits a machine-parseable block
+#
+# Security is the Jones-polynomial quantum cipher of
+# omega_jones_crypto_pkg (knot -> Kauffman/Jones key -> AEAD) plus a
+# Bell-pair QKD session salt, exactly as in examples/zone.bada.
+# ============================================================
+
+RING := 4096
+
+# UltraDatabase replication factor: Omega.DATABASE[first, second, third,
+# fourth] -- every zone record is mirrored across the 4 nearest peers on
+# the ring, so there is no single point of failure and a forged replica
+# is out-voted (and healed) by the honest quorum.
+REPLICAS := 4
+
+# ---- L1 sponge: zone:// naming --------------------------------------
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }
+    return h
+}
+def zone_id(s) { return str_hash(s) % RING }
+
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) { return [] }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) { return [rest, "/", split(rest, ".")] }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+# ---- L3 key schedule: Jones-polynomial quantum cipher ---------------
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    bits := []
+    i := 0
+    while (i < n) { bits <- 0; i := i + 1 }
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            if (bits[i] == 0) {
+                ra := uf_find(parent, e0)
+                rb := uf_find(parent, e1)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e2)
+                rb := uf_find(parent, e3)
+                if (ra != rb) { parent[ra] = rb }
+                a_cnt := a_cnt + 1
+            } else {
+                ra := uf_find(parent, e1)
+                rb := uf_find(parent, e2)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e3)
+                rb := uf_find(parent, e0)
+                if (ra != rb) { parent[ra] = rb }
+                b_cnt := b_cnt + 1
+            }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r := uf_find(parent, lbl)
+            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        weight := ipow(A, a_cnt - b_cnt)
+        lf := ipow(d, loops - 1)
+        sum := sum + weight * lf
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+def jones_key(diagram) {
+    As := [0.8, 1.0, 1.2, 1.5, 2.0]
+    acc := "jones|"
+    i := 0
+    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + "|"; i := i + 1 }
+    return str_hash(acc)
+}
+def zone_diagram(host) {
+    if (host == "bada.or.jp") {
+        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]
+    }
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+# ---- keystream AEAD -------------------------------------------------
+def lcg(state) { return (state * 48271) % 2147483647 }
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+# the keystream works on 16-bit code units so any character (incl. CJK)
+# round-trips through encrypt/decrypt.
+def zone_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+def zone_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+def zone_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }
+    return h
+}
+def zone_seal(plain, key, salt) {
+    ct := zone_encrypt(plain, key, salt)
+    return [ct, salt, zone_tag(ct, key, salt)]
+}
+def zone_open(sealed, key) {
+    ct := sealed[0]
+    salt := sealed[1]
+    tag := sealed[2]
+    if (zone_tag(ct, key, salt) != tag) { return [] }
+    return [zone_decrypt(ct, key, salt)]
+}
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt]
+}
+
+# ---- L2 cream: the P2P ring -----------------------------------------
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+def peer_new(name) { return [name, zone_id("peer:" + name), [], 0] }
+def net_sort(net) {
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) { if (p[1] < sorted[j][1]) { pos := j; found := true } }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) { sorted[m][3] = m; m := m + 1 }
+    return sorted
+}
+def peer_neighbors(net, p) {
+    n := len(net)
+    i := p[3]
+    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]
+}
+def dht_nearest(net, key) {
+    best := net[0]
+    bd := ring_dist(best[1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) { best := net[i]; bd := d }
+        i := i + 1
+    }
+    return best
+}
+def zone_route(net, key) {
+    route := []
+    cur := net[0]
+    route <- cur[0]
+    hop := 0
+    moved := true
+    while (moved && hop < 16) {
+        moved := false
+        nb := peer_neighbors(net, cur)
+        best := cur
+        j := 0
+        while (j < 3) {
+            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) { best := nb[j] }
+            j := j + 1
+        }
+        if (best[1] != cur[1]) { cur := best; route <- cur[0]; moved := true }
+        hop := hop + 1
+    }
+    return route
+}
+def store_lookup(store, url) {
+    i := 0
+    while (i < len(store)) {
+        if (store[i][0] == url) { return store[i] }
+        i := i + 1
+    }
+    return []
+}
+
+# ---- UltraDatabase: the REPLICAS nearest peers (Omega.DATABASE[1..4]) -
+def dht_replicas(net, key) {
+    used := []
+    i := 0
+    while (i < len(net)) { used <- 0; i := i + 1 }
+    order := []
+    r := 0
+    while (r < REPLICAS && r < len(net)) {
+        best := 0 - 1
+        bd := 0
+        j := 0
+        while (j < len(net)) {
+            if (used[j] == 0) {
+                d := ring_dist(net[j][1], key)
+                if (best < 0) { best := j; bd := d }
+                else { if (d < bd) { best := j; bd := d } }
+            }
+            j := j + 1
+        }
+        used[best] = 1
+        order <- net[best]
+        r := r + 1
+    }
+    return order
+}
+
+# ---- boot the ultra network (six peers, no server) ------------------
+def zone_boot() {
+    raw := []
+    raw <- peer_new("tokyo.zone.jp")
+    raw <- peer_new("osaka.zone.jp")
+    raw <- peer_new("nagoya.zone.jp")
+    raw <- peer_new("sapporo.zone.jp")
+    raw <- peer_new("fukuoka.zone.jp")
+    raw <- peer_new("naha.zone.jp")
+    return net_sort(raw)
+}
+
+# deep-copy a ciphertext (byte) array so each replica is independent
+def arr_copy(a) {
+    out := []
+    i := 0
+    while (i < len(a)) { out <- a[i]; i := i + 1 }
+    return out
+}
+
+# ---- write one sealed record into a peer's store (insert or overwrite)
+# Each replica keeps its OWN copy of the ciphertext (arrays are references),
+# so tampering with one replica cannot silently corrupt the others.
+def store_put(owner, url, sealed) {
+    ct := arr_copy(sealed[0])
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) { owner[2] <- [url, ct, sealed[1], sealed[2]] }
+    else { rec[1] = ct; rec[2] = sealed[1]; rec[3] = sealed[2] }
+}
+
+# ---- publish (encrypted, replicated across the UltraDatabase quorum) --
+def zone_publish(net, url, content) {
+    p := zone_parse(url)
+    if (len(p) == 0) { return false }
+    host := p[0]
+    key := zone_id(url)
+    jk := jones_key(zone_diagram(host))
+    sess := qkd_session()
+    salt := sess[1]
+    sealed := zone_seal(content, jk, salt)
+    reps := dht_replicas(net, key)
+    i := 0
+    while (i < len(reps)) { store_put(reps[i], url, sealed); i := i + 1 }
+    return true
+}
+
+# ---- serve one navigation: emit a machine-parseable block -----------
+# The dedicated browser reads only lines beginning with "@@".
+def zone_serve(net, url) {
+    p := zone_parse(url)
+    if (len(p) == 0) {
+        print("@@STATUS 400")
+        print("@@BODY_BEGIN")
+        print("# 400 bad-zone")
+        print("not a zone:// URL")
+        print("@@BODY_END")
+        return ""
+    }
+    host := p[0]
+    key := zone_id(url)
+    route := zone_route(net, key)
+    owner := dht_nearest(net, key)
+    print("@@HOST", host)
+    print("@@PATH", p[1])
+    print("@@KEY", key)
+    print("@@ROUTE", route)
+    print("@@NODE", owner[0])
+    sess := qkd_session()
+    if (!sess[0]) {
+        print("@@QKD compromised")
+        print("@@STATUS 495")
+        print("@@BODY_BEGIN")
+        print("# 495 quantum-channel-compromised")
+        print("the Bell pair lost correlation -- someone is on the wire")
+        print("@@BODY_END")
+        return ""
+    }
+    print("@@QKD ok")
+    jk := jones_key(zone_diagram(host))
+    reps := dht_replicas(net, key)
+    total := len(reps)
+
+    # --- UltraDatabase quorum read: verify every replica's AEAD tag -----
+    good := 0
+    present := 0
+    haveBody := false
+    body := ""
+    goodCt := []
+    goodSalt := 0
+    goodTag := 0
+    i := 0
+    while (i < total) {
+        rec := store_lookup(reps[i][2], url)
+        if (len(rec) > 0) {
+            present := present + 1
+            opened := zone_open([ rec[1], rec[2], rec[3] ], jk)
+            if (len(opened) > 0) {
+                good := good + 1
+                if (!haveBody) {
+                    body := opened[0]
+                    goodCt := rec[1]
+                    goodSalt := rec[2]
+                    goodTag := rec[3]
+                    haveBody := true
+                }
+            }
+        }
+        i := i + 1
+    }
+
+    if (present == 0) {
+        print("@@STATUS 404")
+        print("@@BODY_BEGIN")
+        print("# 404 zone-not-found")
+        print("no UltraDatabase replica on the ring holds " + url)
+        print("@@BODY_END")
+        return ""
+    }
+    if (!haveBody) {
+        print("@@QUORUM 0", total)
+        print("@@STATUS 409")
+        print("@@BODY_BEGIN")
+        print("# 409 zone-guard-reject")
+        print("every replica failed the Jones-AEAD tag: forged content or wrong knot")
+        print("@@BODY_END")
+        return ""
+    }
+
+    # --- self-heal: repair missing / forged replicas from the quorum ----
+    goodSealed := [ goodCt, goodSalt, goodTag ]
+    repaired := 0
+    i := 0
+    while (i < total) {
+        rec := store_lookup(reps[i][2], url)
+        bad := false
+        if (len(rec) == 0) { bad := true }
+        else { if (len(zone_open([ rec[1], rec[2], rec[3] ], jk)) == 0) { bad := true } }
+        if (bad) { store_put(reps[i], url, goodSealed); repaired := repaired + 1 }
+        i := i + 1
+    }
+    if (repaired > 0) { ["zone-heal", url, repaired] >> tuplespace }
+
+    print("@@CIPHER", goodCt[0], goodCt[1], goodCt[2], len(goodCt))
+    print("@@TAG", goodTag)
+    print("@@JONESKEY", jk)
+    print("@@QUORUM", good, total)
+    print("@@REPAIRED", repaired)
+    print("@@STATUS 200")
+    print("@@BODY_BEGIN")
+    print(body)
+    print("@@BODY_END")
+    return body
+}
+
+# ====================================================================
+# cognitive_system search (the earlier ultranetwork's emerge_equation /
+# manifold_scan, fused in): decrypt the Akashic index, score each page by
+# keyword overlap, then reweight the scores through the phase core
+# (softmax = |psi|^2) into a relevance distribution and rank it.
+# ====================================================================
+def lower_one(cc) {
+    if (cc >= 65 && cc <= 90) { return cc + 32 }
+    return cc
+}
+# count case-insensitive occurrences of needle in hay (both lowercased)
+def count_occ(hay, needle) {
+    nl := len(needle)
+    if (nl == 0) { return 0 }
+    c := 0
+    i := 0
+    while (i + nl <= len(hay)) {
+        k := 0
+        match := true
+        while (k < nl && match) {
+            if (lower_one(ord(hay, i + k)) != lower_one(ord(needle, k))) { match := false }
+            k := k + 1
+        }
+        if (match) { c := c + 1 }
+        i := i + 1
+    }
+    return c
+}
+def score_text(text, terms) {
+    s := 0.0
+    t := 0
+    while (t < len(terms)) {
+        s := s + count_occ(text, terms[t])
+        t := t + 1
+    }
+    return s
+}
+# read (quorum) and decrypt one url's plaintext, or "" if unavailable
+def zone_read_plain(net, url) {
+    p := zone_parse(url)
+    if (len(p) == 0) { return "" }
+    jk := jones_key(zone_diagram(p[0]))
+    reps := dht_replicas(net, zone_id(url))
+    i := 0
+    while (i < len(reps)) {
+        rec := store_lookup(reps[i][2], url)
+        if (len(rec) > 0) {
+            opened := zone_open([ rec[1], rec[2], rec[3] ], jk)
+            if (len(opened) > 0) { return opened[0] }
+        }
+        i := i + 1
+    }
+    return ""
+}
+def zone_search(net, urls, query) {
+    terms := split(query, " ")
+    logits := []
+    raw := []
+    i := 0
+    while (i < len(urls)) {
+        sc := score_text(zone_read_plain(net, urls[i]), terms)
+        raw <- sc
+        # map a raw hit-count to a logit; misses fall far below (ruled out)
+        if (sc > 0) { logits <- sc } else { logits <- (0 - 40.0) }
+        i := i + 1
+    }
+    # phase core: relevance = |psi|^2 = softmax(logits) (cognitive_system)
+    rel := cognitive_system(logits, [], [])
+    print("@@SEARCH_QUERY", query)
+    print("@@SEARCH_ENTROPY", entropy(rel))
+    # rank by relevance (selection sort over indices), emit hits only
+    used := []
+    i := 0
+    while (i < len(urls)) { used <- 0; i := i + 1 }
+    ranked := 0
+    while (ranked < len(urls)) {
+        best := 0 - 1
+        bv := 0
+        j := 0
+        while (j < len(urls)) {
+            if (used[j] == 0) {
+                if (best < 0) { best := j; bv := rel[j] }
+                else { if (rel[j] > bv) { best := j; bv := rel[j] } }
+            }
+            j := j + 1
+        }
+        used[best] = 1
+        if (raw[best] > 0) { print("@@HIT", f5(rel[best]), urls[best]) }
+        ranked := ranked + 1
+    }
+    print("@@SEARCH_DONE")
+    return ""
+}
+# ============================================================
+# ngn-extra.bada -- projects the zone:// ultra-network onto the
+# NTT NGN line, fusing:
+#   * the NTT NGN backbone  -> the zone:// P2P ring (regional
+#     offices become the ring peers; UltraDatabase replicates
+#     across them).
+#   * each home/office Von-Neumann PC -> a leaf node holding an
+#     HDD-backed pseudo-quantum register (its sectors store the
+#     |psi|^2 state = the "hard disk quantum computer").
+#   * entanglement -> Bell pairs (H + CNOT + Measure) established
+#     over NTT lines between two PCs; zero-preservation of the
+#     forbidden |01>,|10> outcomes is the entanglement-integrity
+#     (and tap-evidence) check on the line.
+#
+# This file is APPENDED to browser/zone-lib.bada (which supplies
+# zone_boot / zone_publish / zone_serve / the UltraDB quorum and
+# the Jones quantum cipher). It adds only the NGN/HDD/entangle
+# layer on top.
+# ============================================================
+
+# ---- HDD-backed pseudo-quantum register -----------------------------
+# The disk holds the measured state |psi|^2 as a "sector" vector.
+def hdd_new(nq) {
+    return Measure(qubit(nq))        # |0..0> written to disk
+}
+# a Bell pair prepared on the phase core and committed to disk:
+# H on q0, CNOT(q0->q1), measure -> [00,01,10,11]; a clean line
+# leaves only |00> and |11> (perfect correlation).
+def hdd_bell() {
+    r := qubit(2)
+    r := H(r, 0)
+    r := CNOT(r, 0, 1)
+    return Measure(r)
+}
+
+# ---- home/office PC on an NTT subscriber line -----------------------
+# pc = [name, ip, region_index, hdd_state]
+def pc_new(name, ip, region) {
+    return [name, ip, region, hdd_new(1)]
+}
+
+# ---- entangle two PCs over the NTT line (machine-parseable) ---------
+def entangle_show(a, b) {
+    bell := hdd_bell()
+    intact := 0
+    if ((bell[1] == 0) && (bell[2] == 0)) { intact := 1 }
+    fact := ["ngn-entangle", a, b, intact]
+    fact >> tuplespace
+    print("@@BELL " + a + " " + b + " " + f5(bell[0]) + " " + f5(bell[1]) + " " + f5(bell[2]) + " " + f5(bell[3]) + " " + intact)
+    return intact
+}
+
+# ---- project the local machine onto the NGN grid & fetch zone -------
+# Publishes the caller's own IP into zone://url.or.jp/lan/<ip> across the
+# NGN-projected UltraDatabase, then serves zone://url.or.jp (over "NTT").
+def ngn_register(net, ip, region) {
+    page := "# NGN node " + ip + "
+region " + region + " (NTT NGN)
+projected from a home/office PC onto the ultra-network"
+    zone_publish(net, "zone://url.or.jp/lan/" + ip, page)
+    return true
+}
+
+# ============================================================
+# ngn-quantum.bada -- AUTO-GENERATED (zone-lib + ngn-extra + demo).
+# The ultra-network zone://url.or.jp projected onto the NTT NGN.
+# ============================================================
+
+def show_entangle(a, b) {
+    bell := hdd_bell()
+    ok := "TAPPED"
+    if ((bell[1] == 0) && (bell[2] == 0)) { ok := "intact" }
+    print("  " + a + "  <=NTT=>  " + b + "   |00>=" + f5(bell[0]) + " |11>=" + f5(bell[3]) + "   entanglement: " + ok)
+    fact := ["ngn-entangle", a, b]
+    fact >> tuplespace
+    return bell
+}
+def show_get(net, who, url) {
+    p := zone_parse(url)
+    host := p[0]
+    key := zone_id(url)
+    reps := dht_replicas(net, key)
+    jk := jones_key(zone_diagram(host))
+    good := 0
+    body := ""
+    have := false
+    i := 0
+    while (i < len(reps)) {
+        rec := store_lookup(reps[i][2], url)
+        if (len(rec) > 0) {
+            opened := zone_open([ rec[1], rec[2], rec[3] ], jk)
+            if (len(opened) > 0) { good := good + 1; if (!have) { body := opened[0]; have := true } }
+        }
+        i := i + 1
+    }
+    if (!have) { print("  " + who + " -> " + url + " : NOT AVAILABLE"); return "" }
+    print("  " + who + " -> " + url)
+    print("    200 over NTT NGN   quorum " + good + "/" + len(reps) + "   jones-key " + jk)
+    print("    body: " + body)
+    return body
+}
+
+print("================================================================")
+print("NGN QUANTUM GRID -- zone://url.or.jp projected onto the NTT NGN line")
+print("================================================================")
+
+NET := zone_boot()
+print("")
+print("NTT NGN backbone (regional offices = zone ring peers, UltraDB x" + REPLICAS + "):")
+for pr in NET { print("  NGN-" + pr[0] + "   id " + pr[1]) }
+
+print("")
+print("home/office PCs (Von-Neumann) on NTT subscriber lines, each an")
+print("HDD-backed pseudo-quantum register (sectors hold |psi|^2):")
+homePC := pc_new("home-PC (Tokyo)",   "192.168.0.23", 4)
+offPC  := pc_new("office-PC (Osaka)",  "192.168.10.5", 0)
+nasPC  := pc_new("NAS (Nagoya)",       "192.168.20.9", 1)
+print("  " + homePC[0] + "  ip " + homePC[1] + "  hdd|0>^2 = " + f5(homePC[3][0]))
+print("  " + offPC[0]  + "  ip " + offPC[1]  + "  hdd|0>^2 = " + f5(offPC[3][0]))
+print("  " + nasPC[0]  + "  ip " + nasPC[1]  + "  hdd|0>^2 = " + f5(nasPC[3][0]))
+
+print("")
+print("--- entanglement over NTT lines (Bell pairs; zero-preservation = tap-evidence) ---")
+show_entangle(homePC[0], offPC[0])
+show_entangle(homePC[0], nasPC[0])
+show_entangle(offPC[0],  nasPC[0])
+
+print("")
+print("--- project each PC's IP onto the NGN-replicated zone table ---")
+ngn_register(NET, homePC[1], homePC[2])
+ngn_register(NET, offPC[1],  offPC[2])
+ngn_register(NET, nasPC[1],  nasPC[2])
+print("  projected: " + homePC[1] + ", " + offPC[1] + ", " + nasPC[1] + " -> zone://url.or.jp/lan/<ip>")
+
+print("")
+print("--- publish the ultra-network WWW across the NGN, then browse it over NTT ---")
+zone_publish(NET, "zone://url.or.jp/", "# Ultra Network over NTT NGN | no http, no center | entangled home/office PCs")
+zone_publish(NET, "zone://url.or.jp/lan/", "# NGN LAN index | home/office nodes projected onto NTT")
+show_get(NET, homePC[0], "zone://url.or.jp/")
+show_get(NET, offPC[0],  "zone://url.or.jp/lan/" + homePC[1])
+
+print("")
+print("Akashic/NGN ledger = " + len(tuplespace) + " append-only facts")
+print("(entanglements + node projections + replicated zone records + measurements)")
+print("================================================================")

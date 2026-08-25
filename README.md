@@ -44,6 +44,7 @@
 | アプリ | 内容 |
 |:---|:---|
 | [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ **ZoneBrowser** — zone:// 専用ブラウザ(P2P DHT + Jones量子暗号 + UltraDB複製 + 認知検索) |
+| [`ngn-quantum.html`](bada_gui_ide/dist/ngn-quantum.html) | **NGN Quantum Grid** — zone:// を **NTT NGN 回線**に投射(地域局バックボーン環 + 各家庭/職場PCのHDD擬似量子レジスタ + NTT回線上のエンタングルメント) |
 | [`lan-to-zone.html`](bada_gui_ide/dist/lan-to-zone.html) | **LAN → zone://** — 自分のLAN IPを `zone://url.or.jp/lan/` に暗号化取り込み |
 | [`modem-vault.html`](bada_gui_ide/dist/modem-vault.html) | **Modem Vault** — 自分のモデム認証情報の量子暗号保管庫 + LAN検出 |
 | [`quantum-shark.html`](bada_gui_ide/dist/quantum-shark.html) | **QuantumShark** — 量子暗号つきパケット アナライザ(`.qcap` 復号。デモ: master `demo`) |

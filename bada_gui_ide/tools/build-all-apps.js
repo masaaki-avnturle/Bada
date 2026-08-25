@@ -16,7 +16,9 @@ const builds = [
   "build-ultraweb-example.js",
   "build-modemvault.js",     // dist/modem-vault.html
   "build-quantum-shark.js",  // dist/quantum-shark.html
-  "build-zoneimport.js"      // dist/lan-to-zone.html
+  "build-zoneimport.js",     // dist/lan-to-zone.html
+  "build-ngn-example.js",    // examples/ngn-quantum.bada
+  "build-ngngrid.js"         // dist/ngn-quantum.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -32,6 +34,9 @@ it in any browser — no install, no dependencies, works offline.
   zone-browser.html   ZoneBrowser — the dedicated ultra-network browser for
                       the zone:// WWW (P2P DHT + Jones quantum cipher + the
                       evolved UltraDatabase quorum + cognitive_system search).
+  ngn-quantum.html    NGN Quantum Grid — zone://url.or.jp projected onto the
+                      NTT NGN line: regional backbone ring, home/office PCs as
+                      HDD pseudo-quantum registers, entanglement over NTT lines.
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for

@@ -1,0 +1,62 @@
+# ============================================================
+# ngn-extra.bada -- projects the zone:// ultra-network onto the
+# NTT NGN line, fusing:
+#   * the NTT NGN backbone  -> the zone:// P2P ring (regional
+#     offices become the ring peers; UltraDatabase replicates
+#     across them).
+#   * each home/office Von-Neumann PC -> a leaf node holding an
+#     HDD-backed pseudo-quantum register (its sectors store the
+#     |psi|^2 state = the "hard disk quantum computer").
+#   * entanglement -> Bell pairs (H + CNOT + Measure) established
+#     over NTT lines between two PCs; zero-preservation of the
+#     forbidden |01>,|10> outcomes is the entanglement-integrity
+#     (and tap-evidence) check on the line.
+#
+# This file is APPENDED to browser/zone-lib.bada (which supplies
+# zone_boot / zone_publish / zone_serve / the UltraDB quorum and
+# the Jones quantum cipher). It adds only the NGN/HDD/entangle
+# layer on top.
+# ============================================================
+
+# ---- HDD-backed pseudo-quantum register -----------------------------
+# The disk holds the measured state |psi|^2 as a "sector" vector.
+def hdd_new(nq) {
+    return Measure(qubit(nq))        # |0..0> written to disk
+}
+# a Bell pair prepared on the phase core and committed to disk:
+# H on q0, CNOT(q0->q1), measure -> [00,01,10,11]; a clean line
+# leaves only |00> and |11> (perfect correlation).
+def hdd_bell() {
+    r := qubit(2)
+    r := H(r, 0)
+    r := CNOT(r, 0, 1)
+    return Measure(r)
+}
+
+# ---- home/office PC on an NTT subscriber line -----------------------
+# pc = [name, ip, region_index, hdd_state]
+def pc_new(name, ip, region) {
+    return [name, ip, region, hdd_new(1)]
+}
+
+# ---- entangle two PCs over the NTT line (machine-parseable) ---------
+def entangle_show(a, b) {
+    bell := hdd_bell()
+    intact := 0
+    if ((bell[1] == 0) && (bell[2] == 0)) { intact := 1 }
+    fact := ["ngn-entangle", a, b, intact]
+    fact >> tuplespace
+    print("@@BELL " + a + " " + b + " " + f5(bell[0]) + " " + f5(bell[1]) + " " + f5(bell[2]) + " " + f5(bell[3]) + " " + intact)
+    return intact
+}
+
+# ---- project the local machine onto the NGN grid & fetch zone -------
+# Publishes the caller's own IP into zone://url.or.jp/lan/<ip> across the
+# NGN-projected UltraDatabase, then serves zone://url.or.jp (over "NTT").
+def ngn_register(net, ip, region) {
+    page := "# NGN node " + ip + "
+region " + region + " (NTT NGN)
+projected from a home/office PC onto the ultra-network"
+    zone_publish(net, "zone://url.or.jp/lan/" + ip, page)
+    return true
+}
