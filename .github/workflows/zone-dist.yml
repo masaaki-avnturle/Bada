@@ -1,0 +1,66 @@
+name: zone:// distribution (downloadable bundle)
+
+# Packages the secure zone:// ultra-network WWW into a downloadable bundle:
+#   - dist/bada-zone.html  (single self-contained file — open in a browser)
+#   - zone.bada + bada.js + bada-cli.js + README.txt
+# Uploaded as an Actions artifact, and (on a zone-v* tag, or when a
+# release_tag is given) attached to a GitHub Release for direct download.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: zone-v1.1.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'zone-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-zone-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Smoke-test zone.bada (interpreter)
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node cli/bada-cli.js run examples/zone.bada | tee /tmp/zone.out
+          grep -q "200 zone-delivered" /tmp/zone.out
+          grep -q "409 zone-guard-reject" /tmp/zone.out
+          grep -q "cannot read" /tmp/zone.out
+
+      - name: Build downloadable dist
+        working-directory: bada_gui_ide
+        run: node tools/build-zone-dist.js
+
+      - name: Package zip
+        working-directory: bada_gui_ide/dist
+        run: |
+          zip -j bada-zone-dist.zip bada-zone.html zone.bada bada.js bada-cli.js README.txt
+          ls -la
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-zone-dist
+          path: |
+            bada_gui_ide/dist/bada-zone.html
+            bada_gui_ide/dist/bada-zone-dist.zip
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: |
+            bada_gui_ide/dist/bada-zone.html
+            bada_gui_ide/dist/bada-zone-dist.zip

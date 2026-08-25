@@ -54,6 +54,16 @@
 
 ビルドは [`bada-ide-build.yml`](.github/workflows/bada-ide-build.yml) が自動実行します (`bada-ide-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) を参照。
 
+### 🌐 安全な zone:// ウルトラネットワーク WWW — インストール不要でダウンロード
+
+`https:`/`http:` に代わる暗号化 zone:// を、**1 ファイルだけ**でどこでも動く自己完結版にしました:
+
+| 入手方法 | 内容 |
+|:---|:---|
+| **単一 HTML** | [`bada_gui_ide/dist/bada-zone.html`](bada_gui_ide/dist/bada-zone.html) をダウンロードしてブラウザで開くだけ (依存なし・オフライン可)。Bada 言語コアと `zone.bada` を同梱し、開くと暗号化 zone:// が自動実行されます |
+| **配布 zip** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-zone-dist.zip` (単一 HTML + `zone.bada` + `bada.js` + CLI + README)。[`zone-dist.yml`](.github/workflows/zone-dist.yml) が `zone-v*` タグ / `workflow_dispatch` で生成・添付します |
+| **CLI** | `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zone.bada` |
+
 ---
 
 ## 🔤 Bada Language — 設計原理

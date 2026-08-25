@@ -95,6 +95,23 @@ GET "zone://url.or.jp/"
 を推測した盗聴者は AEAD タグ照合に失敗して復号不能 — いずれも
 `examples/zone.bada` の attack 1 / attack 2 で実証しています。
 
+### zone:// をダウンロードして動かす
+
+インストール不要で、**1 ファイルだけ**でどこでも動く自己完結版を用意しています:
+
+- **単一 HTML** — [`bada_gui_ide/dist/bada-zone.html`](dist/bada-zone.html) を
+  ダウンロードしてブラウザで開くだけ (依存なし・オフライン可)。Bada 言語コアと
+  `zone.bada` を同梱し、開くと暗号化 zone:// のデモが自動実行されます。
+  「zone.bada を保存」「生成 C を保存」ボタンでソースや C も取り出せます。
+- **配布 zip** — [Releases](https://github.com/masaaki-avnturle/Bada/releases)
+  の `bada-zone-dist.zip` (単一 HTML + `zone.bada` + `bada.js` + `bada-cli.js`
+  + README)。`zone-v*` タグの push か `workflow_dispatch` で
+  [`zone-dist.yml`](../.github/workflows/zone-dist.yml) が生成・添付します
+  (Actions アーティファクトとしても取得可)。
+- **自分で生成** — `node bada_gui_ide/tools/build-zone-dist.js` で
+  `bada_gui_ide/dist/` に上記一式を再生成できます。
+- **CLI** — `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zone.bada`
+
 インタープリタとコンパイル済みバイナリは同一の数値を出力します
 (Hadamard プローブ `0.50000 0.50000`、禁制プローブ `0.62246 0.00000 0.37754`、
 Bell 状態 `[0.5, 0, 0, 0.5]` などを両経路で検証済み)。
