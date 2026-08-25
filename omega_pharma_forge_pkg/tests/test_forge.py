@@ -81,3 +81,81 @@ def test_reproducible():
     a = QuantumSynthesizer(cfg=DosingConfig(steps=800), seed=77); a.run()
     b = QuantumSynthesizer(cfg=DosingConfig(steps=800), seed=77); b.run()
     assert a.summary() == b.summary()
+
+
+# --------------------------------------------------------------------------- #
+#  温度結合反応器（熱暴走とその制御）
+# --------------------------------------------------------------------------- #
+from omega_pharma_forge import (
+    ThermalReactor, ThermalConfig, ThermalController, ThermalDosingConfig,
+    run_thermal_uncontrolled,
+)
+
+
+def test_arrhenius_increases_with_temperature():
+    rc = ThermalReactor()
+    assert math.isclose(rc.arrhenius(rc.th.T_ref), 1.0, rel_tol=1e-12)
+    assert rc.arrhenius(320.0) > 1.0      # 高温ほど速い
+    assert rc.arrhenius(280.0) < 1.0
+
+
+def test_heat_removal_is_linear_in_temperature():
+    rc = ThermalReactor()
+    a = rc.heat_removal(310.0)
+    b = rc.heat_removal(320.0)
+    assert math.isclose(b - a, rc.th.UA * 10.0, rel_tol=1e-9)
+
+
+def test_no_reaction_no_heat():
+    rc = ThermalReactor()          # C=0 なので反応が起きない
+    assert math.isclose(rc.heat_generation(), 0.0, abs_tol=1e-12)
+
+
+def test_thermal_mass_conservation():
+    rc = ThermalReactor()
+    rc.net.s.C = 0.2
+    m0 = rc.net.s.mass()
+    for _ in range(500):
+        rc.step()
+    assert abs(rc.net.s.mass() - m0) < 1e-9
+
+
+def test_uncontrolled_dump_causes_thermal_runaway():
+    u = run_thermal_uncontrolled(catalyst=0.30, steps=3000)
+    assert u["runaway"] == 1.0
+    assert u["T_max"] > 330.0
+    assert u["min_semenov_margin"] < 0.0
+
+
+def test_controller_prevents_runaway():
+    c = ThermalController(cfg=ThermalDosingConfig(steps=3000), seed=0xBADA)
+    c.run()
+    s = c.summary()
+    assert s["stayed_below_alarm"] == 1.0
+    assert s["min_semenov_margin"] > 0.0
+    assert s["scram"] == 0.0
+
+
+def test_controller_beats_uncontrolled_on_yield_and_purity():
+    c = ThermalController(cfg=ThermalDosingConfig(steps=3000), seed=0xBADA)
+    c.run()
+    cs = c.summary()
+    u = run_thermal_uncontrolled(steps=3000)
+    assert cs["yield"] > u["yield"]
+    assert cs["purity"] > u["purity"]
+    assert cs["T_max"] < u["T_max"]
+
+
+def test_thermal_scram_latches_when_forced_hot():
+    """冷却を弱くすると熱暴走し、SCRAM がラッチする。"""
+    weak_cooling = ThermalConfig(UA=20.0)
+    c = ThermalController(thermal=weak_cooling,
+                          cfg=ThermalDosingConfig(steps=1500), seed=3)
+    c.run()
+    assert c.summary()["scram"] == 1.0
+
+
+def test_thermal_reproducible():
+    a = ThermalController(cfg=ThermalDosingConfig(steps=800), seed=5); a.run()
+    b = ThermalController(cfg=ThermalDosingConfig(steps=800), seed=5); b.run()
+    assert a.summary() == b.summary()

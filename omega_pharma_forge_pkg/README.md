@@ -67,6 +67,26 @@ A への選択性 = k3 / (k3 + 2·k4·I)
 制御なしでは χ≫1 で連鎖が暴走し中間体が高濃度になるため、2次の過分解が優位に
 なって純度・収率とも制御ありに劣ります。質量保存は機械精度（~1e-16）で成立します。
 
+## 温度結合反応器（v0.2 で追加）
+
+等温モデルに **温度** を導入した `thermal_reactor.py` を同梱しています。実際の
+反応器で最も危険なのは、発熱が温度を上げ、温度が Arrhenius 則で反応を速め、
+それがさらに発熱を増やす **熱暴走（thermal runaway）** です。
+
+```
+k(T) = k_ref · exp[ −(Ea/R)·(1/T − 1/T_ref) ]          Arrhenius 則
+ρCp·V·dT/dt = Σ(−ΔH)·r − U·A·(T − T_jacket)           熱収支
+```
+
+暴走判定には **Semenov 条件** を使います。発熱曲線の傾きが除熱直線の傾きを
+上回った時点（`d(発熱)/dT > d(除熱)/dT`）で安定点が失われます。
+コントローラは触媒投与（χ 制御）と冷却ジャケット温度の 2 系統で制御します。
+
+| 条件 | 収率 | 純度 | 最高温度 | Semenov |
+|:--|--:|--:|--:|:--|
+| **制御あり** | **0.4372** | **0.6571** | 300.0 K | 常に安定 ✓ |
+| 制御なし（一括投与・冷却固定） | 0.3030 | 0.3032 | 357.0 K | 暴走 ✗ |
+
 ## インストール
 
 ```bash
@@ -79,7 +99,7 @@ cd ../omega_pharma_forge_pkg && pip install -e .
 ## 使い方
 
 ```bash
-omega-pharma-forge 3000        # 3シナリオ（制御あり / χスイープ / 制御なし）
+omega-pharma-forge 3000        # 4シナリオ（制御あり / χスイープ / 制御なし / 熱暴走）
 ```
 
 ```python
@@ -93,7 +113,8 @@ print(s.report())
 ## テスト
 
 ```bash
-pytest -q    # 9テスト: 質量保存・非負性・触媒依存性・制御優位・選択性・SCRAM・再現性
+pytest -q    # 18テスト: 質量保存・非負性・触媒依存性・制御優位・選択性・SCRAM・
+             #          Arrhenius・熱収支・熱暴走・Semenov条件・再現性
 ```
 
 ## 構成
@@ -104,7 +125,8 @@ omega_pharma_forge_pkg/
 ├── omega_pharma_forge/
 │   ├── reaction_network.py  # 質量作用則ODE + RK4 + 連鎖係数χ
 │   ├── synthesizer.py       # 擬似量子VMによる投与制御 + SCRAM
-│   └── cli.py               # 3シナリオ・アプリケーション
+│   ├── thermal_reactor.py   # Arrhenius + 熱収支 + Semenov条件 + 冷却制御
+│   └── cli.py               # 4シナリオ・アプリケーション
 ├── examples/demo.py
 └── tests/test_forge.py
 ```
