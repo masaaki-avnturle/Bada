@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>QuantumShark — 量子暗号つきパケット アナライザ</title>
+<style>
+  :root{color-scheme:light dark;--bg:#04060a;--panel:#0a1220;--line:#1c2838;--ink:#d6e2ee;
+        --dim:#8aa0b8;--gold:#c8a44a;--green:#2e9e57;--red:#d0574a;--blue:#4a80d0;}
+  *{box-sizing:border-box;} html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{padding:12px 18px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0a1220,#04060a);
+         display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  h1{margin:0;font-size:17px;} h1 .a{color:var(--gold);}
+  header .note{color:var(--dim);font-size:12px;}
+  .bar{display:flex;gap:8px;align-items:center;padding:8px 18px;border-bottom:1px solid var(--line);background:#070c15;flex-wrap:wrap;}
+  input,button{font:inherit;}
+  input{background:#020407;border:1px solid var(--line);border-radius:7px;padding:7px 10px;color:var(--ink);}
+  #filter{flex:1;min-width:200px;font-family:"SFMono-Regular",Consolas,monospace;}
+  button.act{border:0;background:var(--green);color:#eafff0;border-radius:7px;padding:8px 14px;cursor:pointer;font-weight:600;}
+  button.sec{border:1px solid var(--line);background:#132033;color:var(--ink);border-radius:7px;padding:7px 12px;cursor:pointer;}
+  main{height:calc(100% - 108px);display:flex;flex-direction:column;}
+  #lock{padding:30px 18px;max-width:520px;}
+  #lock .card{background:#070c15;border:1px solid var(--line);border-radius:12px;padding:18px;}
+  label{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;font-family:"SFMono-Regular",Consolas,monospace;}
+  thead th{position:sticky;top:0;background:#0c1626;color:var(--dim);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);font-weight:600;}
+  tbody td{padding:4px 8px;border-bottom:1px solid #0e1826;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  tbody tr{cursor:pointer;} tbody tr:hover{background:#0e1a2b;} tbody tr.sel{background:#13294a;}
+  td.info{white-space:normal;color:#c7d6e6;}
+  .p-DNS{color:#7ac0ff;} .p-TCP{color:#8fe0a8;} .p-ARP{color:#e0c07a;} .p-UDP{color:#c79bff;}
+  .p-TLSv13,.p-TLS{color:#f0a3d0;} .p-ICMP{color:#f2a49b;} .p-HTTP{color:#9fe0ff;}
+  #tablewrap{flex:1;overflow:auto;}
+  #details{height:180px;border-top:1px solid var(--line);background:#020407;overflow:auto;padding:10px 14px;
+           font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;white-space:pre-wrap;}
+  .pill{display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;margin-right:6px;}
+  .ok{background:#123a24;color:#7ce0a3;} .bad{background:#3a1614;color:#f2a49b;} .info2{background:#12233a;color:#8fb6ff;}
+  .hidden{display:none;} code{color:var(--gold);}
+</style>
+</head>
+<body>
+<header>
+  <h1>Quantum<span class="a">Shark</span></h1>
+  <span class="note">量子暗号(Jones)で暗号化されたパケット キャプチャを復号して解析 — 自分の通信の防御的分析用</span>
+</header>
+
+<div id="lockbar" class="bar">
+  <span class="note">🔒 マスターパスワードで .qcap を復号します</span>
+</div>
+
+<main>
+  <section id="lock">
+    <div class="card">
+      <b>キャプチャを開く</b>
+      <p class="note">同梱デモを開くか(マスター: <code>demo</code>)、<code>qshark-capture.js</code> で作った自分の <code>.qcap</code> を選択してください。</p>
+      <label>マスターパスワード</label>
+      <input id="master" type="password" class="mono" value="demo"/>
+      <div style="margin-top:12px">
+        <button class="act" id="openDemo">デモを開く</button>
+        <label style="display:inline-block;margin:0 0 0 8px">
+          <input id="file" type="file" accept=".qcap,application/json" class="hidden"/>
+          <button class="sec" id="pick">.qcap を選択</button>
+        </label>
+      </div>
+      <div id="lockMsg" class="note" style="margin-top:10px"></div>
+    </div>
+  </section>
+
+  <section id="app" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+    <div class="bar">
+      <input id="filter" placeholder="表示フィルタ: proto/ip/文字列 (例: TCP, 192.168, Client Hello)"/>
+      <span id="stat" class="note"></span>
+      <button class="sec" id="close">閉じる</button>
+    </div>
+    <div id="tablewrap">
+      <table>
+        <thead><tr><th>No.</th><th>Time</th><th>Source</th><th>Destination</th><th>Protocol</th><th>Len</th><th>Info</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="details">パケットを選択すると詳細を表示します。</div>
+  </section>
+</main>
+
+<script>
+/* ==== Bada core (inlined) ==== */
+/* ============================================================================
+ * bada.js — The Bada language (Unknown-Prior Engine language), JavaScript port.
+ *
+ * A faithful port of the C reference (lexer.c / parser.c / interp.c /
+ * transpile.c) so the same Bada programs run in the browser (APK / EXE /
+ * Ubuntu app) with the documented numerics:
+ *   (i)  zero preservation  — confident zeros survive the phase step
+ *   (ii) |psi|^2 == a       — the unit-modulus phase only reweights
+ *
+ * Additions over the C reference, per the paper "Reviser-Extensible Grammars:
+ * a Q#-targeted quantum front end for the Unknown-Prior Engine":
+ *   - @reviser : grammar { rule ... } — grammar-extension transactions whose
+ *     production rules are committed to a rule ledger consulted by the parser
+ *     (extension points: stmt / expr / postfix; latest-highest priority;
+ *     program-order scope).
+ *   - A Q#-style quantum sublanguage on the phase core: qubit, H, X, S, T,
+ *     Rz, CNOT, Measure — gates are phase/permutation steps, measurement is
+ *     an append-only ledger commit.
+ *   - Omega::Quantum inference library: prepare_unknown, observe, estimate,
+ *     forbidden (append-only measurement record, max-entropy start).
+ *   - Generic string primitives (split / substr / str_find / ord / chr) so
+ *     the zone:// URL scheme of the ultra-network WWW (examples/zone.bada)
+ *     can be written entirely in Bada itself: the runtime supplies only
+ *     character-level access, the parser, DHT and quantum guard are Bada.
+ *
+ * Exports (UMD): BadaLang.run / tokens / ast / emitC / VERSION
+ * ==========================================================================*/
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.BadaLang = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var VERSION = "1.1.0";
+
+  /* ------------------------------------------------------------------ *
+   * Tokens
+   * ------------------------------------------------------------------ */
+  var KEYWORDS = {
+    Omega: "OMEGA", DATABASE: "DATABASE", tuplespace: "TUPLESPACE",
+    TupleSpace: "TUPLESPACE", asperal: "ASPERAL", struct: "STRUCT",
+    def: "DEF", typedef: "TYPEDEF", "return": "RETURN", "if": "IF",
+    "else": "ELSE", "while": "WHILE", "for": "FOR", "in": "IN",
+    "static": "STATIC", dynamic: "DYNAMIC", refine: "REFINE", star: "STAR",
+    "true": "TRUE", "false": "FALSE", nil: "NIL", let: "LET",
+    print: "PRINT", each: "EACH"
+  };
+
+  function isDigit(c) { return c >= "0" && c <= "9"; }
+  function isAlpha(c) { return /[A-Za-z_]/.test(c); }
+  function isAlnum(c) { return /[A-Za-z0-9_]/.test(c); }
+
+  function tokenize(src) {
+    var toks = [], pos = 0, line = 1, n = src.length;
+    function peek() { return pos < n ? src[pos] : "\0"; }
+    function peek2() { return pos + 1 < n ? src[pos + 1] : "\0"; }
+    function adv() { var c = src[pos++]; if (c === "\n") line++; return c; }
+    function mk(type, lexeme, num) {
+      return { type: type, lexeme: lexeme, num: num || 0, line: line };
+    }
+    for (;;) {
+      /* skip whitespace + comments (#, //) */
+      for (;;) {
+        var c0 = peek();
+        if (c0 === " " || c0 === "\t" || c0 === "\r" || c0 === "\n") { adv(); }
+        else if (c0 === "#") { while (pos < n && peek() !== "\n") adv(); }
+        else if (c0 === "/" && peek2() === "/") { while (pos < n && peek() !== "\n") adv(); }
+        else break;
+      }
+      var startLine = line;
+      var c = peek();
+      if (pos >= n) { toks.push({ type: "EOF", lexeme: "<eof>", num: 0, line: line }); break; }
+
+      /* numbers */
+      if (isDigit(c)) {
+        var s = pos;
+        while (isDigit(peek())) adv();
+        var isf = false;
+        if (peek() === "." && isDigit(peek2())) { isf = true; adv(); while (isDigit(peek())) adv(); }
+        if (peek() === "e" || peek() === "E") { isf = true; adv(); if (peek() === "+" || peek() === "-") adv(); while (isDigit(peek())) adv(); }
+        var text = src.slice(s, pos);
+        toks.push({ type: isf ? "FLOAT" : "INT", lexeme: text, num: parseFloat(text), line: startLine });
+        continue;
+      }
+      /* identifiers / keywords: allow @ prefix and trailing ? / ! */
+      if (isAlpha(c) || c === "@") {
+        var s2 = pos;
+        if (c === "@") adv();
+        while (isAlnum(peek())) adv();
+        if (peek() === "?" || peek() === "!") adv();
+        var buf = src.slice(s2, pos);
+        if (buf[0] === "@") {
+          if (buf === "@reviser") { toks.push({ type: "REVISER", lexeme: buf, num: 0, line: startLine }); continue; }
+          toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        if (buf === "do") { toks.push({ type: "IDENT", lexeme: "do", num: 0, line: startLine }); continue; }
+        if (Object.prototype.hasOwnProperty.call(KEYWORDS, buf)) {
+          toks.push({ type: KEYWORDS[buf], lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+        continue;
+      }
+      /* strings — double quoted, and single quoted (used by rule patterns) */
+      if (c === '"' || c === "'") {
+        var quote = c;
+        adv();
+        var out = "";
+        while (pos < n && peek() !== quote) {
+          var ch = adv();
+          if (ch === "\\") {
+            var e = adv();
+            out += e === "n" ? "\n" : e === "t" ? "\t" : e === '"' ? '"' : e === "'" ? "'" : e === "\\" ? "\\" : e;
+          } else out += ch;
+        }
+        if (peek() === quote) adv();
+        toks.push({ type: "STRING", lexeme: out, num: 0, line: startLine });
+        continue;
+      }
+
+      adv(); /* consume c */
+      switch (c) {
+        case "(": toks.push(mk("LPAREN", "(")); continue;
+        case ")": toks.push(mk("RPAREN", ")")); continue;
+        case "{": toks.push(mk("LBRACE", "{")); continue;
+        case "}": toks.push(mk("RBRACE", "}")); continue;
+        case "[": toks.push(mk("LBRACK", "[")); continue;
+        case "]": toks.push(mk("RBRACK", "]")); continue;
+        case ",": toks.push(mk("COMMA", ",")); continue;
+        case ".": toks.push(mk("DOT", ".")); continue;
+        case "|": toks.push(mk("PIPE", "|")); continue;
+        case "~": toks.push(mk("CONSIST", "~")); continue;
+        case "+": toks.push(mk("PLUS", "+")); continue;
+        case "*": toks.push(mk("STAR_OP", "*")); continue;
+        case "/": toks.push(mk("SLASH", "/")); continue;
+        case "%": toks.push(mk("PERCENT", "%")); continue;
+        case ";": toks.push(mk("SEMI", ";")); continue;
+        case "-":
+          if (peek() === ">") { adv(); toks.push(mk("QUERY", "->")); continue; }
+          toks.push(mk("MINUS", "-")); continue;
+        case "<":
+          if (peek() === "-") { adv(); toks.push(mk("LARROW", "<-")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("LE", "<=")); continue; }
+          toks.push(mk("LT", "<")); continue;
+        case ">":
+          if (peek() === ">") { adv(); toks.push(mk("COMMIT", ">>")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("GE", ">=")); continue; }
+          toks.push(mk("GT", ">")); continue;
+        case "=":
+          if (peek() === "=") { adv(); toks.push(mk("EQ", "==")); continue; }
+          if (peek() === ">") { adv(); toks.push(mk("ARROW", "=>")); continue; }
+          toks.push(mk("ASSIGN", "=")); continue;
+        case "!":
+          if (peek() === "=") { adv(); toks.push(mk("NE", "!=")); continue; }
+          toks.push(mk("NOT", "!")); continue;
+        case "&":
+          if (peek() === "&") { adv(); toks.push(mk("AND", "&&")); continue; }
+          toks.push(mk("AND", "&")); continue;
+        case ":":
+          if (peek() === "=") {
+            adv();
+            if (peek() === ">") { adv(); toks.push(mk("DEFARROW", ":=>")); continue; }
+            toks.push(mk("WALRUS", ":=")); continue;
+          }
+          if (peek() === ":") { adv(); toks.push(mk("SCOPE", "::")); continue; }
+          toks.push(mk("COLON", ":")); continue;
+      }
+      toks.push(mk("ERROR", c));
+    }
+    return toks;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST
+   * ------------------------------------------------------------------ */
+  function node(type, line) {
+    return { type: type, line: line, num: 0, str: null, boolean: false, kids: [], params: [], body: null };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Parser (recursive descent, + rule-ledger extension points)
+   * ------------------------------------------------------------------ */
+  function Parser(toks) {
+    this.toks = toks;
+    this.i = 0;
+    this.errors = [];
+    /* the parse-time rule ledger (grammar facts committed by @reviser :
+       grammar transactions; consulted latest-first; program-order scope) */
+    this.ruleLedger = [];
+  }
+  Parser.prototype.cur = function () { return this.toks[this.i]; };
+  Parser.prototype.peekn = function (k) { var j = this.i + k; if (j >= this.toks.length) j = this.toks.length - 1; return this.toks[j]; };
+  Parser.prototype.check = function (t) { return this.cur().type === t; };
+  Parser.prototype.advance = function () { var t = this.cur(); if (this.i < this.toks.length - 1) this.i++; return t; };
+  Parser.prototype.match = function (t) { if (this.check(t)) { this.advance(); return true; } return false; };
+  Parser.prototype.perr = function (msg) {
+    this.errors.push("[parse error] line " + this.cur().line + " near '" + (this.cur().lexeme || "?") + "': " + msg);
+  };
+  Parser.prototype.expect = function (t, what) { if (!this.match(t)) this.perr(what); };
+
+  Parser.prototype.parsePipeParams = function (holder) {
+    this.expect("PIPE", "expected '|'");
+    while (!this.check("PIPE") && !this.check("EOF")) {
+      if (this.check("IDENT")) { holder.params.push(this.cur().lexeme); this.advance(); }
+      else this.advance();
+      if (this.check("PIPE")) break;
+      if (this.check("COMMA")) this.advance();
+    }
+    this.expect("PIPE", "expected closing '|'");
+  };
+
+  /* ---- rule-ledger matching -------------------------------------- */
+  /* pattern atom: {kind:'tok', text} literal, {kind:'hole'} expression hole */
+  Parser.prototype.tryRules = function (heads) {
+    /* latest commit wins (highest priority), then ledger order */
+    for (var r = this.ruleLedger.length - 1; r >= 0; r--) {
+      var rule = this.ruleLedger[r];
+      if (heads.indexOf(rule.head) < 0) continue;
+      if (!rule.pattern.length || rule.pattern[0].kind !== "tok") continue; /* avoid left recursion */
+      if (this.cur().lexeme !== rule.pattern[0].text) continue;
+      var save = this.i;
+      var holes = [];
+      var ok = true;
+      for (var k = 0; k < rule.pattern.length; k++) {
+        var atom = rule.pattern[k];
+        if (atom.kind === "tok") {
+          if (this.cur().lexeme === atom.text && !this.check("EOF")) this.advance();
+          else { ok = false; break; }
+        } else { /* hole: capture a full expression */
+          holes.push(this.parseExpr());
+        }
+      }
+      if (!ok) { this.i = save; continue; }
+      var ext = node("EXTENDED", this.toks[save].line);
+      ext.str = rule.name;
+      ext.rule = rule;
+      ext.kids = holes;
+      return ext;
+    }
+    return null;
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    /* extension point: rules with head 'expr' / 'postfix' before built-ins */
+    var ext = this.tryRules(["expr", "postfix"]);
+    if (ext) return ext;
+
+    var t = this.cur();
+    switch (t.type) {
+      case "INT": case "FLOAT": { var n1 = node(t.type === "INT" ? "INT" : "FLOAT", t.line); n1.num = t.num; this.advance(); return n1; }
+      case "STRING": { var n2 = node("STRING", t.line); n2.str = t.lexeme; this.advance(); return n2; }
+      case "TRUE": { var n3 = node("BOOL", t.line); n3.boolean = true; this.advance(); return n3; }
+      case "FALSE": { var n4 = node("BOOL", t.line); n4.boolean = false; this.advance(); return n4; }
+      case "NIL": { var n5 = node("NIL", t.line); this.advance(); return n5; }
+      case "STAR": { var n6 = node("IDENT", t.line); n6.str = "STAR"; this.advance(); return n6; }
+      case "LPAREN": { this.advance(); var e = this.parseExpr(); this.expect("RPAREN", "expected ')'"); return e; }
+      case "LBRACK": {
+        this.advance();
+        var a = node("ARRAY", t.line);
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          a.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RBRACK", "expected ']'");
+        return a;
+      }
+      case "PIPE": { /* lambda */
+        var lam = node("LAMBDA", t.line);
+        this.parsePipeParams(lam);
+        if (this.check("IDENT") && this.cur().lexeme === "do") {
+          this.advance();
+          var body = node("BLOCK", t.line);
+          while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+            body.kids.push(this.parseStmt());
+          if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+          lam.body = body;
+        } else {
+          lam.body = this.parseExpr();
+        }
+        return lam;
+      }
+      case "OMEGA": { var n7 = node("IDENT", t.line); n7.str = "Omega"; this.advance(); return n7; }
+      case "TUPLESPACE": { var n8 = node("IDENT", t.line); n8.str = "TupleSpace"; this.advance(); return n8; }
+      case "IDENT": { var n9 = node("IDENT", t.line); n9.str = t.lexeme; this.advance(); return n9; }
+      case "DATABASE": { var nA = node("IDENT", t.line); nA.str = "DATABASE"; this.advance(); return nA; }
+      default:
+        this.perr("expected expression");
+        this.advance();
+        return node("NIL", t.line);
+    }
+  };
+
+  Parser.prototype.parsePostfix = function () {
+    var e = this.parsePrimary();
+    for (;;) {
+      if (this.match("LPAREN")) {
+        var call = node("CALL", e.line);
+        call.kids.push(e);
+        while (!this.check("RPAREN") && !this.check("EOF")) {
+          call.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RPAREN", "expected ')'");
+        e = call;
+      } else if (this.match("LBRACK")) {
+        var idx = node("INDEX", e.line);
+        idx.kids.push(e);
+        if (!this.check("RBRACK")) idx.kids.push(this.parseExpr());
+        this.expect("RBRACK", "expected ']'");
+        e = idx;
+      } else if (this.match("DOT")) {
+        var m = this.cur();
+        if (this.check("EACH")) {
+          this.advance();
+          var each = node("EACH", m.line);
+          each.kids.push(e);
+          var lam = node("LAMBDA", m.line);
+          if (this.check("PIPE")) this.parsePipeParams(lam);
+          if (this.check("IDENT") && this.cur().lexeme === "do") {
+            this.advance();
+            var body = node("BLOCK", m.line);
+            while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+              body.kids.push(this.parseStmt());
+            if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+            lam.body = body;
+          } else {
+            lam.body = this.parseExpr();
+          }
+          each.kids.push(lam);
+          e = each;
+        } else {
+          var name = m.lexeme;
+          this.advance();
+          if (this.match("LPAREN")) {
+            var call2 = node("CALL", m.line);
+            var meth = node("GET", m.line);
+            meth.str = name;
+            meth.kids.push(e);
+            call2.kids.push(meth);
+            while (!this.check("RPAREN") && !this.check("EOF")) {
+              call2.kids.push(this.parseExpr());
+              if (!this.match("COMMA")) break;
+            }
+            this.expect("RPAREN", "expected ')'");
+            e = call2;
+          } else {
+            var get = node("GET", m.line);
+            get.str = name;
+            get.kids.push(e);
+            e = get;
+          }
+        }
+      } else if (this.match("SCOPE")) {
+        var m2 = this.cur();
+        var name2 = m2.lexeme || "?";
+        this.advance();
+        var get2 = node("GET", m2.line);
+        get2.str = name2;
+        get2.kids.push(e);
+        e = get2;
+      } else break;
+    }
+    return e;
+  };
+
+  Parser.prototype.parseUnary = function () {
+    if (this.check("MINUS") || this.check("NOT")) {
+      var op = this.advance();
+      var n = node("UNARY", op.line);
+      n.str = op.lexeme;
+      n.kids.push(this.parseUnary());
+      return n;
+    }
+    return this.parsePostfix();
+  };
+
+  Parser.prototype.bin = function (sub, ops) {
+    var left = sub.call(this);
+    for (;;) {
+      var matched = false;
+      for (var i = 0; i < ops.length; i++) {
+        if (this.check(ops[i][0])) {
+          var op = this.advance();
+          var n = node("BINARY", op.line);
+          n.str = ops[i][1];
+          n.kids.push(left);
+          n.kids.push(sub.call(this));
+          left = n;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseFactor = function () { return this.bin(this.parseUnary, [["STAR_OP", "*"], ["SLASH", "/"], ["PERCENT", "%"]]); };
+  Parser.prototype.parseTerm = function () { return this.bin(this.parseFactor, [["PLUS", "+"], ["MINUS", "-"]]); };
+  Parser.prototype.parseCompare = function () { return this.bin(this.parseTerm, [["LT", "<"], ["LE", "<="], ["GT", ">"], ["GE", ">="]]); };
+  Parser.prototype.parseEquality = function () { return this.bin(this.parseCompare, [["EQ", "=="], ["NE", "!="], ["CONSIST", "~"]]); };
+  Parser.prototype.parseAnd = function () { return this.bin(this.parseEquality, [["AND", "&&"]]); };
+  Parser.prototype.parseOr = function () { return this.bin(this.parseAnd, [["OR", "||"]]); };
+
+  Parser.prototype.parseQuery = function () {
+    var left = this.parseOr();
+    while (this.check("ARROW") || this.check("QUERY")) {
+      var op = this.advance();
+      var n = node("QUERY", op.line);
+      n.kids.push(left);
+      n.kids.push(this.parseOr());
+      left = n;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseCommit = function () {
+    var left = this.parseQuery();
+    for (;;) {
+      if (this.check("COMMIT")) {
+        this.advance();
+        var n = node("COMMIT", left.line);
+        n.kids.push(left);
+        n.kids.push(this.parseQuery());
+        left = n;
+      } else if (this.check("LARROW")) {
+        this.advance();
+        var n2 = node("LARROW", left.line);
+        n2.kids.push(left);
+        n2.kids.push(this.parseQuery());
+        left = n2;
+      } else break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseExpr = function () { return this.parseCommit(); };
+
+  /* ---- statements ---- */
+  Parser.prototype.parseBlock = function () {
+    var line = this.cur().line;
+    this.expect("LBRACE", "expected '{'");
+    var b = node("BLOCK", line);
+    while (!this.check("RBRACE") && !this.check("EOF"))
+      b.kids.push(this.parseDecl());
+    this.expect("RBRACE", "expected '}'");
+    return b;
+  };
+
+  Parser.prototype.parseFunc = function () {
+    var line = this.cur().line;
+    this.expect("DEF", "expected 'def'");
+    var fn = node("FUNC", line);
+    if (this.check("IDENT")) { fn.str = this.cur().lexeme; this.advance(); }
+    else fn.str = "anon";
+    if (this.check("PIPE")) this.parsePipeParams(fn);
+    else if (this.match("LPAREN")) {
+      while (!this.check("RPAREN") && !this.check("EOF")) {
+        if (this.check("IDENT")) { fn.params.push(this.cur().lexeme); this.advance(); }
+        else this.advance();
+        if (!this.match("COMMA")) break;
+      }
+      this.expect("RPAREN", "expected ')'");
+    }
+    if (this.check("LBRACE")) {
+      fn.body = this.parseBlock();
+    } else if (this.match("COMMIT") || this.match("ARROW") || this.match("DEFARROW") || this.match("ASSIGN")) {
+      var body = node("BLOCK", line);
+      var ret = node("RETURN", line);
+      ret.kids.push(this.parseExpr());
+      body.kids.push(ret);
+      this.match("SEMI");
+      fn.body = body;
+    } else {
+      var body2 = node("BLOCK", line);
+      var ret2 = node("RETURN", line);
+      ret2.kids.push(this.parseExpr());
+      body2.kids.push(ret2);
+      fn.body = body2;
+    }
+    return fn;
+  };
+
+  Parser.prototype.parseAsperal = function () {
+    var line = this.cur().line;
+    this.expect("ASPERAL", "expected 'asperal'");
+    if (this.check("PIPE")) {
+      var n = node("ASPERAL", line);
+      n.str = "union";
+      this.parsePipeParams(n);
+      this.match("DEFARROW");
+      if (this.check("LBRACE")) n.body = this.parseBlock();
+      return n;
+    }
+    var st = node("STRUCT", line);
+    if (this.check("IDENT")) { st.str = this.cur().lexeme; this.advance(); }
+    else if (this.check("TUPLESPACE")) { st.str = "TupleSpace"; this.advance(); }
+    else st.str = "anon";
+    if (this.match("COLON")) this.match("STRUCT");
+    else this.match("STRUCT");
+    st.body = this.parseBlock();
+    return st;
+  };
+
+  Parser.prototype.parseOmega = function () {
+    var line = this.cur().line;
+    this.expect("OMEGA", "expected 'Omega'");
+    var n = node("OMEGA_DB", line);
+    if (this.match("SCOPE")) {
+      if (this.check("DATABASE")) { this.advance(); n.str = "DATABASE"; }
+      else if (this.check("TUPLESPACE")) { this.advance(); n.str = "Tuplespace"; }
+      else if (this.check("IDENT")) { n.str = this.cur().lexeme; this.advance(); }
+      else n.str = "DATABASE";
+    } else n.str = "DATABASE";
+    if (this.match("LBRACK")) {
+      if (this.check("TUPLESPACE") || this.check("IDENT")) this.advance();
+      this.expect("RBRACK", "expected ']'");
+    }
+    if (this.match("LT")) { if (this.check("DATABASE") || this.check("IDENT")) this.advance(); }
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  /* @reviser — either the value-level learning loop (executes its block),
+     or, when the header names 'grammar', a grammar-extension transaction:
+        @reviser : grammar {
+            rule "name" head [ 'tok' expr ... ] => denotation
+        }
+     Rules are committed to the parse-time rule ledger (program-order scope,
+     latest-highest priority) and, at run time, appended to the tuplespace
+     ledger as ["rule", name, head, ...] facts (auditability). */
+  Parser.prototype.parseReviser = function () {
+    var line = this.cur().line;
+    this.expect("REVISER", "expected '@reviser'");
+    var isGrammar = false;
+    var j = this.i;
+    while (j < this.toks.length && this.toks[j].type !== "LBRACE" && this.toks[j].type !== "EOF") {
+      if (this.toks[j].lexeme === "grammar") isGrammar = true;
+      j++;
+    }
+    /* skip header noise up to '{' */
+    while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+    if (isGrammar) return this.parseGrammarBlock(line);
+    var n = node("REVISER", line);
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  Parser.prototype.parseGrammarBlock = function (line) {
+    var g = node("GRAMMAR", line);
+    g.rules = [];
+    this.expect("LBRACE", "expected '{'");
+    while (!this.check("RBRACE") && !this.check("EOF")) {
+      if (this.check("IDENT") && this.cur().lexeme === "rule") {
+        this.advance();
+        var rule = { name: "?", head: "expr", pattern: [], denotation: null, prio: this.ruleLedger.length };
+        if (this.check("STRING") || this.check("IDENT")) { rule.name = this.cur().lexeme; this.advance(); }
+        if (this.check("IDENT") || this.check("STRUCT")) { rule.head = this.cur().lexeme; this.advance(); }
+        this.expect("LBRACK", "expected '[' pattern");
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          var t = this.cur();
+          if (t.type === "STRING") { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          else if (t.type === "IDENT" && t.lexeme === "expr") { rule.pattern.push({ kind: "hole" }); this.advance(); }
+          else { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          this.match("COMMA");
+        }
+        this.expect("RBRACK", "expected ']'");
+        this.expect("ARROW", "expected '=>' denotation");
+        rule.denotation = this.parseExpr();
+        /* monotone append: the rule ledger only grows */
+        this.ruleLedger.push(rule);
+        g.rules.push(rule);
+        this.match("SEMI");
+      } else {
+        this.perr("expected 'rule' in grammar reviser");
+        this.advance();
+      }
+    }
+    this.expect("RBRACE", "expected '}'");
+    return g;
+  };
+
+  Parser.prototype.parseIf = function () {
+    var line = this.cur().line;
+    this.expect("IF", "if");
+    var n = node("IF", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    if (this.match("ELSE")) {
+      if (this.check("IF")) n.kids.push(this.parseIf());
+      else n.kids.push(this.parseBlock());
+    }
+    return n;
+  };
+
+  Parser.prototype.parseWhile = function () {
+    var line = this.cur().line;
+    this.expect("WHILE", "while");
+    var n = node("WHILE", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseFor = function () {
+    var line = this.cur().line;
+    this.expect("FOR", "for");
+    var n = node("FOR", line);
+    n.str = this.cur().lexeme;
+    if (this.check("IDENT")) this.advance();
+    this.expect("IN", "in");
+    n.kids.push(this.parseExpr());
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseStmt = function () {
+    var line = this.cur().line;
+    /* extension point: rules with head 'stmt' before built-ins */
+    var ext = this.tryRules(["stmt"]);
+    if (ext) { this.match("SEMI"); return ext; }
+
+    if (this.check("DEF")) return this.parseFunc();
+    if (this.check("ASPERAL")) return this.parseAsperal();
+    if (this.check("OMEGA")) return this.parseOmega();
+    if (this.check("REVISER")) return this.parseReviser();
+    if (this.check("IF")) return this.parseIf();
+    if (this.check("WHILE")) return this.parseWhile();
+    if (this.check("FOR")) return this.parseFor();
+    if (this.check("TYPEDEF")) {
+      this.advance();
+      var n = node("STRUCT", line);
+      n.str = "typedef";
+      while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+      n.body = this.parseBlock();
+      return n;
+    }
+    if (this.match("RETURN")) {
+      var r = node("RETURN", line);
+      if (!this.check("RBRACE") && !this.check("SEMI")) r.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return r;
+    }
+    if (this.match("PRINT")) {
+      var pn = node("PRINT", line);
+      var par = this.match("LPAREN");
+      pn.kids.push(this.parseExpr());
+      while (this.match("COMMA")) pn.kids.push(this.parseExpr());
+      if (par) this.expect("RPAREN", ")");
+      this.match("SEMI");
+      return pn;
+    }
+    if (this.check("IDENT") && this.peekn(1).type === "WALRUS") {
+      var b = node("BIND", line);
+      b.str = this.cur().lexeme;
+      this.advance(); this.advance();
+      b.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return b;
+    }
+    var e = this.parseExpr();
+    if (this.check("ASSIGN")) {
+      this.advance();
+      var a = node("ASSIGN", line);
+      a.kids.push(e);
+      a.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return a;
+    }
+    this.match("SEMI");
+    return e;
+  };
+
+  Parser.prototype.parseDecl = function () { return this.parseStmt(); };
+
+  function parseProgram(src) {
+    var toks = tokenize(src);
+    var p = new Parser(toks);
+    var prog = node("PROGRAM", 1);
+    while (!p.check("EOF")) {
+      var d = p.parseDecl();
+      if (d) prog.kids.push(d);
+      if (p.errors.length > 50) { p.errors.push("too many parse errors, aborting"); break; }
+    }
+    return { program: prog, errors: p.errors, ruleLedger: p.ruleLedger };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Values
+   * ------------------------------------------------------------------ */
+  function Vnil() { return { t: "nil" }; }
+  function Vnum(x) { return { t: "num", num: x }; }
+  function Vbool(b) { return { t: "bool", b: b }; }
+  function Vstr(s) { return { t: "str", str: s == null ? "" : String(s) }; }
+  function Vstar() { return { t: "star" }; }
+  function Varr(items) { return { t: "arr", items: items || [] }; }
+  function Vdist(p) { return { t: "dist", p: p }; }
+  function Vts(ts) { return { t: "ts", ts: ts }; }
+  function Vreg(reg) { return { t: "reg", reg: reg }; }
+
+  function distNormalize(p) {
+    var s = 0;
+    for (var i = 0; i < p.length; i++) s += p[i];
+    if (s > 0) for (var j = 0; j < p.length; j++) p[j] /= s;
+  }
+  function arrToP(items) {
+    var p = new Array(items.length);
+    for (var i = 0; i < items.length; i++) p[i] = items[i].t === "num" ? items[i].num : 0;
+    return p;
+  }
+  function asNum(v) { return v && v.t === "num" ? v.num : 0; }
+  function truthy(v) {
+    switch (v.t) {
+      case "nil": case "star": return false;
+      case "bool": return v.b;
+      case "num": return v.num !== 0;
+      case "str": return v.str.length > 0;
+      default: return true;
+    }
+  }
+
+  /* C %g-alike for string concat */
+  function fmtG(x) {
+    if (!isFinite(x)) return String(x);
+    if (x === Math.trunc(x) && Math.abs(x) < 1e15) return String(x);
+    return String(parseFloat(x.toPrecision(6)));
+  }
+  function fmtNum(x) {
+    if (x === Math.trunc(x) && isFinite(x) && Math.abs(x) < 9.2e18) return String(Math.trunc(x));
+    return x.toFixed(5);
+  }
+  /* C "%.2e" with >=2 exponent digits */
+  function fmtSci(x) {
+    var s = x.toExponential(2); /* e.g. 5.55e-17 or 1.23e-7 */
+    return s.replace(/e([+-])(\d)$/, "e$10$2");
+  }
+
+  function printValue(v) {
+    switch (v.t) {
+      case "nil": return "nil";
+      case "star": return "star";
+      case "bool": return v.b ? "true" : "false";
+      case "num": return fmtNum(v.num);
+      case "str": return v.str;
+      case "arr": return "[" + v.items.map(printValue).join(", ") + "]";
+      case "dist": return "dist[" + Array.prototype.map.call(v.p, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      case "phase": return "phase[V=" + v.v + ", |.|=1]";
+      case "ts": return "tuplespace<" + (v.ts ? v.ts.facts.length : 0) + " facts>";
+      case "func": return "<fn " + (v.decl && v.decl.str ? v.decl.str : "lambda") + ">";
+      case "native": return "<native fn>";
+      case "struct": return "<struct " + v.name + ">";
+      case "inst": return "<" + v.name + " instance>";
+      case "reg": {
+        var probs = regProbs(v.reg);
+        return "qreg[n=" + v.reg.n + "] |psi|^2=[" +
+          Array.prototype.map.call(probs, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      }
+      default: return "?";
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Quantum register on the phase core
+   * psi_i = sqrt(a_i) * exp(i * theta_i)  — stored as re/im amplitude
+   * vectors; gates are index permutations and/or phase contributions.
+   * ------------------------------------------------------------------ */
+  function regNew(n) {
+    var V = 1 << n;
+    var re = new Float64Array(V), im = new Float64Array(V);
+    re[0] = 1;
+    return { n: n, re: re, im: im };
+  }
+  function regProbs(reg) {
+    var V = reg.re.length, p = new Array(V), s = 0;
+    for (var i = 0; i < V; i++) { p[i] = reg.re[i] * reg.re[i] + reg.im[i] * reg.im[i]; s += p[i]; }
+    if (s > 0) for (var j = 0; j < V; j++) p[j] /= s;
+    return p;
+  }
+  function gateH(reg, q) {
+    var V = reg.re.length, bit = 1 << q, r = Math.SQRT1_2;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var ar = reg.re[i], ai = reg.im[i], br = reg.re[j], bi = reg.im[j];
+      reg.re[i] = r * (ar + br); reg.im[i] = r * (ai + bi);
+      reg.re[j] = r * (ar - br); reg.im[j] = r * (ai - bi);
+    }
+  }
+  function gateX(reg, q) {
+    var V = reg.re.length, bit = 1 << q;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var tr = reg.re[i], ti = reg.im[i];
+      reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+      reg.re[j] = tr; reg.im[j] = ti;
+    }
+  }
+  /* pure phase gate on |1> of qubit q: amp *= e^{i lam}. By |psi|^2 == a this
+     changes no probability (Theorem 2 => unitarity of the phase layer). */
+  function gatePhase(reg, q, lam) {
+    var V = reg.re.length, bit = 1 << q;
+    var c = Math.cos(lam), s = Math.sin(lam);
+    for (var i = 0; i < V; i++) {
+      if (!(i & bit)) continue;
+      var ar = reg.re[i], ai = reg.im[i];
+      reg.re[i] = ar * c - ai * s;
+      reg.im[i] = ar * s + ai * c;
+    }
+  }
+  function gateCNOT(reg, c, t) {
+    var V = reg.re.length, cb = 1 << c, tb = 1 << t;
+    for (var i = 0; i < V; i++) {
+      if ((i & cb) && !(i & tb)) {
+        var j = i | tb;
+        var tr = reg.re[i], ti = reg.im[i];
+        reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+        reg.re[j] = tr; reg.im[j] = ti;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Interpreter
+   * ------------------------------------------------------------------ */
+  function Env(parent) { this.map = Object.create(null); this.parent = parent || null; }
+  Env.prototype.set = function (k, v) {
+    for (var e = this; e; e = e.parent) if (Object.prototype.hasOwnProperty.call(e.map, k)) { /* C ref sets in own env only */ break; }
+    this.map[k] = v;
+  };
+  Env.prototype.get = function (k) {
+    for (var e = this; e; e = e.parent)
+      if (Object.prototype.hasOwnProperty.call(e.map, k)) return e.map[k];
+    return undefined;
+  };
+  Env.prototype.root = function () { var e = this; while (e.parent) e = e.parent; return e; };
+
+  function Interp(opts) {
+    opts = opts || {};
+    this.out = opts.out || function () {};
+    this.ledger = { facts: [] };          /* the append-only tuplespace */
+    this.qstate = { prior: null };        /* Omega::Quantum estimator */
+    this.global = new Env(null);
+    this.steps = 0;
+    this.maxSteps = opts.maxSteps || 20000000;
+    this.installNatives();
+    this.global.set("Omega", Vts(this.ledger));
+    this.global.set("tuplespace", Vts(this.ledger));
+  }
+
+  Interp.prototype.commit = function (v) {
+    if (v.t !== "nil") this.ledger.facts.push(v);
+    return this.ledger.facts.length - 1;
+  };
+
+  Interp.prototype.installNatives = function () {
+    var self = this;
+    var g = this.global;
+    function nat(name, fn) { g.set(name, { t: "native", name: name, fn: fn }); }
+
+    nat("softmax", function (a) {
+      if (!a[0]) return Vnil();
+      var src;
+      if (a[0].t === "dist") src = Array.prototype.slice.call(a[0].p);
+      else if (a[0].t === "arr") src = arrToP(a[0].items);
+      else return Vnil();
+      var v = src.length, out = new Array(v);
+      var mx = -Infinity;
+      for (var i = 0; i < v; i++) if (src[i] > mx) mx = src[i];
+      var s = 0;
+      for (var j = 0; j < v; j++) { out[j] = Math.exp(src[j] - mx); s += out[j]; }
+      for (var k = 0; k < v; k++) out[k] /= s;
+      /* confident-zero semantics: a logit far below the max is ruled out */
+      for (var l = 0; l < v; l++) if (src[l] - mx < -30.0) out[l] = 0.0;
+      distNormalize(out);
+      return Vdist(out);
+    });
+    nat("entropy", function (a) {
+      var p;
+      if (a[0].t === "dist") p = a[0].p;
+      else if (a[0].t === "arr") p = arrToP(a[0].items);
+      else return Vnum(0);
+      var H = 0;
+      for (var i = 0; i < p.length; i++) { var q = p[i]; if (q < 1e-12) q = 1e-12; H += -q * Math.log(q); }
+      return Vnum(H);
+    });
+    nat("unknown_prior", function (a) {
+      var v = Math.trunc(asNum(a[0])); if (v < 1) v = 1;
+      var p = new Array(v);
+      for (var i = 0; i < v; i++) p[i] = 1.0 / v;
+      return Vdist(p);
+    });
+    nat("update", function (a) {
+      if (a.length < 2 || a[0].t !== "dist") return a.length > 0 ? a[0] : Vnil();
+      var prior = a[0].p;
+      var evid = a[1].t === "dist" ? a[1].p : (a[1].t === "arr" ? arrToP(a[1].items) : null);
+      if (!evid) return a[0];
+      var lr = a.length >= 3 ? asNum(a[2]) : 0.5;
+      var v = prior.length, out = new Array(v), s = 0;
+      for (var i = 0; i < v; i++) { var e = i < evid.length ? evid[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+      if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+      return Vdist(out);
+    });
+    nat("manifold_embed", function (a) {
+      if (a.length < 1 || a[0].t !== "arr") return Vnil();
+      var x = a[0].items;
+      var W = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var outdim = W ? W.length : x.length;
+      var d = new Array(outdim);
+      for (var i = 0; i < outdim; i++) {
+        var acc = 0;
+        if (W && W[i].t === "arr") {
+          var row = W[i].items;
+          for (var j = 0; j < x.length && j < row.length; j++) acc += asNum(row[j]) * asNum(x[j]);
+        } else acc = asNum(x[i]);
+        d[i] = acc;
+      }
+      var nrm = 0;
+      for (var k = 0; k < outdim; k++) nrm += d[k] * d[k];
+      nrm = Math.sqrt(nrm) + 1e-12;
+      for (var l = 0; l < outdim; l++) d[l] /= nrm;
+      return Vdist(d);
+    });
+    nat("cognitive_system", function (a, env) {
+      if (a.length < 1) return Vnil();
+      var adist;
+      if (a[0].t === "dist") adist = Array.prototype.slice.call(a[0].p);
+      else {
+        var sm = g.get("softmax").fn([a[0]], env);
+        if (sm.t !== "dist") return Vnil();
+        adist = Array.prototype.slice.call(sm.p);
+      }
+      var v = adist.length;
+      var theta = new Array(v);
+      for (var z = 0; z < v; z++) theta[z] = 0;
+      var mods = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var betas = (a.length >= 3 && a[2].t === "arr") ? a[2].items : null;
+      if (mods) {
+        for (var m = 0; m < mods.length; m++) {
+          if (mods[m].t !== "arr") continue;
+          var pair = mods[m].items;
+          if (pair.length < 2) continue;
+          var q;
+          if (pair[0].t === "dist") q = pair[0].p;
+          else if (pair[0].t === "arr") q = arrToP(pair[0].items);
+          else continue;
+          var H = 0;
+          for (var i = 0; i < q.length; i++) { var qq = q[i]; if (qq < 1e-12) qq = 1e-12; H += -qq * Math.log(qq); }
+          var phi = pair[1].t === "arr" ? pair[1].items : null;
+          var beta = (betas && m < betas.length) ? asNum(betas[m]) : 1.0;
+          for (var j = 0; j < v; j++) {
+            var phival = (phi && j < phi.length) ? asNum(phi[j]) : 0;
+            theta[j] += beta * H * phival;
+          }
+        }
+      }
+      /* psi = sqrt(a) * exp(i theta); |psi|^2 == a exactly */
+      var qhat = new Array(v), s = 0;
+      for (var k = 0; k < v; k++) {
+        var r = Math.sqrt(adist[k]);
+        var re = r * Math.cos(theta[k]), im = r * Math.sin(theta[k]);
+        var mag2 = re * re + im * im;
+        qhat[k] = mag2; s += mag2;
+      }
+      if (s > 0) for (var l = 0; l < v; l++) qhat[l] /= s;
+      /* commit q_hat to the append-only ledger */
+      self.commit(Vdist(Array.prototype.slice.call(qhat)));
+      /* stash base a for property (ii) verification */
+      env.root().set("__last_a", Vdist(adist));
+      return Vdist(qhat);
+    });
+    nat("len", function (a) {
+      switch (a[0].t) {
+        case "arr": return Vnum(a[0].items.length);
+        case "dist": return Vnum(a[0].p.length);
+        case "str": return Vnum(a[0].str.length);
+        case "ts": return Vnum(a[0].ts ? a[0].ts.facts.length : 0);
+        case "reg": return Vnum(a[0].reg.re.length);
+        default: return Vnum(0);
+      }
+    });
+    nat("sqrt", function (a) { return Vnum(Math.sqrt(asNum(a[0]))); });
+    nat("log", function (a) { return Vnum(Math.log(asNum(a[0]))); });
+    nat("exp", function (a) { return Vnum(Math.exp(asNum(a[0]))); });
+    nat("abs", function (a) { return Vnum(Math.abs(asNum(a[0]))); });
+    nat("dist", function (a) {
+      if (a[0].t === "arr") { var p = arrToP(a[0].items); distNormalize(p); return Vdist(p); }
+      if (a[0].t === "dist") return a[0];
+      return Vnil();
+    });
+    nat("zeros_of", function (a) {
+      var p = null;
+      if (a[0] && a[0].t === "dist") p = a[0].p;
+      else if (a[0] && a[0].t === "reg") p = regProbs(a[0].reg);
+      if (!p) return Varr([]);
+      var out = [];
+      for (var i = 0; i < p.length; i++) if (p[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+    nat("maxdiff", function (a) {
+      if (a[0].t !== "dist" || a[1].t !== "dist") return Vnum(0);
+      var v = Math.min(a[0].p.length, a[1].p.length), m = 0;
+      for (var i = 0; i < v; i++) { var d = Math.abs(a[0].p[i] - a[1].p[i]); if (d > m) m = d; }
+      return Vnum(m);
+    });
+    nat("sci", function (a) { return Vstr(fmtSci(asNum(a[0]))); });
+    nat("f5", function (a) { return Vstr(asNum(a[0]).toFixed(5)); });
+    nat("ledger", function () { return Vts(self.ledger); });
+    nat("last_a", function (a, env) {
+      var v = env.root().get("__last_a");
+      return v === undefined ? Vnil() : v;
+    });
+
+    /* ============== string primitives (zone:// ultra-network) =========
+       Character-level access only: the zone:// URL parser, the P2P DHT
+       and the quantum guard themselves are written in Bada on top of
+       these (see examples/zone.bada). */
+    function wantStrv(v) { return v && v.t === "str" ? v.str : null; }
+    nat("split", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Varr([]);
+      var sep = a.length >= 2 ? wantStrv(a[1]) : null;
+      var parts = (sep == null || sep === "") ? s.split("") : s.split(sep);
+      return Varr(parts.map(Vstr));
+    });
+    nat("substr", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Vstr("");
+      var from = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (from < 0) from = 0;
+      var cnt = a.length >= 3 ? Math.trunc(asNum(a[2])) : s.length - from;
+      if (cnt < 0) cnt = 0;
+      return Vstr(s.substr(from, cnt));
+    });
+    nat("str_find", function (a) {
+      var s = wantStrv(a[0]);
+      var needle = a.length >= 2 ? wantStrv(a[1]) : null;
+      if (s == null || needle == null) return Vnum(-1);
+      return Vnum(s.indexOf(needle));
+    });
+    nat("ord", function (a) {
+      var s = wantStrv(a[0]); if (s == null || !s.length) return Vnum(0);
+      var i = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (i < 0 || i >= s.length) return Vnum(0);
+      return Vnum(s.charCodeAt(i));
+    });
+    nat("chr", function (a) {
+      return Vstr(String.fromCharCode(Math.trunc(asNum(a[0]))));
+    });
+
+    /* ============== the Q#-style quantum sublanguage ==================
+       Registered natively AND reachable through @reviser : grammar rules
+       (whose denotations call phase_uniform / commit_measurement below). */
+    function wantReg(v) { return v && v.t === "reg" ? v.reg : null; }
+
+    nat("qubit", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      return Vreg(regNew(nq));
+    });
+    nat("H", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateH(r, q);
+      return a[0];
+    });
+    nat("X", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateX(r, q);
+      return a[0];
+    });
+    nat("S", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 2);
+      return a[0];
+    });
+    nat("T", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 4);
+      return a[0];
+    });
+    nat("Rz", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var lam = a.length >= 2 ? asNum(a[1]) : 0;
+      var q = a.length >= 3 ? Math.trunc(asNum(a[2])) : 0;
+      gatePhase(r, q, lam);
+      return a[0];
+    });
+    nat("CNOT", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var c = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      var t = a.length >= 3 ? Math.trunc(asNum(a[2])) : 1;
+      gateCNOT(r, c, t);
+      return a[0];
+    });
+    function doMeasure(v) {
+      var r = wantReg(v);
+      if (!r) {
+        if (v && v.t === "dist") { self.commit(v); return v; }
+        return Vnil();
+      }
+      var p = regProbs(r);
+      var d = Vdist(p);
+      /* measurement is an append-only ledger commit */
+      self.commit(Vdist(Array.prototype.slice.call(p)));
+      return d;
+    }
+    nat("Measure", function (a) { return doMeasure(a[0]); });
+    /* denotation names used by the paper's reviser rules */
+    nat("phase_uniform", function (a) {
+      var r = wantReg(a[0]);
+      if (!r) return Vnil();
+      for (var q = 0; q < r.n; q++) gateH(r, q);
+      return a[0];
+    });
+    nat("commit_measurement", function (a) { return doMeasure(a[0]); });
+
+    /* ---------- Omega::Quantum: append-only measurement inference ----- */
+    nat("prepare_unknown", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      var V = 1 << nq;
+      var p = new Array(V);
+      for (var i = 0; i < V; i++) p[i] = 1.0 / V;
+      self.qstate.prior = p;                 /* max-entropy start (Jaynes) */
+      return Vdist(Array.prototype.slice.call(p));
+    });
+    nat("observe", function (a) {
+      var d = doMeasure(a[0]);
+      if (d.t === "dist" && self.qstate.prior) {
+        var prior = self.qstate.prior, lr = 0.5;
+        var v = prior.length, out = new Array(v), s = 0;
+        for (var i = 0; i < v; i++) { var e = i < d.p.length ? d.p[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+        if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+        self.qstate.prior = out;
+      }
+      return d;
+    });
+    nat("estimate", function () {
+      if (!self.qstate.prior) return Vnil();
+      return Vdist(Array.prototype.slice.call(self.qstate.prior));
+    });
+    nat("forbidden", function () {
+      if (!self.qstate.prior) return Varr([]);
+      var out = [];
+      for (var i = 0; i < self.qstate.prior.length; i++)
+        if (self.qstate.prior[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+  }
+
+  Interp.prototype.tick = function (line) {
+    if (++this.steps > this.maxSteps)
+      throw new Error("[runtime] execution budget exceeded near line " + line);
+  };
+
+  function evalBinary(op, l, r) {
+    if (op === "~") {
+      if (l.t === "star" || r.t === "star") return Vbool(true);
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "&&") return Vbool(truthy(l) && truthy(r));
+    if (op === "||") return Vbool(truthy(l) || truthy(r));
+    if (op === "==") {
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "!=") { var e = evalBinary("==", l, r); return Vbool(!e.b); }
+    if (op === "+" && (l.t === "str" || r.t === "str")) {
+      var a = l.t === "str" ? l.str : fmtG(asNum(l));
+      var b = r.t === "str" ? r.str : fmtG(asNum(r));
+      return Vstr(a + b);
+    }
+    var x = asNum(l), y = asNum(r);
+    switch (op) {
+      case "+": return Vnum(x + y);
+      case "-": return Vnum(x - y);
+      case "*": return Vnum(x * y);
+      case "/": return Vnum(y !== 0 ? x / y : 0);
+      case "%": return Vnum(y !== 0 ? x % y : 0);
+      case "<": return Vbool(x < y);
+      case "<=": return Vbool(x <= y);
+      case ">": return Vbool(x > y);
+      case ">=": return Vbool(x >= y);
+    }
+    return Vnil();
+  }
+
+  Interp.prototype.callValue = function (callee, args, env) {
+    if (callee.t === "native") return callee.fn(args, env) || Vnil();
+    if (callee.t === "func") {
+      var decl = callee.decl;
+      var local = new Env(callee.closure);
+      for (var i = 0; i < decl.params.length; i++)
+        local.map[decl.params[i]] = i < args.length ? args[i] : Vnil();
+      var f = this.exec(decl.body, local);
+      return f.ret ? f.val : Vnil();
+    }
+    if (callee.t === "struct") {
+      var fields = new Env(callee.closure);
+      if (callee.decl && callee.decl.body) this.exec(callee.decl.body, fields);
+      return { t: "inst", name: callee.name, fields: fields };
+    }
+    return Vnil();
+  };
+
+  Interp.prototype.eval = function (n, env) {
+    if (!n) return Vnil();
+    this.tick(n.line);
+    switch (n.type) {
+      case "INT": case "FLOAT": return Vnum(n.num);
+      case "STRING": return Vstr(n.str);
+      case "BOOL": return Vbool(n.boolean);
+      case "NIL": return Vnil();
+      case "IDENT": {
+        if (n.str === "STAR") return Vstar();
+        var v = env.get(n.str);
+        if (v !== undefined) return v;
+        if (n.str === "TupleSpace" || n.str === "tuplespace" || n.str === "Omega")
+          return Vts(this.ledger);
+        /* unknown identifier resolves to its name as a symbol/string */
+        return Vstr(n.str);
+      }
+      case "ARRAY": {
+        var items = [];
+        for (var i = 0; i < n.kids.length; i++) items.push(this.eval(n.kids[i], env));
+        return Varr(items);
+      }
+      case "UNARY": {
+        var u = this.eval(n.kids[0], env);
+        if (n.str === "-") return Vnum(-asNum(u));
+        if (n.str === "!") return Vbool(!truthy(u));
+        return u;
+      }
+      case "BINARY": {
+        var l = this.eval(n.kids[0], env), r = this.eval(n.kids[1], env);
+        return evalBinary(n.str, l, r);
+      }
+      case "INDEX": {
+        var base = this.eval(n.kids[0], env);
+        if (n.kids.length < 2) return Vnil();
+        var idx = Math.trunc(asNum(this.eval(n.kids[1], env)));
+        if (base.t === "arr" && idx >= 0 && idx < base.items.length) return base.items[idx];
+        if (base.t === "dist" && idx >= 0 && idx < base.p.length) return Vnum(base.p[idx]);
+        return Vnil();
+      }
+      case "GET": {
+        var b = this.eval(n.kids[0], env);
+        if (b.t === "inst") {
+          var fv = b.fields.get(n.str);
+          if (fv !== undefined) return fv;
+        }
+        if (b.t === "ts") {
+          if (n.str === "len" || n.str === "facts") return Vnum(b.ts ? b.ts.facts.length : 0);
+        }
+        if (b.t === "dist") {
+          if (n.str === "entropy") return this.global.get("entropy").fn([b], env);
+          if (n.str === "v" || n.str === "len") return Vnum(b.p.length);
+        }
+        if (b.t === "str") {
+          if (b.str === "Omega" || n.str === "tuplespace" || n.str === "DATABASE")
+            return Vts(this.ledger);
+          /* Omega::Quantum — expose the quantum-inference library namespace */
+          if (n.str === "Quantum") return Vstr("Quantum");
+        }
+        return Vstr(n.str);
+      }
+      case "CALL": {
+        var calleeNode = n.kids[0];
+        /* special: append/read/scan on a tuplespace value */
+        if (calleeNode.type === "GET") {
+          var gbase = this.eval(calleeNode.kids[0], env);
+          if (gbase.t === "ts" && calleeNode.str === "append") {
+            var av = n.kids.length > 1 ? this.eval(n.kids[1], env) : Vnil();
+            (gbase.ts || this.ledger).facts.push(av);
+            return Vnum((gbase.ts || this.ledger).facts.length - 1);
+          }
+          if (gbase.t === "ts" && (calleeNode.str === "read" || calleeNode.str === "scan")) {
+            var facts = (gbase.ts || this.ledger).facts;
+            return Varr(facts.slice());
+          }
+          /* Omega::Quantum.method(...) */
+          if (gbase.t === "str" && gbase.str === "Quantum") {
+            var qf = this.global.get(calleeNode.str);
+            if (qf && qf.t === "native") {
+              var qargs = [];
+              for (var qi = 1; qi < n.kids.length; qi++) qargs.push(this.eval(n.kids[qi], env));
+              return qf.fn(qargs, env) || Vnil();
+            }
+          }
+        }
+        var callee = this.eval(calleeNode, env);
+        var args = [];
+        for (var ai = 1; ai < n.kids.length; ai++) args.push(this.eval(n.kids[ai], env));
+        return this.callValue(callee, args, env);
+      }
+      case "LAMBDA": return { t: "func", decl: n, closure: env };
+      case "EACH": {
+        var coll = this.eval(n.kids[0], env);
+        var fn = this.eval(n.kids[1], env);
+        if (coll.t === "arr" && fn.t === "func") {
+          for (var ei = 0; ei < coll.items.length; ei++)
+            this.callValue(fn, [coll.items[ei]], env);
+        }
+        return Vnil();
+      }
+      case "COMMIT": {
+        /* l >> r : commit l to the append-only ledger, then yield r (or l) */
+        var cl = this.eval(n.kids[0], env);
+        if (cl.t !== "nil") this.ledger.facts.push(cl);
+        var cr = this.eval(n.kids[1], env);
+        return cr.t !== "nil" ? cr : cl;
+      }
+      case "QUERY": {
+        this.eval(n.kids[0], env);
+        return this.eval(n.kids[1], env);
+      }
+      case "LARROW": {
+        var tgt = this.eval(n.kids[0], env);
+        var val = this.eval(n.kids[1], env);
+        if (tgt.t === "arr") { tgt.items.push(val); return tgt; }
+        return val;
+      }
+      case "EXTENDED": {
+        /* reviser-extended form: bind captured holes _1.. and evaluate the
+           rule's stored denotation (an ordinary Bada expression) */
+        var scope = new Env(env);
+        for (var hi = 0; hi < n.kids.length; hi++)
+          scope.map["_" + (hi + 1)] = this.eval(n.kids[hi], env);
+        return this.eval(n.rule.denotation, scope);
+      }
+      default: break;
+    }
+    var f = this.exec(n, env);
+    return f.val;
+  };
+
+  Interp.prototype.exec = function (n, env) {
+    if (!n) return { ret: false, val: Vnil() };
+    this.tick(n.line);
+    switch (n.type) {
+      case "PROGRAM": case "BLOCK": {
+        var f = { ret: false, val: Vnil() };
+        for (var i = 0; i < n.kids.length; i++) {
+          f = this.exec(n.kids[i], env);
+          if (f.ret) return f;
+        }
+        return f;
+      }
+      case "BIND": {
+        var v = this.eval(n.kids[0], env);
+        env.set(n.str, v);
+        return { ret: false, val: v };
+      }
+      case "ASSIGN": {
+        var lhs = n.kids[0];
+        var av = this.eval(n.kids[1], env);
+        if (lhs.type === "IDENT") env.set(lhs.str, av);
+        else if (lhs.type === "INDEX") {
+          var base = this.eval(lhs.kids[0], env);
+          var idx = Math.trunc(asNum(this.eval(lhs.kids[1], env)));
+          if (base.t === "arr" && idx >= 0 && idx < base.items.length) base.items[idx] = av;
+          else if (base.t === "dist" && idx >= 0 && idx < base.p.length) base.p[idx] = asNum(av);
+        }
+        return { ret: false, val: av };
+      }
+      case "FUNC": {
+        var fv = { t: "func", decl: n, closure: env };
+        env.set(n.str || "anon", fv);
+        return { ret: false, val: fv };
+      }
+      case "STRUCT": {
+        var sv = { t: "struct", name: n.str || "struct", decl: n, closure: env };
+        env.set(n.str || "struct", sv);
+        return { ret: false, val: sv };
+      }
+      case "ASPERAL": return { ret: false, val: Vnil() };
+      case "OMEGA_DB": {
+        env.set("tuplespace", Vts(this.ledger));
+        env.set("Omega", Vts(this.ledger));
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "REVISER": {
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "GRAMMAR": {
+        /* grammar transaction: commit each production rule as a ledger fact —
+           the grammar's history is auditable, append-only, monotone. */
+        for (var g = 0; g < n.rules.length; g++) {
+          var rule = n.rules[g];
+          this.ledger.facts.push(Varr([
+            Vstr("rule"), Vstr(rule.name), Vstr(rule.head),
+            Vstr(rule.pattern.map(function (a2) { return a2.kind === "hole" ? "expr" : a2.text; }).join(" "))
+          ]));
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "IF": {
+        var c = this.eval(n.kids[0], env);
+        if (truthy(c)) return this.exec(n.kids[1], env);
+        else if (n.kids.length > 2) return this.exec(n.kids[2], env);
+        return { ret: false, val: Vnil() };
+      }
+      case "WHILE": {
+        while (truthy(this.eval(n.kids[0], env))) {
+          var wf = this.exec(n.kids[1], env);
+          if (wf.ret) return wf;
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "FOR": {
+        var it = this.eval(n.kids[0], env);
+        var loop = new Env(env);
+        if (it.t === "arr") {
+          for (var fi = 0; fi < it.items.length; fi++) {
+            loop.map[n.str] = it.items[fi];
+            var ff = this.exec(n.kids[1], loop);
+            if (ff.ret) return ff;
+          }
+        } else if (it.t === "dist") {
+          for (var di = 0; di < it.p.length; di++) {
+            loop.map[n.str] = Vnum(it.p[di]);
+            var df = this.exec(n.kids[1], loop);
+            if (df.ret) return df;
+          }
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "RETURN": {
+        return { ret: true, val: n.kids.length ? this.eval(n.kids[0], env) : Vnil() };
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var pi = 0; pi < n.kids.length; pi++)
+          parts.push(printValue(this.eval(n.kids[pi], env)));
+        this.out(parts.join(" "));
+        return { ret: false, val: Vnil() };
+      }
+      default: {
+        return { ret: false, val: this.eval(n, env) };
+      }
+    }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Transpiler: Bada -> C  (self-contained C program, embedded runtime)
+   * ------------------------------------------------------------------ */
+  var C_RUNTIME = [
+    "/* ==== Bada C runtime (emitted by the Bada GUI IDE) ==== */",
+    "#include <stdio.h>",
+    "#include <stdlib.h>",
+    "#include <string.h>",
+    "#include <math.h>",
+    "#include <complex.h>",
+    "typedef enum{BV_NIL,BV_NUM,BV_STR,BV_ARR,BV_DIST,BV_REG}BVT;",
+    "typedef struct BV BV;",
+    "typedef struct{BV*it;int n,cap;}BArr;",
+    "typedef struct{double*p;int v;}BDist;",
+    "typedef struct{double*re;double*im;int n;int v;}BReg;",
+    "struct BV{BVT t;double num;char*str;BArr*arr;BDist*dist;BReg*reg;};",
+    "static BV bnil(void){BV v;memset(&v,0,sizeof v);v.t=BV_NIL;return v;}",
+    "static BV bnum(double x){BV v;memset(&v,0,sizeof v);v.t=BV_NUM;v.num=x;return v;}",
+    "static BV bstr(const char*s){BV v;memset(&v,0,sizeof v);v.t=BV_STR;v.str=strdup(s);return v;}",
+    "static BArr*barr(void){BArr*a=calloc(1,sizeof(BArr));return a;}",
+    "static void bpush(BArr*a,BV v){if(a->n>=a->cap){a->cap=a->cap?a->cap*2:8;a->it=realloc(a->it,a->cap*sizeof(BV));}a->it[a->n++]=v;}",
+    "static BV barrv(BArr*a){BV v;memset(&v,0,sizeof v);v.t=BV_ARR;v.arr=a;return v;}",
+    "static BDist*bdist(int v){if(v<1)v=1;BDist*d=malloc(sizeof(BDist));d->p=calloc((size_t)v,sizeof(double));d->v=v;return d;}",
+    "static BV bdistv(BDist*d){BV v;memset(&v,0,sizeof v);v.t=BV_DIST;v.dist=d;return v;}",
+    "static double bnumof(BV v){return v.t==BV_NUM?v.num:0;}",
+    "/* append-only ledger */",
+    "static BV*G_FACTS=0;static int G_N=0,G_CAP=0;",
+    "static int bcommit(BV v){if(G_N>=G_CAP){G_CAP=G_CAP?G_CAP*2:8;G_FACTS=realloc(G_FACTS,G_CAP*sizeof(BV));}G_FACTS[G_N]=v;return G_N++;}",
+    "static int bledger_len(void){return G_N;}",
+    "static BDist*G_LAST_A=0;",
+    "/* engine builtins */",
+    "static BV b_softmax(BV a){int v;double*src;int own=0;",
+    "  if(a.t==BV_DIST){v=a.dist->v;src=a.dist->p;}else if(a.t==BV_ARR){v=a.arr->n;src=malloc(v*sizeof(double));for(int i=0;i<v;i++)src[i]=bnumof(a.arr->it[i]);own=1;}else return bnil();",
+    "  BDist*o=bdist(v);double mx=-INFINITY;for(int i=0;i<v;i++)if(src[i]>mx)mx=src[i];double s=0;for(int i=0;i<v;i++){o->p[i]=exp(src[i]-mx);s+=o->p[i];}for(int i=0;i<v;i++)o->p[i]/=s;for(int i=0;i<v;i++)if(src[i]-mx<-30.0)o->p[i]=0.0;{double ss=0;for(int i=0;i<v;i++)ss+=o->p[i];if(ss>0)for(int i=0;i<v;i++)o->p[i]/=ss;}if(own)free(src);return bdistv(o);}",
+    "static BV b_entropy(BV a){double*p;int v;int own=0;if(a.t==BV_DIST){p=a.dist->p;v=a.dist->v;}else if(a.t==BV_ARR){v=a.arr->n;p=malloc(v*sizeof(double));for(int i=0;i<v;i++)p[i]=bnumof(a.arr->it[i]);own=1;}else return bnum(0);",
+    "  double H=0;for(int i=0;i<v;i++){double q=p[i];if(q<1e-12)q=1e-12;H+=-q*log(q);}if(own)free(p);return bnum(H);}",
+    "static BV b_unknown_prior(BV a){int v=(int)bnumof(a);if(v<1)v=1;BDist*d=bdist(v);for(int i=0;i<v;i++)d->p[i]=1.0/v;return bdistv(d);}",
+    "static BV b_update(BV pr,BV ev,double lr){if(pr.t!=BV_DIST)return pr;BDist*P=pr.dist;double*E;int ev_v;int own=0;",
+    "  if(ev.t==BV_DIST){E=ev.dist->p;ev_v=ev.dist->v;}else if(ev.t==BV_ARR){ev_v=ev.arr->n;E=malloc(ev_v*sizeof(double));for(int i=0;i<ev_v;i++)E[i]=bnumof(ev.arr->it[i]);own=1;}else return pr;",
+    "  int v=P->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<ev_v?E[i]:0;o->p[i]=(1-lr)*P->p[i]+lr*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;if(own)free(E);return bdistv(o);}",
+    "static BV b_cognitive(BV base,BArr*mods,BArr*betas){BDist*a;",
+    "  if(base.t!=BV_DIST&&base.t!=BV_ARR)return bnil();",
+    "  if(base.t==BV_DIST){a=bdist(base.dist->v);for(int i=0;i<a->v;i++)a->p[i]=base.dist->p[i];}else{BV s=b_softmax(base);if(s.t!=BV_DIST)return bnil();a=bdist(s.dist->v);for(int i=0;i<a->v;i++)a->p[i]=s.dist->p[i];}",
+    "  int v=a->v;if(v<1)v=1;double*th=calloc((size_t)v,sizeof(double));",
+    "  if(mods)for(int m=0;m<mods->n;m++){if(mods->it[m].t!=BV_ARR)continue;BArr*pr=mods->it[m].arr;if(pr->n<2)continue;",
+    "    double*q;int qv;int own=0;if(pr->it[0].t==BV_DIST){q=pr->it[0].dist->p;qv=pr->it[0].dist->v;}else if(pr->it[0].t==BV_ARR){qv=pr->it[0].arr->n;q=malloc(qv*sizeof(double));for(int i=0;i<qv;i++)q[i]=bnumof(pr->it[0].arr->it[i]);own=1;}else continue;",
+    "    double H=0;for(int i=0;i<qv;i++){double qq=q[i];if(qq<1e-12)qq=1e-12;H+=-qq*log(qq);}",
+    "    BArr*phi=pr->it[1].t==BV_ARR?pr->it[1].arr:0;double beta=(betas&&m<betas->n)?bnumof(betas->it[m]):1.0;",
+    "    for(int i=0;i<v;i++){double pv=(phi&&i<phi->n)?bnumof(phi->it[i]):0;th[i]+=beta*H*pv;}if(own)free(q);}",
+    "  BDist*qh=bdist(v);double s=0;for(int i=0;i<v;i++){double complex psi=sqrt(a->p[i])*cexp(I*th[i]);double mag2=creal(psi)*creal(psi)+cimag(psi)*cimag(psi);qh->p[i]=mag2;s+=mag2;}if(s>0)for(int i=0;i<v;i++)qh->p[i]/=s;free(th);",
+    "  if(G_LAST_A){free(G_LAST_A->p);free(G_LAST_A);}G_LAST_A=a;",
+    "  BDist*snap=bdist(v);for(int i=0;i<v;i++)snap->p[i]=qh->p[i];bcommit(bdistv(snap));return bdistv(qh);}",
+    "static BV b_last_a(void){if(!G_LAST_A)return bnil();BDist*c=bdist(G_LAST_A->v);for(int i=0;i<c->v;i++)c->p[i]=G_LAST_A->p[i];return bdistv(c);}",
+    "static BV b_zeros_of(BV a){BArr*o=barr();if(a.t==BV_DIST){for(int i=0;i<a.dist->v;i++)if(a.dist->p[i]==0.0)bpush(o,bnum(i));}return barrv(o);}",
+    "static BV b_maxdiff(BV a,BV b){if(a.t!=BV_DIST||b.t!=BV_DIST)return bnum(0);int v=a.dist->v<b.dist->v?a.dist->v:b.dist->v;double m=0;for(int i=0;i<v;i++){double d=fabs(a.dist->p[i]-b.dist->p[i]);if(d>m)m=d;}return bnum(m);}",
+    "static BV b_sci(BV a){char buf[64];snprintf(buf,64,\"%.2e\",bnumof(a));return bstr(buf);}",
+    "static BV b_f5(BV a){char buf[64];snprintf(buf,64,\"%.5f\",bnumof(a));return bstr(buf);}",
+    "/* ==== quantum sublanguage on the phase core ==== */",
+    "static BReg*bqreg(int n){BReg*r=malloc(sizeof(BReg));r->n=n;r->v=1<<n;r->re=calloc(r->v,sizeof(double));r->im=calloc(r->v,sizeof(double));r->re[0]=1;return r;}",
+    "static BV bregv(BReg*r){BV v;memset(&v,0,sizeof v);v.t=BV_REG;v.reg=r;return v;}",
+    "static BV b_qubit(BV a){int n=(int)bnumof(a);if(n<1)n=1;return bregv(bqreg(n));}",
+    "static void b_gate_h(BReg*r,int q){int bit=1<<q;double c=M_SQRT1_2;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double ar=r->re[i],ai=r->im[i],br=r->re[j],bi=r->im[j];r->re[i]=c*(ar+br);r->im[i]=c*(ai+bi);r->re[j]=c*(ar-br);r->im[j]=c*(ai-bi);}}",
+    "static void b_gate_x(BReg*r,int q){int bit=1<<q;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}",
+    "static void b_gate_ph(BReg*r,int q,double lam){int bit=1<<q;double c=cos(lam),s=sin(lam);for(int i=0;i<r->v;i++){if(!(i&bit))continue;double ar=r->re[i],ai=r->im[i];r->re[i]=ar*c-ai*s;r->im[i]=ar*s+ai*c;}}",
+    "static void b_gate_cnot(BReg*r,int cq,int tq){int cb=1<<cq,tb=1<<tq;for(int i=0;i<r->v;i++){if((i&cb)&&!(i&tb)){int j=i|tb;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}}",
+    "static BV b_H(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_h(a.reg,q);return a;}",
+    "static BV b_X(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_x(a.reg,q);return a;}",
+    "static BV b_S(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/2);return a;}",
+    "static BV b_T(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/4);return a;}",
+    "static BV b_Rz(BV a,double lam,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,lam);return a;}",
+    "static BV b_CNOT(BV a,int c,int t){if(a.t!=BV_REG)return bnil();b_gate_cnot(a.reg,c,t);return a;}",
+    "static BV b_phase_uniform(BV a){if(a.t!=BV_REG)return bnil();for(int q=0;q<a.reg->n;q++)b_gate_h(a.reg,q);return a;}",
+    "static BV b_measure(BV a){if(a.t==BV_DIST){bcommit(a);return a;}if(a.t!=BV_REG)return bnil();BReg*r=a.reg;BDist*d=bdist(r->v);double s=0;for(int i=0;i<r->v;i++){d->p[i]=r->re[i]*r->re[i]+r->im[i]*r->im[i];s+=d->p[i];}if(s>0)for(int i=0;i<r->v;i++)d->p[i]/=s;BDist*snap=bdist(r->v);for(int i=0;i<r->v;i++)snap->p[i]=d->p[i];bcommit(bdistv(snap));return bdistv(d);}",
+    "/* Omega::Quantum estimator: max-entropy start + append-only sharpening */",
+    "static BDist*G_QPRIOR=0;",
+    "static BV b_prepare_unknown(BV a){int n=(int)bnumof(a);if(n<1)n=1;int V=1<<n;BDist*p=bdist(V);for(int i=0;i<V;i++)p->p[i]=1.0/V;G_QPRIOR=p;BDist*c=bdist(V);for(int i=0;i<V;i++)c->p[i]=p->p[i];return bdistv(c);}",
+    "static BV b_observe(BV a){BV d=b_measure(a);if(d.t==BV_DIST&&G_QPRIOR){int v=G_QPRIOR->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<d.dist->v?d.dist->p[i]:0;o->p[i]=0.5*G_QPRIOR->p[i]+0.5*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;free(G_QPRIOR->p);free(G_QPRIOR);G_QPRIOR=o;}return d;}",
+    "static BV b_estimate(void){if(!G_QPRIOR)return bnil();BDist*c=bdist(G_QPRIOR->v);for(int i=0;i<c->v;i++)c->p[i]=G_QPRIOR->p[i];return bdistv(c);}",
+    "static BV b_forbidden(void){BArr*o=barr();if(G_QPRIOR)for(int i=0;i<G_QPRIOR->v;i++)if(G_QPRIOR->p[i]==0.0)bpush(o,bnum(i));return barrv(o);}",
+    "static BV bindex(BV b,BV i){int k=(int)bnumof(i);if(b.t==BV_DIST&&k>=0&&k<b.dist->v)return bnum(b.dist->p[k]);if(b.t==BV_ARR&&k>=0&&k<b.arr->n)return b.arr->it[k];return bnil();}",
+    "static void bprint(BV v){switch(v.t){case BV_NIL:printf(\"nil\");break;case BV_NUM:if(v.num==(long long)v.num)printf(\"%lld\",(long long)v.num);else printf(\"%.5f\",v.num);break;case BV_STR:printf(\"%s\",v.str);break;case BV_ARR:{printf(\"[\");for(int i=0;i<v.arr->n;i++){if(i)printf(\", \");bprint(v.arr->it[i]);}printf(\"]\");break;}case BV_DIST:{printf(\"dist[\");for(int i=0;i<v.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",v.dist->p[i]);}printf(\"]\");break;}case BV_REG:{BV d=b_measure(v);G_N--;printf(\"qreg[n=%d] |psi|^2=[\",v.reg->n);for(int i=0;i<d.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",d.dist->p[i]);}printf(\"]\");break;}}}",
+    "static BV badd(BV a,BV b){if(a.t==BV_STR||b.t==BV_STR){char x[256],y[256],z[520];if(a.t==BV_STR)snprintf(x,256,\"%s\",a.str);else snprintf(x,256,\"%g\",bnumof(a));if(b.t==BV_STR)snprintf(y,256,\"%s\",b.str);else snprintf(y,256,\"%g\",bnumof(b));snprintf(z,520,\"%s%s\",x,y);return bstr(z);}return bnum(bnumof(a)+bnumof(b));}",
+    "static BV bsub(BV a,BV b){return bnum(bnumof(a)-bnumof(b));}",
+    "static BV bmul(BV a,BV b){return bnum(bnumof(a)*bnumof(b));}",
+    "static BV bdiv(BV a,BV b){double d=bnumof(b);return bnum(d!=0?bnumof(a)/d:0);}",
+    ""
+  ].join("\n");
+
+  function Emitter() {
+    this.lines = [];
+    this.tmp = 0;
+    this.declared = Object.create(null);
+  }
+  Emitter.prototype.push = function (s) { this.lines.push(s); };
+
+  function lowerCall(E, n, holes) {
+    var callee = n.kids[0];
+    var argc = n.kids.length - 1;
+    function arg(i, dflt) {
+      return i < argc ? lowerExpr(E, n.kids[i + 1], holes) : (dflt || "bnil()");
+    }
+    if (callee.type === "IDENT") {
+      var name = callee.str;
+      switch (name) {
+        case "softmax": return "b_softmax(" + arg(0) + ")";
+        case "entropy": return "b_entropy(" + arg(0) + ")";
+        case "unknown_prior": return "b_unknown_prior(" + arg(0) + ")";
+        case "dist": return "(" + arg(0) + ")";
+        case "len": {
+          if (argc > 0 && n.kids[1].type === "IDENT" &&
+              (n.kids[1].str === "tuplespace" || n.kids[1].str === "Omega" || n.kids[1].str === "TupleSpace"))
+            return "bnum(bledger_len())";
+          var a0 = arg(0);
+          return "bnum((" + a0 + ").t==BV_ARR?(" + a0 + ").arr->n:((" + a0 + ").t==BV_DIST?(" + a0 + ").dist->v:((" + a0 + ").t==BV_REG?(" + a0 + ").reg->v:0)))";
+        }
+        case "sqrt": return "bnum(sqrt(bnumof(" + arg(0) + ")))";
+        case "log": return "bnum(log(bnumof(" + arg(0) + ")))";
+        case "exp": return "bnum(exp(bnumof(" + arg(0) + ")))";
+        case "abs": return "bnum(fabs(bnumof(" + arg(0) + ")))";
+        case "ledger": return "bnum(bledger_len())";
+        case "zeros_of": return "b_zeros_of(" + arg(0) + ")";
+        case "maxdiff": return "b_maxdiff(" + arg(0) + "," + arg(1) + ")";
+        case "sci": return "b_sci(" + arg(0) + ")";
+        case "f5": return "b_f5(" + arg(0) + ")";
+        case "last_a": return "b_last_a()";
+        case "update": {
+          if (argc > 2) return "b_update(" + arg(0) + "," + arg(1) + ",bnumof(" + arg(2) + "))";
+          return "b_update(" + arg(0) + "," + arg(1) + ",0.5)";
+        }
+        case "cognitive_system": {
+          var b0 = arg(0), b1 = arg(1, "bnil()"), b2 = arg(2, "bnil()");
+          var t1 = "t" + (E.tmp++), t2 = "t" + (E.tmp++);
+          E.push("  BV " + t1 + "=" + b1 + "; BV " + t2 + "=" + b2 + ";");
+          return "b_cognitive(" + b0 + ",(" + t1 + ").t==BV_ARR?(" + t1 + ").arr:0,(" + t2 + ").t==BV_ARR?(" + t2 + ").arr:0)";
+        }
+        /* quantum sublanguage */
+        case "qubit": return "b_qubit(" + arg(0) + ")";
+        case "H": return "b_H(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "X": return "b_X(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "S": return "b_S(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "T": return "b_T(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "Rz": return "b_Rz(" + arg(0) + "," + (argc > 1 ? "bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "0") + ")";
+        case "CNOT": return "b_CNOT(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "1") + ")";
+        case "Measure": case "commit_measurement": return "b_measure(" + arg(0) + ")";
+        case "observe": return "b_observe(" + arg(0) + ")";
+        case "phase_uniform": return "b_phase_uniform(" + arg(0) + ")";
+        case "prepare_unknown": return "b_prepare_unknown(" + arg(0) + ")";
+        case "estimate": return "b_estimate()";
+        case "forbidden": return "b_forbidden()";
+      }
+    }
+    /* method call: x.append(v) -> bcommit(v) */
+    if (callee.type === "GET" && callee.str === "append") {
+      return "bnum(bcommit(" + arg(0) + "))";
+    }
+    return "bnil()";
+  }
+
+  function cQuote(s) {
+    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+  }
+
+  function lowerExpr(E, n, holes) {
+    if (!n) return "bnil()";
+    switch (n.type) {
+      case "INT": case "FLOAT": {
+        var s = String(n.num);
+        if (!/[.eE]/.test(s)) s += ".0";
+        return "bnum(" + s + ")";
+      }
+      case "STRING": return 'bstr("' + cQuote(n.str || "") + '")';
+      case "BOOL": return "bnum(" + (n.boolean ? 1 : 0) + ")";
+      case "NIL": return "bnil()";
+      case "IDENT": {
+        if (holes && Object.prototype.hasOwnProperty.call(holes, n.str)) return holes[n.str];
+        if (n.str === "tuplespace" || n.str === "Omega" || n.str === "TupleSpace")
+          return "bnum(bledger_len())";
+        return "v_" + n.str;
+      }
+      case "ARRAY": {
+        var id = E.tmp++;
+        E.push("  BArr*t" + id + "=barr();");
+        for (var i = 0; i < n.kids.length; i++) {
+          var e = lowerExpr(E, n.kids[i], holes);
+          E.push("  bpush(t" + id + "," + e + ");");
+        }
+        return "barrv(t" + id + ")";
+      }
+      case "BINARY": {
+        var l = lowerExpr(E, n.kids[0], holes);
+        var r = lowerExpr(E, n.kids[1], holes);
+        switch (n.str) {
+          case "+": return "badd(" + l + "," + r + ")";
+          case "-": return "bsub(" + l + "," + r + ")";
+          case "*": return "bmul(" + l + "," + r + ")";
+          case "/": return "bdiv(" + l + "," + r + ")";
+          case "<": return "bnum(bnumof(" + l + ")<bnumof(" + r + ")?1:0)";
+          case "<=": return "bnum(bnumof(" + l + ")<=bnumof(" + r + ")?1:0)";
+          case ">": return "bnum(bnumof(" + l + ")>bnumof(" + r + ")?1:0)";
+          case ">=": return "bnum(bnumof(" + l + ")>=bnumof(" + r + ")?1:0)";
+          case "==": return "bnum(bnumof(" + l + ")==bnumof(" + r + ")?1:0)";
+          case "!=": return "bnum(bnumof(" + l + ")!=bnumof(" + r + ")?1:0)";
+          case "%": return "bnum(fmod(bnumof(" + l + "),bnumof(" + r + ")))";
+          case "&&": return "bnum((bnumof(" + l + ")!=0&&bnumof(" + r + ")!=0)?1:0)";
+          case "||": return "bnum((bnumof(" + l + ")!=0||bnumof(" + r + ")!=0)?1:0)";
+          default: return "bnum(bnumof(" + l + ")+bnumof(" + r + "))";
+        }
+      }
+      case "CALL": return lowerCall(E, n, holes);
+      case "UNARY": {
+        var u = lowerExpr(E, n.kids[0], holes);
+        if (n.str === "-") return "bnum(-bnumof(" + u + "))";
+        if (n.str === "!") return "bnum(bnumof(" + u + ")==0?1:0)";
+        return "(" + u + ")";
+      }
+      case "INDEX": {
+        var b = lowerExpr(E, n.kids[0], holes);
+        var ix = n.kids.length > 1 ? lowerExpr(E, n.kids[1], holes) : "bnum(0)";
+        return "bindex(" + b + "," + ix + ")";
+      }
+      case "COMMIT": {
+        var cl = lowerExpr(E, n.kids[0], holes);
+        var id2 = E.tmp++;
+        E.push("  BV c" + id2 + "=" + cl + "; bcommit(c" + id2 + ");");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "QUERY": {
+        var q0 = lowerExpr(E, n.kids[0], holes);
+        var id3 = E.tmp++;
+        E.push("  BV q" + id3 + "=" + q0 + "; (void)q" + id3 + ";");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "EXTENDED": {
+        /* lower an extended form by lowering the rule denotation with the
+           captured holes substituted (rule lookup happens before lowering,
+           so the native back end sees only ordinary engine calls) */
+        var hmap = {};
+        for (var h = 0; h < n.kids.length; h++) {
+          var he = lowerExpr(E, n.kids[h], holes);
+          var ht = "h" + (E.tmp++);
+          E.push("  BV " + ht + "=" + he + ";");
+          hmap["_" + (h + 1)] = ht;
+        }
+        return lowerExpr(E, n.rule.denotation, hmap);
+      }
+      case "GET": return "bnil()";
+      default: return "bnil()";
+    }
+  }
+
+  function lowerStmt(E, n) {
+    switch (n.type) {
+      case "BIND": {
+        var e = lowerExpr(E, n.kids[0], null);
+        if (E.declared[n.str]) E.push("  v_" + n.str + "=" + e + ";");
+        else { E.declared[n.str] = true; E.push("  BV v_" + n.str + "=" + e + "; (void)v_" + n.str + ";"); }
+        break;
+      }
+      case "ASSIGN": {
+        if (n.kids[0].type === "IDENT") {
+          var e2 = lowerExpr(E, n.kids[1], null);
+          if (!E.declared[n.kids[0].str]) { E.declared[n.kids[0].str] = true; E.push("  BV v_" + n.kids[0].str + "=" + e2 + ";"); }
+          else E.push("  v_" + n.kids[0].str + "=" + e2 + ";");
+        }
+        break;
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var i = 0; i < n.kids.length; i++) parts.push(lowerExpr(E, n.kids[i], null));
+        var stmt = "  ";
+        for (var j = 0; j < parts.length; j++) {
+          stmt += "bprint(" + parts[j] + ");";
+          if (j < parts.length - 1) stmt += 'printf(" ");';
+        }
+        stmt += 'printf("\\n");';
+        E.push(stmt);
+        break;
+      }
+      case "OMEGA_DB": case "REVISER":
+        if (n.body) for (var k = 0; k < n.body.kids.length; k++) lowerStmt(E, n.body.kids[k]);
+        break;
+      case "GRAMMAR":
+        E.push("  /* grammar transaction: " + n.rules.map(function (r) { return r.name; }).join(", ") + " (resolved before lowering) */");
+        break;
+      case "BLOCK":
+        for (var l = 0; l < n.kids.length; l++) lowerStmt(E, n.kids[l]);
+        break;
+      case "FUNC": case "STRUCT": case "ASPERAL":
+        E.push("  /* decl '" + (n.str || "?") + "' specialised at compile time (interp register) */");
+        break;
+      case "IF": {
+        var c = lowerExpr(E, n.kids[0], null);
+        E.push("  if(bnumof(" + c + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        if (n.kids.length > 2) { E.push("  else {"); lowerStmt(E, n.kids[2]); E.push("  }"); }
+        break;
+      }
+      case "WHILE": {
+        var wc = lowerExpr(E, n.kids[0], null);
+        E.push("  while(bnumof(" + wc + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        break;
+      }
+      case "FOR":
+        E.push("  /* 'for' outside the transpiled subset (runs in the interpreter) */");
+        break;
+      default: {
+        var ex = lowerExpr(E, n, null);
+        E.push("  (void)(" + ex + ");");
+      }
+    }
+  }
+
+  function transpileToC(program) {
+    var E = new Emitter();
+    var body = [];
+    E.lines = body;
+    for (var i = 0; i < program.kids.length; i++) lowerStmt(E, program.kids[i]);
+    return C_RUNTIME + "\nint main(void){\n" + body.join("\n") + "\n  return 0;\n}\n";
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST / token dumps (for the IDE's inspector panes)
+   * ------------------------------------------------------------------ */
+  function dumpAst(n, d, out) {
+    var pad = new Array(d + 1).join("  ");
+    var s = pad + n.type.toLowerCase();
+    if (n.str) s += " '" + n.str + "'";
+    if (n.type === "INT" || n.type === "FLOAT") s += " " + n.num;
+    if (n.params && n.params.length) s += " |" + n.params.join(",") + "|";
+    out.push(s);
+    for (var i = 0; i < n.kids.length; i++) dumpAst(n.kids[i], d + 1, out);
+    if (n.body) dumpAst(n.body, d + 1, out);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Public API
+   * ------------------------------------------------------------------ */
+  return {
+    VERSION: VERSION,
+    tokenize: tokenize,
+    parse: parseProgram,
+    tokens: function (src) {
+      return tokenize(src).map(function (t) {
+        return String(t.line).padStart(4) + "  " + t.type.padEnd(10) + "  " + (t.lexeme || "");
+      }).join("\n");
+    },
+    ast: function (src) {
+      var p = parseProgram(src);
+      var out = [];
+      dumpAst(p.program, 0, out);
+      return { text: out.join("\n"), errors: p.errors };
+    },
+    run: function (src, opts) {
+      opts = opts || {};
+      var lines = [];
+      var p = parseProgram(src);
+      var interp = new Interp({
+        out: function (s) { lines.push(s); if (opts.out) opts.out(s); },
+        maxSteps: opts.maxSteps
+      });
+      var ok = true, error = null;
+      try {
+        interp.exec(p.program, interp.global);
+      } catch (e) {
+        ok = false;
+        error = String(e && e.message ? e.message : e);
+        lines.push("[runtime error] " + error);
+      }
+      return {
+        ok: ok && p.errors.length === 0,
+        output: lines.join("\n"),
+        parseErrors: p.errors,
+        error: error,
+        ledgerLen: interp.ledger.facts.length,
+        rules: p.ruleLedger.map(function (r) { return r.name + " (" + r.head + ")"; })
+      };
+    },
+    emitC: function (src) {
+      var p = parseProgram(src);
+      var c = transpileToC(p.program);
+      return { ok: p.errors.length === 0, c: c, errors: p.errors };
+    }
+  };
+});
+
+</script>
+<script>
+var CIPHER_LIB = "# ============================================================\n# modemvault-lib.bada -- a local, offline password vault for\n# YOUR OWN network gear, protected by the Jones-polynomial\n# quantum cipher (the same construction as omega_jones_crypto /\n# zone://).\n#\n# This vault stores ONLY what you type in yourself. It never\n# derives, looks up, or reveals any credential from a model\n# number, MAC, SSID or serial -- the model number is just a\n# label/index. There is no default-credential database and no\n# key generator. It cannot reveal anyone else's passcode.\n#\n# The desktop app generates, per operation:\n#     <this library>\n#     vault_seal(master, salt, passcode)          # encrypt+seal\n#   or\n#     vault_open(master, salt, [ct..], tag)        # verify+decrypt\n# and reads the \"@@\" lines it prints.\n# ============================================================\n\n# ---- string hash ----------------------------------------------------\ndef str_hash(s) {\n    h := 7\n    i := 0\n    n := len(s)\n    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }\n    return h\n}\n\n# ---- Jones-polynomial key schedule (Kauffman bracket state sum) ------\ndef ipow(base, e) {\n    if (e < 0) {\n        r := 1.0\n        k := 0\n        m := 0 - e\n        while (k < m) { r := r * base; k := k + 1 }\n        return 1.0 / r\n    }\n    r := 1.0\n    k := 0\n    while (k < e) { r := r * base; k := k + 1 }\n    return r\n}\ndef uf_find(parent, x) {\n    r := x\n    while (parent[r] >= 0) { r := parent[r] }\n    return r\n}\ndef kauffman(cross, A) {\n    n := len(cross)\n    if (n == 0) { return 1.0 }\n    maxlbl := 0\n    i := 0\n    while (i < n) {\n        k := 1\n        while (k <= 4) {\n            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }\n            k := k + 1\n        }\n        i := i + 1\n    }\n    U := maxlbl + 1\n    states := 1\n    p := 0\n    while (p < n) { states := states * 2; p := p + 1 }\n    d := (0 - (A * A)) - (1.0 / (A * A))\n    sum := 0.0\n    bits := []\n    i := 0\n    while (i < n) { bits <- 0; i := i + 1 }\n    st := 0\n    while (st < states) {\n        parent := []\n        q := 0\n        while (q < U) { parent <- (0 - 1); q := q + 1 }\n        a_cnt := 0\n        b_cnt := 0\n        i := 0\n        while (i < n) {\n            e0 := cross[i][1]\n            e1 := cross[i][2]\n            e2 := cross[i][3]\n            e3 := cross[i][4]\n            if (bits[i] == 0) {\n                ra := uf_find(parent, e0)\n                rb := uf_find(parent, e1)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e2)\n                rb := uf_find(parent, e3)\n                if (ra != rb) { parent[ra] = rb }\n                a_cnt := a_cnt + 1\n            } else {\n                ra := uf_find(parent, e1)\n                rb := uf_find(parent, e2)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e3)\n                rb := uf_find(parent, e0)\n                if (ra != rb) { parent[ra] = rb }\n                b_cnt := b_cnt + 1\n            }\n            i := i + 1\n        }\n        seen := []\n        q := 0\n        while (q < U) { seen <- 0; q := q + 1 }\n        loops := 0\n        lbl := 0\n        while (lbl < U) {\n            r := uf_find(parent, lbl)\n            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }\n            lbl := lbl + 1\n        }\n        weight := ipow(A, a_cnt - b_cnt)\n        lf := ipow(d, loops - 1)\n        sum := sum + weight * lf\n        c := 0\n        carry := 1\n        while (c < n && carry == 1) {\n            if (bits[c] == 0) { bits[c] = 1; carry := 0 }\n            else { bits[c] = 0 }\n            c := c + 1\n        }\n        st := st + 1\n    }\n    return sum\n}\ndef jones_key(diagram) {\n    As := [0.8, 1.0, 1.2, 1.5, 2.0]\n    acc := \"jones|\"\n    i := 0\n    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + \"|\"; i := i + 1 }\n    return str_hash(acc)\n}\n\n# ---- master password -> a knot -> the vault key ---------------------\n# The master password is woven into a knot diagram; its Jones polynomial\n# (mixed with the master hash) is the vault key. A wrong master yields a\n# different key, so the AEAD tag fails and nothing decrypts.\ndef master_diagram(master) {\n    if (len(master) == 0) { master := \".\" }\n    n := 3 + (len(master) % 3)\n    cross := []\n    i := 0\n    while (i < n) {\n        e0 := 1 + (ord(master, i % len(master)) % 8)\n        e1 := 1 + ((ord(master, (i + 1) % len(master)) + 3) % 8)\n        e2 := 1 + ((ord(master, (i + 2) % len(master)) + 5) % 8)\n        e3 := 1 + ((ord(master, (i + 3) % len(master)) + 7) % 8)\n        cross <- [i, e0, e1, e2, e3, 1]\n        i := i + 1\n    }\n    return cross\n}\ndef vault_key(master) {\n    jk := jones_key(master_diagram(master))\n    return (jk * 31 + str_hash(\"vault|\" + master)) % 999983\n}\n\n# ---- keystream AEAD (16-bit code units; any character round-trips) ---\ndef lcg(state) { return (state * 48271) % 2147483647 }\ndef key_seed(key, salt) {\n    state := (key + salt * 2654435761) % 2147483647\n    if (state <= 0) { state := state + 2147483646 }\n    return state\n}\ndef vault_encrypt(plain, key, salt) {\n    state := key_seed(key, salt)\n    out := []\n    i := 0\n    while (i < len(plain)) {\n        state := lcg(state)\n        out <- (ord(plain, i) + (state % 65536)) % 65536\n        i := i + 1\n    }\n    return out\n}\ndef vault_decrypt(ct, key, salt) {\n    state := key_seed(key, salt)\n    out := \"\"\n    i := 0\n    while (i < len(ct)) {\n        state := lcg(state)\n        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)\n        i := i + 1\n    }\n    return out\n}\ndef vault_tag(ct, key, salt) {\n    h := (key % 999983) + salt + 1\n    i := 0\n    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }\n    return h\n}\n\n# ---- operations the app calls (emit machine-parseable @@ lines) ------\ndef vault_seal(master, salt, passcode) {\n    k := vault_key(master)\n    ct := vault_encrypt(passcode, k, salt)\n    print(\"@@CT\", ct)\n    print(\"@@SALT\", salt)\n    print(\"@@TAG\", vault_tag(ct, k, salt))\n    print(\"@@OK\")\n}\ndef vault_open(master, salt, ct, tag) {\n    k := vault_key(master)\n    if (vault_tag(ct, k, salt) != tag) {\n        print(\"@@FAIL wrong-master-or-tampered\")\n        return \"\"\n    }\n    print(\"@@PLAIN\", vault_decrypt(ct, k, salt))\n    return \"\"\n}\n";
+var DEMO_QCAP  = {"magic":"QCAP1","tool":"demo","count":6,"check":{"salt":1717,"ct":[1165,2410,62061,24896,6814,39179,56444,7766,52346],"tag":2023434858},"cap":{"salt":1717,"ct":[1143,2418,61991,24909,6811,39106,56457,7704,52283,27642,19246,23234,61410,64167,53440,3194,8465,782,8619,51581,2614,26812,56615,9781,64551,39623,52317,8386,621,2866,41934,8441,35042,27917,5839,4306,63729,27991,27644,34928,56333,55333,39523,14779,5080,15165,36414,7523,57998,1699,1704,52908,63908,64994,39071,32410,25114,62722,10169,58446,55190,61218,62262,13941,7882,50456,21641,56313,28632,29134,4706,55729,21716,16129,20700,12211,44176,50792,37564,4482,48888,56367,27006,50310,63610,18750,9283,9150,6974,56750,65148,29166,1874,10796,6387,37946,1790,6112,23396,36195,58239,10076,33862,49374,50949,51690,47998,59902,46345,37007,41540,51392,49734,22837,13114,31355,20250,37435,60803,57687,10617,8503,48599,7632,34404,52057,20418,12064,6293,5845,63797,42360,53420,2565,49712,24575,44590,28942,3045,2911,12943,5007,59242,53258,637,64584,2695,61313,21383,61800,1179,20839,43683,24595,64618,57824,45628,9538,15122,38219,4731,3211,23934,6940,15283,33990,30793,36304,4827,13077,3890,36431,55255,56937,26220,8316,23941,62364,13973,43356,16774,45485,65304,39554,12158,40222,17068,5545,26603,32610,11239,47044,16220,13660,50774,6359,24668,21909,39832,16144,17037,45038,14070,58166,40680,59122,61475,5891,44720,11104,59513,43220,36407,30902,23848,49259,19579,53288,17756,23654,29002,39641,51280,16340,24910,22620,38470,55548,16652,15281,2441,51961,31254,7664,1153,32741,19223,58680,24889,25201,6307,43319,26257,21772,5701,61434,9038,64383,4416,10172,14194,59186,43564,62004,13391,35394,38841,24235,2120,48258,37305,36719,18498,8106,60980,49788,47064,6254,53315,48032,26381,54182,53359,23900,30574,6486,6517,55251,27443,58550,31859,21672,50908,26960,15401,7401,33366,12258,56488,39020,24952,1370,59954,30010,31929,13973,51576,51265,26668,60500,25921,40091,17981,44749,27918,61188,7768,53815,7348,30148,49255,56376,17401,24205,15654,56132,64229,33993,21154,3725,27636,21203,43565,29271,15720,47976,7435,59360,29317,60644,516,35345,64470,5882,17608,28933,22620,50185,29880,12126,36493,60475,24970,25034,5739,31448,30078,38896,19796,19683,65113,35564,2149,50669,43691,41640,26755,40391,43617,20894,48837,15618,53051,40143,27528,8391,29284,7196,22657,6041,40964,3112,31715,3123,24361,65360,6399,36982,18016,34283,17596,27409,23554,31961,13104,63946,43960,44737,29486,43110,41586,22828,14072,48439,59622,63215,13579,23254,13116,6132,33632,9197,12632,5953,895,30322,55044,59900,16955,26546,19680,1637,11993,25575,30014,27265,16711,31278,61409,26618,51888,5303,64684,54175,11561,13698,45719,2732,14731,32959,12203,49821,12572,2968,26447,6862,41670,42175,46709,57855,35859,23969,46984,34921,18559,4636,4855,19493,14009,4860,7141,39112,62519,4859,13952,42371,13057,45614,6608,50892,23292,4000,55100,22189,13807,6258,46529,44655,2438,62338,39126,14387,48253,52493,10107,7477,49954,3843,14679,33179,62628,63536,9750,62360,3238,36413,30745,2341,48807,9220,10637,22910,37382,34266,57324,15305,15104,58561,10267,50538,31402,38134,29635,47613,13092,46002,29901,58633,26696,51166,50004,53355,50679,52588,38024,11458,16285,35945,64463,15862,10414,44911,27169,34402,11345,32868,26913,63130,54127,10856,17269,16328,39802,2839,61259,34552,15433,29558,50174,15797,64810,21471,38666,20537,18228,32686,53080,1011,13294,22558,40021,25957,218,26742,22178,24272,42754,24825,117,14310,63206,10426,19644,54343,24154,63502,35231,55603,62969,15206,12686,51852,35491,38375,39290,7046,65081,16557,38254,32792,54480,38201,65205,10407,12651,6347,3363,30169,45377,24144,28630,47260,9447,49434,55258,58285,61551,5225,49759,22048,61221,64079,837,52615,52063,59308,2539,1551,64234,55257,53252,53321,15289,23286,35019,61618,8086,1751,18740,49904,8932,24460,37753,41069,50275,34456,48188,29613,39408,39296,43410,2318,58301,61311,15756,24452,45784,38696,41505,58233,58286,40485,43800,44146,28693,34445,62355,19608,60498,6608,64855,34078,1693,12435,930,60968,37184,17004,64437,1269,31839,56893,20290,26572,47714,33704,17851,43860,49545,38458,13345,61964,65495,796,64743,8780,48919,46039,53219,19074,52926,46484,54822,9627,14448,27903,4257,22041,4900,58322,51021,26794,57867,55529,16407,35827,12304,1012,32572,52608,22787,28652,31780,1329,47846,35742,31191,13576,42704,40738,61893,11492,19628,32922,43857,10334,22649,29533,2089,8320,770,57119,49259,24346,8126,41116,37856,35938,43343,37765,16110,39462,40863,22724,56602,54414,63607,15837,44094,60829,25546,27782,23476,26015,23357,23305,24782,39400,59402,11643,43725,7845,57352,48773,9957,58144,978,42088,41421,58363,5698,64465,27156,39778,48162,60723,61866,35650,38590,49621,43357,29802,44491,28531,64922,14807,8489,22501,10638,59129,64175,43724,60132,10079,39068,27501,38219,41360,2744,35984,59062,60694,54850,47046,33288,45873,9643,19370,30028,26590,9176,11961],"tag":412319124}};
+</script>
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  var packets=[], filtered=[];
+
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function openRec(master, rec){
+    var out=[];
+    BadaLang.run(CIPHER_LIB+"\nvault_open("+JSON.stringify(master)+", "+rec.salt+", ["+rec.ct.join(",")+"], "+rec.tag+")\n",
+      {maxSteps:200000000,out:function(s){out.push(s);}});
+    var t=out.join("\n"),i=t.indexOf("@@PLAIN ");
+    if(i<0) return null;
+    return t.slice(i).split("\n")[0].slice(8);
+  }
+
+  function loadQcap(qcap, master){
+    /* verify master via the check record */
+    var chk=openRec(master, qcap.check);
+    if(chk!=="qshark-ok"){ return { ok:false, err:"マスターパスワードが違います(または破損しています)" }; }
+    var plain=openRec(master, qcap.cap);
+    if(plain===null){ return { ok:false, err:"復号に失敗しました" }; }
+    var recs; try{ recs=JSON.parse(plain); }catch(e){ return { ok:false, err:"キャプチャの解析に失敗しました" }; }
+    return { ok:true, records:recs };
+  }
+
+  function show(recs){
+    packets=recs;
+    $("lock").classList.add("hidden"); $("lockbar").classList.add("hidden");
+    $("app").classList.remove("hidden");
+    applyFilter();
+  }
+  function applyFilter(){
+    var q=$("filter").value.trim().toLowerCase();
+    filtered = !q ? packets : packets.filter(function(p){
+      return (p.proto||"").toLowerCase().indexOf(q)>=0 ||
+             (p.src||"").toLowerCase().indexOf(q)>=0 ||
+             (p.dst||"").toLowerCase().indexOf(q)>=0 ||
+             (p.info||"").toLowerCase().indexOf(q)>=0;
+    });
+    renderRows();
+    $("stat").textContent = filtered.length+" / "+packets.length+" packets";
+  }
+  function protoClass(p){ return "p-"+String(p||"").replace(/[^A-Za-z0-9]/g,""); }
+  function renderRows(){
+    var tb=$("rows"); tb.innerHTML="";
+    filtered.forEach(function(p,idx){
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td>'+esc(p.no)+'</td><td>'+esc(p.time)+'</td><td>'+esc(p.src)+'</td><td>'+esc(p.dst)+
+        '</td><td class="'+protoClass(p.proto)+'">'+esc(p.proto)+'</td><td>'+esc(p.len)+'</td><td class="info">'+esc(p.info)+'</td>';
+      tr.addEventListener("click",function(){
+        Array.prototype.forEach.call(tb.children,function(x){x.classList.remove("sel");});
+        tr.classList.add("sel");
+        $("details").textContent =
+          "Frame "+p.no+":  "+p.len+" bytes\n"+
+          "Time (relative): "+p.time+"\n"+
+          "Source:      "+p.src+"\n"+
+          "Destination: "+p.dst+"\n"+
+          "Protocol:    "+p.proto+"\n"+
+          "Info:        "+p.info+"\n\n"+
+          "(このキャプチャは Jones 量子暗号で暗号化された .qcap から復号されました)";
+      });
+      tb.appendChild(tr);
+    });
+  }
+
+  function tryOpen(qcap){
+    var m=$("master").value;
+    var r=loadQcap(qcap, m);
+    if(!r.ok){ $("lockMsg").innerHTML='<span class="pill bad">'+esc(r.err)+'</span>'; return; }
+    $("lockMsg").textContent=""; show(r.records);
+  }
+
+  $("openDemo").addEventListener("click", function(){ tryOpen(DEMO_QCAP); });
+  $("pick").addEventListener("click", function(){ $("file").click(); });
+  $("file").addEventListener("change", function(){
+    var f=this.files && this.files[0]; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=function(){ try{ var q=JSON.parse(String(rd.result)); tryOpen(q); }
+      catch(e){ $("lockMsg").innerHTML='<span class="pill bad">.qcap の読み込みに失敗しました</span>'; } };
+    rd.readAsText(f);
+  });
+  $("filter").addEventListener("input", applyFilter);
+  $("close").addEventListener("click", function(){
+    $("app").classList.add("hidden"); $("lock").classList.remove("hidden"); $("lockbar").classList.remove("hidden");
+  });
+})();
+</script>
+</body>
+</html>

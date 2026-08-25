@@ -164,6 +164,24 @@ Electron (Windows/Ubuntu) と Cordova (Android) で包みます。ビルドは
 (`zonebrowser-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
 Ubuntu の AppImage / deb はローカルでのビルドも確認済みです。
 
+### 🦈 QuantumShark — 量子暗号つきパケット アナライザ
+
+Wireshark 風のパケット解析に **Jones 量子暗号**を付けたアプリ
+[`netcapture/`](netcapture/)(ビューア: [`dist/quantum-shark.html`](dist/quantum-shark.html)):
+自分のマシンの通信を CLI [`netcapture/cli/qshark-capture.js`](netcapture/cli/qshark-capture.js)
+で捕捉し、キャプチャを **Jones 量子暗号 AEAD で暗号化した `.qcap`** として保存。
+ビューアはマスターパスワードで復号し、No./Time/Source/Destination/Protocol/Len/Info の
+表・表示フィルタ・詳細ペインで解析します(誤ったマスターは復号不可。デモ内蔵、
+マスター `demo`)。自分の通信の防御的分析用です。
+
+### 🛰 LAN → zone:// — 自分のLAN IPをウルトラネットワークに取り込む
+
+自分のPC/LANのIPを **`zone://url.or.jp/lan/`** に暗号化取り込みするアプリ
+[`zoneimport/`](zoneimport/)([`dist/lan-to-zone.html`](dist/lan-to-zone.html)):
+検出/入力したIPを zone:// ページとして UltraDatabase クォーラム(4複製)に公開し
+**Jones 量子暗号**で封緘。読み戻すと `200` + `quorum` + `Jones-AEAD verified` を表示。
+確実な検出は CLI [`zoneimport/cli/lan-to-zone.js`](zoneimport/cli/lan-to-zone.js)。
+
 ### 🔐 Modem Vault — 量子暗号パスワード保管庫 + LANモデム検出
 
 **自分自身の**モデム/ルーター認証情報を Jones 量子暗号で暗号化保管し、マスター
