@@ -1,0 +1,212 @@
+# ============================================================
+# modemvault-lib.bada -- a local, offline password vault for
+# YOUR OWN network gear, protected by the Jones-polynomial
+# quantum cipher (the same construction as omega_jones_crypto /
+# zone://).
+#
+# This vault stores ONLY what you type in yourself. It never
+# derives, looks up, or reveals any credential from a model
+# number, MAC, SSID or serial -- the model number is just a
+# label/index. There is no default-credential database and no
+# key generator. It cannot reveal anyone else's passcode.
+#
+# The desktop app generates, per operation:
+#     <this library>
+#     vault_seal(master, salt, passcode)          # encrypt+seal
+#   or
+#     vault_open(master, salt, [ct..], tag)        # verify+decrypt
+# and reads the "@@" lines it prints.
+# ============================================================
+
+# ---- string hash ----------------------------------------------------
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }
+    return h
+}
+
+# ---- Jones-polynomial key schedule (Kauffman bracket state sum) ------
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    bits := []
+    i := 0
+    while (i < n) { bits <- 0; i := i + 1 }
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            if (bits[i] == 0) {
+                ra := uf_find(parent, e0)
+                rb := uf_find(parent, e1)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e2)
+                rb := uf_find(parent, e3)
+                if (ra != rb) { parent[ra] = rb }
+                a_cnt := a_cnt + 1
+            } else {
+                ra := uf_find(parent, e1)
+                rb := uf_find(parent, e2)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e3)
+                rb := uf_find(parent, e0)
+                if (ra != rb) { parent[ra] = rb }
+                b_cnt := b_cnt + 1
+            }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r := uf_find(parent, lbl)
+            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        weight := ipow(A, a_cnt - b_cnt)
+        lf := ipow(d, loops - 1)
+        sum := sum + weight * lf
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+def jones_key(diagram) {
+    As := [0.8, 1.0, 1.2, 1.5, 2.0]
+    acc := "jones|"
+    i := 0
+    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + "|"; i := i + 1 }
+    return str_hash(acc)
+}
+
+# ---- master password -> a knot -> the vault key ---------------------
+# The master password is woven into a knot diagram; its Jones polynomial
+# (mixed with the master hash) is the vault key. A wrong master yields a
+# different key, so the AEAD tag fails and nothing decrypts.
+def master_diagram(master) {
+    if (len(master) == 0) { master := "." }
+    n := 3 + (len(master) % 3)
+    cross := []
+    i := 0
+    while (i < n) {
+        e0 := 1 + (ord(master, i % len(master)) % 8)
+        e1 := 1 + ((ord(master, (i + 1) % len(master)) + 3) % 8)
+        e2 := 1 + ((ord(master, (i + 2) % len(master)) + 5) % 8)
+        e3 := 1 + ((ord(master, (i + 3) % len(master)) + 7) % 8)
+        cross <- [i, e0, e1, e2, e3, 1]
+        i := i + 1
+    }
+    return cross
+}
+def vault_key(master) {
+    jk := jones_key(master_diagram(master))
+    return (jk * 31 + str_hash("vault|" + master)) % 999983
+}
+
+# ---- keystream AEAD (16-bit code units; any character round-trips) ---
+def lcg(state) { return (state * 48271) % 2147483647 }
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+def vault_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+def vault_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+def vault_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }
+    return h
+}
+
+# ---- operations the app calls (emit machine-parseable @@ lines) ------
+def vault_seal(master, salt, passcode) {
+    k := vault_key(master)
+    ct := vault_encrypt(passcode, k, salt)
+    print("@@CT", ct)
+    print("@@SALT", salt)
+    print("@@TAG", vault_tag(ct, k, salt))
+    print("@@OK")
+}
+def vault_open(master, salt, ct, tag) {
+    k := vault_key(master)
+    if (vault_tag(ct, k, salt) != tag) {
+        print("@@FAIL wrong-master-or-tampered")
+        return ""
+    }
+    print("@@PLAIN", vault_decrypt(ct, k, salt))
+    return ""
+}

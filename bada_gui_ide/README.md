@@ -164,6 +164,24 @@ Electron (Windows/Ubuntu) と Cordova (Android) で包みます。ビルドは
 (`zonebrowser-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
 Ubuntu の AppImage / deb はローカルでのビルドも確認済みです。
 
+### 🔐 Modem Vault — 量子暗号パスワード保管庫 + LANモデム検出
+
+**自分自身の**モデム/ルーター認証情報を Jones 量子暗号で暗号化保管し、マスター
+パスワードで復号表示するアプリ [`modemvault/`](modemvault/) を同梱しています
+(単一 HTML: [`dist/modem-vault.html`](dist/modem-vault.html)):
+
+- **保管庫** — 自分で入力した型番＋パスコードを Jones 量子暗号 AEAD で暗号化して
+  `localStorage` に保存。マスターパスワード(結び目→Jones 鍵)でのみ復号。誤った
+  マスターはタグ照合に失敗して復号不可。マスターは保存しません。
+- **LAN検出** — 自分の PC の IP(WebRTC)から推定ゲートウェイ・管理URLを提示、
+  MAC の OUI 照合でメーカー推定。確実な検出は CLI
+  [`modemvault/cli/modem-scan.js`](modemvault/cli/modem-scan.js)(ゲートウェイ
+  IP・MAC・ベンダー・管理URLを実読取)。パスワードは一切扱いません。
+
+> 型番・MAC・シリアルからパスコードを割り出す/他人の機器を対象にする機能は
+> 意図的に非対応です(不正アクセス防止)。あなたが自分で入力した内容だけを
+> 暗号化保管します。生成: `node tools/build-modemvault.js`。
+
 ### その他のダウンロード形態
 
 インストール不要で、**1 ファイルだけ**でどこでも動く自己完結版:
