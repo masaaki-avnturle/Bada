@@ -1,9 +1,10 @@
-name: Bada GUI IDE build (Windows EXE + Ubuntu + Android APK)
+name: Bada GUI IDE build (Windows EXE + Ubuntu + Android APK + CLI)
 
-# bada_gui_ide/ (www + electron + cordova) から
+# bada_gui_ide/ (www + electron + cordova + cli) から
 #   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
 #   - Ubuntu 向け AppImage / deb
 #   - Android 向け APK
+#   - コマンドライン アプリ (Node SEA 単一実行ファイル: bada-cli.exe / bada-cli-linux-x64)
 # をビルドし、Actions アーティファクト、および (bada-ide-v* タグ時)
 # GitHub Release に添付します。
 
@@ -95,6 +96,100 @@ jobs:
           files: |
             bada_gui_ide/electron/dist/*.AppImage
             bada_gui_ide/electron/dist/*.deb
+
+  # ---- コマンドライン アプリ (単一実行ファイル, Node SEA) ----
+  # cli/bada-cli.js を esbuild で 1 ファイルにバンドルし、Node SEA
+  # (Single Executable Application) で node 本体へ注入して、依存なしで
+  # 実行できる単体バイナリを作る。run/build/emit/tokens/ast/repl/examples。
+  cli-linux:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build single-binary CLI (Node SEA)
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          mkdir -p dist-cli
+          npx --yes esbuild cli/bada-cli.js --bundle --platform=node --format=cjs --outfile=dist-cli/bada-bundle.cjs
+          cat > dist-cli/sea-config.json <<'EOF'
+          { "main": "dist-cli/bada-bundle.cjs", "output": "dist-cli/sea-prep.blob", "disableExperimentalSEAWarning": true }
+          EOF
+          node --experimental-sea-config dist-cli/sea-config.json
+          node -e "require('fs').copyFileSync(process.execPath,'dist-cli/bada-cli-linux-x64')"
+          npx --yes postject dist-cli/bada-cli-linux-x64 NODE_SEA_BLOB dist-cli/sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          chmod +x dist-cli/bada-cli-linux-x64
+      - name: Smoke test CLI binary
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          ./dist-cli/bada-cli-linux-x64 version
+          ./dist-cli/bada-cli-linux-x64 run examples/engine.bada | grep -q "5.55e-17"
+          ./dist-cli/bada-cli-linux-x64 run examples/quantum.bada | grep -q "0.50000 0.50000"
+          ./dist-cli/bada-cli-linux-x64 build examples/core.bada -o /tmp/core
+          /tmp/core | grep -q "compiled engine: V        = 8"
+          ./dist-cli/bada-cli-linux-x64 examples all -o /tmp/ex && ls /tmp/ex
+          printf 'Measure(H(qubit(1)))\nexit\n' | ./dist-cli/bada-cli-linux-x64 repl | grep -q "0.50000, 0.50000"
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-cli-linux
+          path: bada_gui_ide/dist-cli/bada-cli-linux-x64
+      - name: Attach CLI to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: bada_gui_ide/dist-cli/bada-cli-linux-x64
+
+  cli-windows:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build single-binary CLI (Node SEA)
+        working-directory: bada_gui_ide
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist-cli
+          npx --yes esbuild cli/bada-cli.js --bundle --platform=node --format=cjs --outfile=dist-cli/bada-bundle.cjs
+          cat > dist-cli/sea-config.json <<'EOF'
+          { "main": "dist-cli/bada-bundle.cjs", "output": "dist-cli/sea-prep.blob", "disableExperimentalSEAWarning": true }
+          EOF
+          node --experimental-sea-config dist-cli/sea-config.json
+          node -e "require('fs').copyFileSync(process.execPath,'dist-cli/bada-cli.exe')"
+          npx --yes postject dist-cli/bada-cli.exe NODE_SEA_BLOB dist-cli/sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+      - name: Smoke test CLI binary
+        working-directory: bada_gui_ide
+        shell: bash
+        run: |
+          set -e
+          ./dist-cli/bada-cli.exe version
+          ./dist-cli/bada-cli.exe run examples/engine.bada | grep -q "5.55e-17"
+          ./dist-cli/bada-cli.exe run examples/quantum.bada | grep -q "0.50000 0.50000"
+          ./dist-cli/bada-cli.exe emit examples/core.bada -o core.gen.c
+          test -s core.gen.c
+          printf 'Measure(H(qubit(1)))\nexit\n' | ./dist-cli/bada-cli.exe repl | grep -q "0.50000, 0.50000"
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-cli-windows
+          path: bada_gui_ide/dist-cli/bada-cli.exe
+      - name: Attach CLI to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: bada_gui_ide/dist-cli/bada-cli.exe
 
   android-apk:
     runs-on: ubuntu-latest
