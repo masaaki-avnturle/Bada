@@ -29,6 +29,27 @@
 
 ---
 
+## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
+
+`https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
+
+### 👉 [**bada_gui_ide/dist/zone-browser.html をダウンロード**](bada_gui_ide/dist/zone-browser.html)
+
+ダウンロード手順(GitHub 上):上のリンクを開き、ファイル表示画面の右上にある **「Download raw file」(⬇ アイコン)** を押すと保存できます。保存した `zone-browser.html` をダブルクリックすればブラウザで開きます。
+
+| ファイル | 内容 |
+|:---|:---|
+| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
+| [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
+| [`zone.bada`](bada_gui_ide/examples/zone.bada) | zone:// スキームの Bada ソース |
+
+> 直接リンク(右クリック→「名前を付けて保存」でも可):
+> `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
+> (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
+> ファイル画面の「Download raw file」から取得してください)
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
