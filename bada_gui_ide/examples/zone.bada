@@ -215,13 +215,15 @@ def key_seed(key, salt) {
     return state
 }
 
+# the keystream works on 16-bit code units so any character (incl. CJK)
+# round-trips through encrypt/decrypt.
 def zone_encrypt(plain, key, salt) {
     state := key_seed(key, salt)
     out := []
     i := 0
     while (i < len(plain)) {
         state := lcg(state)
-        out <- (ord(plain, i) + (state % 256)) % 256
+        out <- (ord(plain, i) + (state % 65536)) % 65536
         i := i + 1
     }
     return out
@@ -233,7 +235,7 @@ def zone_decrypt(ct, key, salt) {
     i := 0
     while (i < len(ct)) {
         state := lcg(state)
-        out := out + chr((ct[i] - (state % 256) + 256) % 256)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
         i := i + 1
     }
     return out
@@ -463,7 +465,7 @@ print("================================================================")
 key := zone_id("zone://url.or.jp/")
 victim := dht_nearest(NET, key)
 rec := store_lookup(victim[2], "zone://url.or.jp/")
-rec[1][0] = (rec[1][0] + 1) % 256
+rec[1][0] = (rec[1][0] + 1) % 65536
 GET "zone://url.or.jp/"
 
 # heal: republish -- the append-only Akashic record still holds truth

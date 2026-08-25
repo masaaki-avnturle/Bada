@@ -1,0 +1,378 @@
+# ============================================================
+# zone-lib.bada -- the zone:// ultra-network runtime as a Bada
+# LIBRARY (functions only, no demo output), so a dedicated
+# browser can drive one navigation at a time.
+#
+# The browser generates, per navigation:
+#     <this library>
+#     NET := zone_boot()
+#     zone_publish(NET, url, content)   # for every page of the site
+#     zone_serve(NET, requested_url)    # emits a machine-parseable block
+#
+# Security is the Jones-polynomial quantum cipher of
+# omega_jones_crypto_pkg (knot -> Kauffman/Jones key -> AEAD) plus a
+# Bell-pair QKD session salt, exactly as in examples/zone.bada.
+# ============================================================
+
+RING := 4096
+
+# ---- L1 sponge: zone:// naming --------------------------------------
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }
+    return h
+}
+def zone_id(s) { return str_hash(s) % RING }
+
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) { return [] }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) { return [rest, "/", split(rest, ".")] }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+# ---- L3 key schedule: Jones-polynomial quantum cipher ---------------
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    bits := []
+    i := 0
+    while (i < n) { bits <- 0; i := i + 1 }
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            if (bits[i] == 0) {
+                ra := uf_find(parent, e0)
+                rb := uf_find(parent, e1)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e2)
+                rb := uf_find(parent, e3)
+                if (ra != rb) { parent[ra] = rb }
+                a_cnt := a_cnt + 1
+            } else {
+                ra := uf_find(parent, e1)
+                rb := uf_find(parent, e2)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e3)
+                rb := uf_find(parent, e0)
+                if (ra != rb) { parent[ra] = rb }
+                b_cnt := b_cnt + 1
+            }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r := uf_find(parent, lbl)
+            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        weight := ipow(A, a_cnt - b_cnt)
+        lf := ipow(d, loops - 1)
+        sum := sum + weight * lf
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+def jones_key(diagram) {
+    As := [0.8, 1.0, 1.2, 1.5, 2.0]
+    acc := "jones|"
+    i := 0
+    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + "|"; i := i + 1 }
+    return str_hash(acc)
+}
+def zone_diagram(host) {
+    if (host == "bada.or.jp") {
+        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]
+    }
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+# ---- keystream AEAD -------------------------------------------------
+def lcg(state) { return (state * 48271) % 2147483647 }
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+# the keystream works on 16-bit code units so any character (incl. CJK)
+# round-trips through encrypt/decrypt.
+def zone_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+def zone_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+def zone_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }
+    return h
+}
+def zone_seal(plain, key, salt) {
+    ct := zone_encrypt(plain, key, salt)
+    return [ct, salt, zone_tag(ct, key, salt)]
+}
+def zone_open(sealed, key) {
+    ct := sealed[0]
+    salt := sealed[1]
+    tag := sealed[2]
+    if (zone_tag(ct, key, salt) != tag) { return [] }
+    return [zone_decrypt(ct, key, salt)]
+}
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt]
+}
+
+# ---- L2 cream: the P2P ring -----------------------------------------
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+def peer_new(name) { return [name, zone_id("peer:" + name), [], 0] }
+def net_sort(net) {
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) { if (p[1] < sorted[j][1]) { pos := j; found := true } }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) { sorted[m][3] = m; m := m + 1 }
+    return sorted
+}
+def peer_neighbors(net, p) {
+    n := len(net)
+    i := p[3]
+    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]
+}
+def dht_nearest(net, key) {
+    best := net[0]
+    bd := ring_dist(best[1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) { best := net[i]; bd := d }
+        i := i + 1
+    }
+    return best
+}
+def zone_route(net, key) {
+    route := []
+    cur := net[0]
+    route <- cur[0]
+    hop := 0
+    moved := true
+    while (moved && hop < 16) {
+        moved := false
+        nb := peer_neighbors(net, cur)
+        best := cur
+        j := 0
+        while (j < 3) {
+            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) { best := nb[j] }
+            j := j + 1
+        }
+        if (best[1] != cur[1]) { cur := best; route <- cur[0]; moved := true }
+        hop := hop + 1
+    }
+    return route
+}
+def store_lookup(store, url) {
+    i := 0
+    while (i < len(store)) {
+        if (store[i][0] == url) { return store[i] }
+        i := i + 1
+    }
+    return []
+}
+
+# ---- boot the ultra network (six peers, no server) ------------------
+def zone_boot() {
+    raw := []
+    raw <- peer_new("tokyo.zone.jp")
+    raw <- peer_new("osaka.zone.jp")
+    raw <- peer_new("nagoya.zone.jp")
+    raw <- peer_new("sapporo.zone.jp")
+    raw <- peer_new("fukuoka.zone.jp")
+    raw <- peer_new("naha.zone.jp")
+    return net_sort(raw)
+}
+
+# ---- publish (encrypted) --------------------------------------------
+def zone_publish(net, url, content) {
+    p := zone_parse(url)
+    if (len(p) == 0) { return false }
+    host := p[0]
+    key := zone_id(url)
+    owner := dht_nearest(net, key)
+    jk := jones_key(zone_diagram(host))
+    sess := qkd_session()
+    salt := sess[1]
+    sealed := zone_seal(content, jk, salt)
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) { owner[2] <- [url, sealed[0], sealed[1], sealed[2]] }
+    else { rec[1] = sealed[0]; rec[2] = sealed[1]; rec[3] = sealed[2] }
+    return true
+}
+
+# ---- serve one navigation: emit a machine-parseable block -----------
+# The dedicated browser reads only lines beginning with "@@".
+def zone_serve(net, url) {
+    p := zone_parse(url)
+    if (len(p) == 0) {
+        print("@@STATUS 400")
+        print("@@BODY_BEGIN")
+        print("# 400 bad-zone")
+        print("not a zone:// URL")
+        print("@@BODY_END")
+        return ""
+    }
+    host := p[0]
+    key := zone_id(url)
+    route := zone_route(net, key)
+    owner := dht_nearest(net, key)
+    print("@@HOST", host)
+    print("@@PATH", p[1])
+    print("@@KEY", key)
+    print("@@ROUTE", route)
+    print("@@NODE", owner[0])
+    sess := qkd_session()
+    if (!sess[0]) {
+        print("@@QKD compromised")
+        print("@@STATUS 495")
+        print("@@BODY_BEGIN")
+        print("# 495 quantum-channel-compromised")
+        print("the Bell pair lost correlation -- someone is on the wire")
+        print("@@BODY_END")
+        return ""
+    }
+    print("@@QKD ok")
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) {
+        print("@@STATUS 404")
+        print("@@BODY_BEGIN")
+        print("# 404 zone-not-found")
+        print("no peer on the ring holds " + url)
+        print("@@BODY_END")
+        return ""
+    }
+    jk := jones_key(zone_diagram(host))
+    sealed := [ rec[1], rec[2], rec[3] ]
+    opened := zone_open(sealed, jk)
+    if (len(opened) == 0) {
+        print("@@STATUS 409")
+        print("@@BODY_BEGIN")
+        print("# 409 zone-guard-reject")
+        print("AEAD tag failed: forged/tampered content or wrong knot")
+        print("@@BODY_END")
+        return ""
+    }
+    print("@@CIPHER", rec[1][0], rec[1][1], rec[1][2], len(rec[1]))
+    print("@@TAG", rec[3])
+    print("@@JONESKEY", jk)
+    print("@@STATUS 200")
+    print("@@BODY_BEGIN")
+    print(opened[0])
+    print("@@BODY_END")
+    return opened[0]
+}

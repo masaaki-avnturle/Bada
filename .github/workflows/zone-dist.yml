@@ -38,14 +38,16 @@ jobs:
           grep -q "409 zone-guard-reject" /tmp/zone.out
           grep -q "cannot read" /tmp/zone.out
 
-      - name: Build downloadable dist
+      - name: Build downloadable dist (runner + dedicated browser)
         working-directory: bada_gui_ide
-        run: node tools/build-zone-dist.js
+        run: |
+          node tools/build-zone-dist.js
+          node tools/build-zone-browser.js
 
       - name: Package zip
         working-directory: bada_gui_ide/dist
         run: |
-          zip -j bada-zone-dist.zip bada-zone.html zone.bada bada.js bada-cli.js README.txt
+          zip -j bada-zone-dist.zip zone-browser.html bada-zone.html zone.bada bada.js bada-cli.js README.txt
           ls -la
 
       - name: Upload Actions artifact
@@ -53,6 +55,7 @@ jobs:
         with:
           name: bada-zone-dist
           path: |
+            bada_gui_ide/dist/zone-browser.html
             bada_gui_ide/dist/bada-zone.html
             bada_gui_ide/dist/bada-zone-dist.zip
 
@@ -62,5 +65,6 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.release_tag }}
           files: |
+            bada_gui_ide/dist/zone-browser.html
             bada_gui_ide/dist/bada-zone.html
             bada_gui_ide/dist/bada-zone-dist.zip

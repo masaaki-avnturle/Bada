@@ -95,21 +95,42 @@ GET "zone://url.or.jp/"
 を推測した盗聴者は AEAD タグ照合に失敗して復号不能 — いずれも
 `examples/zone.bada` の attack 1 / attack 2 で実証しています。
 
-### zone:// をダウンロードして動かす
+### 🌐 ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
-インストール不要で、**1 ファイルだけ**でどこでも動く自己完結版を用意しています:
+`zone://` 専用のブラウザ [`bada_gui_ide/dist/zone-browser.html`](dist/zone-browser.html)
+を同梱しています。**この 1 ファイルをダウンロードしてブラウザで開くだけ**で、
+サーバー無しにウルトラネットワークを閲覧できます (依存なし・オフライン可):
 
-- **単一 HTML** — [`bada_gui_ide/dist/bada-zone.html`](dist/bada-zone.html) を
-  ダウンロードしてブラウザで開くだけ (依存なし・オフライン可)。Bada 言語コアと
-  `zone.bada` を同梱し、開くと暗号化 zone:// のデモが自動実行されます。
-  「zone.bada を保存」「生成 C を保存」ボタンでソースや C も取り出せます。
+- **アドレスバー** に `zone://url.or.jp/` のように入力すると、ピアのハッシュから
+  構築された P2P リング DHT を辿ってページを持つノードを探し、Bell 対 QKD で
+  セッション鍵を合意し、ゾーンの結び目から導いた Jones 鍵で本文を復号して描画。
+- **戻る / 進む / 再読み込み**、ページ内の zone:// リンクのクリック遷移、
+  ゾーン インデックス (ブックマーク) に対応。
+- **セキュリティパネル** に status・DHT 鍵・所有ノード・経路・QKD 結果・
+  Jones 鍵・AEAD タグ・暗号文の先頭バイトをライブ表示。改ざんや誤った結び目は
+  `409 zone-guard-reject`、存在しないゾーンは `404` として表示されます。
+- ゾーンが違えば鍵も違います (url.or.jp=三葉結び目 → 919492、
+  bada.or.jp=8の字結び目 → 400638)。パネルの Jones 鍵で確認できます。
+
+ナビゲーションのたびに Bada の zone ランタイム (`browser/zone-lib.bada`) が
+実際に走り、リングの再構築・暗号化ページの再発行・QKD・復号を行います。
+サイト内容は [`browser/zone-site.json`](browser/zone-site.json) を編集して
+`node tools/build-zone-browser.js` で再生成できます。
+
+### その他のダウンロード形態
+
+インストール不要で、**1 ファイルだけ**でどこでも動く自己完結版:
+
+- **ランナー単一 HTML** — [`bada_gui_ide/dist/bada-zone.html`](dist/bada-zone.html)
+  を開くと `zone.bada` のデモが自動実行され、「zone.bada を保存」「生成 C を保存」
+  ボタンでソースや C も取り出せます。
 - **配布 zip** — [Releases](https://github.com/masaaki-avnturle/Bada/releases)
-  の `bada-zone-dist.zip` (単一 HTML + `zone.bada` + `bada.js` + `bada-cli.js`
-  + README)。`zone-v*` タグの push か `workflow_dispatch` で
+  の `bada-zone-dist.zip` (専用ブラウザ + ランナー + `zone.bada` + `bada.js`
+  + `bada-cli.js` + README)。`zone-v*` タグの push か `workflow_dispatch` で
   [`zone-dist.yml`](../.github/workflows/zone-dist.yml) が生成・添付します
   (Actions アーティファクトとしても取得可)。
-- **自分で生成** — `node bada_gui_ide/tools/build-zone-dist.js` で
-  `bada_gui_ide/dist/` に上記一式を再生成できます。
+- **自分で生成** — `node bada_gui_ide/tools/build-zone-dist.js` と
+  `node tools/build-zone-browser.js` で `bada_gui_ide/dist/` に一式を再生成。
 - **CLI** — `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zone.bada`
 
 インタープリタとコンパイル済みバイナリは同一の数値を出力します
