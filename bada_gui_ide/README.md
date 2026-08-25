@@ -51,32 +51,49 @@ C リファレンス (`bada` 実行ファイル: lexer / parser / interpreter / 
 `https:` / `http:` に代わる、未知のインターネット「ウルトラネットワーク」の
 WWW スキーム **`zone://url.or.jp/`** を **Bada 言語そのもの**で実装した
 リファレンスです。中央サーバも DNS ルートも持たず、`zone:` は P2P の
-仕組みだけから構築されます:
+仕組みだけから構築され、通信は **Jones 多項式量子暗号**
+(`omega_jones_crypto_pkg`) で端から端まで保護されます:
 
 - **L1 zone:// ネーミング** — URL パーサは純 Bada (`zone_parse`)。ランタイム
   は文字列プリミティブ `split` `substr` `str_find` `ord` `chr` のみを提供。
 - **L2 P2P 解決** — ピア自身のハッシュから構築するリング DHT
   (カオス的円周距離 `ring_dist`、近傍 ±1 と +2 フィンガーのみで
   グリーディ・ホップ解決 `zone_route`)。
-- **L3 量子ガード** — Bell 対 (`H` + `CNOT` + `Measure`) によるセッション
-  鍵合意。零の保存 (禁制状態 |01>,|10> が厳密に 0 のまま) が盗聴・改ざんの
-  証拠になり、`data2-guard` ダイジェスト照合で偽造レコードは
-  `409 zone-guard-reject` として拒否されます。
+- **L3 量子暗号ガード** — 以前に作成した Jones 多項式量子暗号
+  (`omega_jones_crypto_pkg/lib/jones_key.c`) を Bada に移植して適用:
+  1. **鍵** — 各ゾーンの長期鍵は **結び目図から導出**します。Kauffman
+     ブラケット/Jones 多項式 `<D>(A) = Σ A^(a-b)·d^(loops-1)`
+     (`d = -A² - 1/A²`) を複数の A で標本化しハッシュ (`jones_key`)。
+     結び目がゾーンの秘密、多項式がその鍵スケジュールです
+     (url.or.jp=三葉結び目, bada.or.jp=8の字結び目 → 別鍵)。
+  2. **QKD** — Bell 対 (`H`+`CNOT`+`Measure`) がセッションごとの
+     ソルトを合意。零の保存 (禁制状態 |01>,|10> が厳密に 0 のまま)
+     が盗聴・改ざんの証拠になります。
+  3. **AEAD** — 本文は (Jones 鍵, セッションソルト) をシードにした
+     鍵ストリームで暗号化し、鍵付き認証タグで封緘 (`zone_seal` /
+     `zone_open`)。改ざん・偽造レコードはタグ照合で
+     `409 zone-guard-reject`、結び目を持たないピアは平文を復号できません。
 - **L4 Precog キャッシュ** — 次のフェッチ先を `unknown_prior` → `update` で
   学習 (エントロピー単調減少) して先読み。
-- **Akashic ゾーン台帳** — 文法ルール・ゾーンレコード・フェッチ・測定の
-  すべてが追記専用 tuplespace のファクトとしてコミットされます。
+- **Akashic ゾーン台帳** — 文法ルール・暗号化ゾーンレコード・フェッチ・
+  測定のすべてが追記専用 tuplespace のファクトとしてコミットされます。
   `PUT` / `GET` というブラウザ動詞自体も `@reviser : grammar` で
   ルールレジャーへコミットされる文法ファクトです。
 
 ```
 GET "zone://url.or.jp/"
   zone    : host url.or.jp  path /  labels [url, or, jp]
-  qkd     : Bell-pair session key agreed (|01>,|10> stayed 0)
+  qkd     : Bell-pair session ok (|01>,|10> stayed 0; channel untapped)
   key     : 1546  route : [osaka.zone.jp, nagoya.zone.jp]
-  guard   : digest 832857 verified (data2-guard OK)
+  cipher  : [39.00000, 159.00000, 173.00000, ...] (101 bytes on the wire)
+  guard   : Jones-key AEAD verified (tag 772012037)
   status  : 200 zone-delivered from nagoya.zone.jp
+  body    : <zone-page>| Ultra Network home | ...
 ```
+
+改ざん (ciphertext 1 バイト反転) は `409 zone-guard-reject`、誤った結び目
+を推測した盗聴者は AEAD タグ照合に失敗して復号不能 — いずれも
+`examples/zone.bada` の attack 1 / attack 2 で実証しています。
 
 インタープリタとコンパイル済みバイナリは同一の数値を出力します
 (Hadamard プローブ `0.50000 0.50000`、禁制プローブ `0.62246 0.00000 0.37754`、
