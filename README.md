@@ -37,11 +37,21 @@
 
 ダウンロード手順(GitHub 上):上のリンクを開き、ファイル表示画面の右上にある **「Download raw file」(⬇ アイコン)** を押すと保存できます。保存した `zone-browser.html` をダブルクリックすればブラウザで開きます。
 
-| ファイル | 内容 |
+### 📦 ウルトラネットワーク アプリ一式(単一HTML・ダウンロードして開くだけ)
+
+以下はすべて **1 ファイル完結**の HTML アプリです。リンクを開き **「Download raw file」(⬇)** で保存 → ダブルクリックで起動(インストール不要・依存なし・オフライン可):
+
+| アプリ | 内容 |
 |:---|:---|
-| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
+| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ **ZoneBrowser** — zone:// 専用ブラウザ(P2P DHT + Jones量子暗号 + UltraDB複製 + 認知検索) |
+| [`lan-to-zone.html`](bada_gui_ide/dist/lan-to-zone.html) | **LAN → zone://** — 自分のLAN IPを `zone://url.or.jp/lan/` に暗号化取り込み |
+| [`modem-vault.html`](bada_gui_ide/dist/modem-vault.html) | **Modem Vault** — 自分のモデム認証情報の量子暗号保管庫 + LAN検出 |
+| [`quantum-shark.html`](bada_gui_ide/dist/quantum-shark.html) | **QuantumShark** — 量子暗号つきパケット アナライザ(`.qcap` 復号。デモ: master `demo`) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
-| [`zone.bada`](bada_gui_ide/examples/zone.bada) | zone:// スキームの Bada ソース |
+
+**一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します(Actions アーティファクトとしても取得可)。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
+
+各アプリに付属する CLI(自分のマシン/LAN対象)は [`bada_gui_ide/zoneimport/`](bada_gui_ide/zoneimport/) · [`modemvault/`](bada_gui_ide/modemvault/) · [`netcapture/`](bada_gui_ide/netcapture/) を参照。
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 

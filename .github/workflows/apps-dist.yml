@@ -1,0 +1,85 @@
+name: Ultra Network apps (downloadable bundle)
+
+# Builds every self-contained ultra-network app into bada_gui_ide/dist and
+# packages them for download:
+#   zone-browser.html, lan-to-zone.html, modem-vault.html,
+#   quantum-shark.html, bada-zone.html  (+ apps-README.txt)
+# Uploaded as an Actions artifact, and (on an apps-v* tag, or when a
+# release_tag is given) attached to a GitHub Release for one-click download.
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: apps-v1.1.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'apps-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Smoke-test the runtimes
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node cli/bada-cli.js run examples/zone.bada     | grep -q "200 zone-delivered"
+          node cli/bada-cli.js run examples/ultraweb.bada | grep -q "quorum 4/4"
+
+      - name: Build all apps
+        working-directory: bada_gui_ide
+        run: node tools/build-all-apps.js
+
+      - name: Package zip
+        working-directory: bada_gui_ide/dist
+        run: |
+          zip -j bada-ultranetwork-apps.zip \
+            zone-browser.html lan-to-zone.html modem-vault.html \
+            quantum-shark.html bada-zone.html apps-README.txt
+          ls -la
+
+      - name: Upload Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bada-ultranetwork-apps
+          path: |
+            bada_gui_ide/dist/zone-browser.html
+            bada_gui_ide/dist/lan-to-zone.html
+            bada_gui_ide/dist/modem-vault.html
+            bada_gui_ide/dist/quantum-shark.html
+            bada_gui_ide/dist/bada-zone.html
+            bada_gui_ide/dist/bada-ultranetwork-apps.zip
+
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: Ultra Network apps ${{ github.event.inputs.release_tag || github.ref_name }}
+          body: |
+            ウルトラネットワークの単一HTMLアプリ一式(ダウンロードして開くだけ・依存なし・オフライン可)。
+
+            - **zone-browser.html** — zone:// 専用ブラウザ(P2P DHT + Jones量子暗号 + UltraDB + 認知検索)
+            - **lan-to-zone.html** — 自分のLAN IPを zone:// に暗号化取り込み
+            - **modem-vault.html** — 自分のモデム認証情報の量子暗号保管庫 + LAN検出
+            - **quantum-shark.html** — 量子暗号つきパケット アナライザ(.qcap 復号)
+            - **bada-zone.html** — zone.bada ランナー
+            - **bada-ultranetwork-apps.zip** — 上記一式 + README
+          files: |
+            bada_gui_ide/dist/zone-browser.html
+            bada_gui_ide/dist/lan-to-zone.html
+            bada_gui_ide/dist/modem-vault.html
+            bada_gui_ide/dist/quantum-shark.html
+            bada_gui_ide/dist/bada-zone.html
+            bada_gui_ide/dist/bada-ultranetwork-apps.zip
