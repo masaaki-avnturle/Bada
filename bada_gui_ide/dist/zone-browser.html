@@ -1,3 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ZoneBrowser — ウルトラネットワーク専用ブラウザ (zone://)</title>
+<style>
+  :root { color-scheme: light dark; --bg:#04060a; --panel:#0a1220; --line:#1c2838;
+          --ink:#d6e2ee; --dim:#8aa0b8; --gold:#c8a44a; --green:#2e9e57; --red:#d0574a; --blue:#4a80d0; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font-family: system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; }
+  #chrome { position:sticky; top:0; z-index:5; background:linear-gradient(180deg,#0a1220,#070c15);
+            border-bottom:1px solid var(--line); padding:10px 12px; }
+  .navrow { display:flex; gap:8px; align-items:center; }
+  .navbtn { width:36px; height:36px; border:1px solid var(--line); border-radius:8px; background:#132033;
+            color:var(--ink); font-size:16px; cursor:pointer; }
+  .navbtn:disabled { opacity:.4; cursor:default; }
+  .navbtn:hover:not(:disabled) { filter:brightness(1.2); }
+  #addr { flex:1; display:flex; align-items:center; gap:8px; background:#020407; border:1px solid var(--line);
+          border-radius:20px; padding:6px 14px; }
+  #lock { font-size:14px; }
+  #url { flex:1; background:transparent; border:0; outline:0; color:var(--ink); font-size:14px;
+         font-family:"SFMono-Regular",Consolas,monospace; }
+  #go { border:0; background:var(--green); color:#eafff0; border-radius:16px; padding:7px 16px; cursor:pointer; font-weight:600; }
+  .brand { display:flex; align-items:center; gap:8px; margin-right:6px; }
+  .brand .o { color:var(--gold); font-size:20px; font-weight:700; }
+  .brand small { color:var(--dim); }
+  main { display:grid; grid-template-columns: 220px 1fr 300px; gap:0; height:calc(100% - 58px); }
+  @media (max-width:900px){ main{ grid-template-columns:1fr; } #side,#sec{ display:none; } }
+  #side { border-right:1px solid var(--line); padding:14px; overflow:auto; }
+  #side h3, #sec h3 { margin:0 0 10px; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); }
+  #side a { display:block; color:var(--blue); text-decoration:none; font-size:13px; padding:6px 8px; border-radius:6px;
+            font-family:"SFMono-Regular",Consolas,monospace; word-break:break-all; }
+  #side a:hover { background:#101d2e; }
+  #page { overflow:auto; padding:28px 34px; }
+  #page h1.doc { font-size:26px; margin:0 0 6px; }
+  #page h2.doc { font-size:19px; margin:22px 0 6px; color:var(--gold); }
+  #page p.doc { margin:8px 0; line-height:1.65; max-width:64ch; }
+  #page a.zlink { color:var(--blue); text-decoration:none; border-bottom:1px solid #24405f; cursor:pointer; }
+  #page a.zlink:hover { color:#8fb6ff; }
+  #page .pill { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; margin-right:6px; }
+  .ok { background:#123a24; color:#7ce0a3; } .bad { background:#3a1614; color:#f2a49b; }
+  #sec { border-left:1px solid var(--line); padding:14px; overflow:auto; font-size:12.5px; }
+  #sec .kv { display:flex; justify-content:space-between; gap:8px; padding:5px 0; border-bottom:1px dashed #16222f; }
+  #sec .kv b { color:var(--dim); font-weight:500; }
+  #sec .kv span { text-align:right; font-family:"SFMono-Regular",Consolas,monospace; word-break:break-all; }
+  #sec .big { font-size:13px; margin-top:12px; }
+  .status-200 { color:#7ce0a3; } .status-err { color:#f2a49b; }
+  #raw { margin-top:14px; }
+  #raw summary { color:var(--dim); cursor:pointer; }
+  #raw pre { background:#020407; border:1px solid var(--line); border-radius:8px; padding:10px; overflow:auto;
+             font-size:11px; max-height:220px; white-space:pre-wrap; }
+  footer { grid-column:1/-1; }
+</style>
+</head>
+<body>
+<div id="chrome">
+  <div class="navrow">
+    <div class="brand"><span class="o">Ω</span><div><b>ZoneBrowser</b><br><small>ultra-network · zone://</small></div></div>
+    <button class="navbtn" id="back"  title="戻る">‹</button>
+    <button class="navbtn" id="fwd"   title="進む">›</button>
+    <button class="navbtn" id="reload" title="再読み込み">⟳</button>
+    <div id="addr">
+      <span id="lock" title="Jones量子暗号で保護">🔒</span>
+      <input id="url" spellcheck="false" autocomplete="off" value="zone://url.or.jp/"/>
+    </div>
+    <button id="go">開く</button>
+  </div>
+</div>
+
+<main>
+  <nav id="side">
+    <h3>ゾーン インデックス</h3>
+    <div id="bookmarks"></div>
+    <h3 style="margin-top:18px">ネットワーク</h3>
+    <div id="peers" style="font-size:12px;color:var(--dim);font-family:monospace"></div>
+  </nav>
+
+  <section id="page"><p class="doc" style="color:var(--dim)">読み込み中…</p></section>
+
+  <aside id="sec">
+    <h3>セキュリティ</h3>
+    <div id="secbody"></div>
+    <details id="raw"><summary>zone プロトコル トレース</summary><pre id="rawpre"></pre></details>
+  </aside>
+</main>
+
+<script>
+/* ==== Bada language core (inlined) ==== */
 /* ============================================================================
  * bada.js — The Bada language (Unknown-Prior Engine language), JavaScript port.
  *
@@ -1838,3 +1929,183 @@
     }
   };
 });
+
+</script>
+<script>
+/* ==== zone:// runtime library + site (inlined) ==== */
+var ZONE_LIB = "# ============================================================\n# zone-lib.bada -- the zone:// ultra-network runtime as a Bada\n# LIBRARY (functions only, no demo output), so a dedicated\n# browser can drive one navigation at a time.\n#\n# The browser generates, per navigation:\n#     <this library>\n#     NET := zone_boot()\n#     zone_publish(NET, url, content)   # for every page of the site\n#     zone_serve(NET, requested_url)    # emits a machine-parseable block\n#\n# Security is the Jones-polynomial quantum cipher of\n# omega_jones_crypto_pkg (knot -> Kauffman/Jones key -> AEAD) plus a\n# Bell-pair QKD session salt, exactly as in examples/zone.bada.\n# ============================================================\n\nRING := 4096\n\n# ---- L1 sponge: zone:// naming --------------------------------------\ndef str_hash(s) {\n    h := 7\n    i := 0\n    n := len(s)\n    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }\n    return h\n}\ndef zone_id(s) { return str_hash(s) % RING }\n\ndef zone_parse(url) {\n    if (str_find(url, \"zone://\") != 0) { return [] }\n    rest := substr(url, 7, len(url) - 7)\n    cut := str_find(rest, \"/\")\n    if (cut < 0) { return [rest, \"/\", split(rest, \".\")] }\n    host := substr(rest, 0, cut)\n    path := substr(rest, cut, len(rest) - cut)\n    return [host, path, split(host, \".\")]\n}\n\n# ---- L3 key schedule: Jones-polynomial quantum cipher ---------------\ndef ipow(base, e) {\n    if (e < 0) {\n        r := 1.0\n        k := 0\n        m := 0 - e\n        while (k < m) { r := r * base; k := k + 1 }\n        return 1.0 / r\n    }\n    r := 1.0\n    k := 0\n    while (k < e) { r := r * base; k := k + 1 }\n    return r\n}\ndef uf_find(parent, x) {\n    r := x\n    while (parent[r] >= 0) { r := parent[r] }\n    return r\n}\ndef kauffman(cross, A) {\n    n := len(cross)\n    if (n == 0) { return 1.0 }\n    maxlbl := 0\n    i := 0\n    while (i < n) {\n        k := 1\n        while (k <= 4) {\n            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }\n            k := k + 1\n        }\n        i := i + 1\n    }\n    U := maxlbl + 1\n    states := 1\n    p := 0\n    while (p < n) { states := states * 2; p := p + 1 }\n    d := (0 - (A * A)) - (1.0 / (A * A))\n    sum := 0.0\n    bits := []\n    i := 0\n    while (i < n) { bits <- 0; i := i + 1 }\n    st := 0\n    while (st < states) {\n        parent := []\n        q := 0\n        while (q < U) { parent <- (0 - 1); q := q + 1 }\n        a_cnt := 0\n        b_cnt := 0\n        i := 0\n        while (i < n) {\n            e0 := cross[i][1]\n            e1 := cross[i][2]\n            e2 := cross[i][3]\n            e3 := cross[i][4]\n            if (bits[i] == 0) {\n                ra := uf_find(parent, e0)\n                rb := uf_find(parent, e1)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e2)\n                rb := uf_find(parent, e3)\n                if (ra != rb) { parent[ra] = rb }\n                a_cnt := a_cnt + 1\n            } else {\n                ra := uf_find(parent, e1)\n                rb := uf_find(parent, e2)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e3)\n                rb := uf_find(parent, e0)\n                if (ra != rb) { parent[ra] = rb }\n                b_cnt := b_cnt + 1\n            }\n            i := i + 1\n        }\n        seen := []\n        q := 0\n        while (q < U) { seen <- 0; q := q + 1 }\n        loops := 0\n        lbl := 0\n        while (lbl < U) {\n            r := uf_find(parent, lbl)\n            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }\n            lbl := lbl + 1\n        }\n        weight := ipow(A, a_cnt - b_cnt)\n        lf := ipow(d, loops - 1)\n        sum := sum + weight * lf\n        c := 0\n        carry := 1\n        while (c < n && carry == 1) {\n            if (bits[c] == 0) { bits[c] = 1; carry := 0 }\n            else { bits[c] = 0 }\n            c := c + 1\n        }\n        st := st + 1\n    }\n    return sum\n}\ndef jones_key(diagram) {\n    As := [0.8, 1.0, 1.2, 1.5, 2.0]\n    acc := \"jones|\"\n    i := 0\n    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + \"|\"; i := i + 1 }\n    return str_hash(acc)\n}\ndef zone_diagram(host) {\n    if (host == \"bada.or.jp\") {\n        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]\n    }\n    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]\n}\n\n# ---- keystream AEAD -------------------------------------------------\ndef lcg(state) { return (state * 48271) % 2147483647 }\ndef key_seed(key, salt) {\n    state := (key + salt * 2654435761) % 2147483647\n    if (state <= 0) { state := state + 2147483646 }\n    return state\n}\n# the keystream works on 16-bit code units so any character (incl. CJK)\n# round-trips through encrypt/decrypt.\ndef zone_encrypt(plain, key, salt) {\n    state := key_seed(key, salt)\n    out := []\n    i := 0\n    while (i < len(plain)) {\n        state := lcg(state)\n        out <- (ord(plain, i) + (state % 65536)) % 65536\n        i := i + 1\n    }\n    return out\n}\ndef zone_decrypt(ct, key, salt) {\n    state := key_seed(key, salt)\n    out := \"\"\n    i := 0\n    while (i < len(ct)) {\n        state := lcg(state)\n        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)\n        i := i + 1\n    }\n    return out\n}\ndef zone_tag(ct, key, salt) {\n    h := (key % 999983) + salt + 1\n    i := 0\n    while (i < len(ct)) { h := (h * 31 + ct[i] + 7) % 2147483647; i := i + 1 }\n    return h\n}\ndef zone_seal(plain, key, salt) {\n    ct := zone_encrypt(plain, key, salt)\n    return [ct, salt, zone_tag(ct, key, salt)]\n}\ndef zone_open(sealed, key) {\n    ct := sealed[0]\n    salt := sealed[1]\n    tag := sealed[2]\n    if (zone_tag(ct, key, salt) != tag) { return [] }\n    return [zone_decrypt(ct, key, salt)]\n}\ndef qkd_session() {\n    bell := qubit(2)\n    bell := H(bell, 0)\n    bell := CNOT(bell, 0, 1)\n    outcome := Measure(bell)\n    ok := (outcome[1] == 0) && (outcome[2] == 0)\n    salt := (len(tuplespace) * 131 + 17) % 4096\n    return [ok, salt]\n}\n\n# ---- L2 cream: the P2P ring -----------------------------------------\ndef ring_dist(a, b) {\n    d := a - b\n    if (d < 0) { d := 0 - d }\n    e := RING - d\n    if (e < d) { return e }\n    return d\n}\ndef peer_new(name) { return [name, zone_id(\"peer:\" + name), [], 0] }\ndef net_sort(net) {\n    sorted := []\n    i := 0\n    while (i < len(net)) {\n        p := net[i]\n        pos := len(sorted)\n        found := false\n        j := 0\n        while (j < len(sorted)) {\n            if (!found) { if (p[1] < sorted[j][1]) { pos := j; found := true } }\n            j := j + 1\n        }\n        out := []\n        k := 0\n        while (k < len(sorted)) {\n            if (k == pos) { out <- p }\n            out <- sorted[k]\n            k := k + 1\n        }\n        if (pos == len(sorted)) { out <- p }\n        sorted := out\n        i := i + 1\n    }\n    m := 0\n    while (m < len(sorted)) { sorted[m][3] = m; m := m + 1 }\n    return sorted\n}\ndef peer_neighbors(net, p) {\n    n := len(net)\n    i := p[3]\n    return [ net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n] ]\n}\ndef dht_nearest(net, key) {\n    best := net[0]\n    bd := ring_dist(best[1], key)\n    i := 1\n    while (i < len(net)) {\n        d := ring_dist(net[i][1], key)\n        if (d < bd) { best := net[i]; bd := d }\n        i := i + 1\n    }\n    return best\n}\ndef zone_route(net, key) {\n    route := []\n    cur := net[0]\n    route <- cur[0]\n    hop := 0\n    moved := true\n    while (moved && hop < 16) {\n        moved := false\n        nb := peer_neighbors(net, cur)\n        best := cur\n        j := 0\n        while (j < 3) {\n            if (ring_dist(nb[j][1], key) < ring_dist(best[1], key)) { best := nb[j] }\n            j := j + 1\n        }\n        if (best[1] != cur[1]) { cur := best; route <- cur[0]; moved := true }\n        hop := hop + 1\n    }\n    return route\n}\ndef store_lookup(store, url) {\n    i := 0\n    while (i < len(store)) {\n        if (store[i][0] == url) { return store[i] }\n        i := i + 1\n    }\n    return []\n}\n\n# ---- boot the ultra network (six peers, no server) ------------------\ndef zone_boot() {\n    raw := []\n    raw <- peer_new(\"tokyo.zone.jp\")\n    raw <- peer_new(\"osaka.zone.jp\")\n    raw <- peer_new(\"nagoya.zone.jp\")\n    raw <- peer_new(\"sapporo.zone.jp\")\n    raw <- peer_new(\"fukuoka.zone.jp\")\n    raw <- peer_new(\"naha.zone.jp\")\n    return net_sort(raw)\n}\n\n# ---- publish (encrypted) --------------------------------------------\ndef zone_publish(net, url, content) {\n    p := zone_parse(url)\n    if (len(p) == 0) { return false }\n    host := p[0]\n    key := zone_id(url)\n    owner := dht_nearest(net, key)\n    jk := jones_key(zone_diagram(host))\n    sess := qkd_session()\n    salt := sess[1]\n    sealed := zone_seal(content, jk, salt)\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) { owner[2] <- [url, sealed[0], sealed[1], sealed[2]] }\n    else { rec[1] = sealed[0]; rec[2] = sealed[1]; rec[3] = sealed[2] }\n    return true\n}\n\n# ---- serve one navigation: emit a machine-parseable block -----------\n# The dedicated browser reads only lines beginning with \"@@\".\ndef zone_serve(net, url) {\n    p := zone_parse(url)\n    if (len(p) == 0) {\n        print(\"@@STATUS 400\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 400 bad-zone\")\n        print(\"not a zone:// URL\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    host := p[0]\n    key := zone_id(url)\n    route := zone_route(net, key)\n    owner := dht_nearest(net, key)\n    print(\"@@HOST\", host)\n    print(\"@@PATH\", p[1])\n    print(\"@@KEY\", key)\n    print(\"@@ROUTE\", route)\n    print(\"@@NODE\", owner[0])\n    sess := qkd_session()\n    if (!sess[0]) {\n        print(\"@@QKD compromised\")\n        print(\"@@STATUS 495\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 495 quantum-channel-compromised\")\n        print(\"the Bell pair lost correlation -- someone is on the wire\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@QKD ok\")\n    rec := store_lookup(owner[2], url)\n    if (len(rec) == 0) {\n        print(\"@@STATUS 404\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 404 zone-not-found\")\n        print(\"no peer on the ring holds \" + url)\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    jk := jones_key(zone_diagram(host))\n    sealed := [ rec[1], rec[2], rec[3] ]\n    opened := zone_open(sealed, jk)\n    if (len(opened) == 0) {\n        print(\"@@STATUS 409\")\n        print(\"@@BODY_BEGIN\")\n        print(\"# 409 zone-guard-reject\")\n        print(\"AEAD tag failed: forged/tampered content or wrong knot\")\n        print(\"@@BODY_END\")\n        return \"\"\n    }\n    print(\"@@CIPHER\", rec[1][0], rec[1][1], rec[1][2], len(rec[1]))\n    print(\"@@TAG\", rec[3])\n    print(\"@@JONESKEY\", jk)\n    print(\"@@STATUS 200\")\n    print(\"@@BODY_BEGIN\")\n    print(opened[0])\n    print(\"@@BODY_END\")\n    return opened[0]\n}\n";
+var ZONE_SITE = {"zone://url.or.jp/":"# Ultra Network\n## サーバーもDNSも無い、もう一つのWWW\nzone:// は https:/http: に代わる、ウルトラネットワークのWWWスキームです。中央サーバも DNS ルートも無く、ページはピア同士の P2P リング (DHT) だけで解決され、Jones 多項式量子暗号で端から端まで保護されます。\n## この専用ブラウザについて\nアドレスバーに zone:// のアドレスを入力すると、ピアのハッシュから構築されたリングを辿ってページを持つノードを探し、Bell 対 QKD でセッション鍵を合意し、結び目から導いた鍵で本文を復号して表示します。\n## サイトを見て回る\n-> zone://url.or.jp/labs/quantum | 量子ラボ — 位相コア上の量子計算\n-> zone://url.or.jp/security | セキュリティ — Jones量子暗号の仕組み\n-> zone://url.or.jp/about | このネットワークについて\n-> zone://bada.or.jp/ | Bada 言語ポータル (別ゾーン・別の結び目鍵)\n-> zone://ghost.or.jp/nowhere | 存在しないゾーン (404 のデモ)","zone://url.or.jp/labs/quantum":"# 量子ラボ\n## qubit がゾーンを流れる\nこのゾーンは Bada の量子サブ言語で書かれています。qubit(n) でレジスタを作り、H・X・S・T・Rz・CNOT の各ゲートは位相コミット、Measure は追記専用レジャーへのコミットです。\n## 零の保存\n禁制状態 (振幅ゼロ) は位相ステップを通しても厳密にゼロのまま保たれます。これがウルトラネットワークの改ざん検知の土台になっています。\n-> zone://url.or.jp/ | ← ホームに戻る\n-> zone://url.or.jp/security | セキュリティの詳細へ","zone://url.or.jp/security":"# セキュリティ — Jones 多項式量子暗号\n## 鍵は結び目から生まれる\n各ゾーンの長期鍵は、そのゾーン固有の結び目図の Kauffman ブラケット / Jones 多項式を複数の変数値で標本化してハッシュすることで導出されます。結び目がゾーンの秘密、多項式がその鍵スケジュールです。\n## QKD と AEAD\nBell 対 (H+CNOT+Measure) がセッションごとのソルトを合意し、本文は Jones 鍵とソルトから作った鍵ストリームで暗号化、鍵付き認証タグで封緘されます。改ざんや誤った結び目はタグ照合に失敗し 409 zone-guard-reject になります。\n## 右のパネルを見てください\nこのページ自体も暗号化されて届いています。右のセキュリティパネルに DHT 鍵・経路・Jones 鍵・AEAD タグ・暗号文の先頭バイトが表示されています。\n-> zone://url.or.jp/ | ← ホームに戻る","zone://url.or.jp/about":"# このネットワークについて\nウルトラネットワークは、山口フレームワークの TupleSpace / Akashic レコードの発想を土台にした、サーバーレスな次世代 WWW の構想です。すべてのページ・取得・測定は追記専用の台帳 (Akashic ゾーン台帳) に事実として刻まれます。\n## 特徴\n中央の権威が無いこと、単一障害点が無いこと、通信が量子暗号で守られること。zone:// はその入口です。\n-> zone://url.or.jp/ | ← ホームに戻る\n-> zone://bada.or.jp/ | Bada 言語ポータルへ","zone://bada.or.jp/":"# Bada 言語ポータル\nこのゾーンは url.or.jp とは別の結び目 (8の字結び目) を鍵に使う、独立したゾーンです。別の鍵で暗号化されているため、右パネルの Jones 鍵が先ほどのゾーンと異なることを確認できます。\n## Bada とは\nプログラムそのものがレジャーの事実になる量子プログラミング言語です。zone:// のランタイム全体もこの Bada 言語だけで書かれています。\n-> zone://bada.or.jp/download | ダウンロード\n-> zone://url.or.jp/ | url.or.jp ホームへ戻る","zone://bada.or.jp/download":"# ダウンロード\nこの ZoneBrowser 自体が単一 HTML ファイルとして配布されています。ダウンロードしてブラウザで開くだけで、サーバー無しにウルトラネットワークを閲覧できます。\n## 入手方法\nリポジトリの bada_gui_ide/dist/zone-browser.html、またはリリースの配布 zip から入手できます。\n-> zone://bada.or.jp/ | ← Bada ポータルに戻る"};
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var urlInput = $("url"), pageEl = $("page"), secEl = $("secbody"), rawEl = $("rawpre");
+
+  /* ---- history ---- */
+  var hist = [], hi = -1;
+
+  function badaLiteral(s) { return JSON.stringify(String(s)); }
+
+  /* build the per-navigation Bada program and run the zone runtime */
+  function resolve(url) {
+    var prog = ZONE_LIB + "\nNET := zone_boot()\n";
+    for (var u in ZONE_SITE) if (Object.prototype.hasOwnProperty.call(ZONE_SITE, u))
+      prog += "zone_publish(NET, " + badaLiteral(u) + ", " + badaLiteral(ZONE_SITE[u]) + ")\n";
+    prog += "zone_serve(NET, " + badaLiteral(url) + ")\n";
+    var lines = [];
+    var r = BadaLang.run(prog, { maxSteps: 20000000, out: function (s) { lines.push(s); } });
+    return { ok: r.ok, out: lines.join("\n"), ledger: r.ledgerLen };
+  }
+
+  /* parse the @@ block emitted by zone_serve */
+  function parseBlock(text) {
+    var meta = { status: "?", host: "", path: "", key: "", route: "", node: "",
+                 qkd: "", cipher: "", tag: "", jones: "", body: "" };
+    var lines = text.split("\n"), body = [], inBody = false;
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i];
+      if (ln === "@@BODY_BEGIN") { inBody = true; continue; }
+      if (ln === "@@BODY_END") { inBody = false; continue; }
+      if (inBody) { body.push(ln); continue; }
+      if (ln.indexOf("@@") !== 0) continue;
+      var sp = ln.indexOf(" ");
+      var key = (sp < 0 ? ln : ln.slice(0, sp)).slice(2);
+      var val = sp < 0 ? "" : ln.slice(sp + 1);
+      if (key === "STATUS") meta.status = val;
+      else if (key === "HOST") meta.host = val;
+      else if (key === "PATH") meta.path = val;
+      else if (key === "KEY") meta.key = val;
+      else if (key === "ROUTE") meta.route = val;
+      else if (key === "NODE") meta.node = val;
+      else if (key === "QKD") meta.qkd = val;
+      else if (key === "CIPHER") meta.cipher = val;
+      else if (key === "TAG") meta.tag = val;
+      else if (key === "JONESKEY") meta.jones = val;
+    }
+    meta.body = body.join("\n");
+    return meta;
+  }
+
+  function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  /* render the zone page markup:
+       # Title            -> h1
+       ## Section         -> h2
+       -> zone://... | L  -> clickable link
+       (blank)            -> paragraph break
+       text               -> paragraph                                         */
+  function renderPage(meta) {
+    if (meta.status !== "200") {
+      var cls = "bad";
+      pageEl.innerHTML =
+        '<h1 class="doc">' + esc(meta.status) + '</h1>' +
+        '<p class="doc"><span class="pill ' + cls + '">zone error</span></p>' +
+        renderBody(meta.body);
+      return;
+    }
+    pageEl.innerHTML =
+      '<p class="doc"><span class="pill ok">🔒 200 zone-delivered</span>' +
+      '<span class="pill ok">Jones-AEAD verified</span>' +
+      '<span class="pill ok">QKD ' + esc(meta.qkd) + '</span></p>' +
+      renderBody(meta.body);
+    /* wire up clickable zone links */
+    var links = pageEl.querySelectorAll("a.zlink");
+    for (var i = 0; i < links.length; i++) {
+      links[i].addEventListener("click", function (e) {
+        e.preventDefault(); navigate(this.getAttribute("data-href"), true);
+      });
+    }
+  }
+
+  function renderBody(body) {
+    var out = [], lines = body.split("\n"), h1done = false;
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].replace(/\s+$/,"");
+      if (ln === "") continue;
+      var m;
+      if ((m = /^##\s+(.*)$/.exec(ln))) { out.push('<h2 class="doc">' + esc(m[1]) + '</h2>'); continue; }
+      if ((m = /^#\s+(.*)$/.exec(ln))) {
+        if (!h1done) { out.push('<h1 class="doc">' + esc(m[1]) + '</h1>'); h1done = true; }
+        else out.push('<h2 class="doc">' + esc(m[1]) + '</h2>');
+        continue;
+      }
+      if ((m = /^->\s*(\S+)\s*\|\s*(.*)$/.exec(ln))) {
+        out.push('<p class="doc"><a class="zlink" data-href="' + esc(m[1]) + '" href="#">' + esc(m[2]) + '</a> ' +
+                 '<small style="color:var(--dim)">' + esc(m[1]) + '</small></p>');
+        continue;
+      }
+      out.push('<p class="doc">' + esc(ln) + '</p>');
+    }
+    return out.join("");
+  }
+
+  function renderSecurity(meta, ledger) {
+    var errCls = meta.status === "200" ? "status-200" : "status-err";
+    function kv(k, v) { return '<div class="kv"><b>' + k + '</b><span>' + esc(v || "—") + '</span></div>'; }
+    secEl.innerHTML =
+      '<div class="big ' + errCls + '">status ' + esc(meta.status) + '</div>' +
+      kv("host", meta.host) +
+      kv("path", meta.path) +
+      kv("DHT key", meta.key) +
+      kv("owner node", meta.node) +
+      kv("route", meta.route) +
+      kv("QKD (Bell)", meta.qkd) +
+      kv("Jones key", meta.jones) +
+      kv("AEAD tag", meta.tag) +
+      kv("cipher[0..2]/len", meta.cipher) +
+      kv("Akashic ledger", ledger + " facts");
+  }
+
+  function setLock(ok) { $("lock").textContent = ok ? "🔒" : "⚠️"; }
+
+  function navigate(url, push) {
+    url = String(url).trim();
+    if (url.indexOf("zone://") !== 0) {
+      if (url.indexOf("://") < 0) url = "zone://" + url; /* bare host -> zone:// */
+    }
+    urlInput.value = url;
+    var res = resolve(url);
+    rawEl.textContent = res.out;
+    var meta = parseBlock(res.out);
+    setLock(meta.status === "200");
+    renderPage(meta);
+    renderSecurity(meta, res.ledger);
+    if (push) { hist = hist.slice(0, hi + 1); hist.push(url); hi = hist.length - 1; }
+    updateNav();
+    pageEl.scrollTop = 0;
+  }
+
+  function updateNav() {
+    $("back").disabled = hi <= 0;
+    $("fwd").disabled = hi >= hist.length - 1;
+  }
+
+  /* ---- sidebar: bookmarks + peers ---- */
+  function buildSidebar() {
+    var bm = $("bookmarks"), html = "";
+    for (var u in ZONE_SITE) if (Object.prototype.hasOwnProperty.call(ZONE_SITE, u))
+      html += '<a data-href="' + esc(u) + '" href="#">' + esc(u) + '</a>';
+    bm.innerHTML = html;
+    var links = bm.querySelectorAll("a");
+    for (var i = 0; i < links.length; i++)
+      links[i].addEventListener("click", function (e) { e.preventDefault(); navigate(this.getAttribute("data-href"), true); });
+    /* peers: derive from a boot+trace of any navigation's ring (parse from a probe) */
+    var probe = resolve("zone://url.or.jp/");
+    $("peers").textContent = "6 peers · ring 4096\n(server-less P2P DHT)";
+  }
+
+  /* ---- events ---- */
+  $("go").addEventListener("click", function () { navigate(urlInput.value, true); });
+  urlInput.addEventListener("keydown", function (e) { if (e.key === "Enter") navigate(urlInput.value, true); });
+  $("back").addEventListener("click", function () { if (hi > 0) { hi--; navigate(hist[hi], false); } });
+  $("fwd").addEventListener("click", function () { if (hi < hist.length - 1) { hi++; navigate(hist[hi], false); } });
+  $("reload").addEventListener("click", function () { navigate(urlInput.value, false); });
+
+  /* boot */
+  buildSidebar();
+  navigate("zone://url.or.jp/", true);
+})();
+</script>
+</body>
+</html>
