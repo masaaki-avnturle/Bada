@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#04060a" />
+<title>Ω-Suite</title>
+<style>
+  :root {
+    --bg:#04060a; --panel:#0b1220; --edge:#1a2440; --ink:#cfe0ff;
+    --muted:#7a8db3; --gold:#c8a44a; --acc:#40b8c0; --hot:#f26a4b;
+    --ok:#3ec98a; --warn:#f2c94c;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; background:var(--bg); color:var(--ink);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Hiragino Sans","Segoe UI",Roboto,sans-serif;
+    -webkit-text-size-adjust:100%; }
+  header { padding:12px 16px 8px; border-bottom:1px solid var(--edge);
+    background:linear-gradient(180deg,#060a14,#04060a); position:sticky; top:0; z-index:10; }
+  h1 { margin:0; font-size:17px; letter-spacing:.05em; color:var(--gold); }
+  .sub { color:var(--muted); font-size:11.5px; margin-top:2px; }
+  nav { display:flex; gap:6px; overflow-x:auto; padding:10px 16px 0;
+    border-bottom:1px solid var(--edge); background:#060a14;
+    position:sticky; top:60px; z-index:9; scrollbar-width:none; }
+  nav::-webkit-scrollbar { display:none; }
+  nav button { flex:0 0 auto; background:transparent; color:var(--muted);
+    border:none; border-bottom:2px solid transparent; padding:8px 10px;
+    font-size:12.5px; cursor:pointer; white-space:nowrap; }
+  nav button.on { color:var(--acc); border-bottom-color:var(--acc); }
+  main { padding:14px 16px 40px; max-width:900px; margin:0 auto; }
+  section { display:none; } section.on { display:block; }
+  .panel { background:var(--panel); border:1px solid var(--edge);
+    border-radius:10px; padding:12px; margin-bottom:12px; }
+  .panel h2 { margin:0 0 8px; font-size:12.5px; color:var(--acc);
+    letter-spacing:.06em; text-transform:uppercase; }
+  .warn { padding:9px 11px; border-radius:8px; background:#1c1508;
+    border:1px solid #5a4416; color:#f2d68e; font-size:12px; margin-bottom:12px; }
+  .warn b { color:var(--warn); }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:6px 0; }
+  label { font-size:12px; color:var(--muted); min-width:118px; }
+  input[type=range] { flex:1 1 150px; accent-color:var(--acc); min-width:120px; }
+  input[type=text], textarea { width:100%; background:#06101d; color:var(--ink);
+    border:1px solid var(--edge); border-radius:6px; padding:8px; font-size:13px;
+    font-family:inherit; }
+  button.act { background:#14315a; color:#eaf3ff; border:1px solid #2a5a9a;
+    border-radius:8px; padding:9px 14px; font-size:13px; cursor:pointer; }
+  button.act.sec { background:#0f1a2f; border-color:var(--edge); color:var(--ink); }
+  button.act:disabled { opacity:.45; cursor:not-allowed; }
+  .val { color:var(--acc); min-width:52px; text-align:right; font-variant-numeric:tabular-nums; }
+  pre { background:#050a14; border:1px solid var(--edge); border-radius:8px;
+    padding:10px; overflow-x:auto; font-size:11.5px; line-height:1.5;
+    color:#b9cdf0; white-space:pre; margin:8px 0 0; }
+  canvas { display:block; width:100%; background:#000; border-radius:8px; touch-action:none; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  th,td { text-align:right; padding:5px 6px; border-bottom:1px solid var(--edge); }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--muted); font-weight:600; }
+  .good { color:var(--ok); } .bad { color:var(--hot); }
+  .legend { font-size:11px; color:var(--muted); margin-top:6px; }
+  footer { padding:14px 16px 30px; font-size:11px; color:var(--muted);
+    border-top:1px solid var(--edge); line-height:1.7; }
+  .hero { display:grid; gap:8px; }
+  .card { background:#081020; border:1px solid var(--edge); border-radius:9px; padding:10px 12px; }
+  .card h3 { margin:0 0 3px; font-size:13px; color:var(--ink); }
+  .card p { margin:0; font-size:11.5px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ω-Suite</h1>
+  <div class="sub">Bada リポジトリの概念シミュレーション 7 種 — オフライン・依存ゼロ</div>
+</header>
+
+<nav id="nav"></nav>
+
+<main>
+  <!-- ============ ホーム ============ -->
+  <section id="s-home" class="on">
+    <div class="warn">
+      <b>すべて概念シミュレーション・非医療です。</b>
+      実在の医療機器・薬剤・治療方針とは無関係で、ここから実際の物質を作ったり
+      医療上の判断を導いたりすることはできません。研究・教育・アート目的です。
+    </div>
+    <div class="panel">
+      <h2>収録している 7 つのモデル</h2>
+      <div class="hero">
+        <div class="card"><h3>Γ 多様体エージェント</h3>
+          <p>Γ(s+1)=s·Γ(s) の漸化を注意重みに使うローカル応答エンジン。</p></div>
+        <div class="card"><h3>擬似量子VM / メビウス回路</h3>
+          <p>ノイマン型の擬似量子VM、二重被覆する仮想HDD、反ダランベルシアン場。</p></div>
+        <div class="card"><h3>臨界連鎖の防止</h3>
+          <p>分岐過程を常に未臨界 (k_eff&lt;1) に保つフィードバック制御と SCRAM。</p></div>
+        <div class="card"><h3>自己触媒連鎖と熱暴走</h3>
+          <p>質量作用則 + Arrhenius + Semenov 条件。選択性と速度のトレードオフ。</p></div>
+        <div class="card"><h3>服薬リスク重複チェッカー</h3>
+          <p>薬効クラスの重なりだけを指摘。用量・配合は一切扱いません。</p></div>
+        <div class="card"><h3>呼吸ガイドと心拍変動</h3>
+          <p>圧受容器反射の共鳴（毎分約6回）を再現するRSAシミュレータ。</p></div>
+        <div class="card"><h3>形態形成場と腫瘍動態</h3>
+          <p>Gray-Scott 分岐 + 電磁ドリフト、Gompertz 競合と適応療法。</p></div>
+      </div>
+      <div class="legend" style="margin-top:10px">
+        計算コアはリポジトリの Python 実装からの移植で、61 件の照合テストで
+        数値が一致することを確認しています。
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Γ 多様体 ============ -->
+  <section id="s-gamma">
+    <div class="panel">
+      <h2>Γ 大域的部分積分多様体</h2>
+      <div class="legend">
+        Γ(s)=∫₀^∞ t^{s-1}e^{-t}dt に部分積分を施すと大域的漸化 Γ(s+1)=s·Γ(s) が
+        得られます。この漸化を状態の重み更新に使い、softmax で注意分布を作ります。
+      </div>
+      <div class="row"><label>ステップ数</label>
+        <input type="range" id="gSteps" min="0" max="8" step="1" value="3" />
+        <span class="val" id="gStepsV">3</span></div>
+      <div class="row"><label>温度</label>
+        <input type="range" id="gTemp" min="0.5" max="5" step="0.1" value="2" />
+        <span class="val" id="gTempV">2.0</span></div>
+      <pre id="gOut"></pre>
+    </div>
+    <div class="panel">
+      <h2>質問に答える</h2>
+      <input type="text" id="gQ" placeholder="例: ガンマ関数の部分積分について教えて" />
+      <div class="row" style="margin-top:8px"><button class="act" id="gAsk">尋ねる</button></div>
+      <pre id="gAns">（質問を入力してください）</pre>
+    </div>
+  </section>
+
+  <!-- ============ 擬似量子 ============ -->
+  <section id="s-quantum">
+    <div class="panel">
+      <h2>ノイマン型 擬似量子VM</h2>
+      <div class="legend">
+        振幅レジスタと測定命令を持つ小さな仮想機械です。<b>本物の量子計算機では
+        ありません</b>（実数振幅の決定論的シミュレータ）。seed 固定で完全再現します。
+      </div>
+      <div class="row"><label>seed</label>
+        <input type="range" id="qSeed" min="1" max="200" step="1" value="42" />
+        <span class="val" id="qSeedV">42</span></div>
+      <div class="row"><button class="act" id="qRun">プログラム実行</button></div>
+      <pre id="qOut"></pre>
+    </div>
+    <div class="panel">
+      <h2>メビウス回路ハードディスク</h2>
+      <div class="legend">
+        1周で表裏が反転し、2周で元に戻る（二重被覆）。裏面ではビットが反転して読めます。
+      </div>
+      <div class="row"><button class="act" id="mRun">二重被覆を確かめる</button></div>
+      <pre id="mOut"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 臨界連鎖 ============ -->
+  <section id="s-critical">
+    <div class="panel">
+      <h2>臨界連鎖の防止シミュレーション</h2>
+      <div class="legend">
+        k_eff = ν·p_f·(1−吸収量)。k_eff &lt; 1 なら連鎖は減衰します。擬似量子VMが
+        吸収量を微調整し、人口が閾値を超えると SCRAM（全挿入）が作動します。
+      </div>
+      <div class="row"><label>世代数</label>
+        <input type="range" id="cGen" min="20" max="120" step="10" value="60" />
+        <span class="val" id="cGenV">60</span></div>
+      <div class="row"><label>外乱の中性子数</label>
+        <input type="range" id="cPert" min="0" max="100000" step="5000" value="0" />
+        <span class="val" id="cPertV">0</span></div>
+      <div class="row"><button class="act" id="cRun">実行</button></div>
+      <pre id="cOut"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 反応速度論 ============ -->
+  <section id="s-reaction">
+    <div class="panel">
+      <h2>自己触媒連鎖と選択性</h2>
+      <div class="legend">
+        χ = k₂·P·C/(k₃+2k₄·I)。目的物は 1 次 (k₃I)、副生成物は 2 次 (2k₄I²) で
+        生成されるため、<b>中間体 I を低く保つほど純度が上がる</b>反面、遅くなります。
+      </div>
+      <div class="row"><label>χ 目標値</label>
+        <input type="range" id="rChi" min="0.15" max="0.90" step="0.05" value="0.30" />
+        <span class="val" id="rChiV">0.30</span></div>
+      <div class="row"><button class="act" id="rRun">制御あり/なしを比較</button></div>
+      <div id="rTable"></div>
+      <pre id="rOut"></pre>
+    </div>
+    <div class="panel">
+      <h2>温度結合反応器（熱暴走）</h2>
+      <div class="legend">
+        Arrhenius 則で温度が反応を速め、発熱がさらに温度を上げます。Semenov 条件
+        d(発熱)/dT &gt; d(除熱)/dT が成立した時点で安定点が失われます。
+      </div>
+      <div class="row"><label>伝熱 U·A</label>
+        <input type="range" id="tUA" min="20" max="900" step="20" value="600" />
+        <span class="val" id="tUAV">600</span></div>
+      <div class="row"><button class="act" id="tRun">実行</button></div>
+      <pre id="tOut"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 服薬チェッカー ============ -->
+  <section id="s-medsafe">
+    <div class="panel">
+      <h2>服薬リスクの重複チェック</h2>
+      <div class="warn">
+        このツールは<b>重なりの指摘だけ</b>を行います。用量・配合比・服用スケジュール、
+        「この組み合わせなら安全」という判定は<b>一切出力しません</b>。安全な組み合わせを
+        決められるのは、あなたの状態を知っている主治医と薬剤師だけです。
+      </div>
+      <textarea id="mdIn" rows="5"
+        placeholder="お薬の名前を1行に1つ、または読点区切りで入力&#10;例:&#10;アムロジピン&#10;カンデサルタン"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="act" id="mdRun">チェック</button>
+        <button class="act sec" id="mdSample">例を入れる</button>
+      </div>
+      <pre id="mdOut">（お薬の名前を入力してください）</pre>
+    </div>
+  </section>
+
+  <!-- ============ 呼吸 ============ -->
+  <section id="s-breath">
+    <div class="panel">
+      <h2>呼吸ガイド</h2>
+      <div class="row">
+        <label>パターン</label>
+        <select id="bPat" style="flex:1;background:#06101d;color:var(--ink);
+          border:1px solid var(--edge);border-radius:6px;padding:7px;font-size:13px">
+          <option value="slow">ゆっくり呼吸（吸4/吐6）</option>
+          <option value="coherent">コヒーレント呼吸（吸5/吐5・毎分6回）</option>
+          <option value="box">ボックス呼吸（4/4/4/4）</option>
+          <option value="478">4-7-8呼吸（吸4/止7/吐8）</option>
+        </select>
+      </div>
+      <canvas id="bCv" height="220" style="margin-top:10px"></canvas>
+      <div class="row" style="margin-top:10px">
+        <button class="act" id="bStart">▶ 始める</button>
+        <button class="act sec" id="bStop" disabled>■ やめる</button>
+      </div>
+      <div class="legend">
+        つらければいつでも止めて、普段どおりの呼吸に戻してください。
+        息苦しさやめまいを感じたら中止を。持病がある場合は主治医にご相談ください。
+      </div>
+    </div>
+    <div class="panel">
+      <h2>圧受容器反射の共鳴</h2>
+      <div class="legend">
+        反射ループの遅れ（約5秒）が約 0.1 Hz の共鳴を生みます。呼吸回数を振ると
+        毎分6回付近で心拍変動が最大になります。
+      </div>
+      <div class="row"><button class="act" id="bSweep">共鳴曲線を計算</button></div>
+      <pre id="bOut"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 形態形成場 ============ -->
+  <section id="s-morpho">
+    <div class="panel">
+      <h2>形態形成場と電磁ドリフト</h2>
+      <canvas id="fCv" height="320"></canvas>
+      <div class="row" style="margin-top:8px">
+        <label>電磁 Ex ↔</label>
+        <input type="range" id="fEx" min="-0.05" max="0.05" step="0.005" value="0" />
+        <span class="val" id="fExV">0.000</span></div>
+      <div class="row"><label>電磁 Ey ↕</label>
+        <input type="range" id="fEy" min="-0.05" max="0.05" step="0.005" value="0" />
+        <span class="val" id="fEyV">0.000</span></div>
+      <div class="row">
+        <button class="act" id="fRun">▶ 開始</button>
+        <button class="act sec" id="fStop" disabled>⏸ 停止</button>
+        <button class="act sec" id="fReset">↺ リセット</button>
+      </div>
+      <div class="legend" id="fStat">
+        タップで種を追加できます。青=基質 u ／ 赤=活性因子 v。
+      </div>
+    </div>
+    <div class="panel">
+      <h2>腫瘍動態と治療方針</h2>
+      <div class="legend">
+        感受性 S と耐性 R が同じ収容力を奪い合います。ε は<b>用量ではなく</b>
+        感受性クローンの死亡率を 0〜1 で表した無次元パラメータです。
+      </div>
+      <div class="row"><button class="act" id="uRun">3方針を比較</button></div>
+      <div id="uTable"></div>
+      <pre id="uOut"></pre>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Ω-Suite — Bada リポジトリの概念シミュレーション集。計算コアは Python 実装からの
+  移植で、61 件の照合テストで数値一致を確認しています。<br>
+  すべて非医療・研究/教育/アート目的です。しんどさが続くときは主治医・薬剤師にご相談ください。
+  夜間は よりそいホットライン 0120-279-338（24時間・無料）。<br>
+  © 2025 Masaaki Yamaguchi · Bada / bio_medicine
+</footer>
+
+<script src="engines.js"></script>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const fmt = (x, d = 4) => Number(x).toFixed(d);
+
+// ---- タブ ------------------------------------------------------------------
+const TABS = [
+  ["home", "ホーム"], ["gamma", "Γ多様体"], ["quantum", "擬似量子"],
+  ["critical", "臨界連鎖"], ["reaction", "反応速度論"], ["medsafe", "服薬チェック"],
+  ["breath", "呼吸"], ["morpho", "形態形成場"],
+];
+const nav = $("nav");
+TABS.forEach(([id, label], i) => {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.className = i === 0 ? "on" : "";
+  b.onclick = () => {
+    document.querySelectorAll("nav button").forEach((x) => x.classList.remove("on"));
+    document.querySelectorAll("main section").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    $("s-" + id).classList.add("on");
+    if (id === "morpho") fitFieldCanvas();
+    if (id === "breath") fitBreathCanvas();
+  };
+  nav.appendChild(b);
+});
+
+function bindRange(id, decimals, onChange) {
+  const s = $(id), v = $(id + "V");
+  const apply = () => {
+    const val = parseFloat(s.value);
+    if (v) v.textContent = decimals === 0 ? String(val) : val.toFixed(decimals);
+    if (onChange) onChange(val);
+  };
+  s.addEventListener("input", apply);
+  apply();
+}
+
+// ---- Γ 多様体 ---------------------------------------------------------------
+function renderGamma() {
+  const steps = parseInt($("gSteps").value, 10);
+  const temp = parseFloat($("gTemp").value);
+  const m = new Omega.GammaManifold();
+  [["reason", 1.0], ["recall", 2.0], ["explore", 0.5]].forEach(([n, s]) => m.register(s, n));
+  for (let i = 0; i < steps; i++) m.step();
+  const dist = m.softmax(temp);
+  const lines = [
+    "Γ(s+1)=s·Γ(s) 自己検証: " + (Omega.gammaSelfCheck() ? "PASS" : "FAIL"),
+    "Γ(5) = " + fmt(Omega.gammaFn(5), 6) + "   (= 4! = 24)",
+    "",
+    `${steps} ステップ後の注意分布 (温度 ${temp.toFixed(1)}):`,
+  ];
+  m.states.forEach((st, i) => {
+    const bar = "█".repeat(Math.round(dist[i] * 30));
+    lines.push(`  ${st.label.padEnd(9)} s=${st.s.toFixed(2).padStart(5)}  ` +
+               `p=${dist[i].toFixed(3)}  ${bar}`);
+  });
+  $("gOut").textContent = lines.join("\n");
+}
+bindRange("gSteps", 0, renderGamma);
+bindRange("gTemp", 1, renderGamma);
+
+const KB = [
+  { keys: ["gamma", "ガンマ", "関数", "部分積分", "多様体", "manifold"],
+    text: "ガンマ関数 Γ(s)=∫₀^∞ t^{s-1}e^{-t}dt に部分積分を施すと大域的漸化 " +
+          "Γ(s+1)=s·Γ(s) が得られます。本エンジンはこの漸化を注意の重み更新に使います。" },
+  { keys: ["bada", "言語", "language", "omega"],
+    text: "Bada は本リポジトリの作用素環プログラミング言語で、omega_llm エンジンや " +
+          "π-softmax などの構文を持ちます。" },
+  { keys: ["agi", "chatgpt", "ai", "知能", "思考"],
+    text: "これは AGI でも ChatGPT でもありません。ローカルで動く決定論的な検索＋" +
+          "テンプレート応答エンジンで、ガンマ漸化を注意重みに用いる研究用の骨組みです。" },
+  { keys: ["hello", "hi", "こんにちは", "使い方", "help"],
+    text: "質問を入力すると、知識ベースの中からガンマ多様体上の注意重みが最大の" +
+          "エントリを根拠に応答します。" },
+];
+function scoreKB(q, k) {
+  const ql = q.toLowerCase();
+  let n = 0;
+  for (const key of k.keys) {
+    const kl = key.toLowerCase();
+    if (/^[\x00-\x7F]*$/.test(kl)) {
+      if (new RegExp("(?<![a-z0-9])" + kl + "(?![a-z0-9])").test(ql)) n++;
+    } else if (ql.includes(kl)) n++;
+  }
+  return n;
+}
+$("gAsk").onclick = () => {
+  const q = $("gQ").value.trim();
+  if (!q) { $("gAns").textContent = "（質問を入力してください）"; return; }
+  const m = new Omega.GammaManifold();
+  KB.forEach((k) => m.register(0.5 + scoreKB(q, k)));
+  for (let i = 0; i < 3; i++) m.step();
+  const dist = m.softmax(2.0);
+  const ranked = KB.map((k, i) => [k, dist[i]]).sort((a, b) => b[1] - a[1]);
+  const best = ranked[0][0];
+  const out = scoreKB(q, best) === 0
+    ? "その質問に対応する知識片が見つかりませんでした。gamma / bada / agi / 使い方 などの語を含めて試してください。"
+    : best.text;
+  const lines = ["注意分布 (ガンマ多様体 softmax):"];
+  ranked.forEach(([k, p]) => lines.push(`  p=${p.toFixed(3)}  ${k.text.slice(0, 34)}…`));
+  lines.push("", "A: " + out);
+  $("gAns").textContent = lines.join("\n");
+};
+
+// ---- 擬似量子 ---------------------------------------------------------------
+bindRange("qSeed", 0);
+$("qRun").onclick = () => {
+  const seed = parseInt($("qSeed").value, 10);
+  const vm = new Omega.PseudoQuantumVM(4, seed);
+  const prog = [["LOAD", 0, 0], ["H", 0], ["MEASURE", 0],
+                ["LOAD", 1, 1], ["X", 1], ["MEASURE", 1], ["HALT"]];
+  const out = vm.run(prog);
+  $("qOut").textContent = [
+    "プログラム:",
+    "  LOAD r0,0 ; H r0 ; MEASURE r0      ← 重ね合わせから測定",
+    "  LOAD r1,1 ; X r1 ; MEASURE r1      ← 反転すると確実に 0",
+    "  HALT",
+    "",
+    `seed=${seed} の出力ビット: [${out.join(", ")}]`,
+    "",
+    "※ 実数振幅の決定論的シミュレータであり、本物の量子計算機ではありません。",
+  ].join("\n");
+};
+$("mRun").onclick = () => {
+  const d = new Omega.MobiusDisk(8);
+  const val = 0b10101010;
+  d.write(val);
+  const b = (x) => "0b" + x.toString(2).padStart(8, "0");
+  const lines = [`セクタ0 に書き込み: ${b(val)}   面=+1（表）`];
+  d.seek(8);
+  lines.push(`1周 (8セクタ) 後: 面=${d.face > 0 ? "+1" : "-1"}  読み出し=${b(d.read())}  ← 反転`);
+  d.seek(8);
+  lines.push(`2周 後:           面=${d.face > 0 ? "+1" : "-1"}  読み出し=${b(d.read())}  ← 復帰`);
+  lines.push("", `二重被覆の判定: ${d.isOrientableReturn() ? "表に復帰 ✓" : "裏面のまま"}`);
+  $("mOut").textContent = lines.join("\n");
+};
+
+// ---- 臨界連鎖 ---------------------------------------------------------------
+bindRange("cGen", 0);
+bindRange("cPert", 0);
+$("cRun").onclick = () => {
+  const gen = parseInt($("cGen").value, 10);
+  const pert = parseInt($("cPert").value, 10);
+  const g = new Omega.CriticalGuard({}, 21);
+  g.run(gen, pert > 0 ? Math.floor(gen / 3) : -1, pert);
+  const s = g.summary();
+  const core = new Omega.ChainCore({}, 21);
+  let unguarded = core.population;
+  for (let i = 0; i < 12; i++) core.step(0);
+  $("cOut").textContent = [
+    "=== 防止制御あり ===",
+    `世代数              : ${s.generations}`,
+    `最大 k_eff          : ${fmt(s.maxKEff)}  ${s.alwaysSubcritical ? "(常に未臨界 ✓)" : "(臨界超過 ✗)"}`,
+    `最大中性子数        : ${s.maxPopulation}`,
+    `最終中性子数        : ${s.finalPopulation}`,
+    `SCRAM 作動世代数    : ${s.scramEvents}`,
+    `連鎖消滅            : ${s.extinguished ? "はい" : "いいえ"}`,
+    "",
+    "=== 比較: 防止制御なし (吸収量 0) ===",
+    `k_eff(0) = ${fmt(core.kEff(0), 3)} > 1 のため連鎖が成長`,
+    `12世代後の中性子数: ${unguarded} → ${core.population}`,
+    "",
+    "教育用の抽象モデルです。実在の炉・核物質の設計データは含みません。",
+  ].join("\n");
+};
+
+// ---- 反応速度論 -------------------------------------------------------------
+bindRange("rChi", 2);
+$("rRun").onclick = () => {
+  const chiT = parseFloat($("rChi").value);
+  const syn = new Omega.QuantumSynthesizer(
+    { chiTarget: chiT, chiMax: chiT + 0.15, steps: 3000 }, 0xbada);
+  syn.run();
+  const s = syn.summary();
+  const u = Omega.runUncontrolled(0.30, 3000);
+  $("rTable").innerHTML = `<table>
+    <tr><th>条件</th><th>収率</th><th>純度</th><th>最大 I</th><th>最大 χ</th></tr>
+    <tr><td>制御あり χ*=${chiT.toFixed(2)}</td><td>${fmt(s.yield)}</td>
+        <td>${fmt(s.purity)}</td><td>${fmt(s.maxI)}</td><td>${fmt(s.maxChi, 3)}</td></tr>
+    <tr><td>制御なし（一括投与）</td><td>${fmt(u.yield)}</td>
+        <td>${fmt(u.purity)}</td><td>${fmt(u.maxI)}</td><td>${fmt(u.maxChi, 2)}</td></tr>
+  </table>`;
+  $("rOut").textContent = [
+    `臨界未満の維持 : ${s.stayedSubcritical ? "はい ✓" : "いいえ ✗"}`,
+    `触媒 累積投与量: ${fmt(s.catalystUsed)}`,
+    `質量保存誤差   : ${s.massError.toExponential(2)}`,
+    "",
+    "χ を絞るほど中間体 I が下がり純度が上がりますが、絞りすぎると反応が",
+    "遅く時間内に終わらず収率が落ちます（内点に最適値があります）。",
+    "",
+    "収率・純度は抽象モデル上の化学量であり、薬効を示すものではありません。",
+  ].join("\n");
+};
+bindRange("tUA", 0);
+$("tRun").onclick = () => {
+  const UA = parseFloat($("tUA").value);
+  // 制御あり: χ 制御 + 比例冷却 + SCRAM
+  const rc = new Omega.ThermalReactor({}, { UA });
+  let dosed = 0, scram = false, minMargin = Infinity;
+  const budget = 0.30, vm = new Omega.PseudoQuantumVM(2, 0xbada);
+  for (let i = 0; i < 3000; i++) {
+    const excess = Math.max(0, rc.T - rc.th.Tref);
+    const Tj = Math.max(280, 295 - 2 * excess);
+    if (rc.T >= rc.th.Tscram || rc.isRunaway) scram = true;
+    let dose = 0;
+    if (!scram && rc.T < rc.th.Talarm && dosed < budget) {
+      const chi = rc.net.chainFactor();
+      if (chi < 0.45) {
+        vm.output = []; vm.halted = false;
+        const bit = vm.run([["LOAD", 0, 0], ["H", 0],
+          ["PHASE", 0, 0.8 * Math.tanh(0.30 - chi)], ["MEASURE", 0], ["HALT"]])[0];
+        dose = Math.min(bit ? 0.0020 : 0.0005, budget - dosed);
+      }
+    }
+    rc.step(dose, scram ? 280 : Tj);
+    dosed += dose;
+    minMargin = Math.min(minMargin, rc.semenovMargin());
+  }
+  // 制御なし: 一括投与・冷却固定
+  const rc2 = new Omega.ThermalReactor({}, { UA });
+  const m0 = rc2.net.mass();
+  rc2.net.s.C = 0.30;
+  let runaway = false;
+  for (let i = 0; i < 3000; i++) { rc2.step(); runaway = runaway || rc2.isRunaway; }
+  $("tOut").textContent = [
+    `伝熱係数 U·A = ${UA}`,
+    "",
+    "=== 制御あり（χ制御 + 比例冷却 + SCRAM） ===",
+    `収率        : ${fmt(rc.net.yieldFraction(1))}`,
+    `純度        : ${fmt(rc.net.purity())}`,
+    `最高温度    : ${fmt(rc.Tmax, 2)} K  ${rc.Tmax < rc.th.Talarm ? "(警報未満 ✓)" : "(警報超過 ✗)"}`,
+    `Semenov最小 : ${fmt(minMargin, 2)}  ${minMargin > 0 ? "(常に安定 ✓)" : "(暴走域 ✗)"}`,
+    `SCRAM       : ${scram ? "あり" : "なし"}`,
+    "",
+    "=== 制御なし（一括投与・冷却固定） ===",
+    `収率        : ${fmt(rc2.net.yieldFraction(m0))}`,
+    `純度        : ${fmt(rc2.net.purity())}`,
+    `最高温度    : ${fmt(rc2.Tmax, 2)} K`,
+    `熱暴走      : ${runaway ? "発生 ✗" : "なし"}`,
+    "",
+    "発熱→昇温→Arrhenius加速→さらに発熱、の正のフィードバックが熱暴走です。",
+  ].join("\n");
+};
+
+// ---- 服薬チェック -----------------------------------------------------------
+$("mdSample").onclick = () => {
+  $("mdIn").value = "アムロジピン\nカンデサルタン\nセレネース\nリスパダール";
+};
+$("mdRun").onclick = () => {
+  const names = $("mdIn").value.split(/[\n,、]/).map((s) => s.trim()).filter(Boolean);
+  if (!names.length) { $("mdOut").textContent = "（お薬の名前を入力してください）"; return; }
+  const r = Omega.checkMeds(names);
+  const L = ["=== 服薬リスク重複チェック（教育用・医療助言ではありません） ===", ""];
+  if (Object.keys(r.resolved).length) {
+    L.push("■ 判別できた薬剤と薬効クラス");
+    for (const [n, c] of Object.entries(r.resolved)) L.push(`  ・${n} → ${c}`);
+    L.push("");
+  }
+  if (Object.keys(r.brandNotes).length) {
+    L.push("■ 薬剤名ではない入力");
+    for (const [n, note] of Object.entries(r.brandNotes)) L.push(`  ・${n}: ${note}`);
+    L.push("");
+  }
+  if (r.unknown.length) {
+    L.push("■ 判別できなかった入力");
+    L.push("  " + r.unknown.join("、"));
+    L.push("  （綴りをご確認ください。評価に含まれていません）", "");
+  }
+  if (!r.findings.length) {
+    L.push("■ 重複しているリスクは見つかりませんでした。");
+    L.push("  ただしこれは『安全』を意味しません。個別の相互作用・体質・腎肝機能・");
+    L.push("  併存疾患は一切考慮していません。");
+  } else {
+    L.push("■ 重なっているリスク");
+    for (const f of r.findings) {
+      L.push(`  ${f.severity === "重大" ? "🔴" : "🟡"} [${f.severity}] ${f.label}`);
+      L.push(`       該当 ${f.drugs.length} 剤: ${f.drugs.join("、")}`);
+    }
+    if (r.hasCritical) {
+      L.push("", "  ⚠ 「重大」は重なることで生命に関わりうる作用です。");
+      L.push("    自己判断で足したり、まとめて飲んだりしないでください。");
+    }
+  }
+  L.push("", "─".repeat(52));
+  L.push("このツールができるのは『重なりの指摘』だけです。安全な組み合わせや量を");
+  L.push("決められるのは、あなたの状態を知っている主治医と薬剤師だけです。");
+  L.push("お薬手帳を持ってご相談ください。");
+  L.push("", "夜間や緊急時: よりそいホットライン 0120-279-338（24時間・無料）");
+  L.push("              いのちの電話       0570-783-556");
+  $("mdOut").textContent = L.join("\n");
+};
+
+// ---- 呼吸 -------------------------------------------------------------------
+const bCv = $("bCv"), bCtx = bCv.getContext("2d");
+let bTimer = null, bT0 = 0;
+function fitBreathCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  bCv.width = bCv.clientWidth * dpr;
+  bCv.height = 220 * dpr;
+  bCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawBreath(0);
+}
+function drawBreath(t) {
+  const p = Omega.BREATH_PATTERNS[$("bPat").value];
+  const W = bCv.clientWidth, H = 220;
+  bCtx.fillStyle = "#000"; bCtx.fillRect(0, 0, W, H);
+  const [phase, prog] = p.phaseAt(t);
+  const vol = p.lungVolume(t);
+  const cx = W / 2, cy = H / 2 + 6;
+  const rMax = Math.min(W, H) * 0.32;
+  const r = rMax * (0.35 + 0.65 * vol);
+  const grad = bCtx.createRadialGradient(cx, cy, r * 0.2, cx, cy, r);
+  grad.addColorStop(0, "rgba(64,184,192,0.85)");
+  grad.addColorStop(1, "rgba(20,49,90,0.15)");
+  bCtx.fillStyle = grad;
+  bCtx.beginPath(); bCtx.arc(cx, cy, r, 0, Math.PI * 2); bCtx.fill();
+  bCtx.strokeStyle = "#40b8c0"; bCtx.lineWidth = 2;
+  bCtx.beginPath(); bCtx.arc(cx, cy, r, 0, Math.PI * 2); bCtx.stroke();
+  const msg = { "吸う": "すーっと吸って", "止める": "そのまま",
+                "吐く": "ゆーっくり吐いて", "止める(空)": "からっぽのまま" }[phase];
+  bCtx.fillStyle = "#cfe0ff";
+  bCtx.font = "600 17px -apple-system,sans-serif";
+  bCtx.textAlign = "center";
+  bCtx.fillText(msg, cx, 26);
+  const dur = { "吸う": p.inhale, "止める": p.holdIn,
+                "吐く": p.exhale, "止める(空)": p.holdOut }[phase];
+  bCtx.fillStyle = "#7a8db3"; bCtx.font = "13px -apple-system,sans-serif";
+  bCtx.fillText(`あと ${(dur * (1 - prog)).toFixed(1)} 秒`, cx, H - 12);
+}
+$("bPat").onchange = () => { if (!bTimer) drawBreath(0); };
+$("bStart").onclick = () => {
+  bT0 = Date.now();
+  $("bStart").disabled = true; $("bStop").disabled = false;
+  bTimer = setInterval(() => drawBreath((Date.now() - bT0) / 1000), 60);
+};
+$("bStop").onclick = () => {
+  clearInterval(bTimer); bTimer = null;
+  $("bStart").disabled = false; $("bStop").disabled = true;
+  drawBreath(0);
+};
+$("bSweep").onclick = () => {
+  $("bOut").textContent = "計算中…";
+  setTimeout(() => {
+    const sim = new Omega.RSASimulator();
+    const L = ["=== パターン別の心拍変動（モデル計算値） ===",
+               "パターン           回/分   RSA振幅      SDNN"];
+    for (const p of Object.values(Omega.BREATH_PATTERNS)) {
+      const m = sim.metrics(p);
+      L.push(`  ${p.name.padEnd(12)} ${m.breathsPerMinute.toFixed(1).padStart(5)}  ` +
+             `${m.rsaAmplitude.toFixed(2).padStart(6)}bpm  ${m.sdnnMs.toFixed(2).padStart(7)}ms`);
+    }
+    const sweep = Omega.resonanceSweep();
+    const peak = sweep.reduce((a, b) => (b[1] > a[1] ? b : a));
+    const top = Math.max(...sweep.map((s) => s[1]));
+    L.push("", "=== 共鳴曲線 ===");
+    sweep.forEach(([bpm, amp], i) => {
+      const isPeak = Math.abs(bpm - peak[0]) < 1e-9;
+      if (i % 3 !== 0 && !isPeak) return;   // 間引くが、山の行は必ず出す
+      const bar = "█".repeat(Math.round(amp / top * 26));
+      L.push(`  ${bpm.toFixed(2).padStart(5)}回/分 |${bar.padEnd(26)}| ${amp.toFixed(2)}` +
+             (isPeak ? "  ← 最大" : ""));
+    });
+    L.push("", `→ 毎分 ${peak[0].toFixed(1)} 回付近で心拍変動が最大。圧受容器反射の`,
+           "  ループ遅延が生む約0.1Hzの共鳴で、コヒーレント呼吸が毎分6回に",
+           "  設定されている理由でもあります。",
+           "", "教育用の生理学モデルであり、実測値でも診断でもありません。");
+    $("bOut").textContent = L.join("\n");
+  }, 20);
+};
+
+// ---- 形態形成場 -------------------------------------------------------------
+const FN = 72;
+const fCv = $("fCv"), fCtx = fCv.getContext("2d");
+let field = new Omega.MorphogenField({ n: FN });
+let fRaf = 0, fRunning = false;
+const fImg = fCtx.createImageData(FN, FN);
+const fTmp = document.createElement("canvas");
+fTmp.width = FN; fTmp.height = FN;
+const fTmpCtx = fTmp.getContext("2d");
+
+function fitFieldCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const size = Math.min(fCv.clientWidth, 420);
+  fCv.width = size * dpr; fCv.height = size * dpr;
+  fCv.style.height = size + "px";
+  fCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  paintField();
+}
+function paintField() {
+  const d = fImg.data;
+  for (let p = 0; p < FN * FN; p++) {
+    const ui = field.u[p], vi = field.v[p];
+    const k = p * 4;
+    d[k] = Math.floor(255 * Math.min(1, vi * 1.7));
+    d[k + 1] = Math.floor(55 * (1 - ui) + 35);
+    d[k + 2] = Math.floor(255 * Math.min(1, ui * 0.85));
+    d[k + 3] = 255;
+  }
+  fTmpCtx.putImageData(fImg, 0, 0);
+  const size = fCv.clientWidth;
+  fCtx.imageSmoothingEnabled = false;
+  fCtx.drawImage(fTmp, 0, 0, size, size);
+}
+function fLoop() {
+  if (!fRunning) return;
+  for (let i = 0; i < 4; i++) field.step();
+  paintField();
+  const [cx, cy] = field.centroid();
+  $("fStat").textContent =
+    `t=${field.t.toFixed(0)}  細胞数=${field.countSpots()}  ` +
+    `重心=(${cx.toFixed(1)}, ${cy.toFixed(1)})  ` +
+    `活性因子=${field.totalActivator().toFixed(1)}`;
+  fRaf = requestAnimationFrame(fLoop);
+}
+bindRange("fEx", 3, (v) => { field.cfg.Ex = v; });
+bindRange("fEy", 3, (v) => { field.cfg.Ey = v; });
+$("fRun").onclick = () => {
+  if (field.totalActivator() === 0) field.seedSpot(4);
+  fRunning = true;
+  $("fRun").disabled = true; $("fStop").disabled = false;
+  fLoop();
+};
+$("fStop").onclick = () => {
+  fRunning = false; cancelAnimationFrame(fRaf);
+  $("fRun").disabled = false; $("fStop").disabled = true;
+};
+$("fReset").onclick = () => {
+  fRunning = false; cancelAnimationFrame(fRaf);
+  const Ex = field.cfg.Ex, Ey = field.cfg.Ey;
+  field = new Omega.MorphogenField({ n: FN, Ex, Ey });
+  $("fRun").disabled = false; $("fStop").disabled = true;
+  $("fStat").textContent = "タップで種を追加できます。青=基質 u ／ 赤=活性因子 v。";
+  paintField();
+};
+fCv.addEventListener("pointerdown", (e) => {
+  const rect = fCv.getBoundingClientRect();
+  const i = Math.floor((e.clientX - rect.left) * FN / rect.width);
+  const j = Math.floor((e.clientY - rect.top) * FN / rect.height);
+  field.seedSpot(3, i, j);
+  paintField();
+});
+
+$("uRun").onclick = () => {
+  $("uOut").textContent = "計算中…";
+  setTimeout(() => {
+    const res = Omega.comparePolicies();
+    let html = `<table><tr><th>方針</th><th>最終腫瘍量</th><th>耐性割合</th>
+      <th>進行まで</th><th>停滞</th><th>治療割合</th></tr>`;
+    for (const [name, s] of Object.entries(res)) {
+      const ttp = Number.isFinite(s.timeToProgression)
+        ? s.timeToProgression.toFixed(1) : "達せず";
+      html += `<tr><td>${name}</td><td>${s.finalTotal.toFixed(1)}</td>
+        <td>${(s.resistantFraction * 100).toFixed(1)}%</td><td>${ttp}</td>
+        <td class="${s.stalled ? "good" : "bad"}">${s.stalled ? "はい ✓" : "いいえ"}</td>
+        <td>${(s.treatmentFraction * 100).toFixed(0)}%</td></tr>`;
+    }
+    $("uTable").innerHTML = html + "</table>";
+    $("uOut").textContent = [
+      "常時最大強度では感受性クローンが消え、競合から解放された耐性クローンが",
+      "空いた席を占めて再増殖します（competitive release）。感受性クローンを",
+      "あえて残す断続的な方針では、耐性クローンが抑え込まれ腫瘍量が停滞します。",
+      "",
+      "これは適応療法 (adaptive therapy) として知られる数理的帰結です。",
+      "ε は用量ではなく無次元パラメータで、治療方針の助言ではありません。",
+    ].join("\n");
+  }, 20);
+};
+
+// ---- 初期化 -----------------------------------------------------------------
+window.addEventListener("resize", () => { fitFieldCanvas(); fitBreathCanvas(); });
+renderGamma();
+fitFieldCanvas();
+fitBreathCanvas();
+</script>
+</body>
+</html>
