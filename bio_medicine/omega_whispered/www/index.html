@@ -153,7 +153,8 @@
         <option value="pharma">薬学（薬物動態 / 薬力学 / 製剤 / 臨床）</option>
         <option value="econ">経済学（ミクロ / マクロ / 計量 / 金融 / ゲーム理論）</option>
         <option value="lex">専門英語・造語（数学 / 化学 / 物理 / 薬学 / 経済 の英語と語源）</option>
-        <option value="all">すべて（数学 + 化学・物理 + 薬学 + 経済学 + 専門英語）</option>
+        <option value="multi">ロシア語・フランス語（数学 / 物理 / 化学 / 薬学 / 経済 の専門用語）</option>
+        <option value="all">すべて（数学 + 化学・物理 + 薬学 + 経済学 + 専門英語 + 露仏）</option>
       </select>
       <label>検査モード</label>
       <select id="mode">
@@ -279,6 +280,21 @@
         出題され、他の系統の検査にも専門英語と造語の設問が混ざります。
       </p>
       <p style="font-size:13px;margin:6px 0">
+        <b>ロシア語・フランス語のウィスパードテスト</b>:
+        出題系統を「ロシア語・フランス語」にすると、<b>数学 / 物理学 / 化学 / 薬学 / 経済学</b>
+        の専門用語を<b>原語のまま</b>検査します（露 5 分野 + 仏 5 分野）。
+        瞬読ではキリル文字・フランス語がそのまま提示されます。
+        用語（<code>производная</code>=導関数、<code>сверхпроводимость</code>=超伝導、
+        <code>раствор</code>=溶液、<code>период полувыведения</code>=半減期、
+        <code>dérivée</code>、<code>liaison covalente</code>、<code>demi-vie</code>、
+        <code>taux de chômage</code>）、論文の略号（<code>ч.т.д. · и т.д. · ЛС · ВВП ·
+        C.Q.F.D. · ssi · AMM · DCI · PIB · TVA</code>）、
+        <b>空似言葉</b>（<code>expérience</code>=実験/経験、<code>рецепт</code>=処方箋に対し
+        <code>recette</code>=レシピ・収入、<code>решение</code>=解に対し <code>раствор</code>=溶液）、
+        <b>露 ⇄ 仏 の対応</b>も出題します。他の系統の検査にも、その分野に対応する
+        ロシア語・フランス語の用語が混ざります。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
         <b>化学・物理のウィスパードテスト</b>:
         出題系統を切り替えると、<b>有機化合物・半導体・超電導</b>を軸にした化学／物理の検査になります。
         記号（<code>–OH · C=O · E_g · E_F · T_c · Δ · λ_L · Φ₀</code>）、関係式の意味、
@@ -297,6 +313,7 @@
       <div class="stat"><span>薬学銀行</span><b id="s_npharm">—</b></div>
       <div class="stat"><span>経済学銀行</span><b id="s_necon">—</b></div>
       <div class="stat"><span>専門英語・造語銀行</span><b id="s_nlex">—</b></div>
+      <div class="stat"><span>ロシア語・フランス語銀行</span><b id="s_nmulti">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -373,13 +390,14 @@
 <script src="sound.js"></script>
 <script src="econ_bank.js"></script>
 <script src="lex_bank.js"></script>
+<script src="multiling_bank.js"></script>
 <script src="pdf_symbols.js"></script>
 <script src="chem_extract.js"></script>
 <script>
 "use strict";
 (function () {
   var SB = window.SymbolBank, TB = window.TermBank, CP = window.ChemPhysBank, PH = window.PharmaBank,
-      EC = window.EconBank, LX = window.LexBank,
+      EC = window.EconBank, LX = window.LexBank, ML = window.MultiLingBank,
       PS = window.PDFSymbols, CX = window.ChemExtract, FE = window.FlashEngine, SND = window.OmegaSound;
 
   /* 出題系統(数学 / 化学・物理 / 薬学 / 経済学 / 専門英語・造語)に応じて問題銀行を合成する */
@@ -392,7 +410,12 @@
       var sub = LX.SUBJECT_OF[x.field] || "all";
       return want.all || want[sub] || sub === "all";
     };
-    return { COIN: LX.COIN.filter(keep), MORPH: LX.MORPH.filter(keep) };
+    var keepML = function (x) {
+      var sub = ML.SUBJECT_OF[x.field] || "all";
+      return want.all || want[sub];
+    };
+    return { COIN: LX.COIN.filter(keep), MORPH: LX.MORPH.filter(keep),
+             FOREIGN: ML.TERMS.filter(keepML) };
   }
 
   function bank() {
@@ -409,6 +432,9 @@
     var lex = { FIELDS: LX.FIELDS, SYMBOLS: LX.SYMBOLS, CTX: LX.CTX, EQUATIONS: LX.EQUATIONS,
                 ASSOC: LX.ASSOC, TERMS: LX.TERMS, APTITUDE: LX.APTITUDE, FIELD_PROFILE: LX.FIELD_PROFILE,
                 COIN: LX.COIN, MORPH: LX.MORPH, LABELS: LX.LABELS, lex: true };
+    var multi = { FIELDS: ML.FIELDS, SYMBOLS: ML.SYMBOLS, CTX: ML.CTX, EQUATIONS: ML.EQUATIONS,
+                  ASSOC: ML.ASSOC, TERMS: ML.TERMS, APTITUDE: ML.APTITUDE, FIELD_PROFILE: ML.FIELD_PROFILE,
+                  LABELS: ML.LABELS, foreign: true };
     math.lexAdd = lexFor(["math"]); chem.lexAdd = lexFor(["chem"]);
     pharma.lexAdd = lexFor(["pharma"]); econ.lexAdd = lexFor(["econ"]);
     var out;
@@ -416,27 +442,30 @@
     else if (mode === "pharma") out = pharma;
     else if (mode === "econ") out = econ;
     else if (mode === "lex") out = lex;
-    else if (mode === "all" || mode === "both") out = merge([math, chem, pharma, econ, lex]);
+    else if (mode === "multi") out = multi;
+    else if (mode === "all" || mode === "both") out = merge([math, chem, pharma, econ, lex, multi]);
     else out = math;   /* "both" は以前の版の値 */
     if (!out.COIN) { out.COIN = (out.lexAdd || { COIN: [] }).COIN; out.MORPH = (out.lexAdd || { MORPH: [] }).MORPH; }
+    /* 各系統には、その分野に対応するロシア語・フランス語の用語を配る */
+    if (!out.FOREIGN) out.FOREIGN = (out.lexAdd || { FOREIGN: [] }).FOREIGN || [];
     return out;
   }
 
   /* 複数の銀行を 1 つに合成する */
   function merge(banks) {
     var out = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [],
-                TERMS: [], APTITUDE: [], COIN: [], MORPH: [], FIELD_PROFILE: {} };
+                TERMS: [], APTITUDE: [], COIN: [], MORPH: [], FOREIGN: [], FIELD_PROFILE: {} };
     banks.forEach(function (b) {
       ["FIELDS", "SYMBOLS", "CTX", "EQUATIONS", "ASSOC", "TERMS", "APTITUDE"].forEach(function (k) {
         out[k] = out[k].concat(b[k]);
       });
       Object.keys(b.FIELD_PROFILE).forEach(function (f) { out.FIELD_PROFILE[f] = b.FIELD_PROFILE[f]; });
     });
-    out.COIN = LX.COIN.slice(); out.MORPH = LX.MORPH.slice();
+    out.COIN = LX.COIN.slice(); out.MORPH = LX.MORPH.slice(); out.FOREIGN = ML.TERMS.slice();
     return out;
   }
   BK = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [], TERMS: [],
-         APTITUDE: [], COIN: [], MORPH: [], FIELD_PROFILE: {} };
+         APTITUDE: [], COIN: [], MORPH: [], FOREIGN: [], FIELD_PROFILE: {} };
 
   /* 設問文の言い回し。専門英語の系統では「記号 → 表記」「方程式 → 造語」に差し替える */
   function lbl(key, fallback, vars) {
@@ -635,6 +664,21 @@
   }
 
   /* 瞬読: 専門用語 — 表示された用語はどれか */
+  /* 瞬読: ロシア語・フランス語の用語 — 表示された原語はどれか */
+  function qFlashForeign(k) {
+    var pool = shuffle(foreignPool().slice());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.t].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.t; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(原語の専門用語)", lv: target.lv, field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま一瞬だけ表示された " + esc(ML.LANG_OF(target.field)) + " の専門用語は、次のどれですか。",
+      opts: opts, correct: target.t, mono: true,
+      why: target.t + " = " + target.en + "(" + target.field + ") — " + target.def
+    };
+  }
+
   function qFlashTerm(k) {
     var pool = shuffle(flashTerms());
     var shown = pool.slice(0, k), rest = pool.slice(k);
@@ -703,9 +747,11 @@
   function buildFlash(n) {
     var k = +$("k4").value, out = [];
     var hasCoin = (BK.COIN || []).filter(function (c) { return c.flashable; }).length >= 4;
+    var hasForeign = foreignPool().length >= k + 4;
     for (var i = 0; i < n; i++) {
       var r = Math.random();
-      if (r < 0.24) out.push(qFlashTerm(k));
+      if (r < 0.14 && hasForeign) out.push(qFlashForeign(k));
+      else if (r < 0.24) out.push(qFlashTerm(k));
       else if (r < 0.40) {
         /* 専門英語の系統では EQUATIONS 自体が造語なので、語基を散らす形で出す
            (方程式として散らすと答えの語がそのまま断片に現れてしまう) */
@@ -838,6 +884,70 @@
     };
   }
 
+  /* --- ロシア語・フランス語: 日本語 → 原語 --- */
+  function qForeignWord(term) {
+    var lang = ML.LANG_OF(term.field);
+    var pool = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && ML.LANG_OF(x.field) === lang;
+    }).map(function (x) { return x.t; });
+    var nears = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && x.field === term.field;
+    }).slice(0, 2).map(function (x) { return x.t; });
+    return {
+      phase: 1, kind: "外国語の専門用語(日→原語)", lv: Math.max(2, term.lv), field: term.field,
+      sym: term.en,
+      text: "この専門用語を <b>" + esc(lang) + "</b> で書くとどれですか。",
+      opts: buildOptions(term.t, nears, pool, 4), correct: term.t, mono: true,
+      why: term.t + " = " + term.en + "(" + term.field + ") — " + term.def
+    };
+  }
+
+  /* --- ロシア語・フランス語: 原語 → 日本語 --- */
+  function qForeignMean(term) {
+    var pool = ML.TERMS.filter(function (x) { return x.t !== term.t; }).map(function (x) { return x.en; });
+    var nears = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && x.field === term.field;
+    }).slice(0, 2).map(function (x) { return x.en; });
+    return {
+      phase: 1, kind: "外国語の専門用語(原語→日)", lv: Math.max(2, term.lv), field: term.field,
+      sym: term.t,
+      text: "この " + esc(ML.LANG_OF(term.field)) + " の専門用語は何を意味しますか。",
+      opts: buildOptions(term.en, nears, pool, 4), correct: term.en,
+      why: term.t + " = " + term.en + "(" + term.field + ") — " + term.def
+    };
+  }
+
+  /* --- ロシア語 ⇄ フランス語: 同じ概念の対応 --- */
+  function qForeignPair(term) {
+    var lang = ML.LANG_OF(term.field);
+    var otherLang = lang === "ロシア語" ? "フランス語" : "ロシア語";
+    var mates = ML.TERMS.filter(function (x) {
+      return x.en === term.en && ML.LANG_OF(x.field) === otherLang;
+    });
+    if (!mates.length) return qForeignMean(term);
+    var mate = mates[0];
+    var pool = ML.TERMS.filter(function (x) {
+      return x.t !== mate.t && ML.LANG_OF(x.field) === otherLang;
+    }).map(function (x) { return x.t; });
+    return {
+      phase: 1, kind: "外国語の対応(露 ⇄ 仏)", lv: Math.max(3, term.lv), field: mate.field,
+      sym: term.t,
+      text: "この " + esc(lang) + " の用語(" + esc(term.en) + ")に対応する <b>" +
+            esc(otherLang) + "</b> の用語はどれですか。",
+      opts: buildOptions(mate.t, null, pool, 4), correct: mate.t, mono: true,
+      why: term.t + "(" + lang + ") = " + mate.t + "(" + otherLang + ") = " + term.en +
+           " — " + mate.def
+    };
+  }
+
+  /* 系統に配られた外国語用語(専門用語の系統では全件) */
+  function foreignPool() {
+    var f = $("field").value, lvMax = +$("lvmax").value;
+    var all = BK.foreign ? BK.TERMS : (BK.FOREIGN || []);
+    var sc = all.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
+    return sc.length >= 5 ? sc : all;
+  }
+
   /* 瞬読: 造語の語基をバラバラに散らす → 元の造語はどれか */
   function qFlashCoin() {
     /* 借用語(語そのものが語源)や語基が 1 つのものは、断片に答えが現れるので散らせない */
@@ -886,6 +996,7 @@
     var morphs = shuffle((BK.MORPH || []).filter(inScope));
     if (morphs.length < 4) morphs = shuffle((BK.MORPH || []).slice());
     var usedTerm = {}, terms1 = shuffle(scopedTerms());
+    var foreigns = shuffle(foreignPool().slice());
     while (qs.length < n1 && k < 400) {
       k++;
       var roll = Math.random();
@@ -893,18 +1004,23 @@
         /* 語根・接辞(造語を読み解く土台) */
         var m = morphs.pop() || pick(BK.MORPH);
         qs.push(Math.random() < 0.5 ? qMorph(m) : qMorphEx(m));
-      } else if (roll < 0.32 && terms1.length >= 5) {
+      } else if (roll < 0.30 && terms1.length >= 5) {
         /* 専門英語の語彙(日 ⇄ 英) */
         var tm = terms1.find(function (x) { return !usedTerm[x.t]; }) || pick(terms1);
         usedTerm[tm.t] = 1;
         qs.push(Math.random() < 0.5 ? qTermToTrans(tm) : qTransToTerm(tm));
-      } else if (roll < 0.46 && ctxs.length && +$("lvmax").value >= 4) {
+      } else if (roll < 0.46 && foreigns.length >= 5) {
+        /* ロシア語・フランス語の専門用語 */
+        var fw = foreigns.pop() || pick(foreigns);
+        var fr = Math.random();
+        qs.push(fr < 0.4 ? qForeignMean(fw) : fr < 0.75 ? qForeignWord(fw) : qForeignPair(fw));
+      } else if (roll < 0.56 && ctxs.length && +$("lvmax").value >= 4) {
         qs.push(qContext(ctxs.pop() || pick(BK.CTX)));
       } else {
         var s = syms.find(function (x) { return !usedCh[x.ch]; });
         if (!s) { s = pick(BK.SYMBOLS.filter(inScope) || BK.SYMBOLS); if (!s) break; }
         usedCh[s.ch] = 1;
-        qs.push(roll < 0.72 ? qSymbolField(s) : qSymbolMeaning(s));
+        qs.push(roll < 0.78 ? qSymbolField(s) : qSymbolMeaning(s));
       }
     }
     qs = qs.slice(0, n1);
@@ -1449,6 +1565,8 @@
       EC.ASSOC.length + " 連想 / " + EC.TERMS.length + " 用語 (" + EC.FIELDS.length + " 分野)";
     $("s_nlex").textContent = LX.SYMBOLS.length + " 表記 / " + LX.TERMS.length + " 専門英語 / " +
       LX.COIN.length + " 造語 / " + LX.MORPH.length + " 語根 (" + LX.FIELDS.length + " 系統)";
+    $("s_nmulti").textContent = ML.TERMS.length + " 用語 / " + ML.SYMBOLS.length + " 表記 / " +
+      ML.EQUATIONS.length + " 定型表現 (" + ML.FIELDS.length + " 系統: 露 5 + 仏 5)";
     if (state.pdf) showPdf(state.pdfName || "PDF", state.pdf);   /* 系統を変えたら PDF 照合もやり直す */
   }
 

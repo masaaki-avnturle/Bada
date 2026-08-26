@@ -1,10 +1,12 @@
-# Ω-Whispered — ウィスパード適性検査（瞬読 × 数学 × 化学・物理 × 薬学）
+# Ω-Whispered — ウィスパード適性検査（瞬読 × 数学 / 化学・物理 / 薬学 / 経済学 × 専門英語・造語 × 露仏の専門用語）
 
 論文 **PDF に現れる記号・化合物**、**式が何を主張しているのか**、
 **どの分野に適性があるか**、そして **瞬読（フラッシュ）でどこまで捉えられるか** を検査する
 4 段構成の適性検査アプリです。出題系統は **数学**、
-**化学・物理（有機化合物 / 半導体 / 超電導）**、**薬学（薬物動態 / 薬力学 / 製剤 / 臨床）**
-から選べ、検査中は **電子音**が鳴ります。
+**化学・物理（有機化合物 / 半導体 / 超電導）**、**薬学（薬物動態 / 薬力学 / 製剤 / 臨床）**、
+**経済学（ミクロ / マクロ / 計量 / 金融 / ゲーム理論）**、
+**専門英語・造語（語源と語根）**、**ロシア語・フランス語の専門用語**から選べ、
+検査中は **電子音**が鳴ります。
 依存ゼロ・ブラウザ／APK／EXE／deb・AppImage で動作し、
 **PDF の解析はすべて端末内**で完結します（外部送信なし）。
 
@@ -15,7 +17,14 @@
 | **数学** | 記号 114 種・方程式 51 式・連想 20 組・専門用語 100 語 / 10 分野 |
 | **化学・物理** | 記号 67 種・関係式 33 式・連想 18 組・専門用語 50 語 / 8 分野（有機化学・半導体・超伝導・量子化学・固体物理・熱力学・電磁気・反応速度） |
 | **薬学** | 記号 51 種・関係式 26 式・連想 16 組・専門用語 46 語 / 8 分野（薬物動態・薬力学・医薬品化学・製剤学・薬理学・毒性/安全性・生化学分子標的・臨床薬学） |
-| **すべて** | 上記を合成（記号 232 種・式 110・連想 54・用語 196 / 26 分野） |
+| **経済学** | 記号 54 種・関係式 27 式・連想 14 組・専門用語 51 語 / 8 分野（ミクロ・マクロ・計量経済学・金融ファイナンス・ゲーム理論・国際経済・行動経済学・公共経済厚生） |
+| **専門英語・造語** | 学術表記 51 種・多義語 14 組・専門英語 59 語・**造語 44**・**語根接辞 26** / 6 系統（数学英語・化学英語・物理英語・薬学英語・経済英語・学術英語共通） |
+| **ロシア語・フランス語** | 専門用語 **102 語**（露 51 / 仏 51）・略号 36 種・定型表現 22・空似言葉 8 組 / 10 系統（露仏 × 数学・物理学・化学・薬学・経済学） |
+| **すべて** | 上記を合成（記号・表記 373 種・式 203・用語 408 / 50 分野） |
+
+**専門英語・造語とロシア語・フランス語の設問は、他の系統の検査にも混ざります。**
+数学の検査を選べば数学の英語・数学に関係する造語・`производная` / `dérivée` が、
+薬学を選べば薬学の英語・`период полувыведения` / `demi-vie` が出題されます。
 
 ---
 
@@ -146,6 +155,78 @@
 
 > **薬学の設問は教科書的な学習内容です。**
 > 実際の診断・処方・服薬の判断には使用できません。服薬に関することは必ず医師・薬剤師にご相談ください。
+
+### 経済学のウィスパードテスト（ミクロ / マクロ / 計量 / 金融 / ゲーム理論）
+
+| 検査 | 経済学での中身 |
+|:--|:--|
+| 記号適性 | `GDP · CPI · MC · MR · PED · MRS · NPV · WACC · β_i · VaR · OLS · IV · DID · PPP · DWL · Gini` の意味と分野 |
+| 文脈依存記号 | `K`=資本ストック/行使価格、`r`=割引率/実質利子率/相関係数、`π`=インフレ率/利潤/利得、`β`=CAPM のベータ/回帰係数/割引因子 |
+| 関係式の意味 | `GDP=C+I+G+(X−M)` · `MR=MC` · `MV=PY` · `i≈r+π^e` · `E[R_i]=R_f+β_i(E[R_m]−R_f)` · `β̂=(X'X)⁻¹X'y` |
+| **簡単な問題 → 関係する問題** | 下表 |
+| 瞬読 | 用語（機会費用・死荷重・逆選択・モラルハザード・裁定取引…）と関係式のトークンをランダム提示 |
+| 適性分野診断 | 8 分野のどこに適性があるかをプロファイル化 |
+
+| 簡単な問題 | → | 関係する専門の問題 | つながり |
+|:--|:-:|:--|:--|
+| 安くすればたくさん売れる | → | `PED = (ΔQ/Q) ÷ (ΔP/P)` | 増え方を率で測ると、値下げで総収入が増えるか減るかが決まる |
+| お金は借りると利息がつく | → | `NPV = Σ CF_t/(1+r)^t − I₀` | 「将来のお金は今より価値が低い」＝割引がファイナンスの土台 |
+| 損は得より強く感じる | → | `V(x)=x^α, −λ(−x)^β` | 参照点からの変化で評価し、損失側を λ≈2 倍で見る |
+| 卵を一つのかごに盛るな | → | `E[R_i]=R_f+β_i(E[R_m]−R_f)` | 分散で消せるリスクには報酬がつかない |
+| 中古車は買うまで当たり外れが不明 | → | 逆選択（レモン市場） | 平均品質しか払われないと良品が退出する |
+| アンケートだけでは原因はわからない | → | `E[zε]=0, Cov(z,x)≠0` | 外から来た変動を借りて内生性を断ち切る |
+
+> **経済学の設問も学習用**であり、投資判断や資産運用の助言ではありません。
+
+### 専門英語・造語のウィスパードテスト（語源と語根）
+
+| 検査 | 専門英語での中身 |
+|:--|:--|
+| 表記の意味 | `et al. · i.e. · cf. · ibid. · N.B. · iff · s.t. · w.l.o.g. · Q.E.D. · a.e. · in situ · ab initio · aq. · m.p./b.p. · ee · RCT · ITT · in vitro/in vivo/in silico · ceteris paribus · YoY · CAGR` |
+| **文脈依存の多義語** | `field`=体/場/分野、`normal`=法線/規定度/正常、`regular`=正則/定時/正規雇用、`positive`=正/陽性/実証的、`elastic`=弾性/弾力的、`derivative`=導関数/デリバティブ/誘導体、`solution`=溶液/解、`order`=位数/反応次数/桁、`potency`=力価 |
+| **造語の成り立ち** | 下表（本検査の主眼のひとつ） |
+| 語根・接辞 | `-on`（粒子）· `-ase`（酵素）· `-ose`（糖）· `-ene` · `iso-` · `homo-/hetero-` · `-morph` · `-lysis` · `-nomics` · `quasi-` · `eigen-` |
+| 瞬読 | 専門英語と、**造語を語基へ分解した断片**をランダム提示 |
+
+| 造語 | 成り立ち | 意味 |
+|:--|:--|:--|
+| `photon` | phōt-（ギ: 光）+ -on（粒子） | 電磁場の量子 |
+| `phonon` | phōnē（ギ: 音）+ -on | 格子振動の量子（photon の型を音に適用） |
+| `positron` | positive + electron | 電子の反粒子 |
+| `qubit` | quantum + bit | 量子情報の最小単位（bit 自体も binary+digit の混成語） |
+| `laser` | Light Amplification by Stimulated Emission of Radiation | 頭字語が普通名詞になった例 |
+| `entropy` | en-（中に）+ tropē（転換） | energy と語形をそろえて Clausius が命名 |
+| `isotope` | isos（等しい）+ topos（場所） | 周期表で同じ位置に入る核種 |
+| `vitamin` | vital + amine | アミンでないものが見つかり語尾の e が落ちた |
+| `eigenvalue` | eigen（独: 固有の）+ value | 独英の混成語 |
+| `algorithm` | al-Khwārizmī（人名） | 人名が普通名詞化 |
+| `stagflation` | stagnation + inflation | 停滞と物価上昇の同時発生 |
+| `econometrics` | economy + -metrics（測る） | Frisch が 1926 年に命名 |
+
+借用語（`quark` は Joyce の小説から、`nudge` は日常語から）のように**語そのものが語源**のものは、
+瞬読で断片に答えが現れてしまうため、フラッシュ出題からは自動的に除外されます。
+
+### ロシア語・フランス語のウィスパードテスト（数学 / 物理学 / 化学 / 薬学 / 経済学）
+
+出題系統を「ロシア語・フランス語」にすると、5 分野の専門用語を**原語のまま**検査します。
+瞬読ではキリル文字・フランス語がそのまま提示されます（読みはカタカナで解説に併記）。
+
+| 分野 | ロシア語 | フランス語 |
+|:--|:--|:--|
+| 数学 | `производная`（導関数）· `предел`（極限）· `множество`（集合）· `непрерывность`（連続性） | `dérivée` · `limite` · `ensemble` · `corps`（体）· `anneau`（環）· `dénombrable`（可算） |
+| 物理学 | `скорость` · `импульс`（運動量）· `сверхпроводимость`（超伝導）· `волновая функция` | `vitesse` · `quantité de mouvement` · `champ`（場）· `supraconductivité` |
+| 化学 | `раствор`（溶液）· `окисление / восстановление`（酸化/還元）· `равновесие`（平衡） | `solution aqueuse` · `liaison covalente` · `oxydoréduction` · `point de fusion` |
+| 薬学 | `лекарство` · `рецепт`（処方箋）· `период полувыведения`（半減期）· `противопоказание`（禁忌） | `médicament` · `ordonnance` · `demi-vie` · `posologie` · `contre-indication` |
+| 経済学 | `спрос / предложение`（需要/供給）· `безработица`（失業）· `равновесная цена` | `offre et demande` · `taux de chômage` · `valeur ajoutée` · `taux d'intérêt` |
+
+| 検査 | 中身 |
+|:--|:--|
+| 略号・表記 | `ч.т.д.`（＝Q.E.D.）· `и т.д.` · `т.е.` · `ЛС` · `ЖНВЛП` · `ВВП` / `C.Q.F.D.` · `ssi` · `c.-à-d.` · `AMM` · `DCI` · `PIB` · `TVA` |
+| **空似言葉** | `expérience`＝実験（英 experience とずれる）、`рецепт`＝処方箋に対し `recette`＝レシピ・収入、`решение`＝解に対し溶液は `раствор`、`actuel / актуальный`＝現在の（英 actual ではない） |
+| 定型表現の対訳 | `ч.т.д. = что и требовалось доказать` · `si et seulement si (ssi)` · `théorème des accroissements finis`（平均値の定理）· `loi de conservation de l'énergie` |
+| **露 ⇄ 仏 の対応** | 同じ概念の対を突き合わせる（20 対: 導関数・極限・運動量・超伝導・処方箋・禁忌・需要・供給・失業・金利 …） |
+| 瞬読 | 原語の用語・略号をランダム提示 |
+| 適性分野診断 | 露 5 分野 + 仏 5 分野のどこに適性があるかをプロファイル化 |
 
 ### 電子音
 
@@ -316,7 +397,7 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | プラットフォーム | 成果物 | 形式 |
 |:--|:--|:--|
 | **Android** | `omega_whispered-android` | `omega_whispered-debug.apk`（Cordova 12 / minSdk 24 / AndroidX） |
-| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.2.0-win-x64.exe`（NSIS インストーラ + portable） |
+| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.3.0-win-x64.exe`（NSIS インストーラ + portable） |
 | **Linux (Ubuntu)** | `omega_whispered-linux` | `…-linux-amd64.deb` + `…-linux-x86_64.AppImage` |
 | 任意のOS | `omega-whispered.html` | 単一ファイル版 |
 | 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
@@ -336,7 +417,7 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 |:--|:--|:--|
 | `apps` | `omega_whispered` | `all` にすると bio_medicine の 4 アプリすべてをビルド |
 | `publish_release` | `false` | `true` にすると成果物を **Release** として公開（ログイン不要でDL可） |
-| `release_tag` | `apps-v1.2.0` | 公開時のタグ名 |
+| `release_tag` | `apps-v1.3.0` | 公開時のタグ名 |
 
 - Artifacts の**ダウンロードには GitHub ログインが必要**です（保持 90 日）。
   ログイン不要で配布したい場合は `publish_release` を使うか、タグ `apps-v*` を push してください
@@ -346,13 +427,13 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 
 ```bash
 # .deb（/opt/Omega-Whispered にインストールし、デスクトップエントリとアイコンを登録）
-sudo apt install ./Omega-Whispered-1.2.0-linux-amd64.deb
+sudo apt install ./Omega-Whispered-1.3.0-linux-amd64.deb
 omega-whispered                    # またはアプリ一覧から起動
 sudo apt remove omega-whispered    # アンインストール
 
 # AppImage（インストール不要・単体実行）
-chmod +x Omega-Whispered-1.2.0-linux-x86_64.AppImage
-./Omega-Whispered-1.2.0-linux-x86_64.AppImage
+chmod +x Omega-Whispered-1.3.0-linux-x86_64.AppImage
+./Omega-Whispered-1.3.0-linux-x86_64.AppImage
 # FUSE の無い環境では: ./Omega-…AppImage --appimage-extract-and-run
 ```
 
@@ -383,8 +464,9 @@ Android Gradle Plugin が**ビルドのたびにランダムな署名鍵を生�
   CI はビルド後に `apksigner verify --print-certs` で実際の署名を照合し、
   一致しなければビルドを失敗させます。
 - `android-versionCode` を明示（規則: `major*10000 + minor*100 + patch`）し、
-  更新のたびに上げています（1.1.0 → `10100`、薬学を加えた **1.2.0** → `10200`）。
-  Windows / Linux 版もあわせて **1.2.0** です。
+  更新のたびに上げています（1.1.0 → `10100`、薬学を加えた 1.2.0 → `10200`、
+  経済学・専門英語・露仏を加えた **1.3.0** → `10300`）。
+  Windows / Linux 版もあわせて **1.3.0** です。
 
 **お使いの端末での手順**: 旧版はランダムな鍵で署名されているため、
 **一度だけ旧版をアンインストール**してから新しい APK を入れてください。
@@ -405,7 +487,7 @@ Windows 版（NSIS）と Ubuntu 版（`.deb`）はもともと署名鍵の問題
 |:--|:--|
 | Android | 一度アンインストールが必要（1.1.0 以降は不要） |
 | Windows 10/11 | インストーラを実行するだけで上書き更新 |
-| Ubuntu (.deb) | `sudo apt install ./Omega-Whispered-1.2.0-linux-amd64.deb` で更新 |
+| Ubuntu (.deb) | `sudo apt install ./Omega-Whispered-1.3.0-linux-amd64.deb` で更新 |
 | AppImage / 単一 HTML | ファイルを置き換えるだけ |
 
 #### 自分でビルドする
@@ -434,6 +516,9 @@ APK は Android SDK + Cordova 12 が必要です（CI と同じ手順は
 | `www/term_bank.js` | 数学の専門用語 100 語（意味・英名・分野・難度） |
 | `www/chem_phys_bank.js` | 化学・物理の銀行（記号 67 / 関係式 33 / 連想 18 / 用語 50 / 適性 10 / 8 分野プロファイル） |
 | `www/pharma_bank.js` | 薬学の銀行（記号 51 / 関係式 26 / 連想 16 / 用語 46 / 適性 10 / 8 分野プロファイル） |
+| `www/econ_bank.js` | 経済学の銀行（記号 54 / 関係式 27 / 連想 14 / 用語 51 / 適性 10 / 8 分野プロファイル） |
+| `www/lex_bank.js` | 専門英語・造語の銀行（学術表記 51 / 多義語 14 / 専門英語 59 / 造語 44 / 語根接辞 26 / 6 系統） |
+| `www/multiling_bank.js` | ロシア語・フランス語の銀行（専門用語 102 / 略号 36 / 定型表現 22 / 空似言葉 8 / 10 系統） |
 | `www/chem_extract.js` | PDF 本文から化学式・化学物理・薬学用語を検出（元素記号で妥当性検証・語境界つき） |
 | `www/sound.js` | 電子音エンジン（Web Audio で合成。音声ファイル不要） |
 | `www/flash.js` | 瞬読エンジン（ランダム配置バースト提示・マスク・方程式トークナイザ・ステアケース） |

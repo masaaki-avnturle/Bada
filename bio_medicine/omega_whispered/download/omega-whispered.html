@@ -160,7 +160,8 @@
         <option value="pharma">薬学（薬物動態 / 薬力学 / 製剤 / 臨床）</option>
         <option value="econ">経済学（ミクロ / マクロ / 計量 / 金融 / ゲーム理論）</option>
         <option value="lex">専門英語・造語（数学 / 化学 / 物理 / 薬学 / 経済 の英語と語源）</option>
-        <option value="all">すべて（数学 + 化学・物理 + 薬学 + 経済学 + 専門英語）</option>
+        <option value="multi">ロシア語・フランス語（数学 / 物理 / 化学 / 薬学 / 経済 の専門用語）</option>
+        <option value="all">すべて（数学 + 化学・物理 + 薬学 + 経済学 + 専門英語 + 露仏）</option>
       </select>
       <label>検査モード</label>
       <select id="mode">
@@ -286,6 +287,21 @@
         出題され、他の系統の検査にも専門英語と造語の設問が混ざります。
       </p>
       <p style="font-size:13px;margin:6px 0">
+        <b>ロシア語・フランス語のウィスパードテスト</b>:
+        出題系統を「ロシア語・フランス語」にすると、<b>数学 / 物理学 / 化学 / 薬学 / 経済学</b>
+        の専門用語を<b>原語のまま</b>検査します（露 5 分野 + 仏 5 分野）。
+        瞬読ではキリル文字・フランス語がそのまま提示されます。
+        用語（<code>производная</code>=導関数、<code>сверхпроводимость</code>=超伝導、
+        <code>раствор</code>=溶液、<code>период полувыведения</code>=半減期、
+        <code>dérivée</code>、<code>liaison covalente</code>、<code>demi-vie</code>、
+        <code>taux de chômage</code>）、論文の略号（<code>ч.т.д. · и т.д. · ЛС · ВВП ·
+        C.Q.F.D. · ssi · AMM · DCI · PIB · TVA</code>）、
+        <b>空似言葉</b>（<code>expérience</code>=実験/経験、<code>рецепт</code>=処方箋に対し
+        <code>recette</code>=レシピ・収入、<code>решение</code>=解に対し <code>раствор</code>=溶液）、
+        <b>露 ⇄ 仏 の対応</b>も出題します。他の系統の検査にも、その分野に対応する
+        ロシア語・フランス語の用語が混ざります。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
         <b>化学・物理のウィスパードテスト</b>:
         出題系統を切り替えると、<b>有機化合物・半導体・超電導</b>を軸にした化学／物理の検査になります。
         記号（<code>–OH · C=O · E_g · E_F · T_c · Δ · λ_L · Φ₀</code>）、関係式の意味、
@@ -304,6 +320,7 @@
       <div class="stat"><span>薬学銀行</span><b id="s_npharm">—</b></div>
       <div class="stat"><span>経済学銀行</span><b id="s_necon">—</b></div>
       <div class="stat"><span>専門英語・造語銀行</span><b id="s_nlex">—</b></div>
+      <div class="stat"><span>ロシア語・フランス語銀行</span><b id="s_nmulti">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -3761,6 +3778,560 @@
 
 </script>
 <script>
+/* ===== inlined: www/multiling_bank.js ===== */
+/*
+ * multiling_bank.js — ロシア語・フランス語の専門用語のウィスパード問題銀行
+ * Ω-Whispered — Masaaki Yamaguchi / Bada (bio_medicine/omega_whispered)
+ *
+ * 数学・物理学・化学・薬学・経済学の論文で使われる
+ *   (1) ロシア語・フランス語の専門用語 (TERMS: t = 原語, en = 日本語)
+ *   (2) 論文中の略号・定型表記 (SYMBOLS)
+ *   (3) 言語をまたぐと意味がずれる語・空似言葉 (CTX)
+ *   (4) 定型表現の対訳 (EQUATIONS)
+ * を収録する。TERMS の t に原語を置いてあるので、瞬読ではキリル文字・
+ * フランス語がそのまま提示される。
+ *
+ * 読みはカタカナで def に併記する。依存ゼロ。Node からも require できる。
+ */
+(function (root) {
+  "use strict";
+
+  var FIELDS = ["ロシア語・数学", "ロシア語・物理学", "ロシア語・化学", "ロシア語・薬学", "ロシア語・経済学",
+                "フランス語・数学", "フランス語・物理学", "フランス語・化学", "フランス語・薬学", "フランス語・経済学"];
+
+  /* 系統(math / chem / pharma / econ)との対応。他系統へ配るときに使う */
+  var SUBJECT_OF = {
+    "ロシア語・数学": "math", "フランス語・数学": "math",
+    "ロシア語・物理学": "chem", "フランス語・物理学": "chem",
+    "ロシア語・化学": "chem", "フランス語・化学": "chem",
+    "ロシア語・薬学": "pharma", "フランス語・薬学": "pharma",
+    "ロシア語・経済学": "econ", "フランス語・経済学": "econ"
+  };
+
+  var LANG_OF = function (f) { return f.indexOf("ロシア") === 0 ? "ロシア語" : "フランス語"; };
+
+  /* ======================= 論文中の略号・定型表記 ======================= */
+  var SYMBOLS = [
+    /* --- ロシア語 --- */
+    { ch: "ч.т.д.", ja: "証明終わり", mean: "что и требовалось доказать(チトトレボヴァロシ ドカザーチ)= Q.E.D.", field: "ロシア語・数学", lv: 3 },
+    { ch: "и т.д.", ja: "など", mean: "и так далее(イ タク ダーレエ)= etc.", field: "ロシア語・数学", lv: 1 },
+    { ch: "т.е.", ja: "すなわち", mean: "то есть(ト イェスチ)= i.e.", field: "ロシア語・数学", lv: 2 },
+    { ch: "т.к.", ja: "なぜなら", mean: "так как(タク カク)= since / because", field: "ロシア語・数学", lv: 2 },
+    { ch: "см.", ja: "参照せよ", mean: "смотри(スモトリー)= see / cf.", field: "ロシア語・数学", lv: 2 },
+    { ch: "рис.", ja: "図", mean: "рисунок(リスーノク)= figure", field: "ロシア語・物理学", lv: 1 },
+    { ch: "табл.", ja: "表", mean: "таблица(タブリーツァ)= table", field: "ロシア語・物理学", lv: 1 },
+    { ch: "ур-ние", ja: "方程式", mean: "уравнение(ウラヴネーニエ)の略記 = equation", field: "ロシア語・数学", lv: 3 },
+    { ch: "ф-ла", ja: "式", mean: "формула(フォールムラ)の略記 = formula", field: "ロシア語・数学", lv: 3 },
+    { ch: "н.у.", ja: "標準状態", mean: "нормальные условия(ノルマーリヌィエ ウスローヴィヤ)= 標準状態(0 °C, 1 atm)", field: "ロシア語・化学", lv: 3 },
+    { ch: "р-р", ja: "溶液", mean: "раствор(ラストヴォール)の略記 = solution", field: "ロシア語・化学", lv: 3 },
+    { ch: "в-во", ja: "物質", mean: "вещество(ヴェシチェストヴォー)の略記 = substance", field: "ロシア語・化学", lv: 4 },
+    { ch: "т. пл.", ja: "融点", mean: "температура плавления(テンペラトゥーラ プラヴレーニヤ)= melting point", field: "ロシア語・化学", lv: 4 },
+    { ch: "ЛС", ja: "医薬品", mean: "лекарственное средство(レカールストヴェンノエ スレードストヴォ)= drug product", field: "ロシア語・薬学", lv: 4 },
+    { ch: "ЖНВЛП", ja: "必須医薬品リスト", mean: "生命に必要不可欠な医薬品の公定リスト(価格規制の対象)", field: "ロシア語・薬学", lv: 5 },
+    { ch: "ВВП", ja: "国内総生産", mean: "валовой внутренний продукт(ヴァロヴォーイ ヴヌートレンニー プロドゥークト)= GDP", field: "ロシア語・経済学", lv: 2 },
+    { ch: "ЦБ РФ", ja: "ロシア中央銀行", mean: "Центральный банк(ツェントラーリヌィ バンク)。金融政策を担う", field: "ロシア語・経済学", lv: 3 },
+    { ch: "МРОТ", ja: "最低賃金", mean: "минимальный размер оплаты труда(最低労働報酬額)", field: "ロシア語・経済学", lv: 4 },
+
+    /* --- フランス語 --- */
+    { ch: "C.Q.F.D.", ja: "証明終わり", mean: "ce qu'il fallait démontrer(ス キル ファレ デモントレ)= Q.E.D.", field: "フランス語・数学", lv: 3 },
+    { ch: "ssi", ja: "必要十分条件", mean: "si et seulement si(シ エ スルマン シ)= if and only if", field: "フランス語・数学", lv: 3 },
+    { ch: "c.-à-d.", ja: "すなわち", mean: "c'est-à-dire(セタディール)= i.e.", field: "フランス語・数学", lv: 2 },
+    { ch: "p. ex.", ja: "たとえば", mean: "par exemple(パー エグザンプル)= e.g.", field: "フランス語・数学", lv: 1 },
+    { ch: "d'où", ja: "ゆえに", mean: "ドゥ。「そこから」= hence / therefore。導出の接続に使う", field: "フランス語・数学", lv: 2 },
+    { ch: "env.", ja: "およそ", mean: "environ(アンヴィロン)= approximately。数値の概数に添える", field: "フランス語・数学", lv: 2 },
+    { ch: "fig.", ja: "図", mean: "figure(フィギュール)", field: "フランス語・物理学", lv: 1 },
+    { ch: "tab.", ja: "表", mean: "tableau(タブロー)", field: "フランス語・物理学", lv: 1 },
+    { ch: "S.I.", ja: "国際単位系", mean: "Système International d'unités。フランス語が原語の単位系", field: "フランス語・物理学", lv: 2 },
+    { ch: "T.P.", ja: "実習", mean: "travaux pratiques(トラヴォー プラティック)= 実験実習", field: "フランス語・化学", lv: 3 },
+    { ch: "C.N.T.P.", ja: "標準温度圧力", mean: "conditions normales de température et de pression = 標準状態", field: "フランス語・化学", lv: 4 },
+    { ch: "p.f.", ja: "融点", mean: "point de fusion(ポワン ド フュジオン)= melting point", field: "フランス語・化学", lv: 3 },
+    { ch: "AMM", ja: "製造販売承認", mean: "autorisation de mise sur le marché = marketing authorisation", field: "フランス語・薬学", lv: 4 },
+    { ch: "DCI", ja: "国際一般名", mean: "dénomination commune internationale = INN(一般名)", field: "フランス語・薬学", lv: 4 },
+    { ch: "PIB", ja: "国内総生産", mean: "produit intérieur brut(プロデュイ アンテリユール ブリュ)= GDP", field: "フランス語・経済学", lv: 2 },
+    { ch: "SMIC", ja: "最低賃金", mean: "salaire minimum interprofessionnel de croissance", field: "フランス語・経済学", lv: 4 },
+    { ch: "INSEE", ja: "国立統計経済研究所", mean: "統計を作成する機関。経済指標の一次資料になる", field: "フランス語・経済学", lv: 4 },
+    { ch: "TVA", ja: "付加価値税", mean: "taxe sur la valeur ajoutée。付加価値税(VAT)はフランス発祥", field: "フランス語・経済学", lv: 3 }
+  ];
+
+  /* ============ 空似言葉・言語で意味がずれる語 ============ */
+  var CTX = [
+    { ch: "expérience", items: [
+      { field: "フランス語・物理学", mean: "実験(experiment)。英語の experience と同形だが第一義は実験" },
+      { field: "フランス語・化学", mean: "実験操作・試行" },
+      { field: "フランス語・経済学", mean: "経験・体験(expérience acquise)" },
+      { field: "フランス語・薬学", mean: "臨床での経験(expérience clinique)" }
+    ]},
+    { ch: "опыт", items: [
+      { field: "ロシア語・物理学", mean: "実験(オープィト)。experiment の意味で使う" },
+      { field: "ロシア語・化学", mean: "実験・試行" },
+      { field: "ロシア語・経済学", mean: "経験・実績" },
+      { field: "ロシア語・薬学", mean: "臨床経験" }
+    ]},
+    { ch: "actuel / актуальный", items: [
+      { field: "フランス語・経済学", mean: "現在の(actuel = current)。英語 actual(実際の)とは別" },
+      { field: "ロシア語・経済学", mean: "актуальный = 今日的な・喫緊の。英語 actual とは意味がずれる" },
+      { field: "フランス語・数学", mean: "現時点の値・現行の定義" },
+      { field: "ロシア語・数学", mean: "актуальная бесконечность = 実無限(数学の術語)" }
+    ]},
+    { ch: "sensible", items: [
+      { field: "フランス語・物理学", mean: "感度が高い(検出器が sensible)" },
+      { field: "フランス語・薬学", mean: "感受性がある(菌が抗菌薬に sensible)" },
+      { field: "フランス語・経済学", mean: "顕著な(une hausse sensible = 目立った上昇)" },
+      { field: "フランス語・化学", mean: "反応しやすい・不安定な" }
+    ]},
+    { ch: "решение / solution", items: [
+      { field: "ロシア語・数学", mean: "решение = 方程式の解" },
+      { field: "ロシア語・化学", mean: "раствор が溶液。решение は「解決」で溶液ではない" },
+      { field: "フランス語・化学", mean: "solution = 溶液" },
+      { field: "フランス語・数学", mean: "solution = 解" }
+    ]},
+    { ch: "порядок / ordre", items: [
+      { field: "ロシア語・数学", mean: "порядок = 位数・階数・順序" },
+      { field: "ロシア語・物理学", mean: "порядок величины = 桁" },
+      { field: "フランス語・数学", mean: "ordre = 位数・順序" },
+      { field: "フランス語・化学", mean: "ordre de réaction = 反応次数" }
+    ]},
+    { ch: "рецепт / recette", items: [
+      { field: "ロシア語・薬学", mean: "рецепт = 処方箋(prescription)" },
+      { field: "フランス語・薬学", mean: "ordonnance が処方箋。recette は「レシピ・収入」で処方箋ではない" },
+      { field: "フランス語・経済学", mean: "recette = 収入・売上(recettes fiscales = 税収)" },
+      { field: "ロシア語・経済学", mean: "выручка = 売上。рецепт は使わない" }
+    ]},
+    { ch: "производная / dérivée", items: [
+      { field: "ロシア語・数学", mean: "производная = 導関数" },
+      { field: "フランス語・数学", mean: "dérivée = 導関数" },
+      { field: "フランス語・経済学", mean: "produit dérivé = デリバティブ(金融派生商品)" },
+      { field: "ロシア語・化学", mean: "производное = 誘導体(化合物)" }
+    ]}
+  ];
+
+  /* ==================== 定型表現の対訳 ==================== */
+  var EQUATIONS = [
+    /* --- ロシア語 --- */
+    { eq: "ч.т.д. = что и требовалось доказать", name: "証明終わり(露)", field: "ロシア語・数学", lv: 3,
+      mean: "「示すべきことであった」。証明の終わりに置く",
+      why: "ラテン語 quod erat demonstrandum の直訳。フランス語の C.Q.F.D. と同じ構造をしている。" },
+    { eq: "тогда и только тогда, когда", name: "必要十分条件(露)", field: "ロシア語・数学", lv: 4,
+      mean: "「そのときかつそのときに限り」= if and only if",
+      why: "英語 iff、フランス語 ssi にあたる定型。数学の同値を宣言する言い方。" },
+    { eq: "предел последовательности", name: "数列の極限(露)", field: "ロシア語・数学", lv: 3,
+      mean: "предел(プレヂェール)= 極限、последовательность = 数列",
+      why: "解析の基本語彙。предельный переход で「極限移行」を表す。" },
+    { eq: "необходимо и достаточно", name: "必要かつ十分(露)", field: "ロシア語・数学", lv: 4,
+      mean: "必要条件かつ十分条件であること",
+      why: "定理の主張を述べるときの定型。フランス語では nécessaire et suffisant。" },
+    { eq: "закон сохранения энергии", name: "エネルギー保存則(露)", field: "ロシア語・物理学", lv: 2,
+      mean: "закон = 法則、сохранение = 保存、энергия = エネルギー",
+      why: "закон сохранения(保存則)は импульса(運動量)、заряда(電荷)にも同じ形で使う。" },
+    { eq: "скорость реакции", name: "反応速度(露)", field: "ロシア語・化学", lv: 2,
+      mean: "скорость(スコーロスチ)= 速度、реакция = 反応",
+      why: "скорость は物理の「速さ」と同じ語。константа скорости で速度定数。" },
+    { eq: "период полувыведения", name: "生物学的半減期(露)", field: "ロシア語・薬学", lv: 4,
+      mean: "период = 期間、полу- = 半分、выведение = 排出",
+      why: "物理の半減期は период полураспада(半崩壊)。薬学では「半分抜ける期間」と言い分ける。" },
+    { eq: "побочное действие", name: "副作用(露)", field: "ロシア語・薬学", lv: 3,
+      mean: "побочное = 副次的な、действие = 作用",
+      why: "нежелательная реакция(望まれない反応)も使う。安全性情報の基本語。" },
+    { eq: "спрос и предложение", name: "需要と供給(露)", field: "ロシア語・経済学", lv: 2,
+      mean: "спрос(スプロース)= 需要、предложение = 供給",
+      why: "предложение は「文・提案」の意味もある多義語。文脈で見分ける。" },
+    { eq: "уровень инфляции", name: "インフレ率(露)", field: "ロシア語・経済学", lv: 3,
+      mean: "уровень = 水準、инфляция = インフレーション",
+      why: "уровень безработицы なら失業率。уровень + 名詞で「〜率・水準」を作る。" },
+
+    /* --- フランス語 --- */
+    { eq: "C.Q.F.D. = ce qu'il fallait démontrer", name: "証明終わり(仏)", field: "フランス語・数学", lv: 3,
+      mean: "「示すべきであったこと」。証明の終わりに置く",
+      why: "ロシア語の ч.т.д. と同じくラテン語 Q.E.D. の直訳。三言語で構造が一致する。" },
+    { eq: "si et seulement si (ssi)", name: "必要十分条件(仏)", field: "フランス語・数学", lv: 3,
+      mean: "「かつそのときに限り」= if and only if",
+      why: "略記 ssi は英語 iff と同じ作り方(語をつなげて短縮)。" },
+    { eq: "il suffit de montrer que", name: "〜を示せば十分である(仏)", field: "フランス語・数学", lv: 4,
+      mean: "証明の方針を宣言する定型",
+      why: "il suffit(十分である)/ il faut(必要である)の対で、必要性と十分性を書き分ける。" },
+    { eq: "théorème des accroissements finis", name: "平均値の定理(仏)", field: "フランス語・数学", lv: 5,
+      mean: "accroissement = 増分、fini = 有限。「有限増分の定理」",
+      why: "英語 mean value theorem と発想が違う名前。仏語圏の教科書ではこの名で載る。" },
+    { eq: "quantité de mouvement", name: "運動量(仏)", field: "フランス語・物理学", lv: 3,
+      mean: "quantité = 量、mouvement = 運動",
+      why: "英語 momentum のようなラテン借用ではなく、意味をそのまま並べた語。" },
+    { eq: "loi de conservation de l'énergie", name: "エネルギー保存則(仏)", field: "フランス語・物理学", lv: 2,
+      mean: "loi = 法則、conservation = 保存",
+      why: "loi de … の形で法則名を作る。ロシア語の закон сохранения と同じ構造。" },
+    { eq: "vitesse de réaction", name: "反応速度(仏)", field: "フランス語・化学", lv: 2,
+      mean: "vitesse = 速度、réaction = 反応",
+      why: "constante de vitesse で速度定数。物理の「速さ」と同じ語を使う点はロシア語と同じ。" },
+    { eq: "liaison covalente", name: "共有結合(仏)", field: "フランス語・化学", lv: 3,
+      mean: "liaison = 結合、covalente = 共有の",
+      why: "liaison hydrogène(水素結合)、liaison ionique(イオン結合)と同じ型で並ぶ。" },
+    { eq: "demi-vie plasmatique", name: "血漿中半減期(仏)", field: "フランス語・薬学", lv: 4,
+      mean: "demi = 半分、vie = 寿命、plasmatique = 血漿の",
+      why: "英語 half-life の直訳的な語。物理の放射性半減期も demi-vie と言う。" },
+    { eq: "effet indésirable", name: "副作用(仏)", field: "フランス語・薬学", lv: 3,
+      mean: "effet = 作用、indésirable = 望ましくない",
+      why: "EU の規制文書で使われる公式表現。英語 adverse reaction に対応する。" },
+    { eq: "offre et demande", name: "需要と供給(仏)", field: "フランス語・経済学", lv: 2,
+      mean: "offre = 供給、demande = 需要",
+      why: "日本語や英語と語順が逆(供給が先)。loi de l'offre et de la demande で需給の法則。" },
+    { eq: "taux de chômage", name: "失業率(仏)", field: "フランス語・経済学", lv: 3,
+      mean: "taux = 率、chômage = 失業",
+      why: "taux d'intérêt(金利)、taux d'inflation(インフレ率)と同じ型。taux + de + 名詞。" }
+  ];
+
+  /* ============ 日本語/英語 → ロシア語・フランス語 の連想 ============ */
+  var ASSOC = [
+    { simple: "証明の終わりに書く記号(英: Q.E.D.)", simpleMean: "示すべきことは示された",
+      adv: "ч.т.д.", advName: "что и требовалось доказать(露)", field: "ロシア語・数学", lv: 3,
+      why: "ラテン語 quod erat demonstrandum をロシア語に直訳したもの。フランス語 C.Q.F.D. も同じ直訳。",
+      wrong: ["и т.д.", "т.е.", "см."] },
+    { simple: "「かつそのときに限り」(英: iff)", simpleMean: "同値であることの宣言",
+      adv: "si et seulement si (ssi)", advName: "必要十分条件(仏)", field: "フランス語・数学", lv: 3,
+      why: "英語 iff、ロシア語 тогда и только тогда と対応する。三言語とも「そのときかつそのときだけ」という同じ言い方。",
+      wrong: ["c'est-à-dire", "par exemple", "d'où"] },
+    { simple: "微分して得られる関数", simpleMean: "変化の速さを表す関数",
+      adv: "производная", advName: "導関数(露)", field: "ロシア語・数学", lv: 3,
+      why: "производить(生み出す)から。フランス語 dérivée も「派生したもの」で、発想は同じ。",
+      wrong: ["интеграл", "предел", "уравнение"] },
+    { simple: "エネルギーは増えも減りもしない", simpleMean: "保存される量がある",
+      adv: "loi de conservation de l'énergie", advName: "エネルギー保存則(仏)", field: "フランス語・物理学", lv: 2,
+      why: "loi de conservation(保存則)の型。ロシア語 закон сохранения も語の並びが同じ。",
+      wrong: ["quantité de mouvement", "vitesse de réaction", "liaison covalente"] },
+    { simple: "温度を上げると反応が速くなる", simpleMean: "反応の速さが変わる",
+      adv: "скорость реакции", advName: "反応速度(露)", field: "ロシア語・化学", lv: 2,
+      why: "скорость は物理の「速さ」と同じ語。константа скорости(速度定数)へつながる。",
+      wrong: ["раствор", "вещество", "давление"] },
+    { simple: "原子どうしが電子を出し合ってつながる", simpleMean: "電子を共有して結合する",
+      adv: "liaison covalente", advName: "共有結合(仏)", field: "フランス語・化学", lv: 3,
+      why: "liaison(結合)+ covalente(共有の)。liaison hydrogène / ionique と同じ型で語彙が広がる。",
+      wrong: ["solution aqueuse", "point de fusion", "vitesse de réaction"] },
+    { simple: "薬が半分になるまでの時間", simpleMean: "濃度が半減する時間",
+      adv: "период полувыведения", advName: "生物学的半減期(露)", field: "ロシア語・薬学", lv: 4,
+      why: "полу-(半分)+ выведение(排出)。放射性物質の半減期は полураспада(半崩壊)と言い分ける。",
+      wrong: ["побочное действие", "лекарственное средство", "дозировка"] },
+    { simple: "薬の望ましくない働き", simpleMean: "副作用",
+      adv: "effet indésirable", advName: "副作用(仏)", field: "フランス語・薬学", lv: 3,
+      why: "effet(作用)+ indésirable(望ましくない)。EU の規制文書の公式表現。",
+      wrong: ["demi-vie plasmatique", "ordonnance", "posologie"] },
+    { simple: "買いたい量と売りたい量", simpleMean: "需要と供給",
+      adv: "offre et demande", advName: "需要と供給(仏)", field: "フランス語・経済学", lv: 2,
+      why: "フランス語では供給(offre)が先に来る。日本語・英語と語順が逆になる点に注意。",
+      wrong: ["taux de chômage", "produit intérieur brut", "valeur ajoutée"] },
+    { simple: "国内で生み出された付加価値の合計", simpleMean: "GDP",
+      adv: "ВВП (валовой внутренний продукт)", advName: "国内総生産(露)", field: "ロシア語・経済学", lv: 3,
+      why: "валовой(粗い・総額の)+ внутренний(内部の)+ продукт(生産物)。フランス語 PIB も同じ構成。",
+      wrong: ["уровень инфляции", "спрос и предложение", "ЦБ РФ"] },
+    { simple: "物価が上がっていく割合", simpleMean: "インフレ率",
+      adv: "уровень инфляции", advName: "インフレ率(露)", field: "ロシア語・経済学", lv: 3,
+      why: "уровень(水準)+ 名詞で率を表す。уровень безработицы なら失業率。",
+      wrong: ["спрос и предложение", "ВВП", "выручка"] },
+    { simple: "働きたいのに職がない人の割合", simpleMean: "失業率",
+      adv: "taux de chômage", advName: "失業率(仏)", field: "フランス語・経済学", lv: 3,
+      why: "taux(率)+ de + 名詞。taux d'intérêt(金利)、taux d'inflation(インフレ率)と同じ作り方。",
+      wrong: ["offre et demande", "valeur ajoutée", "produit intérieur brut"] },
+    { simple: "実験のことを何と言うか(仏)", simpleMean: "experiment にあたる語",
+      adv: "expérience", advName: "実験(仏)", field: "フランス語・物理学", lv: 3,
+      why: "英語の experience と同形だが、フランス語では第一義が「実験」。空似言葉の代表例。",
+      wrong: ["expertise", "épreuve", "essai clinique"] },
+    { simple: "方程式の「解」(露)", simpleMean: "方程式を満たす値",
+      adv: "решение", advName: "解(露)", field: "ロシア語・数学", lv: 3,
+      why: "решение は「解決」でもある。化学の「溶液」は раствор で、英語 solution の二つの意味が別語になる。",
+      wrong: ["раствор", "уравнение", "предел"] }
+  ];
+
+  /* ======================= 専門用語(t = 原語) ======================= */
+  var TERMS = [
+    /* --- ロシア語・数学 --- */
+    { t: "производная", en: "導関数", field: "ロシア語・数学", lv: 3, def: "プロイズヴォードナヤ。微分して得られる関数" },
+    { t: "интеграл", en: "積分", field: "ロシア語・数学", lv: 2, def: "インテグラール。和の極限として面積などを与える" },
+    { t: "предел", en: "極限", field: "ロシア語・数学", lv: 2, def: "プレヂェール。限りなく近づく値" },
+    { t: "уравнение", en: "方程式", field: "ロシア語・数学", lv: 2, def: "ウラヴネーニエ。равный(等しい)から作られた語" },
+    { t: "множество", en: "集合", field: "ロシア語・数学", lv: 3, def: "ムノージェストヴォ。много(多い)から。теория множеств で集合論" },
+    { t: "функция", en: "関数", field: "ロシア語・数学", lv: 1, def: "フーンクツィヤ" },
+    { t: "матрица", en: "行列", field: "ロシア語・数学", lv: 3, def: "マートリツァ。собственное значение で固有値" },
+    { t: "вероятность", en: "確率", field: "ロシア語・数学", lv: 3, def: "ヴェロヤートノスチ。вероятный(ありそうな)から" },
+    { t: "доказательство", en: "証明", field: "ロシア語・数学", lv: 3, def: "ドカザーチェリストヴォ。доказать(証明する)の名詞形" },
+    { t: "теорема", en: "定理", field: "ロシア語・数学", lv: 2, def: "テオレーマ。лемма(補題)、следствие(系)と組で使う" },
+    { t: "непрерывность", en: "連続性", field: "ロシア語・数学", lv: 4, def: "ネプレルィーヴノスチ。не(否定)+ прерывать(中断する)" },
+
+    /* --- ロシア語・物理学 --- */
+    { t: "скорость", en: "速度", field: "ロシア語・物理学", lv: 1, def: "スコーロスチ。化学の反応速度にも同じ語を使う" },
+    { t: "ускорение", en: "加速度", field: "ロシア語・物理学", lv: 2, def: "ウスコレーニエ。скорость に接頭辞が付いた形" },
+    { t: "сила", en: "力", field: "ロシア語・物理学", lv: 1, def: "シーラ。сила тяжести で重力" },
+    { t: "энергия", en: "エネルギー", field: "ロシア語・物理学", lv: 1, def: "エネールギヤ" },
+    { t: "импульс", en: "運動量", field: "ロシア語・物理学", lv: 3, def: "イーンプリス。закон сохранения импульса で運動量保存則" },
+    { t: "волновая функция", en: "波動関数", field: "ロシア語・物理学", lv: 4, def: "ヴォルノヴァーヤ フーンクツィヤ。волна = 波" },
+    { t: "проводимость", en: "伝導率", field: "ロシア語・物理学", lv: 4, def: "プロヴォヂーモスチ。сверхпроводимость で超伝導" },
+    { t: "сверхпроводимость", en: "超伝導", field: "ロシア語・物理学", lv: 5, def: "スヴェルフプロヴォヂーモスチ。сверх-(超)+ проводимость(伝導)" },
+    { t: "плотность", en: "密度", field: "ロシア語・物理学", lv: 2, def: "プロートノスチ。плотность состояний で状態密度" },
+    { t: "колебание", en: "振動", field: "ロシア語・物理学", lv: 3, def: "コレバーニエ。колебания решётки で格子振動" },
+
+    /* --- ロシア語・化学 --- */
+    { t: "вещество", en: "物質", field: "ロシア語・化学", lv: 2, def: "ヴェシチェストヴォー" },
+    { t: "раствор", en: "溶液", field: "ロシア語・化学", lv: 2, def: "ラストヴォール。растворить(溶かす)から。решение(解決)とは別語" },
+    { t: "реакция", en: "反応", field: "ロシア語・化学", lv: 1, def: "レアークツィヤ" },
+    { t: "окисление", en: "酸化", field: "ロシア語・化学", lv: 3, def: "オキスレーニエ。восстановление が還元" },
+    { t: "восстановление", en: "還元", field: "ロシア語・化学", lv: 4, def: "ヴォススタノヴレーニエ。「回復」の意味もある" },
+    { t: "кислота", en: "酸", field: "ロシア語・化学", lv: 2, def: "キスロター。основание が塩基" },
+    { t: "соединение", en: "化合物", field: "ロシア語・化学", lv: 3, def: "ソエヂネーニエ。соединить(結合する)から" },
+    { t: "катализатор", en: "触媒", field: "ロシア語・化学", lv: 3, def: "カタリザートル" },
+    { t: "равновесие", en: "平衡", field: "ロシア語・化学", lv: 3, def: "ラヴノヴェーシエ。равный(等しい)+ вес(重さ)" },
+    { t: "молекулярная масса", en: "分子量", field: "ロシア語・化学", lv: 3, def: "モレクリャールナヤ マッサ" },
+
+    /* --- ロシア語・薬学 --- */
+    { t: "лекарство", en: "薬", field: "ロシア語・薬学", lv: 2, def: "レカールストヴォ。лечить(治療する)から" },
+    { t: "доза", en: "用量", field: "ロシア語・薬学", lv: 2, def: "ドーザ。дозировка で用法用量" },
+    { t: "рецепт", en: "処方箋", field: "ロシア語・薬学", lv: 3, def: "レツェープト。フランス語の recette(レシピ・収入)とは意味が違う" },
+    { t: "побочное действие", en: "副作用", field: "ロシア語・薬学", lv: 3, def: "パボーチノエ ヂェーイストヴィエ" },
+    { t: "всасывание", en: "吸収", field: "ロシア語・薬学", lv: 4, def: "フサースィヴァニエ。消化管からの吸収" },
+    { t: "выведение", en: "排泄", field: "ロシア語・薬学", lv: 4, def: "ヴィヴェヂェーニエ。период полувыведения で半減期" },
+    { t: "противопоказание", en: "禁忌", field: "ロシア語・薬学", lv: 5, def: "プロチヴォポカザーニエ。против(反対)+ показание(適応)" },
+    { t: "показание", en: "適応", field: "ロシア語・薬学", lv: 4, def: "ポカザーニエ。その薬を使ってよい病態" },
+    { t: "антибиотик", en: "抗生物質", field: "ロシア語・薬学", lv: 2, def: "アンチビオーチク" },
+    { t: "клиническое испытание", en: "臨床試験", field: "ロシア語・薬学", lv: 4, def: "クリニーチェスコエ イスピターニエ" },
+
+    /* --- ロシア語・経済学 --- */
+    { t: "спрос", en: "需要", field: "ロシア語・経済学", lv: 2, def: "スプロース。спросить(尋ねる・求める)から" },
+    { t: "предложение", en: "供給", field: "ロシア語・経済学", lv: 3, def: "プレドロジェーニエ。「文・提案」の意味もある多義語" },
+    { t: "издержки", en: "費用", field: "ロシア語・経済学", lv: 3, def: "イズヂェールジキ。предельные издержки で限界費用" },
+    { t: "прибыль", en: "利潤", field: "ロシア語・経済学", lv: 2, def: "プリーブィリ。убыток が損失" },
+    { t: "инфляция", en: "インフレーション", field: "ロシア語・経済学", lv: 2, def: "インフリャーツィヤ" },
+    { t: "безработица", en: "失業", field: "ロシア語・経済学", lv: 3, def: "ベズラボーチツァ。без(無い)+ работа(仕事)" },
+    { t: "процентная ставка", en: "金利", field: "ロシア語・経済学", lv: 3, def: "プロツェーントナヤ スターフカ" },
+    { t: "налог", en: "税", field: "ロシア語・経済学", lv: 2, def: "ナローグ。НДС で付加価値税" },
+    { t: "рынок", en: "市場", field: "ロシア語・経済学", lv: 2, def: "ルィーノク。рыночная экономика で市場経済" },
+    { t: "равновесная цена", en: "均衡価格", field: "ロシア語・経済学", lv: 4, def: "ラヴノヴェースナヤ ツェナー" },
+
+    /* --- フランス語・数学 --- */
+    { t: "dérivée", en: "導関数", field: "フランス語・数学", lv: 3, def: "デリヴェ。dériver(派生する)から" },
+    { t: "intégrale", en: "積分", field: "フランス語・数学", lv: 2, def: "アンテグラル" },
+    { t: "limite", en: "極限", field: "フランス語・数学", lv: 2, def: "リミット" },
+    { t: "ensemble", en: "集合", field: "フランス語・数学", lv: 3, def: "アンサンブル。théorie des ensembles で集合論" },
+    { t: "application", en: "写像", field: "フランス語・数学", lv: 4, def: "アプリカシオン。英語 map にあたる。「応用」の意味もある" },
+    { t: "corps", en: "体(たい)", field: "フランス語・数学", lv: 4, def: "コール。英語 field。anneau(環)、groupe(群)と組で覚える" },
+    { t: "anneau", en: "環", field: "フランス語・数学", lv: 4, def: "アノー。「指輪」が原義。英語 ring と同じ発想" },
+    { t: "démonstration", en: "証明", field: "フランス語・数学", lv: 3, def: "デモンストラシオン。preuve も使う" },
+    { t: "borné", en: "有界な", field: "フランス語・数学", lv: 4, def: "ボルネ。borne(境界)から" },
+    { t: "dénombrable", en: "可算な", field: "フランス語・数学", lv: 5, def: "デノンブラーブル。dénombrer(数え上げる)から" },
+    { t: "espace vectoriel", en: "ベクトル空間", field: "フランス語・数学", lv: 3, def: "エスパス ヴェクトリエル" },
+
+    /* --- フランス語・物理学 --- */
+    { t: "vitesse", en: "速度", field: "フランス語・物理学", lv: 1, def: "ヴィテス。化学の反応速度にも使う" },
+    { t: "accélération", en: "加速度", field: "フランス語・物理学", lv: 2, def: "アクセレラシオン" },
+    { t: "quantité de mouvement", en: "運動量", field: "フランス語・物理学", lv: 3, def: "カンティテ ド ムーヴマン。英語 momentum の言い換え" },
+    { t: "énergie", en: "エネルギー", field: "フランス語・物理学", lv: 1, def: "エネルジー" },
+    { t: "champ", en: "場", field: "フランス語・物理学", lv: 3, def: "シャン。champ magnétique で磁場。数学の「体」は corps で別語" },
+    { t: "onde", en: "波", field: "フランス語・物理学", lv: 2, def: "オンド。fonction d'onde で波動関数" },
+    { t: "rayonnement", en: "放射", field: "フランス語・物理学", lv: 4, def: "レヨンヌマン。rayon(光線)から" },
+    { t: "supraconductivité", en: "超伝導", field: "フランス語・物理学", lv: 5, def: "スュプラコンデュクティヴィテ。supra-(超)+ conductivité" },
+    { t: "pesanteur", en: "重力", field: "フランス語・物理学", lv: 3, def: "プザントゥール。gravitation も使う" },
+    { t: "rendement", en: "効率・収率", field: "フランス語・物理学", lv: 3, def: "ランドマン。化学では収率、経済では利回りも指す" },
+
+    /* --- フランス語・化学 --- */
+    { t: "solution aqueuse", en: "水溶液", field: "フランス語・化学", lv: 2, def: "ソリュシオン アクーズ" },
+    { t: "mélange", en: "混合物", field: "フランス語・化学", lv: 2, def: "メランジュ。corps pur(純物質)と対になる" },
+    { t: "liaison covalente", en: "共有結合", field: "フランス語・化学", lv: 3, def: "リエゾン コヴァラント" },
+    { t: "oxydoréduction", en: "酸化還元", field: "フランス語・化学", lv: 4, def: "オキシドレデュクシオン。oxydation と réduction の合成" },
+    { t: "acide / base", en: "酸 / 塩基", field: "フランス語・化学", lv: 2, def: "アシッド / バーズ" },
+    { t: "point de fusion", en: "融点", field: "フランス語・化学", lv: 3, def: "ポワン ド フュジオン。point d'ébullition が沸点" },
+    { t: "rendement de réaction", en: "反応収率", field: "フランス語・化学", lv: 3, def: "ランドマン ド レアクシオン" },
+    { t: "catalyseur", en: "触媒", field: "フランス語・化学", lv: 3, def: "カタリズール" },
+    { t: "équilibre chimique", en: "化学平衡", field: "フランス語・化学", lv: 3, def: "エキリーブル シミック" },
+    { t: "masse molaire", en: "モル質量", field: "フランス語・化学", lv: 3, def: "マス モレール" },
+
+    /* --- フランス語・薬学 --- */
+    { t: "médicament", en: "医薬品", field: "フランス語・薬学", lv: 2, def: "メディカマン" },
+    { t: "ordonnance", en: "処方箋", field: "フランス語・薬学", lv: 3, def: "オルドナンス。recette(レシピ・収入)ではない" },
+    { t: "posologie", en: "用法用量", field: "フランス語・薬学", lv: 4, def: "ポゾロジー。dose(用量)と投与間隔をまとめた語" },
+    { t: "effet indésirable", en: "副作用", field: "フランス語・薬学", lv: 3, def: "エフェ アンデジラーブル" },
+    { t: "biodisponibilité", en: "バイオアベイラビリティ", field: "フランス語・薬学", lv: 4, def: "ビオディスポニビリテ。全身循環に到達する割合" },
+    { t: "demi-vie", en: "半減期", field: "フランス語・薬学", lv: 3, def: "ドゥミ ヴィ。demi(半分)+ vie(寿命)" },
+    { t: "contre-indication", en: "禁忌", field: "フランス語・薬学", lv: 4, def: "コントル アンディカシオン。contre(反対)+ indication(適応)" },
+    { t: "essai clinique", en: "臨床試験", field: "フランス語・薬学", lv: 3, def: "エセ クリニック" },
+    { t: "principe actif", en: "有効成分", field: "フランス語・薬学", lv: 3, def: "プランシプ アクティフ。excipient が添加剤" },
+    { t: "voie orale", en: "経口投与", field: "フランス語・薬学", lv: 3, def: "ヴォワ オラル。voie intraveineuse で静脈内投与" },
+
+    /* --- フランス語・経済学 --- */
+    { t: "offre", en: "供給", field: "フランス語・経済学", lv: 2, def: "オフル。offre et demande で需給(供給が先)" },
+    { t: "demande", en: "需要", field: "フランス語・経済学", lv: 2, def: "ドゥマンド" },
+    { t: "coût marginal", en: "限界費用", field: "フランス語・経済学", lv: 3, def: "クー マルジナル" },
+    { t: "valeur ajoutée", en: "付加価値", field: "フランス語・経済学", lv: 3, def: "ヴァルール アジュテ。TVA(付加価値税)の由来" },
+    { t: "chômage", en: "失業", field: "フランス語・経済学", lv: 3, def: "ショマージュ。taux de chômage で失業率" },
+    { t: "croissance", en: "成長", field: "フランス語・経済学", lv: 2, def: "クロワサンス。croissance économique で経済成長" },
+    { t: "impôt", en: "税", field: "フランス語・経済学", lv: 2, def: "アンポ。impôt sur le revenu で所得税" },
+    { t: "taux d'intérêt", en: "金利", field: "フランス語・経済学", lv: 3, def: "トー ダンテレ" },
+    { t: "épargne", en: "貯蓄", field: "フランス語・経済学", lv: 3, def: "エパルニュ。investissement(投資)と対になる" },
+    { t: "concurrence", en: "競争", field: "フランス語・経済学", lv: 3, def: "コンキュランス。concurrence parfaite で完全競争" }
+  ];
+
+  /* ============================== 適性設問 ============================== */
+  var APTITUDE = [
+    { q: "原語で論文を読むとしたら、どちらに惹かれますか。", opts: [
+      { t: "ロシア語。数学・物理の古典的な文献が読みたい", w: { "ロシア語・数学": 2, "ロシア語・物理学": 2 } },
+      { t: "フランス語。数学の術語の作り方に興味がある", w: { "フランス語・数学": 2.5 } },
+      { t: "ロシア語。化学・薬学の実務文書を読みたい", w: { "ロシア語・化学": 2, "ロシア語・薬学": 1.5 } },
+      { t: "フランス語。EU の規制文書や経済統計を読みたい", w: { "フランス語・薬学": 1.5, "フランス語・経済学": 2 } }
+    ]},
+    { q: "知らない外国語の専門語に出会ったとき、どうしますか。", opts: [
+      { t: "接頭辞・語根に分けて意味を推測する", w: { "ロシア語・物理学": 2, "フランス語・化学": 1.5 } },
+      { t: "英語の対応語を探して一対一で覚える", w: { "フランス語・数学": 2, "ロシア語・数学": 1.5 } },
+      { t: "用例の文ごと覚える", w: { "フランス語・薬学": 2, "ロシア語・薬学": 1.5 } },
+      { t: "定義を数式や図に置き換える", w: { "ロシア語・数学": 2.5 } }
+    ]},
+    { q: "空似言葉(形は似ているが意味が違う語)についてどう感じますか。", opts: [
+      { t: "面白い。意味のずれ方に法則を探したい", w: { "フランス語・物理学": 2, "ロシア語・経済学": 1.5 } },
+      { t: "危険だ。必ず辞書で確認する", w: { "フランス語・薬学": 2.5 } },
+      { t: "文脈で判断できるので気にしない", w: { "ロシア語・化学": 2 } },
+      { t: "定義が数式で書いてあれば問題ない", w: { "ロシア語・数学": 2, "フランス語・数学": 1 } }
+    ]},
+    { q: "キリル文字を見たときの感覚は？", opts: [
+      { t: "読める。音を当てれば意味も見えてくる", w: { "ロシア語・物理学": 2.5, "ロシア語・数学": 1.5 } },
+      { t: "図形として覚えれば怖くない", w: { "ロシア語・化学": 2.5 } },
+      { t: "略号(ЛС, ВВП)から入るのが早い", w: { "ロシア語・薬学": 2, "ロシア語・経済学": 2 } },
+      { t: "ラテン文字の言語のほうが取り組みやすい", w: { "フランス語・数学": 2, "フランス語・経済学": 1.5 } }
+    ]},
+    { q: "術語の名前の付け方で、興味があるのは？", opts: [
+      { t: "意味をそのまま並べる作り方(quantité de mouvement)", w: { "フランス語・物理学": 3 } },
+      { t: "接頭辞を重ねる作り方(сверхпроводимость)", w: { "ロシア語・物理学": 3 } },
+      { t: "ラテン語から直訳する作り方(ч.т.д. / C.Q.F.D.)", w: { "ロシア語・数学": 1.5, "フランス語・数学": 1.5 } },
+      { t: "制度の名前がそのまま術語になる作り方(AMM, ЖНВЛП)", w: { "フランス語・薬学": 2, "ロシア語・薬学": 2 } }
+    ]},
+    { q: "薬の文書を原語で読むとしたら、まず知りたい語は？", opts: [
+      { t: "禁忌と副作用", w: { "フランス語・薬学": 2.5, "ロシア語・薬学": 1.5 } },
+      { t: "用法用量と投与経路", w: { "ロシア語・薬学": 2.5, "フランス語・薬学": 1 } },
+      { t: "有効成分と添加剤", w: { "フランス語・薬学": 2, "ロシア語・化学": 1 } },
+      { t: "承認と規制の枠組み", w: { "フランス語・薬学": 2, "ロシア語・経済学": 1 } }
+    ]},
+    { q: "経済統計を原語で見るとき、気になるのは？", opts: [
+      { t: "指標の定義(何を数えているか)", w: { "フランス語・経済学": 2.5 } },
+      { t: "発表機関と一次資料", w: { "フランス語・経済学": 2, "ロシア語・経済学": 1 } },
+      { t: "政策の名前と制度の略号", w: { "ロシア語・経済学": 2.5 } },
+      { t: "他国と比較できる形になっているか", w: { "ロシア語・経済学": 1.5, "フランス語・経済学": 1.5 } }
+    ]},
+    { q: "化学の実験手順書を原語で読むなら？", opts: [
+      { t: "条件(温度・圧力・標準状態)の表記から入る", w: { "ロシア語・化学": 2.5 } },
+      { t: "操作の動詞(溶かす・還流する)から入る", w: { "フランス語・化学": 2.5 } },
+      { t: "物質名と命名法から入る", w: { "フランス語・化学": 2, "ロシア語・化学": 1 } },
+      { t: "図表の見出しから入る", w: { "ロシア語・物理学": 1.5, "フランス語・物理学": 1.5 } }
+    ]},
+    { q: "同じ概念に言語ごとに別の名前が付いていることを知ったら？", opts: [
+      { t: "どちらの発想が自然かを比べたい", w: { "フランス語・数学": 2.5 } },
+      { t: "歴史的にどちらが先かを調べたい", w: { "ロシア語・数学": 2, "フランス語・物理学": 1 } },
+      { t: "実務で通じるほうを覚えれば十分", w: { "ロシア語・薬学": 2 } },
+      { t: "両方覚えて対応表を作りたい", w: { "ロシア語・経済学": 1.5, "フランス語・経済学": 1.5 } }
+    ]},
+    { q: "外国語の専門語を覚えるとき、効くと感じるのは？", opts: [
+      { t: "音読して音で覚える", w: { "ロシア語・物理学": 2 } },
+      { t: "語形の規則(taux de …, уровень …)で束にする", w: { "フランス語・経済学": 2, "ロシア語・経済学": 1.5 } },
+      { t: "対訳カードで一対一に覚える", w: { "フランス語・化学": 2 } },
+      { t: "実際の文書を読み流して慣れる", w: { "フランス語・薬学": 1.5, "ロシア語・薬学": 1.5 } }
+    ]}
+  ];
+
+  /* ============================== 分野プロファイル ============================== */
+  function prof(tag, think, eqs, syms, near, next) {
+    return { tag: tag, think: think, eqs: eqs, syms: syms, near: near, next: next };
+  }
+  var FIELD_PROFILE = {
+    "ロシア語・数学": prof(
+      "ロシア語で書かれた数学の語彙と論証の型",
+      "ラテン語由来の定型をロシア語に直訳した言い回しが多く、語根から意味を組み立てられる。",
+      "ч.т.д. · тогда и только тогда · необходимо и достаточно",
+      "ч.т.д. и т.д. т.е. т.к. см. ур-ние ф-ла",
+      ["ロシア語・物理学", "フランス語・数学"],
+      "略号と定型句 → 解析の基本語彙(предел・производная) → 定理の述べ方"),
+    "ロシア語・物理学": prof(
+      "ロシア語で書かれた物理の語彙",
+      "接頭辞(сверх-, у-, про-)を重ねて概念を作るため、語形から意味が読める。",
+      "закон сохранения энергии · импульс · волновая функция",
+      "рис. табл. н.у.",
+      ["ロシア語・数学", "ロシア語・化学"],
+      "力学の基本語 → 保存則の言い回し → 固体物理(сверхпроводимость)"),
+    "ロシア語・化学": prof(
+      "ロシア語で書かれた化学の語彙",
+      "実験条件と操作の語彙が中心。溶液(раствор)と解(решение)のように英語の一語が別語に分かれる。",
+      "скорость реакции · окисление / восстановление · равновесие",
+      "р-р в-во т. пл. н.у.",
+      ["ロシア語・物理学", "ロシア語・薬学"],
+      "物質と操作の語 → 反応の語彙 → 実験項の読み方"),
+    "ロシア語・薬学": prof(
+      "ロシア語で書かれた薬学・規制の語彙",
+      "против-(反対)や полу-(半分)など接頭辞で概念が対になる。制度の略号が多い。",
+      "период полувыведения · побочное действие · противопоказание",
+      "ЛС ЖНВЛП",
+      ["ロシア語・化学", "フランス語・薬学"],
+      "薬の基本語 → 薬物動態の語 → 添付文書と規制文書"),
+    "ロシア語・経済学": prof(
+      "ロシア語で書かれた経済の語彙",
+      "уровень + 名詞で「〜率」を作るなど、語形の型で語彙が広がる。",
+      "спрос и предложение · уровень инфляции · равновесная цена",
+      "ВВП ЦБ РФ МРОТ",
+      ["フランス語・経済学", "ロシア語・数学"],
+      "需給の語 → 指標名と略号 → 統計資料の読み方"),
+    "フランス語・数学": prof(
+      "フランス語で書かれた数学の語彙と論証の型",
+      "corps(体)・anneau(環)のように日常語をそのまま構造名にする。定型句が論証の骨格を作る。",
+      "C.Q.F.D. · si et seulement si · il suffit de montrer que",
+      "ssi c.-à-d. p. ex. d'où cf.",
+      ["フランス語・物理学", "ロシア語・数学"],
+      "定型句 → 代数の構造名(groupe/anneau/corps) → 解析の語彙"),
+    "フランス語・物理学": prof(
+      "フランス語で書かれた物理の語彙",
+      "意味をそのまま並べた複合語(quantité de mouvement)が多く、直訳で理解できる。",
+      "loi de conservation de l'énergie · quantité de mouvement",
+      "fig. tab. S.I.",
+      ["フランス語・化学", "フランス語・数学"],
+      "力学の語 → 場と波の語彙 → 単位系(S.I.)の記述"),
+    "フランス語・化学": prof(
+      "フランス語で書かれた化学の語彙",
+      "liaison … / point de … のような型で語彙が体系的に並ぶ。",
+      "vitesse de réaction · liaison covalente · oxydoréduction",
+      "T.P. C.N.T.P. p.f.",
+      ["フランス語・物理学", "フランス語・薬学"],
+      "物質と結合の語 → 反応と平衡 → 実験実習(T.P.)の記述"),
+    "フランス語・薬学": prof(
+      "フランス語で書かれた薬学・規制の語彙",
+      "contre-(反対)や demi-(半分)など接頭辞で対になる語が多い。EU 規制の公式表現が使われる。",
+      "demi-vie plasmatique · effet indésirable · posologie",
+      "AMM DCI",
+      ["フランス語・化学", "ロシア語・薬学"],
+      "薬の基本語 → 薬物動態の語 → 承認文書(AMM/DCI)の語彙"),
+    "フランス語・経済学": prof(
+      "フランス語で書かれた経済の語彙",
+      "taux de … の型で率を表すなど、語形の規則で語彙が束になる。付加価値税など制度語の原語でもある。",
+      "offre et demande · taux de chômage · valeur ajoutée",
+      "PIB SMIC INSEE TVA",
+      ["ロシア語・経済学", "フランス語・薬学"],
+      "需給の語 → 指標名(taux de …) → 統計機関の資料")
+  };
+
+  var API = { FIELDS: FIELDS, SYMBOLS: SYMBOLS, CTX: CTX, EQUATIONS: EQUATIONS,
+              ASSOC: ASSOC, TERMS: TERMS, APTITUDE: APTITUDE, FIELD_PROFILE: FIELD_PROFILE,
+              SUBJECT_OF: SUBJECT_OF, LANG_OF: LANG_OF,
+              LABELS: {
+                p1: "第一次検査 — 原語の表記",
+                p2: "第二次検査 — 定型表現の対訳",
+                symMean: "この論文中の略号・表記は何を意味しますか。",
+                symField: "この表記(%ja%)が使われるのは、どの言語のどの分野ですか。",
+                ctx: "<b>%field%</b> の文献でこの語が現れたとき、最も自然な訳はどれですか。",
+                eqMean: "この原語の表現は何を意味しますか。",
+                eqName: "この表現の日本語名はどれですか。",
+                assoc: "この言い方にあたる原語の表現はどれですか。",
+                assocRev: "この原語の表現に対応する、日本語での言い方はどれですか。",
+                flashSym: "いま一瞬だけ表示された略号・表記は、次のどれですか。",
+                flashTerm: "いま一瞬だけ表示された原語の専門用語は、次のどれですか。",
+                flashTermMean: "いま表示された原語の用語のうち 1 つの意味が下にあります。正しい説明はどれですか。",
+                flashEq: "いま<b>バラバラに散らして</b>表示されたのは、どの表現の断片ですか。",
+                kindSym: "略号・表記の意味", kindSymField: "表記の言語と分野", kindCtx: "空似言葉・多義語",
+                kindEqMean: "原語表現の意味", kindEqName: "原語表現の同定",
+                kindAssoc: "連想(日本語→原語)", kindAssocRev: "連想(原語→日本語)",
+                kindFlashSym: "瞬読(原語の表記)", kindFlashEq: "瞬読(原語表現バラバラ)"
+              } };
+  if (typeof module !== "undefined" && module.exports) module.exports = API;
+  root.MultiLingBank = API;
+})(typeof globalThis !== "undefined" ? globalThis : this);
+
+</script>
+<script>
 /* ===== inlined: www/pdf_symbols.js ===== */
 /*
  * pdf_symbols.js — 数学論文 PDF から「方程式の記号」を実抽出するミニ PDF パーサ
@@ -4600,7 +5171,7 @@
 "use strict";
 (function () {
   var SB = window.SymbolBank, TB = window.TermBank, CP = window.ChemPhysBank, PH = window.PharmaBank,
-      EC = window.EconBank, LX = window.LexBank,
+      EC = window.EconBank, LX = window.LexBank, ML = window.MultiLingBank,
       PS = window.PDFSymbols, CX = window.ChemExtract, FE = window.FlashEngine, SND = window.OmegaSound;
 
   /* 出題系統(数学 / 化学・物理 / 薬学 / 経済学 / 専門英語・造語)に応じて問題銀行を合成する */
@@ -4613,7 +5184,12 @@
       var sub = LX.SUBJECT_OF[x.field] || "all";
       return want.all || want[sub] || sub === "all";
     };
-    return { COIN: LX.COIN.filter(keep), MORPH: LX.MORPH.filter(keep) };
+    var keepML = function (x) {
+      var sub = ML.SUBJECT_OF[x.field] || "all";
+      return want.all || want[sub];
+    };
+    return { COIN: LX.COIN.filter(keep), MORPH: LX.MORPH.filter(keep),
+             FOREIGN: ML.TERMS.filter(keepML) };
   }
 
   function bank() {
@@ -4630,6 +5206,9 @@
     var lex = { FIELDS: LX.FIELDS, SYMBOLS: LX.SYMBOLS, CTX: LX.CTX, EQUATIONS: LX.EQUATIONS,
                 ASSOC: LX.ASSOC, TERMS: LX.TERMS, APTITUDE: LX.APTITUDE, FIELD_PROFILE: LX.FIELD_PROFILE,
                 COIN: LX.COIN, MORPH: LX.MORPH, LABELS: LX.LABELS, lex: true };
+    var multi = { FIELDS: ML.FIELDS, SYMBOLS: ML.SYMBOLS, CTX: ML.CTX, EQUATIONS: ML.EQUATIONS,
+                  ASSOC: ML.ASSOC, TERMS: ML.TERMS, APTITUDE: ML.APTITUDE, FIELD_PROFILE: ML.FIELD_PROFILE,
+                  LABELS: ML.LABELS, foreign: true };
     math.lexAdd = lexFor(["math"]); chem.lexAdd = lexFor(["chem"]);
     pharma.lexAdd = lexFor(["pharma"]); econ.lexAdd = lexFor(["econ"]);
     var out;
@@ -4637,27 +5216,30 @@
     else if (mode === "pharma") out = pharma;
     else if (mode === "econ") out = econ;
     else if (mode === "lex") out = lex;
-    else if (mode === "all" || mode === "both") out = merge([math, chem, pharma, econ, lex]);
+    else if (mode === "multi") out = multi;
+    else if (mode === "all" || mode === "both") out = merge([math, chem, pharma, econ, lex, multi]);
     else out = math;   /* "both" は以前の版の値 */
     if (!out.COIN) { out.COIN = (out.lexAdd || { COIN: [] }).COIN; out.MORPH = (out.lexAdd || { MORPH: [] }).MORPH; }
+    /* 各系統には、その分野に対応するロシア語・フランス語の用語を配る */
+    if (!out.FOREIGN) out.FOREIGN = (out.lexAdd || { FOREIGN: [] }).FOREIGN || [];
     return out;
   }
 
   /* 複数の銀行を 1 つに合成する */
   function merge(banks) {
     var out = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [],
-                TERMS: [], APTITUDE: [], COIN: [], MORPH: [], FIELD_PROFILE: {} };
+                TERMS: [], APTITUDE: [], COIN: [], MORPH: [], FOREIGN: [], FIELD_PROFILE: {} };
     banks.forEach(function (b) {
       ["FIELDS", "SYMBOLS", "CTX", "EQUATIONS", "ASSOC", "TERMS", "APTITUDE"].forEach(function (k) {
         out[k] = out[k].concat(b[k]);
       });
       Object.keys(b.FIELD_PROFILE).forEach(function (f) { out.FIELD_PROFILE[f] = b.FIELD_PROFILE[f]; });
     });
-    out.COIN = LX.COIN.slice(); out.MORPH = LX.MORPH.slice();
+    out.COIN = LX.COIN.slice(); out.MORPH = LX.MORPH.slice(); out.FOREIGN = ML.TERMS.slice();
     return out;
   }
   BK = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [], TERMS: [],
-         APTITUDE: [], COIN: [], MORPH: [], FIELD_PROFILE: {} };
+         APTITUDE: [], COIN: [], MORPH: [], FOREIGN: [], FIELD_PROFILE: {} };
 
   /* 設問文の言い回し。専門英語の系統では「記号 → 表記」「方程式 → 造語」に差し替える */
   function lbl(key, fallback, vars) {
@@ -4856,6 +5438,21 @@
   }
 
   /* 瞬読: 専門用語 — 表示された用語はどれか */
+  /* 瞬読: ロシア語・フランス語の用語 — 表示された原語はどれか */
+  function qFlashForeign(k) {
+    var pool = shuffle(foreignPool().slice());
+    var shown = pool.slice(0, k), rest = pool.slice(k);
+    var target = pick(shown);
+    var opts = shuffle([target.t].concat(shuffle(rest).slice(0, 3).map(function (x) { return x.t; })));
+    return {
+      phase: 4, flash: true, kind: "瞬読(原語の専門用語)", lv: target.lv, field: target.field,
+      items: shown.map(function (x) { return x.t; }),
+      text: "いま一瞬だけ表示された " + esc(ML.LANG_OF(target.field)) + " の専門用語は、次のどれですか。",
+      opts: opts, correct: target.t, mono: true,
+      why: target.t + " = " + target.en + "(" + target.field + ") — " + target.def
+    };
+  }
+
   function qFlashTerm(k) {
     var pool = shuffle(flashTerms());
     var shown = pool.slice(0, k), rest = pool.slice(k);
@@ -4924,9 +5521,11 @@
   function buildFlash(n) {
     var k = +$("k4").value, out = [];
     var hasCoin = (BK.COIN || []).filter(function (c) { return c.flashable; }).length >= 4;
+    var hasForeign = foreignPool().length >= k + 4;
     for (var i = 0; i < n; i++) {
       var r = Math.random();
-      if (r < 0.24) out.push(qFlashTerm(k));
+      if (r < 0.14 && hasForeign) out.push(qFlashForeign(k));
+      else if (r < 0.24) out.push(qFlashTerm(k));
       else if (r < 0.40) {
         /* 専門英語の系統では EQUATIONS 自体が造語なので、語基を散らす形で出す
            (方程式として散らすと答えの語がそのまま断片に現れてしまう) */
@@ -5059,6 +5658,70 @@
     };
   }
 
+  /* --- ロシア語・フランス語: 日本語 → 原語 --- */
+  function qForeignWord(term) {
+    var lang = ML.LANG_OF(term.field);
+    var pool = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && ML.LANG_OF(x.field) === lang;
+    }).map(function (x) { return x.t; });
+    var nears = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && x.field === term.field;
+    }).slice(0, 2).map(function (x) { return x.t; });
+    return {
+      phase: 1, kind: "外国語の専門用語(日→原語)", lv: Math.max(2, term.lv), field: term.field,
+      sym: term.en,
+      text: "この専門用語を <b>" + esc(lang) + "</b> で書くとどれですか。",
+      opts: buildOptions(term.t, nears, pool, 4), correct: term.t, mono: true,
+      why: term.t + " = " + term.en + "(" + term.field + ") — " + term.def
+    };
+  }
+
+  /* --- ロシア語・フランス語: 原語 → 日本語 --- */
+  function qForeignMean(term) {
+    var pool = ML.TERMS.filter(function (x) { return x.t !== term.t; }).map(function (x) { return x.en; });
+    var nears = ML.TERMS.filter(function (x) {
+      return x.t !== term.t && x.field === term.field;
+    }).slice(0, 2).map(function (x) { return x.en; });
+    return {
+      phase: 1, kind: "外国語の専門用語(原語→日)", lv: Math.max(2, term.lv), field: term.field,
+      sym: term.t,
+      text: "この " + esc(ML.LANG_OF(term.field)) + " の専門用語は何を意味しますか。",
+      opts: buildOptions(term.en, nears, pool, 4), correct: term.en,
+      why: term.t + " = " + term.en + "(" + term.field + ") — " + term.def
+    };
+  }
+
+  /* --- ロシア語 ⇄ フランス語: 同じ概念の対応 --- */
+  function qForeignPair(term) {
+    var lang = ML.LANG_OF(term.field);
+    var otherLang = lang === "ロシア語" ? "フランス語" : "ロシア語";
+    var mates = ML.TERMS.filter(function (x) {
+      return x.en === term.en && ML.LANG_OF(x.field) === otherLang;
+    });
+    if (!mates.length) return qForeignMean(term);
+    var mate = mates[0];
+    var pool = ML.TERMS.filter(function (x) {
+      return x.t !== mate.t && ML.LANG_OF(x.field) === otherLang;
+    }).map(function (x) { return x.t; });
+    return {
+      phase: 1, kind: "外国語の対応(露 ⇄ 仏)", lv: Math.max(3, term.lv), field: mate.field,
+      sym: term.t,
+      text: "この " + esc(lang) + " の用語(" + esc(term.en) + ")に対応する <b>" +
+            esc(otherLang) + "</b> の用語はどれですか。",
+      opts: buildOptions(mate.t, null, pool, 4), correct: mate.t, mono: true,
+      why: term.t + "(" + lang + ") = " + mate.t + "(" + otherLang + ") = " + term.en +
+           " — " + mate.def
+    };
+  }
+
+  /* 系統に配られた外国語用語(専門用語の系統では全件) */
+  function foreignPool() {
+    var f = $("field").value, lvMax = +$("lvmax").value;
+    var all = BK.foreign ? BK.TERMS : (BK.FOREIGN || []);
+    var sc = all.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
+    return sc.length >= 5 ? sc : all;
+  }
+
   /* 瞬読: 造語の語基をバラバラに散らす → 元の造語はどれか */
   function qFlashCoin() {
     /* 借用語(語そのものが語源)や語基が 1 つのものは、断片に答えが現れるので散らせない */
@@ -5107,6 +5770,7 @@
     var morphs = shuffle((BK.MORPH || []).filter(inScope));
     if (morphs.length < 4) morphs = shuffle((BK.MORPH || []).slice());
     var usedTerm = {}, terms1 = shuffle(scopedTerms());
+    var foreigns = shuffle(foreignPool().slice());
     while (qs.length < n1 && k < 400) {
       k++;
       var roll = Math.random();
@@ -5114,18 +5778,23 @@
         /* 語根・接辞(造語を読み解く土台) */
         var m = morphs.pop() || pick(BK.MORPH);
         qs.push(Math.random() < 0.5 ? qMorph(m) : qMorphEx(m));
-      } else if (roll < 0.32 && terms1.length >= 5) {
+      } else if (roll < 0.30 && terms1.length >= 5) {
         /* 専門英語の語彙(日 ⇄ 英) */
         var tm = terms1.find(function (x) { return !usedTerm[x.t]; }) || pick(terms1);
         usedTerm[tm.t] = 1;
         qs.push(Math.random() < 0.5 ? qTermToTrans(tm) : qTransToTerm(tm));
-      } else if (roll < 0.46 && ctxs.length && +$("lvmax").value >= 4) {
+      } else if (roll < 0.46 && foreigns.length >= 5) {
+        /* ロシア語・フランス語の専門用語 */
+        var fw = foreigns.pop() || pick(foreigns);
+        var fr = Math.random();
+        qs.push(fr < 0.4 ? qForeignMean(fw) : fr < 0.75 ? qForeignWord(fw) : qForeignPair(fw));
+      } else if (roll < 0.56 && ctxs.length && +$("lvmax").value >= 4) {
         qs.push(qContext(ctxs.pop() || pick(BK.CTX)));
       } else {
         var s = syms.find(function (x) { return !usedCh[x.ch]; });
         if (!s) { s = pick(BK.SYMBOLS.filter(inScope) || BK.SYMBOLS); if (!s) break; }
         usedCh[s.ch] = 1;
-        qs.push(roll < 0.72 ? qSymbolField(s) : qSymbolMeaning(s));
+        qs.push(roll < 0.78 ? qSymbolField(s) : qSymbolMeaning(s));
       }
     }
     qs = qs.slice(0, n1);
@@ -5670,6 +6339,8 @@
       EC.ASSOC.length + " 連想 / " + EC.TERMS.length + " 用語 (" + EC.FIELDS.length + " 分野)";
     $("s_nlex").textContent = LX.SYMBOLS.length + " 表記 / " + LX.TERMS.length + " 専門英語 / " +
       LX.COIN.length + " 造語 / " + LX.MORPH.length + " 語根 (" + LX.FIELDS.length + " 系統)";
+    $("s_nmulti").textContent = ML.TERMS.length + " 用語 / " + ML.SYMBOLS.length + " 表記 / " +
+      ML.EQUATIONS.length + " 定型表現 (" + ML.FIELDS.length + " 系統: 露 5 + 仏 5)";
     if (state.pdf) showPdf(state.pdfName || "PDF", state.pdf);   /* 系統を変えたら PDF 照合もやり直す */
   }
 
