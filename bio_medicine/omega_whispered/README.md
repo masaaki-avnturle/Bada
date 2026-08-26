@@ -440,17 +440,29 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 
 #### いちばん簡単: Releases からダウンロードする（ログイン不要）
 
-[**→ Releases から最新版をダウンロード**](https://github.com/masaaki-avnturle/Bada/releases/latest)
+[**→ Ω apps 1.4.0 のダウンロードページ**](https://github.com/masaaki-avnturle/Bada/releases/tag/apps-v1.4.0)
 
 Release の添付ファイルは **ログイン不要・ZIP なしの直リンク**です。
 スマートフォンに APK を入れるときは、端末のブラウザでこのページを開いて
 `omega_whispered-debug.apk` を直接タップするのが最短です。
 
+| プラットフォーム | ファイル | 直リンク |
+|:--|:--|:--|
+| Android | `omega_whispered-debug.apk` (3.6 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega_whispered-debug.apk) |
+| Windows 10/11 | `Omega-Whispered-1.4.0-win-x64.exe` (78 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-win-x64.exe) |
+| Ubuntu (.deb) | `Omega-Whispered-1.4.0-linux-amd64.deb` (75 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-linux-amd64.deb) |
+| Ubuntu (AppImage) | `Omega-Whispered-1.4.0-linux-x86_64.AppImage` (108 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-linux-x86_64.AppImage) |
+| 任意のOS | `omega-whispered.html` (556 KB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega-whispered.html) |
+
 ```bash
-# コマンドで最新版を取得する例
-curl -LO https://github.com/masaaki-avnturle/Bada/releases/latest/download/omega_whispered-debug.apk
-curl -LO https://github.com/masaaki-avnturle/Bada/releases/latest/download/omega-whispered.html
+# コマンドで取得する例
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega_whispered-debug.apk
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega-whispered.html
 ```
+
+> このリポジトリには他のアプリの Release も置かれているため、
+> `releases/latest` は別のアプリを指すことがあります。
+> **タグ `apps-v1.4.0` を指定したうえのリンクが確実です。**
 
 #### Actions からダウンロードする
 
