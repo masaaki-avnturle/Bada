@@ -75,7 +75,8 @@
 | プラットフォーム | 入手 |
 |:---|:---|
 | **ブラウザ (単一 HTML)** ★ | [`bio_medicine/omega_drug_forge/www/index.html`](bio_medicine/omega_drug_forge/www/index.html) をダウンロードして開くだけ |
-| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-DrugForge.exe` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-DrugForge-1.0.0-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-DrugForge-1.0.0-x86_64.AppImage` / `.deb` |
 | **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `omega_drug_forge-debug.apk` |
 
 数学基盤: `AGM(a,b)` 相加相乗平均 · `Γ(s)` ガンマ関数 · `∂φ/∂t = D∇²φ + ρφ(1-φ/K)` 形態形成場 · `E_red = E₀ - (RT/nF)ln(Q)·Γ-AGM` 還元電位。詳細は [`bio_medicine/omega_drug_forge/README.md`](bio_medicine/omega_drug_forge/README.md) を参照。

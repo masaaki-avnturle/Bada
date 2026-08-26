@@ -1,6 +1,7 @@
-name: Ω apps build (APK + Windows EXE)
+name: Ω apps build (APK + Windows EXE + Linux)
 
-# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
+# bio_medicine 配下の各アプリ(www + electron + cordova)から
+# Android APK・Windows EXE・Linux AppImage/deb をビルドし、
 # Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
 #
 # ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
@@ -41,6 +42,37 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [omega_drug_forge]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: bio_medicine/${{ matrix.app }}/electron
+        run: |
+          npm install
+          npm run dist-linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-linux
+          path: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
+      - name: Attach Linux packages to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
 
   android-apk:
     runs-on: ubuntu-latest

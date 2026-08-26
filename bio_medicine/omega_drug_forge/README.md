@@ -32,7 +32,8 @@
 `www/index.html` をブラウザで開くだけで動作します。
 
 ### ダウンロード (GitHub Releases)
-- **Windows**: `Omega-DrugForge.exe` — ポータブル実行ファイル
+- **Windows 10 / 11**: `Omega-DrugForge-1.0.0-x64.exe` — NSIS インストーラ / ポータブル
+- **Ubuntu**: `Omega-DrugForge-1.0.0-x86_64.AppImage` / `.deb`
 - **Android**: `omega_drug_forge-debug.apk`
 
 ### ローカル実行 (Electron)
