@@ -143,6 +143,12 @@
   <div class="col" style="flex:0 0 340px">
     <div class="card">
       <h3>検査設定</h3>
+      <label>出題系統</label>
+      <select id="subject">
+        <option value="math">数学（記号・方程式）</option>
+        <option value="chem">化学・物理（有機化合物 / 半導体 / 超電導）</option>
+        <option value="both">両方（数学 + 化学・物理）</option>
+      </select>
       <label>検査モード</label>
       <select id="mode">
         <option value="full">フル(記号 → 方程式 → 適性分野診断)</option>
@@ -166,6 +172,9 @@
       <input type="range" id="lvmax" min="1" max="5" value="5"/>
       <label>専門分野</label>
       <select id="field"><option value="">すべての分野</option></select>
+      <label>🔊 電子音: <span class="val" id="snd_v">ON</span></label>
+      <input type="range" id="vol" min="0" max="100" value="50"/>
+      <div class="cap" id="sndCap">検査中の出題・正誤・瞬読提示に電子音が鳴ります（音量 0 で消音）。</div>
       <button id="start">▶ 適性検査を開始</button>
       <button class="sec" id="dict">📖 記号辞典を開く</button>
       <div class="cap" id="setupStat">問題銀行を読み込み中…</div>
@@ -184,6 +193,8 @@
         <div class="stat"><span>数式記号の種類 / 総出現</span><b id="p_syms">—</b></div>
         <div class="stat"><span>辞典に一致した記号</span><b id="p_known">—</b></div>
         <div class="chips" id="p_chips"></div>
+        <div class="stat"><span>化学式 / 化学・物理用語</span><b id="p_chem">—</b></div>
+        <div class="chips" id="p_chemchips"></div>
         <details>
           <summary>抽出された数式断片・埋め込みフォント</summary>
           <div id="p_frags"></div>
@@ -227,11 +238,22 @@
         注視点 → 提示 → マスクの順で提示し、露出時間は <b>2-down/1-up ステアケース</b>で適応的に上下させて
         <b>瞬読閾値(ms)</b>を推定します。
       </p>
+      <p style="font-size:13px;margin:6px 0">
+        <b>化学・物理のウィスパードテスト</b>:
+        出題系統を切り替えると、<b>有機化合物・半導体・超電導</b>を軸にした化学／物理の検査になります。
+        記号（<code>–OH · C=O · E_g · E_F · T_c · Δ · λ_L · Φ₀</code>）、関係式の意味、
+        そして <b>簡単な問題 → 関係する専門の問題</b> への連想
+        （<code>V=IR → σ=q(nμ_n+pμ_p)</code>、<code>磁石が浮く → ∇²B=B/λ_L²</code>、
+        <code>温度を上げると反応が速い → k=Ae^(−Ea/RT)</code>）を検査します。
+        PDF を読み込むと、その論文に出てきた<b>化合物・専門用語・記号</b>からも出題します。
+        検査中は<b>電子音</b>が鳴ります（出題・正誤・瞬読の注視点/提示/マスク）。
+      </p>
       <div class="stat"><span>記号銀行</span><b id="s_nsym">—</b></div>
       <div class="stat"><span>方程式銀行 (Lv1〜Lv5)</span><b id="s_neq">—</b></div>
       <div class="stat"><span>連想対応 (簡単 → 専門)</span><b id="s_nas">—</b></div>
       <div class="stat"><span>適性設問 / 分野プロファイル</span><b id="s_napt">—</b></div>
       <div class="stat"><span>専門用語銀行 (瞬読)</span><b id="s_nterm">—</b></div>
+      <div class="stat"><span>化学・物理銀行</span><b id="s_nchem">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -302,12 +324,43 @@
 
 <script src="symbol_bank.js"></script>
 <script src="term_bank.js"></script>
+<script src="chem_phys_bank.js"></script>
 <script src="flash.js"></script>
+<script src="sound.js"></script>
 <script src="pdf_symbols.js"></script>
+<script src="chem_extract.js"></script>
 <script>
 "use strict";
 (function () {
-  var B = window.SymbolBank, PS = window.PDFSymbols, TB = window.TermBank, FE = window.FlashEngine;
+  var SB = window.SymbolBank, TB = window.TermBank, CP = window.ChemPhysBank,
+      PS = window.PDFSymbols, CX = window.ChemExtract, FE = window.FlashEngine, SND = window.OmegaSound;
+
+  /* 出題系統(数学 / 化学・物理 / 両方)に応じて問題銀行を合成する */
+  var BK = null;
+  function bank() {
+    var el = document.getElementById("subject");
+    var mode = el ? el.value : "math";
+    var math = { FIELDS: SB.FIELDS, SYMBOLS: SB.SYMBOLS, CTX: SB.CTX, EQUATIONS: SB.EQUATIONS,
+                 ASSOC: SB.ASSOC, TERMS: TB.TERMS, APTITUDE: SB.APTITUDE, FIELD_PROFILE: SB.FIELD_PROFILE };
+    var chem = { FIELDS: CP.FIELDS, SYMBOLS: CP.SYMBOLS, CTX: CP.CTX, EQUATIONS: CP.EQUATIONS,
+                 ASSOC: CP.ASSOC, TERMS: CP.TERMS, APTITUDE: CP.APTITUDE, FIELD_PROFILE: CP.FIELD_PROFILE };
+    if (mode === "chem") return chem;
+    if (mode !== "both") return math;
+    var prof = {};
+    Object.keys(math.FIELD_PROFILE).forEach(function (k) { prof[k] = math.FIELD_PROFILE[k]; });
+    Object.keys(chem.FIELD_PROFILE).forEach(function (k) { prof[k] = chem.FIELD_PROFILE[k]; });
+    return {
+      FIELDS: math.FIELDS.concat(chem.FIELDS),
+      SYMBOLS: math.SYMBOLS.concat(chem.SYMBOLS),
+      CTX: math.CTX.concat(chem.CTX),
+      EQUATIONS: math.EQUATIONS.concat(chem.EQUATIONS),
+      ASSOC: math.ASSOC.concat(chem.ASSOC),
+      TERMS: math.TERMS.concat(chem.TERMS),
+      APTITUDE: math.APTITUDE.concat(chem.APTITUDE),
+      FIELD_PROFILE: prof
+    };
+  }
+  BK = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [], TERMS: [], APTITUDE: [], FIELD_PROFILE: {} };
   var $ = function (id) { return document.getElementById(id); };
 
   /* ============================ 共通ユーティリティ ============================ */
@@ -329,8 +382,9 @@
 
   /* ============================== 状態 ============================== */
   var state = {
-    pdf: null,          /* {symbols, fragments, ...} */
+    pdf: null,          /* {symbols, fragments, text, ...} */
     pdfKnown: [],       /* 辞典に一致した PDF 由来の記号 [{sym, count}] */
+    pdfChem: null,      /* PDF から検出した化学式・用語・記号 */
     qs: [], i: 0, answers: [], t0: 0, running: false
   };
 
@@ -355,12 +409,12 @@
 
   /* --- 第一次: 記号 → 意味 --- */
   function qSymbolMeaning(sym, fromPdf) {
-    var siblings = B.SYMBOLS.filter(function (s) {
+    var siblings = BK.SYMBOLS.filter(function (s) {
       return s.ch !== sym.ch && Math.abs(s.lv - sym.lv) <= 1;
     });
     var nears = shuffle(siblings.filter(function (s) { return s.field === sym.field; }))
                   .slice(0, 2).map(function (s) { return s.mean; });
-    var pool = B.SYMBOLS.filter(function (s) { return s.ch !== sym.ch; }).map(function (s) { return s.mean; });
+    var pool = BK.SYMBOLS.filter(function (s) { return s.ch !== sym.ch; }).map(function (s) { return s.mean; });
     return {
       phase: 1, kind: "記号の意味", lv: sym.lv, field: sym.field, src: fromPdf || null,
       sym: sym.ch,
@@ -373,7 +427,7 @@
 
   /* --- 第一次: 記号 → 専門分野 --- */
   function qSymbolField(sym) {
-    var pool = B.FIELDS.filter(function (f) { return f !== sym.field; });
+    var pool = BK.FIELDS.filter(function (f) { return f !== sym.field; });
     return {
       phase: 1, kind: "記号の分野", lv: Math.max(2, sym.lv), field: sym.field, sym: sym.ch,
       text: "この記号(" + sym.ja + ")が最も特徴的に用いられる分野はどれですか。",
@@ -399,7 +453,7 @@
 
   /* --- 第二次: 方程式 → 意味 --- */
   function qEquationMeaning(eq) {
-    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.mean; });
+    var pool = BK.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.mean; });
     return {
       phase: 2, kind: "方程式の意味", lv: eq.lv, field: eq.field,
       eq: eq.eq,
@@ -412,7 +466,7 @@
 
   /* --- 第二次: 方程式 → 名称 --- */
   function qEquationName(eq) {
-    var pool = B.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.name; });
+    var pool = BK.EQUATIONS.filter(function (e) { return e.name !== eq.name; }).map(function (e) { return e.name; });
     return {
       phase: 2, kind: "方程式の同定", lv: eq.lv, field: eq.field,
       eq: eq.eq,
@@ -438,7 +492,7 @@
 
   /* --- 第二次: 逆向き連想(専門の方程式 → 元になった簡単な方程式) --- */
   function qAssocReverse(a) {
-    var pool = B.ASSOC.filter(function (x) { return x.adv !== a.adv; }).map(function (x) { return x.simple; });
+    var pool = BK.ASSOC.filter(function (x) { return x.adv !== a.adv; }).map(function (x) { return x.simple; });
     return {
       phase: 2, kind: "連想(専門→簡単)", lv: a.lv, field: a.field,
       eq: a.adv,
@@ -471,15 +525,15 @@
 
   function flashTerms() {
     var f = $("field").value, lvMax = +$("lvmax").value;
-    var t = TB.TERMS.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
-    return t.length >= 8 ? t : TB.TERMS.slice();
+    var t = BK.TERMS.filter(function (x) { return x.lv <= lvMax && (!f || x.field === f); });
+    return t.length >= 8 ? t : BK.TERMS.slice();
   }
 
   /* 瞬読: 記号 — 表示された記号はどれか */
   function qFlashSymbol(k) {
     var pool = (state.pdfKnown.length >= k + 4)
       ? shuffle(state.pdfKnown.map(function (p) { return p.sym; }))
-      : shuffle(B.SYMBOLS.filter(inScope).length >= k + 4 ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+      : shuffle(BK.SYMBOLS.filter(inScope).length >= k + 4 ? BK.SYMBOLS.filter(inScope) : BK.SYMBOLS.slice());
     var shown = pool.slice(0, k), rest = pool.slice(k);
     var target = pick(shown);
     var opts = shuffle([target.ch].concat(shuffle(rest).slice(0, 3).map(function (s) { return s.ch; })));
@@ -524,8 +578,8 @@
 
   /* 瞬読: 方程式をバラバラのトークンにして散らす → 元の方程式はどれか */
   function qFlashEquation() {
-    var pool = B.EQUATIONS.filter(inScope);
-    if (pool.length < 4) pool = B.EQUATIONS.slice();
+    var pool = BK.EQUATIONS.filter(inScope);
+    if (pool.length < 4) pool = BK.EQUATIONS.slice();
     var target = pick(pool);
     var others = shuffle(pool.filter(function (e) { return e.name !== target.name; })).slice(0, 3);
     return {
@@ -540,7 +594,7 @@
 
   /* 瞬読: 個数把握(面的にいくつ見えたか) */
   function qFlashCount(k) {
-    var pool = shuffle(B.SYMBOLS.filter(inScope).length >= k ? B.SYMBOLS.filter(inScope) : B.SYMBOLS.slice());
+    var pool = shuffle(BK.SYMBOLS.filter(inScope).length >= k ? BK.SYMBOLS.filter(inScope) : BK.SYMBOLS.slice());
     var shown = pool.slice(0, k);
     var cands = {}; cands[k] = 1;
     [k - 2, k - 1, k + 1, k + 2].forEach(function (v) { if (v >= 1) cands[v] = 1; });
@@ -586,22 +640,45 @@
     return out;
   }
 
+  /* --- 論文から検出した化合物を問う(PDF 読込時のみ) --- */
+  function qPdfCompound(hit) {
+    var names = [], seen = {};
+    Object.keys(CX.KNOWN).forEach(function (f) {
+      if (f !== hit.formula && !seen[CX.KNOWN[f]]) { seen[CX.KNOWN[f]] = 1; names.push(CX.KNOWN[f]); }
+    });
+    return {
+      phase: 1, kind: "論文中の化合物", lv: 3, field: "有機化学",
+      src: "この論文に " + hit.count + " 回出現",
+      sym: hit.formula,
+      text: "この論文に現れた化学式は何を表しますか。",
+      opts: buildOptions(hit.name, null, names, 4),
+      correct: hit.name,
+      why: hit.formula + " = " + hit.name
+    };
+  }
+
   /* --- 検査全体の組み立て --- */
   function buildExam() {
+    BK = bank();
     var mode = $("mode").value;
-    if (mode === "aptitude") return shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude);
+    if (mode === "aptitude") return shuffle(BK.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude);
     if (mode === "flash") return buildFlash(+$("n4").value);
     var n1 = +$("n1").value, n2 = +$("n2").value, qs = [];
 
     /* 第一次: PDF 由来の記号を優先 */
     var pdfSyms = shuffle(state.pdfKnown.slice()).filter(function (p) { return inScope(p.sym); });
-    var syms = spreadByField(shuffle(B.SYMBOLS.filter(inScope)));
-    var ctxs = shuffle(B.CTX.filter(function (c) {
+    var syms = spreadByField(shuffle(BK.SYMBOLS.filter(inScope)));
+    var ctxs = shuffle(BK.CTX.filter(function (c) {
       return c.items.some(function (it) { return !$("field").value || it.field === $("field").value; });
     }));
     var usedCh = {}, k = 0;
 
-    var nPdf = Math.min(pdfSyms.length, Math.ceil(n1 * 0.6));
+    /* 論文から検出できた既知化合物(最大2問) */
+    var chemHits = (state.pdfChem && state.pdfChem.formulas || []).filter(function (f) { return f.name; });
+    var nChem = Math.min(chemHits.length, 2, Math.max(0, n1 - 2));
+    for (var ci = 0; ci < nChem; ci++) qs.push(qPdfCompound(chemHits[ci]));
+
+    var nPdf = Math.min(pdfSyms.length, Math.ceil(n1 * 0.6) - qs.length);
     for (var p = 0; p < nPdf; p++) {
       var ps = pdfSyms[p];
       usedCh[ps.sym.ch] = 1;
@@ -611,10 +688,10 @@
       k++;
       var roll = Math.random();
       if (roll < 0.18 && ctxs.length && +$("lvmax").value >= 4) {
-        qs.push(qContext(ctxs.pop() || pick(B.CTX)));
+        qs.push(qContext(ctxs.pop() || pick(BK.CTX)));
       } else {
         var s = syms.find(function (x) { return !usedCh[x.ch]; });
-        if (!s) { s = pick(B.SYMBOLS.filter(inScope) || B.SYMBOLS); if (!s) break; }
+        if (!s) { s = pick(BK.SYMBOLS.filter(inScope) || BK.SYMBOLS); if (!s) break; }
         usedCh[s.ch] = 1;
         qs.push(roll < 0.45 ? qSymbolField(s) : qSymbolMeaning(s));
       }
@@ -622,8 +699,8 @@
     qs = qs.slice(0, n1);
 
     /* 第二次: 方程式の意味 + 同定 + 連想(簡単→専門 / 専門→簡単) */
-    var eqs = spreadByField(shuffle(B.EQUATIONS.filter(inScope)));
-    var assoc = shuffle(B.ASSOC.filter(inScope));
+    var eqs = spreadByField(shuffle(BK.EQUATIONS.filter(inScope)));
+    var assoc = shuffle(BK.ASSOC.filter(inScope));
     var second = [], usedEq = {}, g = 0;
     /* 連想問題を全体の約 4 割は必ず入れる(本検査の主眼) */
     var nAssoc = Math.max(1, Math.min(assoc.length, Math.round(n2 * 0.4)));
@@ -634,7 +711,7 @@
     while (second.length < n2 && g < 400) {
       g++;
       var e = eqs.find(function (x) { return !usedEq[x.name]; });
-      if (!e) { e = pick(B.EQUATIONS.filter(inScope) || B.EQUATIONS); if (!e) break; }
+      if (!e) { e = pick(BK.EQUATIONS.filter(inScope) || BK.EQUATIONS); if (!e) break; }
       usedEq[e.name] = 1;
       second.push(Math.random() < 0.72 ? qEquationMeaning(e) : qEquationName(e));
     }
@@ -648,13 +725,14 @@
     /* 第四次(瞬読) → 第三次(適性診断) の順で付け足す(フルモードのみ) */
     if (mode === "full") {
       all = all.concat(buildFlash(+$("n4").value));
-      all = all.concat(shuffle(B.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude));
+      all = all.concat(shuffle(BK.APTITUDE.slice()).slice(0, +$("n3").value).map(qAptitude));
     }
     return all;
   }
 
   /* ============================== 検査の進行 ============================== */
   function startExam() {
+    if (SND) { SND.unlock(); SND.play("boot"); }
     state.qs = buildExam();
     if (!state.qs.length) { $("setupStat").textContent = "条件に合う設問がありません。難度や分野を広げてください。"; return; }
     state.i = 0; state.answers = []; state.running = true;
@@ -677,6 +755,8 @@
     var got = scored.filter(function (a) { return a.ok; }).length;
     $("q_score").textContent = scored.length ? "正答 " + got + " / " + scored.length : "";
     $("q_bar").style.width = (100 * state.i / state.qs.length) + "%";
+    if (SND) SND.play(q.phase !== state.lastPhase ? "phase" : "question");
+    state.lastPhase = q.phase;
 
     q.tags = '<div class="qtext"><span class="tag">' + esc(q.kind) + "</span>" +
              (q.aptitude ? '<span class="tag">正誤なし</span>'
@@ -728,7 +808,10 @@
   function runFlash(q) {
     var stage = $("stage");
     var items = shuffle(q.items.slice()).map(function (t) { return { text: t, cls: "item" }; });
-    FE.burst(stage, items, q.ms, { fix: 500, mask: 120 }).then(function (actual) {
+    FE.burst(stage, items, q.ms, {
+      fix: 500, mask: 120,
+      onPhase: function (name) { if (SND) SND.play(name === "show" ? "flash" : (name === "mask" ? "mask" : "fix")); }
+    }).then(function (actual) {
       q.actualMs = Math.round(actual);
       $("q_body").innerHTML = q.tags + '<div class="qtext">' + q.text + "</div>";
       renderOptions(q);
@@ -741,6 +824,7 @@
     var sec = (Date.now() - state.t0) / 1000;
     var ok = q.aptitude ? null : (chosen === q.correct);
     state.answers.push({ q: q, chosen: chosen, ok: ok, sec: sec });
+    if (SND) SND.play(q.aptitude ? "select" : (ok ? "correct" : "wrong"));
 
     var btns = $("q_opts").children, i, b;
     for (i = 0; i < btns.length; i++) {
@@ -786,6 +870,7 @@
   /* ============================== 判定 ============================== */
   function finish() {
     state.running = false;
+    if (SND) SND.play("result");
     $("examCard").style.display = "none";
     $("resultCard").style.display = "block";
 
@@ -956,7 +1041,7 @@
       Object.keys(a.q.wmax).forEach(function (f) { max[f] = (max[f] || 0) + a.q.wmax[f]; });
     });
     var rows = [];
-    B.FIELDS.forEach(function (f) {
+    BK.FIELDS.forEach(function (f) {
       var pref = (max[f] >= 2) ? Math.min(1, (got[f] || 0) / max[f]) : null;   /* 露出が少ない分野は未測定 */
       var bf = byField[f];
       var perf = (bf && bf.lv > 0) ? bf.lvOk / bf.lv : null;
@@ -987,7 +1072,7 @@
 
     var top = rows.slice(0, 3), html = "";
     top.forEach(function (r, i) {
-      var p = B.FIELD_PROFILE[r.field];
+      var p = BK.FIELD_PROFILE[r.field];
       if (!p) return;
       html += '<div class="fp"><h4>' + (i === 0 ? "◎ 第一適性: " : "○ 第" + (i + 1) + "適性: ") +
         esc(r.field) + " — " + esc(p.tag) + " (" + (100 * r.total).toFixed(0) + ")</h4>" +
@@ -1052,8 +1137,11 @@
 
   function showPdf(name, res) {
     state.pdf = res;
+    state.pdfName = name;
+    /* 化学式・化学/物理用語の検出(本文テキストを走査) */
+    state.pdfChem = CX.scan(res.text || "", CP.TERMS, CP.SYMBOLS);
     var index = {};
-    B.SYMBOLS.forEach(function (s) { index[s.ch] = s; });
+    BK.SYMBOLS.forEach(function (s) { index[s.ch] = s; });
     state.pdfKnown = res.symbols.filter(function (s) { return index[s.ch]; })
       .map(function (s) { return { sym: index[s.ch], count: s.count }; });
 
@@ -1072,18 +1160,37 @@
     }).join("") || '<div class="cap">数式断片は取得できませんでした。</div>';
     $("p_fonts").textContent = res.fonts.length ? "埋め込みフォント: " + res.fonts.slice(0, 12).join(" / ") : "";
 
+    /* 化学・物理の検出結果 */
+    var ch = state.pdfChem;
+    var known = ch.formulas.filter(function (f) { return f.name; });
+    $("p_chem").textContent = ch.formulas.length + " 式(既知 " + known.length + ") / " +
+      ch.terms.length + " 用語 / " + ch.symbols.length + " 記号";
+    var chips = known.slice(0, 12).map(function (f) {
+      return '<span class="chip" title="' + esc(f.name) + '"><b>' + esc(f.formula) +
+             "</b> <small>" + f.count + "</small></span>";
+    }).concat(ch.terms.slice(0, 10).map(function (t) {
+      return '<span class="chip" title="' + esc(t.term.def) + '">' + esc(t.term.t) +
+             " <small>" + t.count + "</small></span>";
+    })).concat(ch.symbols.slice(0, 8).map(function (x) {
+      return '<span class="chip" title="' + esc(x.sym.mean) + '"><b>' + esc(x.sym.ch) +
+             "</b> <small>" + x.count + "</small></span>";
+    }));
+    $("p_chemchips").innerHTML = chips.join("") ||
+      '<span class="cap">化学式・化学/物理用語は見つかりませんでした。</span>';
+
     if (!res.ok) {
       $("pdfStat").textContent = name + " — " + res.note;
     } else {
-      $("pdfStat").innerHTML = esc(name) + " — <b>" + state.pdfKnown.length +
-        "</b> 種の記号を辞典と照合しました。第一次検査で優先出題します。";
+      $("pdfStat").innerHTML = esc(name) + " — 記号 <b>" + state.pdfKnown.length +
+        "</b> 種を辞典と照合" + (known.length ? "、化合物 <b>" + known.length + "</b> 種を検出" : "") +
+        "。第一次検査で優先出題します。";
     }
   }
 
   /* ============================== 記号辞典 ============================== */
   function renderDict() {
     var f = $("dfield").value;
-    var list = B.SYMBOLS.filter(function (s) { return !f || s.field === f; })
+    var list = BK.SYMBOLS.filter(function (s) { return !f || s.field === f; })
                         .sort(function (a, b) { return a.lv - b.lv; });
     var h = "<table><tr><th>記号</th><th>読み</th><th>意味</th><th>分野 / Lv</th></tr>";
     list.forEach(function (s) {
@@ -1095,18 +1202,31 @@
   }
 
   /* ============================== 初期化 ============================== */
-  function init() {
-    B.FIELDS.forEach(function (f) {
-      [$("field"), $("dfield")].forEach(function (sel) {
+  /* 出題系統に合わせて分野セレクトと銀行の統計を更新する */
+  function refreshSubject() {
+    BK = bank();
+    [$("field"), $("dfield")].forEach(function (sel) {
+      var keep = sel.value;
+      sel.innerHTML = '<option value="">すべての分野</option>';
+      BK.FIELDS.forEach(function (f) {
         var o = document.createElement("option"); o.value = f; o.textContent = f; sel.appendChild(o);
       });
+      if (BK.FIELDS.indexOf(keep) >= 0) sel.value = keep;
     });
-    $("s_nsym").textContent = B.SYMBOLS.length + " 記号 (+ 文脈依存 " + B.CTX.length + " 種)";
-    $("s_neq").textContent = B.EQUATIONS.length + " 式";
-    $("s_nas").textContent = B.ASSOC.length + " 対応";
-    $("s_napt").textContent = B.APTITUDE.length + " 設問 / " +
-      Object.keys(B.FIELD_PROFILE).length + " 分野プロファイル";
-    $("s_nterm").textContent = TB.TERMS.length + " 語 (10 分野 × 10 語)";
+    $("s_nsym").textContent = BK.SYMBOLS.length + " 記号 (+ 文脈依存 " + BK.CTX.length + " 種)";
+    $("s_neq").textContent = BK.EQUATIONS.length + " 式";
+    $("s_nas").textContent = BK.ASSOC.length + " 対応";
+    $("s_napt").textContent = BK.APTITUDE.length + " 設問 / " +
+      Object.keys(BK.FIELD_PROFILE).length + " 分野プロファイル";
+    $("s_nterm").textContent = BK.TERMS.length + " 語";
+    $("s_nchem").textContent = CP.SYMBOLS.length + " 記号 / " + CP.EQUATIONS.length + " 式 / " +
+      CP.ASSOC.length + " 連想 / " + CP.TERMS.length + " 用語 (" + CP.FIELDS.length + " 分野)";
+    if (state.pdf) showPdf(state.pdfName || "PDF", state.pdf);   /* 系統を変えたら PDF 照合もやり直す */
+  }
+
+  function init() {
+    refreshSubject();
+    $("subject").onchange = refreshSubject;
     try {
       var best = localStorage.getItem("omega_whispered_best");
       $("s_best").textContent = best ? "Ω " + best : "未記録";
@@ -1126,6 +1246,20 @@
       $("n3").disabled = (m !== "full" && m !== "aptitude");
       ["n4", "ms4", "k4"].forEach(function (id) { $(id).disabled = (m !== "full" && m !== "flash"); });
     };
+    /* 電子音 */
+    var vol = $("vol");
+    function applySound() {
+      var v = +vol.value / 100;
+      if (SND) { SND.setVolume(v); SND.setEnabled(v > 0); }
+      $("snd_v").textContent = v > 0 ? "ON (" + vol.value + "%)" : "OFF";
+    }
+    vol.oninput = applySound;
+    vol.onchange = function () { applySound(); if (SND) SND.play("select"); };
+    applySound();
+    if (SND && !SND.available()) {
+      $("sndCap").textContent = "この環境では Web Audio が使えないため、電子音は鳴りません。";
+      vol.disabled = true;
+    }
     $("start").onclick = startExam;
     $("again").onclick = function () {
       $("resultCard").style.display = "none";

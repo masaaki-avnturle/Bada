@@ -30,7 +30,8 @@
    * stage : 提示領域の DOM(position:relative)
    * items : [{text, cls}] 表示する要素(順序はここでシャッフル済みを想定)
    * ms    : 露出時間(ミリ秒)
-   * opts  : {fix:注視点ms, mask:マスクms, minFont, maxFont, rotate}
+   * opts  : {fix:注視点ms, mask:マスクms, minFont, maxFont, rotate,
+ *           onPhase:function(name) — "fix"|"show"|"mask"|"end" の各段階で呼ばれる(電子音用)}
    * 戻り値: Promise(実測露出 ms を解決)
    */
   function burst(stage, items, ms, opts) {
@@ -39,12 +40,14 @@
     var maskMs = opts.mask === undefined ? 120 : opts.mask;
     var minF = opts.minFont || 17, maxF = opts.maxFont || 30;
     var rot = opts.rotate === undefined ? 22 : opts.rotate;
+    var onPhase = typeof opts.onPhase === "function" ? opts.onPhase : function () {};
 
     function clear() { while (stage.firstChild) stage.removeChild(stage.firstChild); }
 
     function fixation() {
       return new Promise(function (res) {
         clear();
+        onPhase("fix");
         var f = document.createElement("div");
         f.className = "fl fix";
         f.textContent = "+";
@@ -98,13 +101,15 @@
     return fixation().then(function () {
       return new Promise(function (res) {
         var t0 = (root.performance && performance.now) ? performance.now() : Date.now();
+        onPhase("show");
         scatter();
         /* 描画済みフレームから計時するため、次のフレームで待機を開始する */
         var start = function () {
           setTimeout(function () {
             var t1 = (root.performance && performance.now) ? performance.now() : Date.now();
+            onPhase("mask");
             mask();
-            setTimeout(function () { clear(); res(t1 - t0); }, maskMs);
+            setTimeout(function () { clear(); onPhase("end"); res(t1 - t0); }, maskMs);
           }, ms);
         };
         if (root.requestAnimationFrame) requestAnimationFrame(start); else start();

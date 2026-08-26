@@ -14,6 +14,7 @@
  *       (3) CM/AMS フォント (CMMI/CMSY/CMEX/CMR/MSBM/EUFM) の内蔵エンコーディング
  *   - Type0(Identity-H 等) の 2 バイトコード
  *
+ * 抽出した本文は text として返すので、化学式・専門用語の検出(chem_extract.js)にも使える。
  * 非対応(正直な限界): スキャン画像だけの PDF、暗号化 PDF、上記以外の特殊エンコーディング。
  * 抽出できない場合は symbols が空で返る(偽の結果は返さない)。
  */
@@ -544,7 +545,7 @@
 
     if (/trailer[\s\S]{0,600}\/Encrypt/.test(doc.raw)) {
       return Promise.resolve({ ok: false, symbols: [], fragments: [], pages: 0, fonts: [], glyphs: 0,
-        note: "暗号化された PDF です(このアプリは復号しません)。" });
+        text: "", note: "暗号化された PDF です(このアプリは復号しません)。" });
     }
 
     return doc.expandObjStreams().then(function () {
@@ -555,6 +556,7 @@
         if (d && /\/Type\s*\/Page(?![sA-Za-z])/.test(d)) pageNums.push(k);
       }
       var counts = {}, fragments = [], fontsSeen = {}, stats = { glyphs: 0 };
+      var textParts = [], textLen = 0, TEXT_CAP = 600000;   /* 化学式・用語の検出用に本文も貯める */
 
       function resourcesOf(pageDict, depth) {
         var res = dictGet(pageDict, "Resources");
@@ -612,6 +614,7 @@
               var runs = extractRuns(pageText.join("\n"), fonts);
               for (var i = 0; i < runs.length; i++) {
                 var t = runs[i], hasSym = false, arr = Array.from(t);
+                if (textLen < TEXT_CAP) { textParts.push(t); textLen += t.length; }
                 for (var q = 0; q < arr.length; q++) {
                   stats.glyphs++;
                   if (isMathSymbol(arr[q])) { counts[arr[q]] = (counts[arr[q]] || 0) + 1; hasSym = true; }
@@ -637,7 +640,8 @@
             : "テキストは抽出できましたが、数式記号は見つかりませんでした。");
         report("完了");
         return { ok: ok, symbols: symbols, fragments: fragments, pages: pageNums.length,
-                 fonts: fonts, glyphs: stats.glyphs, note: note };
+                 fonts: fonts, glyphs: stats.glyphs, note: note,
+                 text: textParts.join(" ") };
       });
     });
   }
