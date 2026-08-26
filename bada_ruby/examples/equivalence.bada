@@ -1,0 +1,68 @@
+# equivalence.bada — 等価原理を Bada 言語で検証する
+#   実行: bin/bada run examples/equivalence.bada
+#
+# 慣性質量 m_i と重力質量 m_g が等価であるという原理を、
+# エトヴェシュ比 η = 2(a₁−a₂)/(a₁+a₂) で数値的に確かめる。
+# 等価原理が厳密なら、落下加速度 a = (m_g/m_i)·g は物質によらず g に等しく、
+# したがって η = 0 になる。
+
+print "=== 等価原理 (Equivalence Principle) ==="
+print ""
+
+let g = 9.80665
+
+# --- 1. 質量が違っても落ち方は同じ ---
+print "-- 同じ比 m_g/m_i を持つ 2 物体 --"
+let a1 = accel(g, 1.0, 1.0)
+let a2 = accel(g, 7.0, 7.0)
+print "  物体1 (m_g=1, m_i=1): a = ", a1
+print "  物体2 (m_g=7, m_i=7): a = ", a2
+print "  エトヴェシュ比 eta  = ", eotvos(a1, a2)
+print "  → 質量が 7 倍でも加速度は同じ。これが等価原理。"
+print ""
+
+# --- 2. 落下軌道そのものを比べる ---
+print "-- 自由落下の軌道 (t=0..4) --"
+print "   t      x(m_i=1)      x(m_i=7)        差"
+repeat 5 as k
+  let t = k * 1.0
+  let xa = fall_x(g, 1.0, 1.0, t)
+  let xb = fall_x(g, 7.0, 7.0, t)
+  print "  ", t, "   ", xa, "   ", xb, "   ", abs(xa - xb)
+end
+print "  → 測地線は質量によらず一致する。"
+print ""
+
+# --- 3. 等価原理が破れていたら何が起きるか ---
+print "-- 破れを入れた場合 (m_g/m_i を 1 からずらす) --"
+let b1 = accel(g, 1.0, 1.0)
+let b2 = accel(g, 1.000000000001, 1.0)
+print "  ずれ 1e-12 のときの eta = ", eotvos(b1, b2)
+let c2 = accel(g, 1.001, 1.0)
+print "  ずれ 1e-3  のときの eta = ", eotvos(b1, c2)
+print "  → eta は m_g/m_i のずれをそのまま拾う（実験の感度がそのまま上限になる）。"
+print ""
+
+# --- 4. 等価原理から出てくる重力赤方偏移 ---
+print "-- 重力赤方偏移 dnu/nu = g h / c^2 --"
+repeat 4 as k
+  let h = 10.0 ^ (k + 1)
+  print "  h = ", h, " m  ->  ", redshift(g, h)
+end
+print ""
+
+# --- 5. Γ 多様体の不変性との対応 ---
+# 部分積分の漸化 Γ(s+1) = s·Γ(s) は s によらず成り立つ「不変性」であり、
+# 等価原理の「物質によらず m_g/m_i = 1」と同じ形をしている。
+print "-- Gamma 多様体の不変性 Gamma(s+1) = s*Gamma(s) --"
+repeat 4 as k
+  let s = 1.5 + k
+  print "  s = ", s, "  Gamma(s+1) = ", gamma(s + 1), "  s*Gamma(s) = ", s * gamma(s)
+  print "        破れ = ", gamma_defect(s)
+end
+print ""
+print "  → どちらも『対象によらず比が 1 になる』という同じ形の不変性である。"
+
+# 結果を Ω::DATABASE (アカシック TupleSpace) へ書き込む
+set eta_node = 0.0
+Omega::push eta_node as equivalence_eta
