@@ -27,6 +27,7 @@ const { spawnSync } = require("child_process");
 /* 静的 require — esbuild バンドル (単一バイナリ化) のため動的パス不可 */
 const Bada = require("../www/bada.js");
 const EXAMPLES = require("../www/examples.js");
+const { ffi } = require("./bada-ffi.js");
 
 function usage() {
   console.error(
@@ -54,7 +55,7 @@ function readSource(file) {
 
 /* ---------------- REPL ---------------- */
 function repl() {
-  const session = Bada.createSession();
+  const session = Bada.createSession({ ffi });
   console.log("Bada " + Bada.VERSION + " -- quantum REPL on the Unknown-Prior Engine");
   console.log('型: dist / phase / tuplespace / qubit.  例: reg := H(qubit(1)) ; Measure(reg)');
   console.log('@reviser : grammar { rule ... } で文法も拡張できます。exit / quit で終了。');
@@ -153,7 +154,7 @@ else if (cmd === "examples") {
     if (a.errors.length) console.error(a.errors.join("\n"));
     console.log(a.text);
   } else if (cmd === "run") {
-    const r = Bada.run(src, { out: (s) => console.log(s) });
+    const r = Bada.run(src, { out: (s) => console.log(s), ffi });
     if (r.parseErrors.length) console.error(r.parseErrors.join("\n"));
     process.exit(r.ok ? 0 : 1);
   } else if (cmd === "emit") {

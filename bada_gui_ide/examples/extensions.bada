@@ -1,0 +1,86 @@
+# ============================================================
+# extensions.bada -- reviser extension transactions:
+# extending Bada with Bada itself, C, Python, and Java.
+#
+# @reviser : extension <lang> { fun NAME |params| """code""" }
+# commits each extension as an append-only ledger fact and binds
+# NAME as a callable:
+#   bada   -- code is Bada source     (self-extension, runs everywhere)
+#   c      -- body of  double NAME(double p1, ...)
+#             * interpreter: gcc-built and called via the FFI bridge
+#             * compiler   : INLINED into the emitted native C
+#   python -- code reads ARGS (JSON-decoded), assigns RESULT
+#   java   -- body of  static double run(double[] args)
+# python / java / c run in the CLI and the desktop IDE (FFI bridge).
+# ============================================================
+
+print("================================================================")
+print("REVISER EXTENSIONS -- Bada / C / Python / Java")
+print("================================================================")
+
+# ---- 1. Bada extending Bada (self-extension) ------------------------
+@reviser : extension bada {
+    fun sharpen |d, evidence| """
+        return update(d, evidence, 0.7)
+    """
+    fun engine_entropy |d| """
+        return entropy(d)
+    """
+}
+print("")
+print("[bada] self-extension:")
+prior := unknown_prior(4)
+post := sharpen(prior, [0.7, 0.2, 0.1, 0.0])
+print("  sharpen(uniform)        :", post)
+print("  engine_entropy(post)    :", f5(engine_entropy(post)))
+
+# ---- 2. C extension (inlined by the compiler, gcc'd by the interp) --
+@reviser : extension c {
+    fun c_hypot |a, b| """
+        return sqrt(a*a + b*b);
+    """
+    fun c_born |amp| """
+        /* Born rule: probability = |amplitude|^2 */
+        return amp*amp;
+    """
+}
+print("")
+print("[c] native extension:")
+print("  c_hypot(3, 4)           :", c_hypot(3, 4))
+print("  c_born(0.70710678)      :", f5(c_born(0.70710678)))
+
+# ---- 3. Python extension (JSON marshalling, lists welcome) ----------
+@reviser : extension python {
+    fun py_mean |xs| """
+RESULT = sum(ARGS[0]) / len(ARGS[0])
+    """
+    fun py_top |xs| """
+xs = ARGS[0]
+RESULT = sorted(range(len(xs)), key=lambda i: -xs[i])[:2]
+    """
+}
+print("")
+print("[python] extension:")
+reg := qubit(2)
+reg := H(reg, 0)
+reg := CNOT(reg, 0, 1)
+probs := Measure(reg)                 # Bell pair |psi|^2 -> ledger commit
+print("  Bell |psi|^2            :", probs)
+print("  py_mean(Bell)           :", py_mean(probs))
+print("  py_top(Bell) basis      :", py_top(probs))
+
+# ---- 4. Java extension ---------------------------------------------
+@reviser : extension java {
+    fun j_geo_mean |a, b| """
+        return Math.sqrt(args[0] * args[1]);
+    """
+}
+print("")
+print("[java] extension:")
+print("  j_geo_mean(2, 8)        :", j_geo_mean(2, 8))
+
+# ---- the extension ledger ------------------------------------------
+print("")
+print("extension + measurement facts in the ledger:", len(tuplespace))
+print("(every extension is an append-only committed fact -- auditable)")
+print("================================================================")

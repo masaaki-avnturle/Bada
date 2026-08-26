@@ -31,7 +31,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.1.0";
+  var VERSION = "1.2.0";
 
   /* ------------------------------------------------------------------ *
    * Tokens
@@ -102,7 +102,19 @@
         toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
         continue;
       }
-      /* strings — double quoted, and single quoted (used by rule patterns) */
+      /* strings — double quoted, and single quoted (used by rule patterns).
+         """triple-quoted""" strings are raw multi-line blocks (no escape
+         processing) for embedding foreign extension code (@reviser :
+         extension) without fighting quotes. */
+      if (c === '"' && peek2() === '"' && pos + 2 < n && src[pos + 2] === '"') {
+        adv(); adv(); adv();
+        var rawStart = pos;
+        while (pos < n && !(src[pos] === '"' && src[pos + 1] === '"' && src[pos + 2] === '"')) adv();
+        var raw = src.slice(rawStart, pos);
+        if (pos < n) { adv(); adv(); adv(); }
+        toks.push({ type: "STRING", lexeme: raw, num: 0, line: startLine });
+        continue;
+      }
       if (c === '"' || c === "'") {
         var quote = c;
         adv();
@@ -533,18 +545,62 @@
   Parser.prototype.parseReviser = function () {
     var line = this.cur().line;
     this.expect("REVISER", "expected '@reviser'");
-    var isGrammar = false;
+    var isGrammar = false, isExtension = false, extLang = "bada";
     var j = this.i;
     while (j < this.toks.length && this.toks[j].type !== "LBRACE" && this.toks[j].type !== "EOF") {
       if (this.toks[j].lexeme === "grammar") isGrammar = true;
+      if (this.toks[j].lexeme === "extension") {
+        isExtension = true;
+        var nx = this.toks[j + 1];
+        if (nx && (nx.type === "IDENT" || nx.type === "STRING")) extLang = nx.lexeme.toLowerCase();
+      }
       j++;
     }
     /* skip header noise up to '{' */
     while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
     if (isGrammar) return this.parseGrammarBlock(line);
+    if (isExtension) return this.parseExtensionBlock(line, extLang);
     var n = node("REVISER", line);
     n.body = this.parseBlock();
     return n;
+  };
+
+  /* @reviser : extension <lang> { fun NAME |params| """code""" ... }
+     A foreign-extension transaction: each fun commits an extension fact to
+     the ledger and binds NAME as a callable implemented in <lang>:
+       bada   — code is Bada source (runs everywhere; self-extension)
+       c      — code is the body of  double NAME(double p1, ...)  — the
+                interpreter gcc-builds it, the Bada->C compiler INLINES it
+       python — code sees ARGS (JSON-decoded list) and sets RESULT
+       java   — code is the body of  static double run(double[] args)
+     python/java/c run via the host FFI bridge (CLI & desktop IDE). */
+  Parser.prototype.parseExtensionBlock = function (line, lang) {
+    var x = node("EXTENSION", line);
+    x.lang = lang;
+    x.funcs = [];
+    this.expect("LBRACE", "expected '{'");
+    while (!this.check("RBRACE") && !this.check("EOF")) {
+      if ((this.check("IDENT") && this.cur().lexeme === "fun") || this.check("DEF")) {
+        this.advance();
+        var fn = { name: "?", params: [], code: "" };
+        if (this.check("IDENT") || this.check("STRING")) { fn.name = this.cur().lexeme; this.advance(); }
+        if (this.check("PIPE")) {
+          var holder = node("LAMBDA", this.cur().line);
+          this.parsePipeParams(holder);
+          fn.params = holder.params;
+        }
+        this.match("ARROW"); this.match("DEFARROW"); /* optional connector */
+        if (this.check("STRING")) { fn.code = this.cur().lexeme; this.advance(); }
+        else this.perr("expected extension code string (use \"\"\"...\"\"\")");
+        x.funcs.push(fn);
+        this.match("SEMI");
+      } else {
+        this.perr("expected 'fun' in extension reviser");
+        this.advance();
+      }
+    }
+    this.expect("RBRACE", "expected '}'");
+    return x;
   };
 
   Parser.prototype.parseGrammarBlock = function (line) {
@@ -840,6 +896,49 @@
   };
   Env.prototype.root = function () { var e = this; while (e.parent) e = e.parent; return e; };
 
+  /* ---- foreign-extension marshalling (JSON over argv/stdout) ---------- */
+  function badaToJson(v) {
+    switch (v.t) {
+      case "num": return v.num;
+      case "bool": return v.b;
+      case "str": return v.str;
+      case "arr": return v.items.map(badaToJson);
+      case "dist": return Array.prototype.slice.call(v.p);
+      case "reg": return regProbs(v.reg);
+      default: return null;
+    }
+  }
+  function jsToBada(x) {
+    if (x === null || x === undefined) return Vnil();
+    if (typeof x === "number") return Vnum(x);
+    if (typeof x === "boolean") return Vbool(x);
+    if (typeof x === "string") return Vstr(x);
+    if (Array.isArray(x)) return Varr(x.map(jsToBada));
+    return Vstr(String(x));
+  }
+  function makeFfiNative(interp, lang, xf) {
+    return {
+      t: "native",
+      name: xf.name,
+      fn: function (args) {
+        if (!interp.ffi) {
+          interp.out("[extension] " + lang + " 拡張 '" + xf.name +
+            "' はこの環境では実行できません (CLI / デスクトップ版で利用可)");
+          return Vnil();
+        }
+        var argv = args.map(function (a) { return JSON.stringify(badaToJson(a)); });
+        var r = interp.ffi(lang, xf.name, xf.code, xf.params, argv);
+        if (!r || !r.ok) {
+          interp.out("[extension] " + lang + ":" + xf.name + " failed: " + (r && r.error ? r.error : "ffi error"));
+          return Vnil();
+        }
+        var text = String(r.stdout == null ? "" : r.stdout).trim();
+        if (text === "") return Vnil();
+        try { return jsToBada(JSON.parse(text)); } catch (e) { return Vstr(text); }
+      }
+    };
+  }
+
   function Interp(opts) {
     opts = opts || {};
     this.out = opts.out || function () {};
@@ -848,6 +947,10 @@
     this.global = new Env(null);
     this.steps = 0;
     this.maxSteps = opts.maxSteps || 20000000;
+    /* host FFI bridge for foreign extensions (@reviser : extension):
+       ffi(lang, name, code, params, argv) -> {ok, stdout, error}
+       Provided by the CLI / desktop IDE; absent in browser & APK. */
+    this.ffi = opts.ffi || null;
     this.installNatives();
     this.global.set("Omega", Vts(this.ledger));
     this.global.set("tuplespace", Vts(this.ledger));
@@ -1404,6 +1507,29 @@
         }
         return { ret: false, val: Vnil() };
       }
+      case "EXTENSION": {
+        /* foreign-extension transaction: commit each extension as a ledger
+           fact and bind its name as a callable in the current env. */
+        var self2 = this;
+        for (var xi = 0; xi < n.funcs.length; xi++) {
+          var xf = n.funcs[xi];
+          this.ledger.facts.push(Varr([
+            Vstr("extension"), Vstr(n.lang), Vstr(xf.name), Vstr("|" + xf.params.join(",") + "|")
+          ]));
+          if (n.lang === "bada") {
+            /* self-extension: the code IS Bada — parse once, bind a closure */
+            var sub = parseProgram(xf.code);
+            var decl = node("FUNC", n.line);
+            decl.str = xf.name;
+            decl.params = xf.params;
+            decl.body = sub.program; /* PROGRAM executes like a BLOCK */
+            env.set(xf.name, { t: "func", decl: decl, closure: env });
+          } else {
+            env.set(xf.name, makeFfiNative(self2, n.lang, xf));
+          }
+        }
+        return { ret: false, val: Vnil() };
+      }
       case "IF": {
         var c = this.eval(n.kids[0], env);
         if (truthy(c)) return this.exec(n.kids[1], env);
@@ -1543,6 +1669,8 @@
     this.lines = [];
     this.tmp = 0;
     this.declared = Object.create(null);
+    this.preludes = [];                  /* hoisted C extension functions */
+    this.extC = Object.create(null);     /* name -> params (C extensions) */
   }
   Emitter.prototype.push = function (s) { this.lines.push(s); };
 
@@ -1554,6 +1682,13 @@
     }
     if (callee.type === "IDENT") {
       var name = callee.str;
+      /* C extensions (@reviser : extension c) are inlined native functions */
+      if (E.extC[name]) {
+        var xp = E.extC[name];
+        var xargs = [];
+        for (var xi = 0; xi < xp.length; xi++) xargs.push("bnumof(" + arg(xi, "bnum(0)") + ")");
+        return "bnum(bx_" + name + "(" + xargs.join(",") + "))";
+      }
       switch (name) {
         case "softmax": return "b_softmax(" + arg(0) + ")";
         case "entropy": return "b_entropy(" + arg(0) + ")";
@@ -1735,6 +1870,25 @@
       case "GRAMMAR":
         E.push("  /* grammar transaction: " + n.rules.map(function (r) { return r.name; }).join(", ") + " (resolved before lowering) */");
         break;
+      case "EXTENSION":
+        if (n.lang === "c") {
+          /* inline each C extension as a native function in the emitted C */
+          for (var ex = 0; ex < n.funcs.length; ex++) {
+            var xf = n.funcs[ex];
+            E.extC[xf.name] = xf.params;
+            E.preludes.push(
+              "/* @reviser : extension c -- " + xf.name + " */\n" +
+              "static double bx_" + xf.name + "(" +
+              (xf.params.length ? xf.params.map(function (p) { return "double " + p; }).join(", ") : "void") +
+              ") {\n" + xf.code + "\n}"
+            );
+          }
+        } else {
+          E.push("  /* extension transaction (" + n.lang + "): " +
+            n.funcs.map(function (f) { return f.name; }).join(", ") +
+            " -- runs in the interpreter's FFI, not in compiled output */");
+        }
+        break;
       case "BLOCK":
         for (var l = 0; l < n.kids.length; l++) lowerStmt(E, n.kids[l]);
         break;
@@ -1771,7 +1925,8 @@
     var body = [];
     E.lines = body;
     for (var i = 0; i < program.kids.length; i++) lowerStmt(E, program.kids[i]);
-    return C_RUNTIME + "\nint main(void){\n" + body.join("\n") + "\n  return 0;\n}\n";
+    var prelude = E.preludes.length ? E.preludes.join("\n") + "\n" : "";
+    return C_RUNTIME + prelude + "\nint main(void){\n" + body.join("\n") + "\n  return 0;\n}\n";
   }
 
   /* ------------------------------------------------------------------ *
@@ -1812,7 +1967,8 @@
       var p = parseProgram(src);
       var interp = new Interp({
         out: function (s) { lines.push(s); if (opts.out) opts.out(s); },
-        maxSteps: opts.maxSteps
+        maxSteps: opts.maxSteps,
+        ffi: opts.ffi
       });
       var ok = true, error = null;
       try {
@@ -1844,7 +2000,8 @@
       var outLines = [];
       var interp = new Interp({
         out: function (s) { outLines.push(s); if (opts.out) opts.out(s); },
-        maxSteps: opts.maxSteps
+        maxSteps: opts.maxSteps,
+        ffi: opts.ffi
       });
       var ruleLedger = [];
       return {

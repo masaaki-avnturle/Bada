@@ -65,7 +65,13 @@
     showTab("out");
     logLine("── インタープリタ実行 ──────────────────────────", "head");
     var t0 = Date.now();
-    var r = BadaLang.run(src, { maxSteps: 20000000 });
+    var r = BadaLang.run(src, {
+      maxSteps: 20000000,
+      /* デスクトップ版: @reviser : extension (python/java/c) を FFI で実行 */
+      ffi: native && native.ffiSync
+        ? function (lang, name, code, params, argv) { return native.ffiSync(lang, name, code, params, argv); }
+        : null
+    });
     if (r.parseErrors.length) {
       for (var i = 0; i < r.parseErrors.length; i++) logLine(r.parseErrors[i], "err");
     }

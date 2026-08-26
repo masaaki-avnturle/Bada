@@ -77,6 +77,8 @@
 
 `.bada` ソースを IDE ウィンドウに**ドラッグ&ドロップ**すると、**コンパイル(Bada→C→ネイティブリンク)** と**インタープリタ実行**を自動で行う GUI 開発環境です。論文 *Reviser-Extensible Grammars* の `@reviser : grammar` 文法拡張と Q# 風量子サブ言語 (`qubit` / `H` / `CNOT` / `Measure` / `Omega::Quantum`) を実装しています。
 
+さらに **`@reviser : extension`** で Bada を **Bada自身 / C / Python / Java** で機能拡張できます([`examples/extensions.bada`](bada_gui_ide/examples/extensions.bada)): 各拡張は追記専用レジャーへコミットされる拡張トランザクションで、C 拡張は**コンパイラが生成 C にインライン**してネイティブ化、Python / Java / C 拡張はインタープリタ(CLI・デスクトップ IDE)の FFI ブリッジで実行、Bada 拡張(自己拡張)は全プラットフォームで動作します。
+
 さらに `https:`/`http:` に代わるウルトラネットワークWWW の **`zone://url.or.jp`** スキームを Bada 言語自身で実装したリファレンス [`examples/zone.bada`](bada_gui_ide/examples/zone.bada) を同梱: `zone:` は中央サーバ・DNS ルートなしに P2P の仕組み(ピアハッシュのリング DHT)だけから構築され、通信は **Jones 多項式量子暗号** (`omega_jones_crypto_pkg` を Bada に移植) で保護されます — 各ゾーンの鍵は結び目図の Kauffman ブラケット標本から導出し、Bell 対 QKD がセッションソルトを合意、本文は Jones 鍵 AEAD で暗号化・封緘され、改ざんや誤った結び目は `409 zone-guard-reject` として排除、全レコードは追記専用 tuplespace(Akashic ゾーン台帳)にコミットされます。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) の「zone://」節を参照。
 
 | プラットフォーム | 入手 |
