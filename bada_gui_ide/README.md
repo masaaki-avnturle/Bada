@@ -224,6 +224,22 @@ dist[0.50000, 0.50000]
 | [`examples/atom_critical.bada`](examples/atom_critical.bada) | 同じモデルを **Bada 言語**で書いたリファレンス実装 |
 | [`tools/build-atom-critical.js`](tools/build-atom-critical.js) | 単一 HTML のビルダ (既知の物理値とのセルフチェック付き) |
 
+### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+インストール型のアプリとしても配布します。[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `acpi-debug.apk` |
+| **Windows 10 / 11** | `ACPI-1.0.0-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
+
+パッケージ定義は [`acpi-app/`](acpi-app/) (Electron + Cordova)、ビルドは
+[`acpi-app-build.yml`](../.github/workflows/acpi-app-build.yml) が実行します
+(`acpi-app-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+アプリの中身 `acpi-app/www/index.html` は `tools/build-atom-critical.js` が
+`dist/atom-critical.html` と同時に生成します。
+
 ### 臨界期の定義
 
 原子単位系で、クーロン障壁が完全に消える**障壁抑制場** (barrier-suppression field) は
@@ -321,6 +337,8 @@ bada_gui_ide/
   examples/   hello / engine / core / quantum / zone / atom_critical の各 .bada
   tools/      単一 HTML ビルダ (build-zone-browser.js / build-atom-critical.js)
   dist/       配布用の単一 HTML (zone-browser.html / bada-zone.html / atom-critical.html)
+  acpi-app/   ACPI のネイティブ アプリ (Windows EXE / Ubuntu AppImage・deb / Android APK)
+  zonebrowser-app/  ZoneBrowser のネイティブ アプリ
 ```
 
 ## ローカルでの起動

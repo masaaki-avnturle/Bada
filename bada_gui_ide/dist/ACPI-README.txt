@@ -11,6 +11,12 @@ Atomic Critical-Period Intensity simulator (Bada / Ω)
   bada.js                 Bada 言語コア。
   bada-cli.js             Bada の CLI ランナー。
 
+ネイティブ アプリ (インストール型) も Releases から入手できます:
+  Android          acpi-debug.apk
+  Windows 10 / 11  ACPI-1.0.0-x64.exe   (NSIS インストーラ / ポータブル)
+  Ubuntu           ACPI-1.0.0-x86_64.AppImage / ACPI-1.0.0-amd64.deb
+  https://github.com/masaaki-avnturle/Bada/releases
+
 使い方:
   1) GUI  : atom-critical.html をダブルクリック。
             元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に
@@ -23,6 +29,10 @@ Atomic Critical-Period Intensity simulator (Bada / Ω)
             node atom-critical-cli.js selftest
             (atom-critical-cli.js と atom_critical.js を同じ階層に置いてください)
   3) Bada : node bada-cli.js run atom_critical.bada
+  4) アプリ: Windows / Ubuntu 版では CSV・JSON・PNG が「名前を付けて保存」
+            ダイアログで書き出せます。Android 版は WebView がファイル保存を
+            扱えないため、同じボタンで内容を表示するパネルが開きます
+            (テキストはクリップボードへコピー、図は長押しで保存)。
 
 何を計算しているか:
   「臨界期」= 強レーザー場のなかで原子のクーロン障壁が完全に抑制され

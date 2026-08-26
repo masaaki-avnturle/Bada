@@ -77,3 +77,13 @@ const ext = html.match(/<(?:script|link|img)\b[^>]*\b(?:src|href)\s*=\s*["'](?!#
 if (ext) { console.error("外部参照が残っています:\n" + ext.join("\n")); process.exit(1); }
 
 console.log("built " + path.relative(IDE, outFile) + "  (" + (html.length / 1024).toFixed(1) + " KB, 自己完結)");
+
+/* ネイティブ アプリ (Windows EXE / Ubuntu AppImage・deb / Android APK) の
+   www/index.html としても配置する。electron-builder は ../www を
+   extraResources に、cordova は www/ をそのまま取り込む。 */
+const APPWWW = path.join(IDE, "acpi-app", "www");
+if (fs.existsSync(path.join(IDE, "acpi-app"))) {
+  fs.mkdirSync(APPWWW, { recursive: true });
+  fs.writeFileSync(path.join(APPWWW, "index.html"), html);
+  console.log("staged acpi-app/www/index.html (Electron / Cordova)");
+}

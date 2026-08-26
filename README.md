@@ -46,6 +46,21 @@
 | [`atom_critical.js`](bada_gui_ide/www/atom_critical.js) | モデルコア(GUI と CLI が共有) |
 | [`atom_critical.bada`](bada_gui_ide/examples/atom_critical.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
 
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル | インストール |
+|:---|:---|:---|
+| **Android** (APK) | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
+| **Windows 10 / 11** | `ACPI-1.0.0-x64.exe` | NSIS インストーラ / ポータブル |
+| **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x ACPI-1.0.0-x86_64.AppImage && ./ACPI-1.0.0-x86_64.AppImage` |
+| **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
+
+ビルドは [`acpi-app-build.yml`](.github/workflows/acpi-app-build.yml) が実行します(`acpi-app-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/acpi-app/`](bada_gui_ide/acpi-app/) を参照。
+
+Windows / Ubuntu アプリでは CSV・JSON・PNG が「名前を付けて保存」で書き出せます。Android アプリは WebView がファイル保存を扱えないため、同じボタンで内容を表示するパネルが開き、テキストはクリップボードへコピー、図は長押しで保存できます。
+
 **臨界期とは** — 原子単位系で、クーロン障壁が完全に消える障壁抑制場は
 `F_cr = I_p²/(4 Z_c)`、対応する臨界強度は `I_cr = F_cr² · I_a`
 (`I_a = 3.5094×10¹⁶ W/cm²`)。臨界期は瞬時場が `|E(t)| ≥ F_cr` を満たす時間窓、
