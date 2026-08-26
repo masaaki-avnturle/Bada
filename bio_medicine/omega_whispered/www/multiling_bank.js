@@ -16,7 +16,9 @@
   "use strict";
 
   var FIELDS = ["ロシア語・数学", "ロシア語・物理学", "ロシア語・化学", "ロシア語・薬学", "ロシア語・経済学", "ロシア語・情報科学",
-                "フランス語・数学", "フランス語・物理学", "フランス語・化学", "フランス語・薬学", "フランス語・経済学", "フランス語・情報科学"];
+                "フランス語・数学", "フランス語・物理学", "フランス語・化学", "フランス語・薬学", "フランス語・経済学", "フランス語・情報科学",
+                "ドイツ語・数学", "ドイツ語・物理学", "ドイツ語・化学", "ドイツ語・薬学", "ドイツ語・経済学", "ドイツ語・情報科学",
+                "中国語・数学", "中国語・物理学", "中国語・化学", "中国語・薬学", "中国語・経済学", "中国語・情報科学"];
 
   /* 系統(math / chem / pharma / econ)との対応。他系統へ配るときに使う */
   var SUBJECT_OF = {
@@ -25,10 +27,18 @@
     "ロシア語・化学": "chem", "フランス語・化学": "chem",
     "ロシア語・薬学": "pharma", "フランス語・薬学": "pharma",
     "ロシア語・経済学": "econ", "フランス語・経済学": "econ",
-    "ロシア語・情報科学": "cs", "フランス語・情報科学": "cs"
+    "ロシア語・情報科学": "cs", "フランス語・情報科学": "cs",
+    "ドイツ語・数学": "math", "中国語・数学": "math",
+    "ドイツ語・物理学": "chem", "中国語・物理学": "chem",
+    "ドイツ語・化学": "chem", "中国語・化学": "chem",
+    "ドイツ語・薬学": "pharma", "中国語・薬学": "pharma",
+    "ドイツ語・経済学": "econ", "中国語・経済学": "econ",
+    "ドイツ語・情報科学": "cs", "中国語・情報科学": "cs"
   };
 
-  var LANG_OF = function (f) { return f.indexOf("ロシア") === 0 ? "ロシア語" : "フランス語"; };
+  /* 分野名は「言語・分野」の形。前半が言語名になる */
+  var LANG_OF = function (f) { return String(f).split("・")[0]; };
+  var LANGS = ["ロシア語", "フランス語", "ドイツ語", "中国語"];
 
   /* ======================= 論文中の略号・定型表記 ======================= */
   var SYMBOLS = [
@@ -82,7 +92,44 @@
     { ch: "IA", ja: "人工知能", mean: "intelligence artificielle(アンテリジャンス アルティフィシエル)= AI", field: "フランス語・情報科学", lv: 2 },
     { ch: "RGPD", ja: "一般データ保護規則", mean: "règlement général sur la protection des données = GDPR", field: "フランス語・情報科学", lv: 4 },
     { ch: "Ko / Mo / Go", ja: "キロ/メガ/ギガオクテット", mean: "kilo-octet などの略。英語の KB/MB/GB にあたる", field: "フランス語・情報科学", lv: 3 },
-    { ch: "MAJ", ja: "更新", mean: "mise à jour(ミザジュール)= update", field: "フランス語・情報科学", lv: 3 }
+    { ch: "MAJ", ja: "更新", mean: "mise à jour(ミザジュール)= update", field: "フランス語・情報科学", lv: 3 },
+
+    /* --- ドイツ語 --- */
+    { ch: "q.e.d. / w.z.b.w.", ja: "証明終わり", mean: "was zu beweisen war(ヴァス ツー ベヴァイゼン ヴァー)= 示すべきであったこと", field: "ドイツ語・数学", lv: 3 },
+    { ch: "o.B.d.A.", ja: "一般性を失わずに", mean: "ohne Beschränkung der Allgemeinheit = without loss of generality", field: "ドイツ語・数学", lv: 5 },
+    { ch: "d.h.", ja: "すなわち", mean: "das heißt(ダス ハイスト)= i.e.", field: "ドイツ語・数学", lv: 1 },
+    { ch: "z.B.", ja: "たとえば", mean: "zum Beispiel(ツム バイシュピール)= e.g.", field: "ドイツ語・数学", lv: 1 },
+    { ch: "vgl.", ja: "参照せよ", mean: "vergleiche(フェアグライヒェ)= cf.", field: "ドイツ語・数学", lv: 2 },
+    { ch: "bzw.", ja: "あるいは / それぞれ", mean: "beziehungsweise(ベツィーウングスヴァイゼ)= respectively / or rather", field: "ドイツ語・数学", lv: 3 },
+    { ch: "Abb.", ja: "図", mean: "Abbildung(アップビルドゥング)= figure。数学では「写像」の意味にもなる", field: "ドイツ語・物理学", lv: 2 },
+    { ch: "Tab.", ja: "表", mean: "Tabelle(タベレ)= table", field: "ドイツ語・物理学", lv: 1 },
+    { ch: "Vgl. Bd.", ja: "巻を参照", mean: "Band(バント)= 巻。文献参照の表記", field: "ドイツ語・物理学", lv: 4 },
+    { ch: "Smp.", ja: "融点", mean: "Schmelzpunkt(シュメルツプンクト)= melting point。Sdp. は沸点", field: "ドイツ語・化学", lv: 3 },
+    { ch: "Lsg.", ja: "溶液", mean: "Lösung(レーズング)の略。「解」の意味も持つ", field: "ドイツ語・化学", lv: 3 },
+    { ch: "AM", ja: "医薬品", mean: "Arzneimittel(アルツナイミッテル)= drug product", field: "ドイツ語・薬学", lv: 3 },
+    { ch: "NW", ja: "副作用", mean: "Nebenwirkung(ネーベンヴィルクング)= side effect", field: "ドイツ語・薬学", lv: 3 },
+    { ch: "BIP", ja: "国内総生産", mean: "Bruttoinlandsprodukt(ブルットインラントスプロドゥクト)= GDP", field: "ドイツ語・経済学", lv: 2 },
+    { ch: "MwSt.", ja: "付加価値税", mean: "Mehrwertsteuer(メーアヴェルトシュトイアー)= VAT", field: "ドイツ語・経済学", lv: 3 },
+    { ch: "EZB", ja: "欧州中央銀行", mean: "Europäische Zentralbank。ユーロ圏の金融政策を担う", field: "ドイツ語・経済学", lv: 3 },
+    { ch: "KI", ja: "人工知能", mean: "künstliche Intelligenz(キュンストリッヒェ インテリゲンツ)= AI", field: "ドイツ語・情報科学", lv: 2 },
+    { ch: "DSGVO", ja: "一般データ保護規則", mean: "Datenschutz-Grundverordnung = GDPR。原語はドイツ語", field: "ドイツ語・情報科学", lv: 4 },
+    { ch: "EDV", ja: "電子データ処理", mean: "elektronische Datenverarbeitung。IT の古くからの呼び方", field: "ドイツ語・情報科学", lv: 4 },
+
+    /* --- 中国語 --- */
+    { ch: "证毕", ja: "証明終わり", mean: "zhèngbì(ジョンビー)= Q.E.D.。「证明完毕」の略", field: "中国語・数学", lv: 3 },
+    { ch: "即", ja: "すなわち", mean: "jí(ジー)= i.e.。「亦即」も使う", field: "中国語・数学", lv: 2 },
+    { ch: "例如", ja: "たとえば", mean: "lìrú(リールー)= e.g.", field: "中国語・数学", lv: 1 },
+    { ch: "参见", ja: "参照せよ", mean: "cānjiàn(ツァンジエン)= cf. / see", field: "中国語・数学", lv: 2 },
+    { ch: "当且仅当", ja: "必要十分条件", mean: "dāng qiě jǐn dāng = if and only if。「そのときかつそのときに限り」の直訳", field: "中国語・数学", lv: 4 },
+    { ch: "图 / 表", ja: "図 / 表", mean: "tú / biǎo。日本語の「図」「表」と同じ用法", field: "中国語・物理学", lv: 1 },
+    { ch: "标准状况", ja: "標準状態", mean: "biāozhǔn zhuàngkuàng = 標準状態(0 °C, 101.3 kPa)", field: "中国語・化学", lv: 3 },
+    { ch: "熔点 / 沸点", ja: "融点 / 沸点", mean: "róngdiǎn / fèidiǎn。日本語の「融点」は中国語では「熔点」と書く", field: "中国語・化学", lv: 3 },
+    { ch: "国药准字", ja: "医薬品承認番号", mean: "guóyào zhǔnzì。中国の医薬品承認番号の冒頭表記", field: "中国語・薬学", lv: 5 },
+    { ch: "不良反应", ja: "副作用・有害反応", mean: "bùliáng fǎnyìng = adverse reaction", field: "中国語・薬学", lv: 3 },
+    { ch: "国内生产总值", ja: "国内総生産", mean: "guónèi shēngchǎn zǒngzhí = GDP。略して「国内生产总值(GDP)」と併記される", field: "中国語・経済学", lv: 2 },
+    { ch: "增值税", ja: "付加価値税", mean: "zēngzhíshuì = VAT", field: "中国語・経済学", lv: 3 },
+    { ch: "人工智能", ja: "人工知能", mean: "réngōng zhìnéng = AI。「智能」が intelligence", field: "中国語・情報科学", lv: 2 },
+    { ch: "操作系统", ja: "オペレーティングシステム", mean: "cāozuò xìtǒng = OS。「系统」が system", field: "中国語・情報科学", lv: 2 }
   ];
 
   /* ============ 空似言葉・言語で意味がずれる語 ============ */
@@ -146,6 +193,48 @@
       { field: "フランス語・経済学", mean: "l'industrie du logiciel = ソフトウェア産業" },
       { field: "ロシア語・情報科学", mean: "программное обеспечение(ПО)= ソフトウェア。электронная почта が電子メール" },
       { field: "フランス語・薬学", mean: "logiciel de prescription = 処方支援ソフト" }
+    ]},
+    { ch: "Satz", items: [
+      { field: "ドイツ語・数学", mean: "定理(Lehrsatz)。証明の対象になる主張" },
+      { field: "ドイツ語・物理学", mean: "法則(Erhaltungssatz = 保存則)" },
+      { field: "ドイツ語・経済学", mean: "率(Zinssatz = 金利、Steuersatz = 税率)" },
+      { field: "ドイツ語・情報科学", mean: "文(自然言語処理の sentence)・組版の一組" }
+    ]},
+    { ch: "Körper", items: [
+      { field: "ドイツ語・数学", mean: "体(たい)。四則が自由にできる代数構造(英語 field)" },
+      { field: "ドイツ語・物理学", mean: "物体(starrer Körper = 剛体)" },
+      { field: "ドイツ語・薬学", mean: "身体(Körpergewicht = 体重、用量計算に使う)" },
+      { field: "ドイツ語・化学", mean: "固体・物体としての試料" }
+    ]},
+    { ch: "Lösung", items: [
+      { field: "ドイツ語・化学", mean: "溶液(wässrige Lösung = 水溶液)" },
+      { field: "ドイツ語・数学", mean: "解(方程式を満たす値)" },
+      { field: "ドイツ語・情報科学", mean: "解決策・ソリューション" },
+      { field: "ドイツ語・経済学", mean: "問題の解決(Problemlösung)" }
+    ]},
+    { ch: "Gift", items: [
+      { field: "ドイツ語・薬学", mean: "毒。英語の gift(贈り物)とは全く別の意味" },
+      { field: "ドイツ語・化学", mean: "毒物(Giftstoff)。触媒毒は Katalysatorgift" },
+      { field: "ドイツ語・物理学", mean: "半導体の文脈では使わない。ドープは dotieren" },
+      { field: "ドイツ語・数学", mean: "数学の術語としては用いない" }
+    ]},
+    { ch: "程序 / 算法", items: [
+      { field: "中国語・情報科学", mean: "程序 = プログラム、算法 = アルゴリズム。日本語の「程序(順序)」とは意味が違う" },
+      { field: "中国語・数学", mean: "算法 は計算手続き全般。「运算」が演算" },
+      { field: "中国語・経済学", mean: "程序 は「手続き・プロセス」の意味でも使う" },
+      { field: "中国語・薬学", mean: "操作程序 = 操作手順(SOP)" }
+    ]},
+    { ch: "需求 / 函数", items: [
+      { field: "中国語・経済学", mean: "需求 = 需要。日本語の「需要」とは字が違う" },
+      { field: "中国語・数学", mean: "函数 = 関数。日本語が「関数」に書き換える前の表記" },
+      { field: "中国語・情報科学", mean: "函数 は関数(サブルーチン)。需求 は要件(requirements)" },
+      { field: "中国語・物理学", mean: "波函数 = 波動関数" }
+    ]},
+    { ch: "氧 / 熵", items: [
+      { field: "中国語・化学", mean: "氧 = 酸素。だから酸化は「氧化」で「酸」の字を使わない" },
+      { field: "中国語・物理学", mean: "熵 = エントロピー。熱(火)と商から作られた一字の新造字" },
+      { field: "中国語・薬学", mean: "氧疗 = 酸素療法" },
+      { field: "中国語・情報科学", mean: "信息熵 = 情報エントロピー" }
     ]},
     { ch: "производная / dérivée", items: [
       { field: "ロシア語・数学", mean: "производная = 導関数" },
@@ -245,7 +334,53 @@
       why: "英語 machine learning を機械ではなく「自動」と訳しているのが特徴。apprentissage profond で深層学習。" },
     { eq: "traitement du signal", name: "信号処理(仏)", field: "フランス語・情報科学", lv: 4,
       mean: "traitement = 処理、signal = 信号",
-      why: "traitement de données なら情報処理。traitement + de + 名詞で「〜処理」を作る。" }
+      why: "traitement de données なら情報処理。traitement + de + 名詞で「〜処理」を作る。" },
+
+    /* --- ドイツ語 --- */
+    { eq: "was zu beweisen war (w.z.b.w.)", name: "証明終わり(独)", field: "ドイツ語・数学", lv: 3,
+      mean: "「示すべきであったこと」。証明の終わりに置く",
+      why: "ラテン語 Q.E.D. の直訳。露 ч.т.д.、仏 C.Q.F.D. と四言語で構造が一致する。" },
+    { eq: "genau dann, wenn", name: "必要十分条件(独)", field: "ドイツ語・数学", lv: 4,
+      mean: "「ちょうどそのとき、〜のとき」= if and only if",
+      why: "英語 iff、仏 ssi、露 тогда и только тогда にあたる定型。" },
+    { eq: "ohne Beschränkung der Allgemeinheit", name: "一般性を失わずに(独)", field: "ドイツ語・数学", lv: 5,
+      mean: "対称性から場合を絞ってよい、という宣言",
+      why: "英語 without loss of generality の直訳。略記 o.B.d.A. で書かれる。" },
+    { eq: "Energieerhaltungssatz", name: "エネルギー保存則(独)", field: "ドイツ語・物理学", lv: 3,
+      mean: "Energie + Erhaltung(保存)+ Satz(法則)を 1 語に連結したもの",
+      why: "ドイツ語は概念を複合語で 1 語にする。長さがそのまま定義の構造を表す。" },
+    { eq: "wässrige Lösung", name: "水溶液(独)", field: "ドイツ語・化学", lv: 3,
+      mean: "Wasser(水)の形容詞形 + Lösung(溶液)",
+      why: "Lösung は「解」でもあるので、数学の文脈と読み分ける必要がある。" },
+    { eq: "Halbwertszeit", name: "半減期(独)", field: "ドイツ語・薬学", lv: 4,
+      mean: "halb(半分)+ Wert(値)+ Zeit(時間)",
+      why: "物理の放射性半減期も薬学の生物学的半減期も同じ語を使う。" },
+    { eq: "Angebot und Nachfrage", name: "需要と供給(独)", field: "ドイツ語・経済学", lv: 2,
+      mean: "Angebot = 供給、Nachfrage = 需要",
+      why: "フランス語 offre et demande と同じく供給が先に来る。日本語と語順が逆。" },
+    { eq: "maschinelles Lernen", name: "機械学習(独)", field: "ドイツ語・情報科学", lv: 3,
+      mean: "maschinell(機械の)+ Lernen(学習)",
+      why: "英語 machine learning の直訳。仏 apprentissage automatique は「自動」と訳す点が違う。" },
+
+    /* --- 中国語 --- */
+    { eq: "当且仅当", name: "必要十分条件(中)", field: "中国語・数学", lv: 4,
+      mean: "「当たり、かつ、ただ〜のときのみ当たる」= if and only if",
+      why: "英語 if and only if を語順ごと写した訳語。数学の同値を宣言する定型。" },
+    { eq: "证明完毕(证毕)", name: "証明終わり(中)", field: "中国語・数学", lv: 3,
+      mean: "「証明が完了した」",
+      why: "四言語(露・仏・独・中)とも、ラテン語 Q.E.D. に対応する決まり文句を持つ。" },
+    { eq: "能量守恒定律", name: "エネルギー保存則(中)", field: "中国語・物理学", lv: 3,
+      mean: "能量(エネルギー)+ 守恒(保存)+ 定律(法則)",
+      why: "「守恒」が保存。动量守恒(運動量保存)、电荷守恒(電荷保存)と同じ型で並ぶ。" },
+    { eq: "氧化还原反应", name: "酸化還元反応(中)", field: "中国語・化学", lv: 3,
+      mean: "氧化(酸化)+ 还原(還元)+ 反应(反応)",
+      why: "「氧」が酸素なので、酸化は「酸」ではなく「氧」の字で書く。日本語との大きな違い。" },
+    { eq: "时间复杂度", name: "時間計算量(中)", field: "中国語・情報科学", lv: 3,
+      mean: "时间(時間)+ 复杂度(複雑さの度合い)",
+      why: "英語 time complexity の直訳。空间复杂度なら空間計算量。" },
+    { eq: "通货膨胀率", name: "インフレ率(中)", field: "中国語・経済学", lv: 3,
+      mean: "通货(通貨)+ 膨胀(膨張)+ 率",
+      why: "「通貨が膨らむ」という比喩がそのまま術語になっている。失业率(失業率)と同じ「〜率」の型。" }
   ];
 
   /* ============ 日本語/英語 → ロシア語・フランス語 の連想 ============ */
@@ -318,6 +453,46 @@
       adv: "открытый ключ / закрытый ключ", advName: "公開鍵 / 秘密鍵(露)", field: "ロシア語・情報科学", lv: 4,
       why: "открытый(開かれた)/ закрытый(閉じられた)の対で表す。フランス語では clé publique / clé privée。",
       wrong: ["шифрование", "хеш-функция", "цифровая подпись"] },
+    { simple: "「毒」をドイツ語で言うと", simpleMean: "体に害を与える物質",
+      adv: "Gift", advName: "毒(独)", field: "ドイツ語・薬学", lv: 3,
+      why: "英語の gift(贈り物)と同じ綴りだが意味は「毒」。空似言葉の代表例で、Giftstoff(毒物)のように複合語を作る。",
+      wrong: ["Geschenk", "Arznei", "Wirkstoff"] },
+    { simple: "代数で「四則が自由にできる構造」(独)", simpleMean: "足し算も割り算もできる集まり",
+      adv: "Körper", advName: "体(独)", field: "ドイツ語・数学", lv: 4,
+      why: "英語 field、仏語 corps にあたる。ドイツ語では「身体・物体」と同じ語で、物理では剛体 starrer Körper に使う。",
+      wrong: ["Ring", "Menge", "Gruppe"] },
+    { simple: "解の形をあらかじめ仮に置く(独)", simpleMean: "こういう形だろうと当たりをつける",
+      adv: "Ansatz", advName: "アンザッツ(独)", field: "ドイツ語・数学", lv: 5,
+      why: "英語圏でもそのまま ansatz として使われる。訳しにくいまま輸入された数学・物理の語。",
+      wrong: ["Beweis", "Vermutung", "Abbildung"] },
+    { simple: "エネルギーは増えも減りもしない(独)", simpleMean: "保存される量がある",
+      adv: "Energieerhaltungssatz", advName: "エネルギー保存則(独)", field: "ドイツ語・物理学", lv: 3,
+      why: "Energie + Erhaltung + Satz を 1 語に連結する。ドイツ語では概念の構造がそのまま語の長さになる。",
+      wrong: ["Wellenfunktion", "Beschleunigung", "Wirkungsquerschnitt"] },
+    { simple: "薬が半分になるまでの時間(独)", simpleMean: "濃度が半減する時間",
+      adv: "Halbwertszeit", advName: "半減期(独)", field: "ドイツ語・薬学", lv: 3,
+      why: "halb(半分)+ Wert(値)+ Zeit(時間)。ロシア語は период полувыведения、フランス語は demi-vie。",
+      wrong: ["Nebenwirkung", "Dosierung", "Wirkstoff"] },
+    { simple: "「酸化」を中国語で書くと", simpleMean: "酸素と結びつくこと",
+      adv: "氧化", advName: "酸化(中)", field: "中国語・化学", lv: 3,
+      why: "中国語では酸素を「氧」と書くため、酸化は「酸」ではなく「氧化」。還元は「还原」。",
+      wrong: ["酸化", "还原", "催化"] },
+    { simple: "「関数」を中国語で書くと", simpleMean: "入力に対して出力が決まる対応",
+      adv: "函数", advName: "関数(中)", field: "中国語・数学", lv: 2,
+      why: "日本語も戦前は「函数」と書いた。中国語は今もこの表記を使う。方程(方程式)、矩阵(行列)も日本語と字が違う。",
+      wrong: ["方程", "矩阵", "集合"] },
+    { simple: "「コンピュータ」を中国語で言うと", simpleMean: "計算する機械",
+      adv: "计算机", advName: "計算機(中)", field: "中国語・情報科学", lv: 2,
+      why: "大陸では「计算机」、台湾では「電腦(電子の脳)」。フランス語 ordinateur と同じく、音訳を避けて意味で作った語。",
+      wrong: ["电脑", "程序", "网络"] },
+    { simple: "でたらめさの度合いを表す一字(中)", simpleMean: "乱雑さを測る量",
+      adv: "熵", advName: "エントロピー(中)", field: "中国語・物理学", lv: 4,
+      why: "火(熱)と商を組み合わせて作られた一字の新造字。熱量を温度で割る(商)という定義がそのまま字形になっている。",
+      wrong: ["焓", "能量", "功"] },
+    { simple: "買いたい量のことを中国語では", simpleMean: "需要のこと",
+      adv: "需求", advName: "需要(中)", field: "中国語・経済学", lv: 2,
+      why: "日本語の「需要」は中国語では「需求」、「供給」は「供给」。字が少しずつ違う点に注意。",
+      wrong: ["供给", "价格", "市场"] },
     { simple: "方程式の「解」(露)", simpleMean: "方程式を満たす値",
       adv: "решение", advName: "解(露)", field: "ロシア語・数学", lv: 3,
       why: "решение は「解決」でもある。化学の「溶液」は раствор で、英語 solution の二つの意味が別語になる。",
@@ -487,7 +662,157 @@
     { t: "serveur", en: "サーバ", field: "フランス語・情報科学", lv: 2, def: "セルヴール" },
     { t: "infonuagique", en: "クラウドコンピューティング", field: "フランス語・情報科学", lv: 5, def: "アンフォニュアジック。information + nuage(雲)の造語。ケベックで作られた" },
     { t: "courriel", en: "電子メール", field: "フランス語・情報科学", lv: 3, def: "クーリエル。courrier + électronique の造語。ケベック発祥で仏本国にも広まった" },
-    { t: "intelligence artificielle", en: "人工知能", field: "フランス語・情報科学", lv: 3, def: "アンテリジャンス アルティフィシエル" }
+    { t: "intelligence artificielle", en: "人工知能", field: "フランス語・情報科学", lv: 3, def: "アンテリジャンス アルティフィシエル" },
+
+    /* --- ドイツ語・数学 --- */
+    { t: "Ableitung", en: "導関数", field: "ドイツ語・数学", lv: 3, def: "アップライトゥング。ableiten(導き出す)から" },
+    { t: "Integral", en: "積分", field: "ドイツ語・数学", lv: 2, def: "インテグラール" },
+    { t: "Grenzwert", en: "極限", field: "ドイツ語・数学", lv: 3, def: "グレンツヴェルト。Grenze(境界)+ Wert(値)" },
+    { t: "Menge", en: "集合", field: "ドイツ語・数学", lv: 2, def: "メンゲ。「量・多数」の一般語でもある。Mengenlehre で集合論" },
+    { t: "Abbildung", en: "写像", field: "ドイツ語・数学", lv: 4, def: "アップビルドゥング。「図」の意味もある(Abb.)" },
+    { t: "Körper", en: "体(たい)", field: "ドイツ語・数学", lv: 4, def: "ケルパー。「身体・物体」でもある。英語 field にあたる" },
+    { t: "Ring", en: "環", field: "ドイツ語・数学", lv: 4, def: "リング。英語 ring と同じ語で、加法と乗法をもつ構造" },
+    { t: "Beweis", en: "証明", field: "ドイツ語・数学", lv: 3, def: "ベヴァイス。beweisen(証明する)から" },
+    { t: "Satz", en: "定理", field: "ドイツ語・数学", lv: 3, def: "ザッツ。「文・楽章」の意味もある多義語" },
+    { t: "Eigenwert", en: "固有値", field: "ドイツ語・数学", lv: 3, def: "アイゲンヴェルト。英語 eigenvalue はこの語の前半をそのまま借りた" },
+    { t: "Ansatz", en: "解の形の仮置き", field: "ドイツ語・数学", lv: 5, def: "アンザッツ。英語圏でもそのまま ansatz として使う" },
+    { t: "Vermutung", en: "予想", field: "ドイツ語・数学", lv: 4, def: "フェアムートゥング。未証明の主張" },
+
+    /* --- ドイツ語・物理学 --- */
+    { t: "Geschwindigkeit", en: "速度", field: "ドイツ語・物理学", lv: 2, def: "ゲシュヴィンディヒカイト" },
+    { t: "Beschleunigung", en: "加速度", field: "ドイツ語・物理学", lv: 3, def: "ベシュロイニグング" },
+    { t: "Kraft", en: "力", field: "ドイツ語・物理学", lv: 1, def: "クラフト。Schwerkraft で重力" },
+    { t: "Impuls", en: "運動量", field: "ドイツ語・物理学", lv: 3, def: "インプルス。Impulserhaltung で運動量保存" },
+    { t: "Wellenfunktion", en: "波動関数", field: "ドイツ語・物理学", lv: 4, def: "ヴェレンフンクツィオーン。Welle = 波" },
+    { t: "Zustandsdichte", en: "状態密度", field: "ドイツ語・物理学", lv: 5, def: "ツーシュタンツディヒテ。Zustand(状態)+ Dichte(密度)" },
+    { t: "Supraleitung", en: "超伝導", field: "ドイツ語・物理学", lv: 5, def: "ズープラライトゥング。supra-(超)+ Leitung(伝導)" },
+    { t: "Erhaltungssatz", en: "保存則", field: "ドイツ語・物理学", lv: 4, def: "エアハルトゥングスザッツ。Erhaltung(保存)+ Satz(定理)" },
+    { t: "Nullpunktsenergie", en: "零点エネルギー", field: "ドイツ語・物理学", lv: 5, def: "ヌルプンクツエネルギー" },
+    { t: "Wirkungsquerschnitt", en: "断面積(反応断面積)", field: "ドイツ語・物理学", lv: 5, def: "ヴィルクングスクヴェアシュニット。Wirkung(作用)+ Querschnitt(断面)" },
+
+    /* --- ドイツ語・化学 --- */
+    { t: "Lösung", en: "溶液", field: "ドイツ語・化学", lv: 2, def: "レーズング。「解決・解」の意味もあり、数学では「解」を指す" },
+    { t: "Stoff", en: "物質", field: "ドイツ語・化学", lv: 2, def: "シュトフ。Reinstoff で純物質、Gemisch が混合物" },
+    { t: "Reaktionsgeschwindigkeit", en: "反応速度", field: "ドイツ語・化学", lv: 4, def: "レアクツィオーンスゲシュヴィンディヒカイト。長い複合語はドイツ語の特徴" },
+    { t: "Oxidation / Reduktion", en: "酸化 / 還元", field: "ドイツ語・化学", lv: 3, def: "オクシダツィオーン / レドゥクツィオーン" },
+    { t: "Säure / Base", en: "酸 / 塩基", field: "ドイツ語・化学", lv: 2, def: "ゾイレ / バーゼ" },
+    { t: "Gleichgewicht", en: "平衡", field: "ドイツ語・化学", lv: 3, def: "グライヒゲヴィヒト。gleich(等しい)+ Gewicht(重さ)" },
+    { t: "Katalysator", en: "触媒", field: "ドイツ語・化学", lv: 3, def: "カタリザートル" },
+    { t: "Bindung", en: "結合", field: "ドイツ語・化学", lv: 3, def: "ビンドゥング。kovalente Bindung で共有結合" },
+    { t: "Ausbeute", en: "収率", field: "ドイツ語・化学", lv: 4, def: "アウスボイテ。実験項でよく使う" },
+    { t: "Siedepunkt", en: "沸点", field: "ドイツ語・化学", lv: 3, def: "ジーデプンクト。Schmelzpunkt が融点" },
+
+    /* --- ドイツ語・薬学 --- */
+    { t: "Arzneimittel", en: "医薬品", field: "ドイツ語・薬学", lv: 3, def: "アルツナイミッテル。Arznei(薬)+ Mittel(手段・剤)" },
+    { t: "Wirkstoff", en: "有効成分", field: "ドイツ語・薬学", lv: 3, def: "ヴィルクシュトフ。Wirkung(作用)+ Stoff(物質)" },
+    { t: "Nebenwirkung", en: "副作用", field: "ドイツ語・薬学", lv: 3, def: "ネーベンヴィルクング。neben(そばの)+ Wirkung(作用)" },
+    { t: "Gegenanzeige", en: "禁忌", field: "ドイツ語・薬学", lv: 4, def: "ゲーゲンアンツァイゲ。gegen(反対)+ Anzeige(適応)" },
+    { t: "Dosierung", en: "用法用量", field: "ドイツ語・薬学", lv: 3, def: "ドジールング" },
+    { t: "Halbwertszeit", en: "半減期", field: "ドイツ語・薬学", lv: 3, def: "ハルプヴェルツツァイト。halb(半分)+ Wert(値)+ Zeit(時間)" },
+    { t: "Verordnung", en: "処方", field: "ドイツ語・薬学", lv: 4, def: "フェアオルドヌング。「規則・法令」の意味もある" },
+    { t: "Bioverfügbarkeit", en: "バイオアベイラビリティ", field: "ドイツ語・薬学", lv: 5, def: "ビオフェアフューグバーカイト。verfügbar(利用可能な)から" },
+    { t: "Wechselwirkung", en: "相互作用", field: "ドイツ語・薬学", lv: 4, def: "ヴェクセルヴィルクング。物理でも「相互作用」に使う" },
+    { t: "klinische Studie", en: "臨床試験", field: "ドイツ語・薬学", lv: 3, def: "クリーニシェ シュトゥーディエ" },
+
+    /* --- ドイツ語・経済学 --- */
+    { t: "Angebot und Nachfrage", en: "需要と供給", field: "ドイツ語・経済学", lv: 2, def: "アンゲボート ウント ナーハフラーゲ。供給が先に来る語順" },
+    { t: "Grenzkosten", en: "限界費用", field: "ドイツ語・経済学", lv: 3, def: "グレンツコステン。Grenze(境界)+ Kosten(費用)" },
+    { t: "Wertschöpfung", en: "付加価値", field: "ドイツ語・経済学", lv: 4, def: "ヴェルトシェプフング。Wert(価値)+ Schöpfung(創造)" },
+    { t: "Arbeitslosigkeit", en: "失業", field: "ドイツ語・経済学", lv: 3, def: "アルバイツロージヒカイト。Arbeit(仕事)+ los(無い)" },
+    { t: "Konjunktur", en: "景気", field: "ドイツ語・経済学", lv: 4, def: "コンユンクトゥーア。英語 conjuncture とは意味がずれる" },
+    { t: "Zinssatz", en: "金利", field: "ドイツ語・経済学", lv: 3, def: "ツィンスザッツ。Zins(利子)+ Satz(率)" },
+    { t: "Steuer", en: "税", field: "ドイツ語・経済学", lv: 2, def: "シュトイアー。「舵」の意味もある同綴りの語がある" },
+    { t: "Ersparnis", en: "貯蓄", field: "ドイツ語・経済学", lv: 3, def: "エアシュパルニス。sparen(節約する)から" },
+    { t: "Wettbewerb", en: "競争", field: "ドイツ語・経済学", lv: 3, def: "ヴェットベヴェルプ" },
+    { t: "Geldpolitik", en: "金融政策", field: "ドイツ語・経済学", lv: 3, def: "ゲルトポリティーク。Geld(貨幣)+ Politik(政策)" },
+
+    /* --- ドイツ語・情報科学 --- */
+    { t: "Rechner", en: "計算機", field: "ドイツ語・情報科学", lv: 2, def: "レヒナー。rechnen(計算する)から。Computer も使う" },
+    { t: "Speicher", en: "メモリ・記憶装置", field: "ドイツ語・情報科学", lv: 2, def: "シュパイヒャー。speichern(蓄える)から" },
+    { t: "Datenbank", en: "データベース", field: "ドイツ語・情報科学", lv: 2, def: "ダーテンバンク" },
+    { t: "Verschlüsselung", en: "暗号化", field: "ドイツ語・情報科学", lv: 4, def: "フェアシュリュッセルング。Schlüssel(鍵)から" },
+    { t: "Schlüssel", en: "鍵", field: "ドイツ語・情報科学", lv: 3, def: "シュリュッセル。öffentlicher Schlüssel で公開鍵" },
+    { t: "maschinelles Lernen", en: "機械学習", field: "ドイツ語・情報科学", lv: 3, def: "マシネレス レルネン" },
+    { t: "neuronales Netz", en: "ニューラルネットワーク", field: "ドイツ語・情報科学", lv: 4, def: "ノイロナーレス ネッツ" },
+    { t: "Rechenaufwand", en: "計算量", field: "ドイツ語・情報科学", lv: 4, def: "レッヒェンアウフヴァント。Aufwand は「手間・コスト」" },
+    { t: "Betriebssystem", en: "オペレーティングシステム", field: "ドイツ語・情報科学", lv: 3, def: "ベトリープスジステーム。Betrieb(運転)+ System" },
+    { t: "Datenschutz", en: "データ保護", field: "ドイツ語・情報科学", lv: 3, def: "ダーテンシュッツ。DSGVO(GDPR)の中心概念" },
+
+    /* --- 中国語・数学 --- */
+    { t: "导数", en: "導関数", field: "中国語・数学", lv: 3, def: "dǎoshù(ダオシュー)。「导」は導く" },
+    { t: "积分", en: "積分", field: "中国語・数学", lv: 2, def: "jīfēn(ジーフェン)。日本語と同じ漢字の簡体字" },
+    { t: "极限", en: "極限", field: "中国語・数学", lv: 2, def: "jíxiàn(ジーシエン)" },
+    { t: "集合", en: "集合", field: "中国語・数学", lv: 2, def: "jíhé(ジーホー)。日本語と同じ語" },
+    { t: "函数", en: "関数", field: "中国語・数学", lv: 2, def: "hánshù(ハンシュー)。日本語の「函数」の元の表記" },
+    { t: "方程", en: "方程式", field: "中国語・数学", lv: 2, def: "fāngchéng(ファンチョン)。「方程式」ではなく「方程」で完結する" },
+    { t: "矩阵", en: "行列", field: "中国語・数学", lv: 3, def: "jǔzhèn(ジュージェン)。日本語の「行列」とは字が違う" },
+    { t: "概率", en: "確率", field: "中国語・数学", lv: 3, def: "gàilǜ(ガイリュー)。台湾では「機率」" },
+    { t: "证明", en: "証明", field: "中国語・数学", lv: 2, def: "zhèngmíng(ジョンミン)" },
+    { t: "定理", en: "定理", field: "中国語・数学", lv: 2, def: "dìnglǐ(ディンリー)。「引理」が補題" },
+    { t: "特征值", en: "固有値", field: "中国語・数学", lv: 4, def: "tèzhēngzhí(トージョンジー)。「特徴の値」と表現する" },
+    { t: "流形", en: "多様体", field: "中国語・数学", lv: 5, def: "liúxíng(リウシン)。manifold の訳語" },
+
+    /* --- 中国語・物理学 --- */
+    { t: "速度", en: "速度", field: "中国語・物理学", lv: 1, def: "sùdù(スードゥー)" },
+    { t: "加速度", en: "加速度", field: "中国語・物理学", lv: 2, def: "jiāsùdù(ジアスードゥー)" },
+    { t: "动量", en: "運動量", field: "中国語・物理学", lv: 3, def: "dòngliàng(ドンリアン)。「動く量」" },
+    { t: "能量", en: "エネルギー", field: "中国語・物理学", lv: 1, def: "néngliàng(ノンリアン)。「能の量」" },
+    { t: "波函数", en: "波動関数", field: "中国語・物理学", lv: 4, def: "bōhánshù(ボーハンシュー)" },
+    { t: "超导", en: "超伝導", field: "中国語・物理学", lv: 4, def: "chāodǎo(チャオダオ)。「超导电性」の略" },
+    { t: "守恒定律", en: "保存則", field: "中国語・物理学", lv: 3, def: "shǒuhéng dìnglǜ(ショウホン ディンリュー)。「守恒」が保存" },
+    { t: "熵", en: "エントロピー", field: "中国語・物理学", lv: 4, def: "shāng(シャン)。熱(火)と商の会意で作られた一字の新造字" },
+    { t: "电导率", en: "電気伝導率", field: "中国語・物理学", lv: 4, def: "diàndǎolǜ(ディエンダオリュー)" },
+    { t: "跃迁", en: "遷移", field: "中国語・物理学", lv: 5, def: "yuèqiān(ユエチエン)。エネルギー準位間の transition" },
+
+    /* --- 中国語・化学 --- */
+    { t: "溶液", en: "溶液", field: "中国語・化学", lv: 2, def: "róngyè(ロンイエ)。日本語と同じ語" },
+    { t: "物质", en: "物質", field: "中国語・化学", lv: 2, def: "wùzhì(ウージー)" },
+    { t: "反应", en: "反応", field: "中国語・化学", lv: 1, def: "fǎnyìng(ファンイン)。日本語「反応」の簡体字" },
+    { t: "氧化 / 还原", en: "酸化 / 還元", field: "中国語・化学", lv: 3, def: "yǎnghuà / huányuán。「酸化」ではなく「氧化」(氧=酸素)" },
+    { t: "酸 / 碱", en: "酸 / 塩基", field: "中国語・化学", lv: 2, def: "suān / jiǎn。塩基は「碱」の一字" },
+    { t: "催化剂", en: "触媒", field: "中国語・化学", lv: 3, def: "cuīhuàjì(ツイホアジー)。「催化」が触媒作用" },
+    { t: "化合物", en: "化合物", field: "中国語・化学", lv: 2, def: "huàhéwù(ホアホーウー)" },
+    { t: "平衡", en: "平衡", field: "中国語・化学", lv: 3, def: "pínghéng(ピンホン)" },
+    { t: "共价键", en: "共有結合", field: "中国語・化学", lv: 4, def: "gòngjiàjiàn(ゴンジアジエン)。「键」が結合(bond)" },
+    { t: "摩尔质量", en: "モル質量", field: "中国語・化学", lv: 3, def: "mó'ěr zhìliàng。「摩尔」は mole の音訳" },
+
+    /* --- 中国語・薬学 --- */
+    { t: "药物", en: "薬物", field: "中国語・薬学", lv: 2, def: "yàowù(ヤオウー)。「药」は「薬」の簡体字" },
+    { t: "处方", en: "処方箋", field: "中国語・薬学", lv: 3, def: "chǔfāng(チューファン)。「处方药」で処方箋医薬品" },
+    { t: "剂量", en: "用量", field: "中国語・薬学", lv: 3, def: "jìliàng(ジーリアン)。「剂」は剤" },
+    { t: "半衰期", en: "半減期", field: "中国語・薬学", lv: 3, def: "bànshuāiqī(バンシュアイチー)。「衰える」で減衰を表す" },
+    { t: "不良反应", en: "副作用", field: "中国語・薬学", lv: 3, def: "bùliáng fǎnyìng。「副作用」も使うが公式文書では「不良反应」" },
+    { t: "禁忌症", en: "禁忌", field: "中国語・薬学", lv: 4, def: "jìnjìzhèng(ジンジージョン)" },
+    { t: "生物利用度", en: "バイオアベイラビリティ", field: "中国語・薬学", lv: 4, def: "shēngwù lìyòngdù。「利用できる度合い」" },
+    { t: "临床试验", en: "臨床試験", field: "中国語・薬学", lv: 3, def: "línchuáng shìyàn(リンチュアン シーイエン)" },
+    { t: "抗生素", en: "抗生物質", field: "中国語・薬学", lv: 2, def: "kàngshēngsù(カンションスー)" },
+    { t: "药代动力学", en: "薬物動態学", field: "中国語・薬学", lv: 5, def: "yàodài dònglìxué。「薬の代謝の動力学」" },
+
+    /* --- 中国語・経済学 --- */
+    { t: "需求 / 供给", en: "需要 / 供給", field: "中国語・経済学", lv: 2, def: "xūqiú / gōngjǐ。日本語の「需要」は中国語では「需求」" },
+    { t: "边际成本", en: "限界費用", field: "中国語・経済学", lv: 3, def: "biānjì chéngběn。「边际」が marginal" },
+    { t: "通货膨胀", en: "インフレーション", field: "中国語・経済学", lv: 3, def: "tōnghuò péngzhàng。「通貨が膨張する」" },
+    { t: "失业率", en: "失業率", field: "中国語・経済学", lv: 2, def: "shīyèlǜ(シーイエリュー)" },
+    { t: "利率", en: "金利", field: "中国語・経済学", lv: 2, def: "lìlǜ(リーリュー)" },
+    { t: "增加值", en: "付加価値", field: "中国語・経済学", lv: 4, def: "zēngjiāzhí。「增值税」(付加価値税)の元" },
+    { t: "均衡价格", en: "均衡価格", field: "中国語・経済学", lv: 3, def: "jūnhéng jiàgé" },
+    { t: "货币政策", en: "金融政策", field: "中国語・経済学", lv: 3, def: "huòbì zhèngcè。「货币」が貨幣" },
+    { t: "博弈论", en: "ゲーム理論", field: "中国語・経済学", lv: 4, def: "bóyìlùn(ボーイールン)。「博弈」は囲碁・賭け事" },
+    { t: "计量经济学", en: "計量経済学", field: "中国語・経済学", lv: 4, def: "jìliàng jīngjìxué" },
+
+    /* --- 中国語・情報科学 --- */
+    { t: "计算机", en: "計算機(コンピュータ)", field: "中国語・情報科学", lv: 1, def: "jìsuànjī(ジースアンジー)。台湾では「電腦」" },
+    { t: "算法", en: "アルゴリズム", field: "中国語・情報科学", lv: 2, def: "suànfǎ(スアンファー)。「計算の法」。日本語の「算法」とは指す範囲が違う" },
+    { t: "数据", en: "データ", field: "中国語・情報科学", lv: 2, def: "shùjù(シュージュー)。「数据库」でデータベース" },
+    { t: "内存", en: "メモリ", field: "中国語・情報科学", lv: 3, def: "nèicún(ネイツン)。「内部の記憶」" },
+    { t: "网络", en: "ネットワーク", field: "中国語・情報科学", lv: 2, def: "wǎngluò(ワンルオ)。「网」は網" },
+    { t: "程序", en: "プログラム", field: "中国語・情報科学", lv: 2, def: "chéngxù(チョンシュー)。日本語の「程序(順序)」とは意味が違う" },
+    { t: "机器学习", en: "機械学習", field: "中国語・情報科学", lv: 3, def: "jīqì xuéxí(ジーチー シュエシー)" },
+    { t: "神经网络", en: "ニューラルネットワーク", field: "中国語・情報科学", lv: 4, def: "shénjīng wǎngluò" },
+    { t: "加密", en: "暗号化", field: "中国語・情報科学", lv: 3, def: "jiāmì(ジアミー)。「密を加える」。解密が復号" },
+    { t: "密钥", en: "鍵(暗号鍵)", field: "中国語・情報科学", lv: 4, def: "mìyuè / mìyào。「公钥」が公開鍵、「私钥」が秘密鍵" },
+    { t: "复杂度", en: "計算量(複雑度)", field: "中国語・情報科学", lv: 3, def: "fùzádù(フーザードゥー)。「时间复杂度」で時間計算量" },
+    { t: "云计算", en: "クラウドコンピューティング", field: "中国語・情報科学", lv: 3, def: "yún jìsuàn。「云」は雲" }
   ];
 
   /* ============================== 適性設問 ============================== */
@@ -557,6 +882,18 @@
       { t: "頻出する動詞と操作の語から", w: { "フランス語・情報科学": 2.5 } },
       { t: "図表とコード例から", w: { "ロシア語・物理学": 1.5, "フランス語・物理学": 1.5 } },
       { t: "用語集を先に作ってから", w: { "フランス語・情報科学": 1.5, "ロシア語・情報科学": 1.5 } }
+    ]},
+    { q: "長い複合語(Energieerhaltungssatz)を見たときの感覚は？", opts: [
+      { t: "分解すれば意味が読める。むしろ分かりやすい", w: { "ドイツ語・物理学": 2.5, "ドイツ語・化学": 1 } },
+      { t: "定義がそのまま語になっていて気持ちがよい", w: { "ドイツ語・数学": 2.5 } },
+      { t: "長すぎる。略号のほうがよい", w: { "ロシア語・情報科学": 1.5, "フランス語・情報科学": 1.5 } },
+      { t: "薬や制度の名前もこの形で覚えたい", w: { "ドイツ語・薬学": 2, "ドイツ語・経済学": 1.5 } }
+    ]},
+    { q: "漢字で書かれた術語(函数・矩阵・熵・算法)はどうですか。", opts: [
+      { t: "字から意味が推測できて読みやすい", w: { "中国語・数学": 2.5 } },
+      { t: "日本語と字が違う点が面白い", w: { "中国語・化学": 2, "中国語・情報科学": 1.5 } },
+      { t: "一字の新造字(熵)に驚く", w: { "中国語・物理学": 2.5 } },
+      { t: "読み(ピンイン)も一緒に覚えたい", w: { "中国語・薬学": 1.5, "中国語・経済学": 1.5 } }
     ]},
     { q: "外国語の専門語を覚えるとき、効くと感じるのは？", opts: [
       { t: "音読して音で覚える", w: { "ロシア語・物理学": 2 } },
@@ -648,6 +985,90 @@
       "AMM DCI",
       ["フランス語・化学", "ロシア語・薬学"],
       "薬の基本語 → 薬物動態の語 → 承認文書(AMM/DCI)の語彙"),
+    "ドイツ語・数学": prof(
+      "ドイツ語で書かれた数学の語彙と論証の型",
+      "Körper(体)・Ring(環)・Menge(集合)のように日常語をそのまま構造名にし、複合語で概念を組み立てる。",
+      "was zu beweisen war · genau dann, wenn · ohne Beschränkung der Allgemeinheit",
+      "q.e.d./w.z.b.w. o.B.d.A. d.h. z.B. vgl. bzw.",
+      ["ドイツ語・物理学", "フランス語・数学"],
+      "定型句 → 代数の構造名(Gruppe/Ring/Körper) → Ansatz・Eigenwert など輸出された語"),
+    "ドイツ語・物理学": prof(
+      "ドイツ語で書かれた物理の語彙",
+      "Erhaltungssatz(保存則)のように、概念の構造がそのまま複合語の長さになる。",
+      "Energieerhaltungssatz · Wellenfunktion · Wirkungsquerschnitt",
+      "Abb. Tab. Bd.",
+      ["ドイツ語・化学", "ドイツ語・数学"],
+      "力学の基本語 → 保存則の言い回し → 量子・固体物理(Supraleitung)"),
+    "ドイツ語・化学": prof(
+      "ドイツ語で書かれた化学の語彙",
+      "Stoff(物質)を核に複合語を作る。Lösung が「溶液」と「解」を兼ねる点に注意する。",
+      "wässrige Lösung · Reaktionsgeschwindigkeit · Gleichgewicht",
+      "Smp. Sdp. Lsg.",
+      ["ドイツ語・物理学", "ドイツ語・薬学"],
+      "物質と操作の語 → 反応と平衡 → 実験項(Ausbeute)の記述"),
+    "ドイツ語・薬学": prof(
+      "ドイツ語で書かれた薬学の語彙",
+      "Wirkung(作用)を核に、Neben-(副)・Gegen-(反対)などの接頭辞で概念が対になる。",
+      "Halbwertszeit · Nebenwirkung · Gegenanzeige · Bioverfügbarkeit",
+      "AM NW",
+      ["ドイツ語・化学", "フランス語・薬学"],
+      "薬の基本語 → 薬物動態の語 → 添付文書(Fachinformation)の語彙"),
+    "ドイツ語・経済学": prof(
+      "ドイツ語で書かれた経済の語彙",
+      "Grenz-(限界)や -satz(率)など、部品の組み合わせで術語が体系的に並ぶ。",
+      "Angebot und Nachfrage · Grenzkosten · Wertschöpfung",
+      "BIP MwSt. EZB",
+      ["フランス語・経済学", "ドイツ語・数学"],
+      "需給の語 → 指標名(BIP, Zinssatz) → 政策文書(EZB)の語彙"),
+    "ドイツ語・情報科学": prof(
+      "ドイツ語で書かれた情報科学の語彙",
+      "Rechner・Speicher・Datenbank のように、英語を自国語に置き換えた語が定着している。",
+      "maschinelles Lernen · Verschlüsselung · Rechenaufwand",
+      "KI DSGVO EDV",
+      ["ドイツ語・数学", "中国語・情報科学"],
+      "基本語 → アルゴリズムとデータの語 → 機械学習・データ保護(DSGVO)"),
+    "中国語・数学": prof(
+      "中国語で書かれた数学の語彙",
+      "漢字から意味が読めるが、函数・矩阵・概率のように日本語と字が違うものが多い。",
+      "当且仅当 · 证明完毕(证毕)",
+      "证毕 即 例如 参见",
+      ["中国語・情報科学", "中国語・物理学"],
+      "日本語と字が違う語 → 定型句 → 解析・代数の語彙(流形など)"),
+    "中国語・物理学": prof(
+      "中国語で書かれた物理の語彙",
+      "守恒(保存)・跃迁(遷移)のように、動きを表す漢字で概念を作る。熵のような新造字もある。",
+      "能量守恒定律 · 波函数 · 超导",
+      "图 表",
+      ["中国語・化学", "中国語・数学"],
+      "力学の語 → 保存則 → 量子・固体物理(超导)"),
+    "中国語・化学": prof(
+      "中国語で書かれた化学の語彙",
+      "氧(酸素)・碱(塩基)・键(結合)など、日本語と字が違う基本語をまず押さえる。",
+      "氧化还原反应 · 共价键 · 摩尔质量",
+      "标准状况 熔点 沸点",
+      ["中国語・物理学", "中国語・薬学"],
+      "元素と基本語 → 反応と平衡 → 有機化学の命名"),
+    "中国語・薬学": prof(
+      "中国語で書かれた薬学の語彙",
+      "药(薬)を核に、不良反应・禁忌症のように公式文書の言い回しが決まっている。",
+      "半衰期 · 不良反应 · 生物利用度 · 药代动力学",
+      "国药准字 不良反应",
+      ["中国語・化学", "ドイツ語・薬学"],
+      "薬の基本語 → 薬物動態の語 → 説明書(说明书)の読み方"),
+    "中国語・経済学": prof(
+      "中国語で書かれた経済の語彙",
+      "「〜率」「〜政策」の型で語彙が束になる。需求・供给のように日本語と字が違う語に注意する。",
+      "通货膨胀率 · 均衡价格 · 货币政策",
+      "国内生产总值 增值税",
+      ["中国語・情報科学", "フランス語・経済学"],
+      "需給の語 → 指標名 → 統計・政策文書の語彙"),
+    "中国語・情報科学": prof(
+      "中国語で書かれた情報科学の語彙",
+      "音訳を避け、算法・程序・网络・密钥のように意味で訳した語が使われる。",
+      "时间复杂度 · 机器学习 · 加密 / 解密",
+      "人工智能 操作系统",
+      ["中国語・数学", "ドイツ語・情報科学"],
+      "基本語(计算机・程序) → アルゴリズムとデータ → 機械学習・暗号"),
     "フランス語・経済学": prof(
       "フランス語で書かれた経済の語彙",
       "taux de … の型で率を表すなど、語形の規則で語彙が束になる。付加価値税など制度語の原語でもある。",

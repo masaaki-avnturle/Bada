@@ -1,4 +1,4 @@
-# Ω-Whispered — ウィスパード適性検査（瞬読 × 数学 / 化学・物理 / 薬学 / 経済学 / 情報科学 × 専門英語・造語 × 露仏の専門用語）
+# Ω-Whispered — ウィスパード適性検査（瞬読 × 数学 / 化学・物理 / 薬学 / 経済学 / 情報科学 × 専門英語・造語 × 露仏独中の専門用語）
 
 論文 **PDF に現れる記号・化合物**、**式が何を主張しているのか**、
 **どの分野に適性があるか**、そして **瞬読（フラッシュ）でどこまで捉えられるか** を検査する
@@ -6,7 +6,7 @@
 **化学・物理（有機化合物 / 半導体 / 超電導）**、**薬学（薬物動態 / 薬力学 / 製剤 / 臨床）**、
 **経済学（ミクロ / マクロ / 計量 / 金融 / ゲーム理論）**、
 **情報科学（アルゴリズム / データ構造 / OS / ネットワーク / 機械学習 / 暗号）**、
-**専門英語・造語（語源と語根）**、**ロシア語・フランス語の専門用語**から選べ、
+**専門英語・造語（語源と語根）**、**外国語（ロシア語・フランス語・ドイツ語・中国語）の専門用語**から選べ、
 検査中は **電子音**が鳴ります。
 依存ゼロ・ブラウザ／APK／EXE／deb・AppImage で動作し、
 **PDF の解析はすべて端末内**で完結します（外部送信なし）。
@@ -21,13 +21,13 @@
 | **経済学** | 記号 54 種・関係式 27 式・連想 14 組・専門用語 51 語 / 8 分野（ミクロ・マクロ・計量経済学・金融ファイナンス・ゲーム理論・国際経済・行動経済学・公共経済厚生） |
 | **情報科学** | 記号 53 種・関係式 26 式・連想 14 組・専門用語 48 語 / 8 分野（アルゴリズム計算量・データ構造・プログラミング言語型理論・OS システム・ネットワーク・データベース・機械学習 AI・情報理論暗号） |
 | **専門英語・造語** | 学術表記 63 種・多義語 18 組・専門英語 75 語・**造語 60**・**語根接辞 32** / 7 系統（数学英語・化学英語・物理英語・薬学英語・経済英語・**情報科学英語**・学術英語共通） |
-| **ロシア語・フランス語** | 専門用語 **139 語**（露 69 / 仏 70）・略号 48 種・定型表現 28・空似言葉 11 組 / 12 系統（露仏 × 数学・物理学・化学・薬学・経済学・**情報科学**） |
-| **すべて** | 上記を合成（記号・表記 450 種・式 251・用語 509 / 61 分野） |
+| **外国語（露・仏・独・中）** | 専門用語 **265 語**（露 69 / 仏 70 / **独 62** / **中 64**）・略号 81 種・定型表現 42・空似言葉 18 組 / **24 系統**（4 言語 × 数学・物理学・化学・薬学・経済学・情報科学） |
+| **すべて** | 上記を合成（記号・表記 483 種・式 265・用語 635 / 73 分野） |
 
 **専門英語・造語とロシア語・フランス語の設問は、他の系統の検査にも混ざります。**
 数学の検査を選べば数学の英語・数学に関係する造語・`производная` / `dérivée` が、
 薬学を選べば薬学の英語・`период полувыведения` / `demi-vie` が、
-情報科学を選べば `bit = binary + digit`・`ordinateur` / `машинное обучение` が出題されます。
+情報科学を選べば `bit = binary + digit`・`ordinateur` / `машинное обучение` / `maschinelles Lernen` / `机器学习` が出題されます。
 
 ---
 
@@ -241,10 +241,10 @@
 借用語（`quark` は Joyce の小説から、`nudge` は日常語から）のように**語そのものが語源**のものは、
 瞬読で断片に答えが現れてしまうため、フラッシュ出題からは自動的に除外されます。
 
-### ロシア語・フランス語のウィスパードテスト（数学 / 物理学 / 化学 / 薬学 / 経済学）
+### 外国語のウィスパードテスト（ロシア語 / フランス語 / ドイツ語 / 中国語 × 6 分野）
 
-出題系統を「ロシア語・フランス語」にすると、5 分野の専門用語を**原語のまま**検査します。
-瞬読ではキリル文字・フランス語がそのまま提示されます（読みはカタカナで解説に併記）。
+出題系統を「外国語」にすると、6 分野の専門用語を**原語のまま**検査します。
+瞬読ではキリル文字・フランス語・ドイツ語・簡体字がそのまま提示されます（読みはカタカナ／ピンインで解説に併記）。
 
 | 分野 | ロシア語 | フランス語 |
 |:--|:--|:--|
@@ -255,12 +255,23 @@
 | 経済学 | `спрос / предложение`（需要/供給）· `безработица`（失業）· `равновесная цена` | `offre et demande` · `taux de chômage` · `valeur ajoutée` · `taux d'intérêt` |
 | 情報科学 | `программа` · `вычисление`（計算）· `машинное обучение` · `нейронная сеть` · `открытый ключ`（公開鍵）· `облачные вычисления` | `ordinateur`（計算機）· `logiciel`（ソフト）· `octet`（バイト）· `apprentissage automatique` · `chiffrement` · `courriel` · `infonuagique` |
 
+**ドイツ語・中国語**（各 6 分野）:
+
+| 分野 | ドイツ語 | 中国語 |
+|:--|:--|:--|
+| 数学 | `Ableitung`（導関数）· `Menge`（集合）· `Körper`（体）· `Ring`（環）· `Eigenwert` · `Ansatz` · `Satz`（定理） | `导数` · `函数`（関数）· `方程`（方程式）· `矩阵`（行列）· `概率`（確率）· `流形`（多様体） |
+| 物理学 | `Geschwindigkeit` · `Impuls`（運動量）· `Wellenfunktion` · `Supraleitung`（超伝導）· `Erhaltungssatz`（保存則） | `动量`（運動量）· `能量`（エネルギー）· `熵`（エントロピー）· `超导` · `守恒定律`（保存則）· `跃迁`（遷移） |
+| 化学 | `Lösung`（溶液／解）· `Stoff`（物質）· `Gleichgewicht`（平衡）· `Bindung`（結合）· `Ausbeute`（収率） | `氧化 / 还原`（酸化／還元）· `催化剂`（触媒）· `共价键`（共有結合）· `碱`（塩基）· `摩尔质量` |
+| 薬学 | `Arzneimittel` · `Wirkstoff`（有効成分）· `Nebenwirkung`（副作用）· `Gegenanzeige`（禁忌）· `Halbwertszeit` | `药物` · `处方`（処方箋）· `半衰期` · `不良反应`（副作用）· `生物利用度` · `药代动力学` |
+| 経済学 | `Angebot und Nachfrage` · `Grenzkosten`（限界費用）· `Konjunktur`（景気）· `Wertschöpfung`（付加価値） | `需求 / 供给`（需要／供給）· `边际成本` · `通货膨胀`（インフレ）· `博弈论`（ゲーム理論） |
+| 情報科学 | `Rechner`（計算機）· `Speicher`（メモリ）· `Verschlüsselung`（暗号化）· `maschinelles Lernen` · `Rechenaufwand`（計算量） | `计算机` · `算法`（アルゴリズム）· `程序`（プログラム）· `密钥`（鍵）· `机器学习` · `复杂度`（計算量） |
+
 | 検査 | 中身 |
 |:--|:--|
 | 略号・表記 | `ч.т.д.`（＝Q.E.D.）· `и т.д.` · `т.е.` · `ЛС` · `ВВП` · `ЭВМ` · `ОС` · `БД` · `ИИ` / `C.Q.F.D.` · `ssi` · `AMM` · `DCI` · `PIB` · `TVA` · `TIC` · `SGBD` · `IA` · `RGPD` |
-| **空似言葉** | `expérience`＝実験（英 experience とずれる）、`рецепт`＝処方箋に対し `recette`＝レシピ・収入、`решение`＝解に対し溶液は `раствор`、`actuel / актуальный`＝現在の（英 actual ではない）、**`octet`＝バイト**（仏語は byte を使わず 8 ビットであることを語で明示）、**`ordinateur` / `logiciel` / `courriel`**（英語を避けて作られた仏語の造語） |
+| **空似言葉** | `expérience`＝実験（英 experience とずれる）、`рецепт`＝処方箋に対し `recette`＝レシピ・収入、`решение`＝解に対し溶液は `раствор`、`actuel / актуальный`＝現在の（英 actual ではない）、**`octet`＝バイト**（仏語は byte を使わず 8 ビットであることを語で明示）、**`ordinateur` / `logiciel` / `courriel`**（英語を避けて作られた仏語の造語）、**`Gift`＝毒**（英語の贈り物ではない）、**`Körper`＝体（数学）／身体／物体**、**`Satz`＝定理／率／文**、**`Lösung`＝溶液／解**、**`氧化`＝酸化**（「酸」の字を使わない）、**`函数`＝関数**、**`程序`＝プログラム**（日本語の「程序＝順序」とは違う） |
 | 定型表現の対訳 | `ч.т.д. = что и требовалось доказать` · `si et seulement si (ssi)` · `théorème des accroissements finis`（平均値の定理）· `loi de conservation de l'énergie` |
-| **露 ⇄ 仏 の対応** | 同じ概念の対を突き合わせる（30 対: 導関数・極限・運動量・超伝導・処方箋・禁忌・需要・供給・失業・金利・機械学習・暗号化・ファイル・サーバ …） |
+| **言語をまたぐ対応** | 同じ概念を露 ⇄ 仏 ⇄ 独 ⇄ 中 で突き合わせる（2 言語以上で対応する概念 71、4 言語すべてそろう概念 16: 導関数・積分・極限・集合・証明・速度・加速度・エネルギー・運動量・超伝導・触媒・半減期・副作用・需要・供給・機械学習 …） |
 | 瞬読 | 原語の用語・略号をランダム提示 |
 | 適性分野診断 | 露 5 分野 + 仏 5 分野のどこに適性があるかをプロファイル化 |
 
@@ -433,14 +444,14 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | プラットフォーム | 成果物 | 形式 |
 |:--|:--|:--|
 | **Android** | `omega_whispered-android` | `omega_whispered-debug.apk`（Cordova 12 / minSdk 24 / AndroidX） |
-| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.4.0-win-x64.exe`（NSIS インストーラ + portable） |
+| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.5.0-win-x64.exe`（NSIS インストーラ + portable） |
 | **Linux (Ubuntu)** | `omega_whispered-linux` | `…-linux-amd64.deb` + `…-linux-x86_64.AppImage` |
 | 任意のOS | `omega-whispered.html` | 単一ファイル版 |
 | 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
 
 #### いちばん簡単: Releases からダウンロードする（ログイン不要）
 
-[**→ Ω apps 1.4.0 のダウンロードページ**](https://github.com/masaaki-avnturle/Bada/releases/tag/apps-v1.4.0)
+[**→ Ω apps 1.5.0 のダウンロードページ**](https://github.com/masaaki-avnturle/Bada/releases/tag/apps-v1.5.0)
 
 Release の添付ファイルは **ログイン不要・ZIP なしの直リンク**です。
 スマートフォンに APK を入れるときは、端末のブラウザでこのページを開いて
@@ -448,21 +459,21 @@ Release の添付ファイルは **ログイン不要・ZIP なしの直リン�
 
 | プラットフォーム | ファイル | 直リンク |
 |:--|:--|:--|
-| Android | `omega_whispered-debug.apk` (3.6 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega_whispered-debug.apk) |
-| Windows 10/11 | `Omega-Whispered-1.4.0-win-x64.exe` (78 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-win-x64.exe) |
-| Ubuntu (.deb) | `Omega-Whispered-1.4.0-linux-amd64.deb` (75 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-linux-amd64.deb) |
-| Ubuntu (AppImage) | `Omega-Whispered-1.4.0-linux-x86_64.AppImage` (108 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/Omega-Whispered-1.4.0-linux-x86_64.AppImage) |
-| 任意のOS | `omega-whispered.html` (556 KB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega-whispered.html) |
+| Android | `omega_whispered-debug.apk` (3.6 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/omega_whispered-debug.apk) |
+| Windows 10/11 | `Omega-Whispered-1.5.0-win-x64.exe` (78 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/Omega-Whispered-1.5.0-win-x64.exe) |
+| Ubuntu (.deb) | `Omega-Whispered-1.5.0-linux-amd64.deb` (75 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/Omega-Whispered-1.5.0-linux-amd64.deb) |
+| Ubuntu (AppImage) | `Omega-Whispered-1.5.0-linux-x86_64.AppImage` (108 MB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/Omega-Whispered-1.5.0-linux-x86_64.AppImage) |
+| 任意のOS | `omega-whispered.html` (556 KB) | [ダウンロード](https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/omega-whispered.html) |
 
 ```bash
 # コマンドで取得する例
-curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega_whispered-debug.apk
-curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/omega-whispered.html
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/omega_whispered-debug.apk
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.5.0/omega-whispered.html
 ```
 
 > このリポジトリには他のアプリの Release も置かれているため、
 > `releases/latest` は別のアプリを指すことがあります。
-> **タグ `apps-v1.4.0` を指定したうえのリンクが確実です。**
+> **タグ `apps-v1.5.0` を指定したうえのリンクが確実です。**
 
 #### Actions からダウンロードする
 
@@ -479,7 +490,7 @@ curl -LO https://github.com/masaaki-avnturle/Bada/releases/download/apps-v1.4.0/
 |:--|:--|:--|
 | `apps` | `omega_whispered` | `all` にすると bio_medicine の 4 アプリすべてをビルド |
 | `publish_release` | `false` | `true` にすると成果物を **Release** として公開（ログイン不要でDL可） |
-| `release_tag` | `apps-v1.4.0` | 公開時のタグ名 |
+| `release_tag` | `apps-v1.5.0` | 公開時のタグ名 |
 
 - Artifacts の**ダウンロードには GitHub ログインが必要**で、ファイルは **ZIP に包まれて**届きます（保持 90 日）。
   ログイン不要・ZIP なしで配布したい場合は、手動実行で `publish_release` を有効にするか、
@@ -499,13 +510,13 @@ gh run download -R masaaki-avnturle/Bada -n omega_whispered-android
 
 ```bash
 # .deb（/opt/Omega-Whispered にインストールし、デスクトップエントリとアイコンを登録）
-sudo apt install ./Omega-Whispered-1.4.0-linux-amd64.deb
+sudo apt install ./Omega-Whispered-1.5.0-linux-amd64.deb
 omega-whispered                    # またはアプリ一覧から起動
 sudo apt remove omega-whispered    # アンインストール
 
 # AppImage（インストール不要・単体実行）
-chmod +x Omega-Whispered-1.4.0-linux-x86_64.AppImage
-./Omega-Whispered-1.4.0-linux-x86_64.AppImage
+chmod +x Omega-Whispered-1.5.0-linux-x86_64.AppImage
+./Omega-Whispered-1.5.0-linux-x86_64.AppImage
 # FUSE の無い環境では: ./Omega-…AppImage --appimage-extract-and-run
 ```
 
@@ -537,8 +548,9 @@ Android Gradle Plugin が**ビルドのたびにランダムな署名鍵を生�
   一致しなければビルドを失敗させます。
 - `android-versionCode` を明示（規則: `major*10000 + minor*100 + patch`）し、
   更新のたびに上げています（1.1.0 → `10100`、薬学を加えた 1.2.0 → `10200`、
-  経済学・専門英語・露仏を加えた 1.3.0 → `10300`、情報科学を加えた **1.4.0** → `10400`）。
-  Windows / Linux 版もあわせて **1.4.0** です。
+  経済学・専門英語・露仏を加えた 1.3.0 → `10300`、情報科学を加えた 1.4.0 → `10400`、
+  ドイツ語・中国語を加えた **1.5.0** → `10500`）。
+  Windows / Linux 版もあわせて **1.5.0** です。
 
 **お使いの端末での手順**: 旧版はランダムな鍵で署名されているため、
 **一度だけ旧版をアンインストール**してから新しい APK を入れてください。
@@ -559,7 +571,7 @@ Windows 版（NSIS）と Ubuntu 版（`.deb`）はもともと署名鍵の問題
 |:--|:--|
 | Android | 一度アンインストールが必要（1.1.0 以降は不要） |
 | Windows 10/11 | インストーラを実行するだけで上書き更新 |
-| Ubuntu (.deb) | `sudo apt install ./Omega-Whispered-1.4.0-linux-amd64.deb` で更新 |
+| Ubuntu (.deb) | `sudo apt install ./Omega-Whispered-1.5.0-linux-amd64.deb` で更新 |
 | AppImage / 単一 HTML | ファイルを置き換えるだけ |
 
 #### 自分でビルドする
@@ -591,7 +603,7 @@ APK は Android SDK + Cordova 12 が必要です（CI と同じ手順は
 | `www/econ_bank.js` | 経済学の銀行（記号 54 / 関係式 27 / 連想 14 / 用語 51 / 適性 10 / 8 分野プロファイル） |
 | `www/cs_bank.js` | 情報科学の銀行（記号 53 / 関係式 26 / 連想 14 / 用語 48 / 適性 10 / 8 分野プロファイル） |
 | `www/lex_bank.js` | 専門英語・造語の銀行（学術表記 63 / 多義語 18 / 専門英語 75 / 造語 60 / 語根接辞 32 / 7 系統） |
-| `www/multiling_bank.js` | ロシア語・フランス語の銀行（専門用語 139 / 略号 48 / 定型表現 28 / 空似言葉 11 / 12 系統） |
+| `www/multiling_bank.js` | 外国語の銀行（専門用語 265 / 略号 81 / 定型表現 42 / 空似言葉 18 / 24 系統: 露・仏・独・中 × 6 分野） |
 | `www/chem_extract.js` | PDF 本文から化学式・化学物理・薬学用語を検出（元素記号で妥当性検証・語境界つき） |
 | `www/sound.js` | 電子音エンジン（Web Audio で合成。音声ファイル不要） |
 | `www/flash.js` | 瞬読エンジン（ランダム配置バースト提示・マスク・方程式トークナイザ・ステアケース） |
