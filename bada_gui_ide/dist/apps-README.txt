@@ -10,6 +10,9 @@ it in any browser — no install, no dependencies, works offline.
   ngn-quantum.html    NGN Quantum Grid — zone://url.or.jp projected onto the
                       NTT NGN line: regional backbone ring, home/office PCs as
                       HDD pseudo-quantum registers, entanglement over NTT lines.
+  zone-studio.html    Zone Studio — author YOUR OWN WWW addressed by zone://
+                      URIs and publish it into the ultra-network over NTT NGN
+                      (UltraDB quorum + Jones cipher); export/import .zonesite.
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for
