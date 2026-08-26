@@ -1,0 +1,69 @@
+# topology.bada — トポロジーを Bada 言語で扱う
+#   実行: bin/bada run examples/topology.bada
+#
+# メビウスの帯の二重被覆、オイラー標数、種数との関係を確かめる。
+# 既存の omega_mobius_drive_pkg（擬似量子VMのメビウス回路HDD）で使っている
+# 「1周で表裏反転、2周で復帰」という性質を、位相不変量として書き直したもの。
+
+print "=== トポロジー (Topology) ==="
+print ""
+
+# --- 1. メビウスの帯の二重被覆 ---
+# 帯を半回転ひねって繋ぐと、1 周では裏面に出てしまい、2 周して初めて戻る。
+print "-- メビウスの帯: 向きは 2 周で戻る --"
+print "  周回   向き   復帰したか"
+repeat 7 as k
+  print "   ", k, "     ", mobius_orientation(k), "      ", orientable(k)
+end
+print "  → 奇数周では -1（裏面）。偶数周で +1 に戻る = 二重被覆。"
+print ""
+
+# --- 2. オイラー標数 chi = V - E + F ---
+print "-- オイラー標数 chi = V - E + F --"
+print "  正四面体  (V=4,  E=6,  F=4)  chi = ", euler(4, 6, 4)
+print "  立方体    (V=8,  E=12, F=6)  chi = ", euler(8, 12, 6)
+print "  正八面体  (V=6,  E=12, F=8)  chi = ", euler(6, 12, 8)
+print "  正十二面体(V=20, E=30, F=12) chi = ", euler(20, 30, 12)
+print "  正二十面体(V=12, E=30, F=20) chi = ", euler(12, 30, 20)
+print "  → どの多面体も chi = 2。球面と同相だから同じ値になる（位相不変量）。"
+print ""
+
+# --- 3. 種数 g と chi = 2 - 2g ---
+print "-- 向き付け可能閉曲面: chi = 2 - 2g --"
+repeat 5 as g
+  print "  種数 g = ", g, "  chi = ", genus_euler(g)
+end
+print "  → g=0 が球面 (chi=2)、g=1 がトーラス (chi=0)、穴が増えるほど減る。"
+print ""
+
+# --- 4. メビウスの帯は向き付け不可能 ---
+print "-- 向き付け不可能な面 --"
+print "  メビウスの帯 chi = ", mobius_euler()
+print "  円板         chi = ", euler(1, 1, 1)
+print "  → メビウスの帯は chi=0 で、円板 (chi=1) とは別物。"
+print "     境界は 1 本しかなく、表と裏の区別がない。"
+print ""
+
+# --- 5. 二重被覆を Bada の演算子で回してみる ---
+# 多様体ノード g に対して、1 周ぶんの作用を繰り返しかけていく。
+print "-- Bada 演算子による周回 --"
+set g = 2.5
+repeat 4 as k
+  g -< 1.0
+  print "  ", k + 1, " 周目: 多様体積分後の値 = ", g
+end
+print ""
+
+# --- 6. Gamma 多様体の周期性との対応 ---
+# Γ(s+1)=s·Γ(s) を s 方向に 1 周ぶん進めることは、
+# メビウスの帯を 1 周まわるのと同じく「元に戻らない」操作である。
+print "-- Gamma 漸化を 1 ステップ進める（元には戻らない） --"
+repeat 4 as k
+  let s = 1.0 + k
+  print "  s = ", s, "  Gamma(s) = ", gamma(s), "  ->  Gamma(s+1) = ", gamma(s + 1)
+end
+print "  → s を 1 進めるたびに値は s 倍される。周回して元に戻る位相とは違い、"
+print "     Gamma 多様体では進むたびに重みが積み上がる（対数で足し算になる）。"
+
+set topo_node = 0.0
+Omega::push topo_node as topology_mobius

@@ -1,7 +1,10 @@
-name: Ω apps build (APK + Windows EXE)
+name: Ω apps build (APK + Windows EXE + Ubuntu)
 
-# bio_medicine 配下の各アプリ(www + electron + cordova)から Android APK と Windows EXE をビルドし、
-# Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
+# bio_medicine 配下の各アプリ(www + electron + cordova)から
+#   - Android APK
+#   - Windows 10/11 EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu / Linux (AppImage + .deb)
+# をビルドし、Actions アーティファクト、および (apps-v* タグ時) GitHub Release に添付します。
 #
 # ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
 
@@ -15,12 +18,24 @@ permissions:
   contents: write
 
 jobs:
+  # --- 計算コアの照合テスト（Ω-Suite の JS が Python 実装と一致するか） ------
+  engine-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ω-Suite engine parity tests
+        run: node bio_medicine/omega_suite/test/test_engines.js
+
   windows-exe:
+    needs: engine-tests
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy, omega_morpho_forge, omega_suite]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -42,12 +57,49 @@ jobs:
         with:
           files: bio_medicine/${{ matrix.app }}/electron/dist/*.exe
 
-  android-apk:
+  linux-app:
+    needs: engine-tests
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy]
+        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy, omega_morpho_forge, omega_suite]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install AppImage / deb build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libfuse2 fakeroot
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: bio_medicine/${{ matrix.app }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-linux
+          path: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
+      - name: Attach Linux artifacts to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bio_medicine/${{ matrix.app }}/electron/dist/*.AppImage
+            bio_medicine/${{ matrix.app }}/electron/dist/*.deb
+
+  android-apk:
+    needs: engine-tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [omega_biofeedback, omega_thermal_trace, omega_telepathy, omega_morpho_forge, omega_suite]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

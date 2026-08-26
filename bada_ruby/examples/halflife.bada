@@ -1,0 +1,76 @@
+# halflife.bada — 半減期と壊変系列を Bada 言語で解く
+#   実行: bin/bada run examples/halflife.bada
+#
+# 放射性崩壊は dN/dt = −λN、半減期は T½ = ln2/λ。
+# 壊変系列 A → B → C は Bateman 方程式で解ける。
+#
+# ⚠ 実在の核種データや臨界計算は含まない。半減期という指数崩壊則そのものを
+#    扱う、教科書どおりの純粋な物理。
+
+print "=== 半減期と壊変系列 (Radioactive Decay) ==="
+print ""
+
+# --- 1. 崩壊定数と半減期は互いの逆算 ---
+print "-- lambda = ln2 / T_half --"
+repeat 4 as k
+  let th = 5.0 * (k + 1)
+  let lam = decay_constant(th)
+  print "  T_half = ", th, "  ->  lambda = ", lam, "  ->  逆算 T_half = ", half_life(lam)
+end
+print ""
+
+# --- 2. 半減期ごとに正確に半分になる ---
+print "-- 残存比 N/N0 = 2^(-t/T_half),  T_half = 10 --"
+repeat 7 as k
+  let t = k * 10.0
+  print "  t = ", t, "  N/N0 = ", remaining(10.0, t), "   (= 2^-", k, ")"
+end
+print "  → 10 経つごとにきっちり半分。これが半減期の定義。"
+print ""
+
+# --- 3. 放射能 A = λN は N と同じ半減期で減る ---
+print "-- 放射能 A = lambda * N,  N0 = 1000, T_half = 10 --"
+repeat 4 as k
+  let t = k * 10.0
+  print "  t = ", t, "  N = ", decay(1000.0, 10.0, t), "  A = ", activity(1000.0, 10.0, t)
+end
+print ""
+
+# --- 4. 壊変系列 A → B → C（Bateman 方程式） ---
+# 親 A (T½=5) → 娘 B (T½=15) → 安定な孫 C
+print "-- 壊変系列 A -> B -> C   T_half(A)=5, T_half(B)=15, C は安定 --"
+print "     t         A          B          C        総量"
+repeat 9 as k
+  let t = k * 10.0
+  let a = chain3(5.0, 15.0, 1000.0, t, 0)
+  let b = chain3(5.0, 15.0, 1000.0, t, 1)
+  let c = chain3(5.0, 15.0, 1000.0, t, 2)
+  print "  ", t, "   ", a, "   ", b, "   ", c, "   ", a + b + c
+end
+print "  → 総量は常に 1000 で保存される（物質収支が閉じている）。"
+print ""
+
+# --- 5. 娘核種が最大になる時刻 ---
+# 親が速く（T½=5）娘が遅い（T½=15）ので、B はいったん増えてから減る。
+print "-- 娘核種 B のピークを探す --"
+let best_t = 0.0
+let best_b = 0.0
+repeat 60 as k
+  let t = k * 1.0
+  let b = chain3(5.0, 15.0, 1000.0, t, 1)
+  let is_new = max(0.0, b - best_b)
+  let best_b = max(best_b, b)
+  let best_t = best_t + is_new / max(is_new, 1e-300) * (t - best_t)
+end
+print "  B が最大になるのは t = ", best_t, "  そのとき B = ", best_b
+print ""
+
+# --- 6. 永年平衡 ---
+# 親の半減期が娘よりはるかに長いとき、娘の量は N_B ≒ N_A·λ_A/λ_B に落ち着く。
+print "-- 永年平衡 (親が娘よりずっと長寿命のとき) --"
+print "  T_half(親)=10000, T_half(娘)=10  ->  N_B/N_A ~ ", secular_ratio(10000.0, 10.0)
+print "  T_half(親)=1000,  T_half(娘)=10  ->  N_B/N_A ~ ", secular_ratio(1000.0, 10.0)
+print "  → 親が長寿命なほど、娘は相対的に少ない量で釣り合う。"
+
+set decay_node = 0.0
+Omega::push decay_node as halflife_chain

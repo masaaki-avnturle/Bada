@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#04060a" />
+  <title>Ω-MorphoForge</title>
+  <style>
+    :root {
+      --bg: #04060a; --panel: #0b1220; --edge: #1a2440;
+      --ink: #cfe0ff; --muted: #7a8db3; --gold: #c8a44a;
+      --hot: #f26a4b; --cool: #4a80d0; --acc: #40b8c0; --warn: #f2c94c;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans",
+                    "Segoe UI", Roboto, sans-serif;
+      -webkit-text-size-adjust: 100%; touch-action: manipulation;
+    }
+    header {
+      padding: 14px 16px 6px; border-bottom: 1px solid var(--edge);
+      background: linear-gradient(180deg, #060a14, #04060a);
+    }
+    h1 { margin: 0; font-size: 17px; letter-spacing: .04em; color: var(--gold); }
+    .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .warn {
+      margin: 10px 16px; padding: 8px 10px; border-radius: 8px;
+      background: #1c1508; border: 1px solid #5a4416; color: #f2d68e;
+      font-size: 12px; line-height: 1.55;
+    }
+    .warn b { color: var(--warn); }
+    main {
+      display: grid; grid-template-columns: 1fr; gap: 12px;
+      padding: 12px 16px 28px;
+    }
+    @media (min-width: 820px) {
+      main { grid-template-columns: minmax(0, 1fr) 320px; }
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--edge);
+      border-radius: 10px; padding: 12px;
+    }
+    .panel h2 {
+      margin: 0 0 8px; font-size: 13px; color: var(--acc);
+      letter-spacing: .06em; text-transform: uppercase;
+    }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    label { font-size: 12px; color: var(--muted); min-width: 96px; }
+    input[type="range"] { flex: 1 1 160px; accent-color: var(--acc); }
+    input[type="number"] {
+      width: 72px; background: #06101d; color: var(--ink);
+      border: 1px solid var(--edge); border-radius: 6px; padding: 4px 6px;
+    }
+    button {
+      background: #0f1a2f; color: var(--ink);
+      border: 1px solid var(--edge); border-radius: 8px;
+      padding: 8px 12px; font-size: 13px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button.primary { background: #14315a; border-color: #2a5a9a; color: #eaf3ff; }
+    button.hot     { background: #3a1a10; border-color: #6b2e1c; color: #ffd6c8; }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    #cv {
+      width: 100%; aspect-ratio: 1 / 1; display: block;
+      background: #000; border-radius: 8px; touch-action: none;
+    }
+    .stats {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px;
+      font-size: 12px; margin-top: 8px; color: var(--muted);
+    }
+    .stats b { color: var(--ink); font-weight: 600; }
+    .toggle {
+      display: inline-flex; gap: 6px; align-items: center;
+      background: #0a1524; border: 1px solid var(--edge); border-radius: 999px;
+      padding: 4px 10px; font-size: 12px; cursor: pointer;
+    }
+    .toggle input { accent-color: var(--acc); }
+    .legend { font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .badge {
+      display: inline-block; padding: 1px 6px; border-radius: 4px;
+      background: #0f1a2f; border: 1px solid var(--edge);
+      font-size: 11px; color: var(--acc); margin-left: 6px;
+    }
+    .waddington {
+      width: 100%; height: 90px; display: block; background: #050a14;
+      border-radius: 6px; border: 1px solid var(--edge);
+    }
+    footer {
+      padding: 12px 16px 24px; font-size: 11px; color: var(--muted);
+      border-top: 1px solid var(--edge); line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Ω-MorphoForge <span class="badge">v0.1</span></h1>
+  <div class="sub">形態形成場 × 電磁誘導 × カタストロフ分岐 — iPS細胞分化の抽象シミュレーション</div>
+</header>
+
+<div class="warn">
+  <b>非医療・概念シミュレーション。</b>
+  Gray-Scott反応拡散系と Waddington 地形（カタストロフ理論）の抽象モデルです。
+  実在の細胞・実験手順・iPS 樹立プロトコル・薬剤の成分や用量は一切含まれておらず、
+  出力から実際の細胞や医薬品を作ることはできません。研究・教育・アート目的の玩具です。
+</div>
+
+<main>
+  <section class="panel">
+    <h2>形態形成場 <span class="badge" id="stepBadge">t=0</span></h2>
+    <canvas id="cv" width="128" height="128"></canvas>
+    <div class="legend">
+      青=基質 u ／ 赤=活性因子 v ／ 緑=分化した細胞（カタストロフを越えた領域）
+    </div>
+    <div class="stats" id="stats">
+      <div>細胞数（連結領域）: <b id="stSpots">0</b></div>
+      <div>分化細胞の割合: <b id="stDiff">0.0%</b></div>
+      <div>重心 (x, y): <b id="stCentroid">—</b></div>
+      <div>状態: <b id="stMode">停止</b></div>
+    </div>
+    <canvas class="waddington" id="wcv" width="600" height="90"></canvas>
+    <div class="legend">
+      Waddington 地形 U(φ) = ¼φ⁴ − ½aφ² − bφ ・ 赤玉 = 場の局所状態。
+      a > 0 でくぼみが2つに割れ、b で分岐先が決まる（尖点カタストロフ）。
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>制御</h2>
+
+    <div class="row" style="margin-bottom:10px;">
+      <button id="btnRun" class="primary">▶ 開始</button>
+      <button id="btnPause" disabled>⏸ 一時停止</button>
+      <button id="btnReset" class="hot">↺ リセット</button>
+    </div>
+
+    <div class="row"><label>F 供給率</label>
+      <input type="range" id="F" min="0.01" max="0.06" step="0.001" value="0.030" />
+      <input type="number" id="Fn" step="0.001" />
+    </div>
+    <div class="row"><label>k 除去率</label>
+      <input type="range" id="K" min="0.04" max="0.075" step="0.0005" value="0.0565" />
+      <input type="number" id="Kn" step="0.0005" />
+    </div>
+
+    <div class="row" style="margin-top:8px;">
+      <label>電磁 Ex ↔</label>
+      <input type="range" id="Ex" min="-0.05" max="0.05" step="0.005" value="0" />
+      <span id="ExV" style="color:var(--acc);min-width:44px;text-align:right;">0.000</span>
+    </div>
+    <div class="row"><label>電磁 Ey ↕</label>
+      <input type="range" id="Ey" min="-0.05" max="0.05" step="0.005" value="0" />
+      <span id="EyV" style="color:var(--acc);min-width:44px;text-align:right;">0.000</span>
+    </div>
+    <div class="legend">＋方向にドリフト、－方向に逆流。円形容器なので折り返します。</div>
+
+    <div class="row" style="margin-top:12px;"><label>カタストロフ a</label>
+      <input type="range" id="A" min="-0.5" max="1.5" step="0.05" value="0.6" />
+      <span id="AV" style="color:var(--acc);min-width:44px;text-align:right;">0.60</span>
+    </div>
+    <div class="row"><label>バイアス b</label>
+      <input type="range" id="B" min="-0.5" max="0.5" step="0.02" value="0" />
+      <span id="BV" style="color:var(--acc);min-width:44px;text-align:right;">0.00</span>
+    </div>
+    <div class="legend">a を上げると 1 → 2 の分岐（不分岐→分岐）が起きます。</div>
+
+    <div class="row" style="margin-top:12px; gap:12px;">
+      <label class="toggle"><input type="checkbox" id="tCoil" checked /> 円形容器 (コイル境界)</label>
+    </div>
+    <div class="row" style="gap:12px;">
+      <label class="toggle"><input type="checkbox" id="tAnti" /> 反重力（逆流電磁）モード</label>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="btnSeed">💧 中央に種を置く</button>
+      <button id="btnPreset1">分岐プリセット</button>
+      <button id="btnPreset2">停滞プリセット</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Ω-MorphoForge は本リポジトリの <code>omega_morphofield_pkg</code> の
+  Python 実装（Gray-Scott 反応拡散、外部場ドリフト）と、カタストロフ理論の
+  尖点分岐（φ⁴ − aφ² − bφ）を組み合わせた **抽象**モデルです。
+  <br>
+  非医療・実在の医療機器や薬剤とは無関係です。しんどさが続くときは主治医・薬剤師にご相談ください。
+  <br>
+  © 2025 Masaaki Yamaguchi · Bada / bio_medicine
+</footer>
+
+<script>
+"use strict";
+
+// ============================================================
+//  Ω-MorphoForge — 形態形成場 + 電磁ドリフト + カタストロフ分岐
+//    * Gray-Scott 反応拡散（円形容器境界）
+//    * 外部場 (Ex, Ey) の移流項（電磁誘導ドリフト）
+//    * カタストロフ地形 U(φ) = 1/4 φ^4 − 1/2 a φ^2 − b φ
+//      各格子点で局所平衡へゆっくり緩和し、φ の符号で分化領域を色分け
+//
+//  すべて依存ゼロ・オフライン動作。iPS 化を「分化状態の分岐」の抽象として
+//  可視化する概念シミュレーションであり、医療目的には使えません。
+// ============================================================
+
+const N = 96;                       // 格子解像度
+const SZ = N * N;
+const CANVAS_PX = 384;              // 内部レンダリング解像度
+const CV_SCALE = CANVAS_PX / N;
+
+const cv  = document.getElementById("cv");
+cv.width = CANVAS_PX; cv.height = CANVAS_PX;
+const ctx = cv.getContext("2d");
+const img = ctx.createImageData(N, N);
+
+const wcv = document.getElementById("wcv");
+const wctx = wcv.getContext("2d");
+
+let u = new Float32Array(SZ);
+let v = new Float32Array(SZ);
+let phi = new Float32Array(SZ);     // カタストロフ場（分化度）
+let un = new Float32Array(SZ);
+let vn = new Float32Array(SZ);
+let mask = new Uint8Array(SZ);      // 円形容器内 = 1
+let tstep = 0;
+let running = false;
+let raf = 0;
+
+const params = {
+  Du: 0.16, Dv: 0.08,
+  F: 0.030, k: 0.0565,
+  Ex: 0.0, Ey: 0.0,
+  a: 0.6, b: 0.0,
+  gamma: 0.02,      // カタストロフ緩和率
+  couple: 3.5,      // v → カタストロフ場への駆動係数
+  coil: true,
+  anti: false,      // 逆流電磁モード
+  dt: 1.0,
+};
+
+// ---- ヘルパ --------------------------------------------------
+const idx = (i, j) => j * N + i;
+
+function buildMask() {
+  const cx = (N - 1) / 2, cy = (N - 1) / 2;
+  const R2 = ((N / 2) - 1) * ((N / 2) - 1);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const dx = i - cx, dy = j - cy;
+      mask[idx(i, j)] = (dx * dx + dy * dy <= R2) ? 1 : 0;
+    }
+  }
+}
+
+function resetField() {
+  u.fill(1.0); v.fill(0.0); phi.fill(-1.0);   // 未分化 = φ<0
+  tstep = 0;
+}
+function seedSpot(cx, cy, r) {
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const dx = i - cx, dy = j - cy;
+      if (dx * dx + dy * dy <= r * r) {
+        u[idx(i, j)] = 0.5; v[idx(i, j)] = 0.5;
+      }
+    }
+  }
+}
+
+// ---- Gray-Scott + 移流 + 境界 (円形コイル容器) ---------------
+function step() {
+  const { Du, Dv, F, k, Ex, Ey, dt, coil, anti } = params;
+  const EX = anti ? -Ex : Ex;   // 逆流モードは移流方向を反転
+  const EY = anti ? -Ey : Ey;
+
+  for (let j = 0; j < N; j++) {
+    const jm = (j - 1 + N) % N, jp = (j + 1) % N;
+    for (let i = 0; i < N; i++) {
+      const p = idx(i, j);
+      if (coil && !mask[p]) { un[p] = 1.0; vn[p] = 0.0; continue; }
+
+      const im = (i - 1 + N) % N, ip = (i + 1) % N;
+      const L = idx(im, j), R = idx(ip, j),
+            U = idx(i, jm),  D = idx(i, jp);
+
+      const ui = u[p], vi = v[p];
+      const lapU = u[L] + u[R] + u[U] + u[D] - 4 * ui;
+      const lapV = v[L] + v[R] + v[U] + v[D] - 4 * vi;
+
+      // 風上差分による移流（電磁ドリフト）
+      let advU = 0, advV = 0;
+      if (EX > 0) { advU += EX * (ui - u[L]); advV += EX * (vi - v[L]); }
+      else if (EX < 0) { advU += EX * (u[R] - ui); advV += EX * (v[R] - vi); }
+      if (EY > 0) { advU += EY * (ui - u[U]); advV += EY * (vi - v[U]); }
+      else if (EY < 0) { advU += EY * (u[D] - ui); advV += EY * (v[D] - vi); }
+
+      const uvv = ui * vi * vi;
+      const du = Du * lapU - uvv + F * (1 - ui) - advU;
+      const dv = Dv * lapV + uvv - (F + k) * vi - advV;
+
+      un[p] = Math.max(0, Math.min(1, ui + dt * du));
+      vn[p] = Math.max(0, Math.min(1, vi + dt * dv));
+    }
+  }
+  [u, un] = [un, u]; [v, vn] = [vn, v];
+
+  // ---- カタストロフ地形での分化 (φ の局所緩和) ----
+  // dφ/dt = −γ · dU/dφ + γ · couple · (v − v*)
+  //       = −γ (φ^3 − a φ − b) + γ · couple · (v − 0.3)
+  const g = params.gamma;
+  const vStar = 0.30;
+  for (let p = 0; p < SZ; p++) {
+    if (coil && !mask[p]) { phi[p] = 0; continue; }
+    const f = phi[p];
+    const dphi = -(f * f * f - params.a * f - params.b) + params.couple * (v[p] - vStar);
+    phi[p] = Math.max(-1.5, Math.min(1.5, f + g * dphi));
+  }
+
+  tstep++;
+}
+
+// ---- 表示 ----------------------------------------------------
+function paint() {
+  const d = img.data;
+  for (let p = 0; p < SZ; p++) {
+    let r, g, b;
+    if (params.coil && !mask[p]) {
+      r = 8; g = 12; b = 22;
+    } else {
+      const ui = u[p], vi = v[p], f = phi[p];
+      // 基底: u 青, v 赤
+      r = Math.floor(255 * Math.min(1, vi * 1.6));
+      g = Math.floor(55 * (1 - ui) + 40);
+      b = Math.floor(255 * Math.min(1, ui * 0.85));
+      // 分化した領域 (φ > 0.5) を緑に強調
+      if (f > 0.5) {
+        const t = Math.min(1, (f - 0.5) * 2);
+        r = Math.floor(r * (1 - t) + 40 * t);
+        g = Math.floor(g * (1 - t) + 220 * t);
+        b = Math.floor(b * (1 - t) + 90 * t);
+      }
+    }
+    const k = p * 4;
+    d[k] = r; d[k + 1] = g; d[k + 2] = b; d[k + 3] = 255;
+  }
+  // ImageData を N×N で描いてからスケール描画
+  const tmp = document.createElement("canvas");
+  tmp.width = N; tmp.height = N;
+  tmp.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tmp, 0, 0, CANVAS_PX, CANVAS_PX);
+
+  // 円形容器の縁を描く
+  if (params.coil) {
+    ctx.strokeStyle = "#c8a44a";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(CANVAS_PX / 2, CANVAS_PX / 2, ((N / 2) - 1) * CV_SCALE, 0, Math.PI * 2);
+    ctx.stroke();
+    // コイル巻線の目印
+    ctx.strokeStyle = "rgba(200,164,74,0.35)";
+    ctx.lineWidth = 1;
+    for (let k = 0; k < 24; k++) {
+      const ang = (k / 24) * Math.PI * 2;
+      const r1 = ((N / 2) - 1) * CV_SCALE, r2 = r1 + 6;
+      const cx = CANVAS_PX / 2, cy = CANVAS_PX / 2;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+      ctx.lineTo(cx + Math.cos(ang) * r2, cy + Math.sin(ang) * r2);
+      ctx.stroke();
+    }
+  }
+}
+
+function paintWaddington() {
+  const W = wcv.width, H = wcv.height;
+  wctx.fillStyle = "#050a14"; wctx.fillRect(0, 0, W, H);
+
+  // U(φ) をプロット
+  const a = params.a, b = params.b;
+  const phiMin = -1.5, phiMax = 1.5;
+  let uVals = [];
+  for (let i = 0; i < W; i++) {
+    const f = phiMin + (phiMax - phiMin) * i / (W - 1);
+    const u = 0.25 * f * f * f * f - 0.5 * a * f * f - b * f;
+    uVals.push(u);
+  }
+  let uMin = Math.min(...uVals), uMax = Math.max(...uVals);
+  const pad = (uMax - uMin) * 0.1 + 1e-6;
+  uMin -= pad; uMax += pad;
+  wctx.strokeStyle = "#4a80d0";
+  wctx.lineWidth = 2;
+  wctx.beginPath();
+  for (let i = 0; i < W; i++) {
+    const y = H - (uVals[i] - uMin) / (uMax - uMin) * H;
+    if (i === 0) wctx.moveTo(i, y); else wctx.lineTo(i, y);
+  }
+  wctx.stroke();
+
+  // 平均 φ に赤玉
+  let avgPhi = 0, cnt = 0;
+  for (let p = 0; p < SZ; p++) {
+    if (!params.coil || mask[p]) { avgPhi += phi[p]; cnt++; }
+  }
+  if (cnt > 0) {
+    avgPhi /= cnt;
+    const px = (avgPhi - phiMin) / (phiMax - phiMin) * W;
+    const uBall = 0.25 * avgPhi ** 4 - 0.5 * a * avgPhi * avgPhi - b * avgPhi;
+    const py = H - (uBall - uMin) / (uMax - uMin) * H;
+    wctx.fillStyle = "#f26a4b";
+    wctx.beginPath(); wctx.arc(px, py, 5, 0, Math.PI * 2); wctx.fill();
+  }
+
+  // 軸ラベル
+  wctx.fillStyle = "#7a8db3";
+  wctx.font = "10px sans-serif";
+  wctx.fillText("φ (分化度)", 6, H - 6);
+  wctx.fillText("U(φ)", W - 40, 12);
+}
+
+// ---- 指標 ---------------------------------------------------
+function countSpots(threshold) {
+  const seen = new Uint8Array(SZ);
+  const stack = new Int32Array(SZ);
+  let count = 0;
+  for (let start = 0; start < SZ; start++) {
+    if (seen[start] || v[start] <= threshold) continue;
+    if (params.coil && !mask[start]) continue;
+    count++;
+    let sp = 0; stack[sp++] = start; seen[start] = 1;
+    while (sp > 0) {
+      const p = stack[--sp];
+      const i = p % N, j = (p - i) / N;
+      const nb = [
+        idx((i - 1 + N) % N, j), idx((i + 1) % N, j),
+        idx(i, (j - 1 + N) % N), idx(i, (j + 1) % N),
+      ];
+      for (const q of nb) {
+        if (seen[q]) continue;
+        if (v[q] <= threshold) continue;
+        if (params.coil && !mask[q]) continue;
+        seen[q] = 1; stack[sp++] = q;
+      }
+    }
+  }
+  return count;
+}
+
+function updateStats() {
+  document.getElementById("stepBadge").textContent = "t=" + tstep;
+  document.getElementById("stSpots").textContent = countSpots(0.25);
+
+  let diffCount = 0, total = 0, cx = 0, cy = 0, w = 0;
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const p = idx(i, j);
+      if (params.coil && !mask[p]) continue;
+      total++;
+      if (phi[p] > 0.5) diffCount++;
+      if (v[p] > 0.1) { cx += i * v[p]; cy += j * v[p]; w += v[p]; }
+    }
+  }
+  const pct = total > 0 ? (100 * diffCount / total) : 0;
+  document.getElementById("stDiff").textContent = pct.toFixed(1) + "%";
+  document.getElementById("stCentroid").textContent =
+    w > 1e-6 ? `(${(cx / w).toFixed(1)}, ${(cy / w).toFixed(1)})` : "—";
+  document.getElementById("stMode").textContent =
+    running ? (params.anti ? "運転中（逆流）" : "運転中")
+            : (tstep === 0 ? "停止" : "一時停止");
+}
+
+// ---- ループ --------------------------------------------------
+function loop() {
+  if (!running) return;
+  for (let s = 0; s < 3; s++) step();       // 1フレームで数ステップ進める
+  paint();
+  paintWaddington();
+  updateStats();
+  raf = requestAnimationFrame(loop);
+}
+
+// ---- UI ------------------------------------------------------
+function link(sliderId, numId, key, decimals) {
+  const s = document.getElementById(sliderId);
+  const n = numId ? document.getElementById(numId) : null;
+  const label = document.getElementById(sliderId + "V");
+  const apply = (val) => {
+    params[key] = val;
+    if (n) n.value = val;
+    if (label) label.textContent = val.toFixed(decimals);
+  };
+  s.addEventListener("input", () => apply(parseFloat(s.value)));
+  if (n) n.addEventListener("input", () => {
+    const v = parseFloat(n.value);
+    if (!isNaN(v)) { s.value = v; apply(v); }
+  });
+  apply(parseFloat(s.value));
+}
+
+link("F", "Fn", "F", 3);
+link("K", "Kn", "k", 4);
+link("Ex", null, "Ex", 3);
+link("Ey", null, "Ey", 3);
+link("A", null, "a", 2);
+link("B", null, "b", 2);
+
+document.getElementById("tCoil").addEventListener("change", (e) => {
+  params.coil = e.target.checked;
+});
+document.getElementById("tAnti").addEventListener("change", (e) => {
+  params.anti = e.target.checked;
+});
+
+document.getElementById("btnRun").addEventListener("click", () => {
+  running = true;
+  document.getElementById("btnRun").disabled = true;
+  document.getElementById("btnPause").disabled = false;
+  loop();
+});
+document.getElementById("btnPause").addEventListener("click", () => {
+  running = false;
+  document.getElementById("btnRun").disabled = false;
+  document.getElementById("btnPause").disabled = true;
+  updateStats();
+});
+document.getElementById("btnReset").addEventListener("click", () => {
+  running = false;
+  cancelAnimationFrame(raf);
+  resetField();
+  paint(); paintWaddington(); updateStats();
+  document.getElementById("btnRun").disabled = false;
+  document.getElementById("btnPause").disabled = true;
+});
+document.getElementById("btnSeed").addEventListener("click", () => {
+  seedSpot(N / 2, N / 2, 4);
+  paint(); updateStats();
+});
+document.getElementById("btnPreset1").addEventListener("click", () => {
+  document.getElementById("F").value = 0.030; params.F = 0.030;
+  document.getElementById("K").value = 0.0565; params.k = 0.0565;
+  document.getElementById("A").value = 0.9; params.a = 0.9;
+  document.getElementById("B").value = 0; params.b = 0;
+  document.getElementById("AV").textContent = "0.90";
+  document.getElementById("BV").textContent = "0.00";
+  document.getElementById("Fn").value = 0.030;
+  document.getElementById("Kn").value = 0.0565;
+  // 種を置いてスタート
+  resetField(); seedSpot(N / 2, N / 2, 4);
+  paint(); paintWaddington(); updateStats();
+});
+document.getElementById("btnPreset2").addEventListener("click", () => {
+  document.getElementById("F").value = 0.037; params.F = 0.037;
+  document.getElementById("K").value = 0.065;  params.k = 0.065;
+  document.getElementById("A").value = 0.2; params.a = 0.2;
+  document.getElementById("Fn").value = 0.037;
+  document.getElementById("Kn").value = 0.065;
+  document.getElementById("AV").textContent = "0.20";
+  resetField(); seedSpot(N / 2, N / 2, 4);
+  paint(); paintWaddington(); updateStats();
+});
+
+// タップで種を置ける
+cv.addEventListener("pointerdown", (e) => {
+  const rect = cv.getBoundingClientRect();
+  const cx = Math.floor((e.clientX - rect.left) * N / rect.width);
+  const cy = Math.floor((e.clientY - rect.top)  * N / rect.height);
+  seedSpot(cx, cy, 3);
+  paint(); updateStats();
+});
+
+// 初期化
+buildMask();
+resetField();
+paint(); paintWaddington(); updateStats();
+</script>
+</body>
+</html>
