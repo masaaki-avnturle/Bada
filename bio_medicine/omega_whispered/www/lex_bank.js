@@ -16,12 +16,12 @@
 (function (root) {
   "use strict";
 
-  var FIELDS = ["数学英語", "化学英語", "物理英語", "薬学英語", "経済英語", "学術英語共通"];
+  var FIELDS = ["数学英語", "化学英語", "物理英語", "薬学英語", "経済英語", "情報科学英語", "学術英語共通"];
 
   /* 系統(math / chem / pharma / econ)との対応。他系統へ造語を配るときに使う */
   var SUBJECT_OF = {
     "数学英語": "math", "物理英語": "chem", "化学英語": "chem",
-    "薬学英語": "pharma", "経済英語": "econ", "学術英語共通": "all"
+    "薬学英語": "pharma", "経済英語": "econ", "情報科学英語": "cs", "学術英語共通": "all"
   };
 
   /* ======================= 学術英語の表記・略号 ======================= */
@@ -87,7 +87,21 @@
     { ch: "CAGR", ja: "年平均成長率", mean: "compound annual growth rate。複利換算した平均成長率", field: "経済英語", lv: 3 },
     { ch: "s.a.", ja: "季節調整済み", mean: "seasonally adjusted。季節変動を取り除いた系列", field: "経済英語", lv: 4 },
     { ch: "FY", ja: "会計年度", mean: "fiscal year。暦年とずれることがある", field: "経済英語", lv: 2 },
-    { ch: "ppt", ja: "パーセントポイント", mean: "percentage point。率どうしの差を表す(% との混同に注意)", field: "経済英語", lv: 3 }
+    { ch: "ppt", ja: "パーセントポイント", mean: "percentage point。率どうしの差を表す(% との混同に注意)", field: "経済英語", lv: 3 },
+
+    /* --- 情報科学英語 --- */
+    { ch: "w.h.p.", ja: "高い確率で", mean: "with high probability。乱択アルゴリズムの解析で使う", field: "情報科学英語", lv: 5 },
+    { ch: "s.t. (subject to)", ja: "制約のもとで", mean: "最適化問題の制約条件を導く", field: "情報科学英語", lv: 3 },
+    { ch: "RFC", ja: "インターネット標準文書", mean: "Request for Comments。仕様が番号付きで公開される", field: "情報科学英語", lv: 3 },
+    { ch: "API", ja: "アプリケーション・プログラミング・インタフェース", mean: "呼び出しの約束事。実装を隠して機能だけを見せる", field: "情報科学英語", lv: 2 },
+    { ch: "POSIX", ja: "ポシックス", mean: "Portable Operating System Interface。UNIX 系 OS の共通仕様", field: "情報科学英語", lv: 4 },
+    { ch: "REPL", ja: "対話実行環境", mean: "Read-Eval-Print Loop。読んで評価して表示する繰り返し", field: "情報科学英語", lv: 4 },
+    { ch: "ASCII", ja: "アスキー", mean: "American Standard Code for Information Interchange。7 ビットの文字符号", field: "情報科学英語", lv: 2 },
+    { ch: "UTF-8", ja: "可変長 Unicode 符号", mean: "1〜4 バイトで符号化する方式。ASCII と互換", field: "情報科学英語", lv: 3 },
+    { ch: "CI/CD", ja: "継続的統合 / 継続的デリバリ", mean: "変更ごとに自動で検査し、届けるまでを自動化する運用", field: "情報科学英語", lv: 3 },
+    { ch: "SLA / SLO", ja: "サービス水準合意 / 目標", mean: "可用性や応答時間について約束する水準と、内部で狙う目標", field: "情報科学英語", lv: 4 },
+    { ch: "FLOPS", ja: "浮動小数点演算性能", mean: "floating point operations per second。計算機の速さの指標", field: "情報科学英語", lv: 3 },
+    { ch: "P vs NP", ja: "P 対 NP 問題", mean: "解くのと検証するのは同じ難しさか、という未解決問題", field: "情報科学英語", lv: 4 }
   ];
 
   /* ============ 文脈依存: 同じ英単語が分野で意味を変える ============ */
@@ -169,6 +183,30 @@
       { field: "化学英語", mean: "有効成分の含量・効力" },
       { field: "学術英語共通", mean: "潜在的な力" },
       { field: "経済英語", mean: "政策の効き目(policy potency)" }
+    ]},
+    { ch: "kernel", items: [
+      { field: "情報科学英語", mean: "OS の中核(特権モードで動く部分)。機械学習ではカーネル法の核関数" },
+      { field: "数学英語", mean: "核(準同型で 0 に写る元の集合)・積分核" },
+      { field: "物理英語", mean: "積分核(グリーン関数の核)" },
+      { field: "学術英語共通", mean: "穀粒・核心" }
+    ]},
+    { ch: "thread", items: [
+      { field: "情報科学英語", mean: "スレッド(同じプロセス内で並行に走る実行の流れ)" },
+      { field: "学術英語共通", mean: "議論の流れ・一連の投稿" },
+      { field: "化学英語", mean: "ねじ山(器具の接合部)" },
+      { field: "数学英語", mean: "糸のように連なる列(比喩的な用法)" }
+    ]},
+    { ch: "bug", items: [
+      { field: "情報科学英語", mean: "不具合。1947 年に実際の蛾が挟まった逸話が有名だが、語自体はそれ以前からある" },
+      { field: "薬学英語", mean: "病原体(俗な言い方。superbug = 多剤耐性菌)" },
+      { field: "学術英語共通", mean: "虫" },
+      { field: "経済英語", mean: "熱狂・過熱(the bug for …)" }
+    ]},
+    { ch: "protocol", items: [
+      { field: "情報科学英語", mean: "通信規約(TCP/IP のような取り決め)" },
+      { field: "薬学英語", mean: "試験実施計画書(臨床試験の手順書)" },
+      { field: "化学英語", mean: "実験手順(合成の標準手順)" },
+      { field: "学術英語共通", mean: "儀礼・議定書" }
     ]},
     { ch: "stable", items: [
       { field: "数学英語", mean: "安定な(摂動で解が離れていかない)" },
@@ -362,6 +400,71 @@
       parts: [{ p: "人名" }, { p: "economics (経済政策)" }],
       mean: "特定の政権が掲げた一連の経済政策を指す通称",
       note: "Reaganomics(1980 年代)以来の型。-nomics は人名に付いて政策パッケージを指す接尾辞になった。" },
+    /* ---------- 情報科学 ---------- */
+    { w: "bit", ja: "ビット", field: "情報科学英語", lv: 2, kind: "混成語",
+      parts: [{ p: "binary (2 進の)" }, { p: "digit (桁)" }],
+      mean: "情報量の最小単位。2 値のどちらかを表す",
+      note: "Tukey が 1946 年ごろに提案し、Shannon が 1948 年の論文で採用した。qubit はこの語を土台にしている。" },
+    { w: "byte", ja: "バイト", field: "情報科学英語", lv: 2, kind: "借用",
+      parts: [{ p: "bite (ひと口) の綴りを変えた語" }],
+      mean: "1 文字ぶんをまとめて扱う単位。今日では 8 ビット",
+      note: "bit と綴りが紛れないよう i を y に替えた。フランス語では 8 ビットであることを明示して octet と呼ぶ。" },
+    { w: "pixel", ja: "画素", field: "情報科学英語", lv: 2, kind: "混成語",
+      parts: [{ p: "picture (画像)" }, { p: "element (要素)" }],
+      mean: "画像を構成する最小の点",
+      note: "voxel は volume + element で立体の画素。texel(texture + element)も同じ作り方。" },
+    { w: "codec", ja: "コーデック", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "coder (符号化器)" }, { p: "decoder (復号器)" }],
+      mean: "符号化と復号を行う一組の仕組み",
+      note: "modem(modulator + demodulator)と同じ、対になる装置名を縮めて足す型。" },
+    { w: "modem", ja: "モデム", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "modulator (変調器)" }, { p: "demodulator (復調器)" }],
+      mean: "デジタル信号を回線に載る波形へ変換し、また戻す装置",
+      note: "codec と同型の造語。往復する二つの機能を 1 語にまとめている。" },
+    { w: "malware", ja: "悪意のあるソフトウェア", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "malicious (悪意のある)" }, { p: "software (ソフトウェア)" }],
+      mean: "利用者に害を与えることを目的とした software の総称",
+      note: "software 自体が hardware をもじった造語(hard/soft の対比)。firmware・freeware も同じ系列。" },
+    { w: "phishing", ja: "フィッシング詐欺", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "fishing (釣り)" }, { p: "ph-（phreaking の綴りに合わせた置き換え)" }],
+      mean: "偽の画面や連絡で認証情報を釣り出す攻撃",
+      note: "f を ph に替えるのは電話をハックする phreaking(phone + freak)以来の綴りの遊び。" },
+    { w: "blog", ja: "ブログ", field: "情報科学英語", lv: 1, kind: "縮約",
+      parts: [{ p: "web (ウェブ)" }, { p: "log (記録)" }],
+      mean: "日付順に記事を並べて公開する形式のサイト",
+      note: "weblog を we + blog と切り直した冗談から広まった。切る位置が語を作り替えた例。" },
+    { w: "cybernetics", ja: "サイバネティクス", field: "情報科学英語", lv: 4, kind: "新古典複合語",
+      parts: [{ p: "kybernētēs (ギリシャ語: 舵取り)" }, { p: "-ics (学問を表す接尾辞)" }],
+      mean: "生物と機械に共通する制御と通信の理論",
+      note: "Wiener が 1948 年に命名。ここから cyberspace・cyborg・cybersecurity と cyber- が広がった。" },
+    { w: "cyborg", ja: "サイボーグ", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "cybernetic (制御の)" }, { p: "organism (生体)" }],
+      mean: "機械と一体化した生体",
+      note: "1960 年に宇宙飛行の文脈で提案された語。cybernetics から派生した接頭辞 cyber- の初期の例。" },
+    { w: "boolean", ja: "ブール値", field: "情報科学英語", lv: 2, kind: "人名由来",
+      parts: [{ p: "George Boole (19 世紀の論理学者の名)" }],
+      mean: "真か偽の 2 値をとる型",
+      note: "人名がそのまま型名になった。Turing machine・Hamming distance・Markov chain も同じ人名由来。" },
+    { w: "daemon", ja: "デーモン(常駐プロセス)", field: "情報科学英語", lv: 4, kind: "借用",
+      parts: [{ p: "daimōn (ギリシャ語: 見えない働き手・精霊)" }],
+      mean: "背後で常時動き続けるプロセス",
+      note: "マクスウェルの悪魔(Maxwell's demon)にちなむとされる。悪霊の demon とは綴りを分けている。" },
+    { w: "wiki", ja: "ウィキ", field: "情報科学英語", lv: 2, kind: "借用",
+      parts: [{ p: "wiki wiki (ハワイ語: 速い)" }],
+      mean: "誰でも編集できる形式のウェブサイト",
+      note: "Cunningham が 1995 年に命名。英語以外の日常語がそのまま情報科学の術語になった例。" },
+    { w: "avatar", ja: "アバター", field: "情報科学英語", lv: 3, kind: "借用",
+      parts: [{ p: "avatāra (サンスクリット語: 神の化身)" }],
+      mean: "利用者を画面上で表す分身",
+      note: "宗教用語が仮想空間の語に転用された。emoji(絵文字)のように、他言語からの借用も情報科学には多い。" },
+    { w: "spam", ja: "迷惑メール", field: "情報科学英語", lv: 2, kind: "借用",
+      parts: [{ p: "Monty Python のコントで連呼される缶詰肉の商品名" }],
+      mean: "無差別に大量に送りつけられるメッセージ",
+      note: "「同じ語が延々と繰り返される」というコントの情景がそのまま比喩になった。" },
+    { w: "firmware", ja: "ファームウェア", field: "情報科学英語", lv: 3, kind: "混成語",
+      parts: [{ p: "firm (固い、hard と soft の中間)" }, { p: "-ware (software の型)" }],
+      mean: "機器に組み込まれ、書き換えは可能だが普段は固定されている制御プログラム",
+      note: "hardware と software の中間という位置づけを、語の硬さの度合いで表している。" },
     { w: "Brexit", ja: "ブレグジット", field: "経済英語", lv: 2, kind: "混成語",
       parts: [{ p: "Britain (英国)" }, { p: "exit (離脱)" }],
       mean: "英国の欧州連合からの離脱",
@@ -422,7 +525,13 @@
     { m: "-tropy / -tropic", from: "ギリシャ語 tropē", mean: "転換・向き", ex: ["entropy", "isotropic", "phototropic"], field: "物理英語", lv: 4 },
     { m: "-stat", from: "ギリシャ語 statos", mean: "一定に保つもの", ex: ["thermostat", "bacteriostatic", "electrostatics"], field: "物理英語", lv: 3 },
     { m: "-emia", from: "ギリシャ語 haima", mean: "血中の状態", ex: ["hyperglycemia", "anemia", "bacteremia"], field: "薬学英語", lv: 4 },
-    { m: "-ic / -ous (酸)", from: "命名法の語尾", mean: "酸化数の高い / 低い", ex: ["sulfuric acid", "sulfurous acid", "ferric / ferrous"], field: "化学英語", lv: 4 }
+    { m: "-ic / -ous (酸)", from: "命名法の語尾", mean: "酸化数の高い / 低い", ex: ["sulfuric acid", "sulfurous acid", "ferric / ferrous"], field: "化学英語", lv: 4 },
+    { m: "-ware", from: "hardware / software の対比から", mean: "〜として作られたもの(の総称)", ex: ["software", "firmware", "malware", "freeware"], field: "情報科学英語", lv: 2 },
+    { m: "cyber-", from: "cybernetics(ギ: kybernētēs 舵取り)", mean: "計算機・ネットワークに関わる", ex: ["cyberspace", "cyborg", "cybersecurity"], field: "情報科学英語", lv: 3 },
+    { m: "-el (要素)", from: "element の切り出し", mean: "画像・空間を構成する最小単位", ex: ["pixel", "voxel", "texel"], field: "情報科学英語", lv: 4 },
+    { m: "meta-", from: "ギリシャ語 meta", mean: "〜についての〜(一段上の階層)", ex: ["metadata", "metaprogramming", "metalanguage"], field: "情報科学英語", lv: 3 },
+    { m: "-oid / -bot", from: "-oeidēs(〜のような)/ robot の切り出し", mean: "〜に似たもの / 自動で動くもの", ex: ["humanoid", "chatbot", "botnet"], field: "情報科学英語", lv: 3 },
+    { m: "en- / de- (符号化)", from: "encode / decode の対", mean: "符号化する / 復号する", ex: ["encode", "decode", "encrypt", "decrypt"], field: "情報科学英語", lv: 2 }
   ];
 
   /* ======================= 専門英語の語彙(t = 英語) ======================= */
@@ -496,7 +605,25 @@
     { t: "a fortiori", en: "なおさら", field: "学術英語共通", lv: 5, def: "より強い理由で成り立つ、という論法" },
     { t: "seminal", en: "先駆的な", field: "学術英語共通", lv: 4, def: "後続の研究の出発点になった、という評価" },
     { t: "caveat", en: "留保・注意点", field: "学術英語共通", lv: 4, def: "主張に付ける限定条件" },
-    { t: "reproducibility", en: "再現性", field: "学術英語共通", lv: 3, def: "同じ手順で同じ結果が得られること" }
+    { t: "reproducibility", en: "再現性", field: "学術英語共通", lv: 3, def: "同じ手順で同じ結果が得られること" },
+
+    /* --- 情報科学英語 --- */
+    { t: "time complexity", en: "時間計算量", field: "情報科学英語", lv: 2, def: "入力サイズに対して手数がどう増えるか" },
+    { t: "overhead", en: "オーバーヘッド", field: "情報科学英語", lv: 2, def: "本来の処理以外に余分にかかる時間・容量" },
+    { t: "throughput", en: "スループット", field: "情報科学英語", lv: 2, def: "単位時間あたりに処理できる量" },
+    { t: "latency", en: "レイテンシ(遅延)", field: "情報科学英語", lv: 2, def: "要求してから応答が返るまでの時間。throughput とは別物" },
+    { t: "bottleneck", en: "ボトルネック", field: "情報科学英語", lv: 2, def: "全体の速度を決めてしまう最も遅い箇所" },
+    { t: "deadlock", en: "デッドロック", field: "情報科学英語", lv: 3, def: "互いに相手の資源を待って進まなくなる状態" },
+    { t: "race condition", en: "競合状態", field: "情報科学英語", lv: 3, def: "実行順序によって結果が変わる不具合" },
+    { t: "idempotent", en: "冪等な", field: "情報科学英語", lv: 4, def: "何度実行しても結果が同じであること" },
+    { t: "graceful degradation", en: "緩やかな劣化", field: "情報科学英語", lv: 4, def: "一部が壊れても全体が止まらず、機能を落として動き続けること" },
+    { t: "backward compatible", en: "後方互換の", field: "情報科学英語", lv: 3, def: "新しい版が古い入力・利用者を壊さないこと" },
+    { t: "garbage collection", en: "ごみ集め", field: "情報科学英語", lv: 3, def: "到達不能になった記憶領域を自動的に回収すること" },
+    { t: "sandbox", en: "サンドボックス", field: "情報科学英語", lv: 3, def: "外に影響を出さない隔離された実行環境" },
+    { t: "boilerplate", en: "定型コード", field: "情報科学英語", lv: 3, def: "毎回ほぼ同じ形で書かざるを得ない部分" },
+    { t: "regression", en: "デグレ(退行)", field: "情報科学英語", lv: 3, def: "以前は動いていた機能が変更で壊れること。統計の回帰とは別語義" },
+    { t: "fault tolerance", en: "耐障害性", field: "情報科学英語", lv: 4, def: "部品が壊れても系全体としては動き続ける性質" },
+    { t: "state of the art (SOTA)", en: "最高性能", field: "情報科学英語", lv: 3, def: "その時点で最も良いとされる結果" }
   ];
 
   /* ============ 日常語 → 専門英語 の連想 ============ */
@@ -553,6 +680,22 @@
       adv: "in silico", advName: "イン・シリコ", field: "薬学英語", lv: 4,
       why: "in vitro(ガラスの中で)/ in vivo(生体内で)というラテン語の型に silicon を差し込んだ造語。",
       wrong: ["in situ", "ab initio", "ex vivo"] },
+    { simple: "「2 進の桁」を 1 語で言うと", simpleMean: "0 か 1 かの最小単位",
+      adv: "bit", advName: "ビット", field: "情報科学英語", lv: 2,
+      why: "binary + digit の混成語。qubit(quantum + bit)はこの語の上に建てられた造語。",
+      wrong: ["byte", "pixel", "codec"] },
+    { simple: "「画像を作る最小の点」", simpleMean: "拡大すると見える四角い粒",
+      adv: "pixel", advName: "画素", field: "情報科学英語", lv: 2,
+      why: "picture + element。立体版は voxel(volume + element)、模様は texel(texture + element)。",
+      wrong: ["bit", "byte", "codec"] },
+    { simple: "「舵を取る」から生まれた学問の名", simpleMean: "制御と通信を一緒に扱う",
+      adv: "cybernetics", advName: "サイバネティクス", field: "情報科学英語", lv: 4,
+      why: "ギリシャ語 kybernētēs(舵取り)から Wiener が命名。cyberspace・cyborg の cyber- はここから。",
+      wrong: ["informatics", "automata", "robotics"] },
+    { simple: "「悪さをするソフト」の総称", simpleMean: "害を与える目的のプログラム",
+      adv: "malware", advName: "マルウェア", field: "情報科学英語", lv: 3,
+      why: "malicious + software。software 自体が hardware をもじった造語で、-ware が総称の接尾辞になった。",
+      wrong: ["firmware", "freeware", "spyware"] },
     { simple: "「0 と 1 を同時に持てる情報の単位」", simpleMean: "どちらとも決まっていない状態",
       adv: "qubit", advName: "量子ビット", field: "物理英語", lv: 4,
       why: "quantum + bit の混成語。bit 自体も binary + digit の混成語で、造語の上に造語が重なっている。",
@@ -615,6 +758,18 @@
       { t: "定義を書き下してから短い呼び名を決める", w: { "数学英語": 2.5 } },
       { t: "分野の慣例に従うのを待つ", w: { "学術英語共通": 2 } }
     ]},
+    { q: "術語が略号だらけの文書(API, RFC, POSIX)はどうですか。", opts: [
+      { t: "定義さえ押さえれば読みやすい", w: { "情報科学英語": 3 } },
+      { t: "初出で展開してほしい", w: { "学術英語共通": 2.5 } },
+      { t: "仕様の原文に当たりたくなる", w: { "情報科学英語": 2, "学術英語共通": 1 } },
+      { t: "実際に動かして確かめたい", w: { "情報科学英語": 2, "物理英語": 1 } }
+    ]},
+    { q: "日常語が術語に転用された例(bug, thread, kernel, daemon)を見て思うのは？", opts: [
+      { t: "比喩の元をたどりたくなる", w: { "情報科学英語": 2.5, "学術英語共通": 1 } },
+      { t: "分野ごとの意味を区別して覚えたい", w: { "数学英語": 2 } },
+      { t: "実務では文脈で決まるので気にしない", w: { "情報科学英語": 2 } },
+      { t: "誤解を招くので別語にすべきだと思う", w: { "薬学英語": 2 } }
+    ]},
     { q: "語彙を増やすとき、効くと感じるのは？", opts: [
       { t: "語根・接辞の体系を覚えること", w: { "化学英語": 2, "学術英語共通": 2 } },
       { t: "論文をたくさん読んで文脈ごと覚えること", w: { "物理英語": 2, "薬学英語": 1.5 } },
@@ -664,6 +819,14 @@
       syms: "YoY QoQ CAGR s.a. FY ppt bps",
       near: ["学術英語共通", "薬学英語"],
       next: "指標の読み方 → 因果推論の語彙 → 政策文書の言い回し"
+    },
+    "情報科学英語": {
+      tag: "仕様と実装を過不足なく述べる語彙を扱う分野",
+      think: "曖昧さを残さず、性能と失敗の仕方まで含めて書く。日常語の転用と略号が多い。",
+      eqs: "time complexity · idempotent · graceful degradation · backward compatible",
+      syms: "API RFC POSIX REPL ASCII UTF-8 CI/CD SLA FLOPS w.h.p.",
+      near: ["数学英語", "学術英語共通"],
+      next: "略号と仕様書の語彙 → 日常語の転用(bug/thread/kernel) → 造語の型(-ware, cyber-)"
     },
     "学術英語共通": {
       tag: "分野を問わず論文で共有される語彙と型",
