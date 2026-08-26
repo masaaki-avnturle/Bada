@@ -290,15 +290,40 @@ jobs:
       - name: Write download summary
         run: |
           RUN="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          REPO="${{ github.server_url }}/${{ github.repository }}"
           {
-            echo "## ⬇ ダウンロード (Artifacts)"
+            echo "## ⬇ ダウンロード"
             echo ""
-            echo "このページ下部の **Artifacts** から各ファイルをダウンロードできます。"
-            echo "（Artifacts のダウンロードには GitHub へのログインが必要です。"
-            echo "  ログイン不要で配布したい場合は、手動実行時に \`publish_release\` を有効にするか、"
-            echo "  タグ \`apps-v*\` を push して Release を作成してください。）"
+            echo "### 1. このページから直接とる (Artifacts)"
+            echo ""
+            echo "**このページを一番下までスクロールすると \`Artifacts\` の欄があります。**"
+            echo "名前をクリックすると ZIP でダウンロードできます（GitHub にログインしている必要があります）。"
+            echo "ZIP を展開すると、中に APK / EXE / deb / AppImage / 単一 HTML が入っています。"
             echo ""
             echo "実行ページ: $RUN"
+            echo ""
+            echo "### 2. ログインせずにとる (Releases)"
+            echo ""
+            echo "Release の添付ファイルは **ログイン不要・ZIP なしの直リンク** です。"
+            echo "スマートフォンから APK を入れるときはこちらが簡単です。"
+            echo ""
+            echo "- Releases 一覧: $REPO/releases"
+            echo "- 最新版: $REPO/releases/latest"
+            echo ""
+            echo "Release がまだ無いときは、Actions の **Run workflow** で"
+            echo "\`publish_release\` を有効にして実行するか、タグ \`apps-v*\` を push してください。"
+            echo ""
+            echo "### 3. コマンドでとる (gh CLI)"
+            echo ""
+            echo '```bash'
+            echo "# この実行の成果物をまとめて取得(要ログイン)"
+            echo "gh run download ${{ github.run_id }} -R ${{ github.repository }}"
+            echo ""
+            echo "# 最新 Release から取得(ログイン不要でも curl で可)"
+            echo "gh release download -R ${{ github.repository }} --pattern '*.apk'"
+            echo '```'
+            echo ""
+            echo "### 成果物"
             echo ""
             echo "| 成果物 | ファイル | サイズ |"
             echo "|:--|:--|--:|"
@@ -315,6 +340,7 @@ jobs:
             echo ""
             echo "### 導入方法"
             echo "- **Android**: \`*-debug.apk\` を端末に転送して開く（提供元不明のアプリの許可が必要）"
+            echo "  - 1.1.0 以降は固定鍵で署名しているため、旧版があってもアンインストール不要で上書きできます"
             echo "- **Windows 10/11**: \`*-win-x64.exe\`（NSIS インストーラ / portable）を実行"
             echo "- **Ubuntu**: \`sudo apt install ./*-linux-amd64.deb\` または \`chmod +x *.AppImage && ./*.AppImage\`"
             echo "- **任意のOS**: \`omega-whispered.html\` をブラウザで開くだけ（インストール不要・オフライン動作）"
@@ -338,6 +364,7 @@ jobs:
           find artifacts -type f -exec cp {} release/ \;
           ls -la release
       - name: Create / update Release
+        id: rel
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}
@@ -352,3 +379,19 @@ jobs:
 
             ⚠ 非公式ファン・オマージュ / 学習・娯楽目的です。
           files: release/*
+      - name: Write release summary
+        run: |
+          TAG="${{ inputs.release_tag != '' && inputs.release_tag || github.ref_name }}"
+          BASE="${{ github.server_url }}/${{ github.repository }}/releases/download/$TAG"
+          {
+            echo "## 🎉 Release を公開しました (ログイン不要でダウンロードできます)"
+            echo ""
+            echo "- Release ページ: ${{ steps.rel.outputs.url }}"
+            echo ""
+            echo "| ファイル | 直リンク |"
+            echo "|:--|:--|"
+            for f in release/*; do
+              B=$(basename "$f")
+              echo "| \`$B\` | $BASE/$B |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

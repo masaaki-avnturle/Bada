@@ -438,6 +438,20 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | 任意のOS | `omega-whispered.html` | 単一ファイル版 |
 | 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
 
+#### いちばん簡単: Releases からダウンロードする（ログイン不要）
+
+[**→ Releases から最新版をダウンロード**](https://github.com/masaaki-avnturle/Bada/releases/latest)
+
+Release の添付ファイルは **ログイン不要・ZIP なしの直リンク**です。
+スマートフォンに APK を入れるときは、端末のブラウザでこのページを開いて
+`omega_whispered-debug.apk` を直接タップするのが最短です。
+
+```bash
+# コマンドで最新版を取得する例
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/latest/download/omega_whispered-debug.apk
+curl -LO https://github.com/masaaki-avnturle/Bada/releases/latest/download/omega-whispered.html
+```
+
 #### Actions からダウンロードする
 
 `bio_medicine/**` を更新して push すると、**ワークフローが自動で走り**、成果物が Actions に残ります。
@@ -455,9 +469,19 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | `publish_release` | `false` | `true` にすると成果物を **Release** として公開（ログイン不要でDL可） |
 | `release_tag` | `apps-v1.4.0` | 公開時のタグ名 |
 
-- Artifacts の**ダウンロードには GitHub ログインが必要**です（保持 90 日）。
-  ログイン不要で配布したい場合は `publish_release` を使うか、タグ `apps-v*` を push してください
-  （`omega-apps-release.yml` が全アプリをビルドして Release に添付します）。
+- Artifacts の**ダウンロードには GitHub ログインが必要**で、ファイルは **ZIP に包まれて**届きます（保持 90 日）。
+  ログイン不要・ZIP なしで配布したい場合は、手動実行で `publish_release` を有効にするか、
+  タグ `apps-v*` を push してください（`omega-apps-release.yml` が全アプリをビルドして Release に添付します）。
+- 実行ページの **Summary** には、Artifacts の一覧に加えて
+  **Releases への直リンク**と `gh` コマンドの例が表示されます。
+
+```bash
+# gh CLI があるなら、実行 ID を指定してまとめて取得できる
+gh run download <run-id> -R masaaki-avnturle/Bada
+
+# 最新の実行から取得する
+gh run download -R masaaki-avnturle/Bada -n omega_whispered-android
+```
 
 #### Ubuntu へのインストール
 
