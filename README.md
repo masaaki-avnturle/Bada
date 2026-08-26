@@ -83,11 +83,13 @@
 
 ブラウザ不要のインストール型アプリも用意しています。[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
 
+👉 **[Release glucogate-v1.0.0](https://github.com/masaaki-avnturle/Bada/releases/tag/glucogate-v1.0.0)** — 直リンク:
+
 | プラットフォーム | ファイル |
 |:---|:---|
-| **Android** (APK) | `glucogate-forge-debug.apk` |
-| **Windows 10 / 11** | `Omega-GlucoGate-Forge-1.0.0-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu** | `Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage` / `Omega-GlucoGate-Forge-1.0.0-amd64.deb` |
+| **Android** (APK) | [`glucogate-forge-debug.apk`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/glucogate-forge-debug.apk) |
+| **Windows 10 / 11** | [`Omega-GlucoGate-Forge-1.0.0-x64.exe`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x64.exe) (NSIS インストーラ) / [`-x64-portable.exe`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x64-portable.exe) (ポータブル) |
+| **Ubuntu** | [`-x86_64.AppImage`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage) / [`-amd64.deb`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-amd64.deb) |
 
 ビルドは [`glucogate-app-build.yml`](.github/workflows/glucogate-app-build.yml) が実行します(`glucogate-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bio_medicine/omega_glucogate_forge/`](bio_medicine/omega_glucogate_forge/) を参照。
 

@@ -55,12 +55,15 @@
 
 ブラウザ不要のインストール型アプリを [Releases](https://github.com/masaaki-avnturle/Bada/releases) から入手できます:
 
-| プラットフォーム | ファイル | 起動方法 |
+👉 **[Release glucogate-v1.0.0 から入手](https://github.com/masaaki-avnturle/Bada/releases/tag/glucogate-v1.0.0)**
+
+| プラットフォーム | ファイル (直リンク) | 起動方法 |
 |:---|:---|:---|
-| **Android** (APK) | `glucogate-forge-debug.apk` | 端末にコピーしてタップ（提供元不明のアプリのインストールを許可） |
-| **Windows 10 / 11** | `Omega-GlucoGate-Forge-1.0.0-x64.exe`(NSIS インストーラ)<br>`Omega-GlucoGate-Forge-1.0.0-x64.exe`(ポータブル) | ダブルクリック |
-| **Ubuntu** | `Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
-| **Ubuntu** (deb) | `Omega-GlucoGate-Forge-1.0.0-amd64.deb` | `sudo dpkg -i` または `sudo apt install ./...deb` |
+| **Android** (APK) | [`glucogate-forge-debug.apk`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/glucogate-forge-debug.apk) | 端末にコピーしてタップ（「提供元不明のアプリ」を許可） |
+| **Windows 10 / 11** (インストーラ) | [`Omega-GlucoGate-Forge-1.0.0-x64.exe`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x64.exe) | ダブルクリック → インストール先を選択 |
+| **Windows 10 / 11** (ポータブル) | [`Omega-GlucoGate-Forge-1.0.0-x64-portable.exe`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x64-portable.exe) | インストール不要。ダブルクリックで起動 |
+| **Ubuntu** (AppImage) | [`Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage) | `chmod +x ./Omega-GlucoGate-Forge-*.AppImage && ./Omega-GlucoGate-Forge-*.AppImage` |
+| **Ubuntu** (deb) | [`Omega-GlucoGate-Forge-1.0.0-amd64.deb`](https://github.com/masaaki-avnturle/Bada/releases/download/glucogate-v1.0.0/Omega-GlucoGate-Forge-1.0.0-amd64.deb) | `sudo apt install ./Omega-GlucoGate-Forge-1.0.0-amd64.deb` → メニューから起動 |
 
 ビルドは [`glucogate-app-build.yml`](../../.github/workflows/glucogate-app-build.yml) が実行します
 (`glucogate-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
