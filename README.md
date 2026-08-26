@@ -87,6 +87,16 @@
 
 ビルドは [`ngngrid-app-build.yml`](.github/workflows/ngngrid-app-build.yml)([`bada_gui_ide/ngngrid-app/`](bada_gui_ide/ngngrid-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
+**Zone Studio**(zone:// で自分の WWW を構築)もネイティブ アプリを用意しています:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `zone-studio-debug.apk` |
+| **Windows 10 / 11** | `Zone-Studio-*-x64.exe` |
+| **Ubuntu** | `Zone-Studio-*-x86_64.AppImage` / `Zone-Studio-*-amd64.deb` |
+
+ビルドは [`zonestudio-app-build.yml`](.github/workflows/zonestudio-app-build.yml)([`bada_gui_ide/zonestudio-app/`](bada_gui_ide/zonestudio-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの

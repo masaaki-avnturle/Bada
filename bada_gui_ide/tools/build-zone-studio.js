@@ -268,3 +268,11 @@ var ZONE_RUNTIME = ${JSON.stringify(runtime)};
 `;
 fs.writeFileSync(path.join(IDE, "dist", "zone-studio.html"), html);
 console.log("built dist/zone-studio.html (" + fs.statSync(path.join(IDE, "dist", "zone-studio.html")).size + " bytes)");
+
+/* also stage it as the Zone Studio app's www/index.html (Electron / Cordova) */
+const APPWWW = path.join(IDE, "zonestudio-app", "www");
+if (fs.existsSync(path.join(IDE, "zonestudio-app"))) {
+  fs.mkdirSync(APPWWW, { recursive: true });
+  fs.writeFileSync(path.join(APPWWW, "index.html"), html);
+  console.log("staged zonestudio-app/www/index.html");
+}
