@@ -31,7 +31,17 @@
     "GaN": "窒化ガリウム(青色LED)", "SiC": "炭化ケイ素(パワー半導体)", "InP": "リン化インジウム",
     "ZnO": "酸化亜鉛", "TiO2": "酸化チタン", "Al2O3": "アルミナ", "Fe2O3": "酸化鉄(III)",
     "Nb3Sn": "ニオブスズ(超伝導線材)", "NbTi": "ニオブチタン(超伝導線材)", "MgB2": "二ホウ化マグネシウム(超伝導体)",
-    "YBa2Cu3O7": "YBCO(高温超伝導体)", "LaFeAsO": "鉄系超伝導体の母物質", "Hg": "水銀(初めて超伝導が観測された金属)"
+    "YBa2Cu3O7": "YBCO(高温超伝導体)", "LaFeAsO": "鉄系超伝導体の母物質", "Hg": "水銀(初めて超伝導が観測された金属)",
+    /* 医薬品・生体分子(薬学の出題に使う) */
+    "C9H8O4": "アスピリン(アセチルサリチル酸)", "C8H9NO2": "アセトアミノフェン",
+    "C8H10N4O2": "カフェイン", "C13H18O2": "イブプロフェン", "C17H19NO3": "モルヒネ",
+    "C16H19N3O5S": "アモキシシリン", "C16H18N2O4S": "ペニシリンG", "C9H13NO3": "アドレナリン",
+    "C21H30O2": "テトラヒドロカンナビノール類縁の炭素骨格(C21H30O2)", "C27H46O": "コレステロール",
+    "C6H8O6": "アスコルビン酸(ビタミンC)", "C10H16N2O3S": "ビオチン",
+    "C4H8N2O3": "アスパラギン", "C3H7NO2": "アラニン", "C5H9NO4": "グルタミン酸",
+    "C63H88CoN14O14P": "ビタミンB12(シアノコバラミン)", "C12H22O11": "スクロース",
+    "C10H16N5O13P3": "ATP(アデノシン三リン酸)", "C21H27N7O14P2": "NAD⁺",
+    "C55H72MgN4O5": "クロロフィルa", "C2H6O": "エタノール(別表記)"
   };
 
   /* 単一元素からなる実在の分子(単元素 + 数字は変数名と紛れるため、この範囲だけ許可する) */
@@ -104,22 +114,55 @@
     });
 
     /* --- 専門用語(日本語名・英語名) --- */
+    var lower = t.toLowerCase();
     (terms || []).forEach(function (term) {
       var c = 0, idx = 0;
       while ((idx = t.indexOf(term.t, idx)) >= 0) { c++; idx += term.t.length; }
-      var en = term.en, lower = t.toLowerCase(), le = en.toLowerCase(), j = 0;
-      while (en && (j = lower.indexOf(le, j)) >= 0) { c++; j += le.length; }
+      var en = term.en;
+      if (en && /^[A-Z]{2,5}$/.test(en)) {
+        /* MIC・AUC・TDM のような略号は、atomic の "mic" のように単語の一部と一致してしまう。
+           大文字のまま・前後が英字でないときだけ数える。 */
+        var ra = new RegExp("(^|[^A-Za-z])" + en + "(?![A-Za-z])", "g");
+        while (ra.exec(t)) c++;
+      } else if (en) {
+        var le = en.toLowerCase(), j = 0;
+        while ((j = lower.indexOf(le, j)) >= 0) { c++; j += le.length; }
+      }
       if (c > 0) out.terms.push({ term: term, count: c });
     });
     out.terms.sort(function (a, b) { return b.count - a.count; });
 
-    /* --- 記号表記(E_g, T_c など。空白除去した本文で照合) --- */
+    /* --- 記号表記(E_g, T_c, AUC など) ---
+       CL / TI / MIC のような英字だけの略号は、CLASS・TIME などの一部にたまたま一致してしまう。
+       英字のみの略号は前後が英字でないこと(語境界)を求め、
+       添字やギリシャ文字を含む記号(E_g, t½, μ_n)は空白を除いた本文で部分一致させる。 */
     var compact = t.replace(/\s+/g, "");
     (symbols || []).forEach(function (sym) {
       var key = sym.ch.replace(/\s+/g, "");
       if (key.length < 2) return;                       /* 1 文字記号は誤検出が多いので除外 */
-      var c = 0, i = 0;
-      while ((i = compact.indexOf(key, i)) >= 0) { c++; i += key.length; }
+      var c = 0;
+      if (/^[A-Za-z]+$/.test(key)) {
+        var re = new RegExp("(^|[^A-Za-z])" + key + "(?![A-Za-z])", "g");
+        while (re.exec(t)) c++;
+      } else {
+        /* 添字つき記号 (K_m, E_g, C_max…) は本文では "K m" のように分かれて出るため、
+           空白を除いた本文でも照合する。ただし union_int の "n_i" のように
+           長い識別子の途中と一致することがあるので、直後が英数字・下線でないことを求める。
+           あわせて、本文側でも文字間の空白を許した語境界つきの照合を行い(T_c is… のように
+           直後が語の場合を拾う)、多い方を採用する。 */
+        var i = 0;
+        while ((i = compact.indexOf(key, i)) >= 0) {
+          var nx = compact.charAt(i + key.length);
+          if (!nx || !/[A-Za-z0-9_]/.test(nx)) c++;
+          i += key.length;
+        }
+        var spaced = key.split("").map(function (ch) {
+          return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        }).join("\\s*");
+        var rs = new RegExp("(^|[^A-Za-z0-9_])" + spaced + "(?![A-Za-z0-9_])", "g"), c2 = 0;
+        while (rs.exec(t)) c2++;
+        if (c2 > c) c = c2;
+      }
       if (c > 0) out.symbols.push({ sym: sym, count: c });
     });
     out.symbols.sort(function (a, b) { return b.count - a.count; });

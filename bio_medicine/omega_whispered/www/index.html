@@ -134,7 +134,9 @@
   「フルメタル・パニック!」の<b>ウィスパード</b>という設定に着想を得た二次的創作であり、
   原作・アニメの権利者とは一切関係がありません。<b>結果は学習・娯楽目的の指標</b>であり、
   実在の能力・適性・知能を測定または診断するものではありません。
-  PDF の解析はすべて<b>あなたの端末内のみ</b>で行われ、外部へ送信されません。</div>
+  PDF の解析はすべて<b>あなたの端末内のみ</b>で行われ、外部へ送信されません。<br/>
+  <b>薬学の設問は教科書的な学習内容</b>であり、実際の診断・処方・服薬の判断には使用できません。
+  服薬に関することは必ず医師・薬剤師にご相談ください。</div>
 
 <main>
 <div class="grid">
@@ -147,7 +149,8 @@
       <select id="subject">
         <option value="math">数学（記号・方程式）</option>
         <option value="chem">化学・物理（有機化合物 / 半導体 / 超電導）</option>
-        <option value="both">両方（数学 + 化学・物理）</option>
+        <option value="pharma">薬学（薬物動態 / 薬力学 / 製剤 / 臨床）</option>
+        <option value="all">すべて（数学 + 化学・物理 + 薬学）</option>
       </select>
       <label>検査モード</label>
       <select id="mode">
@@ -239,6 +242,16 @@
         <b>瞬読閾値(ms)</b>を推定します。
       </p>
       <p style="font-size:13px;margin:6px 0">
+        <b>薬学のウィスパードテスト</b>:
+        出題系統を「薬学」にすると、<b>薬物動態(PK) / 薬力学(PD) / 医薬品化学 / 製剤学 / 薬理学 /
+        毒性・安全性 / 生化学・分子標的 / 臨床薬学</b> の 8 分野になります。
+        記号（<code>AUC · C_max · t½ · CL · V_d · F · EC50 · LD50 · TI · K_m · logP · TDM</code>）、
+        関係式の意味、そして <b>簡単な問題 → 関係する専門の問題</b> への連想
+        （<code>薬は時間とともに消える → C(t)=C₀e^(−k_e t)</code>、
+        <code>腎臓が悪いと薬が抜けにくい → CLcr による用量調節</code>、
+        <code>グレープフルーツで効きすぎる → CYP3A4 阻害</code>）を検査します。
+      </p>
+      <p style="font-size:13px;margin:6px 0">
         <b>化学・物理のウィスパードテスト</b>:
         出題系統を切り替えると、<b>有機化合物・半導体・超電導</b>を軸にした化学／物理の検査になります。
         記号（<code>–OH · C=O · E_g · E_F · T_c · Δ · λ_L · Φ₀</code>）、関係式の意味、
@@ -254,6 +267,7 @@
       <div class="stat"><span>適性設問 / 分野プロファイル</span><b id="s_napt">—</b></div>
       <div class="stat"><span>専門用語銀行 (瞬読)</span><b id="s_nterm">—</b></div>
       <div class="stat"><span>化学・物理銀行</span><b id="s_nchem">—</b></div>
+      <div class="stat"><span>薬学銀行</span><b id="s_npharm">—</b></div>
       <div class="stat"><span>最高記録 Ω</span><b id="s_best">—</b></div>
       <p class="cap">採点: 正解した設問の難度 lv を、Γ カーネル由来の応答時間係数
         Γ<sub>k</sub>(τ)=e<sup>−τ·log(1+τ)</sup> (τ = 応答秒数/20) で重み付けし、
@@ -325,6 +339,7 @@
 <script src="symbol_bank.js"></script>
 <script src="term_bank.js"></script>
 <script src="chem_phys_bank.js"></script>
+<script src="pharma_bank.js"></script>
 <script src="flash.js"></script>
 <script src="sound.js"></script>
 <script src="pdf_symbols.js"></script>
@@ -332,7 +347,7 @@
 <script>
 "use strict";
 (function () {
-  var SB = window.SymbolBank, TB = window.TermBank, CP = window.ChemPhysBank,
+  var SB = window.SymbolBank, TB = window.TermBank, CP = window.ChemPhysBank, PH = window.PharmaBank,
       PS = window.PDFSymbols, CX = window.ChemExtract, FE = window.FlashEngine, SND = window.OmegaSound;
 
   /* 出題系統(数学 / 化学・物理 / 両方)に応じて問題銀行を合成する */
@@ -344,21 +359,26 @@
                  ASSOC: SB.ASSOC, TERMS: TB.TERMS, APTITUDE: SB.APTITUDE, FIELD_PROFILE: SB.FIELD_PROFILE };
     var chem = { FIELDS: CP.FIELDS, SYMBOLS: CP.SYMBOLS, CTX: CP.CTX, EQUATIONS: CP.EQUATIONS,
                  ASSOC: CP.ASSOC, TERMS: CP.TERMS, APTITUDE: CP.APTITUDE, FIELD_PROFILE: CP.FIELD_PROFILE };
+    var pharma = { FIELDS: PH.FIELDS, SYMBOLS: PH.SYMBOLS, CTX: PH.CTX, EQUATIONS: PH.EQUATIONS,
+                   ASSOC: PH.ASSOC, TERMS: PH.TERMS, APTITUDE: PH.APTITUDE, FIELD_PROFILE: PH.FIELD_PROFILE };
     if (mode === "chem") return chem;
-    if (mode !== "both") return math;
-    var prof = {};
-    Object.keys(math.FIELD_PROFILE).forEach(function (k) { prof[k] = math.FIELD_PROFILE[k]; });
-    Object.keys(chem.FIELD_PROFILE).forEach(function (k) { prof[k] = chem.FIELD_PROFILE[k]; });
-    return {
-      FIELDS: math.FIELDS.concat(chem.FIELDS),
-      SYMBOLS: math.SYMBOLS.concat(chem.SYMBOLS),
-      CTX: math.CTX.concat(chem.CTX),
-      EQUATIONS: math.EQUATIONS.concat(chem.EQUATIONS),
-      ASSOC: math.ASSOC.concat(chem.ASSOC),
-      TERMS: math.TERMS.concat(chem.TERMS),
-      APTITUDE: math.APTITUDE.concat(chem.APTITUDE),
-      FIELD_PROFILE: prof
-    };
+    if (mode === "pharma") return pharma;
+    if (mode !== "all" && mode !== "both") return math;
+    /* "both" は以前の版の値。数学 + 化学・物理 + 薬学をすべて合成する */
+    return merge([math, chem, pharma]);
+  }
+
+  /* 複数の銀行を 1 つに合成する */
+  function merge(banks) {
+    var out = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [],
+                TERMS: [], APTITUDE: [], FIELD_PROFILE: {} };
+    banks.forEach(function (b) {
+      ["FIELDS", "SYMBOLS", "CTX", "EQUATIONS", "ASSOC", "TERMS", "APTITUDE"].forEach(function (k) {
+        out[k] = out[k].concat(b[k]);
+      });
+      Object.keys(b.FIELD_PROFILE).forEach(function (f) { out.FIELD_PROFILE[f] = b.FIELD_PROFILE[f]; });
+    });
+    return out;
   }
   BK = { FIELDS: [], SYMBOLS: [], CTX: [], EQUATIONS: [], ASSOC: [], TERMS: [], APTITUDE: [], FIELD_PROFILE: {} };
   var $ = function (id) { return document.getElementById(id); };
@@ -1139,7 +1159,8 @@
     state.pdf = res;
     state.pdfName = name;
     /* 化学式・化学/物理用語の検出(本文テキストを走査) */
-    state.pdfChem = CX.scan(res.text || "", CP.TERMS, CP.SYMBOLS);
+    state.pdfChem = CX.scan(res.text || "",
+      CP.TERMS.concat(PH.TERMS), CP.SYMBOLS.concat(PH.SYMBOLS));
     var index = {};
     BK.SYMBOLS.forEach(function (s) { index[s.ch] = s; });
     state.pdfKnown = res.symbols.filter(function (s) { return index[s.ch]; })
@@ -1221,6 +1242,8 @@
     $("s_nterm").textContent = BK.TERMS.length + " 語";
     $("s_nchem").textContent = CP.SYMBOLS.length + " 記号 / " + CP.EQUATIONS.length + " 式 / " +
       CP.ASSOC.length + " 連想 / " + CP.TERMS.length + " 用語 (" + CP.FIELDS.length + " 分野)";
+    $("s_npharm").textContent = PH.SYMBOLS.length + " 記号 / " + PH.EQUATIONS.length + " 式 / " +
+      PH.ASSOC.length + " 連想 / " + PH.TERMS.length + " 用語 (" + PH.FIELDS.length + " 分野)";
     if (state.pdf) showPdf(state.pdfName || "PDF", state.pdf);   /* 系統を変えたら PDF 照合もやり直す */
   }
 

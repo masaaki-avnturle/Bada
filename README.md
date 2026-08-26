@@ -36,7 +36,7 @@
 | **`main/`** | Bada v3 ソースコード · BadaOS · TupleSpace全体インデックス · 4000+ LOC | [→ 開く](https://masaaki-avnturle.github.io/Bada/) |
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
-| **`bio_medicine/omega_whispered/`** | Ω-Whispered ウィスパード適性検査 · 瞬読(フラッシュ) × 数学記号 × 方程式の意味解析 × 適性分野診断 · **単一HTML / APK / Windows EXE / Ubuntu deb・AppImage** | [→ ダウンロード](https://masaaki-avnturle.github.io/Bada/bio_medicine/omega_whispered/download/) |
+| **`bio_medicine/omega_whispered/`** | Ω-Whispered ウィスパード適性検査 · 瞬読(フラッシュ) × 数学 / 化学・物理 / 薬学 の記号・方程式の意味解析 × 適性分野診断 · 電子音つき · **単一HTML / APK / Windows EXE / Ubuntu deb・AppImage** | [→ ダウンロード](https://masaaki-avnturle.github.io/Bada/bio_medicine/omega_whispered/download/) |
 
 ---
 
