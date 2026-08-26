@@ -144,6 +144,15 @@ jobs:
           echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-${GRADLE_VER}-all.zip" >> "$GITHUB_ENV"
       - name: Show Gradle version in use
         run: gradle --version
+      # ランナーには ~/.android/debug.keystore が無く、AGP がビルドごとにランダムな鍵を
+      # 生成してしまう。署名証明書が毎回変わると、同じパッケージ名でも端末の旧版へ
+      # 上書きインストールできない(署名不一致)。固定の鍵を配置して常に同じ署名にする。
+      - name: Install fixed signing key (so updates can be installed over old builds)
+        run: |
+          set -e
+          mkdir -p "$HOME/.android"
+          cp .github/keystore/omega-debug.keystore "$HOME/.android/debug.keystore"
+          ls -la "$HOME/.android/debug.keystore"
       - name: Build debug APK (Cordova, pinned versions)
         run: |
           set -e
@@ -163,6 +172,28 @@ jobs:
           mkdir -p out
           cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk "out/${{ matrix.app }}-debug.apk"
           ls -la out
+      # 署名が固定鍵のものであることを確認する(ずれていたら上書き更新できなくなるので落とす)
+      - name: Verify APK signature is the fixed key
+        run: |
+          set -e
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | head -1)
+          echo "apksigner: $APKSIGNER"
+          "$APKSIGNER" verify --print-certs "out/${{ matrix.app }}-debug.apk" | tee /tmp/certs.txt
+          GOT=$(grep -i "certificate SHA-256 digest" /tmp/certs.txt | head -1 | awk '{print $NF}' | tr 'A-Z' 'a-z')
+          WANT=$(tr -d '[:space:]' < .github/keystore/FINGERPRINT.txt | tr 'A-Z' 'a-z')
+          echo "signer SHA-256: $GOT"
+          echo "expected      : $WANT"
+          if [ "$GOT" != "$WANT" ]; then
+            echo "::error::APK の署名が固定鍵と一致しません。旧版へ上書きインストールできなくなります。"
+            exit 1
+          fi
+          echo "✓ 固定鍵で署名されています(旧版へ上書き更新できます)"
+          {
+            echo "### Android 署名"
+            echo ""
+            echo "APK は固定鍵で署名されています（SHA-256: \`$GOT\`）。"
+            echo "同じ鍵で署名された版どうしは**上書きインストール**できます。"
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:

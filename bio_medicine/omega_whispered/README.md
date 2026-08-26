@@ -282,7 +282,7 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 | プラットフォーム | 成果物 | 形式 |
 |:--|:--|:--|
 | **Android** | `omega_whispered-android` | `omega_whispered-debug.apk`（Cordova 12 / minSdk 24 / AndroidX） |
-| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.0.0-win-x64.exe`（NSIS インストーラ + portable） |
+| **Windows 10 / 11** | `omega_whispered-windows` | `Omega-Whispered-1.1.0-win-x64.exe`（NSIS インストーラ + portable） |
 | **Linux (Ubuntu)** | `omega_whispered-linux` | `…-linux-amd64.deb` + `…-linux-x86_64.AppImage` |
 | 任意のOS | `omega-whispered.html` | 単一ファイル版 |
 | 任意のOS | `omega_whispered-app.zip` | `www/` 一式 + 単一ファイル + README + ビルドスクリプト |
@@ -312,13 +312,13 @@ cd Bada && git sparse-checkout set bio_medicine/omega_whispered
 
 ```bash
 # .deb（/opt/Omega-Whispered にインストールし、デスクトップエントリとアイコンを登録）
-sudo apt install ./Omega-Whispered-1.0.0-linux-amd64.deb
+sudo apt install ./Omega-Whispered-1.1.0-linux-amd64.deb
 omega-whispered                    # またはアプリ一覧から起動
 sudo apt remove omega-whispered    # アンインストール
 
 # AppImage（インストール不要・単体実行）
-chmod +x Omega-Whispered-1.0.0-linux-x86_64.AppImage
-./Omega-Whispered-1.0.0-linux-x86_64.AppImage
+chmod +x Omega-Whispered-1.1.0-linux-x86_64.AppImage
+./Omega-Whispered-1.1.0-linux-x86_64.AppImage
 # FUSE の無い環境では: ./Omega-…AppImage --appimage-extract-and-run
 ```
 
@@ -328,6 +328,50 @@ Ubuntu 22.04 / 24.04（x86_64）を想定。`.deb` の依存は
 #### Android APK のインストール
 
 デバッグ署名の APK です。端末に転送して開き、「提供元不明のアプリのインストール」を許可してください。
+
+#### ⚠ 旧版が入っていてインストールできないとき（署名不一致）
+
+**症状**: 以前の版（数学のみの版など）が入っている端末に新しい APK を入れようとすると
+「アプリがインストールされていません」「既存のパッケージと競合しています」となる。
+
+**原因**: GitHub Actions のランナーには `~/.android/debug.keystore` が無いため、
+Android Gradle Plugin が**ビルドのたびにランダムな署名鍵を生成**していました。
+パッケージ名 `io.github.masaaki_avnturle.omega_whispered` は同じでも
+**署名証明書が毎回違う**ため、Android が上書きインストールを拒否します。
+加えて `android-versionCode` を指定していなかったため、内容を更新しても
+毎回 `10000` が生成され、「同じバージョン」と見なされていました。
+
+**対処（済み）**:
+
+- リポジトリに**固定の署名鍵** `.github/keystore/omega-debug.keystore` を用意し、
+  CI がこれを `~/.android/debug.keystore` として配置してからビルドするようにしました。
+  以降のビルドはすべて同じ証明書（SHA-256 `fc3547e2…0d55`）で署名されます。
+  CI はビルド後に `apksigner verify --print-certs` で実際の署名を照合し、
+  一致しなければビルドを失敗させます。
+- `android-versionCode` を明示（1.1.0 → `10100`、規則: `major*10000 + minor*100 + patch`）し、
+  Windows / Linux 版もあわせて **1.1.0** に上げました。
+
+**お使いの端末での手順**: 旧版はランダムな鍵で署名されているため、
+**一度だけ旧版をアンインストール**してから新しい APK を入れてください。
+
+```bash
+# 端末側: 設定 → アプリ → Omega-Whispered → アンインストール
+# または adb が使えるなら
+adb uninstall io.github.masaaki_avnturle.omega_whispered
+adb install omega_whispered-debug.apk
+```
+
+**1.1.0 以降は、同じ鍵で署名されるのでアンインストール不要で上書き更新できます。**
+
+Windows 版（NSIS）と Ubuntu 版（`.deb`）はもともと署名鍵の問題がなく、
+バージョンが上がったので**そのまま上書きインストール／`apt install` で更新**できます。
+
+| プラットフォーム | 旧版がある場合 |
+|:--|:--|
+| Android | 一度アンインストールが必要（1.1.0 以降は不要） |
+| Windows 10/11 | インストーラを実行するだけで上書き更新 |
+| Ubuntu (.deb) | `sudo apt install ./Omega-Whispered-1.1.0-linux-amd64.deb` で更新 |
+| AppImage / 単一 HTML | ファイルを置き換えるだけ |
 
 #### 自分でビルドする
 
