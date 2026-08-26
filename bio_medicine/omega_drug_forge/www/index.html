@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<!--
+  Ω-DrugForge — 形態形成場による薬剤製造シミュレーション (概念シミュレーション)
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_drug_forge
+
+  ガンマ関数における大域的微分多様体の相加相乗平均(AGM)方程式に基づき、
+  形態形成場(Morphogenetic Field)で還元剤の新薬を設計・製造シミュレーションする。
+  対象: 酸性ウイルス環境(HIV/癌関連)に対するセレネース(ハロペリドール)改良型薬剤。
+
+  数学基盤:
+    AGM(a,b): a_{n+1}=(a_n+b_n)/2, b_{n+1}=√(a_n·b_n)
+    Γカーネル: Γ(s)=∫₀^∞ t^{s-1} e^{-t} dt
+    微分多様体上の相加相乗平均方程式: M(x)=AGM(1,x)·Γ(x)/√(2π)
+    形態形成場: ∂φ/∂t = D∇²φ + ρφ(1-φ/K) - μφ + S(x,t)
+    還元ポテンシャル: E_red = E₀ - (RT/nF)ln(Q) · Γ-AGM変調
+
+  ⚠ 概念実証・教育用／非医療。実在の薬剤製造とは無関係です。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-DrugForge — 形態形成場 薬剤製造シミュレーション</title>
+<style>
+:root{
+  --bg:#04060a;--panel:#0a0e16;--panel2:#0d1320;--line:#1b2638;
+  --gold:#c8a44a;--cyan:#40b8c0;--blue:#4a80d0;--violet:#9060d0;
+  --txt:#d8e0ec;--dim:#8794a8;--good:#48c08a;--bad:#d0506a;--warn:#e0b020;
+  --red-glow:#d04060;--green-glow:#40d080;
+  --mono:Consolas,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.55}
+header{padding:20px 20px 12px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#070b14,#04060a)}
+h1{font-size:21px;margin-bottom:4px}h1 .om{color:var(--gold)}h1 .sub-t{color:var(--cyan);font-size:14px;font-weight:400}
+.sub{color:var(--dim);font-size:12px}
+.eq{font-family:var(--mono);color:var(--violet);font-size:11.5px;margin-top:6px;line-height:1.7}
+.disc{margin:12px 20px 0;padding:10px 14px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12px}
+main{padding:16px 20px 60px}
+.row{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start}
+.col{flex:1;min-width:300px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+.card h3{margin:0 0 10px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+.step{display:inline-block;width:20px;height:20px;line-height:20px;text-align:center;border-radius:50%;background:var(--gold);color:#000;font-weight:700;font-size:11px;margin-right:5px}
+label{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px}
+input[type=range]{width:100%;accent-color:var(--gold)}
+.val{color:var(--cyan);font-family:var(--mono)}
+select,input[type=text],textarea{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12.5px;font-family:var(--mono)}
+textarea{height:50px;resize:vertical}
+button.act{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin:8px 4px 0 0}
+button.act:hover{background:#1f2f4a}
+button.sec{color:var(--cyan);border-color:var(--cyan)}
+button.dl{color:var(--green-glow);border-color:var(--green-glow)}
+button:disabled{opacity:.4;cursor:not-allowed}
+canvas{background:#000;border:1px solid var(--line);border-radius:6px;display:block;width:100%;height:auto}
+.stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11.5px;padding:3px 0;border-bottom:1px solid var(--line)}
+.stat b{color:var(--cyan)}.stat .good{color:var(--good)}.stat .bad{color:var(--bad)}.stat .warn{color:var(--warn)}
+.tabs{display:flex;gap:2px;margin-bottom:0}
+.tabs button{background:var(--panel);color:var(--dim);border:1px solid var(--line);border-bottom:none;padding:6px 10px;border-radius:7px 7px 0 0;cursor:pointer;font-size:11.5px}
+.tabs button.on{background:var(--panel2);color:var(--gold);border-color:var(--gold)}
+pre{background:#06090f;border:1px solid var(--line);border-radius:0 6px 6px 6px;padding:10px;font-size:11px;font-family:var(--mono);color:var(--cyan);max-height:260px;overflow:auto;white-space:pre;margin:0}
+.pipeline{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin:10px 0;font-size:11px;font-family:var(--mono)}
+.pipeline .stage{padding:5px 8px;border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--dim);transition:all .3s}
+.pipeline .stage.active{border-color:var(--gold);color:var(--gold);box-shadow:0 0 8px #c8a44a40}
+.pipeline .stage.done{border-color:var(--good);color:var(--good)}
+.pipeline .arrow{color:var(--dim)}
+.progress{width:100%;height:6px;background:#0a0e16;border-radius:3px;margin:8px 0;overflow:hidden}
+.progress .bar{height:100%;background:linear-gradient(90deg,var(--gold),var(--cyan));border-radius:3px;width:0;transition:width .3s}
+.mol-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-family:var(--mono);margin:2px}
+.mol-badge.acid{background:#3a1520;color:var(--bad);border:1px solid var(--bad)}
+.mol-badge.base{background:#152a3a;color:var(--cyan);border:1px solid var(--cyan)}
+.mol-badge.redox{background:#1a2a15;color:var(--good);border:1px solid var(--good)}
+footer{color:var(--dim);font-size:11px;padding:20px;text-align:center;border-top:1px solid var(--line)}
+code{font-family:var(--mono);color:var(--violet)}
+@media(max-width:700px){.col{min-width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-DrugForge <span class="sub-t">— 形態形成場 薬剤製造シミュレーション</span></h1>
+  <div class="sub">Γ-AGM Global Differential Manifold · Morphogenetic Field Drug Synthesis · Reducing-Agent Design · Bada/bio_medicine</div>
+  <div class="eq">
+    AGM(a,b): a<sub>n+1</sub>=(a<sub>n</sub>+b<sub>n</sub>)/2, b<sub>n+1</sub>=√(a<sub>n</sub>·b<sub>n</sub>)
+    &nbsp;·&nbsp; Γ(s)=∫₀<sup>∞</sup> t<sup>s-1</sup>e<sup>-t</sup>dt
+    &nbsp;·&nbsp; ∂φ/∂t = D∇²φ + ρφ(1-φ/K) - μφ + S(x,t)
+    &nbsp;·&nbsp; E<sub>red</sub> = E₀ - (RT/nF)ln(Q)·Γ-AGM
+  </div>
+</header>
+
+<div class="disc">⚠ <b>概念実証・教育用シミュレーション／非医療</b>:
+  ガンマ関数における大域的微分多様体の相加相乗平均(AGM)方程式で、
+  形態形成場による<b>還元剤新薬の設計・製造</b>をシミュレーションします。
+  酸性ウイルス環境(HIV/癌関連)におけるセレネース改良型のモデルです。
+  <b>実在の薬剤・医療とは無関係の概念シミュレーションです。</b></div>
+
+<main>
+<div class="row">
+
+<!-- ===== Left Column: Controls ===== -->
+<div class="col" style="flex:0 0 330px">
+
+  <div class="card">
+    <h3><span class="step">1</span>標的ウイルス & 薬剤ベース</h3>
+    <label>標的病原体</label>
+    <select id="target">
+      <option value="hiv">HIV-1 (酸性エンベロープ pH 5.0-6.5)</option>
+      <option value="hiv2">HIV-2 (酸性環境 pH 4.8-6.0)</option>
+      <option value="onco_ras">癌: RAS変異型 (腫瘍微小環境 pH 6.2-6.8)</option>
+      <option value="onco_p53">癌: p53欠損型 (酸性環境 pH 6.0-6.5)</option>
+      <option value="onco_her2">癌: HER2陽性 (酸性環境 pH 6.3-6.9)</option>
+    </select>
+    <label>薬剤ベース</label>
+    <select id="drugbase">
+      <option value="serenace">セレネース(ハロペリドール)改良型</option>
+      <option value="serenace_f">セレネース・フッ素置換改良型</option>
+      <option value="nucleoside">ヌクレオシド逆転写酵素阻害剤ベース</option>
+      <option value="protease_i">プロテアーゼ阻害剤ベース</option>
+      <option value="checkpoint">免疫チェックポイント阻害ベース</option>
+    </select>
+    <label>還元剤タイプ</label>
+    <select id="reducer">
+      <option value="nabh4">NaBH₄ 型 (水素化ホウ素系)</option>
+      <option value="lialh4">LiAlH₄ 型 (水素化リチウムアルミ系)</option>
+      <option value="ascorbic">アスコルビン酸型 (生体適合)</option>
+      <option value="glutathione">グルタチオン型 (内因性還元)</option>
+      <option value="thiol">チオール型 (-SH 求核)</option>
+    </select>
+    <div style="margin-top:8px">
+      <span class="mol-badge acid">pH<span id="ph_v">5.5</span></span>
+      <span class="mol-badge redox">E°=<span id="ered_v">-0.32</span>V</span>
+      <span class="mol-badge base">logP=<span id="logp_v">3.2</span></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3><span class="step">2</span>形態形成場 パラメータ</h3>
+    <label>拡散係数 D: <span class="val" id="D_v">0.50</span></label>
+    <input type="range" id="D" min="5" max="200" value="50"/>
+    <label>増殖率 ρ: <span class="val" id="rho_v">1.20</span></label>
+    <input type="range" id="rho" min="10" max="300" value="120"/>
+    <label>環境収容力 K: <span class="val" id="K_v">100</span></label>
+    <input type="range" id="K" min="20" max="300" value="100"/>
+    <label>減衰率 μ: <span class="val" id="mu_v">0.30</span></label>
+    <input type="range" id="mu" min="5" max="150" value="30"/>
+    <label>Γ-AGM 結合定数 κ: <span class="val" id="kappa_v">1.00</span></label>
+    <input type="range" id="kappa" min="0" max="300" value="100"/>
+  </div>
+
+  <div class="card">
+    <h3><span class="step">3</span>AGM 収束 & 還元最適化</h3>
+    <label>AGM 初期値 a₀: <span class="val" id="a0_v">1.00</span></label>
+    <input type="range" id="a0" min="10" max="300" value="100"/>
+    <label>AGM 初期値 b₀: <span class="val" id="b0_v">0.50</span></label>
+    <input type="range" id="b0" min="1" max="299" value="50"/>
+    <label>還元電位 E₀ (mV): <span class="val" id="E0_v">-320</span></label>
+    <input type="range" id="E0" min="-800" max="200" value="-320"/>
+    <label>製造ステップ数: <span class="val" id="steps_v">200</span></label>
+    <input type="range" id="steps" min="50" max="500" step="10" value="200"/>
+    <button class="act" id="run">▶ 形態形成場で薬剤製造シミュレーション</button>
+    <button class="act sec" id="stop" disabled>■ 停止</button>
+  </div>
+
+  <div class="card">
+    <h3>製造パイプライン</h3>
+    <div class="pipeline" id="pipeline">
+      <span class="stage" id="ps1">Γ-AGM収束</span><span class="arrow">→</span>
+      <span class="stage" id="ps2">形態形成場</span><span class="arrow">→</span>
+      <span class="stage" id="ps3">還元反応</span><span class="arrow">→</span>
+      <span class="stage" id="ps4">薬剤合成</span><span class="arrow">→</span>
+      <span class="stage" id="ps5">適合評価</span>
+    </div>
+    <div class="progress"><div class="bar" id="pbar"></div></div>
+    <div class="stat"><span>状態</span><b id="status">準備完了</b></div>
+    <div class="stat"><span>AGM 収束値 M</span><b id="s_agm">—</b></div>
+    <div class="stat"><span>形態形成場 強度</span><b id="s_field">—</b></div>
+    <div class="stat"><span>還元ポテンシャル</span><b id="s_redox">—</b></div>
+    <div class="stat"><span>薬剤適合スコア</span><b id="s_score">—</b></div>
+    <div class="stat"><span>酸性ウイルス選択性</span><b id="s_select">—</b></div>
+    <div class="stat"><span>IC₅₀ (推定)</span><b id="s_ic50">—</b></div>
+  </div>
+</div>
+
+<!-- ===== Right Column: Visualizations ===== -->
+<div class="col">
+
+  <div class="card">
+    <h3>形態形成場 φ(x,y,t) — 薬剤活性表面</h3>
+    <canvas id="cField" width="400" height="300"></canvas>
+    <div style="font-size:11px;color:var(--dim);margin-top:4px">
+      色=形態形成場強度 φ ／ 等高線=Γ-AGM変調面 ／ 粒子=還元剤分子の拡散軌跡</div>
+  </div>
+
+  <div class="card">
+    <h3>AGM 収束 & 還元電位グラフ</h3>
+    <canvas id="cAGM" width="400" height="180"></canvas>
+    <div style="font-size:11px;color:var(--dim);margin-top:4px">
+      金線=a<sub>n</sub>(相加平均) ／ シアン線=b<sub>n</sub>(相乗平均) ／ 紫線=E<sub>red</sub>(還元電位)</div>
+  </div>
+
+  <div class="card">
+    <h3>薬剤分子プロファイル</h3>
+    <canvas id="cMol" width="400" height="160"></canvas>
+    <div style="font-size:11px;color:var(--dim);margin-top:4px">
+      結合親和性 ／ 酸性環境選択性 ／ 還元活性 ／ 膜透過性 ／ 代謝安定性</div>
+  </div>
+
+  <div class="card">
+    <h3>シミュレーション結果</h3>
+    <div class="tabs">
+      <button class="on" onclick="showTab(0)">薬剤設計書</button>
+      <button onclick="showTab(1)">AGMデータ</button>
+      <button onclick="showTab(2)">製造プロトコル</button>
+    </div>
+    <pre id="output">シミュレーションを実行してください...</pre>
+  </div>
+
+  <div class="card">
+    <h3>データエクスポート</h3>
+    <button class="act dl" id="expJson" disabled>⬇ JSON</button>
+    <button class="act dl" id="expCsv" disabled>⬇ CSV</button>
+    <button class="act dl" id="expReport" disabled>⬇ レポート</button>
+  </div>
+
+</div>
+</div>
+</main>
+
+<footer>
+  Ω-DrugForge — Γ-AGM Global Differential Manifold · Morphogenetic Field Drug Manufacturing Simulation<br/>
+  概念実証・教育用シミュレーション／非医療 · Bada / Masaaki Yamaguchi
+</footer>
+
+<script>
+"use strict";
+/* ================================================================
+   Ω-DrugForge: 形態形成場による薬剤製造シミュレーション
+   数学基盤: Γ関数, AGM(相加相乗平均), 微分多様体, 還元電位
+   ================================================================ */
+
+// --- Slider bindings ---
+const S = (id, div) => {
+  const el = document.getElementById(id);
+  const vl = document.getElementById(id + '_v');
+  if (!el || !vl) return;
+  const upd = () => { vl.textContent = div ? (el.value / div).toFixed(2) : el.value; };
+  el.addEventListener('input', upd); upd();
+};
+S('D',100); S('rho',100); S('K',1); S('mu',100); S('kappa',100);
+S('a0',100); S('b0',100); S('E0',1); S('steps',1);
+
+// --- Target presets ---
+const TARGETS = {
+  hiv:      { ph:5.5, name:'HIV-1',     env:'酸性エンベロープ' },
+  hiv2:     { ph:5.0, name:'HIV-2',     env:'酸性環境' },
+  onco_ras: { ph:6.5, name:'RAS変異癌', env:'腫瘍微小環境' },
+  onco_p53: { ph:6.2, name:'p53欠損癌', env:'酸性環境' },
+  onco_her2:{ ph:6.6, name:'HER2陽性癌',env:'酸性環境' }
+};
+const DRUGS = {
+  serenace:    { logP:3.2, mw:375.9, name:'セレネース改良型' },
+  serenace_f:  { logP:3.8, mw:393.9, name:'セレネースF置換型' },
+  nucleoside:  { logP:0.8, mw:267.2, name:'NRTI改良型' },
+  protease_i:  { logP:4.1, mw:505.6, name:'PI改良型' },
+  checkpoint:  { logP:2.5, mw:950.0, name:'免疫CP改良型' }
+};
+const REDUCERS = {
+  nabh4:      { e0:-1.24, name:'NaBH₄型',       bio:0.3 },
+  lialh4:     { e0:-2.48, name:'LiAlH₄型',      bio:0.1 },
+  ascorbic:   { e0: 0.06, name:'アスコルビン酸型', bio:0.95 },
+  glutathione:{ e0:-0.24, name:'グルタチオン型',   bio:0.99 },
+  thiol:      { e0:-0.33, name:'チオール型',      bio:0.7 }
+};
+
+const tgt = () => TARGETS[document.getElementById('target').value];
+const drg = () => DRUGS[document.getElementById('drugbase').value];
+const red = () => REDUCERS[document.getElementById('reducer').value];
+
+function updateBadges() {
+  const t = tgt(), d = drg(), r = red();
+  document.getElementById('ph_v').textContent = t.ph.toFixed(1);
+  document.getElementById('ered_v').textContent = r.e0.toFixed(2);
+  document.getElementById('logp_v').textContent = d.logP.toFixed(1);
+}
+['target','drugbase','reducer'].forEach(id =>
+  document.getElementById(id).addEventListener('change', updateBadges));
+updateBadges();
+
+// --- Math utilities ---
+function gamma(z) {
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gamma(1 - z));
+  z -= 1;
+  const g = 7, C = [
+    0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7
+  ];
+  let x = C[0];
+  for (let i = 1; i < g + 2; i++) x += C[i] / (z + i);
+  const t = z + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+function agmStep(a, b) {
+  return [(a + b) / 2, Math.sqrt(Math.abs(a * b))];
+}
+
+function agmConverge(a0, b0, n) {
+  const hist = { a: [a0], b: [b0] };
+  let a = a0, b = b0;
+  for (let i = 0; i < n; i++) {
+    [a, b] = agmStep(a, b);
+    hist.a.push(a);
+    hist.b.push(b);
+    if (Math.abs(a - b) < 1e-15) break;
+  }
+  return { value: a, hist };
+}
+
+function gammaAGM(x, kappa) {
+  const agm = agmConverge(1, Math.abs(x) + 0.01, 30);
+  const g = gamma(Math.abs(x) + 0.5);
+  return agm.value * g * kappa / Math.sqrt(2 * Math.PI);
+}
+
+// --- Morphogenetic field simulation ---
+class MorphField {
+  constructor(w, h) {
+    this.w = w; this.h = h;
+    this.phi = new Float64Array(w * h);
+    this.buf = new Float64Array(w * h);
+  }
+  init(sourceX, sourceY, radius, intensity) {
+    for (let y = 0; y < this.h; y++)
+      for (let x = 0; x < this.w; x++) {
+        const dx = x - sourceX, dy = y - sourceY;
+        const r2 = (dx * dx + dy * dy) / (radius * radius);
+        this.phi[y * this.w + x] = intensity * Math.exp(-r2) + Math.random() * 0.05;
+      }
+  }
+  step(D, rho, K, mu, kappa) {
+    const { w, h, phi, buf } = this;
+    for (let y = 1; y < h - 1; y++)
+      for (let x = 1; x < w - 1; x++) {
+        const i = y * w + x;
+        const lap = phi[i-1] + phi[i+1] + phi[i-w] + phi[i+w] - 4 * phi[i];
+        const v = phi[i];
+        const r = Math.sqrt(x*x + y*y) / w + 0.001;
+        const gk = Math.exp(-kappa * r * Math.log(r + 0.001));
+        buf[i] = v + D * lap + rho * v * (1 - v / K) * gk - mu * v;
+        if (buf[i] < 0) buf[i] = 0;
+        if (buf[i] > K * 2) buf[i] = K * 2;
+      }
+    this.phi.set(buf);
+  }
+}
+
+// --- Reducing agent particles ---
+class Particle {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.vx = (Math.random() - 0.5) * 0.8;
+    this.vy = (Math.random() - 0.5) * 0.8;
+    this.life = 1;
+  }
+  update(field, w) {
+    const ix = Math.min(w - 2, Math.max(1, Math.floor(this.x)));
+    const iy = Math.min(w - 2, Math.max(1, Math.floor(this.y)));
+    const i = iy * w + ix;
+    const gx = (field[i + 1] - field[i - 1]) * 0.02;
+    const gy = (field[i + w] - field[i - w]) * 0.02;
+    this.vx += gx + (Math.random() - 0.5) * 0.3;
+    this.vy += gy + (Math.random() - 0.5) * 0.3;
+    this.vx *= 0.95; this.vy *= 0.95;
+    this.x += this.vx; this.y += this.vy;
+    this.life -= 0.003;
+  }
+}
+
+// --- State ---
+let simState = null, animId = null, tabIdx = 0;
+const FIELD_W = 100, FIELD_H = 75;
+
+// --- Pipeline stage management ---
+function setStage(idx) {
+  for (let i = 1; i <= 5; i++) {
+    const el = document.getElementById('ps' + i);
+    el.classList.remove('active', 'done');
+    if (i < idx) el.classList.add('done');
+    else if (i === idx) el.classList.add('active');
+  }
+}
+
+// --- Visualize: field ---
+function drawField(ctx, cw, ch, field, w, h, particles) {
+  const img = ctx.createImageData(cw, ch);
+  const sx = cw / w, sy = ch / h;
+  const maxV = Math.max(1, ...field);
+
+  for (let py = 0; py < ch; py++) {
+    for (let px = 0; px < cw; px++) {
+      const fx = Math.floor(px / sx), fy = Math.floor(py / sy);
+      const v = field[fy * w + fx] / maxV;
+      const off = (py * cw + px) * 4;
+      const r = Math.floor(v * 200 * (v > 0.7 ? 1.3 : 0.6));
+      const g = Math.floor(v * 180 + (v > 0.5 ? 40 : 0));
+      const b = Math.floor((1 - v) * 120 + v * 60);
+      img.data[off] = Math.min(255, r);
+      img.data[off + 1] = Math.min(255, g);
+      img.data[off + 2] = Math.min(255, b);
+      img.data[off + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // contour lines
+  ctx.strokeStyle = 'rgba(200,164,74,0.25)';
+  ctx.lineWidth = 0.5;
+  for (let level = 0.1; level < 1; level += 0.15) {
+    ctx.beginPath();
+    for (let x = 0; x < w - 1; x++) {
+      for (let y = 0; y < h - 1; y++) {
+        const v = field[y * w + x] / maxV;
+        const vr = field[y * w + x + 1] / maxV;
+        if ((v < level) !== (vr < level)) {
+          const t = (level - v) / (vr - v + 1e-9);
+          ctx.moveTo((x + t) * sx, y * sy);
+          ctx.lineTo((x + t) * sx, (y + 1) * sy);
+        }
+      }
+    }
+    ctx.stroke();
+  }
+
+  // particles
+  for (const p of particles) {
+    if (p.life <= 0) continue;
+    ctx.fillStyle = `rgba(64,208,128,${p.life * 0.7})`;
+    ctx.beginPath();
+    ctx.arc(p.x * sx, p.y * sy, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(64,176,192,${p.life * 0.3})`;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x * sx, p.y * sy);
+    ctx.lineTo((p.x - p.vx * 3) * sx, (p.y - p.vy * 3) * sy);
+    ctx.stroke();
+  }
+}
+
+// --- Visualize: AGM convergence & redox ---
+function drawAGM(ctx, cw, ch, agmHist, redoxHist) {
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#06090f';
+  ctx.fillRect(0, 0, cw, ch);
+
+  const n = agmHist.a.length;
+  if (n < 2) return;
+
+  ctx.strokeStyle = '#1b2638';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < 5; i++) {
+    const y = ch * 0.1 + i * ch * 0.18;
+    ctx.beginPath(); ctx.moveTo(40, y); ctx.lineTo(cw - 10, y); ctx.stroke();
+  }
+
+  const maxA = Math.max(...agmHist.a, ...agmHist.b, 0.01);
+  const xScale = (cw - 50) / Math.max(n - 1, 1);
+
+  ctx.strokeStyle = '#c8a44a';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = 40 + i * xScale, y = ch * 0.9 - (agmHist.a[i] / maxA) * ch * 0.75;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = '#40b8c0';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = 40 + i * xScale, y = ch * 0.9 - (agmHist.b[i] / maxA) * ch * 0.75;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  if (redoxHist && redoxHist.length > 1) {
+    const minE = Math.min(...redoxHist), maxE = Math.max(...redoxHist);
+    const rangeE = maxE - minE || 1;
+    ctx.strokeStyle = '#9060d0';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    const rScale = (cw - 50) / Math.max(redoxHist.length - 1, 1);
+    for (let i = 0; i < redoxHist.length; i++) {
+      const x = 40 + i * rScale, y = ch * 0.9 - ((redoxHist[i] - minE) / rangeE) * ch * 0.75;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.fillStyle = '#c8a44a'; ctx.font = '10px Consolas,monospace';
+  ctx.fillText('a_n', 5, 14);
+  ctx.fillStyle = '#40b8c0'; ctx.fillText('b_n', 5, 28);
+  ctx.fillStyle = '#9060d0'; ctx.fillText('E_red', 5, 42);
+}
+
+// --- Visualize: molecule profile radar ---
+function drawMolProfile(ctx, cw, ch, profile) {
+  ctx.clearRect(0, 0, cw, ch);
+  ctx.fillStyle = '#06090f';
+  ctx.fillRect(0, 0, cw, ch);
+
+  const labels = ['結合親和性','酸性選択性','還元活性','膜透過性','代謝安定性'];
+  const cx = cw / 2, cy = ch / 2 + 5, R = Math.min(cw, ch) * 0.35;
+  const n = 5;
+
+  for (let r = 0.25; r <= 1; r += 0.25) {
+    ctx.strokeStyle = '#1b2638';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      const x = cx + R * r * Math.cos(a), y = cy + R * r * Math.sin(a);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+    ctx.strokeStyle = '#1b2638';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+    ctx.stroke();
+  }
+  if (profile) {
+    ctx.fillStyle = 'rgba(64,184,192,0.2)';
+    ctx.strokeStyle = '#40b8c0';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const idx = i % n;
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      const v = profile[idx];
+      const x = cx + R * v * Math.cos(a), y = cy + R * v * Math.sin(a);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.fill();
+    ctx.stroke();
+
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      const v = profile[i];
+      const x = cx + R * v * Math.cos(a), y = cy + R * v * Math.sin(a);
+      ctx.fillStyle = '#c8a44a';
+      ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#8794a8';
+  ctx.font = '11px -apple-system,sans-serif';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + (2 * Math.PI * i) / n;
+    const lx = cx + (R + 28) * Math.cos(a), ly = cy + (R + 14) * Math.sin(a);
+    ctx.fillText(labels[i], lx, ly);
+  }
+}
+
+// --- Simulation engine ---
+function runSimulation() {
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+
+  const params = {
+    D: document.getElementById('D').value / 100,
+    rho: document.getElementById('rho').value / 100,
+    K: +document.getElementById('K').value,
+    mu: document.getElementById('mu').value / 100,
+    kappa: document.getElementById('kappa').value / 100,
+    a0: document.getElementById('a0').value / 100,
+    b0: document.getElementById('b0').value / 100,
+    E0: +document.getElementById('E0').value / 1000,
+    totalSteps: +document.getElementById('steps').value,
+    target: tgt(), drug: drg(), reducer: red()
+  };
+
+  const field = new MorphField(FIELD_W, FIELD_H);
+  field.init(FIELD_W / 2, FIELD_H / 2, 15, params.K * 0.8);
+
+  const agm = agmConverge(params.a0, params.b0, 50);
+  const particles = [];
+  for (let i = 0; i < 60; i++) {
+    particles.push(new Particle(
+      FIELD_W * 0.2 + Math.random() * FIELD_W * 0.6,
+      FIELD_H * 0.2 + Math.random() * FIELD_H * 0.6
+    ));
+  }
+
+  const redoxHist = [];
+  let step = 0;
+
+  const cField = document.getElementById('cField');
+  const ctxF = cField.getContext('2d');
+  const cAGM = document.getElementById('cAGM');
+  const ctxA = cAGM.getContext('2d');
+  const cMol = document.getElementById('cMol');
+  const ctxM = cMol.getContext('2d');
+
+  document.getElementById('run').disabled = true;
+  document.getElementById('stop').disabled = false;
+  document.getElementById('status').textContent = '製造中...';
+
+  simState = { params, field, agm, particles, redoxHist, step };
+
+  function tick() {
+    if (step >= params.totalSteps) {
+      finalize();
+      return;
+    }
+
+    const progress = step / params.totalSteps;
+    document.getElementById('pbar').style.width = (progress * 100) + '%';
+
+    if (progress < 0.15) setStage(1);
+    else if (progress < 0.4) setStage(2);
+    else if (progress < 0.65) setStage(3);
+    else if (progress < 0.85) setStage(4);
+    else setStage(5);
+
+    field.step(params.D * 0.01, params.rho * 0.01, params.K, params.mu * 0.01, params.kappa);
+
+    for (const p of particles) {
+      p.update(field.phi, FIELD_W);
+      if (p.x < 1 || p.x >= FIELD_W - 1 || p.y < 1 || p.y >= FIELD_H - 1 || p.life <= 0) {
+        p.x = FIELD_W * 0.3 + Math.random() * FIELD_W * 0.4;
+        p.y = FIELD_H * 0.3 + Math.random() * FIELD_H * 0.4;
+        p.life = 1;
+        p.vx = (Math.random() - 0.5) * 0.8;
+        p.vy = (Math.random() - 0.5) * 0.8;
+      }
+    }
+
+    const t_norm = progress * 4 + 0.5;
+    const gAGM = gammaAGM(t_norm, params.kappa);
+    const nernst = params.E0 - (0.02569 / 2) * Math.log(Math.abs(gAGM) + 0.01);
+    const acidMod = 1 + (7 - params.target.ph) * 0.15;
+    const ered = nernst * acidMod * params.reducer.bio;
+    redoxHist.push(ered);
+
+    const fieldMax = Math.max(...field.phi);
+    const fieldAvg = field.phi.reduce((s, v) => s + v, 0) / field.phi.length;
+    document.getElementById('s_agm').textContent = agm.value.toFixed(6);
+    document.getElementById('s_field').textContent = fieldAvg.toFixed(2) + ' / ' + fieldMax.toFixed(1);
+    document.getElementById('s_redox').textContent = ered.toFixed(4) + ' V';
+
+    if (step % 2 === 0) {
+      drawField(ctxF, cField.width, cField.height, field.phi, FIELD_W, FIELD_H, particles);
+      drawAGM(ctxA, cAGM.width, cAGM.height, agm.hist, redoxHist);
+    }
+
+    step++;
+    simState.step = step;
+    animId = requestAnimationFrame(tick);
+  }
+
+  function finalize() {
+    animId = null;
+    document.getElementById('run').disabled = false;
+    document.getElementById('stop').disabled = true;
+    setStage(5);
+    document.getElementById('pbar').style.width = '100%';
+    document.getElementById('status').textContent = '製造完了';
+
+    const agmVal = agm.value;
+    const fieldAvg = field.phi.reduce((s, v) => s + v, 0) / field.phi.length;
+    const fieldMax = Math.max(...field.phi);
+    const lastE = redoxHist[redoxHist.length - 1] || 0;
+    const phFactor = (7 - params.target.ph) / 3;
+
+    const binding = Math.min(1, Math.abs(agmVal * 0.4 + lastE * 0.8 + phFactor * 0.3));
+    const acidSel = Math.min(1, phFactor * 0.6 + params.reducer.bio * 0.4);
+    const redAct = Math.min(1, Math.abs(lastE) * 1.2 + params.reducer.bio * 0.3);
+    const membrane = Math.min(1, params.drug.logP / 5 * 0.7 + agmVal * 0.2);
+    const metab = Math.min(1, 0.3 + params.reducer.bio * 0.4 + agmVal * 0.15);
+    const profile = [binding, acidSel, redAct, membrane, metab];
+    const score = profile.reduce((s, v) => s + v, 0) / 5;
+    const ic50 = Math.max(0.01, 10 * Math.exp(-score * 4) * (1 + (1 - acidSel) * 2));
+
+    document.getElementById('s_score').innerHTML =
+      `<span class="${score > 0.6 ? 'good' : score > 0.4 ? 'warn' : 'bad'}">${(score * 100).toFixed(1)}%</span>`;
+    document.getElementById('s_select').innerHTML =
+      `<span class="${acidSel > 0.6 ? 'good' : 'warn'}">${(acidSel * 100).toFixed(1)}%</span>`;
+    document.getElementById('s_ic50').innerHTML =
+      `<span class="${ic50 < 1 ? 'good' : 'warn'}">${ic50.toFixed(3)} μM</span>`;
+
+    drawMolProfile(ctxM, cMol.width, cMol.height, profile);
+    drawAGM(ctxA, cAGM.width, cAGM.height, agm.hist, redoxHist);
+    drawField(ctxF, cField.width, cField.height, field.phi, FIELD_W, FIELD_H, particles);
+
+    simState.results = {
+      target: params.target, drug: params.drug, reducer: params.reducer,
+      agm: agmVal, fieldAvg, fieldMax, lastE, profile, score, ic50, acidSel,
+      redoxHist, agmHist: agm.hist
+    };
+    updateOutput();
+    ['expJson','expCsv','expReport'].forEach(id => document.getElementById(id).disabled = false);
+  }
+
+  tick();
+}
+
+// --- Tab output ---
+function showTab(idx) {
+  tabIdx = idx;
+  document.querySelectorAll('.tabs button').forEach((b, i) => {
+    b.classList.toggle('on', i === idx);
+  });
+  updateOutput();
+}
+
+function updateOutput() {
+  const out = document.getElementById('output');
+  if (!simState || !simState.results) {
+    out.textContent = 'シミュレーションを実行してください...';
+    return;
+  }
+  const r = simState.results;
+  const p = simState.params;
+  if (tabIdx === 0) {
+    out.textContent =
+`╔══════════════════════════════════════════════════════╗
+║  Ω-DrugForge 薬剤設計書 (概念シミュレーション)      ║
+╠══════════════════════════════════════════════════════╣
+║ 標的: ${r.target.name} (${r.target.env} pH ${r.target.ph})
+║ 薬剤ベース: ${r.drug.name} (MW=${r.drug.mw}, logP=${r.drug.logP})
+║ 還元剤: ${r.reducer.name} (E₀=${r.reducer.e0}V, 生体適合=${r.reducer.bio})
+╠──────────────────────────────────────────────────────╣
+║ ■ Γ-AGM 収束値 M = ${r.agm.toFixed(8)}
+║   AGM(${p.a0.toFixed(2)}, ${p.b0.toFixed(2)}) → ${r.agm.toFixed(8)}
+║   Γ変調結合定数 κ = ${p.kappa.toFixed(2)}
+║
+║ ■ 形態形成場
+║   平均場強度: ${r.fieldAvg.toFixed(4)}
+║   最大場強度: ${r.fieldMax.toFixed(4)}
+║   拡散係数 D=${p.D.toFixed(2)}, 増殖率 ρ=${p.rho.toFixed(2)}
+║   環境収容力 K=${p.K}, 減衰率 μ=${p.mu.toFixed(2)}
+║
+║ ■ 還元ポテンシャル
+║   最終還元電位: ${r.lastE.toFixed(6)} V
+║   酸性環境変調: pH ${r.target.ph} → 係数 ${(1 + (7 - r.target.ph) * 0.15).toFixed(3)}
+║
+║ ■ 薬剤プロファイル
+║   結合親和性:   ${(r.profile[0]*100).toFixed(1)}%
+║   酸性選択性:   ${(r.profile[1]*100).toFixed(1)}%
+║   還元活性:     ${(r.profile[2]*100).toFixed(1)}%
+║   膜透過性:     ${(r.profile[3]*100).toFixed(1)}%
+║   代謝安定性:   ${(r.profile[4]*100).toFixed(1)}%
+║
+║ ■ 総合スコア:  ${(r.score*100).toFixed(1)}%
+║   推定 IC₅₀:   ${r.ic50.toFixed(3)} μM
+║   酸性ウイルス選択性: ${(r.acidSel*100).toFixed(1)}%
+╚══════════════════════════════════════════════════════╝
+⚠ 概念シミュレーション・非医療`;
+  } else if (tabIdx === 1) {
+    const lines = ['step,a_n,b_n,E_red'];
+    const n = r.agmHist.a.length;
+    const m = r.redoxHist.length;
+    const len = Math.max(n, m);
+    for (let i = 0; i < Math.min(len, 60); i++) {
+      lines.push(`${i},${i<n?r.agmHist.a[i].toFixed(8):''},${i<n?r.agmHist.b[i].toFixed(8):''},${i<m?r.redoxHist[i].toFixed(6):''}`);
+    }
+    if (len > 60) lines.push(`... (${len} total rows)`);
+    out.textContent = lines.join('\n');
+  } else {
+    out.textContent =
+`╔══════════════════════════════════════════════════════╗
+║  製造プロトコル (概念シミュレーション)                ║
+╠══════════════════════════════════════════════════════╣
+║
+║ Phase 1: Γ-AGM 収束計算
+║   初期値 a₀=${p.a0.toFixed(2)}, b₀=${p.b0.toFixed(2)}
+║   相加相乗平均方程式を大域的微分多様体上で収束
+║   収束値 M = ${r.agm.toFixed(8)}
+║   Γ(s)カーネル結合: κ = ${p.kappa.toFixed(2)}
+║
+║ Phase 2: 形態形成場 生成
+║   ∂φ/∂t = D∇²φ + ρφ(1-φ/K) - μφ + S(x,t)
+║   D=${p.D.toFixed(2)}, ρ=${p.rho.toFixed(2)}, K=${p.K}, μ=${p.mu.toFixed(2)}
+║   場安定化まで ${p.totalSteps} ステップ
+║
+║ Phase 3: 還元反応シミュレーション
+║   還元剤: ${r.reducer.name}
+║   Nernst式: E = E₀ - (RT/nF)ln(Q) · Γ-AGM変調
+║   酸性環境(pH ${r.target.ph})での選択的還元
+║   最終還元電位: ${r.lastE.toFixed(6)} V
+║
+║ Phase 4: 薬剤合成
+║   ベース薬剤: ${r.drug.name}
+║   形態形成場 φ の極大領域で分子構造最適化
+║   Γ-AGM変調による結合親和性調整
+║
+║ Phase 5: 適合性評価
+║   標的: ${r.target.name}
+║   総合スコア: ${(r.score*100).toFixed(1)}%
+║   推定 IC₅₀: ${r.ic50.toFixed(3)} μM
+║
+╚══════════════════════════════════════════════════════╝
+⚠ 概念シミュレーション・非医療`;
+  }
+}
+
+// --- Export ---
+function exportData(type) {
+  if (!simState || !simState.results) return;
+  const r = simState.results;
+  let content, filename, mime;
+
+  if (type === 'json') {
+    content = JSON.stringify({
+      meta: { app: 'Ω-DrugForge', type: '概念シミュレーション', warning: '非医療' },
+      target: r.target, drug: r.drug, reducer: r.reducer,
+      agm: r.agm, fieldAvg: r.fieldAvg, fieldMax: r.fieldMax,
+      redoxFinal: r.lastE, profile: {
+        binding: r.profile[0], acidSelectivity: r.profile[1],
+        reducingActivity: r.profile[2], membranePermeability: r.profile[3],
+        metabolicStability: r.profile[4]
+      },
+      score: r.score, ic50_uM: r.ic50, acidSelectivity: r.acidSel,
+      agmHistory: r.agmHist, redoxHistory: r.redoxHist
+    }, null, 2);
+    filename = 'drugforge_result.json'; mime = 'application/json';
+  } else if (type === 'csv') {
+    const lines = ['step,a_n,b_n,E_red'];
+    const n = r.agmHist.a.length, m = r.redoxHist.length;
+    for (let i = 0; i < Math.max(n, m); i++)
+      lines.push(`${i},${i<n?r.agmHist.a[i]:''},${i<n?r.agmHist.b[i]:''},${i<m?r.redoxHist[i]:''}`);
+    content = lines.join('\n');
+    filename = 'drugforge_agm.csv'; mime = 'text/csv';
+  } else {
+    content = document.getElementById('output').textContent;
+    filename = 'drugforge_report.txt'; mime = 'text/plain';
+  }
+
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// --- Events ---
+document.getElementById('run').addEventListener('click', runSimulation);
+document.getElementById('stop').addEventListener('click', () => {
+  if (animId) { cancelAnimationFrame(animId); animId = null; }
+  document.getElementById('run').disabled = false;
+  document.getElementById('stop').disabled = true;
+  document.getElementById('status').textContent = '停止';
+});
+document.getElementById('expJson').addEventListener('click', () => exportData('json'));
+document.getElementById('expCsv').addEventListener('click', () => exportData('csv'));
+document.getElementById('expReport').addEventListener('click', () => exportData('report'));
+
+// initial draw
+const ctxM = document.getElementById('cMol').getContext('2d');
+drawMolProfile(ctxM, 400, 160, null);
+const ctxA = document.getElementById('cAGM').getContext('2d');
+drawAGM(ctxA, 400, 180, {a:[],b:[]}, []);
+</script>
+</body>
+</html>
