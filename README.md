@@ -39,8 +39,8 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
-| [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
+| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体（単一 HTML）。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
+| [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー（開くと自動実行） |
 | [`zone.bada`](bada_gui_ide/examples/zone.bada) | zone:// スキームの Bada ソース |
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
@@ -55,10 +55,30 @@
 
 ビルドは [`zonebrowser-app-build.yml`](.github/workflows/zonebrowser-app-build.yml) が実行します(`zonebrowser-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/zonebrowser-app/`](bada_gui_ide/zonebrowser-app/) を参照。
 
-> 直接リンク(右クリック→「名前を付けて保存」でも可):
+> 直接リンク（右クリック→「名前を付けて保存」でも可）:
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
-> (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
-> ファイル画面の「Download raw file」から取得してください)
+> （このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
+> ファイル画面の「Download raw file」から取得してください）
+
+---
+
+## 🧪 Ω-DrugForge — 形態形成場 薬剤製造シミュレーション
+
+> ⚠ **概念実証・教育用シミュレーション／非医療**
+
+ガンマ関数における**大域的微分多様体の相加相乗平均（AGM）方程式**に基づき、**形態形成場（Morphogenetic Field）**で還元剤の新薬を設計・製造シミュレーションするアプリケーション。HIV（酸性エンベロープ）・癌（腫瘍微小環境）を標的とし、セレネース（ハロペリドール）改良型を含む薬剤ベースで還元反応をシミュレーションします。
+
+### 👉 [**bio_medicine/omega_drug_forge/www/index.html をダウンロード**](bio_medicine/omega_drug_forge/www/index.html)
+
+ダウンロード手順（GitHub 上）:上のリンクを開き、ファイル表示画面の右上にある **「Download raw file」（⬇ アイコン）** を押すと保存できます。保存した `index.html` をダブルクリックすればブラウザで開きます。
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **ブラウザ (単一 HTML)** ★ | [`bio_medicine/omega_drug_forge/www/index.html`](bio_medicine/omega_drug_forge/www/index.html) をダウンロードして開くだけ |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-DrugForge.exe` |
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `omega_drug_forge-debug.apk` |
+
+数学基盤: `AGM(a,b)` 相加相乗平均 · `Γ(s)` ガンマ関数 · `∂φ/∂t = D∇²φ + ρφ(1-φ/K)` 形態形成場 · `E_red = E₀ - (RT/nF)ln(Q)·Γ-AGM` 還元電位。詳細は [`bio_medicine/omega_drug_forge/README.md`](bio_medicine/omega_drug_forge/README.md) を参照。
 
 ---
 
@@ -75,11 +95,11 @@
 
 ## 🖱️ Bada GUI IDE — ダウンロード (Windows EXE / Ubuntu / Android APK)
 
-`.bada` ソースを IDE ウィンドウに**ドラッグ&ドロップ**すると、**コンパイル(Bada→C→ネイティブリンク)** と**インタープリタ実行**を自動で行う GUI 開発環境です。論文 *Reviser-Extensible Grammars* の `@reviser : grammar` 文法拡張と Q# 風量子サブ言語 (`qubit` / `H` / `CNOT` / `Measure` / `Omega::Quantum`) を実装しています。
+`.bada` ソースを IDE ウィンドウに**ドラッグ&ドロップ**すると、**コンパイル（Bada→C→ネイティブリンク）** と**インタープリタ実行**を自動で行う GUI 開発環境です。論文 *Reviser-Extensible Grammars* の `@reviser : grammar` 文法拡張と Q# 風量子サブ言語 (`qubit` / `H` / `CNOT` / `Measure` / `Omega::Quantum`) を実装しています。
 
-さらに **`@reviser : extension`** で Bada を **Bada自身 / C / Python / Java** で機能拡張できます([`examples/extensions.bada`](bada_gui_ide/examples/extensions.bada)): 各拡張は追記専用レジャーへコミットされる拡張トランザクションで、C 拡張は**コンパイラが生成 C にインライン**してネイティブ化、Python / Java / C 拡張はインタープリタ(CLI・デスクトップ IDE)の FFI ブリッジで実行、Bada 拡張(自己拡張)は全プラットフォームで動作します。
+さらに **`@reviser : extension`** で Bada を **Bada自身 / C / Python / Java** で機能拡張できます（[`examples/extensions.bada`](bada_gui_ide/examples/extensions.bada)）: 各拡張は追記専用レジャーへコミットされる拡張トランザクションで、C 拡張は**コンパイラが生成 C にインライン**してネイティブ化、Python / Java / C 拡張はインタープリタ（CLI・デスクトップ IDE）の FFI ブリッジで実行、Bada 拡張（自己拡張）は全プラットフォームで動作します。
 
-さらに `https:`/`http:` に代わるウルトラネットワークWWW の **`zone://url.or.jp`** スキームを Bada 言語自身で実装したリファレンス [`examples/zone.bada`](bada_gui_ide/examples/zone.bada) を同梱: `zone:` は中央サーバ・DNS ルートなしに P2P の仕組み(ピアハッシュのリング DHT)だけから構築され、通信は **Jones 多項式量子暗号** (`omega_jones_crypto_pkg` を Bada に移植) で保護されます — 各ゾーンの鍵は結び目図の Kauffman ブラケット標本から導出し、Bell 対 QKD がセッションソルトを合意、本文は Jones 鍵 AEAD で暗号化・封緘され、改ざんや誤った結び目は `409 zone-guard-reject` として排除、全レコードは追記専用 tuplespace(Akashic ゾーン台帳)にコミットされます。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) の「zone://」節を参照。
+さらに `https:`/`http:` に代わるウルトラネットワークWWW の **`zone://url.or.jp`** スキームを Bada 言語自身で実装したリファレンス [`examples/zone.bada`](bada_gui_ide/examples/zone.bada) を同梱: `zone:` は中央サーバ・DNS ルートなしに P2P の仕組み（ピアハッシュのリング DHT）だけから構築され、通信は **Jones 多項式量子暗号** (`omega_jones_crypto_pkg` を Bada に移植) で保護されます — 各ゾーンの鍵は結び目図の Kauffman ブラケット標本から導出し、Bell 対 QKD がセッションソルトを合意、本文は Jones 鍵 AEAD で暗号化・封緘され、改ざんや誤った結び目は `409 zone-guard-reject` として排除、全レコードは追記専用 tuplespace（Akashic ゾーン台帳）にコミットされます。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) の「zone://」節を参照。
 
 | プラットフォーム | 入手 |
 |:---|:---|
