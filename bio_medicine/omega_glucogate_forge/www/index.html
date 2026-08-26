@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<!--
+  Ω-GlucoGate Forge — 形態形成場によるドーパミン作動性「糖取り込み薬剤」製造装置シミュレータ
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_glucogate_forge
+
+  Γ大域的部分積分多様体 e^{−x log x} で変調した反応拡散(形態形成)場から薬剤スペックを鍛造し、
+  経口PK → D2受容体占有 → インスリン感受性/GLUT4トランスロケーション → 細胞内への糖取り込み
+  U_cell = Vmax·M·G/(Km+G) を 1 分刻みで積分して、血中の糖が細胞内へ入る過程を可視化する。
+
+  ⚠ 概念シミュレーション・非医療。実在の医薬品を設計/製造/評価するものではありません。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-GlucoGate Forge</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--rose:#d05070;--green:#48b878;--txt:#e6ecf5;--dim:#8794a8;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:16px 18px 8px}h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12.5px;margin-top:6px}
+  .disc{margin:12px 18px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:12px}
+  nav{display:flex;gap:6px;padding:12px 18px 0;flex-wrap:wrap}
+  nav button{background:#0a0e16;color:var(--dim);border:1px solid var(--line);border-radius:8px 8px 0 0;padding:8px 14px;cursor:pointer;font-size:12.5px;font-weight:700}
+  nav button.on{color:var(--gold);border-color:var(--gold);background:#12182a}
+  main{display:none;gap:16px;flex-wrap:wrap;padding:12px 18px 50px}main.on{display:flex}
+  .col{flex:1;min-width:300px}.col.narrow{flex:0 0 300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto}
+  canvas.field{image-rendering:pixelated}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}
+  select,input[type=number]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px;font-family:var(--mono)}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button.go{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button.go.sec{color:var(--cyan);border-color:var(--cyan)}
+  button.go.vio{color:var(--violet);border-color:var(--violet)}
+  button.go:disabled{opacity:.45;cursor:progress}
+  .cap{font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px}
+  .stat{display:flex;justify-content:space-between;gap:10px;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .stat b{color:var(--cyan);font-weight:400}
+  .meter{height:7px;background:#06090f;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:2px 0 7px}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,#40b8c0,#c8a44a)}
+  table{width:100%;border-collapse:collapse;font-size:12px;font-family:var(--mono)}
+  th,td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:right}th{color:var(--dim);font-weight:400}
+  th:first-child,td:first-child{text-align:left}
+  td.ctl{color:var(--dim)}td.trt{color:var(--gold)}td.dlt{color:var(--green)}td.dlt.bad{color:var(--rose)}
+  pre{background:#06090f;border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;max-height:360px;font-family:var(--mono);font-size:11.5px;color:#cfe0f0}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--dim);margin-top:5px;justify-content:center}
+  .legend i{display:inline-block;width:16px;height:2px;vertical-align:middle;margin-right:4px}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+  .row{display:flex;gap:8px}.row>*{flex:1}
+  .tag{display:inline-block;border:1px solid var(--line);border-radius:20px;padding:1px 9px;font-size:11px;color:var(--cyan);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-GlucoGate Forge — ドーパミン作動性「糖取り込み薬剤」製造装置</h1>
+  <div class="sub">Morphogenetic-Field Drug Forge · Dopaminergic GLUT4 Recruitment · Glucose–Insulin PK/PD Simulator · Bada/bio_medicine</div>
+  <div class="eq">Du(r)=Du₀(½+½e<sup>−κr log κr</sup>) &nbsp;·&nbsp; Occ=C/(C+K<sub>i</sub>) &nbsp;·&nbsp; U<sub>cell</sub>=V<sub>max</sub>·M·G/(K<sub>m</sub>+G)</div>
+</header>
+<div class="disc">⚠ <b>概念シミュレーション・非医療</b>:
+  形態形成場から「薬剤スペック(親和性・半減期・BBB透過・GLUT4動員係数)」を決定論的に鍛造し、
+  血糖–インスリン–GLUT4 の数理モデルで<b>血中の糖が細胞内へ取り込まれる過程</b>を積分します。
+  <b>実在の医薬品を設計・製造・評価するものではなく、出力を医療判断に用いることはできません。</b>
+  ドーパミン D2 作動薬が 2 型糖尿病の血糖コントロールを改善しうるという知見に着想していますが、
+  本モデルの係数はすべて概念的な仮想値です。治療の変更は必ず主治医にご相談ください。</div>
+
+<nav>
+  <button id="t1" class="on">① 形態形成場 製造装置</button>
+  <button id="t2">② 薬剤スペック / 投与設計</button>
+  <button id="t3">③ 生体シミュレーション</button>
+  <button id="t4">④ 出力・ソース生成</button>
+</nav>
+
+<!-- ================================================= ① 製造装置 -->
+<main id="m1" class="on">
+  <div class="col narrow">
+    <div class="card">
+      <h3>形態形成場のパラメータ</h3>
+      <label>供給率 F (Gray–Scott): <span class="val" id="feed_v">0.037</span></label>
+      <input type="range" id="feed" min="26" max="58" value="37"/>
+      <label>消滅率 k (Gray–Scott): <span class="val" id="kill_v">0.060</span></label>
+      <input type="range" id="kill" min="550" max="650" value="600"/>
+      <label>Γカーネル κ (大域的多様体変調): <span class="val" id="kappa_v">1.00</span></label>
+      <input type="range" id="kappa" min="0" max="260" value="100"/>
+      <label>収束ステップ: <span class="val" id="steps_v">2400</span></label>
+      <input type="range" id="steps" min="400" max="5000" step="200" value="2400"/>
+      <label>種 (同じ種は同じ薬剤を鍛造): <span class="val" id="seed_v">7</span></label>
+      <input type="range" id="seed" min="1" max="64" value="7"/>
+      <button class="go" id="run_forge">▶ 場を収束させて薬剤を鍛造</button>
+      <button class="go sec" id="run_auto">⚙ 自動鍛造 — 最良の薬剤を探索</button>
+      <label>探索する候補数: <span class="val" id="ncand_v">12</span></label>
+      <input type="range" id="ncand" min="4" max="40" step="2" value="12"/>
+      <div class="cap" id="forge_status">準備完了</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3>形態形成場 φ(r) — 反応拡散の収束形態</h3>
+      <canvas class="field" id="field" width="128" height="128"></canvas>
+      <div class="cap">色 = モルフォゲン濃度 v。Γカーネル e<sup>−x log x</sup> が中心から周辺へ拡散率を変調し、
+        生じた形態が薬剤の分子記述子になります。</div>
+    </div>
+  </div>
+
+  <div class="col narrow">
+    <div class="card">
+      <h3>形態記述子 → 分子パラメータ</h3>
+      <div id="desc_box"><div class="cap">まだ鍛造していません</div></div>
+    </div>
+    <div class="card" id="auto_box" style="display:none">
+      <h3>自動鍛造の探索ログ</h3>
+      <table id="auto_tbl"></table>
+    </div>
+  </div>
+</main>
+
+<!-- ================================================= ② 薬剤スペック -->
+<main id="m2">
+  <div class="col">
+    <div class="card">
+      <h3>鍛造された薬剤 <span class="tag" id="drug_uid">—</span></h3>
+      <div id="drug_box"><div class="cap">① で薬剤を鍛造してください</div></div>
+    </div>
+    <div class="card">
+      <h3>作用機序 (このモデルが解いている経路)</h3>
+      <div style="font-size:12px;color:var(--dim);line-height:1.9">
+        <div>経口投与 → 吸収 <code>ka</code> → 血漿中濃度 <code>Cp</code> → <b>末梢D2占有</b> <code>Cp/(Cp+Ki)</code></div>
+        <div>└ BBB透過 → 効果部位 <code>Ce</code> → <b>中枢(視床下部)D2占有</b> → 日単位の感作 <code>Ψ</code></div>
+        <div>　　├ ① 肝糖放出 EGP を <b>−α·Ψ</b> 抑制（血中へ出る糖を減らす）</div>
+        <div>　　└ ② インスリン感受性 <b>Si·(1+κ<sub>ins</sub>Ψ)</b> 増強（細胞が糖を取り込みやすくなる）</div>
+        <div>末梢D2占有 → ③ <b>インスリン非依存の GLUT4 動員</b> <code>κ<sub>GLUT4</sub></code>（本アプリの概念部分）</div>
+        <div>末梢D2占有 → ④ <b>膵島 D2 はインスリン分泌を抑制</b>（−ι·Occ / 設計上のトレードオフ）</div>
+        <div style="color:var(--gold)">⇒ GLUT4 膜提示率 M ↑ ⇒ <b>U<sub>cell</sub> = V<sub>max</sub>·M·G/(K<sub>m</sub>+G)</b> ↑ = 血中の糖が細胞内へ</div>
+      </div>
+    </div>
+  </div>
+  <div class="col narrow">
+    <div class="card">
+      <h3>病態・食事</h3>
+      <label>病態プリセット</label>
+      <select id="preset">
+        <option value="t2d">2型糖尿病(中等症)</option>
+        <option value="t2d-severe">2型糖尿病(重症・高血糖)</option>
+        <option value="healthy">非糖尿病(対照)</option>
+      </select>
+      <label>朝食 / 昼食 / 夕食 の炭水化物 (g)</label>
+      <div class="row">
+        <input type="number" id="meal1" value="60" min="0" max="200"/>
+        <input type="number" id="meal2" value="75" min="0" max="200"/>
+        <input type="number" id="meal3" value="70" min="0" max="200"/>
+      </div>
+      <div class="cap">7:00 / 12:00 / 19:00 に摂取</div>
+    </div>
+    <div class="card">
+      <h3>投与設計</h3>
+      <label>1回投与量: <span class="val" id="dose_v">4.8</span> mg</label>
+      <input type="range" id="dose" min="0" max="200" step="2" value="48"/>
+      <label>1日投与回数: <span class="val" id="ndose_v">1</span></label>
+      <input type="range" id="ndose" min="1" max="3" value="1"/>
+      <label>初回投与時刻: <span class="val" id="firsth_v">7</span> 時</label>
+      <input type="range" id="firsth" min="0" max="23" value="7"/>
+      <label>投与日数 (最終24hで評価): <span class="val" id="days_v">7</span> 日</label>
+      <input type="range" id="days" min="1" max="21" value="7"/>
+      <button class="go" id="run_sim">▶ 生体シミュレーションを実行</button>
+      <div class="cap" id="sim_status">薬剤を鍛造してから実行します</div>
+    </div>
+  </div>
+</main>
+
+<!-- ================================================= ③ シミュレーション -->
+<main id="m3">
+  <div class="col">
+    <div class="card">
+      <h3>血糖 G(t) — 最終24時間</h3>
+      <canvas id="ch_g" width="720" height="220"></canvas>
+      <div class="legend"><span><i style="background:#c8a44a"></i>投薬</span><span><i style="background:#8794a8"></i>対照(無投薬)</span><span><i style="background:#48b878"></i>目標域 70–180 mg/dL</span></div>
+    </div>
+    <div class="card">
+      <h3>細胞内への糖取り込み U<sub>cell</sub>(t) と累積取り込み量</h3>
+      <canvas id="ch_u" width="720" height="200"></canvas>
+      <div class="legend"><span><i style="background:#c8a44a"></i>投薬 U<sub>cell</sub> (mg/min)</span><span><i style="background:#8794a8"></i>対照 U<sub>cell</sub></span><span><i style="background:#9060d0"></i>投薬 累積 (g)</span><span><i style="background:#40b8c0"></i>対照 累積 (g)</span></div>
+    </div>
+    <div class="card">
+      <h3>GLUT4 膜提示率 M(t) — 糖の「入口」の開き具合</h3>
+      <canvas id="ch_m" width="720" height="180"></canvas>
+      <div class="legend"><span><i style="background:#c8a44a"></i>投薬</span><span><i style="background:#8794a8"></i>対照</span></div>
+    </div>
+    <div class="card">
+      <h3>血漿インスリン I(t) と 血中薬物濃度 / D2 占有率</h3>
+      <canvas id="ch_i" width="720" height="180"></canvas>
+      <div class="legend"><span><i style="background:#c8a44a"></i>投薬インスリン (µU/mL)</span><span><i style="background:#8794a8"></i>対照インスリン</span><span><i style="background:#d05070"></i>中枢D2占有 %</span><span><i style="background:#40b8c0"></i>末梢D2占有 %</span></div>
+    </div>
+  </div>
+  <div class="col narrow">
+    <div class="card">
+      <h3>最終24時間の指標</h3>
+      <table id="metrics"><tr><td class="cap">未実行</td></tr></table>
+    </div>
+    <div class="card">
+      <h3>設計上の注意</h3>
+      <div style="font-size:11.5px;color:var(--dim)">
+        定常状態では「1日の総取り込み量」は摂取量にほぼ拘束されます。薬剤が改善するのは
+        <b>同じ糖を、より低い血糖値で細胞に入れられるか</b>＝<b>細胞内クリアランス</b>
+        <code>U<sub>cell</sub>/G</code> です。ここが本アプリの主指標です。
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ================================================= ④ 出力 -->
+<main id="m4">
+  <div class="col narrow">
+    <div class="card">
+      <h3>ダウンロード</h3>
+      <button class="go" id="dl_json">⬇ glucogate.spec.json (薬剤スペック+指標)</button>
+      <button class="go sec" id="dl_csv">⬇ timeseries.csv (最終24hの時系列)</button>
+      <button class="go vio" id="dl_src">⬇ 生成ソース (選択中の言語)</button>
+      <label>生成ソースの言語</label>
+      <select id="lang"><option value="c">C</option><option value="python">Python</option><option value="js">JavaScript</option></select>
+      <div class="cap">鍛造した薬剤の定数を焼き込んだ、依存なしの再現用ソースを生成します。</div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card">
+      <h3>生成ソース — 鍛造薬剤の PK/PD モデル</h3>
+      <pre id="src">① で鍛造し、③ でシミュレーションを実行すると生成されます。</pre>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Ω-GlucoGate Forge · <code>bio_medicine/omega_glucogate_forge</code> ·
+  Γ大域的部分積分多様体 ∫Γ(γ)′dx<sub>m</sub> = 2e<sup>−x log x</sup> ·
+  © 2025 Masaaki Yamaguchi · 山口 雅旭 · Bada — 概念実証（非医療）
+</footer>
+
+<script>
+"use strict";
+/* ==================================================================
+   Ω-GlucoGate Forge — 形態形成場 薬剤製造装置 + 血糖/GLUT4 シミュレータ
+   すべて依存なし・決定論的。glucogate_sim.py / glucogate.c と同一のモデル。
+   ================================================================== */
+
+const $ = id => document.getElementById(id);
+const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
+const sat = v => Math.tanh(Math.max(0, v));
+/* Γ大域的部分積分多様体の核 e^{−x log x} */
+const gammaKernel = x => x <= 1e-9 ? 1.0 : Math.exp(-x * Math.log(x));
+
+/* ---------------------------------------------- ① 形態形成場 (製造装置) */
+class MorphogenField {
+  constructor(n, feed, kill, kappa, seed) {
+    this.n = n; this.feed = feed; this.kill = kill; this.kappa = kappa; this.seed = seed;
+    const n2 = n * n, du = 0.16, dv = 0.08;
+    this.u = new Float32Array(n2).fill(1);
+    this.v = new Float32Array(n2);
+    this.tu = new Float32Array(n2); this.tv = new Float32Array(n2);
+    this.gu = new Float32Array(n2); this.gv = new Float32Array(n2);
+    const c = (n - 1) / 2;
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const r = Math.hypot(x - c, y - c) / (c + 1e-9);
+      const g = 0.5 + 0.5 * gammaKernel(kappa * r + 1e-6);
+      const i = y * n + x;
+      this.gu[i] = du * g;
+      this.gv[i] = dv * (1 - 0.35 * (g - 0.5));
+    }
+    /* 決定論的な種付け(線形合同法) */
+    let st = (seed * 1664525 + 1013904223) >>> 0;
+    const rnd = () => { st = (Math.imul(st, 1664525) + 1013904223) >>> 0; return st / 4294967296; };
+    const rad = Math.max(2, n >> 4) + 1;
+    for (let s = 0; s < Math.max(6, n >> 2); s++) {
+      const sx = (n * 0.2 + rnd() * n * 0.6) | 0, sy = (n * 0.2 + rnd() * n * 0.6) | 0;
+      for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+        if (dx * dx + dy * dy > rad * rad) continue;
+        const i = (((sy + dy) % n + n) % n) * n + (((sx + dx) % n + n) % n);
+        this.u[i] = 0.5; this.v[i] = 0.25;
+      }
+    }
+  }
+  step(iters) {
+    const n = this.n, F = this.feed, k = this.kill, gu = this.gu, gv = this.gv;
+    for (let it = 0; it < iters; it++) {
+      const u = this.u, v = this.v, nu = this.tu, nv = this.tv;
+      for (let y = 0; y < n; y++) {
+        const yc = y * n, ym = ((y - 1 + n) % n) * n, yp = ((y + 1) % n) * n;
+        for (let x = 0; x < n; x++) {
+          const i = yc + x, xm = (x - 1 + n) % n, xp = (x + 1) % n;
+          const ui = u[i], vi = v[i];
+          const lu = u[yc + xm] + u[yc + xp] + u[ym + x] + u[yp + x] - 4 * ui;
+          const lv = v[yc + xm] + v[yc + xp] + v[ym + x] + v[yp + x] - 4 * vi;
+          const uvv = ui * vi * vi;
+          nu[i] = clamp(ui + gu[i] * lu - uvv + F * (1 - ui), 0, 1);
+          nv[i] = clamp(vi + gv[i] * lv + uvv - (F + k) * vi, 0, 1);
+        }
+      }
+      this.u = nu; this.v = nv; this.tu = u; this.tv = v;
+    }
+    return this;
+  }
+  descriptors() {
+    const n = this.n, v = this.v, n2 = n * n;
+    let occ = 0, g = 0, num = 0, den = 0, cross = 0;
+    for (let i = 0; i < n2; i++) if (v[i] > 0.20) occ++;
+    for (let y = 0; y < n; y++) {
+      const yc = y * n, yp = ((y + 1) % n) * n;
+      let prev = v[yc] > 0.2;
+      for (let x = 0; x < n; x++) {
+        const i = yc + x;
+        g += Math.abs(v[yc + (x + 1) % n] - v[i]) + Math.abs(v[yp + x] - v[i]);
+        const a = v[i], b = v[(n - 1 - y) * n + (n - 1 - x)];
+        num += Math.abs(a - b); den += Math.abs(a) + Math.abs(b);
+        if (x > 0) { const cur = v[i] > 0.2; if (cur !== prev) cross++; prev = cur; }
+      }
+    }
+    const lam = cross ? (2 * n * n) / cross : n;
+    return {
+      occupancy: occ / n2,
+      branching: clamp(g / (2 * n2) * 12, 0, 1),
+      symmetry: clamp(1 - num / (den + 1e-9), 0, 1),
+      feature_length: clamp(lam / n, 0, 1)
+    };
+  }
+  render(cv) {
+    const n = this.n, ctx = cv.getContext("2d");
+    if (cv.width !== n) { cv.width = n; cv.height = n; }
+    const img = ctx.createImageData(n, n), d = img.data, v = this.v, u = this.u;
+    for (let i = 0; i < n * n; i++) {
+      const t = clamp(v[i] * 3.0, 0, 1), s = clamp(u[i], 0, 1);
+      d[i * 4] = 20 + 200 * t * t;                    /* R: 金 */
+      d[i * 4 + 1] = 12 + 150 * t + 40 * (1 - s);
+      d[i * 4 + 2] = 26 + 190 * (1 - s) * (1 - t) + 60 * t;  /* B: 青紫の背景場 */
+      d[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+}
+
+/* ---------------------------------------------- ② 薬剤スペックの鍛造 */
+function forgeDrug(desc) {
+  const occ = desc.occupancy, br = desc.branching, sym = desc.symmetry, lam = desc.feature_length;
+  const pki = 6.40 + 2.80 * sat(1.4 * br);
+  const bbb = clamp(0.10 + 0.85 * lam, 0.05, 0.95);
+  const fOral = clamp(0.22 + 0.62 * sym, 0.10, 0.92);
+  const tHalf = clamp(2.0 + 20.0 * occ, 1.0, 26.0);
+  const kIns = clamp(0.20 + 1.60 * br * sym, 0, 2.0);
+  const kGlut4 = clamp(0.10 + 1.20 * occ * br, 0, 1.5);
+  const mw = 280 + 240 * occ;
+  const vd = 45 + 190 * bbb;
+  const ka = 0.010 + 0.030 * sym;
+  const hex = v => ("0000" + (Math.floor(Math.abs(v)) % 65536).toString(16).toUpperCase()).slice(-4);
+  return {
+    name: "Ω-GG-" + hex(pki * 1000 + tHalf * 37 + bbb * 911) + "-" + hex(kIns * 3313 + kGlut4 * 7717 + fOral * 1543),
+    pKi_D2: pki, Ki_ng_per_mL: Math.pow(10, -pki) * mw * 1e6, MW: mw,
+    t_half_h: tHalf, F_oral: fOral, ka_per_min: ka, Vd_L: vd, BBB_index: bbb,
+    kappa_insulin_sens: kIns, kappa_glut4: kGlut4, descriptors: desc
+  };
+}
+const NO_DRUG = {
+  name: "(無投薬)", pKi_D2: 9, Ki_ng_per_mL: 1e9, MW: 300, t_half_h: 6, F_oral: 0,
+  ka_per_min: 0.02, Vd_L: 100, BBB_index: 0, kappa_insulin_sens: 0, kappa_glut4: 0
+};
+
+/* ---------------------------------------------- ③ 生理モデル (PK/PD) */
+const PRESETS = {
+  "t2d":        { Si: 0.00085, beta: 0.35, kEGP: 0.35, Gb: 152, Ib: 15, label: "2型糖尿病(中等症)" },
+  "t2d-severe": { Si: 0.00050, beta: 0.20, kEGP: 0.22, Gb: 196, Ib: 13, label: "2型糖尿病(重症・高血糖)" },
+  "healthy":    { Si: 0.00220, beta: 1.00, kEGP: 0.75, Gb: 92,  Ib: 8,  label: "非糖尿病(対照)" }
+};
+const BW = 70, VG = 1.6 * BW, KM = 90, U_II = 70, EGP0 = 145, P2 = 0.028, IZ = 2.0,
+      N_CLR = 0.14, I_MIN = 1.5, KD_X = 0.035, HILL = 2.0, TAU_M = 12,
+      M_MIN = 0.05, M_MAX = 1.0, SEC_GAIN = 6.0, KEO = 0.02, TAU_SENS = 2880,
+      ALPHA_HEP = 0.22, IOTA_ISLET = 0.45, TAU_MEAL = 45, F_MEAL = 0.90;
+
+function mTarget(drive) {
+  const d = Math.pow(Math.max(0, drive), HILL);
+  return M_MIN + (M_MAX - M_MIN) * d / (d + Math.pow(KD_X, HILL));
+}
+
+function simulate(drug, o) {
+  const p = PRESETS[o.preset], meals = o.meals, days = o.days;
+  const Si0 = p.Si, beta = p.beta, kEGP = p.kEGP, Gb = p.Gb, Ib = p.Ib;
+  /* 基礎で収支が閉じるように Vmax と基礎分泌を自己校正 */
+  const Xb = Si0 * (Ib - IZ), Mb = mTarget(Xb);
+  const Vmax = (EGP0 - U_II) / Math.max(1e-6, Mb * Gb / (KM + Gb));
+  const secBasal = N_CLR * (Ib - I_MIN);
+
+  const ki = drug.Ki_ng_per_mL, ke = Math.LN2 / (drug.t_half_h * 60), ka = drug.ka_per_min;
+  const vdML = drug.Vd_L * 1000, bbb = drug.BBB_index;
+  const doseTimes = new Set();
+  if (o.treated && o.dose > 0)
+    for (let d = 0; d < days; d++) for (let j = 0; j < o.nDose; j++)
+      doseTimes.add(Math.round((d * 24 + o.firstH + j * (24 / o.nDose)) * 60));
+
+  let G = Gb, I = Ib, X = Xb, M = Mb, Agut = 0, Ac = 0, Ce = 0, Psi = 0, upCum = 0;
+  const total = days * 1440, day0 = total - 1440;
+  let tir = 0, tar = 0, tbr = 0, gsum = 0, upDay = 0, msum = 0, clr = 0,
+      occCPeak = 0, occPSum = 0, gPeak = 0;
+  const series = [];
+
+  for (let t = 0; t < total; t++) {
+    if (doseTimes.has(t)) Agut += o.dose;
+    const absRate = ka * Agut;
+    Agut -= absRate;
+    Ac += drug.F_oral * absRate - ke * Ac;
+    const Cp = Ac / vdML * 1e6;                 /* mg/mL → ng/mL */
+    const occP = Cp / (Cp + ki);
+    Ce += KEO * (bbb * Cp - Ce);
+    const occC = Ce / (Ce + ki);
+    Psi += (occC - Psi) / TAU_SENS;
+
+    let Ra = 0; const tod = t % 1440;
+    for (let m = 0; m < meals.length; m++) {
+      let dtm = tod - meals[m][0] * 60; if (dtm < 0) dtm += 1440;
+      if (dtm < 600) Ra += meals[m][1] * 1000 * F_MEAL * (dtm / (TAU_MEAL * TAU_MEAL)) * Math.exp(-dtm / TAU_MEAL);
+    }
+    let egp = EGP0 * (1 - ALPHA_HEP * Psi) / (1 + kEGP * (I - Ib) / Math.max(1e-6, Ib));
+    egp *= 1 + 2.5 * Math.max(0, 85 - G) / 85;
+    egp = clamp(egp, 0.15 * EGP0, 2.2 * EGP0);
+
+    const U = Vmax * M * G / (KM + G);          /* ← 細胞内への取り込み */
+    G = Math.max(15, G + (Ra + egp - U_II - U) / VG);
+
+    let sec = secBasal * (1 + beta * SEC_GAIN * Math.max(0, G - Gb) / 100);
+    sec *= clamp((G - 40) / 30, 0, 1) * (1 - IOTA_ISLET * occP);
+    I = Math.max(I_MIN, I + sec - N_CLR * (I - I_MIN));
+
+    const SiEff = Si0 * (1 + drug.kappa_insulin_sens * Psi);
+    X = Math.max(0, X + P2 * (SiEff * (I - IZ) - X));
+    const Xd = drug.kappa_glut4 * 0.020 * occP;
+    M = clamp(M + (mTarget(X + Xd) - M) / TAU_M, M_MIN, M_MAX);
+    upCum += U;
+
+    if (t >= day0) {
+      gsum += G; upDay += U; msum += M; clr += U / G;
+      if (G >= 70 && G <= 180) tir++; else if (G > 180) tar++; else tbr++;
+      if (occC > occCPeak) occCPeak = occC;
+      if (G > gPeak) gPeak = G;
+      occPSum += occP;
+      if (t % 5 === 0) series.push({ t: (t - day0) / 60, G: G, I: I, M: M, U: U, Cp: Cp, occC: occC, occP: occP, cum: upDay / 1000 });
+    }
+  }
+  const meanG = gsum / 1440, hypo = 100 * tbr / 1440;
+  return {
+    preset: o.preset, mean_glucose: meanG, peak_glucose: gPeak, eA1c: (meanG + 46.7) / 28.7,
+    TIR: 100 * tir / 1440, TAR: 100 * tar / 1440, TBR: hypo,
+    uptake_g_per_day: upDay / 1000, cell_clearance_dL_min: clr / 1440,
+    mean_GLUT4: msum / 1440, peak_occ_central: occCPeak, mean_occ_peripheral: occPSum / 1440,
+    side_effect_index: clamp(100 * (0.55 * Math.pow(occCPeak, 1.2) + 0.30 * (occPSum / 1440)) + 1.5 * hypo, 0, 100),
+    total_uptake_g: upCum / 1000, series: series
+  };
+}
+
+/* 製造装置の目的関数 (無投薬 base に対する改善度) */
+function score(res, base) {
+  const dclr = 100 * (res.cell_clearance_dL_min / Math.max(1e-9, base.cell_clearance_dL_min) - 1);
+  return (base.mean_glucose - res.mean_glucose) + 0.50 * (res.TIR - base.TIR)
+       + 0.30 * dclr - 2.0 * res.TBR - 0.30 * res.side_effect_index;
+}
+
+/* ---------------------------------------------- 画面状態 */
+const state = { field: null, drug: null, sim: null, ctrl: null, opts: null, busy: false };
+
+function simOpts(treated) {
+  return {
+    preset: $("preset").value, days: +$("days").value,
+    dose: +$("dose").value / 10, nDose: +$("ndose").value, firstH: +$("firsth").value,
+    meals: [[7, +$("meal1").value], [12, +$("meal2").value], [19, +$("meal3").value]],
+    treated: treated !== false
+  };
+}
+
+/* ---------------------------------------------- 折れ線グラフ */
+function drawChart(cv, cfg) {
+  const ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  const L = 46, R = cfg.y2 ? 46 : 12, T = 10, B = 22;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = "#06090f"; ctx.fillRect(0, 0, W, H);
+  const x2p = x => L + (x / 24) * (W - L - R);
+  const y2p = (y, ax) => { const a = ax || cfg; return H - B - ((y - a.yMin) / (a.yMax - a.yMin)) * (H - T - B); };
+  (cfg.bands || []).forEach(b => {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(L, y2p(b.y1), W - L - R, y2p(b.y0) - y2p(b.y1));
+  });
+  ctx.strokeStyle = "#1b2638"; ctx.fillStyle = "#8794a8";
+  ctx.font = "10px Consolas,monospace"; ctx.lineWidth = 1;
+  for (let h = 0; h <= 24; h += 3) {
+    ctx.beginPath(); ctx.moveTo(x2p(h), T); ctx.lineTo(x2p(h), H - B); ctx.stroke();
+    ctx.textAlign = "center"; ctx.fillText(h + ":00", x2p(h), H - 8);
+  }
+  for (let i = 0; i <= 4; i++) {
+    const y = cfg.yMin + (cfg.yMax - cfg.yMin) * i / 4;
+    ctx.beginPath(); ctx.moveTo(L, y2p(y)); ctx.lineTo(W - R, y2p(y)); ctx.stroke();
+    ctx.textAlign = "right"; ctx.fillText(y.toFixed(cfg.dec || 0), L - 4, y2p(y) + 3);
+  }
+  if (cfg.y2) {
+    ctx.textAlign = "left"; ctx.fillStyle = "#9060d0";
+    for (let i = 0; i <= 4; i++) {
+      const y = cfg.y2.yMin + (cfg.y2.yMax - cfg.y2.yMin) * i / 4;
+      ctx.fillText(y.toFixed(cfg.y2.dec || 0), W - R + 4, y2p(y, cfg.y2) + 3);
+    }
+  }
+  (cfg.series || []).forEach(s => {
+    if (!s.data || !s.data.length) return;
+    const ax = s.axis === 2 ? cfg.y2 : cfg;
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.w || 1.6;
+    ctx.setLineDash(s.dash || []);
+    ctx.beginPath();
+    s.data.forEach((p, i) => { const X = x2p(p.x), Y = y2p(p.y, ax); i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); });
+    ctx.stroke(); ctx.setLineDash([]);
+  });
+  ctx.strokeStyle = "#1b2638"; ctx.strokeRect(L, T, W - L - R, H - T - B);
+}
+
+const pick = (ser, key, scale) => ser.map(s => ({ x: s.t, y: s[key] * (scale || 1) }));
+
+function drawAll() {
+  const a = state.sim, b = state.ctrl;
+  if (!a) return;
+  const gMax = Math.max(240, Math.ceil(Math.max(a.peak_glucose, b.peak_glucose) / 40) * 40);
+  drawChart($("ch_g"), {
+    yMin: 40, yMax: gMax,
+    bands: [{ y0: 70, y1: 180, color: "rgba(72,184,120,0.10)" }],
+    series: [
+      { data: pick(b.series, "G"), color: "#8794a8", dash: [4, 3] },
+      { data: pick(a.series, "G"), color: "#c8a44a", w: 2 }
+    ]
+  });
+  const uMax = Math.ceil(Math.max(...a.series.map(s => s.U), ...b.series.map(s => s.U)) / 50) * 50 + 50;
+  drawChart($("ch_u"), {
+    yMin: 0, yMax: uMax,
+    y2: { yMin: 0, yMax: Math.ceil(Math.max(a.uptake_g_per_day, b.uptake_g_per_day) / 50) * 50 + 50, dec: 0 },
+    series: [
+      { data: pick(b.series, "U"), color: "#8794a8", dash: [4, 3] },
+      { data: pick(a.series, "U"), color: "#c8a44a", w: 2 },
+      { data: pick(b.series, "cum"), color: "#40b8c0", dash: [2, 3], axis: 2 },
+      { data: pick(a.series, "cum"), color: "#9060d0", w: 1.8, axis: 2 }
+    ]
+  });
+  drawChart($("ch_m"), {
+    yMin: 0, yMax: 1, dec: 2,
+    series: [
+      { data: pick(b.series, "M"), color: "#8794a8", dash: [4, 3] },
+      { data: pick(a.series, "M"), color: "#c8a44a", w: 2 }
+    ]
+  });
+  drawChart($("ch_i"), {
+    yMin: 0, yMax: Math.ceil(Math.max(...a.series.map(s => s.I), ...b.series.map(s => s.I)) / 20) * 20 + 20,
+    y2: { yMin: 0, yMax: 100, dec: 0 },
+    series: [
+      { data: pick(b.series, "I"), color: "#8794a8", dash: [4, 3] },
+      { data: pick(a.series, "I"), color: "#c8a44a", w: 2 },
+      { data: pick(a.series, "occC", 100), color: "#d05070", axis: 2 },
+      { data: pick(a.series, "occP", 100), color: "#40b8c0", dash: [3, 3], axis: 2 }
+    ]
+  });
+}
+
+function metricRow(label, c, t, dec, better) {
+  const d = t - c, good = better > 0 ? d > 0 : d < 0;
+  return "<tr><td>" + label + "</td><td class='ctl'>" + c.toFixed(dec) + "</td><td class='trt'>" +
+    t.toFixed(dec) + "</td><td class='dlt" + (good || Math.abs(d) < 1e-9 ? "" : " bad") + "'>" +
+    (d >= 0 ? "+" : "") + d.toFixed(dec) + "</td></tr>";
+}
+
+function showMetrics() {
+  const a = state.sim, b = state.ctrl;
+  let h = "<tr><th>指標</th><th>対照</th><th>投薬</th><th>Δ</th></tr>";
+  h += metricRow("平均血糖 mg/dL", b.mean_glucose, a.mean_glucose, 1, -1);
+  h += metricRow("最高血糖 mg/dL", b.peak_glucose, a.peak_glucose, 1, -1);
+  h += metricRow("推定HbA1c %", b.eA1c, a.eA1c, 2, -1);
+  h += metricRow("TIR 70–180 %", b.TIR, a.TIR, 1, 1);
+  h += metricRow("高血糖 >180 %", b.TAR, a.TAR, 1, -1);
+  h += metricRow("低血糖 <70 %", b.TBR, a.TBR, 1, -1);
+  h += metricRow("細胞内取込 g/日", b.uptake_g_per_day, a.uptake_g_per_day, 1, 1);
+  h += metricRow("細胞内クリアランス dL/min", b.cell_clearance_dL_min, a.cell_clearance_dL_min, 3, 1);
+  h += metricRow("GLUT4膜提示 %", 100 * b.mean_GLUT4, 100 * a.mean_GLUT4, 1, 1);
+  h += "<tr><td>中枢D2占有 ピーク</td><td class='ctl'>—</td><td class='trt'>" +
+    (100 * a.peak_occ_central).toFixed(0) + "%</td><td></td></tr>";
+  h += "<tr><td>末梢D2占有 平均</td><td class='ctl'>—</td><td class='trt'>" +
+    (100 * a.mean_occ_peripheral).toFixed(0) + "%</td><td></td></tr>";
+  h += "<tr><td>副作用指標 /100</td><td class='ctl'>—</td><td class='trt" +
+    (a.side_effect_index > 70 ? "" : "") + "'>" + a.side_effect_index.toFixed(0) + "</td><td></td></tr>";
+  h += "<tr><td>製造装置スコア</td><td class='ctl'>—</td><td class='trt'>" +
+    score(a, b).toFixed(1) + "</td><td></td></tr>";
+  $("metrics").innerHTML = h;
+}
+
+/* ---------------------------------------------- 表示 */
+function bar(label, v, txt) {
+  return "<div class='stat'><span>" + label + "</span><b>" + txt + "</b></div>" +
+    "<div class='meter'><i style='width:" + (100 * clamp(v, 0, 1)).toFixed(1) + "%'></i></div>";
+}
+function showDescriptors(d) {
+  $("desc_box").innerHTML =
+    bar("充填率 (occupancy)", d.occupancy, d.occupancy.toFixed(3)) +
+    bar("分岐度 (branching)", d.branching, d.branching.toFixed(3)) +
+    bar("点対称性 (symmetry)", d.symmetry, d.symmetry.toFixed(3)) +
+    bar("特徴長 (feature length)", d.feature_length, d.feature_length.toFixed(3)) +
+    "<div class='cap'>充填率→半減期 / 分岐度→D2親和性 / 対称性→経口F / 特徴長→BBB透過</div>";
+}
+function showDrug(dr) {
+  $("drug_uid").textContent = dr.name;
+  $("drug_box").innerHTML =
+    bar("D2 親和性 pKi", (dr.pKi_D2 - 6) / 3.2, dr.pKi_D2.toFixed(2) + "  (Ki " + dr.Ki_ng_per_mL.toFixed(2) + " ng/mL)") +
+    bar("消失半減期", dr.t_half_h / 26, dr.t_half_h.toFixed(1) + " h") +
+    bar("経口バイオアベイラビリティ", dr.F_oral, (100 * dr.F_oral).toFixed(0) + " %") +
+    bar("血液脳関門 透過指数", dr.BBB_index, dr.BBB_index.toFixed(2)) +
+    bar("κ 中枢性インスリン感受性増強", dr.kappa_insulin_sens / 2, dr.kappa_insulin_sens.toFixed(2)) +
+    bar("κ GLUT4 動員 (インスリン非依存)", dr.kappa_glut4 / 1.5, dr.kappa_glut4.toFixed(2)) +
+    "<div class='stat'><span>分子量 / 分布容積 / 吸収速度</span><b>" + dr.MW.toFixed(0) + " · " +
+    dr.Vd_L.toFixed(0) + " L · " + dr.ka_per_min.toFixed(3) + "/min</b></div>";
+}
+
+/* ---------------------------------------------- ① 鍛造の実行 */
+function currentFieldParams() {
+  return {
+    feed: +$("feed").value / 1000, kill: +$("kill").value / 10000,
+    kappa: +$("kappa").value / 100, seed: +$("seed").value, steps: +$("steps").value
+  };
+}
+function runForge() {
+  if (state.busy) return;
+  state.busy = true; $("run_forge").disabled = true; $("run_auto").disabled = true;
+  const p = currentFieldParams();
+  const fld = new MorphogenField(128, p.feed, p.kill, p.kappa, p.seed);
+  let done = 0;
+  const chunk = () => {
+    const nstep = Math.min(120, p.steps - done);
+    fld.step(nstep); done += nstep;
+    fld.render($("field"));
+    $("forge_status").textContent = "形態形成場を収束中… " + done + " / " + p.steps + " ステップ";
+    if (done < p.steps) { requestAnimationFrame(chunk); return; }
+    const desc = fld.descriptors();
+    state.field = fld; state.drug = forgeDrug(desc);
+    showDescriptors(desc); showDrug(state.drug);
+    const dead = desc.occupancy < 0.02 || desc.occupancy > 0.995;
+    $("forge_status").innerHTML = dead
+      ? "⚠ 形態が消失/飽和しました (F,k を調整してください) — 鍛造した薬剤は不活性です"
+      : "鍛造完了: <b>" + state.drug.name + "</b> — ② で投与設計へ";
+    $("sim_status").textContent = "準備完了 — ▶ を押してください";
+    state.busy = false; $("run_forge").disabled = false; $("run_auto").disabled = false;
+  };
+  requestAnimationFrame(chunk);
+}
+
+/* 自動鍛造: N 候補を小さい場で試作し、最良の設計で本鍛造する */
+function runAutoForge() {
+  if (state.busy) return;
+  state.busy = true; $("run_forge").disabled = true; $("run_auto").disabled = true;
+  $("auto_box").style.display = "";
+  const N = +$("ncand").value, seed0 = +$("seed").value;
+  const o = simOpts(true); o.days = Math.min(o.days, 4);
+  const ctrl = simulate(NO_DRUG, Object.assign({}, o, { treated: false }));
+  let st = seed0 >>> 0, i = 0, best = null, bestS = -1e9, bestP = null;
+  let html = "<tr><th>#</th><th>F</th><th>k</th><th>κ</th><th>pKi</th><th>得点</th></tr>";
+  const rnd = () => { st = (Math.imul(st, 1103515245) + 12345) >>> 0; return (st % 1000) / 1000; };
+  const chunk = () => {
+    const f = 0.026 + rnd() * 0.032, k = 0.055 + rnd() * 0.010, kp = 0.2 + rnd() * 2.4;
+    const fld = new MorphogenField(40, f, k, kp, seed0 + i).step(500);
+    const dr = forgeDrug(fld.descriptors());
+    const r = simulate(dr, o);
+    const s = score(r, ctrl);
+    if (s > bestS) { bestS = s; best = dr; bestP = { feed: f, kill: k, kappa: kp, seed: seed0 + i }; }
+    html += "<tr" + (s === bestS ? " style='color:#c8a44a'" : "") + "><td>" + (i + 1) + "</td><td>" +
+      f.toFixed(3) + "</td><td>" + k.toFixed(3) + "</td><td>" + kp.toFixed(2) + "</td><td>" +
+      dr.pKi_D2.toFixed(2) + "</td><td>" + s.toFixed(1) + "</td></tr>";
+    $("auto_tbl").innerHTML = html;
+    $("forge_status").textContent = "自動鍛造 " + (i + 1) + " / " + N + " 候補…";
+    if (++i < N) { requestAnimationFrame(chunk); return; }
+    /* 最良設計をスライダに反映して本鍛造 */
+    $("feed").value = Math.round(bestP.feed * 1000); $("feed_v").textContent = bestP.feed.toFixed(3);
+    $("kill").value = Math.round(bestP.kill * 10000); $("kill_v").textContent = bestP.kill.toFixed(3);
+    $("kappa").value = Math.round(bestP.kappa * 100); $("kappa_v").textContent = bestP.kappa.toFixed(2);
+    $("seed").value = bestP.seed; $("seed_v").textContent = bestP.seed;
+    state.busy = false; $("run_forge").disabled = false; $("run_auto").disabled = false;
+    runForge();
+  };
+  requestAnimationFrame(chunk);
+}
+
+/* ---------------------------------------------- ③ シミュレーションの実行 */
+function runSim() {
+  if (!state.drug) { $("sim_status").textContent = "先に ① で薬剤を鍛造してください"; return; }
+  const o = simOpts(true);
+  state.opts = o;
+  state.ctrl = simulate(NO_DRUG, Object.assign({}, o, { treated: false }));
+  state.sim = simulate(state.drug, o);
+  drawAll(); showMetrics(); buildSource();
+  $("sim_status").innerHTML = "完了: 平均血糖 " + state.sim.mean_glucose.toFixed(1) +
+    " mg/dL (対照 " + state.ctrl.mean_glucose.toFixed(1) + ")";
+  showTab(3);
+}
+
+/* ---------------------------------------------- ④ 出力 */
+function download(name, text, mime) {
+  const b = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(b); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+}
+function specBlob() {
+  const strip = r => { const c = Object.assign({}, r); delete c.series; return c; };
+  return {
+    app: "omega_glucogate_forge", version: "1.0.0",
+    disclaimer: "概念シミュレーション・非医療。実在の医薬品ではありません。",
+    forge: currentFieldParams(),
+    drug: state.drug,
+    condition: PRESETS[state.opts.preset],
+    regimen: {
+      dose_mg: state.opts.dose, doses_per_day: state.opts.nDose,
+      first_dose_h: state.opts.firstH, days: state.opts.days, meals: state.opts.meals
+    },
+    metrics_control: strip(state.ctrl), metrics_treated: strip(state.sim),
+    forge_score: score(state.sim, state.ctrl)
+  };
+}
+function csvBlob() {
+  let s = "t_h,glucose_mg_dL,insulin_uU_mL,GLUT4_membrane,uptake_mg_min,cum_uptake_g,plasma_drug_ng_mL,occ_central,occ_peripheral,control_glucose,control_uptake_mg_min\n";
+  state.sim.series.forEach((p, i) => {
+    const c = state.ctrl.series[i] || { G: 0, U: 0 };
+    s += [p.t.toFixed(4), p.G.toFixed(3), p.I.toFixed(4), p.M.toFixed(5), p.U.toFixed(4),
+          p.cum.toFixed(4), p.Cp.toFixed(5), p.occC.toFixed(5), p.occP.toFixed(5),
+          c.G.toFixed(3), c.U.toFixed(4)].join(",") + "\n";
+  });
+  return s;
+}
+
+/* 鍛造した薬剤の定数を焼き込んだ、依存なしの再現用ソースを生成 */
+function buildSource() {
+  const d = state.drug, o = state.opts, p = PRESETS[o.preset];
+  const head = [
+    "Ω-GlucoGate Forge — 生成ソース (" + d.name + ")",
+    "形態形成場から鍛造した薬剤の PK/PD と 血糖-インスリン-GLUT4 モデルを再現します。",
+    "⚠ 概念シミュレーション・非医療。実在の医薬品ではありません。"
+  ];
+  const K = {
+    KI: d.Ki_ng_per_mL, KE: Math.LN2 / (d.t_half_h * 60), KA: d.ka_per_min, FO: d.F_oral,
+    VDML: d.Vd_L * 1000, BBB: d.BBB_index, KINS: d.kappa_insulin_sens, KGLUT: d.kappa_glut4,
+    SI: p.Si, BETA: p.beta, KEGP: p.kEGP, GB: p.Gb, IB: p.Ib,
+    DOSE: o.dose, NDOSE: o.nDose, FIRST: o.firstH, DAYS: o.days,
+    M1: o.meals[0][1], M2: o.meals[1][1], M3: o.meals[2][1]
+  };
+  const lang = $("lang").value;
+  let src;
+  if (lang === "c") {
+    src = "/*\n * " + head.join("\n * ") + "\n *\n * build: gcc -O2 -o glucogate glucogate.c -lm\n */\n" +
+"#include <stdio.h>\n#include <math.h>\n\n" +
+"#define KI      " + K.KI.toFixed(6) + "   /* D2 Ki (ng/mL) */\n" +
+"#define KE      " + K.KE.toFixed(8) + " /* 消失 (1/min) */\n" +
+"#define KA      " + K.KA.toFixed(6) + "\n#define FORAL   " + K.FO.toFixed(6) + "\n" +
+"#define VDML    " + K.VDML.toFixed(1) + "\n#define BBB     " + K.BBB.toFixed(6) + "\n" +
+"#define KINS    " + K.KINS.toFixed(6) + "\n#define KGLUT   " + K.KGLUT.toFixed(6) + "\n" +
+"#define SI      " + K.SI.toFixed(8) + "\n#define BETA    " + K.BETA.toFixed(4) + "\n" +
+"#define KEGP    " + K.KEGP.toFixed(4) + "\n#define GB      " + K.GB.toFixed(1) + "\n#define IB      " + K.IB.toFixed(1) + "\n" +
+"#define DOSE    " + K.DOSE.toFixed(2) + "\n#define NDOSE   " + K.NDOSE + "\n#define FIRSTH  " + K.FIRST + "\n#define DAYS    " + K.DAYS + "\n" +
+"static const double meals[3][2] = {{7," + K.M1 + "},{12," + K.M2 + "},{19," + K.M3 + "}};\n\n" +
+"static double mtarget(double x){ double d=x>0?x*x:0.0; return 0.05+0.95*d/(d+0.035*0.035); }\n\n" +
+"int main(void){\n" +
+"  double Xb=SI*(IB-2.0), Mb=mtarget(Xb);\n" +
+"  double Vmax=(145.0-70.0)/(Mb*GB/(90.0+GB)), secb=0.14*(IB-1.5);\n" +
+"  double G=GB,I=IB,X=Xb,M=Mb,Ag=0,Ac=0,Ce=0,Psi=0,up=0,gs=0; int t,i,tir=0;\n" +
+"  for(t=0;t<DAYS*1440;t++){\n" +
+"    for(i=0;i<NDOSE;i++) if(t%1440==(int)((FIRSTH+i*(24.0/NDOSE))*60)) Ag+=DOSE;\n" +
+"    double ab=KA*Ag; Ag-=ab; Ac+=FORAL*ab-KE*Ac;\n" +
+"    double Cp=Ac/VDML*1e6, occP=Cp/(Cp+KI);\n" +
+"    Ce+=0.02*(BBB*Cp-Ce); double occC=Ce/(Ce+KI); Psi+=(occC-Psi)/2880.0;\n" +
+"    double Ra=0, tod=t%1440;\n" +
+"    for(i=0;i<3;i++){ double dt=tod-meals[i][0]*60; if(dt<0) dt+=1440;\n" +
+"      if(dt<600) Ra+=meals[i][1]*1000*0.9*(dt/(45.0*45.0))*exp(-dt/45.0); }\n" +
+"    double egp=145.0*(1-0.22*Psi)/(1+KEGP*(I-IB)/IB);\n" +
+"    egp*=1+2.5*(85.0-G>0?85.0-G:0)/85.0;\n" +
+"    if(egp<21.75) egp=21.75;\n    if(egp>319.0) egp=319.0;\n" +
+"    double U=Vmax*M*G/(90.0+G);            /* 細胞内への取り込み */\n" +
+"    G+=(Ra+egp-70.0-U)/112.0; if(G<15) G=15;\n" +
+"    double sec=secb*(1+BETA*6.0*(G>GB?G-GB:0)/100.0);\n" +
+"    double lo=(G-40)/30; lo=lo<0?0:(lo>1?1:lo);\n" +
+"    sec*=lo*(1-0.45*occP); I+=sec-0.14*(I-1.5); if(I<1.5) I=1.5;\n" +
+"    X+=0.028*(SI*(1+KINS*Psi)*(I-2.0)-X); if(X<0) X=0;\n" +
+"    M+=(mtarget(X+KGLUT*0.020*occP)-M)/12.0;\n" +
+"    if(t>=(DAYS-1)*1440){ up+=U; gs+=G; if(G>=70&&G<=180) tir++; }\n" +
+"  }\n" +
+"  printf(\"平均血糖 %.1f mg/dL / TIR %.1f %% / 細胞内取込 %.1f g/日\\n\", gs/1440.0, 100.0*tir/1440.0, up/1000.0);\n" +
+"  return 0;\n}\n";
+  } else if (lang === "python") {
+    src = "# -*- coding: utf-8 -*-\n# " + head.join("\n# ") + "\nimport math\n\n" +
+"KI, KE, KA = " + K.KI.toFixed(6) + ", " + K.KE.toFixed(8) + ", " + K.KA.toFixed(6) + "\n" +
+"FORAL, VDML, BBB = " + K.FO.toFixed(6) + ", " + K.VDML.toFixed(1) + ", " + K.BBB.toFixed(6) + "\n" +
+"KINS, KGLUT = " + K.KINS.toFixed(6) + ", " + K.KGLUT.toFixed(6) + "\n" +
+"SI, BETA, KEGP, GB, IB = " + K.SI.toFixed(8) + ", " + K.BETA + ", " + K.KEGP + ", " + K.GB + ", " + K.IB + "\n" +
+"DOSE, NDOSE, FIRSTH, DAYS = " + K.DOSE + ", " + K.NDOSE + ", " + K.FIRST + ", " + K.DAYS + "\n" +
+"MEALS = [(7, " + K.M1 + "), (12, " + K.M2 + "), (19, " + K.M3 + ")]\n\n" +
+"def mtarget(x):\n    d = max(0.0, x) ** 2\n    return 0.05 + 0.95 * d / (d + 0.035 ** 2)\n\n" +
+"Xb = SI * (IB - 2.0); Mb = mtarget(Xb)\n" +
+"Vmax = (145.0 - 70.0) / (Mb * GB / (90.0 + GB)); secb = 0.14 * (IB - 1.5)\n" +
+"G, I, X, M = GB, IB, Xb, Mb\nAg = Ac = Ce = Psi = up = gs = 0.0\ntir = 0\n" +
+"for t in range(DAYS * 1440):\n" +
+"    if any(t % 1440 == int((FIRSTH + i * (24.0 / NDOSE)) * 60) for i in range(NDOSE)):\n        Ag += DOSE\n" +
+"    ab = KA * Ag; Ag -= ab; Ac += FORAL * ab - KE * Ac\n" +
+"    Cp = Ac / VDML * 1e6; occP = Cp / (Cp + KI)\n" +
+"    Ce += 0.02 * (BBB * Cp - Ce); occC = Ce / (Ce + KI); Psi += (occC - Psi) / 2880.0\n" +
+"    Ra = 0.0; tod = t % 1440\n" +
+"    for (mh, carb) in MEALS:\n        dt = tod - mh * 60\n        if dt < 0: dt += 1440\n" +
+"        if dt < 600: Ra += carb * 1000 * 0.9 * (dt / 2025.0) * math.exp(-dt / 45.0)\n" +
+"    egp = 145.0 * (1 - 0.22 * Psi) / (1 + KEGP * (I - IB) / IB)\n" +
+"    egp *= 1 + 2.5 * max(0.0, 85.0 - G) / 85.0\n    egp = min(319.0, max(21.75, egp))\n" +
+"    U = Vmax * M * G / (90.0 + G)            # 細胞内への取り込み\n" +
+"    G = max(15.0, G + (Ra + egp - 70.0 - U) / 112.0)\n" +
+"    sec = secb * (1 + BETA * 6.0 * max(0.0, G - GB) / 100.0)\n" +
+"    sec *= min(1.0, max(0.0, (G - 40) / 30)) * (1 - 0.45 * occP)\n" +
+"    I = max(1.5, I + sec - 0.14 * (I - 1.5))\n" +
+"    X = max(0.0, X + 0.028 * (SI * (1 + KINS * Psi) * (I - 2.0) - X))\n" +
+"    M += (mtarget(X + KGLUT * 0.020 * occP) - M) / 12.0\n" +
+"    if t >= (DAYS - 1) * 1440:\n        up += U; gs += G; tir += 1 if 70 <= G <= 180 else 0\n" +
+"print('平均血糖 %.1f mg/dL / TIR %.1f %% / 細胞内取込 %.1f g/日' % (gs/1440, 100*tir/1440, up/1000))\n";
+  } else {
+    src = "// " + head.join("\n// ") + "\n// run: node glucogate.js\n" +
+"const KI=" + K.KI.toFixed(6) + ", KE=" + K.KE.toFixed(8) + ", KA=" + K.KA.toFixed(6) +
+", FORAL=" + K.FO.toFixed(6) + ", VDML=" + K.VDML.toFixed(1) + ", BBB=" + K.BBB.toFixed(6) + ";\n" +
+"const KINS=" + K.KINS.toFixed(6) + ", KGLUT=" + K.KGLUT.toFixed(6) + ", SI=" + K.SI.toFixed(8) +
+", BETA=" + K.BETA + ", KEGP=" + K.KEGP + ", GB=" + K.GB + ", IB=" + K.IB + ";\n" +
+"const DOSE=" + K.DOSE + ", NDOSE=" + K.NDOSE + ", FIRSTH=" + K.FIRST + ", DAYS=" + K.DAYS +
+", MEALS=[[7," + K.M1 + "],[12," + K.M2 + "],[19," + K.M3 + "]];\n" +
+"const mtarget=x=>{const d=Math.pow(Math.max(0,x),2);return 0.05+0.95*d/(d+0.035*0.035);};\n" +
+"let Xb=SI*(IB-2), Mb=mtarget(Xb);\n" +
+"const Vmax=(145-70)/(Mb*GB/(90+GB)), secb=0.14*(IB-1.5);\n" +
+"let G=GB,I=IB,X=Xb,M=Mb,Ag=0,Ac=0,Ce=0,Psi=0,up=0,gs=0,tir=0;\n" +
+"for(let t=0;t<DAYS*1440;t++){\n" +
+"  for(let i=0;i<NDOSE;i++) if(t%1440===Math.round((FIRSTH+i*(24/NDOSE))*60)) Ag+=DOSE;\n" +
+"  const ab=KA*Ag; Ag-=ab; Ac+=FORAL*ab-KE*Ac;\n" +
+"  const Cp=Ac/VDML*1e6, occP=Cp/(Cp+KI);\n" +
+"  Ce+=0.02*(BBB*Cp-Ce); const occC=Ce/(Ce+KI); Psi+=(occC-Psi)/2880;\n" +
+"  let Ra=0; const tod=t%1440;\n" +
+"  for(const [mh,carb] of MEALS){ let dt=tod-mh*60; if(dt<0) dt+=1440;\n" +
+"    if(dt<600) Ra+=carb*1000*0.9*(dt/2025)*Math.exp(-dt/45); }\n" +
+"  let egp=145*(1-0.22*Psi)/(1+KEGP*(I-IB)/IB);\n" +
+"  egp*=1+2.5*Math.max(0,85-G)/85; egp=Math.min(319,Math.max(21.75,egp));\n" +
+"  const U=Vmax*M*G/(90+G);              // 細胞内への取り込み\n" +
+"  G=Math.max(15,G+(Ra+egp-70-U)/112);\n" +
+"  let sec=secb*(1+BETA*6*Math.max(0,G-GB)/100);\n" +
+"  sec*=Math.min(1,Math.max(0,(G-40)/30))*(1-0.45*occP);\n" +
+"  I=Math.max(1.5,I+sec-0.14*(I-1.5));\n" +
+"  X=Math.max(0,X+0.028*(SI*(1+KINS*Psi)*(I-2)-X));\n" +
+"  M+=(mtarget(X+KGLUT*0.020*occP)-M)/12;\n" +
+"  if(t>=(DAYS-1)*1440){ up+=U; gs+=G; if(G>=70&&G<=180) tir++; }\n" +
+"}\n" +
+"console.log('平均血糖 '+(gs/1440).toFixed(1)+' mg/dL / TIR '+(100*tir/1440).toFixed(1)+' % / 細胞内取込 '+(up/1000).toFixed(1)+' g/日');\n";
+  }
+  $("src").textContent = src;
+  return src;
+}
+
+/* ---------------------------------------------- タブ / イベント */
+function showTab(n) {
+  for (let i = 1; i <= 4; i++) {
+    $("m" + i).classList.toggle("on", i === n);
+    $("t" + i).classList.toggle("on", i === n);
+  }
+}
+[1, 2, 3, 4].forEach(i => $("t" + i).onclick = () => showTab(i));
+
+const sliders = [
+  ["feed", v => (v / 1000).toFixed(3)], ["kill", v => (v / 10000).toFixed(3)],
+  ["kappa", v => (v / 100).toFixed(2)], ["steps", v => v], ["seed", v => v],
+  ["ncand", v => v], ["dose", v => (v / 10).toFixed(1)], ["ndose", v => v],
+  ["firsth", v => v], ["days", v => v]
+];
+sliders.forEach(([id, f]) => {
+  const el = $(id), out = $(id + "_v");
+  const upd = () => { out.textContent = f(+el.value); };
+  el.addEventListener("input", upd); upd();
+});
+
+$("run_forge").onclick = runForge;
+$("run_auto").onclick = runAutoForge;
+$("run_sim").onclick = runSim;
+$("lang").onchange = () => { if (state.sim) buildSource(); };
+$("dl_json").onclick = () => state.sim
+  ? download("glucogate.spec.json", JSON.stringify(specBlob(), null, 1), "application/json")
+  : alert("先に ③ でシミュレーションを実行してください");
+$("dl_csv").onclick = () => state.sim
+  ? download("glucogate_timeseries.csv", csvBlob(), "text/csv")
+  : alert("先に ③ でシミュレーションを実行してください");
+$("dl_src").onclick = () => {
+  if (!state.sim) { alert("先に ③ でシミュレーションを実行してください"); return; }
+  const ext = { c: "c", python: "py", js: "js" }[$("lang").value];
+  download("glucogate." + ext, buildSource(), "text/plain");
+};
+
+/* 起動時に既定条件で 1 本鍛造しておく */
+runForge();
+</script>
+</body>
+</html>

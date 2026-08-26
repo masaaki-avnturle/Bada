@@ -62,6 +62,29 @@
 
 ---
 
+## 🩸 ダウンロード — 糖取り込み薬剤 製造装置シミュレータ (Ω-GlucoGate Forge)
+
+糖尿病で**血液中の糖が細胞内に入らない**状態に対し、**形態形成場（Γ大域的部分積分多様体で変調した反応拡散場）の薬剤製造装置**で
+**ドーパミン作動性(D2)の「糖取り込み薬剤」を鍛造**し、投与後に**血中の糖が細胞内へ取り込まれる過程**
+(`U_cell = V_max·M·G/(K_m+G)`, GLUT4 膜提示率 M) を 1 分刻みで積分するシミュレータです。**1 ファイルをダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可)。
+
+### 👉 [**bio_medicine/omega_glucogate_forge/www/index.html をダウンロード**](bio_medicine/omega_glucogate_forge/www/index.html)
+
+ダウンロード手順(GitHub 上):上のリンクを開き、ファイル表示画面の右上にある **「Download raw file」(⬇ アイコン)** を押すと保存できます。保存した `index.html` をダブルクリックすればブラウザで開きます。
+
+| ファイル | 内容 |
+|:---|:---|
+| [`www/index.html`](bio_medicine/omega_glucogate_forge/www/index.html) | ★ 本体(単一 HTML)。①形態形成場で薬剤を鍛造 → ②投与設計 → ③血糖/GLUT4/細胞内取り込みの24hシミュレーション → ④CSV・spec.json・C/Python/JSソース生成 |
+| [`glucogate_sim.py`](bio_medicine/omega_glucogate_forge/glucogate_sim.py) | Python CLI (標準ライブラリのみ)。`--auto-forge N` で最良の薬剤を自動探索 |
+| [`glucogate.c`](bio_medicine/omega_glucogate_forge/glucogate.c) | ネイティブ C 版。`gcc -std=c99 -O2 -o glucogate glucogate.c -lm` |
+| [`README.md`](bio_medicine/omega_glucogate_forge/README.md) | モデル(PK/PD・GLUT4 トランスロケーション)の詳細と検証結果 |
+
+ネイティブ アプリ (Windows EXE / Android APK) は [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-GlucoGate-Forge-*.exe` / `omega_glucogate_forge-debug.apk`([`omega-apps-build.yml`](.github/workflows/omega-apps-build.yml) が `apps-v*` タグでビルド)。
+
+> ⚠ **概念シミュレーション・非医療**: 実在の医薬品を設計・製造・評価するものではなく、出力を医療判断に用いることはできません。治療に関することは必ず主治医にご相談ください。
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -70,6 +93,7 @@
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
+| **`bio_medicine/`** | 概念シミュレーション・アプリ群(非医療) — **`omega_glucogate_forge`**(形態形成場によるドーパミン作動性 糖取り込み薬剤の製造装置+血糖/GLUT4シミュレータ) · `omega_thermal_trace` · `omega_telepathy` · `omega_biofeedback` · `omega_telomere_forge` ほか | [→ 開く](bio_medicine/) |
 
 ---
 
