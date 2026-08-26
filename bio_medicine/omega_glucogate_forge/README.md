@@ -49,7 +49,22 @@
 | **単一 HTML（推奨）** ★ | [`www/index.html`](www/index.html) を「Download raw file」で保存 → ダブルクリックで起動。依存なし・オフライン可 |
 | **Python CLI** | [`glucogate_sim.py`](glucogate_sim.py) — 標準ライブラリのみ。`python3 glucogate_sim.py` |
 | **C（ネイティブ）** | [`glucogate.c`](glucogate.c) — `gcc -std=c99 -O2 -o glucogate glucogate.c -lm` |
-| **Windows / Ubuntu / Android** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-GlucoGate-Forge-*.exe` / `omega_glucogate_forge-debug.apk`（[`omega-apps-build.yml`](../../.github/workflows/omega-apps-build.yml) が `apps-v*` タグでビルド） |
+
+
+### 📱💻 ネイティブ アプリ（インストール型）
+
+ブラウザ不要のインストール型アプリを [Releases](https://github.com/masaaki-avnturle/Bada/releases) から入手できます:
+
+| プラットフォーム | ファイル | 起動方法 |
+|:---|:---|:---|
+| **Android** (APK) | `glucogate-forge-debug.apk` | 端末にコピーしてタップ（提供元不明のアプリのインストールを許可） |
+| **Windows 10 / 11** | `Omega-GlucoGate-Forge-1.0.0-x64.exe`(NSIS インストーラ)<br>`Omega-GlucoGate-Forge-1.0.0-x64.exe`(ポータブル) | ダブルクリック |
+| **Ubuntu** | `Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
+| **Ubuntu** (deb) | `Omega-GlucoGate-Forge-1.0.0-amd64.deb` | `sudo dpkg -i` または `sudo apt install ./...deb` |
+
+ビルドは [`glucogate-app-build.yml`](../../.github/workflows/glucogate-app-build.yml) が実行します
+(`glucogate-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+パッケージ前に **C / Python / 単一HTML の 3 実装が同じ結果を出すことを CI で検証**しています。
 
 ---
 

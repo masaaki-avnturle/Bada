@@ -1,0 +1,161 @@
+name: Ω-GlucoGate Forge app build (Windows EXE + Ubuntu + Android APK)
+
+# bio_medicine/omega_glucogate_forge (形態形成場 薬剤製造装置シミュレータ) を
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+#   - Android 向け APK
+# としてビルドし、Actions アーティファクト、および
+# (glucogate-v* タグ / release_tag 指定時) GitHub Release に添付します。
+#
+# ⚠ 概念シミュレーション・非医療。実在の医薬品を設計/製造/評価するものではありません。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: glucogate-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'glucogate-v*'
+
+permissions:
+  contents: write
+
+env:
+  APP: bio_medicine/omega_glucogate_forge
+
+jobs:
+  # 3 実装 (C / Python / 単一HTML) が同じモデルを解いていることを確認してからパッケージする
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build & run the native C forge
+        run: |
+          set -e
+          gcc -std=c99 -O2 -Wall -Wextra -o /tmp/glucogate "$APP/glucogate.c" -lm
+          /tmp/glucogate --days 5 --dose 4.8 | tee /tmp/c.out
+          grep -q "O-GG-2253-18AC" /tmp/c.out
+          grep -q "158.2" /tmp/c.out
+      - name: Run the Python CLI
+        run: |
+          set -e
+          python3 "$APP/glucogate_sim.py" --days 5 --dose 4.8 | tee /tmp/py.out
+          grep -q "Ω-GG-2253-18AC" /tmp/py.out
+          grep -q "158.2" /tmp/py.out
+      - name: Check the single-file app
+        run: |
+          set -e
+          test -f "$APP/www/index.html"
+          grep -q "Ω-GlucoGate Forge" "$APP/www/index.html"
+          grep -q "非医療" "$APP/www/index.html"
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: bio_medicine/omega_glucogate_forge/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glucogate-windows
+          path: bio_medicine/omega_glucogate_forge/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bio_medicine/omega_glucogate_forge/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bio_medicine/omega_glucogate_forge/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: glucogate-linux
+          path: |
+            bio_medicine/omega_glucogate_forge/electron/dist/*.AppImage
+            bio_medicine/omega_glucogate_forge/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bio_medicine/omega_glucogate_forge/electron/dist/*.AppImage
+            bio_medicine/omega_glucogate_forge/electron/dist/*.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          cordova create cordova-build io.github.masaaki_avnturle.omega_glucogate_forge GlucoGateForge
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/glucogate-forge-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: glucogate-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk

@@ -79,7 +79,17 @@
 | [`glucogate.c`](bio_medicine/omega_glucogate_forge/glucogate.c) | ネイティブ C 版。`gcc -std=c99 -O2 -o glucogate glucogate.c -lm` |
 | [`README.md`](bio_medicine/omega_glucogate_forge/README.md) | モデル(PK/PD・GLUT4 トランスロケーション)の詳細と検証結果 |
 
-ネイティブ アプリ (Windows EXE / Android APK) は [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `Omega-GlucoGate-Forge-*.exe` / `omega_glucogate_forge-debug.apk`([`omega-apps-build.yml`](.github/workflows/omega-apps-build.yml) が `apps-v*` タグでビルド)。
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `glucogate-forge-debug.apk` |
+| **Windows 10 / 11** | `Omega-GlucoGate-Forge-1.0.0-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage` / `Omega-GlucoGate-Forge-1.0.0-amd64.deb` |
+
+ビルドは [`glucogate-app-build.yml`](.github/workflows/glucogate-app-build.yml) が実行します(`glucogate-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bio_medicine/omega_glucogate_forge/`](bio_medicine/omega_glucogate_forge/) を参照。
 
 > ⚠ **概念シミュレーション・非医療**: 実在の医薬品を設計・製造・評価するものではなく、出力を医療判断に用いることはできません。治療に関することは必ず主治医にご相談ください。
 
