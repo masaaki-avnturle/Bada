@@ -42,6 +42,16 @@ jobs:
           grep -q "0.50000 0.50000" /tmp/quantum.out
           node cli/bada-cli.js build examples/core.bada -o /tmp/core
           /tmp/core | grep -q "compiled engine: V        = 8"
+          # reviser extension transactions (bada / c / python / java)
+          node cli/bada-cli.js run examples/extensions.bada | tee /tmp/ext.out
+          grep -q "c_hypot(3, 4)           : 5" /tmp/ext.out
+          grep -q "py_mean(Bell)           : 0.25000" /tmp/ext.out
+          grep -q "j_geo_mean(2, 8)        : 4" /tmp/ext.out
+          grep -q "sharpen(uniform)" /tmp/ext.out
+          # C extensions are inlined by the Bada->C compiler
+          printf '@reviser : extension c {\n fun c_hy |a, b| """\n return sqrt(a*a+b*b);\n """\n}\nprint(c_hy(5, 12))\n' > /tmp/cext.bada
+          node cli/bada-cli.js build /tmp/cext.bada -o /tmp/cext
+          /tmp/cext | grep -q "^13$"
 
   windows-exe:
     runs-on: windows-latest
@@ -133,6 +143,7 @@ jobs:
           ./dist-cli/bada-cli-linux-x64 build examples/core.bada -o /tmp/core
           /tmp/core | grep -q "compiled engine: V        = 8"
           ./dist-cli/bada-cli-linux-x64 examples all -o /tmp/ex && ls /tmp/ex
+          ./dist-cli/bada-cli-linux-x64 run examples/extensions.bada | grep -q "j_geo_mean(2, 8)        : 4"
           printf 'Measure(H(qubit(1)))\nexit\n' | ./dist-cli/bada-cli-linux-x64 repl | grep -q "0.50000, 0.50000"
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4

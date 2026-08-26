@@ -87,6 +87,15 @@ ipcMain.handle("bada:buildAndRun", (_ev, cSource) => {
   };
 });
 
+/* @reviser : extension (python / java / c) のホスト側 FFI。
+   CLI と同じブリッジ (cli/bada-ffi.js) を使う。 */
+const badaFfi = require(app.isPackaged
+  ? path.join(process.resourcesPath, "cli", "bada-ffi.js")
+  : path.join(__dirname, "..", "cli", "bada-ffi.js"));
+ipcMain.on("bada:ffiSync", (ev, lang, name, code, params, argv) => {
+  ev.returnValue = badaFfi.ffi(lang, name, code, params, argv);
+});
+
 ipcMain.handle("bada:saveFile", async (_ev, name, text) => {
   const win = BrowserWindow.getFocusedWindow();
   const r = await dialog.showSaveDialog(win, { defaultPath: name });

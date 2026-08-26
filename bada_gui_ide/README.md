@@ -46,6 +46,38 @@ C リファレンス (`bada` 実行ファイル: lexer / parser / interpreter / 
   `estimate()` `forbidden()` — 最大エントロピーから始まり、追記専用の測定
   記録で事前分布が単調に鋭くなります。
 
+## 🔌 @reviser : extension — Bada / C / Python / Java による機能拡張
+
+リバイザは文法だけでなく**実装**も拡張できます。拡張トランザクション
+
+```
+@reviser : extension <bada|c|python|java> {
+    fun 名前 |引数, ...| """コード"""
+}
+```
+
+は各拡張を追記専用レジャーへ `["extension", lang, name, params]` として
+コミットし、`名前(...)` を呼び出し可能にします (`examples/extensions.bada`):
+
+| 言語 | コード規約 | 実行 |
+|:---|:---|:---|
+| **bada** | コードは Bada ソース (`return` 可) — **自己拡張** | 全プラットフォーム |
+| **c** | `double 名前(double p1, …)` の**関数本体** (数値のみ) | インタープリタ: gcc でビルドして FFI 呼び出し / **コンパイラ: 生成 C にインライン**されネイティブ関数になる |
+| **python** | `ARGS` (JSON デコード済みリスト) を読み `RESULT` に代入 — リストも可 | CLI・デスクトップ IDE (要 python3) |
+| **java** | `static double run(double[] args)` の**本体** (数値のみ) | CLI・デスクトップ IDE (要 JDK) |
+
+- 引数は JSON でマーシャリング (`dist` / 量子レジスタは確率ベクトルとして渡る)
+- 複数行コードは **`"""` 三重引用符文字列** (エスケープ不要の raw ブロック)
+- C / Java はソースのハッシュでキャッシュされ再コンパイルされません
+- ブラウザ / APK では bada 拡張のみ動作し、他言語は明示メッセージで縮退
+
+```
+@reviser : extension c {
+    fun c_hypot |a, b| """ return sqrt(a*a + b*b); """
+}
+print(c_hypot(3, 4))          # => 5   (bada build なら生成Cにインライン)
+```
+
 ## zone:// — ウルトラネットワーク WWW (`examples/zone.bada`)
 
 `https:` / `http:` に代わる、未知のインターネット「ウルトラネットワーク」の
