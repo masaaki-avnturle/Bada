@@ -1,0 +1,465 @@
+# ============================================================
+# atom_critical.bada -- 原子の臨界期の強度 (ACPI) を Bada 言語で
+# 記述したリファレンス実装。
+#
+# 「臨界期」とは、強レーザー場のなかで原子のクーロン障壁が完全に
+# 抑制され (over-the-barrier)、束縛状態がもはや保護されない時間窓を
+# いう。原子単位系で障壁抑制場は
+#
+#     F_cr = I_p^2 / (4 Z_c)          [a.u.]
+#     I_cr = F_cr^2 * I_a,  I_a = 3.5094e16 W/cm^2
+#
+# 臨界期の「強度」はこの窓の内側での I(t) = |E(t)|^2 * I_a である。
+#
+# Ω 層 (山口フレームワーク) を重ねる:
+#     zeta       : ζ_n(x) = (x log x)^n           (20250330 / caostics)
+#     Γ-deprive  : D(x)   = e^{-x log x}          (⊕(iℏ∇)^⊕L)
+#     Dalanversian Λ = cos(i x log x) - i sin(i x log x) = e^{x log x}
+#     均衡余裕   : e^f + e^{-f} - (e^f - e^{-f}) = 2 e^{-f}
+#                  -> 臨界期でゼロに潰れる = 重力/反重力均衡の喪失
+#     Euler 極均衡: x^n + y^n - n x y z = 0
+#     Kauffman   : <D>(A) = Σ_states A^{a-b} d^{loops-1}
+#     臨界強度指数: E(σ) = K(σ) × H(σ) / (4 (π_n, e_n))
+#                  ("QuantumComputerinacertaintheorem" の E(σ)=K(σ)×H(σ)/4(π_n,e_n))
+#
+# 実行:  node cli/bada-cli.js run examples/atom_critical.bada
+# 同一モデルの GUI 版:  dist/atom-critical.html
+# ============================================================
+
+print("================================================================")
+print("ATOM CRITICAL BADA -- 原子の臨界期の強度 (ACPI)")
+print("================================================================")
+
+# ---- grammar transaction: 臨界期の動詞を文法へ commit ---------------
+@reviser : grammar {
+    rule "critical-scan" stmt [ 'CRIT' expr expr ] => crit_scan(_1, _2)
+    rule "omega-index"   stmt [ 'ESIG' expr ]      => omega_index(_1)
+}
+print("critical verbs committed to the grammar ledger:", len(tuplespace), "facts")
+
+# ====================================================================
+# 定数 (CODATA 2018, 原子単位系)
+# ====================================================================
+E_HARTREE := 27.211386245988      # eV / hartree
+I_AU      := 3.5094452e16         # W/cm^2  (原子単位の強度)
+FS_AU     := 41.341374575751      # 1 fs = 41.3414 a.u. of time
+HC_EVNM   := 1239.841984          # eV*nm
+PI        := 3.14159265358979
+
+# ====================================================================
+# 数学プリミティブ (Bada 側で実装 -- 組込みは exp/log/sqrt/abs のみ)
+# ====================================================================
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+
+# 実数冪 x^y = exp(y log x)   (x > 0)
+def fpow(x, y) {
+    if (x <= 0.0) { return 0.0 }
+    return exp(y * log(x))
+}
+
+# cos(x) -- [-pi, pi] へ還元してから Taylor 展開
+def bcos(x) {
+    t := x
+    while (t > PI)       { t := t - 2.0 * PI }
+    while (t < 0.0 - PI) { t := t + 2.0 * PI }
+    term := 1.0
+    sum := 1.0
+    k := 1
+    while (k <= 12) {
+        term := 0.0 - term * t * t / ((2.0 * k - 1.0) * (2.0 * k))
+        sum := sum + term
+        k := k + 1
+    }
+    return sum
+}
+
+def cosh_b(u) { return 0.5 * (exp(u) + exp(0.0 - u)) }
+
+# ====================================================================
+# Ω 層の作用素
+# ====================================================================
+def xlogx(x) {
+    if (x <= 0.0) { return 0.0 }
+    return x * log(x)
+}
+def zeta_n(x, n)   { return fpow(xlogx(x), n) }        # ζ_n = (x log x)^n
+def gamma_dep(x)   { return exp(0.0 - xlogx(x)) }      # e^{-x log x}
+def dalanversian(x){ return exp(xlogx(x)) }            # Λ = e^{x log x}
+def antigravity(x) { return 2.0 * cosh_b(xlogx(x)) }   # Λ^- = 2 cosh(x log x)
+def balance_margin(x) { return 2.0 * exp(0.0 - xlogx(x)) }
+def euler_residual(x, y, z, n) {
+    return fpow(x, n) + fpow(y, n) - n * x * y * z
+}
+
+# ---- Kauffman ブラケット状態和 (zone.bada / omega_jones_crypto と同一) ----
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+# 交差は [e0, e1, e2, e3] (反時計回り)。A 平滑化 = e0-e1, e2-e3。
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 0
+        while (k <= 3) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0.0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    st := 0
+    while (st < states) {
+        # 状態 st の各ビットを取り出す
+        bits := []
+        v := st
+        i := 0
+        while (i < n) { bits <- (v % 2); v := (v - (v % 2)) / 2; i := i + 1 }
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][0]
+            e1 := cross[i][1]
+            e2 := cross[i][2]
+            e3 := cross[i][3]
+            if (bits[i] == 0) {
+                ra := uf_find(parent, e0); rb := uf_find(parent, e1)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e2); rb := uf_find(parent, e3)
+                if (ra != rb) { parent[ra] = rb }
+                a_cnt := a_cnt + 1
+            } else {
+                ra := uf_find(parent, e1); rb := uf_find(parent, e2)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e3); rb := uf_find(parent, e0)
+                if (ra != rb) { parent[ra] = rb }
+                b_cnt := b_cnt + 1
+            }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r := uf_find(parent, lbl)
+            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        sum := sum + ipow(A, a_cnt - b_cnt) * ipow(d, loops - 1)
+        st := st + 1
+    }
+    return sum
+}
+
+# 臨界サブ窓 c 個 -> 閉 2-ブレイド ((2,c) トーラス絡み目) 図式
+def braid(c) {
+    cross := []
+    i := 0
+    while (i < c) {
+        j := (i + 1) % c
+        cross <- [i, c + i, c + j, j]
+        i := i + 1
+    }
+    return cross
+}
+
+# π と e の n 次近似 -- E(σ) の分母 4(π_n, e_n)
+def pi_n(n) {
+    s := 0.0
+    k := 0
+    while (k <= n) {
+        if (k % 2 == 0) { s := s + 1.0 / (2.0 * k + 1.0) }
+        else            { s := s - 1.0 / (2.0 * k + 1.0) }
+        k := k + 1
+    }
+    return 4.0 * s
+}
+def e_n(n) {
+    s := 0.0
+    f := 1.0
+    k := 0
+    while (k <= n) {
+        if (k > 0) { f := f * k }
+        s := s + 1.0 / f
+        k := k + 1
+    }
+    return s
+}
+def shannon_of(ps) {
+    H := 0.0
+    i := 0
+    while (i < len(ps)) {
+        p := ps[i]
+        if (p > 0.000000000001) { H := H - p * log(p) }
+        i := i + 1
+    }
+    return H
+}
+
+# ====================================================================
+# 物理層: 障壁抑制場と ADK トンネル電離率
+# ====================================================================
+# 障壁抑制場  F_cr = I_p^2 / (4 Z_c)   [a.u.]
+def critical_field(Ip_au, Zc) { return Ip_au * Ip_au / (4.0 * Zc) }
+
+# Γ(z) -- Lanczos 近似 (ADK の規格化係数 |C_{n*}|^2 に必要)
+def gamma_fn(z) {
+    g := [676.5203681218851, 0.0 - 1259.1392167224028, 771.32342877765313,
+          0.0 - 176.61502916214059, 12.507343278686905, 0.0 - 0.13857109526572012,
+          0.0000099843695780195716, 0.00000015056327351493116]
+    w := z - 1.0
+    x := 0.99999999999980993
+    i := 0
+    while (i < 8) { x := x + g[i] / (w + i + 1.0); i := i + 1 }
+    t := w + 7.5
+    return sqrt(2.0 * PI) * fpow(t, w + 0.5) * exp(0.0 - t) * x
+}
+
+# ADK: n* = Z_c/κ,  κ = sqrt(2 I_p),  |C_{n*}|^2 = 2^{2n*} / (n* Γ(2n*))
+# w(F) = |C|^2 (2l+1) I_p (2κ^3/F)^{2n*-1} exp(-2κ^3/(3F))
+# 水素 (n*=1) では厳密解 w = (4/F) e^{-2/(3F)} に一致する。
+def adk_rate(F, Ip_au, Zc, l) {
+    if (F < 0.000000000001) { return 0.0 }
+    kappa := sqrt(2.0 * Ip_au)
+    nstar := Zc / kappa
+    C2 := fpow(2.0, 2.0 * nstar) / (nstar * gamma_fn(2.0 * nstar))
+    k3 := kappa * kappa * kappa
+    arg := 2.0 * k3 / F
+    return C2 * (2 * l + 1) * Ip_au * fpow(arg, 2.0 * nstar - 1.0) * exp(0.0 - arg / 3.0)
+}
+
+# ====================================================================
+# 臨界期のスキャン
+# ====================================================================
+# 元素データ: [記号, I_p(eV), l]
+ELEMENTS := [["H", 13.5984, 0], ["He", 24.5874, 0], ["Ne", 21.5645, 1],
+             ["Ar", 15.7596, 1], ["Kr", 13.9996, 1], ["Xe", 12.1298, 1]]
+
+ZC       := 1                 # 残留イオン電荷
+LAMBDA   := 800.0             # nm
+I0       := 600000000000000.0 # 6.0e14 W/cm^2 (ピーク強度)
+FWHM     := 8.0               # fs
+NSTEP    := 2400              # 時間ステップ
+ZORDER   := 3                 # ζ / Euler の次数 n
+KAUFF_A  := 1.0699            # Kauffman ループ変数
+MAXCROSS := 8                 # 状態和は 2^8 = 256 状態まで
+
+def crit_scan(sym_ip_l, I0) {
+    sym := sym_ip_l[0]
+    Ip_ev := sym_ip_l[1]
+    l := sym_ip_l[2]
+
+    Ip := Ip_ev / E_HARTREE
+    Fcr := critical_field(Ip, ZC)
+    Icr := Fcr * Fcr * I_AU
+    E0 := sqrt(I0 / I_AU)
+    omega := HC_EVNM / (LAMBDA * E_HARTREE)     # 角振動数 [a.u.]
+    tau := FWHM * FS_AU
+    T := 2.2 * tau
+    dt := 2.0 * T / (NSTEP - 1)
+
+    print("")
+    print("---- " + sym + " ------------------------------------------------")
+    print("  I_p      :", f5(Ip_ev), "eV  =", f5(Ip), "a.u.")
+    print("  F_cr     :", sci(Fcr), "a.u.   ->  I_cr =", sci(Icr), "W/cm^2")
+    print("  I_0      :", sci(I0), "W/cm^2   I_0/I_cr =", f5(I0 / Icr))
+
+    # --- 時間発展 -----------------------------------------------------
+    P := 1.0
+    t0_list := []
+    t1_list := []
+    ipk_list := []
+    isum_list := []
+    icnt_list := []
+    sign_list := []
+    inwin := 0
+    xmax := 0.0
+    margin_min := 2.0
+    zeros := 0
+    prev_res := 0.0
+    ipeak := 0.0
+    isum := 0.0
+    icnt := 0
+    tcur := 0.0
+    i := 0
+    while (i < NSTEP) {
+        tt := (0.0 - T) + i * dt
+        u := tt / tau
+        env := exp(0.0 - 2.0 * 0.6931471805599453 * u * u)   # ガウシアン振幅包絡
+        f := E0 * env * bcos(omega * tt)
+        af := f
+        if (af < 0.0) { af := 0.0 - af }
+        w := adk_rate(af, Ip, ZC, l)
+        cap := 2.0 * Ip
+        if (w > cap) { w := cap }
+
+        x := af / Fcr
+        if (x > xmax) { xmax := x }
+        m := balance_margin(x)
+        if (m < margin_min) { margin_min := m }
+        res := euler_residual(x, P, 1.0, ZORDER)
+        if (i > 0) {
+            if (res * prev_res < 0.0) { zeros := zeros + 1 }
+        }
+        prev_res := res
+
+        iinst := af * af * I_AU
+        if (x >= 1.0) {
+            if (inwin == 0) {
+                inwin := 1
+                t0_list <- (tt / FS_AU)
+                ipeak := 0.0
+                isum := 0.0
+                icnt := 0
+                if (f >= 0.0) { sign_list <- 1 } else { sign_list <- (0 - 1) }
+            }
+            if (iinst > ipeak) { ipeak := iinst }
+            isum := isum + iinst
+            icnt := icnt + 1
+        } else {
+            if (inwin == 1) {
+                inwin := 0
+                t1_list <- (tt / FS_AU)
+                ipk_list <- ipeak
+                isum_list <- isum
+                icnt_list <- icnt
+            }
+        }
+        P := P * exp(0.0 - w * dt)
+        i := i + 1
+    }
+    if (inwin == 1) {
+        t1_list <- (T / FS_AU)
+        ipk_list <- ipeak
+        isum_list <- isum
+        icnt_list <- icnt
+    }
+
+    nwin := len(t0_list)
+    if (nwin == 0) {
+        print("  臨界期   : なし -- 場が F_cr に達しません (I_0 < I_cr)")
+        print("  電離確率 :", f5((1.0 - P) * 100.0), "%")
+        return [0, 0.0, 0.0, 0.0]
+    }
+
+    tstart := t0_list[0]
+    tend := t1_list[nwin - 1]
+    dur := tend - tstart
+    on := 0.0
+    gpeak := 0.0
+    gsum := 0.0
+    gcnt := 0
+    k := 0
+    while (k < nwin) {
+        on := on + (t1_list[k] - t0_list[k])
+        if (ipk_list[k] > gpeak) { gpeak := ipk_list[k] }
+        gsum := gsum + isum_list[k]
+        gcnt := gcnt + icnt_list[k]
+        k := k + 1
+    }
+    imean := gsum / gcnt
+
+    print("  臨界期   : t =", f5(tstart), "fs ...", f5(tend), "fs")
+    print("  全長     :", f5(dur), "fs  (", f5(dur * 1000.0), "as )")
+    print("  サブ窓   :", nwin, "個   合計 ON =", f5(on), "fs   デューティ比",
+          f5(on / dur * 100.0), "%")
+    print("  臨界強度 : ピーク", sci(gpeak), "  平均", sci(imean), "W/cm^2")
+    print("  超臨界度 : I_peak/I_cr =", f5(gpeak / Icr))
+    print("  電離確率 :", f5((1.0 - P) * 100.0), "%")
+
+    # --- Ω 層の集計 ---------------------------------------------------
+    c := nwin
+    if (c > MAXCROSS) { c := MAXCROSS }
+    writhe := 0
+    k := 0
+    while (k < c) { writhe := writhe + sign_list[k]; k := k + 1 }
+    K := kauffman(braid(c), KAUFF_A)
+
+    # H(σ): 臨界窓のフルーエンス分布 + 束縛/電離の二値エントロピー
+    shares := []
+    tot := 0.0
+    k := 0
+    while (k < nwin) { tot := tot + isum_list[k]; k := k + 1 }
+    k := 0
+    while (k < nwin) { shares <- (isum_list[k] / tot); k := k + 1 }
+    Hw := shannon_of(shares)
+    Hion := shannon_of([P, 1.0 - P])
+    Hsig := Hw + Hion
+
+    pn := pi_n(c)
+    en := e_n(c)
+    Esig := K * Hsig / (4.0 * pn * en)
+
+    print("  Ω 層     : x_max =", f5(xmax), "  均衡余裕 min =", sci(margin_min),
+          "  Euler 零交差", zeros, "回")
+    print("           : ζ_n(x_max) =", sci(zeta_n(xmax, ZORDER)),
+          "  Γ-deprivation =", sci(gamma_dep(xmax)),
+          "  Λ =", sci(dalanversian(xmax)))
+    print("           : Kauffman <D>(A=" + f5(KAUFF_A) + ") =", sci(K),
+          "  writhe =", writhe, "  H(σ) =", f5(Hsig))
+    print("           : E(σ) = K(σ)·H(σ)/(4 π_n e_n) =", sci(Esig))
+    return [nwin, dur, gpeak, Esig]
+}
+
+def omega_index(r) { return r[3] }
+
+# ====================================================================
+# 実行 -- 各元素の臨界期をスキャンし、tuplespace に commit する
+# ====================================================================
+print("")
+print("駆動場: λ =", f5(LAMBDA), "nm   I_0 =", sci(I0), "W/cm^2   FWHM =", f5(FWHM), "fs")
+print("臨界期の定義: |E(t)| >= F_cr = I_p^2/(4 Z_c)  (障壁抑制 / over-the-barrier)")
+
+results := []
+i := 0
+while (i < len(ELEMENTS)) {
+    r := crit_scan(ELEMENTS[i], I0)
+    results <- r
+    i := i + 1
+}
+
+print("")
+print("================================================================")
+print("要約 -- 臨界期の長さと強度")
+print("================================================================")
+i := 0
+while (i < len(ELEMENTS)) {
+    r := results[i]
+    if (r[0] == 0) {
+        print(ELEMENTS[i][0], ": 臨界期なし (亜臨界)")
+    } else {
+        print(ELEMENTS[i][0], ": 臨界期", f5(r[1]), "fs /", r[0], "窓 / ピーク",
+              sci(r[2]), "W/cm^2 / E(σ) =", sci(r[3]))
+    }
+    i := i + 1
+}
+print("")
+print("ledger =", len(tuplespace), "facts")
+print("================================================================")

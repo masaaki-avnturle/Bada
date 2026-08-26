@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>ACPI — 原子の臨界期の強度シミュレータ (Bada / Ω)</title>
+<style>
+  :root { color-scheme: dark; --bg:#04060a; --panel:#0a1220; --panel2:#070c15; --line:#1c2838;
+          --ink:#d6e2ee; --dim:#8aa0b8; --gold:#c8a44a; --green:#2e9e57; --red:#d0574a;
+          --blue:#4a80d0; --violet:#9060d0; --cyan:#40b8c0; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+         font-family: system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; font-size:13px; }
+  code,.mono { font-family:"SFMono-Regular",Consolas,"DejaVu Sans Mono",monospace; }
+
+  header { display:flex; align-items:center; gap:12px; padding:9px 14px;
+           background:linear-gradient(180deg,#0a1220,#070c15); border-bottom:1px solid var(--line); }
+  header .o { color:var(--gold); font-size:19px; font-weight:700; letter-spacing:.02em; }
+  header .sub { color:var(--dim); font-size:12px; }
+  header .sp { flex:1; }
+  header .tag { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:2px 9px; }
+
+  main { display:grid; grid-template-columns:290px 1fr 310px; height:calc(100% - 45px); }
+  #side { border-right:1px solid var(--line); padding:12px; overflow:auto; background:var(--panel2); }
+  #view { overflow:auto; padding:12px 14px; }
+  #out  { border-left:1px solid var(--line); padding:12px; overflow:auto; background:var(--panel2); }
+  @media (max-width:1180px){ main{ grid-template-columns:1fr; height:auto; } body{ overflow:auto; } #side,#out{ border:0; border-bottom:1px solid var(--line); } }
+
+  h3 { margin:0 0 9px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  h3:not(:first-child) { margin-top:18px; }
+  label { display:block; margin:9px 0 3px; color:var(--dim); font-size:11.5px; }
+  select,input[type=number],input[type=text] { width:100%; background:#020407; color:var(--ink);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12.5px; }
+  input[type=range] { width:100%; accent-color:var(--gold); margin:4px 0 0; }
+  .row { display:flex; gap:8px; }  .row > * { flex:1; }
+  .val { float:right; color:var(--gold); font-family:"SFMono-Regular",Consolas,monospace; }
+  button { border:0; border-radius:7px; padding:8px 10px; cursor:pointer; font-weight:600; font-size:12.5px;
+           background:#132033; color:var(--ink); border:1px solid var(--line); }
+  button:hover { filter:brightness(1.25); }
+  button.go { background:var(--green); color:#eafff0; border-color:#1d6b3b; }
+  button.alt { background:#16223a; }
+  .btns { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:14px; }
+  .btns .wide { grid-column:1/-1; }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .card > .cap { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .card .cap b { font-size:12.5px; font-weight:600; }
+  .card .cap span { color:var(--dim); font-size:11px; }
+  canvas { display:block; width:100%; border-radius:6px; background:#02040a; }
+
+  .kv { display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px dashed #16222f; }
+  .kv b { color:var(--dim); font-weight:500; font-size:11.5px; }
+  .kv span { text-align:right; font-family:"SFMono-Regular",Consolas,monospace; font-size:11.5px; word-break:break-all; }
+  .kv span.hi { color:var(--gold); }
+  .kv span.ok { color:#7ce0a3; } .kv span.bad { color:#f2a49b; }
+
+  table { width:100%; border-collapse:collapse; font-size:11.5px; font-family:"SFMono-Regular",Consolas,monospace; }
+  th,td { text-align:right; padding:3px 6px; border-bottom:1px solid #14202e; }
+  th { color:var(--dim); font-weight:500; text-align:right; }
+  th:first-child,td:first-child { text-align:left; }
+  .scroll { max-height:190px; overflow:auto; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--dim); margin-top:6px; }
+  .legend i { display:inline-block; width:11px; height:3px; border-radius:2px; vertical-align:middle; margin-right:4px; }
+  .note { color:var(--dim); font-size:11px; line-height:1.6; margin-top:8px; }
+  .banner { border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; }
+  .banner.crit { background:#2a1a08; border:1px solid #6b4a12; color:#f0cd83; }
+  .banner.sub  { background:#0d1a2a; border:1px solid #234058; color:#9dc0e0; }
+  details summary { color:var(--dim); cursor:pointer; font-size:11.5px; }
+  details pre { background:#02040a; border:1px solid var(--line); border-radius:7px; padding:9px;
+                font-size:10.5px; line-height:1.5; overflow:auto; max-height:280px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <span class="o">Ω</span>
+  <div>
+    <div><b>ACPI</b> — 原子の臨界期の強度シミュレータ</div>
+    <div class="sub">Atomic Critical-Period Intensity · 障壁抑制場 + ADK 電離 + Ω 作用素層 (β/ζ/Γ-deprivation/Kauffman)</div>
+  </div>
+  <span class="sp"></span>
+  <span class="tag mono" id="ver">v–</span>
+  <span class="tag">単一 HTML · 依存なし · オフライン可</span>
+</header>
+
+<main>
+<!-- ============================ 入力 ============================ -->
+<section id="side">
+  <h3>原子</h3>
+  <label>元素</label>
+  <select id="element"></select>
+  <div class="row">
+    <div><label>電離段数</label><select id="stage"></select></div>
+    <div><label>残留電荷 Z<sub>c</sub></label><input type="number" id="charge" min="1" max="20" step="1" value="1"/></div>
+  </div>
+
+  <h3>駆動レーザー場</h3>
+  <label>波長 λ <span class="val" id="lamV">800 nm</span></label>
+  <input type="range" id="lambda" min="200" max="4000" step="10" value="800"/>
+  <label>ピーク強度 I₀ <span class="val" id="i0V">–</span></label>
+  <input type="range" id="i0" min="11" max="18" step="0.02" value="14.78"/>
+  <label>パルス幅 FWHM <span class="val" id="fwhmV">8 fs</span></label>
+  <input type="range" id="fwhm" min="0.5" max="60" step="0.5" value="8"/>
+  <label>キャリアエンベロープ位相 φ <span class="val" id="cepV">0.00 rad</span></label>
+  <input type="range" id="cep" min="0" max="6.2832" step="0.0628" value="0"/>
+  <label>パルス形状</label>
+  <select id="shape">
+    <option value="gaussian">ガウシアン</option>
+    <option value="sech2">sech²</option>
+    <option value="flattop">フラットトップ</option>
+  </select>
+
+  <h3>Ω 作用素層</h3>
+  <label>ζ / Euler 次数 n <span class="val" id="zoV">3</span></label>
+  <input type="range" id="zorder" min="2" max="6" step="1" value="3"/>
+  <label>Kauffman ループ変数 A <span class="val" id="kaV">1.0699</span></label>
+  <input type="range" id="ka" min="0.5" max="1.8" step="0.0001" value="1.0699"/>
+
+  <h3>数値</h3>
+  <label>時間ステップ数 <span class="val" id="stepsV">8000</span></label>
+  <input type="range" id="steps" min="1000" max="40000" step="500" value="8000"/>
+
+  <div class="btns">
+    <button class="go wide" id="run">▶ シミュレーション実行</button>
+    <button class="alt wide" id="sweepBtn">📈 強度スイープ (I₀ 掃引)</button>
+    <button id="csv">⬇ CSV</button>
+    <button id="json">⬇ JSON</button>
+    <button class="wide" id="png">🖼 PNG (全図)</button>
+  </div>
+  <div class="note">
+    臨界期 = 場の瞬時強度が<b>障壁抑制強度</b> I<sub>cr</sub> = (I<sub>p</sub>²/4Z<sub>c</sub>)² · I<sub>a</sub>
+    を超え、クーロン障壁が完全に消える時間窓。原子単位系 I<sub>a</sub> = 3.5094×10¹⁶ W/cm²。
+  </div>
+</section>
+
+<!-- ============================ 図 ============================ -->
+<section id="view">
+  <div id="banner"></div>
+
+  <div class="card">
+    <div class="cap"><b>① 場の強度と臨界期</b><span id="cap1">–</span></div>
+    <canvas id="c1" height="230"></canvas>
+    <div class="legend">
+      <span><i style="background:#c8a44a"></i>I(t) 瞬時強度</span>
+      <span><i style="background:#4a80d0"></i>E(t) 電場</span>
+      <span><i style="background:#d0574a"></i>I_cr 臨界強度</span>
+      <span><i style="background:#5a3a10"></i>臨界期の窓</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>② 束縛占有率と ADK 電離率</b><span id="cap2">–</span></div>
+    <canvas id="c2" height="200"></canvas>
+    <div class="legend">
+      <span><i style="background:#2e9e57"></i>P_bound(t)</span>
+      <span><i style="background:#9060d0"></i>W_ADK(t) [log]</span>
+      <span><i style="background:#5a3a10"></i>臨界期の窓</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>③ Ω 作用素層 — 超臨界度・均衡余裕・ζ<sub>n</sub></b><span id="cap3">–</span></div>
+    <canvas id="c3" height="200"></canvas>
+    <div class="legend">
+      <span><i style="background:#40b8c0"></i>x = |E|/F_cr</span>
+      <span><i style="background:#c8a44a"></i>均衡余裕 2e^{−x log x}</span>
+      <span><i style="background:#9060d0"></i>ζ_n = (x log x)^n</span>
+      <span><i style="background:#d0574a"></i>Euler 残差 x^n+y^n−nxyz</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>④ 強度スイープ — I₀ に対する臨界期の応答</b><span id="cap4">「強度スイープ」を押してください</span></div>
+    <canvas id="c4" height="200"></canvas>
+    <div class="legend">
+      <span><i style="background:#c8a44a"></i>臨界期の長さ [fs]</span>
+      <span><i style="background:#2e9e57"></i>電離確率</span>
+      <span><i style="background:#40b8c0"></i>E(σ) 臨界強度指数</span>
+      <span><i style="background:#d0574a"></i>I_cr</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>⑤ 臨界サブ窓 (半サイクルごと)</b><span id="cap5">–</span></div>
+    <div class="scroll">
+      <table id="wtab"><thead><tr>
+        <th>#</th><th>t₀ [fs]</th><th>t₁ [fs]</th><th>幅 [as]</th><th>I_peak [W/cm²]</th><th>I_mean [W/cm²]</th><th>符号</th>
+      </tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 出力 ============================ -->
+<section id="out">
+  <h3>臨界期 (critical period)</h3>
+  <div id="kCrit"></div>
+  <h3>臨界スケール</h3>
+  <div id="kScale"></div>
+  <h3>Ω 層 — 山口フレームワーク</h3>
+  <div id="kOmega"></div>
+  <h3>原子 / ADK パラメータ</h3>
+  <div id="kAtom"></div>
+  <h3>テキスト要約</h3>
+  <details open><summary>summary()</summary><pre id="sum" class="mono"></pre></details>
+  <div class="note">
+    Ω 層は山口フレームワーク (Bada / omega_llm) の作用素層です:
+    ζ(s)=β(p,q)/log x · ζ<sub>n</sub>=(x log x)<sup>n</sup> ·
+    Γ-deprivation e<sup>−x log x</sup> · Dalanversian Λ=cos(ix log x)−i sin(ix log x) ·
+    Euler 極均衡 x<sup>n</sup>+y<sup>n</sup>−nxyz=0 · Kauffman ⟨D⟩(A) ·
+    E(σ)=K(σ)×H(σ)/4(π<sub>n</sub>,e<sub>n</sub>)。
+  </div>
+</section>
+</main>
+
+<script>
+/*<<ATOM_CRITICAL_CORE>>*/
+</script>
+<script>
+"use strict";
+(function () {
+  var AC = window.AtomCritical;
+  var $ = function (id) { return document.getElementById(id); };
+  $("ver").textContent = "v" + AC.VERSION;
+
+  /* ---------------- 入力 ---------------- */
+  var elSel = $("element"), stSel = $("stage");
+  AC.ELEMENTS.forEach(function (e) {
+    var o = document.createElement("option");
+    o.value = e.sym; o.textContent = e.sym + " — " + e.name + " (Z=" + e.Z + ")";
+    elSel.appendChild(o);
+  });
+  elSel.value = "Ar";
+
+  function fillStages() {
+    var e = AC.element(elSel.value);
+    stSel.innerHTML = "";
+    e.Ip.forEach(function (ip, i) {
+      var o = document.createElement("option");
+      o.value = String(i + 1);
+      o.textContent = "第 " + (i + 1) + " 電離 — I_p = " + ip.toFixed(4) + " eV";
+      stSel.appendChild(o);
+    });
+    stSel.value = "1"; $("charge").value = "1";
+  }
+  fillStages();
+
+  function sci(v, d) {
+    if (v === null || v === undefined || !isFinite(v)) return "–";
+    var s = Number(v).toExponential(d === undefined ? 3 : d);
+    return s.replace(/e([+-])(\d+)/, "×10<sup>$1$2</sup>").replace("+", "");
+  }
+  function sciTxt(v, d) { return isFinite(v) ? Number(v).toExponential(d === undefined ? 3 : d) : "–"; }
+
+  function params() {
+    return {
+      element: elSel.value,
+      stage: parseInt(stSel.value, 10),
+      charge: parseInt($("charge").value, 10) || 1,
+      lambdaNm: +$("lambda").value,
+      intensity: Math.pow(10, +$("i0").value),
+      fwhmFs: +$("fwhm").value,
+      cep: +$("cep").value,
+      shape: $("shape").value,
+      zetaOrder: +$("zorder").value,
+      kauffmanA: +$("ka").value,
+      steps: +$("steps").value
+    };
+  }
+  function syncLabels() {
+    $("lamV").textContent = $("lambda").value + " nm";
+    $("i0V").innerHTML = sci(Math.pow(10, +$("i0").value), 2) + " W/cm²";
+    $("fwhmV").textContent = (+$("fwhm").value).toFixed(1) + " fs";
+    $("cepV").textContent = (+$("cep").value).toFixed(2) + " rad";
+    $("zoV").textContent = $("zorder").value;
+    $("kaV").textContent = (+$("ka").value).toFixed(4);
+    $("stepsV").textContent = $("steps").value;
+  }
+
+  /* ---------------- 描画ヘルパ ---------------- */
+  function setup(cv) {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || 700, h = +cv.getAttribute("height");
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.height = h + "px";
+    var g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    return { g: g, w: w, h: h };
+  }
+  function Plot(cv, xmin, xmax, pad) {
+    var s = setup(cv);
+    pad = pad || { l: 54, r: 54, t: 12, b: 24 };
+    var P = {
+      g: s.g, w: s.w, h: s.h, pad: pad, xmin: xmin, xmax: xmax,
+      X: function (x) { return pad.l + (x - xmin) / (xmax - xmin || 1) * (s.w - pad.l - pad.r); },
+      iw: s.w - pad.l - pad.r, ih: s.h - pad.t - pad.b
+    };
+    P.frame = function (xlabel) {
+      var g = P.g;
+      g.strokeStyle = "#16222f"; g.lineWidth = 1;
+      g.strokeRect(pad.l + .5, pad.t + .5, P.iw, P.ih);
+      g.fillStyle = "#7b8ea3"; g.font = "10px monospace"; g.textAlign = "center";
+      for (var k = 0; k <= 4; k++) {
+        var xv = xmin + (xmax - xmin) * k / 4, px = P.X(xv);
+        g.strokeStyle = "#0f1a26"; g.beginPath(); g.moveTo(px, pad.t); g.lineTo(px, pad.t + P.ih); g.stroke();
+        g.fillText(P.fmtX ? P.fmtX(xv) : xv.toFixed(2), px, s.h - 8);
+      }
+      if (xlabel) { g.textAlign = "right"; g.fillText(xlabel, s.w - pad.r, pad.t - 2); }
+    };
+    P.axisY = function (side, lo, hi, color, label, logscale) {
+      var g = P.g, x = side === "L" ? pad.l : pad.l + P.iw;
+      g.fillStyle = color; g.font = "10px monospace";
+      g.textAlign = side === "L" ? "right" : "left";
+      for (var k = 0; k <= 4; k++) {
+        var v = lo + (hi - lo) * k / 4;
+        var py = pad.t + P.ih - (k / 4) * P.ih;
+        var lab = logscale ? "1e" + Math.round(v) : (Math.abs(v) >= 1e4 || (Math.abs(v) < 1e-2 && v !== 0)
+                  ? v.toExponential(1) : v.toFixed(Math.abs(hi - lo) < 3 ? 2 : 1));
+        g.fillText(lab, side === "L" ? x - 5 : x + 5, py + 3);
+        if (side === "L") { g.strokeStyle = "#0f1a26"; g.beginPath(); g.moveTo(pad.l, py); g.lineTo(pad.l + P.iw, py); g.stroke(); }
+      }
+      if (label) {
+        g.save(); g.translate(side === "L" ? 11 : s.w - 11, pad.t + P.ih / 2);
+        g.rotate(side === "L" ? -Math.PI / 2 : Math.PI / 2);
+        g.textAlign = "center"; g.fillText(label, 0, 0); g.restore();
+      }
+      return function (v) { return pad.t + P.ih - (v - lo) / ((hi - lo) || 1) * P.ih; };
+    };
+    P.line = function (xs, ys, Y, color, width, dash) {
+      var g = P.g; g.save(); g.beginPath();
+      g.rect(pad.l, pad.t, P.iw, P.ih); g.clip();
+      g.strokeStyle = color; g.lineWidth = width || 1.3;
+      if (dash) g.setLineDash(dash);
+      g.beginPath();
+      var started = false;
+      for (var i = 0; i < xs.length; i++) {
+        var v = ys[i];
+        if (!isFinite(v)) { started = false; continue; }
+        var px = P.X(xs[i]), py = Y(v);
+        if (!started) { g.moveTo(px, py); started = true; } else g.lineTo(px, py);
+      }
+      g.stroke(); g.restore();
+    };
+    P.band = function (x0, x1, color) {
+      var g = P.g, a = P.X(x0), b = P.X(x1);
+      if (b - a < 0.7) b = a + 0.7;
+      g.fillStyle = color; g.fillRect(a, pad.t + 1, b - a, P.ih - 1);
+    };
+    P.hline = function (Y, v, color, label) {
+      var g = P.g, py = Y(v);
+      if (py < pad.t || py > pad.t + P.ih) return;
+      g.strokeStyle = color; g.lineWidth = 1; g.setLineDash([5, 4]);
+      g.beginPath(); g.moveTo(pad.l, py); g.lineTo(pad.l + P.iw, py); g.stroke(); g.setLineDash([]);
+      if (label) { g.fillStyle = color; g.font = "10px monospace"; g.textAlign = "left"; g.fillText(label, pad.l + 5, py - 3); }
+    };
+    return P;
+  }
+  function extent(arr) {
+    var lo = Infinity, hi = -Infinity;
+    for (var i = 0; i < arr.length; i++) { var v = arr[i]; if (!isFinite(v)) continue; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    if (hi === lo) hi = lo + 1;
+    return [lo, hi];
+  }
+  function bands(P, res) {
+    res.critical.windows.forEach(function (w) { P.band(w.t0, w.t1, "rgba(200,164,74,0.13)"); });
+  }
+
+  /* ---------------- 各図 ---------------- */
+  var LAST = null, LASTSWEEP = null;
+
+  function draw1(res) {
+    var s = res.series, t = s.t;
+    var P = Plot($("c1"), t[0], t[t.length - 1]);
+    P.fmtX = function (v) { return v.toFixed(1); };
+    P.frame("t [fs]");
+    bands(P, res);
+    var imax = Math.max(res.params.intensity, res.scales.Icr) * 1.12;
+    var Yi = P.axisY("L", 0, imax, "#c8a44a", "I(t) [W/cm²]");
+    var emax = res.scales.E0AU * 1.15;
+    var Ye = P.axisY("R", -emax, emax, "#4a80d0", "E(t) [a.u.]");
+    P.line(t, s.E, Ye, "#4a80d0", 1.0);
+    P.line(t, s.I, Yi, "#c8a44a", 1.4);
+    P.hline(Yi, res.scales.Icr, "#d0574a", "I_cr = " + sciTxt(res.scales.Icr, 3) + " W/cm²");
+    $("cap1").textContent = "λ=" + res.params.lambdaNm + "nm  I₀/I_cr=" + res.scales.overcritical.toFixed(3)
+      + "  γ_K=" + res.scales.gammaK.toFixed(3) + " (" + res.scales.regime + ")";
+  }
+
+  function draw2(res) {
+    var s = res.series, t = s.t;
+    var P = Plot($("c2"), t[0], t[t.length - 1]);
+    P.fmtX = function (v) { return v.toFixed(1); };
+    P.frame("t [fs]");
+    bands(P, res);
+    var Yp = P.axisY("L", 0, 1, "#2e9e57", "P_bound");
+    var lg = new Float64Array(s.rate.length);
+    var lo = 0, hi = -400;
+    for (var i = 0; i < s.rate.length; i++) {
+      var v = s.rate[i];
+      lg[i] = v > 0 ? Math.log10(v) : NaN;
+      if (isFinite(lg[i])) { if (lg[i] > hi) hi = lg[i]; }
+    }
+    lo = hi - 14;
+    var Yr = P.axisY("R", lo, hi + 1, "#9060d0", "log₁₀ W_ADK [a.u.⁻¹]", true);
+    P.line(t, lg, Yr, "#9060d0", 1.1);
+    P.line(t, s.Pbound, Yp, "#2e9e57", 1.8);
+    $("cap2").textContent = "電離 " + (res.result.ionization * 100).toFixed(4) + " %  ·  束縛残存 "
+      + sciTxt(res.result.Pbound, 3);
+  }
+
+  function draw3(res) {
+    var s = res.series, t = s.t;
+    var P = Plot($("c3"), t[0], t[t.length - 1]);
+    P.fmtX = function (v) { return v.toFixed(1); };
+    P.frame("t [fs]");
+    bands(P, res);
+    var xe = extent(s.x);
+    var Yx = P.axisY("L", 0, Math.max(xe[1] * 1.1, 1.3), "#40b8c0", "x = |E|/F_cr");
+    var ze = extent(s.zeta), ee = extent(s.euler);
+    var rhi = Math.max(2.05, ze[1] * 1.05, Math.abs(ee[0]), Math.abs(ee[1]));
+    var Yr = P.axisY("R", -rhi, rhi, "#9060d0", "ζ_n · 均衡余裕 · Euler 残差");
+    P.line(t, s.euler, Yr, "#d0574a", 1.0);
+    P.line(t, s.zeta, Yr, "#9060d0", 1.2);
+    P.line(t, s.margin, Yr, "#c8a44a", 1.4);
+    P.hline(Yx, 1, "#d0574a", "x = 1 (障壁抑制しきい値)");
+    $("cap3").textContent = "min 均衡余裕 = " + sciTxt(res.omega.marginMin, 3)
+      + "  ·  Euler 零交差 " + res.omega.eulerZeroCrossings + " 回  ·  x_max = " + res.omega.xMax.toFixed(3);
+  }
+
+  function draw4(sw, Icr) {
+    if (!sw) { setup($("c4")); return; }
+    var xs = sw.points.map(function (p) { return Math.log10(p.intensity); });
+    var P = Plot($("c4"), xs[0], xs[xs.length - 1]);
+    P.fmtX = function (v) { return "1e" + v.toFixed(1); };
+    P.frame("I₀ [W/cm²]");
+    var dur = sw.points.map(function (p) { return p.durationFs; });
+    var de = extent(dur);
+    var Yd = P.axisY("L", 0, Math.max(de[1] * 1.1, 1e-6), "#c8a44a", "臨界期の長さ [fs]");
+    var Yp = P.axisY("R", 0, 1.05, "#2e9e57", "電離確率 / E(σ) 正規化");
+    var esig = sw.points.map(function (p) { return p.Esigma; });
+    var em = Math.max.apply(null, esig.concat([1e-12]));
+    P.line(xs, sw.points.map(function (p) { return p.ionization; }), Yp, "#2e9e57", 1.7);
+    P.line(xs, esig.map(function (v) { return v / em; }), Yp, "#40b8c0", 1.3, [4, 3]);
+    P.line(xs, dur, Yd, "#c8a44a", 1.7);
+    var g = P.g, px = P.X(Math.log10(Icr));
+    if (px > P.pad.l && px < P.pad.l + P.iw) {
+      g.strokeStyle = "#d0574a"; g.setLineDash([5, 4]); g.lineWidth = 1;
+      g.beginPath(); g.moveTo(px, P.pad.t); g.lineTo(px, P.pad.t + P.ih); g.stroke(); g.setLineDash([]);
+      g.fillStyle = "#d0574a"; g.font = "10px monospace"; g.textAlign = "left";
+      g.fillText("I_cr", px + 4, P.pad.t + 12);
+    }
+    $("cap4").textContent = sw.points.length + " 点 · I_cr = " + sciTxt(Icr, 3) + " W/cm² (E(σ) は最大値で正規化)";
+  }
+
+  /* ---------------- 出力パネル ---------------- */
+  function kv(host, rows) {
+    host.innerHTML = rows.map(function (r) {
+      return '<div class="kv"><b>' + r[0] + '</b><span class="' + (r[2] || "") + '">' + r[1] + "</span></div>";
+    }).join("");
+  }
+  function render(res) {
+    var c = res.critical, s = res.scales, o = res.omega, a = res.atom;
+    $("banner").innerHTML = c.exists
+      ? '<div class="banner crit">⚠ <b>臨界期が発生しています</b> — 全長 ' + c.durationFs.toFixed(3) + ' fs ('
+        + (c.durationFs * 1000).toFixed(0) + ' as) · 半サイクル臨界窓 ' + c.count
+        + ' 個 · 臨界期のピーク強度 ' + sci(c.IpeakWcm2) + ' W/cm² (I_cr の '
+        + c.overcriticalPeak.toFixed(2) + ' 倍)</div>'
+      : '<div class="banner sub">臨界期は発生していません — ピーク強度が障壁抑制強度 I_cr = '
+        + sci(s.Icr) + ' W/cm² に届いていません (現在 I₀/I_cr = ' + s.overcritical.toFixed(4) + ')。</div>';
+
+    kv($("kCrit"), c.exists ? [
+      ["臨界期 開始 t₀", c.tStartFs.toFixed(4) + " fs", "hi"],
+      ["臨界期 終了 t₁", c.tEndFs.toFixed(4) + " fs", "hi"],
+      ["全長 Δt", c.durationFs.toFixed(4) + " fs", "hi"],
+      ["", (c.durationFs * 1000).toFixed(1) + " as", "hi"],
+      ["半サイクル臨界窓", c.count + " 個"],
+      ["合計 ON 時間", c.totalOnFs.toFixed(4) + " fs"],
+      ["平均窓幅", c.meanWindowAs.toFixed(1) + " as"],
+      ["デューティ比", (c.dutyRatio * 100).toFixed(2) + " %"],
+      ["臨界期 ピーク強度", sci(c.IpeakWcm2) + " W/cm²", "hi"],
+      ["臨界期 平均強度", sci(c.ImeanWcm2) + " W/cm²", "hi"],
+      ["超臨界度 I_peak/I_cr", c.overcriticalPeak.toFixed(4), "ok"],
+      ["臨界期フルーエンス", sci(c.fluenceJcm2) + " J/cm²"],
+      ["電離確率", (res.result.ionization * 100).toFixed(5) + " %", "ok"]
+    ] : [
+      ["臨界期", "なし", "bad"],
+      ["必要ピーク強度", "≥ " + sci(s.Icr) + " W/cm²", "hi"],
+      ["現在 I₀/I_cr", s.overcritical.toFixed(5)],
+      ["電離確率", (res.result.ionization * 100).toExponential(3) + " %"]
+    ]);
+
+    kv($("kScale"), [
+      ["障壁抑制場 F_cr", sciTxt(s.FcrAU, 5) + " a.u.", "hi"],
+      ["臨界強度 I_cr", sci(s.Icr, 4) + " W/cm²", "hi"],
+      ["ピーク場 E₀", sciTxt(s.E0AU, 5) + " a.u."],
+      ["ピーク強度 I₀", sci(s.I0, 4) + " W/cm²"],
+      ["光子エネルギー", s.photonEV.toFixed(4) + " eV"],
+      ["角振動数 ω", sciTxt(s.omegaAU, 5) + " a.u."],
+      ["光学周期", s.cycleFs.toFixed(4) + " fs"],
+      ["U_p (ポンデロモーティブ)", s.UpEV.toFixed(4) + " eV"],
+      ["γ_Keldysh", s.gammaK.toFixed(5) + " (" + s.regime + ")", s.gammaK < 1 ? "ok" : ""],
+      ["時間分解能 dt", (s.dtFs * 1000).toFixed(2) + " as"]
+    ]);
+
+    kv($("kOmega"), [
+      ["ζ 半径 r_ζ = n*²/Z_c", a.zetaRadiusA0.toFixed(5) + " a₀", "hi"],
+      ["β(p,q) = Γ(p)Γ(q)/Γ(p+q)", a.betaPQ.toFixed(6)],
+      ["ζ_n 最大 (x log x)^n", sci(o.zetaMax, 4)],
+      ["Γ-deprivation 最小", sci(o.depMin, 4)],
+      ["均衡余裕 2e^{−x log x} 最小", sci(o.marginMin, 4), o.marginMin < 0.5 ? "bad" : ""],
+      ["Euler 零交差", o.eulerZeroCrossings + " 回"],
+      ["Kauffman A", o.A.toFixed(4)],
+      ["交差数 (臨界窓)", o.crossingsUsed + (o.truncated ? " / " + o.crossings + " (切詰)" : "")],
+      ["writhe w", String(o.writhe)],
+      ["⟨D⟩(A)", sciTxt(o.kauffman, 6), "hi"],
+      ["Jones f(A) = (−A³)^{−w}⟨D⟩", sciTxt(o.jones, 6)],
+      ["H(σ) エントロピー", o.entropy.toFixed(6) + " nats"],
+      ["π_" + o.n + " , e_" + o.n, o.piN.toFixed(6) + " , " + o.eN.toFixed(6)],
+      ["<b>E(σ) 臨界強度指数</b>", sciTxt(o.Esigma, 6), "hi"],
+      ["E(σ)·I_cr", sci(o.EsigmaWcm2, 4) + " W/cm²", "hi"]
+    ]);
+
+    kv($("kAtom"), [
+      ["元素", a.sym + " (" + a.name + ")  Z=" + a.Z],
+      ["電離段数", "第 " + a.stage + " 電離"],
+      ["I_p", a.IpEV.toFixed(4) + " eV = " + a.IpAU.toFixed(6) + " a.u.", "hi"],
+      ["残留電荷 Z_c", String(a.Zc)],
+      ["軌道角運動量 l", String(a.l) + "  (f_l0 = " + a.flm + ")"],
+      ["κ = √(2I_p)", a.kappa.toFixed(6)],
+      ["有効主量子数 n*", a.nstar.toFixed(6)],
+      ["|C_{n*l*}|²", a.Cn2.toFixed(6)],
+      ["率キャップ適用率", (res.result.cappedFraction * 100).toFixed(2) + " %", res.result.cappedFraction > 0 ? "bad" : "ok"]
+    ]);
+
+    $("sum").textContent = AC.summary(res);
+
+    var tb = $("wtab").querySelector("tbody");
+    tb.innerHTML = c.windows.map(function (w, i) {
+      return "<tr><td>" + (i + 1) + "</td><td>" + w.t0.toFixed(4) + "</td><td>" + w.t1.toFixed(4)
+        + "</td><td>" + w.durAs.toFixed(1) + "</td><td>" + sciTxt(w.Ipeak, 3)
+        + "</td><td>" + sciTxt(w.Imean, 3) + "</td><td>" + (w.sign > 0 ? "+" : "−") + "</td></tr>";
+    }).join("") || '<tr><td colspan="7" style="color:#8aa0b8">臨界サブ窓なし</td></tr>';
+    $("cap5").textContent = c.count + " 窓";
+  }
+
+  /* ---------------- 実行 ---------------- */
+  function run() {
+    syncLabels();
+    var t0 = performance.now();
+    var res;
+    try { res = AC.simulate(params()); }
+    catch (e) { $("banner").innerHTML = '<div class="banner sub">エラー: ' + e.message + "</div>"; return; }
+    LAST = res;
+    render(res);
+    draw1(res); draw2(res); draw3(res);
+    draw4(LASTSWEEP, res.scales.Icr);
+    $("cap1").textContent += "  ·  " + (performance.now() - t0).toFixed(0) + " ms";
+  }
+
+  function runSweep() {
+    var p = params();
+    $("cap4").textContent = "計算中…";
+    setTimeout(function () {
+      var Icr = AC.criticalIntensity(AC.element(p.element).Ip[p.stage - 1], p.charge);
+      LASTSWEEP = AC.sweep(p, { from: Icr / 30, to: Icr * 300, points: 46 });
+      draw4(LASTSWEEP, Icr);
+    }, 20);
+  }
+
+  function download(name, text, mime) {
+    var b = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+    var u = URL.createObjectURL(b), a = document.createElement("a");
+    a.href = u; a.download = name; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(u); }, 1500);
+  }
+  function stem() {
+    var p = params();
+    return "acpi_" + p.element + p.stage + "_" + p.lambdaNm + "nm_"
+      + Number(p.intensity).toExponential(2).replace("+", "") + "_" + p.fwhmFs + "fs";
+  }
+
+  $("csv").onclick = function () { if (LAST) download(stem() + ".csv", AC.toCSV(LAST), "text/csv;charset=utf-8"); };
+  $("json").onclick = function () {
+    if (!LAST) return;
+    var o = JSON.parse(JSON.stringify({
+      version: LAST.version, params: LAST.params, atom: LAST.atom, scales: LAST.scales,
+      critical: LAST.critical, omega: LAST.omega, result: LAST.result
+    }));
+    o.series = {};
+    ["t", "E", "I", "Pbound", "rate", "x", "zeta", "dep", "margin", "euler"].forEach(function (k) {
+      o.series[k] = Array.prototype.slice.call(LAST.series[k]);
+    });
+    if (LASTSWEEP) o.sweep = LASTSWEEP;
+    download(stem() + ".json", JSON.stringify(o, null, 2), "application/json");
+  };
+  $("png").onclick = function () {
+    var ids = ["c1", "c2", "c3", "c4"], cs = ids.map($), gap = 14, pad = 16;
+    var w = Math.max.apply(null, cs.map(function (c) { return c.width; }));
+    var h = cs.reduce(function (a, c) { return a + c.height + gap; }, 0) + 2 * pad + 34;
+    var out = document.createElement("canvas"); out.width = w + 2 * pad; out.height = h;
+    var g = out.getContext("2d");
+    g.fillStyle = "#04060a"; g.fillRect(0, 0, out.width, out.height);
+    g.fillStyle = "#c8a44a"; g.font = "bold 18px monospace";
+    g.fillText("ACPI — " + (LAST ? LAST.atom.sym + "  I0=" + sciTxt(LAST.params.intensity, 2)
+      + " W/cm2  λ=" + LAST.params.lambdaNm + "nm  臨界期 " + LAST.critical.durationFs.toFixed(3) + " fs" : ""), pad, pad + 18);
+    var y = pad + 34;
+    cs.forEach(function (c) { g.drawImage(c, pad, y); y += c.height + gap; });
+    out.toBlob(function (b) {
+      var u = URL.createObjectURL(b), a = document.createElement("a");
+      a.href = u; a.download = stem() + ".png"; a.click();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 1500);
+    });
+  };
+
+  $("run").onclick = run;
+  $("sweepBtn").onclick = runSweep;
+  elSel.onchange = function () { fillStages(); run(); };
+  ["stage", "charge", "lambda", "i0", "fwhm", "cep", "shape", "zorder", "ka", "steps"].forEach(function (id) {
+    $(id).addEventListener("input", function () { syncLabels(); });
+    $(id).addEventListener("change", run);
+  });
+  window.addEventListener("resize", function () {
+    if (LAST) { draw1(LAST); draw2(LAST); draw3(LAST); draw4(LASTSWEEP, LAST.scales.Icr); }
+  });
+
+  syncLabels();
+  run();
+  runSweep();
+})();
+</script>
+</body>
+</html>

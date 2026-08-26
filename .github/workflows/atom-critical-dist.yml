@@ -1,0 +1,104 @@
+name: ACPI 原子の臨界期シミュレータ (downloadable bundle)
+
+# 原子の臨界期の強度シミュレータ (ACPI) をダウンロード可能な形に固めます:
+#   - bada_gui_ide/dist/atom-critical.html  (単一 HTML — 開くだけで動く)
+#   - CLI + モデルコア + Bada リファレンス実装 + README を zip
+# Actions アーティファクトとして、また acpi-v* タグ (または release_tag 指定)
+# のときは GitHub Release に添付して直接ダウンロードできるようにします。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: acpi-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'acpi-v*'
+    paths-ignore:
+      - '**.md'
+
+permissions:
+  contents: write
+
+jobs:
+  build-acpi-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: セルフテスト (既知の物理値との照合)
+        working-directory: bada_gui_ide
+        run: node cli/atom-critical-cli.js selftest
+
+      - name: Bada リファレンス実装のスモークテスト
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node cli/bada-cli.js run examples/atom_critical.bada | tee /tmp/acpi.out
+          grep -q "臨界期" /tmp/acpi.out
+          grep -q "E(σ)" /tmp/acpi.out
+          grep -q "臨界期なし (亜臨界)" /tmp/acpi.out
+
+      - name: 単一 HTML をビルド
+        working-directory: bada_gui_ide
+        run: node tools/build-atom-critical.js
+
+      - name: 生成物が変更されていないことを確認
+        run: git diff --exit-code -- bada_gui_ide/dist/atom-critical.html
+
+      - name: サンプル出力を生成 (CSV / スキャン表)
+        working-directory: bada_gui_ide
+        run: |
+          node cli/atom-critical-cli.js csv  dist/acpi-sample-Ar-6e14.csv -e Ar -I 6e14 -l 800 -f 8
+          node cli/atom-critical-cli.js scan -I 4e14 > dist/acpi-element-scan-4e14.txt
+          node cli/atom-critical-cli.js run  -e Ar -I 6e14 > dist/acpi-summary-Ar-6e14.txt
+
+      - name: zip にまとめる
+        working-directory: bada_gui_ide
+        run: |
+          cd dist
+          cp ../cli/atom-critical-cli.js ../cli/bada-cli.js ../www/atom_critical.js ../www/bada.js ../www/examples.js .
+          cp ../examples/atom_critical.bada .
+          zip -j acpi-dist.zip atom-critical.html atom-critical-cli.js atom_critical.js \
+                               atom_critical.bada bada.js bada-cli.js examples.js \
+                               ACPI-README.txt acpi-sample-Ar-6e14.csv \
+                               acpi-element-scan-4e14.txt acpi-summary-Ar-6e14.txt
+          ls -la
+
+      - name: Actions アーティファクトをアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: acpi-atom-critical
+          path: |
+            bada_gui_ide/dist/atom-critical.html
+            bada_gui_ide/dist/acpi-dist.zip
+
+      - name: Release へ添付
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: ACPI 原子の臨界期の強度シミュレータ ${{ github.event.inputs.release_tag || github.ref_name }}
+          body: |
+            **原子の臨界期の強度シミュレータ (ACPI — Atomic Critical-Period Intensity)**
+
+            強レーザー場のなかで原子のクーロン障壁が完全に抑制される時間窓
+            (= 臨界期) と、その窓での強度 I(t) を計算します。
+            物理層 (障壁抑制場 F_cr = I_p²/4Z_c, ADK トンネル電離, Keldysh γ, U_p)
+            に、山口フレームワークの Ω 作用素層 (ζ, β(p,q), Γ-deprivation,
+            Dalanversian, Euler 極均衡, Kauffman ⟨D⟩, E(σ)=K(σ)×H(σ)/4(π_n,e_n))
+            を重ねています。
+
+            - **atom-critical.html** — シミュレータ本体。ダウンロードして開くだけ
+              (依存なし・オフライン可)。12 元素 · 波長 200–4000 nm ·
+              10¹¹–10¹⁸ W/cm² · CSV/JSON/PNG 出力。
+            - **acpi-dist.zip** — 上記 + CLI + モデルコア + Bada 実装
+              (`atom_critical.bada`) + サンプル出力 + README。
+          files: |
+            bada_gui_ide/dist/atom-critical.html
+            bada_gui_ide/dist/acpi-dist.zip

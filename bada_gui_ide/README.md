@@ -208,6 +208,106 @@ dist[0.50000, 0.50000]
   無いためネイティブ リンクはデスクトップ版のみ)。「📁 開く」から
   `.bada` を選択するか、対応ファイラーからのドロップで読み込めます。
 
+## ⚛️ ACPI — 原子の臨界期の強度シミュレータ (`dist/atom-critical.html`)
+
+強レーザー場のなかで原子の**クーロン障壁が完全に抑制される時間窓 (= 臨界期)** と、
+その窓での**強度** I(t) を計算する単一 HTML アプリです。ダウンロードして
+ダブルクリックで開くだけで動きます (依存なし・オフライン可)。
+
+### 👉 [**dist/atom-critical.html をダウンロード**](dist/atom-critical.html)
+
+| ファイル | 内容 |
+|:---|:---|
+| [`dist/atom-critical.html`](dist/atom-critical.html) | ★ シミュレータ本体 (単一 HTML)。12 元素 · λ 200–4000 nm · I₀ 10¹¹–10¹⁸ W/cm² · CSV/JSON/PNG 出力 |
+| [`cli/atom-critical-cli.js`](cli/atom-critical-cli.js) | CLI 版 (`run` / `csv` / `json` / `sweep` / `scan` / `elements` / `selftest`) |
+| [`www/atom_critical.js`](www/atom_critical.js) | モデルコア (GUI と CLI が共有する UMD モジュール) |
+| [`examples/atom_critical.bada`](examples/atom_critical.bada) | 同じモデルを **Bada 言語**で書いたリファレンス実装 |
+| [`tools/build-atom-critical.js`](tools/build-atom-critical.js) | 単一 HTML のビルダ (既知の物理値とのセルフチェック付き) |
+
+### 臨界期の定義
+
+原子単位系で、クーロン障壁が完全に消える**障壁抑制場** (barrier-suppression field) は
+
+```
+F_cr = I_p² / (4 Z_c)      [a.u.]
+I_cr = F_cr² · I_a ,        I_a = ½ ε₀ c F_au² = 3.5094×10¹⁶ W/cm²
+```
+
+**臨界期**とは瞬時場が `|E(t)| ≥ F_cr` を満たす時間窓、**臨界期の強度**とは
+その窓の内側の `I(t) = |E(t)|² · I_a` です。水素では
+`I_cr = 1.37×10¹⁴ W/cm²` という既知の障壁抑制強度を再現します。
+直線偏光では臨界期は半サイクルごとの**アト秒スケールのサブ窓**に分裂し、
+アプリはその 1 つ 1 つの幅・ピーク強度・平均強度を表にします。
+
+### 二層モデル
+
+**(A) 物理層** — 標準的な強場原子物理:
+
+| 量 | 式 | 検証 |
+|:---|:---|:---|
+| 障壁抑制場 | `F_cr = I_p²/(4Z_c)` | H → 1.37×10¹⁴ W/cm² |
+| ADK トンネル電離率 | `w = \|C_{n*l*}\|² f_{l0} I_p (2κ³/F)^{2n*−1} e^{−2κ³/3F}` | H (n\*=1) で厳密解 `(4/F)e^{−2/3F}` に一致 |
+| Keldysh パラメータ | `γ = √(I_p/2U_p)` | Ar/800nm/2×10¹⁴ → 0.812 |
+| ポンデロモーティブ | `U_p[eV] = 9.337×10⁻¹⁴ I λ²` | 800nm/2×10¹⁴ → 11.95 eV |
+
+束縛占有率は `dP/dt = −w(t)P` を瞬時場に沿って指数積分します。
+
+**(B) Ω 層** — 山口フレームワーク (Bada / omega_llm) の作用素層:
+
+| 作用素 | 式 | 臨界期での意味 |
+|:---|:---|:---|
+| ζ 半径 | `ζ(s) = β(p,q)/log x`, `r_ζ = n*²/Z_c` | 極の場の半径 (quantum_computer.pdf) |
+| ζ_n | `ζ_n = (x log x)^n`, `x = \|E\|/F_cr` | 超臨界度の n 次 zeta |
+| Γ-deprivation | `D = e^{−x log x}` | 束縛多様体の剥奪率 |
+| Dalanversian | `Λ = cos(ix log x) − i sin(ix log x) = e^{x log x}` | 反重力/重力の位相 |
+| 均衡余裕 | `(e^f + e^{−f}) − (e^f − e^{−f}) = 2e^{−f}` | 臨界期で 0 へ潰れる = 均衡の喪失 |
+| Euler 極均衡 | `x^n + y^n − n x y z = 0` | 零交差が極均衡の破れ |
+| Kauffman | `⟨D⟩(A) = Σ_states A^{a−b} d^{loops−1}` | 臨界サブ窓を交差とする閉 2-ブレイド |
+| 臨界強度指数 | `E(σ) = K(σ) × H(σ) / (4 (π_n, e_n))` | 臨界期の「強さ」の不変量 |
+
+`K(σ)` は臨界サブ窓を交差とする (2,c) トーラス絡み目の Kauffman ブラケット
+(union-find による厳密な状態和 — `examples/zone.bada` の `kauffman` と同一構成)、
+`H(σ)` は各サブ窓のフルーエンス分布と束縛/電離の二値分布の Shannon エントロピー、
+`π_n` / `e_n` は Leibniz 級数と指数級数の n 次近似です。
+ブラケット多項式の値なので `E(σ)` は負にもなります。
+
+### 使い方
+
+```sh
+# GUI — ダウンロードして開くだけ
+open bada_gui_ide/dist/atom-critical.html
+
+# CLI
+node bada_gui_ide/cli/atom-critical-cli.js run   -e Ar -I 6e14 -l 800 -f 8
+node bada_gui_ide/cli/atom-critical-cli.js scan  -I 4e14        # 全元素を一括比較
+node bada_gui_ide/cli/atom-critical-cli.js sweep -e Xe --points 30
+node bada_gui_ide/cli/atom-critical-cli.js csv   out.csv -e Ne -I 2e15
+node bada_gui_ide/cli/atom-critical-cli.js selftest             # 既知の物理値と照合
+
+# Bada 言語版 (同じ結果を独立に再現する)
+node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/atom_critical.bada
+
+# 単一 HTML を再ビルド
+node bada_gui_ide/tools/build-atom-critical.js
+```
+
+出力例 (Ar, 800 nm, 6×10¹⁴ W/cm², FWHM 8 fs):
+
+```
+臨界(障壁抑制)場  : F_cr = 8.386e-2 a.u.  →  I_cr = 2.468e+14 W/cm²
+レジーム          : γ_Keldysh = 0.4688 (tunneling)  U_p = 35.856 eV  I₀/I_cr = 2.431
+■ 臨界期 (critical period)
+  時間窓          : t = -4.1563 fs … 4.1563 fs
+  全長            : 8.3126 fs  (8312.6 as)
+  サブ窓 (半周期) : 7 個  合計 4.1277 fs  平均 589.7 as  デューティ比 49.7 %
+  臨界期の強度    : ピーク 6.000e+14 W/cm²  平均 3.965e+14 W/cm²
+  臨界強度指数    : E(σ) = K(σ)·H(σ)/(4 π_7 e_7) = 6.23557e-2
+  電離確率        : 99.990265 %
+```
+
+Release への添付は [`atom-critical-dist.yml`](../.github/workflows/atom-critical-dist.yml)
+が行います (`acpi-v*` タグで Release へ / `workflow_dispatch` で Actions アーティファクト)。
+
 ## ディレクトリ構成
 
 ```
@@ -218,7 +318,9 @@ bada_gui_ide/
   cli/        CLI アプリ:  run|build|emit|tokens|ast|repl|examples|version
               (node cli/bada-cli.js … で実行、Release では単一バイナリ
                bada-cli.exe / bada-cli-linux-x64 として配布)
-  examples/   hello / engine / core / quantum / zone の各 .bada
+  examples/   hello / engine / core / quantum / zone / atom_critical の各 .bada
+  tools/      単一 HTML ビルダ (build-zone-browser.js / build-atom-critical.js)
+  dist/       配布用の単一 HTML (zone-browser.html / bada-zone.html / atom-critical.html)
 ```
 
 ## ローカルでの起動
@@ -233,4 +335,8 @@ cd bada_gui_ide/electron && npm install && npm start
 # CLI
 node bada_gui_ide/cli/bada-cli.js run   bada_gui_ide/examples/engine.bada
 node bada_gui_ide/cli/bada-cli.js build bada_gui_ide/examples/core.bada -o core && ./core
+
+# ACPI — 原子の臨界期の強度シミュレータ
+open bada_gui_ide/dist/atom-critical.html
+node bada_gui_ide/cli/atom-critical-cli.js run -e Ar -I 6e14
 ```

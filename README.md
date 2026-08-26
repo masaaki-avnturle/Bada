@@ -29,6 +29,55 @@
 
 ---
 
+## ⬇️ ダウンロード — 原子の臨界期の強度シミュレータ (ACPI)
+
+強レーザー場のなかで原子の**クーロン障壁が完全に抑制される時間窓 (= 臨界期)** と、
+その窓での**強度** I(t) を計算するアプリ。**下のファイルを 1 つダウンロードして開くだけ**で
+動きます (インストール不要・依存なし・オフライン可):
+
+### 👉 [**bada_gui_ide/dist/atom-critical.html をダウンロード**](bada_gui_ide/dist/atom-critical.html)
+
+ダウンロード手順(GitHub 上):上のリンクを開き、ファイル表示画面の右上にある **「Download raw file」(⬇ アイコン)** を押すと保存できます。保存した `atom-critical.html` をダブルクリックすればブラウザで開きます。
+
+| ファイル | 内容 |
+|:---|:---|
+| [`atom-critical.html`](bada_gui_ide/dist/atom-critical.html) | ★ シミュレータ本体(単一 HTML)。元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に再計算され、4 枚の図と数値パネルが更新されます。CSV / JSON / PNG 出力付き |
+| [`atom-critical-cli.js`](bada_gui_ide/cli/atom-critical-cli.js) | CLI 版 — `run` / `csv` / `json` / `sweep` / `scan` / `elements` / `selftest` |
+| [`atom_critical.js`](bada_gui_ide/www/atom_critical.js) | モデルコア(GUI と CLI が共有) |
+| [`atom_critical.bada`](bada_gui_ide/examples/atom_critical.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
+
+**臨界期とは** — 原子単位系で、クーロン障壁が完全に消える障壁抑制場は
+`F_cr = I_p²/(4 Z_c)`、対応する臨界強度は `I_cr = F_cr² · I_a`
+(`I_a = 3.5094×10¹⁶ W/cm²`)。臨界期は瞬時場が `|E(t)| ≥ F_cr` を満たす時間窓、
+その強度は `I(t) = |E(t)|² · I_a` です。水素で `I_cr = 1.37×10¹⁴ W/cm²` という
+既知の障壁抑制強度を再現します。直線偏光では臨界期は半サイクルごとの
+**アト秒スケールのサブ窓**に分裂し、アプリはその 1 つ 1 つを表にします。
+
+**二層モデル** — (A) 物理層: 障壁抑制場 · ADK トンネル電離率(水素で厳密解
+`(4/F)e^{−2/3F}` に一致)· Keldysh γ · ポンデロモーティブ U_p。
+(B) Ω 層(山口フレームワーク): `ζ(s)=β(p,q)/log x` · `ζ_n=(x log x)^n` ·
+gamma-deprivation `e^{−x log x}` · Dalanversian `Λ=cos(ix log x)−i sin(ix log x)` ·
+均衡余裕 `2e^{−x log x}`(臨界期で 0 へ潰れる = 重力/反重力均衡の喪失)·
+Euler 極均衡 `x^n+y^n−nxyz=0` · Kauffman ブラケット `⟨D⟩(A)` ·
+**臨界強度指数** `E(σ) = K(σ)×H(σ)/4(π_n,e_n)`。
+
+```sh
+node bada_gui_ide/cli/atom-critical-cli.js run  -e Ar -I 6e14 -l 800 -f 8
+node bada_gui_ide/cli/atom-critical-cli.js scan -I 4e14      # 全元素を一括比較
+node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/atom_critical.bada
+```
+
+zip 一式(CLI + コア + Bada 実装 + サンプル出力)は [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `acpi-dist.zip`。
+ビルドは [`atom-critical-dist.yml`](.github/workflows/atom-critical-dist.yml) が実行します(`acpi-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) の「ACPI」節を参照。
+
+> 直接リンク(右クリック→「名前を付けて保存」でも可):
+> `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/atom-critical.html`
+> (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
+> ファイル画面の「Download raw file」から取得してください)
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
@@ -70,6 +119,7 @@
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
+| **`bada_gui_ide/dist/atom-critical.html`** | **ACPI — 原子の臨界期の強度シミュレータ** · 障壁抑制場 F_cr=I_p²/4Z_c · ADK トンネル電離 · Keldysh γ · Ω 作用素層 (ζ/β(p,q)/Γ-deprivation/Dalanversian/Euler 極均衡/Kauffman ⟨D⟩/E(σ)) · 単一 HTML | [→ 開く](bada_gui_ide/dist/atom-critical.html) |
 
 ---
 
