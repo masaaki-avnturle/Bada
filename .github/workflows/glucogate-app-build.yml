@@ -4,18 +4,15 @@ name: Ω-GlucoGate Forge app build (Windows EXE + Ubuntu + Android APK)
 #   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
 #   - Ubuntu 向け AppImage / deb
 #   - Android 向け APK
-# としてビルドし、Actions アーティファクト、および
-# (glucogate-v* タグ / release_tag 指定時) GitHub Release に添付します。
+# としてビルドし、Actions アーティファクトと GitHub Release の両方に添付します。
+# Release のタグは glucogate-v* タグ push ならそのタグ、
+# workflow_dispatch / workflow_call なら glucogate-v1.0.0 です。
 #
 # ⚠ 概念シミュレーション・非医療。実在の医薬品を設計/製造/評価するものではありません。
 
 on:
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'GitHub Release に添付するタグ名 (例: glucogate-v1.0.0)。空欄なら Actions アーティファクトのみ。'
-        required: false
-        default: ''
+  workflow_call:      # omega-apps-build.yml から再利用呼び出しされる
   push:
     tags:
       - 'glucogate-v*'
@@ -25,6 +22,9 @@ permissions:
 
 env:
   APP: bio_medicine/omega_glucogate_forge
+  # タグ push ならそのタグ、workflow_dispatch / workflow_call なら既定タグの Release へ添付する
+  # (softprops/action-gh-release は無ければタグと Release を作成する)
+  RELEASE_TAG: ${{ (github.event_name == 'push' && github.ref_name) || 'glucogate-v1.0.0' }}
 
 jobs:
   # 3 実装 (C / Python / 単一HTML) が同じモデルを解いていることを確認してからパッケージする
@@ -71,10 +71,22 @@ jobs:
           name: glucogate-windows
           path: bio_medicine/omega_glucogate_forge/electron/dist/*.exe
       - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Ω-GlucoGate Forge ${{ env.RELEASE_TAG }}
+          body: |
+            **Ω-GlucoGate Forge** — 形態形成場によるドーパミン作動性「糖取り込み薬剤」製造装置シミュレータ
+            (`bio_medicine/omega_glucogate_forge`)
+
+            | プラットフォーム | ファイル |
+            |:---|:---|
+            | Android | `glucogate-forge-debug.apk` |
+            | Windows 10 / 11 | `Omega-GlucoGate-Forge-1.0.0-x64.exe` (NSIS / ポータブル) |
+            | Ubuntu | `Omega-GlucoGate-Forge-1.0.0-x86_64.AppImage` / `-amd64.deb` |
+
+            ⚠ 概念シミュレーション・非医療。実在の医薬品を設計・製造・評価するものではなく、
+            出力を医療判断に用いることはできません。
           files: bio_medicine/omega_glucogate_forge/electron/dist/*.exe
 
   linux-app:
@@ -98,10 +110,9 @@ jobs:
             bio_medicine/omega_glucogate_forge/electron/dist/*.AppImage
             bio_medicine/omega_glucogate_forge/electron/dist/*.deb
       - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             bio_medicine/omega_glucogate_forge/electron/dist/*.AppImage
             bio_medicine/omega_glucogate_forge/electron/dist/*.deb
@@ -154,8 +165,7 @@ jobs:
           name: glucogate-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: out/*.apk
