@@ -81,6 +81,52 @@ ok("gamma: Γ(0.5)=√π", close(O.gammaFn(0.5), Math.sqrt(Math.PI), 1e-6));
   ok("guard: 外乱後も連鎖を抑え込む", s2.finalPopulation < 100, s2.finalPopulation);
 }
 
+// ---- 3b. 臨界期の強度（未臨界増倍と 1/M 法） --------------------------------
+{
+  // M = 1/(1-k) は k→1 で発散する
+  ok("subcrit: M(0)=1", close(O.multiplication(0), 1));
+  ok("subcrit: M(0.99)=100", close(O.multiplication(0.99), 100, 1e-9));
+  ok("subcrit: M(0.999)=1000", close(O.multiplication(0.999), 1000, 1e-9));
+  ok("subcrit: 臨界で発散", !Number.isFinite(O.multiplication(1.0)));
+  ok("subcrit: 1/M = 1-k", close(O.inverseMultiplication(0.75), 0.25));
+
+  // 臨界減速
+  ok("subcrit: tau(0.9)=10*tau(0)",
+     close(O.relaxationTime(0.9, 1e-4), 1e-3, 1e-12));
+  ok("subcrit: tau は k とともに増える",
+     O.relaxationTime(0.999, 1e-4) > O.relaxationTime(0.99, 1e-4));
+
+  // 1/M 外挿が真の臨界位置 0.8 を当てる（Python 版と同じ seed / 同じ結果）
+  const a = new O.ApproachToCritical(null, {}, 0x51de);
+  a.run();
+  const s = a.summary();
+  ok("subcrit: 1/M 外挿が臨界位置 0.8 を予測",
+     close(s.finalPrediction, 0.8, 0.01), s.finalPrediction);
+  ok("subcrit: 安全接近は臨界を越えない", s.stayedSubcritical && s.maxK < 1, s.maxK);
+  ok("subcrit: それでも k>0.99 まで近づく", s.finalK > 0.99, s.finalK);
+
+  const u = O.runUnsafeApproach(null, 0.2);
+  ok("subcrit: 固定刻みだと踏み越える", u.crossedCritical && u.maxK >= 1, u.maxK);
+
+  // 点炉動特性
+  const pk = new O.PointKinetics();
+  ok("kinetics: 即発臨界の境界は beta",
+     !pk.isPromptCritical(0.0064) && pk.isPromptCritical(0.0065));
+  // 小さい rho では T = (beta-rho)/(lam*rho)
+  [0.0005, 0.001, 0.002].forEach((rho) => {
+    const analytic = (0.0065 - rho) / (0.0785 * rho);
+    ok(`kinetics: T(${rho}) が解析解と一致`,
+       Math.abs(pk.period(rho) - analytic) / analytic < 0.05, pk.period(rho));
+  });
+  const periods = [0.0005, 0.001, 0.002, 0.004, 0.006].map((r) => pk.period(r));
+  ok("kinetics: rho が beta に近いほど期は短い",
+     periods.every((v, i) => i === 0 || v < periods[i - 1]));
+  const steady = new O.PointKinetics({}, 1.0);
+  steady.run(0, 5.0, 1e-3);
+  ok("kinetics: rho=0 は定常", close(steady.n, 1.0, 1e-3), steady.n);
+  ok("kinetics: rho=(k-1)/k", close(O.reactivityFromK(1.0), 0));
+}
+
 // ---- 4. 反応速度論 / 熱暴走 --------------------------------------------------
 {
   const net = new O.ReactionNetwork({}, { P: 1, C: 0.25 });

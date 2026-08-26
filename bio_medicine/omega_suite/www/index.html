@@ -68,7 +68,7 @@
 <body>
 <header>
   <h1>Ω-Suite</h1>
-  <div class="sub">Bada リポジトリの概念シミュレーション 7 種 — オフライン・依存ゼロ</div>
+  <div class="sub">Bada リポジトリの概念シミュレーション 8 種 — オフライン・依存ゼロ</div>
 </header>
 
 <nav id="nav"></nav>
@@ -82,7 +82,7 @@
       医療上の判断を導いたりすることはできません。研究・教育・アート目的です。
     </div>
     <div class="panel">
-      <h2>収録している 7 つのモデル</h2>
+      <h2>収録している 8 つのモデル</h2>
       <div class="hero">
         <div class="card"><h3>Γ 多様体エージェント</h3>
           <p>Γ(s+1)=s·Γ(s) の漸化を注意重みに使うローカル応答エンジン。</p></div>
@@ -90,6 +90,8 @@
           <p>ノイマン型の擬似量子VM、二重被覆する仮想HDD、反ダランベルシアン場。</p></div>
         <div class="card"><h3>臨界連鎖の防止</h3>
           <p>分岐過程を常に未臨界 (k_eff&lt;1) に保つフィードバック制御と SCRAM。</p></div>
+        <div class="card"><h3>臨界期の強度</h3>
+          <p>未臨界増倍 M=1/(1−k) の発散と、1/M 法による安全な臨界接近。</p></div>
         <div class="card"><h3>自己触媒連鎖と熱暴走</h3>
           <p>質量作用則 + Arrhenius + Semenov 条件。選択性と速度のトレードオフ。</p></div>
         <div class="card"><h3>服薬リスク重複チェッカー</h3>
@@ -100,7 +102,7 @@
           <p>Gray-Scott 分岐 + 電磁ドリフト、Gompertz 競合と適応療法。</p></div>
       </div>
       <div class="legend" style="margin-top:10px">
-        計算コアはリポジトリの Python 実装からの移植で、61 件の照合テストで
+        計算コアはリポジトリの Python 実装からの移植で、79 件の照合テストで
         数値が一致することを確認しています。
       </div>
     </div>
@@ -170,6 +172,56 @@
         <span class="val" id="cPertV">0</span></div>
       <div class="row"><button class="act" id="cRun">実行</button></div>
       <pre id="cOut"></pre>
+    </div>
+  </section>
+
+  <!-- ============ 臨界期の強度 ============ -->
+  <section id="s-subcrit">
+    <div class="panel">
+      <h2>未臨界増倍 — 臨界に近づくときの強度</h2>
+      <div class="legend">
+        中性子源を置いた未臨界系では、1個が k 個、その k 個がさらに…と積み上がり、
+        定常数は N = S/(1−k) になります。この <b>M = 1/(1−k)</b> が未臨界増倍率で、
+        k → 1 で<b>発散</b>します。これが「臨界期の強度」です。
+        同時に緩和時間 τ = ℓ/(1−k) も発散します（臨界減速）。
+      </div>
+      <div class="row"><label>k_eff</label>
+        <input type="range" id="sK" min="0" max="0.9999" step="0.0001" value="0.9" />
+        <span class="val" id="sKV">0.9000</span></div>
+      <div class="stats">
+        <div>増倍率 M: <b id="sM">—</b></div>
+        <div>1/M: <b id="sInv">—</b></div>
+        <div>緩和時間 τ: <b id="sTau">—</b></div>
+        <div>反応度 ρ: <b id="sRho">—</b></div>
+      </div>
+      <canvas id="sCv" height="200" style="margin-top:10px"></canvas>
+      <div class="legend">青 = M（対数目盛）／ 橙 = 1/M。1/M は臨界へ直線的に落ちます。</div>
+    </div>
+
+    <div class="panel">
+      <h2>1/M 法による安全な臨界接近</h2>
+      <div class="legend">
+        M が発散するなら、その逆数 1/M は臨界で素直に 0 になります。制御量 x に対して
+        1/M を測り、直線を 1/M = 0 へ外挿すれば、<b>まだ到達していない臨界点の位置を
+        事前に予測</b>できます。予測地点までの残り距離の半分より先へ進まない規則を守れば、
+        踏み越えずに接近できます。原子炉の起動や燃料装荷で実際に使われる安全手順です。
+      </div>
+      <div class="row"><button class="act" id="sRun">安全接近を実行</button></div>
+      <div id="sTable"></div>
+      <pre id="sOut"></pre>
+    </div>
+
+    <div class="panel">
+      <h2>点炉動特性 — 遅発中性子と即発臨界</h2>
+      <div class="legend">
+        反応度 ρ が遅発中性子割合 β よりずっと小さいうちは、応答は遅発中性子の
+        タイムスケールに支配されて安定期が長く、操作が間に合います。
+        <b>ρ ≥ β（即発臨界）</b>では即発中性子だけで連鎖が成立し、応答が桁違いに
+        速くなります。近づいてはならない境界です。
+      </div>
+      <div class="row"><button class="act" id="kRun">安定期を計算</button></div>
+      <div id="kTable"></div>
+      <pre id="kOut"></pre>
     </div>
   </section>
 
@@ -292,7 +344,7 @@
 
 <footer>
   Ω-Suite — Bada リポジトリの概念シミュレーション集。計算コアは Python 実装からの
-  移植で、61 件の照合テストで数値一致を確認しています。<br>
+  移植で、79 件の照合テストで数値一致を確認しています。<br>
   すべて非医療・研究/教育/アート目的です。しんどさが続くときは主治医・薬剤師にご相談ください。
   夜間は よりそいホットライン 0120-279-338（24時間・無料）。<br>
   © 2025 Masaaki Yamaguchi · Bada / bio_medicine
@@ -307,7 +359,8 @@ const fmt = (x, d = 4) => Number(x).toFixed(d);
 // ---- タブ ------------------------------------------------------------------
 const TABS = [
   ["home", "ホーム"], ["gamma", "Γ多様体"], ["quantum", "擬似量子"],
-  ["critical", "臨界連鎖"], ["reaction", "反応速度論"], ["medsafe", "服薬チェック"],
+  ["critical", "臨界連鎖"], ["subcrit", "臨界期の強度"],
+  ["reaction", "反応速度論"], ["medsafe", "服薬チェック"],
   ["breath", "呼吸"], ["morpho", "形態形成場"],
 ];
 const nav = $("nav");
@@ -322,6 +375,7 @@ TABS.forEach(([id, label], i) => {
     $("s-" + id).classList.add("on");
     if (id === "morpho") fitFieldCanvas();
     if (id === "breath") fitBreathCanvas();
+    if (id === "subcrit") fitSubcritCanvas();
   };
   nav.appendChild(b);
 });
@@ -463,6 +517,118 @@ $("cRun").onclick = () => {
     `12世代後の中性子数: ${unguarded} → ${core.population}`,
     "",
     "教育用の抽象モデルです。実在の炉・核物質の設計データは含みません。",
+  ].join("\n");
+};
+
+// ---- 臨界期の強度 -----------------------------------------------------------
+const sCv = $("sCv"), sCtx = sCv.getContext("2d");
+function fitSubcritCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  sCv.width = sCv.clientWidth * dpr;
+  sCv.height = 200 * dpr;
+  sCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawSubcrit();
+}
+function drawSubcrit() {
+  const W = sCv.clientWidth, H = 200;
+  sCtx.fillStyle = "#000"; sCtx.fillRect(0, 0, W, H);
+  const kNow = parseFloat($("sK").value);
+  const pad = 28;
+  // M を対数目盛で、1/M を線形で描く
+  const kMax = 0.9995;
+  const logMax = Math.log10(Omega.multiplication(kMax));
+  sCtx.lineWidth = 2;
+  // M
+  sCtx.strokeStyle = "#4a80d0"; sCtx.beginPath();
+  for (let px = 0; px <= W; px++) {
+    const k = (px / W) * kMax;
+    const y = H - pad - (Math.log10(Omega.multiplication(k)) / logMax) * (H - 2 * pad);
+    px === 0 ? sCtx.moveTo(px, y) : sCtx.lineTo(px, y);
+  }
+  sCtx.stroke();
+  // 1/M
+  sCtx.strokeStyle = "#f2994a"; sCtx.beginPath();
+  for (let px = 0; px <= W; px++) {
+    const k = (px / W) * kMax;
+    const y = H - pad - Omega.inverseMultiplication(k) * (H - 2 * pad);
+    px === 0 ? sCtx.moveTo(px, y) : sCtx.lineTo(px, y);
+  }
+  sCtx.stroke();
+  // 現在位置
+  const cx = (kNow / kMax) * W;
+  sCtx.strokeStyle = "rgba(200,164,74,0.8)"; sCtx.lineWidth = 1;
+  sCtx.beginPath(); sCtx.moveTo(cx, pad * 0.4); sCtx.lineTo(cx, H - pad * 0.6); sCtx.stroke();
+  sCtx.fillStyle = "#7a8db3"; sCtx.font = "10px sans-serif";
+  sCtx.fillText("k=0", 2, H - 6);
+  sCtx.fillText("k→1", W - 26, H - 6);
+  sCtx.fillStyle = "#4a80d0"; sCtx.fillText("M (log)", 4, 12);
+  sCtx.fillStyle = "#f2994a"; sCtx.fillText("1/M", 60, 12);
+}
+bindRange("sK", 4, (k) => {
+  const M = Omega.multiplication(k);
+  $("sM").textContent = Number.isFinite(M) ? M.toFixed(1) : "∞ (臨界)";
+  $("sInv").textContent = Omega.inverseMultiplication(k).toFixed(5);
+  const tau = Omega.relaxationTime(k, 1e-4);
+  $("sTau").textContent = Number.isFinite(tau) ? tau.toExponential(3) : "∞";
+  $("sRho").textContent = Omega.reactivityFromK(k).toFixed(5);
+  drawSubcrit();
+});
+$("sRun").onclick = () => {
+  const a = new Omega.ApproachToCritical(null, {}, 0x51de);
+  a.run();
+  const s = a.summary();
+  let html = `<table><tr><th>step</th><th>位置 x</th><th>k_eff</th>
+    <th>計数率</th><th>1/M</th><th>臨界位置の予測</th></tr>`;
+  for (const m of a.log) {
+    const pred = Number.isFinite(m.predictedCritical)
+      ? m.predictedCritical.toFixed(4) : "—";
+    html += `<tr><td>${m.step}</td><td>${m.position.toFixed(4)}</td>
+      <td>${m.kEff.toFixed(4)}</td><td>${m.countRate.toFixed(0)}</td>
+      <td>${m.inverseM.toFixed(4)}</td><td>${pred}</td></tr>`;
+  }
+  $("sTable").innerHTML = html + "</table>";
+  const u = Omega.runUnsafeApproach(null, 0.2);
+  $("sOut").textContent = [
+    `真の臨界位置     : 0.8000`,
+    `最終予測         : ${s.finalPrediction.toFixed(4)}`,
+    `到達位置         : ${s.finalPosition.toFixed(4)}  (k = ${s.finalK.toFixed(4)})`,
+    `最終増倍率 M     : ${s.finalMultiplication.toFixed(1)}`,
+    `臨界を越えたか   : ${s.stayedSubcritical ? "いいえ ✓ 未臨界を維持" : "はい ✗"}`,
+    "",
+    "--- 比較: 外挿を使わず固定の刻みで進んだ場合 ---",
+    `到達位置 ${u.finalPosition.toFixed(4)}  最大 k = ${u.maxK.toFixed(4)}`,
+    `臨界を踏み越えた : ${u.crossedCritical ? "はい ✗" : "いいえ"}`,
+    "",
+    "→ 1/M を外挿すると、まだ到達していない臨界位置が事前に分かります。",
+    "  残り距離の半分より先へ進まない規則を守れば踏み越えずに済みます。",
+    "",
+    "注記: 無次元の k のみを扱う教育用モデルです。核種データ・断面積・質量・",
+    "      幾何形状は含まず、臨界量や装置の設計には使用できません。",
+  ].join("\n");
+};
+$("kRun").onclick = () => {
+  const pk = new Omega.PointKinetics();
+  const beta = pk.cfg.beta;
+  let html = `<table><tr><th>反応度 ρ</th><th>ρ/β</th><th>安定期 T</th>
+    <th>状態</th></tr>`;
+  for (const rho of [0.0005, 0.001, 0.002, 0.004, 0.006, 0.0064, 0.0065, 0.008]) {
+    const T = pk.period(rho);
+    const prompt = pk.isPromptCritical(rho);
+    html += `<tr><td>${rho.toFixed(5)}</td><td>${(rho / beta).toFixed(3)}</td>
+      <td>${Number.isFinite(T) ? T.toFixed(3) : "∞"}</td>
+      <td class="${prompt ? "bad" : "good"}">${prompt ? "即発臨界 ✗" : "制御可能"}</td></tr>`;
+  }
+  $("kTable").innerHTML = html + "</table>";
+  $("kOut").textContent = [
+    `遅発中性子割合 β = ${beta}   即発中性子世代時間 Λ = ${pk.cfg.Lambda}`,
+    "",
+    "ρ が β よりずっと小さいうちは、応答は遅発中性子のタイムスケールに支配され、",
+    "安定期が長いので操作が間に合います。ρ が β に近づくほど T は急激に短くなり、",
+    "ρ ≥ β（即発臨界）では即発中性子だけで連鎖が成立して Λ のタイムスケールに",
+    "跳ね上がります。即発臨界は「近づいてはならない境界」で、運転はこれよりも",
+    "はるかに小さい ρ の範囲で行われます。",
+    "",
+    "注記: β・Λ は説明用の例示値で、特定の核種データではありません。",
   ].join("\n");
 };
 
@@ -769,8 +935,9 @@ $("uRun").onclick = () => {
 };
 
 // ---- 初期化 -----------------------------------------------------------------
-window.addEventListener("resize", () => { fitFieldCanvas(); fitBreathCanvas(); });
+window.addEventListener("resize", () => { fitFieldCanvas(); fitBreathCanvas(); fitSubcritCanvas(); });
 renderGamma();
+fitSubcritCanvas();
 fitFieldCanvas();
 fitBreathCanvas();
 </script>

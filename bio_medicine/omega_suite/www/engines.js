@@ -373,6 +373,154 @@ class CriticalGuard {
   }
 }
 
+/** 未臨界増倍率 M = 1/(1-k)。k→1 で発散する（臨界期の強度）。 */
+function multiplication(k) { return k >= 1 ? Infinity : 1 / (1 - k); }
+
+/** 1/M = 1-k。臨界で 0 になり、外挿に使える。 */
+function inverseMultiplication(k) { return Math.max(0, 1 - k); }
+
+/** 臨界減速: 緩和時間 tau = l/(1-k) も k→1 で発散する。 */
+function relaxationTime(k, lifetime = 1e-4) {
+  return k >= 1 ? Infinity : lifetime / (1 - k);
+}
+
+/**
+ * 1/M 法による安全な臨界接近。
+ * 直近2点の (x, 1/M) を 1/M=0 へ外挿して臨界位置を予測し、
+ * 残り距離の safetyFraction 倍しか進まない。
+ */
+class ApproachToCritical {
+  constructor(kOfX = null, cfg = {}, seed = 0x51de) {
+    this.cfg = Object.assign({
+      baseCount: 1e3, countingNoise: 0.02, safetyFraction: 0.5,
+      minStep: 1e-3, maxSteps: 40,
+    }, cfg);
+    this.kOfX = kOfX || ((x) => 1.25 * x);      // 臨界は x = 0.8
+    this.rng = new LCG(seed);
+    this.log = [];
+  }
+  measure(x) {
+    const k = this.kOfX(x);
+    if (k >= 1) return { k, rate: Infinity, invM: 0 };
+    let rate = this.cfg.baseCount * multiplication(k);
+    rate *= 1 + this.cfg.countingNoise * (2 * this.rng.random() - 1);
+    return { k, rate, invM: this.cfg.baseCount / rate };
+  }
+  predictCritical() {
+    if (this.log.length < 2) return Infinity;
+    const a = this.log[this.log.length - 2], b = this.log[this.log.length - 1];
+    const dx = b.position - a.position, dy = b.inverseM - a.inverseM;
+    if (dx <= 0 || dy >= 0) return Infinity;
+    return a.position - a.inverseM * dx / dy;
+  }
+  run(start = 0.05, firstStep = 0.15) {
+    let x = start, step = firstStep;
+    for (let i = 0; i < this.cfg.maxSteps; i++) {
+      const { k, rate, invM } = this.measure(x);
+      const over = k >= 1;
+      this.log.push({ step: i, position: x, kEff: k, countRate: rate,
+                      inverseM: invM, predictedCritical: Infinity, supercritical: over });
+      const pred = this.predictCritical();
+      this.log[this.log.length - 1].predictedCritical = pred;
+      if (over) break;
+      if (Number.isFinite(pred)) {
+        const remaining = pred - x;
+        if (remaining <= 0) break;
+        step = Math.min(step, remaining * this.cfg.safetyFraction);
+      }
+      if (step < this.cfg.minStep) break;
+      x += step;
+    }
+    return this.log;
+  }
+  summary() {
+    if (!this.log.length) return {};
+    const last = this.log[this.log.length - 1];
+    const preds = this.log.map((m) => m.predictedCritical).filter(Number.isFinite);
+    return {
+      steps: this.log.length,
+      finalPosition: last.position,
+      finalK: last.kEff,
+      finalMultiplication: multiplication(last.kEff),
+      finalPrediction: preds.length ? preds[preds.length - 1] : Infinity,
+      stayedSubcritical: !this.log.some((m) => m.supercritical),
+      maxK: Math.max(...this.log.map((m) => m.kEff)),
+    };
+  }
+}
+
+/** 比較用: 外挿を使わず固定の刻みで進むと臨界を踏み越える。 */
+function runUnsafeApproach(kOfX = null, fixedStep = 0.2, maxSteps = 40) {
+  const kf = kOfX || ((x) => 1.25 * x);
+  let x = 0.05, maxK = 0, crossed = false, steps = 0;
+  for (let i = 0; i < maxSteps; i++) {
+    const k = kf(x);
+    maxK = Math.max(maxK, k);
+    steps++;
+    if (k >= 1) { crossed = true; break; }
+    x += fixedStep;
+  }
+  return { steps, finalPosition: x, maxK, crossedCritical: crossed };
+}
+
+/** 反応度 rho = (k-1)/k。 */
+function reactivityFromK(k) { return Math.abs(k) < 1e-15 ? -Infinity : (k - 1) / k; }
+
+/**
+ * 1群の点炉動特性。rho < beta なら遅発中性子が応答を遅くし制御できる。
+ * rho >= beta（即発臨界）は近づいてはならない境界。
+ */
+class PointKinetics {
+  constructor(cfg = {}, n0 = 1.0) {
+    this.cfg = Object.assign({ beta: 0.0065, Lambda: 1e-4, lam: 0.0785 }, cfg);
+    this.n = n0;
+    this.c = this.cfg.beta * n0 / (this.cfg.Lambda * this.cfg.lam);
+    this.t = 0;
+  }
+  isPromptCritical(rho) { return rho >= this.cfg.beta; }
+  derivs(n, c, rho) {
+    const { beta, Lambda, lam } = this.cfg;
+    return [(rho - beta) / Lambda * n + lam * c, beta / Lambda * n - lam * c];
+  }
+  step(rho, dt) {
+    const n = this.n, c = this.c;
+    const [k1n, k1c] = this.derivs(n, c, rho);
+    const [k2n, k2c] = this.derivs(n + 0.5 * dt * k1n, c + 0.5 * dt * k1c, rho);
+    const [k3n, k3c] = this.derivs(n + 0.5 * dt * k2n, c + 0.5 * dt * k2c, rho);
+    const [k4n, k4c] = this.derivs(n + dt * k3n, c + dt * k3c, rho);
+    this.n = Math.max(n + (dt / 6) * (k1n + 2 * k2n + 2 * k3n + k4n), 0);
+    this.c = Math.max(c + (dt / 6) * (k1c + 2 * k2c + 2 * k3c + k4c), 0);
+    this.t += dt;
+  }
+  run(rho, duration, dt = 1e-3) {
+    const out = [[this.t, this.n]];
+    for (let i = 0; i < Math.floor(duration / dt); i++) {
+      this.step(rho, dt);
+      out.push([this.t, this.n]);
+    }
+    return out;
+  }
+  /** インアワー方程式 rho = w*Lambda + w*beta/(w+lam) を解いて安定期 T=1/w。 */
+  period(rho) {
+    const { beta, Lambda, lam } = this.cfg;
+    if (Math.abs(rho) < 1e-15) return Infinity;
+    const inhour = (w) => w * Lambda + w * beta / (w + lam) - rho;
+    let lo, hi;
+    if (rho > 0) {
+      lo = 1e-12; hi = 1;
+      while (inhour(hi) < 0 && hi < 1e12) hi *= 10;
+    } else {
+      lo = -lam + 1e-12; hi = -1e-12;
+    }
+    for (let i = 0; i < 200; i++) {
+      const mid = 0.5 * (lo + hi);
+      if (inhour(lo) * inhour(mid) <= 0) hi = mid; else lo = mid;
+    }
+    const w = 0.5 * (lo + hi);
+    return Math.abs(w) < 1e-15 ? Infinity : 1 / w;
+  }
+}
+
 // ===========================================================================
 // 4. 自己触媒連鎖の反応速度論 + 温度結合反応器
 // ===========================================================================
@@ -976,6 +1124,8 @@ return {
   LCG, QReg, PseudoQuantumVM, MobiusDisk, DAlembertField,
   // 3
   ChainCore, CriticalGuard,
+  multiplication, inverseMultiplication, relaxationTime,
+  ApproachToCritical, runUnsafeApproach, reactivityFromK, PointKinetics,
   // 4
   ReactionNetwork, ThermalReactor, QuantumSynthesizer, runUncontrolled,
   DEFAULT_RATES, DEFAULT_THERMAL,
