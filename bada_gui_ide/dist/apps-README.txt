@@ -22,6 +22,11 @@ it in any browser — no install, no dependencies, works offline.
   migemo.html         Migemogram — an Instagram-like photo feed with migemo-style
                       romaji -> Japanese incremental search (type "sora" to find
                       そら/ソラ captions). Posts/likes/comments in localStorage.
+  migemo-media.html   Migemogram Media — gallery of your own photos/videos (from
+                      your PC via a picker, from your cloud via a media URL):
+                      hover to pop out big, hover a video for a muted CM preview,
+                      click for a full lightbox with sound, migemo search, and
+                      "import to zone://url.or.jp" (UltraDB quorum + Jones cipher).
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for
