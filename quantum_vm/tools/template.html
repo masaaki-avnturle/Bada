@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>BadaVM Pro — 量子ハイパーバイザ (BadaBSD + BadaX Server)</title>
+<title>BadaVM Pro — 量子ハイパーバイザ (BadaOS + BadaX Server)</title>
 <style>
   :root {
     color-scheme: dark;
@@ -180,12 +180,12 @@
     <div style="color:var(--dim); padding:2px 6px 6px;">▾ 自分の PC</div>
     <div class="vmitem sel" id="vmentry">
       <span class="vmdot" id="vmdot"></span>
-      <span class="vmname"><b>BadaBSD 11.0 (量子)</b><small>NetBSD 風ゲスト OS · Bada言語製</small></span>
+      <span class="vmname"><b>BadaOS 12.0 (量子)</b><small>NetBSD 風ベース + Ubuntu 風 apt · Bada言語製</small></span>
     </div>
     <div id="libinfo">
       <b>構成 3 点セット (全て Bada 言語)</b><br/>
       ① BadaVM Pro — ハイパーバイザ<br/>
-      ② BadaBSD — NetBSD 風ゲスト OS<br/>
+      ② BadaOS — NetBSD 風ベース +<br/>&nbsp;&nbsp;&nbsp;Ubuntu 風 apt ゲスト OS<br/>
       ③ BadaX Server — Windows ホスト側<br/>
       &nbsp;&nbsp;&nbsp;ASTEC-X 風 X サーバー<br/><br/>
       マシン状態は追記専用イベント台帳<br/>(Akashic machine tape) の決定論的<br/>リプレイ。スナップショット = 台帳の<br/>プレフィックスです。
@@ -195,7 +195,7 @@
   <div id="main">
     <div id="tabs">
       <div class="tab" id="tab-home">🏠 ホーム</div>
-      <div class="tab sel" id="tab-vm">BadaBSD 11.0 (量子)</div>
+      <div class="tab sel" id="tab-vm">BadaOS 12.0 (量子)</div>
     </div>
     <div id="content">
 
@@ -209,13 +209,16 @@
             <p>量子 vCPU (8 qubit / Hilbert 次元 256)、tuplespace メモリ、仮想ディスク wd0、
                NAT ネットワーク、CD-ROM。マシン記述は .qvmx。スナップショットはイベント台帳の
                プレフィックスとしてコミットされます。<span style="color:var(--gold)">bada/vmpro.bada</span></p>
-            <div class="go"><button class="tbtn pow" id="home-poweron">▶ BadaBSD をパワーオン</button></div>
+            <div class="go"><button class="tbtn pow" id="home-poweron">▶ BadaOS をパワーオン</button></div>
           </div>
           <div class="card">
-            <h3>② BadaBSD 11.0 — NetBSD 風 OS</h3>
-            <p>CD イメージから起動し、sysinst 風フルスクリーン・インストーラで仮想ディスクへ
-               インストール (disklabel → newfs FFSv2 → セット展開 → root パスワード → DHCP)。
-               ブートローダ・dmesg・/etc/rc・ログイン・シェルまで完備。
+            <h3>② BadaOS 12.0 — NetBSD 風ベース + Ubuntu 風 apt</h3>
+            <p>CD から起動し、sysinst 風インストーラで<b>仮想ディスク wd0 か実ディスク rd0
+               (RDM パススルー)</b> へインストール。ブートローダ工程では <b>LILO をマスター
+               ブートレコードへ書き込み、GRUB 2 メニューモード</b>でチェイン起動します。
+               ログイン後は Ubuntu 風コマンドライン:
+               <code>apt install ssh xinetd zsh tcsh bash</code> で Linux 一式
+               (sshd / xinetd / GNU シェル群) が入り、chsh でシェル切替。
                <span style="color:var(--gold)">bada/badabsd.bada</span></p>
           </div>
           <div class="card">
@@ -237,15 +240,15 @@
           <div id="offscreen">
             <div class="big">この仮想マシンはパワーオフの状態です</div>
             <button class="tbtn pow" id="poweron">▶ この仮想マシンをパワーオンする</button>
-            <div style="color:#57606a;font-size:11.5px">初回起動時は BadaBSD-11.0-amd64-quantum.iso から
-              sysinst インストーラが立ち上がります</div>
+            <div style="color:#57606a;font-size:11.5px">初回起動時は BadaOS-12.0-amd64-quantum.iso から
+              sysinst インストーラが立ち上がります (実ディスク RDM / LILO→MBR / GRUB メニュー対応)</div>
           </div>
         </div>
         <div id="devices">
           <span>💾 <b>メモリ</b> 4096 MB (tuplespace)</span>
           <span>⚛ <b>プロセッサ</b> 2 (量子 8 qubit)</span>
-          <span>🖴 <b>ハードディスク (SCSI)</b> 20 GB .qvmdk</span>
-          <span>💿 <b>CD/DVD</b> BadaBSD-11.0-amd64-quantum.iso</span>
+          <span>🖴 <b>ディスク</b> wd0 .qvmdk / rd0 実ディスク (RDM)</span>
+          <span>💿 <b>CD/DVD</b> BadaOS-12.0-amd64-quantum.iso</span>
           <span>🌐 <b>ネットワーク</b> NAT (10.0.2.0/24)</span>
           <span>🖥 <b>ディスプレイ</b> BadaX Server 10.0.2.2:0</span>
         </div>
@@ -287,7 +290,7 @@
 <!-- ===== settings dialog (.qvmx) ===== -->
 <div class="dlg" id="dlg-settings">
   <div class="dlgbox">
-    <h2>⚙ 仮想マシン設定 — BadaBSD 11.0 (量子).qvmx</h2>
+    <h2>⚙ 仮想マシン設定 — BadaOS 12.0 (量子).qvmx</h2>
     <table id="vmxtable"></table>
     <div class="note">この設定は Bada の <code>vmx_emit()</code> がいま生成した実物です。</div>
     <button class="tbtn close" id="dlg-settings-close">閉じる</button>
@@ -299,14 +302,20 @@
   <div class="dlgbox">
     <h2>ヘルプ — 最短ツアー</h2>
     <div style="line-height:1.9">
-      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動します。<br/>
-      &nbsp;&nbsp;&nbsp;メニューは表示されたキー (a, b, j, x…) を 1 文字押すだけ。<b>a → a → a → a → a</b>
-      と進むとインストールが走ります。<br/>
-      2. root パスワードとホスト名を入力 → 任意のキーで<b>ディスクから再起動</b>。<br/>
+      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動します。メニューは表示された
+         キーを 1 文字押すだけ: <b>a</b>(言語) → <b>a</b>(インストール) → <b>a/b</b>(仮想 wd0 か
+         実ディスク rd0・RDM) → <b>a</b>(GPT) → <b>a</b>(<b>LILO を MBR へ + GRUB メニュー</b>) →
+         <b>a</b>(最終確認)。<br/>
+      2. root パスワードとホスト名を入力 → 任意のキーで<b>ディスクから再起動</b>
+         (LILO→GRUB メニュー経由でブートします)。<br/>
       3. <b>login: root</b> + 設定したパスワードでログイン。<br/>
-      4. <code>help</code> でコマンド一覧。<code>xclock &amp;</code> <code>xeyes &amp;</code>
-         <code>xterm &amp;</code> を打つと <b>BadaX Server</b> (ASTEC-X 風ウィンドウ) に表示されます。<br/>
-      5. <code>qstat</code> で Bell 対の零保存、<code>xdpyinfo</code> で JONES-KNOT-COOKIE-1 を確認。<br/>
+      4. <code>apt update</code> → <code>apt install ssh xinetd zsh tcsh bash</code> で
+         Ubuntu 風に Linux 一式を導入。<code>zsh</code> や <code>bash</code> でシェル切替、
+         <code>chsh -s /bin/zsh</code> でログインシェル変更、<code>service sshd status</code> /
+         <code>netstat</code> でデーモン確認。<br/>
+      5. <code>xclock &amp;</code> <code>xeyes &amp;</code> <code>xterm &amp;</code> は
+         <b>BadaX Server</b> (ASTEC-X 風ウィンドウ) に表示。<code>qstat</code> で Bell 対の零保存、
+         <code>xdpyinfo</code> で JONES-KNOT-COOKIE-1 を確認。<br/>
       6. 📷 スナップショット = イベント台帳のプレフィックス。⤺ 復元 でその時点に巻き戻ります。
     </div>
     <button class="tbtn close" id="dlg-help-close">閉じる</button>
@@ -327,7 +336,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
   var $ = function (id) { return document.getElementById(id); };
 
   /* ================= persistent event ledger ================= */
-  var LS_EVENTS = "badavm.events.v1", LS_SNAP = "badavm.snapshot.v1";
+  var LS_EVENTS = "badavm.events.v2", LS_SNAP = "badavm.snapshot.v2";
   var events = [];      /* the Akashic machine tape */
   var snapshot = null;  /* ledger prefix length */
   try {
@@ -377,7 +386,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
   }
   function buildProgram(evs, tail) {
     var p = 'NOW := ' + JSON.stringify(nowString()) + '\n' + VM_LIBS + '\n';
-    p += 'VM := vm_create("BadaBSD 11.0 (quantum)", 2, 4096, 20480)\n';
+    p += 'VM := vm_create("BadaOS 12.0 (quantum)", 2, 4096, 20480)\n';
     if (tail) { p += tail + '\n'; return p; }
     p += 'EVENTS := ' + JSON.stringify(evs) + '\n';
     p += 'os_run(VM, EVENTS)\n';
@@ -619,9 +628,9 @@ var VM_LIBS = __VM_LIBS_JSON__;
       });
     } else if (cls === "xterm") {
       var pre = document.createElement("pre"); pre.className = "xtermtxt";
-      pre.textContent = "BadaBSD 11.0 (GENERIC.QUANTUM) -- xterm on " + title.replace(/^xterm -- /, "") +
-        "\n$ uname -a\nBadaBSD " + (title.replace(/^xterm -- /, "") || "badabsd") +
-        " 11.0_QUANTUM amd64 (quantum)\n$ echo displayed via BadaX Server on Windows\n" +
+      pre.textContent = "BadaOS 12.0 (GENERIC.QUANTUM) -- xterm on " + title.replace(/^xterm -- /, "") +
+        "\n$ uname -a\nBadaOS " + (title.replace(/^xterm -- /, "") || "badaos") +
+        " 12.0_QUANTUM amd64 GNU/Quantum\n$ echo displayed via BadaX Server on Windows\n" +
         "displayed via BadaX Server on Windows\n$ ▎";
       body.appendChild(pre);
     }

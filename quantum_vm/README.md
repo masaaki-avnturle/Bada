@@ -1,11 +1,11 @@
-# BadaVM Pro — 量子ハイパーバイザ + BadaBSD + BadaX Server
+# BadaVM Pro — 量子ハイパーバイザ + BadaOS + BadaX Server
 
 **すべて量子プログラミング言語 Bada で書かれた 3 点セット**です(教育目的の非公式オマージュ):
 
 | # | コンポーネント | 風 (オマージュ元) | Bada ソース |
 |:--|:--|:--|:--|
 | ① | **BadaVM Pro** — デスクトップ・ハイパーバイザ | VMware Workstation Pro | [`bada/vmpro.bada`](bada/vmpro.bada) |
-| ② | **BadaBSD 11.0** — ゲスト OS (インストールして使う) | NetBSD | [`bada/badabsd.bada`](bada/badabsd.bada) |
+| ② | **BadaOS 12.0** — ゲスト OS (NetBSD 風ベース + **Ubuntu 風 apt**) | NetBSD + Ubuntu | [`bada/badabsd.bada`](bada/badabsd.bada) |
 | ③ | **BadaX Server** — Windows ホスト側の外部 X サーバー | ASTEC-X | [`bada/badax.bada`](bada/badax.bada) |
 
 ダウンロードは 1 ファイルだけ: **[`dist/bada-vm-pro.html`](dist/bada-vm-pro.html)** を保存してブラウザで開くだけで動きます(インストール不要・依存なし・オフライン可)。Windows 10 / 11 向けのインストール型 EXE も [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます。
@@ -14,25 +14,38 @@
 
 ## 何ができるか
 
-1. **▶ 起動** すると、仮想マシンが `BadaBSD-11.0-amd64-quantum.iso` (CD) から起動し、
+1. **▶ 起動** すると、仮想マシンが `BadaOS-12.0-amd64-quantum.iso` (CD) から起動し、
    NetBSD の sysinst 風フルスクリーン・インストーラが立ち上がります。
-2. メニューキー **a → a → a → a → a** で仮想ディスク wd0 へインストール
-   (GPT/MBR 選択 → `newfs -O 2` FFSv2 → `base.tgz` 〜 `xserver-badax.tgz` のセット展開)。
-   root パスワードとホスト名を設定し、DHCP で `10.0.2.15` を取得して完了。
-3. 再起動するとブートローダ → カーネル autoconf dmesg → `/etc/rc` → **login:**。
-   `root` でログインすると Bourne 風シェルが使えます (`help` で一覧)。
-4. `xclock &` `xeyes &` `xterm &` を実行すると、X クライアントが NAT 越しに
+2. インストール先は **仮想ディスク wd0 (.qvmdk)** か、VMware Pro の Raw Device Mapping 風の
+   **実ディスク rd0 (パススルー)** を選択。GPT/MBR を選んだあと、**ブートローダ工程**で
+   **LILO をマスターブートレコードへ (`lilo -M` がセクタ 0 に 446 byte のブートコードを書き込み)、
+   GRUB 2 メニューモードでチェイン**する構成 (推奨)、GRUB 単体、LILO 単体を選べます。
+   `newfs -O 2` FFSv2 → `base.tgz` 〜 `apt-quantum.tgz` / `xserver-badax.tgz` のセット展開 →
+   root パスワード → ホスト名 → DHCP で完了。
+3. 再起動すると **LILO(MBR) → GRUB メニュー → カーネル dmesg → `/etc/rc` → `login:`**。
+   `root` でログインするとシェルが使えます (`help` で一覧)。
+4. **Ubuntu 風コマンドライン**:
+   ```
+   apt update
+   apt install ssh xinetd zsh tcsh bash     # Linux 一式 (sshd / xinetd / GNU シェル群)
+   netstat                                   # *.22 sshd, xinetd の echo/daytime/chargen が LISTEN
+   zsh                                       # シェル切替 (bash / zsh / tcsh)
+   chsh -s /bin/zsh                          # ログインシェル変更 (/etc/passwd に反映)
+   ssh localhost                             # Bell 対 QKD ハンドシェイクの ssh
+   service sshd status / apt list --installed / dpkg -l / which zsh
+   ```
+5. `xclock &` `xeyes &` `xterm &` を実行すると、X クライアントが NAT 越しに
    `DISPLAY=10.0.2.2:0` — **Windows ホスト側の BadaX Server ウィンドウ** — に表示されます。
    ASTEC-X と同じ「計算は UNIX 側、表示は Windows 側」のワークフローです。
-5. **📷 スナップショット / ⤺ 復元** — マシンの全状態は追記専用イベント台帳
-   (Akashic machine tape) の決定論的リプレイなので、スナップショットは台帳の
-   プレフィックスそのものです。
+6. **📷 スナップショット / ⤺ 復元** — マシンの全状態 (apt でインストールしたパッケージ含む) は
+   追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイなので、スナップショットは
+   台帳のプレフィックスそのものです。
 
 ### 量子要素
 
 - **vCPU** は 8 qubit (Hilbert 次元 256) の量子レジスタを持ち、`qstat` で Bell 対の
   **零保存** (禁制状態 |01>,|10> が厳密に 0 のまま) を確認できます。
-- 仮想ネットワークは **Bell 対 QKD** で守られ、X サーバーの認証は
+- 仮想ネットワークと `ssh` は **Bell 対 QKD** で守られ、X サーバーの認証は
   MIT-MAGIC-COOKIE-1 ならぬ **JONES-KNOT-COOKIE-1** — 三葉結び目の
   Kauffman ブラケット / Jones 多項式標本から導出した鍵です
   (`omega_jones_crypto_pkg` の Bada 移植、`zone.bada` と同じ構成)。
@@ -61,8 +74,9 @@ node quantum_vm/tools/build-vm.js
 ```
 
 で `dist/bada-vm-pro.html` と Electron 用 `app/www/index.html` を再生成します。
-ビルド前に、実 Bada インタープリタで **電源オン → sysinst インストール → 再起動 →
-ログイン → シェル → BadaX への X クライアント表示** のライフサイクル全体を
+ビルド前に、実 Bada インタープリタで **電源オン → sysinst インストール (実ディスク rd0 +
+LILO→MBR + GRUB メニュー) → 再起動 → ログイン → `apt install ssh xinetd zsh tcsh bash` →
+シェル切替 → QKD ssh → BadaX への X クライアント表示** のライフサイクル全体 (24 イベント) を
 セルフチェックし、失敗すると生成しません。
 
 ```
@@ -72,9 +86,11 @@ quantum_vm/
 │   │                     + 共有量子サービス (Kauffman/Jones 鍵, Bell 対 QKD)
 │   ├── badax.bada     ③ X サーバー: JONES-KNOT-COOKIE-1 認証, ウィンドウ管理,
 │   │                     カスケード配置, xdpyinfo
-│   └── badabsd.bada   ② OS: sysinst / FFS 風 FS / ブート / dmesg / rc / login /
-│                         シェル (uname, ls, cat, ps, df, ifconfig, sysctl,
-│                         qstat, echo リダイレクト, xclock, xeyes, xterm …)
+│   └── badabsd.bada   ② BadaOS: sysinst (ディスク選択 wd0/rd0・ブートローダ工程) /
+│                         LILO→MBR + GRUB メニュー / FFS 風 FS / dmesg / rc / login /
+│                         apt (openssh・xinetd・bash・zsh・tcsh ほか) / service /
+│                         chsh・which・dpkg / QKD ssh / シェル (echo リダイレクト,
+│                         ps, df, ifconfig, netstat, sysctl, qstat, xclock…)
 ├── tools/
 │   ├── template.html  ホスト UI (VMware 風クローム + BadaX ウィンドウ)
 │   └── build-vm.js    セルフチェック + 単一 HTML 生成
@@ -82,5 +98,6 @@ quantum_vm/
 └── app/electron/          Windows 10/11 EXE / Ubuntu 用ラッパー
 ```
 
-> ※ VMware, NetBSD, ASTEC-X の各名称はそれぞれの権利者の商標です。本フォルダは
-> それらとは無関係の、Bada 言語による教育目的の再構成 (オマージュ) です。
+> ※ VMware, NetBSD, Ubuntu, ASTEC-X, GRUB, LILO の各名称はそれぞれの権利者の商標・成果物です。
+> 本フォルダはそれらとは無関係の、Bada 言語による教育目的の再構成 (オマージュ) です。
+> rd0「実ディスク」も本アプリ内のシミュレーションであり、実際のホストのディスクには書き込みません。

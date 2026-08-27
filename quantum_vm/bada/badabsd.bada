@@ -1,29 +1,29 @@
 # ============================================================
-# badabsd.bada -- BadaBSD 11.0 : a NetBSD-style operating system
-# written in the Bada quantum programming language.
+# badabsd.bada -- BadaOS 12.0 : the guest operating system of
+# BadaVM Pro, written in the Bada quantum programming language.
 #
-# BadaBSD is an (unofficial, educational) homage to NetBSD: the
-# guest OS of the BadaVM Pro quantum hypervisor. It ships as a
-# CD image (BadaBSD-11.0-amd64-quantum.iso), installs itself to
-# the virtual disk with a sysinst-style full-screen installer
-# (disklabel -> newfs FFSv2 -> set extraction -> root password
-# -> hostname -> DHCP), boots from the disk through a BSD boot
-# loader + kernel autoconf dmesg + /etc/rc, and gives you a
-# login and a Bourne-style shell.
+# BadaOS is an (unofficial, educational) homage that marries a
+# NetBSD-style BASE (sysinst full-screen installer, FFSv2,
+# /etc/rc, dmesg autoconf) with an Ubuntu-style COMMAND LINE:
+# an apt package manager whose archive ships the classic Linux
+# userland -- openssh (sshd), xinetd, and the bash / zsh / tcsh
+# shells -- installable with plain `apt install ssh xinetd zsh
+# tcsh bash`.
+#
+# Like VMware-style raw device mapping, the installer can target
+# either the virtual disk wd0 (.qvmdk) or the pass-through REAL
+# DISK rd0 (RDM). The boot loader step installs LILO INTO THE
+# MASTER BOOT RECORD in GRUB MENU MODE: lilo -M writes the 446
+# byte boot code into sector 0 (partition table preserved) and
+# chains into a GRUB 2 style menu on every boot.
 #
 # The WHOLE MACHINE is the deterministic replay of an
-# append-only EVENT LEDGER (the Akashic machine tape): the
-# hypervisor feeds every power button, key press and command
-# line in as an event; replaying the ledger rebuilds the file
-# system, the users and the mapped X windows. Snapshots are
-# ledger prefixes (vmpro.bada).
-#
-# X clients (xclock, xeyes, xterm, xlogo) connect OUT of the VM
-# to the BadaX Server running on the Windows 10/11 host
-# (DISPLAY=10.0.2.2:0, badax.bada) -- the classic ASTEC-X
-# workflow: compute in the VM, display on Windows -- over a
-# Bell-pair QKD handshake with a JONES-KNOT-COOKIE-1 display
-# cookie.
+# append-only EVENT LEDGER (the Akashic machine tape); snapshots
+# are ledger prefixes (vmpro.bada). X clients (xclock, xeyes,
+# xterm, xlogo) connect OUT of the VM to the BadaX Server on the
+# Windows 10/11 host (DISPLAY=10.0.2.2:0, badax.bada) -- the
+# ASTEC-X workflow -- over Bell-pair QKD with a
+# JONES-KNOT-COOKIE-1 display cookie.
 #
 # State vector ST (one list, replay-rebuilt):
 #   0 stage      "off"|"sysinst"|"login"|"passwd"|"shell"|"halted"
@@ -38,15 +38,20 @@
 #   9 user       logged-in user ("" if none)
 #  10 xconnected 0/1
 #  11 ip         "" until DHCP
+#  12 pkgs       apt-installed package names
+#  13 shells     the shell stack (last = current; "sh" at bottom)
+#  14 services   running daemons (sshd, xinetd, ...)
+#  15 bootloader "grub-lilo" | "grub" | "lilo"
+#  16 disk       install target: "wd0" (virtual) | "rd0" (real, RDM)
 # ============================================================
 
-OS_VERSION := "11.0_QUANTUM"
-OS_KERNEL  := "BadaBSD 11.0 (GENERIC.QUANTUM) #0"
+OS_VERSION := "12.0_QUANTUM"
+OS_KERNEL  := "BadaOS 12.0 (GENERIC.QUANTUM) #0"
 OS_DISPLAY := "10.0.2.2:0"
 
 def os_new(vm) {
-    return ["off", 0, "badabsd", "", [], 0, [], x_server_new(vm[8]),
-            "", "", 0, ""]
+    return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
+            "", "", 0, "", [], ["sh"], [], "grub-lilo", "wd0"]
 }
 
 # ====================================================================
@@ -118,21 +123,31 @@ def fs_ls(fs, dir) {
 def os_seedfs(st) {
     fs := st[4]
     hn := st[2]
+    dsk := st[16]
     fs_put(fs, "/etc/release",
-        "BadaBSD 11.0 (GENERIC.QUANTUM) -- quantum edition\n" +
+        "BadaOS 12.0 (GENERIC.QUANTUM) -- quantum edition\n" +
+        "NetBSD-style base + Ubuntu-style apt userland\n" +
         "built from the Bada language event ledger")
+    fs_put(fs, "/etc/os-release",
+        "NAME=\"BadaOS\"\n" +
+        "VERSION=\"12.0 (quantum)\"\n" +
+        "ID=badaos\n" +
+        "ID_LIKE=\"netbsd ubuntu\"\n" +
+        "PRETTY_NAME=\"BadaOS 12.0 GNU/Quantum (NetBSD-style base, Ubuntu-style apt)\"")
     fs_put(fs, "/etc/motd",
-        "BadaBSD 11.0 (GENERIC.QUANTUM)\n\n" +
-        "Welcome to BadaBSD, the quantum BSD of the Bada language!\n" +
+        "BadaOS 12.0 (GENERIC.QUANTUM)\n\n" +
+        "Welcome to BadaOS, the quantum OS of the Bada language!\n" +
+        "  * Ubuntu-style packages:  apt update && apt install ssh xinetd zsh tcsh bash\n" +
+        "  * Shells: sh (builtin) + bash / zsh / tcsh via apt, switch with chsh\n" +
+        "  * Boot: LILO in the MBR of " + dsk + ", GRUB 2 menu mode\n" +
         "The X display of this VM is the BadaX Server on the Windows host:\n" +
         "    DISPLAY=" + OS_DISPLAY + "   (JONES-KNOT-COOKIE-1 authorized)\n" +
         "Try:  xclock &   xeyes &   xterm &   xdpyinfo   qstat   help")
     fs_put(fs, "/etc/rc.conf",
-        "# BadaBSD /etc/rc.conf -- generated by sysinst\n" +
+        "# BadaOS /etc/rc.conf -- generated by sysinst\n" +
         "rc_configured=YES\n" +
         "hostname=" + hn + "\n" +
         "dhcpcd=YES\n" +
-        "sshd=YES\n" +
         "badax_display=" + OS_DISPLAY + "\n")
     fs_put(fs, "/etc/passwd",
         "root:*:0:0:Charlie Root:/root:/bin/sh\n" +
@@ -143,8 +158,26 @@ def os_seedfs(st) {
         "10.0.2.15  " + hn + "\n" +
         "10.0.2.2   winhost badax  # BadaX Server (Windows 10/11)")
     fs_put(fs, "/etc/fstab",
-        "/dev/wd0a  /  ffs  rw  1 1\n" +
-        "/dev/wd0b  none  swap  sw  0 0")
+        "/dev/" + dsk + "a  /  ffs  rw  1 1\n" +
+        "/dev/" + dsk + "b  none  swap  sw  0 0")
+    fs_put(fs, "/etc/apt/sources.list",
+        "# BadaOS quantum archive (Ubuntu-style)\n" +
+        "deb cd0:/pool quantum main\n" +
+        "deb zone://apt.badaos.or.jp/ quantum main   # QKD-secured mirror")
+    fs_put(fs, "/etc/lilo.conf",
+        "# lilo -M /dev/r" + dsk + "d : boot code -> MBR (446 bytes, ptable kept)\n" +
+        "boot=/dev/r" + dsk + "d\n" +
+        "map=/boot/map\n" +
+        "install=menu   # GRUB menu mode chain\n" +
+        "image=/netbsd.quantum\n" +
+        "  label=BadaOS-GNU/Quantum\n" +
+        "  root=/dev/" + dsk + "a")
+    fs_put(fs, "/boot/grub/grub.cfg",
+        "set default=0\nset timeout=0\n" +
+        "menuentry 'BadaOS GNU/Quantum 12.0 (kernel netbsd.quantum)' {\n" +
+        "  badaos_kernel /netbsd.quantum root=/dev/" + dsk + "a\n}\n" +
+        "menuentry 'Advanced options for BadaOS' {}\n" +
+        "menuentry 'Memory test (memtest86+q, Hilbert dim 256)' {}")
     fs_put(fs, "/root/.profile",
         "export PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/X11R7/bin\n" +
         "export DISPLAY=" + OS_DISPLAY + "  # BadaX Server on the host")
@@ -156,6 +189,8 @@ def os_seedfs(st) {
     fs_put(fs, "/sbin/init", "#!binary")
     fs_put(fs, "/sbin/reboot", "#!binary")
     fs_put(fs, "/usr/bin/uname", "#!binary")
+    fs_put(fs, "/usr/bin/apt", "#!binary (BadaOS quantum apt)")
+    fs_put(fs, "/usr/bin/dpkg", "#!binary")
     fs_put(fs, "/usr/X11R7/bin/xclock", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xeyes", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
@@ -166,10 +201,202 @@ def os_seedfs(st) {
 }
 
 # ====================================================================
-# Boot: BIOS -> boot loader -> kernel autoconf -> /etc/rc -> login
+# The apt package archive (Ubuntu-style userland for BadaOS)
+#   [name, version, description, kind, binpath]
+#   kind: "shell" | "service" | "tool"
+# ====================================================================
+def pkg_catalog() {
+    return [
+      ["bash",           "5.2.21-2badaos", "GNU Bourne Again SHell",                    "shell",   "/bin/bash"],
+      ["zsh",            "5.9-6badaos",    "shell with lots of features",               "shell",   "/bin/zsh"],
+      ["tcsh",           "6.24.10-1",      "TENEX C Shell, an enhanced version of csh", "shell",   "/bin/tcsh"],
+      ["openssh-server", "9.6p1-3badaos",  "secure shell (SSH) server (QKD hardened)",  "service", "/usr/sbin/sshd"],
+      ["openssh-client", "9.6p1-3badaos",  "secure shell (SSH) client",                 "tool",    "/usr/bin/ssh"],
+      ["xinetd",         "2.3.15.4-1",     "replacement for inetd with many features",  "service", "/usr/sbin/xinetd"],
+      ["curl",           "8.5.0-2badaos",  "command line tool for transferring data",   "tool",    "/usr/bin/curl"],
+      ["vim",            "9.1-1badaos",    "Vi IMproved - enhanced vi editor",          "tool",    "/usr/bin/vim"],
+      ["coreutils",      "9.4-3badaos",    "GNU core utilities (Linux 一式)",           "tool",    "/usr/bin/coreutils"],
+      ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"]
+    ]
+}
+
+# apt spelling aliases ("apt install ssh" works like on Ubuntu)
+def pkg_resolve(name) {
+    if (name == "ssh")  { return "openssh-server" }
+    if (name == "sshd") { return "openssh-server" }
+    if (name == "csh")  { return "tcsh" }
+    return name
+}
+
+def pkg_lookup(name) {
+    cat := pkg_catalog()
+    i := 0
+    while (i < len(cat)) {
+        if (cat[i][0] == name) { return cat[i] }
+        i := i + 1
+    }
+    return []
+}
+
+def pkg_installed(st, name) { return list_has(st[12], pkg_resolve(name)) }
+
+def cur_shell(st) { return st[13][len(st[13]) - 1] }
+
+# start the daemons a package provides (also used by /etc/rc at boot)
+def svc_start(emit, st, pkg, from_rc) {
+    if (pkg == "openssh-server") {
+        if (list_has(st[14], "sshd") == 0) { st[14] <- "sshd" }
+        if (from_rc == 1) { tty(emit, "Starting sshd.") }
+        else {
+            tty(emit, "ssh-keygen: generating quantum host key (jones-ed25519) ... done")
+            tty(emit, "  fingerprint SHA256:jones-" + jones_key(vm_knot()) + " (Kauffman bracket)")
+            tty(emit, "sshd: listening on 0.0.0.0 port 22 (Bell-pair QKD banner enabled)")
+        }
+    }
+    if (pkg == "xinetd") {
+        if (list_has(st[14], "xinetd") == 0) { st[14] <- "xinetd" }
+        if (from_rc == 1) { tty(emit, "Starting xinetd.") }
+        else {
+            tty(emit, "xinetd: started, active services: echo daytime chargen (tcp)")
+        }
+    }
+    return 0
+}
+
+def apt_install_one(emit, vm, st, rawname) {
+    name := pkg_resolve(rawname)
+    p := pkg_lookup(name)
+    if (len(p) == 0) {
+        tty(emit, "E: Unable to locate package " + rawname)
+        return 0
+    }
+    if (pkg_installed(st, name) == 1) {
+        tty(emit, name + " is already the newest version (" + p[1] + ").")
+        return 0
+    }
+    kb := 120 + (str_hash(name) % 900)
+    tty(emit, "Get:1 cd0:/pool quantum/main " + name + " " + p[1] + " [" + kb + " kB]")
+    tty(emit, "Unpacking " + name + " (" + p[1] + ") ...")
+    tty(emit, "Setting up " + name + " (" + p[1] + ") ...")
+    st[12] <- name
+    fs_put(st[4], p[4], "#!binary (" + name + " " + p[1] + ", apt)")
+    if (p[3] == "shell") {
+        tty(emit, "update-alternatives: " + p[4] + " を /etc/shells に登録しました")
+        old := fs_get(st[4], "/etc/shells")
+        base := "/bin/sh"
+        if (len(old) == 1) { base := old[0] }
+        fs_put(st[4], "/etc/shells", base + "\n" + p[4])
+    }
+    if (name == "openssh-server") {
+        fs_put(st[4], "/etc/ssh/sshd_config",
+            "Port 22\nPermitRootLogin yes\nQKDGuard yes   # Bell-pair zero-preservation\n" +
+            "HostKey /etc/ssh/ssh_host_jones_key")
+        tty(emit, "update-rc.d: sshd defaults (enabled at boot)")
+        svc_start(emit, st, name, 0)
+    }
+    if (name == "xinetd") {
+        fs_put(st[4], "/etc/xinetd.conf",
+            "defaults { instances = 60  log_type = SYSLOG authpriv }\n" +
+            "service echo    { type = INTERNAL  protocol = tcp  wait = no }\n" +
+            "service daytime { type = INTERNAL  protocol = tcp  wait = no }\n" +
+            "service chargen { type = INTERNAL  protocol = tcp  wait = no }")
+        tty(emit, "update-rc.d: xinetd defaults (enabled at boot)")
+        svc_start(emit, st, name, 0)
+    }
+    return 0
+}
+
+def apt_cmd(emit, vm, st, argv) {
+    if (len(argv) < 2) {
+        tty(emit, "apt 2.7.3badaos (amd64, quantum)")
+        tty(emit, "usage: apt update | apt install PKG... | apt remove PKG | apt list --installed")
+        tty(emit, "archive: /etc/apt/sources.list (cd0 pool + QKD-secured zone:// mirror)")
+        return 0
+    }
+    sub := argv[1]
+    if (sub == "update") {
+        tty(emit, "Get:1 cd0:/pool quantum InRelease [signed: jones-" + jones_key(vm_knot()) + "]")
+        tty(emit, "Get:2 zone://apt.badaos.or.jp quantum/main amd64 Packages (QKD ok, zero-preservation holds)")
+        tty(emit, "Fetched index: " + len(pkg_catalog()) + " packages / Akashic ledger " + len(tuplespace) + " facts")
+        tty(emit, "Reading package lists... Done")
+        tty(emit, "All packages are up to date.")
+        return 0
+    }
+    if (sub == "install") {
+        if (len(argv) < 3) { tty(emit, "apt install PKG..."); return 0 }
+        tty(emit, "Reading package lists... Done")
+        tty(emit, "Building dependency tree... Done")
+        i := 2
+        while (i < len(argv)) {
+            apt_install_one(emit, vm, st, argv[i])
+            i := i + 1
+        }
+        tty(emit, "committed to the Akashic package ledger (" + len(tuplespace) + " facts)")
+        return 0
+    }
+    if (sub == "remove") {
+        if (len(argv) < 3) { tty(emit, "apt remove PKG"); return 0 }
+        name := pkg_resolve(argv[2])
+        if (pkg_installed(st, name) == 0) {
+            tty(emit, "Package '" + argv[2] + "' is not installed, so not removed")
+            return 0
+        }
+        out := []
+        i := 0
+        while (i < len(st[12])) {
+            if (st[12][i] != name) { out <- st[12][i] }
+            i := i + 1
+        }
+        st[12] = out
+        p := pkg_lookup(name)
+        r := fs_rm(st[4], p[4])
+        st[4] = r[1]
+        svcs := []
+        i := 0
+        while (i < len(st[14])) {
+            keep := 1
+            if (name == "openssh-server" && st[14][i] == "sshd") { keep := 0 }
+            if (name == "xinetd" && st[14][i] == "xinetd") { keep := 0 }
+            if (keep == 1) { svcs <- st[14][i] }
+            i := i + 1
+        }
+        st[14] = svcs
+        tty(emit, "Removing " + name + " (" + p[1] + ") ...")
+        return 0
+    }
+    if (sub == "list") {
+        if (len(argv) > 2 && argv[2] == "--installed") {
+            tty(emit, "Listing... Done")
+            i := 0
+            while (i < len(st[12])) {
+                p := pkg_lookup(st[12][i])
+                tty(emit, p[0] + "/quantum,now " + p[1] + " amd64 [installed]")
+                i := i + 1
+            }
+            if (len(st[12]) == 0) { tty(emit, "(nothing installed yet -- try: apt install ssh xinetd zsh tcsh bash)") }
+            return 0
+        }
+        tty(emit, "Listing... Done")
+        cat := pkg_catalog()
+        i := 0
+        while (i < len(cat)) {
+            mark := ""
+            if (pkg_installed(st, cat[i][0]) == 1) { mark := " [installed]" }
+            tty(emit, cat[i][0] + "/quantum " + cat[i][1] + " amd64" + mark + " -- " + cat[i][2])
+            i := i + 1
+        }
+        return 0
+    }
+    tty(emit, "E: Invalid operation " + sub)
+    return 0
+}
+
+# ====================================================================
+# Boot: BIOS -> LILO(MBR) -> GRUB menu -> kernel -> /etc/rc -> login
 # ====================================================================
 def os_dmesg(emit, vm, st) {
-    tty(emit, "Copyright (c) 1996, 2026 The BadaBSD Foundation, Inc.  All rights reserved.")
+    dsk := st[16]
+    tty(emit, "Copyright (c) 1996, 2026 The BadaOS Foundation, Inc.  All rights reserved.")
     tty(emit, OS_KERNEL + ": " + NOW)
     tty(emit, "total memory = " + vm[2] + " MB (tuplespace-backed, append-only)")
     tty(emit, "avail memory = " + (vm[2] - 137) + " MB")
@@ -178,26 +405,33 @@ def os_dmesg(emit, vm, st) {
     tty(emit, "qcpu1 at mainbus0: Bada Quantum vCPU, 8 qubits (entangled with qcpu0)")
     tty(emit, "qrng0 at qcpu0: quantum RNG, Bell-pair entropy source")
     tty(emit, "jones0 at mainbus0: Jones-polynomial crypto engine (Kauffman bracket)")
-    tty(emit, "wd0 at atabus0 drive 0: <QUANTUM VIRTUAL-HD, " + vm[5] + ">")
-    tty(emit, "wd0: " + vm[3] + " MB, " + (vm[3] * 2048) + " sectors")
+    if (dsk == "rd0") {
+        tty(emit, "rd0 at atabus0 drive 0: <REAL DISK, raw device mapping (RDM)>")
+        tty(emit, "rd0: pass-through to the host physical disk, " + vm[3] + " MB")
+    } else {
+        tty(emit, "wd0 at atabus0 drive 0: <QUANTUM VIRTUAL-HD, " + vm[5] + ">")
+        tty(emit, "wd0: " + vm[3] + " MB, " + (vm[3] * 2048) + " sectors (.qvmdk)")
+    }
     tty(emit, "cd0 at atapibus0 drive 1: <BADAVM CD-ROM> cdrom removable")
     tty(emit, "wm0 at pci0: BadaVM NAT Ethernet, address " + vm[4])
     tty(emit, "wsdisplay0 at vga0: console emulation, exported to BadaX")
-    tty(emit, "boot device: wd0")
+    tty(emit, "boot device: " + dsk)
     return 0
 }
 
 def os_rc(emit, vm, st) {
     tty(emit, "Starting file system checks:")
-    tty(emit, "/dev/rwd0a: file system is clean; not checking")
+    tty(emit, "/dev/r" + st[16] + "a: file system is clean; not checking")
     tty(emit, "Setting tty flags.")
     tty(emit, "Starting network.")
     tty(emit, "Hostname: " + st[2])
     tty(emit, "wm0: DHCP lease 10.0.2.15 from 10.0.2.2 (BadaVM NAT)")
     tty(emit, "add net default: gateway 10.0.2.2")
     tty(emit, "Starting dhcpcd.")
-    tty(emit, "Starting sshd.")
     tty(emit, "Starting cron.")
+    st[14] = []
+    if (pkg_installed(st, "openssh-server") == 1) { svc_start(emit, st, "openssh-server", 1) }
+    if (pkg_installed(st, "xinetd") == 1) { svc_start(emit, st, "xinetd", 1) }
     tty(emit, "BadaX display export: DISPLAY=" + OS_DISPLAY +
               " (BadaX Server on the Windows host)")
     st[11] = "10.0.2.15"
@@ -206,8 +440,29 @@ def os_rc(emit, vm, st) {
 
 def os_login_banner(emit, vm, st) {
     tty(emit, " ")
-    tty(emit, "BadaBSD/amd64 (" + st[2] + ") (console)")
+    tty(emit, "BadaOS/amd64 (" + st[2] + ") (console)")
     tty(emit, " ")
+    return 0
+}
+
+# LILO lives in the MBR; on boot it chains into the GRUB 2 style menu.
+def os_bootloader_screen(emit, st) {
+    bl := st[15]
+    dsk := st[16]
+    if (bl == "lilo") {
+        tty(emit, "LILO 24.2 (MBR of " + dsk + ")  boot: BadaOS-GNU/Quantum")
+        return 0
+    }
+    if (bl == "grub-lilo") {
+        tty(emit, "LILO 24.2 (MBR of " + dsk + ") -> chaining GRUB menu mode")
+    }
+    tty(emit, "             GNU GRUB  version 2.12  (BadaOS quantum)")
+    tty(emit, " +--------------------------------------------------------------+")
+    tty(emit, " | *BadaOS GNU/Quantum 12.0 (kernel netbsd.quantum)             |")
+    tty(emit, " |  Advanced options for BadaOS                                 |")
+    tty(emit, " |  Memory test (memtest86+q, Hilbert dim 256)                  |")
+    tty(emit, " +--------------------------------------------------------------+")
+    tty(emit, "booting the highlighted entry in 0 seconds...")
     return 0
 }
 
@@ -216,7 +471,7 @@ def os_boot(emit, vm, st) {
     if (emit) { print("@@CLS") }
     vm_bios(emit, vm, st[1])
     if (st[1] == 0) {
-        tty(emit, ">> BadaBSD/amd64 BIOS Boot (CD), Revision 5.11 (quantum)")
+        tty(emit, ">> BadaOS/amd64 BIOS Boot (CD), Revision 5.12 (quantum)")
         tty(emit, ">> Memory: 640k base, " + (vm[2] - 1) + "M ext")
         tty(emit, "booting cd0a:netbsd.quantum - starting in 0 seconds...")
         tty(emit, " ")
@@ -227,11 +482,10 @@ def os_boot(emit, vm, st) {
         st[5] = 0
         sysinst_screen(emit, vm, st)
     } else {
-        tty(emit, ">> BadaBSD/amd64 BIOS Boot, Revision 5.11 (quantum)")
-        tty(emit, "booting hd0a:netbsd.quantum - starting in 0 seconds...")
+        os_bootloader_screen(emit, st)
         tty(emit, " ")
         os_dmesg(emit, vm, st)
-        tty(emit, "root on wd0a dumps on wd0b")
+        tty(emit, "root on " + st[16] + "a dumps on " + st[16] + "b")
         tty(emit, " ")
         os_rc(emit, vm, st)
         os_login_banner(emit, vm, st)
@@ -242,11 +496,14 @@ def os_boot(emit, vm, st) {
 
 # ====================================================================
 # sysinst -- the NetBSD-style full-screen installer
+#   0 language  1 main menu  2 target disk  3 partition scheme
+#   4 boot loader  5 last chance  6/7 root password  8 hostname
+#   10 done -> reboot
 # ====================================================================
 def sysinst_head(emit, title) {
     tty(emit, " ")
     tty(emit, "+-----------------------------------------------------------+")
-    tty(emit, "| BadaBSD-11.0 sysinst (quantum)                            |")
+    tty(emit, "| BadaOS-12.0 sysinst (quantum)                             |")
     tty(emit, "| " + title)
     tty(emit, "+-----------------------------------------------------------+")
     return 0
@@ -256,35 +513,49 @@ def sysinst_screen(emit, vm, st) {
     sub := st[5]
     if (sub == 0) {
         sysinst_head(emit, "Welcome / ようこそ")
-        tty(emit, "Welcome to sysinst, the BadaBSD-11.0 system installation tool.")
-        tty(emit, "This menu-driven tool will install BadaBSD on the virtual disk wd0.")
+        tty(emit, "Welcome to sysinst, the BadaOS-12.0 system installation tool.")
+        tty(emit, "This menu-driven tool will install BadaOS on a disk of this VM.")
         tty(emit, " ")
         tty(emit, "Installation messages in:")
         tty(emit, "    a: English")
         tty(emit, "    j: Japanese / 日本語")
     } else if (sub == 1) {
-        sysinst_head(emit, "BadaBSD-11.0 Install System")
-        tty(emit, "    a: Install BadaBSD to hard disk")
-        tty(emit, "    b: Upgrade BadaBSD on a hard disk")
+        sysinst_head(emit, "BadaOS-12.0 Install System")
+        tty(emit, "    a: Install BadaOS to hard disk")
+        tty(emit, "    b: Upgrade BadaOS on a hard disk")
         tty(emit, "    c: Re-install sets or install additional sets")
         tty(emit, "    d: Reboot the computer")
         tty(emit, "    x: Exit Install System")
     } else if (sub == 2) {
-        sysinst_head(emit, "Available disks")
-        tty(emit, "On which disk do you want to install BadaBSD?")
+        sysinst_head(emit, "Target disk (VMware Pro style)")
+        tty(emit, "On which disk do you want to install BadaOS?")
         tty(emit, " ")
-        tty(emit, "    a: wd0  (" + vm[3] + " MB, QUANTUM VIRTUAL-HD, " + vm[5] + ")")
+        tty(emit, "    a: wd0  仮想ディスク (" + vm[3] + " MB, QUANTUM VIRTUAL-HD .qvmdk)")
+        tty(emit, "    b: rd0  実ディスク   (raw device mapping -- ホスト物理ディスクへ")
+        tty(emit, "            パススルー。MBR セクタ 0 も実体に書き込みます)")
     } else if (sub == 3) {
         sysinst_head(emit, "Partitioning scheme")
-        tty(emit, "Select the partitioning scheme for wd0:")
+        tty(emit, "Select the partitioning scheme for " + st[16] + ":")
         tty(emit, " ")
         tty(emit, "    a: GPT  (GUID Partition Table)")
         tty(emit, "    b: MBR  (Master Boot Record)")
     } else if (sub == 4) {
-        sysinst_head(emit, "Last chance!")
-        tty(emit, "Shall we continue? The disk wd0 will be OVERWRITTEN.")
+        sysinst_head(emit, "Boot loader -> Master Boot Record")
+        tty(emit, "Install which boot loader into the MBR of " + st[16] + "?")
         tty(emit, " ")
-        tty(emit, "    a: Yes, install BadaBSD")
+        tty(emit, "    a: LILO を MBR へ + GRUB メニューモード (推奨)")
+        tty(emit, "       lilo -M が 446 byte のブートコードをセクタ 0 に書き、")
+        tty(emit, "       起動時は GRUB 2 スタイルのメニューにチェインします")
+        tty(emit, "    b: GRUB 2 のみ (grub-install /dev/r" + st[16] + "d)")
+        tty(emit, "    c: LILO のみ (テキスト boot: プロンプト)")
+    } else if (sub == 5) {
+        sysinst_head(emit, "Last chance!")
+        tty(emit, "Shall we continue? The disk " + st[16] + " will be OVERWRITTEN.")
+        if (st[16] == "rd0") {
+            tty(emit, "(rd0 は実ディスクです: MBR も含めて実体へ書き込まれます)")
+        }
+        tty(emit, " ")
+        tty(emit, "    a: Yes, install BadaOS")
         tty(emit, "    b: No, back to the main menu")
     } else if (sub == 6) {
         sysinst_head(emit, "Root password")
@@ -294,27 +565,54 @@ def sysinst_screen(emit, vm, st) {
         tty(emit, "Repeat new password:")
     } else if (sub == 8) {
         sysinst_head(emit, "Hostname")
-        tty(emit, "Enter the hostname of this machine (empty = badabsd):")
+        tty(emit, "Enter the hostname of this machine (empty = badaos):")
     } else if (sub == 10) {
         tty(emit, " ")
-        tty(emit, "Installation of BadaBSD-11.0 is now complete.  The event ledger")
+        tty(emit, "Installation of BadaOS-12.0 is now complete.  The event ledger")
         tty(emit, "has been committed to the Akashic machine tape (" + len(tuplespace) + " facts).")
         tty(emit, " ")
-        tty(emit, "Hit any key to reboot from the hard disk...")
+        tty(emit, "After the reboot:  apt update && apt install ssh xinetd zsh tcsh bash")
+        tty(emit, " ")
+        tty(emit, "Hit any key to reboot from " + st[16] + " (LILO/GRUB in the MBR)...")
+    }
+    return 0
+}
+
+def sysinst_bootloader_install(emit, vm, st) {
+    bl := st[15]
+    dsk := st[16]
+    tty(emit, " ")
+    if (bl == "grub") {
+        tty(emit, "grub-install /dev/r" + dsk + "d ... boot.img -> MBR sector 0 (446 bytes)")
+        tty(emit, "grub-install: core.img embedded, /boot/grub/grub.cfg generated")
+        tty(emit, "Installation finished. No error reported.")
+        return 0
+    }
+    tty(emit, "lilo -M /dev/r" + dsk + "d mbr  ... writing 446 byte boot code to sector 0")
+    tty(emit, "  (partition table preserved; backup in /boot/boot." + dsk + ".0000)")
+    if (bl == "grub-lilo") {
+        tty(emit, "lilo: install=menu -> chaining GRUB 2 menu mode (/boot/grub/grub.cfg)")
+        tty(emit, "Added BadaOS-GNU/Quantum *  (default, timeout 0)")
+    } else {
+        tty(emit, "Added BadaOS-GNU/Quantum *")
+    }
+    if (dsk == "rd0") {
+        tty(emit, "rd0: RDM flush -- the REAL master boot record now carries LILO")
     }
     return 0
 }
 
 def sysinst_extract(emit, vm, st) {
+    dsk := st[16]
     tty(emit, " ")
-    tty(emit, "Creating GPT label on wd0 ... done.")
-    tty(emit, "wd0a: root file system (" + (vm[3] - 512) + " MB, FFSv2)")
-    tty(emit, "wd0b: swap (512 MB)")
-    tty(emit, "newfs -O 2 /dev/rwd0a ... done  (quantum superblock committed)")
+    tty(emit, "Creating GPT label on " + dsk + " ... done.")
+    tty(emit, dsk + "a: root file system (" + (vm[3] - 512) + " MB, FFSv2)")
+    tty(emit, dsk + "b: swap (512 MB)")
+    tty(emit, "newfs -O 2 /dev/r" + dsk + "a ... done  (quantum superblock committed)")
     tty(emit, " ")
     tty(emit, "Extracting installation sets from cd0:")
     sets := ["kern-GENERIC.QUANTUM", "base", "etc", "comp", "games", "man",
-             "misc", "rescue", "text",
+             "misc", "rescue", "text", "apt-quantum",
              "xbase", "xcomp", "xetc", "xfont", "xserver-badax"]
     i := 0
     while (i < len(sets)) {
@@ -324,6 +622,7 @@ def sysinst_extract(emit, vm, st) {
         i := i + 1
     }
     tty(emit, "All selected sets extracted; ldconfig + etcupdate done.")
+    sysinst_bootloader_install(emit, vm, st)
     return 0
 }
 
@@ -342,18 +641,31 @@ def sysinst_key(emit, vm, st, k) {
         return 0
     }
     if (sub == 2) {
-        if (k == "a") { st[5] = 3; sysinst_screen(emit, vm, st) }
+        if (k == "a") { st[16] = "wd0"; st[5] = 3; sysinst_screen(emit, vm, st) }
+        else if (k == "b") {
+            st[16] = "rd0"
+            tty(emit, "rd0: raw device mapping armed (VMware Pro style pass-through)")
+            st[5] = 3
+            sysinst_screen(emit, vm, st)
+        }
         return 0
     }
     if (sub == 3) {
         if (list_has(["a", "b"], k) == 1) {
-            if (k == "a") { tty(emit, "Using GPT.") } else { tty(emit, "Using MBR.") }
+            if (k == "a") { tty(emit, "Using GPT (with a protective MBR for the boot code).") }
+            else { tty(emit, "Using MBR.") }
             st[5] = 4
             sysinst_screen(emit, vm, st)
         }
         return 0
     }
     if (sub == 4) {
+        if (k == "a") { st[15] = "grub-lilo"; st[5] = 5; sysinst_screen(emit, vm, st) }
+        else if (k == "b") { st[15] = "grub"; st[5] = 5; sysinst_screen(emit, vm, st) }
+        else if (k == "c") { st[15] = "lilo"; st[5] = 5; sysinst_screen(emit, vm, st) }
+        return 0
+    }
+    if (sub == 5) {
         if (k == "a") {
             sysinst_extract(emit, vm, st)
             st[5] = 6
@@ -393,7 +705,7 @@ def sysinst_line(emit, vm, st, s) {
     }
     if (sub == 8) {
         hn := s
-        if (len(hn) == 0) { hn := "badabsd" }
+        if (len(hn) == 0) { hn := "badaos" }
         st[2] = hn
         tty(emit, "Hostname: " + hn)
         tty(emit, " ")
@@ -423,6 +735,16 @@ def os_motd(emit, st) {
     return 0
 }
 
+def login_shell(st) {
+    pw := fs_get(st[4], "/etc/passwd")
+    if (len(pw) == 1) {
+        if (str_find(pw[0], "/bin/zsh") >= 0) { return "zsh" }
+        if (str_find(pw[0], "/bin/bash") >= 0) { return "bash" }
+        if (str_find(pw[0], "/bin/tcsh") >= 0) { return "tcsh" }
+    }
+    return "sh"
+}
+
 def os_login_line(emit, vm, st, s) {
     if (st[0] == "login") {
         if (len(s) == 0) { return 0 }
@@ -434,6 +756,7 @@ def os_login_line(emit, vm, st, s) {
     if (st[8] == "root" && s == st[3]) {
         st[9] = "root"
         st[0] = "shell"
+        st[13] = [login_shell(st)]
         tty(emit, "Last login: " + NOW + " on console")
         os_motd(emit, st)
     } else {
@@ -509,8 +832,18 @@ def cmd_ps(emit, st) {
     tty(emit, "PID  TTY    STAT  TIME     COMMAND")
     tty(emit, "  1  ?      Is    0:00.02  init")
     tty(emit, " 12  ?      Ss    0:00.05  dhcpcd: wm0 [10.0.2.15]")
-    tty(emit, " 35  ?      Is    0:00.01  /usr/sbin/sshd")
     tty(emit, " 48  ?      Is    0:00.01  cron")
+    pid := 60
+    i := 0
+    while (i < len(st[14])) {
+        d := st[14][i]
+        line := " " + (pid + i) + "  ?      Is    0:00.01  "
+        if (d == "sshd") { line := line + "/usr/sbin/sshd -D (QKD)" }
+        else if (d == "xinetd") { line := line + "/usr/sbin/xinetd -stayalive" }
+        else { line := line + d }
+        tty(emit, line)
+        i := i + 1
+    }
     base := 100
     i := 0
     while (i < len(st[6])) {
@@ -519,7 +852,8 @@ def cmd_ps(emit, st) {
                   " -display " + OS_DISPLAY)
         i := i + 1
     }
-    tty(emit, (200 + len(st[6])) + "  console Ss   0:00.04  -sh (sh)")
+    sh := cur_shell(st)
+    tty(emit, (200 + len(st[6])) + "  console Ss   0:00.04  -" + sh + " (" + sh + ")")
     return 0
 }
 
@@ -539,25 +873,51 @@ def cmd_qstat(emit, vm) {
     return 0
 }
 
+def shell_banner(emit, name) {
+    if (name == "bash") {
+        tty(emit, "GNU bash, version 5.2.21(1)-release (x86_64-badaos-quantum)")
+    } else if (name == "zsh") {
+        tty(emit, "zsh 5.9 (x86_64-badaos-quantum)")
+    } else if (name == "tcsh") {
+        tty(emit, "tcsh 6.24.10 (BadaOS quantum) options wide,nls,dl,al,kan,rh,color")
+    }
+    return 0
+}
+
+def shell_path(name) {
+    if (name == "sh") { return "/bin/sh" }
+    return "/bin/" + name
+}
+
 def shell_exec(emit, vm, st, line) {
     argv := tokenize(line)
     if (len(argv) == 0) { return 0 }
     cmd := argv[0]
 
     if (list_has(["help", "?"], cmd) == 1) {
-        tty(emit, "BadaBSD built-ins:")
-        tty(emit, "  uname [-a]  hostname  whoami  date  dmesg  ps  df  mount")
-        tty(emit, "  ls [path]  cat FILE  echo TEXT [> FILE]  touch FILE  rm FILE")
-        tty(emit, "  ifconfig  netstat  sysctl [name]  qstat  man CMD  clear")
-        tty(emit, "  startx  xclock &  xeyes &  xterm &  xlogo &  xdpyinfo")
-        tty(emit, "  xlsclients  xkill ID  exit  reboot  halt  shutdown -h now")
+        tty(emit, "BadaOS built-ins:")
+        tty(emit, "  apt update|install|remove|list  dpkg -l  which CMD  chsh -s SHELL")
+        tty(emit, "  bash  zsh  tcsh  (apt install bash zsh tcsh ... してから起動)")
+        tty(emit, "  ssh HOST  service NAME start|stop|status  (ssh/xinetd は apt で)")
+        tty(emit, "  uname [-a]  lsb_release -a  hostname  whoami  date  dmesg  ps  df")
+        tty(emit, "  mount  ls [path]  cat FILE  echo TEXT [> FILE]  touch  rm  clear")
+        tty(emit, "  ifconfig  netstat  sysctl [name]  qstat  man CMD  exit  reboot")
+        tty(emit, "  halt  startx  xclock &  xeyes &  xterm &  xlogo &  xdpyinfo")
+        tty(emit, "  xlsclients  xkill ID")
         return 0
     }
     if (cmd == "uname") {
         if (len(argv) > 1) {
-            tty(emit, "BadaBSD " + st[2] + " " + OS_VERSION + " " + OS_KERNEL +
-                      " amd64 (quantum)")
-        } else { tty(emit, "BadaBSD") }
+            tty(emit, "BadaOS " + st[2] + " " + OS_VERSION + " " + OS_KERNEL +
+                      " amd64 GNU/Quantum")
+        } else { tty(emit, "BadaOS") }
+        return 0
+    }
+    if (cmd == "lsb_release") {
+        tty(emit, "Distributor ID: BadaOS")
+        tty(emit, "Description:    BadaOS 12.0 GNU/Quantum (NetBSD-style base, Ubuntu-style apt)")
+        tty(emit, "Release:        12.0")
+        tty(emit, "Codename:       quantum")
         return 0
     }
     if (cmd == "hostname") { tty(emit, st[2]); return 0 }
@@ -571,13 +931,16 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "ps") { cmd_ps(emit, st); return 0 }
     if (cmd == "df") {
         tty(emit, "Filesystem   Size   Used  Avail  %Cap  Mounted on")
-        tty(emit, "/dev/wd0a    " + (vm[3] - 512) + "M   842M  " +
+        tty(emit, "/dev/" + st[16] + "a    " + (vm[3] - 512) + "M   842M  " +
                   (vm[3] - 512 - 842) + "M    4%   /")
         tty(emit, "tuplespace   inf    " + len(tuplespace) + "f   inf     0%   /akashic")
         return 0
     }
     if (cmd == "mount") {
-        tty(emit, "/dev/wd0a on / type ffs (local)")
+        tty(emit, "/dev/" + st[16] + "a on / type ffs (local)")
+        if (st[16] == "rd0") {
+            tty(emit, "  (rd0 = raw device mapping: ホスト実ディスクへのパススルー)")
+        }
         tty(emit, "tuplespace on /akashic type akashic (append-only, quantum)")
         return 0
     }
@@ -600,7 +963,7 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "echo") {
-        # echo TEXT [> FILE]  /  echo TEXT [>> FILE]
+        # echo TEXT [> FILE]  /  echo TEXT [>> FILE]  /  echo $SHELL
         redir := 0 - 1
         mode := ""
         i := 1
@@ -626,7 +989,10 @@ def shell_exec(emit, vm, st, line) {
             text := ""
             i := 1
             while (i < len(argv)) {
-                text := text + argv[i]
+                word := argv[i]
+                if (word == "$SHELL") { word := shell_path(cur_shell(st)) }
+                if (word == "$0") { word := cur_shell(st) }
+                text := text + word
                 if (i < len(argv) - 1) { text := text + " " }
                 i := i + 1
             }
@@ -660,21 +1026,32 @@ def shell_exec(emit, vm, st, line) {
         if (st[10] == 1) {
             tty(emit, "tcp    10.0.2.15.65100      10.0.2.2.6000       ESTABLISHED  # BadaX (QKD)")
         }
-        tty(emit, "tcp    *.22                 *.*                 LISTEN")
+        if (list_has(st[14], "sshd") == 1) {
+            tty(emit, "tcp    *.22                 *.*                 LISTEN       # sshd (QKD)")
+        }
+        if (list_has(st[14], "xinetd") == 1) {
+            tty(emit, "tcp    *.7                  *.*                 LISTEN       # xinetd: echo")
+            tty(emit, "tcp    *.13                 *.*                 LISTEN       # xinetd: daytime")
+            tty(emit, "tcp    *.19                 *.*                 LISTEN       # xinetd: chargen")
+        }
+        if (len(st[14]) == 0 && st[10] == 0) {
+            tty(emit, "(no daemons yet -- apt install ssh xinetd)")
+        }
         return 0
     }
     if (cmd == "sysctl") {
         if (len(argv) > 1 && argv[1] != "-a") {
             n := argv[1]
-            if (n == "kern.ostype") { tty(emit, "kern.ostype = BadaBSD") }
+            if (n == "kern.ostype") { tty(emit, "kern.ostype = BadaOS") }
             else if (n == "kern.osrelease") { tty(emit, "kern.osrelease = " + OS_VERSION) }
             else if (n == "hw.qcpu.qubits") { tty(emit, "hw.qcpu.qubits = 8") }
             else { tty(emit, "sysctl: " + n + ": unknown oid") }
             return 0
         }
-        tty(emit, "kern.ostype = BadaBSD")
+        tty(emit, "kern.ostype = BadaOS")
         tty(emit, "kern.osrelease = " + OS_VERSION)
         tty(emit, "kern.version = " + OS_KERNEL)
+        tty(emit, "kern.bootloader = " + st[15] + " (MBR of " + st[16] + ")")
         tty(emit, "hw.machine = amd64 (BadaVM Pro)")
         tty(emit, "hw.ncpu = " + vm[1])
         tty(emit, "hw.qcpu.qubits = 8")
@@ -683,10 +1060,121 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "qstat") { cmd_qstat(emit, vm); return 0 }
+
+    # ---- Ubuntu-style userland ----------------------------------------
+    if (list_has(["apt", "apt-get"], cmd) == 1) { apt_cmd(emit, vm, st, argv); return 0 }
+    if (cmd == "dpkg") {
+        tty(emit, "||/ Name              Version           Description")
+        tty(emit, "+++-=================-=================-==========================")
+        i := 0
+        while (i < len(st[12])) {
+            p := pkg_lookup(st[12][i])
+            tty(emit, "ii  " + p[0] + "  " + p[1] + "  " + p[2])
+            i := i + 1
+        }
+        if (len(st[12]) == 0) { tty(emit, "(no packages -- apt install ssh xinetd zsh tcsh bash)") }
+        return 0
+    }
+    if (cmd == "which") {
+        if (len(argv) < 2) { tty(emit, "usage: which command"); return 0 }
+        n := pkg_resolve(argv[1])
+        p := pkg_lookup(n)
+        if (len(p) > 0 && pkg_installed(st, n) == 1) { tty(emit, p[4]); return 0 }
+        if (argv[1] == "sh") { tty(emit, "/bin/sh"); return 0 }
+        tty(emit, "which: no " + argv[1] + " in PATH")
+        return 0
+    }
+    if (list_has(["bash", "zsh", "tcsh", "csh"], cmd) == 1) {
+        name := pkg_resolve(cmd)
+        if (cmd == "csh") { name := "tcsh" }
+        if (pkg_installed(st, name) == 0) {
+            tty(emit, cmd + ": command not found  (apt install " + name + " でインストール)")
+            return 0
+        }
+        st[13] <- name
+        shell_banner(emit, name)
+        return 0
+    }
+    if (cmd == "chsh") {
+        # chsh -s /bin/zsh
+        target := ""
+        if (len(argv) >= 3 && argv[1] == "-s") { target := argv[2] }
+        if (len(argv) == 2) { target := argv[1] }
+        name := target
+        if (str_find(name, "/bin/") == 0) { name := substr(name, 5, len(name) - 5) }
+        if (name != "sh" && pkg_installed(st, name) == 0) {
+            tty(emit, "chsh: " + target + ": non-standard shell (apt install " + name + " first)")
+            return 0
+        }
+        pw := fs_get(st[4], "/etc/passwd")
+        body := "root:*:0:0:Charlie Root:/root:" + shell_path(name) + "\n" +
+                "operator:*:2:5:System &:/usr/guest/operator:/sbin/nologin\n" +
+                "daemon:*:1:1:The devil himself:/:/sbin/nologin"
+        if (len(pw) == 1) { fs_put(st[4], "/etc/passwd", body) }
+        tty(emit, "chsh: root のログインシェルを " + shell_path(name) + " に変更しました")
+        return 0
+    }
+    if (cmd == "ssh") {
+        if (pkg_installed(st, "openssh-server") == 0 && pkg_installed(st, "openssh-client") == 0) {
+            tty(emit, "ssh: command not found  (apt install ssh)")
+            return 0
+        }
+        host := "localhost"
+        if (len(argv) > 1) { host := argv[1] }
+        tty(emit, "The authenticity of host '" + host + "' -- jones fingerprint " +
+                  "SHA256:jones-" + jones_key(vm_knot()))
+        sess := qkd_session()
+        if (sess[0]) {
+            tty(emit, "QKD channel: Bell pair OK (zero-preservation) -- session key agreed")
+            tty(emit, "Welcome to BadaOS 12.0 GNU/Quantum (" + host + ")")
+            tty(emit, "Connection to " + host + " closed.")
+        } else {
+            tty(emit, "QKD channel COMPROMISED -- connection refused")
+        }
+        return 0
+    }
+    if (cmd == "service") {
+        if (len(argv) < 3) { tty(emit, "usage: service NAME start|stop|status"); return 0 }
+        name := argv[1]
+        act := argv[2]
+        pkgname := name
+        if (name == "sshd") { pkgname := "openssh-server" }
+        if (name == "ssh") { pkgname := "openssh-server"; name := "sshd" }
+        if (act == "status") {
+            if (list_has(st[14], name) == 1) { tty(emit, name + " is running.") }
+            else { tty(emit, name + " is not running.") }
+            return 0
+        }
+        if (act == "start") {
+            if (pkg_installed(st, pkgname) == 0) {
+                tty(emit, "service: " + name + " not installed (apt install " + pkgname + ")")
+                return 0
+            }
+            svc_start(emit, st, pkgname, 0)
+            return 0
+        }
+        if (act == "stop") {
+            out := []
+            i := 0
+            while (i < len(st[14])) {
+                if (st[14][i] != name) { out <- st[14][i] }
+                i := i + 1
+            }
+            st[14] = out
+            tty(emit, "Stopping " + name + ".")
+            return 0
+        }
+        tty(emit, "service: unknown action " + act)
+        return 0
+    }
+
     if (cmd == "man") {
         if (len(argv) < 2) { tty(emit, "What manual page do you want?"); return 0 }
         n := argv[1]
-        if (n == "xclock") { tty(emit, "xclock(1) -- analogue clock for X; displays on the BadaX Server.") }
+        if (n == "apt") { tty(emit, "apt(8) -- Ubuntu-style package manager over the quantum archive.") }
+        else if (n == "lilo") { tty(emit, "lilo(8) -- installs the boot loader into the MBR (lilo -M, GRUB menu chain).") }
+        else if (n == "grub") { tty(emit, "grub(8) -- GRUB 2 menu; config in /boot/grub/grub.cfg.") }
+        else if (n == "xclock") { tty(emit, "xclock(1) -- analogue clock for X; displays on the BadaX Server.") }
         else if (n == "xeyes") { tty(emit, "xeyes(1) -- eyes that follow the Windows-host pointer.") }
         else if (n == "xterm") { tty(emit, "xterm(1) -- terminal emulator for X.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
@@ -734,6 +1222,14 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (list_has(["exit", "logout"], cmd) == 1) {
+        if (len(st[13]) > 1) {
+            popped := []
+            i := 0
+            while (i < len(st[13]) - 1) { popped <- st[13][i]; i := i + 1 }
+            st[13] = popped
+            tty(emit, "exit")
+            return 0
+        }
         st[9] = ""
         st[0] = "login"
         os_login_banner(emit, vm, st)
@@ -751,6 +1247,11 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "Please press any key to reboot.")
         st[0] = "halted"
         st[9] = ""
+        return 0
+    }
+    hint := pkg_lookup(pkg_resolve(cmd))
+    if (len(hint) > 0) {
+        tty(emit, cmd + ": command not found  (apt install " + hint[0] + " でインストール)")
         return 0
     }
     tty(emit, cmd + ": not found")
@@ -783,12 +1284,16 @@ def os_apply(vm, st, ev, emit) {
             st[9] = ""
             st[6] = []
             st[10] = 0
+            st[13] = ["sh"]
+            st[14] = []
             vm_power_off(emit, vm)
         } else if (act == "reset") {
             st[0] = "off"
             st[9] = ""
             st[6] = []
             st[10] = 0
+            st[13] = ["sh"]
+            st[14] = []
             os_boot(emit, vm, st)
         }
         return 0
@@ -808,6 +1313,15 @@ def os_apply(vm, st, ev, emit) {
     if (kind == "xclose") { st[6] = x_unmap_window(emit, st[6], ev[1]); return 0 }
     if (kind == "xmove") { x_move_window(st[6], ev[1], ev[2], ev[3]); return 0 }
     return 0
+}
+
+# the prompt of the current shell (Ubuntu-style for bash/zsh/tcsh)
+def os_prompt(st) {
+    sh := cur_shell(st)
+    if (sh == "bash") { return "root@" + st[2] + ":~# " }
+    if (sh == "zsh")  { return "[root@" + st[2] + "] ~ # " }
+    if (sh == "tcsh") { return st[2] + ":~% " }
+    return st[2] + "# "
 }
 
 # after the last event: tell the host chrome what to show
@@ -848,7 +1362,7 @@ def os_status(vm, st) {
     } else if (stage == "shell") {
         print("@@MODE line")
         print("@@ECHO on")
-        print("@@PROMPT " + st[2] + "# ")
+        print("@@PROMPT " + os_prompt(st))
     }
     return 0
 }

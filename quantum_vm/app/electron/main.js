@@ -4,7 +4,8 @@
  *
  * 本体は www/index.html に完全自己完結しています:
  *   ① BadaVM Pro   — 量子ハイパーバイザ (VMware Workstation Pro 風オマージュ)
- *   ② BadaBSD 11.0 — NetBSD 風ゲスト OS (sysinst 風インストーラ付き)
+ *   ② BadaOS 12.0  — NetBSD 風ベース + Ubuntu 風 apt のゲスト OS
+ *                    (sysinst 風インストーラ / 実ディスク RDM / LILO→MBR+GRUB)
  *   ③ BadaX Server — ASTEC-X 風 X サーバー (JONES-KNOT-COOKIE-1 + Bell対QKD)
  * 3 つとも量子プログラミング言語 Bada で書かれ、同梱の Bada 言語コア
  * (bada.js) がすべてのキー入力を Bada プログラムとして実行します。
