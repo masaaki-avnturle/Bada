@@ -135,7 +135,11 @@
   .xwin .body { flex:1; background:#efefef; overflow:hidden; position:relative; }
   .xwin canvas { display:block; }
   .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
-                       color:#d8f3d8; background:#101210; height:100%; overflow:auto; }
+                       color:#d8f3d8; background:#101210; height:100%; overflow:auto;
+                       outline:none; white-space:pre-wrap; word-break:break-all; cursor:text; }
+  .xwin pre.xtermtxt .in { color:#ffffff; }
+  .xcur { display:inline-block; width:6px; height:11px; background:#d8f3d8;
+          vertical-align:-1px; animation:blink 1s steps(1) infinite; }
 
   /* ===== dialogs ===== */
   .dlg { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
@@ -419,6 +423,18 @@ var VM_LIBS = __VM_LIBS_JSON__;
       case "SNAPSHOT": note("スナップショット: " + val); break;
       case "XCONN": xconn(val); break;
       case "X": handleX(val); break;
+      case "XTTY": {
+        var sp2 = val.indexOf(" ");
+        var xid = sp2 < 0 ? val : val.slice(0, sp2);
+        xtermData_(xid).lines.push(sp2 < 0 ? "" : val.slice(sp2 + 1));
+        break;
+      }
+      case "XCLS": xtermData_(val).lines = []; break;
+      case "XPROMPT": {
+        var sp3 = val.indexOf(" ");
+        if (sp3 >= 0) xtermData_(val.slice(0, sp3)).prompt = val.slice(sp3 + 1);
+        break;
+      }
     }
   }
 
@@ -434,6 +450,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
     persist();
     applyScene();
+    renderAllXterms();
     repaintTerm();
     updateButtons();
   }
@@ -450,6 +467,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
     ttyLine("(イベント台帳 " + events.length + " 件をリプレイして復元しました — 画面は最終イベント分のみ)");
     applyScene();
+    renderAllXterms();
     repaintTerm();
     updateButtons();
   }
@@ -562,6 +580,45 @@ var VM_LIBS = __VM_LIBS_JSON__;
   var xwins = {};   /* id -> {el, class} */
   var mouse = { x: 300, y: 200 };
 
+  /* ---- xterm windows are LIVE shells (pty sessions into BadaOS) ---- */
+  var XTERM_MAX = 600;
+  var xtermData = {};  /* id -> { lines, prompt, buf } */
+  function xtermData_(id) {
+    id = String(id);
+    if (!xtermData[id]) xtermData[id] = { lines: [], prompt: "# ", buf: "" };
+    return xtermData[id];
+  }
+  function renderXterm(win, id) {
+    if (!win.pre) return;
+    var d = xtermData_(id);
+    while (d.lines.length > XTERM_MAX) d.lines.shift();
+    var html = "";
+    for (var i = 0; i < d.lines.length; i++) html += esc(d.lines[i]) + "\n";
+    html += esc(d.prompt) + '<span class="in">' + esc(d.buf) + '</span><span class="xcur"></span>';
+    win.pre.innerHTML = html;
+    win.pre.scrollTop = win.pre.scrollHeight;
+  }
+  function renderAllXterms() {
+    for (var id in xwins) if (xwins[id].cls === "xterm") renderXterm(xwins[id], id);
+  }
+  function xtermKey(win, id, e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    var d = xtermData_(id);
+    if (e.key === "Enter") {
+      e.preventDefault(); e.stopPropagation();
+      var b = d.buf; d.buf = "";
+      d.lines.push(d.prompt + b);
+      renderXterm(win, id);
+      send(["xline", +id, b]);
+    } else if (e.key === "Backspace") {
+      e.preventDefault(); e.stopPropagation();
+      d.buf = d.buf.slice(0, -1); renderXterm(win, id);
+    } else if (e.key.length === 1) {
+      e.preventDefault(); e.stopPropagation();
+      d.buf += e.key; renderXterm(win, id);
+    }
+  }
+
   function handleX(val) {
     var sp = val.indexOf(" ");
     var op = sp < 0 ? val : val.slice(0, sp);
@@ -604,7 +661,9 @@ var VM_LIBS = __VM_LIBS_JSON__;
       if (!xwins[id]) xwins[id] = makeXWin(id, cls, x, y, w, h, title);
       else { xwins[id].el.style.left = x + "px"; xwins[id].el.style.top = y + "px"; }
     }
-    for (var id2 in xwins) if (!keep[id2]) { xroot.removeChild(xwins[id2].el); delete xwins[id2]; }
+    for (var id2 in xwins) if (!keep[id2]) {
+      xroot.removeChild(xwins[id2].el); delete xwins[id2]; delete xtermData[id2];
+    }
     var count = 0; for (var k in xwins) count++;
     $("xempty").style.display = count ? "none" : "flex";
     if (count) showX(true);
@@ -628,11 +687,13 @@ var VM_LIBS = __VM_LIBS_JSON__;
       });
     } else if (cls === "xterm") {
       var pre = document.createElement("pre"); pre.className = "xtermtxt";
-      pre.textContent = "BadaOS 12.0 (GENERIC.QUANTUM) -- xterm on " + title.replace(/^xterm -- /, "") +
-        "\n$ uname -a\nBadaOS " + (title.replace(/^xterm -- /, "") || "badaos") +
-        " 12.0_QUANTUM amd64 GNU/Quantum\n$ echo displayed via BadaX Server on Windows\n" +
-        "displayed via BadaX Server on Windows\n$ ▎";
+      pre.tabIndex = 0;
+      pre.title = "ここに直接コマンドを入力できます (live BadaOS shell)";
       body.appendChild(pre);
+      win.pre = pre;
+      pre.addEventListener("keydown", function (e) { xtermKey(win, id, e); });
+      pre.addEventListener("mousedown", function () { setTimeout(function(){ pre.focus(); }, 0); });
+      renderXterm(win, id);
     }
     bx.addEventListener("click", function () { send(["xclose", +id]); });
     dragify(el, tb, xroot, function (nx, ny) { send(["xmove", +id, nx, ny]); });

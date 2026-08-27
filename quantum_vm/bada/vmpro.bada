@@ -176,7 +176,25 @@ def qkd_session() {
 }
 
 # ---- guarded printing (silent during ledger replay) -----------------
-def tty(emit, s)  { if (emit) { print("@@TTY " + s) } }
+# SINK routes terminal output: [0] == 0 -> the VM console (@@TTY),
+# [0] == <window id> -> that xterm window on the BadaX display (@@XTTY).
+# A one-element list so functions can retarget it in place.
+SINK := [0]
+
+def tty(emit, s) {
+    if (emit) {
+        if (SINK[0] == 0) { print("@@TTY " + s) }
+        else { print("@@XTTY " + SINK[0] + " " + s) }
+    }
+}
+
+def cls(emit) {
+    if (emit) {
+        if (SINK[0] == 0) { print("@@CLS") }
+        else { print("@@XCLS " + SINK[0]) }
+    }
+}
+
 def hyp(emit, s)  { if (emit) { print("@@HYP " + s) } }
 
 # ====================================================================

@@ -68,13 +68,24 @@ def x_geometry(class, nth) {
 
 # ---- CreateWindow + MapWindow ---------------------------------------
 # xwins is the guest-side list of mapped windows:
-#   [id, class, x, y, w, h, title]
+#   [id, class, x, y, w, h, title, session]
+# session is per-window client state; for xterm it is the window's own
+# shell stack (a live BadaOS pty session on ttyp<id>).
 def x_map_window(xsrv, xwins, class, title) {
     id := xsrv[0]
     xsrv[0] = id + 1
     g := x_geometry(class, len(xwins))
-    xwins <- [id, class, g[0], g[1], g[2], g[3], title]
+    xwins <- [id, class, g[0], g[1], g[2], g[3], title, ["sh"]]
     return id
+}
+
+def xwin_find(xwins, id) {
+    i := 0
+    while (i < len(xwins)) {
+        if (xwins[i][0] == id) { return xwins[i] }
+        i := i + 1
+    }
+    return []
 }
 
 def x_unmap_window(emit, xwins, id) {

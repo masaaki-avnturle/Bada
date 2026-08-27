@@ -72,6 +72,11 @@ function run(events) {
     ["line", "xeyes &"],        // 22
     ["line", "xdpyinfo"],       // 23
     ["line", "qstat"],          // 24
+    ["line", "xterm &"],        // 25 window 3: a LIVE shell inside the xterm
+    ["xline", 3, "uname -a"],   // 26 command typed INSIDE the xterm window
+    ["xline", 3, "zsh"],        // 27 shell switch inside the xterm
+    ["xline", 3, "exit"],       // 28 back to sh in the xterm
+    ["xline", 3, "exit"],       // 29 shell exits -> the window closes
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -99,6 +104,11 @@ function run(events) {
     [21, "@@X WIN 1|xclock"],               // window on the BadaX display
     [23, "JONES-KNOT-COOKIE-1"],            // X auth cookie verified
     [24, "zero-preservation"],              // quantum tamper evidence
+    [25, "@@XTTY 3 This is a live shell"],  // xterm greets its own pty
+    [26, "@@XTTY 3 BadaOS quantum 12.0_QUANTUM"], // command ran inside the xterm
+    [27, "@@XPROMPT 3 [root@quantum] ~ # "],      // zsh prompt inside the xterm
+    [28, "@@XPROMPT 3 quantum# "],                // popped back to sh
+    [29, "@@X UNMAP 3"],                    // exit at the bottom closes the window
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -109,7 +119,8 @@ function run(events) {
     }
   }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB) -> boot -> login -> apt " +
-    "(ssh/xinetd/zsh/tcsh/bash) -> shells -> X on BadaX (" + tape.length + " ledger events)");
+    "(ssh/xinetd/zsh/tcsh/bash) -> shells -> X on BadaX -> live xterm shell (" +
+    tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

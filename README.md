@@ -86,7 +86,7 @@ GNU シェル群) を導入、VM 内の X クライアント (`xclock` / `xeyes`
 - 仮想マシンは量子 vCPU (8 qubit / Hilbert 次元 256)・tuplespace メモリ・仮想ディスク wd0 / 実ディスク rd0 (RDM)・NAT を持ち、マシン記述は `.qvmx`
 - BadaOS は CD (ISO) から起動 → sysinst で ディスク選択 (wd0/rd0)・GPT/MBR・**ブートローダ (LILO→MBR + GRUB メニュー)**・`newfs` FFSv2・セット展開 → root パスワード・ホスト名・DHCP → LILO/GRUB 経由でディスクから再起動 → `login: root`
 - **Ubuntu 風 apt**: `apt update && apt install ssh xinetd zsh tcsh bash` で sshd (QKD)・xinetd・bash/zsh/tcsh を導入。`zsh` 等でシェル切替、`chsh -s /bin/zsh`、`service sshd status`、`netstat`、`ssh localhost` (Bell 対 QKD)、`qstat` で零保存確認
-- X 表示は ASTEC-X と同じ「計算は UNIX 側・表示は Windows 側」: `DISPLAY=10.0.2.2:0` の **BadaX Server** へ NAT 越しに接続。認証は **JONES-KNOT-COOKIE-1**(三葉結び目の Kauffman/Jones 多項式鍵)+ Bell 対 QKD
+- X 表示は ASTEC-X と同じ「計算は UNIX 側・表示は Windows 側」: `DISPLAY=10.0.2.2:0` の **BadaX Server** へ NAT 越しに接続。認証は **JONES-KNOT-COOKIE-1**(三葉結び目の Kauffman/Jones 多項式鍵)+ Bell 対 QKD。**xterm ウィンドウの中もライブな pty セッション**で、ウィンドウ内で直接コマンドライン (apt / zsh / …) が使えます
 - マシン全状態は追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイ。**スナップショット = 台帳のプレフィックス**
 - ビルドは [`quantumvm-app-build.yml`](.github/workflows/quantumvm-app-build.yml)(`quantumvm-v*` タグで Release へ添付)。詳細は [`quantum_vm/README.md`](quantum_vm/README.md)
 

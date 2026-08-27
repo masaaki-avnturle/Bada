@@ -37,6 +37,11 @@
 5. `xclock &` `xeyes &` `xterm &` を実行すると、X クライアントが NAT 越しに
    `DISPLAY=10.0.2.2:0` — **Windows ホスト側の BadaX Server ウィンドウ** — に表示されます。
    ASTEC-X と同じ「計算は UNIX 側、表示は Windows 側」のワークフローです。
+   **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
+   ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
+   `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、
+   最下段で `exit` すると実物の xterm と同じくウィンドウが閉じます)。VM コンソールと
+   xterm は同じ OS 状態を共有します。
 6. **📷 スナップショット / ⤺ 復元** — マシンの全状態 (apt でインストールしたパッケージ含む) は
    追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイなので、スナップショットは
    台帳のプレフィックスそのものです。
@@ -76,7 +81,7 @@ node quantum_vm/tools/build-vm.js
 で `dist/bada-vm-pro.html` と Electron 用 `app/www/index.html` を再生成します。
 ビルド前に、実 Bada インタープリタで **電源オン → sysinst インストール (実ディスク rd0 +
 LILO→MBR + GRUB メニュー) → 再起動 → ログイン → `apt install ssh xinetd zsh tcsh bash` →
-シェル切替 → QKD ssh → BadaX への X クライアント表示** のライフサイクル全体 (24 イベント) を
+シェル切替 → QKD ssh → BadaX への X クライアント表示 → xterm 内ライブシェル** のライフサイクル全体 (29 イベント) を
 セルフチェックし、失敗すると生成しません。
 
 ```

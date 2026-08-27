@@ -806,6 +806,13 @@ def x_launch(emit, vm, st, class, title) {
     id := x_map_window(st[7], st[6], class, title)
     tty(emit, class + ": window " + id + " mapped on " + OS_DISPLAY +
               " (BadaX Server, Windows host)")
+    if (class == "xterm") {
+        # the xterm is a LIVE pty session into this BadaOS: greet it
+        SINK[0] = id
+        tty(emit, "BadaOS 12.0 GNU/Quantum (" + st[2] + ") -- xterm on ttyp" + id)
+        tty(emit, "This is a live shell: type commands here (help / apt / zsh ...)")
+        SINK[0] = 0
+    }
     return 0
 }
 
@@ -864,7 +871,10 @@ def cmd_qstat(emit, vm) {
     bell := CNOT(bell, 0, 1)
     tty(emit, "  Bell pair prepared: (|00> + |11>) / sqrt(2)")
     outcome := Measure(bell)
-    if (emit) { print("@@TTY   Measure commit ->", outcome) }
+    if (emit) {
+        if (SINK[0] == 0) { print("@@TTY   Measure commit ->", outcome) }
+        else { print("@@XTTY " + SINK[0] + "   Measure commit ->", outcome) }
+    }
     zp := "no"
     if ((outcome[1] == 0) && (outcome[2] == 0)) { zp := "yes -- EXACTLY 0" }
     tty(emit, "  zero-preservation (forbidden |01>,|10>): " + zp)
@@ -1182,7 +1192,7 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "clear") {
-        if (emit) { print("@@CLS") }
+        cls(emit)
         return 0
     }
     if (cmd == "startx") {
@@ -1237,12 +1247,18 @@ def shell_exec(emit, vm, st, line) {
     }
     if (cmd == "reboot") {
         tty(emit, "syncing disks... done")
-        tty(emit, "rebooting...")
+        tty(emit, "rebooting...  (X clients on the BadaX display are closed)")
+        SINK[0] = 0
+        st[6] = []
+        st[10] = 0
         os_boot(emit, vm, st)
         return 0
     }
     if (list_has(["halt", "shutdown", "poweroff"], cmd) == 1) {
         tty(emit, "syncing disks... done")
+        SINK[0] = 0
+        st[6] = []
+        st[10] = 0
         tty(emit, "The operating system has halted.")
         tty(emit, "Please press any key to reboot.")
         st[0] = "halted"
@@ -1312,16 +1328,56 @@ def os_apply(vm, st, ev, emit) {
     }
     if (kind == "xclose") { st[6] = x_unmap_window(emit, st[6], ev[1]); return 0 }
     if (kind == "xmove") { x_move_window(st[6], ev[1], ev[2], ev[3]); return 0 }
+    if (kind == "xline") {
+        w := xwin_find(st[6], ev[1])
+        if (len(w) == 0) { return 0 }
+        if (w[1] != "xterm") { return 0 }
+        SINK[0] = ev[1]
+        xterm_exec(emit, vm, st, w, ev[2])
+        SINK[0] = 0
+        return 0
+    }
     return 0
 }
 
-# the prompt of the current shell (Ubuntu-style for bash/zsh/tcsh)
-def os_prompt(st) {
-    sh := cur_shell(st)
+# the prompt of a shell stack (Ubuntu-style for bash/zsh/tcsh)
+def stack_prompt(st, stack) {
+    sh := stack[len(stack) - 1]
     if (sh == "bash") { return "root@" + st[2] + ":~# " }
     if (sh == "zsh")  { return "[root@" + st[2] + "] ~ # " }
     if (sh == "tcsh") { return st[2] + ":~% " }
     return st[2] + "# "
+}
+
+def os_prompt(st) { return stack_prompt(st, st[13]) }
+
+# ---- a command line INSIDE an xterm window --------------------------
+# The xterm carries its own shell stack (w[7]); output is routed to the
+# window through SINK. `exit` at the bottom of the stack closes the
+# window, exactly like a real xterm when its shell exits.
+def xterm_exec(emit, vm, st, w, line) {
+    argv := tokenize(line)
+    if (len(argv) > 0) {
+        if (list_has(["exit", "logout"], argv[0]) == 1) {
+            if (len(w[7]) > 1) {
+                popped := []
+                i := 0
+                while (i < len(w[7]) - 1) { popped <- w[7][i]; i := i + 1 }
+                w[7] = popped
+                tty(emit, "exit")
+                return 0
+            }
+            SINK[0] = 0
+            st[6] = x_unmap_window(emit, st[6], w[0])
+            return 0
+        }
+    }
+    save := st[13]
+    st[13] = w[7]
+    shell_exec(emit, vm, st, line)
+    w[7] = st[13]
+    st[13] = save
+    return 0
 }
 
 # after the last event: tell the host chrome what to show
@@ -1330,6 +1386,14 @@ def os_status(vm, st) {
     print("@@POWERSTATE " + vm[6])
     print("@@XCONN " + st[10] + "|" + st[7][1] + "|" + vm[8])
     x_scene(true, st[6])
+    i := 0
+    while (i < len(st[6])) {
+        w := st[6][i]
+        if (w[1] == "xterm") {
+            print("@@XPROMPT " + w[0] + " " + stack_prompt(st, w[7]))
+        }
+        i := i + 1
+    }
     stage := st[0]
     if (stage == "off") {
         print("@@MODE off")
