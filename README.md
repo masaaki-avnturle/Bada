@@ -71,6 +71,39 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`bada_on_rails/`** | **Bada on Rails** — Bada 言語の Rails 風 Web フレームワーク · 作用素プログラミング (`@reviser : extension rails` ホスト作用素) · **分岐オブジェクト** (`superpose [...] with [...]` / Born 則 `collapse` / 位相回転 / 重ね合わせ属性の遅延収縮 / 分岐ルーティング) · Akashic 追記専用台帳 DB · `@reviser : grammar` ルーティング DSL (`resources :posts`) · ERB 風 `.bada.erb` ビュー · scaffold ジェネレータ + CLI + 量子ブログ同梱 | [→ 開く](bada_on_rails/) |
+
+---
+
+## 🚄 Bada on Rails — 量子プログラミング言語 Bada の Web フレームワーク
+
+**分岐オブジェクト・作用素プログラミング**による Rails 風フルスタック Web フレームワーク。ルーティング・モデル・コントローラ・ビューを**すべて Bada 言語**で書きます (Node.js だけで動作・依存ゼロ)。
+
+```bada
+# config/routes.bada — @reviser : grammar 文法拡張が定義する DSL
+root to: "posts#index"
+resources :posts
+get "/lucky", to: superpose ["posts#index", "posts#quantum"] with [0.5, 0.5]
+
+# app/controllers/posts_controller.bada — 作用素スタイル
+def posts_create() {
+  id := post_create([["title", param("title")],
+                     ["status", superpose ["draft", "published"] with [0.5, 0.5]]])
+  redirect_to("/posts/" + id)   # ステータスは重ね合わせのまま保存され、
+}                               # 最初の読み出しで測定・確定 (collapse 事実を台帳へ)
+```
+
+- **分岐オブジェクト** — `superpose [...] with [...]` で値の重ね合わせを準備、`collapse` は Born 則の射影測定 (`branch_phase` の位相回転は確率 |amp|² を変えない)。レコード属性・ルート先にも指定可能
+- **Akashic 台帳 DB** — 永続化は追記のみ (`db/akashic.jsonl`)。作成・更新・削除 (墓標)・測定がすべて事実としてコミットされ、現在状態は台帳のリプレイ
+- **scaffold** — `bada-rails new myapp` → `bada-rails generate scaffold post title:string body:text` → `bada-rails server`
+
+```sh
+node bada_on_rails/bin/bada-rails server --root bada_on_rails/examples/quantum_blog -p 2300
+# → http://localhost:2300/ (量子ブログ) · /quantum (分岐デモ) · /lucky (分岐ルーティング)
+node bada_on_rails/test/run_tests.js   # 結合テスト
+```
+
+詳細は [`bada_on_rails/README.md`](bada_on_rails/README.md) を参照。
 
 ---
 

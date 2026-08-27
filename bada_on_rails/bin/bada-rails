@@ -1,0 +1,142 @@
+#!/usr/bin/env node
+/*
+ * bada-rails — Bada on Rails コマンドラインツール
+ *
+ *   bada-rails new <dir>                          アプリスケルトン生成
+ *   bada-rails generate scaffold <name> [f:t...]  scaffold 生成
+ *   bada-rails server  [--root DIR] [-p PORT] [--seed N] [--db FILE]
+ *   bada-rails routes  [--root DIR]
+ *   bada-rails console [--root DIR]               Bada 対話コンソール
+ *   bada-rails version
+ */
+"use strict";
+
+const path = require("path");
+const fs = require("fs");
+const readline = require("readline");
+const { RailsApp, VERSION } = require("../lib/kernel.js");
+const gen = require("../lib/generators.js");
+
+function usage() {
+  console.error(
+    "Bada on Rails " + VERSION + " — 量子プログラミング言語 Bada の Web フレームワーク\n" +
+    "usage:\n" +
+    "  bada-rails new <dir>                          # アプリスケルトン生成\n" +
+    "  bada-rails generate scaffold <name> [f:t...]  # 例: post title:string body:text\n" +
+    "  bada-rails server  [--root DIR] [-p PORT] [--seed N] [--db FILE]\n" +
+    "  bada-rails routes  [--root DIR]\n" +
+    "  bada-rails console [--root DIR]\n" +
+    "  bada-rails version"
+  );
+}
+
+function parseFlags(argv) {
+  const flags = { _: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--root") flags.root = argv[++i];
+    else if (a === "-p" || a === "--port") flags.port = parseInt(argv[++i], 10);
+    else if (a === "--seed") flags.seed = parseInt(argv[++i], 10);
+    else if (a === "--db") flags.db = argv[++i];
+    else flags._.push(a);
+  }
+  return flags;
+}
+
+function appRoot(flags) {
+  const root = path.resolve(flags.root || process.cwd());
+  if (!fs.existsSync(path.join(root, "config", "routes.bada"))) {
+    console.error("エラー: " + root + " は Bada on Rails アプリではありません (config/routes.bada がない)。");
+    console.error("`bada-rails new <dir>` で作成するか、--root DIR を指定してください。");
+    process.exit(1);
+  }
+  return root;
+}
+
+function bootApp(flags, opts) {
+  const root = appRoot(flags);
+  const o = Object.assign({}, opts || {});
+  if (flags.seed !== undefined && Number.isFinite(flags.seed)) o.seed = flags.seed;
+  if (flags.db !== undefined) o.dbPath = path.resolve(flags.db);
+  const app = new RailsApp(root, o);
+  app.boot();
+  return app;
+}
+
+const argv = process.argv.slice(2);
+const cmd = argv[0];
+const flags = parseFlags(argv.slice(1));
+
+if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") { usage(); process.exit(cmd ? 0 : 1); }
+
+if (cmd === "version" || cmd === "--version" || cmd === "-v") {
+  console.log("bada-rails " + VERSION + " (node " + process.version + ")");
+  process.exit(0);
+}
+
+if (cmd === "new") {
+  const dir = flags._[0];
+  if (!dir) { usage(); process.exit(1); }
+  try {
+    const root = gen.newApp(dir, (s) => console.error(s));
+    console.error("\nBada on Rails アプリを作成しました: " + root);
+    console.error("  cd " + dir + " && bada-rails server");
+  } catch (e) {
+    console.error("エラー: " + e.message);
+    process.exit(1);
+  }
+
+} else if (cmd === "generate" || cmd === "g") {
+  const kind = flags._[0];
+  if (kind !== "scaffold" || !flags._[1]) {
+    console.error("usage: bada-rails generate scaffold <name> [field:type ...]   (type: string | text)");
+    process.exit(1);
+  }
+  const root = appRoot(flags);
+  try {
+    const r = gen.scaffold(root, flags._[1], flags._.slice(2), (s) => console.error(s));
+    console.error("\nscaffold " + r.name + " を生成しました (RESTful ルート: resources :" + r.res + ")");
+  } catch (e) {
+    console.error("エラー: " + e.message);
+    process.exit(1);
+  }
+
+} else if (cmd === "server" || cmd === "s") {
+  const app = bootApp(flags);
+  app.server(flags.port || 2300);
+
+} else if (cmd === "routes") {
+  const app = bootApp(flags, { quiet: true, dbPath: null });
+  const rows = app.routesTable();
+  const w1 = Math.max(6, ...rows.map((r) => r.method.length));
+  const w2 = Math.max(7, ...rows.map((r) => r.pattern.length));
+  console.log("METHOD".padEnd(w1) + "  " + "PATTERN".padEnd(w2) + "  TARGET");
+  for (const r of rows) {
+    console.log(r.method.padEnd(w1) + "  " + r.pattern.padEnd(w2) + "  " + r.target);
+  }
+
+} else if (cmd === "console" || cmd === "c") {
+  const app = bootApp(flags);
+  console.log("Bada on Rails " + VERSION + " console — Bada セッション (rails 作用素・分岐オブジェクト使用可)");
+  console.log('例: collapse(superpose ["a", "b"] with [0.5, 0.5])  /  post_all()  /  akashic_tail(5)');
+  console.log("exit / quit で終了。");
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY });
+  rl.setPrompt("bada-rails> ");
+  rl.prompt();
+  rl.on("line", (line) => {
+    const t = line.trim();
+    if (t === "exit" || t === "quit") { rl.close(); return; }
+    if (t) {
+      const r = app.session.eval(t);
+      if (r.errors.length) for (const e of r.errors) console.error(e);
+      if (r.output) console.log(r.output);
+      if (r.value !== null && r.value !== undefined) console.log(r.value);
+    }
+    rl.prompt();
+  });
+  rl.on("close", () => { console.log("(Akashic ledger: " + app.db.facts.length + " facts)"); process.exit(0); });
+
+} else {
+  usage();
+  process.exit(1);
+}

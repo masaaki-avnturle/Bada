@@ -1,0 +1,103 @@
+# ============================================================
+# railtie.bada — Bada on Rails 標準ライブラリ (Bada 言語側)
+#
+# Bada on Rails のフレームワーク面はすべてここで Bada 言語自身の
+# 拡張機構によって定義される:
+#
+#   1. @reviser : extension rails { ... }
+#      — カーネル (lib/kernel.js) が提供するホスト作用素の宣言。
+#        FFI 規約は論文 "Reviser-Extensible Grammars" の拡張
+#        トランザクションそのもの (JSON over argv/stdout)。
+#        各宣言は追記専用台帳に extension 事実としてコミットされる。
+#
+#   2. @reviser : grammar { ... }
+#      — Rails 風ルーティング / モデル宣言 / 重ね合わせ構文を
+#        文法拡張トランザクションとして導入する。以後のファイル
+#        (config/routes.bada, app/models/*.bada, ...) は
+#            get "/posts", to: "posts#index"
+#            resources :posts
+#            model :post, fields: ["title", "body"]
+#            superpose ["a", "b"] with [0.7, 0.3]
+#        をそのまま Bada 文として書ける。
+#
+#   3. 作用素シュガー — collapse / branch / field などの短い定義。
+# ============================================================
+
+@reviser : extension rails {
+  # ---- ルーティング / モデル宣言 ----
+  fun rails_route     |method, pattern, target| """host"""
+  fun rails_resources |name|                    """host"""
+  fun rails_model     |name, fields|            """host"""
+
+  # ---- リクエスト ----
+  fun param           |name|                    """host"""
+  fun params_all      ||                        """host"""
+  fun request_method  ||                        """host"""
+  fun request_path    ||                        """host"""
+
+  # ---- レスポンス ----
+  fun render_view     |name, locals|            """host"""
+  fun render_html     |html|                    """host"""
+  fun render_json     |value|                   """host"""
+  fun redirect_to     |path|                    """host"""
+  fun head            |status|                  """host"""
+
+  # ---- Akashic DB (追記専用 tuplespace 台帳) ----
+  fun db_all          |model|                   """host"""
+  fun db_find         |model, id|               """host"""
+  fun db_create       |model, fields|           """host"""
+  fun db_update       |model, id, fields|       """host"""
+  fun db_destroy      |model, id|               """host"""
+  fun db_count        |model|                   """host"""
+  fun akashic_len     ||                        """host"""
+  fun akashic_tail    |n|                       """host"""
+
+  # ---- 分岐オブジェクト (値の重ね合わせ / Born 則測定) ----
+  fun branch_make     |values, weights|         """host"""
+  fun branch_uniform  |values|                  """host"""
+  fun branch_phase    |b, index, theta|         """host"""
+  fun branch_probs    |b|                       """host"""
+  fun branch_values   |b|                       """host"""
+  fun branch_state    |b|                       """host"""
+  fun branch_collapse |b|                       """host"""
+
+  # ---- ユーティリティ ----
+  fun h               |value|                   """host"""
+  fun fmt             |value|                   """host"""
+  fun pairs_get       |pairs, key|              """host"""
+  fun log             |message|                 """host"""
+  fun __probe         |value|                   """host"""
+  fun __rails_emit    |html|                    """host"""
+}
+
+# ---- Rails 風 DSL: 文法拡張トランザクション -----------------------------
+# ルールは解析時ルール台帳へ追記コミットされ (最新最優先・単調増加)、
+# 実行時にも rule 事実として tuplespace 台帳へ記録される。
+
+@reviser : grammar {
+  rule "route_get"    stmt [ 'get' expr ',' 'to' ':' expr ]    => rails_route("GET", _1, _2);
+  rule "route_post"   stmt [ 'post' expr ',' 'to' ':' expr ]   => rails_route("POST", _1, _2);
+  rule "route_put"    stmt [ 'put' expr ',' 'to' ':' expr ]    => rails_route("PUT", _1, _2);
+  rule "route_patch"  stmt [ 'patch' expr ',' 'to' ':' expr ]  => rails_route("PATCH", _1, _2);
+  rule "route_delete" stmt [ 'delete' expr ',' 'to' ':' expr ] => rails_route("DELETE", _1, _2);
+  rule "route_root"   stmt [ 'root' 'to' ':' expr ]            => rails_route("GET", "/", _1);
+  rule "resources"    stmt [ 'resources' ':' expr ]            => rails_resources(_1);
+  rule "model_decl"   stmt [ 'model' ':' expr ',' 'fields' ':' expr ] => rails_model(_1, _2);
+
+  # 分岐オブジェクト構文:  superpose [値...] with [重み...]
+  rule "superpose"    expr [ 'superpose' expr 'with' expr ]    => branch_make(_1, _2);
+}
+
+# ---- 作用素シュガー ------------------------------------------------------
+
+def branch |values| => branch_uniform(values)
+def collapse |b| => branch_collapse(b)
+def field |record, key| => pairs_get(record, key)
+
+# フォーム再描画用: レコードが nil (new) なら空文字を返す
+def form_value |record, key| {
+  if (record == nil) { return "" }
+  v := pairs_get(record, key)
+  if (v == nil) { return "" }
+  return v
+}

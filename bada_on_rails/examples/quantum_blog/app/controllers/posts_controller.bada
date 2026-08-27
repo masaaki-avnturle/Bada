@@ -1,0 +1,78 @@
+# PostsController — quantum_blog
+#
+# ルート先 "posts#index" は関数 posts_index にディスパッチされる。
+# レスポンスは render_view / render_json / redirect_to / head 作用素で返す。
+
+# ---- フォームパラメータ (strong parameters はモデル側でも二重に効く) ----
+
+def posts_form_status() {
+  s := param("status")
+  if (s == "superposed") {
+    # 量子ステータス: draft / published の重ね合わせのまま Akashic 台帳に
+    # 保存され、最初の読み出しで測定・確定する (遅延収縮)。
+    return superpose ["draft", "published"] with [0.5, 0.5]
+  }
+  return s
+}
+
+def posts_form_params() {
+  return [["title", param("title")], ["body", param("body")], ["status", posts_form_status()]]
+}
+
+# ---- RESTful アクション ----
+
+def posts_index() {
+  render_view("posts/index", ["posts", post_all(), "count", post_count(), "ledger", akashic_tail(5)])
+}
+
+def posts_show() {
+  r := post_find(param("id"))
+  if (r == nil) { head(404) return }
+  render_view("posts/show", ["record", r])
+}
+
+def posts_new() {
+  render_view("posts/new", ["record", nil, "action_url", "/posts", "form_method", "POST"])
+}
+
+def posts_create() {
+  id := post_create(posts_form_params())
+  redirect_to("/posts/" + id)
+}
+
+def posts_edit() {
+  r := post_find(param("id"))
+  if (r == nil) { head(404) return }
+  render_view("posts/edit", ["record", r, "action_url", "/posts/" + field(r, "id"), "form_method", "PATCH"])
+}
+
+def posts_update() {
+  if (post_find(param("id")) == nil) { head(404) return }
+  post_update(param("id"), posts_form_params())
+  redirect_to("/posts/" + param("id"))
+}
+
+def posts_destroy() {
+  post_destroy(param("id"))
+  redirect_to("/posts")
+}
+
+# ---- 分岐オブジェクトのデモ ----
+
+def posts_quantum() {
+  # 挨拶を 3 状態の重ね合わせとして準備する
+  g := superpose ["こんにちは、量子ブログ!", "Hello, quantum blog!", "⟨ψ| Bada on Rails |ψ⟩"] with [0.5, 0.3, 0.2]
+
+  # 位相回転 — 確率 |amp|^2 は不変 (Bada の性質 (ii): 位相は再重み付け
+  # するだけで確率を壊さない)。branch_state で確認できる。
+  branch_phase(g, 0, 3.14159265 / 2)
+
+  # collapse は Born 則で 1 分岐を選ぶ射影測定。結果は Akashic 台帳へ
+  # measurement 事実としてコミットされ、同じ分岐オブジェクトの再測定は
+  # 同じ値を返す (測定の恒久性)。
+  render_view("posts/quantum", [
+    "chosen", collapse(g),
+    "state", branch_state(g),
+    "ledger", akashic_tail(3)
+  ])
+}

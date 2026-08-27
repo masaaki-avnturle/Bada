@@ -232,6 +232,7 @@
       if (!rule.pattern.length || rule.pattern[0].kind !== "tok") continue; /* avoid left recursion */
       if (this.cur().lexeme !== rule.pattern[0].text) continue;
       var save = this.i;
+      var errSave = this.errors.length;
       var holes = [];
       var ok = true;
       for (var k = 0; k < rule.pattern.length; k++) {
@@ -243,7 +244,10 @@
           holes.push(this.parseExpr());
         }
       }
-      if (!ok) { this.i = save; continue; }
+      /* backtrack cleanly: a failed match (or a hole that errored while
+         speculatively parsing) must not leave parse errors behind */
+      if (ok && this.errors.length > errSave) ok = false;
+      if (!ok) { this.i = save; this.errors.length = errSave; continue; }
       var ext = node("EXTENDED", this.toks[save].line);
       ext.str = rule.name;
       ext.rule = rule;
