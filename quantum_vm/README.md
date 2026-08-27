@@ -59,6 +59,15 @@
    ```
    ZoneBrowser ウィンドウはアドレスバー・リンク遷移・セキュリティ表示
    (ノード / 経路 / DHT キー / Jones 鍵 / AEAD タグ) 付きです。
+   さらに **MigemoInsta** — リング上の写真フィード (zone://insta.or.jp/) を
+   **migemo 検索**(ローマ字で日本語をインクリメンタル検索: `sakura` が
+   さくら/サクラ/桜 に当たる)できる Instagram 風アプリ:
+   ```
+   migemoinsta sakura        # CLI 検索 (romaji → ひらがな/カタカナ/漢字よみ)
+   migemoinsta post 今日の空  # 自分の投稿をリングへ封緘・公開
+   migemoinsta &             # X クライアント: 検索バー + フィード + ♥
+   ```
+   migemo エンジン (ローマ字→かな展開・促音・拗音対応) も Bada 言語製です。
 7. **📷 スナップショット / ⤺ 復元** — マシンの全状態 (apt でインストールしたパッケージ含む) は
    追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイなので、スナップショットは
    台帳のプレフィックスそのものです。

@@ -103,6 +103,13 @@ function run(events) {
     ["xzone", 2, "zone://bada.or.jp/"],       // 38 navigate (another knot key)
     ["xzone", 2, "zone://ghost.or.jp/nowhere"], // 39 404 demo
     ["line", "curl zone://url.or.jp/security"], // 40 curl speaks zone:// too
+    ["line", "migemoinsta sakura"],       // 41 migemo: romaji hits さくら/桜
+    ["line", "migemoinsta post BadaOS saikou desu"], // 42 post to the ring
+    ["line", "migemoinsta saikou"],       // 43 finds our own post
+    ["line", "migemoinsta &"],            // 44 the X client (window 3)
+    ["xinsta", 3, "neko"],                // 45 incremental search in the window
+    ["xilike", 3, 4],                     // 46 like the neko post
+    ["xzone", 2, "zone://insta.or.jp/"],  // 47 the feed is a zone site too
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -155,6 +162,17 @@ function run(events) {
     [38, "@@ZPAGE 2|200|zone://bada.or.jp/|"], // navigation (different knot)
     [39, "@@ZPAGE 2|404|"],                 // unknown zone -> 404
     [40, "Jones 多項式量子暗号"],           // curl zone://.../security
+    [41, "@sakura_chan"],                   // migemo: "sakura" -> さくら
+    [41, "さくら / サクラ"],
+    [42, "zone://insta.or.jp/p/100"],       // our post got a zone page
+    [43, "BadaOS saikou desu"],             // ... and migemo finds it
+    [44, "@@X WIN 3|migemoinsta"],          // MigemoInsta mapped on BadaX
+    [44, "@@IPOST 3|1|sakura_chan"],        // feed rendered
+    [45, "@@IPAGE 3|neko|1|"],              // incremental search: 1 hit
+    [45, "@@IPOST 3|4|neko_master"],
+    [46, "@@ILIKE 3|4|1"],                  // like committed to the ledger
+    [47, "@@ZPAGE 2|200|zone://insta.or.jp/|"], // the feed in the ZoneBrowser
+    [47, "MigemoInsta"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -166,7 +184,7 @@ function run(events) {
   }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
-    " -> live xterm -> zone:// ultra network (" + tape.length + " ledger events)");
+    " -> live xterm -> zone:// ultra network -> MigemoInsta migemo feed (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

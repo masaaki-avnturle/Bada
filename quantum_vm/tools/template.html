@@ -150,6 +150,27 @@
   .xwin .zstat { background:#e8ecef; border-top:1px solid #b9c2c8; padding:2px 6px;
                  font:9.5px "Cascadia Mono",Consolas,monospace; color:#345; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; }
+  .xwin .ihead { display:flex; align-items:center; gap:6px; padding:5px 8px;
+                 background:linear-gradient(90deg,#7b2ff7,#f107a3,#f7b32f); color:#fff; }
+  .xwin .ihead b { font-size:12.5px; font-style:italic; letter-spacing:.02em; }
+  .xwin .isearch { display:flex; gap:4px; padding:4px 6px; background:#faf7fb; border-bottom:1px solid #e2d5e8; }
+  .xwin .isearch input { flex:1; border:1px solid #c9b3d6; border-radius:10px; padding:2px 9px;
+                         font:11px "Cascadia Mono",Consolas,monospace; background:#fff; color:#312; }
+  .xwin .ifeed { flex:1; overflow:auto; background:#f4eff6; padding:6px; }
+  .xwin .icard { background:#fff; border:1px solid #ddd0e4; border-radius:8px; margin:0 0 8px;
+                 overflow:hidden; }
+  .xwin .icard .iart { background:#1c1626; color:#fff; text-align:center; padding:10px 4px;
+                       font-size:22px; line-height:1.35; letter-spacing:2px; }
+  .xwin .icard .imeta { padding:5px 8px 2px; font-size:11px; color:#333; }
+  .xwin .icard .imeta b { color:#7b2ff7; }
+  .xwin .icard .irow { display:flex; align-items:center; gap:6px; padding:2px 8px 6px; font-size:11px; }
+  .xwin .icard .ilike { border:1px solid #e5b3c8; background:#fff0f5; border-radius:10px;
+                        padding:1px 8px; cursor:pointer; font-size:11px; color:#c2185b; }
+  .xwin .icard .ilike.on { background:#f8467c; color:#fff; border-color:#c2185b; }
+  .xwin .icard .iaead { font-size:9px; color:#1d6b35; margin-left:auto; }
+  .xwin .istat { background:#efe7f3; border-top:1px solid #d8c8e0; padding:2px 6px;
+                 font:9.5px "Cascadia Mono",Consolas,monospace; color:#534; white-space:nowrap;
+                 overflow:hidden; text-overflow:ellipsis; }
   .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
                        color:#d8f3d8; background:#101210; height:100%; overflow:auto;
                        outline:none; white-space:pre-wrap; word-break:break-all; cursor:text; }
@@ -462,6 +483,24 @@ var VM_LIBS = __VM_LIBS_JSON__;
         break;
       }
       case "ZEND": break;
+      case "IPAGE": {
+        var pf = val.split("|");
+        var pd = instaData_(pf[0]);
+        pd.query = pf[1] || ""; pd.nm = pf[2]; pd.total = pf[3];
+        pd.node = pf[4]; pd.route = pf[5]; pd.jones = pf[6];
+        pd.posts = []; pd.loaded = true;
+        break;
+      }
+      case "IPOST": {
+        var qf = val.split("|");
+        instaData_(qf[0]).posts.push({
+          pid: qf[1], user: qf[2], likes: qf[3], liked: qf[4] === "1",
+          aead: qf[5] === "1", art: qf[6], caption: qf.slice(7).join("|")
+        });
+        break;
+      }
+      case "IEND": break;
+      case "ILIKE": break;
       case "XECHO": {
         var sp4 = val.indexOf(" ");
         if (sp4 >= 0) xtermData_(val.slice(0, sp4)).echo = (val.slice(sp4 + 1) === "on");
@@ -639,6 +678,46 @@ var VM_LIBS = __VM_LIBS_JSON__;
   function renderAllXterms() {
     for (var id in xwins) if (xwins[id].cls === "xterm") renderXterm(xwins[id], id);
     for (var id2 in xwins) if (xwins[id2].cls === "zonebrowser") renderZone(xwins[id2], id2);
+    for (var id3 in xwins) if (xwins[id3].cls === "migemoinsta") renderInsta(xwins[id3], id3);
+  }
+
+  /* ---- MigemoInsta windows: photo feed on the zone:// ring ---- */
+  var instaData = {};  /* id -> { query, posts, nm, total, node, route, jones, loaded } */
+  function instaData_(id) {
+    id = String(id);
+    if (!instaData[id]) instaData[id] = { query: "", posts: [], loaded: false };
+    return instaData[id];
+  }
+  function renderInsta(win, id) {
+    if (!win.ifeed) return;
+    var d = instaData_(id);
+    if (win.iin && document.activeElement !== win.iin) win.iin.value = d.query;
+    if (!d.loaded) {
+      win.ifeed.innerHTML = '<p style="color:#987;padding:8px">読み込み中… (リロード後は検索し直してください)</p>';
+      win.istat.textContent = "zone://insta.or.jp 待機中";
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < d.posts.length; i++) {
+      var p = d.posts[i];
+      html += '<div class="icard">' +
+        '<div class="iart">' + esc(p.art).split("¶").join("<br/>") + "</div>" +
+        '<div class="imeta"><b>@' + esc(p.user) + "</b> " + esc(p.caption) + "</div>" +
+        '<div class="irow"><button class="ilike' + (p.liked ? " on" : "") +
+        '" data-pid="' + esc(p.pid) + '">♥ ' + esc(p.likes) + "</button>" +
+        '<span class="iaead">' + (p.aead ? "🔒 Jones-AEAD ok" : "⚠ AEAD") + "</span></div>" +
+        "</div>";
+    }
+    if (!d.posts.length) html = '<p style="color:#987;padding:8px">該当なし — sakura / neko / ramen などで検索</p>';
+    win.ifeed.innerHTML = html;
+    var btns = win.ifeed.querySelectorAll("button.ilike");
+    for (var j = 0; j < btns.length; j++) {
+      btns[j].addEventListener("click", function () {
+        send(["xilike", +id, +this.getAttribute("data-pid")]);
+      });
+    }
+    win.istat.textContent = d.nm + "/" + d.total + " posts · node " + d.node +
+      " · route " + d.route + " · Jones " + d.jones;
   }
 
   /* ---- ZoneBrowser windows: the zone:// ultra network in-guest ---- */
@@ -747,7 +826,8 @@ var VM_LIBS = __VM_LIBS_JSON__;
       else { xwins[id].el.style.left = x + "px"; xwins[id].el.style.top = y + "px"; }
     }
     for (var id2 in xwins) if (!keep[id2]) {
-      xroot.removeChild(xwins[id2].el); delete xwins[id2]; delete xtermData[id2]; delete zoneData[id2];
+      xroot.removeChild(xwins[id2].el); delete xwins[id2];
+      delete xtermData[id2]; delete zoneData[id2]; delete instaData[id2];
     }
     var count = 0; for (var k in xwins) count++;
     $("xempty").style.display = count ? "none" : "flex";
@@ -792,6 +872,28 @@ var VM_LIBS = __VM_LIBS_JSON__;
         e.stopPropagation();
       });
       renderZone(win, id);
+    } else if (cls === "migemoinsta") {
+      var ih = document.createElement("div"); ih.className = "ihead";
+      ih.innerHTML = "<b>◎ MigemoInsta</b><small>ultra network feed</small>";
+      var isr = document.createElement("div"); isr.className = "isearch";
+      var iin = document.createElement("input");
+      iin.spellcheck = false; iin.placeholder = "migemo検索: sakura / neko / ryoushi …";
+      isr.appendChild(iin);
+      var ifd = document.createElement("div"); ifd.className = "ifeed";
+      var ist = document.createElement("div"); ist.className = "istat";
+      body.style.display = "flex"; body.style.flexDirection = "column";
+      body.appendChild(ih); body.appendChild(isr); body.appendChild(ifd); body.appendChild(ist);
+      win.iin = iin; win.ifeed = ifd; win.istat = ist;
+      var itimer = null;
+      iin.addEventListener("input", function () {
+        clearTimeout(itimer);
+        itimer = setTimeout(function () { send(["xinsta", +id, iin.value.trim()]); }, 400);
+      });
+      iin.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") { e.preventDefault(); clearTimeout(itimer); send(["xinsta", +id, iin.value.trim()]); }
+        e.stopPropagation();
+      });
+      renderInsta(win, id);
     } else if (cls === "xterm") {
       var pre = document.createElement("pre"); pre.className = "xtermtxt";
       pre.tabIndex = 0;

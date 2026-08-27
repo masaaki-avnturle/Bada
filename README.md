@@ -89,6 +89,7 @@ VM 内の X クライアント (`xclock` / `xeyes` / `xterm`) を
 - **Linux 一式がプリインストール**: vim・emacs・sshd・xinetd・curl・wget は初期状態で導入済み、sshd/xinetd は初回起動から自動起動。**NAT 経由でインターネット**が使え (`ping`/`curl`/`wget`/`host`)、`apt` は外部ミラー `http://archive.badaos.or.jp` から取得 (`apt install zsh tcsh bash` など)。**ユーザー切替**も完備: インストーラが一般ユーザー `bada` を作成し、`su - bada` / `su`(パスワード)/ `sudo CMD` / `adduser` / `passwd` が使えます (プロンプトは root `#`・一般 `$`)
 - X 表示は ASTEC-X と同じ「計算は UNIX 側・表示は Windows 側」: `DISPLAY=10.0.2.2:0` の **BadaX Server** へ NAT 越しに接続。認証は **JONES-KNOT-COOKIE-1**(三葉結び目の Kauffman/Jones 多項式鍵)+ Bell 対 QKD。**xterm ウィンドウの中もライブな pty セッション**で、ウィンドウ内で直接コマンドライン (apt / zsh / …) が使えます
 - **zone:// ウルトラネットワークを OS 内に同梱**: `zone zone://url.or.jp/`(CLI)・`curl zone://…`・`zone put URL TEXT`(自作ページの封緘・公開)・**`zonebrowser &` で ZoneBrowser が X クライアントとして BadaX 上に表示**(アドレスバー・リンク遷移・DHT 経路/Jones 鍵/AEAD タグのセキュリティ表示)
+- **MigemoInsta** — リング上の写真フィード zone://insta.or.jp/ を **migemo 検索**(`sakura` が さくら/サクラ/桜 に当たる、Bada 製ローマ字→かなエンジン)できる Instagram 風アプリ。`migemoinsta &`(X クライアント: 検索バー+フィード+♥)/ `migemoinsta sakura`(CLI)/ `migemoinsta post TEXT`(投稿をリングへ封緘・公開)。フィードは ZoneBrowser からも閲覧可
 - マシン全状態は追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイ。**スナップショット = 台帳のプレフィックス**
 - ビルドは [`quantumvm-app-build.yml`](.github/workflows/quantumvm-app-build.yml)(`quantumvm-v*` タグで Release へ添付)。詳細は [`quantum_vm/README.md`](quantum_vm/README.md)
 
