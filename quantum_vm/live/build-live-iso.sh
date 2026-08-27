@@ -58,7 +58,33 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     linux-image-amd64 live-boot systemd-sysv \
     xserver-xorg xinit openbox chromium fonts-noto-cjk \
     kbd sudo rsync parted dosfstools e2fsprogs \
-    grub2-common grub-pc-bin grub-efi-amd64-bin
+    grub2-common grub-pc-bin grub-efi-amd64-bin \
+    vim emacs-nox openssh-server curl wget less ca-certificates
+# xinetd is optional in newer Debian suites
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
+
+# real networking (DHCP on every ethernet NIC) so `apt` reaches the FULL
+# Debian archive -- 60,000+ packages, the same class as Ubuntu.
+mkdir -p "$CHROOT/etc/systemd/network"
+cat > "$CHROOT/etc/systemd/network/20-dhcp.network" <<'EOF'
+[Match]
+Name=en* eth*
+
+[Network]
+DHCP=yes
+EOF
+chroot "$CHROOT" systemctl enable systemd-networkd systemd-resolved ssh 2>/dev/null || \
+chroot "$CHROOT" systemctl enable systemd-networkd ssh || true
+ln -sf /run/systemd/resolve/resolv.conf "$CHROOT/etc/resolv.conf" || true
+
+cat > "$CHROOT/etc/motd" <<'EOF'
+BadaOS GNU/Quantum 12.0 -- the real machine build
+
+  * vim / emacs / sshd / xinetd preinstalled
+  * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
+        sudo apt update && sudo apt install <anything>
+  * install to the real disk:  sudo badaos-install
+EOF
 
 echo "==> [3/6] configure the BadaOS kiosk (autologin -> X -> fullscreen)"
 echo badaos > "$CHROOT/etc/hostname"
@@ -105,6 +131,26 @@ chroot "$CHROOT" chown -R bada:bada /home/bada
 
 # the real-disk installer + branding for the installed system's GRUB
 install -m 0755 "$HERE/badaos-install" "$CHROOT/usr/local/sbin/badaos-install"
+
+# unattended VM install: kernel arg badaos.autoinstall=/dev/XXX runs the
+# installer non-interactively at boot (used by the "Install to /dev/vda"
+# GRUB entry -- vda only exists on virtio VMs, never on real hardware).
+cat > "$CHROOT/etc/systemd/system/badaos-autoinstall.service" <<'EOF'
+[Unit]
+Description=BadaOS unattended real-disk install (VM)
+ConditionKernelCommandLine=badaos.autoinstall
+After=basic.target systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+StandardOutput=journal+console
+StandardError=journal+console
+ExecStart=/bin/sh -c 'DEV=$(sed -n "s/.*badaos\.autoinstall=\\([^ ]*\\).*/\\1/p" /proc/cmdline); exec /usr/local/sbin/badaos-install --auto "$DEV"'
+
+[Install]
+WantedBy=multi-user.target
+EOF
+chroot "$CHROOT" systemctl enable badaos-autoinstall.service
 sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="BadaOS GNU\/Quantum"/' \
     "$CHROOT/etc/default/grub" 2>/dev/null || \
     echo 'GRUB_DISTRIBUTOR="BadaOS GNU/Quantum"' >> "$CHROOT/etc/default/grub"

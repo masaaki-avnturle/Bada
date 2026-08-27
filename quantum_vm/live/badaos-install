@@ -20,14 +20,25 @@ set -euo pipefail
 grep -q boot=live /proc/cmdline || {
     echo "badaos-install must run inside the BadaOS live boot."; exit 1; }
 
+# --auto DEV : unattended install (for VIRTUAL MACHINES; no prompts,
+# powers the machine off when done so the VM can reboot from its disk).
+AUTO=0
+if [ "${1:-}" = "--auto" ]; then
+    AUTO=1
+    TARGET="${2:?usage: badaos-install --auto /dev/vda}"
+    D="${TARGET#/dev/}"
+fi
+
 echo "=============================================================="
 echo " BadaOS GNU/Quantum 12.0 — real-disk installer"
 echo "=============================================================="
 echo "Disks on this machine:"
 lsblk -d -o NAME,SIZE,MODEL,TYPE | grep -v loop || true
 echo
-read -rp "Target disk (e.g. sda / nvme0n1, WILL BE ERASED): " D
-TARGET="/dev/$D"
+if [ "$AUTO" = 0 ]; then
+    read -rp "Target disk (e.g. sda / nvme0n1, WILL BE ERASED): " D
+    TARGET="/dev/$D"
+fi
 [ -b "$TARGET" ] || { echo "no such block device: $TARGET"; exit 1; }
 # refuse the live medium itself
 LIVEDEV="$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)"
@@ -35,8 +46,12 @@ case "$LIVEDEV" in "$TARGET"*) echo "that is the live medium itself"; exit 1;; e
 
 echo
 echo "  *** ALL DATA ON $TARGET WILL BE DESTROYED ***"
-read -rp "Type exactly 'INSTALL $D' to continue: " CONFIRM
-[ "$CONFIRM" = "INSTALL $D" ] || { echo "aborted."; exit 1; }
+if [ "$AUTO" = 0 ]; then
+    read -rp "Type exactly 'INSTALL $D' to continue: " CONFIRM
+    [ "$CONFIRM" = "INSTALL $D" ] || { echo "aborted."; exit 1; }
+else
+    echo "  (unattended VM mode: installing to $TARGET)"
+fi
 
 P="$TARGET"
 case "$D" in nvme*|mmcblk*) P="${TARGET}p";; esac
@@ -107,6 +122,10 @@ echo "==> update-grub: the menu will show 'BadaOS GNU/Quantum'"
 chroot_run update-initramfs -u
 chroot_run update-grub
 
+# the installed system must not re-run the unattended installer
+sed -i '/badaos-autoinstall/d' "$M/etc/systemd/system/multi-user.target.wants/badaos-autoinstall.service" 2>/dev/null || true
+rm -f "$M/etc/systemd/system/multi-user.target.wants/badaos-autoinstall.service"
+
 sync
 echo
 echo "=============================================================="
@@ -114,3 +133,10 @@ echo " Done. Remove the live USB and reboot:"
 echo "   the GRUB menu of this PC now boots BadaOS GNU/Quantum 12.0"
 echo "   standalone from $TARGET  (login: bada / badaos)"
 echo "=============================================================="
+if [ "$AUTO" = 1 ]; then
+    echo "BADAOS-AUTOINSTALL-DONE"
+    umount -lf "$M/dev/pts" "$M/dev" "$M/sys" "$M/proc" "$M/boot/efi" "$M" 2>/dev/null || true
+    trap - EXIT
+    sync
+    poweroff
+fi

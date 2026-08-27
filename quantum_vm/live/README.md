@@ -7,7 +7,11 @@
 - 中身は最小の Debian live システム(カーネル + squashfs)で、起動すると自動ログインし、
   BadaOS 環境(`dist/bada-vm-pro.html` — Bada 言語製ハイパーバイザ + BadaOS + BadaX Server)
   を **全画面キオスク**で自動起動します(`#autoboot` で VM も自動パワーオン)
-- 日本語フォント (Noto CJK) 同梱、ネットワーク不要・完全オフライン
+- **vim・emacs・sshd・xinetd・curl・wget を実物としてプリインストール**
+- **DHCP ネットワーク + 本物の Debian フルアーカイブ**: ネット接続があれば
+  `sudo apt update && sudo apt install <なんでも>` で **6 万超パッケージ
+  (Ubuntu と同級の規模)** をインストール可能。オフラインでも本体は完全動作
+- 日本語フォント (Noto CJK) 同梱
 - ISO は [Releases](https://github.com/masaaki-avnturle/Bada/releases) の
   `BadaOS-12.0-live-amd64.iso`(CI の `live-iso` ジョブがビルド)
 
@@ -31,7 +35,20 @@ QEMU での実起動検証済み — 電源投入直後の画面はこの通り 
 3. **GRUB メニューに BadaOS が表示** → Enter で起動 → 全画面で BadaOS が立ち上がります
    (コンソールに落ちるには Ctrl+Alt+F2、ログイン `bada` / パスワード `badaos`)
 
-## 使い方 2 — 実ディスクへ本インストール(単独起動マシン化)
+## 使い方 2 — バーチャルマシン経由で実ディスクへインストール(検証済み)
+
+VMware / VirtualBox / QEMU の**仮想マシンに普通の OS と同じ手順でインストール**できます:
+新規 VM を作成 → ISO を光学ドライブに割り当てて起動 → GRUB メニューの
+**「Install BadaOS to /dev/vda (VIRTUAL MACHINE, unattended)」**(QEMU/KVM の
+virtio ディスク用・自動)か、通常の Live 起動から `sudo badaos-install`(VMware 等の
+sda ディスク)→ 完了後 ISO を外して再起動すると、**VM がディスク単体から GRUB →
+BadaOS を起動**します。この一連の流れは QEMU 上で実際にインストール→ディスク単独起動まで
+通しで検証しています(下のスクリーンショット参照)。
+
+無人モードはコマンドでも使えます: `sudo badaos-install --auto /dev/vda`
+(確認なしで消去・インストールし、完了後に自動で電源断 — VM 専用)
+
+## 使い方 3 — 実 PC の実ディスクへ本インストール(単独起動マシン化)
 
 > ⚠️ **選んだディスクは完全に消去されます。** 消えて困るデータのある PC では実行しないでください。
 > まずは古い PC・予備 PC・予備ディスクでどうぞ。
@@ -48,7 +65,7 @@ QEMU での実起動検証済み — 電源投入直後の画面はこの通り 
 5. USB を抜いて再起動 → **その PC の GRUB メニューが「BadaOS GNU/Quantum」を表示し、
    ハードディスクから単独起動**します
 
-## 使い方 3 — 既存 Linux とデュアルブート(何も消さない)
+## 使い方 4 — 既存 Linux とデュアルブート(何も消さない)
 
 既に GRUB で起動している Linux マシンでは、ISO をループバック起動エントリとして
 追加できます:

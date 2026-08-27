@@ -110,6 +110,11 @@ function run(events) {
     ["xinsta", 3, "neko"],                // 45 incremental search in the window
     ["xilike", 3, 4],                     // 46 like the neko post
     ["xzone", 2, "zone://insta.or.jp/"],  // 47 the feed is a zone site too
+    ["line", "apt install gcc python3 cowsay"], // 48 Ubuntu-sized archive: ANY package
+    ["line", "cowsay moo"],               // 49 ... and it runs
+    ["line", "which cowsay"],             // 50
+    ["line", "apt search firefox"],       // 51
+    ["line", "apt remove cowsay"],        // 52
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -144,7 +149,7 @@ function run(events) {
     [21, "Setting up zsh"],
     [22, "@@PROMPT quantum$ "],             // ordinary-user prompt ($)
     [23, "@@TTY bada"],                     // whoami as the user
-    [24, "Fetched 16.2 kB"],                // sudo apt update worked
+    [24, "Fetched 18.7 MB"],                // sudo apt update worked
     [25, "@@PROMPT quantum# "],             // exit -> back to root (#)
     [27, "@@PROMPT Password: "],            // su asks the password...
     [27, "@@ECHO off"],                     // ...hidden input
@@ -173,6 +178,12 @@ function run(events) {
     [46, "@@ILIKE 3|4|1"],                  // like committed to the ledger
     [47, "@@ZPAGE 2|200|zone://insta.or.jp/|"], // the feed in the ZoneBrowser
     [47, "MigemoInsta"],
+    [48, "Setting up gcc"],                 // Ubuntu-compatible universe installs
+    [48, "Setting up cowsay"],
+    [49, "cowsay: moo -- OK"],              // installed applications execute
+    [50, "@@TTY /usr/bin/cowsay"],
+    [51, "74362 indexed packages"],         // apt search over the Ubuntu-sized index
+    [52, "Removing cowsay"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -184,7 +195,7 @@ function run(events) {
   }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
-    " -> live xterm -> zone:// ultra network -> MigemoInsta migemo feed (" + tape.length + " ledger events)");
+    " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

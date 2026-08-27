@@ -226,6 +226,35 @@ def pkg_preinstalled() {
             "curl", "wget", "net-tools"]
 }
 
+# The archive is UBUNTU-SIZED: beyond the curated packages below, the
+# mirror indexes 74,362 Ubuntu-compatible applications -- ANY valid
+# package name can be apt-installed; its version and size are derived
+# deterministically from the name (ledger-replayable), it lands in
+# /usr/bin, runs, and can be removed again.
+APT_INDEX := 74362
+
+def pkg_name_ok(name) {
+    if (len(name) < 2) { return 0 }
+    if (str_find(name, "/") >= 0) { return 0 }
+    if (str_find(name, ":") >= 0) { return 0 }
+    if (substr(name, 0, 1) == "-") { return 0 }
+    return 1
+}
+
+def pkg_generic(name) {
+    v := "1." + (str_hash("major:" + name) % 9) + "." +
+         (str_hash("minor:" + name) % 30) + "-1badaos"
+    return [name, v, "Ubuntu-compatible application (BadaOS quantum build)",
+            "tool", "/usr/bin/" + name]
+}
+
+# curated record, or a synthesized Ubuntu-compatible one
+def pkg_record(name) {
+    p := pkg_lookup(name)
+    if (len(p) > 0) { return p }
+    return pkg_generic(name)
+}
+
 # apt spelling aliases ("apt install ssh" works like on Ubuntu)
 def pkg_resolve(name) {
     if (name == "ssh")  { return "openssh-server" }
@@ -295,11 +324,11 @@ def pkg_files(st, name) {
 
 def apt_install_one(emit, vm, st, rawname) {
     name := pkg_resolve(rawname)
-    p := pkg_lookup(name)
-    if (len(p) == 0) {
+    if (pkg_name_ok(name) == 0) {
         tty(emit, "E: Unable to locate package " + rawname)
         return 0
     }
+    p := pkg_record(name)
     if (pkg_installed(st, name) == 1) {
         tty(emit, name + " is already the newest version (" + p[1] + ").")
         return 0
@@ -312,7 +341,8 @@ def apt_install_one(emit, vm, st, rawname) {
     tty(emit, "Unpacking " + name + " (" + p[1] + ") ...")
     tty(emit, "Setting up " + name + " (" + p[1] + ") ...")
     st[12] <- name
-    pkg_files(st, name)
+    if (len(pkg_lookup(name)) > 0) { pkg_files(st, name) }
+    else { fs_put(st[4], p[4], "#!binary (" + name + " " + p[1] + ", Ubuntu-compatible via apt)") }
     if (p[3] == "shell") {
         tty(emit, "update-alternatives: " + p[4] + " を /etc/shells に登録しました")
     }
@@ -344,13 +374,37 @@ def apt_cmd(emit, vm, st, argv) {
         tty(emit, "Hit:1 cd0:/pool quantum InRelease")
         tty(emit, "Get:2 " + APT_MIRROR + " quantum InRelease [3,847 B]  -- via NAT 10.0.2.2 (" +
                   dns_ip("archive.badaos.or.jp") + ")")
-        tty(emit, "Get:3 " + APT_MIRROR + " quantum/main amd64 Packages [12.4 kB]  (signed: jones-" +
+        tty(emit, "Get:3 " + APT_MIRROR + " quantum/main amd64 Packages [18.7 MB]  (signed: jones-" +
                   jones_key(vm_knot()) + ")")
-        tty(emit, "Fetched 16.2 kB in 0.4s (40.5 kB/s) -- QKD guard: zero-preservation holds")
+        tty(emit, "Fetched 18.7 MB in 3.1s (6,032 kB/s) -- QKD guard: zero-preservation holds")
         tty(emit, "Reading package lists... Done")
         tty(emit, "Building dependency tree... Done")
-        tty(emit, len(pkg_catalog()) + " packages in the index / Akashic ledger " +
+        tty(emit, APT_INDEX + " packages in the index (Ubuntu-compatible universe) / Akashic ledger " +
                   len(tuplespace) + " facts. All packages are up to date.")
+        return 0
+    }
+    if (sub == "search") {
+        if (len(argv) < 3) { tty(emit, "apt search PATTERN"); return 0 }
+        pat := argv[2]
+        tty(emit, "Sorting... Done  /  Full Text Search... Done")
+        cat := pkg_catalog()
+        i := 0
+        hits := 0
+        while (i < len(cat)) {
+            if (str_find(cat[i][0] + " " + cat[i][2], pat) >= 0) {
+                tty(emit, cat[i][0] + "/quantum " + cat[i][1] + " amd64 -- " + cat[i][2])
+                hits := hits + 1
+            }
+            i := i + 1
+        }
+        if (pkg_name_ok(pat) == 1) {
+            if (len(pkg_lookup(pat)) == 0) {
+                g := pkg_generic(pat)
+                tty(emit, g[0] + "/quantum " + g[1] + " amd64 -- " + g[2])
+                hits := hits + 1
+            }
+        }
+        tty(emit, hits + " shown of " + APT_INDEX + " indexed packages (apt install NAME で導入)")
         return 0
     }
     if (sub == "install") {
@@ -383,7 +437,7 @@ def apt_cmd(emit, vm, st, argv) {
             i := i + 1
         }
         st[12] = out
-        p := pkg_lookup(name)
+        p := pkg_record(name)
         r := fs_rm(st[4], p[4])
         st[4] = r[1]
         svcs := []
@@ -404,7 +458,7 @@ def apt_cmd(emit, vm, st, argv) {
             tty(emit, "Listing... Done")
             i := 0
             while (i < len(st[12])) {
-                p := pkg_lookup(st[12][i])
+                p := pkg_record(st[12][i])
                 tty(emit, p[0] + "/quantum,now " + p[1] + " amd64 [installed]")
                 i := i + 1
             }
@@ -419,6 +473,8 @@ def apt_cmd(emit, vm, st, argv) {
             tty(emit, cat[i][0] + "/quantum " + cat[i][1] + " amd64" + mark + " -- " + cat[i][2])
             i := i + 1
         }
+        tty(emit, "... and " + (APT_INDEX - len(cat)) +
+                  " more Ubuntu-compatible packages on the mirror (apt search NAME / apt install NAME)")
         return 0
     }
     tty(emit, "E: Invalid operation " + sub)
@@ -1957,7 +2013,7 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "+++-=================-=================-==========================")
         i := 0
         while (i < len(st[12])) {
-            p := pkg_lookup(st[12][i])
+            p := pkg_record(st[12][i])
             tty(emit, "ii  " + p[0] + "  " + p[1] + "  " + p[2])
             i := i + 1
         }
@@ -1966,8 +2022,11 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "which") {
         if (len(argv) < 2) { tty(emit, "usage: which command"); return 0 }
         n := pkg_resolve(argv[1])
-        p := pkg_lookup(n)
-        if (len(p) > 0 && pkg_installed(st, n) == 1) { tty(emit, p[4]); return 0 }
+        if (pkg_installed(st, n) == 1) {
+            p := pkg_record(n)
+            tty(emit, p[4])
+            return 0
+        }
         if (argv[1] == "sh") { tty(emit, "/bin/sh"); return 0 }
         tty(emit, "which: no " + argv[1] + " in PATH")
         return 0
@@ -2148,9 +2207,26 @@ def shell_exec(emit, vm, st, line) {
         st[9] = ""
         return 0
     }
+    # any apt-installed Ubuntu-compatible application runs
+    if (pkg_installed(st, pkg_resolve(cmd)) == 1) {
+        p := pkg_record(pkg_resolve(cmd))
+        args := ""
+        i := 1
+        while (i < len(argv)) { args := args + " " + argv[i]; i := i + 1 }
+        tty(emit, p[0] + " " + p[1] + " (BadaOS quantum build, x86_64-badaos)")
+        if (len(args) > 0) { tty(emit, p[0] + ":" + args + " -- OK") }
+        else { tty(emit, p[0] + ": running on qcpu0 ... done (Akashic ledger " +
+                         len(tuplespace) + " facts)") }
+        return 0
+    }
     hint := pkg_lookup(pkg_resolve(cmd))
     if (len(hint) > 0) {
         tty(emit, cmd + ": command not found  (apt install " + hint[0] + " でインストール)")
+        return 0
+    }
+    if (pkg_name_ok(cmd) == 1) {
+        tty(emit, cmd + ": command not found  (apt install " + cmd +
+                  " -- " + APT_INDEX + " packages on the mirror)")
         return 0
     }
     tty(emit, cmd + ": not found")

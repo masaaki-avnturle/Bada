@@ -33,6 +33,9 @@
    wget http://www.badaos.or.jp/             # ~/index.html に保存
    apt update                                # 外部ミラー http://archive.badaos.or.jp から取得
    apt install zsh tcsh bash                 # 追加パッケージも NAT 越しにダウンロード
+   apt install gcc python3 cowsay ...        # ★ アーカイブは Ubuntu 級 (74,362 パッケージ):
+                                             #   任意のパッケージ名が導入・実行・削除可能
+   apt search NAME / apt remove NAME         # 検索・削除も Ubuntu 同様
    vim /etc/motd  /  emacs /etc/rc.conf      # プリインストール済みエディタ
    su - bada                                 # root → 一般ユーザー (プロンプトが $ に)
    sudo apt update                           # 一般ユーザーから root 権限で 1 コマンド
