@@ -19,6 +19,9 @@ it in any browser — no install, no dependencies, works offline.
   instanton.html      InstantOn — power off saves state to disk so the next
                       power-on skips the boot and resumes instantly (hibernate
                       / Windows fast startup). Real actions in the desktop app / CLI.
+  migemo.html         Migemogram — an Instagram-like photo feed with migemo-style
+                      romaji -> Japanese incremental search (type "sora" to find
+                      そら/ソラ captions). Posts/likes/comments in localStorage.
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for

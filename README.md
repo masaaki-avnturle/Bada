@@ -49,6 +49,9 @@
 | [`lan-to-zone.html`](bada_gui_ide/dist/lan-to-zone.html) | **LAN → zone://** — 自分のLAN IPを `zone://url.or.jp/lan/` に暗号化取り込み |
 | [`modem-vault.html`](bada_gui_ide/dist/modem-vault.html) | **Modem Vault** — 自分のモデム認証情報の量子暗号保管庫 + LAN検出 |
 | [`quantum-shark.html`](bada_gui_ide/dist/quantum-shark.html) | **QuantumShark** — 量子暗号つきパケット アナライザ(`.qcap` 復号。デモ: master `demo`) |
+| [`safepower.html`](bada_gui_ide/dist/safepower.html) | **SafePower** — 安全オフ(sync+ハイバネート)+ rehalt(再起動せずOS再ロード)。実行はデスクトップ版/CLI |
+| [`instanton.html`](bada_gui_ide/dist/instanton.html) | **InstantOn** — 電源オフで状態保存→次回ブート省略で即復帰。実行はデスクトップ版/CLI |
+| [`migemo.html`](bada_gui_ide/dist/migemo.html) | **Migemogram** — Instagram風の写真SNS + migemo式ローマ字インクリメンタル検索(`sora` で そら/ソラ を絞り込み)。写真/いいね/コメントは localStorage 保存 |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
 **一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。

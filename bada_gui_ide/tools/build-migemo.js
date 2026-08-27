@@ -1,0 +1,315 @@
+#!/usr/bin/env node
+/* ============================================================================
+ * build-migemo.js — build "Migemogram", a single self-contained HTML photo
+ * SNS (Instagram-like) whose search uses migemo-style romaji -> Japanese
+ * incremental search.
+ *
+ * migemo (by Satoru Takabayashi, NAIST) turns romaji you type into a pattern
+ * that matches Japanese kana as you type. Migemogram brings that idea to a
+ * photo feed: type "sora" and posts whose caption contains "そら/ソラ/sora"
+ * light up instantly.
+ *
+ * Everything is client-side and offline: posts (photos as data URLs),
+ * captions, likes, comments and profiles live in localStorage. Output:
+ * ../dist/migemo.html
+ * ==========================================================================*/
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const IDE = path.join(__dirname, "..");
+
+const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Migemogram — ローマ字インクリメンタル検索つき写真SNS</title>
+<style>
+  :root{color-scheme:light dark;--bg:#04060a;--panel:#0a1220;--line:#1c2838;--ink:#e6edf5;
+        --dim:#8aa0b8;--gold:#c8a44a;--pink:#e1306c;--blue:#4a80d0;--green:#2e9e57;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0a1220,#060a12);
+         border-bottom:1px solid var(--line);padding:10px 14px;display:flex;gap:12px;align-items:center;}
+  .logo{font-size:20px;font-weight:800;background:linear-gradient(90deg,#f09433,#e1306c,#bc1888);
+        -webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.5px;}
+  #searchwrap{flex:1;display:flex;align-items:center;gap:8px;background:#020407;border:1px solid var(--line);
+              border-radius:20px;padding:7px 14px;max-width:420px;margin:0 auto;}
+  #search{flex:1;background:transparent;border:0;outline:0;color:var(--ink);font-size:14px;}
+  .navbtn{border:1px solid var(--line);background:#132033;color:var(--ink);border-radius:9px;padding:8px 12px;cursor:pointer;font-size:14px;}
+  .navbtn.on{background:#1c2f49;border-color:#38537a;}
+  main{max-width:600px;margin:0 auto;padding:14px 12px 60px;}
+  .hint{color:var(--dim);font-size:12px;text-align:center;margin:2px 0 12px;}
+  .post{background:#070c15;border:1px solid var(--line);border-radius:14px;margin-bottom:16px;overflow:hidden;}
+  .post .top{display:flex;align-items:center;gap:9px;padding:10px 12px;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#f09433,#bc1888);
+          display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px;}
+  .post .user{font-weight:600;font-size:14px;} .post .place{color:var(--dim);font-size:11px;}
+  .post img.photo{display:block;width:100%;max-height:560px;object-fit:cover;background:#0c1420;}
+  .post .ph{width:100%;height:340px;display:flex;align-items:center;justify-content:center;
+            background:linear-gradient(135deg,#12233a,#241a3a);color:#6b86a8;font-size:13px;}
+  .actions{display:flex;gap:14px;padding:10px 12px 4px;font-size:20px;}
+  .actions span{cursor:pointer;user-select:none;} .liked{color:var(--pink);}
+  .likes{padding:0 12px;font-size:13px;font-weight:600;}
+  .caption{padding:4px 12px 2px;font-size:14px;line-height:1.5;}
+  .caption .u{font-weight:600;margin-right:6px;}
+  .cmts{padding:2px 12px;font-size:13px;color:var(--dim);}
+  .cmts .c{color:var(--ink);margin:2px 0;} .cmts .c .u{font-weight:600;margin-right:6px;}
+  .addc{display:flex;gap:6px;padding:8px 12px 12px;}
+  .addc input{flex:1;background:#020407;border:1px solid var(--line);border-radius:16px;padding:7px 12px;color:var(--ink);font-size:13px;}
+  .addc button{border:0;background:transparent;color:var(--blue);font-weight:600;cursor:pointer;}
+  mark{background:#5a4a12;color:#ffe9a8;border-radius:3px;padding:0 1px;}
+  /* composer */
+  #fab{position:fixed;right:calc(50% - 288px);bottom:20px;width:54px;height:54px;border-radius:50%;border:0;
+       background:linear-gradient(135deg,#f09433,#e1306c);color:#fff;font-size:28px;cursor:pointer;box-shadow:0 6px 20px #0008;}
+  @media(max-width:620px){#fab{right:18px;}}
+  #modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:20;padding:14px;}
+  #modal.on{display:flex;}
+  .sheet{background:#0a1220;border:1px solid var(--line);border-radius:14px;width:100%;max-width:440px;padding:16px;}
+  .sheet h3{margin:0 0 10px;} label{display:block;font-size:12px;color:var(--dim);margin:8px 0 3px;}
+  .sheet input,.sheet textarea{width:100%;background:#020407;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--ink);font-size:14px;}
+  .sheet textarea{min-height:64px;resize:vertical;}
+  .preview{width:100%;height:200px;object-fit:cover;border-radius:8px;margin-top:8px;background:#0c1420;}
+  .sheet .row{display:flex;gap:8px;margin-top:12px;}
+  .sheet button.post-btn{flex:1;border:0;background:var(--green);color:#eafff0;font-weight:600;border-radius:8px;padding:10px;cursor:pointer;}
+  .sheet button.cancel{border:1px solid var(--line);background:#132033;color:var(--ink);border-radius:8px;padding:10px 14px;cursor:pointer;}
+  /* profile */
+  #profile{display:none;} #profile.on{display:block;}
+  .pgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;margin-top:12px;}
+  .pgrid .cell{aspect-ratio:1;background:#0c1420;overflow:hidden;border-radius:4px;}
+  .pgrid .cell img{width:100%;height:100%;object-fit:cover;}
+  .pgrid .cell .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#5a748f;font-size:11px;}
+  .phead{display:flex;align-items:center;gap:14px;padding:6px 4px;}
+  .phead .big{width:64px;height:64px;font-size:26px;border-radius:50%;background:linear-gradient(135deg,#f09433,#bc1888);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;}
+  .phead .stats{display:flex;gap:16px;color:var(--dim);font-size:13px;}
+  .phead .stats b{color:var(--ink);display:block;font-size:15px;}
+  .empty{color:var(--dim);text-align:center;padding:40px 0;}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">Migemogram</span>
+  <div id="searchwrap"><span style="opacity:.6">🔎</span>
+    <input id="search" placeholder="ローマ字で検索 (例: sora, neko, kyoto)"/></div>
+  <button class="navbtn on" id="tabFeed">フィード</button>
+  <button class="navbtn" id="tabMe">プロフィール</button>
+</header>
+<main>
+  <div class="hint" id="hint">migemo式: ローマ字を打つと日本語(かな)のキャプションを即座に絞り込みます。</div>
+  <div id="feed"></div>
+  <div id="profile"></div>
+</main>
+
+<button id="fab" title="投稿">＋</button>
+
+<div id="modal">
+  <div class="sheet">
+    <h3>新規投稿</h3>
+    <label>写真</label>
+    <input id="c_file" type="file" accept="image/*"/>
+    <img id="c_prev" class="preview" style="display:none"/>
+    <label>キャプション(日本語OK)</label>
+    <textarea id="c_cap" placeholder="例: 京都の空 とても綺麗だった #sora"></textarea>
+    <label>場所(任意)</label>
+    <input id="c_place" placeholder="例: 京都"/>
+    <div class="row">
+      <button class="post-btn" id="c_post">シェア</button>
+      <button class="cancel" id="c_cancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ==== migemo-lite: romaji -> hiragana, and a romaji query matcher ==== */
+var MIGEMO = (function(){
+  // longest-first romaji -> hiragana table (Hepburn-ish + kunrei + youon)
+  var T = {
+    "kya":"きゃ","kyu":"きゅ","kyo":"きょ","sha":"しゃ","shu":"しゅ","sho":"しょ",
+    "cha":"ちゃ","chu":"ちゅ","cho":"ちょ","nya":"にゃ","nyu":"にゅ","nyo":"にょ",
+    "hya":"ひゃ","hyu":"ひゅ","hyo":"ひょ","mya":"みゃ","myu":"みゅ","myo":"みょ",
+    "rya":"りゃ","ryu":"りゅ","ryo":"りょ","gya":"ぎゃ","gyu":"ぎゅ","gyo":"ぎょ",
+    "ja":"じゃ","ju":"じゅ","jo":"じょ","jya":"じゃ","jyu":"じゅ","jyo":"じょ",
+    "bya":"びゃ","byu":"びゅ","byo":"びょ","pya":"ぴゃ","pyu":"ぴゅ","pyo":"ぴょ",
+    "tsu":"つ","shi":"し","chi":"ち","sci":"し",
+    "ka":"か","ki":"き","ku":"く","ke":"け","ko":"こ",
+    "sa":"さ","si":"し","su":"す","se":"せ","so":"そ",
+    "ta":"た","ti":"ち","tu":"つ","te":"て","to":"と",
+    "na":"な","ni":"に","nu":"ぬ","ne":"ね","no":"の",
+    "ha":"は","hi":"ひ","fu":"ふ","hu":"ふ","he":"へ","ho":"ほ",
+    "ma":"ま","mi":"み","mu":"む","me":"め","mo":"も",
+    "ya":"や","yu":"ゆ","yo":"よ",
+    "ra":"ら","ri":"り","ru":"る","re":"れ","ro":"ろ",
+    "wa":"わ","wo":"を","wi":"うぃ","we":"うぇ",
+    "ga":"が","gi":"ぎ","gu":"ぐ","ge":"げ","go":"ご",
+    "za":"ざ","zi":"じ","ji":"じ","zu":"ず","ze":"ぜ","zo":"ぞ",
+    "da":"だ","di":"ぢ","du":"づ","de":"で","do":"ど",
+    "ba":"ば","bi":"び","bu":"ぶ","be":"べ","bo":"ぼ",
+    "pa":"ぱ","pi":"ぴ","pu":"ぷ","pe":"ぺ","po":"ぽ",
+    "fa":"ふぁ","fi":"ふぃ","fe":"ふぇ","fo":"ふぉ",
+    "a":"あ","i":"い","u":"う","e":"え","o":"お","n":"ん","-":"ー"
+  };
+  function romajiToHira(s){
+    s=String(s).toLowerCase(); var out="",i=0;
+    while(i<s.length){
+      // sokuon: double consonant -> っ
+      var c=s[i];
+      if(c===s[i+1] && "kstpgzdbhmyrwcfj".indexOf(c)>=0){ out+="っ"; i++; continue; }
+      var m=null;
+      for(var L=3;L>=1;L--){ var seg=s.substr(i,L); if(T[seg]){ m=seg; break; } }
+      if(m){ out+=T[m]; i+=m.length; }
+      else { out+=c; i++; }
+    }
+    return out;
+  }
+  function kataToHira(s){ return String(s).replace(/[\\u30a1-\\u30f6]/g,function(ch){ return String.fromCharCode(ch.charCodeAt(0)-0x60); }); }
+  // does haystack match the romaji query (migemo-style)?
+  function match(hay, query){
+    if(!query) return true;
+    var q=String(query).toLowerCase().trim();
+    var h=String(hay);
+    var hl=h.toLowerCase();
+    // 1) plain latin substring
+    if(hl.indexOf(q)>=0) return true;
+    // 2) romaji query -> hiragana, match against hiragana form of haystack
+    var qh=romajiToHira(q);
+    var hh=kataToHira(h);
+    if(qh && hh.indexOf(qh)>=0) return true;
+    // 3) also match if query-hira appears in the katakana->hira of haystack (already covered) or raw
+    if(qh && h.indexOf(qh)>=0) return true;
+    return false;
+  }
+  return { romajiToHira:romajiToHira, match:match };
+})();
+
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  var KEY="migemogram.v1";
+  var ME="me";
+
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function load(){ try{return JSON.parse(localStorage.getItem(KEY)||"null")||seed();}catch(e){return seed();} }
+  function save(s){ try{localStorage.setItem(KEY,JSON.stringify(s));}catch(e){alert("保存に失敗(画像が大きすぎるかも): "+e);} }
+  function seed(){
+    var s={ posts:[
+      {id:"p1",user:"aya",place:"京都",img:null,cap:"京都の空がとても綺麗だった そら sora",likes:12,liked:false,cmts:[{u:"ken",t:"最高！"}]},
+      {id:"p2",user:"ken",place:"奈良",img:null,cap:"奈良の鹿 かわいい shika #nara",likes:8,liked:false,cmts:[]},
+      {id:"p3",user:"me",place:"東京",img:null,cap:"猫とお昼寝 ねこ neko",likes:5,liked:false,cmts:[{u:"aya",t:"ねこ最高"}]}
+    ]};
+    save(s); return s;
+  }
+  var state=load();
+
+  /* ---- rendering ---- */
+  var tab="feed";
+  function avatar(u){ return '<div class="avatar">'+esc((u||"?")[0].toUpperCase())+'</div>'; }
+  function photo(p){
+    if(p.img) return '<img class="photo" src="'+p.img+'"/>';
+    return '<div class="ph">'+esc(p.place||"Migemogram")+'</div>';
+  }
+  function hi(text,q){
+    if(!q) return esc(text);
+    // highlight latin query occurrences (case-insensitive, indexOf-based)
+    var out="", low=text.toLowerCase(), ql=q.toLowerCase(), i=0;
+    if(ql.length===0) return esc(text);
+    var idx;
+    while((idx=low.indexOf(ql,i))>=0){
+      out+=esc(text.slice(i,idx))+"<mark>"+esc(text.slice(idx,idx+ql.length))+"</mark>";
+      i=idx+ql.length;
+    }
+    out+=esc(text.slice(i));
+    return out;
+  }
+  function renderFeed(){
+    var q=$("search").value.trim();
+    var box=$("feed"); box.innerHTML="";
+    var posts=state.posts.filter(function(p){ return MIGEMO.match((p.cap||"")+" "+(p.user||"")+" "+(p.place||""), q); });
+    if(!posts.length){ box.innerHTML='<div class="empty">「'+esc(q)+'」に一致する投稿はありません。</div>'; return; }
+    posts.slice().reverse().forEach(function(p){
+      var d=document.createElement("div"); d.className="post";
+      d.innerHTML=
+        '<div class="top">'+avatar(p.user)+'<div><div class="user">'+esc(p.user)+'</div>'+(p.place?'<div class="place">'+esc(p.place)+'</div>':'')+'</div></div>'+
+        photo(p)+
+        '<div class="actions"><span data-like="'+p.id+'" class="'+(p.liked?"liked":"")+'">'+(p.liked?"♥":"♡")+'</span><span data-focus="'+p.id+'">💬</span></div>'+
+        '<div class="likes">いいね '+p.likes+' 件</div>'+
+        '<div class="caption"><span class="u">'+esc(p.user)+'</span>'+hi(p.cap||"",q)+'</div>'+
+        '<div class="cmts">'+p.cmts.map(function(c){return '<div class="c"><span class="u">'+esc(c.u)+'</span>'+esc(c.t)+'</div>';}).join("")+'</div>'+
+        '<div class="addc"><input placeholder="コメントを追加…" data-cin="'+p.id+'"/><button data-cadd="'+p.id+'">投稿</button></div>';
+      box.appendChild(d);
+    });
+    box.querySelectorAll("[data-like]").forEach(function(e){ e.addEventListener("click",function(){ toggleLike(this.getAttribute("data-like")); }); });
+    box.querySelectorAll("[data-focus]").forEach(function(e){ e.addEventListener("click",function(){ var i=box.querySelector('[data-cin="'+this.getAttribute("data-focus")+'"]'); if(i)i.focus(); }); });
+    box.querySelectorAll("[data-cadd]").forEach(function(e){ e.addEventListener("click",function(){ addComment(this.getAttribute("data-cadd")); }); });
+    box.querySelectorAll("[data-cin]").forEach(function(e){ e.addEventListener("keydown",function(ev){ if(ev.key==="Enter") addComment(this.getAttribute("data-cin")); }); });
+  }
+  function renderProfile(){
+    var mine=state.posts.filter(function(p){return p.user===ME;});
+    var box=$("profile");
+    box.innerHTML=
+      '<div class="phead"><div class="big">'+esc(ME[0].toUpperCase())+'</div>'+
+      '<div><div style="font-weight:700;font-size:16px">@'+esc(ME)+'</div>'+
+      '<div class="stats"><span><b>'+mine.length+'</b>投稿</span><span><b>'+mine.reduce(function(a,p){return a+p.likes;},0)+'</b>いいね</span></div></div></div>'+
+      (mine.length? '<div class="pgrid">'+mine.slice().reverse().map(function(p){ return '<div class="cell">'+(p.img?'<img src="'+p.img+'"/>':'<div class="ph">'+esc((p.cap||"").slice(0,8))+'</div>')+'</div>'; }).join("")+'</div>'
+        : '<div class="empty">まだ投稿がありません。＋ から投稿しましょう。</div>');
+  }
+  function render(){
+    $("feed").style.display = tab==="feed"?"block":"none";
+    $("profile").classList.toggle("on", tab==="me");
+    $("hint").style.display = tab==="feed"?"block":"none";
+    $("tabFeed").classList.toggle("on",tab==="feed");
+    $("tabMe").classList.toggle("on",tab==="me");
+    if(tab==="feed") renderFeed(); else renderProfile();
+  }
+
+  function toggleLike(id){ var p=byId(id); if(!p)return; p.liked=!p.liked; p.likes+=p.liked?1:-1; save(state); renderFeed(); }
+  function addComment(id){ var inp=document.querySelector('[data-cin="'+id+'"]'); if(!inp)return; var t=inp.value.trim(); if(!t)return; var p=byId(id); p.cmts.push({u:ME,t:t}); inp.value=""; save(state); renderFeed(); }
+  function byId(id){ for(var i=0;i<state.posts.length;i++) if(state.posts[i].id===id) return state.posts[i]; return null; }
+
+  /* ---- search ---- */
+  $("search").addEventListener("input", function(){ if(tab!=="feed"){ tab="feed"; render(); } else renderFeed(); });
+
+  /* ---- tabs ---- */
+  $("tabFeed").addEventListener("click", function(){ tab="feed"; render(); });
+  $("tabMe").addEventListener("click", function(){ tab="me"; render(); });
+
+  /* ---- composer ---- */
+  var pendingImg=null;
+  $("fab").addEventListener("click", function(){ $("modal").classList.add("on"); });
+  $("c_cancel").addEventListener("click", function(){ closeModal(); });
+  function closeModal(){ $("modal").classList.remove("on"); $("c_cap").value=$("c_place").value=""; $("c_file").value=""; $("c_prev").style.display="none"; pendingImg=null; }
+  $("c_file").addEventListener("change", function(){
+    var f=this.files&&this.files[0]; if(!f)return;
+    var rd=new FileReader();
+    rd.onload=function(){
+      // downscale to keep localStorage small
+      var img=new Image();
+      img.onload=function(){
+        var max=900, w=img.width, h=img.height;
+        if(w>max||h>max){ var r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r); }
+        var cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+        cv.getContext("2d").drawImage(img,0,0,w,h);
+        pendingImg=cv.toDataURL("image/jpeg",0.82);
+        $("c_prev").src=pendingImg; $("c_prev").style.display="block";
+      };
+      img.src=String(rd.result);
+    };
+    rd.readAsDataURL(f);
+  });
+  $("c_post").addEventListener("click", function(){
+    var cap=$("c_cap").value.trim();
+    if(!cap && !pendingImg){ alert("写真かキャプションを入力してください"); return; }
+    state.posts.push({ id:"p"+Date.now(), user:ME, place:$("c_place").value.trim(), img:pendingImg, cap:cap, likes:0, liked:false, cmts:[] });
+    save(state); closeModal(); tab="feed"; render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
+`;
+
+fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
+fs.writeFileSync(path.join(IDE, "dist", "migemo.html"), html);
+console.log("built dist/migemo.html (" + fs.statSync(path.join(IDE, "dist", "migemo.html")).size + " bytes)");
