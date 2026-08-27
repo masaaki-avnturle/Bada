@@ -200,6 +200,7 @@ public class LauncherActivity extends Activity {
         addQuickTool(bar, "🧮", "電卓", CalcActivity.class, 300, 440);
         addQuickTool(bar, "🕐", "時計", ClockActivity.class, 340, 200);
         addQuickTool(bar, "📊", "空き容量", MonitorActivity.class, 360, 320);
+        addQuickTool(bar, "🗄", "キャビネット", CabinetActivity.class, 400, 580);
 
         // スペーサー
         View spacer = new View(this);
