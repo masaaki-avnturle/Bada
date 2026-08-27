@@ -31,9 +31,24 @@ const DIST = path.join(QVM, "dist");
 fs.mkdirSync(DIST, { recursive: true });
 
 const badaCore = fs.readFileSync(path.join(WWW, "bada.js"), "utf8");
+
+/* the zone:// ultra-network runtime + well-known site, bundled INTO the
+ * guest OS (the same zone-lib.bada that powers the ZoneBrowser app) */
+const BR = path.join(REPO, "bada_gui_ide", "browser");
+const zoneLib = fs.readFileSync(path.join(BR, "zone-lib.bada"), "utf8");
+const zoneSite = JSON.parse(fs.readFileSync(path.join(BR, "zone-site.json"), "utf8"));
+const zoneSiteBada =
+  "# ---- the well-known zone:// site (generated from zone-site.json) ----\n" +
+  "def zone_site() {\n    return [\n" +
+  Object.entries(zoneSite)
+    .map(([u, c]) => "        [" + JSON.stringify(u) + ", " + JSON.stringify(c) + "]")
+    .join(",\n") +
+  "\n    ]\n}\n";
+
 const libs =
   fs.readFileSync(path.join(QVM, "bada", "vmpro.bada"), "utf8") + "\n" +
   fs.readFileSync(path.join(QVM, "bada", "badax.bada"), "utf8") + "\n" +
+  zoneLib + "\n" + zoneSiteBada + "\n" +
   fs.readFileSync(path.join(QVM, "bada", "badabsd.bada"), "utf8");
 const Bada = require(path.join(WWW, "bada.js"));
 
@@ -81,6 +96,13 @@ function run(events) {
     ["xline", 1, "su - bada"],  // 31 switch user inside the xterm
     ["xline", 1, "exit"],       // 32 pop back to root in the xterm
     ["xline", 1, "exit"],       // 33 shell exits -> the window closes
+    ["line", "zone zone://url.or.jp/"],  // 34 the zone:// ultra network, in-guest
+    ["line", "zone put zone://url.or.jp/mypage hello ultra network from BadaOS"], // 35
+    ["line", "zone zone://url.or.jp/mypage"], // 36 fetch the page we published
+    ["line", "zonebrowser &"],  // 37 the ZoneBrowser as an X client (window 2)
+    ["xzone", 2, "zone://bada.or.jp/"],       // 38 navigate (another knot key)
+    ["xzone", 2, "zone://ghost.or.jp/nowhere"], // 39 404 demo
+    ["line", "curl zone://url.or.jp/security"], // 40 curl speaks zone:// too
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -125,6 +147,14 @@ function run(events) {
     [31, "@@XPROMPT 1 quantum$ "],          // su - bada inside the xterm
     [32, "@@XPROMPT 1 quantum# "],
     [33, "@@X UNMAP 1"],                    // exit at the bottom closes the window
+    [34, "status 200 zone-delivered"],      // zone:// resolved on the P2P ring
+    [34, "Ultra Network"],                  // ... and decrypted the home page
+    [36, "hello ultra network from BadaOS"],// our own zone put page round-trips
+    [37, "@@X WIN 2|zonebrowser"],          // ZoneBrowser mapped on BadaX
+    [37, "@@ZPAGE 2|200|zone://url.or.jp/|"],
+    [38, "@@ZPAGE 2|200|zone://bada.or.jp/|"], // navigation (different knot)
+    [39, "@@ZPAGE 2|404|"],                 // unknown zone -> 404
+    [40, "Jones 多項式量子暗号"],           // curl zone://.../security
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -136,7 +166,7 @@ function run(events) {
   }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
-    " -> live xterm (" + tape.length + " ledger events)");
+    " -> live xterm -> zone:// ultra network (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

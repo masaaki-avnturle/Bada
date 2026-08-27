@@ -53,6 +53,8 @@
 #  15 bootloader "grub-lilo" | "grub" | "lilo"
 #  16 disk       install target: "wd0" (virtual) | "rd0" (real, RDM)
 #  17 users      [[name, password, shell], ...] (root included)
+#  18 zpub       pages the guest published to the ultra network
+#               (zone put URL TEXT), re-sealed on every fetch
 # ============================================================
 
 OS_VERSION := "12.0_QUANTUM"
@@ -63,7 +65,7 @@ APT_MIRROR := "http://archive.badaos.or.jp"
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
             "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
-            "wd0", []]
+            "wd0", [], []]
 }
 
 # ====================================================================
@@ -519,6 +521,129 @@ def cmd_wget(emit, st, home, url) {
 }
 
 # ====================================================================
+# The zone:// ultra network INSIDE BadaOS
+# --------------------------------------------------------------------
+# The zone runtime (zone-lib.bada: P2P ring DHT, Kauffman/Jones key
+# schedule, Bell-pair QKD, keystream AEAD) is bundled into this OS.
+# The well-known site (zone://url.or.jp/ ...) plus everything the guest
+# published with `zone put` is re-published onto a fresh ring for every
+# fetch -- deterministic, so the ledger replays perfectly. Fetches are
+# pure queries and are skipped during silent replay (only `zone put`
+# mutates state).
+# ====================================================================
+def zone_net(st) {
+    net := zone_boot()
+    site := zone_site()
+    i := 0
+    while (i < len(site)) {
+        zone_publish(net, site[i][0], site[i][1])
+        i := i + 1
+    }
+    i := 0
+    while (i < len(st[18])) {
+        zone_publish(net, st[18][i][0], st[18][i][1])
+        i := i + 1
+    }
+    return net
+}
+
+def route_join(route) {
+    s := ""
+    i := 0
+    while (i < len(route)) {
+        s := s + route[i]
+        if (i < len(route) - 1) { s := s + ">" }
+        i := i + 1
+    }
+    return s
+}
+
+# -> [status, host, path, key, node, jones, tag, routestr, body]
+def zone_fetch(st, url) {
+    net := zone_net(st)
+    p := zone_parse(url)
+    if (len(p) == 0) {
+        return [400, "", "", 0, "-", 0, 0, "-",
+                "not a zone:// URL (use zone://host/path)"]
+    }
+    host := p[0]
+    key := zone_id(url)
+    route := route_join(zone_route(net, key))
+    owner := dht_nearest(net, key)
+    sess := qkd_session()
+    if (!sess[0]) {
+        return [495, host, p[1], key, owner[0], 0, 0, route,
+                "the Bell pair lost correlation -- someone is on the wire"]
+    }
+    rec := store_lookup(owner[2], url)
+    if (len(rec) == 0) {
+        return [404, host, p[1], key, owner[0], 0, 0, route,
+                "no peer on the ring holds " + url]
+    }
+    jk := jones_key(zone_diagram(host))
+    opened := zone_open([rec[1], rec[2], rec[3]], jk)
+    if (len(opened) == 0) {
+        return [409, host, p[1], key, owner[0], jk, rec[3], route,
+                "AEAD tag failed: tampered content or wrong knot"]
+    }
+    return [200, host, p[1], key, owner[0], jk, rec[3], route, opened[0]]
+}
+
+# CLI rendering (the `zone` command and `curl zone://...`)
+def zone_print(emit, st, url) {
+    if (!emit) { return 0 }
+    r := zone_fetch(st, url)
+    tty(emit, "zone: " + url + "  (ultra network: P2P ring DHT, no DNS, no server)")
+    tty(emit, "  DHT key " + r[3] + " -> node " + r[4] + "   route " + r[7])
+    if (r[0] == 200) {
+        tty(emit, "  QKD ok (zero-preservation) / Jones key " + r[5] + " / AEAD tag " + r[6])
+        tty(emit, "  status 200 zone-delivered")
+    } else {
+        tty(emit, "  status " + r[0] + " zone-error")
+    }
+    tty(emit, "----------------------------------------------------------------")
+    parts := split(r[8], "\n")
+    i := 0
+    while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }
+    return 0
+}
+
+# ZoneBrowser X-window rendering (@@Z protocol for the host chrome)
+def zone_show(emit, st, id, url) {
+    if (!emit) { return 0 }
+    r := zone_fetch(st, url)
+    print("@@ZPAGE " + id + "|" + r[0] + "|" + url + "|" + r[3] + "|" + r[4] +
+          "|" + r[5] + "|" + r[6] + "|" + r[7])
+    parts := split(r[8], "\n")
+    i := 0
+    while (i < len(parts)) { print("@@ZBODY " + id + " " + parts[i]); i := i + 1 }
+    print("@@ZEND " + id)
+    return 0
+}
+
+# the ZoneBrowser as an X client on the BadaX display
+def zonebrowser_launch(emit, vm, st, url) {
+    if (st[10] == 0) {
+        x_hello(emit)
+        ok := x_connect(emit, st[7], x_client_cookie(st))
+        if (ok == 0) {
+            tty(emit, "zonebrowser: unable to open display " + OS_DISPLAY)
+            return 0
+        }
+        st[10] = 1
+        tty(emit, "BadaX: display " + OS_DISPLAY + " opened, JONES-KNOT-COOKIE-1 verified")
+    }
+    id := x_map_window(st[7], st[6], "zonebrowser",
+                       "ZoneBrowser -- ultra network (zone://)")
+    tty(emit, "zonebrowser: window " + id + " mapped on " + OS_DISPLAY +
+              " -- " + url)
+    w := xwin_find(st[6], id)
+    w[7] = [url]
+    zone_show(emit, st, id, url)
+    return 0
+}
+
+# ====================================================================
 # File system seed -- run at install time
 # ====================================================================
 def os_seedfs(st) {
@@ -542,6 +667,8 @@ def os_seedfs(st) {
         "  * Internet over the NAT:  ping www.badaos.or.jp   curl http://www.badaos.or.jp/\n" +
         "  * apt fetches from " + APT_MIRROR + " :  apt update && apt install zsh tcsh bash\n" +
         "  * Users: su - bada (to the first user) / su (back to root) / sudo CMD / adduser\n" +
+        "  * zone:// ultra network:  zone zone://url.or.jp/   zonebrowser &\n" +
+        "    (server-less P2P WWW, Jones quantum cipher; publish: zone put URL TEXT)\n" +
         "The X display of this VM is the BadaX Server on the Windows host:\n" +
         "    DISPLAY=" + OS_DISPLAY + "   (JONES-KNOT-COOKIE-1 authorized)\n" +
         "Try:  xclock &   xeyes &   xterm &   xdpyinfo   qstat   help")
@@ -599,6 +726,8 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/bin/su", "#!binary (setuid root)")
     fs_put(fs, "/usr/bin/sudo", "#!binary (setuid root)")
     fs_put(fs, "/usr/bin/ping", "#!binary")
+    fs_put(fs, "/usr/bin/zone", "#!binary (zone:// ultra-network client, pure Bada)")
+    fs_put(fs, "/usr/X11R7/bin/zonebrowser", "#!binary (X client: ZoneBrowser)")
     fs_put(fs, "/usr/X11R7/bin/xclock", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xeyes", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
@@ -1189,6 +1318,8 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "  bash  zsh  tcsh  (bash/zsh/tcsh は apt install ... 後に起動可)")
         tty(emit, "  vim FILE  emacs FILE  (プリインストール済み)")
         tty(emit, "  ping HOST  curl URL  wget URL  host NAME   (NAT 経由のインターネット)")
+        tty(emit, "  zone [get] zone://url.or.jp/  zone put URL TEXT  zonebrowser [URL] &")
+        tty(emit, "    (ウルトラネットワーク zone:// -- P2P リング DHT + Jones 量子暗号)")
         tty(emit, "  ssh HOST  service NAME start|stop|status   (sshd/xinetd は起動済み)")
         tty(emit, "  uname [-a]  lsb_release -a  hostname  date  dmesg  ps  df  mount")
         tty(emit, "  ls [path]  cat FILE  echo TEXT [> FILE]  touch  rm  clear  free")
@@ -1459,7 +1590,41 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "curl") {
         if (pkg_installed(st, "curl") == 0) { tty(emit, "curl: command not found (apt install curl)"); return 0 }
         if (len(argv) < 2) { tty(emit, "curl: try 'curl URL'"); return 0 }
+        if (str_find(argv[1], "zone://") == 0) {
+            zone_print(emit, st, argv[1])
+            return 0
+        }
         cmd_curl(emit, st, argv[1])
+        return 0
+    }
+
+    # ---- the zone:// ultra network --------------------------------------
+    if (cmd == "zone") {
+        if (len(argv) >= 4 && argv[1] == "put") {
+            text := ""
+            i := 3
+            while (i < len(argv)) {
+                text := text + argv[i]
+                if (i < len(argv) - 1) { text := text + " " }
+                i := i + 1
+            }
+            st[18] <- [argv[2], text]
+            tty(emit, "zone: sealed under the zone's Jones key and committed to the ring:")
+            tty(emit, "  " + argv[2] + "  (" + len(text) + " chars, Akashic ledger " +
+                      len(tuplespace) + " facts)")
+            tty(emit, "  fetch it:  zone " + argv[2] + "   or open it in zonebrowser")
+            return 0
+        }
+        url := "zone://url.or.jp/"
+        if (len(argv) >= 3 && argv[1] == "get") { url := argv[2] }
+        else if (len(argv) >= 2 && argv[1] != "get") { url := argv[1] }
+        zone_print(emit, st, url)
+        return 0
+    }
+    if (cmd == "zonebrowser") {
+        url := "zone://url.or.jp/"
+        if (len(argv) > 1 && argv[1] != "&") { url := argv[1] }
+        zonebrowser_launch(emit, vm, st, url)
         return 0
     }
     if (cmd == "wget") {
@@ -1599,6 +1764,8 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "apt") { tty(emit, "apt(8) -- package manager; fetches " + APT_MIRROR + " over the NAT.") }
         else if (n == "lilo") { tty(emit, "lilo(8) -- installs the boot loader into the MBR (lilo -M, GRUB menu chain).") }
         else if (n == "grub") { tty(emit, "grub(8) -- GRUB 2 menu; config in /boot/grub/grub.cfg.") }
+        else if (n == "zone") { tty(emit, "zone(1) -- zone:// ultra-network client (P2P ring DHT + Jones cipher); zone put URL TEXT publishes.") }
+        else if (n == "zonebrowser") { tty(emit, "zonebrowser(1) -- X client browser for zone://; displays on the BadaX Server.") }
         else if (n == "vim") { tty(emit, "vim(1) -- Vi IMproved; preinstalled by the vim.tgz set.") }
         else if (n == "emacs") { tty(emit, "emacs(1) -- GNU Emacs; preinstalled by the emacs.tgz set.") }
         else if (n == "xclock") { tty(emit, "xclock(1) -- analogue clock for X; displays on the BadaX Server.") }
@@ -1818,6 +1985,14 @@ def os_apply(vm, st, ev, emit) {
         SINK[0] = ev[1]
         xterm_exec(emit, vm, st, w, ev[2])
         SINK[0] = 0
+        return 0
+    }
+    if (kind == "xzone") {
+        w := xwin_find(st[6], ev[1])
+        if (len(w) == 0) { return 0 }
+        if (w[1] != "zonebrowser") { return 0 }
+        w[7] = [ev[2]]
+        zone_show(emit, st, ev[1], ev[2])
         return 0
     }
     return 0

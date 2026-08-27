@@ -48,7 +48,18 @@
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、
    最下段で `exit` すると実物の xterm と同じくウィンドウが閉じます)。VM コンソールと
    xterm は同じ OS 状態を共有します。
-6. **📷 スナップショット / ⤺ 復元** — マシンの全状態 (apt でインストールしたパッケージ含む) は
+6. **zone:// ウルトラネットワークが OS 内で使えます** — ZoneBrowser と同じ
+   zone ランタイム (`bada_gui_ide/browser/zone-lib.bada`: P2P リング DHT +
+   Kauffman/Jones 鍵 + Bell 対 QKD + AEAD) を OS に同梱:
+   ```
+   zone zone://url.or.jp/            # CLI で取得 (DHT 経路・Jones 鍵・AEAD タグ表示)
+   curl zone://url.or.jp/security    # curl も zone:// を話します
+   zone put zone://url.or.jp/mypage こんにちは   # 自分のページをリングへ封緘・公開
+   zonebrowser &                     # ZoneBrowser を X クライアントとして BadaX に表示
+   ```
+   ZoneBrowser ウィンドウはアドレスバー・リンク遷移・セキュリティ表示
+   (ノード / 経路 / DHT キー / Jones 鍵 / AEAD タグ) 付きです。
+7. **📷 スナップショット / ⤺ 復元** — マシンの全状態 (apt でインストールしたパッケージ含む) は
    追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイなので、スナップショットは
    台帳のプレフィックスそのものです。
 
