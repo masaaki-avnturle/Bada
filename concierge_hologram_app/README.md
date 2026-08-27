@@ -90,4 +90,55 @@ bada run main.om        # もしくは omega main.om
 
 ---
 
+## 📦 配布パッケージ — Android APK / Windows 10・11 / Ubuntu
+
+Bada版モジュール（`*.om`）のロジックをそのまま移植した**実際に動くアプリ**を同梱し、
+3プラットフォーム向けにパッケージ化できます。中身は共通の `www/index.html`（1ファイル完結）を、
+Electron（Windows・Ubuntu）と Cordova（Android）でラップする、本リポジトリ標準の構成です。
+
+```
+concierge_hologram_app/
+├── www/index.html          … 実動作アプリ（カメラ透過＋方位/傾き/GPS＋案内ラベル）
+├── electron/               … Windows 10/11 EXE ＆ Ubuntu AppImage/deb
+│   ├── main.js             … Electron ラッパー（カメラ/位置の許可を付与）
+│   └── package.json        … electron-builder 設定（win: nsis+portable / linux: AppImage+deb）
+└── cordova/config.xml      … Android APK（カメラ/位置/センサ権限つき）
+```
+
+### ビルド方法（GitHub Actions）
+
+ワークフロー **`.github/workflows/concierge-app-build.yml`** が 3 つを同時にビルドします。
+
+| ジョブ | 生成物 | ツール |
+|:--|:--|:--|
+| `windows-exe` | `Machi-Shiori-1.0.0-x64.exe`（インストーラ ＋ portable） | Electron / electron-builder |
+| `ubuntu-app`  | `Machi-Shiori-1.0.0-x64.AppImage`, `*.deb` | Electron / electron-builder |
+| `android-apk` | `machi-shiori-debug.apk` | Cordova 12 |
+
+- **手動実行**: Actions → *まちしおり build* → **Run workflow**。生成物は Actions のアーティファクトに出ます。
+- **リリース添付**: `shiori-v*` タグ（例 `shiori-v1.0.0`）を push すると、EXE / AppImage / deb / APK が
+  GitHub Release に自動添付されます。
+
+  ```bash
+  git tag shiori-v1.0.0 && git push origin shiori-v1.0.0
+  ```
+
+### ローカルでの確認
+
+```bash
+# デスクトップ（Windows/Ubuntu）で試す
+cd concierge_hologram_app/electron
+npm install
+npm start                 # Electron で起動（Webカメラがあれば風景として使用）
+npm run dist              # Windows EXE
+npm run dist:linux        # Ubuntu AppImage + deb
+```
+
+> **センサの扱い** — スマホでは背面カメラ・コンパス・傾き・GPS を使い、ラベルは実位置へ
+> ワールドロックされます。デスクトップなどセンサが無い環境では、自動で**方位ダイヤル**を表示し、
+> デモ位置で同等に動作します（カメラが使えなければ空景グラデーションにフォールバック）。
+> iOS/Android では初回に カメラ・位置・モーション の許可を求めます。
+
+---
+
 *© 2026 — Bada 言語（Omega方言）による半透明ホログラム・コンシェルジュ*

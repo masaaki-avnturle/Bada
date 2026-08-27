@@ -1,0 +1,123 @@
+name: まちしおり build (APK + Windows + Ubuntu)
+
+# concierge_hologram_app (www + electron + cordova) から
+#   ・Android APK        (Cordova)
+#   ・Windows 10/11 EXE  (Electron: nsis インストーラ + portable)
+#   ・Ubuntu アプリ      (Electron: AppImage + .deb)
+# をビルドし、Actions アーティファクト、および (shiori-v* タグ時)
+# GitHub Release へ添付します。
+#
+# ⚠ 案内データはサンプルの街データです。概念デモ用途。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'shiori-v*'
+
+permissions:
+  contents: write
+
+env:
+  APP_DIR: concierge_hologram_app
+
+jobs:
+  # ── Windows 10/11 (EXE) ──────────────────────────────────────────────
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: ${{ env.APP_DIR }}/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: machi-shiori-windows
+          path: |
+            ${{ env.APP_DIR }}/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.APP_DIR }}/electron/dist/*.exe
+
+  # ── Ubuntu (AppImage + .deb) ─────────────────────────────────────────
+  ubuntu-app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y fakeroot dpkg
+      - name: Build Ubuntu app (Electron → AppImage + deb)
+        working-directory: ${{ env.APP_DIR }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Ubuntu artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: machi-shiori-ubuntu
+          path: |
+            ${{ env.APP_DIR }}/electron/dist/*.AppImage
+            ${{ env.APP_DIR }}/electron/dist/*.deb
+      - name: Attach Ubuntu builds to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.APP_DIR }}/electron/dist/*.AppImage
+            ${{ env.APP_DIR }}/electron/dist/*.deb
+
+  # ── Android (APK) ────────────────────────────────────────────────────
+  android-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          cordova create cordova-build io.github.masaaki_avnturle.machi_shiori MachiShiori
+          rm -rf cordova-build/www
+          cp -r "$APP_DIR/www" cordova-build/www
+          cp "$APP_DIR/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/machi-shiori-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: machi-shiori-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk

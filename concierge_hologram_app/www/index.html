@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<!--
+  まちしおり — ホログラム・コンシェルジュ (Machi-Shiori)
+  Masaaki Yamaguchi / Bada — concierge_hologram_app
+
+  スマホの半透明(シースルー)ホログラフィーディスプレイに見立てた案内アプリ。
+  風景にかざすと、カメラ透過像の上に、周囲の対象(山・川・店・駅・名所…)の
+  情報を、実位置に貼り付く発光文字ラベルとして重ねて表示します。
+
+  この www/index.html は、Bada言語版(concierge_hologram_app/*.om)の各モジュール
+  ── PoseSensor / worldToScreen / POIIndex / FactBook / Concierge / Overlay ──
+  を JavaScript へ忠実に移植した「実際に動く」実装です。
+
+  ・カメラ      : getUserMedia (背面カメラ = 風景の透過)
+  ・傾き/方位   : DeviceOrientationEvent (平行感覚 = pitch/roll, compass = yaw)
+  ・位置        : Geolocation (近傍POIの方位・距離)
+  デスクトップ(Windows/Ubuntu)などセンサが無い環境では、方位ダイヤルと
+  デモ位置で同等に動作します。
+
+  ⚠ 案内データはサンプルの街データです。実運用では地図API等に差し替えます。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<title>まちしおり — ホログラム・コンシェルジュ</title>
+<style>
+  :root{
+    --gold:#c8a44a; --cyan:#42d0ff; --ink:#f4fbff; --dim:#9fb0c4;
+    --panel:rgba(4,9,16,.42);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#04060a;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+    color:var(--ink)}
+
+  /* ─ 風景(カメラ透過像 or フォールバックの空景) ─ */
+  #scene{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:
+    linear-gradient(180deg,#1a2740 0%,#274060 42%,#3a5a72 62%,#5a7a5c 78%,#3e5a3a 100%)}
+  #sceneVideo{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+
+  /* ─ 半透明ホログラム・オーバーレイ(発光文字は screen 合成で加算的に) ─ */
+  #overlay{position:fixed;inset:0;pointer-events:none;mix-blend-mode:screen}
+  .label{position:absolute;transform:translate(-50%,-100%);
+    background:var(--panel);border:1px solid rgba(66,208,255,.5);border-radius:12px;
+    padding:9px 12px;min-width:150px;max-width:240px;backdrop-filter:blur(2px);
+    box-shadow:0 0 18px rgba(66,208,255,.28);pointer-events:auto;
+    transition:opacity .25s}
+  .label h3{margin:0 0 3px;font-size:14px;color:var(--ink);letter-spacing:.3px}
+  .label .sum{margin:0;font-size:11.5px;color:#ddeaf6;line-height:1.45}
+  .label ul{margin:5px 0 0;padding-left:15px}
+  .label li{font-size:11px;color:var(--dim);line-height:1.5}
+  .label .badge{display:inline-block;margin-top:6px;font-size:10.5px;color:#04121c;
+    background:var(--cyan);border-radius:6px;padding:1px 7px;font-weight:700}
+  .reticle{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;
+    border:2px solid var(--cyan);border-radius:50%;box-shadow:0 0 10px var(--cyan)}
+  .leader{position:absolute;height:2px;transform-origin:0 50%;
+    background:linear-gradient(90deg,rgba(66,208,255,.9),rgba(66,208,255,0))}
+
+  /* ─ コンシェルジュ(常駐UI) ─ */
+  #topbar{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+    display:flex;align-items:center;gap:10px;
+    background:linear-gradient(180deg,rgba(4,6,10,.65),rgba(4,6,10,0))}
+  #avatar{width:34px;height:34px;border-radius:50%;flex:0 0 auto;
+    background:radial-gradient(circle at 35% 30%,#8fe0ff,#2b7fb0);
+    box-shadow:0 0 14px rgba(66,208,255,.6)}
+  #hello{font-size:12.5px;line-height:1.4}
+  #hello b{color:var(--gold)}
+  #status{margin-left:auto;font-size:10.5px;color:var(--dim);text-align:right;white-space:nowrap}
+
+  #bottom{position:fixed;left:0;right:0;bottom:0;padding:12px 14px calc(env(safe-area-inset-bottom) + 14px);
+    display:flex;flex-direction:column;gap:10px;
+    background:linear-gradient(0deg,rgba(4,6,10,.72),rgba(4,6,10,0))}
+  #hint{font-size:12px;color:var(--dim);text-align:center}
+  .btnrow{display:flex;gap:10px}
+  button{flex:1;background:linear-gradient(180deg,rgba(26,39,64,.9),rgba(14,22,38,.9));
+    color:var(--gold);border:1px solid var(--gold);border-radius:12px;padding:13px;
+    font-weight:700;font-size:15px;cursor:pointer}
+  button:active{background:rgba(31,47,74,.95)}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+
+  /* ─ デスクトップ用の方位ダイヤル(センサ無し時) ─ */
+  #dial{display:none;align-items:center;gap:10px}
+  #dial label{font-size:11px;color:var(--dim)}
+  #heading{flex:1}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+  <!-- 風景 -->
+  <div id="scene"></div>
+  <video id="sceneVideo" playsinline muted autoplay></video>
+
+  <!-- 案内ラベル(ワールドロック) -->
+  <div id="overlay"></div>
+
+  <!-- コンシェルジュ -->
+  <div id="topbar">
+    <div id="avatar"></div>
+    <div id="hello">コンシェルジュ <b>しおり</b><br><span id="scenekind" style="color:var(--dim)">風景を読み取り中…</span></div>
+    <div id="status">起動中</div>
+  </div>
+
+  <div id="bottom">
+    <div id="hint">「案内をはじめる」を押して、風景にかざしてください</div>
+    <div id="dial">
+      <label>方位</label>
+      <input id="heading" type="range" min="0" max="359" value="0"/>
+      <span id="headnum" style="font-size:11px;color:var(--cyan);width:64px;text-align:right">北 0°</span>
+    </div>
+    <div class="btnrow">
+      <button id="startBtn">案内をはじめる</button>
+      <button id="recenterBtn" class="sec">再センタリング</button>
+    </div>
+  </div>
+
+<script>
+"use strict";
+/* ============================================================================
+   まちしおり — ロジック (Bada版モジュールの JS 移植)
+   ========================================================================== */
+const DEG = Math.PI/180, R_EARTH = 6371000;
+const $ = s => document.querySelector(s);
+
+/* ---- 姿勢(Concierge::Pose の JS版) ---------------------------------------- */
+const Pose = {
+  pitch:0, roll:0, yaw:0,          // rad (yaw=方位, 北=0)
+  lat:35.6812, lon:139.7671,       // 既定(デモ)位置
+  hfov:62*DEG, vfov:48*DEG,
+  hasSensor:false, hasGeo:false,
+  _yawSmooth:0
+};
+
+/* ---- POIインデックス + 事実(Concierge::Knowledge の JS版) ------------------
+   ユーザーの現在地を中心に、方位と距離を指定して周囲へ配置する。
+   これにより「どこにいても」端末を回すと各POIが正しい方角に現れる。      */
+const POI_SPEC = [
+  {name:"あかね山",   kind:"山",     bearing:315, dist:900, elev:40,
+   sum:"市街を見下ろす標高342mの低山。", details:["山頂まで徒歩約90分","展望台とベンチあり","夕焼けの名所"]},
+  {name:"せせらぎ川", kind:"水辺",   bearing:135, dist:260, elev:0,
+   sum:"桜並木の続く市民の憩いの川。", details:["約2kmの遊歩道","春は桜、初夏は蛍","貸しボートあり"]},
+  {name:"中央駅",     kind:"駅",     bearing:90,  dist:180, elev:0,
+   sum:"3路線が乗り入れるターミナル駅。", details:["みどりの窓口は東口","タクシー乗り場あり"]},
+  {name:"時計台",     kind:"名所",   bearing:20,  dist:220, elev:25,
+   sum:"1897年築、国の重要文化財。", details:["毎正時に鐘の音","内部は資料館として公開","夜間ライトアップ"]},
+  {name:"café ひなた",kind:"飲食店", bearing:200, dist:120, elev:0,
+   sum:"川沿いの自家焙煎コーヒー店。", details:["営業 8:00–19:00","テラス席あり","名物はチーズケーキ"]},
+  {name:"みどり書店", kind:"お店",   bearing:250, dist:150, elev:0,
+   sum:"古書と雑貨の小さな本屋。", details:["2階に喫茶コーナー"]},
+  {name:"中央公園",   kind:"公園",   bearing:0,   dist:300, elev:0,
+   sum:"噴水のある芝生の広場。", details:["週末はマルシェ","遊具・ベンチあり"]}
+];
+const KIND_WEIGHT = {"名所":1.6,"駅":1.4,"飲食店":1.3,"山":1.2,"お店":1.1,"水辺":1.0,"公園":1.0};
+
+let POIS = [];   // 実座標に展開したPOI
+
+/* 現在地(またはデモ位置)を中心に、方位/距離指定を緯度経度へ展開 */
+function anchorPois(){
+  POIS = POI_SPEC.map(s => {
+    const b = s.bearing*DEG, d = s.dist;
+    const dLat = (d*Math.cos(b))/R_EARTH/DEG;
+    const dLon = (d*Math.sin(b))/(R_EARTH*Math.cos(Pose.lat*DEG))/DEG;
+    return Object.assign({}, s, {lat:Pose.lat+dLat, lon:Pose.lon+dLon});
+  });
+}
+
+/* ---- 地理計算(Concierge::Pose の JS版) ------------------------------------ */
+function geoDistance(a,b){
+  const dlat=(b.lat-a.lat)*DEG, dlon=(b.lon-a.lon)*DEG;
+  const la1=a.lat*DEG, la2=b.lat*DEG;
+  const h=Math.sin(dlat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dlon/2)**2;
+  return 2*R_EARTH*Math.atan2(Math.sqrt(h),Math.sqrt(1-h));
+}
+function geoBearing(from,to){
+  const la1=from.lat*DEG, la2=to.lat*DEG, dlon=(to.lon-from.lon)*DEG;
+  const y=Math.sin(dlon)*Math.cos(la2);
+  const x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dlon);
+  let b=Math.atan2(y,x); if(b<0) b+=2*Math.PI; return b;
+}
+function bearingText(b){
+  const dirs=["北","北東","東","南東","南","南西","西","北西"];
+  return dirs[Math.floor(((b/DEG+22.5)%360)/45)];
+}
+function distanceText(m){ return m<1000 ? Math.round(m)+"m" : (Math.round(m/100)/10)+"km"; }
+
+/* worldToScreen: 対象の実位置を端末姿勢で画面座標へ(ワールドロックの中核) */
+function worldToScreen(target, W, H){
+  const self={lat:Pose.lat,lon:Pose.lon};
+  const bearing=geoBearing(self,target), dist=geoDistance(self,target);
+  let rel=bearing-Pose.yaw;
+  while(rel> Math.PI) rel-=2*Math.PI;
+  while(rel<-Math.PI) rel+=2*Math.PI;
+  if(Math.abs(rel)>Pose.hfov/2) return {visible:false,bearing,dist};
+  const sx = W/2 + (rel/(Pose.hfov/2))*(W/2);
+  const elevAngle=Math.atan2(target.elev||0,dist);
+  const relV=elevAngle-Pose.pitch;
+  const sy = H/2 - (relV/(Pose.vfov/2))*(H/2) - H*0.06;   // やや上寄せ
+  return {visible:true,x:sx,y:sy,bearing,dist};
+}
+
+/* ---- コンシェルジュ(Concierge::Agent の JS版) ----------------------------- */
+function describe(poi){
+  const self={lat:Pose.lat,lon:Pose.lon};
+  const dist=geoDistance(self,poi), bearing=geoBearing(self,poi);
+  const lines=[poi.sum].concat(poi.details.slice(0,2).map(d=>"・"+d));
+  if(dist<120) lines.push("すぐそこです。");
+  const relevance=(0.75)*(KIND_WEIGHT[poi.kind]||1);
+  return {poi,title:poi.name,lines,badge:bearingText(bearing)+" "+distanceText(dist),relevance};
+}
+function piSoftmax(cards){                 // omega_math.c 由来
+  const H=0.62, s=cards.map(c=>Math.exp(c.relevance*H*Math.PI));
+  const sum=s.reduce((a,b)=>a+b,0);
+  cards.forEach((c,i)=>c.relevance=s[i]/sum);
+  return cards.sort((a,b)=>b.relevance-a.relevance);
+}
+const MAX_CARDS=4;
+
+/* ---- 風景の情景推定(カメラ平均色 → SceneClassifier の簡易版) -------------- */
+const sampleCanvas=document.createElement("canvas"); sampleCanvas.width=32; sampleCanvas.height=32;
+const sctx=sampleCanvas.getContext("2d",{willReadFrequently:true});
+function readSceneKind(){
+  const v=$("#sceneVideo");
+  if(v.style.display==="none"||v.videoWidth===0) return "—";
+  try{
+    sctx.drawImage(v,0,0,32,32);
+    const d=sctx.getImageData(0,0,32,32).data; let r=0,g=0,b=0;
+    for(let i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2];}
+    const n=d.length/4; r/=n;g/=n;b/=n;
+    const bright=(r+g+b)/3/255;
+    if(b>g&&b>r&&bright>0.5) return "大空・水辺";
+    if(g>r&&g>b) return "緑・草木";
+    if(bright<0.25) return "夜・室内";
+    if(r>g&&r>b) return "夕景・街";
+    return "街なみ";
+  }catch(e){ return "—"; }
+}
+
+/* ============================================================================
+   オーバーレイ描画(Concierge::Overlay の JS版, world-locked)
+   ========================================================================== */
+const overlay=$("#overlay");
+function render(){
+  const W=window.innerWidth, H=window.innerHeight;
+  const cards=piSoftmax(POIS.map(describe)).slice(0,MAX_CARDS);
+  overlay.innerHTML="";
+  const placed=[];
+  for(const card of cards){
+    const p=worldToScreen(card.poi,W,H);
+    if(!p.visible) continue;
+
+    // 照準リング(対象の実位置)
+    const ret=document.createElement("div");
+    ret.className="reticle"; ret.style.left=p.x+"px"; ret.style.top=p.y+"px";
+    overlay.appendChild(ret);
+
+    // ラベル位置(対象の上, 重なれば上へ回避)
+    let lx=p.x, ly=p.y-40;
+    let tries=0;
+    while(placed.some(q=>Math.abs(q.x-lx)<130 && Math.abs(q.y-ly)<96) && tries<6){ ly-=92; tries++; }
+    placed.push({x:lx,y:ly});
+
+    // リーダー線(ラベル→対象)
+    const dx=p.x-lx, dy=p.y-ly, len=Math.hypot(dx,dy), ang=Math.atan2(dy,dx)/DEG;
+    const ld=document.createElement("div");
+    ld.className="leader"; ld.style.left=lx+"px"; ld.style.top=ly+"px";
+    ld.style.width=len+"px"; ld.style.transform=`rotate(${ang}deg)`;
+    overlay.appendChild(ld);
+
+    // ラベル本体
+    const el=document.createElement("div");
+    el.className="label";
+    el.style.left=lx+"px"; el.style.top=ly+"px";
+    el.style.opacity=(0.55+0.45*card.relevance/(cards[0].relevance||1)).toFixed(2);
+    el.innerHTML =
+      `<h3>${card.title}</h3>`+
+      `<p class="sum">${card.lines[0]}</p>`+
+      `<ul>${card.lines.slice(1).map(l=>`<li>${l.replace(/^・/,"")}</li>`).join("")}</ul>`+
+      `<span class="badge">${card.badge}</span>`;
+    overlay.appendChild(el);
+  }
+}
+
+/* ============================================================================
+   センサ配線
+   ========================================================================== */
+function onOrientation(e){
+  // iOS は webkitCompassHeading(真北), その他は alpha
+  let heading;
+  if(typeof e.webkitCompassHeading==="number"){ heading=e.webkitCompassHeading; }
+  else if(e.alpha!=null){ heading=360-e.alpha; }         // alpha は反時計回り
+  if(heading!=null){
+    Pose.hasSensor=true;
+    // 角度の巻き込みを避けて平滑化
+    const target=heading*DEG;
+    let d=target-Pose._yawSmooth;
+    while(d> Math.PI)d-=2*Math.PI; while(d<-Math.PI)d+=2*Math.PI;
+    Pose._yawSmooth+=d*0.15; Pose.yaw=Pose._yawSmooth;
+  }
+  if(e.beta!=null)  Pose.pitch=((e.beta-90)*DEG)*0.6;     // 端末を立てて構える前提
+  if(e.gamma!=null) Pose.roll=e.gamma*DEG;
+}
+function onGeo(pos){
+  Pose.lat=pos.coords.latitude; Pose.lon=pos.coords.longitude; Pose.hasGeo=true;
+  anchorPois();
+}
+
+async function startCamera(){
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"}}, audio:false});
+    const v=$("#sceneVideo"); v.srcObject=stream; v.style.display="block";
+    $("#scene").style.display="none";
+    return true;
+  }catch(e){ return false; }   // 不許可なら空景グラデーションのまま
+}
+
+async function requestSensors(){
+  // iOS 13+ は許可が必要
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined" &&
+       typeof DeviceOrientationEvent.requestPermission==="function"){
+      const r=await DeviceOrientationEvent.requestPermission();
+      if(r==="granted") window.addEventListener("deviceorientation",onOrientation,true);
+    }else if("DeviceOrientationEvent" in window){
+      window.addEventListener("deviceorientationabsolute",onOrientation,true);
+      window.addEventListener("deviceorientation",onOrientation,true);
+    }
+  }catch(e){}
+  if("geolocation" in navigator){
+    navigator.geolocation.getCurrentPosition(onGeo,()=>{},{enableHighAccuracy:true});
+    navigator.geolocation.watchPosition(onGeo,()=>{},{enableHighAccuracy:true});
+  }
+}
+
+/* デスクトップ用: 方位ダイヤル(センサ検出できない時に表示) */
+function enableDial(){
+  $("#dial").style.display="flex";
+  const hd=$("#heading"), num=$("#headnum");
+  const upd=()=>{ Pose.yaw=(+hd.value)*DEG; num.textContent=bearingText(Pose.yaw)+" "+hd.value+"°"; };
+  hd.addEventListener("input",upd); upd();
+}
+
+/* ============================================================================
+   起動
+   ========================================================================== */
+let started=false;
+async function start(){
+  if(started) return; started=true;
+  $("#hint").textContent="風景にかざすと、周囲の情報をご案内します。";
+  $("#startBtn").textContent="案内中";
+  anchorPois();
+  const cam=await startCamera();
+  await requestSensors();
+  // 少し待ってセンサ反応が無ければダイヤルを出す(PC等)
+  setTimeout(()=>{ if(!Pose.hasSensor) enableDial(); },1200);
+}
+
+$("#startBtn").addEventListener("click",start);
+$("#recenterBtn").addEventListener("click",()=>{ if("geolocation" in navigator)
+  navigator.geolocation.getCurrentPosition(onGeo,()=>{},{enableHighAccuracy:true}); anchorPois(); });
+
+// 対象タップで詳細(全事実)をアラート的に展開
+overlay.addEventListener("click",e=>{
+  const lbl=e.target.closest(".label"); if(!lbl) return;
+  const name=lbl.querySelector("h3").textContent;
+  const poi=POIS.find(p=>p.name===name); if(!poi) return;
+  lbl.querySelector("ul").innerHTML=poi.details.map(d=>`<li>${d}</li>`).join("");
+});
+
+/* メインループ */
+anchorPois();
+function loop(){
+  render();
+  const st=$("#status");
+  st.innerHTML = (Pose.hasSensor?"方位 "+Math.round((Pose.yaw/DEG+360)%360)+"°":"デモ方位")
+    + " · " + (Pose.hasGeo?"GPS":"デモ位置");
+  $("#scenekind").textContent = "情景: "+readSceneKind();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
