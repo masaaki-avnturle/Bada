@@ -28,9 +28,14 @@ Samsung タブレットの**フリーフォーム機能(ポップアップ表示
 
 ## 📱 使い方
 
-1. [Releases](https://github.com/masaaki-avnturle/Bada/releases) から
-   `bada-multiwindow-debug.apk` をダウンロードしてインストール
-   (提供元不明アプリの許可が必要です)。
+1. APK をダウンロードしてインストール(提供元不明アプリの許可が必要です)。
+   - **Actions から**: [Actions の実行一覧](https://github.com/masaaki-avnturle/Bada/actions/workflows/multiwindow-app-build.yml)
+     で最新の実行を開き、ページ下部 **Artifacts** の `multiwindow-android` を
+     ダウンロード(zip 内に `bada-multiwindow-debug.apk`)。
+     `multiwindow/` を変更する PR や main への push のたびに自動ビルドされます。
+   - **Releases から**: `multiwindow-v*` タグ作成後は
+     [Releases](https://github.com/masaaki-avnturle/Bada/releases) の
+     `bada-multiwindow-debug.apk` を直接ダウンロード。
 2. 「Bada MultiWindow」を起動し、開きたいツールのボタンを押す。
 3. フリーフォーム対応端末(Samsung DeX、または freeform が有効な One UI)では、
    そのままタブレット画面上に独立ウィンドウとして開きます。
@@ -61,6 +66,8 @@ Samsung タブレットの**フリーフォーム機能(ポップアップ表示
 GitHub Actions [`multiwindow-app-build.yml`](../.github/workflows/multiwindow-app-build.yml)
 が自動ビルドします:
 
+- `multiwindow/` を変更する **PR / main への push** → Actions 実行ページの
+  **Artifacts** から `multiwindow-android` をダウンロード
 - `multiwindow-v*` タグを push → APK を GitHub Release に添付
 - Actions の `workflow_dispatch` → アーティファクトとしてダウンロード
   (`release_tag` を指定すると Release にも添付)

@@ -4,8 +4,13 @@ name: Bada MultiWindow app build (Android APK)
 # Android APK としてビルドします。純ネイティブ (Java + フレームワーク API のみ、
 # 依存ライブラリ・WebView なし) なので APK は極小で、ストレージ空き容量の
 # 少ないタブレットにもインストールできます。
-# Actions アーティファクト、および (multiwindow-v* タグ / release_tag 指定時)
-# GitHub Release に添付します。
+#
+# APK の入手方法:
+#   - multiwindow/ を変更する PR・main への push のたびに自動ビルドされ、
+#     Actions の実行ページから `multiwindow-android` アーティファクトとして
+#     ダウンロードできます (中身は bada-multiwindow-debug.apk)。
+#   - multiwindow-v* タグ push / release_tag 指定の workflow_dispatch では
+#     GitHub Release にも添付します。
 
 on:
   workflow_dispatch:
@@ -14,9 +19,20 @@ on:
         description: 'GitHub Release に添付するタグ名 (例: multiwindow-v1.0.0)。空欄なら Actions アーティファクトのみ。'
         required: false
         default: ''
+  pull_request:
+    paths:
+      - 'multiwindow/**'
+      - '.github/workflows/multiwindow-app-build.yml'
   push:
+    branches:
+      - main
     tags:
       - 'multiwindow-v*'
+    # paths フィルタはタグ push には適用されない (GitHub Actions の仕様) ため、
+    # multiwindow-v* タグは常にビルドされる
+    paths:
+      - 'multiwindow/**'
+      - '.github/workflows/multiwindow-app-build.yml'
 
 permissions:
   contents: write

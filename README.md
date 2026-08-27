@@ -112,11 +112,11 @@ Samsung タブレットの**フリーフォーム機能(ポップアップ表示
 空き容量不足でも安全に動くよう、保存失敗時の警告表示と、ストレージ/RAM 使用率を
 常時監視できる「空き容量モニター」ウィンドウを備えています。
 
-| プラットフォーム | ファイル |
+| プラットフォーム | 入手 |
 |:---|:---|
-| **Android** (Samsung タブレット / APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-multiwindow-debug.apk` |
+| **Android** (Samsung タブレット / APK) | [Actions の最新実行](https://github.com/masaaki-avnturle/Bada/actions/workflows/multiwindow-app-build.yml) の **Artifacts** `multiwindow-android`(zip 内に `bada-multiwindow-debug.apk`)、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-multiwindow-debug.apk` |
 
-ビルドは [`multiwindow-app-build.yml`](.github/workflows/multiwindow-app-build.yml) が実行します(`multiwindow-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・技術詳細は [`multiwindow/README.md`](multiwindow/README.md) を参照。
+ビルドは [`multiwindow-app-build.yml`](.github/workflows/multiwindow-app-build.yml) が実行します(`multiwindow/` 変更の PR / main への push で Actions アーティファクト / `multiwindow-v*` タグで Release へ添付 / `workflow_dispatch` も可)。使い方・技術詳細は [`multiwindow/README.md`](multiwindow/README.md) を参照。
 
 ---
 
