@@ -70,6 +70,32 @@
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
+| **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+
+---
+
+## 🏗️ Bada C++Builder — Inprise/Borland C++Builder 風 RAD IDE (オマージュ)
+
+1997〜2001 年ごろの **Inprise (Borland) C++Builder** の開発環境を、依存ゼロの**単一 HTML** としてブラウザ上に再現しました(非公式・教育目的のオマージュです)。
+
+**👉 [`cpp_builder/index.html` を開く](cpp_builder/index.html)** / GitHub Pages: <https://masaaki-avnturle.github.io/Bada/cpp_builder/>
+
+- **フォームデザイナ** — コンポーネントパレット (Standard/Additional/Win32/System, 14種) からクリック配置、8px グリッドスナップ、ドラッグ移動・リサイズ
+- **Object Inspector** — Properties / Events タブ。イベント欄ダブルクリックでハンドラ自動生成
+- **コード自動生成** — VCL 風の `Unit1.cpp` / `Unit1.h` / `Unit1.dfm` を常時生成、ハンドラ本体は編集可能
+- **F9 で実行** — 内蔵の C++ サブセット・ミニインタープリタ (`if/while/for`、`Label1->Caption`、`Memo1->Lines->Add`、`ShowMessage`、`IntToStr`、`TTimer` など) が設計したフォームを実際に動かします
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-cppbuilder-debug.apk` |
+| **Windows 10 / 11** | `BadaCppBuilder-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
+
+ビルドは [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) が実行します(`cppbuilder-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
 
 ---
 
