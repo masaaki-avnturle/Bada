@@ -83,6 +83,7 @@ VM 内の X クライアント (`xclock` / `xeyes` / `xterm`) を
 | **どこでも** (単一 HTML) ★ | [`quantum_vm/dist/bada-vm-pro.html`](quantum_vm/dist/bada-vm-pro.html) — 「Download raw file」で保存して開く |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS) / `BadaVMPro-*-portable.exe` |
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **実機起動** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`BadaOS-12.0-live-amd64.iso`** — USB に書いて PC を起動すると**本物の GRUB メニューに「BadaOS GNU/Quantum 12.0」**。`sudo badaos-install` で**実ディスクへ本インストール**(MBR/EFI へ grub-install)して単独起動化。詳細 [`quantum_vm/live/`](quantum_vm/live/) |
 
 - 仮想マシンは量子 vCPU (8 qubit / Hilbert 次元 256)・tuplespace メモリ・仮想ディスク wd0 / 実ディスク rd0 (RDM)・NAT を持ち、マシン記述は `.qvmx`
 - BadaOS は CD (ISO) から起動 → sysinst で ディスク選択 (wd0/rd0)・GPT/MBR・**ブートローダ (LILO→MBR + GRUB メニュー)**・`newfs` FFSv2・セット展開 → root パスワード・ホスト名・DHCP → LILO/GRUB 経由でディスクから再起動 → `login: root`

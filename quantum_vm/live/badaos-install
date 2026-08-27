@@ -1,0 +1,116 @@
+#!/bin/bash
+# ============================================================================
+# badaos-install — install BadaOS GNU/Quantum onto a REAL disk, for real.
+#
+# Run from inside the BadaOS live boot (as root: `sudo badaos-install`).
+# It partitions the chosen disk, copies the running live system onto it,
+# and installs GRUB — into the MBR on BIOS machines, or as a "BadaOS"
+# entry in the EFI boot menu on UEFI machines — so the PC boots BadaOS
+# standalone from its own hard disk from then on.
+#
+#   !!!  THE CHOSEN DISK IS COMPLETELY ERASED  !!!
+#
+# Dual boot note: this simple installer takes the whole disk. To keep an
+# existing OS, install to a second disk, or add the live ISO to an existing
+# GRUB with quantum_vm/live/badaos-add-grub-entry.sh instead.
+# ============================================================================
+set -euo pipefail
+
+[ "$(id -u)" = 0 ] || { echo "run as root: sudo badaos-install"; exit 1; }
+grep -q boot=live /proc/cmdline || {
+    echo "badaos-install must run inside the BadaOS live boot."; exit 1; }
+
+echo "=============================================================="
+echo " BadaOS GNU/Quantum 12.0 — real-disk installer"
+echo "=============================================================="
+echo "Disks on this machine:"
+lsblk -d -o NAME,SIZE,MODEL,TYPE | grep -v loop || true
+echo
+read -rp "Target disk (e.g. sda / nvme0n1, WILL BE ERASED): " D
+TARGET="/dev/$D"
+[ -b "$TARGET" ] || { echo "no such block device: $TARGET"; exit 1; }
+# refuse the live medium itself
+LIVEDEV="$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)"
+case "$LIVEDEV" in "$TARGET"*) echo "that is the live medium itself"; exit 1;; esac
+
+echo
+echo "  *** ALL DATA ON $TARGET WILL BE DESTROYED ***"
+read -rp "Type exactly 'INSTALL $D' to continue: " CONFIRM
+[ "$CONFIRM" = "INSTALL $D" ] || { echo "aborted."; exit 1; }
+
+P="$TARGET"
+case "$D" in nvme*|mmcblk*) P="${TARGET}p";; esac
+
+if [ -d /sys/firmware/efi ]; then
+    echo "==> UEFI machine: GPT + ESP + root"
+    parted -s "$TARGET" mklabel gpt \
+        mkpart ESP fat32 1MiB 257MiB set 1 esp on \
+        mkpart badaos ext4 257MiB 100%
+    udevadm settle || sleep 2
+    mkfs.vfat -F32 -n BADAESP "${P}1"
+    mkfs.ext4 -q -F -L badaos "${P}2"
+    ROOTPART="${P}2"; ESPPART="${P}1"
+else
+    echo "==> BIOS machine: MBR + one bootable partition (GRUB into the MBR)"
+    parted -s "$TARGET" mklabel msdos \
+        mkpart primary ext4 1MiB 100% set 1 boot on
+    udevadm settle || sleep 2
+    mkfs.ext4 -q -F -L badaos "${P}1"
+    ROOTPART="${P}1"; ESPPART=""
+fi
+
+M=/mnt/badaos
+mkdir -p "$M"
+mount "$ROOTPART" "$M"
+
+echo "==> copying the system to $ROOTPART (a few minutes)..."
+rsync -aHAX --info=progress2 \
+    --exclude=/proc/'*' --exclude=/sys/'*' --exclude=/dev/'*' \
+    --exclude=/run/'*' --exclude=/tmp/'*' --exclude=/mnt/'*' \
+    --exclude=/media/'*' --exclude=/lib/live/mount \
+    / "$M/"
+mkdir -p "$M"/{proc,sys,dev,run,tmp,mnt,media}
+
+UUID="$(blkid -s UUID -o value "$ROOTPART")"
+{
+    echo "UUID=$UUID / ext4 errors=remount-ro 0 1"
+    if [ -n "$ESPPART" ]; then
+        echo "UUID=$(blkid -s UUID -o value "$ESPPART") /boot/efi vfat umask=0077 0 1"
+    fi
+} > "$M/etc/fstab"
+
+# the installed system boots normally, not via live-boot
+sed -i 's/ boot=live//g; s/ toram//g; s/ textonly//g' "$M/etc/default/grub" 2>/dev/null || true
+chroot_run() { chroot "$M" env DEBIAN_FRONTEND=noninteractive "$@"; }
+mount -t proc proc "$M/proc"
+mount -t sysfs sys "$M/sys"
+mount -o bind /dev "$M/dev"
+mount -o bind /dev/pts "$M/dev/pts"
+trap 'umount -lf "$M/dev/pts" "$M/dev" "$M/sys" "$M/proc" "$M/boot/efi" "$M" 2>/dev/null || true' EXIT
+
+if [ -n "$ESPPART" ]; then
+    mkdir -p "$M/boot/efi"
+    mount "$ESPPART" "$M/boot/efi"
+    echo "==> grub-install (UEFI): boot entry 'BadaOS' in the firmware menu"
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=BadaOS --recheck --no-nvram || \
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=BadaOS --recheck
+    # removable fallback path so it boots even without an NVRAM entry
+    mkdir -p "$M/boot/efi/EFI/BOOT"
+    cp "$M/boot/efi/EFI/BadaOS/grubx64.efi" "$M/boot/efi/EFI/BOOT/BOOTX64.EFI" 2>/dev/null || true
+else
+    echo "==> grub-install (BIOS): writing GRUB into the MBR of $TARGET"
+    chroot_run grub-install --target=i386-pc --recheck "$TARGET"
+fi
+echo "==> update-grub: the menu will show 'BadaOS GNU/Quantum'"
+chroot_run update-initramfs -u
+chroot_run update-grub
+
+sync
+echo
+echo "=============================================================="
+echo " Done. Remove the live USB and reboot:"
+echo "   the GRUB menu of this PC now boots BadaOS GNU/Quantum 12.0"
+echo "   standalone from $TARGET  (login: bada / badaos)"
+echo "=============================================================="

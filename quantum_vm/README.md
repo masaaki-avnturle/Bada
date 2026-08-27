@@ -94,6 +94,7 @@
 | **単一 HTML** ★ | [`dist/bada-vm-pro.html`](dist/bada-vm-pro.html) を「Download raw file」で保存して開くだけ |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS インストーラ) / `BadaVMPro-*-portable.exe` |
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・実ディスクへの本インストール (`badaos-install`)・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
 
 ビルドは [`quantumvm-app-build.yml`](../.github/workflows/quantumvm-app-build.yml) が実行します
 (`quantumvm-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
@@ -131,4 +132,7 @@ quantum_vm/
 
 > ※ VMware, NetBSD, Ubuntu, ASTEC-X, GRUB, LILO の各名称はそれぞれの権利者の商標・成果物です。
 > 本フォルダはそれらとは無関係の、Bada 言語による教育目的の再構成 (オマージュ) です。
-> rd0「実ディスク」も本アプリ内のシミュレーションであり、実際のホストのディスクには書き込みません。
+> アプリ内 sysinst の rd0「実ディスク」はシミュレーションで、ホストのディスクには書き込みません。
+> **実機の実ディスクに本当にインストールして GRUB から単独起動**したい場合は
+> [`live/README.md`](live/README.md) の BadaOS Live ISO (`BadaOS-12.0-live-amd64.iso` +
+> `badaos-install`) を使ってください — こちらは本物の GRUB を本物の MBR/ESP に書き込みます。
