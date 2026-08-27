@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bada MultiWindow — タブレット画面上に「本物の」フリーフォーム ウィンドウを
+  複数開くマルチウィンドウ アプリ。
+
+  ・アプリ内部 (別の画面の内部) に擬似ウィンドウを描くのではなく、
+    OS のフリーフォーム機能 (Samsung ポップアップ表示 / Samsung DeX /
+    Android freeform) で各ツールを独立したウィンドウとしてタブレット上に開く。
+  ・android:resizeableActivity="true" + documentLaunchMode="always" +
+    ActivityOptions#setLaunchBounds() の組み合わせで実現。
+  ・Samsung 旧 MultiWindow SDK 世代の端末向け meta-data も併記。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- フリーフォーム機能があれば使う (無い端末でも通常起動できるよう required=false) -->
+    <uses-feature
+        android:name="android.software.freeform_window_management"
+        android:required="false" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.DarkActionBar"
+        android:resizeableActivity="true"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!-- Samsung マルチウィンドウ / ポップアップ表示 (旧 MultiWindow SDK 系端末向け) -->
+        <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.multiinstance.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.penwindow.enable" android:value="true" />
+
+        <!-- ランチャー: ここから各ツール ウィンドウをタブレット画面上へ開く -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:resizeableActivity="true">
+            <layout
+                android:defaultWidth="420dp"
+                android:defaultHeight="560dp"
+                android:gravity="center"
+                android:minWidth="300dp"
+                android:minHeight="360dp" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 各ツール: documentLaunchMode="always" で起動のたびに独立タスク =
+             独立フリーフォーム ウィンドウになる (同じツールを何枚でも開ける) -->
+        <activity
+            android:name=".MemoActivity"
+            android:exported="false"
+            android:label="@string/win_memo"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always"
+            android:windowSoftInputMode="adjustResize">
+            <layout
+                android:defaultWidth="360dp"
+                android:defaultHeight="420dp"
+                android:gravity="top|start"
+                android:minWidth="220dp"
+                android:minHeight="200dp" />
+        </activity>
+
+        <activity
+            android:name=".CalcActivity"
+            android:exported="false"
+            android:label="@string/win_calc"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="300dp"
+                android:defaultHeight="440dp"
+                android:gravity="top|start"
+                android:minWidth="220dp"
+                android:minHeight="320dp" />
+        </activity>
+
+        <activity
+            android:name=".ClockActivity"
+            android:exported="false"
+            android:label="@string/win_clock"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="340dp"
+                android:defaultHeight="200dp"
+                android:gravity="top|end"
+                android:minWidth="200dp"
+                android:minHeight="120dp" />
+        </activity>
+
+        <activity
+            android:name=".MonitorActivity"
+            android:exported="false"
+            android:label="@string/win_monitor"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="360dp"
+                android:defaultHeight="320dp"
+                android:gravity="bottom|end"
+                android:minWidth="240dp"
+                android:minHeight="220dp" />
+        </activity>
+
+    </application>
+</manifest>

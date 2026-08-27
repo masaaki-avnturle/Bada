@@ -71,6 +71,7 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`multiwindow/`** | **Bada MultiWindow** — Samsung フリーフォーム (ポップアップ表示 / DeX) でタブレット画面上に直接複数の独立ウィンドウを開くマルチウィンドウ アプリ · メモ/電卓/時計/空き容量モニター · マルチインスタンス · 依存ゼロ・WebView 不使用の超軽量 APK (低ストレージ/低メモリ端末対応) | [→ 開く](multiwindow/) |
 
 ---
 
@@ -96,6 +97,26 @@
 | **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
 
 ビルドは [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) が実行します(`cppbuilder-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
+
+---
+
+## 🪟 Bada MultiWindow — Samsung フリーフォームでタブレット画面上にマルチウィンドウ
+
+Samsung タブレットの**フリーフォーム機能(ポップアップ表示 / Samsung DeX)**で、
+アプリ画面の内部ではなく**タブレットの画面上に直接**、複数の独立した OS ウィンドウ
+(メモ / 電卓 / 時計 / 空き容量モニター)を開くマルチウィンドウ アプリです。
+同じツールを何枚でも開け、各ウィンドウはドラッグ移動・リサイズできます。
+
+依存ライブラリゼロ・WebView 不使用の純ネイティブ実装で APK は極小 —
+**内部ストレージ(ハードディスク)やメモリの空きが少ないタブレットでも動作**します。
+空き容量不足でも安全に動くよう、保存失敗時の警告表示と、ストレージ/RAM 使用率を
+常時監視できる「空き容量モニター」ウィンドウを備えています。
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (Samsung タブレット / APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-multiwindow-debug.apk` |
+
+ビルドは [`multiwindow-app-build.yml`](.github/workflows/multiwindow-app-build.yml) が実行します(`multiwindow-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・技術詳細は [`multiwindow/README.md`](multiwindow/README.md) を参照。
 
 ---
 
