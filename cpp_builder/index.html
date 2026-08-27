@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<!--
+  Bada C++Builder — Inprise/Borland C++Builder 風 IDE (オマージュ / homage)
+  ==========================================================================
+  1997-2001 年ごろの Inprise (Borland) C++Builder の RAD 開発環境を、
+  依存ゼロの単一 HTML ファイルとしてブラウザ上に再現した教育目的の
+  非公式オマージュです。Borland / Inprise / Embarcadero とは無関係です。
+
+  機能:
+    - フォームデザイナ (グリッド / ドラッグ移動 / 8方向リサイズ / スナップ)
+    - コンポーネントパレット (Standard / Additional / Win32 / System)
+    - Object Inspector (Properties / Events, 文字列リストエディタ付き)
+    - Unit1.cpp / Unit1.h / Unit1.dfm 自動生成 (VCL 風 C++ コード)
+    - C++ サブセットのミニインタープリタでイベントハンドラを実行 (F9)
+    - プロジェクト保存 / 読込 (JSON) + localStorage 自動保存
+  masaaki-avnturle/Bada
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bada C++Builder — Inprise/Borland C++Builder 風 IDE</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+  font-family:Tahoma,'MS Sans Serif','Yu Gothic UI',Meiryo,sans-serif;
+  font-size:11px;background:#008080;color:#000;
+}
+/* ---------- Win98 3D primitives ---------- */
+.raised{background:#c0c0c0;border:1px solid;border-color:#dfdfdf #000 #000 #dfdfdf;
+  box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #808080}
+.raised-thin{background:#c0c0c0;border:1px solid;border-color:#fff #808080 #808080 #fff}
+.sunken{background:#fff;border:1px solid;border-color:#808080 #fff #fff #808080;
+  box-shadow:inset 1px 1px 0 #000, inset -1px -1px 0 #dfdfdf}
+.btn3d{background:#c0c0c0;border:1px solid;border-color:#dfdfdf #000 #000 #dfdfdf;
+  box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;cursor:default}
+.btn3d:active,.btn3d.down{border-color:#000 #dfdfdf #dfdfdf #000;
+  box-shadow:inset 1px 1px 0 #808080, inset -1px -1px 0 #fff}
+/* ---------- windows ---------- */
+.win{position:absolute;background:#c0c0c0;border:1px solid;border-color:#dfdfdf #000 #000 #dfdfdf;
+  box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #808080, 2px 2px 6px rgba(0,0,0,.35);
+  display:flex;flex-direction:column}
+.titlebar{height:18px;display:flex;align-items:center;padding:1px 2px 1px 4px;
+  background:linear-gradient(90deg,#808080,#b5b5b5);color:#c0c0c0;flex:0 0 auto;cursor:default}
+.win.active>.titlebar{background:linear-gradient(90deg,#000080,#1084d0);color:#fff}
+.titlebar .tb-title{flex:1;font-weight:bold;font-size:11px;white-space:nowrap;overflow:hidden}
+.titlebar .tb-btn{width:16px;height:14px;margin-left:2px;font-size:9px;line-height:12px;
+  text-align:center;font-family:Marlett,Tahoma,sans-serif;color:#000}
+.wbody{flex:1;overflow:hidden;position:relative}
+/* ---------- main bar ---------- */
+#mainbar{left:0;top:0;right:0;position:absolute}
+#menubar{display:flex;padding:1px 0;border-bottom:1px solid #808080;box-shadow:0 1px 0 #fff}
+.menuitem{padding:2px 7px;cursor:default}
+.menuitem:hover,.menuitem.open{background:#000080;color:#fff}
+.menupop{position:absolute;z-index:5000;min-width:170px;padding:1px}
+.menupop .mi{padding:3px 20px 3px 22px;position:relative;white-space:nowrap}
+.menupop .mi .sc{float:right;margin-left:24px;color:inherit}
+.menupop .mi:hover{background:#000080;color:#fff}
+.menupop .mi.dis{color:#808080;text-shadow:1px 1px 0 #fff}
+.menupop .mi.dis:hover{background:transparent;color:#808080}
+.menupop .sep{height:0;border-top:1px solid #808080;border-bottom:1px solid #fff;margin:3px 1px}
+#toolrow{display:flex;align-items:stretch;padding:2px;gap:4px}
+#speedbar{display:flex;flex-wrap:wrap;align-content:flex-start;gap:1px;padding:2px;width:212px}
+.sbtn{width:24px;height:23px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.sbtn.sep{width:5px;border:none;box-shadow:none;background:transparent}
+/* ---------- palette ---------- */
+#palette{flex:1;display:flex;flex-direction:column;min-width:0}
+#pal-tabs{display:flex;padding:2px 2px 0 2px;gap:0}
+.paltab{padding:2px 9px;border:1px solid;border-color:#fff #808080 #c0c0c0 #fff;
+  border-radius:3px 3px 0 0;background:#c0c0c0;margin-right:1px;position:relative;top:1px}
+.paltab.sel{font-weight:bold;top:0;padding-bottom:4px;z-index:2}
+#pal-body{display:flex;gap:1px;padding:3px;border-top:1px solid #808080;box-shadow:0 1px 0 #fff inset}
+.palbtn{width:28px;height:27px;display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:bold;position:relative}
+.palbtn.down{background:#dfdfdf}
+.palbtn .g{pointer-events:none}
+/* ---------- object inspector ---------- */
+#inspector{width:191px}
+#insp-obj{margin:2px;height:20px;display:flex;align-items:center;padding:0 2px;background:#fff}
+#insp-obj select{flex:1;border:none;outline:none;background:#fff;font-size:11px;font-family:inherit}
+#insp-tabs{display:flex;margin:0 2px}
+.insptab{flex:1;text-align:center;padding:2px}
+.insptab.sel{font-weight:bold;background:#c0c0c0;border-bottom-color:#c0c0c0}
+#insp-grid{flex:1;overflow-y:auto;margin:0 2px 2px 2px;background:#fff}
+.iprow{display:flex;border-bottom:1px dotted #c0c0c0;height:17px;line-height:15px}
+.iprow .ipn{width:44%;padding-left:3px;border-right:1px solid #c0c0c0;color:#800000;
+  overflow:hidden;white-space:nowrap}
+.iprow .ipv{flex:1;position:relative}
+.iprow input,.iprow select{width:100%;height:15px;border:none;outline:none;font-size:11px;
+  font-family:inherit;background:#fff;padding-left:3px}
+.iprow.selrow{background:#c0c0c0}
+.ipv .ell{position:absolute;right:1px;top:1px;width:14px;height:13px;font-size:9px;
+  display:flex;align-items:center;justify-content:center}
+/* ---------- form designer ---------- */
+#formwin .wbody{overflow:hidden}
+.formclient{position:absolute;left:0;top:0;right:0;bottom:0;background:#c0c0c0;
+  background-image:radial-gradient(#404040 1px,transparent 1.2px);background-size:8px 8px;
+  background-position:1px 1px;overflow:hidden}
+.dcomp{position:absolute}
+.dcomp>*{pointer-events:none}
+.grip{position:absolute;width:5px;height:5px;background:#000;z-index:60}
+.rband{position:absolute;border:1px dashed #000;z-index:59;pointer-events:none}
+/* ---------- code editor ---------- */
+#codewin .wbody{display:flex;flex-direction:column;background:#c0c0c0}
+#codetabs{display:flex;padding:2px 2px 0 2px}
+.codetab{padding:2px 10px;border:1px solid;border-color:#fff #808080 #c0c0c0 #fff;
+  border-radius:3px 3px 0 0;margin-right:1px}
+.codetab.sel{font-weight:bold;background:#fff}
+#edwrap{flex:1;position:relative;margin:0 2px;border:1px solid;border-color:#808080 #fff #fff #808080;
+  background:#fff;overflow:hidden}
+#edhl,#edta{position:absolute;left:0;top:0;width:100%;height:100%;margin:0;
+  font-family:'Courier New',Consolas,monospace;font-size:13px;line-height:16px;
+  white-space:pre;padding:2px 4px 2px 30px;tab-size:4}
+#edhl{pointer-events:none;overflow:hidden;color:#000;counter-reset:ln}
+#edhl .cl{display:block;min-height:16px}
+#edhl .cl::before{counter-increment:ln;content:counter(ln);position:absolute;left:0;width:24px;
+  text-align:right;color:#008080;font-size:10px;background:#efefef;border-right:1px solid #c0c0c0}
+#edta{background:transparent;color:transparent;caret-color:#000;border:none;outline:none;
+  resize:none;overflow:auto;user-select:text}
+.k{color:#000;font-weight:bold}
+.s{color:#0000ff}
+.c{color:#008000;font-style:italic}
+.n{color:#0000a0}
+.p{color:#008000}
+#codestatus{display:flex;height:18px;margin:2px;gap:2px}
+.stpanel{padding:1px 6px;border:1px solid;border-color:#808080 #fff #fff #808080;line-height:14px}
+/* ---------- VCL control looks ---------- */
+.vbtn{width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-family:inherit}
+.vlabel{white-space:nowrap;font-size:11px}
+.vedit{width:100%;height:100%;font-size:11px;font-family:inherit;padding:1px 3px;
+  border:1px solid;border-color:#808080 #fff #fff #808080;
+  box-shadow:inset 1px 1px 0 #000, inset -1px -1px 0 #dfdfdf;outline:none}
+textarea.vedit{resize:none;white-space:pre;user-select:text}
+.vcheck{display:flex;align-items:center;gap:5px;height:100%;font-size:11px}
+.vcheck .box{width:13px;height:13px;background:#fff;border:1px solid;
+  border-color:#808080 #fff #fff #808080;box-shadow:inset 1px 1px 0 #000, inset -1px -1px 0 #dfdfdf;
+  display:flex;align-items:center;justify-content:center;font-size:10px;flex:0 0 auto}
+.vcheck .rad{width:12px;height:12px;border-radius:50%;background:#fff;border:1px solid #404040;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.vcheck .rad i{width:5px;height:5px;border-radius:50%;background:#000;display:none}
+.vcheck.on .rad i{display:block}
+.vlist{width:100%;height:100%;overflow-y:auto;font-size:11px;user-select:none}
+.vlist .li{padding:0 3px;height:14px;line-height:14px;white-space:nowrap}
+.vlist .li.sel{background:#000080;color:#fff}
+.vpanel{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px}
+.vgroup{width:100%;height:100%;position:relative;border:1px solid #808080;border-radius:2px;
+  box-shadow:1px 1px 0 #fff, inset 1px 1px 0 #fff}
+.vgroup .cap{position:absolute;left:8px;top:-8px;background:inherit;padding:0 3px;font-size:11px}
+.vprog{width:100%;height:100%;padding:2px;display:flex;gap:1px;overflow:hidden}
+.vprog i{flex:0 0 8px;background:#000080}
+.vtimer{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px}
+.vcombo{width:100%;height:100%;font-size:11px;font-family:inherit;
+  border:1px solid;border-color:#808080 #fff #fff #808080;background:#fff;outline:none}
+/* ---------- dialogs ---------- */
+#modal{position:absolute;inset:0;z-index:9000;display:none;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0)}
+#modal.show{display:flex}
+.dlg{position:relative;min-width:260px}
+.dlg .dbody{padding:14px 18px;display:flex;gap:14px;align-items:flex-start}
+.dlg .dbtns{display:flex;justify-content:center;gap:8px;padding:0 10px 12px 10px}
+.dlg .dbtn{min-width:75px;height:23px;font-size:11px;font-family:inherit}
+.dlg .dmsg{white-space:pre-wrap;max-width:420px;line-height:1.5;padding-top:4px;user-select:text}
+.dlg .dico{font-size:26px;line-height:1}
+#sletext{width:340px;height:200px;font-family:'Courier New',monospace;font-size:12px;
+  white-space:pre;resize:none;outline:none;padding:3px;user-select:text}
+/* ---------- splash ---------- */
+#splash{position:absolute;inset:0;z-index:9999;background:#008080;display:flex;
+  align-items:center;justify-content:center}
+#splash .card{width:480px;background:#fff;border:1px solid #000;box-shadow:4px 4px 0 rgba(0,0,0,.4);
+  padding:0 0 14px 0;text-align:center}
+#splash .band{background:linear-gradient(135deg,#000040,#000080 45%,#c00000);color:#fff;
+  padding:26px 20px 20px 20px;text-align:left}
+#splash .band h1{font-size:30px;font-style:italic;letter-spacing:1px;font-family:Georgia,serif}
+#splash .band .inp{font-size:13px;letter-spacing:5px;margin-bottom:6px;color:#ffd0d0}
+#splash .stat{margin-top:14px;font-size:11px;color:#404040}
+/* ---------- runtime ---------- */
+#runwin .formclient{background-image:none}
+.rt-clickable{cursor:default}
+::-webkit-scrollbar{width:15px;height:15px}
+::-webkit-scrollbar-track{background:#dfdfdf}
+::-webkit-scrollbar-thumb{background:#c0c0c0;border:1px solid;border-color:#fff #404040 #404040 #fff}
+</style>
+</head>
+<body>
+<div id="desktop" style="position:absolute;inset:0">
+  <!-- ======= main IDE bar ======= -->
+  <div id="mainbar" class="raised">
+    <div class="titlebar active" id="maintitle">
+      <span class="tb-title" id="maincaption">C++Builder — Project1</span>
+      <span class="tb-btn btn3d" title="About" onclick="showAbout()">?</span>
+    </div>
+    <div id="menubar"></div>
+    <div id="toolrow">
+      <div id="speedbar" class="raised-thin"></div>
+      <div id="palette" class="raised-thin">
+        <div id="pal-tabs"></div>
+        <div id="pal-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======= Object Inspector ======= -->
+  <div id="inspector" class="win" style="left:8px;top:118px;height:430px">
+    <div class="titlebar"><span class="tb-title">Object Inspector</span></div>
+    <div id="insp-obj" class="sunken"><select id="insp-sel"></select></div>
+    <div id="insp-tabs">
+      <div class="insptab paltab sel" data-tab="props">Properties</div>
+      <div class="insptab paltab" data-tab="events">Events</div>
+    </div>
+    <div id="insp-grid" class="sunken"></div>
+  </div>
+
+  <!-- ======= Form Designer ======= -->
+  <div id="formwin" class="win" style="left:270px;top:130px;width:480px;height:340px">
+    <div class="titlebar"><span class="tb-title" id="formcaption">Form1</span></div>
+    <div class="wbody"><div class="formclient" id="formclient"></div></div>
+  </div>
+
+  <!-- ======= Code Editor ======= -->
+  <div id="codewin" class="win" style="left:300px;top:170px;width:620px;height:400px">
+    <div class="titlebar"><span class="tb-title" id="codecaption">Unit1.cpp</span></div>
+    <div class="wbody">
+      <div id="codetabs">
+        <div class="codetab sel" data-f="cpp">Unit1.cpp</div>
+        <div class="codetab" data-f="h">Unit1.h</div>
+        <div class="codetab" data-f="dfm">Unit1.dfm</div>
+      </div>
+      <div id="edwrap">
+        <pre id="edhl"></pre>
+        <textarea id="edta" spellcheck="false" wrap="off"></textarea>
+      </div>
+      <div id="codestatus">
+        <div class="stpanel" id="st-pos" style="width:90px">1: 1</div>
+        <div class="stpanel" id="st-mod" style="width:80px"></div>
+        <div class="stpanel" style="width:60px">Insert</div>
+        <div class="stpanel" style="flex:1" id="st-msg">Ready — F9 で実行 / F12 でフォーム⇔コード切替</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= modal layer ======= -->
+<div id="modal"></div>
+
+<!-- ======= splash ======= -->
+<div id="splash">
+  <div class="card">
+    <div class="band">
+      <div class="inp">I N P R I S E&nbsp;&nbsp;(homage)</div>
+      <h1>Borland<sup style="font-size:12px">™</sup> C++Builder<sup style="font-size:12px">®</sup> 風</h1>
+      <div style="margin-top:6px;font-size:12px">Bada Edition — The RAD way to build the Web</div>
+    </div>
+    <div class="stat" id="splashstat">Loading VCL emulation...</div>
+    <div style="font-size:10px;color:#808080;margin-top:8px;padding:0 24px">
+      非公式・教育目的のオマージュ再現です。Borland / Inprise / Embarcadero とは一切関係ありません。
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+ *  utilities
+ * =================================================================== */
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const snap = v => Math.round(v / 8) * 8;
+const clampi = (v,a,b)=>Math.max(a,Math.min(b,v));
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+const COLORS = {
+  clBtnFace:'#c0c0c0', clWindow:'#ffffff', clWhite:'#ffffff', clBlack:'#000000',
+  clRed:'#ff0000', clMaroon:'#800000', clLime:'#00ff00', clGreen:'#008000',
+  clBlue:'#0000ff', clNavy:'#000080', clYellow:'#ffff00', clOlive:'#808000',
+  clAqua:'#00ffff', clTeal:'#008080', clFuchsia:'#ff00ff', clPurple:'#800080',
+  clSilver:'#c0c0c0', clGray:'#808080', clInfoBk:'#ffffe1', clCream:'#fffbf0',
+  clSkyBlue:'#a6caf0', clMoneyGreen:'#c0dcc0'
+};
+const colHex = c => COLORS[c] || c || '#c0c0c0';
+
+/* =====================================================================
+ *  component catalog
+ * =================================================================== */
+const DEFS = {
+  TLabel:      {page:'Standard',  glyph:'A',  w:32, h:13, props:{Caption:'str'},                                    hint:'Label'},
+  TButton:     {page:'Standard',  glyph:'OK', w:75, h:25, props:{Caption:'str'},                                    hint:'Button'},
+  TEdit:       {page:'Standard',  glyph:'ab', w:121,h:21, props:{Text:'str', Color:'color'},                        hint:'Edit'},
+  TMemo:       {page:'Standard',  glyph:'▤',  w:185,h:89, props:{Lines:'items', Color:'color'},                     hint:'Memo'},
+  TCheckBox:   {page:'Standard',  glyph:'☑', w:97, h:17, props:{Caption:'str', Checked:'bool'},                    hint:'CheckBox'},
+  TRadioButton:{page:'Standard',  glyph:'◉',  w:113,h:17, props:{Caption:'str', Checked:'bool'},                    hint:'RadioButton'},
+  TListBox:    {page:'Standard',  glyph:'≡',  w:121,h:97, props:{Items:'items', Color:'color'},                     hint:'ListBox'},
+  TComboBox:   {page:'Standard',  glyph:'▼',  w:145,h:21, props:{Items:'items', Text:'str'},                        hint:'ComboBox'},
+  TPanel:      {page:'Standard',  glyph:'▣',  w:185,h:41, props:{Caption:'str', Color:'color',
+                 BevelOuter:['bvRaised','bvLowered','bvNone']},                                                     hint:'Panel'},
+  TGroupBox:   {page:'Standard',  glyph:'▭',  w:185,h:105,props:{Caption:'str'},                                    hint:'GroupBox'},
+  TShape:      {page:'Additional',glyph:'◆',  w:65, h:65, props:{Shape:['stRectangle','stSquare','stRoundRect','stCircle','stEllipse'],
+                 BrushColor:'color', PenColor:'color'},                                                             hint:'Shape'},
+  TBevel:      {page:'Additional',glyph:'▱',  w:100,h:50, props:{Style:['bsLowered','bsRaised']},                   hint:'Bevel'},
+  TProgressBar:{page:'Win32',     glyph:'▮▯', w:150,h:17, props:{Min:'int', Max:'int', Position:'int'},             hint:'ProgressBar'},
+  TTimer:      {page:'System',    glyph:'◷',  w:24, h:24, props:{Interval:'int', Enabled:'bool'}, nonvisual:true,   hint:'Timer'}
+};
+const PAGES = ['Standard','Additional','Win32','System'];
+function eventsFor(type){
+  if (type==='TTimer') return ['OnTimer'];
+  const ev = ['OnClick','OnDblClick'];
+  if (type==='TEdit'||type==='TMemo'||type==='TComboBox') ev.push('OnChange');
+  return ev;
+}
+const defaultEvent = t => t==='TTimer' ? 'OnTimer' : (t==='TEdit'||t==='TMemo') ? 'OnChange' : 'OnClick';
+
+/* =====================================================================
+ *  project state
+ * =================================================================== */
+let project = null;
+let selName = 'Form1';           // selected object name
+let pendingType = null;          // palette component waiting to be dropped
+let inspTab = 'props';
+let codeFile = 'cpp';
+let modified = false;
+
+function blankProject(){
+  return {
+    form:{Name:'Form1', Caption:'Form1', Left:200, Top:120, Width:460, Height:300, Color:'clBtnFace'},
+    comps:[], bodies:{}, counters:{}
+  };
+}
+function demoProject(){
+  const p = blankProject();
+  p.form.Caption = 'Form1';
+  p.comps = [
+    {type:'TLabel', name:'Label1', props:{Left:24, Top:24, Width:200, Height:16, Caption:'ようこそ C++Builder へ',
+      Enabled:true, Visible:true}, events:{}},
+    {type:'TEdit', name:'Edit1', props:{Left:24, Top:56, Width:185, Height:21, Text:'世界', Color:'clWindow',
+      Enabled:true, Visible:true}, events:{}},
+    {type:'TButton', name:'Button1', props:{Left:224, Top:54, Width:75, Height:25, Caption:'あいさつ',
+      Enabled:true, Visible:true}, events:{OnClick:'Button1Click'}},
+    {type:'TMemo', name:'Memo1', props:{Left:24, Top:96, Width:275, Height:120, Lines:'Memo1', Color:'clWindow',
+      Enabled:true, Visible:true}, events:{}}
+  ];
+  p.counters = {TLabel:1, TEdit:1, TButton:1, TMemo:1};
+  p.bodies = {Button1Click:
+    '\tLabel1->Caption = "こんにちは、" + Edit1->Text + "!";\n'+
+    '\tMemo1->Lines->Add("clicked: " + IntToStr(Memo1->Lines->Count));'};
+  return p;
+}
+function findComp(name){ return project.comps.find(c=>c.name===name); }
+function makeName(type){
+  const base = type.slice(1);
+  project.counters[type] = (project.counters[type]||0) + 1;
+  let n = base + project.counters[type];
+  while (findComp(n) || n===project.form.Name) { project.counters[type]++; n = base + project.counters[type]; }
+  return n;
+}
+function addComp(type, x, y){
+  const d = DEFS[type];
+  const props = {Left:snap(x), Top:snap(y), Width:d.w, Height:d.h, Enabled:true, Visible:true};
+  const name = makeName(type);
+  for (const [k,t] of Object.entries(d.props)){
+    if (t==='str')        props[k] = (k==='Caption'||k==='Text') ? name : '';
+    else if (t==='items') props[k] = (type==='TMemo') ? name : '';
+    else if (t==='bool')  props[k] = (k==='Enabled');
+    else if (t==='int')   props[k] = 0;
+    else if (t==='color') props[k] = (k==='Color') ? 'clWindow' : (k==='BrushColor'?'clWhite':'clBlack');
+    else if (Array.isArray(t)) props[k] = t[0];
+  }
+  if (type==='TTimer'){ props.Interval = 1000; props.Enabled = true; }
+  if (type==='TPanel') props.Color = 'clBtnFace';
+  if (type==='TProgressBar'){ props.Min=0; props.Max=100; props.Position=40; }
+  const c = {type, name, props, events:{}};
+  project.comps.push(c);
+  return c;
+}
+
+/* =====================================================================
+ *  window manager
+ * =================================================================== */
+let ztop = 100;
+function activateWin(w){
+  $$('.win,.raised#mainbar').forEach(x=>x.classList.remove('active'));
+  $$('.win .titlebar').forEach(t=>t.parentElement.classList.remove('active'));
+  w.classList.add('active');
+  if (w.id!=='mainbar') w.style.zIndex = ++ztop;
+}
+function makeWindow(w){
+  w.addEventListener('mousedown', ()=>activateWin(w));
+  const tb = w.querySelector('.titlebar');
+  if (!tb) return;
+  tb.addEventListener('mousedown', e=>{
+    if (e.target.classList.contains('tb-btn')) return;
+    const sx=e.clientX, sy=e.clientY, ox=w.offsetLeft, oy=w.offsetTop;
+    const mv = ev=>{ w.style.left=(ox+ev.clientX-sx)+'px'; w.style.top=Math.max(90,oy+ev.clientY-sy)+'px'; };
+    const up = ()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    e.preventDefault();
+  });
+}
+
+/* =====================================================================
+ *  menus
+ * =================================================================== */
+const MENUS = [
+  ['File', [
+    ['New Application', ()=>{ if(confirmNew()) { loadProject(blankProject()); } }],
+    ['Open Project...', 'Ctrl+F11', openProjectDlg],
+    ['Save Project', 'Ctrl+S', saveProject],
+    null,
+    ['Exit', ()=>msgBox('Bada C++Builder','ブラウザのタブを閉じると終了します。\n(プロジェクトは自動保存されています)','ℹ️')]
+  ]],
+  ['Edit', [
+    ['Delete', 'Del', deleteSelected],
+    null,
+    ['Bring to Front', ()=>zOrder(true)],
+    ['Send to Back', ()=>zOrder(false)]
+  ]],
+  ['Search', [ ['Find...', null, null, true] ]],
+  ['View', [
+    ['Object Inspector', 'F11', ()=>{ const w=$('#inspector'); w.style.display=w.style.display==='none'?'flex':'none'; }],
+    ['Toggle Form/Unit', 'F12', toggleFormUnit],
+    ['Forms...', ()=>activateWin($('#formwin'))],
+    ['Units...', ()=>activateWin($('#codewin'))]
+  ]],
+  ['Project', [
+    ['Compile Unit1', 'Ctrl+F9', ()=>compileProject(true)],
+    ['Build All', ()=>compileProject(true)]
+  ]],
+  ['Run', [
+    ['Run', 'F9', runProject],
+    ['Program Reset', 'Ctrl+F2', stopProgram]
+  ]],
+  ['Component', [ ['Install Component...', null, null, true] ]],
+  ['Tools', [ ['Debugger Options...', null, null, true] ]],
+  ['Help', [
+    ['About...', showAbout]
+  ]]
+];
+let openMenu = null;
+function closeMenus(){
+  if (openMenu){ openMenu.pop.remove(); openMenu.item.classList.remove('open'); openMenu=null; }
+}
+function buildMenus(){
+  const bar = $('#menubar');
+  MENUS.forEach(([title, items])=>{
+    const mi = document.createElement('div');
+    mi.className='menuitem'; mi.textContent=title;
+    mi.addEventListener('mousedown', e=>{
+      e.stopPropagation();
+      if (openMenu && openMenu.item===mi){ closeMenus(); return; }
+      closeMenus();
+      const pop = document.createElement('div');
+      pop.className='menupop raised';
+      items.forEach(it=>{
+        if (!it){ const s=document.createElement('div'); s.className='sep'; pop.appendChild(s); return; }
+        let [label, a, b, dis] = it;
+        let sc=null, fn=null;
+        if (typeof a==='string'){ sc=a; fn=b; } else fn=a;
+        const d = document.createElement('div');
+        d.className = 'mi' + ((dis||!fn)?' dis':'');
+        d.innerHTML = esc(label) + (sc?`<span class="sc">${sc}</span>`:'');
+        if (fn && !dis) d.addEventListener('mouseup', ()=>{ closeMenus(); fn(); });
+        pop.appendChild(d);
+      });
+      const r = mi.getBoundingClientRect();
+      pop.style.left = r.left+'px'; pop.style.top = r.bottom+'px';
+      document.body.appendChild(pop);
+      mi.classList.add('open');
+      openMenu = {item:mi, pop};
+    });
+    bar.appendChild(mi);
+  });
+  document.addEventListener('mousedown', closeMenus);
+}
+
+/* =====================================================================
+ *  speedbar + palette
+ * =================================================================== */
+function buildSpeedbar(){
+  const sb = $('#speedbar');
+  const B = (g,tip,fn)=>{
+    const b=document.createElement('div'); b.className='sbtn btn3d'; b.textContent=g; b.title=tip;
+    if(fn) b.addEventListener('click',fn); sb.appendChild(b);
+  };
+  const S = ()=>{ const s=document.createElement('div'); s.className='sbtn sep'; sb.appendChild(s); };
+  B('◻','New Application', ()=>{ if(confirmNew()) loadProject(blankProject()); });
+  B('◰','Open Project (Ctrl+F11)', openProjectDlg);
+  B('▣','Save Project (Ctrl+S)', saveProject);
+  S();
+  B('▶','Run (F9)', runProject);
+  B('∥','Program Pause', null);
+  B('◼','Program Reset (Ctrl+F2)', stopProgram);
+  S();
+  B('⇄','Toggle Form/Unit (F12)', toggleFormUnit);
+  B('ⓘ','About', showAbout);
+}
+let palPage = 'Standard';
+function buildPalette(){
+  const tabs = $('#pal-tabs'); tabs.innerHTML='';
+  PAGES.forEach(p=>{
+    const t=document.createElement('div');
+    t.className='paltab'+(p===palPage?' sel':''); t.textContent=p;
+    t.addEventListener('mousedown', ()=>{ palPage=p; buildPalette(); });
+    tabs.appendChild(t);
+  });
+  const body = $('#pal-body'); body.innerHTML='';
+  const arrow = document.createElement('div');
+  arrow.className='palbtn btn3d'+(pendingType?'':' down');
+  arrow.innerHTML='<span class="g">↖</span>'; arrow.title='選択ツール';
+  arrow.addEventListener('mousedown', e=>{ e.preventDefault(); pendingType=null; buildPalette(); });
+  body.appendChild(arrow);
+  Object.entries(DEFS).filter(([,d])=>d.page===palPage).forEach(([type,d])=>{
+    const b=document.createElement('div');
+    b.className='palbtn btn3d'+(pendingType===type?' down':'');
+    b.innerHTML=`<span class="g">${d.glyph}</span>`; b.title=type+' — '+d.hint;
+    b.addEventListener('mousedown', e=>{
+      e.preventDefault();
+      pendingType = (pendingType===type)? null : type;
+      buildPalette();
+      $('#formclient').style.cursor = pendingType?'crosshair':'default';
+    });
+    body.appendChild(b);
+  });
+}
+
+/* =====================================================================
+ *  form designer
+ * =================================================================== */
+function layoutFormWin(){
+  const fw = $('#formwin');
+  fw.style.width  = (project.form.Width +8)+'px';
+  fw.style.height = (project.form.Height+28)+'px';
+  $('#formcaption').textContent = project.form.Caption;
+  $('#maincaption').textContent = 'C++Builder — Project1' + (modified?' *':'');
+}
+function renderControl(c, design){
+  // returns element for component c (inner visual), honoring props
+  const p = c.props, dis = !p.Enabled;
+  const wrap = document.createElement('div');
+  wrap.style.width='100%'; wrap.style.height='100%';
+  const gray = dis? 'color:#808080;' : '';
+  switch(c.type){
+    case 'TLabel':
+      wrap.innerHTML = `<span class="vlabel" style="${gray}">${esc(p.Caption)}</span>`; break;
+    case 'TButton':
+      wrap.innerHTML = `<div class="vbtn btn3d" style="${gray}">${esc(p.Caption)}</div>`; break;
+    case 'TEdit':
+      wrap.innerHTML = `<input class="vedit" style="background:${colHex(p.Color)};${gray}" value="${esc(p.Text)}" ${dis?'disabled':''}>`; break;
+    case 'TMemo':
+      wrap.innerHTML = `<textarea class="vedit" style="background:${colHex(p.Color)};${gray}" ${dis?'disabled':''}>${esc(p.Lines)}</textarea>`; break;
+    case 'TCheckBox':
+      wrap.innerHTML = `<label class="vcheck" style="${gray}"><span class="box">${p.Checked?'✓':''}</span>${esc(p.Caption)}</label>`; break;
+    case 'TRadioButton':
+      wrap.innerHTML = `<label class="vcheck ${p.Checked?'on':''}" style="${gray}"><span class="rad"><i></i></span>${esc(p.Caption)}</label>`; break;
+    case 'TListBox': {
+      const items = String(p.Items||'').split('\n').filter(s=>s.length||false);
+      wrap.innerHTML = `<div class="vlist sunken" style="background:${colHex(p.Color)};${gray}">`+
+        items.map((s,i)=>`<div class="li" data-i="${i}">${esc(s)}</div>`).join('')+`</div>`; break;
+    }
+    case 'TComboBox': {
+      if (design){
+        wrap.innerHTML = `<div class="vedit" style="display:flex;align-items:center;background:#fff">`+
+          `<span style="flex:1;overflow:hidden">${esc(p.Text)}</span>`+
+          `<span class="btn3d" style="width:15px;height:15px;text-align:center;font-size:8px;line-height:14px">▼</span></div>`;
+      } else {
+        const items = String(p.Items||'').split('\n').filter(s=>s.length);
+        wrap.innerHTML = `<select class="vcombo" ${dis?'disabled':''}>`+
+          items.map(s=>`<option ${s===p.Text?'selected':''}>${esc(s)}</option>`).join('')+`</select>`;
+      }
+      break;
+    }
+    case 'TPanel': {
+      const bev = p.BevelOuter==='bvNone' ? '' : (p.BevelOuter==='bvLowered'?'raised-thin':'raised-thin');
+      wrap.innerHTML = `<div class="vpanel ${bev}" style="background:${colHex(p.Color)};${gray}${p.BevelOuter==='bvLowered'?'border-color:#808080 #fff #fff #808080;':''}">${esc(p.Caption)}</div>`; break;
+    }
+    case 'TGroupBox':
+      wrap.innerHTML = `<div class="vgroup" style="background:${colHex('clBtnFace')};${gray}"><span class="cap" style="background:#c0c0c0">${esc(p.Caption)}</span></div>`; break;
+    case 'TShape': {
+      const rad = p.Shape==='stCircle'||p.Shape==='stEllipse' ? '50%' : (p.Shape==='stRoundRect'?'10px':'0');
+      const sq = p.Shape==='stSquare'||p.Shape==='stCircle';
+      const sz = sq? Math.min(p.Width,p.Height):null;
+      wrap.innerHTML = `<div style="width:${sq?sz+'px':'100%'};height:${sq?sz+'px':'100%'};background:${colHex(p.BrushColor)};border:1px solid ${colHex(p.PenColor)};border-radius:${rad}"></div>`; break;
+    }
+    case 'TBevel':
+      wrap.innerHTML = `<div style="width:100%;height:100%;border:1px solid;border-color:${p.Style==='bsRaised'?'#fff #808080 #808080 #fff':'#808080 #fff #fff #808080'}"></div>`; break;
+    case 'TProgressBar': {
+      const pct = clampi((p.Position-p.Min)/Math.max(1,(p.Max-p.Min)),0,1);
+      const blocks = Math.round(pct * Math.floor((p.Width-6)/9));
+      wrap.innerHTML = `<div class="vprog sunken">${'<i></i>'.repeat(Math.max(0,blocks))}</div>`; break;
+    }
+    case 'TTimer':
+      wrap.innerHTML = design? `<div class="vtimer raised-thin">◷</div>` : '';
+      if (!design) wrap.style.display='none';
+      break;
+  }
+  return wrap;
+}
+function renderDesign(){
+  const fc = $('#formclient');
+  fc.innerHTML='';
+  fc.style.background = colHex(project.form.Color);
+  fc.style.backgroundImage = 'radial-gradient(#404040 1px,transparent 1.2px)';
+  layoutFormWin();
+  project.comps.forEach(c=>{
+    const d = document.createElement('div');
+    d.className='dcomp'; d.dataset.name=c.name;
+    d.style.left=c.props.Left+'px'; d.style.top=c.props.Top+'px';
+    d.style.width=c.props.Width+'px'; d.style.height=c.props.Height+'px';
+    d.appendChild(renderControl(c, true));
+    fc.appendChild(d);
+  });
+  drawGrips();
+}
+function drawGrips(){
+  $$('.grip').forEach(g=>g.remove());
+  const c = findComp(selName);
+  if (!c) return;
+  const fc = $('#formclient');
+  const {Left:x, Top:y, Width:w, Height:h} = c.props;
+  const pts = [[0,0,'nw'],[w/2,0,'n'],[w,0,'ne'],[0,h/2,'w'],[w,h/2,'e'],[0,h,'sw'],[w/2,h,'s'],[w,h,'se']];
+  pts.forEach(([gx,gy,dir])=>{
+    const g=document.createElement('div');
+    g.className='grip'; g.dataset.dir=dir;
+    g.style.left=(x+gx-2)+'px'; g.style.top=(y+gy-2)+'px';
+    g.style.cursor=dir+'-resize';
+    g.addEventListener('mousedown', e=>startResize(e,c,dir));
+    fc.appendChild(g);
+  });
+}
+function selectObj(name){
+  selName = name;
+  drawGrips();
+  renderInspector();
+}
+function startResize(e, c, dir){
+  e.stopPropagation(); e.preventDefault();
+  const sx=e.clientX, sy=e.clientY;
+  const o = {...c.props};
+  const mv = ev=>{
+    let dx=ev.clientX-sx, dy=ev.clientY-sy;
+    let {Left:L,Top:T,Width:W,Height:H} = o;
+    if (dir.includes('e')) W=Math.max(8,snap(o.Width+dx));
+    if (dir.includes('s')) H=Math.max(8,snap(o.Height+dy));
+    if (dir.includes('w')){ L=snap(o.Left+dx); W=Math.max(8,o.Width+o.Left-L); }
+    if (dir.includes('n')){ T=snap(o.Top+dy); H=Math.max(8,o.Height+o.Top-T); }
+    Object.assign(c.props,{Left:L,Top:T,Width:W,Height:H});
+    const d=$(`.dcomp[data-name="${c.name}"]`);
+    d.style.left=L+'px'; d.style.top=T+'px'; d.style.width=W+'px'; d.style.height=H+'px';
+    drawGrips();
+  };
+  const up = ()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); touch(); };
+  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+}
+function designerEvents(){
+  const fc = $('#formclient');
+  fc.addEventListener('mousedown', e=>{
+    activateWin($('#formwin'));
+    const t = e.target.closest('.dcomp');
+    if (pendingType){
+      const r = fc.getBoundingClientRect();
+      const c = addComp(pendingType, e.clientX-r.left, e.clientY-r.top);
+      if (!e.shiftKey){ pendingType=null; fc.style.cursor='default'; }
+      buildPalette(); renderDesign(); selectObj(c.name); touch();
+      return;
+    }
+    if (t){
+      selectObj(t.dataset.name);
+      // drag-move
+      const c = findComp(t.dataset.name);
+      const sx=e.clientX, sy=e.clientY, ox=c.props.Left, oy=c.props.Top;
+      let moved=false;
+      const mv = ev=>{
+        const nx=snap(ox+ev.clientX-sx), ny=snap(oy+ev.clientY-sy);
+        if (nx!==c.props.Left||ny!==c.props.Top) moved=true;
+        c.props.Left=nx; c.props.Top=ny;
+        t.style.left=nx+'px'; t.style.top=ny+'px';
+        drawGrips();
+      };
+      const up = ()=>{
+        document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+        if (moved) touch(); else renderInspector();
+      };
+      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+      e.preventDefault();
+    } else {
+      selectObj('Form1');
+    }
+  });
+  fc.addEventListener('dblclick', e=>{
+    const t = e.target.closest('.dcomp');
+    if (!t) { openHandlerFor(null); return; }
+    openHandlerFor(findComp(t.dataset.name));
+  });
+}
+function deleteSelected(){
+  const c = findComp(selName);
+  if (!c) return;
+  project.comps = project.comps.filter(x=>x!==c);
+  selName='Form1';
+  renderDesign(); renderInspector(); touch();
+}
+function zOrder(front){
+  const c = findComp(selName);
+  if (!c) return;
+  project.comps = project.comps.filter(x=>x!==c);
+  if (front) project.comps.push(c); else project.comps.unshift(c);
+  renderDesign(); touch();
+}
+
+/* =====================================================================
+ *  Object Inspector
+ * =================================================================== */
+function objProps(name){
+  if (name==='Form1') return {obj:project.form, type:'TForm',
+    list:{Caption:'str', Color:'color', Width:'int', Height:'int', Left:'int', Top:'int', Name:'name'}};
+  const c = findComp(name);
+  const base = {Name:'name', Left:'int', Top:'int', Width:'int', Height:'int', Enabled:'bool', Visible:'bool'};
+  return {obj:c.props, type:c.type, comp:c, list:{...base, ...DEFS[c.type].props}};
+}
+function renderInspector(){
+  const sel = $('#insp-sel');
+  sel.innerHTML='';
+  const opts = [['Form1', project.form.Name+': TForm1'],
+    ...project.comps.map(c=>[c.name, c.name+': '+c.type])];
+  opts.forEach(([v,l])=>{
+    const o=document.createElement('option'); o.value=v; o.textContent=l;
+    if (v===selName) o.selected=true;
+    sel.appendChild(o);
+  });
+  $$('.insptab').forEach(t=>t.classList.toggle('sel', t.dataset.tab===inspTab));
+  const grid = $('#insp-grid'); grid.innerHTML='';
+  const info = objProps(selName);
+  if (!info.obj) return;
+  if (inspTab==='props'){
+    Object.entries(info.list).forEach(([pn, pt])=>{
+      grid.appendChild(inspRow(pn, pt, info));
+    });
+  } else {
+    if (selName==='Form1'){
+      const r=document.createElement('div'); r.className='iprow';
+      r.innerHTML='<div class="ipn" style="width:100%;color:#808080">(Form events omitted)</div>';
+      grid.appendChild(r);
+    } else {
+      eventsFor(info.type).forEach(ev=>{
+        grid.appendChild(eventRow(ev, info.comp));
+      });
+    }
+  }
+}
+function inspRow(pn, pt, info){
+  const row = document.createElement('div'); row.className='iprow';
+  const nm = document.createElement('div'); nm.className='ipn'; nm.textContent=pn; nm.title=pn;
+  const vv = document.createElement('div'); vv.className='ipv';
+  const cur = pn==='Name' ? (info.comp?info.comp.name:project.form.Name) : info.obj[pn];
+  const commit = v => setProp(info, pn, pt, v);
+  if (pt==='bool' || Array.isArray(pt) || pt==='color'){
+    const s=document.createElement('select');
+    const options = pt==='bool' ? ['true','false'] : (pt==='color'? Object.keys(COLORS) : pt);
+    options.forEach(o=>{
+      const op=document.createElement('option'); op.value=o; op.textContent=o;
+      if (String(cur)===o) op.selected=true; s.appendChild(op);
+    });
+    s.addEventListener('change', ()=>commit(pt==='bool'? s.value==='true' : s.value));
+    vv.appendChild(s);
+  } else if (pt==='items'){
+    const i=document.createElement('input');
+    i.value = String(cur||'').split('\n').join(' ');
+    i.readOnly = true; i.style.color='#000080';
+    i.value = '(TStrings)';
+    const b=document.createElement('div'); b.className='ell btn3d'; b.textContent='…';
+    b.title='文字列リストエディタを開く';
+    b.addEventListener('click', ()=>stringListEditor(info, pn));
+    vv.appendChild(i); vv.appendChild(b);
+  } else {
+    const i=document.createElement('input');
+    i.value = cur==null?'':cur;
+    i.addEventListener('keydown', e=>{ if(e.key==='Enter') i.blur(); e.stopPropagation(); });
+    i.addEventListener('blur', ()=>{
+      let v=i.value;
+      if (pt==='int'){ v=parseInt(v,10); if(isNaN(v)) { i.value=cur; return; } }
+      if (pt==='name'){
+        if (!/^[A-Za-z_]\w*$/.test(v) || (v!==selName && (findComp(v)||v===project.form.Name))){ i.value=cur; return; }
+      }
+      if (v!==cur) commit(v);
+    });
+    vv.appendChild(i);
+  }
+  row.appendChild(nm); row.appendChild(vv);
+  return row;
+}
+function setProp(info, pn, pt, v){
+  if (pn==='Name'){
+    if (info.comp){ info.comp.name=v; selName=v; }
+    else { project.form.Name=v; }
+  } else {
+    info.obj[pn]=v;
+  }
+  renderDesign(); renderInspector(); touch();
+}
+function eventRow(ev, comp){
+  const row=document.createElement('div'); row.className='iprow';
+  const nm=document.createElement('div'); nm.className='ipn'; nm.textContent=ev;
+  const vv=document.createElement('div'); vv.className='ipv';
+  const i=document.createElement('input');
+  i.value = comp.events[ev]||'';
+  i.title = 'ダブルクリックでハンドラ生成';
+  i.addEventListener('dblclick', ()=>createHandler(comp, ev));
+  i.addEventListener('keydown', e=>{ if(e.key==='Enter') i.blur(); e.stopPropagation(); });
+  i.addEventListener('blur', ()=>{
+    const v=i.value.trim();
+    if (!v){ delete comp.events[ev]; }
+    else if (/^[A-Za-z_]\w*$/.test(v)){
+      comp.events[ev]=v;
+      if (!(v in project.bodies)) project.bodies[v]='\t';
+    }
+    regenCode(); touch();
+  });
+  vv.appendChild(i);
+  row.appendChild(nm); row.appendChild(vv);
+  return row;
+}
+function createHandler(comp, ev){
+  let name = comp.events[ev];
+  if (!name){
+    name = comp.name + ev.replace(/^On/,'');
+    comp.events[ev]=name;
+  }
+  if (!(name in project.bodies)) project.bodies[name]='\t';
+  regenCode(); renderInspector(); touch();
+  jumpToHandler(name);
+}
+function openHandlerFor(comp){
+  if (!comp){ activateWin($('#codewin')); return; }
+  createHandler(comp, defaultEvent(comp.type));
+}
+function stringListEditor(info, pn){
+  const cur = String(info.obj[pn]||'');
+  const lines = cur? cur.split('\n').length : 0;
+  showDlg(`String List Editor`, dlg=>{
+    dlg.innerHTML = `
+      <div style="padding:8px 10px 4px 10px">${lines} lines — 1行が1項目になります</div>
+      <div style="padding:0 10px"><textarea id="sletext" class="sunken"></textarea></div>
+      <div class="dbtns" style="justify-content:flex-end;padding-top:10px">
+        <button class="dbtn btn3d" id="sle-ok">OK</button>
+        <button class="dbtn btn3d" id="sle-cancel">Cancel</button>
+      </div>`;
+    dlg.querySelector('#sletext').value = cur;
+    dlg.querySelector('#sle-ok').addEventListener('click', ()=>{
+      info.obj[pn] = dlg.querySelector('#sletext').value;
+      closeDlg(); renderDesign(); renderInspector(); touch();
+    });
+    dlg.querySelector('#sle-cancel').addEventListener('click', closeDlg);
+  });
+}
+
+/* =====================================================================
+ *  code generation
+ * =================================================================== */
+const CPP_SEP = '//---------------------------------------------------------------------------';
+function genHeader(){
+  const decls = project.comps.map(c=>`\t${c.type} *${c.name};`).join('\n');
+  const handlers = [...new Set(Object.values(project.comps.flatMap(c=>Object.values(c.events))))]
+    .map(h=>`\tvoid __fastcall ${h}(TObject *Sender);`).join('\n');
+  return `${CPP_SEP}
+#ifndef Unit1H
+#define Unit1H
+${CPP_SEP}
+#include <Classes.hpp>
+#include <Controls.hpp>
+#include <StdCtrls.hpp>
+#include <ExtCtrls.hpp>
+#include <ComCtrls.hpp>
+#include <Forms.hpp>
+${CPP_SEP}
+class TForm1 : public TForm
+{
+__published:\t// IDE-managed Components
+${decls}${decls?'\n':''}${handlers}${handlers?'\n':''}private:\t// User declarations
+public:\t\t// User declarations
+\t__fastcall TForm1(TComponent* Owner);
+};
+${CPP_SEP}
+extern PACKAGE TForm1 *Form1;
+${CPP_SEP}
+#endif
+`;
+}
+let bodyLines = {};   // handler name -> first body line number in cpp (1-based)
+function genCpp(){
+  bodyLines = {};
+  let out = `${CPP_SEP}
+#include <vcl.h>
+#pragma hdrstop
+
+#include "Unit1.h"
+${CPP_SEP}
+#pragma package(smart_init)
+#pragma resource "*.dfm"
+TForm1 *Form1;
+${CPP_SEP}
+__fastcall TForm1::TForm1(TComponent* Owner)
+\t: TForm(Owner)
+{
+}
+${CPP_SEP}
+`;
+  const used = [...new Set(project.comps.flatMap(c=>Object.values(c.events)))];
+  used.forEach(h=>{
+    const body = project.bodies[h] ?? '\t';
+    out += `void __fastcall TForm1::${h}(TObject *Sender)\n{\n`;
+    bodyLines[h] = out.split('\n').length;
+    out += body.replace(/\n$/,'') + `\n}\n${CPP_SEP}\n`;
+  });
+  return out;
+}
+function genDfm(){
+  const f = project.form;
+  const q = s=>`'${String(s).replace(/'/g,"''")}'`;
+  let out = `object ${f.Name}: TForm1\n  Left = ${f.Left}\n  Top = ${f.Top}\n  Width = ${f.Width}\n  Height = ${f.Height}\n  Caption = ${q(f.Caption)}\n  Color = ${f.Color}\n  TextHeight = 13\n`;
+  project.comps.forEach(c=>{
+    out += `  object ${c.name}: ${c.type}\n`;
+    Object.entries(c.props).forEach(([k,v])=>{
+      if (k==='Lines'||k==='Items'){
+        const items = String(v||'').split('\n').filter(s=>s.length);
+        if (items.length) out += `    ${k}.Strings = (\n${items.map(s=>'      '+q(s)).join('\n')})\n`;
+      } else if (typeof v==='string' && !/^(cl|bv|st|bs)/.test(v)) out += `    ${k} = ${q(v)}\n`;
+      else out += `    ${k} = ${v}\n`;
+    });
+    Object.entries(c.events).forEach(([e,h])=>{ out += `    ${e} = ${h}\n`; });
+    out += `  end\n`;
+  });
+  return out + 'end\n';
+}
+function regenCode(){
+  const ta = $('#edta');
+  if (codeFile==='cpp'){ ta.value = genCpp(); ta.readOnly=false; }
+  else if (codeFile==='h'){ ta.value = genHeader(); ta.readOnly=true; }
+  else { ta.value = genDfm(); ta.readOnly=true; }
+  highlight();
+}
+function extractBodies(){
+  // pull handler bodies back out of the (possibly edited) cpp text
+  const src = $('#edta').value;
+  const re = /void __fastcall TForm1::(\w+)\(TObject \*Sender\)\s*\n\{\n([\s\S]*?)\n\}/g;
+  let m;
+  while ((m = re.exec(src))){
+    project.bodies[m[1]] = m[2];
+  }
+}
+const HL_RE = /(\/\/.*$)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|\b(void|int|double|float|bool|char|if|else|while|for|return|true|false|class|public|private|extern|new|delete|String|TObject|TForm|TComponent|__fastcall|__published)\b|\b(\d+(?:\.\d+)?)\b/g;
+function highlight(){
+  const src = $('#edta').value;
+  const html = src.split('\n').map(line=>{
+    let h = esc(line);
+    if (/^\s*#/.test(line)) h = `<span class="p">${h}</span>`;
+    else h = h.replace(HL_RE, (m,cm,st,kw,num)=>
+      cm!==undefined ? `<span class="c">${cm}</span>` :
+      st!==undefined ? `<span class="s">${st}</span>` :
+      kw!==undefined ? `<span class="k">${kw}</span>` :
+                       `<span class="n">${num}</span>`);
+    return `<span class="cl">${h||' '}</span>`;
+  }).join('');
+  $('#edhl').innerHTML = html;
+}
+function codeEditorEvents(){
+  const ta = $('#edta');
+  ta.addEventListener('input', ()=>{
+    if (codeFile==='cpp'){ extractBodies(); touch(false); }
+    highlight(); updateCaret();
+  });
+  ta.addEventListener('scroll', ()=>{
+    $('#edhl').scrollTop = ta.scrollTop; $('#edhl').scrollLeft = ta.scrollLeft;
+  });
+  ta.addEventListener('keydown', e=>{
+    e.stopPropagation();
+    if (e.key==='Tab'){
+      e.preventDefault();
+      const s=ta.selectionStart;
+      ta.value = ta.value.slice(0,s)+'\t'+ta.value.slice(ta.selectionEnd);
+      ta.selectionStart=ta.selectionEnd=s+1;
+      ta.dispatchEvent(new Event('input'));
+    }
+    if (e.key==='F9'){ e.preventDefault(); runProject(); }
+    if (e.key==='F12'){ e.preventDefault(); toggleFormUnit(); }
+  });
+  ['keyup','click'].forEach(ev=>ta.addEventListener(ev, updateCaret));
+  $$('.codetab').forEach(t=>t.addEventListener('mousedown', ()=>{
+    codeFile = t.dataset.f;
+    $$('.codetab').forEach(x=>x.classList.toggle('sel',x===t));
+    $('#codecaption').textContent = 'Unit1.'+codeFile;
+    regenCode();
+  }));
+}
+function updateCaret(){
+  const ta=$('#edta');
+  const upto = ta.value.slice(0, ta.selectionStart).split('\n');
+  $('#st-pos').textContent = upto.length+': '+(upto[upto.length-1].length+1);
+}
+function jumpToHandler(name){
+  codeFile='cpp';
+  $$('.codetab').forEach(x=>x.classList.toggle('sel',x.dataset.f==='cpp'));
+  regenCode();
+  activateWin($('#codewin'));
+  const ta=$('#edta');
+  const idx = ta.value.indexOf(`TForm1::${name}(`);
+  if (idx>=0){
+    const bodyStart = ta.value.indexOf('{', idx)+2;
+    ta.focus();
+    ta.selectionStart=ta.selectionEnd=Math.min(bodyStart+1, ta.value.length);
+    const line = ta.value.slice(0,bodyStart).split('\n').length;
+    ta.scrollTop = Math.max(0,(line-6)*16);
+  }
+  updateCaret();
+}
+function toggleFormUnit(){
+  const fw=$('#formwin'), cw=$('#codewin');
+  if (parseInt(cw.style.zIndex||0) >= parseInt(fw.style.zIndex||0)) activateWin(fw);
+  else activateWin(cw);
+}
+
+/* =====================================================================
+ *  mini C++ interpreter (VCL subset)
+ * =================================================================== */
+function lex(src){
+  const toks=[]; let i=0, line=1;
+  const push=(t,v)=>toks.push({t,v,line});
+  while(i<src.length){
+    const c=src[i];
+    if (c==='\n'){ line++; i++; continue; }
+    if (/\s/.test(c)){ i++; continue; }
+    if (c==='/'&&src[i+1]==='/'){ while(i<src.length&&src[i]!=='\n')i++; continue; }
+    if (c==='/'&&src[i+1]==='*'){ i+=2; while(i<src.length&&!(src[i]==='*'&&src[i+1]==='/')){ if(src[i]==='\n')line++; i++; } i+=2; continue; }
+    if (c==='"'||c==="'"){
+      const q=c; let s=''; i++;
+      while(i<src.length&&src[i]!==q){
+        if (src[i]==='\\'){ const m={n:'\n',t:'\t','\\':'\\','"':'"',"'":"'"}; s+=m[src[i+1]]??src[i+1]; i+=2; }
+        else s+=src[i++];
+      }
+      i++; push('str',s); continue;
+    }
+    if (/[0-9]/.test(c)){ let n=''; while(i<src.length&&/[0-9.]/.test(src[i]))n+=src[i++]; push('num',parseFloat(n)); continue; }
+    if (/[A-Za-z_]/.test(c)){ let w=''; while(i<src.length&&/[A-Za-z0-9_]/.test(src[i]))w+=src[i++]; push('id',w); continue; }
+    const two=src.substr(i,2);
+    if (['->','==','!=','<=','>=','&&','||','++','--','+=','-='].includes(two)){ push('op',two); i+=2; continue; }
+    push('op',c); i++;
+  }
+  push('eof'); return toks;
+}
+function parse(src){
+  const toks=lex(src); let pos=0;
+  const peek=()=>toks[pos], next=()=>toks[pos++];
+  const err=(m,tk)=>{ const e=new Error(m); e.cline=(tk||peek()).line; e.parse=true; throw e; };
+  const eat=(t,v)=>{ const tk=peek(); if(tk.t!==t||(v!==undefined&&tk.v!==v)) err(`'${v??t}' がありません (found '${tk.v??tk.t}')`,tk); return next(); };
+  const isOp=v=>peek().t==='op'&&peek().v===v;
+  const TYPES=['int','double','float','bool','char','String','AnsiString','UnicodeString','long','unsigned'];
+
+  function block(){
+    const st=[]; eat('op','{');
+    while(!isOp('}')&&peek().t!=='eof') st.push(statement());
+    eat('op','}');
+    return {k:'block',st};
+  }
+  function statement(){
+    const tk=peek();
+    if (tk.t==='op'&&tk.v==='{') return block();
+    if (tk.t==='op'&&tk.v===';'){ next(); return {k:'empty'}; }
+    if (tk.t==='id'&&tk.v==='if'){
+      next(); eat('op','('); const c=expr(); eat('op',')');
+      const then=statement();
+      let els=null;
+      if (peek().t==='id'&&peek().v==='else'){ next(); els=statement(); }
+      return {k:'if',c,then,els,line:tk.line};
+    }
+    if (tk.t==='id'&&tk.v==='while'){
+      next(); eat('op','('); const c=expr(); eat('op',')');
+      return {k:'while',c,body:statement(),line:tk.line};
+    }
+    if (tk.t==='id'&&tk.v==='for'){
+      next(); eat('op','(');
+      const init = isOp(';')? {k:'empty'} : simpleStmt(); eat('op',';');
+      const cond = isOp(';')? {k:'lit',v:true} : expr(); eat('op',';');
+      const step = isOp(')')? {k:'empty'} : {k:'expr',e:exprOrAssign()};
+      eat('op',')');
+      return {k:'for',init,cond,step,body:statement(),line:tk.line};
+    }
+    if (tk.t==='id'&&TYPES.includes(tk.v)){
+      const s=varDecl(); eat('op',';'); return s;
+    }
+    const s = {k:'expr',e:exprOrAssign(),line:tk.line};
+    eat('op',';');
+    return s;
+  }
+  function simpleStmt(){
+    if (peek().t==='id'&&TYPES.includes(peek().v)) return varDecl();
+    return {k:'expr',e:exprOrAssign(),line:peek().line};
+  }
+  function varDecl(){
+    const line=peek().line;
+    next(); // type name (loose: single token types)
+    const decls=[];
+    do {
+      const nm=eat('id').v;
+      let init=null;
+      if (isOp('=')){ next(); init=expr(); }
+      decls.push({nm,init});
+    } while (isOp(',') && next());
+    return {k:'decl',decls,line};
+  }
+  function exprOrAssign(){
+    const e=expr();
+    if (isOp('=')||isOp('+=')||isOp('-=')){
+      const op=next().v;
+      const rhs=exprOrAssign();
+      return {k:'assign',target:e,op,rhs,line:e.line};
+    }
+    return e;
+  }
+  function expr(){ return orE(); }
+  const binParser=(sub,ops)=>()=>{
+    let l=sub();
+    while (peek().t==='op'&&ops.includes(peek().v)){
+      const op=next().v; const r=sub();
+      l={k:'bin',op,l,r,line:l.line};
+    }
+    return l;
+  };
+  const mulE = binParser(()=>unary(),['*','/','%']);
+  const addE = binParser(mulE,['+','-']);
+  const relE = binParser(addE,['<','>','<=','>=']);
+  const eqE  = binParser(relE,['==','!=']);
+  const andE = binParser(eqE,['&&']);
+  const orE  = binParser(andE,['||']);
+  function unary(){
+    if (isOp('!')){ const l=next().line; return {k:'un',op:'!',e:unary(),line:l}; }
+    if (isOp('-')){ const l=next().line; return {k:'un',op:'-',e:unary(),line:l}; }
+    if (isOp('+')){ next(); return unary(); }
+    return postfix();
+  }
+  function postfix(){
+    let e=primary();
+    for(;;){
+      if (isOp('->')||isOp('.')){ next(); const nm=eat('id').v; e={k:'mem',obj:e,name:nm,line:e.line}; }
+      else if (isOp('(')){
+        next(); const args=[];
+        if (!isOp(')')){ do{ args.push(expr()); }while(isOp(',')&&next()); }
+        eat('op',')');
+        e={k:'call',callee:e,args,line:e.line};
+      }
+      else if (isOp('++')||isOp('--')){ const op=next().v; e={k:'post',op,target:e,line:e.line}; }
+      else break;
+    }
+    return e;
+  }
+  function primary(){
+    const tk=next();
+    if (tk.t==='num') return {k:'lit',v:tk.v,line:tk.line};
+    if (tk.t==='str') return {k:'lit',v:tk.v,line:tk.line};
+    if (tk.t==='id'){
+      if (tk.v==='true') return {k:'lit',v:true,line:tk.line};
+      if (tk.v==='false') return {k:'lit',v:false,line:tk.line};
+      if (tk.v==='NULL'||tk.v==='nullptr') return {k:'lit',v:null,line:tk.line};
+      return {k:'id',name:tk.v,line:tk.line};
+    }
+    if (tk.t==='op'&&tk.v==='('){ const e=expr(); eat('op',')'); return e; }
+    err(`式が必要です (found '${tk.v??tk.t}')`,tk);
+  }
+
+  const stmts=[];
+  while (peek().t!=='eof') stmts.push(statement());
+  return {k:'block',st:stmts};
+}
+
+/* ---------- runtime object model ---------- */
+let RT = null;   // {props:{name:{...}}, els:{name:el}, timers:[], win, closed}
+function rtObj(name){ return {__c:name}; }
+function rtOf(name){
+  if (!RT.props[name]) throw new Error(`E2451 未定義のシンボル '${name}'`);
+  return RT.props[name];
+}
+function rtRepaint(name){
+  const el = RT.els[name];
+  if (!el) { if (name==='Form1') rtFormPaint(); return; }
+  const c = {type:RT.types[name], name, props:RT.props[name]};
+  el.style.left=c.props.Left+'px'; el.style.top=c.props.Top+'px';
+  el.style.width=c.props.Width+'px'; el.style.height=c.props.Height+'px';
+  el.style.display = c.props.Visible===false? 'none':'';
+  const focus = document.activeElement;
+  const isInput = el.contains(focus);
+  if (isInput && (c.type==='TEdit'||c.type==='TMemo')){
+    // targeted update to not lose focus
+    const inp = el.querySelector('input,textarea');
+    const want = c.type==='TEdit'? c.props.Text : c.props.Lines;
+    if (inp.value!==want) inp.value=want;
+    inp.style.background = colHex(c.props.Color);
+    return;
+  }
+  el.innerHTML='';
+  el.appendChild(renderControl(c,false));
+  rtWire(name, el);
+}
+function rtFormPaint(){
+  const f = RT.props.Form1;
+  RT.win.querySelector('.tb-title').textContent = f.Caption;
+  RT.client.style.background = colHex(f.Color);
+  RT.win.style.width=(f.Width+8)+'px'; RT.win.style.height=(f.Height+28)+'px';
+}
+function rtGet(name, prop){
+  const p = rtOf(name), type = RT.types[name]||'TForm';
+  if (prop==='Lines'||prop==='Items') return {__list:{owner:name, prop}};
+  if (prop==='ItemIndex') return p.ItemIndex ?? -1;
+  if (prop in p) return p[prop];
+  throw new Error(`E2316 '${prop}' は '${type}' のメンバーではありません`);
+}
+function rtSet(name, prop, v){
+  const p = rtOf(name);
+  if (prop==='Position'&&RT.types[name]==='TProgressBar') v=clampi(v,p.Min,p.Max);
+  p[prop]=v;
+  if (prop==='Checked'&&RT.types[name]==='TRadioButton'&&v){
+    Object.keys(RT.props).forEach(n=>{
+      if (n!==name&&RT.types[n]==='TRadioButton'&&RT.props[n].Checked){ RT.props[n].Checked=false; rtRepaint(n); }
+    });
+  }
+  if (prop==='Interval'||prop==='Enabled'){ if (RT.types[name]==='TTimer') rtTimers(); }
+  rtRepaint(name);
+}
+function listOps(l){
+  const p = rtOf(l.owner);
+  const get = ()=>String(p[l.prop]||'')===''?[]:String(p[l.prop]).split('\n');
+  const set = a=>{ p[l.prop]=a.join('\n'); rtRepaint(l.owner); };
+  return {get,set};
+}
+function truthy(v){ return !!v; }
+const BUILTINS = {
+  ShowMessage: a=>{ msgBox(RT?RT.props.Form1.Caption:'Project1', String(a[0]), null); },
+  IntToStr:    a=>String(Math.trunc(Number(a[0]))),
+  StrToInt:    a=>{ const n=parseInt(a[0],10); if(isNaN(n)) throw new Error(`EConvertError '${a[0]}' は整数ではありません`); return n; },
+  FloatToStr:  a=>String(Number(a[0])),
+  StrToFloat:  a=>{ const n=parseFloat(a[0]); if(isNaN(n)) throw new Error(`EConvertError '${a[0]}' は数値ではありません`); return n; },
+  Random:      a=>a.length? Math.floor(Math.random()*Number(a[0])) : Math.random(),
+  Abs:         a=>Math.abs(Number(a[0])),
+  Length:      a=>String(a[0]).length,
+  UpperCase:   a=>String(a[0]).toUpperCase(),
+  LowerCase:   a=>String(a[0]).toLowerCase(),
+  Trim:        a=>String(a[0]).trim(),
+  Close:       ()=>stopProgram(),
+  Beep:        ()=>{}
+};
+function interpret(ast, senderName){
+  const vars = new Map();
+  vars.set('Sender', rtObj(senderName||'Form1'));
+  const MAXSTEP = 200000; let steps=0;
+  function tick(){ if (++steps>MAXSTEP) throw new Error('無限ループを検出しました (Program Reset)'); }
+
+  function evalNode(n){
+    tick();
+    switch(n.k){
+      case 'block': for(const s of n.st) evalNode(s); return;
+      case 'empty': return;
+      case 'decl': for(const d of n.decls) vars.set(d.nm, d.init? ev(d.init):0); return;
+      case 'if': if (truthy(ev(n.c))) evalNode(n.then); else if (n.els) evalNode(n.els); return;
+      case 'while': while (truthy(ev(n.c))) { tick(); evalNode(n.body); if (RT&&RT.closed) return; } return;
+      case 'for': evalNode(n.init); while (truthy(ev(n.cond))){ tick(); evalNode(n.body); evalNode(n.step); if (RT&&RT.closed) return; } return;
+      case 'expr': ev(n.e); return;
+      default: ev(n); return;
+    }
+  }
+  function ref(n){
+    if (n.k==='id'){
+      if (vars.has(n.name)) return {get:()=>vars.get(n.name), set:v=>vars.set(n.name,v)};
+      if (RT.props[n.name]) throw new Error(`E2034 '${n.name}' はオブジェクトです (プロパティを指定してください)`);
+      // bare form property (inside TForm1 method)
+      if (n.name in RT.props.Form1) return {get:()=>rtGet('Form1',n.name), set:v=>rtSet('Form1',n.name,v)};
+      // implicit local
+      return {get:()=>{ throw new Error(`E2451 未定義のシンボル '${n.name}'`); }, set:v=>vars.set(n.name,v)};
+    }
+    if (n.k==='mem'){
+      const o = ev(n.obj);
+      if (o&&o.__c) return {get:()=>rtGet(o.__c,n.name), set:v=>rtSet(o.__c,n.name,v)};
+      if (o&&o.__list){
+        const {get}=listOps(o.__list);
+        if (n.name==='Count') return {get:()=>get().length, set:()=>{}};
+        if (n.name==='Text') return {get:()=>get().join('\n'), set:v=>listOps(o.__list).set(String(v).split('\n'))};
+      }
+      throw new Error(`E2316 メンバー '${n.name}' を解決できません`);
+    }
+    throw new Error('E2064 左辺値ではありません');
+  }
+  function ev(n){
+    tick();
+    switch(n.k){
+      case 'lit': return n.v;
+      case 'id': {
+        if (vars.has(n.name)) return vars.get(n.name);
+        if (n.name==='Form1'||RT.props[n.name]) return rtObj(n.name);
+        if (n.name in RT.props.Form1) return rtGet('Form1', n.name);
+        if (BUILTINS[n.name]) return {__fn:n.name};
+        throw new Error(`E2451 未定義のシンボル '${n.name}'`);
+      }
+      case 'mem': {
+        const o = ev(n.obj);
+        if (o&&o.__c){
+          if (['SetFocus','Hide','Show','Clear','BringToFront'].includes(n.name)) return {__m:{obj:o.__c, name:n.name}};
+          return rtGet(o.__c, n.name);
+        }
+        if (o&&o.__list){
+          if (['Add','Clear','Delete','Insert'].includes(n.name)) return {__lm:{list:o.__list, name:n.name}};
+          if (n.name==='Count') return listOps(o.__list).get().length;
+          if (n.name==='Text') return listOps(o.__list).get().join('\n');
+        }
+        throw new Error(`E2316 メンバー '${n.name}' を解決できません`);
+      }
+      case 'call': {
+        const args = n.args.map(ev);
+        const cal = (n.callee.k==='id'&&BUILTINS[n.callee.name])? {__fn:n.callee.name} : ev(n.callee);
+        if (cal&&cal.__fn) return BUILTINS[cal.__fn](args);
+        if (cal&&cal.__lm){
+          const {get,set}=listOps(cal.__lm.list);
+          const a=get();
+          switch(cal.__lm.name){
+            case 'Add': a.push(String(args[0])); set(a); return a.length-1;
+            case 'Clear': set([]); return;
+            case 'Delete': a.splice(Number(args[0]),1); set(a); return;
+            case 'Insert': a.splice(Number(args[0]),0,String(args[1])); set(a); return;
+          }
+        }
+        if (cal&&cal.__m){
+          const el=RT.els[cal.__m.obj];
+          switch(cal.__m.name){
+            case 'SetFocus': if(el){const i=el.querySelector('input,textarea,select'); (i||el).focus();} return;
+            case 'Hide': rtSet(cal.__m.obj,'Visible',false); return;
+            case 'Show': rtSet(cal.__m.obj,'Visible',true); return;
+            case 'Clear': {
+              const t=RT.types[cal.__m.obj];
+              if (t==='TEdit') rtSet(cal.__m.obj,'Text','');
+              else if (t==='TMemo') rtSet(cal.__m.obj,'Lines','');
+              else if (t==='TListBox') rtSet(cal.__m.obj,'Items','');
+              return;
+            }
+            case 'BringToFront': if(el) el.parentElement.appendChild(el); return;
+          }
+        }
+        throw new Error('E2268 未定義の関数を呼び出しました');
+      }
+      case 'assign': {
+        const r = ref(n.target);
+        let v = ev(n.rhs);
+        if (n.op==='+='){ const cur=r.get(); v = (typeof cur==='string'||typeof v==='string')? String(cur)+String(v) : cur+v; }
+        if (n.op==='-=') v = r.get()-v;
+        r.set(v); return v;
+      }
+      case 'post': { const r=ref(n.target); const cur=Number(r.get()); r.set(n.op==='++'?cur+1:cur-1); return cur; }
+      case 'bin': {
+        const a=ev(n.l), b=ev(n.r);
+        switch(n.op){
+          case '+': return (typeof a==='string'||typeof b==='string')? String(a)+String(b) : a+b;
+          case '-': return a-b; case '*': return a*b;
+          case '/': return b===0? (()=>{throw new Error('EDivByZero 0 で除算しました')})() : a/b;
+          case '%': return a%b;
+          case '==': return a===b||String(a)===String(b); case '!=': return !(a===b||String(a)===String(b));
+          case '<': return a<b; case '>': return a>b; case '<=': return a<=b; case '>=': return a>=b;
+          case '&&': return truthy(a)&&truthy(b); case '||': return truthy(a)||truthy(b);
+        }
+      }
+      case 'un': return n.op==='!'? !truthy(ev(n.e)) : -ev(n.e);
+    }
+    throw new Error('E0000 評価できないノードです');
+  }
+  evalNode(ast);
+}
+
+/* =====================================================================
+ *  compile + run
+ * =================================================================== */
+let compiled = null;   // {handlerName: ast}
+function compileProject(showDialog){
+  extractBodies();
+  compiled = {};
+  const used = [...new Set(project.comps.flatMap(c=>Object.values(c.events)))];
+  let errors = [];
+  used.forEach(h=>{
+    try { compiled[h] = parse(project.bodies[h] ?? ''); }
+    catch(e){
+      const line = (bodyLines[h]||1) + (e.cline?e.cline-1:0);
+      errors.push(`[C++ エラー] Unit1.cpp(${line}): ${h}: ${e.message}`);
+    }
+  });
+  if (errors.length){
+    compiled=null;
+    jumpToHandler(used[0]);
+    msgBox('Compiler', errors.join('\n'), '⛔');
+    $('#st-msg').textContent = errors[0];
+    return false;
+  }
+  if (showDialog){
+    msgBox('Compiling — Project1',
+      `Unit1.cpp\n\nLines processed: ${genCpp().split('\n').length}\nHints: 0    Warnings: 0    Errors: 0\n\nDone: Compiled.`, 'ℹ️');
+  }
+  $('#st-msg').textContent = 'Compile: done — 0 error(s)';
+  return true;
+}
+function runProject(){
+  stopProgram();
+  if (!compileProject(false)) return;
+  const f = project.form;
+  RT = {props:{}, types:{}, els:{}, timers:[], closed:false};
+  RT.props.Form1 = {...f};
+  project.comps.forEach(c=>{ RT.props[c.name]={...c.props}; RT.types[c.name]=c.type; });
+  // window
+  const win = document.createElement('div');
+  win.className='win active'; win.id='runwin';
+  win.style.left=(f.Left+90)+'px'; win.style.top=(f.Top+40)+'px';
+  win.style.width=(f.Width+8)+'px'; win.style.height=(f.Height+28)+'px';
+  win.style.zIndex = ++ztop + 500;
+  win.innerHTML = `<div class="titlebar active"><span class="tb-title">${esc(f.Caption)}</span>`+
+    `<span class="tb-btn btn3d" data-x="1">✕</span></div>`+
+    `<div class="wbody"><div class="formclient" style="background:${colHex(f.Color)};background-image:none"></div></div>`;
+  document.body.appendChild(win);
+  makeWindow(win);
+  win.querySelector('[data-x]').addEventListener('click', stopProgram);
+  RT.win = win;
+  RT.client = win.querySelector('.formclient');
+  project.comps.forEach(c=>{
+    const el=document.createElement('div');
+    el.className='dcomp rt-clickable'; el.style.pointerEvents='auto';
+    el.dataset.name=c.name;
+    el.style.left=c.props.Left+'px'; el.style.top=c.props.Top+'px';
+    el.style.width=c.props.Width+'px'; el.style.height=c.props.Height+'px';
+    if (c.props.Visible===false || c.type==='TTimer') el.style.display = c.type==='TTimer'?'none':'none';
+    el.appendChild(renderControl(c,false));
+    Array.from(el.children).forEach(ch=>ch.style.pointerEvents='auto');
+    RT.els[c.name]=el;
+    RT.client.appendChild(el);
+    rtWire(c.name, el);
+  });
+  rtTimers();
+  $('#st-msg').textContent = 'Running — フォームの ✕ か Ctrl+F2 で停止';
+}
+function fire(name, ev){
+  if (!RT||RT.closed) return;
+  const comps = project.comps.find(c=>c.name===name);
+  const h = comps && comps.events[ev];
+  if (!h || !compiled || !compiled[h]) return;
+  try { interpret(compiled[h], name); }
+  catch(e){
+    msgBox('Application Error',
+      `プロジェクト Project1.exe が例外クラスを生成しました:\n\n${e.message}\n\nProcess stopped.`, '⛔');
+    stopProgram();
+  }
+}
+function rtWire(name, el){
+  const type = RT.types[name];
+  el.querySelectorAll('*').forEach(ch=>ch.style.pointerEvents='auto');
+  el.style.pointerEvents='auto';
+  if (type==='TTimer') return;
+  el.addEventListener('click', e=>{
+    if (RT.closed) return;
+    if (type==='TCheckBox'){ rtSet(name,'Checked',!rtOf(name).Checked); }
+    if (type==='TRadioButton'){ rtSet(name,'Checked',true); }
+    if (type==='TListBox'){
+      const li=e.target.closest('.li');
+      if (li){ rtOf(name).ItemIndex=parseInt(li.dataset.i,10);
+        el.querySelectorAll('.li').forEach(x=>x.classList.toggle('sel',x===li)); }
+    }
+    fire(name,'OnClick');
+  });
+  el.addEventListener('dblclick', ()=>fire(name,'OnDblClick'));
+  const inp = el.querySelector('input,textarea,select');
+  if (inp){
+    inp.addEventListener('input', ()=>{
+      if (type==='TEdit') rtOf(name).Text=inp.value;
+      if (type==='TMemo') rtOf(name).Lines=inp.value;
+      if (type==='TComboBox') rtOf(name).Text=inp.value;
+      fire(name,'OnChange');
+    });
+  }
+}
+function rtTimers(){
+  if (!RT) return;
+  RT.timers.forEach(clearInterval); RT.timers=[];
+  Object.keys(RT.types).forEach(n=>{
+    if (RT.types[n]!=='TTimer') return;
+    const p=RT.props[n];
+    if (p.Enabled && p.Interval>0){
+      RT.timers.push(setInterval(()=>fire(n,'OnTimer'), Math.max(10,p.Interval)));
+    }
+  });
+}
+function stopProgram(){
+  if (!RT) return;
+  RT.closed=true;
+  RT.timers.forEach(clearInterval);
+  if (RT.win) RT.win.remove();
+  RT=null;
+  $('#st-msg').textContent = 'Stopped.';
+}
+
+/* =====================================================================
+ *  dialogs
+ * =================================================================== */
+function showDlg(title, build){
+  const m=$('#modal'); m.innerHTML='';
+  const d=document.createElement('div');
+  d.className='dlg raised';
+  d.innerHTML=`<div class="titlebar active"><span class="tb-title">${esc(title)}</span></div>`;
+  const body=document.createElement('div');
+  d.appendChild(body);
+  build(body);
+  m.appendChild(d); m.classList.add('show');
+}
+function closeDlg(){ $('#modal').classList.remove('show'); $('#modal').innerHTML=''; }
+function msgBox(title, text, ico){
+  showDlg(title, b=>{
+    b.innerHTML=`<div class="dbody">${ico?`<div class="dico">${ico}</div>`:''}<div class="dmsg">${esc(text)}</div></div>
+      <div class="dbtns"><button class="dbtn btn3d" id="mb-ok">OK</button></div>`;
+    const ok=b.querySelector('#mb-ok');
+    ok.addEventListener('click', closeDlg);
+    setTimeout(()=>ok.focus(),0);
+  });
+}
+function showAbout(){
+  showDlg('About Bada C++Builder', b=>{
+    b.innerHTML=`
+      <div style="margin:10px;border:1px solid #000">
+        <div style="background:linear-gradient(135deg,#000040,#000080 45%,#c00000);color:#fff;padding:16px 18px">
+          <div style="letter-spacing:5px;font-size:11px;color:#ffd0d0">I N P R I S E&nbsp;&nbsp;(homage)</div>
+          <div style="font-size:24px;font-style:italic;font-family:Georgia,serif;margin-top:4px">Borland™ C++Builder® 風</div>
+          <div style="font-size:11px;margin-top:4px">Bada Edition — 単一 HTML / 依存ゼロ / ブラウザ RAD</div>
+        </div>
+        <div style="padding:10px 14px;background:#fff;font-size:11px;line-height:1.7;user-select:text">
+          Version 6.0 (Homage Build 2026)<br>
+          VCL 風フォームデザイナ + Object Inspector + C++ サブセット実行系<br>
+          <span style="color:#800000">これは非公式・教育目的のオマージュ再現です。<br>
+          Borland / Inprise / Embarcadero とは一切関係ありません。</span>
+        </div>
+      </div>
+      <div class="dbtns"><button class="dbtn btn3d" onclick="closeDlg()">OK</button></div>`;
+  });
+}
+function confirmNew(){
+  return confirm('現在のプロジェクトを破棄して新規作成しますか?');
+}
+
+/* =====================================================================
+ *  save / open / autosave
+ * =================================================================== */
+const LS_KEY='bada_cppbuilder_project';
+function touch(regen){
+  modified=true;
+  layoutFormWin();
+  if (regen!==false) regenCode();
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(project)); }catch(e){}
+  $('#st-mod').textContent='Modified';
+}
+function saveProject(){
+  extractBodies();
+  const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='Project1.cbproj.json';
+  a.click(); URL.revokeObjectURL(a.href);
+  modified=false; $('#st-mod').textContent=''; layoutFormWin();
+  $('#st-msg').textContent='Saved: Project1.cbproj.json';
+}
+function openProjectDlg(){
+  const i=document.createElement('input');
+  i.type='file'; i.accept='.json,.cbproj';
+  i.addEventListener('change', ()=>{
+    const f=i.files[0]; if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{ try{ loadProject(JSON.parse(r.result)); }catch(e){ msgBox('Error','プロジェクトファイルを読み込めません:\n'+e.message,'⛔'); } };
+    r.readAsText(f);
+  });
+  i.click();
+}
+function loadProject(p){
+  stopProgram();
+  project=p;
+  project.bodies = project.bodies||{};
+  project.counters = project.counters||{};
+  selName='Form1'; pendingType=null; modified=false;
+  buildPalette(); renderDesign(); renderInspector(); regenCode();
+  $('#st-mod').textContent='';
+  layoutFormWin();
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(project)); }catch(e){}
+}
+
+/* =====================================================================
+ *  init
+ * =================================================================== */
+function initKeys(){
+  document.addEventListener('keydown', e=>{
+    if ($('#modal').classList.contains('show')){
+      if (e.key==='Enter'||e.key==='Escape'){ closeDlg(); e.preventDefault(); }
+      return;
+    }
+    if (e.key==='F9'&&!e.ctrlKey){ e.preventDefault(); runProject(); }
+    else if (e.key==='F9'&&e.ctrlKey){ e.preventDefault(); compileProject(true); }
+    else if (e.key==='F12'){ e.preventDefault(); toggleFormUnit(); }
+    else if (e.key==='F11'&&!e.ctrlKey){ e.preventDefault();
+      const w=$('#inspector'); w.style.display=w.style.display==='none'?'flex':'none'; }
+    else if (e.key==='F2'&&e.ctrlKey){ e.preventDefault(); stopProgram(); }
+    else if (e.key==='s'&&e.ctrlKey){ e.preventDefault(); saveProject(); }
+    else if (e.key==='Delete'){ if (document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA') deleteSelected(); }
+    else if (e.key==='Escape'){ if(RT) stopProgram(); else { pendingType=null; buildPalette(); selectObj('Form1'); } }
+  });
+}
+function init(){
+  buildMenus(); buildSpeedbar(); buildPalette();
+  ['inspector','formwin','codewin'].forEach(id=>makeWindow($('#'+id)));
+  $('#mainbar').addEventListener('mousedown', ()=>activateWin($('#mainbar')));
+  designerEvents(); codeEditorEvents(); initKeys();
+  $('#insp-sel').addEventListener('change', e=>selectObj(e.target.value));
+  $$('.insptab').forEach(t=>t.addEventListener('mousedown', ()=>{ inspTab=t.dataset.tab; renderInspector(); }));
+  let saved=null;
+  try{ saved=JSON.parse(localStorage.getItem(LS_KEY)); }catch(e){}
+  loadProject(saved && saved.form ? saved : demoProject());
+  activateWin($('#formwin'));
+  // splash
+  const stats=['Loading VCL emulation...','Initializing Form Designer...','Loading Component Palette...','Ready.'];
+  let si=0;
+  const t=setInterval(()=>{
+    si++;
+    if (si<stats.length) $('#splashstat').textContent=stats[si];
+    else { clearInterval(t); $('#splash').style.display='none'; }
+  }, 380);
+  $('#splash').addEventListener('click', ()=>{ clearInterval(t); $('#splash').style.display='none'; });
+}
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
