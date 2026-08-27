@@ -20,7 +20,8 @@ const builds = [
   "build-ngn-example.js",    // examples/ngn-quantum.bada
   "build-ngngrid.js",        // dist/ngn-quantum.html
   "build-zone-studio.js",    // dist/zone-studio.html
-  "build-safepower.js"       // dist/safepower.html
+  "build-safepower.js",      // dist/safepower.html
+  "build-instanton.js"       // dist/instanton.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -45,6 +46,9 @@ it in any browser — no install, no dependencies, works offline.
   safepower.html      SafePower — safe instant power-off (sync + hibernate) and
                       a rehalt-style soft reboot. Real actions run in the
                       SafePower desktop app / CLI; this page shows the commands.
+  instanton.html      InstantOn — power off saves state to disk so the next
+                      power-on skips the boot and resumes instantly (hibernate
+                      / Windows fast startup). Real actions in the desktop app / CLI.
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for

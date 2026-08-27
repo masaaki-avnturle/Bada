@@ -107,6 +107,16 @@
 
 デスクトップ版は確認のうえ実際に電源操作を実行、ブラウザ/Androidは表示のみ。CLI も同梱(`node cli/safepower.js <action>` / `./cli/rehalt`)。ビルドは [`safepower-app-build.yml`](.github/workflows/safepower-app-build.yml)([`bada_gui_ide/safepower-app/`](bada_gui_ide/safepower-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
+**InstantOn**(瞬間起動)— SafePower の応用。**電源を切ると状態をディスクに保存し、次に電源を入れると通常のブート準備を飛ばして、いきなり前回の状態から即復帰**するよう設定(Windows は高速スタートアップ=ハイブリッドブート、Linux/macOS はハイバネート復帰):
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `instanton-debug.apk`(表示のみ・実機設定は要 root) |
+| **Windows 10 / 11** | `InstantOn-*-x64.exe` |
+| **Ubuntu** | `InstantOn-*-x86_64.AppImage` / `InstantOn-*-amd64.deb` |
+
+デスクトップ版は確認のうえ設定/休止を実行、ブラウザ/Androidは表示のみ。CLI も同梱(`node cli/instanton.js <status|enable|hibernate-now|disable>`)。ビルドは [`instanton-app-build.yml`](.github/workflows/instanton-app-build.yml)([`bada_gui_ide/instanton-app/`](bada_gui_ide/instanton-app/))。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
