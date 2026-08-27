@@ -121,6 +121,16 @@
 
 デスクトップ版は確認のうえ設定/休止を実行、ブラウザ/Androidは表示のみ。CLI も同梱(`node cli/instanton.js <status|enable|hibernate-now|disable>`)。ビルドは [`instanton-app-build.yml`](.github/workflows/instanton-app-build.yml)([`bada_gui_ide/instanton-app/`](bada_gui_ide/instanton-app/))。
 
+**Migemogram Media**(写真・動画ギャラリー)もネイティブ アプリを用意しています。**デスクトップ版は Google Drive / Google Photos の実 OAuth 連携**に対応(内部の localhost サーバ `http://127.0.0.1:8713` で配信し、その生成元を Google Cloud Console に登録)。`file://` では Google サインインが使えないため連携はデスクトップ版が対象、Android WebView も OAuth を弾くため Android は手動URL/端末内メディアの取り込みが中心です:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `migemogram-media-debug.apk`(手動URL/端末内メディア) |
+| **Windows 10 / 11** | `Migemogram-Media-*-x64.exe`(Google 連携対応) |
+| **Ubuntu** | `Migemogram-Media-*-x86_64.AppImage` / `Migemogram-Media-*-amd64.deb`(Google 連携対応) |
+
+未接続・オフライン時は「＋ PCから追加」「🔗 URL追加」に自動フォールバック。ビルドは [`migemomedia-app-build.yml`](.github/workflows/migemomedia-app-build.yml)([`bada_gui_ide/migemomedia-app/`](bada_gui_ide/migemomedia-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
