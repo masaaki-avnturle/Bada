@@ -45,6 +45,7 @@
 <header>
   <div><div class="logo">MadoKey · 窓使いのキー</div>
   <div class="sub">奈由太氏「窓使いの憂鬱」オマージュ — Word / Excel / LibreOffice のキーバインド設定</div></div>
+  <span id="deskBadge" style="display:none;background:#173a29;border:1px solid #2e6b46;border-radius:8px;padding:5px 10px;font-size:12px;color:#8ff0c0"></span>
   <div style="flex:1"></div>
   <button class="btn" id="importBtn">📂 .mayu 取込</button>
   <input id="importFile" type="file" accept=".mayu,.txt" style="display:none"/>
@@ -173,7 +174,20 @@
       el.addEventListener("click",function(){ binds.splice(+this.getAttribute("data-del"),1); commit(true); });
     });
   }
-  function commit(rerender){ save(binds); regen(); if(rerender) renderRows(); }
+  function commit(rerender){ save(binds); regen(); syncDesktop(); if(rerender) renderRows(); }
+
+  /* ---------- desktop (Electron) bridge: register real global hotkeys ----------
+     window.madokey is injected by the MadoKey desktop app's preload. In a plain
+     browser it is undefined, so this is a no-op. */
+  function syncDesktop(){
+    var badge=$("deskBadge");
+    if(window.madokey && typeof window.madokey.setBinds==="function"){
+      var active=binds.filter(function(b){ return (b[0]||"").trim(); });
+      try{ window.madokey.setBinds(active); }catch(e){}
+      if(badge){ badge.style.display="inline-block";
+        badge.textContent="🖥 デスクトップ版: "+active.length+" 個のキーバインド有効"; }
+    } else if(badge){ badge.style.display="none"; }
+  }
   function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
 
   $("addRow").addEventListener("click",function(){ binds.push(["Ctrl+Alt+","any","keys",""]); commit(true); });
@@ -336,7 +350,7 @@
   function flash(msg){ var f=$("flash"); f.textContent=msg; f.classList.add("on"); if(flashT)clearTimeout(flashT); flashT=setTimeout(function(){ f.classList.remove("on"); },1600); }
 
   /* ---------- init ---------- */
-  renderRows(); regen(); doSum(); $("rubyOut").innerHTML=rubyAnnotate($("rubyIn").value);
+  renderRows(); regen(); syncDesktop(); doSum(); $("rubyOut").innerHTML=rubyAnnotate($("rubyIn").value);
 })();
 </script>
 </body>

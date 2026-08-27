@@ -132,6 +132,16 @@
 
 未接続・オフライン時は「＋ PCから追加」「🔗 URL追加」に自動フォールバック。ビルドは [`migemomedia-app-build.yml`](.github/workflows/migemomedia-app-build.yml)([`bada_gui_ide/migemomedia-app/`](bada_gui_ide/migemomedia-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
+**MadoKey 窓使いのキー**(Word/Excel/LibreOffice のキーバインド)もネイティブ アプリを用意しています。**デスクトップ版(Windows/Ubuntu)は、エディタで編集したキーバインドを本物のグローバル ホットキーとして登録**し、前面の Word/Excel/LibreOffice に**ルビ・合計・コピー・独自バインド**を実際に送り込みます(Python 常駐なしで動作)。Android は他アプリのキーを奪えないため設定エディタのみ:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `madokey-debug.apk`(設定エディタ・`.mayu`/`.ahk` 書き出し) |
+| **Windows 10 / 11** | `MadoKey-*-x64.exe`(キーバインド常駐 / SendKeys・COM ExecuteMso) |
+| **Ubuntu** | `MadoKey-*-x86_64.AppImage` / `MadoKey-*-amd64.deb`(キーバインド常駐 / xdotool・UNO) |
+
+Ubuntu ではキー送出に `xdotool`(X11 推奨)、`uno`/`sum(Calc)`/`ruby(Writer)` に `python3-uno` を利用します。ビルドは [`madokey-app-build.yml`](.github/workflows/madokey-app-build.yml)([`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの

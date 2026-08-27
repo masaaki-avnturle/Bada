@@ -77,9 +77,39 @@ bind <修飾>+<キー> [@対象] = <アクション> [引数]
   `mso` は Word/Excel の COM `CommandBars.ExecuteMso`、`uno`/`sum(Calc)`/
   `ruby(Writer)` は起動中 LibreOffice への UNO dispatch。
 
+## ネイティブ アプリ（APK / Windows 10-11 / Ubuntu）
+
+設定エディタを各プラットフォームのネイティブ アプリとしても配布します。
+**デスクトップ版（Windows / Ubuntu）は、エディタで編集したキーバインドを
+Electron の globalShortcut で「本物のグローバル ホットキー」として登録**し、
+前面の Word / Excel / LibreOffice に実際にルビ・合計・コピー等を送り込みます
+（Python の常駐なしで動作）。
+
+| プラットフォーム | ファイル | 動作 |
+|---|---|---|
+| **Windows 10 / 11** | `MadoKey-*-x64.exe` | キーバインド常駐 + 設定エディタ（SendKeys / COM ExecuteMso） |
+| **Ubuntu** | `MadoKey-*-x86_64.AppImage` / `*-amd64.deb` | キーバインド常駐 + 設定エディタ（xdotool / UNO。X11 推奨） |
+| **Android** | `madokey-debug.apk` | 設定エディタのみ（Android は他アプリのキーを奪えないため） |
+
+- 実行に必要な外部ツール:
+  - **Ubuntu**: キー送出に `xdotool`（`sudo apt install xdotool`。Wayland は制限あり）。
+    `uno`/`sum(Calc)`/`ruby(Writer)` は `python3-uno` +
+    `soffice --accept="socket,host=localhost,port=2002;urp;"` 起動時に有効。
+  - **Windows**: 追加不要（PowerShell の SendKeys / COM を使用）。
+- ビルドは [`madokey-app-build.yml`](../../.github/workflows/madokey-app-build.yml)。
+  ブランチ/`main` への push で自動ビルドされ、Actions の Artifacts から取得できます。
+  `madokey-v*` タグ / `workflow_dispatch` で Release に添付。
+
+```sh
+node bada_gui_ide/tools/build-madokey.js
+cd bada_gui_ide/madokey-app/electron && npm install && npm start
+npm run dist         # Windows EXE
+npm run dist:linux   # Ubuntu AppImage / deb
+```
+
 ## 入手
 
 設定エディタ `dist/madokey.html` は
-[`apps-dist.yml`](../../.github/workflows/apps-dist.yml) のバンドルに含まれ、
+[`apps-dist.yml`](../../.github/workflows/apps-dist.yml) のバンドルにも含まれ、
 Actions の Artifacts から取得できます。常駐本体（`madokey.py` / `madokey.mayu` /
 `requirements.txt`）はこのフォルダをそのままダウンロードしてください。
