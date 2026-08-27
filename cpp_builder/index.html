@@ -25,8 +25,9 @@
 html,body{width:100%;height:100%;overflow:hidden}
 body{
   font-family:Tahoma,'MS Sans Serif','Yu Gothic UI',Meiryo,sans-serif;
-  font-size:11px;background:#008080;color:#000;
+  font-size:11px;background:#008080;color:#000;touch-action:manipulation;
 }
+.titlebar,.formclient,.grip{touch-action:none}
 /* ---------- Win98 3D primitives ---------- */
 .raised{background:#c0c0c0;border:1px solid;border-color:#dfdfdf #000 #000 #dfdfdf;
   box-shadow:inset 1px 1px 0 #fff, inset -1px -1px 0 #808080}
@@ -387,12 +388,12 @@ function makeWindow(w){
   w.addEventListener('mousedown', ()=>activateWin(w));
   const tb = w.querySelector('.titlebar');
   if (!tb) return;
-  tb.addEventListener('mousedown', e=>{
+  tb.addEventListener('pointerdown', e=>{
     if (e.target.classList.contains('tb-btn')) return;
     const sx=e.clientX, sy=e.clientY, ox=w.offsetLeft, oy=w.offsetTop;
     const mv = ev=>{ w.style.left=(ox+ev.clientX-sx)+'px'; w.style.top=Math.max(90,oy+ev.clientY-sy)+'px'; };
-    const up = ()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); };
-    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+    const up = ()=>{ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); };
+    document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
     e.preventDefault();
   });
 }
@@ -622,7 +623,7 @@ function drawGrips(){
     g.className='grip'; g.dataset.dir=dir;
     g.style.left=(x+gx-2)+'px'; g.style.top=(y+gy-2)+'px';
     g.style.cursor=dir+'-resize';
-    g.addEventListener('mousedown', e=>startResize(e,c,dir));
+    g.addEventListener('pointerdown', e=>startResize(e,c,dir));
     fc.appendChild(g);
   });
 }
@@ -647,12 +648,12 @@ function startResize(e, c, dir){
     d.style.left=L+'px'; d.style.top=T+'px'; d.style.width=W+'px'; d.style.height=H+'px';
     drawGrips();
   };
-  const up = ()=>{ document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up); touch(); };
-  document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  const up = ()=>{ document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up); touch(); };
+  document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
 }
 function designerEvents(){
   const fc = $('#formclient');
-  fc.addEventListener('mousedown', e=>{
+  fc.addEventListener('pointerdown', e=>{
     activateWin($('#formwin'));
     const t = e.target.closest('.dcomp');
     if (pendingType){
@@ -676,10 +677,10 @@ function designerEvents(){
         drawGrips();
       };
       const up = ()=>{
-        document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+        document.removeEventListener('pointermove',mv); document.removeEventListener('pointerup',up);
         if (moved) touch(); else renderInspector();
       };
-      document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+      document.addEventListener('pointermove',mv); document.addEventListener('pointerup',up);
       e.preventDefault();
     } else {
       selectObj('Form1');

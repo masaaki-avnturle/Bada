@@ -85,7 +85,17 @@
 - **コード自動生成** — VCL 風の `Unit1.cpp` / `Unit1.h` / `Unit1.dfm` を常時生成、ハンドラ本体は編集可能
 - **F9 で実行** — 内蔵の C++ サブセット・ミニインタープリタ (`if/while/for`、`Label1->Caption`、`Memo1->Lines->Add`、`ShowMessage`、`IntToStr`、`TTimer` など) が設計したフォームを実際に動かします
 
-詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-cppbuilder-debug.apk` |
+| **Windows 10 / 11** | `BadaCppBuilder-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
+
+ビルドは [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) が実行します(`cppbuilder-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
 
 ---
 

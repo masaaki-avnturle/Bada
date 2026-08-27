@@ -13,6 +13,24 @@
 - ローカル: [`index.html`](index.html) をダウンロードしてダブルクリック
   (GitHub のファイル表示画面右上の「Download raw file」⬇ で保存できます)
 
+### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から(またはビルド実行時の Actions アーティファクトから):
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-cppbuilder-debug.apk` |
+| **Windows 10 / 11** | `BadaCppBuilder-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
+
+ビルドは [`cppbuilder-app-build.yml`](../.github/workflows/cppbuilder-app-build.yml) が実行します
+(`cppbuilder-v*` タグを push すると Release へ添付 / Actions の `workflow_dispatch` から手動実行すると
+アーティファクトとしてダウンロード可能。`release_tag` 入力を指定すればそのタグの Release にも添付されます)。
+デスクトップ版は Electron ラッパー ([`app/electron/`](app/electron/))、Android 版は Cordova
+([`app/cordova/`](app/cordova/)) で、いずれも中身は同じ自己完結 `index.html` です。
+デザイナのドラッグ操作はポインターイベント対応なのでタッチ画面でも動作します。
+
 ## 🖥️ 画面構成 — 本家そのままの 4 点セット
 
 | ウィンドウ | 内容 |
