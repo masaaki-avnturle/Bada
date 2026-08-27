@@ -1,0 +1,2776 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BadaVM Pro — 量子ハイパーバイザ (BadaBSD + BadaX Server)</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:#1e1f22; --panel:#2b2d30; --panel2:#26282b; --line:#3c3f43;
+    --ink:#d6d9de; --dim:#8b919a; --accent:#3d9bd8; --accent2:#63b3e4;
+    --green:#4caf6e; --red:#d0574a; --gold:#c8a44a;
+    --term-bg:#0a0c0e; --term-ink:#cfe8cf;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+         font-family: system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+         font-size:13px; }
+  button { font-family:inherit; }
+
+  /* ===== application chrome ===== */
+  #menubar { display:flex; align-items:center; gap:2px; background:#202124;
+             border-bottom:1px solid var(--line); padding:4px 8px; user-select:none; }
+  #menubar .logo { font-weight:700; color:var(--accent2); margin-right:10px; }
+  #menubar .logo small { color:var(--dim); font-weight:400; }
+  #menubar .m { padding:3px 9px; border-radius:4px; color:var(--ink); cursor:default; }
+  #menubar .m:hover { background:#33363a; }
+  #toolbar { display:flex; align-items:center; gap:6px; background:var(--panel);
+             border-bottom:1px solid var(--line); padding:6px 10px; user-select:none; }
+  .tbtn { display:flex; align-items:center; gap:6px; background:#34373b; color:var(--ink);
+          border:1px solid #44484d; border-radius:5px; padding:5px 11px; cursor:pointer; font-size:12.5px; }
+  .tbtn:hover:not(:disabled) { background:#3d4147; border-color:var(--accent); }
+  .tbtn:disabled { opacity:.38; cursor:default; }
+  .tbtn.pow { color:#8fe3ae; }
+  .tbtn.stop { color:#f2a49b; }
+  .tsep { width:1px; height:22px; background:var(--line); margin:0 4px; }
+
+  #frame { display:grid; grid-template-columns:230px 1fr; height:calc(100% - 92px); }
+
+  /* ===== library sidebar ===== */
+  #library { background:var(--panel2); border-right:1px solid var(--line); padding:10px; overflow:auto; }
+  #library h3 { margin:2px 0 8px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+  .vmitem { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; cursor:pointer; }
+  .vmitem:hover { background:#31343a; }
+  .vmitem.sel { background:#2f4256; outline:1px solid #3d5a75; }
+  .vmdot { width:9px; height:9px; border-radius:50%; background:#5a5f66; }
+  .vmdot.on { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .vmname b { font-size:12.5px; }
+  .vmname small { display:block; color:var(--dim); }
+  #libinfo { margin-top:14px; border-top:1px dashed var(--line); padding-top:10px;
+             font-size:11.5px; color:var(--dim); line-height:1.7; }
+  #libinfo b { color:var(--ink); }
+
+  /* ===== tabs + main ===== */
+  #main { display:flex; flex-direction:column; min-width:0; }
+  #tabs { display:flex; gap:2px; background:#232528; border-bottom:1px solid var(--line); padding:4px 8px 0; }
+  .tab { padding:6px 16px; border:1px solid var(--line); border-bottom:none;
+         border-radius:6px 6px 0 0; background:#2a2c2f; color:var(--dim); cursor:pointer; }
+  .tab.sel { background:var(--bg); color:var(--ink); border-color:#484c51; }
+  #content { flex:1; position:relative; overflow:hidden; }
+
+  /* ---- home tab ---- */
+  #home { position:absolute; inset:0; overflow:auto; padding:34px 40px; }
+  #home h1 { margin:0 0 4px; font-size:24px; }
+  #home h1 span { color:var(--accent2); }
+  #home .sub { color:var(--dim); margin-bottom:22px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; max-width:1000px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card h3 { margin:0 0 6px; font-size:14px; color:var(--accent2); }
+  .card p { margin:0; color:var(--dim); line-height:1.65; font-size:12.5px; }
+  .card .go { margin-top:12px; }
+
+  /* ---- vm tab ---- */
+  #vmtab { position:absolute; inset:0; display:none; grid-template-rows:1fr auto; }
+  #screenwrap { position:relative; margin:14px; border:1px solid #000; border-radius:6px;
+                background:var(--term-bg); overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.5); }
+  #term { position:absolute; inset:0; padding:10px 12px 26px; overflow-y:auto; cursor:text;
+          font:12.5px/1.42 "Cascadia Mono","SFMono-Regular",Consolas,"BIZ UDGothic",monospace;
+          color:var(--term-ink); white-space:pre-wrap; word-break:break-all; }
+  #term .in { color:#ffffff; }
+  #cursor { display:inline-block; width:7px; height:13px; background:var(--term-ink);
+            vertical-align:-2px; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #offscreen { position:absolute; inset:0; display:flex; flex-direction:column; gap:14px;
+               align-items:center; justify-content:center; background:
+               radial-gradient(ellipse at 50% 40%, #14161a 0%, #0a0c0e 70%); }
+  #offscreen .big { font-size:15px; color:var(--dim); }
+  #poweron { font-size:15px; padding:10px 22px; }
+  #devices { display:flex; flex-wrap:wrap; gap:8px 18px; padding:8px 16px 12px; color:var(--dim);
+             font-size:12px; border-top:1px solid var(--line); background:var(--panel2); }
+  #devices span b { color:var(--ink); font-weight:500; }
+
+  /* ===== status bar ===== */
+  #status { display:flex; align-items:center; gap:16px; background:#202124; border-top:1px solid var(--line);
+            padding:4px 12px; font-size:11.5px; color:var(--dim); user-select:none; }
+  #status .ok { color:#8fe3ae; }
+  #status .led { margin-left:auto; }
+
+  /* ===== BadaX Server window (ASTEC-X style companion app) ===== */
+  #xapp { position:absolute; width:640px; height:480px; left:calc(50% - 100px); top:70px;
+          display:none; flex-direction:column; background:#e8e8e8; color:#111;
+          border:1px solid #666; border-radius:8px 8px 6px 6px; box-shadow:0 10px 40px rgba(0,0,0,.65);
+          z-index:40; min-width:380px; min-height:260px; resize:both; overflow:hidden; }
+  #xtitle { display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#3d6ea5,#2d5182);
+            color:#fff; padding:5px 10px; border-radius:7px 7px 0 0; cursor:move; user-select:none; }
+  #xtitle .xlogo { font-weight:800; font-family:serif; font-size:15px; }
+  #xtitle small { opacity:.85; }
+  #xtitle .win-x { margin-left:auto; border:0; background:#c0392b; color:#fff; width:22px; height:18px;
+                   border-radius:3px; cursor:pointer; line-height:1; }
+  #xmenu { display:flex; gap:2px; background:#f2f2f2; border-bottom:1px solid #c9c9c9; padding:2px 6px;
+           font-size:12px; user-select:none; }
+  #xmenu span { padding:2px 8px; border-radius:3px; }
+  #xmenu span:hover { background:#dfe7f2; }
+  #xroot { position:relative; flex:1; overflow:hidden;
+           background:#7d8890;
+           background-image:
+             linear-gradient(45deg, #747f87 25%, transparent 25%, transparent 75%, #747f87 75%),
+             linear-gradient(45deg, #747f87 25%, transparent 25%, transparent 75%, #747f87 75%);
+           background-size:4px 4px; background-position:0 0, 2px 2px; }
+  #xempty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+            color:#e9edf1; text-shadow:0 1px 2px rgba(0,0,0,.4); font-size:12.5px; text-align:center; }
+  #xstatus { display:flex; gap:14px; background:#f2f2f2; border-top:1px solid #c9c9c9;
+             padding:3px 8px; font-size:11px; color:#333; }
+  #xstatus .auth { color:#1d7a3d; }
+
+  .xwin { position:absolute; background:#d6d6d6; border:2px solid #4a5b6b;
+          box-shadow:2px 3px 10px rgba(0,0,0,.45); display:flex; flex-direction:column; }
+  .xwin .tbar { display:flex; align-items:center; background:#5f9ea0; color:#0b2a2b;
+                font:11px "Cascadia Mono",Consolas,monospace; padding:2px 4px; cursor:move; user-select:none;
+                border-bottom:2px solid #4a5b6b; }
+  .xwin .tbar .t { flex:1; overflow:hidden; white-space:nowrap; }
+  .xwin .tbar button { border:1px solid #33565c; background:#cfe5e4; width:14px; height:13px;
+                       font-size:9px; line-height:1; cursor:pointer; padding:0; margin-left:3px; }
+  .xwin .body { flex:1; background:#efefef; overflow:hidden; position:relative; }
+  .xwin canvas { display:block; }
+  .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
+                       color:#d8f3d8; background:#101210; height:100%; overflow:auto; }
+
+  /* ===== dialogs ===== */
+  .dlg { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+         background:rgba(0,0,0,.55); z-index:60; }
+  .dlgbox { width:min(680px, 92%); max-height:82%; overflow:auto; background:var(--panel);
+            border:1px solid var(--line); border-radius:10px; padding:18px 20px; }
+  .dlgbox h2 { margin:0 0 10px; font-size:16px; }
+  .dlgbox table { width:100%; border-collapse:collapse; font-size:12px;
+                  font-family:"Cascadia Mono",Consolas,monospace; }
+  .dlgbox td { padding:4px 8px; border-bottom:1px solid #34373b; vertical-align:top; }
+  .dlgbox td.k { color:var(--gold); white-space:nowrap; }
+  .dlgbox .close { margin-top:14px; }
+  .note { color:var(--dim); font-size:11.5px; margin-top:10px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div id="menubar">
+  <span class="logo">Ω BadaVM <span style="color:var(--gold)">Pro</span>
+    <small>— 量子ハイパーバイザ (Bada言語製 / VMware Workstation Pro 風オマージュ)</small></span>
+  <span class="m">ファイル</span><span class="m">編集</span><span class="m">表示</span>
+  <span class="m" id="menu-vm">VM</span><span class="m" id="menu-x">BadaX</span><span class="m" id="menu-help">ヘルプ</span>
+</div>
+
+<div id="toolbar">
+  <button class="tbtn pow"  id="bt-on"   title="仮想マシンをパワーオン">▶ 起動</button>
+  <button class="tbtn stop" id="bt-off"  title="仮想マシンの電源を切る" disabled>⏻ 電源オフ</button>
+  <button class="tbtn"      id="bt-reset" title="リセット" disabled>⟲ リセット</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-snap"    title="現在のイベント台帳をスナップショット">📷 スナップショット</button>
+  <button class="tbtn" id="bt-restore" title="スナップショットへ復元" disabled>⤺ 復元</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-settings" title="仮想マシン設定 (.qvmx)">⚙ 設定</button>
+  <button class="tbtn" id="bt-x"        title="BadaX Server ウィンドウの表示/非表示">🖥 BadaX Server</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-wipe" title="仮想ディスクを消去して工場出荷状態に戻す">🗑 ディスク消去</button>
+</div>
+
+<div id="frame">
+  <nav id="library">
+    <h3>ライブラリ</h3>
+    <div style="color:var(--dim); padding:2px 6px 6px;">▾ 自分の PC</div>
+    <div class="vmitem sel" id="vmentry">
+      <span class="vmdot" id="vmdot"></span>
+      <span class="vmname"><b>BadaBSD 11.0 (量子)</b><small>NetBSD 風ゲスト OS · Bada言語製</small></span>
+    </div>
+    <div id="libinfo">
+      <b>構成 3 点セット (全て Bada 言語)</b><br/>
+      ① BadaVM Pro — ハイパーバイザ<br/>
+      ② BadaBSD — NetBSD 風ゲスト OS<br/>
+      ③ BadaX Server — Windows ホスト側<br/>
+      &nbsp;&nbsp;&nbsp;ASTEC-X 風 X サーバー<br/><br/>
+      マシン状態は追記専用イベント台帳<br/>(Akashic machine tape) の決定論的<br/>リプレイ。スナップショット = 台帳の<br/>プレフィックスです。
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="tabs">
+      <div class="tab" id="tab-home">🏠 ホーム</div>
+      <div class="tab sel" id="tab-vm">BadaBSD 11.0 (量子)</div>
+    </div>
+    <div id="content">
+
+      <section id="home" style="display:none">
+        <h1>BadaVM <span>Pro</span></h1>
+        <div class="sub">量子プログラミング言語 Bada で書かれたデスクトップ・ハイパーバイザ(教育目的の
+          VMware Workstation Pro 風オマージュ)。ゲスト OS も X サーバーも、すべて Bada 言語です。</div>
+        <div class="cards">
+          <div class="card">
+            <h3>① BadaVM Pro ハイパーバイザ</h3>
+            <p>量子 vCPU (8 qubit / Hilbert 次元 256)、tuplespace メモリ、仮想ディスク wd0、
+               NAT ネットワーク、CD-ROM。マシン記述は .qvmx。スナップショットはイベント台帳の
+               プレフィックスとしてコミットされます。<span style="color:var(--gold)">bada/vmpro.bada</span></p>
+            <div class="go"><button class="tbtn pow" id="home-poweron">▶ BadaBSD をパワーオン</button></div>
+          </div>
+          <div class="card">
+            <h3>② BadaBSD 11.0 — NetBSD 風 OS</h3>
+            <p>CD イメージから起動し、sysinst 風フルスクリーン・インストーラで仮想ディスクへ
+               インストール (disklabel → newfs FFSv2 → セット展開 → root パスワード → DHCP)。
+               ブートローダ・dmesg・/etc/rc・ログイン・シェルまで完備。
+               <span style="color:var(--gold)">bada/badabsd.bada</span></p>
+          </div>
+          <div class="card">
+            <h3>③ BadaX Server — Windows 用 X サーバー</h3>
+            <p>ASTEC-X 風の外部 X サーバー (ホスト側アプリ)。VM の中の xclock / xeyes / xterm が
+               NAT 越しに DISPLAY=10.0.2.2:0 へ接続し、Windows 側に表示されます。認証は
+               MIT-MAGIC-COOKIE-1 ならぬ <b>JONES-KNOT-COOKIE-1</b> (三葉結び目の Jones 多項式鍵)
+               + Bell 対 QKD。<span style="color:var(--gold)">bada/badax.bada</span></p>
+          </div>
+        </div>
+        <div class="note">※ 本アプリは単一 HTML に Bada 言語コア (bada.js) と 3 本の .bada ソースを
+          同梱した自己完結アプリです。VMware・NetBSD・ASTEC-X とは無関係の、名称をもじった教育目的の
+          オマージュです。ゲストの全状態はローカルの localStorage にのみ保存されます。</div>
+      </section>
+
+      <section id="vmtab">
+        <div id="screenwrap">
+          <div id="term" tabindex="0"></div>
+          <div id="offscreen">
+            <div class="big">この仮想マシンはパワーオフの状態です</div>
+            <button class="tbtn pow" id="poweron">▶ この仮想マシンをパワーオンする</button>
+            <div style="color:#57606a;font-size:11.5px">初回起動時は BadaBSD-11.0-amd64-quantum.iso から
+              sysinst インストーラが立ち上がります</div>
+          </div>
+        </div>
+        <div id="devices">
+          <span>💾 <b>メモリ</b> 4096 MB (tuplespace)</span>
+          <span>⚛ <b>プロセッサ</b> 2 (量子 8 qubit)</span>
+          <span>🖴 <b>ハードディスク (SCSI)</b> 20 GB .qvmdk</span>
+          <span>💿 <b>CD/DVD</b> BadaBSD-11.0-amd64-quantum.iso</span>
+          <span>🌐 <b>ネットワーク</b> NAT (10.0.2.0/24)</span>
+          <span>🖥 <b>ディスプレイ</b> BadaX Server 10.0.2.2:0</span>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="status">
+  <span id="st-power">電源: オフ</span>
+  <span id="st-ledger">台帳: 0 イベント</span>
+  <span id="st-qkd">QKD: —</span>
+  <span id="st-x">BadaX: 未接続</span>
+  <span class="led" id="st-note">Bada 言語コア搭載 — すべてのキー入力が Bada プログラムとして実行されます</span>
+</div>
+
+<!-- ===== BadaX Server: the ASTEC-X style X server on the Windows host ===== -->
+<div id="xapp">
+  <div id="xtitle">
+    <span class="xlogo">X</span><b>BadaX Server</b>
+    <small>— :0.0 · ASTEC-X 風 (Bada言語製)</small>
+    <button class="win-x" id="x-close" title="閉じる (サーバーは動作し続けます)">×</button>
+  </div>
+  <div id="xmenu"><span>ファイル</span><span>表示</span><span id="xmenu-info">情報</span><span>ヘルプ</span></div>
+  <div id="xroot">
+    <div id="xempty">X クライアント待機中…<br/>
+      <small>BadaBSD 側で&nbsp; <code>xclock &amp;</code> / <code>xeyes &amp;</code> /
+      <code>xterm &amp;</code> &nbsp;を実行してください</small></div>
+  </div>
+  <div id="xstatus">
+    <span id="xs-disp">display 10.0.2.2:0.0</span>
+    <span class="auth" id="xs-auth">JONES-KNOT-COOKIE-1: 待機</span>
+    <span id="xs-clients">clients: 0</span>
+    <span id="xs-qkd">QKD: —</span>
+  </div>
+</div>
+
+<!-- ===== settings dialog (.qvmx) ===== -->
+<div class="dlg" id="dlg-settings">
+  <div class="dlgbox">
+    <h2>⚙ 仮想マシン設定 — BadaBSD 11.0 (量子).qvmx</h2>
+    <table id="vmxtable"></table>
+    <div class="note">この設定は Bada の <code>vmx_emit()</code> がいま生成した実物です。</div>
+    <button class="tbtn close" id="dlg-settings-close">閉じる</button>
+  </div>
+</div>
+
+<!-- ===== help dialog ===== -->
+<div class="dlg" id="dlg-help">
+  <div class="dlgbox">
+    <h2>ヘルプ — 最短ツアー</h2>
+    <div style="line-height:1.9">
+      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動します。<br/>
+      &nbsp;&nbsp;&nbsp;メニューは表示されたキー (a, b, j, x…) を 1 文字押すだけ。<b>a → a → a → a → a</b>
+      と進むとインストールが走ります。<br/>
+      2. root パスワードとホスト名を入力 → 任意のキーで<b>ディスクから再起動</b>。<br/>
+      3. <b>login: root</b> + 設定したパスワードでログイン。<br/>
+      4. <code>help</code> でコマンド一覧。<code>xclock &amp;</code> <code>xeyes &amp;</code>
+         <code>xterm &amp;</code> を打つと <b>BadaX Server</b> (ASTEC-X 風ウィンドウ) に表示されます。<br/>
+      5. <code>qstat</code> で Bell 対の零保存、<code>xdpyinfo</code> で JONES-KNOT-COOKIE-1 を確認。<br/>
+      6. 📷 スナップショット = イベント台帳のプレフィックス。⤺ 復元 でその時点に巻き戻ります。
+    </div>
+    <button class="tbtn close" id="dlg-help-close">閉じる</button>
+  </div>
+</div>
+
+<script>
+/* ==== Bada language core (inlined) ==== */
+/* ============================================================================
+ * bada.js — The Bada language (Unknown-Prior Engine language), JavaScript port.
+ *
+ * A faithful port of the C reference (lexer.c / parser.c / interp.c /
+ * transpile.c) so the same Bada programs run in the browser (APK / EXE /
+ * Ubuntu app) with the documented numerics:
+ *   (i)  zero preservation  — confident zeros survive the phase step
+ *   (ii) |psi|^2 == a       — the unit-modulus phase only reweights
+ *
+ * Additions over the C reference, per the paper "Reviser-Extensible Grammars:
+ * a Q#-targeted quantum front end for the Unknown-Prior Engine":
+ *   - @reviser : grammar { rule ... } — grammar-extension transactions whose
+ *     production rules are committed to a rule ledger consulted by the parser
+ *     (extension points: stmt / expr / postfix; latest-highest priority;
+ *     program-order scope).
+ *   - A Q#-style quantum sublanguage on the phase core: qubit, H, X, S, T,
+ *     Rz, CNOT, Measure — gates are phase/permutation steps, measurement is
+ *     an append-only ledger commit.
+ *   - Omega::Quantum inference library: prepare_unknown, observe, estimate,
+ *     forbidden (append-only measurement record, max-entropy start).
+ *   - Generic string primitives (split / substr / str_find / ord / chr) so
+ *     the zone:// URL scheme of the ultra-network WWW (examples/zone.bada)
+ *     can be written entirely in Bada itself: the runtime supplies only
+ *     character-level access, the parser, DHT and quantum guard are Bada.
+ *
+ * Exports (UMD): BadaLang.run / tokens / ast / emitC / VERSION
+ * ==========================================================================*/
+(function (root, factory) {
+  if (typeof module === "object" && module.exports) module.exports = factory();
+  else root.BadaLang = factory();
+})(typeof self !== "undefined" ? self : this, function () {
+  "use strict";
+
+  var VERSION = "1.2.0";
+
+  /* ------------------------------------------------------------------ *
+   * Tokens
+   * ------------------------------------------------------------------ */
+  var KEYWORDS = {
+    Omega: "OMEGA", DATABASE: "DATABASE", tuplespace: "TUPLESPACE",
+    TupleSpace: "TUPLESPACE", asperal: "ASPERAL", struct: "STRUCT",
+    def: "DEF", typedef: "TYPEDEF", "return": "RETURN", "if": "IF",
+    "else": "ELSE", "while": "WHILE", "for": "FOR", "in": "IN",
+    "static": "STATIC", dynamic: "DYNAMIC", refine: "REFINE", star: "STAR",
+    "true": "TRUE", "false": "FALSE", nil: "NIL", let: "LET",
+    print: "PRINT", each: "EACH"
+  };
+
+  function isDigit(c) { return c >= "0" && c <= "9"; }
+  function isAlpha(c) { return /[A-Za-z_]/.test(c); }
+  function isAlnum(c) { return /[A-Za-z0-9_]/.test(c); }
+
+  function tokenize(src) {
+    var toks = [], pos = 0, line = 1, n = src.length;
+    function peek() { return pos < n ? src[pos] : "\0"; }
+    function peek2() { return pos + 1 < n ? src[pos + 1] : "\0"; }
+    function adv() { var c = src[pos++]; if (c === "\n") line++; return c; }
+    function mk(type, lexeme, num) {
+      return { type: type, lexeme: lexeme, num: num || 0, line: line };
+    }
+    for (;;) {
+      /* skip whitespace + comments (#, //) */
+      for (;;) {
+        var c0 = peek();
+        if (c0 === " " || c0 === "\t" || c0 === "\r" || c0 === "\n") { adv(); }
+        else if (c0 === "#") { while (pos < n && peek() !== "\n") adv(); }
+        else if (c0 === "/" && peek2() === "/") { while (pos < n && peek() !== "\n") adv(); }
+        else break;
+      }
+      var startLine = line;
+      var c = peek();
+      if (pos >= n) { toks.push({ type: "EOF", lexeme: "<eof>", num: 0, line: line }); break; }
+
+      /* numbers */
+      if (isDigit(c)) {
+        var s = pos;
+        while (isDigit(peek())) adv();
+        var isf = false;
+        if (peek() === "." && isDigit(peek2())) { isf = true; adv(); while (isDigit(peek())) adv(); }
+        if (peek() === "e" || peek() === "E") { isf = true; adv(); if (peek() === "+" || peek() === "-") adv(); while (isDigit(peek())) adv(); }
+        var text = src.slice(s, pos);
+        toks.push({ type: isf ? "FLOAT" : "INT", lexeme: text, num: parseFloat(text), line: startLine });
+        continue;
+      }
+      /* identifiers / keywords: allow @ prefix and trailing ? / ! */
+      if (isAlpha(c) || c === "@") {
+        var s2 = pos;
+        if (c === "@") adv();
+        while (isAlnum(peek())) adv();
+        if (peek() === "?" || peek() === "!") adv();
+        var buf = src.slice(s2, pos);
+        if (buf[0] === "@") {
+          if (buf === "@reviser") { toks.push({ type: "REVISER", lexeme: buf, num: 0, line: startLine }); continue; }
+          toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        if (buf === "do") { toks.push({ type: "IDENT", lexeme: "do", num: 0, line: startLine }); continue; }
+        if (Object.prototype.hasOwnProperty.call(KEYWORDS, buf)) {
+          toks.push({ type: KEYWORDS[buf], lexeme: buf, num: 0, line: startLine });
+          continue;
+        }
+        toks.push({ type: "IDENT", lexeme: buf, num: 0, line: startLine });
+        continue;
+      }
+      /* strings — double quoted, and single quoted (used by rule patterns).
+         """triple-quoted""" strings are raw multi-line blocks (no escape
+         processing) for embedding foreign extension code (@reviser :
+         extension) without fighting quotes. */
+      if (c === '"' && peek2() === '"' && pos + 2 < n && src[pos + 2] === '"') {
+        adv(); adv(); adv();
+        var rawStart = pos;
+        while (pos < n && !(src[pos] === '"' && src[pos + 1] === '"' && src[pos + 2] === '"')) adv();
+        var raw = src.slice(rawStart, pos);
+        if (pos < n) { adv(); adv(); adv(); }
+        toks.push({ type: "STRING", lexeme: raw, num: 0, line: startLine });
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        var quote = c;
+        adv();
+        var out = "";
+        while (pos < n && peek() !== quote) {
+          var ch = adv();
+          if (ch === "\\") {
+            var e = adv();
+            out += e === "n" ? "\n" : e === "t" ? "\t" : e === '"' ? '"' : e === "'" ? "'" : e === "\\" ? "\\" : e;
+          } else out += ch;
+        }
+        if (peek() === quote) adv();
+        toks.push({ type: "STRING", lexeme: out, num: 0, line: startLine });
+        continue;
+      }
+
+      adv(); /* consume c */
+      switch (c) {
+        case "(": toks.push(mk("LPAREN", "(")); continue;
+        case ")": toks.push(mk("RPAREN", ")")); continue;
+        case "{": toks.push(mk("LBRACE", "{")); continue;
+        case "}": toks.push(mk("RBRACE", "}")); continue;
+        case "[": toks.push(mk("LBRACK", "[")); continue;
+        case "]": toks.push(mk("RBRACK", "]")); continue;
+        case ",": toks.push(mk("COMMA", ",")); continue;
+        case ".": toks.push(mk("DOT", ".")); continue;
+        case "|": toks.push(mk("PIPE", "|")); continue;
+        case "~": toks.push(mk("CONSIST", "~")); continue;
+        case "+": toks.push(mk("PLUS", "+")); continue;
+        case "*": toks.push(mk("STAR_OP", "*")); continue;
+        case "/": toks.push(mk("SLASH", "/")); continue;
+        case "%": toks.push(mk("PERCENT", "%")); continue;
+        case ";": toks.push(mk("SEMI", ";")); continue;
+        case "-":
+          if (peek() === ">") { adv(); toks.push(mk("QUERY", "->")); continue; }
+          toks.push(mk("MINUS", "-")); continue;
+        case "<":
+          if (peek() === "-") { adv(); toks.push(mk("LARROW", "<-")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("LE", "<=")); continue; }
+          toks.push(mk("LT", "<")); continue;
+        case ">":
+          if (peek() === ">") { adv(); toks.push(mk("COMMIT", ">>")); continue; }
+          if (peek() === "=") { adv(); toks.push(mk("GE", ">=")); continue; }
+          toks.push(mk("GT", ">")); continue;
+        case "=":
+          if (peek() === "=") { adv(); toks.push(mk("EQ", "==")); continue; }
+          if (peek() === ">") { adv(); toks.push(mk("ARROW", "=>")); continue; }
+          toks.push(mk("ASSIGN", "=")); continue;
+        case "!":
+          if (peek() === "=") { adv(); toks.push(mk("NE", "!=")); continue; }
+          toks.push(mk("NOT", "!")); continue;
+        case "&":
+          if (peek() === "&") { adv(); toks.push(mk("AND", "&&")); continue; }
+          toks.push(mk("AND", "&")); continue;
+        case ":":
+          if (peek() === "=") {
+            adv();
+            if (peek() === ">") { adv(); toks.push(mk("DEFARROW", ":=>")); continue; }
+            toks.push(mk("WALRUS", ":=")); continue;
+          }
+          if (peek() === ":") { adv(); toks.push(mk("SCOPE", "::")); continue; }
+          toks.push(mk("COLON", ":")); continue;
+      }
+      toks.push(mk("ERROR", c));
+    }
+    return toks;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST
+   * ------------------------------------------------------------------ */
+  function node(type, line) {
+    return { type: type, line: line, num: 0, str: null, boolean: false, kids: [], params: [], body: null };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Parser (recursive descent, + rule-ledger extension points)
+   * ------------------------------------------------------------------ */
+  function Parser(toks) {
+    this.toks = toks;
+    this.i = 0;
+    this.errors = [];
+    /* the parse-time rule ledger (grammar facts committed by @reviser :
+       grammar transactions; consulted latest-first; program-order scope) */
+    this.ruleLedger = [];
+  }
+  Parser.prototype.cur = function () { return this.toks[this.i]; };
+  Parser.prototype.peekn = function (k) { var j = this.i + k; if (j >= this.toks.length) j = this.toks.length - 1; return this.toks[j]; };
+  Parser.prototype.check = function (t) { return this.cur().type === t; };
+  Parser.prototype.advance = function () { var t = this.cur(); if (this.i < this.toks.length - 1) this.i++; return t; };
+  Parser.prototype.match = function (t) { if (this.check(t)) { this.advance(); return true; } return false; };
+  Parser.prototype.perr = function (msg) {
+    this.errors.push("[parse error] line " + this.cur().line + " near '" + (this.cur().lexeme || "?") + "': " + msg);
+  };
+  Parser.prototype.expect = function (t, what) { if (!this.match(t)) this.perr(what); };
+
+  Parser.prototype.parsePipeParams = function (holder) {
+    this.expect("PIPE", "expected '|'");
+    while (!this.check("PIPE") && !this.check("EOF")) {
+      if (this.check("IDENT")) { holder.params.push(this.cur().lexeme); this.advance(); }
+      else this.advance();
+      if (this.check("PIPE")) break;
+      if (this.check("COMMA")) this.advance();
+    }
+    this.expect("PIPE", "expected closing '|'");
+  };
+
+  /* ---- rule-ledger matching -------------------------------------- */
+  /* pattern atom: {kind:'tok', text} literal, {kind:'hole'} expression hole */
+  Parser.prototype.tryRules = function (heads) {
+    /* latest commit wins (highest priority), then ledger order */
+    for (var r = this.ruleLedger.length - 1; r >= 0; r--) {
+      var rule = this.ruleLedger[r];
+      if (heads.indexOf(rule.head) < 0) continue;
+      if (!rule.pattern.length || rule.pattern[0].kind !== "tok") continue; /* avoid left recursion */
+      if (this.cur().lexeme !== rule.pattern[0].text) continue;
+      var save = this.i;
+      var holes = [];
+      var ok = true;
+      for (var k = 0; k < rule.pattern.length; k++) {
+        var atom = rule.pattern[k];
+        if (atom.kind === "tok") {
+          if (this.cur().lexeme === atom.text && !this.check("EOF")) this.advance();
+          else { ok = false; break; }
+        } else { /* hole: capture a full expression */
+          holes.push(this.parseExpr());
+        }
+      }
+      if (!ok) { this.i = save; continue; }
+      var ext = node("EXTENDED", this.toks[save].line);
+      ext.str = rule.name;
+      ext.rule = rule;
+      ext.kids = holes;
+      return ext;
+    }
+    return null;
+  };
+
+  Parser.prototype.parsePrimary = function () {
+    /* extension point: rules with head 'expr' / 'postfix' before built-ins */
+    var ext = this.tryRules(["expr", "postfix"]);
+    if (ext) return ext;
+
+    var t = this.cur();
+    switch (t.type) {
+      case "INT": case "FLOAT": { var n1 = node(t.type === "INT" ? "INT" : "FLOAT", t.line); n1.num = t.num; this.advance(); return n1; }
+      case "STRING": { var n2 = node("STRING", t.line); n2.str = t.lexeme; this.advance(); return n2; }
+      case "TRUE": { var n3 = node("BOOL", t.line); n3.boolean = true; this.advance(); return n3; }
+      case "FALSE": { var n4 = node("BOOL", t.line); n4.boolean = false; this.advance(); return n4; }
+      case "NIL": { var n5 = node("NIL", t.line); this.advance(); return n5; }
+      case "STAR": { var n6 = node("IDENT", t.line); n6.str = "STAR"; this.advance(); return n6; }
+      case "LPAREN": { this.advance(); var e = this.parseExpr(); this.expect("RPAREN", "expected ')'"); return e; }
+      case "LBRACK": {
+        this.advance();
+        var a = node("ARRAY", t.line);
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          a.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RBRACK", "expected ']'");
+        return a;
+      }
+      case "PIPE": { /* lambda */
+        var lam = node("LAMBDA", t.line);
+        this.parsePipeParams(lam);
+        if (this.check("IDENT") && this.cur().lexeme === "do") {
+          this.advance();
+          var body = node("BLOCK", t.line);
+          while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+            body.kids.push(this.parseStmt());
+          if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+          lam.body = body;
+        } else {
+          lam.body = this.parseExpr();
+        }
+        return lam;
+      }
+      case "OMEGA": { var n7 = node("IDENT", t.line); n7.str = "Omega"; this.advance(); return n7; }
+      case "TUPLESPACE": { var n8 = node("IDENT", t.line); n8.str = "TupleSpace"; this.advance(); return n8; }
+      case "IDENT": { var n9 = node("IDENT", t.line); n9.str = t.lexeme; this.advance(); return n9; }
+      case "DATABASE": { var nA = node("IDENT", t.line); nA.str = "DATABASE"; this.advance(); return nA; }
+      default:
+        this.perr("expected expression");
+        this.advance();
+        return node("NIL", t.line);
+    }
+  };
+
+  Parser.prototype.parsePostfix = function () {
+    var e = this.parsePrimary();
+    for (;;) {
+      if (this.match("LPAREN")) {
+        var call = node("CALL", e.line);
+        call.kids.push(e);
+        while (!this.check("RPAREN") && !this.check("EOF")) {
+          call.kids.push(this.parseExpr());
+          if (!this.match("COMMA")) break;
+        }
+        this.expect("RPAREN", "expected ')'");
+        e = call;
+      } else if (this.match("LBRACK")) {
+        var idx = node("INDEX", e.line);
+        idx.kids.push(e);
+        if (!this.check("RBRACK")) idx.kids.push(this.parseExpr());
+        this.expect("RBRACK", "expected ']'");
+        e = idx;
+      } else if (this.match("DOT")) {
+        var m = this.cur();
+        if (this.check("EACH")) {
+          this.advance();
+          var each = node("EACH", m.line);
+          each.kids.push(e);
+          var lam = node("LAMBDA", m.line);
+          if (this.check("PIPE")) this.parsePipeParams(lam);
+          if (this.check("IDENT") && this.cur().lexeme === "do") {
+            this.advance();
+            var body = node("BLOCK", m.line);
+            while (!(this.check("IDENT") && this.cur().lexeme === "end") && !this.check("EOF"))
+              body.kids.push(this.parseStmt());
+            if (this.check("IDENT") && this.cur().lexeme === "end") this.advance();
+            lam.body = body;
+          } else {
+            lam.body = this.parseExpr();
+          }
+          each.kids.push(lam);
+          e = each;
+        } else {
+          var name = m.lexeme;
+          this.advance();
+          if (this.match("LPAREN")) {
+            var call2 = node("CALL", m.line);
+            var meth = node("GET", m.line);
+            meth.str = name;
+            meth.kids.push(e);
+            call2.kids.push(meth);
+            while (!this.check("RPAREN") && !this.check("EOF")) {
+              call2.kids.push(this.parseExpr());
+              if (!this.match("COMMA")) break;
+            }
+            this.expect("RPAREN", "expected ')'");
+            e = call2;
+          } else {
+            var get = node("GET", m.line);
+            get.str = name;
+            get.kids.push(e);
+            e = get;
+          }
+        }
+      } else if (this.match("SCOPE")) {
+        var m2 = this.cur();
+        var name2 = m2.lexeme || "?";
+        this.advance();
+        var get2 = node("GET", m2.line);
+        get2.str = name2;
+        get2.kids.push(e);
+        e = get2;
+      } else break;
+    }
+    return e;
+  };
+
+  Parser.prototype.parseUnary = function () {
+    if (this.check("MINUS") || this.check("NOT")) {
+      var op = this.advance();
+      var n = node("UNARY", op.line);
+      n.str = op.lexeme;
+      n.kids.push(this.parseUnary());
+      return n;
+    }
+    return this.parsePostfix();
+  };
+
+  Parser.prototype.bin = function (sub, ops) {
+    var left = sub.call(this);
+    for (;;) {
+      var matched = false;
+      for (var i = 0; i < ops.length; i++) {
+        if (this.check(ops[i][0])) {
+          var op = this.advance();
+          var n = node("BINARY", op.line);
+          n.str = ops[i][1];
+          n.kids.push(left);
+          n.kids.push(sub.call(this));
+          left = n;
+          matched = true;
+          break;
+        }
+      }
+      if (!matched) break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseFactor = function () { return this.bin(this.parseUnary, [["STAR_OP", "*"], ["SLASH", "/"], ["PERCENT", "%"]]); };
+  Parser.prototype.parseTerm = function () { return this.bin(this.parseFactor, [["PLUS", "+"], ["MINUS", "-"]]); };
+  Parser.prototype.parseCompare = function () { return this.bin(this.parseTerm, [["LT", "<"], ["LE", "<="], ["GT", ">"], ["GE", ">="]]); };
+  Parser.prototype.parseEquality = function () { return this.bin(this.parseCompare, [["EQ", "=="], ["NE", "!="], ["CONSIST", "~"]]); };
+  Parser.prototype.parseAnd = function () { return this.bin(this.parseEquality, [["AND", "&&"]]); };
+  Parser.prototype.parseOr = function () { return this.bin(this.parseAnd, [["OR", "||"]]); };
+
+  Parser.prototype.parseQuery = function () {
+    var left = this.parseOr();
+    while (this.check("ARROW") || this.check("QUERY")) {
+      var op = this.advance();
+      var n = node("QUERY", op.line);
+      n.kids.push(left);
+      n.kids.push(this.parseOr());
+      left = n;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseCommit = function () {
+    var left = this.parseQuery();
+    for (;;) {
+      if (this.check("COMMIT")) {
+        this.advance();
+        var n = node("COMMIT", left.line);
+        n.kids.push(left);
+        n.kids.push(this.parseQuery());
+        left = n;
+      } else if (this.check("LARROW")) {
+        this.advance();
+        var n2 = node("LARROW", left.line);
+        n2.kids.push(left);
+        n2.kids.push(this.parseQuery());
+        left = n2;
+      } else break;
+    }
+    return left;
+  };
+
+  Parser.prototype.parseExpr = function () { return this.parseCommit(); };
+
+  /* ---- statements ---- */
+  Parser.prototype.parseBlock = function () {
+    var line = this.cur().line;
+    this.expect("LBRACE", "expected '{'");
+    var b = node("BLOCK", line);
+    while (!this.check("RBRACE") && !this.check("EOF"))
+      b.kids.push(this.parseDecl());
+    this.expect("RBRACE", "expected '}'");
+    return b;
+  };
+
+  Parser.prototype.parseFunc = function () {
+    var line = this.cur().line;
+    this.expect("DEF", "expected 'def'");
+    var fn = node("FUNC", line);
+    if (this.check("IDENT")) { fn.str = this.cur().lexeme; this.advance(); }
+    else fn.str = "anon";
+    if (this.check("PIPE")) this.parsePipeParams(fn);
+    else if (this.match("LPAREN")) {
+      while (!this.check("RPAREN") && !this.check("EOF")) {
+        if (this.check("IDENT")) { fn.params.push(this.cur().lexeme); this.advance(); }
+        else this.advance();
+        if (!this.match("COMMA")) break;
+      }
+      this.expect("RPAREN", "expected ')'");
+    }
+    if (this.check("LBRACE")) {
+      fn.body = this.parseBlock();
+    } else if (this.match("COMMIT") || this.match("ARROW") || this.match("DEFARROW") || this.match("ASSIGN")) {
+      var body = node("BLOCK", line);
+      var ret = node("RETURN", line);
+      ret.kids.push(this.parseExpr());
+      body.kids.push(ret);
+      this.match("SEMI");
+      fn.body = body;
+    } else {
+      var body2 = node("BLOCK", line);
+      var ret2 = node("RETURN", line);
+      ret2.kids.push(this.parseExpr());
+      body2.kids.push(ret2);
+      fn.body = body2;
+    }
+    return fn;
+  };
+
+  Parser.prototype.parseAsperal = function () {
+    var line = this.cur().line;
+    this.expect("ASPERAL", "expected 'asperal'");
+    if (this.check("PIPE")) {
+      var n = node("ASPERAL", line);
+      n.str = "union";
+      this.parsePipeParams(n);
+      this.match("DEFARROW");
+      if (this.check("LBRACE")) n.body = this.parseBlock();
+      return n;
+    }
+    var st = node("STRUCT", line);
+    if (this.check("IDENT")) { st.str = this.cur().lexeme; this.advance(); }
+    else if (this.check("TUPLESPACE")) { st.str = "TupleSpace"; this.advance(); }
+    else st.str = "anon";
+    if (this.match("COLON")) this.match("STRUCT");
+    else this.match("STRUCT");
+    st.body = this.parseBlock();
+    return st;
+  };
+
+  Parser.prototype.parseOmega = function () {
+    var line = this.cur().line;
+    this.expect("OMEGA", "expected 'Omega'");
+    var n = node("OMEGA_DB", line);
+    if (this.match("SCOPE")) {
+      if (this.check("DATABASE")) { this.advance(); n.str = "DATABASE"; }
+      else if (this.check("TUPLESPACE")) { this.advance(); n.str = "Tuplespace"; }
+      else if (this.check("IDENT")) { n.str = this.cur().lexeme; this.advance(); }
+      else n.str = "DATABASE";
+    } else n.str = "DATABASE";
+    if (this.match("LBRACK")) {
+      if (this.check("TUPLESPACE") || this.check("IDENT")) this.advance();
+      this.expect("RBRACK", "expected ']'");
+    }
+    if (this.match("LT")) { if (this.check("DATABASE") || this.check("IDENT")) this.advance(); }
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  /* @reviser — either the value-level learning loop (executes its block),
+     or, when the header names 'grammar', a grammar-extension transaction:
+        @reviser : grammar {
+            rule "name" head [ 'tok' expr ... ] => denotation
+        }
+     Rules are committed to the parse-time rule ledger (program-order scope,
+     latest-highest priority) and, at run time, appended to the tuplespace
+     ledger as ["rule", name, head, ...] facts (auditability). */
+  Parser.prototype.parseReviser = function () {
+    var line = this.cur().line;
+    this.expect("REVISER", "expected '@reviser'");
+    var isGrammar = false, isExtension = false, extLang = "bada";
+    var j = this.i;
+    while (j < this.toks.length && this.toks[j].type !== "LBRACE" && this.toks[j].type !== "EOF") {
+      if (this.toks[j].lexeme === "grammar") isGrammar = true;
+      if (this.toks[j].lexeme === "extension") {
+        isExtension = true;
+        var nx = this.toks[j + 1];
+        if (nx && (nx.type === "IDENT" || nx.type === "STRING")) extLang = nx.lexeme.toLowerCase();
+      }
+      j++;
+    }
+    /* skip header noise up to '{' */
+    while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+    if (isGrammar) return this.parseGrammarBlock(line);
+    if (isExtension) return this.parseExtensionBlock(line, extLang);
+    var n = node("REVISER", line);
+    n.body = this.parseBlock();
+    return n;
+  };
+
+  /* @reviser : extension <lang> { fun NAME |params| """code""" ... }
+     A foreign-extension transaction: each fun commits an extension fact to
+     the ledger and binds NAME as a callable implemented in <lang>:
+       bada   — code is Bada source (runs everywhere; self-extension)
+       c      — code is the body of  double NAME(double p1, ...)  — the
+                interpreter gcc-builds it, the Bada->C compiler INLINES it
+       python — code sees ARGS (JSON-decoded list) and sets RESULT
+       java   — code is the body of  static double run(double[] args)
+     python/java/c run via the host FFI bridge (CLI & desktop IDE). */
+  Parser.prototype.parseExtensionBlock = function (line, lang) {
+    var x = node("EXTENSION", line);
+    x.lang = lang;
+    x.funcs = [];
+    this.expect("LBRACE", "expected '{'");
+    while (!this.check("RBRACE") && !this.check("EOF")) {
+      if ((this.check("IDENT") && this.cur().lexeme === "fun") || this.check("DEF")) {
+        this.advance();
+        var fn = { name: "?", params: [], code: "" };
+        if (this.check("IDENT") || this.check("STRING")) { fn.name = this.cur().lexeme; this.advance(); }
+        if (this.check("PIPE")) {
+          var holder = node("LAMBDA", this.cur().line);
+          this.parsePipeParams(holder);
+          fn.params = holder.params;
+        }
+        this.match("ARROW"); this.match("DEFARROW"); /* optional connector */
+        if (this.check("STRING")) { fn.code = this.cur().lexeme; this.advance(); }
+        else this.perr("expected extension code string (use \"\"\"...\"\"\")");
+        x.funcs.push(fn);
+        this.match("SEMI");
+      } else {
+        this.perr("expected 'fun' in extension reviser");
+        this.advance();
+      }
+    }
+    this.expect("RBRACE", "expected '}'");
+    return x;
+  };
+
+  Parser.prototype.parseGrammarBlock = function (line) {
+    var g = node("GRAMMAR", line);
+    g.rules = [];
+    this.expect("LBRACE", "expected '{'");
+    while (!this.check("RBRACE") && !this.check("EOF")) {
+      if (this.check("IDENT") && this.cur().lexeme === "rule") {
+        this.advance();
+        var rule = { name: "?", head: "expr", pattern: [], denotation: null, prio: this.ruleLedger.length };
+        if (this.check("STRING") || this.check("IDENT")) { rule.name = this.cur().lexeme; this.advance(); }
+        if (this.check("IDENT") || this.check("STRUCT")) { rule.head = this.cur().lexeme; this.advance(); }
+        this.expect("LBRACK", "expected '[' pattern");
+        while (!this.check("RBRACK") && !this.check("EOF")) {
+          var t = this.cur();
+          if (t.type === "STRING") { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          else if (t.type === "IDENT" && t.lexeme === "expr") { rule.pattern.push({ kind: "hole" }); this.advance(); }
+          else { rule.pattern.push({ kind: "tok", text: t.lexeme }); this.advance(); }
+          this.match("COMMA");
+        }
+        this.expect("RBRACK", "expected ']'");
+        this.expect("ARROW", "expected '=>' denotation");
+        rule.denotation = this.parseExpr();
+        /* monotone append: the rule ledger only grows */
+        this.ruleLedger.push(rule);
+        g.rules.push(rule);
+        this.match("SEMI");
+      } else {
+        this.perr("expected 'rule' in grammar reviser");
+        this.advance();
+      }
+    }
+    this.expect("RBRACE", "expected '}'");
+    return g;
+  };
+
+  Parser.prototype.parseIf = function () {
+    var line = this.cur().line;
+    this.expect("IF", "if");
+    var n = node("IF", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    if (this.match("ELSE")) {
+      if (this.check("IF")) n.kids.push(this.parseIf());
+      else n.kids.push(this.parseBlock());
+    }
+    return n;
+  };
+
+  Parser.prototype.parseWhile = function () {
+    var line = this.cur().line;
+    this.expect("WHILE", "while");
+    var n = node("WHILE", line);
+    var par = this.match("LPAREN");
+    n.kids.push(this.parseExpr());
+    if (par) this.expect("RPAREN", ")");
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseFor = function () {
+    var line = this.cur().line;
+    this.expect("FOR", "for");
+    var n = node("FOR", line);
+    n.str = this.cur().lexeme;
+    if (this.check("IDENT")) this.advance();
+    this.expect("IN", "in");
+    n.kids.push(this.parseExpr());
+    n.kids.push(this.parseBlock());
+    return n;
+  };
+
+  Parser.prototype.parseStmt = function () {
+    var line = this.cur().line;
+    /* extension point: rules with head 'stmt' before built-ins */
+    var ext = this.tryRules(["stmt"]);
+    if (ext) { this.match("SEMI"); return ext; }
+
+    if (this.check("DEF")) return this.parseFunc();
+    if (this.check("ASPERAL")) return this.parseAsperal();
+    if (this.check("OMEGA")) return this.parseOmega();
+    if (this.check("REVISER")) return this.parseReviser();
+    if (this.check("IF")) return this.parseIf();
+    if (this.check("WHILE")) return this.parseWhile();
+    if (this.check("FOR")) return this.parseFor();
+    if (this.check("TYPEDEF")) {
+      this.advance();
+      var n = node("STRUCT", line);
+      n.str = "typedef";
+      while (!this.check("LBRACE") && !this.check("EOF")) this.advance();
+      n.body = this.parseBlock();
+      return n;
+    }
+    if (this.match("RETURN")) {
+      var r = node("RETURN", line);
+      if (!this.check("RBRACE") && !this.check("SEMI")) r.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return r;
+    }
+    if (this.match("PRINT")) {
+      var pn = node("PRINT", line);
+      var par = this.match("LPAREN");
+      pn.kids.push(this.parseExpr());
+      while (this.match("COMMA")) pn.kids.push(this.parseExpr());
+      if (par) this.expect("RPAREN", ")");
+      this.match("SEMI");
+      return pn;
+    }
+    if (this.check("IDENT") && this.peekn(1).type === "WALRUS") {
+      var b = node("BIND", line);
+      b.str = this.cur().lexeme;
+      this.advance(); this.advance();
+      b.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return b;
+    }
+    var e = this.parseExpr();
+    if (this.check("ASSIGN")) {
+      this.advance();
+      var a = node("ASSIGN", line);
+      a.kids.push(e);
+      a.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return a;
+    }
+    this.match("SEMI");
+    return e;
+  };
+
+  Parser.prototype.parseDecl = function () { return this.parseStmt(); };
+
+  function parseProgram(src) {
+    var toks = tokenize(src);
+    var p = new Parser(toks);
+    var prog = node("PROGRAM", 1);
+    while (!p.check("EOF")) {
+      var d = p.parseDecl();
+      if (d) prog.kids.push(d);
+      if (p.errors.length > 50) { p.errors.push("too many parse errors, aborting"); break; }
+    }
+    return { program: prog, errors: p.errors, ruleLedger: p.ruleLedger };
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Values
+   * ------------------------------------------------------------------ */
+  function Vnil() { return { t: "nil" }; }
+  function Vnum(x) { return { t: "num", num: x }; }
+  function Vbool(b) { return { t: "bool", b: b }; }
+  function Vstr(s) { return { t: "str", str: s == null ? "" : String(s) }; }
+  function Vstar() { return { t: "star" }; }
+  function Varr(items) { return { t: "arr", items: items || [] }; }
+  function Vdist(p) { return { t: "dist", p: p }; }
+  function Vts(ts) { return { t: "ts", ts: ts }; }
+  function Vreg(reg) { return { t: "reg", reg: reg }; }
+
+  function distNormalize(p) {
+    var s = 0;
+    for (var i = 0; i < p.length; i++) s += p[i];
+    if (s > 0) for (var j = 0; j < p.length; j++) p[j] /= s;
+  }
+  function arrToP(items) {
+    var p = new Array(items.length);
+    for (var i = 0; i < items.length; i++) p[i] = items[i].t === "num" ? items[i].num : 0;
+    return p;
+  }
+  function asNum(v) { return v && v.t === "num" ? v.num : 0; }
+  function truthy(v) {
+    switch (v.t) {
+      case "nil": case "star": return false;
+      case "bool": return v.b;
+      case "num": return v.num !== 0;
+      case "str": return v.str.length > 0;
+      default: return true;
+    }
+  }
+
+  /* C %g-alike for string concat */
+  function fmtG(x) {
+    if (!isFinite(x)) return String(x);
+    if (x === Math.trunc(x) && Math.abs(x) < 1e15) return String(x);
+    return String(parseFloat(x.toPrecision(6)));
+  }
+  function fmtNum(x) {
+    if (x === Math.trunc(x) && isFinite(x) && Math.abs(x) < 9.2e18) return String(Math.trunc(x));
+    return x.toFixed(5);
+  }
+  /* C "%.2e" with >=2 exponent digits */
+  function fmtSci(x) {
+    var s = x.toExponential(2); /* e.g. 5.55e-17 or 1.23e-7 */
+    return s.replace(/e([+-])(\d)$/, "e$10$2");
+  }
+
+  function printValue(v) {
+    switch (v.t) {
+      case "nil": return "nil";
+      case "star": return "star";
+      case "bool": return v.b ? "true" : "false";
+      case "num": return fmtNum(v.num);
+      case "str": return v.str;
+      case "arr": return "[" + v.items.map(printValue).join(", ") + "]";
+      case "dist": return "dist[" + Array.prototype.map.call(v.p, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      case "phase": return "phase[V=" + v.v + ", |.|=1]";
+      case "ts": return "tuplespace<" + (v.ts ? v.ts.facts.length : 0) + " facts>";
+      case "func": return "<fn " + (v.decl && v.decl.str ? v.decl.str : "lambda") + ">";
+      case "native": return "<native fn>";
+      case "struct": return "<struct " + v.name + ">";
+      case "inst": return "<" + v.name + " instance>";
+      case "reg": {
+        var probs = regProbs(v.reg);
+        return "qreg[n=" + v.reg.n + "] |psi|^2=[" +
+          Array.prototype.map.call(probs, function (x) { return x.toFixed(5); }).join(", ") + "]";
+      }
+      default: return "?";
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Quantum register on the phase core
+   * psi_i = sqrt(a_i) * exp(i * theta_i)  — stored as re/im amplitude
+   * vectors; gates are index permutations and/or phase contributions.
+   * ------------------------------------------------------------------ */
+  function regNew(n) {
+    var V = 1 << n;
+    var re = new Float64Array(V), im = new Float64Array(V);
+    re[0] = 1;
+    return { n: n, re: re, im: im };
+  }
+  function regProbs(reg) {
+    var V = reg.re.length, p = new Array(V), s = 0;
+    for (var i = 0; i < V; i++) { p[i] = reg.re[i] * reg.re[i] + reg.im[i] * reg.im[i]; s += p[i]; }
+    if (s > 0) for (var j = 0; j < V; j++) p[j] /= s;
+    return p;
+  }
+  function gateH(reg, q) {
+    var V = reg.re.length, bit = 1 << q, r = Math.SQRT1_2;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var ar = reg.re[i], ai = reg.im[i], br = reg.re[j], bi = reg.im[j];
+      reg.re[i] = r * (ar + br); reg.im[i] = r * (ai + bi);
+      reg.re[j] = r * (ar - br); reg.im[j] = r * (ai - bi);
+    }
+  }
+  function gateX(reg, q) {
+    var V = reg.re.length, bit = 1 << q;
+    for (var i = 0; i < V; i++) {
+      if (i & bit) continue;
+      var j = i | bit;
+      var tr = reg.re[i], ti = reg.im[i];
+      reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+      reg.re[j] = tr; reg.im[j] = ti;
+    }
+  }
+  /* pure phase gate on |1> of qubit q: amp *= e^{i lam}. By |psi|^2 == a this
+     changes no probability (Theorem 2 => unitarity of the phase layer). */
+  function gatePhase(reg, q, lam) {
+    var V = reg.re.length, bit = 1 << q;
+    var c = Math.cos(lam), s = Math.sin(lam);
+    for (var i = 0; i < V; i++) {
+      if (!(i & bit)) continue;
+      var ar = reg.re[i], ai = reg.im[i];
+      reg.re[i] = ar * c - ai * s;
+      reg.im[i] = ar * s + ai * c;
+    }
+  }
+  function gateCNOT(reg, c, t) {
+    var V = reg.re.length, cb = 1 << c, tb = 1 << t;
+    for (var i = 0; i < V; i++) {
+      if ((i & cb) && !(i & tb)) {
+        var j = i | tb;
+        var tr = reg.re[i], ti = reg.im[i];
+        reg.re[i] = reg.re[j]; reg.im[i] = reg.im[j];
+        reg.re[j] = tr; reg.im[j] = ti;
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Interpreter
+   * ------------------------------------------------------------------ */
+  function Env(parent) { this.map = Object.create(null); this.parent = parent || null; }
+  Env.prototype.set = function (k, v) {
+    for (var e = this; e; e = e.parent) if (Object.prototype.hasOwnProperty.call(e.map, k)) { /* C ref sets in own env only */ break; }
+    this.map[k] = v;
+  };
+  Env.prototype.get = function (k) {
+    for (var e = this; e; e = e.parent)
+      if (Object.prototype.hasOwnProperty.call(e.map, k)) return e.map[k];
+    return undefined;
+  };
+  Env.prototype.root = function () { var e = this; while (e.parent) e = e.parent; return e; };
+
+  /* ---- foreign-extension marshalling (JSON over argv/stdout) ---------- */
+  function badaToJson(v) {
+    switch (v.t) {
+      case "num": return v.num;
+      case "bool": return v.b;
+      case "str": return v.str;
+      case "arr": return v.items.map(badaToJson);
+      case "dist": return Array.prototype.slice.call(v.p);
+      case "reg": return regProbs(v.reg);
+      default: return null;
+    }
+  }
+  function jsToBada(x) {
+    if (x === null || x === undefined) return Vnil();
+    if (typeof x === "number") return Vnum(x);
+    if (typeof x === "boolean") return Vbool(x);
+    if (typeof x === "string") return Vstr(x);
+    if (Array.isArray(x)) return Varr(x.map(jsToBada));
+    return Vstr(String(x));
+  }
+  function makeFfiNative(interp, lang, xf) {
+    return {
+      t: "native",
+      name: xf.name,
+      fn: function (args) {
+        if (!interp.ffi) {
+          interp.out("[extension] " + lang + " 拡張 '" + xf.name +
+            "' はこの環境では実行できません (CLI / デスクトップ版で利用可)");
+          return Vnil();
+        }
+        var argv = args.map(function (a) { return JSON.stringify(badaToJson(a)); });
+        var r = interp.ffi(lang, xf.name, xf.code, xf.params, argv);
+        if (!r || !r.ok) {
+          interp.out("[extension] " + lang + ":" + xf.name + " failed: " + (r && r.error ? r.error : "ffi error"));
+          return Vnil();
+        }
+        var text = String(r.stdout == null ? "" : r.stdout).trim();
+        if (text === "") return Vnil();
+        try { return jsToBada(JSON.parse(text)); } catch (e) { return Vstr(text); }
+      }
+    };
+  }
+
+  function Interp(opts) {
+    opts = opts || {};
+    this.out = opts.out || function () {};
+    this.ledger = { facts: [] };          /* the append-only tuplespace */
+    this.qstate = { prior: null };        /* Omega::Quantum estimator */
+    this.global = new Env(null);
+    this.steps = 0;
+    this.maxSteps = opts.maxSteps || 20000000;
+    /* host FFI bridge for foreign extensions (@reviser : extension):
+       ffi(lang, name, code, params, argv) -> {ok, stdout, error}
+       Provided by the CLI / desktop IDE; absent in browser & APK. */
+    this.ffi = opts.ffi || null;
+    this.installNatives();
+    this.global.set("Omega", Vts(this.ledger));
+    this.global.set("tuplespace", Vts(this.ledger));
+  }
+
+  Interp.prototype.commit = function (v) {
+    if (v.t !== "nil") this.ledger.facts.push(v);
+    return this.ledger.facts.length - 1;
+  };
+
+  Interp.prototype.installNatives = function () {
+    var self = this;
+    var g = this.global;
+    function nat(name, fn) { g.set(name, { t: "native", name: name, fn: fn }); }
+
+    nat("softmax", function (a) {
+      if (!a[0]) return Vnil();
+      var src;
+      if (a[0].t === "dist") src = Array.prototype.slice.call(a[0].p);
+      else if (a[0].t === "arr") src = arrToP(a[0].items);
+      else return Vnil();
+      var v = src.length, out = new Array(v);
+      var mx = -Infinity;
+      for (var i = 0; i < v; i++) if (src[i] > mx) mx = src[i];
+      var s = 0;
+      for (var j = 0; j < v; j++) { out[j] = Math.exp(src[j] - mx); s += out[j]; }
+      for (var k = 0; k < v; k++) out[k] /= s;
+      /* confident-zero semantics: a logit far below the max is ruled out */
+      for (var l = 0; l < v; l++) if (src[l] - mx < -30.0) out[l] = 0.0;
+      distNormalize(out);
+      return Vdist(out);
+    });
+    nat("entropy", function (a) {
+      var p;
+      if (a[0].t === "dist") p = a[0].p;
+      else if (a[0].t === "arr") p = arrToP(a[0].items);
+      else return Vnum(0);
+      var H = 0;
+      for (var i = 0; i < p.length; i++) { var q = p[i]; if (q < 1e-12) q = 1e-12; H += -q * Math.log(q); }
+      return Vnum(H);
+    });
+    nat("unknown_prior", function (a) {
+      var v = Math.trunc(asNum(a[0])); if (v < 1) v = 1;
+      var p = new Array(v);
+      for (var i = 0; i < v; i++) p[i] = 1.0 / v;
+      return Vdist(p);
+    });
+    nat("update", function (a) {
+      if (a.length < 2 || a[0].t !== "dist") return a.length > 0 ? a[0] : Vnil();
+      var prior = a[0].p;
+      var evid = a[1].t === "dist" ? a[1].p : (a[1].t === "arr" ? arrToP(a[1].items) : null);
+      if (!evid) return a[0];
+      var lr = a.length >= 3 ? asNum(a[2]) : 0.5;
+      var v = prior.length, out = new Array(v), s = 0;
+      for (var i = 0; i < v; i++) { var e = i < evid.length ? evid[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+      if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+      return Vdist(out);
+    });
+    nat("manifold_embed", function (a) {
+      if (a.length < 1 || a[0].t !== "arr") return Vnil();
+      var x = a[0].items;
+      var W = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var outdim = W ? W.length : x.length;
+      var d = new Array(outdim);
+      for (var i = 0; i < outdim; i++) {
+        var acc = 0;
+        if (W && W[i].t === "arr") {
+          var row = W[i].items;
+          for (var j = 0; j < x.length && j < row.length; j++) acc += asNum(row[j]) * asNum(x[j]);
+        } else acc = asNum(x[i]);
+        d[i] = acc;
+      }
+      var nrm = 0;
+      for (var k = 0; k < outdim; k++) nrm += d[k] * d[k];
+      nrm = Math.sqrt(nrm) + 1e-12;
+      for (var l = 0; l < outdim; l++) d[l] /= nrm;
+      return Vdist(d);
+    });
+    nat("cognitive_system", function (a, env) {
+      if (a.length < 1) return Vnil();
+      var adist;
+      if (a[0].t === "dist") adist = Array.prototype.slice.call(a[0].p);
+      else {
+        var sm = g.get("softmax").fn([a[0]], env);
+        if (sm.t !== "dist") return Vnil();
+        adist = Array.prototype.slice.call(sm.p);
+      }
+      var v = adist.length;
+      var theta = new Array(v);
+      for (var z = 0; z < v; z++) theta[z] = 0;
+      var mods = (a.length >= 2 && a[1].t === "arr") ? a[1].items : null;
+      var betas = (a.length >= 3 && a[2].t === "arr") ? a[2].items : null;
+      if (mods) {
+        for (var m = 0; m < mods.length; m++) {
+          if (mods[m].t !== "arr") continue;
+          var pair = mods[m].items;
+          if (pair.length < 2) continue;
+          var q;
+          if (pair[0].t === "dist") q = pair[0].p;
+          else if (pair[0].t === "arr") q = arrToP(pair[0].items);
+          else continue;
+          var H = 0;
+          for (var i = 0; i < q.length; i++) { var qq = q[i]; if (qq < 1e-12) qq = 1e-12; H += -qq * Math.log(qq); }
+          var phi = pair[1].t === "arr" ? pair[1].items : null;
+          var beta = (betas && m < betas.length) ? asNum(betas[m]) : 1.0;
+          for (var j = 0; j < v; j++) {
+            var phival = (phi && j < phi.length) ? asNum(phi[j]) : 0;
+            theta[j] += beta * H * phival;
+          }
+        }
+      }
+      /* psi = sqrt(a) * exp(i theta); |psi|^2 == a exactly */
+      var qhat = new Array(v), s = 0;
+      for (var k = 0; k < v; k++) {
+        var r = Math.sqrt(adist[k]);
+        var re = r * Math.cos(theta[k]), im = r * Math.sin(theta[k]);
+        var mag2 = re * re + im * im;
+        qhat[k] = mag2; s += mag2;
+      }
+      if (s > 0) for (var l = 0; l < v; l++) qhat[l] /= s;
+      /* commit q_hat to the append-only ledger */
+      self.commit(Vdist(Array.prototype.slice.call(qhat)));
+      /* stash base a for property (ii) verification */
+      env.root().set("__last_a", Vdist(adist));
+      return Vdist(qhat);
+    });
+    nat("len", function (a) {
+      switch (a[0].t) {
+        case "arr": return Vnum(a[0].items.length);
+        case "dist": return Vnum(a[0].p.length);
+        case "str": return Vnum(a[0].str.length);
+        case "ts": return Vnum(a[0].ts ? a[0].ts.facts.length : 0);
+        case "reg": return Vnum(a[0].reg.re.length);
+        default: return Vnum(0);
+      }
+    });
+    nat("sqrt", function (a) { return Vnum(Math.sqrt(asNum(a[0]))); });
+    nat("log", function (a) { return Vnum(Math.log(asNum(a[0]))); });
+    nat("exp", function (a) { return Vnum(Math.exp(asNum(a[0]))); });
+    nat("abs", function (a) { return Vnum(Math.abs(asNum(a[0]))); });
+    nat("dist", function (a) {
+      if (a[0].t === "arr") { var p = arrToP(a[0].items); distNormalize(p); return Vdist(p); }
+      if (a[0].t === "dist") return a[0];
+      return Vnil();
+    });
+    nat("zeros_of", function (a) {
+      var p = null;
+      if (a[0] && a[0].t === "dist") p = a[0].p;
+      else if (a[0] && a[0].t === "reg") p = regProbs(a[0].reg);
+      if (!p) return Varr([]);
+      var out = [];
+      for (var i = 0; i < p.length; i++) if (p[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+    nat("maxdiff", function (a) {
+      if (a[0].t !== "dist" || a[1].t !== "dist") return Vnum(0);
+      var v = Math.min(a[0].p.length, a[1].p.length), m = 0;
+      for (var i = 0; i < v; i++) { var d = Math.abs(a[0].p[i] - a[1].p[i]); if (d > m) m = d; }
+      return Vnum(m);
+    });
+    nat("sci", function (a) { return Vstr(fmtSci(asNum(a[0]))); });
+    nat("f5", function (a) { return Vstr(asNum(a[0]).toFixed(5)); });
+    nat("ledger", function () { return Vts(self.ledger); });
+    nat("last_a", function (a, env) {
+      var v = env.root().get("__last_a");
+      return v === undefined ? Vnil() : v;
+    });
+
+    /* ============== string primitives (zone:// ultra-network) =========
+       Character-level access only: the zone:// URL parser, the P2P DHT
+       and the quantum guard themselves are written in Bada on top of
+       these (see examples/zone.bada). */
+    function wantStrv(v) { return v && v.t === "str" ? v.str : null; }
+    nat("split", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Varr([]);
+      var sep = a.length >= 2 ? wantStrv(a[1]) : null;
+      var parts = (sep == null || sep === "") ? s.split("") : s.split(sep);
+      return Varr(parts.map(Vstr));
+    });
+    nat("substr", function (a) {
+      var s = wantStrv(a[0]); if (s == null) return Vstr("");
+      var from = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (from < 0) from = 0;
+      var cnt = a.length >= 3 ? Math.trunc(asNum(a[2])) : s.length - from;
+      if (cnt < 0) cnt = 0;
+      return Vstr(s.substr(from, cnt));
+    });
+    nat("str_find", function (a) {
+      var s = wantStrv(a[0]);
+      var needle = a.length >= 2 ? wantStrv(a[1]) : null;
+      if (s == null || needle == null) return Vnum(-1);
+      return Vnum(s.indexOf(needle));
+    });
+    nat("ord", function (a) {
+      var s = wantStrv(a[0]); if (s == null || !s.length) return Vnum(0);
+      var i = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      if (i < 0 || i >= s.length) return Vnum(0);
+      return Vnum(s.charCodeAt(i));
+    });
+    nat("chr", function (a) {
+      return Vstr(String.fromCharCode(Math.trunc(asNum(a[0]))));
+    });
+
+    /* ============== the Q#-style quantum sublanguage ==================
+       Registered natively AND reachable through @reviser : grammar rules
+       (whose denotations call phase_uniform / commit_measurement below). */
+    function wantReg(v) { return v && v.t === "reg" ? v.reg : null; }
+
+    nat("qubit", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      return Vreg(regNew(nq));
+    });
+    nat("H", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateH(r, q);
+      return a[0];
+    });
+    nat("X", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gateX(r, q);
+      return a[0];
+    });
+    nat("S", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 2);
+      return a[0];
+    });
+    nat("T", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var q = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      gatePhase(r, q, Math.PI / 4);
+      return a[0];
+    });
+    nat("Rz", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var lam = a.length >= 2 ? asNum(a[1]) : 0;
+      var q = a.length >= 3 ? Math.trunc(asNum(a[2])) : 0;
+      gatePhase(r, q, lam);
+      return a[0];
+    });
+    nat("CNOT", function (a) {
+      var r = wantReg(a[0]); if (!r) return Vnil();
+      var c = a.length >= 2 ? Math.trunc(asNum(a[1])) : 0;
+      var t = a.length >= 3 ? Math.trunc(asNum(a[2])) : 1;
+      gateCNOT(r, c, t);
+      return a[0];
+    });
+    function doMeasure(v) {
+      var r = wantReg(v);
+      if (!r) {
+        if (v && v.t === "dist") { self.commit(v); return v; }
+        return Vnil();
+      }
+      var p = regProbs(r);
+      var d = Vdist(p);
+      /* measurement is an append-only ledger commit */
+      self.commit(Vdist(Array.prototype.slice.call(p)));
+      return d;
+    }
+    nat("Measure", function (a) { return doMeasure(a[0]); });
+    /* denotation names used by the paper's reviser rules */
+    nat("phase_uniform", function (a) {
+      var r = wantReg(a[0]);
+      if (!r) return Vnil();
+      for (var q = 0; q < r.n; q++) gateH(r, q);
+      return a[0];
+    });
+    nat("commit_measurement", function (a) { return doMeasure(a[0]); });
+
+    /* ---------- Omega::Quantum: append-only measurement inference ----- */
+    nat("prepare_unknown", function (a) {
+      var nq = Math.max(1, Math.trunc(asNum(a[0]) || 1));
+      var V = 1 << nq;
+      var p = new Array(V);
+      for (var i = 0; i < V; i++) p[i] = 1.0 / V;
+      self.qstate.prior = p;                 /* max-entropy start (Jaynes) */
+      return Vdist(Array.prototype.slice.call(p));
+    });
+    nat("observe", function (a) {
+      var d = doMeasure(a[0]);
+      if (d.t === "dist" && self.qstate.prior) {
+        var prior = self.qstate.prior, lr = 0.5;
+        var v = prior.length, out = new Array(v), s = 0;
+        for (var i = 0; i < v; i++) { var e = i < d.p.length ? d.p[i] : 0; out[i] = (1 - lr) * prior[i] + lr * e; s += out[i]; }
+        if (s > 0) for (var j = 0; j < v; j++) out[j] /= s;
+        self.qstate.prior = out;
+      }
+      return d;
+    });
+    nat("estimate", function () {
+      if (!self.qstate.prior) return Vnil();
+      return Vdist(Array.prototype.slice.call(self.qstate.prior));
+    });
+    nat("forbidden", function () {
+      if (!self.qstate.prior) return Varr([]);
+      var out = [];
+      for (var i = 0; i < self.qstate.prior.length; i++)
+        if (self.qstate.prior[i] === 0.0) out.push(Vnum(i));
+      return Varr(out);
+    });
+  }
+
+  Interp.prototype.tick = function (line) {
+    if (++this.steps > this.maxSteps)
+      throw new Error("[runtime] execution budget exceeded near line " + line);
+  };
+
+  function evalBinary(op, l, r) {
+    if (op === "~") {
+      if (l.t === "star" || r.t === "star") return Vbool(true);
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "&&") return Vbool(truthy(l) && truthy(r));
+    if (op === "||") return Vbool(truthy(l) || truthy(r));
+    if (op === "==") {
+      if (l.t === "num" && r.t === "num") return Vbool(l.num === r.num);
+      if (l.t === "str" && r.t === "str") return Vbool(l.str === r.str);
+      return Vbool(l.t === r.t);
+    }
+    if (op === "!=") { var e = evalBinary("==", l, r); return Vbool(!e.b); }
+    if (op === "+" && (l.t === "str" || r.t === "str")) {
+      var a = l.t === "str" ? l.str : fmtG(asNum(l));
+      var b = r.t === "str" ? r.str : fmtG(asNum(r));
+      return Vstr(a + b);
+    }
+    var x = asNum(l), y = asNum(r);
+    switch (op) {
+      case "+": return Vnum(x + y);
+      case "-": return Vnum(x - y);
+      case "*": return Vnum(x * y);
+      case "/": return Vnum(y !== 0 ? x / y : 0);
+      case "%": return Vnum(y !== 0 ? x % y : 0);
+      case "<": return Vbool(x < y);
+      case "<=": return Vbool(x <= y);
+      case ">": return Vbool(x > y);
+      case ">=": return Vbool(x >= y);
+    }
+    return Vnil();
+  }
+
+  Interp.prototype.callValue = function (callee, args, env) {
+    if (callee.t === "native") return callee.fn(args, env) || Vnil();
+    if (callee.t === "func") {
+      var decl = callee.decl;
+      var local = new Env(callee.closure);
+      for (var i = 0; i < decl.params.length; i++)
+        local.map[decl.params[i]] = i < args.length ? args[i] : Vnil();
+      var f = this.exec(decl.body, local);
+      return f.ret ? f.val : Vnil();
+    }
+    if (callee.t === "struct") {
+      var fields = new Env(callee.closure);
+      if (callee.decl && callee.decl.body) this.exec(callee.decl.body, fields);
+      return { t: "inst", name: callee.name, fields: fields };
+    }
+    return Vnil();
+  };
+
+  Interp.prototype.eval = function (n, env) {
+    if (!n) return Vnil();
+    this.tick(n.line);
+    switch (n.type) {
+      case "INT": case "FLOAT": return Vnum(n.num);
+      case "STRING": return Vstr(n.str);
+      case "BOOL": return Vbool(n.boolean);
+      case "NIL": return Vnil();
+      case "IDENT": {
+        if (n.str === "STAR") return Vstar();
+        var v = env.get(n.str);
+        if (v !== undefined) return v;
+        if (n.str === "TupleSpace" || n.str === "tuplespace" || n.str === "Omega")
+          return Vts(this.ledger);
+        /* unknown identifier resolves to its name as a symbol/string */
+        return Vstr(n.str);
+      }
+      case "ARRAY": {
+        var items = [];
+        for (var i = 0; i < n.kids.length; i++) items.push(this.eval(n.kids[i], env));
+        return Varr(items);
+      }
+      case "UNARY": {
+        var u = this.eval(n.kids[0], env);
+        if (n.str === "-") return Vnum(-asNum(u));
+        if (n.str === "!") return Vbool(!truthy(u));
+        return u;
+      }
+      case "BINARY": {
+        var l = this.eval(n.kids[0], env), r = this.eval(n.kids[1], env);
+        return evalBinary(n.str, l, r);
+      }
+      case "INDEX": {
+        var base = this.eval(n.kids[0], env);
+        if (n.kids.length < 2) return Vnil();
+        var idx = Math.trunc(asNum(this.eval(n.kids[1], env)));
+        if (base.t === "arr" && idx >= 0 && idx < base.items.length) return base.items[idx];
+        if (base.t === "dist" && idx >= 0 && idx < base.p.length) return Vnum(base.p[idx]);
+        return Vnil();
+      }
+      case "GET": {
+        var b = this.eval(n.kids[0], env);
+        if (b.t === "inst") {
+          var fv = b.fields.get(n.str);
+          if (fv !== undefined) return fv;
+        }
+        if (b.t === "ts") {
+          if (n.str === "len" || n.str === "facts") return Vnum(b.ts ? b.ts.facts.length : 0);
+        }
+        if (b.t === "dist") {
+          if (n.str === "entropy") return this.global.get("entropy").fn([b], env);
+          if (n.str === "v" || n.str === "len") return Vnum(b.p.length);
+        }
+        if (b.t === "str") {
+          if (b.str === "Omega" || n.str === "tuplespace" || n.str === "DATABASE")
+            return Vts(this.ledger);
+          /* Omega::Quantum — expose the quantum-inference library namespace */
+          if (n.str === "Quantum") return Vstr("Quantum");
+        }
+        return Vstr(n.str);
+      }
+      case "CALL": {
+        var calleeNode = n.kids[0];
+        /* special: append/read/scan on a tuplespace value */
+        if (calleeNode.type === "GET") {
+          var gbase = this.eval(calleeNode.kids[0], env);
+          if (gbase.t === "ts" && calleeNode.str === "append") {
+            var av = n.kids.length > 1 ? this.eval(n.kids[1], env) : Vnil();
+            (gbase.ts || this.ledger).facts.push(av);
+            return Vnum((gbase.ts || this.ledger).facts.length - 1);
+          }
+          if (gbase.t === "ts" && (calleeNode.str === "read" || calleeNode.str === "scan")) {
+            var facts = (gbase.ts || this.ledger).facts;
+            return Varr(facts.slice());
+          }
+          /* Omega::Quantum.method(...) */
+          if (gbase.t === "str" && gbase.str === "Quantum") {
+            var qf = this.global.get(calleeNode.str);
+            if (qf && qf.t === "native") {
+              var qargs = [];
+              for (var qi = 1; qi < n.kids.length; qi++) qargs.push(this.eval(n.kids[qi], env));
+              return qf.fn(qargs, env) || Vnil();
+            }
+          }
+        }
+        var callee = this.eval(calleeNode, env);
+        var args = [];
+        for (var ai = 1; ai < n.kids.length; ai++) args.push(this.eval(n.kids[ai], env));
+        return this.callValue(callee, args, env);
+      }
+      case "LAMBDA": return { t: "func", decl: n, closure: env };
+      case "EACH": {
+        var coll = this.eval(n.kids[0], env);
+        var fn = this.eval(n.kids[1], env);
+        if (coll.t === "arr" && fn.t === "func") {
+          for (var ei = 0; ei < coll.items.length; ei++)
+            this.callValue(fn, [coll.items[ei]], env);
+        }
+        return Vnil();
+      }
+      case "COMMIT": {
+        /* l >> r : commit l to the append-only ledger, then yield r (or l) */
+        var cl = this.eval(n.kids[0], env);
+        if (cl.t !== "nil") this.ledger.facts.push(cl);
+        var cr = this.eval(n.kids[1], env);
+        return cr.t !== "nil" ? cr : cl;
+      }
+      case "QUERY": {
+        this.eval(n.kids[0], env);
+        return this.eval(n.kids[1], env);
+      }
+      case "LARROW": {
+        var tgt = this.eval(n.kids[0], env);
+        var val = this.eval(n.kids[1], env);
+        if (tgt.t === "arr") { tgt.items.push(val); return tgt; }
+        return val;
+      }
+      case "EXTENDED": {
+        /* reviser-extended form: bind captured holes _1.. and evaluate the
+           rule's stored denotation (an ordinary Bada expression) */
+        var scope = new Env(env);
+        for (var hi = 0; hi < n.kids.length; hi++)
+          scope.map["_" + (hi + 1)] = this.eval(n.kids[hi], env);
+        return this.eval(n.rule.denotation, scope);
+      }
+      default: break;
+    }
+    var f = this.exec(n, env);
+    return f.val;
+  };
+
+  Interp.prototype.exec = function (n, env) {
+    if (!n) return { ret: false, val: Vnil() };
+    this.tick(n.line);
+    switch (n.type) {
+      case "PROGRAM": case "BLOCK": {
+        var f = { ret: false, val: Vnil() };
+        for (var i = 0; i < n.kids.length; i++) {
+          f = this.exec(n.kids[i], env);
+          if (f.ret) return f;
+        }
+        return f;
+      }
+      case "BIND": {
+        var v = this.eval(n.kids[0], env);
+        env.set(n.str, v);
+        return { ret: false, val: v };
+      }
+      case "ASSIGN": {
+        var lhs = n.kids[0];
+        var av = this.eval(n.kids[1], env);
+        if (lhs.type === "IDENT") env.set(lhs.str, av);
+        else if (lhs.type === "INDEX") {
+          var base = this.eval(lhs.kids[0], env);
+          var idx = Math.trunc(asNum(this.eval(lhs.kids[1], env)));
+          if (base.t === "arr" && idx >= 0 && idx < base.items.length) base.items[idx] = av;
+          else if (base.t === "dist" && idx >= 0 && idx < base.p.length) base.p[idx] = asNum(av);
+        }
+        return { ret: false, val: av };
+      }
+      case "FUNC": {
+        var fv = { t: "func", decl: n, closure: env };
+        env.set(n.str || "anon", fv);
+        return { ret: false, val: fv };
+      }
+      case "STRUCT": {
+        var sv = { t: "struct", name: n.str || "struct", decl: n, closure: env };
+        env.set(n.str || "struct", sv);
+        return { ret: false, val: sv };
+      }
+      case "ASPERAL": return { ret: false, val: Vnil() };
+      case "OMEGA_DB": {
+        env.set("tuplespace", Vts(this.ledger));
+        env.set("Omega", Vts(this.ledger));
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "REVISER": {
+        if (n.body) return this.exec(n.body, env);
+        return { ret: false, val: Vnil() };
+      }
+      case "GRAMMAR": {
+        /* grammar transaction: commit each production rule as a ledger fact —
+           the grammar's history is auditable, append-only, monotone. */
+        for (var g = 0; g < n.rules.length; g++) {
+          var rule = n.rules[g];
+          this.ledger.facts.push(Varr([
+            Vstr("rule"), Vstr(rule.name), Vstr(rule.head),
+            Vstr(rule.pattern.map(function (a2) { return a2.kind === "hole" ? "expr" : a2.text; }).join(" "))
+          ]));
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "EXTENSION": {
+        /* foreign-extension transaction: commit each extension as a ledger
+           fact and bind its name as a callable in the current env. */
+        var self2 = this;
+        for (var xi = 0; xi < n.funcs.length; xi++) {
+          var xf = n.funcs[xi];
+          this.ledger.facts.push(Varr([
+            Vstr("extension"), Vstr(n.lang), Vstr(xf.name), Vstr("|" + xf.params.join(",") + "|")
+          ]));
+          if (n.lang === "bada") {
+            /* self-extension: the code IS Bada — parse once, bind a closure */
+            var sub = parseProgram(xf.code);
+            var decl = node("FUNC", n.line);
+            decl.str = xf.name;
+            decl.params = xf.params;
+            decl.body = sub.program; /* PROGRAM executes like a BLOCK */
+            env.set(xf.name, { t: "func", decl: decl, closure: env });
+          } else {
+            env.set(xf.name, makeFfiNative(self2, n.lang, xf));
+          }
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "IF": {
+        var c = this.eval(n.kids[0], env);
+        if (truthy(c)) return this.exec(n.kids[1], env);
+        else if (n.kids.length > 2) return this.exec(n.kids[2], env);
+        return { ret: false, val: Vnil() };
+      }
+      case "WHILE": {
+        while (truthy(this.eval(n.kids[0], env))) {
+          var wf = this.exec(n.kids[1], env);
+          if (wf.ret) return wf;
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "FOR": {
+        var it = this.eval(n.kids[0], env);
+        var loop = new Env(env);
+        if (it.t === "arr") {
+          for (var fi = 0; fi < it.items.length; fi++) {
+            loop.map[n.str] = it.items[fi];
+            var ff = this.exec(n.kids[1], loop);
+            if (ff.ret) return ff;
+          }
+        } else if (it.t === "dist") {
+          for (var di = 0; di < it.p.length; di++) {
+            loop.map[n.str] = Vnum(it.p[di]);
+            var df = this.exec(n.kids[1], loop);
+            if (df.ret) return df;
+          }
+        }
+        return { ret: false, val: Vnil() };
+      }
+      case "RETURN": {
+        return { ret: true, val: n.kids.length ? this.eval(n.kids[0], env) : Vnil() };
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var pi = 0; pi < n.kids.length; pi++)
+          parts.push(printValue(this.eval(n.kids[pi], env)));
+        this.out(parts.join(" "));
+        return { ret: false, val: Vnil() };
+      }
+      default: {
+        return { ret: false, val: this.eval(n, env) };
+      }
+    }
+  };
+
+  /* ------------------------------------------------------------------ *
+   * Transpiler: Bada -> C  (self-contained C program, embedded runtime)
+   * ------------------------------------------------------------------ */
+  var C_RUNTIME = [
+    "/* ==== Bada C runtime (emitted by the Bada GUI IDE) ==== */",
+    "#include <stdio.h>",
+    "#include <stdlib.h>",
+    "#include <string.h>",
+    "#include <math.h>",
+    "#include <complex.h>",
+    "typedef enum{BV_NIL,BV_NUM,BV_STR,BV_ARR,BV_DIST,BV_REG}BVT;",
+    "typedef struct BV BV;",
+    "typedef struct{BV*it;int n,cap;}BArr;",
+    "typedef struct{double*p;int v;}BDist;",
+    "typedef struct{double*re;double*im;int n;int v;}BReg;",
+    "struct BV{BVT t;double num;char*str;BArr*arr;BDist*dist;BReg*reg;};",
+    "static BV bnil(void){BV v;memset(&v,0,sizeof v);v.t=BV_NIL;return v;}",
+    "static BV bnum(double x){BV v;memset(&v,0,sizeof v);v.t=BV_NUM;v.num=x;return v;}",
+    "static BV bstr(const char*s){BV v;memset(&v,0,sizeof v);v.t=BV_STR;v.str=strdup(s);return v;}",
+    "static BArr*barr(void){BArr*a=calloc(1,sizeof(BArr));return a;}",
+    "static void bpush(BArr*a,BV v){if(a->n>=a->cap){a->cap=a->cap?a->cap*2:8;a->it=realloc(a->it,a->cap*sizeof(BV));}a->it[a->n++]=v;}",
+    "static BV barrv(BArr*a){BV v;memset(&v,0,sizeof v);v.t=BV_ARR;v.arr=a;return v;}",
+    "static BDist*bdist(int v){if(v<1)v=1;BDist*d=malloc(sizeof(BDist));d->p=calloc((size_t)v,sizeof(double));d->v=v;return d;}",
+    "static BV bdistv(BDist*d){BV v;memset(&v,0,sizeof v);v.t=BV_DIST;v.dist=d;return v;}",
+    "static double bnumof(BV v){return v.t==BV_NUM?v.num:0;}",
+    "/* append-only ledger */",
+    "static BV*G_FACTS=0;static int G_N=0,G_CAP=0;",
+    "static int bcommit(BV v){if(G_N>=G_CAP){G_CAP=G_CAP?G_CAP*2:8;G_FACTS=realloc(G_FACTS,G_CAP*sizeof(BV));}G_FACTS[G_N]=v;return G_N++;}",
+    "static int bledger_len(void){return G_N;}",
+    "static BDist*G_LAST_A=0;",
+    "/* engine builtins */",
+    "static BV b_softmax(BV a){int v;double*src;int own=0;",
+    "  if(a.t==BV_DIST){v=a.dist->v;src=a.dist->p;}else if(a.t==BV_ARR){v=a.arr->n;src=malloc(v*sizeof(double));for(int i=0;i<v;i++)src[i]=bnumof(a.arr->it[i]);own=1;}else return bnil();",
+    "  BDist*o=bdist(v);double mx=-INFINITY;for(int i=0;i<v;i++)if(src[i]>mx)mx=src[i];double s=0;for(int i=0;i<v;i++){o->p[i]=exp(src[i]-mx);s+=o->p[i];}for(int i=0;i<v;i++)o->p[i]/=s;for(int i=0;i<v;i++)if(src[i]-mx<-30.0)o->p[i]=0.0;{double ss=0;for(int i=0;i<v;i++)ss+=o->p[i];if(ss>0)for(int i=0;i<v;i++)o->p[i]/=ss;}if(own)free(src);return bdistv(o);}",
+    "static BV b_entropy(BV a){double*p;int v;int own=0;if(a.t==BV_DIST){p=a.dist->p;v=a.dist->v;}else if(a.t==BV_ARR){v=a.arr->n;p=malloc(v*sizeof(double));for(int i=0;i<v;i++)p[i]=bnumof(a.arr->it[i]);own=1;}else return bnum(0);",
+    "  double H=0;for(int i=0;i<v;i++){double q=p[i];if(q<1e-12)q=1e-12;H+=-q*log(q);}if(own)free(p);return bnum(H);}",
+    "static BV b_unknown_prior(BV a){int v=(int)bnumof(a);if(v<1)v=1;BDist*d=bdist(v);for(int i=0;i<v;i++)d->p[i]=1.0/v;return bdistv(d);}",
+    "static BV b_update(BV pr,BV ev,double lr){if(pr.t!=BV_DIST)return pr;BDist*P=pr.dist;double*E;int ev_v;int own=0;",
+    "  if(ev.t==BV_DIST){E=ev.dist->p;ev_v=ev.dist->v;}else if(ev.t==BV_ARR){ev_v=ev.arr->n;E=malloc(ev_v*sizeof(double));for(int i=0;i<ev_v;i++)E[i]=bnumof(ev.arr->it[i]);own=1;}else return pr;",
+    "  int v=P->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<ev_v?E[i]:0;o->p[i]=(1-lr)*P->p[i]+lr*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;if(own)free(E);return bdistv(o);}",
+    "static BV b_cognitive(BV base,BArr*mods,BArr*betas){BDist*a;",
+    "  if(base.t!=BV_DIST&&base.t!=BV_ARR)return bnil();",
+    "  if(base.t==BV_DIST){a=bdist(base.dist->v);for(int i=0;i<a->v;i++)a->p[i]=base.dist->p[i];}else{BV s=b_softmax(base);if(s.t!=BV_DIST)return bnil();a=bdist(s.dist->v);for(int i=0;i<a->v;i++)a->p[i]=s.dist->p[i];}",
+    "  int v=a->v;if(v<1)v=1;double*th=calloc((size_t)v,sizeof(double));",
+    "  if(mods)for(int m=0;m<mods->n;m++){if(mods->it[m].t!=BV_ARR)continue;BArr*pr=mods->it[m].arr;if(pr->n<2)continue;",
+    "    double*q;int qv;int own=0;if(pr->it[0].t==BV_DIST){q=pr->it[0].dist->p;qv=pr->it[0].dist->v;}else if(pr->it[0].t==BV_ARR){qv=pr->it[0].arr->n;q=malloc(qv*sizeof(double));for(int i=0;i<qv;i++)q[i]=bnumof(pr->it[0].arr->it[i]);own=1;}else continue;",
+    "    double H=0;for(int i=0;i<qv;i++){double qq=q[i];if(qq<1e-12)qq=1e-12;H+=-qq*log(qq);}",
+    "    BArr*phi=pr->it[1].t==BV_ARR?pr->it[1].arr:0;double beta=(betas&&m<betas->n)?bnumof(betas->it[m]):1.0;",
+    "    for(int i=0;i<v;i++){double pv=(phi&&i<phi->n)?bnumof(phi->it[i]):0;th[i]+=beta*H*pv;}if(own)free(q);}",
+    "  BDist*qh=bdist(v);double s=0;for(int i=0;i<v;i++){double complex psi=sqrt(a->p[i])*cexp(I*th[i]);double mag2=creal(psi)*creal(psi)+cimag(psi)*cimag(psi);qh->p[i]=mag2;s+=mag2;}if(s>0)for(int i=0;i<v;i++)qh->p[i]/=s;free(th);",
+    "  if(G_LAST_A){free(G_LAST_A->p);free(G_LAST_A);}G_LAST_A=a;",
+    "  BDist*snap=bdist(v);for(int i=0;i<v;i++)snap->p[i]=qh->p[i];bcommit(bdistv(snap));return bdistv(qh);}",
+    "static BV b_last_a(void){if(!G_LAST_A)return bnil();BDist*c=bdist(G_LAST_A->v);for(int i=0;i<c->v;i++)c->p[i]=G_LAST_A->p[i];return bdistv(c);}",
+    "static BV b_zeros_of(BV a){BArr*o=barr();if(a.t==BV_DIST){for(int i=0;i<a.dist->v;i++)if(a.dist->p[i]==0.0)bpush(o,bnum(i));}return barrv(o);}",
+    "static BV b_maxdiff(BV a,BV b){if(a.t!=BV_DIST||b.t!=BV_DIST)return bnum(0);int v=a.dist->v<b.dist->v?a.dist->v:b.dist->v;double m=0;for(int i=0;i<v;i++){double d=fabs(a.dist->p[i]-b.dist->p[i]);if(d>m)m=d;}return bnum(m);}",
+    "static BV b_sci(BV a){char buf[64];snprintf(buf,64,\"%.2e\",bnumof(a));return bstr(buf);}",
+    "static BV b_f5(BV a){char buf[64];snprintf(buf,64,\"%.5f\",bnumof(a));return bstr(buf);}",
+    "/* ==== quantum sublanguage on the phase core ==== */",
+    "static BReg*bqreg(int n){BReg*r=malloc(sizeof(BReg));r->n=n;r->v=1<<n;r->re=calloc(r->v,sizeof(double));r->im=calloc(r->v,sizeof(double));r->re[0]=1;return r;}",
+    "static BV bregv(BReg*r){BV v;memset(&v,0,sizeof v);v.t=BV_REG;v.reg=r;return v;}",
+    "static BV b_qubit(BV a){int n=(int)bnumof(a);if(n<1)n=1;return bregv(bqreg(n));}",
+    "static void b_gate_h(BReg*r,int q){int bit=1<<q;double c=M_SQRT1_2;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double ar=r->re[i],ai=r->im[i],br=r->re[j],bi=r->im[j];r->re[i]=c*(ar+br);r->im[i]=c*(ai+bi);r->re[j]=c*(ar-br);r->im[j]=c*(ai-bi);}}",
+    "static void b_gate_x(BReg*r,int q){int bit=1<<q;for(int i=0;i<r->v;i++){if(i&bit)continue;int j=i|bit;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}",
+    "static void b_gate_ph(BReg*r,int q,double lam){int bit=1<<q;double c=cos(lam),s=sin(lam);for(int i=0;i<r->v;i++){if(!(i&bit))continue;double ar=r->re[i],ai=r->im[i];r->re[i]=ar*c-ai*s;r->im[i]=ar*s+ai*c;}}",
+    "static void b_gate_cnot(BReg*r,int cq,int tq){int cb=1<<cq,tb=1<<tq;for(int i=0;i<r->v;i++){if((i&cb)&&!(i&tb)){int j=i|tb;double tr=r->re[i],ti=r->im[i];r->re[i]=r->re[j];r->im[i]=r->im[j];r->re[j]=tr;r->im[j]=ti;}}}",
+    "static BV b_H(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_h(a.reg,q);return a;}",
+    "static BV b_X(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_x(a.reg,q);return a;}",
+    "static BV b_S(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/2);return a;}",
+    "static BV b_T(BV a,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,M_PI/4);return a;}",
+    "static BV b_Rz(BV a,double lam,int q){if(a.t!=BV_REG)return bnil();b_gate_ph(a.reg,q,lam);return a;}",
+    "static BV b_CNOT(BV a,int c,int t){if(a.t!=BV_REG)return bnil();b_gate_cnot(a.reg,c,t);return a;}",
+    "static BV b_phase_uniform(BV a){if(a.t!=BV_REG)return bnil();for(int q=0;q<a.reg->n;q++)b_gate_h(a.reg,q);return a;}",
+    "static BV b_measure(BV a){if(a.t==BV_DIST){bcommit(a);return a;}if(a.t!=BV_REG)return bnil();BReg*r=a.reg;BDist*d=bdist(r->v);double s=0;for(int i=0;i<r->v;i++){d->p[i]=r->re[i]*r->re[i]+r->im[i]*r->im[i];s+=d->p[i];}if(s>0)for(int i=0;i<r->v;i++)d->p[i]/=s;BDist*snap=bdist(r->v);for(int i=0;i<r->v;i++)snap->p[i]=d->p[i];bcommit(bdistv(snap));return bdistv(d);}",
+    "/* Omega::Quantum estimator: max-entropy start + append-only sharpening */",
+    "static BDist*G_QPRIOR=0;",
+    "static BV b_prepare_unknown(BV a){int n=(int)bnumof(a);if(n<1)n=1;int V=1<<n;BDist*p=bdist(V);for(int i=0;i<V;i++)p->p[i]=1.0/V;G_QPRIOR=p;BDist*c=bdist(V);for(int i=0;i<V;i++)c->p[i]=p->p[i];return bdistv(c);}",
+    "static BV b_observe(BV a){BV d=b_measure(a);if(d.t==BV_DIST&&G_QPRIOR){int v=G_QPRIOR->v;BDist*o=bdist(v);double s=0;for(int i=0;i<v;i++){double e=i<d.dist->v?d.dist->p[i]:0;o->p[i]=0.5*G_QPRIOR->p[i]+0.5*e;s+=o->p[i];}if(s>0)for(int i=0;i<v;i++)o->p[i]/=s;free(G_QPRIOR->p);free(G_QPRIOR);G_QPRIOR=o;}return d;}",
+    "static BV b_estimate(void){if(!G_QPRIOR)return bnil();BDist*c=bdist(G_QPRIOR->v);for(int i=0;i<c->v;i++)c->p[i]=G_QPRIOR->p[i];return bdistv(c);}",
+    "static BV b_forbidden(void){BArr*o=barr();if(G_QPRIOR)for(int i=0;i<G_QPRIOR->v;i++)if(G_QPRIOR->p[i]==0.0)bpush(o,bnum(i));return barrv(o);}",
+    "static BV bindex(BV b,BV i){int k=(int)bnumof(i);if(b.t==BV_DIST&&k>=0&&k<b.dist->v)return bnum(b.dist->p[k]);if(b.t==BV_ARR&&k>=0&&k<b.arr->n)return b.arr->it[k];return bnil();}",
+    "static void bprint(BV v){switch(v.t){case BV_NIL:printf(\"nil\");break;case BV_NUM:if(v.num==(long long)v.num)printf(\"%lld\",(long long)v.num);else printf(\"%.5f\",v.num);break;case BV_STR:printf(\"%s\",v.str);break;case BV_ARR:{printf(\"[\");for(int i=0;i<v.arr->n;i++){if(i)printf(\", \");bprint(v.arr->it[i]);}printf(\"]\");break;}case BV_DIST:{printf(\"dist[\");for(int i=0;i<v.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",v.dist->p[i]);}printf(\"]\");break;}case BV_REG:{BV d=b_measure(v);G_N--;printf(\"qreg[n=%d] |psi|^2=[\",v.reg->n);for(int i=0;i<d.dist->v;i++){if(i)printf(\", \");printf(\"%.5f\",d.dist->p[i]);}printf(\"]\");break;}}}",
+    "static BV badd(BV a,BV b){if(a.t==BV_STR||b.t==BV_STR){char x[256],y[256],z[520];if(a.t==BV_STR)snprintf(x,256,\"%s\",a.str);else snprintf(x,256,\"%g\",bnumof(a));if(b.t==BV_STR)snprintf(y,256,\"%s\",b.str);else snprintf(y,256,\"%g\",bnumof(b));snprintf(z,520,\"%s%s\",x,y);return bstr(z);}return bnum(bnumof(a)+bnumof(b));}",
+    "static BV bsub(BV a,BV b){return bnum(bnumof(a)-bnumof(b));}",
+    "static BV bmul(BV a,BV b){return bnum(bnumof(a)*bnumof(b));}",
+    "static BV bdiv(BV a,BV b){double d=bnumof(b);return bnum(d!=0?bnumof(a)/d:0);}",
+    ""
+  ].join("\n");
+
+  function Emitter() {
+    this.lines = [];
+    this.tmp = 0;
+    this.declared = Object.create(null);
+    this.preludes = [];                  /* hoisted C extension functions */
+    this.extC = Object.create(null);     /* name -> params (C extensions) */
+  }
+  Emitter.prototype.push = function (s) { this.lines.push(s); };
+
+  function lowerCall(E, n, holes) {
+    var callee = n.kids[0];
+    var argc = n.kids.length - 1;
+    function arg(i, dflt) {
+      return i < argc ? lowerExpr(E, n.kids[i + 1], holes) : (dflt || "bnil()");
+    }
+    if (callee.type === "IDENT") {
+      var name = callee.str;
+      /* C extensions (@reviser : extension c) are inlined native functions */
+      if (E.extC[name]) {
+        var xp = E.extC[name];
+        var xargs = [];
+        for (var xi = 0; xi < xp.length; xi++) xargs.push("bnumof(" + arg(xi, "bnum(0)") + ")");
+        return "bnum(bx_" + name + "(" + xargs.join(",") + "))";
+      }
+      switch (name) {
+        case "softmax": return "b_softmax(" + arg(0) + ")";
+        case "entropy": return "b_entropy(" + arg(0) + ")";
+        case "unknown_prior": return "b_unknown_prior(" + arg(0) + ")";
+        case "dist": return "(" + arg(0) + ")";
+        case "len": {
+          if (argc > 0 && n.kids[1].type === "IDENT" &&
+              (n.kids[1].str === "tuplespace" || n.kids[1].str === "Omega" || n.kids[1].str === "TupleSpace"))
+            return "bnum(bledger_len())";
+          var a0 = arg(0);
+          return "bnum((" + a0 + ").t==BV_ARR?(" + a0 + ").arr->n:((" + a0 + ").t==BV_DIST?(" + a0 + ").dist->v:((" + a0 + ").t==BV_REG?(" + a0 + ").reg->v:0)))";
+        }
+        case "sqrt": return "bnum(sqrt(bnumof(" + arg(0) + ")))";
+        case "log": return "bnum(log(bnumof(" + arg(0) + ")))";
+        case "exp": return "bnum(exp(bnumof(" + arg(0) + ")))";
+        case "abs": return "bnum(fabs(bnumof(" + arg(0) + ")))";
+        case "ledger": return "bnum(bledger_len())";
+        case "zeros_of": return "b_zeros_of(" + arg(0) + ")";
+        case "maxdiff": return "b_maxdiff(" + arg(0) + "," + arg(1) + ")";
+        case "sci": return "b_sci(" + arg(0) + ")";
+        case "f5": return "b_f5(" + arg(0) + ")";
+        case "last_a": return "b_last_a()";
+        case "update": {
+          if (argc > 2) return "b_update(" + arg(0) + "," + arg(1) + ",bnumof(" + arg(2) + "))";
+          return "b_update(" + arg(0) + "," + arg(1) + ",0.5)";
+        }
+        case "cognitive_system": {
+          var b0 = arg(0), b1 = arg(1, "bnil()"), b2 = arg(2, "bnil()");
+          var t1 = "t" + (E.tmp++), t2 = "t" + (E.tmp++);
+          E.push("  BV " + t1 + "=" + b1 + "; BV " + t2 + "=" + b2 + ";");
+          return "b_cognitive(" + b0 + ",(" + t1 + ").t==BV_ARR?(" + t1 + ").arr:0,(" + t2 + ").t==BV_ARR?(" + t2 + ").arr:0)";
+        }
+        /* quantum sublanguage */
+        case "qubit": return "b_qubit(" + arg(0) + ")";
+        case "H": return "b_H(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "X": return "b_X(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "S": return "b_S(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "T": return "b_T(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + ")";
+        case "Rz": return "b_Rz(" + arg(0) + "," + (argc > 1 ? "bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "0") + ")";
+        case "CNOT": return "b_CNOT(" + arg(0) + "," + (argc > 1 ? "(int)bnumof(" + arg(1) + ")" : "0") + "," + (argc > 2 ? "(int)bnumof(" + arg(2) + ")" : "1") + ")";
+        case "Measure": case "commit_measurement": return "b_measure(" + arg(0) + ")";
+        case "observe": return "b_observe(" + arg(0) + ")";
+        case "phase_uniform": return "b_phase_uniform(" + arg(0) + ")";
+        case "prepare_unknown": return "b_prepare_unknown(" + arg(0) + ")";
+        case "estimate": return "b_estimate()";
+        case "forbidden": return "b_forbidden()";
+      }
+    }
+    /* method call: x.append(v) -> bcommit(v) */
+    if (callee.type === "GET" && callee.str === "append") {
+      return "bnum(bcommit(" + arg(0) + "))";
+    }
+    return "bnil()";
+  }
+
+  function cQuote(s) {
+    return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\t/g, "\\t");
+  }
+
+  function lowerExpr(E, n, holes) {
+    if (!n) return "bnil()";
+    switch (n.type) {
+      case "INT": case "FLOAT": {
+        var s = String(n.num);
+        if (!/[.eE]/.test(s)) s += ".0";
+        return "bnum(" + s + ")";
+      }
+      case "STRING": return 'bstr("' + cQuote(n.str || "") + '")';
+      case "BOOL": return "bnum(" + (n.boolean ? 1 : 0) + ")";
+      case "NIL": return "bnil()";
+      case "IDENT": {
+        if (holes && Object.prototype.hasOwnProperty.call(holes, n.str)) return holes[n.str];
+        if (n.str === "tuplespace" || n.str === "Omega" || n.str === "TupleSpace")
+          return "bnum(bledger_len())";
+        return "v_" + n.str;
+      }
+      case "ARRAY": {
+        var id = E.tmp++;
+        E.push("  BArr*t" + id + "=barr();");
+        for (var i = 0; i < n.kids.length; i++) {
+          var e = lowerExpr(E, n.kids[i], holes);
+          E.push("  bpush(t" + id + "," + e + ");");
+        }
+        return "barrv(t" + id + ")";
+      }
+      case "BINARY": {
+        var l = lowerExpr(E, n.kids[0], holes);
+        var r = lowerExpr(E, n.kids[1], holes);
+        switch (n.str) {
+          case "+": return "badd(" + l + "," + r + ")";
+          case "-": return "bsub(" + l + "," + r + ")";
+          case "*": return "bmul(" + l + "," + r + ")";
+          case "/": return "bdiv(" + l + "," + r + ")";
+          case "<": return "bnum(bnumof(" + l + ")<bnumof(" + r + ")?1:0)";
+          case "<=": return "bnum(bnumof(" + l + ")<=bnumof(" + r + ")?1:0)";
+          case ">": return "bnum(bnumof(" + l + ")>bnumof(" + r + ")?1:0)";
+          case ">=": return "bnum(bnumof(" + l + ")>=bnumof(" + r + ")?1:0)";
+          case "==": return "bnum(bnumof(" + l + ")==bnumof(" + r + ")?1:0)";
+          case "!=": return "bnum(bnumof(" + l + ")!=bnumof(" + r + ")?1:0)";
+          case "%": return "bnum(fmod(bnumof(" + l + "),bnumof(" + r + ")))";
+          case "&&": return "bnum((bnumof(" + l + ")!=0&&bnumof(" + r + ")!=0)?1:0)";
+          case "||": return "bnum((bnumof(" + l + ")!=0||bnumof(" + r + ")!=0)?1:0)";
+          default: return "bnum(bnumof(" + l + ")+bnumof(" + r + "))";
+        }
+      }
+      case "CALL": return lowerCall(E, n, holes);
+      case "UNARY": {
+        var u = lowerExpr(E, n.kids[0], holes);
+        if (n.str === "-") return "bnum(-bnumof(" + u + "))";
+        if (n.str === "!") return "bnum(bnumof(" + u + ")==0?1:0)";
+        return "(" + u + ")";
+      }
+      case "INDEX": {
+        var b = lowerExpr(E, n.kids[0], holes);
+        var ix = n.kids.length > 1 ? lowerExpr(E, n.kids[1], holes) : "bnum(0)";
+        return "bindex(" + b + "," + ix + ")";
+      }
+      case "COMMIT": {
+        var cl = lowerExpr(E, n.kids[0], holes);
+        var id2 = E.tmp++;
+        E.push("  BV c" + id2 + "=" + cl + "; bcommit(c" + id2 + ");");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "QUERY": {
+        var q0 = lowerExpr(E, n.kids[0], holes);
+        var id3 = E.tmp++;
+        E.push("  BV q" + id3 + "=" + q0 + "; (void)q" + id3 + ";");
+        return lowerExpr(E, n.kids[1], holes);
+      }
+      case "EXTENDED": {
+        /* lower an extended form by lowering the rule denotation with the
+           captured holes substituted (rule lookup happens before lowering,
+           so the native back end sees only ordinary engine calls) */
+        var hmap = {};
+        for (var h = 0; h < n.kids.length; h++) {
+          var he = lowerExpr(E, n.kids[h], holes);
+          var ht = "h" + (E.tmp++);
+          E.push("  BV " + ht + "=" + he + ";");
+          hmap["_" + (h + 1)] = ht;
+        }
+        return lowerExpr(E, n.rule.denotation, hmap);
+      }
+      case "GET": return "bnil()";
+      default: return "bnil()";
+    }
+  }
+
+  function lowerStmt(E, n) {
+    switch (n.type) {
+      case "BIND": {
+        var e = lowerExpr(E, n.kids[0], null);
+        if (E.declared[n.str]) E.push("  v_" + n.str + "=" + e + ";");
+        else { E.declared[n.str] = true; E.push("  BV v_" + n.str + "=" + e + "; (void)v_" + n.str + ";"); }
+        break;
+      }
+      case "ASSIGN": {
+        if (n.kids[0].type === "IDENT") {
+          var e2 = lowerExpr(E, n.kids[1], null);
+          if (!E.declared[n.kids[0].str]) { E.declared[n.kids[0].str] = true; E.push("  BV v_" + n.kids[0].str + "=" + e2 + ";"); }
+          else E.push("  v_" + n.kids[0].str + "=" + e2 + ";");
+        }
+        break;
+      }
+      case "PRINT": {
+        var parts = [];
+        for (var i = 0; i < n.kids.length; i++) parts.push(lowerExpr(E, n.kids[i], null));
+        var stmt = "  ";
+        for (var j = 0; j < parts.length; j++) {
+          stmt += "bprint(" + parts[j] + ");";
+          if (j < parts.length - 1) stmt += 'printf(" ");';
+        }
+        stmt += 'printf("\\n");';
+        E.push(stmt);
+        break;
+      }
+      case "OMEGA_DB": case "REVISER":
+        if (n.body) for (var k = 0; k < n.body.kids.length; k++) lowerStmt(E, n.body.kids[k]);
+        break;
+      case "GRAMMAR":
+        E.push("  /* grammar transaction: " + n.rules.map(function (r) { return r.name; }).join(", ") + " (resolved before lowering) */");
+        break;
+      case "EXTENSION":
+        if (n.lang === "c") {
+          /* inline each C extension as a native function in the emitted C */
+          for (var ex = 0; ex < n.funcs.length; ex++) {
+            var xf = n.funcs[ex];
+            E.extC[xf.name] = xf.params;
+            E.preludes.push(
+              "/* @reviser : extension c -- " + xf.name + " */\n" +
+              "static double bx_" + xf.name + "(" +
+              (xf.params.length ? xf.params.map(function (p) { return "double " + p; }).join(", ") : "void") +
+              ") {\n" + xf.code + "\n}"
+            );
+          }
+        } else {
+          E.push("  /* extension transaction (" + n.lang + "): " +
+            n.funcs.map(function (f) { return f.name; }).join(", ") +
+            " -- runs in the interpreter's FFI, not in compiled output */");
+        }
+        break;
+      case "BLOCK":
+        for (var l = 0; l < n.kids.length; l++) lowerStmt(E, n.kids[l]);
+        break;
+      case "FUNC": case "STRUCT": case "ASPERAL":
+        E.push("  /* decl '" + (n.str || "?") + "' specialised at compile time (interp register) */");
+        break;
+      case "IF": {
+        var c = lowerExpr(E, n.kids[0], null);
+        E.push("  if(bnumof(" + c + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        if (n.kids.length > 2) { E.push("  else {"); lowerStmt(E, n.kids[2]); E.push("  }"); }
+        break;
+      }
+      case "WHILE": {
+        var wc = lowerExpr(E, n.kids[0], null);
+        E.push("  while(bnumof(" + wc + ")!=0){");
+        lowerStmt(E, n.kids[1]);
+        E.push("  }");
+        break;
+      }
+      case "FOR":
+        E.push("  /* 'for' outside the transpiled subset (runs in the interpreter) */");
+        break;
+      default: {
+        var ex = lowerExpr(E, n, null);
+        E.push("  (void)(" + ex + ");");
+      }
+    }
+  }
+
+  function transpileToC(program) {
+    var E = new Emitter();
+    var body = [];
+    E.lines = body;
+    for (var i = 0; i < program.kids.length; i++) lowerStmt(E, program.kids[i]);
+    var prelude = E.preludes.length ? E.preludes.join("\n") + "\n" : "";
+    return C_RUNTIME + prelude + "\nint main(void){\n" + body.join("\n") + "\n  return 0;\n}\n";
+  }
+
+  /* ------------------------------------------------------------------ *
+   * AST / token dumps (for the IDE's inspector panes)
+   * ------------------------------------------------------------------ */
+  function dumpAst(n, d, out) {
+    var pad = new Array(d + 1).join("  ");
+    var s = pad + n.type.toLowerCase();
+    if (n.str) s += " '" + n.str + "'";
+    if (n.type === "INT" || n.type === "FLOAT") s += " " + n.num;
+    if (n.params && n.params.length) s += " |" + n.params.join(",") + "|";
+    out.push(s);
+    for (var i = 0; i < n.kids.length; i++) dumpAst(n.kids[i], d + 1, out);
+    if (n.body) dumpAst(n.body, d + 1, out);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Public API
+   * ------------------------------------------------------------------ */
+  return {
+    VERSION: VERSION,
+    tokenize: tokenize,
+    parse: parseProgram,
+    tokens: function (src) {
+      return tokenize(src).map(function (t) {
+        return String(t.line).padStart(4) + "  " + t.type.padEnd(10) + "  " + (t.lexeme || "");
+      }).join("\n");
+    },
+    ast: function (src) {
+      var p = parseProgram(src);
+      var out = [];
+      dumpAst(p.program, 0, out);
+      return { text: out.join("\n"), errors: p.errors };
+    },
+    run: function (src, opts) {
+      opts = opts || {};
+      var lines = [];
+      var p = parseProgram(src);
+      var interp = new Interp({
+        out: function (s) { lines.push(s); if (opts.out) opts.out(s); },
+        maxSteps: opts.maxSteps,
+        ffi: opts.ffi
+      });
+      var ok = true, error = null;
+      try {
+        interp.exec(p.program, interp.global);
+      } catch (e) {
+        ok = false;
+        error = String(e && e.message ? e.message : e);
+        lines.push("[runtime error] " + error);
+      }
+      return {
+        ok: ok && p.errors.length === 0,
+        output: lines.join("\n"),
+        parseErrors: p.errors,
+        error: error,
+        ledgerLen: interp.ledger.facts.length,
+        rules: p.ruleLedger.map(function (r) { return r.name + " (" + r.head + ")"; })
+      };
+    },
+    emitC: function (src) {
+      var p = parseProgram(src);
+      var c = transpileToC(p.program);
+      return { ok: p.errors.length === 0, c: c, errors: p.errors };
+    },
+    /* Interactive session (REPL): a persistent interpreter + a persistent
+       rule ledger, so bindings, the tuplespace, and @reviser : grammar
+       rules all survive across eval() calls. */
+    createSession: function (opts) {
+      opts = opts || {};
+      var outLines = [];
+      var interp = new Interp({
+        out: function (s) { outLines.push(s); if (opts.out) opts.out(s); },
+        maxSteps: opts.maxSteps,
+        ffi: opts.ffi
+      });
+      var ruleLedger = [];
+      return {
+        eval: function (src) {
+          outLines.length = 0;
+          var toks = tokenize(src);
+          var p = new Parser(toks);
+          p.ruleLedger = ruleLedger; /* grammar persists across lines */
+          var prog = node("PROGRAM", 1);
+          while (!p.check("EOF")) {
+            var d = p.parseDecl();
+            if (d) prog.kids.push(d);
+            if (p.errors.length > 50) break;
+          }
+          var result = { ok: true, errors: p.errors, output: "", value: null };
+          try {
+            var f = interp.exec(prog, interp.global);
+            if (f.val && f.val.t !== "nil") result.value = printValue(f.val);
+          } catch (e) {
+            result.ok = false;
+            result.errors = p.errors.concat(["[runtime error] " + String(e && e.message ? e.message : e)]);
+          }
+          result.ok = result.ok && p.errors.length === 0;
+          result.output = outLines.join("\n");
+          return result;
+        },
+        ledgerLen: function () { return interp.ledger.facts.length; },
+        rules: function () {
+          return ruleLedger.map(function (r) { return r.name + " (" + r.head + ")"; });
+        }
+      };
+    }
+  };
+});
+
+</script>
+<script>
+/* ==== BadaVM Pro + BadaBSD + BadaX runtime libraries (inlined .bada) ==== */
+var VM_LIBS = "# ============================================================\n# vmpro.bada -- BadaVM Pro : the QUANTUM HYPERVISOR, written in\n# the Bada quantum programming language.\n#\n# BadaVM Pro is an (unofficial, educational) homage to desktop\n# hypervisors in the style of VMware Workstation Pro: a virtual\n# machine monitor with a VMX-like machine description, virtual\n# hardware (quantum vCPU, RAM, disk, NAT network, CD-ROM), a\n# BIOS POST + boot order, snapshots, and a guest console.\n#\n# QUANTUM SERVICES (shared by the guest OS and the X server) ----\n#   * qcpu       -- every vCPU carries a qubit register; the\n#                   scheduler entropy and the guest qrng device\n#                   are Measure commits on that register.\n#   * qkd_session-- a Bell pair (H + CNOT + Measure) agrees a\n#                   session salt; zero-preservation (the\n#                   forbidden |01>,|10> stay EXACTLY 0) is the\n#                   tamper evidence on the virtual wire.\n#   * jones_key  -- long-term keys are derived from a knot\n#                   diagram by sampling the Kauffman bracket /\n#                   Jones polynomial (omega_jones_crypto_pkg,\n#                   ported to Bada) -- used as the X server's\n#                   JONES-KNOT-COOKIE-1 display cookie.\n#\n# SNAPSHOTS are event-ledger prefixes: the whole machine state\n# is the deterministic replay of the append-only event ledger\n# (the Akashic machine tape), so a snapshot is just a committed\n# prefix length -- restore == replay that prefix.\n#\n# Host protocol: every UI-visible effect is printed as a line\n# beginning with \"@@\" (a machine-parseable block, exactly like\n# zone-lib.bada's zone_serve).\n# ============================================================\n\n# ---- small shared utilities ----------------------------------------\ndef str_hash(s) {\n    h := 7\n    i := 0\n    n := len(s)\n    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }\n    return h\n}\n\ndef hex2(v) {\n    d := \"0123456789abcdef\"\n    lo := v % 16\n    hi := ((v - lo) / 16) % 16\n    return substr(d, hi, 1) + substr(d, lo, 1)\n}\n\ndef ipow(base, e) {\n    if (e < 0) {\n        r := 1.0\n        k := 0\n        m := 0 - e\n        while (k < m) { r := r * base; k := k + 1 }\n        return 1.0 / r\n    }\n    r := 1.0\n    k := 0\n    while (k < e) { r := r * base; k := k + 1 }\n    return r\n}\n\n# ---- Jones-polynomial key schedule (omega_jones_crypto, in Bada) ----\ndef uf_find(parent, x) {\n    r := x\n    while (parent[r] >= 0) { r := parent[r] }\n    return r\n}\n\ndef kauffman(cross, A) {\n    n := len(cross)\n    if (n == 0) { return 1.0 }\n    maxlbl := 0\n    i := 0\n    while (i < n) {\n        k := 1\n        while (k <= 4) {\n            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }\n            k := k + 1\n        }\n        i := i + 1\n    }\n    U := maxlbl + 1\n    states := 1\n    p := 0\n    while (p < n) { states := states * 2; p := p + 1 }\n    d := (0 - (A * A)) - (1.0 / (A * A))\n    sum := 0.0\n    bits := []\n    i := 0\n    while (i < n) { bits <- 0; i := i + 1 }\n    st := 0\n    while (st < states) {\n        parent := []\n        q := 0\n        while (q < U) { parent <- (0 - 1); q := q + 1 }\n        a_cnt := 0\n        b_cnt := 0\n        i := 0\n        while (i < n) {\n            e0 := cross[i][1]\n            e1 := cross[i][2]\n            e2 := cross[i][3]\n            e3 := cross[i][4]\n            if (bits[i] == 0) {\n                ra := uf_find(parent, e0)\n                rb := uf_find(parent, e1)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e2)\n                rb := uf_find(parent, e3)\n                if (ra != rb) { parent[ra] = rb }\n                a_cnt := a_cnt + 1\n            } else {\n                ra := uf_find(parent, e1)\n                rb := uf_find(parent, e2)\n                if (ra != rb) { parent[ra] = rb }\n                ra := uf_find(parent, e3)\n                rb := uf_find(parent, e0)\n                if (ra != rb) { parent[ra] = rb }\n                b_cnt := b_cnt + 1\n            }\n            i := i + 1\n        }\n        seen := []\n        q := 0\n        while (q < U) { seen <- 0; q := q + 1 }\n        loops := 0\n        lbl := 0\n        while (lbl < U) {\n            r := uf_find(parent, lbl)\n            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }\n            lbl := lbl + 1\n        }\n        weight := ipow(A, a_cnt - b_cnt)\n        lf := ipow(d, loops - 1)\n        sum := sum + weight * lf\n        c := 0\n        carry := 1\n        while (c < n && carry == 1) {\n            if (bits[c] == 0) { bits[c] = 1; carry := 0 }\n            else { bits[c] = 0 }\n            c := c + 1\n        }\n        st := st + 1\n    }\n    return sum\n}\n\n# the trefoil knot is the hypervisor's secret; its Jones polynomial is\n# the key schedule of the display cookie (JONES-KNOT-COOKIE-1).\ndef vm_knot() {\n    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]\n}\n\ndef jones_key(diagram) {\n    As := [0.8, 1.0, 1.2, 1.5, 2.0]\n    acc := \"jones|\"\n    i := 0\n    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + \"|\"; i := i + 1 }\n    return str_hash(acc)\n}\n\n# ---- Bell-pair QKD: the quantum-secured virtual wire ----------------\n# Returns [ok, salt]. ok == false means the Bell correlation broke:\n# somebody is tapping the virtual network.\ndef qkd_session() {\n    bell := qubit(2)\n    bell := H(bell, 0)\n    bell := CNOT(bell, 0, 1)\n    outcome := Measure(bell)\n    ok := (outcome[1] == 0) && (outcome[2] == 0)\n    salt := (len(tuplespace) * 131 + 17) % 4096\n    return [ok, salt]\n}\n\n# ---- guarded printing (silent during ledger replay) -----------------\ndef tty(emit, s)  { if (emit) { print(\"@@TTY \" + s) } }\ndef hyp(emit, s)  { if (emit) { print(\"@@HYP \" + s) } }\n\n# ====================================================================\n# The virtual machine record\n#   VM = [ name, vcpus, ram_mb, disk_mb, mac, serial, power,\n#          iso, jones_cookie ]\n#         0     1      2       3        4    5       6\n#         7    8\n# ====================================================================\ndef vm_mac(name) {\n    h := str_hash(\"mac:\" + name)\n    a := h % 256\n    b := ((h - (h % 256)) / 256) % 256\n    c := ((h - (h % 65536)) / 65536) % 256\n    return \"00:0c:ba:\" + hex2(a) + \":\" + hex2(b) + \":\" + hex2(c)\n}\n\ndef vm_create(name, vcpus, ram_mb, disk_mb) {\n    mac := vm_mac(name)\n    serial := \"QVM-\" + str_hash(\"serial:\" + name)\n    cookie := jones_key(vm_knot())\n    return [name, vcpus, ram_mb, disk_mb, mac, serial, 0,\n            \"BadaBSD-11.0-amd64-quantum.iso\", cookie]\n}\n\n# ---- the VMX-like machine description (Settings dialog) -------------\ndef vmx_emit(emit, vm) {\n    if (!emit) { return 0 }\n    print(\"@@VMX .encoding = UTF-8\")\n    print(\"@@VMX config.version = 8\")\n    print(\"@@VMX virtualHW.version = 21\")\n    print(\"@@VMX displayName = \" + vm[0])\n    print(\"@@VMX guestOS = badabsd-64\")\n    print(\"@@VMX numvcpus = \" + vm[1])\n    print(\"@@VMX cpuid.family = bada-qcpu\")\n    print(\"@@VMX qcpu.qubits = 8\")\n    print(\"@@VMX qcpu.hilbert_dim = 256\")\n    print(\"@@VMX memsize = \" + vm[2])\n    print(\"@@VMX scsi0:0.fileName = \" + vm[0] + \".qvmdk\")\n    print(\"@@VMX scsi0:0.capacity = \" + vm[3] + \" MB\")\n    print(\"@@VMX ide1:0.fileName = \" + vm[7])\n    print(\"@@VMX ethernet0.connectionType = nat\")\n    print(\"@@VMX ethernet0.address = \" + vm[4])\n    print(\"@@VMX display.server = BadaX (JONES-KNOT-COOKIE-1)\")\n    print(\"@@VMX display.cookie = \" + vm[8])\n    print(\"@@VMX serialNumber = \" + vm[5])\n    return 0\n}\n\n# ---- BIOS POST + boot order ----------------------------------------\ndef vm_bios(emit, vm, has_system) {\n    tty(emit, \"BadaVM Pro BIOS v5.11 -- (C) Global Differential Manifold Research\")\n    tty(emit, \"qcpu0 + qcpu1 : Bada Quantum vCPU @ 8 qubits (Hilbert dim 256)\")\n    tty(emit, \"Memory test : \" + vm[2] + \"M OK  (tuplespace-backed, append-only)\")\n    tty(emit, \"QKD channel : Bell pair OK -- zero-preservation verified\")\n    tty(emit, \" \")\n    if (has_system == 0) {\n        tty(emit, \"Boot order: CD-ROM, Hard Disk\")\n        tty(emit, \"Booting from CD-ROM : \" + vm[7])\n    } else {\n        tty(emit, \"Boot order: Hard Disk, CD-ROM\")\n        tty(emit, \"Booting from Hard Disk (wd0) ...\")\n    }\n    tty(emit, \" \")\n    return 0\n}\n\n# ---- power + snapshot ----------------------------------------------\ndef vm_power_on(emit, vm) {\n    vm[6] = 1\n    hyp(emit, \"power-on \" + vm[0])\n    if (emit) { print(\"@@POWER on\") }\n    return 0\n}\n\ndef vm_power_off(emit, vm) {\n    vm[6] = 0\n    hyp(emit, \"power-off \" + vm[0])\n    if (emit) { print(\"@@POWER off\") }\n    return 0\n}\n\n# a snapshot commits the current ledger length: state == replay(prefix)\ndef vm_snapshot(emit, vm, nevents) {\n    if (emit) {\n        print(\"@@SNAPSHOT \" + nevents + \" events / \" + len(tuplespace) + \" facts\")\n    }\n    return nevents\n}\n\n# ============================================================\n# badax.bada -- BadaX Server : an X window server FOR WINDOWS,\n# written in the Bada quantum programming language.\n#\n# BadaX Server is an (unofficial, educational) homage to\n# Windows X servers in the style of ASTEC-X: it runs on the\n# Windows 10 / 11 host OUTSIDE the virtual machine, listens on\n# display :0 (tcp 6000 on the BadaVM NAT, host address\n# 10.0.2.2), and displays the X clients that the guest OS\n# (BadaBSD) starts remotely -- exactly the classic \"run the\n# client on the UNIX box, see the window on the PC\" workflow.\n#\n# SECURITY -- the display cookie is not MIT-MAGIC-COOKIE-1 but\n# JONES-KNOT-COOKIE-1: the cookie is derived from the trefoil\n# knot's Kauffman bracket / Jones polynomial (vmpro.bada's\n# jones_key), and every client connection first runs a\n# Bell-pair QKD handshake over the virtual wire. A client with\n# the wrong knot -- or a tapped wire (broken zero-preservation)\n# -- is rejected before any window is mapped.\n#\n# Host protocol (\"@@X ...\" lines; the host chrome renders them):\n#   @@X SRV <vendor>|<release>|<display>     server hello\n#   @@X AUTH ok <cookie>                     handshake accepted\n#   @@X DENY <reason>                        handshake rejected\n#   @@X SCENE_BEGIN / @@X WIN id|class|x|y|w|h|title / @@X SCENE_END\n#   @@X UNMAP <id>\n# ============================================================\n\nX_VENDOR  := \"BadaX Server (quantum, ASTEC-X style homage)\"\nX_RELEASE := \"X11R7.7-Q\"\nX_DISPLAY := \"10.0.2.2:0.0\"\n\n# ---- the server record: [nextid, clients, cookie] -------------------\ndef x_server_new(cookie) { return [1, 0, cookie] }\n\ndef x_hello(emit) {\n    if (emit) { print(\"@@X SRV \" + X_VENDOR + \"|\" + X_RELEASE + \"|\" + X_DISPLAY) }\n    return 0\n}\n\n# ---- XOpenDisplay: QKD handshake + JONES-KNOT-COOKIE-1 --------------\n# Returns 1 when the connection is accepted.\ndef x_connect(emit, xsrv, client_cookie) {\n    sess := qkd_session()\n    if (!sess[0]) {\n        if (emit) { print(\"@@X DENY qkd-compromised (Bell correlation broken)\") }\n        return 0\n    }\n    if (client_cookie != xsrv[2]) {\n        if (emit) { print(\"@@X DENY bad JONES-KNOT-COOKIE-1 (wrong knot)\") }\n        return 0\n    }\n    xsrv[1] = xsrv[1] + 1\n    if (emit) { print(\"@@X AUTH ok \" + xsrv[2]) }\n    return 1\n}\n\n# ---- window placement: classic cascade on the root window -----------\ndef x_geometry(class, nth) {\n    x := 24 + (nth % 4) * 96\n    y := 20 + (nth % 4) * 56\n    if (class == \"xclock\") { return [x, y, 170, 190] }\n    if (class == \"xeyes\")  { return [x, y, 210, 130] }\n    if (class == \"xterm\")  { return [x, y, 400, 240] }\n    if (class == \"xlogo\")  { return [x, y, 140, 140] }\n    return [x, y, 240, 160]\n}\n\n# ---- CreateWindow + MapWindow ---------------------------------------\n# xwins is the guest-side list of mapped windows:\n#   [id, class, x, y, w, h, title]\ndef x_map_window(xsrv, xwins, class, title) {\n    id := xsrv[0]\n    xsrv[0] = id + 1\n    g := x_geometry(class, len(xwins))\n    xwins <- [id, class, g[0], g[1], g[2], g[3], title]\n    return id\n}\n\ndef x_unmap_window(emit, xwins, id) {\n    out := []\n    found := 0\n    i := 0\n    while (i < len(xwins)) {\n        if (xwins[i][0] == id) { found := 1 }\n        else { out <- xwins[i] }\n        i := i + 1\n    }\n    if (found == 1 && emit) { print(\"@@X UNMAP \" + id) }\n    return out\n}\n\ndef x_move_window(xwins, id, nx, ny) {\n    i := 0\n    while (i < len(xwins)) {\n        if (xwins[i][0] == id) { xwins[i][2] = nx; xwins[i][3] = ny }\n        i := i + 1\n    }\n    return 0\n}\n\n# ---- emit the whole scene (the host repaints from this) -------------\ndef x_scene(emit, xwins) {\n    if (!emit) { return 0 }\n    print(\"@@X SCENE_BEGIN\")\n    i := 0\n    while (i < len(xwins)) {\n        w := xwins[i]\n        print(\"@@X WIN \" + w[0] + \"|\" + w[1] + \"|\" + w[2] + \"|\" + w[3] + \"|\" +\n              w[4] + \"|\" + w[5] + \"|\" + w[6])\n        i := i + 1\n    }\n    print(\"@@X SCENE_END\")\n    return 0\n}\n\n# ---- xdpyinfo, answered by the server -------------------------------\ndef x_dpyinfo(emit, xsrv, xwins) {\n    tty(emit, \"name of display:    \" + X_DISPLAY)\n    tty(emit, \"version number:    11.0\")\n    tty(emit, \"vendor string:    \" + X_VENDOR)\n    tty(emit, \"vendor release number:    \" + X_RELEASE)\n    tty(emit, \"authorization protocol:    JONES-KNOT-COOKIE-1\")\n    tty(emit, \"display cookie:    \" + xsrv[2] + \"  (trefoil-knot Jones key)\")\n    tty(emit, \"transport:    BadaVM NAT tcp/6000, Bell-pair QKD secured\")\n    tty(emit, \"number of clients:    \" + xsrv[1])\n    tty(emit, \"mapped windows:    \" + len(xwins))\n    tty(emit, \"default screen:    0  (root 1184x760, depth 24)\")\n    return 0\n}\n\n# ============================================================\n# badabsd.bada -- BadaBSD 11.0 : a NetBSD-style operating system\n# written in the Bada quantum programming language.\n#\n# BadaBSD is an (unofficial, educational) homage to NetBSD: the\n# guest OS of the BadaVM Pro quantum hypervisor. It ships as a\n# CD image (BadaBSD-11.0-amd64-quantum.iso), installs itself to\n# the virtual disk with a sysinst-style full-screen installer\n# (disklabel -> newfs FFSv2 -> set extraction -> root password\n# -> hostname -> DHCP), boots from the disk through a BSD boot\n# loader + kernel autoconf dmesg + /etc/rc, and gives you a\n# login and a Bourne-style shell.\n#\n# The WHOLE MACHINE is the deterministic replay of an\n# append-only EVENT LEDGER (the Akashic machine tape): the\n# hypervisor feeds every power button, key press and command\n# line in as an event; replaying the ledger rebuilds the file\n# system, the users and the mapped X windows. Snapshots are\n# ledger prefixes (vmpro.bada).\n#\n# X clients (xclock, xeyes, xterm, xlogo) connect OUT of the VM\n# to the BadaX Server running on the Windows 10/11 host\n# (DISPLAY=10.0.2.2:0, badax.bada) -- the classic ASTEC-X\n# workflow: compute in the VM, display on Windows -- over a\n# Bell-pair QKD handshake with a JONES-KNOT-COOKIE-1 display\n# cookie.\n#\n# State vector ST (one list, replay-rebuilt):\n#   0 stage      \"off\"|\"sysinst\"|\"login\"|\"passwd\"|\"shell\"|\"halted\"\n#   1 installed  0/1\n#   2 hostname\n#   3 rootpw\n#   4 fs         [[path, content], ...]   (the FFS)\n#   5 substage   sysinst step number\n#   6 xwins      [[id,class,x,y,w,h,title], ...]\n#   7 xsrv       BadaX server record\n#   8 tmp        (installer scratch: first password, login name)\n#   9 user       logged-in user (\"\" if none)\n#  10 xconnected 0/1\n#  11 ip         \"\" until DHCP\n# ============================================================\n\nOS_VERSION := \"11.0_QUANTUM\"\nOS_KERNEL  := \"BadaBSD 11.0 (GENERIC.QUANTUM) #0\"\nOS_DISPLAY := \"10.0.2.2:0\"\n\ndef os_new(vm) {\n    return [\"off\", 0, \"badabsd\", \"\", [], 0, [], x_server_new(vm[8]),\n            \"\", \"\", 0, \"\"]\n}\n\n# ====================================================================\n# The FFS-style file system (path -> content pairs)\n# ====================================================================\ndef fs_get(fs, path) {\n    i := 0\n    while (i < len(fs)) {\n        if (fs[i][0] == path) { return [fs[i][1]] }\n        i := i + 1\n    }\n    return []\n}\n\ndef fs_put(fs, path, content) {\n    i := 0\n    while (i < len(fs)) {\n        if (fs[i][0] == path) { fs[i][1] = content; return 0 }\n        i := i + 1\n    }\n    fs <- [path, content]\n    return 0\n}\n\ndef fs_rm(fs, path) {\n    out := []\n    found := 0\n    i := 0\n    while (i < len(fs)) {\n        if (fs[i][0] == path) { found := 1 }\n        else { out <- fs[i] }\n        i := i + 1\n    }\n    return [found, out]\n}\n\ndef list_has(xs, s) {\n    i := 0\n    while (i < len(xs)) {\n        if (xs[i] == s) { return 1 }\n        i := i + 1\n    }\n    return 0\n}\n\n# entries directly below dir (\"bin/\" style suffix marks subdirs)\ndef fs_ls(fs, dir) {\n    prefix := dir\n    if (prefix != \"/\") { prefix := prefix + \"/\" }\n    names := []\n    i := 0\n    while (i < len(fs)) {\n        p := fs[i][0]\n        if (str_find(p, prefix) == 0) {\n            rest := substr(p, len(prefix), len(p) - len(prefix))\n            cut := str_find(rest, \"/\")\n            name := rest\n            if (cut >= 0) { name := substr(rest, 0, cut) + \"/\" }\n            if (len(name) > 0) {\n                if (list_has(names, name) == 0) { names <- name }\n            }\n        }\n        i := i + 1\n    }\n    return names\n}\n\n# ---- the base + X sets, extracted by sysinst ------------------------\ndef os_seedfs(st) {\n    fs := st[4]\n    hn := st[2]\n    fs_put(fs, \"/etc/release\",\n        \"BadaBSD 11.0 (GENERIC.QUANTUM) -- quantum edition\\n\" +\n        \"built from the Bada language event ledger\")\n    fs_put(fs, \"/etc/motd\",\n        \"BadaBSD 11.0 (GENERIC.QUANTUM)\\n\\n\" +\n        \"Welcome to BadaBSD, the quantum BSD of the Bada language!\\n\" +\n        \"The X display of this VM is the BadaX Server on the Windows host:\\n\" +\n        \"    DISPLAY=\" + OS_DISPLAY + \"   (JONES-KNOT-COOKIE-1 authorized)\\n\" +\n        \"Try:  xclock &   xeyes &   xterm &   xdpyinfo   qstat   help\")\n    fs_put(fs, \"/etc/rc.conf\",\n        \"# BadaBSD /etc/rc.conf -- generated by sysinst\\n\" +\n        \"rc_configured=YES\\n\" +\n        \"hostname=\" + hn + \"\\n\" +\n        \"dhcpcd=YES\\n\" +\n        \"sshd=YES\\n\" +\n        \"badax_display=\" + OS_DISPLAY + \"\\n\")\n    fs_put(fs, \"/etc/passwd\",\n        \"root:*:0:0:Charlie Root:/root:/bin/sh\\n\" +\n        \"operator:*:2:5:System &:/usr/guest/operator:/sbin/nologin\\n\" +\n        \"daemon:*:1:1:The devil himself:/:/sbin/nologin\")\n    fs_put(fs, \"/etc/hosts\",\n        \"127.0.0.1  localhost\\n\" +\n        \"10.0.2.15  \" + hn + \"\\n\" +\n        \"10.0.2.2   winhost badax  # BadaX Server (Windows 10/11)\")\n    fs_put(fs, \"/etc/fstab\",\n        \"/dev/wd0a  /  ffs  rw  1 1\\n\" +\n        \"/dev/wd0b  none  swap  sw  0 0\")\n    fs_put(fs, \"/root/.profile\",\n        \"export PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/X11R7/bin\\n\" +\n        \"export DISPLAY=\" + OS_DISPLAY + \"  # BadaX Server on the host\")\n    fs_put(fs, \"/root/.Xauthority\",\n        \"JONES-KNOT-COOKIE-1  (trefoil knot, Kauffman-bracket derived)\")\n    fs_put(fs, \"/bin/sh\", \"#!binary (Bourne shell)\")\n    fs_put(fs, \"/bin/ls\", \"#!binary\")\n    fs_put(fs, \"/bin/cat\", \"#!binary\")\n    fs_put(fs, \"/sbin/init\", \"#!binary\")\n    fs_put(fs, \"/sbin/reboot\", \"#!binary\")\n    fs_put(fs, \"/usr/bin/uname\", \"#!binary\")\n    fs_put(fs, \"/usr/X11R7/bin/xclock\", \"#!binary (X client)\")\n    fs_put(fs, \"/usr/X11R7/bin/xeyes\", \"#!binary (X client)\")\n    fs_put(fs, \"/usr/X11R7/bin/xterm\", \"#!binary (X client)\")\n    fs_put(fs, \"/usr/X11R7/bin/xlogo\", \"#!binary (X client)\")\n    fs_put(fs, \"/usr/X11R7/bin/xdpyinfo\", \"#!binary (X client)\")\n    fs_put(fs, \"/var/log/messages\", \"(see dmesg)\")\n    return 0\n}\n\n# ====================================================================\n# Boot: BIOS -> boot loader -> kernel autoconf -> /etc/rc -> login\n# ====================================================================\ndef os_dmesg(emit, vm, st) {\n    tty(emit, \"Copyright (c) 1996, 2026 The BadaBSD Foundation, Inc.  All rights reserved.\")\n    tty(emit, OS_KERNEL + \": \" + NOW)\n    tty(emit, \"total memory = \" + vm[2] + \" MB (tuplespace-backed, append-only)\")\n    tty(emit, \"avail memory = \" + (vm[2] - 137) + \" MB\")\n    tty(emit, \"mainbus0 (root): BadaVM Pro quantum virtual platform\")\n    tty(emit, \"qcpu0 at mainbus0: Bada Quantum vCPU, 8 qubits, Hilbert dim 256\")\n    tty(emit, \"qcpu1 at mainbus0: Bada Quantum vCPU, 8 qubits (entangled with qcpu0)\")\n    tty(emit, \"qrng0 at qcpu0: quantum RNG, Bell-pair entropy source\")\n    tty(emit, \"jones0 at mainbus0: Jones-polynomial crypto engine (Kauffman bracket)\")\n    tty(emit, \"wd0 at atabus0 drive 0: <QUANTUM VIRTUAL-HD, \" + vm[5] + \">\")\n    tty(emit, \"wd0: \" + vm[3] + \" MB, \" + (vm[3] * 2048) + \" sectors\")\n    tty(emit, \"cd0 at atapibus0 drive 1: <BADAVM CD-ROM> cdrom removable\")\n    tty(emit, \"wm0 at pci0: BadaVM NAT Ethernet, address \" + vm[4])\n    tty(emit, \"wsdisplay0 at vga0: console emulation, exported to BadaX\")\n    tty(emit, \"boot device: wd0\")\n    return 0\n}\n\ndef os_rc(emit, vm, st) {\n    tty(emit, \"Starting file system checks:\")\n    tty(emit, \"/dev/rwd0a: file system is clean; not checking\")\n    tty(emit, \"Setting tty flags.\")\n    tty(emit, \"Starting network.\")\n    tty(emit, \"Hostname: \" + st[2])\n    tty(emit, \"wm0: DHCP lease 10.0.2.15 from 10.0.2.2 (BadaVM NAT)\")\n    tty(emit, \"add net default: gateway 10.0.2.2\")\n    tty(emit, \"Starting dhcpcd.\")\n    tty(emit, \"Starting sshd.\")\n    tty(emit, \"Starting cron.\")\n    tty(emit, \"BadaX display export: DISPLAY=\" + OS_DISPLAY +\n              \" (BadaX Server on the Windows host)\")\n    st[11] = \"10.0.2.15\"\n    return 0\n}\n\ndef os_login_banner(emit, vm, st) {\n    tty(emit, \" \")\n    tty(emit, \"BadaBSD/amd64 (\" + st[2] + \") (console)\")\n    tty(emit, \" \")\n    return 0\n}\n\ndef os_boot(emit, vm, st) {\n    vm_power_on(emit, vm)\n    if (emit) { print(\"@@CLS\") }\n    vm_bios(emit, vm, st[1])\n    if (st[1] == 0) {\n        tty(emit, \">> BadaBSD/amd64 BIOS Boot (CD), Revision 5.11 (quantum)\")\n        tty(emit, \">> Memory: 640k base, \" + (vm[2] - 1) + \"M ext\")\n        tty(emit, \"booting cd0a:netbsd.quantum - starting in 0 seconds...\")\n        tty(emit, \" \")\n        os_dmesg(emit, vm, st)\n        tty(emit, \"root on md0a (install image)\")\n        tty(emit, \" \")\n        st[0] = \"sysinst\"\n        st[5] = 0\n        sysinst_screen(emit, vm, st)\n    } else {\n        tty(emit, \">> BadaBSD/amd64 BIOS Boot, Revision 5.11 (quantum)\")\n        tty(emit, \"booting hd0a:netbsd.quantum - starting in 0 seconds...\")\n        tty(emit, \" \")\n        os_dmesg(emit, vm, st)\n        tty(emit, \"root on wd0a dumps on wd0b\")\n        tty(emit, \" \")\n        os_rc(emit, vm, st)\n        os_login_banner(emit, vm, st)\n        st[0] = \"login\"\n    }\n    return 0\n}\n\n# ====================================================================\n# sysinst -- the NetBSD-style full-screen installer\n# ====================================================================\ndef sysinst_head(emit, title) {\n    tty(emit, \" \")\n    tty(emit, \"+-----------------------------------------------------------+\")\n    tty(emit, \"| BadaBSD-11.0 sysinst (quantum)                            |\")\n    tty(emit, \"| \" + title)\n    tty(emit, \"+-----------------------------------------------------------+\")\n    return 0\n}\n\ndef sysinst_screen(emit, vm, st) {\n    sub := st[5]\n    if (sub == 0) {\n        sysinst_head(emit, \"Welcome / ようこそ\")\n        tty(emit, \"Welcome to sysinst, the BadaBSD-11.0 system installation tool.\")\n        tty(emit, \"This menu-driven tool will install BadaBSD on the virtual disk wd0.\")\n        tty(emit, \" \")\n        tty(emit, \"Installation messages in:\")\n        tty(emit, \"    a: English\")\n        tty(emit, \"    j: Japanese / 日本語\")\n    } else if (sub == 1) {\n        sysinst_head(emit, \"BadaBSD-11.0 Install System\")\n        tty(emit, \"    a: Install BadaBSD to hard disk\")\n        tty(emit, \"    b: Upgrade BadaBSD on a hard disk\")\n        tty(emit, \"    c: Re-install sets or install additional sets\")\n        tty(emit, \"    d: Reboot the computer\")\n        tty(emit, \"    x: Exit Install System\")\n    } else if (sub == 2) {\n        sysinst_head(emit, \"Available disks\")\n        tty(emit, \"On which disk do you want to install BadaBSD?\")\n        tty(emit, \" \")\n        tty(emit, \"    a: wd0  (\" + vm[3] + \" MB, QUANTUM VIRTUAL-HD, \" + vm[5] + \")\")\n    } else if (sub == 3) {\n        sysinst_head(emit, \"Partitioning scheme\")\n        tty(emit, \"Select the partitioning scheme for wd0:\")\n        tty(emit, \" \")\n        tty(emit, \"    a: GPT  (GUID Partition Table)\")\n        tty(emit, \"    b: MBR  (Master Boot Record)\")\n    } else if (sub == 4) {\n        sysinst_head(emit, \"Last chance!\")\n        tty(emit, \"Shall we continue? The disk wd0 will be OVERWRITTEN.\")\n        tty(emit, \" \")\n        tty(emit, \"    a: Yes, install BadaBSD\")\n        tty(emit, \"    b: No, back to the main menu\")\n    } else if (sub == 6) {\n        sysinst_head(emit, \"Root password\")\n        tty(emit, \"Setting the password for the superuser account 'root'.\")\n        tty(emit, \"New password: (input hidden; empty = no password)\")\n    } else if (sub == 7) {\n        tty(emit, \"Repeat new password:\")\n    } else if (sub == 8) {\n        sysinst_head(emit, \"Hostname\")\n        tty(emit, \"Enter the hostname of this machine (empty = badabsd):\")\n    } else if (sub == 10) {\n        tty(emit, \" \")\n        tty(emit, \"Installation of BadaBSD-11.0 is now complete.  The event ledger\")\n        tty(emit, \"has been committed to the Akashic machine tape (\" + len(tuplespace) + \" facts).\")\n        tty(emit, \" \")\n        tty(emit, \"Hit any key to reboot from the hard disk...\")\n    }\n    return 0\n}\n\ndef sysinst_extract(emit, vm, st) {\n    tty(emit, \" \")\n    tty(emit, \"Creating GPT label on wd0 ... done.\")\n    tty(emit, \"wd0a: root file system (\" + (vm[3] - 512) + \" MB, FFSv2)\")\n    tty(emit, \"wd0b: swap (512 MB)\")\n    tty(emit, \"newfs -O 2 /dev/rwd0a ... done  (quantum superblock committed)\")\n    tty(emit, \" \")\n    tty(emit, \"Extracting installation sets from cd0:\")\n    sets := [\"kern-GENERIC.QUANTUM\", \"base\", \"etc\", \"comp\", \"games\", \"man\",\n             \"misc\", \"rescue\", \"text\",\n             \"xbase\", \"xcomp\", \"xetc\", \"xfont\", \"xserver-badax\"]\n    i := 0\n    while (i < len(sets)) {\n        kb := 1024 + (str_hash(sets[i]) % 30000)\n        tty(emit, \"  \" + sets[i] + \".tgz: 100% |===============================| \" +\n                  kb + \" KB\")\n        i := i + 1\n    }\n    tty(emit, \"All selected sets extracted; ldconfig + etcupdate done.\")\n    return 0\n}\n\ndef sysinst_key(emit, vm, st, k) {\n    sub := st[5]\n    if (sub == 0) {\n        if (list_has([\"a\", \"j\"], k) == 1) { st[5] = 1; sysinst_screen(emit, vm, st) }\n        return 0\n    }\n    if (sub == 1) {\n        if (k == \"a\") { st[5] = 2; sysinst_screen(emit, vm, st) }\n        else if (k == \"d\") { os_boot(emit, vm, st) }\n        else if (list_has([\"b\", \"c\", \"x\"], k) == 1) {\n            tty(emit, \"sysinst: nothing to do on a blank disk -- choose a.\")\n        }\n        return 0\n    }\n    if (sub == 2) {\n        if (k == \"a\") { st[5] = 3; sysinst_screen(emit, vm, st) }\n        return 0\n    }\n    if (sub == 3) {\n        if (list_has([\"a\", \"b\"], k) == 1) {\n            if (k == \"a\") { tty(emit, \"Using GPT.\") } else { tty(emit, \"Using MBR.\") }\n            st[5] = 4\n            sysinst_screen(emit, vm, st)\n        }\n        return 0\n    }\n    if (sub == 4) {\n        if (k == \"a\") {\n            sysinst_extract(emit, vm, st)\n            st[5] = 6\n            sysinst_screen(emit, vm, st)\n        } else if (k == \"b\") { st[5] = 1; sysinst_screen(emit, vm, st) }\n        return 0\n    }\n    if (sub == 10) {\n        st[1] = 1\n        os_seedfs(st)\n        os_boot(emit, vm, st)\n        return 0\n    }\n    return 0\n}\n\ndef sysinst_line(emit, vm, st, s) {\n    sub := st[5]\n    if (sub == 6) {\n        st[8] = s\n        st[5] = 7\n        sysinst_screen(emit, vm, st)\n        return 0\n    }\n    if (sub == 7) {\n        if (s == st[8]) {\n            st[3] = s\n            tty(emit, \"Password set.\")\n            st[5] = 8\n            sysinst_screen(emit, vm, st)\n        } else {\n            tty(emit, \"Passwords do not match -- try again.\")\n            st[5] = 6\n            sysinst_screen(emit, vm, st)\n        }\n        return 0\n    }\n    if (sub == 8) {\n        hn := s\n        if (len(hn) == 0) { hn := \"badabsd\" }\n        st[2] = hn\n        tty(emit, \"Hostname: \" + hn)\n        tty(emit, \" \")\n        tty(emit, \"Configuring network: wm0 (BadaVM NAT)\")\n        tty(emit, \"  DHCPDISCOVER on wm0 (\" + vm[4] + \")\")\n        tty(emit, \"  DHCPOFFER 10.0.2.15 from 10.0.2.2  -- lease accepted\")\n        tty(emit, \"  QKD guard: Bell pair OK, zero-preservation holds on the wire\")\n        st[11] = \"10.0.2.15\"\n        st[5] = 10\n        sysinst_screen(emit, vm, st)\n        return 0\n    }\n    return 0\n}\n\n# ====================================================================\n# login\n# ====================================================================\ndef os_motd(emit, st) {\n    m := fs_get(st[4], \"/etc/motd\")\n    if (len(m) == 1) {\n        parts := split(m[0], \"\\n\")\n        i := 0\n        while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }\n    }\n    tty(emit, \" \")\n    return 0\n}\n\ndef os_login_line(emit, vm, st, s) {\n    if (st[0] == \"login\") {\n        if (len(s) == 0) { return 0 }\n        st[8] = s\n        st[0] = \"passwd\"\n        return 0\n    }\n    # passwd stage\n    if (st[8] == \"root\" && s == st[3]) {\n        st[9] = \"root\"\n        st[0] = \"shell\"\n        tty(emit, \"Last login: \" + NOW + \" on console\")\n        os_motd(emit, st)\n    } else {\n        tty(emit, \"Login incorrect\")\n        st[0] = \"login\"\n    }\n    return 0\n}\n\n# ====================================================================\n# the shell\n# ====================================================================\ndef tokenize(s) {\n    raw := split(s, \" \")\n    out := []\n    i := 0\n    while (i < len(raw)) {\n        if (len(raw[i]) > 0) { out <- raw[i] }\n        i := i + 1\n    }\n    return out\n}\n\ndef abspath(p) {\n    if (len(p) == 0) { return \"/\" }\n    if (str_find(p, \"/\") == 0) { return p }\n    return \"/root/\" + p\n}\n\ndef x_client_cookie(st) {\n    a := fs_get(st[4], \"/root/.Xauthority\")\n    if (len(a) == 0) { return 0 - 1 }\n    return jones_key(vm_knot())\n}\n\ndef x_launch(emit, vm, st, class, title) {\n    if (st[10] == 0) {\n        x_hello(emit)\n        ok := x_connect(emit, st[7], x_client_cookie(st))\n        if (ok == 0) {\n            tty(emit, class + \": unable to open display \" + OS_DISPLAY)\n            return 0\n        }\n        st[10] = 1\n        tty(emit, \"BadaX: display \" + OS_DISPLAY + \" opened, JONES-KNOT-COOKIE-1 verified\")\n    }\n    id := x_map_window(st[7], st[6], class, title)\n    tty(emit, class + \": window \" + id + \" mapped on \" + OS_DISPLAY +\n              \" (BadaX Server, Windows host)\")\n    return 0\n}\n\ndef cmd_ls(emit, st, path) {\n    names := fs_ls(st[4], path)\n    if (len(names) == 0) {\n        one := fs_get(st[4], path)\n        if (len(one) == 1) { tty(emit, path); return 0 }\n        tty(emit, \"ls: \" + path + \": No such file or directory\")\n        return 0\n    }\n    line := \"\"\n    i := 0\n    while (i < len(names)) {\n        line := line + names[i]\n        if (i < len(names) - 1) { line := line + \"   \" }\n        i := i + 1\n    }\n    tty(emit, line)\n    return 0\n}\n\ndef cmd_ps(emit, st) {\n    tty(emit, \"PID  TTY    STAT  TIME     COMMAND\")\n    tty(emit, \"  1  ?      Is    0:00.02  init\")\n    tty(emit, \" 12  ?      Ss    0:00.05  dhcpcd: wm0 [10.0.2.15]\")\n    tty(emit, \" 35  ?      Is    0:00.01  /usr/sbin/sshd\")\n    tty(emit, \" 48  ?      Is    0:00.01  cron\")\n    base := 100\n    i := 0\n    while (i < len(st[6])) {\n        w := st[6][i]\n        tty(emit, (base + w[0]) + \"  ttyp0  S     0:00.03  \" + w[1] +\n                  \" -display \" + OS_DISPLAY)\n        i := i + 1\n    }\n    tty(emit, (200 + len(st[6])) + \"  console Ss   0:00.04  -sh (sh)\")\n    return 0\n}\n\ndef cmd_qstat(emit, vm) {\n    tty(emit, \"qstat: quantum device status (qcpu0 + qcpu1)\")\n    bell := qubit(2)\n    bell := H(bell, 0)\n    bell := CNOT(bell, 0, 1)\n    tty(emit, \"  Bell pair prepared: (|00> + |11>) / sqrt(2)\")\n    outcome := Measure(bell)\n    if (emit) { print(\"@@TTY   Measure commit ->\", outcome) }\n    zp := \"no\"\n    if ((outcome[1] == 0) && (outcome[2] == 0)) { zp := \"yes -- EXACTLY 0\" }\n    tty(emit, \"  zero-preservation (forbidden |01>,|10>): \" + zp)\n    tty(emit, \"  display cookie (trefoil Jones key): \" + vm[8])\n    tty(emit, \"  Akashic ledger: \" + len(tuplespace) + \" committed facts\")\n    return 0\n}\n\ndef shell_exec(emit, vm, st, line) {\n    argv := tokenize(line)\n    if (len(argv) == 0) { return 0 }\n    cmd := argv[0]\n\n    if (list_has([\"help\", \"?\"], cmd) == 1) {\n        tty(emit, \"BadaBSD built-ins:\")\n        tty(emit, \"  uname [-a]  hostname  whoami  date  dmesg  ps  df  mount\")\n        tty(emit, \"  ls [path]  cat FILE  echo TEXT [> FILE]  touch FILE  rm FILE\")\n        tty(emit, \"  ifconfig  netstat  sysctl [name]  qstat  man CMD  clear\")\n        tty(emit, \"  startx  xclock &  xeyes &  xterm &  xlogo &  xdpyinfo\")\n        tty(emit, \"  xlsclients  xkill ID  exit  reboot  halt  shutdown -h now\")\n        return 0\n    }\n    if (cmd == \"uname\") {\n        if (len(argv) > 1) {\n            tty(emit, \"BadaBSD \" + st[2] + \" \" + OS_VERSION + \" \" + OS_KERNEL +\n                      \" amd64 (quantum)\")\n        } else { tty(emit, \"BadaBSD\") }\n        return 0\n    }\n    if (cmd == \"hostname\") { tty(emit, st[2]); return 0 }\n    if (cmd == \"whoami\") { tty(emit, st[9]); return 0 }\n    if (cmd == \"id\") {\n        tty(emit, \"uid=0(root) gid=0(wheel) groups=0(wheel),2(kmem),3(sys)\")\n        return 0\n    }\n    if (cmd == \"date\") { tty(emit, NOW); return 0 }\n    if (cmd == \"dmesg\") { os_dmesg(emit, vm, st); return 0 }\n    if (cmd == \"ps\") { cmd_ps(emit, st); return 0 }\n    if (cmd == \"df\") {\n        tty(emit, \"Filesystem   Size   Used  Avail  %Cap  Mounted on\")\n        tty(emit, \"/dev/wd0a    \" + (vm[3] - 512) + \"M   842M  \" +\n                  (vm[3] - 512 - 842) + \"M    4%   /\")\n        tty(emit, \"tuplespace   inf    \" + len(tuplespace) + \"f   inf     0%   /akashic\")\n        return 0\n    }\n    if (cmd == \"mount\") {\n        tty(emit, \"/dev/wd0a on / type ffs (local)\")\n        tty(emit, \"tuplespace on /akashic type akashic (append-only, quantum)\")\n        return 0\n    }\n    if (cmd == \"ls\") {\n        p := \"/root\"\n        if (len(argv) > 1) { p := abspath(argv[1]) }\n        cmd_ls(emit, st, p)\n        return 0\n    }\n    if (cmd == \"cat\") {\n        if (len(argv) < 2) { tty(emit, \"usage: cat file\"); return 0 }\n        c := fs_get(st[4], abspath(argv[1]))\n        if (len(c) == 0) {\n            tty(emit, \"cat: \" + argv[1] + \": No such file or directory\")\n        } else {\n            parts := split(c[0], \"\\n\")\n            i := 0\n            while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }\n        }\n        return 0\n    }\n    if (cmd == \"echo\") {\n        # echo TEXT [> FILE]  /  echo TEXT [>> FILE]\n        redir := 0 - 1\n        mode := \"\"\n        i := 1\n        while (i < len(argv)) {\n            if (list_has([\">\", \">>\"], argv[i]) == 1) { redir := i; mode := argv[i] }\n            i := i + 1\n        }\n        if (redir >= 0 && redir < len(argv) - 1) {\n            text := \"\"\n            i := 1\n            while (i < redir) {\n                text := text + argv[i]\n                if (i < redir - 1) { text := text + \" \" }\n                i := i + 1\n            }\n            path := abspath(argv[redir + 1])\n            if (mode == \">>\") {\n                old := fs_get(st[4], path)\n                if (len(old) == 1) { text := old[0] + \"\\n\" + text }\n            }\n            fs_put(st[4], path, text)\n        } else {\n            text := \"\"\n            i := 1\n            while (i < len(argv)) {\n                text := text + argv[i]\n                if (i < len(argv) - 1) { text := text + \" \" }\n                i := i + 1\n            }\n            tty(emit, text)\n        }\n        return 0\n    }\n    if (cmd == \"touch\") {\n        if (len(argv) > 1) { fs_put(st[4], abspath(argv[1]), \"\") }\n        return 0\n    }\n    if (cmd == \"rm\") {\n        if (len(argv) < 2) { tty(emit, \"usage: rm file\"); return 0 }\n        r := fs_rm(st[4], abspath(argv[1]))\n        if (r[0] == 0) { tty(emit, \"rm: \" + argv[1] + \": No such file or directory\") }\n        else { st[4] = r[1] }\n        return 0\n    }\n    if (cmd == \"ifconfig\") {\n        tty(emit, \"wm0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500\")\n        tty(emit, \"        address: \" + vm[4])\n        tty(emit, \"        inet \" + st[11] + \"/24 broadcast 10.0.2.255 (BadaVM NAT)\")\n        tty(emit, \"        qkd: Bell-pair guard active, zero-preservation holds\")\n        tty(emit, \"lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 33624\")\n        tty(emit, \"        inet 127.0.0.1/8\")\n        return 0\n    }\n    if (cmd == \"netstat\") {\n        tty(emit, \"Active Internet connections\")\n        tty(emit, \"Proto  Local Address        Foreign Address     (state)\")\n        if (st[10] == 1) {\n            tty(emit, \"tcp    10.0.2.15.65100      10.0.2.2.6000       ESTABLISHED  # BadaX (QKD)\")\n        }\n        tty(emit, \"tcp    *.22                 *.*                 LISTEN\")\n        return 0\n    }\n    if (cmd == \"sysctl\") {\n        if (len(argv) > 1 && argv[1] != \"-a\") {\n            n := argv[1]\n            if (n == \"kern.ostype\") { tty(emit, \"kern.ostype = BadaBSD\") }\n            else if (n == \"kern.osrelease\") { tty(emit, \"kern.osrelease = \" + OS_VERSION) }\n            else if (n == \"hw.qcpu.qubits\") { tty(emit, \"hw.qcpu.qubits = 8\") }\n            else { tty(emit, \"sysctl: \" + n + \": unknown oid\") }\n            return 0\n        }\n        tty(emit, \"kern.ostype = BadaBSD\")\n        tty(emit, \"kern.osrelease = \" + OS_VERSION)\n        tty(emit, \"kern.version = \" + OS_KERNEL)\n        tty(emit, \"hw.machine = amd64 (BadaVM Pro)\")\n        tty(emit, \"hw.ncpu = \" + vm[1])\n        tty(emit, \"hw.qcpu.qubits = 8\")\n        tty(emit, \"hw.qcpu.hilbert_dim = 256\")\n        tty(emit, \"kern.akashic.facts = \" + len(tuplespace))\n        return 0\n    }\n    if (cmd == \"qstat\") { cmd_qstat(emit, vm); return 0 }\n    if (cmd == \"man\") {\n        if (len(argv) < 2) { tty(emit, \"What manual page do you want?\"); return 0 }\n        n := argv[1]\n        if (n == \"xclock\") { tty(emit, \"xclock(1) -- analogue clock for X; displays on the BadaX Server.\") }\n        else if (n == \"xeyes\") { tty(emit, \"xeyes(1) -- eyes that follow the Windows-host pointer.\") }\n        else if (n == \"xterm\") { tty(emit, \"xterm(1) -- terminal emulator for X.\") }\n        else if (n == \"qstat\") { tty(emit, \"qstat(8) -- show quantum device status (Bell pair, ledger).\") }\n        else { tty(emit, \"man: no entry for \" + n + \" (misc sets are minimal)\") }\n        return 0\n    }\n    if (cmd == \"clear\") {\n        if (emit) { print(\"@@CLS\") }\n        return 0\n    }\n    if (cmd == \"startx\") {\n        tty(emit, \"startx: the X display of this VM is REMOTE, ASTEC-X style:\")\n        tty(emit, \"  BadaX Server is already running on the Windows 10/11 host.\")\n        tty(emit, \"  DISPLAY=\" + OS_DISPLAY + \" is exported -- start clients directly:\")\n        tty(emit, \"      xclock &   xeyes &   xterm &   xlogo &\")\n        return 0\n    }\n    if (cmd == \"xclock\") { x_launch(emit, vm, st, \"xclock\", \"xclock\"); return 0 }\n    if (cmd == \"xeyes\")  { x_launch(emit, vm, st, \"xeyes\", \"xeyes\"); return 0 }\n    if (cmd == \"xterm\")  { x_launch(emit, vm, st, \"xterm\", \"xterm -- \" + st[2]); return 0 }\n    if (cmd == \"xlogo\")  { x_launch(emit, vm, st, \"xlogo\", \"xlogo\"); return 0 }\n    if (cmd == \"xdpyinfo\") {\n        if (st[10] == 0) {\n            x_hello(emit)\n            ok := x_connect(emit, st[7], x_client_cookie(st))\n            if (ok == 0) { tty(emit, \"xdpyinfo: unable to open display\"); return 0 }\n            st[10] = 1\n        }\n        x_dpyinfo(emit, st[7], st[6])\n        return 0\n    }\n    if (cmd == \"xlsclients\") {\n        i := 0\n        while (i < len(st[6])) {\n            w := st[6][i]\n            tty(emit, st[2] + \"  \" + w[1] + \"  (window \" + w[0] + \")\")\n            i := i + 1\n        }\n        if (len(st[6]) == 0) { tty(emit, \"xlsclients: no clients on \" + OS_DISPLAY) }\n        return 0\n    }\n    if (cmd == \"xkill\") {\n        if (len(argv) < 2) { tty(emit, \"usage: xkill window-id\"); return 0 }\n        st[6] = x_unmap_window(emit, st[6], to_num(argv[1]))\n        return 0\n    }\n    if (list_has([\"exit\", \"logout\"], cmd) == 1) {\n        st[9] = \"\"\n        st[0] = \"login\"\n        os_login_banner(emit, vm, st)\n        return 0\n    }\n    if (cmd == \"reboot\") {\n        tty(emit, \"syncing disks... done\")\n        tty(emit, \"rebooting...\")\n        os_boot(emit, vm, st)\n        return 0\n    }\n    if (list_has([\"halt\", \"shutdown\", \"poweroff\"], cmd) == 1) {\n        tty(emit, \"syncing disks... done\")\n        tty(emit, \"The operating system has halted.\")\n        tty(emit, \"Please press any key to reboot.\")\n        st[0] = \"halted\"\n        st[9] = \"\"\n        return 0\n    }\n    tty(emit, cmd + \": not found\")\n    return 0\n}\n\n# string -> number (for xkill ids)\ndef to_num(s) {\n    v := 0\n    i := 0\n    while (i < len(s)) {\n        c := ord(s, i)\n        if (c >= 48 && c <= 57) { v := v * 10 + (c - 48) }\n        i := i + 1\n    }\n    return v\n}\n\n# ====================================================================\n# the event pump: apply one ledger event\n# ====================================================================\ndef os_apply(vm, st, ev, emit) {\n    kind := ev[0]\n    if (kind == \"power\") {\n        act := ev[1]\n        if (act == \"on\") {\n            if (st[0] == \"off\") { os_boot(emit, vm, st) }\n        } else if (act == \"off\") {\n            st[0] = \"off\"\n            st[9] = \"\"\n            st[6] = []\n            st[10] = 0\n            vm_power_off(emit, vm)\n        } else if (act == \"reset\") {\n            st[0] = \"off\"\n            st[9] = \"\"\n            st[6] = []\n            st[10] = 0\n            os_boot(emit, vm, st)\n        }\n        return 0\n    }\n    if (st[0] == \"off\") { return 0 }\n    if (kind == \"key\") {\n        if (st[0] == \"sysinst\") { sysinst_key(emit, vm, st, ev[1]) }\n        else if (st[0] == \"halted\") { os_boot(emit, vm, st) }\n        return 0\n    }\n    if (kind == \"line\") {\n        if (st[0] == \"sysinst\") { sysinst_line(emit, vm, st, ev[1]) }\n        else if (list_has([\"login\", \"passwd\"], st[0]) == 1) { os_login_line(emit, vm, st, ev[1]) }\n        else if (st[0] == \"shell\") { shell_exec(emit, vm, st, ev[1]) }\n        return 0\n    }\n    if (kind == \"xclose\") { st[6] = x_unmap_window(emit, st[6], ev[1]); return 0 }\n    if (kind == \"xmove\") { x_move_window(st[6], ev[1], ev[2], ev[3]); return 0 }\n    return 0\n}\n\n# after the last event: tell the host chrome what to show\ndef os_status(vm, st) {\n    print(\"@@STAGE \" + st[0] + \"|\" + st[5])\n    print(\"@@POWERSTATE \" + vm[6])\n    print(\"@@XCONN \" + st[10] + \"|\" + st[7][1] + \"|\" + vm[8])\n    x_scene(true, st[6])\n    stage := st[0]\n    if (stage == \"off\") {\n        print(\"@@MODE off\")\n    } else if (stage == \"halted\") {\n        print(\"@@MODE key\")\n        print(\"@@ECHO on\")\n    } else if (stage == \"sysinst\") {\n        sub := st[5]\n        if (list_has([6, 7], sub) == 1) {\n            print(\"@@MODE line\")\n            print(\"@@ECHO off\")\n            print(\"@@PROMPT password: \")\n        } else if (sub == 8) {\n            print(\"@@MODE line\")\n            print(\"@@ECHO on\")\n            print(\"@@PROMPT hostname> \")\n        } else {\n            print(\"@@MODE key\")\n            print(\"@@ECHO on\")\n            print(\"@@PROMPT sysinst> \")\n        }\n    } else if (stage == \"login\") {\n        print(\"@@MODE line\")\n        print(\"@@ECHO on\")\n        print(\"@@PROMPT login: \")\n    } else if (stage == \"passwd\") {\n        print(\"@@MODE line\")\n        print(\"@@ECHO off\")\n        print(\"@@PROMPT Password: \")\n    } else if (stage == \"shell\") {\n        print(\"@@MODE line\")\n        print(\"@@ECHO on\")\n        print(\"@@PROMPT \" + st[2] + \"# \")\n    }\n    return 0\n}\n\n# ====================================================================\n# entry point: replay the ledger, emit only the newest event\n# ====================================================================\ndef os_run(vm, events) {\n    st := os_new(vm)\n    n := len(events)\n    i := 0\n    while (i < n) {\n        os_apply(vm, st, events[i], i == n - 1)\n        i := i + 1\n    }\n    os_status(vm, st)\n    return st\n}\n";
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ================= persistent event ledger ================= */
+  var LS_EVENTS = "badavm.events.v1", LS_SNAP = "badavm.snapshot.v1";
+  var events = [];      /* the Akashic machine tape */
+  var snapshot = null;  /* ledger prefix length */
+  try {
+    var se = localStorage.getItem(LS_EVENTS);
+    if (se) events = JSON.parse(se) || [];
+    var ss = localStorage.getItem(LS_SNAP);
+    if (ss) snapshot = JSON.parse(ss);
+  } catch (e) {}
+  function persist() {
+    try {
+      localStorage.setItem(LS_EVENTS, JSON.stringify(events));
+      if (snapshot == null) localStorage.removeItem(LS_SNAP);
+      else localStorage.setItem(LS_SNAP, JSON.stringify(snapshot));
+    } catch (e) {}
+  }
+
+  /* ================= terminal ================= */
+  var term = $("term"), MAXLINES = 3000;
+  var mode = "off", echo = true, prompt = "", inputBuf = "";
+  var lines = [];
+  function repaintTerm() {
+    while (lines.length > MAXLINES) lines.shift();
+    var html = "";
+    for (var i = 0; i < lines.length; i++) html += esc(lines[i]) + "\n";
+    if (mode === "line") {
+      html += esc(prompt) + '<span class="in">' + esc(echo ? inputBuf : "") +
+              '</span><span id="cursor"></span>';
+    } else if (mode === "key") {
+      html += '<span id="cursor"></span>';
+    }
+    term.innerHTML = html;
+    term.scrollTop = term.scrollHeight;
+  }
+  function ttyLine(s) { lines.push(s); }
+  function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  /* ================= the Bada bridge =================
+     Every interaction appends ONE event to the ledger and replays the
+     whole tape through the Bada language core; only the newest event
+     emits output ("@@" protocol lines).                              */
+  function nowString() {
+    var d = new Date();
+    var days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    var mons = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return days[d.getDay()] + " " + mons[d.getMonth()] + " " + d.getDate() + " " +
+           d.toTimeString().slice(0, 8) + " " + d.getFullYear();
+  }
+  function buildProgram(evs, tail) {
+    var p = 'NOW := ' + JSON.stringify(nowString()) + '\n' + VM_LIBS + '\n';
+    p += 'VM := vm_create("BadaBSD 11.0 (quantum)", 2, 4096, 20480)\n';
+    if (tail) { p += tail + '\n'; return p; }
+    p += 'EVENTS := ' + JSON.stringify(evs) + '\n';
+    p += 'os_run(VM, EVENTS)\n';
+    return p;
+  }
+  function runBada(prog) {
+    var out = [];
+    var r = BadaLang.run(prog, { maxSteps: 80000000, out: function (s) { out.push(s); } });
+    return { ok: r.ok, lines: out, ledger: r.ledgerLen, error: r.error || (r.parseErrors || []).join("; ") };
+  }
+
+  var vmxRows = [], sceneBuf = null, powered = false;
+
+  function handleLine(ln) {
+    if (ln.indexOf("@@") !== 0) return;
+    var sp = ln.indexOf(" ");
+    var key = (sp < 0 ? ln : ln.slice(0, sp)).slice(2);
+    var val = sp < 0 ? "" : ln.slice(sp + 1);
+    switch (key) {
+      case "TTY": ttyLine(val); break;
+      case "CLS": lines = []; break;
+      case "POWER": setPower(val === "on"); break;
+      case "HYP": note("hypervisor: " + val); break;
+      case "VMX": vmxRows.push(val); break;
+      case "MODE": mode = val; break;
+      case "ECHO": echo = (val === "on"); break;
+      case "PROMPT": prompt = val; break;
+      case "STAGE": break;
+      case "POWERSTATE": setPower(val === "1"); break;
+      case "SNAPSHOT": note("スナップショット: " + val); break;
+      case "XCONN": xconn(val); break;
+      case "X": handleX(val); break;
+    }
+  }
+
+  function send(ev, opts) {
+    opts = opts || {};
+    events.push(ev);
+    vmxRows = []; sceneBuf = null; mode = "off"; prompt = "";
+    var r = runBada(buildProgram(events));
+    if (!r.ok) {
+      ttyLine("[bada runtime] " + r.error);
+    }
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
+    persist();
+    applyScene();
+    repaintTerm();
+    updateButtons();
+  }
+
+  /* full-repaint replay: used at load / snapshot-restore; replays the tape
+     with every event emitting, so the console scrollback is rebuilt. */
+  function replayAll() {
+    lines = []; vmxRows = []; sceneBuf = null; mode = "off"; prompt = ""; powered = false;
+    if (events.length === 0) { setPower(false); repaintTerm(); updateButtons(); return; }
+    /* emit only from the last "screen-clearing" boundary: run the tape once
+       with the final event emitting -- the guest repaints its last screen. */
+    var r = runBada(buildProgram(events));
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
+    ttyLine("(イベント台帳 " + events.length + " 件をリプレイして復元しました — 画面は最終イベント分のみ)");
+    applyScene();
+    repaintTerm();
+    updateButtons();
+  }
+
+  function setPower(on) {
+    powered = on;
+    $("vmdot").className = "vmdot" + (on ? " on" : "");
+    $("st-power").textContent = "電源: " + (on ? "オン" : "オフ");
+    $("offscreen").style.display = on ? "none" : "flex";
+    if (!on) { mode = "off"; xScene([]); }
+  }
+  function updateButtons() {
+    $("bt-on").disabled = powered;
+    $("bt-off").disabled = !powered;
+    $("bt-reset").disabled = !powered;
+    $("bt-restore").disabled = (snapshot == null);
+  }
+  function note(s) { $("st-note").textContent = s; }
+
+  /* ================= power / snapshot ================= */
+  function powerOn() { showTab("vm"); if (!powered) send(["power", "on"]); term.focus(); }
+  $("bt-on").addEventListener("click", powerOn);
+  $("poweron").addEventListener("click", powerOn);
+  $("home-poweron").addEventListener("click", powerOn);
+  $("bt-off").addEventListener("click", function () {
+    if (powered) { send(["power", "off"]); ttyLine("(電源が切れました)"); repaintTerm(); }
+  });
+  $("bt-reset").addEventListener("click", function () { if (powered) send(["power", "reset"]); });
+  $("bt-snap").addEventListener("click", function () {
+    snapshot = events.length;
+    persist(); updateButtons();
+    note("スナップショット作成: 台帳プレフィックス " + snapshot + " イベント");
+  });
+  $("bt-restore").addEventListener("click", function () {
+    if (snapshot == null) return;
+    events = events.slice(0, snapshot);
+    persist();
+    replayAll();
+    note("スナップショットへ復元 (" + snapshot + " イベント)");
+  });
+  $("bt-wipe").addEventListener("click", function () {
+    if (!confirm("仮想ディスクとイベント台帳を完全に消去します。よろしいですか?")) return;
+    events = []; snapshot = null; persist();
+    lines = []; setPower(false); xScene([]);
+    repaintTerm(); updateButtons();
+    note("工場出荷状態に戻しました");
+  });
+
+  /* ================= settings dialog ================= */
+  $("bt-settings").addEventListener("click", function () {
+    vmxRows = [];
+    var r = runBada(buildProgram(null, "vmx_emit(true, VM)"));
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    var html = "";
+    for (var j = 0; j < vmxRows.length; j++) {
+      var row = vmxRows[j], eq = row.indexOf(" = ");
+      var k = eq < 0 ? row : row.slice(0, eq), v = eq < 0 ? "" : row.slice(eq + 3);
+      html += '<tr><td class="k">' + esc(k) + '</td><td>' + esc(v) + "</td></tr>";
+    }
+    $("vmxtable").innerHTML = html;
+    $("dlg-settings").style.display = "flex";
+  });
+  $("dlg-settings-close").addEventListener("click", function () { $("dlg-settings").style.display = "none"; });
+  $("dlg-help-close").addEventListener("click", function () { $("dlg-help").style.display = "none"; });
+  $("menu-help").addEventListener("click", function () { $("dlg-help").style.display = "flex"; });
+  $("menu-vm").addEventListener("click", function () { showTab("vm"); });
+
+  /* ================= tabs ================= */
+  function showTab(which) {
+    var vm = which === "vm";
+    $("tab-vm").className = "tab" + (vm ? " sel" : "");
+    $("tab-home").className = "tab" + (vm ? "" : " sel");
+    $("vmtab").style.display = vm ? "grid" : "none";
+    $("home").style.display = vm ? "none" : "block";
+    if (vm) term.focus();
+  }
+  $("tab-vm").addEventListener("click", function () { showTab("vm"); });
+  $("tab-home").addEventListener("click", function () { showTab("home"); });
+
+  /* ================= keyboard -> guest ================= */
+  function consoleKey(e) {
+    if ($("dlg-settings").style.display === "flex" || $("dlg-help").style.display === "flex") return;
+    if (mode === "off") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (mode === "key") {
+      var k = e.key.length === 1 ? e.key : (e.key === "Enter" ? " " : null);
+      if (k != null) { e.preventDefault(); send(["key", k]); }
+      return;
+    }
+    if (mode === "line") {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        var b = inputBuf; inputBuf = "";
+        ttyLine(prompt + (echo ? b : ""));
+        send(["line", b]);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        inputBuf = inputBuf.slice(0, -1); repaintTerm();
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        inputBuf += e.key; repaintTerm();
+      }
+    }
+  }
+  term.addEventListener("keydown", consoleKey);
+  term.addEventListener("click", function () { term.focus(); });
+
+  /* ================= BadaX Server window ================= */
+  var xapp = $("xapp"), xroot = $("xroot");
+  var xwins = {};   /* id -> {el, class} */
+  var mouse = { x: 300, y: 200 };
+
+  function handleX(val) {
+    var sp = val.indexOf(" ");
+    var op = sp < 0 ? val : val.slice(0, sp);
+    var rest = sp < 0 ? "" : val.slice(sp + 1);
+    if (op === "SRV") {
+      var p = rest.split("|");
+      $("xs-disp").textContent = "display " + (p[2] || "10.0.2.2:0.0");
+      note("BadaX: " + (p[0] || ""));
+    } else if (op === "AUTH") {
+      var cookie = rest.replace(/^ok\s*/, "");
+      $("xs-auth").textContent = "JONES-KNOT-COOKIE-1: 認証済 (" + cookie + ")";
+      $("xs-qkd").textContent = "QKD: Bell対 OK (零保存)";
+      $("st-qkd").textContent = "QKD: OK";
+      showX(true);
+    } else if (op === "DENY") {
+      $("xs-auth").textContent = "認証拒否: " + rest;
+    } else if (op === "SCENE_BEGIN") {
+      sceneBuf = [];
+    } else if (op === "WIN") {
+      if (sceneBuf) sceneBuf.push(rest);
+    } else if (op === "SCENE_END") {
+      /* applied after the full run in applyScene() */
+    } else if (op === "UNMAP") {
+      /* scene repaint covers it */
+    }
+  }
+  function xconn(val) {
+    var p = val.split("|");
+    $("xs-clients").textContent = "clients: " + (p[1] || "0");
+    $("st-x").textContent = (p[0] === "1") ? "BadaX: 接続中 (cookie " + (p[2] || "?") + ")" : "BadaX: 未接続";
+  }
+  function applyScene() { if (sceneBuf != null) xScene(sceneBuf); }
+
+  function xScene(rows) {
+    var keep = {};
+    for (var i = 0; i < rows.length; i++) {
+      var f = rows[i].split("|");
+      var id = f[0], cls = f[1], x = +f[2], y = +f[3], w = +f[4], h = +f[5], title = f.slice(6).join("|");
+      keep[id] = true;
+      if (!xwins[id]) xwins[id] = makeXWin(id, cls, x, y, w, h, title);
+      else { xwins[id].el.style.left = x + "px"; xwins[id].el.style.top = y + "px"; }
+    }
+    for (var id2 in xwins) if (!keep[id2]) { xroot.removeChild(xwins[id2].el); delete xwins[id2]; }
+    var count = 0; for (var k in xwins) count++;
+    $("xempty").style.display = count ? "none" : "flex";
+    if (count) showX(true);
+  }
+
+  function makeXWin(id, cls, x, y, w, h, title) {
+    var el = document.createElement("div");
+    el.className = "xwin";
+    el.style.cssText = "left:" + x + "px;top:" + y + "px;width:" + w + "px;height:" + h + "px;";
+    var tb = document.createElement("div"); tb.className = "tbar";
+    var tt = document.createElement("span"); tt.className = "t"; tt.textContent = " " + title;
+    var bx = document.createElement("button"); bx.textContent = "x"; bx.title = "close (xkill)";
+    tb.appendChild(tt); tb.appendChild(bx); el.appendChild(tb);
+    var body = document.createElement("div"); body.className = "body"; el.appendChild(body);
+    var win = { el: el, cls: cls, canvas: null };
+    if (cls === "xclock" || cls === "xeyes" || cls === "xlogo") {
+      var cv = document.createElement("canvas");
+      body.appendChild(cv); win.canvas = cv;
+      requestAnimationFrame(function fit() {
+        cv.width = body.clientWidth; cv.height = body.clientHeight; drawXWin(win);
+      });
+    } else if (cls === "xterm") {
+      var pre = document.createElement("pre"); pre.className = "xtermtxt";
+      pre.textContent = "BadaBSD 11.0 (GENERIC.QUANTUM) -- xterm on " + title.replace(/^xterm -- /, "") +
+        "\n$ uname -a\nBadaBSD " + (title.replace(/^xterm -- /, "") || "badabsd") +
+        " 11.0_QUANTUM amd64 (quantum)\n$ echo displayed via BadaX Server on Windows\n" +
+        "displayed via BadaX Server on Windows\n$ ▎";
+      body.appendChild(pre);
+    }
+    bx.addEventListener("click", function () { send(["xclose", +id]); });
+    dragify(el, tb, xroot, function (nx, ny) { send(["xmove", +id, nx, ny]); });
+    xroot.appendChild(el);
+    return win;
+  }
+
+  function drawXWin(win) {
+    var cv = win.canvas; if (!cv) return;
+    var g = cv.getContext("2d"), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H);
+    if (win.cls === "xclock") {
+      var cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 8;
+      g.fillStyle = "#f4f2ea"; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+      g.strokeStyle = "#333"; g.lineWidth = 2; g.stroke();
+      g.strokeStyle = "#555"; g.lineWidth = 1;
+      for (var i = 0; i < 12; i++) {
+        var a = i * Math.PI / 6;
+        g.beginPath();
+        g.moveTo(cx + Math.sin(a) * (R - 8), cy - Math.cos(a) * (R - 8));
+        g.lineTo(cx + Math.sin(a) * (R - 2), cy - Math.cos(a) * (R - 2));
+        g.stroke();
+      }
+      var d = new Date();
+      var sec = d.getSeconds(), min = d.getMinutes() + sec / 60, hr = (d.getHours() % 12) + min / 60;
+      function hand(frac, len, wdt, color) {
+        var a = frac * 2 * Math.PI;
+        g.strokeStyle = color; g.lineWidth = wdt;
+        g.beginPath(); g.moveTo(cx, cy);
+        g.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); g.stroke();
+      }
+      hand(hr / 12, R * 0.5, 3.5, "#222");
+      hand(min / 60, R * 0.72, 2.5, "#222");
+      hand(sec / 60, R * 0.8, 1, "#b03030");
+      g.fillStyle = "#222"; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill();
+    } else if (win.cls === "xeyes") {
+      var r = xroot.getBoundingClientRect(), er = cv.getBoundingClientRect();
+      var mx = mouse.x - er.left, my = mouse.y - er.top;
+      function eye(cx2) {
+        var ew = W / 2 - 10, eh = H - 14, ex = cx2, ey = H / 2;
+        g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 3;
+        g.beginPath(); g.ellipse(ex, ey, ew / 2, eh / 2, 0, 0, 7); g.fill(); g.stroke();
+        var dx = mx - ex, dy = my - ey, dl = Math.sqrt(dx * dx + dy * dy) || 1;
+        var px = ex + (dx / dl) * (ew / 4), py = ey + (dy / dl) * (eh / 4);
+        g.fillStyle = "#111"; g.beginPath();
+        g.ellipse(px, py, Math.max(4, ew / 10), Math.max(5, eh / 8), 0, 0, 7); g.fill();
+      }
+      eye(W / 4 + 3); eye(3 * W / 4 - 3);
+    } else if (win.cls === "xlogo") {
+      g.fillStyle = "#eee"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#000";
+      g.font = "bold " + Math.floor(Math.min(W, H) * 0.8) + "px serif";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("X", W / 2, H / 2 + Math.min(W, H) * 0.05);
+    }
+  }
+  setInterval(function () {
+    for (var id in xwins) if (xwins[id].cls === "xclock") drawXWin(xwins[id]);
+  }, 1000);
+  document.addEventListener("mousemove", function (e) {
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    for (var id in xwins) if (xwins[id].cls === "xeyes") drawXWin(xwins[id]);
+  });
+
+  /* ---- window dragging (BadaX app itself + each X window) ---- */
+  function dragify(el, handle, bounds, onDone) {
+    var sx, sy, ox, oy, dragging = false;
+    handle.addEventListener("mousedown", function (e) {
+      if (e.target.tagName === "BUTTON") return;
+      dragging = true; sx = e.clientX; sy = e.clientY;
+      ox = el.offsetLeft; oy = el.offsetTop;
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      var nx = ox + e.clientX - sx, ny = oy + e.clientY - sy;
+      if (bounds) {
+        nx = Math.max(0, Math.min(nx, bounds.clientWidth - 60));
+        ny = Math.max(0, Math.min(ny, bounds.clientHeight - 30));
+      }
+      el.style.left = nx + "px"; el.style.top = ny + "px";
+    });
+    document.addEventListener("mouseup", function () {
+      if (!dragging) return;
+      dragging = false;
+      if (onDone) onDone(el.offsetLeft, el.offsetTop);
+    });
+  }
+  dragify(xapp, $("xtitle"), null, null);
+
+  function showX(show) { xapp.style.display = show ? "flex" : "none"; }
+  $("bt-x").addEventListener("click", function () {
+    showX(xapp.style.display !== "flex");
+  });
+  $("menu-x").addEventListener("click", function () { showX(true); });
+  $("x-close").addEventListener("click", function () { showX(false); });
+  $("xmenu-info").addEventListener("click", function () {
+    alert("BadaX Server (ASTEC-X 風・教育目的オマージュ)\n" +
+      "display 10.0.2.2:0.0 — BadaVM NAT tcp/6000\n" +
+      "認証: JONES-KNOT-COOKIE-1 (三葉結び目の Kauffman/Jones 鍵)\n" +
+      "セッション: Bell 対 QKD (零保存タンパー検知)\n" +
+      "実装: quantum_vm/bada/badax.bada (Bada 言語)");
+  });
+
+  /* ================= boot the app ================= */
+  updateButtons();
+  if (events.length > 0) replayAll(); else repaintTerm();
+  showTab(events.length > 0 ? "vm" : "home");
+})();
+</script>
+</body>
+</html>

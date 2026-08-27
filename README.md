@@ -62,6 +62,32 @@
 
 ---
 
+## 🖥️ BadaVM Pro — 量子ハイパーバイザ + BadaBSD + BadaX Server (NEW)
+
+**VMware Workstation Pro 風ハイパーバイザ**の中に **NetBSD 風 OS「BadaBSD 11.0」**を
+sysinst 風インストーラでインストールし、VM 内の X クライアント (`xclock` / `xeyes` /
+`xterm`) を **ASTEC-X 風の Windows 用 X サーバー「BadaX Server」**に表示する 3 点セット。
+ハイパーバイザも OS も X サーバーも、**すべて量子プログラミング言語 Bada で記述**されています
+(非公式・教育目的のオマージュ)。
+
+### 👉 [**quantum_vm/dist/bada-vm-pro.html をダウンロード**](quantum_vm/dist/bada-vm-pro.html)
+
+上のファイルを 1 つ保存して開くだけで動きます(インストール不要・依存なし・オフライン可)。
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **どこでも** (単一 HTML) ★ | [`quantum_vm/dist/bada-vm-pro.html`](quantum_vm/dist/bada-vm-pro.html) — 「Download raw file」で保存して開く |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS) / `BadaVMPro-*-portable.exe` |
+| **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+
+- 仮想マシンは量子 vCPU (8 qubit / Hilbert 次元 256)・tuplespace メモリ・仮想ディスク wd0・NAT を持ち、マシン記述は `.qvmx`
+- BadaBSD は CD (ISO) から起動 → `a→a→a→a→a` で GPT/`newfs` FFSv2/セット展開 → root パスワード・ホスト名・DHCP → ディスクから再起動 → `login: root` → シェル (`help` で一覧、`qstat` で Bell 対の零保存を確認)
+- X 表示は ASTEC-X と同じ「計算は UNIX 側・表示は Windows 側」: `DISPLAY=10.0.2.2:0` の **BadaX Server** へ NAT 越しに接続。認証は **JONES-KNOT-COOKIE-1**(三葉結び目の Kauffman/Jones 多項式鍵)+ Bell 対 QKD
+- マシン全状態は追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイ。**スナップショット = 台帳のプレフィックス**
+- ビルドは [`quantumvm-app-build.yml`](.github/workflows/quantumvm-app-build.yml)(`quantumvm-v*` タグで Release へ添付)。詳細は [`quantum_vm/README.md`](quantum_vm/README.md)
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -71,6 +97,7 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`quantum_vm/`** | **BadaVM Pro** — VMware Workstation Pro 風・量子ハイパーバイザ(オマージュ) · NetBSD 風ゲスト OS **BadaBSD 11.0** (sysinst 風インストーラ/FFS/ブート/シェル) · ASTEC-X 風 Windows 用 X サーバー **BadaX Server** (JONES-KNOT-COOKIE-1 + Bell対QKD) · 3 つとも Bada 言語製 · 単一HTML + Windows 10/11 EXE | [→ 開く](quantum_vm/) |
 
 ---
 

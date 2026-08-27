@@ -1,0 +1,130 @@
+# ============================================================
+# badax.bada -- BadaX Server : an X window server FOR WINDOWS,
+# written in the Bada quantum programming language.
+#
+# BadaX Server is an (unofficial, educational) homage to
+# Windows X servers in the style of ASTEC-X: it runs on the
+# Windows 10 / 11 host OUTSIDE the virtual machine, listens on
+# display :0 (tcp 6000 on the BadaVM NAT, host address
+# 10.0.2.2), and displays the X clients that the guest OS
+# (BadaBSD) starts remotely -- exactly the classic "run the
+# client on the UNIX box, see the window on the PC" workflow.
+#
+# SECURITY -- the display cookie is not MIT-MAGIC-COOKIE-1 but
+# JONES-KNOT-COOKIE-1: the cookie is derived from the trefoil
+# knot's Kauffman bracket / Jones polynomial (vmpro.bada's
+# jones_key), and every client connection first runs a
+# Bell-pair QKD handshake over the virtual wire. A client with
+# the wrong knot -- or a tapped wire (broken zero-preservation)
+# -- is rejected before any window is mapped.
+#
+# Host protocol ("@@X ..." lines; the host chrome renders them):
+#   @@X SRV <vendor>|<release>|<display>     server hello
+#   @@X AUTH ok <cookie>                     handshake accepted
+#   @@X DENY <reason>                        handshake rejected
+#   @@X SCENE_BEGIN / @@X WIN id|class|x|y|w|h|title / @@X SCENE_END
+#   @@X UNMAP <id>
+# ============================================================
+
+X_VENDOR  := "BadaX Server (quantum, ASTEC-X style homage)"
+X_RELEASE := "X11R7.7-Q"
+X_DISPLAY := "10.0.2.2:0.0"
+
+# ---- the server record: [nextid, clients, cookie] -------------------
+def x_server_new(cookie) { return [1, 0, cookie] }
+
+def x_hello(emit) {
+    if (emit) { print("@@X SRV " + X_VENDOR + "|" + X_RELEASE + "|" + X_DISPLAY) }
+    return 0
+}
+
+# ---- XOpenDisplay: QKD handshake + JONES-KNOT-COOKIE-1 --------------
+# Returns 1 when the connection is accepted.
+def x_connect(emit, xsrv, client_cookie) {
+    sess := qkd_session()
+    if (!sess[0]) {
+        if (emit) { print("@@X DENY qkd-compromised (Bell correlation broken)") }
+        return 0
+    }
+    if (client_cookie != xsrv[2]) {
+        if (emit) { print("@@X DENY bad JONES-KNOT-COOKIE-1 (wrong knot)") }
+        return 0
+    }
+    xsrv[1] = xsrv[1] + 1
+    if (emit) { print("@@X AUTH ok " + xsrv[2]) }
+    return 1
+}
+
+# ---- window placement: classic cascade on the root window -----------
+def x_geometry(class, nth) {
+    x := 24 + (nth % 4) * 96
+    y := 20 + (nth % 4) * 56
+    if (class == "xclock") { return [x, y, 170, 190] }
+    if (class == "xeyes")  { return [x, y, 210, 130] }
+    if (class == "xterm")  { return [x, y, 400, 240] }
+    if (class == "xlogo")  { return [x, y, 140, 140] }
+    return [x, y, 240, 160]
+}
+
+# ---- CreateWindow + MapWindow ---------------------------------------
+# xwins is the guest-side list of mapped windows:
+#   [id, class, x, y, w, h, title]
+def x_map_window(xsrv, xwins, class, title) {
+    id := xsrv[0]
+    xsrv[0] = id + 1
+    g := x_geometry(class, len(xwins))
+    xwins <- [id, class, g[0], g[1], g[2], g[3], title]
+    return id
+}
+
+def x_unmap_window(emit, xwins, id) {
+    out := []
+    found := 0
+    i := 0
+    while (i < len(xwins)) {
+        if (xwins[i][0] == id) { found := 1 }
+        else { out <- xwins[i] }
+        i := i + 1
+    }
+    if (found == 1 && emit) { print("@@X UNMAP " + id) }
+    return out
+}
+
+def x_move_window(xwins, id, nx, ny) {
+    i := 0
+    while (i < len(xwins)) {
+        if (xwins[i][0] == id) { xwins[i][2] = nx; xwins[i][3] = ny }
+        i := i + 1
+    }
+    return 0
+}
+
+# ---- emit the whole scene (the host repaints from this) -------------
+def x_scene(emit, xwins) {
+    if (!emit) { return 0 }
+    print("@@X SCENE_BEGIN")
+    i := 0
+    while (i < len(xwins)) {
+        w := xwins[i]
+        print("@@X WIN " + w[0] + "|" + w[1] + "|" + w[2] + "|" + w[3] + "|" +
+              w[4] + "|" + w[5] + "|" + w[6])
+        i := i + 1
+    }
+    print("@@X SCENE_END")
+    return 0
+}
+
+# ---- xdpyinfo, answered by the server -------------------------------
+def x_dpyinfo(emit, xsrv, xwins) {
+    tty(emit, "name of display:    " + X_DISPLAY)
+    tty(emit, "version number:    11.0")
+    tty(emit, "vendor string:    " + X_VENDOR)
+    tty(emit, "vendor release number:    " + X_RELEASE)
+    tty(emit, "authorization protocol:    JONES-KNOT-COOKIE-1")
+    tty(emit, "display cookie:    " + xsrv[2] + "  (trefoil-knot Jones key)")
+    tty(emit, "transport:    BadaVM NAT tcp/6000, Bell-pair QKD secured")
+    tty(emit, "number of clients:    " + xsrv[1])
+    tty(emit, "mapped windows:    " + len(xwins))
+    tty(emit, "default screen:    0  (root 1184x760, depth 24)")
+    return 0
+}

@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BadaVM Pro — 量子ハイパーバイザ (BadaBSD + BadaX Server)</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:#1e1f22; --panel:#2b2d30; --panel2:#26282b; --line:#3c3f43;
+    --ink:#d6d9de; --dim:#8b919a; --accent:#3d9bd8; --accent2:#63b3e4;
+    --green:#4caf6e; --red:#d0574a; --gold:#c8a44a;
+    --term-bg:#0a0c0e; --term-ink:#cfe8cf;
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+         font-family: system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;
+         font-size:13px; }
+  button { font-family:inherit; }
+
+  /* ===== application chrome ===== */
+  #menubar { display:flex; align-items:center; gap:2px; background:#202124;
+             border-bottom:1px solid var(--line); padding:4px 8px; user-select:none; }
+  #menubar .logo { font-weight:700; color:var(--accent2); margin-right:10px; }
+  #menubar .logo small { color:var(--dim); font-weight:400; }
+  #menubar .m { padding:3px 9px; border-radius:4px; color:var(--ink); cursor:default; }
+  #menubar .m:hover { background:#33363a; }
+  #toolbar { display:flex; align-items:center; gap:6px; background:var(--panel);
+             border-bottom:1px solid var(--line); padding:6px 10px; user-select:none; }
+  .tbtn { display:flex; align-items:center; gap:6px; background:#34373b; color:var(--ink);
+          border:1px solid #44484d; border-radius:5px; padding:5px 11px; cursor:pointer; font-size:12.5px; }
+  .tbtn:hover:not(:disabled) { background:#3d4147; border-color:var(--accent); }
+  .tbtn:disabled { opacity:.38; cursor:default; }
+  .tbtn.pow { color:#8fe3ae; }
+  .tbtn.stop { color:#f2a49b; }
+  .tsep { width:1px; height:22px; background:var(--line); margin:0 4px; }
+
+  #frame { display:grid; grid-template-columns:230px 1fr; height:calc(100% - 92px); }
+
+  /* ===== library sidebar ===== */
+  #library { background:var(--panel2); border-right:1px solid var(--line); padding:10px; overflow:auto; }
+  #library h3 { margin:2px 0 8px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); }
+  .vmitem { display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:6px; cursor:pointer; }
+  .vmitem:hover { background:#31343a; }
+  .vmitem.sel { background:#2f4256; outline:1px solid #3d5a75; }
+  .vmdot { width:9px; height:9px; border-radius:50%; background:#5a5f66; }
+  .vmdot.on { background:var(--green); box-shadow:0 0 6px var(--green); }
+  .vmname b { font-size:12.5px; }
+  .vmname small { display:block; color:var(--dim); }
+  #libinfo { margin-top:14px; border-top:1px dashed var(--line); padding-top:10px;
+             font-size:11.5px; color:var(--dim); line-height:1.7; }
+  #libinfo b { color:var(--ink); }
+
+  /* ===== tabs + main ===== */
+  #main { display:flex; flex-direction:column; min-width:0; }
+  #tabs { display:flex; gap:2px; background:#232528; border-bottom:1px solid var(--line); padding:4px 8px 0; }
+  .tab { padding:6px 16px; border:1px solid var(--line); border-bottom:none;
+         border-radius:6px 6px 0 0; background:#2a2c2f; color:var(--dim); cursor:pointer; }
+  .tab.sel { background:var(--bg); color:var(--ink); border-color:#484c51; }
+  #content { flex:1; position:relative; overflow:hidden; }
+
+  /* ---- home tab ---- */
+  #home { position:absolute; inset:0; overflow:auto; padding:34px 40px; }
+  #home h1 { margin:0 0 4px; font-size:24px; }
+  #home h1 span { color:var(--accent2); }
+  #home .sub { color:var(--dim); margin-bottom:22px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:14px; max-width:1000px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .card h3 { margin:0 0 6px; font-size:14px; color:var(--accent2); }
+  .card p { margin:0; color:var(--dim); line-height:1.65; font-size:12.5px; }
+  .card .go { margin-top:12px; }
+
+  /* ---- vm tab ---- */
+  #vmtab { position:absolute; inset:0; display:none; grid-template-rows:1fr auto; }
+  #screenwrap { position:relative; margin:14px; border:1px solid #000; border-radius:6px;
+                background:var(--term-bg); overflow:hidden; box-shadow:0 4px 24px rgba(0,0,0,.5); }
+  #term { position:absolute; inset:0; padding:10px 12px 26px; overflow-y:auto; cursor:text;
+          font:12.5px/1.42 "Cascadia Mono","SFMono-Regular",Consolas,"BIZ UDGothic",monospace;
+          color:var(--term-ink); white-space:pre-wrap; word-break:break-all; }
+  #term .in { color:#ffffff; }
+  #cursor { display:inline-block; width:7px; height:13px; background:var(--term-ink);
+            vertical-align:-2px; animation:blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity:0; } }
+  #offscreen { position:absolute; inset:0; display:flex; flex-direction:column; gap:14px;
+               align-items:center; justify-content:center; background:
+               radial-gradient(ellipse at 50% 40%, #14161a 0%, #0a0c0e 70%); }
+  #offscreen .big { font-size:15px; color:var(--dim); }
+  #poweron { font-size:15px; padding:10px 22px; }
+  #devices { display:flex; flex-wrap:wrap; gap:8px 18px; padding:8px 16px 12px; color:var(--dim);
+             font-size:12px; border-top:1px solid var(--line); background:var(--panel2); }
+  #devices span b { color:var(--ink); font-weight:500; }
+
+  /* ===== status bar ===== */
+  #status { display:flex; align-items:center; gap:16px; background:#202124; border-top:1px solid var(--line);
+            padding:4px 12px; font-size:11.5px; color:var(--dim); user-select:none; }
+  #status .ok { color:#8fe3ae; }
+  #status .led { margin-left:auto; }
+
+  /* ===== BadaX Server window (ASTEC-X style companion app) ===== */
+  #xapp { position:absolute; width:640px; height:480px; left:calc(50% - 100px); top:70px;
+          display:none; flex-direction:column; background:#e8e8e8; color:#111;
+          border:1px solid #666; border-radius:8px 8px 6px 6px; box-shadow:0 10px 40px rgba(0,0,0,.65);
+          z-index:40; min-width:380px; min-height:260px; resize:both; overflow:hidden; }
+  #xtitle { display:flex; align-items:center; gap:8px; background:linear-gradient(180deg,#3d6ea5,#2d5182);
+            color:#fff; padding:5px 10px; border-radius:7px 7px 0 0; cursor:move; user-select:none; }
+  #xtitle .xlogo { font-weight:800; font-family:serif; font-size:15px; }
+  #xtitle small { opacity:.85; }
+  #xtitle .win-x { margin-left:auto; border:0; background:#c0392b; color:#fff; width:22px; height:18px;
+                   border-radius:3px; cursor:pointer; line-height:1; }
+  #xmenu { display:flex; gap:2px; background:#f2f2f2; border-bottom:1px solid #c9c9c9; padding:2px 6px;
+           font-size:12px; user-select:none; }
+  #xmenu span { padding:2px 8px; border-radius:3px; }
+  #xmenu span:hover { background:#dfe7f2; }
+  #xroot { position:relative; flex:1; overflow:hidden;
+           background:#7d8890;
+           background-image:
+             linear-gradient(45deg, #747f87 25%, transparent 25%, transparent 75%, #747f87 75%),
+             linear-gradient(45deg, #747f87 25%, transparent 25%, transparent 75%, #747f87 75%);
+           background-size:4px 4px; background-position:0 0, 2px 2px; }
+  #xempty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+            color:#e9edf1; text-shadow:0 1px 2px rgba(0,0,0,.4); font-size:12.5px; text-align:center; }
+  #xstatus { display:flex; gap:14px; background:#f2f2f2; border-top:1px solid #c9c9c9;
+             padding:3px 8px; font-size:11px; color:#333; }
+  #xstatus .auth { color:#1d7a3d; }
+
+  .xwin { position:absolute; background:#d6d6d6; border:2px solid #4a5b6b;
+          box-shadow:2px 3px 10px rgba(0,0,0,.45); display:flex; flex-direction:column; }
+  .xwin .tbar { display:flex; align-items:center; background:#5f9ea0; color:#0b2a2b;
+                font:11px "Cascadia Mono",Consolas,monospace; padding:2px 4px; cursor:move; user-select:none;
+                border-bottom:2px solid #4a5b6b; }
+  .xwin .tbar .t { flex:1; overflow:hidden; white-space:nowrap; }
+  .xwin .tbar button { border:1px solid #33565c; background:#cfe5e4; width:14px; height:13px;
+                       font-size:9px; line-height:1; cursor:pointer; padding:0; margin-left:3px; }
+  .xwin .body { flex:1; background:#efefef; overflow:hidden; position:relative; }
+  .xwin canvas { display:block; }
+  .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
+                       color:#d8f3d8; background:#101210; height:100%; overflow:auto; }
+
+  /* ===== dialogs ===== */
+  .dlg { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+         background:rgba(0,0,0,.55); z-index:60; }
+  .dlgbox { width:min(680px, 92%); max-height:82%; overflow:auto; background:var(--panel);
+            border:1px solid var(--line); border-radius:10px; padding:18px 20px; }
+  .dlgbox h2 { margin:0 0 10px; font-size:16px; }
+  .dlgbox table { width:100%; border-collapse:collapse; font-size:12px;
+                  font-family:"Cascadia Mono",Consolas,monospace; }
+  .dlgbox td { padding:4px 8px; border-bottom:1px solid #34373b; vertical-align:top; }
+  .dlgbox td.k { color:var(--gold); white-space:nowrap; }
+  .dlgbox .close { margin-top:14px; }
+  .note { color:var(--dim); font-size:11.5px; margin-top:10px; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div id="menubar">
+  <span class="logo">Ω BadaVM <span style="color:var(--gold)">Pro</span>
+    <small>— 量子ハイパーバイザ (Bada言語製 / VMware Workstation Pro 風オマージュ)</small></span>
+  <span class="m">ファイル</span><span class="m">編集</span><span class="m">表示</span>
+  <span class="m" id="menu-vm">VM</span><span class="m" id="menu-x">BadaX</span><span class="m" id="menu-help">ヘルプ</span>
+</div>
+
+<div id="toolbar">
+  <button class="tbtn pow"  id="bt-on"   title="仮想マシンをパワーオン">▶ 起動</button>
+  <button class="tbtn stop" id="bt-off"  title="仮想マシンの電源を切る" disabled>⏻ 電源オフ</button>
+  <button class="tbtn"      id="bt-reset" title="リセット" disabled>⟲ リセット</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-snap"    title="現在のイベント台帳をスナップショット">📷 スナップショット</button>
+  <button class="tbtn" id="bt-restore" title="スナップショットへ復元" disabled>⤺ 復元</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-settings" title="仮想マシン設定 (.qvmx)">⚙ 設定</button>
+  <button class="tbtn" id="bt-x"        title="BadaX Server ウィンドウの表示/非表示">🖥 BadaX Server</button>
+  <span class="tsep"></span>
+  <button class="tbtn" id="bt-wipe" title="仮想ディスクを消去して工場出荷状態に戻す">🗑 ディスク消去</button>
+</div>
+
+<div id="frame">
+  <nav id="library">
+    <h3>ライブラリ</h3>
+    <div style="color:var(--dim); padding:2px 6px 6px;">▾ 自分の PC</div>
+    <div class="vmitem sel" id="vmentry">
+      <span class="vmdot" id="vmdot"></span>
+      <span class="vmname"><b>BadaBSD 11.0 (量子)</b><small>NetBSD 風ゲスト OS · Bada言語製</small></span>
+    </div>
+    <div id="libinfo">
+      <b>構成 3 点セット (全て Bada 言語)</b><br/>
+      ① BadaVM Pro — ハイパーバイザ<br/>
+      ② BadaBSD — NetBSD 風ゲスト OS<br/>
+      ③ BadaX Server — Windows ホスト側<br/>
+      &nbsp;&nbsp;&nbsp;ASTEC-X 風 X サーバー<br/><br/>
+      マシン状態は追記専用イベント台帳<br/>(Akashic machine tape) の決定論的<br/>リプレイ。スナップショット = 台帳の<br/>プレフィックスです。
+    </div>
+  </nav>
+
+  <div id="main">
+    <div id="tabs">
+      <div class="tab" id="tab-home">🏠 ホーム</div>
+      <div class="tab sel" id="tab-vm">BadaBSD 11.0 (量子)</div>
+    </div>
+    <div id="content">
+
+      <section id="home" style="display:none">
+        <h1>BadaVM <span>Pro</span></h1>
+        <div class="sub">量子プログラミング言語 Bada で書かれたデスクトップ・ハイパーバイザ(教育目的の
+          VMware Workstation Pro 風オマージュ)。ゲスト OS も X サーバーも、すべて Bada 言語です。</div>
+        <div class="cards">
+          <div class="card">
+            <h3>① BadaVM Pro ハイパーバイザ</h3>
+            <p>量子 vCPU (8 qubit / Hilbert 次元 256)、tuplespace メモリ、仮想ディスク wd0、
+               NAT ネットワーク、CD-ROM。マシン記述は .qvmx。スナップショットはイベント台帳の
+               プレフィックスとしてコミットされます。<span style="color:var(--gold)">bada/vmpro.bada</span></p>
+            <div class="go"><button class="tbtn pow" id="home-poweron">▶ BadaBSD をパワーオン</button></div>
+          </div>
+          <div class="card">
+            <h3>② BadaBSD 11.0 — NetBSD 風 OS</h3>
+            <p>CD イメージから起動し、sysinst 風フルスクリーン・インストーラで仮想ディスクへ
+               インストール (disklabel → newfs FFSv2 → セット展開 → root パスワード → DHCP)。
+               ブートローダ・dmesg・/etc/rc・ログイン・シェルまで完備。
+               <span style="color:var(--gold)">bada/badabsd.bada</span></p>
+          </div>
+          <div class="card">
+            <h3>③ BadaX Server — Windows 用 X サーバー</h3>
+            <p>ASTEC-X 風の外部 X サーバー (ホスト側アプリ)。VM の中の xclock / xeyes / xterm が
+               NAT 越しに DISPLAY=10.0.2.2:0 へ接続し、Windows 側に表示されます。認証は
+               MIT-MAGIC-COOKIE-1 ならぬ <b>JONES-KNOT-COOKIE-1</b> (三葉結び目の Jones 多項式鍵)
+               + Bell 対 QKD。<span style="color:var(--gold)">bada/badax.bada</span></p>
+          </div>
+        </div>
+        <div class="note">※ 本アプリは単一 HTML に Bada 言語コア (bada.js) と 3 本の .bada ソースを
+          同梱した自己完結アプリです。VMware・NetBSD・ASTEC-X とは無関係の、名称をもじった教育目的の
+          オマージュです。ゲストの全状態はローカルの localStorage にのみ保存されます。</div>
+      </section>
+
+      <section id="vmtab">
+        <div id="screenwrap">
+          <div id="term" tabindex="0"></div>
+          <div id="offscreen">
+            <div class="big">この仮想マシンはパワーオフの状態です</div>
+            <button class="tbtn pow" id="poweron">▶ この仮想マシンをパワーオンする</button>
+            <div style="color:#57606a;font-size:11.5px">初回起動時は BadaBSD-11.0-amd64-quantum.iso から
+              sysinst インストーラが立ち上がります</div>
+          </div>
+        </div>
+        <div id="devices">
+          <span>💾 <b>メモリ</b> 4096 MB (tuplespace)</span>
+          <span>⚛ <b>プロセッサ</b> 2 (量子 8 qubit)</span>
+          <span>🖴 <b>ハードディスク (SCSI)</b> 20 GB .qvmdk</span>
+          <span>💿 <b>CD/DVD</b> BadaBSD-11.0-amd64-quantum.iso</span>
+          <span>🌐 <b>ネットワーク</b> NAT (10.0.2.0/24)</span>
+          <span>🖥 <b>ディスプレイ</b> BadaX Server 10.0.2.2:0</span>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<div id="status">
+  <span id="st-power">電源: オフ</span>
+  <span id="st-ledger">台帳: 0 イベント</span>
+  <span id="st-qkd">QKD: —</span>
+  <span id="st-x">BadaX: 未接続</span>
+  <span class="led" id="st-note">Bada 言語コア搭載 — すべてのキー入力が Bada プログラムとして実行されます</span>
+</div>
+
+<!-- ===== BadaX Server: the ASTEC-X style X server on the Windows host ===== -->
+<div id="xapp">
+  <div id="xtitle">
+    <span class="xlogo">X</span><b>BadaX Server</b>
+    <small>— :0.0 · ASTEC-X 風 (Bada言語製)</small>
+    <button class="win-x" id="x-close" title="閉じる (サーバーは動作し続けます)">×</button>
+  </div>
+  <div id="xmenu"><span>ファイル</span><span>表示</span><span id="xmenu-info">情報</span><span>ヘルプ</span></div>
+  <div id="xroot">
+    <div id="xempty">X クライアント待機中…<br/>
+      <small>BadaBSD 側で&nbsp; <code>xclock &amp;</code> / <code>xeyes &amp;</code> /
+      <code>xterm &amp;</code> &nbsp;を実行してください</small></div>
+  </div>
+  <div id="xstatus">
+    <span id="xs-disp">display 10.0.2.2:0.0</span>
+    <span class="auth" id="xs-auth">JONES-KNOT-COOKIE-1: 待機</span>
+    <span id="xs-clients">clients: 0</span>
+    <span id="xs-qkd">QKD: —</span>
+  </div>
+</div>
+
+<!-- ===== settings dialog (.qvmx) ===== -->
+<div class="dlg" id="dlg-settings">
+  <div class="dlgbox">
+    <h2>⚙ 仮想マシン設定 — BadaBSD 11.0 (量子).qvmx</h2>
+    <table id="vmxtable"></table>
+    <div class="note">この設定は Bada の <code>vmx_emit()</code> がいま生成した実物です。</div>
+    <button class="tbtn close" id="dlg-settings-close">閉じる</button>
+  </div>
+</div>
+
+<!-- ===== help dialog ===== -->
+<div class="dlg" id="dlg-help">
+  <div class="dlgbox">
+    <h2>ヘルプ — 最短ツアー</h2>
+    <div style="line-height:1.9">
+      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動します。<br/>
+      &nbsp;&nbsp;&nbsp;メニューは表示されたキー (a, b, j, x…) を 1 文字押すだけ。<b>a → a → a → a → a</b>
+      と進むとインストールが走ります。<br/>
+      2. root パスワードとホスト名を入力 → 任意のキーで<b>ディスクから再起動</b>。<br/>
+      3. <b>login: root</b> + 設定したパスワードでログイン。<br/>
+      4. <code>help</code> でコマンド一覧。<code>xclock &amp;</code> <code>xeyes &amp;</code>
+         <code>xterm &amp;</code> を打つと <b>BadaX Server</b> (ASTEC-X 風ウィンドウ) に表示されます。<br/>
+      5. <code>qstat</code> で Bell 対の零保存、<code>xdpyinfo</code> で JONES-KNOT-COOKIE-1 を確認。<br/>
+      6. 📷 スナップショット = イベント台帳のプレフィックス。⤺ 復元 でその時点に巻き戻ります。
+    </div>
+    <button class="tbtn close" id="dlg-help-close">閉じる</button>
+  </div>
+</div>
+
+<script>
+/* ==== Bada language core (inlined) ==== */
+__BADA_CORE__
+</script>
+<script>
+/* ==== BadaVM Pro + BadaBSD + BadaX runtime libraries (inlined .bada) ==== */
+var VM_LIBS = __VM_LIBS_JSON__;
+</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ================= persistent event ledger ================= */
+  var LS_EVENTS = "badavm.events.v1", LS_SNAP = "badavm.snapshot.v1";
+  var events = [];      /* the Akashic machine tape */
+  var snapshot = null;  /* ledger prefix length */
+  try {
+    var se = localStorage.getItem(LS_EVENTS);
+    if (se) events = JSON.parse(se) || [];
+    var ss = localStorage.getItem(LS_SNAP);
+    if (ss) snapshot = JSON.parse(ss);
+  } catch (e) {}
+  function persist() {
+    try {
+      localStorage.setItem(LS_EVENTS, JSON.stringify(events));
+      if (snapshot == null) localStorage.removeItem(LS_SNAP);
+      else localStorage.setItem(LS_SNAP, JSON.stringify(snapshot));
+    } catch (e) {}
+  }
+
+  /* ================= terminal ================= */
+  var term = $("term"), MAXLINES = 3000;
+  var mode = "off", echo = true, prompt = "", inputBuf = "";
+  var lines = [];
+  function repaintTerm() {
+    while (lines.length > MAXLINES) lines.shift();
+    var html = "";
+    for (var i = 0; i < lines.length; i++) html += esc(lines[i]) + "\n";
+    if (mode === "line") {
+      html += esc(prompt) + '<span class="in">' + esc(echo ? inputBuf : "") +
+              '</span><span id="cursor"></span>';
+    } else if (mode === "key") {
+      html += '<span id="cursor"></span>';
+    }
+    term.innerHTML = html;
+    term.scrollTop = term.scrollHeight;
+  }
+  function ttyLine(s) { lines.push(s); }
+  function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  /* ================= the Bada bridge =================
+     Every interaction appends ONE event to the ledger and replays the
+     whole tape through the Bada language core; only the newest event
+     emits output ("@@" protocol lines).                              */
+  function nowString() {
+    var d = new Date();
+    var days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    var mons = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return days[d.getDay()] + " " + mons[d.getMonth()] + " " + d.getDate() + " " +
+           d.toTimeString().slice(0, 8) + " " + d.getFullYear();
+  }
+  function buildProgram(evs, tail) {
+    var p = 'NOW := ' + JSON.stringify(nowString()) + '\n' + VM_LIBS + '\n';
+    p += 'VM := vm_create("BadaBSD 11.0 (quantum)", 2, 4096, 20480)\n';
+    if (tail) { p += tail + '\n'; return p; }
+    p += 'EVENTS := ' + JSON.stringify(evs) + '\n';
+    p += 'os_run(VM, EVENTS)\n';
+    return p;
+  }
+  function runBada(prog) {
+    var out = [];
+    var r = BadaLang.run(prog, { maxSteps: 80000000, out: function (s) { out.push(s); } });
+    return { ok: r.ok, lines: out, ledger: r.ledgerLen, error: r.error || (r.parseErrors || []).join("; ") };
+  }
+
+  var vmxRows = [], sceneBuf = null, powered = false;
+
+  function handleLine(ln) {
+    if (ln.indexOf("@@") !== 0) return;
+    var sp = ln.indexOf(" ");
+    var key = (sp < 0 ? ln : ln.slice(0, sp)).slice(2);
+    var val = sp < 0 ? "" : ln.slice(sp + 1);
+    switch (key) {
+      case "TTY": ttyLine(val); break;
+      case "CLS": lines = []; break;
+      case "POWER": setPower(val === "on"); break;
+      case "HYP": note("hypervisor: " + val); break;
+      case "VMX": vmxRows.push(val); break;
+      case "MODE": mode = val; break;
+      case "ECHO": echo = (val === "on"); break;
+      case "PROMPT": prompt = val; break;
+      case "STAGE": break;
+      case "POWERSTATE": setPower(val === "1"); break;
+      case "SNAPSHOT": note("スナップショット: " + val); break;
+      case "XCONN": xconn(val); break;
+      case "X": handleX(val); break;
+    }
+  }
+
+  function send(ev, opts) {
+    opts = opts || {};
+    events.push(ev);
+    vmxRows = []; sceneBuf = null; mode = "off"; prompt = "";
+    var r = runBada(buildProgram(events));
+    if (!r.ok) {
+      ttyLine("[bada runtime] " + r.error);
+    }
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
+    persist();
+    applyScene();
+    repaintTerm();
+    updateButtons();
+  }
+
+  /* full-repaint replay: used at load / snapshot-restore; replays the tape
+     with every event emitting, so the console scrollback is rebuilt. */
+  function replayAll() {
+    lines = []; vmxRows = []; sceneBuf = null; mode = "off"; prompt = ""; powered = false;
+    if (events.length === 0) { setPower(false); repaintTerm(); updateButtons(); return; }
+    /* emit only from the last "screen-clearing" boundary: run the tape once
+       with the final event emitting -- the guest repaints its last screen. */
+    var r = runBada(buildProgram(events));
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    $("st-ledger").textContent = "台帳: " + events.length + " イベント / " + r.ledger + " facts";
+    ttyLine("(イベント台帳 " + events.length + " 件をリプレイして復元しました — 画面は最終イベント分のみ)");
+    applyScene();
+    repaintTerm();
+    updateButtons();
+  }
+
+  function setPower(on) {
+    powered = on;
+    $("vmdot").className = "vmdot" + (on ? " on" : "");
+    $("st-power").textContent = "電源: " + (on ? "オン" : "オフ");
+    $("offscreen").style.display = on ? "none" : "flex";
+    if (!on) { mode = "off"; xScene([]); }
+  }
+  function updateButtons() {
+    $("bt-on").disabled = powered;
+    $("bt-off").disabled = !powered;
+    $("bt-reset").disabled = !powered;
+    $("bt-restore").disabled = (snapshot == null);
+  }
+  function note(s) { $("st-note").textContent = s; }
+
+  /* ================= power / snapshot ================= */
+  function powerOn() { showTab("vm"); if (!powered) send(["power", "on"]); term.focus(); }
+  $("bt-on").addEventListener("click", powerOn);
+  $("poweron").addEventListener("click", powerOn);
+  $("home-poweron").addEventListener("click", powerOn);
+  $("bt-off").addEventListener("click", function () {
+    if (powered) { send(["power", "off"]); ttyLine("(電源が切れました)"); repaintTerm(); }
+  });
+  $("bt-reset").addEventListener("click", function () { if (powered) send(["power", "reset"]); });
+  $("bt-snap").addEventListener("click", function () {
+    snapshot = events.length;
+    persist(); updateButtons();
+    note("スナップショット作成: 台帳プレフィックス " + snapshot + " イベント");
+  });
+  $("bt-restore").addEventListener("click", function () {
+    if (snapshot == null) return;
+    events = events.slice(0, snapshot);
+    persist();
+    replayAll();
+    note("スナップショットへ復元 (" + snapshot + " イベント)");
+  });
+  $("bt-wipe").addEventListener("click", function () {
+    if (!confirm("仮想ディスクとイベント台帳を完全に消去します。よろしいですか?")) return;
+    events = []; snapshot = null; persist();
+    lines = []; setPower(false); xScene([]);
+    repaintTerm(); updateButtons();
+    note("工場出荷状態に戻しました");
+  });
+
+  /* ================= settings dialog ================= */
+  $("bt-settings").addEventListener("click", function () {
+    vmxRows = [];
+    var r = runBada(buildProgram(null, "vmx_emit(true, VM)"));
+    for (var i = 0; i < r.lines.length; i++) handleLine(r.lines[i]);
+    var html = "";
+    for (var j = 0; j < vmxRows.length; j++) {
+      var row = vmxRows[j], eq = row.indexOf(" = ");
+      var k = eq < 0 ? row : row.slice(0, eq), v = eq < 0 ? "" : row.slice(eq + 3);
+      html += '<tr><td class="k">' + esc(k) + '</td><td>' + esc(v) + "</td></tr>";
+    }
+    $("vmxtable").innerHTML = html;
+    $("dlg-settings").style.display = "flex";
+  });
+  $("dlg-settings-close").addEventListener("click", function () { $("dlg-settings").style.display = "none"; });
+  $("dlg-help-close").addEventListener("click", function () { $("dlg-help").style.display = "none"; });
+  $("menu-help").addEventListener("click", function () { $("dlg-help").style.display = "flex"; });
+  $("menu-vm").addEventListener("click", function () { showTab("vm"); });
+
+  /* ================= tabs ================= */
+  function showTab(which) {
+    var vm = which === "vm";
+    $("tab-vm").className = "tab" + (vm ? " sel" : "");
+    $("tab-home").className = "tab" + (vm ? "" : " sel");
+    $("vmtab").style.display = vm ? "grid" : "none";
+    $("home").style.display = vm ? "none" : "block";
+    if (vm) term.focus();
+  }
+  $("tab-vm").addEventListener("click", function () { showTab("vm"); });
+  $("tab-home").addEventListener("click", function () { showTab("home"); });
+
+  /* ================= keyboard -> guest ================= */
+  function consoleKey(e) {
+    if ($("dlg-settings").style.display === "flex" || $("dlg-help").style.display === "flex") return;
+    if (mode === "off") return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (mode === "key") {
+      var k = e.key.length === 1 ? e.key : (e.key === "Enter" ? " " : null);
+      if (k != null) { e.preventDefault(); send(["key", k]); }
+      return;
+    }
+    if (mode === "line") {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        var b = inputBuf; inputBuf = "";
+        ttyLine(prompt + (echo ? b : ""));
+        send(["line", b]);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        inputBuf = inputBuf.slice(0, -1); repaintTerm();
+      } else if (e.key.length === 1) {
+        e.preventDefault();
+        inputBuf += e.key; repaintTerm();
+      }
+    }
+  }
+  term.addEventListener("keydown", consoleKey);
+  term.addEventListener("click", function () { term.focus(); });
+
+  /* ================= BadaX Server window ================= */
+  var xapp = $("xapp"), xroot = $("xroot");
+  var xwins = {};   /* id -> {el, class} */
+  var mouse = { x: 300, y: 200 };
+
+  function handleX(val) {
+    var sp = val.indexOf(" ");
+    var op = sp < 0 ? val : val.slice(0, sp);
+    var rest = sp < 0 ? "" : val.slice(sp + 1);
+    if (op === "SRV") {
+      var p = rest.split("|");
+      $("xs-disp").textContent = "display " + (p[2] || "10.0.2.2:0.0");
+      note("BadaX: " + (p[0] || ""));
+    } else if (op === "AUTH") {
+      var cookie = rest.replace(/^ok\s*/, "");
+      $("xs-auth").textContent = "JONES-KNOT-COOKIE-1: 認証済 (" + cookie + ")";
+      $("xs-qkd").textContent = "QKD: Bell対 OK (零保存)";
+      $("st-qkd").textContent = "QKD: OK";
+      showX(true);
+    } else if (op === "DENY") {
+      $("xs-auth").textContent = "認証拒否: " + rest;
+    } else if (op === "SCENE_BEGIN") {
+      sceneBuf = [];
+    } else if (op === "WIN") {
+      if (sceneBuf) sceneBuf.push(rest);
+    } else if (op === "SCENE_END") {
+      /* applied after the full run in applyScene() */
+    } else if (op === "UNMAP") {
+      /* scene repaint covers it */
+    }
+  }
+  function xconn(val) {
+    var p = val.split("|");
+    $("xs-clients").textContent = "clients: " + (p[1] || "0");
+    $("st-x").textContent = (p[0] === "1") ? "BadaX: 接続中 (cookie " + (p[2] || "?") + ")" : "BadaX: 未接続";
+  }
+  function applyScene() { if (sceneBuf != null) xScene(sceneBuf); }
+
+  function xScene(rows) {
+    var keep = {};
+    for (var i = 0; i < rows.length; i++) {
+      var f = rows[i].split("|");
+      var id = f[0], cls = f[1], x = +f[2], y = +f[3], w = +f[4], h = +f[5], title = f.slice(6).join("|");
+      keep[id] = true;
+      if (!xwins[id]) xwins[id] = makeXWin(id, cls, x, y, w, h, title);
+      else { xwins[id].el.style.left = x + "px"; xwins[id].el.style.top = y + "px"; }
+    }
+    for (var id2 in xwins) if (!keep[id2]) { xroot.removeChild(xwins[id2].el); delete xwins[id2]; }
+    var count = 0; for (var k in xwins) count++;
+    $("xempty").style.display = count ? "none" : "flex";
+    if (count) showX(true);
+  }
+
+  function makeXWin(id, cls, x, y, w, h, title) {
+    var el = document.createElement("div");
+    el.className = "xwin";
+    el.style.cssText = "left:" + x + "px;top:" + y + "px;width:" + w + "px;height:" + h + "px;";
+    var tb = document.createElement("div"); tb.className = "tbar";
+    var tt = document.createElement("span"); tt.className = "t"; tt.textContent = " " + title;
+    var bx = document.createElement("button"); bx.textContent = "x"; bx.title = "close (xkill)";
+    tb.appendChild(tt); tb.appendChild(bx); el.appendChild(tb);
+    var body = document.createElement("div"); body.className = "body"; el.appendChild(body);
+    var win = { el: el, cls: cls, canvas: null };
+    if (cls === "xclock" || cls === "xeyes" || cls === "xlogo") {
+      var cv = document.createElement("canvas");
+      body.appendChild(cv); win.canvas = cv;
+      requestAnimationFrame(function fit() {
+        cv.width = body.clientWidth; cv.height = body.clientHeight; drawXWin(win);
+      });
+    } else if (cls === "xterm") {
+      var pre = document.createElement("pre"); pre.className = "xtermtxt";
+      pre.textContent = "BadaBSD 11.0 (GENERIC.QUANTUM) -- xterm on " + title.replace(/^xterm -- /, "") +
+        "\n$ uname -a\nBadaBSD " + (title.replace(/^xterm -- /, "") || "badabsd") +
+        " 11.0_QUANTUM amd64 (quantum)\n$ echo displayed via BadaX Server on Windows\n" +
+        "displayed via BadaX Server on Windows\n$ ▎";
+      body.appendChild(pre);
+    }
+    bx.addEventListener("click", function () { send(["xclose", +id]); });
+    dragify(el, tb, xroot, function (nx, ny) { send(["xmove", +id, nx, ny]); });
+    xroot.appendChild(el);
+    return win;
+  }
+
+  function drawXWin(win) {
+    var cv = win.canvas; if (!cv) return;
+    var g = cv.getContext("2d"), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H);
+    if (win.cls === "xclock") {
+      var cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 8;
+      g.fillStyle = "#f4f2ea"; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fill();
+      g.strokeStyle = "#333"; g.lineWidth = 2; g.stroke();
+      g.strokeStyle = "#555"; g.lineWidth = 1;
+      for (var i = 0; i < 12; i++) {
+        var a = i * Math.PI / 6;
+        g.beginPath();
+        g.moveTo(cx + Math.sin(a) * (R - 8), cy - Math.cos(a) * (R - 8));
+        g.lineTo(cx + Math.sin(a) * (R - 2), cy - Math.cos(a) * (R - 2));
+        g.stroke();
+      }
+      var d = new Date();
+      var sec = d.getSeconds(), min = d.getMinutes() + sec / 60, hr = (d.getHours() % 12) + min / 60;
+      function hand(frac, len, wdt, color) {
+        var a = frac * 2 * Math.PI;
+        g.strokeStyle = color; g.lineWidth = wdt;
+        g.beginPath(); g.moveTo(cx, cy);
+        g.lineTo(cx + Math.sin(a) * len, cy - Math.cos(a) * len); g.stroke();
+      }
+      hand(hr / 12, R * 0.5, 3.5, "#222");
+      hand(min / 60, R * 0.72, 2.5, "#222");
+      hand(sec / 60, R * 0.8, 1, "#b03030");
+      g.fillStyle = "#222"; g.beginPath(); g.arc(cx, cy, 3, 0, 7); g.fill();
+    } else if (win.cls === "xeyes") {
+      var r = xroot.getBoundingClientRect(), er = cv.getBoundingClientRect();
+      var mx = mouse.x - er.left, my = mouse.y - er.top;
+      function eye(cx2) {
+        var ew = W / 2 - 10, eh = H - 14, ex = cx2, ey = H / 2;
+        g.fillStyle = "#fff"; g.strokeStyle = "#111"; g.lineWidth = 3;
+        g.beginPath(); g.ellipse(ex, ey, ew / 2, eh / 2, 0, 0, 7); g.fill(); g.stroke();
+        var dx = mx - ex, dy = my - ey, dl = Math.sqrt(dx * dx + dy * dy) || 1;
+        var px = ex + (dx / dl) * (ew / 4), py = ey + (dy / dl) * (eh / 4);
+        g.fillStyle = "#111"; g.beginPath();
+        g.ellipse(px, py, Math.max(4, ew / 10), Math.max(5, eh / 8), 0, 0, 7); g.fill();
+      }
+      eye(W / 4 + 3); eye(3 * W / 4 - 3);
+    } else if (win.cls === "xlogo") {
+      g.fillStyle = "#eee"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#000";
+      g.font = "bold " + Math.floor(Math.min(W, H) * 0.8) + "px serif";
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("X", W / 2, H / 2 + Math.min(W, H) * 0.05);
+    }
+  }
+  setInterval(function () {
+    for (var id in xwins) if (xwins[id].cls === "xclock") drawXWin(xwins[id]);
+  }, 1000);
+  document.addEventListener("mousemove", function (e) {
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    for (var id in xwins) if (xwins[id].cls === "xeyes") drawXWin(xwins[id]);
+  });
+
+  /* ---- window dragging (BadaX app itself + each X window) ---- */
+  function dragify(el, handle, bounds, onDone) {
+    var sx, sy, ox, oy, dragging = false;
+    handle.addEventListener("mousedown", function (e) {
+      if (e.target.tagName === "BUTTON") return;
+      dragging = true; sx = e.clientX; sy = e.clientY;
+      ox = el.offsetLeft; oy = el.offsetTop;
+      e.preventDefault();
+    });
+    document.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      var nx = ox + e.clientX - sx, ny = oy + e.clientY - sy;
+      if (bounds) {
+        nx = Math.max(0, Math.min(nx, bounds.clientWidth - 60));
+        ny = Math.max(0, Math.min(ny, bounds.clientHeight - 30));
+      }
+      el.style.left = nx + "px"; el.style.top = ny + "px";
+    });
+    document.addEventListener("mouseup", function () {
+      if (!dragging) return;
+      dragging = false;
+      if (onDone) onDone(el.offsetLeft, el.offsetTop);
+    });
+  }
+  dragify(xapp, $("xtitle"), null, null);
+
+  function showX(show) { xapp.style.display = show ? "flex" : "none"; }
+  $("bt-x").addEventListener("click", function () {
+    showX(xapp.style.display !== "flex");
+  });
+  $("menu-x").addEventListener("click", function () { showX(true); });
+  $("x-close").addEventListener("click", function () { showX(false); });
+  $("xmenu-info").addEventListener("click", function () {
+    alert("BadaX Server (ASTEC-X 風・教育目的オマージュ)\n" +
+      "display 10.0.2.2:0.0 — BadaVM NAT tcp/6000\n" +
+      "認証: JONES-KNOT-COOKIE-1 (三葉結び目の Kauffman/Jones 鍵)\n" +
+      "セッション: Bell 対 QKD (零保存タンパー検知)\n" +
+      "実装: quantum_vm/bada/badax.bada (Bada 言語)");
+  });
+
+  /* ================= boot the app ================= */
+  updateButtons();
+  if (events.length > 0) replayAll(); else repaintTerm();
+  showTab(events.length > 0 ? "vm" : "home");
+})();
+</script>
+</body>
+</html>
