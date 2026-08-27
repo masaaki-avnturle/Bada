@@ -1,0 +1,150 @@
+// ============================================================================
+//  concierge.om  —  コンシェルジュ（案内役の人格と文章生成）
+//  Concierge::Agent
+//
+//  認識された対象（Entity）ごとに、知識ベース（FactBook）を引き、方位・距離
+//  を添えた「丁寧な案内文」を組み立てる。表示スペースは限られるため、
+//  omega の π-softmax で「今いちばん伝えるべき情報」を選び出す。
+// ============================================================================
+
+import Omega::DATABASE
+import Concierge::Knowledge       // FactBook, Fact
+import Concierge::Pose            // bearingText, distanceText, worldToScreen
+import Concierge::Vision          // Entity, kindName
+
+const HBAR_EFF := 0.62
+const PI       := 3.14159265358979
+
+// ---- 画面に出す案内カード ----
+type Card := Record {
+  entity   : Entity,
+  title    : String,
+  lines    : List<String>,     // 本文（数行）
+  badge    : String,           // 方位・距離バッジ（例 "北東 300m"）
+  relevance: Float             // 表示優先度
+}
+
+// ============================================================================
+//  Concierge — 案内役
+// ============================================================================
+class Concierge {
+
+  def initialize(facts) {
+    @facts := facts
+    @name  := "しおり"                 // コンシェルジュの名前
+    @log   := Omega::DATABASE[TupleSpace].new
+  }
+
+  // 起動時のあいさつ
+  def greet() := block {
+    return "ようこそ。コンシェルジュの " + @name
+         + " です。風景にかざすと、見えているものをご案内します。"
+  }
+
+  // ------------------------------------------------------------------------
+  //  annotate — 対象群を案内カード群に変換し、優先度順に上位を返す。
+  //    entities : SceneReader が返した対象
+  //    pose     : 端末姿勢（方位・距離の計算に使用）
+  //    maxCards : 同時に出す最大枚数（画面を埋めすぎない）
+  // ------------------------------------------------------------------------
+  def annotate(entities, pose, maxCards) := block {
+    cards := []
+    for e in entities do {
+      cards.push(describe(e, pose))
+    }
+    // π-softmax で相対的な表示優先度を正規化し、上位のみ採用
+    ranked := rank(cards)
+    return takeTop(ranked, maxCards)
+  }
+
+  // 1対象 → 案内カード
+  def describe(entity, pose) := block {
+    fact := @facts.lookup(entity)
+
+    lines := []
+    lines.push(fact.summary)
+
+    // 事実の箇条書きを 2 件まで（読みやすさ優先）
+    n := 0
+    for d in fact.details do {
+      if n < 2 { lines.push("・" + d); n := n + 1 }
+    }
+
+    // 方位・距離バッジ（地理位置が分かる対象のみ）
+    badge := ""
+    if entity.hasGeo {
+      proj := worldToScreen(pose, entity.geo, 1, 1)   // 距離/方位取得目的
+      badge := bearingText(proj.bearing) + " " + distanceText(proj.dist)
+      // 近ければ一言添える
+      if proj.dist < 120.0 { lines.push("すぐそこです。") }
+    }
+
+    @log.push(["card", entity.label])
+    return Card {
+      entity: entity,
+      title: fact.title,
+      lines: lines,
+      badge: badge,
+      relevance: baseRelevance(entity)
+    }
+  }
+
+  // 素の重要度: 確度 × 種類の重み × 近さ
+  def baseRelevance(entity) := block {
+    w := kindWeight(entity.kind)
+    prox := 1.0
+    if entity.hasGeo { prox := 1.0 }   // 距離補正は rank 側で扱う
+    return entity.conf * w * prox
+  }
+
+  // 名所・駅などは案内価値が高い
+  def kindWeight(kind) := block {
+    match kind {
+    | EntityKind.LANDMARK   => return 1.6
+    | EntityKind.STATION    => return 1.4
+    | EntityKind.RESTAURANT => return 1.3
+    | EntityKind.MOUNTAIN   => return 1.2
+    | EntityKind.SHOP       => return 1.1
+    | _                      => return 1.0
+    }
+  }
+
+  // π-softmax による表示優先度の正規化（omega_math.c 由来）
+  def rank(cards) := block {
+    sum := 0.0
+    exps := []
+    i := 0
+    for c in cards do {
+      e := exp(c.relevance * HBAR_EFF * PI)
+      exps[i] := e
+      sum := sum + e
+      i := i + 1
+    }
+    i := 0
+    for c in cards do {
+      c.relevance := exps[i] / sum
+      i := i + 1
+    }
+    return cards.sortBy(fn(c) => -c.relevance)
+  }
+
+  def takeTop(cards, k) := block {
+    out := []
+    n := 0
+    for c in cards do {
+      if n < k { out.push(c); n := n + 1 }
+    }
+    return out
+  }
+
+  // 対象をタップした時の詳細（全事実を返す）
+  def detail(entity) := block {
+    fact := @facts.lookup(entity)
+    lines := [fact.summary]
+    for d in fact.details do { lines.push("・" + d) }
+    return Card {
+      entity: entity, title: fact.title, lines: lines,
+      badge: "", relevance: 1.0
+    }
+  }
+}

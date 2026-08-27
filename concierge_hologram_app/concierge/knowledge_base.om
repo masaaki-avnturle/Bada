@@ -1,0 +1,138 @@
+// ============================================================================
+//  knowledge_base.om  —  知識ベース / POIインデックス
+//  Concierge::Knowledge
+//
+//  コンシェルジュが参照する事実データベース。アカシックレコード
+//  （Omega::DATABASE / TupleSpace）に、場所・施設・自然物の情報を格納する。
+//    - POIIndex : 緯度経度つきの近傍施設（店・駅・名所・山…）
+//    - FactBook : 種類/名前から解説文の素材（事実）を引く
+// ============================================================================
+
+import Omega::DATABASE
+import Concierge::Pose            // GeoPoint, geoDistance
+import Concierge::Vision          // EntityKind
+
+// ---- POI（地点情報） ----
+type Poi := Record {
+  name  : String,
+  kind  : EntityKind,
+  geo   : GeoPoint,
+  tags  : List<String>,      // 例: ["和食","予算¥¥","10:00-22:00"]
+  note  : String             // 一言メモ
+}
+
+// ---- 解説素材（事実） ----
+type Fact := Record {
+  title   : String,
+  summary : String,          // 1行要約
+  details : List<String>     // 箇条書きの事実
+}
+
+// ============================================================================
+//  POIIndex — 近傍POIの検索
+// ============================================================================
+class POIIndex {
+
+  def initialize() {
+    @db  := Omega::DATABASE[TupleSpace].new
+    @pois := []
+    seed()
+  }
+
+  // サンプルの街データ（実運用では地図APIやローカルDBから取得）
+  def seed() {
+    add("あかね山",        EntityKind.MOUNTAIN,  35.6800, 139.7500, 40.0,
+        ["標高342m","低山ハイク"], "山頂から市街を一望できます。")
+    add("せせらぎ川",      EntityKind.RIVER,     35.6805, 139.7660, 0.0,
+        ["桜並木","遊歩道"], "春は桜、夏は蛍が見られます。")
+    add("中央駅",          EntityKind.STATION,   35.6812, 139.7671, 0.0,
+        ["3路線","タクシー乗り場"], "みどりの窓口は東口です。")
+    add("時計台",          EntityKind.LANDMARK,  35.6820, 139.7640, 25.0,
+        ["1897年築","国重要文化財"], "毎正時に鐘が鳴ります。")
+    add("café ひなた",     EntityKind.RESTAURANT,35.6808, 139.7655, 0.0,
+        ["自家焙煎","¥¥","8:00-19:00"], "テラス席から川が見えます。")
+    add("みどり書店",      EntityKind.SHOP,      35.6815, 139.7648, 0.0,
+        ["古書","雑貨"], "2階に喫茶コーナーがあります。")
+    add("中央公園",        EntityKind.PARK,      35.6822, 139.7658, 0.0,
+        ["芝生広場","噴水"], "週末はマルシェが出ます。")
+    print("[知識] " + @pois.length + " 件のPOIをアカシックレコードに登録")
+  }
+
+  def add(name, kind, lat, lon, elev, tags, note) {
+    p := Poi {
+      name: name, kind: kind,
+      geo: GeoPoint { lat: lat, lon: lon, elev: elev },
+      tags: tags, note: note
+    }
+    @pois.push(p)
+    @db.push([name, kind, lat, lon])
+  }
+
+  // 端末位置から半径 radius[m] 以内のPOIを近い順に返す
+  def nearby(pose, radius) := block {
+    self := GeoPoint { lat: pose.lat, lon: pose.lon, elev: 0.0 }
+    hits := []
+    for p in @pois do {
+      d := geoDistance(self, p.geo)
+      if d <= radius { hits.push(p) }
+    }
+    return hits.sortBy(fn(p) => geoDistance(self, p.geo))
+  }
+}
+
+// ============================================================================
+//  FactBook — 種類/名前から事実を引く
+// ============================================================================
+class FactBook {
+
+  def initialize() {
+    @db := Omega::DATABASE[TupleSpace].new
+    @byName := []
+    seed()
+  }
+
+  def seed() {
+    put("あかね山", Fact {
+      title: "あかね山",
+      summary: "市街を見下ろす標高342mの低山。",
+      details: ["山頂まで徒歩約90分","展望台とベンチあり","夕焼けの名所"]
+    })
+    put("時計台", Fact {
+      title: "時計台",
+      summary: "1897年築、国の重要文化財。",
+      details: ["毎正時に鐘の音","内部は資料館として公開","夜間ライトアップ"]
+    })
+    put("せせらぎ川", Fact {
+      title: "せせらぎ川",
+      summary: "桜並木の続く市民の憩いの川。",
+      details: ["約2kmの遊歩道","春は桜、初夏は蛍","貸しボートあり"]
+    })
+    put("café ひなた", Fact {
+      title: "café ひなた",
+      summary: "川沿いの自家焙煎コーヒー店。",
+      details: ["営業 8:00–19:00","テラス席あり","名物はチーズケーキ"]
+    })
+  }
+
+  def put(name, fact) { @byName[name] := fact; @db.push([name, "fact"]) }
+
+  // 名前で厳密一致、なければ種類から一般的な解説を生成
+  def lookup(entity) := block {
+    if @byName[entity.label] != nil {
+      return @byName[entity.label]
+    }
+    return generic(entity.kind)
+  }
+
+  // 実体名が未確定でも、種類に応じた一般解説を返す
+  def generic(kind) := block {
+    match kind {
+    | EntityKind.MOUNTAIN   => return Fact { title:"山", summary:"遠くに見える山並みです。", details:["方角と距離を表示中"] }
+    | EntityKind.RIVER      => return Fact { title:"水辺", summary:"川や水辺のようです。", details:["increased 水分反射を検出"] }
+    | EntityKind.PLANT      => return Fact { title:"植物", summary:"樹木・植生を検出しました。", details:["季節の見どころがあるかも"] }
+    | EntityKind.BUILDING   => return Fact { title:"建物", summary:"建物を検出しました。", details:["名称は確認中"] }
+    | EntityKind.SIGN       => return Fact { title:"看板", summary:"看板・標識を検出。", details:["文字を読み取り中"] }
+    | _                      => return Fact { title:"対象", summary:"対象を検出しました。", details:[] }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+// ============================================================================
+//  main.om  —  『まちしおり — ホログラム・コンシェルジュ』
+//  スマホ半透明ディスプレイ AR 案内アプリ  (Bada言語 / Omega方言)
+//
+//  ■ 何をするアプリか
+//    スマートフォンの半透明（シースルー）ホログラフィーディスプレイに、
+//    コンシェルジュ「しおり」が常駐する。風景にデバイスをかざすと、
+//    ・カメラ透過像から対象（山・川・店・駅・名所・植物・看板…）を認識
+//    ・GPS/方位で近傍POIを突き合わせ、実体名・方位・距離を確定
+//    ・知識ベースから丁寧な解説を組み立て
+//    ・対象の実位置に貼り付く「文字ラベル」として、素通しの風景へ重ねて表示
+//    してくれる。端末を動かしてもラベルは対象を追う（world-locked）。
+//
+//  ■ モジュール構成
+//    display/translucent_display.om … 半透明シースルー表示・発光文字合成
+//    sensor/pose_anchor.om          … 傾き+方位+GPS / ワールドロック投影 / かざす検出
+//    vision/scene_reader.om         … 透過像の対象認識 + POI突き合わせ
+//    concierge/knowledge_base.om    … POIインデックス + 事実データ（アカシック）
+//    concierge/concierge.om         … 案内文生成 + π-softmaxで優先度選別
+//    overlay/annotation_overlay.om  … ラベルのワールドロック配置・描画
+// ============================================================================
+
+import Omega::DATABASE
+import Concierge::Display          // TranslucentDisplay
+import Concierge::Pose             // PoseSensor
+import Concierge::Vision           // SeeThroughCamera, SceneReader
+import Concierge::Knowledge        // POIIndex, FactBook
+import Concierge::Agent            // Concierge
+import Concierge::Overlay          // AnnotationOverlay
+
+const SCREEN_W := 1080
+const SCREEN_H := 2340         // 一般的なスマホ縦解像度
+const MAX_CARDS := 4           // 同時に出す案内カードの上限
+
+// ============================================================================
+//  App — アプリ全体
+// ============================================================================
+class App {
+
+  def initialize() {
+    @disp    := TranslucentDisplay.new(SCREEN_W, SCREEN_H)
+    @pose    := PoseSensor.new
+    @camera  := SeeThroughCamera.new
+    @poi     := POIIndex.new
+    @facts   := FactBook.new
+    @reader  := SceneReader.new(@poi)
+    @agent   := Concierge.new(@facts)
+    @overlay := AnnotationOverlay.new(@disp, SCREEN_W, SCREEN_H)
+    @running := false
+  }
+
+  def boot() {
+    print("========================================================")
+    print(" まちしおり — ホログラム・コンシェルジュ")
+    print("========================================================")
+    @disp.boot()
+    @pose.calibrate()
+    @camera.open()
+    print(@agent.greet())
+    @running := true
+  }
+
+  // ------------------------------------------------------------------------
+  //  frame — 1フレームの処理。
+  //    1) 姿勢を読む → 2) かざしている時だけ認識・案内 → 3) 描画
+  // ------------------------------------------------------------------------
+  def frame() {
+    pose := @pose.sample()
+
+    if not @pose.isHeldUp(pose) {
+      // かざしていない間は素通し（ヒントだけ薄く出す）
+      idleHint()
+      return
+    }
+
+    // 風景を透過取得 → 対象認識
+    img := @camera.frame()
+    entities := @reader.read(img, pose, SCREEN_W, SCREEN_H)
+
+    // コンシェルジュが案内カードを生成（優先度上位のみ）
+    cards := @agent.annotate(entities, pose, MAX_CARDS)
+
+    // ワールドロックで対象に貼り付けて描画
+    @overlay.render(cards, pose)
+  }
+
+  // かざしていない時の控えめな案内
+  def idleHint() {
+    @disp.beginFrame()
+    @disp.drawBadge(Point { x: 40, y: 60 },
+                    "風景にかざすと案内します", defaultStyle())
+    @disp.present()
+  }
+
+  // ------------------------------------------------------------------------
+  //  ユーザーが対象をタップ → 詳細カードを大きく表示
+  // ------------------------------------------------------------------------
+  def onTap(screenX, screenY) {
+    pose := @pose.sample()
+    img  := @camera.frame()
+    entities := @reader.read(img, pose, SCREEN_W, SCREEN_H)
+    hit := pick(entities, screenX, screenY, pose)
+    if hit != nil {
+      card := @agent.detail(hit)
+      @overlay.render([card], pose)
+    }
+  }
+
+  def pick(entities, x, y, pose) := block {
+    for e in entities do {
+      p := @overlay.targetScreenPos(e, pose)
+      if p != nil {
+        dx := p.x - x
+        dy := p.y - y
+        if (dx*dx + dy*dy) < (80*80) { return e }
+      }
+    }
+    return nil
+  }
+
+  // ------------------------------------------------------------------------
+  //  メインループ（イベント駆動: センサ/カメラの各フレーム）
+  // ------------------------------------------------------------------------
+  def run() {
+    boot()
+    while @running do {
+      ev := Device::Event.next()          // フレーム/タップ/終了
+      match ev.kind {
+      | "frame" => frame()
+      | "tap"   => onTap(ev.x, ev.y)
+      | "quit"  => @running := false
+      | _       => { }
+      }
+    }
+    shutdown()
+  }
+
+  def shutdown() {
+    @disp.shutdown()
+    print("ご案内を終了します。またのお越しをお待ちしています。")
+  }
+}
+
+// ============================================================================
+//  起動
+// ============================================================================
+app := App.new
+app.run()

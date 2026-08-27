@@ -1,0 +1,93 @@
+// ============================================================================
+//  annotation_overlay.om  —  文字ラベルのワールドロック配置と描画
+//  Concierge::Overlay
+//
+//  コンシェルジュの案内カードを、対象の実位置へ貼り付けて（world-locked）
+//  半透明ディスプレイに描く。端末を動かしてもラベルは対象を追う。
+//  ラベル同士が重ならないよう簡易レイアウトも行う。
+// ============================================================================
+
+import Concierge::Pose            // DevicePose, worldToScreen, ScreenProj
+import Concierge::Display         // TranslucentDisplay, defaultStyle, Point
+
+// ============================================================================
+//  AnnotationOverlay
+// ============================================================================
+class AnnotationOverlay {
+
+  def initialize(display, screenW, screenH) {
+    @disp := display
+    @w := screenW
+    @h := screenH
+    @style := defaultStyle()
+    @placed := []                  // 重なり回避用の占有矩形
+  }
+
+  // ------------------------------------------------------------------------
+  //  render — カード群を 1 フレーム描画する。
+  //    cards : Concierge が優先度順に返した案内カード
+  //    pose  : 現在の端末姿勢（対象の画面位置を再投影）
+  // ------------------------------------------------------------------------
+  def render(cards, pose) {
+    @disp.beginFrame()
+    @placed := []
+
+    for card in cards do {
+      // 対象の現在の画面位置を計算（world-lock: 毎フレーム再投影）
+      target := targetScreenPos(card.entity, pose)
+      if target == nil { continue }        // 画角外なら描かない
+
+      // ラベルは対象の右上に置き、他ラベルと重なれば下へずらす
+      anchor := layoutAnchor(target)
+
+      @disp.drawLabel(anchor, target, card.title, card.lines, @style)
+
+      // 方位・距離バッジを対象直下に
+      if card.badge != "" {
+        @disp.drawBadge(Point { x: target.x - 30, y: target.y + 16 },
+                        card.badge, @style)
+      }
+    }
+
+    // 画面上部にコンシェルジュのステータス行
+    @disp.present()
+  }
+
+  // 対象の現在の画面位置（world-lock）。地理位置があれば再投影、
+  // なければ最後に見えた bbox 中心を使う。
+  def targetScreenPos(entity, pose) := block {
+    if entity.hasGeo {
+      proj := worldToScreen(pose, entity.geo, @w, @h)
+      if not proj.visible { return nil }
+      return Point { x: proj.x, y: proj.y }
+    }
+    // 画像bbox中心（画面ロック: 端末が大きく動くと外れる）
+    return Point { x: entity.bx + entity.bw/2.0, y: entity.by + entity.bh/2.0 }
+  }
+
+  // ラベルの左上位置を決め、既存ラベルと重なれば下方向へ回避
+  def layoutAnchor(target) := block {
+    ax := target.x + 24
+    ay := target.y - 20
+    tries := 0
+    while overlaps(ax, ay) and tries < 6 do {
+      ay := ay + 70                 // 1行分ずらす
+      tries := tries + 1
+    }
+    rect := Rect { x: ax, y: ay, w: 300, h: 64 }
+    @placed.push(rect)
+    return Point { x: ax, y: ay }
+  }
+
+  def overlaps(x, y) := block {
+    for r in @placed do {
+      if x < r.x + r.w and x + 300 > r.x and
+         y < r.y + r.h and y + 64 > r.y {
+        return true
+      }
+    }
+    return false
+  }
+}
+
+type Rect := Record { x : Float, y : Float, w : Float, h : Float }

@@ -1,0 +1,169 @@
+// ============================================================================
+//  scene_reader.om  —  風景の読み取り（パススルー＋対象認識）
+//  Concierge::Vision
+//
+//  背面カメラの透過像から、風景中の「対象（エンティティ）」を検出する。
+//  各対象は、画面上のバウンディングボックスと、（地物なら）地理位置を持つ。
+//    - 見えている物体の種類を推定（山・川・建物・店・駅・植物・看板…）
+//    - GPS/方位から近傍POI（Point of Interest）を突き合わせて実体名を確定
+// ============================================================================
+
+import Omega::DATABASE
+import Concierge::Pose            // pose_anchor.om (GeoPoint, worldToScreen…)
+
+// ---- 対象の種類 ----
+type EntityKind := Enum {
+  MOUNTAIN,     // 山・丘
+  RIVER,        // 川・湖・海
+  BUILDING,     // 建物・ビル
+  SHOP,         // 店舗
+  RESTAURANT,   // 飲食店
+  STATION,      // 駅・バス停
+  LANDMARK,     // 名所・史跡・タワー
+  PLANT,        // 樹木・花・植生
+  SIGN,         // 看板・標識
+  PARK,         // 公園・広場
+  UNKNOWN
+}
+
+// ---- 認識された対象 ----
+type Entity := Record {
+  id      : Int,
+  kind    : EntityKind,
+  label   : String,       // 認識名（未確定なら種類名）
+  bx      : Float, by : Float, bw : Float, bh : Float,   // 画面bbox
+  geo     : GeoPoint,     // 実世界の位置（分かる場合）
+  hasGeo  : Bool,
+  conf    : Float         // 確度 0..1
+}
+
+// ============================================================================
+//  Camera — 透過像の取得
+// ============================================================================
+class SeeThroughCamera {
+
+  def initialize() { @online := false }
+
+  def open() {
+    @cam := Device::Camera.open("rear")
+    @online := (@cam != nil)
+    if @online { print("[視覚] 背面カメラ起動。風景にかざしてください。") }
+    return @online
+  }
+
+  def frame() := block {
+    if not @online { return nil }
+    return @cam.grab()
+  }
+}
+
+// ============================================================================
+//  SceneReader — フレーム＋位置情報から対象を抽出
+// ============================================================================
+class SceneReader {
+
+  def initialize(poi) {
+    @poi    := poi                 // POIIndex（近傍施設データ）
+    @seen   := Omega::DATABASE[TupleSpace].new
+    @nextId := 1
+  }
+
+  // ------------------------------------------------------------------------
+  //  read — 1フレームを解析し、対象リストを返す。
+  //    frame : 透過カメラフレーム
+  //    pose  : 現在の端末姿勢（方位・位置）
+  // ------------------------------------------------------------------------
+  def read(frame, pose, screenW, screenH) := block {
+    entities := []
+
+    // (A) 画像から領域候補を検出（物体検出器）。種類と粗いbboxを得る。
+    regions := Device::Detector.detect(frame)     // [{kind, box, score}]
+    for reg in regions do {
+      entities.push(Entity {
+        id: newId(),
+        kind: mapKind(reg.kind),
+        label: kindName(mapKind(reg.kind)),
+        bx: reg.box.x, by: reg.box.y, bw: reg.box.w, bh: reg.box.h,
+        geo: GeoPoint { lat:0, lon:0, elev:0 }, hasGeo: false,
+        conf: reg.score
+      })
+    }
+
+    // (B) 近傍POIを方位で突き合わせ、画面内に入るものを対象化する。
+    //     （建物名・店名・山名など、画像だけでは分からない実体名を補完）
+    for p in @poi.nearby(pose, 1500.0) do {
+      proj := worldToScreen(pose, p.geo, screenW, screenH)
+      if proj.visible {
+        // 既存の画像領域に重なれば実体名を確定、なければ新規に追加
+        e := matchRegion(entities, proj)
+        if e != nil {
+          e.label := p.name
+          e.geo   := p.geo
+          e.hasGeo := true
+          e.conf  := max(e.conf, 0.8)
+        } else {
+          entities.push(Entity {
+            id: newId(), kind: p.kind, label: p.name,
+            bx: proj.x - 40, by: proj.y - 40, bw: 80, bh: 80,
+            geo: p.geo, hasGeo: true, conf: 0.72
+          })
+        }
+      }
+    }
+
+    // (C) 確度で降順ソートし、記録
+    entities := sortByConf(entities)
+    for e in entities do { @seen.push([e.kind, e.label, e.conf]) }
+    return entities
+  }
+
+  // 画像検出器のラベルを EntityKind へ写像
+  def mapKind(raw) := block {
+    match raw {
+    | "mountain" | "hill"     => return EntityKind.MOUNTAIN
+    | "water" | "river" | "sea" => return EntityKind.RIVER
+    | "building" | "tower"    => return EntityKind.BUILDING
+    | "storefront"            => return EntityKind.SHOP
+    | "food"                  => return EntityKind.RESTAURANT
+    | "train" | "bus"         => return EntityKind.STATION
+    | "tree" | "flower"       => return EntityKind.PLANT
+    | "signboard" | "sign"    => return EntityKind.SIGN
+    | "park"                  => return EntityKind.PARK
+    | _                        => return EntityKind.UNKNOWN
+    }
+  }
+
+  // 投影点が既存bboxに入るか
+  def matchRegion(entities, proj) := block {
+    for e in entities do {
+      if proj.x >= e.bx and proj.x <= e.bx + e.bw and
+         proj.y >= e.by and proj.y <= e.by + e.bh {
+        return e
+      }
+    }
+    return nil
+  }
+
+  def newId() := block { id := @nextId; @nextId := @nextId + 1; return id }
+
+  def sortByConf(list) := block {
+    return list.sortBy(fn(e) => -e.conf)
+  }
+}
+
+// ---- 対象の種類名（日本語） ----
+func kindName(kind) := block {
+  match kind {
+  | EntityKind.MOUNTAIN   => return "山"
+  | EntityKind.RIVER      => return "水辺"
+  | EntityKind.BUILDING   => return "建物"
+  | EntityKind.SHOP       => return "お店"
+  | EntityKind.RESTAURANT => return "飲食店"
+  | EntityKind.STATION    => return "駅・停留所"
+  | EntityKind.LANDMARK   => return "名所"
+  | EntityKind.PLANT      => return "植物"
+  | EntityKind.SIGN       => return "看板"
+  | EntityKind.PARK       => return "公園"
+  | EntityKind.UNKNOWN    => return "対象"
+  }
+}

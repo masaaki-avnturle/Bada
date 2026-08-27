@@ -1,0 +1,162 @@
+// ============================================================================
+//  pose_anchor.om  —  姿勢・方位・位置センサとワールドロック
+//  Concierge::Pose
+//
+//  スマホの IMU（傾き）＋ 磁気コンパス（方位）＋ GPS（緯度経度）から、
+//  端末の「向いている方向」を求める。これにより、風景中の対象に付けた
+//  文字ラベルを "ワールド座標に固定" し、端末を動かしても対象に貼り付い
+//  たまま追従させる（world-locked annotation）。
+//
+//  また「風景にかざす」動作（端末を持ち上げて前方へ向ける）を検出する。
+// ============================================================================
+
+import Omega::DATABASE
+
+const PI  := 3.14159265358979
+const DEG := PI / 180.0
+const R_EARTH := 6371000.0        // 地球半径 [m]
+
+// ---- 端末の姿勢（世界に対する向き） ----
+type DevicePose := Record {
+  pitch : Float,     // 仰角（上下）rad
+  roll  : Float,     // 左右の傾き rad
+  yaw   : Float,     // 方位角（北=0, 東=+90°）rad
+  lat   : Float,     // 緯度
+  lon   : Float,     // 経度
+  hfov  : Float,     // 水平画角 rad
+  vfov  : Float      // 垂直画角 rad
+}
+
+// ---- 地理座標 ----
+type GeoPoint := Record { lat : Float, lon : Float, elev : Float }
+
+// ============================================================================
+//  PoseSensor — IMU + コンパス + GPS を融合
+// ============================================================================
+class PoseSensor {
+
+  def initialize() {
+    @pitch := 0.0
+    @roll  := 0.0
+    @yaw   := 0.0
+    @alpha := 0.12               // 相補フィルタ（揺れ平滑化）
+    @raised := false
+    @hfov  := 62.0 * DEG         // 標準的な背面カメラの画角
+    @vfov  := 48.0 * DEG
+  }
+
+  def calibrate() {
+    Device::Compass.calibrate()
+    print("[姿勢] コンパス/IMU を校正。北を基準に方位を測ります。")
+  }
+
+  // 毎フレーム: 傾き・方位・位置を読み、平滑化した DevicePose を返す
+  def sample() := block {
+    imu  := Device::IMU.read()
+    comp := Device::Compass.read()       // 真北からの方位
+    gps  := Device::GPS.read()
+
+    // 加速度から仰角・ロールを算出
+    p := atan2(imu.ay, sqrt(imu.ax*imu.ax + imu.az*imu.az))
+    r := atan2(-imu.ax, imu.az)
+
+    @pitch := (1.0 - @alpha) * @pitch + @alpha * p
+    @roll  := (1.0 - @alpha) * @roll  + @alpha * r
+    @yaw   := comp.heading                // 磁気→真北補正済みと仮定
+
+    return DevicePose {
+      pitch: @pitch, roll: @roll, yaw: @yaw,
+      lat: gps.lat, lon: gps.lon,
+      hfov: @hfov, vfov: @vfov
+    }
+  }
+
+  // 「風景にかざす」ジェスチャ検出:
+  //   端末を持ち上げ、画面をほぼ垂直（前方を向く）に構えた状態。
+  def isHeldUp(pose) := block {
+    // pitch がほぼ水平前方（|pitch| 小）かつ持ち上げ加速度を検出
+    facingForward := abs(pose.pitch) < (35.0 * DEG)
+    lifted := Device::IMU.read().ay > 0.3
+    if facingForward and lifted { @raised := true }
+    if abs(pose.pitch) > (70.0 * DEG) { @raised := false }   // 下ろした
+    return @raised
+  }
+}
+
+// ============================================================================
+//  自由関数 : 地理計算 と ワールド→スクリーン投影
+// ============================================================================
+
+// 2地点間の距離 [m]（Haversine）
+func geoDistance(a, b) := block {
+  dlat := (b.lat - a.lat) * DEG
+  dlon := (b.lon - a.lon) * DEG
+  la1  := a.lat * DEG
+  la2  := b.lat * DEG
+  h := sin(dlat/2)*sin(dlat/2) + cos(la1)*cos(la2)*sin(dlon/2)*sin(dlon/2)
+  return 2.0 * R_EARTH * atan2(sqrt(h), sqrt(1.0 - h))
+}
+
+// 端末から対象への方位角 [rad]（北=0, 東=+）
+func geoBearing(from, to) := block {
+  la1 := from.lat * DEG
+  la2 := to.lat * DEG
+  dlon := (to.lon - from.lon) * DEG
+  y := sin(dlon) * cos(la2)
+  x := cos(la1)*sin(la2) - sin(la1)*cos(la2)*cos(dlon)
+  b := atan2(y, x)
+  if b < 0 { b := b + 2.0*PI }
+  return b
+}
+
+// 方位角を日本語 8方位に
+func bearingText(bearing) := block {
+  deg := bearing / DEG
+  dirs := ["北","北東","東","南東","南","南西","西","北西"]
+  idx := floor(((deg + 22.5) mod 360.0) / 45.0)
+  return dirs[idx]
+}
+
+// 距離を読みやすく
+func distanceText(m) := block {
+  if m < 1000.0 { return floor(m) + "m" }
+  return (floor(m / 100.0) / 10.0) + "km"
+}
+
+// ------------------------------------------------------------------------
+//  worldToScreen — 対象の地理位置を、現在の端末姿勢で画面座標へ投影する。
+//  これにより、端末を振っても対象の実位置にラベルが貼り付く（world-lock）。
+// ------------------------------------------------------------------------
+func worldToScreen(pose, target, screenW, screenH) := block {
+  self := GeoPoint { lat: pose.lat, lon: pose.lon, elev: 0.0 }
+
+  bearing := geoBearing(self, target)          // 対象の絶対方位
+  dist    := geoDistance(self, target)
+
+  // 端末の視線方位 yaw に対する相対角（-π..π）
+  rel := bearing - pose.yaw
+  while rel >  PI do { rel := rel - 2.0*PI }
+  while rel < -PI do { rel := rel + 2.0*PI }
+
+  // 水平画角の外なら画面外（表示しない）
+  if abs(rel) > pose.hfov / 2.0 {
+    return ScreenProj { x: 0, y: 0, visible: false, dist: dist, bearing: bearing }
+  }
+
+  // 相対方位 → 画面 x（中央基準）
+  sx := screenW/2.0 + (rel / (pose.hfov/2.0)) * (screenW/2.0)
+
+  // 仰角: 対象の高さと距離から見上げ角。ここでは地物を水平面近傍と仮定し、
+  // 端末の pitch を差し引いて縦位置を出す。
+  elevAngle := atan2(target.elev, dist)        // 対象の見かけ仰角
+  relV := elevAngle - pose.pitch
+  sy := screenH/2.0 - (relV / (pose.vfov/2.0)) * (screenH/2.0)
+
+  return ScreenProj {
+    x: sx, y: sy, visible: true, dist: dist, bearing: bearing
+  }
+}
+
+type ScreenProj := Record {
+  x : Float, y : Float, visible : Bool, dist : Float, bearing : Float
+}

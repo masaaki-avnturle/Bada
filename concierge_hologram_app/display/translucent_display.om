@@ -1,0 +1,211 @@
+// ============================================================================
+//  translucent_display.om  —  半透明シースルー・ホログラフィーディスプレイ
+//  Concierge::Display
+//
+//  スマートフォンの透過型パネル（黒画素＝透明／発光画素＝表示）を、
+//  ホログラフィーディスプレイとして扱う。現実の風景はパネルを素通しで
+//  見え、その上に発光文字（コンシェルジュの解説）を "加算" で重ねる。
+//
+//  合成モデル（発光型・半透明）:
+//     out(x) = scene(x) + α · textLight(x)          // 加算合成
+//     見た目の透過率  τ = 1 - α_panel               // パネル全体の透け具合
+//
+//  文字の発光は前作のコースティクス光線場を流用できるが、本アプリでは
+//  可読性を最優先し、平面（2.5D）レイヤに発光テキストを描く。
+// ============================================================================
+
+import Omega::DATABASE
+
+// ---- 色 / 発光ピクセル ----
+type Rgba := Record { r : Float, g : Float, b : Float, a : Float }
+
+// ---- テキストスタイル ----
+type LabelStyle := Record {
+  ink       : Rgba,      // 文字の発光色
+  panel     : Rgba,      // 文字の背後に敷く半透明パネル色
+  fontPx    : Int,       // 文字サイズ
+  padPx     : Int,       // 余白
+  leader    : Rgba,      // 対象へ引くリーダー線の色
+  cornerPx  : Int        // 角丸
+}
+
+// 既定スタイル: 白い発光文字 + うっすら暗いパネル（逆光でも読める）
+func defaultStyle() := block {
+  return LabelStyle {
+    ink:    Rgba { r:0.96, g:0.99, b:1.00, a:1.00 },
+    panel:  Rgba { r:0.02, g:0.04, b:0.08, a:0.42 },   // 42% だけ遮光
+    fontPx: 26,
+    padPx:  14,
+    leader: Rgba { r:0.35, g:0.85, b:1.00, a:0.85 },
+    cornerPx: 12
+  }
+}
+
+// ============================================================================
+//  TranslucentDisplay — 半透明パネルへの描画器
+// ============================================================================
+class TranslucentDisplay {
+
+  def initialize(width, height) {
+    @w := width
+    @h := height
+    @panelAlpha := 0.0          // パネル全体の遮光（0=完全透過）
+    @online := false
+    @layer  := []               // 発光レイヤ（加算バッファ）
+    @log    := Omega::DATABASE[TupleSpace].new
+  }
+
+  def boot() {
+    // 透過型パネルを "パススルー主体" モードで起動
+    Device::Panel.setMode("see-through")
+    Device::Panel.setGlobalDimming(0.0)     // 既定は素通し
+    @online := true
+    print("[表示] 半透明シースルー・ディスプレイ ON（風景は素通しで見えます）")
+    return true
+  }
+
+  // 1フレームの発光レイヤをクリア（黒＝透明）
+  def beginFrame() {
+    @layer := []
+  }
+
+  // ------------------------------------------------------------------------
+  //  drawLabel — 発光テキストのラベルを、対象の画面位置へ描く。
+  //    anchor  : ラベルを置く画面座標 {x, y}
+  //    target  : 解説対象の画面座標 {x, y}（リーダー線の終点）
+  //    title   : 見出し（対象名）
+  //    lines   : 本文（コンシェルジュの解説、複数行）
+  // ------------------------------------------------------------------------
+  def drawLabel(anchor, target, title, lines, style) {
+    // 1) パネル寸法をテキスト量から見積もる
+    cols := longestWidth(title, lines)
+    rows := 1 + lines.length
+    boxW := cols * (style.fontPx * 0.58) + style.padPx * 2
+    boxH := rows * (style.fontPx * 1.35) + style.padPx * 2
+
+    // 画面外にはみ出さないよう位置補正
+    pos := clampToScreen(anchor, boxW, boxH)
+
+    // 2) 対象へリーダー線（発光）
+    strokeLeader(pos, target, style.leader)
+
+    // 3) 半透明パネル（背後だけ少し遮光して可読性を確保）
+    fillRoundRect(pos.x, pos.y, boxW, boxH, style.cornerPx, style.panel)
+
+    // 4) 発光文字（加算）
+    tx := pos.x + style.padPx
+    ty := pos.y + style.padPx
+    emitText(tx, ty, title, style.ink, style.fontPx, true)          // 見出し（太）
+    ln := 1
+    for s in lines do {
+      emitText(tx, ty + ln * (style.fontPx * 1.35), s,
+               style.ink, style.fontPx - 2, false)
+      ln := ln + 1
+    }
+
+    @log.push(["label", title, pos.x, pos.y])
+  }
+
+  // 小さな方位/距離バッジ（例: "北東 300m"）
+  def drawBadge(pos, text, style) {
+    w := text.length * (style.fontPx * 0.5) + 16
+    fillRoundRect(pos.x, pos.y, w, style.fontPx + 10, 8,
+                  Rgba { r:0.05, g:0.10, b:0.16, a:0.55 })
+    emitText(pos.x + 8, pos.y + 5, text, style.leader, style.fontPx - 6, false)
+  }
+
+  // ------------------------------------------------------------------------
+  //  present — 発光レイヤをパネルへ加算合成して表示する。
+  //  scene はパネル越しに直接見えるため、ここでは発光ぶんだけを出力する。
+  // ------------------------------------------------------------------------
+  def present() {
+    // 文字が乗っている領域だけ、局所的にパネルを遮光（コントラスト確保）
+    for px in @layer do {
+      Device::Panel.write(px.x, px.y, px.color.r, px.color.g, px.color.b, px.color.a)
+    }
+    Device::Panel.flush()
+  }
+
+  def shutdown() {
+    @online := false
+    Device::Panel.setGlobalDimming(0.0)
+    print("[表示] ディスプレイを素通しに戻して終了")
+  }
+
+  // ---- 低レベル描画（発光レイヤへの書き込み） ----
+
+  def emitText(x, y, str, color, size, bold) {
+    // フォントラスタライザへ委譲。加算発光なので黒背景に文字だけ光る。
+    glyphs := Device::Font.layout(str, size, bold)
+    for g in glyphs do {
+      @layer.push(Pixel { x: x + g.dx, y: y + g.dy, color: color })
+    }
+  }
+
+  def fillRoundRect(x, y, w, h, radius, color) {
+    for j from 0 to h do {
+      for i from 0 to w do {
+        if inRoundRect(i, j, w, h, radius) {
+          @layer.push(Pixel { x: x + i, y: y + j, color: color })
+        }
+      }
+    }
+  }
+
+  def strokeLeader(box, target, color) {
+    // ラベル端から対象中心へ 1px の発光線
+    sx := box.x
+    sy := box.y
+    steps := 48
+    for k from 0 to steps do {
+      t := k / steps
+      @layer.push(Pixel {
+        x: sx + (target.x - sx) * t,
+        y: sy + (target.y - sy) * t,
+        color: color
+      })
+    }
+    // 対象点に小さな照準リング
+    ring(target.x, target.y, 10, color)
+  }
+
+  def ring(cx, cy, rad, color) {
+    n := 24
+    for k from 0 to n do {
+      a := 2.0 * 3.14159265 * k / n
+      @layer.push(Pixel { x: cx + cos(a)*rad, y: cy + sin(a)*rad, color: color })
+    }
+  }
+
+  // ---- 補助 ----
+  def longestWidth(title, lines) := block {
+    m := title.length
+    for s in lines do { if s.length > m { m := s.length } }
+    return m
+  }
+
+  def clampToScreen(anchor, boxW, boxH) := block {
+    x := anchor.x
+    y := anchor.y
+    if x + boxW > @w { x := @w - boxW - 8 }
+    if y + boxH > @h { y := @h - boxH - 8 }
+    if x < 8 { x := 8 }
+    if y < 8 { y := 8 }
+    return Point { x: x, y: y }
+  }
+
+  def inRoundRect(i, j, w, h, r) := block {
+    if i >= r and i <= w - r { return true }
+    if j >= r and j <= h - r { return true }
+    // 角の内側判定
+    cx := (i < r) ? r : w - r
+    cy := (j < r) ? r : h - r
+    dx := i - cx
+    dy := j - cy
+    return (dx*dx + dy*dy) <= r*r
+  }
+}
+
+// ---- 発光ピクセル / 点 ----
+type Pixel := Record { x : Float, y : Float, color : Rgba }
+type Point := Record { x : Float, y : Float }
