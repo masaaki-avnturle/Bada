@@ -34,6 +34,11 @@ it in any browser — no install, no dependencies, works offline.
   quantum-shark.html  QuantumShark — a Wireshark-style packet analyzer whose
                       capture files (.qcap) are encrypted with the Jones cipher
                       (demo master: "demo").
+  madokey.html        MadoKey (窓使いのキー) — an homage to 窓使いの憂鬱: a
+                      keybinding config editor for Word/Excel/LibreOffice.
+                      Edit key -> action bindings (ruby, sum, copy, custom),
+                      try them live in-page, and export madokey.mayu (the
+                      madokey.py daemon config) and madokey.ahk (AutoHotkey v1).
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
@@ -41,6 +46,7 @@ Command-line tools (need the repo checkout; run with Node.js):
   zoneimport/cli/lan-to-zone.js         import your LAN IPs into zone:// (real)
   modemvault/cli/modem-scan.js          detect your LAN modem/gateway (no passwords)
   netcapture/cli/qshark-capture.js      capture your own traffic -> encrypted .qcap
+  madokey-app/madokey.py                MadoKey keybinding daemon (Word/Excel/LO)
 
 Scope: every app is for YOUR OWN machine / network. None derives or reveals
 anyone else's credentials.

@@ -1,0 +1,368 @@
+#!/usr/bin/env node
+/* ============================================================================
+ * build-madokey.js — build "MadoKey (窓使いのキー)" 設定エディタ, a single
+ * self-contained HTML app (an homage to 窓使いの憂鬱 / Madotsukai no Yuuutsu).
+ *
+ * The page lets you edit keybindings visually (key combo + target app +
+ * action + arg), persists them to localStorage, and exports them as a
+ * `madokey.mayu` config file (the format the madokey.py daemon reads) and as
+ * an AutoHotkey v1 `madokey.ahk` script. It also has a live in-browser demo of
+ * the "合計 (sum)", "ルビ (ruby)" and "コピー (copy)" actions so you can see
+ * what a keystroke does without installing anything.
+ *
+ * Output: ../dist/madokey.html
+ * ==========================================================================*/
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const IDE = path.join(__dirname, "..");
+
+const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>MadoKey 窓使いのキー — Word/Excel/LibreOffice キーバインド設定</title>
+<style>
+  :root{color-scheme:light dark;--bg:#04060a;--panel:#0a1220;--line:#1c2838;--ink:#e6edf5;
+        --dim:#8aa0b8;--gold:#c8a44a;--blue:#4a80d0;--green:#2e9e57;--red:#c0504d;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,#0a1220,#060a12);
+         border-bottom:1px solid var(--line);padding:12px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .logo{font-size:20px;font-weight:800;letter-spacing:.5px;
+        background:linear-gradient(90deg,#c8a44a,#4a80d0);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:12px;}
+  main{max-width:980px;margin:0 auto;padding:16px 14px 70px;}
+  .card{background:#070c15;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--gold);} h3{font-size:13px;margin:14px 0 6px;color:var(--dim);}
+  .btn{border:1px solid var(--line);background:#132033;color:var(--ink);border-radius:9px;padding:8px 12px;cursor:pointer;font-size:13px;}
+  .btn:hover{background:#1c2f49;} .btn.p{background:#173a29;border-color:#2e6b46;} .btn.g{background:#2a1520;border-color:#6b2e3a;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:middle;}
+  th{color:var(--dim);font-weight:600;font-size:12px;}
+  input,select,textarea{background:#020407;border:1px solid var(--line);border-radius:7px;color:var(--ink);font-size:13px;padding:6px 8px;font-family:inherit;}
+  input.combo{width:120px;} input.arg{width:100%;} select.app,select.act{width:100%;}
+  td .del{color:var(--red);cursor:pointer;border:0;background:transparent;font-size:16px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+  textarea.out{width:100%;min-height:150px;white-space:pre;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;line-height:1.45;}
+  .demo{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media(max-width:720px){.demo{grid-template-columns:1fr;}}
+  .demo .box{background:#0a1220;border:1px solid var(--line);border-radius:10px;padding:12px;}
+  .kbd{display:inline-block;border:1px solid #38537a;background:#132033;border-radius:5px;padding:1px 6px;font-size:12px;font-family:ui-monospace,monospace;color:#bcd0ee;}
+  .big{font-size:22px;font-weight:800;color:var(--green);}
+  ruby{font-size:22px;} rt{font-size:11px;color:var(--gold);}
+  .muted{color:var(--dim);font-size:12px;} .ok{color:var(--green);} .warn{color:var(--gold);}
+  a{color:var(--blue);}
+  .flash{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#132033;border:1px solid #38537a;
+         border-radius:10px;padding:9px 16px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:30;}
+  .flash.on{opacity:1;}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">MadoKey · 窓使いのキー</div>
+  <div class="sub">奈由太氏「窓使いの憂鬱」オマージュ — Word / Excel / LibreOffice のキーバインド設定</div></div>
+  <div style="flex:1"></div>
+  <button class="btn" id="importBtn">📂 .mayu 取込</button>
+  <input id="importFile" type="file" accept=".mayu,.txt" style="display:none"/>
+  <button class="btn" id="resetBtn">初期値に戻す</button>
+</header>
+<main>
+
+  <div class="card">
+    <h2>① キーバインド設定</h2>
+    <div class="muted">行を編集・追加するだけで独自バインドになります。<span class="kbd">修飾</span> は
+      Ctrl / Alt / Shift / Win を <code>+</code> でつなぎます（例 <code>Ctrl+Alt+R</code>）。
+      対象は前面アプリを自動判定して一致するものを優先します。</div>
+    <table id="tbl">
+      <thead><tr><th style="width:130px">キー</th><th style="width:110px">対象</th>
+        <th style="width:130px">アクション</th><th>引数</th><th style="width:28px"></th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="row">
+      <button class="btn p" id="addRow">＋ 行を追加</button>
+      <span class="muted">アクション: ruby(ルビ) / sum(合計) / copy / cut / paste / mso &lt;IdMso&gt; / uno &lt;.uno:Cmd&gt; / keys &lt;combo&gt; / text &lt;文字列&gt; / run &lt;cmd&gt;</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>② 書き出し</h2>
+    <div class="row">
+      <button class="btn p" id="genMayu">madokey.mayu を生成 / ダウンロード</button>
+      <button class="btn" id="genAhk">madokey.ahk を生成 / ダウンロード（Windows）</button>
+      <button class="btn" id="copyMayu">📋 .mayu をコピー</button>
+    </div>
+    <h3>madokey.mayu</h3>
+    <textarea class="out" id="mayuOut" spellcheck="false" readonly></textarea>
+    <div class="muted"><code>python madokey.py</code> がこのファイルを読み込みます。Windows で Python を使わない場合は
+      <code>madokey.ahk</code> を <a href="https://www.autohotkey.com/" target="_blank" rel="noopener">AutoHotkey v1</a> で実行してください。</div>
+  </div>
+
+  <div class="card">
+    <h2>③ 動作デモ（この場で試せます・インストール不要）</h2>
+    <div class="demo">
+      <div class="box">
+        <h3>合計 — <span class="kbd">Ctrl+Alt+S</span>（Excel/Calc の一瞬合計）</h3>
+        <div class="muted">数値を貼り付け（改行・カンマ・スペース区切り）→ 合計:</div>
+        <textarea id="sumIn" style="width:100%;min-height:70px" spellcheck="false">120
+340
+55.5
+1000</textarea>
+        <div class="row"><button class="btn p" id="sumBtn">Σ 合計する</button>
+          <span>=SUM → <span class="big" id="sumOut">—</span></span></div>
+      </div>
+      <div class="box">
+        <h3>ルビ — <span class="kbd">Ctrl+Alt+R</span>（ふりがな自動付与）</h3>
+        <div class="muted">漢字を入力すると、よみを推定してルビを振ります（実機では IME/Word/LibreOffice のよみを使用）:</div>
+        <input id="rubyIn" style="width:100%" value="東京 の 桜 と 富士山 が 綺麗"/>
+        <div class="row"><button class="btn p" id="rubyBtn">▲ ルビを振る</button></div>
+        <div id="rubyOut" style="margin-top:8px;line-height:2.2"></div>
+      </div>
+      <div class="box">
+        <h3>コピー — <span class="kbd">Ctrl+Alt+C</span></h3>
+        <input id="copyIn" style="width:100%" value="MadoKey でコピーしたテキスト"/>
+        <div class="row"><button class="btn p" id="copyBtn">⧉ コピー</button><span class="muted" id="copyMsg"></span></div>
+      </div>
+      <div class="box">
+        <h3>定型文 — <span class="kbd">Ctrl+Alt+M / D</span></h3>
+        <div class="muted">text アクションはその場でカーソル位置に挿入します:</div>
+        <input id="textIn" style="width:100%" placeholder="ここに挿入されます"/>
+        <div class="row"><button class="btn" data-ins="〒000-0000 ○○県○○市">住所</button>
+          <button class="btn" data-ins="【重要】">【重要】</button></div>
+      </div>
+    </div>
+    <div class="muted" style="margin-top:10px">※ ブラウザは他アプリのキーを奪えないため、本ページはデモです。実運用は
+      <code>madokey.py</code>（常駐）または <code>madokey.ahk</code> で行います。</div>
+  </div>
+
+</main>
+<div class="flash" id="flash"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  var KEY="madokey.binds.v1";
+  var APPS=["any","word","excel","writer","calc"];
+  var ACTS=["ruby","sum","copy","cut","paste","mso","uno","keys","text","run","reload","quit"];
+
+  function DEFAULTS(){
+    return [
+      ["Ctrl+Alt+C","any","copy",""],
+      ["Ctrl+Alt+X","any","cut",""],
+      ["Ctrl+Alt+V","any","paste",""],
+      ["Ctrl+Alt+R","word","ruby",""],
+      ["Ctrl+Alt+R","excel","ruby",""],
+      ["Ctrl+Alt+R","writer","ruby",""],
+      ["Ctrl+Alt+S","excel","sum",""],
+      ["Ctrl+Alt+S","calc","sum",""],
+      ["Ctrl+Alt+B","word","mso","Bold"],
+      ["Ctrl+Alt+B","excel","mso","Bold"],
+      ["Ctrl+Alt+H","word","mso","TextHighlightColorPicker"],
+      ["Ctrl+Alt+M","any","text","〒000-0000 ○○県○○市"],
+      ["Ctrl+Alt+D","any","text","【重要】"],
+      ["Ctrl+Alt+F5","any","reload",""],
+      ["Ctrl+Alt+F12","any","quit",""]
+    ];
+  }
+  function load(){ try{var v=JSON.parse(localStorage.getItem(KEY)); return (v&&v.length)?v:DEFAULTS();}catch(e){return DEFAULTS();} }
+  function save(b){ try{localStorage.setItem(KEY,JSON.stringify(b));}catch(e){} }
+  var binds=load();
+
+  /* ---------- table editor ---------- */
+  function opt(list,val){ var s=""; for(var i=0;i<list.length;i++){ s+='<option'+(list[i]===val?' selected':'')+'>'+list[i]+'</option>'; } return s; }
+  function renderRows(){
+    var tb=$("rows"); tb.innerHTML="";
+    binds.forEach(function(b,idx){
+      var tr=document.createElement("tr");
+      tr.innerHTML=
+        '<td><input class="combo" value="'+esc(b[0])+'" data-i="'+idx+'" data-f="0"/></td>'+
+        '<td><select class="app" data-i="'+idx+'" data-f="1">'+opt(APPS,b[1])+'</select></td>'+
+        '<td><select class="act" data-i="'+idx+'" data-f="2">'+opt(ACTS,b[2])+'</select></td>'+
+        '<td><input class="arg" value="'+esc(b[3]||"")+'" data-i="'+idx+'" data-f="3" placeholder="(引数)"/></td>'+
+        '<td><button class="del" data-del="'+idx+'" title="削除">✕</button></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll("input,select").forEach(function(el){
+      el.addEventListener("input",function(){ var i=+this.getAttribute("data-i"), f=+this.getAttribute("data-f"); binds[i][f]=this.value; commit(false); });
+    });
+    tb.querySelectorAll("[data-del]").forEach(function(el){
+      el.addEventListener("click",function(){ binds.splice(+this.getAttribute("data-del"),1); commit(true); });
+    });
+  }
+  function commit(rerender){ save(binds); regen(); if(rerender) renderRows(); }
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+
+  $("addRow").addEventListener("click",function(){ binds.push(["Ctrl+Alt+","any","keys",""]); commit(true); });
+  $("resetBtn").addEventListener("click",function(){ if(confirm("初期バインドに戻しますか？")){ binds=DEFAULTS(); commit(true); } });
+
+  /* ---------- .mayu generation (mirrors madokey.py format) ---------- */
+  function genMayu(){
+    var L=[];
+    L.push("# madokey.mayu — MadoKey 設定エディタが生成");
+    L.push("# 書式: bind <修飾>+<キー> [@対象] = <アクション> [引数]");
+    L.push("");
+    binds.forEach(function(b){
+      var combo=(b[0]||"").trim(); if(!combo) return;
+      var app=b[1]||"any", act=b[2]||"keys", arg=(b[3]||"").trim();
+      var line="bind "+combo;
+      if(app && app!=="any") line+=" @"+app;
+      line+=" = "+act; if(arg) line+=" "+arg;
+      L.push(line);
+    });
+    return L.join("\\n")+"\\n";
+  }
+
+  /* ---------- .ahk generation (mirrors madokey.py emit_ahk) ---------- */
+  var AHKMOD={ctrl:"^",alt:"!",shift:"+",win:"#"};
+  function parseCombo(spec){
+    var parts=String(spec).split("+").map(function(s){return s.trim().toLowerCase();}).filter(Boolean);
+    var mods={}, key=null;
+    parts.forEach(function(p){
+      var t=p; if(t==="control")t="ctrl"; if(t==="super"||t==="cmd"||t==="meta")t="win";
+      if(t==="ctrl"||t==="alt"||t==="shift"||t==="win") mods[t]=1; else key=t;
+    });
+    return {mods:mods,key:key};
+  }
+  function ahkPre(mods){ var s=""; ["ctrl","alt","shift","win"].forEach(function(m){ if(mods[m])s+=AHKMOD[m]; }); return s; }
+  function ahkHotkey(b){ var c=parseCombo(b[0]); return ahkPre(c.mods)+(c.key||""); }
+  function ahkAction(b){
+    var a=b[2], arg=(b[3]||"").trim();
+    if(a==="copy") return "SendInput ^c";
+    if(a==="cut") return "SendInput ^x";
+    if(a==="paste") return "SendInput ^v";
+    if(a==="keys"){ var c=parseCombo(arg); return "SendInput "+ahkPre(c.mods)+"{"+(c.key||"")+"}"; }
+    if(a==="text"){ var safe=arg.replace(/\`/g,"\`\`").replace(/\\n/g,"\`n"); return "SendInput {Raw}"+safe; }
+    if(a==="run") return "Run, "+arg;
+    if(a==="sum") return "SendInput !=";
+    if(a==="ruby") return 'MadoKeyMso("PhoneticGuide")';
+    if(a==="mso") return 'MadoKeyMso("'+arg+'")';
+    if(a==="uno") return "; uno は AHK では未対応: "+arg;
+    if(a==="reload") return "Reload";
+    if(a==="quit") return "ExitApp";
+    return "; (未対応) "+a;
+  }
+  function genAhk(){
+    var out=[];
+    out.push("; madokey.ahk — MadoKey 設定エディタが生成 (AutoHotkey v1)");
+    out.push("#NoEnv"); out.push("#SingleInstance force"); out.push("SendMode Input"); out.push("");
+    out.push("MadoKeyMso(id) {");
+    out.push('    try { app := ComObjActive("Word.Application") }');
+    out.push('    catch { try { app := ComObjActive("Excel.Application") } catch { return } }');
+    out.push("    try app.CommandBars.ExecuteMso(id)");
+    out.push("}"); out.push("");
+    var win={word:"ahk_exe WINWORD.EXE",excel:"ahk_exe EXCEL.EXE",writer:"ahk_exe soffice.bin",calc:"ahk_exe soffice.bin"};
+    ["any","word","excel","writer","calc"].forEach(function(scope){
+      var group=binds.filter(function(b){ return (b[1]||"any")===scope && (b[0]||"").trim(); });
+      if(!group.length) return;
+      if(scope!=="any") out.push("#IfWinActive, "+win[scope]);
+      group.forEach(function(b){ out.push(ahkHotkey(b)+"::"+ahkAction(b)); });
+      if(scope!=="any") out.push("#IfWinActive");
+      out.push("");
+    });
+    return out.join("\\n")+"\\n";
+  }
+
+  function regen(){ $("mayuOut").value=genMayu(); }
+  function dl(name,text){
+    var blob=new Blob([text],{type:"text/plain;charset=utf-8"});
+    var a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name;
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },100);
+  }
+  $("genMayu").addEventListener("click",function(){ dl("madokey.mayu",genMayu()); flash("madokey.mayu を書き出しました"); });
+  $("genAhk").addEventListener("click",function(){ dl("madokey.ahk",genAhk()); flash("madokey.ahk を書き出しました"); });
+  $("copyMayu").addEventListener("click",function(){ copyText(genMayu(),"設定をコピーしました"); });
+
+  /* ---------- import .mayu ---------- */
+  $("importBtn").addEventListener("click",function(){ $("importFile").click(); });
+  $("importFile").addEventListener("change",function(){
+    var f=this.files&&this.files[0]; if(!f) return;
+    var rd=new FileReader();
+    rd.onload=function(){ binds=parseMayu(String(rd.result)); commit(true); flash("読み込みました ("+binds.length+" 件)"); };
+    rd.readAsText(f); this.value="";
+  });
+  function parseMayu(text){
+    var out=[];
+    text.split(/\\r?\\n/).forEach(function(raw){
+      var line=raw.split("#")[0].trim(); if(!line) return;
+      if(line.toLowerCase().indexOf("bind")!==0) return;
+      var body=line.slice(4).trim(); var eq=body.indexOf("="); if(eq<0) return;
+      var left=body.slice(0,eq).trim(), right=body.slice(eq+1).trim();
+      var app="any"; var m=left.match(/@(\\w+)/);
+      if(m){ app=m[1].toLowerCase(); left=(left.slice(0,m.index)+left.slice(m.index+m[0].length)).trim(); }
+      var rp=right.split(/\\s+/); var act=(rp.shift()||"keys").toLowerCase(); var arg=rp.join(" ");
+      out.push([left,app,act,arg]);
+    });
+    return out.length?out:DEFAULTS();
+  }
+
+  /* ---------- live demos ---------- */
+  function calcSum(s){
+    var nums=String(s).split(/[^0-9.\\-]+/).map(function(x){return parseFloat(x);}).filter(function(x){return !isNaN(x);});
+    var t=0; nums.forEach(function(n){ t+=n; }); return {n:nums.length,total:t};
+  }
+  function doSum(){
+    var r=calcSum($("sumIn").value);
+    var v=Math.round(r.total*1e6)/1e6;
+    $("sumOut").textContent=v+"  ("+r.n+"件)";
+  }
+  $("sumBtn").addEventListener("click",doSum);
+  $("sumIn").addEventListener("input",doSum);
+
+  // small kanji->reading dictionary for the ruby DEMO (実機は IME/Word/LO のよみを使用)
+  var YOMI={ "東京":"とうきょう","桜":"さくら","富士山":"ふじさん","綺麗":"きれい","日本":"にほん",
+    "京都":"きょうと","奈良":"なら","鹿":"しか","空":"そら","猫":"ねこ","犬":"いぬ","山":"やま",
+    "川":"かわ","海":"うみ","花":"はな","雪":"ゆき","月":"つき","星":"ほし","太陽":"たいよう",
+    "重要":"じゅうよう","合計":"ごうけい","窓":"まど","鍵":"かぎ" };
+  function rubyAnnotate(text){
+    var tokens=String(text).split(/(\\s+)/);
+    var html="";
+    tokens.forEach(function(tk){
+      if(/^\\s+$/.test(tk)){ html+=tk; return; }
+      var yomi=YOMI[tk];
+      if(yomi){ html+="<ruby>"+esc(tk)+"<rt>"+esc(yomi)+"</rt></ruby> "; }
+      else if(/[\\u4e00-\\u9fff]/.test(tk)){ html+="<ruby>"+esc(tk)+"<rt>?</rt></ruby> "; }
+      else { html+=esc(tk)+" "; }
+    });
+    return html;
+  }
+  $("rubyBtn").addEventListener("click",function(){ $("rubyOut").innerHTML=rubyAnnotate($("rubyIn").value); });
+
+  function copyText(t,msg){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(t).then(function(){ flash(msg||"コピーしました"); },function(){ fallbackCopy(t,msg); });
+    } else fallbackCopy(t,msg);
+  }
+  function fallbackCopy(t,msg){
+    var ta=document.createElement("textarea"); ta.value=t; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); flash(msg||"コピーしました"); }catch(e){ flash("コピーできませんでした"); }
+    ta.remove();
+  }
+  $("copyBtn").addEventListener("click",function(){ copyText($("copyIn").value,"コピーしました"); $("copyMsg").textContent="クリップボードにコピー"; });
+
+  document.querySelectorAll("[data-ins]").forEach(function(btn){
+    btn.addEventListener("click",function(){
+      var el=$("textIn"); var ins=this.getAttribute("data-ins");
+      var s=el.selectionStart||el.value.length, e=el.selectionEnd||el.value.length;
+      el.value=el.value.slice(0,s)+ins+el.value.slice(e); el.focus();
+      el.selectionStart=el.selectionEnd=s+ins.length;
+    });
+  });
+
+  var flashT=null;
+  function flash(msg){ var f=$("flash"); f.textContent=msg; f.classList.add("on"); if(flashT)clearTimeout(flashT); flashT=setTimeout(function(){ f.classList.remove("on"); },1600); }
+
+  /* ---------- init ---------- */
+  renderRows(); regen(); doSum(); $("rubyOut").innerHTML=rubyAnnotate($("rubyIn").value);
+})();
+</script>
+</body>
+</html>
+`;
+
+fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
+const outPath = path.join(IDE, "dist", "madokey.html");
+fs.writeFileSync(outPath, html);
+console.log("built dist/madokey.html (" + fs.statSync(outPath).size + " bytes)");

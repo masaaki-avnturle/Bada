@@ -53,6 +53,7 @@
 | [`instanton.html`](bada_gui_ide/dist/instanton.html) | **InstantOn** — 電源オフで状態保存→次回ブート省略で即復帰。実行はデスクトップ版/CLI |
 | [`migemo.html`](bada_gui_ide/dist/migemo.html) | **Migemogram** — Instagram風の写真SNS + migemo式ローマ字インクリメンタル検索(`sora` で そら/ソラ を絞り込み)。写真/いいね/コメントは localStorage 保存 |
 | [`migemo-media.html`](bada_gui_ide/dist/migemo-media.html) | **Migemogram Media** — 自分のPC(ファイル選択)/クラウド(URL)の写真・動画ギャラリー。**ポイントでどアップ**、動画ポイントで**CM風ミュートプレビュー**、クリックで音声つきどアップ、migemo検索、**zone://url.or.jp に取り込み**(UltraDB複製 + Jones量子暗号) |
+| [`madokey.html`](bada_gui_ide/dist/madokey.html) | **MadoKey 窓使いのキー** — 奈由太氏「窓使いの憂鬱」オマージュ。**Word / Excel / LibreOffice のキーバインド設定エディタ**。キー→動作(**ルビ・合計・コピー・独自バインド**)を編集し、その場で試して、`madokey.mayu`(常駐 `madokey.py` 用)/ `madokey.ahk`(AutoHotkey)を書き出し。常駐本体は [`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
 **一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。

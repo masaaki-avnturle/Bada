@@ -1,0 +1,67 @@
+# ============================================================================
+#  madokey.mayu — 窓使いのキー (MadoKey) 設定ファイル
+#
+#  奈由太氏の「窓使いの憂鬱」へのオマージュ。キーバインドを 1 か所で定義し、
+#  Word / Excel / LibreOffice Writer / Calc に、ルビ付け・合計・コピーなどの
+#  操作を「ひと押し」で送り込みます。行を書き換えるだけで独自バインドに
+#  変更できます (アプリ再起動 or Ctrl+Alt+F5 で再読込)。
+#
+#  書式:
+#     bind <修飾>+<キー> [@対象] = <アクション> [引数]
+#
+#  <修飾>  : Ctrl / Alt / Shift / Win  (+ でつなぐ。大文字小文字は無視)
+#  <キー>  : A-Z 0-9 F1-F12 Space Enter Tab など
+#  @対象   : word / excel / writer / calc / any (省略時 any)
+#            前面のアプリを自動判定し、対象が一致するバインドを優先。
+#
+#  <アクション>:
+#     ruby            選択文字にルビ(ふりがな)。よみは IME/エンジンが自動補完
+#                     - Word  : ExecuteMso("PhoneticGuide")  → ルビ ダイアログ
+#                     - Excel : ExecuteMso("PhoneticShowOrHide")
+#                     - Writer: dispatch .uno:RubyDialog
+#     sum             合計を一瞬で
+#                     - Excel : Alt+=  (オート SUM)
+#                     - Calc  : dispatch .uno:AutoSum
+#     copy            コピー (Ctrl+C 相当・どのアプリでも)
+#     cut / paste     切り取り / 貼り付け
+#     mso <IdMso>     任意の Office リボン コマンド (Windows, Word/Excel)
+#     uno <.uno:Cmd>  任意の LibreOffice コマンド (Writer/Calc)
+#     keys <sequence> 任意のキー送出。例: keys Ctrl+Shift+V / keys Alt+=
+#     text <文字列>   定型文の挿入 (署名・住所・記号など)
+#     run <コマンド>  外部コマンドの実行
+#
+#  行末 # 以降はコメント。空行は無視。
+# ============================================================================
+
+# ---- どのアプリでも効く基本バインド --------------------------------------
+bind Ctrl+Alt+C          = copy               # コピー
+bind Ctrl+Alt+X          = cut                # 切り取り
+bind Ctrl+Alt+V          = paste              # 貼り付け
+
+# ---- ルビ (ふりがな) ------------------------------------------------------
+bind Ctrl+Alt+R  @word   = ruby               # Word: ルビ ダイアログ (よみ自動)
+bind Ctrl+Alt+R  @excel  = ruby               # Excel: ふりがなの表示/非表示
+bind Ctrl+Alt+R  @writer = ruby               # Writer: 書式→ルビ
+
+# ---- 合計 (オート SUM) ----------------------------------------------------
+bind Ctrl+Alt+S  @excel  = sum                # Excel: Alt+= でオート SUM
+bind Ctrl+Alt+S  @calc   = sum                # Calc : .uno:AutoSum
+
+# ---- よく使う書式・定型文 (自由に変更・追加できます) ----------------------
+bind Ctrl+Alt+B  @word   = mso Bold           # 太字 (Word リボン)
+bind Ctrl+Alt+B  @excel  = mso Bold           # 太字 (Excel リボン)
+bind Ctrl+Alt+H  @word   = mso TextHighlightColorPicker   # 蛍光ペン
+bind Ctrl+Alt+G  @writer = uno .uno:Bold      # 太字 (Writer)
+bind Ctrl+Alt+G  @calc   = uno .uno:Bold      # 太字 (Calc)
+
+bind Ctrl+Alt+M          = text 〒000-0000 ○○県○○市    # 住所の定型文
+bind Ctrl+Alt+D          = text 【重要】                 # 見出し記号
+
+# ---- 独自バインドの例 -----------------------------------------------------
+# bind Ctrl+Alt+T @excel = mso PivotTableInsert          # ピボットテーブル
+# bind Ctrl+Alt+P        = run libreoffice --calc         # Calc を起動
+# bind Win+Alt+N         = keys Ctrl+Shift+N              # 任意キーへ再割当
+
+# ---- MadoKey 自身の操作 ---------------------------------------------------
+bind Ctrl+Alt+F5         = reload             # この設定ファイルを再読込
+bind Ctrl+Alt+F12        = quit               # MadoKey を終了
