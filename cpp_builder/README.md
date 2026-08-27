@@ -21,7 +21,7 @@
 | プラットフォーム | ファイル |
 |:---|:---|
 | **Android** (APK) | `bada-cppbuilder-debug.apk` |
-| **Windows 10 / 11** | `BadaCppBuilder-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Windows 10 / 11** | `BadaCppBuilder-*-x64.exe` (NSIS インストーラ) / `BadaCppBuilder-*-portable.exe` (ポータブル) |
 | **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
 
 ビルドは [`cppbuilder-app-build.yml`](../.github/workflows/cppbuilder-app-build.yml) が実行します
