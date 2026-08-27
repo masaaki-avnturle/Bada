@@ -23,16 +23,22 @@
    `newfs -O 2` FFSv2 → `base.tgz` 〜 `apt-quantum.tgz` / `xserver-badax.tgz` のセット展開 →
    root パスワード → ホスト名 → DHCP で完了。
 3. 再起動すると **LILO(MBR) → GRUB メニュー → カーネル dmesg → `/etc/rc` → `login:`**。
-   `root` でログインするとシェルが使えます (`help` で一覧)。
-4. **Ubuntu 風コマンドライン**:
+   **vim・emacs・sshd・xinetd・curl・wget は最初からインストール済み**で、sshd と xinetd は
+   初回起動から `/etc/rc` が自動起動します (`netstat` で *.22 ほかが即 LISTEN)。
+   インストーラは root と一緒に**最初の一般ユーザー `bada`** も作ります (Ubuntu 流)。
+4. **Ubuntu 風コマンドライン + NAT 経由のインターネット**:
    ```
-   apt update
-   apt install ssh xinetd zsh tcsh bash     # Linux 一式 (sshd / xinetd / GNU シェル群)
-   netstat                                   # *.22 sshd, xinetd の echo/daytime/chargen が LISTEN
-   zsh                                       # シェル切替 (bash / zsh / tcsh)
-   chsh -s /bin/zsh                          # ログインシェル変更 (/etc/passwd に反映)
+   ping www.badaos.or.jp                     # NAT (10.0.2.2 / DNS 10.0.2.3) 越しに外へ
+   curl http://www.badaos.or.jp/             # 外部サイトを取得
+   wget http://www.badaos.or.jp/             # ~/index.html に保存
+   apt update                                # 外部ミラー http://archive.badaos.or.jp から取得
+   apt install zsh tcsh bash                 # 追加パッケージも NAT 越しにダウンロード
+   vim /etc/motd  /  emacs /etc/rc.conf      # プリインストール済みエディタ
+   su - bada                                 # root → 一般ユーザー (プロンプトが $ に)
+   sudo apt update                           # 一般ユーザーから root 権限で 1 コマンド
+   su                                        # 一般ユーザー → root (パスワード入力)
+   adduser NAME / passwd [NAME] / chsh -s /bin/zsh / whoami / id / exit
    ssh localhost                             # Bell 対 QKD ハンドシェイクの ssh
-   service sshd status / apt list --installed / dpkg -l / which zsh
    ```
 5. `xclock &` `xeyes &` `xterm &` を実行すると、X クライアントが NAT 越しに
    `DISPLAY=10.0.2.2:0` — **Windows ホスト側の BadaX Server ウィンドウ** — に表示されます。

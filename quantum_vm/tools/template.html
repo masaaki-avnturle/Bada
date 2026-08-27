@@ -340,7 +340,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
   var $ = function (id) { return document.getElementById(id); };
 
   /* ================= persistent event ledger ================= */
-  var LS_EVENTS = "badavm.events.v2", LS_SNAP = "badavm.snapshot.v2";
+  var LS_EVENTS = "badavm.events.v3", LS_SNAP = "badavm.snapshot.v3";
   var events = [];      /* the Akashic machine tape */
   var snapshot = null;  /* ledger prefix length */
   try {
@@ -430,6 +430,11 @@ var VM_LIBS = __VM_LIBS_JSON__;
         break;
       }
       case "XCLS": xtermData_(val).lines = []; break;
+      case "XECHO": {
+        var sp4 = val.indexOf(" ");
+        if (sp4 >= 0) xtermData_(val.slice(0, sp4)).echo = (val.slice(sp4 + 1) === "on");
+        break;
+      }
       case "XPROMPT": {
         var sp3 = val.indexOf(" ");
         if (sp3 >= 0) xtermData_(val.slice(0, sp3)).prompt = val.slice(sp3 + 1);
@@ -585,7 +590,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
   var xtermData = {};  /* id -> { lines, prompt, buf } */
   function xtermData_(id) {
     id = String(id);
-    if (!xtermData[id]) xtermData[id] = { lines: [], prompt: "# ", buf: "" };
+    if (!xtermData[id]) xtermData[id] = { lines: [], prompt: "# ", buf: "", echo: true };
     return xtermData[id];
   }
   function renderXterm(win, id) {
@@ -594,7 +599,8 @@ var VM_LIBS = __VM_LIBS_JSON__;
     while (d.lines.length > XTERM_MAX) d.lines.shift();
     var html = "";
     for (var i = 0; i < d.lines.length; i++) html += esc(d.lines[i]) + "\n";
-    html += esc(d.prompt) + '<span class="in">' + esc(d.buf) + '</span><span class="xcur"></span>';
+    html += esc(d.prompt) + '<span class="in">' + esc(d.echo === false ? "" : d.buf) +
+            '</span><span class="xcur"></span>';
     win.pre.innerHTML = html;
     win.pre.scrollTop = win.pre.scrollHeight;
   }
@@ -607,7 +613,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     if (e.key === "Enter") {
       e.preventDefault(); e.stopPropagation();
       var b = d.buf; d.buf = "";
-      d.lines.push(d.prompt + b);
+      d.lines.push(d.prompt + (d.echo === false ? "" : b));
       renderXterm(win, id);
       send(["xline", +id, b]);
     } else if (e.key === "Backspace") {

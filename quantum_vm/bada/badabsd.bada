@@ -4,26 +4,32 @@
 #
 # BadaOS is an (unofficial, educational) homage that marries a
 # NetBSD-style BASE (sysinst full-screen installer, FFSv2,
-# /etc/rc, dmesg autoconf) with an Ubuntu-style COMMAND LINE:
-# an apt package manager whose archive ships the classic Linux
-# userland -- openssh (sshd), xinetd, and the bash / zsh / tcsh
-# shells -- installable with plain `apt install ssh xinetd zsh
-# tcsh bash`.
+# /etc/rc, dmesg autoconf) with an Ubuntu-style COMMAND LINE.
 #
-# Like VMware-style raw device mapping, the installer can target
-# either the virtual disk wd0 (.qvmdk) or the pass-through REAL
-# DISK rd0 (RDM). The boot loader step installs LILO INTO THE
-# MASTER BOOT RECORD in GRUB MENU MODE: lilo -M writes the 446
-# byte boot code into sector 0 (partition table preserved) and
-# chains into a GRUB 2 style menu on every boot.
+# THE FULL LINUX-STYLE USERLAND IS PREINSTALLED: vim, emacs,
+# sshd (openssh-server), xinetd, curl and wget ship in the
+# installation sets and their daemons start from the very first
+# boot. apt stays available for more packages and now fetches
+# THROUGH THE NAT from the external mirror
+# http://archive.badaos.or.jp (10.0.2.2 gateway, QKD-guarded).
 #
-# The WHOLE MACHINE is the deterministic replay of an
-# append-only EVENT LEDGER (the Akashic machine tape); snapshots
-# are ledger prefixes (vmpro.bada). X clients (xclock, xeyes,
-# xterm, xlogo) connect OUT of the VM to the BadaX Server on the
-# Windows 10/11 host (DISPLAY=10.0.2.2:0, badax.bada) -- the
-# ASTEC-X workflow -- over Bell-pair QKD with a
-# JONES-KNOT-COOKIE-1 display cookie.
+# THE INTERNET WORKS over the NAT: ping / host / curl / wget
+# resolve external sites through the gateway DNS (10.0.2.3) and
+# fetch pages from the ultra-network web (deterministic, ledger-
+# replayable simulation).
+#
+# MULTI-USER: sysinst creates the first ordinary user account
+# ("bada", Ubuntu style) next to root. Every terminal session --
+# the VM console and每 xterm window alike -- is a stack of
+# [shell, user] frames, so `su - bada` drops root to the user,
+# `su` (with the password) climbs back, `sudo CMD` runs one
+# command as root, `exit` pops one frame, and prompts show
+# "#" for root and "$" for ordinary users. adduser / passwd
+# manage further accounts.
+#
+# Boot: LILO IN THE MASTER BOOT RECORD chaining a GRUB 2 menu
+# (or plain GRUB / plain LILO), onto the virtual disk wd0 or the
+# raw-device-mapped real disk rd0.
 #
 # State vector ST (one list, replay-rebuilt):
 #   0 stage      "off"|"sysinst"|"login"|"passwd"|"shell"|"halted"
@@ -32,26 +38,32 @@
 #   3 rootpw
 #   4 fs         [[path, content], ...]   (the FFS)
 #   5 substage   sysinst step number
-#   6 xwins      [[id,class,x,y,w,h,title], ...]
+#   6 xwins      [[id,class,x,y,w,h,title,session], ...]
 #   7 xsrv       BadaX server record
 #   8 tmp        (installer scratch: first password, login name)
 #   9 user       logged-in user ("" if none)
 #  10 xconnected 0/1
 #  11 ip         "" until DHCP
-#  12 pkgs       apt-installed package names
-#  13 shells     the shell stack (last = current; "sh" at bottom)
+#  12 pkgs       installed package names
+#  13 console session = [stack, pending]
+#               stack   = [[shell, user], ...] (last = current)
+#               pending = [] | ["su", user] | ["adduser", name]
+#                            | ["passwd", name]
 #  14 services   running daemons (sshd, xinetd, ...)
 #  15 bootloader "grub-lilo" | "grub" | "lilo"
 #  16 disk       install target: "wd0" (virtual) | "rd0" (real, RDM)
+#  17 users      [[name, password, shell], ...] (root included)
 # ============================================================
 
 OS_VERSION := "12.0_QUANTUM"
 OS_KERNEL  := "BadaOS 12.0 (GENERIC.QUANTUM) #0"
 OS_DISPLAY := "10.0.2.2:0"
+APT_MIRROR := "http://archive.badaos.or.jp"
 
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
-            "", "", 0, "", [], ["sh"], [], "grub-lilo", "wd0"]
+            "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
+            "wd0", []]
 }
 
 # ====================================================================
@@ -119,91 +131,73 @@ def fs_ls(fs, dir) {
     return names
 }
 
-# ---- the base + X sets, extracted by sysinst ------------------------
-def os_seedfs(st) {
-    fs := st[4]
-    hn := st[2]
-    dsk := st[16]
-    fs_put(fs, "/etc/release",
-        "BadaOS 12.0 (GENERIC.QUANTUM) -- quantum edition\n" +
-        "NetBSD-style base + Ubuntu-style apt userland\n" +
-        "built from the Bada language event ledger")
-    fs_put(fs, "/etc/os-release",
-        "NAME=\"BadaOS\"\n" +
-        "VERSION=\"12.0 (quantum)\"\n" +
-        "ID=badaos\n" +
-        "ID_LIKE=\"netbsd ubuntu\"\n" +
-        "PRETTY_NAME=\"BadaOS 12.0 GNU/Quantum (NetBSD-style base, Ubuntu-style apt)\"")
-    fs_put(fs, "/etc/motd",
-        "BadaOS 12.0 (GENERIC.QUANTUM)\n\n" +
-        "Welcome to BadaOS, the quantum OS of the Bada language!\n" +
-        "  * Ubuntu-style packages:  apt update && apt install ssh xinetd zsh tcsh bash\n" +
-        "  * Shells: sh (builtin) + bash / zsh / tcsh via apt, switch with chsh\n" +
-        "  * Boot: LILO in the MBR of " + dsk + ", GRUB 2 menu mode\n" +
-        "The X display of this VM is the BadaX Server on the Windows host:\n" +
-        "    DISPLAY=" + OS_DISPLAY + "   (JONES-KNOT-COOKIE-1 authorized)\n" +
-        "Try:  xclock &   xeyes &   xterm &   xdpyinfo   qstat   help")
-    fs_put(fs, "/etc/rc.conf",
-        "# BadaOS /etc/rc.conf -- generated by sysinst\n" +
-        "rc_configured=YES\n" +
-        "hostname=" + hn + "\n" +
-        "dhcpcd=YES\n" +
-        "badax_display=" + OS_DISPLAY + "\n")
-    fs_put(fs, "/etc/passwd",
-        "root:*:0:0:Charlie Root:/root:/bin/sh\n" +
-        "operator:*:2:5:System &:/usr/guest/operator:/sbin/nologin\n" +
-        "daemon:*:1:1:The devil himself:/:/sbin/nologin")
-    fs_put(fs, "/etc/hosts",
-        "127.0.0.1  localhost\n" +
-        "10.0.2.15  " + hn + "\n" +
-        "10.0.2.2   winhost badax  # BadaX Server (Windows 10/11)")
-    fs_put(fs, "/etc/fstab",
-        "/dev/" + dsk + "a  /  ffs  rw  1 1\n" +
-        "/dev/" + dsk + "b  none  swap  sw  0 0")
-    fs_put(fs, "/etc/apt/sources.list",
-        "# BadaOS quantum archive (Ubuntu-style)\n" +
-        "deb cd0:/pool quantum main\n" +
-        "deb zone://apt.badaos.or.jp/ quantum main   # QKD-secured mirror")
-    fs_put(fs, "/etc/lilo.conf",
-        "# lilo -M /dev/r" + dsk + "d : boot code -> MBR (446 bytes, ptable kept)\n" +
-        "boot=/dev/r" + dsk + "d\n" +
-        "map=/boot/map\n" +
-        "install=menu   # GRUB menu mode chain\n" +
-        "image=/netbsd.quantum\n" +
-        "  label=BadaOS-GNU/Quantum\n" +
-        "  root=/dev/" + dsk + "a")
-    fs_put(fs, "/boot/grub/grub.cfg",
-        "set default=0\nset timeout=0\n" +
-        "menuentry 'BadaOS GNU/Quantum 12.0 (kernel netbsd.quantum)' {\n" +
-        "  badaos_kernel /netbsd.quantum root=/dev/" + dsk + "a\n}\n" +
-        "menuentry 'Advanced options for BadaOS' {}\n" +
-        "menuentry 'Memory test (memtest86+q, Hilbert dim 256)' {}")
-    fs_put(fs, "/root/.profile",
-        "export PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/X11R7/bin\n" +
-        "export DISPLAY=" + OS_DISPLAY + "  # BadaX Server on the host")
-    fs_put(fs, "/root/.Xauthority",
-        "JONES-KNOT-COOKIE-1  (trefoil knot, Kauffman-bracket derived)")
-    fs_put(fs, "/bin/sh", "#!binary (Bourne shell)")
-    fs_put(fs, "/bin/ls", "#!binary")
-    fs_put(fs, "/bin/cat", "#!binary")
-    fs_put(fs, "/sbin/init", "#!binary")
-    fs_put(fs, "/sbin/reboot", "#!binary")
-    fs_put(fs, "/usr/bin/uname", "#!binary")
-    fs_put(fs, "/usr/bin/apt", "#!binary (BadaOS quantum apt)")
-    fs_put(fs, "/usr/bin/dpkg", "#!binary")
-    fs_put(fs, "/usr/X11R7/bin/xclock", "#!binary (X client)")
-    fs_put(fs, "/usr/X11R7/bin/xeyes", "#!binary (X client)")
-    fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
-    fs_put(fs, "/usr/X11R7/bin/xlogo", "#!binary (X client)")
-    fs_put(fs, "/usr/X11R7/bin/xdpyinfo", "#!binary (X client)")
-    fs_put(fs, "/var/log/messages", "(see dmesg)")
+# ====================================================================
+# Users -- root plus ordinary accounts (Ubuntu-style first user)
+#   record: [name, password, shell]
+# ====================================================================
+def user_find(st, name) {
+    i := 0
+    while (i < len(st[17])) {
+        if (st[17][i][0] == name) { return st[17][i] }
+        i := i + 1
+    }
+    return []
+}
+
+def user_add(st, name, password, shell) {
+    if (len(user_find(st, name)) > 0) { return 0 }
+    st[17] <- [name, password, shell]
+    return 1
+}
+
+def user_home(name) {
+    if (name == "root") { return "/root" }
+    return "/home/" + name
+}
+
+def shell_path(name) { return "/bin/" + name }
+
+# regenerate /etc/passwd from the user table
+def fs_passwd_sync(st) {
+    body := ""
+    i := 0
+    n := 0
+    while (i < len(st[17])) {
+        u := st[17][i]
+        uid := 1000 + n
+        gid := 100
+        gecos := u[0]
+        if (u[0] == "root") { uid := 0; gid := 0; gecos := "Charlie Root" }
+        else { n := n + 1 }
+        body := body + u[0] + ":*:" + uid + ":" + gid + ":" + gecos + ":" +
+                user_home(u[0]) + ":" + shell_path(u[2]) + "\n"
+        i := i + 1
+    }
+    body := body + "daemon:*:1:1:The devil himself:/:/sbin/nologin"
+    fs_put(st[4], "/etc/passwd", body)
+    return 0
+}
+
+# ====================================================================
+# Terminal sessions -- a stack of [shell, user] frames + pending input
+# (the console and every xterm window carry one each)
+# ====================================================================
+def sess_new(shell, user) { return [[[shell, user]], []] }
+def sess_shell(sess) { return sess[0][len(sess[0]) - 1][0] }
+def sess_user(sess)  { return sess[0][len(sess[0]) - 1][1] }
+def sess_depth(sess) { return len(sess[0]) }
+def sess_push(sess, shell, user) { sess[0] <- [shell, user]; return 0 }
+def sess_pop(sess) {
+    popped := []
+    i := 0
+    while (i < len(sess[0]) - 1) { popped <- sess[0][i]; i := i + 1 }
+    sess[0] = popped
     return 0
 }
 
 # ====================================================================
 # The apt package archive (Ubuntu-style userland for BadaOS)
 #   [name, version, description, kind, binpath]
-#   kind: "shell" | "service" | "tool"
 # ====================================================================
 def pkg_catalog() {
     return [
@@ -213,11 +207,19 @@ def pkg_catalog() {
       ["openssh-server", "9.6p1-3badaos",  "secure shell (SSH) server (QKD hardened)",  "service", "/usr/sbin/sshd"],
       ["openssh-client", "9.6p1-3badaos",  "secure shell (SSH) client",                 "tool",    "/usr/bin/ssh"],
       ["xinetd",         "2.3.15.4-1",     "replacement for inetd with many features",  "service", "/usr/sbin/xinetd"],
-      ["curl",           "8.5.0-2badaos",  "command line tool for transferring data",   "tool",    "/usr/bin/curl"],
       ["vim",            "9.1-1badaos",    "Vi IMproved - enhanced vi editor",          "tool",    "/usr/bin/vim"],
+      ["emacs",          "29.2-1badaos",   "GNU Emacs editor (quantum build)",          "tool",    "/usr/bin/emacs"],
+      ["curl",           "8.5.0-2badaos",  "command line tool for transferring data",   "tool",    "/usr/bin/curl"],
+      ["wget",           "1.21.4-1badaos", "retrieves files from the web",              "tool",    "/usr/bin/wget"],
       ["coreutils",      "9.4-3badaos",    "GNU core utilities (Linux 一式)",           "tool",    "/usr/bin/coreutils"],
       ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"]
     ]
+}
+
+# packages that sysinst PREINSTALLS (the Linux suite works at once)
+def pkg_preinstalled() {
+    return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
+            "curl", "wget", "net-tools"]
 }
 
 # apt spelling aliases ("apt install ssh" works like on Ubuntu)
@@ -225,6 +227,7 @@ def pkg_resolve(name) {
     if (name == "ssh")  { return "openssh-server" }
     if (name == "sshd") { return "openssh-server" }
     if (name == "csh")  { return "tcsh" }
+    if (name == "vi")   { return "vim" }
     return name
 }
 
@@ -239,8 +242,6 @@ def pkg_lookup(name) {
 }
 
 def pkg_installed(st, name) { return list_has(st[12], pkg_resolve(name)) }
-
-def cur_shell(st) { return st[13][len(st[13]) - 1] }
 
 # start the daemons a package provides (also used by /etc/rc at boot)
 def svc_start(emit, st, pkg, from_rc) {
@@ -263,6 +264,31 @@ def svc_start(emit, st, pkg, from_rc) {
     return 0
 }
 
+def pkg_files(st, name) {
+    p := pkg_lookup(name)
+    if (len(p) == 0) { return 0 }
+    fs_put(st[4], p[4], "#!binary (" + name + " " + p[1] + ")")
+    if (p[3] == "shell") {
+        old := fs_get(st[4], "/etc/shells")
+        base := "/bin/sh"
+        if (len(old) == 1) { base := old[0] }
+        fs_put(st[4], "/etc/shells", base + "\n" + p[4])
+    }
+    if (name == "openssh-server") {
+        fs_put(st[4], "/etc/ssh/sshd_config",
+            "Port 22\nPermitRootLogin yes\nQKDGuard yes   # Bell-pair zero-preservation\n" +
+            "HostKey /etc/ssh/ssh_host_jones_key")
+    }
+    if (name == "xinetd") {
+        fs_put(st[4], "/etc/xinetd.conf",
+            "defaults { instances = 60  log_type = SYSLOG authpriv }\n" +
+            "service echo    { type = INTERNAL  protocol = tcp  wait = no }\n" +
+            "service daytime { type = INTERNAL  protocol = tcp  wait = no }\n" +
+            "service chargen { type = INTERNAL  protocol = tcp  wait = no }")
+    }
+    return 0
+}
+
 def apt_install_one(emit, vm, st, rawname) {
     name := pkg_resolve(rawname)
     p := pkg_lookup(name)
@@ -275,31 +301,22 @@ def apt_install_one(emit, vm, st, rawname) {
         return 0
     }
     kb := 120 + (str_hash(name) % 900)
-    tty(emit, "Get:1 cd0:/pool quantum/main " + name + " " + p[1] + " [" + kb + " kB]")
+    kbps := 200 + (str_hash("speed" + name) % 1800)
+    tty(emit, "Get:1 " + APT_MIRROR + "/pool quantum/main amd64 " + name + " " +
+              p[1] + " [" + kb + " kB]")
+    tty(emit, "Fetched " + kb + " kB in 0.3s (" + kbps + " kB/s) -- via NAT 10.0.2.2, QKD guard OK")
     tty(emit, "Unpacking " + name + " (" + p[1] + ") ...")
     tty(emit, "Setting up " + name + " (" + p[1] + ") ...")
     st[12] <- name
-    fs_put(st[4], p[4], "#!binary (" + name + " " + p[1] + ", apt)")
+    pkg_files(st, name)
     if (p[3] == "shell") {
         tty(emit, "update-alternatives: " + p[4] + " を /etc/shells に登録しました")
-        old := fs_get(st[4], "/etc/shells")
-        base := "/bin/sh"
-        if (len(old) == 1) { base := old[0] }
-        fs_put(st[4], "/etc/shells", base + "\n" + p[4])
     }
     if (name == "openssh-server") {
-        fs_put(st[4], "/etc/ssh/sshd_config",
-            "Port 22\nPermitRootLogin yes\nQKDGuard yes   # Bell-pair zero-preservation\n" +
-            "HostKey /etc/ssh/ssh_host_jones_key")
         tty(emit, "update-rc.d: sshd defaults (enabled at boot)")
         svc_start(emit, st, name, 0)
     }
     if (name == "xinetd") {
-        fs_put(st[4], "/etc/xinetd.conf",
-            "defaults { instances = 60  log_type = SYSLOG authpriv }\n" +
-            "service echo    { type = INTERNAL  protocol = tcp  wait = no }\n" +
-            "service daytime { type = INTERNAL  protocol = tcp  wait = no }\n" +
-            "service chargen { type = INTERNAL  protocol = tcp  wait = no }")
         tty(emit, "update-rc.d: xinetd defaults (enabled at boot)")
         svc_start(emit, st, name, 0)
     }
@@ -310,20 +327,34 @@ def apt_cmd(emit, vm, st, argv) {
     if (len(argv) < 2) {
         tty(emit, "apt 2.7.3badaos (amd64, quantum)")
         tty(emit, "usage: apt update | apt install PKG... | apt remove PKG | apt list --installed")
-        tty(emit, "archive: /etc/apt/sources.list (cd0 pool + QKD-secured zone:// mirror)")
+        tty(emit, "archive: cd0 pool + " + APT_MIRROR + " (external mirror over the NAT)")
         return 0
     }
     sub := argv[1]
     if (sub == "update") {
-        tty(emit, "Get:1 cd0:/pool quantum InRelease [signed: jones-" + jones_key(vm_knot()) + "]")
-        tty(emit, "Get:2 zone://apt.badaos.or.jp quantum/main amd64 Packages (QKD ok, zero-preservation holds)")
-        tty(emit, "Fetched index: " + len(pkg_catalog()) + " packages / Akashic ledger " + len(tuplespace) + " facts")
+        if (len(st[11]) == 0) {
+            tty(emit, "Err:1 " + APT_MIRROR + " quantum InRelease")
+            tty(emit, "  Temporary failure resolving 'archive.badaos.or.jp' (network is down)")
+            return 0
+        }
+        tty(emit, "Hit:1 cd0:/pool quantum InRelease")
+        tty(emit, "Get:2 " + APT_MIRROR + " quantum InRelease [3,847 B]  -- via NAT 10.0.2.2 (" +
+                  dns_ip("archive.badaos.or.jp") + ")")
+        tty(emit, "Get:3 " + APT_MIRROR + " quantum/main amd64 Packages [12.4 kB]  (signed: jones-" +
+                  jones_key(vm_knot()) + ")")
+        tty(emit, "Fetched 16.2 kB in 0.4s (40.5 kB/s) -- QKD guard: zero-preservation holds")
         tty(emit, "Reading package lists... Done")
-        tty(emit, "All packages are up to date.")
+        tty(emit, "Building dependency tree... Done")
+        tty(emit, len(pkg_catalog()) + " packages in the index / Akashic ledger " +
+                  len(tuplespace) + " facts. All packages are up to date.")
         return 0
     }
     if (sub == "install") {
         if (len(argv) < 3) { tty(emit, "apt install PKG..."); return 0 }
+        if (len(st[11]) == 0) {
+            tty(emit, "E: network is down (no DHCP lease on wm0)")
+            return 0
+        }
         tty(emit, "Reading package lists... Done")
         tty(emit, "Building dependency tree... Done")
         i := 2
@@ -373,7 +404,6 @@ def apt_cmd(emit, vm, st, argv) {
                 tty(emit, p[0] + "/quantum,now " + p[1] + " amd64 [installed]")
                 i := i + 1
             }
-            if (len(st[12]) == 0) { tty(emit, "(nothing installed yet -- try: apt install ssh xinetd zsh tcsh bash)") }
             return 0
         }
         tty(emit, "Listing... Done")
@@ -388,6 +418,202 @@ def apt_cmd(emit, vm, st, argv) {
         return 0
     }
     tty(emit, "E: Invalid operation " + sub)
+    return 0
+}
+
+# ====================================================================
+# The internet over the NAT (gateway 10.0.2.2, DNS 10.0.2.3)
+# Deterministic (ledger-replayable) simulation of the outside web.
+# ====================================================================
+def dns_ip(host) {
+    h := str_hash("dns:" + host)
+    return "203.0.113." + (1 + (h % 254))
+}
+
+def url_host(url) {
+    rest := url
+    cut := str_find(rest, "://")
+    if (cut >= 0) { rest := substr(rest, cut + 3, len(rest) - cut - 3) }
+    cut := str_find(rest, "/")
+    if (cut >= 0) { rest := substr(rest, 0, cut) }
+    return rest
+}
+
+# the well-known sites of the ultra-network web
+def web_get(url) {
+    if (str_find(url, "www.badaos.or.jp") >= 0) {
+        return [200, "<!doctype html><title>BadaOS</title>\n" +
+            "<h1>BadaOS 12.0 GNU/Quantum</h1>\n" +
+            "<p>The quantum OS of the Bada language. NetBSD-style base,\n" +
+            "Ubuntu-style apt, LILO in the MBR chaining a GRUB menu.</p>\n" +
+            "<a href=" + APT_MIRROR + ">package archive</a>"]
+    }
+    if (str_find(url, "archive.badaos.or.jp") >= 0) {
+        return [200, "Origin: BadaOS quantum archive\nSuite: quantum\n" +
+            "Components: main\nArchitectures: amd64\n" +
+            "Signed-By: jones-" + jones_key(vm_knot()) + " (Kauffman bracket)"]
+    }
+    if (str_find(url, "url.or.jp") >= 0) {
+        return [200, "# Ultra Network\nserver-less WWW -- zone:// gateway\n" +
+            "(browse it with the ZoneBrowser; this is the http mirror)"]
+    }
+    host := url_host(url)
+    if (str_find(host, ".") < 0) { return [0, ""] }
+    return [200, "<!doctype html><title>" + host + "</title>\n" +
+        "<p>You reached " + host + " (" + dns_ip(host) + ") from BadaOS\n" +
+        "through the BadaVM NAT gateway 10.0.2.2 -- the internet works.</p>"]
+}
+
+def cmd_ping(emit, st, host) {
+    if (len(st[11]) == 0) { tty(emit, "ping: network is down"); return 0 }
+    if (str_find(host, ".") < 0 && host != "localhost") {
+        tty(emit, "ping: cannot resolve " + host + ": Unknown host")
+        return 0
+    }
+    ip := dns_ip(host)
+    if (host == "localhost") { ip := "127.0.0.1" }
+    tty(emit, "PING " + host + " (" + ip + "): 56 data bytes  -- via NAT 10.0.2.2")
+    i := 0
+    while (i < 3) {
+        ms := 8 + ((str_hash(host) + i * 37) % 32)
+        tty(emit, "64 bytes from " + ip + ": icmp_seq=" + i + " ttl=57 time=" +
+                  ms + "." + ((str_hash(host + i) % 9)) + " ms")
+        i := i + 1
+    }
+    tty(emit, "--- " + host + " ping statistics ---")
+    tty(emit, "3 packets transmitted, 3 packets received, 0.0% packet loss")
+    return 0
+}
+
+def cmd_curl(emit, st, url) {
+    if (len(st[11]) == 0) { tty(emit, "curl: (6) network is down"); return 0 }
+    r := web_get(url)
+    if (r[0] == 0) {
+        tty(emit, "curl: (6) Could not resolve host: " + url_host(url))
+        return 0
+    }
+    parts := split(r[1], "\n")
+    i := 0
+    while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }
+    return 0
+}
+
+def cmd_wget(emit, st, home, url) {
+    if (len(st[11]) == 0) { tty(emit, "wget: unable to resolve (network is down)"); return 0 }
+    host := url_host(url)
+    r := web_get(url)
+    if (r[0] == 0) {
+        tty(emit, "wget: unable to resolve host address '" + host + "'")
+        return 0
+    }
+    tty(emit, "--" + NOW + "--  " + url)
+    tty(emit, "Resolving " + host + " (via 10.0.2.3)... " + dns_ip(host))
+    tty(emit, "Connecting to " + host + "|" + dns_ip(host) + "|:80 through NAT 10.0.2.2... connected.")
+    tty(emit, "HTTP request sent, awaiting response... 200 OK")
+    tty(emit, "Length: " + len(r[1]) + " [text/html]")
+    path := home + "/index.html"
+    fs_put(st[4], path, r[1])
+    tty(emit, "Saving to: '" + path + "'")
+    tty(emit, "'" + path + "' saved [" + len(r[1]) + "/" + len(r[1]) + "]")
+    return 0
+}
+
+# ====================================================================
+# File system seed -- run at install time
+# ====================================================================
+def os_seedfs(st) {
+    fs := st[4]
+    hn := st[2]
+    dsk := st[16]
+    fs_put(fs, "/etc/release",
+        "BadaOS 12.0 (GENERIC.QUANTUM) -- quantum edition\n" +
+        "NetBSD-style base + Ubuntu-style apt userland\n" +
+        "built from the Bada language event ledger")
+    fs_put(fs, "/etc/os-release",
+        "NAME=\"BadaOS\"\n" +
+        "VERSION=\"12.0 (quantum)\"\n" +
+        "ID=badaos\n" +
+        "ID_LIKE=\"netbsd ubuntu\"\n" +
+        "PRETTY_NAME=\"BadaOS 12.0 GNU/Quantum (NetBSD-style base, Ubuntu-style apt)\"")
+    fs_put(fs, "/etc/motd",
+        "BadaOS 12.0 (GENERIC.QUANTUM)\n\n" +
+        "Welcome to BadaOS, the quantum OS of the Bada language!\n" +
+        "  * Preinstalled: vim, emacs, sshd, xinetd, curl, wget (Linux 一式)\n" +
+        "  * Internet over the NAT:  ping www.badaos.or.jp   curl http://www.badaos.or.jp/\n" +
+        "  * apt fetches from " + APT_MIRROR + " :  apt update && apt install zsh tcsh bash\n" +
+        "  * Users: su - bada (to the first user) / su (back to root) / sudo CMD / adduser\n" +
+        "The X display of this VM is the BadaX Server on the Windows host:\n" +
+        "    DISPLAY=" + OS_DISPLAY + "   (JONES-KNOT-COOKIE-1 authorized)\n" +
+        "Try:  xclock &   xeyes &   xterm &   xdpyinfo   qstat   help")
+    fs_put(fs, "/etc/rc.conf",
+        "# BadaOS /etc/rc.conf -- generated by sysinst\n" +
+        "rc_configured=YES\n" +
+        "hostname=" + hn + "\n" +
+        "dhcpcd=YES\nsshd=YES\nxinetd=YES\n" +
+        "badax_display=" + OS_DISPLAY + "\n")
+    fs_put(fs, "/etc/hosts",
+        "127.0.0.1  localhost\n" +
+        "10.0.2.15  " + hn + "\n" +
+        "10.0.2.2   winhost badax  # BadaX Server + NAT gateway (Windows 10/11)\n" +
+        "10.0.2.3   natdns         # gateway DNS")
+    fs_put(fs, "/etc/resolv.conf",
+        "# generated by dhcpcd from the BadaVM NAT lease\nnameserver 10.0.2.3")
+    fs_put(fs, "/etc/fstab",
+        "/dev/" + dsk + "a  /  ffs  rw  1 1\n" +
+        "/dev/" + dsk + "b  none  swap  sw  0 0")
+    fs_put(fs, "/etc/apt/sources.list",
+        "# BadaOS quantum archive (Ubuntu-style)\n" +
+        "deb cd0:/pool quantum main\n" +
+        "deb " + APT_MIRROR + " quantum main   # external mirror over the NAT (QKD)")
+    fs_put(fs, "/etc/sudoers",
+        "# /etc/sudoers -- BadaOS\nroot ALL=(ALL:ALL) ALL\n" +
+        "%users ALL=(ALL) NOPASSWD: ALL   # quantum trust via QKD zero-preservation")
+    fs_put(fs, "/etc/shells", "/bin/sh")
+    fs_put(fs, "/etc/lilo.conf",
+        "# lilo -M /dev/r" + dsk + "d : boot code -> MBR (446 bytes, ptable kept)\n" +
+        "boot=/dev/r" + dsk + "d\n" +
+        "map=/boot/map\n" +
+        "install=menu   # GRUB menu mode chain\n" +
+        "image=/netbsd.quantum\n" +
+        "  label=BadaOS-GNU/Quantum\n" +
+        "  root=/dev/" + dsk + "a")
+    fs_put(fs, "/boot/grub/grub.cfg",
+        "set default=0\nset timeout=0\n" +
+        "menuentry 'BadaOS GNU/Quantum 12.0 (kernel netbsd.quantum)' {\n" +
+        "  badaos_kernel /netbsd.quantum root=/dev/" + dsk + "a\n}\n" +
+        "menuentry 'Advanced options for BadaOS' {}\n" +
+        "menuentry 'Memory test (memtest86+q, Hilbert dim 256)' {}")
+    fs_put(fs, "/root/.profile",
+        "export PATH=/sbin:/usr/sbin:/bin:/usr/bin:/usr/X11R7/bin\n" +
+        "export DISPLAY=" + OS_DISPLAY + "  # BadaX Server on the host")
+    fs_put(fs, "/root/.Xauthority",
+        "JONES-KNOT-COOKIE-1  (trefoil knot, Kauffman-bracket derived)")
+    fs_put(fs, "/bin/sh", "#!binary (Bourne shell)")
+    fs_put(fs, "/bin/ls", "#!binary")
+    fs_put(fs, "/bin/cat", "#!binary")
+    fs_put(fs, "/sbin/init", "#!binary")
+    fs_put(fs, "/sbin/reboot", "#!binary")
+    fs_put(fs, "/usr/bin/uname", "#!binary")
+    fs_put(fs, "/usr/bin/apt", "#!binary (BadaOS quantum apt)")
+    fs_put(fs, "/usr/bin/dpkg", "#!binary")
+    fs_put(fs, "/usr/bin/su", "#!binary (setuid root)")
+    fs_put(fs, "/usr/bin/sudo", "#!binary (setuid root)")
+    fs_put(fs, "/usr/bin/ping", "#!binary")
+    fs_put(fs, "/usr/X11R7/bin/xclock", "#!binary (X client)")
+    fs_put(fs, "/usr/X11R7/bin/xeyes", "#!binary (X client)")
+    fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
+    fs_put(fs, "/usr/X11R7/bin/xlogo", "#!binary (X client)")
+    fs_put(fs, "/usr/X11R7/bin/xdpyinfo", "#!binary (X client)")
+    fs_put(fs, "/var/log/messages", "(see dmesg)")
+    # the Linux suite is preinstalled by the installation sets
+    pre := pkg_preinstalled()
+    i := 0
+    while (i < len(pre)) {
+        if (pkg_installed(st, pre[i]) == 0) { st[12] <- pre[i] }
+        pkg_files(st, pre[i])
+        i := i + 1
+    }
+    fs_passwd_sync(st)
     return 0
 }
 
@@ -425,8 +651,8 @@ def os_rc(emit, vm, st) {
     tty(emit, "Setting tty flags.")
     tty(emit, "Starting network.")
     tty(emit, "Hostname: " + st[2])
-    tty(emit, "wm0: DHCP lease 10.0.2.15 from 10.0.2.2 (BadaVM NAT)")
-    tty(emit, "add net default: gateway 10.0.2.2")
+    tty(emit, "wm0: DHCP lease 10.0.2.15 from 10.0.2.2 (BadaVM NAT, dns 10.0.2.3)")
+    tty(emit, "add net default: gateway 10.0.2.2  -- the internet is reachable")
     tty(emit, "Starting dhcpcd.")
     tty(emit, "Starting cron.")
     st[14] = []
@@ -571,7 +797,8 @@ def sysinst_screen(emit, vm, st) {
         tty(emit, "Installation of BadaOS-12.0 is now complete.  The event ledger")
         tty(emit, "has been committed to the Akashic machine tape (" + len(tuplespace) + " facts).")
         tty(emit, " ")
-        tty(emit, "After the reboot:  apt update && apt install ssh xinetd zsh tcsh bash")
+        tty(emit, "Preinstalled and enabled at boot: vim emacs sshd xinetd curl wget")
+        tty(emit, "First ordinary user: 'bada' (password = root password; su - bada)")
         tty(emit, " ")
         tty(emit, "Hit any key to reboot from " + st[16] + " (LILO/GRUB in the MBR)...")
     }
@@ -613,6 +840,7 @@ def sysinst_extract(emit, vm, st) {
     tty(emit, "Extracting installation sets from cd0:")
     sets := ["kern-GENERIC.QUANTUM", "base", "etc", "comp", "games", "man",
              "misc", "rescue", "text", "apt-quantum",
+             "vim", "emacs", "openssh", "xinetd", "netutils",
              "xbase", "xcomp", "xetc", "xfont", "xserver-badax"]
     i := 0
     while (i < len(sets)) {
@@ -709,9 +937,16 @@ def sysinst_line(emit, vm, st, s) {
         st[2] = hn
         tty(emit, "Hostname: " + hn)
         tty(emit, " ")
+        # users: root + the Ubuntu-style first ordinary account
+        st[17] = []
+        user_add(st, "root", st[3], "sh")
+        user_add(st, "bada", st[3], "sh")
+        tty(emit, "Creating first user account 'bada' (uid 1000, /home/bada,")
+        tty(emit, "  password = root password; change it later with passwd bada)")
+        tty(emit, " ")
         tty(emit, "Configuring network: wm0 (BadaVM NAT)")
         tty(emit, "  DHCPDISCOVER on wm0 (" + vm[4] + ")")
-        tty(emit, "  DHCPOFFER 10.0.2.15 from 10.0.2.2  -- lease accepted")
+        tty(emit, "  DHCPOFFER 10.0.2.15 from 10.0.2.2  -- lease accepted (dns 10.0.2.3)")
         tty(emit, "  QKD guard: Bell pair OK, zero-preservation holds on the wire")
         st[11] = "10.0.2.15"
         st[5] = 10
@@ -722,7 +957,7 @@ def sysinst_line(emit, vm, st, s) {
 }
 
 # ====================================================================
-# login
+# login (any account in the user table)
 # ====================================================================
 def os_motd(emit, st) {
     m := fs_get(st[4], "/etc/motd")
@@ -735,16 +970,6 @@ def os_motd(emit, st) {
     return 0
 }
 
-def login_shell(st) {
-    pw := fs_get(st[4], "/etc/passwd")
-    if (len(pw) == 1) {
-        if (str_find(pw[0], "/bin/zsh") >= 0) { return "zsh" }
-        if (str_find(pw[0], "/bin/bash") >= 0) { return "bash" }
-        if (str_find(pw[0], "/bin/tcsh") >= 0) { return "tcsh" }
-    }
-    return "sh"
-}
-
 def os_login_line(emit, vm, st, s) {
     if (st[0] == "login") {
         if (len(s) == 0) { return 0 }
@@ -753,12 +978,16 @@ def os_login_line(emit, vm, st, s) {
         return 0
     }
     # passwd stage
-    if (st[8] == "root" && s == st[3]) {
-        st[9] = "root"
+    rec := user_find(st, st[8])
+    if (len(rec) > 0 && s == rec[1]) {
+        st[9] = rec[0]
         st[0] = "shell"
-        st[13] = [login_shell(st)]
+        st[13] = sess_new(rec[2], rec[0])
         tty(emit, "Last login: " + NOW + " on console")
         os_motd(emit, st)
+        if (rec[0] != "root") {
+            tty(emit, "(ordinary user session -- sudo CMD for root tasks, su to become root)")
+        }
     } else {
         tty(emit, "Login incorrect")
         st[0] = "login"
@@ -780,10 +1009,11 @@ def tokenize(s) {
     return out
 }
 
-def abspath(p) {
-    if (len(p) == 0) { return "/" }
+def abspath(home, p) {
+    if (len(p) == 0) { return home }
     if (str_find(p, "/") == 0) { return p }
-    return "/root/" + p
+    if (p == "~") { return home }
+    return home + "/" + p
 }
 
 def x_client_cookie(st) {
@@ -807,10 +1037,11 @@ def x_launch(emit, vm, st, class, title) {
     tty(emit, class + ": window " + id + " mapped on " + OS_DISPLAY +
               " (BadaX Server, Windows host)")
     if (class == "xterm") {
-        # the xterm is a LIVE pty session into this BadaOS: greet it
+        w := xwin_find(st[6], id)
+        w[7] = sess_new(sess_shell(st[13]), sess_user(st[13]))
         SINK[0] = id
         tty(emit, "BadaOS 12.0 GNU/Quantum (" + st[2] + ") -- xterm on ttyp" + id)
-        tty(emit, "This is a live shell: type commands here (help / apt / zsh ...)")
+        tty(emit, "This is a live shell: type commands here (help / apt / su / zsh ...)")
         SINK[0] = 0
     }
     return 0
@@ -859,8 +1090,9 @@ def cmd_ps(emit, st) {
                   " -display " + OS_DISPLAY)
         i := i + 1
     }
-    sh := cur_shell(st)
-    tty(emit, (200 + len(st[6])) + "  console Ss   0:00.04  -" + sh + " (" + sh + ")")
+    sh := sess_shell(st[13])
+    tty(emit, (200 + len(st[6])) + "  console Ss   0:00.04  -" + sh + " (" +
+              sess_user(st[13]) + ")")
     return 0
 }
 
@@ -894,23 +1126,72 @@ def shell_banner(emit, name) {
     return 0
 }
 
-def shell_path(name) {
-    if (name == "sh") { return "/bin/sh" }
-    return "/bin/" + name
+# ---- vim / emacs: preinstalled full-screen editors (view mode) ------
+def cmd_vim(emit, st, home, argv) {
+    if (len(argv) < 2) {
+        tty(emit, "VIM - Vi IMproved 9.1  (BadaOS quantum build)")
+        tty(emit, "usage: vim FILE   (view; write with: echo text > FILE)")
+        return 0
+    }
+    path := abspath(home, argv[1])
+    c := fs_get(st[4], path)
+    if (len(c) == 0) {
+        tty(emit, "~")
+        tty(emit, "~        VIM - Vi IMproved 9.1 (BadaOS quantum)")
+        tty(emit, "~")
+        tty(emit, "\"" + path + "\" [New File]")
+        return 0
+    }
+    parts := split(c[0], "\n")
+    i := 0
+    while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }
+    while (i < 8) { tty(emit, "~"); i := i + 1 }
+    tty(emit, "\"" + path + "\" " + len(parts) + "L, " + len(c[0]) +
+              "B  [view -- edit with: echo text > " + path + "]")
+    return 0
+}
+
+def cmd_emacs(emit, st, home, argv) {
+    if (len(argv) < 2) {
+        tty(emit, "GNU Emacs 29.2 (BadaOS quantum build)")
+        tty(emit, "usage: emacs FILE   (view; write with: echo text > FILE)")
+        return 0
+    }
+    path := abspath(home, argv[1])
+    c := fs_get(st[4], path)
+    body := ""
+    lines := 0
+    if (len(c) == 1) {
+        parts := split(c[0], "\n")
+        i := 0
+        while (i < len(parts)) { tty(emit, parts[i]); i := i + 1 }
+        lines := len(parts)
+    } else {
+        tty(emit, "(New file)")
+    }
+    tty(emit, "-UUU:----F1  " + path + "   All L1  (Fundamental)  " + lines + " lines")
+    tty(emit, "C-x C-c to quit  [view -- edit with: echo text > " + path + "]")
+    return 0
 }
 
 def shell_exec(emit, vm, st, line) {
     argv := tokenize(line)
     if (len(argv) == 0) { return 0 }
     cmd := argv[0]
+    sess := st[13]
+    user := sess_user(sess)
+    home := user_home(user)
 
     if (list_has(["help", "?"], cmd) == 1) {
         tty(emit, "BadaOS built-ins:")
+        tty(emit, "  su [-] [USER]  sudo CMD  adduser NAME  passwd [USER]  whoami  id")
         tty(emit, "  apt update|install|remove|list  dpkg -l  which CMD  chsh -s SHELL")
-        tty(emit, "  bash  zsh  tcsh  (apt install bash zsh tcsh ... してから起動)")
-        tty(emit, "  ssh HOST  service NAME start|stop|status  (ssh/xinetd は apt で)")
-        tty(emit, "  uname [-a]  lsb_release -a  hostname  whoami  date  dmesg  ps  df")
-        tty(emit, "  mount  ls [path]  cat FILE  echo TEXT [> FILE]  touch  rm  clear")
+        tty(emit, "  bash  zsh  tcsh  (bash/zsh/tcsh は apt install ... 後に起動可)")
+        tty(emit, "  vim FILE  emacs FILE  (プリインストール済み)")
+        tty(emit, "  ping HOST  curl URL  wget URL  host NAME   (NAT 経由のインターネット)")
+        tty(emit, "  ssh HOST  service NAME start|stop|status   (sshd/xinetd は起動済み)")
+        tty(emit, "  uname [-a]  lsb_release -a  hostname  date  dmesg  ps  df  mount")
+        tty(emit, "  ls [path]  cat FILE  echo TEXT [> FILE]  touch  rm  clear  free")
         tty(emit, "  ifconfig  netstat  sysctl [name]  qstat  man CMD  exit  reboot")
         tty(emit, "  halt  startx  xclock &  xeyes &  xterm &  xlogo &  xdpyinfo")
         tty(emit, "  xlsclients  xkill ID")
@@ -931,14 +1212,103 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "hostname") { tty(emit, st[2]); return 0 }
-    if (cmd == "whoami") { tty(emit, st[9]); return 0 }
+    if (cmd == "whoami") { tty(emit, user); return 0 }
     if (cmd == "id") {
-        tty(emit, "uid=0(root) gid=0(wheel) groups=0(wheel),2(kmem),3(sys)")
+        if (user == "root") {
+            tty(emit, "uid=0(root) gid=0(wheel) groups=0(wheel),2(kmem),3(sys)")
+        } else {
+            tty(emit, "uid=1000(" + user + ") gid=100(users) groups=100(users),27(sudo)")
+        }
         return 0
     }
+
+    # ---- user switching -------------------------------------------------
+    if (cmd == "su") {
+        target := "root"
+        i := 1
+        while (i < len(argv)) {
+            a := argv[i]
+            if (a != "-" && a != "-l") { target := a }
+            i := i + 1
+        }
+        rec := user_find(st, target)
+        if (len(rec) == 0) {
+            tty(emit, "su: user " + target + " does not exist")
+            return 0
+        }
+        if (user == "root") {
+            sess_push(sess, rec[2], target)
+            return 0
+        }
+        sess[1] = ["su", target]
+        return 0
+    }
+    if (cmd == "sudo") {
+        if (len(argv) < 2) { tty(emit, "usage: sudo COMMAND"); return 0 }
+        if (user != "root") {
+            if (len(fs_get(st[4], "/etc/sudoers")) == 0) {
+                tty(emit, "sudo: /etc/sudoers is missing")
+                return 0
+            }
+        }
+        rest := ""
+        i := 1
+        while (i < len(argv)) {
+            rest := rest + argv[i]
+            if (i < len(argv) - 1) { rest := rest + " " }
+            i := i + 1
+        }
+        if (list_has(["-s", "-i", "su", "sh", "bash", "zsh", "tcsh"], argv[1]) == 1) {
+            rootrec := user_find(st, "root")
+            sh := "sh"
+            if (list_has(["bash", "zsh", "tcsh"], argv[1]) == 1) { sh := argv[1] }
+            else if (len(rootrec) > 0) { sh := rootrec[2] }
+            sess_push(sess, sh, "root")
+            tty(emit, "(root shell -- exit to return to " + user + ")")
+            return 0
+        }
+        sess_push(sess, sess_shell(sess), "root")
+        shell_exec(emit, vm, st, rest)
+        sess_pop(st[13])
+        return 0
+    }
+    if (cmd == "adduser") {
+        if (user != "root") { tty(emit, "adduser: Only root may add a user"); return 0 }
+        if (len(argv) < 2) { tty(emit, "usage: adduser NAME"); return 0 }
+        if (len(user_find(st, argv[1])) > 0) {
+            tty(emit, "adduser: The user '" + argv[1] + "' already exists.")
+            return 0
+        }
+        sess[1] = ["adduser", argv[1]]
+        tty(emit, "Adding user '" + argv[1] + "' (uid 100x, group users, /home/" + argv[1] + ")")
+        return 0
+    }
+    if (cmd == "passwd") {
+        target := user
+        if (len(argv) > 1) { target := argv[1] }
+        if (user != "root" && target != user) {
+            tty(emit, "passwd: Permission denied (only root may change other users)")
+            return 0
+        }
+        if (len(user_find(st, target)) == 0) {
+            tty(emit, "passwd: user " + target + " does not exist")
+            return 0
+        }
+        sess[1] = ["passwd", target]
+        tty(emit, "Changing password for " + target + ".")
+        return 0
+    }
+
     if (cmd == "date") { tty(emit, NOW); return 0 }
     if (cmd == "dmesg") { os_dmesg(emit, vm, st); return 0 }
     if (cmd == "ps") { cmd_ps(emit, st); return 0 }
+    if (cmd == "free") {
+        tty(emit, "               total        used        free      shared")
+        tty(emit, "Mem:         " + (vm[2] * 1024) + "      141312     " +
+                  ((vm[2] - 138) * 1024) + "        8192")
+        tty(emit, "Swap:         524288           0      524288")
+        return 0
+    }
     if (cmd == "df") {
         tty(emit, "Filesystem   Size   Used  Avail  %Cap  Mounted on")
         tty(emit, "/dev/" + st[16] + "a    " + (vm[3] - 512) + "M   842M  " +
@@ -955,14 +1325,14 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "ls") {
-        p := "/root"
-        if (len(argv) > 1) { p := abspath(argv[1]) }
+        p := home
+        if (len(argv) > 1) { p := abspath(home, argv[1]) }
         cmd_ls(emit, st, p)
         return 0
     }
     if (cmd == "cat") {
         if (len(argv) < 2) { tty(emit, "usage: cat file"); return 0 }
-        c := fs_get(st[4], abspath(argv[1]))
+        c := fs_get(st[4], abspath(home, argv[1]))
         if (len(c) == 0) {
             tty(emit, "cat: " + argv[1] + ": No such file or directory")
         } else {
@@ -973,7 +1343,7 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "echo") {
-        # echo TEXT [> FILE]  /  echo TEXT [>> FILE]  /  echo $SHELL
+        # echo TEXT [> FILE]  /  echo TEXT [>> FILE]  /  $SHELL $USER $HOME
         redir := 0 - 1
         mode := ""
         i := 1
@@ -989,7 +1359,7 @@ def shell_exec(emit, vm, st, line) {
                 if (i < redir - 1) { text := text + " " }
                 i := i + 1
             }
-            path := abspath(argv[redir + 1])
+            path := abspath(home, argv[redir + 1])
             if (mode == ">>") {
                 old := fs_get(st[4], path)
                 if (len(old) == 1) { text := old[0] + "\n" + text }
@@ -1000,8 +1370,10 @@ def shell_exec(emit, vm, st, line) {
             i := 1
             while (i < len(argv)) {
                 word := argv[i]
-                if (word == "$SHELL") { word := shell_path(cur_shell(st)) }
-                if (word == "$0") { word := cur_shell(st) }
+                if (word == "$SHELL") { word := shell_path(sess_shell(sess)) }
+                if (word == "$USER") { word := user }
+                if (word == "$HOME") { word := home }
+                if (word == "$0") { word := sess_shell(sess) }
                 text := text + word
                 if (i < len(argv) - 1) { text := text + " " }
                 i := i + 1
@@ -1011,12 +1383,12 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "touch") {
-        if (len(argv) > 1) { fs_put(st[4], abspath(argv[1]), "") }
+        if (len(argv) > 1) { fs_put(st[4], abspath(home, argv[1]), "") }
         return 0
     }
     if (cmd == "rm") {
         if (len(argv) < 2) { tty(emit, "usage: rm file"); return 0 }
-        r := fs_rm(st[4], abspath(argv[1]))
+        r := fs_rm(st[4], abspath(home, argv[1]))
         if (r[0] == 0) { tty(emit, "rm: " + argv[1] + ": No such file or directory") }
         else { st[4] = r[1] }
         return 0
@@ -1025,6 +1397,7 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "wm0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500")
         tty(emit, "        address: " + vm[4])
         tty(emit, "        inet " + st[11] + "/24 broadcast 10.0.2.255 (BadaVM NAT)")
+        tty(emit, "        gateway 10.0.2.2  dns 10.0.2.3  -- internet reachable")
         tty(emit, "        qkd: Bell-pair guard active, zero-preservation holds")
         tty(emit, "lo0: flags=8049<UP,LOOPBACK,RUNNING,MULTICAST> mtu 33624")
         tty(emit, "        inet 127.0.0.1/8")
@@ -1043,9 +1416,6 @@ def shell_exec(emit, vm, st, line) {
             tty(emit, "tcp    *.7                  *.*                 LISTEN       # xinetd: echo")
             tty(emit, "tcp    *.13                 *.*                 LISTEN       # xinetd: daytime")
             tty(emit, "tcp    *.19                 *.*                 LISTEN       # xinetd: chargen")
-        }
-        if (len(st[14]) == 0 && st[10] == 0) {
-            tty(emit, "(no daemons yet -- apt install ssh xinetd)")
         }
         return 0
     }
@@ -1071,8 +1441,52 @@ def shell_exec(emit, vm, st, line) {
     }
     if (cmd == "qstat") { cmd_qstat(emit, vm); return 0 }
 
-    # ---- Ubuntu-style userland ----------------------------------------
-    if (list_has(["apt", "apt-get"], cmd) == 1) { apt_cmd(emit, vm, st, argv); return 0 }
+    # ---- the internet over the NAT --------------------------------------
+    if (cmd == "ping") {
+        if (len(argv) < 2) { tty(emit, "usage: ping host"); return 0 }
+        cmd_ping(emit, st, argv[1])
+        return 0
+    }
+    if (list_has(["host", "nslookup"], cmd) == 1) {
+        if (len(argv) < 2) { tty(emit, "usage: host name"); return 0 }
+        if (str_find(argv[1], ".") < 0) {
+            tty(emit, "Host " + argv[1] + " not found: 3(NXDOMAIN)")
+        } else {
+            tty(emit, argv[1] + " has address " + dns_ip(argv[1]) + "   (via 10.0.2.3)")
+        }
+        return 0
+    }
+    if (cmd == "curl") {
+        if (pkg_installed(st, "curl") == 0) { tty(emit, "curl: command not found (apt install curl)"); return 0 }
+        if (len(argv) < 2) { tty(emit, "curl: try 'curl URL'"); return 0 }
+        cmd_curl(emit, st, argv[1])
+        return 0
+    }
+    if (cmd == "wget") {
+        if (pkg_installed(st, "wget") == 0) { tty(emit, "wget: command not found (apt install wget)"); return 0 }
+        if (len(argv) < 2) { tty(emit, "wget: missing URL"); return 0 }
+        cmd_wget(emit, st, home, argv[1])
+        return 0
+    }
+
+    # ---- editors (preinstalled) -----------------------------------------
+    if (list_has(["vim", "vi"], cmd) == 1) { cmd_vim(emit, st, home, argv); return 0 }
+    if (cmd == "emacs") { cmd_emacs(emit, st, home, argv); return 0 }
+
+    # ---- Ubuntu-style userland ------------------------------------------
+    if (list_has(["apt", "apt-get"], cmd) == 1) {
+        if (user != "root") {
+            if (len(argv) > 1) {
+                if (argv[1] != "list") {
+                    tty(emit, "E: Could not open lock file - open (13: Permission denied)")
+                    tty(emit, "E: Unable to acquire the dpkg lock. Are you root? (try: sudo apt ...)")
+                    return 0
+                }
+            }
+        }
+        apt_cmd(emit, vm, st, argv)
+        return 0
+    }
     if (cmd == "dpkg") {
         tty(emit, "||/ Name              Version           Description")
         tty(emit, "+++-=================-=================-==========================")
@@ -1082,7 +1496,6 @@ def shell_exec(emit, vm, st, line) {
             tty(emit, "ii  " + p[0] + "  " + p[1] + "  " + p[2])
             i := i + 1
         }
-        if (len(st[12]) == 0) { tty(emit, "(no packages -- apt install ssh xinetd zsh tcsh bash)") }
         return 0
     }
     if (cmd == "which") {
@@ -1095,18 +1508,17 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (list_has(["bash", "zsh", "tcsh", "csh"], cmd) == 1) {
-        name := pkg_resolve(cmd)
+        name := cmd
         if (cmd == "csh") { name := "tcsh" }
         if (pkg_installed(st, name) == 0) {
             tty(emit, cmd + ": command not found  (apt install " + name + " でインストール)")
             return 0
         }
-        st[13] <- name
+        sess_push(sess, name, user)
         shell_banner(emit, name)
         return 0
     }
     if (cmd == "chsh") {
-        # chsh -s /bin/zsh
         target := ""
         if (len(argv) >= 3 && argv[1] == "-s") { target := argv[2] }
         if (len(argv) == 2) { target := argv[1] }
@@ -1116,25 +1528,25 @@ def shell_exec(emit, vm, st, line) {
             tty(emit, "chsh: " + target + ": non-standard shell (apt install " + name + " first)")
             return 0
         }
-        pw := fs_get(st[4], "/etc/passwd")
-        body := "root:*:0:0:Charlie Root:/root:" + shell_path(name) + "\n" +
-                "operator:*:2:5:System &:/usr/guest/operator:/sbin/nologin\n" +
-                "daemon:*:1:1:The devil himself:/:/sbin/nologin"
-        if (len(pw) == 1) { fs_put(st[4], "/etc/passwd", body) }
-        tty(emit, "chsh: root のログインシェルを " + shell_path(name) + " に変更しました")
+        rec := user_find(st, user)
+        if (len(rec) > 0) { rec[2] = name }
+        fs_passwd_sync(st)
+        tty(emit, "chsh: " + user + " のログインシェルを " + shell_path(name) + " に変更しました")
         return 0
     }
     if (cmd == "ssh") {
-        if (pkg_installed(st, "openssh-server") == 0 && pkg_installed(st, "openssh-client") == 0) {
-            tty(emit, "ssh: command not found  (apt install ssh)")
-            return 0
+        if (pkg_installed(st, "openssh-client") == 0) {
+            if (pkg_installed(st, "openssh-server") == 0) {
+                tty(emit, "ssh: command not found  (apt install ssh)")
+                return 0
+            }
         }
         host := "localhost"
         if (len(argv) > 1) { host := argv[1] }
         tty(emit, "The authenticity of host '" + host + "' -- jones fingerprint " +
                   "SHA256:jones-" + jones_key(vm_knot()))
-        sess := qkd_session()
-        if (sess[0]) {
+        sess2 := qkd_session()
+        if (sess2[0]) {
             tty(emit, "QKD channel: Bell pair OK (zero-preservation) -- session key agreed")
             tty(emit, "Welcome to BadaOS 12.0 GNU/Quantum (" + host + ")")
             tty(emit, "Connection to " + host + " closed.")
@@ -1155,6 +1567,7 @@ def shell_exec(emit, vm, st, line) {
             else { tty(emit, name + " is not running.") }
             return 0
         }
+        if (user != "root") { tty(emit, "service: permission denied (try: sudo service ...)"); return 0 }
         if (act == "start") {
             if (pkg_installed(st, pkgname) == 0) {
                 tty(emit, "service: " + name + " not installed (apt install " + pkgname + ")")
@@ -1181,12 +1594,14 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "man") {
         if (len(argv) < 2) { tty(emit, "What manual page do you want?"); return 0 }
         n := argv[1]
-        if (n == "apt") { tty(emit, "apt(8) -- Ubuntu-style package manager over the quantum archive.") }
+        if (n == "su") { tty(emit, "su(1) -- switch user: su - USER (down), su (back to root, asks password).") }
+        else if (n == "sudo") { tty(emit, "sudo(8) -- run one command as root (NOPASSWD via QKD trust).") }
+        else if (n == "apt") { tty(emit, "apt(8) -- package manager; fetches " + APT_MIRROR + " over the NAT.") }
         else if (n == "lilo") { tty(emit, "lilo(8) -- installs the boot loader into the MBR (lilo -M, GRUB menu chain).") }
         else if (n == "grub") { tty(emit, "grub(8) -- GRUB 2 menu; config in /boot/grub/grub.cfg.") }
+        else if (n == "vim") { tty(emit, "vim(1) -- Vi IMproved; preinstalled by the vim.tgz set.") }
+        else if (n == "emacs") { tty(emit, "emacs(1) -- GNU Emacs; preinstalled by the emacs.tgz set.") }
         else if (n == "xclock") { tty(emit, "xclock(1) -- analogue clock for X; displays on the BadaX Server.") }
-        else if (n == "xeyes") { tty(emit, "xeyes(1) -- eyes that follow the Windows-host pointer.") }
-        else if (n == "xterm") { tty(emit, "xterm(1) -- terminal emulator for X.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
         return 0
@@ -1232,11 +1647,8 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (list_has(["exit", "logout"], cmd) == 1) {
-        if (len(st[13]) > 1) {
-            popped := []
-            i := 0
-            while (i < len(st[13]) - 1) { popped <- st[13][i]; i := i + 1 }
-            st[13] = popped
+        if (sess_depth(sess) > 1) {
+            sess_pop(sess)
             tty(emit, "exit")
             return 0
         }
@@ -1246,6 +1658,7 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (cmd == "reboot") {
+        if (user != "root") { tty(emit, "reboot: permission denied (try: sudo reboot)"); return 0 }
         tty(emit, "syncing disks... done")
         tty(emit, "rebooting...  (X clients on the BadaX display are closed)")
         SINK[0] = 0
@@ -1255,6 +1668,7 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
     if (list_has(["halt", "shutdown", "poweroff"], cmd) == 1) {
+        if (user != "root") { tty(emit, cmd + ": permission denied (try: sudo " + cmd + ")"); return 0 }
         tty(emit, "syncing disks... done")
         SINK[0] = 0
         st[6] = []
@@ -1274,6 +1688,45 @@ def shell_exec(emit, vm, st, line) {
     return 0
 }
 
+# ---- pending single-line inputs (passwords for su / adduser / passwd)
+def shell_pending(emit, vm, st, sess, line) {
+    kind := sess[1][0]
+    if (kind == "su") {
+        target := sess[1][1]
+        sess[1] = []
+        rec := user_find(st, target)
+        if (len(rec) > 0 && line == rec[1]) {
+            sess_push(sess, rec[2], target)
+        } else {
+            tty(emit, "su: Sorry")
+        }
+        return 0
+    }
+    if (kind == "adduser") {
+        name := sess[1][1]
+        sess[1] = []
+        user_add(st, name, line, "sh")
+        fs_passwd_sync(st)
+        fs_put(st[4], "/home/" + name + "/.profile",
+               "export DISPLAY=" + OS_DISPLAY + "\n")
+        tty(emit, "adduser: user '" + name + "' added (login and su - " + name + " now work)")
+        return 0
+    }
+    if (kind == "passwd") {
+        target := sess[1][1]
+        sess[1] = []
+        rec := user_find(st, target)
+        if (len(rec) > 0) {
+            rec[1] = line
+            if (target == "root") { st[3] = line }
+            tty(emit, "passwd: password updated successfully")
+        }
+        return 0
+    }
+    sess[1] = []
+    return 0
+}
+
 # string -> number (for xkill ids)
 def to_num(s) {
     v := 0
@@ -1286,84 +1739,17 @@ def to_num(s) {
     return v
 }
 
-# ====================================================================
-# the event pump: apply one ledger event
-# ====================================================================
-def os_apply(vm, st, ev, emit) {
-    kind := ev[0]
-    if (kind == "power") {
-        act := ev[1]
-        if (act == "on") {
-            if (st[0] == "off") { os_boot(emit, vm, st) }
-        } else if (act == "off") {
-            st[0] = "off"
-            st[9] = ""
-            st[6] = []
-            st[10] = 0
-            st[13] = ["sh"]
-            st[14] = []
-            vm_power_off(emit, vm)
-        } else if (act == "reset") {
-            st[0] = "off"
-            st[9] = ""
-            st[6] = []
-            st[10] = 0
-            st[13] = ["sh"]
-            st[14] = []
-            os_boot(emit, vm, st)
-        }
-        return 0
-    }
-    if (st[0] == "off") { return 0 }
-    if (kind == "key") {
-        if (st[0] == "sysinst") { sysinst_key(emit, vm, st, ev[1]) }
-        else if (st[0] == "halted") { os_boot(emit, vm, st) }
-        return 0
-    }
-    if (kind == "line") {
-        if (st[0] == "sysinst") { sysinst_line(emit, vm, st, ev[1]) }
-        else if (list_has(["login", "passwd"], st[0]) == 1) { os_login_line(emit, vm, st, ev[1]) }
-        else if (st[0] == "shell") { shell_exec(emit, vm, st, ev[1]) }
-        return 0
-    }
-    if (kind == "xclose") { st[6] = x_unmap_window(emit, st[6], ev[1]); return 0 }
-    if (kind == "xmove") { x_move_window(st[6], ev[1], ev[2], ev[3]); return 0 }
-    if (kind == "xline") {
-        w := xwin_find(st[6], ev[1])
-        if (len(w) == 0) { return 0 }
-        if (w[1] != "xterm") { return 0 }
-        SINK[0] = ev[1]
-        xterm_exec(emit, vm, st, w, ev[2])
-        SINK[0] = 0
-        return 0
-    }
-    return 0
-}
-
-# the prompt of a shell stack (Ubuntu-style for bash/zsh/tcsh)
-def stack_prompt(st, stack) {
-    sh := stack[len(stack) - 1]
-    if (sh == "bash") { return "root@" + st[2] + ":~# " }
-    if (sh == "zsh")  { return "[root@" + st[2] + "] ~ # " }
-    if (sh == "tcsh") { return st[2] + ":~% " }
-    return st[2] + "# "
-}
-
-def os_prompt(st) { return stack_prompt(st, st[13]) }
-
 # ---- a command line INSIDE an xterm window --------------------------
-# The xterm carries its own shell stack (w[7]); output is routed to the
-# window through SINK. `exit` at the bottom of the stack closes the
-# window, exactly like a real xterm when its shell exits.
 def xterm_exec(emit, vm, st, w, line) {
+    if (len(w[7][1]) > 0) {
+        shell_pending(emit, vm, st, w[7], line)
+        return 0
+    }
     argv := tokenize(line)
     if (len(argv) > 0) {
         if (list_has(["exit", "logout"], argv[0]) == 1) {
-            if (len(w[7]) > 1) {
-                popped := []
-                i := 0
-                while (i < len(w[7]) - 1) { popped <- w[7][i]; i := i + 1 }
-                w[7] = popped
+            if (sess_depth(w[7]) > 1) {
+                sess_pop(w[7])
                 tty(emit, "exit")
                 return 0
             }
@@ -1380,6 +1766,80 @@ def xterm_exec(emit, vm, st, w, line) {
     return 0
 }
 
+# ====================================================================
+# the event pump: apply one ledger event
+# ====================================================================
+def os_apply(vm, st, ev, emit) {
+    kind := ev[0]
+    if (kind == "power") {
+        act := ev[1]
+        if (act == "on") {
+            if (st[0] == "off") { os_boot(emit, vm, st) }
+        } else if (act == "off") {
+            st[0] = "off"
+            st[9] = ""
+            st[6] = []
+            st[10] = 0
+            st[13] = sess_new("sh", "root")
+            st[14] = []
+            vm_power_off(emit, vm)
+        } else if (act == "reset") {
+            st[0] = "off"
+            st[9] = ""
+            st[6] = []
+            st[10] = 0
+            st[13] = sess_new("sh", "root")
+            st[14] = []
+            os_boot(emit, vm, st)
+        }
+        return 0
+    }
+    if (st[0] == "off") { return 0 }
+    if (kind == "key") {
+        if (st[0] == "sysinst") { sysinst_key(emit, vm, st, ev[1]) }
+        else if (st[0] == "halted") { os_boot(emit, vm, st) }
+        return 0
+    }
+    if (kind == "line") {
+        if (st[0] == "sysinst") { sysinst_line(emit, vm, st, ev[1]) }
+        else if (list_has(["login", "passwd"], st[0]) == 1) { os_login_line(emit, vm, st, ev[1]) }
+        else if (st[0] == "shell") {
+            if (len(st[13][1]) > 0) { shell_pending(emit, vm, st, st[13], ev[1]) }
+            else { shell_exec(emit, vm, st, ev[1]) }
+        }
+        return 0
+    }
+    if (kind == "xclose") { st[6] = x_unmap_window(emit, st[6], ev[1]); return 0 }
+    if (kind == "xmove") { x_move_window(st[6], ev[1], ev[2], ev[3]); return 0 }
+    if (kind == "xline") {
+        w := xwin_find(st[6], ev[1])
+        if (len(w) == 0) { return 0 }
+        if (w[1] != "xterm") { return 0 }
+        SINK[0] = ev[1]
+        xterm_exec(emit, vm, st, w, ev[2])
+        SINK[0] = 0
+        return 0
+    }
+    return 0
+}
+
+# the prompt of a session (Ubuntu-style; "#" for root, "$" for users)
+def stack_prompt(st, sess) {
+    sh := sess_shell(sess)
+    user := sess_user(sess)
+    mark := "#"
+    if (user != "root") { mark := "$" }
+    if (sh == "bash") { return user + "@" + st[2] + ":~" + mark + " " }
+    if (sh == "zsh")  { return "[" + user + "@" + st[2] + "] ~ " + mark + " " }
+    if (sh == "tcsh") {
+        if (user == "root") { return st[2] + ":~# " }
+        return st[2] + ":~% "
+    }
+    return st[2] + mark + " "
+}
+
+def os_prompt(st) { return stack_prompt(st, st[13]) }
+
 # after the last event: tell the host chrome what to show
 def os_status(vm, st) {
     print("@@STAGE " + st[0] + "|" + st[5])
@@ -1390,7 +1850,13 @@ def os_status(vm, st) {
     while (i < len(st[6])) {
         w := st[6][i]
         if (w[1] == "xterm") {
-            print("@@XPROMPT " + w[0] + " " + stack_prompt(st, w[7]))
+            if (len(w[7][1]) > 0) {
+                print("@@XPROMPT " + w[0] + " Password: ")
+                print("@@XECHO " + w[0] + " off")
+            } else {
+                print("@@XPROMPT " + w[0] + " " + stack_prompt(st, w[7]))
+                print("@@XECHO " + w[0] + " on")
+            }
         }
         i := i + 1
     }
@@ -1425,8 +1891,13 @@ def os_status(vm, st) {
         print("@@PROMPT Password: ")
     } else if (stage == "shell") {
         print("@@MODE line")
-        print("@@ECHO on")
-        print("@@PROMPT " + os_prompt(st))
+        if (len(st[13][1]) > 0) {
+            print("@@ECHO off")
+            print("@@PROMPT Password: ")
+        } else {
+            print("@@ECHO on")
+            print("@@PROMPT " + os_prompt(st))
+        }
     }
     return 0
 }
