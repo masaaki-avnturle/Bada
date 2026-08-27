@@ -1,0 +1,31 @@
+#!/bin/sh
+# rehalt — reload the OS without a full hardware restart.
+#
+# Linux: systemd soft-reboot (userspace restarts, the running kernel is kept),
+# falling back to kexec (fast reboot skipping firmware POST), then a normal
+# reboot. macOS: restart. Run as your own user; may prompt for privileges.
+#
+#   ./rehalt            # do it (after confirm)
+#   ./rehalt --dry-run  # just print what would run
+#   ./rehalt --yes      # skip the confirmation
+
+set -e
+OS="$(uname -s)"
+case "$OS" in
+  Linux)  CMD="systemctl soft-reboot || systemctl kexec || systemctl reboot" ;;
+  Darwin) CMD="osascript -e 'tell app \"System Events\" to restart'" ;;
+  *)      echo "unsupported OS: $OS" >&2; exit 2 ;;
+esac
+
+echo "[rehalt] $CMD"
+for a in "$@"; do [ "$a" = "--dry-run" ] || [ "$a" = "-n" ] && { echo "[rehalt] --dry-run: not executing."; exit 0; }; done
+
+SKIP=0
+for a in "$@"; do [ "$a" = "--yes" ] || [ "$a" = "-y" ] && SKIP=1; done
+if [ "$SKIP" -ne 1 ]; then
+  printf "再起動せずに OS を再ロードします。実行しますか? [y/N] "
+  read ans
+  case "$ans" in y|Y|yes|YES) ;; *) echo "中止しました。"; exit 0 ;; esac
+fi
+
+sh -c "$CMD"

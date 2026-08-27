@@ -1,0 +1,184 @@
+#!/usr/bin/env node
+/* ============================================================================
+ * build-safepower.js — build "SafePower", the safe instant power-off + rehalt
+ * app, as a single self-contained HTML (dist/safepower.html) and stage it as
+ * the SafePower app's www/index.html.
+ *
+ * On the DESKTOP app (Electron) the buttons run the real OS commands after a
+ * confirmation (via the window.safePower bridge). In a plain browser / the
+ * Android APK there is no bridge, so it shows exactly what each action would
+ * run (copyable) and states that device power control needs the desktop app
+ * (or root on Android).
+ * ==========================================================================*/
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const IDE = path.join(__dirname, "..");
+
+const html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>SafePower — 安全オフ / rehalt</title>
+<style>
+  :root{color-scheme:light dark;--bg:#04060a;--panel:#0a1220;--line:#1c2838;--ink:#d6e2ee;
+        --dim:#8aa0b8;--gold:#c8a44a;--green:#2e9e57;--red:#d0574a;--blue:#4a80d0;--amber:#c8a44a;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;line-height:1.6;}
+  header{padding:16px 20px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0a1220,#04060a);}
+  h1{margin:0;font-size:19px;} h1 .a{color:var(--gold);}
+  header p{margin:4px 0 0;color:var(--dim);font-size:12.5px;}
+  main{max-width:640px;margin:0 auto;padding:18px 20px 50px;}
+  #env{font-size:12.5px;padding:8px 12px;border-radius:8px;margin-bottom:14px;}
+  #env.desk{background:#123a24;color:#7ce0a3;} #env.view{background:#3a2e12;color:#e8cf8a;}
+  .card{background:#070c15;border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .card h2{margin:0 0 4px;font-size:16px;} .card h2 .ic{margin-right:6px;}
+  .card p{margin:4px 0 0;color:var(--dim);font-size:12.5px;}
+  .cmd{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px;background:#020407;border:1px solid var(--line);
+       border-radius:7px;padding:8px 10px;margin-top:10px;color:#bcd;word-break:break-all;}
+  .row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  button{font:inherit;border:1px solid var(--line);background:#132033;color:var(--ink);border-radius:8px;padding:9px 15px;cursor:pointer;}
+  button.go{border:0;background:var(--green);color:#eafff0;font-weight:600;}
+  button.warn{border:0;background:#7a3a1c;color:#ffe6d6;font-weight:600;}
+  button.copy{padding:6px 10px;font-size:12px;}
+  .out{font-family:"SFMono-Regular",Consolas,monospace;font-size:11.5px;white-space:pre-wrap;color:#9fb;margin-top:8px;}
+  .note{color:var(--dim);font-size:12px;}
+  code{color:var(--gold);}
+  .danger{color:#f2a49b;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Safe<span class="a">Power</span> <span class="note">安全オフ / rehalt</span></h1>
+  <p>電源スイッチをいきなり切っても壊れないように状態を保存して電源を落とす「安全オフ」と、再起動せずに OS を再ロードする「rehalt」。<b>あなた自身の PC が対象</b>です。</p>
+</header>
+<main>
+  <div id="env" class="view">環境を判定中…</div>
+
+  <div class="card">
+    <h2><span class="ic">🛡️</span>安全オフ(突然の電源断でも安全)</h2>
+    <p>ハードディスク/SSD へバッファを <code>sync</code> で書き出し、状態をディスクに保存(ハイバネート)してから電源を切ります。以後は電源スイッチをいきなり切っても、データ破損や誤作動が起きません。次回はそのまま復帰します。</p>
+    <div class="cmd" data-cmd="safe-off">—</div>
+    <div class="row">
+      <button class="go" data-run="safe-off">安全オフを実行</button>
+      <button class="copy" data-copy="safe-off">コマンドをコピー</button>
+    </div>
+    <div class="out" data-out="safe-off"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🌙</span>サスペンド(RAM保存・省電力)</h2>
+    <p>状態を RAM に保ちつつ省電力状態へ。復帰は高速ですが、この状態で<span class="danger">電源を完全に切ると保存されていない内容は失われます</span>。突然の電源断に備えるなら上の「安全オフ(ハイバネート)」を使ってください。</p>
+    <div class="cmd" data-cmd="suspend">—</div>
+    <div class="row">
+      <button data-run="suspend">サスペンド</button>
+      <button class="copy" data-copy="suspend">コマンドをコピー</button>
+    </div>
+    <div class="out" data-out="suspend"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">⏻</span>安全シャットダウン</h2>
+    <p><code>sync</code> でバッファを書き出してからクリーンに電源を落とします。</p>
+    <div class="cmd" data-cmd="shutdown">—</div>
+    <div class="row">
+      <button data-run="shutdown">シャットダウン</button>
+      <button class="copy" data-copy="shutdown">コマンドをコピー</button>
+    </div>
+    <div class="out" data-out="shutdown"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="ic">🔁</span>rehalt(再起動せずに OS を再ロード)</h2>
+    <p><b>Linux</b>: <code>systemctl soft-reboot</code> — 実行中のカーネルを保ったままユーザ空間だけを再起動します(フォールバックで <code>kexec</code> = ファームウェアPOSTを飛ばす高速再起動)。<b>Windows</b>: カーネルのソフト再起動が無いため、シェル/セッションを再起動して近似します。zsh 等の「rehalt」相当です。</p>
+    <div class="cmd" data-cmd="rehalt">—</div>
+    <div class="row">
+      <button class="warn" data-run="rehalt">rehalt を実行</button>
+      <button class="copy" data-copy="rehalt">コマンドをコピー</button>
+    </div>
+    <div class="out" data-out="rehalt"></div>
+  </div>
+
+  <p class="note">実行は必ず確認後に行われます。Linux は polkit / sudo、Windows は管理者権限が必要な場合があります。ブラウザ単体・Android では OS 電源操作は行えません(コマンド表示のみ。Android で実機を制御するには root/system 権限が必要)。CLI も同梱: <code>node cli/safepower.js &lt;action&gt;</code> / <code>./cli/rehalt</code></p>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var bridge = (typeof window!=="undefined" && window.safePower) ? window.safePower : null;
+
+  /* fallback command text for the display-only (browser / Android) mode */
+  function osGuess(){
+    var ua=navigator.userAgent||"";
+    if(/Windows/i.test(ua)) return "win32";
+    if(/Android/i.test(ua)) return "android";
+    if(/Mac/i.test(ua)) return "darwin";
+    return "linux";
+  }
+  var CMDS = {
+    linux:{ "safe-off":"sync && systemctl hibernate","suspend":"sync && systemctl suspend","shutdown":"sync && systemctl poweroff","rehalt":"systemctl soft-reboot || systemctl kexec || systemctl reboot" },
+    win32:{ "safe-off":"shutdown /h","suspend":"rundll32.exe powrprof.dll,SetSuspendState 0,1,0","shutdown":"shutdown /s /t 0","rehalt":"taskkill /f /im explorer.exe & start explorer.exe" },
+    darwin:{ "safe-off":"sync && pmset -a hibernatemode 25 && pmset sleepnow","suspend":"pmset sleepnow","shutdown":"sync && shutdown -h now","rehalt":"osascript -e 'tell app \\"System Events\\" to restart'" },
+    android:{ "safe-off":"(要 root) svc power ... ","suspend":"(要 root)","shutdown":"(要 root) reboot -p","rehalt":"(要 root) setprop ctl.restart zygote" }
+  };
+  var platform = bridge ? bridge.platform : osGuess();
+
+  var envEl=document.getElementById("env");
+  if(bridge){ envEl.className="desk"; envEl.textContent="デスクトップ版: ボタンを押すと確認のうえ実際に実行します ("+platform+")"; }
+  else { envEl.className="view"; envEl.textContent="表示のみモード ("+platform+"): 実行はデスクトップ版(Electron)または下のコマンドを端末で。"+(platform==="android"?" Android の電源操作には root/system 権限が必要です。":""); }
+
+  function cmdText(action){
+    if(bridge){ return null; /* filled async */ }
+    var m=CMDS[platform]||CMDS.linux; return m[action]||"(未対応)";
+  }
+  /* fill command displays */
+  var cmdEls=document.querySelectorAll(".cmd");
+  Array.prototype.forEach.call(cmdEls,function(el){
+    var a=el.getAttribute("data-cmd");
+    if(bridge){ bridge.preview(a).then(function(r){ el.textContent=(r&&r.command)||"(この OS では未対応)"; }); }
+    else { el.textContent=cmdText(a); }
+  });
+
+  function label(a){ return ({"safe-off":"安全オフ(ハイバネート)","suspend":"サスペンド","shutdown":"シャットダウン","rehalt":"rehalt(OS再ロード)"})[a]||a; }
+
+  document.querySelectorAll("button[data-run]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var a=this.getAttribute("data-run");
+      var out=document.querySelector('[data-out="'+a+'"]');
+      if(!bridge){
+        out.innerHTML='<span class="note">表示のみモードでは実行できません。端末で次を実行してください:</span>\\n'+ (CMDS[platform]||CMDS.linux)[a];
+        return;
+      }
+      if(!confirm(label(a)+" を実行します。よろしいですか?")) return;
+      out.textContent="実行中…";
+      bridge.run(a).then(function(r){
+        if(r.ok) out.textContent="[ok] "+ (r.command||"") + (r.out?("\\n"+r.out):"");
+        else out.innerHTML='<span class="danger">[失敗 code '+(r.code)+']</span> '+(r.command||"")+"\\n"+((r.err||"").trim()||"権限が必要かもしれません(sudo / 管理者)。");
+      });
+    });
+  });
+  document.querySelectorAll("button[data-copy]").forEach(function(b){
+    b.addEventListener("click", function(){
+      var a=this.getAttribute("data-copy");
+      var txt=(CMDS[platform]||CMDS.linux)[a];
+      var el=document.querySelector('[data-cmd="'+a+'"]'); if(el&&el.textContent&&el.textContent!=="—")txt=el.textContent;
+      try{ navigator.clipboard.writeText(txt); this.textContent="コピー済"; var self=this; setTimeout(function(){self.textContent="コマンドをコピー";},1200); }catch(e){}
+    });
+  });
+})();
+</script>
+</body>
+</html>
+`;
+
+fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
+fs.writeFileSync(path.join(IDE, "dist", "safepower.html"), html);
+console.log("built dist/safepower.html (" + fs.statSync(path.join(IDE, "dist", "safepower.html")).size + " bytes)");
+const APPWWW = path.join(IDE, "safepower-app", "www");
+if (fs.existsSync(path.join(IDE, "safepower-app"))) {
+  fs.mkdirSync(APPWWW, { recursive: true });
+  fs.writeFileSync(path.join(APPWWW, "index.html"), html);
+  console.log("staged safepower-app/www/index.html");
+}

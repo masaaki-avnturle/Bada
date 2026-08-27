@@ -97,6 +97,16 @@
 
 ビルドは [`zonestudio-app-build.yml`](.github/workflows/zonestudio-app-build.yml)([`bada_gui_ide/zonestudio-app/`](bada_gui_ide/zonestudio-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
+**SafePower**(安全オフ + rehalt)— 電源スイッチをいきなり切っても壊れないよう `sync`+ハイバネートで状態保存して電源断、および再起動せずに OS を再ロードする rehalt(Linux `systemctl soft-reboot`/`kexec`)。**あなた自身の PC 対象**:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `safepower-debug.apk`(表示のみ・実機制御は要 root) |
+| **Windows 10 / 11** | `SafePower-*-x64.exe` |
+| **Ubuntu** | `SafePower-*-x86_64.AppImage` / `SafePower-*-amd64.deb` |
+
+デスクトップ版は確認のうえ実際に電源操作を実行、ブラウザ/Androidは表示のみ。CLI も同梱(`node cli/safepower.js <action>` / `./cli/rehalt`)。ビルドは [`safepower-app-build.yml`](.github/workflows/safepower-app-build.yml)([`bada_gui_ide/safepower-app/`](bada_gui_ide/safepower-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの

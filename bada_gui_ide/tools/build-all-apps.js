@@ -19,7 +19,8 @@ const builds = [
   "build-zoneimport.js",     // dist/lan-to-zone.html
   "build-ngn-example.js",    // examples/ngn-quantum.bada
   "build-ngngrid.js",        // dist/ngn-quantum.html
-  "build-zone-studio.js"     // dist/zone-studio.html
+  "build-zone-studio.js",    // dist/zone-studio.html
+  "build-safepower.js"       // dist/safepower.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -41,6 +42,9 @@ it in any browser — no install, no dependencies, works offline.
   zone-studio.html    Zone Studio — author YOUR OWN WWW addressed by zone://
                       URIs and publish it into the ultra-network over NTT NGN
                       (UltraDB quorum + Jones cipher); export/import .zonesite.
+  safepower.html      SafePower — safe instant power-off (sync + hibernate) and
+                      a rehalt-style soft reboot. Real actions run in the
+                      SafePower desktop app / CLI; this page shows the commands.
   lan-to-zone.html    LAN -> zone:// — import your own PC/LAN IP addresses into
                       zone://url.or.jp/lan/ (encrypted, quorum-replicated).
   modem-vault.html    Modem Vault — a Jones-quantum-cipher password vault for
