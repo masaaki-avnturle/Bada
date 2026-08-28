@@ -7,7 +7,16 @@
 - 中身は最小の Debian live システム(カーネル + squashfs)で、起動すると自動ログインし、
   BadaOS 環境(`dist/bada-vm-pro.html` — Bada 言語製ハイパーバイザ + BadaOS + BadaX Server)
   を **全画面キオスク**で自動起動します(`#autoboot` で VM も自動パワーオン)
-- **vim・emacs・sshd・xinetd・curl・wget を実物としてプリインストール**
+- **vim・emacs・sshd・xinetd・curl・wget・grub-install・update-grub を実物としてプリインストール**
+- **実ディスクの「空きスペース」への本インストール対応**: `badaos-install` の既定モードは
+  空き領域に新パーティションを 1 個作るだけで、**既存の OS・パーティションは消しません**
+  (os-prober が既存 OS も GRUB メニューに登録)
+- **BadaOS Commander** — System Commander 風のブートマネージャ: インストール後の GRUB
+  メニューは白×青のカラーメニュー + 黄色のハイライトバーになり、os-prober の検出に加えて
+  **他のブータブルパーティション (FAT/NTFS/exFAT, 55AA ブートレコード) ごとに
+  チェインロードエントリ**を自動生成 — System Commander と同じ「この 1 画面にマシンの
+  全 OS が並び、選ぶとその OS 自身のブートセクタへチェインする」方式です
+  (`/etc/grub.d/25_badaos_commander`、`update-grub` のたびに再生成)
 - **DHCP ネットワーク + 本物の Debian フルアーカイブ**: ネット接続があれば
   `sudo apt update && sudo apt install <なんでも>` で **6 万超パッケージ
   (Ubuntu と同級の規模)** をインストール可能。オフラインでも本体は完全動作
@@ -35,35 +44,63 @@ QEMU での実起動検証済み — 電源投入直後の画面はこの通り 
 3. **GRUB メニューに BadaOS が表示** → Enter で起動 → 全画面で BadaOS が立ち上がります
    (コンソールに落ちるには Ctrl+Alt+F2、ログイン `bada` / パスワード `badaos`)
 
-## 使い方 2 — バーチャルマシン経由で実ディスクへインストール(検証済み)
+## 使い方 2 — USB から実ディスクの「空きスペース」へインストール(何も消さない・検証済み)
 
-VMware / VirtualBox / QEMU の**仮想マシンに普通の OS と同じ手順でインストール**できます:
-新規 VM を作成 → ISO を光学ドライブに割り当てて起動 → GRUB メニューの
-**「Install BadaOS to /dev/vda (VIRTUAL MACHINE, unattended)」**(QEMU/KVM の
-virtio ディスク用・自動)か、通常の Live 起動から `sudo badaos-install`(VMware 等の
-sda ディスク)→ 完了後 ISO を外して再起動すると、**VM がディスク単体から GRUB →
-BadaOS を起動**します。この一連の流れは QEMU 上で実際にインストール→ディスク単独起動まで
-通しで検証しています(下のスクリーンショット参照)。
+**ディスク全体は消しません。** インストーラの既定モードは、選んだハードディスクの
+**未割り当て(空き)領域に新しいパーティションを 1 個作るだけ**で、既存のパーティション
+(Windows・Linux・データ)には一切触れません。
 
-無人モードはコマンドでも使えます: `sudo badaos-install --auto /dev/vda`
-(確認なしで消去・インストールし、完了後に自動で電源断 — VM 専用)
-
-## 使い方 3 — 実 PC の実ディスクへ本インストール(単独起動マシン化)
-
-> ⚠️ **選んだディスクは完全に消去されます。** 消えて困るデータのある PC では実行しないでください。
-> まずは古い PC・予備 PC・予備ディスクでどうぞ。
-
-1. USB から BadaOS Live を起動(3 番目の「console (text only)」でも可)
-2. ターミナルで:
+1. 使い方 1 の手順で USB から BadaOS Live を起動(「console (text only)」でも可)
+2. (空き領域が無い場合)先に Windows の「ディスクの管理 → ボリュームの縮小」などで
+   4 GiB 以上の空き領域を作っておく
+3. ターミナルで:
    ```
    sudo badaos-install
    ```
-3. 対象ディスク(例: `sda`)を入力し、確認のため `INSTALL sda` とタイプ
-4. インストーラが GPT/MBR を自動判別してパーティション作成 → システムコピー →
-   **BIOS 機なら `grub-install` が実ディスクの MBR に GRUB を書き込み**、
-   **UEFI 機なら EFI ブートメニューに「BadaOS」エントリを登録**します
-5. USB を抜いて再起動 → **その PC の GRUB メニューが「BadaOS GNU/Quantum」を表示し、
-   ハードディスクから単独起動**します
+4. 対象ディスク(例: `sda`)を入力 → モードで **1 (FREE SPACE・既定)** を選択 →
+   最大の空き領域が表示されるので、確認のため `INSTALL FREE sda` とタイプ
+   (モード 2 なら既存パーティション 1 個だけをフォーマットして使うことも可能)
+5. 新パーティション作成 → システムコピー → **ブートローダへの記銘**:
+   - **BIOS 機**: `grub-install` が MBR に GRUB を書き込み(パーティションテーブルは保持)、
+     `update-grub` + **os-prober が既存の Windows / Linux も GRUB メニューに登録**します
+   - **UEFI 機**: **既存の EFI システムパーティションをフォーマットせずにそのまま使い**、
+     ファームウェアのブートメニューに「BadaOS」エントリを追加するだけです
+6. USB を抜いて再起動 → **GRUB メニューに「BadaOS GNU/Quantum」と元の OS が並び**、
+   どちらも選んで起動できます
+7. インストール済みパーティションは**実ディスクからも、バーチャルマシンからも**起動できます
+   (VMware の物理ディスク割り当て / QEMU の `-drive file=/dev/sdX` など raw ディスクを
+   VM に渡せば、同じ GRUB → BadaOS がそのまま VM 内で立ち上がります)
+
+> `grub-install` と `update-grub` は Live システムにもインストール済み BadaOS にも
+> **最初から入っています**(grub2-common / grub-pc-bin / grub-efi-amd64-bin)。
+
+## 使い方 3 — バーチャルマシン経由で実ディスクへインストール(検証済み)
+
+VMware / VirtualBox / QEMU の**仮想マシンに普通の OS と同じ手順でインストール**できます:
+新規 VM を作成 → ISO を光学ドライブに割り当てて起動 → GRUB メニューの
+**「Install BadaOS into FREE SPACE of /dev/vda (VM, keeps other partitions)」**
+(空き領域へ・既存パーティション保持)か
+**「Install BadaOS to /dev/vda (VIRTUAL MACHINE, unattended)」**(ディスク全体を消去)
+を選ぶだけ(QEMU/KVM の virtio ディスク用・全自動)。VMware 等の sda ディスクでは
+通常の Live 起動から `sudo badaos-install` → 完了後 ISO を外して再起動すると、
+**VM がディスク単体から GRUB → BadaOS を起動**します。空き領域インストールも含め、
+この一連の流れは QEMU 上で実際にインストール→ディスク単独起動まで通しで検証しています。
+
+無人モードはコマンドでも使えます:
+```
+sudo badaos-install --auto-free /dev/vda   # 空き領域へ (既存パーティション保持)
+sudo badaos-install --auto /dev/vda        # ディスク全体を消去
+```
+(確認なしでインストールし、完了後に自動で電源断 — VM 専用)
+
+## 使い方 3b — ディスク全体を消して単独マシン化(明示モード)
+
+> ⚠️ **モード 3 を選ぶと選んだディスクは完全に消去されます。** 消えて困るデータのある
+> PC では実行しないでください。まずは古い PC・予備 PC・予備ディスクでどうぞ。
+
+`sudo badaos-install` → モード **3 (WHOLE DISK)** → `INSTALL sda` とタイプ。
+GPT/MBR を自動判別してパーティション作成 → システムコピー → GRUB を MBR/ESP へ →
+再起動後は**その PC が BadaOS 単独起動マシン**になります。
 
 ## 使い方 4 — 既存 Linux とデュアルブート(何も消さない)
 
@@ -94,7 +131,8 @@ grub-pc-bin grub-efi-amd64-bin grub-common`
 |:--|:--|
 | `build-live-iso.sh` | debootstrap → キオスク設定 → squashfs → `grub-mkrescue`(ISO 生成) |
 | `grub-live.cfg` | 実機の電源投入時に表示される GRUB メニュー |
-| `badaos-install` | Live 内から実ディスクへ本インストール(MBR/ESP へ `grub-install`) |
+| `badaos-install` | Live 内から実ディスクへ本インストール — 既定は**空き領域へ**(何も消さない)、既存パーティション再利用 / ディスク全体消去も選択可(MBR/ESP へ `grub-install`、os-prober で既存 OS も GRUB メニューへ) |
+| `25_badaos_commander` | **BadaOS Commander** — System Commander 風ブートマネージャ (`/etc/grub.d/` スクリプト: カラーメニュー + 他 OS パーティションへのチェインロードエントリ生成) |
 | `badaos-add-grub-entry.sh` | 既存 Linux の GRUB に ISO ループバックエントリを追加 |
 
 > BadaVM Pro アプリ内の sysinst「rd0 実ディスク」はシミュレーションのままです。

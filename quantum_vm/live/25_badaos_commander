@@ -1,0 +1,73 @@
+#!/bin/sh
+# ============================================================================
+# 25_badaos_commander — "BadaOS Commander", a System Commander-style OS
+# chooser inside the real GRUB menu (an homage to V Communications'
+# System Commander multi-boot manager).
+#
+# Installed as /etc/grub.d/25_badaos_commander; update-grub runs it every
+# time the menu is regenerated. It contributes two things:
+#
+#   1. The System Commander look: a colorful full-screen text menu
+#      (white-on-blue list, yellow highlight bar) instead of the plain
+#      monochrome GRUB menu.
+#   2. The System Commander behavior: ONE MENU LISTING EVERY OS ON THE
+#      MACHINE. os-prober already adds proper entries for other Linux /
+#      Windows installs; on top of that, this script adds a raw
+#      "chainload" entry for every other bootable partition (FAT/NTFS/
+#      exFAT with a valid 55AA boot record) — each entry hands control to
+#      that partition's own boot sector, exactly the way System Commander
+#      chained the operating systems it managed.
+#
+# The script must never break update-grub: every probe is best-effort and
+# it exits 0 even when nothing can be enumerated.
+# ============================================================================
+set -u
+
+# --- the System Commander look ---------------------------------------------
+cat <<'EOF'
+# BadaOS Commander (System Commander style menu)
+set menu_color_normal=white/blue
+set menu_color_highlight=yellow/red
+set color_normal=light-cyan/black
+set color_highlight=yellow/blue
+EOF
+
+# --- one entry per other bootable partition (chainload) --------------------
+ROOTDEV="$(findmnt -no SOURCE / 2>/dev/null || true)"
+LIVEDEV="$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)"
+
+# NOTE: probe with blkid per device, not lsblk's FSTYPE/PARTTYPE columns —
+# inside the installer chroot there is no udev database and those columns
+# come back empty (verified in the QEMU end-to-end test).
+lsblk -nrpo NAME,TYPE 2>/dev/null | \
+while read -r dev type; do
+    [ "$type" = "part" ] || continue
+    [ "$dev" = "${ROOTDEV:-none}" ] && continue
+    [ "$dev" = "${LIVEDEV:-none}" ] && continue
+    # only foreign-OS style filesystems; other Linuxes get real entries
+    # from os-prober, and the EFI System Partition is not an OS
+    fstype="$(blkid -o value -s TYPE "$dev" 2>/dev/null || true)"
+    parttype="$(blkid -p -o value -s PART_ENTRY_TYPE "$dev" 2>/dev/null || true)"
+    case "${fstype:-}" in ntfs|vfat|exfat) ;; *) continue ;; esac
+    case "${parttype:-}" in
+        0xef|c12a7328-f81f-11d2-ba4b-00a0c93ec93b|C12A7328-F81F-11D2-BA4B-00A0C93EC93B) continue ;;
+    esac
+    # System Commander rule: only partitions whose own boot record is
+    # bootable (55AA signature) get a chain entry
+    sig="$(dd if="$dev" bs=1 skip=510 count=2 2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    [ "$sig" = "55aa" ] || continue
+    uuid="$(blkid -s UUID -o value "$dev" 2>/dev/null || true)"
+    [ -n "$uuid" ] || continue
+    echo "BadaOS Commander: chainload entry for $dev" >&2
+    cat <<ENTRY
+menuentry 'OS on $dev (BadaOS Commander chainload)' --class os {
+    insmod part_msdos
+    insmod part_gpt
+    insmod chain
+    search --no-floppy --fs-uuid --set=root $uuid
+    chainloader +1
+}
+ENTRY
+done
+
+exit 0

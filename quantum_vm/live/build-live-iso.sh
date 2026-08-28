@@ -58,7 +58,7 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     linux-image-amd64 live-boot systemd-sysv \
     xserver-xorg xinit openbox chromium fonts-noto-cjk \
     kbd sudo rsync parted dosfstools e2fsprogs \
-    grub2-common grub-pc-bin grub-efi-amd64-bin \
+    grub2-common grub-pc-bin grub-efi-amd64-bin os-prober ntfs-3g \
     vim emacs-nox openssh-server curl wget less ca-certificates
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
@@ -80,10 +80,12 @@ ln -sf /run/systemd/resolve/resolv.conf "$CHROOT/etc/resolv.conf" || true
 cat > "$CHROOT/etc/motd" <<'EOF'
 BadaOS GNU/Quantum 12.0 -- the real machine build
 
-  * vim / emacs / sshd / xinetd preinstalled
+  * vim / emacs / sshd / xinetd / grub-install / update-grub preinstalled
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>
   * install to the real disk:  sudo badaos-install
+    (default mode installs into the FREE SPACE of the disk -- existing
+     partitions and OSes are kept and stay in the GRUB menu)
 EOF
 
 echo "==> [3/6] configure the BadaOS kiosk (autologin -> X -> fullscreen)"
@@ -132,20 +134,28 @@ chroot "$CHROOT" chown -R bada:bada /home/bada
 # the real-disk installer + branding for the installed system's GRUB
 install -m 0755 "$HERE/badaos-install" "$CHROOT/usr/local/sbin/badaos-install"
 
-# unattended VM install: kernel arg badaos.autoinstall=/dev/XXX runs the
-# installer non-interactively at boot (used by the "Install to /dev/vda"
-# GRUB entry -- vda only exists on virtio VMs, never on real hardware).
+# BadaOS Commander: System Commander-style OS chooser in the installed GRUB
+# (colored menu + a chainload entry per other bootable partition; runs on
+# every update-grub next to os-prober)
+install -m 0755 "$HERE/25_badaos_commander" "$CHROOT/etc/grub.d/25_badaos_commander"
+
+# unattended VM install: kernel arg badaos.autoinstall=/dev/XXX (whole disk)
+# or badaos.autoinstall-free=/dev/XXX (into the free space, keeping the
+# existing partitions) runs the installer non-interactively at boot (used by
+# the "Install to /dev/vda" GRUB entries -- vda only exists on virtio VMs,
+# never on real hardware).
 cat > "$CHROOT/etc/systemd/system/badaos-autoinstall.service" <<'EOF'
 [Unit]
 Description=BadaOS unattended real-disk install (VM)
-ConditionKernelCommandLine=badaos.autoinstall
+ConditionKernelCommandLine=|badaos.autoinstall
+ConditionKernelCommandLine=|badaos.autoinstall-free
 After=basic.target systemd-udev-settle.service
 
 [Service]
 Type=oneshot
 StandardOutput=journal+console
 StandardError=journal+console
-ExecStart=/bin/sh -c 'DEV=$(sed -n "s/.*badaos\.autoinstall=\\([^ ]*\\).*/\\1/p" /proc/cmdline); exec /usr/local/sbin/badaos-install --auto "$DEV"'
+ExecStart=/bin/sh -c 'C=$(cat /proc/cmdline); DEV=$(echo "$C" | sed -n "s/.*badaos\.autoinstall-free=\([^ ]*\).*/\1/p"); if [ -n "$DEV" ]; then exec /usr/local/sbin/badaos-install --auto-free "$DEV"; fi; DEV=$(echo "$C" | sed -n "s/.*badaos\.autoinstall=\([^ ]*\).*/\1/p"); exec /usr/local/sbin/badaos-install --auto "$DEV"'
 
 [Install]
 WantedBy=multi-user.target
@@ -154,6 +164,10 @@ chroot "$CHROOT" systemctl enable badaos-autoinstall.service
 sed -i 's/^GRUB_DISTRIBUTOR=.*/GRUB_DISTRIBUTOR="BadaOS GNU\/Quantum"/' \
     "$CHROOT/etc/default/grub" 2>/dev/null || \
     echo 'GRUB_DISTRIBUTOR="BadaOS GNU/Quantum"' >> "$CHROOT/etc/default/grub"
+# free-space installs keep the machine's other OSes: os-prober puts them
+# into the GRUB menu next to BadaOS on every update-grub
+grep -q '^GRUB_DISABLE_OS_PROBER=' "$CHROOT/etc/default/grub" 2>/dev/null || \
+    echo 'GRUB_DISABLE_OS_PROBER=false' >> "$CHROOT/etc/default/grub"
 
 echo "==> [4/6] squashfs"
 chroot "$CHROOT" apt-get clean

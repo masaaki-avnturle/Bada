@@ -22,7 +22,8 @@
    GRUB 2 メニューモードでチェイン**する構成 (推奨)、GRUB 単体、LILO 単体を選べます。
    `newfs -O 2` FFSv2 → `base.tgz` 〜 `apt-quantum.tgz` / `xserver-badax.tgz` のセット展開 →
    root パスワード → ホスト名 → DHCP で完了。
-3. 再起動すると **LILO(MBR) → GRUB メニュー → カーネル dmesg → `/etc/rc` → `login:`**。
+3. 再起動すると **LILO(MBR) → BadaOS Commander (System Commander 風 OS 選択メニュー,
+   GRUB メニューモード) → カーネル dmesg → `/etc/rc` → `login:`**。
    **vim・emacs・sshd・xinetd・curl・wget は最初からインストール済み**で、sshd と xinetd は
    初回起動から `/etc/rc` が自動起動します (`netstat` で *.22 ほかが即 LISTEN)。
    インストーラは root と一緒に**最初の一般ユーザー `bada`** も作ります (Ubuntu 流)。
@@ -37,6 +38,7 @@
                                              #   任意のパッケージ名が導入・実行・削除可能
    apt search NAME / apt remove NAME         # 検索・削除も Ubuntu 同様
    vim /etc/motd  /  emacs /etc/rc.conf      # プリインストール済みエディタ
+   grub-install / update-grub                # ブートローダ工具も最初から入っています
    su - bada                                 # root → 一般ユーザー (プロンプトが $ に)
    sudo apt update                           # 一般ユーザーから root 権限で 1 コマンド
    su                                        # 一般ユーザー → root (パスワード入力)
@@ -97,7 +99,7 @@
 | **単一 HTML** ★ | [`dist/bada-vm-pro.html`](dist/bada-vm-pro.html) を「Download raw file」で保存して開くだけ |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS インストーラ) / `BadaVMPro-*-portable.exe` |
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
-| **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・実ディスクへの本インストール (`badaos-install`)・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
+| **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・**実ディスクの空きスペースへの本インストール(既存 OS を消さず GRUB メニューに共存、`badaos-install` 既定モード)**・ディスク全体インストール・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
 
 ビルドは [`quantumvm-app-build.yml`](../.github/workflows/quantumvm-app-build.yml) が実行します
 (`quantumvm-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
@@ -111,8 +113,9 @@ node quantum_vm/tools/build-vm.js
 で `dist/bada-vm-pro.html` と Electron 用 `app/www/index.html` を再生成します。
 ビルド前に、実 Bada インタープリタで **電源オン → sysinst インストール (実ディスク rd0 +
 LILO→MBR + GRUB メニュー) → 再起動 → ログイン → `apt install ssh xinetd zsh tcsh bash` →
-シェル切替 → QKD ssh → BadaX への X クライアント表示 → xterm 内ライブシェル** のライフサイクル全体 (29 イベント) を
-セルフチェックし、失敗すると生成しません。
+シェル切替 → QKD ssh → BadaX への X クライアント表示 → xterm 内ライブシェル →
+zone:// / MigemoInsta → Ubuntu 級 apt → grub-install / update-grub** の
+ライフサイクル全体 (55 イベント) をセルフチェックし、失敗すると生成しません。
 
 ```
 quantum_vm/
@@ -136,6 +139,8 @@ quantum_vm/
 > ※ VMware, NetBSD, Ubuntu, ASTEC-X, GRUB, LILO の各名称はそれぞれの権利者の商標・成果物です。
 > 本フォルダはそれらとは無関係の、Bada 言語による教育目的の再構成 (オマージュ) です。
 > アプリ内 sysinst の rd0「実ディスク」はシミュレーションで、ホストのディスクには書き込みません。
-> **実機の実ディスクに本当にインストールして GRUB から単独起動**したい場合は
+> **実機の実ディスクに本当にインストールして GRUB から起動**したい場合は
 > [`live/README.md`](live/README.md) の BadaOS Live ISO (`BadaOS-12.0-live-amd64.iso` +
 > `badaos-install`) を使ってください — こちらは本物の GRUB を本物の MBR/ESP に書き込みます。
+> 既定モードは**ディスクの空きスペースへのインストール**で、既存の OS・パーティションは
+> 消さずに GRUB メニューへ並べます(全体消去は明示的な別モード)。

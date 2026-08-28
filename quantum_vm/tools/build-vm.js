@@ -115,6 +115,9 @@ function run(events) {
     ["line", "which cowsay"],             // 50
     ["line", "apt search firefox"],       // 51
     ["line", "apt remove cowsay"],        // 52
+    ["line", "which grub-install"],       // 53 boot-loader tools preinstalled
+    ["line", "grub-install /dev/rrd0d"],  // 54 GRUB into the MBR (table kept)
+    ["line", "update-grub"],              // 55 re-register the OS in the menu
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -134,6 +137,7 @@ function run(events) {
     [7,  "xinetd.tgz: 100%"],
     [10, "Creating first user account 'bada'"],
     [11, "GNU GRUB  version 2.12"],         // boots through the GRUB menu
+    [11, "BadaOS Commander -- OS Selection"], // System Commander-style chooser
     [11, "Starting sshd."],                 // preinstalled daemons start at boot
     [11, "Starting xinetd."],
     [11, "login:"],
@@ -184,6 +188,9 @@ function run(events) {
     [50, "@@TTY /usr/bin/cowsay"],
     [51, "74362 indexed packages"],         // apt search over the Ubuntu-sized index
     [52, "Removing cowsay"],
+    [53, "@@TTY /usr/sbin/grub-install"],   // grub-install/update-grub preinstalled
+    [54, "Installation finished. No error reported."],
+    [55, "Found BadaOS GNU/Quantum 12.0 on /dev/rd0a"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -195,7 +202,8 @@ function run(events) {
   }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
-    " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt (" + tape.length + " ledger events)");
+    " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
+    " -> grub-install/update-grub (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */
