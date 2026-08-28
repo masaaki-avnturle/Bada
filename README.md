@@ -61,9 +61,19 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
+| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧。**🛡 ZoneShield 付属** — Jones多項式量子暗号のセキュリティソフト(下記) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 | [`zone.bada`](bada_gui_ide/examples/zone.bada) | zone:// スキームの Bada ソース |
+
+#### 🛡 付属セキュリティソフト — ZoneShield(量子暗号アプリケーション)
+
+ZoneBrowser のツールバー右端の **🛡 ボタン**で起動。ネットワークが使っているのと**同一の Bada 実装**(結び目図 → Kauffman/Jones 多項式 → 鍵 → AEAD、Bell対 QKD セッション salt)を、手元の道具として使えます:
+
+- **封緘(暗号化)** — 任意のテキスト(日本語可)を host の結び目鍵で封緘し、コピペできる**封筒 JSON** を出力
+- **開封(復号)** — 封筒 JSON を貼り付けると AEAD タグを検証してから復号。改ざん・結び目違いは **409 で拒否**し平文を出さない
+- **セキュリティスキャン** — 公開中の全 zone ページを再配信して Jones-AEAD 検証し、改ざん検知の自己テスト(暗号文 1 ユニット反転 → 409)まで実施したレポートを表示
+
+APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.html` を包むため)。
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 
