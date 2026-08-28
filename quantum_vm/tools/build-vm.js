@@ -200,6 +200,18 @@ function run(events) {
       process.exit(1);
     }
   }
+  // the Japanese install path: picking "j" localizes the sysinst screens
+  const jpTape = [["power", "on"], ["key", "j"], ["key", "a"], ["key", "b"]];
+  for (const [n, marker] of [[2, "インストールシステム"],
+                             [3, "インストール先ディスク"],
+                             [4, "パーティション方式"]]) {
+    const jp = run(jpTape.slice(0, n));
+    if (!jp.ok || jp.output.indexOf(marker) < 0) {
+      console.error("self-check FAILED (japanese sysinst) at event " + n + ": missing " + JSON.stringify(marker));
+      console.error((jp.output || jp.error || "").split("\n").slice(-20).join("\n"));
+      process.exit(1);
+    }
+  }
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +

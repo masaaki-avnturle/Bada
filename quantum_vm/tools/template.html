@@ -189,6 +189,22 @@
   .dlgbox td { padding:4px 8px; border-bottom:1px solid #34373b; vertical-align:top; }
   .dlgbox td.k { color:var(--gold); white-space:nowrap; }
   .dlgbox .close { margin-top:14px; }
+  /* one-screen setup dialog (Ubuntu look) */
+  .subox { width:min(720px,94%); max-height:88%; overflow:auto; background:#f7f7f7; color:#111;
+           border-radius:10px; box-shadow:0 12px 40px rgba(0,0,0,.6); font-size:13px; }
+  .suhead { background:linear-gradient(90deg,#2c001e,#5e2750 60%,#772953); color:#fff; padding:12px 18px; }
+  .suhead b { font-size:15px; }
+  .subody { padding:14px 18px 4px; }
+  .sug { border:1px solid #ddd; background:#fff; border-radius:8px; padding:10px 12px; margin-bottom:10px; }
+  .sug .t { font-weight:700; margin-bottom:6px; }
+  .sug label { display:block; padding:3px 0; cursor:pointer; }
+  .sug input[type=radio] { accent-color:#e95420; margin-right:7px; }
+  .sug input[type=text] { font:inherit; padding:5px 8px; border:1px solid #bbb; border-radius:4px; width:170px; background:#fff; color:#111; }
+  .sunote { font-size:11px; color:#666; margin-top:4px; }
+  .sufoot { display:flex; justify-content:flex-end; gap:10px; padding:4px 18px 16px; }
+  .subtn { font:inherit; font-size:13px; padding:8px 20px; border-radius:4px; border:1px solid #c7c7c7; background:#fff; cursor:pointer; color:#111; }
+  .subtn.primary { background:#e95420; border-color:#c7431a; color:#fff; font-weight:700; }
+  .subtn.primary:focus { outline:3px solid #f6b39a; }
   .note { color:var(--dim); font-size:11.5px; margin-top:10px; line-height:1.6; }
 </style>
 </head>
@@ -343,9 +359,11 @@
   <div class="dlgbox">
     <h2>ヘルプ — 最短ツアー</h2>
     <div style="line-height:1.9">
-      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動します。メニューは表示された
-         キーを 1 文字押すだけ: <b>a</b>(言語) → <b>a</b>(インストール) → <b>a/b</b>(仮想 wd0 か
-         実ディスク rd0・RDM) → <b>a</b>(GPT) → <b>a</b>(<b>LILO を MBR へ + GRUB メニュー</b>) →
+      1. <b>▶ 起動</b> — 初回は CD (ISO) から <b>sysinst</b> が起動し、<b>1 画面セットアップ</b>が
+         開きます: 「日本語 or English (CUI)」「GUI おまかせ or CUI 手動」「実ディスク rd0 or
+         仮想 wd0」を一度に選んで<b>この内容でインストール開始</b>を押すだけで最後まで自動。
+         「閉じる」なら classic CUI を手動で: <b>a/j</b>(言語) → <b>a</b>(インストール) →
+         <b>a/b</b>(wd0/rd0) → <b>a</b>(GPT) → <b>a</b>(<b>LILO を MBR へ + GRUB メニュー</b>) →
          <b>a</b>(最終確認)。<br/>
       2. root パスワードとホスト名を入力 → 任意のキーで<b>ディスクから再起動</b>
          (LILO→GRUB メニュー経由でブートします)。<br/>
@@ -360,6 +378,39 @@
       6. 📷 スナップショット = イベント台帳のプレフィックス。⤺ 復元 でその時点に巻き戻ります。
     </div>
     <button class="tbtn close" id="dlg-help-close">閉じる</button>
+  </div>
+</div>
+
+<!-- ===== one-screen setup dialog: language / method / disk, all at once ===== -->
+<div class="dlg" id="dlg-setup">
+  <div class="subox">
+    <div class="suhead"><b>BadaOS 12.0 セットアップ</b><br>
+      <span style="font-size:11px;opacity:.85">One-screen setup — 言語・方式・インストール先を 1 画面で選んで、そのままインストール</span></div>
+    <div class="subody">
+      <div class="sug"><div class="t">1. 言語 / Language</div>
+        <label><input type="radio" name="su-lang" value="ja" checked>日本語でインストールする(インストーラの画面も日本語になります)</label>
+        <label><input type="radio" name="su-lang" value="en">English — installer messages in English</label>
+      </div>
+      <div class="sug"><div class="t">2. 方式 / Method</div>
+        <label><input type="radio" name="su-auto" value="auto" checked>GUI おまかせ — この 1 画面の内容で<b>最後まで自動でインストール</b></label>
+        <label><input type="radio" name="su-auto" value="cui">CUI 手動 — classic <b>sysinst</b> をコンソールでキー操作して進める</label>
+      </div>
+      <div class="sug"><div class="t">3. インストール先 / Target disk</div>
+        <label><input type="radio" name="su-disk" value="rd0" checked>実ハードディスク <b>rd0</b> — VMware Pro 流 raw device mapping(パススルー)</label>
+        <label><input type="radio" name="su-disk" value="wd0">仮想ディスク <b>wd0</b> (.qvmdk)</label>
+        <div class="sunote">※ アプリ内の rd0 はシミュレーションです。本物の PC の実ディスクへは
+        Live ISO(GRUB メニューの「Install BadaOS」= Ubuntu 風 GUI インストーラ)をどうぞ。</div>
+      </div>
+      <div class="sug"><div class="t">4. アカウント / Account</div>
+        root パスワード <input type="text" id="su-pw" value="swordfish">
+        &nbsp;&nbsp;ホスト名 <input type="text" id="su-host" value="quantum">
+        <div class="sunote">ブートローダは推奨構成 (LILO→MBR + GRUB メニューモード, GPT) を使います。</div>
+      </div>
+    </div>
+    <div class="sufoot">
+      <button class="subtn" id="su-close">閉じる(手動で進める)</button>
+      <button class="subtn primary" id="su-go">この内容でインストール開始</button>
+    </div>
   </div>
 </div>
 
@@ -398,6 +449,17 @@ var VM_LIBS = __VM_LIBS_JSON__;
   var term = $("term"), MAXLINES = 3000;
   var mode = "off", echo = true, prompt = "", inputBuf = "";
   var lines = [];
+  var stageNow = "", setupDismissed = false;
+
+  /* one-screen setup: pops up when sysinst reaches its welcome screen */
+  function maybeSetup() {
+    var d = $("dlg-setup");
+    if (stageNow === "sysinst|0" && powered && !setupDismissed) {
+      if (d.style.display !== "flex") { d.style.display = "flex"; $("su-go").focus(); }
+    } else if (d.style.display === "flex" && stageNow !== "sysinst|0") {
+      d.style.display = "none";
+    }
+  }
   function repaintTerm() {
     while (lines.length > MAXLINES) lines.shift();
     var html = "";
@@ -455,7 +517,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
       case "MODE": mode = val; break;
       case "ECHO": echo = (val === "on"); break;
       case "PROMPT": prompt = val; break;
-      case "STAGE": break;
+      case "STAGE": stageNow = val; break;
       case "POWERSTATE": setPower(val === "1"); break;
       case "SNAPSHOT": note("スナップショット: " + val); break;
       case "XCONN": xconn(val); break;
@@ -516,6 +578,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
 
   function send(ev, opts) {
     opts = opts || {};
+    if (ev[0] === "power") setupDismissed = false;
     events.push(ev);
     vmxRows = []; sceneBuf = null; mode = "off"; prompt = "";
     var r = runBada(buildProgram(events));
@@ -529,6 +592,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     renderAllXterms();
     repaintTerm();
     updateButtons();
+    maybeSetup();
   }
 
   /* full-repaint replay: used at load / snapshot-restore; replays the tape
@@ -546,6 +610,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     renderAllXterms();
     repaintTerm();
     updateButtons();
+    maybeSetup();
   }
 
   function setPower(on) {
@@ -553,7 +618,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     $("vmdot").className = "vmdot" + (on ? " on" : "");
     $("st-power").textContent = "電源: " + (on ? "オン" : "オフ");
     $("offscreen").style.display = on ? "none" : "flex";
-    if (!on) { mode = "off"; xScene([]); }
+    if (!on) { mode = "off"; xScene([]); $("dlg-setup").style.display = "none"; }
   }
   function updateButtons() {
     $("bt-on").disabled = powered;
@@ -608,6 +673,48 @@ var VM_LIBS = __VM_LIBS_JSON__;
   });
   $("dlg-settings-close").addEventListener("click", function () { $("dlg-settings").style.display = "none"; });
   $("dlg-help-close").addEventListener("click", function () { $("dlg-help").style.display = "none"; });
+
+  /* ============ one-screen setup dialog: buttons ============ */
+  function suChoice(name) {
+    var els = document.querySelectorAll("input[name=" + name + "]");
+    for (var i = 0; i < els.length; i++) { if (els[i].checked) return els[i].value; }
+    return "";
+  }
+  $("su-close").addEventListener("click", function () {
+    setupDismissed = true;
+    $("dlg-setup").style.display = "none";
+    term.focus();
+  });
+  $("su-go").addEventListener("click", function () {
+    var lang = suChoice("su-lang");
+    var auto = suChoice("su-auto") === "auto";
+    var disk = suChoice("su-disk");
+    var pw = $("su-pw").value;
+    var host = $("su-host").value;
+    setupDismissed = true;
+    $("dlg-setup").style.display = "none";
+    var langKey = lang === "ja" ? "j" : "a";
+    if (!auto) { send(["key", langKey]); term.focus(); return; }
+    /* drive the whole sysinst in one go: language -> install -> disk ->
+       GPT -> LILO->MBR + GRUB menu -> confirm -> password x2 -> hostname */
+    var seq = [
+      ["key", langKey], ["key", "a"], ["key", disk === "rd0" ? "b" : "a"],
+      ["key", "a"], ["key", "a"], ["key", "a"],
+      ["line", pw], ["line", pw], ["line", host]
+    ];
+    note(lang === "ja" ? "おまかせインストール実行中 (" + disk + ")..."
+                       : "one-click install running (" + disk + ")...");
+    (function step(i) {
+      if (i >= seq.length || !powered) {
+        note(lang === "ja" ? "おまかせインストール完了 — 任意のキーで再起動します"
+                           : "one-click install done -- press any key to reboot");
+        term.focus();
+        return;
+      }
+      send(seq[i]);
+      setTimeout(function () { step(i + 1); }, 350);
+    })(0);
+  });
   $("menu-help").addEventListener("click", function () { $("dlg-help").style.display = "flex"; });
   $("menu-vm").addEventListener("click", function () { showTab("vm"); });
 
@@ -626,6 +733,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
   /* ================= keyboard -> guest ================= */
   function consoleKey(e) {
     if ($("dlg-settings").style.display === "flex" || $("dlg-help").style.display === "flex") return;
+    if ($("dlg-setup").style.display === "flex") return;
     if (mode === "off") return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (mode === "key") {

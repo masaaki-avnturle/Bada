@@ -67,7 +67,14 @@ APT_MIRROR := "http://archive.badaos.or.jp"
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
             "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
-            "wd0", [], [], [], []]
+            "wd0", [], [], [], [], "en"]
+}
+
+# 21: installer language ("en" | "ja") -- picked on the sysinst welcome
+# screen (or the one-screen GUI setup dialog of the host chrome)
+def trs(st, en, ja) {
+    if (st[21] == "ja") { return ja }
+    return en
 }
 
 # ====================================================================
@@ -1182,28 +1189,28 @@ def sysinst_screen(emit, vm, st) {
         tty(emit, "    a: English")
         tty(emit, "    j: Japanese / 日本語")
     } else if (sub == 1) {
-        sysinst_head(emit, "BadaOS-12.0 Install System")
-        tty(emit, "    a: Install BadaOS to hard disk")
-        tty(emit, "    b: Upgrade BadaOS on a hard disk")
-        tty(emit, "    c: Re-install sets or install additional sets")
-        tty(emit, "    d: Reboot the computer")
-        tty(emit, "    x: Exit Install System")
+        sysinst_head(emit, trs(st, "BadaOS-12.0 Install System", "BadaOS-12.0 インストールシステム"))
+        tty(emit, trs(st, "    a: Install BadaOS to hard disk", "    a: ハードディスクへ BadaOS をインストール"))
+        tty(emit, trs(st, "    b: Upgrade BadaOS on a hard disk", "    b: ハードディスク上の BadaOS をアップグレード"))
+        tty(emit, trs(st, "    c: Re-install sets or install additional sets", "    c: セットの再インストール / 追加セットの導入"))
+        tty(emit, trs(st, "    d: Reboot the computer", "    d: コンピュータを再起動"))
+        tty(emit, trs(st, "    x: Exit Install System", "    x: インストールシステムを終了"))
     } else if (sub == 2) {
-        sysinst_head(emit, "Target disk (VMware Pro style)")
-        tty(emit, "On which disk do you want to install BadaOS?")
+        sysinst_head(emit, trs(st, "Target disk (VMware Pro style)", "インストール先ディスク (VMware Pro 流)"))
+        tty(emit, trs(st, "On which disk do you want to install BadaOS?", "BadaOS をどのディスクへインストールしますか?"))
         tty(emit, " ")
         tty(emit, "    a: wd0  仮想ディスク (" + vm[3] + " MB, QUANTUM VIRTUAL-HD .qvmdk)")
         tty(emit, "    b: rd0  実ディスク   (raw device mapping -- ホスト物理ディスクへ")
         tty(emit, "            パススルー。MBR セクタ 0 も実体に書き込みます)")
     } else if (sub == 3) {
-        sysinst_head(emit, "Partitioning scheme")
-        tty(emit, "Select the partitioning scheme for " + st[16] + ":")
+        sysinst_head(emit, trs(st, "Partitioning scheme", "パーティション方式"))
+        tty(emit, trs(st, "Select the partitioning scheme for " + st[16] + ":", st[16] + " のパーティション方式を選んでください:"))
         tty(emit, " ")
         tty(emit, "    a: GPT  (GUID Partition Table)")
         tty(emit, "    b: MBR  (Master Boot Record)")
     } else if (sub == 4) {
-        sysinst_head(emit, "Boot loader -> Master Boot Record")
-        tty(emit, "Install which boot loader into the MBR of " + st[16] + "?")
+        sysinst_head(emit, trs(st, "Boot loader -> Master Boot Record", "ブートローダ -> マスターブートレコード"))
+        tty(emit, trs(st, "Install which boot loader into the MBR of " + st[16] + "?", st[16] + " の MBR へどのブートローダを入れますか?"))
         tty(emit, " ")
         tty(emit, "    a: LILO を MBR へ + GRUB メニューモード (推奨)")
         tty(emit, "       lilo -M が 446 byte のブートコードをセクタ 0 に書き、")
@@ -1211,32 +1218,35 @@ def sysinst_screen(emit, vm, st) {
         tty(emit, "    b: GRUB 2 のみ (grub-install /dev/r" + st[16] + "d)")
         tty(emit, "    c: LILO のみ (テキスト boot: プロンプト)")
     } else if (sub == 5) {
-        sysinst_head(emit, "Last chance!")
-        tty(emit, "Shall we continue? The disk " + st[16] + " will be OVERWRITTEN.")
+        sysinst_head(emit, trs(st, "Last chance!", "最終確認!"))
+        tty(emit, trs(st, "Shall we continue? The disk " + st[16] + " will be OVERWRITTEN.", "続行しますか? ディスク " + st[16] + " は上書きされます。"))
         if (st[16] == "rd0") {
             tty(emit, "(rd0 は実ディスクです: MBR も含めて実体へ書き込まれます)")
         }
         tty(emit, " ")
-        tty(emit, "    a: Yes, install BadaOS")
-        tty(emit, "    b: No, back to the main menu")
+        tty(emit, trs(st, "    a: Yes, install BadaOS", "    a: はい、BadaOS をインストールします"))
+        tty(emit, trs(st, "    b: No, back to the main menu", "    b: いいえ、メインメニューへ戻ります"))
     } else if (sub == 6) {
-        sysinst_head(emit, "Root password")
-        tty(emit, "Setting the password for the superuser account 'root'.")
-        tty(emit, "New password: (input hidden; empty = no password)")
+        sysinst_head(emit, trs(st, "Root password", "root パスワード"))
+        tty(emit, trs(st, "Setting the password for the superuser account 'root'.", "スーパーユーザー 'root' のパスワードを設定します。"))
+        tty(emit, trs(st, "New password: (input hidden; empty = no password)", "新しいパスワード: (入力は非表示。空 = パスワード無し)"))
     } else if (sub == 7) {
-        tty(emit, "Repeat new password:")
+        tty(emit, trs(st, "Repeat new password:", "新しいパスワード (もう一度):"))
     } else if (sub == 8) {
-        sysinst_head(emit, "Hostname")
-        tty(emit, "Enter the hostname of this machine (empty = badaos):")
+        sysinst_head(emit, trs(st, "Hostname", "ホスト名"))
+        tty(emit, trs(st, "Enter the hostname of this machine (empty = badaos):", "このマシンのホスト名を入力してください (空 = badaos):"))
     } else if (sub == 10) {
         tty(emit, " ")
-        tty(emit, "Installation of BadaOS-12.0 is now complete.  The event ledger")
-        tty(emit, "has been committed to the Akashic machine tape (" + len(tuplespace) + " facts).")
+        tty(emit, trs(st, "Installation of BadaOS-12.0 is now complete.  The event ledger",
+                        "BadaOS-12.0 のインストールが完了しました。イベント台帳は"))
+        tty(emit, trs(st, "has been committed to the Akashic machine tape (" + len(tuplespace) + " facts).",
+                        "Akashic machine tape に記帳済みです (" + len(tuplespace) + " facts)。"))
         tty(emit, " ")
         tty(emit, "Preinstalled and enabled at boot: vim emacs sshd xinetd curl wget")
         tty(emit, "First ordinary user: 'bada' (password = root password; su - bada)")
         tty(emit, " ")
-        tty(emit, "Hit any key to reboot from " + st[16] + " (LILO/GRUB in the MBR)...")
+        tty(emit, trs(st, "Hit any key to reboot from " + st[16] + " (LILO/GRUB in the MBR)...",
+                        "何かキーを押すと " + st[16] + " から再起動します (MBR の LILO/GRUB 経由)..."))
     }
     return 0
 }
@@ -1293,7 +1303,12 @@ def sysinst_extract(emit, vm, st) {
 def sysinst_key(emit, vm, st, k) {
     sub := st[5]
     if (sub == 0) {
-        if (list_has(["a", "j"], k) == 1) { st[5] = 1; sysinst_screen(emit, vm, st) }
+        if (list_has(["a", "j"], k) == 1) {
+            if (k == "j") { st[21] = "ja" }
+            if (k == "a") { st[21] = "en" }
+            st[5] = 1
+            sysinst_screen(emit, vm, st)
+        }
         return 0
     }
     if (sub == 1) {
