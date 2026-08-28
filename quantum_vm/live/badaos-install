@@ -43,14 +43,36 @@ MIN_MB=4096     # minimum size for the BadaOS root partition
 
 AUTO=0
 MODE=""
+POWEROFF=0
+RUNPART=""
 if [ "${1:-}" = "--auto" ]; then
-    AUTO=1; MODE=disk
+    AUTO=1; MODE=disk; POWEROFF=1
     TARGET="${2:?usage: badaos-install --auto /dev/vda}"
     D="${TARGET#/dev/}"
 elif [ "${1:-}" = "--auto-free" ]; then
-    AUTO=1; MODE=free
+    AUTO=1; MODE=free; POWEROFF=1
     TARGET="${2:?usage: badaos-install --auto-free /dev/vda}"
     D="${TARGET#/dev/}"
+elif [ "${1:-}" = "--run" ]; then
+    # non-interactive single run for the GUI installer: no prompts, no
+    # poweroff — the GUI shows progress and offers the reboot itself.
+    AUTO=1
+    MODE="${2:?usage: badaos-install --run free|part|disk TARGET}"
+    RUNTARGET="${3:?usage: badaos-install --run free|part|disk TARGET}"
+    case "$MODE" in
+        free|disk)
+            TARGET="$RUNTARGET"
+            D="${TARGET#/dev/}"
+            ;;
+        part)
+            RUNPART="$RUNTARGET"
+            PK="$(lsblk -nro PKNAME "$RUNPART" | head -1)"
+            [ -n "$PK" ] || { echo "cannot find the disk of $RUNPART"; exit 1; }
+            D="$PK"
+            TARGET="/dev/$D"
+            ;;
+        *) echo "unknown --run mode: $MODE"; exit 1;;
+    esac
 fi
 
 echo "=============================================================="
@@ -176,7 +198,11 @@ free)
     ;;
 # ---------------------------------------------------------------------------
 part)
-    read -rp "Partition to FORMAT and install into (e.g. ${D}3): " PN
+    if [ "$AUTO" = 1 ]; then
+        PN="${RUNPART#/dev/}"
+    else
+        read -rp "Partition to FORMAT and install into (e.g. ${D}3): " PN
+    fi
     ROOTPART="/dev/$PN"
     [ -b "$ROOTPART" ] || { echo "no such partition: $ROOTPART"; exit 1; }
     PK="$(lsblk -nro PKNAME "$ROOTPART" | head -1)"
@@ -189,8 +215,10 @@ part)
         echo "$ROOTPART is smaller than the ${MIN_MB} MiB BadaOS needs."; exit 1; }
     echo
     echo "  *** ONLY $ROOTPART will be formatted; the rest of $TARGET is kept ***"
-    read -rp "Type exactly 'INSTALL $PN' to continue: " CONFIRM
-    [ "$CONFIRM" = "INSTALL $PN" ] || { echo "aborted."; exit 1; }
+    if [ "$AUTO" = 0 ]; then
+        read -rp "Type exactly 'INSTALL $PN' to continue: " CONFIRM
+        [ "$CONFIRM" = "INSTALL $PN" ] || { echo "aborted."; exit 1; }
+    fi
     mkfs.ext4 -q -F -L badaos "$ROOTPART"
     if [ "$EFI" = 1 ]; then
         ESPPART="$(find_esp)"
@@ -325,7 +353,7 @@ fi
 echo "   The same partition also boots inside a virtual machine"
 echo "   (VMware raw disk / QEMU -drive with the physical disk)."
 echo "=============================================================="
-if [ "$AUTO" = 1 ]; then
+if [ "$POWEROFF" = 1 ]; then
     echo "BADAOS-AUTOINSTALL-DONE"
     umount -lf "$M/dev/pts" "$M/dev" "$M/sys" "$M/proc" "$M/boot/efi" "$M" 2>/dev/null || true
     trap - EXIT

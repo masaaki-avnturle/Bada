@@ -7,6 +7,9 @@
 - 中身は最小の Debian live システム(カーネル + squashfs)で、起動すると自動ログインし、
   BadaOS 環境(`dist/bada-vm-pro.html` — Bada 言語製ハイパーバイザ + BadaOS + BadaX Server)
   を **全画面キオスク**で自動起動します(`#autoboot` で VM も自動パワーオン)
+- **Ubuntu と同じ操作感の GUI インストーラ**: GRUB メニューの「Install BadaOS」から
+  日本語の親切なウィザード(種類選択 → 色分きパーティションバー → 確認 → 進捗バー →
+  再起動)。既定は空き領域インストールで何も消しません
 - **vim・emacs・sshd・xinetd・curl・wget・grub-install・update-grub を実物としてプリインストール**
 - **実ディスクの「空きスペース」への本インストール対応**: `badaos-install` の既定モードは
   空き領域に新パーティションを 1 個作るだけで、**既存の OS・パーティションは消しません**
@@ -44,7 +47,23 @@ QEMU での実起動検証済み — 電源投入直後の画面はこの通り 
 3. **GRUB メニューに BadaOS が表示** → Enter で起動 → 全画面で BadaOS が立ち上がります
    (コンソールに落ちるには Ctrl+Alt+F2、ログイン `bada` / パスワード `badaos`)
 
-## 使い方 2 — USB から実ディスクの「空きスペース」へインストール(何も消さない・検証済み)
+## 使い方 2 — Ubuntu 風の GUI インストーラでインストール(いちばん簡単・おすすめ)
+
+USB から起動して、GRUB メニューで **「Install BadaOS (friendly GUI installer, Ubuntu style)」**
+を選ぶだけで、**Ubuntu のインストーラ(Ubiquity)と同じ操作感の親切な GUI ウィザード**が
+全画面で立ち上がります:
+
+1. **ようこそ** → 2. **インストールの種類**(空き領域=推奨 / パーティション指定 /
+   ディスク全体)→ 3. **ディスクの選択** — Ubuntu と同じ**色分きパーティションバー**で
+   「どこが残り、どこに BadaOS が入るか」が一目で分かります → 4. **書き込み確認**
+   (ここまで一切ディスクに書き込みません)→ 5. **進捗バー + BadaOS 紹介スライド** →
+   6. **完了 → 今すぐ再起動**
+
+既定の「空き領域にインストール」は**既存の OS・データを一切消しません**。日本語 UI、
+キーボードだけでも操作可能(Enter で次へ)。中身は下記 `badaos-install` と同じ
+検証済みエンジンです(GUI は `installer/` の HTML ウィザード + localhost バックエンド)。
+
+## 使い方 2b — コマンドラインでインストール(同じエンジン)
 
 **ディスク全体は消しません。** インストーラの既定モードは、選んだハードディスクの
 **未割り当て(空き)領域に新しいパーティションを 1 個作るだけ**で、既存のパーティション
@@ -131,7 +150,8 @@ grub-pc-bin grub-efi-amd64-bin grub-common`
 |:--|:--|
 | `build-live-iso.sh` | debootstrap → キオスク設定 → squashfs → `grub-mkrescue`(ISO 生成) |
 | `grub-live.cfg` | 実機の電源投入時に表示される GRUB メニュー |
-| `badaos-install` | Live 内から実ディスクへ本インストール — 既定は**空き領域へ**(何も消さない)、既存パーティション再利用 / ディスク全体消去も選択可(MBR/ESP へ `grub-install`、os-prober で既存 OS も GRUB メニューへ) |
+| `installer/` | **Ubuntu 風 GUI インストーラ** — `index.html`(日本語ウィザード: 種類選択・パーティションバー・確認・進捗)+ `badaos-installer-httpd.py`(localhost:7788 の root バックエンド、実作業は `badaos-install --run` に委譲) |
+| `badaos-install` | Live 内から実ディスクへ本インストール — 既定は**空き領域へ**(何も消さない)、既存パーティション再利用 / ディスク全体消去も選択可(MBR/ESP へ `grub-install`、os-prober で既存 OS も GRUB メニューへ)。GUI から使う非対話 `--run` モード付き |
 | `25_badaos_commander` | **BadaOS Commander** — System Commander 風ブートマネージャ (`/etc/grub.d/` スクリプト: カラーメニュー + 他 OS パーティションへのチェインロードエントリ生成) |
 | `badaos-add-grub-entry.sh` | 既存 Linux の GRUB に ISO ループバックエントリを追加 |
 

@@ -99,7 +99,7 @@
 | **単一 HTML** ★ | [`dist/bada-vm-pro.html`](dist/bada-vm-pro.html) を「Download raw file」で保存して開くだけ |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS インストーラ) / `BadaVMPro-*-portable.exe` |
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
-| **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・**実ディスクの空きスペースへの本インストール(既存 OS を消さず GRUB メニューに共存、`badaos-install` 既定モード)**・ディスク全体インストール・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
+| **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・**Ubuntu 風の親切な GUI インストーラ**(日本語ウィザード + パーティションバー)・**実ディスクの空きスペースへの本インストール(既存 OS を消さず GRUB メニューに共存)**・ディスク全体インストール・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
 
 ビルドは [`quantumvm-app-build.yml`](../.github/workflows/quantumvm-app-build.yml) が実行します
 (`quantumvm-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。

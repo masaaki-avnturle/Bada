@@ -119,20 +119,50 @@ echo
 echo "BadaOS GNU/Quantum 12.0 (live console)"
 echo "  startx            -- launch the BadaOS environment"
 echo "  sudo badaos-install -- install BadaOS to a REAL disk (GRUB into the MBR/ESP)"
+echo "  (GUI install: reboot and pick 'Install BadaOS' in the GRUB menu)"
 echo
 EOF
 
 cat > "$CHROOT/home/bada/.xinitrc" <<'EOF'
 xset -dpms s off
 openbox --sm-disable &
+# "Install BadaOS" GRUB entry: open the Ubuntu-style GUI installer instead
+# of the BadaOS environment (wait for its local backend to come up first)
+URL="file:///opt/badaos/bada-vm-pro.html#autoboot"
+if grep -q badaos.gui-installer /proc/cmdline; then
+  URL="http://127.0.0.1:7788/"
+  for i in $(seq 1 30); do
+    if timeout 1 bash -c "exec 3<>/dev/tcp/127.0.0.1/7788" 2>/dev/null; then break; fi
+    sleep 1
+  done
+fi
 exec chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
-  --disable-session-crashed-bubble --password-store=basic \
-  "file:///opt/badaos/bada-vm-pro.html#autoboot"
+  --disable-session-crashed-bubble --password-store=basic "$URL"
 EOF
 chroot "$CHROOT" chown -R bada:bada /home/bada
 
 # the real-disk installer + branding for the installed system's GRUB
 install -m 0755 "$HERE/badaos-install" "$CHROOT/usr/local/sbin/badaos-install"
+
+# the Ubuntu-style GUI installer (wizard page + root backend on localhost)
+mkdir -p "$CHROOT/usr/local/lib/badaos-installer"
+install -m 0644 "$HERE/installer/index.html" "$CHROOT/usr/local/lib/badaos-installer/index.html"
+install -m 0755 "$HERE/installer/badaos-installer-httpd.py" \
+    "$CHROOT/usr/local/lib/badaos-installer/badaos-installer-httpd.py"
+cat > "$CHROOT/etc/systemd/system/badaos-installer.service" <<'EOF'
+[Unit]
+Description=BadaOS GUI installer backend (Ubuntu-style wizard on localhost:7788)
+ConditionKernelCommandLine=boot=live
+After=basic.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/badaos-installer/badaos-installer-httpd.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+chroot "$CHROOT" systemctl enable badaos-installer.service
 
 # BadaOS Commander: System Commander-style OS chooser in the installed GRUB
 # (colored menu + a chainload entry per other bootable partition; runs on
