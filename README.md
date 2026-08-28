@@ -29,6 +29,28 @@
 
 ---
 
+## 🜁 ダウンロード — Bada VM Pro(今までの集大成)
+
+**量子プログラミング言語 Bada のオペレーティングシステム。** シェルは**ウェブブラウザーのデザイン**(タブ + `bada://` アドレスバー)、ベース(カーネル)は **BadaGPT** で、**OS の update / upgrade も BadaGPT が実行**します。**Bada on Rails**(scaffold → CRUD)、**合い言葉コマンド**(silent talk 無音テキスト = 決定論的一致、音声 = Web Speech API + レーベンシュタイン照合)、**トランスフォーマー・スタジオ**(本物の self-attention 順伝播 + 学習)、**GUI / CUI プログラミング**をひとつに統合。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_vm_pro/index.html をダウンロード**](bada_vm_pro/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-vm-pro-debug.apk` |
+| **Windows 10 / 11** | `BadaVMPro-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
+
+ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が実行します(`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・合い言葉・量子 Bada 文法は [`bada_vm_pro/`](bada_vm_pro/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
@@ -71,6 +93,7 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 
 ---
 
