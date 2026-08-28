@@ -62,6 +62,40 @@
 
 ---
 
+## 🖥️ BadaVM Pro — 量子ハイパーバイザ + BadaOS + BadaX Server (NEW)
+
+**VMware Workstation Pro 風ハイパーバイザ**の中に、**NetBSD 風ベース + Ubuntu 風 apt の
+OS「BadaOS 12.0」**を sysinst 風インストーラでインストールし (**仮想ディスク wd0 /
+実ディスク rd0 (RDM) を選択、LILO をマスターブートレコードへ + GRUB メニューモード**)、
+**Linux 一式のコマンドライン**を動かす (vim・emacs・sshd・xinetd はプリインストール、
+NAT 経由のインターネットと外部ミラーからの `apt`、`su`/`sudo` のユーザー切替)。
+VM 内の X クライアント (`xclock` / `xeyes` / `xterm`) を
+**ASTEC-X 風の Windows 用 X サーバー「BadaX Server」**に表示する 3 点セット。
+ハイパーバイザも OS も X サーバーも、**すべて量子プログラミング言語 Bada で記述**されています
+(非公式・教育目的のオマージュ)。
+
+### 👉 [**quantum_vm/dist/bada-vm-pro.html をダウンロード**](quantum_vm/dist/bada-vm-pro.html)
+
+上のファイルを 1 つ保存して開くだけで動きます(インストール不要・依存なし・オフライン可)。
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **どこでも** (単一 HTML) ★ | [`quantum_vm/dist/bada-vm-pro.html`](quantum_vm/dist/bada-vm-pro.html) — 「Download raw file」で保存して開く |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (NSIS) / `BadaVMPro-*-portable.exe` |
+| **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **実機起動** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`BadaOS-12.0-live-amd64.iso`** — USB に書いて PC を起動すると**本物の GRUB メニューに「BadaOS GNU/Quantum 12.0」**。**Ubuntu 風の親切な GUI インストーラ**(日本語ウィザード)か `sudo badaos-install` で**実ディスクの空きスペースへ本インストール**(既存 OS・パーティションは消さず、os-prober で GRUB メニューに共存。全体消去は明示モード。MBR/EFI へ grub-install)。詳細 [`quantum_vm/live/`](quantum_vm/live/) |
+
+- 仮想マシンは量子 vCPU (8 qubit / Hilbert 次元 256)・tuplespace メモリ・仮想ディスク wd0 / 実ディスク rd0 (RDM)・NAT を持ち、マシン記述は `.qvmx`
+- BadaOS は CD (ISO) から起動 → sysinst で ディスク選択 (wd0/rd0)・GPT/MBR・**ブートローダ (LILO→MBR + GRUB メニュー)**・`newfs` FFSv2・セット展開 → root パスワード・ホスト名・DHCP → LILO/GRUB 経由でディスクから再起動 → `login: root`
+- **Linux 一式がプリインストール**: vim・emacs・sshd・xinetd・curl・wget は初期状態で導入済み、sshd/xinetd は初回起動から自動起動。**NAT 経由でインターネット**が使え (`ping`/`curl`/`wget`/`host`)、`apt` は外部ミラー `http://archive.badaos.or.jp` から取得 (`apt install zsh tcsh bash` など)。**ユーザー切替**も完備: インストーラが一般ユーザー `bada` を作成し、`su - bada` / `su`(パスワード)/ `sudo CMD` / `adduser` / `passwd` が使えます (プロンプトは root `#`・一般 `$`)
+- X 表示は ASTEC-X と同じ「計算は UNIX 側・表示は Windows 側」: `DISPLAY=10.0.2.2:0` の **BadaX Server** へ NAT 越しに接続。認証は **JONES-KNOT-COOKIE-1**(三葉結び目の Kauffman/Jones 多項式鍵)+ Bell 対 QKD。**xterm ウィンドウの中もライブな pty セッション**で、ウィンドウ内で直接コマンドライン (apt / zsh / …) が使えます
+- **zone:// ウルトラネットワークを OS 内に同梱**: `zone zone://url.or.jp/`(CLI)・`curl zone://…`・`zone put URL TEXT`(自作ページの封緘・公開)・**`zonebrowser &` で ZoneBrowser が X クライアントとして BadaX 上に表示**(アドレスバー・リンク遷移・DHT 経路/Jones 鍵/AEAD タグのセキュリティ表示)
+- **MigemoInsta** — リング上の写真フィード zone://insta.or.jp/ を **migemo 検索**(`sakura` が さくら/サクラ/桜 に当たる、Bada 製ローマ字→かなエンジン)できる Instagram 風アプリ。`migemoinsta &`(X クライアント: 検索バー+フィード+♥)/ `migemoinsta sakura`(CLI)/ `migemoinsta post TEXT`(投稿をリングへ封緘・公開)。フィードは ZoneBrowser からも閲覧可
+- マシン全状態は追記専用イベント台帳 (Akashic machine tape) の決定論的リプレイ。**スナップショット = 台帳のプレフィックス**
+- ビルドは [`quantumvm-app-build.yml`](.github/workflows/quantumvm-app-build.yml)(`quantumvm-v*` タグで Release へ添付)。詳細は [`quantum_vm/README.md`](quantum_vm/README.md)
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -71,6 +105,7 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`quantum_vm/`** | **BadaVM Pro** — VMware Workstation Pro 風・量子ハイパーバイザ(オマージュ) · ゲスト OS **BadaOS 12.0** (NetBSD 風ベース + Ubuntu 風 `apt` で ssh/xinetd/zsh/tcsh/bash · 実ディスク RDM · LILO→MBR + GRUB メニュー) · ASTEC-X 風 Windows 用 X サーバー **BadaX Server** (JONES-KNOT-COOKIE-1 + Bell対QKD) · 3 つとも Bada 言語製 · 単一HTML + Windows 10/11 EXE | [→ 開く](quantum_vm/) |
 
 ---
 

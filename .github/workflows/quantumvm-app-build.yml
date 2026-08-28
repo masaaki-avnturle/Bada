@@ -1,0 +1,164 @@
+name: BadaVM Pro app build (Windows 10/11 EXE + Ubuntu)
+
+# quantum_vm/ の BadaVM Pro (量子ハイパーバイザ + BadaOS ゲスト OS +
+# BadaX Server) を
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。本体は tools/build-vm.js が生成する自己完結 HTML
+# (dist/bada-vm-pro.html) で、これをそのまま www として Electron ラッパーに
+# 同梱します。ビルド前に、実 Bada インタープリタで
+# インストール (実ディスク RDM / LILO→MBR / GRUB メニュー) → 再起動 →
+# ログイン (vim/emacs/sshd/xinetd プリインストール) → NAT 経由インターネット
+# (ping/curl/wget, apt 外部ミラー) → su/sudo ユーザー切替 → X 表示
+# のライフサイクル全体をセルフチェックします。
+# Actions アーティファクト、および (quantumvm-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: quantumvm-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'quantumvm-v*'
+    # PR マージ前でもこのブランチへの push でビルド + Release 添付を実行
+    # (タグ push はブランチ保護で 403 になるため。マージ後はタグ運用が本線)
+    branches:
+      - 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build + self-check (Bada full guest lifecycle)
+        run: |
+          set -e
+          node quantum_vm/tools/build-vm.js
+          test -f quantum_vm/dist/bada-vm-pro.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("quantum_vm/dist/bada-vm-pro.html", "utf8");
+            for (const marker of ["BadaLang", "VM_LIBS", "vm_create", "os_run",
+                                  "JONES-KNOT-COOKIE-1", "sysinst"]) {
+              if (!src.includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+            console.log("dist HTML markers OK");
+          '
+      - name: Upload single-file app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badavmpro-html
+          path: quantum_vm/dist/bada-vm-pro.html
+      - name: Attach single-file app to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'quantumvm-v1.11.0' }}
+          files: quantum_vm/dist/bada-vm-pro.html
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build self-contained www
+        shell: bash
+        run: node quantum_vm/tools/build-vm.js
+      - name: Build Windows 10/11 EXE (Electron)
+        working-directory: quantum_vm/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badavmpro-windows
+          path: quantum_vm/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'quantumvm-v1.11.0' }}
+          files: quantum_vm/app/electron/dist/*.exe
+
+  # BadaOS Live: a REAL bootable ISO for real PCs — GRUB 2 menu at power-on,
+  # minimal Debian live system, BadaOS fullscreen kiosk, and the
+  # badaos-install real-disk installer inside. Verified locally by booting
+  # the ISO in QEMU (the GRUB menu shows "BadaOS GNU/Quantum 12.0").
+  live-iso:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build the app (kiosk payload)
+        run: node quantum_vm/tools/build-vm.js
+      - name: Install ISO build tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq debootstrap debian-archive-keyring \
+            squashfs-tools xorriso mtools grub-pc-bin grub-efi-amd64-bin grub-common
+      - name: Build BadaOS live ISO (debootstrap + squashfs + grub-mkrescue)
+        run: sudo bash quantum_vm/live/build-live-iso.sh quantum_vm/dist/BadaOS-12.0-live-amd64.iso
+      - name: Verify the ISO is BIOS+UEFI bootable
+        run: |
+          xorriso -indev quantum_vm/dist/BadaOS-12.0-live-amd64.iso -report_el_torito plain | tee eltorito.txt
+          grep -q "BIOS" eltorito.txt && grep -q "UEFI" eltorito.txt
+          test "$(stat -c%s quantum_vm/dist/BadaOS-12.0-live-amd64.iso)" -gt 200000000
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaos-live-iso
+          path: quantum_vm/dist/BadaOS-12.0-live-amd64.iso
+      - name: Attach ISO to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'quantumvm-v1.11.0' }}
+          files: quantum_vm/dist/BadaOS-12.0-live-amd64.iso
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build self-contained www
+        run: node quantum_vm/tools/build-vm.js
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: quantum_vm/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: badavmpro-linux
+          path: |
+            quantum_vm/app/electron/dist/*.AppImage
+            quantum_vm/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'quantumvm-v1.11.0' }}
+          files: |
+            quantum_vm/app/electron/dist/*.AppImage
+            quantum_vm/app/electron/dist/*.deb

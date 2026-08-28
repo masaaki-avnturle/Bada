@@ -1,0 +1,362 @@
+#!/bin/bash
+# ============================================================================
+# badaos-install — install BadaOS GNU/Quantum onto a REAL disk, for real.
+#
+# Run from inside the BadaOS live boot (as root: `sudo badaos-install`,
+# e.g. after booting the ISO from a USB stick).
+#
+# THE DEFAULT MODE DOES NOT ERASE THE DISK: it installs into the FREE
+# (unallocated) SPACE of the chosen disk by creating one new partition
+# there — every existing partition (Windows, Linux, data) is left exactly
+# as it is. Alternatively one existing partition of your choice can be
+# reused (only that partition is formatted). Erasing the whole disk is a
+# separate, explicit mode.
+#
+# Boot loader registration ("GRUBに記銘"):
+#   * BIOS machines: grub-install writes GRUB to the MBR of the chosen disk
+#     (partition table kept), and update-grub + os-prober add the OSes
+#     already on the machine (Windows / other Linux) to the GRUB menu, so
+#     the menu shows BadaOS *and* everything that was there before.
+#   * UEFI machines: the EXISTING EFI System Partition is reused as-is
+#     (never formatted); grub-install adds a separate "BadaOS" entry to the
+#     firmware boot menu next to the existing ones.
+#
+# Modes:
+#   sudo badaos-install                  interactive (free space / one
+#                                        partition / whole disk)
+#   sudo badaos-install --auto-free DEV  unattended: install into the largest
+#                                        free region of DEV, keep all existing
+#                                        partitions (VM use; powers off)
+#   sudo badaos-install --auto DEV       unattended: ERASE DEV completely and
+#                                        install (VM use; powers off)
+#
+# grub-install and update-grub are preinstalled in the live system and in
+# every installed BadaOS (grub2-common / grub-pc-bin / grub-efi-amd64-bin).
+# ============================================================================
+set -euo pipefail
+
+[ "$(id -u)" = 0 ] || { echo "run as root: sudo badaos-install"; exit 1; }
+grep -q boot=live /proc/cmdline || {
+    echo "badaos-install must run inside the BadaOS live boot."; exit 1; }
+
+MIN_MB=4096     # minimum size for the BadaOS root partition
+
+AUTO=0
+MODE=""
+POWEROFF=0
+RUNPART=""
+if [ "${1:-}" = "--auto" ]; then
+    AUTO=1; MODE=disk; POWEROFF=1
+    TARGET="${2:?usage: badaos-install --auto /dev/vda}"
+    D="${TARGET#/dev/}"
+elif [ "${1:-}" = "--auto-free" ]; then
+    AUTO=1; MODE=free; POWEROFF=1
+    TARGET="${2:?usage: badaos-install --auto-free /dev/vda}"
+    D="${TARGET#/dev/}"
+elif [ "${1:-}" = "--run" ]; then
+    # non-interactive single run for the GUI installer: no prompts, no
+    # poweroff — the GUI shows progress and offers the reboot itself.
+    AUTO=1
+    MODE="${2:?usage: badaos-install --run free|part|disk TARGET}"
+    RUNTARGET="${3:?usage: badaos-install --run free|part|disk TARGET}"
+    case "$MODE" in
+        free|disk)
+            TARGET="$RUNTARGET"
+            D="${TARGET#/dev/}"
+            ;;
+        part)
+            RUNPART="$RUNTARGET"
+            PK="$(lsblk -nro PKNAME "$RUNPART" | head -1)"
+            [ -n "$PK" ] || { echo "cannot find the disk of $RUNPART"; exit 1; }
+            D="$PK"
+            TARGET="/dev/$D"
+            ;;
+        *) echo "unknown --run mode: $MODE"; exit 1;;
+    esac
+fi
+
+echo "=============================================================="
+echo " BadaOS GNU/Quantum 12.0 — real-disk installer"
+echo "=============================================================="
+echo "Disks and partitions on this machine:"
+lsblk -o NAME,SIZE,FSTYPE,PARTTYPENAME,MOUNTPOINTS 2>/dev/null | grep -v loop || \
+    lsblk | grep -v loop || true
+echo
+if [ "$AUTO" = 0 ]; then
+    read -rp "Target disk (e.g. sda / nvme0n1): " D
+    TARGET="/dev/$D"
+fi
+[ -b "$TARGET" ] || { echo "no such block device: $TARGET"; exit 1; }
+# refuse the live medium itself
+LIVEDEV="$(findmnt -no SOURCE /run/live/medium 2>/dev/null || true)"
+case "$LIVEDEV" in "$TARGET"*) echo "that is the live medium itself"; exit 1;; esac
+
+# partition device prefix (sda -> sda1, nvme0n1 -> nvme0n1p1)
+P="$TARGET"
+case "$D" in nvme*|mmcblk*) P="${TARGET}p";; esac
+
+if [ "$AUTO" = 0 ]; then
+    echo
+    echo "Install mode:"
+    echo "  1) FREE SPACE (default, keeps everything) -- create ONE new partition"
+    echo "     in the unallocated space of $TARGET; no existing partition is touched"
+    echo "  2) ONE EXISTING PARTITION -- format only a partition you name;"
+    echo "     the rest of the disk is kept"
+    echo "  3) WHOLE DISK -- erase $TARGET completely and install"
+    read -rp "Mode [1/2/3, Enter=1]: " MSEL
+    case "${MSEL:-1}" in
+        1) MODE=free;;
+        2) MODE=part;;
+        3) MODE=disk;;
+        *) echo "unknown mode"; exit 1;;
+    esac
+fi
+
+EFI=0
+if [ -d /sys/firmware/efi ]; then EFI=1; fi
+
+ROOTPART=""
+ESPPART=""
+FORMAT_ESP=0
+
+# --- locate an existing EFI System Partition (never formatted) -------------
+find_esp() {
+    lsblk -nro NAME,PARTTYPE 2>/dev/null | \
+        awk 'toupper($2)=="C12A7328-F81F-11D2-BA4B-00A0C93EC93B"{print "/dev/"$1; exit}'
+}
+
+# --- largest free region of $TARGET, MiB (echoes "START END SIZE") ---------
+largest_free() {
+    parted -s -m "$TARGET" unit MiB print free 2>/dev/null | tr -d ';' | \
+        awk -F: '$5=="free" {
+            gsub(/MiB/,"")
+            if ($4+0 > best) { best=$4+0; s=$2+0; e=$3+0 }
+        } END {
+            # start rounded up, end rounded down minus 1 MiB: parted rejects
+            # an end coordinate equal to the device end ("outside the device")
+            if (best > 0) printf "%d %d %d\n", int(s)+1, int(e)-1, int(e)-int(s)-2
+        }'
+}
+
+case "$MODE" in
+# ---------------------------------------------------------------------------
+free)
+    # a blank disk has no partition table yet: give it one (nothing is lost,
+    # there is nothing on it); the whole disk then counts as free space.
+    if ! parted -s "$TARGET" print >/dev/null 2>&1; then
+        echo "==> $TARGET has no partition table; creating one (disk is blank)"
+        if [ "$EFI" = 1 ]; then parted -s "$TARGET" mklabel gpt
+        else parted -s "$TARGET" mklabel msdos; fi
+    fi
+    REGION="$(largest_free)"
+    [ -n "$REGION" ] || { echo "no free space found on $TARGET."; exit 1; }
+    FSTART="$(echo "$REGION" | awk '{print $1}')"
+    FEND="$(echo "$REGION" | awk '{print $2}')"
+    FSIZE="$(echo "$REGION" | awk '{print $3}')"
+    echo
+    echo "==> largest FREE region on $TARGET: ${FSIZE} MiB (${FSTART}MiB - ${FEND}MiB)"
+    if [ "$FSIZE" -lt "$MIN_MB" ]; then
+        echo "that is smaller than the ${MIN_MB} MiB BadaOS needs."
+        echo "Shrink a partition first (e.g. in Windows: Disk Management ->"
+        echo "Shrink Volume), then run badaos-install again."
+        exit 1
+    fi
+    echo "    A new partition will be created THERE ONLY."
+    echo "    No existing partition of $TARGET is modified or erased."
+    if [ "$AUTO" = 0 ]; then
+        read -rp "Type exactly 'INSTALL FREE $D' to continue: " CONFIRM
+        [ "$CONFIRM" = "INSTALL FREE $D" ] || { echo "aborted."; exit 1; }
+    else
+        echo "    (unattended VM mode: using the free space of $TARGET)"
+    fi
+    BEFORE="$(lsblk -nro NAME "$TARGET")"
+    if [ "$EFI" = 1 ]; then
+        parted -s "$TARGET" unit MiB mkpart badaos ext4 "${FSTART}MiB" "${FEND}MiB"
+    else
+        # msdos: try a primary partition, then a logical one (4-primary limit)
+        parted -s "$TARGET" unit MiB mkpart primary ext4 "${FSTART}MiB" "${FEND}MiB" || \
+        parted -s "$TARGET" unit MiB mkpart logical ext4 "${FSTART}MiB" "${FEND}MiB" || {
+            echo "could not create a partition in the free region (msdos partition"
+            echo "limit?). Free a primary slot or use an existing partition (mode 2)."
+            exit 1
+        }
+    fi
+    udevadm settle || sleep 2
+    AFTER="$(lsblk -nro NAME "$TARGET")"
+    NEWNAME="$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)"
+    [ -n "$NEWNAME" ] || { echo "new partition did not appear"; exit 1; }
+    ROOTPART="/dev/$NEWNAME"
+    echo "==> new partition: $ROOTPART (only this one is formatted)"
+    mkfs.ext4 -q -F -L badaos "$ROOTPART"
+    if [ "$EFI" = 1 ]; then
+        ESPPART="$(find_esp)"
+        [ -n "$ESPPART" ] || {
+            echo "UEFI machine but no EFI System Partition found; use whole-disk"
+            echo "mode (3) on an empty disk instead."; exit 1; }
+        echo "==> reusing the existing EFI System Partition $ESPPART (NOT formatted)"
+    fi
+    ;;
+# ---------------------------------------------------------------------------
+part)
+    if [ "$AUTO" = 1 ]; then
+        PN="${RUNPART#/dev/}"
+    else
+        read -rp "Partition to FORMAT and install into (e.g. ${D}3): " PN
+    fi
+    ROOTPART="/dev/$PN"
+    [ -b "$ROOTPART" ] || { echo "no such partition: $ROOTPART"; exit 1; }
+    PK="$(lsblk -nro PKNAME "$ROOTPART" | head -1)"
+    [ "$PK" = "$D" ] || { echo "$ROOTPART is not a partition of $TARGET"; exit 1; }
+    if findmnt -no TARGET "$ROOTPART" >/dev/null 2>&1; then
+        echo "$ROOTPART is mounted; unmount it first."; exit 1
+    fi
+    SZ="$(lsblk -bnro SIZE "$ROOTPART" | head -1)"
+    [ "$((SZ / 1024 / 1024))" -ge "$MIN_MB" ] || {
+        echo "$ROOTPART is smaller than the ${MIN_MB} MiB BadaOS needs."; exit 1; }
+    echo
+    echo "  *** ONLY $ROOTPART will be formatted; the rest of $TARGET is kept ***"
+    if [ "$AUTO" = 0 ]; then
+        read -rp "Type exactly 'INSTALL $PN' to continue: " CONFIRM
+        [ "$CONFIRM" = "INSTALL $PN" ] || { echo "aborted."; exit 1; }
+    fi
+    mkfs.ext4 -q -F -L badaos "$ROOTPART"
+    if [ "$EFI" = 1 ]; then
+        ESPPART="$(find_esp)"
+        [ -n "$ESPPART" ] || { echo "no EFI System Partition found"; exit 1; }
+        if [ "$ESPPART" = "$ROOTPART" ]; then
+            echo "that IS the EFI System Partition"; exit 1
+        fi
+        echo "==> reusing the existing EFI System Partition $ESPPART (NOT formatted)"
+    fi
+    ;;
+# ---------------------------------------------------------------------------
+disk)
+    echo
+    echo "  *** ALL DATA ON $TARGET WILL BE DESTROYED ***"
+    if [ "$AUTO" = 0 ]; then
+        read -rp "Type exactly 'INSTALL $D' to continue: " CONFIRM
+        [ "$CONFIRM" = "INSTALL $D" ] || { echo "aborted."; exit 1; }
+    else
+        echo "  (unattended VM mode: installing to $TARGET)"
+    fi
+    if [ "$EFI" = 1 ]; then
+        echo "==> UEFI machine: GPT + ESP + root"
+        parted -s "$TARGET" mklabel gpt \
+            mkpart ESP fat32 1MiB 257MiB set 1 esp on \
+            mkpart badaos ext4 257MiB 100%
+        udevadm settle || sleep 2
+        mkfs.vfat -F32 -n BADAESP "${P}1"
+        mkfs.ext4 -q -F -L badaos "${P}2"
+        ROOTPART="${P}2"; ESPPART="${P}1"; FORMAT_ESP=1
+    else
+        echo "==> BIOS machine: MBR + one bootable partition (GRUB into the MBR)"
+        parted -s "$TARGET" mklabel msdos \
+            mkpart primary ext4 1MiB 100% set 1 boot on
+        udevadm settle || sleep 2
+        mkfs.ext4 -q -F -L badaos "${P}1"
+        ROOTPART="${P}1"; ESPPART=""
+    fi
+    ;;
+esac
+
+# ===========================================================================
+# common: copy the system, register GRUB, keep the other OSes in the menu
+# ===========================================================================
+M=/mnt/badaos
+mkdir -p "$M"
+mount "$ROOTPART" "$M"
+
+echo "==> copying the system to $ROOTPART (a few minutes)..."
+rsync -aHAX --info=progress2 \
+    --exclude=/proc/'*' --exclude=/sys/'*' --exclude=/dev/'*' \
+    --exclude=/run/'*' --exclude=/tmp/'*' --exclude=/mnt/'*' \
+    --exclude=/media/'*' --exclude=/lib/live/mount \
+    / "$M/"
+mkdir -p "$M"/{proc,sys,dev,run,tmp,mnt,media}
+
+UUID="$(blkid -s UUID -o value "$ROOTPART")"
+{
+    echo "UUID=$UUID / ext4 errors=remount-ro 0 1"
+    if [ -n "$ESPPART" ]; then
+        echo "UUID=$(blkid -s UUID -o value "$ESPPART") /boot/efi vfat umask=0077 0 1"
+    fi
+} > "$M/etc/fstab"
+
+# the installed system boots normally, not via live-boot, and lists the
+# machine's other OSes in its GRUB menu (os-prober)
+sed -i 's/ boot=live//g; s/ toram//g; s/ textonly//g' "$M/etc/default/grub" 2>/dev/null || true
+sed -i 's/^#*GRUB_DISABLE_OS_PROBER=.*/GRUB_DISABLE_OS_PROBER=false/' "$M/etc/default/grub" 2>/dev/null || true
+grep -q '^GRUB_DISABLE_OS_PROBER=' "$M/etc/default/grub" 2>/dev/null || \
+    echo 'GRUB_DISABLE_OS_PROBER=false' >> "$M/etc/default/grub"
+
+chroot_run() { chroot "$M" env DEBIAN_FRONTEND=noninteractive "$@"; }
+mount -t proc proc "$M/proc"
+mount -t sysfs sys "$M/sys"
+mount -o bind /dev "$M/dev"
+mount -o bind /dev/pts "$M/dev/pts"
+trap 'umount -lf "$M/dev/pts" "$M/dev" "$M/sys" "$M/proc" "$M/boot/efi" "$M" 2>/dev/null || true' EXIT
+
+if [ -n "$ESPPART" ]; then
+    mkdir -p "$M/boot/efi"
+    mount "$ESPPART" "$M/boot/efi"
+    echo "==> grub-install (UEFI): adding boot entry 'BadaOS' to the firmware menu"
+    [ "$FORMAT_ESP" = 1 ] || \
+        echo "    (existing ESP reused; the entries already on it are untouched)"
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=BadaOS --recheck --no-nvram || \
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot/efi \
+        --bootloader-id=BadaOS --recheck
+    # removable fallback path so it boots even without an NVRAM entry
+    # (only when this install owns the whole disk -- never on a shared ESP,
+    #  where BOOTX64.EFI may belong to another OS)
+    if [ "$FORMAT_ESP" = 1 ]; then
+        mkdir -p "$M/boot/efi/EFI/BOOT"
+        cp "$M/boot/efi/EFI/BadaOS/grubx64.efi" "$M/boot/efi/EFI/BOOT/BOOTX64.EFI" 2>/dev/null || true
+    fi
+else
+    WRITE_MBR=1
+    if [ "$AUTO" = 0 ] && [ "$MODE" != disk ]; then
+        echo
+        echo "GRUB will now be written to the MBR of $TARGET (the partition table"
+        echo "is kept). update-grub + os-prober then put the OSes already on this"
+        echo "machine into the GRUB menu, next to BadaOS."
+        read -rp "Write GRUB to the MBR of $TARGET? [Y/n]: " YN
+        case "${YN:-Y}" in n|N) WRITE_MBR=0;; esac
+    fi
+    if [ "$WRITE_MBR" = 1 ]; then
+        echo "==> grub-install (BIOS): writing GRUB into the MBR of $TARGET"
+        chroot_run grub-install --target=i386-pc --recheck "$TARGET"
+    else
+        echo "==> skipping the MBR. To boot BadaOS, add it to your existing GRUB:"
+        echo "    it is the ext4 partition labeled 'badaos' ($ROOTPART)."
+    fi
+fi
+echo "==> update-grub: registering BadaOS (and the machine's other OSes)"
+chroot_run update-initramfs -u
+chroot_run update-grub
+
+# the installed system must not re-run the unattended installer
+sed -i '/badaos-autoinstall/d' "$M/etc/systemd/system/multi-user.target.wants/badaos-autoinstall.service" 2>/dev/null || true
+rm -f "$M/etc/systemd/system/multi-user.target.wants/badaos-autoinstall.service"
+
+sync
+echo
+echo "=============================================================="
+echo " Done. Remove the live USB and reboot:"
+echo "   the GRUB menu now lists BadaOS GNU/Quantum 12.0"
+if [ "$MODE" = disk ]; then
+    echo "   standalone from $TARGET  (login: bada / badaos)"
+else
+    echo "   on $ROOTPART -- every other partition and OS of $TARGET"
+    echo "   is untouched  (login: bada / badaos)"
+fi
+echo "   The same partition also boots inside a virtual machine"
+echo "   (VMware raw disk / QEMU -drive with the physical disk)."
+echo "=============================================================="
+if [ "$POWEROFF" = 1 ]; then
+    echo "BADAOS-AUTOINSTALL-DONE"
+    umount -lf "$M/dev/pts" "$M/dev" "$M/sys" "$M/proc" "$M/boot/efi" "$M" 2>/dev/null || true
+    trap - EXIT
+    sync
+    poweroff
+fi

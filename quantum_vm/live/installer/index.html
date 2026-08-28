@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>BadaOS 12.0 のインストール</title>
+<style>
+/* ======================================================================
+   BadaOS GUI installer — an Ubuntu-style (Ubiquity-like) friendly wizard.
+   Aubergine header, orange primary actions, left step rail, partition bar.
+   ====================================================================== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: "Noto Sans CJK JP", "Ubuntu", system-ui, sans-serif;
+  background: #f7f7f7; color: #111; display: flex; flex-direction: column;
+}
+header {
+  background: linear-gradient(90deg, #2c001e, #5e2750 60%, #772953);
+  color: #fff; padding: 14px 22px; display: flex; align-items: center; gap: 12px;
+}
+header .logo {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff9e6d, #e95420 65%, #b83c12);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.25);
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header .sub { font-size: 12px; opacity: .75; }
+main { flex: 1; display: flex; min-height: 0; }
+nav {
+  width: 210px; background: #efe9ed; border-right: 1px solid #ddd;
+  padding: 18px 0; font-size: 13px;
+}
+nav div { padding: 9px 20px; color: #777; }
+nav div.cur { color: #2c001e; font-weight: 700; border-left: 4px solid #e95420; background: #fff; }
+nav div.done { color: #3a7d33; }
+nav div.done::before { content: "✓ "; }
+section { flex: 1; padding: 26px 34px; overflow: auto; }
+h2 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.en { color: #888; font-size: 12.5px; margin-bottom: 18px; }
+p.lead { font-size: 14.5px; line-height: 1.75; margin-bottom: 14px; }
+footer {
+  border-top: 1px solid #ddd; background: #fff;
+  padding: 12px 22px; display: flex; justify-content: flex-end; gap: 10px;
+}
+button {
+  font: inherit; font-size: 14px; padding: 9px 26px; border-radius: 4px;
+  border: 1px solid #c7c7c7; background: #fff; cursor: pointer;
+}
+button.primary { background: #e95420; border-color: #c7431a; color: #fff; font-weight: 600; }
+button.primary:focus { outline: 3px solid #f6b39a; }
+button:disabled { opacity: .45; cursor: default; }
+.card {
+  display: block; border: 1.5px solid #ccc; border-radius: 8px; background: #fff;
+  padding: 14px 16px; margin-bottom: 12px; cursor: pointer;
+}
+.card:has(input:checked) { border-color: #e95420; box-shadow: 0 0 0 2px #f9c9b4; }
+.card b { font-size: 15px; }
+.card .desc { font-size: 12.5px; color: #666; margin-top: 4px; line-height: 1.6; }
+.card input { margin-right: 9px; accent-color: #e95420; }
+.warn { color: #b00020; font-weight: 600; }
+.safe { color: #3a7d33; font-weight: 600; }
+select {
+  font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 4px;
+  border: 1px solid #bbb; background: #fff; min-width: 340px;
+}
+.bar {
+  display: flex; height: 46px; border: 1px solid #999; border-radius: 6px;
+  overflow: hidden; margin: 14px 0 6px;
+}
+.seg { position: relative; min-width: 2px; border-right: 1px solid rgba(0,0,0,.25); }
+.seg:last-child { border-right: none; }
+.fs-part  { background: #a4c2e0; }
+.fs-esp   { background: #d8c690; }
+.fs-free  { background: repeating-linear-gradient(45deg,#bfe6b8,#bfe6b8 8px,#d9f2d4 8px,#d9f2d4 16px); }
+.fs-new   { background: #e95420; }
+.fs-wipe  { background: repeating-linear-gradient(45deg,#f2b3b3,#f2b3b3 8px,#fad3d3 8px,#fad3d3 16px); }
+.seg span {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; font-size: 10.5px; color: #222;
+  overflow: hidden; white-space: nowrap;
+}
+.legend { font-size: 11.5px; color: #666; margin-bottom: 14px; }
+.legend i { display: inline-block; width: 11px; height: 11px; border: 1px solid #999; margin: 0 4px 0 12px; vertical-align: -1px; }
+ul.actions { margin: 12px 0 0 22px; font-size: 14px; line-height: 2; }
+.progress-outer {
+  height: 20px; background: #e6e0e3; border-radius: 10px; overflow: hidden; margin: 18px 0 8px;
+}
+.progress-inner {
+  height: 100%; width: 0%; border-radius: 10px;
+  background: linear-gradient(90deg, #e95420, #f4964f); transition: width .8s;
+}
+#phase { font-size: 14px; font-weight: 600; }
+#pct { color: #666; font-size: 12.5px; }
+.slide {
+  margin-top: 22px; background: #2c001e; color: #eee; border-radius: 10px;
+  padding: 18px 22px; font-size: 13.5px; line-height: 1.8; min-height: 90px;
+}
+.slide b { color: #f4964f; }
+#log {
+  display: none; margin-top: 14px; background: #111; color: #9fdf9f;
+  font: 11px/1.5 monospace; padding: 10px; border-radius: 6px;
+  height: 180px; overflow: auto; white-space: pre-wrap;
+}
+.big-ok { font-size: 52px; color: #3a7d33; margin: 18px 0 6px; }
+a.toggle { font-size: 12px; color: #772953; cursor: pointer; text-decoration: underline; }
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <div>
+    <h1>BadaOS 12.0 GNU/Quantum のインストール</h1>
+    <div class="sub">Install BadaOS — the quantum OS of the Bada language</div>
+  </div>
+</header>
+<main>
+  <nav id="rail"></nav>
+  <section id="content"></section>
+</main>
+<footer>
+  <button id="btn-back">戻る</button>
+  <button id="btn-next" class="primary">続ける</button>
+</footer>
+<script>
+"use strict";
+const STEPS = ["ようこそ", "インストールの種類", "ディスクの選択", "インストールの確認", "インストール", "完了"];
+const MIN_MB = 4096;
+let step = 0;
+let data = null;            // /api/disks payload
+let st = { mode: "free", disk: null, part: null };
+let pollTimer = null, slideTimer = null, slideIx = 0;
+
+const SLIDES = [
+  "<b>量子 OS へようこそ。</b>BadaOS のハイパーバイザ・ゲスト OS・X サーバーは、すべて量子プログラミング言語 <b>Bada</b> で書かれています。8 qubit の vCPU が Bell 対の零保存を守ります。",
+  "<b>Ubuntu 級の apt。</b>74,362 パッケージのアーカイブから <code>apt install</code> でなんでも導入。vim・emacs・sshd・xinetd はプリインストール済みです。",
+  "<b>zone:// ウルトラネットワーク。</b>サーバーの無い P2P WWW。ページは Jones 多項式の量子暗号で封緘され、ZoneBrowser や MigemoInsta で閲覧できます。",
+  "<b>BadaOS Commander。</b>System Commander 風のブートマネージャが、このマシンの全 OS を 1 つの GRUB メニューに並べます。既存の OS は消えません。",
+];
+
+const $ = (id) => document.getElementById(id);
+const fmtG = (mib) => (mib / 1024).toFixed(1) + " GB";
+
+function rail() {
+  $("rail").innerHTML = STEPS.map((s, i) =>
+    `<div class="${i === step ? "cur" : i < step ? "done" : ""}">${s}</div>`).join("");
+}
+
+function segsOf(disk, mode) {
+  return disk.segments.map(sg => {
+    let cls = sg.type === "free" ? "fs-free" : (sg.esp ? "fs-esp" : "fs-part");
+    let label = sg.type === "free" ? "空き領域" : (sg.name || "") ;
+    let sub = fmtG(sg.sizeMiB) + (sg.fstype && sg.type !== "free" ? " " + sg.fstype : "");
+    if (mode === "disk") { cls = sg.type === "free" ? "fs-free" : "fs-wipe"; }
+    if (mode === "free" && sg.type === "free" && sg.sizeMiB === disk.bestFree) {
+      cls = "fs-new"; label = "BadaOS (新規)"; sub = fmtG(sg.sizeMiB);
+      return { cls: cls, label: label, sub: sub, w: sg.sizeMiB, white: 1 };
+    }
+    if (mode === "part" && st.part && sg.name === st.part) {
+      cls = "fs-new"; label = "BadaOS"; return { cls, label, sub, w: sg.sizeMiB, white: 1 };
+    }
+    return { cls: cls, label: label, sub: sub, w: sg.sizeMiB, white: 0 };
+  });
+}
+
+function barHTML(disk, mode) {
+  const total = disk.segments.reduce((a, s) => a + s.sizeMiB, 0) || 1;
+  const segs = segsOf(disk, mode).map(s =>
+    `<div class="seg ${s.cls}" style="width:${(100 * s.w / total).toFixed(2)}%">
+       <span style="${s.white ? "color:#fff;font-weight:700" : ""}">${s.label}<br>${s.sub}</span>
+     </div>`).join("");
+  return `<div class="bar">${segs}</div>
+    <div class="legend">凡例: <i class="fs-part"></i>既存パーティション(そのまま)
+      <i class="fs-free"></i>空き領域 <i class="fs-new"></i>BadaOS
+      ${mode === "disk" ? '<i class="fs-wipe"></i><span class="warn">削除されます</span>' : ""}</div>`;
+}
+
+function curDisk() { return data.disks.find(d => d.dev === st.disk) || data.disks[0]; }
+
+/* ---------------- pages ---------------- */
+function pageWelcome() {
+  return `<h2>BadaOS 12.0 へようこそ</h2>
+  <div class="en">Welcome — this wizard installs BadaOS the same friendly way Ubuntu does.</div>
+  <p class="lead">このウィザードが、数クリックで BadaOS をこのコンピュータにインストールします。</p>
+  <p class="lead">おすすめの方法は<b>「空き領域にインストール」</b>です:
+  いまある Windows や Linux、データには<b class="safe">一切手を付けず</b>、
+  ディスクの空き領域だけを使って BadaOS を追加します。再起動後は
+  <b>BadaOS Commander</b>(GRUB メニュー)でどの OS を起動するか選べます。</p>
+  <p class="lead">まだ試したいだけなら、このまま何もインストールせずに Live 環境を使い続けられます。</p>`;
+}
+
+function pageType() {
+  return `<h2>インストールの種類</h2>
+  <div class="en">Choose how to install — nothing is written to the disk until you confirm.</div>
+  <label class="card"><input type="radio" name="mode" value="free" ${st.mode === "free" ? "checked" : ""}>
+    <b>空き領域にインストール</b> <span class="safe">(推奨・何も消えません)</span>
+    <div class="desc">ディスクの未割り当て領域に BadaOS 用のパーティションを 1 個だけ作ります。
+    既存の OS・パーティション・データはそのまま残り、起動時のメニューに BadaOS が並びます。</div></label>
+  <label class="card"><input type="radio" name="mode" value="part" ${st.mode === "part" ? "checked" : ""}>
+    <b>パーティションを指定してインストール</b>
+    <div class="desc">選んだパーティション 1 個だけをフォーマットして使います。それ以外は残ります。</div></label>
+  <label class="card"><input type="radio" name="mode" value="disk" ${st.mode === "disk" ? "checked" : ""}>
+    <b>ディスクを削除して BadaOS をインストール</b>
+    <div class="desc"><span class="warn">⚠ 選んだディスクの全データが消去されます。</span>
+    BadaOS 専用マシンにする場合だけ選んでください。</div></label>`;
+}
+
+function pageDisk() {
+  const d = curDisk();
+  let extra = "";
+  if (st.mode === "part") {
+    const parts = d.segments.filter(s => s.type === "part" && !s.esp && s.sizeMiB >= MIN_MB);
+    extra = parts.length
+      ? "<p class='lead'>フォーマットして使うパーティション:</p>" + parts.map(p =>
+        `<label class="card"><input type="radio" name="part" value="${p.name}" ${st.part === p.name ? "checked" : ""}>
+         <b>/dev/${p.name}</b> — ${fmtG(p.sizeMiB)} ${p.fstype || ""} ${p.label ? "(" + p.label + ")" : ""}
+         <div class="desc warn">このパーティションの中身は消えます。他はそのままです。</div></label>`).join("")
+      : "<p class='lead warn'>このディスクに 4 GB 以上の使えるパーティションがありません。</p>";
+  }
+  let note;
+  if (st.mode === "free") {
+    note = d.bestFree >= MIN_MB
+      ? `<p class="lead">最大の空き領域 <b>${fmtG(d.bestFree)}</b> に BadaOS を作ります。
+         <span class="safe">既存のパーティションには書き込みません。</span></p>`
+      : `<p class="lead warn">このディスクに ${fmtG(MIN_MB)} 以上の空き領域がありません。
+         Windows の「ボリュームの縮小」などで空きを作ってから再実行してください。</p>`;
+  } else if (st.mode === "disk") {
+    note = `<p class="lead warn">⚠ このディスクのすべての内容が削除されます。</p>`;
+  } else { note = ""; }
+  return `<h2>ディスクの選択</h2>
+  <div class="en">Pick the target disk — the colored bar shows exactly what will change.</div>
+  <select id="disksel">${data.disks.map(x =>
+    `<option value="${x.dev}" ${x.dev === d.dev ? "selected" : ""}>${x.dev} — ${fmtG(x.sizeMiB)} ${x.model || ""}</option>`).join("")}
+  </select>
+  ${barHTML(d, st.mode)} ${note} ${extra}`;
+}
+
+function pageConfirm() {
+  const d = curDisk();
+  const acts = [];
+  if (st.mode === "free") {
+    acts.push(`${d.dev} の空き領域に <b>${fmtG(d.bestFree)}</b> の新しいパーティションを作成 (ext4)`);
+    acts.push(`<span class="safe">既存のパーティションと OS はすべてそのまま残します</span>`);
+  } else if (st.mode === "part") {
+    acts.push(`<b>/dev/${st.part}</b> をフォーマット (ext4) — <span class="warn">この 1 個の中身だけ消えます</span>`);
+    acts.push(`<span class="safe">他のパーティションはそのまま残します</span>`);
+  } else {
+    acts.push(`<span class="warn">${d.dev} 全体を消去</span>してパーティションを作成`);
+  }
+  acts.push("BadaOS のシステム一式をコピー (vim / emacs / sshd / apt / BadaVM Pro)");
+  acts.push(data.efi
+    ? "既存の EFI システムパーティションに「BadaOS」起動エントリを追加 (フォーマットしません)"
+    : `grub-install が ${d.dev} の MBR に GRUB を書き込み (パーティションテーブルは保持)`);
+  acts.push("update-grub + os-prober + BadaOS Commander が、このマシンの全 OS を起動メニューに登録");
+  return `<h2>ディスクに変更を書き込みますか?</h2>
+  <div class="en">Review the changes — nothing has been written yet.</div>
+  <p class="lead">「インストール」を押すと、次の変更がディスクに書き込まれます:</p>
+  <ul class="actions">${acts.map(a => "<li>" + a + "</li>").join("")}</ul>
+  ${barHTML(d, st.mode)}`;
+}
+
+function pageProgress() {
+  return `<h2>インストールしています…</h2>
+  <div class="en">Installing — this takes a few minutes. Feel free to read about BadaOS below.</div>
+  <div id="phase">準備しています…</div>
+  <div class="progress-outer"><div id="pbar" class="progress-inner"></div></div>
+  <div id="pct"></div>
+  <a class="toggle" onclick="const l=document.getElementById('log');l.style.display=l.style.display==='block'?'none':'block'">詳細ログを表示 / 隠す</a>
+  <div id="log"></div>
+  <div class="slide" id="slide">${SLIDES[0]}</div>`;
+}
+
+function pageDone(ok, rc) {
+  if (ok) return `<h2>インストールが完了しました</h2>
+    <div class="en">Installation finished successfully.</div>
+    <div class="big-ok">✓</div>
+    <p class="lead">BadaOS 12.0 GNU/Quantum のインストールが終わりました。
+    再起動すると <b>BadaOS Commander</b>(GRUB メニュー)に BadaOS と既存の OS が並びます。<br>
+    ログイン: <b>bada</b> / パスワード: <b>badaos</b></p>
+    <p class="lead">USB メモリを抜いてから「今すぐ再起動」を押してください。</p>`;
+  return `<h2>インストールに失敗しました</h2>
+    <div class="en">Installation failed (exit code ${rc}).</div>
+    <p class="lead warn">エラーが発生しました。下の詳細ログを確認してください。ディスクの空き領域不足が主な原因です。</p>
+    <a class="toggle" onclick="const l=document.getElementById('log');l.style.display='block'">詳細ログを表示</a>
+    <div id="log" style="display:block"></div>`;
+}
+
+/* ---------------- flow ---------------- */
+function canNext() {
+  if (step === 2) {
+    const d = curDisk();
+    if (st.mode === "free") return d.bestFree >= MIN_MB;
+    if (st.mode === "part") return !!st.part;
+  }
+  return true;
+}
+
+function render() {
+  rail();
+  const c = $("content");
+  if (step === 0) c.innerHTML = pageWelcome();
+  if (step === 1) c.innerHTML = pageType();
+  if (step === 2) c.innerHTML = pageDisk();
+  if (step === 3) c.innerHTML = pageConfirm();
+  if (step === 4) c.innerHTML = pageProgress();
+  $("btn-back").classList.toggle("hidden", step === 0 || step >= 4);
+  $("btn-next").textContent = step === 3 ? "インストール" : "続ける";
+  $("btn-next").disabled = !canNext();
+  if (step === 4) { $("btn-next").classList.add("hidden"); } else { $("btn-next").classList.remove("hidden"); }
+  c.querySelectorAll("input[name=mode]").forEach(r =>
+    r.addEventListener("change", () => { st.mode = r.value; }));
+  c.querySelectorAll("input[name=part]").forEach(r =>
+    r.addEventListener("change", () => { st.part = r.value; $("btn-next").disabled = !canNext(); }));
+  const sel = $("disksel");
+  if (sel) sel.addEventListener("change", () => { st.disk = sel.value; st.part = null; render(); });
+  $("btn-next").focus();
+}
+
+async function start() {
+  const d = curDisk();
+  const target = st.mode === "part" ? "/dev/" + st.part : d.dev;
+  step = 4; render();
+  slideTimer = setInterval(() => {
+    slideIx = (slideIx + 1) % SLIDES.length;
+    const s = $("slide"); if (s) s.innerHTML = SLIDES[slideIx];
+  }, 7000);
+  await fetch("/api/install", { method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "mode=" + st.mode + "&target=" + encodeURIComponent(target) });
+  pollTimer = setInterval(poll, 2000);
+}
+
+const PHASES = [
+  [/==> update-grub/, "起動メニューに登録しています (update-grub + os-prober)…", 90],
+  [/==> grub-install/, "ブートローダを書き込んでいます (grub-install)…", 82],
+  [/==> copying the system/, "システムをコピーしています…", 15],
+  [/==> new partition|==> largest FREE|==> UEFI machine|==> BIOS machine|ONLY .* will be formatted/, "パーティションを準備しています…", 6],
+];
+
+async function poll() {
+  let j;
+  try { j = await (await fetch("/api/progress")).json(); } catch (e) { return; }
+  const logEl = $("log");
+  if (logEl) { logEl.textContent = j.log; logEl.scrollTop = logEl.scrollHeight; }
+  let pct = 3, phase = "準備しています…";
+  for (const [re, label, base] of PHASES) {
+    if (re.test(j.log)) { phase = label; pct = base; break; }
+  }
+  if (/==> copying the system/.test(j.log)) {
+    const m = j.log.match(/(\d{1,3})%/g);
+    if (m) { const last = parseInt(m[m.length - 1]); pct = Math.max(pct, 15 + Math.round(last * 0.62)); }
+  }
+  if (j.state === "done") {
+    clearInterval(pollTimer); clearInterval(slideTimer);
+    step = 5; rail();
+    $("content").innerHTML = pageDone(true);
+    $("btn-back").classList.add("hidden");
+    $("btn-next").classList.remove("hidden");
+    $("btn-next").textContent = "今すぐ再起動";
+    $("btn-next").disabled = false;
+    $("btn-next").focus();
+    return;
+  }
+  if (j.state === "error") {
+    clearInterval(pollTimer); clearInterval(slideTimer);
+    step = 5; rail();
+    $("content").innerHTML = pageDone(false, j.rc);
+    $("log").textContent = j.log;
+    $("btn-back").classList.remove("hidden");
+    $("btn-next").classList.add("hidden");
+    return;
+  }
+  const p = $("pbar"); if (p) p.style.width = pct + "%";
+  const ph = $("phase"); if (ph) ph.textContent = phase;
+  const pc = $("pct"); if (pc) pc.textContent = pct + "%";
+}
+
+$("btn-next").addEventListener("click", async () => {
+  if (step === 3) { start(); return; }
+  if (step === 5) { fetch("/api/reboot", { method: "POST" }); $("btn-next").disabled = true; return; }
+  if (step < 3) { step++; render(); }
+});
+$("btn-back").addEventListener("click", () => { if (step > 0 && step < 4) { step--; render(); } });
+
+(async function init() {
+  try {
+    data = await (await fetch("/api/disks")).json();
+  } catch (e) {
+    $("content").innerHTML = "<h2>バックエンドに接続できません</h2><p class='lead'>badaos-installer.service が起動しているか確認してください。</p>";
+    return;
+  }
+  if (!data.disks.length) {
+    $("content").innerHTML = "<h2>ディスクが見つかりません</h2>";
+    return;
+  }
+  const best = data.disks.find(d => d.bestFree >= MIN_MB) || data.disks[0];
+  st.disk = best.dev;
+  render();
+})();
+</script>
+</body>
+</html>

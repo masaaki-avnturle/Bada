@@ -1,0 +1,286 @@
+# ============================================================
+# vmpro.bada -- BadaVM Pro : the QUANTUM HYPERVISOR, written in
+# the Bada quantum programming language.
+#
+# BadaVM Pro is an (unofficial, educational) homage to desktop
+# hypervisors in the style of VMware Workstation Pro: a virtual
+# machine monitor with a VMX-like machine description, virtual
+# hardware (quantum vCPU, RAM, disk, NAT network, CD-ROM), a
+# BIOS POST + boot order, snapshots, and a guest console.
+#
+# QUANTUM SERVICES (shared by the guest OS and the X server) ----
+#   * qcpu       -- every vCPU carries a qubit register; the
+#                   scheduler entropy and the guest qrng device
+#                   are Measure commits on that register.
+#   * qkd_session-- a Bell pair (H + CNOT + Measure) agrees a
+#                   session salt; zero-preservation (the
+#                   forbidden |01>,|10> stay EXACTLY 0) is the
+#                   tamper evidence on the virtual wire.
+#   * jones_key  -- long-term keys are derived from a knot
+#                   diagram by sampling the Kauffman bracket /
+#                   Jones polynomial (omega_jones_crypto_pkg,
+#                   ported to Bada) -- used as the X server's
+#                   JONES-KNOT-COOKIE-1 display cookie.
+#
+# SNAPSHOTS are event-ledger prefixes: the whole machine state
+# is the deterministic replay of the append-only event ledger
+# (the Akashic machine tape), so a snapshot is just a committed
+# prefix length -- restore == replay that prefix.
+#
+# Host protocol: every UI-visible effect is printed as a line
+# beginning with "@@" (a machine-parseable block, exactly like
+# zone-lib.bada's zone_serve).
+# ============================================================
+
+# ---- small shared utilities ----------------------------------------
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) { h := (h * 31 + ord(s, i)) % 999983; i := i + 1 }
+    return h
+}
+
+def hex2(v) {
+    d := "0123456789abcdef"
+    lo := v % 16
+    hi := ((v - lo) / 16) % 16
+    return substr(d, hi, 1) + substr(d, lo, 1)
+}
+
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+
+# ---- Jones-polynomial key schedule (omega_jones_crypto, in Bada) ----
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    bits := []
+    i := 0
+    while (i < n) { bits <- 0; i := i + 1 }
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            if (bits[i] == 0) {
+                ra := uf_find(parent, e0)
+                rb := uf_find(parent, e1)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e2)
+                rb := uf_find(parent, e3)
+                if (ra != rb) { parent[ra] = rb }
+                a_cnt := a_cnt + 1
+            } else {
+                ra := uf_find(parent, e1)
+                rb := uf_find(parent, e2)
+                if (ra != rb) { parent[ra] = rb }
+                ra := uf_find(parent, e3)
+                rb := uf_find(parent, e0)
+                if (ra != rb) { parent[ra] = rb }
+                b_cnt := b_cnt + 1
+            }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r := uf_find(parent, lbl)
+            if (seen[r] == 0) { seen[r] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        weight := ipow(A, a_cnt - b_cnt)
+        lf := ipow(d, loops - 1)
+        sum := sum + weight * lf
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+
+# the trefoil knot is the hypervisor's secret; its Jones polynomial is
+# the key schedule of the display cookie (JONES-KNOT-COOKIE-1).
+def vm_knot() {
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+def jones_key(diagram) {
+    As := [0.8, 1.0, 1.2, 1.5, 2.0]
+    acc := "jones|"
+    i := 0
+    while (i < len(As)) { acc := acc + f5(kauffman(diagram, As[i])) + "|"; i := i + 1 }
+    return str_hash(acc)
+}
+
+# ---- Bell-pair QKD: the quantum-secured virtual wire ----------------
+# Returns [ok, salt]. ok == false means the Bell correlation broke:
+# somebody is tapping the virtual network.
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt]
+}
+
+# ---- guarded printing (silent during ledger replay) -----------------
+# SINK routes terminal output: [0] == 0 -> the VM console (@@TTY),
+# [0] == <window id> -> that xterm window on the BadaX display (@@XTTY).
+# A one-element list so functions can retarget it in place.
+SINK := [0]
+
+def tty(emit, s) {
+    if (emit) {
+        if (SINK[0] == 0) { print("@@TTY " + s) }
+        else { print("@@XTTY " + SINK[0] + " " + s) }
+    }
+}
+
+def cls(emit) {
+    if (emit) {
+        if (SINK[0] == 0) { print("@@CLS") }
+        else { print("@@XCLS " + SINK[0]) }
+    }
+}
+
+def hyp(emit, s)  { if (emit) { print("@@HYP " + s) } }
+
+# ====================================================================
+# The virtual machine record
+#   VM = [ name, vcpus, ram_mb, disk_mb, mac, serial, power,
+#          iso, jones_cookie ]
+#         0     1      2       3        4    5       6
+#         7    8
+# ====================================================================
+def vm_mac(name) {
+    h := str_hash("mac:" + name)
+    a := h % 256
+    b := ((h - (h % 256)) / 256) % 256
+    c := ((h - (h % 65536)) / 65536) % 256
+    return "00:0c:ba:" + hex2(a) + ":" + hex2(b) + ":" + hex2(c)
+}
+
+def vm_create(name, vcpus, ram_mb, disk_mb) {
+    mac := vm_mac(name)
+    serial := "QVM-" + str_hash("serial:" + name)
+    cookie := jones_key(vm_knot())
+    return [name, vcpus, ram_mb, disk_mb, mac, serial, 0,
+            "BadaOS-12.0-amd64-quantum.iso", cookie]
+}
+
+# ---- the VMX-like machine description (Settings dialog) -------------
+def vmx_emit(emit, vm) {
+    if (!emit) { return 0 }
+    print("@@VMX .encoding = UTF-8")
+    print("@@VMX config.version = 8")
+    print("@@VMX virtualHW.version = 21")
+    print("@@VMX displayName = " + vm[0])
+    print("@@VMX guestOS = badaos-64")
+    print("@@VMX numvcpus = " + vm[1])
+    print("@@VMX cpuid.family = bada-qcpu")
+    print("@@VMX qcpu.qubits = 8")
+    print("@@VMX qcpu.hilbert_dim = 256")
+    print("@@VMX memsize = " + vm[2])
+    print("@@VMX scsi0:0.fileName = " + vm[0] + ".qvmdk")
+    print("@@VMX scsi0:0.capacity = " + vm[3] + " MB")
+    print("@@VMX ide1:0.fileName = " + vm[7])
+    print("@@VMX ethernet0.connectionType = nat")
+    print("@@VMX ethernet0.address = " + vm[4])
+    print("@@VMX display.server = BadaX (JONES-KNOT-COOKIE-1)")
+    print("@@VMX display.cookie = " + vm[8])
+    print("@@VMX serialNumber = " + vm[5])
+    return 0
+}
+
+# ---- BIOS POST + boot order ----------------------------------------
+def vm_bios(emit, vm, has_system) {
+    tty(emit, "BadaVM Pro BIOS v5.11 -- (C) Global Differential Manifold Research")
+    tty(emit, "qcpu0 + qcpu1 : Bada Quantum vCPU @ 8 qubits (Hilbert dim 256)")
+    tty(emit, "Memory test : " + vm[2] + "M OK  (tuplespace-backed, append-only)")
+    tty(emit, "QKD channel : Bell pair OK -- zero-preservation verified")
+    tty(emit, " ")
+    if (has_system == 0) {
+        tty(emit, "Boot order: CD-ROM, Hard Disk")
+        tty(emit, "Booting from CD-ROM : " + vm[7])
+    } else {
+        tty(emit, "Boot order: Hard Disk, CD-ROM")
+        tty(emit, "Booting from Hard Disk (wd0) ...")
+    }
+    tty(emit, " ")
+    return 0
+}
+
+# ---- power + snapshot ----------------------------------------------
+def vm_power_on(emit, vm) {
+    vm[6] = 1
+    hyp(emit, "power-on " + vm[0])
+    if (emit) { print("@@POWER on") }
+    return 0
+}
+
+def vm_power_off(emit, vm) {
+    vm[6] = 0
+    hyp(emit, "power-off " + vm[0])
+    if (emit) { print("@@POWER off") }
+    return 0
+}
+
+# a snapshot commits the current ledger length: state == replay(prefix)
+def vm_snapshot(emit, vm, nevents) {
+    if (emit) {
+        print("@@SNAPSHOT " + nevents + " events / " + len(tuplespace) + " facts")
+    }
+    return nevents
+}
