@@ -35,16 +35,16 @@ apt-get install -y --no-install-recommends \
   lightdm lightdm-gtk-greeter \
   w9wm xterm x11-utils feh fonts-dejavu || true
 
-# ---- インストーラ Calamares — recommends 込みで導入 (QML/パーティション/GRUB
-#      など実行時依存が要るため --no-install-recommends にしない)。加えて
-#      インストール先で grub を設置できるよう grub 一式と os-prober、
-#      ライブ側で squashfs を展開する squashfs-tools も入れる。----
-apt-get install -y \
-  calamares \
-  qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-controls2 \
-  qml-module-qtquick-layouts \
+# ---- GUI インストーラ (自作: zenity ウィザード) の実行時依存 ----
+#   Calamares は設定が繊細で不安定だったため、自作の GUI インストーラに置換。
+#   ディスク操作 (parted/sgdisk/mkfs)、squashfs 展開、GRUB 設置に必要な
+#   一式を導入する。これらはインストール後のシステムにも含まれる。
+apt-get install -y --no-install-recommends \
+  zenity \
+  parted gdisk dosfstools e2fsprogs util-linux \
+  squashfs-tools rsync \
   grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober \
-  squashfs-tools dosfstools || true
+  || true
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -93,10 +93,10 @@ cat > /etc/skel/Desktop/install-badaos.desktop <<EOF
 [Desktop Entry]
 Type=Application
 Name=Bada VM Pro OS をインストール
-Comment=実ディスクへインストール (Calamares)
+Comment=実ディスクへインストール (GUI ウィザード)
 Exec=/usr/local/bin/install-badaos
 Terminal=false
-Icon=calamares
+Icon=drive-harddisk
 Categories=System;
 EOF
 # casper のライブユーザ (bada) はパスワード無し sudo を持つ (casper が付与)
