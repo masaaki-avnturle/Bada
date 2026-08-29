@@ -49,11 +49,16 @@ rm -rf "$WORK"; mkdir -p "$CHROOT" "$IMAGE" "$OUT"
 debootstrap --arch="$ARCH" --variant=minbase \
   --include=ca-certificates,gnupg "$SUITE" "$CHROOT" "$MIRROR"
 
-# chroot 用マウント
-mount --bind /dev  "$CHROOT/dev"
-mount --bind /run  "$CHROOT/run"
+# chroot 用マウント (proc/sys/devpts が無いと initramfs 更新等が失敗する)
+mount --bind /dev       "$CHROOT/dev"
+mount --bind /dev/pts   "$CHROOT/dev/pts"
+mount -t proc  none     "$CHROOT/proc"
+mount -t sysfs none     "$CHROOT/sys"
+mount --bind /run       "$CHROOT/run"
+# DNS 解決用 (apt がミラーへ到達できるように)
+cp -f /etc/resolv.conf "$CHROOT/etc/resolv.conf" 2>/dev/null || true
 cleanup() {
-  for m in dev/pts dev proc sys run; do
+  for m in dev/pts proc sys run dev; do
     mountpoint -q "$CHROOT/$m" && umount -lf "$CHROOT/$m" || true
   done
 }

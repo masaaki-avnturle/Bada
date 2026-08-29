@@ -12,11 +12,10 @@ deb http://archive.ubuntu.com/ubuntu jammy-updates main universe multiverse rest
 deb http://security.ubuntu.com/ubuntu jammy-security main universe multiverse restricted
 EOF
 
-# ---- あなたのリポジトリの apt リポジトリ (flat, 署名なし = trusted) ----
-if [ -n "$APT_BASE_URL" ]; then
-  sed "s#@APT_BASE_URL@#${APT_BASE_URL}#g" /tmp/bada.list.tmpl > /etc/apt/sources.list.d/bada.list
-fi
-
+# 注意: あなたのリポジトリの apt リポジトリ (badaos-v* リリース) は
+# 「今まさにビルドして作る」ものなので、ビルド中にはまだ存在しません。
+# ここで登録して apt-get update すると 404 で失敗するため、登録は
+# このスクリプトの最後 (update しない) に回します。まずは Ubuntu 公式のみ。
 apt-get update
 
 # ---- ライブ起動 + カーネル + 基本ツール ----
@@ -27,11 +26,11 @@ apt-get install -y --no-install-recommends \
   xserver-xorg xinit x11-xserver-utils \
   lightdm lightdm-gtk-greeter \
   w9wm xterm feh fonts-dejavu \
-  chromium-browser \
-  calamares calamares-settings-debian || true
+  calamares || true
 
-# calamares-settings-debian が無い環境向けに、独自 /etc/calamares 設定を優先
-# (build-iso.sh が config/calamares を配置済み)
+# 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
+# ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
+# 必要なら apt で追加可能 (NAT/DHCP で公式ミラーへ到達できる)。
 
 # ---- ロケール/タイムゾーン ----
 sed -i 's/# *ja_JP.UTF-8/ja_JP.UTF-8/; s/# *en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen || true
@@ -87,6 +86,15 @@ chmod +x /etc/skel/Desktop/*.desktop 2>/dev/null || true
 
 # ---- casper 用: 自動ログインユーザ名を bada に固定 ----
 echo "export USER=bada" >> /etc/skel/.profile
+
+# ---- あなたのリポジトリの apt リポジトリを登録 (インストール後に使う) ----
+# ビルド中は fetch しない (リリースは本ビルドで作られる)。起動後に
+#   sudo apt update && sudo apt install laevateinn bada-vm-pro
+# で取得できる (badaos-v* リリースの Packages/.deb を参照)。
+if [ -n "$APT_BASE_URL" ]; then
+  sed "s#@APT_BASE_URL@#${APT_BASE_URL}#g" /tmp/bada.list.tmpl > /etc/apt/sources.list.d/bada.list
+  echo "registered bada apt repo: $APT_BASE_URL (fetched at first boot, not now)"
+fi
 
 # initramfs を更新 (casper を取り込む)
 update-initramfs -u || true
