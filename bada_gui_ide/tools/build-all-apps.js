@@ -26,7 +26,8 @@ const builds = [
   "build-migemo-media.js",   // dist/migemo-media.html
   "build-madokey.js",        // dist/madokey.html
   "build-earth-view.js",     // dist/earth-view.html
-  "build-earth-twin.js"      // dist/earth-twin.html
+  "build-earth-twin.js",     // dist/earth-twin.html
+  "build-planet-cinema.js"   // dist/planet-cinema.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -85,6 +86,12 @@ it in any browser — no install, no dependencies, works offline.
                       + CDS sky-survey imagery. ESI scoring gamma-normalized
                       via Γ(z+1)=zΓ(z); trefoil Jones polynomial |V(e^iθ)|
                       drives the heat palette. Offline snapshot included.
+  planet-cinema.html  PlanetCinema — 見つかった惑星の動画館: parameter-driven
+                      animated video of the planets GammaTwin finds (same NASA
+                      space-telescope catalog). Complex rotation z=e^{iωt},
+                      real special relativity (Lorentz γ, Doppler D, light
+                      aberration on the starfield), Jones-heat surface classes,
+                      Kepler orbit estimates, and MediaRecorder .webm export.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
