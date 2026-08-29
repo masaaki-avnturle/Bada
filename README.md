@@ -62,6 +62,29 @@
 
 ---
 
+## ⬇️ ダウンロード — リストア系アプリ (音色 / 動画)
+
+変調・編集されたメディアを**逆補正して元へ近づける**2つのアプリ。**すべて端末内処理・非送信**の近似ツールで、完全復元は保証しません。
+
+| アプリ | 内容 | Web | ソース |
+|:---|:---|:---|:---|
+| **音色リストア** (Sound Restore Studio) | ボイスチェンジ/ピッチ・フォルマント・音色変調された**声・楽器**を元の質音へ逆変換 | [`voice_restore/www/index.html`](voice_restore/www/index.html) | [→ 開く](voice_restore/) |
+| **動画リストア** (Video Restore Studio) | 色補正・明るさ・回転・反転・ズーム・速度など**編集された動画**を逆補正 | [`video_restore/www/index.html`](video_restore/www/index.html) | [→ 開く](video_restore/) |
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型も用意しています。[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | 音色リストア | 動画リストア |
+|:---|:---|:---|
+| **Android** (APK) | `sound-restore-debug.apk` | `video-restore-debug.apk` |
+| **Windows 10 / 11** | `Sound-Restore-Studio-*-x64.exe` | `Video-Restore-Studio-*-x64.exe` |
+| **Ubuntu** | `Sound-Restore-Studio-*.AppImage` / `*.deb` | `Video-Restore-Studio-*.AppImage` / `*.deb` |
+
+ビルドは [`restore-apps-build.yml`](.github/workflows/restore-apps-build.yml) が実行します(`restore-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。Android=Cordova、Windows/Ubuntu=Electron。詳細は各アプリの README([`voice_restore/`](voice_restore/) / [`video_restore/`](video_restore/))を参照。
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -71,6 +94,8 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`voice_restore/`** | **音色リストア** (Sound Restore Studio) — 変調された声・楽器を元の質音へ逆変換 · フェーズボコーダ + ケプストラム包絡 + スペクトルEQ · APK/Windows/Ubuntu | [→ 開く](voice_restore/) |
+| **`video_restore/`** | **動画リストア** (Video Restore Studio) — 編集された動画を逆補正 · Canvasフィルタ + MediaRecorder · APK/Windows/Ubuntu | [→ 開く](video_restore/) |
 
 ---
 

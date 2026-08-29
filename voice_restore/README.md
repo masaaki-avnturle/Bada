@@ -1,0 +1,91 @@
+# 音色リストア — Sound Restore Studio
+
+ミュージックレコーダーやボイスチェンジャーで **変調(ピッチ・フォルマント・音色改変)された
+声・楽器の録音** を、**逆変換して元の質音に近づける** アプリです。ブラウザでも動き、**Android APK**
+としてもビルドできます。依存ライブラリなし・**すべて端末内で完結**(音声はどこにも送信されません)。
+
+> ⚠ 逆変換は変調内容の推定に基づく **近似** です。元信号の完全復元を保証するものではありません。
+> 録音の取り扱いは、各自の権利と責任の範囲で行ってください。
+
+---
+
+## 2つのモード
+
+### 🎤 声モード
+- **ピッチ復元**(±12 半音)/ **フォルマント復元**(50〜200% — 声道の長さ=声色)。
+- **変調の自動推定**: 平均ピッチを測り、目標声域(男性/女性/中性)へ合わせる初期値を提案。
+
+### 🎸 楽器モード
+- **ピッチ復元** + **音色(スペクトル包絡)復元**。
+- **A=440 チューニング**: 基音を推定し、平均律で最も近い音へ戻すピッチ補正量を自動算出。
+- **3バンド EQ 逆補正**(低/中/高 ±18dB): 楽器のトーン(イコライザ)改変を打ち消す。
+
+共通で **弱ノイズゲート / 出力ゲイン / クリップ保護**、**A/B 試聴**、**WAV 書き出し**。
+
+## 使い方(ブラウザ)
+
+```bash
+cd voice_restore/www
+python3 -m http.server 8000     # → http://localhost:8000/
+```
+
+1. **① 読み込み** — ファイル選択 / マイク録音 / 「デモ音声を生成」。
+2. **② 質音を戻す** — モード(声/楽器)を選び「変調を自動推定」で初期値 → スライダーで微調整 → **「復元を実行」**。
+3. **③ 試聴・書き出し** — 「変調前」「復元後」で聴き比べ、**「WAV で保存」**。
+
+## ネイティブ アプリ (Android APK / Windows 10・11 / Ubuntu)
+
+**偽のバイナリはリポジトリに置いていません。** 実際のインストーラは GitHub Actions がビルドします。
+
+| プラットフォーム | 成果物 | 技術 |
+|:--|:--|:--|
+| **Android** | `sound-restore-debug.apk` | Cordova |
+| **Windows 10 / 11** | `Sound-Restore-Studio-*-x64.exe`(NSIS インストーラ / ポータブル) | Electron |
+| **Ubuntu** | `Sound-Restore-Studio-*-x86_64.AppImage` / `*-amd64.deb` | Electron |
+
+### ダウンロード手順
+
+1. GitHub の **Actions** タブ → **「Restore apps build (APK + Windows + Ubuntu)」** → **Run workflow**(手動実行)。
+   完了後、各 **Artifacts**(`sound-restore-android` / `voice_restore-windows` / `voice_restore-linux`)から取得。
+2. **Releases から配布**したい場合はタグを push:
+   ```bash
+   git tag restore-v1.0.0 && git push origin restore-v1.0.0
+   ```
+   `.github/workflows/restore-apps-build.yml` が3プラットフォーム分をビルドし、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に添付します(または Run workflow の `release_tag` 欄にタグ名を入力)。
+
+> マイク録音: デスクトップ版(Electron)は許可済み。Android は WebView が getUserMedia を許可する端末で動作します。
+> いずれもファイル読み込み → 処理 → 保存の流れは権限なしで動きます。
+
+## 仕組み(DSP) — `www/dsp.js`(UMD / 純粋関数)
+
+| 処理 | 手法 |
+|:--|:--|
+| ピッチシフト | フェーズボコーダ(STFT + 位相伝播)でタイムストレッチ → 線形リサンプル。 |
+| フォルマント/音色シフト | ケプストラム包絡を周波数軸ワープして再適用(ピッチは保持)。 |
+| 3バンド EQ | STFT 領域で周波数依存ゲインを乗算(楽器トーンの逆補正)。 |
+| チューニング | 自己相関で基音推定 → A=440 平均律の最寄り音への補正量(cents)。 |
+| 復元 | `restoreSound(x,{pitchSemitones, formantRatio, eq, sampleRate})`(EQ→音色→ピッチ)。 |
+| 書き出し | 16bit PCM WAV。 |
+
+## テスト
+
+```bash
+node voice_restore/test/dsp.test.mjs      # 28 件
+```
+
+## ファイル構成
+
+```
+voice_restore/
+├── www/index.html      … UI(声/楽器 モード)
+├── www/dsp.js          … 信号処理コア(UMD)
+├── cordova/config.xml  … Android APK 設定
+├── electron/           … Windows / Ubuntu 用ラッパー(main.js + package.json)
+├── test/dsp.test.mjs
+└── README.md
+```
+
+## 制限
+
+- 完全なブラインド復元は原理的に不可能です(強い/多段/時間変化する変調ほど近似の限界)。
+- 位相ボコーダ由来のわずかな残響感が出ることがあります。補正量は控えめにすると自然です。
