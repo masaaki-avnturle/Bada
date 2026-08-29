@@ -19,6 +19,13 @@ on:
   push:
     tags:
       - 'yappa3d-v*'
+    # 一時トリガー: 開発ブランチへの push でもビルド (ワークフロー登録 + 検証用。
+    # main マージ後は削除して構いません — タグ / workflow_dispatch だけで動きます)
+    branches:
+      - 'claude/yappa-3d-design-app-wwx8xn'
+    paths:
+      - 'yappa3d/**'
+      - '.github/workflows/yappa3d-app-build.yml'
 
 permissions:
   contents: write
@@ -78,6 +85,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: yappa3d/app/electron/dist/*.exe
 
   linux-app:
@@ -109,6 +117,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: |
             yappa3d/app/electron/dist/*.AppImage
             yappa3d/app/electron/dist/*.deb
@@ -170,4 +179,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: out/*.apk
