@@ -11,6 +11,24 @@ WebGL レンダラ・行列演算・ジオメトリ生成まで、すべて [`in
 - ローカル: [`index.html`](index.html) をダウンロードしてダブルクリック
   (GitHub のファイル表示画面右上の「Download raw file」⬇ で保存できます)
 
+### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から(またはビルド実行時の Actions アーティファクトから):
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `yappa3d-debug.apk` |
+| **Windows 10 / 11** | `Yappa3D-*-x64.exe` (NSIS インストーラ) / `Yappa3D-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `Yappa3D-*-x86_64.AppImage` / `Yappa3D-*-amd64.deb` |
+
+ビルドは [`yappa3d-app-build.yml`](../.github/workflows/yappa3d-app-build.yml) が実行します
+(`yappa3d-v*` タグを push すると Release へ添付 / Actions の `workflow_dispatch` から手動実行すると
+アーティファクトとしてダウンロード可能。`release_tag` 入力を指定すればそのタグの Release にも添付されます)。
+デスクトップ版は Electron ラッパー ([`app/electron/`](app/electron/))、Android 版は Cordova
+([`app/cordova/`](app/cordova/)) で、いずれも中身は同じ自己完結 `index.html` です。
+ビューポートはポインターイベント + ピンチ操作対応なのでタッチ画面でも動作します。
+
 ## 🖥️ 画面構成
 
 | パネル | 内容 |

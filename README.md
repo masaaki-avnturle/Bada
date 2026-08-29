@@ -87,7 +87,17 @@
 - **保存と書き出し** — シーン JSON 保存 / 読込、**OBJ + MTL 書き出し** (Blender 等で読込可)、PNG スクリーンショット、localStorage 自動保存(次回開いたとき復元)
 - **Undo / Redo** (Ctrl+Z / Ctrl+Y)、複製 (Ctrl+D)、削除 (Delete)、F で選択にフォーカス
 
-詳細は [`yappa3d/README.md`](yappa3d/README.md) を参照。
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `yappa3d-debug.apk` |
+| **Windows 10 / 11** | `Yappa3D-*-x64.exe` (NSIS インストーラ) / `Yappa3D-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `Yappa3D-*-x86_64.AppImage` / `Yappa3D-*-amd64.deb` |
+
+ビルドは [`yappa3d-app-build.yml`](.github/workflows/yappa3d-app-build.yml) が実行します(`yappa3d-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`yappa3d/README.md`](yappa3d/README.md) を参照。
 
 ---
 
