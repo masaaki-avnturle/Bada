@@ -1,0 +1,43 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Ω-USB Resume — thin wrapper that runs the Bada USB-resume engine from this
+# app folder. All the real work lives in ../bada_ruby/lib/bada/usb_resume.rb
+# (Bada::UsbResume) and is driven exactly like `bin/bada usb`.
+#
+#   ./usb_resume            scan + resume all faulted devices (simulation)
+#   ./usb_resume scan       list USB devices only
+#   ./usb_resume --apply    write the resume steps to real sysfs (Linux, root)
+#   ./usb_resume --base 8   model the n進数 drift in base-8 (default 16)
+#   ./usb_resume --device 2-3   resume only the given device id
+
+Encoding.default_external = Encoding::UTF_8
+Encoding.default_internal = Encoding::UTF_8
+ARGV.map! { |a| a.dup.force_encoding("UTF-8") }
+
+$LOAD_PATH.unshift(File.expand_path("../bada_ruby/lib", __dir__))
+require "bada"
+
+sub   = ARGV.first && !ARGV.first.start_with?("-") ? ARGV.shift : nil
+apply = ARGV.delete("--apply") ? true : false
+base  = (i = ARGV.index("--base"))   ? ARGV[i + 1].to_i : 16
+want  = (i = ARGV.index("--device")) ? ARGV[i + 1] : nil
+
+db = Bada::TupleSpace.new
+devices = Bada::UsbResume.scan
+devices = devices.select { |d| d.id == want } if want
+
+if sub == "scan"
+  puts "USB devices (#{devices.length}):"
+  devices.each do |d|
+    h = d.to_h
+    puts format("  %-6s %s:%s  %-34s [%s]", h[:id], h[:vendor], h[:product], h[:name], h[:status])
+  end
+else
+  puts apply ? "Resuming USB devices — APPLYING to sysfs…" : "Resuming USB devices — simulation…"
+  puts
+  results = Bada::UsbResume.resume_all(devices, apply: apply, db: db, base: base)
+  results.each { |r| puts Bada::UsbResume.render(r); puts }
+  resumed = results.count { |r| r[:resumed] }
+  puts "#{resumed}/#{results.length} device(s) resumed. Ω::DATABASE tuples: #{db.size}"
+end

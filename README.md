@@ -31,7 +31,7 @@
 
 ## 🜁 ダウンロード — Bada VM Pro(今までの集大成)
 
-**量子プログラミング言語 Bada のオペレーティングシステム。** シェルは**ウェブブラウザーのデザイン**(タブ + `bada://` アドレスバー)、ベース(カーネル)は **BadaGPT** で、**OS の update / upgrade も BadaGPT が実行**します。**Bada on Rails**(scaffold → CRUD)、**合い言葉コマンド**(silent talk 無音テキスト = 決定論的一致、音声 = Web Speech API + レーベンシュタイン照合)、**トランスフォーマー・スタジオ**(本物の self-attention 順伝播 + 学習)、**GUI / CUI プログラミング**をひとつに統合。依存ゼロ・単一 HTML・オフライン動作。
+**量子プログラミング言語 Bada のオペレーティングシステム。** デスクトップは **w9wm window manager**(9wm + 仮想スクリーン 4 面、右クリック = New/Reshape/Move/Delete/Hide)、ベース(カーネル)は **BadaGPT** で、**OS の update / upgrade も BadaGPT が実行**します。**bash / apt / vim / emacs / ssh / xinetd / texlive-full / screen / fcitx-mozc を事前インストール**した Ubuntu 風ユーザーランドと**日本語入力対応ターミナル 3 種**(xterm / x-terminal-emulator / terminal)、**Bada on Rails**(scaffold → CRUD)、**合い言葉コマンド**、**トランスフォーマー・スタジオ**、**GUI / CUI プログラミング**をひとつに統合。依存ゼロ・単一 HTML・オフライン動作、**ライブ CD (`BadaVMPro-live.iso`) 配布 + ISO マウント機能**つき。
 
 ### 👉 [**bada_vm_pro/index.html をダウンロード**](bada_vm_pro/index.html)
 
@@ -46,6 +46,7 @@
 | **Android** (APK) | `bada-vm-pro-debug.apk` |
 | **Windows 10 / 11** | `BadaVMPro-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | **Ubuntu** | `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
+| **ライブ CD / USB** (ISO) | `BadaVMPro-live.iso` — 本物の isolinux ブータブル ISO。**Rufus の「ISO イメージモード」で USB ブートディスクを作成可**。マウントして `INDEX.HTM` を開けば OS 起動、VM Pro 内でも「ISO をマウント」で `/mnt/cdrom` に読込可 |
 
 ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が実行します(`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・合い言葉・量子 Bada 文法は [`bada_vm_pro/`](bada_vm_pro/) を参照。
 
@@ -115,7 +116,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
-| **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
+| **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — w9wm デスクトップ(9wm + 仮想スクリーン) · BadaGPT カーネル(OS update/upgrade 担当) · bash/apt/vim/emacs/ssh/xinetd/texlive-full/screen/fcitx-mozc 事前インストール · 日本語入力対応ターミナル · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage/**ライブ CD ISO** 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 
 ---
@@ -173,6 +174,55 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **ランナー (単一 HTML)** | [`bada_gui_ide/dist/bada-zone.html`](bada_gui_ide/dist/bada-zone.html) — `zone.bada` を開くだけで自動実行 |
 | **配布 zip** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-zone-dist.zip` (専用ブラウザ + ランナー + `zone.bada` + `bada.js` + CLI + README)。[`zone-dist.yml`](.github/workflows/zone-dist.yml) が `zone-v*` タグ / `workflow_dispatch` で生成・添付します |
 | **CLI** | `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zone.bada` |
+
+### 🔐 量子暗号アプリ (Bada QuantumCrypto) — 暗号化と解除(復号)
+
+zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。テキストとファイルを**暗号化**し、同じパスフレーズ + 結び目で**解除**できます (Kauffman ブラケット鍵導出 + Bell 対 QKD + ChaCha20/HMAC AEAD、端末内完結・通信なし):
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `quantumcrypto-debug.apk` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaQuantumCrypto-Setup-*-x64.exe` (インストーラ) / `BadaQuantumCrypto-Portable-*-x64.exe` (インストール不要) |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaQuantumCrypto-*.AppImage` / `.deb` |
+| **どこでも** (HTML) | [`bada_gui_ide/quantumcrypto-app/www/`](bada_gui_ide/quantumcrypto-app/www/) の `index.html` + `qcrypto.js` をブラウザで開くだけ |
+
+ビルドは [`quantumcrypto-app-build.yml`](.github/workflows/quantumcrypto-app-build.yml) が自動実行します (`quantumcrypto-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方と仕組みは [`bada_gui_ide/quantumcrypto-app/README.md`](bada_gui_ide/quantumcrypto-app/README.md) を参照。
+
+### 🜁 Bada VM Pro — 量子 Bada OS (w9wm デスクトップ)
+
+量子 Bada 言語の OS。デスクトップは **w9wm window manager** (9wm + 仮想スクリーン 4 面、右クリック = New/Reshape/Move/Delete/Hide)、カーネルは BadaGPT。**bash / apt / vim / emacs / ssh / xinetd / texlive-full / screen / fcitx-mozc** を事前インストールし、**日本語入力対応**のターミナル (xterm / x-terminal-emulator / terminal) を同梱:
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-vm-pro-debug.apk` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (インストーラ / ポータブル) |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **ライブ CD / USB** (ISO) | Releases / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `BadaVMPro-live.iso` — 本物の isolinux ブータブル ISO (El Torito + isohybrid)。**Rufus の「ISO イメージモード」で USB ブートディスクを作成可** (マウントして `INDEX.HTM` を開けば OS 起動)。VM Pro 自身もアプリメニューから ISO を `/mnt/cdrom` にマウント可能 |
+| **どこでも** (単一 HTML) | [`bada_vm_pro/index.html`](bada_vm_pro/index.html) をダウンロードして開くだけ |
+
+ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が自動実行します (`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch`)。詳細は [`bada_vm_pro/README.md`](bada_vm_pro/README.md) を参照。
+
+### 🔎 Bada Search — SourceTree 付属 PDF・ソースコード検索エンジン (Windows 10/11)
+
+Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属アプリとして使う検索エンジン。リポジトリ丸ごとを対象に、**40 種以上のプログラミング言語のソース**と **PDF の中身** (FlateDecode テキスト抽出・依存ゼロ) を AND / 正規表現 / 言語・パスフィルタで横断検索し、行番号 + ハイライト付きで表示します:
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaSearch-Setup-*-x64.exe` (インストーラ) / `BadaSearch-Portable-*-x64.exe` (インストール不要) |
+
+SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行します (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
+
+### 🔌 Ω-USB Resume — 接触不良 USB メモリの復旧アプリ
+
+接触不良・未認可・プラグプレイ不発で使えなくなった USB を、物理修理なしにソフト側から復旧(レジューム)するアプリ。機械語記述子の n進数のズレを複素回転体 e^(iθ) の閉軌道平均で訂正し、可積分系のエントロピー不変量 Ξ で検証してから再認可 → 電源 → 再列挙します(既定はシミュレーション・非破壊):
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `omega-usb-resume-debug.apk` |
+| **Windows 10 / 11** (EXE) | `Omega-USB-Resume-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** (AppImage / deb) | GUI `Omega-USB-Resume-*.AppImage` / `.deb`、CLI `usb-resume-linux-x64` ＋ `usb-resume-cli_*_amd64.deb` (→ `/usr/bin/usb-resume`、`--apply` で実 sysfs) |
+
+ビルドは [`omega-usb-resume-build.yml`](.github/workflows/omega-usb-resume-build.yml) が自動実行します (`usb-resume-v*` タグで Release へ添付 / ブランチ push で Actions アーティファクト)。詳細は [`omega_usb_resume/README.md`](omega_usb_resume/README.md) を参照。
 
 ---
 

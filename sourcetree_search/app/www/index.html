@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Bada Search — SourceTree 付属 PDF・ソースコード検索エンジン</title>
+<style>
+:root{
+  --bg:#0b0e14; --panel:#131826; --panel2:#0f1420; --edge:#232b3d;
+  --text:#d7dce8; --dim:#8a93a8; --gold:#c8a44a; --cyan:#40b8c0;
+  --blue:#4a80d0; --green:#4ac077; --red:#d05a5a; --hl:#c8a44a;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--edge);border-radius:7px;padding:6px 13px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+button.primary{background:linear-gradient(135deg,#14b88a,#0f8f6c);border:none;color:#02120c;font-weight:bold}
+input,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:7px;padding:7px 10px}
+input:focus{outline:none;border-color:var(--cyan)}
+::-webkit-scrollbar{width:9px}::-webkit-scrollbar-thumb{background:#2a3450;border-radius:5px}
+header{padding:12px 16px;border-bottom:1px solid var(--edge);background:linear-gradient(180deg,#0d1322,var(--bg));flex:none}
+header h1{font-size:16px;color:var(--gold)}
+header .sub{color:var(--dim);font-size:12px;margin-top:2px}
+#toolbar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--edge);flex-wrap:wrap;flex:none}
+#repopath{color:var(--cyan);font-family:var(--mono);font-size:12px;max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#searchbar{display:flex;gap:8px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--edge);flex-wrap:wrap;flex:none}
+#q{flex:1;min-width:220px;font-family:var(--mono)}
+#opts{display:flex;gap:12px;align-items:center;font-size:12.5px;color:var(--dim)}
+#opts label{display:flex;gap:4px;align-items:center;cursor:pointer}
+#main{flex:1;overflow-y:auto;padding:12px 16px}
+#stats{font-size:12.5px;color:var(--dim);margin-bottom:10px}
+#stats .badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);margin-right:5px}
+.file{background:var(--panel);border:1px solid var(--edge);border-radius:10px;margin-bottom:10px;overflow:hidden}
+.file .head{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#161d2f;cursor:pointer}
+.file .head .rel{font-family:var(--mono);font-size:13px;color:var(--cyan);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .head .lang{font-size:11px;padding:1px 9px;border-radius:99px;border:1px solid var(--edge);color:var(--gold)}
+.file .head .cnt{font-size:11px;color:var(--dim)}
+.file .head button{padding:2px 9px;font-size:11px}
+.file .lines{font-family:var(--mono);font-size:12.5px}
+.file .ln{display:flex;gap:0;border-top:1px solid #1a2133;padding:3px 12px;white-space:pre-wrap;word-break:break-all}
+.file .ln .no{color:var(--dim);min-width:52px;text-align:right;padding-right:12px;flex:none;-webkit-user-select:none;user-select:none}
+mark{background:var(--hl);color:#161200;border-radius:2px;padding:0 1px}
+#empty{color:var(--dim);text-align:center;margin-top:60px;line-height:2}
+#empty .kbd{font-family:var(--mono);background:#1a2133;border:1px solid var(--edge);border-radius:5px;padding:0 6px;font-size:12px}
+#sthelp{background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:14px;margin:16px auto;max-width:680px;font-size:13px;line-height:1.9;text-align:left}
+#sthelp h2{font-size:14px;color:var(--cyan);margin-bottom:6px}
+#sthelp code{font-family:var(--mono);background:#1a2133;border-radius:4px;padding:0 5px;font-size:12px;color:var(--gold)}
+#status{padding:6px 16px;border-top:1px solid var(--edge);font-size:12px;color:var(--dim);flex:none;min-height:28px}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--dim);border-top-color:var(--cyan);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🔎 Bada Search <span style="color:var(--dim);font-weight:normal;font-size:12px">— SourceTree 付属 PDF・ソースコード検索エンジン</span></h1>
+  <div class="sub">リポジトリを丸ごとインデックスし、プログラミング言語のソースと PDF の中身を横断検索 (依存ゼロ・オフライン)</div>
+</header>
+<div id="toolbar">
+  <button id="pick" class="primary">📂 リポジトリ/フォルダを選択</button>
+  <button id="reindex" disabled>↻ 再インデックス</button>
+  <span id="repopath">(未選択 — SourceTree のカスタム操作から $REPO 付きで起動すると自動で開きます)</span>
+</div>
+<div id="searchbar">
+  <input id="q" placeholder="検索語 (空白区切り = AND) — 例: kauffman bracket / jones_key / 量子" disabled/>
+  <div id="opts">
+    <label><input type="checkbox" id="oRegex"/>正規表現</label>
+    <label><input type="checkbox" id="oCase"/>大文字小文字</label>
+    <select id="oLang" title="言語フィルタ"><option value="">すべての言語</option></select>
+    <input id="oPath" placeholder="パス絞り込み (例: src/)" style="width:150px;font-size:12px"/>
+  </div>
+</div>
+<div id="main">
+  <div id="stats" style="display:none"></div>
+  <div id="results"></div>
+  <div id="empty">
+    <div style="font-size:38px">🔎</div>
+    フォルダを選択するか、SourceTree から起動してください。<br/>
+    <div id="sthelp">
+      <h2>🌳 SourceTree (Windows 10/11) に付属させる</h2>
+      1. SourceTree の <b>ツール → オプション → カスタム操作</b> を開き「追加」<br/>
+      2. <b>メニューキャプション</b>: <code>Bada Search (PDF・コード検索)</code><br/>
+      3. <b>実行するスクリプト</b>: インストールした <code>BadaSearch.exe</code> のパス<br/>
+      &nbsp;&nbsp;&nbsp;(既定: <code id="exepath">C:\Users\&lt;you&gt;\AppData\Local\Programs\BadaSearch\BadaSearch.exe</code>)<br/>
+      4. <b>パラメータ</b>: <code>$REPO</code><br/>
+      → 以後、SourceTree のリポジトリ上で <b>操作 → カスタム操作 → Bada Search</b> を選ぶと、
+      そのリポジトリを自動インデックスしてこの検索画面が開きます。
+    </div>
+  </div>
+</div>
+<div id="status"></div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var api = window.badaSearch || null;
+  var curDir = null, searching = false, pending = false;
+
+  function setStatus(html){ $("status").innerHTML = html || ""; }
+  function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+  function highlight(line, query, opts){
+    var text = escHtml(line);
+    try {
+      var res;
+      if (opts.regex) res = [new RegExp(query, opts.caseSensitive ? "g" : "gi")];
+      else res = query.split(/\s+/).filter(Boolean).map(function(t){
+        return new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), opts.caseSensitive ? "g" : "gi");
+      });
+      res.forEach(function(re){
+        text = text.replace(re, function(m){ return "\u0001" + m + "\u0002"; });
+      });
+    } catch(e){}
+    return text.replace(/\u0001/g, "<mark>").replace(/\u0002/g, "</mark>");
+  }
+
+  function renderIndexInfo(info){
+    curDir = info.root;
+    $("repopath").textContent = info.root;
+    $("q").disabled = false; $("reindex").disabled = false;
+    $("empty").style.display = "none";
+    var sel = $("oLang");
+    sel.innerHTML = '<option value="">すべての言語</option>';
+    Object.keys(info.langs).sort().forEach(function(l){
+      var o = document.createElement("option");
+      o.value = l; o.textContent = l + " (" + info.langs[l] + ")";
+      sel.appendChild(o);
+    });
+    var st = $("stats");
+    st.style.display = "block";
+    st.innerHTML = "📇 " + info.files + " ファイルをインデックス (走査 " + info.scanned + ") — " +
+      Object.keys(info.langs).sort().map(function(l){
+        return '<span class="badge">' + escHtml(l) + " " + info.langs[l] + "</span>";
+      }).join("");
+    setStatus("インデックス完了 — 検索語を入力してください");
+    $("q").focus();
+  }
+
+  async function indexDir(dir){
+    if (!api){ setStatus("Electron ブリッジがありません (BadaSearch.exe から起動してください)"); return; }
+    setStatus('<span class="spin"></span>インデックス作成中: ' + escHtml(dir));
+    $("results").innerHTML = "";
+    var info = await api.buildIndex(dir);
+    renderIndexInfo(info);
+  }
+
+  function opts(){
+    return { regex: $("oRegex").checked, caseSensitive: $("oCase").checked,
+             lang: $("oLang").value || null, pathFilter: $("oPath").value.trim() || null };
+  }
+
+  async function doSearch(){
+    if (!api || !curDir) return;
+    var q = $("q").value;
+    if (!q.trim()){ $("results").innerHTML = ""; setStatus(""); return; }
+    if (searching){ pending = true; return; }
+    searching = true;
+    var o = opts();
+    var r = await api.search(q, o);
+    searching = false;
+    if (pending){ pending = false; doSearch(); return; }
+    if (r.error){ setStatus("⚠ " + escHtml(r.error)); return; }
+    setStatus(r.total + " 件ヒット / " + r.files + " ファイル");
+    var out = [];
+    r.hits.forEach(function(h, i){
+      out.push('<div class="file"><div class="head" data-i="' + i + '">' +
+        '<span class="rel">' + escHtml(h.rel) + '</span>' +
+        '<span class="lang">' + escHtml(h.lang) + '</span>' +
+        '<span class="cnt">' + h.count + ' 件</span>' +
+        '<button data-open="' + encodeURIComponent(h.path) + '">開く</button>' +
+        '<button data-reveal="' + encodeURIComponent(h.path) + '">📁</button>' +
+        "</div><div class=\"lines\">" +
+        h.matches.slice(0, 12).map(function(m){
+          return '<div class="ln"><span class="no">' + m.line + '</span><span>' + highlight(m.text, q, o) + "</span></div>";
+        }).join("") +
+        (h.count > 12 ? '<div class="ln"><span class="no">…</span><span style="color:var(--dim)">ほか ' + (h.count - 12) + ' 件</span></div>' : "") +
+        "</div></div>");
+    });
+    $("results").innerHTML = out.length ? out.join("") :
+      '<div style="color:var(--dim);text-align:center;margin-top:40px">ヒットなし — 別の語や正規表現、言語フィルタをお試しください</div>';
+    $("results").querySelectorAll("button[data-open]").forEach(function(b){
+      b.onclick = function(e){ e.stopPropagation(); api.openFile(decodeURIComponent(b.getAttribute("data-open"))); };
+    });
+    $("results").querySelectorAll("button[data-reveal]").forEach(function(b){
+      b.onclick = function(e){ e.stopPropagation(); api.revealFile(decodeURIComponent(b.getAttribute("data-reveal"))); };
+    });
+  }
+
+  var deb = null;
+  $("q").addEventListener("input", function(){ clearTimeout(deb); deb = setTimeout(doSearch, 250); });
+  $("q").addEventListener("keydown", function(e){ if (e.key === "Enter"){ clearTimeout(deb); doSearch(); } });
+  ["oRegex","oCase","oLang","oPath"].forEach(function(id){
+    $(id).addEventListener("change", doSearch);
+    $(id).addEventListener("input", function(){ clearTimeout(deb); deb = setTimeout(doSearch, 300); });
+  });
+  $("pick").onclick = async function(){
+    if (!api) return;
+    var dir = await api.chooseFolder();
+    if (dir) indexDir(dir);
+  };
+  $("reindex").onclick = function(){ if (curDir) indexDir(curDir); };
+
+  (async function boot(){
+    if (!api){ setStatus("ブラウザ プレビュー モード (検索機能は BadaSearch.exe で有効)"); return; }
+    try {
+      var exe = await api.appPath();
+      if (exe) $("exepath").textContent = exe;
+    } catch(e){}
+    var repo = await api.startupRepo();
+    if (repo){ indexDir(repo); }
+    else setStatus("フォルダを選択してください (SourceTree からは $REPO 付きで自動)");
+  })();
+})();
+</script>
+</body>
+</html>
