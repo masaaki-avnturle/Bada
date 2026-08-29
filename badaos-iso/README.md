@@ -9,7 +9,7 @@
 - **実ディスクへインストール**: **Calamares** インストーラ同梱(ライブ起動 → デスクトップの「インストール」)
 - **ネットワーク**: NetworkManager(**NAT / DHCP がそのまま通る**)→ `apt` が使える
 - **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
-- **起動方式**: BIOS(isolinux)+ UEFI(GRUB)ハイブリッド ISO → **Rufus でそのまま USB に書ける**
+- **起動方式**: GRUB (grub-mkrescue) による BIOS + UEFI ハイブリッド ISO。`search` でカーネルのある ISO を確実に検出 → **Rufus でそのまま USB に書ける**
 
 ## ⬇️ ダウンロード
 
@@ -17,24 +17,24 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| `BadaVMPro-OS-1.0.0-amd64.iso` | 起動可能 ISO 本体 |
-| `BadaVMPro-OS-1.0.0-amd64.iso.sha256` | 検証用チェックサム |
+| `BadaVMPro-OS-1.0.1-amd64.iso` | 起動可能 ISO 本体 |
+| `BadaVMPro-OS-1.0.1-amd64.iso.sha256` | 検証用チェックサム |
 | `Packages` / `Packages.gz` / `Release` | apt リポジトリ索引(flat) |
 | `*.deb` | apt で配布される Bada アプリ |
 
 ## 🔥 Rufus で USB ブートを作る手順(Windows)
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
-2. **「選択」**で `BadaVMPro-OS-1.0.0-amd64.iso` を指定
+2. **「選択」**で `BadaVMPro-OS-1.0.1-amd64.iso` を指定
 3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」**
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
-> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.0.0-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
+> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.0.1-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
 
 ## 🖥 起動後
 
-1. GRUB/isolinux メニューで **Bada VM Pro OS** を選択 → w9wm デスクトップに自動ログイン(ユーザー `bada`)
+1. GRUB メニューで **Bada VM Pro OS** を選択 → w9wm デスクトップに自動ログイン(ユーザー `bada`)
 2. **Bada VM Pro** が自動起動します
 3. **実ディスクへインストール**: デスクトップの **Calamares(インストール)** を実行 → 画面の指示どおりにパーティション・ユーザーを設定
 4. ネットワークは NAT/DHCP で自動接続。ターミナル(xterm)から:
