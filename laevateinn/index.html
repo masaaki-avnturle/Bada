@@ -130,6 +130,23 @@ input:focus{outline:none;border-color:var(--cyan)}
       <div class="kv"><b>受信元</b><span id="tilesrc">—</span></div>
       <div id="tiles"></div>
     </div>
+    <div class="card">
+      <h2>🔗 実車接続 (Bluetooth)</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button id="btconnect" class="primary">OBD-II に接続 (BLE)</button>
+        <button id="btdemo">デモ接続</button>
+        <button id="btdisc" style="display:none" class="danger">切断</button>
+      </div>
+      <div class="kv"><b>状態</b><span id="btstate">未接続</span></div>
+      <div class="kv"><b>デバイス</b><span id="btdev">—</span></div>
+      <div class="kv"><b>実速度</b><span id="btspeed">—</span></div>
+      <div class="kv"><b>回転数</b><span id="btrpm">—</span></div>
+      <div class="kv"><b>水温 / 電圧</b><span id="btmisc">—</span></div>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:12.5px;color:var(--dim)">
+        <input type="checkbox" id="btvoice" style="width:auto"/> 🔊 アルの音声案内 (カーナビとBT接続済みの端末なら車のスピーカーから流れます)
+      </label>
+      <p style="font-size:11px;color:var(--dim);margin-top:8px">対応: ELM327 互換の BLE OBD-II アダプタ (Vgate iCar Pro BLE 等)。車両データの読取と音声案内のみで、<b>車両の操縦は行いません</b>。</p>
+    </div>
   </div>
 </div>
 
@@ -401,6 +418,8 @@ function say(role, text){
   log.appendChild(el);
   while (log.children.length > 60) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
+  /* 🔊 音声案内 ON なら、アルの発話をカーナビ (BT オーディオ) へ */
+  if (role === "al" && typeof alSpeak === "function") alSpeak(text);
 }
 function setStatus(m){ document.getElementById("st-msg").textContent = m || ""; }
 
@@ -657,6 +676,274 @@ function alSend(){
 }
 document.getElementById("alsend").addEventListener("click", alSend);
 document.getElementById("alin").addEventListener("keydown", function(e){ if (e.key === "Enter") alSend(); });
+
+/* =====================================================================
+ * 実車接続 — ELM327 (OBD-II) プロトコルエンジン
+ *   ELM327 互換 BLE アダプタと会話する純ロジック。ブラウザでは
+ *   Web Bluetooth、APK (Cordova) では cordova-plugin-ble-central、
+ *   ハードウェアなしでは DemoAdapter が同じ経路を駆動する。
+ *   ここは tools/engine-test.js で単体テストされる。
+ * ===================================================================== */
+const ELM_INIT = ["ATZ", "ATE0", "ATL0", "ATS0", "ATSP0"];
+const ELM_POLL = ["010D", "010C", "0105", "ATRV"];
+
+function elmParseLine(line){
+  const t = String(line).replace(/[\r\n>]/g, "").trim().toUpperCase().replace(/\s+/g, " ");
+  if (!t) return null;
+  if (t === "OK" || /^ELM327/.test(t)) return { type: "ok", raw: t };
+  if (t === "NO DATA" || t === "UNABLE TO CONNECT" || /^CAN ERROR/.test(t) || t === "STOPPED")
+    return { type: "nodata", raw: t };
+  if (/^SEARCHING/.test(t)) return { type: "info", raw: t };
+  if (/^[0-9]+(\.[0-9]+)?V$/.test(t)) return { type: "volt", v: parseFloat(t) };
+  const h = t.replace(/ /g, "");
+  if (/^41[0-9A-F]{2}/.test(h)){
+    const pid = h.slice(2, 4);
+    if (pid === "0D" && h.length >= 6) return { type: "speed", kmh: parseInt(h.slice(4, 6), 16) };
+    if (pid === "0C" && h.length >= 8) return { type: "rpm", rpm: parseInt(h.slice(4, 8), 16) / 4 };
+    if (pid === "05" && h.length >= 6) return { type: "coolant", c: parseInt(h.slice(4, 6), 16) - 40 };
+    return { type: "raw", raw: t };
+  }
+  if (/^(01[0-9A-F]{2}|AT[A-Z0-9]*)$/.test(h)) return { type: "echo", raw: t };
+  return { type: "raw", raw: t };
+}
+
+/* write(cmd) でアダプタへ送り、feed(受信文字列) で応答を渡す。
+ * ">" プロンプトごとに次のコマンドへ進む。init 完了後は ELM_POLL を巡回。 */
+function ElmSession(write, onTelemetry, onState){
+  this.write = write;
+  this.onTelemetry = onTelemetry || function(){};
+  this.onState = onState || function(){};
+  this.buf = "";
+  this.initQueue = ELM_INIT.slice();
+  this.pollIdx = 0;
+  this.ready = false;
+  this.alive = true;
+  this.lastSent = null;
+}
+ElmSession.prototype.start = function(){
+  this.onState("init");
+  this.sendNext();
+};
+ElmSession.prototype.sendNext = function(){
+  if (!this.alive) return;
+  let cmd;
+  if (this.initQueue.length){
+    cmd = this.initQueue.shift();
+  } else {
+    if (!this.ready){ this.ready = true; this.onState("ready"); }
+    cmd = ELM_POLL[this.pollIdx % ELM_POLL.length];
+    this.pollIdx++;
+  }
+  this.lastSent = cmd;
+  this.write(cmd + "\r");
+};
+ElmSession.prototype.feed = function(chunk){
+  if (!this.alive) return;
+  this.buf += String(chunk);
+  /* ">" プロンプトが来るまで蓄積。来たらそこまでを行処理して次を送る */
+  let p;
+  while ((p = this.buf.indexOf(">")) >= 0){
+    const block = this.buf.slice(0, p);
+    this.buf = this.buf.slice(p + 1);
+    const lines = block.split(/[\r\n]+/);
+    for (const ln of lines){
+      const ev = elmParseLine(ln);
+      if (!ev) continue;
+      if (ev.type === "speed" || ev.type === "rpm" || ev.type === "coolant" || ev.type === "volt")
+        this.onTelemetry(ev);
+      if (ev.type === "nodata") this.onTelemetry({ type: "nodata", raw: ev.raw, cmd: this.lastSent });
+    }
+    this.sendNext();
+  }
+};
+ElmSession.prototype.stop = function(){ this.alive = false; this.onState("closed"); };
+
+/* ── デモアダプタ (ハードなしで全経路を通す。表示は「デモ」明記) ── */
+function DemoAdapter(){
+  this.t = 0;
+  this.session = null;
+}
+DemoAdapter.prototype.connect = function(session){
+  const self = this;
+  this.session = session;
+  session.write = function(cmd){
+    setTimeout(function(){ session.feed(self.respond(cmd)); }, 40);
+  };
+  session.start();
+};
+DemoAdapter.prototype.respond = function(cmd){
+  const c = String(cmd).trim().toUpperCase();
+  this.t += 0.7;
+  if (c === "ATZ") return "ELM327 v1.5\r>";
+  if (/^AT/.test(c) && c !== "ATRV") return "OK\r>";
+  if (c === "ATRV") return (12.1 + Math.sin(this.t * 0.1) * 0.4).toFixed(1) + "V\r>";
+  const speed = Math.max(0, Math.round(45 + Math.sin(this.t * 0.35) * 35));
+  if (c === "010D") return "41 0D " + speed.toString(16).padStart(2, "0").toUpperCase() + "\r>";
+  if (c === "010C"){
+    const rpm = Math.round((900 + speed * 55) * 4);
+    return "41 0C " + rpm.toString(16).padStart(4, "0").toUpperCase().replace(/(..)(..)/, "$1 $2") + "\r>";
+  }
+  if (c === "0105") return "41 05 " + (0x28 + 40).toString(16).toUpperCase() + "\r>";
+  return "NO DATA\r>";
+};
+
+/* ── Bluetooth ブリッジ (Web Bluetooth / Cordova BLE / デモ) ── */
+const BT = { session: null, device: null, kind: null, real: { kmh: null, rpm: null, coolant: null, volt: null } };
+const BLE_SERVICES = [0xfff0, 0xffe0];
+const BLE_UUID = function(x){ return "0000" + x.toString(16).padStart(4, "0") + "-0000-1000-8000-00805f9b34fb"; };
+
+function btUi(state, dev){
+  document.getElementById("btstate").textContent = state;
+  if (dev !== undefined) document.getElementById("btdev").textContent = dev || "—";
+  const on = !!BT.session;
+  document.getElementById("btdisc").style.display = on ? "" : "none";
+  document.getElementById("btconnect").style.display = on ? "none" : "";
+  document.getElementById("btdemo").style.display = on ? "none" : "";
+}
+function btTelemetry(ev){
+  if (ev.type === "speed"){
+    BT.real.kmh = ev.kmh;
+    document.getElementById("btspeed").textContent = ev.kmh + " km/h" + (BT.kind === "demo" ? " (デモ)" : "");
+    if (ev.kmh >= 80 && !BT.spokeFast){ BT.spokeFast = true; sayAl("実車速度 " + ev.kmh + " km/h。速度に注意してください。"); }
+    if (ev.kmh < 70) BT.spokeFast = false;
+  }
+  if (ev.type === "rpm"){ BT.real.rpm = ev.rpm; document.getElementById("btrpm").textContent = Math.round(ev.rpm) + " rpm"; }
+  if (ev.type === "coolant") BT.real.coolant = ev.c;
+  if (ev.type === "volt") BT.real.volt = ev.v;
+  if (ev.type === "coolant" || ev.type === "volt")
+    document.getElementById("btmisc").textContent =
+      (BT.real.coolant == null ? "—" : BT.real.coolant + "°C") + " / " + (BT.real.volt == null ? "—" : BT.real.volt.toFixed(1) + "V");
+  if (ev.type === "volt" && ev.v < 11.6 && !BT.spokeVolt){ BT.spokeVolt = true; sayAl("バッテリー電圧が " + ev.v.toFixed(1) + "V まで下がっています。点検をおすすめします。"); }
+}
+function btDisconnect(){
+  if (BT.session) BT.session.stop();
+  try { if (BT.kind === "webbt" && BT.device && BT.device.gatt.connected) BT.device.gatt.disconnect(); } catch (e) {}
+  try { if (BT.kind === "cordova" && BT.device) window.ble.disconnect(BT.device, function(){}, function(){}); } catch (e) {}
+  BT.session = null; BT.device = null; BT.kind = null;
+  btUi("未接続", null);
+  document.getElementById("btspeed").textContent = "—";
+  document.getElementById("btrpm").textContent = "—";
+  sayAl("実車接続を終了しました。");
+}
+function btConnectDemo(){
+  BT.kind = "demo";
+  const session = new ElmSession(function(){}, btTelemetry, function(st){ btUi(st === "ready" ? "接続中 (デモ)" : st, "Demo ELM327"); });
+  BT.session = session;
+  new DemoAdapter().connect(session);
+  btUi("初期化中 (デモ)", "Demo ELM327");
+  sayAl("デモアダプタに接続しました。実機と同じ ELM327 経路で走行データを流します。");
+}
+async function btConnectReal(){
+  /* Cordova (APK) → ble-central / ブラウザ → Web Bluetooth */
+  if (window.ble && window.ble.scan) return btConnectCordova();
+  if (!navigator.bluetooth){
+    sayAl("この環境には Bluetooth API がありません。Android版APKか、Chrome系ブラウザ (https/file) でどうぞ。デモ接続でも全機能を試せます。");
+    return;
+  }
+  try {
+    btUi("デバイス選択中…");
+    const dev = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: BLE_SERVICES.map(BLE_UUID)
+    });
+    btUi("接続中…", dev.name || dev.id);
+    const server = await dev.gatt.connect();
+    let notifyChar = null, writeChar = null;
+    for (const s of BLE_SERVICES){
+      let svc = null;
+      try { svc = await server.getPrimaryService(BLE_UUID(s)); } catch (e) { continue; }
+      const chars = await svc.getCharacteristics();
+      for (const ch of chars){
+        if (!notifyChar && ch.properties.notify) notifyChar = ch;
+        if (!writeChar && (ch.properties.write || ch.properties.writeWithoutResponse)) writeChar = ch;
+      }
+      if (notifyChar && writeChar) break;
+    }
+    if (!notifyChar || !writeChar){ btUi("非対応デバイス", dev.name); sayAl("このデバイスに ELM327 系のシリアル特性 (FFF0/FFE0) が見つかりません。"); try{dev.gatt.disconnect();}catch(e){} return; }
+    const enc = new TextEncoder(), dec = new TextDecoder();
+    const session = new ElmSession(function(cmd){
+      const p = writeChar.properties.writeWithoutResponse ? writeChar.writeValueWithoutResponse(enc.encode(cmd)) : writeChar.writeValue(enc.encode(cmd));
+      if (p && p.catch) p.catch(function(){});
+    }, btTelemetry, function(st){ btUi(st === "ready" ? "接続中 (実機)" : st, dev.name || dev.id); });
+    await notifyChar.startNotifications();
+    notifyChar.addEventListener("characteristicvaluechanged", function(ev2){
+      session.feed(dec.decode(ev2.target.value));
+    });
+    dev.addEventListener("gattserverdisconnected", function(){ if (BT.session === session) btDisconnect(); });
+    BT.session = session; BT.device = dev; BT.kind = "webbt";
+    session.start();
+    sayAl("OBD-II アダプタ " + (dev.name || "") + " に接続しました。実車データの受信を始めます。");
+  } catch (e) {
+    btUi("未接続", null);
+    if (!/cancel/i.test(String(e && e.message))) sayAl("接続できませんでした: " + (e && e.message ? e.message : e));
+  }
+}
+function btConnectCordova(){
+  btUi("スキャン中… (5秒)");
+  const found = {};
+  window.ble.scan([], 5, function(d){ found[d.id] = d; }, function(){});
+  setTimeout(function(){
+    let best = null;
+    for (const id in found){
+      const d = found[id];
+      if (/OBD|ELM|VLINK|VGATE|VEEPEAK|ICAR/i.test(d.name || "")) { best = d; break; }
+      if (!best || (d.rssi || -99) > (best.rssi || -99)) best = d;
+    }
+    if (!best){ btUi("未接続", null); sayAl("BLE デバイスが見つかりません。アダプタの電源と位置情報権限を確認してください。"); return; }
+    btUi("接続中…", best.name || best.id);
+    window.ble.connect(best.id, function(){
+      const enc = new TextEncoder(), dec = new TextDecoder();
+      let svc = null, wc = null, nc = null;
+      /* FFF0 系 → FFE0 系の順で試す */
+      const cand = [
+        { s: "FFF0", n: "FFF1", w: "FFF2" },
+        { s: "FFE0", n: "FFE1", w: "FFE1" }
+      ];
+      function tryCand(i){
+        if (i >= cand.length){ btUi("非対応デバイス", best.name); return; }
+        const c = cand[i];
+        const session = new ElmSession(function(cmd){
+          window.ble.writeWithoutResponse(best.id, c.s, c.w, enc.encode(cmd + "").buffer, function(){}, function(){
+            window.ble.write(best.id, c.s, c.w, enc.encode(cmd + "").buffer, function(){}, function(){});
+          });
+        }, btTelemetry, function(st){ btUi(st === "ready" ? "接続中 (実機)" : st, best.name || best.id); });
+        window.ble.startNotification(best.id, c.s, c.n, function(data){
+          session.feed(dec.decode(data));
+        }, function(){ tryCand(i + 1); });
+        BT.session = session; BT.device = best.id; BT.kind = "cordova";
+        setTimeout(function(){ session.start(); }, 300);
+      }
+      tryCand(0);
+      sayAl("OBD-II アダプタ " + (best.name || "") + " に接続しました。実車データの受信を始めます。");
+    }, function(){ btUi("未接続", null); sayAl("接続が切れました。"); if (BT.kind === "cordova") btDisconnect(); });
+  }, 5200);
+}
+
+/* ── アルの音声 (カーナビへは端末の既存 BT オーディオ経由で出る) ── */
+function alSpeak(text){
+  if (!document.getElementById("btvoice").checked) return;
+  try {
+    if (window.speechSynthesis && window.SpeechSynthesisUtterance){
+      const u = new SpeechSynthesisUtterance(String(text).replace(/<[^>]*>/g, ""));
+      u.lang = "ja-JP"; u.rate = 1.05;
+      speechSynthesis.speak(u);
+      return;
+    }
+  } catch (e) {}
+  /* TTS 非対応 WebView → 通知ビープ (これも BT オーディオへ乗る) */
+  try {
+    const ac = alSpeak._ac || (alSpeak._ac = new (window.AudioContext || window.webkitAudioContext)());
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = 880; g.gain.value = 0.06;
+    o.connect(g); g.connect(ac.destination);
+    o.start(); o.stop(ac.currentTime + 0.18);
+  } catch (e) {}
+}
+function sayAl(text){ say("al", text); }
+
+document.getElementById("btconnect").addEventListener("click", function(){ btConnectReal(); });
+document.getElementById("btdemo").addEventListener("click", btConnectDemo);
+document.getElementById("btdisc").addEventListener("click", btDisconnect);
 
 /* ── 起動 ── */
 queueTiles();

@@ -46,7 +46,8 @@ jobs:
             for (const marker of ["function planRoute", "function alPerceive",
                                   "function deadReckonStep", "function landmarkFix",
                                   "function gnssFix", "function mapSeal", "function mapOpen",
-                                  "function alReply"]) {
+                                  "function alReply", "function elmParseLine",
+                                  "function ElmSession"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
@@ -98,6 +99,8 @@ jobs:
           cp "$APP/cordova/config.xml" cordova-build/config.xml
           cd cordova-build
           cordova platform add android@12.0.1
+          # 実車接続 (OBD-II BLE): アプリは window.ble を検出して Cordova 経路を使う
+          cordova plugin add cordova-plugin-ble-central@1.7.4
           cordova build android --verbose
       - name: Collect APK
         run: |

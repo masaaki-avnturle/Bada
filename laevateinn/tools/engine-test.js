@@ -114,4 +114,44 @@ assert(/人工衛星/.test(G("alReply")("状態", { mode: "sat", x: 1, y: 2, spe
 assert(/停止/.test(G("alReply")("停止して", {})), "Al acknowledges a stop command");
 assert(/アル/.test(G("alReply")("あなたはだれ?", {})), "Al introduces itself");
 
+/* 7. 実車接続 — ELM327 (OBD-II) プロトコルエンジン */
+const P = G("elmParseLine");
+assert(P("41 0D 3C").type === "speed" && P("41 0D 3C").kmh === 60, "ELM: '41 0D 3C' -> 60 km/h");
+assert(P("410C1AF8").type === "rpm" && P("410C1AF8").rpm === 1726, "ELM: '410C1AF8' -> 1726 rpm");
+assert(P("41 05 5A").type === "coolant" && P("41 05 5A").c === 50, "ELM: '41 05 5A' -> coolant 50°C");
+assert(P("12.6V").type === "volt" && P("12.6V").v === 12.6, "ELM: 'ATRV' reply '12.6V' -> battery voltage");
+assert(P("NO DATA").type === "nodata" && P("UNABLE TO CONNECT").type === "nodata", "ELM: NO DATA / UNABLE TO CONNECT are flagged");
+assert(P("010D").type === "echo" && P("ATZ").type === "echo", "ELM: command echoes are ignored as echo");
+assert(P("ELM327 v1.5").type === "ok", "ELM: version banner is acknowledged");
+
+const writes = [];
+const telemetry = [];
+const states = [];
+const Session = G("ElmSession");
+const sess = new Session(function(c){ writes.push(c.trim()); }, function(ev){ telemetry.push(ev); }, function(st){ states.push(st); });
+sess.start();
+assert(writes.join(",") === "ATZ", "ELM session: starts with ATZ reset");
+sess.feed("ELM327 v1.5\r\r>");
+sess.feed("OK\r>");   /* ATE0 */
+sess.feed("OK\r>");   /* ATL0 */
+sess.feed("OK\r>");   /* ATS0 */
+sess.feed("OK\r>");   /* ATSP0 */
+assert(writes.join(",") === "ATZ,ATE0,ATL0,ATS0,ATSP0,010D",
+       "ELM session: full init sequence then first speed poll");
+assert(states.indexOf("ready") >= 0, "ELM session: reports ready after init");
+sess.feed("41 0D 28\r>");                       /* 40 km/h */
+sess.feed("41 0C 0F A0\r>");                    /* 1000 rpm */
+sess.feed("41 05 46\r>");                       /* 30°C */
+sess.feed("12.4V\r>");
+assert(writes[writes.length - 1] === "010D" && writes.length === 10,
+       "ELM session: poll cycle wraps around (010D 010C 0105 ATRV -> 010D)");
+const spd = telemetry.filter(function(e){ return e.type === "speed"; });
+const rpm = telemetry.filter(function(e){ return e.type === "rpm"; });
+assert(spd.length === 1 && spd[0].kmh === 40, "ELM session: telemetry speed 40 km/h delivered");
+assert(rpm.length === 1 && rpm[0].rpm === 1000, "ELM session: telemetry 1000 rpm delivered");
+sess.feed("41 0D");        /* 分割パケット前半 */
+sess.feed(" 50\r>");       /* 後半 — 結合して 80 km/h */
+const spd2 = telemetry.filter(function(e){ return e.type === "speed"; });
+assert(spd2.length === 2 && spd2[1].kmh === 80, "ELM session: split BLE packets are reassembled (80 km/h)");
+
 console.log("\nALL ENGINE TESTS PASSED");
