@@ -424,3 +424,10 @@ fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
 const outPath = path.join(IDE, "dist", "earth-twin.html");
 fs.writeFileSync(outPath, html);
 console.log("built dist/earth-twin.html (" + fs.statSync(outPath).size + " bytes)");
+
+/* Stage the same page as the GammaTwin native app's www/index.html
+ * (kept out of git; regenerated at build time). */
+const appWww = path.join(IDE, "gammatwin-app", "www");
+fs.mkdirSync(appWww, { recursive: true });
+fs.writeFileSync(path.join(appWww, "index.html"), html);
+console.log("staged gammatwin-app/www/index.html");

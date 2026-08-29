@@ -512,3 +512,10 @@ fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
 const outPath = path.join(IDE, "dist", "planet-cinema.html");
 fs.writeFileSync(outPath, html);
 console.log("built dist/planet-cinema.html (" + fs.statSync(outPath).size + " bytes)");
+
+/* Stage the same page as the PlanetCinema native app's www/index.html
+ * (kept out of git; regenerated at build time). */
+const appWww = path.join(IDE, "planetcinema-app", "www");
+fs.mkdirSync(appWww, { recursive: true });
+fs.writeFileSync(path.join(appWww, "index.html"), html);
+console.log("staged planetcinema-app/www/index.html");

@@ -1,0 +1,203 @@
+name: Space apps build (Orbita + GammaTwin + PlanetCinema — Windows EXE + Ubuntu + Android APK)
+
+# 3つの宇宙アプリをネイティブ ビルドします:
+#   Orbita       (earth-view)    — 公開衛星から見る地球 ライブ+動画
+#   GammaTwin    (earth-twin)    — 地球型惑星ファインダー (NASA 宇宙望遠鏡カタログ)
+#   PlanetCinema (planet-cinema) — 見つかった惑星の動画館 (.webm録画)
+# それぞれ Windows 10/11 EXE (NSIS+ポータブル) / Ubuntu AppImage・deb /
+# Android APK。本体 (www/index.html) は各 build ツールが生成する自己完結 HTML。
+# Actions アーティファクト (spaceapps-*)、および (space-v* タグ / release_tag
+# 指定時) GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: space-v1.1.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - claude/zone-url-scheme-ibrc5y
+      - main
+    paths:
+      - 'bada_gui_ide/orbita-app/**'
+      - 'bada_gui_ide/gammatwin-app/**'
+      - 'bada_gui_ide/planetcinema-app/**'
+      - 'bada_gui_ide/tools/build-earth-view.js'
+      - 'bada_gui_ide/tools/build-earth-twin.js'
+      - 'bada_gui_ide/tools/build-planet-cinema.js'
+      - 'bada_gui_ide/vendor/satellite.min.js'
+      - '.github/workflows/space-apps-build.yml'
+    tags:
+      - 'space-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build all three www pages
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node tools/build-earth-view.js
+          node tools/build-earth-twin.js
+          node tools/build-planet-cinema.js
+          test -f orbita-app/www/index.html
+          test -f gammatwin-app/www/index.html
+          test -f planetcinema-app/www/index.html
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate www (all three)
+        working-directory: bada_gui_ide
+        shell: bash
+        run: |
+          node tools/build-earth-view.js
+          node tools/build-earth-twin.js
+          node tools/build-planet-cinema.js
+      - name: Build Windows EXEs (Electron ×3)
+        working-directory: bada_gui_ide
+        shell: bash
+        run: |
+          set -e
+          for d in orbita-app gammatwin-app planetcinema-app; do
+            (cd "$d/electron" && npm install && npm run dist)
+          done
+      - name: Upload EXE artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: spaceapps-windows
+          path: |
+            bada_gui_ide/orbita-app/electron/dist/*.exe
+            bada_gui_ide/gammatwin-app/electron/dist/*.exe
+            bada_gui_ide/planetcinema-app/electron/dist/*.exe
+      - name: Attach EXEs to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_gui_ide/orbita-app/electron/dist/*.exe
+            bada_gui_ide/gammatwin-app/electron/dist/*.exe
+            bada_gui_ide/planetcinema-app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate www (all three)
+        working-directory: bada_gui_ide
+        run: |
+          node tools/build-earth-view.js
+          node tools/build-earth-twin.js
+          node tools/build-planet-cinema.js
+      - name: Build Ubuntu AppImage + deb (Electron ×3)
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          for d in orbita-app gammatwin-app planetcinema-app; do
+            (cd "$d/electron" && npm install && npm run dist:linux)
+          done
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: spaceapps-linux
+          path: |
+            bada_gui_ide/orbita-app/electron/dist/*.AppImage
+            bada_gui_ide/orbita-app/electron/dist/*.deb
+            bada_gui_ide/gammatwin-app/electron/dist/*.AppImage
+            bada_gui_ide/gammatwin-app/electron/dist/*.deb
+            bada_gui_ide/planetcinema-app/electron/dist/*.AppImage
+            bada_gui_ide/planetcinema-app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_gui_ide/orbita-app/electron/dist/*.AppImage
+            bada_gui_ide/orbita-app/electron/dist/*.deb
+            bada_gui_ide/gammatwin-app/electron/dist/*.AppImage
+            bada_gui_ide/gammatwin-app/electron/dist/*.deb
+            bada_gui_ide/planetcinema-app/electron/dist/*.AppImage
+            bada_gui_ide/planetcinema-app/electron/dist/*.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Generate www (all three)
+        working-directory: bada_gui_ide
+        run: |
+          node tools/build-earth-view.js
+          node tools/build-earth-twin.js
+          node tools/build-planet-cinema.js
+      - name: Build debug APKs (Cordova ×3, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          mkdir -p out
+          build_one () {
+            local dir="$1" id="$2" cls="$3" apk="$4"
+            rm -rf cordova-build
+            cordova create cordova-build "$id" "$cls"
+            rm -rf cordova-build/www
+            cp -r "bada_gui_ide/$dir/www" cordova-build/www
+            cp "bada_gui_ide/$dir/cordova/config.xml" cordova-build/config.xml
+            (cd cordova-build && cordova platform add android@12.0.1 && cordova build android)
+            cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk "out/$apk"
+          }
+          build_one orbita-app       io.github.masaaki_avnturle.orbita       Orbita       orbita-debug.apk
+          build_one gammatwin-app    io.github.masaaki_avnturle.gammatwin    GammaTwin    gammatwin-debug.apk
+          build_one planetcinema-app io.github.masaaki_avnturle.planetcinema PlanetCinema planetcinema-debug.apk
+          ls -la out
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: spaceapps-android
+          path: out/*.apk
+      - name: Attach APKs to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk

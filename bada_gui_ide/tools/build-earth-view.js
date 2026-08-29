@@ -501,3 +501,10 @@ fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
 const outPath = path.join(IDE, "dist", "earth-view.html");
 fs.writeFileSync(outPath, html);
 console.log("built dist/earth-view.html (" + fs.statSync(outPath).size + " bytes)");
+
+/* Stage the same page as the Orbita native app's www/index.html
+ * (kept out of git; regenerated at build time). */
+const appWww = path.join(IDE, "orbita-app", "www");
+fs.mkdirSync(appWww, { recursive: true });
+fs.writeFileSync(path.join(appWww, "index.html"), html);
+console.log("staged orbita-app/www/index.html");

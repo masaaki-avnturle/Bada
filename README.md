@@ -145,6 +145,16 @@
 
 Ubuntu ではキー送出に `xdotool`(X11 推奨)、`uno`/`sum(Calc)`/`ruby(Writer)` に `python3-uno` を利用します。ビルドは [`madokey-app-build.yml`](.github/workflows/madokey-app-build.yml)([`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
+**宇宙3アプリ — Orbita / GammaTwin / PlanetCinema** もネイティブ アプリを用意しています(1つのワークフローでまとめてビルド):
+
+| アプリ | Android (APK) | Windows 10 / 11 | Ubuntu |
+|:---|:---|:---|:---|
+| **Orbita**(衛星から見る地球) | `orbita-debug.apk` | `Orbita-*-x64.exe` | `Orbita-*-x86_64.AppImage` / `*-amd64.deb` |
+| **GammaTwin**(地球型惑星ファインダー) | `gammatwin-debug.apk` | `GammaTwin-*-x64.exe` | `GammaTwin-*-x86_64.AppImage` / `*-amd64.deb` |
+| **PlanetCinema**(惑星の動画館) | `planetcinema-debug.apk` | `PlanetCinema-*-x64.exe` | `PlanetCinema-*-x86_64.AppImage` / `*-amd64.deb` |
+
+ビルドは [`space-apps-build.yml`](.github/workflows/space-apps-build.yml)。Actions の Artifacts **`spaceapps-windows` / `spaceapps-linux` / `spaceapps-android`** から取得できます([`orbita-app/`](bada_gui_ide/orbita-app/)・[`gammatwin-app/`](bada_gui_ide/gammatwin-app/)・[`planetcinema-app/`](bada_gui_ide/planetcinema-app/))。ライブ表示は要ネット(GammaTwin/PlanetCinema はオフライン スナップショット内蔵)。Release への添付は `workflow_dispatch` の `release_tag`(例 `space-v1.1.0`)で。
+
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
 > (このブランチのマージ後に `main` から取得できます。マージ前は本ブランチの
