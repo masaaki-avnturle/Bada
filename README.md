@@ -128,6 +128,19 @@
 | **配布 zip** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-zone-dist.zip` (専用ブラウザ + ランナー + `zone.bada` + `bada.js` + CLI + README)。[`zone-dist.yml`](.github/workflows/zone-dist.yml) が `zone-v*` タグ / `workflow_dispatch` で生成・添付します |
 | **CLI** | `node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zone.bada` |
 
+### 🔐 量子暗号アプリ (Bada QuantumCrypto) — 暗号化と解除(復号)
+
+zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。テキストとファイルを**暗号化**し、同じパスフレーズ + 結び目で**解除**できます (Kauffman ブラケット鍵導出 + Bell 対 QKD + ChaCha20/HMAC AEAD、端末内完結・通信なし):
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `quantumcrypto-debug.apk` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaQuantumCrypto-Setup-*-x64.exe` (インストーラ) / `BadaQuantumCrypto-Portable-*-x64.exe` (インストール不要) |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaQuantumCrypto-*.AppImage` / `.deb` |
+| **どこでも** (HTML) | [`bada_gui_ide/quantumcrypto-app/www/`](bada_gui_ide/quantumcrypto-app/www/) の `index.html` + `qcrypto.js` をブラウザで開くだけ |
+
+ビルドは [`quantumcrypto-app-build.yml`](.github/workflows/quantumcrypto-app-build.yml) が自動実行します (`quantumcrypto-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方と仕組みは [`bada_gui_ide/quantumcrypto-app/README.md`](bada_gui_ide/quantumcrypto-app/README.md) を参照。
+
 ---
 
 ## 🔤 Bada Language — 設計原理
