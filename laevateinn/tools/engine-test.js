@@ -114,6 +114,44 @@ assert(/人工衛星/.test(G("alReply")("状態", { mode: "sat", x: 1, y: 2, spe
 assert(/停止/.test(G("alReply")("停止して", {})), "Al acknowledges a stop command");
 assert(/アル/.test(G("alReply")("あなたはだれ?", {})), "Al introduces itself");
 
+/* 6b. トランスフォーマー制御ヘッド — 車両の操縦 */
+const clearRays = [];
+for (let i = 0; i < 16; i++) clearRays.push({ dist: 9999, type: "none" });
+/* 目標が正面 → 直進・加速 */
+const cStraight = G("alControl")(clearRays, 0);
+assert(Math.abs(cStraight.steer) < 0.05 && cStraight.throttle > 0.8, "control: clear road, goal ahead -> ~straight, accelerate");
+/* 目標が左 (負の bearing) → 左へ操舵 */
+const cLeft = G("alControl")(clearRays, -0.8);
+assert(cLeft.steer < -0.1, "control: goal to the left -> steer left (negative)");
+const cRight = G("alControl")(clearRays, 0.8);
+assert(cRight.steer > 0.1, "control: goal to the right -> steer right (positive)");
+/* 正面に障害物 → 制動 (throttle 負) */
+const frontObs = clearRays.map(function(r){ return { dist: r.dist, type: r.type }; });
+frontObs[8] = { dist: 22, type: "car" };
+const cBrake = G("alControl")(frontObs, 0);
+assert(cBrake.throttle < 0, "control: obstacle dead ahead -> brake (throttle<0)");
+/* 右前方に障害物・目標は正面 → 左へ回避操舵 */
+const rightObs = clearRays.map(function(r){ return { dist: r.dist, type: r.type }; });
+rightObs[10] = { dist: 30, type: "walker" };
+const cAvoid = G("alControl")(rightObs, 0);
+assert(cAvoid.steer < -0.02, "control: obstacle on the right -> steer away to the left");
+/* steer は ±maxSteer に飽和 */
+const cSat = G("alControl")(clearRays, 3.0);
+assert(Math.abs(cSat.steer) <= 0.6 + 1e-9, "control: steering saturates at +/- maxSteer");
+
+/* 6c. 車両運動モデル — 制御出力が実際に車体を動かす */
+let car = { x: 100, y: 100, heading: 0, speed: 0 };
+for (let i = 0; i < 40; i++) car = G("carStep")(car, { steer: 0, throttle: 1 }, 0.05);
+assert(car.speed > 20 && car.x > 100 && Math.abs(car.y - 100) < 1, "kinematics: throttle+straight accelerates forward along x");
+const before = car.heading;
+for (let i = 0; i < 20; i++) car = G("carStep")(car, { steer: 0.6, throttle: 1 }, 0.05);
+assert(car.heading > before + 0.1, "kinematics: positive steer turns heading (right/CW in screen space)");
+let braking = { x: 0, y: 0, heading: 0, speed: 40 };
+for (let i = 0; i < 40; i++) braking = G("carStep")(braking, { steer: 0, throttle: -1 }, 0.05);
+assert(braking.speed < 1, "kinematics: full brake brings the car to a stop");
+const parked = G("carStep")({ x: 0, y: 0, heading: 0, speed: 0 }, { steer: 0.6, throttle: 0 }, 0.05);
+assert(Math.abs(parked.heading) < 1e-6, "kinematics: steering has little effect at a standstill (speed-dependent)");
+
 /* 7. 実車接続 — ELM327 (OBD-II) プロトコルエンジン */
 const P = G("elmParseLine");
 assert(P("41 0D 3C").type === "speed" && P("41 0D 3C").kmh === 60, "ELM: '41 0D 3C' -> 60 km/h");

@@ -105,7 +105,10 @@ input:focus{outline:none;border-color:var(--cyan)}
       <h2>アルのトランスフォーマー知覚 — 16 レイセンサへの attention</h2>
       <div class="kv"><b>脅威スコア</b><span id="threat">0.00</span></div>
       <div class="kv"><b>注意の焦点</b><span id="focus">—</span></div>
+      <div class="kv"><b>🕹 操舵出力</b><span id="ctrl-steer">→ 0°</span></div>
+      <div class="kv"><b>🚦 加減速出力</b><span id="ctrl-throttle">—</span></div>
       <div id="rays"></div>
+      <p style="font-size:11px;color:var(--dim);margin-top:6px">操舵角・加減速はトランスフォーマーの出力そのものです(車体はこの2値だけで動きます)。実車の操縦系には送りません。</p>
     </div>
   </div>
 
@@ -259,6 +262,44 @@ function alPerceive(rays){
     if (t > best){ best = t; focus = i; }
   }
   return { threat: threat, focus: focus, attn: attn, closeness: closeness };
+}
+
+/* ── レイ i の自車前方基準の方位オフセット (0=正面, +右回り) ── */
+function rayAngle(i){ return (i - 7.5) / 16 * Math.PI * 2; }
+
+/* =====================================================================
+ * トランスフォーマー制御ヘッド — 「車両を操縦する」本体
+ *   知覚 attention を制御出力に写す。attention 出力ベクトル (context)
+ *   を作り、幾何ベース(回避 + 目標追従)の操舵/加減速則と結合する。
+ *   出力: steer (rad, ±maxSteer), throttle (-1..1: 正=加速/負=制動)。
+ *   これが stepControl で毎フレーム自車の heading と speed を動かす。
+ * ===================================================================== */
+const CTRL = { maxSteer: 0.6, kGoal: 0.9, kAvoid: 1.9, kBrake: 3.2, cruise: 46 };
+function alControl(rays, goalBearing){
+  const per = alPerceive(rays);
+  /* attention 出力ベクトル (context = Σ wᵢ·Vᵢ) — 本物の attention 集約 */
+  const ctx = new Array(AL_TF.dim).fill(0);
+  for (let i = 0; i < rays.length; i++){
+    const v = alEmbed("val:ray" + i + ":" + (rays[i].type || "none"));
+    for (let d = 0; d < AL_TF.dim; d++) ctx[d] += per.attn[i] * v[d];
+  }
+  /* 前方性 (正面ほど 1、真横で 0、後方は 0) */
+  let frontThreat = 0, avoid = 0;
+  for (let i = 0; i < rays.length; i++){
+    const ang = rayAngle(i);
+    const front = Math.max(0, Math.cos(ang));
+    const salience = per.attn[i] * per.closeness[i];   /* 注意 × 近さ */
+    frontThreat += salience * front;
+    /* 障害物のある側と逆へ操舵 (右に危険→左へ) */
+    avoid -= salience * front * Math.sign(ang || 1e-6);
+  }
+  goalBearing = Math.max(-Math.PI, Math.min(Math.PI, goalBearing || 0));
+  let steer = CTRL.kGoal * goalBearing + CTRL.kAvoid * avoid;
+  steer = Math.max(-CTRL.maxSteer, Math.min(CTRL.maxSteer, steer));
+  let throttle = 1 - CTRL.kBrake * frontThreat;
+  throttle = Math.max(-1, Math.min(1, throttle));
+  return { steer: steer, throttle: throttle, frontThreat: frontThreat,
+           threat: per.threat, focus: per.focus, attn: per.attn, closeness: per.closeness, ctx: ctx };
 }
 
 /* =====================================================================
@@ -492,39 +533,65 @@ function senseRays(){
   return rays;
 }
 
-/* ── 走行更新 ── */
+/* ── 車両運動モデル (自転車近似) ──────────────────────────────────
+ * トランスフォーマーの制御出力 ctrl = {steer, throttle} をそのまま
+ * ハンドルとアクセル/ブレーキとして車体に適用する。これが「操縦」。
+ *   steer   → heading を回頭 (速度が高いほど転舵が効く)
+ *   throttle→ 正で加速・負で制動。速度に応じ前進
+ * ---------------------------------------------------------------- */
+function carStep(car, ctrl, dt){
+  const cruise = CTRL.cruise;
+  /* throttle=+1 で cruise へ、-1 で 0 (制動) を目標に一次遅れ */
+  const target = ctrl.throttle >= 0 ? cruise * ctrl.throttle : 0;
+  const accel = ctrl.throttle >= 0 ? 34 : 90;   /* 制動は加速より強い */
+  let speed = car.speed + (target - car.speed) * Math.min(1, (accel / cruise) * dt);
+  if (speed < 0) speed = 0;
+  /* 転舵: 停止時はほぼ効かない (実車と同じく速度依存) */
+  const steerGain = Math.min(1, speed / 12);
+  const heading = car.heading + ctrl.steer * steerGain * dt * 2.4;
+  return {
+    x: car.x + Math.cos(heading) * speed * dt,
+    y: car.y + Math.sin(heading) * speed * dt,
+    heading: heading, speed: speed
+  };
+}
+function angleWrap(a){ while (a > Math.PI) a -= 2*Math.PI; while (a < -Math.PI) a += 2*Math.PI; return a; }
+
+/* ── 走行更新: トランスフォーマー制御ループ ── */
 function stepDrive(dt){
-  if (!S.driving || !S.path.length || S.wp >= S.path.length) { S.car.speed = Math.max(0, S.car.speed - 60 * dt); return; }
-  const wp = S.path[S.wp];
-  const tx = (wp[0] + 0.5) * CELL, ty = (wp[1] + 0.5) * CELL;
-  const dx = tx - S.car.x, dy = ty - S.car.y;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 6){
+  if (!S.driving || !S.path.length || S.wp >= S.path.length){
+    S.car = carStep(S.car, { steer: 0, throttle: -1 }, dt);   /* 制動停止 */
+    return;
+  }
+  /* 現在の目標ウェイポイント (少し先読み) */
+  let wp = S.path[S.wp];
+  let tx = (wp[0] + 0.5) * CELL, ty = (wp[1] + 0.5) * CELL;
+  if (Math.hypot(tx - S.car.x, ty - S.car.y) < CELL * 0.5){
     S.wp++;
     if (S.wp >= S.path.length){
       S.driving = false; S.car.speed = 0;
-      say("al", "目的地に到着しました。お疲れさまです。");
-      document.getElementById("drive").textContent = "▶ 自動走行 開始";
+      sayAl("目的地に到着しました。お疲れさまです。");
+      const b = document.getElementById("drive"); if (b){ b.textContent = "▶ 自動走行 開始"; b.className = "primary"; }
       return;
     }
-    return;
+    wp = S.path[S.wp]; tx = (wp[0] + 0.5) * CELL; ty = (wp[1] + 0.5) * CELL;
   }
-  S.car.heading = Math.atan2(dy, dx);
-  /* トランスフォーマー知覚 → 速度制御 */
-  const per = alPerceive(senseRays());
-  S.threat = per.threat; S.focus = per.focus; S.lastAttn = per;
-  const frontFocused = per.focus >= 6 && per.focus <= 9; /* 進行方向 ±約45° */
-  let targetSpeed = 46;
-  if (per.threat > 0.55 && frontFocused) targetSpeed = 0;
-  else if (per.threat > 0.30 && frontFocused) targetSpeed = 14;
-  if (targetSpeed === 0 && S.car.speed > 1 && !S.warned){
-    say("al", "前方 " + (S.lastAttn ? "レイ" + per.focus : "") + " に障害物。attention 集中 — 停止します。");
+  /* 目標方位 (自車 heading 基準の相対角) をトランスフォーマーへ */
+  const goalBearing = angleWrap(Math.atan2(ty - S.car.y, tx - S.car.x) - S.car.heading);
+  const ctrl = alControl(senseRays(), goalBearing);
+  S.threat = ctrl.threat; S.focus = ctrl.focus; S.lastAttn = ctrl; S.lastCtrl = ctrl;
+  /* 制御出力を UI へ */
+  const sEl = document.getElementById("ctrl-steer"), tEl = document.getElementById("ctrl-throttle");
+  if (sEl) sEl.textContent = (ctrl.steer >= 0 ? "→ " : "← ") + (Math.abs(ctrl.steer) * 57.3).toFixed(0) + "°";
+  if (tEl) tEl.textContent = (ctrl.throttle >= 0 ? "アクセル " + (ctrl.throttle * 100).toFixed(0) + "%" : "ブレーキ " + (-ctrl.throttle * 100).toFixed(0) + "%");
+  /* 音声警告 (制動/再発進) */
+  if (ctrl.throttle < -0.2 && S.car.speed > 3 && !S.warned){
+    sayAl("前方レイ " + ctrl.focus + " に障害物。トランスフォーマーが制動します。");
     S.warned = true;
   }
-  if (targetSpeed > 0 && S.warned && per.threat < 0.25){ say("al", "進路クリア。再発進します。"); S.warned = false; }
-  S.car.speed += (targetSpeed - S.car.speed) * Math.min(1, 3 * dt);
-  S.car.x += Math.cos(S.car.heading) * S.car.speed * dt;
-  S.car.y += Math.sin(S.car.heading) * S.car.speed * dt;
+  if (ctrl.throttle > 0.3 && S.warned && ctrl.frontThreat < 0.12){ sayAl("進路クリア。再発進します。"); S.warned = false; }
+  /* トランスフォーマー出力で車体を動かす = 操縦 */
+  S.car = carStep(S.car, ctrl, dt);
 }
 
 /* ── 測位更新 ── */
@@ -618,7 +685,7 @@ function loop(ts){
   stepTiles(dt);
   stepDrive(dt);
   stepPos(dt);
-  if (!S.driving){ const per = alPerceive(senseRays()); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
+  if (!S.driving){ const per = alControl(senseRays(), 0); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
   obsTimer += dt;
   if (obsTimer > 4 && S.obstacles.length < 6){ obsTimer = 0; spawnObstacle(); }
   for (const o of S.obstacles) o.ttl -= dt;
