@@ -65,7 +65,11 @@ jobs:
           for u in \
             "https://github.com/${{ github.repository }}/releases/download/badavmpro-v1.0.0/BadaVMPro-1.0.0-amd64.deb" \
             "https://github.com/${{ github.repository }}/releases/download/laevateinn-v1.0.0/Laevateinn-1.0.0-amd64.deb" ; do
-            echo "fetch $u"; curl -fsSL -o "out_debs/$(basename "$u")" "$u" || echo "skip (not published yet): $u"
+            f="out_debs/$(basename "$u")"
+            echo "fetch $u"
+            curl -fL --retry 4 --retry-delay 3 -o "$f" "$u" \
+              && echo "  got $(du -h "$f" | cut -f1)" \
+              || { echo "  skip (not available): $u"; rm -f "$f"; }
           done
           ls -l out_debs || true
 
@@ -73,12 +77,17 @@ jobs:
         run: |
           sudo bash badaos-iso/build-iso.sh "${{ steps.v.outputs.version }}" "${{ steps.v.outputs.apt_base }}"
 
+      - name: Fix ownership of build outputs (build-iso.sh ran as root)
+        run: sudo chown -R "$(id -u):$(id -g)" out out_debs 2>/dev/null || true
+
       - name: Build apt repo index (flat) from the same .deb
+        continue-on-error: true
         run: |
+          mkdir -p out/apt
           if compgen -G "out_debs/*.deb" > /dev/null; then
             bash badaos-iso/tools/make-apt-repo.sh out_debs out/apt
           else
-            echo "no .deb to index"; mkdir -p out/apt
+            echo "no .deb to index (app releases not fetched); apt index skipped"
           fi
           ls -lR out || true
 
