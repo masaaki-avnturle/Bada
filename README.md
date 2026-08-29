@@ -150,6 +150,7 @@ zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。�
 | **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-vm-pro-debug.apk` |
 | **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (インストーラ / ポータブル) |
 | **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **ライブ CD** (ISO) | Releases / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `BadaVMPro-live.iso` — ISO 9660 + El Torito ブータブル (マウントして `INDEX.HTM` を開けば OS 起動)。VM Pro 自身もアプリメニューから ISO を `/mnt/cdrom` にマウント可能 |
 | **どこでも** (単一 HTML) | [`bada_vm_pro/index.html`](bada_vm_pro/index.html) をダウンロードして開くだけ |
 
 ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が自動実行します (`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch`)。詳細は [`bada_vm_pro/README.md`](bada_vm_pro/README.md) を参照。

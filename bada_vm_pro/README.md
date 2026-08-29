@@ -13,6 +13,7 @@ x-terminal-emulator / terminal)を載せた、依存ゼロの **単一 HTML** (`
 | **Android APK** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) から `bada-vm-pro-debug.apk`(提供元不明アプリの許可が必要) |
 | **Windows 10/11** | Releases から `BadaVMPro-*-x64.exe`(NSIS インストーラ / ポータブル) |
 | **Ubuntu** | Releases から `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
+| **ライブ CD (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — ISO 9660 + El Torito ブータブル。マウントして `INDEX.HTM` をブラウザで開けば OS が起動、CD ブートすると BIOS テキストの案内バナーを表示。ISO は依存ゼロの自前ビルダー [`tools/build-iso.js`](tools/build-iso.js) が生成 |
 
 ネイティブ版は [`badavmpro-app-build.yml`](../.github/workflows/badavmpro-app-build.yml) がビルドします
 (`badavmpro-v*` タグを push するか、Actions の `workflow_dispatch` で `release_tag` を指定)。
@@ -46,6 +47,7 @@ screen · fcitx-mozc · xterm · x-terminal-emulator · terminal · w9wm · core
 | `pdflatex file.tex` | texlive-full 同梱。`\section` 等を処理して `.pdf` を VFS に出力(`~/letter.tex` がサンプル) |
 | `fcitx-mozc status` | 日本語入力の状態と使い方 |
 | `ls cd cat echo> mkdir touch rm cp mv grep ps man uname lsb_release dpkg -l …` | ふつうの Ubuntu コマンド(永続 VFS 上で動作) |
+| `mount` / `eject` | 💿 **ISO マウント** — アプリメニュー「ISO をマウント」で `.iso` (自分自身のライブ CD `BadaVMPro-live.iso` を含む) を `/mnt/cdrom` に読み込み。`ls /mnt/cdrom`・`cat /mnt/cdrom/README.TXT` で閲覧、`eject` で取り出し |
 
 ## ⌨️ ターミナルの日本語入力
 

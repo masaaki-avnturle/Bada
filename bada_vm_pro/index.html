@@ -1084,6 +1084,21 @@ function runShell(cmd, ctx){
     };
     return MAN[argv[1]] || "No manual entry for " + (argv[1] || "(なし)");
   }
+  case "mount": {
+    if (argv[1]) return "mount: GUI のアプリメニュー「💿 ISO をマウント」から .iso を選んでください";
+    const cd = store.get("cdrom", null);
+    const rows = ["badafs on / type badafs (rw,quantum)",
+                  "tuplespace on /akashic type akashic (rw,append-only)"];
+    if (cd) rows.push("iso9660 " + cd.volumeId + " on /mnt/cdrom type iso9660 (ro" + (cd.bootable ? ",eltorito" : "") + ", " + cd.files + " files)");
+    else rows.push("(/mnt/cdrom は未マウント — アプリメニュー「💿 ISO をマウント」で BadaVMPro-live.iso 等を読み込めます)");
+    return rows.join("\n");
+  }
+  case "eject": case "umount": {
+    if (!store.get("cdrom", null)) return cmd0 + ": /mnt/cdrom はマウントされていません";
+    fsDelete("/mnt/cdrom");
+    store.set("cdrom", null);
+    return cmd0 + ": /mnt/cdrom を取り出しました";
+  }
   case "free": return "               total        used        free\nMem:         8388608     1048576     7340032\nQubits:            8           2           6";
   case "df": return "Filesystem     1K-blocks  Used Available Use% Mounted on\nbadafs          16777216  4096  16773120   1% /\ntuplespace       8388608   128   8388480   1% /akashic";
   }
@@ -1102,6 +1117,94 @@ function runShell(cmd, ctx){
   if ((m = c.match(/^bada\s+(.+)$/))) return badaInterpret(m[1].split(";").join("\n"));
   if (/^(qubit|H|X|Z|CNOT|measure|state|let|print)\b/.test(c)) return badaInterpret(c.split(";").join("\n"));
   return notFound();
+}
+
+/* =====================================================================
+ * ISO 9660 マウント — Bada VM Pro ライブ CD (BadaVMPro-live.iso) 等を
+ * /mnt/cdrom に読み込む (tools/iso9660.js のパーサーを移植)
+ * ===================================================================== */
+function parseIso9660(iso){
+  var SECTOR = 2048;
+  function rd32le(off){ return (iso[off] | (iso[off+1] << 8) | (iso[off+2] << 16) | (iso[off+3] << 24)) >>> 0; }
+  var pvd = 16 * SECTOR;
+  if (!(iso[pvd] === 1 && iso[pvd+1] === 0x43 && iso[pvd+2] === 0x44 && iso[pvd+3] === 0x30 && iso[pvd+4] === 0x30 && iso[pvd+5] === 0x31)){
+    throw new Error("ISO 9660 ではありません (CD001 が見つかりません)");
+  }
+  var volumeId = "";
+  for (var i = 0; i < 32; i++) volumeId += String.fromCharCode(iso[pvd + 40 + i]);
+  volumeId = volumeId.replace(/\s+$/, "");
+  var files = [];
+  function walk(lba, size, prefix){
+    var off = lba * SECTOR, end = off + size;
+    while (off < end){
+      var len = iso[off];
+      if (len === 0){ off = (Math.floor(off / SECTOR) + 1) * SECTOR; continue; }
+      var flags = iso[off + 25], nameLen = iso[off + 32], name = "";
+      for (var j = 0; j < nameLen; j++) name += String.fromCharCode(iso[off + 33 + j]);
+      var extent = rd32le(off + 2), fsize = rd32le(off + 10);
+      if (!(nameLen === 1 && (name.charCodeAt(0) === 0 || name.charCodeAt(0) === 1))){
+        var clean = name.replace(/;1$/, "");
+        if (flags & 2){ if (prefix.split("/").length < 6) walk(extent, fsize, prefix + clean + "/"); }
+        else files.push({ name: prefix + clean, size: fsize, data: iso.slice(extent * SECTOR, extent * SECTOR + fsize) });
+      }
+      off += len;
+    }
+  }
+  var rootOff = pvd + 156;
+  walk(rd32le(rootOff + 2), rd32le(rootOff + 10), "");
+  var bootable = false, bvd = 17 * SECTOR;
+  if (iso[bvd] === 0){
+    var id = "";
+    for (var k = 0; k < 23; k++) id += String.fromCharCode(iso[bvd + 7 + k]);
+    if (id === "EL TORITO SPECIFICATION") bootable = true;
+  }
+  return { volumeId: volumeId, files: files, bootable: bootable };
+}
+function mountIsoBytes(bytes){
+  var r = parseIso9660(bytes);
+  var MAXF = 2 * 1024 * 1024, kept = 0;
+  fsDelete("/mnt/cdrom");
+  fsPut("/mnt/cdrom", null);
+  r.files.forEach(function(f){
+    var content;
+    if (f.size > MAXF) content = "(大きいファイルのため内容は省略: " + f.size + " bytes)\n";
+    else {
+      var bin = false;
+      for (var i = 0; i < f.data.length; i++) if (f.data[i] === 0){ bin = true; break; }
+      content = bin ? "(バイナリファイル: " + f.size + " bytes)\n" : utf8dec(f.data);
+      if (!bin) kept++;
+    }
+    fsPut("/mnt/cdrom/" + f.name.replace(/\//g, "_"), content);
+  });
+  store.set("cdrom", { volumeId: r.volumeId, files: r.files.length, bootable: r.bootable, at: new Date().toISOString() });
+  return r;
+}
+function mountIsoDialog(){
+  var inp = document.createElement("input");
+  inp.type = "file"; inp.accept = ".iso,application/x-iso9660-image";
+  inp.onchange = function(){
+    var f = inp.files && inp.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var r = mountIsoBytes(new Uint8Array(reader.result));
+        setStatus("💿 " + r.volumeId + " を /mnt/cdrom にマウント (" + r.files.length + " ファイル" + (r.bootable ? ", El Torito ブータブル" : "") + ") — ターミナルで ls /mnt/cdrom");
+        var w = WM.wins.find(function(x){ return x.term && !x.hidden; });
+        if (w && w.term){ w.term.print("mount: " + r.volumeId + " on /mnt/cdrom type iso9660 (ro)"); w.term.render(); wmFocus(w); }
+        else openTerm("xterm");
+      } catch (e){ setStatus("💿 マウント失敗: " + e.message); }
+    };
+    reader.readAsArrayBuffer(f);
+  };
+  inp.click();
+}
+/* utf8 デコード (ISO 内テキスト用) */
+function utf8dec(bytes){
+  if (typeof TextDecoder !== "undefined") return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return s;
 }
 
 /* =====================================================================
@@ -1770,6 +1873,7 @@ function appMenu(x, y){
     { label: "terminal",            fn: function(){ openTerm("term"); } },
     { label: "vim",                 fn: function(){ const t = openTerm("xterm"); t.term.openVim("/home/user/hello.bada"); } },
     { label: "emacs",               fn: function(){ const t = openTerm("xte"); t.term.openEmacs("/home/user/README.txt"); } },
+    { label: "💿 ISO をマウント (/mnt/cdrom)", fn: mountIsoDialog },
     "-",
     { label: "✦ BadaGPT",           fn: function(){ navigate("bada://gpt"); } },
     { label: "🚂 Bada on Rails",    fn: function(){ navigate("bada://rails"); } },
@@ -1842,7 +1946,8 @@ function pageHome(vp){
   '・<span class="kbd">Ctrl+Alt+←→</span> 仮想スクリーン切替 / 枠ドラッグで移動・右下角でリサイズ (タイトルバーはありません)</div>' +
   '<div class="card"><b>プリインストール済み (apt list --installed)</b><br>' +
   '<span class="kbd">bash</span> <span class="kbd">apt</span> <span class="kbd">vim</span> <span class="kbd">emacs</span> <span class="kbd">ssh</span> <span class="kbd">xinetd</span> <span class="kbd">texlive-full</span> <span class="kbd">screen</span> <span class="kbd">fcitx-mozc</span> <span class="kbd">xterm</span> <span class="kbd">x-terminal-emulator</span> <span class="kbd">terminal</span><br>' +
-  'ターミナルの日本語入力: OS の IME でそのまま変換入力 / <span class="kbd">Ctrl+Space</span> で内蔵 Mozc (ローマ字→かな, F7 カタカナ)</div>' +
+  'ターミナルの日本語入力: OS の IME でそのまま変換入力 / <span class="kbd">Ctrl+Space</span> で内蔵 Mozc (ローマ字→かな, F7 カタカナ)<br>' +
+  '💿 <b>ライブ CD</b>: この OS は <span class="kbd">BadaVMPro-live.iso</span> (ISO 9660 + El Torito) としても配布。アプリメニュー「ISO をマウント」で ISO を <span class="kbd">/mnt/cdrom</span> に読み込み、<span class="kbd">mount</span> / <span class="kbd">eject</span> コマンドで管理できます</div>' +
   '<div class="grid" id="homegrid"></div>' +
   '</div>';
   const grid = vp.querySelector("#homegrid");

@@ -153,4 +153,20 @@ assert(get("kanaToKatakana")("たみなる") === "タミナル", "hiragana → k
 /* 12. 不明コマンドは bash 風エラー */
 assert(/command not found/.test(runShell("no-such-cmd", ctx)), "unknown command reports bash-style error");
 
+/* 13. ISO 9660 ライブ CD のマウント (/mnt/cdrom) */
+{
+  const isoLib = require(path.join(__dirname, "iso9660.js"));
+  const iso = isoLib.buildIso({ volumeId: "ENGTEST", files: [
+    { name: "index.htm", data: "<html>live</html>" },
+    { name: "readme.txt", data: "hello from cd" }
+  ]});
+  const r = get("mountIsoBytes")(iso);
+  assert(r.volumeId === "ENGTEST" && r.bootable === true, "mountIsoBytes parses volume id + El Torito");
+  assert(/INDEX\.HTM/.test(runShell("ls /mnt/cdrom", ctx)), "ls /mnt/cdrom lists the ISO contents");
+  assert(runShell("cat /mnt/cdrom/README.TXT", ctx).trim() === "hello from cd", "cat reads a file from the mounted ISO");
+  assert(/ENGTEST on \/mnt\/cdrom/.test(runShell("mount", ctx)), "mount shows the cdrom volume");
+  assert(/取り出しました/.test(runShell("eject", ctx)), "eject unmounts the ISO");
+  assert(/No such file/.test(runShell("ls /mnt/cdrom", ctx)), "after eject /mnt/cdrom is gone");
+}
+
 console.log("\nALL ENGINE TESTS PASSED");
