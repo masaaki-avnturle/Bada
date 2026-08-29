@@ -20,6 +20,17 @@ on:
   push:
     tags:
       - 'lightquantum-v*'
+    # 開発ブランチへの push でもビルドし、lightquantum-v1.0.0 Release に添付する
+    # (main マージ前からダウンロードできるようにするため)
+    branches:
+      - 'claude/light-quantum-lighting-control-2fgfev'
+    paths:
+      - 'light_quantum/**'
+      - '.github/workflows/lightquantum-app-build.yml'
+
+# ブランチ push / タグ / 手動入力から Release タグ名を決める
+env:
+  RELEASE_TAG: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'lightquantum-v1.0.0' }}
 
 permissions:
   contents: write
@@ -74,10 +85,10 @@ jobs:
           name: lightquantum-windows
           path: light_quantum/app/electron/dist/*.exe
       - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/light-quantum-lighting-control-2fgfev'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: light_quantum/app/electron/dist/*.exe
 
   linux-app:
@@ -105,10 +116,10 @@ jobs:
             light_quantum/app/electron/dist/*.AppImage
             light_quantum/app/electron/dist/*.deb
       - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/light-quantum-lighting-control-2fgfev'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             light_quantum/app/electron/dist/*.AppImage
             light_quantum/app/electron/dist/*.deb
@@ -166,8 +177,8 @@ jobs:
           name: lightquantum-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/light-quantum-lighting-control-2fgfev'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ env.RELEASE_TAG }}
           files: out/*.apk
