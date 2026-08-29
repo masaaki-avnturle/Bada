@@ -90,8 +90,9 @@ install -Dm644 "$HERE/config/xsessions/w9wm.desktop" "$CHROOT/usr/share/xsession
 install -Dm755 "$HERE/config/w9wm-session.sh" "$CHROOT/usr/local/bin/w9wm-session"
 install -Dm755 "$HERE/config/bada-launcher.sh" "$CHROOT/usr/local/bin/bada-launcher"
 install -Dm755 "$HERE/config/install-badaos.sh" "$CHROOT/usr/local/bin/install-badaos"
-mkdir -p "$CHROOT/etc/calamares"
-cp -r "$HERE/config/calamares/." "$CHROOT/etc/calamares/"
+# GUI インストーラ (zenity ウィザード + 実インストール本体)
+install -Dm755 "$HERE/installer/badaos-installer.sh"    "$CHROOT/usr/local/bin/badaos-installer"
+install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/badaos/badaos-install-core.sh"
 cp "$HERE/config/setup-inside.sh" "$CHROOT/tmp/setup-inside.sh"
 chmod +x "$CHROOT/tmp/setup-inside.sh"
 
