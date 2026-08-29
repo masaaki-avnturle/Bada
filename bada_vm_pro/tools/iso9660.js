@@ -65,9 +65,37 @@ function bootSector(message){
   return img;
 }
 
+/* ── ハイブリッド MBR (LBA 0) ──────────────────────────────────────
+ * ISO の先頭 512B (システム領域内 = ISO 9660 が無視する領域) に、
+ * ・BIOS teletype でバナー表示 → halt するブートコード
+ * ・イメージ全体を覆う 1 パーティションの MBR パーティションテーブル
+ * ・0x55AA 署名
+ * を置く。これで「isohybrid」ISO になり、Rufus が DD イメージモードで
+ * USB に書き込め、USB からも (CD からも) BIOS ブートできる。 */
+function hybridMbr(message, total512){
+  const mbr = new Uint8Array(512);
+  const code = [0xBE, 0x14, 0x7C, 0xAC, 0x84, 0xC0, 0x74, 0x09,
+                0xB4, 0x0E, 0xBB, 0x07, 0x00, 0xCD, 0x10, 0xEB,
+                0xF2, 0xF4, 0xEB, 0xFD];
+  mbr.set(code, 0);
+  const msg = message.replace(/\n/g, "\r\n") + "\0";
+  for (let i = 0; i < msg.length && 0x14 + i < 440; i++) mbr[0x14 + i] = msg.charCodeAt(i) & 255;
+  /* パーティションテーブル (offset 446): 1 エントリ, イメージ全体 (LBA0..) */
+  const p = 446;
+  mbr[p] = 0x80;                                  /* bootable フラグ */
+  mbr[p + 1] = 0x00; mbr[p + 2] = 0x01; mbr[p + 3] = 0x00;  /* 開始 CHS = 0/0/1 */
+  mbr[p + 4] = 0x17;                              /* パーティションタイプ (isohybrid 慣例) */
+  mbr[p + 5] = 0xFE; mbr[p + 6] = 0xFF; mbr[p + 7] = 0xFF;  /* 終了 CHS = 最大 (LBA 使用の合図) */
+  le32(mbr, p + 8, 0);                            /* 開始 LBA = 0 */
+  le32(mbr, p + 12, total512 >>> 0);              /* セクタ数 (512B 単位) */
+  mbr[510] = 0x55; mbr[511] = 0xAA;
+  return mbr;
+}
+
 /*
- * buildIso({ volumeId, files: [{name, data(Uint8Array|string)}], bootMessage })
- *   → Uint8Array (ISO イメージ)
+ * buildIso({ volumeId, files: [{name, data(Uint8Array|string)}], bootMessage, hybrid })
+ *   → Uint8Array (ISO イメージ)。hybrid !== false なら Rufus 対応の
+ *     ハイブリッド ISO (先頭に MBR + パーティションテーブル) を生成。
  */
 function buildIso(opts){
   const volumeId = (opts.volumeId || "BADAVMPRO").toUpperCase().slice(0, 32);
@@ -184,15 +212,21 @@ function buildIso(opts){
   }
 
   /* ── ブートイメージ ── */
-  iso.set(bootSector(opts.bootMessage ||
-    "\nBada VM Pro Live CD (w9wm desktop / quantum Bada OS)\n" +
-    "This disc is a data CD carrying the Bada VM Pro OS.\n" +
-    "Open INDEX.HTM from this disc in any web browser to boot the OS,\n" +
+  const bootMsg = opts.bootMessage ||
+    "\nBada VM Pro Live CD/USB (w9wm desktop / quantum Bada OS)\n" +
+    "This medium carries the Bada VM Pro OS as a data volume.\n" +
+    "Open INDEX.HTM from it in any web browser to boot the OS,\n" +
     "or install the native app from github.com/masaaki-avnturle/Bada Releases.\n" +
-    "System halted.\n"), sector(LBA_BOOTIMG));
+    "System halted.\n";
+  iso.set(bootSector(bootMsg), sector(LBA_BOOTIMG));
 
   /* ── ファイルデータ ── */
   files.forEach(function(f){ if (f.data.length) iso.set(f.data, sector(f.lba)); });
+
+  /* ── ハイブリッド MBR (Rufus / USB ブート対応) を LBA 0 に ── */
+  if (opts.hybrid !== false){
+    iso.set(hybridMbr(bootMsg, totalSectors * 4), 0);   /* 2048B → 512B は ×4 */
+  }
 
   return iso;
 }
@@ -242,7 +276,17 @@ function parseIso(iso){
     for (let i = 0; i < 23; i++) id += String.fromCharCode(iso[bvd + 7 + i]);
     if (id === "EL TORITO SPECIFICATION") bootable = true;
   }
-  return { volumeId: volumeId, files: files, bootable: bootable };
+  /* ハイブリッド MBR (isohybrid) 情報 */
+  let hybrid = null;
+  if (iso[510] === 0x55 && iso[511] === 0xAA){
+    const p = 446;
+    const type = iso[p + 4];
+    const startLBA = rd32le(p + 8), sectors = rd32le(p + 12);
+    if (type !== 0 && sectors > 0){
+      hybrid = { bootFlag: iso[p], type: type, startLBA: startLBA, sectors: sectors };
+    }
+  }
+  return { volumeId: volumeId, files: files, bootable: bootable, hybrid: hybrid };
 }
 
 if (typeof module !== "undefined" && module.exports) module.exports = { buildIso: buildIso, parseIso: parseIso, isoName: isoName, SECTOR: SECTOR };

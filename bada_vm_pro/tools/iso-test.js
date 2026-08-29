@@ -42,9 +42,25 @@ ok(iso[17 * SECTOR] === 0 &&
   ok(boot[0] === 0xBE && boot[510] === 0x55 && boot[511] === 0xAA, "boot sector code + 55AA signature");
 }
 
+/* ── ハイブリッド MBR (Rufus / USB ブート) ── */
+ok(iso[510] === 0x55 && iso[511] === 0xAA, "LBA0 carries an MBR 55AA signature");
+{
+  const p = 446;
+  ok(iso[p] === 0x80, "MBR partition 1 is marked active/bootable (0x80)");
+  ok(iso[p + 4] === 0x17, "MBR partition type is 0x17 (isohybrid convention)");
+  const startLBA = iso[p+8] | (iso[p+9]<<8) | (iso[p+10]<<16) | (iso[p+11]<<24);
+  const sectors = (iso[p+12] | (iso[p+13]<<8) | (iso[p+14]<<16) | (iso[p+15]<<24)) >>> 0;
+  ok(startLBA === 0, "MBR partition starts at LBA 0");
+  ok(sectors === (iso.length / 512), "MBR partition spans the whole image (" + sectors + " × 512B)");
+  ok(iso[0] === 0xBE, "MBR begins with boot code (mov si,imm)");
+}
+
 const parsed = parseIso(iso);
 ok(parsed.volumeId === "TESTVOL", "volume id round-trips");
 ok(parsed.bootable === true, "parser detects El Torito");
+ok(parsed.hybrid && parsed.hybrid.startLBA === 0 && parsed.hybrid.sectors === iso.length / 512,
+   "parser reports the hybrid MBR partition (Rufus can DD-write this)");
+ok(parsed.volumeId && iso[16 * SECTOR] === 1, "MBR does not disturb the ISO 9660 filesystem (PVD still at LBA16)");
 ok(parsed.files.length === 3, "3 files in root — got " + parsed.files.length);
 const idx = parsed.files.find(function(f){ return f.name === "INDEX.HTM"; });
 ok(!!idx, "8.3 name mapping (index.htm → INDEX.HTM)");

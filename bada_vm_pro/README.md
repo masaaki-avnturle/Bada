@@ -13,7 +13,21 @@ x-terminal-emulator / terminal)を載せた、依存ゼロの **単一 HTML** (`
 | **Android APK** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) から `bada-vm-pro-debug.apk`(提供元不明アプリの許可が必要) |
 | **Windows 10/11** | Releases から `BadaVMPro-*-x64.exe`(NSIS インストーラ / ポータブル) |
 | **Ubuntu** | Releases から `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
-| **ライブ CD (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — ISO 9660 + El Torito ブータブル。マウントして `INDEX.HTM` をブラウザで開けば OS が起動、CD ブートすると BIOS テキストの案内バナーを表示。ISO は依存ゼロの自前ビルダー [`tools/build-iso.js`](tools/build-iso.js) が生成 |
+| **ライブ CD / USB (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — **ハイブリッド ISO (ISO 9660 + El Torito + MBR パーティションテーブル)**。**Rufus** で USB メモリに書き込めます (下記)。マウントして `INDEX.HTM` をブラウザで開けば OS が起動、CD/USB からブートすると BIOS テキストの案内バナーを表示。ISO は依存ゼロの自前ビルダー [`tools/build-iso.js`](tools/build-iso.js) が生成 |
+
+### 🔥 Rufus で USB 起動メディアを作る
+
+`BadaVMPro-live.iso` はハイブリッド ISO(先頭に MBR + イメージ全体を覆うブータブル
+パーティション)なので、**Rufus** でそのまま USB に書き込めます:
+
+1. [Releases](https://github.com/masaaki-avnturle/Bada/releases) / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `badavmpro-iso` から `BadaVMPro-live.iso` を入手
+2. [Rufus](https://rufus.ie) を起動 → USB メモリを選択 → 「選択」で ISO を指定
+3. Rufus が「ISOHybrid イメージ」と検出したら **DD イメージモード**で「スタート」
+4. 書き込んだ USB から BIOS/UEFI ブート → 案内バナーが表示されます。中の
+   `INDEX.HTM` を任意の PC のブラウザで開けば w9wm デスクトップの OS が起動します
+
+> QEMU での実ブート検証済み: CD ブート (El Torito) / USB・HDD ブート (MBR) の
+> 両方で BIOS がブートコードを実行しバナーを表示することを確認しています。
 
 ネイティブ版は [`badavmpro-app-build.yml`](../.github/workflows/badavmpro-app-build.yml) がビルドします
 (`badavmpro-v*` タグを push するか、Actions の `workflow_dispatch` で `release_tag` を指定)。
