@@ -18,11 +18,19 @@ EOF
 # このスクリプトの最後 (update しない) に回します。まずは Ubuntu 公式のみ。
 apt-get update
 
-# ---- ライブ起動 + カーネル + 基本ツール ----
+# ---- 必須: カーネル + casper (ライブ起動) — 失敗したらビルドを止める ----
+# ここが入らないと「kernel が無い」状態の ISO になるため || true を付けない。
 apt-get install -y --no-install-recommends \
   linux-generic casper initramfs-tools \
   network-manager net-tools iproute2 isc-dhcp-client \
-  sudo nano less curl wget ca-certificates locales tzdata \
+  sudo locales tzdata
+
+# 導入確認 (カーネルの実体があるか)
+ls -1 /boot/vmlinuz-* >/dev/null 2>&1 || { echo "FATAL: kernel not installed in chroot"; exit 1; }
+
+# ---- デスクトップ (w9wm) とインストーラ — 失敗しても致命ではない ----
+apt-get install -y --no-install-recommends \
+  nano less curl wget \
   xserver-xorg xinit x11-xserver-utils \
   lightdm lightdm-gtk-greeter \
   w9wm xterm feh fonts-dejavu \
