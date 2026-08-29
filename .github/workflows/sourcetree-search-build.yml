@@ -1,0 +1,68 @@
+name: Bada Search app build (SourceTree companion, Windows EXE)
+
+# sourcetree_search/ の「Bada Search」— SourceTree (Windows 10/11) に
+# カスタム操作 ($REPO) で付属させる PDF・ソースコード検索エンジン。
+# プログラミング言語のソースと PDF (FlateDecode テキスト抽出) を
+# リポジトリ丸ごとインデックスして横断検索します (依存ゼロ)。
+# Windows 10/11 向け EXE (NSIS インストーラ + ポータブル) をビルドし、
+# Actions アーティファクト、および (stsearch-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: stsearch-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'stsearch-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Search core self-check (index / PDF extraction / AND / regex / filters)
+        run: |
+          set -e
+          node sourcetree_search/tools/test-search.js | tee /tmp/st.out
+          grep -q "ALL SEARCH TESTS PASSED" /tmp/st.out
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Assemble app (core + www into electron dir)
+        shell: bash
+        run: |
+          set -e
+          cp -r sourcetree_search/core sourcetree_search/app/electron/core
+          cp -r sourcetree_search/app/www sourcetree_search/app/electron/www
+      - name: Build Windows EXE (Electron)
+        working-directory: sourcetree_search/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badasearch-windows
+          path: sourcetree_search/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: sourcetree_search/app/electron/dist/*.exe

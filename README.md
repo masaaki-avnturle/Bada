@@ -154,6 +154,16 @@ zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。�
 
 ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が自動実行します (`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch`)。詳細は [`bada_vm_pro/README.md`](bada_vm_pro/README.md) を参照。
 
+### 🔎 Bada Search — SourceTree 付属 PDF・ソースコード検索エンジン (Windows 10/11)
+
+Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属アプリとして使う検索エンジン。リポジトリ丸ごとを対象に、**40 種以上のプログラミング言語のソース**と **PDF の中身** (FlateDecode テキスト抽出・依存ゼロ) を AND / 正規表現 / 言語・パスフィルタで横断検索し、行番号 + ハイライト付きで表示します:
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaSearch-Setup-*-x64.exe` (インストーラ) / `BadaSearch-Portable-*-x64.exe` (インストール不要) |
+
+SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行します (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
+
 ---
 
 ## 🔤 Bada Language — 設計原理
