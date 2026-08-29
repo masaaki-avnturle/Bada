@@ -29,16 +29,28 @@ python3 -m http.server 8000     # → http://localhost:8000/
 2. **② 編集を戻す** — 「色を自動推定」で初期値 → スライダー/ボタンで微調整(リアルタイム反映)。
 3. **③ 書き出す** — 「逆補正した動画を書き出す(WebM)」。頭から実時間で録画し、終了で自動保存。
 
-## Android APK をビルドする
+## ネイティブ アプリ (Android APK / Windows 10・11 / Ubuntu)
 
-**偽のバイナリはリポジトリに置いていません。** 実際の APK は GitHub Actions がビルドします。
+**偽のバイナリはリポジトリに置いていません。** 実際のインストーラは GitHub Actions がビルドします。
 
-1. GitHub の **Actions** → **「Restore apps build (APK)」** → **Run workflow**。
-   完了後、Artifacts から `video-restore-android`(APK) をダウンロード。
-2. Release へ添付する場合はタグ:
+| プラットフォーム | 成果物 | 技術 |
+|:--|:--|:--|
+| **Android** | `video-restore-debug.apk` | Cordova |
+| **Windows 10 / 11** | `Video-Restore-Studio-*-x64.exe`(NSIS / ポータブル) | Electron |
+| **Ubuntu** | `Video-Restore-Studio-*-x86_64.AppImage` / `*-amd64.deb` | Electron |
+
+### ダウンロード手順
+
+1. GitHub の **Actions** タブ → **「Restore apps build (APK + Windows + Ubuntu)」** → **Run workflow**。
+   完了後、各 **Artifacts**(`video-restore-android` / `video_restore-windows` / `video_restore-linux`)から取得。
+2. **Releases から配布**する場合はタグを push:
    ```bash
    git tag restore-v1.0.0 && git push origin restore-v1.0.0
    ```
+   `.github/workflows/restore-apps-build.yml` が3プラットフォーム分をビルドし、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に添付します。
+
+> デスクトップ版(Electron)は `captureStream` に対応しており書き出しが安定します。
+> Android は WebView が captureStream 非対応の場合、書き出し不可(プレビュー調整は可能)。
 
 ## 仕組み — `www/vfx.js`(UMD / 純粋関数)+ Canvas
 
@@ -60,9 +72,10 @@ node video_restore/test/vfx.test.mjs      # 23 件
 
 ```
 video_restore/
-├── www/index.html   … UI(プレビュー + 逆補正)
-├── www/vfx.js       … 映像補正コア(UMD)
-├── cordova/config.xml … Android APK 設定
+├── www/index.html      … UI(プレビュー + 逆補正)
+├── www/vfx.js          … 映像補正コア(UMD)
+├── cordova/config.xml  … Android APK 設定
+├── electron/           … Windows / Ubuntu 用ラッパー(main.js + package.json)
 ├── test/vfx.test.mjs
 └── README.md
 ```

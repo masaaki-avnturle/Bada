@@ -33,20 +33,28 @@ python3 -m http.server 8000     # → http://localhost:8000/
 2. **② 質音を戻す** — モード(声/楽器)を選び「変調を自動推定」で初期値 → スライダーで微調整 → **「復元を実行」**。
 3. **③ 試聴・書き出し** — 「変調前」「復元後」で聴き比べ、**「WAV で保存」**。
 
-## Android APK をビルドする
+## ネイティブ アプリ (Android APK / Windows 10・11 / Ubuntu)
 
-**偽のバイナリはリポジトリに置いていません。** 実際の APK は GitHub Actions がビルドします。
+**偽のバイナリはリポジトリに置いていません。** 実際のインストーラは GitHub Actions がビルドします。
 
-1. GitHub の **Actions** → **「Restore apps build (APK)」** → **Run workflow**(手動実行)。
-   完了後、Artifacts から `sound-restore-android`(APK) をダウンロード。
-2. Release に添付したい場合はタグを push:
+| プラットフォーム | 成果物 | 技術 |
+|:--|:--|:--|
+| **Android** | `sound-restore-debug.apk` | Cordova |
+| **Windows 10 / 11** | `Sound-Restore-Studio-*-x64.exe`(NSIS インストーラ / ポータブル) | Electron |
+| **Ubuntu** | `Sound-Restore-Studio-*-x86_64.AppImage` / `*-amd64.deb` | Electron |
+
+### ダウンロード手順
+
+1. GitHub の **Actions** タブ → **「Restore apps build (APK + Windows + Ubuntu)」** → **Run workflow**(手動実行)。
+   完了後、各 **Artifacts**(`sound-restore-android` / `voice_restore-windows` / `voice_restore-linux`)から取得。
+2. **Releases から配布**したい場合はタグを push:
    ```bash
    git tag restore-v1.0.0 && git push origin restore-v1.0.0
    ```
-   `.github/workflows/restore-apps-build.yml` が Cordova で APK をビルドし、Release に添付します。
+   `.github/workflows/restore-apps-build.yml` が3プラットフォーム分をビルドし、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に添付します(または Run workflow の `release_tag` 欄にタグ名を入力)。
 
-> マイク録音は端末の WebView が getUserMedia を許可する場合のみ動作します。
-> ファイル読み込み → 処理 → 保存の流れは権限なしで動きます(APK には録音用に RECORD_AUDIO を宣言済み)。
+> マイク録音: デスクトップ版(Electron)は許可済み。Android は WebView が getUserMedia を許可する端末で動作します。
+> いずれもファイル読み込み → 処理 → 保存の流れは権限なしで動きます。
 
 ## 仕組み(DSP) — `www/dsp.js`(UMD / 純粋関数)
 
@@ -69,9 +77,10 @@ node voice_restore/test/dsp.test.mjs      # 28 件
 
 ```
 voice_restore/
-├── www/index.html   … UI(声/楽器 モード)
-├── www/dsp.js       … 信号処理コア(UMD)
-├── cordova/config.xml … Android APK 設定
+├── www/index.html      … UI(声/楽器 モード)
+├── www/dsp.js          … 信号処理コア(UMD)
+├── cordova/config.xml  … Android APK 設定
+├── electron/           … Windows / Ubuntu 用ラッパー(main.js + package.json)
 ├── test/dsp.test.mjs
 └── README.md
 ```
