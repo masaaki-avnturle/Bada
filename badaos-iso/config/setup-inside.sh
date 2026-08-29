@@ -28,13 +28,23 @@ apt-get install -y --no-install-recommends \
 # 導入確認 (カーネルの実体があるか)
 ls -1 /boot/vmlinuz-* >/dev/null 2>&1 || { echo "FATAL: kernel not installed in chroot"; exit 1; }
 
-# ---- デスクトップ (w9wm) とインストーラ — 失敗しても致命ではない ----
+# ---- デスクトップ (w9wm) — 失敗しても致命ではない ----
 apt-get install -y --no-install-recommends \
   nano less curl wget \
   xserver-xorg xinit x11-xserver-utils \
   lightdm lightdm-gtk-greeter \
-  w9wm xterm feh fonts-dejavu \
-  calamares || true
+  w9wm xterm x11-utils feh fonts-dejavu || true
+
+# ---- インストーラ Calamares — recommends 込みで導入 (QML/パーティション/GRUB
+#      など実行時依存が要るため --no-install-recommends にしない)。加えて
+#      インストール先で grub を設置できるよう grub 一式と os-prober、
+#      ライブ側で squashfs を展開する squashfs-tools も入れる。----
+apt-get install -y \
+  calamares \
+  qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-controls2 \
+  qml-module-qtquick-layouts \
+  grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober \
+  squashfs-tools dosfstools || true
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -76,12 +86,20 @@ unmanaged-devices=none
 EOF
 
 # ---- デスクトップにインストーラ (Calamares) とアプリのショートカット ----
+# 既定の calamares.desktop は pkexec を使い、w9wm には polkit エージェントが
+# 無いため起動できない。sudo で起動する専用ランチャに差し替える。
 mkdir -p /etc/skel/Desktop
-if [ -f /usr/share/applications/calamares.desktop ] || [ -f /usr/share/applications/io.calamares.calamares.desktop ]; then
-  for f in /usr/share/applications/*calamares*.desktop; do
-    [ -f "$f" ] && cp "$f" /etc/skel/Desktop/ 2>/dev/null || true
-  done
-fi
+cat > /etc/skel/Desktop/install-badaos.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=Bada VM Pro OS をインストール
+Comment=実ディスクへインストール (Calamares)
+Exec=/usr/local/bin/install-badaos
+Terminal=false
+Icon=calamares
+Categories=System;
+EOF
+# casper のライブユーザ (bada) はパスワード無し sudo を持つ (casper が付与)
 cat > /etc/skel/Desktop/bada-vm-pro.desktop <<EOF
 [Desktop Entry]
 Type=Application
