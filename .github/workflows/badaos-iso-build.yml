@@ -1,0 +1,104 @@
+name: Bada VM Pro OS ISO build (bootable Ubuntu-based live/installer)
+
+# badaos-iso/ の Bada VM Pro OS を、起動可能な ISO としてビルドします。
+#   ・Ubuntu 22.04 (jammy) ベースを debootstrap
+#   ・w9wm を既定 X セッションに / Bada アプリをプリインストール
+#   ・Calamares で実ディスクへインストール可能
+#   ・NetworkManager (NAT/DHCP) で apt 稼働
+#   ・あなたのリポジトリの apt リポジトリ (flat, [trusted=yes]) を登録
+#   ・BIOS + UEFI ハイブリッド → Rufus で USB に書ける
+# 生成物 (ISO + apt リポジトリ索引 + .deb) を Actions アーティファクト、
+# および (badaos-v* タグ / release_tag 指定時) GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release に添付するタグ名 (例: badaos-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'badaos-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax check
+        run: |
+          set -e
+          for f in badaos-iso/build-iso.sh badaos-iso/config/setup-inside.sh \
+                   badaos-iso/config/w9wm-session.sh badaos-iso/config/bada-launcher.sh \
+                   badaos-iso/tools/make-apt-repo.sh; do
+            bash -n "$f" && echo "ok: $f"
+          done
+
+  build-iso:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc /usr/share/dotnet /opt/hostedtoolcache/CodeQL || true
+          df -h
+
+      - name: Compute version + apt base URL
+        id: v
+        run: |
+          TAG="${{ github.event.inputs.release_tag || github.ref_name }}"
+          VER="${TAG#badaos-v}"; [ -n "$VER" ] || VER="1.0.0"
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "apt_base=https://github.com/${{ github.repository }}/releases/download/${TAG}/" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch prebuilt Bada .deb (from prior app releases, if available)
+        continue-on-error: true
+        run: |
+          mkdir -p out_debs
+          for u in \
+            "https://github.com/${{ github.repository }}/releases/download/badavmpro-v1.0.0/BadaVMPro-1.0.0-amd64.deb" \
+            "https://github.com/${{ github.repository }}/releases/download/laevateinn-v1.0.0/Laevateinn-1.0.0-amd64.deb" ; do
+            echo "fetch $u"; curl -fsSL -o "out_debs/$(basename "$u")" "$u" || echo "skip (not published yet): $u"
+          done
+          ls -l out_debs || true
+
+      - name: Build the ISO
+        run: |
+          sudo bash badaos-iso/build-iso.sh "${{ steps.v.outputs.version }}" "${{ steps.v.outputs.apt_base }}"
+
+      - name: Build apt repo index (flat) from the same .deb
+        run: |
+          if compgen -G "out_debs/*.deb" > /dev/null; then
+            bash badaos-iso/tools/make-apt-repo.sh out_debs out/apt
+          else
+            echo "no .deb to index"; mkdir -p out/apt
+          fi
+          ls -lR out || true
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaos-iso
+          path: |
+            out/*.iso
+            out/*.sha256
+
+      - name: Attach ISO + apt repo to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.v.outputs.tag }}
+          files: |
+            out/*.iso
+            out/*.sha256
+            out/apt/Packages
+            out/apt/Packages.gz
+            out/apt/Release
+            out/apt/*.deb
