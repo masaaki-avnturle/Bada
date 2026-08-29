@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada VM Pro — 量子Bada OS (ブラウザーデザイン / BadaGPT / Bada on Rails)</title>
+<!--
+  Bada VM Pro — 今までの集大成
+  ─────────────────────────────────────────────────────────────
+  ・ウェブブラウザーのデザイン (タブ + bada:// アドレスバー) を OS シェルに採用
+  ・カーネルベースは BadaGPT: OS の update / upgrade も BadaGPT が実行
+  ・Bada on Rails: scaffold 生成 → bada://rails/<resource> で CRUD 稼働
+  ・量子 Bada 言語 (qubit / H / X / Z / CNOT / measure) の状態ベクトル実行系
+  ・合い言葉コマンド: silent talk (無音テキスト) は決定論的 100% 精度、
+    音声 (Web Speech API) も同じ正規化+類似度エンジンで照合
+  ・トランスフォーマー・スタジオ: 本物の self-attention 順伝播 (16次元/1ヘッド)
+    + 学習可能な bigram 統計で Bada コードを補完。attention 行列を可視化
+  ・GUI プログラミング (フォームデザイナ → Bada コード生成 → 実行)
+  ・CUI プログラミング (シェル + Bada 量子 REPL)
+  依存ゼロ・単一 HTML・オフライン動作。APK / EXE / AppImage は
+  .github/workflows/badavmpro-app-build.yml がビルドします。
+-->
+<style>
+:root{
+  --bg:#0b0e14; --panel:#131826; --panel2:#0f1420; --edge:#232b3d;
+  --text:#d7dce8; --dim:#8a93a8; --gold:#c8a44a; --cyan:#40b8c0;
+  --purple:#9060d0; --blue:#4a80d0; --green:#4ac077; --red:#d05a5a;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--edge);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+input,textarea,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:6px;padding:5px 8px}
+input:focus,textarea:focus{outline:none;border-color:var(--cyan)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2a3450;border-radius:5px}
+
+/* ── ブラウザークローム ───────────────────────── */
+#tabbar{display:flex;align-items:flex-end;gap:2px;padding:6px 8px 0;background:#070a10;flex:none;overflow-x:auto}
+.tab{display:flex;align-items:center;gap:8px;max-width:220px;min-width:110px;padding:7px 10px;background:#101624;border:1px solid var(--edge);border-bottom:none;border-radius:9px 9px 0 0;color:var(--dim);cursor:pointer;white-space:nowrap;overflow:hidden;font-size:12.5px}
+.tab.active{background:var(--panel);color:var(--text);border-color:#31405e}
+.tab .fav{flex:none}
+.tab .ttl{overflow:hidden;text-overflow:ellipsis;flex:1}
+.tab .x{flex:none;border:none;background:none;padding:0 2px;color:var(--dim);border-radius:4px}
+.tab .x:hover{color:var(--red)}
+#newtab{flex:none;border:none;background:none;color:var(--dim);font-size:17px;padding:4px 10px}
+#newtab:hover{color:var(--gold)}
+#navbar{display:flex;align-items:center;gap:6px;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--edge);flex:none}
+#navbar .nbtn{border:none;background:none;padding:4px 7px;color:var(--dim);font-size:15px;border-radius:6px}
+#navbar .nbtn:hover{background:#1c2436;color:var(--text)}
+#addrwrap{flex:1;display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--edge);border-radius:99px;padding:4px 14px}
+#addrwrap:focus-within{border-color:var(--cyan)}
+#lock{color:var(--green);font-size:12px}
+#addr{flex:1;border:none;background:none;padding:2px 0;font-family:var(--mono);font-size:13px}
+#micbtn.on{color:#fff;background:var(--red);border-color:var(--red);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.55}}
+#gptbtn{background:linear-gradient(135deg,#3b2a63,#173a4d);border-color:var(--purple)}
+
+/* ── ビューポート / ページ共通 ─────────────────── */
+#viewport{flex:1;overflow:auto;background:var(--bg)}
+.page{max-width:1060px;margin:0 auto;padding:26px 22px 70px}
+.page h1{font-size:22px;color:var(--gold);margin-bottom:4px}
+.page h2{font-size:15px;color:var(--cyan);margin:20px 0 8px}
+.page .sub{color:var(--dim);font-size:13px;margin-bottom:16px}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.appicon{display:flex;flex-direction:column;align-items:center;gap:8px;padding:18px 8px;background:var(--panel);border:1px solid var(--edge);border-radius:14px;cursor:pointer;text-align:center}
+.appicon:hover{border-color:var(--gold);transform:translateY(-2px)}
+.appicon .em{font-size:34px}
+.appicon .nm{font-size:12.5px}
+.appicon .ds{font-size:10.5px;color:var(--dim)}
+pre.code,.term{background:#080b12;border:1px solid var(--edge);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12.5px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
+.badge.ok{color:var(--green);border-color:var(--green)}
+.badge.warn{color:var(--gold);border-color:var(--gold)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kbd{font-family:var(--mono);background:#1a2133;border:1px solid var(--edge);border-radius:5px;padding:0 6px;font-size:12px}
+a.link{color:var(--cyan);cursor:pointer;text-decoration:underline}
+table.tbl{border-collapse:collapse;width:100%;font-size:13px}
+table.tbl th,table.tbl td{border:1px solid var(--edge);padding:6px 9px;text-align:left}
+table.tbl th{color:var(--gold);background:#101624}
+
+/* ── ターミナル ───────────────────────────────── */
+.term{height:420px;overflow-y:auto}
+.term .in{color:var(--green)}
+.term .qq{color:var(--purple)}
+.term .err{color:var(--red)}
+#termline{display:flex;gap:8px;margin-top:8px}
+#termin{flex:1;font-family:var(--mono)}
+
+/* ── BadaGPT ─────────────────────────────────── */
+#chatlog{height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:4px}
+.msg{max-width:82%;padding:9px 13px;border-radius:12px;font-size:13.5px;white-space:pre-wrap;word-break:break-word}
+.msg.user{align-self:flex-end;background:#1d3a5f;border:1px solid #2d5a8f}
+.msg.gpt{align-self:flex-start;background:#211a38;border:1px solid #3b2a63}
+.msg.sys{align-self:center;background:none;border:none;color:var(--dim);font-size:12px}
+.msg .prog{height:7px;background:#0a0d14;border-radius:4px;margin-top:8px;overflow:hidden}
+.msg .prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--purple),var(--cyan));transition:width .25s}
+
+/* ── GUIデザイナ ─────────────────────────────── */
+#designer{display:grid;grid-template-columns:150px 1fr 230px;gap:10px}
+#palette button{display:block;width:100%;margin-bottom:6px}
+#canvas{position:relative;height:360px;background:#e8e4d8;border-radius:8px;overflow:hidden;color:#222}
+.cmp{position:absolute;user-select:none;cursor:move;font-size:13px}
+.cmp.sel{outline:2px dashed var(--purple)}
+.cmp.TButton{background:linear-gradient(#fdfdfd,#d4d0c8);border:1px solid #888;border-radius:4px;padding:4px 14px}
+.cmp.TLabel{padding:2px 4px}
+.cmp.TEdit{background:#fff;border:1px solid #888;padding:3px 6px;min-width:110px}
+#guiprev{position:fixed;inset:0;background:rgba(4,6,10,.72);display:none;align-items:center;justify-content:center;z-index:60}
+#guiprev .win{background:#e8e4d8;color:#222;border-radius:10px;min-width:420px;min-height:320px;position:relative;box-shadow:0 20px 60px #000}
+#guiprev .bar{background:linear-gradient(90deg,#0a246a,#a6caf0);color:#fff;padding:5px 12px;border-radius:10px 10px 0 0;display:flex;justify-content:space-between}
+#guiprev .body{position:relative;height:300px}
+
+/* ── attention ヒートマップ ───────────────────── */
+.attn{display:grid;gap:2px;margin-top:8px}
+.attn div{width:100%;padding-top:100%;border-radius:3px;position:relative}
+.attn span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;font-family:var(--mono)}
+
+/* ── ステータスバー ───────────────────────────── */
+#statusbar{flex:none;display:flex;gap:18px;align-items:center;padding:5px 14px;background:#070a10;border-top:1px solid var(--edge);font-size:11.5px;color:var(--dim);overflow-x:auto;white-space:nowrap}
+#statusbar b{color:var(--gold);font-weight:600}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:5px}
+
+@media (max-width:760px){
+  #designer{grid-template-columns:1fr}
+  .page{padding:16px 12px 70px}
+  .msg{max-width:94%}
+}
+</style>
+</head>
+<body>
+
+<div id="tabbar"></div>
+<div id="navbar">
+  <button class="nbtn" id="backbtn" title="戻る">◀</button>
+  <button class="nbtn" id="fwdbtn" title="進む">▶</button>
+  <button class="nbtn" id="reloadbtn" title="再読み込み">⟳</button>
+  <button class="nbtn" id="homebtn" title="ホーム">⌂</button>
+  <div id="addrwrap">
+    <span id="lock">🔒</span>
+    <input id="addr" spellcheck="false" autocomplete="off" placeholder="bada:// アドレス、または合い言葉コマンド"/>
+  </div>
+  <button id="micbtn" title="合い言葉を音声で (Web Speech API)">🎙</button>
+  <button id="gptbtn" title="BadaGPT を開く">✦ BadaGPT</button>
+</div>
+<div id="viewport"></div>
+<div id="statusbar">
+  <span><span class="dot"></span><b>Bada VM Pro</b> <span id="st-ver"></span></span>
+  <span>kernel: <b>BadaGPT</b> <span id="st-gpt">ready</span></span>
+  <span>rails: <span id="st-rails">stopped</span></span>
+  <span>合い言葉: <span id="st-aikotoba"></span></span>
+  <span id="st-msg"></span>
+</div>
+
+<div id="guiprev"><div class="win"><div class="bar"><span id="gp-title">Form1</span><button onclick="closeGuiPreview()" style="padding:0 8px">✕</button></div><div class="body" id="gp-body"></div></div></div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * Bada VM Pro — カーネル: BadaGPT / シェル: ブラウザーデザイン
+ * ===================================================================== */
+
+/* ── 永続ストア (localStorage) ──────────────────────────────────── */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("badavm."+k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("badavm."+k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ── OS 状態 ────────────────────────────────────────────────────── */
+function osVersion(){ return store.get("os.version", "5.0.0"); }
+function setStatus(msg){ const el = document.getElementById("st-msg"); if(el) el.textContent = msg || ""; }
+function refreshStatusbar(){
+  document.getElementById("st-ver").textContent = "v" + osVersion();
+  document.getElementById("st-aikotoba").textContent = "「" + aikotoba() + "」";
+  document.getElementById("st-rails").textContent = store.get("rails.server", false) ? "running :3000" : "stopped";
+}
+
+/* OS update / upgrade は BadaGPT が担う。ここは version 台帳の操作のみ。 */
+function osUpdate(kind){
+  const v = osVersion().split(".").map(Number);
+  if (kind === "upgrade") { v[0] += 1; v[1] = 0; v[2] = 0; }
+  else                    { v[2] += 1; }
+  const nv = v.join(".");
+  store.set("os.version", nv);
+  const log = store.get("os.changelog", []);
+  log.unshift({ v: nv, kind: kind, at: new Date().toISOString(),
+    notes: kind === "upgrade"
+      ? "メジャーアップグレード: 量子スケジューラ刷新 / BadaGPT カーネル世代交代 / Rails ブリッジ高速化"
+      : "アップデート: セキュリティ修正 / zone:// スタック調整 / attention キャッシュ最適化" });
+  store.set("os.changelog", log.slice(0, 30));
+  refreshStatusbar();
+  return nv;
+}
+
+/* =====================================================================
+ * 量子 Bada 言語インタープリタ (状態ベクトル・シミュレータ)
+ *   qubit q0 q1 / H q0 / X q0 / Z q0 / CNOT q0 q1 / measure
+ *   let x = 式 / print 式や文字列
+ * ===================================================================== */
+function badaInterpret(src){
+  const out = [];
+  const vars = Object.create(null);
+  let qnames = [];          // qubit 名 → インデックス
+  let state = null;         // 複素振幅 {re,im} の配列 (長さ 2^n)
+
+  function initQ(names){
+    for (const n of names) if (!qnames.includes(n)) qnames.push(n);
+    if (qnames.length > 8) throw new Error("qubit は最大 8 個までです");
+    const dim = 1 << qnames.length;
+    state = new Array(dim).fill(null).map(function(_, i){ return { re: i === 0 ? 1 : 0, im: 0 }; });
+  }
+  function qi(name){
+    const i = qnames.indexOf(name);
+    if (i < 0) throw new Error("未宣言の qubit: " + name + " (先に `qubit " + name + "` を実行)");
+    return i;
+  }
+  function apply1(t, m){ // m = [[a,b],[c,d]] 実数行列で十分 (H/X/Z)
+    const n = qnames.length, dim = 1 << n, bit = 1 << (n - 1 - t);
+    const ns = state.map(function(a){ return { re: a.re, im: a.im }; });
+    for (let i = 0; i < dim; i++){
+      if (i & bit) continue;
+      const j = i | bit, a = state[i], b = state[j];
+      ns[i] = { re: m[0][0]*a.re + m[0][1]*b.re, im: m[0][0]*a.im + m[0][1]*b.im };
+      ns[j] = { re: m[1][0]*a.re + m[1][1]*b.re, im: m[1][0]*a.im + m[1][1]*b.im };
+    }
+    state = ns;
+  }
+  function applyCNOT(c, t){
+    const n = qnames.length, dim = 1 << n;
+    const cb = 1 << (n - 1 - c), tb = 1 << (n - 1 - t);
+    const ns = state.map(function(a){ return { re: a.re, im: a.im }; });
+    for (let i = 0; i < dim; i++) if (i & cb) ns[i ^ tb] = state[i];
+    state = ns;
+  }
+  function measureAll(){
+    const dim = state.length;
+    let r = Math.random(), acc = 0, hit = 0;
+    for (let i = 0; i < dim; i++){
+      acc += state[i].re*state[i].re + state[i].im*state[i].im;
+      if (r <= acc){ hit = i; break; }
+      hit = i;
+    }
+    const bits = hit.toString(2).padStart(qnames.length, "0");
+    state = state.map(function(_, i){ return { re: i === hit ? 1 : 0, im: 0 }; });
+    return bits;
+  }
+  function amplitudes(){
+    const dim = state.length, lines = [];
+    for (let i = 0; i < dim; i++){
+      const p = state[i].re*state[i].re + state[i].im*state[i].im;
+      if (p > 1e-9) lines.push("|" + i.toString(2).padStart(qnames.length,"0") + "⟩ " +
+        (state[i].re.toFixed(3)) + (state[i].im >= 0 ? "+" : "") + state[i].im.toFixed(3) + "i  (p=" + p.toFixed(3) + ")");
+    }
+    return lines.join("\n");
+  }
+  function evalExpr(e){
+    e = e.trim();
+    const safe = e.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function(name){
+      if (name in vars) return "(" + vars[name] + ")";
+      if (["sqrt","sin","cos","abs","floor","pow","PI","E","log","exp"].includes(name)) return "Math." + name;
+      throw new Error("未定義の変数: " + name);
+    });
+    if (!/^[-+*/%().,0-9\sMathsqrtincoabflwpPIElgex]*$/.test(safe)) throw new Error("式に使えない文字があります: " + e);
+    return Function('"use strict";return (' + safe + ")")();
+  }
+
+  const H = [[Math.SQRT1_2, Math.SQRT1_2],[Math.SQRT1_2, -Math.SQRT1_2]];
+  const X = [[0,1],[1,0]], Z = [[1,0],[0,-1]];
+
+  const lines = String(src).split(/\r?\n/);
+  for (let ln = 0; ln < lines.length; ln++){
+    let line = lines[ln].replace(/(#|\/\/).*$/, "").trim();
+    if (!line) continue;
+    try {
+      let m;
+      if ((m = line.match(/^qubit\s+(.+)$/i)))           { initQ(m[1].split(/[\s,]+/).filter(Boolean)); out.push("qubit: [" + qnames.join(" ") + "] を |0…0⟩ に初期化"); }
+      else if ((m = line.match(/^H\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), H); out.push("H " + m[1]); }
+      else if ((m = line.match(/^X\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), X); out.push("X " + m[1]); }
+      else if ((m = line.match(/^Z\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), Z); out.push("Z " + m[1]); }
+      else if ((m = line.match(/^CNOT\s+(\S+)\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyCNOT(qi(m[1]), qi(m[2])); out.push("CNOT " + m[1] + "→" + m[2]); }
+      else if (/^state$/i.test(line))                    { if(!state) throw new Error("先に qubit 宣言"); out.push(amplitudes()); }
+      else if (/^measure$/i.test(line))                  { if(!state) throw new Error("先に qubit 宣言"); out.push("measure → |" + measureAll() + "⟩"); }
+      else if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/))) { vars[m[1]] = evalExpr(m[2]); out.push(m[1] + " = " + vars[m[1]]); }
+      else if ((m = line.match(/^print\s+(.+)$/)))       {
+        const arg = m[1].trim();
+        if (/^".*"$/.test(arg)) out.push(arg.slice(1, -1));
+        else out.push(String(evalExpr(arg)));
+      }
+      else throw new Error("構文エラー: " + line);
+    } catch (e) {
+      out.push("!! " + (ln+1) + "行目: " + e.message);
+    }
+  }
+  return out.join("\n");
+}
+
+/* =====================================================================
+ * トランスフォーマー・スタジオ
+ *   16 次元埋め込み + 1 ヘッド self-attention の本物の順伝播に、
+ *   ユーザーが「学習」させた bigram 統計を混合して次トークンを予測。
+ * ===================================================================== */
+const TF = {
+  dim: 16,
+  vocab: ["qubit","H","X","Z","CNOT","measure","state","let","print","=","q0","q1","q2","form","button","label","on","click","rails","scaffold","\"こんにちは\"","1","2","+","*"],
+  bigram: store.get("tf.bigram", {}),
+  lastAttn: null, lastTokens: null
+};
+function tfHash(s){ let h = 2166136261; for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function tfRand(seed){ let s = seed || 1; return function(){ s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff * 2 - 1; }; }
+function tfEmbed(tok){ const r = tfRand(tfHash("emb:" + tok)); const v = []; for (let i = 0; i < TF.dim; i++) v.push(r()); return v; }
+function tfMat(name){ const r = tfRand(tfHash(name)); const m = []; for (let i = 0; i < TF.dim; i++){ const row = []; for (let j = 0; j < TF.dim; j++) row.push(r() * 0.6); m.push(row); } return m; }
+const TF_Wq = tfMat("Wq"), TF_Wk = tfMat("Wk"), TF_Wv = tfMat("Wv");
+function tfMatVec(M, v){ const o = []; for (let i = 0; i < TF.dim; i++){ let s = 0; for (let j = 0; j < TF.dim; j++) s += M[i][j] * v[j]; o.push(s); } return o; }
+function tfDot(a, b){ let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function tfSoftmax(xs){ const mx = Math.max.apply(null, xs); const es = xs.map(function(x){ return Math.exp(x - mx); }); const z = es.reduce(function(a,b){ return a+b; }, 0); return es.map(function(e){ return e / z; }); }
+function tfTokenize(code){ return String(code).replace(/([=+*])/g, " $1 ").split(/\s+/).filter(Boolean); }
+
+function tfTrain(code){
+  const toks = tfTokenize(code);
+  for (let i = 0; i + 1 < toks.length; i++){
+    const k = toks[i];
+    if (!TF.bigram[k]) TF.bigram[k] = {};
+    TF.bigram[k][toks[i+1]] = (TF.bigram[k][toks[i+1]] || 0) + 1;
+    if (!TF.vocab.includes(toks[i])) TF.vocab.push(toks[i]);
+    if (!TF.vocab.includes(toks[i+1])) TF.vocab.push(toks[i+1]);
+  }
+  store.set("tf.bigram", TF.bigram);
+  return toks.length;
+}
+
+function transformerPredict(context, topk){
+  const toks = tfTokenize(context).slice(-8);
+  if (!toks.length) return { tokens: [], preds: [], attn: [] };
+  const emb = toks.map(tfEmbed);
+  const qs = emb.map(function(v){ return tfMatVec(TF_Wq, v); });
+  const ks = emb.map(function(v){ return tfMatVec(TF_Wk, v); });
+  const vs = emb.map(function(v){ return tfMatVec(TF_Wv, v); });
+  const scale = 1 / Math.sqrt(TF.dim);
+  /* causal self-attention: 各位置 i は 0..i を参照 */
+  const attn = [];
+  let ctxVec = null;
+  for (let i = 0; i < toks.length; i++){
+    const scores = [];
+    for (let j = 0; j <= i; j++) scores.push(tfDot(qs[i], ks[j]) * scale);
+    const w = tfSoftmax(scores);
+    attn.push(w);
+    const o = new Array(TF.dim).fill(0);
+    for (let j = 0; j <= i; j++) for (let d = 0; d < TF.dim; d++) o[d] += w[j] * vs[j][d];
+    ctxVec = o; // 最終位置の出力を文脈ベクトルに
+  }
+  /* 語彙全体とスコアリング: attention 出力の内積 + 学習済み bigram */
+  const last = toks[toks.length - 1];
+  const bg = TF.bigram[last] || {};
+  const raw = TF.vocab.map(function(w){
+    const a = tfDot(ctxVec, tfEmbed(w)) * 0.35;
+    const b = Math.log(1 + (bg[w] || 0)) * 2.2;
+    return a + b;
+  });
+  const probs = tfSoftmax(raw);
+  const order = TF.vocab.map(function(w, i){ return { w: w, p: probs[i] }; })
+    .sort(function(x, y){ return y.p - x.p; }).slice(0, topk || 5);
+  TF.lastAttn = attn; TF.lastTokens = toks;
+  return { tokens: toks, preds: order, attn: attn };
+}
+
+/* =====================================================================
+ * Bada on Rails — scaffold 生成 + ミニ CRUD サーバー (bada://rails/*)
+ * ===================================================================== */
+function railsDB(){ return store.get("rails.db", { resources: {} }); }
+function railsSave(db){ store.set("rails.db", db); }
+
+function railsScaffold(name, fieldSpecs){
+  const res = name.toLowerCase();
+  const fields = (fieldSpecs || []).map(function(fs){
+    const p = fs.split(":");
+    return { name: p[0], type: p[1] || "string" };
+  });
+  if (!fields.length) fields.push({ name: "title", type: "string" }, { name: "body", type: "text" });
+  const db = railsDB();
+  db.resources[res] = db.resources[res] || { fields: fields, rows: [], nextId: 1 };
+  db.resources[res].fields = fields;
+  railsSave(db);
+  const Model = res.charAt(0).toUpperCase() + res.slice(1).replace(/s$/, "");
+  const code =
+    "# == Bada on Rails scaffold ==\n" +
+    "# app/models/" + res + ".bada\n" +
+    "model " + Model + " {\n" +
+    fields.map(function(f){ return "  field :" + f.name + ", :" + f.type; }).join("\n") + "\n" +
+    "  validates_presence " + (fields[0] ? ":" + fields[0].name : ":title") + "\n" +
+    "}\n\n" +
+    "# app/controllers/" + res + "_controller.bada\n" +
+    "controller " + Model + "s {\n" +
+    "  def index   { @" + res + " = " + Model + ".all }\n" +
+    "  def create  { " + Model + ".create(params) ; redirect \"bada://rails/" + res + "\" }\n" +
+    "  def destroy { " + Model + ".find(params.id).delete }\n" +
+    "}\n\n" +
+    "# config/routes.bada\n" +
+    "routes { resources :" + res + " }   # → bada://rails/" + res + "\n";
+  return { resource: res, fields: fields, code: code };
+}
+function railsCreateRow(res, values){
+  const db = railsDB(), r = db.resources[res];
+  if (!r) return false;
+  const row = { id: r.nextId++ };
+  r.fields.forEach(function(f){ row[f.name] = values[f.name] || ""; });
+  r.rows.push(row); railsSave(db); return true;
+}
+function railsDeleteRow(res, id){
+  const db = railsDB(), r = db.resources[res];
+  if (!r) return;
+  r.rows = r.rows.filter(function(x){ return x.id !== id; }); railsSave(db);
+}
+
+/* =====================================================================
+ * 合い言葉コマンド — silent talk 以上の精度
+ *   正規化 (カナ折りたたみ・空白/記号除去) + レーベンシュタイン類似度。
+ *   silent talk モード (テキスト) は正規化一致で決定論的 = 100%。
+ * ===================================================================== */
+function aikotoba(){ return store.get("aikotoba", "バダ、起動"); }
+function normalizeSpeech(s){
+  s = String(s || "").trim().toLowerCase();
+  s = s.replace(/[ァ-ン]/g, function(ch){ return ch; }); // カタカナはそのまま
+  s = s.replace(/[ぁ-ん]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) + 0x60); }); // ひらがな→カタカナ
+  s = s.replace(/[\s、。,.!?！?・「」『』:;ー―\-]/g, "");
+  return s;
+}
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = []; for (let j = 0; j <= n; j++) prev.push(j);
+  for (let i = 1; i <= m; i++){
+    const cur = [i];
+    for (let j = 1; j <= n; j++){
+      cur.push(Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1)));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+function similarity(a, b){
+  a = normalizeSpeech(a); b = normalizeSpeech(b);
+  if (!a.length && !b.length) return 1;
+  const d = levenshtein(a, b);
+  return 1 - d / Math.max(a.length, b.length, 1);
+}
+const VOICE_COMMANDS = [
+  { words: ["ターミナル", "たーみなる", "terminal", "コンソール"], url: "bada://terminal", desc: "CUI ターミナルを開く" },
+  { words: ["レール", "レールズ", "rails", "れーるず"],             url: "bada://rails",    desc: "Bada on Rails を開く" },
+  { words: ["ジーピーティー", "gpt", "チャット", "アシスタント"],   url: "bada://gpt",      desc: "BadaGPT を開く" },
+  { words: ["トランスフォーマー", "transformer", "注意", "アテンション"], url: "bada://transformer", desc: "トランスフォーマー・スタジオ" },
+  { words: ["スタジオ", "デザイナ", "gui", "フォーム"],             url: "bada://studio",   desc: "GUI デザイナを開く" },
+  { words: ["ホーム", "home", "デスクトップ"],                       url: "bada://home",     desc: "ホームに戻る" },
+  { words: ["設定", "せってい", "settings"],                          url: "bada://settings", desc: "設定を開く" },
+  { words: ["アップデート", "update", "更新"],                        action: "update",       desc: "BadaGPT に OS update を依頼" },
+  { words: ["アップグレード", "upgrade"],                             action: "upgrade",      desc: "BadaGPT に OS upgrade を依頼" }
+];
+/* 入力全体を照合: まず合い言葉 (プレフィックス可) → 残りをコマンド照合 */
+function matchPassphrase(input){
+  const pass = aikotoba();
+  const nIn = normalizeSpeech(input), nPass = normalizeSpeech(pass);
+  let rest = null, passScore = 0;
+  if (nIn.startsWith(nPass)) { rest = nIn.slice(nPass.length); passScore = 1; }
+  else {
+    // 前半 |pass| 文字とのあいまい照合 (音声誤認識対策)
+    const head = nIn.slice(0, nPass.length);
+    passScore = 1 - levenshtein(head, nPass) / Math.max(nPass.length, 1);
+    if (passScore >= 0.7) rest = nIn.slice(nPass.length);
+  }
+  if (rest === null) return { ok: false, passScore: passScore, reason: "合い言葉が一致しません" };
+  if (!rest) return { ok: true, passScore: passScore, cmd: null };
+  let best = null, bestScore = 0;
+  for (const c of VOICE_COMMANDS){
+    for (const w of c.words){
+      const s = similarity(rest, w);
+      if (s > bestScore){ bestScore = s; best = c; }
+    }
+  }
+  if (best && bestScore >= 0.62) return { ok: true, passScore: passScore, cmd: best, cmdScore: bestScore };
+  return { ok: true, passScore: passScore, cmd: null, cmdScore: bestScore };
+}
+function executeVoice(input, sourceLabel){
+  const r = matchPassphrase(input);
+  if (!r.ok){ setStatus("✗ " + r.reason + " (score " + (r.passScore*100|0) + "%)"); return r; }
+  if (r.cmd){
+    setStatus("✓ " + sourceLabel + " → " + r.cmd.desc + " (精度 " + Math.round((r.cmdScore||1)*100) + "%)");
+    if (r.cmd.url) navigate(r.cmd.url);
+    else if (r.cmd.action === "update" || r.cmd.action === "upgrade"){ navigate("bada://gpt"); setTimeout(function(){ gptSend("os " + r.cmd.action); }, 150); }
+  } else {
+    setStatus("✓ 合い言葉を確認。コマンド語が見つかりません");
+  }
+  return r;
+}
+
+/* ── Web Speech API (音声) ─────────────────────────────────────── */
+let recog = null, recogOn = false;
+function toggleMic(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById("micbtn");
+  if (!SR){ setStatus("この環境に音声認識APIがありません — silent talk モード (bada://voice) をどうぞ"); navigate("bada://voice"); return; }
+  if (recogOn){ if (recog) recog.stop(); recogOn = false; btn.classList.remove("on"); return; }
+  recog = new SR();
+  recog.lang = "ja-JP"; recog.interimResults = false; recog.continuous = true;
+  recog.onresult = function(ev){
+    const t = ev.results[ev.results.length - 1][0].transcript;
+    executeVoice(t, "🎙音声");
+  };
+  recog.onend = function(){ recogOn = false; btn.classList.remove("on"); };
+  recog.start(); recogOn = true; btn.classList.add("on");
+  setStatus("🎙 聴取中… 「" + aikotoba() + " ターミナル」のように話してください");
+}
+
+/* =====================================================================
+ * BadaGPT — OS のベース。update/upgrade を担い、Rails・量子コードも操縦
+ * ===================================================================== */
+function badaGPTReply(text, push){
+  const t = text.trim();
+  const lower = t.toLowerCase();
+
+  /* OS update / upgrade */
+  if (/(os\s*)?(update|upgrade|アップデート|アップグレード|更新)/i.test(lower)){
+    const kind = /(upgrade|アップグレード)/i.test(lower) ? "upgrade" : "update";
+    const from = osVersion();
+    push("gpt", (kind === "upgrade" ? "OS アップグレード" : "OS アップデート") + "を開始します (現在 v" + from + ")。BadaGPT カーネルがパッケージを検証中…", { progress: true, then: function(){
+      const nv = osUpdate(kind);
+      push("gpt", "✅ 完了: v" + from + " → v" + nv + "\n" + store.get("os.changelog", [{notes:""}])[0].notes + "\n再起動は不要です (ライブパッチ適用)。");
+    }});
+    return;
+  }
+  /* Rails scaffold */
+  let m = t.match(/scaffold\s+(\w+)((?:\s+\w+:\w+)*)/i);
+  if (m){
+    const r = railsScaffold(m[1], m[2].trim() ? m[2].trim().split(/\s+/) : []);
+    push("gpt", "Bada on Rails で scaffold を生成しました:\n\n" + r.code + "\nbada://rails/" + r.resource + " で CRUD が動いています。");
+    return;
+  }
+  if (/rails\s*(server|s\b|サーバ)/i.test(lower) || /サーバー?を?起動/.test(t)){
+    store.set("rails.server", true); refreshStatusbar();
+    push("gpt", "🚂 Bada on Rails サーバーを起動しました → bada://rails (Puma-Ω, port 3000 相当)");
+    return;
+  }
+  /* 量子コード実行 */
+  if (/^(qubit|H |X |Z |CNOT|measure|let |print )/m.test(t)){
+    push("gpt", "量子 Bada コードを実行します:\n\n" + badaInterpret(t));
+    return;
+  }
+  if (/ベル|bell|もつれ|entangle/i.test(lower)){
+    const code = "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure";
+    push("gpt", "ベル状態 (量子もつれ) を作りますね:\n\n" + code + "\n\n--- 実行結果 ---\n" + badaInterpret(code));
+    return;
+  }
+  if (/補完|complete|次の?トークン|予測/.test(t)){
+    const ctx = t.replace(/.*(補完|complete|予測)[::]?/,"").trim() || "qubit q0 H";
+    const p = transformerPredict(ctx, 5);
+    push("gpt", "トランスフォーマー (self-attention) による次トークン予測:\n文脈: " + p.tokens.join(" ") + "\n" +
+      p.preds.map(function(x, i){ return (i+1) + ". " + x.w + "  (p=" + x.p.toFixed(3) + ")"; }).join("\n") +
+      "\n詳細な attention 行列は bada://transformer で。");
+    return;
+  }
+  if (/合い言葉|あいことば|passphrase|silent/i.test(t)){
+    push("gpt", "現在の合い言葉は「" + aikotoba() + "」です。bada://voice で変更できます。\nsilent talk モード (無音テキスト) は正規化一致なので decisionは決定論的 = 100% 精度、音声も同じ照合エンジン (レーベンシュタイン類似度) を通します。");
+    return;
+  }
+  if (/バージョン|version/i.test(t)){
+    push("gpt", "Bada VM Pro v" + osVersion() + " / カーネル: BadaGPT (この会話がカーネルです)。「os update」「os upgrade」と言えば私が適用します。");
+    return;
+  }
+  if (/help|ヘルプ|何が|できる/.test(t)){
+    push("gpt", "私は Bada VM Pro のベース (カーネル) です。できること:\n• os update / os upgrade — OS の更新を私が実行\n• scaffold Post title:string body:text — Bada on Rails 生成\n• rails server — CRUD サーバー起動\n• 量子 Bada コードをそのまま貼れば実行 (qubit/H/CNOT/measure)\n• 「ベル状態を作って」— 量子もつれのデモ\n• 「補完: qubit q0 H」— トランスフォーマーで次トークン予測\n• 合い言葉 — 音声/silent talk コマンドの説明");
+    return;
+  }
+  push("gpt", "「" + t + "」ですね。Bada VM Pro のカーネルとして承りました。\n`help` で全コマンド、`os update` で更新、コードを貼れば量子実行します。");
+}
+
+/* =====================================================================
+ * ブラウザーシェル: タブ + bada:// ルーター
+ * ===================================================================== */
+const tabs = [];
+let activeTab = -1;
+function newTab(url){
+  tabs.push({ url: url || "bada://home", hist: [url || "bada://home"], hi: 0 });
+  activeTab = tabs.length - 1;
+  renderTabs(); renderCurrent();
+}
+function closeTab(i){
+  tabs.splice(i, 1);
+  if (!tabs.length){ newTab("bada://home"); return; }
+  if (activeTab >= tabs.length) activeTab = tabs.length - 1;
+  renderTabs(); renderCurrent();
+}
+function switchTab(i){ activeTab = i; renderTabs(); renderCurrent(); }
+function navigate(url){
+  const t = tabs[activeTab];
+  t.hist = t.hist.slice(0, t.hi + 1); t.hist.push(url); t.hi++;
+  t.url = url;
+  renderTabs(); renderCurrent();
+}
+function goBack(){ const t = tabs[activeTab]; if (t.hi > 0){ t.hi--; t.url = t.hist[t.hi]; renderTabs(); renderCurrent(); } }
+function goFwd(){ const t = tabs[activeTab]; if (t.hi < t.hist.length - 1){ t.hi++; t.url = t.hist[t.hi]; renderTabs(); renderCurrent(); } }
+
+const PAGES = {
+  "home":        { title: "ホーム",        fav: "🏠" },
+  "gpt":         { title: "BadaGPT",       fav: "✦" },
+  "rails":       { title: "Bada on Rails", fav: "🚂" },
+  "terminal":    { title: "ターミナル",     fav: "🖥" },
+  "studio":      { title: "GUI スタジオ",   fav: "🎨" },
+  "transformer": { title: "Transformer",   fav: "🧠" },
+  "voice":       { title: "合い言葉",       fav: "🎙" },
+  "settings":    { title: "設定",           fav: "⚙" }
+};
+function pageKey(url){
+  const m = String(url).match(/^bada:\/\/([a-z]+)/i);
+  return m ? m[1].toLowerCase() : "home";
+}
+function renderTabs(){
+  const bar = document.getElementById("tabbar");
+  bar.innerHTML = "";
+  tabs.forEach(function(t, i){
+    const k = pageKey(t.url), meta = PAGES[k] || { title: t.url, fav: "🌐" };
+    const el = document.createElement("div");
+    el.className = "tab" + (i === activeTab ? " active" : "");
+    el.innerHTML = '<span class="fav">' + meta.fav + '</span><span class="ttl">' + meta.title + '</span>';
+    el.onclick = function(){ switchTab(i); };
+    const x = document.createElement("button");
+    x.className = "x"; x.textContent = "✕";
+    x.onclick = function(ev){ ev.stopPropagation(); closeTab(i); };
+    el.appendChild(x);
+    bar.appendChild(el);
+  });
+  const plus = document.createElement("button");
+  plus.id = "newtab"; plus.textContent = "＋"; plus.title = "新しいタブ";
+  plus.onclick = function(){ newTab("bada://home"); };
+  bar.appendChild(plus);
+  const t = tabs[activeTab];
+  document.getElementById("addr").value = t ? t.url : "";
+}
+function renderCurrent(){
+  const vp = document.getElementById("viewport");
+  const t = tabs[activeTab];
+  renderPage(t.url, vp);
+  refreshStatusbar();
+}
+
+/* ── ページレンダラー ──────────────────────────────────────────── */
+function renderPage(url, vp){
+  const key = pageKey(url);
+  switch (key){
+    case "gpt":         return pageGPT(vp);
+    case "rails":       return pageRails(vp, url);
+    case "terminal":    return pageTerminal(vp);
+    case "studio":      return pageStudio(vp);
+    case "transformer": return pageTransformer(vp);
+    case "voice":       return pageVoice(vp);
+    case "settings":    return pageSettings(vp);
+    default:            return pageHome(vp);
+  }
+}
+
+/* bada://home */
+function pageHome(vp){
+  vp.innerHTML =
+  '<div class="page">' +
+  '<h1>🜁 Bada VM Pro</h1>' +
+  '<div class="sub">量子プログラミング言語 Bada のオペレーティングシステム — シェルはウェブブラウザー、ベース (カーネル) は BadaGPT。v' + osVersion() + '</div>' +
+  '<div class="grid" id="homegrid"></div>' +
+  '<h2>クイックスタート</h2>' +
+  '<div class="card">アドレスバーに <span class="kbd">bada://terminal</span> のように入力するか、合い言葉「<b>' + aikotoba() + ' ターミナル</b>」を 🎙 (音声) か bada://voice (silent talk) で。<br>' +
+  'OS の更新は BadaGPT に「<span class="kbd">os update</span>」「<span class="kbd">os upgrade</span>」と話しかけるだけです。</div>' +
+  '</div>';
+  const grid = vp.querySelector("#homegrid");
+  const apps = [
+    ["gpt","✦","BadaGPT","OSのベース / update・upgrade 担当"],
+    ["terminal","🖥","ターミナル","CUI / 量子 Bada REPL"],
+    ["rails","🚂","Bada on Rails","scaffold → CRUD"],
+    ["studio","🎨","GUI スタジオ","フォームデザイナ → Bada"],
+    ["transformer","🧠","Transformer","self-attention 可視化・補完"],
+    ["voice","🎙","合い言葉","silent talk / 音声コマンド"],
+    ["settings","⚙","設定","バージョン・changelog"]
+  ];
+  apps.forEach(function(a){
+    const el = document.createElement("div");
+    el.className = "appicon";
+    el.innerHTML = '<span class="em">' + a[1] + '</span><span class="nm">' + a[2] + '</span><span class="ds">' + a[3] + '</span>';
+    el.onclick = function(){ navigate("bada://" + a[0]); };
+    grid.appendChild(el);
+  });
+}
+
+/* bada://gpt */
+let gptHistory = store.get("gpt.history", [
+  { role: "gpt", text: "こんにちは。私は Bada VM Pro のベース、BadaGPT です。\nOS の update / upgrade は私が担当します。`help` で出来ることを一覧します。" }
+]);
+function gptPush(role, text, opts){
+  gptHistory.push({ role: role, text: text });
+  gptHistory = gptHistory.slice(-80);
+  store.set("gpt.history", gptHistory);
+  const log = document.getElementById("chatlog");
+  if (log){
+    const el = document.createElement("div");
+    el.className = "msg " + role;
+    el.textContent = text;
+    if (opts && opts.progress){
+      const p = document.createElement("div"); p.className = "prog";
+      const i = document.createElement("i"); p.appendChild(i); el.appendChild(p);
+      let w = 0;
+      const timer = setInterval(function(){
+        w += 12 + Math.random() * 18;
+        if (w >= 100){ w = 100; clearInterval(timer); if (opts.then) setTimeout(opts.then, 250); }
+        i.style.width = w + "%";
+      }, 220);
+    }
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function gptSend(text){
+  const inp = document.getElementById("gptin");
+  const t = (text !== undefined ? text : (inp ? inp.value : "")).trim();
+  if (!t) return;
+  if (inp) inp.value = "";
+  gptPush("user", t);
+  setTimeout(function(){ badaGPTReply(t, gptPush); }, 120);
+}
+function pageGPT(vp){
+  vp.innerHTML =
+  '<div class="page">' +
+  '<h1>✦ BadaGPT</h1><div class="sub">Bada VM Pro のベース・カーネル — OS update / upgrade、Rails、量子実行、補完をすべて担当</div>' +
+  '<div class="card"><div id="chatlog"></div>' +
+  '<div class="row" style="margin-top:10px"><input id="gptin" style="flex:1" placeholder="os update / scaffold Post title:string / ベル状態を作って …"/>' +
+  '<button id="gptsend" style="background:var(--purple);border-color:var(--purple)">送信</button></div>' +
+  '<div class="row" style="margin-top:8px">' +
+  '<button onclick="gptSend(\'os update\')">os update</button>' +
+  '<button onclick="gptSend(\'os upgrade\')">os upgrade</button>' +
+  '<button onclick="gptSend(\'ベル状態を作って\')">ベル状態</button>' +
+  '<button onclick="gptSend(\'scaffold Post title:string body:text\')">scaffold Post</button>' +
+  '<button onclick="gptSend(\'help\')">help</button></div></div></div>';
+  const log = vp.querySelector("#chatlog");
+  gptHistory.forEach(function(m){
+    const el = document.createElement("div"); el.className = "msg " + m.role; el.textContent = m.text; log.appendChild(el);
+  });
+  log.scrollTop = log.scrollHeight;
+  vp.querySelector("#gptsend").onclick = function(){ gptSend(); };
+  vp.querySelector("#gptin").addEventListener("keydown", function(e){ if (e.key === "Enter") gptSend(); });
+}
+
+/* bada://rails — 一覧 & bada://rails/<res> の CRUD ビュー */
+function pageRails(vp, url){
+  const m = String(url).match(/^bada:\/\/rails\/(\w+)/i);
+  if (m && railsDB().resources[m[1].toLowerCase()]) return railsResourceView(vp, m[1].toLowerCase());
+  const db = railsDB();
+  const names = Object.keys(db.resources);
+  vp.innerHTML =
+  '<div class="page"><h1>🚂 Bada on Rails</h1>' +
+  '<div class="sub">Convention over Quantum Configuration — scaffold 一発で bada://rails/&lt;resource&gt; に CRUD が立ちます</div>' +
+  '<div class="card"><h2 style="margin-top:0">rails generate scaffold</h2>' +
+  '<div class="row"><input id="scname" placeholder="Post" style="width:130px"/>' +
+  '<input id="scfields" placeholder="title:string body:text" style="flex:1"/>' +
+  '<button id="scgo" style="background:var(--red);border-color:var(--red)">generate</button></div>' +
+  '<pre class="code" id="sccode" style="margin-top:10px;display:none"></pre></div>' +
+  '<div class="card"><h2 style="margin-top:0">リソース</h2>' +
+  (names.length ? names.map(function(n){
+     return '<div class="row" style="margin-bottom:6px"><span class="badge ok">resources :' + n + '</span>' +
+            '<a class="link" onclick="navigate(\'bada://rails/' + n + '\')">bada://rails/' + n + '</a>' +
+            '<span class="badge">' + railsDB().resources[n].rows.length + ' rows</span></div>';
+   }).join("") : '<span style="color:var(--dim)">まだありません。上の generate か、BadaGPT に「scaffold Post title:string」と話しかけてください。</span>') +
+  '</div>' +
+  '<div class="card">サーバー: <span class="badge ' + (store.get("rails.server", false) ? 'ok">running (Puma-Ω :3000)' : 'warn">stopped') + '</span> ' +
+  '<button onclick="store.set(\'rails.server\',true);refreshStatusbar();renderCurrent()">rails server</button></div>' +
+  '</div>';
+  vp.querySelector("#scgo").onclick = function(){
+    const name = vp.querySelector("#scname").value.trim() || "Post";
+    const fields = vp.querySelector("#scfields").value.trim();
+    const r = railsScaffold(name, fields ? fields.split(/\s+/) : []);
+    const pre = vp.querySelector("#sccode");
+    pre.style.display = "block"; pre.textContent = r.code;
+    setStatus("scaffold " + r.resource + " を生成");
+    setTimeout(function(){ renderCurrent(); }, 1400);
+  };
+}
+function railsResourceView(vp, res){
+  const r = railsDB().resources[res];
+  vp.innerHTML =
+  '<div class="page"><h1>🚂 /' + res + '</h1><div class="sub">bada://rails/' + res + ' — ' +
+  r.fields.map(function(f){ return f.name + ":" + f.type; }).join(", ") + '</div>' +
+  '<div class="card"><h2 style="margin-top:0">new</h2><div class="row" id="newrow">' +
+  r.fields.map(function(f){ return '<input data-f="' + f.name + '" placeholder="' + f.name + '" style="flex:1;min-width:120px"/>'; }).join("") +
+  '<button id="mkrow" style="background:var(--green);border-color:var(--green)">create</button></div></div>' +
+  '<div class="card"><table class="tbl"><tr><th>id</th>' +
+  r.fields.map(function(f){ return "<th>" + f.name + "</th>"; }).join("") + '<th></th></tr>' +
+  r.rows.map(function(row){
+    return "<tr><td>" + row.id + "</td>" +
+      r.fields.map(function(f){ return "<td>" + String(row[f.name] || "").replace(/</g, "&lt;") + "</td>"; }).join("") +
+      '<td><button onclick="railsDeleteRow(\'' + res + '\',' + row.id + ');renderCurrent()">🗑</button></td></tr>';
+  }).join("") + '</table></div>' +
+  '<a class="link" onclick="navigate(\'bada://rails\')">← リソース一覧</a></div>';
+  vp.querySelector("#mkrow").onclick = function(){
+    const vals = {};
+    vp.querySelectorAll("#newrow input").forEach(function(i){ vals[i.getAttribute("data-f")] = i.value; });
+    railsCreateRow(res, vals); renderCurrent();
+  };
+}
+
+/* bada://terminal */
+let termLog = [
+  "Bada VM Pro CUI — v" + "" + " type `help`",
+  ""
+];
+function pageTerminal(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🖥 ターミナル</h1><div class="sub">CUI プログラミング — シェル + 量子 Bada REPL。複数行コードは ; か改行 (Shift+Enter は不要、;で区切り) で</div>' +
+  '<div class="term" id="termout"></div>' +
+  '<div id="termline"><span style="color:var(--green);font-family:var(--mono)">bada&gt;</span>' +
+  '<input id="termin" spellcheck="false" placeholder="help / qubit q0 q1; H q0; CNOT q0 q1; measure"/></div></div>';
+  const out = vp.querySelector("#termout");
+  function draw(){ out.innerHTML = termLog.map(function(l){
+    if (l.startsWith("$ ")) return '<div class="in">' + l.replace(/</g, "&lt;") + "</div>";
+    if (l.startsWith("!!")) return '<div class="err">' + l.replace(/</g, "&lt;") + "</div>";
+    return "<div>" + String(l).replace(/</g, "&lt;") + "</div>";
+  }).join(""); out.scrollTop = out.scrollHeight; }
+  termLog[0] = "Bada VM Pro CUI — v" + osVersion() + "  (`help` でコマンド一覧)";
+  draw();
+  const inp = vp.querySelector("#termin");
+  inp.addEventListener("keydown", function(e){
+    if (e.key !== "Enter") return;
+    const cmd = inp.value.trim(); inp.value = "";
+    if (!cmd) return;
+    termLog.push("$ " + cmd);
+    termLog.push(runShell(cmd));
+    termLog = termLog.slice(-300);
+    draw();
+  });
+  inp.focus();
+}
+function runShell(cmd){
+  const c = cmd.trim();
+  if (c === "help") return [
+    "help            このヘルプ",
+    "ver             OS バージョン",
+    "ls              アプリ一覧",
+    "open <app>      アプリを開く (gpt/rails/studio/transformer/voice)",
+    "os update|upgrade   BadaGPT 経由で OS 更新",
+    "rails scaffold <Name> [f:t ...]   scaffold 生成",
+    "aikotoba <語>   合い言葉を変更",
+    "clear           画面クリア",
+    "それ以外        量子 Bada として実行 (qubit/H/X/Z/CNOT/measure/state/let/print, ; 区切り)"
+  ].join("\n");
+  if (c === "ver") return "Bada VM Pro v" + osVersion() + " (kernel: BadaGPT)";
+  if (c === "ls") return Object.keys(PAGES).join("  ");
+  if (c === "clear"){ termLog = []; return "" ; }
+  let m;
+  if ((m = c.match(/^open\s+(\w+)/))){ navigate("bada://" + m[1]); return "→ bada://" + m[1]; }
+  if ((m = c.match(/^os\s+(update|upgrade)/))){
+    const from = osVersion(), nv = osUpdate(m[1]);
+    return "BadaGPT: v" + from + " → v" + nv + " (" + m[1] + " 完了)";
+  }
+  if ((m = c.match(/^rails\s+scaffold\s+(\w+)(.*)$/))){
+    const r = railsScaffold(m[1], m[2].trim() ? m[2].trim().split(/\s+/) : []);
+    return r.code + "→ bada://rails/" + r.resource;
+  }
+  if ((m = c.match(/^aikotoba\s+(.+)$/))){ store.set("aikotoba", m[1].trim()); refreshStatusbar(); return "合い言葉を「" + m[1].trim() + "」に変更しました"; }
+  return badaInterpret(c.split(";").join("\n"));
+}
+
+/* bada://studio — GUI プログラミング */
+let guiCmps = store.get("gui.cmps", [
+  { type: "TLabel",  x: 30, y: 24,  caption: "量子フォーム Form1" },
+  { type: "TButton", x: 30, y: 70,  caption: "測定する" },
+  { type: "TEdit",   x: 30, y: 120, caption: "" }
+]);
+let guiSel = -1, guiSeq = guiCmps.length;
+function pageStudio(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🎨 GUI スタジオ</h1><div class="sub">GUI プログラミング — 部品を置いてドラッグ → Bada コード生成 → ▶ 実行 (ボタンは量子測定を発火)</div>' +
+  '<div id="designer">' +
+  '<div class="card" id="palette" style="margin:0"><b style="font-size:12px;color:var(--gold)">パレット</b><br><br>' +
+  '<button data-t="TButton">□ TButton</button><button data-t="TLabel">A TLabel</button><button data-t="TEdit">▭ TEdit</button>' +
+  '<hr style="border-color:var(--edge);margin:10px 0"/>' +
+  '<button id="guirun" style="background:var(--green);border-color:var(--green)">▶ 実行 (F9)</button>' +
+  '<button id="guidel">🗑 選択を削除</button></div>' +
+  '<div class="card" style="margin:0"><div id="canvas"></div></div>' +
+  '<div class="card" style="margin:0"><b style="font-size:12px;color:var(--gold)">プロパティ</b>' +
+  '<div id="props" style="margin-top:8px;font-size:12.5px;color:var(--dim)">部品を選択してください</div></div>' +
+  '</div>' +
+  '<h2>生成された Bada コード</h2><pre class="code" id="guicode"></pre></div>';
+  vp.querySelectorAll("#palette button[data-t]").forEach(function(b){
+    b.onclick = function(){
+      guiSeq++;
+      guiCmps.push({ type: b.getAttribute("data-t"), x: 40 + (guiSeq*17)%180, y: 40 + (guiSeq*23)%200,
+        caption: b.getAttribute("data-t") === "TEdit" ? "" : b.getAttribute("data-t").slice(1) + guiSeq });
+      saveGui(); drawGui(vp);
+    };
+  });
+  vp.querySelector("#guirun").onclick = runGuiPreview;
+  vp.querySelector("#guidel").onclick = function(){ if (guiSel >= 0){ guiCmps.splice(guiSel, 1); guiSel = -1; saveGui(); drawGui(vp); } };
+  drawGui(vp);
+}
+function saveGui(){ store.set("gui.cmps", guiCmps); }
+function guiCode(){
+  return "form Form1 {\n  title \"Bada VM Pro Form\"\n" +
+    guiCmps.map(function(c, i){
+      let l = "  " + c.type.slice(1).toLowerCase() + " c" + i + " at (" + c.x + "," + c.y + ")";
+      if (c.caption) l += ' caption "' + c.caption + '"';
+      if (c.type === "TButton") l += ' on click {\n    qubit q0; H q0\n    print measure   # 量子測定\n  }';
+      return l;
+    }).join("\n") + "\n}";
+}
+function drawGui(vp){
+  const cv = vp.querySelector("#canvas");
+  cv.innerHTML = "";
+  guiCmps.forEach(function(c, i){
+    const el = document.createElement("div");
+    el.className = "cmp " + c.type + (i === guiSel ? " sel" : "");
+    el.style.left = c.x + "px"; el.style.top = c.y + "px";
+    el.textContent = c.type === "TEdit" ? (c.caption || "") : c.caption;
+    if (c.type === "TEdit" && !c.caption) el.innerHTML = "&nbsp;";
+    el.onmousedown = function(ev){
+      guiSel = i; drawGui(vp);
+      const sx = ev.clientX - c.x, sy = ev.clientY - c.y;
+      function mv(e2){ c.x = Math.max(0, e2.clientX - sx); c.y = Math.max(0, e2.clientY - sy);
+        el.style.left = c.x + "px"; el.style.top = c.y + "px"; }
+      function up(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); saveGui(); drawGui(vp); }
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      ev.preventDefault();
+    };
+    cv.appendChild(el);
+  });
+  const props = vp.querySelector("#props");
+  if (guiSel >= 0 && guiCmps[guiSel]){
+    const c = guiCmps[guiSel];
+    props.innerHTML = '<div>type: <b>' + c.type + '</b></div><div>at: (' + c.x + ',' + c.y + ')</div>' +
+      '<div style="margin-top:6px">caption<br/><input id="propcap" style="width:100%" value="' + String(c.caption).replace(/"/g, "&quot;") + '"/></div>';
+    props.querySelector("#propcap").oninput = function(e){ c.caption = e.target.value; saveGui();
+      const cvv = document.querySelectorAll("#canvas .cmp")[guiSel]; if (cvv) cvv.textContent = c.caption; };
+  } else props.textContent = "部品を選択してください";
+  vp.querySelector("#guicode").textContent = guiCode();
+}
+function runGuiPreview(){
+  const ov = document.getElementById("guiprev"), body = document.getElementById("gp-body");
+  body.innerHTML = "";
+  guiCmps.forEach(function(c){
+    let el;
+    if (c.type === "TButton"){ el = document.createElement("button"); el.className = "cmp TButton"; el.textContent = c.caption;
+      el.style.cursor = "pointer";
+      el.onclick = function(){ const r = badaInterpret("qubit q0\nH q0\nmeasure");
+        alert("on click → 量子測定\n" + r); }; }
+    else if (c.type === "TEdit"){ el = document.createElement("input"); el.className = "cmp TEdit"; el.value = c.caption; }
+    else { el = document.createElement("div"); el.className = "cmp TLabel"; el.textContent = c.caption; }
+    el.style.position = "absolute"; el.style.left = c.x + "px"; el.style.top = c.y + "px"; el.style.cursor = el.style.cursor || "default";
+    body.appendChild(el);
+  });
+  ov.style.display = "flex";
+}
+function closeGuiPreview(){ document.getElementById("guiprev").style.display = "none"; }
+
+/* bada://transformer */
+function pageTransformer(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🧠 トランスフォーマー・スタジオ</h1>' +
+  '<div class="sub">16次元・1ヘッド self-attention の本物の順伝播 + 学習可能な bigram 統計。文脈を入れて次トークンを予測し、attention 行列を可視化します</div>' +
+  '<div class="card"><div class="row"><input id="tfctx" style="flex:1" value="qubit q0 q1 H q0 CNOT"/>' +
+  '<button id="tfgo" style="background:var(--cyan);border-color:var(--cyan);color:#04252a">予測</button></div>' +
+  '<div id="tfout" style="margin-top:12px"></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">トランスフォーマーをプログラムする (学習)</h2>' +
+  '<div class="sub">Bada コードを与えると bigram 統計を更新し、予測が変わります — これが「トランスフォーマーでプログラミング」です</div>' +
+  '<textarea id="tftrain" rows="4" style="width:100%">qubit q0 q1\nH q0\nCNOT q0 q1\nmeasure</textarea>' +
+  '<div class="row" style="margin-top:8px"><button id="tftrainbtn" style="background:var(--purple);border-color:var(--purple)">学習</button>' +
+  '<button id="tfreset">統計リセット</button><span id="tfstat" class="badge"></span></div></div></div>';
+  function show(){
+    const p = transformerPredict(vp.querySelector("#tfctx").value, 6);
+    let html = "<b>文脈:</b> <span class='kbd'>" + p.tokens.join("</span> <span class='kbd'>") + "</span>" +
+      "<h2>次トークン予測</h2><table class='tbl'><tr><th>#</th><th>token</th><th>p</th></tr>" +
+      p.preds.map(function(x, i){ return "<tr><td>" + (i+1) + "</td><td><b>" + String(x.w).replace(/</g,"&lt;") + "</b></td><td>" + x.p.toFixed(4) + "</td></tr>"; }).join("") +
+      "</table><h2>attention 行列 (causal)</h2>";
+    const n = p.tokens.length;
+    html += "<div class='attn' style='grid-template-columns:repeat(" + n + ",1fr);max-width:" + (n*46) + "px'>";
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
+      const w = (p.attn[i] && j < p.attn[i].length) ? p.attn[i][j] : 0;
+      const c = Math.round(255 * w);
+      html += "<div style='background:rgb(" + Math.round(c*0.56) + "," + Math.round(c*0.38) + "," + c + ")'><span>" + (w ? w.toFixed(2).slice(1) : "·") + "</span></div>";
+    }
+    html += "</div><div class='sub' style='margin-top:6px'>行 = query 位置 / 列 = key 位置。下三角のみ (causal mask)。</div>";
+    vp.querySelector("#tfout").innerHTML = html;
+  }
+  vp.querySelector("#tfgo").onclick = show;
+  vp.querySelector("#tfctx").addEventListener("keydown", function(e){ if (e.key === "Enter") show(); });
+  vp.querySelector("#tftrainbtn").onclick = function(){
+    const n = tfTrain(vp.querySelector("#tftrain").value);
+    vp.querySelector("#tfstat").textContent = n + " トークンを学習 (語彙 " + TF.vocab.length + ")";
+    show();
+  };
+  vp.querySelector("#tfreset").onclick = function(){ TF.bigram = {}; store.set("tf.bigram", {}); vp.querySelector("#tfstat").textContent = "リセット"; show(); };
+  show();
+}
+
+/* bada://voice — 合い言葉 / silent talk */
+function pageVoice(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🎙 合い言葉コマンド</h1>' +
+  '<div class="sub">silent talk 以上の精度: テキスト (silent talk モード) は正規化一致で決定論的 100%。音声も同じ照合エンジン (カナ折りたたみ + レーベンシュタイン類似度) を通します</div>' +
+  '<div class="card"><h2 style="margin-top:0">合い言葉</h2>' +
+  '<div class="row"><input id="passin" value="' + aikotoba().replace(/"/g, "&quot;") + '" style="flex:1"/>' +
+  '<button id="passset">変更</button></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">🤫 silent talk モード (無音・テキスト)</h2>' +
+  '<div class="row"><input id="silentin" style="flex:1" placeholder="' + aikotoba() + ' ターミナル"/>' +
+  '<button id="silentgo" style="background:var(--gold);border-color:var(--gold);color:#221a04">実行</button></div>' +
+  '<div id="voicelog" style="margin-top:10px;font-size:12.5px;color:var(--dim)"></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">🎙 音声モード</h2>' +
+  '<button onclick="toggleMic()">マイクを開始/停止</button> <span class="sub">Web Speech API が使える環境で有効 (APK 版 WebView は端末依存)</span></div>' +
+  '<div class="card"><h2 style="margin-top:0">コマンド一覧</h2><table class="tbl"><tr><th>言い方 (合い言葉のあとに)</th><th>動作</th></tr>' +
+  VOICE_COMMANDS.map(function(c){ return "<tr><td>" + c.words.slice(0, 3).join(" / ") + "</td><td>" + c.desc + "</td></tr>"; }).join("") +
+  '</table></div></div>';
+  vp.querySelector("#passset").onclick = function(){
+    const v = vp.querySelector("#passin").value.trim();
+    if (v){ store.set("aikotoba", v); refreshStatusbar(); setStatus("合い言葉を「" + v + "」に変更"); renderCurrent(); }
+  };
+  function go(){
+    const v = vp.querySelector("#silentin").value;
+    const r = executeVoice(v, "🤫silent");
+    const log = document.getElementById("voicelog");
+    if (log) log.innerHTML = "照合: 合い言葉 " + Math.round((r.passScore || 0) * 100) + "%" +
+      (r.cmd ? " / コマンド「" + r.cmd.desc + "」 " + Math.round((r.cmdScore || 1) * 100) + "%" :
+       (r.ok ? " / コマンド語なし" : " — 不一致"));
+  }
+  vp.querySelector("#silentgo").onclick = go;
+  vp.querySelector("#silentin").addEventListener("keydown", function(e){ if (e.key === "Enter") go(); });
+}
+
+/* bada://settings */
+function pageSettings(vp){
+  const log = store.get("os.changelog", []);
+  vp.innerHTML =
+  '<div class="page"><h1>⚙ 設定</h1>' +
+  '<div class="card"><h2 style="margin-top:0">システム</h2>' +
+  '<table class="tbl"><tr><th>OS</th><td>Bada VM Pro v' + osVersion() + '</td></tr>' +
+  '<tr><th>カーネル (ベース)</th><td>BadaGPT — update/upgrade も担当</td></tr>' +
+  '<tr><th>シェル</th><td>ブラウザーデザイン (bada:// スキーム)</td></tr>' +
+  '<tr><th>言語</th><td>量子 Bada (qubit/H/X/Z/CNOT/measure) + Bada on Rails</td></tr>' +
+  '<tr><th>合い言葉</th><td>「' + aikotoba() + '」</td></tr></table>' +
+  '<div class="row" style="margin-top:10px">' +
+  '<button onclick="navigate(\'bada://gpt\');setTimeout(function(){gptSend(\'os update\')},150)">BadaGPT に update を依頼</button>' +
+  '<button onclick="navigate(\'bada://gpt\');setTimeout(function(){gptSend(\'os upgrade\')},150)">BadaGPT に upgrade を依頼</button>' +
+  '</div></div>' +
+  '<div class="card"><h2 style="margin-top:0">changelog</h2>' +
+  (log.length ? log.map(function(e){ return "<div style='margin-bottom:8px'><span class='badge " + (e.kind === "upgrade" ? "warn" : "ok") + "'>v" + e.v + "</span> <span class='sub'>" + e.at.slice(0, 19).replace("T", " ") + "</span><br/>" + e.notes + "</div>"; }).join("")
+              : "<span style='color:var(--dim)'>まだ更新履歴がありません。</span>") +
+  '</div></div>';
+}
+
+/* ── 起動 ──────────────────────────────────────────────────────── */
+document.getElementById("backbtn").onclick = goBack;
+document.getElementById("fwdbtn").onclick = goFwd;
+document.getElementById("reloadbtn").onclick = function(){ renderCurrent(); };
+document.getElementById("homebtn").onclick = function(){ navigate("bada://home"); };
+document.getElementById("micbtn").onclick = toggleMic;
+document.getElementById("gptbtn").onclick = function(){ navigate("bada://gpt"); };
+document.getElementById("addr").addEventListener("keydown", function(e){
+  if (e.key !== "Enter") return;
+  const v = e.target.value.trim();
+  if (!v) return;
+  if (/^bada:\/\//i.test(v)) navigate(v);
+  else {
+    /* アドレスバーに合い言葉を打っても silent talk として動く */
+    const r = executeVoice(v, "⌨address");
+    if (!r.ok) navigate("bada://" + v.replace(/^\/+/, ""));
+  }
+});
+newTab("bada://home");
+refreshStatusbar();
+</script>
+</body>
+</html>

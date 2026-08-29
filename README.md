@@ -29,6 +29,40 @@
 
 ---
 
+## 🜁 ダウンロード — Bada VM Pro(今までの集大成)
+
+**量子プログラミング言語 Bada のオペレーティングシステム。** シェルは**ウェブブラウザーのデザイン**(タブ + `bada://` アドレスバー)、ベース(カーネル)は **BadaGPT** で、**OS の update / upgrade も BadaGPT が実行**します。**Bada on Rails**(scaffold → CRUD)、**合い言葉コマンド**(silent talk 無音テキスト = 決定論的一致、音声 = Web Speech API + レーベンシュタイン照合)、**トランスフォーマー・スタジオ**(本物の self-attention 順伝播 + 学習)、**GUI / CUI プログラミング**をひとつに統合。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_vm_pro/index.html をダウンロード**](bada_vm_pro/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-vm-pro-debug.apk` |
+| **Windows 10 / 11** | `BadaVMPro-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
+
+ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が実行します(`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・合い言葉・量子 Bada 文法は [`bada_vm_pro/`](bada_vm_pro/) を参照。
+
+---
+
+## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
+
+自動走行の自動車**レーヴァテイン**とアシスタントAI**アル**。**アルのトランスフォーマーが車両を操縦**します — 知覚 attention を操舵角と加減速の2値に写す制御ヘッドが、その2値だけで車体(自転車近似モデル)を動かし、周囲(16レイセンサへの attention)を検知して自動で回避・減速・停止・再発進。測位は 2 モード — **🌐 Web地図モード**は衛星を使わず、ウェブサイトから受信する地図タイル(AEAD 検証つき)+推測航法+ランドマーク補正で走り、**🛰 人工衛星モード**は 4 機の擬似距離から最小二乗で測位します。A* 経路計画・依存ゼロ・単一 HTML。
+
+**🔗 実車接続対応**: ELM327 互換の **BLE OBD-II アダプタに本物の Bluetooth で接続**し、実車の速度・回転数・水温・電圧をリアルタイム受信(ブラウザ = Web Bluetooth / APK = BLE プラグイン。ELM327 初期化列 + PID ポーリング + 分割パケット再結合を実装、読取専用)。**アルの音声案内**は、スマホとカーナビの既存 Bluetooth オーディオ接続を通じて**車のスピーカーから流れます**。アダプタなしでも「デモ接続」で全経路を確認可能。
+
+### 👉 [**laevateinn/index.html をダウンロード**](laevateinn/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動。APK (`laevateinn-al-debug.apk`) / Windows EXE / Ubuntu 版は [Releases](https://github.com/masaaki-avnturle/Bada/releases) から([`laevateinn-app-build.yml`](.github/workflows/laevateinn-app-build.yml) が `laevateinn-v*` タグでビルド)。詳細は [`laevateinn/`](laevateinn/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
@@ -39,9 +73,19 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧 |
+| [`zone-browser.html`](bada_gui_ide/dist/zone-browser.html) | ★ 専用ブラウザ本体(単一 HTML)。アドレスバーに `zone://url.or.jp/` と入力して閲覧。**🛡 ZoneShield 付属** — Jones多項式量子暗号のセキュリティソフト(下記) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 | [`zone.bada`](bada_gui_ide/examples/zone.bada) | zone:// スキームの Bada ソース |
+
+#### 🛡 付属セキュリティソフト — ZoneShield(量子暗号アプリケーション)
+
+ZoneBrowser のツールバー右端の **🛡 ボタン**で起動。ネットワークが使っているのと**同一の Bada 実装**(結び目図 → Kauffman/Jones 多項式 → 鍵 → AEAD、Bell対 QKD セッション salt)を、手元の道具として使えます:
+
+- **封緘(暗号化)** — 任意のテキスト(日本語可)を host の結び目鍵で封緘し、コピペできる**封筒 JSON** を出力
+- **開封(復号)** — 封筒 JSON を貼り付けると AEAD タグを検証してから復号。改ざん・結び目違いは **409 で拒否**し平文を出さない
+- **セキュリティスキャン** — 公開中の全 zone ページを再配信して Jones-AEAD 検証し、改ざん検知の自己テスト(暗号文 1 ユニット反転 → 409)まで実施したレポートを表示
+
+APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.html` を包むため)。
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 
@@ -71,6 +115,8 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
+| **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 
 ---
 
