@@ -212,6 +212,18 @@ Git GUI **SourceTree** のカスタム操作 (`$REPO`) に登録して付属ア�
 
 SourceTree への登録: ツール → オプション → カスタム操作 → スクリプトに `BadaSearch.exe`、パラメータに `$REPO`。ビルドは [`sourcetree-search-build.yml`](.github/workflows/sourcetree-search-build.yml) が自動実行します (`stsearch-v*` タグ / `workflow_dispatch`)。詳細は [`sourcetree_search/README.md`](sourcetree_search/README.md) を参照。
 
+### 🔌 Ω-USB Resume — 接触不良 USB メモリの復旧アプリ
+
+接触不良・未認可・プラグプレイ不発で使えなくなった USB を、物理修理なしにソフト側から復旧(レジューム)するアプリ。機械語記述子の n進数のズレを複素回転体 e^(iθ) の閉軌道平均で訂正し、可積分系のエントロピー不変量 Ξ で検証してから再認可 → 電源 → 再列挙します(既定はシミュレーション・非破壊):
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `omega-usb-resume-debug.apk` |
+| **Windows 10 / 11** (EXE) | `Omega-USB-Resume-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** (AppImage / deb) | GUI `Omega-USB-Resume-*.AppImage` / `.deb`、CLI `usb-resume-linux-x64` ＋ `usb-resume-cli_*_amd64.deb` (→ `/usr/bin/usb-resume`、`--apply` で実 sysfs) |
+
+ビルドは [`omega-usb-resume-build.yml`](.github/workflows/omega-usb-resume-build.yml) が自動実行します (`usb-resume-v*` タグで Release へ添付 / ブランチ push で Actions アーティファクト)。詳細は [`omega_usb_resume/README.md`](omega_usb_resume/README.md) を参照。
+
 ---
 
 ## 🔤 Bada Language — 設計原理
