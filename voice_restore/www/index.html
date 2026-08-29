@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>声色リストア — Voice Restore Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>音色リストア — Sound Restore Studio</title>
 <style>
   :root{
     --bg:#04060a; --panel:#0b1018; --panel2:#111826; --line:#1c2636;
@@ -18,8 +18,8 @@
   .wrap{max-width:960px;margin:0 auto;padding:28px 18px 80px}
   header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:18px}
   .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--gold),var(--red));
-    display:grid;place-items:center;font-weight:800;color:#0a0a0a;font-size:22px}
-  h1{font-size:1.35rem;margin:0}
+    display:grid;place-items:center;font-weight:800;color:#0a0a0a;font-size:20px}
+  h1{font-size:1.3rem;margin:0}
   .sub{color:var(--dim);font-size:.86rem;margin-top:2px}
   .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
     border-radius:16px;padding:18px;margin-top:18px}
@@ -42,30 +42,37 @@
   .hint{color:var(--dim);font-size:.8rem;margin-top:4px}
   canvas{width:100%;height:120px;background:#060a12;border:1px solid var(--line);border-radius:10px;display:block}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media(max-width:640px){.grid2{grid-template-columns:1fr}}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:640px){.grid2,.grid3{grid-template-columns:1fr}}
   .pill{font-size:.78rem;color:var(--dim);background:#0a1120;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
   .status{font-size:.85rem;color:var(--cyan);min-height:1.4em}
   .warn{background:#1a1206;border:1px solid #6b5320;border-radius:12px;padding:12px 14px;color:#e8d9a8;font-size:.84rem}
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .seg button{border:0;border-radius:0;background:transparent}
   .seg button.on{background:var(--blue);color:#fff}
+  .modeSeg button.on{background:var(--gold);color:#0a0a0a}
   footer{margin-top:30px;color:var(--dim);font-size:.78rem;text-align:center}
   .meterwrap{height:8px;background:#0a1120;border-radius:999px;overflow:hidden;border:1px solid var(--line)}
   .meter{height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--gold),var(--red))}
+  .hidden{display:none}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="logo">声</div>
+    <div class="logo">音</div>
     <div>
-      <h1>声色リストア <span class="pill">Voice Restore Studio</span></h1>
-      <div class="sub">ミュージックレコーダー等でボイスチェンジ(ピッチ・フォルマント変調)された録音を、元の声色に逆変換して戻します。</div>
+      <h1>音色リストア <span class="pill">Sound Restore Studio</span></h1>
+      <div class="sub">ミュージックレコーダー等で変調(ボイスチェンジ / 音色改変)された <b>声・楽器</b> の録音を、元の質音へ逆変換します。</div>
+    </div>
+    <div style="margin-left:auto" class="seg modeSeg" id="modeSeg">
+      <button data-m="voice" class="on">🎤 声</button>
+      <button data-m="inst">🎸 楽器</button>
     </div>
   </header>
 
   <div class="warn" style="margin-top:18px">
-    ⚠ すべての処理はあなたのブラウザ内だけで完結します(音声はどこにも送信されません)。逆変換は変調の推定に基づく近似で、完全な復元を保証するものではありません。録音の取り扱いは各自の責任と権利の範囲でお願いします。
+    ⚠ 処理はすべてこの端末内で完結します(音声はどこにも送信されません)。逆変換は変調内容の推定に基づく<b>近似</b>で、完全復元を保証しません。録音の取り扱いは各自の権利と責任の範囲でお願いします。
   </div>
 
   <!-- 1. 入力 -->
@@ -84,22 +91,25 @@
       <div class="meterwrap" style="flex:1"><div id="recMeter" class="meter"></div></div>
     </div>
     <canvas id="waveIn" width="920" height="120" style="margin-top:12px"></canvas>
-    <div class="hint">対応形式: WAV / MP3 / M4A / OGG など(ブラウザの対応による)。読み込み後、下で復元量を調整します。</div>
+    <div class="hint">対応形式: WAV / MP3 / M4A / OGG など(端末の対応による)。</div>
   </div>
 
   <!-- 2. 復元設定 -->
   <div class="card">
-    <h2><span class="badge">2</span> 声色を戻す — 逆変換の量</h2>
+    <h2><span class="badge">2</span> 質音を戻す — 逆変換の量</h2>
 
     <div class="row" style="margin-bottom:6px">
       <button id="autoBtn">🔍 変調を自動推定</button>
+      <!-- 声モード用 -->
       <div class="seg" id="targetSeg">
         <button data-t="male" class="on">男性の声へ</button>
         <button data-t="female">女性の声へ</button>
         <button data-t="neutral">中性</button>
       </div>
+      <!-- 楽器モード用 -->
+      <button id="tuneBtn" class="hidden">🎯 A=440 に合わせる</button>
     </div>
-    <div class="hint">自動推定は現在の平均ピッチを測り、目標の声域に合わせる補正量の目安を出します(あくまで初期値。耳で微調整してください)。</div>
+    <div class="hint" id="autoHint">自動推定は現在の平均ピッチを測り、目標声域に合わせる補正量の目安を出します(初期値。耳で微調整してください)。</div>
 
     <label class="field">
       <span class="lab"><span>ピッチ復元 <span class="hint" style="display:inline">(半音 — 変調で上げられていたら下げる)</span></span><span class="val" id="pitchVal">0.0</span></span>
@@ -107,9 +117,28 @@
     </label>
 
     <label class="field">
-      <span class="lab"><span>フォルマント復元 <span class="hint" style="display:inline">(声道の長さ・声色。100%で無変更)</span></span><span class="val" id="formantVal">100%</span></span>
+      <span class="lab"><span id="formantLbl">フォルマント復元 <span class="hint" style="display:inline">(声道の長さ・声色。100%で無変更)</span></span><span class="val" id="formantVal">100%</span></span>
       <input id="formant" type="range" min="50" max="200" step="1" value="100" />
     </label>
+
+    <!-- 楽器モード: 3バンド EQ(トーン改変の逆補正) -->
+    <div id="eqBlock" class="hidden">
+      <div class="hint" style="margin:6px 0 2px">🎛 トーン(EQ)逆補正 — 楽器の音色調整を打ち消します。</div>
+      <div class="grid3">
+        <label class="field" style="margin:6px 0">
+          <span class="lab"><span>低域</span><span class="val" id="eqLowVal">0dB</span></span>
+          <input id="eqLow" type="range" min="-18" max="18" step="0.5" value="0" />
+        </label>
+        <label class="field" style="margin:6px 0">
+          <span class="lab"><span>中域</span><span class="val" id="eqMidVal">0dB</span></span>
+          <input id="eqMid" type="range" min="-18" max="18" step="0.5" value="0" />
+        </label>
+        <label class="field" style="margin:6px 0">
+          <span class="lab"><span>高域</span><span class="val" id="eqHighVal">0dB</span></span>
+          <input id="eqHigh" type="range" min="-18" max="18" step="0.5" value="0" />
+        </label>
+      </div>
+    </div>
 
     <div class="grid2">
       <label class="field" style="margin:0">
@@ -138,239 +167,194 @@
       <button id="dlBtn" disabled>⬇ WAV で保存</button>
     </div>
     <canvas id="waveOut" width="920" height="120" style="margin-top:12px"></canvas>
-    <div class="hint">「変調前」と「復元後」を切り替えて聴き比べ、②のスライダーを調整→再度「復元を実行」で追い込めます。</div>
+    <div class="hint">「変調前」と「復元後」を切り替えて聴き比べ、②を調整→再度「復元を実行」で追い込めます。</div>
   </div>
 
   <footer>
-    声色リストア — Bada / omega_llm · 100% クライアントサイド DSP(フェーズボコーダ + ケプストラム包絡)。
+    音色リストア — Bada / omega_llm · 100% クライアントサイド DSP(フェーズボコーダ + ケプストラム包絡 + スペクトル EQ)。
   </footer>
 </div>
 
-<script type="module">
-import { restoreVoice, estimateMedianF0, semitonesBetween, encodeWav } from "./dsp.js";
-
+<script src="dsp.js"></script>
+<script>
+const { restoreSound, estimateMedianF0, semitonesBetween, tuningToEqualTemperament, encodeWav } = VRDSP;
 const $ = (id) => document.getElementById(id);
-let audioCtx = null;
-let origBuffer = null;     // AudioBuffer (変調された入力)
-let restoredChannels = null; // Float32Array[]
-let restoredSR = 44100;
-let currentSource = null;
+let audioCtx = null, origBuffer = null, restoredChannels = null, restoredSR = 44100, currentSource = null;
 let mediaRecorder = null, recChunks = [], recStream = null, analyser = null, meterRAF = 0;
-let target = "male";
+let target = "male", mode = "voice";
 
 function ctx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
 
-// ---- 波形描画 ----
 function drawWave(canvas, channel, color){
-  const c = canvas.getContext("2d");
-  const W = canvas.width, H = canvas.height;
-  c.clearRect(0,0,W,H);
-  c.fillStyle = "#060a12"; c.fillRect(0,0,W,H);
-  c.strokeStyle = "#16202f"; c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke();
-  if(!channel){ return; }
-  c.strokeStyle = color; c.lineWidth = 1; c.beginPath();
-  const step = Math.max(1, Math.floor(channel.length / W));
-  for(let x=0;x<W;x++){
-    let min=1,max=-1;
-    for(let j=0;j<step;j++){ const v=channel[x*step+j]||0; if(v<min)min=v; if(v>max)max=v; }
-    const y1=(1-(max*0.9+1)/2)*H, y2=(1-(min*0.9+1)/2)*H;
-    c.moveTo(x,y1); c.lineTo(x,y2);
-  }
+  const c = canvas.getContext("2d"); const W = canvas.width, H = canvas.height;
+  c.clearRect(0,0,W,H); c.fillStyle="#060a12"; c.fillRect(0,0,W,H);
+  c.strokeStyle="#16202f"; c.beginPath(); c.moveTo(0,H/2); c.lineTo(W,H/2); c.stroke();
+  if(!channel) return;
+  c.strokeStyle=color; c.lineWidth=1; c.beginPath();
+  const step=Math.max(1,Math.floor(channel.length/W));
+  for(let x=0;x<W;x++){ let min=1,max=-1; for(let j=0;j<step;j++){ const v=channel[x*step+j]||0; if(v<min)min=v; if(v>max)max=v; }
+    c.moveTo(x,(1-(max*0.9+1)/2)*H); c.lineTo(x,(1-(min*0.9+1)/2)*H); }
   c.stroke();
 }
 
-// ---- 入力読み込み ----
 async function loadArrayBuffer(ab, label){
-  $("loadStatus").textContent = "デコード中…";
+  $("loadStatus").textContent="デコード中…";
   try{
-    origBuffer = await ctx().decodeAudioData(ab);
-    restoredChannels = null;
-    $("applyBtn").disabled = false;
-    $("playOrig").disabled = false;
-    $("playRest").disabled = true; $("dlBtn").disabled = true;
-    drawWave($("waveIn"), origBuffer.getChannelData(0), "#4a80d0");
-    drawWave($("waveOut"), null);
-    const dur = origBuffer.duration.toFixed(1);
-    $("loadStatus").textContent = `読み込み完了: ${label} · ${dur}s · ${origBuffer.sampleRate}Hz · ${origBuffer.numberOfChannels}ch`;
-    $("procStatus").textContent = "";
-  }catch(e){
-    $("loadStatus").textContent = "デコードに失敗しました: " + e.message;
-  }
+    origBuffer = await ctx().decodeAudioData(ab); restoredChannels=null;
+    $("applyBtn").disabled=false; $("playOrig").disabled=false; $("playRest").disabled=true; $("dlBtn").disabled=true;
+    drawWave($("waveIn"), origBuffer.getChannelData(0), "#4a80d0"); drawWave($("waveOut"), null);
+    $("loadStatus").textContent=`読み込み完了: ${label} · ${origBuffer.duration.toFixed(1)}s · ${origBuffer.sampleRate}Hz · ${origBuffer.numberOfChannels}ch`;
+    $("procStatus").textContent="";
+  }catch(e){ $("loadStatus").textContent="デコードに失敗しました: "+e.message; }
 }
 
-$("file").addEventListener("change", async (e)=>{
-  const f = e.target.files[0]; if(!f) return;
-  await loadArrayBuffer(await f.arrayBuffer(), f.name);
-});
+$("file").addEventListener("change", async (e)=>{ const f=e.target.files[0]; if(!f) return; await loadArrayBuffer(await f.arrayBuffer(), f.name); });
 
-// ---- デモ音声(母音風 + ピッチ変調をかけた「変調済み」サンプル) ----
+// デモ音声(声=変調母音 / 楽器=変調弦楽器風)
 $("demoBtn").addEventListener("click", ()=>{
-  const sr = 44100, dur = 2.2, n = Math.round(sr*dur);
-  const x = new Float32Array(n);
-  const seq = [130,146,164,146,130]; // なだらかな抑揚
-  for(let i=0;i<n;i++){
-    const t = i/sr;
-    const f0 = seq[Math.min(seq.length-1, Math.floor(t/dur*seq.length))] * 1.5; // すでに+7半音ほど変調された想定
-    let s=0;
-    for(let h=1;h*f0<sr/2 && h<40;h++){
-      const fh=h*f0; let g=0.04;
-      for(const F of [1100,1900,3200]) g+=Math.exp(-Math.pow((fh-F)/300,2)); // 高めフォルマント=変調済み
-      s += g*Math.sin(2*Math.PI*fh*t);
-    }
-    const env = Math.min(1, t*6) * Math.min(1,(dur-t)*6);
-    x[i]=0.12*s*env;
+  const sr=44100, dur=2.2, n=Math.round(sr*dur); const x=new Float32Array(n);
+  if(mode==="voice"){
+    const seq=[130,146,164,146,130];
+    for(let i=0;i<n;i++){ const t=i/sr; const f0=seq[Math.min(seq.length-1,Math.floor(t/dur*seq.length))]*1.5; let s=0;
+      for(let h=1;h*f0<sr/2&&h<40;h++){ const fh=h*f0; let g=0.04; for(const F of [1100,1900,3200]) g+=Math.exp(-Math.pow((fh-F)/300,2)); s+=g*Math.sin(2*Math.PI*fh*t); }
+      const env=Math.min(1,t*6)*Math.min(1,(dur-t)*6); x[i]=0.12*s*env; }
+    $("loadStatus").textContent="デモ声(ピッチ・フォルマントを高く変調した想定)を生成。②で復元を。";
+  }else{
+    // ギター風: 少しシャープ(+40cents) & 高域ブーストした「変調済み」楽器音
+    const notes=[196,247,294,247]; // G3 B3 D4 …
+    for(let i=0;i<n;i++){ const t=i/sr; const base=notes[Math.min(notes.length-1,Math.floor(t/dur*notes.length))]*Math.pow(2,0.40/12); let s=0;
+      for(let h=1;h*base<sr/2&&h<30;h++){ const fh=h*base; const decay=Math.exp(-h*0.18); const bright=1+Math.min(2.2,fh/2500); s+=decay*bright*Math.sin(2*Math.PI*fh*t); }
+      const env=Math.exp(-((t%(dur/4))*3)); x[i]=0.05*s*env; }
+    $("loadStatus").textContent="デモ楽器音(+40centsシャープ・高域ブーストした想定)を生成。②で復元を。";
   }
-  const buf = ctx().createBuffer(1, n, sr);
-  buf.copyToChannel(x, 0);
-  origBuffer = buf; restoredChannels = null;
+  const buf=ctx().createBuffer(1,n,sr); buf.copyToChannel(x,0);
+  origBuffer=buf; restoredChannels=null;
   $("applyBtn").disabled=false; $("playOrig").disabled=false; $("playRest").disabled=true; $("dlBtn").disabled=true;
-  drawWave($("waveIn"), x, "#4a80d0"); drawWave($("waveOut"), null);
-  $("loadStatus").textContent = "デモ音声を生成しました(ピッチ・フォルマントを高く変調した想定の声)。②で復元してみてください。";
+  drawWave($("waveIn"),x,"#4a80d0"); drawWave($("waveOut"),null);
 });
 
-// ---- マイク録音 ----
+// マイク録音
 $("recBtn").addEventListener("click", async ()=>{
-  if(mediaRecorder && mediaRecorder.state === "recording"){
-    mediaRecorder.stop(); return;
-  }
+  if(mediaRecorder && mediaRecorder.state==="recording"){ mediaRecorder.stop(); return; }
   try{
-    recStream = await navigator.mediaDevices.getUserMedia({audio:true});
-    mediaRecorder = new MediaRecorder(recStream);
-    recChunks = [];
-    mediaRecorder.ondataavailable = (ev)=>{ if(ev.data.size) recChunks.push(ev.data); };
-    mediaRecorder.onstop = async ()=>{
-      cancelAnimationFrame(meterRAF); $("recMeter").style.width="0%";
-      recStream.getTracks().forEach(t=>t.stop());
-      $("recBtn").textContent = "● マイク録音"; $("recBtn").classList.add("rec");
-      const blob = new Blob(recChunks, {type: mediaRecorder.mimeType || "audio/webm"});
-      await loadArrayBuffer(await blob.arrayBuffer(), "マイク録音");
-    };
-    // レベルメーター
-    const src = ctx().createMediaStreamSource(recStream);
-    analyser = ctx().createAnalyser(); analyser.fftSize = 512; src.connect(analyser);
-    const data = new Uint8Array(analyser.fftSize);
-    const tick=()=>{ analyser.getByteTimeDomainData(data); let peak=0; for(const v of data) peak=Math.max(peak,Math.abs(v-128)); $("recMeter").style.width=Math.min(100,peak/128*140)+"%"; meterRAF=requestAnimationFrame(tick); };
-    tick();
-    mediaRecorder.start();
-    $("recBtn").textContent = "■ 録音停止"; $("recBtn").classList.remove("rec");
-    $("loadStatus").textContent = "録音中…もう一度押すと停止します。";
-  }catch(e){
-    $("loadStatus").textContent = "マイクを使用できません: " + e.message;
-  }
+    recStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRecorder=new MediaRecorder(recStream); recChunks=[];
+    mediaRecorder.ondataavailable=(ev)=>{ if(ev.data.size) recChunks.push(ev.data); };
+    mediaRecorder.onstop=async ()=>{ cancelAnimationFrame(meterRAF); $("recMeter").style.width="0%";
+      recStream.getTracks().forEach(t=>t.stop()); $("recBtn").textContent="● マイク録音"; $("recBtn").classList.add("rec");
+      const blob=new Blob(recChunks,{type:mediaRecorder.mimeType||"audio/webm"}); await loadArrayBuffer(await blob.arrayBuffer(),"マイク録音"); };
+    const src=ctx().createMediaStreamSource(recStream); analyser=ctx().createAnalyser(); analyser.fftSize=512; src.connect(analyser);
+    const data=new Uint8Array(analyser.fftSize);
+    const tick=()=>{ analyser.getByteTimeDomainData(data); let peak=0; for(const v of data) peak=Math.max(peak,Math.abs(v-128)); $("recMeter").style.width=Math.min(100,peak/128*140)+"%"; meterRAF=requestAnimationFrame(tick); }; tick();
+    mediaRecorder.start(); $("recBtn").textContent="■ 録音停止"; $("recBtn").classList.remove("rec"); $("loadStatus").textContent="録音中…もう一度押すと停止します。";
+  }catch(e){ $("loadStatus").textContent="マイクを使用できません: "+e.message; }
 });
 
-// ---- スライダー表示 ----
+// スライダー表示
 const fmt = ()=>{
-  $("pitchVal").textContent = (+$("pitch").value).toFixed(1);
-  $("formantVal").textContent = $("formant").value + "%";
-  $("gateVal").textContent = (+$("gate").value===0) ? "オフ" : $("gate").value + "%";
-  $("gainVal").textContent = (+$("gain").value).toFixed(2) + "×";
+  $("pitchVal").textContent=(+$("pitch").value).toFixed(1);
+  $("formantVal").textContent=$("formant").value+"%";
+  $("gateVal").textContent=(+$("gate").value===0)?"オフ":$("gate").value+"%";
+  $("gainVal").textContent=(+$("gain").value).toFixed(2)+"×";
+  $("eqLowVal").textContent=(+$("eqLow").value).toFixed(1)+"dB";
+  $("eqMidVal").textContent=(+$("eqMid").value).toFixed(1)+"dB";
+  $("eqHighVal").textContent=(+$("eqHigh").value).toFixed(1)+"dB";
 };
-["pitch","formant","gate","gain"].forEach(id=> $(id).addEventListener("input", fmt));
-fmt();
+["pitch","formant","gate","gain","eqLow","eqMid","eqHigh"].forEach(id=> $(id).addEventListener("input",fmt)); fmt();
 
-// ---- 目標声域の切替 ----
-$("targetSeg").addEventListener("click",(e)=>{
-  const b = e.target.closest("button[data-t]"); if(!b) return;
-  target = b.dataset.t;
-  [...$("targetSeg").children].forEach(x=>x.classList.toggle("on", x===b));
+// モード切替
+$("modeSeg").addEventListener("click",(e)=>{
+  const b=e.target.closest("button[data-m]"); if(!b) return;
+  mode=b.dataset.m; [...$("modeSeg").children].forEach(x=>x.classList.toggle("on",x===b));
+  const inst = mode==="inst";
+  $("eqBlock").classList.toggle("hidden",!inst);
+  $("tuneBtn").classList.toggle("hidden",!inst);
+  $("targetSeg").classList.toggle("hidden",inst);
+  $("formantLbl").innerHTML = inst
+    ? '音色(スペクトル包絡)復元 <span class="hint" style="display:inline">(明るさ・胴鳴り。100%で無変更)</span>'
+    : 'フォルマント復元 <span class="hint" style="display:inline">(声道の長さ・声色。100%で無変更)</span>';
+  $("autoHint").textContent = inst
+    ? "自動推定は基音を測り、A=440 平均律で最も近い音へ戻すピッチ補正量を出します。"
+    : "自動推定は現在の平均ピッチを測り、目標声域に合わせる補正量の目安を出します。";
 });
 
-// ---- 自動推定 ----
+$("targetSeg").addEventListener("click",(e)=>{ const b=e.target.closest("button[data-t]"); if(!b) return; target=b.dataset.t; [...$("targetSeg").children].forEach(x=>x.classList.toggle("on",x===b)); });
+
+// 自動推定(声)
 $("autoBtn").addEventListener("click", ()=>{
   if(!origBuffer){ $("procStatus").textContent="先に録音を読み込んでください。"; return; }
-  const ch = origBuffer.getChannelData(0);
-  const f0 = estimateMedianF0(ch, origBuffer.sampleRate, 70, 500);
-  if(!f0){ $("procStatus").textContent = "有声区間を検出できませんでした。手動で調整してください。"; return; }
-  const targetHz = target==="male" ? 120 : target==="female" ? 210 : 165;
-  let st = semitonesBetween(f0, targetHz);
-  st = Math.max(-12, Math.min(12, st));
-  $("pitch").value = st.toFixed(1);
-  // フォルマントもピッチ補正に緩く追従(声道長の目安)
-  const fRatio = Math.pow(2, st/12);
-  let fp = Math.max(50, Math.min(200, Math.round(100 * Math.pow(fRatio, 0.6))));
-  $("formant").value = fp;
-  fmt();
-  $("procStatus").textContent = `推定平均ピッチ ${f0.toFixed(0)}Hz → 目標 ${targetHz}Hz。ピッチ ${st.toFixed(1)}半音 / フォルマント ${fp}% を初期値に設定しました。`;
+  const ch=origBuffer.getChannelData(0);
+  if(mode==="voice"){
+    const f0=estimateMedianF0(ch,origBuffer.sampleRate,70,500);
+    if(!f0){ $("procStatus").textContent="有声区間を検出できませんでした。手動で調整してください。"; return; }
+    const targetHz= target==="male"?120: target==="female"?210:165;
+    let st=Math.max(-12,Math.min(12,semitonesBetween(f0,targetHz)));
+    $("pitch").value=st.toFixed(1);
+    const fRatio=Math.pow(2,st/12); $("formant").value=Math.max(50,Math.min(200,Math.round(100*Math.pow(fRatio,0.6)))); fmt();
+    $("procStatus").textContent=`推定平均ピッチ ${f0.toFixed(0)}Hz → 目標 ${targetHz}Hz。ピッチ ${st.toFixed(1)}半音 / 音色 ${$("formant").value}% を初期値に設定。`;
+  }else{
+    tuneToA440(ch);
+  }
 });
 
-// ---- 復元処理 ----
-function applyGate(ch, pct){
-  if(pct<=0) return;
-  const thr = (pct/100) * 0.08; // 弱いゲート
-  const win = 1024;
-  for(let s=0;s<ch.length;s+=win){
-    let r=0, m=Math.min(win, ch.length-s);
-    for(let i=0;i<m;i++) r+=ch[s+i]*ch[s+i];
-    r=Math.sqrt(r/m);
-    if(r<thr){ const g = r<thr*0.5?0:0.3; for(let i=0;i<m;i++) ch[s+i]*=g; }
-  }
+// 楽器チューニング補正
+function tuneToA440(ch){
+  const f0=estimateMedianF0(ch,origBuffer.sampleRate,60,2000);
+  if(!f0){ $("procStatus").textContent="基音を検出できませんでした。手動で調整してください。"; return; }
+  const t=tuningToEqualTemperament(f0,440);
+  const st=Math.max(-12,Math.min(12,t.semitoneCorrection));
+  $("pitch").value=st.toFixed(2); fmt();
+  $("procStatus").textContent=`推定基音 ${f0.toFixed(1)}Hz ≈ ${t.note}(${t.cents>=0?"+":""}${t.cents.toFixed(0)}cents)。${st.toFixed(2)}半音でA=440へ補正。`;
 }
+$("tuneBtn").addEventListener("click", ()=>{ if(!origBuffer){ $("procStatus").textContent="先に録音を読み込んでください。"; return; } tuneToA440(origBuffer.getChannelData(0)); });
 
+// ゲート
+function applyGate(ch,pct){ if(pct<=0) return; const thr=(pct/100)*0.08, win=1024;
+  for(let s=0;s<ch.length;s+=win){ let r=0,m=Math.min(win,ch.length-s); for(let i=0;i<m;i++) r+=ch[s+i]*ch[s+i]; r=Math.sqrt(r/m);
+    if(r<thr){ const g=r<thr*0.5?0:0.3; for(let i=0;i<m;i++) ch[s+i]*=g; } } }
+
+// 復元
 $("applyBtn").addEventListener("click", async ()=>{
   if(!origBuffer) return;
-  $("applyBtn").disabled = true;
-  $("procStatus").textContent = "復元中…(数秒かかることがあります)";
-  await new Promise(r=>setTimeout(r,30)); // UI 更新を反映
+  $("applyBtn").disabled=true; $("procStatus").textContent="復元中…(数秒かかることがあります)";
+  await new Promise(r=>setTimeout(r,30));
   try{
-    const sr = origBuffer.sampleRate;
-    const semis = +$("pitch").value;
-    const fRatio = (+$("formant").value)/100;
-    const gate = +$("gate").value;
-    const gain = +$("gain").value;
-    const out = [];
+    const sr=origBuffer.sampleRate, semis=+$("pitch").value, fRatio=(+$("formant").value)/100;
+    const gate=+$("gate").value, gain=+$("gain").value;
+    const eq = mode==="inst" ? { lowDb:+$("eqLow").value, midDb:+$("eqMid").value, highDb:+$("eqHigh").value } : null;
+    const out=[];
     for(let c=0;c<origBuffer.numberOfChannels;c++){
-      const inp = origBuffer.getChannelData(c);
-      let y = restoreVoice(inp, semis, fRatio);
-      applyGate(y, gate);
-      if(gain!==1){ for(let i=0;i<y.length;i++) y[i]*=gain; }
-      // クリップ保護
+      const inp=origBuffer.getChannelData(c);
+      let y=restoreSound(inp,{ pitchSemitones:semis, formantRatio:fRatio, eq, sampleRate:sr });
+      applyGate(y,gate);
+      if(gain!==1) for(let i=0;i<y.length;i++) y[i]*=gain;
       let peak=0; for(let i=0;i<y.length;i++){ const a=Math.abs(y[i]); if(a>peak)peak=a; }
       if(peak>1){ const k=0.99/peak; for(let i=0;i<y.length;i++) y[i]*=k; }
       out.push(y);
     }
-    restoredChannels = out; restoredSR = sr;
-    drawWave($("waveOut"), out[0], "#4ac07a");
-    $("playRest").disabled=false; $("dlBtn").disabled=false;
-    $("procStatus").textContent = `復元完了 ✓  ピッチ ${semis.toFixed(1)}半音 / フォルマント ${$("formant").value}%。試聴して聴き比べてください。`;
-  }catch(e){
-    $("procStatus").textContent = "処理に失敗しました: " + e.message;
-  }finally{
-    $("applyBtn").disabled = false;
-  }
+    restoredChannels=out; restoredSR=sr;
+    drawWave($("waveOut"),out[0],"#4ac07a"); $("playRest").disabled=false; $("dlBtn").disabled=false;
+    const eqTxt = eq ? ` / EQ ${eq.lowDb}/${eq.midDb}/${eq.highDb}dB` : "";
+    $("procStatus").textContent=`復元完了 ✓  ピッチ ${semis.toFixed(2)}半音 / 音色 ${$("formant").value}%${eqTxt}。試聴して聴き比べてください。`;
+  }catch(e){ $("procStatus").textContent="処理に失敗しました: "+e.message; }
+  finally{ $("applyBtn").disabled=false; }
 });
 
-// ---- 再生 ----
+// 再生
 function stopPlay(){ if(currentSource){ try{currentSource.stop();}catch(_){} currentSource=null; } $("stopBtn").disabled=true; }
-function playChannels(channels, sr){
-  stopPlay();
-  const buf = ctx().createBuffer(channels.length, channels[0].length, sr);
-  channels.forEach((ch,i)=> buf.copyToChannel(ch, i));
-  const src = ctx().createBufferSource(); src.buffer=buf; src.connect(ctx().destination); src.start();
-  currentSource = src; $("stopBtn").disabled=false;
-  src.onended = ()=>{ $("stopBtn").disabled=true; };
-}
-$("playOrig").addEventListener("click", ()=>{
-  if(!origBuffer) return;
-  const chs=[]; for(let c=0;c<origBuffer.numberOfChannels;c++) chs.push(origBuffer.getChannelData(c));
-  playChannels(chs, origBuffer.sampleRate);
-});
-$("playRest").addEventListener("click", ()=>{ if(restoredChannels) playChannels(restoredChannels, restoredSR); });
+function playChannels(channels,sr){ stopPlay(); const buf=ctx().createBuffer(channels.length,channels[0].length,sr);
+  channels.forEach((ch,i)=>buf.copyToChannel(ch,i)); const src=ctx().createBufferSource(); src.buffer=buf; src.connect(ctx().destination); src.start();
+  currentSource=src; $("stopBtn").disabled=false; src.onended=()=>{ $("stopBtn").disabled=true; }; }
+$("playOrig").addEventListener("click", ()=>{ if(!origBuffer) return; const chs=[]; for(let c=0;c<origBuffer.numberOfChannels;c++) chs.push(origBuffer.getChannelData(c)); playChannels(chs,origBuffer.sampleRate); });
+$("playRest").addEventListener("click", ()=>{ if(restoredChannels) playChannels(restoredChannels,restoredSR); });
 $("stopBtn").addEventListener("click", stopPlay);
 
-// ---- ダウンロード ----
-$("dlBtn").addEventListener("click", ()=>{
-  if(!restoredChannels) return;
-  const wav = encodeWav(restoredChannels, restoredSR);
-  const blob = new Blob([wav], {type:"audio/wav"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href=url; a.download="restored_voice.wav"; a.click();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
-});
+// ダウンロード
+$("dlBtn").addEventListener("click", ()=>{ if(!restoredChannels) return;
+  const blob=new Blob([encodeWav(restoredChannels,restoredSR)],{type:"audio/wav"}); const url=URL.createObjectURL(blob);
+  const a=document.createElement("a"); a.href=url; a.download="restored_sound.wav"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),4000); });
 
-// 初期描画
-drawWave($("waveIn"), null); drawWave($("waveOut"), null);
+drawWave($("waveIn"),null); drawWave($("waveOut"),null);
 </script>
 </body>
 </html>

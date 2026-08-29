@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>動画リストア — Video Restore Studio</title>
+<style>
+  :root{
+    --bg:#04060a; --panel:#0b1018; --panel2:#111826; --line:#1c2636;
+    --ink:#e7edf5; --dim:#8595ab; --gold:#c8a44a; --blue:#4a80d0; --cyan:#40b8c0;
+    --red:#d0604a; --green:#4ac07a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 20% -10%,#0a1220 0,var(--bg) 60%);
+    color:var(--ink);font-family:"Segoe UI",system-ui,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    line-height:1.6;-webkit-font-smoothing:antialiased}
+  a{color:var(--blue)}
+  .wrap{max-width:1000px;margin:0 auto;padding:26px 16px 80px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:16px}
+  .logo{width:46px;height:46px;border-radius:12px;background:linear-gradient(135deg,var(--cyan),var(--blue));
+    display:grid;place-items:center;font-weight:800;color:#04060a;font-size:20px}
+  h1{font-size:1.3rem;margin:0}
+  .sub{color:var(--dim);font-size:.86rem;margin-top:2px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);
+    border-radius:16px;padding:16px;margin-top:16px}
+  .card h2{font-size:1rem;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .badge{font-size:.7rem;color:#04060a;background:var(--cyan);border-radius:999px;padding:1px 8px;font-weight:700}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+    border-radius:10px;padding:9px 14px;transition:.15s}
+  button:hover:not(:disabled){border-color:var(--blue);transform:translateY(-1px)}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:linear-gradient(135deg,var(--blue),#3a68b0);border-color:transparent;font-weight:700}
+  button.gold{background:linear-gradient(135deg,var(--gold),#a8842a);border-color:transparent;color:#0a0a0a;font-weight:700}
+  button.on{background:var(--cyan);color:#04060a;font-weight:700;border-color:transparent}
+  .file-in{position:relative;overflow:hidden;display:inline-block}
+  .file-in input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  label.field{display:block;margin:10px 0}
+  label.field .lab{display:flex;justify-content:space-between;font-size:.88rem;margin-bottom:4px}
+  label.field .val{color:var(--gold);font-variant-numeric:tabular-nums;font-weight:700}
+  input[type=range]{width:100%;accent-color:var(--cyan)}
+  .hint{color:var(--dim);font-size:.8rem;margin-top:4px}
+  #stage{width:100%;background:#000;border:1px solid var(--line);border-radius:12px;display:block;max-height:60vh;object-fit:contain}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  @media(max-width:680px){.grid2,.grid3{grid-template-columns:1fr 1fr}}
+  @media(max-width:460px){.grid2,.grid3{grid-template-columns:1fr}}
+  .pill{font-size:.78rem;color:var(--dim);background:#0a1120;border:1px solid var(--line);border-radius:999px;padding:3px 10px}
+  .status{font-size:.85rem;color:var(--cyan);min-height:1.4em}
+  .warn{background:#06161a;border:1px solid #1d5560;border-radius:12px;padding:12px 14px;color:#bfe6ec;font-size:.84rem}
+  footer{margin-top:28px;color:var(--dim);font-size:.78rem;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">動</div>
+    <div>
+      <h1>動画リストア <span class="pill">Video Restore Studio</span></h1>
+      <div class="sub">編集(色補正・明るさ・回転・反転・ズーム・速度)された動画を、逆補正して元の映像へ近づけます。</div>
+    </div>
+  </header>
+
+  <div class="warn" style="margin-top:16px">
+    ⚠ 処理はすべてこの端末内で完結します(動画はどこにも送信されません)。逆補正は<b>近似</b>で、切り取られた画素や失われた情報を復元するものではありません(トリミングやカット編集の完全復元はできません)。素材の取り扱いは各自の権利と責任の範囲でお願いします。
+  </div>
+
+  <!-- 1. 入力 -->
+  <div class="card">
+    <h2><span class="badge">1</span> 編集された動画を読み込む</h2>
+    <div class="row">
+      <span class="file-in"><button class="primary">🎬 動画ファイルを選択</button><input id="file" type="file" accept="video/*" /></span>
+      <span id="loadStatus" class="status"></span>
+    </div>
+    <canvas id="stage" width="960" height="540" style="margin-top:12px"></canvas>
+    <video id="src" playsinline crossorigin="anonymous" style="display:none"></video>
+    <div class="row" style="margin-top:10px">
+      <button id="playBtn" disabled>▶ 再生</button>
+      <button id="pauseBtn" disabled>⏸ 一時停止</button>
+      <button id="beginBtn" disabled>⏮ 先頭へ</button>
+      <span id="timeLabel" class="pill">0.0 / 0.0s</span>
+    </div>
+  </div>
+
+  <!-- 2. 逆補正 -->
+  <div class="card">
+    <h2><span class="badge">2</span> 編集を戻す — 逆補正</h2>
+    <div class="row" style="margin-bottom:6px">
+      <button id="autoBtn">🔍 色を自動推定</button>
+      <button id="resetBtn">↺ リセット</button>
+    </div>
+    <div class="hint">「色を自動推定」は現在のフレームの明るさ・彩度を測り、中庸へ戻す初期値を入れます(目安。目で微調整してください)。</div>
+
+    <div class="grid2">
+      <label class="field"><span class="lab"><span>明るさ</span><span class="val" id="brightnessVal">1.00</span></span><input id="brightness" type="range" min="0.2" max="3" step="0.01" value="1"></label>
+      <label class="field"><span class="lab"><span>コントラスト</span><span class="val" id="contrastVal">1.00</span></span><input id="contrast" type="range" min="0.2" max="3" step="0.01" value="1"></label>
+      <label class="field"><span class="lab"><span>彩度</span><span class="val" id="saturateVal">1.00</span></span><input id="saturate" type="range" min="0" max="3" step="0.01" value="1"></label>
+      <label class="field"><span class="lab"><span>色相回転</span><span class="val" id="hueVal">0°</span></span><input id="hue" type="range" min="-180" max="180" step="1" value="0"></label>
+    </div>
+    <div class="grid2">
+      <label class="field"><span class="lab"><span>ネガ反転を戻す(invert)</span><span class="val" id="invertVal">0%</span></span><input id="invert" type="range" min="0" max="100" step="1" value="0"></label>
+      <label class="field"><span class="lab"><span>セピア/白黒を戻す(彩度で補正)</span><span class="val" id="grayVal">0%</span></span><input id="gray" type="range" min="0" max="100" step="1" value="0"></label>
+    </div>
+
+    <div class="hint" style="margin-top:8px">🔄 かたち(回転・反転・ズーム・位置)</div>
+    <div class="row" style="margin:6px 0">
+      <button data-rot="0" class="rotBtn on">0°</button>
+      <button data-rot="90" class="rotBtn">↻90°</button>
+      <button data-rot="180" class="rotBtn">180°</button>
+      <button data-rot="270" class="rotBtn">↺270°</button>
+      <button id="flipH">左右反転</button>
+      <button id="flipV">上下反転</button>
+    </div>
+    <div class="grid3">
+      <label class="field"><span class="lab"><span>ズーム</span><span class="val" id="zoomVal">1.00×</span></span><input id="zoom" type="range" min="0.5" max="2.5" step="0.01" value="1"></label>
+      <label class="field"><span class="lab"><span>水平位置</span><span class="val" id="panXVal">0%</span></span><input id="panX" type="range" min="-50" max="50" step="1" value="0"></label>
+      <label class="field"><span class="lab"><span>垂直位置</span><span class="val" id="panYVal">0%</span></span><input id="panY" type="range" min="-50" max="50" step="1" value="0"></label>
+    </div>
+    <label class="field"><span class="lab"><span>再生速度を戻す</span><span class="val" id="speedVal">1.00×</span></span><input id="speed" type="range" min="0.25" max="4" step="0.05" value="1"></label>
+    <div class="hint">元動画が 2倍速に編集されていたら 0.5× に。逆補正なので「編集で掛けた倍率の逆数」を目安に。</div>
+  </div>
+
+  <!-- 3. 書き出し -->
+  <div class="card">
+    <h2><span class="badge">3</span> 書き出す</h2>
+    <div class="row">
+      <button id="exportBtn" class="gold" disabled>⬇ 逆補正した動画を書き出す(WebM)</button>
+      <span id="exportStatus" class="status"></span>
+    </div>
+    <div class="hint">書き出しは動画を頭から実時間で再生しながら録画します(長さ分だけ時間がかかります)。出力は WebM(映像+音声)。<br>※ 端末/WebView によっては録画(captureStream)が使えないことがあります。その場合もプレビューでの確認・調整は可能です。</div>
+    <a id="dl" style="display:none"></a>
+  </div>
+
+  <footer>動画リストア — Bada / omega_llm · 100% クライアントサイド(Canvas フィルタ + MediaRecorder)。</footer>
+</div>
+
+<script src="vfx.js"></script>
+<script>
+const { buildFilter, analyzePixels, suggestCorrection, inverseSpeed } = VFX;
+const $ = (id)=>document.getElementById(id);
+const video = $("src"), canvas = $("stage"), cctx = canvas.getContext("2d");
+let rot=0, flipH=false, flipV=false, rafId=0, hasVideo=false, recorder=null;
+
+function readParams(){
+  return {
+    brightness:+$("brightness").value, contrast:+$("contrast").value, saturate:+$("saturate").value,
+    hue:+$("hue").value, invert:(+$("invert").value)/100, grayscale:0,
+    // grayscale スライダーは「白黒を戻す」= 彩度を足す方向に使うため saturate に反映(表示のみ）
+    zoom:+$("zoom").value, panX:(+$("panX").value)/100, panY:(+$("panY").value)/100,
+  };
+}
+
+function draw(){
+  if(!hasVideo) return;
+  const p=readParams();
+  const vw=video.videoWidth||canvas.width, vh=video.videoHeight||canvas.height;
+  // 回転に応じてキャンバスの縦横を合わせる
+  const swap = (rot===90||rot===270);
+  canvas.width = swap ? vh : vw;
+  canvas.height = swap ? vw : vh;
+  cctx.save();
+  cctx.filter = buildFilter(p);
+  cctx.translate(canvas.width/2, canvas.height/2);
+  cctx.rotate(rot*Math.PI/180);
+  cctx.scale(flipH?-1:1, flipV?-1:1);
+  const z=p.zoom;
+  cctx.translate(p.panX*vw, p.panY*vh);
+  cctx.drawImage(video, -vw/2*z, -vh/2*z, vw*z, vh*z);
+  cctx.restore();
+}
+
+function loop(){ draw(); rafId=requestAnimationFrame(loop); }
+
+$("file").addEventListener("change", (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  video.src=URL.createObjectURL(f);
+  video.onloadedmetadata=()=>{
+    hasVideo=true;
+    ["playBtn","pauseBtn","beginBtn","exportBtn"].forEach(id=>$(id).disabled=false);
+    $("loadStatus").textContent=`読み込み: ${f.name} · ${video.videoWidth}×${video.videoHeight} · ${video.duration.toFixed(1)}s`;
+    cancelAnimationFrame(rafId); loop();
+    updateTime();
+  };
+});
+
+function updateTime(){ $("timeLabel").textContent=`${(video.currentTime||0).toFixed(1)} / ${(video.duration||0).toFixed(1)}s`; if(hasVideo) requestAnimationFrame(updateTime); }
+$("playBtn").addEventListener("click", ()=>{ video.playbackRate=+$("speed").value; video.play(); });
+$("pauseBtn").addEventListener("click", ()=>video.pause());
+$("beginBtn").addEventListener("click", ()=>{ video.currentTime=0; });
+
+// スライダー表示
+const fmt=()=>{
+  $("brightnessVal").textContent=(+$("brightness").value).toFixed(2);
+  $("contrastVal").textContent=(+$("contrast").value).toFixed(2);
+  $("saturateVal").textContent=(+$("saturate").value).toFixed(2);
+  $("hueVal").textContent=$("hue").value+"°";
+  $("invertVal").textContent=$("invert").value+"%";
+  $("grayVal").textContent=$("gray").value+"%";
+  $("zoomVal").textContent=(+$("zoom").value).toFixed(2)+"×";
+  $("panXVal").textContent=$("panX").value+"%";
+  $("panYVal").textContent=$("panY").value+"%";
+  $("speedVal").textContent=(+$("speed").value).toFixed(2)+"×";
+  // 「白黒/セピアを戻す」= 彩度を持ち上げる補助(スライダー0で無効)
+};
+["brightness","contrast","saturate","hue","invert","gray","zoom","panX","panY","speed"].forEach(id=>$(id).addEventListener("input",fmt));
+$("gray").addEventListener("input",()=>{ // 白黒を戻す量を彩度へ緩く反映
+  const g=(+$("gray").value)/100; if(g>0){ $("saturate").value=(1+g*1.5).toFixed(2); fmt(); }
+});
+$("speed").addEventListener("input",()=>{ if(!video.paused) video.playbackRate=+$("speed").value; });
+fmt();
+
+// 回転・反転
+document.querySelectorAll(".rotBtn").forEach(b=>b.addEventListener("click",()=>{
+  rot=+b.dataset.rot; document.querySelectorAll(".rotBtn").forEach(x=>x.classList.toggle("on",x===b));
+}));
+$("flipH").addEventListener("click",()=>{ flipH=!flipH; $("flipH").classList.toggle("on",flipH); });
+$("flipV").addEventListener("click",()=>{ flipV=!flipV; $("flipV").classList.toggle("on",flipV); });
+
+// 自動推定(色)
+$("autoBtn").addEventListener("click", ()=>{
+  if(!hasVideo){ $("exportStatus").textContent="先に動画を読み込んでください。"; return; }
+  // 現在のキャンバス内容から統計(フィルタ適用後だが目安として)
+  try{
+    const tmp=document.createElement("canvas"); tmp.width=160; tmp.height=90;
+    tmp.getContext("2d").drawImage(video,0,0,160,90);
+    const data=tmp.getContext("2d").getImageData(0,0,160,90).data;
+    const stats=analyzePixels(data);
+    const s=suggestCorrection(stats);
+    $("brightness").value=s.brightness.toFixed(2);
+    $("saturate").value=s.saturate.toFixed(2);
+    fmt();
+    $("exportStatus").textContent=`推定: 平均輝度 ${(stats.lumaMean*100).toFixed(0)}% / 彩度 ${(stats.satMean*100).toFixed(0)}% → 明るさ ${s.brightness.toFixed(2)} / 彩度 ${s.saturate.toFixed(2)} を初期値に。`;
+  }catch(err){ $("exportStatus").textContent="フレーム解析に失敗しました: "+err.message; }
+});
+
+$("resetBtn").addEventListener("click", ()=>{
+  const d={brightness:1,contrast:1,saturate:1,hue:0,invert:0,gray:0,zoom:1,panX:0,panY:0,speed:1};
+  Object.entries(d).forEach(([k,v])=>{ if($(k)) $(k).value=v; });
+  rot=0; flipH=false; flipV=false;
+  document.querySelectorAll(".rotBtn").forEach(x=>x.classList.toggle("on",x.dataset.rot==="0"));
+  $("flipH").classList.remove("on"); $("flipV").classList.remove("on");
+  fmt();
+});
+
+// 書き出し(実時間録画)
+$("exportBtn").addEventListener("click", async ()=>{
+  if(!hasVideo) return;
+  if(recorder && recorder.state==="recording"){ recorder.stop(); return; }
+  if(typeof canvas.captureStream!=="function"){ $("exportStatus").textContent="この端末では書き出し(captureStream)に対応していません。"; return; }
+  try{
+    $("exportBtn").disabled=true; $("exportStatus").textContent="書き出し準備中…";
+    video.currentTime=0; video.playbackRate=+$("speed").value;
+    const fps=30;
+    const cStream=canvas.captureStream(fps);
+    let tracks=[...cStream.getVideoTracks()];
+    // 音声トラックを合成(可能なら)
+    try{ if(typeof video.captureStream==="function"){ const vs=video.captureStream(); tracks=tracks.concat(vs.getAudioTracks()); } }catch(_){}
+    const stream=new MediaStream(tracks);
+    let mime="video/webm;codecs=vp9,opus";
+    if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm;codecs=vp8,opus";
+    if(!MediaRecorder.isTypeSupported(mime)) mime="video/webm";
+    recorder=new MediaRecorder(stream,{mimeType:mime});
+    const chunks=[];
+    recorder.ondataavailable=(e)=>{ if(e.data.size) chunks.push(e.data); };
+    recorder.onstop=()=>{
+      const blob=new Blob(chunks,{type:"video/webm"});
+      const url=URL.createObjectURL(blob);
+      const a=$("dl"); a.href=url; a.download="restored_video.webm"; a.style.display="inline"; a.textContent="⬇ restored_video.webm を保存"; a.click();
+      $("exportBtn").disabled=false; $("exportBtn").textContent="⬇ 逆補正した動画を書き出す(WebM)";
+      $("exportStatus").textContent="書き出し完了 ✓(保存ダイアログ / ダウンロードを確認)。";
+    };
+    const onEnded=()=>{ if(recorder && recorder.state==="recording") recorder.stop(); video.removeEventListener("ended",onEnded); };
+    video.addEventListener("ended",onEnded);
+    recorder.start();
+    $("exportBtn").textContent="■ 録画停止";
+    $("exportBtn").disabled=false;
+    $("exportStatus").textContent="録画中…(動画の最後まで再生されると自動停止。途中停止も可)";
+    await video.play();
+  }catch(err){ $("exportStatus").textContent="書き出しに失敗しました: "+err.message; $("exportBtn").disabled=false; $("exportBtn").textContent="⬇ 逆補正した動画を書き出す(WebM)"; }
+});
+</script>
+</body>
+</html>

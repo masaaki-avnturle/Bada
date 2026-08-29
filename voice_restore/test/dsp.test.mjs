@@ -2,10 +2,12 @@
  * dsp.js の単体テスト。 node voice_restore/test/dsp.test.mjs で実行。
  * Web Audio に依存しない純粋関数のみを検証する。
  */
-import {
-  fft, pitchShift, formantShift, restoreVoice,
-  estimateMedianF0, semitonesBetween, encodeWav, resampleLinear,
-} from "../www/dsp.js";
+import DSP from "../www/dsp.js"; // UMD: Node では default = api オブジェクト
+const {
+  fft, pitchShift, formantShift, restoreVoice, restoreSound,
+  spectralEQ, estimateMedianF0, semitonesBetween, tuningToEqualTemperament,
+  encodeWav, resampleLinear,
+} = DSP;
 
 let passed = 0, failed = 0;
 function ok(name, cond, extra = "") {
@@ -153,6 +155,57 @@ console.log("restoreVoice");
   const fRestored = measureFreq(restored, SR, 80, 400);
   ok("変調でピッチが上がる(+7半音≈1.5倍)", fMod > fOrig * 1.3, `orig=${fOrig.toFixed(1)} mod=${fMod.toFixed(1)}`);
   ok("復元後のピッチが元へ戻る", Math.abs(fOrig - fRestored) < 12, `orig=${fOrig.toFixed(1)} restored=${fRestored.toFixed(1)}`);
+}
+
+console.log("spectralEQ (楽器トーンの逆補正)");
+{
+  const x = vowel(160, 0.8); // 母音風でも広帯域スペクトルを持つ
+  function bandEnergy(sig, f0, f1) {
+    const n = 2048; const re = new Float64Array(n), im = new Float64Array(n);
+    let e = 0, cnt = 0;
+    for (let s = 0; s + n <= sig.length; s += n) {
+      for (let i = 0; i < n; i++) { re[i] = sig[s + i]; im[i] = 0; }
+      fft(re, im, false);
+      for (let k = 1; k < n / 2; k++) {
+        const f = (k * SR) / n;
+        if (f >= f0 && f < f1) { e += re[k] * re[k] + im[k] * im[k]; }
+      }
+      cnt++;
+    }
+    return e / Math.max(1, cnt);
+  }
+  const highBoost = spectralEQ(x, SR, 0, 0, 12, 300, 3000); // 高域 +12dB
+  ok("高域ブーストで高域エネルギーが増える",
+     bandEnergy(highBoost, 3500, 7000) > bandEnergy(x, 3500, 7000) * 1.8,
+     `ratio=${(bandEnergy(highBoost,3500,7000)/bandEnergy(x,3500,7000)).toFixed(2)}`);
+  const lowCut = spectralEQ(x, SR, -12, 0, 0, 300, 3000); // 低域 -12dB
+  ok("低域カットで低域エネルギーが減る",
+     bandEnergy(lowCut, 50, 250) < bandEnergy(x, 50, 250) * 0.5,
+     `ratio=${(bandEnergy(lowCut,50,250)/bandEnergy(x,50,250)).toFixed(2)}`);
+  const noop = spectralEQ(x, SR, 0, 0, 0);
+  ok("全バンド0dBは入力を保つ", !hasNaN(noop) && noop.length === x.length);
+}
+
+console.log("tuningToEqualTemperament (A=440 チューニング)");
+{
+  const t = tuningToEqualTemperament(445, 440); // A4 より少しシャープ
+  ok("445Hz は A4 と判定", t.note === "A4", `note=${t.note}`);
+  ok("445Hz は約 +19.6 cents シャープ", Math.abs(t.cents - 19.56) < 1, `cents=${t.cents.toFixed(1)}`);
+  ok("補正量は cents と逆符号(下げる)", t.semitoneCorrection < 0, `corr=${t.semitoneCorrection.toFixed(3)}`);
+  const t2 = tuningToEqualTemperament(261.63, 440); // ほぼ C4
+  ok("261.63Hz は C4", t2.note === "C4", `note=${t2.note}`);
+}
+
+console.log("restoreSound (楽器: EQ+音色+ピッチの合成復元)");
+{
+  const orig = vowel(196, 0.8, [900, 1800, 3000]); // 楽器風(G3付近)
+  // 変調: +5半音, 音色包絡1.2倍, 高域+8dB
+  const modulated = restoreSound(orig, { pitchSemitones: 5, formantRatio: 1.2, eq: { highDb: 8 }, sampleRate: SR });
+  // 復元: 逆量
+  const restored = restoreSound(modulated, { pitchSemitones: -5, formantRatio: 1 / 1.2, eq: { highDb: -8 }, sampleRate: SR });
+  ok("復元出力にNaNが無い", !hasNaN(restored) && restored.length === orig.length);
+  const fO = measureFreq(orig, SR, 120, 500), fR = measureFreq(restored, SR, 120, 500);
+  ok("復元後のピッチが元へ戻る(≈196Hz)", Math.abs(fO - fR) < 12, `orig=${fO.toFixed(1)} restored=${fR.toFixed(1)}`);
 }
 
 console.log("encodeWav");
