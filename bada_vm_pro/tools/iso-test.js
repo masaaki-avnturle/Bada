@@ -68,18 +68,32 @@ ok(idx && Buffer.from(idx.data).toString("utf8") === payload, "file content roun
 const emp = parsed.files.find(function(f){ return f.name === "EMPTY.TXT"; });
 ok(emp && emp.size === 0, "empty file round-trips with size 0");
 
-/* ── 実物のライブ CD をビルドして検査 ── */
-require("./build-iso.js");
-const live = new Uint8Array(fs.readFileSync(path.join(__dirname, "..", "dist", "BadaVMPro-live.iso")));
-const lp = parseIso(live);
-ok(lp.volumeId === "BADAVMPRO_LIVE", "live ISO volume id");
-ok(lp.bootable, "live ISO is El Torito bootable");
-const names = lp.files.map(function(f){ return f.name; }).sort().join(",");
-ok(names === "AUTORUN.INF,INDEX.HTM,LICENSE.TXT,README.TXT", "live ISO file set — got " + names);
-const htm = lp.files.find(function(f){ return f.name === "INDEX.HTM"; });
-const orig = fs.readFileSync(path.join(__dirname, "..", "index.html"));
-ok(htm && htm.size === orig.length && Buffer.compare(Buffer.from(htm.data), orig) === 0,
-   "INDEX.HTM on the ISO is byte-identical to bada_vm_pro/index.html");
+/* ── 実物のライブ CD/USB (isolinux ISO) を build-iso.sh でビルドして検査 ──
+ * 配布 ISO は Rufus が「ISO イメージモード」で認識できるよう、本物の
+ * isolinux (syslinux) で組む。xorriso/isolinux が無い環境ではスキップ。 */
+const cp = require("child_process");
+function hasXorriso(){
+  try { cp.execSync("command -v xorriso", { stdio: "ignore" }); return true; } catch (e){ return false; }
+}
+if (hasXorriso()){
+  cp.execSync("bash " + JSON.stringify(path.join(__dirname, "build-iso.sh")), { stdio: "inherit" });
+  const live = new Uint8Array(fs.readFileSync(path.join(__dirname, "..", "dist", "BadaVMPro-live.iso")));
+  const lp = parseIso(live);
+  ok(lp.volumeId === "BADAVMPRO_LIVE", "live ISO volume id");
+  ok(lp.bootable, "live ISO is El Torito bootable");
+  ok(lp.hybrid && lp.hybrid.sectors > 0, "live ISO carries an isohybrid MBR (USB DD fallback)");
+  const names = lp.files.map(function(f){ return f.name; });
+  /* Rufus が ISO モードで認識する鍵 = 本物の isolinux/isolinux.bin の存在 */
+  ok(names.indexOf("isolinux/isolinux.bin") >= 0, "live ISO contains a real isolinux bootloader (Rufus ISO mode)");
+  ok(names.indexOf("isolinux/ldlinux.c32") >= 0, "live ISO contains ldlinux.c32");
+  ok(names.indexOf("INDEX.HTM") >= 0 && names.indexOf("README.TXT") >= 0, "live ISO carries INDEX.HTM + README.TXT");
+  const htm = lp.files.find(function(f){ return f.name === "INDEX.HTM"; });
+  const orig = fs.readFileSync(path.join(__dirname, "..", "index.html"));
+  ok(htm && htm.size === orig.length && Buffer.compare(Buffer.from(htm.data), orig) === 0,
+     "INDEX.HTM on the ISO is byte-identical to bada_vm_pro/index.html (in-app mount reads the real ISO)");
+} else {
+  console.log("skip - xorriso/isolinux not installed; live-ISO build checked in CI (build-iso.sh)");
+}
 
 console.log(failed === 0 ? "\nALL ISO TESTS PASSED" : "\n" + failed + " TEST(S) FAILED");
 process.exit(failed === 0 ? 0 : 1);

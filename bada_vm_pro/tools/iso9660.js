@@ -1,10 +1,12 @@
 /*
- * iso9660.js — 依存ゼロの ISO 9660 (+ El Torito ブート) ビルダー / パーサー
+ * iso9660.js — 依存ゼロの ISO 9660 (+ El Torito / isohybrid) ビルダー / パーサー
  *
- * Bada VM Pro のライブ CD (BadaVMPro-live.iso) を生成し、
- * また Bada VM Pro 自身が ISO をマウントするためのリファレンス実装。
- * ISO 9660 Level 1 (8.3 大文字名・ルートディレクトリのみ) + El Torito
- * (エミュレーションなし・2048B ブートイメージ) をサポートします。
+ * 主な用途は Bada VM Pro 自身が ISO を /mnt/cdrom にマウントするための
+ * パーサー (parseIso) と、その単体テスト用の合成 ISO ビルダー (buildIso)。
+ * 配布用ライブ CD/USB (BadaVMPro-live.iso) は Rufus の「ISO イメージモード」
+ * 対応のため、本物の isolinux を用いる tools/build-iso.sh が生成します
+ * (このパーサーはその実物 ISO も読めることをテストで確認)。
+ * ISO 9660 Level 1 (8.3 大文字名) + El Torito + isohybrid MBR に対応。
  */
 "use strict";
 

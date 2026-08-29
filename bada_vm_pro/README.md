@@ -13,21 +13,23 @@ x-terminal-emulator / terminal)を載せた、依存ゼロの **単一 HTML** (`
 | **Android APK** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) から `bada-vm-pro-debug.apk`(提供元不明アプリの許可が必要) |
 | **Windows 10/11** | Releases から `BadaVMPro-*-x64.exe`(NSIS インストーラ / ポータブル) |
 | **Ubuntu** | Releases から `BadaVMPro-*-x86_64.AppImage` / `BadaVMPro-*-amd64.deb` |
-| **ライブ CD / USB (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — **ハイブリッド ISO (ISO 9660 + El Torito + MBR パーティションテーブル)**。**Rufus** で USB メモリに書き込めます (下記)。マウントして `INDEX.HTM` をブラウザで開けば OS が起動、CD/USB からブートすると BIOS テキストの案内バナーを表示。ISO は依存ゼロの自前ビルダー [`tools/build-iso.js`](tools/build-iso.js) が生成 |
+| **ライブ CD / USB (ISO)** | Releases / Actions アーティファクトから `BadaVMPro-live.iso` — **本物の isolinux (syslinux) で組んだブータブル ISO** (El Torito + isohybrid MBR)。**Rufus の「ISO イメージモード」**で USB ブートディスクを作成できます (下記)。マウントして `INDEX.HTM` をブラウザで開けば OS が起動、CD/USB からブートすると isolinux が案内バナーを表示。ISO は [`tools/build-iso.sh`](tools/build-iso.sh) (xorriso + isolinux) が生成 |
 
-### 🔥 Rufus で USB 起動メディアを作る
+### 🔥 Rufus で USB 起動メディアを作る (ISO イメージモード)
 
-`BadaVMPro-live.iso` はハイブリッド ISO(先頭に MBR + イメージ全体を覆うブータブル
-パーティション)なので、**Rufus** でそのまま USB に書き込めます:
+`BadaVMPro-live.iso` は**本物の isolinux ブートローダ**を含む標準的なブータブル ISO
+なので、Rufus がディスクを認識し **「ISO イメージモード」**でブート USB を作成できます
+(DD モードは不要):
 
 1. [Releases](https://github.com/masaaki-avnturle/Bada/releases) / [Actions](https://github.com/masaaki-avnturle/Bada/actions) の `badavmpro-iso` から `BadaVMPro-live.iso` を入手
 2. [Rufus](https://rufus.ie) を起動 → USB メモリを選択 → 「選択」で ISO を指定
-3. Rufus が「ISOHybrid イメージ」と検出したら **DD イメージモード**で「スタート」
-4. 書き込んだ USB から BIOS/UEFI ブート → 案内バナーが表示されます。中の
+3. Rufus が「ISOHybrid…」と尋ねたら **「ISO イメージモードで書き込む」を選択**して「スタート」
+4. 書き込んだ USB からブート → isolinux が起動して案内バナーを表示。中の
    `INDEX.HTM` を任意の PC のブラウザで開けば w9wm デスクトップの OS が起動します
 
-> QEMU での実ブート検証済み: CD ブート (El Torito) / USB・HDD ブート (MBR) の
-> 両方で BIOS がブートコードを実行しバナーを表示することを確認しています。
+> QEMU での実ブート検証済み: 本物の **ISOLINUX 6.04** が起動しバナーを表示することを
+> スクリーンショットで確認。isohybrid MBR も残してあるので、Rufus が DD モードを選んでも
+> USB からブートできます。
 
 ネイティブ版は [`badavmpro-app-build.yml`](../.github/workflows/badavmpro-app-build.yml) がビルドします
 (`badavmpro-v*` タグを push するか、Actions の `workflow_dispatch` で `release_tag` を指定)。

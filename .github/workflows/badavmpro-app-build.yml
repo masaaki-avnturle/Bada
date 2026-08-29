@@ -78,15 +78,23 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Build Bada VM Pro live ISO (ハイブリッド ISO 9660 + El Torito + MBR, 依存ゼロ)
+      - name: Install ISO tooling (xorriso + isolinux, Rufus ISO モード対応)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xorriso isolinux syslinux-common
+      - name: Build Bada VM Pro live ISO (本物の isolinux ブータブル ISO)
         run: |
           set -e
-          node bada_vm_pro/tools/build-iso.js
+          bash bada_vm_pro/tools/build-iso.sh
           file bada_vm_pro/dist/BadaVMPro-live.iso
-          # ISO 9660 かつ Rufus 対応のハイブリッド MBR (DOS/MBR boot sector) であること
+          # ISO 9660 かつブータブル (El Torito) であること
           file bada_vm_pro/dist/BadaVMPro-live.iso | grep -q "ISO 9660"
           file bada_vm_pro/dist/BadaVMPro-live.iso | grep -q "bootable"
-          file bada_vm_pro/dist/BadaVMPro-live.iso | grep -q "MBR boot sector"
+          # Rufus が ISO モードで認識する本物の isolinux が入っていること
+          xorriso -indev bada_vm_pro/dist/BadaVMPro-live.iso -report_el_torito plain 2>/dev/null | grep -q "isolinux.bin"
+          # アプリ内マウント用 JS パーサーが実物 ISO を読め、INDEX.HTM が同一であること
+          node bada_vm_pro/tools/iso-test.js | tee /tmp/iso.out
+          grep -q "ALL ISO TESTS PASSED" /tmp/iso.out
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
