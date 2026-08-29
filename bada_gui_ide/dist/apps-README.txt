@@ -44,6 +44,12 @@ it in any browser — no install, no dependencies, works offline.
                       NASA DSCOVR/EPIC) animated into video, plus a real SGP4
                       pass predictor (inlined satellite.js) for the NOAA/ISS
                       satellites you can receive yourself. Needs internet.
+  earth-twin.html     GammaTwin — 地球型惑星ファインダー: ranks planets whose
+                      conditions are isomorphic to Earth using the free NASA
+                      Exoplanet Archive (Kepler/TESS space-telescope catalog)
+                      + CDS sky-survey imagery. ESI scoring gamma-normalized
+                      via Γ(z+1)=zΓ(z); trefoil Jones polynomial |V(e^iθ)|
+                      drives the heat palette. Offline snapshot included.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

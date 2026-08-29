@@ -55,6 +55,7 @@
 | [`migemo-media.html`](bada_gui_ide/dist/migemo-media.html) | **Migemogram Media** — 自分のPC(ファイル選択)/クラウド(URL)の写真・動画ギャラリー。**ポイントでどアップ**、動画ポイントで**CM風ミュートプレビュー**、クリックで音声つきどアップ、migemo検索、**zone://url.or.jp に取り込み**(UltraDB複製 + Jones量子暗号) |
 | [`madokey.html`](bada_gui_ide/dist/madokey.html) | **MadoKey 窓使いのキー** — 奈由太氏「窓使いの憂鬱」オマージュ。**Word / Excel / LibreOffice のキーバインド設定エディタ**。キー→動作(**ルビ・合計・コピー・独自バインド**)を編集し、その場で試して、`madokey.mayu`(常駐 `madokey.py` 用)/ `madokey.ahk`(AutoHotkey)を書き出し。常駐本体は [`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/) |
 | [`earth-view.html`](bada_gui_ide/dist/earth-view.html) | **Orbita 衛星から見る地球** — **誰でも自由にアクセスできる公開衛星**(Himawari-9・GOES-19/18・Meteosat・NASA DSCOVR/EPIC)から、**宇宙から見た地球をライブ表示・動画再生**(高精細)。さらに自分で受信できる **NOAA/ISS の上空通過(パス)予報**(SGP4=satellite.js 内蔵)+ RTL-SDR 受信ガイド。※インターネット接続が必要 |
+| [`earth-twin.html`](bada_gui_ide/dist/earth-twin.html) | **GammaTwin 地球型惑星ファインダー** — **誰でも自由にアクセスできる宇宙望遠鏡カタログ**(NASA Exoplanet Archive = Kepler/K2/TESS の確定惑星)に常時アクセスし、**Γ関数の大域的部分積分(Γ(z+1)=zΓ(z))で重み付けした ESI** と **Jones多項式 V(t)=−t⁻⁴+t⁻³+t⁻¹ の熱感知カラー**で、**地球と境遇が同型な惑星**を発見・ランキング。銀河マップ(RA/Dec)+ 各主星の実サーベイ画像(CDS hips2fits 望遠鏡ビュー)。オフライン時は実測値スナップショットで動作 |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
 **一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
