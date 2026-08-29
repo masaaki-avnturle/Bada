@@ -156,6 +156,13 @@ jobs:
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 8 (cordova-android 12 is incompatible with runner's Gradle 9)
+        run: |
+          # ランナー標準の Gradle 9 では cordova-android 12 の cordova.gradle が
+          # 「unable to resolve class XmlParser」で失敗するため、Gradle 8.7 を PATH 先頭に置く
+          curl -sSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.7-bin.zip
+          unzip -q /tmp/gradle.zip -d "$HOME/gradle8"
+          echo "$HOME/gradle8/gradle-8.7/bin" >> "$GITHUB_PATH"
       - name: Build all Android APKs (Cordova, debug)
         run: |
           set -e
