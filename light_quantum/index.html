@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bada 光量子制限装置 — 新幹線の窓の塗り絵</title>
+<!--
+  Bada 光量子制限装置 (Bada Light-Quantum Restriction Device)
+
+  特殊相対性理論 × 光量子仮説 (E = hν) × AdS5 多様体の次元方程式による
+  「整数制限法」の光シミュレーション。
+
+  ・蛍光灯の光が当たる範囲を「制限装置」で設定し、
+    AdS5 計量 ds² = (R/z)² (η_μν dx^μ dx^ν + dz²) の離散スライス
+    z_n = R·exp(k·n/N) が定める "飛び飛び" の整数バンド n = 1..N の
+    うち、設定範囲に入ったバンドだけが照らされる。
+  ・照らされたバンドの中だけ、新幹線の窓の外の「塗り絵」の風景に
+    色が付いて見える (光の当たらない場所は線画 = 塗る前の塗り絵)。
+  ・点灯・消灯は慣性の法則に従わず「瞬時」に切り替わる (慣性違反モード)。
+  ・新幹線の速度 β = v/c により、相対論的ドップラー効果
+    D = √((1+β)/(1-β)) で光の波長・光子エネルギーが変化し、
+    ローレンツ収縮 1/γ で風景が縮み、時間の遅れ 1/γ で
+    蛍光灯のフリッカーがゆっくり見える。
+
+  完全自己完結の 1 ファイル HTML。ブラウザ / Electron (Windows・Ubuntu) /
+  Cordova WebView (Android APK) でそのまま動作します。
+-->
+<style>
+  :root {
+    --bg: #0d1220;
+    --panel: #171e31;
+    --panel2: #1f2840;
+    --line: #2c3a5e;
+    --text: #dce6ff;
+    --dim: #8fa0c9;
+    --accent: #57c8ff;
+    --accent2: #ffd257;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+    display: flex; flex-direction: row; overflow: hidden;
+  }
+  #stage { flex: 1 1 auto; min-width: 0; position: relative; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #panel {
+    flex: 0 0 316px; width: 316px; height: 100%; overflow-y: auto;
+    background: var(--panel); border-left: 1px solid var(--line); padding: 12px 14px 24px;
+  }
+  h1 { font-size: 15px; margin: 2px 0 2px; color: var(--accent); letter-spacing: .04em; }
+  h1 small { color: var(--dim); font-weight: normal; font-size: 10px; display: block; margin-top: 2px; }
+  fieldset {
+    border: 1px solid var(--line); border-radius: 8px; margin: 10px 0 0; padding: 8px 10px 10px;
+    background: var(--panel2);
+  }
+  legend { font-size: 11px; color: var(--accent2); padding: 0 6px; letter-spacing: .06em; }
+  label.row { display: block; font-size: 11px; color: var(--dim); margin: 7px 0 2px; }
+  label.row b { color: var(--text); font-weight: normal; float: right; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 20px; }
+  .chk { display: flex; align-items: center; gap: 7px; font-size: 12px; margin: 7px 0 2px; cursor: pointer; }
+  .chk input { accent-color: var(--accent2); width: 15px; height: 15px; }
+  select, button {
+    background: #0e1526; color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; font-size: 12px; padding: 4px 8px;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  #readout {
+    font-size: 11px; line-height: 1.75; font-variant-numeric: tabular-nums;
+    color: var(--dim); white-space: pre-line;
+  }
+  #readout b { color: var(--text); font-weight: normal; }
+  #bands { font-size: 11px; color: var(--dim); line-height: 1.6; word-break: break-all; }
+  .formula {
+    font-size: 10.5px; color: var(--dim); border-top: 1px dashed var(--line);
+    margin-top: 8px; padding-top: 6px; line-height: 1.7;
+  }
+  .warn { color: #ff9b7a; }
+  .ok { color: #7dffb0; }
+  #hint { font-size: 10.5px; color: var(--dim); margin-top: 10px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="view"></canvas></div>
+
+<div id="panel">
+  <h1>Bada 光量子制限装置<small>特殊相対論 × 光量子仮説 (E=hν) × AdS₅ 整数制限法 — 新幹線の窓の塗り絵</small></h1>
+
+  <fieldset>
+    <legend>新幹線 (特殊相対性理論)</legend>
+    <label class="row">速度 β = v/c <b id="vBeta">0.30</b></label>
+    <input type="range" id="beta" min="0" max="0.99" step="0.01" value="0.30">
+    <label class="chk"><input type="checkbox" id="pause"> 一時停止</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>制限装置 (光の当たる範囲)</legend>
+    <label class="row">範囲 開始 <b id="vRangeA">15%</b></label>
+    <input type="range" id="rangeA" min="0" max="100" step="1" value="15">
+    <label class="row">範囲 終了 <b id="vRangeB">70%</b></label>
+    <input type="range" id="rangeB" min="0" max="100" step="1" value="70">
+    <label class="chk"><input type="checkbox" id="inertia" checked> 慣性違反モード (瞬時点灯・瞬時消灯)</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>AdS₅ 次元方程式 — 整数制限法</legend>
+    <label class="row">量子数の上限 N (整数バンド数) <b id="vN">7</b></label>
+    <input type="range" id="qn" min="1" max="24" step="1" value="7">
+    <label class="row">ワープ係数 k <b id="vK">1.2</b></label>
+    <input type="range" id="warp" min="-3" max="3" step="0.1" value="1.2">
+    <label class="row">曲率半径 R (バンド幅) <b id="vR">1.0</b></label>
+    <input type="range" id="radius" min="0.4" max="2.0" step="0.05" value="1.0">
+    <div id="bands"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>蛍光灯 (光量子)</legend>
+    <label class="row">光源波長 λ₀ <b id="vLambda">545 nm</b></label>
+    <input type="range" id="lambda" min="380" max="750" step="1" value="545">
+    <label class="row">電源周波数
+      <select id="mains" style="float:right">
+        <option value="50" selected>50 Hz (東日本)</option>
+        <option value="60">60 Hz (西日本)</option>
+      </select>
+    </label>
+    <label class="chk" style="clear:both"><input type="checkbox" id="flicker" checked> フリッカー (2×電源周波数, スロー観測)</label>
+    <label class="row">輝度ブースト (LED超え) <b id="vBoost">1.6×</b></label>
+    <input type="range" id="boost" min="1" max="3" step="0.1" value="1.6">
+    <label class="row">光子レート <b id="vRate">120 /s</b></label>
+    <input type="range" id="rate" min="0" max="400" step="10" value="120">
+  </fieldset>
+
+  <fieldset>
+    <legend>観測値</legend>
+    <div id="readout"></div>
+    <div class="formula">
+      E = hν = hc/λ 　 D = √((1+β)/(1−β))<br>
+      γ = 1/√(1−β²) 　 λ<sub>obs</sub> = λ₀/D<br>
+      AdS₅: ds² = (R/z)²(η<sub>μν</sub>dx<sup>μ</sup>dx<sup>ν</sup> + dz²)<br>
+      整数制限: z<sub>n</sub> = R·e<sup>k·n/N</sup> (n = 1, 2, …, N)
+    </div>
+  </fieldset>
+
+  <div id="hint">
+    光の当たった整数バンドの中だけ、窓の外の塗り絵に色が付きます。
+    β を上げると波長が青方偏移し、可視域 (380–750nm) を外れると
+    光子が見えなくなります。風景はローレンツ収縮 1/γ で縮みます。
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================== 物理定数 ============================== */
+const PHYS = {
+  h : 6.62607015e-34,   // プランク定数 [J·s]
+  c : 2.99792458e8,     // 光速 [m/s]
+  eV: 1.602176634e-19   // 電子ボルト [J]
+};
+
+/* ローレンツ因子 γ = 1/√(1-β²) */
+function lorentzGamma(beta) { return 1 / Math.sqrt(1 - beta * beta); }
+
+/* 相対論的ドップラー因子 (光源へ接近): D = √((1+β)/(1-β)) */
+function dopplerFactor(beta) { return Math.sqrt((1 + beta) / (1 - beta)); }
+
+/* 光子エネルギー E = hν = hc/λ [eV] (λ は nm) */
+function photonEnergyEV(lambdaNm) {
+  return PHYS.h * PHYS.c / (lambdaNm * 1e-9) / PHYS.eV;
+}
+
+/* ============================ AdS5 整数制限法 ============================
+ * AdS5 計量 ds² = (R/z)² (η dx² + dz²) の第5次元 z を整数 n で離散化:
+ *   z_n = R · exp(k·n/N)   (n = 1..N)
+ * を窓の横方向 [0,1] に正規化して "飛び飛び" のバンド中心を得る。
+ * k → 0 の極限では等間隔 (平坦な次元) に退化する。
+ * 戻り値: [{n, u(中心 0..1), w(半幅 0..1)}...]
+ */
+function ads5Bands(N, k, R) {
+  const zs = [];
+  for (let n = 1; n <= N; n++) {
+    zs.push(Math.abs(k) < 1e-6 ? n : Math.exp(k * n / N));
+  }
+  const z0 = zs[0], z1 = zs[zs.length - 1];
+  const span = (z1 - z0) || 1;
+  const halfW = Math.min(0.5 / (N + 1), 0.11) * R;   // 曲率半径 R がバンド幅を決める
+  return zs.map((z, i) => ({
+    n: i + 1,
+    u: N === 1 ? 0.5 : 0.08 + 0.84 * ((z - z0) / span),
+    w: halfW
+  }));
+}
+
+/* ======================= 波長 → RGB (可視域近似) ======================= */
+function wavelengthToRGB(nm) {
+  let r = 0, g = 0, b = 0;
+  if (nm >= 380 && nm < 440) { r = -(nm - 440) / 60; b = 1; }
+  else if (nm < 490) { g = (nm - 440) / 50; b = 1; }
+  else if (nm < 510) { g = 1; b = -(nm - 510) / 20; }
+  else if (nm < 580) { r = (nm - 510) / 70; g = 1; }
+  else if (nm < 645) { r = 1; g = -(nm - 645) / 65; }
+  else if (nm <= 750) { r = 1; }
+  let f = 1;
+  if (nm >= 380 && nm < 420) f = 0.3 + 0.7 * (nm - 380) / 40;
+  else if (nm > 700 && nm <= 750) f = 0.3 + 0.7 * (750 - nm) / 50;
+  else if (nm < 380 || nm > 750) f = 0;
+  return [Math.round(255 * r * f), Math.round(255 * g * f), Math.round(255 * b * f)];
+}
+
+/* ============================== 状態 ============================== */
+const S = {
+  beta: 0.30, rangeA: 0.15, rangeB: 0.70, inertia: true,
+  N: 7, k: 1.2, R: 1.0,
+  lambda: 545, mains: 50, flicker: true, boost: 1.6, rate: 120,
+  pause: false,
+  offset: 0, tSlow: 0
+};
+const SLOWMO = 0.018;   // フリッカーのスロー観測倍率 (100Hz → 約1.8Hz)
+
+const canvas = document.getElementById("view");
+const ctx = canvas.getContext("2d");
+let W = 0, H = 0, DPR = 1;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = canvas.clientWidth; H = canvas.clientHeight;
+  canvas.width = Math.round(W * DPR);
+  canvas.height = Math.round(H * DPR);
+}
+window.addEventListener("resize", resize);
+
+/* ============================ 塗り絵の風景 ============================
+ * colored=false: 塗る前の塗り絵 (白地 + 輪郭線)
+ * colored=true : 光が当たって色の付いた状態
+ */
+const INK = "#3a3a46";
+
+function strokeFill(c, path, fillCol, colored) {
+  c.beginPath(); path(c);
+  c.fillStyle = colored ? fillCol : "#ffffff";
+  c.fill();
+  c.strokeStyle = colored ? "#2b2b34" : INK;
+  c.lineWidth = 2.2;
+  c.stroke();
+}
+
+function drawFuji(c, x, y, s, colored) {
+  strokeFill(c, p => { p.moveTo(x - 150 * s, y); p.lineTo(x - 34 * s, y - 96 * s);
+    p.lineTo(x + 34 * s, y - 96 * s); p.lineTo(x + 150 * s, y); p.closePath(); },
+    "#7f9fd4", colored);
+  strokeFill(c, p => { p.moveTo(x - 34 * s, y - 96 * s); p.lineTo(x + 34 * s, y - 96 * s);
+    p.lineTo(x + 46 * s, y - 78 * s); p.lineTo(x + 22 * s, y - 86 * s); p.lineTo(x, y - 76 * s);
+    p.lineTo(x - 22 * s, y - 86 * s); p.lineTo(x - 46 * s, y - 78 * s); p.closePath(); },
+    "#ffffff", colored);
+}
+
+function drawSun(c, x, y, s, colored) {
+  strokeFill(c, p => p.arc(x, y, 26 * s, 0, Math.PI * 2), "#ffb347", colored);
+  c.strokeStyle = colored ? "#2b2b34" : INK; c.lineWidth = 2;
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    c.beginPath();
+    c.moveTo(x + Math.cos(a) * 33 * s, y + Math.sin(a) * 33 * s);
+    c.lineTo(x + Math.cos(a) * 44 * s, y + Math.sin(a) * 44 * s);
+    c.stroke();
+  }
+}
+
+function drawCloud(c, x, y, s, colored) {
+  strokeFill(c, p => {
+    p.arc(x - 26 * s, y, 15 * s, Math.PI * 0.5, Math.PI * 1.5);
+    p.arc(x - 8 * s, y - 13 * s, 15 * s, Math.PI * 0.9, Math.PI * 1.95);
+    p.arc(x + 14 * s, y - 10 * s, 13 * s, Math.PI * 1.1, Math.PI * 2.0);
+    p.arc(x + 28 * s, y, 13 * s, Math.PI * 1.5, Math.PI * 0.5);
+    p.closePath();
+  }, "#f3f7ff", colored);
+}
+
+function drawHill(c, x, y, s, colored) {
+  strokeFill(c, p => { p.moveTo(x - 130 * s, y); p.quadraticCurveTo(x, y - 74 * s, x + 130 * s, y);
+    p.closePath(); }, "#9ed08c", colored);
+}
+
+function drawTree(c, x, y, s, colored) {
+  strokeFill(c, p => p.rect(x - 5 * s, y - 26 * s, 10 * s, 26 * s), "#a8734b", colored);
+  strokeFill(c, p => p.arc(x, y - 44 * s, 22 * s, 0, Math.PI * 2), "#63b95f", colored);
+}
+
+function drawHouse(c, x, y, s, colored) {
+  strokeFill(c, p => p.rect(x - 34 * s, y - 40 * s, 68 * s, 40 * s), "#f4e2b8", colored);
+  strokeFill(c, p => { p.moveTo(x - 44 * s, y - 40 * s); p.lineTo(x, y - 70 * s);
+    p.lineTo(x + 44 * s, y - 40 * s); p.closePath(); }, "#d96e5a", colored);
+  strokeFill(c, p => p.rect(x - 10 * s, y - 26 * s, 20 * s, 26 * s), "#7fb4d8", colored);
+}
+
+function drawFlower(c, x, y, s, colored) {
+  c.strokeStyle = colored ? "#2b6b2e" : INK; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 14 * s); c.stroke();
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5 - Math.PI / 2;
+    strokeFill(c, p => p.arc(x + Math.cos(a) * 6 * s, y - 14 * s + Math.sin(a) * 6 * s,
+      4.4 * s, 0, Math.PI * 2), "#ff8fb0", colored);
+  }
+  strokeFill(c, p => p.arc(x, y - 14 * s, 3.4 * s, 0, Math.PI * 2), "#ffd257", colored);
+}
+
+function drawPole(c, x, y, s, colored) {
+  strokeFill(c, p => p.rect(x - 3.4 * s, y - 108 * s, 6.8 * s, 108 * s), "#c9c2b4", colored);
+  strokeFill(c, p => p.rect(x - 26 * s, y - 102 * s, 52 * s, 6 * s), "#c9c2b4", colored);
+}
+
+/* 1 タイル分の風景 (シーン座標 0..tileW) — レイヤーごとに視差スクロール */
+function drawLandscape(c, offset, colored, winX, winY, winW, winH) {
+  const horizon = winY + winH * 0.58;
+
+  /* 空 */
+  if (colored) {
+    const g = c.createLinearGradient(0, winY, 0, horizon);
+    g.addColorStop(0, "#aee3ff"); g.addColorStop(1, "#e8f7ff");
+    c.fillStyle = g;
+  } else c.fillStyle = "#ffffff";
+  c.fillRect(winX, winY, winW, horizon - winY);
+
+  /* 地面 (田んぼ) */
+  if (colored) {
+    const g2 = c.createLinearGradient(0, horizon, 0, winY + winH);
+    g2.addColorStop(0, "#bfe6a0"); g2.addColorStop(1, "#8fce77");
+    c.fillStyle = g2;
+  } else c.fillStyle = "#ffffff";
+  c.fillRect(winX, horizon, winW, winY + winH - horizon);
+  c.strokeStyle = colored ? "#2b2b34" : INK; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(winX, horizon); c.lineTo(winX + winW, horizon); c.stroke();
+
+  /* 田んぼの畝 (遠近の横線) */
+  c.strokeStyle = colored ? "#6faf58" : "#9a9aa6"; c.lineWidth = 1.2;
+  for (let i = 1; i <= 4; i++) {
+    const yy = horizon + (winY + winH - horizon) * (i * i) / 22;
+    c.beginPath(); c.moveTo(winX, yy); c.lineTo(winX + winW, yy); c.stroke();
+  }
+
+  const layer = (tileW, par, draw) => {
+    const off = offset * par;
+    const first = Math.floor((off - winW * 0.2) / tileW);
+    const last = Math.ceil((off + winW * 1.2) / tileW);
+    for (let t = first; t <= last; t++) draw(t, winX + t * tileW - off);
+  };
+
+  /* 遠景: 富士山・太陽・雲 (ゆっくり) */
+  layer(900, 0.15, (t, x) => {
+    drawFuji(ctx, x + 430, horizon, 1, colored);
+    if (((t % 2) + 2) % 2 === 0) drawSun(ctx, x + 120, winY + winH * 0.14, 1, colored);
+    drawCloud(ctx, x + 640, winY + winH * 0.17, 1, colored);
+    drawCloud(ctx, x + 240, winY + winH * 0.10, 0.8, colored);
+  });
+
+  /* 中景: 丘と木 */
+  layer(700, 0.45, (t, x) => {
+    drawHill(ctx, x + 180, horizon + 1, 1, colored);
+    drawHill(ctx, x + 520, horizon + 1, 0.75, colored);
+    drawTree(ctx, x + 350, horizon + 2, 1, colored);
+    drawTree(ctx, x + 620, horizon + 4, 0.8, colored);
+  });
+
+  /* 近景: 家・花・電柱 */
+  layer(560, 1.0, (t, x) => {
+    const m = ((t % 3) + 3) % 3;
+    if (m === 0) drawHouse(ctx, x + 150, horizon + 52, 1.15, colored);
+    if (m === 1) { drawTree(ctx, x + 130, horizon + 58, 1.3, colored); }
+    drawFlower(ctx, x + 320, horizon + 78, 1.1, colored);
+    drawFlower(ctx, x + 372, horizon + 66, 0.85, colored);
+    drawPole(ctx, x + 480, horizon + 90, 1, colored);
+  });
+}
+
+/* ============================== 光子の粒 ============================== */
+const photons = [];
+function spawnPhotons(dt, lit, winX, winY, winW, winH, tint) {
+  if (!lit.length || S.rate <= 0) return;
+  let expect = S.rate * dt;
+  while (expect > 0) {
+    if (Math.random() < expect) {
+      const b = lit[Math.floor(Math.random() * lit.length)];
+      const level = 1 + Math.floor(Math.random() * 8);      // 飛び飛びのエネルギー準位
+      photons.push({
+        x: winX + (b.u + (Math.random() * 2 - 1) * b.w * 0.8) * winW,
+        y: winY + winH * level / 9,
+        life: 0.5, tint
+      });
+    }
+    expect -= 1;
+  }
+  for (let i = photons.length - 1; i >= 0; i--) {
+    photons[i].life -= dt;
+    if (photons[i].life <= 0) photons.splice(i, 1);
+  }
+}
+
+function drawPhotons() {
+  for (const p of photons) {
+    /* 慣性違反: フェードせず存在するか消えるかの二値 */
+    const a = S.inertia ? (p.life > 0 ? 0.9 : 0) : Math.min(1, p.life * 2) * 0.9;
+    ctx.fillStyle = `rgba(${p.tint[0]},${p.tint[1]},${p.tint[2]},${a})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 2.6, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+/* ============================== 車内 ============================== */
+function drawInterior(winX, winY, winW, winH, flickAmp, tint) {
+  /* 壁 */
+  ctx.fillStyle = "#232a3d";
+  ctx.fillRect(0, 0, W, H);
+  const wall = ctx.createLinearGradient(0, 0, 0, H);
+  wall.addColorStop(0, "#2d3550"); wall.addColorStop(0.5, "#262e46"); wall.addColorStop(1, "#1b2133");
+  ctx.fillStyle = wall; ctx.fillRect(0, 0, W, H);
+
+  /* 天井の蛍光灯 */
+  const fl = Math.max(0, Math.min(1, flickAmp));
+  const tubeY = Math.max(14, winY * 0.28);
+  ctx.fillStyle = "#39415c"; roundRect(W * 0.18 - 8, tubeY - 7, W * 0.64 + 16, 22, 10); ctx.fill();
+  ctx.fillStyle = `rgba(${tint[0]},${tint[1]},${tint[2]},${0.25 + 0.75 * fl})`;
+  roundRect(W * 0.18, tubeY - 3, W * 0.64, 14, 7); ctx.fill();
+  const glow = ctx.createRadialGradient(W / 2, tubeY, 4, W / 2, tubeY, W * 0.4);
+  glow.addColorStop(0, `rgba(${tint[0]},${tint[1]},${tint[2]},${0.28 * fl})`);
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow; ctx.fillRect(0, 0, W, winY);
+
+  /* 座席のシルエット */
+  ctx.fillStyle = "#1a2136";
+  const sy = winY + winH + 18;
+  for (let x = 30; x < W - 80; x += 170) {
+    roundRect(x, sy, 120, Math.max(30, H - sy - 8), 14); ctx.fill();
+    ctx.fillStyle = "#151b2c"; roundRect(x + 10, sy + 12, 100, 16, 8); ctx.fill();
+    ctx.fillStyle = "#1a2136";
+  }
+
+  /* 窓枠 */
+  ctx.strokeStyle = "#4a566f"; ctx.lineWidth = 14;
+  roundRect(winX - 7, winY - 7, winW + 14, winH + 14, 26); ctx.stroke();
+  ctx.strokeStyle = "#0e1424"; ctx.lineWidth = 3;
+  roundRect(winX - 14, winY - 14, winW + 28, winH + 28, 30); ctx.stroke();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function windowClipPath(winX, winY, winW, winH) {
+  roundRect(winX, winY, winW, winH, 20);
+}
+
+/* ============================== メイン描画 ============================== */
+let lastT = 0;
+
+function renderFrame(now) {
+  requestAnimationFrame(renderFrame);
+  if (!W || !H) resize();
+  const dt = Math.min(0.05, (now - lastT) / 1000 || 0.016);
+  lastT = now;
+
+  const beta = S.beta;
+  const gam = lorentzGamma(beta);
+  const D = dopplerFactor(beta);
+  const lamObs = S.lambda / D;                 // 前方の光源へ接近 → 青方偏移
+  const nuObs = PHYS.c / (lamObs * 1e-9);
+  const eObs = photonEnergyEV(lamObs);
+  const visible = lamObs >= 380 && lamObs <= 750;
+  let tint = wavelengthToRGB(lamObs);
+  if (!visible) tint = [40, 40, 52];
+
+  /* 時間の遅れ: 車内から見た蛍光灯フリッカーは 1/γ 倍にゆっくり */
+  const fFlicker = (S.mains * 2) / gam;
+  if (!S.pause) {
+    S.tSlow += dt;
+    S.offset += beta * 900 * dt;               // 走行スクロール
+  }
+  const phase = Math.sin(2 * Math.PI * fFlicker * SLOWMO * S.tSlow);
+  let flickAmp = S.flicker ? 0.62 + 0.38 * phase : 1;
+  if (S.flicker && S.inertia) flickAmp = phase > -0.55 ? 1 : 0;   // 慣性違反 = 矩形波
+  flickAmp = Math.min(1, flickAmp * (visible ? 1 : 0.25));
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  /* 窓のジオメトリ */
+  const winW = Math.min(W * 0.78, 980);
+  const winH = Math.min(H * 0.58, 560);
+  const winX = (W - winW) / 2;
+  const winY = Math.max(54, (H - winH) * 0.42);
+
+  drawInterior(winX, winY, winW, winH, flickAmp, tint);
+
+  /* --- 窓の外: まず「塗る前の塗り絵」(線画) --- */
+  ctx.save();
+  windowClipPath(winX, winY, winW, winH); ctx.clip();
+  /* ローレンツ収縮: 進行方向に 1/γ で縮む */
+  const cx = winX + winW / 2;
+  ctx.translate(cx, 0); ctx.scale(1 / gam, 1); ctx.translate(-cx, 0);
+  const exW = winW * gam;   // 収縮後も窓を覆う描画幅
+  drawLandscape(ctx, S.offset, false, cx - exW / 2, winY, exW, winH);
+  ctx.restore();
+
+  /* --- 整数制限法バンド: 設定範囲に入ったものだけ点灯 --- */
+  const bands = ads5Bands(S.N, S.k, S.R);
+  const a = Math.min(S.rangeA, S.rangeB), b = Math.max(S.rangeA, S.rangeB);
+  const litBands = [];
+
+  for (const band of bands) {
+    const inRange = band.u >= a && band.u <= b;
+    /* 慣性違反モード: 範囲判定は瞬時 (フェードなし)。
+       慣性ありモードのみ、範囲端でなだらかに減光する。 */
+    let gate = inRange ? 1 : 0;
+    if (!S.inertia && !inRange) {
+      const d = Math.min(Math.abs(band.u - a), Math.abs(band.u - b));
+      gate = Math.max(0, 1 - d / 0.08);
+    }
+    const amp = gate * flickAmp;
+    if (amp <= 0.01 || !visible && amp <= 0.2) continue;
+    litBands.push(band);
+
+    const bx = winX + (band.u - band.w) * winW;
+    const bw = band.w * 2 * winW;
+
+    /* 色付きの塗り絵をバンド内にだけ描く */
+    ctx.save();
+    windowClipPath(winX, winY, winW, winH); ctx.clip();
+    ctx.beginPath(); ctx.rect(bx, winY, bw, winH); ctx.clip();
+    ctx.globalAlpha = S.inertia ? (amp > 0.05 ? 1 : 0) : Math.min(1, amp * 1.2);
+    ctx.translate(cx, 0); ctx.scale(1 / gam, 1); ctx.translate(-cx, 0);
+    drawLandscape(ctx, S.offset, true, cx - exW / 2, winY, exW, winH);
+    ctx.restore();
+
+    /* 蛍光灯の光のグロー (輝度ブースト = LED超え) */
+    ctx.save();
+    windowClipPath(winX, winY, winW, winH); ctx.clip();
+    const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    const aGlow = 0.10 * amp * S.boost;
+    g.addColorStop(0, "rgba(0,0,0,0)");
+    g.addColorStop(0.5, `rgba(${tint[0]},${tint[1]},${tint[2]},${aGlow})`);
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.fillRect(bx, winY, bw, winH);
+    /* 上端の入射光すじ */
+    const top = ctx.createLinearGradient(0, winY, 0, winY + winH * 0.5);
+    top.addColorStop(0, `rgba(${tint[0]},${tint[1]},${tint[2]},${0.30 * amp * S.boost})`);
+    top.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = top; ctx.fillRect(bx, winY, bw, winH * 0.5);
+    ctx.restore();
+
+    /* バンドの量子数ラベル */
+    ctx.fillStyle = `rgba(220,230,255,${0.75 * Math.max(amp, 0.4)})`;
+    ctx.font = "11px sans-serif"; ctx.textAlign = "center";
+    ctx.fillText("n=" + band.n, bx + bw / 2, winY + winH + 16);
+  }
+
+  /* 消灯バンドの目盛り */
+  ctx.textAlign = "center"; ctx.font = "11px sans-serif";
+  for (const band of bands) {
+    if (litBands.includes(band)) continue;
+    const bx = winX + band.u * winW;
+    ctx.fillStyle = "rgba(120,132,170,0.5)";
+    ctx.fillText("n=" + band.n, bx, winY + winH + 16);
+  }
+
+  /* 制限装置の設定範囲インジケータ */
+  const ry = winY + winH + 24;
+  ctx.strokeStyle = "rgba(87,200,255,0.9)"; ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(winX + a * winW, ry); ctx.lineTo(winX + b * winW, ry);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(87,200,255,0.35)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(winX, ry); ctx.lineTo(winX + winW, ry); ctx.stroke();
+  ctx.fillStyle = "rgba(87,200,255,0.9)"; ctx.font = "10px sans-serif";
+  ctx.fillText("制限装置の照射範囲", winX + (a + b) / 2 * winW, ry + 13);
+
+  /* 光子の粒 */
+  if (!S.pause) spawnPhotons(dt, visible ? litBands : [], winX, winY, winW, winH, tint);
+  drawPhotons();
+
+  updateReadout(gam, D, lamObs, nuObs, eObs, visible, litBands, bands);
+}
+
+/* ============================== 表示更新 ============================== */
+const readoutEl = document.getElementById("readout");
+const bandsEl = document.getElementById("bands");
+let lastReadout = 0;
+
+function updateReadout(gam, D, lamObs, nuObs, eObs, visible, lit, bands) {
+  const now = performance.now();
+  if (now - lastReadout < 200) return;
+  lastReadout = now;
+  const vis = visible
+    ? '<span class="ok">可視域 (見える)</span>'
+    : '<span class="warn">可視域外 — 光子は届いているが見えない</span>';
+  readoutEl.innerHTML =
+    `γ (ローレンツ因子): <b>${gam.toFixed(3)}</b>\n` +
+    `D (ドップラー因子): <b>${D.toFixed(3)}</b>\n` +
+    `観測波長 λ_obs: <b>${lamObs.toFixed(1)} nm</b> ${vis}\n` +
+    `観測振動数 ν_obs: <b>${(nuObs / 1e12).toFixed(1)} THz</b>\n` +
+    `光子エネルギー E=hν: <b>${eObs.toFixed(3)} eV</b>\n` +
+    `点灯バンド: <b>${lit.length} / ${bands.length}</b> (n = ${lit.map(x => x.n).join(", ") || "なし"})`;
+  bandsEl.textContent = "z_n 正規化位置: " +
+    bands.map(x => `${x.n}:${(x.u * 100).toFixed(0)}%`).join("  ");
+}
+
+/* ============================== 入力 ============================== */
+function bind(id, fmt, apply) {
+  const el = document.getElementById(id);
+  const out = document.getElementById("v" + id.charAt(0).toUpperCase() + id.slice(1));
+  const on = () => {
+    apply(el);
+    if (out && fmt) out.textContent = fmt(el);
+  };
+  el.addEventListener("input", on);
+  el.addEventListener("change", on);
+  on();
+}
+
+bind("beta", el => Number(el.value).toFixed(2), el => S.beta = Number(el.value));
+bind("rangeA", el => el.value + "%", el => S.rangeA = Number(el.value) / 100);
+bind("rangeB", el => el.value + "%", el => S.rangeB = Number(el.value) / 100);
+bind("inertia", null, el => S.inertia = el.checked);
+bind("qn", el => el.value, el => S.N = Number(el.value));
+bind("warp", el => Number(el.value).toFixed(1), el => S.k = Number(el.value));
+bind("radius", el => Number(el.value).toFixed(2), el => S.R = Number(el.value));
+bind("lambda", el => el.value + " nm", el => S.lambda = Number(el.value));
+bind("mains", null, el => S.mains = Number(el.value));
+bind("flicker", null, el => S.flicker = el.checked);
+bind("boost", el => Number(el.value).toFixed(1) + "×", el => S.boost = Number(el.value));
+bind("rate", el => el.value + " /s", el => S.rate = Number(el.value));
+bind("pause", null, el => S.pause = el.checked);
+
+resize();
+requestAnimationFrame(renderFrame);
+</script>
+</body>
+</html>

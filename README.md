@@ -71,6 +71,7 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`light_quantum/`** | **Bada 光量子制限装置** — 特殊相対論 × 光量子仮説 (E=hν) × AdS₅ 整数制限法の「新幹線の窓の塗り絵」光シミュレーション · 慣性違反モード (瞬時点灯) · ドップラー青方偏移 / ローレンツ収縮 / 時間の遅れ · 単一HTML/依存ゼロ | [→ 開く](light_quantum/) |
 
 ---
 
@@ -96,6 +97,26 @@
 | **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
 
 ビルドは [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) が実行します(`cppbuilder-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
+
+---
+
+## 💡 Bada 光量子制限装置 — 新幹線の窓の塗り絵 (特殊相対論 × E=hν × AdS₅ 整数制限法)
+
+蛍光灯の光の当たる範囲を「制限装置」で設定すると、AdS₅ 計量 `ds² = (R/z)²(η dx² + dz²)` の整数制限法 `z_n = R·e^(k·n/N)` が定める**飛び飛びの整数バンド**にだけ光が当たり、そのバンドの中だけ**新幹線の窓の外の塗り絵に色が付く**シミュレーションです。点灯・消灯は慣性の法則に違反して**瞬時**に切り替わり (慣性違反モード)、速度 β=v/c を上げると相対論的ドップラー因子 `D=√((1+β)/(1−β))` で光子エネルギー E=hν が青方偏移して可視域から外れ、風景はローレンツ収縮 1/γ で縮み、フリッカーは時間の遅れ 1/γ でゆっくり見えます。
+
+**👉 [`light_quantum/index.html` を開く](light_quantum/index.html)** / GitHub Pages: <https://masaaki-avnturle.github.io/Bada/light_quantum/>
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+ブラウザ不要のインストール型アプリも [Releases](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-lightquantum-debug.apk` |
+| **Windows 10 / 11** | `BadaLightQuantum-*-x64.exe` (NSIS インストーラ) / `BadaLightQuantum-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `BadaLightQuantum-*-x86_64.AppImage` / `BadaLightQuantum-*-amd64.deb` |
+
+ビルドは [`lightquantum-app-build.yml`](.github/workflows/lightquantum-app-build.yml) が実行します(`lightquantum-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`light_quantum/README.md`](light_quantum/README.md) を参照。
 
 ---
 
