@@ -24,7 +24,8 @@ const builds = [
   "build-instanton.js",      // dist/instanton.html
   "build-migemo.js",         // dist/migemo.html
   "build-migemo-media.js",   // dist/migemo-media.html
-  "build-madokey.js"         // dist/madokey.html
+  "build-madokey.js",        // dist/madokey.html
+  "build-earth-view.js"      // dist/earth-view.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -72,6 +73,11 @@ it in any browser — no install, no dependencies, works offline.
                       Edit key -> action bindings (ruby, sum, copy, custom),
                       try them live in-page, and export madokey.mayu (the
                       madokey.py daemon config) and madokey.ahk (AutoHotkey v1).
+  earth-view.html     Orbita — 衛星から見る地球: LIVE views of Earth from
+                      free public satellites (Himawari-9, GOES-19/18, Meteosat,
+                      NASA DSCOVR/EPIC) animated into video, plus a real SGP4
+                      pass predictor (inlined satellite.js) for the NOAA/ISS
+                      satellites you can receive yourself. Needs internet.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
