@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Laevateinn — 自動走行アシスタント「アル」(Web地図モード / 人工衛星モード)</title>
+<!--
+  Laevateinn (レーヴァテイン) — 自動走行の自動車アシスタント AI「アル」
+  ─────────────────────────────────────────────────────────────────
+  ・アシスタント「アル」: BadaGPT 系の意図エンジンで対話・状況実況
+  ・周囲検知: アルのトランスフォーマー — 16 本のレイセンサをトークン化し、
+    本物の attention (16次元 QK 内積 + softmax) で脅威に注意を向ける
+  ・測位は 2 モード:
+      🌐 Web地図モード — 衛星を使わず、ウェブサイトから受信した地図タイル
+         (Jones/zone 系 AEAD 封筒で検証) + 推測航法 + ランドマーク補正
+      🛰 人工衛星モード — 4 機の衛星の擬似距離から最小二乗で測位
+  ・経路計画: A* / 障害物で自動減速・停止・再発進
+  依存ゼロ・単一 HTML・オフライン動作 (地図受信・衛星はシミュレーション)。
+  APK / EXE / AppImage は .github/workflows/laevateinn-app-build.yml が
+  ビルドします。エンジンは tools/engine-test.js で単体テストされます。
+-->
+<style>
+:root{
+  --bg:#070a12; --panel:#0e1424; --panel2:#0a0f1c; --edge:#1f2a42;
+  --text:#d8deea; --dim:#8791a8; --gold:#c8a44a; --cyan:#3fb6c4;
+  --red:#d05a5a; --green:#4ac077; --purple:#9060d0; --blue:#4a80d0;
+  --mono:"SFMono-Regular",Consolas,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:13.5px/1.55 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--edge);border-radius:7px;padding:5px 12px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+button.primary{background:var(--green);border-color:var(--green);color:#04160b;font-weight:600}
+button.danger{background:var(--red);border-color:var(--red);color:#fff}
+input{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:7px;padding:6px 9px}
+input:focus{outline:none;border-color:var(--cyan)}
+::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#28324e;border-radius:4px}
+
+#topbar{flex:none;display:flex;align-items:center;gap:10px;padding:9px 14px;background:#050810;border-bottom:1px solid var(--edge);flex-wrap:wrap}
+#topbar .logo{font-size:16px;font-weight:700;color:var(--gold)}
+#topbar .logo small{color:var(--dim);font-weight:400;margin-left:8px}
+#modes{display:flex;border:1px solid var(--edge);border-radius:99px;overflow:hidden}
+#modes button{border:none;border-radius:0;padding:6px 14px;background:none;color:var(--dim)}
+#modes button.on{background:var(--blue);color:#fff}
+#drive{margin-left:auto}
+.badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
+.badge.ok{color:var(--green);border-color:var(--green)}
+.badge.warn{color:var(--gold);border-color:var(--gold)}
+.badge.bad{color:var(--red);border-color:var(--red)}
+
+#main{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;padding:12px;overflow:auto}
+@media (max-width:900px){#main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--edge);border-radius:12px;padding:12px}
+.card h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:8px}
+#mapwrap{position:relative}
+#cv{width:100%;height:auto;display:block;border-radius:8px;background:#0a0e18;cursor:crosshair}
+#maphint{position:absolute;left:10px;bottom:10px;font-size:11px;color:var(--dim);background:rgba(5,8,16,.75);padding:3px 10px;border-radius:8px}
+
+#alpanel{display:flex;flex-direction:column;gap:12px;min-width:0}
+#allog{height:250px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding:2px}
+.msg{max-width:88%;padding:7px 11px;border-radius:11px;font-size:12.8px;white-space:pre-wrap;word-break:break-word}
+.msg.al{align-self:flex-start;background:#1c1533;border:1px solid #3b2a63}
+.msg.al b{color:var(--purple)}
+.msg.you{align-self:flex-end;background:#12304f;border:1px solid #2d5a8f}
+.msg.ev{align-self:center;background:none;border:none;color:var(--dim);font-size:11.5px}
+#alrow{display:flex;gap:8px;margin-top:8px}
+#alin{flex:1;min-width:0}
+
+.kv{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-bottom:1px dashed #182240;font-size:12.5px}
+.kv b{color:var(--dim);font-weight:500}
+.kv span{font-family:var(--mono);text-align:right;word-break:break-all}
+#rays{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin-top:6px}
+#rays div{height:44px;border-radius:4px;background:#101830;position:relative;overflow:hidden}
+#rays div i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(180deg,var(--red),#7a2e2e);display:block}
+#rays div.focus{outline:2px solid var(--gold)}
+#rays span{position:absolute;top:2px;left:0;right:0;text-align:center;font-size:9px;color:var(--dim);font-family:var(--mono)}
+#tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px}
+#tiles div{height:26px;border-radius:5px;background:#101830;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--dim);font-family:var(--mono)}
+#tiles div.got{background:#123a24;color:#7ce0a3}
+#tiles div.bad{background:#3a1614;color:#f2a49b}
+#statusbar{flex:none;display:flex;gap:16px;padding:5px 14px;background:#050810;border-top:1px solid var(--edge);font-size:11.5px;color:var(--dim);overflow-x:auto;white-space:nowrap}
+#statusbar b{color:var(--gold)}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <span class="logo">⚔ Laevateinn<small>自動走行アシスタント「アル」</small></span>
+  <div id="modes">
+    <button id="mode-web" class="on">🌐 Web地図 (衛星不使用)</button>
+    <button id="mode-sat">🛰 人工衛星</button>
+  </div>
+  <button id="drive" class="primary">▶ 自動走行 開始</button>
+</div>
+
+<div id="main">
+  <div>
+    <div class="card" id="mapwrap">
+      <h2>マップ — クリックで目的地を設定 (A* が経路を計画)</h2>
+      <canvas id="cv" width="720" height="540"></canvas>
+      <div id="maphint">地図タイルは受信・AEAD検証したところから表示されます</div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h2>アルのトランスフォーマー知覚 — 16 レイセンサへの attention</h2>
+      <div class="kv"><b>脅威スコア</b><span id="threat">0.00</span></div>
+      <div class="kv"><b>注意の焦点</b><span id="focus">—</span></div>
+      <div id="rays"></div>
+    </div>
+  </div>
+
+  <div id="alpanel">
+    <div class="card">
+      <h2>アル (Al) — レーヴァテインのアシスタントAI</h2>
+      <div id="allog"></div>
+      <div id="alrow">
+        <input id="alin" placeholder="アルに話す: 状態 / どこ / 地図 / 停止 / 発進 / help"/>
+        <button id="alsend">送信</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>測位</h2>
+      <div class="kv"><b>ソース</b><span id="possrc">—</span></div>
+      <div class="kv"><b>推定位置</b><span id="posest">—</span></div>
+      <div class="kv"><b>推定誤差</b><span id="poserr">—</span></div>
+      <div class="kv"><b>速度</b><span id="spd">0.0 m/s</span></div>
+    </div>
+    <div class="card">
+      <h2>地図データ受信 (9 タイル)</h2>
+      <div class="kv"><b>受信元</b><span id="tilesrc">—</span></div>
+      <div id="tiles"></div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">
+  <span><b>Laevateinn</b> v1.0</span>
+  <span>assistant: <b>アル</b> (BadaGPT系意図エンジン)</span>
+  <span id="st-mode">mode: web</span>
+  <span id="st-msg"></span>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * Laevateinn — 自動走行アシスタント「アル」
+ * エンジン部 (純ロジック) は tools/engine-test.js で単体テストされます。
+ * ===================================================================== */
+
+/* ── 決定論的乱数・ハッシュ (Bada VM Pro / zone:// と同系) ─────────── */
+function lvHash(s){ let h = 2166136261; for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function lvRand(seed){ let s = (seed >>> 0) || 1; return function(){ s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff; }; }
+
+/* =====================================================================
+ * 道路網 (12×9)。'#' 道路 / 'L' ランドマーク交差点 / '.' 空地
+ * この地図そのものは「ウェブサイト」がタイルとして配信する (下の MapNet)
+ * ===================================================================== */
+const GRID_W = 12, GRID_H = 9, CELL = 60;
+const ROADS = [
+  "L##########L",
+  "#..#....#..#",
+  "#..#....#..#",
+  "L#####L####L",
+  "#..#..#..#.#",
+  "#..#..#..#.#",
+  "L####L#####L",
+  "#....#.....#",
+  "L##########L"
+];
+function isRoad(x, y){ return x >= 0 && y >= 0 && x < GRID_W && y < GRID_H && ROADS[y][x] !== "."; }
+function isLandmark(x, y){ return isRoad(x, y) && ROADS[y][x] === "L"; }
+
+/* ── A* 経路計画 ────────────────────────────────────────────────── */
+function planRoute(from, to){
+  if (!isRoad(from[0], from[1]) || !isRoad(to[0], to[1])) return null;
+  const key = function(p){ return p[0] + "," + p[1]; };
+  const open = [{ p: from, g: 0, f: 0, prev: null }];
+  const seen = {};
+  while (open.length){
+    let bi = 0;
+    for (let i = 1; i < open.length; i++) if (open[i].f < open[bi].f) bi = i;
+    const cur = open.splice(bi, 1)[0];
+    const k = key(cur.p);
+    if (k in seen) continue;
+    seen[k] = cur;
+    if (cur.p[0] === to[0] && cur.p[1] === to[1]){
+      const path = [];
+      let n = cur;
+      while (n){ path.unshift(n.p); n = n.prev; }
+      return path;
+    }
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const d of dirs){
+      const nx = cur.p[0] + d[0], ny = cur.p[1] + d[1];
+      if (!isRoad(nx, ny) || (key([nx,ny]) in seen)) continue;
+      const g = cur.g + 1;
+      const h = Math.abs(nx - to[0]) + Math.abs(ny - to[1]);
+      open.push({ p: [nx, ny], g: g, f: g + h, prev: cur });
+    }
+  }
+  return null;
+}
+
+/* =====================================================================
+ * アルのトランスフォーマー知覚
+ *   16 本のレイセンサ → トークン化 → 16次元 QK attention (softmax)。
+ *   query は自車の進行方向トークン。近接バイアスを logit に加え、
+ *   threat = Σ w_i · closeness_i、焦点 = argmax w_i · closeness_i。
+ * ===================================================================== */
+const AL_TF = { dim: 16, range: 150 };
+function alEmbed(tok){
+  const r = lvRand(lvHash("al:" + tok));
+  const v = [];
+  for (let i = 0; i < AL_TF.dim; i++) v.push(r() * 2 - 1);
+  return v;
+}
+function alDot(a, b){ let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function alSoftmax(xs){
+  const mx = Math.max.apply(null, xs);
+  const es = xs.map(function(x){ return Math.exp(x - mx); });
+  const z = es.reduce(function(a, b){ return a + b; }, 0);
+  return es.map(function(e){ return e / z; });
+}
+/* rays: [{dist, type}] × 16。dist は AL_TF.range 超で「何もなし」 */
+function alPerceive(rays){
+  const q = alEmbed("ego:forward");
+  const scale = 1 / Math.sqrt(AL_TF.dim);
+  const logits = [], closeness = [];
+  for (let i = 0; i < rays.length; i++){
+    const r = rays[i];
+    const c = r.dist < AL_TF.range ? Math.max(0, 1 - r.dist / AL_TF.range) : 0;
+    closeness.push(c);
+    const tok = "ray" + i + ":" + (r.type || "none") + ":" + Math.min(9, Math.floor((r.dist / AL_TF.range) * 10));
+    /* attention logit = QK 内積 + 近接バイアス (距離が近いほど注意) */
+    logits.push(alDot(q, alEmbed(tok)) * scale + c * 5.5);
+  }
+  const attn = alSoftmax(logits);
+  let threat = 0, focus = -1, best = 0;
+  for (let i = 0; i < rays.length; i++){
+    const t = attn[i] * closeness[i];
+    threat += t;
+    if (t > best){ best = t; focus = i; }
+  }
+  return { threat: threat, focus: focus, attn: attn, closeness: closeness };
+}
+
+/* =====================================================================
+ * 測位エンジン
+ * ── Web地図モード (衛星不使用): 推測航法 + ランドマーク補正 ──────
+ * ── 人工衛星モード: 4 衛星の擬似距離から最小二乗トリラテレーション ─
+ * ===================================================================== */
+function deadReckonStep(est, heading, speed, dt, driftRand){
+  /* IMU/オドメトリ積分。drift は毎ステップ僅かに蓄積 */
+  const drift = driftRand ? (driftRand() - 0.5) * 1.2 : 0;
+  return {
+    x: est.x + Math.cos(heading) * speed * dt + drift,
+    y: est.y + Math.sin(heading) * speed * dt + (driftRand ? (driftRand() - 0.5) * 1.2 : 0)
+  };
+}
+function landmarkFix(est, truePos, cell){
+  /* ランドマーク交差点を通過 → Web地図タイルの既知座標に吸着 */
+  const gx = Math.floor(truePos.x / cell), gy = Math.floor(truePos.y / cell);
+  if (isLandmark(gx, gy)){
+    return { fixed: true, x: (gx + 0.5) * cell, y: (gy + 0.5) * cell };
+  }
+  return { fixed: false, x: est.x, y: est.y };
+}
+const SATS = [
+  { name: "LVT-1", x: -4000, y: -3000 },
+  { name: "LVT-2", x:  4800, y: -2600 },
+  { name: "LVT-3", x:  4200, y:  4600 },
+  { name: "LVT-4", x: -3800, y:  4200 }
+];
+function gnssFix(truePos, noise, rnd){
+  /* 擬似距離 + ガウスノイズ → ガウス・ニュートン 6 反復 (2D) */
+  const ranges = SATS.map(function(s){
+    const d = Math.hypot(s.x - truePos.x, s.y - truePos.y);
+    return d + (rnd ? (rnd() + rnd() + rnd() - 1.5) * noise : 0);
+  });
+  let px = 0, py = 0;
+  for (let it = 0; it < 6; it++){
+    let a11 = 0, a12 = 0, a22 = 0, b1 = 0, b2 = 0;
+    for (let i = 0; i < SATS.length; i++){
+      const dx = px - SATS[i].x, dy = py - SATS[i].y;
+      const r = Math.hypot(dx, dy) || 1;
+      const res = ranges[i] - r;
+      const jx = -dx / r, jy = -dy / r;
+      a11 += jx * jx; a12 += jx * jy; a22 += jy * jy;
+      b1 += jx * res; b2 += jy * res;
+    }
+    const det = a11 * a22 - a12 * a12;
+    if (Math.abs(det) < 1e-9) break;
+    px -= ( a22 * b1 - a12 * b2) / det;
+    py -= (-a12 * b1 + a11 * b2) / det;
+  }
+  return { x: px, y: py };
+}
+
+/* =====================================================================
+ * MapNet — 「ウェブサイト」からの地図タイル受信
+ *   9 タイル (4×3 セル)。zone:// 系の LCG キーストリーム AEAD で封緘
+ *   された封筒を受信し、タグ検証に通ったタイルだけ地図に描く。
+ *   人工衛星モードでは同じ封筒を衛星ブロードキャストとして受信。
+ * ===================================================================== */
+function lvSeed(key, salt){
+  let s = (key + Math.imul(salt, 2654435761)) % 2147483647;
+  if (s <= 0) s += 2147483646;
+  return s;
+}
+function lvLcg(s){ return (Math.imul(s, 48271) >>> 0) % 2147483647 || 1; }
+function mapSeal(plain, key, salt){
+  let st = lvSeed(key, salt);
+  const ct = [];
+  for (let i = 0; i < plain.length; i++){
+    st = lvLcg(st);
+    ct.push((plain.charCodeAt(i) + (st % 65536)) % 65536);
+  }
+  let tag = (key % 999983) + salt + 1;
+  for (let i = 0; i < ct.length; i++) tag = (Math.imul(tag, 31) + ct[i] + 7) % 2147483647;
+  return { ct: ct, salt: salt, tag: tag < 0 ? tag + 2147483647 : tag };
+}
+function mapOpen(env, key){
+  let tag = (key % 999983) + env.salt + 1;
+  for (let i = 0; i < env.ct.length; i++) tag = (Math.imul(tag, 31) + env.ct[i] + 7) % 2147483647;
+  if ((tag < 0 ? tag + 2147483647 : tag) !== env.tag) return null;   /* 改ざん → 拒否 */
+  let st = lvSeed(key, env.salt);
+  let out = "";
+  for (let i = 0; i < env.ct.length; i++){
+    st = lvLcg(st);
+    out += String.fromCharCode((env.ct[i] - (st % 65536) + 65536 * 2) % 65536);
+  }
+  return out;
+}
+const MAP_KEY = lvHash("laevateinn-map.or.jp");
+function tileId(tx, ty){ return "tile-" + tx + "-" + ty; }
+function tilePayload(tx, ty){
+  /* タイル = 4×3 セル分の道路データ (行文字列) */
+  const rows = [];
+  for (let y = ty * 3; y < ty * 3 + 3; y++) rows.push(ROADS[y].slice(tx * 4, tx * 4 + 4));
+  return tileId(tx, ty) + "|" + rows.join("|");
+}
+function tileEnvelope(tx, ty){
+  return mapSeal(tilePayload(tx, ty), MAP_KEY, (lvHash(tileId(tx, ty)) % 4000) + 1);
+}
+function tileReceive(env){
+  const plain = mapOpen(env, MAP_KEY);
+  if (plain === null) return null;
+  const parts = plain.split("|");
+  return { id: parts[0], rows: parts.slice(1) };
+}
+
+/* =====================================================================
+ * アル (Al) — BadaGPT 系の意図エンジン (レーヴァテインのアシスタント)
+ * ===================================================================== */
+function alReply(text, ctx){
+  const t = String(text).trim();
+  ctx = ctx || {};
+  if (/help|ヘルプ|何が|使い方/.test(t))
+    return "私はレーヴァテインのアシスタントAI、アルです。\n・「状態」「どこ」— 現在の測位と速度\n・「地図」— タイル受信状況\n・「停止」「発進」— 走行制御\n・「衛星」「ウェブ」— 測位モード切替\n地図をクリックすると目的地を設定し、A* で経路を引いて自動走行します。周囲は私のトランスフォーマーが16レイで見張っています。";
+  if (/状態|status|どこ|位置/.test(t))
+    return "現在位置は (" + Math.round(ctx.x || 0) + ", " + Math.round(ctx.y || 0) + ")、速度 " + (ctx.speed || 0).toFixed(1) + " m/s。測位は" + (ctx.mode === "sat" ? "人工衛星 (GNSS 最小二乗)" : "ウェブ地図 + 推測航法 — 衛星は使っていません") + "。推定誤差 " + (ctx.err == null ? "—" : ctx.err.toFixed(1) + " m") + " です。";
+  if (/地図|タイル|map/.test(t))
+    return "地図タイルは " + (ctx.tiles || 0) + "/9 受信済み。すべて AEAD タグ検証に通ったものだけ描画しています。受信元は" + (ctx.mode === "sat" ? "衛星ブロードキャスト" : "ウェブサイト (https://laevateinn-map.or.jp)") + "です。";
+  if (/停止|止ま|stop/.test(t)) return "了解、停止します。ブレーキ制御をこちらで引き受けました。";
+  if (/発進|進|再開|go|start/.test(t)) return "了解、発進します。進路の安全は私のトランスフォーマーが確認済みです。";
+  if (/衛星|さてらいと|sat/.test(t)) return "測位を人工衛星モードに切り替えます。4機 (LVT-1〜4) の擬似距離から最小二乗で解きます。";
+  if (/ウェブ|web|地上/.test(t)) return "測位をWeb地図モードに切り替えます。衛星は使わず、推測航法とランドマーク補正、ウェブサイト由来の地図で走ります。";
+  if (/名前|あなた|だれ|誰/.test(t)) return "アルです。剣の名を持つ車、レーヴァテインの案内役を務めます。よろしく。";
+  if (/ありがと|thanks/.test(t)) return "どういたしまして。安全第一で行きましょう。";
+  return "「" + t + "」ですね。走行にかかわる指示なら「停止」「発進」「衛星」「ウェブ」、状況は「状態」「地図」で聞いてください。";
+}
+
+/* =====================================================================
+ * ここから UI / シミュレーション (ブラウザのみ)
+ * ===================================================================== */
+const S = {
+  mode: "web",                 // web | sat
+  driving: false,
+  car: { x: CELL * 0.5, y: CELL * 0.5, heading: 0, speed: 0 },
+  est: { x: CELL * 0.5, y: CELL * 0.5 },
+  target: null, path: [], wp: 0,
+  obstacles: [],
+  tiles: {},                   // "tx,ty" -> {ok:bool}
+  tileQueue: [], tileTimer: 0,
+  threat: 0, focus: -1, lastAttn: null,
+  err: 0
+};
+const rndDrift = lvRand(20260828);
+const rndGnss = lvRand(424242);
+const rndObs = lvRand(777);
+
+const cv = document.getElementById("cv");
+const cx = cv.getContext("2d");
+
+function say(role, text){
+  const log = document.getElementById("allog");
+  const el = document.createElement("div");
+  el.className = "msg " + role;
+  if (role === "al") el.innerHTML = "<b>アル</b> " + text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/\n/g,"<br>");
+  else el.textContent = text;
+  log.appendChild(el);
+  while (log.children.length > 60) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+function setStatus(m){ document.getElementById("st-msg").textContent = m || ""; }
+
+/* ── タイル受信 (1.4 秒ごとに 1 枚) ── */
+function queueTiles(){
+  S.tileQueue = [];
+  for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++) S.tileQueue.push([tx, ty]);
+}
+function stepTiles(dt){
+  if (!S.tileQueue.length) return;
+  S.tileTimer += dt;
+  if (S.tileTimer < 1.4) return;
+  S.tileTimer = 0;
+  const [tx, ty] = S.tileQueue.shift();
+  const env = tileEnvelope(tx, ty);
+  const tile = tileReceive(env);
+  S.tiles[tx + "," + ty] = { ok: !!tile };
+  drawTilesPanel();
+  if (tile && Object.keys(S.tiles).length === 1)
+    say("al", (S.mode === "sat" ? "衛星ブロードキャスト" : "ウェブサイト") + "から最初の地図タイルを受信、AEAD検証OK。描画を始めます。");
+  if (!S.tileQueue.length) say("al", "地図タイル 9/9 受信完了。全タイル検証済みです。");
+}
+function tileGot(x, y){
+  const t = S.tiles[Math.floor(x / 4) + "," + Math.floor(y / 3)];
+  return t && t.ok;
+}
+function drawTilesPanel(){
+  const box = document.getElementById("tiles");
+  box.innerHTML = "";
+  for (let ty = 0; ty < 3; ty++) for (let tx = 0; tx < 3; tx++){
+    const d = document.createElement("div");
+    const t = S.tiles[tx + "," + ty];
+    d.className = t ? (t.ok ? "got" : "bad") : "";
+    d.textContent = t ? (t.ok ? "✓ " : "✗ ") + tileId(tx, ty) : "… " + tileId(tx, ty);
+    box.appendChild(d);
+  }
+  document.getElementById("tilesrc").textContent =
+    S.mode === "sat" ? "衛星ブロードキャスト (LVT-1〜4)" : "https://laevateinn-map.or.jp (衛星不使用)";
+}
+
+/* ── 障害物 ── */
+function spawnObstacle(){
+  for (let tries = 0; tries < 30; tries++){
+    const x = Math.floor(rndObs() * GRID_W), y = Math.floor(rndObs() * GRID_H);
+    if (!isRoad(x, y)) continue;
+    const px = (x + 0.5) * CELL, py = (y + 0.5) * CELL;
+    if (Math.hypot(px - S.car.x, py - S.car.y) < CELL * 1.6) continue;
+    S.obstacles.push({ x: px, y: py, type: rndObs() < 0.5 ? "car" : "walker", ttl: 12 + rndObs() * 10 });
+    return;
+  }
+}
+
+/* ── センサ: 16 レイ ── */
+function senseRays(){
+  const rays = [];
+  for (let i = 0; i < 16; i++){
+    const a = S.car.heading + (i - 7.5) / 16 * Math.PI * 2;
+    let best = AL_TF.range + 1, type = "none";
+    for (const o of S.obstacles){
+      const dx = o.x - S.car.x, dy = o.y - S.car.y;
+      const d = Math.hypot(dx, dy);
+      if (d > AL_TF.range) continue;
+      let da = Math.atan2(dy, dx) - a;
+      while (da > Math.PI) da -= 2 * Math.PI;
+      while (da < -Math.PI) da += 2 * Math.PI;
+      if (Math.abs(da) < Math.PI / 16 && d < best){ best = d; type = o.type; }
+    }
+    rays.push({ dist: best, type: type });
+  }
+  return rays;
+}
+
+/* ── 走行更新 ── */
+function stepDrive(dt){
+  if (!S.driving || !S.path.length || S.wp >= S.path.length) { S.car.speed = Math.max(0, S.car.speed - 60 * dt); return; }
+  const wp = S.path[S.wp];
+  const tx = (wp[0] + 0.5) * CELL, ty = (wp[1] + 0.5) * CELL;
+  const dx = tx - S.car.x, dy = ty - S.car.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 6){
+    S.wp++;
+    if (S.wp >= S.path.length){
+      S.driving = false; S.car.speed = 0;
+      say("al", "目的地に到着しました。お疲れさまです。");
+      document.getElementById("drive").textContent = "▶ 自動走行 開始";
+      return;
+    }
+    return;
+  }
+  S.car.heading = Math.atan2(dy, dx);
+  /* トランスフォーマー知覚 → 速度制御 */
+  const per = alPerceive(senseRays());
+  S.threat = per.threat; S.focus = per.focus; S.lastAttn = per;
+  const frontFocused = per.focus >= 6 && per.focus <= 9; /* 進行方向 ±約45° */
+  let targetSpeed = 46;
+  if (per.threat > 0.55 && frontFocused) targetSpeed = 0;
+  else if (per.threat > 0.30 && frontFocused) targetSpeed = 14;
+  if (targetSpeed === 0 && S.car.speed > 1 && !S.warned){
+    say("al", "前方 " + (S.lastAttn ? "レイ" + per.focus : "") + " に障害物。attention 集中 — 停止します。");
+    S.warned = true;
+  }
+  if (targetSpeed > 0 && S.warned && per.threat < 0.25){ say("al", "進路クリア。再発進します。"); S.warned = false; }
+  S.car.speed += (targetSpeed - S.car.speed) * Math.min(1, 3 * dt);
+  S.car.x += Math.cos(S.car.heading) * S.car.speed * dt;
+  S.car.y += Math.sin(S.car.heading) * S.car.speed * dt;
+}
+
+/* ── 測位更新 ── */
+function stepPos(dt){
+  if (S.mode === "web"){
+    S.est = deadReckonStep(S.est, S.car.heading, S.car.speed, dt, rndDrift);
+    const fx = landmarkFix(S.est, S.car, CELL);
+    if (fx.fixed && (Math.abs(fx.x - S.est.x) > 2 || Math.abs(fx.y - S.est.y) > 2)){
+      S.est = { x: fx.x, y: fx.y };
+    } else { S.est = { x: fx.x, y: fx.y }; }
+    document.getElementById("possrc").textContent = "Web地図 + 推測航法 (衛星不使用)";
+  } else {
+    S.est = gnssFix(S.car, 6, rndGnss);
+    document.getElementById("possrc").textContent = "人工衛星 GNSS (LVT-1〜4, 最小二乗)";
+  }
+  S.err = Math.hypot(S.est.x - S.car.x, S.est.y - S.car.y);
+  document.getElementById("posest").textContent = "(" + S.est.x.toFixed(0) + ", " + S.est.y.toFixed(0) + ")";
+  document.getElementById("poserr").textContent = S.err.toFixed(1) + " m";
+  document.getElementById("spd").textContent = S.car.speed.toFixed(1) + " m/s";
+}
+
+/* ── 描画 ── */
+function draw(){
+  cx.clearRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < GRID_H; y++) for (let x = 0; x < GRID_W; x++){
+    if (!tileGot(x, y)){ cx.fillStyle = "#0a0e18"; cx.fillRect(x * CELL, y * CELL, CELL, CELL); continue; }
+    if (isRoad(x, y)){
+      cx.fillStyle = "#1b2438"; cx.fillRect(x * CELL, y * CELL, CELL, CELL);
+      cx.strokeStyle = "#2c3a5c"; cx.strokeRect(x * CELL + .5, y * CELL + .5, CELL - 1, CELL - 1);
+      if (isLandmark(x, y)){ cx.fillStyle = "#c8a44a"; cx.beginPath(); cx.arc((x+.5)*CELL, (y+.5)*CELL, 4, 0, 7); cx.fill(); }
+    } else { cx.fillStyle = "#0d1322"; cx.fillRect(x * CELL, y * CELL, CELL, CELL); }
+  }
+  /* 経路 */
+  if (S.path.length){
+    cx.strokeStyle = "rgba(63,182,196,.8)"; cx.lineWidth = 3; cx.beginPath();
+    for (let i = 0; i < S.path.length; i++){
+      const px = (S.path[i][0] + .5) * CELL, py = (S.path[i][1] + .5) * CELL;
+      if (i === 0) cx.moveTo(px, py); else cx.lineTo(px, py);
+    }
+    cx.stroke(); cx.lineWidth = 1;
+    const g = S.path[S.path.length - 1];
+    cx.fillStyle = "#3fb6c4"; cx.fillRect((g[0]+.5)*CELL-6, (g[1]+.5)*CELL-6, 12, 12);
+  }
+  /* 障害物 */
+  for (const o of S.obstacles){
+    cx.fillStyle = o.type === "car" ? "#d05a5a" : "#d0a44a";
+    cx.beginPath(); cx.arc(o.x, o.y, o.type === "car" ? 9 : 6, 0, 7); cx.fill();
+  }
+  /* 推定位置 (測位) */
+  cx.strokeStyle = "#9060d0"; cx.beginPath(); cx.arc(S.est.x, S.est.y, 10, 0, 7); cx.stroke();
+  /* 自車 */
+  cx.save(); cx.translate(S.car.x, S.car.y); cx.rotate(S.car.heading);
+  cx.fillStyle = "#4ac077"; cx.beginPath(); cx.moveTo(12, 0); cx.lineTo(-9, -7); cx.lineTo(-9, 7); cx.closePath(); cx.fill();
+  cx.restore();
+  /* 衛星モードなら衛星の方位線 */
+  if (S.mode === "sat"){
+    cx.strokeStyle = "rgba(74,128,208,.35)";
+    for (const s of SATS){
+      const a = Math.atan2(s.y - S.car.y, s.x - S.car.x);
+      cx.beginPath(); cx.moveTo(S.car.x, S.car.y);
+      cx.lineTo(S.car.x + Math.cos(a) * 46, S.car.y + Math.sin(a) * 46); cx.stroke();
+    }
+  }
+}
+function drawRays(){
+  const box = document.getElementById("rays");
+  if (!box.children.length){
+    for (let i = 0; i < 16; i++){
+      const d = document.createElement("div");
+      d.innerHTML = "<span>" + i + "</span><i style='height:0%'></i>";
+      box.appendChild(d);
+    }
+  }
+  const per = S.lastAttn;
+  for (let i = 0; i < 16; i++){
+    const d = box.children[i];
+    const h = per ? Math.round(per.attn[i] * 100 / Math.max.apply(null, per.attn)) : 0;
+    d.querySelector("i").style.height = (per && per.closeness[i] > 0 ? Math.max(8, h) : Math.min(h, 4)) + "%";
+    d.classList.toggle("focus", per && i === per.focus && per.closeness[i] > 0);
+  }
+  document.getElementById("threat").textContent = S.threat.toFixed(2);
+  document.getElementById("focus").textContent =
+    (S.lastAttn && S.focus >= 0 && S.lastAttn.closeness[S.focus] > 0) ? ("レイ " + S.focus + " (" + (S.focus>=6&&S.focus<=9?"前方":"周辺") + ")") : "—";
+}
+
+/* ── メインループ ── */
+let last = 0, obsTimer = 0;
+function loop(ts){
+  const dt = Math.min(0.05, (ts - last) / 1000 || 0.016);
+  last = ts;
+  stepTiles(dt);
+  stepDrive(dt);
+  stepPos(dt);
+  if (!S.driving){ const per = alPerceive(senseRays()); S.threat = per.threat; S.focus = per.focus; S.lastAttn = per; }
+  obsTimer += dt;
+  if (obsTimer > 4 && S.obstacles.length < 6){ obsTimer = 0; spawnObstacle(); }
+  for (const o of S.obstacles) o.ttl -= dt;
+  S.obstacles = S.obstacles.filter(function(o){ return o.ttl > 0; });
+  draw(); drawRays();
+  requestAnimationFrame(loop);
+}
+
+/* ── 入力 ── */
+cv.addEventListener("click", function(ev){
+  const r = cv.getBoundingClientRect();
+  const x = Math.floor((ev.clientX - r.left) / r.width * GRID_W);
+  const y = Math.floor((ev.clientY - r.top) / r.height * GRID_H);
+  if (!isRoad(x, y)){ say("al", "そこは道路ではありません。道路上のセルを指定してください。"); return; }
+  const from = [Math.max(0, Math.min(GRID_W - 1, Math.floor(S.car.x / CELL))), Math.max(0, Math.min(GRID_H - 1, Math.floor(S.car.y / CELL)))];
+  const path = planRoute(from, [x, y]);
+  if (!path){ say("al", "経路が見つかりません。"); return; }
+  S.path = path; S.wp = 0; S.target = [x, y];
+  say("al", "目的地 (" + x + "," + y + ") を設定。A* で " + path.length + " 区間の経路を引きました。「▶ 自動走行 開始」でいつでも出られます。");
+});
+document.getElementById("drive").addEventListener("click", function(){
+  if (!S.path.length){ say("al", "先に地図をクリックして目的地を決めてください。"); return; }
+  S.driving = !S.driving;
+  this.textContent = S.driving ? "⏸ 停止" : "▶ 自動走行 開始";
+  this.className = S.driving ? "danger" : "primary";
+  say("al", S.driving ? "自動走行を開始します。周囲は私が見張ります。" : "停止しました。");
+});
+function setMode(m){
+  S.mode = m;
+  document.getElementById("mode-web").classList.toggle("on", m === "web");
+  document.getElementById("mode-sat").classList.toggle("on", m === "sat");
+  document.getElementById("st-mode").textContent = "mode: " + m;
+  drawTilesPanel();
+  say("al", m === "sat"
+    ? "人工衛星モードに切替。LVT-1〜4 の擬似距離で測位し、地図も衛星ブロードキャストで受けます。"
+    : "Web地図モードに切替。衛星は使いません — ウェブサイトの地図タイルと推測航法+ランドマーク補正で走ります。");
+}
+document.getElementById("mode-web").addEventListener("click", function(){ setMode("web"); });
+document.getElementById("mode-sat").addEventListener("click", function(){ setMode("sat"); });
+function alSend(){
+  const inp = document.getElementById("alin");
+  const t = inp.value.trim();
+  if (!t) return;
+  inp.value = "";
+  say("you", t);
+  const reply = alReply(t, { x: S.est.x, y: S.est.y, speed: S.car.speed, mode: S.mode, err: S.err,
+                             tiles: Object.keys(S.tiles).length });
+  setTimeout(function(){
+    say("al", reply);
+    if (/停止|止ま|stop/.test(t) && S.driving) document.getElementById("drive").click();
+    if (/発進|進|再開|go|start/.test(t) && !S.driving && S.path.length) document.getElementById("drive").click();
+    if (/衛星|さてらいと|sat/.test(t) && S.mode !== "sat") setMode("sat");
+    if (/ウェブ|web|地上/.test(t) && S.mode !== "web") setMode("web");
+  }, 150);
+}
+document.getElementById("alsend").addEventListener("click", alSend);
+document.getElementById("alin").addEventListener("keydown", function(e){ if (e.key === "Enter") alSend(); });
+
+/* ── 起動 ── */
+queueTiles();
+drawTilesPanel();
+say("al", "こんにちは、アルです。レーヴァテインの走行はお任せください。\nまず地図タイルをウェブサイトから受信します (衛星不使用のWeb地図モード)。地図の道路をクリックして目的地をどうぞ。");
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
