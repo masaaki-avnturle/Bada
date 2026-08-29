@@ -115,6 +115,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`multiwindow/`** | **Bada MultiWindow** — Windows 風デスクトップ & Samsung フリーフォーム (ポップアップ表示 / DeX) でタブレット画面上に直接複数の独立ウィンドウを開くマルチウィンドウ アプリ · インストール済みアプリのウィンドウ起動 · 🗄 ファイルキャビネット(札束めくり) · メモ/電卓/時計/空き容量モニター · 依存ゼロ・WebView 不使用の超軽量 APK (低ストレージ/低メモリ端末対応) | [→ 開く](multiwindow/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 
@@ -142,6 +143,32 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **Ubuntu** | `BadaCppBuilder-*-x86_64.AppImage` / `BadaCppBuilder-*-amd64.deb` |
 
 ビルドは [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) が実行します(`cppbuilder-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`cpp_builder/README.md`](cpp_builder/README.md) を参照。
+
+---
+
+## 🪟 Bada MultiWindow — Windows 風デスクトップ & Samsung フリーフォーム マルチウィンドウ
+
+Samsung タブレットの**フリーフォーム機能(ポップアップ表示 / Samsung DeX)**で、
+アプリ画面の内部ではなく**タブレットの画面上に直接**、複数の独立した OS ウィンドウを
+開くマルチウィンドウ アプリです。**Microsoft Windows 風のデスクトップ**(タスクバー +
+⊞ スタートメニュー + 検索)から**タブレットにインストールされている全アプリ**を
+タップひとつでウィンドウ起動でき、Windows と同じように複数のアプリを画面上で
+重ねたり並べたりできます。内蔵ツール(メモ / 電卓 / 時計 / 空き容量モニター /
+🗄 ファイルキャビネット)は同じものを何枚でも開け、各ウィンドウはドラッグ移動・
+リサイズできます。ファイルキャビネットは、タブレット内のアプリとファイルを
+横スライドではなく**札束をペラペラめくるように** 3D フリップで閲覧する
+フォルダ ブラウザです。
+
+依存ライブラリゼロ・WebView 不使用の純ネイティブ実装で APK は極小 —
+**内部ストレージ(ハードディスク)やメモリの空きが少ないタブレットでも動作**します。
+空き容量不足でも安全に動くよう、保存失敗時の警告表示と、ストレージ/RAM 使用率を
+常時監視できる「空き容量モニター」ウィンドウを備えています。
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (Samsung タブレット / APK) | [Actions の最新実行](https://github.com/masaaki-avnturle/Bada/actions/workflows/multiwindow-app-build.yml) の **Artifacts** `multiwindow-android`(zip 内に `bada-multiwindow-debug.apk`)、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-multiwindow-debug.apk` |
+
+ビルドは [`multiwindow-app-build.yml`](.github/workflows/multiwindow-app-build.yml) が実行します(`multiwindow/` 変更の PR / main への push で Actions アーティファクト / `multiwindow-v*` タグで Release へ添付 / `workflow_dispatch` も可)。使い方・技術詳細は [`multiwindow/README.md`](multiwindow/README.md) を参照。
 
 ---
 
