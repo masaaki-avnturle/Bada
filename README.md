@@ -130,6 +130,40 @@
 
 ---
 
+## 📦 全アプリ ネイティブ版 ダウンロード (APK / Windows 10・11 / Ubuntu)
+
+これまでに作った**アプリ全部**を、Android APK・Windows 10/11 EXE・Ubuntu AppImage/deb の 3 プラットフォームでビルドし、[**Releases**](https://github.com/masaaki-avnturle/Bada/releases) からダウンロードできます。
+
+**Ω アプリ 13 本** (概念シミュレーション/アート・非医療) は統一ワークフロー [`all-apps-build.yml`](.github/workflows/all-apps-build.yml) が一括ビルドします (`all-apps-v*` タグ、または Actions から手動実行)。仕組みの詳細は [`apps/`](apps/) を参照:
+
+| アプリ | Android (APK) | Windows 10 / 11 | Ubuntu |
+|:---|:---|:---|:---|
+| **Ω-Biofeedback Oracle** — 生成バイオフィードバック音響アート | `omega_biofeedback-debug.apk` | `Omega-Biofeedback-Oracle-*-x64.exe` / `-portable.exe` | `Omega-Biofeedback-Oracle-*.AppImage` / `.deb` |
+| **Ω-Thermal Trace** — 温度トレース概念ビジュアライザ | `omega_thermal_trace-debug.apk` | `Omega-Thermal-Trace-*-x64.exe` / `-portable.exe` | `Omega-Thermal-Trace-*.AppImage` / `.deb` |
+| **Ω-Telepathy** — テレパシー概念シミュレーション | `omega_telepathy-debug.apk` | `Omega-Telepathy-*-x64.exe` / `-portable.exe` | `Omega-Telepathy-*.AppImage` / `.deb` |
+| **Ω-Attach Station** — 署名付きバンドル統合生成器 | `omega_attach_station-debug.apk` | `Omega-Attach-Station-*-x64.exe` / `-portable.exe` | `Omega-Attach-Station-*.AppImage` / `.deb` |
+| **Ω-Apriori CodeGen Studio** — AI ソースコード生成器 | `omega_codegen-debug.apk` | `Omega-Apriori-CodeGen-*-x64.exe` / `-portable.exe` | `Omega-Apriori-CodeGen-*.AppImage` / `.deb` |
+| **Ω-Function Foundry** — 任意関数の FPGA 鍛造 | `omega_function_foundry-debug.apk` | `Omega-Function-Foundry-*-x64.exe` / `-portable.exe` | `Omega-Function-Foundry-*.AppImage` / `.deb` |
+| **Ω-Host App** — メモ帳 + 付加 AI デモ | `omega_host_app-debug.apk` | `Omega-Host-App-*-x64.exe` / `-portable.exe` | `Omega-Host-App-*.AppImage` / `.deb` |
+| **Ω-PatternForge** — テロメア分裂パターンマッチ AI | `omega_patternforge-debug.apk` | `Omega-PatternForge-*-x64.exe` / `-portable.exe` | `Omega-PatternForge-*.AppImage` / `.deb` |
+| **Ω-SelfEvolve** — 自己進化ソースコード + UID | `omega_self_evolve-debug.apk` | `Omega-SelfEvolve-*-x64.exe` / `-portable.exe` | `Omega-SelfEvolve-*.AppImage` / `.deb` |
+| **Ω-Telomere Forge** — テロメア自己進化 → FPGA 鍛造 | `omega_telomere_forge-debug.apk` | `Omega-Telomere-Forge-*-x64.exe` / `-portable.exe` | `Omega-Telomere-Forge-*.AppImage` / `.deb` |
+| **Ω-Tomograph** — Γ多様体 概念トモグラフ | `omega_tomograph-debug.apk` | `Omega-Tomograph-*-x64.exe` / `-portable.exe` | `Omega-Tomograph-*.AppImage` / `.deb` |
+| **Ω-Apriori Injector Studio** — 署名付き AI プラグイン SDK | `omega_apriori_injector-debug.apk` | `Omega-Apriori-Injector-*-x64.exe` / `-portable.exe` | `Omega-Apriori-Injector-*.AppImage` / `.deb` |
+| **Ω-Apriori Core** — 未知事前エンジン CPU | `omega_apriori_cpu-debug.apk` | `Omega-Apriori-Core-*-x64.exe` / `-portable.exe` | `Omega-Apriori-Core-*.AppImage` / `.deb` |
+
+さらに、以下の 3 アプリはそれぞれ専用ワークフローで 3 プラットフォームすべてに対応済みです:
+
+| アプリ | ワークフロー / タグ |
+|:---|:---|
+| **ZoneBrowser** (zone:// 専用ブラウザ) | [`zonebrowser-app-build.yml`](.github/workflows/zonebrowser-app-build.yml) · `zonebrowser-v*` |
+| **Bada C++Builder** (RAD IDE オマージュ) | [`cppbuilder-app-build.yml`](.github/workflows/cppbuilder-app-build.yml) · `cppbuilder-v*` |
+| **Bada GUI IDE** (+ CLI 単一実行ファイル) | [`bada-ide-build.yml`](.github/workflows/bada-ide-build.yml) · `bada-ide-v*` |
+
+> **インストールのヒント** — Android: debug 署名 APK のため「提供元不明のアプリ」を許可。Ubuntu: `chmod +x *.AppImage` で直接実行、または `sudo apt install ./*.deb`。Windows: `-x64.exe` はインストーラ、`-portable.exe` はそのまま起動。
+
+---
+
 ## 🔤 Bada Language — 設計原理
 
 山口フレームワークの作用素環プログラミングを実現するために設計された独自OOP言語。

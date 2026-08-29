@@ -1,0 +1,187 @@
+name: Ω all apps build (Android APK + Windows 10/11 EXE + Ubuntu)
+
+# apps/apps.json に登録された「これまでに作った全アプリ」を
+#   - Android 向け APK (Cordova, debug)
+#   - Windows 10/11 向け EXE (Electron: NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb (Electron)
+# として一括ビルドします。共通ラッパーは apps/wrapper/、
+# 各アプリ設定は apps/tools/gen-config.js が apps.json から生成します。
+# Actions アーティファクト、および (all-apps-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+#
+# ⚠ いずれのアプリも 概念シミュレーション/アート・非医療 です。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: all-apps-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'all-apps-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  check-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate apps.json + generators
+        run: |
+          set -e
+          node apps/tools/gen-config.js check
+          node --check apps/wrapper/main.js
+          node --check apps/wrapper/electron-builder.config.js
+          for id in $(node apps/tools/gen-config.js list); do
+            node apps/tools/gen-config.js appjson "$id" > /dev/null
+            node apps/tools/gen-config.js cordova "$id" > /dev/null
+          done
+          node apps/tools/gen-config.js notes > /tmp/notes.md
+          head -5 /tmp/notes.md
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: check-manifest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build all Windows EXE (NSIS installer + portable)
+        shell: bash
+        run: |
+          set -e
+          cd apps/wrapper
+          npm install
+          mkdir -p ../../out
+          for id in $(node ../tools/gen-config.js list); do
+            echo "=== building $id (windows) ==="
+            while IFS= read -r line; do [ -n "$line" ] && export "$line"; done \
+              < <(node ../tools/gen-config.js env "$id")
+            rm -rf www dist app.json
+            mkdir www
+            cp -r "../../$BADA_SRC/." www/
+            node ../tools/gen-config.js appjson "$id" > app.json
+            npm run dist:win
+            mv dist/*.exe ../../out/
+          done
+          ls -la ../../out
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-apps-windows
+          path: out/*.exe
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          files: out/*.exe
+
+  ubuntu-apps:
+    runs-on: ubuntu-latest
+    needs: check-manifest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build all Ubuntu apps (AppImage + deb)
+        run: |
+          set -e
+          cd apps/wrapper
+          npm install
+          mkdir -p ../../out
+          for id in $(node ../tools/gen-config.js list); do
+            echo "=== building $id (linux) ==="
+            while IFS= read -r line; do [ -n "$line" ] && export "$line"; done \
+              < <(node ../tools/gen-config.js env "$id")
+            rm -rf www dist app.json
+            mkdir www
+            cp -r "../../$BADA_SRC/." www/
+            node ../tools/gen-config.js appjson "$id" > app.json
+            npm run dist:linux
+            mv dist/*.AppImage dist/*.deb ../../out/
+          done
+          ls -la ../../out
+      - name: Upload Ubuntu artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-apps-ubuntu
+          path: |
+            out/*.AppImage
+            out/*.deb
+      - name: Generate release notes
+        run: node apps/tools/gen-config.js notes > out-notes.md
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          body_path: out-notes.md
+          files: |
+            out/*.AppImage
+            out/*.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: check-manifest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Build all Android APKs (Cordova, debug)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          mkdir -p out
+          cordova create cordova-build io.github.masaaki_avnturle.tmp TmpApp
+          for id in $(node apps/tools/gen-config.js list); do
+            echo "=== building $id (android) ==="
+            while IFS= read -r line; do [ -n "$line" ] && export "$line"; done \
+              < <(node apps/tools/gen-config.js env "$id")
+            rm -rf cordova-build/www
+            mkdir cordova-build/www
+            cp -r "$BADA_SRC/." cordova-build/www/
+            node apps/tools/gen-config.js cordova "$id" > cordova-build/config.xml
+            (
+              cd cordova-build
+              cordova platform rm android > /dev/null 2>&1 || true
+              cordova platform add android@12.0.1
+              cordova build android --verbose
+            )
+            cp cordova-build/platforms/android/app/build/outputs/apk/debug/app-debug.apk "out/${id}-debug.apk"
+          done
+          ls -la out
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: all-apps-android
+          path: out/*.apk
+      - name: Attach to Release
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          files: out/*.apk
