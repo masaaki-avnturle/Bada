@@ -1,0 +1,2202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada VM Pro — 量子Bada OS (w9wm デスクトップ / BadaGPT / Ubuntu ユーザーランド)</title>
+<!--
+  Bada VM Pro — w9wm デスクトップ版
+  ─────────────────────────────────────────────────────────────
+  ・デスクトップは window manager「w9wm」(9wm + 仮想スクリーン) の移植:
+      右クリック(B3) = WMメニュー New / Reshape / Move / Delete / Hide
+                       + 隠したウィンドウ一覧 + 仮想スクリーン 0-3
+      左クリック(B1) = アプリケーションメニュー
+      ウィンドウはタイトルバーなし・4px ボーダー (枠ドラッグで移動 /
+      右下角で リサイズ / Ctrl+Alt+←→ で仮想スクリーン切替)
+  ・Ubuntu 風ユーザーランドを事前インストール:
+      bash / apt / vim / emacs / ssh / xinetd / texlive-full /
+      screen / fcitx-mozc / xterm / x-terminal-emulator / terminal
+  ・ターミナルは日本語入力対応 (OS の IME による変換入力 + 内蔵
+      fcitx-mozc ローマ字かな変換, Ctrl+Space で切替)
+  ・カーネルベースは BadaGPT: OS update/upgrade を担当 (apt upgrade 連動)
+  ・Bada on Rails / 量子 Bada 実行系 / 合い言葉 / トランスフォーマー /
+      GUI・CUI プログラミングは従来どおり同梱
+  依存ゼロ・単一 HTML・オフライン動作。APK / EXE / AppImage は
+  .github/workflows/badavmpro-app-build.yml がビルドします。
+-->
+<style>
+:root{
+  --panel:#131826; --panel2:#0f1420; --edge:#232b3d;
+  --text:#d7dce8; --dim:#8a93a8; --gold:#c8a44a; --cyan:#40b8c0;
+  --purple:#9060d0; --blue:#4a80d0; --green:#4ac077; --red:#d05a5a;
+  --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+  --wmgray:#9c9c9c; --wmborder:#55585e; --wmactive:#2f3540; --menu:#e7e7e7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--wmgray);color:var(--text);font:14px/1.55 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--edge);border-radius:6px;padding:4px 10px;cursor:pointer}
+button:hover{border-color:var(--gold)}
+input,textarea,select{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--edge);border-radius:6px;padding:5px 8px}
+input:focus,textarea:focus{outline:none;border-color:var(--cyan)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#2a3450;border-radius:5px}
+
+/* ── w9wm ルート (デスクトップ) ─────────────────── */
+#desk{position:fixed;inset:0;overflow:hidden;
+  background-color:var(--wmgray);
+  background-image:repeating-conic-gradient(#a4a4a4 0% 25%, #989898 0% 50%);
+  background-size:4px 4px;cursor:default;-webkit-user-select:none;user-select:none}
+#desk.sweep{cursor:crosshair}
+#desk.pick-del{cursor:not-allowed}
+#rootstatus{position:absolute;right:6px;bottom:6px;z-index:5;background:#00000055;color:#f0f0f0;
+  font:11px var(--mono);padding:3px 8px;border-radius:4px;max-width:64vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+#deskhint{position:absolute;left:8px;bottom:6px;z-index:5;color:#00000088;font:11px var(--mono);pointer-events:none}
+#menubtn{position:absolute;left:8px;top:8px;z-index:5;background:#00000033;border:1px solid #00000044;color:#111;
+  font-size:15px;border-radius:6px;padding:2px 9px}
+#menubtn:hover{background:#00000055;border-color:#000}
+
+/* ── w9wm ウィンドウ (タイトルバーなし・4px ボーダー) ── */
+.win{position:absolute;background:var(--panel);border:4px solid #c9c9c9;outline:1px solid #444;
+  box-shadow:2px 3px 0 #00000042;display:flex;flex-direction:column;min-width:140px;min-height:100px}
+.win.focus{border-color:var(--wmactive);outline-color:#0a0c10}
+.win .body{flex:1;overflow:auto;background:var(--panel);position:relative}
+.win .rsz{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;cursor:nwse-resize;z-index:3}
+.win.hidden{display:none!important}
+
+/* ── w9wm メニュー ─────────────────────────────── */
+.wmenu{position:absolute;z-index:99;background:var(--menu);color:#000;border:1px solid #000;
+  font:13px/1.2 var(--mono);min-width:150px;box-shadow:2px 2px 0 #00000055;-webkit-user-select:none;user-select:none}
+.wmenu .it{padding:5px 12px;cursor:pointer;white-space:nowrap}
+.wmenu .it:hover{background:#000;color:#fff}
+.wmenu .sep{border-top:1px solid #777;margin:2px 0}
+.wmenu .cap{padding:3px 12px;font-size:11px;color:#555}
+.wmenu .vrow{display:flex;gap:4px;padding:5px 10px}
+.wmenu .vbox{width:22px;height:16px;border:1px solid #000;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;background:#fff}
+.wmenu .vbox.cur{background:#000;color:#fff}
+#sweepbox{position:absolute;z-index:98;border:2px dashed #000;background:#ffffff22;pointer-events:none;display:none}
+
+/* ── ページ (ウィンドウ内アプリ共通) ──────────── */
+.page{padding:16px 16px 30px;max-width:100%}
+.page h1{font-size:18px;color:var(--gold);margin-bottom:4px}
+.page h2{font-size:14px;color:var(--cyan);margin:16px 0 8px}
+.page .sub{color:var(--dim);font-size:12.5px;margin-bottom:12px}
+.card{background:var(--panel2);border:1px solid var(--edge);border-radius:10px;padding:13px;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px}
+.appicon{display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 6px;background:var(--panel);border:1px solid var(--edge);border-radius:12px;cursor:pointer;text-align:center}
+.appicon:hover{border-color:var(--gold)}
+.appicon .em{font-size:28px}
+.appicon .nm{font-size:12px}
+.appicon .ds{font-size:10px;color:var(--dim)}
+pre.code{background:#080b12;border:1px solid var(--edge);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12.5px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.badge{display:inline-block;padding:1px 9px;border-radius:99px;font-size:11px;border:1px solid var(--edge);color:var(--dim)}
+.badge.ok{color:var(--green);border-color:var(--green)}
+.badge.warn{color:var(--gold);border-color:var(--gold)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.kbd{font-family:var(--mono);background:#1a2133;border:1px solid var(--edge);border-radius:5px;padding:0 6px;font-size:12px}
+a.link{color:var(--cyan);cursor:pointer;text-decoration:underline}
+.tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.tbl th,.tbl td{border:1px solid var(--edge);padding:5px 8px;text-align:left}
+.tbl th{color:var(--dim);font-weight:600}
+
+/* ── ターミナル (xterm / x-terminal-emulator / terminal) ── */
+.termwrap{position:absolute;inset:0;display:flex;flex-direction:column;font-family:var(--mono);font-size:13px;line-height:1.35}
+.termwrap .screen{flex:1;overflow-y:auto;padding:6px 8px;white-space:pre-wrap;word-break:break-all;cursor:text}
+.termwrap.theme-xterm{background:#ffffff;color:#000}
+.termwrap.theme-xterm .cur{background:#000;color:#fff}
+.termwrap.theme-dark{background:#000;color:#d8d8d8}
+.termwrap.theme-dark .cur{background:#d8d8d8;color:#000}
+.termwrap.theme-ubuntu{background:#300a24;color:#eeeeec}
+.termwrap.theme-ubuntu .cur{background:#eeeeec;color:#300a24}
+.termwrap .ime{text-decoration:underline;text-underline-offset:2px;opacity:.92}
+.termwrap .imebadge{position:absolute;right:6px;top:4px;font-size:10px;padding:1px 7px;border-radius:8px;background:#0008;color:#ffd166;z-index:2;pointer-events:none}
+.termwrap textarea.kb{position:absolute;left:0;bottom:0;width:4px;height:4px;opacity:0.01;border:none;resize:none;background:transparent;color:transparent;caret-color:transparent;z-index:1}
+.termwrap .modeline{background:#00000033;font-size:12px;padding:1px 8px;white-space:pre;overflow:hidden}
+.termwrap.theme-xterm .modeline{background:#00000014;color:#000}
+
+/* ── BadaGPT ── */
+#chatlog{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.msg{padding:8px 12px;border-radius:10px;max-width:92%;white-space:pre-wrap;word-break:break-word;font-size:13px}
+.msg.user{align-self:flex-end;background:#233150}
+.msg.gpt{align-self:flex-start;background:#1c2436;border:1px solid var(--edge)}
+.prog{height:5px;background:#0d1119;border-radius:3px;margin-top:8px;overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--purple),var(--cyan))}
+
+/* ── GUIデザイナ ── */
+#designer{display:grid;grid-template-columns:150px 1fr 170px;gap:10px}
+#canvas{position:relative;min-height:280px;background:#0a0e17;border:1px dashed var(--edge);border-radius:8px;overflow:hidden}
+.cmp{position:absolute;font-size:12px;padding:4px 10px;border-radius:5px;cursor:move;-webkit-user-select:none;user-select:none}
+.cmp.TButton{background:#2a3a5c;border:1px solid var(--blue)}
+.cmp.TLabel{color:var(--gold)}
+.cmp.TEdit{background:#0d1119;border:1px solid var(--edge);min-width:110px;color:var(--dim)}
+.cmp.sel{outline:2px solid var(--cyan)}
+#guiprev{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:200}
+#gp-inner{width:min(480px,94vw);background:#e8e8ec;color:#16181d;border-radius:10px;overflow:hidden}
+#gp-title{background:linear-gradient(180deg,#3c4a68,#232c42);color:#fff;padding:6px 12px;font-size:13px;display:flex;justify-content:space-between}
+#gp-body{position:relative;height:320px}
+
+/* ── attention ── */
+.attn{display:grid;gap:2px}
+.attn div{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fffa}
+</style>
+</head>
+<body>
+<div id="desk"></div>
+<div id="sweepbox"></div>
+<button id="menubtn" title="アプリケーションメニュー (B1)">☰</button>
+<div id="deskhint">w9wm — B3(右クリック):WMメニュー / B1(左クリック):アプリ / Ctrl+Alt+←→:仮想スクリーン</div>
+<div id="rootstatus"><span id="st-ver"></span> · 合い言葉 <span id="st-aikotoba"></span> · rails <span id="st-rails"></span> · <span id="st-msg"></span></div>
+<button id="micbtn" style="display:none"></button>
+
+<div id="guiprev"><div id="gp-inner">
+  <div id="gp-title"><span>Form1 — Bada VM Pro (プレビュー)</span><span style="cursor:pointer" onclick="closeGuiPreview()">✕</span></div>
+  <div id="gp-body"></div>
+</div></div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * Bada VM Pro — カーネル: BadaGPT / デスクトップ: w9wm window manager
+ * ===================================================================== */
+
+/* ── 永続ストア (localStorage) ──────────────────────────────────── */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("badavm."+k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("badavm."+k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ── OS 状態 ────────────────────────────────────────────────────── */
+function osVersion(){ return store.get("os.version", "5.0.0"); }
+function setStatus(msg){ const el = document.getElementById("st-msg"); if(el) el.textContent = msg || ""; }
+function refreshStatusbar(){
+  document.getElementById("st-ver").textContent = "BadaVMPro v" + osVersion();
+  document.getElementById("st-aikotoba").textContent = "「" + aikotoba() + "」";
+  document.getElementById("st-rails").textContent = store.get("rails.server", false) ? ":3000" : "stop";
+}
+
+/* OS update / upgrade は BadaGPT が担う。ここは version 台帳の操作のみ。 */
+function osUpdate(kind){
+  const v = osVersion().split(".").map(Number);
+  if (kind === "upgrade") { v[0] += 1; v[1] = 0; v[2] = 0; }
+  else                    { v[2] += 1; }
+  const nv = v.join(".");
+  store.set("os.version", nv);
+  const log = store.get("os.changelog", []);
+  log.unshift({ v: nv, kind: kind, at: new Date().toISOString(),
+    notes: kind === "upgrade"
+      ? "メジャーアップグレード: 量子スケジューラ刷新 / BadaGPT カーネル世代交代 / Rails ブリッジ高速化"
+      : "アップデート: セキュリティ修正 / zone:// スタック調整 / attention キャッシュ最適化" });
+  store.set("os.changelog", log.slice(0, 30));
+  refreshStatusbar();
+  return nv;
+}
+
+/* =====================================================================
+ * 量子 Bada 言語インタープリタ (状態ベクトル・シミュレータ)
+ * ===================================================================== */
+function badaInterpret(src){
+  const out = [];
+  const vars = Object.create(null);
+  let qnames = [];
+  let state = null;
+
+  function initQ(names){
+    for (const n of names) if (!qnames.includes(n)) qnames.push(n);
+    if (qnames.length > 8) throw new Error("qubit は最大 8 個までです");
+    const dim = 1 << qnames.length;
+    state = new Array(dim).fill(null).map(function(_, i){ return { re: i === 0 ? 1 : 0, im: 0 }; });
+  }
+  function qi(name){
+    const i = qnames.indexOf(name);
+    if (i < 0) throw new Error("未宣言の qubit: " + name + " (先に `qubit " + name + "` を実行)");
+    return i;
+  }
+  function apply1(t, m){
+    const n = qnames.length, dim = 1 << n, bit = 1 << (n - 1 - t);
+    const ns = state.map(function(a){ return { re: a.re, im: a.im }; });
+    for (let i = 0; i < dim; i++){
+      if (i & bit) continue;
+      const j = i | bit, a = state[i], b = state[j];
+      ns[i] = { re: m[0][0]*a.re + m[0][1]*b.re, im: m[0][0]*a.im + m[0][1]*b.im };
+      ns[j] = { re: m[1][0]*a.re + m[1][1]*b.re, im: m[1][0]*a.im + m[1][1]*b.im };
+    }
+    state = ns;
+  }
+  function applyCNOT(c, t){
+    const n = qnames.length, dim = 1 << n;
+    const cb = 1 << (n - 1 - c), tb = 1 << (n - 1 - t);
+    const ns = state.map(function(a){ return { re: a.re, im: a.im }; });
+    for (let i = 0; i < dim; i++) if (i & cb) ns[i ^ tb] = state[i];
+    state = ns;
+  }
+  function measureAll(){
+    const dim = state.length;
+    let r = Math.random(), acc = 0, hit = 0;
+    for (let i = 0; i < dim; i++){
+      acc += state[i].re*state[i].re + state[i].im*state[i].im;
+      if (r <= acc){ hit = i; break; }
+      hit = i;
+    }
+    const bits = hit.toString(2).padStart(qnames.length, "0");
+    state = state.map(function(_, i){ return { re: i === hit ? 1 : 0, im: 0 }; });
+    return bits;
+  }
+  function amplitudes(){
+    const dim = state.length, lines = [];
+    for (let i = 0; i < dim; i++){
+      const p = state[i].re*state[i].re + state[i].im*state[i].im;
+      if (p > 1e-9) lines.push("|" + i.toString(2).padStart(qnames.length,"0") + "⟩ " +
+        (state[i].re.toFixed(3)) + (state[i].im >= 0 ? "+" : "") + state[i].im.toFixed(3) + "i  (p=" + p.toFixed(3) + ")");
+    }
+    return lines.join("\n");
+  }
+  function evalExpr(e){
+    e = e.trim();
+    const safe = e.replace(/[A-Za-z_][A-Za-z0-9_]*/g, function(name){
+      if (name in vars) return "(" + vars[name] + ")";
+      if (["sqrt","sin","cos","abs","floor","pow","PI","E","log","exp"].includes(name)) return "Math." + name;
+      throw new Error("未定義の変数: " + name);
+    });
+    if (!/^[-+*/%().,0-9\sMathsqrtincoabflwpPIElgex]*$/.test(safe)) throw new Error("式に使えない文字があります: " + e);
+    return Function('"use strict";return (' + safe + ")")();
+  }
+
+  const H = [[Math.SQRT1_2, Math.SQRT1_2],[Math.SQRT1_2, -Math.SQRT1_2]];
+  const X = [[0,1],[1,0]], Z = [[1,0],[0,-1]];
+
+  const lines = String(src).split(/\r?\n/);
+  for (let ln = 0; ln < lines.length; ln++){
+    let line = lines[ln].replace(/(#|\/\/).*$/, "").trim();
+    if (!line) continue;
+    try {
+      let m;
+      if ((m = line.match(/^qubit\s+(.+)$/i)))           { initQ(m[1].split(/[\s,]+/).filter(Boolean)); out.push("qubit: [" + qnames.join(" ") + "] を |0…0⟩ に初期化"); }
+      else if ((m = line.match(/^H\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), H); out.push("H " + m[1]); }
+      else if ((m = line.match(/^X\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), X); out.push("X " + m[1]); }
+      else if ((m = line.match(/^Z\s+(\S+)$/)))          { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), Z); out.push("Z " + m[1]); }
+      else if ((m = line.match(/^CNOT\s+(\S+)\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyCNOT(qi(m[1]), qi(m[2])); out.push("CNOT " + m[1] + "→" + m[2]); }
+      else if (/^state$/i.test(line))                    { if(!state) throw new Error("先に qubit 宣言"); out.push(amplitudes()); }
+      else if (/^measure$/i.test(line))                  { if(!state) throw new Error("先に qubit 宣言"); out.push("measure → |" + measureAll() + "⟩"); }
+      else if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/))) { vars[m[1]] = evalExpr(m[2]); out.push(m[1] + " = " + vars[m[1]]); }
+      else if ((m = line.match(/^print\s+(.+)$/)))       {
+        const arg = m[1].trim();
+        if (/^".*"$/.test(arg)) out.push(arg.slice(1, -1));
+        else out.push(String(evalExpr(arg)));
+      }
+      else throw new Error("構文エラー: " + line);
+    } catch (e) {
+      out.push("!! " + (ln+1) + "行目: " + e.message);
+    }
+  }
+  return out.join("\n");
+}
+
+/* =====================================================================
+ * トランスフォーマー・スタジオ (16次元 1ヘッド self-attention + bigram)
+ * ===================================================================== */
+const TF = {
+  dim: 16,
+  vocab: ["qubit","H","X","Z","CNOT","measure","state","let","print","=","q0","q1","q2","form","button","label","on","click","rails","scaffold","\"こんにちは\"","1","2","+","*"],
+  bigram: store.get("tf.bigram", {}),
+  lastAttn: null, lastTokens: null
+};
+function tfHash(s){ let h = 2166136261; for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function tfRand(seed){ let s = seed || 1; return function(){ s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff; return s / 0x7fffffff * 2 - 1; }; }
+function tfEmbed(tok){ const r = tfRand(tfHash("emb:" + tok)); const v = []; for (let i = 0; i < TF.dim; i++) v.push(r()); return v; }
+function tfMat(name){ const r = tfRand(tfHash(name)); const m = []; for (let i = 0; i < TF.dim; i++){ const row = []; for (let j = 0; j < TF.dim; j++) row.push(r() * 0.6); m.push(row); } return m; }
+const TF_Wq = tfMat("Wq"), TF_Wk = tfMat("Wk"), TF_Wv = tfMat("Wv");
+function tfMatVec(M, v){ const o = []; for (let i = 0; i < TF.dim; i++){ let s = 0; for (let j = 0; j < TF.dim; j++) s += M[i][j] * v[j]; o.push(s); } return o; }
+function tfDot(a, b){ let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function tfSoftmax(xs){ const mx = Math.max.apply(null, xs); const es = xs.map(function(x){ return Math.exp(x - mx); }); const z = es.reduce(function(a,b){ return a+b; }, 0); return es.map(function(e){ return e / z; }); }
+function tfTokenize(code){ return String(code).replace(/([=+*])/g, " $1 ").split(/\s+/).filter(Boolean); }
+
+function tfTrain(code){
+  const toks = tfTokenize(code);
+  for (let i = 0; i + 1 < toks.length; i++){
+    const k = toks[i];
+    if (!TF.bigram[k]) TF.bigram[k] = {};
+    TF.bigram[k][toks[i+1]] = (TF.bigram[k][toks[i+1]] || 0) + 1;
+    if (!TF.vocab.includes(toks[i])) TF.vocab.push(toks[i]);
+    if (!TF.vocab.includes(toks[i+1])) TF.vocab.push(toks[i+1]);
+  }
+  store.set("tf.bigram", TF.bigram);
+  return toks.length;
+}
+
+function transformerPredict(context, topk){
+  const toks = tfTokenize(context).slice(-8);
+  if (!toks.length) return { tokens: [], preds: [], attn: [] };
+  const emb = toks.map(tfEmbed);
+  const qs = emb.map(function(v){ return tfMatVec(TF_Wq, v); });
+  const ks = emb.map(function(v){ return tfMatVec(TF_Wk, v); });
+  const vs = emb.map(function(v){ return tfMatVec(TF_Wv, v); });
+  const scale = 1 / Math.sqrt(TF.dim);
+  const attn = [];
+  let ctxVec = null;
+  for (let i = 0; i < toks.length; i++){
+    const scores = [];
+    for (let j = 0; j <= i; j++) scores.push(tfDot(qs[i], ks[j]) * scale);
+    const w = tfSoftmax(scores);
+    attn.push(w);
+    const o = new Array(TF.dim).fill(0);
+    for (let j = 0; j <= i; j++) for (let d = 0; d < TF.dim; d++) o[d] += w[j] * vs[j][d];
+    ctxVec = o;
+  }
+  const last = toks[toks.length - 1];
+  const bg = TF.bigram[last] || {};
+  const raw = TF.vocab.map(function(w){
+    const a = tfDot(ctxVec, tfEmbed(w)) * 0.35;
+    const b = Math.log(1 + (bg[w] || 0)) * 2.2;
+    return a + b;
+  });
+  const probs = tfSoftmax(raw);
+  const order = TF.vocab.map(function(w, i){ return { w: w, p: probs[i] }; })
+    .sort(function(x, y){ return y.p - x.p; }).slice(0, topk || 5);
+  TF.lastAttn = attn; TF.lastTokens = toks;
+  return { tokens: toks, preds: order, attn: attn };
+}
+
+/* =====================================================================
+ * Bada on Rails — scaffold 生成 + ミニ CRUD サーバー (bada://rails/*)
+ * ===================================================================== */
+function railsDB(){ return store.get("rails.db", { resources: {} }); }
+function railsSave(db){ store.set("rails.db", db); }
+
+function railsScaffold(name, fieldSpecs){
+  const res = name.toLowerCase();
+  const fields = (fieldSpecs || []).map(function(fs){
+    const p = fs.split(":");
+    return { name: p[0], type: p[1] || "string" };
+  });
+  if (!fields.length) fields.push({ name: "title", type: "string" }, { name: "body", type: "text" });
+  const db = railsDB();
+  db.resources[res] = db.resources[res] || { fields: fields, rows: [], nextId: 1 };
+  db.resources[res].fields = fields;
+  railsSave(db);
+  const Model = res.charAt(0).toUpperCase() + res.slice(1).replace(/s$/, "");
+  const code =
+    "# == Bada on Rails scaffold ==\n" +
+    "# app/models/" + res + ".bada\n" +
+    "model " + Model + " {\n" +
+    fields.map(function(f){ return "  field :" + f.name + ", :" + f.type; }).join("\n") + "\n" +
+    "  validates_presence " + (fields[0] ? ":" + fields[0].name : ":title") + "\n" +
+    "}\n\n" +
+    "# app/controllers/" + res + "_controller.bada\n" +
+    "controller " + Model + "s {\n" +
+    "  def index   { @" + res + " = " + Model + ".all }\n" +
+    "  def create  { " + Model + ".create(params) ; redirect \"bada://rails/" + res + "\" }\n" +
+    "  def destroy { " + Model + ".find(params.id).delete }\n" +
+    "}\n\n" +
+    "# config/routes.bada\n" +
+    "routes { resources :" + res + " }   # → bada://rails/" + res + "\n";
+  return { resource: res, fields: fields, code: code };
+}
+function railsCreateRow(res, values){
+  const db = railsDB(), r = db.resources[res];
+  if (!r) return false;
+  const row = { id: r.nextId++ };
+  r.fields.forEach(function(f){ row[f.name] = values[f.name] || ""; });
+  r.rows.push(row); railsSave(db); return true;
+}
+function railsDeleteRow(res, id){
+  const db = railsDB(), r = db.resources[res];
+  if (!r) return;
+  r.rows = r.rows.filter(function(x){ return x.id !== id; }); railsSave(db);
+}
+
+/* =====================================================================
+ * 合い言葉コマンド — 正規化 + レーベンシュタイン類似度
+ * ===================================================================== */
+function aikotoba(){ return store.get("aikotoba", "バダ、起動"); }
+function normalizeSpeech(s){
+  s = String(s || "").trim().toLowerCase();
+  s = s.replace(/[ァ-ン]/g, function(ch){ return ch; });
+  s = s.replace(/[ぁ-ん]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) + 0x60); });
+  s = s.replace(/[\s、。,.!?！?・「」『』:;ー―\-]/g, "");
+  return s;
+}
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = []; for (let j = 0; j <= n; j++) prev.push(j);
+  for (let i = 1; i <= m; i++){
+    const cur = [i];
+    for (let j = 1; j <= n; j++){
+      cur.push(Math.min(prev[j] + 1, cur[j-1] + 1, prev[j-1] + (a[i-1] === b[j-1] ? 0 : 1)));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+function similarity(a, b){
+  a = normalizeSpeech(a); b = normalizeSpeech(b);
+  if (!a.length && !b.length) return 1;
+  const d = levenshtein(a, b);
+  return 1 - d / Math.max(a.length, b.length, 1);
+}
+const VOICE_COMMANDS = [
+  { words: ["ターミナル", "たーみなる", "terminal", "コンソール", "xterm"], url: "bada://terminal", desc: "ターミナル (xterm) を開く" },
+  { words: ["レール", "レールズ", "rails", "れーるず"],             url: "bada://rails",    desc: "Bada on Rails を開く" },
+  { words: ["ジーピーティー", "gpt", "チャット", "アシスタント"],   url: "bada://gpt",      desc: "BadaGPT を開く" },
+  { words: ["トランスフォーマー", "transformer", "注意", "アテンション"], url: "bada://transformer", desc: "トランスフォーマー・スタジオ" },
+  { words: ["スタジオ", "デザイナ", "gui", "フォーム"],             url: "bada://studio",   desc: "GUI デザイナを開く" },
+  { words: ["ホーム", "home", "デスクトップ"],                       url: "bada://home",     desc: "ホームを開く" },
+  { words: ["設定", "せってい", "settings"],                          url: "bada://settings", desc: "設定を開く" },
+  { words: ["アップデート", "update", "更新"],                        action: "update",       desc: "BadaGPT に OS update を依頼" },
+  { words: ["アップグレード", "upgrade"],                             action: "upgrade",      desc: "BadaGPT に OS upgrade を依頼" }
+];
+function matchPassphrase(input){
+  const pass = aikotoba();
+  const nIn = normalizeSpeech(input), nPass = normalizeSpeech(pass);
+  let rest = null, passScore = 0;
+  if (nIn.startsWith(nPass)) { rest = nIn.slice(nPass.length); passScore = 1; }
+  else {
+    const head = nIn.slice(0, nPass.length);
+    passScore = 1 - levenshtein(head, nPass) / Math.max(nPass.length, 1);
+    if (passScore >= 0.7) rest = nIn.slice(nPass.length);
+  }
+  if (rest === null) return { ok: false, passScore: passScore, reason: "合い言葉が一致しません" };
+  if (!rest) return { ok: true, passScore: passScore, cmd: null };
+  let best = null, bestScore = 0;
+  for (const c of VOICE_COMMANDS){
+    for (const w of c.words){
+      const s = similarity(rest, w);
+      if (s > bestScore){ bestScore = s; best = c; }
+    }
+  }
+  if (best && bestScore >= 0.62) return { ok: true, passScore: passScore, cmd: best, cmdScore: bestScore };
+  return { ok: true, passScore: passScore, cmd: null, cmdScore: bestScore };
+}
+function executeVoice(input, sourceLabel){
+  const r = matchPassphrase(input);
+  if (!r.ok){ setStatus("✗ " + r.reason + " (score " + (r.passScore*100|0) + "%)"); return r; }
+  if (r.cmd){
+    setStatus("✓ " + sourceLabel + " → " + r.cmd.desc + " (精度 " + Math.round((r.cmdScore||1)*100) + "%)");
+    if (r.cmd.url) navigate(r.cmd.url);
+    else if (r.cmd.action === "update" || r.cmd.action === "upgrade"){ navigate("bada://gpt"); setTimeout(function(){ gptSend("os " + r.cmd.action); }, 150); }
+  } else {
+    setStatus("✓ 合い言葉を確認。コマンド語が見つかりません");
+  }
+  return r;
+}
+
+/* ── Web Speech API (音声) ─────────────────────────────────────── */
+let recog = null, recogOn = false;
+function toggleMic(){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById("micbtn");
+  if (!SR){ setStatus("この環境に音声認識APIがありません — silent talk モード (bada://voice) をどうぞ"); navigate("bada://voice"); return; }
+  if (recogOn){ if (recog) recog.stop(); recogOn = false; if (btn) btn.classList.remove("on"); return; }
+  recog = new SR();
+  recog.lang = "ja-JP"; recog.interimResults = false; recog.continuous = true;
+  recog.onresult = function(ev){
+    const t = ev.results[ev.results.length - 1][0].transcript;
+    executeVoice(t, "🎙音声");
+  };
+  recog.onend = function(){ recogOn = false; if (btn) btn.classList.remove("on"); };
+  recog.start(); recogOn = true; if (btn) btn.classList.add("on");
+  setStatus("🎙 聴取中… 「" + aikotoba() + " ターミナル」のように話してください");
+}
+
+/* =====================================================================
+ * BadaGPT — OS のベース。update/upgrade を担い、Rails・量子コードも操縦
+ * ===================================================================== */
+function badaGPTReply(text, push){
+  const t = text.trim();
+  const lower = t.toLowerCase();
+
+  if (/(os\s*)?(update|upgrade|アップデート|アップグレード|更新)/i.test(lower)){
+    const kind = /(upgrade|アップグレード)/i.test(lower) ? "upgrade" : "update";
+    const from = osVersion();
+    push("gpt", (kind === "upgrade" ? "OS アップグレード" : "OS アップデート") + "を開始します (現在 v" + from + ")。BadaGPT カーネルがパッケージを検証中…", { progress: true, then: function(){
+      const nv = osUpdate(kind);
+      push("gpt", "✅ 完了: v" + from + " → v" + nv + "\n" + store.get("os.changelog", [{notes:""}])[0].notes + "\n再起動は不要です (ライブパッチ適用)。");
+    }});
+    return;
+  }
+  let m = t.match(/scaffold\s+(\w+)((?:\s+\w+:\w+)*)/i);
+  if (m){
+    const r = railsScaffold(m[1], m[2].trim() ? m[2].trim().split(/\s+/) : []);
+    push("gpt", "Bada on Rails で scaffold を生成しました:\n\n" + r.code + "\nbada://rails/" + r.resource + " で CRUD が動いています。");
+    return;
+  }
+  if (/rails\s*(server|s\b|サーバ)/i.test(lower) || /サーバー?を?起動/.test(t)){
+    store.set("rails.server", true); refreshStatusbar();
+    push("gpt", "🚂 Bada on Rails サーバーを起動しました → bada://rails (Puma-Ω, port 3000 相当)");
+    return;
+  }
+  if (/^(qubit|H |X |Z |CNOT|measure|let |print )/m.test(t)){
+    push("gpt", "量子 Bada コードを実行します:\n\n" + badaInterpret(t));
+    return;
+  }
+  if (/ベル|bell|もつれ|entangle/i.test(lower)){
+    const code = "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure";
+    push("gpt", "ベル状態 (量子もつれ) を作りますね:\n\n" + code + "\n\n--- 実行結果 ---\n" + badaInterpret(code));
+    return;
+  }
+  if (/補完|complete|次の?トークン|予測/.test(t)){
+    const ctx = t.replace(/.*(補完|complete|予測)[::]?/,"").trim() || "qubit q0 H";
+    const p = transformerPredict(ctx, 5);
+    push("gpt", "トランスフォーマー (self-attention) による次トークン予測:\n文脈: " + p.tokens.join(" ") + "\n" +
+      p.preds.map(function(x, i){ return (i+1) + ". " + x.w + "  (p=" + x.p.toFixed(3) + ")"; }).join("\n") +
+      "\n詳細な attention 行列は bada://transformer で。");
+    return;
+  }
+  if (/合い言葉|あいことば|passphrase|silent/i.test(t)){
+    push("gpt", "現在の合い言葉は「" + aikotoba() + "」です。bada://voice で変更できます。\nsilent talk モード (無音テキスト) は正規化一致なので決定論的 = 100% 精度、音声も同じ照合エンジン (レーベンシュタイン類似度) を通します。");
+    return;
+  }
+  if (/バージョン|version/i.test(t)){
+    push("gpt", "Bada VM Pro v" + osVersion() + " / カーネル: BadaGPT / デスクトップ: w9wm。「os update」「os upgrade」と言えば私が適用します。");
+    return;
+  }
+  if (/help|ヘルプ|何が|できる/.test(t)){
+    push("gpt", "私は Bada VM Pro のベース (カーネル) です。できること:\n• os update / os upgrade — OS の更新を私が実行\n• scaffold Post title:string body:text — Bada on Rails 生成\n• rails server — CRUD サーバー起動\n• 量子 Bada コードをそのまま貼れば実行 (qubit/H/CNOT/measure)\n• 「ベル状態を作って」— 量子もつれのデモ\n• 「補完: qubit q0 H」— トランスフォーマーで次トークン予測\n• デスクトップは w9wm: 右クリックで WM メニュー、ターミナルには bash/apt/vim/emacs/ssh/screen/latex がプリインストール済み");
+    return;
+  }
+  push("gpt", "「" + t + "」ですね。Bada VM Pro のカーネルとして承りました。\n`help` で全コマンド、`os update` で更新、コードを貼れば量子実行します。");
+}
+
+/* =====================================================================
+ * Ubuntu 風ユーザーランド — VFS + パッケージ (apt) + bash
+ *   事前インストール: bash, apt, vim, emacs, openssh (ssh), xinetd,
+ *   texlive-full, screen, fcitx-mozc, xterm, x-terminal-emulator, terminal
+ * ===================================================================== */
+const PRINSTALLED = [
+  ["bash",              "5.2.21-2ubuntu4",  "GNU Bourne Again SHell"],
+  ["apt",               "2.7.14",           "commandline package manager"],
+  ["vim",               "9.1.0016-1ubuntu7","Vi IMproved - enhanced vi editor"],
+  ["emacs",             "29.3+1-1ubuntu2",  "GNU Emacs editor (metapackage)"],
+  ["openssh-client",    "9.6p1-3ubuntu13",  "secure shell (SSH) client"],
+  ["openssh-server",    "9.6p1-3ubuntu13",  "secure shell (SSH) server"],
+  ["xinetd",            "2.3.15.4-1",       "replacement for inetd with many enhancements"],
+  ["texlive-full",      "2024.20240301-1",  "TeX Live: metapackage pulling in all components"],
+  ["screen",            "4.9.1-1",          "terminal multiplexer with VT100/ANSI emulation"],
+  ["fcitx-mozc",        "2.28.5029.102-3",  "Mozc engine for fcitx - Japanese input method"],
+  ["xterm",             "390-1ubuntu2",     "X terminal emulator"],
+  ["x-terminal-emulator","1.0-bada1",       "x-terminal-emulator alternative (dark)"],
+  ["terminal",          "1.0-bada1",        "Bada virtual terminal (GNOME-terminal 風)"],
+  ["w9wm",              "0.4.2-9bada1",     "hack of 9wm to provide virtual screens"],
+  ["coreutils",         "9.4-3ubuntu6",     "GNU core utilities"]
+];
+function pkgDB(){
+  let db = store.get("apt.db", null);
+  if (!db){
+    db = { installed: {}, updatedAt: null };
+    PRINSTALLED.forEach(function(p){ db.installed[p[0]] = { ver: p[1], desc: p[2], auto: false }; });
+    store.set("apt.db", db);
+  }
+  return db;
+}
+function pkgSave(db){ store.set("apt.db", db); }
+
+/* ── VFS ── */
+function fsDefault(){
+  return { d: {
+    "home": { d: {
+      "user": { d: {
+        "README.txt": { f: "Bada VM Pro (w9wm デスクトップ) へようこそ。\n\n・右クリック(B3) = WM メニュー (New/Reshape/Move/Delete/Hide + 仮想スクリーン)\n・左クリック(B1) = アプリケーションメニュー\n・ターミナルは xterm / x-terminal-emulator / terminal の 3 種。\n・bash / apt / vim / emacs / ssh / xinetd / texlive-full / screen /\n  fcitx-mozc はプリインストール済み (apt list --installed)\n・日本語入力: OS の IME でそのまま入力するか、Ctrl+Space で内蔵 Mozc\n  (ローマ字→かな) をオン。F7 でカタカナ、Enter で確定。\n" },
+        "hello.bada": { f: "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure\n" },
+        "letter.tex": { f: "\\documentclass{article}\n\\title{Bada VM Pro}\n\\author{user}\n\\begin{document}\n\\maketitle\n\\section{量子暗号}\nJones 多項式と Kauffman ブラケットについて。\n$\\langle L \\rangle = A \\langle L_0 \\rangle + A^{-1} \\langle L_\\infty \\rangle$\n\\end{document}\n" },
+        ".bashrc": { f: "# ~/.bashrc\nexport LANG=ja_JP.UTF-8\nexport GTK_IM_MODULE=fcitx\nexport QT_IM_MODULE=fcitx\nexport XMODIFIERS=@im=fcitx\nalias ll='ls -la'\n" }
+      } }
+    } },
+    "etc": { d: {
+      "hostname": { f: "badavm\n" },
+      "os-release": { f: "PRETTY_NAME=\"BadaVMPro OS (Ubuntu-flavoured)\"\nNAME=\"BadaVMPro\"\nVERSION_ID=\"" + "24.04" + "\"\nID=ubuntu\n" },
+      "xinetd.conf": { f: "# /etc/xinetd.conf\ndefaults\n{\n    instances      = 60\n    log_type       = SYSLOG authpriv\n    log_on_success = HOST PID\n    log_on_failure = HOST\n    cps            = 25 30\n}\nincludedir /etc/xinetd.d\n" },
+      "xinetd.d": { d: {
+        "echo":    { f: "service echo\n{\n    disable = no\n    type = INTERNAL\n    id = echo-stream\n    socket_type = stream\n    protocol = tcp\n    user = root\n    wait = no\n}\n" },
+        "daytime": { f: "service daytime\n{\n    disable = no\n    type = INTERNAL\n    id = daytime-stream\n    socket_type = stream\n    protocol = tcp\n    user = root\n    wait = no\n}\n" },
+        "zoneqkd": { f: "service zoneqkd\n{\n    disable = no\n    port = 9999\n    socket_type = stream\n    protocol = tcp\n    server = /usr/sbin/zone-qkd-helper\n    user = root\n    wait = no\n}\n" }
+      } }
+    } },
+    "usr": { d: { "bin": { d: {} }, "share": { d: { "texlive": { d: { "VERSION": { f: "TeX Live 2024\n" } } } } } } },
+    "tmp": { d: {} }
+  } };
+}
+function vfs(){
+  let t = store.get("fs2", null);
+  if (!t){ t = fsDefault(); store.set("fs2", t); }
+  return t;
+}
+function vfsSave(t){ store.set("fs2", t); }
+function fsNorm(path, cwd){
+  let p = String(path || "");
+  if (!p) p = cwd;
+  if (p.startsWith("~")) p = "/home/user" + p.slice(1);
+  if (!p.startsWith("/")) p = (cwd === "/" ? "" : cwd) + "/" + p;
+  const parts = [];
+  p.split("/").forEach(function(seg){
+    if (!seg || seg === ".") return;
+    if (seg === "..") parts.pop();
+    else parts.push(seg);
+  });
+  return "/" + parts.join("/");
+}
+function fsGet(tree, path){
+  if (path === "/") return tree;
+  let node = tree;
+  for (const seg of path.split("/").filter(Boolean)){
+    if (!node || !node.d || !(seg in node.d)) return null;
+    node = node.d[seg];
+  }
+  return node;
+}
+function fsPut(path, content){ /* content: string(file) か null(dir) */
+  const t = vfs();
+  const parts = path.split("/").filter(Boolean);
+  let node = t;
+  for (let i = 0; i < parts.length - 1; i++){
+    if (!node.d[parts[i]]) node.d[parts[i]] = { d: {} };
+    if (!node.d[parts[i]].d) return false;
+    node = node.d[parts[i]];
+  }
+  const name = parts[parts.length - 1];
+  if (content === null) node.d[name] = node.d[name] && node.d[name].d ? node.d[name] : { d: {} };
+  else node.d[name] = { f: content };
+  vfsSave(t);
+  return true;
+}
+function fsDelete(path){
+  const t = vfs();
+  const parts = path.split("/").filter(Boolean);
+  let node = t;
+  for (let i = 0; i < parts.length - 1; i++){
+    node = node.d && node.d[parts[i]];
+    if (!node) return false;
+  }
+  const name = parts[parts.length - 1];
+  if (!node.d || !(name in node.d)) return false;
+  delete node.d[name];
+  vfsSave(t);
+  return true;
+}
+
+/* ── fcitx-mozc: ローマ字 → ひらがな ── */
+const ROMAJI = (function(){
+  const t = {
+    a:"あ",i:"い",u:"う",e:"え",o:"お",
+    ka:"か",ki:"き",ku:"く",ke:"け",ko:"こ", ga:"が",gi:"ぎ",gu:"ぐ",ge:"げ",go:"ご",
+    sa:"さ",si:"し",shi:"し",su:"す",se:"せ",so:"そ", za:"ざ",zi:"じ",ji:"じ",zu:"ず",ze:"ぜ",zo:"ぞ",
+    ta:"た",ti:"ち",chi:"ち",tu:"つ",tsu:"つ",te:"て",to:"と", da:"だ",di:"ぢ",du:"づ",de:"で",do:"ど",
+    na:"な",ni:"に",nu:"ぬ",ne:"ね",no:"の",
+    ha:"は",hi:"ひ",hu:"ふ",fu:"ふ",he:"へ",ho:"ほ", ba:"ば",bi:"び",bu:"ぶ",be:"べ",bo:"ぼ",
+    pa:"ぱ",pi:"ぴ",pu:"ぷ",pe:"ぺ",po:"ぽ",
+    ma:"ま",mi:"み",mu:"む",me:"め",mo:"も",
+    ya:"や",yu:"ゆ",yo:"よ",
+    ra:"ら",ri:"り",ru:"る",re:"れ",ro:"ろ",
+    wa:"わ",wo:"を",nn:"ん",
+    kya:"きゃ",kyu:"きゅ",kyo:"きょ", gya:"ぎゃ",gyu:"ぎゅ",gyo:"ぎょ",
+    sha:"しゃ",shu:"しゅ",sho:"しょ", sya:"しゃ",syu:"しゅ",syo:"しょ",
+    ja:"じゃ",ju:"じゅ",jo:"じょ", jya:"じゃ",jyu:"じゅ",jyo:"じょ",
+    cha:"ちゃ",chu:"ちゅ",cho:"ちょ", tya:"ちゃ",tyu:"ちゅ",tyo:"ちょ",
+    nya:"にゃ",nyu:"にゅ",nyo:"にょ", hya:"ひゃ",hyu:"ひゅ",hyo:"ひょ",
+    bya:"びゃ",byu:"びゅ",byo:"びょ", pya:"ぴゃ",pyu:"ぴゅ",pyo:"ぴょ",
+    mya:"みゃ",myu:"みゅ",myo:"みょ", rya:"りゃ",ryu:"りゅ",ryo:"りょ",
+    fa:"ふぁ",fi:"ふぃ",fe:"ふぇ",fo:"ふぉ",
+    va:"ゔぁ",vi:"ゔぃ",vu:"ゔ",ve:"ゔぇ",vo:"ゔぉ",
+    "-":"ー", ",":"、", ".":"。", "!":"!", "?":"?"
+  };
+  return t;
+})();
+function romajiToKana(src){
+  let s = String(src).toLowerCase(), out = "", i = 0;
+  while (i < s.length){
+    /* 促音: 子音の連続 (kk, tt, pp, ss, cc...) */
+    if (i + 1 < s.length && s[i] === s[i+1] && /[bcdfghjklmpqrstvwyz]/.test(s[i]) && s[i] !== "n"){
+      out += "っ"; i++; continue;
+    }
+    /* n の後に子音 or 末尾 → ん */
+    if (s[i] === "n" && (i + 1 >= s.length || /[^aiueoyn]/.test(s[i+1]))){
+      out += "ん"; i++; continue;
+    }
+    let hit = false;
+    for (let len = 3; len >= 1; len--){
+      const chunk = s.substr(i, len);
+      if (ROMAJI[chunk]){ out += ROMAJI[chunk]; i += len; hit = true; break; }
+    }
+    if (!hit){ out += s[i]; i++; }
+  }
+  return out;
+}
+function kanaToKatakana(s){
+  return String(s).replace(/[ぁ-ゖ]/g, function(ch){ return String.fromCharCode(ch.charCodeAt(0) + 0x60); });
+}
+
+/* ── xinetd / サービス台帳 ── */
+function svcState(){ return store.get("svc", { xinetd: true, sshd: true, "fcitx-mozc": true }); }
+function svcSave(s){ store.set("svc", s); }
+function xinetdServices(){
+  const t = vfs();
+  const dir = fsGet(t, "/etc/xinetd.d");
+  const names = dir && dir.d ? Object.keys(dir.d) : [];
+  const ports = { echo: 7, daytime: 13, chargen: 19, zoneqkd: 9999 };
+  return names.map(function(n){ return { name: n, port: ports[n] || 0 }; });
+}
+
+/* =====================================================================
+ * bash シェル (runShell) — ターミナルから ctx 付きで呼ばれる。
+ * ctx = { cwd, host, term } / 省略時は単発実行 (テスト用)。
+ * ===================================================================== */
+function shellCtx(){ return { cwd: "/home/user", host: "badavm", user: "user", term: null }; }
+function runShell(cmd, ctx){
+  ctx = ctx || shellCtx();
+  const c = String(cmd).trim();
+  if (!c) return "";
+  const argv = c.split(/\s+/);
+  const cmd0 = argv[0];
+  const db = pkgDB();
+  const out = [];
+  function P(s){ out.push(s); }
+  function done(){ return out.join("\n"); }
+  function notFound(){ return "bash: " + cmd0 + ": command not found (apt install " + cmd0 + " を試してください)"; }
+  let m;
+
+  switch (cmd0){
+  case "help": return [
+    "Bada VM Pro シェル (bash " + db.installed.bash.ver.split("-")[0] + ") — 主なコマンド:",
+    "  ls / cd / pwd / cat / echo / mkdir / touch / rm / cp / mv   ファイル操作 (echo hi > file 可)",
+    "  apt update|upgrade|install|remove|list --installed          パッケージ管理",
+    "  vim <file> / emacs <file>                                   エディタ (プリインストール)",
+    "  ssh user@bada.or.jp / screen / screen -ls / screen -r        リモート & 多重化",
+    "  xinetd status / service xinetd start|stop                    スーパーサーバー",
+    "  pdflatex <file.tex> / latex / tex --version                  TeX Live (texlive-full)",
+    "  fcitx-mozc status                                            日本語入力 (Ctrl+Space で切替)",
+    "  uname -a / lsb_release -a / ps / man <cmd> / history / clear / exit",
+    "  ver / os update|upgrade / rails scaffold <Name> [f:t ...] / open <app> / aikotoba <語>",
+    "  qubit/H/X/Z/CNOT/measure/state/let/print                     量子 Bada (セミコロン区切り可)"
+  ].join("\n");
+  case "ver": return "Bada VM Pro v" + osVersion() + " (kernel: BadaGPT / wm: w9wm)";
+  case "pwd": return ctx.cwd;
+  case "whoami": return ctx.user;
+  case "hostname": return ctx.host;
+  case "date": return new Date().toString();
+  case "uname":
+    if (argv[1] === "-a") return "Linux " + ctx.host + " 6.8.0-badaquantum #1 SMP PREEMPT_DYNAMIC Bada x86_64 x86_64 x86_64 GNU/Linux";
+    return "Linux";
+  case "lsb_release":
+    return "No LSB modules are available.\nDistributor ID:\tUbuntu\nDescription:\tBadaVMPro OS (Ubuntu-flavoured) 24.04\nRelease:\t24.04\nCodename:\tbadable";
+  case "clear": if (ctx.term) ctx.term.clear(); return "";
+  case "exit":
+    if (ctx.remote){ ctx.remote = false; ctx.host = "badavm"; ctx.cwd = "/home/user"; return "logout\nConnection to " + (ctx.lastHost || "remote") + " closed."; }
+    if (ctx.term && ctx.term.screenSession){ return ctx.term.screenExit(); }
+    if (ctx.term){ ctx.term.requestClose(); return "exit"; }
+    return "exit";
+  case "history": return ctx.term ? ctx.term.history.map(function(h, i){ return "  " + (i+1) + "  " + h; }).join("\n") : "";
+  case "which": {
+    const name = argv[1] || "";
+    const known = ["bash","apt","apt-get","vim","emacs","ssh","sshd","xinetd","screen","latex","pdflatex","tex","fcitx-mozc","xterm","x-terminal-emulator","terminal","ls","cat","echo","uname","w9wm"];
+    return known.includes(name) ? "/usr/bin/" + name : "";
+  }
+  case "ps": {
+    const svcs = svcState();
+    const rows = ["  PID TTY      TIME     CMD",
+      "    1 ?        00:00:01 badagpt-kernel", "   77 ?        00:00:00 w9wm",
+      "  120 pts/0    00:00:00 bash"];
+    if (svcs.xinetd) rows.push("  201 ?        00:00:00 xinetd");
+    if (svcs.sshd) rows.push("  202 ?        00:00:00 sshd");
+    if (svcs["fcitx-mozc"]) rows.push("  203 ?        00:00:00 fcitx5 (mozc)");
+    if (ctx.term && ctx.term.screens.length) rows.push("  3" + (10 + ctx.term.screens.length) + " ?        00:00:00 screen");
+    rows.push("  999 pts/0    00:00:00 ps");
+    return rows.join("\n");
+  }
+
+  /* ── ファイル系 ── */
+  case "ls": {
+    const flags = argv.filter(function(a){ return a.startsWith("-"); }).join("");
+    const target = argv.filter(function(a, i){ return i > 0 && !a.startsWith("-"); })[0];
+    const path = fsNorm(target || ctx.cwd, ctx.cwd);
+    const node = fsGet(vfs(), path);
+    if (!node) return "ls: cannot access '" + (target || path) + "': No such file or directory";
+    if (node.f !== undefined) return path.split("/").pop();
+    let names = Object.keys(node.d).sort();
+    if (!flags.includes("a")) names = names.filter(function(n){ return !n.startsWith("."); });
+    if (flags.includes("l")){
+      return names.map(function(n){
+        const ch = node.d[n];
+        const isDir = !!ch.d;
+        const size = isDir ? 4096 : (ch.f || "").length;
+        return (isDir ? "drwxr-xr-x" : "-rw-r--r--") + " 1 user user " + String(size).padStart(7) + " " +
+          new Date().toISOString().slice(5, 10).replace("-", " ") + " " + n + (isDir ? "/" : "");
+      }).join("\n");
+    }
+    return names.map(function(n){ return node.d[n].d ? n + "/" : n; }).join("  ");
+  }
+  case "cd": {
+    const path = fsNorm(argv[1] || "~", ctx.cwd);
+    const node = fsGet(vfs(), path);
+    if (!node || node.f !== undefined) return "bash: cd: " + (argv[1] || path) + ": No such file or directory";
+    ctx.cwd = path; return "";
+  }
+  case "cat": {
+    if (!argv[1]) return "cat: 引数がありません";
+    const node = fsGet(vfs(), fsNorm(argv[1], ctx.cwd));
+    if (!node) return "cat: " + argv[1] + ": No such file or directory";
+    if (node.d) return "cat: " + argv[1] + ": Is a directory";
+    return node.f;
+  }
+  case "mkdir": {
+    if (!argv[1]) return "mkdir: 引数がありません";
+    fsPut(fsNorm(argv[1], ctx.cwd), null); return "";
+  }
+  case "touch": {
+    if (!argv[1]) return "touch: 引数がありません";
+    const p = fsNorm(argv[1], ctx.cwd);
+    if (!fsGet(vfs(), p)) fsPut(p, "");
+    return "";
+  }
+  case "rm": {
+    const target = argv.filter(function(a, i){ return i > 0 && !a.startsWith("-"); })[0];
+    if (!target) return "rm: 引数がありません";
+    const p = fsNorm(target, ctx.cwd);
+    const node = fsGet(vfs(), p);
+    if (!node) return "rm: cannot remove '" + target + "': No such file or directory";
+    if (node.d && !argv.includes("-r") && !argv.includes("-rf")) return "rm: cannot remove '" + target + "': Is a directory (rm -r を使用)";
+    fsDelete(p); return "";
+  }
+  case "cp": case "mv": {
+    if (argv.length < 3) return cmd0 + ": 引数が足りません";
+    const src = fsNorm(argv[1], ctx.cwd), dst = fsNorm(argv[2], ctx.cwd);
+    const node = fsGet(vfs(), src);
+    if (!node || node.d) return cmd0 + ": '" + argv[1] + "' が読めません (ファイルのみ対応)";
+    fsPut(dst, node.f);
+    if (cmd0 === "mv") fsDelete(src);
+    return "";
+  }
+  case "echo": {
+    const rest = c.replace(/^echo\s*/, "");
+    const rd = rest.match(/^(.*?)\s*>>?\s*(\S+)\s*$/);
+    if (rd){
+      const text = rd[1].replace(/^"(.*)"$/, "$1");
+      const p = fsNorm(rd[2], ctx.cwd);
+      const prev = rest.includes(">>") ? ((fsGet(vfs(), p) || {}).f || "") : "";
+      fsPut(p, prev + text + "\n");
+      return "";
+    }
+    return rest.replace(/^"(.*)"$/, "$1");
+  }
+  case "grep": {
+    if (argv.length < 3) return "grep: 使い方: grep <pattern> <file>";
+    const node = fsGet(vfs(), fsNorm(argv[2], ctx.cwd));
+    if (!node || node.d) return "grep: " + argv[2] + ": No such file";
+    try {
+      const re = new RegExp(argv[1]);
+      return node.f.split("\n").filter(function(l){ return re.test(l); }).join("\n");
+    } catch(e){ return "grep: 不正なパターン"; }
+  }
+
+  /* ── apt ── */
+  case "apt": case "apt-get": {
+    const sub = argv[1] || "";
+    if (sub === "update"){
+      db.updatedAt = new Date().toISOString(); pkgSave(db);
+      return [
+        "取得:1 bada://archive.bada.or.jp/ubuntu badable InRelease [270 kB]",
+        "取得:2 bada://archive.bada.or.jp/ubuntu badable/main amd64 Packages [1,432 kB]",
+        "取得:3 zone://url.or.jp/quantum badable/quantum amd64 Packages [88.4 kB]",
+        "パッケージリストを読み込んでいます... 完了",
+        "依存関係ツリーを作成しています... 完了",
+        "すべてのパッケージは最新です。"
+      ].join("\n");
+    }
+    if (sub === "upgrade" || sub === "full-upgrade" || sub === "dist-upgrade"){
+      const from = osVersion(), nv = osUpdate("update");
+      return [
+        "パッケージリストを読み込んでいます... 完了",
+        "アップグレード: 3 個、新規インストール: 0 個、削除: 0 個。",
+        "badagpt-kernel (" + from + " → " + nv + ") を設定しています ...",
+        "w9wm (0.4.2-9bada1) を設定しています ...",
+        "zone-qkd-stack を設定しています ...",
+        "BadaGPT: OS を v" + nv + " にライブパッチしました (再起動不要)"
+      ].join("\n");
+    }
+    if (sub === "list"){
+      const names = Object.keys(db.installed).sort();
+      return names.map(function(n){
+        return n + "/badable,now " + db.installed[n].ver + " amd64 [インストール済み]";
+      }).join("\n") + "\n(" + names.length + " 件 — texlive-full を含む全パッケージが事前インストール済み)";
+    }
+    if (sub === "install"){
+      const pkgs = argv.slice(2).filter(function(a){ return !a.startsWith("-"); });
+      if (!pkgs.length) return "apt install <パッケージ名>";
+      const lines = [];
+      pkgs.forEach(function(p){
+        if (db.installed[p]) lines.push(p + " はすでに最新バージョン (" + db.installed[p].ver + ") です。");
+        else {
+          db.installed[p] = { ver: "1.0-bada1", desc: "installed via apt (Bada archive)", auto: false };
+          lines.push("取得:1 bada://archive.bada.or.jp/ubuntu badable/main amd64 " + p + " amd64 1.0-bada1");
+          lines.push(p + " (1.0-bada1) を展開しています...");
+          lines.push(p + " (1.0-bada1) を設定しています...");
+        }
+      });
+      pkgSave(db);
+      return lines.join("\n");
+    }
+    if (sub === "remove" || sub === "purge"){
+      const p = argv[2];
+      if (!p) return "apt remove <パッケージ名>";
+      if (["bash","apt","coreutils","w9wm"].includes(p)) return "E: 必須パッケージ " + p + " は削除できません (essential)";
+      if (!db.installed[p]) return "E: パッケージ " + p + " が見つかりません";
+      delete db.installed[p]; pkgSave(db);
+      return p + " を削除しました。";
+    }
+    if (sub === "show"){
+      const p = argv[2] && db.installed[argv[2]];
+      if (!p) return "E: パッケージが見つかりません";
+      return "Package: " + argv[2] + "\nVersion: " + p.ver + "\nDescription: " + p.desc;
+    }
+    return "apt " + (sub || "") + ": update / upgrade / install / remove / list --installed / show をどうぞ";
+  }
+  case "dpkg":
+    if (argv[1] === "-l"){
+      return Object.keys(db.installed).sort().map(function(n){
+        return "ii  " + n.padEnd(22) + db.installed[n].ver.padEnd(22) + "amd64  " + db.installed[n].desc;
+      }).join("\n");
+    }
+    return "dpkg: -l で一覧";
+
+  /* ── エディタ / ssh / screen (ターミナル必須) ── */
+  case "vim": case "vi":
+    if (!ctx.term) return "vim: 端末がありません (GUI のターミナルから実行してください)";
+    ctx.term.openVim(argv[1] ? fsNorm(argv[1], ctx.cwd) : null);
+    return "";
+  case "emacs":
+    if (!ctx.term) return "emacs: 端末がありません (GUI のターミナルから実行してください)";
+    ctx.term.openEmacs(argv[1] ? fsNorm(argv[1], ctx.cwd) : null);
+    return "";
+  case "ssh": {
+    const hostArg = argv[1] || "";
+    if (!hostArg) return "usage: ssh [user@]host";
+    const mm = hostArg.match(/^(?:(\w+)@)?([\w.\-]+)$/);
+    if (!mm) return "ssh: Could not resolve hostname " + hostArg;
+    const host = mm[2];
+    const KNOWN = ["bada.or.jp", "url.or.jp", "localhost", "badavm"];
+    if (!KNOWN.includes(host)) return "ssh: Could not resolve hostname " + host + ": Name or service not known";
+    ctx.remote = true; ctx.lastHost = host; ctx.host = host; ctx.cwd = "/home/user";
+    return [
+      "zone:// Bell 対 QKD ハンドシェイク中... 相関ビット一致 (Jones 鍵検証 OK)",
+      "Warning: Permanently added '" + host + "' (ED25519-Ω) to the list of known hosts.",
+      "Welcome to " + host + " — BadaVMPro OS (Ubuntu-flavoured) / OpenSSH " + db.installed["openssh-client"].ver.split("p")[0],
+      "Last login: " + new Date().toUTCString() + " from badavm",
+      "(exit でローカルに戻ります)"
+    ].join("\n");
+  }
+  case "sshd":
+    return svcState().sshd ? "sshd: already running (port 22, via xinetd + standalone)" : "sshd: stopped — `service sshd start`";
+  case "screen": {
+    if (!ctx.term) return "screen: 端末がありません";
+    if (argv[1] === "-ls" || argv[1] === "-list"){
+      const ss = ctx.term.screens;
+      if (!ss.length) return "No Sockets found in /run/screen/S-user.";
+      return "There are screens on:\n" + ss.map(function(s){
+        return "\t" + s.id + ".pts-0." + ctx.host + "\t(" + s.at + ")\t(Detached)";
+      }).join("\n") + "\n" + ss.length + " Socket(s) in /run/screen/S-user.";
+    }
+    if (argv[1] === "-r"){ return ctx.term.screenResume(argv[2]); }
+    return ctx.term.screenNew();
+  }
+
+  /* ── xinetd / service ── */
+  case "xinetd": {
+    const s = svcState();
+    if (argv[1] === "status" || !argv[1]){
+      const list = xinetdServices();
+      return "xinetd " + db.installed.xinetd.ver + " — " + (s.xinetd ? "active (running)" : "inactive (stopped)") + "\n" +
+        "管理サービス (/etc/xinetd.d):\n" +
+        list.map(function(x){ return "  " + x.name.padEnd(10) + " port " + String(x.port).padStart(5) + "/tcp  " + (s.xinetd ? "LISTEN" : "-"); }).join("\n");
+    }
+    return "xinetd: status / service xinetd start|stop をどうぞ";
+  }
+  case "service": case "systemctl": {
+    const name = cmd0 === "systemctl" ? argv[2] : argv[1];
+    const act  = cmd0 === "systemctl" ? argv[1] : argv[2];
+    const s = svcState();
+    if (!name) return cmd0 + ": usage: " + cmd0 + (cmd0 === "systemctl" ? " start|stop|status <svc>" : " <svc> start|stop|status");
+    const key = name.replace(/\.service$/, "");
+    if (!(key in s)) return cmd0 + ": unit " + name + " not found (xinetd / sshd / fcitx-mozc)";
+    if (act === "start"){ s[key] = true; svcSave(s); return "● " + key + ": active (running) にしました"; }
+    if (act === "stop"){ s[key] = false; svcSave(s); return "● " + key + ": inactive (stopped) にしました"; }
+    return "● " + key + ".service — " + (s[key] ? "active (running)" : "inactive (dead)");
+  }
+
+  /* ── TeX Live ── */
+  case "tex": case "latex": case "pdflatex": {
+    if (argv[1] === "--version" || !argv[1]){
+      return "pdfTeX 3.141592653-2.6-1.15.2 (TeX Live 2024/Bada)\nkpathsea version 6.4.0\ntexlive-full " + db.installed["texlive-full"].ver + " — 全コンポーネント事前インストール済み";
+    }
+    const p = fsNorm(argv[1], ctx.cwd);
+    const node = fsGet(vfs(), p);
+    if (!node || node.d) return "! I can't find file `" + argv[1] + "'.";
+    const src = node.f;
+    if (!/\\begin\{document\}/.test(src)) return "! LaTeX Error: Missing \\begin{document}.";
+    if (!/\\end\{document\}/.test(src)) return "! Emergency stop. (\\end{document} がありません)";
+    const title = (src.match(/\\title\{([^}]*)\}/) || [])[1] || "";
+    const sections = [];
+    src.replace(/\\section\{([^}]*)\}/g, function(_, s){ sections.push(s); return ""; });
+    const body = src.replace(/[\s\S]*\\begin\{document\}/, "").replace(/\\end\{document\}[\s\S]*/, "")
+      .replace(/\\maketitle/, title ? "《" + title + "》\n" : "")
+      .replace(/\\section\{([^}]*)\}/g, "\n■ $1\n")
+      .replace(/\\[a-zA-Z]+(\{[^}]*\})?/g, "").trim();
+    const outName = p.replace(/\.tex$/, "") + (cmd0 === "pdflatex" ? ".pdf" : ".dvi");
+    fsPut(outName, (cmd0 === "pdflatex" ? "%PDF-1.7 (Bada pdfTeX)\n" : "; DVI (Bada TeX)\n") + body + "\n");
+    return [
+      "This is " + (cmd0 === "pdflatex" ? "pdfTeX" : "TeX") + ", Version 3.141592653 (TeX Live 2024/Bada)",
+      "(" + p + ")",
+      "LaTeX2e <2024-06-01>",
+      sections.map(function(s){ return "[section: " + s + "]"; }).join(" "),
+      "Output written on " + outName.split("/").pop() + " (1 page).",
+      "Transcript written on " + p.split("/").pop().replace(/\.tex$/, ".log") + "."
+    ].filter(Boolean).join("\n");
+  }
+  case "kpsewhich": return "/usr/share/texlive/" + (argv[1] || "");
+
+  /* ── fcitx-mozc ── */
+  case "fcitx-mozc": case "fcitx": case "fcitx5": case "im-config": {
+    const s = svcState();
+    const on = ctx.term ? ctx.term.mozcOn : false;
+    return [
+      "fcitx-mozc " + db.installed["fcitx-mozc"].ver + " — 日本語入力メソッド (" + (s["fcitx-mozc"] ? "daemon: running" : "daemon: stopped") + ")",
+      "このターミナルの Mozc: " + (on ? "オン (あ)" : "オフ (A)"),
+      "使い方:",
+      "  Ctrl+Space   Mozc オン/オフ (ローマ字→ひらがな変換, F7 でカタカナ, Enter 確定, Esc 取消)",
+      "  OS の IME    そのまま変換入力できます (変換候補も OS 側に表示)",
+      "  環境変数     GTK_IM_MODULE=fcitx / QT_IM_MODULE=fcitx / XMODIFIERS=@im=fcitx (~/.bashrc 済み)"
+    ].join("\n");
+  }
+
+  /* ── ターミナル起動 / アプリ ── */
+  case "xterm": if (typeof openTerm === "function") openTerm("xterm"); return "xterm: 新しい端末を開きました";
+  case "x-terminal-emulator": if (typeof openTerm === "function") openTerm("xte"); return "x-terminal-emulator: 新しい端末を開きました";
+  case "terminal": if (typeof openTerm === "function") openTerm("term"); return "terminal: 新しい端末を開きました";
+  case "w9wm": return "w9wm 0.4.2 — 既に実行中です (このデスクトップ自体が w9wm)。B3 メニュー / 仮想スクリーン 4 面";
+  case "man": {
+    const MAN = {
+      w9wm: "w9wm(1) — 9wm に仮想スクリーンを加えた WM。B3=WMメニュー(New/Reshape/Move/Delete/Hide) B1=アプリ Ctrl+Alt+←→=画面切替",
+      vim: "vim(1) — i で挿入 / Esc / :w 保存 / :q 終了 / :wq / dd 行削除 / x 1字削除 / hjkl 移動",
+      emacs: "emacs(1) — C-x C-s 保存 / C-x C-c 終了 / C-k 行キル / C-y ヤンク / C-a C-e 行頭行末",
+      screen: "screen(1) — screen で開始 / Ctrl+a d デタッチ / screen -ls / screen -r 再接続",
+      ssh: "ssh(1) — ssh user@bada.or.jp (Bell対QKDハンドシェイク付き) / exit で戻る",
+      xinetd: "xinetd(8) — スーパーサーバー。xinetd status / service xinetd start|stop。設定は /etc/xinetd.d",
+      apt: "apt(8) — apt update / upgrade / install <p> / remove <p> / list --installed",
+      latex: "latex(1) — texlive-full 同梱。pdflatex file.tex で PDF を VFS に出力",
+      "fcitx-mozc": "fcitx-mozc(1) — Ctrl+Space で日本語入力 (ローマ字→かな)。OS の IME もそのまま使えます"
+    };
+    return MAN[argv[1]] || "No manual entry for " + (argv[1] || "(なし)");
+  }
+  case "free": return "               total        used        free\nMem:         8388608     1048576     7340032\nQubits:            8           2           6";
+  case "df": return "Filesystem     1K-blocks  Used Available Use% Mounted on\nbadafs          16777216  4096  16773120   1% /\ntuplespace       8388608   128   8388480   1% /akashic";
+  }
+
+  /* ── VM Pro 固有コマンド ── */
+  if ((m = c.match(/^open\s+(\w+)/))){ navigate("bada://" + m[1]); return "→ bada://" + m[1]; }
+  if ((m = c.match(/^os\s+(update|upgrade)/))){
+    const from = osVersion(), nv = osUpdate(m[1]);
+    return "BadaGPT: v" + from + " → v" + nv + " (" + m[1] + " 完了)";
+  }
+  if ((m = c.match(/^rails\s+scaffold\s+(\w+)(.*)$/))){
+    const r = railsScaffold(m[1], m[2].trim() ? m[2].trim().split(/\s+/) : []);
+    return r.code + "→ bada://rails/" + r.resource;
+  }
+  if ((m = c.match(/^aikotoba\s+(.+)$/))){ store.set("aikotoba", m[1].trim()); refreshStatusbar(); return "合い言葉を「" + m[1].trim() + "」に変更しました"; }
+  if ((m = c.match(/^bada\s+(.+)$/))) return badaInterpret(m[1].split(";").join("\n"));
+  if (/^(qubit|H|X|Z|CNOT|measure|state|let|print)\b/.test(c)) return badaInterpret(c.split(";").join("\n"));
+  return notFound();
+}
+
+/* =====================================================================
+ * ターミナル・エミュレータ (xterm / x-terminal-emulator / terminal)
+ *   日本語入力: OS IME (composition イベント) + 内蔵 fcitx-mozc
+ * ===================================================================== */
+const TERM_THEMES = {
+  xterm: { cls: "theme-xterm",  name: "xterm" },
+  xte:   { cls: "theme-dark",   name: "x-terminal-emulator" },
+  term:  { cls: "theme-ubuntu", name: "terminal" }
+};
+function esc(s){ return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); }
+
+function Terminal(kind, body){
+  const self = this;
+  const theme = TERM_THEMES[kind] || TERM_THEMES.xterm;
+  this.kind = kind;
+  this.ctx = shellCtx(); this.ctx.term = this;
+  this.lines = [
+    "BadaVMPro OS (Ubuntu-flavoured) 24.04 — " + theme.name + " (bash)",
+    "プリインストール: vim emacs ssh xinetd texlive-full screen fcitx-mozc bash apt",
+    "日本語入力: そのまま IME で入力可 / Ctrl+Space で内蔵 Mozc (ローマ字→かな)",
+    "`help` でコマンド一覧",
+    ""
+  ];
+  this.input = ""; this.cursor = 0;
+  this.history = []; this.hidx = -1;
+  this.mode = "shell";           // shell | vim | emacs
+  this.compose = "";             // IME 変換中テキスト
+  this.mozcOn = false; this.mozcBuf = "";
+  this.screens = []; this.screenSession = null; this.savedShell = null;
+  this.vim = null; this.emacs = null;
+  this.onClose = null;
+
+  const wrap = document.createElement("div");
+  wrap.className = "termwrap " + theme.cls;
+  wrap.innerHTML = '<div class="imebadge"></div><div class="screen"></div><div class="modeline" style="display:none"></div><textarea class="kb" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea>';
+  body.appendChild(wrap);
+  this.el = wrap;
+  this.scr = wrap.querySelector(".screen");
+  this.modeline = wrap.querySelector(".modeline");
+  this.kb = wrap.querySelector("textarea.kb");
+  this.badge = wrap.querySelector(".imebadge");
+  this.composingNative = false;
+
+  wrap.addEventListener("mousedown", function(e){ setTimeout(function(){ self.kb.focus(); }, 0); });
+  this.kb.addEventListener("keydown", function(e){ self.onKey(e); });
+  this.kb.addEventListener("input", function(e){ self.onInput(e); });
+  this.kb.addEventListener("compositionstart", function(){ self.composingNative = true; self.compose = ""; self.render(); });
+  this.kb.addEventListener("compositionupdate", function(e){ self.compose = e.data || ""; self.render(); });
+  this.kb.addEventListener("compositionend", function(e){
+    self.composingNative = false; self.compose = "";
+    if (e.data) self.insertText(e.data);
+    self.kb.value = "";
+    self.render();
+  });
+  this.kb.addEventListener("paste", function(e){
+    e.preventDefault();
+    const t = (e.clipboardData && e.clipboardData.getData("text")) || "";
+    if (t) self.insertText(t.replace(/\r?\n/g, " "));
+  });
+
+  this.prompt = function(){
+    const c = self.ctx;
+    let p = c.user + "@" + c.host + ":" + (c.cwd === "/home/user" ? "~" : c.cwd) + "$ ";
+    if (self.screenSession) p = "[screen " + self.screenSession.id + "] " + p;
+    return p;
+  };
+  this.updateBadge();
+  this.render();
+}
+Terminal.prototype.updateBadge = function(){
+  this.badge.textContent = this.mozcOn ? "Mozc あ" : (this.composingNative ? "IME" : "直接 A");
+};
+Terminal.prototype.clear = function(){ this.lines = []; };
+Terminal.prototype.print = function(text){
+  const self = this;
+  String(text).split("\n").forEach(function(l){ self.lines.push(l); });
+  if (this.lines.length > 600) this.lines = this.lines.slice(-600);
+};
+Terminal.prototype.insertText = function(t){
+  if (this.mode === "vim"){ this.vimInsert(t); return; }
+  if (this.mode === "emacs"){ this.emacsInsert(t); return; }
+  this.input = this.input.slice(0, this.cursor) + t + this.input.slice(this.cursor);
+  this.cursor += t.length;
+  this.render();
+};
+Terminal.prototype.requestClose = function(){ if (this.onClose) this.onClose(); };
+
+/* ── screen (多重化) ── */
+Terminal.prototype.screenNew = function(){
+  const id = 10000 + Math.floor(Math.random() * 20000);
+  const sess = { id: id, at: new Date().toISOString().slice(0, 16).replace("T", " "), lines: [] };
+  this.screens.push(sess);
+  this.savedShell = { lines: this.lines, input: this.input, cursor: this.cursor };
+  this.screenSession = sess;
+  this.lines = ["[screen " + id + " を開始 — Ctrl+a d でデタッチ / exit で終了]", ""];
+  this.input = ""; this.cursor = 0;
+  return "";
+};
+Terminal.prototype.screenDetach = function(){
+  if (!this.screenSession) return;
+  this.screenSession.lines = this.lines;
+  const id = this.screenSession.id;
+  this.screenSession = null;
+  const sv = this.savedShell || { lines: [], input: "", cursor: 0 };
+  this.lines = sv.lines; this.input = sv.input; this.cursor = sv.cursor;
+  this.print("[detached from " + id + ".pts-0]");
+  this.render();
+};
+Terminal.prototype.screenResume = function(idArg){
+  let sess = null;
+  if (idArg) sess = this.screens.find(function(s){ return String(s.id) === String(idArg).split(".")[0]; }) || null;
+  else sess = this.screens[this.screens.length - 1] || null;
+  if (!sess) return "screen: There is no screen to be resumed" + (idArg ? " matching " + idArg : "") + ".";
+  this.savedShell = { lines: this.lines, input: this.input, cursor: this.cursor };
+  this.screenSession = sess;
+  this.lines = sess.lines.length ? sess.lines : ["[screen " + sess.id + " に再接続]", ""];
+  this.input = ""; this.cursor = 0;
+  return "";
+};
+Terminal.prototype.screenExit = function(){
+  const id = this.screenSession.id;
+  this.screens = this.screens.filter(function(s){ return s.id !== id; });
+  this.screenSession = null;
+  const sv = this.savedShell || { lines: [], input: "", cursor: 0 };
+  this.lines = sv.lines; this.input = sv.input; this.cursor = sv.cursor;
+  return "[screen " + id + " is terminating]";
+};
+
+/* ── vim ── */
+Terminal.prototype.openVim = function(path){
+  const node = path ? fsGet(vfs(), path) : null;
+  this.vim = {
+    path: path, buf: (node && node.f !== undefined ? node.f : "").split("\n"),
+    row: 0, col: 0, mode: "normal", cmdline: "", msg: path ? '"' + path + '"' : "[無名]",
+    pend: "", yank: null, dirty: false
+  };
+  if (this.vim.buf.length === 0) this.vim.buf = [""];
+  this.mode = "vim";
+  this.modeline.style.display = "block";
+  this.render();
+};
+Terminal.prototype.vimInsert = function(t){
+  const v = this.vim;
+  if (v.mode === "insert"){
+    const line = v.buf[v.row];
+    v.buf[v.row] = line.slice(0, v.col) + t + line.slice(v.col);
+    v.col += t.length; v.dirty = true;
+  } else if (v.mode === "cmd"){ v.cmdline += t; }
+  this.render();
+};
+Terminal.prototype.vimKey = function(e){
+  const v = this.vim, self = this;
+  const k = e.key;
+  function clamp(){ v.row = Math.max(0, Math.min(v.row, v.buf.length - 1)); v.col = Math.max(0, Math.min(v.col, Math.max(0, v.buf[v.row].length - (v.mode === "insert" ? 0 : 1)))); if (v.buf[v.row].length === 0) v.col = 0; }
+  function exCmd(cmd){
+    if (cmd === "w" || cmd === "wq" || cmd === "x"){
+      if (!v.path) v.path = "/home/user/untitled.txt";
+      fsPut(v.path, v.buf.join("\n"));
+      v.msg = '"' + v.path + '" ' + v.buf.length + "L written";
+      v.dirty = false;
+      if (cmd !== "w"){ self.closeEditor(); return; }
+    } else if (cmd === "q"){
+      if (v.dirty){ v.msg = "E37: 変更が保存されていません (:q! で強制終了)"; }
+      else { self.closeEditor(); return; }
+    } else if (cmd === "q!"){ self.closeEditor(); return; }
+    else if (cmd) v.msg = "E492: エディタのコマンドではありません: " + cmd;
+    v.mode = "normal"; v.cmdline = "";
+  }
+  if (v.mode === "cmd"){
+    if (k === "Enter"){ exCmd(v.cmdline); this.render(); return; }
+    if (k === "Escape"){ v.mode = "normal"; v.cmdline = ""; this.render(); return; }
+    if (k === "Backspace"){ v.cmdline = v.cmdline.slice(0, -1); if (!v.cmdline){ v.mode = "normal"; } this.render(); return; }
+    if (k.length === 1 && !e.ctrlKey && !e.metaKey){ v.cmdline += k; this.render(); return; }
+    return;
+  }
+  if (v.mode === "insert"){
+    if (k === "Escape"){ v.mode = "normal"; if (v.col > 0) v.col--; clamp(); this.render(); return; }
+    if (k === "Enter"){ const line = v.buf[v.row]; const rest = line.slice(v.col); v.buf[v.row] = line.slice(0, v.col); v.buf.splice(v.row + 1, 0, rest); v.row++; v.col = 0; v.dirty = true; this.render(); return; }
+    if (k === "Backspace"){
+      if (v.col > 0){ v.buf[v.row] = v.buf[v.row].slice(0, v.col - 1) + v.buf[v.row].slice(v.col); v.col--; }
+      else if (v.row > 0){ const prev = v.buf[v.row - 1]; v.col = prev.length; v.buf[v.row - 1] = prev + v.buf[v.row]; v.buf.splice(v.row, 1); v.row--; }
+      v.dirty = true; this.render(); return;
+    }
+    if (k === "ArrowLeft"){ v.col = Math.max(0, v.col - 1); this.render(); return; }
+    if (k === "ArrowRight"){ v.col = Math.min(v.buf[v.row].length, v.col + 1); this.render(); return; }
+    if (k === "ArrowUp"){ v.row = Math.max(0, v.row - 1); clamp(); this.render(); return; }
+    if (k === "ArrowDown"){ v.row = Math.min(v.buf.length - 1, v.row + 1); clamp(); this.render(); return; }
+    if (k.length === 1 && !e.ctrlKey && !e.metaKey){ this.vimInsert(k); return; }
+    return;
+  }
+  /* normal モード */
+  if (v.pend === "d"){
+    v.pend = "";
+    if (k === "d"){ v.yank = [v.buf[v.row]]; v.buf.splice(v.row, 1); if (!v.buf.length) v.buf = [""]; clamp(); v.dirty = true; v.msg = "1 行削除 (dd)"; this.render(); }
+    return;
+  }
+  if (v.pend === "y"){
+    v.pend = "";
+    if (k === "y"){ v.yank = [v.buf[v.row]]; v.msg = "1 行ヤンク (yy)"; this.render(); }
+    return;
+  }
+  if (v.pend === "g"){
+    v.pend = "";
+    if (k === "g"){ v.row = 0; v.col = 0; this.render(); }
+    return;
+  }
+  switch (k){
+    case "i": v.mode = "insert"; break;
+    case "a": v.mode = "insert"; v.col = Math.min(v.buf[v.row].length, v.col + 1); break;
+    case "A": v.mode = "insert"; v.col = v.buf[v.row].length; break;
+    case "o": v.buf.splice(v.row + 1, 0, ""); v.row++; v.col = 0; v.mode = "insert"; v.dirty = true; break;
+    case "O": v.buf.splice(v.row, 0, ""); v.col = 0; v.mode = "insert"; v.dirty = true; break;
+    case "x": if (v.buf[v.row].length){ v.buf[v.row] = v.buf[v.row].slice(0, v.col) + v.buf[v.row].slice(v.col + 1); clamp(); v.dirty = true; } break;
+    case "p": if (v.yank){ v.buf.splice(v.row + 1, 0, v.yank[0]); v.row++; v.dirty = true; } break;
+    case "d": v.pend = "d"; break;
+    case "y": v.pend = "y"; break;
+    case "g": v.pend = "g"; break;
+    case "G": v.row = v.buf.length - 1; clamp(); break;
+    case "0": v.col = 0; break;
+    case "$": v.col = Math.max(0, v.buf[v.row].length - 1); break;
+    case "h": case "ArrowLeft": v.col = Math.max(0, v.col - 1); break;
+    case "l": case "ArrowRight": v.col = Math.min(Math.max(0, v.buf[v.row].length - 1), v.col + 1); break;
+    case "k": case "ArrowUp": v.row = Math.max(0, v.row - 1); clamp(); break;
+    case "j": case "ArrowDown": v.row = Math.min(v.buf.length - 1, v.row + 1); clamp(); break;
+    case "w": { const rest = v.buf[v.row].slice(v.col); const mm = rest.match(/^\S*\s+/); v.col = mm ? v.col + mm[0].length : v.buf[v.row].length; clamp(); break; }
+    case "b": { const head = v.buf[v.row].slice(0, v.col).replace(/\s+$/, ""); const idx = head.lastIndexOf(" "); v.col = idx >= 0 ? idx + 1 : 0; break; }
+    case ":": v.mode = "cmd"; v.cmdline = ""; break;
+  }
+  this.render();
+};
+
+/* ── emacs ── */
+Terminal.prototype.openEmacs = function(path){
+  const node = path ? fsGet(vfs(), path) : null;
+  this.emacs = {
+    path: path, buf: (node && node.f !== undefined ? node.f : "").split("\n"),
+    row: 0, col: 0, kill: "", pendCx: false, dirty: false,
+    msg: "Welcome to GNU Emacs (Bada). C-x C-s 保存 / C-x C-c 終了"
+  };
+  if (this.emacs.buf.length === 0) this.emacs.buf = [""];
+  this.mode = "emacs";
+  this.modeline.style.display = "block";
+  this.render();
+};
+Terminal.prototype.emacsInsert = function(t){
+  const b = this.emacs;
+  const line = b.buf[b.row];
+  b.buf[b.row] = line.slice(0, b.col) + t + line.slice(b.col);
+  b.col += t.length; b.dirty = true;
+  this.render();
+};
+Terminal.prototype.emacsKey = function(e){
+  const b = this.emacs, self = this;
+  const k = e.key;
+  function clamp(){ b.row = Math.max(0, Math.min(b.row, b.buf.length - 1)); b.col = Math.max(0, Math.min(b.col, b.buf[b.row].length)); }
+  if (b.pendCx){
+    b.pendCx = false;
+    if (e.ctrlKey && (k === "s" || k === "S")){
+      if (!b.path) b.path = "/home/user/untitled.txt";
+      fsPut(b.path, b.buf.join("\n"));
+      b.msg = "Wrote " + b.path; b.dirty = false; this.render(); return;
+    }
+    if (e.ctrlKey && (k === "c" || k === "C")){ this.closeEditor(); return; }
+    b.msg = "C-x " + k + " is undefined"; this.render(); return;
+  }
+  if (e.ctrlKey){
+    switch (k.toLowerCase()){
+      case "x": b.pendCx = true; b.msg = "C-x -"; this.render(); return;
+      case "a": b.col = 0; this.render(); return;
+      case "e": b.col = b.buf[b.row].length; this.render(); return;
+      case "k": b.kill = b.buf[b.row].slice(b.col); b.buf[b.row] = b.buf[b.row].slice(0, b.col); b.dirty = true; b.msg = "killed"; this.render(); return;
+      case "y": this.emacsInsert(b.kill); b.msg = "yank"; return;
+      case "d": { const l = b.buf[b.row]; if (b.col < l.length){ b.buf[b.row] = l.slice(0, b.col) + l.slice(b.col + 1); b.dirty = true; } this.render(); return; }
+      case "n": b.row = Math.min(b.buf.length - 1, b.row + 1); clamp(); this.render(); return;
+      case "p": b.row = Math.max(0, b.row - 1); clamp(); this.render(); return;
+      case "f": b.col = Math.min(b.buf[b.row].length, b.col + 1); this.render(); return;
+      case "b": b.col = Math.max(0, b.col - 1); this.render(); return;
+      case "g": b.msg = "Quit"; this.render(); return;
+    }
+    return;
+  }
+  if (k === "Enter"){ const line = b.buf[b.row]; const rest = line.slice(b.col); b.buf[b.row] = line.slice(0, b.col); b.buf.splice(b.row + 1, 0, rest); b.row++; b.col = 0; b.dirty = true; this.render(); return; }
+  if (k === "Backspace"){
+    if (b.col > 0){ b.buf[b.row] = b.buf[b.row].slice(0, b.col - 1) + b.buf[b.row].slice(b.col); b.col--; }
+    else if (b.row > 0){ const prev = b.buf[b.row - 1]; b.col = prev.length; b.buf[b.row - 1] = prev + b.buf[b.row]; b.buf.splice(b.row, 1); b.row--; }
+    b.dirty = true; this.render(); return;
+  }
+  if (k === "ArrowLeft"){ b.col = Math.max(0, b.col - 1); this.render(); return; }
+  if (k === "ArrowRight"){ b.col = Math.min(b.buf[b.row].length, b.col + 1); this.render(); return; }
+  if (k === "ArrowUp"){ b.row = Math.max(0, b.row - 1); clamp(); this.render(); return; }
+  if (k === "ArrowDown"){ b.row = Math.min(b.buf.length - 1, b.row + 1); clamp(); this.render(); return; }
+  if (k.length === 1 && !e.metaKey){ this.emacsInsert(k); return; }
+};
+Terminal.prototype.closeEditor = function(){
+  this.mode = "shell"; this.vim = null; this.emacs = null;
+  this.modeline.style.display = "none";
+  this.render();
+};
+
+/* ── 入力ディスパッチ ── */
+Terminal.prototype.onInput = function(e){
+  if (this.composingNative || (e && e.isComposing)) return;
+  const t = this.kb.value;
+  this.kb.value = "";
+  if (!t) return;
+  if (this.mozcOn && /^[a-zA-Z\-,.!?]+$/.test(t)){
+    this.mozcBuf += t.toLowerCase();
+    this.compose = romajiToKana(this.mozcBuf);
+    this.render();
+    return;
+  }
+  this.insertText(t);
+};
+Terminal.prototype.commitMozc = function(kata){
+  if (!this.mozcBuf) return;
+  const text = kata ? kanaToKatakana(romajiToKana(this.mozcBuf)) : romajiToKana(this.mozcBuf);
+  this.mozcBuf = ""; this.compose = "";
+  this.insertText(text);
+};
+Terminal.prototype.onKey = function(e){
+  const self = this;
+  if (e.isComposing || e.keyCode === 229) return;      /* OS の IME 変換中はすべて IME に委ねる */
+  /* Ctrl+Space → 内蔵 fcitx-mozc 切替 (どのモードでも) */
+  if (e.ctrlKey && (e.key === " " || e.code === "Space")){
+    e.preventDefault();
+    this.mozcOn = !this.mozcOn;
+    if (!this.mozcOn){ this.mozcBuf = ""; this.compose = ""; }
+    this.updateBadge(); this.render();
+    return;
+  }
+  /* Mozc 変換中のキー */
+  if (this.mozcOn && this.mozcBuf){
+    if (e.key === "Enter" || e.key === " "){ e.preventDefault(); this.commitMozc(false); this.render(); return; }
+    if (e.key === "F7"){ e.preventDefault(); this.commitMozc(true); this.render(); return; }
+    if (e.key === "Escape"){ e.preventDefault(); this.mozcBuf = ""; this.compose = ""; this.render(); return; }
+    if (e.key === "Backspace"){ e.preventDefault(); this.mozcBuf = this.mozcBuf.slice(0, -1); this.compose = romajiToKana(this.mozcBuf); this.render(); return; }
+  }
+  if (this.mode === "vim"){
+    if (["Escape","Enter","Backspace","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Tab"].includes(e.key) || e.ctrlKey) e.preventDefault();
+    this.vimKey(e);
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) e.preventDefault(); /* input イベントの二重挿入防止 → vimKey が処理済み */
+    return;
+  }
+  if (this.mode === "emacs"){
+    if (["Escape","Enter","Backspace","ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Tab"].includes(e.key) || e.ctrlKey) e.preventDefault();
+    this.emacsKey(e);
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) e.preventDefault();
+    return;
+  }
+  /* shell モード */
+  if (e.ctrlKey && e.key === "a" && this.screenPending){ /* handled below */ }
+  if (this.screenPending){
+    this.screenPending = false;
+    if (e.key === "d"){ e.preventDefault(); this.screenDetach(); return; }
+    if (e.key === "a" && e.ctrlKey){ e.preventDefault(); return; }
+  }
+  if (e.ctrlKey){
+    switch (e.key.toLowerCase()){
+      case "c": e.preventDefault(); this.print(this.prompt() + this.input + "^C"); this.input = ""; this.cursor = 0; this.render(); return;
+      case "l": e.preventDefault(); this.clear(); this.render(); return;
+      case "a": e.preventDefault();
+        if (this.screenSession){ this.screenPending = true; return; }
+        this.cursor = 0; this.render(); return;
+      case "e": e.preventDefault(); this.cursor = this.input.length; this.render(); return;
+      case "u": e.preventDefault(); this.input = this.input.slice(this.cursor); this.cursor = 0; this.render(); return;
+      case "v": return; /* paste イベントに委ねる */
+    }
+    return;
+  }
+  switch (e.key){
+    case "Enter": {
+      e.preventDefault();
+      const cmd = this.input;
+      this.print(this.prompt() + cmd);
+      this.input = ""; this.cursor = 0;
+      if (cmd.trim()){
+        this.history.push(cmd); this.hidx = this.history.length;
+        const r = runShell(cmd, this.ctx);
+        if (r) this.print(r);
+      }
+      this.render();
+      return;
+    }
+    case "Backspace":
+      e.preventDefault();
+      if (this.cursor > 0){ this.input = this.input.slice(0, this.cursor - 1) + this.input.slice(this.cursor); this.cursor--; this.render(); }
+      return;
+    case "Delete":
+      e.preventDefault();
+      this.input = this.input.slice(0, this.cursor) + this.input.slice(this.cursor + 1); this.render(); return;
+    case "ArrowLeft": e.preventDefault(); this.cursor = Math.max(0, this.cursor - 1); this.render(); return;
+    case "ArrowRight": e.preventDefault(); this.cursor = Math.min(this.input.length, this.cursor + 1); this.render(); return;
+    case "ArrowUp":
+      e.preventDefault();
+      if (this.hidx > 0){ this.hidx--; this.input = this.history[this.hidx] || ""; this.cursor = this.input.length; this.render(); }
+      return;
+    case "ArrowDown":
+      e.preventDefault();
+      if (this.hidx < this.history.length){ this.hidx++; this.input = this.history[this.hidx] || ""; this.cursor = this.input.length; this.render(); }
+      return;
+    case "Tab": {
+      e.preventDefault();
+      const CMDS = ["apt","vim","emacs","ssh","screen","xinetd","service","pdflatex","latex","fcitx-mozc","ls","cd","cat","echo","mkdir","touch","rm","help","clear","history","man","rails","open","xterm","x-terminal-emulator","terminal","dpkg","ps","uname"];
+      const head = this.input.slice(0, this.cursor);
+      const mm = head.match(/(\S+)$/);
+      if (mm){
+        const cands = CMDS.filter(function(x){ return x.startsWith(mm[1]); });
+        if (cands.length === 1){
+          const add = cands[0].slice(mm[1].length) + " ";
+          this.insertText(add);
+        } else if (cands.length > 1){
+          this.print(this.prompt() + this.input);
+          this.print(cands.join("  "));
+          this.render();
+        }
+      }
+      return;
+    }
+  }
+};
+Terminal.prototype.render = function(){
+  if (this.mode === "vim" && this.vim){
+    const v = this.vim;
+    const rows = [];
+    for (let i = 0; i < v.buf.length; i++){
+      if (i === v.row){
+        const line = v.buf[i], col = Math.min(v.col, line.length);
+        rows.push(esc(line.slice(0, col)) +
+          (this.compose ? '<span class="ime">' + esc(this.compose) + "</span>" : "") +
+          '<span class="cur">' + esc(line[col] || " ") + "</span>" + esc(line.slice(col + 1)));
+      } else rows.push(esc(v.buf[i]));
+    }
+    for (let i = v.buf.length; i < 18; i++) rows.push('<span style="opacity:.4">~</span>');
+    this.scr.innerHTML = rows.join("\n");
+    this.modeline.textContent =
+      (v.mode === "cmd" ? ":" + v.cmdline :
+       (v.mode === "insert" ? "-- INSERT --  " : "") + (v.path || "[無名]") + (v.dirty ? " [+]" : "") +
+       "  " + (v.row + 1) + "," + (v.col + 1) + "   " + v.msg);
+    this.scr.scrollTop = this.scr.scrollHeight;
+    return;
+  }
+  if (this.mode === "emacs" && this.emacs){
+    const b = this.emacs;
+    const rows = [];
+    for (let i = 0; i < b.buf.length; i++){
+      if (i === b.row){
+        const line = b.buf[i], col = Math.min(b.col, line.length);
+        rows.push(esc(line.slice(0, col)) +
+          (this.compose ? '<span class="ime">' + esc(this.compose) + "</span>" : "") +
+          '<span class="cur">' + esc(line[col] || " ") + "</span>" + esc(line.slice(col + 1)));
+      } else rows.push(esc(b.buf[i]));
+    }
+    this.scr.innerHTML = rows.join("\n");
+    this.modeline.textContent = "-UUU:" + (b.dirty ? "**" : "--") + "-F1  " +
+      (b.path ? b.path.split("/").pop() : "*scratch*") + "   (Fundamental)  L" + (b.row + 1) + "   " + b.msg;
+    this.scr.scrollTop = this.scr.scrollHeight;
+    return;
+  }
+  const before = this.input.slice(0, this.cursor);
+  const at = this.input[this.cursor] || " ";
+  const after = this.input.slice(this.cursor + 1);
+  const composeHtml = this.compose ? '<span class="ime">' + esc(this.compose) + "</span>" : "";
+  this.scr.innerHTML = this.lines.map(esc).join("\n") + "\n" +
+    esc(this.prompt()) + esc(before) + composeHtml + '<span class="cur">' + esc(at) + "</span>" + esc(after);
+  this.scr.scrollTop = this.scr.scrollHeight;
+  this.updateBadge();
+};
+
+/* =====================================================================
+ * w9wm ウィンドウマネージャ
+ *   B3 = WM メニュー (New/Reshape/Move/Delete/Hide + 仮想スクリーン)
+ *   B1 = アプリケーションメニュー / Ctrl+Alt+←→ = 仮想スクリーン切替
+ * ===================================================================== */
+const WM = {
+  wins: [], seq: 0, z: 10, desk: 0, NDESK: 4,
+  mode: null,       // null | "reshape" | "move" | "delete" | "hide"
+  pickWin: null
+};
+const PAGES = {
+  "home":        { title: "ホーム",        fav: "🜁" },
+  "gpt":         { title: "BadaGPT",       fav: "✦" },
+  "rails":       { title: "Bada on Rails", fav: "🚂" },
+  "terminal":    { title: "xterm",         fav: "🖥" },
+  "studio":      { title: "GUI スタジオ",   fav: "🎨" },
+  "transformer": { title: "Transformer",   fav: "🧠" },
+  "voice":       { title: "合い言葉",       fav: "🎙" },
+  "settings":    { title: "設定",           fav: "⚙" }
+};
+function pageKey(url){
+  const m = String(url).match(/^bada:\/\/([a-z]+)/i);
+  return m ? m[1].toLowerCase() : "home";
+}
+function deskEl(){ return document.getElementById("desk"); }
+
+function wmCreate(opts){
+  const desk = deskEl();
+  const el = document.createElement("div");
+  el.className = "win";
+  const W = opts.w || 560, H = opts.h || 420;
+  WM.seq++;
+  const x = opts.x !== undefined ? opts.x : (40 + (WM.seq * 36) % 260);
+  const y = opts.y !== undefined ? opts.y : (30 + (WM.seq * 28) % 180);
+  el.style.left = x + "px"; el.style.top = y + "px";
+  el.style.width = W + "px"; el.style.height = H + "px";
+  el.style.zIndex = ++WM.z;
+  el.innerHTML = '<div class="body"></div><div class="rsz"></div>';
+  desk.appendChild(el);
+  const win = { id: "w" + WM.seq, key: opts.key, url: opts.url || "", title: opts.title || opts.key,
+    el: el, body: el.querySelector(".body"), desk: WM.desk, hidden: false, term: null };
+  WM.wins.push(win);
+
+  el.addEventListener("mousedown", function(e){
+    if (WM.mode){ wmPickTarget(win, e); e.stopPropagation(); e.preventDefault(); return; }
+    wmFocus(win);
+    /* 4px ボーダー部をドラッグで移動 (9wm 流) */
+    if (e.target === el){
+      const sx = e.clientX - el.offsetLeft, sy = e.clientY - el.offsetTop;
+      function mv(e2){ el.style.left = Math.max(0, e2.clientX - sx) + "px"; el.style.top = Math.max(0, e2.clientY - sy) + "px"; }
+      function up(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      e.preventDefault();
+    }
+  });
+  const rsz = el.querySelector(".rsz");
+  rsz.addEventListener("mousedown", function(e){
+    e.stopPropagation(); e.preventDefault();
+    wmFocus(win);
+    const sw = el.offsetWidth, sh = el.offsetHeight, sx = e.clientX, sy = e.clientY;
+    function mv(e2){ el.style.width = Math.max(160, sw + e2.clientX - sx) + "px"; el.style.height = Math.max(110, sh + e2.clientY - sy) + "px"; }
+    function up(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }
+    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+  });
+  wmFocus(win);
+  return win;
+}
+function wmFocus(win){
+  WM.wins.forEach(function(w){ w.el.classList.remove("focus"); });
+  win.el.classList.add("focus");
+  win.el.style.zIndex = ++WM.z;
+  WM.focused = win;
+  if (win.term) setTimeout(function(){ win.term.kb.focus(); }, 0);
+}
+function wmClose(win){
+  WM.wins = WM.wins.filter(function(w){ return w !== win; });
+  if (win.el && win.el.parentNode) win.el.parentNode.removeChild(win.el);
+  if (WM.focused === win) WM.focused = WM.wins[WM.wins.length - 1] || null;
+}
+function wmHide(win){ win.hidden = true; win.el.classList.add("hidden"); }
+function wmUnhide(win){
+  win.hidden = false; win.desk = WM.desk;
+  win.el.classList.remove("hidden");
+  wmFocus(win);
+}
+function wmSwitchDesk(n){
+  WM.desk = ((n % WM.NDESK) + WM.NDESK) % WM.NDESK;
+  WM.wins.forEach(function(w){
+    if (w.hidden) return;
+    if (w.desk === WM.desk) w.el.classList.remove("hidden");
+    else w.el.classList.add("hidden");
+  });
+  setStatus("仮想スクリーン " + WM.desk);
+}
+function wmPickTarget(win, e){
+  const mode = WM.mode;
+  WM.mode = null;
+  deskEl().className = "";
+  if (mode === "delete"){ wmClose(win); setStatus("Delete: " + win.title); return; }
+  if (mode === "hide"){ wmHide(win); setStatus("Hide: " + win.title + " (B3 メニューから戻せます)"); return; }
+  if (mode === "move"){
+    const el = win.el;
+    const sx = e.clientX - el.offsetLeft, sy = e.clientY - el.offsetTop;
+    function mv(e2){ el.style.left = Math.max(0, e2.clientX - sx) + "px"; el.style.top = Math.max(0, e2.clientY - sy) + "px"; }
+    function up(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); }
+    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+    return;
+  }
+  if (mode === "reshape"){
+    const box = document.getElementById("sweepbox");
+    const x0 = e.clientX, y0 = e.clientY;
+    box.style.display = "block";
+    function set(e2){
+      const x = Math.min(x0, e2.clientX), y = Math.min(y0, e2.clientY);
+      const w = Math.abs(e2.clientX - x0), h = Math.abs(e2.clientY - y0);
+      box.style.left = x + "px"; box.style.top = y + "px";
+      box.style.width = w + "px"; box.style.height = h + "px";
+      return { x: x, y: y, w: w, h: h };
+    }
+    set(e);
+    function mv(e2){ set(e2); }
+    function up(e2){
+      document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up);
+      const g = set(e2);
+      box.style.display = "none";
+      if (g.w > 60 && g.h > 50){
+        win.el.style.left = g.x + "px"; win.el.style.top = g.y + "px";
+        win.el.style.width = Math.max(160, g.w) + "px"; win.el.style.height = Math.max(110, g.h) + "px";
+      }
+      wmFocus(win);
+    }
+    document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+  }
+}
+
+/* ── メニュー ── */
+let menuEl = null;
+function closeMenu(){ if (menuEl && menuEl.parentNode) menuEl.parentNode.removeChild(menuEl); menuEl = null; }
+function showMenu(items, x, y){
+  closeMenu();
+  const el = document.createElement("div");
+  el.className = "wmenu";
+  items.forEach(function(it){
+    if (it === "-"){ const s = document.createElement("div"); s.className = "sep"; el.appendChild(s); return; }
+    if (it.cap){ const s = document.createElement("div"); s.className = "cap"; s.textContent = it.cap; el.appendChild(s); return; }
+    if (it.vrow){
+      const row = document.createElement("div"); row.className = "vrow";
+      for (let i = 0; i < WM.NDESK; i++){
+        (function(n){
+          const b = document.createElement("div");
+          b.className = "vbox" + (n === WM.desk ? " cur" : "");
+          b.textContent = n;
+          b.onmousedown = function(e){ e.stopPropagation(); };
+          b.onclick = function(){ closeMenu(); wmSwitchDesk(n); };
+          row.appendChild(b);
+        })(i);
+      }
+      el.appendChild(row); return;
+    }
+    const d = document.createElement("div");
+    d.className = "it"; d.textContent = it.label;
+    d.onclick = function(){ closeMenu(); it.fn(); };
+    el.appendChild(d);
+  });
+  el.style.left = Math.min(x, Math.max(0, (window.innerWidth || 1200) - 220)) + "px";
+  el.style.top = Math.min(y, Math.max(0, (window.innerHeight || 800) - 300)) + "px";
+  deskEl().appendChild(el);
+  menuEl = el;
+}
+function wmMenu(x, y){
+  const items = [
+    { cap: "w9wm — バーチャルスクリーン" },
+    { vrow: true },
+    "-",
+    { label: "New",     fn: function(){ openTerm("xterm"); } },
+    { label: "Reshape", fn: function(){ WM.mode = "reshape"; deskEl().className = "sweep"; setStatus("Reshape: ウィンドウ上でドラッグして新しい枠を掃引"); } },
+    { label: "Move",    fn: function(){ WM.mode = "move"; deskEl().className = "sweep"; setStatus("Move: ウィンドウを掴んでドラッグ"); } },
+    { label: "Delete",  fn: function(){ WM.mode = "delete"; deskEl().className = "pick-del"; setStatus("Delete: 閉じるウィンドウをクリック"); } },
+    { label: "Hide",    fn: function(){ WM.mode = "hide"; deskEl().className = "sweep"; setStatus("Hide: 隠すウィンドウをクリック"); } }
+  ];
+  const hidden = WM.wins.filter(function(w){ return w.hidden; });
+  if (hidden.length){
+    items.push("-");
+    items.push({ cap: "隠したウィンドウ" });
+    hidden.forEach(function(w){
+      items.push({ label: w.title, fn: function(){ wmUnhide(w); } });
+    });
+  }
+  showMenu(items, x, y);
+}
+function appMenu(x, y){
+  const items = [
+    { cap: "アプリケーション (プリインストール)" },
+    { label: "xterm",               fn: function(){ openTerm("xterm"); } },
+    { label: "x-terminal-emulator", fn: function(){ openTerm("xte"); } },
+    { label: "terminal",            fn: function(){ openTerm("term"); } },
+    { label: "vim",                 fn: function(){ const t = openTerm("xterm"); t.term.openVim("/home/user/hello.bada"); } },
+    { label: "emacs",               fn: function(){ const t = openTerm("xte"); t.term.openEmacs("/home/user/README.txt"); } },
+    "-",
+    { label: "✦ BadaGPT",           fn: function(){ navigate("bada://gpt"); } },
+    { label: "🚂 Bada on Rails",    fn: function(){ navigate("bada://rails"); } },
+    { label: "🎨 GUI スタジオ",      fn: function(){ navigate("bada://studio"); } },
+    { label: "🧠 Transformer",      fn: function(){ navigate("bada://transformer"); } },
+    { label: "🎙 合い言葉",          fn: function(){ navigate("bada://voice"); } },
+    { label: "⚙ 設定",              fn: function(){ navigate("bada://settings"); } },
+    { label: "🜁 このOSについて",    fn: function(){ navigate("bada://home"); } }
+  ];
+  showMenu(items, x, y);
+}
+
+/* ── ターミナル起動 (xterm / x-terminal-emulator / terminal) ── */
+function openTerm(kind){
+  const theme = TERM_THEMES[kind] || TERM_THEMES.xterm;
+  const win = wmCreate({ key: "term-" + kind, title: theme.name, w: 620, h: 400 });
+  const term = new Terminal(kind, win.body);
+  win.term = term;
+  term.onClose = function(){ wmClose(win); };
+  wmFocus(win);
+  return win;
+}
+
+/* ── アプリウィンドウ (単一インスタンス) / bada:// ルーター ── */
+function findWin(key){ return WM.wins.find(function(w){ return w.key === key; }) || null; }
+function navigate(url){
+  const key = pageKey(url);
+  if (key === "terminal"){ const w = WM.wins.find(function(x){ return x.term && !x.hidden; }); if (w){ wmFocus(w); } else openTerm("xterm"); return; }
+  const meta = PAGES[key] || PAGES.home;
+  let win = findWin(key);
+  if (!win){
+    win = wmCreate({ key: key, url: url, title: meta.fav + " " + meta.title, w: key === "studio" ? 760 : 620, h: 460 });
+  }
+  win.url = url;
+  if (win.hidden) wmUnhide(win);
+  win.desk = WM.desk; win.el.classList.remove("hidden");
+  renderPage(url, win.body);
+  wmFocus(win);
+  refreshStatusbar();
+}
+function renderCurrent(){
+  const w = WM.focused;
+  if (w && !w.term) renderPage(w.url || ("bada://" + w.key), w.body);
+  refreshStatusbar();
+}
+
+/* ── ページレンダラー ──────────────────────────────────────────── */
+function renderPage(url, vp){
+  const key = pageKey(url);
+  switch (key){
+    case "gpt":         return pageGPT(vp);
+    case "rails":       return pageRails(vp, url);
+    case "studio":      return pageStudio(vp);
+    case "transformer": return pageTransformer(vp);
+    case "voice":       return pageVoice(vp);
+    case "settings":    return pageSettings(vp);
+    default:            return pageHome(vp);
+  }
+}
+
+/* bada://home — このOSについて */
+function pageHome(vp){
+  vp.innerHTML =
+  '<div class="page">' +
+  '<h1>🜁 Bada VM Pro <span class="badge ok">w9wm desktop</span></h1>' +
+  '<div class="sub">量子プログラミング言語 Bada の OS — デスクトップは w9wm (9wm + 仮想スクリーン)、カーネルは BadaGPT。v' + osVersion() + '</div>' +
+  '<div class="card"><b>w9wm の操作</b><br>' +
+  '・<span class="kbd">右クリック (B3)</span> WM メニュー — New / Reshape / Move / Delete / Hide + 仮想スクリーン 0-3<br>' +
+  '・<span class="kbd">左クリック (B1)</span> アプリケーションメニュー (左上 ☰ でも可)<br>' +
+  '・<span class="kbd">Ctrl+Alt+←→</span> 仮想スクリーン切替 / 枠ドラッグで移動・右下角でリサイズ (タイトルバーはありません)</div>' +
+  '<div class="card"><b>プリインストール済み (apt list --installed)</b><br>' +
+  '<span class="kbd">bash</span> <span class="kbd">apt</span> <span class="kbd">vim</span> <span class="kbd">emacs</span> <span class="kbd">ssh</span> <span class="kbd">xinetd</span> <span class="kbd">texlive-full</span> <span class="kbd">screen</span> <span class="kbd">fcitx-mozc</span> <span class="kbd">xterm</span> <span class="kbd">x-terminal-emulator</span> <span class="kbd">terminal</span><br>' +
+  'ターミナルの日本語入力: OS の IME でそのまま変換入力 / <span class="kbd">Ctrl+Space</span> で内蔵 Mozc (ローマ字→かな, F7 カタカナ)</div>' +
+  '<div class="grid" id="homegrid"></div>' +
+  '</div>';
+  const grid = vp.querySelector("#homegrid");
+  const apps = [
+    ["terminal","🖥","xterm","bash / apt / vim / emacs / ssh"],
+    ["gpt","✦","BadaGPT","OSのベース / update・upgrade"],
+    ["rails","🚂","Bada on Rails","scaffold → CRUD"],
+    ["studio","🎨","GUI スタジオ","フォームデザイナ → Bada"],
+    ["transformer","🧠","Transformer","self-attention 可視化"],
+    ["voice","🎙","合い言葉","silent talk / 音声"],
+    ["settings","⚙","設定","バージョン・changelog"]
+  ];
+  apps.forEach(function(a){
+    const el = document.createElement("div");
+    el.className = "appicon";
+    el.innerHTML = '<span class="em">' + a[1] + '</span><span class="nm">' + a[2] + '</span><span class="ds">' + a[3] + '</span>';
+    el.onclick = function(){ navigate("bada://" + a[0]); };
+    grid.appendChild(el);
+  });
+}
+
+/* bada://gpt */
+let gptHistory = store.get("gpt.history", [
+  { role: "gpt", text: "こんにちは。私は Bada VM Pro のベース、BadaGPT です。\nOS の update / upgrade は私が担当します。`help` で出来ることを一覧します。" }
+]);
+function gptPush(role, text, opts){
+  gptHistory.push({ role: role, text: text });
+  gptHistory = gptHistory.slice(-80);
+  store.set("gpt.history", gptHistory);
+  const log = document.getElementById("chatlog");
+  if (log){
+    const el = document.createElement("div");
+    el.className = "msg " + role;
+    el.textContent = text;
+    if (opts && opts.progress){
+      const p = document.createElement("div"); p.className = "prog";
+      const i = document.createElement("i"); p.appendChild(i); el.appendChild(p);
+      let w = 0;
+      const timer = setInterval(function(){
+        w += 12 + Math.random() * 18;
+        if (w >= 100){ w = 100; clearInterval(timer); if (opts.then) setTimeout(opts.then, 250); }
+        i.style.width = w + "%";
+      }, 220);
+    }
+    log.appendChild(el);
+    log.scrollTop = log.scrollHeight;
+  }
+}
+function gptSend(text){
+  const inp = document.getElementById("gptin");
+  const t = (text !== undefined ? text : (inp ? inp.value : "")).trim();
+  if (!t) return;
+  if (inp) inp.value = "";
+  gptPush("user", t);
+  setTimeout(function(){ badaGPTReply(t, gptPush); }, 120);
+}
+function pageGPT(vp){
+  vp.innerHTML =
+  '<div class="page">' +
+  '<h1>✦ BadaGPT</h1><div class="sub">Bada VM Pro のベース・カーネル — OS update / upgrade、Rails、量子実行、補完をすべて担当</div>' +
+  '<div class="card"><div id="chatlog"></div>' +
+  '<div class="row" style="margin-top:10px"><input id="gptin" style="flex:1" placeholder="os update / scaffold Post title:string / ベル状態を作って …"/>' +
+  '<button id="gptsend" style="background:var(--purple);border-color:var(--purple)">送信</button></div>' +
+  '<div class="row" style="margin-top:8px">' +
+  '<button onclick="gptSend(\'os update\')">os update</button>' +
+  '<button onclick="gptSend(\'os upgrade\')">os upgrade</button>' +
+  '<button onclick="gptSend(\'ベル状態を作って\')">ベル状態</button>' +
+  '<button onclick="gptSend(\'scaffold Post title:string body:text\')">scaffold Post</button>' +
+  '<button onclick="gptSend(\'help\')">help</button></div></div></div>';
+  const log = vp.querySelector("#chatlog");
+  gptHistory.forEach(function(m){
+    const el = document.createElement("div"); el.className = "msg " + m.role; el.textContent = m.text; log.appendChild(el);
+  });
+  log.scrollTop = log.scrollHeight;
+  vp.querySelector("#gptsend").onclick = function(){ gptSend(); };
+  vp.querySelector("#gptin").addEventListener("keydown", function(e){ if (e.key === "Enter") gptSend(); });
+}
+
+/* bada://rails */
+function pageRails(vp, url){
+  const m = String(url).match(/^bada:\/\/rails\/(\w+)/i);
+  if (m && railsDB().resources[m[1].toLowerCase()]) return railsResourceView(vp, m[1].toLowerCase());
+  const db = railsDB();
+  const names = Object.keys(db.resources);
+  vp.innerHTML =
+  '<div class="page"><h1>🚂 Bada on Rails</h1>' +
+  '<div class="sub">Convention over Quantum Configuration — scaffold 一発で bada://rails/&lt;resource&gt; に CRUD が立ちます</div>' +
+  '<div class="card"><h2 style="margin-top:0">rails generate scaffold</h2>' +
+  '<div class="row"><input id="scname" placeholder="Post" style="width:130px"/>' +
+  '<input id="scfields" placeholder="title:string body:text" style="flex:1"/>' +
+  '<button id="scgo" style="background:var(--red);border-color:var(--red)">generate</button></div>' +
+  '<pre class="code" id="sccode" style="margin-top:10px;display:none"></pre></div>' +
+  '<div class="card"><h2 style="margin-top:0">リソース</h2>' +
+  (names.length ? names.map(function(n){
+     return '<div class="row" style="margin-bottom:6px"><span class="badge ok">resources :' + n + '</span>' +
+            '<a class="link" onclick="navigate(\'bada://rails/' + n + '\')">bada://rails/' + n + '</a>' +
+            '<span class="badge">' + railsDB().resources[n].rows.length + ' rows</span></div>';
+   }).join("") : '<span style="color:var(--dim)">まだありません。上の generate か、BadaGPT に「scaffold Post title:string」と話しかけてください。</span>') +
+  '</div>' +
+  '<div class="card">サーバー: <span class="badge ' + (store.get("rails.server", false) ? 'ok">running (Puma-Ω :3000)' : 'warn">stopped') + '</span> ' +
+  '<button onclick="store.set(\'rails.server\',true);refreshStatusbar();renderCurrent()">rails server</button></div>' +
+  '</div>';
+  vp.querySelector("#scgo").onclick = function(){
+    const name = vp.querySelector("#scname").value.trim() || "Post";
+    const fields = vp.querySelector("#scfields").value.trim();
+    const r = railsScaffold(name, fields ? fields.split(/\s+/) : []);
+    const pre = vp.querySelector("#sccode");
+    pre.style.display = "block"; pre.textContent = r.code;
+    setStatus("scaffold " + r.resource + " を生成");
+    setTimeout(function(){ renderCurrent(); }, 1400);
+  };
+}
+function railsResourceView(vp, res){
+  const r = railsDB().resources[res];
+  vp.innerHTML =
+  '<div class="page"><h1>🚂 /' + res + '</h1><div class="sub">bada://rails/' + res + ' — ' +
+  r.fields.map(function(f){ return f.name + ":" + f.type; }).join(", ") + '</div>' +
+  '<div class="card"><h2 style="margin-top:0">new</h2><div class="row" id="newrow">' +
+  r.fields.map(function(f){ return '<input data-f="' + f.name + '" placeholder="' + f.name + '" style="flex:1;min-width:120px"/>'; }).join("") +
+  '<button id="mkrow" style="background:var(--green);border-color:var(--green)">create</button></div></div>' +
+  '<div class="card"><table class="tbl"><tr><th>id</th>' +
+  r.fields.map(function(f){ return "<th>" + f.name + "</th>"; }).join("") + '<th></th></tr>' +
+  r.rows.map(function(row){
+    return "<tr><td>" + row.id + "</td>" +
+      r.fields.map(function(f){ return "<td>" + String(row[f.name] || "").replace(/</g, "&lt;") + "</td>"; }).join("") +
+      '<td><button onclick="railsDeleteRow(\'' + res + '\',' + row.id + ');renderCurrent()">🗑</button></td></tr>';
+  }).join("") + '</table></div>' +
+  '<a class="link" onclick="navigate(\'bada://rails\')">← リソース一覧</a></div>';
+  vp.querySelector("#mkrow").onclick = function(){
+    const vals = {};
+    vp.querySelectorAll("#newrow input").forEach(function(i){ vals[i.getAttribute("data-f")] = i.value; });
+    railsCreateRow(res, vals); renderCurrent();
+  };
+}
+
+/* bada://studio — GUI プログラミング */
+let guiCmps = store.get("gui.cmps", [
+  { type: "TLabel",  x: 30, y: 24,  caption: "量子フォーム Form1" },
+  { type: "TButton", x: 30, y: 70,  caption: "測定する" },
+  { type: "TEdit",   x: 30, y: 120, caption: "" }
+]);
+let guiSel = -1, guiSeq = guiCmps.length;
+function pageStudio(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🎨 GUI スタジオ</h1><div class="sub">GUI プログラミング — 部品を置いてドラッグ → Bada コード生成 → ▶ 実行 (ボタンは量子測定を発火)</div>' +
+  '<div id="designer">' +
+  '<div class="card" id="palette" style="margin:0"><b style="font-size:12px;color:var(--gold)">パレット</b><br><br>' +
+  '<button data-t="TButton">□ TButton</button><button data-t="TLabel">A TLabel</button><button data-t="TEdit">▭ TEdit</button>' +
+  '<hr style="border-color:var(--edge);margin:10px 0"/>' +
+  '<button id="guirun" style="background:var(--green);border-color:var(--green)">▶ 実行 (F9)</button>' +
+  '<button id="guidel">🗑 選択を削除</button></div>' +
+  '<div class="card" style="margin:0"><div id="canvas"></div></div>' +
+  '<div class="card" style="margin:0"><b style="font-size:12px;color:var(--gold)">プロパティ</b>' +
+  '<div id="props" style="margin-top:8px;font-size:12.5px;color:var(--dim)">部品を選択してください</div></div>' +
+  '</div>' +
+  '<h2>生成された Bada コード</h2><pre class="code" id="guicode"></pre></div>';
+  vp.querySelectorAll("#palette button[data-t]").forEach(function(b){
+    b.onclick = function(){
+      guiSeq++;
+      guiCmps.push({ type: b.getAttribute("data-t"), x: 40 + (guiSeq*17)%180, y: 40 + (guiSeq*23)%200,
+        caption: b.getAttribute("data-t") === "TEdit" ? "" : b.getAttribute("data-t").slice(1) + guiSeq });
+      saveGui(); drawGui(vp);
+    };
+  });
+  vp.querySelector("#guirun").onclick = runGuiPreview;
+  vp.querySelector("#guidel").onclick = function(){ if (guiSel >= 0){ guiCmps.splice(guiSel, 1); guiSel = -1; saveGui(); drawGui(vp); } };
+  drawGui(vp);
+}
+function saveGui(){ store.set("gui.cmps", guiCmps); }
+function guiCode(){
+  return "form Form1 {\n  title \"Bada VM Pro Form\"\n" +
+    guiCmps.map(function(c, i){
+      let l = "  " + c.type.slice(1).toLowerCase() + " c" + i + " at (" + c.x + "," + c.y + ")";
+      if (c.caption) l += ' caption "' + c.caption + '"';
+      if (c.type === "TButton") l += ' on click {\n    qubit q0; H q0\n    print measure   # 量子測定\n  }';
+      return l;
+    }).join("\n") + "\n}";
+}
+function drawGui(vp){
+  const cv = vp.querySelector("#canvas");
+  cv.innerHTML = "";
+  guiCmps.forEach(function(c, i){
+    const el = document.createElement("div");
+    el.className = "cmp " + c.type + (i === guiSel ? " sel" : "");
+    el.style.left = c.x + "px"; el.style.top = c.y + "px";
+    el.textContent = c.type === "TEdit" ? (c.caption || "") : c.caption;
+    if (c.type === "TEdit" && !c.caption) el.innerHTML = "&nbsp;";
+    el.onmousedown = function(ev){
+      guiSel = i; drawGui(vp);
+      const sx = ev.clientX - c.x, sy = ev.clientY - c.y;
+      function mv(e2){ c.x = Math.max(0, e2.clientX - sx); c.y = Math.max(0, e2.clientY - sy);
+        el.style.left = c.x + "px"; el.style.top = c.y + "px"; }
+      function up(){ document.removeEventListener("mousemove", mv); document.removeEventListener("mouseup", up); saveGui(); drawGui(vp); }
+      document.addEventListener("mousemove", mv); document.addEventListener("mouseup", up);
+      ev.preventDefault(); ev.stopPropagation();
+    };
+    cv.appendChild(el);
+  });
+  const props = vp.querySelector("#props");
+  if (guiSel >= 0 && guiCmps[guiSel]){
+    const c = guiCmps[guiSel];
+    props.innerHTML = '<div>type: <b>' + c.type + '</b></div><div>at: (' + c.x + ',' + c.y + ')</div>' +
+      '<div style="margin-top:6px">caption<br/><input id="propcap" style="width:100%" value="' + String(c.caption).replace(/"/g, "&quot;") + '"/></div>';
+    props.querySelector("#propcap").oninput = function(e){ c.caption = e.target.value; saveGui();
+      const cvv = document.querySelectorAll("#canvas .cmp")[guiSel]; if (cvv) cvv.textContent = c.caption; };
+  } else props.textContent = "部品を選択してください";
+  vp.querySelector("#guicode").textContent = guiCode();
+}
+function runGuiPreview(){
+  const ov = document.getElementById("guiprev"), body = document.getElementById("gp-body");
+  body.innerHTML = "";
+  guiCmps.forEach(function(c){
+    let el;
+    if (c.type === "TButton"){ el = document.createElement("button"); el.className = "cmp TButton"; el.textContent = c.caption;
+      el.style.cursor = "pointer";
+      el.onclick = function(){ const r = badaInterpret("qubit q0\nH q0\nmeasure");
+        alert("on click → 量子測定\n" + r); }; }
+    else if (c.type === "TEdit"){ el = document.createElement("input"); el.className = "cmp TEdit"; el.value = c.caption; }
+    else { el = document.createElement("div"); el.className = "cmp TLabel"; el.textContent = c.caption; }
+    el.style.position = "absolute"; el.style.left = c.x + "px"; el.style.top = c.y + "px"; el.style.cursor = el.style.cursor || "default";
+    body.appendChild(el);
+  });
+  ov.style.display = "flex";
+}
+function closeGuiPreview(){ document.getElementById("guiprev").style.display = "none"; }
+
+/* bada://transformer */
+function pageTransformer(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🧠 トランスフォーマー・スタジオ</h1>' +
+  '<div class="sub">16次元・1ヘッド self-attention の本物の順伝播 + 学習可能な bigram 統計。文脈を入れて次トークンを予測し、attention 行列を可視化します</div>' +
+  '<div class="card"><div class="row"><input id="tfctx" style="flex:1" value="qubit q0 q1 H q0 CNOT"/>' +
+  '<button id="tfgo" style="background:var(--cyan);border-color:var(--cyan);color:#04252a">予測</button></div>' +
+  '<div id="tfout" style="margin-top:12px"></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">トランスフォーマーをプログラムする (学習)</h2>' +
+  '<div class="sub">Bada コードを与えると bigram 統計を更新し、予測が変わります</div>' +
+  '<textarea id="tftrain" rows="4" style="width:100%">qubit q0 q1\nH q0\nCNOT q0 q1\nmeasure</textarea>' +
+  '<div class="row" style="margin-top:8px"><button id="tftrainbtn" style="background:var(--purple);border-color:var(--purple)">学習</button>' +
+  '<button id="tfreset">統計リセット</button><span id="tfstat" class="badge"></span></div></div></div>';
+  function show(){
+    const p = transformerPredict(vp.querySelector("#tfctx").value, 6);
+    let html = "<b>文脈:</b> <span class='kbd'>" + p.tokens.join("</span> <span class='kbd'>") + "</span>" +
+      "<h2>次トークン予測</h2><table class='tbl'><tr><th>#</th><th>token</th><th>p</th></tr>" +
+      p.preds.map(function(x, i){ return "<tr><td>" + (i+1) + "</td><td><b>" + String(x.w).replace(/</g,"&lt;") + "</b></td><td>" + x.p.toFixed(4) + "</td></tr>"; }).join("") +
+      "</table><h2>attention 行列 (causal)</h2>";
+    const n = p.tokens.length;
+    html += "<div class='attn' style='grid-template-columns:repeat(" + n + ",1fr);max-width:" + (n*46) + "px'>";
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
+      const w = (p.attn[i] && j < p.attn[i].length) ? p.attn[i][j] : 0;
+      const c = Math.round(255 * w);
+      html += "<div style='background:rgb(" + Math.round(c*0.56) + "," + Math.round(c*0.38) + "," + c + ")'><span>" + (w ? w.toFixed(2).slice(1) : "·") + "</span></div>";
+    }
+    html += "</div><div class='sub' style='margin-top:6px'>行 = query 位置 / 列 = key 位置。下三角のみ (causal mask)。</div>";
+    vp.querySelector("#tfout").innerHTML = html;
+  }
+  vp.querySelector("#tfgo").onclick = show;
+  vp.querySelector("#tfctx").addEventListener("keydown", function(e){ if (e.key === "Enter") show(); });
+  vp.querySelector("#tftrainbtn").onclick = function(){
+    const n = tfTrain(vp.querySelector("#tftrain").value);
+    vp.querySelector("#tfstat").textContent = n + " トークンを学習 (語彙 " + TF.vocab.length + ")";
+    show();
+  };
+  vp.querySelector("#tfreset").onclick = function(){ TF.bigram = {}; store.set("tf.bigram", {}); vp.querySelector("#tfstat").textContent = "リセット"; show(); };
+  show();
+}
+
+/* bada://voice — 合い言葉 / silent talk */
+function pageVoice(vp){
+  vp.innerHTML =
+  '<div class="page"><h1>🎙 合い言葉コマンド</h1>' +
+  '<div class="sub">silent talk 以上の精度: テキスト (silent talk モード) は正規化一致で決定論的 100%。音声も同じ照合エンジンを通します</div>' +
+  '<div class="card"><h2 style="margin-top:0">合い言葉</h2>' +
+  '<div class="row"><input id="passin" value="' + aikotoba().replace(/"/g, "&quot;") + '" style="flex:1"/>' +
+  '<button id="passset">変更</button></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">🤫 silent talk モード (無音・テキスト)</h2>' +
+  '<div class="row"><input id="silentin" style="flex:1" placeholder="' + aikotoba() + ' ターミナル"/>' +
+  '<button id="silentgo" style="background:var(--gold);border-color:var(--gold);color:#221a04">実行</button></div>' +
+  '<div id="voicelog" style="margin-top:10px;font-size:12.5px;color:var(--dim)"></div></div>' +
+  '<div class="card"><h2 style="margin-top:0">🎙 音声モード</h2>' +
+  '<button onclick="toggleMic()">マイクを開始/停止</button> <span class="sub">Web Speech API が使える環境で有効 (APK 版 WebView は端末依存)</span></div>' +
+  '<div class="card"><h2 style="margin-top:0">コマンド一覧</h2><table class="tbl"><tr><th>言い方 (合い言葉のあとに)</th><th>動作</th></tr>' +
+  VOICE_COMMANDS.map(function(c){ return "<tr><td>" + c.words.slice(0, 3).join(" / ") + "</td><td>" + c.desc + "</td></tr>"; }).join("") +
+  '</table></div></div>';
+  vp.querySelector("#passset").onclick = function(){
+    const v = vp.querySelector("#passin").value.trim();
+    if (v){ store.set("aikotoba", v); refreshStatusbar(); setStatus("合い言葉を「" + v + "」に変更"); renderCurrent(); }
+  };
+  function go(){
+    const v = vp.querySelector("#silentin").value;
+    const r = executeVoice(v, "🤫silent");
+    const log = document.getElementById("voicelog");
+    if (log) log.innerHTML = "照合: 合い言葉 " + Math.round((r.passScore || 0) * 100) + "%" +
+      (r.cmd ? " / コマンド「" + r.cmd.desc + "」 " + Math.round((r.cmdScore || 1) * 100) + "%" :
+       (r.ok ? " / コマンド語なし" : " — 不一致"));
+  }
+  vp.querySelector("#silentgo").onclick = go;
+  vp.querySelector("#silentin").addEventListener("keydown", function(e){ if (e.key === "Enter") go(); });
+}
+
+/* bada://settings */
+function pageSettings(vp){
+  const log = store.get("os.changelog", []);
+  const db = pkgDB();
+  vp.innerHTML =
+  '<div class="page"><h1>⚙ 設定</h1>' +
+  '<div class="card"><h2 style="margin-top:0">システム</h2>' +
+  '<table class="tbl"><tr><th>OS</th><td>Bada VM Pro v' + osVersion() + ' (BadaVMPro OS, Ubuntu-flavoured)</td></tr>' +
+  '<tr><th>カーネル (ベース)</th><td>BadaGPT — update/upgrade も担当</td></tr>' +
+  '<tr><th>ウィンドウマネージャ</th><td>w9wm 0.4.2 (9wm + 仮想スクリーン ' + WM.NDESK + ' 面)</td></tr>' +
+  '<tr><th>ターミナル</th><td>xterm / x-terminal-emulator / terminal — 日本語入力対応 (IME + fcitx-mozc)</td></tr>' +
+  '<tr><th>プリインストール</th><td>' + Object.keys(db.installed).sort().join(", ") + '</td></tr>' +
+  '<tr><th>言語</th><td>量子 Bada (qubit/H/X/Z/CNOT/measure) + Bada on Rails</td></tr>' +
+  '<tr><th>合い言葉</th><td>「' + aikotoba() + '」</td></tr></table>' +
+  '<div class="row" style="margin-top:10px">' +
+  '<button onclick="navigate(\'bada://gpt\');setTimeout(function(){gptSend(\'os update\')},150)">BadaGPT に update を依頼</button>' +
+  '<button onclick="navigate(\'bada://gpt\');setTimeout(function(){gptSend(\'os upgrade\')},150)">BadaGPT に upgrade を依頼</button>' +
+  '</div></div>' +
+  '<div class="card"><h2 style="margin-top:0">changelog</h2>' +
+  (log.length ? log.map(function(e){ return "<div style='margin-bottom:8px'><span class='badge " + (e.kind === "upgrade" ? "warn" : "ok") + "'>v" + e.v + "</span> <span class='sub'>" + e.at.slice(0, 19).replace("T", " ") + "</span><br/>" + e.notes + "</div>"; }).join("")
+              : "<span style='color:var(--dim)'>まだ更新履歴がありません。</span>") +
+  '</div></div>';
+}
+
+/* ── 起動 (w9wm セッション開始) ────────────────────────────────── */
+(function boot(){
+  const desk = deskEl();
+  /* B3 = WM メニュー (ルート/どこでも) */
+  desk.addEventListener("contextmenu", function(e){
+    e.preventDefault();
+    wmMenu(e.clientX, e.clientY);
+  });
+  /* B1 (ルート素地) = アプリメニュー */
+  desk.addEventListener("mousedown", function(e){
+    if (menuEl && !menuEl.contains(e.target)){ closeMenu(); }
+    if (e.target !== desk) return;
+    if (WM.mode){ WM.mode = null; desk.className = ""; setStatus(""); return; }
+    if (e.button === 0){ appMenu(e.clientX, e.clientY); }
+  });
+  const mb = document.getElementById("menubtn");
+  if (mb) mb.onclick = function(e){ appMenu(10, 40); e.stopPropagation(); };
+  /* Ctrl+Alt+←→ = 仮想スクリーン */
+  document.addEventListener("keydown", function(e){
+    if (e.ctrlKey && e.altKey){
+      if (e.key === "ArrowRight"){ e.preventDefault(); wmSwitchDesk(WM.desk + 1); }
+      if (e.key === "ArrowLeft"){ e.preventDefault(); wmSwitchDesk(WM.desk - 1); }
+    }
+  });
+  pkgDB(); vfs();
+  navigate("bada://home");
+  const t = openTerm("xterm");
+  t.el && t.el.style && (t.el.style.left = "360px", t.el.style.top = "160px");
+  refreshStatusbar();
+  setStatus("w9wm セッション開始 — 右クリックで WM メニュー");
+})();
+</script>
+</body>
+</html>

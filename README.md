@@ -141,6 +141,19 @@ zone:// の **Jones 多項式量子暗号**を単独アプリにしたもの。�
 
 ビルドは [`quantumcrypto-app-build.yml`](.github/workflows/quantumcrypto-app-build.yml) が自動実行します (`quantumcrypto-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方と仕組みは [`bada_gui_ide/quantumcrypto-app/README.md`](bada_gui_ide/quantumcrypto-app/README.md) を参照。
 
+### 🜁 Bada VM Pro — 量子 Bada OS (w9wm デスクトップ)
+
+量子 Bada 言語の OS。デスクトップは **w9wm window manager** (9wm + 仮想スクリーン 4 面、右クリック = New/Reshape/Move/Delete/Hide)、カーネルは BadaGPT。**bash / apt / vim / emacs / ssh / xinetd / texlive-full / screen / fcitx-mozc** を事前インストールし、**日本語入力対応**のターミナル (xterm / x-terminal-emulator / terminal) を同梱:
+
+| プラットフォーム | 入手 |
+|:---|:---|
+| **Android** (APK) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-vm-pro-debug.apk` |
+| **Windows 10 / 11** (EXE) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*-x64.exe` (インストーラ / ポータブル) |
+| **Ubuntu** (AppImage / deb) | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
+| **どこでも** (単一 HTML) | [`bada_vm_pro/index.html`](bada_vm_pro/index.html) をダウンロードして開くだけ |
+
+ビルドは [`badavmpro-app-build.yml`](.github/workflows/badavmpro-app-build.yml) が自動実行します (`badavmpro-v*` タグで Release へ添付 / `workflow_dispatch`)。詳細は [`bada_vm_pro/README.md`](bada_vm_pro/README.md) を参照。
+
 ---
 
 ## 🔤 Bada Language — 設計原理
