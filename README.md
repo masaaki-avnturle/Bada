@@ -71,6 +71,23 @@
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
+| **`yappa3d/`** | **Yappa 3D** — Bada 3D デザインアプリ · WebGL自前実装 · プリミティブ配置 (立方体/球/円柱/円錐/トーラス/平面) · シーンツリー + インスペクタ · GPUカラーピッキング選択 · OBJ+MTL書き出し / JSON保存 / PNG · Undo/Redo · 単一HTML/依存ゼロ | [→ 開く](yappa3d/) |
+
+---
+
+## 🧊 Yappa 3D — Bada 3D デザインアプリ
+
+**依存ゼロの単一 HTML** で動く 3D デザイン / モデリングアプリです。WebGL レンダラ・行列演算・ジオメトリ生成まですべて 1 ファイルに自前実装しています。
+
+**👉 [`yappa3d/index.html` を開く](yappa3d/index.html)** / GitHub Pages: <https://masaaki-avnturle.github.io/Bada/yappa3d/>
+
+- **プリミティブ配置** — 立方体 / 球 / 円柱 / 円錐 / トーラス / 平面 を「＋ 追加」から配置し、ドラッグで XZ 移動 (Shift で上下)、オービットカメラ + パン + ズーム(タッチのピンチ対応)
+- **シーンツリー + インスペクタ** — 名前 / 位置 / 回転 / 拡大 / 色 / 光沢 / ワイヤーフレーム / 表示切替。クリック選択は GPU カラーピッキング、選択オブジェクトはオレンジのアウトライン表示
+- **落ち影 + グリッド** — 平面射影シャドウと XZ 軸付きグリッドで配置が分かりやすい
+- **保存と書き出し** — シーン JSON 保存 / 読込、**OBJ + MTL 書き出し** (Blender 等で読込可)、PNG スクリーンショット、localStorage 自動保存(次回開いたとき復元)
+- **Undo / Redo** (Ctrl+Z / Ctrl+Y)、複製 (Ctrl+D)、削除 (Delete)、F で選択にフォーカス
+
+詳細は [`yappa3d/README.md`](yappa3d/README.md) を参照。
 
 ---
 
