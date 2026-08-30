@@ -28,7 +28,8 @@ const builds = [
   "build-earth-view.js",     // dist/earth-view.html
   "build-earth-twin.js",     // dist/earth-twin.html
   "build-planet-cinema.js",  // dist/planet-cinema.html
-  "build-geo-signal.js"      // dist/geo-signal.html
+  "build-geo-signal.js",     // dist/geo-signal.html
+  "build-anomaly-map.js"     // dist/anomaly-map.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -100,6 +101,13 @@ it in any browser — no install, no dependencies, works offline.
                       each viewable as a looping space-to-ground zoom movie
                       from public map tiles, recordable to .webm. Honest note:
                       no anti-gravity facility exists.
+  anomaly-map.html    AnomalyMap — 宇宙人らしき信号の場所特定アトラス: the real
+                      signals history seriously considered as possibly alien
+                      (Wow!, BLC1, LGM-1, Parkes perytons, 'Oumuamua, Tabby's
+                      star, FRBs…) with their real coordinates and how each
+                      source was pinpointed (human / natural / still open —
+                      only Wow! remains unresolved). DSS2 sky cutouts + ground
+                      tile views. Honest banner: zero confirmed alien sites.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
