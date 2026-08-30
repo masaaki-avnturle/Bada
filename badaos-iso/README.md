@@ -6,7 +6,8 @@
 - **ベース**: Ubuntu 22.04 (jammy) を `debootstrap` で最小構築
 - **ウィンドウマネージャ**: **w9wm**(lightdm 自動ログイン)+ **日本語端末 mlterm**
 - **日本語環境**: ロケール ja_JP.UTF-8 / Noto CJK フォント / 入力メソッド **fcitx-mozc**(Ctrl+Space で ON/OFF)+ **fcitx-configtool**
-- **プリインストール**: Bada VM Pro / Laevateinn(`.deb` があれば)+ 単一 HTML アプリを `/opt/bada` に
+- **プリインストール**: Bada VM Pro / Laevateinn + 単一 HTML アプリ(`/opt/bada`)。**エディタ vim(gvim)/emacs/neovim**、git/tmux/htop、ファイルマネージャ等の定番も同梱
+- **Ubuntu アプリを簡単導入**: `badaos-apps`（GUI チェックリスト）で LibreOffice/GIMP/VLC/Firefox 系/ブラウザ等を apt でワンクリック導入
 - **実ディスクへインストール**: **Calamares(日本語 GUI)** + **パーティションマネージャ GParted**(使いたい HDD を初期化・作成)。うまく動かない時の代替として自作 zenity ウィザードも同梱
 - **ネットワーク**: NetworkManager(**NAT / DHCP がそのまま通る**)→ `apt` が使える
 - **あなたのリポジトリの apt リポジトリ**: `deb [trusted=yes] <release>/ ./` を登録済み。`apt install` で Bada アプリを取得
@@ -18,20 +19,20 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| `BadaVMPro-OS-1.0.4-amd64.iso` | 起動可能 ISO 本体 |
-| `BadaVMPro-OS-1.0.4-amd64.iso.sha256` | 検証用チェックサム |
+| `BadaVMPro-OS-1.0.5-amd64.iso` | 起動可能 ISO 本体 |
+| `BadaVMPro-OS-1.0.5-amd64.iso.sha256` | 検証用チェックサム |
 | `Packages` / `Packages.gz` / `Release` | apt リポジトリ索引(flat) |
 | `*.deb` | apt で配布される Bada アプリ |
 
 ## 🔥 Rufus で USB ブートを作る手順(Windows)
 
 1. [Rufus](https://rufus.ie/) を起動し、USB メモリ(8GB 以上)を挿す
-2. **「選択」**で `BadaVMPro-OS-1.0.4-amd64.iso` を指定
+2. **「選択」**で `BadaVMPro-OS-1.0.5-amd64.iso` を指定
 3. パーティション構成は **MBR**(BIOS/UEFI 両対応)または GPT(UEFI)。**書き込みモードは「ISO イメージモード」**
 4. **「スタート」** →(確認が出たら)そのまま書き込み
 5. 対象 PC を USB から起動(BIOS/UEFI のブートメニューで USB を選択)
 
-> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.0.4-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
+> macOS / Linux では `sudo dd if=BadaVMPro-OS-1.0.5-amd64.iso of=/dev/sdX bs=4M status=progress conv=fsync` でも可(ISO は isohybrid)。
 
 ## 🖥 起動後
 
@@ -41,7 +42,9 @@
    - `badaos-partition` … **GParted** で使いたい HDD を初期化・パーティション作成
    - `install-badaos` … **Calamares（日本語）** で実ディスクへインストール
    - `install-badaos-simple` … Calamares が動かない場合の代替ウィザード
-   - `fcitx-configtool` … 日本語入力(mozc)の設定
+   - `fcitx-configtool` … 日本語入力(mozc)の設定（mozc は既定で有効。Ctrl+Space で切替）
+   - `badaos-apps` … **Ubuntu 向けアプリを GUI で簡単導入**（vim/emacs/LibreOffice/GIMP など）
+   - `vim` / `gvim` / `emacs` / `neovim` … エディタ
 4. ネットワークは NAT/DHCP で自動接続。ターミナル(xterm)から:
 
 ```

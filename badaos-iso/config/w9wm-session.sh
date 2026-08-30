@@ -22,6 +22,8 @@ HINT='echo; echo "=== Bada VM Pro OS ライブ環境 (日本語) ==="; \
 echo "実ディスクへインストール (Calamares/日本語): install-badaos"; \
 echo "パーティションマネージャ (GParted):          badaos-partition"; \
 echo "かんたんインストール (ウィザード):           install-badaos-simple"; \
+echo "Ubuntu アプリを簡単導入 (GUI):               badaos-apps"; \
+echo "エディタ:                                    vim / gvim / emacs / neovim"; \
 echo "日本語入力の設定 (fcitx):                    fcitx-configtool"; \
 echo "アプリ再起動:                                bada-launcher bada_vm_pro"; \
 echo "Ubuntu アプリ導入例:                         sudo apt update && sudo apt install <pkg>"; \
