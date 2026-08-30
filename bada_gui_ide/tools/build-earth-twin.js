@@ -33,8 +33,20 @@
 const fs = require("fs");
 const path = require("path");
 const IDE = path.join(__dirname, "..");
+const BADA_CORE = fs.readFileSync(path.join(IDE, "www", "bada.js"), "utf8");
+const EXO_BADA = fs.readFileSync(path.join(IDE, "exo", "exo-gamma.bada"), "utf8");
 
-const html = `<!DOCTYPE html>
+/* verify the Bada engine actually runs before we ship it */
+{
+  const Bada = require(path.join(IDE, "www", "bada.js"));
+  const chk = Bada.run(EXO_BADA, { maxSteps: 20000000 });
+  if (!chk.ok || chk.output.indexOf("@@EXO-GAMMA-OK") < 0) {
+    console.error("exo-gamma.bada failed — refusing to package:\n" + (chk.error || (chk.parseErrors || []).join("\n")));
+    process.exit(1);
+  }
+}
+
+let html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
@@ -98,6 +110,11 @@ const html = `<!DOCTYPE html>
     <label class="muted">距離 ≤ <span id="maxDistV">∞</span> 光年
       <input type="range" id="maxDist" min="10" max="3000" step="10" value="3000"/></label>
     <label class="muted"><input type="checkbox" id="habOnly"/> ハビタブル帯のみ</label>
+    <label class="muted">並び順:
+      <select id="sortBy">
+        <option value="esi">ESI (地球類似)</option>
+        <option value="seti">SETI (電磁波候補: ESI×近接度)</option>
+      </select></label>
   </div>
   <div class="muted" id="status"></div>
 
@@ -105,7 +122,7 @@ const html = `<!DOCTYPE html>
     <div>
       <div class="tblwrap">
         <table id="tbl"><thead>
-          <tr><th>#</th><th>惑星</th><th>ESI (Γ重み)</th><th>Jones熱</th><th>半径(R⊕)</th><th>日射(S⊕)</th><th>平衡温度</th><th>距離(光年)</th></tr>
+          <tr><th>#</th><th>惑星</th><th>ESI (Γ重み)</th><th>Jones熱</th><th>半径(R⊕)</th><th>日射(S⊕)</th><th>平衡温度</th><th>距離(光年)</th><th>電波地平</th></tr>
         </thead><tbody id="rows"></tbody></table>
       </div>
       <div class="muted" style="margin-top:6px">クリックで詳細+望遠鏡ビュー。ESI=1 が「地球と同型」。◎≥0.8 ○≥0.7 △≥0.6</div>
@@ -124,6 +141,25 @@ const html = `<!DOCTYPE html>
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>🛸 Bada 量子エンジン — 電磁波を利用し得る地球型惑星の探索</h2>
+    <div class="muted" style="line-height:1.7">
+      Γ多様体(部分積分の関数等式)× Jones 熱感知 × ESI × 電波地平の方程式を、
+      このリポジトリの<b>量子プログラミング言語 Bada</b> に書き直したエンジン
+      (<code>exo/exo-gamma.bada</code>)をページ内に同梱しています。sin/cos は
+      テイラー級数で自作、Γ は Lanczos、上位4候補は <b>qubit / H / CNOT / Measure</b>
+      の 2 量子ビット重ね合わせに載せ、SETI 重み付き振幅を測定台帳へコミットします。
+      <b>電波地平</b>: 人類の電波漏えい開始(~1906年)から約120光年 —
+      「往復可」= 返信が今までに地球へ届き得る距離(≤60光年)。
+      正直な注記: 地球以外の電磁波利用は 2026 年時点で<b>未確認</b>です。
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button class="p" id="badaRun">▶ Bada 量子エンジンを実行</button>
+      <span class="muted" id="badaStat"></span>
+    </div>
+    <pre id="badaOut" style="display:none;max-height:340px;overflow:auto;background:#020409;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap"></pre>
   </div>
 
   <div class="card">
@@ -167,6 +203,8 @@ const html = `<!DOCTYPE html>
   <div class="muted" style="margin-top:12px">ライブ取得にはインターネット接続が必要です(データは NASA/CDS の公開サーバーから直接読み込み。保存・中継なし)。</div>
 </main>
 
+<script>/*__BADA_CORE__*/</script>
+<script>window.EXO_SRC=/*__EXO_SRC__*/"";</script>
 <script>
 (function(){
   "use strict";
@@ -234,6 +272,15 @@ const html = `<!DOCTYPE html>
     return out;
   }
   function habitable(p){ return p.insol!=null && p.insol>=0.25 && p.insol<=1.8 && p.rade!=null && p.rade<=2.0; }
+
+  /* ============ 電磁波 (テクノシグネチャ): 地球の電波地平 ============ */
+  var RADIO_YEARS=120; // 人類の電波漏えい開始 ~1906年から
+  function emLy(p){ return (p.sys||p.distPc==null)?null:p.distPc*PC2LY; }
+  function emStatus(p){ var ly=emLy(p); if(ly==null) return -1; if(ly<=RADIO_YEARS/2) return 2; if(ly<=RADIO_YEARS) return 1; return 0; }
+  function emLabel(p){ var s=emStatus(p);
+    return s===2?"📡 往復可":s===1?"→ 到達済み":s===0?"圏外":"—"; }
+  function setiScore(p){ var ly=emLy(p); if(p.esi==null) return null;
+    return ly==null?p.esi:p.esi*(1/(1+ly/60)); }
 
   /* ================= built-in snapshot (real measured planets) ============ */
   // Approximate published values (NASA Exoplanet Archive / literature):
@@ -318,7 +365,10 @@ const html = `<!DOCTYPE html>
       .filter(function(p){ return p.sys || p.esi>=minE; })
       .filter(function(p){ return p.sys || maxD>=3000 || (p.distPc!=null && p.distPc*PC2LY<=maxD); })
       .filter(function(p){ return !hab || p.sys || habitable(p); })
-      .sort(function(a,b){ return b.esi-a.esi; });
+      .sort(function(a,b){
+        if($("sortBy").value==="seti") return (setiScore(b)||0)-(setiScore(a)||0);
+        return b.esi-a.esi;
+      });
     var tb=$("rows"); tb.innerHTML="";
     VIEW.slice(0,300).forEach(function(p,i){
       var tr=document.createElement("tr"); tr.className="row"+(i===SEL?" sel":"");
@@ -330,7 +380,8 @@ const html = `<!DOCTYPE html>
         "<td>"+(p.rade!=null?p.rade.toFixed(2):"—")+"</td>"+
         "<td>"+(p.insol!=null?p.insol.toFixed(2):"—")+"</td>"+
         "<td>"+(p.teq!=null?p.teq.toFixed(0)+" K":"—")+"</td>"+
-        "<td>"+(p.sys?"—":(p.distPc!=null?(p.distPc*PC2LY).toFixed(1):"—"))+"</td>";
+        "<td>"+(p.sys?"—":(p.distPc!=null?(p.distPc*PC2LY).toFixed(1):"—"))+"</td>"+
+        "<td>"+emLabel(p)+($("sortBy").value==="seti"&&setiScore(p)!=null&&!p.sys?" <span class='muted'>S="+setiScore(p).toFixed(3)+"</span>":"")+"</td>";
       tr.addEventListener("click",function(){ SEL=i; select(p); render(); });
       tb.appendChild(tr);
     });
@@ -349,6 +400,8 @@ const html = `<!DOCTYPE html>
             ["主星温度",p.st!=null?p.st.toFixed(0)+" K":"—"],
             ["距離",p.sys?"—":(p.distPc!=null?(p.distPc*PC2LY).toFixed(1)+" 光年":"—")],
             ["ハビタブル帯",p.sys?"—":(habitable(p)?"はい":"いいえ/不明")],
+            ["電波地平 (電磁波)",p.sys?"—":(emStatus(p)===2?"往復可 — 地球の電波が届き、返信も今までに届き得る距離":emStatus(p)===1?"地球の電波(~120年分)が到達済み":"電波地平の外 (地球の漏えい電波はまだ届いていない)")],
+            ["SETIスコア",setiScore(p)!=null&&!p.sys?setiScore(p).toFixed(3)+" (ESI×近接度)":"—"],
             ["Jones熱 |V(e^{iθ})|",p.teq!=null?jonesV((Math.max(100,Math.min(1500,p.teq))-100)/1400*Math.PI).toFixed(3):"—"]];
     $("dKv").innerHTML=kv.map(function(r){return "<b>"+r[0]+"</b><span>"+esc(r[1])+"</span>";}).join("");
     var img=$("cutout");
@@ -406,9 +459,23 @@ const html = `<!DOCTYPE html>
     if(best>=0 && bd<900){ SEL=best; select(VIEW[best]); render(); }
   });
 
+  /* ================= Bada quantum engine ================================== */
+  $("badaRun").addEventListener("click",function(){
+    var out=$("badaOut"), st=$("badaStat");
+    st.textContent="Bada 実行中…"; out.style.display="block"; out.textContent="";
+    setTimeout(function(){
+      try{
+        var r=window.BadaLang.run(window.EXO_SRC,{maxSteps:20000000});
+        if(r.ok){ out.textContent=r.output;
+          st.textContent=(r.output.indexOf("@@EXO-GAMMA-OK")>=0?"✅ 実行成功":"実行終了")+" (Bada v"+(window.BadaLang.VERSION||"?")+")"; }
+        else { out.textContent=(r.error||(r.parseErrors||[]).join("\\n")); st.textContent="⚠ 実行エラー"; }
+      }catch(e){ out.textContent=String(e); st.textContent="⚠ 実行エラー"; }
+    },30);
+  });
+
   /* ================= wiring =============================================== */
   $("reload").addEventListener("click",loadLive);
-  ["q","minEsi","maxDist","habOnly"].forEach(function(id){
+  ["q","minEsi","maxDist","habOnly","sortBy"].forEach(function(id){
     $(id).addEventListener("input",function(){ SEL=-1; render(); });
   });
 
@@ -419,6 +486,9 @@ const html = `<!DOCTYPE html>
 </body>
 </html>
 `;
+
+html = html.replace("/*__BADA_CORE__*/", function () { return BADA_CORE; });
+html = html.replace('/*__EXO_SRC__*/""', function () { return JSON.stringify(EXO_BADA); });
 
 fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
 const outPath = path.join(IDE, "dist", "earth-twin.html");

@@ -42,8 +42,10 @@
 const fs = require("fs");
 const path = require("path");
 const IDE = path.join(__dirname, "..");
+const BADA_CORE = fs.readFileSync(path.join(IDE, "www", "bada.js"), "utf8");
+const EXO_BADA = fs.readFileSync(path.join(IDE, "exo", "exo-gamma.bada"), "utf8");
 
-const html = `<!DOCTYPE html>
+let html = `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8"/>
@@ -134,6 +136,23 @@ const html = `<!DOCTYPE html>
   </div>
 
   <div class="card">
+    <h2>🛸 Bada 量子エンジン — 電磁波を利用し得る地球型惑星の探索</h2>
+    <div class="muted" style="line-height:1.7">
+      Γ多様体 × Jones 熱感知 × ESI × <b>電波地平</b>の方程式を、リポジトリの
+      <b>量子プログラミング言語 Bada</b> に書き直したエンジン
+      (<code>exo/exo-gamma.bada</code>)を同梱。上位4候補を <b>qubit / H /
+      CNOT / Measure</b> の重ね合わせに載せ、SETI 重み付き振幅を測定します。
+      映像内の <b>📡 電波リング</b>は、地球の漏えい電波(~120年分)がこの惑星に
+      届いているかの実計算です。地球以外の電磁波利用は 2026 年時点で未確認。
+    </div>
+    <div class="controls" style="margin-top:8px">
+      <button class="p" id="badaRun">▶ Bada 量子エンジンを実行</button>
+      <span class="muted" id="badaStat"></span>
+    </div>
+    <pre id="badaOut" style="display:none;max-height:340px;overflow:auto;background:#020409;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11.5px;line-height:1.5;white-space:pre-wrap"></pre>
+  </div>
+
+  <div class="card">
     <h2>ℹ️ 正直な説明</h2>
     <div class="muted" style="line-height:1.8">
       現在の望遠鏡では系外惑星の表面はまだ撮影できません。この動画は、Kepler/K2/TESS
@@ -148,6 +167,8 @@ const html = `<!DOCTYPE html>
   </div>
 </main>
 
+<script>/*__BADA_CORE__*/</script>
+<script>window.EXO_SRC=/*__EXO_SRC__*/"";</script>
 <script>
 (function(){
   "use strict";
@@ -186,6 +207,16 @@ const html = `<!DOCTYPE html>
     defs.forEach(function(d){ out*=Math.pow(Math.max(0,1-Math.abs(d[0]-d[1])/(d[0]+d[1])), d[2]/n); });
     return out;
   }
+
+  /* ============ 電磁波 (テクノシグネチャ): 地球の電波地平 ============ */
+  var RADIO_YEARS=120; // 人類の電波漏えい開始 ~1906年から
+  function emLy(p){ return p.distPc==null?null:p.distPc*PC2LY; }
+  function emStatus(p){ var ly=emLy(p); if(ly==null) return -1; if(ly<=RADIO_YEARS/2) return 2; if(ly<=RADIO_YEARS) return 1; return 0; }
+  function emText(p){ var s=emStatus(p), ly=emLy(p);
+    if(s===2) return "📡 往復可 — 地球の電波が到達済み・返信も届き得る ("+ly.toFixed(1)+" 光年)";
+    if(s===1) return "📡 地球の電波(~120年分)が到達済み ("+ly.toFixed(1)+" 光年)";
+    if(s===0) return "電波地平の外 ("+ly.toFixed(0)+" 光年 > 120 光年)";
+    return "—"; }
 
   /* ============ catalog: same snapshot as GammaTwin + live TAP ============ */
   var SNAPSHOT=[
@@ -354,6 +385,7 @@ const html = `<!DOCTYPE html>
       ["平衡温度",p.teq?p.teq.toFixed(0)+" K ("+(p.teq-273.15).toFixed(0)+" ℃)":"—"],
       ["公転周期",p.per?p.per.toFixed(2)+" 日":"—"],["主星温度",p.st?p.st.toFixed(0)+" K":"—"],
       ["距離",p.distPc?(p.distPc*PC2LY).toFixed(1)+" 光年":"—"],["ESI (Γ重み)",p.esi?p.esi.toFixed(3):"—"],
+      ["電波地平 (電磁波)",emText(p)],
       ["外見クラス",{ice:"氷惑星",temperate:"温帯 (海・雲)",desert:"砂漠",lava:"溶岩",gas:"ガス",rock:"岩石"}[classOf(p)]]];
     $("factKv").innerHTML=kv.map(function(r){return "<b>"+esc(r[0])+"</b><span>"+esc(String(r[1]))+"</span>";}).join("");
     $("estNote").textContent="軌道長半径(推定) a ≈ √((T★/5772)⁴/S) = "+p.aAU.toFixed(3)+" AU / 軌道速度(推定) v = 2πa/P = "+(p.vorb?p.vorb.toFixed(1)+" km/s":"—")+" — 実測値からのケプラー式推定";
@@ -438,6 +470,29 @@ const html = `<!DOCTYPE html>
       ctx.lineWidth=3; ctx.beginPath(); ctx.arc(px,py,R+2,0,7); ctx.stroke();
     }
 
+    /* --- 📡 electromagnetic reach: expanding radio rings from Earth --- */
+    var est=emStatus(CUR);
+    if(est>=0){
+      var ex=54, ey=Hc-56;
+      // Earth marker
+      ctx.fillStyle="#3d7ad4"; ctx.beginPath(); ctx.arc(ex,ey,7,0,7); ctx.fill();
+      ctx.fillStyle="#9fd0ff"; ctx.font="10px sans-serif"; ctx.fillText("地球",ex-11,ey+20);
+      var reach=est>=1;            // do our waves reach this planet?
+      var maxR=reach?Math.hypot(px-ex,py-ey):Math.min(180,Wc*0.2);
+      var kR=(t*46)%maxR;
+      var ring=function(rr,alpha){
+        ctx.strokeStyle=(reach?"rgba(80,220,255,":"rgba(120,140,170,")+alpha+")";
+        ctx.lineWidth=1.6; ctx.beginPath(); ctx.arc(ex,ey,rr,-1.35,0.25); ctx.stroke();
+      };
+      ring(kR,0.75); ring((kR+maxR*0.33)%maxR,0.45); ring((kR+maxR*0.66)%maxR,0.25);
+      ctx.fillStyle=reach?"#7fe0ff":"#8aa0c0";
+      ctx.fillText(est===2?"📡 電波 往復可":est===1?"📡 地球の電波 到達済み":"電波地平の外 (>120光年)", ex+14, ey-10);
+      if(reach && kR>maxR*0.92){ // arrival flash on the planet
+        ctx.strokeStyle="rgba(140,235,255,0.7)"; ctx.lineWidth=2.5;
+        ctx.beginPath(); ctx.arc(px,py,R+8,0,7); ctx.stroke();
+      }
+    }
+
     /* --- orbit inset (real period, sped up) --- */
     var ox=Wc*0.82, oy=Hc*0.72, orR=54;
     ctx.strokeStyle="#1b2740"; ctx.beginPath(); ctx.arc(ox,oy,orR,0,7); ctx.stroke();
@@ -458,7 +513,8 @@ const html = `<!DOCTYPE html>
     $("hud").innerHTML="<b>"+esc(CUR.name)+"</b> — "+({ice:"氷惑星",temperate:"温帯(海・雲)",desert:"砂漠",lava:"溶岩",gas:"ガス",rock:"岩石"})[cls]+
       "<br>自転位相 z=e^{iωt}: Re="+zr.toFixed(3)+" Im="+zi.toFixed(3)+
       "<br>γ="+g.toFixed(3)+"  D="+sr.D.toFixed(3)+"  |V|="+jonesV(heatTheta(CUR.teq)).toFixed(2)+
-      (CUR.vorb?"<br>軌道速度(推定) "+CUR.vorb.toFixed(1)+" km/s":"");
+      (CUR.vorb?"<br>軌道速度(推定) "+CUR.vorb.toFixed(1)+" km/s":"")+
+      "<br>"+(emStatus(CUR)===2?"📡 電波往復可":emStatus(CUR)===1?"📡 地球の電波 到達済み":emStatus(CUR)===0?"電波地平の外":"");
   }
 
   /* ============ recording (.webm) ============ */
@@ -493,6 +549,20 @@ const html = `<!DOCTYPE html>
     }
   });
 
+  /* ============ Bada quantum engine ============ */
+  $("badaRun").addEventListener("click",function(){
+    var out=$("badaOut"), st=$("badaStat");
+    st.textContent="Bada 実行中…"; out.style.display="block"; out.textContent="";
+    setTimeout(function(){
+      try{
+        var r=window.BadaLang.run(window.EXO_SRC,{maxSteps:20000000});
+        if(r.ok){ out.textContent=r.output;
+          st.textContent=(r.output.indexOf("@@EXO-GAMMA-OK")>=0?"✅ 実行成功":"実行終了")+" (Bada v"+(window.BadaLang.VERSION||"?")+")"; }
+        else { out.textContent=(r.error||(r.parseErrors||[]).join("\\n")); st.textContent="⚠ 実行エラー"; }
+      }catch(e){ out.textContent=String(e); st.textContent="⚠ 実行エラー"; }
+    },30);
+  });
+
   /* ============ wiring ============ */
   $("pick").addEventListener("change",function(){ choose(this.value); });
   $("live").addEventListener("click",loadLive);
@@ -507,6 +577,9 @@ const html = `<!DOCTYPE html>
 </body>
 </html>
 `;
+
+html = html.replace("/*__BADA_CORE__*/", function () { return BADA_CORE; });
+html = html.replace('/*__EXO_SRC__*/""', function () { return JSON.stringify(EXO_BADA); });
 
 fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
 const outPath = path.join(IDE, "dist", "planet-cinema.html");
