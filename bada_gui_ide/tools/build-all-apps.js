@@ -27,7 +27,8 @@ const builds = [
   "build-madokey.js",        // dist/madokey.html
   "build-earth-view.js",     // dist/earth-view.html
   "build-earth-twin.js",     // dist/earth-twin.html
-  "build-planet-cinema.js"   // dist/planet-cinema.html
+  "build-planet-cinema.js",  // dist/planet-cinema.html
+  "build-geo-signal.js"      // dist/geo-signal.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -92,6 +93,13 @@ it in any browser — no install, no dependencies, works offline.
                       real special relativity (Lorentz γ, Doppler D, light
                       aberration on the starfield), Jones-heat surface classes,
                       Kepler orbit estimates, and MediaRecorder .webm export.
+  geo-signal.html     GeoSignal — 地球の伝達使用地点シアター: the real places
+                      on Earth (and the ISS overhead) where the EM/gravity
+                      channels are actually in use — deep-space transmitters,
+                      radio telescopes, GW detectors (KAGRA/LIGO/Virgo) —
+                      each viewable as a looping space-to-ground zoom movie
+                      from public map tiles, recordable to .webm. Honest note:
+                      no anti-gravity facility exists.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
