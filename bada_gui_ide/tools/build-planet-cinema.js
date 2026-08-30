@@ -143,7 +143,12 @@ let html = `<!DOCTYPE html>
       (<code>exo/exo-gamma.bada</code>)を同梱。上位4候補を <b>qubit / H /
       CNOT / Measure</b> の重ね合わせに載せ、SETI 重み付き振幅を測定します。
       映像内の <b>📡 電波リング</b>は、地球の漏えい電波(~120年分)がこの惑星に
-      届いているかの実計算です。地球以外の電磁波利用は 2026 年時点で未確認。
+      届いているかの実計算です。<b>🌀 重力チャネル(電磁波以外の伝達)</b>:
+      惑星の重力場が恒星を振り回す実信号(RV半振幅 K)を実式で計算し、系全体
+      ビューでは<b>恒星のバリセンター運動(ふらつき)と時空の波紋</b>、そして
+      <b>同じ恒星系の周辺惑星すべての公転</b>を動画表示します。<b>反重力</b>は
+      実在の斥力=ダークエネルギー Λ として比を実計算(~10⁻²³ で無視可能と
+      正直に判定)。地球以外の電磁波利用は 2026 年時点で未確認。
     </div>
     <div class="controls" style="margin-top:8px">
       <button class="p" id="badaRun">▶ Bada 量子エンジンを実行</button>
@@ -235,13 +240,37 @@ let html = `<!DOCTYPE html>
     ["GJ 1002 c",1.06,0.26,182,21.2,3024,4.85],["HD 40307 g",2.39,0.68,227,197.8,4977,12.9],
     ["51 Pegasi b (灼熱・参考)",13.9,1300,1265,4.23,5793,15.5]
   ];
+  // 実際に視線速度法 (惑星の重力による恒星のふらつき) で発見された惑星
+  var RV_NAMES=/Proxima|Teegarden|Ross 128|Wolf 1061|Luyten|GJ 273|GJ 667|GJ 1002|HD 40307|51 Pegasi/;
   function fromSnapshot(){
-    return SNAPSHOT.map(function(r){return {name:r[0],rade:r[1],insol:r[2],teq:r[3],per:r[4],st:r[5],distPc:r[6]};});
+    return SNAPSHOT.map(function(r){return {name:r[0],rade:r[1],insol:r[2],teq:r[3],per:r[4],st:r[5],distPc:r[6],
+      meth:(RV_NAMES.test(r[0])?"Radial Velocity":"Transit")};});
   }
+  /* ============ 重力チャネル (電磁波以外の伝達) ============ */
+  function isGrav(p){ return !!(p.meth&&/Radial Velocity|Microlensing|Astrometry|Timing/i.test(p.meth)); }
+  function rvK(p){ if(p.rade==null||p.st==null||p.per==null) return null;
+    var mp=p.rade>6?100+p.rade*8:Math.pow(p.rade,3.58);
+    var ms=Math.pow((p.st||5772)/5772,2);
+    return 0.08946*mp*Math.pow(ms,-2/3)*Math.pow(p.per/365.25,-1/3); }
+  function antigravRatio(p){ if(p.st==null||p.insol==null||!(p.insol>0)) return null;
+    var H0=2.268e-18, G=6.67e-11, MSUN=1.989e30, AUm=1.496e11;
+    var r=Math.sqrt(Math.pow((p.st||5772)/5772,4)/p.insol)*AUm;
+    return (0.7*H0*H0*r)/(G*Math.pow((p.st||5772)/5772,2)*MSUN/(r*r)); }
+  /* 周辺 (同じ恒星系) の惑星たち */
+  function heatColor(teq){
+    if(teq==null) return "#5a748f";
+    var t=Math.max(100,Math.min(1500,teq));
+    var hue = t<255 ? 230-(t-100)/155*110 : Math.max(0,120-(t-255)/500*120);
+    return "hsl("+hue.toFixed(0)+",60%,50%)";
+  }
+  function hostOf(name){ return String(name).replace(/\\s+[b-h](\\s|$).*$/,"").replace(/\\s*\\(.*\\)$/,"").trim(); }
+  function siblings(p){ var h=hostOf(p.name);
+    return DATA.filter(function(q){ return hostOf(q.name)===h && q.per&&q.insol&&q.insol>0; })
+      .sort(function(a,b){ return a.per-b.per; }); }
   var DATA=fromSnapshot();
   function setSrc(ok,txt){ var d=$("srcDot"); d.className="dot "+(ok===true?"on":ok===false?"warn":""); $("srcTxt").textContent=txt; }
   var TAP="https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query="+
-    encodeURIComponent("select pl_name,pl_rade,pl_insol,pl_eqt,pl_orbper,st_teff,sy_dist from ps where default_flag=1 and pl_rade is not null and pl_rade<3.2 and pl_insol is not null and pl_eqt is not null order by pl_name");
+    encodeURIComponent("select pl_name,pl_rade,pl_insol,pl_eqt,pl_orbper,st_teff,sy_dist,discoverymethod from ps where default_flag=1 and pl_rade is not null and pl_rade<3.2 and pl_insol is not null and pl_eqt is not null order by pl_name");
   function loadLive(){
     setSrc(null,"NASA Archive 取得中…");
     var ctl=new AbortController(); var to=setTimeout(function(){ctl.abort();},20000);
@@ -249,7 +278,7 @@ let html = `<!DOCTYPE html>
       .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
       .then(function(arr){
         clearTimeout(to);
-        var list=arr.map(function(o){return {name:o.pl_name,rade:o.pl_rade,insol:o.pl_insol,teq:o.pl_eqt,per:o.pl_orbper,st:o.st_teff,distPc:o.sy_dist};})
+        var list=arr.map(function(o){return {name:o.pl_name,rade:o.pl_rade,insol:o.pl_insol,teq:o.pl_eqt,per:o.pl_orbper,st:o.st_teff,distPc:o.sy_dist,meth:o.discoverymethod||"?"};})
           .filter(function(p){return p.rade&&p.insol&&p.teq;});
         if(!list.length) throw new Error("empty");
         DATA=list; setSrc(true,"LIVE: NASA Exoplanet Archive ("+list.length+")");
@@ -386,6 +415,10 @@ let html = `<!DOCTYPE html>
       ["公転周期",p.per?p.per.toFixed(2)+" 日":"—"],["主星温度",p.st?p.st.toFixed(0)+" K":"—"],
       ["距離",p.distPc?(p.distPc*PC2LY).toFixed(1)+" 光年":"—"],["ESI (Γ重み)",p.esi?p.esi.toFixed(3):"—"],
       ["電波地平 (電磁波)",emText(p)],
+      ["伝達チャネル",isGrav(p)?"🌀 重力 — 惑星の重力場が恒星を振り回して発見 ("+(p.meth||"")+")":"✨ 光度 — トランジット減光で発見"],
+      ["重力信号 K (概算)",rvK(p)!=null?rvK(p).toFixed(2)+" m/s (RV半振幅・実式)":"—"],
+      ["反重力 Λ/恒星重力",antigravRatio(p)!=null?antigravRatio(p).toExponential(2)+" (実在の斥力=ダークエネルギー。無視可能)":"—"],
+      ["周辺 (同じ恒星系)",(function(){var s=siblings(p);return hostOf(p.name)+" 系 "+s.length+" 惑星"+(s.length>1?" — 下の系全体ビューで公転中":"");})()],
       ["外見クラス",{ice:"氷惑星",temperate:"温帯 (海・雲)",desert:"砂漠",lava:"溶岩",gas:"ガス",rock:"岩石"}[classOf(p)]]];
     $("factKv").innerHTML=kv.map(function(r){return "<b>"+esc(r[0])+"</b><span>"+esc(String(r[1]))+"</span>";}).join("");
     $("estNote").textContent="軌道長半径(推定) a ≈ √((T★/5772)⁴/S) = "+p.aAU.toFixed(3)+" AU / 軌道速度(推定) v = 2πa/P = "+(p.vorb?p.vorb.toFixed(1)+" km/s":"—")+" — 実測値からのケプラー式推定";
@@ -493,14 +526,38 @@ let html = `<!DOCTYPE html>
       }
     }
 
-    /* --- orbit inset (real period, sped up) --- */
-    var ox=Wc*0.82, oy=Hc*0.72, orR=54;
-    ctx.strokeStyle="#1b2740"; ctx.beginPath(); ctx.arc(ox,oy,orR,0,7); ctx.stroke();
-    ctx.fillStyle="rgb("+rgb[0]+","+rgb[1]+","+rgb[2]+")"; ctx.beginPath(); ctx.arc(ox,oy,5,0,7); ctx.fill();
-    var oph=CUR.per?2*Math.PI*t/(CUR.per*2):t;      // P days -> 2P seconds at 1x
-    ctx.fillStyle="#9fd0ff"; ctx.beginPath(); ctx.arc(ox+Math.cos(oph)*orR,oy+Math.sin(oph)*orR*0.6,4,0,7); ctx.fill();
+    /* --- 系全体 (周辺) ビュー: 同じ恒星系の全惑星 + 恒星の重力ふらつき --- */
+    var ox=Wc*0.82, oy=Hc*0.72, orR=58;
+    var sibs=siblings(CUR); if(!sibs.length) sibs=[CUR];
+    var maxP=sibs[sibs.length-1].per||1;
+    // 恒星のバリセンター運動 (選択惑星の重力による実現象を誇張表示)
+    var selPh=CUR.per?2*Math.PI*t/(CUR.per*2):t;
+    var wobAmp=Math.min(4,1.2+(rvK(CUR)||0)*0.8);
+    var sxw=ox-Math.cos(selPh)*wobAmp, syw=oy-Math.sin(selPh)*wobAmp*0.6;
+    // 重力チャネルなら時空の波紋 (重力による伝達) を恒星から放射
+    if(isGrav(CUR)){
+      var gR=(t*30)%orR;
+      ctx.strokeStyle="rgba(200,164,74,0.5)"; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.ellipse(sxw,syw,gR,gR*0.6,0,0,7); ctx.stroke();
+      ctx.strokeStyle="rgba(200,164,74,0.25)";
+      ctx.beginPath(); ctx.ellipse(sxw,syw,(gR+orR*0.5)%orR,((gR+orR*0.5)%orR)*0.6,0,0,7); ctx.stroke();
+    }
+    for(var si=0;si<sibs.length;si++){
+      var sp=sibs[si];
+      var rr2=orR*(0.35+0.65*si/Math.max(1,sibs.length-1));
+      if(sibs.length===1) rr2=orR;
+      ctx.strokeStyle=sp===CUR?"#38537a":"#1b2740"; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.ellipse(ox,oy,rr2,rr2*0.6,0,0,7); ctx.stroke();
+      var ph2=2*Math.PI*t/((sp.per||1)*2)+si*0.9;
+      var px2=ox+Math.cos(ph2)*rr2, py2=oy+Math.sin(ph2)*rr2*0.6;
+      ctx.fillStyle=sp===CUR?"#9fd0ff":heatColor(sp.teq);
+      ctx.beginPath(); ctx.arc(px2,py2,sp===CUR?4.5:3,0,7); ctx.fill();
+      if(sp===CUR){ ctx.strokeStyle="#fff"; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(px2,py2,6.5,0,7); ctx.stroke(); }
+    }
+    ctx.fillStyle="rgb("+rgb[0]+","+rgb[1]+","+rgb[2]+")"; ctx.beginPath(); ctx.arc(sxw,syw,5,0,7); ctx.fill();
     ctx.fillStyle="#8aa0c0"; ctx.font="10px sans-serif";
-    ctx.fillText("公転 P="+(CUR.per?CUR.per.toFixed(1)+"日":"—")+" (加速表示)", ox-52, oy+orR+14);
+    ctx.fillText(hostOf(CUR.name)+" 系 "+sibs.length+"惑星 (周辺・加速表示)", ox-orR-4, oy+orR*0.6+16);
+    if(isGrav(CUR)) ctx.fillText("🌀 恒星のふらつき K≈"+(rvK(CUR)||0).toFixed(1)+" m/s", ox-orR-4, oy+orR*0.6+28);
 
     /* --- relativistic blueshift tint (D>1 approach) --- */
     if(b>0.01){
@@ -514,7 +571,8 @@ let html = `<!DOCTYPE html>
       "<br>自転位相 z=e^{iωt}: Re="+zr.toFixed(3)+" Im="+zi.toFixed(3)+
       "<br>γ="+g.toFixed(3)+"  D="+sr.D.toFixed(3)+"  |V|="+jonesV(heatTheta(CUR.teq)).toFixed(2)+
       (CUR.vorb?"<br>軌道速度(推定) "+CUR.vorb.toFixed(1)+" km/s":"")+
-      "<br>"+(emStatus(CUR)===2?"📡 電波往復可":emStatus(CUR)===1?"📡 地球の電波 到達済み":emStatus(CUR)===0?"電波地平の外":"");
+      "<br>"+(emStatus(CUR)===2?"📡 電波往復可":emStatus(CUR)===1?"📡 地球の電波 到達済み":emStatus(CUR)===0?"電波地平の外":"")+
+      "  "+(isGrav(CUR)?"🌀 重力チャネル K≈"+(rvK(CUR)||0).toFixed(1)+" m/s":"✨ 光度チャネル");
   }
 
   /* ============ recording (.webm) ============ */

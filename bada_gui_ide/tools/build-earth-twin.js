@@ -114,6 +114,7 @@ let html = `<!DOCTYPE html>
       <select id="sortBy">
         <option value="esi">ESI (地球類似)</option>
         <option value="seti">SETI (電磁波候補: ESI×近接度)</option>
+        <option value="grav">重力チャネル (電磁波以外の伝達)</option>
       </select></label>
   </div>
   <div class="muted" id="status"></div>
@@ -122,7 +123,7 @@ let html = `<!DOCTYPE html>
     <div>
       <div class="tblwrap">
         <table id="tbl"><thead>
-          <tr><th>#</th><th>惑星</th><th>ESI (Γ重み)</th><th>Jones熱</th><th>半径(R⊕)</th><th>日射(S⊕)</th><th>平衡温度</th><th>距離(光年)</th><th>電波地平</th></tr>
+          <tr><th>#</th><th>惑星</th><th>ESI (Γ重み)</th><th>Jones熱</th><th>半径(R⊕)</th><th>日射(S⊕)</th><th>平衡温度</th><th>距離(光年)</th><th>電波地平</th><th>伝達</th></tr>
         </thead><tbody id="rows"></tbody></table>
       </div>
       <div class="muted" style="margin-top:6px">クリックで詳細+望遠鏡ビュー。ESI=1 が「地球と同型」。◎≥0.8 ○≥0.7 △≥0.6</div>
@@ -153,6 +154,10 @@ let html = `<!DOCTYPE html>
       の 2 量子ビット重ね合わせに載せ、SETI 重み付き振幅を測定台帳へコミットします。
       <b>電波地平</b>: 人類の電波漏えい開始(~1906年)から約120光年 —
       「往復可」= 返信が今までに地球へ届き得る距離(≤60光年)。
+      <b>重力チャネル(電磁波以外の伝達)</b>: 惑星は自らの重力場で恒星を振り回し
+      (RV半振幅 K の実式)、その「ふらつき」が我々に届く — 実際に多くの惑星は
+      この重力信号で発見された。<b>反重力</b>は実在する斥力的重力=ダークエネルギー Λ
+      として比を実計算(惑星系では ~10⁻²³ で無視可能、と正直に判定)。
       正直な注記: 地球以外の電磁波利用は 2026 年時点で<b>未確認</b>です。
     </div>
     <div class="controls" style="margin-top:8px">
@@ -282,6 +287,29 @@ let html = `<!DOCTYPE html>
   function setiScore(p){ var ly=emLy(p); if(p.esi==null) return null;
     return ly==null?p.esi:p.esi*(1/(1+ly/60)); }
 
+  /* ============ 重力チャネル (電磁波以外の伝達) ============ */
+  // 惑星自身の重力で発見された = 視線速度 / マイクロレンズ / アストロメトリ / TTV / パルサー
+  function isGrav(p){ return !!(p.meth&&/Radial Velocity|Microlensing|Astrometry|Timing/i.test(p.meth)); }
+  function methJp(p){ if(p.sys) return "—";
+    var m=p.meth||"?";
+    if(/Radial Velocity/i.test(m)) return "🌀 重力 (視線速度=恒星のふらつき)";
+    if(/Microlensing/i.test(m)) return "🌀 重力 (マイクロレンズ=光の重力偏向)";
+    if(/Astrometry/i.test(m)) return "🌀 重力 (アストロメトリ)";
+    if(/Timing/i.test(m)) return "🌀 重力 (タイミング変動)";
+    if(/Transit/i.test(m)) return "✨ 光度 (トランジット)";
+    if(/Imaging/i.test(m)) return "✨ 光度 (直接撮像)";
+    return m; }
+  // RV 半振幅 K [m/s] (実式, sin i=1): 惑星が重力場で恒星に送る信号の強さ
+  function rvK(p){ if(p.rade==null||p.st==null||p.per==null) return null;
+    var mp=p.rade>6?100+p.rade*8:Math.pow(p.rade,3.58);
+    var ms=Math.pow((p.st||5772)/5772,2);
+    return 0.08946*mp*Math.pow(ms,-2/3)*Math.pow(p.per/365.25,-1/3); }
+  // 反重力 (ダークエネルギー Λ) と恒星重力の比 — 惑星系スケールの正直な実計算
+  function antigravRatio(p){ if(p.st==null||p.insol==null||!(p.insol>0)) return null;
+    var H0=2.268e-18, G=6.67e-11, MSUN=1.989e30, AUm=1.496e11;
+    var r=Math.sqrt(Math.pow((p.st||5772)/5772,4)/p.insol)*AUm;
+    return (0.7*H0*H0*r)/(G*Math.pow((p.st||5772)/5772,2)*MSUN/(r*r)); }
+
   /* ================= built-in snapshot (real measured planets) ============ */
   // Approximate published values (NASA Exoplanet Archive / literature):
   // [name, rade(R⊕), insol(S⊕), teq(K), per(d), st_teff, dist(pc), ra, dec]
@@ -317,16 +345,19 @@ let html = `<!DOCTYPE html>
     ["HD 40307 g",2.39,0.68,227,197.8,4977,12.9,88.518,-60.023],
     ["51 Pegasi b (高温・参考)",13.9,1300,1265,4.23,5793,15.5,344.367,20.769]
   ];
+  // 実際に視線速度法 (惑星の重力による恒星のふらつき) で発見された惑星
+  var RV_NAMES=/Proxima|Teegarden|Ross 128|Wolf 1061|Luyten|GJ 273|GJ 667|GJ 1002|HD 40307|51 Pegasi/;
   function fromSnapshot(){
     return SNAPSHOT.map(function(r){
       return {name:r[0],rade:r[1],insol:r[2],teq:r[3],per:r[4],st:r[5],distPc:r[6],ra:r[7],dec:r[8],
-              sys:(r[6]===0)};
+              sys:(r[6]===0),
+              meth:(r[6]===0?"—":(RV_NAMES.test(r[0])?"Radial Velocity":"Transit"))};
     });
   }
 
   /* ================= live NASA Exoplanet Archive (TAP) ==================== */
   var TAP="https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query="+
-    encodeURIComponent("select pl_name,pl_rade,pl_insol,pl_eqt,pl_orbper,st_teff,sy_dist,ra,dec from ps where default_flag=1 and pl_rade is not null and pl_rade<3.2 and pl_insol is not null order by pl_name");
+    encodeURIComponent("select pl_name,pl_rade,pl_insol,pl_eqt,pl_orbper,st_teff,sy_dist,ra,dec,discoverymethod from ps where default_flag=1 and pl_rade is not null and pl_rade<3.2 and pl_insol is not null order by pl_name");
   function loadLive(){
     setSrc(null,"NASA Archive 取得中…"); $("status").textContent="宇宙望遠鏡カタログ(確定惑星)を取得しています…";
     var ctl=new AbortController(); var to=setTimeout(function(){ctl.abort();},20000);
@@ -336,7 +367,8 @@ let html = `<!DOCTYPE html>
         clearTimeout(to);
         var list=arr.map(function(o){
           return {name:o.pl_name,rade:o.pl_rade,insol:o.pl_insol,teq:o.pl_eqt,
-                  per:o.pl_orbper,st:o.st_teff,distPc:o.sy_dist,ra:o.ra,dec:o.dec,sys:false};
+                  per:o.pl_orbper,st:o.st_teff,distPc:o.sy_dist,ra:o.ra,dec:o.dec,sys:false,
+                  meth:o.discoverymethod||"?"};
         }).filter(function(p){return p.rade&&p.insol;});
         if(!list.length) throw new Error("empty");
         DATA=list; setSrc(true,"LIVE: NASA Exoplanet Archive ("+list.length+" 惑星)");
@@ -366,7 +398,13 @@ let html = `<!DOCTYPE html>
       .filter(function(p){ return p.sys || maxD>=3000 || (p.distPc!=null && p.distPc*PC2LY<=maxD); })
       .filter(function(p){ return !hab || p.sys || habitable(p); })
       .sort(function(a,b){
-        if($("sortBy").value==="seti") return (setiScore(b)||0)-(setiScore(a)||0);
+        var mode=$("sortBy").value;
+        if(mode==="seti") return (setiScore(b)||0)-(setiScore(a)||0);
+        if(mode==="grav"){
+          var ga=isGrav(a)?1:0, gb=isGrav(b)?1:0;
+          if(ga!==gb) return gb-ga;                 // 重力チャネルを先頭に
+          return b.esi-a.esi;
+        }
         return b.esi-a.esi;
       });
     var tb=$("rows"); tb.innerHTML="";
@@ -381,7 +419,8 @@ let html = `<!DOCTYPE html>
         "<td>"+(p.insol!=null?p.insol.toFixed(2):"—")+"</td>"+
         "<td>"+(p.teq!=null?p.teq.toFixed(0)+" K":"—")+"</td>"+
         "<td>"+(p.sys?"—":(p.distPc!=null?(p.distPc*PC2LY).toFixed(1):"—"))+"</td>"+
-        "<td>"+emLabel(p)+($("sortBy").value==="seti"&&setiScore(p)!=null&&!p.sys?" <span class='muted'>S="+setiScore(p).toFixed(3)+"</span>":"")+"</td>";
+        "<td>"+emLabel(p)+($("sortBy").value==="seti"&&setiScore(p)!=null&&!p.sys?" <span class='muted'>S="+setiScore(p).toFixed(3)+"</span>":"")+"</td>"+
+        "<td>"+(p.sys?"—":(isGrav(p)?"🌀重力":"✨光度"))+"</td>";
       tr.addEventListener("click",function(){ SEL=i; select(p); render(); });
       tb.appendChild(tr);
     });
@@ -402,6 +441,9 @@ let html = `<!DOCTYPE html>
             ["ハビタブル帯",p.sys?"—":(habitable(p)?"はい":"いいえ/不明")],
             ["電波地平 (電磁波)",p.sys?"—":(emStatus(p)===2?"往復可 — 地球の電波が届き、返信も今までに届き得る距離":emStatus(p)===1?"地球の電波(~120年分)が到達済み":"電波地平の外 (地球の漏えい電波はまだ届いていない)")],
             ["SETIスコア",setiScore(p)!=null&&!p.sys?setiScore(p).toFixed(3)+" (ESI×近接度)":"—"],
+            ["伝達チャネル (発見方法)",methJp(p)],
+            ["重力信号 K (RV半振幅・概算)",(!p.sys&&rvK(p)!=null)?rvK(p).toFixed(2)+" m/s — 惑星の重力が恒星を振り回す実信号":"—"],
+            ["反重力 Λ / 恒星重力 比",(!p.sys&&antigravRatio(p)!=null)?antigravRatio(p).toExponential(2)+" (実在の斥力=ダークエネルギー。惑星系では無視可能)":"—"],
             ["Jones熱 |V(e^{iθ})|",p.teq!=null?jonesV((Math.max(100,Math.min(1500,p.teq))-100)/1400*Math.PI).toFixed(3):"—"]];
     $("dKv").innerHTML=kv.map(function(r){return "<b>"+r[0]+"</b><span>"+esc(r[1])+"</span>";}).join("");
     var img=$("cutout");
