@@ -89,10 +89,15 @@ install -Dm644 "$HERE/config/apt/bada.list.tmpl" "$CHROOT/tmp/bada.list.tmpl"
 install -Dm644 "$HERE/config/xsessions/w9wm.desktop" "$CHROOT/usr/share/xsessions/w9wm.desktop"
 install -Dm755 "$HERE/config/w9wm-session.sh" "$CHROOT/usr/local/bin/w9wm-session"
 install -Dm755 "$HERE/config/bada-launcher.sh" "$CHROOT/usr/local/bin/bada-launcher"
-install -Dm755 "$HERE/config/install-badaos.sh" "$CHROOT/usr/local/bin/install-badaos"
-# GUI インストーラ (zenity ウィザード + 実インストール本体)
+install -Dm755 "$HERE/config/install-badaos.sh"        "$CHROOT/usr/local/bin/install-badaos"
+install -Dm755 "$HERE/config/install-badaos-simple.sh" "$CHROOT/usr/local/bin/install-badaos-simple"
+install -Dm755 "$HERE/config/badaos-partition.sh"      "$CHROOT/usr/local/bin/badaos-partition"
+# 自作 GUI インストーラ (zenity ウィザード + 実インストール本体, Calamares 代替)
 install -Dm755 "$HERE/installer/badaos-installer.sh"    "$CHROOT/usr/local/bin/badaos-installer"
 install -Dm755 "$HERE/installer/badaos-install-core.sh" "$CHROOT/usr/local/lib/badaos/badaos-install-core.sh"
+# Calamares の日本語インストール設定
+mkdir -p "$CHROOT/etc/calamares"
+cp -r "$HERE/config/calamares/." "$CHROOT/etc/calamares/"
 cp "$HERE/config/setup-inside.sh" "$CHROOT/tmp/setup-inside.sh"
 chmod +x "$CHROOT/tmp/setup-inside.sh"
 
