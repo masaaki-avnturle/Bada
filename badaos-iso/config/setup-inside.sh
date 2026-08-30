@@ -28,33 +28,67 @@ apt-get install -y --no-install-recommends \
 # 導入確認 (カーネルの実体があるか)
 ls -1 /boot/vmlinuz-* >/dev/null 2>&1 || { echo "FATAL: kernel not installed in chroot"; exit 1; }
 
+# ---- パッケージを 1 つずつ導入するヘルパ ----
+#   グループ一括 `apt-get install a b c || true` は 1 つでも無効名があると
+#   グループ全体が入らない。ここでは 1 パッケージずつ入れ、失敗しても続行する。
+apt_try(){ for p in "$@"; do apt-get install -y --no-install-recommends "$p" \
+  && echo "  [ok] $p" || echo "  [WARN] $p の導入に失敗 (スキップ)"; done; }
+apt_try_rec(){ for p in "$@"; do apt-get install -y "$p" \
+  && echo "  [ok] $p" || echo "  [WARN] $p の導入に失敗 (スキップ)"; done; }
+
 # ---- デスクトップ (w9wm) + mlterm 端末 + 日本語フォント ----
-apt-get install -y --no-install-recommends \
-  nano less curl wget \
+apt_try nano less curl wget ca-certificates \
   xserver-xorg xinit x11-xserver-utils \
   lightdm lightdm-gtk-greeter \
   w9wm mlterm mlterm-common xterm x11-utils feh \
-  fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji || true
+  fonts-dejavu fonts-noto-cjk fonts-noto-color-emoji
+
+# ---- エディタ (vim / emacs / neovim) と定番 CLI/GUI アプリ ----
+#   vim-gtk3: X クリップボード + 日本語対応。emacs: GTK 版。
+apt_try vim vim-gtk3 emacs neovim \
+  git tmux htop tree file unzip zip p7zip-full xz-utils \
+  pcmanfm mousepad gpicview xarchiver galculator
 
 # ---- 日本語入力 (fcitx-mozc + fcitx-configtool) ----
-apt-get install -y --no-install-recommends \
-  fcitx fcitx-mozc fcitx-configtool fcitx-frontend-gtk3 fcitx-frontend-gtk2 \
-  im-config mozc-utils-gui || true
+#   fcitx-mozc の依存で fcitx 本体・モジュールが入る。recommends 込みで
+#   フロントエンド/モジュールを確実に揃える。
+apt_try_rec fcitx fcitx-mozc fcitx-configtool \
+  fcitx-frontend-gtk3 fcitx-frontend-gtk2 fcitx-frontend-qt5 \
+  fcitx-module-dbus fcitx-ui-classic im-config mozc-utils-gui
 # 既定の入力メソッドを fcitx に
 im-config -n fcitx 2>/dev/null || true
+
+# fcitx プロファイルで mozc を既定有効化 (これが無いと日本語入力が出ない)
+mkdir -p /etc/skel/.config/fcitx
+cat > /etc/skel/.config/fcitx/profile <<EOF
+[Profile]
+IMName=mozc
+EnabledIMList=fcitx-keyboard-us:True,mozc:True
+PreeditStringInApplication=False
+ShareStateAmongWindow=No
+DefaultQuickPhrase=
+EOF
+cat > /etc/skel/.config/fcitx/config <<EOF
+[Hotkey]
+TriggerKey=CTRL_SPACE ZENKAKU_HANKAKU
+SwitchKey=Disabled
+IMSwitchHotkey=ALT_SHIFT
+TimeInterval=250
+[Program]
+DelayStart=2
+[Output]
+EOF
 
 # ---- インストーラ Calamares (日本語 UI) + パーティションマネージャ GParted ----
 #   Calamares は system の LANG に従って日本語表示になる (ja 翻訳同梱)。
 #   recommends 込みで QML/kpmcore(パーティション処理)を確実に入れる。加えて
 #   実ディスク初期化用の GParted、GRUB 設置一式、squashfs 展開ツールを導入。
-apt-get install -y \
-  calamares \
-  qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-controls2 \
+apt_try_rec calamares gparted
+apt_try qml-module-qtquick2 qml-module-qtquick-window2 qml-module-qtquick-controls2 \
   qml-module-qtquick-layouts \
-  gparted \
   parted gdisk dosfstools e2fsprogs util-linux zenity \
   squashfs-tools rsync \
-  grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober || true
+  grub-common grub2-common grub-pc-bin grub-efi-amd64-bin os-prober
 
 # 独自 /etc/calamares 設定を使用 (build-iso.sh が config/calamares を配置済み)
 # ブラウザは同梱しない: Bada アプリは Electron 版 (.deb) を優先起動するため不要。
@@ -78,6 +112,8 @@ LANGUAGE=ja_JP:ja
 GTK_IM_MODULE=fcitx
 QT_IM_MODULE=fcitx
 XMODIFIERS=@im=fcitx
+EDITOR=vim
+VISUAL=vim
 EOF
 
 # ---- X セッションの日本語環境 + fcitx 自動起動 (.xprofile) ----
@@ -183,6 +219,34 @@ Exec=fcitx-configtool
 Terminal=false
 Icon=fcitx
 Categories=Settings;
+EOF
+cat > /etc/skel/Desktop/badaos-apps.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=Ubuntu アプリを導入
+Comment=vim/emacs/LibreOffice/GIMP など人気アプリを apt で簡単導入
+Exec=/usr/local/bin/badaos-apps
+Terminal=false
+Icon=system-software-install
+Categories=System;
+EOF
+cat > /etc/skel/Desktop/vim.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=Vim (gvim)
+Exec=gvim
+Terminal=false
+Icon=gvim
+Categories=Development;
+EOF
+cat > /etc/skel/Desktop/emacs.desktop <<EOF
+[Desktop Entry]
+Type=Application
+Name=Emacs
+Exec=emacs
+Terminal=false
+Icon=emacs
+Categories=Development;
 EOF
 cat > /etc/skel/Desktop/mlterm.desktop <<EOF
 [Desktop Entry]
