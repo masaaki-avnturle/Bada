@@ -29,7 +29,8 @@ const builds = [
   "build-earth-twin.js",     // dist/earth-twin.html
   "build-planet-cinema.js",  // dist/planet-cinema.html
   "build-geo-signal.js",     // dist/geo-signal.html
-  "build-anomaly-map.js"     // dist/anomaly-map.html
+  "build-anomaly-map.js",    // dist/anomaly-map.html
+  "build-heat-sense.js"      // dist/heat-sense.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -108,6 +109,15 @@ it in any browser — no install, no dependencies, works offline.
                       source was pinpointed (human / natural / still open —
                       only Wow! remains unresolved). DSS2 sky cutouts + ground
                       tile views. Honest banner: zero confirmed alien sites.
+  heat-sense.html     HeatSense — 未知の伝達チャネル模索シアター: the real
+                      searches for channels beyond EM/gravity — thermal
+                      (Dyson waste-heat IR, Wien's law computed live with the
+                      Jones heat palette), neutrinos (human comms DEMONSTRATED
+                      at Fermilab 2012; Super-K / IceCube listening), axions
+                      (ADMX), cosmic rays — and entanglement honestly excluded
+                      (no-communication theorem). Ground zoom movies + sky
+                      fov-zoom movies (DSS2), .webm recording. Zero detections
+                      to date, stated up front.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

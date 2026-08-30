@@ -1,0 +1,395 @@
+#!/usr/bin/env node
+/* ============================================================================
+ * build-heat-sense.js — build "HeatSense — 未知の伝達チャネル模索シアター",
+ * a single self-contained HTML app: the search for transmission methods
+ * BEYOND electromagnetism and gravity, done the honest way.
+ *
+ * The Γ-manifold wit + Jones-polynomial THERMAL sensing here is real
+ * physics: the flagship "unknown channel" search is thermal — a civilization
+ * cannot hide its WASTE HEAT (2nd law), so the real Dyson-sphere hunts
+ * (IRAS, WISE, the Ĝ survey) look for infrared excess. Wien's displacement
+ * law λ_peak = 2898/T μm is computed live and drives the Jones |V(e^{iθ})|
+ * heat palette. The other real candidate channels each carry their honest
+ * status:
+ *   🌊 neutrinos  — communication DEMONSTRATED by humans (Fermilab 2012,
+ *                   0.1 bit/s through 240 m of rock); IceCube / Super-K
+ *                   listen; no artificial extraterrestrial neutrinos found.
+ *   ⚛ axions/DM  — ADMX is really listening; new physics, nothing yet.
+ *   🌌 cosmic rays — modulation proposed in the literature; nothing found.
+ *   🔗 entanglement — the no-communication theorem FORBIDS it (excluded,
+ *                   honestly, with the reason).
+ *
+ * 「地球上と他の場所の周辺の動画」— ground search sites (Super-Kamiokande
+ * 神岡, IceCube 南極点, Fermilab, ADMX Seattle…) play the space-to-ground
+ * zoom movie from public map tiles with thermal ripples; sky targets
+ * (Tabby's star, M31…) play a TELESCOPE ZOOM MOVIE built by crossfading
+ * real DSS2 cutouts at shrinking fields of view (30°→0.2°, hips2fits).
+ * Recordable to .webm. Offline: labeled fallbacks. Pinned banner: zero
+ * detections on any unknown channel as of 2026.
+ *
+ * Output: ../dist/heat-sense.html
+ * ==========================================================================*/
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const IDE = path.join(__dirname, "..");
+
+let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>HeatSense — 未知の伝達チャネル模索シアター (Γ×Jones熱感知)</title>
+<style>
+  :root{color-scheme:dark;--bg:#03050c;--line:#1b2740;--ink:#e9f0fb;--dim:#8aa0c0;
+        --cy:#39c2ff;--gold:#c8a44a;--green:#2fbf71;--red:#e0555a;--org:#ff9b4a;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:#03050c;color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 16px;
+         border-bottom:1px solid var(--line);background:#060a14cc;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px);}
+  .logo{font-size:19px;font-weight:800;letter-spacing:.4px;
+        background:linear-gradient(90deg,#ff9b4a,#e0555a);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:12px;}
+  select,input,button{background:#0b1424;border:1px solid var(--line);color:var(--ink);border-radius:8px;
+        padding:7px 10px;font-size:13px;font-family:inherit;}
+  button{cursor:pointer;} button:hover{background:#152238;}
+  button.r{background:#3a1520;border-color:#6b2e3a;}
+  input[type=range]{accent-color:var(--org);}
+  main{max-width:1100px;margin:0 auto;padding:14px 12px 70px;}
+  .banner{background:#3a2412;border:1px solid #6b4a2e;border-radius:10px;padding:10px 13px;font-size:12.5px;color:#ffd9a8;margin-bottom:12px;line-height:1.7;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;} @media(max-width:860px){.grid{grid-template-columns:1fr;}}
+  .stagewrap{position:relative;background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  #stage{width:100%;display:block;background:#000;}
+  .hud{position:absolute;left:10px;top:10px;background:#000b;border:1px solid var(--line);border-radius:8px;
+       padding:7px 11px;font-size:12px;color:#cfe0f5;line-height:1.6;pointer-events:none;max-width:72%;}
+  .hud b{color:var(--gold);}
+  .rec{position:absolute;right:12px;top:12px;display:none;align-items:center;gap:6px;background:#000a;
+       border:1px solid #6b2e3a;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff9aa5;}
+  .rec.on{display:inline-flex;} .rec .d{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite;}
+  @keyframes pulse{50%{opacity:.35;}}
+  .card{background:#070c16;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--cy);}
+  .muted{color:var(--dim);font-size:12px;} a{color:var(--cy);}
+  .list{max-height:250px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .it{padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;}
+  .it:hover{background:#0d1626;} .it.sel{background:#12233c;}
+  .it .t{color:var(--dim);font-size:11.5px;}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-top:10px;}
+  .kv b{color:var(--gold);font-weight:600;}
+  .chband{height:10px;border-radius:5px;background:linear-gradient(90deg,#3050ff,#39c2ff,#2fbf71,#c8a44a,#ff9b4a,#e0555a);margin-top:4px;}
+  .badge{font-size:11px;border-radius:6px;padding:1px 7px;margin-left:6px;font-weight:600;}
+  .b-demo{background:#173a29;color:#7fe0a8;border:1px solid #2e6b46;}
+  .b-search{background:#3a3212;color:#ffd97a;border:1px solid #6b5a2e;}
+  .b-forbid{background:#3a1520;color:#ff9aa5;border:1px solid #6b2e3a;}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">🔥 HeatSense — 未知の伝達チャネル模索シアター</div>
+    <div class="sub">Γ多様体の機知 × Jones多項式の熱エネルギー感知 — 電磁波・重力の先にある伝達手段の、実在の模索を特定する</div></div>
+</header>
+<main>
+
+  <div class="banner">
+    <b>正直な前提</b>: 電磁波・重力以外の「未知の伝達チャネル」で地球外の人工信号が検出された例は、
+    2026年時点で<b>ゼロ</b>です。ただし模索は本物です — <b>熱感知(廃熱の赤外過剰=ダイソン球探索)</b>は
+    WISE 衛星で実施済み、<b>ニュートリノ通信は人類自身が2012年に実証済み</b>(フェルミ研、岩盤240mを貫通
+    0.1 bit/s)、IceCube・スーパーカミオカンデ・ADMX が今も聴取中。<b>量子もつれだけは
+    no-communication 定理により伝達に使えない</b>ことが物理的に確定しています。
+  </div>
+
+  <div class="controls">
+    <label class="muted">見る場所:
+      <select id="pick" style="min-width:260px"></select></label>
+    <button id="play">⏸ 一時停止</button>
+    <button class="r" id="recBtn">⏺ 動画を録画 (.webm)</button>
+    <span class="muted" id="recNote"></span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="stagewrap">
+        <canvas id="stage" width="820" height="560"></canvas>
+        <div class="hud" id="hud"></div>
+        <div class="rec" id="recBadge"><span class="d"></span>REC</div>
+      </div>
+      <div class="controls" style="margin-top:8px">
+        <label class="muted" style="flex:1;min-width:280px">🔥 熱感知: 文明の廃熱温度 T =
+          <b id="tempV" style="color:#ff9b4a">300</b> K
+          <input type="range" id="temp" min="150" max="1000" step="10" value="300" style="width:100%"/></label>
+      </div>
+      <div class="muted" id="wienLine">—</div>
+      <div class="chband"></div>
+      <div class="kv" id="kv"></div>
+    </div>
+    <div>
+      <h2 style="margin-top:2px">🧭 模索チャネル (実在の探索)</h2>
+      <div class="list" id="channels"></div>
+      <h2 style="margin-top:12px">📍 地点 / 天球ターゲット</h2>
+      <div class="list" id="places" style="max-height:220px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🧮 Γ × Jones の実計算</h2>
+    <div class="muted" style="line-height:1.8" id="mathLine">—</div>
+  </div>
+</main>
+
+<script>
+(function(){
+  "use strict";
+  var $=function(id){return document.getElementById(id);};
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+  /* ============ Γ (Lanczos) — 恒等式の自己検証 ============ */
+  var GL=[676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,
+          12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  function gammaFn(z){ if(z<0.5) return Math.PI/(Math.sin(Math.PI*z)*gammaFn(1-z));
+    z-=1; var x=0.99999999999980993;
+    for(var i=0;i<GL.length;i++) x+=GL[i]/(z+i+1);
+    var t=z+7.5; return Math.sqrt(2*Math.PI)*Math.pow(t,z+0.5)*Math.exp(-t)*x; }
+
+  /* ============ Jones 熱感知 (三葉結び目) ============ */
+  function jonesV(th){ function e(n){return {re:Math.cos(n*th),im:Math.sin(n*th)};}
+    var a=e(-4),b=e(-3),c=e(-1),re=-a.re+b.re+c.re,im=-a.im+b.im+c.im;
+    return Math.sqrt(re*re+im*im); }
+  function heatColor(T){ var t=Math.max(150,Math.min(1000,T));
+    var th=(t-150)/850*Math.PI, m=jonesV(th)/3;
+    var hue=Math.max(0,230-(t-150)/850*230);
+    return "hsl("+hue.toFixed(0)+","+(55+m*40).toFixed(0)+"%,55%)"; }
+  function wien(T){ return 2898/T; }   // λ_peak [μm] — ウィーンの変位則 (実式)
+
+  /* ============ 模索チャネル (実在・正直ステータス) ============ */
+  var CHANNELS=[
+    {n:"🔥 熱 (廃熱の赤外過剰=ダイソン球探索)", s:"search",
+     d:"熱力学第2法則により文明は廃熱を隠せない。IRAS/WISE 衛星の全天赤外データで実施された実際の探索 (Ĝ サーベイ等)。候補は精査され、確認例はゼロ。"},
+    {n:"🌊 ニュートリノ", s:"demo",
+     d:"人類が通信を実証済み: 2012年フェルミ研、ニュートリノビームで岩盤240mを貫通し 0.1 bit/s で 'neutrino' と伝送。IceCube・スーパーカミオカンデが地球外の人工ニュートリノを聴取中 — 検出例はまだ無い。"},
+    {n:"⚛ アクシオン / ダークマター", s:"search",
+     d:"ADMX (ワシントン大) が実際に共振空洞で聴取中。未知の物理の候補チャネルだが、信号はまだ無い。"},
+    {n:"🌌 宇宙線の変調", s:"search",
+     d:"超高エネルギー宇宙線に情報を載せる可能性が文献で議論されている。観測網 (Pierre Auger 等) はあるが人工変調の証拠は無い。"},
+    {n:"🔗 量子もつれ", s:"forbid",
+     d:"no-communication 定理により、もつれ単独では情報を伝達できない (測定結果はランダムで、古典通信が必須)。物理が禁止する唯一のチャネル — 模索対象から正直に除外。"}
+  ];
+  function chBadge(s){ return s==="demo"?'<span class="badge b-demo">人類が実証済み</span>':
+    s==="forbid"?'<span class="badge b-forbid">物理が禁止</span>':'<span class="badge b-search">探索中・検出ゼロ</span>'; }
+
+  /* ============ 地点 / 天球ターゲット ============ */
+  var PLACES=[
+    {n:"スーパーカミオカンデ (神岡・地下1000m)", kind:"ground", lat:36.4267, lon:137.3103,
+     ch:"🌊 ニュートリノ", d:"5万トンの純水と1.1万本の光電子増倍管でニュートリノを実検出中"},
+    {n:"IceCube ニュートリノ観測所 (南極点)", kind:"ground", lat:-89.99, lon:-63.45,
+     ch:"🌊 ニュートリノ", d:"南極の氷 1km³ を検出器化。高エネルギー宇宙ニュートリノを実検出"},
+    {n:"フェルミ国立加速器研究所 (イリノイ)", kind:"ground", lat:41.8319, lon:-88.2572,
+     ch:"🌊 ニュートリノ", d:"2012年、人類初のニュートリノ通信をここで実証 (MINERvA)"},
+    {n:"ADMX (ワシントン大学シアトル)", kind:"ground", lat:47.6533, lon:-122.3050,
+     ch:"⚛ アクシオン", d:"アクシオン ダークマターの共振空洞探索を実施中"},
+    {n:"ピエール・オージェ観測所 (アルゼンチン)", kind:"ground", lat:-35.2067, lon:-69.3153,
+     ch:"🌌 宇宙線", d:"3000km² の超高エネルギー宇宙線観測網"},
+    {n:"タビーの星 KIC 8462852 (はくちょう座)", kind:"sky", ra:301.564, dec:44.457,
+     ch:"🔥 熱感知", d:"不規則減光で巨大構造物説が出た星 — 赤外過剰の精査対象になった実例"},
+    {n:"アンドロメダ銀河 M31", kind:"sky", ra:10.685, dec:41.269,
+     ch:"🔥 熱感知", d:"Ĝ サーベイ流の銀河スケール廃熱探索の代表的対象"},
+    {n:"銀河中心 (いて座A*方向)", kind:"sky", ra:266.417, dec:-29.008,
+     ch:"🔥 熱感知", d:"恒星密度が最大の方向 — 赤外サーベイの重点領域"}
+  ];
+
+  /* ============ tiles / stage ============ */
+  function tXY(lat,lon,z){ var n=Math.pow(2,z);
+    var x=(lon+180)/360*n, la=lat*Math.PI/180;
+    var y=(1-Math.log(Math.tan(la)+1/Math.cos(la))/Math.PI)/2*n;
+    return {x:x,y:y}; }
+  var CACHE={};
+  function getTile(z,x,y){
+    var n=Math.pow(2,z); x=((Math.floor(x)%n)+n)%n; y=Math.floor(y);
+    if(y<0||y>=n) return null;
+    var k=z+"|"+x+"|"+y;
+    if(CACHE[k]) return CACHE[k];
+    var im=new Image(); im.crossOrigin="anonymous"; im._ok=false;
+    im.onload=function(){ im._ok=true; };
+    im.src="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/"+z+"/"+y+"/"+x;
+    CACHE[k]=im; return im;
+  }
+  var SKYCACHE={};
+  var FOVS=[30,8,2,0.5,0.15];
+  function getSky(p,fi){
+    var k=p.n+"|"+fi;
+    if(SKYCACHE[k]) return SKYCACHE[k];
+    var im=new Image(); im.crossOrigin="anonymous"; im._ok=false;
+    im.onload=function(){ im._ok=true; };
+    im.src="https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips="+encodeURIComponent("CDS/P/DSS2/color")+
+      "&ra="+p.ra+"&dec="+p.dec+"&fov="+FOVS[fi]+"&width=560&height=560&format=jpg";
+    SKYCACHE[k]=im; return im;
+  }
+
+  var cvs=$("stage"), ctx=cvs.getContext("2d");
+  var CUR=PLACES[0], t0=performance.now(), paused=false, lastF=0, CYCLE=24;
+
+  function fallback(zf){
+    var W=cvs.width,H=cvs.height;
+    var g=ctx.createRadialGradient(W/2,H/2,10,W/2,H/2,W*0.7);
+    g.addColorStop(0,"#1a0f08"); g.addColorStop(0.5,"#0a0f1c"); g.addColorStop(1,"#02040a");
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle="#12314a";
+    var st=40*Math.pow(2,zf%1);
+    for(var x=W/2%st;x<W;x+=st){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+    for(var y=H/2%st;y<H;y+=st){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+    ctx.fillStyle="#28527a"; ctx.font="12px sans-serif";
+    ctx.fillText("(オフライン: 画像未取得のため簡易表示 — 座標は実データ)",14,H-14);
+  }
+
+  function draw(now){
+    requestAnimationFrame(draw);
+    if(paused&&!recording) return;
+    if(now-lastF<33) return; lastF=now;
+    var tt=((now-t0)/1000)%CYCLE, f=tt/CYCLE;
+    var W=cvs.width,H=cvs.height;
+    ctx.fillStyle="#000"; ctx.fillRect(0,0,W,H);
+    var drew=0;
+
+    if(CUR.kind==="ground"){
+      var z=3+(16-3)*Math.min(1,f/0.8);
+      var c=tXY(CUR.lat,CUR.lon,Math.floor(z));
+      var px=256*Math.pow(2,z-Math.floor(z));
+      for(var dx=-2;dx<=2;dx++) for(var dy=-2;dy<=2;dy++){
+        var im=getTile(Math.floor(z),Math.floor(c.x)+dx,Math.floor(c.y)+dy);
+        if(im&&im._ok){ try{
+          ctx.drawImage(im, W/2+((Math.floor(c.x)+dx-c.x))*px, H/2+((Math.floor(c.y)+dy-c.y))*px, px+0.8,px+0.8);
+          drew++; }catch(e){} }
+      }
+      if(!drew) fallback(z);
+    } else {
+      // sky zoom movie: crossfade shrinking fov cutouts
+      var pos=Math.min(FOVS.length-1.001, f/0.85*(FOVS.length-1));
+      var i0=Math.floor(pos), fr=pos-i0;
+      var a=getSky(CUR,i0), b=getSky(CUR,Math.min(FOVS.length-1,i0+1));
+      var sc=Math.pow(FOVS[i0]/FOVS[Math.min(FOVS.length-1,i0+1)], fr);   // zoom within level
+      if(a&&a._ok){ var s=Math.min(W,H)*1.05*sc;
+        try{ ctx.drawImage(a,W/2-s/2,H/2-s/2,s,s); drew++; }catch(e){} }
+      if(b&&b._ok&&fr>0.55){ ctx.globalAlpha=(fr-0.55)/0.45;
+        var s2=Math.min(W,H)*1.05*sc*(FOVS[Math.min(FOVS.length-1,i0+1)]/FOVS[i0]);
+        try{ ctx.drawImage(b,W/2-s2/2,H/2-s2/2,s2,s2); drew++; }catch(e){}
+        ctx.globalAlpha=1; }
+      if(!drew) fallback(pos);
+    }
+
+    /* 熱感知オーバーレイ: 廃熱リング (温度スライダー連動) */
+    var T=parseFloat($("temp").value), col=heatColor(T);
+    var k=(((now-t0)/1000*44)%130+130)%130;
+    ctx.strokeStyle=col; ctx.globalAlpha=0.7; ctx.lineWidth=1.8;
+    ctx.beginPath(); ctx.arc(W/2,H/2,k,0,7); ctx.stroke();
+    ctx.globalAlpha=0.32;
+    ctx.beginPath(); ctx.arc(W/2,H/2,(k+65)%130,0,7); ctx.stroke();
+    ctx.globalAlpha=1;
+    ctx.strokeStyle="#fff"; ctx.lineWidth=1.4;
+    ctx.beginPath(); ctx.moveTo(W/2-12,H/2); ctx.lineTo(W/2-4,H/2); ctx.moveTo(W/2+4,H/2); ctx.lineTo(W/2+12,H/2);
+    ctx.moveTo(W/2,H/2-12); ctx.lineTo(W/2,H/2-4); ctx.moveTo(W/2,H/2+4); ctx.lineTo(W/2,H/2+12); ctx.stroke();
+
+    $("hud").innerHTML="<b>"+esc(CUR.n)+"</b>"+
+      "<br>チャネル: "+esc(CUR.ch)+"  |  "+(CUR.kind==="ground"?("緯度 "+CUR.lat.toFixed(3)+"° 経度 "+CUR.lon.toFixed(3)+"°"):("RA "+CUR.ra.toFixed(2)+"° Dec "+CUR.dec.toFixed(2)+"°"))+
+      "<br>🔥 熱感知 T="+T+" K → λ_peak = "+wien(T).toFixed(2)+" μm (赤外)";
+  }
+
+  /* ============ wiring ============ */
+  function wienUpdate(){
+    var T=parseFloat($("temp").value);
+    $("tempV").textContent=T;
+    var th=(T-150)/850*Math.PI;
+    $("wienLine").innerHTML="ウィーンの変位則 (実式): λ_peak = 2898/T = <b style='color:"+heatColor(T)+"'>"+wien(T).toFixed(2)+" μm</b>"+
+      " — この波長の赤外過剰が「廃熱の模様」。Jones熱感知 |V(e^{iθ})| = "+jonesV(th).toFixed(3)+
+      " (θ="+th.toFixed(2)+")。地球文明 (~300K) は約 10 μm — WISE のバンドそのもの。";
+  }
+  $("temp").addEventListener("input",wienUpdate);
+
+  function select(p){
+    CUR=p; t0=performance.now();
+    $("pick").value=p.n; renderPlaces();
+    var kv=[["場所",p.n],["模索チャネル",p.ch],["何をしているか",p.d],
+      ["座標",p.kind==="ground"?(p.lat.toFixed(4)+"°, "+p.lon.toFixed(4)+"°"):("RA "+p.ra.toFixed(3)+"° / Dec "+p.dec.toFixed(3)+"°")],
+      ["検出状況","地球外の人工信号は未検出 (2026年時点・正直)"]];
+    $("kv").innerHTML=kv.map(function(r){return "<b>"+esc(r[0])+"</b><span>"+esc(r[1])+"</span>";}).join("");
+  }
+  function renderPlaces(){
+    var box=$("places"); box.innerHTML="";
+    PLACES.forEach(function(p){
+      var d=document.createElement("div"); d.className="it"+(p===CUR?" sel":"");
+      d.innerHTML="<div>"+(p.kind==="ground"?"🌏 ":"🌌 ")+esc(p.n)+"</div><div class='t'>"+esc(p.ch)+" — "+esc(p.d)+"</div>";
+      d.addEventListener("click",function(){ select(p); });
+      box.appendChild(d);
+    });
+  }
+  (function(){
+    var box=$("channels");
+    CHANNELS.forEach(function(c){
+      var d=document.createElement("div"); d.className="it";
+      d.innerHTML="<div>"+esc(c.n)+chBadge(c.s)+"</div><div class='t'>"+esc(c.d)+"</div>";
+      box.appendChild(d);
+    });
+  })();
+  var sel=$("pick");
+  PLACES.forEach(function(p){ var o=document.createElement("option"); o.value=p.n;
+    o.textContent=(p.kind==="ground"?"🌏 ":"🌌 ")+p.n; sel.appendChild(o); });
+  sel.addEventListener("change",function(){ var p=PLACES.filter(function(q){return q.n===sel.value;})[0]; if(p) select(p); });
+  $("play").addEventListener("click",function(){ paused=!paused; this.textContent=paused?"▶ 再生":"⏸ 一時停止"; });
+
+  $("mathLine").innerHTML=(function(){
+    var checks=["0.57","0.70","5.58"].map(function(w){ w=parseFloat(w);
+      return "w="+w+" → Γ(1+w)/(wΓ(w)) = "+(gammaFn(1+w)/(w*gammaFn(w))).toFixed(6); }).join("  |  ");
+    return "Γ多様体 (大域的部分積分 Γ(z+1)=zΓ(z)) の自己検証: "+checks+
+      "  |  Γ(0.5)² = "+(gammaFn(0.5)*gammaFn(0.5)).toFixed(6)+" (=π)。"+
+      "この Γ 恒等式が重みの正規化、Jones |V(e^{iθ})| が熱感知カラーを駆動する — "+
+      "GammaTwin/PlanetCinema と同じ機知の、熱チャネル版。";
+  })();
+
+  /* ============ .webm recording ============ */
+  var recording=false, recorder=null, chunks=[];
+  $("recBtn").addEventListener("click",function(){
+    if(!(window.MediaRecorder&&cvs.captureStream)){ $("recNote").textContent="録画未対応"; return; }
+    if(!recording){
+      try{
+        var stream=cvs.captureStream(30);
+        var mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+        recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:5000000});
+        chunks=[];
+        recorder.ondataavailable=function(e){ if(e.data&&e.data.size) chunks.push(e.data); };
+        recorder.onstop=function(){
+          var blob=new Blob(chunks,{type:"video/webm"});
+          var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+          a.download="heatsense-"+CUR.n.replace(/[^A-Za-z0-9._-]+/g,"_").replace(/^_+|_+$/g,"")+".webm";
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+          $("recNote").textContent="動画を保存しました ("+(blob.size/1024/1024).toFixed(1)+" MB)";
+        };
+        recorder.start(200); recording=true;
+        $("recBtn").textContent="⏹ 停止 / 保存"; $("recBadge").classList.add("on");
+        $("recNote").textContent="録画中…";
+      }catch(e){ $("recNote").textContent="録画失敗: "+e.message; }
+    } else {
+      recording=false; try{ recorder.stop(); }catch(e){}
+      $("recBtn").textContent="⏺ 動画を録画 (.webm)"; $("recBadge").classList.remove("on");
+    }
+  });
+
+  /* ============ init ============ */
+  renderPlaces(); select(PLACES[0]); wienUpdate();
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
+`;
+
+fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
+const outPath = path.join(IDE, "dist", "heat-sense.html");
+fs.writeFileSync(outPath, html);
+console.log("built dist/heat-sense.html (" + fs.statSync(outPath).size + " bytes)");
+
+/* Stage as the native app's www/index.html */
+const appWww = path.join(IDE, "heatsense-app", "www");
+fs.mkdirSync(appWww, { recursive: true });
+fs.writeFileSync(path.join(appWww, "index.html"), html);
+console.log("staged heatsense-app/www/index.html");
