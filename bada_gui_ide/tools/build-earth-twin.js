@@ -304,6 +304,11 @@ let html = `<!DOCTYPE html>
     var mp=p.rade>6?100+p.rade*8:Math.pow(p.rade,3.58);
     var ms=Math.pow((p.st||5772)/5772,2);
     return 0.08946*mp*Math.pow(ms,-2/3)*Math.pow(p.per/365.25,-1/3); }
+  /* 文明の伝達 3 手段 (実物理): 必要ビーコン電力 / 人工重力波ひずみ */
+  function civEmPower(p){ var ly=emLy(p); if(ly==null) return null;
+    return 2e13*Math.pow(ly/25000,2); }               // アレシボ級受信の最小送信電力 [W]
+  function civGwH(p){ var ly=emLy(p); if(ly==null) return null;
+    return 32*Math.pow(Math.PI,4)*8.26e-45*1e6*1e4*1e4/(ly*9.4607e15); } // M=1e6kg R=100m f=100Hz
   // 反重力 (ダークエネルギー Λ) と恒星重力の比 — 惑星系スケールの正直な実計算
   function antigravRatio(p){ if(p.st==null||p.insol==null||!(p.insol>0)) return null;
     var H0=2.268e-18, G=6.67e-11, MSUN=1.989e30, AUm=1.496e11;
@@ -444,6 +449,9 @@ let html = `<!DOCTYPE html>
             ["伝達チャネル (発見方法)",methJp(p)],
             ["重力信号 K (RV半振幅・概算)",(!p.sys&&rvK(p)!=null)?rvK(p).toFixed(2)+" m/s — 惑星の重力が恒星を振り回す実信号":"—"],
             ["反重力 Λ / 恒星重力 比",(!p.sys&&antigravRatio(p)!=null)?antigravRatio(p).toExponential(2)+" (実在の斥力=ダークエネルギー。惑星系では無視可能)":"—"],
+            ["文明: 📡 電磁波",(!p.sys&&civEmPower(p)!=null)?"検出可能 — 必要ビーコン電力 ≈ "+civEmPower(p).toExponential(2)+" W (アレシボ級受信)":"—"],
+            ["文明: 🌀 重力手段",(!p.sys&&civGwH(p)!=null)?"人工装置 h ≈ "+civGwH(p).toExponential(2)+" ≪ LIGO 10⁻²² → 恒星質量級が必要":"—"],
+            ["文明: 🛸 反重力発生器",p.sys?"—":"未知の物理 — Λ密度 ≈ 5.3×10⁻¹⁰ J/m³。局所生成の理論・検出器なし"],
             ["Jones熱 |V(e^{iθ})|",p.teq!=null?jonesV((Math.max(100,Math.min(1500,p.teq))-100)/1400*Math.PI).toFixed(3):"—"]];
     $("dKv").innerHTML=kv.map(function(r){return "<b>"+r[0]+"</b><span>"+esc(r[1])+"</span>";}).join("");
     var img=$("cutout");

@@ -252,6 +252,10 @@ let html = `<!DOCTYPE html>
     var mp=p.rade>6?100+p.rade*8:Math.pow(p.rade,3.58);
     var ms=Math.pow((p.st||5772)/5772,2);
     return 0.08946*mp*Math.pow(ms,-2/3)*Math.pow(p.per/365.25,-1/3); }
+  function civEmPower(p){ if(p.distPc==null) return null;
+    var ly=p.distPc*PC2LY; return 2e13*Math.pow(ly/25000,2); }
+  function civGwH(p){ if(p.distPc==null) return null;
+    var ly=p.distPc*PC2LY; return 32*Math.pow(Math.PI,4)*8.26e-45*1e6*1e4*1e4/(ly*9.4607e15); }
   function antigravRatio(p){ if(p.st==null||p.insol==null||!(p.insol>0)) return null;
     var H0=2.268e-18, G=6.67e-11, MSUN=1.989e30, AUm=1.496e11;
     var r=Math.sqrt(Math.pow((p.st||5772)/5772,4)/p.insol)*AUm;
@@ -419,6 +423,9 @@ let html = `<!DOCTYPE html>
       ["重力信号 K (概算)",rvK(p)!=null?rvK(p).toFixed(2)+" m/s (RV半振幅・実式)":"—"],
       ["反重力 Λ/恒星重力",antigravRatio(p)!=null?antigravRatio(p).toExponential(2)+" (実在の斥力=ダークエネルギー。無視可能)":"—"],
       ["周辺 (同じ恒星系)",(function(){var s=siblings(p);return hostOf(p.name)+" 系 "+s.length+" 惑星"+(s.length>1?" — 下の系全体ビューで公転中":"");})()],
+      ["文明: 📡 電磁波",civEmPower(p)!=null?"検出可能 — 必要ビーコン電力 ≈ "+civEmPower(p).toExponential(2)+" W":"—"],
+      ["文明: 🌀 重力手段",civGwH(p)!=null?"人工装置 h ≈ "+civGwH(p).toExponential(2)+" ≪ LIGO 10⁻²² → 恒星質量級が必要":"—"],
+      ["文明: 🛸 反重力発生器","未知の物理 — Λ密度 ≈ 5.3×10⁻¹⁰ J/m³。理論・検出器なし"],
       ["外見クラス",{ice:"氷惑星",temperate:"温帯 (海・雲)",desert:"砂漠",lava:"溶岩",gas:"ガス",rock:"岩石"}[classOf(p)]]];
     $("factKv").innerHTML=kv.map(function(r){return "<b>"+esc(r[0])+"</b><span>"+esc(String(r[1]))+"</span>";}).join("");
     $("estNote").textContent="軌道長半径(推定) a ≈ √((T★/5772)⁴/S) = "+p.aAU.toFixed(3)+" AU / 軌道速度(推定) v = 2πa/P = "+(p.vorb?p.vorb.toFixed(1)+" km/s":"—")+" — 実測値からのケプラー式推定";
