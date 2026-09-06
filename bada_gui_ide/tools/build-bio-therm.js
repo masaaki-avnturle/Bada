@@ -1,0 +1,576 @@
+#!/usr/bin/env node
+/* ============================================================================
+ * build-bio-therm.js — build "BioThermNet — 知的生命体 熱感知ネットワーク",
+ * a single self-contained HTML app: the Γ global (partial-)integration
+ * manifold wit + Jones-polynomial thermal sensing, fused into a NETWORK view
+ * of the discovered exoplanets, plus procedurally generated GRAPHICS of the
+ * intelligent lifeform each planet's REAL measured physics would shape.
+ *
+ * Honest framing (pinned banner): as of 2026 ZERO intelligent civilizations
+ * and zero extraterrestrial lifeforms have been detected. What is real:
+ *   ・the planets and every number about them (NASA Exoplanet Archive values)
+ *   ・the biology/physics laws used to derive the illustration:
+ *       Kleiber's law        P = 3.4 W × (M/kg)^0.75   (validated: 70 kg → ~82 W)
+ *       Stefan–Boltzmann     A = P / (ε σ (T_body⁴ − T_env⁴)) radiator area
+ *       Allen's rule         cold → compact body + fur; hot → radiator fins
+ *       surface gravity      g = R^1.58 g⊕  (from M ≈ R^3.58)
+ *       Wien / star Teff     dim red stars → larger, red-shifted eyes
+ *       insolation           high S⊕ → dark photo-protective pigment
+ *   Every anatomical feature in the drawing is annotated with the formula
+ *   and the number that produced it. The creature is a physics-consistent
+ *   ILLUSTRATION, not an observation.
+ *
+ * Network view (機知ネットワーク): nodes = the real planets; the Γ global
+ * integration manifold gives the network's TOTAL sensed thermal budget
+ * (大域積分 = Σ per-planet hypothetical biosphere heat), and the global
+ * differential manifold gives each node's heat GRADIENT d|V|/dθ on the
+ * trefoil Jones curve (微分). Animated pulses, click-to-select, .webm
+ * recording of the network canvas, PNG download of the creature.
+ *
+ * Output: ../dist/bio-therm.html  (+ staged biotherm-app/www/index.html)
+ * ==========================================================================*/
+"use strict";
+const fs = require("fs");
+const path = require("path");
+const IDE = path.join(__dirname, "..");
+
+let html = `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BioThermNet — 知的生命体 熱感知ネットワーク (Γ×Jones機知)</title>
+<style>
+  :root{color-scheme:dark;--bg:#03050c;--line:#1b2740;--ink:#e9f0fb;--dim:#8aa0c0;
+        --cy:#39c2ff;--gold:#c8a44a;--green:#2fbf71;--red:#e0555a;--org:#ff9b4a;--vio:#b58cff;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:#03050c;color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 16px;
+         border-bottom:1px solid var(--line);background:#060a14cc;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px);}
+  .logo{font-size:19px;font-weight:800;letter-spacing:.4px;
+        background:linear-gradient(90deg,#b58cff,#39c2ff,#2fbf71);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:12px;}
+  select,input,button{background:#0b1424;border:1px solid var(--line);color:var(--ink);border-radius:8px;
+        padding:7px 10px;font-size:13px;font-family:inherit;}
+  button{cursor:pointer;} button:hover{background:#152238;}
+  button.r{background:#3a1520;border-color:#6b2e3a;}
+  button.g{background:#11301f;border-color:#2e6b46;}
+  main{max-width:1160px;margin:0 auto;padding:14px 12px 70px;}
+  .banner{background:#1d1636;border:1px solid #4a3a7a;border-radius:10px;padding:10px 13px;
+          font-size:12.5px;color:#d8c8ff;margin-bottom:12px;line-height:1.7;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;} @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .grid2{display:grid;grid-template-columns:auto 1fr;gap:14px;} @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+  .stagewrap{position:relative;background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  #net{width:100%;display:block;background:#000;cursor:pointer;}
+  #bio{display:block;background:#04070f;border:1px solid var(--line);border-radius:14px;max-width:100%;}
+  .hud{position:absolute;left:10px;top:10px;background:#000b;border:1px solid var(--line);border-radius:8px;
+       padding:7px 11px;font-size:12px;color:#cfe0f5;line-height:1.6;pointer-events:none;max-width:72%;}
+  .hud b{color:var(--gold);}
+  .rec{position:absolute;right:12px;top:12px;display:none;align-items:center;gap:6px;background:#000a;
+       border:1px solid #6b2e3a;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff9aa5;}
+  .rec.on{display:inline-flex;} .rec .d{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite;}
+  @keyframes pulse{50%{opacity:.35;}}
+  .card{background:#070c16;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--cy);}
+  .muted{color:var(--dim);font-size:12px;}
+  .list{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .it{padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;}
+  .it:hover{background:#0d1626;} .it.sel{background:#12233c;}
+  .it .t{color:var(--dim);font-size:11.5px;}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-top:10px;}
+  .kv b{color:var(--gold);font-weight:600;}
+  .anno{font-size:12.5px;line-height:1.75;}
+  .anno li{margin-bottom:7px;}
+  .anno b{color:var(--vio);}
+  .anno .f{color:var(--cy);font-family:ui-monospace,Consolas,monospace;font-size:11.5px;}
+  .gline{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#7fd8a8;margin-top:8px;word-break:break-all;}
+  .swatch{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin-right:4px;}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">🧬 BioThermNet — 知的生命体 熱感知ネットワーク</div>
+    <div class="sub">Γ関数の大域的(部分)積分多様体の機知 × Jones多項式の熱感知 — 発見済み惑星の熱エネルギー網と、その物理が形づくる生命体のグラフィックス</div></div>
+</header>
+<main>
+
+  <div class="banner">
+    <b>正直な前提</b>: 2026年時点で、地球外の知的文明・生命体は<b>一体も検出されていません</b>。
+    このアプリの惑星と数値はすべて実測(NASA Exoplanet Archive)、生命体の姿は
+    <b>その惑星の実測物理が生命に強制する形</b>を実在の法則 — クライバーの法則 P=3.4W·M^0.75
+    (ヒト70kg→約82Wで検証)、シュテファン=ボルツマン放熱面積、アレンの法則(寒冷→毛皮・コンパクト/高温→放熱フィン)、
+    表面重力 g=R^1.58g⊕、恒星色→目の適応 — から決定論的に描いた<b>物理整合イラスト</b>です。観測画像ではありません。
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="stagewrap">
+        <canvas id="net" width="820" height="560"></canvas>
+        <div class="hud" id="hud"></div>
+        <div class="rec" id="recBadge"><span class="d"></span>REC</div>
+      </div>
+      <div class="controls" style="margin-top:8px">
+        <button id="play">⏸ 一時停止</button>
+        <button class="r" id="recBtn">⏺ ネットワーク動画を録画 (.webm)</button>
+        <span class="muted" id="recNote"></span>
+      </div>
+      <div class="gline" id="gammaDemo"></div>
+    </div>
+    <div>
+      <div class="card" style="margin-top:0">
+        <h2>🌍 感知ノード (実在の発見済み惑星)</h2>
+        <div class="list" id="plist"></div>
+        <div class="kv" id="pinfo"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>👁 感知された知的生命体のグラフィックス — <span id="bioName" style="color:var(--gold)"></span></h2>
+    <div class="grid2">
+      <div>
+        <canvas id="bio" width="460" height="540"></canvas>
+        <div class="controls">
+          <button class="g" id="pngBtn">🖼 この生命体をPNG保存</button>
+          <span class="muted" id="pngNote"></span>
+        </div>
+      </div>
+      <div>
+        <div class="muted" style="margin-bottom:6px">各部位は、その惑星の<b>実測値</b>と<b>実在の法則</b>から決定論的に導出(=同じ惑星は常に同じ姿):</div>
+        <ul class="anno" id="anno"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>∮ 機知ネットワークの数理 (すべて実式)</h2>
+    <div class="anno">
+      <li><b>大域積分 (Γ多様体)</b> — ネットワーク総熱量 <span class="f">Q = Σ_ノード P_bio</span> を
+        Γ関数の部分積分恒等式 <span class="f">Γ(z+1)=zΓ(z)</span> の自己検証つきで集計(上のライン参照)。</li>
+      <li><b>微分多様体 (勾配)</b> — 各ノードの熱勾配は三つ葉結び目のJones多項式
+        <span class="f">|V(e^{iθ})|</span> の数値微分 <span class="f">d|V|/dθ</span>。惑星の平衡温度 Teq が θ を決める。</li>
+      <li><b>ノードの仮想生物圏熱量</b> — <span class="f">P_bio = P_個体 × N,  N = 8×10⁹ × ESI²</span>
+        (地球の80億人を、地球類似度ESIの2乗で重み付けした思考実験)。</li>
+      <li><b>個体の代謝熱</b> — クライバーの法則 <span class="f">P_個体 = 3.4 W × (M/kg)^0.75</span>。
+        実測検証: ヒト M=70kg → 3.4×70^0.75 ≈ 82 W(安静時代謝の実測値と一致)。</li>
+    </div>
+  </div>
+
+</main>
+<script>
+(function(){
+  "use strict";
+  function $(id){ return document.getElementById(id); }
+
+  /* ================= Γ (Lanczos) + identity self-check ==================== */
+  var LG=[676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,
+          12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  function gamma(z){
+    if(z<0.5) return Math.PI/(Math.sin(Math.PI*z)*gamma(1-z));
+    z-=1; var x=0.99999999999980993;
+    for(var i=0;i<LG.length;i++) x+=LG[i]/(z+i+1);
+    var t=z+LG.length-0.5;
+    return Math.sqrt(2*Math.PI)*Math.pow(t,z+0.5)*Math.exp(-t)*x;
+  }
+  (function(){
+    var ws=[0.57,0.70,5.58], s="Γ(z+1)=zΓ(z) 部分積分恒等式 検証:  ";
+    for(var i=0;i<ws.length;i++){
+      s+="w="+ws[i]+": "+(gamma(1+ws[i])/(ws[i]*gamma(ws[i]))).toFixed(6)+"  ";
+    }
+    s+="| Γ(0.5)²="+(gamma(0.5)*gamma(0.5)).toFixed(6)+" (π="+Math.PI.toFixed(6)+")";
+    s+=" | クライバー検証: 3.4×70^0.75="+(3.4*Math.pow(70,0.75)).toFixed(1)+" W (ヒト実測≈82W)";
+    $("gammaDemo").textContent=s;
+  })();
+
+  /* ================= Jones heat (trefoil) + gradient ====================== */
+  function jonesV(th){
+    function e(n){ return {re:Math.cos(n*th), im:Math.sin(n*th)}; }
+    var a=e(-4), b=e(-3), c=e(-1);
+    var re=-a.re+b.re+c.re, im=-a.im+b.im+c.im;
+    return Math.sqrt(re*re+im*im);
+  }
+  function thetaOf(teq){ var t=Math.max(100,Math.min(1500,teq==null?255:teq)); return (t-100)/1400*Math.PI; }
+  function jonesGrad(teq){ var th=thetaOf(teq), h=1e-4; return (jonesV(th+h)-jonesV(th-h))/(2*h); }
+  function heatColor(teq){
+    if(teq==null) return "#5a748f";
+    var t=Math.max(100,Math.min(1500,teq));
+    var mag=jonesV(thetaOf(teq))/3;
+    var hue = t<255 ? 230-(t-100)/155*110 : Math.max(0,120-(t-255)/500*120);
+    return "hsl("+hue.toFixed(0)+","+(45+mag*50).toFixed(0)+"%,"+(42+mag*14).toFixed(0)+"%)";
+  }
+
+  /* ================= real planet snapshot (measured values) =============== */
+  // [name, rade(R⊕), insol(S⊕), teq(K), per(d), st_teff(K), dist(ly)]
+  var PLANETS=[
+    ["地球 (基準)",1.00,1.00,255,365.25,5772,0],
+    ["Proxima Centauri b",1.07,0.65,234,11.19,3042,4.25],
+    ["Teegarden's Star b",1.04,1.15,264,4.91,2904,12.5],
+    ["Ross 128 b",1.11,1.38,280,9.87,3192,11.0],
+    ["Luyten b (GJ 273 b)",1.51,1.06,259,18.6,3382,12.4],
+    ["TRAPPIST-1 e",0.92,0.65,250,6.10,2566,40.7],
+    ["TRAPPIST-1 f",1.04,0.38,219,9.21,2566,40.7],
+    ["TOI-700 d",1.07,0.87,269,37.4,3480,101.4],
+    ["TOI-700 e",0.95,1.27,280,27.8,3480,101.4],
+    ["GJ 1002 b",1.03,0.67,231,10.3,3024,15.8],
+    ["LHS 1140 b",1.73,0.43,226,24.7,3216,48.9],
+    ["Kepler-186 f",1.17,0.29,188,129.9,3755,580],
+    ["Kepler-442 b",1.34,0.70,233,112.3,4402,1206],
+    ["Kepler-452 b",1.63,1.10,265,384.8,5757,1796],
+    ["Kepler-1649 c",1.06,0.75,234,19.5,3240,300]
+  ];
+  function mk(r){ return {name:r[0],rade:r[1],insol:r[2],teq:r[3],per:r[4],st:r[5],ly:r[6],earth:(r[6]===0)}; }
+  var DATA=PLANETS.map(mk);
+
+  /* ================= ESI (Γ-identity-normalized weights) ================== */
+  var W={radius:0.57, insol:0.70, teq:5.58};
+  function esiTerm(x,x0,w,n){
+    if(x==null||!(x>0)) return null;
+    var s=1-Math.abs(x-x0)/(x+x0);
+    return Math.pow(Math.max(0,s), gamma(1+w)/(w*gamma(w)) * w/n);
+  }
+  function esi(p){
+    var t1=esiTerm(p.rade,1.0,W.radius,3), t2=esiTerm(p.insol,1.0,W.insol,3), t3=esiTerm(p.teq,255,W.teq,3);
+    if(t1==null||t2==null||t3==null) return null;
+    return t1*t2*t3;
+  }
+  DATA.forEach(function(p){ p.esi=esi(p); });
+
+  /* ================= lifeform physics (all real laws) ===================== */
+  var SIGMA=5.670374419e-8, EPS=0.95;
+  function bioPhys(p){
+    var b={};
+    b.gRel=Math.pow(p.rade,1.58);                       // g = R^1.58 g⊕  (M≈R^3.58, g=M/R²)
+    b.mass=Math.max(8,Math.min(300, 70*Math.pow(1/b.gRel,1.2)));  // 骨強度スケーリング仮説
+    b.metab=3.4*Math.pow(b.mass,0.75);                  // Kleiber [W]
+    b.tEnv=(p.teq==null?255:p.teq);
+    b.tBody=Math.max(288,Math.min(322, b.tEnv+40));     // 恒温仮説: 環境+40K, 生化学の窓 288–322K
+    var flux=EPS*SIGMA*(Math.pow(b.tBody,4)-Math.pow(b.tEnv,4)); // [W/m²]
+    b.flux=flux;
+    b.area=flux>2 ? b.metab/flux : 99;                  // 放熱面積 [m²] (人の皮膚≈1.8m²)
+    b.finF=Math.max(0.25,Math.min(3.5,b.area/1.8));     // アレンの法則: 面積要求→フィン/耳
+    b.cold=b.tEnv<235; b.hot=b.tEnv>285;
+    b.height=1.7/Math.sqrt(b.gRel);                     // 座屈スケーリング: h ∝ g^-1/2
+    b.legs=b.gRel>1.6?6:(b.gRel>1.25?4:2);              // 高重力→多脚で荷重分散
+    b.eyeScale=Math.max(0.8,Math.min(2.6,Math.sqrt(5772/(p.st||5772)))); // 暗い恒星→大きな瞳
+    var st=p.st||5772;
+    b.eyeHue=Math.max(5,Math.min(215,(st-2500)/(7000-2500)*210+5));      // 恒星色への適応
+    b.wien=2898/st;                                     // 恒星のピーク波長 [μm]
+    b.pig=Math.max(0.15,Math.min(0.9,(p.insol||1)*0.45)); // 高進入日射→濃い保護色素
+    b.pop=8e9*Math.pow(p.esi==null?0:p.esi,2);          // 思考実験の個体数
+    b.pBio=b.metab*b.pop;                               // ノードの仮想生物圏熱量 [W]
+    b.grad=jonesGrad(p.teq);                            // 微分多様体: d|V|/dθ
+    b.viable=(p.rade<2.6 && b.tEnv>150 && b.tEnv<340);
+    return b;
+  }
+  DATA.forEach(function(p){ p.bio=bioPhys(p); });
+  var Q_TOTAL=0; DATA.forEach(function(p){ if(!p.earth) Q_TOTAL+=p.bio.pBio; });
+
+  function fmtW(w){
+    if(w>=1e12) return (w/1e12).toFixed(2)+" TW";
+    if(w>=1e9) return (w/1e9).toFixed(2)+" GW";
+    if(w>=1e6) return (w/1e6).toFixed(2)+" MW";
+    return w.toFixed(0)+" W";
+  }
+
+  /* ================= deterministic PRNG from name ========================= */
+  function seedOf(s){ var h=2166136261; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return (h>>>0); }
+  function rng(seed){ var s=seed>>>0; return function(){ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; }; }
+
+  /* ================= network canvas ======================================= */
+  var net=$("net"), nx=net.getContext("2d");
+  var Wn=net.width, Hn=net.height, SEL=1, playing=true, t0=performance.now();
+  // deterministic node layout: Earth hub center, others by log-distance polar
+  DATA.forEach(function(p,i){
+    if(p.earth){ p.x=Wn*0.5; p.y=Hn*0.52; return; }
+    var r=rng(seedOf(p.name));
+    var ang=r()*Math.PI*2;
+    var rad=(0.16+0.78*Math.log10(1+p.ly)/Math.log10(2000))*Math.min(Wn,Hn)*0.46;
+    p.x=Wn*0.5+Math.cos(ang)*rad*1.28;
+    p.y=Hn*0.52+Math.sin(ang)*rad*0.86;
+    p.x=Math.max(40,Math.min(Wn-40,p.x)); p.y=Math.max(46,Math.min(Hn-30,p.y));
+  });
+  var STARS=[]; (function(){ var r=rng(7); for(var i=0;i<130;i++) STARS.push([r()*Wn,r()*Hn,r()*1.3+0.3]); })();
+
+  function drawNet(now){
+    var t=(now-t0)/1000;
+    nx.fillStyle="#000308"; nx.fillRect(0,0,Wn,Hn);
+    nx.fillStyle="#9fb6d8";
+    for(var i=0;i<STARS.length;i++){ nx.globalAlpha=0.25+0.35*Math.abs(Math.sin(t*0.7+i)); nx.fillRect(STARS[i][0],STARS[i][1],STARS[i][2],STARS[i][2]); }
+    nx.globalAlpha=1;
+    var hub=DATA[0];
+    // edges + heat pulses (speed ∝ 1/distance)
+    for(var k=1;k<DATA.length;k++){
+      var p=DATA[k], seld=(k===SEL);
+      nx.strokeStyle=seld?"#b58cff":"#1e3050"; nx.lineWidth=seld?1.6:0.8;
+      nx.beginPath(); nx.moveTo(hub.x,hub.y); nx.lineTo(p.x,p.y); nx.stroke();
+      var per=3+Math.log10(1+p.ly)*3;
+      var ph=((t/per + seedOf(p.name)%97/97)%1);
+      var px=hub.x+(p.x-hub.x)*ph, py=hub.y+(p.y-hub.y)*ph;
+      nx.fillStyle=heatColor(p.teq);
+      nx.beginPath(); nx.arc(px,py,seld?3.4:2.2,0,Math.PI*2); nx.fill();
+    }
+    // nodes
+    for(var k2=0;k2<DATA.length;k2++){
+      var q=DATA[k2], sel2=(k2===SEL);
+      var rad=q.earth?11:5+3.2*Math.max(0,Math.log10(1+q.bio.pBio/1e9));
+      var pul=1+0.14*Math.sin(t*2+k2);
+      var g=nx.createRadialGradient(q.x,q.y,0,q.x,q.y,rad*3*pul);
+      g.addColorStop(0,heatColor(q.teq)); g.addColorStop(1,"rgba(0,0,0,0)");
+      nx.globalAlpha=0.5; nx.fillStyle=g;
+      nx.beginPath(); nx.arc(q.x,q.y,rad*3*pul,0,Math.PI*2); nx.fill();
+      nx.globalAlpha=1;
+      nx.fillStyle=q.earth?"#39c2ff":heatColor(q.teq);
+      nx.beginPath(); nx.arc(q.x,q.y,rad*(sel2?1.3:1),0,Math.PI*2); nx.fill();
+      if(sel2){ nx.strokeStyle="#fff"; nx.lineWidth=1.4; nx.beginPath(); nx.arc(q.x,q.y,rad*1.3+4+2*Math.sin(t*3),0,Math.PI*2); nx.stroke(); }
+      nx.fillStyle=sel2?"#fff":"#8aa0c0"; nx.font=(sel2?"bold ":"")+"10.5px sans-serif";
+      nx.fillText(q.name.replace(/ \\(.*\\)$/,""),q.x+rad+4,q.y+3);
+      // 微分多様体: gradient arrow d|V|/dθ
+      if(!q.earth){
+        var gr=q.bio.grad, ax=q.x, ay=q.y-rad-6, L=Math.max(-16,Math.min(16,gr*9));
+        nx.strokeStyle="#7fd8a8"; nx.lineWidth=1.1;
+        nx.beginPath(); nx.moveTo(ax-0,ay); nx.lineTo(ax+L,ay-Math.abs(L)*0.35); nx.stroke();
+      }
+    }
+    var s=DATA[SEL];
+    $("hud").innerHTML="<b>∮ 大域積分 (ネットワーク総熱量)</b>: Q = Σ P_bio = <b>"+fmtW(Q_TOTAL)+"</b> (思考実験)<br>"+
+      "選択ノード: <b>"+s.name+"</b> — P_bio="+fmtW(s.bio.pBio)+
+      " / 微分 d|V|/dθ="+s.bio.grad.toFixed(3)+
+      " / |V(e^{iθ})|="+jonesV(thetaOf(s.teq)).toFixed(3);
+  }
+  net.addEventListener("click",function(ev){
+    var r=net.getBoundingClientRect();
+    var mx=(ev.clientX-r.left)*Wn/r.width, my=(ev.clientY-r.top)*Hn/r.height, best=-1, bd=1e9;
+    DATA.forEach(function(p,i){ var d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my); if(d<bd){bd=d;best=i;} });
+    if(best>=0 && bd<40*40) select(best);
+  });
+
+  /* ================= creature graphics ==================================== */
+  var bio=$("bio"), bx=bio.getContext("2d");
+  function drawCreature(p){
+    var b=p.bio, Wc=bio.width, Hc=bio.height, r=rng(seedOf(p.name));
+    bx.fillStyle="#04070f"; bx.fillRect(0,0,Wc,Hc);
+    // environment tint from Teq
+    var envG=bx.createLinearGradient(0,0,0,Hc);
+    envG.addColorStop(0,"rgba(10,16,30,1)"); envG.addColorStop(1,heatColor(p.teq));
+    bx.globalAlpha=0.22; bx.fillStyle=envG; bx.fillRect(0,0,Wc,Hc); bx.globalAlpha=1;
+    if(p.earth){
+      bx.fillStyle="#cfe0f5"; bx.font="14px sans-serif"; bx.textAlign="center";
+      bx.fillText("基準ノード: 地球 — 実在の知的生命体はヒト (M=70kg, P≈82W)",Wc/2,Hc/2-8);
+      bx.fillText("他のノードを選ぶと、その惑星の物理が形づくる生命体を描画",Wc/2,Hc/2+16);
+      bx.textAlign="left"; return;
+    }
+    if(!b.viable){
+      bx.fillStyle="#ff9aa5"; bx.font="14px sans-serif"; bx.textAlign="center";
+      bx.fillText("この惑星は熱的/サイズ的に生命圏外 (Teq="+b.tEnv+"K, R="+p.rade+"R⊕)",Wc/2,Hc/2);
+      bx.textAlign="left"; return;
+    }
+    var cx=Wc*0.5, groundY=Hc*0.86;
+    // height scale: 2.4m maps to ~0.62*Hc
+    var mPerPx=2.4/(Hc*0.62), hPx=b.height/mPerPx;
+    var bodyW=hPx*0.34*Math.pow(b.gRel,0.55);           // 高重力→がっしり
+    var bodyH=hPx*0.46, headR=hPx*0.13*(b.cold?1.0:1.06);
+    var hipY=groundY-hPx*0.42, shY=hipY-bodyH, headY=shY-headR*1.15;
+    // heat aura (metabolic waste heat, Jones palette)
+    var aur=bx.createRadialGradient(cx,shY+bodyH*0.4,hPx*0.1,cx,shY+bodyH*0.4,hPx*0.85);
+    aur.addColorStop(0,heatColor(b.tBody)); aur.addColorStop(1,"rgba(0,0,0,0)");
+    bx.globalAlpha=0.30; bx.fillStyle=aur;
+    bx.beginPath(); bx.arc(cx,shY+bodyH*0.4,hPx*0.85,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+    // ground + gravity
+    bx.strokeStyle="#2a3c5c"; bx.lineWidth=2;
+    bx.beginPath(); bx.moveTo(20,groundY); bx.lineTo(Wc-20,groundY); bx.stroke();
+    bx.fillStyle="#8aa0c0"; bx.font="11px sans-serif";
+    bx.fillText("g = "+b.gRel.toFixed(2)+" g⊕  (g=R^1.58g⊕)",24,groundY+16);
+    // scale bar 1 m
+    var oneM=1/mPerPx;
+    bx.strokeStyle="#5a748f"; bx.beginPath(); bx.moveTo(Wc-40,groundY); bx.lineTo(Wc-40,groundY-oneM); bx.stroke();
+    bx.fillText("1 m",Wc-36,groundY-oneM/2);
+    // skin tone from pigment (insolation)
+    var lum=(62-b.pig*40).toFixed(0);
+    var skin="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+lum+"%)";
+    var skin2="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+(lum*0.78).toFixed(0)+"%)";
+    // legs (2/4/6 by gravity)
+    bx.strokeStyle=skin2; bx.lineCap="round";
+    var legW=Math.max(4,bodyW*0.16*Math.pow(b.gRel,0.8)); bx.lineWidth=legW;
+    var nl=b.legs, legLen=hPx*0.42;
+    for(var li=0;li<nl;li++){
+      var fx=cx-bodyW*0.42+bodyW*0.84*(nl===1?0.5:li/(nl-1));
+      var sway=(li%2?1:-1)*bodyW*0.06;
+      bx.beginPath(); bx.moveTo(fx,hipY); bx.quadraticCurveTo(fx+sway,hipY+legLen*0.5,fx+sway*0.5,groundY-2); bx.stroke();
+    }
+    // arms (2, unless 6-legged → small manipulators)
+    bx.lineWidth=Math.max(3,legW*0.66);
+    var armLen=hPx*0.34*(b.cold?0.8:1.1);               // Allen: cold→short appendages
+    [-1,1].forEach(function(sd){
+      bx.beginPath(); bx.moveTo(cx+sd*bodyW*0.5,shY+bodyH*0.16);
+      bx.quadraticCurveTo(cx+sd*(bodyW*0.5+armLen*0.5),shY+bodyH*0.34,cx+sd*(bodyW*0.42+armLen*0.6),shY+bodyH*0.16+armLen);
+      bx.stroke();
+    });
+    // torso
+    bx.fillStyle=skin;
+    bx.beginPath(); bx.ellipse(cx,shY+bodyH*0.5,bodyW*0.55,bodyH*0.56,0,0,Math.PI*2); bx.fill();
+    // radiator fins / ears (hot, Stefan–Boltzmann area demand) — or fur (cold)
+    if(b.hot||b.finF>1.15){
+      bx.fillStyle=skin2; bx.globalAlpha=0.9;
+      var fN=Math.round(2+b.finF*2);
+      for(var fi=0;fi<fN;fi++){
+        var fy=shY+bodyH*(0.12+0.76*fi/Math.max(1,fN-1));
+        var fl=bodyW*(0.5+0.55*b.finF);
+        [-1,1].forEach(function(sd){
+          bx.beginPath();
+          bx.moveTo(cx+sd*bodyW*0.5,fy);
+          bx.quadraticCurveTo(cx+sd*(bodyW*0.5+fl),fy-hPx*0.045,cx+sd*(bodyW*0.5+fl*0.8),fy+hPx*0.035);
+          bx.closePath(); bx.fill();
+        });
+      }
+      bx.globalAlpha=1;
+      // big radiator ears
+      [-1,1].forEach(function(sd){
+        bx.fillStyle=skin2;
+        bx.beginPath(); bx.ellipse(cx+sd*headR*1.35,headY-headR*0.2,headR*0.55*b.finF,headR*0.9*b.finF,sd*0.5,0,Math.PI*2); bx.fill();
+      });
+    }
+    if(b.cold){
+      bx.strokeStyle="hsla(28,25%,72%,0.8)"; bx.lineWidth=1.2;
+      for(var fu=0;fu<140;fu++){
+        var a=r()*Math.PI*2, rr=bodyW*0.55+r()*6;
+        var fx2=cx+Math.cos(a)*rr*0.98, fy2=shY+bodyH*0.5+Math.sin(a)*bodyH*0.56;
+        bx.beginPath(); bx.moveTo(fx2,fy2); bx.lineTo(fx2+Math.cos(a)*7,fy2+Math.sin(a)*7); bx.stroke();
+      }
+    }
+    // head
+    bx.fillStyle=skin;
+    bx.beginPath(); bx.arc(cx,headY,headR,0,Math.PI*2); bx.fill();
+    // eyes: size from star dimness, color from star Teff
+    var eyeR=headR*0.30*b.eyeScale;
+    var eyeCol="hsl("+b.eyeHue.toFixed(0)+",75%,55%)";
+    [-1,1].forEach(function(sd){
+      var ex=cx+sd*headR*0.45, ey=headY-headR*0.08;
+      var eg=bx.createRadialGradient(ex,ey,0,ex,ey,eyeR*1.8);
+      eg.addColorStop(0,eyeCol); eg.addColorStop(1,"rgba(0,0,0,0)");
+      bx.globalAlpha=0.55; bx.fillStyle=eg; bx.beginPath(); bx.arc(ex,ey,eyeR*1.8,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+      bx.fillStyle="#0a0f18"; bx.beginPath(); bx.arc(ex,ey,eyeR,0,Math.PI*2); bx.fill();
+      bx.fillStyle=eyeCol; bx.beginPath(); bx.arc(ex,ey,eyeR*0.62,0,Math.PI*2); bx.fill();
+      bx.fillStyle="#fff"; bx.beginPath(); bx.arc(ex-eyeR*0.2,ey-eyeR*0.24,eyeR*0.16,0,Math.PI*2); bx.fill();
+    });
+    // thermal-sense organ (this app's premise: heat sensing) — IR pit like pit vipers
+    bx.fillStyle=heatColor(b.tBody);
+    bx.beginPath(); bx.arc(cx,headY+headR*0.35,headR*0.13,0,Math.PI*2); bx.fill();
+    // caption
+    bx.fillStyle="#cfe0f5"; bx.font="bold 13px sans-serif";
+    bx.fillText(p.name,16,26);
+    bx.fillStyle="#8aa0c0"; bx.font="11px sans-serif";
+    bx.fillText("物理整合イラスト — 観測ではなく実測パラメータからの決定論的導出",16,44);
+    bx.fillStyle=heatColor(b.tBody);
+    bx.fillText("●",16,62);
+    bx.fillStyle="#8aa0c0";
+    bx.fillText(" = 額の赤外ピット器官 (実在: マムシ類の熱感知に倣う)",26,62);
+  }
+
+  /* ================= annotations ========================================== */
+  function annotate(p){
+    var b=p.bio, ul=$("anno"); ul.innerHTML="";
+    function add(t){ var li=document.createElement("li"); li.innerHTML=t; ul.appendChild(li); }
+    if(p.earth){ add("<b>地球</b> — 基準ノード。実在の知的生命体はヒト: M=70 kg, クライバー熱 <span class='f'>3.4×70^0.75≈82 W</span>(実測と一致)。"); return; }
+    if(!b.viable){ add("<b>生命圏外</b> — Teq="+b.tEnv+" K / R="+p.rade+" R⊕ は液体の水と生化学の窓の外。グラフィックス対象外(正直な判定)。"); return; }
+    add("<b>体格</b> — 表面重力 <span class='f'>g=R^1.58g⊕="+b.gRel.toFixed(2)+"g⊕</span> → 骨強度スケーリングで体重 <span class='f'>M≈70·(g⊕/g)^1.2="+b.mass.toFixed(0)+" kg</span>、身長 <span class='f'>h∝g^-1/2≈"+b.height.toFixed(2)+" m</span>、脚は<b>"+b.legs+"本</b>(高重力ほど多脚で荷重分散)。");
+    add("<b>代謝熱</b> — クライバーの法則 <span class='f'>P=3.4·M^0.75="+b.metab.toFixed(0)+" W</span>。これが熱感知ネットワークが拾う1個体の熱源。");
+    add("<b>放熱器官</b> — 体温 "+b.tBody.toFixed(0)+" K / 環境 "+b.tEnv.toFixed(0)+" K でシュテファン=ボルツマン <span class='f'>A=P/(εσ(Tb⁴−Tenv⁴))="+(b.area>=99?"∞(放熱不能)":b.area.toFixed(2)+" m²")+"</span>(ヒト皮膚≈1.8m²)。"+
+      (b.hot||b.finF>1.15?"面積要求が大きい→<b>放熱フィン・大きな耳</b>(アレンの法則の高温側。実在: フェネックの耳)。":"面積要求は小さい。"));
+    if(b.cold) add("<b>毛皮・コンパクト体型</b> — 環境 "+b.tEnv.toFixed(0)+" K は寒冷 → アレンの法則の寒冷側: 付属肢を短く、表面積/体積比を最小化し断熱毛皮(実在: ホッキョクギツネ)。");
+    add("<b>目</b> — 恒星 Teff="+(p.st||5772)+" K(ピーク波長 Wien <span class='f'>λ=2898/T="+b.wien.toFixed(2)+" μm</span>)→ 瞳の大きさ×"+b.eyeScale.toFixed(2)+"(暗い赤色矮星ほど大きく)、感色域は恒星色に適応。");
+    add("<b>体色</b> — 日射 S="+p.insol+" S⊕ → 保護色素の濃さ "+(b.pig*100).toFixed(0)+"%(高日射ほど濃く。実在: メラニンのUV防御)。");
+    add("<b>ネットワーク寄与</b> — 思考実験の個体数 <span class='f'>N=8×10⁹·ESI²="+(b.pop/1e9).toFixed(2)+"×10⁹</span> で生物圏熱量 <span class='f'>P_bio="+fmtW(b.pBio)+"</span>。微分多様体の勾配 <span class='f'>d|V|/dθ="+b.grad.toFixed(3)+"</span>。");
+  }
+
+  /* ================= list + selection ===================================== */
+  function renderList(){
+    var el=$("plist"); el.innerHTML="";
+    DATA.forEach(function(p,i){
+      var d=document.createElement("div"); d.className="it"+(i===SEL?" sel":"");
+      d.innerHTML="<span class='swatch' style='background:"+heatColor(p.teq)+"'></span><b>"+p.name+"</b>"+
+        "<div class='t'>"+(p.earth?"基準ノード":("ESI "+(p.esi==null?"—":p.esi.toFixed(3))+" · "+p.ly+" 光年 · Teq "+p.teq+" K"))+"</div>";
+      d.addEventListener("click",function(){ select(i); });
+      el.appendChild(d);
+    });
+  }
+  function select(i){
+    SEL=i; var p=DATA[i], b=p.bio;
+    renderList();
+    $("bioName").textContent=p.name;
+    $("pinfo").innerHTML=
+      "<b>半径</b><span>"+p.rade+" R⊕ → g="+b.gRel.toFixed(2)+" g⊕</span>"+
+      "<b>日射</b><span>"+p.insol+" S⊕</span>"+
+      "<b>平衡温度</b><span>"+p.teq+" K</span>"+
+      "<b>恒星 Teff</b><span>"+(p.st||"—")+" K</span>"+
+      "<b>距離</b><span>"+(p.earth?"—":p.ly+" 光年")+"</span>"+
+      "<b>ESI (Γ正規化)</b><span>"+(p.esi==null?"—":p.esi.toFixed(4))+"</span>"+
+      "<b>P_bio (思考実験)</b><span>"+(p.earth?"—":fmtW(b.pBio))+"</span>";
+    drawCreature(p);
+    annotate(p);
+  }
+
+  /* ================= PNG download ========================================= */
+  $("pngBtn").addEventListener("click",function(){
+    try{
+      var a=document.createElement("a");
+      a.href=bio.toDataURL("image/png");
+      a.download="biotherm-"+DATA[SEL].name.replace(/[^A-Za-z0-9._-]+/g,"_").replace(/^_+|_+$/g,"")+".png";
+      document.body.appendChild(a); a.click(); setTimeout(function(){ a.remove(); },200);
+      $("pngNote").textContent="PNGを保存しました";
+    }catch(e){ $("pngNote").textContent="保存失敗: "+e.message; }
+  });
+
+  /* ================= recorder (.webm of the network) ====================== */
+  var recorder=null, chunks=[], recording=false;
+  $("recBtn").addEventListener("click",function(){
+    if(!recording){
+      try{
+        var stream=net.captureStream(30);
+        var mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+        recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6});
+        chunks=[];
+        recorder.ondataavailable=function(e){ if(e.data.size) chunks.push(e.data); };
+        recorder.onstop=function(){
+          var blob=new Blob(chunks,{type:"video/webm"});
+          var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+          a.download="biothermnet.webm";
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+          $("recNote").textContent="動画を保存しました ("+(blob.size/1024/1024).toFixed(1)+" MB)";
+        };
+        recorder.start(200); recording=true;
+        $("recBtn").textContent="⏹ 停止 / 保存"; $("recBadge").classList.add("on");
+        $("recNote").textContent="録画中…";
+      }catch(e){ $("recNote").textContent="録画失敗: "+e.message; }
+    } else {
+      recording=false; try{ recorder.stop(); }catch(e){}
+      $("recBtn").textContent="⏺ ネットワーク動画を録画 (.webm)"; $("recBadge").classList.remove("on");
+    }
+  });
+  $("play").addEventListener("click",function(){
+    playing=!playing; $("play").textContent=playing?"⏸ 一時停止":"▶ 再生";
+    if(playing) requestAnimationFrame(loop);
+  });
+
+  /* ================= init ================================================= */
+  function loop(now){ drawNet(now); if(playing) requestAnimationFrame(loop); }
+  renderList(); select(1);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
+`;
+
+fs.mkdirSync(path.join(IDE, "dist"), { recursive: true });
+const outPath = path.join(IDE, "dist", "bio-therm.html");
+fs.writeFileSync(outPath, html);
+console.log("built dist/bio-therm.html (" + fs.statSync(outPath).size + " bytes)");
+
+/* Stage as the native app's www/index.html */
+const appWww = path.join(IDE, "biotherm-app", "www");
+fs.mkdirSync(appWww, { recursive: true });
+fs.writeFileSync(path.join(appWww, "index.html"), html);
+console.log("staged biotherm-app/www/index.html");

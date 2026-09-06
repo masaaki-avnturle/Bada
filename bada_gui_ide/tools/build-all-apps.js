@@ -30,7 +30,8 @@ const builds = [
   "build-planet-cinema.js",  // dist/planet-cinema.html
   "build-geo-signal.js",     // dist/geo-signal.html
   "build-anomaly-map.js",    // dist/anomaly-map.html
-  "build-heat-sense.js"      // dist/heat-sense.html
+  "build-heat-sense.js",     // dist/heat-sense.html
+  "build-bio-therm.js"       // dist/bio-therm.html
 ];
 for (const b of builds) {
   process.stdout.write("• " + b + "  ");
@@ -118,6 +119,20 @@ it in any browser — no install, no dependencies, works offline.
                       (no-communication theorem). Ground zoom movies + sky
                       fov-zoom movies (DSS2), .webm recording. Zero detections
                       to date, stated up front.
+  bio-therm.html      BioThermNet — 知的生命体 熱感知ネットワーク: a wit
+                      network of the discovered exoplanets. The Γ global
+                      integration manifold totals the network's sensed
+                      thermal budget (大域積分 Q = Σ P_bio); the global
+                      differential manifold gives each node's heat gradient
+                      d|V|/dθ on the trefoil Jones curve. Each planet's REAL
+                      measured physics (Kleiber's law P=3.4W·M^0.75 —
+                      validated 70kg→82W —, Stefan-Boltzmann radiator area,
+                      Allen's rule, g=R^1.58·g⊕, star color) deterministically
+                      shapes a procedural intelligent-lifeform illustration,
+                      each feature annotated with its formula; PNG download +
+                      .webm network recording. Honest banner: ZERO detections
+                      of intelligent life as of 2026 — these are
+                      physics-consistent illustrations, not observations.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

@@ -56,6 +56,43 @@ it in any browser — no install, no dependencies, works offline.
                       real special relativity (Lorentz γ, Doppler D, light
                       aberration on the starfield), Jones-heat surface classes,
                       Kepler orbit estimates, and MediaRecorder .webm export.
+  geo-signal.html     GeoSignal — 地球の伝達使用地点シアター: the real places
+                      on Earth (and the ISS overhead) where the EM/gravity
+                      channels are actually in use — deep-space transmitters,
+                      radio telescopes, GW detectors (KAGRA/LIGO/Virgo) —
+                      each viewable as a looping space-to-ground zoom movie
+                      from public map tiles, recordable to .webm. Honest note:
+                      no anti-gravity facility exists.
+  anomaly-map.html    AnomalyMap — 宇宙人らしき信号の場所特定アトラス: the real
+                      signals history seriously considered as possibly alien
+                      (Wow!, BLC1, LGM-1, Parkes perytons, 'Oumuamua, Tabby's
+                      star, FRBs…) with their real coordinates and how each
+                      source was pinpointed (human / natural / still open —
+                      only Wow! remains unresolved). DSS2 sky cutouts + ground
+                      tile views. Honest banner: zero confirmed alien sites.
+  heat-sense.html     HeatSense — 未知の伝達チャネル模索シアター: the real
+                      searches for channels beyond EM/gravity — thermal
+                      (Dyson waste-heat IR, Wien's law computed live with the
+                      Jones heat palette), neutrinos (human comms DEMONSTRATED
+                      at Fermilab 2012; Super-K / IceCube listening), axions
+                      (ADMX), cosmic rays — and entanglement honestly excluded
+                      (no-communication theorem). Ground zoom movies + sky
+                      fov-zoom movies (DSS2), .webm recording. Zero detections
+                      to date, stated up front.
+  bio-therm.html      BioThermNet — 知的生命体 熱感知ネットワーク: a wit
+                      network of the discovered exoplanets. The Γ global
+                      integration manifold totals the network's sensed
+                      thermal budget (大域積分 Q = Σ P_bio); the global
+                      differential manifold gives each node's heat gradient
+                      d|V|/dθ on the trefoil Jones curve. Each planet's REAL
+                      measured physics (Kleiber's law P=3.4W·M^0.75 —
+                      validated 70kg→82W —, Stefan-Boltzmann radiator area,
+                      Allen's rule, g=R^1.58·g⊕, star color) deterministically
+                      shapes a procedural intelligent-lifeform illustration,
+                      each feature annotated with its formula; PNG download +
+                      .webm network recording. Honest banner: ZERO detections
+                      of intelligent life as of 2026 — these are
+                      physics-consistent illustrations, not observations.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

@@ -60,6 +60,7 @@
 | [`geo-signal.html`](bada_gui_ide/dist/geo-signal.html) | **GeoSignal 地球の伝達使用地点シアター** — 上のアプリが探す伝達チャネルを**地球側から**見る。**電磁波・重力チャネルが実際に使われている実在の地点**(臼田64m・野辺山45m・**KAGRA神岡**・Goldstone DSN・Green Bank・FAST・LIGO×2・Virgo・ALMA・アレシボ跡 等、実座標13地点)を選ぶと、**宇宙→地表へ連続ズームする特定地域の動画**(Esri/OSM 公開タイル合成・ループ・**⏺.webm録画**)+使用の模様(電磁波リング/重力波紋)を表示。**周辺**として **ISS のライブ位置**(公開API)も地図に表示。反重力施設は地球上に存在しない、と正直に明記。オフライン時は簡易描画 |
 | [`anomaly-map.html`](bada_gui_ide/dist/anomaly-map.html) | **AnomalyMap 宇宙人らしき信号の場所特定アトラス** — 歴史上「宇宙人では?」と真剣に検討された**実在の信号・事象**(**Wow!信号**=今も未解決・**BLC1**=プロキシマ方向→人工電波と特定・**LGM-1**=初のパルサーと特定・**パークスのペリュトン**=天文台の電子レンジと特定・オウムアムア・タビーの星・FRB 等11件)を、**実座標の全天アトラス+DSS2実画像の特定ビュー**(地上事象は航空写真タイル)で見る。判定バッジ 🟢未解決/🟡人工と判明/🔵自然と判明 + Rioスケール参考の注目度。**正直な前提を明記: 宇宙人使用が確認された場所は2026年時点でゼロ** |
 | [`heat-sense.html`](bada_gui_ide/dist/heat-sense.html) | **HeatSense 未知の伝達チャネル模索シアター** — Γ多様体の機知 × **Jones多項式の熱エネルギー感知**で、電磁波・重力の先にある**実在の模索**を特定して見る。**🔥 熱感知=本物のダイソン球探索**(廃熱の赤外過剰。**ウィーンの変位則 λ=2898/T μm を実計算**し Jones \|V\| 熱カラー連動)、**🌊 ニュートリノ**(人類が2012年フェルミ研で通信実証済み・スーパーカミオカンデ/IceCube が聴取中)、**⚛ アクシオン**(ADMX)、**🌌 宇宙線**、**🔗 量子もつれは no-communication 定理により禁止と正直に明記**。**地球上の探索地点**(神岡・南極点・フェルミ研 等)は宇宙→地表ズーム動画、**他の場所(天球)**はタビーの星・M31・銀河中心へ **DSS2 実画像の視野縮小ズーム動画**(30°→0.15°)。**⏺.webm録画**。検出例ゼロ(2026)を冒頭に明記 |
+| [`bio-therm.html`](bada_gui_ide/dist/bio-therm.html) | **BioThermNet 知的生命体 熱感知ネットワーク** — **Γ関数の大域的(部分)積分多様体の機知**と**Jones多項式の熱感知**を合わせた**機知ネットワーク**。発見済み惑星(実測値)をノードとし、**大域積分=網の総熱量 Q=ΣP_bio** をΓ部分積分恒等式の自己検証つきで集計、**大域的微分多様体=各ノードの熱勾配 d\|V\|/dθ**(三つ葉Jones曲線の数値微分)を矢印表示、熱パルスがアニメーション(**⏺.webm録画**)。**👁 感知された知的生命体のグラフィックス**: 各惑星の**実測物理から決定論的に生命体の姿を描画** — **クライバーの法則 P=3.4W·M^0.75**(ヒト70kg→82Wで実証)、**シュテファン=ボルツマン放熱面積 A=P/(εσ(Tb⁴−Tenv⁴))**→放熱フィン/大きな耳、**アレンの法則**(寒冷→毛皮・コンパクト)、**表面重力 g=R^1.58g⊕**→体格・脚の本数、**恒星色**→目の大きさと色、日射→保護色素 — 全部位に導出式を注記、**PNG保存**。**正直な前提を冒頭に明記: 知的生命体の検出は2026年時点でゼロ**(観測画像ではなく物理整合イラスト) |
 | [`bada-zone.html`](bada_gui_ide/dist/bada-zone.html) | zone.bada ランナー(開くと自動実行) |
 
 **一括ダウンロード(zip)**: [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `bada-ultranetwork-apps.zip`。[`apps-dist.yml`](.github/workflows/apps-dist.yml) が `apps-v*` タグ / `workflow_dispatch` で生成・添付します。自分で生成する場合は `node bada_gui_ide/tools/build-all-apps.js`。
@@ -148,15 +149,19 @@
 
 Ubuntu ではキー送出に `xdotool`(X11 推奨)、`uno`/`sum(Calc)`/`ruby(Writer)` に `python3-uno` を利用します。ビルドは [`madokey-app-build.yml`](.github/workflows/madokey-app-build.yml)([`bada_gui_ide/madokey-app/`](bada_gui_ide/madokey-app/))。Ubuntu の AppImage / deb はローカルビルド確認済み。
 
-**宇宙3アプリ — Orbita / GammaTwin / PlanetCinema** もネイティブ アプリを用意しています(1つのワークフローでまとめてビルド):
+**宇宙7アプリ — Orbita / GammaTwin / PlanetCinema / GeoSignal / AnomalyMap / HeatSense / BioThermNet** もネイティブ アプリを用意しています(1つのワークフローでまとめてビルド):
 
 | アプリ | Android (APK) | Windows 10 / 11 | Ubuntu |
 |:---|:---|:---|:---|
 | **Orbita**(衛星から見る地球) | `orbita-debug.apk` | `Orbita-*-x64.exe` | `Orbita-*-x86_64.AppImage` / `*-amd64.deb` |
 | **GammaTwin**(地球型惑星ファインダー) | `gammatwin-debug.apk` | `GammaTwin-*-x64.exe` | `GammaTwin-*-x86_64.AppImage` / `*-amd64.deb` |
 | **PlanetCinema**(惑星の動画館) | `planetcinema-debug.apk` | `PlanetCinema-*-x64.exe` | `PlanetCinema-*-x86_64.AppImage` / `*-amd64.deb` |
+| **GeoSignal**(地球の伝達使用地点シアター) | `geosignal-debug.apk` | `GeoSignal-*-x64.exe` | `GeoSignal-*-x86_64.AppImage` / `*-amd64.deb` |
+| **AnomalyMap**(宇宙人らしき信号の場所特定) | `anomalymap-debug.apk` | `AnomalyMap-*-x64.exe` | `AnomalyMap-*-x86_64.AppImage` / `*-amd64.deb` |
+| **HeatSense**(未知の伝達チャネル模索) | `heatsense-debug.apk` | `HeatSense-*-x64.exe` | `HeatSense-*-x86_64.AppImage` / `*-amd64.deb` |
+| **BioThermNet**(知的生命体 熱感知ネットワーク) | `biotherm-debug.apk` | `BioThermNet-*-x64.exe` | `BioThermNet-*-x86_64.AppImage` / `*-amd64.deb` |
 
-ビルドは [`space-apps-build.yml`](.github/workflows/space-apps-build.yml)。Actions の Artifacts **`spaceapps-windows` / `spaceapps-linux` / `spaceapps-android`** から取得できます([`orbita-app/`](bada_gui_ide/orbita-app/)・[`gammatwin-app/`](bada_gui_ide/gammatwin-app/)・[`planetcinema-app/`](bada_gui_ide/planetcinema-app/))。ライブ表示は要ネット(GammaTwin/PlanetCinema はオフライン スナップショット内蔵)。Release への添付は `workflow_dispatch` の `release_tag`(例 `space-v1.1.0`)で。
+ビルドは [`space-apps-build.yml`](.github/workflows/space-apps-build.yml)。Actions の Artifacts **`spaceapps-windows` / `spaceapps-linux` / `spaceapps-android`** から取得できます([`orbita-app/`](bada_gui_ide/orbita-app/)・[`gammatwin-app/`](bada_gui_ide/gammatwin-app/)・[`planetcinema-app/`](bada_gui_ide/planetcinema-app/)・[`geosignal-app/`](bada_gui_ide/geosignal-app/)・[`anomalymap-app/`](bada_gui_ide/anomalymap-app/)・[`heatsense-app/`](bada_gui_ide/heatsense-app/)・[`biotherm-app/`](bada_gui_ide/biotherm-app/))。ライブ表示は要ネット(GammaTwin/PlanetCinema/BioThermNet はオフライン スナップショット内蔵)。Release への添付は `workflow_dispatch` の `release_tag`(例 `space-v1.7.0`)で。
 
 > 直接リンク(右クリック→「名前を付けて保存」でも可):
 > `https://raw.githubusercontent.com/masaaki-avnturle/Bada/main/bada_gui_ide/dist/zone-browser.html`
