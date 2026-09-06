@@ -223,14 +223,16 @@ def pkg_catalog() {
       ["curl",           "8.5.0-2badaos",  "command line tool for transferring data",   "tool",    "/usr/bin/curl"],
       ["wget",           "1.21.4-1badaos", "retrieves files from the web",              "tool",    "/usr/bin/wget"],
       ["coreutils",      "9.4-3badaos",    "GNU core utilities (Linux 一式)",           "tool",    "/usr/bin/coreutils"],
-      ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"]
+      ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"],
+      ["bluez",          "5.71-1badaos",   "Bluetooth tools and daemons (quantum pairing)", "tool", "/usr/bin/bluetoothctl"],
+      ["usbutils",       "017-3badaos",    "Linux USB utilities (lsusb)",               "tool",    "/usr/bin/lsusb"]
     ]
 }
 
 # packages that sysinst PREINSTALLS (the Linux suite works at once)
 def pkg_preinstalled() {
     return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
-            "curl", "wget", "net-tools"]
+            "curl", "wget", "net-tools", "bluez", "usbutils"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1078,6 +1080,11 @@ def os_dmesg(emit, vm, st) {
     }
     tty(emit, "cd0 at atapibus0 drive 1: <BADAVM CD-ROM> cdrom removable")
     tty(emit, "wm0 at pci0: BadaVM NAT Ethernet, address " + vm[4])
+    tty(emit, "wm0: NAT gateway 10.0.2.2, dns 10.0.2.3 (recognized)")
+    tty(emit, "xhci0 at pci0: quantum xHCI USB 3.2 controller")
+    tty(emit, "uhub0 at xhci0: quantum USB hub, 8 ports (usb connectors recognized)")
+    tty(emit, "umass0 at uhub0 port 2: Quantum USB stick <0bada:5150>, USB 3.2")
+    tty(emit, "ubt0 at uhub0 port 1: Quantum Bluetooth 5.3 adapter (Bell-pair pairing)")
     tty(emit, "wsdisplay0 at vga0: console emulation, exported to BadaX")
     tty(emit, "boot device: " + dsk)
     return 0
@@ -1126,8 +1133,10 @@ def os_bootloader_screen(emit, st) {
     tty(emit, " +==============================================================+")
     tty(emit, " | > 1. BadaOS GNU/Quantum 12.0  (/dev/" + dsk + "a, kernel netbsd.quantum)")
     tty(emit, " |   2. Advanced options for BadaOS                             |")
-    tty(emit, " |   3. Memory test (memtest86+q, Hilbert dim 256)              |")
-    tty(emit, " |   4. OS on other bootable partitions (chainload +1)          |")
+    tty(emit, " |   3. Ubuntu 24.04 LTS         (/dev/" + dsk + "e, os-prober)         |")
+    tty(emit, " |   4. Windows 10               (/dev/" + dsk + "f, chainload +1)      |")
+    tty(emit, " |   5. Windows 11               (/dev/" + dsk + "g, chainload +1)      |")
+    tty(emit, " |   6. Memory test (memtest86+q, Hilbert dim 256)              |")
     tty(emit, " +==============================================================+")
     tty(emit, " | [white/blue menu, yellow bar -- every OS of this machine]    |")
     tty(emit, " +==============================================================+")
@@ -1779,6 +1788,21 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "tuplespace on /akashic type akashic (append-only, quantum)")
         return 0
     }
+    if (cmd == "lsusb") {
+        tty(emit, "Bus 001 Device 001: ID 1d6b:0003 quantum xHCI root hub (USB 3.2)")
+        tty(emit, "Bus 001 Device 002: ID 0bada:5150 Quantum USB stick (BadaOS media)")
+        tty(emit, "Bus 001 Device 003: ID 0a12:5303 Quantum Bluetooth 5.3 adapter (ubt0)")
+        tty(emit, "Bus 001 Device 004: ID 0bada:0x01 BadaX quantum keyboard (uhub0 port 4)")
+        return 0
+    }
+    if (cmd == "bluetoothctl") {
+        tty(emit, "Agent registered")
+        tty(emit, "Controller 00:1B:DC:07:31:88 " + st[2] + " [default]")
+        tty(emit, "\tPowered: yes  Discoverable: yes  Pairable: yes (Bell-pair QKD)")
+        tty(emit, "Device 5C:F3:70:8B:C0:DE BadaPhone (paired, quantum link key)")
+        tty(emit, "Device 44:73:D6:AA:11:22 quantum-earbuds (connected, A2DP)")
+        return 0
+    }
     if (cmd == "grub-install") {
         if (user != "root") { tty(emit, "grub-install: permission denied (try: sudo grub-install)"); return 0 }
         dev := "/dev/r" + st[16] + "d"
@@ -1795,13 +1819,23 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "Generating grub configuration file ...")
         tty(emit, "Found linux image: /netbsd.quantum (BadaOS GNU/Quantum 12.0)")
         tty(emit, "Found BadaOS GNU/Quantum 12.0 on /dev/" + dsk + "a")
+        tty(emit, "os-prober: scanning the machine's other partitions...")
+        tty(emit, "Found Ubuntu 24.04 LTS on /dev/" + dsk + "e (ext4)")
+        tty(emit, "Found Windows Boot Manager (Windows 10) on /dev/" + dsk + "f (ntfs)")
+        tty(emit, "Found Windows Boot Manager (Windows 11) on /dev/" + dsk + "g (ntfs)")
         tty(emit, "Found memtest86+q (Hilbert dim 256)")
         fs_put(st[4], "/boot/grub/grub.cfg",
-            "# regenerated by update-grub\n" +
-            "set default=0\nset timeout=0\n" +
+            "# regenerated by update-grub (+ os-prober + BadaOS Commander)\n" +
+            "set default=0\nset timeout=5\n" +
             "menuentry 'BadaOS GNU/Quantum 12.0 (kernel netbsd.quantum)' {\n" +
             "  badaos_kernel /netbsd.quantum root=/dev/" + dsk + "a\n}\n" +
             "menuentry 'Advanced options for BadaOS' {}\n" +
+            "menuentry 'Ubuntu 24.04 LTS (on /dev/" + dsk + "e)' {\n" +
+            "  linux /boot/vmlinuz root=/dev/" + dsk + "e\n}\n" +
+            "menuentry 'Windows 10 (on /dev/" + dsk + "f)' {\n" +
+            "  chainloader +1\n}\n" +
+            "menuentry 'Windows 11 (on /dev/" + dsk + "g)' {\n" +
+            "  chainloader +1\n}\n" +
             "menuentry 'Memory test (memtest86+q, Hilbert dim 256)' {}")
         tty(emit, "done")
         return 0

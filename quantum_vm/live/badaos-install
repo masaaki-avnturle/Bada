@@ -21,9 +21,10 @@
 #     (never formatted); grub-install adds a separate "BadaOS" entry to the
 #     firmware boot menu next to the existing ones.
 #
-# Modes:
-#   sudo badaos-install                  interactive (free space / one
-#                                        partition / whole disk)
+# Modes (Calamares style):
+#   sudo badaos-install                  interactive (free space / replace a
+#                                        partition / format one partition /
+#                                        whole disk)
 #   sudo badaos-install --auto-free DEV  unattended: install into the largest
 #                                        free region of DEV, keep all existing
 #                                        partitions (VM use; powers off)
@@ -57,14 +58,14 @@ elif [ "${1:-}" = "--run" ]; then
     # non-interactive single run for the GUI installer: no prompts, no
     # poweroff — the GUI shows progress and offers the reboot itself.
     AUTO=1
-    MODE="${2:?usage: badaos-install --run free|part|disk TARGET}"
-    RUNTARGET="${3:?usage: badaos-install --run free|part|disk TARGET}"
+    MODE="${2:?usage: badaos-install --run free|replace|part|disk TARGET}"
+    RUNTARGET="${3:?usage: badaos-install --run free|replace|part|disk TARGET}"
     case "$MODE" in
         free|disk)
             TARGET="$RUNTARGET"
             D="${TARGET#/dev/}"
             ;;
-        part)
+        part|replace)
             RUNPART="$RUNTARGET"
             PK="$(lsblk -nro PKNAME "$RUNPART" | head -1)"
             [ -n "$PK" ] || { echo "cannot find the disk of $RUNPART"; exit 1; }
@@ -97,17 +98,20 @@ case "$D" in nvme*|mmcblk*) P="${TARGET}p";; esac
 
 if [ "$AUTO" = 0 ]; then
     echo
-    echo "Install mode:"
+    echo "Install mode (Calamares style):"
     echo "  1) FREE SPACE (default, keeps everything) -- create ONE new partition"
     echo "     in the unallocated space of $TARGET; no existing partition is touched"
-    echo "  2) ONE EXISTING PARTITION -- format only a partition you name;"
+    echo "  2) REPLACE A PARTITION -- DELETE one partition you name, then install"
+    echo "     BadaOS into the space it frees; every other partition is kept"
+    echo "  3) ONE EXISTING PARTITION -- format only a partition you name;"
     echo "     the rest of the disk is kept"
-    echo "  3) WHOLE DISK -- erase $TARGET completely and install"
-    read -rp "Mode [1/2/3, Enter=1]: " MSEL
+    echo "  4) WHOLE DISK -- erase $TARGET completely and install"
+    read -rp "Mode [1/2/3/4, Enter=1]: " MSEL
     case "${MSEL:-1}" in
         1) MODE=free;;
-        2) MODE=part;;
-        3) MODE=disk;;
+        2) MODE=replace;;
+        3) MODE=part;;
+        4) MODE=disk;;
         *) echo "unknown mode"; exit 1;;
     esac
 fi
@@ -136,6 +140,41 @@ largest_free() {
             # an end coordinate equal to the device end ("outside the device")
             if (best > 0) printf "%d %d %d\n", int(s)+1, int(e)-1, int(e)-int(s)-2
         }'
+}
+
+# --- create + format the BadaOS partition in [START,END] MiB; sets ROOTPART -
+mkpart_region() {
+    RSTART="$1"; REND="$2"
+    BEFORE="$(lsblk -nro NAME "$TARGET")"
+    if [ "$EFI" = 1 ]; then
+        parted -s "$TARGET" unit MiB mkpart badaos ext4 "${RSTART}MiB" "${REND}MiB"
+    else
+        # msdos: try a primary partition, then a logical one (4-primary limit)
+        parted -s "$TARGET" unit MiB mkpart primary ext4 "${RSTART}MiB" "${REND}MiB" || \
+        parted -s "$TARGET" unit MiB mkpart logical ext4 "${RSTART}MiB" "${REND}MiB" || {
+            echo "could not create a partition in the region (msdos partition"
+            echo "limit?). Free a primary slot or format a partition instead."
+            exit 1
+        }
+    fi
+    udevadm settle || sleep 2
+    AFTER="$(lsblk -nro NAME "$TARGET")"
+    NEWNAME="$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)"
+    [ -n "$NEWNAME" ] || { echo "new partition did not appear"; exit 1; }
+    ROOTPART="/dev/$NEWNAME"
+    echo "==> new partition: $ROOTPART (only this one is formatted)"
+    mkfs.ext4 -q -F -L badaos "$ROOTPART"
+}
+
+# --- on UEFI, reuse (never format) the machine's existing ESP --------------
+reuse_esp() {
+    if [ "$EFI" = 1 ]; then
+        ESPPART="$(find_esp)"
+        [ -n "$ESPPART" ] || {
+            echo "UEFI machine but no EFI System Partition found; use whole-disk"
+            echo "mode on an empty disk instead."; exit 1; }
+        echo "==> reusing the existing EFI System Partition $ESPPART (NOT formatted)"
+    fi
 }
 
 case "$MODE" in
@@ -169,32 +208,69 @@ free)
     else
         echo "    (unattended VM mode: using the free space of $TARGET)"
     fi
-    BEFORE="$(lsblk -nro NAME "$TARGET")"
-    if [ "$EFI" = 1 ]; then
-        parted -s "$TARGET" unit MiB mkpart badaos ext4 "${FSTART}MiB" "${FEND}MiB"
+    mkpart_region "$FSTART" "$FEND"
+    reuse_esp
+    ;;
+# ---------------------------------------------------------------------------
+replace)
+    # Calamares-style "replace a partition": DELETE the chosen partition,
+    # then install BadaOS into the space it frees (merged with any free
+    # space right next to it). Everything else on the disk is kept.
+    if [ "$AUTO" = 1 ]; then
+        PN="${RUNPART#/dev/}"
     else
-        # msdos: try a primary partition, then a logical one (4-primary limit)
-        parted -s "$TARGET" unit MiB mkpart primary ext4 "${FSTART}MiB" "${FEND}MiB" || \
-        parted -s "$TARGET" unit MiB mkpart logical ext4 "${FSTART}MiB" "${FEND}MiB" || {
-            echo "could not create a partition in the free region (msdos partition"
-            echo "limit?). Free a primary slot or use an existing partition (mode 2)."
-            exit 1
-        }
+        read -rp "Partition to DELETE and replace with BadaOS (e.g. ${D}3): " PN
     fi
+    VICTIM="/dev/$PN"
+    [ -b "$VICTIM" ] || { echo "no such partition: $VICTIM"; exit 1; }
+    PK="$(lsblk -nro PKNAME "$VICTIM" | head -1)"
+    [ "$PK" = "$D" ] || { echo "$VICTIM is not a partition of $TARGET"; exit 1; }
+    if findmnt -no TARGET "$VICTIM" >/dev/null 2>&1; then
+        echo "$VICTIM is mounted; unmount it first."; exit 1
+    fi
+    case "$LIVEDEV" in "$VICTIM"*) echo "that is the live medium itself"; exit 1;; esac
+    PTYPE="$(blkid -p -o value -s PART_ENTRY_TYPE "$VICTIM" 2>/dev/null || true)"
+    case "$(echo "$PTYPE" | tr 'A-Z' 'a-z')" in
+        0xef|c12a7328-f81f-11d2-ba4b-00a0c93ec93b)
+            echo "$VICTIM is the EFI System Partition -- refusing to delete it."
+            exit 1;;
+    esac
+    PNUM="$(echo "$PN" | sed 's/^.*[^0-9]//')"
+    VSTART="$(parted -s -m "$TARGET" unit MiB print 2>/dev/null | tr -d ';' | \
+        awk -F: -v n="$PNUM" '$1==n { gsub(/MiB/,""); printf "%d", $2+0 }')"
+    [ -n "$VSTART" ] || { echo "cannot read the start of $VICTIM"; exit 1; }
+    echo
+    echo "  *** $VICTIM WILL BE DELETED (its data is lost); BadaOS will be ***"
+    echo "  *** installed in its place. All OTHER partitions are kept.     ***"
+    if [ "$AUTO" = 0 ]; then
+        read -rp "Type exactly 'REPLACE $PN' to continue: " CONFIRM
+        [ "$CONFIRM" = "REPLACE $PN" ] || { echo "aborted."; exit 1; }
+    else
+        echo "  (non-interactive: replacing $VICTIM)"
+    fi
+    parted -s "$TARGET" rm "$PNUM"
     udevadm settle || sleep 2
-    AFTER="$(lsblk -nro NAME "$TARGET")"
-    NEWNAME="$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)"
-    [ -n "$NEWNAME" ] || { echo "new partition did not appear"; exit 1; }
-    ROOTPART="/dev/$NEWNAME"
-    echo "==> new partition: $ROOTPART (only this one is formatted)"
-    mkfs.ext4 -q -F -L badaos "$ROOTPART"
-    if [ "$EFI" = 1 ]; then
-        ESPPART="$(find_esp)"
-        [ -n "$ESPPART" ] || {
-            echo "UEFI machine but no EFI System Partition found; use whole-disk"
-            echo "mode (3) on an empty disk instead."; exit 1; }
-        echo "==> reusing the existing EFI System Partition $ESPPART (NOT formatted)"
+    echo "==> $VICTIM deleted; installing BadaOS into the freed space"
+    # the free region that contains the deleted partition's start
+    REGION="$(parted -s -m "$TARGET" unit MiB print free 2>/dev/null | tr -d ';' | \
+        awk -F: -v vs="$VSTART" '$5=="free" {
+            gsub(/MiB/,""); s=$2+0; e=$3+0
+            if (s <= vs+1 && vs < e) {
+                printf "%d %d %d\n", int(s)+1, int(e)-1, int(e)-int(s)-2; exit
+            }
+        }')"
+    [ -n "$REGION" ] || { echo "freed region not found on $TARGET"; exit 1; }
+    FSTART="$(echo "$REGION" | awk '{print $1}')"
+    FEND="$(echo "$REGION" | awk '{print $2}')"
+    FSIZE="$(echo "$REGION" | awk '{print $3}')"
+    if [ "$FSIZE" -lt "$MIN_MB" ]; then
+        echo "the freed region (${FSIZE} MiB) is smaller than the ${MIN_MB} MiB"
+        echo "BadaOS needs. Pick a bigger partition to replace."
+        exit 1
     fi
+    echo "==> freed region: ${FSIZE} MiB (${FSTART}MiB - ${FEND}MiB)"
+    mkpart_region "$FSTART" "$FEND"
+    reuse_esp
     ;;
 # ---------------------------------------------------------------------------
 part)

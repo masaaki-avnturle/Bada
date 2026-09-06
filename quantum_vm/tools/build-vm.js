@@ -118,6 +118,8 @@ function run(events) {
     ["line", "which grub-install"],       // 53 boot-loader tools preinstalled
     ["line", "grub-install /dev/rrd0d"],  // 54 GRUB into the MBR (table kept)
     ["line", "update-grub"],              // 55 re-register the OS in the menu
+    ["line", "lsusb"],                    // 56 USB connectors recognized
+    ["line", "bluetoothctl"],             // 57 Bluetooth recognized (bluez)
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -138,6 +140,9 @@ function run(events) {
     [10, "Creating first user account 'bada'"],
     [11, "GNU GRUB  version 2.12"],         // boots through the GRUB menu
     [11, "BadaOS Commander -- OS Selection"], // System Commander-style chooser
+    [11, "Ubuntu 24.04 LTS"],               // ... listing the other OSes too
+    [11, "Windows 10"],
+    [11, "Windows 11"],
     [11, "Starting sshd."],                 // preinstalled daemons start at boot
     [11, "Starting xinetd."],
     [11, "login:"],
@@ -191,6 +196,12 @@ function run(events) {
     [53, "@@TTY /usr/sbin/grub-install"],   // grub-install/update-grub preinstalled
     [54, "Installation finished. No error reported."],
     [55, "Found BadaOS GNU/Quantum 12.0 on /dev/rd0a"],
+    [55, "Found Ubuntu 24.04 LTS on /dev/rd0e"],          // os-prober lists the
+    [55, "Found Windows Boot Manager (Windows 10)"],      // machine's other OSes
+    [55, "Found Windows Boot Manager (Windows 11)"],
+    [56, "Quantum USB stick"],              // usb connectors recognized (lsusb)
+    [56, "Quantum Bluetooth 5.3 adapter"],
+    [57, "quantum-earbuds (connected, A2DP)"], // bluetoothctl works (bluez)
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -215,7 +226,8 @@ function run(events) {
   console.log("self-check OK: install(rd0, LILO->MBR/GRUB, preinstalled vim/emacs/sshd/xinetd)" +
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
-    " -> grub-install/update-grub (" + tape.length + " ledger events)");
+    " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
+    " (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

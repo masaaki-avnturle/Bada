@@ -59,7 +59,8 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     xserver-xorg xinit openbox chromium fonts-noto-cjk \
     kbd sudo rsync parted dosfstools e2fsprogs \
     grub2-common grub-pc-bin grub-efi-amd64-bin os-prober ntfs-3g \
-    vim emacs-nox openssh-server curl wget less ca-certificates
+    vim emacs-nox openssh-server curl wget less ca-certificates \
+    bluez usbutils
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 
@@ -75,12 +76,15 @@ DHCP=yes
 EOF
 chroot "$CHROOT" systemctl enable systemd-networkd systemd-resolved ssh 2>/dev/null || \
 chroot "$CHROOT" systemctl enable systemd-networkd ssh || true
+# Bluetooth: bluetoothd starts when an adapter is present (bluetoothctl ready)
+chroot "$CHROOT" systemctl enable bluetooth 2>/dev/null || true
 ln -sf /run/systemd/resolve/resolv.conf "$CHROOT/etc/resolv.conf" || true
 
 cat > "$CHROOT/etc/motd" <<'EOF'
 BadaOS GNU/Quantum 12.0 -- the real machine build
 
   * vim / emacs / sshd / xinetd / grub-install / update-grub preinstalled
+  * bluetoothctl (bluez) + lsusb (usbutils) preinstalled; DHCP NAT networking
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>
   * install to the real disk:  sudo badaos-install

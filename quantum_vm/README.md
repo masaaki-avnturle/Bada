@@ -43,6 +43,9 @@
    apt search NAME / apt remove NAME         # 検索・削除も Ubuntu 同様
    vim /etc/motd  /  emacs /etc/rc.conf      # プリインストール済みエディタ
    grub-install / update-grub                # ブートローダ工具も最初から入っています
+                                             #   (update-grub は os-prober 流に Ubuntu /
+                                             #    Windows 10 / Windows 11 もメニューに登録)
+   lsusb / bluetoothctl                      # USB コネクタと Bluetooth も認識済み
    su - bada                                 # root → 一般ユーザー (プロンプトが $ に)
    sudo apt update                           # 一般ユーザーから root 権限で 1 コマンド
    su                                        # 一般ユーザー → root (パスワード入力)

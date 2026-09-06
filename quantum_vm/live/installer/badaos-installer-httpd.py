@@ -150,7 +150,7 @@ class H(http.server.BaseHTTPRequestHandler):
         if self.path == "/api/install":
             mode = (form.get("mode") or [""])[0]
             target = (form.get("target") or [""])[0]
-            if mode not in ("free", "part", "disk") or not re.match(r"^/dev/[a-z0-9]+$", target):
+            if mode not in ("free", "replace", "part", "disk") or not re.match(r"^/dev/[a-z0-9]+$", target):
                 self._send(400, '{"error":"bad request"}')
                 return
             with lock:

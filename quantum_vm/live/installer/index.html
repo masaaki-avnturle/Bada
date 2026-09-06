@@ -156,8 +156,9 @@ function segsOf(disk, mode) {
       cls = "fs-new"; label = "BadaOS (新規)"; sub = fmtG(sg.sizeMiB);
       return { cls: cls, label: label, sub: sub, w: sg.sizeMiB, white: 1 };
     }
-    if (mode === "part" && st.part && sg.name === st.part) {
-      cls = "fs-new"; label = "BadaOS"; return { cls, label, sub, w: sg.sizeMiB, white: 1 };
+    if ((mode === "part" || mode === "replace") && st.part && sg.name === st.part) {
+      cls = "fs-new"; label = mode === "replace" ? "BadaOS (置き換え)" : "BadaOS";
+      return { cls, label, sub, w: sg.sizeMiB, white: 1 };
     }
     return { cls: cls, label: label, sub: sub, w: sg.sizeMiB, white: 0 };
   });
@@ -176,6 +177,20 @@ function barHTML(disk, mode) {
 }
 
 function curDisk() { return data.disks.find(d => d.dev === st.disk) || data.disks[0]; }
+
+/* space freed by deleting partition `name` (its size + free space next to it) */
+function freedSize(d, name) {
+  const segs = d.segments;
+  for (let i = 0; i < segs.length; i++) {
+    if (segs[i].type === "part" && segs[i].name === name) {
+      let s = segs[i].sizeMiB;
+      if (i > 0 && segs[i - 1].type === "free") s += segs[i - 1].sizeMiB;
+      if (i + 1 < segs.length && segs[i + 1].type === "free") s += segs[i + 1].sizeMiB;
+      return s;
+    }
+  }
+  return 0;
+}
 
 /* ---------------- pages ---------------- */
 function pageWelcome() {
@@ -196,6 +211,11 @@ function pageType() {
     <b>空き領域にインストール</b> <span class="safe">(推奨・何も消えません)</span>
     <div class="desc">ディスクの未割り当て領域に BadaOS 用のパーティションを 1 個だけ作ります。
     既存の OS・パーティション・データはそのまま残り、起動時のメニューに BadaOS が並びます。</div></label>
+  <label class="card"><input type="radio" name="mode" value="replace" ${st.mode === "replace" ? "checked" : ""}>
+    <b>パーティションを削除して置き換え</b> (Calamares の「置き換え」)
+    <div class="desc">選んだパーティション 1 個を<span class="warn">削除</span>し、空いた場所に
+    BadaOS をインストールします(隣に空き領域があれば合わせて使います)。
+    <span class="safe">それ以外のパーティションと OS はそのまま残ります。</span></div></label>
   <label class="card"><input type="radio" name="mode" value="part" ${st.mode === "part" ? "checked" : ""}>
     <b>パーティションを指定してインストール</b>
     <div class="desc">選んだパーティション 1 個だけをフォーマットして使います。それ以外は残ります。</div></label>
@@ -216,6 +236,17 @@ function pageDisk() {
          <b>/dev/${p.name}</b> — ${fmtG(p.sizeMiB)} ${p.fstype || ""} ${p.label ? "(" + p.label + ")" : ""}
          <div class="desc warn">このパーティションの中身は消えます。他はそのままです。</div></label>`).join("")
       : "<p class='lead warn'>このディスクに 4 GB 以上の使えるパーティションがありません。</p>";
+  }
+  if (st.mode === "replace") {
+    const parts = d.segments.filter(s => s.type === "part" && !s.esp && freedSize(d, s.name) >= MIN_MB);
+    extra = parts.length
+      ? "<p class='lead'>削除して BadaOS に置き換えるパーティション:</p>" + parts.map(p =>
+        `<label class="card"><input type="radio" name="part" value="${p.name}" ${st.part === p.name ? "checked" : ""}>
+         <b>/dev/${p.name}</b> — ${fmtG(p.sizeMiB)} ${p.fstype || ""} ${p.label ? "(" + p.label + ")" : ""}
+         → BadaOS 用に <b>${fmtG(freedSize(d, p.name))}</b> 空きます
+         <div class="desc"><span class="warn">このパーティションは削除され、中のデータは消えます。</span>
+         それ以外のパーティションと OS は残ります。</div></label>`).join("")
+      : "<p class='lead warn'>このディスクに置き換えられるパーティション(削除で 4 GB 以上空くもの)がありません。</p>";
   }
   let note;
   if (st.mode === "free") {
@@ -241,6 +272,10 @@ function pageConfirm() {
   if (st.mode === "free") {
     acts.push(`${d.dev} の空き領域に <b>${fmtG(d.bestFree)}</b> の新しいパーティションを作成 (ext4)`);
     acts.push(`<span class="safe">既存のパーティションと OS はすべてそのまま残します</span>`);
+  } else if (st.mode === "replace") {
+    acts.push(`<b>/dev/${st.part}</b> を<span class="warn">削除</span>(中のデータは消えます)`);
+    acts.push(`空いた場所 (<b>${fmtG(freedSize(d, st.part))}</b>) に BadaOS のパーティションを作成 (ext4)`);
+    acts.push(`<span class="safe">他のパーティションと OS はすべてそのまま残します</span>`);
   } else if (st.mode === "part") {
     acts.push(`<b>/dev/${st.part}</b> をフォーマット (ext4) — <span class="warn">この 1 個の中身だけ消えます</span>`);
     acts.push(`<span class="safe">他のパーティションはそのまま残します</span>`);
@@ -290,7 +325,7 @@ function canNext() {
   if (step === 2) {
     const d = curDisk();
     if (st.mode === "free") return d.bestFree >= MIN_MB;
-    if (st.mode === "part") return !!st.part;
+    if (st.mode === "part" || st.mode === "replace") return !!st.part;
   }
   return true;
 }
@@ -308,9 +343,9 @@ function render() {
   $("btn-next").disabled = !canNext();
   if (step === 4) { $("btn-next").classList.add("hidden"); } else { $("btn-next").classList.remove("hidden"); }
   c.querySelectorAll("input[name=mode]").forEach(r =>
-    r.addEventListener("change", () => { st.mode = r.value; }));
+    r.addEventListener("change", () => { st.mode = r.value; st.part = null; }));
   c.querySelectorAll("input[name=part]").forEach(r =>
-    r.addEventListener("change", () => { st.part = r.value; $("btn-next").disabled = !canNext(); }));
+    r.addEventListener("change", () => { st.part = r.value; render(); }));
   const sel = $("disksel");
   if (sel) sel.addEventListener("change", () => { st.disk = sel.value; st.part = null; render(); });
   $("btn-next").focus();
@@ -318,7 +353,7 @@ function render() {
 
 async function start() {
   const d = curDisk();
-  const target = st.mode === "part" ? "/dev/" + st.part : d.dev;
+  const target = (st.mode === "part" || st.mode === "replace") ? "/dev/" + st.part : d.dev;
   step = 4; render();
   slideTimer = setInterval(() => {
     slideIx = (slideIx + 1) % SLIDES.length;
@@ -334,6 +369,7 @@ const PHASES = [
   [/==> update-grub/, "起動メニューに登録しています (update-grub + os-prober)…", 90],
   [/==> grub-install/, "ブートローダを書き込んでいます (grub-install)…", 82],
   [/==> copying the system/, "システムをコピーしています…", 15],
+  [/deleted; installing BadaOS|freed region:/, "パーティションを置き換えています…", 8],
   [/==> new partition|==> largest FREE|==> UEFI machine|==> BIOS machine|ONLY .* will be formatted/, "パーティションを準備しています…", 6],
 ];
 
