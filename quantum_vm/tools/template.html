@@ -171,6 +171,25 @@
   .xwin .istat { background:#efe7f3; border-top:1px solid #d8c8e0; padding:2px 6px;
                  font:9.5px "Cascadia Mono",Consolas,monospace; color:#534; white-space:nowrap;
                  overflow:hidden; text-overflow:ellipsis; }
+  /* ===== w9wm mode: Plan 9 look — plain borders, no title bars ===== */
+  #xroot.w9 { background:#9e9e9e; background-image:none; }
+  #xroot.w9 .xwin { border:4px solid #262626; border-radius:0; box-shadow:none; background:#dcdcdc; }
+  #xroot.w9 .xwin .tbar { display:none; }
+  #w9desks { position:absolute; top:6px; left:6px; z-index:50; display:none; align-items:center;
+             gap:3px; background:#c8c8c8; border:1px solid #444; padding:3px 5px;
+             font:10px monospace; color:#222; }
+  #xroot.w9 #w9desks { display:flex; }
+  #w9desks b { margin-right:3px; font-size:9.5px; }
+  #w9desks button { width:20px; height:15px; border:1px solid #444; background:#e4e4e4;
+                    font:9px monospace; cursor:pointer; padding:0; }
+  #w9desks button.cur { background:#4c7a7a; color:#fff; }
+  #w9menu { position:absolute; z-index:60; display:none; background:#e8e8e8; color:#111;
+            border:2px solid #262626; font:11.5px monospace; min-width:130px; }
+  #w9menu div { padding:3px 10px; cursor:pointer; white-space:nowrap; }
+  #w9menu div:hover { background:#4c7a7a; color:#fff; }
+  #w9menu div.sep { border-top:1px solid #999; margin-top:2px; padding-top:4px; cursor:default; }
+  #w9menu div.dim { color:#888; cursor:default; }
+  #w9menu div.dim:hover { background:inherit; color:#888; }
   .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
                        color:#d8f3d8; background:#101210; height:100%; overflow:auto;
                        outline:none; white-space:pre-wrap; word-break:break-all; cursor:text; }
@@ -332,6 +351,8 @@
   </div>
   <div id="xmenu"><span>ファイル</span><span>表示</span><span id="xmenu-info">情報</span><span>ヘルプ</span></div>
   <div id="xroot">
+    <div id="w9desks"><b>w9wm</b></div>
+    <div id="w9menu"></div>
     <div id="xempty">X クライアント待機中…<br/>
       <small>BadaBSD 側で&nbsp; <code>xclock &amp;</code> / <code>xeyes &amp;</code> /
       <code>xterm &amp;</code> &nbsp;を実行してください</small></div>
@@ -915,6 +936,8 @@ var VM_LIBS = __VM_LIBS_JSON__;
       /* applied after the full run in applyScene() */
     } else if (op === "UNMAP") {
       /* scene repaint covers it */
+    } else if (op === "WM") {
+      setWM(rest);
     }
   }
   function xconn(val) {
@@ -922,7 +945,83 @@ var VM_LIBS = __VM_LIBS_JSON__;
     $("xs-clients").textContent = "clients: " + (p[1] || "0");
     $("st-x").textContent = (p[0] === "1") ? "BadaX: 接続中 (cookie " + (p[2] || "?") + ")" : "BadaX: 未接続";
   }
-  function applyScene() { if (sceneBuf != null) xScene(sceneBuf); }
+  /* ===== w9wm: Plan 9 style window management on the BadaX display =====
+     `w9wm &` in the guest emits @@X WM w9wm -> plain 4px borders, no title
+     bars, 4 virtual desktops (the w9wm box bar), B3 menus on windows and
+     the root. `twm &` restores the title-bar look. Desk assignment and
+     hiding are host-side WM state, like a real window manager's. */
+  var wmMode = "twm", curDesk = 0, winDesk = {}, winHidden = {};
+  (function () {
+    var bar = $("w9desks");
+    for (var d = 0; d < 4; d++) (function (d) {
+      var b = document.createElement("button");
+      b.textContent = String(d + 1);
+      b.addEventListener("click", function () { curDesk = d; applyWM(); });
+      bar.appendChild(b);
+    })(d);
+  })();
+  function setWM(m) {
+    if (m !== "w9wm") m = "twm";
+    if (m !== wmMode) { wmMode = m; if (m === "twm") winHidden = {}; }
+    applyWM();
+  }
+  function applyWM() {
+    xroot.classList.toggle("w9", wmMode === "w9wm");
+    var btns = $("w9desks").querySelectorAll("button");
+    for (var i = 0; i < btns.length; i++) btns[i].className = (i === curDesk) ? "cur" : "";
+    for (var id in xwins) {
+      var vis = wmMode !== "w9wm" || (((winDesk[id] || 0) === curDesk) && !winHidden[id]);
+      xwins[id].el.style.display = vis ? "" : "none";
+    }
+    w9CloseMenu();
+  }
+  function w9CloseMenu() { $("w9menu").style.display = "none"; }
+  function w9Menu(items, x, y) {
+    var m = $("w9menu");
+    m.innerHTML = "";
+    for (var i = 0; i < items.length; i++) (function (it) {
+      var d = document.createElement("div");
+      d.textContent = it.label;
+      if (it.cls) d.className = it.cls;
+      if (it.fn) d.addEventListener("click", function (e) { e.stopPropagation(); w9CloseMenu(); it.fn(); });
+      m.appendChild(d);
+    })(items[i]);
+    var r = xroot.getBoundingClientRect();
+    m.style.left = Math.max(0, Math.min(x - r.left, r.width - 150)) + "px";
+    m.style.top = Math.max(0, Math.min(y - r.top, r.height - 40)) + "px";
+    m.style.display = "block";
+  }
+  document.addEventListener("mousedown", function (e) {
+    if (!$("w9menu").contains(e.target)) w9CloseMenu();
+  });
+  xroot.addEventListener("contextmenu", function (e) {
+    if (wmMode !== "w9wm") return;
+    e.preventDefault();
+    var el = e.target, winId = null;
+    while (el && el !== xroot && !winId) {
+      for (var id in xwins) if (xwins[id].el === el) { winId = id; }
+      if (!winId) el = el.parentNode;
+    }
+    var items = [];
+    if (winId) {
+      items.push({ label: "Hide", fn: (function (id) { return function () { winHidden[id] = true; applyWM(); }; })(winId) });
+      for (var d = 0; d < 4; d++) if (d !== (winDesk[winId] || 0))
+        items.push({ label: "To desk " + (d + 1), fn: (function (id, dd) { return function () { winDesk[id] = dd; applyWM(); }; })(winId, d) });
+      items.push({ label: "Delete", fn: (function (id) { return function () { send(["xclose", +id]); }; })(winId) });
+    } else {
+      if (mode === "line") items.push({ label: "New (xterm)", fn: function () { send(["line", "xterm &"]); } });
+      else items.push({ label: "New (xterm)", cls: "dim" });
+      var any = false;
+      for (var hid in winHidden) if (winHidden[hid] && xwins[hid]) {
+        if (!any) { items.push({ label: "-- hidden --", cls: "sep dim" }); any = true; }
+        items.push({ label: (xwins[hid].cls || "win") + " (" + hid + ")",
+          fn: (function (id) { return function () { delete winHidden[id]; applyWM(); }; })(hid) });
+      }
+    }
+    w9Menu(items, e.clientX, e.clientY);
+  });
+
+  function applyScene() { if (sceneBuf != null) xScene(sceneBuf); applyWM(); }
 
   function xScene(rows) {
     var keep = {};
@@ -936,6 +1035,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     for (var id2 in xwins) if (!keep[id2]) {
       xroot.removeChild(xwins[id2].el); delete xwins[id2];
       delete xtermData[id2]; delete zoneData[id2]; delete instaData[id2];
+      delete winDesk[id2]; delete winHidden[id2];
     }
     var count = 0; for (var k in xwins) count++;
     $("xempty").style.display = count ? "none" : "flex";
@@ -1014,6 +1114,25 @@ var VM_LIBS = __VM_LIBS_JSON__;
     }
     bx.addEventListener("click", function () { send(["xclose", +id]); });
     dragify(el, tb, xroot, function (nx, ny) { send(["xmove", +id, nx, ny]); });
+    /* w9wm mode: no title bar, so the 4px border itself drags the window */
+    el.addEventListener("mousedown", function (e) {
+      if (wmMode !== "w9wm" || e.target !== el || e.button !== 0) return;
+      e.preventDefault();
+      var sx = e.clientX, sy = e.clientY, ox = el.offsetLeft, oy = el.offsetTop;
+      function mv(ev) {
+        el.style.left = (ox + ev.clientX - sx) + "px";
+        el.style.top = (oy + ev.clientY - sy) + "px";
+      }
+      function up() {
+        document.removeEventListener("mousemove", mv);
+        document.removeEventListener("mouseup", up);
+        send(["xmove", +id, el.offsetLeft, el.offsetTop]);
+      }
+      document.addEventListener("mousemove", mv);
+      document.addEventListener("mouseup", up);
+    });
+    /* windows map on the w9wm desk that is currently visible */
+    winDesk[id] = (wmMode === "w9wm") ? curDesk : 0;
     xroot.appendChild(el);
     return win;
   }

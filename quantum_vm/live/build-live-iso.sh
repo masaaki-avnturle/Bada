@@ -63,6 +63,10 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     bluez usbutils
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
+# the real w9wm (or its parent 9wm) as an alternative window manager --
+# best effort, whichever the suite still ships
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq w9wm || \
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq 9wm || true
 
 # real networking (DHCP on every ethernet NIC) so `apt` reaches the FULL
 # Debian archive -- 60,000+ packages, the same class as Ubuntu.
@@ -129,7 +133,19 @@ EOF
 
 cat > "$CHROOT/home/bada/.xinitrc" <<'EOF'
 xset -dpms s off
-openbox --sm-disable &
+# window manager: openbox by default (reliable for the kiosk); boot with the
+# kernel arg badaos.wm=w9wm (or run `WM=w9wm startx` from the console) to use
+# the real Plan 9 style w9wm -- falls back to 9wm, then openbox
+WMBIN=openbox
+if [ "${WM:-}" = "w9wm" ] || grep -q badaos.wm=w9wm /proc/cmdline; then
+  if command -v w9wm >/dev/null 2>&1; then WMBIN=w9wm
+  elif command -v 9wm >/dev/null 2>&1; then WMBIN=9wm; fi
+fi
+if [ "$WMBIN" = openbox ]; then
+  openbox --sm-disable &
+else
+  "$WMBIN" &
+fi
 # "Install BadaOS" GRUB entry: open the Ubuntu-style GUI installer instead
 # of the BadaOS environment (wait for its local backend to come up first)
 URL="file:///opt/badaos/bada-vm-pro.html#autoboot"

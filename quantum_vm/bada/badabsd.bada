@@ -67,11 +67,12 @@ APT_MIRROR := "http://archive.badaos.or.jp"
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
             "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
-            "wd0", [], [], [], [], "en"]
+            "wd0", [], [], [], [], "en", "twm"]
 }
 
 # 21: installer language ("en" | "ja") -- picked on the sysinst welcome
 # screen (or the one-screen GUI setup dialog of the host chrome)
+# 22: the window manager running on the BadaX display ("twm" | "w9wm")
 def trs(st, en, ja) {
     if (st[21] == "ja") { return ja }
     return en
@@ -225,14 +226,15 @@ def pkg_catalog() {
       ["coreutils",      "9.4-3badaos",    "GNU core utilities (Linux 一式)",           "tool",    "/usr/bin/coreutils"],
       ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"],
       ["bluez",          "5.71-1badaos",   "Bluetooth tools and daemons (quantum pairing)", "tool", "/usr/bin/bluetoothctl"],
-      ["usbutils",       "017-3badaos",    "Linux USB utilities (lsusb)",               "tool",    "/usr/bin/lsusb"]
+      ["usbutils",       "017-3badaos",    "Linux USB utilities (lsusb)",               "tool",    "/usr/bin/lsusb"],
+      ["w9wm",           "0.4.2-1badaos",  "Plan 9 style window manager with virtual screens (9wm fork)", "tool", "/usr/X11R7/bin/w9wm"]
     ]
 }
 
 # packages that sysinst PREINSTALLS (the Linux suite works at once)
 def pkg_preinstalled() {
     return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
-            "curl", "wget", "net-tools", "bluez", "usbutils"]
+            "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1788,6 +1790,21 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "tuplespace on /akashic type akashic (append-only, quantum)")
         return 0
     }
+    if (list_has(["w9wm", "twm"], cmd) == 1) {
+        if (st[10] == 0) {
+            tty(emit, cmd + ": cannot open display " + OS_DISPLAY + " (run an X client first, e.g. xterm &)")
+            return 0
+        }
+        st[22] = cmd
+        if (cmd == "w9wm") {
+            tty(emit, "w9wm 0.4.2 (quantum) -- Plan 9 style window manager, now managing BadaX")
+            tty(emit, "virtual desktops: 4  (switch with the w9wm box bar on the root window)")
+            tty(emit, "B3 (right click) on a window: Hide / To desk / Delete;  on the root: New xterm / unhide")
+        } else {
+            tty(emit, "twm: BadaX window manager restored (title bars, all desks merged)")
+        }
+        return 0
+    }
     if (cmd == "lsusb") {
         tty(emit, "Bus 001 Device 001: ID 1d6b:0003 quantum xHCI root hub (USB 3.2)")
         tty(emit, "Bus 001 Device 002: ID 0bada:5150 Quantum USB stick (BadaOS media)")
@@ -2212,6 +2229,7 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "grub") { tty(emit, "grub(8) -- GRUB 2 menu; config in /boot/grub/grub.cfg.") }
         else if (n == "grub-install") { tty(emit, "grub-install(8) -- preinstalled; writes GRUB to the MBR/boot sector (partition table kept).") }
         else if (n == "update-grub") { tty(emit, "update-grub(8) -- preinstalled; regenerates /boot/grub/grub.cfg (registers the OSes).") }
+        else if (n == "w9wm") { tty(emit, "w9wm(1) -- Plan 9 style window manager (9wm + virtual screens); run `w9wm &` on BadaX, `twm &` to restore.") }
         else if (n == "zone") { tty(emit, "zone(1) -- zone:// ultra-network client (P2P ring DHT + Jones cipher); zone put URL TEXT publishes.") }
         else if (n == "zonebrowser") { tty(emit, "zonebrowser(1) -- X client browser for zone://; displays on the BadaX Server.") }
         else if (n == "migemoinsta") { tty(emit, "migemoinsta(1) -- photo feed on the zone:// ring with migemo search (romaji hits kana/kanji).") }
@@ -2516,6 +2534,7 @@ def os_status(vm, st) {
     print("@@STAGE " + st[0] + "|" + st[5])
     print("@@POWERSTATE " + vm[6])
     print("@@XCONN " + st[10] + "|" + st[7][1] + "|" + vm[8])
+    print("@@X WM " + st[22])
     x_scene(true, st[6])
     i := 0
     while (i < len(st[6])) {

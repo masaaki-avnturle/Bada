@@ -120,6 +120,8 @@ function run(events) {
     ["line", "update-grub"],              // 55 re-register the OS in the menu
     ["line", "lsusb"],                    // 56 USB connectors recognized
     ["line", "bluetoothctl"],             // 57 Bluetooth recognized (bluez)
+    ["line", "w9wm &"],                   // 58 Plan 9 style WM takes over BadaX
+    ["line", "twm &"],                    // 59 ... and the default look returns
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -202,6 +204,9 @@ function run(events) {
     [56, "Quantum USB stick"],              // usb connectors recognized (lsusb)
     [56, "Quantum Bluetooth 5.3 adapter"],
     [57, "quantum-earbuds (connected, A2DP)"], // bluetoothctl works (bluez)
+    [58, "Plan 9 style window manager"],    // w9wm manages the BadaX display
+    [58, "@@X WM w9wm"],
+    [59, "@@X WM twm"],                     // twm restores the default look
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -227,7 +232,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " (" + tape.length + " ledger events)");
+    " -> w9wm/twm (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */
