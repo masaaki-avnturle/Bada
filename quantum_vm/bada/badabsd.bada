@@ -227,14 +227,23 @@ def pkg_catalog() {
       ["net-tools",      "2.10-1badaos",   "NET-3 networking toolkit",                  "tool",    "/usr/bin/netstat"],
       ["bluez",          "5.71-1badaos",   "Bluetooth tools and daemons (quantum pairing)", "tool", "/usr/bin/bluetoothctl"],
       ["usbutils",       "017-3badaos",    "Linux USB utilities (lsusb)",               "tool",    "/usr/bin/lsusb"],
-      ["w9wm",           "0.4.2-1badaos",  "Plan 9 style window manager with virtual screens (9wm fork)", "tool", "/usr/X11R7/bin/w9wm"]
+      ["w9wm",           "0.4.2-1badaos",  "Plan 9 style window manager with virtual screens (9wm fork)", "tool", "/usr/X11R7/bin/w9wm"],
+      ["afterstep",      "2.2.12-1badaos", "NeXTSTEP style window manager (Wharf dock)", "tool",    "/usr/X11R7/bin/afterstep"],
+      ["mlterm",         "3.9.3-1badaos",  "MultiLingual TERMinal -- UTF-8/日本語対応",  "tool",    "/usr/X11R7/bin/mlterm"],
+      ["fcitx-mozc",     "2.28-1badaos",   "Mozc engine for fcitx -- 日本語入力メソッド", "tool",   "/usr/bin/fcitx"],
+      ["fcitx-configtool","0.4.10-1badaos","fcitx graphic configuration tool",          "tool",    "/usr/bin/fcitx-configtool"],
+      ["texlive-full",   "2024.2-1badaos", "TeX Live: full distribution (pLaTeX 日本語組版含む)", "tool", "/usr/bin/platex"],
+      ["screen",         "4.9.1-1badaos",  "terminal multiplexer with VT100/ANSI emulation", "tool", "/usr/bin/screen"],
+      ["tmux",           "3.4-1badaos",    "terminal multiplexer",                      "tool",    "/usr/bin/tmux"]
     ]
 }
 
 # packages that sysinst PREINSTALLS (the Linux suite works at once)
 def pkg_preinstalled() {
     return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
-            "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm"]
+            "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm",
+            "afterstep", "mlterm", "fcitx-mozc", "fcitx-configtool",
+            "texlive-full", "screen", "tmux"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1498,12 +1507,18 @@ def x_launch(emit, vm, st, class, title) {
     id := x_map_window(st[7], st[6], class, title)
     tty(emit, class + ": window " + id + " mapped on " + OS_DISPLAY +
               " (BadaX Server, Windows host)")
-    if (class == "xterm") {
+    if (list_has(["xterm", "mlterm"], class) == 1) {
         w := xwin_find(st[6], id)
         w[7] = sess_new(sess_shell(st[13]), sess_user(st[13]))
         SINK[0] = id
-        tty(emit, "BadaOS 12.0 GNU/Quantum (" + st[2] + ") -- xterm on ttyp" + id)
-        tty(emit, "This is a live shell: type commands here (help / apt / su / zsh ...)")
+        if (class == "mlterm") {
+            tty(emit, "mlterm 3.9.3 (quantum) -- UTF-8 / 日本語対応マルチリンガルターミナル")
+            tty(emit, "BadaOS 12.0 GNU/Quantum (" + st[2] + ") -- mlterm on ttyp" + id)
+            tty(emit, "ここは日本語の使えるライブシェルです (fcitx-mozc で日本語入力)")
+        } else {
+            tty(emit, "BadaOS 12.0 GNU/Quantum (" + st[2] + ") -- xterm on ttyp" + id)
+            tty(emit, "This is a live shell: type commands here (help / apt / su / zsh ...)")
+        }
         SINK[0] = 0
     }
     return 0
@@ -1790,7 +1805,7 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "tuplespace on /akashic type akashic (append-only, quantum)")
         return 0
     }
-    if (list_has(["w9wm", "twm"], cmd) == 1) {
+    if (list_has(["w9wm", "twm", "afterstep"], cmd) == 1) {
         if (st[10] == 0) {
             tty(emit, cmd + ": cannot open display " + OS_DISPLAY + " (run an X client first, e.g. xterm &)")
             return 0
@@ -1800,9 +1815,38 @@ def shell_exec(emit, vm, st, line) {
             tty(emit, "w9wm 0.4.2 (quantum) -- Plan 9 style window manager, now managing BadaX")
             tty(emit, "virtual desktops: 4  (switch with the w9wm box bar on the root window)")
             tty(emit, "B3 (right click) on a window: Hide / To desk / Delete;  on the root: New xterm / unhide")
+        } else if (cmd == "afterstep") {
+            tty(emit, "AfterStep 2.2.12 (quantum) -- NeXTSTEP style window manager, now managing BadaX")
+            tty(emit, "Wharf dock on the right edge: xterm / mlterm / xclock / xeyes launchers")
         } else {
             tty(emit, "twm: BadaX window manager restored (title bars, all desks merged)")
         }
+        return 0
+    }
+    if (list_has(["fcitx", "fcitx5"], cmd) == 1) {
+        tty(emit, "fcitx-mozc: input method framework started (daemon mode)")
+        tty(emit, "  IM: Mozc (日本語) -- ローマ字入力、Ctrl+Space で ON/OFF")
+        tty(emit, "  keyboard: jp106; candidate window on BadaX display " + OS_DISPLAY)
+        tty(emit, "  設定は fcitx-configtool でどうぞ")
+        return 0
+    }
+    if (cmd == "fcitx-configtool") {
+        tty(emit, "fcitx 設定 (fcitx-configtool)")
+        tty(emit, "  [入力メソッド]  1. キーボード - 日本語 (jp106)   2. Mozc (有効)")
+        tty(emit, "  [全体の設定]    入力メソッドの切替: Ctrl+Space / Zenkaku_Hankaku")
+        tty(emit, "  [外観]          候補ウィンドウ: 縦表示 / フォント: Noto Sans CJK JP")
+        tty(emit, "  [アドオン]      mozc, clipboard, quickphrase, unicode (量子 QKD 経由)")
+        return 0
+    }
+    if (list_has(["platex", "uplatex", "latex", "pdflatex"], cmd) == 1) {
+        f := "quantum.tex"
+        if (len(argv) > 1) { f := argv[1] }
+        tty(emit, "This is e-pTeX, Version 3.141592653-p4.1.0 (utf8.euc) (quantum TeX Live 2024/BadaOS)")
+        tty(emit, "(" + f)
+        tty(emit, "pLaTeX2e <2023-11-01> (based on LaTeX2e <2023-11-01>) 日本語組版")
+        tty(emit, "[1] )")
+        tty(emit, "Output written on badaos.dvi (1 page, 2764 bytes).")
+        tty(emit, "Transcript written on badaos.log.")
         return 0
     }
     if (cmd == "lsusb") {
@@ -2255,6 +2299,7 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "xclock") { x_launch(emit, vm, st, "xclock", "xclock"); return 0 }
     if (cmd == "xeyes")  { x_launch(emit, vm, st, "xeyes", "xeyes"); return 0 }
     if (cmd == "xterm")  { x_launch(emit, vm, st, "xterm", "xterm -- " + st[2]); return 0 }
+    if (cmd == "mlterm") { x_launch(emit, vm, st, "mlterm", "mlterm -- " + st[2] + " (UTF-8/日本語)"); return 0 }
     if (cmd == "xlogo")  { x_launch(emit, vm, st, "xlogo", "xlogo"); return 0 }
     if (cmd == "xdpyinfo") {
         if (st[10] == 0) {
@@ -2466,7 +2511,7 @@ def os_apply(vm, st, ev, emit) {
     if (kind == "xline") {
         w := xwin_find(st[6], ev[1])
         if (len(w) == 0) { return 0 }
-        if (w[1] != "xterm") { return 0 }
+        if (list_has(["xterm", "mlterm"], w[1]) == 0) { return 0 }
         SINK[0] = ev[1]
         xterm_exec(emit, vm, st, w, ev[2])
         SINK[0] = 0
@@ -2539,7 +2584,7 @@ def os_status(vm, st) {
     i := 0
     while (i < len(st[6])) {
         w := st[6][i]
-        if (w[1] == "xterm") {
+        if (list_has(["xterm", "mlterm"], w[1]) == 1) {
             if (len(w[7][1]) > 0) {
                 print("@@XPROMPT " + w[0] + " Password: ")
                 print("@@XECHO " + w[0] + " off")

@@ -60,13 +60,26 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     kbd sudo rsync parted dosfstools e2fsprogs \
     grub2-common grub-pc-bin grub-efi-amd64-bin os-prober ntfs-3g \
     vim emacs-nox openssh-server curl wget less ca-certificates \
-    bluez usbutils
+    bluez usbutils \
+    mlterm screen tmux locales texlive texlive-lang-japanese
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 # the real w9wm (or its parent 9wm) as an alternative window manager --
 # best effort, whichever the suite still ships
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq w9wm || \
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq 9wm || true
+# AfterStep (NeXTSTEP style WM) -- best effort
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq afterstep || true
+# Japanese input: fcitx-mozc + fcitx-configtool, falling back to fcitx5
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx-mozc fcitx-configtool || \
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx5-mozc fcitx5-config-qt || true
+
+echo "==> Japanese locale (ja_JP.UTF-8)"
+sed -i 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' "$CHROOT/etc/locale.gen" 2>/dev/null || true
+grep -q '^ja_JP.UTF-8' "$CHROOT/etc/locale.gen" 2>/dev/null || echo 'ja_JP.UTF-8 UTF-8' >> "$CHROOT/etc/locale.gen"
+grep -q '^en_US.UTF-8' "$CHROOT/etc/locale.gen" 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> "$CHROOT/etc/locale.gen"
+chroot "$CHROOT" locale-gen
+echo 'LANG=ja_JP.UTF-8' > "$CHROOT/etc/default/locale"
 
 # real networking (DHCP on every ethernet NIC) so `apt` reaches the FULL
 # Debian archive -- 60,000+ packages, the same class as Ubuntu.
@@ -89,6 +102,11 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
 
   * vim / emacs / sshd / xinetd / grub-install / update-grub preinstalled
   * bluetoothctl (bluez) + lsusb (usbutils) preinstalled; DHCP NAT networking
+  * Japanese ready: ja_JP.UTF-8 / mlterm / fcitx-mozc + fcitx-configtool
+    (Ctrl+Space), pLaTeX (texlive + texlive-lang-japanese; the FULL TeX
+    Live is one `sudo apt install texlive-full` away), screen / tmux
+  * window managers: w9wm (default on installed systems) / afterstep /
+    openbox -- pick with badaos.wm=... or `WM=afterstep startx`
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>
   * install to the real disk:  sudo badaos-install
@@ -133,19 +151,46 @@ EOF
 
 cat > "$CHROOT/home/bada/.xinitrc" <<'EOF'
 xset -dpms s off
-# window manager: openbox by default (reliable for the kiosk); boot with the
-# kernel arg badaos.wm=w9wm (or run `WM=w9wm startx` from the console) to use
-# the real Plan 9 style w9wm -- falls back to 9wm, then openbox
-WMBIN=openbox
-if [ "${WM:-}" = "w9wm" ] || grep -q badaos.wm=w9wm /proc/cmdline; then
-  if command -v w9wm >/dev/null 2>&1; then WMBIN=w9wm
-  elif command -v 9wm >/dev/null 2>&1; then WMBIN=9wm; fi
+# Japanese environment: locale + fcitx-mozc input method (fcitx5 fallback)
+export LANG=ja_JP.UTF-8
+export GTK_IM_MODULE=fcitx QT_IM_MODULE=fcitx XMODIFIERS=@im=fcitx
+if command -v fcitx >/dev/null 2>&1; then fcitx -d >/dev/null 2>&1
+elif command -v fcitx5 >/dev/null 2>&1; then fcitx5 -d >/dev/null 2>&1
 fi
-if [ "$WMBIN" = openbox ]; then
-  openbox --sm-disable &
-else
-  "$WMBIN" &
+
+# window manager selection:
+#   installed BadaOS  -> w9wm (falls back to 9wm, then openbox)
+#   live boot         -> openbox (most reliable for the kiosk)
+#   badaos.wm=w9wm|afterstep|openbox on the kernel cmdline overrides either
+#   WM=w9wm|afterstep|openbox startx  -> a plain desktop session with mlterm
+#                                        (Japanese terminal), no kiosk
+pickwm() {
+  case "$1" in
+    w9wm)
+      if command -v w9wm >/dev/null 2>&1; then echo w9wm; return; fi
+      if command -v 9wm  >/dev/null 2>&1; then echo 9wm; return; fi ;;
+    afterstep)
+      if command -v afterstep >/dev/null 2>&1; then echo afterstep; return; fi ;;
+  esac
+  echo openbox
+}
+WMSEL=""
+for a in $(cat /proc/cmdline); do
+  case "$a" in badaos.wm=*) WMSEL="${a#badaos.wm=}";; esac
+done
+if [ -n "${WM:-}" ]; then
+  # console-launched desktop session: WM + mlterm, no kiosk
+  WMBIN="$(pickwm "$WM")"
+  if command -v mlterm >/dev/null 2>&1; then mlterm &
+  elif command -v xterm >/dev/null 2>&1; then xterm & fi
+  if [ "$WMBIN" = openbox ]; then exec openbox --sm-disable; fi
+  exec "$WMBIN"
 fi
+if [ -z "$WMSEL" ] && ! grep -q boot=live /proc/cmdline; then
+  WMSEL=w9wm    # the installed BadaOS runs on w9wm
+fi
+WMBIN="$(pickwm "${WMSEL:-openbox}")"
+
 # "Install BadaOS" GRUB entry: open the Ubuntu-style GUI installer instead
 # of the BadaOS environment (wait for its local backend to come up first)
 URL="file:///opt/badaos/bada-vm-pro.html#autoboot"
@@ -156,8 +201,18 @@ if grep -q badaos.gui-installer /proc/cmdline; then
     sleep 1
   done
 fi
-exec chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
-  --disable-session-crashed-bubble --password-store=basic "$URL"
+if [ "$WMBIN" = openbox ]; then
+  openbox --sm-disable &
+  exec chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
+    --disable-session-crashed-bubble --password-store=basic "$URL"
+fi
+# w9wm/9wm/afterstep: map the kiosk window FIRST, then start the WM -- a
+# window manager adopts already-mapped windows in place, so the kiosk never
+# waits for an interactive 9wm-style sweep placement
+chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
+  --disable-session-crashed-bubble --password-store=basic "$URL" &
+sleep 8
+exec "$WMBIN"
 EOF
 chroot "$CHROOT" chown -R bada:bada /home/bada
 

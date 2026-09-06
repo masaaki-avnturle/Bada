@@ -190,6 +190,24 @@
   #w9menu div.sep { border-top:1px solid #999; margin-top:2px; padding-top:4px; cursor:default; }
   #w9menu div.dim { color:#888; cursor:default; }
   #w9menu div.dim:hover { background:inherit; color:#888; }
+  /* ===== mlterm: multilingual terminal look ===== */
+  .xwin.mlt pre.xtermtxt { background:#10151c; color:#dce6f2; }
+  .xwin.mlt .tbar { background:#3a6ea5; color:#eaf2fb; }
+  /* ===== AfterStep mode: NeXTSTEP look + the Wharf dock ===== */
+  #xroot.as { background:#5c6870; background-image:none; }
+  #xroot.as .xwin { border:1px solid #14181c; border-radius:0;
+                    box-shadow:3px 3px 8px rgba(0,0,0,.45); }
+  #xroot.as .xwin .tbar { background:linear-gradient(180deg,#9aa0ac,#565c66);
+                          color:#f2f4f7; border-radius:0; }
+  #xroot.as .xwin .tbar button { border:1px outset #aab; background:#8890a0; color:#111; }
+  #asWharf { position:absolute; top:8px; right:8px; z-index:50; display:none;
+             flex-direction:column; gap:2px; }
+  #xroot.as #asWharf { display:flex; }
+  #asWharf button { width:52px; height:52px; border:2px outset #9aa2ae;
+                    background:linear-gradient(135deg,#7d8794,#4c545e);
+                    color:#eef; font:9px monospace; cursor:pointer; padding:0; }
+  #asWharf button:active { border-style:inset; }
+  #asWharf b { display:block; font-size:15px; margin-bottom:2px; }
   .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
                        color:#d8f3d8; background:#101210; height:100%; overflow:auto;
                        outline:none; white-space:pre-wrap; word-break:break-all; cursor:text; }
@@ -353,6 +371,7 @@
   <div id="xroot">
     <div id="w9desks"><b>w9wm</b></div>
     <div id="w9menu"></div>
+    <div id="asWharf"></div>
     <div id="xempty">X クライアント待機中…<br/>
       <small>BadaBSD 側で&nbsp; <code>xclock &amp;</code> / <code>xeyes &amp;</code> /
       <code>xterm &amp;</code> &nbsp;を実行してください</small></div>
@@ -959,14 +978,27 @@ var VM_LIBS = __VM_LIBS_JSON__;
       b.addEventListener("click", function () { curDesk = d; applyWM(); });
       bar.appendChild(b);
     })(d);
+    /* AfterStep Wharf: NeXT-style dock tiles that launch X clients */
+    var wharf = $("asWharf");
+    var tiles = [["⌨", "xterm"], ["あ", "mlterm"], ["🕐", "xclock"], ["👀", "xeyes"]];
+    for (var t = 0; t < tiles.length; t++) (function (icon, cmd) {
+      var b = document.createElement("button");
+      b.innerHTML = "<b>" + icon + "</b>" + cmd;
+      b.title = cmd + " を起動 (Wharf)";
+      b.addEventListener("click", function () {
+        if (mode === "line") send(["line", cmd + " &"]);
+      });
+      wharf.appendChild(b);
+    })(tiles[t][0], tiles[t][1]);
   })();
   function setWM(m) {
-    if (m !== "w9wm") m = "twm";
-    if (m !== wmMode) { wmMode = m; if (m === "twm") winHidden = {}; }
+    if (m !== "w9wm" && m !== "afterstep") m = "twm";
+    if (m !== wmMode) { wmMode = m; if (m !== "w9wm") winHidden = {}; }
     applyWM();
   }
   function applyWM() {
     xroot.classList.toggle("w9", wmMode === "w9wm");
+    xroot.classList.toggle("as", wmMode === "afterstep");
     var btns = $("w9desks").querySelectorAll("button");
     for (var i = 0; i < btns.length; i++) btns[i].className = (i === curDesk) ? "cur" : "";
     for (var id in xwins) {
@@ -1102,7 +1134,8 @@ var VM_LIBS = __VM_LIBS_JSON__;
         e.stopPropagation();
       });
       renderInsta(win, id);
-    } else if (cls === "xterm") {
+    } else if (cls === "xterm" || cls === "mlterm") {
+      if (cls === "mlterm") el.classList.add("mlt");
       var pre = document.createElement("pre"); pre.className = "xtermtxt";
       pre.tabIndex = 0;
       pre.title = "ここに直接コマンドを入力できます (live BadaOS shell)";

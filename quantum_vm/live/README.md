@@ -13,11 +13,16 @@
 - **vim・emacs・sshd・xinetd・curl・wget・grub-install・update-grub・
   bluetoothctl (bluez)・lsusb (usbutils) を実物としてプリインストール** —
   Bluetooth・USB コネクタ・NAT (DHCP) を認識します
-- **実物の w9wm / 9wm(Plan 9 風ウィンドウマネージャ)も同梱**(そのスイートで
-  提供されている方)。カーネル引数 `badaos.wm=w9wm` を付けて起動(GRUB で `e` →
-  行末に追記)するか、コンソールから `WM=w9wm startx` で、X セッションが
-  openbox の代わりに w9wm/9wm で動きます。アプリ内 BadaX でも `w9wm &` で
-  Plan 9 風ウィンドウ管理 + 仮想デスクトップ 4 面に切替できます
+- **インストール済み BadaOS のウィンドウマネージャは w9wm**(実物。無ければ 9wm →
+  openbox にフォールバック)。`badaos.wm=w9wm|afterstep|openbox` のカーネル引数か
+  `WM=afterstep startx` でいつでも切替でき、**AfterStep(NeXT 風・Wharf 付き)も同梱**。
+  `WM=... startx` はキオスクの代わりに **WM + mlterm のデスクトップセッション**を開きます
+- **日本語環境が最初から整っています**: ロケール `ja_JP.UTF-8`・Noto CJK フォント・
+  **mlterm(日本語対応ターミナル)**・**fcitx-mozc + fcitx-configtool**(Ctrl+Space で
+  日本語入力 ON/OFF。スイートに fcitx4 が無ければ fcitx5-mozc に自動フォールバック)
+- **pLaTeX 日本語組版 (texlive + texlive-lang-japanese)・screen・tmux も同梱**。
+  フル構成が欲しければインストール後に `sudo apt install texlive-full` 一発です
+  (ISO に texlive-full を焼くと配布上限を超えるため、日本語 TeX までを同梱)
 - **実ディスクの「空きスペース」への本インストール対応**: `badaos-install` の既定モードは
   空き領域に新パーティションを 1 個作るだけで、**既存の OS・パーティションは消しません**
   (os-prober が既存 OS も GRUB メニューに登録)

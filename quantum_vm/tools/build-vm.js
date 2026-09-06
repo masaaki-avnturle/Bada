@@ -122,6 +122,13 @@ function run(events) {
     ["line", "bluetoothctl"],             // 57 Bluetooth recognized (bluez)
     ["line", "w9wm &"],                   // 58 Plan 9 style WM takes over BadaX
     ["line", "twm &"],                    // 59 ... and the default look returns
+    ["line", "mlterm &"],                 // 60 Japanese-capable terminal on BadaX
+    ["xline", 4, "echo 日本語のmlterm"],  // 61 UTF-8 shell inside the mlterm
+    ["line", "fcitx"],                    // 62 fcitx-mozc input method
+    ["line", "fcitx-configtool"],         // 63 ... and its config tool
+    ["line", "platex report.tex"],        // 64 TeX Live (Japanese pLaTeX)
+    ["line", "afterstep &"],              // 65 NeXTSTEP style WM + Wharf
+    ["line", "twm &"],                    // 66 back to the default
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -207,6 +214,15 @@ function run(events) {
     [58, "Plan 9 style window manager"],    // w9wm manages the BadaX display
     [58, "@@X WM w9wm"],
     [59, "@@X WM twm"],                     // twm restores the default look
+    [60, "@@X WIN 4|mlterm"],               // mlterm maps as a live terminal
+    [60, "日本語対応マルチリンガルターミナル"],
+    [61, "@@XTTY 4 日本語のmlterm"],        // UTF-8 shell inside the mlterm
+    [62, "Mozc (日本語)"],                  // fcitx-mozc runs
+    [63, "Noto Sans CJK JP"],               // fcitx-configtool runs
+    [64, "quantum TeX Live 2024"],          // pLaTeX (texlive-full) runs
+    [65, "@@X WM afterstep"],               // AfterStep manages BadaX
+    [65, "NeXTSTEP style window manager"],
+    [66, "@@X WM twm"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -232,7 +248,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/twm (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */
