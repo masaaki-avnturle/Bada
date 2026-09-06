@@ -51,6 +51,14 @@
 
 ---
 
+## 💿 ダウンロード — Bada VM Pro OS(起動可能 ISO / USB ブート)
+
+**USB ブートして実ディスクにインストールできる、Ubuntu 22.04 ベースの本物の Linux ディストロ。** ウィンドウマネージャは **w9wm**、Bada アプリをプリインストール、**Calamares** で実ディスクへインストール、**NAT/DHCP で apt** が使え、**あなたのリポジトリの apt リポジトリ**(`deb [trusted=yes] …/ ./`)から `apt install`。BIOS+UEFI ハイブリッド ISO なので **Rufus でそのまま USB に書けます**。
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `badaos-v*` から `BadaVMPro-OS-*-amd64.iso` を取得 → Rufus で USB 書き込み → 起動 → w9wm で Bada VM Pro が自動起動。手順・apt 使用法は [`badaos-iso/`](badaos-iso/) を参照。
+
+---
+
 ## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
 
 自動走行の自動車**レーヴァテイン**とアシスタントAI**アル**。**アルのトランスフォーマーが車両を操縦**します — 知覚 attention を操舵角と加減速の2値に写す制御ヘッドが、その2値だけで車体(自転車近似モデル)を動かし、周囲(16レイセンサへの attention)を検知して自動で回避・減速・停止・再発進。測位は 2 モード — **🌐 Web地図モード**は衛星を使わず、ウェブサイトから受信する地図タイル(AEAD 検証つき)+推測航法+ランドマーク補正で走り、**🛰 人工衛星モード**は 4 機の擬似距離から最小二乗で測位します。A* 経路計画・依存ゼロ・単一 HTML。
@@ -117,6 +125,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
+| **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---
 
