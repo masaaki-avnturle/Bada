@@ -1,0 +1,154 @@
+はい、Omega scriptの文法チェッカーをVimプラグイン(oslo.vim)として実装する最小限のソースコードは以下のようになります。
+
+```vim
+" oslo.vim
+
+" 字句解析器
+function! OmegaLex(input)
+  let tokens = []
+
+  let i = 0
+  while i < len(a:input)
+    let [token, i] = OmegaScanToken(a:input, i)
+    call add(tokens, token)
+  endwhile
+
+  return tokens
+endfunction
+
+function! OmegaScanToken(input, start)
+  let c = a:input[a:start]
+
+  if c =~ '\a'
+    return OmegaScanIdentifier(a:input, a:start)
+  elseif c =~ '\d'
+    return OmegaScanNumber(a:input, a:start)
+  elseif c =~ '[+\-*/=!<>]'
+    return OmegaScanOperator(a:input, a:start)
+  elseif c ==# '"'
+    return OmegaScanString(a:input, a:start)
+  else
+    throw 'ParseError:' . a:start . ': Unexpected character: ' . c
+  endif
+endfunction
+
+function! OmegaScanIdentifier(input, start)
+  let i = a:start
+  while i < len(a:input) && a:input[i] =~ '\w'
+    let i += 1
+  endwhile
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Identifier', 'value': lexeme}, i]
+endfunction
+
+function! OmegaScanNumber(input, start)
+  let i = a:start
+  while i < len(a:input) && a:input[i] =~ '\d'
+    let i += 1
+  endwhile
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Number', 'value': str2nr(lexeme)}, i]
+endfunction
+
+function! OmegaScanOperator(input, start)
+  let i = a:start + 1
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Operator', 'value': lexeme}, i]
+endfunction
+
+function! OmegaScanString(input, start)
+  let i = a:start + 1
+  while i < len(a:input) && a:input[i] !=# '"'
+    let i += 1
+  endwhile
+  if i >= len(a:input)
+    throw 'ParseError:' . a:start . ': Unterminated string'
+  endif
+  let lexeme = strpart(a:input, a:start + 1, i - a:start - 1)
+  return [{'type': 'String', 'value': lexeme}, i + 1]
+endfunction
+
+" 構文解析器
+function! OmegaParse(tokens)
+  let parser = OmegaParser.new(a:tokens)
+  return parser.parse_program()
+endfunction
+
+let s:OmegaParser = {}
+
+function! OmegaParser.new(tokens)
+  let obj = copy(s:OmegaParser)
+  let obj.tokens = a:tokens
+  let obj.index = 0
+  return obj
+endfunction
+
+function! OmegaParser.parse_program(self)
+  let statements = []
+  while self.current_token().type !=# 'EOF'
+    call add(statements, self.parse_statement())
+  endwhile
+  return {'type': 'Program', 'statements': statements}
+endfunction
+
+function! OmegaParser.parse_statement(self)
+  let token = self.current_token()
+  if token.type ==# 'Identifier' && self.peek_token().value ==# '='
+    return self.parse_assignment()
+  elseif token.type ==# 'Identifier' && self.peek_token().value ==# '('
+    return self.parse_function_call()
+  elseif token.value ==# 'def'
+    return self.parse_function_definition()
+  elseif token.value ==# 'let'
+    return self.parse_variable_declaration()
+  else
+    throw 'ParseError:' . token.type . ': Unexpected token: ' . token.value
+  endif
+endfunction
+
+function! OmegaParser.current_token(self)
+  return self.tokens[self.index]
+endfunction
+
+function! OmegaParser.peek_token(self)
+  return self.tokens[self.index + 1]
+endfunction
+
+function! OmegaParser.advance(self)
+  let self.index += 1
+endfunction
+
+" 文法チェック
+function! OmegaCheckSyntax()
+  let errors = []
+
+  try
+    let tokens = OmegaLex(join(getline(1, '$'), "\n"))
+    let ast = OmegaParse(tokens)
+  catch /ParseError/
+    let error = matchlist(v:exception, 'ParseError:\s*\(\d\+\):\s*\(.*\)')[1:2]
+    call add(errors, {'line': str2nr(error[0]), 'message': error[1]})
+  endtry
+
+  return errors
+endfunction
+
+" 使用例
+autocmd BufWritePost *.omega call OmegaCheckSyntax()
+```
+
+このコードでは、Omega scriptの字句生成器と構文解析器を実装し、それらを使って文法チェックを行うVimプラグインを実装しています。
+
+主な機能は以下のとおりです:
+
+1. **字句生成器(`OmegaLex`)**: 入力文字列を走査し、トークンを生成します。トークンの種類は識別子、数値、文字列、演算子などです。
+
+2. **構文解析器(`OmegaParse`)**: トークン列から抽象構文木(AST)を構築します。`parse_program`関数がプログラム全体の解析を行い、`parse_statement`関数が各種文法要素の解析を行います。
+
+3. **文法チェック(`OmegaCheckSyntax`)**: 現在のバッファの内容を解析し、構文エラーがあった場合はエラーメッセージを返します。
+
+4. **Vimの自動保存時イベントフック**: `BufWritePost`イベントで`OmegaCheckSyntax`関数を呼び出し、自動的に文法チェックを行います。
+
+この実装では、字句生成器と構文解析器を明確に分離しており、各部分の責任を明確にしています。また、Vimのイベントフックを使って、ユーザーの操作に合わせて自動的に文法チェックを行うようになっています。
+
+これにより、Omega scriptのソースコードを編集する際に、Vimの文法チェック機能が利用できるようになります。開発者は、手動でエラーを確認する必要がなくなり、より効率的にコーディングできるようになります。

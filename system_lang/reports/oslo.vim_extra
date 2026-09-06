@@ -1,0 +1,154 @@
+
+はい、Omega scriptの文法チェックロジックをVimプラグイン(oslo.vim)として実装するソースコードは以下のようになります。
+
+```vim
+" oslo.vim
+
+" ... (省略) ...
+
+" 文法チェック
+function! OmegaCheckSyntax()
+  let errors = []
+
+  " トークンの解析
+  let tokens = OmegaLex(join(getline(1, '$'), "\n"))
+
+  " 構文解析
+  try
+    let ast = OmegaParse(tokens)
+  catch /ParseError/
+    let error = matchlist(v:exception, 'ParseError:\s*\(\d\+\):\s*\(.*\)')[1:2]
+    call add(errors, {'line': str2nr(error[0]), 'message': error[1]})
+  endtry
+
+  return errors
+endfunction
+
+function! OmegaLex(input)
+  let tokens = []
+
+  let i = 0
+  while i < len(a:input)
+    let [token, i] = OmegaScanToken(a:input, i)
+    call add(tokens, token)
+  endwhile
+
+  return tokens
+endfunction
+
+function! OmegaScanToken(input, start)
+  let c = a:input[a:start]
+
+  if c =~ '\a'
+    return OmegaScanIdentifier(a:input, a:start)
+  elseif c =~ '\d'
+    return OmegaScanNumber(a:input, a:start)
+  elseif c =~ '[+\-*/=!<>]'
+    return OmegaScanOperator(a:input, a:start)
+  elseif c ==# '"'
+    return OmegaScanString(a:input, a:start)
+  else
+    throw 'ParseError:' . a:start . ': Unexpected character: ' . c
+  endif
+endfunction
+
+function! OmegaScanIdentifier(input, start)
+  let i = a:start
+  while i < len(a:input) && a:input[i] =~ '\w'
+    let i += 1
+  endwhile
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Identifier', 'value': lexeme}, i]
+endfunction
+
+function! OmegaScanNumber(input, start)
+  let i = a:start
+  while i < len(a:input) && a:input[i] =~ '\d'
+    let i += 1
+  endwhile
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Number', 'value': str2nr(lexeme)}, i]
+endfunction
+
+function! OmegaScanOperator(input, start)
+  let i = a:start + 1
+  let lexeme = strpart(a:input, a:start, i - a:start)
+  return [{'type': 'Operator', 'value': lexeme}, i]
+endfunction
+
+function! OmegaScanString(input, start)
+  let i = a:start + 1
+  while i < len(a:input) && a:input[i] !=# '"'
+    let i += 1
+  endwhile
+  if i >= len(a:input)
+    throw 'ParseError:' . a:start . ': Unterminated string'
+  endif
+  let lexeme = strpart(a:input, a:start + 1, i - a:start - 1)
+  return [{'type': 'String', 'value': lexeme}, i + 1]
+endfunction
+
+function! OmegaParse(tokens)
+  let parser = OmegaParser.new(a:tokens)
+  return parser.parse_program()
+endfunction
+
+" OmegaParser クラスの実装
+let s:OmegaParser = {}
+
+function! OmegaParser.new(tokens)
+  let obj = copy(s:OmegaParser)
+  let obj.tokens = a:tokens
+  let obj.index = 0
+  return obj
+endfunction
+
+function! OmegaParser.parse_program(self)
+  let statements = []
+  while self.current_token().type !=# 'EOF'
+    call add(statements, self.parse_statement())
+  endwhile
+  return {'type': 'Program', 'statements': statements}
+endfunction
+
+function! OmegaParser.parse_statement(self)
+  let token = self.current_token()
+  if token.type ==# 'Identifier' && self.peek_token().value ==# '='
+    return self.parse_assignment()
+  elseif token.type ==# 'Identifier' && self.peek_token().value ==# '('
+    return self.parse_function_call()
+  elseif token.value ==# 'def'
+    return self.parse_function_definition()
+  elseif token.value ==# 'let'
+    return self.parse_variable_declaration()
+  else
+    throw 'ParseError:' . token.type . ': Unexpected token: ' . token.value
+  endif
+endfunction
+
+" その他の構文解析メソッドの実装 (省略)
+
+function! OmegaParser.current_token(self)
+  return self.tokens[self.index]
+endfunction
+
+function! OmegaParser.peek_token(self)
+  return self.tokens[self.index + 1]
+endfunction
+
+function! OmegaParser.advance(self)
+  let self.index += 1
+endfunction
+
+" ... (省略) ...
+```
+
+このコードでは、Omega scriptの字句解析と構文解析を実装しています。
+
+`OmegaCheckSyntax`関数では、まず`OmegaLex`関数を使ってソースコードをトークン列に変換し、その後`OmegaParse`関数を使ってAST(抽象構文木)を構築します。構文解析中にエラーが発生した場合は、エラーメッセージとともにエラーの行番号を`errors`リストに追加しています。
+
+`OmegaLex`関数は、入力文字列からトークンを生成する字句解析器を実装しています。`OmegaScanToken`関数では、入力文字列の先頭文字に応じて、識別子、数値、演算子、文字列のトークンを生成しています。
+
+`OmegaParse`関数は、トークン列からAST(抽象構文木)を構築する構文解析器を実装しています。`parse_program`、`parse_statement`、`parse_assignment`、`parse_function_definition`などの関数で、Omega scriptの各種構文要素の解析を行っています。
+
+このようにして実装された文法チェックロジックを使うことで、Omega scriptのソースコードを編集する際に、Vimの文法チェック機能を利用できるようになります。

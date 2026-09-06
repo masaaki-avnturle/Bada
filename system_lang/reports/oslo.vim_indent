@@ -1,0 +1,51 @@
+
+Omega scriptのインデントを自動的に管理するための`filetype indent on`機能を実装したVimプラグイン(oslo.vim)のソースコードは以下のようになります。
+
+```vim
+" oslo.vim
+
+" ... (省略) ...
+
+" インデント設定
+function! OmegaIndent(lnum)
+  let prev_lnum = prevnonblank(a:lnum - 1)
+  if prev_lnum == 0
+    return 0
+  endif
+
+  let prev_line = getline(prev_lnum)
+  let curr_line = getline(a:lnum)
+
+  let indent = indent(prev_lnum)
+
+  if prev_line =~# '^\s*def\>'
+    let indent += &shiftwidth
+  elseif prev_line =~# '^\s*let\>'
+    let indent += &shiftwidth
+  elseif prev_line =~# '^\s*if\>'
+    let indent += &shiftwidth
+  elseif prev_line =~# '^\s*else\>'
+    let indent -= &shiftwidth
+  elseif prev_line =~# '^\s*match\>'
+    let indent += &shiftwidth
+  elseif curr_line =~# '^\s*}\>'
+    let indent -= &shiftwidth
+  endif
+
+  return indent
+endfunction
+
+augroup OmegaMode
+  autocmd!
+  autocmd FileType omega setlocal indentexpr=OmegaIndent(v:lnum)
+  autocmd FileType omega setlocal indentkeys+=0=,0),0},0]
+augroup END
+```
+
+このコードでは、`OmegaIndent`関数を定義し、Omega scriptのファイルタイプに対してインデントを自動的に設定する機能を実装しています。
+
+`OmegaIndent`関数では、現在の行の前の行のインデントを基準に、Omega scriptの構文に応じてインデントを調整しています。具体的には、`def`、`let`、`if`、`else`、`match`などのキーワードを検出し、それぞれのブロックに応じてインデントを増減させています。また、`}`の行では、インデントを減らしています。
+
+この関数は、`FileType omega`イベントで呼び出されるように設定されています。さらに、`indentkeys`オプションにも`0=`、`0)`、`0}`、`0]`を追加し、これらの文字が入力された際にもインデントが適切に設定されるようになっています。
+
+これにより、Omega scriptのソースコードを編集する際に、Vimの自動インデント機能が有効になり、コードの可読性が向上します。開発者は、手動でインデントを調整する必要がなくなり、より効率的にコーディングできるようになります。
