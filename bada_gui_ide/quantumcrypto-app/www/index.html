@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada QuantumCrypto — Jones多項式量子暗号 暗号化/解除</title>
+<style>
+  :root {
+    --bg: #04060a; --panel: #0b111c; --panel2: #101a2a; --line: #1d2c44;
+    --text: #d7e3f4; --dim: #7d92b0; --accent: #43d9ad; --accent2: #4aa8ff;
+    --warn: #ff6b81; --gold: #ffd166;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, system-ui, sans-serif; }
+  body { min-height: 100vh; padding-bottom: 40px; }
+  header { padding: 18px 20px 12px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #0a1322, var(--bg)); }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+  header h1 .lock { margin-right: 8px; }
+  header .sub { color: var(--dim); font-size: 12px; margin-top: 6px; line-height: 1.6; }
+  header .sub code { color: var(--accent); background: none; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px; }
+  .tabs { display: flex; gap: 8px; margin: 4px 0 14px; }
+  .tabs button { flex: 1; padding: 10px 0; font-size: 15px; border-radius: 10px 10px 0 0;
+    border: 1px solid var(--line); border-bottom: none; background: var(--panel);
+    color: var(--dim); cursor: pointer; }
+  .tabs button.active { background: var(--panel2); color: var(--accent); font-weight: bold; }
+  section.tab { display: none; background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 0 0 12px 12px; padding: 16px; }
+  section.tab.active { display: block; }
+  label.fld { display: block; font-size: 12px; color: var(--dim); margin: 12px 0 4px; }
+  textarea, input[type=password], input[type=text], select {
+    width: 100%; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; font-size: 14px; }
+  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; }
+  textarea.out { min-height: 140px; color: var(--accent); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > div { flex: 1; min-width: 200px; }
+  .btns { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button.act { flex: 1; min-width: 140px; padding: 12px 14px; font-size: 15px; border: none;
+    border-radius: 10px; cursor: pointer; font-weight: bold; }
+  button.enc { background: linear-gradient(135deg, #14b88a, #0f8f6c); color: #02120c; }
+  button.dec { background: linear-gradient(135deg, #3f9dff, #2f6fd6); color: #041020; }
+  button.ghost { background: var(--panel); color: var(--dim); border: 1px solid var(--line);
+    font-weight: normal; flex: 0 1 auto; min-width: 0; padding: 12px 16px; }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .45; cursor: default; }
+  .status { margin-top: 12px; font-size: 13px; min-height: 20px; line-height: 1.6; }
+  .status.err { color: var(--warn); }
+  .status.ok { color: var(--accent); }
+  .filebox { border: 2px dashed var(--line); border-radius: 12px; padding: 22px; text-align: center;
+    color: var(--dim); cursor: pointer; background: var(--panel); }
+  .filebox.have { border-color: var(--accent); color: var(--text); }
+  .filebox .name { color: var(--gold); word-break: break-all; }
+  #secPanel { margin-top: 18px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; font-size: 12px; }
+  #secPanel h3 { margin: 0 0 8px; font-size: 13px; color: var(--accent2); }
+  #secPanel .kv { display: flex; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #14203466; }
+  #secPanel .kv .k { color: var(--dim); flex: 0 0 120px; }
+  #secPanel .kv .v { word-break: break-all; font-family: ui-monospace, Consolas, monospace; color: var(--text); }
+  footer { text-align: center; color: var(--dim); font-size: 11px; margin-top: 22px; line-height: 1.8; }
+  footer a { color: var(--accent2); }
+  .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--dim);
+    border-top-color: var(--accent); border-radius: 50%; animation: sp 0.8s linear infinite;
+    vertical-align: -2px; margin-right: 6px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="lock">🔐</span>Bada QuantumCrypto</h1>
+  <div class="sub">
+    Jones 多項式量子暗号 — テキストとファイルを<b>暗号化</b>し、パスフレーズで<b>解除(復号)</b>します。<br>
+    鍵は結び目図の Kauffman ブラケット標本 (<code>jones_key</code>) とパスフレーズから導出、
+    Bell 対 QKD がセッションソルトを採取し、本文は ChaCha20 + HMAC-SHA256 の AEAD で封緘。
+    改ざんや誤鍵は <code>409 zone-guard-reject</code> として拒否されます。すべて端末内で完結(通信なし)。
+  </div>
+</header>
+<main>
+  <div class="tabs">
+    <button id="tabTextBtn" class="active">📝 テキスト</button>
+    <button id="tabFileBtn">📁 ファイル</button>
+  </div>
+
+  <!-- ============ テキスト タブ ============ -->
+  <section id="tabText" class="tab active">
+    <label class="fld">平文 または 暗号文 (-----BEGIN BADA QUANTUM CIPHER----- ブロック)</label>
+    <textarea id="txtIn" placeholder="ここに暗号化したい文章、または解除したい暗号文ブロックを貼り付け"></textarea>
+    <div class="row">
+      <div>
+        <label class="fld">パスフレーズ</label>
+        <input type="password" id="txtPass" placeholder="共有した合言葉">
+      </div>
+      <div>
+        <label class="fld">結び目 (量子鍵の図)</label>
+        <select id="txtKnot"></select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="act enc" id="txtEncBtn">🔒 暗号化</button>
+      <button class="act dec" id="txtDecBtn">🔓 解除(復号)</button>
+      <button class="ghost" id="txtSwapBtn" title="結果を入力欄に移す">⬆ 結果を入力へ</button>
+    </div>
+    <div class="status" id="txtStatus"></div>
+    <label class="fld">結果</label>
+    <textarea id="txtOut" class="out" readonly placeholder="ここに結果が表示されます"></textarea>
+    <div class="btns">
+      <button class="ghost" id="txtCopyBtn">📋 結果をコピー</button>
+      <button class="ghost" id="txtSaveBtn">💾 結果を .badaqc.txt で保存</button>
+    </div>
+  </section>
+
+  <!-- ============ ファイル タブ ============ -->
+  <section id="tabFile" class="tab">
+    <div class="filebox" id="fileBox">
+      <div id="fileBoxLabel">タップ / クリックしてファイルを選択<br>
+        <small>(どんな形式でも可 — 暗号化は任意ファイル、解除は .badaqc / アーマーテキスト)</small></div>
+      <div class="name" id="fileName"></div>
+      <input type="file" id="fileInput" style="display:none">
+    </div>
+    <div class="row">
+      <div>
+        <label class="fld">パスフレーズ</label>
+        <input type="password" id="filePass" placeholder="共有した合言葉">
+      </div>
+      <div>
+        <label class="fld">結び目 (量子鍵の図)</label>
+        <select id="fileKnot"></select>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="act enc" id="fileEncBtn">🔒 暗号化して保存 (.badaqc)</button>
+      <button class="act dec" id="fileDecBtn">🔓 解除して元ファイルを保存</button>
+    </div>
+    <div class="btns">
+      <button class="ghost" id="fileArmorBtn">📄 暗号化結果をテキスト表示 (コピー用)</button>
+    </div>
+    <div class="status" id="fileStatus"></div>
+    <textarea id="fileArmorOut" class="out" readonly style="display:none" placeholder=""></textarea>
+  </section>
+
+  <!-- ============ セキュリティ パネル ============ -->
+  <div id="secPanel" style="display:none">
+    <h3>🛡 セキュリティ パネル (直近の操作)</h3>
+    <div id="secBody"></div>
+  </div>
+
+  <footer>
+    Bada QuantumCrypto — <a href="https://github.com/masaaki-avnturle/Bada">masaaki-avnturle/Bada</a> ·
+    zone-lib.bada の kauffman()/jones_key()/qkd_session() を移植 · オフライン動作 · MIT License
+  </footer>
+</main>
+
+<script src="qcrypto.js"></script>
+<script>
+(function () {
+  "use strict";
+  var QC = window.BadaQC;
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ---------- 結び目セレクタ ---------- */
+  [$("txtKnot"), $("fileKnot")].forEach(function (sel) {
+    QC.KNOTS.forEach(function (k) {
+      var o = document.createElement("option");
+      o.value = k.id; o.textContent = k.name;
+      sel.appendChild(o);
+    });
+  });
+
+  /* ---------- タブ ---------- */
+  function showTab(name) {
+    $("tabText").classList.toggle("active", name === "text");
+    $("tabFile").classList.toggle("active", name === "file");
+    $("tabTextBtn").classList.toggle("active", name === "text");
+    $("tabFileBtn").classList.toggle("active", name === "file");
+  }
+  $("tabTextBtn").onclick = function () { showTab("text"); };
+  $("tabFileBtn").onclick = function () { showTab("file"); };
+
+  /* ---------- 共通 ---------- */
+  function setStatus(el, msg, cls) {
+    el.textContent = msg || "";
+    el.className = "status" + (cls ? " " + cls : "");
+  }
+  function busy(el, msg) {
+    el.innerHTML = '<span class="spin"></span>' + msg;
+    el.className = "status";
+  }
+  function showSec(meta, extra) {
+    var rows = [];
+    function kv(k, v) { if (v) rows.push('<div class="kv"><span class="k">' + k + '</span><span class="v">' + v + "</span></div>"); }
+    kv("結び目", meta.knot);
+    kv("Jones 鍵", meta.jones);
+    kv("QKD", meta.qkd);
+    kv("Bell 測定列", meta.qkdBits);
+    kv("ソルト", meta.salt);
+    kv("ノンス", meta.nonce);
+    kv("AEAD タグ", meta.tag);
+    kv("平文サイズ", meta.plainLen != null ? meta.plainLen + " bytes" : "");
+    kv("暗号文サイズ", meta.cipherLen != null ? meta.cipherLen + " bytes" : "");
+    if (extra) kv("備考", extra);
+    $("secBody").innerHTML = rows.join("");
+    $("secPanel").style.display = "block";
+  }
+  /* 重い処理を描画後に回す */
+  function defer(fn) { setTimeout(fn, 30); }
+
+  function saveBlob(bytes, filename) {
+    try {
+      var blob = new Blob([bytes], { type: "application/octet-stream" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 4000);
+      return true;
+    } catch (e) { return false; }
+  }
+  function copyText(text, statusEl) {
+    function done(okFlag) {
+      setStatus(statusEl, okFlag ? "コピーしました" : "コピーに失敗しました — 手動で選択してコピーしてください", okFlag ? "ok" : "err");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      var okFlag = false;
+      try { okFlag = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      done(okFlag);
+    }
+  }
+
+  /* ---------- テキスト タブ ---------- */
+  $("txtEncBtn").onclick = function () {
+    var text = $("txtIn").value, pass = $("txtPass").value;
+    if (!pass) { setStatus($("txtStatus"), "パスフレーズを入力してください", "err"); return; }
+    busy($("txtStatus"), "暗号化しています…");
+    defer(function () {
+      try {
+        var r = QC.encryptText(pass, text, parseInt($("txtKnot").value, 10));
+        $("txtOut").value = r.armored;
+        setStatus($("txtStatus"), "暗号化しました — 結果ブロックを相手に渡してください (パスフレーズと結び目は別経路で共有)", "ok");
+        showSec(r.meta);
+      } catch (e) { setStatus($("txtStatus"), "暗号化失敗: " + e.message, "err"); }
+    });
+  };
+  $("txtDecBtn").onclick = function () {
+    var text = $("txtIn").value, pass = $("txtPass").value;
+    if (!pass) { setStatus($("txtStatus"), "パスフレーズを入力してください", "err"); return; }
+    if (!QC.isArmored(text) && !/^[A-Za-z0-9+/=\s]+$/.test(text.trim())) {
+      setStatus($("txtStatus"), "入力欄に暗号文 (BEGIN BADA QUANTUM CIPHER ブロック) を貼り付けてください", "err"); return;
+    }
+    busy($("txtStatus"), "解除しています…");
+    defer(function () {
+      try {
+        var r = QC.decryptText(pass, text);
+        $("txtOut").value = r.text;
+        setStatus($("txtStatus"), "解除しました (AEAD タグ検証 OK)", "ok");
+        showSec(r.meta, r.isFile ? "これはファイル コンテナです — ファイル タブで解除すると元ファイルを保存できます" : "");
+      } catch (e) { setStatus($("txtStatus"), String(e.message), "err"); }
+    });
+  };
+  $("txtSwapBtn").onclick = function () {
+    if ($("txtOut").value) { $("txtIn").value = $("txtOut").value; $("txtOut").value = ""; }
+  };
+  $("txtCopyBtn").onclick = function () {
+    if ($("txtOut").value) copyText($("txtOut").value, $("txtStatus"));
+  };
+  $("txtSaveBtn").onclick = function () {
+    if (!$("txtOut").value) return;
+    if (!saveBlob(QC.utf8($("txtOut").value), "message.badaqc.txt"))
+      setStatus($("txtStatus"), "保存できない環境です — コピーを使ってください", "err");
+  };
+
+  /* ---------- ファイル タブ ---------- */
+  var pickedFile = null, pickedBytes = null;
+  $("fileBox").onclick = function () { $("fileInput").click(); };
+  $("fileInput").onchange = function () {
+    var f = $("fileInput").files[0];
+    if (!f) return;
+    pickedFile = f; pickedBytes = null;
+    $("fileBox").classList.add("have");
+    $("fileName").textContent = f.name + " (" + f.size + " bytes)";
+    setStatus($("fileStatus"), "", "");
+    $("fileArmorOut").style.display = "none";
+    var reader = new FileReader();
+    reader.onload = function () { pickedBytes = new Uint8Array(reader.result); };
+    reader.onerror = function () { setStatus($("fileStatus"), "ファイルを読み込めませんでした", "err"); };
+    reader.readAsArrayBuffer(f);
+  };
+  function needFile(statusEl) {
+    if (!pickedFile) { setStatus(statusEl, "先にファイルを選択してください", "err"); return true; }
+    if (!pickedBytes) { setStatus(statusEl, "ファイル読み込み中です — もう一度押してください", "err"); return true; }
+    return false;
+  }
+  var lastEncContainer = null;
+  $("fileEncBtn").onclick = function () {
+    if (needFile($("fileStatus"))) return;
+    var pass = $("filePass").value;
+    if (!pass) { setStatus($("fileStatus"), "パスフレーズを入力してください", "err"); return; }
+    busy($("fileStatus"), "暗号化しています… (" + pickedBytes.length + " bytes)");
+    defer(function () {
+      try {
+        var r = QC.encryptBytes(pass, pickedBytes, {
+          knotId: parseInt($("fileKnot").value, 10), filename: pickedFile.name });
+        lastEncContainer = r.container;
+        var outName = pickedFile.name + ".badaqc";
+        var saved = saveBlob(r.container, outName);
+        setStatus($("fileStatus"),
+          saved ? "暗号化しました → " + outName + " を保存 (保存が始まらない場合は下のテキスト表示を使用)"
+                : "暗号化しました — この環境は直接保存できないため「テキスト表示」でコピーしてください", "ok");
+        showSec(r.meta);
+      } catch (e) { setStatus($("fileStatus"), "暗号化失敗: " + e.message, "err"); }
+    });
+  };
+  $("fileDecBtn").onclick = function () {
+    if (needFile($("fileStatus"))) return;
+    var pass = $("filePass").value;
+    if (!pass) { setStatus($("fileStatus"), "パスフレーズを入力してください", "err"); return; }
+    busy($("fileStatus"), "解除しています…");
+    defer(function () {
+      try {
+        var container = pickedBytes;
+        /* アーマーテキスト ファイル (.badaqc.txt) も受け付ける */
+        if (container.length > 4 && !(container[0] === 0x42 && container[1] === 0x51 && container[2] === 0x43 && container[3] === 0x31)) {
+          container = QC.dearmor(QC.utf8dec(container));
+        }
+        var r = QC.decryptContainer(pass, container);
+        var outName = r.filename || (pickedFile.name.replace(/\.badaqc(\.txt)?$/i, "") || "decrypted.bin");
+        var saved = saveBlob(r.plain, outName);
+        setStatus($("fileStatus"),
+          (saved ? "解除しました → " + outName + " を保存" : "解除しました — ただしこの環境では保存できませんでした")
+          + " (AEAD タグ検証 OK)", "ok");
+        showSec(r.meta);
+      } catch (e) { setStatus($("fileStatus"), String(e.message), "err"); }
+    });
+  };
+  $("fileArmorBtn").onclick = function () {
+    if (!lastEncContainer) { setStatus($("fileStatus"), "先に「暗号化して保存」を実行してください", "err"); return; }
+    $("fileArmorOut").value = QC.armor(lastEncContainer);
+    $("fileArmorOut").style.display = "block";
+    copyText($("fileArmorOut").value, $("fileStatus"));
+  };
+})();
+</script>
+</body>
+</html>

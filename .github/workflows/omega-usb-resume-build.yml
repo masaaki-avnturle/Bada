@@ -1,0 +1,186 @@
+name: Ω-USB Resume app build (APK + Windows EXE + Ubuntu)
+
+# omega_usb_resume/ の「Ω-USB Resume」— 接触不良USBメモリを復旧するアプリを
+#   - Android 向け APK (Cordova, GUI)
+#   - Windows 10/11 向け EXE (Electron, NSIS + ポータブル)
+#   - Ubuntu 向け AppImage / deb (Electron GUI) + CLI (usb-resume, Node SEA)
+# としてビルドします。GUI 本体は www/index.html の自己完結 HTML です。
+# タグや workflow_dispatch を待たずに、ブランチ push でも Actions アーティ
+# ファクトを作るので Actions タブからダウンロードできます。
+# usb-resume-v* タグ / release_tag 指定時は GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: usb-resume-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'usb-resume-v*'
+    branches:
+      - main
+      - 'claude/quantum-crypto-multiplatform-303qm2'
+    paths:
+      - 'omega_usb_resume/**'
+      - '.github/workflows/omega-usb-resume-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check GUI HTML (inline JS syntax) + CLI smoke test
+        run: |
+          set -e
+          test -f omega_usb_resume/www/index.html
+          node -e '
+            const fs = require("fs");
+            const h = fs.readFileSync("omega_usb_resume/www/index.html", "utf8");
+            const ms = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+            let n = 0;
+            for (const m of ms){ if (m[1].trim()){ new Function(m[1]); n++; } }
+            if (!n){ console.error("no inline script found"); process.exit(1); }
+            console.log("inline GUI scripts OK:", n);
+          '
+          node omega_usb_resume/cli/usb-resume.js --version
+          node omega_usb_resume/cli/usb-resume.js scan | tee /tmp/usb.out
+          grep -q "USB devices" /tmp/usb.out
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: omega_usb_resume/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-usb-resume-windows
+          path: omega_usb_resume/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: omega_usb_resume/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu GUI (Electron — AppImage + deb)
+        working-directory: omega_usb_resume/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux GUI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-usb-resume-linux
+          path: |
+            omega_usb_resume/electron/dist/*.AppImage
+            omega_usb_resume/electron/dist/*.deb
+      - name: Attach Linux GUI to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            omega_usb_resume/electron/dist/*.AppImage
+            omega_usb_resume/electron/dist/*.deb
+
+  linux-cli:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Ubuntu CLI (usb-resume, Node SEA standalone binary + deb)
+        run: bash omega_usb_resume/cli/build-linux-cli.sh
+      - name: Upload CLI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-usb-resume-linux-cli
+          path: |
+            omega_usb_resume/cli/build/usb-resume-linux-x64
+            omega_usb_resume/cli/build/usb-resume-cli_*_amd64.deb
+      - name: Attach CLI to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            omega_usb_resume/cli/build/usb-resume-linux-x64
+            omega_usb_resume/cli/build/usb-resume-cli_*_amd64.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 8.7 (cordova-android 12 is incompatible with Gradle 9's XmlParser)
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          APP="omega_usb_resume"
+          cordova create cordova-build io.github.masaaki_avnturle.omega_usb_resume OmegaUSBResume
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega-usb-resume-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega-usb-resume-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk

@@ -105,4 +105,68 @@ assert(vu[1] === "0" && vu[2] === "0", "os upgrade bumps the major version and r
 const sh = get("runShell")("rails scaffold Book title:string");
 assert(/bada:\/\/rails\/book/.test(sh), "CUI shell can run rails scaffold");
 
+/* 7. Ubuntu ユーザーランド — apt / 事前インストール */
+const aptList = get("runShell")("apt list --installed");
+for (const p of ["bash", "vim", "emacs", "openssh-client", "xinetd", "texlive-full", "screen", "fcitx-mozc", "xterm", "x-terminal-emulator", "terminal"]){
+  assert(aptList.includes(p + "/badable"), "preinstalled package: " + p);
+}
+assert(/はすでに最新バージョン/.test(get("runShell")("apt install vim")), "apt install of a preinstalled package is a no-op");
+assert(/を設定しています/.test(get("runShell")("apt install cowsay")), "apt install adds a new package");
+assert(get("runShell")("apt list --installed").includes("cowsay/badable"), "newly installed package appears in apt list");
+assert(/essential/.test(get("runShell")("apt remove bash")), "essential package bash cannot be removed");
+
+/* 8. VFS — echo リダイレクト / cat / ls */
+const ctxMk = get("shellCtx");
+const runShell = get("runShell");
+const ctx = ctxMk();
+runShell("echo konnichiwa > /home/user/greet.txt", ctx);
+assert(runShell("cat /home/user/greet.txt", ctx).trim() === "konnichiwa", "echo > file then cat round-trips through the VFS");
+assert(runShell("ls /home/user", ctx).includes("greet.txt"), "ls shows the new file");
+runShell("cd /etc", ctx);
+assert(ctx.cwd === "/etc" && runShell("pwd", ctx) === "/etc", "cd changes the shell cwd");
+
+/* 9. ssh — 既知ホストへ接続してプロンプトが変わり、exit で戻る */
+const sshOut = runShell("ssh user@bada.or.jp", ctx);
+assert(/QKD/.test(sshOut) && /Welcome to bada\.or\.jp/.test(sshOut), "ssh connects with a Bell-pair QKD handshake banner");
+assert(ctx.host === "bada.or.jp", "ssh switches the shell host");
+assert(/closed/.test(runShell("exit", ctx)), "exit closes the ssh connection");
+assert(ctx.host === "badavm", "after exit the shell is local again");
+assert(/Could not resolve/.test(runShell("ssh nowhere.example", ctx)), "unknown ssh host is rejected");
+
+/* 10. xinetd / texlive / fcitx-mozc コマンド */
+assert(/active \(running\)/.test(runShell("xinetd status", ctx)), "xinetd reports active with managed services");
+assert(/echo/.test(runShell("xinetd status", ctx)), "xinetd lists /etc/xinetd.d services");
+assert(/TeX Live 2024/.test(runShell("pdflatex --version", ctx)), "texlive-full provides pdflatex");
+const texOut = runShell("pdflatex /home/user/letter.tex", ctx);
+assert(/Output written on letter\.pdf/.test(texOut), "pdflatex compiles letter.tex to letter.pdf");
+assert(/%PDF/.test(runShell("cat /home/user/letter.pdf", ctx)), "compiled PDF exists in the VFS");
+assert(/Ctrl\+Space/.test(runShell("fcitx-mozc status", ctx)), "fcitx-mozc explains Japanese input toggling");
+
+/* 11. fcitx-mozc ローマ字→かな変換 (端末の日本語入力) */
+const r2k = get("romajiToKana");
+assert(r2k("nihongo") === "にほんご", "romaji nihongo → にほんご");
+assert(r2k("kyouto") === "きょうと", "romaji kyouto → きょうと (拗音)");
+assert(r2k("gakkou") === "がっこう", "romaji gakkou → がっこう (促音)");
+assert(r2k("shinbun") === "しんぶん", "romaji shinbun → しんぶん (ん)");
+assert(get("kanaToKatakana")("たみなる") === "タミナル", "hiragana → katakana conversion (F7)");
+
+/* 12. 不明コマンドは bash 風エラー */
+assert(/command not found/.test(runShell("no-such-cmd", ctx)), "unknown command reports bash-style error");
+
+/* 13. ISO 9660 ライブ CD のマウント (/mnt/cdrom) */
+{
+  const isoLib = require(path.join(__dirname, "iso9660.js"));
+  const iso = isoLib.buildIso({ volumeId: "ENGTEST", files: [
+    { name: "index.htm", data: "<html>live</html>" },
+    { name: "readme.txt", data: "hello from cd" }
+  ]});
+  const r = get("mountIsoBytes")(iso);
+  assert(r.volumeId === "ENGTEST" && r.bootable === true, "mountIsoBytes parses volume id + El Torito");
+  assert(/INDEX\.HTM/.test(runShell("ls /mnt/cdrom", ctx)), "ls /mnt/cdrom lists the ISO contents");
+  assert(runShell("cat /mnt/cdrom/README.TXT", ctx).trim() === "hello from cd", "cat reads a file from the mounted ISO");
+  assert(/ENGTEST on \/mnt\/cdrom/.test(runShell("mount", ctx)), "mount shows the cdrom volume");
+  assert(/取り出しました/.test(runShell("eject", ctx)), "eject unmounts the ISO");
+  assert(/No such file/.test(runShell("ls /mnt/cdrom", ctx)), "after eject /mnt/cdrom is gone");
+}
+
 console.log("\nALL ENGINE TESTS PASSED");

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<!--
+  Ω-USB Resume — 死んだUSBポートを Bada の複素回転体・可積分系で蘇生 (概念シミュレーション)
+  Masaaki Yamaguchi / Bada — omega_usb_resume
+
+  接触不良で化けた機械語の記述子バイト列 (= n進数のズレ) を、同じ記述子の複数読み取りとして扱い、
+  複素回転体 e^{iθ} の閉軌道で平均 (特殊相対性理論のコマ幾何・可積分系: 外れ値を相対論的に減衰) して
+  真値を復元する。回転は大きさを保存するのでエントロピー不変量 Ξ が保存され、それが復旧の証明になる。
+  復元後、authorize(0→1) → power/control=on → unbind/bind (プラグプレイ再列挙) でデバイスをレジュームする。
+
+  ⚠ 概念シミュレーション。ブラウザ/アプリはホストPCの実USBコントローラには触れません。
+     実機での再認可・再列挙は Linux 版 CLI (bin/bada usb --apply) が行います。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-USB Resume</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--green:#3fd07a;--red:#e0604a;--txt:#e6ecf5;--dim:#8794a8;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:16px 18px 8px}h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12.5px;margin-top:6px}
+  .disc{margin:12px 18px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:#e0b020;font-size:12px}
+  main{display:flex;gap:16px;flex-wrap:wrap;padding:16px 18px 50px}
+  .col{flex:1;min-width:300px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}select{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button:disabled{opacity:.5;cursor:default}
+  .dev{display:flex;justify-content:space-between;align-items:center;padding:8px 9px;border:1px solid var(--line);border-radius:8px;margin:6px 0;cursor:pointer;font-size:12.5px}
+  .dev:hover{border-color:var(--cyan)}.dev.sel{border-color:var(--gold);background:#12172180}
+  .dev .id{font-family:var(--mono);color:var(--dim)}
+  .badge{font-family:var(--mono);font-size:11px;padding:2px 7px;border-radius:20px;border:1px solid}
+  .b-resumed{color:var(--green);border-color:var(--green)}.b-dead{color:var(--red);border-color:var(--red)}
+  .cap{font-size:11.5px;color:var(--dim);text-align:center;margin-top:5px}
+  .stat{display:flex;justify-content:space-between;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .steps{font-family:var(--mono);font-size:12px}
+  .steps div{padding:3px 0;border-bottom:1px solid var(--line);display:flex;gap:8px}
+  .ok{color:var(--green)}.bad{color:var(--red)}.pend{color:var(--dim)}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-USB Resume — 死んだUSBポートの蘇生</h1>
+  <div class="sub">Complex Rotational Body · Special-Relativity Spinning-Top · Integrable Error Correction · Bada/omega_usb_resume</div>
+  <div class="eq">接触不良 → n進数のズレ &nbsp;·&nbsp; □=e<sup>iθ</sup> 閉軌道平均 (|□|保存) &nbsp;·&nbsp; Ξ=β(H+1,M+1)/log(N+1) 保存 → RESUMED</div>
+</header>
+<div class="disc">⚠ <b>概念シミュレーション</b>:
+  接触不良で化けた機械語バイト列 (<b>n進数のズレ</b>) を、複素回転体 e<sup>iθ</sup> の可積分な閉軌道で平均して復元し、
+  Ξ 保存で認証してからデバイスをレジュームする過程を再現します。<b>ブラウザ/アプリはホストPCの実USBには触れません</b>。
+  実機での再認可・再列挙は Linux CLI <code>bin/bada usb --apply</code> が行います。</div>
+
+<main>
+  <div class="col" style="flex:0 0 320px">
+    <div class="card">
+      <h3>USB デバイス</h3>
+      <div id="fleet"></div>
+      <div class="cap">不良ポート (赤) を選んでレジュームします</div>
+    </div>
+    <div class="card">
+      <h3>設定</h3>
+      <label>n進数 (機械語のズレの基数): <span class="val" id="base_v">16</span></label>
+      <select id="base"><option value="2">2 (二進)</option><option value="8">8 (八進)</option><option value="10">10 (十進)</option><option value="16" selected>16 (十六進)</option></select>
+      <label>接触不良の激しさ p: <span class="val" id="p_v">0.35</span></label>
+      <input type="range" id="p" min="5" max="60" value="35"/>
+      <button id="run">▶ レジューム実行</button>
+      <div class="cap" id="status">準備完了</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3>機械語 記述子 (USB device descriptor · 18 bytes)</h3>
+      <canvas id="bytes" width="360" height="150"></canvas>
+      <div class="cap">上=真値 / 中=接触不良で化けた読み取り (n進数のズレ) / 下=回転体で復元。緑=一致・赤=ズレ</div>
+    </div>
+    <div class="col" style="display:flex;gap:13px;flex-wrap:wrap;padding:0">
+      <div class="card" style="flex:1;min-width:180px">
+        <h3>複素回転体 e<sup>iθ</sup> (コマ幾何)</h3>
+        <canvas id="rot" width="200" height="200"></canvas>
+        <div class="cap">選択バイトのノイズ読取を回転体に射影。外れ値は相対論的時間遅延で減衰し、閉軌道平均(金)が真値(緑)へ収束</div>
+      </div>
+      <div class="card" style="flex:1;min-width:180px">
+        <h3>レジューム手順</h3>
+        <div class="steps" id="steps"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>可積分認証 & 結果</h3>
+      <div class="stat"><span>回復バイト</span><b id="s_rec">—</b></div>
+      <div class="stat"><span>ビット誤り (入→出)</span><b id="s_bit">—</b></div>
+      <div class="stat"><span>読み取り回数 (制御転送リトライ)</span><b id="s_reads">—</b></div>
+      <div class="stat"><span>base-n チェックサム</span><b id="s_ck">—</b></div>
+      <div class="stat"><span>エントロピー不変量 Ξ</span><b id="s_xi">—</b></div>
+      <div class="stat"><span>Ξ 保存 (可積分系)</span><b id="s_cons">—</b></div>
+      <div class="stat"><span>結果</span><b id="s_final">—</b></div>
+    </div>
+  </div>
+</main>
+<footer>Ω-USB Resume · © 2025 Masaaki Yamaguchi · Bada / omega_usb_resume · 概念シミュレーション</footer>
+
+<script>
+"use strict";
+/* ===== Bada::UsbResume の JavaScript 移植 (lib/bada/usb_resume.rb と等価) ===== */
+
+/* --- Special: gamma / beta (Lanczos) --- */
+var LZ=[0.99999999999980993,676.5203681218851,-1259.1392167224028,771.32342877765313,
+  -176.61502916214059,12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+function gamma(x){ if(x<0.5)return Math.PI/(Math.sin(Math.PI*x)*gamma(1-x));
+  x-=1;var a=LZ[0],t=x+7.5;for(var i=1;i<9;i++)a+=LZ[i]/(x+i);
+  return Math.sqrt(2*Math.PI)*Math.pow(t,x+0.5)*Math.exp(-t)*a; }
+function logGamma(x){return Math.log(Math.abs(gamma(x)));}
+function beta(p,q){return Math.exp(logGamma(p)+logGamma(q)-logGamma(p+q));}
+function xLogX(x){return x<=0?0:x*Math.log(x);}
+
+/* --- Entropy + Manifold invariant Ξ (over descriptor hex string tokens) --- */
+var TOKEN_RE=/[A-Za-z0-9_]+|[一-鿿぀-ゟ゠-ヿ]/g;
+function tokenize(str){return str.match(TOKEN_RE)||[];}
+function shannon(tokens){var f={},n=tokens.length;if(!n)return 0;
+  tokens.forEach(function(t){f[t]=(f[t]||0)+1;});var H=0;
+  for(var k in f){var p=f[k]/n;H-=p*Math.log2(p);}return H;}
+function distribution(tokens){var f={},n=tokens.length;tokens.forEach(function(t){f[t]=(f[t]||0)+1;});
+  return Object.keys(f).map(function(k){return f[k]/n;}).sort(function(a,b){return b-a;});}
+function mElement(x){if(x<=1)return 1;var xl=xLogX(x);return Math.abs(xl)<1e-9?1:1/(xl*xl);}
+function mIntegral(dist){return dist.reduce(function(s,p,i){return s+p*mElement(i+2);},0);}
+function invariant(str){var toks=tokenize(str);var H=shannon(toks),M=mIntegral(distribution(toks)),N=toks.length;
+  var lx=Math.log(N+1);return {H:H,M:M,N:N,xi:lx<1e-15?Infinity:beta(H+1,M+1)/lx};}
+
+/* --- ErrorCorrection: complex rotational body / integrable orbit average --- */
+function lorentz(v){v=Math.min(0.999999,Math.abs(v));return 1/Math.sqrt(1-v*v);}
+function median(arr){if(!arr.length)return 0;var s=arr.slice().sort(function(a,b){return a-b;});var m=s.length>>1;
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;}
+function orbitAverage(samples){ if(!samples.length)return 0;
+  var med=median(samples);var spread=Math.max(1e-9,median(samples.map(function(x){return Math.abs(x-med);})));
+  var acc=0,w=0;samples.forEach(function(s){var v=Math.abs(s-med)/(spread*6);var wi=1/lorentz(v);acc+=s*wi;w+=wi;});
+  return w===0?med:acc/w; }
+function correct(samples){ if(!samples.length)return {value:0,residual:0,samples:0};
+  var est=orbitAverage(samples);
+  var res=Math.sqrt(samples.reduce(function(s,x){return s+(x-est)*(x-est);},0)/samples.length);
+  return {value:est,residual:res,samples:samples.length}; }
+/* certify: rotate the invariant through phases, confirm |·| conserved */
+function certifyInvariant(hex){var base=invariant(hex).xi;var views=[];
+  for(var k=0;k<8;k++){var th=2*Math.PI*k/8;views.push(Math.abs(base));} /* e^{iθ}·x, magnitude = |x| */
+  var c=correct(views);
+  return {invariant:base,certified:c.value,conserved:Math.abs(c.value-base)<=Math.abs(base)*1e-6+1e-6,residual:c.residual};}
+
+/* --- n進数 (base-n) digit drift model --- */
+function byteWidth(base){var w=1;while(Math.pow(base,w)<=255)w++;return w;}
+function toBase(v,base,w){var d=new Array(w).fill(0);for(var i=w-1;i>=0;i--){d[i]=v%base;v=Math.floor(v/base);}return d;}
+function fromBase(d,base){return d.reduce(function(a,x){return a*base+x;},0);}
+/* mulberry32: exact 32-bit PRNG (Math.imul stays within precision, unlike the
+   Ruby LCG which would overflow 2^53 in JS). Seeded per (seed,trial). */
+function makeRng(seed,trial){var st=(Math.imul(seed,2654435761)+Math.imul(trial,40503)+0x9e3779b1)>>>0;
+  return function(){st|=0;st=st+0x6D2B79F5|0;var t=Math.imul(st^st>>>15,1|st);
+    t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function drift(bytes,base,p,seed,trial){var w=byteWidth(base),rng=makeRng(seed,trial);
+  return bytes.map(function(b){var d=toBase(b,base,w).map(function(x){
+    if(rng()<p){var step=rng()<0.5?-1:1;return Math.max(0,Math.min(base-1,x+step));}return x;});
+    return fromBase(d,base)&0xff;});}
+function recoverByte(samples){var c=correct(samples);return Math.max(0,Math.min(255,Math.round(c.value)));}
+/* per-digit recovery: fix each base-n digit independently, then reassemble —
+   literally "fixing the n進数のズレ" (equivalent to recover_byte_basen in Ruby). */
+function recoverByteBaseN(samples,base){var w=byteWidth(base);
+  var digits=[];for(var k=0;k<w;k++){var col=samples.map(function(s){return toBase(s&0xff,base,w)[k];});
+    digits.push(Math.max(0,Math.min(base-1,Math.round(correct(col).value))));}
+  return fromBase(digits,base)&0xff;}
+function popcount(x){var c=0;while(x){c+=x&1;x>>=1;}return c;}
+function hamming(a,b){return a.reduce(function(s,x,i){return s+popcount((x^(b[i]||0))&0xff);},0);}
+function recoverDescriptor(truth,base,reads,p,seed){
+  var noisy=[];for(var t=0;t<reads;t++)noisy.push(drift(truth,base,p,seed,t));
+  var corrected=truth.map(function(_,i){return recoverByteBaseN(noisy.map(function(c){return c[i];}),base);});
+  var body=corrected.slice(0,-1),ckOk=(body.reduce(function(a,x){return a+x;},0)&0xff)===corrected[corrected.length-1];
+  var matched=corrected.reduce(function(s,x,i){return s+(x===truth[i]?1:0);},0);
+  return {corrected:corrected,noisyFirst:noisy[0],reads:reads,
+    bitIn:hamming(truth,noisy[0]),bitOut:hamming(truth,corrected),
+    recovered:matched,total:truth.length,checksumOk:ckOk};}
+function recoverAdaptive(truth,base,reads,maxReads,p,seed){var best=null,r=reads;
+  while(r<=maxReads){var rec=recoverDescriptor(truth,base,r,p,seed);
+    if(!best||rec.recovered>best.recovered)best=rec;if(rec.checksumOk)break;r+=8;}return best;}
+
+/* --- device model --- */
+function checksumOf(b){return b.reduce(function(a,x){return a+x;},0)&0xff;}
+function defaultDescriptor(vendor,product){var head=[0x12,0x01,0x00,0x02,0x00,0x00,0x00,0x40,
+  vendor&0xff,(vendor>>8)&0xff,product&0xff,(product>>8)&0xff,0x00,0x01,0x01,0x02,0x03];
+  return head.concat([checksumOf(head)]);}
+function fleet(){return [
+  {id:"1-1",bus:"1",vendor:0x046d,product:0xc31c,name:"USB Keyboard",authorized:1,pc:"on",bound:true},
+  {id:"usb2",bus:"2",vendor:0x1d6b,product:0x0002,name:"2.0 root hub",authorized:1,pc:"auto",bound:true},
+  {id:"2-3",bus:"2",vendor:0x0781,product:0x5581,name:"USB Mass Storage (faulted)",authorized:0,pc:"suspend",bound:false}
+].map(function(d){d.descriptor=defaultDescriptor(d.vendor,d.product);return d;});}
+function alive(d){return d.authorized===1&&d.bound&&d.pc!=="suspend";}
+function statusOf(d){return alive(d)?"RESUMED":d.authorized!==1?"UNAUTHORIZED":!d.bound?"UNBOUND":"SUSPENDED";}
+
+/* ===== UI ===== */
+var DEV=fleet(),SEL=DEV[2],ANIM=null;
+function hex(x){return x.toString(16).padStart(2,"0");}
+function renderFleet(){var el=document.getElementById("fleet");el.innerHTML="";
+  DEV.forEach(function(d){var live=alive(d);var div=document.createElement("div");
+    div.className="dev"+(d===SEL?" sel":"");
+    div.innerHTML='<span><b>'+d.name+'</b><br><span class="id">'+d.id+'  '+
+      "0x"+d.vendor.toString(16).padStart(4,"0")+":0x"+d.product.toString(16).padStart(4,"0")+'</span></span>'+
+      '<span class="badge '+(live?"b-resumed":"b-dead")+'">'+statusOf(d)+'</span>';
+    div.onclick=function(){SEL=d;renderFleet();drawBytes(d.descriptor,d.descriptor,d.descriptor);};
+    el.appendChild(div);});}
+
+function drawBytes(truth,noisy,corrected,litRow){
+  var c=document.getElementById("bytes"),ctx=c.getContext("2d"),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);var n=truth.length,cw=W/n,rows=[["真値",truth,null],["不良",noisy,truth],["復元",corrected,truth]];
+  var rh=40,y0=14;ctx.font="10px "+getComputedStyle(document.body).getPropertyValue("--mono");
+  rows.forEach(function(row,ri){var label=row[0],data=row[1],ref=row[2];var y=y0+ri*rh;
+    ctx.fillStyle="#8794a8";ctx.fillText(label,2,y-2);
+    for(var i=0;i<n;i++){var x=i*cw,val=data[i];
+      var col="#12324a";if(ref){col=(val===ref[i])?"#123a24":"#3a1414";}
+      if(litRow===ri){ctx.fillStyle="#0e2038";ctx.fillRect(x+1,y+1,cw-2,rh-16);}
+      ctx.fillStyle=col;ctx.fillRect(x+1,y+2,cw-2,rh-18);
+      ctx.fillStyle=ref?((val===ref[i])?"#3fd07a":"#e0604a"):"#40b8c0";
+      ctx.fillText(hex(val),x+cw/2-6,y+rh-20);}
+  });}
+
+function drawRot(samples,truth,est){
+  var c=document.getElementById("rot"),ctx=c.getContext("2d"),W=c.width,H=c.height,cx=W/2,cy=H/2,R=70;
+  ctx.clearRect(0,0,W,H);
+  ctx.strokeStyle="#1b2638";ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.stroke();
+  ctx.strokeStyle="#12324a";ctx.beginPath();ctx.moveTo(cx-R-8,cy);ctx.lineTo(cx+R+8,cy);
+  ctx.moveTo(cx,cy-R-8);ctx.lineTo(cx,cy+R+8);ctx.stroke();
+  var med=median(samples);
+  samples.forEach(function(s,i){var th=2*Math.PI*i/samples.length;
+    var rad=R*(0.55+0.45*Math.min(1,Math.abs(s-med)/8));
+    var x=cx+rad*Math.cos(th),y=cy+rad*Math.sin(th);
+    var out=Math.abs(s-med)>2;ctx.fillStyle=out?"#e0604a":"#40b8c0";
+    ctx.beginPath();ctx.arc(x,y,out?2:2.6,0,7);ctx.fill();});
+  /* true value (green) and orbit-average estimate (gold) as radial marks */
+  function mark(val,col,r){var frac=(val%16)/16;var th=2*Math.PI*frac;
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,cy);
+    ctx.lineTo(cx+r*Math.cos(th),cy+r*Math.sin(th));ctx.stroke();ctx.lineWidth=1;}
+  mark(truth,"#3fd07a",R);mark(Math.round(est),"#c8a44a",R*0.8);
+}
+
+var STEP_DEFS=[["measure","ポート測定"],["n進数補正","n進数補正 (回転体復元)"],
+  ["可積分認証","可積分認証 (Ξ保存)"],["authorize","authorize 0→1"],
+  ["power/control","power/control=on"],["rebind","unbind→bind (再列挙)"],["verify","検証"]];
+function renderSteps(states){var el=document.getElementById("steps");el.innerHTML="";
+  STEP_DEFS.forEach(function(s,i){var st=states[i]||"pend";var mark=st==="ok"?"✓":st==="bad"?"✗":"·";
+    var cls=st==="ok"?"ok":st==="bad"?"bad":"pend";
+    var d=document.createElement("div");d.innerHTML='<span class="'+cls+'">'+mark+'</span><span>'+s[1]+'</span>';
+    el.appendChild(d);});}
+
+function setStat(id,txt,cls){var e=document.getElementById(id);e.textContent=txt;e.className=cls||"";}
+
+function resume(){
+  if(ANIM){clearInterval(ANIM);ANIM=null;}
+  var d=SEL,base=+document.getElementById("base").value,p=+document.getElementById("p").value/100;
+  document.getElementById("run").disabled=true;
+  document.getElementById("status").textContent="レジューム中…";
+  var states=["pend","pend","pend","pend","pend","pend","pend"];renderSteps(states);
+  ["s_rec","s_bit","s_reads","s_ck","s_xi","s_cons","s_final"].forEach(function(id){setStat(id,"—");});
+
+  if(alive(d)){document.getElementById("status").textContent="既に RESUMED です";
+    document.getElementById("run").disabled=false;return;}
+
+  var truth=defaultDescriptor(d.vendor,d.product);
+  var rec=recoverAdaptive(truth,base,9,193,p,7);
+  var cert=certifyInvariant(rec.corrected.map(hex).join(""));
+  /* pick the byte with the most drift for the rotation-body view */
+  var worst=0,worstIdx=0;truth.forEach(function(v,i){var e=Math.abs((rec.noisyFirst[i]||0)-v);if(e>worst){worst=e;worstIdx=i;}});
+  var samples=[];for(var t=0;t<rec.reads;t++)samples.push(drift([truth[worstIdx]],base,p,7,t)[0]);
+
+  var seq=0;
+  ANIM=setInterval(function(){
+    switch(seq){
+      case 0: drawBytes(truth,rec.noisyFirst,rec.noisyFirst,-1);states[0]="ok";
+              setStat("s_final","UNAUTHORIZED → …");break;
+      case 1: drawRot(samples,truth[worstIdx],correct(samples).value);
+              drawBytes(truth,rec.noisyFirst,rec.corrected,2);states[1]=rec.checksumOk?"ok":"bad";
+              setStat("s_rec",rec.recovered+"/"+rec.total,rec.recovered===rec.total?"ok":"bad");
+              setStat("s_bit",rec.bitIn+" → "+rec.bitOut,"ok");
+              setStat("s_reads",rec.reads+" reads","");break;
+      case 2: states[2]=cert.conserved?"ok":"bad";
+              setStat("s_ck",rec.checksumOk?"OK":"FAIL",rec.checksumOk?"ok":"bad");
+              setStat("s_xi",cert.invariant.toFixed(6),"");
+              setStat("s_cons",cert.conserved?"conserved ✓":"NG","conserved" in cert&&cert.conserved?"ok":"bad");break;
+      case 3: d.authorized=1;states[3]="ok";renderFleet();break;
+      case 4: d.pc="on";states[4]="ok";renderFleet();break;
+      case 5: d.bound=true;states[5]="ok";renderFleet();break;
+      case 6: var ok=alive(d)&&rec.checksumOk&&cert.conserved;states[6]=ok?"ok":"bad";
+              setStat("s_final",ok?"RESUMED ✅":"NOT resumed ⚠",ok?"ok":"bad");
+              document.getElementById("status").textContent=ok?"完了: RESUMED":"未復旧 (物理故障の可能性)";
+              document.getElementById("run").disabled=false;renderFleet();
+              clearInterval(ANIM);ANIM=null;break;
+    }
+    renderSteps(states);seq++;
+  },520);
+}
+
+document.getElementById("base").onchange=function(e){document.getElementById("base_v").textContent=e.target.value;};
+document.getElementById("p").oninput=function(e){document.getElementById("p_v").textContent=(e.target.value/100).toFixed(2);};
+document.getElementById("run").onclick=resume;
+
+renderFleet();
+drawBytes(SEL.descriptor,SEL.descriptor,SEL.descriptor);
+renderSteps([]);
+drawRot([128,127,129,120,140,126,130,125],64,64);
+</script>
+</body>
+</html>
