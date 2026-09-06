@@ -61,7 +61,8 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     grub2-common grub-pc-bin grub-efi-amd64-bin os-prober ntfs-3g \
     vim emacs-nox openssh-server curl wget less ca-certificates \
     bluez usbutils \
-    mlterm screen tmux locales texlive texlive-lang-japanese
+    mlterm screen tmux locales texlive texlive-lang-japanese \
+    wmaker htop mc
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 # the real w9wm (or its parent 9wm) as an alternative window manager --
@@ -105,8 +106,11 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
   * Japanese ready: ja_JP.UTF-8 / mlterm / fcitx-mozc + fcitx-configtool
     (Ctrl+Space), pLaTeX (texlive + texlive-lang-japanese; the FULL TeX
     Live is one `sudo apt install texlive-full` away), screen / tmux
-  * window managers: w9wm (default on installed systems) / afterstep /
-    openbox -- pick with badaos.wm=... or `WM=afterstep startx`
+  * window managers: w9wm / afterstep / wmaker / openbox. An INSTALLED
+    BadaOS boots straight into the WM DESKTOP (w9wm + mlterm, no kiosk):
+    drive Ubuntu-style apps from mlterm (apt, htop, mc, vim, tmux ...),
+    `badavm &` opens the BadaVM Pro app as a window. Pick the WM with
+    badaos.wm=... / badaos.session=kiosk restores the fullscreen app
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>
   * install to the real disk:  sudo badaos-install
@@ -158,12 +162,15 @@ if command -v fcitx >/dev/null 2>&1; then fcitx -d >/dev/null 2>&1
 elif command -v fcitx5 >/dev/null 2>&1; then fcitx5 -d >/dev/null 2>&1
 fi
 
-# window manager selection:
-#   installed BadaOS  -> w9wm (falls back to 9wm, then openbox)
-#   live boot         -> openbox (most reliable for the kiosk)
-#   badaos.wm=w9wm|afterstep|openbox on the kernel cmdline overrides either
-#   WM=w9wm|afterstep|openbox startx  -> a plain desktop session with mlterm
-#                                        (Japanese terminal), no kiosk
+# session model:
+#   INSTALLED BadaOS -> a PLAIN WM DESKTOP: just the window manager (w9wm by
+#     default; afterstep / wmaker / openbox selectable) with mlterm on it --
+#     no kiosk. Ubuntu-style applications are driven from mlterm (apt, htop,
+#     mc, vim, tmux, ...); `badavm &` opens the BadaVM Pro app as a normal
+#     window when wanted.
+#   LIVE boot -> the fullscreen BadaOS kiosk (the try-it/installer medium).
+#   Overrides: badaos.session=desktop|kiosk, badaos.wm=w9wm|afterstep|wmaker|
+#   openbox on the kernel cmdline; or `WM=wmaker startx` from a console.
 pickwm() {
   case "$1" in
     w9wm)
@@ -171,28 +178,39 @@ pickwm() {
       if command -v 9wm  >/dev/null 2>&1; then echo 9wm; return; fi ;;
     afterstep)
       if command -v afterstep >/dev/null 2>&1; then echo afterstep; return; fi ;;
+    wmaker)
+      if command -v wmaker >/dev/null 2>&1; then echo wmaker; return; fi ;;
   esac
   echo openbox
 }
 WMSEL=""
+SESSION=""
 for a in $(cat /proc/cmdline); do
-  case "$a" in badaos.wm=*) WMSEL="${a#badaos.wm=}";; esac
+  case "$a" in
+    badaos.wm=*) WMSEL="${a#badaos.wm=}";;
+    badaos.session=*) SESSION="${a#badaos.session=}";;
+  esac
 done
-if [ -n "${WM:-}" ]; then
-  # console-launched desktop session: WM + mlterm, no kiosk
-  WMBIN="$(pickwm "$WM")"
+[ -n "${WM:-}" ] && { WMSEL="$WM"; SESSION=desktop; }
+if [ -z "$SESSION" ]; then
+  if grep -q boot=live /proc/cmdline; then SESSION=kiosk; else SESSION=desktop; fi
+fi
+if grep -q badaos.gui-installer /proc/cmdline; then SESSION=kiosk; fi
+
+if [ "$SESSION" = "desktop" ]; then
+  # the OS boots into the window manager alone: w9wm / afterstep / wmaker,
+  # with mlterm (Japanese terminal) as the workbench for Ubuntu-style apps
+  WMBIN="$(pickwm "${WMSEL:-w9wm}")"
   if command -v mlterm >/dev/null 2>&1; then mlterm &
   elif command -v xterm >/dev/null 2>&1; then xterm & fi
   if [ "$WMBIN" = openbox ]; then exec openbox --sm-disable; fi
+  sleep 1
   exec "$WMBIN"
 fi
-if [ -z "$WMSEL" ] && ! grep -q boot=live /proc/cmdline; then
-  WMSEL=w9wm    # the installed BadaOS runs on w9wm
-fi
-WMBIN="$(pickwm "${WMSEL:-openbox}")"
 
-# "Install BadaOS" GRUB entry: open the Ubuntu-style GUI installer instead
-# of the BadaOS environment (wait for its local backend to come up first)
+# kiosk session (live medium): the fullscreen BadaOS environment, or the
+# Ubuntu-style GUI installer when the "Install BadaOS" GRUB entry was picked
+WMBIN="$(pickwm "${WMSEL:-openbox}")"
 URL="file:///opt/badaos/bada-vm-pro.html#autoboot"
 if grep -q badaos.gui-installer /proc/cmdline; then
   URL="http://127.0.0.1:7788/"
@@ -206,7 +224,7 @@ if [ "$WMBIN" = openbox ]; then
   exec chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
     --disable-session-crashed-bubble --password-store=basic "$URL"
 fi
-# w9wm/9wm/afterstep: map the kiosk window FIRST, then start the WM -- a
+# non-openbox kiosk: map the kiosk window FIRST, then start the WM -- a
 # window manager adopts already-mapped windows in place, so the kiosk never
 # waits for an interactive 9wm-style sweep placement
 chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
@@ -214,6 +232,14 @@ chromium --kiosk --no-first-run --disable-infobars --noerrdialogs \
 sleep 8
 exec "$WMBIN"
 EOF
+
+# `badavm` opens the BadaVM Pro app as a normal window inside the WM desktop
+cat > "$CHROOT/usr/local/bin/badavm" <<'EOF'
+#!/bin/sh
+exec chromium --app=file:///opt/badaos/bada-vm-pro.html#autoboot \
+  --no-first-run --password-store=basic "$@"
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badavm"
 chroot "$CHROOT" chown -R bada:bada /home/bada
 
 # the real-disk installer + branding for the installed system's GRUB

@@ -129,6 +129,8 @@ function run(events) {
     ["line", "platex report.tex"],        // 64 TeX Live (Japanese pLaTeX)
     ["line", "afterstep &"],              // 65 NeXTSTEP style WM + Wharf
     ["line", "twm &"],                    // 66 back to the default
+    ["line", "wmaker &"],                 // 67 Window Maker workspace + Dock
+    ["line", "twm &"],                    // 68 ... and back again
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -223,6 +225,9 @@ function run(events) {
     [65, "@@X WM afterstep"],               // AfterStep manages BadaX
     [65, "NeXTSTEP style window manager"],
     [66, "@@X WM twm"],
+    [67, "@@X WM wmaker"],                  // Window Maker manages BadaX
+    [67, "Window Maker 0.96.0"],
+    [68, "@@X WM twm"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -248,7 +253,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

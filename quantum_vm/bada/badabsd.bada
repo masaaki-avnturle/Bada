@@ -229,6 +229,7 @@ def pkg_catalog() {
       ["usbutils",       "017-3badaos",    "Linux USB utilities (lsusb)",               "tool",    "/usr/bin/lsusb"],
       ["w9wm",           "0.4.2-1badaos",  "Plan 9 style window manager with virtual screens (9wm fork)", "tool", "/usr/X11R7/bin/w9wm"],
       ["afterstep",      "2.2.12-1badaos", "NeXTSTEP style window manager (Wharf dock)", "tool",    "/usr/X11R7/bin/afterstep"],
+      ["wmaker",         "0.96.0-1badaos", "Window Maker -- NeXTSTEP-like window manager", "tool",  "/usr/X11R7/bin/wmaker"],
       ["mlterm",         "3.9.3-1badaos",  "MultiLingual TERMinal -- UTF-8/日本語対応",  "tool",    "/usr/X11R7/bin/mlterm"],
       ["fcitx-mozc",     "2.28-1badaos",   "Mozc engine for fcitx -- 日本語入力メソッド", "tool",   "/usr/bin/fcitx"],
       ["fcitx-configtool","0.4.10-1badaos","fcitx graphic configuration tool",          "tool",    "/usr/bin/fcitx-configtool"],
@@ -242,7 +243,7 @@ def pkg_catalog() {
 def pkg_preinstalled() {
     return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
             "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm",
-            "afterstep", "mlterm", "fcitx-mozc", "fcitx-configtool",
+            "afterstep", "wmaker", "mlterm", "fcitx-mozc", "fcitx-configtool",
             "texlive-full", "screen", "tmux"]
 }
 
@@ -1805,7 +1806,7 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "tuplespace on /akashic type akashic (append-only, quantum)")
         return 0
     }
-    if (list_has(["w9wm", "twm", "afterstep"], cmd) == 1) {
+    if (list_has(["w9wm", "twm", "afterstep", "wmaker"], cmd) == 1) {
         if (st[10] == 0) {
             tty(emit, cmd + ": cannot open display " + OS_DISPLAY + " (run an X client first, e.g. xterm &)")
             return 0
@@ -1818,6 +1819,9 @@ def shell_exec(emit, vm, st, line) {
         } else if (cmd == "afterstep") {
             tty(emit, "AfterStep 2.2.12 (quantum) -- NeXTSTEP style window manager, now managing BadaX")
             tty(emit, "Wharf dock on the right edge: xterm / mlterm / xclock / xeyes launchers")
+        } else if (cmd == "wmaker") {
+            tty(emit, "Window Maker 0.96.0 (quantum) -- NeXTSTEP workspace, now managing BadaX")
+            tty(emit, "Dock on the right edge: xterm / mlterm / xclock / xeyes tiles")
         } else {
             tty(emit, "twm: BadaX window manager restored (title bars, all desks merged)")
         }

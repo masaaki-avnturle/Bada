@@ -58,8 +58,12 @@
    **`w9wm &` で BadaX のウィンドウ管理が Plan 9 スタイルの w9wm になります**:
    タイトルバー無しの素朴なボーダー、**仮想デスクトップ 4 面**(ルート左上の
    w9wm ボックスバーで切替)、ウィンドウ右クリックで Hide / To desk / Delete、
-   ルート右クリックで New xterm / unhide。`twm &` で元の見た目に戻ります
+   ルート右クリックで New xterm / unhide。`afterstep &` で NeXT 風の AfterStep
+   (グラデーションタイトルバー + 右端の Wharf ドックから xterm / mlterm / xclock /
+   xeyes をワンクリック起動)、**`wmaker &` で Window Maker**(NeXTSTEP ワークスペース、
+   同じドック付き)にも切替でき、`twm &` で元の見た目に戻ります
    (WM の状態も OS 状態としてイベント台帳にリプレイされます)。
+   `mlterm &` は **日本語対応の mlterm ウィンドウ**(UTF-8 バナー + ライブシェル)です。
    **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
    ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、

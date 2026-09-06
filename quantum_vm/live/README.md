@@ -13,10 +13,14 @@
 - **vim・emacs・sshd・xinetd・curl・wget・grub-install・update-grub・
   bluetoothctl (bluez)・lsusb (usbutils) を実物としてプリインストール** —
   Bluetooth・USB コネクタ・NAT (DHCP) を認識します
-- **インストール済み BadaOS のウィンドウマネージャは w9wm**(実物。無ければ 9wm →
-  openbox にフォールバック)。`badaos.wm=w9wm|afterstep|openbox` のカーネル引数か
-  `WM=afterstep startx` でいつでも切替でき、**AfterStep(NeXT 風・Wharf 付き)も同梱**。
-  `WM=... startx` はキオスクの代わりに **WM + mlterm のデスクトップセッション**を開きます
+- **インストール済み BadaOS は、起動するとウィンドウマネージャだけのデスクトップに
+  なります**: 既定は **w9wm**(実物。無ければ 9wm → openbox にフォールバック)が立ち上がり、
+  その中に **mlterm** が 1 枚開くだけ — BadaX のキオスク画面ではありません。mlterm から
+  `sudo apt install <なんでも>` で入れた **Ubuntu 向けアプリケーションをそのまま操作**できます
+  (BadaX アプリを見たいときは mlterm で `badavm` と打つだけ)。
+  `badaos.wm=w9wm|afterstep|wmaker|openbox` のカーネル引数か `WM=afterstep startx` で
+  いつでも切替でき、**AfterStep(NeXT 風・Wharf 付き)と Window Maker も同梱**。
+  Live USB のみ従来どおりキオスク起動(`badaos.session=kiosk` でインストール後も選択可)
 - **日本語環境が最初から整っています**: ロケール `ja_JP.UTF-8`・Noto CJK フォント・
   **mlterm(日本語対応ターミナル)**・**fcitx-mozc + fcitx-configtool**(Ctrl+Space で
   日本語入力 ON/OFF。スイートに fcitx4 が無ければ fcitx5-mozc に自動フォールバック)
@@ -113,6 +117,25 @@ USB から起動して、GRUB メニューで **「Install BadaOS (friendly GUI 
 
 > `grub-install` と `update-grub` は Live システムにもインストール済み BadaOS にも
 > **最初から入っています**(grub2-common / grub-pc-bin / grub-efi-amd64-bin)。
+
+## インストール後の起動 — ウィンドウマネージャだけのデスクトップ
+
+インストール済み BadaOS を起動すると、**BadaX のキオスク画面ではなく、
+ウィンドウマネージャだけのシンプルなデスクトップ**が立ち上がります:
+
+- 既定は **w9wm**(Plan 9 風。パッケージが無いアーキテクチャでは 9wm → openbox に
+  自動フォールバック)。ルートで B3(右クリック)メニュー、4 仮想デスクトップ
+- その中に **mlterm(日本語対応ターミナル)が 1 枚**開いた状態で始まります。
+  fcitx-mozc 常駐済みなので Ctrl+Space でそのまま日本語入力できます
+- mlterm から普通に **Ubuntu 向けアプリケーションを操作**: `sudo apt install firefox-esr`
+  `sudo apt install gimp` など Debian フルアーカイブのアプリを入れて、そのまま
+  ウィンドウとして使えます(`htop`・`mc`・`screen`・`tmux` は同梱済み)
+- **WM の切替**: カーネル引数 `badaos.wm=afterstep` / `badaos.wm=wmaker` /
+  `badaos.wm=w9wm`(GRUB メニューで `e` を押して追記)、またはコンソールから
+  `WM=wmaker startx`。**AfterStep と Window Maker は実物を同梱**しています
+- **BadaX(BadaVM Pro)を使いたいとき**は、mlterm で `badavm` と打つとアプリウィンドウ
+  として立ち上がります(従来の全画面キオスクに戻すには `badaos.session=kiosk`)
+- Live USB(この ISO そのもの)は従来どおりキオスク自動起動のままです
 
 ## 使い方 3 — バーチャルマシン経由で実ディスクへインストール(検証済み)
 
