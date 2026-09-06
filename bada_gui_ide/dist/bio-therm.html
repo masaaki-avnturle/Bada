@@ -109,10 +109,17 @@
       <div>
         <canvas id="bio" width="460" height="540"></canvas>
         <div class="controls">
+          <label class="muted">🎨 画風:
+            <select id="styleSel">
+              <option value="std">標準デッサン</option>
+              <option value="monet">モネ風 (印象派)</option>
+              <option value="renoir">ルノワール風 (印象派)</option>
+            </select></label>
           <button class="g" id="bscanBtn">🧍 姿スキャン (走査再生)</button>
-          <button class="g" id="pngBtn">🖼 この生命体をPNG保存</button>
+          <button class="g" id="pngBtn">🖼 PNG保存</button>
           <span class="muted" id="pngNote"></span>
         </div>
+        <div class="muted" style="margin-top:4px;font-size:11.5px">印象派の筆致もシード付き乱数で<b>決定論的</b>(同じ惑星は常に同じ絵)。元は同じ実測物理のデッサン。</div>
       </div>
       <div>
         <div class="muted" style="margin-bottom:6px">各部位は、その惑星の<b>実測値</b>と<b>実在の法則</b>から決定論的に導出(=同じ惑星は常に同じ姿):</div>
@@ -493,7 +500,48 @@
   var bio=$("bio"), bctx=bio.getContext("2d");
   var OFF=document.createElement("canvas"); OFF.width=bio.width; OFF.height=bio.height;
   var bx=OFF.getContext("2d");
-  function presentCreature(){ bctx.clearRect(0,0,bio.width,bio.height); bctx.drawImage(OFF,0,0); }
+  var IMP=document.createElement("canvas"); IMP.width=OFF.width; IMP.height=OFF.height;
+  var STYLE="std";
+  function srcCanvas(){ return STYLE==="std"?OFF:IMP; }
+  function presentCreature(){ bctx.clearRect(0,0,bio.width,bio.height); bctx.drawImage(srcCanvas(),0,0); }
+
+  /* ===== 印象派デッサン (モネ風/ルノワール風): OFF を油彩タッチに再構成 ==== */
+  // モネ: 冷たいパステル・破れた色触・空/水面のタッチ。ルノワール: 暖色の
+  // 柔らかい筆致・ばら色の肌。筆致はシード付き乱数で決定論的。
+  function impressionize(p){
+    var W=OFF.width, H=OFF.height, r=rng((seedOf(p.name)^0x9e3779b9)>>>0);
+    var src=bx.getImageData(0,0,W,H).data;
+    var ix=IMP.getContext("2d"), monet=(STYLE==="monet");
+    var bgg=ix.createLinearGradient(0,0,0,H);
+    if(monet){ bgg.addColorStop(0,"#8fa8c8"); bgg.addColorStop(0.6,"#c8d4e0"); bgg.addColorStop(1,"#9fb08a"); }
+    else { bgg.addColorStop(0,"#d8c0a8"); bgg.addColorStop(0.6,"#e8d8c0"); bgg.addColorStop(1,"#c0a890"); }
+    ix.fillStyle=bgg; ix.fillRect(0,0,W,H);
+    function dab(x,y){
+      var i=((y|0)*W+(x|0))*4, c0=src[i], c1=src[i+1], c2=src[i+2];
+      var dark=(c0+c1+c2)<45, rr,gg,bb;
+      if(dark){ // 元がほぼ黒 (宇宙背景) → 風景のタッチに置き換える
+        if(monet){ rr=120+r()*60; gg=140+r()*50; bb=170+r()*60; }
+        else { rr=200+r()*40; gg=170+r()*40; bb=140+r()*40; }
+        if(r()<0.18){ var tt=r(); rr=rr*0.7+tt*80; gg=gg*0.85+tt*60; } // 補色の斑
+      } else {
+        var j=(r()-0.5)*36;
+        if(monet){ rr=c0*0.92+j; gg=c1*1.0+j; bb=c2*1.12+j+10; }
+        else { rr=c0*1.14+j+12; gg=c1*0.98+j; bb=c2*0.86+j; }
+      }
+      ix.save();
+      ix.translate(x,y); ix.rotate((r()-0.5)*(monet?0.9:0.5));
+      ix.globalAlpha=monet?0.42+r()*0.25:0.5+r()*0.3;
+      ix.fillStyle="rgb("+Math.max(0,Math.min(255,rr|0))+","+Math.max(0,Math.min(255,gg|0))+","+Math.max(0,Math.min(255,bb|0))+")";
+      ix.beginPath(); ix.ellipse(0,0,(monet?2.4:3.2)+r()*3.4,1.2+r()*1.8,0,0,Math.PI*2); ix.fill();
+      ix.restore();
+    }
+    for(var k=0;k<9000;k++) dab(r()*W,r()*H);
+    for(var k2=0;k2<4500;k2++) dab(W*(0.16+0.68*r()),H*(0.22+0.7*r())); // 主題 (姿) を密に
+    ix.globalAlpha=1;
+    ix.fillStyle="rgba(60,40,30,0.85)"; ix.font="italic 12px Georgia,serif";
+    ix.fillText(p.name+" — "+(monet?"モネ風":"ルノワール風")+" 印象派デッサン (実測物理より・決定論)",10,H-10);
+  }
+  function renderCreature(p){ drawCreature(p); if(STYLE!=="std") impressionize(p); }
   function drawCreature(p){
     var b=p.bio, Wc=bio.width, Hc=bio.height, r=rng(seedOf(p.name));
     bx.fillStyle="#04070f"; bx.fillRect(0,0,Wc,Hc);
@@ -681,14 +729,14 @@
       "<b>恒星の主系列寿命</b><span>t_MS="+(p.lin.tMS>99?"99+":p.lin.tMS.toFixed(1))+" Gyr (M★≈"+p.lin.mStar.toFixed(2)+"M☉)</span>"+
       "<b>可能世代数 (上限)</b><span>"+(p.earth?"実績: 現生人類 約1万世代":(p.lin.canEvolve?fmtGen(p.lin.gens):"恒星寿命が45億年に不足"))+"</span>"+
       "<b>P_bio (思考実験)</b><span>"+(p.earth?"—":fmtW(b.pBio))+"</span>";
-    drawCreature(p); presentCreature();
+    renderCreature(p); presentCreature();
     annotate(p);
   }
 
   /* ========= 姿スキャン: 発見された人間並みモデルの姿を走査して見る ====== */
   var BSCAN={on:false,y:0,last:0,p:null};
   function startBodyScan(){
-    var p=DATA[SEL]; drawCreature(p);
+    var p=DATA[SEL]; renderCreature(p);
     BSCAN.on=true; BSCAN.y=0; BSCAN.last=performance.now(); BSCAN.p=p;
     requestAnimationFrame(bodyLoop);
   }
@@ -700,11 +748,11 @@
     var y=Math.min(H,BSCAN.y);
     bctx.fillStyle="#04070f"; bctx.fillRect(0,0,W,H);
     // 未走査領域: 薄いゴースト像 + 走査グリッド
-    bctx.globalAlpha=0.10; bctx.drawImage(OFF,0,0); bctx.globalAlpha=1;
+    bctx.globalAlpha=0.10; bctx.drawImage(srcCanvas(),0,0); bctx.globalAlpha=1;
     bctx.strokeStyle="rgba(57,194,255,0.10)"; bctx.lineWidth=1;
     for(var gy=0;gy<H;gy+=14){ bctx.beginPath(); bctx.moveTo(0,gy); bctx.lineTo(W,gy); bctx.stroke(); }
     // 走査済み領域: 実像を確定
-    if(y>1){ bctx.drawImage(OFF,0,0,W,y,0,0,W,y); }
+    if(y>1){ bctx.drawImage(srcCanvas(),0,0,W,y,0,0,W,y); }
     // 走査ビーム (Jones熱感知カラー)
     var gl=bctx.createLinearGradient(0,Math.max(0,y-18),0,y+3);
     gl.addColorStop(0,"rgba(57,194,255,0)"); gl.addColorStop(1,"rgba(57,194,255,0.55)");
@@ -739,12 +787,12 @@
     var cur=DATA[SEL], n=0;
     DATA.forEach(function(p,i){
       if(n>=12||!humanGrade(p)) return; n++;
-      drawCreature(p);
+      renderCreature(p);
       var wrap=document.createElement("div");
       wrap.style.cssText="width:112px;cursor:pointer;text-align:center";
       var c=document.createElement("canvas"); c.width=110; c.height=130;
       c.style.cssText="border:1px solid #1b2740;border-radius:10px;background:#04070f;max-width:100%";
-      c.getContext("2d").drawImage(OFF,0,0,OFF.width,OFF.height,0,0,110,130);
+      c.getContext("2d").drawImage(srcCanvas(),0,0,OFF.width,OFF.height,0,0,110,130);
       var cap=document.createElement("div"); cap.className="muted"; cap.style.fontSize="10.5px";
       cap.textContent="★ "+p.name;
       wrap.appendChild(c); wrap.appendChild(cap);
@@ -752,8 +800,12 @@
       g.appendChild(wrap);
     });
     if(!n) g.innerHTML="<span class='muted'>★発見はまだありません — 🔭熱感知スキャンかライブ探索を実行してください。</span>";
-    drawCreature(cur); presentCreature();
+    renderCreature(cur); presentCreature();
   }
+  $("styleSel").addEventListener("change",function(){
+    STYLE=this.value;
+    renderCreature(DATA[SEL]); presentCreature(); buildGallery();
+  });
 
   /* ================= PNG download ========================================= */
   $("pngBtn").addEventListener("click",function(){
