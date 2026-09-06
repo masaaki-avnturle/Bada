@@ -34,9 +34,11 @@ on:
 permissions:
   contents: write
 
-# 同一ブランチで新しい push があれば古いビルドは打ち切る
+# 同一ブランチで新しい push があれば古いビルドは打ち切る。
+# ただし Release 作成 (release_tag 付きの workflow_dispatch) は別グループにして、
+# 途中でブランチに push しても取り消されないようにする。
 concurrency:
-  group: acpi-app-${{ github.ref }}
+  group: acpi-app-${{ github.ref }}-${{ github.event.inputs.release_tag || 'ci' }}
   cancel-in-progress: true
 
 jobs:

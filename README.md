@@ -76,11 +76,14 @@ ACPI 関連ブランチ / `main` への push で [`acpi-app-build.yml`](.github/
 
 ##### 🅱️ Releases からダウンロード(期限なし)
 
-`acpi-app-v1.0.0` のようなタグを push すると、同じ成果物が [Releases](https://github.com/masaaki-avnturle/Bada/releases) に添付されます。Actions の **Run workflow** から `release_tag` を入力しても同じです。
+Release への添付は `bundle` ジョブが 1 箇所で行うので、APK・EXE 2 本・AppImage・deb に加えて単一 HTML・CLI・Bada 実装まで **1 つの Release にまとまります**。作り方は 2 通り:
 
 ```sh
+# 方法 1: タグを push する
 git tag acpi-app-v1.0.0 && git push origin acpi-app-v1.0.0
 ```
+
+方法 2: [Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/acpi-app-build.yml) の **Run workflow** を開き、`release_tag` に `acpi-app-v1.0.0` と入力して実行。タグが無ければ実行時の commit を指してタグごと作成されます。
 
 詳細は [`bada_gui_ide/acpi-app/`](bada_gui_ide/acpi-app/) を参照。
 
