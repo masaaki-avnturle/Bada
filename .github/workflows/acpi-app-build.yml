@@ -101,12 +101,6 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: bada_gui_ide/acpi-app/electron/dist/*.exe
-      - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          files: bada_gui_ide/acpi-app/electron/dist/*.exe
 
   linux-app:
     runs-on: ubuntu-latest
@@ -138,14 +132,6 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: |
-            bada_gui_ide/acpi-app/electron/dist/*.AppImage
-            bada_gui_ide/acpi-app/electron/dist/*.deb
-      - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          files: |
             bada_gui_ide/acpi-app/electron/dist/*.AppImage
             bada_gui_ide/acpi-app/electron/dist/*.deb
 
@@ -207,12 +193,6 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: out/*.apk
-      - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          files: out/*.apk
 
   # 3 プラットフォームを 1 つの zip にまとめ、Actions から一括ダウンロード
   # できるようにする。実行ページのサマリにダウンロード手順も書き出す。
@@ -287,6 +267,63 @@ jobs:
             ls -la bundle | sed 's/^/  /'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Release への添付は bundle ジョブだけが行う (3 ジョブが同時に同じ
+      # Release を作りに行くと競合するため)。bundle/ には 4 つのバイナリと
+      # 単一 HTML・CLI・モデルコア・Bada 実装がすべて揃っている。
+      - name: Release へ添付
+        if: (startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '') && needs.windows-exe.result == 'success' && needs.linux-app.result == 'success' && needs.android-apk.result == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: ACPI 原子の臨界期の強度シミュレータ ${{ github.event.inputs.release_tag || github.ref_name }}
+          body: |
+            **ACPI — 原子の臨界期の強度シミュレータ (Atomic Critical-Period Intensity)**
+
+            強レーザー場のなかで原子のクーロン障壁が完全に抑制される時間窓
+            (= 臨界期) と、その窓での強度 I(t) を計算します。
+
+            ### インストールなしで使う
+
+            | ファイル | 使い方 |
+            |---|---|
+            | `atom-critical.html` | ダウンロードしてブラウザで開くだけ (依存なし・オフライン可) |
+
+            ### ネイティブ アプリ
+
+            | プラットフォーム | ファイル | インストール |
+            |---|---|---|
+            | Android | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
+            | Windows 10 / 11 | `ACPI-1.0.0-x64-setup.exe` | インストーラ (インストール先を選べます) |
+            | Windows 10 / 11 | `ACPI-1.0.0-x64-portable.exe` | インストール不要・ダブルクリックで起動 |
+            | Ubuntu | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
+            | Ubuntu | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
+
+            ### コマンドライン / Bada 言語版
+
+            | ファイル | 使い方 |
+            |---|---|
+            | `atom-critical-cli.js` + `atom_critical.js` | `node atom-critical-cli.js run -e Ar -I 6e14` |
+            | `atom_critical.bada` | 同じモデルの Bada 言語リファレンス実装 |
+
+            ### モデル
+
+            **物理層** — 障壁抑制場 `F_cr = I_p²/(4 Z_c)` [a.u.]、`I_cr = F_cr²·I_a`
+            (`I_a = 3.5094×10¹⁶ W/cm²`)。ADK トンネル電離率 (水素で厳密解
+            `(4/F)e^{−2/3F}` に一致)、Keldysh γ、ポンデロモーティブ U_p。
+            水素で `I_cr = 1.37×10¹⁴ W/cm²` という既知の障壁抑制強度を再現します。
+
+            **Ω 層 (山口フレームワーク)** — `ζ(s)=β(p,q)/log x` · `ζ_n=(x log x)ⁿ` ·
+            Γ-deprivation `e^{−x log x}` · Dalanversian `Λ=cos(ix log x)−i sin(ix log x)` ·
+            均衡余裕 `2e^{−x log x}` (臨界期で 0 へ潰れる) · Euler 極均衡
+            `x^n+y^n−nxyz=0` · Kauffman ⟨D⟩(A) · 臨界強度指数
+            **`E(σ) = K(σ)×H(σ)/4(π_n,e_n)`**。
+
+            ---
+            タグを打たずに最新ビルドが欲しい場合は
+            [Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/acpi-app-build.yml)
+            の実行ページ下部 Artifacts からも取得できます (要ログイン・90 日)。
+          files: bundle/*
 
       - name: いずれかのビルドが失敗していたら落とす
         if: needs.windows-exe.result != 'success' || needs.linux-app.result != 'success' || needs.android-apk.result != 'success'
