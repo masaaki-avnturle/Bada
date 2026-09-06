@@ -166,6 +166,7 @@ let html = `<!DOCTYPE html>
       <div>
         <canvas id="bio" width="460" height="540"></canvas>
         <div class="controls">
+          <button class="g" id="bscanBtn">🧍 姿スキャン (走査再生)</button>
           <button class="g" id="pngBtn">🖼 この生命体をPNG保存</button>
           <span class="muted" id="pngNote"></span>
         </div>
@@ -175,6 +176,13 @@ let html = `<!DOCTYPE html>
         <ul class="anno" id="anno"></ul>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>🧍 発見された人間並みモデルの姿 — ギャラリー</h2>
+    <div class="muted" style="margin-bottom:8px">★発見 (人間モデル並み) 判定の惑星ごとに、実測物理から決定論的に導出した<b>姿</b>。
+      サムネイルをクリックすると選択して<b>姿スキャン</b>を走査再生します (観測画像ではなく物理整合イラスト)。</div>
+    <div id="gallery" style="display:flex;flex-wrap:wrap;gap:10px"></div>
   </div>
 
   <div class="card">
@@ -405,8 +413,10 @@ let html = `<!DOCTYPE html>
 
   /* ========= 熱感知スキャン (θ掃引・Γ部分積分の積算・発見ログ) =========== */
   var SCAN={on:false,th:0,integ:0,seen:{},nFound:0,nSense:0,last:0};
-  function dlogAdd(html){
+  function dlogAdd(html,idx){
     var d=document.createElement("div"); d.className="it"; d.innerHTML=html;
+    if(idx!=null){ d.style.cursor="pointer"; d.title="クリックで姿スキャン再生";
+      d.addEventListener("click",function(){ select(idx); startBodyScan(); }); }
     var log=$("dlog"); log.insertBefore(d,log.firstChild);
   }
   function startScan(){
@@ -427,7 +437,7 @@ let html = `<!DOCTYPE html>
         SCAN.seen[p.name]=true; SCAN.nSense++; p.flash=now;
         if(humanGrade(p)){
           SCAN.nFound++;
-          dlogAdd("<b style='color:#ffd97a'>★ 発見 (人間モデル並み)</b>: <b>"+p.name+"</b> — HIS "+(p.his*100).toFixed(1)+"%, M≈"+p.bio.mass.toFixed(0)+"kg (ヒト70kg), P≈"+p.bio.metab.toFixed(0)+"W (ヒト82W), 可能世代 "+fmtGen(p.lin.gens));
+          dlogAdd("<b style='color:#ffd97a'>★ 発見 (人間モデル並み)</b>: <b>"+p.name+"</b> — HIS "+(p.his*100).toFixed(1)+"%, M≈"+p.bio.mass.toFixed(0)+"kg (ヒト70kg), P≈"+p.bio.metab.toFixed(0)+"W (ヒト82W), 可能世代 "+fmtGen(p.lin.gens)+" <span style='color:#39c2ff'>🧍姿を見る</span>",i);
         } else if(DATA.length<80||i<=30){  // ライブ大量カタログでは判定外ログを間引く
           dlogAdd("・感知: "+p.name+" — 判定外: "+gradeFail(p));
         }
@@ -436,8 +446,12 @@ let html = `<!DOCTYPE html>
     SCAN.th=th2;
     if(SCAN.th>=Math.PI){
       SCAN.on=false;
-      dlogAdd("<b>✔ スキャン完了</b> — Γ部分積分 ∫₀^π|V(e^{iθ})|dθ = <b>"+SCAN.integ.toFixed(4)+"</b> / 感知 "+SCAN.nSense+" 惑星 / <b style='color:#ffd97a'>発見 "+SCAN.nFound+" 件 (人間モデル並み)</b>");
+      dlogAdd("<b>✔ スキャン完了</b> — Γ部分積分 ∫₀^π|V(e^{iθ})|dθ = <b>"+SCAN.integ.toFixed(4)+"</b> / 感知 "+SCAN.nSense+" 惑星 / <b style='color:#ffd97a'>発見 "+SCAN.nFound+" 件 (人間モデル並み)</b> — ★行クリックで姿スキャン");
       $("scanBtn").textContent="🔭 熱感知スキャン開始 (θ掃引で発見)";
+      // 最上位の★発見の姿を自動で走査再生
+      for(var ff=1;ff<DATA.length;ff++){
+        if(SCAN.seen[DATA[ff].name]&&humanGrade(DATA[ff])){ select(ff); startBodyScan(); break; }
+      }
     }
   }
   $("scanBtn").addEventListener("click",function(){ if(!SCAN.on) startScan(); });
@@ -531,7 +545,12 @@ let html = `<!DOCTYPE html>
   });
 
   /* ================= creature graphics ==================================== */
-  var bio=$("bio"), bx=bio.getContext("2d");
+  // drawCreature は常にオフスクリーン OFF へ描き、presentCreature が #bio へ転写する
+  // (姿スキャンの走査再生とギャラリーのサムネイルが同じ描画を再利用するため)
+  var bio=$("bio"), bctx=bio.getContext("2d");
+  var OFF=document.createElement("canvas"); OFF.width=bio.width; OFF.height=bio.height;
+  var bx=OFF.getContext("2d");
+  function presentCreature(){ bctx.clearRect(0,0,bio.width,bio.height); bctx.drawImage(OFF,0,0); }
   function drawCreature(p){
     var b=p.bio, Wc=bio.width, Hc=bio.height, r=rng(seedOf(p.name));
     bx.fillStyle="#04070f"; bx.fillRect(0,0,Wc,Hc);
@@ -719,8 +738,78 @@ let html = `<!DOCTYPE html>
       "<b>恒星の主系列寿命</b><span>t_MS="+(p.lin.tMS>99?"99+":p.lin.tMS.toFixed(1))+" Gyr (M★≈"+p.lin.mStar.toFixed(2)+"M☉)</span>"+
       "<b>可能世代数 (上限)</b><span>"+(p.earth?"実績: 現生人類 約1万世代":(p.lin.canEvolve?fmtGen(p.lin.gens):"恒星寿命が45億年に不足"))+"</span>"+
       "<b>P_bio (思考実験)</b><span>"+(p.earth?"—":fmtW(b.pBio))+"</span>";
-    drawCreature(p);
+    drawCreature(p); presentCreature();
     annotate(p);
+  }
+
+  /* ========= 姿スキャン: 発見された人間並みモデルの姿を走査して見る ====== */
+  var BSCAN={on:false,y:0,last:0,p:null};
+  function startBodyScan(){
+    var p=DATA[SEL]; drawCreature(p);
+    BSCAN.on=true; BSCAN.y=0; BSCAN.last=performance.now(); BSCAN.p=p;
+    requestAnimationFrame(bodyLoop);
+  }
+  function bodyLoop(now){
+    if(!BSCAN.on) return;
+    var H=bio.height, W=bio.width, p=BSCAN.p, b=p.bio;
+    var dt=Math.min(0.1,(now-BSCAN.last)/1000); BSCAN.last=now;
+    BSCAN.y+=dt*(H/3.2);                        // 全身走査 ~3.2 秒
+    var y=Math.min(H,BSCAN.y);
+    bctx.fillStyle="#04070f"; bctx.fillRect(0,0,W,H);
+    // 未走査領域: 薄いゴースト像 + 走査グリッド
+    bctx.globalAlpha=0.10; bctx.drawImage(OFF,0,0); bctx.globalAlpha=1;
+    bctx.strokeStyle="rgba(57,194,255,0.10)"; bctx.lineWidth=1;
+    for(var gy=0;gy<H;gy+=14){ bctx.beginPath(); bctx.moveTo(0,gy); bctx.lineTo(W,gy); bctx.stroke(); }
+    // 走査済み領域: 実像を確定
+    if(y>1){ bctx.drawImage(OFF,0,0,W,y,0,0,W,y); }
+    // 走査ビーム (Jones熱感知カラー)
+    var gl=bctx.createLinearGradient(0,Math.max(0,y-18),0,y+3);
+    gl.addColorStop(0,"rgba(57,194,255,0)"); gl.addColorStop(1,"rgba(57,194,255,0.55)");
+    bctx.fillStyle=gl; bctx.fillRect(0,Math.max(0,y-18),W,18);
+    bctx.strokeStyle=heatColor(b?b.tBody:300); bctx.lineWidth=1.8;
+    bctx.beginPath(); bctx.moveTo(0,y); bctx.lineTo(W,y); bctx.stroke();
+    bctx.fillStyle="#39c2ff"; bctx.font="10.5px sans-serif";
+    bctx.fillText("🧍 姿スキャン "+Math.round(y/H*100)+"% (Jones熱感知)",8,Math.min(H-6,Math.max(12,y-6)));
+    // 部位コールアウト: ビームが通過した部位から順に導出値を確定表示
+    if(b&&b.viable&&!p.earth){
+      var calls=[[0.34,"頭部: 瞳×"+b.eyeScale.toFixed(2)+" (恒星 "+(p.st||5772)+"K に適応)"],
+                 [0.56,"体幹: 放熱 A="+(b.area>=99?"—":b.area.toFixed(2)+"m²")+" / 代謝 P="+b.metab.toFixed(0)+"W"],
+                 [0.80,"脚"+b.legs+"本: g="+b.gRel.toFixed(2)+"g⊕ / 体重 M="+b.mass.toFixed(0)+"kg"]];
+      bctx.font="10.5px sans-serif";
+      for(var ci=0;ci<calls.length;ci++){
+        if(y/H>calls[ci][0]){ bctx.fillStyle="#7fd8a8"; bctx.fillText("▸ "+calls[ci][1],8,H*calls[ci][0]); }
+      }
+    }
+    if(y>=H){
+      BSCAN.on=false; presentCreature();
+      bctx.fillStyle=humanGrade(p)?"#ffd97a":"#8aa0c0"; bctx.font="bold 12px sans-serif";
+      bctx.fillText(humanGrade(p)?("★ 姿スキャン完了 — 人間モデル並み (HIS "+(p.his*100).toFixed(1)+"%)"):"姿スキャン完了"+(p.earth?" — 基準: ヒト":" — 判定外"),8,H-10);
+      return;
+    }
+    requestAnimationFrame(bodyLoop);
+  }
+  $("bscanBtn").addEventListener("click",function(){ if(!BSCAN.on) startBodyScan(); });
+
+  /* ========= ギャラリー: ★発見の人間並みモデルの姿を一覧で見る =========== */
+  function buildGallery(){
+    var g=$("gallery"); g.innerHTML="";
+    var cur=DATA[SEL], n=0;
+    DATA.forEach(function(p,i){
+      if(n>=12||!humanGrade(p)) return; n++;
+      drawCreature(p);
+      var wrap=document.createElement("div");
+      wrap.style.cssText="width:112px;cursor:pointer;text-align:center";
+      var c=document.createElement("canvas"); c.width=110; c.height=130;
+      c.style.cssText="border:1px solid #1b2740;border-radius:10px;background:#04070f;max-width:100%";
+      c.getContext("2d").drawImage(OFF,0,0,OFF.width,OFF.height,0,0,110,130);
+      var cap=document.createElement("div"); cap.className="muted"; cap.style.fontSize="10.5px";
+      cap.textContent="★ "+p.name;
+      wrap.appendChild(c); wrap.appendChild(cap);
+      wrap.addEventListener("click",function(){ select(i); startBodyScan(); });
+      g.appendChild(wrap);
+    });
+    if(!n) g.innerHTML="<span class='muted'>★発見はまだありません — 🔭熱感知スキャンかライブ探索を実行してください。</span>";
+    drawCreature(cur); presentCreature();
   }
 
   /* ================= PNG download ========================================= */
@@ -783,7 +872,7 @@ let html = `<!DOCTYPE html>
         }).filter(function(p){ return p.rade&&p.insol&&p.teq; });
         if(!list.length) throw new Error("empty");
         DATA=[mk(PLANETS[0])].concat(list);
-        prepare(); renderList(); select(1);
+        prepare(); renderList(); select(1); buildGallery();
         $("src").textContent="データ: LIVE — NASA確定惑星カタログ "+list.length+" 惑星を探索対象に取得 (表示は発見スコア上位"+(NSHOW-1)+")。🔭スキャンで発見してください。";
       })
       .catch(function(e){
@@ -795,7 +884,7 @@ let html = `<!DOCTYPE html>
 
   /* ================= init ================================================= */
   function loop(now){ drawNet(now); if(playing) requestAnimationFrame(loop); }
-  renderList(); select(1);
+  renderList(); select(1); buildGallery();
   requestAnimationFrame(loop);
   loadLive();   // 常時アクセス: 起動時にカタログを自動取得 (失敗時はスナップショット)
 })();
