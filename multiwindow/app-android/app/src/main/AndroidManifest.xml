@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bada MultiWindow — タブレット画面上に「本物の」フリーフォーム ウィンドウを
+  複数開くマルチウィンドウ アプリ。
+
+  ・アプリ内部 (別の画面の内部) に擬似ウィンドウを描くのではなく、
+    OS のフリーフォーム機能 (Samsung ポップアップ表示 / Samsung DeX /
+    Android freeform) で各ツールを独立したウィンドウとしてタブレット上に開く。
+  ・android:resizeableActivity="true" + documentLaunchMode="always" +
+    ActivityOptions#setLaunchBounds() の組み合わせで実現。
+  ・Samsung 旧 MultiWindow SDK 世代の端末向け meta-data も併記。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- フリーフォーム機能があれば使う (無い端末でも通常起動できるよう required=false) -->
+    <uses-feature
+        android:name="android.software.freeform_window_management"
+        android:required="false" />
+
+    <!-- Windows 風デスクトップ: インストール済みアプリの一覧取得に必要
+         (Android 11+ のパッケージ可視性) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+
+    <!-- ファイルキャビネット: 内部ストレージのファイル閲覧に必要 -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.DarkActionBar"
+        android:resizeableActivity="true"
+        android:allowBackup="false"
+        android:supportsRtl="true">
+
+        <!-- Samsung マルチウィンドウ / ポップアップ表示 (旧 MultiWindow SDK 系端末向け) -->
+        <meta-data android:name="com.sec.android.support.multiwindow" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.multiinstance.enable" android:value="true" />
+        <meta-data android:name="com.samsung.android.sdk.multiwindow.penwindow.enable" android:value="true" />
+
+        <!-- Windows 風デスクトップ: インストール済みアプリと内蔵ツールを
+             タブレット画面上のフリーフォーム ウィンドウとして開くランチャー -->
+        <activity
+            android:name=".LauncherActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:resizeableActivity="true">
+            <layout
+                android:defaultWidth="720dp"
+                android:defaultHeight="540dp"
+                android:gravity="center"
+                android:minWidth="360dp"
+                android:minHeight="400dp" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 各ツール: documentLaunchMode="always" で起動のたびに独立タスク =
+             独立フリーフォーム ウィンドウになる (同じツールを何枚でも開ける) -->
+        <activity
+            android:name=".MemoActivity"
+            android:exported="false"
+            android:label="@string/win_memo"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always"
+            android:windowSoftInputMode="adjustResize">
+            <layout
+                android:defaultWidth="360dp"
+                android:defaultHeight="420dp"
+                android:gravity="top|start"
+                android:minWidth="220dp"
+                android:minHeight="200dp" />
+        </activity>
+
+        <activity
+            android:name=".CalcActivity"
+            android:exported="false"
+            android:label="@string/win_calc"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="300dp"
+                android:defaultHeight="440dp"
+                android:gravity="top|start"
+                android:minWidth="220dp"
+                android:minHeight="320dp" />
+        </activity>
+
+        <activity
+            android:name=".ClockActivity"
+            android:exported="false"
+            android:label="@string/win_clock"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="340dp"
+                android:defaultHeight="200dp"
+                android:gravity="top|end"
+                android:minWidth="200dp"
+                android:minHeight="120dp" />
+        </activity>
+
+        <!-- ファイルキャビネット: アプリ/ファイルを札束のようにペラペラめくって閲覧 -->
+        <activity
+            android:name=".CabinetActivity"
+            android:exported="false"
+            android:label="@string/win_cabinet"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="400dp"
+                android:defaultHeight="580dp"
+                android:gravity="center"
+                android:minWidth="260dp"
+                android:minHeight="340dp" />
+        </activity>
+
+        <!-- キャビネットのファイルを閲覧アプリへ読み取り専用提供 -->
+        <provider
+            android:name=".CabinetFileProvider"
+            android:authorities="io.github.masaaki_avnturle.multiwindow.files"
+            android:exported="false"
+            android:grantUriPermissions="true" />
+
+        <activity
+            android:name=".MonitorActivity"
+            android:exported="false"
+            android:label="@string/win_monitor"
+            android:resizeableActivity="true"
+            android:documentLaunchMode="always">
+            <layout
+                android:defaultWidth="360dp"
+                android:defaultHeight="320dp"
+                android:gravity="bottom|end"
+                android:minWidth="240dp"
+                android:minHeight="220dp" />
+        </activity>
+
+    </application>
+</manifest>
