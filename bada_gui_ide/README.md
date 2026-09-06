@@ -231,7 +231,7 @@ dist[0.50000, 0.50000]
 | プラットフォーム | ファイル |
 |:---|:---|
 | **Android** (APK) | `acpi-debug.apk` |
-| **Windows 10 / 11** | `ACPI-1.0.0-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Windows 10 / 11** | `ACPI-1.0.0-x64-setup.exe` (インストーラ) / `ACPI-1.0.0-x64-portable.exe` (ポータブル) |
 | **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
 
 パッケージ定義は [`acpi-app/`](acpi-app/) (Electron + Cordova)、ビルドは

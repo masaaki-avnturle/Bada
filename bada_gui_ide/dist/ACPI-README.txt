@@ -13,7 +13,8 @@ Atomic Critical-Period Intensity simulator (Bada / Ω)
 
 ネイティブ アプリ (インストール型) も Releases から入手できます:
   Android          acpi-debug.apk
-  Windows 10 / 11  ACPI-1.0.0-x64.exe   (NSIS インストーラ / ポータブル)
+  Windows 10 / 11  ACPI-1.0.0-x64-setup.exe    (NSIS インストーラ)
+                   ACPI-1.0.0-x64-portable.exe (ポータブル)
   Ubuntu           ACPI-1.0.0-x86_64.AppImage / ACPI-1.0.0-amd64.deb
   https://github.com/masaaki-avnturle/Bada/releases
 

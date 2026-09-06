@@ -53,7 +53,7 @@
 | プラットフォーム | ファイル | インストール |
 |:---|:---|:---|
 | **Android** (APK) | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
-| **Windows 10 / 11** | `ACPI-1.0.0-x64.exe` | NSIS インストーラ / ポータブル |
+| **Windows 10 / 11** | `ACPI-1.0.0-x64-setup.exe`(インストーラ)<br>`ACPI-1.0.0-x64-portable.exe`(ポータブル) | ダブルクリック |
 | **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x ACPI-1.0.0-x86_64.AppImage && ./ACPI-1.0.0-x86_64.AppImage` |
 | **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
 
@@ -68,7 +68,7 @@ ACPI 関連ブランチ / `main` への push で [`acpi-app-build.yml`](.github/
 | Artifact | 中身 |
 |:---|:---|
 | `acpi-android-apk` | `acpi-debug.apk` |
-| `acpi-windows-exe` | `ACPI-1.0.0-x64.exe`(NSIS インストーラ / ポータブル) |
+| `acpi-windows-exe` | `ACPI-1.0.0-x64-setup.exe`(NSIS インストーラ) / `ACPI-1.0.0-x64-portable.exe`(ポータブル) |
 | `acpi-ubuntu-appimage-deb` | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
 | **`acpi-all-platforms`** | ★ 上記すべて + 単一 HTML + CLI + Bada 実装 |
 

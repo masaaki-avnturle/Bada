@@ -82,6 +82,18 @@ jobs:
         run: |
           npm install
           npm run dist
+      # nsis と portable が同名で衝突すると片方が上書きされて消えるため、
+      # 2 本そろっていることを明示的に確認する。
+      - name: 生成物を確認 (インストーラ + ポータブルの 2 本)
+        working-directory: bada_gui_ide/acpi-app/electron
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          ls dist/*-x64-setup.exe
+          ls dist/*-x64-portable.exe
+          n=$(ls dist/*.exe | wc -l)
+          test "$n" -eq 2 || { echo "EXE が $n 本しかありません (2 本必要)"; exit 1; }
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
@@ -112,6 +124,13 @@ jobs:
         run: |
           npm install
           npm run dist:linux
+      - name: 生成物を確認 (AppImage + deb)
+        working-directory: bada_gui_ide/acpi-app/electron
+        run: |
+          set -e
+          ls -la dist
+          ls dist/*.AppImage
+          ls dist/*.deb
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -173,9 +192,14 @@ jobs:
           cordova build android --verbose
       - name: Collect APK
         run: |
+          set -e
           mkdir -p out
           cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/acpi-debug.apk
           ls -la out
+          # APK は zip。中に ACPI 本体 (assets/www/index.html) が入っていることを確認する。
+          unzip -l out/acpi-debug.apk | grep -q 'assets/www/index.html'
+          unzip -p out/acpi-debug.apk assets/www/index.html | grep -q 'AtomCritical'
+          echo "APK に ACPI 本体が含まれていることを確認しました"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
