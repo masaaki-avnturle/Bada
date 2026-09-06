@@ -65,6 +65,8 @@
    (WM の状態も OS 状態としてイベント台帳にリプレイされます)。
    `mlterm &` は **日本語対応の mlterm ウィンドウ**(UTF-8 バナー + ライブシェル)、
    `xcalc &` は **実際に計算できる電卓ウィンドウ**(x11-apps)です。
+   `udisksctl` で **USB メモリの認識とマウント**(`udisksctl mount -b /dev/sd0i`)、
+   `apt install nautilus` も NAT 越しにそのまま入ります。
    **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
    ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、

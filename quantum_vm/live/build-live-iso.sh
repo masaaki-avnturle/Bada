@@ -64,7 +64,8 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     mlterm screen tmux locales texlive texlive-lang-japanese \
     wmaker htop mc \
     xterm x11-apps x11-utils x11-xserver-utils \
-    firefox-esr pcmanfm
+    firefox-esr pcmanfm \
+    udisks2 gvfs
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 # the real w9wm (or its parent 9wm) as an alternative window manager --
@@ -77,8 +78,9 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq after
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx-mozc fcitx-configtool || \
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx5-mozc fcitx5-config-qt || true
 # common desktop applications -- best effort, one at a time so a renamed
-# package never sinks the rest (calculator / text editor / image viewer)
-for app in galculator l3afpad gpicview; do
+# package never sinks the rest (calculator / text editor / image viewer /
+# GNOME Files + the gvfs backends and pmount for USB sticks)
+for app in galculator l3afpad gpicview nautilus gvfs-backends exfatprogs pmount; do
   chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$app" || true
 done
 
@@ -99,11 +101,27 @@ Name=en* eth*
 [Network]
 DHCP=yes
 EOF
+# DNS over the NAT: Debian 12 splits systemd-resolved into ITS OWN package;
+# without it networkd's DHCP-provided DNS never reaches /etc/resolv.conf and
+# every lookup (apt, firefox, ping www...) fails even though the NAT is up.
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd-resolved || true
 chroot "$CHROOT" systemctl enable systemd-networkd systemd-resolved ssh 2>/dev/null || \
 chroot "$CHROOT" systemctl enable systemd-networkd ssh || true
+# fallback DNS so resolution works even when the DHCP server hands out none
+mkdir -p "$CHROOT/etc/systemd/resolved.conf.d"
+cat > "$CHROOT/etc/systemd/resolved.conf.d/10-badaos-fallback.conf" <<'EOF'
+[Resolve]
+FallbackDNS=9.9.9.9 1.1.1.1 8.8.8.8
+EOF
 # Bluetooth: bluetoothd starts when an adapter is present (bluetoothctl ready)
 chroot "$CHROOT" systemctl enable bluetooth 2>/dev/null || true
-ln -sf /run/systemd/resolve/resolv.conf "$CHROOT/etc/resolv.conf" || true
+rm -f "$CHROOT/etc/resolv.conf"
+if [ -e "$CHROOT/lib/systemd/system/systemd-resolved.service" ] || \
+   [ -e "$CHROOT/usr/lib/systemd/system/systemd-resolved.service" ]; then
+  ln -sf /run/systemd/resolve/stub-resolv.conf "$CHROOT/etc/resolv.conf"
+else
+  printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\n' > "$CHROOT/etc/resolv.conf"
+fi
 
 cat > "$CHROOT/etc/motd" <<'EOF'
 BadaOS GNU/Quantum 12.0 -- the real machine build
@@ -119,9 +137,14 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     `badavm &` opens the BadaVM Pro app as a window. Pick the WM with
     badaos.wm=... / badaos.session=kiosk restores the fullscreen app
   * desktop apps preinstalled: xterm + x11-apps (xeyes / xclock / xcalc),
-    firefox-esr (web), pcmanfm (files), galculator / l3afpad / gpicview
+    firefox-esr (web), pcmanfm + nautilus (files), galculator / l3afpad /
+    gpicview
+  * NAT internet works out of the box: DHCP (systemd-networkd) + DNS
+    (systemd-resolved, with 9.9.9.9/1.1.1.1/8.8.8.8 fallback)
+  * USB sticks: plug in and open them from pcmanfm / nautilus (udisks2 +
+    gvfs auto-mount), or `udisksctl mount -b /dev/sdb1` / `pmount sdb1`
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
-        sudo apt update && sudo apt install <anything>
+        sudo apt update && sudo apt install <anything>   (nautilus included)
   * install to the real disk:  sudo badaos-install
     (default mode installs into the FREE SPACE of the disk -- existing
      partitions and OSes are kept and stay in the GRUB menu)

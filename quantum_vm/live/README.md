@@ -22,7 +22,15 @@
   いつでも切替でき、**AfterStep(NeXT 風・Wharf 付き)と Window Maker も同梱**。
   Live USB のみ従来どおりキオスク起動(`badaos.session=kiosk` でインストール後も選択可)
 - **マウスカーソル表示済み + デスクトップアプリ同梱**: xterm・x11-apps(xeyes /
-  xclock / xcalc)・firefox-esr・pcmanfm・galculator・l3afpad・gpicview
+  xclock / xcalc)・firefox-esr・pcmanfm・**nautilus(GNOME ファイル)**・
+  galculator・l3afpad・gpicview
+- **NAT インターネット接続が最初から動きます**: DHCP(systemd-networkd)+
+  **DNS(systemd-resolved を同梱・有効化。DHCP が DNS を配らない環境でも
+  9.9.9.9 / 1.1.1.1 / 8.8.8.8 のフォールバックで名前解決)** — QEMU/VMware/
+  VirtualBox の NAT でも実機の LAN でも、起動するだけで apt・firefox が使えます
+- **USB メモリの接続に対応**: udisks2 + gvfs 同梱 — 挿すと pcmanfm / nautilus
+  からクリックでマウント。CLI は `udisksctl mount -b /dev/sdb1` か `pmount sdb1`
+  (vfat / exFAT / NTFS 対応)
 - **日本語環境が最初から整っています**: ロケール `ja_JP.UTF-8`・Noto CJK フォント・
   **mlterm(日本語対応ターミナル)**・**fcitx-mozc + fcitx-configtool**(Ctrl+Space で
   日本語入力 ON/OFF。スイートに fcitx4 が無ければ fcitx5-mozc に自動フォールバック)
@@ -138,7 +146,11 @@ USB から起動して、GRUB メニューで **「Install BadaOS (friendly GUI 
   gpicview(画像ビューア)— mlterm から `xeyes &` `firefox &` `pcmanfm &` で起動
 - mlterm から普通に **Ubuntu 向けアプリケーションを操作**: `sudo apt install gimp`
   など Debian フルアーカイブのアプリを入れて、そのまま
-  ウィンドウとして使えます(`htop`・`mc`・`screen`・`tmux` は同梱済み)
+  ウィンドウとして使えます(`htop`・`mc`・`screen`・`tmux` は同梱済み)。
+  **NAT + DNS が最初から通っている**ので `sudo apt install nautilus` も
+  そのまま成功します(nautilus 自体もプリインストール済み)
+- **USB メモリ**は挿すだけで pcmanfm / nautilus から開けます(udisks2 + gvfs。
+  CLI: `udisksctl mount -b /dev/sdb1`)
 - **WM の切替**: カーネル引数 `badaos.wm=afterstep` / `badaos.wm=wmaker` /
   `badaos.wm=w9wm`(GRUB メニューで `e` を押して追記)、またはコンソールから
   `WM=wmaker startx`。**AfterStep と Window Maker は実物を同梱**しています

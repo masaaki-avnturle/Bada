@@ -132,6 +132,9 @@ function run(events) {
     ["line", "wmaker &"],                 // 67 Window Maker workspace + Dock
     ["line", "twm &"],                    // 68 ... and back again
     ["line", "xcalc &"],                  // 69 x11-apps calculator on BadaX
+    ["line", "udisksctl"],                // 70 USB stick recognized (udisks2)
+    ["line", "udisksctl mount -b /dev/sd0i"], // 71 ... and mounts
+    ["line", "apt install nautilus"],     // 72 nautilus installs over the NAT
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -230,6 +233,9 @@ function run(events) {
     [67, "Window Maker 0.96.0"],
     [68, "@@X WM twm"],
     [69, "|Calculator"],                    // xcalc (x11-apps) maps on BadaX
+    [70, "Quantum USB stick 8GB"],          // USB storage recognized (udisks2)
+    [71, "/media/root/QUANTUM-USB"],        // ... and mounted
+    [72, "Setting up nautilus"],            // nautilus installs over the NAT
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -255,7 +261,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */
