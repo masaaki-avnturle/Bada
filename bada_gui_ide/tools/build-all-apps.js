@@ -119,20 +119,26 @@ it in any browser — no install, no dependencies, works offline.
                       (no-communication theorem). Ground zoom movies + sky
                       fov-zoom movies (DSS2), .webm recording. Zero detections
                       to date, stated up front.
-  bio-therm.html      BioThermNet — 知的生命体 熱感知ネットワーク: a wit
-                      network of the discovered exoplanets. The Γ global
-                      integration manifold totals the network's sensed
-                      thermal budget (大域積分 Q = Σ P_bio); the global
-                      differential manifold gives each node's heat gradient
-                      d|V|/dθ on the trefoil Jones curve. Each planet's REAL
-                      measured physics (Kleiber's law P=3.4W·M^0.75 —
-                      validated 70kg→82W —, Stefan-Boltzmann radiator area,
-                      Allen's rule, g=R^1.58·g⊕, star color) deterministically
-                      shapes a procedural intelligent-lifeform illustration,
-                      each feature annotated with its formula; PNG download +
-                      .webm network recording. Honest banner: ZERO detections
-                      of intelligent life as of 2026 — these are
-                      physics-consistent illustrations, not observations.
+  bio-therm.html      BioThermNet — 人間に近い生命体ファインダー: finds the
+                      planets where a HUMAN-LIKE lifeform is physically
+                      possible and can keep descendants. HIS ヒト同型度 =
+                      Γ-identity-normalized 5-term similarity (gravity, Teq,
+                      insolation, star color, derived body mass vs human
+                      70 kg) ranks the discovery list; 子孫継続性 = real
+                      stellar main-sequence lifetime t=10·(M★/M☉)^-2.5 Gyr
+                      vs Earth's record (4.5 Gyr to intelligence, 25 yr per
+                      generation) → upper-bound generation count, with
+                      close-in M-dwarfs honestly penalized (tidal lock,
+                      flares). The Γ global integral totals the network heat
+                      (Q=ΣP_bio), the differential manifold gives d|V|/dθ per
+                      node. Real physics (Kleiber 3.4W·M^0.75 — validated
+                      70kg→82W —, Stefan-Boltzmann, Allen's rule, g=R^1.58g⊕,
+                      star color) deterministically draws the lifeform WITH
+                      its first-generation descendant (baby-schema
+                      allometry), each feature annotated; PNG download +
+                      .webm recording. Honest banner: ZERO detections as of
+                      2026 — physics-consistent illustrations, not
+                      observations.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

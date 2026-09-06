@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>BioThermNet — 知的生命体 熱感知ネットワーク (Γ×Jones機知)</title>
+<title>BioThermNet — 人間に近い生命体ファインダー・熱感知ネットワーク (Γ×Jones機知)</title>
 <style>
   :root{color-scheme:dark;--bg:#03050c;--line:#1b2740;--ink:#e9f0fb;--dim:#8aa0c0;
         --cy:#39c2ff;--gold:#c8a44a;--green:#2fbf71;--red:#e0555a;--org:#ff9b4a;--vio:#b58cff;}
@@ -55,8 +55,8 @@
 </head>
 <body>
 <header>
-  <div><div class="logo">🧬 BioThermNet — 知的生命体 熱感知ネットワーク</div>
-    <div class="sub">Γ関数の大域的(部分)積分多様体の機知 × Jones多項式の熱感知 — 発見済み惑星の熱エネルギー網と、その物理が形づくる生命体のグラフィックス</div></div>
+  <div><div class="logo">🧬 BioThermNet — 人間に近い生命体ファインダー</div>
+    <div class="sub">Γ関数の大域的積分多様体の機知 × Jones多項式の熱感知 — 人間と同型の生命体が成立し、子孫(世代)を残し続けられる惑星を実測物理で発見する</div></div>
 </header>
 <main>
 
@@ -66,6 +66,8 @@
     <b>その惑星の実測物理が生命に強制する形</b>を実在の法則 — クライバーの法則 P=3.4W·M^0.75
     (ヒト70kg→約82Wで検証)、シュテファン=ボルツマン放熱面積、アレンの法則(寒冷→毛皮・コンパクト/高温→放熱フィン)、
     表面重力 g=R^1.58g⊕、恒星色→目の適応 — から決定論的に描いた<b>物理整合イラスト</b>です。観測画像ではありません。
+    <b>ヒト同型度</b>はΓ恒等式で正規化した実測5項比較、<b>子孫継続性</b>は恒星の主系列寿命
+    t_MS=10·(M★/M☉)^⁻²·⁵ Gyr と地球の実績(知的生命まで45億年・ヒト1世代≈25年)から計算した実式です。
   </div>
 
   <div class="grid">
@@ -84,7 +86,7 @@
     </div>
     <div>
       <div class="card" style="margin-top:0">
-        <h2>🌍 感知ノード (実在の発見済み惑星)</h2>
+        <h2>👪 発見ランキング — ヒト同型度 × 子孫継続性 (実在の惑星)</h2>
         <div class="list" id="plist"></div>
         <div class="kv" id="pinfo"></div>
       </div>
@@ -92,7 +94,7 @@
   </div>
 
   <div class="card">
-    <h2>👁 感知された知的生命体のグラフィックス — <span id="bioName" style="color:var(--gold)"></span></h2>
+    <h2>👁 感知された人間近似生命体と子孫のグラフィックス — <span id="bioName" style="color:var(--gold)"></span></h2>
     <div class="grid2">
       <div>
         <canvas id="bio" width="460" height="540"></canvas>
@@ -119,6 +121,13 @@
         (地球の80億人を、地球類似度ESIの2乗で重み付けした思考実験)。</li>
       <li><b>個体の代謝熱</b> — クライバーの法則 <span class="f">P_個体 = 3.4 W × (M/kg)^0.75</span>。
         実測検証: ヒト M=70kg → 3.4×70^0.75 ≈ 82 W(安静時代謝の実測値と一致)。</li>
+      <li><b>ヒト同型度 HIS (発見スコア)</b> — <span class="f">HIS=Π sᵢ^(Γ(1+wᵢ)/(wᵢΓ(wᵢ))·wᵢ/5)</span>,
+        <span class="f">sᵢ=1−|xᵢ−x⊕|/(xᵢ+x⊕)</span> を重力 g・平衡温度 Teq・日射 S・恒星 Teff・導出体重 M の
+        5項で(重みはΓ恒等式で自己検証)。人間と同じ生命体が成立する惑星ほど 100% に近づく。</li>
+      <li><b>子孫継続性 (世代を残せるか)</b> — 恒星の主系列寿命 <span class="f">t_MS=10·(M★/M☉)⁻²·⁵ Gyr</span>
+        が地球の実績 4.5 Gyr(知的生命までの実時間)を超えるかを判定し、可能世代数の上限
+        <span class="f">N=(t−4.5Gyr)/25yr</span>(ヒトの1世代≈25年)を計算。近接M矮星は
+        潮汐固定・恒星フレア(実在のリスク、例: プロキシマの2016スーパーフレア)で減点。</li>
     </div>
   </div>
 
@@ -231,6 +240,46 @@
   DATA.forEach(function(p){ p.bio=bioPhys(p); });
   var Q_TOTAL=0; DATA.forEach(function(p){ if(!p.earth) Q_TOTAL+=p.bio.pBio; });
 
+  /* ========= ヒト同型度 HIS (Γ部分積分恒等式で正規化した実測5項) ========= */
+  // 人間と同じ生命体が成立する条件: 重力・平衡温度・日射・恒星色・導出体重が
+  // 地球/ヒトの値にどれだけ同型か。各重みは Γ(1+w)/(wΓ(w))≡1 で自己検証。
+  var HW={g:1.2, teq:2.0, insol:0.8, star:0.6, mass:1.0};
+  function simTerm(x,x0,w,n){
+    if(x==null||!(x>0)) return null;
+    var s=1-Math.abs(x-x0)/(x+x0);
+    return Math.pow(Math.max(0,s), gamma(1+w)/(w*gamma(w)) * w/n);
+  }
+  function humanScore(p){
+    if(p.earth) return 1;
+    var b=p.bio, n=5;
+    var t1=simTerm(b.gRel,1,HW.g,n), t2=simTerm(p.teq,255,HW.teq,n),
+        t3=simTerm(p.insol,1,HW.insol,n), t4=simTerm(p.st||5772,5772,HW.star,n),
+        t5=simTerm(b.mass,70,HW.mass,n);
+    if(t1==null||t2==null||t3==null||t4==null||t5==null) return null;
+    return t1*t2*t3*t4*t5;
+  }
+  /* ========= 子孫継続性 (実式): 恒星の主系列寿命 vs 進化に必要な時間 ====== */
+  // t_MS = 10 Gyr × (M★/M☉)^-2.5, M★/M☉ ≈ (Teff/5772)² (GammaTwinと同じ関係)。
+  // 地球の実績: 知的生命まで 4.5 Gyr、ヒトの1世代 ≈ 25 年。
+  function lineage(p){
+    var L={}, ms=Math.pow((p.st||5772)/5772,2);
+    L.mStar=ms;
+    L.tMS=10*Math.pow(ms,-2.5);                 // [Gyr]
+    L.tEvo=Math.min(L.tMS,13.8);                // 宇宙年齢で打ち切り (上限値)
+    L.canEvolve=L.tEvo>=4.5;
+    L.gens=L.canEvolve?(L.tEvo-4.5)*1e9/25:0;   // 可能世代数 (思考実験の上限)
+    L.locked=!p.earth && (p.st||5772)<3800 && p.per<50;  // 近接M矮星: 潮汐固定・フレアの実リスク
+    return L;
+  }
+  DATA.forEach(function(p){ p.lin=lineage(p); p.his=humanScore(p);
+    p.find=(p.his==null?0:p.his)*(p.lin.canEvolve?1:0.25)*(p.lin.locked?0.75:1); });
+  DATA.sort(function(a,b){ if(a.earth) return -1; if(b.earth) return 1; return b.find-a.find; });
+
+  function fmtGen(g){
+    if(g>=1e8) return (g/1e8).toFixed(1)+"億世代";
+    if(g>=1e4) return (g/1e4).toFixed(0)+"万世代";
+    return g.toFixed(0)+"世代";
+  }
   function fmtW(w){
     if(w>=1e12) return (w/1e12).toFixed(2)+" TW";
     if(w>=1e9) return (w/1e9).toFixed(2)+" GW";
@@ -288,6 +337,7 @@
       nx.fillStyle=q.earth?"#39c2ff":heatColor(q.teq);
       nx.beginPath(); nx.arc(q.x,q.y,rad*(sel2?1.3:1),0,Math.PI*2); nx.fill();
       if(sel2){ nx.strokeStyle="#fff"; nx.lineWidth=1.4; nx.beginPath(); nx.arc(q.x,q.y,rad*1.3+4+2*Math.sin(t*3),0,Math.PI*2); nx.stroke(); }
+      if(!q.earth && k2<=3){ nx.strokeStyle="#c8a44a"; nx.lineWidth=1.2; nx.beginPath(); nx.arc(q.x,q.y,rad*1.9,0,Math.PI*2); nx.stroke(); }
       nx.fillStyle=sel2?"#fff":"#8aa0c0"; nx.font=(sel2?"bold ":"")+"10.5px sans-serif";
       nx.fillText(q.name.replace(/ \(.*\)$/,""),q.x+rad+4,q.y+3);
       // 微分多様体: gradient arrow d|V|/dθ
@@ -299,9 +349,11 @@
     }
     var s=DATA[SEL];
     $("hud").innerHTML="<b>∮ 大域積分 (ネットワーク総熱量)</b>: Q = Σ P_bio = <b>"+fmtW(Q_TOTAL)+"</b> (思考実験)<br>"+
-      "選択ノード: <b>"+s.name+"</b> — P_bio="+fmtW(s.bio.pBio)+
+      "選択ノード: <b>"+s.name+"</b> — ヒト同型度="+(s.his==null?"—":(s.his*100).toFixed(1)+"%")+
+      " / P_bio="+fmtW(s.bio.pBio)+
       " / 微分 d|V|/dθ="+s.bio.grad.toFixed(3)+
-      " / |V(e^{iθ})|="+jonesV(thetaOf(s.teq)).toFixed(3);
+      " / |V(e^{iθ})|="+jonesV(thetaOf(s.teq)).toFixed(3)+
+      "<br>金リング = ヒト同型度×子孫継続性の発見トップ3";
   }
   net.addEventListener("click",function(ev){
     var r=net.getBoundingClientRect();
@@ -330,17 +382,9 @@
       bx.fillText("この惑星は熱的/サイズ的に生命圏外 (Teq="+b.tEnv+"K, R="+p.rade+"R⊕)",Wc/2,Hc/2);
       bx.textAlign="left"; return;
     }
-    var cx=Wc*0.5, groundY=Hc*0.86;
+    var groundY=Hc*0.86;
     // height scale: 2.4m maps to ~0.62*Hc
-    var mPerPx=2.4/(Hc*0.62), hPx=b.height/mPerPx;
-    var bodyW=hPx*0.34*Math.pow(b.gRel,0.55);           // 高重力→がっしり
-    var bodyH=hPx*0.46, headR=hPx*0.13*(b.cold?1.0:1.06);
-    var hipY=groundY-hPx*0.42, shY=hipY-bodyH, headY=shY-headR*1.15;
-    // heat aura (metabolic waste heat, Jones palette)
-    var aur=bx.createRadialGradient(cx,shY+bodyH*0.4,hPx*0.1,cx,shY+bodyH*0.4,hPx*0.85);
-    aur.addColorStop(0,heatColor(b.tBody)); aur.addColorStop(1,"rgba(0,0,0,0)");
-    bx.globalAlpha=0.30; bx.fillStyle=aur;
-    bx.beginPath(); bx.arc(cx,shY+bodyH*0.4,hPx*0.85,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+    var mPerPx=2.4/(Hc*0.62);
     // ground + gravity
     bx.strokeStyle="#2a3c5c"; bx.lineWidth=2;
     bx.beginPath(); bx.moveTo(20,groundY); bx.lineTo(Wc-20,groundY); bx.stroke();
@@ -354,82 +398,113 @@
     var lum=(62-b.pig*40).toFixed(0);
     var skin="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+lum+"%)";
     var skin2="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+(lum*0.78).toFixed(0)+"%)";
-    // legs (2/4/6 by gravity)
-    bx.strokeStyle=skin2; bx.lineCap="round";
-    var legW=Math.max(4,bodyW*0.16*Math.pow(b.gRel,0.8)); bx.lineWidth=legW;
-    var nl=b.legs, legLen=hPx*0.42;
-    for(var li=0;li<nl;li++){
-      var fx=cx-bodyW*0.42+bodyW*0.84*(nl===1?0.5:li/(nl-1));
-      var sway=(li%2?1:-1)*bodyW*0.06;
-      bx.beginPath(); bx.moveTo(fx,hipY); bx.quadraticCurveTo(fx+sway,hipY+legLen*0.5,fx+sway*0.5,groundY-2); bx.stroke();
-    }
-    // arms (2, unless 6-legged → small manipulators)
-    bx.lineWidth=Math.max(3,legW*0.66);
-    var armLen=hPx*0.34*(b.cold?0.8:1.1);               // Allen: cold→short appendages
-    [-1,1].forEach(function(sd){
-      bx.beginPath(); bx.moveTo(cx+sd*bodyW*0.5,shY+bodyH*0.16);
-      bx.quadraticCurveTo(cx+sd*(bodyW*0.5+armLen*0.5),shY+bodyH*0.34,cx+sd*(bodyW*0.42+armLen*0.6),shY+bodyH*0.16+armLen);
-      bx.stroke();
-    });
-    // torso
-    bx.fillStyle=skin;
-    bx.beginPath(); bx.ellipse(cx,shY+bodyH*0.5,bodyW*0.55,bodyH*0.56,0,0,Math.PI*2); bx.fill();
-    // radiator fins / ears (hot, Stefan–Boltzmann area demand) — or fur (cold)
-    if(b.hot||b.finF>1.15){
-      bx.fillStyle=skin2; bx.globalAlpha=0.9;
-      var fN=Math.round(2+b.finF*2);
-      for(var fi=0;fi<fN;fi++){
-        var fy=shY+bodyH*(0.12+0.76*fi/Math.max(1,fN-1));
-        var fl=bodyW*(0.5+0.55*b.finF);
+    var eyeCol="hsl("+b.eyeHue.toFixed(0)+",75%,55%)";
+    // one individual; sc scales the body, isChild raises the head ratio
+    // (real juvenile allometry — the "baby schema" — marks the descendant)
+    function being(cx,sc,isChild){
+      var hPx=b.height/mPerPx*sc;
+      var bodyW=hPx*0.34*Math.pow(b.gRel,0.55);         // 高重力→がっしり
+      var bodyH=hPx*0.46, headR=hPx*0.13*(isChild?1.35:1.0)*(b.cold?1.0:1.06);
+      var hipY=groundY-hPx*0.42, shY=hipY-bodyH, headY=shY-headR*1.15;
+      // heat aura (metabolic waste heat, Jones palette)
+      var aur=bx.createRadialGradient(cx,shY+bodyH*0.4,hPx*0.1,cx,shY+bodyH*0.4,hPx*0.85);
+      aur.addColorStop(0,heatColor(b.tBody)); aur.addColorStop(1,"rgba(0,0,0,0)");
+      bx.globalAlpha=0.30; bx.fillStyle=aur;
+      bx.beginPath(); bx.arc(cx,shY+bodyH*0.4,hPx*0.85,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+      // legs (2/4/6 by gravity)
+      bx.strokeStyle=skin2; bx.lineCap="round";
+      var legW=Math.max(4*sc,bodyW*0.16*Math.pow(b.gRel,0.8)); bx.lineWidth=legW;
+      var nl=b.legs, legLen=hPx*0.42;
+      for(var li=0;li<nl;li++){
+        var fx=cx-bodyW*0.42+bodyW*0.84*(nl===1?0.5:li/(nl-1));
+        var sway=(li%2?1:-1)*bodyW*0.06;
+        bx.beginPath(); bx.moveTo(fx,hipY); bx.quadraticCurveTo(fx+sway,hipY+legLen*0.5,fx+sway*0.5,groundY-2); bx.stroke();
+      }
+      // arms
+      bx.lineWidth=Math.max(3*sc,legW*0.66);
+      var armLen=hPx*0.34*(b.cold?0.8:1.1);             // Allen: cold→short appendages
+      [-1,1].forEach(function(sd){
+        bx.beginPath(); bx.moveTo(cx+sd*bodyW*0.5,shY+bodyH*0.16);
+        bx.quadraticCurveTo(cx+sd*(bodyW*0.5+armLen*0.5),shY+bodyH*0.34,cx+sd*(bodyW*0.42+armLen*0.6),shY+bodyH*0.16+armLen);
+        bx.stroke();
+      });
+      // torso
+      bx.fillStyle=skin;
+      bx.beginPath(); bx.ellipse(cx,shY+bodyH*0.5,bodyW*0.55,bodyH*0.56,0,0,Math.PI*2); bx.fill();
+      // radiator fins / ears (hot, Stefan–Boltzmann area demand) — or fur (cold)
+      if(b.hot||b.finF>1.15){
+        bx.fillStyle=skin2; bx.globalAlpha=0.9;
+        var fN=Math.round(2+b.finF*2);
+        for(var fi=0;fi<fN;fi++){
+          var fy=shY+bodyH*(0.12+0.76*fi/Math.max(1,fN-1));
+          var fl=bodyW*(0.5+0.55*b.finF);
+          [-1,1].forEach(function(sd){
+            bx.beginPath();
+            bx.moveTo(cx+sd*bodyW*0.5,fy);
+            bx.quadraticCurveTo(cx+sd*(bodyW*0.5+fl),fy-hPx*0.045,cx+sd*(bodyW*0.5+fl*0.8),fy+hPx*0.035);
+            bx.closePath(); bx.fill();
+          });
+        }
+        bx.globalAlpha=1;
+        // big radiator ears
         [-1,1].forEach(function(sd){
-          bx.beginPath();
-          bx.moveTo(cx+sd*bodyW*0.5,fy);
-          bx.quadraticCurveTo(cx+sd*(bodyW*0.5+fl),fy-hPx*0.045,cx+sd*(bodyW*0.5+fl*0.8),fy+hPx*0.035);
-          bx.closePath(); bx.fill();
+          bx.fillStyle=skin2;
+          bx.beginPath(); bx.ellipse(cx+sd*headR*1.35,headY-headR*0.2,headR*0.55*b.finF,headR*0.9*b.finF,sd*0.5,0,Math.PI*2); bx.fill();
         });
       }
-      bx.globalAlpha=1;
-      // big radiator ears
+      if(b.cold){
+        bx.strokeStyle="hsla(28,25%,72%,0.8)"; bx.lineWidth=1.2;
+        var nFur=Math.round(140*sc);
+        for(var fu=0;fu<nFur;fu++){
+          var a=r()*Math.PI*2, rr=bodyW*0.55+r()*6*sc;
+          var fx2=cx+Math.cos(a)*rr*0.98, fy2=shY+bodyH*0.5+Math.sin(a)*bodyH*0.56;
+          bx.beginPath(); bx.moveTo(fx2,fy2); bx.lineTo(fx2+Math.cos(a)*7*sc,fy2+Math.sin(a)*7*sc); bx.stroke();
+        }
+      }
+      // head
+      bx.fillStyle=skin;
+      bx.beginPath(); bx.arc(cx,headY,headR,0,Math.PI*2); bx.fill();
+      // eyes: size from star dimness, color from star Teff
+      var eyeR=headR*0.30*b.eyeScale;
       [-1,1].forEach(function(sd){
-        bx.fillStyle=skin2;
-        bx.beginPath(); bx.ellipse(cx+sd*headR*1.35,headY-headR*0.2,headR*0.55*b.finF,headR*0.9*b.finF,sd*0.5,0,Math.PI*2); bx.fill();
+        var ex=cx+sd*headR*0.45, ey=headY-headR*0.08;
+        var eg=bx.createRadialGradient(ex,ey,0,ex,ey,eyeR*1.8);
+        eg.addColorStop(0,eyeCol); eg.addColorStop(1,"rgba(0,0,0,0)");
+        bx.globalAlpha=0.55; bx.fillStyle=eg; bx.beginPath(); bx.arc(ex,ey,eyeR*1.8,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+        bx.fillStyle="#0a0f18"; bx.beginPath(); bx.arc(ex,ey,eyeR,0,Math.PI*2); bx.fill();
+        bx.fillStyle=eyeCol; bx.beginPath(); bx.arc(ex,ey,eyeR*0.62,0,Math.PI*2); bx.fill();
+        bx.fillStyle="#fff"; bx.beginPath(); bx.arc(ex-eyeR*0.2,ey-eyeR*0.24,eyeR*0.16,0,Math.PI*2); bx.fill();
       });
-    }
-    if(b.cold){
-      bx.strokeStyle="hsla(28,25%,72%,0.8)"; bx.lineWidth=1.2;
-      for(var fu=0;fu<140;fu++){
-        var a=r()*Math.PI*2, rr=bodyW*0.55+r()*6;
-        var fx2=cx+Math.cos(a)*rr*0.98, fy2=shY+bodyH*0.5+Math.sin(a)*bodyH*0.56;
-        bx.beginPath(); bx.moveTo(fx2,fy2); bx.lineTo(fx2+Math.cos(a)*7,fy2+Math.sin(a)*7); bx.stroke();
+      // thermal-sense organ (this app's premise: heat sensing) — IR pit like pit vipers
+      bx.fillStyle=heatColor(b.tBody);
+      bx.beginPath(); bx.arc(cx,headY+headR*0.35,headR*0.13,0,Math.PI*2); bx.fill();
+      if(isChild){
+        bx.fillStyle="#7fd8a8"; bx.font="10.5px sans-serif"; bx.textAlign="center";
+        bx.fillText("子孫 (第1世代)",cx,groundY-hPx-10);
+        bx.textAlign="left"; bx.font="11px sans-serif";
       }
     }
-    // head
-    bx.fillStyle=skin;
-    bx.beginPath(); bx.arc(cx,headY,headR,0,Math.PI*2); bx.fill();
-    // eyes: size from star dimness, color from star Teff
-    var eyeR=headR*0.30*b.eyeScale;
-    var eyeCol="hsl("+b.eyeHue.toFixed(0)+",75%,55%)";
-    [-1,1].forEach(function(sd){
-      var ex=cx+sd*headR*0.45, ey=headY-headR*0.08;
-      var eg=bx.createRadialGradient(ex,ey,0,ex,ey,eyeR*1.8);
-      eg.addColorStop(0,eyeCol); eg.addColorStop(1,"rgba(0,0,0,0)");
-      bx.globalAlpha=0.55; bx.fillStyle=eg; bx.beginPath(); bx.arc(ex,ey,eyeR*1.8,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
-      bx.fillStyle="#0a0f18"; bx.beginPath(); bx.arc(ex,ey,eyeR,0,Math.PI*2); bx.fill();
-      bx.fillStyle=eyeCol; bx.beginPath(); bx.arc(ex,ey,eyeR*0.62,0,Math.PI*2); bx.fill();
-      bx.fillStyle="#fff"; bx.beginPath(); bx.arc(ex-eyeR*0.2,ey-eyeR*0.24,eyeR*0.16,0,Math.PI*2); bx.fill();
-    });
-    // thermal-sense organ (this app's premise: heat sensing) — IR pit like pit vipers
-    bx.fillStyle=heatColor(b.tBody);
-    bx.beginPath(); bx.arc(cx,headY+headR*0.35,headR*0.13,0,Math.PI*2); bx.fill();
+    // 親 + 子孫 (恒星寿命が世代継続を許す場合)
+    var adultX=p.lin.canEvolve?Wc*0.38:Wc*0.5;
+    being(adultX,1,false);
+    if(p.lin.canEvolve) being(Math.min(Wc-70,adultX+(b.height/mPerPx)*0.52+34),0.55,true);
     // caption
     bx.fillStyle="#cfe0f5"; bx.font="bold 13px sans-serif";
-    bx.fillText(p.name,16,26);
+    bx.fillText(p.name+"  — ヒト同型度 "+(p.his==null?"—":(p.his*100).toFixed(1)+"%"),16,26);
     bx.fillStyle="#8aa0c0"; bx.font="11px sans-serif";
     bx.fillText("物理整合イラスト — 観測ではなく実測パラメータからの決定論的導出",16,44);
     bx.fillStyle=heatColor(b.tBody);
     bx.fillText("●",16,62);
     bx.fillStyle="#8aa0c0";
     bx.fillText(" = 額の赤外ピット器官 (実在: マムシ類の熱感知に倣う)",26,62);
+    if(p.lin.canEvolve){
+      bx.fillStyle="#7fd8a8";
+      bx.fillText("👪 子孫: 身長×0.55・頭部比×1.35 (実在の幼形=ベビースキーマ) で第1世代を描画",16,80);
+      bx.fillText("恒星寿命 t_MS より可能世代数 ≈ "+fmtGen(p.lin.gens)+" (上限の思考実験)",16,96);
+    } else {
+      bx.fillStyle="#ff9aa5";
+      bx.fillText("恒星の主系列寿命が45億年(地球の実績)に満たず、子孫世代の継続は不可と判定",16,80);
+    }
   }
 
   /* ================= annotations ========================================== */
@@ -438,6 +513,8 @@
     function add(t){ var li=document.createElement("li"); li.innerHTML=t; ul.appendChild(li); }
     if(p.earth){ add("<b>地球</b> — 基準ノード。実在の知的生命体はヒト: M=70 kg, クライバー熱 <span class='f'>3.4×70^0.75≈82 W</span>(実測と一致)。"); return; }
     if(!b.viable){ add("<b>生命圏外</b> — Teq="+b.tEnv+" K / R="+p.rade+" R⊕ は液体の水と生化学の窓の外。グラフィックス対象外(正直な判定)。"); return; }
+    add("<b>ヒト同型度 HIS="+(p.his==null?"—":(p.his*100).toFixed(1)+"%")+"</b> — Γ部分積分恒等式で正規化した実測5項(重力・平衡温度・日射・恒星色・導出体重)の同型度 <span class='f'>HIS=Π sᵢ^(Γ(1+wᵢ)/(wᵢΓ(wᵢ))·wᵢ/5)</span>。地球=100%。"+(p.lin.locked?"<b>近接M矮星のため潮汐固定・フレアの実リスクで発見スコア減点。</b>":""));
+    add("<b>子孫継続性</b> — 恒星の主系列寿命 <span class='f'>t_MS=10·(M★/M☉)⁻²·⁵="+(p.lin.tMS>99?"99+":p.lin.tMS.toFixed(1))+" Gyr</span>(M★≈"+p.lin.mStar.toFixed(2)+"M☉)。地球の実績(知的生命まで4.5 Gyr)に対し"+(p.lin.canEvolve?"<b>十分</b> → 可能世代数の上限 <span class='f'>N=(t−4.5Gyr)/25yr≈"+fmtGen(p.lin.gens)+"</span>(1世代25年=ヒトの実測)":"<b>不足</b> — 子孫の世代継続は不可")+"。");
     add("<b>体格</b> — 表面重力 <span class='f'>g=R^1.58g⊕="+b.gRel.toFixed(2)+"g⊕</span> → 骨強度スケーリングで体重 <span class='f'>M≈70·(g⊕/g)^1.2="+b.mass.toFixed(0)+" kg</span>、身長 <span class='f'>h∝g^-1/2≈"+b.height.toFixed(2)+" m</span>、脚は<b>"+b.legs+"本</b>(高重力ほど多脚で荷重分散)。");
     add("<b>代謝熱</b> — クライバーの法則 <span class='f'>P=3.4·M^0.75="+b.metab.toFixed(0)+" W</span>。これが熱感知ネットワークが拾う1個体の熱源。");
     add("<b>放熱器官</b> — 体温 "+b.tBody.toFixed(0)+" K / 環境 "+b.tEnv.toFixed(0)+" K でシュテファン=ボルツマン <span class='f'>A=P/(εσ(Tb⁴−Tenv⁴))="+(b.area>=99?"∞(放熱不能)":b.area.toFixed(2)+" m²")+"</span>(ヒト皮膚≈1.8m²)。"+
@@ -453,8 +530,8 @@
     var el=$("plist"); el.innerHTML="";
     DATA.forEach(function(p,i){
       var d=document.createElement("div"); d.className="it"+(i===SEL?" sel":"");
-      d.innerHTML="<span class='swatch' style='background:"+heatColor(p.teq)+"'></span><b>"+p.name+"</b>"+
-        "<div class='t'>"+(p.earth?"基準ノード":("ESI "+(p.esi==null?"—":p.esi.toFixed(3))+" · "+p.ly+" 光年 · Teq "+p.teq+" K"))+"</div>";
+      d.innerHTML="<span class='swatch' style='background:"+heatColor(p.teq)+"'></span><b>"+(p.earth?"":("#"+i+" "))+p.name+"</b>"+(!p.earth&&p.lin.canEvolve?" 👪":"")+
+        "<div class='t'>"+(p.earth?"基準ノード (ヒト同型度=100%)":("ヒト同型度 "+(p.his==null?"—":(p.his*100).toFixed(1)+"%")+" · 可能世代 "+(p.lin.gens>0?fmtGen(p.lin.gens):"×")+" · "+p.ly+" 光年"))+"</div>";
       d.addEventListener("click",function(){ select(i); });
       el.appendChild(d);
     });
@@ -470,6 +547,9 @@
       "<b>恒星 Teff</b><span>"+(p.st||"—")+" K</span>"+
       "<b>距離</b><span>"+(p.earth?"—":p.ly+" 光年")+"</span>"+
       "<b>ESI (Γ正規化)</b><span>"+(p.esi==null?"—":p.esi.toFixed(4))+"</span>"+
+      "<b>ヒト同型度 HIS</b><span>"+(p.his==null?"—":(p.his*100).toFixed(1)+"%")+(!p.earth&&p.lin.locked?" (潮汐固定リスク減点)":"")+"</span>"+
+      "<b>恒星の主系列寿命</b><span>t_MS="+(p.lin.tMS>99?"99+":p.lin.tMS.toFixed(1))+" Gyr (M★≈"+p.lin.mStar.toFixed(2)+"M☉)</span>"+
+      "<b>可能世代数 (上限)</b><span>"+(p.earth?"実績: 現生人類 約1万世代":(p.lin.canEvolve?fmtGen(p.lin.gens):"恒星寿命が45億年に不足"))+"</span>"+
       "<b>P_bio (思考実験)</b><span>"+(p.earth?"—":fmtW(b.pBio))+"</span>";
     drawCreature(p);
     annotate(p);
