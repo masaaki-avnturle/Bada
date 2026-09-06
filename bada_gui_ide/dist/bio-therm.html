@@ -56,7 +56,7 @@
 <body>
 <header>
   <div><div class="logo">🧬 BioThermNet — 人間に近い生命体ファインダー</div>
-    <div class="sub">Γ関数の大域的積分多様体の機知 × Jones多項式の熱感知 — 人間と同型の生命体が成立し、子孫(世代)を残し続けられる惑星を実測物理で発見する</div></div>
+    <div class="sub">Γ関数の大域的部分積分多様体の機知 × Jones多項式の熱感知 — 🔭θ掃引スキャンと🛰NASAカタログ ライブ探索で、人間モデル並みの生命体が成立し子孫を残せる惑星を発見する</div></div>
 </header>
 <main>
 
@@ -78,10 +78,13 @@
         <div class="rec" id="recBadge"><span class="d"></span>REC</div>
       </div>
       <div class="controls" style="margin-top:8px">
+        <button class="g" id="scanBtn">🔭 熱感知スキャン開始 (θ掃引で発見)</button>
+        <button id="liveBtn">🛰 NASAカタログでライブ探索</button>
         <button id="play">⏸ 一時停止</button>
-        <button class="r" id="recBtn">⏺ ネットワーク動画を録画 (.webm)</button>
+        <button class="r" id="recBtn">⏺ 録画 (.webm)</button>
         <span class="muted" id="recNote"></span>
       </div>
+      <div class="controls"><span class="muted" id="src">データ: 内蔵スナップショット (実測値・オフライン可)</span></div>
       <div class="gline" id="gammaDemo"></div>
     </div>
     <div>
@@ -89,6 +92,13 @@
         <h2>👪 発見ランキング — ヒト同型度 × 子孫継続性 (実在の惑星)</h2>
         <div class="list" id="plist"></div>
         <div class="kv" id="pinfo"></div>
+      </div>
+      <div class="card">
+        <h2>★ 発見ログ — 人間モデル並みの生命体が成立する惑星</h2>
+        <div class="muted" style="margin-bottom:6px"><b>人間モデル (基準)</b>: M=70kg・P=82W・g=1g⊕・1世代25年。
+          <b>発見の判定 (明示)</b>: ヒト同型度 HIS≥75% / 導出体重 35–140kg / 代謝熱 40–170W / 恒星寿命≥4.5Gyr。
+          「発見」は<b>人間モデル並みの生命体が物理的に成立し世代を残せる実在惑星の特定</b>であり、生命体そのものの検出ではありません。</div>
+        <div class="list" id="dlog" style="max-height:230px"><div class="it" style="color:var(--dim)">🔭 熱感知スキャンを開始すると、Jones多項式 |V(e^{iθ})| の θ 掃引で感知した惑星がここに記録されます。</div></div>
       </div>
     </div>
   </div>
@@ -121,6 +131,12 @@
         (地球の80億人を、地球類似度ESIの2乗で重み付けした思考実験)。</li>
       <li><b>個体の代謝熱</b> — クライバーの法則 <span class="f">P_個体 = 3.4 W × (M/kg)^0.75</span>。
         実測検証: ヒト M=70kg → 3.4×70^0.75 ≈ 82 W(安静時代謝の実測値と一致)。</li>
+      <li><b>熱感知スキャン (発見システム)</b> — Jones多項式 <span class="f">|V(e^{iθ})|</span> の θ を
+        0→π に掃引 (低温100K→高温1500K)。各惑星は実測 Teq が決める固有の θ を持ち、掃引が横切った瞬間に
+        感知される。同時にΓ多様体の<b>部分積分</b> <span class="f">∫₀^θ|V(e^{iθ'})|dθ'</span> を積算し
+        (θ=π で大域積分が完成)、人間モデル並み判定を通過した惑星だけを<b>★発見</b>として記録する。</li>
+      <li><b>ライブ探索</b> — NASA Exoplanet Archive (Kepler/K2/TESS の確定惑星カタログ) に常時アクセスし、
+        数千の実測惑星を同じパイプライン (HIS→子孫継続性→発見スコア) にかける。オフライン時は実測スナップショット。</li>
       <li><b>ヒト同型度 HIS (発見スコア)</b> — <span class="f">HIS=Π sᵢ^(Γ(1+wᵢ)/(wᵢΓ(wᵢ))·wᵢ/5)</span>,
         <span class="f">sᵢ=1−|xᵢ−x⊕|/(xᵢ+x⊕)</span> を重力 g・平衡温度 Teq・日射 S・恒星 Teff・導出体重 M の
         5項で(重みはΓ恒等式で自己検証)。人間と同じ生命体が成立する惑星ほど 100% に近づく。</li>
@@ -208,7 +224,6 @@
     if(t1==null||t2==null||t3==null) return null;
     return t1*t2*t3;
   }
-  DATA.forEach(function(p){ p.esi=esi(p); });
 
   /* ================= lifeform physics (all real laws) ===================== */
   var SIGMA=5.670374419e-8, EPS=0.95;
@@ -237,8 +252,7 @@
     b.viable=(p.rade<2.6 && b.tEnv>150 && b.tEnv<340);
     return b;
   }
-  DATA.forEach(function(p){ p.bio=bioPhys(p); });
-  var Q_TOTAL=0; DATA.forEach(function(p){ if(!p.earth) Q_TOTAL+=p.bio.pBio; });
+  var Q_TOTAL=0;
 
   /* ========= ヒト同型度 HIS (Γ部分積分恒等式で正規化した実測5項) ========= */
   // 人間と同じ生命体が成立する条件: 重力・平衡温度・日射・恒星色・導出体重が
@@ -271,9 +285,22 @@
     L.locked=!p.earth && (p.st||5772)<3800 && p.per<50;  // 近接M矮星: 潮汐固定・フレアの実リスク
     return L;
   }
-  DATA.forEach(function(p){ p.lin=lineage(p); p.his=humanScore(p);
-    p.find=(p.his==null?0:p.his)*(p.lin.canEvolve?1:0.25)*(p.lin.locked?0.75:1); });
-  DATA.sort(function(a,b){ if(a.earth) return -1; if(b.earth) return 1; return b.find-a.find; });
+  /* ========= 人間モデル並み判定 (発見の基準・UIにも明示) ================= */
+  function humanGrade(p){
+    if(p.earth||p.his==null) return false;
+    var b=p.bio;
+    return b.viable && p.his>=0.75 && b.mass>=35 && b.mass<=140 &&
+           b.metab>=40 && b.metab<=170 && p.lin.canEvolve;
+  }
+  function gradeFail(p){
+    var b=p.bio;
+    if(!b.viable) return "生命圏外";
+    if(p.his==null||p.his<0.75) return "同型度不足 ("+(p.his==null?"—":(p.his*100).toFixed(0)+"%")+")";
+    if(b.mass<35||b.mass>140) return "体重域外 ("+b.mass.toFixed(0)+"kg)";
+    if(b.metab<40||b.metab>170) return "代謝域外 ("+b.metab.toFixed(0)+"W)";
+    if(!p.lin.canEvolve) return "恒星寿命不足";
+    return "";
+  }
 
   function fmtGen(g){
     if(g>=1e8) return (g/1e8).toFixed(1)+"億世代";
@@ -293,28 +320,81 @@
 
   /* ================= network canvas ======================================= */
   var net=$("net"), nx=net.getContext("2d");
-  var Wn=net.width, Hn=net.height, SEL=1, playing=true, t0=performance.now();
+  var Wn=net.width, Hn=net.height, SEL=1, playing=true, t0=performance.now(), NSHOW=1;
   // deterministic node layout: Earth hub center, others by log-distance polar
-  DATA.forEach(function(p,i){
-    if(p.earth){ p.x=Wn*0.5; p.y=Hn*0.52; return; }
-    var r=rng(seedOf(p.name));
-    var ang=r()*Math.PI*2;
-    var rad=(0.16+0.78*Math.log10(1+p.ly)/Math.log10(2000))*Math.min(Wn,Hn)*0.46;
-    p.x=Wn*0.5+Math.cos(ang)*rad*1.28;
-    p.y=Hn*0.52+Math.sin(ang)*rad*0.86;
-    p.x=Math.max(40,Math.min(Wn-40,p.x)); p.y=Math.max(46,Math.min(Hn-30,p.y));
-  });
+  function layoutNodes(){
+    DATA.forEach(function(p){
+      if(p.earth){ p.x=Wn*0.5; p.y=Hn*0.52; return; }
+      var r=rng(seedOf(p.name));
+      var ang=r()*Math.PI*2;
+      var rad=(0.16+0.78*Math.log10(1+p.ly)/Math.log10(2000))*Math.min(Wn,Hn)*0.46;
+      p.x=Wn*0.5+Math.cos(ang)*rad*1.28;
+      p.y=Hn*0.52+Math.sin(ang)*rad*0.86;
+      p.x=Math.max(40,Math.min(Wn-40,p.x)); p.y=Math.max(46,Math.min(Hn-30,p.y));
+    });
+  }
+  // 全パイプライン: 物理→HIS→系譜→発見スコア順ソート→総熱量→配置
+  // (ライブ探索でカタログ全体を取り込んだあとも同じ手順で再計算する)
+  function prepare(){
+    DATA.forEach(function(p){ p.esi=esi(p); p.bio=bioPhys(p); p.lin=lineage(p); p.his=humanScore(p);
+      p.find=(p.his==null?0:p.his)*(p.lin.canEvolve?1:0.25)*(p.lin.locked?0.75:1); });
+    DATA.sort(function(a,b){ if(a.earth) return -1; if(b.earth) return 1; return b.find-a.find; });
+    Q_TOTAL=0; DATA.forEach(function(p){ if(!p.earth) Q_TOTAL+=p.bio.pBio; });
+    NSHOW=Math.min(DATA.length,61);   // 表示は上位60ノード (スキャンは全惑星が対象)
+    layoutNodes();
+  }
+  prepare();
   var STARS=[]; (function(){ var r=rng(7); for(var i=0;i<130;i++) STARS.push([r()*Wn,r()*Hn,r()*1.3+0.3]); })();
+
+  /* ========= 熱感知スキャン (θ掃引・Γ部分積分の積算・発見ログ) =========== */
+  var SCAN={on:false,th:0,integ:0,seen:{},nFound:0,nSense:0,last:0};
+  function dlogAdd(html){
+    var d=document.createElement("div"); d.className="it"; d.innerHTML=html;
+    var log=$("dlog"); log.insertBefore(d,log.firstChild);
+  }
+  function startScan(){
+    SCAN.on=true; SCAN.th=0; SCAN.integ=0; SCAN.seen={}; SCAN.nFound=0; SCAN.nSense=0; SCAN.last=performance.now();
+    $("dlog").innerHTML="";
+    dlogAdd("🔭 スキャン開始 — Jones熱感知 |V(e^{iθ})| を θ=0→π で掃引 (低温→高温)。対象 "+(DATA.length-1)+" 惑星 (実測)。");
+    $("scanBtn").textContent="⏹ スキャン中… (θ掃引)";
+    if(!playing){ playing=true; $("play").textContent="⏸ 一時停止"; requestAnimationFrame(loop); }
+  }
+  function stepScan(now){
+    var dt=Math.min(0.1,(now-SCAN.last)/1000); SCAN.last=now;
+    var dth=dt*(Math.PI/14);            // 全掃引 ~14 秒
+    var th2=SCAN.th+dth;
+    SCAN.integ+=jonesV(SCAN.th)*dth;    // Γ多様体の部分積分 ∫|V|dθ の積算 (大域積分へ)
+    for(var i=1;i<DATA.length;i++){
+      var p=DATA[i], tp=thetaOf(p.teq);
+      if(tp>=SCAN.th&&tp<th2&&!SCAN.seen[p.name]){
+        SCAN.seen[p.name]=true; SCAN.nSense++; p.flash=now;
+        if(humanGrade(p)){
+          SCAN.nFound++;
+          dlogAdd("<b style='color:#ffd97a'>★ 発見 (人間モデル並み)</b>: <b>"+p.name+"</b> — HIS "+(p.his*100).toFixed(1)+"%, M≈"+p.bio.mass.toFixed(0)+"kg (ヒト70kg), P≈"+p.bio.metab.toFixed(0)+"W (ヒト82W), 可能世代 "+fmtGen(p.lin.gens));
+        } else if(DATA.length<80||i<=30){  // ライブ大量カタログでは判定外ログを間引く
+          dlogAdd("・感知: "+p.name+" — 判定外: "+gradeFail(p));
+        }
+      }
+    }
+    SCAN.th=th2;
+    if(SCAN.th>=Math.PI){
+      SCAN.on=false;
+      dlogAdd("<b>✔ スキャン完了</b> — Γ部分積分 ∫₀^π|V(e^{iθ})|dθ = <b>"+SCAN.integ.toFixed(4)+"</b> / 感知 "+SCAN.nSense+" 惑星 / <b style='color:#ffd97a'>発見 "+SCAN.nFound+" 件 (人間モデル並み)</b>");
+      $("scanBtn").textContent="🔭 熱感知スキャン開始 (θ掃引で発見)";
+    }
+  }
+  $("scanBtn").addEventListener("click",function(){ if(!SCAN.on) startScan(); });
 
   function drawNet(now){
     var t=(now-t0)/1000;
+    if(SCAN.on) stepScan(now);
     nx.fillStyle="#000308"; nx.fillRect(0,0,Wn,Hn);
     nx.fillStyle="#9fb6d8";
     for(var i=0;i<STARS.length;i++){ nx.globalAlpha=0.25+0.35*Math.abs(Math.sin(t*0.7+i)); nx.fillRect(STARS[i][0],STARS[i][1],STARS[i][2],STARS[i][2]); }
     nx.globalAlpha=1;
     var hub=DATA[0];
     // edges + heat pulses (speed ∝ 1/distance)
-    for(var k=1;k<DATA.length;k++){
+    for(var k=1;k<NSHOW;k++){
       var p=DATA[k], seld=(k===SEL);
       nx.strokeStyle=seld?"#b58cff":"#1e3050"; nx.lineWidth=seld?1.6:0.8;
       nx.beginPath(); nx.moveTo(hub.x,hub.y); nx.lineTo(p.x,p.y); nx.stroke();
@@ -325,7 +405,7 @@
       nx.beginPath(); nx.arc(px,py,seld?3.4:2.2,0,Math.PI*2); nx.fill();
     }
     // nodes
-    for(var k2=0;k2<DATA.length;k2++){
+    for(var k2=0;k2<NSHOW;k2++){
       var q=DATA[k2], sel2=(k2===SEL);
       var rad=q.earth?11:5+3.2*Math.max(0,Math.log10(1+q.bio.pBio/1e9));
       var pul=1+0.14*Math.sin(t*2+k2);
@@ -338,6 +418,7 @@
       nx.beginPath(); nx.arc(q.x,q.y,rad*(sel2?1.3:1),0,Math.PI*2); nx.fill();
       if(sel2){ nx.strokeStyle="#fff"; nx.lineWidth=1.4; nx.beginPath(); nx.arc(q.x,q.y,rad*1.3+4+2*Math.sin(t*3),0,Math.PI*2); nx.stroke(); }
       if(!q.earth && k2<=3){ nx.strokeStyle="#c8a44a"; nx.lineWidth=1.2; nx.beginPath(); nx.arc(q.x,q.y,rad*1.9,0,Math.PI*2); nx.stroke(); }
+      if(!q.earth && humanGrade(q)){ nx.fillStyle="#ffd97a"; nx.font="11px sans-serif"; nx.fillText("★",q.x-rad-12,q.y+4); }
       nx.fillStyle=sel2?"#fff":"#8aa0c0"; nx.font=(sel2?"bold ":"")+"10.5px sans-serif";
       nx.fillText(q.name.replace(/ \(.*\)$/,""),q.x+rad+4,q.y+3);
       // 微分多様体: gradient arrow d|V|/dθ
@@ -345,6 +426,36 @@
         var gr=q.bio.grad, ax=q.x, ay=q.y-rad-6, L=Math.max(-16,Math.min(16,gr*9));
         nx.strokeStyle="#7fd8a8"; nx.lineWidth=1.1;
         nx.beginPath(); nx.moveTo(ax-0,ay); nx.lineTo(ax+L,ay-Math.abs(L)*0.35); nx.stroke();
+      }
+    }
+    // 熱感知スキャンの可視化: Jones曲線ゲージ + θ掃引マーカー + 感知リング
+    if(SCAN.on||SCAN.nSense>0){
+      var gx0=40, gx1=Wn-40, gy=Hn-16;
+      nx.strokeStyle="#2a3c5c"; nx.lineWidth=1; nx.beginPath();
+      for(var gi=0;gi<=100;gi++){
+        var gth=gi/100*Math.PI, gx=gx0+(gx1-gx0)*gi/100, gyv=gy-jonesV(gth)*11;
+        if(gi===0) nx.moveTo(gx,gyv); else nx.lineTo(gx,gyv);
+      }
+      nx.stroke();
+      if(SCAN.on){
+        var sx=gx0+(gx1-gx0)*SCAN.th/Math.PI;
+        nx.strokeStyle="#ffd97a"; nx.lineWidth=1.6;
+        nx.beginPath(); nx.moveTo(sx,gy+4); nx.lineTo(sx,gy-42); nx.stroke();
+        nx.fillStyle="#ffd97a"; nx.font="10.5px sans-serif";
+        nx.fillText("θ="+SCAN.th.toFixed(2)+"  ∫|V|dθ="+SCAN.integ.toFixed(3),Math.min(sx+6,Wn-180),gy-32);
+      }
+    }
+    for(var k3=1;k3<NSHOW;k3++){
+      var q3=DATA[k3];
+      if(SCAN.on&&Math.abs(thetaOf(q3.teq)-SCAN.th)<0.08){
+        nx.strokeStyle="#39c2ff"; nx.lineWidth=1.4;
+        nx.beginPath(); nx.arc(q3.x,q3.y,16+6*Math.sin(t*9),0,Math.PI*2); nx.stroke();
+      }
+      if(q3.flash&&now-q3.flash<1500){
+        var fr=(now-q3.flash)/1500;
+        nx.strokeStyle=humanGrade(q3)?"rgba(255,217,122,"+(1-fr).toFixed(2)+")":"rgba(138,160,192,"+(1-fr).toFixed(2)+")";
+        nx.lineWidth=2;
+        nx.beginPath(); nx.arc(q3.x,q3.y,10+fr*36,0,Math.PI*2); nx.stroke();
       }
     }
     var s=DATA[SEL];
@@ -358,7 +469,7 @@
   net.addEventListener("click",function(ev){
     var r=net.getBoundingClientRect();
     var mx=(ev.clientX-r.left)*Wn/r.width, my=(ev.clientY-r.top)*Hn/r.height, best=-1, bd=1e9;
-    DATA.forEach(function(p,i){ var d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my); if(d<bd){bd=d;best=i;} });
+    DATA.slice(0,NSHOW).forEach(function(p,i){ var d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my); if(d<bd){bd=d;best=i;} });
     if(best>=0 && bd<40*40) select(best);
   });
 
@@ -528,9 +639,9 @@
   /* ================= list + selection ===================================== */
   function renderList(){
     var el=$("plist"); el.innerHTML="";
-    DATA.forEach(function(p,i){
+    DATA.slice(0,NSHOW).forEach(function(p,i){
       var d=document.createElement("div"); d.className="it"+(i===SEL?" sel":"");
-      d.innerHTML="<span class='swatch' style='background:"+heatColor(p.teq)+"'></span><b>"+(p.earth?"":("#"+i+" "))+p.name+"</b>"+(!p.earth&&p.lin.canEvolve?" 👪":"")+
+      d.innerHTML="<span class='swatch' style='background:"+heatColor(p.teq)+"'></span><b>"+(p.earth?"":("#"+i+" "))+p.name+"</b>"+(!p.earth&&humanGrade(p)?" <span style='color:#ffd97a'>★</span>":"")+(!p.earth&&p.lin.canEvolve?" 👪":"")+
         "<div class='t'>"+(p.earth?"基準ノード (ヒト同型度=100%)":("ヒト同型度 "+(p.his==null?"—":(p.his*100).toFixed(1)+"%")+" · 可能世代 "+(p.lin.gens>0?fmtGen(p.lin.gens):"×")+" · "+p.ly+" 光年"))+"</div>";
       d.addEventListener("click",function(){ select(i); });
       el.appendChild(d);
@@ -598,10 +709,38 @@
     if(playing) requestAnimationFrame(loop);
   });
 
+  /* ========= ライブ探索: NASA Exoplanet Archive (確定惑星カタログ) ======== */
+  var TAP="https://exoplanetarchive.ipac.caltech.edu/TAP/sync?format=json&query="+
+    encodeURIComponent("select pl_name,pl_rade,pl_insol,pl_eqt,pl_orbper,st_teff,sy_dist from ps where default_flag=1 and pl_rade is not null and pl_rade<3.2 and pl_insol is not null and pl_eqt is not null order by pl_name");
+  function loadLive(){
+    $("src").textContent="データ: NASA Exoplanet Archive (宇宙望遠鏡カタログ) 取得中…";
+    var ctl=new AbortController(); var to=setTimeout(function(){ctl.abort();},20000);
+    fetch(TAP,{signal:ctl.signal})
+      .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+      .then(function(arr){
+        clearTimeout(to);
+        var list=arr.map(function(o){
+          return {name:o.pl_name,rade:o.pl_rade,insol:o.pl_insol,teq:o.pl_eqt,
+                  per:o.pl_orbper||365,st:o.st_teff||5772,
+                  ly:(o.sy_dist!=null?o.sy_dist*3.26156:9999),earth:false};
+        }).filter(function(p){ return p.rade&&p.insol&&p.teq; });
+        if(!list.length) throw new Error("empty");
+        DATA=[mk(PLANETS[0])].concat(list);
+        prepare(); renderList(); select(1);
+        $("src").textContent="データ: LIVE — NASA確定惑星カタログ "+list.length+" 惑星を探索対象に取得 (表示は発見スコア上位"+(NSHOW-1)+")。🔭スキャンで発見してください。";
+      })
+      .catch(function(e){
+        clearTimeout(to);
+        $("src").textContent="データ: ライブ取得に失敗 ("+e.message+") — 実測スナップショット "+(DATA.length-1)+" 惑星で探索中 (オフライン可)。";
+      });
+  }
+  $("liveBtn").addEventListener("click",loadLive);
+
   /* ================= init ================================================= */
   function loop(now){ drawNet(now); if(playing) requestAnimationFrame(loop); }
   renderList(); select(1);
   requestAnimationFrame(loop);
+  loadLive();   // 常時アクセス: 起動時にカタログを自動取得 (失敗時はスナップショット)
 })();
 </script>
 </body>

@@ -136,9 +136,16 @@ it in any browser — no install, no dependencies, works offline.
                       star color) deterministically draws the lifeform WITH
                       its first-generation descendant (baby-schema
                       allometry), each feature annotated; PNG download +
-                      .webm recording. Honest banner: ZERO detections as of
-                      2026 — physics-consistent illustrations, not
-                      observations.
+                      .webm recording. DISCOVERY SYSTEM: a thermal-sensing
+                      SCAN sweeps the Jones curve theta=0..pi (cold->hot),
+                      senses each planet at the theta its measured Teq maps
+                      to while the Gamma PARTIAL integral of |V| accumulates
+                      live, and logs planets passing the explicit
+                      human-model criteria as discoveries; plus LIVE search
+                      of the full NASA confirmed-planet catalog (snapshot
+                      fallback offline). Honest banner: a "discovery" is a
+                      planet identification, not a lifeform detection —
+                      ZERO detections as of 2026.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):
