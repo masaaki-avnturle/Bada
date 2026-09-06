@@ -25,9 +25,14 @@ on:
     tags:
       - 'quantumvm-v*'
     # PR マージ前でもこのブランチへの push でビルド + Release 添付を実行
-    # (タグ push はブランチ保護で 403 になるため。マージ後はタグ運用が本線)
+    # (タグ push はブランチ保護で 403 になるため。マージ後はタグ運用が本線)。
+    # main / master でもビルドして Actions アーティファクトを作るので、
+    # マージ後も Actions タブから EXE / ISO / HTML をダウンロードできます
+    # (workflow_dispatch の「Run workflow」ボタンもマージ後に有効になります)。
     branches:
       - 'claude/bada-quantum-vm-os-x-server-cq0e4t'
+      - main
+      - master
 
 permissions:
   contents: write
@@ -58,6 +63,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: badavmpro-html
+          retention-days: 90
           path: quantum_vm/dist/bada-vm-pro.html
       - name: Attach single-file app to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
@@ -86,6 +92,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: badavmpro-windows
+          retention-days: 90
           path: quantum_vm/app/electron/dist/*.exe
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
@@ -124,6 +131,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: badaos-live-iso
+          retention-days: 90
           path: quantum_vm/dist/BadaOS-12.0-live-amd64.iso
       - name: Attach ISO to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref_name == 'claude/bada-quantum-vm-os-x-server-cq0e4t'
@@ -151,6 +159,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: badavmpro-linux
+          retention-days: 90
           path: |
             quantum_vm/app/electron/dist/*.AppImage
             quantum_vm/app/electron/dist/*.deb

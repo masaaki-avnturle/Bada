@@ -85,6 +85,12 @@ VM 内の X クライアント (`xclock` / `xeyes` / `xterm`) を
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
 | **実機起動** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`BadaOS-12.0-live-amd64.iso`** — USB に書いて PC を起動すると**本物の GRUB メニューに「BadaOS GNU/Quantum 12.0」**。**Ubuntu 風の親切な GUI インストーラ**(日本語ウィザード)か `sudo badaos-install` で**実ディスクの空きスペースへ本インストール**(既存 OS・パーティションは消さず、os-prober で GRUB メニューに共存。全体消去は明示モード。MBR/EFI へ grub-install)。詳細 [`quantum_vm/live/`](quantum_vm/live/) |
 
+> **ダウンロードは 2 通り**: ① [Releases](https://github.com/masaaki-avnturle/Bada/releases)(ログイン不要。最新 ISO への固定リンク:
+> [`releases/latest/download/BadaOS-12.0-live-amd64.iso`](https://github.com/masaaki-avnturle/Bada/releases/latest/download/BadaOS-12.0-live-amd64.iso)、
+> 最新 HTML: [`releases/latest/download/bada-vm-pro.html`](https://github.com/masaaki-avnturle/Bada/releases/latest/download/bada-vm-pro.html))
+> ② [Actions タブ](https://github.com/masaaki-avnturle/Bada/actions/workflows/quantumvm-app-build.yml)(GitHub にログインして、緑 ✓ の実行 → 下部 **Artifacts** の
+> `badavmpro-windows` / `badaos-live-iso` / `badavmpro-html` / `badavmpro-linux`。zip で落ちるので解凍して使用。保存 90 日)
+
 - 仮想マシンは量子 vCPU (8 qubit / Hilbert 次元 256)・tuplespace メモリ・仮想ディスク wd0 / 実ディスク rd0 (RDM)・NAT を持ち、マシン記述は `.qvmx`
 - BadaOS は CD (ISO) から起動 → sysinst で ディスク選択 (wd0/rd0)・GPT/MBR・**ブートローダ (LILO→MBR + GRUB メニュー)**・`newfs` FFSv2・セット展開 → root パスワード・ホスト名・DHCP → LILO/GRUB 経由でディスクから再起動 → `login: root`
 - **Linux 一式がプリインストール**: vim・emacs・sshd・xinetd・curl・wget は初期状態で導入済み、sshd/xinetd は初回起動から自動起動。**NAT 経由でインターネット**が使え (`ping`/`curl`/`wget`/`host`)、`apt` は外部ミラー `http://archive.badaos.or.jp` から取得 (`apt install zsh tcsh bash` など)。**ユーザー切替**も完備: インストーラが一般ユーザー `bada` を作成し、`su - bada` / `su`(パスワード)/ `sudo CMD` / `adduser` / `passwd` が使えます (プロンプトは root `#`・一般 `$`)

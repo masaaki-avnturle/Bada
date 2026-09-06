@@ -108,6 +108,33 @@
 | **Ubuntu** | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaVMPro-*.AppImage` / `.deb` |
 | **実機起動 ISO** 🖥️ | [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `BadaOS-12.0-live-amd64.iso` — **本物の PC の GRUB メニューに BadaOS が表示され単独起動**。USB 起動・**Ubuntu 風の親切な GUI インストーラ**(日本語ウィザード + パーティションバー)・**実ディスクの空きスペースへの本インストール(既存 OS を消さず GRUB メニューに共存)**・ディスク全体インストール・既存 GRUB へのエントリ追加に対応。詳細は [`live/README.md`](live/README.md) |
 
+### ダウンロード方法は 2 通り
+
+**A. Releases から(おすすめ・ログイン不要・保存無期限)** —
+[Releases ページ](https://github.com/masaaki-avnturle/Bada/releases)の最新リリースを開き、
+Assets の一覧からダウンロードします。名前が変わらないファイルは**固定リンク**も使えます:
+
+- 最新の単一 HTML: <https://github.com/masaaki-avnturle/Bada/releases/latest/download/bada-vm-pro.html>
+- 最新の実機起動 ISO: <https://github.com/masaaki-avnturle/Bada/releases/latest/download/BadaOS-12.0-live-amd64.iso>
+
+(EXE / deb / AppImage はファイル名にバージョンが入るため、Releases ページから選んでください)
+
+**B. Actions から(GitHub にログインした状態で)** — リポジトリの
+[Actions タブ](https://github.com/masaaki-avnturle/Bada/actions/workflows/quantumvm-app-build.yml)
+→ 一番上の緑 ✓ の実行を開く → ページ下部の **Artifacts** からダウンロード:
+
+| Artifact 名 | 中身 |
+|:--|:--|
+| `badavmpro-windows` | Windows 10/11 EXE(NSIS インストーラ + ポータブル) |
+| `badaos-live-iso` | 実機起動 ISO (`BadaOS-12.0-live-amd64.iso`) |
+| `badavmpro-html` | 単一 HTML (`bada-vm-pro.html`) |
+| `badavmpro-linux` | Ubuntu 用 AppImage + deb |
+
+Actions の Artifact は **zip** で落ちるので、解凍して中のファイルを使ってください
+(保存期間 90 日)。ビルドは main / master への push・`quantumvm-v*` タグ・
+このブランチへの push のたびに自動実行され、マージ後は Actions タブの
+「Run workflow」ボタンでも手動実行できます。
+
 ビルドは [`quantumvm-app-build.yml`](../.github/workflows/quantumvm-app-build.yml) が実行します
 (`quantumvm-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
 
