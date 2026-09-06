@@ -235,10 +235,18 @@ dist[0.50000, 0.50000]
 | **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
 
 パッケージ定義は [`acpi-app/`](acpi-app/) (Electron + Cordova)、ビルドは
-[`acpi-app-build.yml`](../.github/workflows/acpi-app-build.yml) が実行します
-(`acpi-app-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+[`acpi-app-build.yml`](../.github/workflows/acpi-app-build.yml) が実行します。
 アプリの中身 `acpi-app/www/index.html` は `tools/build-atom-critical.js` が
 `dist/atom-critical.html` と同時に生成します。
+
+**Actions からのダウンロード** — ACPI 関連ブランチ / `main` への push で自動実行され、
+[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/acpi-app-build.yml)
+の実行ページ下部 **Artifacts** から zip で取得できます
+(`acpi-android-apk` / `acpi-windows-exe` / `acpi-ubuntu-appimage-deb`、
+および 3 つをまとめた `acpi-all-platforms`)。要ログイン・保存期間 90 日。
+
+**Releases からのダウンロード** — `acpi-app-v*` タグの push、または
+`workflow_dispatch` の `release_tag` 入力で、同じ成果物が Release に添付されます (期限なし)。
 
 ### 臨界期の定義
 

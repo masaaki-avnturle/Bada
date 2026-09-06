@@ -14,13 +14,19 @@ on:
         required: false
         default: ''
   push:
+    branches:
+      - main
+      - '**acpi**'
+      - '**atomic-critical**'
     tags:
       - 'acpi-v*'
-    paths-ignore:
-      - '**.md'
 
 permissions:
   contents: write
+
+concurrency:
+  group: acpi-dist-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-acpi-dist:
@@ -74,9 +80,26 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: acpi-atom-critical
+          retention-days: 90
+          if-no-files-found: error
           path: |
             bada_gui_ide/dist/atom-critical.html
             bada_gui_ide/dist/acpi-dist.zip
+
+      - name: 実行ページにダウンロード手順を書き出す
+        run: |
+          {
+            echo "## ACPI — 単一 HTML 版 + 配布 zip"
+            echo ""
+            echo "この実行ページ下部の **Artifacts** → \`acpi-atom-critical\` から"
+            echo "ダウンロードできます (GitHub にログインが必要。保存期間 90 日)。"
+            echo ""
+            echo "- \`atom-critical.html\` — シミュレータ本体。開くだけで動きます (依存なし・オフライン可)"
+            echo "- \`acpi-dist.zip\` — 上記 + CLI + モデルコア + Bada 実装 + サンプル出力 + README"
+            echo ""
+            echo "ネイティブ アプリ (APK / Windows EXE / Ubuntu AppImage・deb) は"
+            echo "**ACPI app build** ワークフローの Artifacts にあります。"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Release へ添付
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''

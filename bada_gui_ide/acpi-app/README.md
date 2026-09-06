@@ -28,9 +28,23 @@ acpi-app/
 | **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
 | **Android** | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してインストール |
 
-ビルドは GitHub Actions [`acpi-app-build.yml`](../../.github/workflows/acpi-app-build.yml)
-が行います。`acpi-app-v*` タグの push で Release に自動添付、`workflow_dispatch`
-でも Actions アーティファクトとして取得できます。
+## 入手 (Actions — タグ不要)
+
+ACPI 関連ブランチ / `main` への push で
+[`acpi-app-build.yml`](../../.github/workflows/acpi-app-build.yml) が自動実行されます。
+[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/acpi-app-build.yml)
+→ 最新の実行 → ページ下部の **Artifacts**:
+
+| Artifact | 中身 |
+|:---|:---|
+| `acpi-android-apk` | `acpi-debug.apk` |
+| `acpi-windows-exe` | `ACPI-1.0.0-x64.exe` |
+| `acpi-ubuntu-appimage-deb` | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
+| **`acpi-all-platforms`** | 上記すべて + 単一 HTML + CLI + Bada 実装 |
+
+Actions のアーティファクトは GitHub にログインした状態で取得でき、保存期間は 90 日です。
+`acpi-app-v*` タグの push (または `workflow_dispatch` の `release_tag` 入力) で
+同じ成果物が Release にも添付されます (期限なし)。
 
 インストールしたくない場合は、単一 HTML の
 [`../dist/atom-critical.html`](../dist/atom-critical.html) をダウンロードして

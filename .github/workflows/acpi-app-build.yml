@@ -6,8 +6,15 @@ name: ACPI app build (Windows EXE + Ubuntu + Android APK)
 #   - Android 向け APK
 # としてビルドします。ACPI 本体 (www/index.html) は
 # tools/build-atom-critical.js が生成する自己完結 HTML です。
-# Actions アーティファクト、および (acpi-app-v* タグ / release_tag 指定時)
-# GitHub Release に添付します。
+#
+# ダウンロード方法 (2 通り):
+#   1) Actions から  — ACPI 関連ブランチ / main への push で自動実行され、
+#      実行ページ下部の Artifacts から zip でダウンロードできます
+#      (acpi-android-apk / acpi-windows-exe / acpi-ubuntu-appimage-deb、
+#       および 3 プラットフォームをまとめた acpi-all-platforms)。
+#      GitHub にログインしていれば誰でも取得できます。保存期間 90 日。
+#   2) Releases から — acpi-app-v* タグの push、または workflow_dispatch の
+#      release_tag 入力で、同じ成果物が Release に添付されます (期限なし)。
 
 on:
   workflow_dispatch:
@@ -17,11 +24,20 @@ on:
         required: false
         default: ''
   push:
+    branches:
+      - main
+      - '**acpi**'
+      - '**atomic-critical**'
     tags:
       - 'acpi-app-v*'
 
 permissions:
   contents: write
+
+# 同一ブランチで新しい push があれば古いビルドは打ち切る
+concurrency:
+  group: acpi-app-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test-core:
@@ -69,7 +85,9 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: acpi-windows
+          name: acpi-windows-exe
+          retention-days: 90
+          if-no-files-found: error
           path: bada_gui_ide/acpi-app/electron/dist/*.exe
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
@@ -97,7 +115,9 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: acpi-linux
+          name: acpi-ubuntu-appimage-deb
+          retention-days: 90
+          if-no-files-found: error
           path: |
             bada_gui_ide/acpi-app/electron/dist/*.AppImage
             bada_gui_ide/acpi-app/electron/dist/*.deb
@@ -159,7 +179,9 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: acpi-android
+          name: acpi-android-apk
+          retention-days: 90
+          if-no-files-found: error
           path: out/*.apk
       - name: Attach APK to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
@@ -167,3 +189,85 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
           files: out/*.apk
+
+  # 3 プラットフォームを 1 つの zip にまとめ、Actions から一括ダウンロード
+  # できるようにする。実行ページのサマリにダウンロード手順も書き出す。
+  bundle:
+    runs-on: ubuntu-latest
+    needs: [windows-exe, linux-app, android-apk]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 単一 HTML 版も同梱するため生成
+        working-directory: bada_gui_ide
+        run: node tools/build-atom-critical.js
+
+      - name: 各プラットフォームの成果物を回収
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+          pattern: acpi-*
+          merge-multiple: true
+
+      - name: まとめる
+        run: |
+          set -e
+          mkdir -p bundle
+          find incoming -type f \( -name '*.apk' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) \
+            -exec cp {} bundle/ \;
+          cp bada_gui_ide/dist/atom-critical.html bundle/
+          cp bada_gui_ide/dist/ACPI-README.txt bundle/
+          cp bada_gui_ide/cli/atom-critical-cli.js bundle/
+          cp bada_gui_ide/www/atom_critical.js bundle/
+          cp bada_gui_ide/examples/atom_critical.bada bundle/
+          ls -la bundle
+
+      - name: 一括ダウンロード用アーティファクト
+        uses: actions/upload-artifact@v4
+        with:
+          name: acpi-all-platforms
+          retention-days: 90
+          if-no-files-found: warn
+          path: bundle/*
+
+      - name: 実行ページにダウンロード手順を書き出す
+        run: |
+          {
+            echo "## ACPI — 原子の臨界期の強度シミュレータ"
+            echo ""
+            echo "この実行ページの下部 **Artifacts** から zip でダウンロードできます"
+            echo "(GitHub にログインが必要。保存期間 90 日)。"
+            echo ""
+            echo "| Artifact | 中身 | 使い方 |"
+            echo "|---|---|---|"
+            echo "| \`acpi-android-apk\` | \`acpi-debug.apk\` | 「提供元不明のアプリ」を許可してインストール |"
+            echo "| \`acpi-windows-exe\` | \`ACPI-*-x64.exe\` | NSIS インストーラ / ポータブル |"
+            echo "| \`acpi-ubuntu-appimage-deb\` | \`ACPI-*-x86_64.AppImage\` / \`ACPI-*-amd64.deb\` | \`chmod +x\` して実行 / \`sudo dpkg -i\` |"
+            echo "| \`acpi-all-platforms\` | 上記すべて + 単一 HTML + CLI + Bada 実装 | 一括で欲しいときはこれ |"
+            echo ""
+            echo "### ビルド結果"
+            echo ""
+            echo "| ジョブ | 結果 |"
+            echo "|---|---|"
+            echo "| Windows EXE | ${{ needs.windows-exe.result }} |"
+            echo "| Ubuntu AppImage / deb | ${{ needs.linux-app.result }} |"
+            echo "| Android APK | ${{ needs.android-apk.result }} |"
+            echo ""
+            echo "同梱ファイル:"
+            echo ""
+            echo '```'
+            ls -la bundle | sed 's/^/  /'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: いずれかのビルドが失敗していたら落とす
+        if: needs.windows-exe.result != 'success' || needs.linux-app.result != 'success' || needs.android-apk.result != 'success'
+        run: |
+          echo "windows-exe = ${{ needs.windows-exe.result }}"
+          echo "linux-app   = ${{ needs.linux-app.result }}"
+          echo "android-apk = ${{ needs.android-apk.result }}"
+          exit 1

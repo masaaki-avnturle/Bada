@@ -57,7 +57,32 @@
 | **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x ACPI-1.0.0-x86_64.AppImage && ./ACPI-1.0.0-x86_64.AppImage` |
 | **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
 
-ビルドは [`acpi-app-build.yml`](.github/workflows/acpi-app-build.yml) が実行します(`acpi-app-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。詳細は [`bada_gui_ide/acpi-app/`](bada_gui_ide/acpi-app/) を参照。
+##### 🅰️ Actions からダウンロード(タグ不要・すぐ取れる)
+
+ACPI 関連ブランチ / `main` への push で [`acpi-app-build.yml`](.github/workflows/acpi-app-build.yml) が自動実行され、3 プラットフォーム分がビルドされます。
+
+1. リポジトリの **[Actions タブ](https://github.com/masaaki-avnturle/Bada/actions/workflows/acpi-app-build.yml)** を開く
+2. 一番上の緑チェックの実行をクリック
+3. ページ下部の **Artifacts** から zip をダウンロード
+
+| Artifact | 中身 |
+|:---|:---|
+| `acpi-android-apk` | `acpi-debug.apk` |
+| `acpi-windows-exe` | `ACPI-1.0.0-x64.exe`(NSIS インストーラ / ポータブル) |
+| `acpi-ubuntu-appimage-deb` | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
+| **`acpi-all-platforms`** | ★ 上記すべて + 単一 HTML + CLI + Bada 実装 |
+
+> Actions のアーティファクトは **GitHub にログインしている必要があり、保存期間は 90 日**です。期限なしの配布が欲しいときは下の Releases を使ってください。
+
+##### 🅱️ Releases からダウンロード(期限なし)
+
+`acpi-app-v1.0.0` のようなタグを push すると、同じ成果物が [Releases](https://github.com/masaaki-avnturle/Bada/releases) に添付されます。Actions の **Run workflow** から `release_tag` を入力しても同じです。
+
+```sh
+git tag acpi-app-v1.0.0 && git push origin acpi-app-v1.0.0
+```
+
+詳細は [`bada_gui_ide/acpi-app/`](bada_gui_ide/acpi-app/) を参照。
 
 Windows / Ubuntu アプリでは CSV・JSON・PNG が「名前を付けて保存」で書き出せます。Android アプリは WebView がファイル保存を扱えないため、同じボタンで内容を表示するパネルが開き、テキストはクリップボードへコピー、図は長押しで保存できます。
 
