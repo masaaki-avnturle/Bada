@@ -235,7 +235,8 @@ def pkg_catalog() {
       ["fcitx-configtool","0.4.10-1badaos","fcitx graphic configuration tool",          "tool",    "/usr/bin/fcitx-configtool"],
       ["texlive-full",   "2024.2-1badaos", "TeX Live: full distribution (pLaTeX 日本語組版含む)", "tool", "/usr/bin/platex"],
       ["screen",         "4.9.1-1badaos",  "terminal multiplexer with VT100/ANSI emulation", "tool", "/usr/bin/screen"],
-      ["tmux",           "3.4-1badaos",    "terminal multiplexer",                      "tool",    "/usr/bin/tmux"]
+      ["tmux",           "3.4-1badaos",    "terminal multiplexer",                      "tool",    "/usr/bin/tmux"],
+      ["x11-apps",       "7.7+11badaos",   "X applications (xeyes / xclock / xcalc / xlogo)", "tool", "/usr/X11R7/bin/xcalc"]
     ]
 }
 
@@ -244,7 +245,7 @@ def pkg_preinstalled() {
     return ["vim", "emacs", "openssh-server", "openssh-client", "xinetd",
             "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm",
             "afterstep", "wmaker", "mlterm", "fcitx-mozc", "fcitx-configtool",
-            "texlive-full", "screen", "tmux"]
+            "texlive-full", "screen", "tmux", "x11-apps"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1053,6 +1054,7 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/X11R7/bin/migemoinsta", "#!binary (X client: MigemoInsta, migemo search)")
     fs_put(fs, "/usr/X11R7/bin/xclock", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xeyes", "#!binary (X client)")
+    fs_put(fs, "/usr/X11R7/bin/xcalc", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xlogo", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xdpyinfo", "#!binary (X client)")
@@ -2285,6 +2287,7 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "vim") { tty(emit, "vim(1) -- Vi IMproved; preinstalled by the vim.tgz set.") }
         else if (n == "emacs") { tty(emit, "emacs(1) -- GNU Emacs; preinstalled by the emacs.tgz set.") }
         else if (n == "xclock") { tty(emit, "xclock(1) -- analogue clock for X; displays on the BadaX Server.") }
+        else if (n == "xcalc") { tty(emit, "xcalc(1) -- scientific calculator for X (x11-apps); displays on the BadaX Server.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
         return 0
@@ -2302,6 +2305,7 @@ def shell_exec(emit, vm, st, line) {
     }
     if (cmd == "xclock") { x_launch(emit, vm, st, "xclock", "xclock"); return 0 }
     if (cmd == "xeyes")  { x_launch(emit, vm, st, "xeyes", "xeyes"); return 0 }
+    if (cmd == "xcalc")  { x_launch(emit, vm, st, "xcalc", "Calculator"); return 0 }
     if (cmd == "xterm")  { x_launch(emit, vm, st, "xterm", "xterm -- " + st[2]); return 0 }
     if (cmd == "mlterm") { x_launch(emit, vm, st, "mlterm", "mlterm -- " + st[2] + " (UTF-8/日本語)"); return 0 }
     if (cmd == "xlogo")  { x_launch(emit, vm, st, "xlogo", "xlogo"); return 0 }

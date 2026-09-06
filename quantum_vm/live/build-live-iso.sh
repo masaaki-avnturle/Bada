@@ -62,7 +62,9 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     vim emacs-nox openssh-server curl wget less ca-certificates \
     bluez usbutils \
     mlterm screen tmux locales texlive texlive-lang-japanese \
-    wmaker htop mc
+    wmaker htop mc \
+    xterm x11-apps x11-utils x11-xserver-utils \
+    firefox-esr pcmanfm
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 # the real w9wm (or its parent 9wm) as an alternative window manager --
@@ -74,6 +76,11 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq after
 # Japanese input: fcitx-mozc + fcitx-configtool, falling back to fcitx5
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx-mozc fcitx-configtool || \
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx5-mozc fcitx5-config-qt || true
+# common desktop applications -- best effort, one at a time so a renamed
+# package never sinks the rest (calculator / text editor / image viewer)
+for app in galculator l3afpad gpicview; do
+  chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$app" || true
+done
 
 echo "==> Japanese locale (ja_JP.UTF-8)"
 sed -i 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' "$CHROOT/etc/locale.gen" 2>/dev/null || true
@@ -111,6 +118,8 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     drive Ubuntu-style apps from mlterm (apt, htop, mc, vim, tmux ...),
     `badavm &` opens the BadaVM Pro app as a window. Pick the WM with
     badaos.wm=... / badaos.session=kiosk restores the fullscreen app
+  * desktop apps preinstalled: xterm + x11-apps (xeyes / xclock / xcalc),
+    firefox-esr (web), pcmanfm (files), galculator / l3afpad / gpicview
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>
   * install to the real disk:  sudo badaos-install
@@ -155,6 +164,13 @@ EOF
 
 cat > "$CHROOT/home/bada/.xinitrc" <<'EOF'
 xset -dpms s off
+# make the mouse cursor VISIBLE: modern Xorg keeps the root cursor hidden
+# until some client sets one, and a bare WM session never does -- so set
+# the classic left_ptr on the root window ourselves (x11-xserver-utils)
+if command -v xsetroot >/dev/null 2>&1; then
+  xsetroot -cursor_name left_ptr
+  xsetroot -solid '#30363d'
+fi
 # Japanese environment: locale + fcitx-mozc input method (fcitx5 fallback)
 export LANG=ja_JP.UTF-8
 export GTK_IM_MODULE=fcitx QT_IM_MODULE=fcitx XMODIFIERS=@im=fcitx

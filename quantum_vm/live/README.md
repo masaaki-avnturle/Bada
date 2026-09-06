@@ -21,6 +21,8 @@
   `badaos.wm=w9wm|afterstep|wmaker|openbox` のカーネル引数か `WM=afterstep startx` で
   いつでも切替でき、**AfterStep(NeXT 風・Wharf 付き)と Window Maker も同梱**。
   Live USB のみ従来どおりキオスク起動(`badaos.session=kiosk` でインストール後も選択可)
+- **マウスカーソル表示済み + デスクトップアプリ同梱**: xterm・x11-apps(xeyes /
+  xclock / xcalc)・firefox-esr・pcmanfm・galculator・l3afpad・gpicview
 - **日本語環境が最初から整っています**: ロケール `ja_JP.UTF-8`・Noto CJK フォント・
   **mlterm(日本語対応ターミナル)**・**fcitx-mozc + fcitx-configtool**(Ctrl+Space で
   日本語入力 ON/OFF。スイートに fcitx4 が無ければ fcitx5-mozc に自動フォールバック)
@@ -127,8 +129,15 @@ USB から起動して、GRUB メニューで **「Install BadaOS (friendly GUI 
   自動フォールバック)。ルートで B3(右クリック)メニュー、4 仮想デスクトップ
 - その中に **mlterm(日本語対応ターミナル)が 1 枚**開いた状態で始まります。
   fcitx-mozc 常駐済みなので Ctrl+Space でそのまま日本語入力できます
-- mlterm から普通に **Ubuntu 向けアプリケーションを操作**: `sudo apt install firefox-esr`
-  `sudo apt install gimp` など Debian フルアーカイブのアプリを入れて、そのまま
+- **マウスカーソルは最初から表示されます**(素の X は最初のクライアントがカーソルを
+  設定するまでルートカーソルを隠すため、セッション開始時に `xsetroot -cursor_name
+  left_ptr` で古典的な矢印カーソルを設定しています)
+- **X アプリ・一般アプリケーションを同梱**: `xterm`・**x11-apps(xeyes / xclock /
+  xcalc / xlogo など)**・**firefox-esr(ウェブブラウザ)**・**pcmanfm
+  (ファイルマネージャ)**・galculator(電卓)・l3afpad(テキストエディタ)・
+  gpicview(画像ビューア)— mlterm から `xeyes &` `firefox &` `pcmanfm &` で起動
+- mlterm から普通に **Ubuntu 向けアプリケーションを操作**: `sudo apt install gimp`
+  など Debian フルアーカイブのアプリを入れて、そのまま
   ウィンドウとして使えます(`htop`・`mc`・`screen`・`tmux` は同梱済み)
 - **WM の切替**: カーネル引数 `badaos.wm=afterstep` / `badaos.wm=wmaker` /
   `badaos.wm=w9wm`(GRUB メニューで `e` を押して追記)、またはコンソールから

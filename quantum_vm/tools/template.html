@@ -219,6 +219,13 @@
   #xroot.wmk #asWharf { display:flex; }
   #xroot.wmk #asWharf button { border:2px outset #b9bec6;
                     background:linear-gradient(135deg,#c3c9d1,#8b929c); color:#20232a; }
+  .xwin .calcdisp { background:#dfe8df; color:#15220f; border:1px solid #6a746a;
+                    font:14px "Cascadia Mono",Consolas,monospace; text-align:right;
+                    padding:5px 8px; margin:6px 6px 2px; overflow:hidden; white-space:nowrap; }
+  .xwin .calcgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; padding:4px 6px 6px; }
+  .xwin .calcgrid button { border:1px outset #b8bcc2; background:#d5d9de; color:#222;
+                           font:12px "Cascadia Mono",Consolas,monospace; padding:6px 0; cursor:pointer; }
+  .xwin .calcgrid button:active { border-style:inset; }
   .xwin pre.xtermtxt { margin:0; padding:6px 8px; font:11.5px/1.4 "Cascadia Mono",Consolas,monospace;
                        color:#d8f3d8; background:#101210; height:100%; overflow:auto;
                        outline:none; white-space:pre-wrap; word-break:break-all; cursor:text; }
@@ -991,7 +998,7 @@ var VM_LIBS = __VM_LIBS_JSON__;
     })(d);
     /* AfterStep Wharf: NeXT-style dock tiles that launch X clients */
     var wharf = $("asWharf");
-    var tiles = [["⌨", "xterm"], ["あ", "mlterm"], ["🕐", "xclock"], ["👀", "xeyes"]];
+    var tiles = [["⌨", "xterm"], ["あ", "mlterm"], ["🕐", "xclock"], ["👀", "xeyes"], ["🧮", "xcalc"]];
     for (var t = 0; t < tiles.length; t++) (function (icon, cmd) {
       var b = document.createElement("button");
       b.innerHTML = "<b>" + icon + "</b>" + cmd;
@@ -1146,6 +1153,31 @@ var VM_LIBS = __VM_LIBS_JSON__;
         e.stopPropagation();
       });
       renderInsta(win, id);
+    } else if (cls === "xcalc") {
+      /* a WORKING xcalc: local widget logic, like a real X client's */
+      var cd = document.createElement("div"); cd.className = "calcdisp"; cd.textContent = "0";
+      var cg = document.createElement("div"); cg.className = "calcgrid";
+      body.appendChild(cd); body.appendChild(cg);
+      var cexpr = "";
+      ["7","8","9","/","4","5","6","*","1","2","3","-","0",".","=","+","C"].forEach(function (k) {
+        var b = document.createElement("button"); b.textContent = k;
+        if (k === "C") b.style.gridColumn = "1 / -1";
+        b.addEventListener("click", function () {
+          if (k === "C") { cexpr = ""; cd.textContent = "0"; return; }
+          if (k === "=") {
+            try {
+              if (!/^[0-9+\-*/. ]+$/.test(cexpr)) throw 0;
+              var v = Function('"use strict";return(' + cexpr + ")")();
+              cexpr = (isFinite(v) ? String(+v.toPrecision(12)).replace(/\.?0+$/, "") : "error");
+            } catch (_) { cexpr = "error"; }
+            cd.textContent = cexpr || "0";
+            if (cexpr === "error") cexpr = "";
+            return;
+          }
+          cexpr += k; cd.textContent = cexpr;
+        });
+        cg.appendChild(b);
+      });
     } else if (cls === "xterm" || cls === "mlterm") {
       if (cls === "mlterm") el.classList.add("mlt");
       var pre = document.createElement("pre"); pre.className = "xtermtxt";
