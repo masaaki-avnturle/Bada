@@ -145,9 +145,13 @@ USB から起動して、GRUB メニューで **「Install BadaOS (friendly GUI 
   自動フォールバック)。ルートで B3(右クリック)メニュー、4 仮想デスクトップ
 - その中に **mlterm(日本語対応ターミナル)が 1 枚**開いた状態で始まります。
   fcitx-mozc 常駐済みなので Ctrl+Space でそのまま日本語入力できます
-- **マウスカーソルは最初から表示されます**(素の X は最初のクライアントがカーソルを
-  設定するまでルートカーソルを隠すため、セッション開始時に `xsetroot -cursor_name
-  left_ptr` で古典的な矢印カーソルを設定しています)
+- **マウスカーソルは最初から表示されます**: X の `-nocursor` を廃止し、
+  セッション開始時に `xsetroot -cursor_name left_ptr` で矢印カーソルを設定、
+  さらに **ソフトウェアカーソルを強制**(`/etc/X11/xorg.conf.d/20-badaos-swcursor.conf`)
+  しています。仮想マシン(QEMU/VMware/VirtualBox)ではエミュレートされた GPU が
+  ハードウェアカーソルを描画せずポインタが消えることがあるため、X 自身に
+  カーソルを描かせて必ず見えるようにしています
+  (QEMU で使う場合は `-device usb-tablet` を付けるとポインタが吸い付いて更に快適です)
 - **X アプリ・一般アプリケーションを同梱**: `xterm`・**x11-apps(xeyes / xclock /
   xcalc / xlogo など)**・**firefox-esr(ウェブブラウザ)**・**pcmanfm
   (ファイルマネージャ)**・galculator(電卓)・l3afpad(テキストエディタ)・

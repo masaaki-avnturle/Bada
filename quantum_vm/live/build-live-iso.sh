@@ -172,10 +172,52 @@ ExecStart=
 ExecStart=-/sbin/agetty --autologin bada --noclear %I $TERM
 EOF
 
+# Force a SOFTWARE mouse cursor. In a VM (QEMU/VMware/VirtualBox) the
+# emulated GPU often does not render the X server's HARDWARE cursor, so the
+# pointer is invisible even though the mouse works. SWcursor makes X draw
+# the cursor into the framebuffer itself, so it always shows. Covers the
+# common VM/basic video drivers; harmless on real hardware.
+mkdir -p "$CHROOT/etc/X11/xorg.conf.d"
+cat > "$CHROOT/etc/X11/xorg.conf.d/20-badaos-swcursor.conf" <<'EOF'
+# BadaOS: always draw a visible mouse cursor (software cursor)
+Section "Device"
+    Identifier "BadaOS modesetting"
+    Driver     "modesetting"
+    Option     "SWcursor" "true"
+EndSection
+Section "Device"
+    Identifier "BadaOS QXL"
+    Driver     "qxl"
+    Option     "SWcursor" "true"
+EndSection
+Section "Device"
+    Identifier "BadaOS virtio"
+    Driver     "virtio_gpu"
+    Option     "SWcursor" "true"
+EndSection
+Section "Device"
+    Identifier "BadaOS VMware"
+    Driver     "vmware"
+    Option     "SWcursor" "true"
+EndSection
+Section "Device"
+    Identifier "BadaOS VESA"
+    Driver     "vesa"
+    Option     "SWcursor" "true"
+EndSection
+Section "Device"
+    Identifier "BadaOS fbdev"
+    Driver     "fbdev"
+    Option     "SWcursor" "true"
+EndSection
+EOF
+
 # start X on the autologin console (unless "textonly" is on the cmdline)
 cat > "$CHROOT/home/bada/.bash_profile" <<'EOF'
 if [ -z "$DISPLAY" ] && [ "$(tty)" = /dev/tty1 ] && ! grep -q textonly /proc/cmdline; then
-  exec startx -- -nocursor >/tmp/xorg.log 2>&1
+  # NB: no -nocursor -- that flag disables the X pointer server-wide, which
+  # is why the mouse cursor used to be invisible on the WM desktop.
+  exec startx >/tmp/xorg.log 2>&1
 fi
 echo
 echo "BadaOS GNU/Quantum 12.0 (live console)"
