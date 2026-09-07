@@ -93,10 +93,29 @@ def need_mib():
     # with the engine's.
     global _need_mib
     if _need_mib is None:
+        used = 0
+        # authoritative: the uncompressed squashfs (a mounted squashfs
+        # reports its uncompressed total as df "used"); du -x can't see it
+        # through the live overlay. Take the BIGGEST squashfs mount (the
+        # system image), ignoring small app squashfs mounts.
         try:
-            used = int(sh(["du", "-sxm", "/"]).split()[0])
-        except (ValueError, IndexError):
-            used = 4096
+            with open("/proc/mounts") as fh:
+                sqms = [ln.split()[1] for ln in fh
+                        if ln.split()[2:3] == ["squashfs"]]
+            for sqm in sqms:
+                try:
+                    m = int(sh(["df", "-Pm", sqm]).splitlines()[1].split()[2])
+                except (ValueError, IndexError):
+                    m = 0
+                if m > used:
+                    used = m
+        except OSError:
+            used = 0
+        if used < 1024:
+            try:
+                used = int(sh(["du", "-sm", "--one-file-system", "/"]).split()[0])
+            except (ValueError, IndexError):
+                used = 0
         _need_mib = max(4096, used + used // 5 + 512)
     return _need_mib
 

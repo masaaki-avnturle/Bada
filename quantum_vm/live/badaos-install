@@ -46,9 +46,30 @@ MIN_MB=4096     # hard floor for the BadaOS root partition
 # actually need, so the size gate refuses a too-small partition UP FRONT
 # with a clear message instead of failing halfway through the copy with
 # "No space left on device".
-echo "measuring the size of the live system (about half a minute)..."
-USED_MB="$(du -sxm / 2>/dev/null | awk '{print $1}')"
-case "$USED_MB" in ''|*[!0-9]*) USED_MB="$MIN_MB";; esac
+echo "measuring the size of the live system..."
+# The live root is an overlay whose real content lives in the read-only
+# squashfs, so `du -x /` sees almost nothing (it never descends into the
+# lower layer). The authoritative size is the UNCOMPRESSED squashfs: a
+# mounted squashfs reports that as its df total (it is 100% "used"). Fall
+# back to du without -x, then to the floor.
+measure_system_mb() {
+    local mb best=0 sqm
+    # the BIGGEST squashfs mount is the system image (small app squashfs
+    # mounts, if any, are ignored). df of a squashfs == its uncompressed size.
+    while read -r sqm; do
+        [ -n "$sqm" ] || continue
+        mb="$(df -Pm "$sqm" 2>/dev/null | awk 'NR==2{print $3}')"
+        case "$mb" in ''|*[!0-9]*) mb=0;; esac
+        if [ "$mb" -gt "$best" ]; then best="$mb"; fi
+    done <<EOF
+$(awk '$3=="squashfs"{print $2}' /proc/mounts 2>/dev/null)
+EOF
+    if [ "$best" -ge 1024 ]; then echo "$best"; return; fi
+    mb="$(du -sm --one-file-system / 2>/dev/null | awk '{print $1}')"
+    case "$mb" in ''|*[!0-9]*) mb=0;; esac
+    echo "$mb"
+}
+USED_MB="$(measure_system_mb)"
 NEED_MB=$(( USED_MB + USED_MB / 5 + 512 ))   # +20% ext4/margin
 if [ "$NEED_MB" -lt "$MIN_MB" ]; then NEED_MB="$MIN_MB"; fi
 echo "this BadaOS build needs a partition of about ${NEED_MB} MiB (${USED_MB} MiB of system + headroom)."
