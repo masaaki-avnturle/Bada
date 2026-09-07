@@ -125,7 +125,7 @@ a.toggle { font-size: 12px; color: #772953; cursor: pointer; text-decoration: un
 <script>
 "use strict";
 const STEPS = ["ようこそ", "インストールの種類", "ディスクの選択", "インストールの確認", "インストール", "完了"];
-const MIN_MB = 4096;
+let MIN_MB = 4096;   // updated from /api/disks needMiB (measured live-rootfs size)
 let step = 0;
 let data = null;            // /api/disks payload
 let st = { mode: "free", disk: null, part: null };
@@ -429,6 +429,7 @@ $("btn-back").addEventListener("click", () => { if (step > 0 && step < 4) { step
     $("content").innerHTML = "<h2>ディスクが見つかりません</h2>";
     return;
   }
+  if (data.needMiB) MIN_MB = data.needMiB;
   const best = data.disks.find(d => d.bestFree >= MIN_MB) || data.disks[0];
   st.disk = best.dev;
   render();

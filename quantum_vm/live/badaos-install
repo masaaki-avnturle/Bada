@@ -40,7 +40,18 @@ set -euo pipefail
 grep -q boot=live /proc/cmdline || {
     echo "badaos-install must run inside the BadaOS live boot."; exit 1; }
 
-MIN_MB=4096     # minimum size for the BadaOS root partition
+MIN_MB=4096     # hard floor for the BadaOS root partition
+# The live rootfs has grown (TeX Live, Firefox, GNOME Files, Japanese
+# fonts, ...) well past any fixed constant: MEASURE what the copy will
+# actually need, so the size gate refuses a too-small partition UP FRONT
+# with a clear message instead of failing halfway through the copy with
+# "No space left on device".
+echo "measuring the size of the live system (about half a minute)..."
+USED_MB="$(du -sxm / 2>/dev/null | awk '{print $1}')"
+case "$USED_MB" in ''|*[!0-9]*) USED_MB="$MIN_MB";; esac
+NEED_MB=$(( USED_MB + USED_MB / 5 + 512 ))   # +20% ext4/margin
+if [ "$NEED_MB" -lt "$MIN_MB" ]; then NEED_MB="$MIN_MB"; fi
+echo "this BadaOS build needs a partition of about ${NEED_MB} MiB (${USED_MB} MiB of system + headroom)."
 
 AUTO=0
 MODE=""
@@ -157,11 +168,18 @@ mkpart_region() {
             exit 1
         }
     fi
+    partprobe "$TARGET" 2>/dev/null || true
     udevadm settle || sleep 2
     AFTER="$(lsblk -nro NAME "$TARGET")"
     NEWNAME="$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -1)"
     [ -n "$NEWNAME" ] || { echo "new partition did not appear"; exit 1; }
     ROOTPART="/dev/$NEWNAME"
+    # real hardware: give udev a moment to create the device node
+    for _i in 1 2 3 4 5; do
+        if [ -b "$ROOTPART" ]; then break; fi
+        sleep 1; udevadm settle 2>/dev/null || true
+    done
+    [ -b "$ROOTPART" ] || { echo "device node $ROOTPART did not appear"; exit 1; }
     echo "==> new partition: $ROOTPART (only this one is formatted)"
     mkfs.ext4 -q -F -L badaos "$ROOTPART"
 }
@@ -194,8 +212,8 @@ free)
     FSIZE="$(echo "$REGION" | awk '{print $3}')"
     echo
     echo "==> largest FREE region on $TARGET: ${FSIZE} MiB (${FSTART}MiB - ${FEND}MiB)"
-    if [ "$FSIZE" -lt "$MIN_MB" ]; then
-        echo "that is smaller than the ${MIN_MB} MiB BadaOS needs."
+    if [ "$FSIZE" -lt "$NEED_MB" ]; then
+        echo "that is smaller than the ${NEED_MB} MiB this BadaOS build needs."
         echo "Shrink a partition first (e.g. in Windows: Disk Management ->"
         echo "Shrink Volume), then run badaos-install again."
         exit 1
@@ -249,6 +267,7 @@ replace)
         echo "  (non-interactive: replacing $VICTIM)"
     fi
     parted -s "$TARGET" rm "$PNUM"
+    partprobe "$TARGET" 2>/dev/null || true
     udevadm settle || sleep 2
     echo "==> $VICTIM deleted; installing BadaOS into the freed space"
     # the free region that contains the deleted partition's start
@@ -263,9 +282,9 @@ replace)
     FSTART="$(echo "$REGION" | awk '{print $1}')"
     FEND="$(echo "$REGION" | awk '{print $2}')"
     FSIZE="$(echo "$REGION" | awk '{print $3}')"
-    if [ "$FSIZE" -lt "$MIN_MB" ]; then
-        echo "the freed region (${FSIZE} MiB) is smaller than the ${MIN_MB} MiB"
-        echo "BadaOS needs. Pick a bigger partition to replace."
+    if [ "$FSIZE" -lt "$NEED_MB" ]; then
+        echo "the freed region (${FSIZE} MiB) is smaller than the ${NEED_MB} MiB"
+        echo "this BadaOS build needs. Pick a bigger partition to replace."
         exit 1
     fi
     echo "==> freed region: ${FSIZE} MiB (${FSTART}MiB - ${FEND}MiB)"
@@ -287,8 +306,8 @@ part)
         echo "$ROOTPART is mounted; unmount it first."; exit 1
     fi
     SZ="$(lsblk -bnro SIZE "$ROOTPART" | head -1)"
-    [ "$((SZ / 1024 / 1024))" -ge "$MIN_MB" ] || {
-        echo "$ROOTPART is smaller than the ${MIN_MB} MiB BadaOS needs."; exit 1; }
+    [ "$((SZ / 1024 / 1024))" -ge "$NEED_MB" ] || {
+        echo "$ROOTPART is smaller than the ${NEED_MB} MiB this BadaOS build needs."; exit 1; }
     echo
     echo "  *** ONLY $ROOTPART will be formatted; the rest of $TARGET is kept ***"
     if [ "$AUTO" = 0 ]; then
@@ -342,12 +361,37 @@ M=/mnt/badaos
 mkdir -p "$M"
 mount "$ROOTPART" "$M"
 
-echo "==> copying the system to $ROOTPART (a few minutes)..."
+# last line of defense: the mounted filesystem must actually hold the copy
+AVAIL_MB="$(df -Pm "$M" | awk 'NR==2{print $4}')"
+if [ "${AVAIL_MB:-0}" -lt "$USED_MB" ]; then
+    echo "ERROR: $ROOTPART has only ${AVAIL_MB:-0} MiB free but the system"
+    echo "copy needs about ${USED_MB} MiB. Pick a bigger partition and run"
+    echo "the installer again (nothing else on the disk was changed)."
+    umount "$M" 2>/dev/null || true
+    exit 1
+fi
+
+echo "==> copying the system to $ROOTPART (about ${USED_MB} MiB, a few minutes)..."
+RC=0
 rsync -aHAX --info=progress2 \
     --exclude=/proc/'*' --exclude=/sys/'*' --exclude=/dev/'*' \
     --exclude=/run/'*' --exclude=/tmp/'*' --exclude=/mnt/'*' \
     --exclude=/media/'*' --exclude=/lib/live/mount \
-    / "$M/"
+    / "$M/" || RC=$?
+case "$RC" in
+    0|23|24) : ;;  # 23/24: files vanished/unreadable on the live overlay -- harmless
+    *)
+        echo
+        echo "ERROR: copying the system failed (rsync exit $RC)."
+        LEFT_MB="$(df -Pm "$M" | awk 'NR==2{print $4}')"
+        if [ "${LEFT_MB:-99999}" -lt 64 ]; then
+            echo "The target partition RAN FULL: this BadaOS build needs about"
+            echo "${NEED_MB} MiB. Pick a bigger partition (or free region) and"
+            echo "run the installer again."
+        fi
+        exit 1
+        ;;
+esac
 mkdir -p "$M"/{proc,sys,dev,run,tmp,mnt,media}
 
 UUID="$(blkid -s UUID -o value "$ROOTPART")"

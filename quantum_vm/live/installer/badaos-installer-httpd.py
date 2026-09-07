@@ -83,6 +83,24 @@ def disk_segments(disk, size_mib):
     return segs
 
 
+_need_mib = None
+
+
+def need_mib():
+    # how big the BadaOS root partition must be for THIS build: measured
+    # once from the live rootfs (+20% ext4/margin), floor 4096 MiB — the
+    # same arithmetic as badaos-install, so the wizard's size gates agree
+    # with the engine's.
+    global _need_mib
+    if _need_mib is None:
+        try:
+            used = int(sh(["du", "-sxm", "/"]).split()[0])
+        except (ValueError, IndexError):
+            used = 4096
+        _need_mib = max(4096, used + used // 5 + 512)
+    return _need_mib
+
+
 def api_disks():
     j = json.loads(sh(["lsblk", "--json", "-b", "-o", "NAME,TYPE,SIZE,MODEL"]) or '{"blockdevices":[]}')
     skip = live_disk()
@@ -101,7 +119,8 @@ def api_disks():
         disks.append({"dev": dev, "sizeMiB": size_mib,
                       "model": (d.get("model") or "").strip(),
                       "segments": segs, "bestFree": best})
-    return {"disks": disks, "efi": 1 if os.path.isdir("/sys/firmware/efi") else 0}
+    return {"disks": disks, "efi": 1 if os.path.isdir("/sys/firmware/efi") else 0,
+            "needMiB": need_mib()}
 
 
 class H(http.server.BaseHTTPRequestHandler):
