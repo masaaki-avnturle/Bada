@@ -179,7 +179,7 @@ let html = `<!DOCTYPE html>
         <div class="muted" style="margin-top:4px;font-size:11.5px">印象派の筆致もシード付き乱数で<b>決定論的</b>(同じ惑星は常に同じ絵)。元は同じ実測物理のデッサン。</div>
       </div>
       <div>
-        <div class="muted" style="margin-bottom:6px">各部位は、その惑星の<b>実測値</b>と<b>実在の法則</b>から決定論的に導出(=同じ惑星は常に同じ姿):</div>
+        <div class="muted" style="margin-bottom:6px"><b>8頭身モデル比率の美人像</b>として描画。各部位は、その惑星の<b>実測値</b>と<b>実在の法則</b>から決定論的に導出(=同じ惑星は常に同じ姿):</div>
         <ul class="anno" id="anno"></ul>
       </div>
     </div>
@@ -634,88 +634,147 @@ let html = `<!DOCTYPE html>
     var skin="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+lum+"%)";
     var skin2="hsl(28,"+(20+b.pig*30).toFixed(0)+"%,"+(lum*0.78).toFixed(0)+"%)";
     var eyeCol="hsl("+b.eyeHue.toFixed(0)+",75%,55%)";
-    // one individual; sc scales the body, isChild raises the head ratio
-    // (real juvenile allometry — the "baby schema" — marks the descendant)
+    // one individual as an elegant, model-proportioned figure (8-head canon).
+    // The same measured physics still shapes her: star color -> iris & hair,
+    // insolation -> skin tone, gravity -> height/build correction, cold ->
+    // fur stole, radiator demand -> folding fan, IR pit organ -> forehead gem.
+    var hairL=Math.max(18,Math.min(75,((p.st||5772)-2500)/(7500-2500)*57+18));
+    var hairCol="hsl(28,45%,"+hairL.toFixed(0)+"%)";
+    var dT=Math.max(100,Math.min(1500,p.teq==null?255:p.teq));
+    var dressHue=dT<255?230-(dT-100)/155*110:Math.max(0,120-(dT-255)/500*120);
+    var dressHi="hsl("+dressHue.toFixed(0)+",55%,74%)", dressLo="hsl("+dressHue.toFixed(0)+",60%,56%)";
     function being(cx,sc,isChild){
-      var hPx=b.height/mPerPx*sc;
-      var bodyW=hPx*0.34*Math.pow(b.gRel,0.55);         // 高重力→がっしり
-      var bodyH=hPx*0.46, headR=hPx*0.13*(isChild?1.35:1.0)*(b.cold?1.0:1.06);
-      var hipY=groundY-hPx*0.42, shY=hipY-bodyH, headY=shY-headR*1.15;
+      var hPx=b.height/mPerPx*sc*1.08;
+      var headR=hPx*(isChild?0.085:0.062);
+      var topY=groundY-hPx, headY=topY+headR, neckY=headY+headR*1.12;
+      var shoY=neckY+hPx*0.015, shoW=hPx*0.105*Math.pow(b.gRel,0.25);
+      var waistY=shoY+hPx*0.185, waistW=shoW*0.52;
+      var hipW=shoW*0.98*Math.pow(b.gRel,0.15);
+      var hemY=groundY-hPx*0.06, hemW=hipW*2.3;
       // heat aura (metabolic waste heat, Jones palette)
-      var aur=bx.createRadialGradient(cx,shY+bodyH*0.4,hPx*0.1,cx,shY+bodyH*0.4,hPx*0.85);
+      var aur=bx.createRadialGradient(cx,waistY,hPx*0.08,cx,waistY,hPx*0.62);
       aur.addColorStop(0,heatColor(b.tBody)); aur.addColorStop(1,"rgba(0,0,0,0)");
-      bx.globalAlpha=0.30; bx.fillStyle=aur;
-      bx.beginPath(); bx.arc(cx,shY+bodyH*0.4,hPx*0.85,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
-      // legs (2/4/6 by gravity)
-      bx.strokeStyle=skin2; bx.lineCap="round";
-      var legW=Math.max(4*sc,bodyW*0.16*Math.pow(b.gRel,0.8)); bx.lineWidth=legW;
-      var nl=b.legs, legLen=hPx*0.42;
-      for(var li=0;li<nl;li++){
-        var fx=cx-bodyW*0.42+bodyW*0.84*(nl===1?0.5:li/(nl-1));
-        var sway=(li%2?1:-1)*bodyW*0.06;
-        bx.beginPath(); bx.moveTo(fx,hipY); bx.quadraticCurveTo(fx+sway,hipY+legLen*0.5,fx+sway*0.5,groundY-2); bx.stroke();
-      }
-      // arms
-      bx.lineWidth=Math.max(3*sc,legW*0.66);
-      var armLen=hPx*0.34*(b.cold?0.8:1.1);             // Allen: cold→short appendages
+      bx.globalAlpha=0.22; bx.fillStyle=aur;
+      bx.beginPath(); bx.arc(cx,waistY,hPx*0.62,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
+      // flowing back hair
+      var hairLen=isChild?hPx*0.30:hPx*0.44;
+      bx.fillStyle=hairCol;
+      bx.beginPath();
+      bx.moveTo(cx-headR*0.95,headY-headR*0.2);
+      bx.quadraticCurveTo(cx-headR*2.2,headY+hairLen*0.55,cx-headR*1.25,headY+hairLen);
+      bx.quadraticCurveTo(cx,headY+hairLen*1.12,cx+headR*1.25,headY+hairLen);
+      bx.quadraticCurveTo(cx+headR*2.2,headY+hairLen*0.55,cx+headR*0.95,headY-headR*0.2);
+      bx.quadraticCurveTo(cx,headY-headR*1.5,cx-headR*0.95,headY-headR*0.2);
+      bx.fill();
+      // legs + slippers below the hem
+      bx.strokeStyle=skin2; bx.lineCap="round"; bx.lineWidth=Math.max(2,hPx*0.014);
       [-1,1].forEach(function(sd){
-        bx.beginPath(); bx.moveTo(cx+sd*bodyW*0.5,shY+bodyH*0.16);
-        bx.quadraticCurveTo(cx+sd*(bodyW*0.5+armLen*0.5),shY+bodyH*0.34,cx+sd*(bodyW*0.42+armLen*0.6),shY+bodyH*0.16+armLen);
+        bx.beginPath(); bx.moveTo(cx+sd*hipW*0.35,hemY-4); bx.lineTo(cx+sd*hipW*0.3,groundY-3); bx.stroke();
+        bx.beginPath(); bx.moveTo(cx+sd*hipW*0.3,groundY-3); bx.lineTo(cx+sd*hipW*0.3+sd*headR*0.5,groundY-1); bx.stroke();
+      });
+      // gown: fitted bodice, cinched waist, flowing skirt (hues from Teq heat palette)
+      var dg=bx.createLinearGradient(0,shoY,0,hemY);
+      dg.addColorStop(0,dressHi); dg.addColorStop(1,dressLo);
+      bx.fillStyle=dg;
+      bx.beginPath();
+      bx.moveTo(cx-shoW,shoY);
+      bx.quadraticCurveTo(cx-waistW*1.35,shoY+hPx*0.10,cx-waistW,waistY);
+      bx.quadraticCurveTo(cx-hemW*0.85,hemY-hPx*0.10,cx-hemW*0.5,hemY);
+      bx.quadraticCurveTo(cx,hemY+hPx*0.018,cx+hemW*0.5,hemY);
+      bx.quadraticCurveTo(cx+hemW*0.85,hemY-hPx*0.10,cx+waistW,waistY);
+      bx.quadraticCurveTo(cx+waistW*1.35,shoY+hPx*0.10,cx+shoW,shoY);
+      bx.quadraticCurveTo(cx,shoY-hPx*0.012,cx-shoW,shoY);
+      bx.fill();
+      // waist ribbon + sparkles
+      bx.fillStyle="rgba(255,255,255,0.35)";
+      bx.fillRect(cx-waistW,waistY-hPx*0.012,waistW*2,hPx*0.024);
+      bx.fillStyle="#fff";
+      for(var sp=0;sp<26;sp++){
+        bx.globalAlpha=0.15+r()*0.4;
+        bx.fillRect(cx+(r()-0.5)*hemW*0.9,waistY+r()*(hemY-waistY),1.6,1.6);
+      }
+      bx.globalAlpha=1;
+      // slender arms with small hands
+      bx.strokeStyle=skin; bx.lineWidth=Math.max(2,hPx*0.016);
+      [-1,1].forEach(function(sd){
+        bx.beginPath(); bx.moveTo(cx+sd*shoW*0.92,shoY+hPx*0.012);
+        bx.quadraticCurveTo(cx+sd*(shoW+hPx*0.035),shoY+hPx*0.10,cx+sd*(waistW+hPx*0.028),waistY+hPx*0.05);
         bx.stroke();
+        bx.fillStyle=skin; bx.beginPath(); bx.arc(cx+sd*(waistW+hPx*0.028),waistY+hPx*0.055,Math.max(2,hPx*0.013),0,Math.PI*2); bx.fill();
       });
-      // torso
-      bx.fillStyle=skin;
-      bx.beginPath(); bx.ellipse(cx,shY+bodyH*0.5,bodyW*0.55,bodyH*0.56,0,0,Math.PI*2); bx.fill();
-      // radiator fins / ears (hot, Stefan–Boltzmann area demand) — or fur (cold)
-      if(b.hot||b.finF>1.15){
-        bx.fillStyle=skin2; bx.globalAlpha=0.9;
-        var fN=Math.round(2+b.finF*2);
-        for(var fi=0;fi<fN;fi++){
-          var fy=shY+bodyH*(0.12+0.76*fi/Math.max(1,fN-1));
-          var fl=bodyW*(0.5+0.55*b.finF);
-          [-1,1].forEach(function(sd){
-            bx.beginPath();
-            bx.moveTo(cx+sd*bodyW*0.5,fy);
-            bx.quadraticCurveTo(cx+sd*(bodyW*0.5+fl),fy-hPx*0.045,cx+sd*(bodyW*0.5+fl*0.8),fy+hPx*0.035);
-            bx.closePath(); bx.fill();
-          });
-        }
-        bx.globalAlpha=1;
-        // big radiator ears
-        [-1,1].forEach(function(sd){
-          bx.fillStyle=skin2;
-          bx.beginPath(); bx.ellipse(cx+sd*headR*1.35,headY-headR*0.2,headR*0.55*b.finF,headR*0.9*b.finF,sd*0.5,0,Math.PI*2); bx.fill();
-        });
-      }
+      // cold -> white fur stole (Allen's rule, elegant form)
       if(b.cold){
-        bx.strokeStyle="hsla(28,25%,72%,0.8)"; bx.lineWidth=1.2;
-        var nFur=Math.round(140*sc);
-        for(var fu=0;fu<nFur;fu++){
-          var a=r()*Math.PI*2, rr=bodyW*0.55+r()*6*sc;
-          var fx2=cx+Math.cos(a)*rr*0.98, fy2=shY+bodyH*0.5+Math.sin(a)*bodyH*0.56;
-          bx.beginPath(); bx.moveTo(fx2,fy2); bx.lineTo(fx2+Math.cos(a)*7*sc,fy2+Math.sin(a)*7*sc); bx.stroke();
+        bx.fillStyle="rgba(245,242,236,0.95)";
+        for(var fu=0;fu<26;fu++){
+          var fa=fu/25*Math.PI;
+          bx.beginPath();
+          bx.arc(cx+Math.cos(fa)*shoW*1.15,shoY+hPx*0.01+Math.sin(fa)*hPx*0.028,Math.max(2.5,hPx*0.017*(0.7+r()*0.6)),0,Math.PI*2);
+          bx.fill();
         }
       }
-      // head
+      // hot / high radiator demand -> elegant folding fan in hand
+      if((b.hot||b.finF>1.15)&&!isChild){
+        var fx3=cx+waistW+hPx*0.028, fy3=waistY+hPx*0.055, fr2=hPx*0.09*Math.min(1.8,b.finF);
+        bx.fillStyle=dressLo; bx.globalAlpha=0.92;
+        bx.beginPath(); bx.moveTo(fx3,fy3);
+        bx.arc(fx3,fy3,fr2,-Math.PI*0.15,-Math.PI*0.85,true); bx.closePath(); bx.fill();
+        bx.globalAlpha=1; bx.strokeStyle="rgba(255,255,255,0.5)"; bx.lineWidth=1;
+        for(var rb=0;rb<5;rb++){ var ra2=-Math.PI*(0.15+0.7*rb/4);
+          bx.beginPath(); bx.moveTo(fx3,fy3); bx.lineTo(fx3+Math.cos(ra2)*fr2,fy3+Math.sin(ra2)*fr2); bx.stroke(); }
+      }
+      // neck + face
       bx.fillStyle=skin;
+      bx.fillRect(cx-headR*0.22,neckY-headR*0.35,headR*0.44,headR*0.6);
       bx.beginPath(); bx.arc(cx,headY,headR,0,Math.PI*2); bx.fill();
-      // eyes: size from star dimness, color from star Teff
-      var eyeR=headR*0.30*b.eyeScale;
+      // soft bangs + side strands
+      bx.fillStyle=hairCol;
+      bx.beginPath(); bx.ellipse(cx,headY-headR*0.35,headR*1.0,headR*0.72,0,Math.PI,Math.PI*2); bx.fill();
       [-1,1].forEach(function(sd){
-        var ex=cx+sd*headR*0.45, ey=headY-headR*0.08;
-        var eg=bx.createRadialGradient(ex,ey,0,ex,ey,eyeR*1.8);
-        eg.addColorStop(0,eyeCol); eg.addColorStop(1,"rgba(0,0,0,0)");
-        bx.globalAlpha=0.55; bx.fillStyle=eg; bx.beginPath(); bx.arc(ex,ey,eyeR*1.8,0,Math.PI*2); bx.fill(); bx.globalAlpha=1;
-        bx.fillStyle="#0a0f18"; bx.beginPath(); bx.arc(ex,ey,eyeR,0,Math.PI*2); bx.fill();
-        bx.fillStyle=eyeCol; bx.beginPath(); bx.arc(ex,ey,eyeR*0.62,0,Math.PI*2); bx.fill();
-        bx.fillStyle="#fff"; bx.beginPath(); bx.arc(ex-eyeR*0.2,ey-eyeR*0.24,eyeR*0.16,0,Math.PI*2); bx.fill();
+        bx.beginPath();
+        bx.moveTo(cx+sd*headR*0.9,headY-headR*0.35);
+        bx.quadraticCurveTo(cx+sd*headR*1.15,headY+headR*0.8,cx+sd*headR*0.75,headY+headR*1.6);
+        bx.quadraticCurveTo(cx+sd*headR*0.55,headY+headR*0.7,cx+sd*headR*0.72,headY-headR*0.15);
+        bx.fill();
       });
-      // thermal-sense organ (this app's premise: heat sensing) — IR pit like pit vipers
+      bx.strokeStyle="rgba(255,255,255,0.35)"; bx.lineWidth=1.4;
+      bx.beginPath(); bx.arc(cx,headY-headR*0.18,headR*0.8,Math.PI*1.2,Math.PI*1.55); bx.stroke();
+      // almond eyes: iris color/size adapted to the host star; lashes + brows
+      var eyeR=Math.min(headR*0.34,headR*0.24*b.eyeScale+headR*0.08);
+      [-1,1].forEach(function(sd){
+        var ex=cx+sd*headR*0.42, ey=headY+headR*0.02;
+        bx.fillStyle="#fff"; bx.beginPath(); bx.ellipse(ex,ey,eyeR,eyeR*0.62,0,0,Math.PI*2); bx.fill();
+        bx.fillStyle=eyeCol; bx.beginPath(); bx.arc(ex,ey,eyeR*0.58,0,Math.PI*2); bx.fill();
+        bx.fillStyle="#141821"; bx.beginPath(); bx.arc(ex,ey,eyeR*0.30,0,Math.PI*2); bx.fill();
+        bx.fillStyle="#fff"; bx.beginPath(); bx.arc(ex-eyeR*0.18,ey-eyeR*0.2,eyeR*0.12,0,Math.PI*2); bx.fill();
+        bx.strokeStyle="#2a2119"; bx.lineWidth=1.3;
+        bx.beginPath(); bx.ellipse(ex,ey-eyeR*0.08,eyeR,eyeR*0.6,0,Math.PI*1.05,Math.PI*1.95); bx.stroke();
+        for(var la=0;la<3;la++){ var lx=ex+sd*eyeR*(0.45+la*0.25);
+          bx.beginPath(); bx.moveTo(lx,ey-eyeR*0.5); bx.lineTo(lx+sd*2.2,ey-eyeR*0.85); bx.stroke(); }
+        bx.strokeStyle=hairCol; bx.lineWidth=1.6;
+        bx.beginPath(); bx.arc(ex,ey+eyeR*0.4,eyeR*1.05,Math.PI*1.15,Math.PI*1.85); bx.stroke();
+        bx.fillStyle="rgba(255,150,150,0.22)";
+        bx.beginPath(); bx.ellipse(ex+sd*headR*0.12,headY+headR*0.42,headR*0.2,headR*0.11,0,0,Math.PI*2); bx.fill();
+      });
+      // nose + lips
+      bx.strokeStyle=skin2; bx.lineWidth=1.1;
+      bx.beginPath(); bx.moveTo(cx,headY+headR*0.12); bx.lineTo(cx-headR*0.05,headY+headR*0.32); bx.stroke();
+      bx.fillStyle="hsl(350,65%,62%)";
+      bx.beginPath(); bx.ellipse(cx,headY+headR*0.58,headR*0.24,headR*0.11,0,0,Math.PI*2); bx.fill();
+      bx.fillStyle="rgba(255,255,255,0.4)";
+      bx.beginPath(); bx.ellipse(cx,headY+headR*0.545,headR*0.16,headR*0.045,0,0,Math.PI*2); bx.fill();
+      // forehead gem = IR pit organ (heat sensing), earrings, necklace + pendant
       bx.fillStyle=heatColor(b.tBody);
-      bx.beginPath(); bx.arc(cx,headY+headR*0.35,headR*0.13,0,Math.PI*2); bx.fill();
+      bx.beginPath(); bx.moveTo(cx,headY-headR*0.52); bx.lineTo(cx+headR*0.07,headY-headR*0.42);
+      bx.lineTo(cx,headY-headR*0.32); bx.lineTo(cx-headR*0.07,headY-headR*0.42); bx.closePath(); bx.fill();
+      bx.fillStyle="#e8c86a";
+      [-1,1].forEach(function(sd){ bx.beginPath(); bx.arc(cx+sd*headR*0.95,headY+headR*0.45,Math.max(1.5,headR*0.07),0,Math.PI*2); bx.fill(); });
+      bx.strokeStyle="#e8c86a"; bx.lineWidth=1;
+      bx.beginPath(); bx.arc(cx,neckY-headR*0.15,headR*0.42,Math.PI*0.15,Math.PI*0.85); bx.stroke();
+      bx.fillStyle=heatColor(b.tBody);
+      bx.beginPath(); bx.arc(cx,neckY+headR*0.28,Math.max(1.6,headR*0.08),0,Math.PI*2); bx.fill();
       if(isChild){
         bx.fillStyle="#7fd8a8"; bx.font="10.5px sans-serif"; bx.textAlign="center";
-        bx.fillText("子孫 (第1世代)",cx,groundY-hPx-10);
+        bx.fillText("子孫 (第1世代)",cx,topY-10);
         bx.textAlign="left"; bx.font="11px sans-serif";
       }
     }
@@ -731,7 +790,7 @@ let html = `<!DOCTYPE html>
     bx.fillStyle=heatColor(b.tBody);
     bx.fillText("●",16,62);
     bx.fillStyle="#8aa0c0";
-    bx.fillText(" = 額の赤外ピット器官 (実在: マムシ類の熱感知に倣う)",26,62);
+    bx.fillText(" = 額の宝石=赤外ピット器官 (実在: マムシ類の熱感知に倣う)・瞳と髪は恒星色・ドレスはJones熱パレット",26,62);
     if(p.lin.canEvolve){
       bx.fillStyle="#7fd8a8";
       bx.fillText("👪 子孫: 身長×0.55・頭部比×1.35 (実在の幼形=ベビースキーマ) で第1世代を描画",16,80);
@@ -750,11 +809,11 @@ let html = `<!DOCTYPE html>
     if(!b.viable){ add("<b>生命圏外</b> — Teq="+b.tEnv+" K / R="+p.rade+" R⊕ は液体の水と生化学の窓の外。グラフィックス対象外(正直な判定)。"); return; }
     add("<b>ヒト同型度 HIS="+(p.his==null?"—":(p.his*100).toFixed(1)+"%")+"</b> — Γ部分積分恒等式で正規化した実測5項(重力・平衡温度・日射・恒星色・導出体重)の同型度 <span class='f'>HIS=Π sᵢ^(Γ(1+wᵢ)/(wᵢΓ(wᵢ))·wᵢ/5)</span>。地球=100%。"+(p.lin.locked?"<b>近接M矮星のため潮汐固定・フレアの実リスクで発見スコア減点。</b>":""));
     add("<b>子孫継続性</b> — 恒星の主系列寿命 <span class='f'>t_MS=10·(M★/M☉)⁻²·⁵="+(p.lin.tMS>99?"99+":p.lin.tMS.toFixed(1))+" Gyr</span>(M★≈"+p.lin.mStar.toFixed(2)+"M☉)。地球の実績(知的生命まで4.5 Gyr)に対し"+(p.lin.canEvolve?"<b>十分</b> → 可能世代数の上限 <span class='f'>N=(t−4.5Gyr)/25yr≈"+fmtGen(p.lin.gens)+"</span>(1世代25年=ヒトの実測)":"<b>不足</b> — 子孫の世代継続は不可")+"。");
-    add("<b>体格</b> — 表面重力 <span class='f'>g=R^1.58g⊕="+b.gRel.toFixed(2)+"g⊕</span> → 骨強度スケーリングで体重 <span class='f'>M≈70·(g⊕/g)^1.2="+b.mass.toFixed(0)+" kg</span>、身長 <span class='f'>h∝g^-1/2≈"+b.height.toFixed(2)+" m</span>、脚は<b>"+b.legs+"本</b>(高重力ほど多脚で荷重分散)。");
+    add("<b>体格</b> — 表面重力 <span class='f'>g=R^1.58g⊕="+b.gRel.toFixed(2)+"g⊕</span> → 骨強度スケーリングで体重 <span class='f'>M≈70·(g⊕/g)^1.2="+b.mass.toFixed(0)+" kg</span>、身長 <span class='f'>h∝g^-1/2≈"+b.height.toFixed(2)+" m</span>、<b>8頭身のモデル比率の美人像</b>として描画(重力は身長・体格の補正に反映)。");
     add("<b>代謝熱</b> — クライバーの法則 <span class='f'>P=3.4·M^0.75="+b.metab.toFixed(0)+" W</span>。これが熱感知ネットワークが拾う1個体の熱源。");
     add("<b>放熱器官</b> — 体温 "+b.tBody.toFixed(0)+" K / 環境 "+b.tEnv.toFixed(0)+" K でシュテファン=ボルツマン <span class='f'>A=P/(εσ(Tb⁴−Tenv⁴))="+(b.area>=99?"∞(放熱不能)":b.area.toFixed(2)+" m²")+"</span>(ヒト皮膚≈1.8m²)。"+
-      (b.hot||b.finF>1.15?"面積要求が大きい→<b>放熱フィン・大きな耳</b>(アレンの法則の高温側。実在: フェネックの耳)。":"面積要求は小さい。"));
-    if(b.cold) add("<b>毛皮・コンパクト体型</b> — 環境 "+b.tEnv.toFixed(0)+" K は寒冷 → アレンの法則の寒冷側: 付属肢を短く、表面積/体積比を最小化し断熱毛皮(実在: ホッキョクギツネ)。");
+      (b.hot||b.finF>1.15?"面積要求が大きい→<b>優雅な扇</b>として表現(アレンの法則の高温側の放熱器官。実在の原理: フェネックの耳)。":"面積要求は小さい。"));
+    if(b.cold) add("<b>ファーストール (毛皮)</b> — 環境 "+b.tEnv.toFixed(0)+" K は寒冷 → アレンの法則の寒冷側の断熱毛皮を、白いファーストールとして表現(実在: ホッキョクギツネ)。");
     add("<b>目</b> — 恒星 Teff="+(p.st||5772)+" K(ピーク波長 Wien <span class='f'>λ=2898/T="+b.wien.toFixed(2)+" μm</span>)→ 瞳の大きさ×"+b.eyeScale.toFixed(2)+"(暗い赤色矮星ほど大きく)、感色域は恒星色に適応。");
     add("<b>体色</b> — 日射 S="+p.insol+" S⊕ → 保護色素の濃さ "+(b.pig*100).toFixed(0)+"%(高日射ほど濃く。実在: メラニンのUV防御)。");
     add("<b>ネットワーク寄与</b> — 思考実験の個体数 <span class='f'>N=8×10⁹·ESI²="+(b.pop/1e9).toFixed(2)+"×10⁹</span> で生物圏熱量 <span class='f'>P_bio="+fmtW(b.pBio)+"</span>。微分多様体の勾配 <span class='f'>d|V|/dθ="+b.grad.toFixed(3)+"</span>。");
@@ -822,7 +881,7 @@ let html = `<!DOCTYPE html>
     if(b&&b.viable&&!p.earth){
       var calls=[[0.34,"頭部: 瞳×"+b.eyeScale.toFixed(2)+" (恒星 "+(p.st||5772)+"K に適応)"],
                  [0.56,"体幹: 放熱 A="+(b.area>=99?"—":b.area.toFixed(2)+"m²")+" / 代謝 P="+b.metab.toFixed(0)+"W"],
-                 [0.80,"脚"+b.legs+"本: g="+b.gRel.toFixed(2)+"g⊕ / 体重 M="+b.mass.toFixed(0)+"kg"]];
+                 [0.80,"脚部・ドレス: g="+b.gRel.toFixed(2)+"g⊕ / 体重 M="+b.mass.toFixed(0)+"kg"]];
       bctx.font="10.5px sans-serif";
       for(var ci=0;ci<calls.length;ci++){
         if(y/H>calls[ci][0]){ bctx.fillStyle="#7fd8a8"; bctx.fillText("▸ "+calls[ci][1],8,H*calls[ci][0]); }
