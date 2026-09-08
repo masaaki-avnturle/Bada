@@ -70,8 +70,11 @@
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
    開発ツールも同梱: `git` / `curl` / `gcc`・`make`(build-essential)=
-   **Xcode Command Line Tools 相当**、`xcode-select --install` で clang 追加、
-   `brew install <formula>`(Homebrew / Linuxbrew)も使えます。
+   **Xcode Command Line Tools 相当**、`screen` / `tmux` / `texlive`(日本語)も同梱。
+   **重量級(clang・texlive-full など)は NAT 経由でワンコマンド導入**できます:
+   `badaos-extras clang` / `badaos-extras texlive-full` / `badaos-extras dev|media|all`
+   (2GB の ISO には焼けない大きなものはインターネットから取得。`xcode-select --install`
+   や `brew install <formula>` でも入ります)。
 7. **BadaApache — Bada 言語で書いた Apache** が **ウルトラネットワークに取り込まれます**:
    ```
    apachectl start                 # DocumentRoot を zone://url.or.jp/ に公開

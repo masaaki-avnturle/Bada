@@ -143,6 +143,8 @@ function run(events) {
     ["line", "apachectl start"],          // 77 BadaApache -> publishes to zone://url.or.jp
     ["line", "zone zone://url.or.jp/apache"], // 78 the ring now serves Apache's page
     ["line", "apachectl status"],         // 79 running, pages published
+    ["line", "badaos-extras clang"],      // 80 clang installed over the NAT
+    ["line", "which clang"],              // 81 ... and it is now present
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -254,6 +256,8 @@ function run(events) {
     [78, "BadaApache"],                     // the ring now serves Apache's page
     [78, "status 200 zone-delivered"],
     [79, "pages published to the ring"],    // apachectl status
+    [80, "Setting up clang"],               // clang installed over the NAT
+    [81, "/usr/bin/clang"],                 // ... now on PATH
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -279,7 +283,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

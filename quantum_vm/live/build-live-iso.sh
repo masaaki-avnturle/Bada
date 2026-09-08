@@ -179,8 +179,13 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     gvfs auto-mount), or `udisksctl mount -b /dev/sdb1` / `pmount sdb1`
   * developer tools preinstalled: git, curl, a C/C++ compiler (gcc/g++/make,
     build-essential) -- the Debian equivalent of Xcode Command Line Tools.
-    `xcode-select --install` adds clang/llvm/cmake; `brew` installs Homebrew
-    (Linuxbrew) on first run over the internet
+    screen / tmux / texlive (+ Japanese) are baked in too.
+  * big optionals over the NAT (too large to bake under the 2 GB image):
+        badaos-extras clang          # clang / llvm / lld
+        badaos-extras texlive-full   # the full TeX Live
+        badaos-extras dev | media | all
+    `xcode-select --install` also adds clang/llvm/cmake; `brew` installs
+    Homebrew (Linuxbrew) on first run over the internet
   * BadaApache -- the Apache HTTP Server written in Bada -- serves the zone://
     ultra network: inside BadaVM Pro run `apachectl start` to publish the
     DocumentRoot onto zone://url.or.jp, then `zone zone://url.or.jp/apache`.
@@ -466,6 +471,60 @@ fi
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badapache"
 
+# `badaos-extras` -- install the HEAVY optional packages over the NAT with one
+# command. screen/tmux/texlive and a C/C++ compiler ship on the ISO already;
+# clang, the FULL TeX Live, and other big bundles are too large to bake under
+# the 2 GB image limit, so they are fetched from the Debian archive on demand.
+cat > "$CHROOT/usr/local/bin/badaos-extras" <<'EOF'
+#!/bin/sh
+# BadaOS extras -- one-command installer (over the NAT) for the big optionals.
+set -e
+if [ "$(id -u)" = 0 ]; then S=""; else S="sudo"; fi
+
+bundle() {
+  case "$1" in
+    clang)        echo "clang llvm lld lldb" ;;
+    texlive-full|tex) echo "texlive-full" ;;
+    dev)          echo "build-essential clang llvm cmake git pkg-config gdb valgrind" ;;
+    media)        echo "vlc gimp ffmpeg" ;;
+    screen)       echo "screen" ;;
+    tmux)         echo "tmux" ;;
+    all)          echo "clang llvm lld texlive-full build-essential cmake gdb vlc gimp ffmpeg" ;;
+    *)            echo "$1" ;;   # any other name -> apt package(s) verbatim
+  esac
+}
+
+if [ $# -eq 0 ]; then
+  cat <<USAGE
+badaos-extras -- install big optional software over the internet (NAT).
+Baked into the ISO already: screen, tmux, texlive (+ Japanese), git, curl,
+a C/C++ compiler (build-essential).  Fetch the rest on demand:
+
+  badaos-extras clang          clang / llvm / lld / lldb
+  badaos-extras texlive-full   the FULL TeX Live distribution
+  badaos-extras dev            build-essential clang llvm cmake gdb valgrind
+  badaos-extras media          vlc gimp ffmpeg
+  badaos-extras all            clang + texlive-full + dev + media
+  badaos-extras <pkg> ...      any Debian package name(s)
+
+Needs the internet (NetworkManager provides it automatically).
+USAGE
+  exit 0
+fi
+
+PKGS=""
+for name in "$@"; do PKGS="$PKGS $(bundle "$name")"; done
+echo "==> installing over the NAT:$PKGS"
+$S apt-get update -qq
+# shellcheck disable=SC2086
+$S env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq $PKGS || {
+  echo "install failed -- are you online?  Check: nmcli / ping deb.debian.org" >&2
+  exit 1
+}
+echo "done: $PKGS"
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badaos-extras"
+
 # put Homebrew on PATH for interactive shells (harmless before it is installed)
 cat > "$CHROOT/etc/profile.d/10-badaos-brew.sh" <<'EOF'
 if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
@@ -542,8 +601,11 @@ cp "$CHROOT"/boot/vmlinuz-*   "$ISO/live/vmlinuz"
 cp "$CHROOT"/boot/initrd.img-* "$ISO/live/initrd"
 # /boot stays INSIDE the squashfs so badaos-install can copy a bootable
 # system (kernel + initrd) onto the real disk.
+# xz with a big dictionary + 1 MiB blocks packs the rootfs tighter, keeping
+# the ISO well under the 2 GB release-asset limit (leaving room for the
+# baked userland; the heavy extras go on over the NAT via `badaos-extras`).
 mksquashfs "$CHROOT" "$ISO/live/filesystem.squashfs" \
-    -comp xz -noappend -quiet
+    -comp xz -b 1M -Xdict-size 100% -noappend -quiet
 
 echo "==> [5/6] GRUB menu (this IS the boot menu the real PC shows)"
 sed "s/@VOLID@/BADAOS/g" "$HERE/grub-live.cfg" > "$ISO/boot/grub/grub.cfg"

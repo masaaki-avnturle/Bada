@@ -2160,6 +2160,42 @@ def shell_exec(emit, vm, st, line) {
         }
         return 0
     }
+    # ---- badaos-extras: install the big optionals over the NAT ----------
+    if (cmd == "badaos-extras") {
+        if (len(argv) < 2) {
+            tty(emit, "badaos-extras -- install big optional software over the internet (NAT).")
+            tty(emit, "Baked in already: screen, tmux, texlive (+ Japanese), git, curl, build-essential.")
+            tty(emit, "  badaos-extras clang          clang / llvm / lld / lldb")
+            tty(emit, "  badaos-extras texlive-full   the FULL TeX Live distribution")
+            tty(emit, "  badaos-extras dev            build-essential clang llvm cmake gdb valgrind")
+            tty(emit, "  badaos-extras media          vlc gimp ffmpeg")
+            tty(emit, "  badaos-extras all            clang + texlive-full + dev + media")
+            tty(emit, "  badaos-extras <pkg> ...      any Debian package name(s)")
+            return 0
+        }
+        if (len(st[11]) == 0) { tty(emit, "badaos-extras: network is down (need the NAT). Check nmcli."); return 0 }
+        pkgs := []
+        i := 1
+        while (i < len(argv)) {
+            nm := argv[i]
+            if (nm == "clang") { pkgs <- "clang"; pkgs <- "llvm"; pkgs <- "lld" }
+            else if (list_has(["texlive-full", "tex"], nm) == 1) { pkgs <- "texlive-full" }
+            else if (nm == "dev") { pkgs <- "build-essential"; pkgs <- "clang"; pkgs <- "cmake"; pkgs <- "gdb" }
+            else if (nm == "media") { pkgs <- "vlc"; pkgs <- "gimp"; pkgs <- "ffmpeg" }
+            else if (nm == "all") { pkgs <- "clang"; pkgs <- "llvm"; pkgs <- "texlive-full"; pkgs <- "cmake"; pkgs <- "vlc" }
+            else { pkgs <- nm }
+            i := i + 1
+        }
+        tty(emit, "badaos-extras: fetching over the NAT (10.0.2.2) from the Debian archive...")
+        i := 0
+        while (i < len(pkgs)) {
+            apt_install_one(emit, vm, st, pkgs[i])
+            i := i + 1
+        }
+        tty(emit, "badaos-extras: done (" + len(pkgs) + " package(s)).")
+        return 0
+    }
+
     # ---- BadaApache: the Apache HTTP Server, in Bada, bound to a zone ----
     if (list_has(["apachectl", "apache2ctl", "apache2", "httpd", "badapache"], cmd) == 1) {
         sub := "start"
@@ -2488,6 +2524,8 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "brew") { tty(emit, "brew(1) -- Homebrew / Linuxbrew package manager; `brew install <formula>` (bootstraps over the internet).") }
         else if (n == "xcode-select") { tty(emit, "xcode-select(1) -- BadaOS shim: the Command Line Tools map to git + build-essential + clang on Debian.") }
         else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
+        else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
+        else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
         return 0
