@@ -28,7 +28,7 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var VERSION = "1.0.0";
+  var VERSION = "1.1.0";
 
   /* ===================== 物理定数 (CODATA 2018) ===================== */
   var C_LIGHT = 2.99792458e8;            /* m/s                        */
@@ -43,7 +43,11 @@
   var FS_AU = 1e-15 / T_AU;              /* 1 fs = 41.3414 a.u.        */
 
   /* ===================== 元素データ =====================
-     Ip: 逐次イオン化エネルギー [eV] (NIST)。 l: 最外殻電子の軌道角運動量。 */
+     Ip   : 逐次イオン化エネルギー [eV] (NIST Atomic Spectra Database)。
+     l    : 最外殻電子の軌道角運動量 (ADK の f_l0 = 2l+1 に使う)。
+     note : 電子配置の特記事項と、モデルの適用限界・データの確度。
+            重元素や開殻の高電離段は I_p が推定値のことがあり、ADK が
+            仮定する水素様 n* からのずれも大きくなる。 */
   var ELEMENTS = [
     { sym: "H",  name: "水素",       Z: 1,  l: 0, Ip: [13.5984] },
     { sym: "He", name: "ヘリウム",   Z: 2,  l: 0, Ip: [24.5874, 54.4178] },
@@ -56,7 +60,16 @@
     { sym: "Na", name: "ナトリウム", Z: 11, l: 0, Ip: [5.1391, 47.2864, 71.6200] },
     { sym: "Ar", name: "アルゴン",   Z: 18, l: 1, Ip: [15.7596, 27.6297, 40.7350, 59.5800, 74.8400] },
     { sym: "Kr", name: "クリプトン", Z: 36, l: 1, Ip: [13.9996, 24.3599, 36.9500, 52.5000, 64.7000] },
-    { sym: "Xe", name: "キセノン",   Z: 54, l: 1, Ip: [12.1298, 20.9750, 31.0500, 42.2000, 54.1400] }
+    { sym: "Pd", name: "パラジウム", Z: 46, l: 2, Ip: [8.3369, 19.4283, 32.9300, 46.0000, 61.0000],
+      note: "基底配置 [Kr]4d¹⁰ — 5s 電子を持たない唯一の元素で、最外殻は 4d (l=2)。" +
+            "I_p が 8.34 eV と低いため臨界強度は 1.9×10¹³ W/cm² 程度と小さい。" +
+            "第 4 電離以降の I_p は推定値。閉殻 d¹⁰ に対する単一活性電子 ADK は近似。" },
+    { sym: "Xe", name: "キセノン",   Z: 54, l: 1, Ip: [12.1298, 20.9750, 31.0500, 42.2000, 54.1400] },
+    { sym: "Pu", name: "プルトニウム", Z: 94, l: 0, Ip: [6.0258, 11.5000, 21.1000, 35.0000, 49.0000],
+      note: "基底配置 [Rn]5f⁶7s² — 最外殻は 7s (l=0)。第一 I_p = 6.03 eV は本表で最小で、" +
+            "臨界強度も最小 (5.3×10¹² W/cm²)。第 2 電離以降の I_p は推定値。" +
+            "ADK は水素様 n* と単一活性電子を仮定するため、開殻 5f を持つアクチノイドでは" +
+            "近似が粗くなる (多電子相関・相対論効果は未考慮)。" }
   ];
 
   function element(sym) {
@@ -416,7 +429,7 @@
       version: VERSION,
       params: p,
       atom: {
-        sym: el.sym, name: el.name, Z: el.Z, l: el.l, stage: stage,
+        sym: el.sym, name: el.name, Z: el.Z, l: el.l, stage: stage, note: el.note || "",
         IpEV: IpEV, IpAU: ap.Ip, Zc: Zc,
         kappa: ap.kappa, nstar: ap.nstar, Cn2: ap.Cn2, flm: ap.flm,
         zetaRadiusA0: zetaRadius, betaPQ: betaPQ
@@ -504,13 +517,35 @@
     return L.join("\n") + "\n";
   }
 
+  /* 表示幅 (CJK は 2 桁) で折り返す。句読点・閉じ括弧は行頭に送らない。 */
+  function wideLen(ch) { return /[\u1100-\u115F\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFF60\uFFE0-\uFFE6]/.test(ch) ? 2 : 1; }
+  function wrapWide(text, cols) {
+    var out = [], line = "", w = 0;
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      line += ch; w += wideLen(ch);
+      if (w >= cols) {
+        /* 次が句読点や閉じ括弧なら巻き込んでから改行する */
+        while (i + 1 < text.length && "。、)）」』】,.".indexOf(text[i + 1]) >= 0) { line += text[++i]; }
+        out.push(line); line = ""; w = 0;
+      }
+    }
+    if (line) out.push(line);
+    return out;
+  }
+
   function summary(res) {
     var c = res.critical, s = res.scales, o = res.omega, a = res.atom;
     function sci(v, d) { return Number(v).toExponential(d === undefined ? 3 : d); }
     var L = [];
     L.push("原子              : " + a.sym + " (" + a.name + ")  第 " + a.stage + " 電離  I_p = " + a.IpEV.toFixed(4) + " eV");
     L.push("ADK               : κ = " + a.kappa.toFixed(4) + "  n* = " + a.nstar.toFixed(4) +
-           "  |C_n*|² = " + a.Cn2.toFixed(4) + "  β(p,q) = " + a.betaPQ.toFixed(5));
+           "  |C_n*|² = " + a.Cn2.toFixed(4) + "  f_l0 = " + a.flm + "  β(p,q) = " + a.betaPQ.toFixed(5));
+    if (a.note) {
+      var wrapped = wrapWide(a.note, 60);
+      for (var wj = 0; wj < wrapped.length; wj++)
+        L.push((wj === 0 ? "注記              : " : "                    ") + wrapped[wj]);
+    }
     L.push("臨界(障壁抑制)場  : F_cr = " + sci(s.FcrAU) + " a.u.  →  I_cr = " + sci(s.Icr) + " W/cm²");
     L.push("駆動場            : λ = " + res.params.lambdaNm + " nm (" + s.photonEV.toFixed(3) + " eV)  " +
            "I₀ = " + sci(s.I0) + " W/cm²  FWHM = " + res.params.fwhmFs + " fs  " + res.params.shape);

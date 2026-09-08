@@ -23,10 +23,10 @@ acpi-app/
 
 | プラットフォーム | ファイル | 備考 |
 |:---|:---|:---|
-| **Windows 10 / 11** | `ACPI-1.0.0-x64-setup.exe` | NSIS インストーラ (インストール先を選べます) |
-| **Windows 10 / 11** | `ACPI-1.0.0-x64-portable.exe` | ポータブル — インストール不要、ダブルクリックで起動 |
-| **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
-| **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
+| **Windows 10 / 11** | `ACPI-1.1.0-x64-setup.exe` | NSIS インストーラ (インストール先を選べます) |
+| **Windows 10 / 11** | `ACPI-1.1.0-x64-portable.exe` | ポータブル — インストール不要、ダブルクリックで起動 |
+| **Ubuntu** | `ACPI-1.1.0-x86_64.AppImage` | `chmod +x` して実行 |
+| **Ubuntu** | `ACPI-1.1.0-amd64.deb` | `sudo dpkg -i ACPI-1.1.0-amd64.deb` |
 | **Android** | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してインストール |
 
 ## 入手 (Actions — タグ不要)
@@ -39,8 +39,8 @@ ACPI 関連ブランチ / `main` への push で
 | Artifact | 中身 |
 |:---|:---|
 | `acpi-android-apk` | `acpi-debug.apk` |
-| `acpi-windows-exe` | `ACPI-1.0.0-x64-setup.exe` / `ACPI-1.0.0-x64-portable.exe` |
-| `acpi-ubuntu-appimage-deb` | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
+| `acpi-windows-exe` | `ACPI-1.1.0-x64-setup.exe` / `ACPI-1.1.0-x64-portable.exe` |
+| `acpi-ubuntu-appimage-deb` | `ACPI-1.1.0-x86_64.AppImage` / `ACPI-1.1.0-amd64.deb` |
 | **`acpi-all-platforms`** | 上記すべて + 単一 HTML + CLI + Bada 実装 |
 
 Actions のアーティファクトは GitHub にログインした状態で取得でき、保存期間は 90 日です。

@@ -37,6 +37,9 @@ console.log("self-check (既知の物理値との照合):");
 check("I_a [W/cm^2]", AC.CONST.I_AU, 3.5094e16, 1e-4);
 check("H  I_cr [W/cm^2]", AC.criticalIntensity(13.5984, 1), 1.37e14, 0.01);
 check("Ar I_cr [W/cm^2]", AC.criticalIntensity(15.7596, 1), 2.47e14, 0.01);
+check("Pd I_cr [W/cm^2]", AC.criticalIntensity(8.3369, 1), 1.933e13, 0.01);
+check("Pu I_cr [W/cm^2]", AC.criticalIntensity(6.0258, 1), 5.274e12, 0.01);
+check("元素数", AC.ELEMENTS.length, 14, 0);
 {
   const ap = AC.adkParams(13.5984, 1, 0), F = 0.05;
   check("H  ADK w(0.05) [a.u.]", AC.adkRate(F, ap), (4 / F) * Math.exp(-2 / (3 * F)), 0.02);
@@ -50,6 +53,16 @@ check("gamma_K (Ar, 800nm, 2e14)", AC.keldysh(15.7596, 2e14, 800), 0.812, 0.01);
     + r.critical.count + " 窓, 電離 " + (r.result.ionization * 100).toFixed(3) + " %");
   if (!r.critical.exists) { console.log("  FAIL 臨界期が検出されない"); failed++; }
   if (!(r.result.ionization > 0.9)) { console.log("  FAIL 6e14 W/cm^2 で Ar がほぼ完全電離しない"); failed++; }
+  for (const [sym, I0] of [["Pd", 6e13], ["Pu", 2e13]]) {
+    const q = AC.simulate({ element: sym, intensity: I0, lambdaNm: 800, fwhmFs: 10, steps: 6000 });
+    if (!q.critical.exists || !(q.result.ionization > 0.5) || !q.atom.note) {
+      console.log("  FAIL " + sym + " のシミュレーションが成立しない"); failed++;
+    } else {
+      console.log("  ok   " + sym + " " + I0.toExponential(1) + " -> 臨界期 "
+        + q.critical.durationFs.toFixed(3) + " fs, " + q.critical.count + " 窓, 電離 "
+        + (q.result.ionization * 100).toFixed(3) + " % (l=" + q.atom.l + ")");
+    }
+  }
   const sub = AC.simulate({ element: "Ar", intensity: 1e13, lambdaNm: 800, fwhmFs: 8, steps: 4000 });
   if (sub.critical.exists) { console.log("  FAIL 亜臨界 (1e13) なのに臨界期が出る"); failed++; }
   else console.log("  ok   Ar 1e13 (亜臨界) -> 臨界期なし");

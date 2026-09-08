@@ -245,26 +245,38 @@ def gamma_fn(z) {
 # ADK: n* = Z_c/κ,  κ = sqrt(2 I_p),  |C_{n*}|^2 = 2^{2n*} / (n* Γ(2n*))
 # w(F) = |C|^2 (2l+1) I_p (2κ^3/F)^{2n*-1} exp(-2κ^3/(3F))
 # 水素 (n*=1) では厳密解 w = (4/F) e^{-2/(3F)} に一致する。
-def adk_rate(F, Ip_au, Zc, l) {
-    if (F < 0.000000000001) { return 0.0 }
+#
+# 前係数 |C|^2 (2l+1) I_p と κ^3 は場に依存しないので、元素ごとに一度だけ
+# 求めて時間ループの外に出す (Γ 関数を毎ステップ呼ぶと非常に高くつく)。
+# 返り値: [前係数, κ^3, 2n*-1]
+def adk_const(Ip_au, Zc, l) {
     kappa := sqrt(2.0 * Ip_au)
     nstar := Zc / kappa
     C2 := fpow(2.0, 2.0 * nstar) / (nstar * gamma_fn(2.0 * nstar))
     k3 := kappa * kappa * kappa
-    arg := 2.0 * k3 / F
-    return C2 * (2 * l + 1) * Ip_au * fpow(arg, 2.0 * nstar - 1.0) * exp(0.0 - arg / 3.0)
+    return [C2 * (2 * l + 1) * Ip_au, k3, 2.0 * nstar - 1.0]
+}
+def adk_rate(F, C) {
+    if (F < 0.000000000001) { return 0.0 }
+    arg := 2.0 * C[1] / F
+    return C[0] * fpow(arg, C[2]) * exp(0.0 - arg / 3.0)
 }
 
 # ====================================================================
 # 臨界期のスキャン
 # ====================================================================
 # 元素データ: [記号, I_p(eV), l]
+#   Pd [Kr]4d^10 -- 5s 電子を持たない唯一の元素。最外殻は 4d なので l=2。
+#   Pu [Rn]5f^6 7s^2 -- 最外殻は 7s なので l=0。第一 I_p = 6.03 eV は本表で最小。
+#   ADK は水素様 n* と単一活性電子を仮定するため、重元素・開殻では近似が粗い。
 ELEMENTS := [["H", 13.5984, 0], ["He", 24.5874, 0], ["Ne", 21.5645, 1],
-             ["Ar", 15.7596, 1], ["Kr", 13.9996, 1], ["Xe", 12.1298, 1]]
+             ["Ar", 15.7596, 1], ["Kr", 13.9996, 1], ["Pd", 8.3369, 2],
+             ["Xe", 12.1298, 1], ["Pu", 6.0258, 0]]
 
 ZC       := 1                 # 残留イオン電荷
 LAMBDA   := 800.0             # nm
 I0       := 600000000000000.0 # 6.0e14 W/cm^2 (ピーク強度)
+                              # He (I_cr=1.46e15) は亜臨界、Pd/Pu は深い過臨界になる
 FWHM     := 8.0               # fs
 NSTEP    := 2400              # 時間ステップ
 ZORDER   := 3                 # ζ / Euler の次数 n
@@ -284,6 +296,8 @@ def crit_scan(sym_ip_l, I0) {
     tau := FWHM * FS_AU
     T := 2.2 * tau
     dt := 2.0 * T / (NSTEP - 1)
+    ADK := adk_const(Ip, ZC, l)     # 場に依存しない ADK 前係数 (ループ外で 1 回)
+    CAP := 2.0 * Ip                 # 障壁抑制超えでの外挿を抑えるキャップ
 
     print("")
     print("---- " + sym + " ------------------------------------------------")
@@ -316,9 +330,8 @@ def crit_scan(sym_ip_l, I0) {
         f := E0 * env * bcos(omega * tt)
         af := f
         if (af < 0.0) { af := 0.0 - af }
-        w := adk_rate(af, Ip, ZC, l)
-        cap := 2.0 * Ip
-        if (w > cap) { w := cap }
+        w := adk_rate(af, ADK)
+        if (w > CAP) { w := CAP }
 
         x := af / Fcr
         if (x > xmax) { xmax := x }

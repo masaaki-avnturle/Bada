@@ -13,9 +13,9 @@ Atomic Critical-Period Intensity simulator (Bada / Ω)
 
 ネイティブ アプリ (インストール型) も Releases から入手できます:
   Android          acpi-debug.apk
-  Windows 10 / 11  ACPI-1.0.0-x64-setup.exe    (NSIS インストーラ)
-                   ACPI-1.0.0-x64-portable.exe (ポータブル)
-  Ubuntu           ACPI-1.0.0-x86_64.AppImage / ACPI-1.0.0-amd64.deb
+  Windows 10 / 11  ACPI-1.1.0-x64-setup.exe    (NSIS インストーラ)
+                   ACPI-1.1.0-x64-portable.exe (ポータブル)
+  Ubuntu           ACPI-1.1.0-x86_64.AppImage / ACPI-1.1.0-amd64.deb
   https://github.com/masaaki-avnturle/Bada/releases
 
 使い方:
@@ -44,6 +44,13 @@ Atomic Critical-Period Intensity simulator (Bada / Ω)
 
   「強度」= その窓の内側での I(t) = |E(t)|^2 * I_a。水素では
   I_cr = 1.37e14 W/cm^2 という既知の障壁抑制強度を再現します。
+
+  対応元素 (14): H He Li Be C N O Ne Na Ar Kr Pd Xe Pu (各 1-5 電離段)。
+           Pd は [Kr]4d^10 で 5s 電子を持たない唯一の元素 (最外殻 4d, l=2)。
+           Pu は [Rn]5f^6 7s^2 (最外殻 7s, l=0) で、第一 I_p = 6.03 eV と
+           臨界強度 5.27e12 W/cm^2 はいずれも本表で最小。
+           ADK は水素様 n* と単一活性電子を仮定するため、閉殻 d10 の Pd と
+           開殻 5f の Pu では近似が粗くなる (アプリが注意書きを表示)。
 
   物理層 : 障壁抑制場、ADK トンネル電離率 (水素で厳密解
            w = (4/F) e^{-2/(3F)} に一致)、Keldysh パラメータ γ、

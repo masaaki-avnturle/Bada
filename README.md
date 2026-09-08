@@ -41,7 +41,7 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| [`atom-critical.html`](bada_gui_ide/dist/atom-critical.html) | ★ シミュレータ本体(単一 HTML)。元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に再計算され、4 枚の図と数値パネルが更新されます。CSV / JSON / PNG 出力付き |
+| [`atom-critical.html`](bada_gui_ide/dist/atom-critical.html) | ★ シミュレータ本体(単一 HTML)。14 元素。元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に再計算され、4 枚の図と数値パネルが更新されます。CSV / JSON / PNG 出力付き |
 | [`atom-critical-cli.js`](bada_gui_ide/cli/atom-critical-cli.js) | CLI 版 — `run` / `csv` / `json` / `sweep` / `scan` / `elements` / `selftest` |
 | [`atom_critical.js`](bada_gui_ide/www/atom_critical.js) | モデルコア(GUI と CLI が共有) |
 | [`atom_critical.bada`](bada_gui_ide/examples/atom_critical.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
@@ -53,9 +53,9 @@
 | プラットフォーム | ファイル | インストール |
 |:---|:---|:---|
 | **Android** (APK) | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
-| **Windows 10 / 11** | `ACPI-1.0.0-x64-setup.exe`(インストーラ)<br>`ACPI-1.0.0-x64-portable.exe`(ポータブル) | ダブルクリック |
-| **Ubuntu** | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x ACPI-1.0.0-x86_64.AppImage && ./ACPI-1.0.0-x86_64.AppImage` |
-| **Ubuntu** | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
+| **Windows 10 / 11** | `ACPI-1.1.0-x64-setup.exe`(インストーラ)<br>`ACPI-1.1.0-x64-portable.exe`(ポータブル) | ダブルクリック |
+| **Ubuntu** | `ACPI-1.1.0-x86_64.AppImage` | `chmod +x ACPI-1.1.0-x86_64.AppImage && ./ACPI-1.1.0-x86_64.AppImage` |
+| **Ubuntu** | `ACPI-1.1.0-amd64.deb` | `sudo dpkg -i ACPI-1.1.0-amd64.deb` |
 
 ##### 🅰️ Actions からダウンロード(タグ不要・すぐ取れる)
 
@@ -68,8 +68,8 @@ ACPI 関連ブランチ / `main` への push で [`acpi-app-build.yml`](.github/
 | Artifact | 中身 |
 |:---|:---|
 | `acpi-android-apk` | `acpi-debug.apk` |
-| `acpi-windows-exe` | `ACPI-1.0.0-x64-setup.exe`(NSIS インストーラ) / `ACPI-1.0.0-x64-portable.exe`(ポータブル) |
-| `acpi-ubuntu-appimage-deb` | `ACPI-1.0.0-x86_64.AppImage` / `ACPI-1.0.0-amd64.deb` |
+| `acpi-windows-exe` | `ACPI-1.1.0-x64-setup.exe`(NSIS インストーラ) / `ACPI-1.1.0-x64-portable.exe`(ポータブル) |
+| `acpi-ubuntu-appimage-deb` | `ACPI-1.1.0-x86_64.AppImage` / `ACPI-1.1.0-amd64.deb` |
 | **`acpi-all-platforms`** | ★ 上記すべて + 単一 HTML + CLI + Bada 実装 |
 
 > Actions のアーティファクトは **GitHub にログインしている必要があり、保存期間は 90 日**です。期限なしの配布が欲しいときは下の Releases を使ってください。
@@ -88,6 +88,11 @@ git tag acpi-app-v1.0.0 && git push origin acpi-app-v1.0.0
 詳細は [`bada_gui_ide/acpi-app/`](bada_gui_ide/acpi-app/) を参照。
 
 Windows / Ubuntu アプリでは CSV・JSON・PNG が「名前を付けて保存」で書き出せます。Android アプリは WebView がファイル保存を扱えないため、同じボタンで内容を表示するパネルが開き、テキストはクリップボードへコピー、図は長押しで保存できます。
+
+**対応元素 (14)** — H · He · Li · Be · C · N · O · Ne · Na · Ar · Kr · **Pd** · Xe · **Pu**(各 1–5 電離段)。
+Pd は基底配置 `[Kr]4d¹⁰` で 5s 電子を持たない唯一の元素、最外殻 4d のため `l=2`(`f_l0=5`)。
+Pu は `[Rn]5f⁶7s²` で最外殻 7s(`l=0`)、第一 `I_p = 6.03 eV` は本表で最小、臨界強度 `5.27×10¹² W/cm²` も最小です。
+ADK は水素様 n* と単一活性電子を仮定するため、閉殻 d¹⁰ の Pd と開殻 5f の Pu では近似が粗くなります(該当元素を選ぶとアプリが注意書きを表示します)。
 
 **臨界期とは** — 原子単位系で、クーロン障壁が完全に消える障壁抑制場は
 `F_cr = I_p²/(4 Z_c)`、対応する臨界強度は `I_cr = F_cr² · I_a`

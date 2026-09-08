@@ -182,6 +182,8 @@ function cmdSelfTest() {
   t("H  I_cr [W/cm^2]", AC.criticalIntensity(13.5984, 1), 1.37e14, 0.01);
   t("Ar I_cr [W/cm^2]", AC.criticalIntensity(15.7596, 1), 2.47e14, 0.01);
   t("Xe I_cr [W/cm^2]", AC.criticalIntensity(12.1298, 1), 8.66e13, 0.01);
+  t("Pd I_cr [W/cm^2]", AC.criticalIntensity(8.3369, 1), 1.933e13, 0.01);
+  t("Pu I_cr [W/cm^2]", AC.criticalIntensity(6.0258, 1), 5.274e12, 0.01);
   const ap = AC.adkParams(13.5984, 1, 0);
   t("H ADK w(F=0.05) [a.u.]", AC.adkRate(0.05, ap), (4 / 0.05) * Math.exp(-2 / 0.15), 0.02);
   t("H ADK w(F=0.08) [a.u.]", AC.adkRate(0.08, ap), (4 / 0.08) * Math.exp(-2 / 0.24), 0.02);
@@ -200,6 +202,34 @@ function cmdSelfTest() {
   const s = AC.simulate({ element: "Ar", intensity: 1e13, fwhmFs: 8, steps: 4000 });
   console.log((!s.critical.exists ? "ok   " : "FAIL ") + "Ar 1e13 (亜臨界) -> 臨界期なし");
   if (s.critical.exists) bad++;
+
+  /* 元素表: 14 元素。I_cr が I_p の 4 乗に比例するので、I_p の昇順と
+     I_cr の昇順は一致する (Pu < Pd < ... < He)。 */
+  console.log((AC.ELEMENTS.length === 14 ? "ok   " : "FAIL ")
+    + "元素表 " + AC.ELEMENTS.length + " 元素 (" + AC.ELEMENTS.map(e => e.sym).join(" ") + ")");
+  if (AC.ELEMENTS.length !== 14) bad++;
+  const byIp = AC.ELEMENTS.slice().sort((x, y) => x.Ip[0] - y.Ip[0]).map(e => e.sym).join(" ");
+  const byIcr = AC.ELEMENTS.slice()
+    .sort((x, y) => AC.criticalIntensity(x.Ip[0], 1) - AC.criticalIntensity(y.Ip[0], 1))
+    .map(e => e.sym).join(" ");
+  console.log((byIp === byIcr ? "ok   " : "FAIL ") + "I_p 昇順 == I_cr 昇順: " + byIcr);
+  if (byIp !== byIcr) bad++;
+
+  /* Pd (l=2, 4d) と Pu (l=0, 7s) が実際に走り、臨界期が出ること */
+  for (const [sym, I0] of [["Pd", 6e13], ["Pu", 2e13]]) {
+    const r = AC.simulate({ element: sym, intensity: I0, fwhmFs: 10, steps: 6000 });
+    const ok = r.critical.exists && r.result.ionization > 0.5 && isFinite(r.omega.Esigma);
+    console.log((ok ? "ok   " : "FAIL ") + sym + " " + sci(I0, 1) + " -> 臨界期 "
+      + r.critical.durationFs.toFixed(3) + " fs / " + r.critical.count + " 窓 / 電離 "
+      + (r.result.ionization * 100).toFixed(3) + " % / l=" + r.atom.l
+      + " f_l0=" + r.atom.flm + " E(σ)=" + sci(r.omega.Esigma, 3));
+    if (!ok) bad++;
+    if (!r.atom.note) { console.log("FAIL " + sym + " に注記が無い"); bad++; }
+  }
+  /* Pu は本表で最も低い I_cr。既定の 800nm では 1e12 でもまだ亜臨界。 */
+  const puSub = AC.simulate({ element: "Pu", intensity: 1e12, fwhmFs: 10, steps: 4000 });
+  console.log((!puSub.critical.exists ? "ok   " : "FAIL ") + "Pu 1e12 (亜臨界) -> 臨界期なし");
+  if (puSub.critical.exists) bad++;
   console.log(bad ? "\nselftest FAILED (" + bad + ")" : "\nselftest OK");
   process.exit(bad ? 1 : 0);
 }

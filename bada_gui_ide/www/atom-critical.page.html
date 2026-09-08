@@ -64,6 +64,8 @@
   .legend { display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--dim); margin-top:6px; }
   .legend i { display:inline-block; width:11px; height:3px; border-radius:2px; vertical-align:middle; margin-right:4px; }
   .note { color:var(--dim); font-size:11px; line-height:1.6; margin-top:8px; }
+  .atomnote { background:#1a1408; border:1px solid #4a3a12; border-radius:7px;
+              padding:7px 9px; color:#e0c98a; margin-top:9px; }
   .banner { border-radius:8px; padding:8px 10px; font-size:12px; margin-bottom:10px; }
   .banner.crit { background:#2a1a08; border:1px solid #6b4a12; color:#f0cd83; }
   .banner.sub  { background:#0d1a2a; border:1px solid #234058; color:#9dc0e0; }
@@ -212,6 +214,7 @@
   <div id="kOmega"></div>
   <h3>原子 / ADK パラメータ</h3>
   <div id="kAtom"></div>
+  <div id="kNote"></div>
   <h3>テキスト要約</h3>
   <details open><summary>summary()</summary><pre id="sum" class="mono"></pre></details>
   <div class="note">
@@ -253,7 +256,8 @@
   var elSel = $("element"), stSel = $("stage");
   AC.ELEMENTS.forEach(function (e) {
     var o = document.createElement("option");
-    o.value = e.sym; o.textContent = e.sym + " — " + e.name + " (Z=" + e.Z + ")";
+    o.value = e.sym;
+    o.textContent = e.sym + " — " + e.name + " (Z=" + e.Z + ", I_p=" + e.Ip[0].toFixed(2) + " eV)";
     elSel.appendChild(o);
   });
   elSel.value = "Ar";
@@ -558,6 +562,9 @@
       ["|C_{n*l*}|²", a.Cn2.toFixed(6)],
       ["率キャップ適用率", (res.result.cappedFraction * 100).toFixed(2) + " %", res.result.cappedFraction > 0 ? "bad" : "ok"]
     ]);
+    $("kNote").innerHTML = a.note
+      ? '<div class="note atomnote">⚠ ' + a.note + "</div>"
+      : "";
 
     $("sum").textContent = AC.summary(res);
 

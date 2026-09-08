@@ -67,6 +67,10 @@ jobs:
           node cli/bada-cli.js run examples/atom_critical.bada | tee /tmp/acpi.out
           grep -q "臨界期" /tmp/acpi.out
           grep -q "臨界期なし (亜臨界)" /tmp/acpi.out
+          # Pd (4d, l=2) と Pu (7s, l=0) が最後まで走り切ること
+          grep -q "^---- Pd " /tmp/acpi.out
+          grep -q "^---- Pu " /tmp/acpi.out
+          grep -q "^Pu : 臨界期" /tmp/acpi.out
 
   windows-exe:
     runs-on: windows-latest
@@ -296,10 +300,10 @@ jobs:
             | プラットフォーム | ファイル | インストール |
             |---|---|---|
             | Android | `acpi-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
-            | Windows 10 / 11 | `ACPI-1.0.0-x64-setup.exe` | インストーラ (インストール先を選べます) |
-            | Windows 10 / 11 | `ACPI-1.0.0-x64-portable.exe` | インストール不要・ダブルクリックで起動 |
-            | Ubuntu | `ACPI-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
-            | Ubuntu | `ACPI-1.0.0-amd64.deb` | `sudo dpkg -i ACPI-1.0.0-amd64.deb` |
+            | Windows 10 / 11 | `ACPI-*-x64-setup.exe` | インストーラ (インストール先を選べます) |
+            | Windows 10 / 11 | `ACPI-*-x64-portable.exe` | インストール不要・ダブルクリックで起動 |
+            | Ubuntu | `ACPI-*-x86_64.AppImage` | `chmod +x` して実行 |
+            | Ubuntu | `ACPI-*-amd64.deb` | `sudo dpkg -i` |
 
             ### コマンドライン / Bada 言語版
 
@@ -309,6 +313,13 @@ jobs:
             | `atom_critical.bada` | 同じモデルの Bada 言語リファレンス実装 |
 
             ### モデル
+
+            **対応元素 (14)** — H · He · Li · Be · C · N · O · Ne · Na · Ar · Kr ·
+            **Pd** · Xe · **Pu** (各 1–5 電離段)。Pd は `[Kr]4d¹⁰` で 5s 電子を持たない
+            唯一の元素 (最外殻 4d, `l=2`)、Pu は `[Rn]5f⁶7s²` (最外殻 7s, `l=0`) で
+            第一 `I_p = 6.03 eV`・臨界強度 `5.27×10¹² W/cm²` はいずれも本表で最小。
+            ADK は水素様 n* と単一活性電子を仮定するため、閉殻 d¹⁰ の Pd と開殻 5f の
+            Pu では近似が粗くなります (アプリが該当元素で注意書きを表示)。
 
             **物理層** — 障壁抑制場 `F_cr = I_p²/(4 Z_c)` [a.u.]、`I_cr = F_cr²·I_a`
             (`I_a = 3.5094×10¹⁶ W/cm²`)。ADK トンネル電離率 (水素で厳密解
