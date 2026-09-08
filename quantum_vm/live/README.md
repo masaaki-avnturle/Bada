@@ -24,10 +24,13 @@
 - **マウスカーソル表示済み + デスクトップアプリ同梱**: xterm・x11-apps(xeyes /
   xclock / xcalc)・firefox-esr・pcmanfm・**nautilus(GNOME ファイル)**・
   galculator・l3afpad・gpicview
-- **NAT インターネット接続が最初から動きます**: DHCP(systemd-networkd)+
-  **DNS(systemd-resolved を同梱・有効化。DHCP が DNS を配らない環境でも
-  9.9.9.9 / 1.1.1.1 / 8.8.8.8 のフォールバックで名前解決)** — QEMU/VMware/
-  VirtualBox の NAT でも実機の LAN でも、起動するだけで apt・firefox が使えます
+- **NAT インターネットに自動接続します**: **NetworkManager** が全 NIC(有線/Wi-Fi)を
+  管理し、起動時に DHCP で**自動接続**するので、QEMU/VMware/VirtualBox の NAT でも
+  実機の LAN でも、電源を入れるだけで apt・firefox が使えます。DNS は systemd-resolved
+  (DHCP が DNS を配らない環境でも 9.9.9.9 / 1.1.1.1 / 8.8.8.8 のフォールバックで解決)。
+  **NAT/接続の設定 GUI アプリ**も同梱: `badaos-network`(= nm-connection-editor)、
+  タスクトレイの nm-applet、コンソールなら `nmtui` / `nmcli`。
+  「BadaOS Wired (auto)」という自動接続プロファイルを最初から用意しています
 - **USB メモリの接続に対応**: udisks2 + gvfs 同梱 — 挿すと pcmanfm / nautilus
   からクリックでマウント。CLI は `udisksctl mount -b /dev/sdb1` か `pmount sdb1`
   (vfat / exFAT / NTFS 対応)

@@ -67,6 +67,8 @@
    `xcalc &` は **実際に計算できる電卓ウィンドウ**(x11-apps)です。
    `udisksctl` で **USB メモリの認識とマウント**(`udisksctl mount -b /dev/sd0i`)、
    `apt install nautilus` も NAT 越しにそのまま入ります。
+   `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
+   `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
    **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
    ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、

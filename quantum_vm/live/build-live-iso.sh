@@ -65,7 +65,8 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     wmaker htop mc \
     xterm x11-apps x11-utils x11-xserver-utils \
     firefox-esr pcmanfm \
-    udisks2 gvfs
+    udisks2 gvfs \
+    network-manager
 # xinetd is optional in newer Debian suites
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xinetd || true
 # the real w9wm (or its parent 9wm) as an alternative window manager --
@@ -83,6 +84,9 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx
 for app in galculator l3afpad gpicview nautilus gvfs-backends exfatprogs pmount; do
   chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$app" || true
 done
+# NAT / network settings GUI: NetworkManager's connection editor + tray applet
+# (nm-connection-editor, nm-applet). Best effort so a rename never sinks the ISO.
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq network-manager-gnome || true
 
 echo "==> Japanese locale (ja_JP.UTF-8)"
 sed -i 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' "$CHROOT/etc/locale.gen" 2>/dev/null || true
@@ -91,22 +95,49 @@ grep -q '^en_US.UTF-8' "$CHROOT/etc/locale.gen" 2>/dev/null || echo 'en_US.UTF-8
 chroot "$CHROOT" locale-gen
 echo 'LANG=ja_JP.UTF-8' > "$CHROOT/etc/default/locale"
 
-# real networking (DHCP on every ethernet NIC) so `apt` reaches the FULL
-# Debian archive -- 60,000+ packages, the same class as Ubuntu.
-mkdir -p "$CHROOT/etc/systemd/network"
-cat > "$CHROOT/etc/systemd/network/20-dhcp.network" <<'EOF'
-[Match]
-Name=en* eth*
-
-[Network]
-DHCP=yes
-EOF
-# DNS over the NAT: Debian 12 splits systemd-resolved into ITS OWN package;
-# without it networkd's DHCP-provided DNS never reaches /etc/resolv.conf and
-# every lookup (apt, firefox, ping www...) fails even though the NAT is up.
+# AUTOMATIC internet: NetworkManager manages every wired/Wi-Fi NIC and
+# auto-connects over DHCP at boot, so `apt`/firefox reach the FULL Debian
+# archive (60,000+ packages) with no manual setup -- and it provides the
+# NAT/connection SETTINGS GUI (nm-connection-editor) and tray applet
+# (nm-applet). NetworkManager, not systemd-networkd, owns networking here;
+# systemd-resolved still does DNS (NM feeds it), with a public fallback.
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd-resolved || true
-chroot "$CHROOT" systemctl enable systemd-networkd systemd-resolved ssh 2>/dev/null || \
-chroot "$CHROOT" systemctl enable systemd-networkd ssh || true
+chroot "$CHROOT" systemctl enable NetworkManager systemd-resolved ssh 2>/dev/null || \
+chroot "$CHROOT" systemctl enable NetworkManager ssh || true
+# hand all interfaces to NetworkManager and route its DNS through resolved
+mkdir -p "$CHROOT/etc/NetworkManager/conf.d"
+cat > "$CHROOT/etc/NetworkManager/conf.d/10-badaos.conf" <<'EOF'
+[main]
+dns=systemd-resolved
+# manage every device (nothing is left "unmanaged")
+[keyfile]
+unmanaged-devices=none
+[device]
+wifi.scan-rand-mac-address=no
+EOF
+# an explicit auto-connect DHCP profile that matches ANY ethernet NIC, so a
+# fresh machine is online the moment it boots (belt-and-braces on top of
+# NetworkManager's built-in wired auto-connect)
+mkdir -p "$CHROOT/etc/NetworkManager/system-connections"
+cat > "$CHROOT/etc/NetworkManager/system-connections/badaos-wired.nmconnection" <<'EOF'
+[connection]
+id=BadaOS Wired (auto)
+type=ethernet
+autoconnect=true
+autoconnect-priority=10
+
+[ipv4]
+method=auto
+
+[ipv6]
+method=auto
+EOF
+chmod 600 "$CHROOT/etc/NetworkManager/system-connections/badaos-wired.nmconnection"
+# a bare systemd-networkd would fight NetworkManager for the same NICs -- make
+# sure only NetworkManager is driving them
+chroot "$CHROOT" systemctl disable systemd-networkd 2>/dev/null || true
+chroot "$CHROOT" systemctl mask systemd-networkd 2>/dev/null || true
+rm -f "$CHROOT/etc/systemd/network/20-dhcp.network" 2>/dev/null || true
 # fallback DNS so resolution works even when the DHCP server hands out none
 mkdir -p "$CHROOT/etc/systemd/resolved.conf.d"
 cat > "$CHROOT/etc/systemd/resolved.conf.d/10-badaos-fallback.conf" <<'EOF'
@@ -139,8 +170,10 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
   * desktop apps preinstalled: xterm + x11-apps (xeyes / xclock / xcalc),
     firefox-esr (web), pcmanfm + nautilus (files), galculator / l3afpad /
     gpicview
-  * NAT internet works out of the box: DHCP (systemd-networkd) + DNS
-    (systemd-resolved, with 9.9.9.9/1.1.1.1/8.8.8.8 fallback)
+  * AUTOMATIC internet (NAT): NetworkManager auto-connects DHCP on every
+    NIC at boot; DNS via systemd-resolved (9.9.9.9/1.1.1.1/8.8.8.8 fallback).
+    Settings GUI: `badaos-network` (nm-connection-editor) or the nm-applet
+    tray icon; console: nmtui / nmcli
   * USB sticks: plug in and open them from pcmanfm / nautilus (udisks2 +
     gvfs auto-mount), or `udisksctl mount -b /dev/sdb1` / `pmount sdb1`
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
@@ -282,6 +315,10 @@ if [ "$SESSION" = "desktop" ]; then
   # the OS boots into the window manager alone: w9wm / afterstep / wmaker,
   # with mlterm (Japanese terminal) as the workbench for Ubuntu-style apps
   WMBIN="$(pickwm "${WMSEL:-w9wm}")"
+  # NetworkManager tray applet: shows the connection and opens the settings
+  # GUI (harmless if the WM has no system tray -- the editor still runs from
+  # `badaos-network`)
+  command -v nm-applet >/dev/null 2>&1 && nm-applet >/dev/null 2>&1 &
   if command -v mlterm >/dev/null 2>&1; then mlterm &
   elif command -v xterm >/dev/null 2>&1; then xterm & fi
   if [ "$WMBIN" = openbox ]; then exec openbox --sm-disable; fi
@@ -321,6 +358,21 @@ exec chromium --app=file:///opt/badaos/bada-vm-pro.html#autoboot \
   --no-first-run --password-store=basic "$@"
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badavm"
+
+# `badaos-network` opens the NAT / network SETTINGS GUI (nm-connection-editor);
+# falls back to the nmtui text UI in a terminal if the GTK editor is absent
+cat > "$CHROOT/usr/local/bin/badaos-network" <<'EOF'
+#!/bin/sh
+# BadaOS network / NAT settings
+if command -v nm-connection-editor >/dev/null 2>&1; then
+  exec nm-connection-editor "$@"
+elif command -v nmtui >/dev/null 2>&1; then
+  exec "${TERMINAL:-mlterm}" -e nmtui
+else
+  echo "NetworkManager tools not found." >&2; exit 1
+fi
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badaos-network"
 chroot "$CHROOT" chown -R bada:bada /home/bada
 
 # the real-disk installer + branding for the installed system's GRUB

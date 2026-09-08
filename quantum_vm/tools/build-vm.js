@@ -135,6 +135,7 @@ function run(events) {
     ["line", "udisksctl"],                // 70 USB stick recognized (udisks2)
     ["line", "udisksctl mount -b /dev/sd0i"], // 71 ... and mounts
     ["line", "apt install nautilus"],     // 72 nautilus installs over the NAT
+    ["line", "nmcli"],                    // 73 NetworkManager: NAT auto-connect
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -236,6 +237,8 @@ function run(events) {
     [70, "Quantum USB stick 8GB"],          // USB storage recognized (udisks2)
     [71, "/media/root/QUANTUM-USB"],        // ... and mounted
     [72, "Setting up nautilus"],            // nautilus installs over the NAT
+    [73, "BadaOS Wired (auto)"],            // NetworkManager NAT auto-connect
+    [73, "autoconnect: yes"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -261,7 +264,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */
