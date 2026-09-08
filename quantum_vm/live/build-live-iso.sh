@@ -82,7 +82,7 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fcitx
 # common desktop applications -- best effort, one at a time so a renamed
 # package never sinks the rest (calculator / text editor / image viewer /
 # GNOME Files + the gvfs backends and pmount for USB sticks)
-for app in galculator l3afpad gpicview nautilus gvfs-backends exfatprogs pmount; do
+for app in galculator l3afpad gpicview nautilus gvfs-backends exfatprogs pmount apache2; do
   chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$app" || true
 done
 # NAT / network settings GUI: NetworkManager's connection editor + tray applet
@@ -181,6 +181,10 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     build-essential) -- the Debian equivalent of Xcode Command Line Tools.
     `xcode-select --install` adds clang/llvm/cmake; `brew` installs Homebrew
     (Linuxbrew) on first run over the internet
+  * BadaApache -- the Apache HTTP Server written in Bada -- serves the zone://
+    ultra network: inside BadaVM Pro run `apachectl start` to publish the
+    DocumentRoot onto zone://url.or.jp, then `zone zone://url.or.jp/apache`.
+    The real apache2 is installed too (best effort); source in /opt/badaos
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>   (nautilus included)
   * install to the real disk:  sudo badaos-install
@@ -437,6 +441,30 @@ echo "toolchain directly: make / cmake / gcc / g++ / clang (git + curl too),"
 echo "or 'xcode-select --install' to add clang/llvm. Homebrew: 'brew'."
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/xcodebuild"
+
+# BadaApache: the Apache HTTP Server written in Bada, which publishes its
+# DocumentRoot onto the zone:// ultra network at zone://url.or.jp. Its Bada
+# source ships under /opt/badaos; `badapache` runs it inside BadaVM Pro (the
+# Bada runtime), and also drives the real apache2 if it is installed.
+mkdir -p "$CHROOT/opt/badaos"
+install -m 0644 "$QVM/bada/badapache.bada" "$CHROOT/opt/badaos/badapache.bada" 2>/dev/null || \
+  cp "$QVM/bada/badapache.bada" "$CHROOT/opt/badaos/badapache.bada" 2>/dev/null || true
+cat > "$CHROOT/usr/local/bin/badapache" <<'EOF'
+#!/bin/sh
+# BadaApache -- Apache in the Bada language, bound to zone://url.or.jp.
+# The Bada implementation lives in BadaVM Pro; inside it run:
+#     apachectl start        # publishes DocumentRoot onto zone://url.or.jp
+#     zone zone://url.or.jp/apache
+echo "BadaApache 2.4.58 (Quantum/Bada) -- Apache that serves the zone:// ultra network."
+echo "Bada source: /opt/badaos/badapache.bada"
+echo "Run it inside BadaVM Pro (badavm):  apachectl start  ->  zone zone://url.or.jp/apache"
+if command -v apache2ctl >/dev/null 2>&1; then
+  echo
+  echo "The real apache2 is also installed here; controlling it now:"
+  exec sudo apache2ctl "${@:-status}"
+fi
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badapache"
 
 # put Homebrew on PATH for interactive shells (harmless before it is installed)
 cat > "$CHROOT/etc/profile.d/10-badaos-brew.sh" <<'EOF'

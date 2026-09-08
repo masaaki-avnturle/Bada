@@ -67,12 +67,14 @@ APT_MIRROR := "http://archive.badaos.or.jp"
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
             "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
-            "wd0", [], [], [], [], "en", "twm"]
+            "wd0", [], [], [], [], "en", "twm", []]
 }
 
 # 21: installer language ("en" | "ja") -- picked on the sysinst welcome
 # screen (or the one-screen GUI setup dialog of the host chrome)
 # 22: the window manager running on the BadaX display ("twm" | "w9wm")
+# 23: BadaApache published pages ([] = httpd stopped; [[url,body]...] = the
+#     DocumentRoot mirrored onto zone://url.or.jp while apache is running)
 def trs(st, en, ja) {
     if (st[21] == "ja") { return ja }
     return en
@@ -242,7 +244,9 @@ def pkg_catalog() {
       ["network-manager-gnome","1.30.0-1badaos","NetworkManager GUI (nm-connection-editor + nm-applet)", "tool", "/usr/bin/nm-connection-editor"],
       ["git",            "2.43.0-1badaos", "fast, scalable, distributed revision control system", "tool", "/usr/bin/git"],
       ["build-essential","12.10-1badaos",  "Informational list of build-essential packages (gcc/g++/make -- Xcode CLT equivalent)", "tool", "/usr/bin/gcc"],
-      ["homebrew",       "4.2.0-1badaos",  "the Missing Package Manager (Homebrew / Linuxbrew): brew install", "tool", "/usr/local/bin/brew"]
+      ["homebrew",       "4.2.0-1badaos",  "the Missing Package Manager (Homebrew / Linuxbrew): brew install", "tool", "/usr/local/bin/brew"],
+      ["apache2",        "2.4.58-1badaos", "Apache HTTP Server, in Bada -- publishes DocumentRoot onto zone://url.or.jp", "service", "/usr/sbin/apache2"],
+      ["badapache",      "2.4.58-1badaos", "BadaApache: the Bada-language Apache bound to the zone:// ultra network", "service", "/usr/sbin/apachectl"]
     ]
 }
 
@@ -253,7 +257,7 @@ def pkg_preinstalled() {
             "afterstep", "wmaker", "mlterm", "fcitx-mozc", "fcitx-configtool",
             "texlive-full", "screen", "tmux", "x11-apps", "udisks2",
             "network-manager", "network-manager-gnome",
-            "git", "build-essential"]
+            "git", "build-essential", "apache2", "badapache"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -631,6 +635,16 @@ def zone_net(st) {
     while (i < len(st[18])) {
         zone_publish(net, st[18][i][0], st[18][i][1])
         i := i + 1
+    }
+    # BadaApache: while httpd is running, its DocumentRoot is published to
+    # the ring under zone://url.or.jp/... -- published AFTER the well-known
+    # site so Apache TAKES OVER (serves) url.or.jp on the ultra network.
+    if (len(st) >= 24) {
+        i := 0
+        while (i < len(st[23])) {
+            zone_publish(net, st[23][i][0], st[23][i][1])
+            i := i + 1
+        }
     }
     # the MigemoInsta feed lives on the ring too (zone://insta.or.jp/)
     ipages := insta_pages(st)
@@ -1071,6 +1085,9 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/bin/make", "#!binary (GNU make)")
     fs_put(fs, "/usr/local/bin/brew", "#!/bin/sh (Homebrew launcher)")
     fs_put(fs, "/usr/local/bin/xcode-select", "#!/bin/sh (Xcode CLT shim)")
+    fs_put(fs, "/usr/sbin/apache2", "#!binary (BadaApache httpd)")
+    fs_put(fs, "/usr/sbin/apachectl", "#!/bin/sh (BadaApache control)")
+    fs_put(fs, "/var/www/html/index.html", "<h1>It works! -- served onto zone://url.or.jp by BadaApache</h1>")
     fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xlogo", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xdpyinfo", "#!binary (X client)")
@@ -2143,12 +2160,85 @@ def shell_exec(emit, vm, st, line) {
         }
         return 0
     }
+    # ---- BadaApache: the Apache HTTP Server, in Bada, bound to a zone ----
+    if (list_has(["apachectl", "apache2ctl", "apache2", "httpd", "badapache"], cmd) == 1) {
+        sub := "start"
+        if (len(argv) > 1) { sub := argv[1] }
+        # `apache2 -v` / `httpd -v`
+        if (list_has(["-v", "-V", "--version", "version"], sub) == 1) {
+            tty(emit, "Server version: " + apache_version())
+            tty(emit, "Server built:   quantum ledger " + len(tuplespace) + " facts")
+            return 0
+        }
+        if (list_has(["configtest", "-t"], sub) == 1) {
+            tty(emit, "Syntax OK  (/etc/apache2/apache2.conf, mod_zone bound to zone://url.or.jp)")
+            return 0
+        }
+        if (sub == "stop") {
+            if (apache_running(st) == 0) { tty(emit, "apachectl: httpd (no pid file) not running"); return 0 }
+            st[23] = []
+            tty(emit, "Stopping BadaApache -- withdrawing DocumentRoot from the ring.")
+            tty(emit, "zone://url.or.jp/ reverts to the built-in well-known site.")
+            return 0
+        }
+        if (sub == "status") {
+            if (apache_running(st) == 0) {
+                tty(emit, apache_version())
+                tty(emit, "Status: stopped.  Start it with: apachectl start")
+                return 0
+            }
+            tty(emit, apache_version() + " -- running (pid 4021)")
+            tty(emit, "Bound to zone://url.or.jp on the ultra network (mod_zone).")
+            tty(emit, "DocumentRoot " + apache_docroot_path() + " -- " + len(st[23]) + " pages published to the ring:")
+            i := 0
+            while (i < len(st[23])) {
+                tty(emit, "  " + st[23][i][0])
+                i := i + 1
+            }
+            tty(emit, "Try:  zone zone://url.or.jp/apache    (or open it in zonebrowser)")
+            return 0
+        }
+        # start / restart / graceful (default)
+        st[23] = apache_zone_pages()
+        # write the config + a sample DocumentRoot into the filesystem too
+        fs_put(st[4], "/etc/apache2/apache2.conf", apache_conf_text())
+        fs_put(st[4], apache_docroot_path() + "/index.html", "<!-- served onto zone://url.or.jp by " + apache_version() + " -->")
+        if (list_has(["restart", "graceful"], sub) == 1) {
+            tty(emit, "Restarting BadaApache...")
+        }
+        tty(emit, apache_version())
+        tty(emit, "Setting ServerName to url.or.jp; loading mod_zone, mod_status.")
+        tty(emit, "Bell-pair QKD workers up; sealing DocumentRoot with the trefoil Jones key.")
+        i := 0
+        while (i < len(st[23])) {
+            tty(emit, apache_log_line(st[23][i][0], 200))
+            i := i + 1
+        }
+        tty(emit, "BadaApache started: " + len(st[23]) + " pages now served on zone://url.or.jp/ (no server, no DNS).")
+        tty(emit, "  fetch:  zone zone://url.or.jp/apache   |   curl http://localhost/   |   zonebrowser &")
+        return 0
+    }
+
     if (cmd == "curl") {
         if (pkg_installed(st, "curl") == 0) { tty(emit, "curl: command not found (apt install curl)"); return 0 }
         if (len(argv) < 2) { tty(emit, "curl: try 'curl URL'"); return 0 }
         if (str_find(argv[1], "zone://") == 0) {
             zone_print(emit, st, argv[1])
             return 0
+        }
+        # localhost / url.or.jp over http is served by BadaApache when running
+        if (apache_running(st) == 1) {
+            ch := url_host(argv[1])
+            if (list_has(["localhost", "127.0.0.1", "url.or.jp", "www.url.or.jp"], ch) == 1) {
+                page := apache_serve(st, "zone://url.or.jp/")
+                if (len(page) > 0) {
+                    tty(emit, "<!-- " + apache_version() + " via mod_zone (http bridged to zone://url.or.jp) -->")
+                    parts := split(page[0], "\n")
+                    j := 0
+                    while (j < len(parts)) { tty(emit, parts[j]); j := j + 1 }
+                    return 0
+                }
+            }
         }
         cmd_curl(emit, st, argv[1])
         return 0
@@ -2397,6 +2487,7 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "git") { tty(emit, "git(1) -- the stupid content tracker; distributed revision control (git 2.43.0, preinstalled).") }
         else if (n == "brew") { tty(emit, "brew(1) -- Homebrew / Linuxbrew package manager; `brew install <formula>` (bootstraps over the internet).") }
         else if (n == "xcode-select") { tty(emit, "xcode-select(1) -- BadaOS shim: the Command Line Tools map to git + build-essential + clang on Debian.") }
+        else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
         return 0

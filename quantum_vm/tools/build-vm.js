@@ -49,6 +49,7 @@ const libs =
   fs.readFileSync(path.join(QVM, "bada", "vmpro.bada"), "utf8") + "\n" +
   fs.readFileSync(path.join(QVM, "bada", "badax.bada"), "utf8") + "\n" +
   zoneLib + "\n" + zoneSiteBada + "\n" +
+  fs.readFileSync(path.join(QVM, "bada", "badapache.bada"), "utf8") + "\n" +
   fs.readFileSync(path.join(QVM, "bada", "badabsd.bada"), "utf8");
 const Bada = require(path.join(WWW, "bada.js"));
 
@@ -139,6 +140,9 @@ function run(events) {
     ["line", "git --version"],            // 74 git preinstalled
     ["line", "xcode-select --install"],   // 75 Xcode CLT == Debian toolchain
     ["line", "brew install wget"],        // 76 Homebrew / Linuxbrew
+    ["line", "apachectl start"],          // 77 BadaApache -> publishes to zone://url.or.jp
+    ["line", "zone zone://url.or.jp/apache"], // 78 the ring now serves Apache's page
+    ["line", "apachectl status"],         // 79 running, pages published
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -245,6 +249,11 @@ function run(events) {
     [74, "git version 2.43.0"],             // git preinstalled
     [75, "git / gcc / g++ / clang / make"], // Xcode CLT == Debian toolchain
     [76, "Homebrew"],                       // brew installs over the NAT
+    [77, "BadaApache/2.4.58"],              // Apache-in-Bada starts
+    [77, "served on zone://url.or.jp"],     // ... and publishes to the ring
+    [78, "BadaApache"],                     // the ring now serves Apache's page
+    [78, "status 200 zone-delivered"],
+    [79, "pages published to the ring"],    // apachectl status
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -270,7 +279,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

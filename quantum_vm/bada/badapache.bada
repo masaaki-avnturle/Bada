@@ -1,0 +1,121 @@
+# ====================================================================
+# badapache.bada -- the Apache HTTP Server, reimplemented in the Bada
+# quantum language, that PUBLISHES its DocumentRoot onto the zone://
+# ultra network at zone://url.or.jp.
+#
+# Classic Apache serves files over http:// to browsers. BadaApache does
+# the same, but its "bind address" is a zone on the P2P ring: when it is
+# started it mirrors every page under its DocumentRoot into the ultra
+# network under zone://url.or.jp/..., sealed with that zone's Jones-knot
+# key (the same runtime as zone-lib.bada). So `zone zone://url.or.jp/`,
+# `curl zone://url.or.jp/apache` and the ZoneBrowser all fetch pages that
+# BadaApache is serving -- Apache is "taken into" the ultra network.
+#
+# It is a faithful-in-spirit httpd model: an httpd.conf, a DocumentRoot,
+# an access log line per request, mod_zone (the ring publisher) and
+# mod_status (server-status). Everything is Bada; state lives in the OS
+# state vector (st[23]) so it replays deterministically from the ledger.
+# ====================================================================
+
+def apache_version() { return "BadaApache/2.4.58 (Quantum/Bada) mod_zone/1.0" }
+
+def apache_docroot_path() { return "/var/www/html" }
+
+# the zone this server binds to on the ultra network
+def apache_zone_host() { return "url.or.jp" }
+
+# httpd.conf (what `apachectl configtest` checks and status prints)
+def apache_conf() {
+    lines := []
+    lines <- "# /etc/apache2/apache2.conf -- BadaApache (Bada language)"
+    lines <- "ServerName url.or.jp"
+    lines <- "Listen zone://url.or.jp:80        # bind address is a ZONE, not an IP"
+    lines <- "DocumentRoot " + apache_docroot_path()
+    lines <- "LoadModule zone_module    modules/mod_zone.bada   # publish DocumentRoot to the ring"
+    lines <- "LoadModule status_module  modules/mod_status.bada"
+    lines <- "<Zone url.or.jp>"
+    lines <- "    JonesKnot trefoil        # long-term key = Kauffman/Jones of the knot"
+    lines <- "    QKD Bell-pair            # per-session salt, zero-preservation tamper check"
+    lines <- "    AEAD on"
+    lines <- "</Zone>"
+    lines <- "ErrorLog  /var/log/apache2/error.log"
+    lines <- "CustomLog /var/log/apache2/access.log combined"
+    return lines
+}
+
+def apache_conf_text() {
+    lines := apache_conf()
+    s := ""
+    i := 0
+    while (i < len(lines)) {
+        s := s + lines[i]
+        if (i < len(lines) - 1) { s := s + "\n" }
+        i := i + 1
+    }
+    return s
+}
+
+# the DEFAULT site DocumentRoot: [zone-url, body] pairs in the zone markup
+# (# H1 / ## H2 / plain paragraph / '-> zone://.. | label' links) so they
+# render in the ZoneBrowser exactly like the rest of the ultra network.
+def apache_zone_pages() {
+    home := ""
+    home := home + "# url.or.jp -- served by Apache\n"
+    home := home + "## " + apache_version() + "\n"
+    home := home + "このページは Bada 言語で書かれた Apache (BadaApache) が配信しています。DocumentRoot (" + apache_docroot_path() + ") の各ファイルは、起動時にウルトラネットワークのリングへ zone://url.or.jp/... として封緘・公開され、サーバも DNS も無いまま世界中のピアから取得できます。\n"
+    home := home + "## mod_zone -- サーバーレスな公開\n"
+    home := home + "従来の Apache が TCP:80 で待ち受けるところを、BadaApache は zone://url.or.jp というゾーンに bind します。各ページは Jones 多項式量子鍵で封緘され、Bell 対 QKD でセッション鍵を合意して配送されます。\n"
+    home := home + "-> zone://url.or.jp/apache | BadaApache について\n"
+    home := home + "-> zone://url.or.jp/server-status | サーバーステータス (mod_status)\n"
+    home := home + "-> zone://url.or.jp/security | Jones 多項式量子暗号"
+
+    about := ""
+    about := about + "# BadaApache\n"
+    about := about + "## Bada 言語製の Apache HTTP Server\n"
+    about := about + "httpd.conf・DocumentRoot・仮想ホスト・アクセスログ・mod_status を備えた Apache 風 HTTP サーバを、量子プログラミング言語 Bada だけで実装したものです。\n"
+    about := about + "## ウルトラネットワークへの取り込み\n"
+    about := about + "mod_zone が DocumentRoot をリング DHT へ公開し、http:// の代わりに zone:// でページを配信します。`apachectl start` で公開が始まり、`apachectl stop` でリングから取り下げられます。\n"
+    about := about + "-> zone://url.or.jp/ | ← トップへ\n"
+    about := about + "-> zone://bada.or.jp/ | Bada 言語ポータルへ"
+
+    status := ""
+    status := status + "# server-status\n"
+    status := status + "## " + apache_version() + "\n"
+    status := status + "Server bind: zone://url.or.jp:80 (mod_zone)\n"
+    status := status + "Server MPM: quantum-event (Bell-pair QKD workers)\n"
+    status := status + "Status: running / DocumentRoot published to the ring\n"
+    status := status + "Total accesses served over zone:// since start\n"
+    status := status + "-> zone://url.or.jp/ | ← トップへ"
+
+    return [
+        ["zone://url.or.jp/",              home],
+        ["zone://url.or.jp/index.html",    home],
+        ["zone://url.or.jp/apache",        about],
+        ["zone://url.or.jp/server-status", status]
+    ]
+}
+
+# a single access-log line in the Apache "combined" format
+def apache_log_line(path, code) {
+    return "10.0.2.2 - - [" + NOW + "] \"GET " + path + " zone/1.1\" " +
+           code + " - \"-\" \"" + apache_version() + "\""
+}
+
+# is BadaApache serving right now?  (st[23] non-empty == running)
+def apache_running(st) {
+    if (len(st) < 24) { return 0 }
+    if (len(st[23]) > 0) { return 1 }
+    return 0
+}
+
+# look a page up in the running server's DocumentRoot (mirror of the ring)
+def apache_serve(st, url) {
+    if (apache_running(st) == 0) { return [] }
+    pages := st[23]
+    i := 0
+    while (i < len(pages)) {
+        if (pages[i][0] == url) { return [pages[i][1]] }
+        i := i + 1
+    }
+    return []
+}

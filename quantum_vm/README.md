@@ -72,6 +72,19 @@
    開発ツールも同梱: `git` / `curl` / `gcc`・`make`(build-essential)=
    **Xcode Command Line Tools 相当**、`xcode-select --install` で clang 追加、
    `brew install <formula>`(Homebrew / Linuxbrew)も使えます。
+7. **BadaApache — Bada 言語で書いた Apache** が **ウルトラネットワークに取り込まれます**:
+   ```
+   apachectl start                 # DocumentRoot を zone://url.or.jp/ に公開
+   zone zone://url.or.jp/apache    # リング DHT からその Apache ページを取得
+   curl http://localhost/          # mod_zone が http を zone:// へブリッジ
+   zonebrowser zone://url.or.jp/ & # ZoneBrowser で表示
+   apachectl status / stop / configtest
+   ```
+   従来の Apache が TCP:80 で待ち受けるのに対し、BadaApache は **zone://url.or.jp
+   というゾーンに bind** します(mod_zone)。各ページは Jones 多項式量子鍵で封緘され、
+   Bell 対 QKD でセッション鍵を合意して P2P リングで配送 — サーバも DNS も無しで
+   世界中のピアから取得できます。停止すると url.or.jp は組み込みの既定サイトに戻ります。
+   実装は `quantum_vm/bada/badapache.bada`(全て Bada 言語)。
    **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
    ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、
