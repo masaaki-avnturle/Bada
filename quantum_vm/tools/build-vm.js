@@ -136,6 +136,9 @@ function run(events) {
     ["line", "udisksctl mount -b /dev/sd0i"], // 71 ... and mounts
     ["line", "apt install nautilus"],     // 72 nautilus installs over the NAT
     ["line", "nmcli"],                    // 73 NetworkManager: NAT auto-connect
+    ["line", "git --version"],            // 74 git preinstalled
+    ["line", "xcode-select --install"],   // 75 Xcode CLT == Debian toolchain
+    ["line", "brew install wget"],        // 76 Homebrew / Linuxbrew
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -239,6 +242,9 @@ function run(events) {
     [72, "Setting up nautilus"],            // nautilus installs over the NAT
     [73, "BadaOS Wired (auto)"],            // NetworkManager NAT auto-connect
     [73, "autoconnect: yes"],
+    [74, "git version 2.43.0"],             // git preinstalled
+    [75, "git / gcc / g++ / clang / make"], // Xcode CLT == Debian toolchain
+    [76, "Homebrew"],                       // brew installs over the NAT
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -264,7 +270,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

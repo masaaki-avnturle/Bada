@@ -34,6 +34,11 @@
 - **USB メモリの接続に対応**: udisks2 + gvfs 同梱 — 挿すと pcmanfm / nautilus
   からクリックでマウント。CLI は `udisksctl mount -b /dev/sdb1` か `pmount sdb1`
   (vfat / exFAT / NTFS 対応)
+- **開発ツールを同梱**: `git`・`curl`・C/C++ コンパイラ(`gcc`/`g++`/`make`,
+  build-essential)を最初から用意 — これが **Xcode Command Line Tools の
+  Debian 版相当**です。`xcode-select --install` で clang/llvm/cmake を追加、
+  `brew`(Homebrew / Linuxbrew)は初回実行時にインターネット越しに自動導入
+  されます(Xcode 本体は macOS 専用のため同梱できません)
 - **日本語環境が最初から整っています**: ロケール `ja_JP.UTF-8`・Noto CJK フォント・
   **mlterm(日本語対応ターミナル)**・**fcitx-mozc + fcitx-configtool**(Ctrl+Space で
   日本語入力 ON/OFF。スイートに fcitx4 が無ければ fcitx5-mozc に自動フォールバック)

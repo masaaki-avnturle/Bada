@@ -239,7 +239,10 @@ def pkg_catalog() {
       ["x11-apps",       "7.7+11badaos",   "X applications (xeyes / xclock / xcalc / xlogo)", "tool", "/usr/X11R7/bin/xcalc"],
       ["udisks2",        "2.10.1-1badaos", "D-Bus service to access and mount storage devices (USB sticks)", "service", "/usr/bin/udisksctl"],
       ["network-manager","1.42.4-1badaos", "network management framework (NAT auto-connect + nmcli/nmtui)", "service", "/usr/bin/nmcli"],
-      ["network-manager-gnome","1.30.0-1badaos","NetworkManager GUI (nm-connection-editor + nm-applet)", "tool", "/usr/bin/nm-connection-editor"]
+      ["network-manager-gnome","1.30.0-1badaos","NetworkManager GUI (nm-connection-editor + nm-applet)", "tool", "/usr/bin/nm-connection-editor"],
+      ["git",            "2.43.0-1badaos", "fast, scalable, distributed revision control system", "tool", "/usr/bin/git"],
+      ["build-essential","12.10-1badaos",  "Informational list of build-essential packages (gcc/g++/make -- Xcode CLT equivalent)", "tool", "/usr/bin/gcc"],
+      ["homebrew",       "4.2.0-1badaos",  "the Missing Package Manager (Homebrew / Linuxbrew): brew install", "tool", "/usr/local/bin/brew"]
     ]
 }
 
@@ -249,7 +252,8 @@ def pkg_preinstalled() {
             "curl", "wget", "net-tools", "bluez", "usbutils", "w9wm",
             "afterstep", "wmaker", "mlterm", "fcitx-mozc", "fcitx-configtool",
             "texlive-full", "screen", "tmux", "x11-apps", "udisks2",
-            "network-manager", "network-manager-gnome"]
+            "network-manager", "network-manager-gnome",
+            "git", "build-essential"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1062,6 +1066,11 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/bin/udisksctl", "#!binary (udisks2 CLI)")
     fs_put(fs, "/usr/bin/nmcli", "#!binary (NetworkManager CLI)")
     fs_put(fs, "/usr/bin/nm-connection-editor", "#!binary (NetworkManager GUI)")
+    fs_put(fs, "/usr/bin/git", "#!binary (git 2.43.0)")
+    fs_put(fs, "/usr/bin/gcc", "#!binary (GNU C compiler)")
+    fs_put(fs, "/usr/bin/make", "#!binary (GNU make)")
+    fs_put(fs, "/usr/local/bin/brew", "#!/bin/sh (Homebrew launcher)")
+    fs_put(fs, "/usr/local/bin/xcode-select", "#!/bin/sh (Xcode CLT shim)")
     fs_put(fs, "/usr/X11R7/bin/xterm", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xlogo", "#!binary (X client)")
     fs_put(fs, "/usr/X11R7/bin/xdpyinfo", "#!binary (X client)")
@@ -1884,6 +1893,58 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "(mount from pcmanfm / nautilus by click, or: udisksctl mount -b /dev/sd0i)")
         return 0
     }
+    if (cmd == "git") {
+        sub := ""
+        if (len(argv) > 1) { sub := argv[1] }
+        if (sub == "--version") { tty(emit, "git version 2.43.0 (quantum)"); return 0 }
+        if (sub == "clone") {
+            url := "<repo>"
+            if (len(argv) > 2) { url := argv[2] }
+            tty(emit, "Cloning into '" + url + "'...")
+            tty(emit, "remote: Enumerating objects: 1287, done. (over the NAT)")
+            tty(emit, "Receiving objects: 100% (1287/1287), 3.14 MiB | 2.7 MiB/s, done.")
+            tty(emit, "Resolving deltas: 100% (642/642), done.")
+            return 0
+        }
+        if (sub == "init") { tty(emit, "Initialized empty Git repository in " + st[5] + "/.git/"); return 0 }
+        tty(emit, "usage: git [--version] [clone URL] [init] ... (git 2.43.0 preinstalled)")
+        return 0
+    }
+    if (cmd == "brew") {
+        sub := ""
+        if (len(argv) > 1) { sub := argv[1] }
+        if (sub == "install") {
+            pkg := "<formula>"
+            if (len(argv) > 2) { pkg := argv[2] }
+            tty(emit, "==> Downloading " + pkg + " (Homebrew / Linuxbrew, over the NAT)")
+            tty(emit, "==> Pouring " + pkg + "--quantum.x86_64_linux.bottle.tar.gz")
+            tty(emit, "🍺  /home/linuxbrew/.linuxbrew/Cellar/" + pkg + ": installed")
+            return 0
+        }
+        if (sub == "--version") { tty(emit, "Homebrew 4.2.0 (quantum / Linuxbrew)"); return 0 }
+        tty(emit, "Homebrew (Linuxbrew): brew install <formula> / brew --version")
+        tty(emit, "(first run bootstraps Homebrew into /home/linuxbrew/.linuxbrew over the internet)")
+        return 0
+    }
+    if (list_has(["xcode-select", "xcodebuild"], cmd) == 1) {
+        if (cmd == "xcodebuild") {
+            tty(emit, "xcodebuild: Xcode itself is macOS-only. On BadaOS use make / cmake /")
+            tty(emit, "gcc / g++ / clang (git + curl preinstalled), or `xcode-select --install`.")
+            return 0
+        }
+        opt := ""
+        if (len(argv) > 1) { opt := argv[1] }
+        if (list_has(["-p", "--print-path"], opt) == 1) { tty(emit, "/usr"); return 0 }
+        if (opt == "--install") {
+            tty(emit, "Installing the developer command line tools (git + compilers)...")
+            tty(emit, "Setting up build-essential (gcc/g++/make), clang, llvm, cmake, pkg-config ...")
+            tty(emit, "Done. git / gcc / g++ / clang / make / cmake are ready.")
+            return 0
+        }
+        tty(emit, "xcode-select: the Command Line Tools == git + build-essential + clang on Debian.")
+        tty(emit, "  xcode-select --install   (add clang/llvm/cmake)   xcode-select -p  (print path)")
+        return 0
+    }
     if (list_has(["nmcli", "nm-connection-editor", "badaos-network", "nmtui"], cmd) == 1) {
         if (cmd == "nmcli") {
             sub := ""
@@ -2333,6 +2394,9 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "xcalc") { tty(emit, "xcalc(1) -- scientific calculator for X (x11-apps); displays on the BadaX Server.") }
         else if (n == "udisksctl") { tty(emit, "udisksctl(1) -- udisks2 CLI; mounts USB sticks (`udisksctl mount -b /dev/sd0i`).") }
         else if (n == "nmcli") { tty(emit, "nmcli(1) -- NetworkManager CLI; the NAT auto-connect is managed here (GUI: nm-connection-editor / badaos-network).") }
+        else if (n == "git") { tty(emit, "git(1) -- the stupid content tracker; distributed revision control (git 2.43.0, preinstalled).") }
+        else if (n == "brew") { tty(emit, "brew(1) -- Homebrew / Linuxbrew package manager; `brew install <formula>` (bootstraps over the internet).") }
+        else if (n == "xcode-select") { tty(emit, "xcode-select(1) -- BadaOS shim: the Command Line Tools map to git + build-essential + clang on Debian.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
         return 0

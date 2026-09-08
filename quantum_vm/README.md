@@ -69,6 +69,9 @@
    `apt install nautilus` も NAT 越しにそのまま入ります。
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
+   開発ツールも同梱: `git` / `curl` / `gcc`・`make`(build-essential)=
+   **Xcode Command Line Tools 相当**、`xcode-select --install` で clang 追加、
+   `brew install <formula>`(Homebrew / Linuxbrew)も使えます。
    **xterm ウィンドウの中も本物のコマンドラインです**: 各 xterm は BadaOS 上の
    ライブな pty セッション (ttyp&lt;n&gt;) で、ウィンドウ内を直接クリックして
    `apt` や `zsh` などのコマンドを打てます (シェルスタックはウィンドウごとに独立、

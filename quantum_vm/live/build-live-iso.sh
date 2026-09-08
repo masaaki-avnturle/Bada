@@ -60,6 +60,7 @@ chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
     kbd sudo rsync parted dosfstools e2fsprogs \
     grub2-common grub-pc-bin grub-efi-amd64-bin os-prober ntfs-3g \
     vim emacs-nox openssh-server curl wget less ca-certificates \
+    git build-essential make pkg-config \
     bluez usbutils \
     mlterm screen tmux locales texlive texlive-lang-japanese \
     wmaker htop mc \
@@ -176,6 +177,10 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     tray icon; console: nmtui / nmcli
   * USB sticks: plug in and open them from pcmanfm / nautilus (udisks2 +
     gvfs auto-mount), or `udisksctl mount -b /dev/sdb1` / `pmount sdb1`
+  * developer tools preinstalled: git, curl, a C/C++ compiler (gcc/g++/make,
+    build-essential) -- the Debian equivalent of Xcode Command Line Tools.
+    `xcode-select --install` adds clang/llvm/cmake; `brew` installs Homebrew
+    (Linuxbrew) on first run over the internet
   * apt uses the FULL Debian archive (60,000+ packages, Ubuntu-class):
         sudo apt update && sudo apt install <anything>   (nautilus included)
   * install to the real disk:  sudo badaos-install
@@ -373,6 +378,73 @@ else
 fi
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badaos-network"
+
+# ------------------------------------------------------------------------
+# developer toolchain: git + curl + a C/C++ compiler (build-essential) are
+# baked in -- that is the Debian equivalent of the Xcode Command Line Tools.
+# `brew` (Homebrew / Linuxbrew) and `xcode-select` are provided as launchers
+# so the familiar macOS-style commands work here too.
+# ------------------------------------------------------------------------
+# `brew`: on first use, install Homebrew on Linux over the NAT (it must NOT
+# run as root and lives in /home/linuxbrew/.linuxbrew); afterwards exec the
+# real brew. Needs the internet the first time (NetworkManager provides it).
+cat > "$CHROOT/usr/local/bin/brew" <<'EOF'
+#!/bin/sh
+# BadaOS Homebrew (Linuxbrew) launcher
+BREW=/home/linuxbrew/.linuxbrew/bin/brew
+[ -x "$BREW" ] || { for h in "$HOME/.linuxbrew/bin/brew" /home/linuxbrew/.linuxbrew/bin/brew; do [ -x "$h" ] && BREW="$h" && break; done; }
+if [ -x "$BREW" ]; then exec "$BREW" "$@"; fi
+if [ "$(id -u)" = 0 ]; then
+  echo "Homebrew must not be run as root. Run 'brew' as the 'bada' user." >&2
+  exit 1
+fi
+echo "Homebrew is not installed yet -- installing it now (needs the internet)..."
+export NONINTERACTIVE=1
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || {
+  echo "Homebrew install failed (offline?). Connect to the internet and retry 'brew'." >&2
+  exit 1
+}
+[ -x "$BREW" ] && exec "$BREW" "$@"
+echo "Homebrew installed. Open a new shell (or: eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\")." >&2
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/brew"
+
+# `xcode-select` / `xcodebuild`: Xcode itself is macOS-only, but map the
+# familiar Command Line Tools commands to the Debian developer toolchain.
+cat > "$CHROOT/usr/local/bin/xcode-select" <<'EOF'
+#!/bin/sh
+# BadaOS shim: the Xcode Command Line Tools == git + build-essential + clang
+case "$1" in
+  -p|--print-path) echo "/usr" ;;
+  --install)
+    echo "Installing the developer command line tools (git + compilers)..."
+    if [ "$(id -u)" = 0 ]; then S=""; else S="sudo"; fi
+    $S apt-get update -qq
+    $S env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+        git build-essential clang llvm make cmake pkg-config || {
+        echo "install failed (offline?). Connect to the internet and retry." >&2; exit 1; }
+    echo "Done. git / gcc / g++ / clang / make / cmake are ready." ;;
+  -v|--version) echo "xcode-select version 2409 (BadaOS shim -> Debian toolchain)" ;;
+  *) echo "usage: xcode-select [-p|--print-path] [--install] [--version]"
+     echo "  (BadaOS: the CLT map to git + build-essential + clang on Debian)" ;;
+esac
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/xcode-select"
+cat > "$CHROOT/usr/local/bin/xcodebuild" <<'EOF'
+#!/bin/sh
+echo "xcodebuild: Xcode itself is macOS-only. On BadaOS use the installed"
+echo "toolchain directly: make / cmake / gcc / g++ / clang (git + curl too),"
+echo "or 'xcode-select --install' to add clang/llvm. Homebrew: 'brew'."
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/xcodebuild"
+
+# put Homebrew on PATH for interactive shells (harmless before it is installed)
+cat > "$CHROOT/etc/profile.d/10-badaos-brew.sh" <<'EOF'
+if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+  eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+fi
+EOF
+
 chroot "$CHROOT" chown -R bada:bada /home/bada
 
 # the real-disk installer + branding for the installed system's GRUB
