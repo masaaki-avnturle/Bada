@@ -41,7 +41,7 @@
 
 | ファイル | 内容 |
 |:---|:---|
-| [`atom-critical.html`](bada_gui_ide/dist/atom-critical.html) | ★ シミュレータ本体(単一 HTML)。14 元素。元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に再計算され、4 枚の図と数値パネルが更新されます。CSV / JSON / PNG 出力付き |
+| [`atom-critical.html`](bada_gui_ide/dist/atom-critical.html) | ★ シミュレータ本体(単一 HTML)。15 元素。元素・波長・ピーク強度・パルス幅・CEP を動かすと臨界期が即時に再計算され、4 枚の図と数値パネルが更新されます。CSV / JSON / PNG 出力付き |
 | [`atom-critical-cli.js`](bada_gui_ide/cli/atom-critical-cli.js) | CLI 版 — `run` / `csv` / `json` / `sweep` / `scan` / `elements` / `selftest` |
 | [`atom_critical.js`](bada_gui_ide/www/atom_critical.js) | モデルコア(GUI と CLI が共有) |
 | [`atom_critical.bada`](bada_gui_ide/examples/atom_critical.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
@@ -89,10 +89,11 @@ git tag acpi-app-v1.0.0 && git push origin acpi-app-v1.0.0
 
 Windows / Ubuntu アプリでは CSV・JSON・PNG が「名前を付けて保存」で書き出せます。Android アプリは WebView がファイル保存を扱えないため、同じボタンで内容を表示するパネルが開き、テキストはクリップボードへコピー、図は長押しで保存できます。
 
-**対応元素 (14)** — H · He · Li · Be · C · N · O · Ne · Na · Ar · Kr · **Pd** · Xe · **Pu**(各 1–5 電離段)。
+**対応元素 (15)** — H · He · Li · Be · C · N · O · Ne · Na · Ar · Kr · **Pd** · Xe · **U** · **Pu**(各 1–5 電離段)。
 Pd は基底配置 `[Kr]4d¹⁰` で 5s 電子を持たない唯一の元素、最外殻 4d のため `l=2`(`f_l0=5`)。
-Pu は `[Rn]5f⁶7s²` で最外殻 7s(`l=0`)、第一 `I_p = 6.03 eV` は本表で最小、臨界強度 `5.27×10¹² W/cm²` も最小です。
-ADK は水素様 n* と単一活性電子を仮定するため、閉殻 d¹⁰ の Pd と開殻 5f の Pu では近似が粗くなります(該当元素を選ぶとアプリが注意書きを表示します)。
+U は `[Rn]5f³6d¹7s²`、Pu は `[Rn]5f⁶7s²` でいずれも最外殻 7s(`l=0`)。第一 `I_p` は Pu 6.03 eV < U 6.19 eV の順で本表の最小 2 つ、臨界強度も `5.27×10¹²` / `5.89×10¹² W/cm²` と最小です。
+ADK は水素様 n* と単一活性電子を仮定するため、閉殻 d¹⁰ の Pd と開殻 5f の U・Pu では近似が粗くなります(該当元素を選ぶとアプリが注意書きを表示します)。
+なお本モデルは**同位体を区別しません** — 障壁抑制とトンネル電離は同位体シフト(~10⁻⁵ eV)に対して完全に非選択的です。
 
 **臨界期とは** — 原子単位系で、クーロン障壁が完全に消える障壁抑制場は
 `F_cr = I_p²/(4 Z_c)`、対応する臨界強度は `I_cr = F_cr² · I_a`

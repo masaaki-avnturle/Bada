@@ -183,6 +183,7 @@ function cmdSelfTest() {
   t("Ar I_cr [W/cm^2]", AC.criticalIntensity(15.7596, 1), 2.47e14, 0.01);
   t("Xe I_cr [W/cm^2]", AC.criticalIntensity(12.1298, 1), 8.66e13, 0.01);
   t("Pd I_cr [W/cm^2]", AC.criticalIntensity(8.3369, 1), 1.933e13, 0.01);
+  t("U  I_cr [W/cm^2]", AC.criticalIntensity(6.1941, 1), 5.889e12, 0.01);
   t("Pu I_cr [W/cm^2]", AC.criticalIntensity(6.0258, 1), 5.274e12, 0.01);
   const ap = AC.adkParams(13.5984, 1, 0);
   t("H ADK w(F=0.05) [a.u.]", AC.adkRate(0.05, ap), (4 / 0.05) * Math.exp(-2 / 0.15), 0.02);
@@ -205,9 +206,9 @@ function cmdSelfTest() {
 
   /* 元素表: 14 元素。I_cr が I_p の 4 乗に比例するので、I_p の昇順と
      I_cr の昇順は一致する (Pu < Pd < ... < He)。 */
-  console.log((AC.ELEMENTS.length === 14 ? "ok   " : "FAIL ")
+  console.log((AC.ELEMENTS.length === 15 ? "ok   " : "FAIL ")
     + "元素表 " + AC.ELEMENTS.length + " 元素 (" + AC.ELEMENTS.map(e => e.sym).join(" ") + ")");
-  if (AC.ELEMENTS.length !== 14) bad++;
+  if (AC.ELEMENTS.length !== 15) bad++;
   const byIp = AC.ELEMENTS.slice().sort((x, y) => x.Ip[0] - y.Ip[0]).map(e => e.sym).join(" ");
   const byIcr = AC.ELEMENTS.slice()
     .sort((x, y) => AC.criticalIntensity(x.Ip[0], 1) - AC.criticalIntensity(y.Ip[0], 1))
@@ -216,7 +217,7 @@ function cmdSelfTest() {
   if (byIp !== byIcr) bad++;
 
   /* Pd (l=2, 4d) と Pu (l=0, 7s) が実際に走り、臨界期が出ること */
-  for (const [sym, I0] of [["Pd", 6e13], ["Pu", 2e13]]) {
+  for (const [sym, I0] of [["Pd", 6e13], ["U", 2e13], ["Pu", 2e13]]) {
     const r = AC.simulate({ element: sym, intensity: I0, fwhmFs: 10, steps: 6000 });
     const ok = r.critical.exists && r.result.ionization > 0.5 && isFinite(r.omega.Esigma);
     console.log((ok ? "ok   " : "FAIL ") + sym + " " + sci(I0, 1) + " -> 臨界期 "
