@@ -69,9 +69,16 @@
    `apt install nautilus` も NAT 越しにそのまま入ります。
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
-   **外部ルーター / USB Wi-Fi / USB LTE アダプタ**を PC に挿すと自動認識され、
+   **外部ルーターの USB アダプタ**を PC(BadaOS)の USB コネクタに挿すだけで、
+   **コマンドもパスワードも要らず、自動で NAT 越しにインターネットへ接続**します:
+   udev が新しい net インターフェース(CDC-ECM の `usb0`)を検出 →
+   `usb_modeswitch` で NIC モード確認 → NetworkManager が
+   **プロファイル無し・パスワード無しで自動 DHCP**(`no-auto-default=` で全有線/USB を
+   自動接続)→ NAT のリースを取得してオンライン、という流れが `badaos-usbnet-up`
+   udev ルールで全自動で走ります(手動確認は `badaos-router plug`)。
+   Wi-Fi / LTE アダプタなど**パスワードが要る場合**は
    `badaos-router`(検出・スキャン)→ `badaos-router connect "SSID" "ルーターのパスワード"`
-   でインターネットに接続できます(実 ISO では usb-modeswitch / ModemManager /
+   でも接続できます(実 ISO では usb-modeswitch / ModemManager /
    wpasupplicant + ファームウェア同梱、`nmcli device wifi connect` でも可)。
    `timedatectl` で **Windows / Ubuntu / BadaOS の時計を同期**できます:
    `timedatectl sync`(NTP を NAT 越しに引いて 3 つの OS の時計を合わせる。

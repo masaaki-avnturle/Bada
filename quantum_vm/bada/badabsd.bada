@@ -1094,6 +1094,8 @@ def os_seedfs(st) {
     fs_put(fs, "/sbin/wpa_supplicant", "#!binary (WPA/WPA2/WPA3 supplicant)")
     fs_put(fs, "/usr/sbin/usb_modeswitch", "#!binary (USB dongle mode switch)")
     fs_put(fs, "/usr/local/bin/badaos-router", "#!/bin/sh (external router connect helper)")
+    fs_put(fs, "/usr/local/sbin/badaos-usbnet-up", "#!/bin/sh (USB net hot-plug auto-connect)")
+    fs_put(fs, "/etc/udev/rules.d/70-badaos-usbnet.rules", "ACTION==\"add\", SUBSYSTEM==\"net\", SUBSYSTEMS==\"usb\", RUN+=\"/usr/local/sbin/badaos-usbnet-up %k\"")
     fs_put(fs, "/usr/sbin/apache2", "#!binary (BadaApache httpd)")
     fs_put(fs, "/usr/sbin/apachectl", "#!/bin/sh (BadaApache control)")
     fs_put(fs, "/var/www/html/index.html", "<h1>It works! -- served onto zone://url.or.jp by BadaApache</h1>")
@@ -1964,6 +1966,7 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "Bus 001 Device 002: ID 0bada:5150 Quantum USB stick (BadaOS media)")
         tty(emit, "Bus 001 Device 003: ID 0a12:5303 Quantum Bluetooth 5.3 adapter (ubt0)")
         tty(emit, "Bus 001 Device 004: ID 0bada:0x01 BadaX quantum keyboard (uhub0 port 4)")
+        tty(emit, "Bus 001 Device 005: ID 0bda:8153 Quantum USB router adapter (CDC-ECM, usb0 -- auto-connected)")
         return 0
     }
     if (cmd == "udisksctl") {
@@ -2038,6 +2041,17 @@ def shell_exec(emit, vm, st, line) {
     if (cmd == "badaos-router") {
         op := ""
         if (len(argv) > 1) { op := argv[1] }
+        if (list_has(["plug", "auto", "hotplug"], op) == 1) {
+            tty(emit, "USB router adapter inserted -- hot-plug auto-connect:")
+            tty(emit, "  udev: new interface usb0 (Quantum USB-Ethernet/tethering, CDC-ECM)")
+            tty(emit, "  usb_modeswitch: device already in NIC mode (no switch needed)")
+            tty(emit, "  NetworkManager: auto-default DHCP on usb0 (no profile, no password)")
+            tty(emit, "  leased 192.168.43.62/24, GW 192.168.43.1, DNS 192.168.43.1 (NAT)")
+            st[11] = ["192.168.43.62"]
+            tty(emit, "Online automatically over the plugged router. No command was needed.")
+            tty(emit, "  ping deb.debian.org ... 64 bytes, time=11.2 ms -- internet OK")
+            return 0
+        }
         if (op == "connect") {
             ssid := "MyRouter-5G"
             if (len(argv) > 2) { ssid := argv[2] }
@@ -2055,6 +2069,8 @@ def shell_exec(emit, vm, st, line) {
             return 0
         }
         # list / scan (default): show the auto-recognized adapter + networks
+        tty(emit, "Auto-connect is ON: plug a USB router/Ethernet/tethering adapter and")
+        tty(emit, "it goes online over NAT automatically (no command) -- try: badaos-router plug")
         tty(emit, "Detected network adapters (external router / USB Wi-Fi / LTE):")
         tty(emit, "  eth0   ethernet  connected (NAT 10.0.2.15)")
         tty(emit, "  wlan0  wifi      the plugged USB router adapter (Quantum RTL8812 / usb-modeswitch OK)")
@@ -2660,7 +2676,7 @@ def shell_exec(emit, vm, st, line) {
         else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
         else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
         else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
-        else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug an external router / USB Wi-Fi / LTE dongle, then `badaos-router connect <SSID> <password>` to reach the internet.") }
+        else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug a USB router/Ethernet/tethering adapter and it auto-connects over NAT (badaos-router plug); Wi-Fi APs: badaos-router connect <SSID> <password>.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }

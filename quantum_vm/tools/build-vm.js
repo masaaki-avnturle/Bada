@@ -149,6 +149,7 @@ function run(events) {
     ["line", "timedatectl"],              // 83 status shows NTP synchronized
     ["line", "badaos-router"],            // 84 external router/USB Wi-Fi detected
     ["line", "badaos-router connect MyRouter-5G hunter2"], // 85 enter pw -> online
+    ["line", "badaos-router plug"],       // 86 USB router adapter -> auto NAT connect
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -268,6 +269,8 @@ function run(events) {
     [84, "the plugged USB router adapter"], // external router auto-detected
     [85, "WPA2-PSK 4-way handshake"],       // router password accepted
     [85, "internet OK via MyRouter-5G"],    // ... and online
+    [86, "auto-default DHCP on usb0"],      // USB router hot-plug auto-connect
+    [86, "No command was needed"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -293,7 +296,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect -> USB router hot-plug auto (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

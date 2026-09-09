@@ -122,7 +122,10 @@ mkdir -p "$CHROOT/etc/NetworkManager/conf.d"
 cat > "$CHROOT/etc/NetworkManager/conf.d/10-badaos.conf" <<'EOF'
 [main]
 dns=systemd-resolved
-# manage every device (nothing is left "unmanaged")
+# auto-create a DHCP connection for EVERY wired/USB device with no config, so
+# a USB router / Ethernet / tethering adapter goes online the instant it is
+# plugged in -- no command, no password (empty = auto-default for all).
+no-auto-default=
 [keyfile]
 unmanaged-devices=none
 [device]
@@ -146,6 +149,29 @@ method=auto
 method=auto
 EOF
 chmod 600 "$CHROOT/etc/NetworkManager/system-connections/badaos-wired.nmconnection"
+
+# HOT-PLUG AUTO-CONNECT: the moment a USB router / Ethernet / tethering / LTE
+# adapter is inserted, bring its interface up and let NetworkManager DHCP it
+# automatically (usb-modeswitch flips CD-mode dongles first). No command,
+# no password -- the machine is simply online over the new uplink (NAT).
+cat > "$CHROOT/usr/local/sbin/badaos-usbnet-up" <<'EOF'
+#!/bin/sh
+# arg1 = kernel iface name (usb0 / enx.. / eth.. / wwan0)
+IF="$1"
+[ -n "$IF" ] || exit 0
+command -v usb_modeswitch >/dev/null 2>&1 && usb_modeswitch -W >/dev/null 2>&1 || true
+nmcli device set "$IF" managed yes >/dev/null 2>&1 || true
+# a wired/tethering NIC just needs DHCP; NetworkManager auto-default handles it
+nmcli device connect "$IF" >/dev/null 2>&1 || true
+EOF
+chmod 0755 "$CHROOT/usr/local/sbin/badaos-usbnet-up"
+mkdir -p "$CHROOT/etc/udev/rules.d"
+cat > "$CHROOT/etc/udev/rules.d/70-badaos-usbnet.rules" <<'EOF'
+# BadaOS: auto-bring-up + DHCP any newly plugged USB network adapter
+ACTION=="add", SUBSYSTEM=="net", SUBSYSTEMS=="usb", \
+  RUN+="/usr/local/sbin/badaos-usbnet-up %k"
+EOF
+
 # a bare systemd-networkd would fight NetworkManager for the same NICs -- make
 # sure only NetworkManager is driving them
 chroot "$CHROOT" systemctl disable systemd-networkd 2>/dev/null || true
@@ -199,11 +225,11 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     NIC at boot; DNS via systemd-resolved (9.9.9.9/1.1.1.1/8.8.8.8 fallback).
     Settings GUI: `badaos-network` (nm-connection-editor) or the nm-applet
     tray icon; console: nmtui / nmcli
-  * EXTERNAL router / USB Wi-Fi / USB LTE dongle: plug it in -- it is
-    auto-recognized (usb-modeswitch / ModemManager / wpasupplicant + baked
-    firmware), then connect by entering the router password:
-        badaos-router                       # detect + scan
-        badaos-router connect "SSID" "password"
+  * EXTERNAL router / USB Ethernet / tethering / LTE adapter: JUST PLUG IT
+    into a USB port -- it is auto-recognized and NetworkManager DHCPs it
+    automatically, so you are online over the new uplink (NAT) with no
+    command and no password. (Wi-Fi APs that need a key: badaos-router
+    connect "SSID" "password"; scan/status: badaos-router)
   * clock sync: `timedatectl` -- systemd-timesyncd keeps BadaOS / Ubuntu /
     Windows in step over NTP (via the NAT). `timedatectl set-local-rtc 1`
     keeps the shared RTC in local time for a Windows dual boot
