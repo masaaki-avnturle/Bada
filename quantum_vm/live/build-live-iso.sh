@@ -145,6 +145,18 @@ cat > "$CHROOT/etc/systemd/resolved.conf.d/10-badaos-fallback.conf" <<'EOF'
 [Resolve]
 FallbackDNS=9.9.9.9 1.1.1.1 8.8.8.8
 EOF
+# clock sync: systemd-timesyncd keeps the BadaOS / Ubuntu / Windows clocks in
+# step over NTP (through the NAT). `timedatectl` shows and drives it;
+# `timedatectl set-local-rtc 1` keeps the shared hardware RTC in LOCAL time so
+# a Windows dual boot reads the same wall-clock time.
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd-timesyncd || true
+chroot "$CHROOT" systemctl enable systemd-timesyncd 2>/dev/null || true
+mkdir -p "$CHROOT/etc/systemd/timesyncd.conf.d"
+cat > "$CHROOT/etc/systemd/timesyncd.conf.d/10-badaos.conf" <<'EOF'
+[Time]
+NTP=ntp.nict.jp pool.ntp.org
+FallbackNTP=time.cloudflare.com time.windows.com
+EOF
 # Bluetooth: bluetoothd starts when an adapter is present (bluetoothctl ready)
 chroot "$CHROOT" systemctl enable bluetooth 2>/dev/null || true
 rm -f "$CHROOT/etc/resolv.conf"
@@ -175,6 +187,9 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     NIC at boot; DNS via systemd-resolved (9.9.9.9/1.1.1.1/8.8.8.8 fallback).
     Settings GUI: `badaos-network` (nm-connection-editor) or the nm-applet
     tray icon; console: nmtui / nmcli
+  * clock sync: `timedatectl` -- systemd-timesyncd keeps BadaOS / Ubuntu /
+    Windows in step over NTP (via the NAT). `timedatectl set-local-rtc 1`
+    keeps the shared RTC in local time for a Windows dual boot
   * USB sticks: plug in and open them from pcmanfm / nautilus (udisks2 +
     gvfs auto-mount), or `udisksctl mount -b /dev/sdb1` / `pmount sdb1`
   * developer tools preinstalled: git, curl, a C/C++ compiler (gcc/g++/make,

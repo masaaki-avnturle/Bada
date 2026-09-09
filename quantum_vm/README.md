@@ -69,6 +69,10 @@
    `apt install nautilus` も NAT 越しにそのまま入ります。
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
+   `timedatectl` で **Windows / Ubuntu / BadaOS の時計を同期**できます:
+   `timedatectl sync`(NTP を NAT 越しに引いて 3 つの OS の時計を合わせる。
+   Bell 対 QKD 署名付き)、`timedatectl set-local-rtc 1`(Windows デュアルブート用に
+   共有 RTC をローカル時刻に)、`timedatectl`(状態表示)。
    開発ツールも同梱: `git` / `curl` / `gcc`・`make`(build-essential)=
    **Xcode Command Line Tools 相当**、`screen` / `tmux` / `texlive`(日本語)も同梱。
    **重量級(clang・texlive-full など)は NAT 経由でワンコマンド導入**できます:

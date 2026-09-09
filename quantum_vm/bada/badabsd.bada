@@ -67,7 +67,7 @@ APT_MIRROR := "http://archive.badaos.or.jp"
 def os_new(vm) {
     return ["off", 0, "badaos", "", [], 0, [], x_server_new(vm[8]),
             "", "", 0, "", [], [[["sh", "root"]], []], [], "grub-lilo",
-            "wd0", [], [], [], [], "en", "twm", []]
+            "wd0", [], [], [], [], "en", "twm", [], [0, 0, "Asia/Tokyo"]]
 }
 
 # 21: installer language ("en" | "ja") -- picked on the sysinst welcome
@@ -75,6 +75,7 @@ def os_new(vm) {
 # 22: the window manager running on the BadaX display ("twm" | "w9wm")
 # 23: BadaApache published pages ([] = httpd stopped; [[url,body]...] = the
 #     DocumentRoot mirrored onto zone://url.or.jp while apache is running)
+# 24: timedate state [ntp(0/1), local-rtc(0/1), timezone] -- timedatectl
 def trs(st, en, ja) {
     if (st[21] == "ja") { return ja }
     return en
@@ -1085,6 +1086,7 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/bin/make", "#!binary (GNU make)")
     fs_put(fs, "/usr/local/bin/brew", "#!/bin/sh (Homebrew launcher)")
     fs_put(fs, "/usr/local/bin/xcode-select", "#!/bin/sh (Xcode CLT shim)")
+    fs_put(fs, "/usr/bin/timedatectl", "#!binary (systemd timedatectl)")
     fs_put(fs, "/usr/sbin/apache2", "#!binary (BadaApache httpd)")
     fs_put(fs, "/usr/sbin/apachectl", "#!/bin/sh (BadaApache control)")
     fs_put(fs, "/var/www/html/index.html", "<h1>It works! -- served onto zone://url.or.jp by BadaApache</h1>")
@@ -1817,6 +1819,68 @@ def shell_exec(emit, vm, st, line) {
     }
 
     if (cmd == "date") { tty(emit, NOW); return 0 }
+    # ---- timedatectl: sync the Windows / Ubuntu / BadaOS clocks ----------
+    if (list_has(["timedatectl", "timedate"], cmd) == 1) {
+        td := st[24]
+        sub := "status"
+        if (len(argv) > 1) { sub := argv[1] }
+        if (sub == "set-ntp") {
+            on := 1
+            if (len(argv) > 2 && list_has(["false", "0", "off", "no"], argv[2]) == 1) { on := 0 }
+            td[0] = on
+            if (on == 1) { tty(emit, "systemd-timesyncd: NTP synchronization enabled.") }
+            else { tty(emit, "systemd-timesyncd: NTP synchronization disabled.") }
+            return 0
+        }
+        if (sub == "set-local-rtc") {
+            lr := 0
+            if (len(argv) > 2 && list_has(["1", "true", "yes", "on"], argv[2]) == 1) { lr := 1 }
+            td[1] = lr
+            if (lr == 1) { tty(emit, "RTC now kept in LOCAL time (Windows-compatible for dual boot).") }
+            else { tty(emit, "RTC now kept in UTC (the Linux/Ubuntu default).") }
+            return 0
+        }
+        if (sub == "set-timezone") {
+            if (len(argv) > 2) { td[2] = argv[2]; tty(emit, "Time zone set to " + argv[2] + ".") }
+            else { tty(emit, "Usage: timedatectl set-timezone <Zone>") }
+            return 0
+        }
+        if (list_has(["sync", "sync-clocks", "ntp-sync"], sub) == 1) {
+            if (len(st[11]) == 0) { tty(emit, "timedatectl: network is down (need the NAT). Check nmcli."); return 0 }
+            td[0] = 1
+            tty(emit, "Synchronizing clocks over the NAT (10.0.2.2) ...")
+            tty(emit, "  polling ntp.nict.jp (133.243.238.163:123) via NAT ... stratum 1, GPS")
+            tty(emit, "  Bell-pair QKD signs the NTP transaction (zero-preservation OK, no MITM)")
+            tty(emit, "  offset +0.0000123 s, delay 0.00842 s -- clock stepped")
+            tty(emit, "Clocks now in sync across all three OSes:")
+            tty(emit, "  Windows 10/11 (host RTC) .... " + NOW)
+            tty(emit, "  Ubuntu 24.04 (/dev/" + st[16] + "e) . " + NOW)
+            tty(emit, "  BadaOS 12.0 (quantum) ....... " + NOW)
+            tty(emit, "The shared hardware RTC is written once, so every OS on this")
+            tty(emit, "machine reads the same wall-clock time on next boot.")
+            return 0
+        }
+        # status (default)
+        synced := "no"
+        ntpsvc := "inactive"
+        if (td[0] == 1) { synced := "yes"; ntpsvc := "active" }
+        rtcmode := "UTC"
+        if (td[1] == 1) { rtcmode := "local (Windows-compatible)" }
+        tty(emit, "               Local time: " + NOW)
+        tty(emit, "           Universal time: " + NOW + " (UTC base)")
+        tty(emit, "                 RTC time: " + NOW + "  [RTC in " + rtcmode + "]")
+        tty(emit, "                Time zone: " + td[2] + " (JST, +0900)")
+        tty(emit, "System clock synchronized: " + synced)
+        tty(emit, "              NTP service: " + ntpsvc + " (systemd-timesyncd, NTP over NAT)")
+        tty(emit, "----------------------------------------------------------------")
+        tty(emit, "Clock sync across the machines on this box:")
+        tty(emit, "  Windows 10/11 (host RTC) ....  shares the hardware RTC")
+        tty(emit, "  Ubuntu 24.04 (dual boot) ....  systemd-timesyncd / NTP")
+        tty(emit, "  BadaOS 12.0 (quantum) .......  systemd-timesyncd / NTP")
+        tty(emit, "Run 'timedatectl sync' to NTP-sync all three over the NAT.")
+        tty(emit, "For Windows dual boot use 'timedatectl set-local-rtc 1' (RTC in local time).")
+        return 0
+    }
     if (cmd == "dmesg") { os_dmesg(emit, vm, st); return 0 }
     if (cmd == "ps") { cmd_ps(emit, st); return 0 }
     if (cmd == "free") {
@@ -2525,6 +2589,7 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "xcode-select") { tty(emit, "xcode-select(1) -- BadaOS shim: the Command Line Tools map to git + build-essential + clang on Debian.") }
         else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
         else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
+        else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
