@@ -147,6 +147,8 @@ function run(events) {
     ["line", "which clang"],              // 81 ... and it is now present
     ["line", "timedatectl sync"],         // 82 sync Windows/Ubuntu/BadaOS clocks
     ["line", "timedatectl"],              // 83 status shows NTP synchronized
+    ["line", "badaos-router"],            // 84 external router/USB Wi-Fi detected
+    ["line", "badaos-router connect MyRouter-5G hunter2"], // 85 enter pw -> online
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -263,6 +265,9 @@ function run(events) {
     [82, "Clocks now in sync across all three OSes"], // timedatectl sync
     [82, "BadaOS 12.0 (quantum)"],
     [83, "System clock synchronized: yes"], // status reflects the sync
+    [84, "the plugged USB router adapter"], // external router auto-detected
+    [85, "WPA2-PSK 4-way handshake"],       // router password accepted
+    [85, "internet OK via MyRouter-5G"],    // ... and online
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -288,7 +293,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

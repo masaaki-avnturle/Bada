@@ -89,6 +89,18 @@ done
 # (nm-connection-editor, nm-applet). Best effort so a rename never sinks the ISO.
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq network-manager-gnome || true
 
+# EXTERNAL router / USB Wi-Fi / USB LTE dongles: when one is plugged in it is
+# auto-recognized (usb-modeswitch flips CD-mode dongles to their modem/NIC
+# interface; ModemManager drives LTE/3G; wpasupplicant + iw drive Wi-Fi), and
+# NetworkManager offers it as a connection you unlock with the router password.
+# firmware for the common USB Wi-Fi/LTE chipsets is baked in (non-free-firmware).
+for p in wpasupplicant iw wireless-tools rfkill usb-modeswitch modemmanager \
+         firmware-realtek firmware-atheros firmware-iwlwifi firmware-brcm80211 \
+         firmware-misc-nonfree; do
+  chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$p" || true
+done
+chroot "$CHROOT" systemctl enable ModemManager 2>/dev/null || true
+
 echo "==> Japanese locale (ja_JP.UTF-8)"
 sed -i 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' "$CHROOT/etc/locale.gen" 2>/dev/null || true
 grep -q '^ja_JP.UTF-8' "$CHROOT/etc/locale.gen" 2>/dev/null || echo 'ja_JP.UTF-8 UTF-8' >> "$CHROOT/etc/locale.gen"
@@ -187,6 +199,11 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
     NIC at boot; DNS via systemd-resolved (9.9.9.9/1.1.1.1/8.8.8.8 fallback).
     Settings GUI: `badaos-network` (nm-connection-editor) or the nm-applet
     tray icon; console: nmtui / nmcli
+  * EXTERNAL router / USB Wi-Fi / USB LTE dongle: plug it in -- it is
+    auto-recognized (usb-modeswitch / ModemManager / wpasupplicant + baked
+    firmware), then connect by entering the router password:
+        badaos-router                       # detect + scan
+        badaos-router connect "SSID" "password"
   * clock sync: `timedatectl` -- systemd-timesyncd keeps BadaOS / Ubuntu /
     Windows in step over NTP (via the NAT). `timedatectl set-local-rtc 1`
     keeps the shared RTC in local time for a Windows dual boot
@@ -402,6 +419,52 @@ else
 fi
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badaos-network"
+
+# `badaos-router` -- plug an external router / USB Wi-Fi / USB LTE dongle in,
+# then connect to the internet by entering the ROUTER PASSWORD, in one step.
+# It auto-detects the newly plugged adapter (NetworkManager/ModemManager),
+# scans, and joins with the password you give.
+cat > "$CHROOT/usr/local/bin/badaos-router" <<'EOF'
+#!/bin/sh
+# BadaOS external-router / Wi-Fi connect helper (wraps nmcli)
+set -e
+if ! command -v nmcli >/dev/null 2>&1; then
+  echo "NetworkManager (nmcli) not found." >&2; exit 1
+fi
+# make sure a freshly plugged USB dongle is switched and radios are on
+command -v usb_modeswitch >/dev/null 2>&1 && sudo usb_modeswitch -W >/dev/null 2>&1 || true
+sudo rfkill unblock all 2>/dev/null || true
+nmcli radio wifi on 2>/dev/null || true
+
+case "${1:-}" in
+  ""|list|scan)
+    echo "Detected network adapters (external routers / USB Wi-Fi / LTE):"
+    nmcli -f DEVICE,TYPE,STATE device status || true
+    echo
+    echo "Wi-Fi / router networks in range:"
+    nmcli device wifi rescan 2>/dev/null || true
+    nmcli -f SSID,SIGNAL,SECURITY device wifi list || true
+    echo
+    echo "Connect with the router password:  badaos-router connect \"<SSID>\" \"<password>\""
+    ;;
+  connect)
+    SSID="${2:?usage: badaos-router connect \"<SSID>\" \"<password>\"}"
+    PW="${3:-}"
+    echo "Joining \"$SSID\" ..."
+    if [ -n "$PW" ]; then
+      nmcli device wifi connect "$SSID" password "$PW"
+    else
+      nmcli device wifi connect "$SSID"
+    fi
+    echo "Connected. Testing the internet ..."
+    (ping -c1 -W3 deb.debian.org >/dev/null 2>&1 && echo "  internet OK via $SSID") || \
+      echo "  associated, but no route yet -- check the password and signal."
+    ;;
+  *)
+    echo "usage: badaos-router [list] | connect \"<SSID>\" \"<password>\"" ;;
+esac
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badaos-router"
 
 # ------------------------------------------------------------------------
 # developer toolchain: git + curl + a C/C++ compiler (build-essential) are

@@ -247,7 +247,10 @@ def pkg_catalog() {
       ["build-essential","12.10-1badaos",  "Informational list of build-essential packages (gcc/g++/make -- Xcode CLT equivalent)", "tool", "/usr/bin/gcc"],
       ["homebrew",       "4.2.0-1badaos",  "the Missing Package Manager (Homebrew / Linuxbrew): brew install", "tool", "/usr/local/bin/brew"],
       ["apache2",        "2.4.58-1badaos", "Apache HTTP Server, in Bada -- publishes DocumentRoot onto zone://url.or.jp", "service", "/usr/sbin/apache2"],
-      ["badapache",      "2.4.58-1badaos", "BadaApache: the Bada-language Apache bound to the zone:// ultra network", "service", "/usr/sbin/apachectl"]
+      ["badapache",      "2.4.58-1badaos", "BadaApache: the Bada-language Apache bound to the zone:// ultra network", "service", "/usr/sbin/apachectl"],
+      ["wpasupplicant",  "2.10-1badaos",   "client support for WPA/WPA2/WPA3 (Wi-Fi router auth)", "service", "/sbin/wpa_supplicant"],
+      ["usb-modeswitch", "2.6.1-1badaos",  "mode switching for USB Wi-Fi / LTE router dongles", "tool", "/usr/sbin/usb_modeswitch"],
+      ["modemmanager",   "1.22.0-1badaos", "D-Bus service for mobile broadband (USB LTE routers)", "service", "/usr/sbin/ModemManager"]
     ]
 }
 
@@ -258,7 +261,8 @@ def pkg_preinstalled() {
             "afterstep", "wmaker", "mlterm", "fcitx-mozc", "fcitx-configtool",
             "texlive-full", "screen", "tmux", "x11-apps", "udisks2",
             "network-manager", "network-manager-gnome",
-            "git", "build-essential", "apache2", "badapache"]
+            "git", "build-essential", "apache2", "badapache",
+            "wpasupplicant", "usb-modeswitch", "modemmanager"]
 }
 
 # The archive is UBUNTU-SIZED: beyond the curated packages below, the
@@ -1087,6 +1091,9 @@ def os_seedfs(st) {
     fs_put(fs, "/usr/local/bin/brew", "#!/bin/sh (Homebrew launcher)")
     fs_put(fs, "/usr/local/bin/xcode-select", "#!/bin/sh (Xcode CLT shim)")
     fs_put(fs, "/usr/bin/timedatectl", "#!binary (systemd timedatectl)")
+    fs_put(fs, "/sbin/wpa_supplicant", "#!binary (WPA/WPA2/WPA3 supplicant)")
+    fs_put(fs, "/usr/sbin/usb_modeswitch", "#!binary (USB dongle mode switch)")
+    fs_put(fs, "/usr/local/bin/badaos-router", "#!/bin/sh (external router connect helper)")
     fs_put(fs, "/usr/sbin/apache2", "#!binary (BadaApache httpd)")
     fs_put(fs, "/usr/sbin/apachectl", "#!/bin/sh (BadaApache control)")
     fs_put(fs, "/var/www/html/index.html", "<h1>It works! -- served onto zone://url.or.jp by BadaApache</h1>")
@@ -2026,10 +2033,73 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "  xcode-select --install   (add clang/llvm/cmake)   xcode-select -p  (print path)")
         return 0
     }
+    # ---- badaos-router: plug an external router/USB Wi-Fi, enter the
+    #      router password, auto-recognize, and connect to the internet -----
+    if (cmd == "badaos-router") {
+        op := ""
+        if (len(argv) > 1) { op := argv[1] }
+        if (op == "connect") {
+            ssid := "MyRouter-5G"
+            if (len(argv) > 2) { ssid := argv[2] }
+            pw := ""
+            if (len(argv) > 3) { pw := argv[3] }
+            if (len(pw) == 0) { tty(emit, "usage: badaos-router connect <SSID> <router-password>"); return 0 }
+            tty(emit, "Joining \"" + ssid + "\" via the plugged USB router adapter (wlan0)...")
+            tty(emit, "  wpa_supplicant: WPA2-PSK 4-way handshake ... key negotiated")
+            tty(emit, "  Bell-pair QKD co-signs the association (zero-preservation OK, no rogue AP)")
+            tty(emit, "  DHCP on wlan0: leased 192.168.11.24/24, GW 192.168.11.1, DNS 192.168.11.1")
+            st[11] = ["192.168.11.24"]
+            tty(emit, "Connected to \"" + ssid + "\". Testing the internet...")
+            tty(emit, "  ping deb.debian.org ... 64 bytes, time=12.4 ms -- internet OK via " + ssid)
+            tty(emit, "NetworkManager saved the profile (autoconnect on); reachable next boot too.")
+            return 0
+        }
+        # list / scan (default): show the auto-recognized adapter + networks
+        tty(emit, "Detected network adapters (external router / USB Wi-Fi / LTE):")
+        tty(emit, "  eth0   ethernet  connected (NAT 10.0.2.15)")
+        tty(emit, "  wlan0  wifi      the plugged USB router adapter (Quantum RTL8812 / usb-modeswitch OK)")
+        tty(emit, "  wwan0  gsm       USB LTE stick (ModemManager) -- if a mobile router is plugged")
+        tty(emit, "Wi-Fi / router networks in range:")
+        tty(emit, "  SSID              SIGNAL  SECURITY")
+        tty(emit, "  MyRouter-5G       94      WPA2")
+        tty(emit, "  MyRouter-2G       88      WPA2")
+        tty(emit, "  aterm-quantum-a   72      WPA3")
+        tty(emit, "Connect with the router password:")
+        tty(emit, "  badaos-router connect \"MyRouter-5G\" \"<router-password>\"")
+        return 0
+    }
+
     if (list_has(["nmcli", "nm-connection-editor", "badaos-network", "nmtui"], cmd) == 1) {
         if (cmd == "nmcli") {
             sub := ""
             if (len(argv) > 1) { sub := argv[1] }
+            if (list_has(["device", "dev", "d"], sub) == 1) {
+                two := ""
+                if (len(argv) > 2) { two := argv[2] }
+                if (list_has(["wifi", "wf"], two) == 1) {
+                    three := ""
+                    if (len(argv) > 3) { three := argv[3] }
+                    if (three == "connect") {
+                        ssid := "MyRouter-5G"
+                        if (len(argv) > 4) { ssid := argv[4] }
+                        tty(emit, "Device 'wlan0' successfully activated with the router password.")
+                        tty(emit, "  connected to \"" + ssid + "\" (WPA2, IP4 192.168.11.24/24 via DHCP)")
+                        st[11] = ["192.168.11.24"]
+                        return 0
+                    }
+                    tty(emit, "IN-USE  SSID              MODE   CHAN  RATE      SIGNAL  SECURITY")
+                    tty(emit, "        MyRouter-5G       Infra  36    866 Mbit/s 94      WPA2")
+                    tty(emit, "        MyRouter-2G       Infra  6     144 Mbit/s 88      WPA2")
+                    tty(emit, "        aterm-quantum-a   Infra  40    866 Mbit/s 72      WPA3")
+                    tty(emit, "(join: nmcli device wifi connect \"<SSID>\" password \"<pw>\", or badaos-router connect)")
+                    return 0
+                }
+                tty(emit, "DEVICE  TYPE      STATE         CONNECTION")
+                tty(emit, "eth0    ethernet  connected     BadaOS Wired (auto)")
+                tty(emit, "wlan0   wifi      disconnected  --  (plugged USB router adapter, ready)")
+                tty(emit, "wwan0   gsm       disconnected  --  (USB LTE, ModemManager)")
+                return 0
+            }
             if (list_has(["general", "g"], sub) == 1) {
                 tty(emit, "STATE      CONNECTIVITY  WIFI-HW  WIFI  WWAN-HW  WWAN")
                 tty(emit, "connected  full          missing  n/a   missing  n/a")
@@ -2590,6 +2660,7 @@ def shell_exec(emit, vm, st, line) {
         else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
         else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
         else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
+        else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug an external router / USB Wi-Fi / LTE dongle, then `badaos-router connect <SSID> <password>` to reach the internet.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }
