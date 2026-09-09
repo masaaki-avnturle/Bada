@@ -148,8 +148,9 @@ function run(events) {
     ["line", "timedatectl sync"],         // 82 sync Windows/Ubuntu/BadaOS clocks
     ["line", "timedatectl"],              // 83 status shows NTP synchronized
     ["line", "badaos-router"],            // 84 external router/USB Wi-Fi detected
-    ["line", "badaos-router connect MyRouter-5G hunter2"], // 85 enter pw -> online
-    ["line", "badaos-router plug"],       // 86 USB router adapter -> auto NAT connect
+    ["line", "badaos-router connect MyRouter-5G hunter2"], // 85 too-short passcode -> rejected
+    ["line", "badaos-router connect MyRouter-5G quantum88"], // 86 valid passcode -> verified online
+    ["line", "badaos-router plug"],       // 87 USB router adapter -> auto NAT connect
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -267,10 +268,12 @@ function run(events) {
     [82, "BadaOS 12.0 (quantum)"],
     [83, "System clock synchronized: yes"], // status reflects the sync
     [84, "the plugged USB router adapter"], // external router auto-detected
-    [85, "WPA2-PSK 4-way handshake"],       // router password accepted
-    [85, "internet OK via MyRouter-5G"],    // ... and online
-    [86, "auto-default DHCP on usb0"],      // USB router hot-plug auto-connect
-    [86, "No command was needed"],
+    [85, "passcode too short"],             // 7-char key is rejected up front
+    [86, "WPA2/WPA3-PSK 4-way handshake, try 1/3"], // valid passcode -> handshake
+    [86, "internet reachable"],             // link+DNS+ping verified
+    [86, "Connection confirmed"],           // only then reported connected
+    [87, "auto-default DHCP on usb0"],      // USB router hot-plug auto-connect
+    [87, "No command was needed"],
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -296,7 +299,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect -> USB router hot-plug auto (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect -> USB router hot-plug auto -> passcode connect verified (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

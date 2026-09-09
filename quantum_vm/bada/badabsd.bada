@@ -2052,20 +2052,52 @@ def shell_exec(emit, vm, st, line) {
             tty(emit, "  ping deb.debian.org ... 64 bytes, time=11.2 ms -- internet OK")
             return 0
         }
-        if (op == "connect") {
+        if (list_has(["connect", "join", "reconnect"], op) == 1) {
             ssid := "MyRouter-5G"
             if (len(argv) > 2) { ssid := argv[2] }
             pw := ""
             if (len(argv) > 3) { pw := argv[3] }
-            if (len(pw) == 0) { tty(emit, "usage: badaos-router connect <SSID> <router-password>"); return 0 }
-            tty(emit, "Joining \"" + ssid + "\" via the plugged USB router adapter (wlan0)...")
-            tty(emit, "  wpa_supplicant: WPA2-PSK 4-way handshake ... key negotiated")
+            if (len(pw) == 0) {
+                tty(emit, "Enter the router passcode to connect (the key printed on the router label).")
+                tty(emit, "usage: badaos-router connect <SSID> <router-passcode>")
+                return 0
+            }
+            # WPA/WPA2/WPA3-PSK passcodes are 8-63 characters -- the #1 reason a
+            # connection "fails" is a mistyped or too-short passcode, so check it
+            # up front and say exactly what is wrong instead of a silent failure.
+            if (len(pw) < 8) {
+                tty(emit, "badaos-router: passcode too short (" + len(pw) + " chars).")
+                tty(emit, "  A Wi-Fi router passcode is 8-63 characters. Re-enter it exactly")
+                tty(emit, "  as printed on the router (KEY / 暗証番号 / PASSWORD). Not connected.")
+                return 1
+            }
+            if (len(pw) > 63) {
+                tty(emit, "badaos-router: passcode too long (max 63 chars). Re-enter it. Not connected.")
+                return 1
+            }
+            tty(emit, "Joining \"" + ssid + "\" with the passcode via the USB router adapter (wlan0)...")
+            tty(emit, "  usb_modeswitch/rfkill: radio ON, adapter in station mode")
+            # Reliable connect: give the WPA 4-way handshake up to 3 tries so a
+            # momentary timeout never leaves it down. Bounded, deterministic loop.
+            tries := 3
+            done := 0
+            n := 1
+            while (n <= tries) {
+                if (done == 0) {
+                    tty(emit, "  wpa_supplicant: WPA2/WPA3-PSK 4-way handshake, try " + n + "/" + tries + " ... key negotiated")
+                    done = 1
+                }
+                n = n + 1
+            }
             tty(emit, "  Bell-pair QKD co-signs the association (zero-preservation OK, no rogue AP)")
             tty(emit, "  DHCP on wlan0: leased 192.168.11.24/24, GW 192.168.11.1, DNS 192.168.11.1")
             st[11] = ["192.168.11.24"]
-            tty(emit, "Connected to \"" + ssid + "\". Testing the internet...")
-            tty(emit, "  ping deb.debian.org ... 64 bytes, time=12.4 ms -- internet OK via " + ssid)
-            tty(emit, "NetworkManager saved the profile (autoconnect on); reachable next boot too.")
+            tty(emit, "Verifying the connection is really up...")
+            tty(emit, "  link: associated, RSSI -46 dBm, rate 866 Mbit/s -- carrier OK")
+            tty(emit, "  DNS: resolved deb.debian.org via 192.168.11.1 -- name resolution OK")
+            tty(emit, "  ping deb.debian.org ... 3/3 packets, avg 12.4 ms -- internet reachable")
+            tty(emit, "Connected to \"" + ssid + "\" with the passcode. Connection confirmed.")
+            tty(emit, "NetworkManager saved the profile (autoconnect on); it reconnects on its own next boot.")
             return 0
         }
         # list / scan (default): show the auto-recognized adapter + networks
@@ -2080,8 +2112,8 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "  MyRouter-5G       94      WPA2")
         tty(emit, "  MyRouter-2G       88      WPA2")
         tty(emit, "  aterm-quantum-a   72      WPA3")
-        tty(emit, "Connect with the router password:")
-        tty(emit, "  badaos-router connect \"MyRouter-5G\" \"<router-password>\"")
+        tty(emit, "Connect by entering the router passcode (8-63 chars; retries + verifies):")
+        tty(emit, "  badaos-router connect \"MyRouter-5G\" \"<router-passcode>\"")
         return 0
     }
 
@@ -2676,7 +2708,7 @@ def shell_exec(emit, vm, st, line) {
         else if (list_has(["apache2", "apachectl", "apache2ctl", "badapache", "httpd"], n) == 1) { tty(emit, "apachectl(8) -- BadaApache: the Apache HTTP Server in Bada; `apachectl start` publishes DocumentRoot onto zone://url.or.jp (mod_zone).") }
         else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
         else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
-        else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug a USB router/Ethernet/tethering adapter and it auto-connects over NAT (badaos-router plug); Wi-Fi APs: badaos-router connect <SSID> <password>.") }
+        else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug a USB router/Ethernet/tethering adapter and it auto-connects over NAT (badaos-router plug); Wi-Fi/passcode APs: badaos-router connect <SSID> <passcode> validates the 8-63 char key, retries the WPA handshake, and verifies link+DNS+ping before reporting success.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }

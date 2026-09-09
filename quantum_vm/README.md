@@ -76,10 +76,15 @@
    **プロファイル無し・パスワード無しで自動 DHCP**(`no-auto-default=` で全有線/USB を
    自動接続)→ NAT のリースを取得してオンライン、という流れが `badaos-usbnet-up`
    udev ルールで全自動で走ります(手動確認は `badaos-router plug`)。
-   Wi-Fi / LTE アダプタなど**パスワードが要る場合**は
-   `badaos-router`(検出・スキャン)→ `badaos-router connect "SSID" "ルーターのパスワード"`
-   でも接続できます(実 ISO では usb-modeswitch / ModemManager /
-   wpasupplicant + ファームウェア同梱、`nmcli device wifi connect` でも可)。
+   Wi-Fi / LTE アダプタなど**パスコード(暗証番号)が要る場合**は
+   `badaos-router`(検出・スキャン)→ `badaos-router connect "SSID"` を実行すると
+   **パスコードの入力を求められ**、確実に接続します:入力したパスコードを
+   **8〜63 文字か検証**(短すぎ・打ち間違いを即エラー表示。接続失敗の一番の原因)し、
+   **WPA ハンドシェイクを最大 3 回リトライ**、接続後に**リンク・DNS・ping で疎通確認**
+   してから「接続成功(Connected)」と表示します(パスコードは
+   `badaos-router connect "SSID" "パスコード"` のように直接渡すことも可能。実 ISO では
+   usb-modeswitch / ModemManager / wpasupplicant + ファームウェア同梱、
+   `nmcli device wifi connect` でも可)。
    `timedatectl` で **Windows / Ubuntu / BadaOS の時計を同期**できます:
    `timedatectl sync`(NTP を NAT 越しに引いて 3 つの OS の時計を合わせる。
    Bell 対 QKD 署名付き)、`timedatectl set-local-rtc 1`(Windows デュアルブート用に

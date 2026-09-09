@@ -228,8 +228,10 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
   * EXTERNAL router / USB Ethernet / tethering / LTE adapter: JUST PLUG IT
     into a USB port -- it is auto-recognized and NetworkManager DHCPs it
     automatically, so you are online over the new uplink (NAT) with no
-    command and no password. (Wi-Fi APs that need a key: badaos-router
-    connect "SSID" "password"; scan/status: badaos-router)
+    command and no password. (Wi-Fi APs that need a key: run
+    `badaos-router connect "SSID"` and enter the passcode when prompted --
+    it validates the 8-63 char key, retries, and verifies link+DNS+ping
+    before saying Connected; scan/status: badaos-router)
   * clock sync: `timedatectl` -- systemd-timesyncd keeps BadaOS / Ubuntu /
     Windows in step over NTP (via the NAT). `timedatectl set-local-rtc 1`
     keeps the shared RTC in local time for a Windows dual boot
@@ -471,23 +473,60 @@ case "${1:-}" in
     nmcli device wifi rescan 2>/dev/null || true
     nmcli -f SSID,SIGNAL,SECURITY device wifi list || true
     echo
-    echo "Connect with the router password:  badaos-router connect \"<SSID>\" \"<password>\""
+    echo "Connect by entering the router passcode:  badaos-router connect \"<SSID>\" [passcode]"
     ;;
-  connect)
-    SSID="${2:?usage: badaos-router connect \"<SSID>\" \"<password>\"}"
+  connect|join|reconnect)
+    SSID="${2:?usage: badaos-router connect \"<SSID>\" [passcode]}"
     PW="${3:-}"
-    echo "Joining \"$SSID\" ..."
-    if [ -n "$PW" ]; then
-      nmcli device wifi connect "$SSID" password "$PW"
-    else
-      nmcli device wifi connect "$SSID"
+    # If no passcode was given on the command line, prompt for it (hidden).
+    if [ -z "$PW" ]; then
+      printf 'Enter the passcode for "%s" (as printed on the router): ' "$SSID" >&2
+      stty -echo 2>/dev/null || true
+      read -r PW || true
+      stty echo 2>/dev/null || true
+      echo >&2
     fi
-    echo "Connected. Testing the internet ..."
-    (ping -c1 -W3 deb.debian.org >/dev/null 2>&1 && echo "  internet OK via $SSID") || \
-      echo "  associated, but no route yet -- check the password and signal."
+    # WPA/WPA2/WPA3-PSK passcodes are 8-63 chars: the usual reason a connect
+    # "fails" is a mistyped/too-short key, so check it before we even try.
+    LEN=$(printf %s "$PW" | wc -c)
+    if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 63 ]; then
+      echo "badaos-router: passcode is $LEN characters -- a Wi-Fi passcode must be 8-63." >&2
+      echo "  Re-enter it exactly as printed on the router (KEY / PASSWORD). Not connected." >&2
+      exit 1
+    fi
+    # Reliable connect: retry the association a few times so a momentary
+    # handshake timeout or slow DHCP does not leave you disconnected.
+    OK=0
+    i=1
+    while [ "$i" -le 3 ]; do
+      echo "Joining \"$SSID\" with the passcode (attempt $i/3) ..."
+      if nmcli device wifi connect "$SSID" password "$PW"; then OK=1; break; fi
+      echo "  attempt $i failed; rescanning and retrying ..." >&2
+      nmcli device wifi rescan 2>/dev/null || true
+      sleep 2
+      i=$((i+1))
+    done
+    if [ "$OK" != 1 ]; then
+      echo "Could not join \"$SSID\" -- the passcode was rejected or the AP is out of range." >&2
+      echo "  Double-check the passcode and signal, then re-run badaos-router connect." >&2
+      exit 1
+    fi
+    # Verify the connection is really up: carrier, DNS, then a ping.
+    echo "Verifying the connection ..."
+    for t in 1 2 3 4 5; do
+      if ping -c1 -W3 deb.debian.org >/dev/null 2>&1; then
+        echo "  link + DNS + ping OK -- internet reachable via \"$SSID\". Connected."
+        echo "  NetworkManager saved the profile (autoconnect on); it reconnects next boot."
+        exit 0
+      fi
+      sleep 2
+    done
+    echo "  Associated with \"$SSID\" but no internet route yet." >&2
+    echo "  DHCP/DNS may still be settling -- check the router, then retry." >&2
+    exit 1
     ;;
   *)
-    echo "usage: badaos-router [list] | connect \"<SSID>\" \"<password>\"" ;;
+    echo "usage: badaos-router [list] | connect \"<SSID>\" [passcode]" ;;
 esac
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badaos-router"
