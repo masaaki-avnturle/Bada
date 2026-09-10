@@ -1,0 +1,548 @@
+<title>反重力航空機 YMG-AG01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Shippori+Mincho:wght@500;700&display=swap">
+<style>
+:root{
+  --ground:#0a2748; --sheet:#0b2c53; --stage:#061a30;
+  --ink:#dbeafc; --ink-2:#a9c8ea; --dim:#6f98c4; --line:#7fa8d4;
+  --amber:#e8b24c; --cyan:#57c9e2; --rose:#e0798f; --green:#7fd6a6;
+  --grid:rgba(219,234,252,.09); --gridf:rgba(219,234,252,.045);
+  --edge:rgba(127,168,212,.35);
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --disp:"Oswald","Arial Narrow",system-ui,sans-serif;
+  --min:"Shippori Mincho",serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:linear-gradient(0deg,rgba(4,16,32,.55),rgba(4,16,32,.55)),var(--ground);
+  color:var(--ink); font-family:var(--mono); font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased; padding:16px; min-height:100vh;
+}
+.sheet{max-width:1240px; margin:0 auto; background:var(--sheet); border:1.5px solid var(--edge);
+  box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 0 0 6px rgba(11,44,83,.9), inset 0 0 0 7px var(--edge);
+  position:relative; overflow:hidden}
+.sheet::before{content:""; position:absolute; inset:7px; pointer-events:none; z-index:0;
+  background-image:
+    linear-gradient(var(--gridf) 1px,transparent 1px),linear-gradient(90deg,var(--gridf) 1px,transparent 1px),
+    linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:14px 14px,14px 14px,70px 70px,70px 70px}
+.pad{position:relative; padding:20px 24px 0; z-index:1}
+header{display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;
+  border-bottom:1.5px solid var(--edge); padding-bottom:13px}
+.eyebrow{font-family:var(--disp); letter-spacing:.26em; text-transform:uppercase; color:var(--dim); font-size:11px}
+.tt h1{font-family:var(--disp); font-weight:600; letter-spacing:.04em; font-size:28px; margin:0; line-height:1; text-wrap:balance}
+.tt .en{font-family:var(--disp); font-weight:300; letter-spacing:.32em; text-transform:uppercase; color:var(--ink-2); font-size:12px; margin-top:7px}
+.tt .sub{color:var(--dim); font-size:12px; margin-top:8px; max-width:60ch}
+.tt .sub b{color:var(--ink-2); font-weight:400}
+.meta{font-family:var(--mono); font-size:11px; color:var(--ink-2); text-align:right; line-height:1.85; white-space:nowrap}
+.meta b{color:var(--amber); font-weight:600}
+
+.modebar{position:relative; z-index:1; display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+  padding:10px 24px; border-bottom:1.5px solid var(--edge)}
+.seg{display:inline-flex; border:1.5px solid var(--edge); border-radius:3px; overflow:hidden}
+.seg button{font-family:var(--disp); letter-spacing:.13em; text-transform:uppercase; font-size:12px;
+  padding:8px 15px; background:transparent; color:var(--ink-2); border:none; cursor:pointer; transition:.15s}
+.seg button+button{border-left:1.5px solid var(--edge)}
+.seg button.on{background:var(--amber); color:var(--ground)}
+.seg button:focus-visible{outline:2px solid var(--cyan); outline-offset:-2px}
+.modebar .hint{color:var(--dim); font-size:11px}
+
+.grid{position:relative; z-index:1; display:grid; grid-template-columns:1fr 372px; gap:0}
+@media(max-width:920px){ .grid{grid-template-columns:1fr} }
+.stagewrap{border-right:1.5px solid var(--edge); padding:12px 18px 16px; min-width:0}
+@media(max-width:920px){ .stagewrap{border-right:none; border-bottom:1.5px solid var(--edge)} }
+.viewhead{display:flex; justify-content:space-between; align-items:baseline; margin:2px 2px 8px}
+.viewhead .name{font-family:var(--disp); letter-spacing:.14em; text-transform:uppercase; font-size:13px}
+.viewhead .scale{color:var(--dim); font-size:11px}
+.stage{position:relative; width:100%; aspect-ratio:4/3; background:
+  radial-gradient(120% 90% at 50% 12%, #0d3055 0%, var(--stage) 60%, #04101f 100%);
+  border:1px solid var(--edge); border-radius:2px; overflow:hidden}
+@media(max-width:920px){ .stage{aspect-ratio:1/1} }
+#view3d{position:absolute; inset:0}
+#view3d canvas{display:block; width:100%!important; height:100%!important; touch-action:none; cursor:grab}
+#view3d canvas:active{cursor:grabbing}
+#viewbp{position:absolute; inset:0; padding:6px}
+#viewbp svg{width:100%; height:100%; display:block; overflow:visible}
+.hud{position:absolute; top:10px; left:12px; pointer-events:none; font-family:var(--mono); font-size:11px; line-height:1.7}
+.hud .big{font-family:var(--disp); font-size:26px; font-weight:500; letter-spacing:.02em; line-height:1;
+  font-variant-numeric:tabular-nums}
+.hud .big small{font-size:12px; color:var(--dim); font-weight:300; letter-spacing:.1em}
+.hud .l{color:var(--amber)} .hud .l.warn{color:var(--rose)}
+.hud .cap{color:var(--dim); letter-spacing:.16em; text-transform:uppercase; font-family:var(--disp); font-size:10px}
+.stamp{position:absolute; right:10px; bottom:9px; pointer-events:none; color:var(--dim); font-size:10px;
+  font-family:var(--disp); letter-spacing:.2em; text-transform:uppercase}
+.viewbtns{position:absolute; right:10px; top:10px; display:flex; gap:6px}
+.viewbtns button{pointer-events:auto; font-family:var(--mono); font-size:11px; color:var(--ink-2);
+  background:rgba(6,26,48,.72); border:1px solid var(--edge); border-radius:2px; padding:4px 8px; cursor:pointer}
+.viewbtns button:hover{color:var(--ink); border-color:var(--ink-2)}
+
+.controls{padding:14px 20px 18px}
+.controls h2{font-family:var(--disp); font-weight:500; letter-spacing:.12em; text-transform:uppercase; font-size:13px; color:var(--ink-2); margin:2px 0 2px}
+.controls .note{color:var(--dim); font-size:11px; margin:0 0 8px}
+.formula{background:rgba(4,16,32,.35); border:1px solid var(--edge); border-left-width:3px; padding:7px 11px; margin:7px 0; border-radius:2px}
+.formula.grav{border-left-color:var(--amber)} .formula.rel{border-left-color:var(--ink)}
+.formula.vac{border-left-color:var(--cyan)} .formula.lift{border-left-color:var(--rose)}
+.formula .lab{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.formula .tag{font-family:var(--disp); letter-spacing:.08em; text-transform:uppercase; font-size:11px}
+.formula .tag small{font-family:var(--min); letter-spacing:0; text-transform:none; color:var(--ink-2); margin-left:6px; font-size:11px}
+.formula .eq{font-size:11.5px; margin:5px 0 1px; color:var(--ink); word-break:break-word}
+.formula .eq b{color:var(--amber); font-weight:600; font-variant-numeric:tabular-nums}
+.formula .eq b.c{color:var(--cyan)} .formula .eq b.r{color:var(--rose)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+label.sld{display:block; font-size:11px; color:var(--ink-2); margin:11px 0 0}
+label.sld .rd{float:right; font-family:var(--mono); color:var(--ink); font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--edge);border-radius:2px;margin:6px 0 2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--ground);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--ground);cursor:pointer}
+input[type=range]:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+.rng-amber::-webkit-slider-thumb{background:var(--amber)} .rng-amber::-moz-range-thumb{background:var(--amber)}
+.rng-cyan::-webkit-slider-thumb{background:var(--cyan)} .rng-cyan::-moz-range-thumb{background:var(--cyan)}
+.rng-rose::-webkit-slider-thumb{background:var(--rose)} .rng-rose::-moz-range-thumb{background:var(--rose)}
+.btnrow{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:14px}
+.opbtn{font-family:var(--disp); letter-spacing:.13em; text-transform:uppercase; font-size:12px; padding:10px 6px;
+  background:transparent; border:1.5px solid var(--edge); border-radius:2px; cursor:pointer; transition:.15s; color:var(--ink-2)}
+.opbtn:hover{border-color:var(--ink-2); color:var(--ink)}
+.opbtn:focus-visible{outline:2px solid var(--cyan); outline-offset:2px}
+.opbtn.amber{color:var(--amber); border-color:var(--amber)} .opbtn.amber:hover{background:rgba(232,178,76,.12)}
+.opbtn.amber.on{background:var(--amber); color:var(--ground)}
+.opbtn.cyan{color:var(--cyan); border-color:var(--cyan)} .opbtn.cyan:hover{background:rgba(87,201,226,.12)}
+.opbtn.cyan.on{background:var(--cyan); color:var(--ground)}
+.opbtn.wide{grid-column:span 2}
+
+.lower{position:relative; z-index:1; display:grid; grid-template-columns:1fr 300px; gap:0; border-top:1.5px solid var(--edge)}
+@media(max-width:760px){ .lower{grid-template-columns:1fr} }
+.legend{padding:13px 22px; border-right:1.5px solid var(--edge)}
+@media(max-width:760px){ .legend{border-right:none; border-bottom:1.5px solid var(--edge)} }
+.legend h2{font-family:var(--disp); letter-spacing:.14em; text-transform:uppercase; font-size:12px; color:var(--ink-2); margin:0 0 9px}
+.legend ul{margin:0; padding:0; list-style:none; display:grid; gap:7px}
+.legend li{display:flex; gap:10px; align-items:baseline; font-size:11.5px}
+.legend .k{color:var(--ink); white-space:nowrap; min-width:126px}
+.legend .v{color:var(--ink-2)}
+.tblock{display:grid; grid-template-columns:repeat(4,1fr); font-size:10.5px; align-content:start}
+.tblock div{border-right:1px solid var(--edge); border-top:1px solid var(--edge); padding:7px 10px}
+.tblock div:nth-child(4n){border-right:none}
+.tblock .h{font-family:var(--disp); letter-spacing:.12em; text-transform:uppercase; color:var(--dim); font-size:9px; display:block; margin-bottom:3px}
+.tblock .big{grid-column:span 2}
+.tblock b{color:var(--amber); font-weight:600}
+.foot{position:relative; z-index:1; padding:10px 24px 18px; color:var(--dim); font-size:10.5px; line-height:1.7}
+.foot b{color:var(--ink-2); font-weight:400}
+/* blueprint svg helpers */
+.cl{stroke:var(--line);stroke-width:.6;stroke-dasharray:10 3 2 3;opacity:.5}
+.dim{stroke:var(--ink-2);stroke-width:.7}
+.dtxt{fill:var(--ink);font-family:var(--mono);font-size:10px}
+.dtxt.a{fill:var(--amber)} .dtxt.c{fill:var(--cyan)} .dtxt.r{fill:var(--rose)}
+.lbl{fill:var(--ink-2);font-family:var(--disp);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.hull{fill:rgba(127,168,212,.10);stroke:var(--ink);stroke-width:1.4}
+.ringE{stroke:var(--ink-2);stroke-width:1.1;fill:none} .ringE.a{stroke:var(--amber)}
+.coreB{fill:rgba(224,121,143,.16);stroke:var(--rose);stroke-width:1.4}
+.strutB{stroke:var(--amber);stroke-width:1.5;fill:none}
+.beamB{stroke:var(--cyan);stroke-width:1;fill:rgba(87,201,226,.10)}
+.canopyB{fill:rgba(87,201,226,.10);stroke:var(--cyan);stroke-width:1}
+</style>
+
+<div class="sheet">
+  <div class="pad">
+    <header>
+      <div class="tt">
+        <div class="eyebrow">BadaUFO-OS 反重力理論より作図 · Sheet AG</div>
+        <h1>反重力発生器 航空機</h1>
+        <div class="en">Antigravity Generator Aircraft</div>
+        <div class="sub"><b>重力方程式の補空間＝反重力場エネルギー E_ag=U_grav·cosh(x log x)</b>／<b>特殊相対論の補空間 E⊥=mc²−½mv²</b>／<b>無尽蔵の真空エネルギー体 x^x</b>。機体各部を BadaUFO-OS の反重力方程式から導出した、操作可能な3D機体と設計図面。</div>
+      </div>
+      <div class="meta">
+        DWG&nbsp;NO. <b>YMG-AG01</b><br>
+        REV. 1.0.0 · A2 横<br>
+        典拠 <b>BadaUFO-OS 反重力理論</b><br>
+        Antigravity on manifold<br>
+        著者 <b>Masaaki Yamaguchi</b>
+      </div>
+    </header>
+  </div>
+
+  <div class="modebar">
+    <div class="seg" role="tablist" aria-label="表示モード">
+      <button id="mode3d" class="on" role="tab" aria-selected="true">▣ 3D ビュー</button>
+      <button id="modebp" role="tab" aria-selected="false">▤ 設計図</button>
+    </div>
+    <span class="hint" id="modehint">ドラッグで旋回 · ホイールでズーム · スライダで反重力方程式を駆動</span>
+  </div>
+
+  <div class="grid">
+    <div class="stagewrap">
+      <div class="viewhead"><span class="name" id="stagename">総組図 · 3D Isometric</span><span class="scale">機体基準 尺度 1:∞</span></div>
+      <div class="stage">
+        <div id="view3d"></div>
+        <div id="viewbp" hidden></div>
+        <div class="hud">
+          <div class="cap">揚力比 Lift Ratio</div>
+          <div class="big"><span class="l" id="hudL">2.125</span><small> = E_ag/U_grav</small></div>
+          <div style="margin-top:8px" class="cap">高度 Altitude</div>
+          <div class="big" id="hudAlt" style="font-size:20px">0<small> m</small></div>
+          <div style="margin-top:6px" id="hudState" class="cap">▲ 上昇可能 · 真空リザーバ ∞</div>
+        </div>
+        <div class="viewbtns">
+          <button id="btnReset" title="視点リセット">視点</button>
+        </div>
+        <div class="stamp">YMG-AG01</div>
+      </div>
+    </div>
+
+    <aside class="controls">
+      <div class="eyebrow" style="margin-bottom:2px">反重力方程式 ドライバ</div>
+      <h2>BadaUFO-OS 物理コア</h2>
+      <p class="note">スライダは質量 m・巡航速度 v・高度 alt を動かし、多様体座標 x=1+r₀/r から反重力結合 α_ag=cosh(x log x) と揚力比 L を再導出、機体の反重力リング・真空炉心・反重力ビームに反映します。</p>
+      <div id="cards"></div>
+      <label class="sld">機体質量 m <span class="rd" id="rd-m"></span><input class="rng" id="s-m" type="range" min="4000" max="40000" step="500" value="12000"></label>
+      <label class="sld">巡航速度 v（相対論補空間用）<span class="rd" id="rd-v"></span><input class="rng" id="s-v" type="range" min="0" max="12000" step="100" value="1200"></label>
+      <label class="sld">高度 alt <span class="rd" id="rd-alt"></span><input class="rng rng-cyan" id="s-alt" type="range" min="0" max="200000" step="500" value="0"></label>
+      <label class="sld">反重力出力 スロットル<span class="rd" id="rd-thr"></span><input class="rng rng-amber" id="s-thr" type="range" min="0" max="1" step="0.02" value="0.85"></label>
+      <div class="btnrow">
+        <button class="opbtn amber" id="btnSpin" aria-pressed="false">◔ スピンアップ</button>
+        <button class="opbtn cyan" id="btnClimb" aria-pressed="false">▲ 反重力上昇</button>
+        <button class="opbtn wide" id="btnLand">■ 着陸 / 高度リセット</button>
+      </div>
+    </aside>
+  </div>
+
+  <div class="lower">
+    <div class="legend">
+      <h2>反重力方程式 → 機体部材</h2>
+      <ul>
+        <li><span class="k"><span class="dot" style="background:var(--ink-2)"></span>反重力リング ×3</span><span class="v">反重力箱作用素 □_ag=2cosh(x log x)。回転速度 ∝ 揚力比 L。Γ/ζ/π の三重ジンバルを継承</span></li>
+        <li><span class="k"><span class="dot" style="background:var(--rose)"></span>真空炉心（Jones 母核）</span><span class="v">無尽蔵の真空エネルギー体 E_vac=ρ·x^x。発光強度 ∝ x^x。汲めども尽きぬ動力源</span></li>
+        <li><span class="k"><span class="dot" style="background:var(--cyan)"></span>反重力ビーム / 咽喉部</span><span class="v">重力方程式の補空間から放たれる反重力場。出力 ∝ (L−1)·g_eff。cosh 咽喉で下方へ</span></li>
+        <li><span class="k"><span class="dot" style="background:var(--amber)"></span>D-brane 支持脚 ×3</span><span class="v">相対論補空間 E⊥=mc²−½mv² を抽出する柱。判別式で安定/分岐（重力↔反重力双対 e^π≈π^e）</span></li>
+      </ul>
+    </div>
+    <div class="tblock">
+      <div class="big"><span class="h">Title / 図名</span>反重力発生器 航空機 総組図</div>
+      <div><span class="h">Dwg No.</span><b>YMG-AG01</b></div>
+      <div><span class="h">Rev.</span>1.0.0</div>
+      <div><span class="h">Source</span>BadaUFO-OS</div>
+      <div><span class="h">Author</span>M. Yamaguchi</div>
+      <div><span class="h">Engine</span>反重力方程式</div>
+      <div><span class="h">Sheet</span>AG / 03</div>
+    </div>
+  </div>
+
+  <div class="foot">
+    本図は <b>BadaUFO-OS 反重力理論</b>（bada_ufo_os · 重力方程式の補空間＝反重力場エネルギー、特殊相対論の補空間 E⊥=mc²−½mv²、無尽蔵の真空エネルギー体 x^x）を典拠に、反重力発生器としての航空機の各部材を同理論の作用素から再導出した<b>概念設計図・3Dシミュレーション</b>です。数値は理論パラメータの可視化であり、物理的に機能する装置ではありません。
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ===================================================================
+   BadaUFO-OS 反重力物理コア（lib/badaufo/antigravity.rb を JS へ移植）
+   =================================================================== */
+const C = 299792458.0, G = 6.67430e-11, RHO = 5.0e-10;
+const M_EARTH = 5.972e24, R0 = 6.371e6;   // 地球
+const P = { m:12000, v:1200, alt:0, thr:0.85 };
+
+const manifoldCoord = ratio => 1 + Math.abs(ratio);
+const xLogX = x => (x<=0?0:x*Math.log(x));
+const antigravCoupling = x => Math.cosh(xLogX(x));          // α_ag = Re[□_ag]/2 = cosh(x log x)
+const gravEnergy = (M,m,r) => G*M*m/Math.max(r,1e-9);
+const vacuumEnergy = x => RHO*Math.pow(x,x);               // □_dal = x^x
+const relComplement = (m,v) => m*C*C - 0.5*m*v*v;          // E⊥ = mc² − ½mv²
+
+function physics(){
+  const r = R0 + Math.max(P.alt,0);
+  const x = manifoldCoord(R0/r);
+  const alpha = antigravCoupling(x);
+  const U = gravEnergy(M_EARTH,P.m,r);
+  const Eag = U*alpha;                 // 重力方程式の補空間 = 反重力場エネルギー
+  const Eperp = relComplement(P.m,P.v);
+  const Evac = vacuumEnergy(x);
+  const L = alpha;                     // 揚力比 L = E_ag/U_grav = cosh(x log x)
+  const gEff = G*M_EARTH/(r*r);
+  const aNet = (L-1)*gEff*P.thr;       // 正味反重力加速度
+  return { r,x,alpha,U,Eag,Eperp,Evac,L,gEff,aNet };
+}
+const sci = (v,d=3)=>{ if(!isFinite(v)) return "∞";
+  if(v===0) return "0";
+  const e=Math.floor(Math.log10(Math.abs(v))); const m=v/Math.pow(10,e);
+  return (Math.abs(e)>3)? m.toFixed(d)+"e"+e : v.toLocaleString(undefined,{maximumFractionDigits:2}); };
+const fmt=(x,d=2)=>{const f=Math.pow(10,d);return (Math.round(x*f)/f).toString();};
+const $=id=>document.getElementById(id);
+
+/* ===================================================================
+   3D 機体（Three.js r128）— 反重力発生器航空機
+   =================================================================== */
+const HOST=$("view3d");
+let renderer,scene,camera,craft,rings=[],core,coreLight,field,beam,groundGrid,starField;
+let spinning=false, climbing=false, climbVel=0, visualLift=0;
+const COL={ink:0xdbeafc,ink2:0xa9c8ea,amber:0xe8b24c,cyan:0x57c9e2,rose:0xe0798f,hull:0x9ab6da};
+
+function initThree(){
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  HOST.appendChild(renderer.domElement);
+  scene=new THREE.Scene();
+  scene.fog=new THREE.Fog(0x061a30,120,320);
+  camera=new THREE.PerspectiveCamera(42,1,0.1,2000);
+
+  scene.add(new THREE.HemisphereLight(0x9fc4f0,0x081222,0.85));
+  const key=new THREE.DirectionalLight(0xe8f0ff,1.05); key.position.set(60,90,50); scene.add(key);
+  const rim=new THREE.DirectionalLight(0x57c9e2,0.5); rim.position.set(-70,20,-40); scene.add(rim);
+
+  craft=new THREE.Group(); scene.add(craft);
+
+  // --- 機体ハル（レンズ型サーサー）---
+  const prof=[];
+  for(let i=0;i<=24;i++){ const t=i/24, ang=t*Math.PI; // half lens profile
+    const rr=Math.sin(ang)*34; const yy=Math.cos(ang)*7; prof.push(new THREE.Vector2(rr,yy)); }
+  const hullMat=new THREE.MeshStandardMaterial({color:COL.hull,metalness:0.82,roughness:0.34,
+    flatShading:false});
+  const hull=new THREE.Mesh(new THREE.LatheGeometry(prof,96),hullMat); craft.add(hull);
+  // 下面リム発光
+  const rimMat=new THREE.MeshBasicMaterial({color:COL.cyan,transparent:true,opacity:0.5});
+  const rimRing=new THREE.Mesh(new THREE.TorusGeometry(33,0.7,10,120),rimMat);
+  rimRing.rotation.x=Math.PI/2; rimRing.position.y=-0.5; craft.add(rimRing);
+  // 上部キャノピー
+  const canMat=new THREE.MeshStandardMaterial({color:COL.cyan,metalness:0.1,roughness:0.1,
+    transparent:true,opacity:0.35});
+  const can=new THREE.Mesh(new THREE.SphereGeometry(11,48,32,0,Math.PI*2,0,Math.PI/2),canMat);
+  can.position.y=6.4; craft.add(can);
+  // ハル表面リング（意匠ライン）
+  const lineMat=new THREE.MeshBasicMaterial({color:COL.ink2,transparent:true,opacity:0.35});
+  [20,26,31].forEach(rr=>{ const m=new THREE.Mesh(new THREE.TorusGeometry(rr,0.25,8,120),lineMat);
+    m.rotation.x=Math.PI/2; craft.add(m); });
+
+  // --- 反重力リング ×3（□_ag、傾斜ジンバル）---
+  const ringDefs=[{R:44,tube:1.4,col:COL.amber,tilt:[-0.38,0,0.10]},
+                  {R:52,tube:1.1,col:COL.ink,tilt:[0.55,0.3,-0.12]},
+                  {R:60,tube:0.9,col:COL.cyan,tilt:[0.15,-0.5,0.4]}];
+  ringDefs.forEach(d=>{
+    const g=new THREE.Group(); g.rotation.set(d.tilt[0],d.tilt[1],d.tilt[2]);
+    const mat=new THREE.MeshStandardMaterial({color:d.col,metalness:0.7,roughness:0.3,
+      emissive:d.col,emissiveIntensity:0.18});
+    const torus=new THREE.Mesh(new THREE.TorusGeometry(d.R,d.tube,14,140),mat);
+    g.add(torus);
+    // ジンバル支柱
+    const sMat=new THREE.MeshBasicMaterial({color:d.col,transparent:true,opacity:0.4});
+    for(let a=0;a<Math.PI*2;a+=Math.PI/2){
+      const s=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.35,d.R,6),sMat);
+      s.position.set(Math.cos(a)*d.R/2,0,Math.sin(a)*d.R/2);
+      s.rotation.z=Math.PI/2; s.rotation.y=-a; g.add(s);
+    }
+    craft.add(g); rings.push({grp:g,speed:0,dir:(rings.length%2?-1:1)});
+  });
+
+  // --- 真空炉心（Jones 母核 / x^x）---
+  const coreMat=new THREE.MeshStandardMaterial({color:COL.rose,emissive:COL.rose,
+    emissiveIntensity:1.1,metalness:0.3,roughness:0.4});
+  core=new THREE.Mesh(new THREE.IcosahedronGeometry(9,1),coreMat); core.position.y=1; craft.add(core);
+  coreLight=new THREE.PointLight(COL.rose,1.4,140); coreLight.position.set(0,1,0); craft.add(coreLight);
+  // 真空フィールド殻
+  const fMat=new THREE.MeshBasicMaterial({color:COL.cyan,transparent:true,opacity:0.10,
+    blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false});
+  field=new THREE.Mesh(new THREE.SphereGeometry(15,32,24),fMat); field.position.y=1; craft.add(field);
+
+  // --- D-brane 支持脚 ×3 ---
+  const legMat=new THREE.MeshStandardMaterial({color:COL.amber,metalness:0.6,roughness:0.4});
+  for(let i=0;i<3;i++){ const a=i/3*Math.PI*2+Math.PI/6;
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(0.9,1.4,20,8),legMat);
+    leg.position.set(Math.cos(a)*26,-9,Math.sin(a)*26); leg.rotation.z=Math.cos(a)*0.32; leg.rotation.x=-Math.sin(a)*0.32;
+    craft.add(leg);
+    const foot=new THREE.Mesh(new THREE.CylinderGeometry(3,3,1.2,16),legMat);
+    foot.position.set(Math.cos(a)*30,-18.5,Math.sin(a)*30); craft.add(foot);
+  }
+
+  // --- 反重力ビーム（下方 cosh 咽喉部）---
+  const beamMat=new THREE.MeshBasicMaterial({color:COL.cyan,transparent:true,opacity:0.0,
+    blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false});
+  beam=new THREE.Mesh(new THREE.ConeGeometry(20,80,40,1,true),beamMat);
+  beam.position.y=-46; beam.rotation.x=Math.PI; craft.add(beam);
+
+  // --- 地表グリッド ---
+  groundGrid=new THREE.GridHelper(600,60,0x57c9e2,0x24537d);
+  groundGrid.material.transparent=true; groundGrid.material.opacity=0.5; groundGrid.position.y=-40;
+  scene.add(groundGrid);
+  // 星
+  const sg=new THREE.BufferGeometry(); const pts=[];
+  for(let i=0;i<420;i++){ const rr=380+Math.random()*380, th=Math.random()*Math.PI*2, ph=Math.acos(2*Math.random()-1);
+    pts.push(rr*Math.sin(ph)*Math.cos(th), Math.abs(rr*Math.cos(ph))*0.7+40, rr*Math.sin(ph)*Math.sin(th)); }
+  sg.setAttribute("position",new THREE.Float32BufferAttribute(pts,3));
+  starField=new THREE.Points(sg,new THREE.PointsMaterial({color:0x9fc4f0,size:1.4,transparent:true,opacity:0.7}));
+  scene.add(starField);
+
+  setupOrbit(); resize(); window.addEventListener("resize",resize);
+  requestAnimationFrame(loop);
+}
+
+/* --- 軽量オービットコントロール --- */
+const cam={theta:0.9,phi:1.02,rad:210,tgtY:6};
+function applyCam(){ const s=Math.sin(cam.phi);
+  camera.position.set(cam.rad*s*Math.cos(cam.theta), cam.rad*Math.cos(cam.phi)+cam.tgtY,
+    cam.rad*s*Math.sin(cam.theta));
+  camera.lookAt(0,cam.tgtY,0); }
+function setupOrbit(){
+  const cv=renderer.domElement; let drag=false,px=0,py=0,pinch=0;
+  const down=(x,y)=>{drag=true;px=x;py=y;};
+  const move=(x,y)=>{ if(!drag)return; cam.theta-=(x-px)*0.008; cam.phi=Math.max(0.25,Math.min(1.5,cam.phi-(y-py)*0.007)); px=x;py=y; };
+  cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);down(e.clientX,e.clientY);});
+  cv.addEventListener("pointermove",e=>move(e.clientX,e.clientY));
+  cv.addEventListener("pointerup",()=>drag=false);
+  cv.addEventListener("pointercancel",()=>drag=false);
+  cv.addEventListener("wheel",e=>{e.preventDefault(); cam.rad=Math.max(90,Math.min(420,cam.rad+e.deltaY*0.25));},{passive:false});
+  cv.addEventListener("touchstart",e=>{ if(e.touches.length===2){pinch=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);}},{passive:true});
+  cv.addEventListener("touchmove",e=>{ if(e.touches.length===2){ e.preventDefault(); const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY); cam.rad=Math.max(90,Math.min(420,cam.rad-(d-pinch)*0.5)); pinch=d; }},{passive:false});
+}
+function resize(){ const w=HOST.clientWidth,h=HOST.clientHeight; if(!w||!h)return;
+  renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+
+let last=performance.now();
+function loop(now){
+  const dt=Math.min((now-last)/1000,0.05); last=now;
+  const ph=physics();
+  // climb integration
+  if(climbing){ climbVel+=ph.aNet*dt; climbVel=Math.min(climbVel,4000); P.alt=Math.min(P.alt+climbVel*dt,200000);
+    if(P.alt>=200000) climbVel=0; syncAltUI(); }
+  else if(climbVel>0){ climbVel*=0.96; }
+  // visual lift eased
+  const targetLift=Math.min(P.alt/200000*46,46);
+  visualLift+=(targetLift-visualLift)*Math.min(dt*2,1);
+  craft.position.y=visualLift;
+  // rings spin ∝ L
+  const base=spinning?(0.15+ (ph.L-1)*0.9):0;
+  rings.forEach((r,i)=>{ r.grp.rotation.y+=r.dir*base*(1+i*0.35)*dt*6*(spinning?1:0);
+    r.grp.rotation.z+=r.dir*base*0.15*dt*4; });
+  // core pulse ∝ vacuum
+  const vpow=Math.min(Math.log10(ph.Evac/5e-10+1)/6,1);
+  const pulse=1+0.10*Math.sin(now*0.004)*(spinning?1:0.3);
+  core.scale.setScalar((0.7+0.6*Math.min(ph.x/2,1))*pulse);
+  coreLight.intensity=0.8+2.0*Math.min(ph.x/2.5,1)*(spinning?1:0.55);
+  field.scale.setScalar((0.75+0.7*Math.min(ph.x/2,1))*(1+0.06*Math.sin(now*0.003)));
+  field.material.opacity=0.05+0.13*Math.min(ph.x/2,1)*(spinning?1:0.5);
+  // beam ∝ (L-1)*thr
+  const bpow=Math.max(0,Math.min((ph.L-1)*P.thr*0.9,0.9));
+  beam.material.opacity=(climbing||spinning)? bpow*0.5+0.05 : bpow*0.18;
+  beam.scale.set(0.6+bpow,1,0.6+bpow);
+  // ground scroll to sell ascent
+  groundGrid.position.y=-40 - ((P.alt*0.002)%20);
+  starField.rotation.y+=dt*0.01;
+  // idle gentle bob when landed & not spinning
+  if(!spinning&&!climbing) craft.rotation.y+=dt*0.06;
+
+  cam.tgtY=6+visualLift; applyCam();
+  renderer.render(scene,camera);
+  requestAnimationFrame(loop);
+}
+
+/* ===================================================================
+   設計図（正射投影 SVG）— 物理から寸法を導出
+   =================================================================== */
+function renderBlueprint(){
+  const ph=physics();
+  const host=$("viewbp");
+  const cx=360,cy=310;
+  const hullR=54 + (P.m-4000)/36000*46;          // ハル外径 ∝ 質量
+  const ringR=[hullR+16, hullR+30, hullR+44].map((r,i)=> r*(0.9+0.06*(ph.L-1)) );
+  const coreR=10 + Math.min(ph.x-1,1)*22;         // 炉心 ∝ x（真空 x^x）
+  const beamW=8 + Math.max(0,(ph.L-1))*14;        // ビーム幅 ∝ (L-1)
+  const kk=0.30;
+  const ell=(rx,ry,cls)=>`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" class="${cls}"/>`;
+  let s=`<svg viewBox="0 0 720 620" role="img" aria-label="反重力発生器航空機の正面断面図。ハル・反重力リング・真空炉心・D-brane脚・反重力ビームを反重力方程式で寸法化。">
+    <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0.5,0.8 L8,4 L0.5,7.2" fill="none" stroke="#a9c8ea" stroke-width="1"/></marker>
+    <marker id="ahr" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0.5,0.8 L8,4 L0.5,7.2" fill="none" stroke="#e0798f" stroke-width="1"/></marker></defs>
+    <line class="cl" x1="${cx}" y1="40" x2="${cx}" y2="580"/>
+    <line class="cl" x1="90" y1="${cy}" x2="630" y2="${cy}"/>`;
+  // 反重力ビーム（下方）
+  s+=`<path class="beamB" d="M ${cx-beamW},${cy+10} L ${cx-beamW*2.4},${cy+150} L ${cx+beamW*2.4},${cy+150} L ${cx+beamW},${cy+10} Z"/>`;
+  s+=`<text class="dtxt c" x="${cx+beamW*2.4+6}" y="${cy+150}">反重力ビーム w=${fmt(beamW,1)} ∝(L−1)</text>`;
+  // D-brane 脚
+  s+=`<path class="strutB" d="M ${cx-hullR*0.6},${cy+6} L ${cx-hullR*0.8},${cy+96} M ${cx+hullR*0.6},${cy+6} L ${cx+hullR*0.8},${cy+96}"/>`;
+  s+=`<line class="dim" x1="${cx-hullR*0.8-40}" y1="${cy+96}" x2="${cx+hullR*0.8+40}" y2="${cy+96}" opacity=".4"/>`;
+  s+=`<text class="dtxt a" x="${cx-hullR*0.8-44}" y="${cy+96}" text-anchor="end">D-brane 脚</text>`;
+  // ハル断面（レンズ）
+  s+=`<path class="hull" d="M ${cx-hullR},${cy} Q ${cx-hullR*0.5},${cy-30} ${cx},${cy-32} Q ${cx+hullR*0.5},${cy-30} ${cx+hullR},${cy} Q ${cx+hullR*0.5},${cy+24} ${cx},${cy+26} Q ${cx-hullR*0.5},${cy+24} ${cx-hullR},${cy} Z"/>`;
+  // キャノピー
+  s+=`<path class="canopyB" d="M ${cx-16},${cy-30} A 16 16 0 0 1 ${cx+16},${cy-30} Z"/>`;
+  // 反重力リング（正面＝楕円）
+  ringR.forEach((r,i)=> s+=ell(r,r*kk,"ringE"+(i===0?" a":"")) );
+  // 真空炉心
+  s+=`<circle cx="${cx}" cy="${cy-4}" r="${coreR}" class="coreB"/>`;
+  // 寸法：最外リング径
+  const q=ringR[2], yb=cy-ringR[2]*kk-46;
+  s+=`<line class="dim" x1="${cx-q}" y1="${yb}" x2="${cx+q}" y2="${yb}" marker-start="url(#ah)" marker-end="url(#ah)"/>`;
+  s+=`<line class="dim" x1="${cx-q}" y1="${cy}" x2="${cx-q}" y2="${yb-4}" opacity=".4"/><line class="dim" x1="${cx+q}" y1="${cy}" x2="${cx+q}" y2="${yb-4}" opacity=".4"/>`;
+  s+=`<text class="dtxt" x="${cx}" y="${yb-6}" text-anchor="middle">⌀ ${fmt(q*2,0)}  反重力リング最外径 (L=${fmt(ph.L,3)})</text>`;
+  // ハル径寸法
+  s+=`<line class="dim" x1="${cx-hullR}" y1="${cy+56}" x2="${cx+hullR}" y2="${cy+56}" marker-start="url(#ah)" marker-end="url(#ah)"/>`;
+  s+=`<text class="dtxt" x="${cx}" y="${cy+52}" text-anchor="middle">⌀ ${fmt(hullR*2,0)}  ハル径 ∝ m=${(P.m/1000)}t</text>`;
+  // 炉心引出し
+  s+=`<line class="dim" x1="${cx}" y1="${cy-4}" x2="${cx+90}" y2="${cy-70}" marker-start="url(#ahr)" stroke="#e0798f"/>`;
+  s+=`<text class="dtxt r" x="${cx+94}" y="${cy-72}">真空炉心 R=${fmt(coreR,1)} · x^x=${fmt(Math.pow(ph.x,ph.x),3)}</text>`;
+  s+=`<text class="lbl" x="${cx-q}" y="${cy-ringR[2]*kk-2}">□_ag · α=${fmt(ph.alpha,2)}</text>`;
+  s+=`</svg>`;
+  host.innerHTML=s;
+}
+
+/* ===================================================================
+   カード（方程式読み出し）＋ UI
+   =================================================================== */
+function card(o){ return `<div class="formula ${o.cls}">
+  <div class="lab"><span class="tag"><span class="dot" style="background:${o.dot}"></span>${o.tag}<small>${o.jp||""}</small></span><span class="val" style="color:var(--dim);font-size:11px">${o.side||""}</span></div>
+  <div class="eq">${o.eq}</div></div>`; }
+function renderCards(){
+  const ph=physics(); let h="";
+  h+=card({cls:"grav",dot:"var(--amber)",tag:"E_ag 反重力場",jp:"重力方程式の補空間",side:"補空間",
+    eq:`E_ag = U_grav·cosh(x log x) = <b>${sci(ph.Eag)}</b> J　(x=${fmt(ph.x,4)}, α=${fmt(ph.alpha,3)})`});
+  h+=card({cls:"rel",dot:"var(--ink)",tag:"E⊥ 相対論補空間",jp:"特殊相対性理論",side:"抽出源",
+    eq:`E⊥ = mc² − ½mv² = <b>${sci(ph.Eperp)}</b> J　(m=${P.m}kg, v=${P.v}m/s)`});
+  h+=card({cls:"vac",dot:"var(--cyan)",tag:"E_vac 真空エネルギー体",jp:"無尽蔵 x^x",side:"∞ 動力",
+    eq:`E_vac = ρ·x^x = <b class="c">${sci(ph.Evac)}</b> J　(x^x=${fmt(Math.pow(ph.x,ph.x),3)})`});
+  h+=card({cls:"lift",dot:"var(--rose)",tag:"L 揚力比",jp:"e^π≈π^e 双対",side:ph.L>1?"▲ 上昇":"▼ 束縛",
+    eq:`L = E_ag/U_grav = cosh(x log x) = <b class="r">${fmt(ph.L,4)}</b>　a_net=${fmt(ph.aNet,3)} m/s²`});
+  $("cards").innerHTML=h;
+  // HUD
+  $("hudL").textContent=fmt(ph.L,3); $("hudL").className="l"+(ph.L>1?"":" warn");
+  $("hudAlt").innerHTML=Math.round(P.alt).toLocaleString()+"<small> m</small>";
+  $("hudState").textContent=(ph.L>1?"▲ 上昇可能":"▼ 束縛")+" · 真空リザーバ ∞";
+  if(bpMode) renderBlueprint();
+}
+function syncAltUI(){ $("s-alt").value=Math.round(P.alt); $("rd-alt").textContent=(P.alt>=1000?fmt(P.alt/1000,1)+" km":Math.round(P.alt)+" m"); }
+function readouts(){
+  $("rd-m").textContent=(P.m/1000)+" t";
+  $("rd-v").textContent=P.v.toLocaleString()+" m/s";
+  syncAltUI();
+  $("rd-thr").textContent=Math.round(P.thr*100)+" %";
+}
+
+/* --- スライダ --- */
+const bind=(id,key,parse)=>{ const el=$(id); el.addEventListener("input",()=>{ P[key]=parse(el.value);
+  if(key==="alt"){ climbing=false; climbVel=0; $("btnClimb").classList.remove("on"); $("btnClimb").setAttribute("aria-pressed","false"); }
+  readouts(); renderCards(); }); };
+bind("s-m","m",v=>+v); bind("s-v","v",v=>+v); bind("s-alt","alt",v=>+v); bind("s-thr","thr",v=>+v);
+
+/* --- ボタン --- */
+$("btnSpin").addEventListener("click",e=>{ spinning=!spinning; e.currentTarget.classList.toggle("on",spinning);
+  e.currentTarget.setAttribute("aria-pressed",spinning); e.currentTarget.textContent=spinning?"◕ 停止":"◔ スピンアップ"; });
+$("btnClimb").addEventListener("click",e=>{ climbing=!climbing; if(climbing){spinning=true;$("btnSpin").classList.add("on");$("btnSpin").textContent="◕ 停止";$("btnSpin").setAttribute("aria-pressed","true");}
+  e.currentTarget.classList.toggle("on",climbing); e.currentTarget.setAttribute("aria-pressed",climbing);
+  e.currentTarget.textContent=climbing?"◼ 上昇停止":"▲ 反重力上昇"; });
+$("btnLand").addEventListener("click",()=>{ climbing=false; climbVel=0; P.alt=0; $("btnClimb").classList.remove("on");
+  $("btnClimb").setAttribute("aria-pressed","false"); $("btnClimb").textContent="▲ 反重力上昇"; readouts(); renderCards(); });
+$("btnReset").addEventListener("click",()=>{ cam.theta=0.9; cam.phi=1.02; cam.rad=210; });
+
+/* --- モード切替 --- */
+let bpMode=false;
+function setMode(bp){ bpMode=bp;
+  $("view3d").hidden=bp; $("viewbp").hidden=!bp;
+  $("mode3d").classList.toggle("on",!bp); $("modebp").classList.toggle("on",bp);
+  $("mode3d").setAttribute("aria-selected",!bp); $("modebp").setAttribute("aria-selected",bp);
+  $("stagename").textContent=bp?"正面図 · Front Elevation (断面 A–A)":"総組図 · 3D Isometric";
+  $("modehint").textContent=bp?"寸法は反重力方程式から自動導出 · スライダで再描画":"ドラッグで旋回 · ホイールでズーム · スライダで反重力方程式を駆動";
+  if(bp) renderBlueprint(); else resize();
+}
+$("mode3d").addEventListener("click",()=>setMode(false));
+$("modebp").addEventListener("click",()=>setMode(true));
+
+/* --- 起動 --- */
+try{ initThree(); }catch(err){ HOST.innerHTML='<div style="padding:20px;color:#e0798f;font-size:12px">3D初期化エラー: '+err.message+'</div>'; }
+readouts(); renderCards();
+</script>
