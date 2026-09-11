@@ -19,6 +19,15 @@ on:
   push:
     tags:
       - 'kozuchi-v*'
+    # 初回リリースのブートストラップ: 開発ブランチへの push でもビルドし、
+    # kozuchi-v1.0.0 の Release を Actions の権限で作成します。
+    # main へマージ後は下の branches とフォールバック tag_name は削除して構いません
+    # (以後は kozuchi-v* タグ / workflow_dispatch で運用)。
+    branches:
+      - 'claude/receipt-camera-auto-register-k4vvf9'
+    paths:
+      - 'kozuchi_kakeibo/**'
+      - '.github/workflows/kozuchi-app-build.yml'
 
 permissions:
   contents: write
@@ -109,8 +118,8 @@ jobs:
           name: kozuchi-kakeibo-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/receipt-camera-auto-register-k4vvf9'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'kozuchi-v1.0.0' }}
           files: out/*.apk
