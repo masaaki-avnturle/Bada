@@ -1,0 +1,395 @@
+# ============================================================
+# zeta_port.bada -- INTERDIMENSIONAL PORT TIMETABLE SIMULATOR
+# (visto.pdf -- "M theory in monopolity of extra dimension
+#  Symmetry theory", Masaaki Yamaguchi -- as executable Bada)
+#
+# The simulation takes the SHAPE OF THE ZETA FUNCTIONAL EQUATION
+# as an entropy value, exactly as visto.pdf declares:
+#
+#   "シャノンの公式は、ゼータ関数である"    ∫ x log x = ζ(s)
+#   "ゼータ関数は、重力場と反重力場の積"    ζ(s) = □·□⁻ = 1
+#   "統一場理論はモノポールの磁気単極子"    E(σ) = K(σ) ⊗ H(σ)
+#   ガウス関数が円周率となる結果            ∫∫ e^(-x²-y²) dxdy = π
+#
+# HOW THE PORT WORKS IN THIS MODEL ------------------------------
+# The functional equation  ζ(s) = χ(s) ζ(1-s)  with
+#   χ(s) = 2^s π^(s-1) sin(πs/2) Γ(1-s)
+# folds the critical line s = 1/2 + it onto itself.  Its shape on
+# the line is the REAL Riemann-Siegel function
+#   Z(t) = e^{iθ(t)} ζ(1/2 + it),   θ = Riemann-Siegel theta,
+# i.e. the equation's symmetry is what makes Z real.  Split the
+# Dirichlet terms of Z(t) into the two monopoles of visto.pdf:
+#   K(t) = Σ positive terms   (gravity field    □ )
+#   H(t) = Σ negative terms   (antigravity field □⁻)
+# Then Z = K - H, and a NONTRIVIAL ZERO is the instant where the
+# two magnetic monopoles balance exactly -- □·□⁻ = 1 -- which this
+# simulation reads as a PORT GATE EVENT: the port between the 4D
+# brane and an extra dimension toggles OPEN / CLOSED.
+#
+# The ENTROPY VALUE of the equation's shape (Shannon = zeta):
+#   p_n ∝ (1/√n) · (1 + cos(θ(t) - t·log n)) / 2
+#   S(t) = -Σ p_n log p_n            (builtin entropy() on a dist)
+# -- the phase-interference distribution of the functional
+# equation's own terms.  S(t) is the port's entropy signature.
+#
+# The PORT ADDRESS is assembled from visto.pdf's constants
+# (πe ≅ eπ, the Gauss-π integral) and the D-brane dimension
+# ladder of rtl.pdf ("Dimensions from D-brane is global cut
+# manifold"): D5..D11 -- the extra dimensions of M theory.
+#
+# NOTE: this is a mathematical art-simulation of the Yamaguchi
+# manuscripts.  The zeta zeros are real; the ports are theory.
+# ============================================================
+
+print("================================================================")
+print("ZETA PORT BADA -- interdimensional port timetable (visto.pdf)")
+print("================================================================")
+
+# ---- tunable simulation window (the GUI runner patches these) -------
+T_START := 10.0        # scan start, zeta time  (first zero ~ 14.13)
+T_END := 100.0         # scan end,   zeta time
+T_STEP := 0.05         # sign-change scan resolution
+CURVES := 0            # 1 => emit CURVE| lines for the GUI plotter
+BASE_HOUR := 9         # timetable base clock (09:00:00)
+BASE_MIN := 0
+SEC_PER_UNIT := 60     # 1 zeta unit = 60 seconds of wall time
+M_TERMS := 8           # Dirichlet terms used for the entropy value
+
+# ---- grammar transaction: teach the parser the port verb ------------
+# (reviser-committed, append-only -- same mechanism as zone.bada)
+@reviser : grammar {
+    rule "port-gate" stmt [ 'GATE' expr ] => port_gate(_1)
+}
+print("port verb committed to the grammar ledger:", len(tuplespace), "facts")
+print("")
+
+# ====================================================================
+# 1. pure-Bada math core (no host math beyond sqrt/log/exp/abs)
+# ====================================================================
+PI := 3.141592653589793
+TWO_PI := 6.283185307179586
+E_NAP := 2.718281828459045
+
+def floorp(x) {
+    f := x - (x % 1)
+    if (f > x) { return f - 1 }
+    return f
+}
+
+def fracp(x) {
+    y := x % 1
+    if (y < 0) { y = y + 1 }
+    return y
+}
+
+# sine: range-reduce to [-pi, pi], then 13-term Taylor
+def sinb(x) {
+    y := x % TWO_PI
+    if (y < 0) { y = y + TWO_PI }
+    if (y > PI) { y = y - TWO_PI }
+    term := y
+    sum := y
+    y2 := y * y
+    k := 1
+    while (k < 13) {
+        term = 0 - term * y2 / ((2 * k) * (2 * k + 1))
+        sum = sum + term
+        k = k + 1
+    }
+    return sum
+}
+
+def cosb(x) { return sinb(x + PI / 2) }
+
+# a fresh n-slot array (Bada arrays come from literals or split)
+def zeros(n) {
+    s := ""
+    i := 0
+    while (i < n) { s = s + "0"; i = i + 1 }
+    a := split(s)
+    i = 0
+    while (i < n) { a[i] = 0.0; i = i + 1 }
+    return a
+}
+
+# ====================================================================
+# 2. the functional equation's shape: Riemann-Siegel theta and Z(t)
+#    Z(t) = e^{i theta(t)} zeta(1/2 + it)  -- real BECAUSE of the
+#    functional equation zeta(s) = chi(s) zeta(1-s).
+# ====================================================================
+def rs_theta(t) {
+    return t / 2 * log(t / TWO_PI) - t / 2 - PI / 8 + 1 / (48 * t) + 7 / (5760 * t * t * t)
+}
+
+def rs_z(t) {
+    th := rs_theta(t)
+    a := sqrt(t / TWO_PI)
+    N := floorp(a)
+    p := a - N
+    s := 0
+    n := 1
+    while (n <= N) {
+        s = s + cosb(th - t * log(n)) / sqrt(n)
+        n = n + 1
+    }
+    # first Riemann-Siegel remainder term C0
+    c0 := cosb(TWO_PI * (p * p - p - 0.0625)) / cosb(TWO_PI * p)
+    sgn := 1
+    if ((N % 2) == 0) { sgn = 0 - 1 }
+    return 2 * s + sgn * c0 / sqrt(a)
+}
+
+# ====================================================================
+# 3. ENTROPY OF THE EQUATION'S SHAPE  (visto: Shannon formula = zeta)
+#    p_n ∝ (1/√n)(1 + cos(theta - t log n))/2 ; S = entropy(dist(p))
+# ====================================================================
+def form_entropy(t) {
+    th := rs_theta(t)
+    p := zeros(M_TERMS)
+    n := 1
+    while (n <= M_TERMS) {
+        p[n - 1] = (1 / sqrt(n)) * (1 + cosb(th - t * log(n))) / 2
+        n = n + 1
+    }
+    return entropy(dist(p))
+}
+
+# gravity / antigravity monopole split of Z(t)'s own terms (the same
+# sum as rs_z, C0 remainder included, so K - H == Z exactly):
+# returns [K, H, balance]; balance = □·□⁻ gauge, exactly 1 at a zero
+def monopoles(t) {
+    th := rs_theta(t)
+    a := sqrt(t / TWO_PI)
+    N := floorp(a)
+    p := a - N
+    K := 0.0
+    Hm := 0.0
+    n := 1
+    while (n <= N) {
+        c := 2 * cosb(th - t * log(n)) / sqrt(n)
+        if (c > 0) { K = K + c } else { Hm = Hm - c }
+        n = n + 1
+    }
+    c0 := cosb(TWO_PI * (p * p - p - 0.0625)) / cosb(TWO_PI * p)
+    sgn := 1
+    if ((N % 2) == 0) { sgn = 0 - 1 }
+    r := sgn * c0 / sqrt(a)
+    if (r > 0) { K = K + r } else { Hm = Hm - r }
+    bal := 1 - abs(K - Hm) / (K + Hm + 0.000000000001)
+    return [K, Hm, bal]
+}
+
+# ====================================================================
+# 4. the PORT ADDRESS  (visto: E(σ)=K(σ)⊗H(σ), πe ≅ eπ, Gauss π;
+#    rtl.pdf: the D-brane dimension ladder D5..D11 of M theory)
+# ====================================================================
+def i2s(n) {
+    if (n < 0) { return "-" + i2s(0 - n) }
+    q := n - (n % 10)
+    d := chr(48 + (n % 10))
+    if (q < 10) { return d }
+    return i2s(q / 10) + d
+}
+
+def pad2(n) {
+    if (n < 10) { return "0" + i2s(n) }
+    return i2s(n)
+}
+
+def pad3(n) {
+    if (n < 10) { return "00" + i2s(n) }
+    if (n < 100) { return "0" + i2s(n) }
+    return i2s(n)
+}
+
+# zone ring size shared with zone.bada's DHT
+RING := 4096
+
+def port_address(k, t) {
+    dim := 5 + (k % 7)                      # D5..D11 (M theory cap)
+    ks := floorp(fracp(t / PI) * 1000)      # K-monopole sector (Gauss π)
+    hs := floorp(fracp(t / E_NAP) * 1000)   # H-monopole sector (πe ≅ eπ)
+    zn := floorp(fracp(t / TWO_PI) * RING)  # zone ring slot
+    return "port://D" + i2s(dim) + "/K" + pad3(ks) + ".H" + pad3(hs) + "/zone-" + i2s(zn)
+}
+
+# celestial address on the sky sphere (where to look, not to go)
+def sky_ra(t) {
+    hf := t % 24
+    h := floorp(hf)
+    mf := (hf - h) * 60
+    m := floorp(mf)
+    s := floorp((mf - m) * 60)
+    return "RA " + pad2(h) + "h" + pad2(m) + "m" + pad2(s) + "s"
+}
+
+def sky_dec(t) {
+    d := fracp(t / PI) * 180 - 90
+    if (d >= 0) { return "DEC +" + f5(d) }
+    return "DEC " + f5(d)
+}
+
+# wall-clock timetable entry from zeta time
+def fmt_clock(t) {
+    total := floorp(BASE_HOUR * 3600 + BASE_MIN * 60 + (t - T_START) * SEC_PER_UNIT)
+    day := floorp(total / 86400)
+    rem := total - day * 86400
+    h := floorp(rem / 3600)
+    m := floorp((rem - h * 3600) / 60)
+    s := rem - h * 3600 - m * 60
+    c := pad2(h) + ":" + pad2(m) + ":" + pad2(s)
+    if (day > 0) { return c + " (+" + i2s(day) + "d)" }
+    return c
+}
+
+# ====================================================================
+# 5. the reviser-committed GATE verb: full diagnostic of one instant
+# ====================================================================
+def port_gate(t) {
+    z := rs_z(t)
+    S := form_entropy(t)
+    mp := monopoles(t)
+    print("GATE t =", f5(t), ": Z =", f5(z), " S =", f5(S))
+    print("  gravity monopole  K(σ) =", f5(mp[0]))
+    print("  antigrav monopole H(σ) =", f5(mp[1]))
+    print("  □·□⁻ balance          =", f5(mp[2]), " (1.0 = port gate)")
+    return mp[2]
+}
+
+# ====================================================================
+# 6. quantum seal: a Bell pair guards the gate ledger.  The forbidden
+#    outcomes |01>,|10> measuring EXACTLY 0 is the tamper evidence
+#    (zero-preservation) that the timetable was not falsified.
+# ====================================================================
+bell := qubit(2)
+bell := H(bell, 0)
+bell := CNOT(bell, 0, 1)
+seal := Measure(bell)
+print("quantum seal (Bell pair) |psi|^2 :", seal)
+print("forbidden outcomes stay zero    :", seal[1] == 0, seal[2] == 0)
+print("")
+
+# ====================================================================
+# 7. the scan: every sign change of Z(t) is a gate event.  Alternating
+#    events OPEN and CLOSE the port (the □ / □⁻ dominance flips).
+# ====================================================================
+print("================================================================")
+print("PORT TIMETABLE -- scan t in [" + f5(T_START) + ", " + f5(T_END) + "]")
+print("base clock " + pad2(BASE_HOUR) + ":" + pad2(BASE_MIN) + ":00, 1 zeta unit = " + i2s(SEC_PER_UNIT) + "s")
+print("================================================================")
+
+MAXEV := 128
+ev_t := zeros(MAXEV)
+ev_S := zeros(MAXEV)
+ev_b := zeros(MAXEV)
+nev := 0
+
+t := T_START
+zprev := rs_z(t)
+sample := 0
+while (t < T_END) {
+    tn := t + T_STEP
+    zn := rs_z(tn)
+    if (CURVES == 1) {
+        if ((sample % 2) == 0) {
+            print("CURVE|" + f5(tn) + "|" + f5(zn) + "|" + f5(form_entropy(tn)))
+        }
+    }
+    if (zprev * zn < 0) {
+        if (nev < MAXEV) {
+            # bisect the gate instant to ~1e-9 zeta units
+            lo := t
+            hi := tn
+            fa := zprev
+            it := 0
+            while (it < 40) {
+                mid := (lo + hi) / 2
+                fm := rs_z(mid)
+                if (fa * fm <= 0) { hi = mid } else { lo = mid; fa = fm }
+                it = it + 1
+            }
+            tk := (lo + hi) / 2
+            ev_t[nev] = tk
+            ev_S[nev] = form_entropy(tk)
+            mp := monopoles(tk)
+            ev_b[nev] = mp[2]
+            nev = nev + 1
+        }
+    }
+    zprev = zn
+    t = tn
+    sample = sample + 1
+}
+
+print("gate events found:", nev)
+print("")
+print("  #   zeta time    clock         state   S(entropy)  □·□⁻    address")
+print("  --  -----------  ------------  ------  ----------  ------  --------------------------------")
+
+k := 0
+open_t := 0.0
+S_sum := 0.0
+while (k < nev) {
+    tk := ev_t[k]
+    state := "OPEN "
+    if ((k % 2) == 1) { state = "CLOSE" }
+    row := "  " + pad2(k + 1) + "  t=" + f5(tk) + "   " + fmt_clock(tk) + "   " + state
+    row = row + "   S=" + f5(ev_S[k]) + "  " + f5(ev_b[k]) + "  " + port_address(k + 1, tk)
+    print(row)
+    print("      " + sky_ra(tk) + "  " + sky_dec(tk))
+    if ((k % 2) == 0) { open_t = tk } else {
+        dur := tk - open_t
+        print("      -- port stood open " + f5(dur) + " zeta units = " + i2s(floorp(dur * SEC_PER_UNIT)) + "s")
+    }
+    # machine-readable line for the GUI timetable
+    print("EVENT|" + i2s(k + 1) + "|" + f5(tk) + "|" + state + "|" + f5(ev_S[k]) + "|" + f5(ev_b[k]) + "|" + port_address(k + 1, tk) + "|" + sky_ra(tk) + "|" + sky_dec(tk))
+    # commit the event to the append-only akashic ledger
+    [k + 1, tk, ev_S[k]] >> tuplespace
+    S_sum = S_sum + ev_S[k]
+    k = k + 1
+}
+
+# ====================================================================
+# 8. the GATE verb in surface syntax (the reviser rule at work)
+# ====================================================================
+print("")
+if (nev > 0) {
+    print("reviser verb check on the first gate:")
+    GATE ev_t[0]
+}
+
+# ====================================================================
+# 9. port forecast: unknown-prior over the dimension ladder D5..D11
+#    sharpens on observed gates -- entropy strictly decreases (Jaynes)
+# ====================================================================
+print("")
+print("================================================================")
+print("PORT FORECAST -- unknown prior over dimensions D5..D11")
+print("================================================================")
+prior := unknown_prior(7)
+print("prior entropy   :", f5(entropy(prior)), "(max ignorance)")
+hist := zeros(7)
+k = 0
+while (k < nev) {
+    d := k % 7
+    hist[d] = hist[d] + 1
+    k = k + 1
+}
+post := update(prior, dist(hist), 0.7)
+print("posterior       :", post)
+print("posterior entropy:", f5(entropy(post)), "(sharpened by", nev, "gates)")
+
+# ====================================================================
+# 10. summary
+# ====================================================================
+print("")
+print("================================================================")
+print("SUMMARY")
+print("================================================================")
+if (nev > 0) {
+    print("mean gate entropy S :", f5(S_sum / nev), " (the zeta relation as an entropy value)")
+}
+print("ledger facts        :", len(tuplespace), "(grammar + gates, append-only)")
+print("the functional equation zeta(s) = chi(s) zeta(1-s) folded the")
+print("critical line onto itself; every fold-fixed instant balanced the")
+print("two monopoles (□·□⁻ = 1) and toggled the port. visto.pdf, executed.")

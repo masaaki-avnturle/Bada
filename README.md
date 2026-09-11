@@ -114,6 +114,16 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 
 ---
 
+## ⟨ζ⟩ ダウンロード — ゼータ・ポート(異次元ポート開閉時刻表シミュレータ)
+
+**visto.pdf「M theory in monopolity of extra dimension」を中心文献に、ゼータ関数の関係式(関数等式 ζ(s) = χ(s)ζ(1−s))の方程式の形をエントロピー値として求め、宇宙の異次元へのポートが開閉する時刻表と住所をシミュレーションする Bada アプリ。** Riemann–Siegel Z(t) を純 Bada 実装で走査し、非自明零点(実在の数学: 14.1347…, 21.0220…)を「重力場 □ と反重力場 □⁻ が □·□⁻ = 1 で釣り合うポートゲート」として検出。各イベントにエントロピー S(t)(シャノン公式=ゼータ)、実時刻、`port://D次元/Kセクタ.Hセクタ/zone-…` 形式の住所、天球座標(RA/DEC)を割り当てます。Bell 対の量子封緘・unknown-prior ポート予報・@reviser の GATE 動詞も搭載。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**zeta_port/index.html をダウンロード**](zeta_port/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。中心プログラムは [`bada_gui_ide/examples/zeta_port.bada`](bada_gui_ide/examples/zeta_port.bada)(GUI IDE のサンプルと `bada-cli examples zeta_port` にも同梱)。模型の詳細は [`zeta_port/`](zeta_port/) を参照。
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -125,6 +135,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
+| **`zeta_port/`** | **ゼータ・ポート** — visto.pdf のゼータ関係式をエントロピー値として実行 · Riemann–Siegel Z(t) 純Bada実装 · 異次元ポート開閉時刻表 + `port://` 住所 + 天球座標 · □·□⁻=1 ゲート検出 · 単一HTML/依存ゼロ | [→ 開く](zeta_port/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---
