@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f6f54">
+<title>bookscope - 書籍バーコードスキャン &amp; 蔵書一覧</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,&lt;svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'&gt;&lt;text y='.9em' font-size='90'&gt;📚&lt;/text&gt;&lt;/svg&gt;">
+</head>
+<body>
+<header class="app-header">
+  <h1>📚 bookscope</h1>
+  <nav class="tabs">
+    <button id="tab-scan" class="tab active" type="button">バーコードスキャン</button>
+    <button id="tab-list" class="tab" type="button">蔵書一覧</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ==================== スキャン画面 ==================== -->
+  <section id="view-scan" class="view">
+    <div class="scanner-box">
+      <video id="video" playsinline muted></video>
+      <div class="scan-guide" aria-hidden="true"></div>
+      <p id="scanner-hint" class="scanner-hint">「スキャン開始」を押して、本の裏表紙の上段バーコード(978 で始まる方)をカメラに写してください</p>
+    </div>
+    <div class="scan-controls">
+      <button id="btn-start" class="btn primary" type="button">📷 スキャン開始</button>
+      <button id="btn-stop" class="btn" type="button" hidden>⏹ 停止</button>
+    </div>
+    <p id="camera-warning" class="warning" hidden>
+      ⚠️ この接続ではカメラを使えません。カメラは <strong>HTTPS</strong> または
+      <strong>localhost</strong> でのみ動作します(README.md の HTTPS 設定を参照)。
+      下の手入力は利用できます。
+    </p>
+
+    <form id="manual-form" class="manual-form">
+      <label for="manual-isbn">ISBN を手入力(バーコードが読めない場合):</label>
+      <div class="manual-row">
+        <input id="manual-isbn" type="text" inputmode="numeric" autocomplete="off"
+               placeholder="例: 9784873115658">
+        <button class="btn" type="submit">検索</button>
+      </div>
+    </form>
+
+    <div id="lookup-status" class="status" hidden></div>
+
+    <!-- 検索結果カード -->
+    <div id="result-card" class="book-card" hidden>
+      <div class="book-card-inner">
+        <img id="result-cover" class="cover" alt="表紙" hidden>
+        <div class="no-cover" id="result-no-cover">表紙<br>なし</div>
+        <div class="book-info">
+          <h2 id="result-title"></h2>
+          <p id="result-author" class="meta"></p>
+          <p id="result-publisher" class="meta"></p>
+          <p id="result-isbn" class="meta mono"></p>
+        </div>
+      </div>
+      <details class="desc-details" id="result-desc-wrap">
+        <summary>内容の概要</summary>
+        <p id="result-desc"></p>
+      </details>
+      <div class="card-actions">
+        <button id="btn-register" class="btn primary" type="button">✅ bookscope に登録</button>
+        <button id="btn-discard" class="btn" type="button">キャンセル</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 蔵書一覧画面 ==================== -->
+  <section id="view-list" class="view" hidden>
+    <div class="list-toolbar">
+      <input id="search" type="search" placeholder="タイトル・著者・出版社・ISBN で絞り込み">
+      <select id="sort">
+        <option value="registeredAt-desc">登録が新しい順</option>
+        <option value="registeredAt-asc">登録が古い順</option>
+        <option value="title-asc">タイトル順</option>
+        <option value="author-asc">著者順</option>
+        <option value="pubdate-desc">出版日が新しい順</option>
+      </select>
+      <button id="btn-csv" class="btn" type="button">⬇ CSV 出力</button>
+    </div>
+    <p id="list-count" class="list-count"></p>
+
+    <!-- 広い画面では表、狭い画面ではカード表示(CSS で切替) -->
+    <div class="table-wrap">
+      <table id="book-table">
+        <thead>
+          <tr>
+            <th>表紙</th><th>タイトル</th><th>著者</th><th>出版社</th>
+            <th>出版日</th><th>ISBN</th><th>概要</th><th>登録日</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="book-tbody"></tbody>
+      </table>
+    </div>
+    <div id="book-cards" class="book-cards"></div>
+    <p id="list-empty" class="empty" hidden>まだ書籍が登録されていません。「バーコードスキャン」タブから登録してください。</p>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- ZXing: BarcodeDetector API 非対応ブラウザ(iOS Safari 等)用のフォールバック -->
+<script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/zxing-browser.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
