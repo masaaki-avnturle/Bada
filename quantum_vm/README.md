@@ -69,9 +69,15 @@
    `apt install nautilus` も NAT 越しにそのまま入ります。
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
-   **DNS は NetworkManager 自身が `/etc/resolv.conf` を書きます**(systemd-resolved の
-   スタブ経由にはしません ― 実機で「ルーティングは通るのに名前解決だけ失敗=ネットに
-   繋がらない」の最大の原因なので廃止)。公開 DNS(9.9.9.9 / 1.1.1.1 / 8.8.8.8)を
+   **DNS は NetworkManager 自身が `/etc/resolv.conf` を実ファイルとして書きます**
+   (`rc-manager=file`)。systemd-resolved のスタブ経由や resolvconf/openresolv
+   には任せません ― 実機で「ルーティングは通るのに名前解決だけ失敗=ネットに
+   繋がらない」の最大の原因は、**`/etc/resolv.conf` が無効化した resolved スタブへの
+   壊れたシンボリックリンク(dangling link)になり DNS が全滅**することなので、
+   `resolvconf`/`openresolv` は削除し、NetworkManager が resolv.conf を実ファイルで
+   直接管理するように固定しました。さらに NetworkManager ディスパッチャと起動時の
+   自己修復が、接続のたびに resolv.conf が壊れリンク/空でないか点検し、壊れていれば
+   実ファイル(公開 DNS 入り)に置き換えます。公開 DNS(9.9.9.9 / 1.1.1.1 / 8.8.8.8)を
    プロファイルにフォールバックとして焼き込み、`ifupdown` に載った NIC も
    NetworkManager が管理(`managed=true`)、起動時の自己修復サービス
    `badaos-net.service` が上がらなかった NIC を DHCP で繋ぎ直します。

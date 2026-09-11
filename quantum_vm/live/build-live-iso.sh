@@ -135,13 +135,23 @@ chroot "$CHROOT" systemctl enable NetworkManager || true
 # systemd-resolved, if present, must NOT own resolv.conf here (we use NM's own
 # resolver). Disable it so there is exactly one DNS path.
 chroot "$CHROOT" systemctl disable systemd-resolved 2>/dev/null || true
+# resolvconf / openresolv also fight over /etc/resolv.conf and can leave it a
+# stale symlink -> remove them so NetworkManager (rc-manager=file) is the ONLY
+# writer of a plain /etc/resolv.conf.
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get purge -y -qq resolvconf openresolv 2>/dev/null || true
 # make NetworkManager manage ALL devices, including any listed in
 # /etc/network/interfaces (ifupdown managed=true), and write resolv.conf itself
 mkdir -p "$CHROOT/etc/NetworkManager/conf.d"
 cat > "$CHROOT/etc/NetworkManager/conf.d/10-badaos.conf" <<'EOF'
 [main]
-# NetworkManager writes /etc/resolv.conf directly from DHCP (no resolved stub)
+# NetworkManager writes /etc/resolv.conf directly from DHCP (no resolved stub).
+# rc-manager=file is the KEY fix: NM writes /etc/resolv.conf as a real, plain
+# file itself -- it does NOT go through resolvconf and does NOT leave a symlink.
+# The default (symlink / resolvconf) is what leaves a DANGLING symlink to the
+# systemd-resolved stub after resolved is disabled, which kills DNS entirely
+# ("routing works but names don't resolve").
 dns=default
+rc-manager=file
 plugins=keyfile,ifupdown
 # auto-create a DHCP connection for EVERY wired/USB device with no config, so
 # a USB router / Ethernet / tethering adapter goes online the instant it is
@@ -293,11 +303,12 @@ nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | while IFS=: read -r dev typ s
       esac ;;
   esac
 done
-# DNS backstop: if we cannot resolve a name, ensure public resolvers are present
-if command -v getent >/dev/null 2>&1 && ! getent hosts deb.debian.org >/dev/null 2>&1; then
-  if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
-    printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
-  fi
+# DNS backstop: a DANGLING symlink (e.g. to a disabled systemd-resolved stub)
+# or an empty /etc/resolv.conf silently kills name resolution. Force it to be a
+# real file with working nameservers.
+if [ -L /etc/resolv.conf ] || [ ! -s /etc/resolv.conf ] || ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
+  rm -f /etc/resolv.conf 2>/dev/null || true
+  printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
 fi
 exit 0
 EOF
@@ -318,6 +329,31 @@ EOF
 chroot "$CHROOT" systemctl enable badaos-net.service 2>/dev/null || \
   ln -sf /etc/systemd/system/badaos-net.service \
     "$CHROOT/etc/systemd/system/multi-user.target.wants/badaos-net.service" 2>/dev/null || true
+
+# NetworkManager dispatcher: on EVERY connection up, guarantee /etc/resolv.conf
+# is a real file with nameservers. This continuously self-heals the "resolv.conf
+# is a dangling symlink / empty -> DNS dead" failure, even after roaming or a
+# re-plug, without waiting for the user to run badaos-net-fix.
+mkdir -p "$CHROOT/etc/NetworkManager/dispatcher.d"
+cat > "$CHROOT/etc/NetworkManager/dispatcher.d/90-badaos-resolv" <<'EOF'
+#!/bin/sh
+# args: <interface> <action>
+case "$2" in
+  up|dhcp4-change|dhcp6-change|connectivity-change|hostname)
+    if [ -L /etc/resolv.conf ] || [ ! -s /etc/resolv.conf ] || ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
+      rm -f /etc/resolv.conf 2>/dev/null || true
+      {
+        # keep any DNS NetworkManager already knows for this link, then fall back
+        nmcli -g IP4.DNS device show 2>/dev/null | tr ',' '\n' | sed 's/^ *//' | awk 'NF{print "nameserver "$1}'
+        printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n'
+      } > /etc/resolv.conf 2>/dev/null || \
+        printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
+    fi
+    ;;
+esac
+exit 0
+EOF
+chmod 0755 "$CHROOT/etc/NetworkManager/dispatcher.d/90-badaos-resolv"
 
 # ---------------------------------------------------------------------------
 # `badaos-net-fix` -- the user-facing one-command repair/diagnose tool. If the
@@ -357,8 +393,13 @@ if [ -z "$IP" ]; then
 else
   echo "-> address: $IP"
 fi
-# DNS backstop
-if ! getent hosts deb.debian.org >/dev/null 2>&1; then
+# DNS backstop: a dangling symlink or empty resolv.conf is the classic cause of
+# "routing works but names don't resolve". Replace it with a real file.
+if [ -L /etc/resolv.conf ]; then
+  echo "-> /etc/resolv.conf was a symlink (likely dangling) -- replacing with a real file"
+  $S rm -f /etc/resolv.conf 2>/dev/null || true
+fi
+if ! getent hosts deb.debian.org >/dev/null 2>&1 || [ ! -s /etc/resolv.conf ]; then
   echo "-> DNS was failing; writing public resolvers to /etc/resolv.conf"
   printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' | $S tee /etc/resolv.conf >/dev/null 2>&1 || true
 fi
