@@ -69,6 +69,15 @@
    `apt install nautilus` も NAT 越しにそのまま入ります。
    `nmcli` は **NetworkManager**(NAT 自動接続の管理。GUI は nm-connection-editor /
    `badaos-network`)で、起動時に DHCP で自動的にインターネットへ接続します。
+   **DNS は NetworkManager 自身が `/etc/resolv.conf` を書きます**(systemd-resolved の
+   スタブ経由にはしません ― 実機で「ルーティングは通るのに名前解決だけ失敗=ネットに
+   繋がらない」の最大の原因なので廃止)。公開 DNS(9.9.9.9 / 1.1.1.1 / 8.8.8.8)を
+   プロファイルにフォールバックとして焼き込み、`ifupdown` に載った NIC も
+   NetworkManager が管理(`managed=true`)、起動時の自己修復サービス
+   `badaos-net.service` が上がらなかった NIC を DHCP で繋ぎ直します。
+   **もしインターネットに繋がらない時は `badaos-net-fix` を実行**すると、
+   NetworkManager を再起動 → 全 NIC を DHCP → DNS を修復 → ルーティングと名前解決を
+   検証し、どの段階(リンク/IP/DNS/経路)で失敗したかまで表示します。
    **外部ルーターの USB アダプタ**を PC(BadaOS)の USB コネクタに挿すだけで、
    **コマンドもパスワードも要らず、自動で NAT 越しにインターネットへ接続**します:
    udev が新しい net インターフェース(CDC-ECM の `usb0`)を検出 →

@@ -2117,6 +2117,24 @@ def shell_exec(emit, vm, st, line) {
         return 0
     }
 
+    # ---- badaos-net-fix: one-command internet repair + diagnosis. Restart
+    #      NetworkManager, DHCP every NIC, fix DNS, then verify route + DNS.
+    if (list_has(["badaos-net-fix", "net-fix", "fix-net"], cmd) == 1) {
+        tty(emit, "== BadaOS network fix ==")
+        tty(emit, "-> masking systemd-networkd (NetworkManager owns the NICs)")
+        tty(emit, "-> restarting NetworkManager ... started")
+        tty(emit, "-> devices:")
+        tty(emit, "   DEVICE  TYPE      STATE")
+        tty(emit, "   eth0    ethernet  connecting -> connected")
+        tty(emit, "-> address: 10.0.2.15/24 (DHCP over NAT), GW 10.0.2.2")
+        tty(emit, "-> DNS: writing 9.9.9.9 / 1.1.1.1 / 8.8.8.8 to /etc/resolv.conf")
+        st[11] = ["10.0.2.15"]
+        tty(emit, "   resolved deb.debian.org -> 151.101.66.132 (name resolution OK)")
+        tty(emit, "   ping 1.1.1.1 ... 64 bytes, time=9.8 ms (routing OK)")
+        tty(emit, "OK: internet reachable (routing + DNS). Try: sudo apt update")
+        return 0
+    }
+
     if (list_has(["nmcli", "nm-connection-editor", "badaos-network", "nmtui"], cmd) == 1) {
         if (cmd == "nmcli") {
             sub := ""
@@ -2709,6 +2727,7 @@ def shell_exec(emit, vm, st, line) {
         else if (n == "badaos-extras") { tty(emit, "badaos-extras(1) -- install big optionals (clang / texlive-full / dev / media) over the NAT from the Debian archive.") }
         else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
         else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug a USB router/Ethernet/tethering adapter and it auto-connects over NAT (badaos-router plug); Wi-Fi/passcode APs: badaos-router connect <SSID> <passcode> validates the 8-63 char key, retries the WPA handshake, and verifies link+DNS+ping before reporting success.") }
+        else if (n == "badaos-net-fix") { tty(emit, "badaos-net-fix(1) -- one-command internet repair: restarts NetworkManager, DHCPs every NIC, writes public DNS fallback to /etc/resolv.conf, then verifies routing + name resolution. Run it whenever the internet is down.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }

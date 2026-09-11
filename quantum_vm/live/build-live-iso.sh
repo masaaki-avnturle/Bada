@@ -112,28 +112,58 @@ echo 'LANG=ja_JP.UTF-8' > "$CHROOT/etc/default/locale"
 # auto-connects over DHCP at boot, so `apt`/firefox reach the FULL Debian
 # archive (60,000+ packages) with no manual setup -- and it provides the
 # NAT/connection SETTINGS GUI (nm-connection-editor) and tray applet
-# (nm-applet). NetworkManager, not systemd-networkd, owns networking here;
-# systemd-resolved still does DNS (NM feeds it), with a public fallback.
-chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq systemd-resolved || true
-chroot "$CHROOT" systemctl enable NetworkManager systemd-resolved ssh 2>/dev/null || \
-chroot "$CHROOT" systemctl enable NetworkManager ssh || true
-# hand all interfaces to NetworkManager and route its DNS through resolved
+# (nm-applet). NetworkManager, not systemd-networkd, owns networking here.
+#
+# DNS is handled by NetworkManager ITSELF (dns=default: NM writes a real
+# /etc/resolv.conf from the DHCP-provided servers). We deliberately do NOT
+# route DNS through systemd-resolved + a stub symlink: on real hardware that
+# chain is the #1 reason "the internet doesn't work" -- routing comes up but
+# name resolution silently fails when resolved is slow/not-ready. Public
+# resolvers are appended to every profile as a fallback so names resolve even
+# when the DHCP server hands out no DNS at all.
+chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq isc-dhcp-client || true
+chroot "$CHROOT" systemctl enable NetworkManager ssh 2>/dev/null || \
+chroot "$CHROOT" systemctl enable NetworkManager || true
+# systemd-resolved, if present, must NOT own resolv.conf here (we use NM's own
+# resolver). Disable it so there is exactly one DNS path.
+chroot "$CHROOT" systemctl disable systemd-resolved 2>/dev/null || true
+# make NetworkManager manage ALL devices, including any listed in
+# /etc/network/interfaces (ifupdown managed=true), and write resolv.conf itself
 mkdir -p "$CHROOT/etc/NetworkManager/conf.d"
 cat > "$CHROOT/etc/NetworkManager/conf.d/10-badaos.conf" <<'EOF'
 [main]
-dns=systemd-resolved
+# NetworkManager writes /etc/resolv.conf directly from DHCP (no resolved stub)
+dns=default
+plugins=keyfile,ifupdown
 # auto-create a DHCP connection for EVERY wired/USB device with no config, so
 # a USB router / Ethernet / tethering adapter goes online the instant it is
 # plugged in -- no command, no password (empty = auto-default for all).
 no-auto-default=
+
+[ifupdown]
+# even NICs mentioned in /etc/network/interfaces are handed to NetworkManager
+managed=true
+
 [keyfile]
 unmanaged-devices=none
+
 [device]
 wifi.scan-rand-mac-address=no
 EOF
+# /etc/network/interfaces must define ONLY loopback, otherwise ifupdown claims
+# the ethernet NIC and NetworkManager marks it unmanaged -> no auto internet.
+mkdir -p "$CHROOT/etc/network"
+cat > "$CHROOT/etc/network/interfaces" <<'EOF'
+# BadaOS: NetworkManager manages all real interfaces. Only loopback here.
+source /etc/network/interfaces.d/*
+auto lo
+iface lo inet loopback
+EOF
+mkdir -p "$CHROOT/etc/network/interfaces.d"
 # an explicit auto-connect DHCP profile that matches ANY ethernet NIC, so a
 # fresh machine is online the moment it boots (belt-and-braces on top of
-# NetworkManager's built-in wired auto-connect)
+# NetworkManager's built-in wired auto-connect). Public DNS is appended as a
+# fallback (ignore-auto-dns=false => DHCP DNS first, then these).
 mkdir -p "$CHROOT/etc/NetworkManager/system-connections"
 cat > "$CHROOT/etc/NetworkManager/system-connections/badaos-wired.nmconnection" <<'EOF'
 [connection]
@@ -141,12 +171,17 @@ id=BadaOS Wired (auto)
 type=ethernet
 autoconnect=true
 autoconnect-priority=10
+autoconnect-retries=0
 
 [ipv4]
 method=auto
+dns=9.9.9.9;1.1.1.1;8.8.8.8;
+ignore-auto-dns=false
+may-fail=true
 
 [ipv6]
 method=auto
+may-fail=true
 EOF
 chmod 600 "$CHROOT/etc/NetworkManager/system-connections/badaos-wired.nmconnection"
 
@@ -197,13 +232,109 @@ FallbackNTP=time.cloudflare.com time.windows.com
 EOF
 # Bluetooth: bluetoothd starts when an adapter is present (bluetoothctl ready)
 chroot "$CHROOT" systemctl enable bluetooth 2>/dev/null || true
+# resolv.conf: a PLAIN file (NOT a symlink to the resolved stub). NetworkManager
+# (dns=default) rewrites it from DHCP once online; until then these public
+# resolvers make name resolution work, so DNS never blocks the first boot.
 rm -f "$CHROOT/etc/resolv.conf"
-if [ -e "$CHROOT/lib/systemd/system/systemd-resolved.service" ] || \
-   [ -e "$CHROOT/usr/lib/systemd/system/systemd-resolved.service" ]; then
-  ln -sf /run/systemd/resolve/stub-resolv.conf "$CHROOT/etc/resolv.conf"
-else
-  printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\n' > "$CHROOT/etc/resolv.conf"
+printf '# BadaOS: NetworkManager rewrites this from DHCP. Fallback resolvers:\nnameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > "$CHROOT/etc/resolv.conf"
+
+# ---------------------------------------------------------------------------
+# Boot-time network self-heal: a oneshot that, after NetworkManager is up,
+# forces networking on, connects the first available wired/USB NIC over DHCP,
+# and -- if DNS still looks broken -- drops the public resolvers into
+# /etc/resolv.conf. This guarantees the machine reaches the internet even if
+# the auto-connect profile did not fire (odd NIC name, late-probing driver).
+cat > "$CHROOT/usr/local/sbin/badaos-net-up" <<'EOF'
+#!/bin/sh
+# BadaOS network self-heal (run at boot by badaos-net.service)
+nmcli networking on >/dev/null 2>&1 || true
+# give slow NIC drivers a moment to register
+i=0; while [ "$i" -lt 10 ]; do
+  nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | grep -qE ':(ethernet|wifi):' && break
+  i=$((i+1)); sleep 1
+done
+# connect every managed wired/tethering device that is not already up
+nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | while IFS=: read -r dev typ state; do
+  [ -n "$dev" ] || continue
+  case "$typ" in
+    ethernet|wifi)
+      case "$state" in
+        connected) : ;;
+        *) nmcli device connect "$dev" >/dev/null 2>&1 || true ;;
+      esac ;;
+  esac
+done
+# DNS backstop: if we cannot resolve a name, ensure public resolvers are present
+if command -v getent >/dev/null 2>&1 && ! getent hosts deb.debian.org >/dev/null 2>&1; then
+  if ! grep -q '^nameserver' /etc/resolv.conf 2>/dev/null; then
+    printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf 2>/dev/null || true
+  fi
 fi
+exit 0
+EOF
+chmod 0755 "$CHROOT/usr/local/sbin/badaos-net-up"
+mkdir -p "$CHROOT/etc/systemd/system"
+cat > "$CHROOT/etc/systemd/system/badaos-net.service" <<'EOF'
+[Unit]
+Description=BadaOS network self-heal (auto DHCP + DNS backstop)
+Wants=NetworkManager.service
+After=NetworkManager.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/badaos-net-up
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+EOF
+chroot "$CHROOT" systemctl enable badaos-net.service 2>/dev/null || \
+  ln -sf /etc/systemd/system/badaos-net.service \
+    "$CHROOT/etc/systemd/system/multi-user.target.wants/badaos-net.service" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# `badaos-net-fix` -- the user-facing one-command repair/diagnose tool. If the
+# internet is ever down, run it: it restarts NetworkManager, brings the NICs up
+# on DHCP, fixes DNS, and prints exactly which step (link / IP / DNS / route)
+# failed so the problem is obvious.
+cat > "$CHROOT/usr/local/bin/badaos-net-fix" <<'EOF'
+#!/bin/sh
+# BadaOS internet repair + diagnosis
+[ "$(id -u)" = 0 ] && S="" || S="sudo"
+echo "== BadaOS network fix =="
+$S systemctl unmask systemd-networkd 2>/dev/null; $S systemctl mask systemd-networkd 2>/dev/null || true
+echo "-> restarting NetworkManager ..."
+$S systemctl restart NetworkManager 2>/dev/null || $S service network-manager restart 2>/dev/null || true
+nmcli networking on 2>/dev/null || true
+sleep 2
+echo "-> devices:"; nmcli -f DEVICE,TYPE,STATE device status 2>/dev/null || true
+# bring up every wired/wifi device
+nmcli -t -f DEVICE,TYPE device 2>/dev/null | while IFS=: read -r dev typ; do
+  case "$typ" in ethernet|wifi) nmcli device connect "$dev" 2>/dev/null || true ;; esac
+done
+sleep 3
+IP=$(ip -4 -o addr show scope global 2>/dev/null | awk '{print $4}' | head -n1)
+if [ -z "$IP" ]; then
+  echo "!! no IPv4 address yet -- check the cable / Wi-Fi (badaos-router connect \"SSID\")."
+else
+  echo "-> address: $IP"
+fi
+# DNS backstop
+if ! getent hosts deb.debian.org >/dev/null 2>&1; then
+  echo "-> DNS was failing; writing public resolvers to /etc/resolv.conf"
+  printf 'nameserver 9.9.9.9\nnameserver 1.1.1.1\nnameserver 8.8.8.8\n' | $S tee /etc/resolv.conf >/dev/null 2>&1 || true
+fi
+# verdict
+if ping -c1 -W3 1.1.1.1 >/dev/null 2>&1; then
+  if getent hosts deb.debian.org >/dev/null 2>&1 && ping -c1 -W3 deb.debian.org >/dev/null 2>&1; then
+    echo "OK: internet reachable (routing + DNS). Try: sudo apt update"
+  else
+    echo "Routing OK but DNS still failing -- resolv.conf: "; cat /etc/resolv.conf 2>/dev/null
+  fi
+else
+  echo "No route to the internet yet. If this is Wi-Fi, run: badaos-router connect \"<SSID>\""
+  echo "For a wired/USB router, replug it (auto-DHCP) or check the upstream router."
+fi
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badaos-net-fix"
 
 cat > "$CHROOT/etc/motd" <<'EOF'
 BadaOS GNU/Quantum 12.0 -- the real machine build
@@ -221,8 +352,11 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
   * desktop apps preinstalled: xterm + x11-apps (xeyes / xclock / xcalc),
     firefox-esr (web), pcmanfm + nautilus (files), galculator / l3afpad /
     gpicview
-  * AUTOMATIC internet (NAT): NetworkManager auto-connects DHCP on every
-    NIC at boot; DNS via systemd-resolved (9.9.9.9/1.1.1.1/8.8.8.8 fallback).
+  * AUTOMATIC internet (NAT): NetworkManager auto-connects DHCP on every NIC
+    at boot and writes /etc/resolv.conf itself (public 9.9.9.9/1.1.1.1/8.8.8.8
+    fallback baked in), and a boot self-heal (badaos-net.service) reconnects
+    any NIC that did not come up. IF THE INTERNET IS EVER DOWN, run:
+        badaos-net-fix          # restart NM, DHCP the NICs, fix DNS, diagnose
     Settings GUI: `badaos-network` (nm-connection-editor) or the nm-applet
     tray icon; console: nmtui / nmcli
   * EXTERNAL router / USB Ethernet / tethering / LTE adapter: JUST PLUG IT
