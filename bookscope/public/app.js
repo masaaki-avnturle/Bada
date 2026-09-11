@@ -41,6 +41,14 @@ const store = STANDALONE ? {
     localSave(books);
     return rec;
   },
+  async update(id, fields) {
+    const books = localLoad();
+    const book = books.find((b) => b.id === id);
+    if (!book) throw new Error('not found');
+    Object.assign(book, fields);
+    localSave(books);
+    return book;
+  },
   async remove(id) { localSave(localLoad().filter((b) => b.id !== id)); },
 } : {
   async list() {
@@ -61,11 +69,64 @@ const store = STANDALONE ? {
     }
     return res.json();
   },
+  async update(id, fields) {
+    const res = await fetch(`/api/books/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  },
   async remove(id) {
     const res = await fetch(`/api/books/${encodeURIComponent(id)}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('HTTP ' + res.status);
   },
 };
+
+// ---------------- 表紙画像の撮影・選択 ----------------
+// スマホ・タブレットではカメラ撮影またはギャラリーから選択できる。
+// 保存サイズを抑えるため、端末内で縮小して JPEG の data URL に変換する。
+
+function pickCoverImage() {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      if (!file) { resolve(null); return; }
+      try {
+        resolve(await resizeImageToDataUrl(file, 640, 0.82));
+      } catch (e) {
+        toast('画像の読み込みに失敗しました');
+        resolve(null);
+      }
+    });
+    input.click();
+  });
+}
+
+async function resizeImageToDataUrl(file, maxSize, quality) {
+  const dataUrl = await new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = () => res(reader.result);
+    reader.onerror = () => rej(new Error('read error'));
+    reader.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = () => rej(new Error('decode error'));
+    i.src = dataUrl;
+  });
+  const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.width * scale));
+  canvas.height = Math.max(1, Math.round(img.height * scale));
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality);
+}
 
 // ---------------- タブ切替 ----------------
 
@@ -360,6 +421,16 @@ function hideResult() {
 
 $('btn-discard').addEventListener('click', hideResult);
 
+// 検索結果カード: 表紙をカメラ撮影・ギャラリー選択した画像に差し替える
+$('btn-cover-photo').addEventListener('click', async () => {
+  if (!currentBook) return;
+  const dataUrl = await pickCoverImage();
+  if (!dataUrl) return;
+  currentBook.cover = dataUrl;
+  showResult(currentBook);
+  toast('表紙画像を設定しました(登録ボタンで保存されます)');
+});
+
 $('btn-register').addEventListener('click', async () => {
   if (!currentBook) return;
   const btn = $('btn-register');
@@ -428,7 +499,7 @@ function renderList() {
       td(b.isbn, 'mono'),
       tdDesc(b),
       td((b.registeredAt || '').slice(0, 10)),
-      tdDelete(b),
+      tdActions(b),
     );
     tbody.append(tr);
   }
@@ -469,13 +540,19 @@ function tdDesc(b) {
   return el;
 }
 
-function tdDelete(b) {
+function tdActions(b) {
   const el = document.createElement('td');
-  const btn = document.createElement('button');
-  btn.className = 'btn danger';
-  btn.textContent = '削除';
-  btn.addEventListener('click', () => deleteBook(b));
-  el.append(btn);
+  el.className = 'actions-cell';
+  const cover = document.createElement('button');
+  cover.className = 'btn';
+  cover.textContent = '📷 表紙';
+  cover.title = '表紙画像を撮影・選択して差し替える';
+  cover.addEventListener('click', () => changeCover(b));
+  const del = document.createElement('button');
+  del.className = 'btn danger';
+  del.textContent = '削除';
+  del.addEventListener('click', () => deleteBook(b));
+  el.append(cover, del);
   return el;
 }
 
@@ -530,13 +607,30 @@ function bookCard(b) {
 
   const actions = document.createElement('div');
   actions.className = 'card-actions';
+  const cover = document.createElement('button');
+  cover.className = 'btn';
+  cover.textContent = '📷 表紙を変更';
+  cover.addEventListener('click', () => changeCover(b));
   const del = document.createElement('button');
   del.className = 'btn danger';
   del.textContent = '削除';
   del.addEventListener('click', () => deleteBook(b));
-  actions.append(del);
+  actions.append(cover, del);
   card.append(actions);
   return card;
+}
+
+// 登録済みの書籍の表紙画像を撮影・選択した画像に差し替える
+async function changeCover(b) {
+  const dataUrl = await pickCoverImage();
+  if (!dataUrl) return;
+  try {
+    await store.update(b.id, { cover: dataUrl });
+    toast('表紙画像を更新しました');
+    refreshList();
+  } catch (e) {
+    toast('表紙の更新に失敗しました: ' + e.message);
+  }
 }
 
 async function deleteBook(b) {
@@ -553,8 +647,10 @@ async function deleteBook(b) {
 function exportCsv() {
   const header = ['ISBN', 'タイトル', '著者', '出版社', '出版日', '概要', '表紙URL', '登録日'];
   const esc = (v) => '"' + String(v || '').replace(/"/g, '""') + '"';
+  // 撮影した表紙 (data URL) は巨大なので CSV には URL のみ出力する
+  const coverText = (c) => (String(c || '').startsWith('data:') ? '(撮影画像)' : c);
   const rows = filteredBooks().map((b) =>
-    [b.isbn, b.title, b.author, b.publisher, b.pubdate, b.description, b.cover, b.registeredAt].map(esc).join(','));
+    [b.isbn, b.title, b.author, b.publisher, b.pubdate, b.description, coverText(b.cover), b.registeredAt].map(esc).join(','));
   const bom = '\uFEFF'; // Excel で文字化けしないよう BOM を付ける
   const blob = new Blob([bom + header.map(esc).join(',') + '\n' + rows.join('\n')], { type: 'text/csv' });
   const a = document.createElement('a');

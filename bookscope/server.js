@@ -26,7 +26,7 @@ const DATA_DIR = path.join(ROOT, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'books.json');
 const CERT_KEY = path.join(ROOT, 'certs', 'server.key');
 const CERT_CRT = path.join(ROOT, 'certs', 'server.crt');
-const MAX_BODY = 1024 * 1024; // 1MB
+const MAX_BODY = 5 * 1024 * 1024; // 5MB (表紙画像の data URL を含むため)
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -138,10 +138,34 @@ async function handleApi(req, res, pathname) {
     return;
   }
 
+  const idMatch = pathname.match(/^\/api\/books\/([0-9a-f-]+)$/i);
+
+  // PUT /api/books/:id : 1冊更新 (表紙画像の差し替えなど)
+  if (idMatch && req.method === 'PUT') {
+    let payload;
+    try {
+      payload = JSON.parse(await readBody(req));
+    } catch (e) {
+      sendJson(res, 400, { error: 'invalid JSON body' });
+      return;
+    }
+    const books = loadBooks();
+    const book = books.find((b) => b.id === idMatch[1]);
+    if (!book) {
+      sendJson(res, 404, { error: 'not found' });
+      return;
+    }
+    for (const key of ['title', 'author', 'publisher', 'pubdate', 'cover', 'description']) {
+      if (typeof payload[key] === 'string') book[key] = payload[key].trim();
+    }
+    saveBooks(books);
+    sendJson(res, 200, book);
+    return;
+  }
+
   // DELETE /api/books/:id : 1冊削除
-  const delMatch = pathname.match(/^\/api\/books\/([0-9a-f-]+)$/i);
-  if (delMatch && req.method === 'DELETE') {
-    const id = delMatch[1];
+  if (idMatch && req.method === 'DELETE') {
+    const id = idMatch[1];
     const books = loadBooks();
     const next = books.filter((b) => b.id !== id);
     if (next.length === books.length) {
