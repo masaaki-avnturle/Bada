@@ -106,6 +106,27 @@ it in any browser — no install, no dependencies, works offline.
                       fallback offline). Honest banner: a "discovery" is a
                       planet identification, not a lifeform detection —
                       ZERO detections as of 2026.
+  aqua-vita.html      AquaVita — 命の水・命の樹アトラス: WHERE the water of
+                      life and the tree of life REALLY exist in space, what
+                      surrounds each place, and imagery of it. 14 real
+                      observed sites: the quasar APM 08279+5255 holding
+                      water vapour equal to 140 TRILLION Earth oceans, the
+                      Orion KL / W49N water masers, the TW Hya snow line,
+                      water in the air of K2-18 b (HST) and WASP-96 b
+                      (JWST), the subsurface LIQUID oceans of Enceladus
+                      (Cassini flew through the plume) and Europa; the
+                      Pillars of Creation and Cosmic Cliffs (the tree-like
+                      star-birth columns), Sgr B2's sugar, URACIL (an RNA
+                      base) in the Ryugu sample and all five nucleobases in
+                      Bennu's. True RA/Dec positions on an all-sky atlas,
+                      three real surroundings per site drawn as labelled
+                      rings, DSS2 fov-zoom imagery (solar-system bodies get
+                      honest procedural scenes), and the Γ×Jones analysis:
+                      each site's real temperature maps to θ on the trefoil
+                      Jones curve and the partial integral ∫₀^θ|V|dθ'
+                      accumulates live. .webm recording. Honest banner: no
+                      mythical spring or tree found — these are the real
+                      water and life-chemistry of the cosmos.
   bada-zone.html      zone.bada runner — runs the zone:// reference program.
 
 Command-line tools (need the repo checkout; run with Node.js):

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>AquaVita — 命の水・命の樹アトラス (Γ×Jones分析)</title>
+<style>
+  :root{color-scheme:dark;--bg:#03050c;--line:#1b2740;--ink:#e9f0fb;--dim:#8aa0c0;
+        --cy:#39c2ff;--gold:#c8a44a;--green:#2fbf71;--red:#e0555a;--aqua:#4fd8e8;--leaf:#5fd06a;}
+  *{box-sizing:border-box;}
+  body{margin:0;background:#03050c;color:var(--ink);
+       font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;}
+  header{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:11px 16px;
+         border-bottom:1px solid var(--line);background:#060a14cc;position:sticky;top:0;z-index:20;backdrop-filter:blur(6px);}
+  .logo{font-size:19px;font-weight:800;letter-spacing:.4px;
+        background:linear-gradient(90deg,#4fd8e8,#5fd06a);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .sub{color:var(--dim);font-size:12px;}
+  select,input,button{background:#0b1424;border:1px solid var(--line);color:var(--ink);border-radius:8px;
+        padding:7px 10px;font-size:13px;font-family:inherit;}
+  button{cursor:pointer;} button:hover{background:#152238;}
+  button.r{background:#3a1520;border-color:#6b2e3a;}
+  main{max-width:1140px;margin:0 auto;padding:14px 12px 70px;}
+  .banner{background:#0d2a2e;border:1px solid #2e6b6b;border-radius:10px;padding:10px 13px;
+          font-size:12.5px;color:#bfeef2;margin-bottom:12px;line-height:1.7;}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0;}
+  .grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;} @media(max-width:900px){.grid{grid-template-columns:1fr;}}
+  .stagewrap{position:relative;background:#000;border:1px solid var(--line);border-radius:14px;overflow:hidden;}
+  #stage{width:100%;display:block;background:#000;}
+  .hud{position:absolute;left:10px;top:10px;background:#000b;border:1px solid var(--line);border-radius:8px;
+       padding:7px 11px;font-size:12px;color:#cfe0f5;line-height:1.6;pointer-events:none;max-width:76%;}
+  .hud b{color:var(--gold);}
+  .rec{position:absolute;right:12px;top:12px;display:none;align-items:center;gap:6px;background:#000a;
+       border:1px solid #6b2e3a;border-radius:8px;padding:5px 10px;font-size:12px;color:#ff9aa5;}
+  .rec.on{display:inline-flex;} .rec .d{width:9px;height:9px;border-radius:50%;background:var(--red);animation:pulse 1.2s infinite;}
+  @keyframes pulse{50%{opacity:.35;}}
+  .card{background:#070c16;border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px;}
+  h2{font-size:15px;margin:0 0 10px;color:var(--cy);}
+  .muted{color:var(--dim);font-size:12px;}
+  .list{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:10px;}
+  .it{padding:8px 11px;border-bottom:1px solid var(--line);cursor:pointer;font-size:13px;}
+  .it:hover{background:#0d1626;} .it.sel{background:#12233c;}
+  .it .t{color:var(--dim);font-size:11.5px;}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px;margin-top:10px;}
+  .kv b{color:var(--gold);font-weight:600;}
+  .anno{font-size:12.5px;line-height:1.75;} .anno b{color:var(--aqua);}
+  .anno .f{color:var(--cy);font-family:ui-monospace,Consolas,monospace;font-size:11.5px;}
+  .gline{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#7fd8a8;margin-top:8px;word-break:break-all;}
+  .bw{color:var(--aqua);font-weight:700;} .bt{color:var(--leaf);font-weight:700;}
+  #atlas{width:100%;display:block;background:#000308;border:1px solid var(--line);border-radius:12px;cursor:pointer;}
+</style>
+</head>
+<body>
+<header>
+  <div><div class="logo">💧🌳 AquaVita — 命の水・命の樹アトラス</div>
+    <div class="sub">Γ関数の大域的部分積分多様体の分析 × Jones多項式の熱感知 — 宇宙に実在する「命の水」と「命の樹」の位置・周辺・映像</div></div>
+</header>
+<main>
+
+  <div class="banner">
+    <b>正直な前提</b>: ここに載る場所はすべて<b>実在の観測</b>です —
+    <span class="bw">💧命の水</span>=宇宙で実際に検出された水
+    (クエーサー APM 08279+5255 の<b>地球の海の140兆倍の水蒸気</b>・銀河系の水メーザー・
+    エンケラドス/エウロパの<b>地下の液体の海</b>・系外惑星大気の水)。
+    <span class="bt">🌳命の樹</span>=星が生まれる<b>「創造の柱」</b>の樹状構造と、
+    <b>生命の樹の材料分子</b>(いて座B2の糖、リュウグウ試料の<b>ウラシル=RNA塩基</b>、
+    ベンヌ試料の全5種の核酸塩基)。神話の泉や樹そのものが見つかったわけではない、と明記します。
+    深宇宙の映像は DSS2 実写(要ネット・オフライン時は説明つき簡易描画)、
+    太陽系天体(動くため DSS2 に写らない)は誠実にプロシージャル映像です。
+  </div>
+
+  <div class="controls">
+    <label class="muted">場所:
+      <select id="pick" style="min-width:280px"></select></label>
+    <button id="play">⏸ 一時停止</button>
+    <button class="r" id="recBtn">⏺ 映像を録画 (.webm)</button>
+    <span class="muted" id="recNote"></span>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="stagewrap">
+        <canvas id="stage" width="820" height="560"></canvas>
+        <div class="hud" id="hud"></div>
+        <div class="rec" id="recBadge"><span class="d"></span>REC</div>
+      </div>
+      <div class="gline" id="gammaDemo"></div>
+      <div class="card">
+        <h2>🗺 全天アトラス — 命の水💧 / 命の樹🌳 の位置 (実座標)</h2>
+        <canvas id="atlas" width="820" height="330"></canvas>
+        <div class="muted" style="margin-top:6px">クリックで選択。下段は太陽系(軌道運動のため天球座標は変動)。</div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-top:0">
+        <h2>📍 実在の場所 (14地点)</h2>
+        <div class="list" id="plist"></div>
+        <div class="kv" id="pinfo"></div>
+      </div>
+      <div class="card">
+        <h2>∮ Γ×Jones 分析 (実式・ライブ積算)</h2>
+        <div class="anno" id="analysis"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🔭 この地点の周辺に何があるのか (実在)</h2>
+    <div class="anno" id="around"></div>
+  </div>
+
+</main>
+<script>
+(function(){
+  "use strict";
+  function $(id){ return document.getElementById(id); }
+
+  /* ================= Γ (Lanczos) + identity self-check ==================== */
+  var LG=[676.5203681218851,-1259.1392167224028,771.32342877765313,-176.61502916214059,
+          12.507343278686905,-0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  function gamma(z){
+    if(z<0.5) return Math.PI/(Math.sin(Math.PI*z)*gamma(1-z));
+    z-=1; var x=0.99999999999980993;
+    for(var i=0;i<LG.length;i++) x+=LG[i]/(z+i+1);
+    var t=z+LG.length-0.5;
+    return Math.sqrt(2*Math.PI)*Math.pow(t,z+0.5)*Math.exp(-t)*x;
+  }
+  (function(){
+    var ws=[0.57,0.70,5.58], s="Γ(z+1)=zΓ(z) 部分積分恒等式 検証:  ";
+    for(var i=0;i<ws.length;i++){
+      s+="w="+ws[i]+": "+(gamma(1+ws[i])/(ws[i]*gamma(ws[i]))).toFixed(6)+"  ";
+    }
+    s+="| Γ(0.5)²="+(gamma(0.5)*gamma(0.5)).toFixed(6)+" (π="+Math.PI.toFixed(6)+")";
+    $("gammaDemo").textContent=s;
+  })();
+
+  /* ================= Jones heat (trefoil) ================================= */
+  function jonesV(th){
+    function e(n){ return {re:Math.cos(n*th), im:Math.sin(n*th)}; }
+    var a=e(-4), b=e(-3), c=e(-1);
+    var re=-a.re+b.re+c.re, im=-a.im+b.im+c.im;
+    return Math.sqrt(re*re+im*im);
+  }
+  function thetaOf(T){ var t=Math.max(100,Math.min(1500,T)); return (t-100)/1400*Math.PI; }
+  function jonesGrad(T){ var th=thetaOf(T), h=1e-4; return (jonesV(th+h)-jonesV(th-h))/(2*h); }
+  function partialInt(T){ // Γ多様体の部分積分 ∫₀^θ|V|dθ' (数値積分)
+    var th=thetaOf(T), N=400, s=0;
+    for(var i=0;i<N;i++) s+=jonesV((i+0.5)/N*th)*th/N;
+    return s;
+  }
+  function heatColor(T){
+    if(T==null) return "#5a748f";
+    var t=Math.max(100,Math.min(1500,T));
+    var mag=jonesV(thetaOf(T))/3;
+    var hue = t<255 ? 230-(t-100)/155*110 : Math.max(0,120-(t-255)/500*120);
+    return "hsl("+hue.toFixed(0)+","+(45+mag*50).toFixed(0)+"%,"+(42+mag*14).toFixed(0)+"%)";
+  }
+
+  /* ================= real catalog: 命の水 / 命の樹 ======================== */
+  // すべて実在の観測。T=特徴温度[K] (Jones熱感知のθを決める実測/推定値)。
+  var SITES=[
+    {n:"APM 08279+5255 (最大の水の貯蔵庫)",k:"water",loc:"sky",ra:127.9237,dec:52.7549,dist:"120億光年",T:53,
+     what:"地球の海の140兆倍の水蒸気雲 — 宇宙で知られる最大の「命の水」(Z-Spec/CARMA 2011)",
+     around:["中心: 太陽200億倍の超大質量ブラックホール (水蒸気はその周囲数百光年に分布)","クエーサー風 — X線と光で水蒸気を温める放射 (測定温度 約53K)","重力レンズ像 — 手前の銀河がこのクエーサーを約4倍に拡大して見せている"]},
+    {n:"オリオンKL 水メーザー",k:"water",loc:"sky",ra:83.8096,dec:-5.3753,dist:"1344光年",T:400,
+     what:"銀河系屈指の H₂O メーザー — 水分子が電波でレーザー発振する天然の水の灯台",
+     around:["オリオン大星雲 M42 — 最も近い大質量星形成領域","トラペジウム星団 — 星雲を照らす若い四重星","BN/KL天体 — 爆発的流出を起こした原始星群 (メーザーの励起源)"]},
+    {n:"W49N 水メーザー (銀河系最強)",k:"water",loc:"sky",ra:287.5583,dec:9.1073,dist:"3.6万光年",T:300,
+     what:"銀河系で最も明るい水メーザー — 太陽光度に匹敵する水の電波輝線",
+     around:["W49A — 銀河系最大級の星形成領域 (太陽10万個分のガス)","超コンパクトHII領域群 — 生まれたての大質量星たち","銀河円盤の反対側 — 距離3.6万光年はメーザー視差で実測"]},
+    {n:"TW Hya 原始惑星系円盤の雪線",k:"water",loc:"sky",ra:165.4663,dec:-34.7047,dist:"196光年",T:150,
+     what:"惑星が今まさに作られる円盤の水の雪線 (ALMA実測) — 海を持つ惑星の材料",
+     around:["TW Hya — 最も近い原始惑星系円盤を持つ若い星 (約1000万歳)","円盤の隙間 — 形成中の惑星が掘った溝がALMAに写る","雪線の外側 — 水の氷をまとった塵が彗星や海の素になる"]},
+    {n:"K2-18 b (ハビタブル域の水蒸気)",k:"water",loc:"sky",ra:172.5600,dec:7.5878,dist:"124光年",T:265,
+     what:"ハビタブルゾーンの惑星大気に水蒸気を検出 (ハッブル 2019・JWSTでCH₄/CO₂も)",
+     around:["主星 K2-18 — 赤色矮星 (太陽の45%の大きさ)","姉妹惑星 K2-18c — 内側を回るもう一つのスーパーアース","ハイシアン仮説 — 水素の空の下に水の海を持つ世界かもしれない (検証中)"]},
+    {n:"WASP-96 b (JWSTの水スペクトル)",k:"water",loc:"sky",ra:271.2050,dec:-47.3603,dist:"1150光年",T:1350,
+     what:"JWST最初の公開スペクトルで大気の水の指紋がくっきり (2022)",
+     around:["主星 WASP-96 — 太陽に似たG型星","3.4日で一周する熱い木星 — 雲のない澄んだ大気","いて座の銀河中心方向 — 濃い星の海の中に位置する"]},
+    {n:"エンケラドス (地下の海・間欠泉)",k:"water",loc:"sol",scene:"enceladus",dist:"土星系 (約13億km)",T:273,
+     what:"南極の間欠泉が地下の液体の海を宇宙へ噴き上げる — カッシーニが直接突入して採取",
+     around:["土星のEリング — この間欠泉の水がそのまま作っている輪","タイガーストライプ — 噴出源の4本の裂け目 (実測197K の温点)","地下の全球海 — 岩石核との熱水反応 (生命に使えるエネルギー) の証拠"]},
+    {n:"エウロパ (地球の2倍の海)",k:"water",loc:"sol",scene:"europa",dist:"木星系 (約6.3億km)",T:270,
+     what:"氷殻の下に地球の全海洋の約2倍の液体の水 — 太陽系最大の「命の水」候補",
+     around:["木星 — 潮汐力で海を温め続ける巨大惑星","イオ — 隣の衛星は太陽系一の火山世界 (同じ潮汐加熱の証明)","Europa Clipper 探査機が2030年到着予定 — 海の生命環境を実測へ"]},
+    {n:"創造の柱 (М16 わし星雲)",k:"tree",loc:"sky",ra:274.7000,dec:-13.8067,dist:"6500光年",T:20,
+     what:"星が生まれる巨大な樹状の柱 — 宇宙で最も有名な「命の樹」のかたち (ハッブル/JWST)",
+     around:["わし星雲 M16 と若い星団 NGC 6611 — 柱を照らし彫刻する星々","柱の先端のEGG (蒸発するガス球) — 中で今まさに星の卵が育つ","柱は幅約1光年・高さ数光年 — 数百万年後には蒸発して星団だけが残る"]},
+    {n:"いて座B2 (銀河中心の糖の雲)",k:"tree",loc:"sky",ra:266.8354,dec:-28.3850,dist:"2.5万光年",T:300,
+     what:"グリコールアルデヒド (RNAの前駆体になる糖) やギ酸エチルを含む巨大分子雲",
+     around:["いて座A* — 銀河系中心の超大質量ブラックホール (角度でわずか0.7°隣)","太陽300万個分のガス — 銀河系最大級の分子雲","ホットコア群 — 生まれる星の熱で複雑有機分子が次々に合成される"]},
+    {n:"リュウグウ試料 (ウラシル=RNA塩基)",k:"tree",loc:"sol",scene:"asteroid",dist:"地球近傍小惑星 (試料は地球へ)",T:250,
+     what:"はやぶさ2が持ち帰った砂からウラシル (RNAの4塩基の一つ) とビタミンB3を検出 (2023)",
+     around:["そろばん玉型の炭素質小惑星 — 太陽系誕生時の物質をそのまま保存","アミノ酸20種以上も同時に検出 — 生命の樹の「種」が宇宙を運ばれる証拠","試料カプセルは2020年オーストラリアに帰還 — 分析は今も続く"]},
+    {n:"ベンヌ試料 (全5種の核酸塩基)",k:"tree",loc:"sol",scene:"asteroid",dist:"地球近傍小惑星 (試料は地球へ)",T:250,
+     what:"OSIRIS-REx が持ち帰った試料にアミノ酸と DNA/RNA の全5塩基 (A,G,C,T,U) を確認 (2025)",
+     around:["リュウグウと同じそろばん玉型 — 水で変質した粘土鉱物が豊富","リン酸塩・アンモニアも検出 — 生命の材料一式が揃っていた","2023年ユタ州に試料帰還 — 世界中の研究室で分析中"]},
+    {n:"宇宙の断崖 (NGC 3324)",k:"tree",loc:"sky",ra:159.3542,dec:-58.6250,dist:"7600光年",T:50,
+     what:"JWST最初の公開画像 — 星の紫外線が彫る樹林のような星形成の断崖",
+     around:["りゅうこつ座星雲の縁 — 若い大質量星の紫外線が「山肌」を削る","断崖の中の原始星ジェット — JWSTが多数の生まれたての星を発見","隣にはイータ・カリーナ — 爆発寸前の超大質量星"]},
+    {n:"おうし座分子雲 TMC-1 (有機の森)",k:"tree",loc:"sky",ra:70.4375,dec:25.6833,dist:"430光年",T:10,
+     what:"−263℃の暗黒星雲に芳香族分子 (PAH) や鎖状炭素分子の「森」— 生命化学の出発点",
+     around:["おうし座分子雲 — 最も近い低質量星形成の現場","数百個の若い星と原始星 — 太陽もこんな場所で生まれた","検出分子は150種超 — 電波望遠鏡が読み取る宇宙の有機化学"]}
+  ];
+
+  /* ================= list + selection ===================================== */
+  var CUR=SITES[0], playing=true, t0=performance.now();
+  function glyph(s){ return s.k==="water"?"💧":"🌳"; }
+  function renderList(){
+    var el=$("plist"); el.innerHTML="";
+    SITES.forEach(function(s,i){
+      var d=document.createElement("div"); d.className="it"+(s===CUR?" sel":"");
+      d.innerHTML="<b>"+glyph(s)+" "+s.n+"</b><div class='t'>"+
+        (s.loc==="sky"?("RA "+s.ra.toFixed(2)+"° / Dec "+s.dec.toFixed(2)+"° · "):"太陽系 · ")+s.dist+
+        " · T≈"+s.T+"K</div>";
+      d.addEventListener("click",function(){ select(i); });
+      el.appendChild(d);
+    });
+    var p=$("pick"); p.innerHTML="";
+    SITES.forEach(function(s,i){
+      var o=document.createElement("option"); o.value=i; o.textContent=glyph(s)+" "+s.n;
+      if(s===CUR) o.selected=true;
+      p.appendChild(o);
+    });
+  }
+  $("pick").addEventListener("change",function(){ select(parseInt(this.value,10)); });
+
+  /* ================= Γ×Jones analysis (live-accumulating) ================= */
+  var ANA={target:0,cur:0,last:0};
+  function renderAnalysis(){
+    var s=CUR, th=thetaOf(s.T);
+    $("analysis").innerHTML=
+      "<b>Jones熱感知</b> — 実測/推定温度 T="+s.T+" K → <span class='f'>θ="+th.toFixed(3)+"</span>, "+
+      "<span class='f'>|V(e^{iθ})|="+jonesV(th).toFixed(4)+"</span>, 勾配 <span class='f'>d|V|/dθ="+jonesGrad(s.T).toFixed(3)+"</span><br>"+
+      "<b>Γ多様体の部分積分 (分析機能)</b> — <span class='f'>∫₀^θ|V(e^{iθ'})|dθ' = <span id='intv'>0.0000</span></span>"+
+      " (θ=π での大域積分は 5.0240)<br>"+
+      "<b>ウィーンの変位則</b> — 熱放射のピーク波長 <span class='f'>λ=2898/T="+(2898/s.T).toFixed(2)+" μm</span> "+
+      (s.T<255?"(冷たい水/分子雲 — 遠赤外〜サブミリ波で光る)":"(温かい — 赤外線で光る)");
+    ANA.target=partialInt(s.T); ANA.cur=0; ANA.last=performance.now();
+  }
+  function stepAnalysis(now){
+    if(ANA.cur>=ANA.target) return;
+    var dt=Math.min(0.1,(now-ANA.last)/1000); ANA.last=now;
+    ANA.cur=Math.min(ANA.target,ANA.cur+dt*(ANA.target/1.6));
+    var el=$("intv"); if(el) el.textContent=ANA.cur.toFixed(4);
+  }
+
+  function renderAround(){
+    var s=CUR, h="<b>"+glyph(s)+" "+s.n+"</b> — "+s.what+"<br><br>周辺に実在するもの:<ul style='margin:4px 0 0 18px;padding:0'>";
+    for(var i=0;i<s.around.length;i++) h+="<li style='margin-bottom:6px'>"+s.around[i]+"</li>";
+    h+="</ul>";
+    $("around").innerHTML=h;
+  }
+  function renderInfo(){
+    var s=CUR;
+    $("pinfo").innerHTML=
+      "<b>種別</b><span>"+(s.k==="water"?"💧 命の水 (実検出の水)":"🌳 命の樹 (樹状構造/生命材料分子)")+"</span>"+
+      "<b>位置</b><span>"+(s.loc==="sky"?("RA "+s.ra.toFixed(4)+"° / Dec "+s.dec.toFixed(4)+"° (J2000)"):"太陽系内 (軌道運動のため座標は変動)")+"</span>"+
+      "<b>距離</b><span>"+s.dist+"</span>"+
+      "<b>特徴温度</b><span>T≈"+s.T+" K <span class='swatch' style='display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;background:"+heatColor(s.T)+"'></span></span>"+
+      "<b>映像</b><span>"+(s.loc==="sky"?"DSS2実写の視野ズーム (オフライン時は簡易描画)":"プロシージャル映像 (移動天体のため)")+"</span>";
+  }
+
+  /* ================= imagery: DSS2 fov-zoom / procedural ================== */
+  var stage=$("stage"), sx=stage.getContext("2d");
+  var W=stage.width, H=stage.height;
+  var FOVS=[40,10,3,1,0.3], imgs=[], imgOK=false, selT=performance.now();
+  function hipsUrl(ra,dec,fov){
+    return "https://alasky.cds.unistra.fr/hips-image-services/hips2fits?hips=CDS%2FP%2FDSS2%2Fcolor&width=560&height=560&projection=TAN&format=jpg"+
+      "&ra="+ra+"&dec="+dec+"&fov="+fov;
+  }
+  function loadImgs(){
+    imgs=[]; imgOK=false;
+    if(CUR.loc!=="sky") return;
+    FOVS.forEach(function(f,i){
+      var im=new Image(); im.crossOrigin="anonymous";
+      im.onload=function(){ imgOK=true; };
+      im.src=hipsUrl(CUR.ra,CUR.dec,f);
+      imgs.push(im);
+    });
+  }
+  var STARS=[]; (function(){ var s=7; function r(){ s=(Math.imul(s,1664525)+1013904223)>>>0; return s/4294967296; }
+    for(var i=0;i<160;i++) STARS.push([r()*W,r()*H,r()*1.4+0.3]); })();
+
+  function drawStars(t){
+    sx.fillStyle="#9fb6d8";
+    for(var i=0;i<STARS.length;i++){ sx.globalAlpha=0.25+0.35*Math.abs(Math.sin(t*0.7+i)); sx.fillRect(STARS[i][0],STARS[i][1],STARS[i][2],STARS[i][2]); }
+    sx.globalAlpha=1;
+  }
+  function drawRings(t){ // 周辺の3項目を同心リングでラベル表示 + 熱感知パルス
+    var cx=W/2, cy=H/2;
+    for(var i=0;i<CUR.around.length;i++){
+      var rr=90+i*70;
+      sx.strokeStyle="rgba(79,216,232,0.25)"; sx.lineWidth=1;
+      sx.beginPath(); sx.arc(cx,cy,rr,0,Math.PI*2); sx.stroke();
+      sx.fillStyle="#bfeef2"; sx.font="11px sans-serif";
+      var lbl=CUR.around[i].split(" — ")[0].split("—")[0];
+      if(lbl.length>26) lbl=lbl.slice(0,26)+"…";
+      sx.fillText("周辺"+(i+1)+": "+lbl,cx+rr*0.72,cy-rr*0.72);
+    }
+    var k=((t*46)%150+150)%150;
+    sx.strokeStyle=heatColor(CUR.T); sx.lineWidth=2; sx.globalAlpha=1-k/150;
+    sx.beginPath(); sx.arc(cx,cy,12+k,0,Math.PI*2); sx.stroke(); sx.globalAlpha=1;
+    sx.strokeStyle=heatColor(CUR.T); sx.lineWidth=1.4;
+    sx.beginPath(); sx.moveTo(cx-16,cy); sx.lineTo(cx+16,cy); sx.moveTo(cx,cy-16); sx.lineTo(cx,cy+16); sx.stroke();
+  }
+  function sceneWater(t){ // オフライン用: 水メーザー/水蒸気雲の簡易描画
+    var cx=W/2, cy=H/2;
+    var g=sx.createRadialGradient(cx,cy,0,cx,cy,220);
+    g.addColorStop(0,"rgba(79,216,232,0.8)"); g.addColorStop(0.4,"rgba(30,90,140,0.5)"); g.addColorStop(1,"rgba(0,0,0,0)");
+    sx.fillStyle=g; sx.beginPath(); sx.arc(cx,cy,220,0,Math.PI*2); sx.fill();
+    for(var i=0;i<3;i++){
+      var rr=(t*40+i*70)%210;
+      sx.strokeStyle="rgba(140,230,255,"+(1-rr/210).toFixed(2)+")"; sx.lineWidth=2;
+      sx.beginPath(); sx.arc(cx,cy,20+rr,0,Math.PI*2); sx.stroke();
+    }
+    sx.fillStyle="#bfeef2"; sx.font="26px sans-serif"; sx.textAlign="center";
+    sx.fillText("💧",cx,cy+9); sx.textAlign="left";
+  }
+  function sceneTree(t){ // オフライン用: 創造の柱ふうの樹状柱
+    for(var p=0;p<3;p++){
+      var bx=W*(0.3+p*0.2), bw=46-p*8;
+      var g=sx.createLinearGradient(bx,H*0.9,bx,H*0.18);
+      g.addColorStop(0,"#1c3a24"); g.addColorStop(0.7,"#2f6b3a"); g.addColorStop(1,"#7fd8a8");
+      sx.fillStyle=g;
+      sx.beginPath(); sx.moveTo(bx-bw,H*0.92);
+      for(var y=0;y<=10;y++){
+        var yy=H*0.92-(H*0.72)*y/10, wob=Math.sin(y*1.7+p*2+t*0.4)*10;
+        sx.lineTo(bx-bw*(1-y/12)+wob,yy);
+      }
+      for(var y2=10;y2>=0;y2--){
+        var yy2=H*0.92-(H*0.72)*y2/10, wob2=Math.sin(y2*2.1+p*3+t*0.4)*10;
+        sx.lineTo(bx+bw*(1-y2/12)+wob2,yy2);
+      }
+      sx.closePath(); sx.fill();
+      sx.fillStyle="rgba(255,240,190,"+(0.5+0.3*Math.sin(t*2+p)).toFixed(2)+")";
+      sx.beginPath(); sx.arc(bx+Math.sin(p*7)*8,H*0.20-p*8,3,0,Math.PI*2); sx.fill();
+    }
+    sx.fillStyle="#bfeef2"; sx.font="24px sans-serif"; sx.fillText("🌳",W*0.06,40);
+  }
+  function sceneEnceladus(t){
+    var sxc=W*0.30, syc=H*0.42;
+    sx.fillStyle="#c8b088"; sx.beginPath(); sx.arc(sxc,syc,86,0,Math.PI*2); sx.fill(); // 土星
+    sx.strokeStyle="#e0cf9f"; sx.lineWidth=9;
+    sx.beginPath(); sx.ellipse(sxc,syc,150,38,-0.35,0,Math.PI*2); sx.stroke(); // 輪
+    sx.strokeStyle="rgba(160,220,255,0.35)"; sx.lineWidth=16;
+    sx.beginPath(); sx.ellipse(sxc,syc,210,54,-0.35,0,Math.PI*2); sx.stroke(); // Eリング (間欠泉由来)
+    var ex=W*0.72, ey=H*0.55;
+    sx.fillStyle="#eef4f8"; sx.beginPath(); sx.arc(ex,ey,34,0,Math.PI*2); sx.fill(); // エンケラドス
+    sx.strokeStyle="#8fb8d8"; sx.lineWidth=1.4;
+    for(var i2=0;i2<4;i2++){ sx.beginPath(); sx.moveTo(ex-18+i2*9,ey+16); sx.lineTo(ex-10+i2*9,ey+30); sx.stroke(); } // タイガーストライプ
+    for(var pj=0;pj<26;pj++){ // 間欠泉の粒子
+      var ph=((t*0.5)+pj*0.11)%1;
+      var px2=ex-8+pj%5*4+Math.sin(pj)*3, py2=ey+32+ph*120;
+      sx.fillStyle="rgba(190,235,255,"+(1-ph).toFixed(2)+")";
+      sx.fillRect(px2,py2,2,2);
+    }
+    sx.fillStyle="#bfeef2"; sx.font="11px sans-serif";
+    sx.fillText("エンケラドス — 南極の間欠泉 (地下の海→宇宙へ)",ex-110,ey-48);
+    sx.fillText("Eリング = この水",sxc+90,syc-70);
+  }
+  function sceneEuropa(t){
+    var jx=W*0.28, jy=H*0.45;
+    var g=sx.createLinearGradient(jx,jy-100,jx,jy+100);
+    g.addColorStop(0,"#d8b890"); g.addColorStop(0.5,"#b08858"); g.addColorStop(1,"#d8b890");
+    sx.fillStyle=g; sx.beginPath(); sx.arc(jx,jy,100,0,Math.PI*2); sx.fill(); // 木星
+    sx.strokeStyle="rgba(120,70,40,0.5)"; sx.lineWidth=8;
+    for(var b2=-2;b2<=2;b2++){ sx.beginPath(); sx.ellipse(jx,jy+b2*26,96,10,0,0,Math.PI*2); sx.stroke(); }
+    var ex=W*0.70, ey=H*0.50;
+    sx.fillStyle="#e8ddc8"; sx.beginPath(); sx.arc(ex,ey,44,0,Math.PI*2); sx.fill(); // エウロパ
+    sx.strokeStyle="#b08868"; sx.lineWidth=1.2;
+    for(var l2=0;l2<7;l2++){ sx.beginPath(); sx.moveTo(ex-40+l2*4,ey-30+l2*9); sx.lineTo(ex+38-l2*6,ey-22+l2*8); sx.stroke(); } // 線状模様
+    sx.strokeStyle="rgba(79,216,232,"+(0.5+0.3*Math.sin(t*2)).toFixed(2)+")"; sx.lineWidth=3;
+    sx.beginPath(); sx.arc(ex,ey,52,0,Math.PI*2); sx.stroke(); // 地下海のしるし
+    sx.fillStyle="#bfeef2"; sx.font="11px sans-serif";
+    sx.fillText("エウロパ — 氷殻の下に地球の2倍の海 (青リング=地下海)",ex-140,ey-62);
+    sx.fillStyle="#ffcf7a"; sx.beginPath(); sx.arc(jx+150,jy-90,5,0,Math.PI*2); sx.fill();
+    sx.fillStyle="#bfeef2"; sx.fillText("イオ (火山)",jx+160,jy-86);
+  }
+  function sceneAsteroid(t){
+    var ax=W*0.5, ay=H*0.44, rot=t*0.5;
+    sx.save(); sx.translate(ax,ay); sx.rotate(Math.sin(rot)*0.15);
+    sx.fillStyle="#4a4440";
+    sx.beginPath(); sx.moveTo(0,-64); sx.lineTo(78,0); sx.lineTo(0,64); sx.lineTo(-78,0); sx.closePath(); sx.fill(); // そろばん玉
+    sx.fillStyle="#5a544e";
+    for(var c2=0;c2<14;c2++){ var cxr=Math.sin(c2*3.1)*52, cyr=Math.cos(c2*2.3)*36;
+      sx.beginPath(); sx.arc(cxr,cyr,3+c2%4,0,Math.PI*2); sx.fill(); }
+    sx.restore();
+    sx.fillStyle="#3a80d8"; sx.beginPath(); sx.arc(W*0.86,H*0.78,14,0,Math.PI*2); sx.fill(); // 地球
+    sx.strokeStyle="rgba(200,164,74,0.7)"; sx.lineWidth=1.5; sx.setLineDash([5,5]);
+    sx.beginPath(); sx.moveTo(ax+40,ay+40); sx.quadraticCurveTo(W*0.72,H*0.5,W*0.86,H*0.76); sx.stroke(); sx.setLineDash([]);
+    sx.fillStyle="#bfeef2"; sx.font="11px sans-serif";
+    sx.fillText("炭素質小惑星 — 生命の樹の「種」(核酸塩基・アミノ酸) を保存",ax-160,ay-84);
+    sx.fillText("試料カプセル→地球へ帰還 (実施済み)",W*0.55,H*0.86);
+  }
+
+  function draw(now){
+    var t=(now-t0)/1000;
+    stepAnalysis(now);
+    sx.fillStyle="#000308"; sx.fillRect(0,0,W,H);
+    drawStars(t);
+    if(CUR.loc==="sky" && imgOK){
+      // DSS2実写の視野ズーム: FOVS をクロスフェード (広域=周辺 → 対象)
+      var CYCLE=16, ph=((now-selT)/1000%CYCLE)/CYCLE*(FOVS.length-0.001);
+      var i0=Math.floor(ph), f=ph-i0;
+      var a=imgs[i0], b2=imgs[Math.min(i0+1,FOVS.length-1)];
+      if(a&&a.complete&&a.naturalWidth){ sx.globalAlpha=1; sx.drawImage(a,W/2-280,H/2-280,560,560); }
+      if(b2&&b2.complete&&b2.naturalWidth&&f>0.6){ sx.globalAlpha=(f-0.6)/0.4; sx.drawImage(b2,W/2-280,H/2-280,560,560); sx.globalAlpha=1; }
+      sx.fillStyle="#bfeef2"; sx.font="11px sans-serif";
+      sx.fillText("DSS2 実写 — 視野 "+FOVS[i0]+"° (周辺→対象へズーム)",12,H-14);
+    } else if(CUR.loc==="sky"){
+      if(CUR.k==="water") sceneWater(t); else sceneTree(t);
+      sx.fillStyle="#8aa0c0"; sx.font="11px sans-serif";
+      sx.fillText("オフライン簡易描画 — ネット接続時は DSS2 実写ズームになります",12,H-14);
+    } else {
+      if(CUR.scene==="enceladus") sceneEnceladus(t);
+      else if(CUR.scene==="europa") sceneEuropa(t);
+      else sceneAsteroid(t);
+      sx.fillStyle="#8aa0c0"; sx.font="11px sans-serif";
+      sx.fillText("プロシージャル映像 (移動天体のため DSS2 に写らない — 正直表示)",12,H-14);
+    }
+    drawRings(t);
+    $("hud").innerHTML="<b>"+glyph(CUR)+" "+CUR.n+"</b><br>"+
+      (CUR.loc==="sky"?("位置: RA "+CUR.ra.toFixed(3)+"° / Dec "+CUR.dec.toFixed(3)+"° · "):"位置: 太陽系 · ")+CUR.dist+
+      "<br>Jones熱感知: T≈"+CUR.T+"K → |V|="+jonesV(thetaOf(CUR.T)).toFixed(3)+
+      " / Γ部分積分 ∫|V|dθ'="+ANA.cur.toFixed(3);
+    drawAtlas(t);
+  }
+
+  /* ================= all-sky atlas ======================================== */
+  var atlas=$("atlas"), ax2=atlas.getContext("2d");
+  var AW=atlas.width, AH=atlas.height, SKYH=AH-70;
+  function skyXY(s){ return [ (360-s.ra)/360*AW, (90-s.dec)/180*SKYH ]; }
+  function drawAtlas(t){
+    ax2.fillStyle="#000308"; ax2.fillRect(0,0,AW,AH);
+    ax2.strokeStyle="#14213a"; ax2.lineWidth=1;
+    for(var g2=0;g2<=6;g2++){ var yy=g2/6*SKYH; ax2.beginPath(); ax2.moveTo(0,yy); ax2.lineTo(AW,yy); ax2.stroke(); }
+    for(var g3=0;g3<=8;g3++){ var xx=g3/8*AW; ax2.beginPath(); ax2.moveTo(xx,0); ax2.lineTo(xx,SKYH); ax2.stroke(); }
+    ax2.fillStyle="rgba(140,160,200,0.10)"; // 天の川の帯 (概略)
+    ax2.beginPath(); ax2.ellipse(AW*0.5,SKYH*0.55,AW*0.52,SKYH*0.16,-0.25,0,Math.PI*2); ax2.fill();
+    ax2.strokeStyle="#1b2740"; ax2.strokeRect(0,SKYH+8,AW-1,AH-SKYH-9);
+    ax2.fillStyle="#8aa0c0"; ax2.font="11px sans-serif";
+    ax2.fillText("☀ 太陽系 (移動天体)",10,SKYH+24);
+    var solX=170;
+    SITES.forEach(function(s){
+      var x,y;
+      if(s.loc==="sky"){ var p2=skyXY(s); x=p2[0]; y=p2[1]; }
+      else { x=solX; y=SKYH+38; solX+=160; }
+      var sel3=(s===CUR);
+      var col=s.k==="water"?"#4fd8e8":"#5fd06a";
+      var pul=sel3?3*Math.abs(Math.sin(t*3)):0;
+      ax2.fillStyle=col;
+      ax2.beginPath(); ax2.arc(x,y,5+pul,0,Math.PI*2); ax2.fill();
+      ax2.strokeStyle=heatColor(s.T); ax2.lineWidth=1.4;
+      ax2.beginPath(); ax2.arc(x,y,9+pul,0,Math.PI*2); ax2.stroke();
+      if(sel3){ ax2.strokeStyle="#fff"; ax2.beginPath(); ax2.arc(x,y,14,0,Math.PI*2); ax2.stroke(); }
+      ax2.fillStyle=sel3?"#fff":"#8aa0c0"; ax2.font=(sel3?"bold ":"")+"10px sans-serif";
+      var nm=s.n.split(" (")[0];
+      ax2.fillText(glyph(s)+nm.slice(0,14),x-30,y-14);
+      s._ax=x; s._ay=y;
+    });
+  }
+  atlas.addEventListener("click",function(ev){
+    var r2=atlas.getBoundingClientRect();
+    var mx=(ev.clientX-r2.left)*AW/r2.width, my=(ev.clientY-r2.top)*AH/r2.height, best=-1, bd=1e9;
+    SITES.forEach(function(s,i){ var d2=(s._ax-mx)*(s._ax-mx)+(s._ay-my)*(s._ay-my); if(d2<bd){bd=d2;best=i;} });
+    if(best>=0&&bd<40*40) select(best);
+  });
+
+  function select(i){
+    CUR=SITES[i]; selT=performance.now();
+    renderList(); renderInfo(); renderAround(); renderAnalysis(); loadImgs();
+  }
+
+  /* ================= recorder ============================================= */
+  var recorder=null, chunks=[], recording=false;
+  $("recBtn").addEventListener("click",function(){
+    if(!recording){
+      try{
+        var stream=stage.captureStream(30);
+        var mime=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
+        recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:6e6});
+        chunks=[];
+        recorder.ondataavailable=function(e){ if(e.data.size) chunks.push(e.data); };
+        recorder.onstop=function(){
+          var blob=new Blob(chunks,{type:"video/webm"});
+          var a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+          var nm=CUR.n.replace(/[^A-Za-z0-9._-]+/g,"_").replace(/^_+|_+$/g,"");
+          a.download="aquavita"+(nm?"-"+nm:"")+".webm";
+          document.body.appendChild(a); a.click();
+          setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },200);
+          $("recNote").textContent="映像を保存しました ("+(blob.size/1024/1024).toFixed(1)+" MB)";
+        };
+        recorder.start(200); recording=true;
+        $("recBtn").textContent="⏹ 停止 / 保存"; $("recBadge").classList.add("on");
+        $("recNote").textContent="録画中…";
+      }catch(e){ $("recNote").textContent="録画失敗: "+e.message; }
+    } else {
+      recording=false; try{ recorder.stop(); }catch(e){}
+      $("recBtn").textContent="⏺ 映像を録画 (.webm)"; $("recBadge").classList.remove("on");
+    }
+  });
+  $("play").addEventListener("click",function(){
+    playing=!playing; $("play").textContent=playing?"⏸ 一時停止":"▶ 再生";
+    if(playing) requestAnimationFrame(loop);
+  });
+
+  /* ================= init ================================================= */
+  function loop(now){ draw(now); if(playing) requestAnimationFrame(loop); }
+  renderList(); select(0);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
