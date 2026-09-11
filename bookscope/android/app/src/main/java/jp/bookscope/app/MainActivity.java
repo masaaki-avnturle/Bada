@@ -2,9 +2,12 @@ package jp.bookscope.app;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -22,11 +25,13 @@ import androidx.webkit.WebViewAssetLoader;
 public class MainActivity extends Activity {
 
     private static final int REQ_CAMERA = 1;
+    private static final int REQ_FILE_CHOOSER = 2;
     private static final String START_URL =
             "https://appassets.androidplatform.net/assets/www/index.html";
 
     private WebView webView;
     private PermissionRequest pendingPermissionRequest;
+    private ValueCallback<Uri[]> pendingFileCallback;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,9 +81,41 @@ public class MainActivity extends Activity {
                     }
                 });
             }
+
+            // <input type="file"> (表紙画像のギャラリー選択) は WebView では
+            // これを実装しないと何も起きない
+            @Override
+            public boolean onShowFileChooser(WebView view,
+                    ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
+                if (pendingFileCallback != null) {
+                    pendingFileCallback.onReceiveValue(null);
+                }
+                pendingFileCallback = filePathCallback;
+                try {
+                    startActivityForResult(
+                            fileChooserParams.createIntent(), REQ_FILE_CHOOSER);
+                } catch (Exception e) {
+                    pendingFileCallback = null;
+                    filePathCallback.onReceiveValue(null);
+                    return false;
+                }
+                return true;
+            }
         });
 
         webView.loadUrl(START_URL);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_FILE_CHOOSER && pendingFileCallback != null) {
+            pendingFileCallback.onReceiveValue(
+                    WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            pendingFileCallback = null;
+            return;
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override

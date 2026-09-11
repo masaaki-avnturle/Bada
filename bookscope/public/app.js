@@ -85,24 +85,90 @@ const store = STANDALONE ? {
 };
 
 // ---------------- 表紙画像の撮影・選択 ----------------
-// スマホ・タブレットではカメラ撮影またはギャラリーから選択できる。
-// 保存サイズを抑えるため、端末内で縮小して JPEG の data URL に変換する。
+// 「カメラで撮影」はアプリ内のカメラ画面 (getUserMedia) で撮影する。
+// バーコードスキャンと同じ仕組みなので APK 版 (WebView) でも確実に動く。
+// 「画像から選択」は DOM に常駐させた file input を使う。
+// 保存サイズを抑えるため、いずれも端末内で縮小して JPEG の data URL にする。
 
-function pickCoverImage() {
+const COVER_MAX_SIZE = 640;
+
+// 撮影方法の選択シートを出し、選ばれた方法で data URL を返す (キャンセルは null)
+function chooseCoverImage() {
   return new Promise((resolve) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.addEventListener('change', async () => {
+    const sheet = $('cover-sheet');
+    const btnCamera = $('btn-sheet-camera');
+    // カメラが使えない環境 (HTTP 接続の PC など) では撮影ボタンを無効化
+    btnCamera.disabled = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    sheet.hidden = false;
+    btnCamera.onclick = () => { sheet.hidden = true; captureCoverPhoto().then(resolve); };
+    $('btn-sheet-file').onclick = () => { sheet.hidden = true; pickCoverFile().then(resolve); };
+    $('btn-sheet-cancel').onclick = () => { sheet.hidden = true; resolve(null); };
+  });
+}
+
+// アプリ内カメラで表紙を撮影する
+let coverStream = null;
+async function captureCoverPhoto() {
+  stopScanner(); // バーコード用カメラと競合しないように止める
+  const overlay = $('cover-camera');
+  const video = $('cover-video');
+  try {
+    coverStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 1280 },
+      },
+      audio: false,
+    });
+  } catch (e) {
+    toast('カメラを起動できませんでした: ' + e.message);
+    return null;
+  }
+  overlay.hidden = false;
+  video.srcObject = coverStream;
+  try { await video.play(); } catch (e) { /* 停止時の中断は無視 */ }
+
+  return new Promise((resolve) => {
+    const finish = (value) => {
+      if (coverStream) {
+        coverStream.getTracks().forEach((t) => t.stop());
+        coverStream = null;
+      }
+      video.srcObject = null;
+      overlay.hidden = true;
+      resolve(value);
+    };
+    $('btn-shoot').onclick = () => {
+      const w = video.videoWidth;
+      const h = video.videoHeight;
+      if (!w || !h) { toast('映像の準備ができていません'); return; }
+      const scale = Math.min(1, COVER_MAX_SIZE / Math.max(w, h));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(w * scale));
+      canvas.height = Math.max(1, Math.round(h * scale));
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      finish(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    $('btn-shoot-cancel').onclick = () => finish(null);
+  });
+}
+
+// ギャラリー・ファイルから表紙画像を選択する
+function pickCoverFile() {
+  return new Promise((resolve) => {
+    const input = $('cover-file');
+    input.value = '';
+    input.onchange = async () => {
       const file = input.files && input.files[0];
       if (!file) { resolve(null); return; }
       try {
-        resolve(await resizeImageToDataUrl(file, 640, 0.82));
+        resolve(await resizeImageToDataUrl(file, COVER_MAX_SIZE, 0.82));
       } catch (e) {
         toast('画像の読み込みに失敗しました');
         resolve(null);
       }
-    });
+    };
     input.click();
   });
 }
@@ -424,7 +490,7 @@ $('btn-discard').addEventListener('click', hideResult);
 // 検索結果カード: 表紙をカメラ撮影・ギャラリー選択した画像に差し替える
 $('btn-cover-photo').addEventListener('click', async () => {
   if (!currentBook) return;
-  const dataUrl = await pickCoverImage();
+  const dataUrl = await chooseCoverImage();
   if (!dataUrl) return;
   currentBook.cover = dataUrl;
   showResult(currentBook);
@@ -622,7 +688,7 @@ function bookCard(b) {
 
 // 登録済みの書籍の表紙画像を撮影・選択した画像に差し替える
 async function changeCover(b) {
-  const dataUrl = await pickCoverImage();
+  const dataUrl = await chooseCoverImage();
   if (!dataUrl) return;
   try {
     await store.update(b.id, { cover: dataUrl });
