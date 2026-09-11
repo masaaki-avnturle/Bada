@@ -17,7 +17,15 @@
 | 🏁 開始残高 | 元入金仕訳(借方 資産 / 貸方 元入金)で家計簿を開始 |
 | 💾 データ | 端末内 localStorage にのみ保存。JSON バックアップ / 読み込み、仕訳帳 CSV(Excel 対応 BOM 付き)書き出し |
 
-## 🚀 使い方
+## 📱 Android APK でインストール
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `kozuchi-v*` から **`kozuchi-kakeibo-debug.apk`** をダウンロードし、スマホ・タブレットでタップしてインストールします(初回は「提供元不明のアプリのインストール」の許可が必要です)。
+
+- APK は [`.github/workflows/kozuchi-app-build.yml`](../.github/workflows/kozuchi-app-build.yml) が GitHub Actions 上で Cordova を使ってビルドし、`kozuchi-v*` タグを付けると自動で Release に添付されます(`workflow_dispatch` で手動実行も可能。`release_tag` を空欄にすると Actions アーティファクトのみ)
+- アプリ内の「📷 カメラで撮影する」ボタンは端末の標準カメラアプリを呼び出します
+- レシート解析・簿記エンジンは [`tools/engine-test.js`](tools/engine-test.js) が CI で毎回検証します
+
+## 🚀 使い方(ブラウザ版)
 
 1. [`index.html`](index.html) を開き **「Download raw file」(⬇ アイコン)** で保存
 2. スマホ・タブレットのブラウザで開く(ホーム画面に追加するとアプリのように使えます)

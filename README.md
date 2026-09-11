@@ -67,6 +67,10 @@
 
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → スマホ・タブレットのブラウザで開き、ホーム画面に追加するとアプリのように使えます。使い方は [`kozuchi_kakeibo/`](kozuchi_kakeibo/) を参照。
 
+#### 📱 ネイティブ アプリ (Android APK)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `kozuchi-v*` から `kozuchi-kakeibo-debug.apk` をダウンロード → スマホ・タブレットにインストール(「提供元不明のアプリ」の許可が必要)。ビルドは [`kozuchi-app-build.yml`](.github/workflows/kozuchi-app-build.yml) が実行します(`kozuchi-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+
 ---
 
 ## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
