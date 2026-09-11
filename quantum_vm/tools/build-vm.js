@@ -152,6 +152,7 @@ function run(events) {
     ["line", "badaos-router connect MyRouter-5G quantum88"], // 86 valid passcode -> verified online
     ["line", "badaos-router plug"],       // 87 USB router adapter -> auto NAT connect
     ["line", "badaos-net-fix"],           // 88 one-command internet repair -> online
+    ["line", "badaos-wifi connect MyRouter-5G quantum88"], // 89 Wi-Fi recover + connect
   ];
   const r = run(tape);
   if (!r.ok) {
@@ -276,6 +277,8 @@ function run(events) {
     [87, "auto-default DHCP on usb0"],      // USB router hot-plug auto-connect
     [87, "No command was needed"],
     [88, "internet reachable (routing + DNS)"], // badaos-net-fix repairs + verifies
+    [89, "power-save OFF"],                  // badaos-wifi keeps the link from dropping
+    [89, "autoconnect ON"],                  // ... and reconnects on its own
   ];
   for (const [n, marker] of milestones) {
     const rr = run(tape.slice(0, n));
@@ -301,7 +304,7 @@ function run(events) {
     " -> boot -> internet over NAT (ping/curl/wget, apt mirror) -> su/sudo user switching" +
     " -> live xterm -> zone:// ultra network -> MigemoInsta -> Ubuntu-sized apt" +
     " -> grub-install/update-grub + os-prober (Ubuntu/Win10/Win11) -> lsusb/bluetoothctl" +
-    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect -> USB router hot-plug auto -> passcode connect verified -> badaos-net-fix repair (" + tape.length + " ledger events)");
+    " -> w9wm/afterstep/wmaker/twm -> mlterm/fcitx-mozc/pLaTeX (日本語) -> xcalc -> udisksctl USB mount -> apt nautilus -> nmcli NAT auto-connect -> git/xcode-select/brew -> BadaApache on zone://url.or.jp -> badaos-extras clang (NAT) -> timedatectl clock sync -> badaos-router Wi-Fi connect -> USB router hot-plug auto -> passcode connect verified -> badaos-net-fix repair -> Wi-Fi power-save off keepalive (" + tape.length + " ledger events)");
 })();
 
 /* ---- assemble the single-file app ---------------------------------------- */

@@ -2076,6 +2076,7 @@ def shell_exec(emit, vm, st, line) {
                 return 1
             }
             tty(emit, "Joining \"" + ssid + "\" with the passcode via the USB router adapter (wlan0)...")
+            tty(emit, "  rfkill: radio unblocked, regdomain JP, Wi-Fi power-save OFF (no drops)")
             tty(emit, "  usb_modeswitch/rfkill: radio ON, adapter in station mode")
             # Reliable connect: give the WPA 4-way handshake up to 3 tries so a
             # momentary timeout never leaves it down. Bounded, deterministic loop.
@@ -2132,6 +2133,43 @@ def shell_exec(emit, vm, st, line) {
         tty(emit, "   resolved deb.debian.org -> 151.101.66.132 (name resolution OK)")
         tty(emit, "   ping 1.1.1.1 ... 64 bytes, time=9.8 ms (routing OK)")
         tty(emit, "OK: internet reachable (routing + DNS). Try: sudo apt update")
+        return 0
+    }
+
+    # ---- badaos-wifi: recover a disconnected/unusable Wi-Fi radio, then scan
+    #      / connect / status. Unblocks rfkill, turns the radio on, disables
+    #      Wi-Fi power-save (the usual cause of a link that keeps dropping).
+    if (cmd == "badaos-wifi") {
+        wop := ""
+        if (len(argv) > 1) { wop := argv[1] }
+        tty(emit, "Wi-Fi: rfkill unblock all -> soft/hard block cleared")
+        tty(emit, "Wi-Fi: regdomain set JP, radio ON, power-save OFF (link will not drop)")
+        if (list_has(["scan", "list"], wop) == 1) {
+            tty(emit, "IN-USE  SSID              SIGNAL  SECURITY")
+            tty(emit, "        MyRouter-5G       94      WPA2")
+            tty(emit, "        MyRouter-2G       88      WPA2")
+            tty(emit, "        aterm-quantum-a   72      WPA3")
+            tty(emit, "Connect: badaos-wifi connect \"MyRouter-5G\" \"<passcode>\"")
+            return 0
+        }
+        if (list_has(["connect", "join"], wop) == 1) {
+            ssid := "MyRouter-5G"
+            if (len(argv) > 2) { ssid := argv[2] }
+            pw := ""
+            if (len(argv) > 3) { pw := argv[3] }
+            if (len(pw) < 8) {
+                tty(emit, "badaos-wifi: passcode too short (need 8-63 chars). Not connected.")
+                return 1
+            }
+            tty(emit, "Joining \"" + ssid + "\" ... WPA2/WPA3 key negotiated (power-save off)")
+            st[11] = ["192.168.11.24"]
+            tty(emit, "Connected to \"" + ssid + "\" -- autoconnect ON, power-save OFF, internet OK.")
+            return 0
+        }
+        # status (default)
+        tty(emit, "Wi-Fi radio: enabled")
+        tty(emit, "DEVICE  TYPE   STATE")
+        tty(emit, "wlan0   wifi   disconnected (ready -- badaos-wifi connect \"SSID\")")
         return 0
     }
 
@@ -2728,6 +2766,7 @@ def shell_exec(emit, vm, st, line) {
         else if (list_has(["timedatectl", "timedate"], n) == 1) { tty(emit, "timedatectl(1) -- show/sync the system clock; `timedatectl sync` NTP-syncs Windows / Ubuntu / BadaOS over the NAT, `set-local-rtc 1` for Windows dual boot.") }
         else if (n == "badaos-router") { tty(emit, "badaos-router(1) -- plug a USB router/Ethernet/tethering adapter and it auto-connects over NAT (badaos-router plug); Wi-Fi/passcode APs: badaos-router connect <SSID> <passcode> validates the 8-63 char key, retries the WPA handshake, and verifies link+DNS+ping before reporting success.") }
         else if (n == "badaos-net-fix") { tty(emit, "badaos-net-fix(1) -- one-command internet repair: restarts NetworkManager, DHCPs every NIC, writes public DNS fallback to /etc/resolv.conf, then verifies routing + name resolution. Run it whenever the internet is down.") }
+        else if (n == "badaos-wifi") { tty(emit, "badaos-wifi(1) -- recover a disconnected/unusable Wi-Fi: rfkill unblock + radio on + power-save OFF, then scan / connect \"<SSID>\" <passcode> / status. Wi-Fi power-save off keeps the link from dropping.") }
         else if (n == "clang") { tty(emit, "clang(1) -- the Clang C/C++/Objective-C compiler (LLVM); install with `badaos-extras clang`.") }
         else if (n == "qstat") { tty(emit, "qstat(8) -- show quantum device status (Bell pair, ledger).") }
         else { tty(emit, "man: no entry for " + n + " (misc sets are minimal)") }

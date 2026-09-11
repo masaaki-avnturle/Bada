@@ -89,17 +89,25 @@ done
 # (nm-connection-editor, nm-applet). Best effort so a rename never sinks the ISO.
 chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq network-manager-gnome || true
 
-# EXTERNAL router / USB Wi-Fi / USB LTE dongles: when one is plugged in it is
-# auto-recognized (usb-modeswitch flips CD-mode dongles to their modem/NIC
+# Wi-Fi / EXTERNAL router / USB Wi-Fi / USB LTE dongles: when one is plugged in
+# it is auto-recognized (usb-modeswitch flips CD-mode dongles to their modem/NIC
 # interface; ModemManager drives LTE/3G; wpasupplicant + iw drive Wi-Fi), and
 # NetworkManager offers it as a connection you unlock with the router password.
-# firmware for the common USB Wi-Fi/LTE chipsets is baked in (non-free-firmware).
+# Firmware for the common built-in AND USB Wi-Fi/LTE chipsets is baked in
+# (non-free-firmware) so a wlan interface actually appears, plus wireless-regdb
+# + the regulatory tools so the radio is allowed to transmit on JP channels.
 for p in wpasupplicant iw wireless-tools rfkill usb-modeswitch modemmanager \
+         wireless-regdb crda net-tools \
          firmware-realtek firmware-atheros firmware-iwlwifi firmware-brcm80211 \
-         firmware-misc-nonfree; do
+         firmware-ralink firmware-ti-connectivity firmware-zd1211 \
+         firmware-libertas firmware-linux-free firmware-misc-nonfree; do
   chroot "$CHROOT" env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "$p" || true
 done
 chroot "$CHROOT" systemctl enable ModemManager 2>/dev/null || true
+# regulatory domain: Japan (so 2.4/5 GHz channels the router uses are permitted)
+echo 'REGDOMAIN=JP' > "$CHROOT/etc/default/crda" 2>/dev/null || true
+mkdir -p "$CHROOT/etc/modprobe.d"
+echo 'options cfg80211 ieee80211_regdom=JP' > "$CHROOT/etc/modprobe.d/badaos-regdom.conf"
 
 echo "==> Japanese locale (ja_JP.UTF-8)"
 sed -i 's/^# *ja_JP.UTF-8 UTF-8/ja_JP.UTF-8 UTF-8/' "$CHROOT/etc/locale.gen" 2>/dev/null || true
@@ -149,6 +157,16 @@ unmanaged-devices=none
 
 [device]
 wifi.scan-rand-mac-address=no
+# use wpa_supplicant (not iwd) so every chipset NetworkManager knows works
+wifi.backend=wpa_supplicant
+
+[connection]
+# turn Wi-Fi POWER SAVING OFF (2 = disable). Aggressive powersave is the #1
+# reason a laptop's Wi-Fi "keeps disconnecting" / drops to unusable -- with it
+# off the link stays up.
+wifi.powersave=2
+# keep retrying autoconnect forever instead of giving up after a few tries
+connection.autoconnect-retries=0
 EOF
 # /etc/network/interfaces must define ONLY loopback, otherwise ifupdown claims
 # the ethernet NIC and NetworkManager marks it unmanaged -> no auto internet.
@@ -247,11 +265,22 @@ printf '# BadaOS: NetworkManager rewrites this from DHCP. Fallback resolvers:\nn
 cat > "$CHROOT/usr/local/sbin/badaos-net-up" <<'EOF'
 #!/bin/sh
 # BadaOS network self-heal (run at boot by badaos-net.service)
+# Wi-Fi first: a soft/hard rfkill block or a powered-off radio leaves Wi-Fi
+# "disconnected / unusable", so ALWAYS unblock and switch the radio on at boot.
+command -v rfkill >/dev/null 2>&1 && rfkill unblock all >/dev/null 2>&1 || true
+command -v iw >/dev/null 2>&1 && iw reg set JP >/dev/null 2>&1 || true
+nmcli radio all on >/dev/null 2>&1 || true
+nmcli radio wifi on >/dev/null 2>&1 || true
 nmcli networking on >/dev/null 2>&1 || true
 # give slow NIC drivers a moment to register
 i=0; while [ "$i" -lt 10 ]; do
   nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | grep -qE ':(ethernet|wifi):' && break
   i=$((i+1)); sleep 1
+done
+# kill Wi-Fi power-saving on every wireless interface (keeps the link from
+# dropping); best effort with iw, ignored where unsupported
+for wif in $(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2=="wifi"{print $1}'); do
+  iw dev "$wif" set power_save off >/dev/null 2>&1 || true
 done
 # connect every managed wired/tethering device that is not already up
 nmcli -t -f DEVICE,TYPE,STATE device 2>/dev/null | while IFS=: read -r dev typ state; do
@@ -301,6 +330,17 @@ cat > "$CHROOT/usr/local/bin/badaos-net-fix" <<'EOF'
 [ "$(id -u)" = 0 ] && S="" || S="sudo"
 echo "== BadaOS network fix =="
 $S systemctl unmask systemd-networkd 2>/dev/null; $S systemctl mask systemd-networkd 2>/dev/null || true
+# Wi-Fi recovery: unblock the radio (rfkill), set the regdomain, turn Wi-Fi on
+# and kill power-saving -- this is what makes a "disconnected / unusable" Wi-Fi
+# come back.
+echo "-> Wi-Fi: unblocking radio (rfkill) + power-save off ..."
+$S rfkill unblock all 2>/dev/null || true
+$S iw reg set JP 2>/dev/null || true
+nmcli radio all on 2>/dev/null || true
+nmcli radio wifi on 2>/dev/null || true
+for wif in $(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2=="wifi"{print $1}'); do
+  $S iw dev "$wif" set power_save off 2>/dev/null || true
+done
 echo "-> restarting NetworkManager ..."
 $S systemctl restart NetworkManager 2>/dev/null || $S service network-manager restart 2>/dev/null || true
 nmcli networking on 2>/dev/null || true
@@ -336,6 +376,68 @@ fi
 EOF
 chmod 0755 "$CHROOT/usr/local/bin/badaos-net-fix"
 
+# ---------------------------------------------------------------------------
+# `badaos-wifi` -- dedicated Wi-Fi command that always recovers the radio first
+# (rfkill unblock + radio on + power-save off), then scans / connects / shows
+# status. Fixes the common "Wi-Fi is disconnected and unusable" state.
+cat > "$CHROOT/usr/local/bin/badaos-wifi" <<'EOF'
+#!/bin/sh
+# BadaOS Wi-Fi helper -- recover the radio, then scan / connect / status
+[ "$(id -u)" = 0 ] && S="" || S="sudo"
+wifi_up() {
+  $S rfkill unblock all 2>/dev/null || true
+  $S iw reg set JP 2>/dev/null || true
+  nmcli radio wifi on 2>/dev/null || true
+  for wif in $(nmcli -t -f DEVICE,TYPE device 2>/dev/null | awk -F: '$2=="wifi"{print $1}'); do
+    $S iw dev "$wif" set power_save off 2>/dev/null || true
+  done
+}
+case "${1:-}" in
+  ""|status)
+    wifi_up
+    echo "Wi-Fi radio:"; nmcli radio wifi 2>/dev/null || true
+    echo "rfkill:"; rfkill list 2>/dev/null | sed -n '1,12p'
+    echo "devices:"; nmcli -f DEVICE,TYPE,STATE device status 2>/dev/null | grep -i wifi || echo "  (no Wi-Fi device -- missing firmware? see: dmesg | grep -i firmware)"
+    ;;
+  scan|list)
+    wifi_up; sleep 1
+    nmcli device wifi rescan 2>/dev/null || true
+    nmcli -f IN-USE,SSID,SIGNAL,SECURITY device wifi list 2>/dev/null || true
+    echo "Connect: badaos-wifi connect \"<SSID>\" \"<passcode>\""
+    ;;
+  connect|join)
+    SSID="${2:?usage: badaos-wifi connect \"<SSID>\" [passcode]}"
+    PW="${3:-}"
+    wifi_up
+    if [ -z "$PW" ]; then
+      printf 'Passcode for "%s": ' "$SSID" >&2
+      stty -echo 2>/dev/null || true; read -r PW || true; stty echo 2>/dev/null || true; echo >&2
+    fi
+    LEN=$(printf %s "$PW" | wc -c)
+    if [ "$LEN" -lt 8 ] || [ "$LEN" -gt 63 ]; then
+      echo "Passcode is $LEN chars -- a Wi-Fi passcode is 8-63. Re-enter it." >&2; exit 1
+    fi
+    ok=0; i=1
+    while [ "$i" -le 3 ]; do
+      echo "Joining \"$SSID\" (try $i/3) ..."
+      if nmcli device wifi connect "$SSID" password "$PW"; then ok=1; break; fi
+      nmcli device wifi rescan 2>/dev/null || true; sleep 2; i=$((i+1))
+    done
+    [ "$ok" = 1 ] || { echo "Could not join \"$SSID\" (passcode/signal?)." >&2; exit 1; }
+    # make it persistent + power-save off so it does NOT disconnect again
+    nmcli connection modify "$SSID" connection.autoconnect yes 802-11-wireless.powersave 2 2>/dev/null || true
+    if ping -c1 -W3 deb.debian.org >/dev/null 2>&1; then
+      echo "Connected to \"$SSID\" -- internet OK (autoconnect on, power-save off)."
+    else
+      echo "Associated with \"$SSID\"; verifying DNS/route ... run badaos-net-fix if still down."
+    fi
+    ;;
+  *)
+    echo "usage: badaos-wifi [status] | scan | connect \"<SSID>\" [passcode]" ;;
+esac
+EOF
+chmod 0755 "$CHROOT/usr/local/bin/badaos-wifi"
+
 cat > "$CHROOT/etc/motd" <<'EOF'
 BadaOS GNU/Quantum 12.0 -- the real machine build
 
@@ -362,10 +464,13 @@ BadaOS GNU/Quantum 12.0 -- the real machine build
   * EXTERNAL router / USB Ethernet / tethering / LTE adapter: JUST PLUG IT
     into a USB port -- it is auto-recognized and NetworkManager DHCPs it
     automatically, so you are online over the new uplink (NAT) with no
-    command and no password. (Wi-Fi APs that need a key: run
-    `badaos-router connect "SSID"` and enter the passcode when prompted --
-    it validates the 8-63 char key, retries, and verifies link+DNS+ping
-    before saying Connected; scan/status: badaos-router)
+    command and no password.
+  * Wi-Fi: the radio is unblocked (rfkill) and power-saving is OFF at boot so
+    the link does NOT keep dropping. If Wi-Fi is disconnected/unusable:
+        badaos-wifi              # recover radio + show status
+        badaos-wifi scan         # list networks in range
+        badaos-wifi connect "SSID"   # enter the passcode -> stays connected
+    (badaos-router connect "SSID" and the nm-applet tray icon also work.)
   * clock sync: `timedatectl` -- systemd-timesyncd keeps BadaOS / Ubuntu /
     Windows in step over NTP (via the NAT). `timedatectl set-local-rtc 1`
     keeps the shared RTC in local time for a Windows dual boot

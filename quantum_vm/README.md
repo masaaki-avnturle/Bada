@@ -78,6 +78,12 @@
    **もしインターネットに繋がらない時は `badaos-net-fix` を実行**すると、
    NetworkManager を再起動 → 全 NIC を DHCP → DNS を修復 → ルーティングと名前解決を
    検証し、どの段階(リンク/IP/DNS/経路)で失敗したかまで表示します。
+   **Wi-Fi が切断されて使えない場合**は、起動時に **rfkill のブロック解除・ラジオ ON・
+   Wi-Fi パワーセーブ OFF**(リンクが落ち続ける最大の原因を無効化)を自動で行い、
+   規制ドメインを JP に設定、内蔵/USB Wi-Fi チップのファームウェアを同梱します。
+   手動では **`badaos-wifi`** で復旧できます:`badaos-wifi`(ラジオ復旧+状態表示)/
+   `badaos-wifi scan`(周辺 AP 一覧)/ `badaos-wifi connect "SSID"`(パスコードを入力 →
+   パワーセーブ OFF・autoconnect ON で接続し、切れない)。
    **外部ルーターの USB アダプタ**を PC(BadaOS)の USB コネクタに挿すだけで、
    **コマンドもパスワードも要らず、自動で NAT 越しにインターネットへ接続**します:
    udev が新しい net インターフェース(CDC-ECM の `usb0`)を検出 →
