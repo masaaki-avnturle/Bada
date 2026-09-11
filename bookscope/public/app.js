@@ -583,6 +583,32 @@ $('btn-register').addEventListener('click', async () => {
 
 let allBooks = [];
 
+// この冊数以上登録されたら、自動的に「表紙だけのギャラリー表示」に切り替える
+const GALLERY_MIN_BOOKS = 10;
+const VIEW_KEY = 'bookscope-view';
+
+function loadViewPref() {
+  try {
+    const v = localStorage.getItem(VIEW_KEY);
+    return v === 'list' || v === 'gallery' ? v : 'auto';
+  } catch (e) { return 'auto'; }
+}
+function saveViewPref(v) {
+  try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 保存できなくても動作は継続 */ }
+}
+
+$('view-mode').value = loadViewPref();
+$('view-mode').addEventListener('change', () => {
+  saveViewPref($('view-mode').value);
+  renderList();
+});
+
+function currentViewMode() {
+  const pref = $('view-mode').value;
+  if (pref === 'list' || pref === 'gallery') return pref;
+  return allBooks.length >= GALLERY_MIN_BOOKS ? 'gallery' : 'list';
+}
+
 async function refreshList() {
   try {
     allBooks = await store.list();
@@ -614,8 +640,22 @@ function filteredBooks() {
 
 function renderList() {
   const books = filteredBooks();
+  const mode = currentViewMode();
   $('list-count').textContent = `${books.length} 冊 / 全 ${allBooks.length} 冊`;
   $('list-empty').hidden = allBooks.length > 0;
+
+  const tableWrap = document.querySelector('.table-wrap');
+  const cards = $('book-cards');
+  const gallery = $('book-gallery');
+  tableWrap.hidden = mode !== 'list';
+  cards.hidden = mode !== 'list';
+  gallery.hidden = mode !== 'gallery';
+
+  if (mode === 'gallery') {
+    gallery.textContent = '';
+    for (const b of books) gallery.append(galleryTile(b));
+    return;
+  }
 
   // テーブル(タブレット・PC 向け)
   const tbody = $('book-tbody');
@@ -637,10 +677,103 @@ function renderList() {
   }
 
   // カード(スマホ向け)
-  const cards = $('book-cards');
   cards.textContent = '';
   for (const b of books) cards.append(bookCard(b));
 }
+
+// ---------------- 表紙ギャラリー表示 ----------------
+
+// 表紙タイル。ポイント (ホバー) で内容の概要をその場に表示し、
+// タップ/クリックで詳細を開く。
+function galleryTile(b) {
+  const tile = document.createElement('div');
+  tile.className = 'gallery-item';
+  tile.tabIndex = 0;
+
+  if (b.cover) {
+    const img = document.createElement('img');
+    img.loading = 'lazy';
+    img.src = b.cover;
+    img.alt = b.title || '表紙';
+    tile.append(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'gallery-placeholder';
+    ph.textContent = b.title || '(タイトルなし)';
+    tile.append(ph);
+  }
+
+  const info = document.createElement('div');
+  info.className = 'hover-info';
+  const t = document.createElement('p');
+  t.className = 'hi-title';
+  t.textContent = b.title || '';
+  info.append(t);
+  if (b.author) {
+    const a = document.createElement('p');
+    a.textContent = b.author;
+    info.append(a);
+  }
+  if (b.description) {
+    const d = document.createElement('p');
+    d.textContent = b.description;
+    info.append(d);
+  }
+  tile.append(info);
+
+  const open = () => showBookDetail(b);
+  tile.addEventListener('click', open);
+  tile.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); }
+  });
+  return tile;
+}
+
+// 書籍の詳細 (表紙・書誌情報・内容) を表示する
+let detailBook = null;
+
+function showBookDetail(b) {
+  detailBook = b;
+  $('detail-title').textContent = b.title || '';
+  $('detail-author').textContent = b.author ? `著者: ${b.author}` : '';
+  $('detail-publisher').textContent = [b.publisher, b.pubdate].filter(Boolean).join(' / ');
+  $('detail-isbn').textContent = b.isbn ? `ISBN: ${b.isbn}` : '';
+  $('detail-desc').textContent = b.description || '(内容の概要は登録されていません)';
+
+  const img = $('detail-cover');
+  const noCover = $('detail-no-cover');
+  if (b.cover) {
+    img.src = b.cover;
+    img.hidden = false;
+    noCover.style.display = 'none';
+  } else {
+    img.hidden = true;
+    noCover.style.display = 'flex';
+  }
+  $('book-detail').hidden = false;
+}
+
+function hideBookDetail() {
+  $('book-detail').hidden = true;
+  detailBook = null;
+}
+
+$('btn-detail-close').addEventListener('click', hideBookDetail);
+$('book-detail').addEventListener('click', (ev) => {
+  if (ev.target === $('book-detail')) hideBookDetail(); // 背景タップで閉じる
+});
+$('btn-detail-cover').addEventListener('click', () => {
+  if (!detailBook) return;
+  const b = detailBook;
+  hideBookDetail();
+  changeCover(b);
+});
+$('btn-detail-delete').addEventListener('click', () => {
+  if (!detailBook) return;
+  const b = detailBook;
+  hideBookDetail();
+  deleteBook(b);
+});
 
 function td(text, cls) {
   const el = document.createElement('td');

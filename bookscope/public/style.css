@@ -13,6 +13,9 @@
 
 * { box-sizing: border-box; }
 
+/* hidden 属性は他の display 指定より常に優先する */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
@@ -191,6 +194,78 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
 #book-table .desc-cell p { margin: 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 
 .book-cards { display: none; flex-direction: column; gap: 10px; }
+
+/* ---------- 表紙ギャラリー表示 ---------- */
+
+.book-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.gallery-item {
+  position: relative;
+  aspect-ratio: 3 / 4.3;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.gallery-item:hover, .gallery-item:focus { outline: 2px solid var(--green); }
+.gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.gallery-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: #e4e9e6;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  word-break: break-word;
+}
+
+/* 表紙にポイント (ホバー/フォーカス) すると内容をその場に表示 */
+.hover-info {
+  position: absolute;
+  inset: 0;
+  background: rgba(18, 33, 27, 0.9);
+  color: #fff;
+  padding: 8px;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  overflow: hidden;
+}
+.gallery-item:hover .hover-info,
+.gallery-item:focus .hover-info { opacity: 1; }
+.hover-info .hi-title { font-weight: 700; font-size: 0.8rem; margin: 0 0 4px; }
+.hover-info p {
+  margin: 2px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 7;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 書籍の詳細カード */
+.detail-card {
+  background: var(--card);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 16px;
+}
+.detail-desc { white-space: pre-wrap; font-size: 0.92rem; line-height: 1.7; }
 
 .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
 
