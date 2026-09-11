@@ -92,14 +92,25 @@ const store = STANDALONE ? {
 
 const COVER_MAX_SIZE = 640;
 
-// 撮影方法の選択シートを出し、選ばれた方法で data URL を返す (キャンセルは null)
-function chooseCoverImage() {
+// 登録方法の選択シートを出し、選ばれた方法で表紙 (data URL または画像 URL) を
+// 返す (キャンセル・取得失敗は null)。isbn を渡すと「ISBN から取得」も選べる。
+function chooseCoverImage(isbn) {
   return new Promise((resolve) => {
     const sheet = $('cover-sheet');
+    const btnIsbn = $('btn-sheet-isbn');
     const btnCamera = $('btn-sheet-camera');
+    // ISBN がない書籍では ISBN 取得ボタンを隠す
+    btnIsbn.hidden = !toBookIsbn13(isbn);
     // カメラが使えない環境 (HTTP 接続の PC など) では撮影ボタンを無効化
     btnCamera.disabled = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
     sheet.hidden = false;
+    btnIsbn.onclick = async () => {
+      sheet.hidden = true;
+      toast('ISBN から表紙を検索しています…');
+      const url = await fetchCoverByIsbn(isbn);
+      if (!url) toast('この ISBN の表紙が見つかりませんでした');
+      resolve(url);
+    };
     btnCamera.onclick = () => { sheet.hidden = true; captureCoverPhoto().then(resolve); };
     $('btn-sheet-file').onclick = () => { sheet.hidden = true; pickCoverFile().then(resolve); };
     $('btn-sheet-cancel').onclick = () => { sheet.hidden = true; resolve(null); };
@@ -315,7 +326,62 @@ async function lookupBook(isbn13) {
       }
     }
   }
+  // 表紙は「実際に表示できる URL」を ISBN から解決して登録する
+  if (book) {
+    const cover = await resolveCoverUrl(isbn13, book.cover);
+    book.cover = cover || book.cover || '';
+  }
   return book;
+}
+
+// ---------------- ISBN からの表紙取得 ----------------
+// openBD / 国立国会図書館 (NDL) 書影 / Google Books の順に候補を試し、
+// 実際に読み込めた画像の URL を返す (見つからなければ null)。
+
+function coverCandidates(isbn13, knownCover) {
+  return [
+    knownCover,
+    `https://cover.openbd.jp/${isbn13}.jpg`,
+    `https://ndlsearch.ndl.go.jp/thumbnail/${isbn13}.jpg`,
+  ];
+}
+
+function imageLoads(url, timeoutMs) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const timer = setTimeout(() => { img.src = ''; resolve(false); }, timeoutMs || 4000);
+    img.onload = () => {
+      clearTimeout(timer);
+      resolve(img.naturalWidth > 1 && img.naturalHeight > 1);
+    };
+    img.onerror = () => { clearTimeout(timer); resolve(false); };
+    img.referrerPolicy = 'no-referrer';
+    img.src = url;
+  });
+}
+
+async function firstLoadableImage(urls) {
+  for (const url of [...new Set(urls.filter(Boolean))]) {
+    if (url.startsWith('data:')) return url; // 撮影画像はそのまま使える
+    if (await imageLoads(url)) return url;
+  }
+  return null;
+}
+
+async function resolveCoverUrl(isbn13, knownCover) {
+  return firstLoadableImage(coverCandidates(isbn13, knownCover));
+}
+
+// 登録済み書籍などの ISBN から表紙を取得する (Google Books の候補も加える)
+async function fetchCoverByIsbn(isbn) {
+  const isbn13 = toBookIsbn13(isbn);
+  if (!isbn13) return null;
+  const candidates = coverCandidates(isbn13, null);
+  try {
+    const g = await fetchGoogleBooks(isbn13);
+    if (g && g.cover) candidates.push(g.cover);
+  } catch (e) { /* オフライン時などは残りの候補だけ試す */ }
+  return firstLoadableImage(candidates);
 }
 
 // ---------------- スキャナー ----------------
@@ -490,7 +556,7 @@ $('btn-discard').addEventListener('click', hideResult);
 // 検索結果カード: 表紙をカメラ撮影・ギャラリー選択した画像に差し替える
 $('btn-cover-photo').addEventListener('click', async () => {
   if (!currentBook) return;
-  const dataUrl = await chooseCoverImage();
+  const dataUrl = await chooseCoverImage(currentBook.isbn);
   if (!dataUrl) return;
   currentBook.cover = dataUrl;
   showResult(currentBook);
@@ -688,7 +754,7 @@ function bookCard(b) {
 
 // 登録済みの書籍の表紙画像を撮影・選択した画像に差し替える
 async function changeCover(b) {
-  const dataUrl = await chooseCoverImage();
+  const dataUrl = await chooseCoverImage(b.isbn);
   if (!dataUrl) return;
   try {
     await store.update(b.id, { cover: dataUrl });
