@@ -33,6 +33,7 @@ body {
   z-index: 10;
 }
 .app-header h1 { margin: 0 0 8px; font-size: 1.25rem; }
+.app-version { font-size: 0.7rem; opacity: 0.75; font-weight: 400; }
 
 .tabs { display: flex; gap: 4px; }
 .tab {
@@ -203,9 +204,11 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
   gap: 10px;
 }
 
+/* 古い Android WebView でも動くよう aspect-ratio や inset は使わず、
+   padding-bottom による比率固定 + 絶対配置で組む */
 .gallery-item {
   position: relative;
-  aspect-ratio: 3 / 4.3;
+  padding-bottom: 140%; /* 表紙の縦横比 (幅の 140% の高さ) */
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -214,9 +217,20 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 .gallery-item:hover, .gallery-item:focus { outline: 2px solid var(--green); }
-.gallery-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gallery-item img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 
 .gallery-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -233,7 +247,10 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
 /* 表紙にポイント (ホバー/フォーカス) すると内容をその場に表示 */
 .hover-info {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: rgba(18, 33, 27, 0.9);
   color: #fff;
   padding: 8px;

@@ -10,6 +10,22 @@
 
 const $ = (id) => document.getElementById(id);
 
+// アプリのバージョン (端末に入っている APK が最新かどうかの確認用に表示する)
+const APP_VERSION = '1.4';
+$('app-version').textContent = 'v' + APP_VERSION;
+
+// 端末上で起きたエラーを画面に出す (原因調査をしやすくするため)
+window.addEventListener('error', (ev) => {
+  try { toast('エラー: ' + (ev.message || '不明なエラー')); } catch (e) { /* noop */ }
+});
+
+// http:// の表紙 URL は https ページ (APK 版含む) では混在コンテンツとして
+// ブロックされ画像が写らないため、常に https:// に直して使う
+function httpsCover(url) {
+  const u = String(url || '');
+  return u.indexOf('http://') === 0 ? 'https://' + u.slice(7) : u;
+}
+
 // ---------------- データ保存先 (サーバー API / 端末内ストレージ) ----------------
 // APK 版(Android WebView)ではサーバーがないため、localStorage に保存する。
 const STANDALONE =
@@ -279,7 +295,7 @@ async function fetchOpenBd(isbn13) {
     author: s.author || '',
     publisher: s.publisher || '',
     pubdate: formatPubdate(s.pubdate || ''),
-    cover: s.cover || '',
+    cover: httpsCover(s.cover),
     description,
   };
 }
@@ -291,7 +307,7 @@ async function fetchGoogleBooks(isbn13) {
   const info = data.items && data.items[0] && data.items[0].volumeInfo;
   if (!info) return null;
   let cover = (info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail)) || '';
-  cover = cover.replace(/^http:/, 'https:');
+  cover = httpsCover(cover);
   return {
     isbn: isbn13,
     title: info.title || '',
@@ -349,21 +365,32 @@ function coverCandidates(isbn13, knownCover) {
 function imageLoads(url, timeoutMs) {
   return new Promise((resolve) => {
     const img = new Image();
-    const timer = setTimeout(() => { img.src = ''; resolve(false); }, timeoutMs || 4000);
+    // モバイル回線は遅いことがあるため余裕をもって待つ
+    const timer = setTimeout(() => { img.src = ''; resolve(false); }, timeoutMs || 10000);
     img.onload = () => {
       clearTimeout(timer);
       resolve(img.naturalWidth > 1 && img.naturalHeight > 1);
     };
     img.onerror = () => { clearTimeout(timer); resolve(false); };
-    img.referrerPolicy = 'no-referrer';
+    try { img.referrerPolicy = 'no-referrer'; } catch (e) { /* 未対応でも続行 */ }
     img.src = url;
   });
 }
 
+// 候補を並列で確認し、優先順で最初に表示できた URL を返す
 async function firstLoadableImage(urls) {
-  for (const url of [...new Set(urls.filter(Boolean))]) {
-    if (url.startsWith('data:')) return url; // 撮影画像はそのまま使える
-    if (await imageLoads(url)) return url;
+  const list = [];
+  for (const raw of urls) {
+    const u = httpsCover(raw);
+    if (u && list.indexOf(u) < 0) list.push(u);
+  }
+  for (const u of list) {
+    if (u.indexOf('data:') === 0) return u; // 撮影画像はそのまま使える
+  }
+  if (list.length === 0) return null;
+  const results = await Promise.all(list.map((u) => imageLoads(u)));
+  for (let i = 0; i < list.length; i++) {
+    if (results[i]) return list[i];
   }
   return null;
 }
@@ -527,7 +554,7 @@ function showResult(book) {
   const img = $('result-cover');
   const noCover = $('result-no-cover');
   if (book.cover) {
-    img.src = book.cover;
+    img.src = httpsCover(book.cover);
     img.hidden = false;
     noCover.style.display = 'none';
   } else {
@@ -597,17 +624,19 @@ function saveViewPref(v) {
   try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 保存できなくても動作は継続 */ }
 }
 
-$('view-mode').value = loadViewPref();
-$('view-mode').addEventListener('change', () => {
-  saveViewPref($('view-mode').value);
-  renderList();
-});
+let viewPref = loadViewPref();
 
 function currentViewMode() {
-  const pref = $('view-mode').value;
-  if (pref === 'list' || pref === 'gallery') return pref;
+  if (viewPref === 'list' || viewPref === 'gallery') return viewPref;
   return allBooks.length >= GALLERY_MIN_BOOKS ? 'gallery' : 'list';
 }
+
+// ワンタップで「一覧表 ⇔ 表紙ギャラリー」を切り替えるボタン
+$('btn-view-toggle').addEventListener('click', () => {
+  viewPref = currentViewMode() === 'gallery' ? 'list' : 'gallery';
+  saveViewPref(viewPref);
+  renderList();
+});
 
 async function refreshList() {
   try {
@@ -650,6 +679,8 @@ function renderList() {
   tableWrap.hidden = mode !== 'list';
   cards.hidden = mode !== 'list';
   gallery.hidden = mode !== 'gallery';
+  $('btn-view-toggle').textContent =
+    mode === 'gallery' ? '📋 一覧表示にする' : '🖼 表紙表示にする';
 
   if (mode === 'gallery') {
     gallery.textContent = '';
@@ -693,7 +724,7 @@ function galleryTile(b) {
   if (b.cover) {
     const img = document.createElement('img');
     img.loading = 'lazy';
-    img.src = b.cover;
+    img.src = httpsCover(b.cover);
     img.alt = b.title || '表紙';
     tile.append(img);
   } else {
@@ -743,7 +774,7 @@ function showBookDetail(b) {
   const img = $('detail-cover');
   const noCover = $('detail-no-cover');
   if (b.cover) {
-    img.src = b.cover;
+    img.src = httpsCover(b.cover);
     img.hidden = false;
     noCover.style.display = 'none';
   } else {
@@ -788,7 +819,7 @@ function tdCover(b) {
     const img = document.createElement('img');
     img.className = 'cover';
     img.loading = 'lazy';
-    img.src = b.cover;
+    img.src = httpsCover(b.cover);
     img.alt = '';
     el.append(img);
   }
@@ -831,7 +862,7 @@ function bookCard(b) {
     const img = document.createElement('img');
     img.className = 'cover';
     img.loading = 'lazy';
-    img.src = b.cover;
+    img.src = httpsCover(b.cover);
     img.alt = '表紙';
     inner.append(img);
   } else {
