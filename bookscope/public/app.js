@@ -10,6 +10,63 @@
 
 const $ = (id) => document.getElementById(id);
 
+// ---------------- データ保存先 (サーバー API / 端末内ストレージ) ----------------
+// APK 版(Android WebView)ではサーバーがないため、localStorage に保存する。
+const STANDALONE =
+  location.protocol === 'file:' || location.hostname === 'appassets.androidplatform.net';
+const LOCAL_KEY = 'bookscope-books';
+
+function localLoad() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LOCAL_KEY));
+    return Array.isArray(v) ? v : [];
+  } catch (e) { return []; }
+}
+function localSave(books) { localStorage.setItem(LOCAL_KEY, JSON.stringify(books)); }
+function makeId() {
+  return (crypto && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : 'id-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+}
+
+const store = STANDALONE ? {
+  async list() { return localLoad(); },
+  async add(book) {
+    const books = localLoad();
+    if (book.isbn && books.some((b) => b.isbn === book.isbn)) {
+      const e = new Error('duplicate'); e.status = 409; throw e;
+    }
+    const rec = { ...book, id: makeId(), registeredAt: new Date().toISOString() };
+    books.push(rec);
+    localSave(books);
+    return rec;
+  },
+  async remove(id) { localSave(localLoad().filter((b) => b.id !== id)); },
+} : {
+  async list() {
+    const res = await fetch('/api/books');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return res.json();
+  },
+  async add(book) {
+    const res = await fetch('/api/books', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(book),
+    });
+    if (res.status === 409) { const e = new Error('duplicate'); e.status = 409; throw e; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || ('HTTP ' + res.status));
+    }
+    return res.json();
+  },
+  async remove(id) {
+    const res = await fetch(`/api/books/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  },
+};
+
 // ---------------- タブ切替 ----------------
 
 const views = { scan: $('view-scan'), list: $('view-list') };
@@ -180,7 +237,11 @@ async function startScanner() {
   btnStop.hidden = false;
   setStatus('バーコードを枠内に写してください(978 で始まる上段のバーコード)');
 
-  if ('BarcodeDetector' in window) {
+  // Android WebView(APK 版)では BarcodeDetector が存在しても動かないことが
+  // あるため、標準ブラウザでのみネイティブ API を優先し、それ以外は ZXing を使う。
+  const canNative = 'BarcodeDetector' in window;
+  const canZxing = !!window.ZXingBrowser;
+  if (canNative && (!STANDALONE || !canZxing)) {
     const detector = new window.BarcodeDetector({ formats: ['ean_13'] });
     const tick = async () => {
       if (!scanning) return;
@@ -191,8 +252,8 @@ async function startScanner() {
       detectTimer = setTimeout(tick, 250);
     };
     tick();
-  } else if (window.ZXingBrowser) {
-    // iOS Safari など BarcodeDetector 非対応ブラウザ
+  } else if (canZxing) {
+    // iOS Safari・Android WebView など
     zxingReader = new window.ZXingBrowser.BrowserMultiFormatReader();
     zxingReader.decodeFromVideoElement(video, (result) => {
       if (result) onCodeDetected(result.getText());
@@ -304,22 +365,12 @@ $('btn-register').addEventListener('click', async () => {
   const btn = $('btn-register');
   btn.disabled = true;
   try {
-    const res = await fetch('/api/books', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(currentBook),
-    });
-    if (res.status === 409) {
-      toast('この書籍はすでに登録されています');
-    } else if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast('登録に失敗しました: ' + (err.error || res.status));
-    } else {
-      toast(`「${currentBook.title}」を登録しました 📚`);
-      hideResult();
-    }
+    await store.add(currentBook);
+    toast(`「${currentBook.title}」を登録しました 📚`);
+    hideResult();
   } catch (e) {
-    toast('登録に失敗しました: ' + e.message);
+    if (e.status === 409) toast('この書籍はすでに登録されています');
+    else toast('登録に失敗しました: ' + e.message);
   } finally {
     btn.disabled = false;
   }
@@ -331,8 +382,7 @@ let allBooks = [];
 
 async function refreshList() {
   try {
-    const res = await fetch('/api/books');
-    allBooks = await res.json();
+    allBooks = await store.list();
   } catch (e) {
     allBooks = [];
   }
@@ -492,8 +542,7 @@ function bookCard(b) {
 async function deleteBook(b) {
   if (!confirm(`「${b.title}」を削除しますか?`)) return;
   try {
-    const res = await fetch(`/api/books/${encodeURIComponent(b.id)}`, { method: 'DELETE' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    await store.remove(b.id);
     toast('削除しました');
     refreshList();
   } catch (e) {

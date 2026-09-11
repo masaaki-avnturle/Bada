@@ -1,0 +1,79 @@
+name: bookscope APK build
+
+# bookscope/ の書籍バーコードスキャン & 蔵書一覧アプリを Android APK として
+# ビルドします。Web UI (bookscope/public/) を WebView に同梱した単体動作版で、
+# 蔵書データは端末内 (localStorage) に保存されます。
+#
+# ダウンロード方法:
+#   - ビルドのたびに GitHub Release「bookscope-latest」へ bookscope.apk を添付
+#     (リポジトリの Releases ページからスマホ・タブレットで直接ダウンロード可)
+#   - bookscope-v* タグ / release_tag 指定時はそのタグの Release にも添付
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: bookscope-v1.0.0)。空欄なら bookscope-latest に添付。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - main
+      - claude/book-barcode-scan-o5dduq
+    paths:
+      - 'bookscope/**'
+      - '.github/workflows/bookscope-apk-build.yml'
+    tags:
+      - 'bookscope-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        working-directory: bookscope/android
+        run: gradle assembleDebug --no-daemon
+
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp bookscope/android/app/build/outputs/apk/debug/app-debug.apk out/bookscope.apk
+          ls -la out
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bookscope-apk
+          path: out/bookscope.apk
+
+      - name: Attach APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || github.event.inputs.release_tag || 'bookscope-latest' }}
+          name: ${{ (startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '') && '' || 'bookscope APK (最新ビルド)' }}
+          prerelease: ${{ !(startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '') }}
+          files: out/bookscope.apk
+          body: |
+            📚 bookscope — 書籍バーコードスキャン & 蔵書一覧 Android アプリ
+
+            **インストール方法(スマホ・タブレット)**
+            1. この Release の `bookscope.apk` を端末のブラウザでダウンロード
+            2. ダウンロードした APK を開き、「提供元不明のアプリ」のインストールを許可
+            3. アプリを起動し、カメラを許可して本のバーコード(978 で始まる方)をスキャン
+
+            ※ デバッグ署名のため、更新時は一度アンインストールが必要な場合があります。
+            ※ 蔵書データは端末内に保存されます(サーバー共有版は `bookscope/README.md` 参照)。

@@ -11,7 +11,33 @@
 - 蔵書データはサーバーの `data/books.json` に保存されるため、
   スマホ・タブレット・PC のどこから登録しても同じ一覧を共有できます
 
-## 使い方
+## 2 つの使い方
+
+| 方式 | データ保存先 | 向いている使い方 |
+|---|---|---|
+| **APK 版**(Android アプリ) | 端末内(localStorage) | スマホ・タブレット単体で手軽に使う |
+| **Web 版**(Node.js サーバー) | サーバーの `data/books.json` | 複数端末で同じ蔵書一覧を共有する |
+
+## APK 版: Android アプリとしてインストールする
+
+GitHub Actions が自動で APK をビルドし、このリポジトリの
+**Releases ページ**の [`bookscope-latest`](../../releases/tag/bookscope-latest)
+に `bookscope.apk` を添付します。
+
+1. スマホ・タブレットのブラウザでリポジトリの **Releases** を開き、
+   `bookscope-latest` の **`bookscope.apk`** をダウンロード
+2. ダウンロードした APK を開き、「提供元不明のアプリ」のインストールを許可
+3. アプリを起動 → カメラを許可 → 本のバーコードをスキャン
+
+- 中身は `public/` の Web UI をそのまま WebView に同梱したもの(`android/` 参照)
+- バーコード読み取りは同梱の ZXing を使用(オフラインでも起動可、
+  書誌情報の取得にはネット接続が必要)
+- 蔵書データは端末内に保存されます
+- デバッグ署名のため、更新時は一度アンインストールが必要な場合があります
+- 手動でビルドしたい場合は Actions の「bookscope APK build」を
+  workflow_dispatch で実行するか、`bookscope-v*` タグを push してください
+
+## Web 版の使い方
 
 ### 1. サーバーを起動する(PC 側)
 
@@ -104,8 +130,12 @@ bookscope/
 ├── public/
 │   ├── index.html   # スキャン画面 + 蔵書一覧(タブ切替)
 │   ├── app.js       # スキャン・書誌情報取得・一覧表示のロジック
-│   └── style.css    # スマホ・タブレット対応レスポンシブデザイン
+│   ├── style.css    # スマホ・タブレット対応レスポンシブデザイン
+│   └── vendor/      # 同梱ライブラリ(ZXing バーコードリーダー)
+├── android/         # APK 版(public/ を WebView に同梱する Android プロジェクト)
 ├── data/
 │   └── books.json   # 蔵書データ(自動生成、git 管理外)
 └── certs/           # HTTPS 用証明書(任意、git 管理外)
+
+APK は `.github/workflows/bookscope-apk-build.yml` が自動ビルドします。
 ```
