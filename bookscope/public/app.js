@@ -11,7 +11,7 @@
 const $ = (id) => document.getElementById(id);
 
 // アプリのバージョン (端末に入っている APK が最新かどうかの確認用に表示する)
-const APP_VERSION = '1.4';
+const APP_VERSION = '1.5';
 $('app-version').textContent = 'v' + APP_VERSION;
 
 // 端末上で起きたエラーを画面に出す (原因調査をしやすくするため)
@@ -531,6 +531,17 @@ $('manual-form').addEventListener('submit', (ev) => {
 
 let currentBook = null;
 
+// 「読み取ったらすぐ登録」設定 (既定 ON、選択は端末に保存)
+const AUTOREG_KEY = 'bookscope-autoreg';
+try {
+  $('auto-register').checked = localStorage.getItem(AUTOREG_KEY) !== 'off';
+} catch (e) { /* 既定の ON のまま */ }
+$('auto-register').addEventListener('change', () => {
+  try {
+    localStorage.setItem(AUTOREG_KEY, $('auto-register').checked ? 'on' : 'off');
+  } catch (e) { /* noop */ }
+});
+
 async function handleIsbn(isbn13) {
   hideResult();
   setStatus(`ISBN ${isbn13} の書籍情報を検索中…`);
@@ -542,6 +553,34 @@ async function handleIsbn(isbn13) {
   currentBook = book;
   showResult(book);
   clearStatus();
+
+  // バーコードを読み取ったら、表紙・内容ごとそのまま登録する
+  if ($('auto-register').checked) {
+    const ok = await registerBook(book);
+    if (ok) markRegistered();
+  }
+}
+
+// 書籍を 1 冊登録する (成功: true)
+async function registerBook(book) {
+  try {
+    const rec = await store.add(book);
+    book.id = rec.id; // 登録直後の表紙変更をそのまま保存できるように控えておく
+    if (book.cover) toast(`「${book.title}」を表紙付きで登録しました 📚`);
+    else toast(`「${book.title}」を登録しました(表紙は見つかりませんでした)`);
+    return true;
+  } catch (e) {
+    if (e.status === 409) toast('この書籍はすでに登録されています');
+    else toast('登録に失敗しました: ' + e.message);
+    return false;
+  }
+}
+
+// 結果カードの登録ボタンを「登録済み」表示にする
+function markRegistered() {
+  const btn = $('btn-register');
+  btn.disabled = true;
+  btn.textContent = '✅ 登録済み';
 }
 
 function showResult(book) {
@@ -570,6 +609,9 @@ function showResult(book) {
   } else {
     descWrap.style.display = 'none';
   }
+  const btn = $('btn-register');
+  btn.disabled = false;
+  btn.textContent = '✅ bookscope に登録';
   $('result-card').hidden = false;
 }
 
@@ -586,24 +628,29 @@ $('btn-cover-photo').addEventListener('click', async () => {
   const dataUrl = await chooseCoverImage(currentBook.isbn);
   if (!dataUrl) return;
   currentBook.cover = dataUrl;
+  const registered = !!currentBook.id;
   showResult(currentBook);
-  toast('表紙画像を設定しました(登録ボタンで保存されます)');
+  if (registered) {
+    // すでに登録済み (自動登録直後など) ならそのまま保存する
+    markRegistered();
+    try {
+      await store.update(currentBook.id, { cover: dataUrl });
+      toast('表紙画像を更新しました');
+    } catch (e) {
+      toast('表紙の保存に失敗しました: ' + e.message);
+    }
+  } else {
+    toast('表紙画像を設定しました(登録ボタンで保存されます)');
+  }
 });
 
 $('btn-register').addEventListener('click', async () => {
   if (!currentBook) return;
   const btn = $('btn-register');
   btn.disabled = true;
-  try {
-    await store.add(currentBook);
-    toast(`「${currentBook.title}」を登録しました 📚`);
-    hideResult();
-  } catch (e) {
-    if (e.status === 409) toast('この書籍はすでに登録されています');
-    else toast('登録に失敗しました: ' + e.message);
-  } finally {
-    btn.disabled = false;
-  }
+  const ok = await registerBook(currentBook);
+  if (ok) hideResult();
+  else btn.disabled = false;
 });
 
 // ---------------- 蔵書一覧 ----------------
@@ -650,6 +697,36 @@ async function refreshList() {
 $('search').addEventListener('input', renderList);
 $('sort').addEventListener('change', renderList);
 $('btn-csv').addEventListener('click', exportCsv);
+
+// 表紙のない書籍 (ISBN あり) の表紙を、まとめてバーコードの ISBN から取得する
+$('btn-fetch-covers').addEventListener('click', async () => {
+  const targets = allBooks.filter((b) => !b.cover && toBookIsbn13(b.isbn));
+  if (targets.length === 0) {
+    toast('表紙のない書籍(ISBN あり)はありません');
+    return;
+  }
+  const btn = $('btn-fetch-covers');
+  btn.disabled = true;
+  let done = 0;
+  let found = 0;
+  try {
+    for (const b of targets) {
+      done++;
+      $('list-count').textContent = `表紙を取得中… ${done}/${targets.length} 冊`;
+      const url = await fetchCoverByIsbn(b.isbn);
+      if (url) {
+        await store.update(b.id, { cover: url });
+        found++;
+      }
+    }
+    toast(`${targets.length} 冊中 ${found} 冊の表紙を取得しました`);
+  } catch (e) {
+    toast('表紙の取得中にエラーが発生しました: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+  refreshList();
+});
 
 function filteredBooks() {
   const q = $('search').value.trim().toLowerCase();
