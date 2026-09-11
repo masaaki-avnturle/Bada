@@ -1,0 +1,154 @@
+# =============================================================================
+# agkernel.bada -- the Anti-Gravity OS field kernel, written in Bada
+#
+# A generative-AI kernel for a (simulated) anti-gravity field generator.
+# The engine's phase core IS the kernel: the field is not controlled beside
+# the inference engine -- the field register lives on the phase core.
+#
+#   * a field is a distribution-plus-phase over 2^n field modes (a register)
+#   * "hover" is a pure phase step: it steers attitude phase theta_i while
+#     |psi|^2 = a leaves the LIFT MASS invariant
+#     (the LIFT-CONSERVATION invariant G1: steering can never drop the craft)
+#   * a vented / forbidden field mode is a confident zero, and
+#     zero-preservation guarantees it can NEVER re-excite under any later
+#     phase step (the MODE-ISOLATION theorem G2)
+#   * every telemetry frame is an append-only ledger commit (G4)
+#   * the controller starts from unknown_prior -- honest ignorance of the
+#     airframe -- and EARNS its policy from observed sensor evidence.
+#
+# The @reviser installs generator surface syntax that REALLY rewrites grammar:
+#   charge    n    -> ag_charge(n)     energize an n-coil field register
+#   hover     reg  -> ag_hover(reg)    phase-steer while conserving lift mass
+#   vent      reg  -> ag_vent(reg)     drive a field mode to a confident zero
+#   Telemetry reg  -> ag_telemetry(reg) commit a telemetry frame to the journal
+# =============================================================================
+
+@reviser : grammar {
+  rule "charge"    postfix [ charge ]    => ag_charge(_1)
+  rule "hover"     postfix [ hover ]     => ag_hover(_1)
+  rule "vent"      postfix [ vent ]      => ag_vent(_1)
+  rule "telemetry" stmt    [ Telemetry ] => ag_telemetry(_1)
+}
+
+Omega::DATABASE[tuplespace] {
+
+  # ----- small helpers -------------------------------------------------------
+  def pow2 |n| {
+    v := [1]
+    i := 0
+    while (i < n) { v <- (v[len(v) - 1] * 2) ; i = i + 1 }
+    return v[len(v) - 1]
+  }
+
+  def flat |v, x| {
+    out := []
+    i := 0
+    while (i < v) { out <- x ; i = i + 1 }
+    return out
+  }
+
+  # ----- coil table : append-only, provenance of the whole flight survives ---
+  coils := [ [1.0] ]
+
+  # ===========================================================================
+  # ag_charge -- energize an n-coil field register as honest ignorance over
+  # its 2^n field modes (the OS presumes nothing about the airframe yet).
+  # ===========================================================================
+  def ag_charge |n| {
+    field := unknown_prior(pow2(n))
+    coils <- field
+    return field
+  }
+
+  # ===========================================================================
+  # ag_hover -- the ATTITUDE STEP. A pure-phase gate over the field register.
+  # It installs an attitude phase profile (alternating pi kick, a steering
+  # decision) and runs the phase core. Because |psi|^2 = a, the lift mass is
+  # unchanged: re-steering can never drop the craft. That is the
+  # LIFT-CONSERVATION invariant G1, inherited verbatim from the engine.
+  # ===========================================================================
+  def ag_hover |reg| {
+    v := len(reg)
+    z := []
+    qm := []
+    phi := []
+    i := 0
+    while (i < v) {
+      p := reg[i]
+      if (p > 0.0) { z <- log(p) } else { z <- (0.0 - 800.0) }
+      qm <- (1.0 / v)
+      # attitude phase: odd field modes get a pi kick (a steering decision)
+      if ((i % 2) == 0) { phi <- 0.0 } else { phi <- pi() }
+      i = i + 1
+    }
+    steered := cognitive_system(z, [ [qm, phi] ], [1.0])
+    return steered
+  }
+
+  # ===========================================================================
+  # ag_vent -- drive a chosen field mode to a confident zero. Once a mode is
+  # vented it is a zero in the distribution, and zero-preservation means no
+  # subsequent phase step can re-excite it: MODE ISOLATION as a theorem (G2).
+  # We vent the *last* live field mode as the demo target.
+  # ===========================================================================
+  def ag_vent |reg| {
+    v := len(reg)
+    z := []
+    i := 0
+    while (i < v) {
+      if (i == (v - 1)) { z <- (0.0 - 800.0) } else { z <- log(reg[i] + 0.0000001) }
+      i = i + 1
+    }
+    qm := flat(v, 1.0 / v)
+    phi := flat(v, 0.0)
+    vented := cognitive_system(z, [ [qm, phi] ], [1.0])
+    return vented
+  }
+
+  # ===========================================================================
+  # ag_telemetry -- a telemetry frame is a ledger commit. The journal is the
+  # flight recorder; OS state is re-derived by folding committed facts (G4).
+  # ===========================================================================
+  def ag_telemetry |reg| {
+    return commit_measurement(reg)
+  }
+
+  # which field modes are certified vented (cannot ever re-excite)
+  def vented_modes |reg| { return zeros_of(reg) }
+
+  # total lift mass carried by the register
+  def lift_mass |reg| { return sum(reg) }
+
+  # ===========================================================================
+  # demonstration -- a tiny flight session driven by the reviser syntax
+  # ===========================================================================
+  print("=== agkernel.bada (Anti-Gravity OS field kernel on the phase core) ===")
+
+  # power-up: energize a 2-coil field (4 field modes), honest ignorance
+  f0 := charge 2
+  print("charge 2 (coil table init):", f0)
+  print("  controller starts agnostic, entropy:", f5(entropy(f0)))
+
+  # steer: a phase step re-aims attitude but conserves lift mass
+  f1 := hover f0
+  print("hover (attitude step)     :", f1)
+  print("  G1 lift? |psi|^2 = a    :", sci(maxdiff()))
+  print("  lift mass               :", f5(lift_mass(f1)))
+
+  # telemetry: journal the steered state (append-only)
+  Telemetry f1
+  print("  journal facts           :", len(ledger()))
+
+  # vent: drive one field mode to a confident zero
+  f2 := vent f1
+  print("vent (mode shutdown)      :", f2)
+  print("  vented modes (dead)     :", vented_modes(f2))
+
+  # isolation theorem: a later attitude step CANNOT re-excite the vented mode
+  f3 := hover f2
+  print("hover after vent          :", f3)
+  print("  still vented (G2)       :", vented_modes(f3))
+  print("  re-excitation occurred? :", len(vented_modes(f2)) > len(vented_modes(f3)))
+
+  print("  total journal facts     :", len(ledger()))
+}

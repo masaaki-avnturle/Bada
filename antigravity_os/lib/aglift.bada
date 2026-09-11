@@ -1,0 +1,83 @@
+# =============================================================================
+# aglift.bada -- the generative-AI lift controller that EARNS its policy
+#
+# The kernel's stabilizer does not assume an airframe model; it begins at
+# unknown_prior (uniform = max entropy, Jaynes) over which thruster quadrant
+# needs correction, and sharpens that policy with each observed gust via the
+# engine's update(). This is the generative-AI part of the OS: attitude
+# control is Bayesian inference over an unknown airframe, and the policy
+# sharpens monotonically as sensor evidence accumulates.
+#
+# Reviser surface words:
+#   sense R  -> lift_sense(R)   fold one sensor-evidence vector into policy
+#   steer X  -> lift_steer(X)   MAP quadrant = highest posterior mass
+# =============================================================================
+
+@reviser : grammar {
+  rule "sense" postfix [ sense ] => lift_sense(_1)
+  rule "steer" postfix [ steer ] => lift_steer(_1)
+}
+
+Omega::DATABASE[tuplespace] {
+
+  # the live stabilization policy, threaded append-only (closure-snapshot idiom)
+  policy := [ [0.25, 0.25, 0.25, 0.25] ]
+
+  # initialise the policy as honest ignorance over n thruster quadrants
+  def boot_policy |n| {
+    p := unknown_prior(n)
+    policy <- p
+    return p
+  }
+
+  # observe one gust: fold the sensor evidence into the policy, sharpening it
+  def lift_sense |ev| {
+    cur := policy[len(policy) - 1]
+    nxt := update(cur, ev)
+    policy <- nxt
+    return nxt
+  }
+
+  # how confident the stabilizer now is (information gained over uniform)
+  def policy_confidence |dummy| {
+    cur := policy[len(policy) - 1]
+    uni := unknown_prior(len(cur))
+    return kl_divergence(cur, uni)
+  }
+
+  # steer: pick the MAP quadrant index under the current policy
+  def lift_steer |dummy| {
+    cur := policy[len(policy) - 1]
+    best := [0]
+    bestv := [cur[0]]
+    i := 1
+    while (i < len(cur)) {
+      if (cur[i] > bestv[len(bestv) - 1]) {
+        best  <- i
+        bestv <- cur[i]
+      }
+      i = i + 1
+    }
+    return best[len(best) - 1]
+  }
+
+  # ===========================================================================
+  # demonstration -- four quadrants, airframe unknown, policy earned from gusts
+  # ===========================================================================
+  print("=== aglift.bada (unknown-prior generative-AI lift controller) ===")
+
+  p0 := boot_policy(4)
+  print("boot policy (max entropy):", p0)
+  print("  entropy 0               :", f5(entropy(p0)))
+
+  # quadrant 0 turns out gust-loaded, quadrant 2 occasionally flutters
+  r1 := sense [0.55, 0.20, 0.20, 0.05]
+  print("after gust evidence 1     :", r1)
+  r2 := sense [0.65, 0.15, 0.15, 0.05]
+  print("after gust evidence 2     :", r2)
+
+  print("  entropy now             :", f5(entropy(policy[len(policy) - 1])))
+  print("  policy confidence (KL)  :", f5(policy_confidence(0)))
+  print("  steer -> quadrant       :", steer 0)
+  print("  journal facts           :", len(ledger()))
+}

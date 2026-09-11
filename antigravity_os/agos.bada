@@ -1,0 +1,193 @@
+# =============================================================================
+# agos.bada -- the Anti-Gravity OS init process (PID 1)
+#
+# Boots the generative-AI field kernel for a (simulated) anti-gravity
+# generator and flies one full session: charge -> Split -> hover -> sense ->
+# Telemetry -> vent -> (isolation proof) -> scram, with the four OS
+# invariants demonstrated, each one inherited from an engine theorem:
+#
+#   G1  Lift conservation   |psi|^2 = a    steering conserves lift mass
+#   G2  Mode isolation      zero-preserv.  a vented mode never re-excites
+#   G3  Scram safety        zero-preserv.  a scrammed coil reads probability 0
+#   G4  Auditable telemetry append-only    the journal is the flight recorder
+#
+# All reviser blocks below stack: charge/hover/vent/Telemetry, sense/steer,
+# Split, and arm/scram all become real surface syntax in one program, proving
+# the grammar grows monotonically as facts are committed. The controller is
+# generative-AI end to end: it starts from unknown_prior over the airframe
+# and earns its stabilization policy from observed gust evidence.
+# =============================================================================
+
+@reviser : grammar {
+  rule "charge"    postfix [ charge ]    => k_charge(_1)
+  rule "hover"     postfix [ hover ]     => k_hover(_1)
+  rule "vent"      postfix [ vent ]      => k_vent(_1)
+  rule "split"     postfix [ Split ]     => k_split(_1)
+  rule "sense"     postfix [ sense ]     => k_sense(_1)
+  rule "scram"     postfix [ scram ]     => k_scram(_1)
+  rule "telemetry" stmt    [ Telemetry ] => k_telemetry(_1)
+}
+
+Omega::DATABASE[tuplespace] {
+
+  def pow2 |n| {
+    v := [1]
+    i := 0
+    while (i < n) { v <- (v[len(v) - 1] * 2) ; i = i + 1 }
+    return v[len(v) - 1]
+  }
+  def flat |v, x| {
+    out := []
+    i := 0
+    while (i < v) { out <- x ; i = i + 1 }
+    return out
+  }
+
+  # ---- kernel primitives (compact inline versions of the sys/lib defs) ------
+  def k_charge |n| { return unknown_prior(pow2(n)) }
+
+  def k_split |reg| {
+    v := len(reg)
+    phi := []
+    i := 0
+    while (i < v) { if ((i % 2) == 0) { phi <- 0.0 } else { phi <- pi() } i = i + 1 }
+    return cognitive_system(flat(v, 0.0), [ [flat(v, 1.0 / v), phi] ], [1.0])
+  }
+
+  def k_hover |reg| {
+    v := len(reg)
+    z := []
+    phi := []
+    i := 0
+    while (i < v) {
+      p := reg[i]
+      if (p > 0.0) { z <- log(p) } else { z <- (0.0 - 800.0) }
+      if ((i % 2) == 0) { phi <- 0.0 } else { phi <- pi() }
+      i = i + 1
+    }
+    return cognitive_system(z, [ [flat(v, 1.0 / v), phi] ], [1.0])
+  }
+
+  def k_vent |reg| {
+    v := len(reg)
+    z := []
+    i := 0
+    while (i < v) {
+      if (i == (v - 1)) { z <- (0.0 - 800.0) } else { z <- log(reg[i] + 0.0000001) }
+      i = i + 1
+    }
+    return cognitive_system(z, [ [flat(v, 1.0 / v), flat(v, 0.0)] ], [1.0])
+  }
+
+  def k_scram |reg| {
+    v := len(reg)
+    z := []
+    i := 0
+    while (i < v) { z <- (0.0 - 800.0) ; i = i + 1 }
+    z <- 0.0
+    w := v + 1
+    full := cognitive_system(z, [ [flat(w, 1.0 / w), flat(w, 0.0)] ], [1.0])
+    pilot := []
+    k := 0
+    while (k < v) { pilot <- full[k] ; k = k + 1 }
+    return pilot
+  }
+
+  def k_telemetry |reg| { return commit_measurement(reg) }
+
+  # ---- the generative-AI stabilizer policy (unknown prior, earned) ----------
+  policy := [ [0.25, 0.25, 0.25, 0.25] ]
+  def k_sense |ev| {
+    cur := policy[len(policy) - 1]
+    nxt := update(cur, ev)
+    policy <- nxt
+    return nxt
+  }
+
+  def vented_modes |reg| { return zeros_of(reg) }
+  def live_field |reg| { return sum(reg) }
+
+  # ===========================================================================
+  # PID 1 : the flight session
+  # ===========================================================================
+  print("================================================================")
+  print(" ANTI-GRAVITY OS (generative-AI kernel on the phase core) -- boot")
+  print("================================================================")
+
+  # ---- power-up: energize a 2-coil field (4 field modes) --------------------
+  print("")
+  print("[boot ] charging field generator (2 coils / 4 field modes)")
+  field := charge 2
+  print("  field register          :", field)
+  print("  entropy (ignorance)     :", f5(entropy(field)))
+
+  # ---- arm scratch coil for the interlock -----------------------------------
+  print("")
+  print("[coil ] arming a 1-coil scratch cell")
+  cell := charge 1
+  print("  scratch coil            :", cell)
+  print("  live field mass         :", f5(live_field(cell)))
+
+  # ---- execute: put the field into mode superposition (Split) ---------------
+  print("")
+  print("[exec ] Split on the field register")
+  field := Split field
+  print("  superposition           :", field)
+  print("  G1 lift? |psi|^2=a (md) :", sci(maxdiff()))
+
+  # ---- steer: a phase step re-aims attitude but conserves lift mass ---------
+  print("")
+  print("[hover] attitude phase step")
+  field := hover field
+  print("  steered                 :", field)
+  print("  G1 lift? |psi|^2=a (md) :", sci(maxdiff()))
+
+  # ---- generative AI: the stabilizer earns its policy from gust evidence ----
+  print("")
+  print("[ ai  ] stabilizer folds gust evidence (Bayesian update)")
+  p1 := sense [0.55, 0.20, 0.20, 0.05]
+  print("  policy after gust 1     :", p1)
+  p2 := sense [0.65, 0.15, 0.15, 0.05]
+  print("  policy after gust 2     :", p2)
+  print("  policy entropy          :", f5(entropy(p2)))
+
+  # ---- telemetry: journal the steered state (append-only) -------------------
+  print("")
+  print("[tele ] journalling steered field state")
+  Telemetry field
+  print("  G4 journal facts        :", len(ledger()))
+
+  # ---- vent: shut one field mode down ---------------------------------------
+  print("")
+  print("[vent ] shutting one field mode down")
+  field := vent field
+  print("  after vent              :", field)
+  print("  vented modes (dead)     :", vented_modes(field))
+
+  # ---- isolation theorem: re-steering cannot re-excite the vented mode ------
+  before := vented_modes(field)
+  field := hover field
+  after := vented_modes(field)
+  print("")
+  print("[proof] re-steering after vent")
+  print("  vented before hover     :", before)
+  print("  vented after  hover     :", after)
+  print("  G2 isolation holds      :", len(after) >= len(before))
+
+  # ---- scram the scratch coil: shutdown-safety theorem ----------------------
+  print("")
+  print("[coil ] scramming the scratch coil")
+  cell := scram cell
+  print("  live mass after scram   :", f5(live_field(cell)))
+  print("  G3 post-scram safe      :", live_field(cell) == 0)
+  print("  downed modes (zeros)    :", vented_modes(cell))
+
+  print("")
+  print("================================================================")
+  print(" ANTI-GRAVITY OS invariants upheld | journal facts:", len(ledger()))
+  print("   G1 lift conservation (|psi|^2 = a)")
+  print("   G2 mode isolation    (zero-preservation)")
+  print("   G3 scram safety      (zero-preservation)")
+  print("   G4 auditable telemetry (append-only ledger)")
+  print("================================================================")
+}

@@ -1,0 +1,143 @@
+# =============================================================================
+# agfield.bada -- the Anti-Gravity OS instruction set: field ops as primitives
+#
+# These are the "machine instructions" a field process executes. Every op is
+# either an index permutation (structural) or a phase contribution (the
+# cognitive core) -- no new arithmetic. The engine's theorems are the
+# instruction semantics:
+#     |psi|^2 = a       -> every pure-phase instruction is unitary (reversible)
+#     zero-preservation -> a forbidden field mode stays forbidden (no fault)
+#
+# The curvature BALLAST profile ties in the quantum-kernel paper: field-mode
+# occupancy follows the Zipf / Hurwitz-zeta amplitude law
+#     w_n  proportional to  (n + y)^(-x)      (paper params x=2.73037, y=2.32534)
+# so the deepest mode carries the most curvature mass, exactly the zeta_V
+# truncated-zeta normalization of the paper.
+#
+# Reviser surface words (the OS assembly mnemonics):
+#   Split  reg -> g_split(reg)   uniform mode superposition (Hadamard-like)
+#   Twist  reg -> g_twist(reg)   pi/4 curvature phase, mass unchanged (T-like)
+#   Flip   reg -> g_flip(reg)    swap paired mode amplitudes (X-like)
+#   Couple reg -> g_couple(reg)  conditioned mode exchange on 4 modes (CNOT-like)
+# =============================================================================
+
+@reviser : grammar {
+  rule "split"  postfix [ Split ]  => g_split(_1)
+  rule "twist"  postfix [ Twist ]  => g_twist(_1)
+  rule "flip"   postfix [ Flip ]   => g_flip(_1)
+  rule "couple" postfix [ Couple ] => g_couple(_1)
+}
+
+Omega::DATABASE[tuplespace] {
+
+  def flat |v, x| {
+    out := []
+    i := 0
+    while (i < v) { out <- x ; i = i + 1 }
+    return out
+  }
+
+  # ---- ballast: Zipf / truncated-zeta curvature profile over V field modes --
+  # w_n = (n + y)^(-x), normalized by the partial zeta sum (zeta_V of the paper)
+  def ballast |x, y, v| {
+    w := []
+    i := 0
+    while (i < v) { w <- pow(i + y, 0.0 - x) ; i = i + 1 }
+    s := sum(w)
+    out := []
+    k := 0
+    while (k < v) { out <- (w[k] / s) ; k = k + 1 }
+    return out
+  }
+
+  # ---- Split: uniform base + alternating relative phase (Hadamard-like) -----
+  def g_split |reg| {
+    v := len(reg)
+    z := flat(v, 0.0)
+    qm := flat(v, 1.0 / v)
+    phi := []
+    i := 0
+    while (i < v) {
+      if ((i % 2) == 0) { phi <- 0.0 } else { phi <- pi() }
+      i = i + 1
+    }
+    return cognitive_system(z, [ [qm, phi] ], [1.0])
+  }
+
+  # ---- Twist: pure phase pi/4 on the odd modes; lift mass invariant ---------
+  def g_twist |reg| {
+    v := len(reg)
+    z := []
+    i := 0
+    while (i < v) {
+      p := reg[i]
+      if (p > 0.0) { z <- log(p) } else { z <- (0.0 - 800.0) }
+      i = i + 1
+    }
+    qm := flat(v, 1.0 / v)
+    phi := []
+    k := 0
+    while (k < v) {
+      if ((k % 2) == 1) { phi <- (pi() / 4.0) } else { phi <- 0.0 }
+      k = k + 1
+    }
+    return cognitive_system(z, [ [qm, phi] ], [1.0])
+  }
+
+  # ---- Flip: structural amplitude swap of paired field modes ----------------
+  def g_flip |reg| {
+    if (len(reg) == 2) { return [reg[1], reg[0]] }
+    out := []
+    i := 0
+    while (i < len(reg)) {
+      if ((i % 2) == 0) { out <- reg[i + 1] } else { out <- reg[i - 1] }
+      i = i + 1
+    }
+    return out
+  }
+
+  # ---- Couple: conditioned mode exchange on a 4-mode register ---------------
+  # Index permutation conditioned on the high coil: |10> <-> |11>.
+  def g_couple |reg| {
+    if (len(reg) == 4) {
+      return [reg[0], reg[1], reg[3], reg[2]]
+    }
+    return reg
+  }
+
+  # ===========================================================================
+  # demonstration
+  # ===========================================================================
+  print("=== agfield.bada (anti-gravity field instruction set) ===")
+
+  # one coil, Split -> uniform mode superposition
+  q := unknown_prior(2)
+  print("ground field            :", q)
+  sup := Split q
+  print("Split q (superposition) :", sup)
+  print("  reversible? |psi|^2=a :", sci(maxdiff()))
+
+  # Twist: a pure-phase instruction leaves lift probability untouched
+  tw := Twist sup
+  print("Twist (sup)             :", tw)
+  print("  unitary?  |psi|^2=a   :", sci(maxdiff()))
+
+  # Flip: structural exchange swaps the mode amplitudes
+  flipped := Flip [0.8, 0.2]
+  print("Flip [0.8, 0.2]         :", flipped)
+
+  # Couple on a 4-mode register: permutes |10> and |11>, zeros survive
+  two := [0.4, 0.1, 0.0, 0.5]
+  cp := Couple two
+  print("Couple [.4,.1,0,.5]     :", cp)
+  print("  forbidden stays zero  :", zeros_of(cp))
+
+  # ballast: zeta/Zipf curvature profile with the paper's E1 parameters
+  bal := ballast(2.73037, 2.32534, 8)
+  print("ballast x=2.73037 y=2.32534 (8 modes):")
+  print("  ", f5(bal[0]), f5(bal[1]), f5(bal[2]), f5(bal[3]))
+  print("  ", f5(bal[4]), f5(bal[5]), f5(bal[6]), f5(bal[7]))
+  print("  ballast mass            :", f5(sum(bal)))
+  print("  ballast entropy         :", f5(entropy(bal)))
+  print("  journal facts           :", len(ledger()))
+}

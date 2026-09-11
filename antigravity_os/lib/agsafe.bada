@@ -1,0 +1,93 @@
+# =============================================================================
+# agsafe.bada -- the Anti-Gravity OS safety interlock on the phase core
+#
+# Field-register arming, emergency shutdown (scram), and a re-excitation
+# guarantee that is a THEOREM rather than a runtime check. A scrammed field
+# register is driven to a confident zero against a null sentinel;
+# zero-preservation means a scrammed coil can never regain field mass, so a
+# stale reference reads exactly probability 0 forever. The OS gets shutdown
+# safety from the same theorem that gives the phase core its no-resurrection
+# property (the paper's use-after-free result, re-read as G3).
+#
+# Reviser surface words:
+#   arm   N -> safe_arm(N)     arm a 2^N-mode field register
+#   scram R -> safe_scram(R)   drive all field mass to a confident zero
+# =============================================================================
+
+@reviser : grammar {
+  rule "arm"   postfix [ arm ]   => safe_arm(_1)
+  rule "scram" postfix [ scram ] => safe_scram(_1)
+}
+
+Omega::DATABASE[tuplespace] {
+
+  def pow2 |n| {
+    v := [1]
+    i := 0
+    while (i < n) { v <- (v[len(v) - 1] * 2) ; i = i + 1 }
+    return v[len(v) - 1]
+  }
+
+  # the interlock table: every arm/scram is appended (provenance survives)
+  interlock := [ [1.0] ]
+
+  # arm: an n-coil register, honest ignorance over its 2^n field modes
+  def safe_arm |n| {
+    cell := unknown_prior(pow2(n))
+    interlock <- cell
+    cell >> tuplespace          # journal the arming
+    return cell
+  }
+
+  # scram: collapse every LIVE field mode of the register to a confident zero.
+  # One extra "null sentinel" state absorbs all the mass: its logit is 0 while
+  # every real mode is driven to -800; softmax then puts ~1.0 on the sentinel
+  # and exactly 0.0 on every live mode. Zero-preservation keeps those modes
+  # dead under any later phase step -> post-scram re-excitation is 0.
+  # The returned register is the pilot view (sentinel dropped): all zeros.
+  def safe_scram |reg| {
+    v := len(reg)
+    z := []
+    i := 0
+    while (i < v) { z <- (0.0 - 800.0) ; i = i + 1 }
+    z <- 0.0                     # the null sentinel keeps the mass
+    w := v + 1
+    qm := []
+    ph := []
+    j := 0
+    while (j < w) { qm <- (1.0 / w) ; ph <- 0.0 ; j = j + 1 }
+    full := cognitive_system(z, [ [qm, ph] ], [1.0])
+    # pilot view = full without the sentinel: all confident zeros
+    pilot := []
+    k := 0
+    while (k < v) { pilot <- full[k] ; k = k + 1 }
+    interlock <- pilot
+    pilot >> tuplespace          # journal the scram
+    return pilot
+  }
+
+  # a stale read: how much live field mass remains (0.0 => safe, fully down)
+  def live_field |reg| {
+    s := sum(reg)
+    return s
+  }
+
+  # which modes are certified down (cannot ever carry mass again)
+  def downed_modes |reg| { return zeros_of(reg) }
+
+  # ===========================================================================
+  # demonstration
+  # ===========================================================================
+  print("=== agsafe.bada (anti-gravity safety interlock) ===")
+
+  r := arm 2
+  print("arm 2 (4-mode field)    :", r)
+  print("  live field mass       :", f5(live_field(r)))
+
+  sc := scram r
+  print("scram r                 :", sc)
+  print("  live mass after scram :", f5(live_field(sc)))
+  print("  downed modes (zeros)  :", downed_modes(sc))
+  print("  post-scram field mass :", f5(live_field(sc)), "(0 => safe by theorem)")
+  print("  interlock journal     :", len(ledger()))
+}
