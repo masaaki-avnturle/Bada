@@ -51,6 +51,28 @@
 
 ---
 
+## 🥋 ダウンロード — BadaGPT 道場(応答でアプリを作る技・伝授)
+
+**ChatGPT が「応答してアプリケーションを作る」ときに使っている技 — ①要件抽出 ②仕様化 ③コード生成 ④実行と反復 — を、量子プログラミング言語 Bada を題材にユーザーへ伝授する教習アプリ。** 8 章カリキュラム + 自動判定つき演習 + **BadaGPT 先生チャット**(生成の途中経過を全部見せながら、実際に動く Bada コードを生成し、「12面にして」のような応答で差分修正まで実演)。ミニ Bada インタープリタ(qubit / H / CNOT / Measure、softmax / entropy、append-only 台帳 tuplespace)内蔵。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_teach/index.html をダウンロード**](bada_teach/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-teach-debug.apk` |
+| **Windows 10 / 11** | `BadaTeach-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaTeach-*-x86_64.AppImage` / `BadaTeach-*-amd64.deb` |
+
+ビルドは [`badateach-app-build.yml`](.github/workflows/badateach-app-build.yml) が実行します(`badateach-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。カリキュラム・道場の使い方は [`bada_teach/`](bada_teach/) を参照。
+
+---
+
 ## 💿 ダウンロード — Bada VM Pro OS(起動可能 ISO / USB ブート)
 
 **USB ブートして実ディスクにインストールできる、Ubuntu 22.04 ベースの本物の Linux ディストロ。** ウィンドウマネージャは **w9wm**、Bada アプリをプリインストール、**Calamares** で実ディスクへインストール、**NAT/DHCP で apt** が使え、**あなたのリポジトリの apt リポジトリ**(`deb [trusted=yes] …/ ./`)から `apt install`。BIOS+UEFI ハイブリッド ISO なので **Rufus でそのまま USB に書けます**。

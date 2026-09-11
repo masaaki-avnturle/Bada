@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BadaGPT 道場 — 応答でアプリを作る技・伝授</title>
+<!--
+  BadaGPT 道場 (BadaTeach)
+  ========================
+  ChatGPT が行っている「応答してアプリケーションを作る技」を、
+  量子プログラミング言語 Bada を題材にユーザーへ伝授する教習アプリ。
+
+  ・完全自己完結 (依存ゼロ・単一 HTML・オフライン動作)
+  ・ミニ Bada インタープリタ内蔵 (量子コア: qubit / H / CNOT / Measure,
+    max-entropy prior / softmax / entropy / append-only 台帳 tuplespace)
+  ・「BadaGPT 先生」チャット: 要件抽出 → 仕様化 → コード生成 → 実行&反復
+    の 4 つの技を、実際に動くコード生成でデモしながら教える
+  ・8 章カリキュラム + 自動判定つき演習 + 進捗保存 (localStorage)
+
+  ラッパー: Android APK (Cordova) / Windows 10・11 EXE (Electron+NSIS) /
+  Ubuntu AppImage・deb (Electron) — .github/workflows/badateach-app-build.yml
+-->
+<style>
+:root{
+  --bg:#0b0e14; --bg2:#11151f; --bg3:#171c29; --line:#252b3b;
+  --fg:#d7dce6; --dim:#8892a6; --gold:#c8a44a; --blue:#4a80d0;
+  --teal:#40b8c0; --green:#4fbf7a; --red:#d06060; --purple:#9060d0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);
+  font:14px/1.75 "Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Yu Gothic UI",Meiryo,sans-serif;
+  display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;
+  background:var(--bg2);border-bottom:1px solid var(--line);flex:none}
+header .mark{font-size:20px}
+header h1{font-size:15px;color:var(--gold);font-weight:700;letter-spacing:.04em}
+header .sub{font-size:11px;color:var(--dim)}
+nav{display:flex;gap:4px;margin-left:auto}
+nav button{background:none;border:1px solid var(--line);color:var(--dim);
+  padding:5px 14px;border-radius:6px;cursor:pointer;font-size:13px}
+nav button.on{color:var(--gold);border-color:var(--gold);background:rgba(200,164,74,.08)}
+main{flex:1;display:flex;min-height:0}
+/* ---- lessons ---- */
+#pane-lessons{display:flex;width:100%;min-height:0}
+#lesson-list{width:250px;flex:none;background:var(--bg2);border-right:1px solid var(--line);
+  overflow-y:auto;padding:10px 0}
+#lesson-list .item{padding:9px 14px;cursor:pointer;border-left:3px solid transparent;
+  font-size:13px;color:var(--dim)}
+#lesson-list .item:hover{background:var(--bg3)}
+#lesson-list .item.on{color:var(--fg);border-left-color:var(--gold);background:var(--bg3)}
+#lesson-list .item .done{color:var(--green);margin-left:6px}
+#lesson-view{flex:1;overflow-y:auto;padding:22px 30px;min-width:0}
+#lesson-view h2{color:var(--gold);font-size:19px;margin-bottom:4px}
+#lesson-view h3{color:var(--teal);font-size:15px;margin:20px 0 6px}
+#lesson-view p{margin:8px 0;color:var(--fg)}
+#lesson-view ul,#lesson-view ol{margin:8px 0 8px 22px}
+#lesson-view li{margin:3px 0}
+#lesson-view .waza{background:rgba(144,96,208,.1);border:1px solid var(--purple);
+  border-radius:8px;padding:10px 14px;margin:12px 0}
+#lesson-view .waza b{color:var(--purple)}
+#lesson-view .note{background:rgba(74,128,208,.1);border:1px solid var(--blue);
+  border-radius:8px;padding:10px 14px;margin:12px 0;font-size:13px}
+pre.code{background:#0d1017;border:1px solid var(--line);border-radius:8px;
+  padding:12px 14px;margin:10px 0;overflow-x:auto;
+  font:12.5px/1.6 "SF Mono",Consolas,"Courier New",monospace;color:#cfe0c8;white-space:pre}
+.editor-box{margin:14px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.editor-box .bar{display:flex;align-items:center;gap:8px;background:var(--bg3);
+  padding:6px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.editor-box textarea{width:100%;min-height:170px;background:#0d1017;color:#cfe0c8;
+  border:none;outline:none;padding:12px 14px;resize:vertical;
+  font:12.5px/1.6 "SF Mono",Consolas,"Courier New",monospace;white-space:pre;tab-size:4}
+.editor-box .out{background:#080a0f;border-top:1px solid var(--line);padding:10px 14px;
+  font:12.5px/1.6 "SF Mono",Consolas,monospace;white-space:pre-wrap;color:var(--fg);
+  max-height:260px;overflow-y:auto}
+.editor-box .out.err{color:var(--red)}
+.editor-box .out:empty{display:none}
+button.act{background:var(--gold);color:#14100a;border:none;border-radius:6px;
+  padding:5px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
+button.act.ghost{background:none;border:1px solid var(--line);color:var(--dim);font-weight:400}
+button.act:active{transform:translateY(1px)}
+.verdict{margin:8px 0;padding:8px 12px;border-radius:6px;font-size:13px;display:none}
+.verdict.ok{display:block;background:rgba(79,191,122,.12);border:1px solid var(--green);color:var(--green)}
+.verdict.ng{display:block;background:rgba(208,96,96,.1);border:1px solid var(--red);color:var(--red)}
+.lesson-nav{display:flex;gap:10px;margin:26px 0 10px}
+/* ---- dojo ---- */
+#pane-dojo{display:none;flex-direction:column;width:100%;min-height:0}
+#chat-log{flex:1;overflow-y:auto;padding:20px 26px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:860px;border-radius:10px;padding:10px 14px;font-size:13.5px}
+.msg.user{align-self:flex-end;background:rgba(74,128,208,.15);border:1px solid var(--blue)}
+.msg.bot{align-self:flex-start;background:var(--bg2);border:1px solid var(--line)}
+.msg.bot .step-title{color:var(--gold);font-weight:700;margin-bottom:2px}
+.msg.bot table{border-collapse:collapse;margin:6px 0;font-size:12.5px}
+.msg.bot td,.msg.bot th{border:1px solid var(--line);padding:3px 10px;text-align:left}
+.msg.bot th{color:var(--teal)}
+.msg .codewrap{margin:8px 0 4px}
+.msg .codewrap pre.code{margin:0 0 6px}
+#chat-hint{padding:0 26px 6px;color:var(--dim);font-size:12px;flex:none}
+#chat-hint span{cursor:pointer;border:1px solid var(--line);border-radius:20px;
+  padding:2px 10px;margin-right:6px;display:inline-block;margin-bottom:4px}
+#chat-hint span:hover{color:var(--gold);border-color:var(--gold)}
+#chat-input-row{display:flex;gap:8px;padding:10px 26px 14px;flex:none;
+  background:var(--bg2);border-top:1px solid var(--line)}
+#chat-input{flex:1;background:var(--bg3);border:1px solid var(--line);border-radius:8px;
+  color:var(--fg);padding:9px 12px;font-size:14px;outline:none}
+#chat-input:focus{border-color:var(--gold)}
+/* ---- reference ---- */
+#pane-ref{display:none;overflow-y:auto;width:100%;padding:22px 30px}
+#pane-ref h2{color:var(--gold);font-size:18px;margin-bottom:8px}
+#pane-ref h3{color:var(--teal);font-size:14px;margin:16px 0 4px}
+#pane-ref table{border-collapse:collapse;font-size:13px;margin:8px 0}
+#pane-ref td,#pane-ref th{border:1px solid var(--line);padding:4px 12px}
+#pane-ref th{color:var(--teal)}
+#pane-ref code{color:#cfe0c8;font-family:Consolas,monospace}
+@media (max-width:760px){
+  #lesson-list{width:150px}
+  #lesson-view,#pane-ref{padding:16px}
+  #chat-log{padding:12px}
+  header .sub{display:none}
+}
+</style>
+</head>
+<body>
+<header>
+  <span class="mark">🥋</span>
+  <div><h1>BadaGPT 道場</h1>
+  <div class="sub">応答してアプリケーションを作る技 — 量子プログラミング言語 Bada で伝授</div></div>
+  <nav>
+    <button id="tab-lessons" class="on">📚 カリキュラム</button>
+    <button id="tab-dojo">🥋 道場 (BadaGPT 先生)</button>
+    <button id="tab-ref">📖 リファレンス</button>
+  </nav>
+</header>
+<main>
+  <section id="pane-lessons">
+    <div id="lesson-list"></div>
+    <div id="lesson-view"></div>
+  </section>
+  <section id="pane-dojo">
+    <div id="chat-log"></div>
+    <div id="chat-hint"></div>
+    <div id="chat-input-row">
+      <input id="chat-input" placeholder="作りたいアプリを日本語で頼んでください (例: サイコロアプリを作って)"/>
+      <button class="act" id="chat-send">送信</button>
+    </div>
+  </section>
+  <section id="pane-ref"></section>
+</main>
+<script>
+"use strict";
+/* ================================================================
+ * 1. ミニ Bada インタープリタ (量子コア内蔵)
+ * ================================================================ */
+function softmax(z){
+  var m=-Infinity,i; for(i=0;i<z.length;i++) if(z[i]>m) m=z[i];
+  var s=0,e=[]; for(i=0;i<z.length;i++){ e[i]=Math.exp(z[i]-m); s+=e[i]; }
+  for(i=0;i<e.length;i++) e[i]/=s; return e;
+}
+function entropy(p){
+  var h=0,i; for(i=0;i<p.length;i++) if(p[i]>0) h-=p[i]*Math.log(p[i]);
+  return h;
+}
+function unknownPrior(n){
+  var a=[],i; for(i=0;i<n;i++) a.push(1/n); return a;
+}
+function updateDist(prior,ev){
+  var q=[],s=0,i;
+  for(i=0;i<prior.length;i++){ q[i]=prior[i]*(ev[i]||0); s+=q[i]; }
+  if(s<=0) throw new Error("update: 事後確率がすべて 0 になりました");
+  for(i=0;i<q.length;i++) q[i]/=s; return q;
+}
+/* --- 量子レジスタ: 複素振幅 (re, im) --- */
+function qubitReg(n){
+  var N=1<<n, re=new Array(N).fill(0), im=new Array(N).fill(0);
+  re[0]=1;
+  return {__qreg:true,nq:n,re:re,im:im};
+}
+function applyH(reg,t){
+  var N=reg.re.length, s=Math.SQRT1_2;
+  var re=reg.re.slice(), im=reg.im.slice(), b,p,ar,ai,br,bi;
+  for(b=0;b<N;b++){
+    if(((b>>t)&1)===0){
+      p=b|(1<<t);
+      ar=reg.re[b]; ai=reg.im[b]; br=reg.re[p]; bi=reg.im[p];
+      re[b]=s*(ar+br); im[b]=s*(ai+bi);
+      re[p]=s*(ar-br); im[p]=s*(ai-bi);
+    }
+  }
+  return {__qreg:true,nq:reg.nq,re:re,im:im};
+}
+function applyX(reg,t){
+  var N=reg.re.length, re=reg.re.slice(), im=reg.im.slice(), b,p;
+  for(b=0;b<N;b++){
+    if(((b>>t)&1)===0){
+      p=b|(1<<t);
+      re[b]=reg.re[p]; im[b]=reg.im[p]; re[p]=reg.re[b]; im[p]=reg.im[b];
+    }
+  }
+  return {__qreg:true,nq:reg.nq,re:re,im:im};
+}
+function applyCNOT(reg,c,t){
+  var N=reg.re.length, re=reg.re.slice(), im=reg.im.slice(), b,p;
+  for(b=0;b<N;b++){
+    if(((b>>c)&1)===1 && ((b>>t)&1)===0){
+      p=b|(1<<t);
+      re[b]=reg.re[p]; im[b]=reg.im[p]; re[p]=reg.re[b]; im[p]=reg.im[b];
+    }
+  }
+  return {__qreg:true,nq:reg.nq,re:re,im:im};
+}
+function measureProbs(reg){
+  var out=[],i,v;
+  for(i=0;i<reg.re.length;i++){
+    v=reg.re[i]*reg.re[i]+reg.im[i]*reg.im[i];
+    out.push(Math.abs(v)<1e-12?0:Math.round(v*1e10)/1e10);
+  }
+  return out;
+}
+function mulberry32(seed){
+  var a=seed>>>0;
+  return function(){
+    a|=0; a=(a+0x6D2B79F5)|0;
+    var t=Math.imul(a^(a>>>15),1|a);
+    t=(t+Math.imul(t^(t>>>7),61|t))^t;
+    return ((t^(t>>>14))>>>0)/4294967296;
+  };
+}
+/* --- 字句解析 --- */
+function badaTokenize(src){
+  var toks=[],i=0,n=src.length,line=1,c,j,q,s,two;
+  while(i<n){
+    c=src[i];
+    if(c==="#"){ while(i<n&&src[i]!=="\n")i++; continue; }
+    if(c==="\n"){ toks.push({t:"nl",line:line}); line++; i++; continue; }
+    if(c===" "||c==="\t"||c==="\r"){ i++; continue; }
+    if(c==='"'||c==="'"){
+      q=c; s=""; i++;
+      while(i<n&&src[i]!==q){
+        if(src[i]==="\\"){
+          var esc={n:"\n",t:"\t","\\":"\\",'"':'"',"'":"'"}[src[i+1]];
+          s+=(esc!==undefined?esc:src[i+1]); i+=2;
+        } else s+=src[i++];
+      }
+      if(i>=n) throw new Error(line+"行目: 文字列が閉じていません");
+      i++; toks.push({t:"str",v:s,line:line}); continue;
+    }
+    if(/[0-9]/.test(c)||(c==="."&&/[0-9]/.test(src[i+1]||""))){
+      j=i;
+      while(j<n&&/[0-9.]/.test(src[j]))j++;
+      toks.push({t:"num",v:parseFloat(src.slice(i,j)),line:line}); i=j; continue;
+    }
+    if(/[A-Za-z_]/.test(c)){
+      j=i; while(j<n&&/[A-Za-z0-9_]/.test(src[j]))j++;
+      toks.push({t:"id",v:src.slice(i,j),line:line}); i=j; continue;
+    }
+    two=src.slice(i,i+2);
+    if(two===":="||two===">>"||two==="=="||two==="!="||two==="<="||two===">="){
+      toks.push({t:"op",v:two,line:line}); i+=2; continue;
+    }
+    if("+-*/%(),[]{}<>|".indexOf(c)>=0){
+      toks.push({t:"op",v:c,line:line}); i++; continue;
+    }
+    throw new Error(line+"行目: 解釈できない文字「"+c+"」");
+  }
+  toks.push({t:"eof",line:line});
+  return toks;
+}
+/* --- 構文解析 --- */
+function badaParse(toks){
+  var pos=0;
+  function peek(){ return toks[pos]; }
+  function next(){ return toks[pos++]; }
+  function skipNl(){ while(peek().t==="nl") pos++; }
+  function expectOp(v){
+    var tk=next();
+    if(tk.t!=="op"||tk.v!==v) throw new Error((tk.line||"?")+"行目: 「"+v+"」が必要です");
+    return tk;
+  }
+  function parseBlock(){
+    var stmts=[];
+    skipNl();
+    while(peek().t!=="eof"&&!(peek().t==="op"&&peek().v==="}")){
+      stmts.push(parseStmt());
+      skipNl();
+    }
+    return stmts;
+  }
+  function parseBraced(){
+    skipNl(); expectOp("{");
+    var body=parseBlock();
+    expectOp("}");
+    return body;
+  }
+  function parseStmt(){
+    var tk=peek(),name,params,body,cond,thenB,elseB,e;
+    if(tk.t==="id"&&tk.v==="repeat"){
+      next(); e=parseExpr(); body=parseBraced();
+      return {k:"repeat",count:e,body:body,line:tk.line};
+    }
+    if(tk.t==="id"&&tk.v==="for"){
+      next();
+      name=next();
+      if(name.t!=="id") throw new Error(tk.line+"行目: for の後には変数名が必要です");
+      var inTok=next();
+      if(inTok.t!=="id"||inTok.v!=="in") throw new Error(tk.line+"行目: for には in が必要です");
+      e=parseExpr(); body=parseBraced();
+      return {k:"for",name:name.v,list:e,body:body,line:tk.line};
+    }
+    if(tk.t==="id"&&tk.v==="if"){
+      next(); cond=parseExpr(); thenB=parseBraced(); elseB=null;
+      skipNl();
+      if(peek().t==="id"&&peek().v==="else"){ next(); elseB=parseBraced(); }
+      return {k:"if",cond:cond,then:thenB,els:elseB,line:tk.line};
+    }
+    if(tk.t==="id"&&tk.v==="fun"){
+      next(); name=next();
+      if(name.t!=="id") throw new Error(tk.line+"行目: fun の後には関数名が必要です");
+      expectOp("|"); params=[];
+      while(!(peek().t==="op"&&peek().v==="|")){
+        var p=next();
+        if(p.t!=="id") throw new Error(tk.line+"行目: 引数名が不正です");
+        params.push(p.v);
+        if(peek().t==="op"&&peek().v===",") next();
+      }
+      expectOp("|"); body=parseBraced();
+      return {k:"fun",name:name.v,params:params,body:body,line:tk.line};
+    }
+    if(tk.t==="id"&&tk.v==="return"){
+      next();
+      if(peek().t==="nl"||peek().t==="eof") return {k:"return",expr:null,line:tk.line};
+      return {k:"return",expr:parseExpr(),line:tk.line};
+    }
+    if(tk.t==="id"&&toks[pos+1]&&toks[pos+1].t==="op"&&toks[pos+1].v===":="){
+      next(); next();
+      return {k:"assign",name:tk.v,expr:parseExpr(),line:tk.line};
+    }
+    e=parseExpr();
+    if(peek().t==="op"&&peek().v===">>"){
+      next();
+      var tgt=next();
+      if(tgt.t!=="id"||tgt.v!=="tuplespace")
+        throw new Error(tk.line+"行目: >> の右辺は tuplespace のみです");
+      return {k:"ledger",expr:e,line:tk.line};
+    }
+    return {k:"expr",expr:e,line:tk.line};
+  }
+  function parseExpr(){ return parseCmp(); }
+  function parseCmp(){
+    var l=parseAdd(),tk;
+    while(peek().t==="op"&&["==","!=","<",">","<=",">="].indexOf(peek().v)>=0){
+      tk=next(); l={k:"bin",op:tk.v,l:l,r:parseAdd(),line:tk.line};
+    }
+    return l;
+  }
+  function parseAdd(){
+    var l=parseMul(),tk;
+    while(peek().t==="op"&&(peek().v==="+"||peek().v==="-")){
+      tk=next(); l={k:"bin",op:tk.v,l:l,r:parseMul(),line:tk.line};
+    }
+    return l;
+  }
+  function parseMul(){
+    var l=parseUnary(),tk;
+    while(peek().t==="op"&&(peek().v==="*"||peek().v==="/"||peek().v==="%")){
+      tk=next(); l={k:"bin",op:tk.v,l:l,r:parseUnary(),line:tk.line};
+    }
+    return l;
+  }
+  function parseUnary(){
+    if(peek().t==="op"&&peek().v==="-"){
+      var tk=next();
+      return {k:"un",op:"-",e:parseUnary(),line:tk.line};
+    }
+    return parsePostfix();
+  }
+  function parsePostfix(){
+    var e=parsePrimary(),args,idx;
+    for(;;){
+      if(peek().t==="op"&&peek().v==="("&&e.k==="var"){
+        next(); args=[];
+        while(!(peek().t==="op"&&peek().v===")")){
+          skipNl();
+          args.push(parseExpr());
+          skipNl();
+          if(peek().t==="op"&&peek().v===",") next();
+        }
+        next();
+        e={k:"call",name:e.name,args:args,line:e.line};
+      } else if(peek().t==="op"&&peek().v==="["){
+        next(); idx=parseExpr(); expectOp("]");
+        e={k:"index",obj:e,idx:idx,line:e.line};
+      } else break;
+    }
+    return e;
+  }
+  function parsePrimary(){
+    var tk=next(),items,e;
+    if(tk.t==="num") return {k:"num",v:tk.v,line:tk.line};
+    if(tk.t==="str") return {k:"str",v:tk.v,line:tk.line};
+    if(tk.t==="id")  return {k:"var",name:tk.v,line:tk.line};
+    if(tk.t==="op"&&tk.v==="("){
+      e=parseExpr(); expectOp(")"); return e;
+    }
+    if(tk.t==="op"&&tk.v==="["){
+      items=[]; skipNl();
+      while(!(peek().t==="op"&&peek().v==="]")){
+        items.push(parseExpr());
+        skipNl();
+        if(peek().t==="op"&&peek().v===",") next();
+        skipNl();
+      }
+      next();
+      return {k:"list",items:items,line:tk.line};
+    }
+    throw new Error((tk.line||"?")+"行目: 式を解釈できません");
+  }
+  var prog=parseBlock();
+  if(peek().t!=="eof") throw new Error(peek().line+"行目: 予期しない「}」");
+  return prog;
+}
+/* --- 値の表示形式 --- */
+function badaFmt(v){
+  var s;
+  if(typeof v==="number"){
+    if(!isFinite(v)) return String(v);
+    if(Number.isInteger(v)) return String(v);
+    s=v.toFixed(5).replace(/0+$/,"").replace(/\.$/,"");
+    return s;
+  }
+  if(typeof v==="string") return v;
+  if(typeof v==="boolean") return v?"true":"false";
+  if(Array.isArray(v)){
+    var parts=[],i;
+    for(i=0;i<v.length;i++) parts.push(badaFmt(v[i]));
+    return "["+parts.join(", ")+"]";
+  }
+  if(v&&v.__qreg) return "qubit("+v.nq+")";
+  if(v===null||v===undefined) return "nil";
+  return String(v);
+}
+/* --- 実行 --- */
+function badaRun(src,opts){
+  opts=opts||{};
+  var rng=(typeof opts.seed==="number")?mulberry32(opts.seed):Math.random;
+  var out=[],ledger=[],funcs={},steps=0,MAX=200000;
+  function tick(line){
+    if(++steps>MAX) throw new Error((line||"?")+"行目: 実行ステップ数が上限を超えました (無限ループ?)");
+  }
+  function truthy(v){
+    if(typeof v==="number") return v!==0;
+    if(typeof v==="boolean") return v;
+    if(typeof v==="string") return v.length>0;
+    if(Array.isArray(v)) return v.length>0;
+    return v!=null;
+  }
+  function needNum(v,line,what){
+    if(typeof v!=="number") throw new Error(line+"行目: "+what+"には数値が必要です");
+    return v;
+  }
+  function needList(v,line,what){
+    if(!Array.isArray(v)) throw new Error(line+"行目: "+what+"にはリストが必要です");
+    return v;
+  }
+  function needQ(v,line){
+    if(!v||!v.__qreg) throw new Error(line+"行目: 量子レジスタが必要です (qubit(n) で作成)");
+    return v;
+  }
+  var builtins={
+    print:function(args){
+      var parts=[],i;
+      for(i=0;i<args.length;i++) parts.push(badaFmt(args[i]));
+      out.push(parts.join(" "));
+      return null;
+    },
+    len:function(args,line){
+      var v=args[0];
+      if(typeof v==="string") return v.length;
+      return needList(v,line,"len").length;
+    },
+    softmax:function(args,line){ return softmax(needList(args[0],line,"softmax")); },
+    entropy:function(args,line){ return entropy(needList(args[0],line,"entropy")); },
+    unknown_prior:function(args,line){ return unknownPrior(needNum(args[0],line,"unknown_prior")); },
+    update:function(args,line){
+      return updateDist(needList(args[0],line,"update"),needList(args[1],line,"update"));
+    },
+    qubit:function(args,line){
+      var n=needNum(args[0],line,"qubit");
+      if(n<1||n>10) throw new Error(line+"行目: qubit は 1〜10 量子ビットまでです");
+      return qubitReg(n);
+    },
+    H:function(args,line){ return applyH(needQ(args[0],line),needNum(args[1]!==undefined?args[1]:0,line,"H")); },
+    Had:function(args,line){ return applyH(needQ(args[0],line),0); },
+    X:function(args,line){ return applyX(needQ(args[0],line),needNum(args[1]!==undefined?args[1]:0,line,"X")); },
+    CNOT:function(args,line){
+      return applyCNOT(needQ(args[0],line),
+        needNum(args[1],line,"CNOT"),needNum(args[2],line,"CNOT"));
+    },
+    Measure:function(args,line){ return measureProbs(needQ(args[0],line)); },
+    zeros_of:function(args,line){
+      var p=needList(args[0],line,"zeros_of"),z=[],i;
+      for(i=0;i<p.length;i++) if(p[i]===0) z.push(i);
+      return z;
+    },
+    sample:function(args,line){
+      var p=needList(args[0],line,"sample"),r=rng(),acc=0,i;
+      for(i=0;i<p.length;i++){ acc+=p[i]; if(r<acc) return i; }
+      return p.length-1;
+    },
+    pick:function(args,line){
+      var l=needList(args[0],line,"pick");
+      if(!l.length) throw new Error(line+"行目: pick に空リストは渡せません");
+      return l[Math.floor(rng()*l.length)];
+    },
+    range:function(args,line){
+      var n=needNum(args[0],line,"range"),a=[],i;
+      for(i=0;i<n;i++) a.push(i);
+      return a;
+    },
+    push:function(args,line){
+      var l=needList(args[0],line,"push");
+      l.push(args[1]); return l;
+    },
+    f5:function(args,line){ return needNum(args[0],line,"f5").toFixed(5); },
+    sqrt:function(args,line){ return Math.sqrt(needNum(args[0],line,"sqrt")); },
+    abs:function(args,line){ return Math.abs(needNum(args[0],line,"abs")); },
+    floor:function(args,line){ return Math.floor(needNum(args[0],line,"floor")); },
+    round:function(args,line){ return Math.round(needNum(args[0],line,"round")); },
+    str:function(args){ return badaFmt(args[0]); },
+    num:function(args,line){
+      var v=parseFloat(args[0]);
+      if(isNaN(v)) throw new Error(line+"行目: 数値に変換できません");
+      return v;
+    }
+  };
+  function evalExpr(node,env){
+    tick(node.line);
+    switch(node.k){
+      case "num": return node.v;
+      case "str": return node.v;
+      case "list":{
+        var a=[],i;
+        for(i=0;i<node.items.length;i++) a.push(evalExpr(node.items[i],env));
+        return a;
+      }
+      case "var":
+        if(node.name==="tuplespace") return ledger;
+        if(node.name==="true") return true;
+        if(node.name==="false") return false;
+        if(node.name in env.vars) return env.vars[node.name];
+        if(env.parent) return evalExpr(node,env.parent);
+        throw new Error(node.line+"行目: 未定義の変数「"+node.name+"」");
+      case "index":{
+        var obj=evalExpr(node.obj,env), idx=evalExpr(node.idx,env);
+        if(typeof obj==="string"){
+          idx=needNum(idx,node.line,"添字");
+          if(idx<0||idx>=obj.length) throw new Error(node.line+"行目: 添字 "+idx+" が範囲外です");
+          return obj[idx];
+        }
+        needList(obj,node.line,"添字アクセス");
+        idx=needNum(idx,node.line,"添字");
+        if(idx<0||idx>=obj.length) throw new Error(node.line+"行目: 添字 "+idx+" が範囲外です");
+        return obj[idx];
+      }
+      case "un":{
+        var v=evalExpr(node.e,env);
+        return -needNum(v,node.line,"符号反転");
+      }
+      case "bin":{
+        var l=evalExpr(node.l,env), r=evalExpr(node.r,env);
+        switch(node.op){
+          case "+":
+            if(typeof l==="string"||typeof r==="string") return badaFmt(l)+badaFmt(r);
+            if(Array.isArray(l)&&Array.isArray(r)) return l.concat(r);
+            return needNum(l,node.line,"+")+needNum(r,node.line,"+");
+          case "-": return needNum(l,node.line,"-")-needNum(r,node.line,"-");
+          case "*": return needNum(l,node.line,"*")*needNum(r,node.line,"*");
+          case "/":
+            if(needNum(r,node.line,"/")===0) throw new Error(node.line+"行目: 0 で割ることはできません");
+            return needNum(l,node.line,"/")/r;
+          case "%": return needNum(l,node.line,"%")%needNum(r,node.line,"%");
+          case "==": return badaFmt(l)===badaFmt(r);
+          case "!=": return badaFmt(l)!==badaFmt(r);
+          case "<":  return needNum(l,node.line,"<")<needNum(r,node.line,"<");
+          case ">":  return needNum(l,node.line,">")>needNum(r,node.line,">");
+          case "<=": return needNum(l,node.line,"<=")<=needNum(r,node.line,"<=");
+          case ">=": return needNum(l,node.line,">=")>=needNum(r,node.line,">=");
+        }
+        throw new Error(node.line+"行目: 不明な演算子 "+node.op);
+      }
+      case "call":{
+        var args=[],i;
+        for(i=0;i<node.args.length;i++) args.push(evalExpr(node.args[i],env));
+        if(funcs[node.name]){
+          var f=funcs[node.name],local={vars:{},parent:null};
+          for(i=0;i<f.params.length;i++) local.vars[f.params[i]]=args[i];
+          try{ execBlock(f.body,local); }
+          catch(e){ if(e&&e.__ret!==undefined) return e.__ret; throw e; }
+          return null;
+        }
+        if(builtins[node.name]) return builtins[node.name](args,node.line);
+        throw new Error(node.line+"行目: 未定義の関数「"+node.name+"」");
+      }
+    }
+    throw new Error("内部エラー: 不明な式 "+node.k);
+  }
+  function setVar(env,name,v){
+    var e=env;
+    while(e){
+      if(name in e.vars){ e.vars[name]=v; return; }
+      e=e.parent;
+    }
+    env.vars[name]=v;
+  }
+  function execBlock(stmts,env){
+    var i,s,cnt,j,list,item;
+    for(i=0;i<stmts.length;i++){
+      s=stmts[i]; tick(s.line);
+      switch(s.k){
+        case "assign": setVar(env,s.name,evalExpr(s.expr,env)); break;
+        case "ledger": ledger.push(evalExpr(s.expr,env)); break;
+        case "expr": evalExpr(s.expr,env); break;
+        case "fun": funcs[s.name]={params:s.params,body:s.body}; break;
+        case "return": throw {__ret:s.expr?evalExpr(s.expr,env):null};
+        case "repeat":
+          cnt=evalExpr(s.count,env);
+          if(typeof cnt!=="number") throw new Error(s.line+"行目: repeat には数値が必要です");
+          for(j=0;j<cnt;j++) execBlock(s.body,{vars:{},parent:env});
+          break;
+        case "for":
+          list=evalExpr(s.list,env);
+          if(typeof list==="string") list=list.split("");
+          if(!Array.isArray(list)) throw new Error(s.line+"行目: for in にはリストが必要です");
+          for(j=0;j<list.length;j++){
+            item={vars:{},parent:env};
+            item.vars[s.name]=list[j];
+            execBlock(s.body,item);
+          }
+          break;
+        case "if":
+          if(truthy(evalExpr(s.cond,env))) execBlock(s.then,{vars:{},parent:env});
+          else if(s.els) execBlock(s.els,{vars:{},parent:env});
+          break;
+      }
+    }
+  }
+  var prog=badaParse(badaTokenize(src));
+  try{ execBlock(prog,{vars:{},parent:null}); }
+  catch(e){
+    if(e&&e.__ret!==undefined) throw new Error("return は fun の中でのみ使えます");
+    throw e;
+  }
+  return out.join("\n");
+}
+/* ================================================================
+ * 2. BadaGPT 先生 — 応答でアプリを作る「4 つの技」の実演エンジン
+ *    技① 要件抽出 → 技② 仕様化 → 技③ コード生成 → 技④ 実行と反復
+ * ================================================================ */
+var APP_TEMPLATES=[
+  {
+    id:"dice", name:"量子サイコロ",
+    match:/サイコロ|さいころ|dice|ダイス/,
+    reqs:["1〜N の目をランダムに出す","乱数は量子測定 (重ね合わせ→観測) で作る","出た目を台帳に記録して履歴を数える"],
+    input:"なし (実行のたびに量子測定)", proc:"H で重ね合わせ → Measure → sample で目を決定",
+    output:"出た目と履歴件数", state:"tuplespace (append-only 台帳)",
+    faces:6,
+    code:function(t){
+      var f=t.faces||6;
+      return [
+        "# 量子サイコロ — H で重ね合わせを作り、測定で目を決める",
+        "print(\"=== 量子サイコロ ("+f+"面) ===\")",
+        "reg := qubit(3)",
+        "reg := H(reg, 0)",
+        "reg := H(reg, 1)",
+        "reg := H(reg, 2)",
+        "p := Measure(reg)",
+        "print(\"重ね合わせの確率:\", p)",
+        "roll := sample(p) % "+f+" + 1",
+        "print(\"出た目:\", roll)",
+        "roll >> tuplespace",
+        "print(\"履歴 (台帳):\", len(tuplespace), \"回\")"
+      ].join("\n");
+    }
+  },
+  {
+    id:"fortune", name:"量子おみくじ",
+    match:/おみくじ|占い|うらない|運勢|fortune/,
+    reqs:["実行するたびに運勢を 1 つ引く","結果は量子測定で決める (誰にも予測できない)","引いた運勢を台帳に残す"],
+    input:"なし", proc:"2 量子ビットを H で重ね合わせ → Measure → sample",
+    output:"今日の運勢", state:"tuplespace",
+    code:function(){
+      return [
+        "# 量子おみくじ — 観測するまで運勢は重ね合わせ",
+        "omens := [\"大吉\", \"中吉\", \"小吉\", \"末吉\"]",
+        "reg := qubit(2)",
+        "reg := H(reg, 0)",
+        "reg := H(reg, 1)",
+        "p := Measure(reg)",
+        "i := sample(p)",
+        "print(\"今日の運勢:\", omens[i])",
+        "omens[i] >> tuplespace",
+        "print(\"これまでに引いた回数:\", len(tuplespace))"
+      ].join("\n");
+    }
+  },
+  {
+    id:"todo", name:"ToDo リスト",
+    match:/todo|やること|タスク|買い物リスト|メモ/i,
+    reqs:["やることを追加できる","一覧を番号つきで表示する","件数を数える"],
+    input:"タスク名 (コード内で追加)", proc:">> tuplespace で append-only に追加",
+    output:"番号つき一覧と件数", state:"tuplespace",
+    code:function(){
+      return [
+        "# ToDo アプリ — append-only 台帳をそのままデータベースに使う",
+        "\"Bada の練習をする\" >> tuplespace",
+        "\"牛乳を買う\" >> tuplespace",
+        "\"道場の演習を解く\" >> tuplespace",
+        "print(\"=== ToDo (\" + len(tuplespace) + \" 件) ===\")",
+        "i := 1",
+        "for t in tuplespace {",
+        "    print(i, \":\", t)",
+        "    i := i + 1",
+        "}"
+      ].join("\n");
+    }
+  },
+  {
+    id:"quiz", name:"暗記カード",
+    match:/クイズ|暗記|カード|単語帳|quiz/i,
+    reqs:["問題と答えのペアを持つ","全カードを順に表示する","カード数を数える"],
+    input:"問題と答えのリスト", proc:"for でカードを走査して表示",
+    output:"Q/A の一覧", state:"リスト変数",
+    code:function(){
+      return [
+        "# 暗記カードアプリ — 2 本のリストで Q/A を管理",
+        "q := [\"Bada の台帳の名前は?\", \"H ゲートの別名は?\", \"一様分布のエントロピーは最大? 最小?\"]",
+        "a := [\"tuplespace\", \"アダマール (Hadamard)\", \"最大\"]",
+        "print(\"=== 暗記カード (\" + len(q) + \" 枚) ===\")",
+        "for i in range(len(q)) {",
+        "    print(\"Q\", i + 1, \":\", q[i])",
+        "    print(\"  A :\", a[i])",
+        "}"
+      ].join("\n");
+    }
+  },
+  {
+    id:"calc", name:"電卓",
+    match:/電卓|計算機|計算アプリ|calc/i,
+    reqs:["四則演算ができる","関数 (sqrt など) も使える","結果を表示する"],
+    input:"数値 (コード内の式)", proc:"式を評価して print",
+    output:"計算結果", state:"なし",
+    code:function(){
+      return [
+        "# 電卓アプリ — 式を書き換えて実行するだけ",
+        "print(\"12 + 34 =\", 12 + 34)",
+        "print(\"3.5 * 4 =\", 3.5 * 4)",
+        "print(\"10 / 4  =\", 10 / 4)",
+        "print(\"17 % 5  =\", 17 % 5)",
+        "print(\"sqrt(2) =\", sqrt(2))",
+        "fun heikin |x, y| {",
+        "    return (x + y) / 2",
+        "}",
+        "print(\"平均(3, 8) =\", heikin(3, 8))"
+      ].join("\n");
+    }
+  },
+  {
+    id:"bell", name:"ベル状態デモ",
+    match:/ベル|量子もつれ|エンタングル|bell|量子デモ|量子シミュ/i,
+    reqs:["2 量子ビットをもつれさせる","測定確率が [0.5, 0, 0, 0.5] になることを確認する","禁止状態 (確率 0) を列挙する"],
+    input:"なし", proc:"H → CNOT でベル対を作り Measure",
+    output:"確率分布と禁止状態", state:"なし",
+    code:function(){
+      return [
+        "# ベル状態 — H と CNOT で量子もつれを作る",
+        "bell := qubit(2)",
+        "bell := H(bell, 0)",
+        "bell := CNOT(bell, 0, 1)",
+        "p := Measure(bell)",
+        "print(\"Bell |psi|^2 :\", p)",
+        "print(\"禁止状態 (確率 0):\", zeros_of(p))",
+        "print(\"00 と 11 だけが半々 — 片方を見れば他方が決まる\")"
+      ].join("\n");
+    }
+  },
+  {
+    id:"counter", name:"カウンター",
+    match:/カウンタ|カウント|数える|counter/i,
+    reqs:["ボタンの代わりに repeat で回数を回す","現在値を毎回表示する","最終値を台帳に記録する"],
+    input:"回数 (repeat の数値)", proc:"repeat で加算を繰り返す",
+    output:"カウントの推移", state:"変数 + tuplespace",
+    code:function(){
+      return [
+        "# カウンターアプリ",
+        "count := 0",
+        "repeat 5 {",
+        "    count := count + 1",
+        "    print(\"カウント:\", count)",
+        "}",
+        "count >> tuplespace",
+        "print(\"最終値を台帳に記録しました (\" + len(tuplespace) + \" 件)\")"
+      ].join("\n");
+    }
+  }
+];
+function tutorFindTemplate(msg){
+  var i;
+  for(i=0;i<APP_TEMPLATES.length;i++)
+    if(APP_TEMPLATES[i].match.test(msg)) return APP_TEMPLATES[i];
+  return null;
+}
+function tutorReply(msg,ctx){
+  ctx=ctx||{};
+  var steps=[],code,name,t;
+  msg=(msg||"").trim();
+  /* --- 技④ 反復: 前のアプリへの変更依頼 --- */
+  var faceM=msg.match(/([0-9０-９]+)\s*面/);
+  if(ctx.lastCode&&/にして|に変えて|増やして|直して|変更/.test(msg)){
+    var newCode=null,note="";
+    if(faceM&&/%\s*\d+\s*\+\s*1/.test(ctx.lastCode)){
+      var faces=parseInt(faceM[1].replace(/[０-９]/g,function(c){
+        return String.fromCharCode(c.charCodeAt(0)-0xFEE0);
+      }),10);
+      newCode=ctx.lastCode
+        .replace(/%\s*\d+\s*\+\s*1/,"% "+faces+" + 1")
+        .replace(/\([0-9]+面\)/,"("+faces+"面)");
+      note="サイコロの面数を "+faces+" に変更しました。";
+    }
+    if(newCode){
+      steps.push({icon:"🔁",title:"技④ 実行と反復 — 応答でアプリを育てる",
+        html:"これが <b>反復の技</b> です。作ったアプリは 1 回で終わりではなく、"+
+             "出力を見て「こう変えて」と<b>応答で頼む</b>だけで育っていきます。<br>"+
+             note+" 変更点は 1 か所だけ — <b>差分が小さいほど壊れにくい</b>のもこの技のコツです。"});
+      return {steps:steps,code:newCode,appName:(ctx.lastAppName||"アプリ")+" (改)",
+        followups:["もう一度実行して確かめる","他のアプリも作って"]};
+    }
+  }
+  if(!msg){
+    steps.push({icon:"🙇",title:"BadaGPT 先生",
+      html:"作りたいアプリを日本語でどうぞ。例:「サイコロアプリを作って」「ToDo アプリが欲しい」"});
+    return {steps:steps,code:null,appName:null,followups:[]};
+  }
+  t=tutorFindTemplate(msg);
+  /* --- 技① 要件抽出 --- */
+  var reqs=t?t.reqs:[
+    "「"+msg+"」という依頼から目的を推定する",
+    "画面 (出力) に何を出すかを決める",
+    "覚えておくデータ (状態) を決める"
+  ];
+  var reqHtml="ChatGPT の最初の技は、あいまいな日本語の依頼を<b>箇条書きの要件</b>に直すことです。"+
+    "依頼「<b>"+escapeHtml(msg)+"</b>」から、こう読み取りました:<ul>";
+  var i;
+  for(i=0;i<reqs.length;i++) reqHtml+="<li>"+escapeHtml(reqs[i])+"</li>";
+  reqHtml+="</ul>要件が違うときは、そのまま日本語で言い直せば OK — それが<b>応答型開発</b>です。";
+  steps.push({icon:"🔍",title:"技① 要件抽出 — 依頼を箇条書きに直す",html:reqHtml});
+  /* --- 技② 仕様化 --- */
+  name=t?t.name:"カスタムアプリ";
+  var spec={
+    name:name,
+    input:t?t.input:"なし",
+    proc:t?t.proc:"要件を print で確認する骨組み",
+    output:t?t.output:"要件の一覧",
+    state:t?t.state:"なし"
+  };
+  steps.push({icon:"📐",title:"技② 仕様化 — 入力・処理・出力・状態の 4 点を決める",
+    html:"次の技は、要件を<b>仕様表</b>に落とすこと。どんなアプリも「入力→処理→出力」+「状態」の 4 点で書けます:"+
+      "<table><tr><th>アプリ名</th><td>"+escapeHtml(spec.name)+"</td></tr>"+
+      "<tr><th>入力</th><td>"+escapeHtml(spec.input)+"</td></tr>"+
+      "<tr><th>処理</th><td>"+escapeHtml(spec.proc)+"</td></tr>"+
+      "<tr><th>出力</th><td>"+escapeHtml(spec.output)+"</td></tr>"+
+      "<tr><th>状態</th><td>"+escapeHtml(spec.state)+"</td></tr></table>"});
+  /* --- 技③ コード生成 --- */
+  if(t){
+    code=t.code(t);
+    steps.push({icon:"⚙️",title:"技③ コード生成 — 仕様を型 (テンプレート) に流し込む",
+      html:"3 つ目の技は、仕様の各行を<b>言語の決まった型</b>に対応づけること。今回は Bada で:<ul>"+
+        "<li>状態 → <code>:=</code> の変数と <code>&gt;&gt; tuplespace</code> (台帳)</li>"+
+        "<li>処理 → "+escapeHtml(spec.proc)+"</li>"+
+        "<li>出力 → <code>print(...)</code></li></ul>"+
+        "できあがったコードがこちら。<b>▶ 実行</b>ですぐ動きます。"});
+  } else {
+    code=[
+      "# "+name+" — 仕様確認の骨組み (ここから育てる)",
+      "print(\"=== "+name.replace(/"/g,"")+" ===\")",
+      "print(\"依頼:\", \""+msg.replace(/"/g,"”")+"\")"
+    ];
+    for(i=0;i<reqs.length;i++)
+      code.push("print(\"要件"+(i+1)+":\", \""+reqs[i].replace(/"/g,"”")+"\")");
+    code.push("\"仕様を確認した\" >> tuplespace");
+    code.push("print(\"台帳:\", len(tuplespace), \"件\")");
+    code=code.join("\n");
+    steps.push({icon:"⚙️",title:"技③ コード生成 — まず動く骨組みから",
+      html:"この依頼にぴったりの型はまだ持っていないので、ChatGPT がよく使うもう 1 つの技 — "+
+        "<b>まず動く骨組みを出して、応答で肉づけする</b> — を使います。"+
+        "骨組みを実行したら、「サイコロ」「ToDo」「おみくじ」のような近い形を伝えてください。"});
+  }
+  /* --- 技④ 実行と反復 --- */
+  steps.push({icon:"🔁",title:"技④ 実行と反復 — 出力を見て、また応答で頼む",
+    html:"最後の技は<b>ループを回す</b>こと: ▶ 実行 → 出力を読む → 直したい点を日本語で頼む。"+
+      "たとえば"+(t&&t.id==="dice"?"「<b>12面にして</b>」と送ると、先生が差分だけ直します。":
+      "「もっと項目を増やして」「表示を変えて」のように頼めます。")+
+      "ChatGPT がアプリを作れるのは、この 4 つの技を<b>会話のたびに回している</b>からです。"});
+  return {steps:steps,code:code,appName:name,
+    followups:t&&t.id==="dice"?["12面にして","おみくじアプリも作って"]:
+      ["サイコロアプリを作って","ToDo アプリを作って","ベル状態のデモを見せて"]};
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+/* ================================================================
+ * 3. カリキュラム (8 章) + 演習の自動判定
+ * ================================================================ */
+var LESSONS=[
+  {
+    id:"l1", title:"第1章 応答型アプリ開発とは",
+    body:function(){return [
+      "<p>ChatGPT のようなアシスタントは、キーボードで 1 行ずつコードを打つ代わりに、"+
+      "<b>日本語の応答だけでアプリケーションを組み立てます</b>。この道場では、その裏側で"+
+      "回っている手順 — <b>4 つの技</b> — をあなた自身が使えるように伝授します。</p>",
+      "<div class='waza'><b>4 つの技 (この道場で身につけるもの)</b><ol>"+
+      "<li><b>技① 要件抽出</b> — あいまいな依頼を箇条書きの要件に直す</li>"+
+      "<li><b>技② 仕様化</b> — 要件を「入力・処理・出力・状態」の 4 点に落とす</li>"+
+      "<li><b>技③ コード生成</b> — 仕様を言語の決まった型に流し込む</li>"+
+      "<li><b>技④ 実行と反復</b> — 動かして、出力を見て、また応答で直す</li></ol></div>",
+      "<p>題材には量子プログラミング言語 <b>Bada</b> を使います。重ね合わせ・測定・"+
+      "append-only 台帳という Bada の道具は、小さくても本物のアプリを作るのに十分です。</p>",
+      "<h3>まず 1 行、動かしてみる</h3>",
+      "<p>下のエディタの <b>▶ 実行</b> を押してください。これがあなたの最初の Bada プログラムです。</p>"
+    ].join("");},
+    starter:'print("Bada 道場、入門しました。")',
+    exercise:{
+      text:"print を 2 回使って、1 行目に自分の好きな言葉、2 行目に「押忍」と表示してください。",
+      starter:'print("")\nprint("")',
+      mustOutput:["押忍"], mustCode:["print"],
+      minLines:2
+    }
+  },
+  {
+    id:"l2", title:"第2章 技① 要件抽出",
+    body:function(){return [
+      "<p>「サイコロアプリ作って」という依頼には、実は決めるべきことがたくさん隠れています。"+
+      "何面か? 履歴は残すか? 乱数はどう作るか? — ChatGPT はまず、依頼を"+
+      "<b>確認できる箇条書き</b>に直します。</p>",
+      "<div class='waza'><b>技① のコツ</b><ul>"+
+      "<li>依頼文の<b>名詞</b>を拾う (サイコロ → 目、面、履歴)</li>"+
+      "<li>1 行 1 要件で書く — 長い文は分割する</li>"+
+      "<li>決められないことは<b>仮置き</b>して明記する (例: とりあえず 6 面)</li></ul></div>",
+      "<p>要件はコードの外にある情報なので、プログラムでは <code>print</code> で書き出して"+
+      "依頼者に見せるのが第一歩です。骨組み (スケルトン) と呼びます。</p>",
+      "<pre class='code'># 要件のスケルトン\nprint(\"要件1: 1〜6 の目を出す\")\nprint(\"要件2: 出た目を記録する\")\nprint(\"要件3: 乱数は量子測定で作る\")</pre>",
+      "<h3>道場で見る</h3>",
+      "<p>🥋 道場タブで「サイコロアプリを作って」と送ると、BadaGPT 先生が技①を実演します。</p>"
+    ].join("");},
+    starter:'print("要件1: 1〜6 の目を出す")\nprint("要件2: 出た目を記録する")',
+    exercise:{
+      text:"「おみくじアプリ」の要件を 3 つ考えて、print で「要件1: …」「要件2: …」「要件3: …」と表示してください。",
+      starter:'print("要件1: ")\nprint("要件2: ")\nprint("要件3: ")',
+      mustOutput:["要件1","要件2","要件3"], mustCode:["print"]
+    }
+  },
+  {
+    id:"l3", title:"第3章 技② 仕様化",
+    body:function(){return [
+      "<p>要件が揃ったら、次は<b>仕様表</b>です。どんなアプリも次の 4 点で書き切れます:</p>",
+      "<div class='waza'><b>技② の 4 点セット</b><ul>"+
+      "<li><b>入力</b> — 使う人 (または環境) から何を受け取るか</li>"+
+      "<li><b>処理</b> — 入力をどう変換するか</li>"+
+      "<li><b>出力</b> — 画面に何を出すか</li>"+
+      "<li><b>状態</b> — 次回のために何を覚えておくか</li></ul></div>",
+      "<p>Bada では、状態の置き場所として <b>tuplespace</b> という append-only 台帳が"+
+      "言語に組み込まれています。<code>値 &gt;&gt; tuplespace</code> で追記し、"+
+      "<code>len(tuplespace)</code> で数えられます。追記しかできない (書き換え・削除がない) ので、"+
+      "<b>履歴がそのままデータベース</b>になります。</p>",
+      "<pre class='code'>\"最初の記録\" &gt;&gt; tuplespace\n\"次の記録\" &gt;&gt; tuplespace\nprint(\"台帳:\", len(tuplespace), \"件\")\nfor t in tuplespace {\n    print(\"・\", t)\n}</pre>"
+    ].join("");},
+    starter:'"最初の記録" >> tuplespace\n"次の記録" >> tuplespace\nprint("台帳:", len(tuplespace), "件")\nfor t in tuplespace {\n    print("・", t)\n}',
+    exercise:{
+      text:"tuplespace に文字列を 3 件追記し、len(tuplespace) を使って「台帳: 3 件」と表示してください。",
+      starter:'# ここに 3 件追記\n\nprint("台帳:", len(tuplespace), "件")',
+      mustOutput:["台帳: 3 件"], mustCode:[">> tuplespace","len(tuplespace)"]
+    }
+  },
+  {
+    id:"l4", title:"第4章 Bada 言語入門",
+    body:function(){return [
+      "<p>技③ (コード生成) の前に、道具である Bada の基本文法を押さえます。</p>",
+      "<h3>変数と print</h3>",
+      "<pre class='code'>x := 42            # := で代入\nname := \"Bada\"\nprint(name, \"の答え:\", x)</pre>",
+      "<h3>リストと繰り返し</h3>",
+      "<pre class='code'>xs := [10, 20, 30]\nprint(\"先頭:\", xs[0], \" 長さ:\", len(xs))\nfor x in xs {\n    print(x)\n}\nrepeat 3 {\n    print(\"稽古\")\n}</pre>",
+      "<h3>条件分岐と関数</h3>",
+      "<pre class='code'>fun hanbetsu |x| {\n    if x >= 60 {\n        return \"合格\"\n    }\n    return \"追試\"\n}\nprint(hanbetsu(75))</pre>",
+      "<h3>確率分布 — Bada の心臓部</h3>",
+      "<p>Bada は<b>「わからない」を最大エントロピーの一様分布で表す</b>言語です。"+
+      "証拠 (evidence) が来るたびに <code>update</code> で分布が尖り、"+
+      "エントロピーは必ず下がります。</p>",
+      "<pre class='code'>prior := unknown_prior(4)      # [0.25, 0.25, 0.25, 0.25]\nprint(\"事前:\", prior, \" H =\", entropy(prior))\nev := softmax([2.0, 1.0, 0.0, -1.0])\npost := update(prior, ev)\nprint(\"事後:\", post, \" H =\", entropy(post))</pre>"
+    ].join("");},
+    starter:'prior := unknown_prior(4)\nprint("事前:", prior, " H =", entropy(prior))\nev := softmax([2.0, 1.0, 0.0, -1.0])\npost := update(prior, ev)\nprint("事後:", post, " H =", entropy(post))',
+    exercise:{
+      text:"unknown_prior(3) で 3 状態の一様分布を作り、その entropy を表示してください (ln 3 ≈ 1.09861 になれば正解)。",
+      starter:'p := unknown_prior(3)\n# entropy を表示する',
+      mustOutput:["1.09861"], mustCode:["unknown_prior(3)","entropy"]
+    }
+  },
+  {
+    id:"l5", title:"第5章 量子コア — qubit / H / CNOT / Measure",
+    body:function(){return [
+      "<p>Bada の乱数と「予測できなさ」の源は量子コアです。使う道具は 4 つだけ:</p>",
+      "<div class='waza'><b>量子コアの 4 道具</b><ul>"+
+      "<li><code>qubit(n)</code> — n 量子ビットのレジスタ (最初は |0…0⟩)</li>"+
+      "<li><code>H(reg, i)</code> — i 番目にアダマール: 重ね合わせを作る</li>"+
+      "<li><code>CNOT(reg, c, t)</code> — c が 1 のとき t を反転: もつれを作る</li>"+
+      "<li><code>Measure(reg)</code> — 各基底状態の確率 |ψ|² を返す</li></ul></div>",
+      "<pre class='code'>reg := qubit(1)\nreg := H(reg, 0)\nprint(\"H|0> :\", Measure(reg))   # [0.5, 0.5]</pre>",
+      "<p>2 量子ビットに H と CNOT をかけると<b>ベル状態</b> — 00 と 11 だけが半々で、"+
+      "01 と 10 は確率 0 (禁止状態) — ができます。Bada の定理"+
+      "「confident zero は保存される」は、この禁止状態が後の位相操作で復活しないことを保証します。</p>",
+      "<pre class='code'>bell := qubit(2)\nbell := H(bell, 0)\nbell := CNOT(bell, 0, 1)\np := Measure(bell)\nprint(\"Bell :\", p)             # [0.5, 0, 0, 0.5]\nprint(\"禁止状態:\", zeros_of(p)) # [1, 2]</pre>",
+      "<p>アプリで乱数が欲しいときは <code>sample(Measure(reg))</code> — "+
+      "測定確率に従って基底状態を 1 つ引きます。これが量子サイコロの正体です。</p>"
+    ].join("");},
+    starter:'bell := qubit(2)\nbell := H(bell, 0)\nbell := CNOT(bell, 0, 1)\np := Measure(bell)\nprint("Bell :", p)\nprint("禁止状態:", zeros_of(p))',
+    exercise:{
+      text:"qubit(2) の両方の量子ビットに H をかけ、Measure の結果 (4 状態が全部 0.25) を表示してください。",
+      starter:'reg := qubit(2)\n# 両方に H をかけて Measure を表示',
+      mustOutput:["[0.25, 0.25, 0.25, 0.25]"], mustCode:["qubit(2)","H(","Measure"]
+    }
+  },
+  {
+    id:"l6", title:"第6章 技③ コード生成 — 型に流し込む",
+    body:function(){return [
+      "<p>いよいよ ChatGPT の中心の技です。実は、生成されるアプリの多くは"+
+      "<b>決まった型 (テンプレート) のスロットを埋めたもの</b>です。仕様表の各行が、"+
+      "そのままコードの部品に対応します:</p>",
+      "<div class='waza'><b>技③ の対応表 (仕様 → Bada)</b><ul>"+
+      "<li>状態 → <code>x := 初期値</code> / <code>値 &gt;&gt; tuplespace</code></li>"+
+      "<li>入力 → リストや数値のスロット (あとで応答で差し替える)</li>"+
+      "<li>処理 → <code>for</code> / <code>repeat</code> / <code>fun</code> / 量子コア</li>"+
+      "<li>出力 → <code>print(...)</code></li></ul></div>",
+      "<p>たとえば「量子おみくじ」の型はこうです。<b>運勢リストがスロット</b>になっていて、"+
+      "ここを差し替えるだけで別のアプリ (ルーレット、席決め…) に化けます:</p>",
+      "<pre class='code'>omens := [\"大吉\", \"中吉\", \"小吉\", \"末吉\"]   # ← スロット\nreg := qubit(2)\nreg := H(reg, 0)\nreg := H(reg, 1)\ni := sample(Measure(reg))\nprint(\"結果:\", omens[i])</pre>",
+      "<p>🥋 道場タブで「おみくじアプリを作って」と頼むと、先生がこの型への流し込みを実演します。"+
+      "生成のたびに要件→仕様→コードの 3 段が表示されるのを確認してください。</p>"
+    ].join("");},
+    starter:'omens := ["大吉", "中吉", "小吉", "末吉"]\nreg := qubit(2)\nreg := H(reg, 0)\nreg := H(reg, 1)\ni := sample(Measure(reg))\nprint("結果:", omens[i])',
+    exercise:{
+      text:"上の「おみくじ」の型のスロットを差し替えて、4 人の名前から今日の掃除当番を 1 人選ぶアプリにしてください (出力に「当番」という文字を含めること)。",
+      starter:'names := ["", "", "", ""]\nreg := qubit(2)\nreg := H(reg, 0)\nreg := H(reg, 1)\ni := sample(Measure(reg))\nprint("当番:", names[i])',
+      mustOutput:["当番"], mustCode:["sample","Measure"]
+    }
+  },
+  {
+    id:"l7", title:"第7章 技④ 実行と反復 — 直しの応答",
+    body:function(){return [
+      "<p>最後の技は、<b>作ったら終わりにしない</b>ことです。ChatGPT が強いのは、"+
+      "出力 (またはエラー) を読んで、<b>差分だけを直す応答</b>を返し続けるからです。</p>",
+      "<div class='waza'><b>技④ のループ</b><ol>"+
+      "<li>▶ 実行する</li>"+
+      "<li>出力とエラーを<b>そのまま読む</b> (Bada のエラーは行番号つき)</li>"+
+      "<li>直したい点を<b>1 つだけ</b>日本語にして頼む (「12面にして」)</li>"+
+      "<li>差分が小さいことを確認して、また実行する</li></ol></div>",
+      "<p>下のプログラムには<b>バグが 1 つ</b>あります。実行してエラーの行番号を読み、"+
+      "自分で直してみてください (ヒント: リストの添字は 0 始まり)。</p>"
+    ].join("");},
+    starter:'menu := ["うどん", "そば", "カレー"]\nprint("今日の昼:", menu[3])',
+    exercise:{
+      text:"上のバグを直して「今日の昼: カレー」と表示させてください。",
+      starter:'menu := ["うどん", "そば", "カレー"]\nprint("今日の昼:", menu[3])',
+      mustOutput:["今日の昼: カレー"], mustCode:["menu[2]"]
+    }
+  },
+  {
+    id:"l8", title:"卒業試験 — 4 つの技を通しで",
+    body:function(){return [
+      "<p>ここまでの技を通しで使います。手順:</p>",
+      "<ol><li>🥋 道場タブで、好きなアプリを日本語で依頼する</li>"+
+      "<li>先生の 技①〜③ の応答 (要件・仕様・コード) を読む</li>"+
+      "<li>生成コードを「📋 エディタへ」でこの章に持ってくる</li>"+
+      "<li>技④: 自分の手で 1 か所以上改造して、動かす</li></ol>",
+      "<p>卒業条件: 下のエディタで、<b>量子コア (qubit / H / Measure / sample のどれか) と"+
+      "台帳 (&gt;&gt; tuplespace) の両方を使ったアプリ</b>を完成させて実行してください。</p>",
+      "<div class='note'>これができれば、あなたは「応答でアプリを作る技」の使い手です。"+
+      "こんどはあなたが ChatGPT 側 — 誰かの日本語の依頼を、要件→仕様→コード→反復で"+
+      "形にする側 — に回れます。押忍!</div>"
+    ].join("");},
+    starter:'# 卒業制作: 量子コアと台帳の両方を使うこと\n',
+    exercise:{
+      text:"量子コア (qubit / H / Measure / sample のどれか) と >> tuplespace の両方を使ったアプリを書いて実行してください (出力 3 行以上)。",
+      starter:'# 卒業制作\n',
+      mustCode:[">> tuplespace"], mustCodeAny:["qubit(","H(","Measure","sample("],
+      minOutLines:3
+    }
+  }
+];
+function checkExercise(lessonId,code,opts){
+  var l=null,i,ex,outText;
+  for(i=0;i<LESSONS.length;i++) if(LESSONS[i].id===lessonId){ l=LESSONS[i]; break; }
+  if(!l||!l.exercise) return {pass:false,message:"演習が見つかりません"};
+  ex=l.exercise;
+  try{ outText=badaRun(code,opts||{}); }
+  catch(e){ return {pass:false,message:"実行エラー: "+(e&&e.message?e.message:e)}; }
+  if(ex.mustCode)
+    for(i=0;i<ex.mustCode.length;i++)
+      if(code.indexOf(ex.mustCode[i])<0)
+        return {pass:false,message:"コードに「"+ex.mustCode[i]+"」を使ってください"};
+  if(ex.mustCodeAny){
+    var hit=false;
+    for(i=0;i<ex.mustCodeAny.length;i++)
+      if(code.indexOf(ex.mustCodeAny[i])>=0){ hit=true; break; }
+    if(!hit) return {pass:false,message:"量子コア ("+ex.mustCodeAny.join(" / ")+" のどれか) を使ってください"};
+  }
+  if(ex.mustOutput)
+    for(i=0;i<ex.mustOutput.length;i++)
+      if(outText.indexOf(ex.mustOutput[i])<0)
+        return {pass:false,message:"出力に「"+ex.mustOutput[i]+"」が見つかりません"};
+  if(ex.minLines){
+    var lines=outText.split("\n").filter(function(s){return s.trim().length>0;});
+    if(lines.length<ex.minLines)
+      return {pass:false,message:"出力が "+ex.minLines+" 行以上になるようにしてください"};
+  }
+  if(ex.minOutLines){
+    var lines2=outText.split("\n").filter(function(s){return s.trim().length>0;});
+    if(lines2.length<ex.minOutLines)
+      return {pass:false,message:"出力を "+ex.minOutLines+" 行以上にしてください (print を増やす)"};
+  }
+  return {pass:true,message:"合格! 次の章へ進みましょう。",output:outText};
+}
+/* ================================================================
+ * 4. UI (ブラウザ実行時のみ)
+ * ================================================================ */
+function initUI(){
+  var doneKey="badaTeach.done", progress={};
+  try{ progress=JSON.parse(localStorage.getItem(doneKey)||"{}")||{}; }catch(e){ progress={}; }
+  function saveProgress(){
+    try{ localStorage.setItem(doneKey,JSON.stringify(progress)); }catch(e){}
+  }
+  var panes={lessons:byId("pane-lessons"),dojo:byId("pane-dojo"),ref:byId("pane-ref")};
+  var tabs={lessons:byId("tab-lessons"),dojo:byId("tab-dojo"),ref:byId("tab-ref")};
+  function byId(id){ return document.getElementById(id); }
+  function showPane(name){
+    var k;
+    for(k in panes){
+      panes[k].style.display=(k===name)?(k==="lessons"?"flex":(k==="dojo"?"flex":"block")):"none";
+      tabs[k].classList.toggle("on",k===name);
+    }
+  }
+  tabs.lessons.onclick=function(){ showPane("lessons"); };
+  tabs.dojo.onclick=function(){ showPane("dojo"); };
+  tabs.ref.onclick=function(){ showPane("ref"); };
+  /* ---- カリキュラム ---- */
+  var listEl=byId("lesson-list"), viewEl=byId("lesson-view"), current=0;
+  function renderList(){
+    listEl.innerHTML="";
+    LESSONS.forEach(function(l,i){
+      var d=document.createElement("div");
+      d.className="item"+(i===current?" on":"");
+      d.innerHTML=escapeHtml(l.title)+(progress[l.id]?'<span class="done">✔</span>':"");
+      d.onclick=function(){ current=i; renderList(); renderLesson(); };
+      listEl.appendChild(d);
+    });
+  }
+  function makeEditor(container,starter,runLabel,onRun){
+    var box=document.createElement("div"); box.className="editor-box";
+    var bar=document.createElement("div"); bar.className="bar";
+    var run=document.createElement("button"); run.className="act"; run.textContent="▶ "+(runLabel||"実行");
+    var reset=document.createElement("button"); reset.className="act ghost"; reset.textContent="元に戻す";
+    bar.appendChild(run); bar.appendChild(reset);
+    var ta=document.createElement("textarea"); ta.value=starter||"";
+    ta.spellcheck=false;
+    var out=document.createElement("div"); out.className="out";
+    box.appendChild(bar); box.appendChild(ta); box.appendChild(out);
+    container.appendChild(box);
+    run.onclick=function(){
+      out.classList.remove("err");
+      try{
+        var res=badaRun(ta.value);
+        out.textContent=res||"(出力なし)";
+        if(onRun) onRun(ta.value,res,null);
+      }catch(e){
+        out.classList.add("err");
+        out.textContent="✖ "+(e&&e.message?e.message:e);
+        if(onRun) onRun(ta.value,null,e);
+      }
+    };
+    reset.onclick=function(){ ta.value=starter||""; out.textContent=""; out.classList.remove("err"); };
+    return {box:box,ta:ta,out:out};
+  }
+  function renderLesson(){
+    var l=LESSONS[current];
+    viewEl.innerHTML="";
+    viewEl.scrollTop=0;
+    var h=document.createElement("h2"); h.textContent=l.title; viewEl.appendChild(h);
+    var body=document.createElement("div"); body.innerHTML=l.body(); viewEl.appendChild(body);
+    if(l.starter!=null){
+      var eh=document.createElement("h3"); eh.textContent="🧪 実験エディタ"; viewEl.appendChild(eh);
+      makeEditor(viewEl,l.starter,"実行");
+    }
+    if(l.exercise){
+      var xh=document.createElement("h3"); xh.textContent="✍️ 演習 (自動判定)"; viewEl.appendChild(xh);
+      var xp=document.createElement("p"); xp.textContent=l.exercise.text; viewEl.appendChild(xp);
+      var verdict=document.createElement("div"); verdict.className="verdict";
+      var ed=makeEditor(viewEl,l.exercise.starter,"実行して判定",function(code){
+        var r=checkExercise(l.id,code);
+        verdict.className="verdict "+(r.pass?"ok":"ng");
+        verdict.textContent=(r.pass?"🎖 ":"✖ ")+r.message;
+        if(r.pass){ progress[l.id]=true; saveProgress(); renderList(); }
+      });
+      ed.box.after(verdict);
+    }
+    var navRow=document.createElement("div"); navRow.className="lesson-nav";
+    if(current>0){
+      var prev=document.createElement("button"); prev.className="act ghost"; prev.textContent="← 前の章";
+      prev.onclick=function(){ current--; renderList(); renderLesson(); };
+      navRow.appendChild(prev);
+    }
+    if(current<LESSONS.length-1){
+      var nx=document.createElement("button"); nx.className="act"; nx.textContent="次の章 →";
+      nx.onclick=function(){ current++; renderList(); renderLesson(); };
+      navRow.appendChild(nx);
+    }
+    viewEl.appendChild(navRow);
+  }
+  renderList(); renderLesson();
+  /* ---- 道場 (チャット) ---- */
+  var log=byId("chat-log"), input=byId("chat-input"), send=byId("chat-send"),
+      hint=byId("chat-hint"), dojoCtx={lastCode:null,lastAppName:null};
+  function addMsg(cls,html){
+    var d=document.createElement("div");
+    d.className="msg "+cls; d.innerHTML=html;
+    log.appendChild(d); log.scrollTop=log.scrollHeight;
+    return d;
+  }
+  function renderHints(list){
+    hint.innerHTML="";
+    (list||[]).forEach(function(s){
+      var sp=document.createElement("span"); sp.textContent=s;
+      sp.onclick=function(){ input.value=s; doSend(); };
+      hint.appendChild(sp);
+    });
+  }
+  function addCodeMsg(code,appName){
+    var d=addMsg("bot","");
+    var wrap=document.createElement("div"); wrap.className="codewrap";
+    var pre=document.createElement("pre"); pre.className="code"; pre.textContent=code;
+    var row=document.createElement("div");
+    var run=document.createElement("button"); run.className="act"; run.textContent="▶ 実行";
+    var toEd=document.createElement("button"); toEd.className="act ghost"; toEd.textContent="📋 エディタへ (卒業試験)";
+    var out=document.createElement("div"); out.className="out"; out.style.marginTop="6px";
+    row.appendChild(run); row.appendChild(document.createTextNode(" ")); row.appendChild(toEd);
+    wrap.appendChild(pre); wrap.appendChild(row); wrap.appendChild(out);
+    var title=document.createElement("div"); title.className="step-title";
+    title.textContent="📦 生成コード — "+(appName||"アプリ");
+    d.appendChild(title); d.appendChild(wrap);
+    run.onclick=function(){
+      out.classList.remove("err");
+      try{ out.textContent=badaRun(code)||"(出力なし)"; }
+      catch(e){ out.classList.add("err"); out.textContent="✖ "+(e&&e.message?e.message:e); }
+      log.scrollTop=log.scrollHeight;
+    };
+    toEd.onclick=function(){
+      current=LESSONS.length-1;
+      renderList(); renderLesson(); showPane("lessons");
+      var tas=viewEl.querySelectorAll("textarea");
+      if(tas.length) tas[tas.length-1].value=code;
+    };
+  }
+  function doSend(){
+    var msg=input.value.trim();
+    if(!msg) return;
+    input.value="";
+    addMsg("user",escapeHtml(msg));
+    var r=tutorReply(msg,dojoCtx);
+    var delay=200;
+    r.steps.forEach(function(st){
+      setTimeout(function(){
+        addMsg("bot",'<div class="step-title">'+st.icon+" "+escapeHtml(st.title)+"</div>"+st.html);
+      },delay);
+      delay+=350;
+    });
+    if(r.code){
+      setTimeout(function(){ addCodeMsg(r.code,r.appName); },delay);
+      dojoCtx.lastCode=r.code; dojoCtx.lastAppName=r.appName;
+    }
+    renderHints(r.followups);
+  }
+  send.onclick=doSend;
+  input.addEventListener("keydown",function(e){ if(e.key==="Enter") doSend(); });
+  addMsg("bot",'<div class="step-title">🥋 BadaGPT 先生</div>'+
+    "ようこそ、道場へ。私は ChatGPT が使っている<b>応答でアプリを作る 4 つの技</b> — "+
+    "①要件抽出 ②仕様化 ③コード生成 ④実行と反復 — を、実演しながら伝授します。<br>"+
+    "作りたいアプリを日本語でどうぞ。生成の途中経過 (技の使いどころ) を全部見せます。");
+  renderHints(["サイコロアプリを作って","ToDo アプリを作って","おみくじアプリを作って","ベル状態のデモを見せて"]);
+  /* ---- リファレンス ---- */
+  byId("pane-ref").innerHTML=[
+    "<h2>📖 Bada 言語ミニリファレンス (道場サブセット)</h2>",
+    "<h3>文</h3><table>",
+    "<tr><th><code>x := 式</code></th><td>代入</td></tr>",
+    "<tr><th><code>print(a, b, …)</code></th><td>空白区切りで 1 行表示</td></tr>",
+    "<tr><th><code>値 &gt;&gt; tuplespace</code></th><td>append-only 台帳へ追記 (削除・上書き不可)</td></tr>",
+    "<tr><th><code>repeat n { … }</code></th><td>n 回繰り返し</td></tr>",
+    "<tr><th><code>for x in リスト { … }</code></th><td>要素を順に処理 (<code>tuplespace</code> も走査可)</td></tr>",
+    "<tr><th><code>if 条件 { … } else { … }</code></th><td>条件分岐 (== != &lt; &gt; &lt;= &gt;=)</td></tr>",
+    "<tr><th><code>fun 名 |a, b| { … return 式 }</code></th><td>関数定義</td></tr>",
+    "<tr><th><code># コメント</code></th><td>行末までコメント</td></tr>",
+    "</table>",
+    "<h3>確率・情報</h3><table>",
+    "<tr><th><code>unknown_prior(n)</code></th><td>n 状態の最大エントロピー一様分布</td></tr>",
+    "<tr><th><code>softmax(リスト)</code></th><td>ロジット → 確率分布</td></tr>",
+    "<tr><th><code>update(prior, ev)</code></th><td>ベイズ更新 (要素積を正規化) — エントロピーは必ず下がる</td></tr>",
+    "<tr><th><code>entropy(p)</code></th><td>シャノンエントロピー (自然対数)</td></tr>",
+    "<tr><th><code>zeros_of(p)</code></th><td>確率 0 (禁止状態) の添字一覧</td></tr>",
+    "</table>",
+    "<h3>量子コア</h3><table>",
+    "<tr><th><code>qubit(n)</code></th><td>n 量子ビットのレジスタ (|0…0⟩, n ≤ 10)</td></tr>",
+    "<tr><th><code>H(reg, i)</code> / <code>Had(reg)</code></th><td>アダマール — 重ね合わせ</td></tr>",
+    "<tr><th><code>X(reg, i)</code></th><td>ビット反転 (NOT)</td></tr>",
+    "<tr><th><code>CNOT(reg, c, t)</code></th><td>制御 NOT — もつれ</td></tr>",
+    "<tr><th><code>Measure(reg)</code></th><td>各基底状態の確率 |ψ|² のリスト</td></tr>",
+    "<tr><th><code>sample(p)</code></th><td>分布 p から添字を 1 つ抽選 (量子乱数)</td></tr>",
+    "</table>",
+    "<h3>ユーティリティ</h3><table>",
+    "<tr><th><code>len(x)</code></th><td>リスト・文字列・台帳の長さ</td></tr>",
+    "<tr><th><code>range(n)</code></th><td>[0, 1, …, n−1]</td></tr>",
+    "<tr><th><code>push(リスト, v)</code></th><td>リスト末尾に追加</td></tr>",
+    "<tr><th><code>pick(リスト)</code></th><td>ランダムに 1 要素</td></tr>",
+    "<tr><th><code>f5(x)</code></th><td>小数 5 桁の文字列</td></tr>",
+    "<tr><th><code>sqrt abs floor round str num</code></th><td>数学・変換</td></tr>",
+    "</table>",
+    "<h3>4 つの技 (おさらい)</h3>",
+    "<p>① 依頼を箇条書きの要件に → ② 入力・処理・出力・状態の仕様表に → "+
+    "③ 言語の型 (テンプレート) に流し込んでコードに → ④ 実行して出力を読み、差分だけ応答で直す。</p>"
+  ].join("");
+}
+/* テスト用エクスポート (Node) と UI 起動 (ブラウザ) */
+if(typeof globalThis!=="undefined"){
+  globalThis.BadaTeach={
+    badaRun:badaRun, tutorReply:tutorReply, checkExercise:checkExercise,
+    softmax:softmax, entropy:entropy, unknownPrior:unknownPrior,
+    applyH:applyH, applyCNOT:applyCNOT, qubitReg:qubitReg,
+    measureProbs:measureProbs, LESSONS:LESSONS, APP_TEMPLATES:APP_TEMPLATES
+  };
+}
+if(typeof document!=="undefined"&&document.getElementById){
+  if(document.readyState==="loading")
+    document.addEventListener("DOMContentLoaded",initUI);
+  else initUI();
+}
+</script>
+</body>
+</html>
