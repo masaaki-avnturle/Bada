@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#04060a">
+<title>小槌の家計簿 — レシート撮影で自動記帳(複式簿記)</title>
+<style>
+:root{
+  --bg:#04060a; --panel:#0c1018; --panel2:#111827; --line:#1f2937;
+  --gold:#c8a44a; --gold2:#e6c877; --blue:#4a80d0; --teal:#40b8c0;
+  --text:#e5e7eb; --dim:#9ca3af; --red:#e06060; --green:#5cb87a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:"Hiragino Sans","Noto Sans CJK JP","Yu Gothic UI",Meiryo,system-ui,sans-serif;-webkit-text-size-adjust:100%}
+body{min-height:100vh;padding-bottom:76px}
+a{color:var(--blue)}
+header{padding:14px 16px 10px;text-align:center;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#0a0f1a,#04060a)}
+header h1{font-size:20px;color:var(--gold2);letter-spacing:.05em}
+header p{font-size:11px;color:var(--dim);margin-top:4px}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:50;display:flex;
+  background:#080b12;border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;background:none;border:none;color:var(--dim);font-size:10px;
+  padding:8px 2px 10px;cursor:pointer;line-height:1.3}
+nav button .ico{display:block;font-size:19px;margin-bottom:2px}
+nav button.act{color:var(--gold2)}
+main{max-width:860px;margin:0 auto;padding:14px 12px}
+section.tab{display:none}
+section.tab.act{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+  padding:14px;margin-bottom:14px}
+.card h2{font-size:15px;color:var(--gold);margin-bottom:10px}
+.card h3{font-size:13px;color:var(--teal);margin:10px 0 6px}
+.hint{font-size:11px;color:var(--dim);line-height:1.6}
+button.big{display:block;width:100%;padding:13px;margin:8px 0;border-radius:10px;
+  border:1px solid var(--gold);background:linear-gradient(180deg,#2a2210,#1a1608);
+  color:var(--gold2);font-size:15px;cursor:pointer}
+button.big:active{transform:scale(.98)}
+button.sub{padding:8px 14px;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--text);font-size:13px;cursor:pointer;margin:4px 4px 4px 0}
+button.warn{border-color:var(--red);color:var(--red)}
+input,select,textarea{background:#0a0e16;border:1px solid var(--line);color:var(--text);
+  border-radius:8px;padding:9px;font-size:14px;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--gold)}
+label{display:block;font-size:12px;color:var(--dim);margin:8px 0 4px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1;min-width:120px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th,td{padding:7px 6px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--dim);font-weight:normal;font-size:11px;white-space:nowrap}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tbl-wrap{overflow-x:auto}
+.pos{color:var(--green)} .neg{color:var(--red)}
+video,canvas.prev{width:100%;border-radius:10px;background:#000;display:block}
+#ocrProg{height:6px;background:var(--panel2);border-radius:3px;overflow:hidden;margin:8px 0;display:none}
+#ocrProgBar{height:100%;width:0;background:var(--gold);transition:width .2s}
+.item-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.item-row input.nm{flex:3;min-width:90px}
+.item-row input.amt{flex:1.2;min-width:70px;text-align:right}
+.item-row select{flex:1.6;min-width:90px}
+.item-row button{flex:0 0 34px;padding:8px 0;border-radius:8px;border:1px solid var(--line);
+  background:var(--panel2);color:var(--red);cursor:pointer}
+.badge{display:inline-block;font-size:10px;border:1px solid var(--line);border-radius:99px;
+  padding:2px 8px;color:var(--dim);margin-left:6px}
+.total-line{font-size:16px;color:var(--gold2);text-align:right;margin:8px 0;
+  font-variant-numeric:tabular-nums}
+.bar-wrap{margin:6px 0}
+.bar-label{font-size:11px;color:var(--dim);display:flex;justify-content:space-between}
+.bar{height:10px;border-radius:5px;background:var(--panel2);overflow:hidden;margin-top:2px}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--teal))}
+.msg{padding:10px;border-radius:8px;font-size:13px;margin:8px 0;display:none}
+.msg.ok{display:block;background:#0d2417;border:1px solid var(--green);color:var(--green)}
+.msg.err{display:block;background:#2a0f0f;border:1px solid var(--red);color:var(--red)}
+.bs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.bs-grid{grid-template-columns:1fr}}
+footer{max-width:860px;margin:0 auto;padding:8px 16px 20px;font-size:10px;color:#4b5563;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>🪙 小槌の家計簿</h1>
+  <p>レシートをカメラで撮影 → 自動でデータ登録 → 複式簿記(仕訳帳・元帳・試算表・損益計算書・貸借対照表)</p>
+</header>
+
+<main>
+
+<!-- ================= 撮影タブ ================= -->
+<section class="tab act" id="tab-scan">
+  <div class="card">
+    <h2>📷 レシートを撮影して自動登録</h2>
+    <p class="hint">スマホ・タブレットのカメラでレシートを撮影すると、OCR(文字認識)で日付・品目・金額を読み取り、勘定科目を自動判定して仕訳を登録します。文字認識にはインターネット接続が必要です(初回のみ辞書をダウンロード)。オフライン時は「✏️ 手入力」タブをご利用ください。</p>
+    <input type="file" id="fileCam" accept="image/*" capture="environment" hidden>
+    <input type="file" id="filePick" accept="image/*" hidden>
+    <button class="big" id="btnCam">📷 カメラで撮影する</button>
+    <div class="row">
+      <button class="sub" id="btnLive">🎥 ライブカメラを開く</button>
+      <button class="sub" id="btnPick">🖼 画像ファイルを選ぶ</button>
+    </div>
+    <div id="liveBox" style="display:none">
+      <video id="video" playsinline autoplay muted></video>
+      <div class="row">
+        <button class="sub" id="btnShot">📸 この画面を撮影</button>
+        <button class="sub" id="btnLiveStop">⏹ カメラを閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="prevCard" style="display:none">
+    <h2>🖼 撮影プレビュー</h2>
+    <canvas class="prev" id="prevCanvas"></canvas>
+    <label><input type="checkbox" id="chkEnhance" checked style="width:auto;margin-right:6px">レシート向けに画像を補正する(モノクロ・コントラスト強調)</label>
+    <button class="big" id="btnOcr">🔍 文字を読み取る(OCR)</button>
+    <div id="ocrProg"><div id="ocrProgBar"></div></div>
+    <p class="hint" id="ocrStatus"></p>
+  </div>
+
+  <div class="card" id="ocrCard" style="display:none">
+    <h2>📝 読み取り結果(修正できます)</h2>
+    <textarea id="ocrText" rows="8" placeholder="OCR の結果がここに表示されます。レシートの文字を直接貼り付けて解析することもできます。"></textarea>
+    <button class="big" id="btnParse">🧮 解析して仕訳をつくる</button>
+  </div>
+
+  <div class="card" id="confirmCard" style="display:none">
+    <h2>✅ 内容の確認と登録</h2>
+    <div class="row">
+      <div><label>店名</label><input id="cStore"></div>
+      <div><label>日付</label><input id="cDate" type="date"></div>
+    </div>
+    <label>支払方法(貸方)</label>
+    <select id="cPay"></select>
+    <h3>品目(勘定科目は自動判定・変更できます)</h3>
+    <div id="cItems"></div>
+    <button class="sub" id="btnAddItem">＋ 品目を追加</button>
+    <div class="total-line">合計:<span id="cSum">0</span> 円 <span class="badge" id="cReadTotal"></span></div>
+    <label><input type="checkbox" id="chkPerItem" checked style="width:auto;margin-right:6px">品目ごとに仕訳する(外すと合計 1 件で仕訳)</label>
+    <label id="wholeCatWrap" style="display:none">合計仕訳の勘定科目<select id="cWholeCat"></select></label>
+    <label>摘要メモ</label><input id="cMemo" placeholder="例: 夕食の買い物">
+    <button class="big" id="btnRegister">🪙 小槌に登録する(仕訳作成)</button>
+    <div class="msg" id="regMsg"></div>
+  </div>
+</section>
+
+<!-- ================= 手入力タブ ================= -->
+<section class="tab" id="tab-manual">
+  <div class="card">
+    <h2>✏️ 手入力(支出・収入)</h2>
+    <div class="row">
+      <div><label>種類</label>
+        <select id="mKind"><option value="exp">支出</option><option value="inc">収入</option></select></div>
+      <div><label>日付</label><input id="mDate" type="date"></div>
+    </div>
+    <div class="row">
+      <div><label>金額(円)</label><input id="mAmt" type="number" inputmode="numeric" min="1" placeholder="1000"></div>
+      <div><label id="mCatLabel">費目(借方)</label><select id="mCat"></select></div>
+    </div>
+    <label id="mPayLabel">支払方法(貸方)</label>
+    <select id="mPay"></select>
+    <label>摘要</label><input id="mMemo" placeholder="例: 電気代 8月分">
+    <button class="big" id="btnManual">🪙 登録する</button>
+    <div class="msg" id="mMsg"></div>
+  </div>
+  <div class="card">
+    <h2>📅 今月のようす</h2>
+    <div id="monthSummary"></div>
+  </div>
+</section>
+
+<!-- ================= 仕訳帳タブ ================= -->
+<section class="tab" id="tab-journal">
+  <div class="card">
+    <h2>📒 仕訳帳</h2>
+    <div class="row">
+      <div><label>月で絞り込み</label><input type="month" id="jMonth"></div>
+      <div><label>&nbsp;</label><button class="sub" id="jClear">すべて表示</button></div>
+    </div>
+    <div class="tbl-wrap"><table id="jTable">
+      <thead><tr><th>日付</th><th>借方</th><th>貸方</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+    <p class="hint" id="jEmpty">まだ仕訳がありません。レシートを撮影するか手入力で登録してください。</p>
+  </div>
+</section>
+
+<!-- ================= 元帳タブ ================= -->
+<section class="tab" id="tab-ledger">
+  <div class="card">
+    <h2>📚 総勘定元帳</h2>
+    <label>勘定科目</label><select id="lAcc"></select>
+    <div class="tbl-wrap"><table id="lTable">
+      <thead><tr><th>日付</th><th>相手科目</th><th>摘要</th><th class="num">借方</th><th class="num">貸方</th><th class="num">残高</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>⚖️ 合計残高試算表</h2>
+    <div class="tbl-wrap"><table id="tbTable">
+      <thead><tr><th class="num">借方残高</th><th class="num">借方合計</th><th>勘定科目</th><th class="num">貸方合計</th><th class="num">貸方残高</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </div>
+</section>
+
+<!-- ================= 報告書タブ ================= -->
+<section class="tab" id="tab-report">
+  <div class="card">
+    <h2>📊 損益計算書(P/L)</h2>
+    <div class="row">
+      <div><label>対象月(空欄で全期間)</label><input type="month" id="rMonth"></div>
+      <div><label>&nbsp;</label><button class="sub" id="rClear">全期間</button></div>
+    </div>
+    <div class="tbl-wrap"><table id="plTable"><tbody></tbody></table></div>
+  </div>
+  <div class="card">
+    <h2>🏦 貸借対照表(B/S)</h2>
+    <div class="bs-grid">
+      <div><h3>資産の部</h3><div class="tbl-wrap"><table id="bsAssets"><tbody></tbody></table></div></div>
+      <div><h3>負債・純資産の部</h3><div class="tbl-wrap"><table id="bsLiab"><tbody></tbody></table></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>🧾 費目別グラフ(対象月)</h2>
+    <div id="catBars"></div>
+  </div>
+</section>
+
+<!-- ================= 設定タブ ================= -->
+<section class="tab" id="tab-settings">
+  <div class="card">
+    <h2>🏁 開始残高(元入金)</h2>
+    <p class="hint">家計簿を始めるときの手持ち残高を登録します。複式簿記では「借方: 資産 / 貸方: 元入金」の仕訳になります。</p>
+    <div class="row">
+      <div><label>現金</label><input id="sCash" type="number" inputmode="numeric" placeholder="0"></div>
+      <div><label>普通預金</label><input id="sBank" type="number" inputmode="numeric" placeholder="0"></div>
+      <div><label>電子マネー</label><input id="sEmoney" type="number" inputmode="numeric" placeholder="0"></div>
+    </div>
+    <label>開始日</label><input id="sDate" type="date">
+    <button class="big" id="btnOpening">開始残高を登録する</button>
+    <div class="msg" id="sMsg"></div>
+  </div>
+  <div class="card">
+    <h2>💾 データの保存・書き出し</h2>
+    <p class="hint">データはこの端末のブラウザ内(localStorage)にのみ保存されます。機種変更やバックアップには書き出しをご利用ください。</p>
+    <button class="sub" id="btnExportJson">⬇ JSON バックアップ</button>
+    <button class="sub" id="btnExportCsv">⬇ 仕訳帳 CSV</button>
+    <button class="sub" id="btnImport">⬆ JSON 読み込み</button>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+    <button class="sub warn" id="btnWipe">🗑 全データを消去</button>
+    <div class="msg" id="ioMsg"></div>
+  </div>
+  <div class="card">
+    <h2>ℹ️ このアプリについて</h2>
+    <p class="hint">
+      小槌の家計簿 — 打ち出の小槌のように、レシートを一振り(撮影)するだけで帳簿がふくらむ家計簿です。<br>
+      ・文字認識(OCR)は <a href="https://github.com/naptha/tesseract.js" target="_blank" rel="noopener">Tesseract.js</a> をブラウザ内で実行します。画像が外部サーバーへ送信されることはありません(OCR エンジンと日本語辞書の取得時のみ CDN へアクセスします)。<br>
+      ・簿記機能: 仕訳帳 / 総勘定元帳 / 合計残高試算表 / 損益計算書 / 貸借対照表<br>
+      ・単一 HTML ファイル。インストール不要、ホーム画面に追加すればアプリのように使えます。
+    </p>
+  </div>
+</section>
+
+</main>
+
+<nav id="nav">
+  <button data-tab="tab-scan" class="act"><span class="ico">📷</span>撮影</button>
+  <button data-tab="tab-manual"><span class="ico">✏️</span>手入力</button>
+  <button data-tab="tab-journal"><span class="ico">📒</span>仕訳帳</button>
+  <button data-tab="tab-ledger"><span class="ico">📚</span>元帳</button>
+  <button data-tab="tab-report"><span class="ico">📊</span>報告書</button>
+  <button data-tab="tab-settings"><span class="ico">⚙️</span>設定</button>
+</nav>
+
+<footer>小槌の家計簿 · Bada apps · データは端末内にのみ保存されます</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   小槌の家計簿 — レシート OCR 自動記帳 + 複式簿記
+   単一 HTML / localStorage 保存 / 画像は端末外へ送信しない
+   ============================================================ */
+
+/* ---------- 勘定科目 ---------- */
+const ACCOUNTS = {
+  "現金":            {type:"資産"},
+  "普通預金":        {type:"資産"},
+  "電子マネー":      {type:"資産"},
+  "クレジット未払金":{type:"負債"},
+  "元入金":          {type:"純資産"},
+  "食費":            {type:"費用"},
+  "外食費":          {type:"費用"},
+  "日用品費":        {type:"費用"},
+  "水道光熱費":      {type:"費用"},
+  "通信費":          {type:"費用"},
+  "交通費":          {type:"費用"},
+  "医療費":          {type:"費用"},
+  "被服費":          {type:"費用"},
+  "教育費":          {type:"費用"},
+  "娯楽費":          {type:"費用"},
+  "交際費":          {type:"費用"},
+  "住居費":          {type:"費用"},
+  "雑費":            {type:"費用"},
+  "給与収入":        {type:"収益"},
+  "雑収入":          {type:"収益"},
+};
+const PAY_ACCOUNTS = ["現金","クレジット未払金","電子マネー","普通預金"];
+const EXPENSE_ACCOUNTS = Object.keys(ACCOUNTS).filter(a=>ACCOUNTS[a].type==="費用");
+const INCOME_ACCOUNTS  = Object.keys(ACCOUNTS).filter(a=>ACCOUNTS[a].type==="収益");
+const ASSET_ACCOUNTS   = Object.keys(ACCOUNTS).filter(a=>ACCOUNTS[a].type==="資産");
+// 借方に立つと残高が増える科目種別
+const DEBIT_NATURE = {"資産":true,"費用":true,"負債":false,"純資産":false,"収益":false};
+
+/* ---------- 勘定科目の自動判定ルール ---------- */
+const ITEM_RULES = [
+  ["食費",  ["パン","牛乳","ミルク","弁当","おにぎり","むすび","米","精米","肉","豚","牛","鶏","魚","鮭","さば","野菜","トマト","きゅうり","キャベツ","玉ねぎ","じゃがいも","果物","バナナ","りんご","みかん","惣菜","サラダ","飲料","コーヒー","珈琲","紅茶","緑茶","お茶","茶","酒","ビール","チューハイ","ワイン","菓子","チョコ","スナック","クッキー","ガム","キャンディ","アイス","ヨーグルト","チーズ","バター","卵","たまご","豆腐","納豆","麺","うどん","そば","ラーメン","パスタ","カップ","冷凍","食パン","ジュース","コーラ","ミネラル","ウォーター","水","味噌","醤油","塩","砂糖","油","ドレッシング","ふりかけ","カレー","シチュー","ハム","ソーセージ","ベーコン","かまぼこ","ちくわ","のり","海苔","ツナ","シリアル","はちみつ","ジャム"]],
+  ["日用品費",["洗剤","柔軟剤","シャンプー","リンス","コンディショナー","ボディソープ","ティッシュ","トイレット","歯磨","歯ブラシ","石鹸","せっけん","マスク","電池","乾電池","文具","ノート","ボールペン","ペン","のり(文具)","タオル","ゴミ袋","ごみ袋","ラップ","ホイル","スポンジ","ハンガー","洗顔","化粧水","乳液","綿棒","カミソリ","シェーバー","入浴剤","芳香剤","消臭","殺虫","除菌","ウェット","キッチンペーパー","紙皿","紙コップ"]],
+  ["医療費",["薬","錠","カプセル","絆創膏","バンドエイド","風邪","かぜ","胃腸","目薬","湿布","うがい","体温計","包帯","ガーゼ","マスク(医療)","ビタミン","サプリ","漢方","診察","調剤","処方"]],
+  ["被服費",["シャツ","Tシャツ","ズボン","パンツ(衣料)","スカート","靴下","くつ下","ソックス","下着","肌着","靴","スニーカー","サンダル","帽子","手袋","マフラー","コート","ジャケット","セーター","ベルト"]],
+  ["娯楽費",["書籍","雑誌","コミック","漫画","マンガ","ゲーム","DVD","ブルーレイ","CD","映画","チケット","おもちゃ","玩具","プラモ"]],
+  ["水道光熱費",["電気","ガス","水道","灯油"]],
+  ["通信費",["切手","はがき","ハガキ","郵便","プリペイド","SIM","充電ケーブル"]],
+  ["交通費",["回数券","乗車券","定期券","タクシー","バス","高速","ETC","ガソリン","軽油","駐車"]],
+];
+const STORE_RULES = [
+  ["食費",  ["セブン","ｾﾌﾞﾝ","ローソン","ﾛｰｿﾝ","ファミリーマート","ﾌｧﾐﾘｰﾏｰﾄ","ファミマ","ミニストップ","デイリーヤマザキ","イオン","ｲｵﾝ","マックスバリュ","西友","SEIYU","ライフ","ﾗｲﾌ","マルエツ","サミット","ヤオコー","オーケー","OK","いなげや","業務スーパー","スーパー","ｽｰﾊﾟｰ","成城石井","コープ","生協","肉のハナマサ","ロピア","ベイシア"]],
+  ["外食費",["マクドナルド","ﾏｸﾄﾞﾅﾙﾄﾞ","モスバーガー","ケンタッキー","すき家","吉野家","松屋","なか卯","ガスト","ｶﾞｽﾄ","サイゼリヤ","ジョナサン","デニーズ","ドトール","スターバックス","ｽﾀｰﾊﾞｯｸｽ","タリーズ","コメダ","くら寿司","スシロー","はま寿司","丸亀製麺","日高屋","餃子の王将","バーミヤン","ココイチ","CoCo壱","ラーメン","そば処","食堂","レストラン","カフェ","居酒屋"]],
+  ["日用品費",["マツモトキヨシ","ﾏﾂﾓﾄｷﾖｼ","マツキヨ","ウエルシア","ｳｴﾙｼｱ","ツルハ","スギ薬局","サンドラッグ","ココカラファイン","クリエイト","ダイソー","ﾀﾞｲｿｰ","セリア","キャンドゥ","ニトリ","カインズ","コーナン","ビバホーム","DCM","ハンズ","無印良品","ドラッグ","薬局","ホームセンター"]],
+  ["被服費",["ユニクロ","ﾕﾆｸﾛ","GU","ジーユー","しまむら","ワークマン","西松屋","ZARA","H&M"]],
+  ["娯楽費",["書店","ブックオフ","BOOKOFF","紀伊國屋","紀伊国屋","ジュンク堂","TSUTAYA","ゲオ","GEO","ヨドバシ","ビックカメラ","ヤマダ電機","エディオン","ケーズデンキ"]],
+  ["医療費",["クリニック","医院","病院","歯科","調剤薬局","眼科","皮膚科","内科"]],
+  ["交通費",["JR","ジェイアール","メトロ","地下鉄","エネオス","ENEOS","出光","コスモ石油","シェル","apollostation","タクシー"]],
+];
+
+/* ---------- データ層 ---------- */
+const STORE_KEY = "kozuchi_kakeibo_v1";
+let DB = load();
+function load(){
+  try{
+    const d = JSON.parse(localStorage.getItem(STORE_KEY));
+    if(d && Array.isArray(d.entries)) return d;
+  }catch(e){}
+  return {entries:[], seq:1};
+}
+function save(){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(DB)); }
+  catch(e){ alert("保存に失敗しました: "+e.message); }
+}
+function addEntry(date, debit, credit, amount, memo){
+  amount = Math.round(Number(amount));
+  if(!date || !ACCOUNTS[debit] || !ACCOUNTS[credit] || !(amount>0)) return null;
+  const en = {id:DB.seq++, date, debit, credit, amount, memo:String(memo||"")};
+  DB.entries.push(en);
+  DB.entries.sort((a,b)=> a.date===b.date ? a.id-b.id : (a.date<b.date?-1:1));
+  save();
+  return en;
+}
+function delEntry(id){
+  DB.entries = DB.entries.filter(e=>e.id!==id);
+  save();
+}
+const yen = n => Number(n||0).toLocaleString("ja-JP");
+const today = () => new Date().toISOString().slice(0,10);
+const esc = s => String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- タブ ---------- */
+const nav = document.getElementById("nav");
+nav.addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  nav.querySelectorAll("button").forEach(x=>x.classList.toggle("act", x===b));
+  document.querySelectorAll("section.tab").forEach(s=>s.classList.toggle("act", s.id===b.dataset.tab));
+  renderAll();
+});
+
+/* ---------- セレクト初期化 ---------- */
+function fillSelect(sel, list){
+  sel.innerHTML = list.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join("");
+}
+fillSelect(document.getElementById("cPay"), PAY_ACCOUNTS);
+fillSelect(document.getElementById("mPay"), PAY_ACCOUNTS);
+fillSelect(document.getElementById("mCat"), EXPENSE_ACCOUNTS);
+fillSelect(document.getElementById("cWholeCat"), EXPENSE_ACCOUNTS);
+fillSelect(document.getElementById("lAcc"), Object.keys(ACCOUNTS));
+document.getElementById("mDate").value = today();
+document.getElementById("cDate").value = today();
+document.getElementById("sDate").value = today();
+
+/* ============================================================
+   カメラ・画像取り込み
+   ============================================================ */
+const fileCam  = document.getElementById("fileCam");
+const filePick = document.getElementById("filePick");
+const video    = document.getElementById("video");
+const liveBox  = document.getElementById("liveBox");
+const prevCard = document.getElementById("prevCard");
+const prevCanvas = document.getElementById("prevCanvas");
+let liveStream = null;
+let rawImage = null; // ImageBitmap / HTMLImageElement
+
+document.getElementById("btnCam").onclick  = ()=> fileCam.click();
+document.getElementById("btnPick").onclick = ()=> filePick.click();
+fileCam.addEventListener("change", e=> e.target.files[0] && loadImageFile(e.target.files[0]));
+filePick.addEventListener("change", e=> e.target.files[0] && loadImageFile(e.target.files[0]));
+
+document.getElementById("btnLive").onclick = async ()=>{
+  try{
+    liveStream = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{ideal:"environment"}, width:{ideal:1920}, height:{ideal:1080}}, audio:false});
+    video.srcObject = liveStream;
+    liveBox.style.display = "block";
+  }catch(err){
+    alert("カメラを起動できませんでした。「📷 カメラで撮影する」ボタン(標準カメラ)をお試しください。\n"+err.message);
+  }
+};
+function stopLive(){
+  if(liveStream){ liveStream.getTracks().forEach(t=>t.stop()); liveStream=null; }
+  video.srcObject = null; liveBox.style.display = "none";
+}
+document.getElementById("btnLiveStop").onclick = stopLive;
+document.getElementById("btnShot").onclick = ()=>{
+  if(!video.videoWidth) return;
+  const c = document.createElement("canvas");
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  stopLive();
+  setRawImage(c);
+};
+function loadImageFile(file){
+  const img = new Image();
+  img.onload = ()=>{ URL.revokeObjectURL(img.src); setRawImage(img); };
+  img.onerror = ()=> alert("画像を読み込めませんでした");
+  img.src = URL.createObjectURL(file);
+  fileCam.value = ""; filePick.value = "";
+}
+function setRawImage(src){
+  rawImage = src;
+  drawPreview();
+  prevCard.style.display = "block";
+  document.getElementById("ocrCard").style.display = "none";
+  document.getElementById("confirmCard").style.display = "none";
+  prevCard.scrollIntoView({behavior:"smooth"});
+}
+document.getElementById("chkEnhance").addEventListener("change", drawPreview);
+
+/* レシート向け前処理: 縮小 + グレースケール + コントラスト強調 */
+function drawPreview(){
+  if(!rawImage) return;
+  const W = rawImage.videoWidth || rawImage.naturalWidth || rawImage.width;
+  const H = rawImage.videoHeight || rawImage.naturalHeight || rawImage.height;
+  const maxSide = 1600;
+  const sc = Math.min(1, maxSide/Math.max(W,H));
+  prevCanvas.width = Math.round(W*sc); prevCanvas.height = Math.round(H*sc);
+  const ctx = prevCanvas.getContext("2d");
+  ctx.drawImage(rawImage, 0,0, prevCanvas.width, prevCanvas.height);
+  if(!document.getElementById("chkEnhance").checked) return;
+  const im = ctx.getImageData(0,0,prevCanvas.width,prevCanvas.height);
+  const d = im.data;
+  // グレースケール + ヒストグラム
+  const hist = new Uint32Array(256);
+  for(let i=0;i<d.length;i+=4){
+    const g = (d[i]*0.299 + d[i+1]*0.587 + d[i+2]*0.114)|0;
+    d[i]=d[i+1]=d[i+2]=g; hist[g]++;
+  }
+  // 2%〜98% で線形コントラスト伸長
+  const total = (d.length/4)|0;
+  let lo=0, hi=255, acc=0;
+  for(let v=0;v<256;v++){ acc+=hist[v]; if(acc>total*0.02){lo=v;break;} }
+  acc=0;
+  for(let v=255;v>=0;v--){ acc+=hist[v]; if(acc>total*0.02){hi=v;break;} }
+  const range = Math.max(1, hi-lo);
+  for(let i=0;i<d.length;i+=4){
+    let g = ((d[i]-lo)*255/range)|0;
+    g = g<0?0:(g>255?255:g);
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  ctx.putImageData(im,0,0);
+}
+
+/* ============================================================
+   OCR (Tesseract.js — ブラウザ内で実行)
+   ============================================================ */
+const TESSERACT_CDN = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
+let tessWorker = null;
+function loadScript(src){
+  return new Promise((ok,ng)=>{
+    const s=document.createElement("script");
+    s.src=src; s.onload=ok; s.onerror=()=>ng(new Error("読み込み失敗: "+src));
+    document.head.appendChild(s);
+  });
+}
+async function ensureWorker(onProgress){
+  if(tessWorker) return tessWorker;
+  if(!window.Tesseract) await loadScript(TESSERACT_CDN);
+  tessWorker = await Tesseract.createWorker(["jpn","eng"], 1, {
+    logger: m=>{
+      if(m.status==="recognizing text") onProgress(m.progress);
+    }
+  });
+  return tessWorker;
+}
+document.getElementById("btnOcr").onclick = async ()=>{
+  const status = document.getElementById("ocrStatus");
+  const prog = document.getElementById("ocrProg");
+  const bar  = document.getElementById("ocrProgBar");
+  const btn  = document.getElementById("btnOcr");
+  btn.disabled = true; prog.style.display="block"; bar.style.width="5%";
+  status.textContent = "OCR エンジンを準備しています…(初回は日本語辞書のダウンロードに少し時間がかかります)";
+  try{
+    const worker = await ensureWorker(p=>{ bar.style.width = (10+p*90)+"%"; });
+    status.textContent = "文字を読み取っています…";
+    const {data} = await worker.recognize(prevCanvas);
+    document.getElementById("ocrText").value = (data.text||"").trim();
+    document.getElementById("ocrCard").style.display = "block";
+    status.textContent = "読み取りが完了しました。結果を確認して「解析」を押してください。";
+    document.getElementById("ocrCard").scrollIntoView({behavior:"smooth"});
+  }catch(err){
+    status.textContent = "OCR を実行できませんでした(オフラインの可能性があります)。下の欄にレシート内容を貼り付けるか、手入力タブをご利用ください。";
+    document.getElementById("ocrCard").style.display = "block";
+    console.error(err);
+  }finally{
+    btn.disabled = false; prog.style.display="none"; bar.style.width="0";
+  }
+};
+
+/* ============================================================
+   レシート解析
+   ============================================================ */
+function z2h(s){ // 全角→半角(数字・記号・英字)
+  return s.replace(/[０-９Ａ-Ｚａ-ｚ]/g, c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+          .replace(/[¥￥\\]/g,"¥").replace(/[，、]/g,",").replace(/[．]/g,".")
+          .replace(/[―−‐]/g,"-").replace(/　/g," ");
+}
+const SKIP_WORDS = ["小計","合計","合 計","総計","計","お預","お預り","預り","現金","お釣","おつり","釣銭","釣り","レジ","責任者","担当","点数","買上点数","対象額","対象","税率","消費税","内税","外税","税込","税抜","ポイント","POINT","pt","Pt","カード","クレジット","VISA","Master","JCB","チャージ","残高","領収","明細","バーコード","No.","NO.","TEL","電話","ありがとう","ご来店","またお越し","返品","交換","値引前","QR","PayPay","会員"];
+function parseAmount(str){
+  const m = String(str).replace(/[,\s]/g,"").match(/-?\d+/);
+  return m ? parseInt(m[0],10) : NaN;
+}
+function parseReceipt(text){
+  const lines = z2h(text).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+  const res = {store:"", date:"", items:[], total:0, tax:0};
+
+  /* 日付: 2025/09/11, 2025年9月11日, 令和7年9月11日 など */
+  const now = new Date();
+  for(const ln of lines){
+    let m = ln.match(/(20\d{2})[年\/\-.](\d{1,2})[月\/\-.](\d{1,2})/);
+    if(!m){
+      const g = ln.match(/令和\s?(\d{1,2})[年\/.](\d{1,2})[月\/.](\d{1,2})/);
+      if(g) m = [g[0], 2018+parseInt(g[1],10), g[2], g[3]];
+    }
+    if(m){
+      const y=+m[1], mo=+m[2], da=+m[3];
+      if(mo>=1&&mo<=12&&da>=1&&da<=31){
+        res.date = `${y}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+        break;
+      }
+    }
+  }
+  if(!res.date) res.date = today();
+
+  /* 店名: 冒頭 5 行から日付・電話・数字だけの行を除いた最初の行 */
+  for(const ln of lines.slice(0,5)){
+    if(/^\d|TEL|電話|〒|レシート|領収/i.test(ln)) continue;
+    if(/^[\d\s:¥\-,.\/]+$/.test(ln)) continue;
+    res.store = ln.replace(/[*※#]+/g,"").trim().slice(0,30);
+    break;
+  }
+
+  /* 合計・消費税 */
+  for(const ln of lines){
+    const a = parseAmount(ln.split(/合計|合 計|総計|お買上げ?計|お会計/).pop());
+    if(/合計|総計|お買上げ?計|お会計/.test(ln) && !/小計|point|ポイント/i.test(ln) && a>0){
+      res.total = Math.max(res.total, a);
+    }
+    if(/消費税|内税|外税/.test(ln)){
+      const t = parseAmount(ln.replace(/\([^)]*\)|\d+(\.\d+)?\s*%/g,"")
+                              .replace(/.*(消費税|内税|外税)[^\d¥-]*/,""));
+      if(t>0 && t<100000) res.tax = t;
+    }
+  }
+
+  /* 品目: 「名称 …… ¥金額」型の行。除外語を含む行はスキップ */
+  for(const ln of lines){
+    if(SKIP_WORDS.some(w=>ln.includes(w))) continue;
+    if(/\d{1,2}:\d{2}/.test(ln) || /20\d{2}|令和/.test(ln) || /\d{1,2}月\d{1,2}日/.test(ln)) continue; // 日時行
+    const m = ln.match(/^(.*?)[\s.…]*[¥]?(-?\d[\d,]*)\s*円?\s*[*※軽内外]?\s*$/);
+    if(!m) continue;
+    let name = m[1].replace(/^[\d\s*※#>-]+/,"").replace(/[¥@].*$/,"").trim();
+    const amt = parseAmount(m[2]);
+    if(!name || name.length<1) continue;
+    if(!(amt>0) || amt>1000000) continue;         // 金額なし・非現実的な値は除外
+    if(/^\d+$/.test(name)) continue;               // 名前が数字だけ(バーコード等)
+    if(res.total && amt===res.total && res.items.length>0) continue; // 合計行の再掲
+    res.items.push({name:name.slice(0,25), amount:amt, cat:guessCategory(name, res.store)});
+  }
+
+  /* 合計が取れず品目があれば合算 */
+  if(!res.total && res.items.length) res.total = res.items.reduce((s,i)=>s+i.amount,0);
+  /* 品目が 1 つも取れず合計だけある場合は合計を 1 品目に */
+  if(res.total && !res.items.length){
+    res.items.push({name:res.store?`${res.store} お買い物`:"お買い物", amount:res.total,
+                    cat:guessCategory("", res.store)});
+  }
+  return res;
+}
+function guessCategory(itemName, storeName){
+  for(const [cat,kws] of ITEM_RULES)
+    if(kws.some(k=>itemName.includes(k))) return cat;
+  for(const [cat,kws] of STORE_RULES)
+    if(kws.some(k=>storeName.includes(k))) return cat;
+  return "雑費";
+}
+
+/* ---------- 確認フォーム ---------- */
+const cItems = document.getElementById("cItems");
+function itemRowHtml(it){
+  const opts = EXPENSE_ACCOUNTS.map(a=>`<option ${a===it.cat?"selected":""}>${esc(a)}</option>`).join("");
+  return `<div class="item-row">
+    <input class="nm" value="${esc(it.name)}" placeholder="品名">
+    <input class="amt" type="number" inputmode="numeric" value="${it.amount}" placeholder="金額">
+    <select>${opts}</select>
+    <button type="button" title="削除">✕</button>
+  </div>`;
+}
+function showConfirm(parsed){
+  document.getElementById("cStore").value = parsed.store;
+  document.getElementById("cDate").value = parsed.date;
+  document.getElementById("cReadTotal").textContent =
+    parsed.total ? `レシート記載の合計: ¥${yen(parsed.total)}` : "合計は読み取れませんでした";
+  cItems.innerHTML = parsed.items.map(itemRowHtml).join("");
+  updateSum();
+  document.getElementById("confirmCard").style.display = "block";
+  document.getElementById("regMsg").className = "msg";
+  document.getElementById("confirmCard").scrollIntoView({behavior:"smooth"});
+}
+function collectItems(){
+  return [...cItems.querySelectorAll(".item-row")].map(r=>({
+    name: r.querySelector(".nm").value.trim(),
+    amount: Math.round(Number(r.querySelector(".amt").value)||0),
+    cat: r.querySelector("select").value,
+  })).filter(i=>i.name && i.amount>0);
+}
+function updateSum(){
+  document.getElementById("cSum").textContent = yen(collectItems().reduce((s,i)=>s+i.amount,0));
+}
+cItems.addEventListener("input", updateSum);
+cItems.addEventListener("click", e=>{
+  if(e.target.tagName==="BUTTON"){ e.target.closest(".item-row").remove(); updateSum(); }
+});
+document.getElementById("btnAddItem").onclick = ()=>{
+  cItems.insertAdjacentHTML("beforeend", itemRowHtml({name:"",amount:"",cat:"雑費"}));
+};
+document.getElementById("chkPerItem").addEventListener("change", e=>{
+  document.getElementById("wholeCatWrap").style.display = e.target.checked ? "none" : "block";
+});
+document.getElementById("btnParse").onclick = ()=>{
+  const t = document.getElementById("ocrText").value.trim();
+  if(!t){ alert("読み取り結果が空です。撮影し直すか、レシートの文字を貼り付けてください。"); return; }
+  showConfirm(parseReceipt(t));
+};
+
+/* ---------- レシート登録 ---------- */
+document.getElementById("btnRegister").onclick = ()=>{
+  const date  = document.getElementById("cDate").value;
+  const store = document.getElementById("cStore").value.trim();
+  const pay   = document.getElementById("cPay").value;
+  const memoX = document.getElementById("cMemo").value.trim();
+  const items = collectItems();
+  const msg = document.getElementById("regMsg");
+  if(!date){ msg.className="msg err"; msg.textContent="日付を入力してください。"; return; }
+  if(!items.length){ msg.className="msg err"; msg.textContent="品目が 1 件もありません。"; return; }
+  const baseMemo = [store, memoX].filter(Boolean).join(" / ");
+  let count = 0;
+  if(document.getElementById("chkPerItem").checked){
+    // 品目ごとに、勘定科目単位でまとめて仕訳(同じ費目は合算)
+    const byCat = {};
+    for(const it of items){
+      byCat[it.cat] = byCat[it.cat] || {amount:0, names:[]};
+      byCat[it.cat].amount += it.amount;
+      byCat[it.cat].names.push(it.name);
+    }
+    for(const [cat,v] of Object.entries(byCat)){
+      const nm = v.names.slice(0,3).join("、") + (v.names.length>3?` ほか${v.names.length-3}点`:"");
+      if(addEntry(date, cat, pay, v.amount, [baseMemo,nm].filter(Boolean).join(" / "))) count++;
+    }
+  }else{
+    const total = items.reduce((s,i)=>s+i.amount,0);
+    const cat = document.getElementById("cWholeCat").value;
+    if(addEntry(date, cat, pay, total, baseMemo || "レシートお買い物")) count++;
+  }
+  msg.className="msg ok";
+  msg.textContent = `✅ ${count} 件の仕訳を登録しました(借方: 費目 / 貸方: ${pay})。仕訳帳タブで確認できます。`;
+  renderAll();
+};
+
+/* ---------- 手入力 ---------- */
+document.getElementById("mKind").addEventListener("change", e=>{
+  const inc = e.target.value==="inc";
+  document.getElementById("mCatLabel").textContent = inc ? "収入の科目(貸方)" : "費目(借方)";
+  document.getElementById("mPayLabel").textContent = inc ? "受取先(借方)" : "支払方法(貸方)";
+  fillSelect(document.getElementById("mCat"), inc ? INCOME_ACCOUNTS : EXPENSE_ACCOUNTS);
+  fillSelect(document.getElementById("mPay"), inc ? ASSET_ACCOUNTS : PAY_ACCOUNTS);
+});
+document.getElementById("btnManual").onclick = ()=>{
+  const inc  = document.getElementById("mKind").value==="inc";
+  const date = document.getElementById("mDate").value;
+  const amt  = Number(document.getElementById("mAmt").value);
+  const cat  = document.getElementById("mCat").value;
+  const pay  = document.getElementById("mPay").value;
+  const memo = document.getElementById("mMemo").value.trim();
+  const msg  = document.getElementById("mMsg");
+  const en = inc ? addEntry(date, pay, cat, amt, memo)   // 収入: 借方 資産 / 貸方 収益
+                 : addEntry(date, cat, pay, amt, memo);  // 支出: 借方 費用 / 貸方 資産・負債
+  if(!en){ msg.className="msg err"; msg.textContent="日付と 1 円以上の金額を入力してください。"; return; }
+  msg.className="msg ok";
+  msg.textContent = `✅ 登録しました: ${en.debit} / ${en.credit} ¥${yen(en.amount)}`;
+  document.getElementById("mAmt").value = ""; document.getElementById("mMemo").value = "";
+  renderAll();
+};
+
+/* ============================================================
+   簿記帳票の描画
+   ============================================================ */
+function entriesOfMonth(month){ // month: "YYYY-MM" or "" for all
+  return month ? DB.entries.filter(e=>e.date.startsWith(month)) : DB.entries.slice();
+}
+
+/* 仕訳帳 */
+document.getElementById("jMonth").addEventListener("change", renderJournal);
+document.getElementById("jClear").onclick = ()=>{ document.getElementById("jMonth").value=""; renderJournal(); };
+function renderJournal(){
+  const month = document.getElementById("jMonth").value;
+  const rows = entriesOfMonth(month);
+  const tb = document.querySelector("#jTable tbody");
+  tb.innerHTML = rows.map(e=>`<tr>
+    <td>${e.date.slice(5)}</td><td>${esc(e.debit)}</td><td>${esc(e.credit)}</td>
+    <td class="num">¥${yen(e.amount)}</td><td>${esc(e.memo)}</td>
+    <td><button class="sub warn" data-del="${e.id}" style="padding:3px 8px;margin:0">✕</button></td>
+  </tr>`).join("");
+  document.getElementById("jEmpty").style.display = rows.length ? "none":"block";
+}
+document.querySelector("#jTable tbody").addEventListener("click", e=>{
+  const id = e.target.dataset && e.target.dataset.del;
+  if(id && confirm("この仕訳を削除しますか?")){ delEntry(+id); renderAll(); }
+});
+
+/* 総勘定元帳 */
+document.getElementById("lAcc").addEventListener("change", renderLedger);
+function renderLedger(){
+  const acc = document.getElementById("lAcc").value;
+  const debitNature = DEBIT_NATURE[ACCOUNTS[acc].type];
+  let bal = 0;
+  const rows = [];
+  for(const e of DB.entries){
+    if(e.debit!==acc && e.credit!==acc) continue;
+    const isDebit = e.debit===acc;
+    bal += (isDebit === debitNature) ? e.amount : -e.amount;
+    rows.push(`<tr><td>${e.date.slice(5)}</td><td>${esc(isDebit?e.credit:e.debit)}</td>
+      <td>${esc(e.memo)}</td>
+      <td class="num">${isDebit?"¥"+yen(e.amount):""}</td>
+      <td class="num">${!isDebit?"¥"+yen(e.amount):""}</td>
+      <td class="num ${bal<0?"neg":""}">¥${yen(bal)}</td></tr>`);
+  }
+  document.querySelector("#lTable tbody").innerHTML =
+    rows.join("") || `<tr><td colspan="6" class="hint">この科目の記帳はまだありません</td></tr>`;
+}
+
+/* 合計残高試算表 */
+function renderTrial(){
+  const sums = {};
+  for(const e of DB.entries){
+    sums[e.debit]  = sums[e.debit]  || {d:0,c:0};
+    sums[e.credit] = sums[e.credit] || {d:0,c:0};
+    sums[e.debit].d  += e.amount;
+    sums[e.credit].c += e.amount;
+  }
+  let td=0,tc=0,tdb=0,tcb=0;
+  const rows = Object.keys(ACCOUNTS).filter(a=>sums[a]).map(a=>{
+    const s = sums[a];
+    const net = s.d - s.c;
+    const db = net>0?net:0, cb = net<0?-net:0;
+    td+=s.d; tc+=s.c; tdb+=db; tcb+=cb;
+    return `<tr><td class="num">${db?"¥"+yen(db):""}</td><td class="num">¥${yen(s.d)}</td>
+      <td>${esc(a)}<span class="badge">${ACCOUNTS[a].type}</span></td>
+      <td class="num">¥${yen(s.c)}</td><td class="num">${cb?"¥"+yen(cb):""}</td></tr>`;
+  });
+  rows.push(`<tr style="color:var(--gold2)"><td class="num">¥${yen(tdb)}</td><td class="num">¥${yen(td)}</td>
+    <td>合計</td><td class="num">¥${yen(tc)}</td><td class="num">¥${yen(tcb)}</td></tr>`);
+  document.querySelector("#tbTable tbody").innerHTML = rows.join("");
+}
+
+/* 損益計算書・貸借対照表・グラフ */
+document.getElementById("rMonth").addEventListener("change", renderReports);
+document.getElementById("rClear").onclick = ()=>{ document.getElementById("rMonth").value=""; renderReports(); };
+function accountBalance(acc, entries){
+  const debitNature = DEBIT_NATURE[ACCOUNTS[acc].type];
+  let bal = 0;
+  for(const e of entries){
+    if(e.debit===acc)  bal += debitNature ? e.amount : -e.amount;
+    if(e.credit===acc) bal += debitNature ? -e.amount : e.amount;
+  }
+  return bal;
+}
+function renderReports(){
+  const month = document.getElementById("rMonth").value;
+  const ens = entriesOfMonth(month);
+  const label = month ? month.replace("-","年")+"月" : "全期間";
+
+  /* P/L */
+  let expRows="", incRows="", expT=0, incT=0;
+  for(const a of EXPENSE_ACCOUNTS){
+    const b = accountBalance(a, ens);
+    if(b){ expT+=b; expRows+=`<tr><td>${esc(a)}</td><td class="num">¥${yen(b)}</td></tr>`; }
+  }
+  for(const a of INCOME_ACCOUNTS){
+    const b = accountBalance(a, ens);
+    if(b){ incT+=b; incRows+=`<tr><td>${esc(a)}</td><td class="num">¥${yen(b)}</td></tr>`; }
+  }
+  const profit = incT - expT;
+  document.querySelector("#plTable tbody").innerHTML =
+    `<tr><th colspan="2">【${esc(label)}】収益の部</th></tr>` +
+    (incRows||`<tr><td colspan="2" class="hint">収益の記帳はありません</td></tr>`) +
+    `<tr style="color:var(--teal)"><td>収益合計</td><td class="num">¥${yen(incT)}</td></tr>` +
+    `<tr><th colspan="2">費用の部</th></tr>` +
+    (expRows||`<tr><td colspan="2" class="hint">費用の記帳はありません</td></tr>`) +
+    `<tr style="color:var(--teal)"><td>費用合計</td><td class="num">¥${yen(expT)}</td></tr>` +
+    `<tr style="color:var(--gold2);font-size:14px"><td>${profit>=0?"当期純利益(黒字)":"当期純損失(赤字)"}</td>
+       <td class="num ${profit>=0?"pos":"neg"}">¥${yen(Math.abs(profit))}</td></tr>`;
+
+  /* B/S — 全期間の残高で作成 */
+  const all = DB.entries;
+  let aRows="", aT=0;
+  for(const acc of ASSET_ACCOUNTS){
+    const b = accountBalance(acc, all);
+    if(b){ aT+=b; aRows+=`<tr><td>${esc(acc)}</td><td class="num ${b<0?"neg":""}">¥${yen(b)}</td></tr>`; }
+  }
+  const liab = accountBalance("クレジット未払金", all);
+  const capital = accountBalance("元入金", all);
+  const allProfit = INCOME_ACCOUNTS.reduce((s,a)=>s+accountBalance(a,all),0)
+                  - EXPENSE_ACCOUNTS.reduce((s,a)=>s+accountBalance(a,all),0);
+  document.querySelector("#bsAssets tbody").innerHTML =
+    (aRows||`<tr><td colspan="2" class="hint">資産の記帳はありません</td></tr>`) +
+    `<tr style="color:var(--gold2)"><td>資産合計</td><td class="num">¥${yen(aT)}</td></tr>`;
+  document.querySelector("#bsLiab tbody").innerHTML =
+    `<tr><td>クレジット未払金</td><td class="num">¥${yen(liab)}</td></tr>` +
+    `<tr><td>元入金</td><td class="num">¥${yen(capital)}</td></tr>` +
+    `<tr><td>繰越利益(累計収支)</td><td class="num ${allProfit<0?"neg":"pos"}">¥${yen(allProfit)}</td></tr>` +
+    `<tr style="color:var(--gold2)"><td>負債・純資産合計</td><td class="num">¥${yen(liab+capital+allProfit)}</td></tr>`;
+
+  /* 費目別グラフ */
+  const bars = EXPENSE_ACCOUNTS.map(a=>[a, accountBalance(a,ens)]).filter(x=>x[1]>0)
+    .sort((x,y)=>y[1]-x[1]);
+  const mx = bars.length ? bars[0][1] : 1;
+  document.getElementById("catBars").innerHTML =
+    bars.map(([a,v])=>`<div class="bar-wrap">
+      <div class="bar-label"><span>${esc(a)}</span><span>¥${yen(v)}</span></div>
+      <div class="bar"><i style="width:${Math.max(2,v/mx*100)}%"></i></div></div>`).join("")
+    || `<p class="hint">対象期間の支出がありません</p>`;
+}
+
+/* 今月サマリ(手入力タブ) */
+function renderMonthSummary(){
+  const m = today().slice(0,7);
+  const ens = entriesOfMonth(m);
+  const exp = EXPENSE_ACCOUNTS.reduce((s,a)=>s+accountBalance(a,ens),0);
+  const inc = INCOME_ACCOUNTS.reduce((s,a)=>s+accountBalance(a,ens),0);
+  const cash = accountBalance("現金", DB.entries);
+  document.getElementById("monthSummary").innerHTML =
+    `<table><tbody>
+      <tr><td>今月の支出</td><td class="num neg">¥${yen(exp)}</td></tr>
+      <tr><td>今月の収入</td><td class="num pos">¥${yen(inc)}</td></tr>
+      <tr><td>今月の収支</td><td class="num ${inc-exp>=0?"pos":"neg"}">¥${yen(inc-exp)}</td></tr>
+      <tr><td>現金残高(累計)</td><td class="num">¥${yen(cash)}</td></tr>
+    </tbody></table>`;
+}
+
+/* ---------- 設定 ---------- */
+document.getElementById("btnOpening").onclick = ()=>{
+  const date = document.getElementById("sDate").value || today();
+  const pairs = [["現金","sCash"],["普通預金","sBank"],["電子マネー","sEmoney"]];
+  let n=0;
+  for(const [acc,id] of pairs){
+    const v = Number(document.getElementById(id).value);
+    if(v>0 && addEntry(date, acc, "元入金", v, "開始残高")) n++;
+  }
+  const msg = document.getElementById("sMsg");
+  if(n){ msg.className="msg ok"; msg.textContent=`✅ 開始残高を ${n} 件登録しました。`; }
+  else { msg.className="msg err"; msg.textContent="1 円以上の金額を入力してください。"; }
+  pairs.forEach(([,id])=>document.getElementById(id).value="");
+  renderAll();
+};
+function download(name, content, mime){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content],{type:mime}));
+  a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+}
+document.getElementById("btnExportJson").onclick = ()=>
+  download(`kozuchi_backup_${today()}.json`, JSON.stringify(DB,null,1), "application/json");
+document.getElementById("btnExportCsv").onclick = ()=>{
+  const head = "日付,借方科目,貸方科目,金額,摘要\n";
+  const body = DB.entries.map(e=>
+    [e.date,e.debit,e.credit,e.amount,`"${e.memo.replace(/"/g,'""')}"`].join(",")).join("\n");
+  download(`kozuchi_journal_${today()}.csv`, "\uFEFF"+head+body, "text/csv");
+};
+document.getElementById("btnImport").onclick = ()=>document.getElementById("fileImport").click();
+document.getElementById("fileImport").addEventListener("change", e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    const msg = document.getElementById("ioMsg");
+    try{
+      const d = JSON.parse(r.result);
+      if(!d || !Array.isArray(d.entries)) throw new Error("形式が違います");
+      if(!confirm(`${d.entries.length} 件の仕訳を読み込み、現在のデータと置き換えます。よろしいですか?`)) return;
+      DB = {entries:d.entries, seq:Math.max(1, ...d.entries.map(x=>x.id+1), d.seq||1)};
+      save(); renderAll();
+      msg.className="msg ok"; msg.textContent="✅ 読み込みました。";
+    }catch(err){ msg.className="msg err"; msg.textContent="読み込みに失敗しました: "+err.message; }
+  };
+  r.readAsText(f);
+  e.target.value="";
+});
+document.getElementById("btnWipe").onclick = ()=>{
+  if(!confirm("すべての仕訳データを消去します。元に戻せません。よろしいですか?")) return;
+  if(!confirm("本当に消去しますか?(バックアップをおすすめします)")) return;
+  DB = {entries:[], seq:1}; save(); renderAll();
+  const msg = document.getElementById("ioMsg");
+  msg.className="msg ok"; msg.textContent="消去しました。";
+};
+
+/* ---------- 全描画 ---------- */
+function renderAll(){
+  renderJournal(); renderLedger(); renderTrial(); renderReports(); renderMonthSummary();
+}
+renderAll();
+</script>
+</body>
+</html>
