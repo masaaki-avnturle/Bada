@@ -71,6 +71,28 @@
 
 ---
 
+## 🕶 ダウンロード — Mimir(ARグラス・コンシェルジュ / 相対論的光路差反射システム)
+
+**今までの集大成のシステム。** タブレット / スマートフォンの**画像や文章を AR グラスへ投影**し、**コンシェルジュ「ミーミル」**として応対するアプリ。投影光学系は**特殊相対性理論の光路差・反射システム** — ローレンツ因子 γ、相対論的ドップラー D=1/(γ(1−βcosθ))、光行差、コンバイナ薄膜反射の光路差 **Δ=2nd·cosθt**、干渉フリンジ強度 I=(1+cosφ)/2 による**干渉輝度補正**、IPD と虚像距離からの**両眼収束シフト(SBS ステレオ投影)** — が毎フレーム駆動します。時刻・日付・計算・メモ・投影の声かけ操作(レーベンシュタイン意図照合、Web Speech API 対応)。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**mimir/index.html をダウンロード**](mimir/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。USB-C / HDMI ミラーリング型 AR グラス(XREAL / Rokid / VITURE 等)を接続 → 「⛶ 全画面投影」で HUD がグラスに表示されます。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `mimir-concierge-debug.apk` |
+| **Windows 10 / 11** | `Mimir-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `Mimir-*-x86_64.AppImage` / `Mimir-*-amd64.deb` |
+
+ビルドは [`mimir-app-build.yml`](.github/workflows/mimir-app-build.yml) が実行します(`mimir-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・光学エンジンの式・コンシェルジュへの話しかけ方は [`mimir/`](mimir/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
@@ -125,6 +147,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
+| **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---

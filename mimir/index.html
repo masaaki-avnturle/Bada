@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mimir — ARグラス・コンシェルジュ(相対論的光路差反射システム)</title>
+<!--
+  Mimir(ミーミル)— ARグラス・コンシェルジュ
+  ==========================================
+  タブレット / スマートフォン上の画像やテキストを、外部ディスプレイとして
+  接続した AR グラス(USB-C / HDMI 接続のミラーリング型)へ投影し、
+  コンシェルジュとして応対する自己完結 HTML アプリ。
+
+  ● 特殊相対性理論の光路差・反射システム(光学エンジン)
+      - ローレンツ因子 γ = 1/√(1-β²)
+      - 相対論的ドップラー因子 D = 1/(γ(1-β cosθ)) による観測波長 λ' = λ/D
+      - 相対論的光行差 cosθ' = (cosθ+β)/(1+β cosθ)
+      - コンバイナ(反射合成板)の薄膜反射光路差 Δ = 2 n d cosθt(スネル屈折)
+        + 外面反射の λ/2 位相跳び
+      - 干渉位相 φ = 2πΔ/λ' + π → フリンジ強度 I = (1+cosφ)/2
+        に基づく HUD の干渉輝度補正
+      - 両眼視差: IPD と虚像距離から左右眼の収束シフト(px)を算出し
+        SBS(サイドバイサイド)投影の左右像へ適用
+  ● 投影: 単眼ミラー / 両眼 SBS、全画面化、外部ディスプレイ用の別ウィンドウ
+  ● コンテンツ: 画像ファイル・テキスト・クリップボードを HUD カードとして投影
+  ● コンシェルジュ「ミーミル」: 意図エンジン(レーベンシュタイン照合)
+      時刻・日付・計算・メモ・投影操作・光学系の説明に応答。
+      音声入出力は Web Speech API があれば利用(無くても動作)。
+
+  依存ゼロ・オフライン動作。APK / Windows EXE / Ubuntu AppImage・deb は
+  .github/workflows/mimir-app-build.yml がこのファイルを www として包んで
+  ビルドします。
+-->
+<style>
+  :root{
+    --bg:#05070d; --panel:#0b101c; --panel2:#101827; --line:#1d2a40;
+    --fg:#d8e4f5; --dim:#7d8ea8; --acc:#40c8b8; --acc2:#c8a44a; --warn:#d06060;
+    --hud-color:#7dffb0; --hud-size:22px; --hud-bright:1;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; background:var(--bg); color:var(--fg);
+    font-family:"Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Yu Gothic UI",system-ui,sans-serif; }
+  header{ display:flex; align-items:center; gap:10px; padding:10px 14px;
+    border-bottom:1px solid var(--line); background:var(--panel); position:sticky; top:0; z-index:5; }
+  header h1{ font-size:16px; margin:0; letter-spacing:.06em; }
+  header .sub{ color:var(--dim); font-size:11px; }
+  header .spacer{ flex:1; }
+  .badge{ font-size:10px; color:var(--acc); border:1px solid var(--acc);
+    border-radius:10px; padding:1px 8px; white-space:nowrap; }
+  main{ display:grid; grid-template-columns:minmax(300px,380px) 1fr; gap:12px; padding:12px; }
+  @media (max-width:840px){ main{ grid-template-columns:1fr; } }
+  details.sec{ background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    margin-bottom:10px; overflow:hidden; }
+  details.sec>summary{ cursor:pointer; padding:9px 12px; font-size:13px; font-weight:600;
+    color:var(--acc2); list-style:none; user-select:none; }
+  details.sec>summary::before{ content:"▸ "; color:var(--dim); }
+  details.sec[open]>summary::before{ content:"▾ "; }
+  .secBody{ padding:0 12px 12px; font-size:12px; }
+  .row{ display:flex; align-items:center; gap:8px; margin:7px 0; flex-wrap:wrap; }
+  .row label{ min-width:9em; color:var(--dim); }
+  .row output{ min-width:4.5em; text-align:right; color:var(--acc); font-variant-numeric:tabular-nums; }
+  input[type=range]{ flex:1; accent-color:var(--acc); min-width:80px; }
+  input[type=number], input[type=text], textarea, select{
+    background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+    border-radius:6px; padding:6px 8px; font-size:12px; }
+  textarea{ width:100%; min-height:56px; resize:vertical; }
+  button{ background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+    border-radius:7px; padding:7px 11px; font-size:12px; cursor:pointer; }
+  button:hover{ border-color:var(--acc); color:var(--acc); }
+  button.pri{ border-color:var(--acc); color:var(--acc); font-weight:600; }
+  button.warn{ border-color:var(--warn); color:var(--warn); }
+  .btnRow{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+  .hint{ color:var(--dim); font-size:11px; line-height:1.6; margin:6px 0; }
+  table.phys{ width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.phys td{ padding:3px 4px; border-bottom:1px dashed var(--line); }
+  table.phys td:last-child{ text-align:right; color:var(--acc);
+    font-family:ui-monospace,Menlo,Consolas,monospace; }
+  /* ---- HUD(投影面) ---- */
+  #hudWrap{ background:#000; border:1px solid var(--line); border-radius:10px;
+    min-height:420px; position:relative; overflow:hidden; display:flex; }
+  #hudWrap:fullscreen{ border:none; border-radius:0; }
+  .eye{ flex:1; position:relative; overflow:hidden; height:100%; min-height:420px; }
+  .eye+.eye{ border-left:1px solid #123; }
+  .hud{ position:absolute; inset:0; padding:26px 30px; color:var(--hud-color);
+    filter:brightness(var(--hud-bright)); font-size:var(--hud-size); overflow:hidden; }
+  .hudClock{ position:absolute; top:12px; right:18px; font-size:.85em; opacity:.9;
+    font-variant-numeric:tabular-nums; text-shadow:0 0 8px currentColor; }
+  .hudStatus{ position:absolute; bottom:10px; left:18px; right:18px; font-size:11px;
+    opacity:.65; display:flex; justify-content:space-between; gap:10px;
+    font-family:ui-monospace,Menlo,Consolas,monospace; white-space:nowrap; overflow:hidden; }
+  .hudItems{ position:absolute; top:52px; bottom:34px; left:22px; right:22px;
+    display:flex; flex-direction:column; gap:12px; overflow:hidden; justify-content:flex-end; }
+  .card{ border:1px solid color-mix(in srgb, var(--hud-color) 55%, transparent);
+    border-radius:10px; padding:10px 14px; background:rgba(0,0,0,.35);
+    text-shadow:0 0 10px currentColor; line-height:1.5; max-width:100%;
+    animation:cardIn .35s ease; word-break:break-word; }
+  .card.img{ padding:6px; }
+  .card img{ display:block; max-width:100%; max-height:38vh; border-radius:6px; }
+  .card .who{ font-size:.6em; opacity:.7; letter-spacing:.15em; margin-bottom:2px; }
+  @keyframes cardIn{ from{ opacity:0; transform:translateY(10px);} to{ opacity:1; transform:none;} }
+  /* ---- コンシェルジュ ---- */
+  #chatLog{ background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    height:190px; overflow-y:auto; padding:8px; font-size:12px; }
+  .msg{ margin:5px 0; line-height:1.5; }
+  .msg .tag{ font-size:10px; border-radius:8px; padding:0 6px; margin-right:6px; }
+  .msg.user .tag{ color:var(--acc2); border:1px solid var(--acc2); }
+  .msg.mimir .tag{ color:var(--acc); border:1px solid var(--acc); }
+  #askRow{ display:flex; gap:6px; margin-top:8px; }
+  #askInput{ flex:1; }
+  footer{ padding:8px 14px; color:var(--dim); font-size:11px; border-top:1px solid var(--line); }
+  a{ color:var(--acc); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🕶 Mimir <span class="sub">— ARグラス・コンシェルジュ</span></h1>
+  <span class="badge">特殊相対論 光路差反射システム</span>
+  <div class="spacer"></div>
+  <span class="sub" id="dispInfo">ディスプレイ: 内蔵のみ</span>
+</header>
+
+<main>
+<div id="side">
+
+  <details class="sec" open>
+    <summary>🕶 投影(グラスへの出力)</summary>
+    <div class="secBody">
+      <div class="hint">
+        AR グラス(USB-C / HDMI のミラーリング型)を接続すると、この画面が
+        そのままグラスに表示されます。<b>「全画面投影」</b>で HUD だけを表示。
+        デスクトップでは<b>「別ウィンドウ投影」</b>でグラス側ディスプレイに
+        HUD ウィンドウを移動できます。黒背景は透過型グラスでは「透明」になります。
+      </div>
+      <div class="row"><label>投影モード</label>
+        <select id="modeSel">
+          <option value="mono">単眼ミラー(1 画面)</option>
+          <option value="sbs">両眼 SBS(左右ステレオ)</option>
+        </select>
+      </div>
+      <div class="row"><label>瞳孔間距離 IPD</label>
+        <input type="range" id="ipd" min="50" max="78" value="64" step="0.5">
+        <output id="ipdOut">64 mm</output></div>
+      <div class="row"><label>虚像距離</label>
+        <input type="range" id="vdist" min="0.5" max="10" value="3" step="0.1">
+        <output id="vdistOut">3.0 m</output></div>
+      <div class="row"><label>HUD 輝度</label>
+        <input type="range" id="bright" min="0.3" max="2" value="1" step="0.05">
+        <output id="brightOut">×1.00</output></div>
+      <div class="row"><label>文字サイズ</label>
+        <input type="range" id="fsize" min="12" max="48" value="22" step="1">
+        <output id="fsizeOut">22 px</output></div>
+      <div class="row"><label>HUD 色</label>
+        <select id="hudColor">
+          <option value="#7dffb0">グリーン(視認性最良)</option>
+          <option value="#8fd4ff">シアン</option>
+          <option value="#ffd47d">アンバー</option>
+          <option value="#ffffff">ホワイト</option>
+        </select>
+      </div>
+      <div class="btnRow">
+        <button class="pri" id="btnFull">⛶ 全画面投影</button>
+        <button id="btnWin">🗔 別ウィンドウ投影</button>
+        <button id="btnClear">HUD をクリア</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="sec" open>
+    <summary>🖼 コンテンツ(画像・文章を投影)</summary>
+    <div class="secBody">
+      <div class="btnRow">
+        <button class="pri" id="btnImg">📷 画像を選んで投影</button>
+        <button id="btnPaste">📋 クリップボード貼付</button>
+      </div>
+      <input type="file" id="imgFile" accept="image/*" multiple style="display:none">
+      <textarea id="textIn" placeholder="ここに文章を入力すると HUD カードとしてグラスに投影されます"></textarea>
+      <div class="btnRow"><button class="pri" id="btnText">📤 文章を投影</button></div>
+    </div>
+  </details>
+
+  <details class="sec" open>
+    <summary>🤵 コンシェルジュ「ミーミル」</summary>
+    <div class="secBody">
+      <div id="chatLog"></div>
+      <div id="askRow">
+        <input type="text" id="askInput" placeholder="例: いま何時? / 3+4*2 / メモ 牛乳を買う / 明るくして">
+        <button id="btnMic" title="音声入力">🎤</button>
+        <button class="pri" id="btnAsk">送信</button>
+      </div>
+      <div class="row" style="margin-top:6px"><label style="min-width:auto">
+        <input type="checkbox" id="chkSpeak"> 応答を読み上げる</label></div>
+      <div class="hint">応答はチャットとグラス HUD の両方に表示されます。
+        「ヘルプ」でできることの一覧。</div>
+    </div>
+  </details>
+
+  <details class="sec">
+    <summary>🔬 光学エンジン(特殊相対論・光路差)</summary>
+    <div class="secBody">
+      <div class="row"><label>コンバイナ屈折率 n</label>
+        <input type="number" id="phyN" value="1.52" step="0.01" min="1" max="3" style="width:5.5em"></div>
+      <div class="row"><label>反射膜厚 d</label>
+        <input type="number" id="phyD" value="180" step="5" min="10" max="2000" style="width:5.5em"> nm</div>
+      <div class="row"><label>入射角 θ</label>
+        <input type="range" id="phyTheta" min="0" max="80" value="30" step="1">
+        <output id="phyThetaOut">30°</output></div>
+      <div class="row"><label>波長 λ</label>
+        <input type="range" id="phyLambda" min="400" max="700" value="532" step="1">
+        <output id="phyLambdaOut">532 nm</output></div>
+      <div class="row"><label>頭部速度 v</label>
+        <input type="range" id="phyV" min="0" max="10" value="1.4" step="0.1">
+        <output id="phyVOut">1.4 m/s</output></div>
+      <table class="phys"><tbody id="phyTable"></tbody></table>
+      <div class="hint">
+        コンバイナ反射面の光路差 Δ=2nd·cosθt(外面反射の λ/2 跳び込み)から
+        干渉位相とフリンジ強度を求め、HUD の<b>干渉輝度補正</b>に用います。
+        頭部運動は相対論的ドップラー D=1/(γ(1−βcosθ)) で観測波長 λ'=λ/D に
+        繰り込み、光行差で入射角を補正します(v≪c のため補正は極小ですが、
+        エンジンは任意の β で厳密に計算します)。
+      </div>
+    </div>
+  </details>
+
+</div>
+
+<div id="stage">
+  <div id="hudWrap">
+    <div class="eye" id="eyeL">
+      <div class="hud" id="hudL">
+        <div class="hudClock" id="clockL">--:--:--</div>
+        <div class="hudItems" id="itemsL"></div>
+        <div class="hudStatus"><span id="statL1">MIMIR READY</span><span id="statL2"></span></div>
+      </div>
+    </div>
+    <div class="eye" id="eyeR" style="display:none">
+      <div class="hud" id="hudR">
+        <div class="hudClock" id="clockR">--:--:--</div>
+        <div class="hudItems" id="itemsR"></div>
+        <div class="hudStatus"><span id="statR1">MIMIR READY</span><span id="statR2"></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="hint" style="margin-top:8px">
+    透過型グラスでは黒が透明として抜けるため、HUD は黒地+高コントラスト表示です。
+    SBS モードでは光学エンジンの収束シフト(IPD・虚像距離から算出)が左右像へ適用されます。
+  </div>
+</div>
+</main>
+
+<footer>
+  Mimir — 依存ゼロ・単一 HTML・オフライン動作 |
+  <a href="https://github.com/masaaki-avnturle/Bada" target="_blank" rel="noopener">masaaki-avnturle/Bada</a>
+</footer>
+
+<script>
+"use strict";
+/* =====================================================================
+ * 1. 特殊相対性理論・光路差エンジン(純関数 — tools/engine-test.js が検証)
+ * ===================================================================== */
+var C_LIGHT = 299792458; /* m/s */
+
+/* ローレンツ因子 γ = 1/√(1-β²) */
+function gammaFactor(beta){
+  if (!(beta > -1 && beta < 1)) return Infinity;
+  return 1 / Math.sqrt(1 - beta * beta);
+}
+
+/* 相対論的ドップラー因子 D = 1/(γ(1-β cosθ))
+ * θ: 光源方向と運動方向のなす角(θ=0 で正面接近 → 青方偏移 D>1)
+ * 観測周波数 f' = D f、観測波長 λ' = λ/D */
+function relDoppler(beta, cosTheta){
+  var g = gammaFactor(beta);
+  return 1 / (g * (1 - beta * cosTheta));
+}
+
+/* 相対論的光行差: 運動系で観測される光の方向
+ * cosθ' = (cosθ + β)/(1 + β cosθ) */
+function aberrate(cosTheta, beta){
+  return (cosTheta + beta) / (1 + beta * cosTheta);
+}
+
+/* スネルの法則: 屈折角 θt(rad)。入射角 θi は度で受ける。 */
+function snellRefract(n, thetaIDeg){
+  var s = Math.sin(thetaIDeg * Math.PI / 180) / n;
+  if (s > 1) s = 1;
+  return Math.asin(s);
+}
+
+/* コンバイナ薄膜の反射光路差 Δ = 2 n d cosθt  (d, Δ は nm)
+ * 外面(空気→媒質)反射の λ/2 位相跳びは opdPhase 側で +π として扱う。 */
+function opticalPathDiff(n, dNm, thetaIDeg){
+  var thetaT = snellRefract(n, thetaIDeg);
+  return 2 * n * dNm * Math.cos(thetaT);
+}
+
+/* 干渉位相 φ = 2πΔ/λ + π(外面反射の位相跳び) */
+function opdPhase(opdNm, lambdaNm){
+  return 2 * Math.PI * opdNm / lambdaNm + Math.PI;
+}
+
+/* フリンジ強度(2 光束干渉、正規化): I = (1 + cosφ)/2 */
+function fringeIntensity(phase){
+  return (1 + Math.cos(phase)) / 2;
+}
+
+/* 相対論込みの光路差評価:
+ * 頭部速度 v で運動する観測者に対し、
+ *  - 光行差で入射角 θ を θ' に補正
+ *  - ドップラーで観測波長 λ' = λ/D に補正
+ * したうえで位相 φ' を返す。v=0 で静止解に一致。
+ * 返値: { beta, gamma, doppler, thetaObsDeg, lambdaObsNm, opdNm, phase, intensity } */
+function relativisticOPD(n, dNm, thetaIDeg, lambdaNm, vMps){
+  var beta = vMps / C_LIGHT;
+  var g = gammaFactor(beta);
+  var cosI = Math.cos(thetaIDeg * Math.PI / 180);
+  var D = relDoppler(beta, cosI);
+  var cosObs = aberrate(cosI, beta);
+  if (cosObs > 1) cosObs = 1; if (cosObs < -1) cosObs = -1;
+  var thetaObsDeg = Math.acos(cosObs) * 180 / Math.PI;
+  var lambdaObs = lambdaNm / D;
+  var opd = opticalPathDiff(n, dNm, thetaObsDeg);
+  var phase = opdPhase(opd, lambdaObs);
+  return { beta: beta, gamma: g, doppler: D, thetaObsDeg: thetaObsDeg,
+           lambdaObsNm: lambdaObs, opdNm: opd, phase: phase,
+           intensity: fringeIntensity(phase) };
+}
+
+/* 両眼収束シフト: IPD(mm) と虚像距離(m) から、
+ * 水平 FOV fovDeg・横幅 widthPx のパネル上での片眼シフト量(px)。 */
+function stereoShiftPx(ipdMm, distM, widthPx, fovDeg){
+  var half = Math.atan((ipdMm / 1000 / 2) / distM);      /* 片眼の収束半角 rad */
+  var pxPerRad = widthPx / (fovDeg * Math.PI / 180);
+  return half * pxPerRad;
+}
+
+/* =====================================================================
+ * 2. コンシェルジュ「ミーミル」 — 意図エンジン
+ * ===================================================================== */
+function levenshtein(a, b){
+  a = String(a); b = String(b);
+  var m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  var prev = new Array(n + 1), cur = new Array(n + 1), i, j;
+  for (j = 0; j <= n; j++) prev[j] = j;
+  for (i = 1; i <= m; i++){
+    cur[0] = i;
+    for (j = 1; j <= n; j++){
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1,
+                        prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+    }
+    var t = prev; prev = cur; cur = t;
+  }
+  return prev[n];
+}
+
+/* あいまい一致: text 中に kw が含まれる、または編集距離 ≤ 許容値 */
+function fuzzyHas(text, kw){
+  if (text.indexOf(kw) >= 0) return true;
+  var tol = kw.length >= 5 ? 2 : (kw.length >= 3 ? 1 : 0);
+  if (!tol) return false;
+  for (var i = 0; i + kw.length <= text.length; i++){
+    if (levenshtein(text.substr(i, kw.length), kw) <= tol) return true;
+  }
+  return false;
+}
+
+/* 安全な四則演算(eval 不使用の再帰下降パーサ)。失敗時 NaN。 */
+function safeCalc(exprRaw){
+  var expr = String(exprRaw).replace(/[×✕]/g, "*").replace(/÷/g, "/")
+                            .replace(/[()\d+\-*/.%\s]/g, function(c){ return c; });
+  if (/[^()\d+\-*/.%\s]/.test(expr)) return NaN;
+  var pos = 0;
+  function skip(){ while (pos < expr.length && expr.charAt(pos) === " ") pos++; }
+  function num(){
+    skip();
+    if (expr.charAt(pos) === "("){
+      pos++; var v = addsub(); skip();
+      if (expr.charAt(pos) !== ")") return NaN;
+      pos++; return v;
+    }
+    var neg = false;
+    while (expr.charAt(pos) === "+" || expr.charAt(pos) === "-"){
+      if (expr.charAt(pos) === "-") neg = !neg;
+      pos++; skip();
+    }
+    var s = pos;
+    while (pos < expr.length && /[\d.]/.test(expr.charAt(pos))) pos++;
+    if (s === pos) return NaN;
+    var v2 = parseFloat(expr.slice(s, pos));
+    return neg ? -v2 : v2;
+  }
+  function muldiv(){
+    var v = num();
+    for (;;){
+      skip();
+      var c = expr.charAt(pos);
+      if (c === "*" || c === "/" || c === "%"){
+        pos++;
+        var r = num();
+        if (c === "*") v = v * r;
+        else if (c === "/") v = v / r;
+        else v = v % r;
+      } else return v;
+    }
+  }
+  function addsub(){
+    var v = muldiv();
+    for (;;){
+      skip();
+      var c = expr.charAt(pos);
+      if (c === "+" || c === "-"){
+        pos++;
+        var r = muldiv();
+        v = c === "+" ? v + r : v - r;
+      } else return v;
+    }
+  }
+  var out = addsub();
+  skip();
+  if (pos !== expr.length) return NaN;
+  return typeof out === "number" ? out : NaN;
+}
+
+var mimirMemos = [];
+
+function pad2(x){ return (x < 10 ? "0" : "") + x; }
+function nowClock(d){
+  d = d || new Date();
+  return pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+}
+function todayStr(d){
+  d = d || new Date();
+  var w = ["日","月","火","水","木","金","土"][d.getDay()];
+  return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日(" + w + ")";
+}
+
+/* ミーミルの応答。返値 { reply, action? }。
+ * action は UI 側が解釈: "brighter"|"darker"|"bigger"|"smaller"|"clear"|"sbs"|"mono"|"fullscreen" */
+function mimirReply(textRaw){
+  var text = String(textRaw || "").trim();
+  if (!text) return { reply: "ご用件をどうぞ。「ヘルプ」で一覧を表示します。" };
+
+  /* 計算: 式そのもの、または「計算」を含む */
+  var exprM = text.replace(/^計算\s*/, "");
+  if (/^[\d(+\-.\s][\d()+\-*/.%×✕÷\s]*$/.test(exprM)){
+    var v = safeCalc(exprM);
+    if (!isNaN(v) && isFinite(v)){
+      var shown = Math.round(v * 1e10) / 1e10;
+      return { reply: exprM.trim() + " = " + shown };
+    }
+  }
+
+  if (fuzzyHas(text, "ヘルプ") || fuzzyHas(text, "使い方") || fuzzyHas(text, "help")){
+    return { reply: "できること — ①時刻・日付(「いま何時?」「今日は何日?」) ②計算(「3+4*2」) " +
+      "③メモ(「メモ 牛乳を買う」「メモ一覧」「メモ削除」) ④投影操作(「明るくして」「暗くして」" +
+      "「文字大きく」「文字小さく」「SBSにして」「単眼にして」「全画面」「クリア」) " +
+      "⑤光学系(「光路差は?」「相対論の補正は?」)" };
+  }
+
+  if (fuzzyHas(text, "何時") || fuzzyHas(text, "時刻") || fuzzyHas(text, "じかん") || fuzzyHas(text, "時間は")){
+    return { reply: "現在の時刻は " + nowClock() + " です。" };
+  }
+  if (fuzzyHas(text, "何日") || fuzzyHas(text, "日付") || fuzzyHas(text, "今日は")){
+    return { reply: "今日は " + todayStr() + " です。" };
+  }
+
+  /* メモ */
+  var memoAdd = text.match(/^メモ[\s::]+(.+)$/);
+  if (memoAdd){
+    mimirMemos.push({ text: memoAdd[1], at: nowClock() });
+    saveMemos();
+    return { reply: "メモしました(" + mimirMemos.length + "件目): " + memoAdd[1] };
+  }
+  if (fuzzyHas(text, "メモ一覧") || fuzzyHas(text, "メモを見")){
+    if (!mimirMemos.length) return { reply: "メモはまだありません。「メモ ○○」で追加できます。" };
+    var lines = mimirMemos.map(function(mm, i){ return (i + 1) + ". " + mm.text + "(" + mm.at + ")"; });
+    return { reply: "メモ一覧 — " + lines.join(" / ") };
+  }
+  if (fuzzyHas(text, "メモ削除") || fuzzyHas(text, "メモを消")){
+    var nn = mimirMemos.length;
+    mimirMemos = [];
+    saveMemos();
+    return { reply: nn + " 件のメモを削除しました。" };
+  }
+
+  /* 投影操作 */
+  if (fuzzyHas(text, "明るく")) return { reply: "HUD を明るくします。", action: "brighter" };
+  if (fuzzyHas(text, "暗く"))   return { reply: "HUD を暗くします。", action: "darker" };
+  if (fuzzyHas(text, "大きく")) return { reply: "文字を大きくします。", action: "bigger" };
+  if (fuzzyHas(text, "小さく")) return { reply: "文字を小さくします。", action: "smaller" };
+  if (fuzzyHas(text, "SBS") || fuzzyHas(text, "sbs") || fuzzyHas(text, "両眼") || fuzzyHas(text, "ステレオ"))
+    return { reply: "両眼 SBS 投影に切り替えます。", action: "sbs" };
+  if (fuzzyHas(text, "単眼") || fuzzyHas(text, "ミラー"))
+    return { reply: "単眼ミラー投影に切り替えます。", action: "mono" };
+  if (fuzzyHas(text, "全画面") || fuzzyHas(text, "フルスクリーン"))
+    return { reply: "全画面投影します。グラス側で HUD をご覧ください。", action: "fullscreen" };
+  if (fuzzyHas(text, "クリア") || text.indexOf("消して") >= 0)
+    return { reply: "HUD をクリアしました。", action: "clear" };
+
+  /* 光学系の説明(現在のエンジン値で答える) */
+  if (fuzzyHas(text, "光路差") || fuzzyHas(text, "干渉")){
+    var r1 = currentOptics();
+    return { reply: "現在のコンバイナ光路差は Δ = " + r1.opdNm.toFixed(1) + " nm、" +
+      "干渉位相 φ = " + r1.phase.toFixed(3) + " rad、フリンジ強度 I = " +
+      r1.intensity.toFixed(3) + " です。HUD 輝度はこの I で補正しています。" };
+  }
+  if (fuzzyHas(text, "相対論") || fuzzyHas(text, "ドップラー") || fuzzyHas(text, "ローレンツ")){
+    var r2 = currentOptics();
+    return { reply: "頭部速度 v に対して β = " + r2.beta.toExponential(3) +
+      "、γ = " + r2.gamma.toFixed(15) + "、ドップラー因子 D = " + r2.doppler.toFixed(15) +
+      "。観測波長 λ' = " + r2.lambdaObsNm.toFixed(9) + " nm に繰り込んで光路差を評価しています。" };
+  }
+
+  if (fuzzyHas(text, "こんにちは") || fuzzyHas(text, "こんばんは") ||
+      fuzzyHas(text, "おはよう") || fuzzyHas(text, "やあ")){
+    return { reply: "こんにちは。コンシェルジュのミーミルです。画像や文章の投影、時刻・計算・メモなど、なんなりとお申し付けください。" };
+  }
+  if (fuzzyHas(text, "ありがとう")) return { reply: "どういたしまして。他にご用があればいつでもどうぞ。" };
+  if (fuzzyHas(text, "あなたは") || fuzzyHas(text, "誰")){
+    return { reply: "私はミーミル — ARグラスの中に住むコンシェルジュです。特殊相対性理論の光路差反射システムで HUD を最適化しています。" };
+  }
+
+  return { reply: "「" + text + "」ですね。うまく理解できませんでした。「ヘルプ」でできることの一覧をご案内します。" };
+}
+
+/* =====================================================================
+ * 3. HUD 状態と描画
+ * ===================================================================== */
+var hudState = {
+  items: [],            /* {type:'text'|'image'|'answer', content, at} */
+  maxItems: 5,
+  mode: "mono",         /* mono | sbs */
+  ipd: 64, vdist: 3, bright: 1, fsize: 22, color: "#7dffb0",
+  fovDeg: 46, panelPx: 1920
+};
+
+function pushItem(item){
+  hudState.items.push(item);
+  while (hudState.items.length > hudState.maxItems) hudState.items.shift();
+}
+
+function projectText(text){
+  text = String(text || "").trim();
+  if (!text) return false;
+  pushItem({ type: "text", content: text, at: nowClock() });
+  renderHUD();
+  return true;
+}
+function projectAnswer(text){
+  pushItem({ type: "answer", content: text, at: nowClock() });
+  renderHUD();
+}
+function projectImage(dataUrl, name){
+  pushItem({ type: "image", content: dataUrl, name: name || "", at: nowClock() });
+  renderHUD();
+}
+
+function byId(id){ return document.getElementById(id); }
+
+function currentOptics(){
+  var n = parseFloat(val("phyN", "1.52")) || 1.52;
+  var d = parseFloat(val("phyD", "180")) || 180;
+  var th = parseFloat(val("phyTheta", "30")) || 0;
+  var lam = parseFloat(val("phyLambda", "532")) || 532;
+  var v = parseFloat(val("phyV", "1.4")) || 0;
+  return relativisticOPD(n, d, th, lam, v);
+}
+function val(id, dflt){
+  var el = byId(id);
+  var v = el && el.value;
+  return (v === undefined || v === null || v === "") ? dflt : v;
+}
+
+function buildCard(item){
+  var div = document.createElement("div");
+  div.className = "card" + (item.type === "image" ? " img" : "");
+  if (item.type === "image"){
+    var img = document.createElement("img");
+    img.src = item.content;
+    img.alt = item.name || "projected image";
+    div.appendChild(img);
+  } else {
+    var who = document.createElement("div");
+    who.className = "who";
+    who.textContent = (item.type === "answer" ? "MIMIR · " : "NOTE · ") + item.at;
+    var body = document.createElement("div");
+    body.textContent = item.content;
+    div.appendChild(who);
+    div.appendChild(body);
+  }
+  return div;
+}
+
+function renderHUD(){
+  var r = currentOptics();
+  /* 干渉輝度補正: フリンジ強度 I が低いほど HUD を増光して知覚輝度を一定化 */
+  var comp = 1 / Math.max(0.35, r.intensity);
+  var effBright = hudState.bright * Math.min(2.4, comp);
+
+  var root = document.documentElement;
+  if (root && root.style && root.style.setProperty){
+    root.style.setProperty("--hud-color", hudState.color);
+    root.style.setProperty("--hud-size", hudState.fsize + "px");
+    root.style.setProperty("--hud-bright", String(effBright.toFixed(3)));
+  }
+
+  var shift = stereoShiftPx(hudState.ipd, hudState.vdist, hudState.panelPx, hudState.fovDeg);
+  var sbs = hudState.mode === "sbs";
+  var eyeR = byId("eyeR");
+  if (eyeR && eyeR.style) eyeR.style.display = sbs ? "" : "none";
+
+  var sides = sbs ? [["itemsL", "statL2", +1], ["itemsR", "statR2", -1]]
+                  : [["itemsL", "statL2", 0]];
+  for (var s = 0; s < sides.length; s++){
+    var cont = byId(sides[s][0]);
+    if (!cont) continue;
+    if (cont.replaceChildren) cont.replaceChildren();
+    else cont.innerHTML = "";
+    for (var i = 0; i < hudState.items.length; i++){
+      cont.appendChild(buildCard(hudState.items[i]));
+    }
+    if (cont.style) cont.style.transform =
+      sides[s][2] ? "translateX(" + (sides[s][2] * shift / 10).toFixed(1) + "px)" : "";
+    var stat = byId(sides[s][1]);
+    if (stat) stat.textContent =
+      "Δ=" + r.opdNm.toFixed(1) + "nm φ=" + r.phase.toFixed(2) +
+      " I=" + r.intensity.toFixed(2) + " γ=" + r.gamma.toFixed(12) +
+      (sbs ? " ±" + (shift / 10).toFixed(1) + "px" : "");
+  }
+  updateMirrors();
+  return true;
+}
+
+function renderPhysTable(){
+  var t = byId("phyTable");
+  if (!t) return;
+  var r = currentOptics();
+  var dt = r.opdNm * 1e-9 / C_LIGHT; /* 光路差の伝播時間差 */
+  var rows = [
+    ["β = v/c", r.beta.toExponential(4)],
+    ["ローレンツ因子 γ", r.gamma.toFixed(15)],
+    ["ドップラー因子 D", r.doppler.toFixed(15)],
+    ["光行差後の入射角 θ'", r.thetaObsDeg.toFixed(9) + "°"],
+    ["観測波長 λ'", r.lambdaObsNm.toFixed(9) + " nm"],
+    ["光路差 Δ = 2nd·cosθt", r.opdNm.toFixed(3) + " nm"],
+    ["伝播時間差 Δ/c", (dt * 1e18).toFixed(4) + " as"],
+    ["干渉位相 φ = 2πΔ/λ'+π", r.phase.toFixed(6) + " rad"],
+    ["フリンジ強度 I", r.intensity.toFixed(6)],
+    ["収束シフト(片眼)", (stereoShiftPx(hudState.ipd, hudState.vdist,
+        hudState.panelPx, hudState.fovDeg) / 10).toFixed(2) + " px"]
+  ];
+  var html = "";
+  for (var i = 0; i < rows.length; i++){
+    html += "<tr><td>" + rows[i][0] + "</td><td>" + rows[i][1] + "</td></tr>";
+  }
+  t.innerHTML = html;
+}
+
+/* =====================================================================
+ * 4. 永続化(localStorage は無い環境でも動くようガード)
+ * ===================================================================== */
+function saveMemos(){
+  try { localStorage.setItem("mimir.memos", JSON.stringify(mimirMemos)); } catch (e) {}
+}
+function loadMemos(){
+  try {
+    var s = localStorage.getItem("mimir.memos");
+    if (s) mimirMemos = JSON.parse(s) || [];
+  } catch (e) {}
+}
+
+/* =====================================================================
+ * 5. UI 配線(ブラウザ実行時のみ副作用; テスト環境ではスタブ DOM 上で安全)
+ * ===================================================================== */
+var extWin = null; /* 別ウィンドウ投影 */
+
+function chatAdd(role, text){
+  var log = byId("chatLog");
+  if (!log) return;
+  var div = document.createElement("div");
+  div.className = "msg " + role;
+  var tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = role === "user" ? "あなた" : "ミーミル";
+  var body = document.createElement("span");
+  body.textContent = text;
+  div.appendChild(tag);
+  div.appendChild(body);
+  log.appendChild(div);
+  if (typeof log.scrollTop === "number") log.scrollTop = 1e9;
+}
+
+function speakMaybe(text){
+  try {
+    var chk = byId("chkSpeak");
+    if (chk && chk.checked && typeof speechSynthesis !== "undefined" &&
+        typeof SpeechSynthesisUtterance !== "undefined"){
+      var u = new SpeechSynthesisUtterance(text);
+      u.lang = "ja-JP";
+      speechSynthesis.speak(u);
+    }
+  } catch (e) {}
+}
+
+function applyAction(action){
+  if (!action) return;
+  var el;
+  if (action === "brighter"){ hudState.bright = Math.min(2, hudState.bright + 0.2); el = byId("bright"); if (el) el.value = hudState.bright; }
+  else if (action === "darker"){ hudState.bright = Math.max(0.3, hudState.bright - 0.2); el = byId("bright"); if (el) el.value = hudState.bright; }
+  else if (action === "bigger"){ hudState.fsize = Math.min(48, hudState.fsize + 4); el = byId("fsize"); if (el) el.value = hudState.fsize; }
+  else if (action === "smaller"){ hudState.fsize = Math.max(12, hudState.fsize - 4); el = byId("fsize"); if (el) el.value = hudState.fsize; }
+  else if (action === "clear"){ hudState.items = []; }
+  else if (action === "sbs"){ hudState.mode = "sbs"; el = byId("modeSel"); if (el) el.value = "sbs"; }
+  else if (action === "mono"){ hudState.mode = "mono"; el = byId("modeSel"); if (el) el.value = "mono"; }
+  else if (action === "fullscreen"){ goFullscreen(); }
+  syncOutputs();
+  renderHUD();
+}
+
+function ask(text){
+  text = String(text || "").trim();
+  if (!text) return;
+  chatAdd("user", text);
+  var r = mimirReply(text);
+  chatAdd("mimir", r.reply);
+  projectAnswer(r.reply);
+  speakMaybe(r.reply);
+  applyAction(r.action);
+}
+
+function goFullscreen(){
+  var el = byId("hudWrap");
+  try {
+    if (el && el.requestFullscreen) el.requestFullscreen();
+  } catch (e) {}
+}
+
+function hudDocHTML(){
+  /* 別ウィンドウ投影用: 現在の HUD を丸ごと持つ最小ドキュメント */
+  var wrap = byId("hudWrap");
+  var inner = wrap && wrap.innerHTML ? wrap.innerHTML : "";
+  return "<!DOCTYPE html><html lang='ja'><head><meta charset='utf-8'>" +
+    "<title>Mimir HUD</title><style>" +
+    "html,body{margin:0;background:#000;height:100%;overflow:hidden;" +
+    "font-family:'Hiragino Kaku Gothic ProN','Noto Sans CJK JP',system-ui,sans-serif;}" +
+    "#w{display:flex;height:100%;--hud-color:" + hudState.color +
+    ";--hud-size:" + hudState.fsize + "px;--hud-bright:1;}" +
+    ".eye{flex:1;position:relative;overflow:hidden;}" +
+    ".eye+.eye{border-left:1px solid #123;}" +
+    ".hud{position:absolute;inset:0;padding:26px 30px;color:var(--hud-color);" +
+    "font-size:var(--hud-size);}" +
+    ".hudClock{position:absolute;top:12px;right:18px;font-size:.85em;" +
+    "text-shadow:0 0 8px currentColor;}" +
+    ".hudItems{position:absolute;top:52px;bottom:34px;left:22px;right:22px;" +
+    "display:flex;flex-direction:column;gap:12px;overflow:hidden;justify-content:flex-end;}" +
+    ".hudStatus{position:absolute;bottom:10px;left:18px;right:18px;font-size:11px;" +
+    "opacity:.65;display:flex;justify-content:space-between;" +
+    "font-family:ui-monospace,Menlo,Consolas,monospace;}" +
+    ".card{border:1px solid rgba(125,255,176,.55);border-radius:10px;padding:10px 14px;" +
+    "background:rgba(0,0,0,.35);text-shadow:0 0 10px currentColor;line-height:1.5;}" +
+    ".card.img{padding:6px;} .card img{display:block;max-width:100%;max-height:60vh;border-radius:6px;}" +
+    ".card .who{font-size:.6em;opacity:.7;letter-spacing:.15em;margin-bottom:2px;}" +
+    "</style></head><body><div id='w'>" + inner + "</div></body></html>";
+}
+
+function updateMirrors(){
+  try {
+    if (extWin && !extWin.closed && extWin.document){
+      extWin.document.open();
+      extWin.document.write(hudDocHTML());
+      extWin.document.close();
+    }
+  } catch (e) {}
+}
+
+function openExtWindow(){
+  try {
+    extWin = window.open("", "mimirHud", "width=960,height=540");
+    updateMirrors();
+    chatAdd("mimir", "HUD ウィンドウを開きました。グラス側のディスプレイへ移動して全画面(F11)にしてください。");
+  } catch (e) {
+    chatAdd("mimir", "別ウィンドウを開けませんでした: " + e);
+  }
+}
+
+function syncOutputs(){
+  var pairs = [["ipd", "ipdOut", function(v){ return v + " mm"; }],
+               ["vdist", "vdistOut", function(v){ return Number(v).toFixed(1) + " m"; }],
+               ["bright", "brightOut", function(v){ return "×" + Number(v).toFixed(2); }],
+               ["fsize", "fsizeOut", function(v){ return v + " px"; }],
+               ["phyTheta", "phyThetaOut", function(v){ return v + "°"; }],
+               ["phyLambda", "phyLambdaOut", function(v){ return v + " nm"; }],
+               ["phyV", "phyVOut", function(v){ return v + " m/s"; }]];
+  for (var i = 0; i < pairs.length; i++){
+    var inp = byId(pairs[i][0]), out = byId(pairs[i][1]);
+    if (inp && out) out.textContent = pairs[i][2](inp.value);
+  }
+}
+
+function readState(){
+  hudState.mode = val("modeSel", hudState.mode);
+  hudState.ipd = parseFloat(val("ipd", hudState.ipd)) || hudState.ipd;
+  hudState.vdist = parseFloat(val("vdist", hudState.vdist)) || hudState.vdist;
+  hudState.bright = parseFloat(val("bright", hudState.bright)) || hudState.bright;
+  hudState.fsize = parseFloat(val("fsize", hudState.fsize)) || hudState.fsize;
+  hudState.color = val("hudColor", hudState.color);
+}
+
+function wireUI(){
+  var ids = ["modeSel", "ipd", "vdist", "bright", "fsize", "hudColor",
+             "phyN", "phyD", "phyTheta", "phyLambda", "phyV"];
+  for (var i = 0; i < ids.length; i++){
+    var el = byId(ids[i]);
+    if (el && el.addEventListener){
+      el.addEventListener("input", function(){
+        readState(); syncOutputs(); renderPhysTable(); renderHUD();
+      });
+    }
+  }
+  function on(id, ev, fn){
+    var el2 = byId(id);
+    if (el2 && el2.addEventListener) el2.addEventListener(ev, fn);
+  }
+  on("btnFull", "click", goFullscreen);
+  on("btnWin", "click", openExtWindow);
+  on("btnClear", "click", function(){ hudState.items = []; renderHUD(); });
+  on("btnText", "click", function(){
+    var ta = byId("textIn");
+    if (ta && projectText(ta.value)) ta.value = "";
+  });
+  on("btnImg", "click", function(){
+    var f = byId("imgFile");
+    if (f && f.click) f.click();
+  });
+  on("imgFile", "change", function(ev){
+    var files = ev && ev.target && ev.target.files;
+    if (!files) return;
+    for (var k = 0; k < files.length; k++){
+      (function(file){
+        var rd = new FileReader();
+        rd.onload = function(){ projectImage(rd.result, file.name); };
+        rd.readAsDataURL(file);
+      })(files[k]);
+    }
+  });
+  on("btnPaste", "click", function(){
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText){
+        navigator.clipboard.readText().then(function(t){
+          if (t) projectText(t);
+        }, function(){ chatAdd("mimir", "クリップボードを読めませんでした。テキスト欄に貼り付けてください。"); });
+      } else {
+        chatAdd("mimir", "この環境ではクリップボード API が使えません。テキスト欄に貼り付けてください。");
+      }
+    } catch (e) {}
+  });
+  on("btnAsk", "click", function(){
+    var inp = byId("askInput");
+    if (inp){ ask(inp.value); inp.value = ""; }
+  });
+  on("askInput", "keydown", function(ev){
+    if (ev && ev.key === "Enter"){
+      var inp = byId("askInput");
+      if (inp){ ask(inp.value); inp.value = ""; }
+    }
+  });
+  on("btnMic", "click", function(){
+    try {
+      var SR = (typeof window !== "undefined") &&
+               (window.SpeechRecognition || window.webkitSpeechRecognition);
+      if (!SR){ chatAdd("mimir", "この環境では音声入力(Web Speech API)が使えません。"); return; }
+      var rec = new SR();
+      rec.lang = "ja-JP";
+      rec.onresult = function(ev){
+        var t = ev && ev.results && ev.results[0] && ev.results[0][0] &&
+                ev.results[0][0].transcript;
+        if (t) ask(t);
+      };
+      rec.start();
+      chatAdd("mimir", "🎤 どうぞお話しください…");
+    } catch (e) { chatAdd("mimir", "音声入力を開始できませんでした: " + e); }
+  });
+}
+
+function tickClock(){
+  var t = nowClock();
+  var l = byId("clockL"), r = byId("clockR");
+  if (l) l.textContent = t;
+  if (r) r.textContent = t;
+}
+
+function detectDisplays(){
+  try {
+    if (typeof screen !== "undefined" && screen.isExtended !== undefined){
+      var el = byId("dispInfo");
+      if (el) el.textContent = "ディスプレイ: " + (screen.isExtended ? "外部あり(グラス?)" : "内蔵のみ");
+    }
+  } catch (e) {}
+}
+
+function init(){
+  loadMemos();
+  readState();
+  syncOutputs();
+  renderPhysTable();
+  renderHUD();
+  wireUI();
+  tickClock();
+  setInterval(tickClock, 1000);
+  detectDisplays();
+  try {
+    if (typeof screen !== "undefined" && screen.addEventListener){
+      screen.addEventListener("change", detectDisplays);
+    }
+  } catch (e) {}
+  chatAdd("mimir", "ようこそ。コンシェルジュのミーミルです。画像や文章をグラスへ投影します。「ヘルプ」でできることをご案内します。");
+  projectAnswer("Mimir 起動 — 相対論的光路差反射システム 校正完了");
+}
+
+if (typeof document !== "undefined" && document.getElementById){
+  init();
+}
+</script>
+</body>
+</html>
