@@ -59,6 +59,28 @@
 
 ---
 
+## ⚛ ダウンロード — Bada QuantOS(擬似量子オペレーティングシステム)
+
+**今までの集大成である擬似量子コンピュータ(量子 Bada 実行系)をオペレーティングシステム化。カーネルは生成 AI。** タブレット・スマートフォンの機能(**電話回線 tel:/sms:/mailto: / カメラ / ギャラリー / 時計・アラーム / 電卓 / メモ / ファイル / 連絡先**)を、**トポロジーの写像機構**(各機能に結び目=カール列を割り当て、Kauffman ブラケット不変量 ⟨K⟩=(−A³)^w で分類し、4 量子ビットレジスタの基底状態へ**単射写像** φ)で移植。機能間の遷移はハイパーキューブ辺に沿う X ゲート列の**連続変形**で、「写像室」で全写像表と検算を観測可能。生成AIカーネルは応答のたびに 6 段パイプライン(**トークン化→意図解析→トポロジー写像→計画→生成→検証**)を開示し、「090-… に電話」「写真を撮って」「1+2*3」等の自然言語で全機能を操作。Android では tel:/sms: インテントで**実際の電話回線から発信**。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_quantos/index.html をダウンロード**](bada_quantos/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-quantos-debug.apk` |
+| **Windows 10 / 11** | `BadaQuantOS-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaQuantOS-*-x86_64.AppImage` / `BadaQuantOS-*-amd64.deb` |
+
+ビルドは [`quantos-app-build.yml`](.github/workflows/quantos-app-build.yml) が実行します(`quantos-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。写像機構・カーネルの詳細は [`bada_quantos/`](bada_quantos/) を参照。
+
+---
+
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
 
 **ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。

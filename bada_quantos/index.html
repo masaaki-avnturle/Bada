@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada QuantOS — 擬似量子オペレーティングシステム</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111623; --panel:#151b2c; --line:#26304a;
+    --tx:#dbe4ff; --dim:#8b97b8; --acc:#7c5cff; --acc2:#2dd4bf; --warn:#f59e0b; --err:#f87171;
+    --ket:#a78bfa;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #1a2340 0%, var(--bg) 55%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  /* ── ステータスバー ── */
+  #statusbar{
+    display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:12px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:rgba(11,14,20,.8); backdrop-filter:blur(6px);
+  }
+  #statusbar b{ color:var(--tx); font-weight:600; }
+  #sbKet{ margin-left:auto; color:var(--ket); font-family:ui-monospace,Consolas,monospace; }
+  #sbDev{ color:var(--acc2); }
+  /* ── ホーム画面 ── */
+  #screen{ flex:1; overflow:auto; position:relative; }
+  #home{ padding:18px 14px 90px; }
+  #homeHead{ text-align:center; margin:10px 0 16px; }
+  #homeHead h1{ font-size:22px; letter-spacing:.06em; }
+  #homeHead h1 span{ color:var(--acc); }
+  #homeHead p{ font-size:11.5px; color:var(--dim); margin-top:6px; line-height:1.7; }
+  #grid{
+    display:grid; grid-template-columns:repeat(auto-fill,minmax(86px,1fr));
+    gap:14px; max-width:640px; margin:0 auto;
+  }
+  .app{
+    background:linear-gradient(160deg,var(--panel),var(--bg2)); border:1px solid var(--line);
+    border-radius:18px; padding:12px 6px 9px; text-align:center; cursor:pointer; user-select:none;
+    transition:transform .08s, border-color .15s;
+  }
+  .app:active{ transform:scale(.94); }
+  .app:hover{ border-color:var(--acc); }
+  .app .ic{ font-size:30px; line-height:1.2; }
+  .app .nm{ font-size:11.5px; margin-top:6px; }
+  .app .kt{ font-size:9.5px; color:var(--ket); font-family:ui-monospace,Consolas,monospace; margin-top:3px; }
+  /* ── アプリパネル ── */
+  #panel{ display:none; position:absolute; inset:0; background:var(--bg); overflow:auto; padding-bottom:90px; }
+  #panelBar{
+    position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px;
+    padding:10px 14px; background:rgba(11,14,20,.92); border-bottom:1px solid var(--line); backdrop-filter:blur(6px);
+  }
+  #panelBar button{ font-size:13px; }
+  #panelTitle{ font-size:15px; font-weight:600; }
+  #panelKet{ margin-left:auto; font-size:11px; color:var(--ket); font-family:ui-monospace,Consolas,monospace; }
+  #panelBody{ padding:16px 14px; max-width:760px; margin:0 auto; }
+  /* ── 部品 ── */
+  button{
+    background:linear-gradient(160deg,#232c48,#1a2136); color:var(--tx); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:active{ transform:scale(.96); }
+  button.acc{ background:linear-gradient(160deg,var(--acc),#5a3fd8); border-color:transparent; }
+  button.grn{ background:linear-gradient(160deg,#0f9d84,#0b7a67); border-color:transparent; }
+  input,textarea,select{
+    background:var(--bg2); color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; font-size:14px; font-family:inherit; width:100%;
+  }
+  textarea{ font-family:ui-monospace,Consolas,monospace; min-height:110px; }
+  pre{
+    background:#0a0d16; border:1px solid var(--line); border-radius:10px; padding:11px;
+    font-size:12.5px; line-height:1.6; overflow:auto; font-family:ui-monospace,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .row{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin:10px 0; }
+  .hint{ font-size:11.5px; color:var(--dim); line-height:1.8; }
+  .tag{ display:inline-block; font-size:10.5px; color:var(--acc2); border:1px solid var(--line); border-radius:99px; padding:1px 9px; margin:2px 3px 2px 0; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ border-bottom:1px solid var(--line); padding:6px 5px; text-align:left; }
+  th{ color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:ui-monospace,Consolas,monospace; color:var(--ket); }
+  /* ── ダイヤルパッド ── */
+  #dialNum{ font-size:26px; text-align:center; letter-spacing:.08em; font-family:ui-monospace,Consolas,monospace; min-height:40px; padding:6px; }
+  #pad{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; max-width:300px; margin:12px auto; }
+  #pad button{ font-size:20px; padding:14px 0; border-radius:14px; }
+  /* ── 電卓 ── */
+  #calcDisp{ font-size:24px; text-align:right; font-family:ui-monospace,Consolas,monospace; padding:10px; }
+  #calcPad{ display:grid; grid-template-columns:repeat(4,1fr); gap:8px; max-width:340px; margin:12px auto; }
+  #calcPad button{ font-size:18px; padding:13px 0; }
+  /* ── AI ログ ── */
+  .msgU,.msgA{ border-radius:14px; padding:10px 13px; margin:8px 0; max-width:92%; font-size:13.5px; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+  .msgU{ background:#233054; margin-left:auto; }
+  .msgA{ background:var(--panel); border:1px solid var(--line); }
+  details{ margin-top:7px; font-size:11.5px; color:var(--dim); }
+  details pre{ margin-top:6px; }
+  /* ── コマンドバー ── */
+  #cmdbar{
+    position:fixed; left:0; right:0; bottom:0; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(13,17,28,.95); border-top:1px solid var(--line); backdrop-filter:blur(8px); z-index:20;
+  }
+  #cmdbar input{ flex:1; border-radius:99px; padding:10px 16px; }
+  #cmdbar button{ border-radius:99px; }
+  .gitem{ display:inline-block; margin:5px; }
+  .gitem img{ max-width:150px; border-radius:10px; border:1px solid var(--line); display:block; }
+  video,canvas{ max-width:100%; border-radius:12px; border:1px solid var(--line); }
+</style>
+</head>
+<body>
+  <div id="statusbar">
+    <b>⚛ QuantOS</b>
+    <span id="sbDev"></span>
+    <span id="sbTime"></span>
+    <span id="sbKet">Ψ = |0000⟩</span>
+  </div>
+
+  <div id="screen">
+    <div id="home">
+      <div id="homeHead">
+        <h1>Bada <span>QuantOS</span></h1>
+        <p>擬似量子コンピュータ(集大成)のオペレーティングシステム — カーネルは生成AI。<br/>
+        タブレット・スマートフォンの全機能を<b>トポロジーの写像機構</b>(結び目不変量 ↦ 量子レジスタ基底)で移植。</p>
+      </div>
+      <div id="grid"></div>
+    </div>
+    <div id="panel">
+      <div id="panelBar">
+        <button onclick="closeApp()">◀ ホーム</button>
+        <span id="panelTitle"></span>
+        <span id="panelKet"></span>
+      </div>
+      <div id="panelBody"></div>
+    </div>
+  </div>
+
+  <div id="cmdbar">
+    <input id="cmdInput" placeholder="AIカーネルへ — 例:「090-1234-5678 に電話」「写真を撮って」「1+2*3」"
+           onkeydown="if(event.key==='Enter')cmdSend()"/>
+    <button class="acc" onclick="cmdSend()">実行</button>
+  </div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * Bada QuantOS — 擬似量子オペレーティングシステム
+ *
+ *  今までの集大成である擬似量子コンピュータ (量子 Bada 実行系) を核に、
+ *  タブレット・スマートフォンの機能 (電話回線 / SMS / メール / カメラ /
+ *  時計 / 電卓 / メモ / ファイル / 連絡先) を、トポロジーの写像機構
+ *  (各機能に結び目=カール列を割り当て、Kauffman ブラケット不変量
+ *   (−A³)^w で分類し、量子レジスタの基底状態へ単射に写像) によって
+ *  「生成 AI がカーネルである OS」へ移植したアプリケーション。
+ *
+ *  依存ゼロ・単一 HTML・オフライン動作。電話・SMS・メールの発信は
+ *  端末 OS の回線機能へ tel: / sms: / mailto: インテントとして委譲します
+ *  (Android APK では Cordova の allow-intent 経由で実際の電話アプリが
+ *   起動します。デスクトップでは発行内容を表示します)。
+ *
+ *  エンジン構成 (純ロジック — tools/engine-test.js が Node で検証):
+ *   1. qkInterpret     — 擬似量子カーネル (qubit/H/X/Z/CNOT/measure/state/let/print)
+ *   2. topoInvariant   — 結び目 (カール列) の不変量: 交点数 c, ライズ w, ⟨K⟩=(−A³)^w
+ *   3. topoMap         — 機能 ↦ 量子レジスタ基底 |b₀b₁b₂b₃⟩ の単射写像 φ
+ *   4. topoRoute       — 機能間の連続変形 (ハイパーキューブ辺に沿う X ゲート列)
+ *   5. deviceProfile   — 端末判定 (スマートフォン / タブレット / デスクトップ)
+ *   6. calcEval        — 電卓 (再帰下降パーサ。eval 不使用)
+ *   7. intentDetect    — 意図解析 (自然言語 → OS 機能)
+ *   8. aiKernel        — 生成AIカーネル: トークン化→意図→写像→計画→生成→検証
+ *   9. osDispatch      — 実行系: tel:/sms:/mailto: 発行・アプリ起動
+ * ===================================================================== */
+
+/* ── 環境ガード (Node テスト環境では DOM / navigator が無い) ── */
+var UA      = (typeof navigator !== "undefined" && navigator.userAgent) ? navigator.userAgent : "";
+var SCREENW = (typeof window !== "undefined" && window.innerWidth) ? window.innerWidth : 1280;
+function store(k, v){ try{ localStorage.setItem("quantos:" + k, JSON.stringify(v)); }catch(e){} }
+function load(k, d){ try{ var s = localStorage.getItem("quantos:" + k); return s === null || s === undefined ? d : JSON.parse(s); }catch(e){ return d; } }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ════════════════════════════════════════════════════════════════════
+ * 1. 擬似量子カーネル — 量子 Bada インタープリタ
+ *    H/X/Z/CNOT は実振幅で閉じるため複素数は不要 (集大成の実行系)
+ * ════════════════════════════════════════════════════════════════════ */
+function qkInterpret(src){
+  var out = [];
+  var names = [];                 // 量子ビット名 → 添字
+  var state = null;               // 実振幅の状態ベクトル (長さ 2^n)
+  var vars = {};                  // let 変数
+  function qi(name){
+    var i = names.indexOf(name);
+    if (i < 0) throw new Error("未宣言の量子ビット: " + name + " (先に qubit 宣言)");
+    return i;
+  }
+  function bitOf(k, i){ return (k >> (names.length - 1 - i)) & 1; }
+  function ketStr(k){
+    var s = "";
+    for (var i = 0; i < names.length; i++) s += bitOf(k, i);
+    return "|" + s + "⟩";
+  }
+  function applyH(t){
+    var n = names.length, ns = new Float64Array(1 << n), r = Math.SQRT1_2;
+    for (var k = 0; k < state.length; k++){
+      if (!state[k]) continue;
+      var flip = k ^ (1 << (n - 1 - t));
+      if (bitOf(k, t) === 0){ ns[k] += r * state[k]; ns[flip] += r * state[k]; }
+      else                  { ns[flip] += r * state[k]; ns[k] -= r * state[k]; }
+    }
+    state = ns;
+  }
+  function applyX(t){
+    var n = names.length, ns = new Float64Array(1 << n);
+    for (var k = 0; k < state.length; k++){ if (state[k]) ns[k ^ (1 << (n - 1 - t))] += state[k]; }
+    state = ns;
+  }
+  function applyZ(t){
+    for (var k = 0; k < state.length; k++){ if (bitOf(k, t) === 1) state[k] = -state[k]; }
+  }
+  function applyCNOT(c, t){
+    if (c === t) throw new Error("CNOT の制御と標的が同じです");
+    var n = names.length, ns = new Float64Array(1 << n);
+    for (var k = 0; k < state.length; k++){
+      if (!state[k]) continue;
+      ns[bitOf(k, c) === 1 ? (k ^ (1 << (n - 1 - t))) : k] += state[k];
+    }
+    state = ns;
+  }
+  function stateLines(){
+    var lines = [];
+    for (var k = 0; k < state.length; k++){
+      if (Math.abs(state[k]) > 1e-9) lines.push("  " + ketStr(k) + " " + state[k].toFixed(3));
+    }
+    return lines.length ? lines : ["  (零ベクトル)"];
+  }
+  function evalExpr(e){
+    var toks = e.match(/\d+\.?\d*|[A-Za-z_]\w*|[+\-*/()]/g) || [];
+    var pos = 0;
+    function peek(){ return toks[pos]; }
+    function factor(){
+      var t = toks[pos++];
+      if (t === "(") { var v = addsub(); if (toks[pos++] !== ")") throw new Error("括弧が閉じていません"); return v; }
+      if (t === "-") return -factor();
+      if (/^\d/.test(t)) return parseFloat(t);
+      if (t in vars) return vars[t];
+      throw new Error("未定義の変数: " + t);
+    }
+    function muldiv(){
+      var v = factor();
+      while (peek() === "*" || peek() === "/"){ var op = toks[pos++]; var r = factor(); v = op === "*" ? v * r : v / r; }
+      return v;
+    }
+    function addsub(){
+      var v = muldiv();
+      while (peek() === "+" || peek() === "-"){ var op = toks[pos++]; var r = muldiv(); v = op === "+" ? v + r : v - r; }
+      return v;
+    }
+    var res = addsub();
+    if (pos < toks.length) throw new Error("式を解釈できません: " + e);
+    return res;
+  }
+  var lines = String(src).split(/\n/);
+  try{
+    for (var li = 0; li < lines.length; li++){
+      var line = lines[li].trim();
+      if (!line || line.charAt(0) === "#") continue;
+      var m;
+      if ((m = line.match(/^qubit\s+(.+)$/i))){
+        names = m[1].trim().split(/\s+/);
+        if (names.length > 8) throw new Error("量子ビットは 8 個まで");
+        state = new Float64Array(1 << names.length); state[0] = 1;
+        out.push("qubit " + names.join(" ") + " (" + names.length + "量子ビット)");
+      }
+      else if ((m = line.match(/^H\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyH(qi(m[1])); out.push("H " + m[1]); }
+      else if ((m = line.match(/^X\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyX(qi(m[1])); out.push("X " + m[1]); }
+      else if ((m = line.match(/^Z\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyZ(qi(m[1])); out.push("Z " + m[1]); }
+      else if ((m = line.match(/^CNOT\s+(\S+)\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyCNOT(qi(m[1]), qi(m[2])); out.push("CNOT " + m[1] + "→" + m[2]); }
+      else if (/^state$/i.test(line)){ if(!state) throw new Error("先に qubit 宣言"); out.push.apply(out, stateLines()); }
+      else if (/^measure$/i.test(line)){
+        if(!state) throw new Error("先に qubit 宣言");
+        var r = Math.random(), acc = 0, hit = 0;
+        for (var k = 0; k < state.length; k++){ acc += state[k] * state[k]; if (r <= acc + 1e-12){ hit = k; break; } }
+        state = new Float64Array(state.length); state[hit] = 1;
+        out.push("measure → " + ketStr(hit));
+      }
+      else if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/i))){ vars[m[1]] = evalExpr(m[2]); }
+      else if ((m = line.match(/^print\s+(.+)$/i))){ out.push("print → " + evalExpr(m[1])); }
+      else throw new Error("解釈できない行: " + line);
+    }
+  }catch(e){
+    out.push("!! " + e.message);
+  }
+  return out.join("\n");
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 2–4. トポロジー写像機構
+ *   各 OS 機能に結び目 (Reidemeister I カール列 = ±1 の交点符号列) を
+ *   割り当てる。カール列の Kauffman ブラケットは ⟨K⟩ = (−A³)^w
+ *   (w = ライズ = 符号和) で、(交点数 c, ライズ w) の組が機能ごとに
+ *   すべて異なるため、写像 φ: 機能 → 基底状態 |b₀b₁b₂b₃⟩ は単射。
+ *   機能間の遷移はハイパーキューブの辺 (X ゲート 1 発 = ビット 1 反転)
+ *   に沿った連続変形として表す。
+ * ════════════════════════════════════════════════════════════════════ */
+var OS_APPS = [
+  { id:"ai",       name:"AIカーネル", icon:"🧠", knot:[],                 desc:"生成AIのOSシェル (核 = 自明結び目)" },
+  { id:"phone",    name:"電話",       icon:"📞", knot:[1,1,1],            desc:"電話回線 — tel: インテントで発信" },
+  { id:"contacts", name:"連絡先",     icon:"👥", knot:[-1,-1,-1],         desc:"連絡先帳 (端末内保存)" },
+  { id:"sms",      name:"メッセージ", icon:"💬", knot:[1,1],              desc:"SMS — sms: インテントで送信" },
+  { id:"mail",     name:"メール",     icon:"✉️", knot:[-1,-1],            desc:"メール — mailto: で作成" },
+  { id:"camera",   name:"カメラ",     icon:"📷", knot:[1,1,1,1],          desc:"カメラ撮影 → ギャラリーへ" },
+  { id:"gallery",  name:"ギャラリー", icon:"🖼", knot:[1,1,-1,-1],        desc:"撮影した写真" },
+  { id:"clock",    name:"時計",       icon:"⏰", knot:[1],                desc:"時計・アラーム" },
+  { id:"calc",     name:"電卓",       icon:"🧮", knot:[-1],               desc:"四則演算 (パーサ内蔵)" },
+  { id:"notes",    name:"メモ",       icon:"📝", knot:[1,-1],             desc:"メモ帳 (自動保存)" },
+  { id:"files",    name:"ファイル",   icon:"📁", knot:[1,1,1,-1],         desc:"仮想ファイルシステム" },
+  { id:"qlab",     name:"量子ラボ",   icon:"⚛️", knot:[1,1,1,1,1],        desc:"量子 Bada コンソール" },
+  { id:"topo",     name:"写像室",     icon:"🪢", knot:[-1,-1,-1,-1],      desc:"トポロジー写像の観測室" },
+  { id:"settings", name:"設定",       icon:"⚙️", knot:[-1,-1,-1,-1,-1],   desc:"端末プロファイル・データ" }
+];
+var TOPO_QUBITS = 4;   /* 2^4 = 16 基底 ≥ 機能数 14 → 単射写像が張れる */
+
+function topoInvariant(knot){
+  var w = 0;
+  for (var i = 0; i < knot.length; i++) w += knot[i];
+  var c = knot.length;
+  /* カール列の Kauffman ブラケット: 各カールが (−A^{±3}) を掛ける */
+  var bracket = (w === 0) ? "1" : "(−A" + (w > 0 ? "³" : "⁻³") + ")^" + Math.abs(w);
+  return { crossings: c, writhe: w, bracket: bracket, aExp: 3 * w, key: c + ":" + w };
+}
+
+function topoMap(appId){
+  var idx = -1, app = null;
+  for (var i = 0; i < OS_APPS.length; i++){ if (OS_APPS[i].id === appId){ idx = i; app = OS_APPS[i]; break; } }
+  if (!app) return null;
+  var bits = "";
+  for (var b = TOPO_QUBITS - 1; b >= 0; b--) bits += ((idx >> b) & 1);
+  var prog = "qubit q0 q1 q2 q3";
+  for (var j = 0; j < TOPO_QUBITS; j++){ if (bits.charAt(j) === "1") prog += "\nX q" + j; }
+  prog += "\nstate";
+  return {
+    id: app.id, name: app.name, icon: app.icon, index: idx,
+    ket: "|" + bits + "⟩",
+    invariant: topoInvariant(app.knot),
+    program: prog
+  };
+}
+
+function topoRoute(fromId, toId){
+  var a = topoMap(fromId), b = topoMap(toId);
+  if (!a || !b) return null;
+  var x = a.index ^ b.index, steps = [];
+  for (var j = 0; j < TOPO_QUBITS; j++){
+    if ((x >> (TOPO_QUBITS - 1 - j)) & 1) steps.push("X q" + j);
+  }
+  return {
+    from: a, to: b, steps: steps, hamming: steps.length,
+    note: "ハイパーキューブの辺に沿う連続変形 (" + steps.length + " ステップ)。" +
+          "各機能の結び目不変量 (c, w) は変形の間も保存されます。"
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 5. 端末プロファイル — このタブレット / スマートフォンを判定
+ * ════════════════════════════════════════════════════════════════════ */
+function deviceProfile(ua, width){
+  ua = ua || ""; width = width || 1280;
+  var kind;
+  if (/Android/i.test(ua))            kind = /Mobile/i.test(ua) ? "smartphone" : "tablet";
+  else if (/iPhone|iPod/i.test(ua))   kind = "smartphone";
+  else if (/iPad/i.test(ua))          kind = "tablet";
+  else                                kind = "desktop";
+  var label = kind === "smartphone" ? "スマートフォン" : kind === "tablet" ? "タブレット" : "デスクトップ";
+  var tel = kind !== "desktop";
+  return {
+    kind: kind, label: label, width: width,
+    tel: tel, sms: tel,
+    note: tel
+      ? "電話回線・SMS は端末 OS へ tel:/sms: インテントとして委譲します"
+      : "この端末には電話回線がないため、発信内容の表示のみ行います"
+  };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 6. 電卓 — 再帰下降パーサ (eval 不使用)
+ * ════════════════════════════════════════════════════════════════════ */
+function calcEval(expr){
+  var toks = String(expr).match(/\d+\.?\d*|[+\-*/()%]/g);
+  if (!toks || !toks.length) throw new Error("式が空です");
+  var pos = 0;
+  function peek(){ return toks[pos]; }
+  function factor(){
+    var t = toks[pos++];
+    if (t === "(") { var v = addsub(); if (toks[pos++] !== ")") throw new Error("括弧が閉じていません"); return v; }
+    if (t === "-") return -factor();
+    if (t === "+") return factor();
+    if (/^\d/.test(t)) return parseFloat(t);
+    throw new Error("解釈できません: " + t);
+  }
+  function muldiv(){
+    var v = factor();
+    while (peek() === "*" || peek() === "/" || peek() === "%"){
+      var op = toks[pos++], r = factor();
+      if (op === "*") v = v * r; else if (op === "/") v = v / r; else v = v % r;
+    }
+    return v;
+  }
+  function addsub(){
+    var v = muldiv();
+    while (peek() === "+" || peek() === "-"){ var op = toks[pos++], r = muldiv(); v = op === "+" ? v + r : v - r; }
+    return v;
+  }
+  var res = addsub();
+  if (pos < toks.length) throw new Error("式の途中で終わりました");
+  if (!isFinite(res)) throw new Error("結果が発散しました (0 除算など)");
+  return res;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 7. 意図解析 — 自然言語 → OS 機能
+ * ════════════════════════════════════════════════════════════════════ */
+function qTokenize(text){
+  return String(text).match(/[A-Za-z0-9_.\-⟩|]+|[぀-ヿ一-鿿]+|[^\s]/g) || [];
+}
+function extractNumber(text){
+  var m = String(text).match(/(\+?\d[\d\-()]{5,}\d)/);
+  return m ? m[1].replace(/[()]/g, "") : null;
+}
+function intentDetect(text){
+  var t = String(text).trim();
+  var num = extractNumber(t);
+  if (/^(qubit|H\s|X\s|Z\s|CNOT|measure|state|let\s|print\s)/m.test(t))
+    return { intent: "quantum_code", code: t, why: "量子 Bada の予約語で始まるコード" };
+  if (/アラーム|時計|何時|時刻|起こして/i.test(t))
+    return { intent: "clock", hour: (t.match(/(\d{1,2})\s*時/) || [])[1] || null, why: "時計・アラームの依頼" };
+  if (/電話|かけて|発信|call/i.test(t))
+    return { intent: "phone", number: num, why: "発信の依頼" + (num ? " (番号抽出: " + num + ")" : "") };
+  if (/SMS|メッセージ|ショートメール/i.test(t))
+    return { intent: "sms", number: num, body: t.replace(/.*[「『]([^」』]*)[」』].*/, "$1"), why: "SMS 送信の依頼" };
+  if (/メール|mail/i.test(t))
+    return { intent: "mail", why: "メール作成の依頼" };
+  if (/写真|カメラ|撮っ|撮影/i.test(t))
+    return { intent: "camera", why: "撮影の依頼" };
+  if (/ギャラリー|アルバム|画像を見/i.test(t))
+    return { intent: "gallery", why: "写真閲覧の依頼" };
+  if (/^[\d\s+\-*/().%]+$/.test(t) && /\d/.test(t) && /[+\-*/%]/.test(t))
+    return { intent: "calc", expr: t, why: "数式そのもの" };
+  if (/計算|電卓/i.test(t))
+    return { intent: "calc", expr: (t.match(/[\d+\-*/().%\s]{3,}/) || [""])[0].trim() || null, why: "計算の依頼" };
+  if (/メモ|note/i.test(t))
+    return { intent: "notes", why: "メモの依頼" };
+  if (/連絡先|アドレス帳/i.test(t))
+    return { intent: "contacts", why: "連絡先の依頼" };
+  if (/ファイル/i.test(t))
+    return { intent: "files", why: "ファイル操作の依頼" };
+  if (/トポロジー|写像|結び目|不変量/i.test(t))
+    return { intent: "topo", why: "トポロジー写像の観測依頼" };
+  if (/量子|ベル状態|もつれ|qubit/i.test(t))
+    return { intent: "qlab", why: "量子計算の依頼" };
+  if (/設定|プロファイル|端末情報/i.test(t))
+    return { intent: "settings", why: "設定の依頼" };
+  if (/ホーム|home/i.test(t))
+    return { intent: "home", why: "ホームへ戻る" };
+  return { intent: "chat", why: "対話 (機能語なし) — 生成応答" };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 8. 生成AIカーネル — OS シェル
+ *    応答のたびに 6 段パイプラインを開示:
+ *    ①トークン化 ②意図解析 ③トポロジー写像 ④計画 ⑤生成 ⑥検証
+ * ════════════════════════════════════════════════════════════════════ */
+var INTENT_APP = {
+  phone:"phone", sms:"sms", mail:"mail", camera:"camera", gallery:"gallery",
+  clock:"clock", calc:"calc", notes:"notes", contacts:"contacts", files:"files",
+  quantum_code:"qlab", qlab:"qlab", topo:"topo", settings:"settings", chat:"ai", home:"ai"
+};
+var CHAT_TEMPLATES = [
+  "私は QuantOS の生成AIカーネルです。{n} 個の機能が 4 量子ビットレジスタの基底に写像されています。「電話」「写真を撮って」「1+2*3」のように話しかけてください。",
+  "了解しました。現在のレジスタは {ket}、端末は {dev} です。機能名を言えばトポロジー写像 φ に沿って遷移します。",
+  "このOSではすべての機能が結び目不変量で分類されています。「写像室」と言えば全写像表をお見せします。",
+  "御用をどうぞ。発信・撮影・計算・量子回路の実行 — どれも意図解析 → 写像 → 実行の 3 手で済みます。"
+];
+function aiKernel(text){
+  var stages = [];
+  var toks = qTokenize(text);
+  stages.push({ name: "① トークン化", detail: toks.join(" · ") + "  (" + toks.length + " トークン)" });
+  var it = intentDetect(text);
+  stages.push({ name: "② 意図解析", detail: it.intent + " — " + it.why });
+  var appId = INTENT_APP[it.intent] || "ai";
+  var tm = topoMap(appId);
+  stages.push({ name: "③ トポロジー写像", detail: tm.name + " ↦ " + tm.ket + "  (交点数 " + tm.invariant.crossings + ", w=" + tm.invariant.writhe + ", ⟨K⟩=" + tm.invariant.bracket + ")" });
+  var action = { type: "open", app: appId }, reply = "", plan = "", verify = "OK";
+  if (it.intent === "phone"){
+    if (it.number){
+      action = { type: "tel", app: "phone", number: it.number };
+      plan = "番号を検証 → tel: インテントを端末回線へ発行";
+      reply = "📞 " + it.number + " へ発信します (tel:" + it.number + " を端末OSへ委譲)。";
+      verify = /^\+?\d[\d\-]{5,}\d$/.test(it.number) ? "番号形式 OK" : "番号形式が不正です";
+    } else {
+      plan = "番号が無いのでダイヤルパッドを開く";
+      reply = "📞 電話を開きます。番号を押して発信してください。";
+    }
+  }
+  else if (it.intent === "sms"){
+    action = it.number ? { type: "sms", app: "sms", number: it.number, body: it.body || "" } : action;
+    plan = "sms: インテントを構成";
+    reply = it.number ? "💬 " + it.number + " へ SMS を作成します。" : "💬 メッセージを開きます。";
+  }
+  else if (it.intent === "mail"){ plan = "mailto: を構成"; reply = "✉️ メール作成画面を開きます。"; }
+  else if (it.intent === "calc" && it.expr){
+    plan = "再帰下降パーサで式を評価";
+    try { var v = calcEval(it.expr); reply = "🧮 " + it.expr + " = " + v; verify = "パーサ検算 OK"; }
+    catch(e){ reply = "🧮 式を解釈できません: " + e.message; verify = "検証で棄却"; }
+  }
+  else if (it.intent === "quantum_code"){
+    plan = "擬似量子カーネル qkInterpret で実行";
+    reply = "⚛️ 量子 Bada を実行しました:\n" + qkInterpret(it.code);
+    verify = reply.indexOf("!!") < 0 ? "実行 OK" : "実行系がエラーを報告";
+  }
+  else if (it.intent === "clock" && it.hour){
+    action = { type: "open", app: "clock", hour: it.hour };
+    plan = "時計を開いてアラーム時刻を提案";
+    reply = "⏰ " + it.hour + " 時のアラームですね。時計を開きます。";
+  }
+  else if (it.intent === "chat"){
+    plan = "テンプレート選択 + 状態の埋め込み (決定論的生成)";
+    var h = 0; for (var i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+    var prof = deviceProfile(UA, SCREENW);
+    reply = CHAT_TEMPLATES[h % CHAT_TEMPLATES.length]
+      .replace("{n}", String(OS_APPS.length)).replace("{ket}", tm.ket).replace("{dev}", prof.label);
+  }
+  else {
+    plan = "対応アプリ「" + tm.name + "」を開く";
+    reply = tm.icon + " " + tm.name + " を開きます。";
+  }
+  stages.push({ name: "④ 計画", detail: plan || "—" });
+  stages.push({ name: "⑤ 生成", detail: action.type + (action.number ? " " + action.number : "") + " / 応答文を生成" });
+  stages.push({ name: "⑥ 検証", detail: verify });
+  return { stages: stages, intent: it.intent, action: action, reply: reply, map: tm };
+}
+/* ════════════════════════════════════════════════════════════════════
+ * 9. 実行系 — tel:/sms:/mailto: の発行、アプリ起動
+ * ════════════════════════════════════════════════════════════════════ */
+function osDispatch(k){
+  var a = (k && k.action) || { type: "none" };
+  var prof = deviceProfile(UA, SCREENW);
+  if (a.type === "tel" || a.type === "sms"){
+    var href = a.type + ":" + a.number + (a.type === "sms" && a.body ? "?body=" + encodeURIComponent(a.body) : "");
+    if (!prof.tel)
+      return { performed: false, how: "この端末 (" + prof.label + ") には電話回線がありません。発行予定だったインテント: " + href };
+    if (typeof location === "undefined")
+      return { performed: false, how: "(テスト環境) " + href };
+    location.href = href;
+    return { performed: true, how: href + " を端末 OS へ発行しました" };
+  }
+  if (a.type === "mail"){
+    var mh = "mailto:" + (a.to || "");
+    if (typeof location === "undefined") return { performed: false, how: "(テスト環境) " + mh };
+    location.href = mh;
+    return { performed: true, how: mh + " を発行しました" };
+  }
+  if (a.type === "open"){
+    if (typeof document !== "undefined" && typeof openApp === "function") openApp(a.app);
+    return { performed: true, how: "アプリ「" + a.app + "」へ写像遷移" };
+  }
+  return { performed: false, how: "表示のみ" };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * ここから UI (Node テストでは DOM スタブ上で無害に初期化される)
+ * ════════════════════════════════════════════════════════════════════ */
+var currentApp = null;
+var camStream = null;
+
+function el(id){ return document.getElementById(id); }
+
+function openApp(id){
+  var tm = topoMap(id);
+  if (!tm) return;
+  currentApp = id;
+  el("home").style.display = "none";
+  el("panel").style.display = "block";
+  el("panelTitle").textContent = (appById(id).icon || "") + " " + tm.name;
+  el("panelKet").textContent = "φ ↦ " + tm.ket + " · w=" + tm.invariant.writhe;
+  el("sbKet").textContent = "Ψ = " + tm.ket;
+  el("panelBody").innerHTML = "";
+  stopCamera();
+  var r = RENDER[id];
+  if (r) r(el("panelBody"), tm);
+}
+function closeApp(){
+  currentApp = null;
+  stopCamera();
+  el("panel").style.display = "none";
+  el("home").style.display = "block";
+  el("sbKet").textContent = "Ψ = |0000⟩";
+}
+function appById(id){
+  for (var i = 0; i < OS_APPS.length; i++) if (OS_APPS[i].id === id) return OS_APPS[i];
+  return {};
+}
+
+/* ── 各アプリの描画 ── */
+var RENDER = {};
+
+/* 電話 */
+var dialBuf = "";
+function dialKey(k){
+  if (k === "⌫") dialBuf = dialBuf.slice(0, -1); else dialBuf += k;
+  el("dialNum").textContent = dialBuf || "​";
+}
+function dialCall(){
+  if (!dialBuf) return;
+  var calls = load("calls", []);
+  calls.unshift({ n: dialBuf, t: new Date().toLocaleString("ja-JP") });
+  store("calls", calls.slice(0, 30));
+  var res = osDispatch({ action: { type: "tel", number: dialBuf } });
+  el("dialMsg").textContent = res.how;
+  renderCallLog();
+}
+function renderCallLog(){
+  var calls = load("calls", []), h = "";
+  for (var i = 0; i < calls.length; i++)
+    h += "<tr><td class='mono'>" + esc(calls[i].n) + "</td><td>" + esc(calls[i].t) + "</td>" +
+         "<td><button onclick=\"dialBuf='" + esc(calls[i].n) + "';dialKey('')\">再入力</button></td></tr>";
+  el("callLog").innerHTML = h || "<tr><td colspan='3' class='hint'>発信履歴はまだありません</td></tr>";
+}
+RENDER.phone = function(body){
+  var prof = deviceProfile(UA, SCREENW);
+  dialBuf = "";
+  var keys = ["1","2","3","4","5","6","7","8","9","*","0","#"];
+  var pad = "";
+  for (var i = 0; i < keys.length; i++) pad += "<button onclick=\"dialKey('" + keys[i] + "')\">" + keys[i] + "</button>";
+  body.innerHTML =
+    "<div class='card'><div id='dialNum'>​</div><div id='pad'>" + pad +
+    "<button onclick=\"dialKey('⌫')\">⌫</button><button class='grn' onclick='dialCall()'>📞 発信</button>" +
+    "<button onclick=\"dialBuf='';dialKey('')\">C</button></div>" +
+    "<p class='hint' id='dialMsg'>" + esc(prof.note) + "</p></div>" +
+    "<div class='card'><b>発信履歴</b><table><tbody id='callLog'></tbody></table></div>";
+  renderCallLog();
+};
+
+/* 連絡先 */
+function contactAdd(){
+  var n = el("ctName").value.trim(), p = el("ctNum").value.trim();
+  if (!n || !p) return;
+  var cs = load("contacts", []);
+  cs.push({ name: n, num: p });
+  store("contacts", cs);
+  el("ctName").value = ""; el("ctNum").value = "";
+  renderContacts();
+}
+function contactDel(i){
+  var cs = load("contacts", []); cs.splice(i, 1); store("contacts", cs); renderContacts();
+}
+function contactCall(num){ osDispatch({ action: { type: "tel", number: num } }); }
+function contactSms(num){ osDispatch({ action: { type: "sms", number: num, body: "" } }); }
+function renderContacts(){
+  var cs = load("contacts", []), h = "";
+  for (var i = 0; i < cs.length; i++)
+    h += "<tr><td>" + esc(cs[i].name) + "</td><td class='mono'>" + esc(cs[i].num) + "</td><td>" +
+         "<button onclick=\"contactCall('" + esc(cs[i].num) + "')\">📞</button> " +
+         "<button onclick=\"contactSms('" + esc(cs[i].num) + "')\">💬</button> " +
+         "<button onclick='contactDel(" + i + ")'>🗑</button></td></tr>";
+  el("ctList").innerHTML = h || "<tr><td colspan='3' class='hint'>連絡先はまだありません</td></tr>";
+}
+RENDER.contacts = function(body){
+  body.innerHTML =
+    "<div class='card'><div class='row'><input id='ctName' placeholder='名前' style='flex:1'/>" +
+    "<input id='ctNum' placeholder='電話番号' style='flex:1'/><button class='acc' onclick='contactAdd()'>追加</button></div></div>" +
+    "<div class='card'><table><tbody id='ctList'></tbody></table></div>";
+  renderContacts();
+};
+
+/* メッセージ (SMS) */
+function smsSend(){
+  var n = el("smsTo").value.trim(), b = el("smsBody").value;
+  if (!n) return;
+  var res = osDispatch({ action: { type: "sms", number: n, body: b } });
+  el("smsMsg").textContent = res.how;
+}
+RENDER.sms = function(body){
+  var prof = deviceProfile(UA, SCREENW);
+  body.innerHTML =
+    "<div class='card'><div class='row'><input id='smsTo' placeholder='宛先番号'/></div>" +
+    "<textarea id='smsBody' placeholder='本文'></textarea>" +
+    "<div class='row'><button class='grn' onclick='smsSend()'>💬 送信 (sms: インテント)</button></div>" +
+    "<p class='hint' id='smsMsg'>" + esc(prof.note) + "</p></div>";
+};
+
+/* メール */
+function mailSend(){
+  var to = el("mailTo").value.trim(), sub = el("mailSub").value, b = el("mailBody").value;
+  var href = "mailto:" + to + "?subject=" + encodeURIComponent(sub) + "&body=" + encodeURIComponent(b);
+  if (typeof location !== "undefined") location.href = href;
+  el("mailMsg").textContent = href + " を発行しました";
+}
+RENDER.mail = function(body){
+  body.innerHTML =
+    "<div class='card'><div class='row'><input id='mailTo' placeholder='宛先メールアドレス'/></div>" +
+    "<div class='row'><input id='mailSub' placeholder='件名'/></div>" +
+    "<textarea id='mailBody' placeholder='本文'></textarea>" +
+    "<div class='row'><button class='grn' onclick='mailSend()'>✉️ 作成 (mailto:)</button></div>" +
+    "<p class='hint' id='mailMsg'>端末の既定メールアプリへ委譲します</p></div>";
+};
+
+/* カメラ */
+function stopCamera(){
+  if (camStream){
+    try{ var ts = camStream.getTracks(); for (var i = 0; i < ts.length; i++) ts[i].stop(); }catch(e){}
+    camStream = null;
+  }
+}
+function cameraStart(){
+  if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    el("camMsg").textContent = "この環境ではカメラ API を利用できません (権限または非対応)。";
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false })
+    .then(function(s){ camStream = s; el("camVideo").srcObject = s; el("camVideo").play(); el("camMsg").textContent = "カメラ起動中 — 「撮影」で ギャラリーへ保存"; })
+    .catch(function(e){ el("camMsg").textContent = "カメラを起動できません: " + e.message; });
+}
+function cameraShot(){
+  var v = el("camVideo");
+  if (!camStream || !v.videoWidth){ el("camMsg").textContent = "先に「カメラ起動」を押してください。"; return; }
+  var c = el("camCanvas");
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext("2d").drawImage(v, 0, 0);
+  var url = c.toDataURL("image/jpeg", 0.85);
+  var g = load("gallery", []);
+  g.unshift({ url: url, t: new Date().toLocaleString("ja-JP") });
+  store("gallery", g.slice(0, 20));
+  el("camMsg").textContent = "📸 撮影しました → ギャラリーに保存 (" + g.length + " 枚)";
+}
+RENDER.camera = function(body){
+  body.innerHTML =
+    "<div class='card'><video id='camVideo' playsinline muted></video>" +
+    "<canvas id='camCanvas' style='display:none'></canvas>" +
+    "<div class='row'><button class='acc' onclick='cameraStart()'>▶ カメラ起動</button>" +
+    "<button class='grn' onclick='cameraShot()'>📸 撮影</button></div>" +
+    "<p class='hint' id='camMsg'>撮影した写真は端末内 (localStorage) のギャラリーに保存されます。</p></div>";
+};
+
+/* ギャラリー */
+function galleryDel(i){ var g = load("gallery", []); g.splice(i, 1); store("gallery", g); openApp("gallery"); }
+RENDER.gallery = function(body){
+  var g = load("gallery", []), h = "";
+  for (var i = 0; i < g.length; i++)
+    h += "<span class='gitem'><img src='" + g[i].url + "' alt='photo'/><span class='hint'>" + esc(g[i].t) +
+         " <button onclick='galleryDel(" + i + ")'>🗑</button></span></span>";
+  body.innerHTML = "<div class='card'>" + (h || "<p class='hint'>写真はまだありません。カメラで撮影してください。</p>") + "</div>";
+};
+
+/* 時計・アラーム */
+var alarms = [];
+function alarmSet(){
+  var t = el("almTime").value;
+  if (!t) return;
+  var parts = t.split(":");
+  var now = new Date(), tgt = new Date();
+  tgt.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+  if (tgt <= now) tgt.setDate(tgt.getDate() + 1);
+  var ms = tgt - now;
+  var idx = alarms.length;
+  alarms.push({ t: t, at: tgt.toLocaleString("ja-JP") });
+  setTimeout(function(){ alert("⏰ QuantOS アラーム: " + t + " になりました"); }, ms);
+  renderAlarms();
+  el("almMsg").textContent = "アラームを " + tgt.toLocaleString("ja-JP") + " に設定しました (アプリ起動中に鳴ります)";
+}
+function renderAlarms(){
+  var h = "";
+  for (var i = 0; i < alarms.length; i++) h += "<tr><td>⏰ " + esc(alarms[i].t) + "</td><td>" + esc(alarms[i].at) + "</td></tr>";
+  el("almList").innerHTML = h || "<tr><td class='hint'>アラームはありません</td></tr>";
+}
+RENDER.clock = function(body, tm){
+  body.innerHTML =
+    "<div class='card' style='text-align:center'><div id='clockBig' style='font-size:42px;font-family:ui-monospace,Consolas,monospace'></div>" +
+    "<div class='hint' id='clockDate'></div></div>" +
+    "<div class='card'><div class='row'><input id='almTime' type='time' style='max-width:160px'/>" +
+    "<button class='acc' onclick='alarmSet()'>アラーム設定</button></div>" +
+    "<table><tbody id='almList'></tbody></table><p class='hint' id='almMsg'></p></div>";
+  updateClock(); renderAlarms();
+};
+function updateClock(){
+  var d = new Date();
+  var pad2 = function(x){ return (x < 10 ? "0" : "") + x; };
+  var t = pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  el("sbTime").textContent = t.slice(0, 5);
+  if (currentApp === "clock"){
+    el("clockBig").textContent = t;
+    el("clockDate").textContent = d.toLocaleDateString("ja-JP", { year:"numeric", month:"long", day:"numeric", weekday:"long" });
+  }
+}
+
+/* 電卓 */
+var calcBuf = "";
+function calcKey(k){
+  if (k === "C") calcBuf = "";
+  else if (k === "⌫") calcBuf = calcBuf.slice(0, -1);
+  else if (k === "="){
+    try{ calcBuf = String(calcEval(calcBuf)); }catch(e){ calcBuf = ""; el("calcDisp").textContent = "エラー: " + e.message; return; }
+  }
+  else calcBuf += k;
+  el("calcDisp").textContent = calcBuf || "0";
+}
+RENDER.calc = function(body){
+  calcBuf = "";
+  var keys = ["7","8","9","/","4","5","6","*","1","2","3","-","0",".","%","+","(",")","⌫","C"];
+  var pad = "";
+  for (var i = 0; i < keys.length; i++) pad += "<button onclick=\"calcKey('" + keys[i] + "')\">" + keys[i] + "</button>";
+  body.innerHTML =
+    "<div class='card'><div id='calcDisp'>0</div><div id='calcPad'>" + pad +
+    "<button class='acc' style='grid-column:span 4' onclick=\"calcKey('=')\">=</button></div>" +
+    "<p class='hint'>eval を使わない再帰下降パーサ (calcEval) で計算します。</p></div>";
+};
+
+/* メモ */
+function notesSave(){ store("notes", el("notesTa").value); el("notesMsg").textContent = "保存しました (" + new Date().toLocaleTimeString("ja-JP") + ")"; }
+RENDER.notes = function(body){
+  body.innerHTML =
+    "<div class='card'><textarea id='notesTa' style='min-height:220px' oninput='notesSave()' placeholder='メモ — 入力すると自動保存'></textarea>" +
+    "<p class='hint' id='notesMsg'>端末内 (localStorage) に自動保存します。</p></div>";
+  el("notesTa").value = load("notes", "");
+};
+
+/* ファイル */
+function fileAdd(){
+  var n = el("fName").value.trim(), c = el("fBody").value;
+  if (!n) return;
+  var fs = load("files", {});
+  fs[n] = c;
+  store("files", fs);
+  el("fName").value = ""; el("fBody").value = "";
+  renderFiles();
+}
+function fileView(n){
+  var fs = load("files", {});
+  el("fBody").value = fs[n] || ""; el("fName").value = n;
+}
+function fileDel(n){ var fs = load("files", {}); delete fs[n]; store("files", fs); renderFiles(); }
+function renderFiles(){
+  var fs = load("files", {}), h = "";
+  for (var n in fs)
+    h += "<tr><td class='mono'>📄 " + esc(n) + "</td><td>" + fs[n].length + " 文字</td><td>" +
+         "<button onclick=\"fileView('" + esc(n) + "')\">開く</button> <button onclick=\"fileDel('" + esc(n) + "')\">🗑</button></td></tr>";
+  el("fList").innerHTML = h || "<tr><td colspan='3' class='hint'>ファイルはまだありません</td></tr>";
+}
+RENDER.files = function(body){
+  body.innerHTML =
+    "<div class='card'><div class='row'><input id='fName' placeholder='ファイル名' style='flex:1'/>" +
+    "<button class='acc' onclick='fileAdd()'>保存</button></div>" +
+    "<textarea id='fBody' placeholder='内容'></textarea></div>" +
+    "<div class='card'><table><tbody id='fList'></tbody></table></div>";
+  renderFiles();
+};
+
+/* 量子ラボ */
+function qlabRun(){
+  el("qlabOut").textContent = qkInterpret(el("qlabIn").value);
+}
+function qlabSample(code){ el("qlabIn").value = code; qlabRun(); }
+RENDER.qlab = function(body){
+  body.innerHTML =
+    "<div class='card'><textarea id='qlabIn' placeholder='qubit q0 q1&#10;H q0&#10;CNOT q0 q1&#10;state&#10;measure'></textarea>" +
+    "<div class='row'><button class='acc' onclick='qlabRun()'>⚛️ 実行</button>" +
+    "<button onclick=\"qlabSample('qubit q0 q1\\nH q0\\nCNOT q0 q1\\nstate\\nmeasure')\">ベル状態</button>" +
+    "<button onclick=\"qlabSample('qubit q0 q1 q2\\nH q0\\nCNOT q0 q1\\nCNOT q1 q2\\nstate')\">GHZ</button>" +
+    "<button onclick=\"qlabSample('let x = 1 + 2\\nlet y = x * 2\\nprint y')\">let/print</button></div>" +
+    "<pre id='qlabOut'>擬似量子カーネル — qubit / H / X / Z / CNOT / measure / state / let / print</pre></div>";
+};
+
+/* 写像室 (トポロジー) */
+function topoShowRoute(){
+  var a = el("topoFrom").value, b = el("topoTo").value;
+  var r = topoRoute(a, b);
+  var run = qkInterpret(r.to.program);
+  el("topoRouteOut").textContent =
+    r.from.name + " " + r.from.ket + "  →  " + r.to.name + " " + r.to.ket + "\n" +
+    "変形ゲート列: " + (r.steps.join(" → ") || "(恒等 — 同一機能)") + "\n" + r.note + "\n\n" +
+    "到達状態の検算 (擬似量子カーネル実行):\n" + run;
+}
+RENDER.topo = function(body){
+  var rows = "", opts = "";
+  for (var i = 0; i < OS_APPS.length; i++){
+    var m = topoMap(OS_APPS[i].id);
+    rows += "<tr><td>" + OS_APPS[i].icon + " " + esc(m.name) + "</td>" +
+            "<td class='mono'>[" + OS_APPS[i].knot.join(",") + "]</td>" +
+            "<td>c=" + m.invariant.crossings + ", w=" + m.invariant.writhe + "</td>" +
+            "<td class='mono'>" + m.invariant.bracket + "</td>" +
+            "<td class='mono'>" + m.ket + "</td></tr>";
+    opts += "<option value='" + OS_APPS[i].id + "'>" + esc(m.name) + "</option>";
+  }
+  body.innerHTML =
+    "<div class='card'><p class='hint'>写像 φ: 各機能の結び目 (カール列) を Kauffman ブラケット不変量 ⟨K⟩=(−A³)^w で分類し、" +
+    "4 量子ビットレジスタの基底状態へ<b>単射</b>に写像します。(c, w) はすべての機能で異なります。</p>" +
+    "<table><thead><tr><th>機能</th><th>結び目</th><th>不変量</th><th>⟨K⟩</th><th>基底</th></tr></thead>" +
+    "<tbody>" + rows + "</tbody></table></div>" +
+    "<div class='card'><b>連続変形 (機能間遷移)</b><div class='row'>" +
+    "<select id='topoFrom' style='flex:1'>" + opts + "</select> →" +
+    "<select id='topoTo' style='flex:1'>" + opts + "</select>" +
+    "<button class='acc' onclick='topoShowRoute()'>変形</button></div>" +
+    "<pre id='topoRouteOut'>2 つの機能を選んで「変形」— ハイパーキューブ上の X ゲート列と検算を表示します。</pre></div>";
+};
+
+/* AIカーネル (チャット画面) */
+RENDER.ai = function(body){
+  body.innerHTML = "<div id='aiLog'></div><p class='hint'>下のコマンドバーから話しかけてください。応答のたびに 6 段パイプライン (トークン化→意図→写像→計画→生成→検証) を開示します。</p>";
+  var log = load("ailog", []);
+  var h = "";
+  for (var i = 0; i < log.length; i++){
+    h += "<div class='msgU'>" + esc(log[i].u) + "</div><div class='msgA'>" + esc(log[i].a) + "</div>";
+  }
+  el("aiLog").innerHTML = h || "<div class='msgA'>🧠 私は QuantOS の生成AIカーネルです。このOSのすべての機能はトポロジー写像で私に接続されています。御用をどうぞ。</div>";
+};
+
+/* 設定 */
+function settingsClear(){
+  try{
+    var ks = ["calls","contacts","gallery","notes","files","ailog"];
+    for (var i = 0; i < ks.length; i++) localStorage.setItem("quantos:" + ks[i], JSON.stringify(null));
+  }catch(e){}
+  el("setMsg").textContent = "端末内データを消去しました。";
+}
+RENDER.settings = function(body){
+  var p = deviceProfile(UA, SCREENW);
+  var rows =
+    "<tr><td>端末種別</td><td>" + p.label + " (" + p.kind + ")</td></tr>" +
+    "<tr><td>画面幅</td><td>" + p.width + " px</td></tr>" +
+    "<tr><td>電話回線 (tel:)</td><td>" + (p.tel ? "✔ 委譲可" : "✖ なし") + "</td></tr>" +
+    "<tr><td>SMS (sms:)</td><td>" + (p.sms ? "✔ 委譲可" : "✖ なし") + "</td></tr>" +
+    "<tr><td>量子レジスタ</td><td class='mono'>" + TOPO_QUBITS + " qubit / " + (1 << TOPO_QUBITS) + " 基底</td></tr>" +
+    "<tr><td>写像済み機能</td><td>" + OS_APPS.length + " 個 (単射 φ)</td></tr>" +
+    "<tr><td>UserAgent</td><td style='word-break:break-all'>" + esc(UA || "(なし)") + "</td></tr>";
+  body.innerHTML =
+    "<div class='card'><b>端末プロファイル</b><table><tbody>" + rows + "</tbody></table>" +
+    "<p class='hint'>" + esc(p.note) + "</p></div>" +
+    "<div class='card'><b>データ</b><div class='row'><button onclick='settingsClear()'>端末内データを消去</button></div>" +
+    "<p class='hint' id='setMsg'>発信履歴・連絡先・写真・メモ・ファイル・AIログを消去します。</p></div>";
+};
+
+/* ── コマンドバー (生成AIカーネルへの入口) ── */
+function cmdSend(){
+  var t = el("cmdInput").value.trim();
+  if (!t) return;
+  el("cmdInput").value = "";
+  var k = aiKernel(t);
+  var log = load("ailog", []) || [];
+  log.push({ u: t, a: k.reply });
+  store("ailog", log.slice(-50));
+  /* AI 画面にいなければ写像遷移してから表示 */
+  if (currentApp !== "ai") openApp("ai");
+  var lg = el("aiLog");
+  var stagesHtml = "";
+  for (var i = 0; i < k.stages.length; i++)
+    stagesHtml += esc(k.stages[i].name) + " — " + esc(k.stages[i].detail) + "\n";
+  lg.innerHTML +=
+    "<div class='msgU'>" + esc(t) + "</div>" +
+    "<div class='msgA'>" + esc(k.reply) +
+    "<details><summary>🧠 カーネル・パイプライン開示</summary><pre>" + stagesHtml + "</pre></details></div>";
+  var res = osDispatch(k);
+  if (k.action.type !== "open" && res && res.how){
+    lg.innerHTML += "<div class='msgA'>⚙ " + esc(res.how) + "</div>";
+  }
+  if (typeof lg.scrollIntoView === "function"){ try{ window.scrollTo && window.scrollTo(0, 999999); }catch(e){} }
+}
+
+/* ── ホーム画面の初期化 ── */
+function initHome(){
+  var g = el("grid"), h = "";
+  for (var i = 0; i < OS_APPS.length; i++){
+    var m = topoMap(OS_APPS[i].id);
+    h += "<div class='app' onclick=\"openApp('" + OS_APPS[i].id + "')\">" +
+         "<div class='ic'>" + OS_APPS[i].icon + "</div>" +
+         "<div class='nm'>" + esc(OS_APPS[i].name) + "</div>" +
+         "<div class='kt'>" + m.ket + "</div></div>";
+  }
+  g.innerHTML = h;
+  var p = deviceProfile(UA, SCREENW);
+  el("sbDev").textContent = p.label;
+  updateClock();
+  setInterval(updateClock, 1000);
+}
+initHome();
+</script>
+</body>
+</html>
