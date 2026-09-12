@@ -28,8 +28,8 @@ const core =
 const ctx = { console };
 vm.createContext(ctx);
 /* const/let は vm グローバルに載らないため、同一スクリプト末尾でまとめて返す */
-const { parseReceipt, guessCategory, accountBalance, ACCOUNTS } = vm.runInContext(
-  core + "\n;({ parseReceipt, guessCategory, accountBalance, ACCOUNTS });", ctx);
+const { parseReceipt, guessCategory, accountBalance, ACCOUNTS, hk2zk, cleanOcrText } = vm.runInContext(
+  core + "\n;({ parseReceipt, guessCategory, accountBalance, ACCOUNTS, hk2zk, cleanOcrText });", ctx);
 
 let failed = 0;
 function t(name, cond) {
@@ -78,6 +78,19 @@ r = parseReceipt(`マツモトキヨシ
 t("dr-total", r.total === 1980);
 t("dr-fallback-item", r.items.length === 1 && r.items[0].amount === 1980);
 t("dr-store-cat", r.items[0].cat === "日用品費");
+
+/* ---- テスト3.5: OCR 文字化け修復 (半角カナ・文字間空白) ---- */
+t("hk2zk", hk2zk("ｾﾌﾞﾝ-ｲﾚﾌﾞﾝ ﾎﾟｲﾝﾄ ｳﾞｧ") === "セブン-イレブン ポイント ヴァ");
+t("clean-spaces", cleanOcrText("コ ー ヒ ー 120") === "コーヒー 120");
+r = parseReceipt(`ｽ-ﾊﾟ-ﾗｲﾌ 田町店
+2025/09/10
+食 パ ン    ¥158
+ｼｬﾝﾌﾟ-      ¥398
+合 計       ¥556`);
+t("garbled-total", r.total === 556);
+t("garbled-items", r.items.length === 2);
+t("garbled-food", r.items[0].name === "食パン" && r.items[0].cat === "食費");
+t("garbled-daily", r.items[1].cat === "日用品費");
 
 /* ---- テスト4: 勘定科目の自動判定 ---- */
 t("cat-medicine", guessCategory("目薬", "") === "医療費");
