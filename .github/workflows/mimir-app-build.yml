@@ -1,0 +1,185 @@
+name: Mimir app build (Android APK + Windows EXE + Ubuntu)
+
+# mimir/ の「Mimir」— ARグラス・コンシェルジュ
+#   (特殊相対性理論の光路差反射システム: ローレンツ因子 / 相対論的ドップラー /
+#    光行差 / 薄膜反射 Δ=2nd·cosθt / 干渉輝度補正、
+#    単眼ミラー・両眼 SBS 投影、画像・文章の HUD 投影、
+#    意図エンジンのコンシェルジュ「ミーミル」) を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は mimir/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (mimir-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: mimir-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'mimir-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f mimir/index.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("mimir/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/mimir.js", m[1]);
+            for (const marker of ["function gammaFactor", "function relDoppler",
+                                  "function aberrate", "function snellRefract",
+                                  "function opticalPathDiff", "function opdPhase",
+                                  "function fringeIntensity", "function relativisticOPD",
+                                  "function stereoShiftPx", "function levenshtein",
+                                  "function safeCalc", "function mimirReply",
+                                  "function projectText", "function renderHUD"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/mimir.js
+          echo "Mimir self-check OK"
+      - name: Engine tests (relativity / OPD reflection / stereo shift / concierge / HUD)
+        run: |
+          set -e
+          node mimir/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p mimir/app/www
+          cp mimir/index.html mimir/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="mimir/app"
+          cordova create cordova-build io.github.masaaki_avnturle.mimir Mimir
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/mimir-concierge-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mimir-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p mimir/app/www
+          cp mimir/index.html mimir/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: mimir/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mimir-windows
+          path: mimir/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: mimir/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p mimir/app/www
+          cp mimir/index.html mimir/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: mimir/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mimir-linux
+          path: |
+            mimir/app/electron/dist/*.AppImage
+            mimir/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            mimir/app/electron/dist/*.AppImage
+            mimir/app/electron/dist/*.deb
