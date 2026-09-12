@@ -122,6 +122,18 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。中心プログラムは [`bada_gui_ide/examples/zeta_port.bada`](bada_gui_ide/examples/zeta_port.bada)(GUI IDE のサンプルと `bada-cli examples zeta_port` にも同梱)。模型の詳細は [`zeta_port/`](zeta_port/) を参照。
 
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `zetaport-v*` から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `zeta-port-debug.apk` |
+| **Windows 10 / 11** | `ZetaPort-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `ZetaPort-*-x86_64.AppImage` / `ZetaPort-*-amd64.deb` |
+
+ビルドは [`zetaport-app-build.yml`](.github/workflows/zetaport-app-build.yml) が実行します(`zetaport-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+
 ---
 
 ## 📁 フォルダ構成 — Repository Structure

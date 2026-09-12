@@ -1,0 +1,176 @@
+name: ZetaPort app build (Android APK + Windows EXE + Ubuntu)
+
+# zeta_port/ の「ゼータ・ポート」— 異次元ポート開閉時刻表シミュレータ
+#   (visto.pdf のゼータ関数関係式をエントロピー値として Bada 言語で実行 /
+#    Riemann-Siegel Z(t) 純Bada実装 / □·□⁻=1 ゲート検出 /
+#    port:// 住所 + 天球座標 / Bell対の量子封緘) を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は zeta_port/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (zetaport-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: zetaport-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'zetaport-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run the central Bada program (zeta zeros = gate events)
+        run: |
+          set -e
+          node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/zeta_port.bada > /tmp/zp.out
+          EVENTS=$(grep -c '^EVENT|' /tmp/zp.out)
+          echo "gate events: $EVENTS"
+          test "$EVENTS" -ge 20
+          # the first nontrivial zeta zero must be found near 14.1347
+          grep -q '^EVENT|1|14\.13' /tmp/zp.out
+          # the monopole balance must be exact at every gate (□·□⁻ = 1)
+          test "$(grep -c '^EVENT|' /tmp/zp.out)" = "$(grep -c '|1\.00000|' /tmp/zp.out)"
+          echo "zeta_port.bada self-check OK"
+      - name: Verify packaged index.html is in sync with build.js
+        run: |
+          set -e
+          node zeta_port/build.js
+          git diff --exit-code zeta_port/index.html
+          echo "zeta_port/index.html reproducible OK"
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p zeta_port/app/www
+          cp zeta_port/index.html zeta_port/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="zeta_port/app"
+          cordova create cordova-build io.github.masaaki_avnturle.zetaport ZetaPort
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/zeta-port-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zetaport-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p zeta_port/app/www
+          cp zeta_port/index.html zeta_port/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: zeta_port/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: zetaport-windows
+          path: zeta_port/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: zeta_port/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p zeta_port/app/www
+          cp zeta_port/index.html zeta_port/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: zeta_port/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zetaport-linux
+          path: |
+            zeta_port/app/electron/dist/*.AppImage
+            zeta_port/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            zeta_port/app/electron/dist/*.AppImage
+            zeta_port/app/electron/dist/*.deb

@@ -12,6 +12,27 @@
 2. ダブルクリックで起動(インストール不要・ネット接続不要)
 3. 基準日時・ゼータ時間範囲・時間スケールを選んで **「▶ Bada でシミュレーション実行」**
 
+## 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `zetaport-v*` から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `zeta-port-debug.apk` |
+| **Windows 10 / 11** | `ZetaPort-*-x64.exe` (NSIS インストーラ) / `ZetaPort-*-portable.exe` (ポータブル) |
+| **Ubuntu** | `ZetaPort-*-x86_64.AppImage` / `ZetaPort-*-amd64.deb` |
+
+ビルドは [`zetaport-app-build.yml`](../.github/workflows/zetaport-app-build.yml) が実行します
+(`zetaport-v*` タグを push すると Release へ添付 / `workflow_dispatch` でも起動可)。
+どの版も本体は同じ自己完結 `index.html`(Bada 言語コア + zeta_port.bada 内蔵)を包んでおり、
+ラッパーは [`app/cordova/`](app/cordova/)(Android)と [`app/electron/`](app/electron/)
+(Windows / Ubuntu)にあります。ワークフローの `test-core` ジョブが、パッケージ前に
+Bada プログラム本体を実行してゼータ零点検出(第1零点 14.13…、全ゲートで □·□⁻ = 1.00000)を
+検証し、`index.html` が `build.js` から再現可能であることも確認します。
+
+## CLI での実行
+
 CLI でも実行できます:
 
 ```sh
