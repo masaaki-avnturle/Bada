@@ -36,7 +36,8 @@ const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
         midiToWavelength, wavelengthToRGB, scoreToSpectral,
         CHORD_TYPES, chordMidis, chordTexTokens, synthPreset,
         instrumentPreset, scoreToEvents, mergeEvents, harmonicAmps,
-        chordFromPitchClasses, extractChordLine } = sandbox;
+        chordFromPitchClasses, extractChordLine,
+        badaQuantumRun, quantumScaleMidi, QUANTUM_SAMPLE } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -312,6 +313,45 @@ const chordLine = extractChordLine(lineEvents, 4);
 check("2小節 → 2 コード (C → Am)",
   chordLine.length === 2 && chordLine[0].rootPc === 0 && chordLine[0].type === "M" &&
   chordLine[1].rootPc === 9 && chordLine[1].type === "m");
+
+console.log("[21] 量子作曲 — 擬似量子シミュレーター (Bada 言語)");
+const rngOf = seq => { let i = 0; return () => seq[Math.min(i++, seq.length - 1)]; };
+// ベル状態の量子もつれ: 測定は必ず |00> か |11>
+const bell = "qubit q0 q1\nH q0\nCNOT q0 q1\nmeasure";
+check("Bell 状態: r=0.9 → |11>", badaQuantumRun(bell, rngOf([0.9]), 0).log.includes("measure -> |11>"));
+check("Bell 状態: r=0.1 → |00>", badaQuantumRun(bell, rngOf([0.1]), 0).log.includes("measure -> |00>"));
+check("state コマンドが p=0.500 の重ね合わせを表示",
+  badaQuantumRun("qubit q0 q1\nH q0\nCNOT q0 q1\nstate", rngOf([0]), 0).log.includes("(p=0.500)"));
+// note: X q0 → |1000> = 8 → C 長音階の第9度 (D5 = MIDI 74)
+const rNote = badaQuantumRun("qubit q0 q1 q2 q3\nX q0\nnote q", rngOf([0.5]), 0);
+check("note: |1000>=8 → D5 (MIDI 74) の 4分音符",
+  rNote.events.length === 1 && rNote.events[0].midis[0] === 74 && rNote.events[0].durBeats === 1);
+check("note ログに音名 D5", rNote.log.includes("-> D5"));
+// chord: |0110>=6 → root F#, 型 M (6//12=0)
+const rChord = badaQuantumRun("qubit q0 q1 q2 q3\nX q1\nX q2\nchord h", rngOf([0.5]), 0);
+check("chord: |0110>=6 → F#M = [66,70,73] の 2分音符",
+  JSON.stringify(rChord.events[0].midis) === "[66,70,73]" && rChord.events[0].durBeats === 2);
+// rest が拍を進める
+const rRest = badaQuantumRun("qubit q0\nX q0\nrest q\nnote q", rngOf([0.5]), 0);
+check("rest 後の note は startBeat=1", rRest.events[0].startBeat === 1);
+// 重ね合わせ: H 後 r=0.99 → |1>
+const rSup = badaQuantumRun("qubit q0\nH q0\nnote q", rngOf([0.99]), 0);
+check("重ね合わせの測定 (r=0.99) → v=1 → D4 (62)", rSup.events[0].midis[0] === 62);
+// 調号写像
+check("quantumScaleMidi: v=0, C → 60", quantumScaleMidi(0, 0) === 60);
+check("quantumScaleMidi: v=7, C → 72 (1オクターブ上)", quantumScaleMidi(7, 0) === 72);
+check("quantumScaleMidi: v=0, B♭ (♭2) → 58 (B♭3)", quantumScaleMidi(0, -2) === 58);
+// エラー処理と let/print
+check("qubit 宣言前の H はエラー行を出す", badaQuantumRun("H q0", rngOf([0]), 0).log.includes("行目"));
+check("let/print 互換", badaQuantumRun("let x = 2 + 3\nprint x", rngOf([0]), 0).log.includes("5"));
+// サンプルプログラム → 楽譜生成 → ラウンドトリップ
+const rSample = badaQuantumRun(QUANTUM_SAMPLE, rngOf([0.1, 0.9, 0.3, 0.7, 0.5, 0.2]), -2);
+check("サンプル量子プログラム: 4 音 + 2 和音 + 休符", rSample.events.length === 6);
+const qTex = notesToMusixTex(rSample.events, { source: "quantum", signature: -2 });
+const qBack = parseMusixTeX(qTex);
+check("量子作曲の楽譜が完全な MusixTeX として生成・再パース可",
+  qTex.includes("\\input musixtex") && qBack.warnings.length === 0 &&
+  qBack.events.filter(e => e.type === "note").length === 6);
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");
