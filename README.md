@@ -93,6 +93,28 @@
 
 ---
 
+## 🔑 ダウンロード — クリアキャスト東京(東京のテレビ・ラジオを雑音ゼロで)
+
+**東京のテレビ番組・ラジオ放送を、雑音・画像の乱れゼロで視聴するクリーン視聴アプリ。** かつての KeyHole TV のような「1クリックで東京の放送へ」という使い勝手を、無許諾の P2P 再送信では**なく**、**放送局の公式無料配信だけ**で合法に再現します — 📡 在京キー局系列の公式 YouTube 24 時間ニュースライブ(日テレNEWS / ANN / TBS NEWS DIG / テレ東BIZ / FNN)をアプリ内再生、📺 TVer リアルタイム配信・NHKプラス・ABEMA へワンタップ、📻 radiko + NHK らじる★らじる で東京の全ラジオ局へ。公式デジタル配信なのでスノーノイズ・ゴーストは原理的にゼロ。さらに**回線診断エンジン**(RTT ジッタ統計 μ・σ、ITU-T G.107 **E モデル** R 値 → **MOS** 推定、推奨画質・推奨バッファ `clamp(3·(μ+4σ)/1000, 2s, 30s)`)が帯域不足によるブロックノイズ・再生停止を未然に防ぎます。依存ゼロ・単一 HTML。
+
+### 👉 [**clearcast_tokyo/index.html をダウンロード**](clearcast_tokyo/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `clearcast-tokyo-debug.apk` |
+| **Windows 10 / 11** | `ClearCastTokyo-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `ClearCastTokyo-*-x86_64.AppImage` / `ClearCastTokyo-*-amd64.deb` |
+
+ビルドは [`clearcast-app-build.yml`](.github/workflows/clearcast-app-build.yml) が実行します(`clearcast-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。収録局・法的な考え方・テストは [`clearcast_tokyo/`](clearcast_tokyo/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):

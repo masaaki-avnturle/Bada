@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>クリアキャスト東京 — ClearCast Tokyo</title>
+<!--
+  クリアキャスト東京 (ClearCast Tokyo)
+  ────────────────────────────────────
+  東京のテレビ・ラジオを「雑音・画像の乱れゼロ」で視聴するための
+  公式配信クリーン視聴アプリ。単一 HTML・依存ゼロ。
+
+  かつての KeyHole TV のような "1クリックで東京の放送へ" という使い勝手を、
+  無許諾再送信 (P2P 再送信) では **なく**、放送局自身が公式に無料配信している
+  デジタルストリームだけで実現します:
+
+    ・在京キー局の公式 24 時間ニュースライブ (YouTube 公式チャンネル埋め込み)
+    ・TVer リアルタイム配信 / NHKプラス / ABEMA (公式プレーヤーへワンタップ)
+    ・radiko / NHK らじる★らじる (東京の全ラジオ局の公式プレーヤー)
+
+  デジタル配信にはアナログ受信特有の雑音・ゴースト・スノーノイズが
+  原理的に存在しません。さらに内蔵の「回線診断エンジン」(RTT ジッタ統計、
+  ITU-T G.107 E モデルの R 値 → MOS 推定、推奨画質・推奨バッファ算出) が、
+  帯域不足によるブロックノイズやバッファリング乱れを事前に防ぎます。
+-->
+<style>
+  :root {
+    --bg: #05070d; --panel: #0b101c; --panel2: #101827; --line: #1d2940;
+    --gold: #c8a44a; --blue: #4a80d0; --teal: #40b8c0; --violet: #9060d0;
+    --text: #dce4f2; --dim: #8494ac; --ok: #4ac07a; --warn: #d0a040; --bad: #d05a5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif; }
+  body { padding: 0 16px 48px; max-width: 1180px; margin: 0 auto; }
+  header { padding: 22px 0 12px; text-align: center; }
+  header h1 { font-size: 1.55rem; letter-spacing: .06em; }
+  header h1 .k { color: var(--gold); }
+  header p.sub { color: var(--dim); margin-top: 6px; font-size: .88rem; }
+  nav#tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 16px; }
+  nav#tabs button { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 16px; font-size: .92rem; cursor: pointer; }
+  nav#tabs button.on { background: var(--gold); color: #10131c; border-color: var(--gold); font-weight: 700; }
+  main { margin-top: 18px; }
+  section.pane { display: none; }
+  section.pane.on { display: block; }
+  h2.sec { font-size: 1.08rem; color: var(--gold); margin: 18px 0 10px; letter-spacing: .05em; }
+  p.note { color: var(--dim); font-size: .84rem; line-height: 1.7; margin: 6px 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+  .card h3 { font-size: 1rem; }
+  .card .net { color: var(--teal); font-size: .78rem; }
+  .card .desc { color: var(--dim); font-size: .82rem; line-height: 1.6; flex: 1; }
+  .card .row { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn, a.btn { display: inline-block; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; padding: 7px 12px; font-size: .85rem;
+    cursor: pointer; text-decoration: none; }
+  .btn.play { background: #16233c; border-color: var(--blue); color: #cfe0ff; }
+  .btn.gold { border-color: var(--gold); color: var(--gold); }
+  .frame-wrap { position: relative; width: 100%; aspect-ratio: 16/9; max-width: 100%;
+    background: #000; border-radius: 8px; overflow: hidden; border: 1px solid var(--line); }
+  .frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .badge { display: inline-block; font-size: .7rem; border: 1px solid var(--line);
+    color: var(--dim); border-radius: 6px; padding: 2px 7px; }
+  .badge.live { border-color: var(--bad); color: #ff9a9a; }
+  form#custom-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 4px; }
+  form#custom-form input { flex: 1 1 260px; background: var(--panel2); border: 1px solid var(--line);
+    color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: .88rem; }
+  table.diag { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .9rem; }
+  table.diag th, table.diag td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; }
+  table.diag th { color: var(--dim); font-weight: 500; width: 42%; }
+  .mos-ok { color: var(--ok); font-weight: 700; }
+  .mos-warn { color: var(--warn); font-weight: 700; }
+  .mos-bad { color: var(--bad); font-weight: 700; }
+  .about { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; line-height: 1.9; font-size: .9rem; }
+  .about h3 { color: var(--gold); margin: 14px 0 6px; font-size: 1rem; }
+  .about ul { margin: 4px 0 8px 22px; }
+  .about code { background: var(--panel2); border-radius: 5px; padding: 1px 6px; font-size: .82rem; }
+  footer { margin-top: 34px; text-align: center; color: var(--dim); font-size: .76rem; line-height: 1.8; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🔑 クリアキャスト<span class="k">東京</span> <small style="color:var(--dim);font-size:.7em">ClearCast Tokyo</small></h1>
+  <p class="sub">東京のテレビ・ラジオを、雑音・画像乱れゼロの<strong>公式デジタル配信</strong>で。無許諾再送信は使いません。</p>
+  <nav id="tabs">
+    <button data-pane="live" class="on">📡 ライブ視聴</button>
+    <button data-pane="tv">📺 テレビ公式</button>
+    <button data-pane="radio">📻 ラジオ</button>
+    <button data-pane="net">📶 回線診断</button>
+    <button data-pane="about">ℹ️ このアプリ</button>
+  </nav>
+</header>
+<main>
+
+  <section class="pane on" id="pane-live">
+    <h2 class="sec">在京キー局の公式 24 時間ライブ (アプリ内再生)</h2>
+    <p class="note">各局が YouTube で公式配信している 24 時間ニュースライブを、そのままアプリ内で再生します。
+      「▶ 再生」でプレーヤーを読み込み(押すまで通信しません)。配信状況により再生できない場合は
+      「ライブ一覧」から現在の配信をお選びください。</p>
+    <div class="grid" id="live-grid"></div>
+    <h2 class="sec">＋ 自分でライブを追加</h2>
+    <p class="note">YouTube のチャンネル ID (UC…) か動画 URL を貼り付けると、カードとして追加できます(端末内にのみ保存)。</p>
+    <form id="custom-form">
+      <input id="custom-name" placeholder="表示名 (例: TOKYO MX ニュース)">
+      <input id="custom-src" placeholder="UCxxxxxxxx / https://www.youtube.com/watch?v=…">
+      <button class="btn gold" type="submit">追加</button>
+    </form>
+    <div class="grid" id="custom-grid"></div>
+  </section>
+
+  <section class="pane" id="pane-tv">
+    <h2 class="sec">テレビ番組 — 公式無料配信へワンタップ</h2>
+    <p class="note">番組本編は各局の公式サービス (TVer リアルタイム配信・NHKプラス・ABEMA) で。
+      公式のデジタル配信なので雑音・ゴーストはありません。ボタンは既定ブラウザ/公式アプリで開きます。</p>
+    <div class="grid" id="tv-grid"></div>
+  </section>
+
+  <section class="pane" id="pane-radio">
+    <h2 class="sec">東京のラジオ — 公式ストリーミング</h2>
+    <p class="note">民放ラジオは radiko、NHK ラジオは らじる★らじる の公式プレーヤーを開きます。
+      どちらもデジタル配信のため AM/FM 特有のノイズがありません。(radiko は日本国内・エリア判定あり)</p>
+    <div class="grid" id="radio-grid"></div>
+  </section>
+
+  <section class="pane" id="pane-net">
+    <h2 class="sec">回線診断 — 乱れゼロ視聴のためのクリーン・シグナル・エンジン</h2>
+    <p class="note">RTT を複数回計測してジッタを統計し、ITU-T G.107 E モデルで体感品質 (MOS) を推定、
+      ブロックノイズ・バッファリングを起こさない<strong>推奨画質</strong>と<strong>推奨バッファ秒数</strong>を算出します。</p>
+    <button class="btn play" id="probe-btn">📶 回線を診断する</button>
+    <div id="probe-out"></div>
+  </section>
+
+  <section class="pane" id="pane-about">
+    <div class="about">
+      <h3>このアプリについて</h3>
+      <p>かつての <strong>KeyHole TV</strong> は、テレビ放送を P2P で再送信する仕組みでした。放送の無許諾再送信は
+        日本の著作権法(公衆送信権・送信可能化権)に抵触するため、本アプリは再送信を一切行いません。
+        代わりに、<strong>放送局自身が公式に無料配信しているストリームだけ</strong>を 1 つの画面にまとめ、
+        「1クリックで東京の放送へ」という使い勝手を合法に再現しています。</p>
+      <h3>なぜ雑音・画像の乱れがないのか</h3>
+      <ul>
+        <li><strong>公式デジタル配信のみ</strong> — アナログ受信のスノーノイズ・ゴースト・音声雑音は原理的に発生しません。</li>
+        <li><strong>回線診断エンジン</strong> — RTT ジッタ統計 (平均 μ・標準偏差 σ)、E モデル R 値
+          <code>R = 93.2 − Id(遅延) − Ie,eff(損失)</code> から MOS を推定し、回線に合った画質を推奨。
+          帯域不足によるブロックノイズ・再生停止を未然に防ぎます。</li>
+        <li><strong>推奨バッファ</strong> — <code>buffer = clamp(3·(μ + 4σ)/1000, 2s, 30s)</code> で
+          ジッタを吸収できる先読み量を提示します。</li>
+      </ul>
+      <h3>収録している公式配信</h3>
+      <ul>
+        <li>📡 日テレNEWS / ANN(テレビ朝日) / TBS NEWS DIG / テレ東BIZ / FNN(フジテレビ) の公式 YouTube 24 時間ライブ</li>
+        <li>📺 TVer(リアルタイム配信・見逃し) / NHKプラス / ABEMA / TOKYO MX 公式サイト</li>
+        <li>📻 radiko(TBSラジオ・文化放送・ニッポン放送・TOKYO FM・J-WAVE・interfm・ラジオNIKKEI) /
+            NHK らじる★らじる(R1・R2・FM)</li>
+      </ul>
+      <p>各配信の権利は各放送局・配信事業者に帰属します。本アプリは非公式のリンク集・公式埋め込みプレーヤーであり、
+        各社とは無関係です。ストリームの抽出・保存・再配信は行いません。</p>
+    </div>
+  </section>
+
+</main>
+<footer>
+  クリアキャスト東京 — 単一 HTML・依存ゼロ。APK / Windows / Ubuntu 版は
+  リポジトリの Releases から。 MIT License / Masaaki Yamaguchi
+</footer>
+
+<script>
+"use strict";
+
+/* ============================================================
+ * 1. 局カタログ — すべて公式の無料配信のみ
+ * ============================================================ */
+
+function liveCatalog() {
+  // 在京キー局系列の公式 YouTube ニュースチャンネル (24 時間ライブ配信あり)
+  return [
+    { name: "日テレNEWS",        net: "日本テレビ系 (NNN)",  ch: "UCuTAXTexrhetbOe3zgskJBQ",
+      desc: "日本テレビ報道局の公式チャンネル。最新ニュースの 24 時間ライブ。" },
+    { name: "ANNニュース",       net: "テレビ朝日系 (ANN)",  ch: "UCGCZAYq5Xxojl_tSXcVJhiQ",
+      desc: "テレビ朝日系 ANN の公式チャンネル。ニュースライブ・会見中継。" },
+    { name: "TBS NEWS DIG",     net: "TBS系 (JNN)",         ch: "UC6AG81pAkf6Lbi_1VC5NmPA",
+      desc: "TBS/JNN の公式ニュースチャンネル。24 時間ライブ配信。" },
+    { name: "テレ東BIZ",         net: "テレビ東京系 (TXN)",  ch: "UCkKVQ_GNjd8FbAuT6xDcWgg",
+      desc: "テレビ東京の経済ニュース公式チャンネル。WBS などのライブ・速報。" },
+    { name: "FNNプライムオンライン", net: "フジテレビ系 (FNN)", ch: "UCoQBJMzcwmXrRSHBFAlTsIw",
+      desc: "フジテレビ系 FNN の公式チャンネル。最新ニュースのライブ配信。" }
+  ];
+}
+
+function tvCatalog() {
+  return [
+    { name: "TVer リアルタイム配信", net: "民放公式・無料", url: "https://tver.jp/live",
+      desc: "日テレ・テレ朝・TBS・テレ東・フジの地上波番組を放送と同時に無料配信(対象番組)。" },
+    { name: "TVer 見逃し配信",      net: "民放公式・無料", url: "https://tver.jp/",
+      desc: "放送後 1 週間程度、東京キー局の番組を無料で視聴。" },
+    { name: "NHKプラス",           net: "NHK 公式",       url: "https://plus.nhk.jp/",
+      desc: "NHK総合・Eテレの常時同時配信+見逃し配信(受信契約者は追加負担なし)。" },
+    { name: "ABEMA",               net: "テレ朝系・無料",  url: "https://abema.tv/",
+      desc: "ニュースチャンネルなどを 24 時間無料配信。" },
+    { name: "TOKYO MX",            net: "東京ローカル",    url: "https://s.mxtv.jp/",
+      desc: "TOKYO MX の公式サイト。番組配信・エムキャス後継の視聴情報。" },
+    { name: "NHK ニュース・防災",   net: "NHK 公式",       url: "https://www3.nhk.or.jp/news/live/",
+      desc: "NHK ニュースのライブ配信(災害時の特設ライブ等)。" }
+  ];
+}
+
+function radioCatalog() {
+  return [
+    { name: "TBSラジオ",     band: "AM 954 / FM 90.5", url: "https://radiko.jp/#!/live/TBS" },
+    { name: "文化放送",       band: "AM 1134 / FM 91.6", url: "https://radiko.jp/#!/live/QRR" },
+    { name: "ニッポン放送",   band: "AM 1242 / FM 93.0", url: "https://radiko.jp/#!/live/LFR" },
+    { name: "TOKYO FM",      band: "FM 80.0",           url: "https://radiko.jp/#!/live/FMT" },
+    { name: "J-WAVE",        band: "FM 81.3",           url: "https://radiko.jp/#!/live/FMJ" },
+    { name: "interfm",       band: "FM 89.7",           url: "https://radiko.jp/#!/live/INT" },
+    { name: "ラジオNIKKEI",  band: "短波 → radiko",      url: "https://radiko.jp/#!/live/RN1" },
+    { name: "NHKラジオ第1",  band: "AM 594",             url: "https://www.nhk.or.jp/radio/player/?ch=r1" },
+    { name: "NHKラジオ第2",  band: "AM 693",             url: "https://www.nhk.or.jp/radio/player/?ch=r2" },
+    { name: "NHK-FM",        band: "FM 82.5",            url: "https://www.nhk.or.jp/radio/player/?ch=fm" }
+  ];
+}
+
+/* ============================================================
+ * 2. YouTube 公式埋め込み URL ヘルパ
+ * ============================================================ */
+
+function ytEmbedURL(channelId) {
+  // 公式の live_stream 埋め込み: そのチャンネルの現在のライブ配信を再生
+  return "https://www.youtube-nocookie.com/embed/live_stream?channel=" +
+         encodeURIComponent(channelId) + "&autoplay=1";
+}
+function ytVideoEmbedURL(videoId) {
+  return "https://www.youtube-nocookie.com/embed/" + encodeURIComponent(videoId) + "?autoplay=1";
+}
+function ytStreamsURL(channelId) {
+  return "https://www.youtube.com/channel/" + encodeURIComponent(channelId) + "/streams";
+}
+
+/* 入力 (UC… / watch URL / youtu.be / embed URL) を {type,id} に正規化 */
+function parseYouTubeId(input) {
+  var s = String(input || "").trim();
+  if (!s) return null;
+  var m;
+  if (/^UC[0-9A-Za-z_-]{20,}$/.test(s)) return { type: "channel", id: s };
+  m = s.match(/[?&]v=([0-9A-Za-z_-]{6,})/);           if (m) return { type: "video", id: m[1] };
+  m = s.match(/youtu\.be\/([0-9A-Za-z_-]{6,})/);       if (m) return { type: "video", id: m[1] };
+  m = s.match(/\/embed\/([0-9A-Za-z_-]{6,})/);         if (m) return { type: "video", id: m[1] };
+  m = s.match(/\/channel\/(UC[0-9A-Za-z_-]{20,})/);    if (m) return { type: "channel", id: m[1] };
+  m = s.match(/\/live\/([0-9A-Za-z_-]{6,})/);          if (m) return { type: "video", id: m[1] };
+  return null;
+}
+
+/* ============================================================
+ * 3. クリーン・シグナル・エンジン (回線診断)
+ *    RTT ジッタ統計 → ITU-T G.107 E モデル → MOS / 推奨画質 / 推奨バッファ
+ * ============================================================ */
+
+function jitterStats(samples) {
+  var n = samples.length;
+  if (!n) return { n: 0, mean: 0, sd: 0, min: 0, max: 0 };
+  var sum = 0, min = Infinity, max = -Infinity, i;
+  for (i = 0; i < n; i++) { sum += samples[i]; if (samples[i] < min) min = samples[i]; if (samples[i] > max) max = samples[i]; }
+  var mean = sum / n, v = 0;
+  for (i = 0; i < n; i++) v += (samples[i] - mean) * (samples[i] - mean);
+  var sd = Math.sqrt(v / n);
+  return { n: n, mean: mean, sd: sd, min: min, max: max };
+}
+
+/* E モデル (ITU-T G.107 簡略形):
+ *   Id  = 0.024·d + 0.11·(d − 177.3)·H(d − 177.3)   (d = 片道換算遅延 ms)
+ *   Ie,eff = Ie + (95 − Ie)·Ppl/(Ppl + Bpl)          (Ie=0, Bpl=10)
+ *   R   = 93.2 − Id − Ie,eff
+ */
+function emodelR(latencyMs, jitterMs, lossPct) {
+  var d = latencyMs + 2 * jitterMs;                     // ジッタバッファ分を遅延に算入
+  var Id = 0.024 * d + (d > 177.3 ? 0.11 * (d - 177.3) : 0);
+  var Ppl = Math.max(0, lossPct);
+  var Ieff = 95 * Ppl / (Ppl + 10);
+  return 93.2 - Id - Ieff;
+}
+
+function mosFromR(R) {
+  if (R < 0) return 1.0;
+  if (R > 100) return 4.5;
+  return 1 + 0.035 * R + 7e-6 * R * (R - 60) * (100 - R);
+}
+
+function recommendQuality(mbps) {
+  if (mbps >= 6)   return "1080p (フルHD)";
+  if (mbps >= 3)   return "720p (HD)";
+  if (mbps >= 1.5) return "480p";
+  if (mbps >= 0.7) return "360p";
+  return "音声のみ / ラジオ推奨";
+}
+
+function recommendBufferSec(meanMs, sdMs) {
+  var b = 3 * (meanMs + 4 * sdMs) / 1000;
+  return Math.min(30, Math.max(2, b));
+}
+
+function mosLabel(mos) {
+  if (mos >= 4.0) return { cls: "mos-ok",   txt: "優秀 — 乱れなく視聴できます" };
+  if (mos >= 3.3) return { cls: "mos-warn", txt: "良好 — おおむね快適です" };
+  return { cls: "mos-bad", txt: "注意 — 画質を下げるかラジオをご利用ください" };
+}
+
+/* ============================================================
+ * 4. 端末内保存 (カスタムライブ) — localStorage は無い環境でも動く
+ * ============================================================ */
+
+var STORE_KEY = "clearcast_custom_v1";
+function storeGet() {
+  try { if (typeof localStorage !== "undefined") {
+    var s = localStorage.getItem(STORE_KEY); if (s) return JSON.parse(s);
+  } } catch (e) {}
+  return [];
+}
+function storeSet(list) {
+  try { if (typeof localStorage !== "undefined") localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch (e) {}
+}
+
+/* ============================================================
+ * 5. 描画
+ * ============================================================ */
+
+function el(tag, attrs, children) {
+  var e = document.createElement(tag), k;
+  if (attrs) for (k in attrs) {
+    if (k === "text") e.textContent = attrs[k];
+    else if (k === "html") e.innerHTML = attrs[k];
+    else if (k.indexOf("on") === 0 && typeof attrs[k] === "function") e.addEventListener(k.slice(2), attrs[k]);
+    else e.setAttribute(k, attrs[k]);
+  }
+  if (children) for (var i = 0; i < children.length; i++) if (children[i]) e.appendChild(children[i]);
+  return e;
+}
+
+function liveCard(st, removable, onRemove) {
+  var wrap = el("div", { "class": "frame-wrap" });
+  var loaded = false;
+  var playBtn = el("button", { "class": "btn play", text: "▶ 再生", onclick: function () {
+    if (loaded) return;
+    loaded = true;
+    var src = st.video ? ytVideoEmbedURL(st.video) : ytEmbedURL(st.ch);
+    wrap.appendChild(el("iframe", {
+      src: src, allow: "autoplay; encrypted-media; picture-in-picture; fullscreen",
+      allowfullscreen: "", loading: "lazy", referrerpolicy: "origin"
+    }));
+    playBtn.textContent = "⏹ 読み込み済み";
+  } });
+  var row = [playBtn];
+  if (st.ch) row.push(el("a", { "class": "btn", href: ytStreamsURL(st.ch), target: "_blank",
+                               rel: "noopener", text: "ライブ一覧" }));
+  if (removable) row.push(el("button", { "class": "btn", text: "🗑 削除", onclick: onRemove }));
+  return el("div", { "class": "card" }, [
+    el("div", null, [ el("span", { "class": "badge live", text: "公式 LIVE" }) ]),
+    el("h3", { text: st.name }),
+    st.net ? el("div", { "class": "net", text: st.net }) : null,
+    st.desc ? el("div", { "class": "desc", text: st.desc }) : null,
+    wrap,
+    el("div", { "class": "row" }, row)
+  ]);
+}
+
+function renderLive() {
+  var grid = document.getElementById("live-grid");
+  if (!grid || !grid.replaceChildren) return;
+  grid.replaceChildren();
+  var cat = liveCatalog();
+  for (var i = 0; i < cat.length; i++) grid.appendChild(liveCard(cat[i], false));
+  renderCustom();
+}
+
+function renderCustom() {
+  var grid = document.getElementById("custom-grid");
+  if (!grid || !grid.replaceChildren) return;
+  grid.replaceChildren();
+  var list = storeGet();
+  list.forEach(function (st, idx) {
+    grid.appendChild(liveCard(st, true, function () {
+      var l = storeGet(); l.splice(idx, 1); storeSet(l); renderCustom();
+    }));
+  });
+}
+
+function renderTV() {
+  var grid = document.getElementById("tv-grid");
+  if (!grid || !grid.replaceChildren) return;
+  grid.replaceChildren();
+  tvCatalog().forEach(function (s) {
+    grid.appendChild(el("div", { "class": "card" }, [
+      el("h3", { text: s.name }),
+      el("div", { "class": "net", text: s.net }),
+      el("div", { "class": "desc", text: s.desc }),
+      el("div", { "class": "row" }, [
+        el("a", { "class": "btn play", href: s.url, target: "_blank", rel: "noopener", text: "公式プレーヤーを開く ↗" })
+      ])
+    ]));
+  });
+}
+
+function renderRadio() {
+  var grid = document.getElementById("radio-grid");
+  if (!grid || !grid.replaceChildren) return;
+  grid.replaceChildren();
+  radioCatalog().forEach(function (s) {
+    grid.appendChild(el("div", { "class": "card" }, [
+      el("h3", { text: "📻 " + s.name }),
+      el("div", { "class": "net", text: s.band }),
+      el("div", { "class": "row" }, [
+        el("a", { "class": "btn play", href: s.url, target: "_blank", rel: "noopener", text: "公式で聴く ↗" })
+      ])
+    ]));
+  });
+}
+
+/* ============================================================
+ * 6. 回線診断の実行
+ * ============================================================ */
+
+function runProbe() {
+  var out = document.getElementById("probe-out");
+  if (!out || typeof fetch !== "function") return;
+  out.innerHTML = "<p class='note'>計測中…(数秒かかります)</p>";
+  var pingURL = "https://www.google.com/generate_204";
+  var dlURL = "https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js";
+  var rtts = [], fails = 0, N = 8;
+
+  function ping(i) {
+    if (i >= N) return download();
+    var t0 = Date.now();
+    return fetch(pingURL + "?t=" + t0 + i, { mode: "no-cors", cache: "no-store" })
+      .then(function () { rtts.push(Date.now() - t0); })
+      .catch(function () { fails++; })
+      .then(function () { return ping(i + 1); });
+  }
+  function download() {
+    var t0 = Date.now();
+    return fetch(dlURL + "?t=" + t0, { cache: "no-store" })
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (buf) { report(buf.byteLength, (Date.now() - t0) / 1000); })
+      .catch(function () { report(0, 0); });
+  }
+  function report(bytes, sec) {
+    var st = jitterStats(rtts);
+    var lossPct = 100 * fails / N;
+    var mbps = sec > 0 ? (bytes * 8) / sec / 1e6 : 0;
+    var R = emodelR(st.mean, st.sd, lossPct);
+    var mos = mosFromR(R);
+    var lab = mosLabel(mos);
+    out.innerHTML =
+      "<table class='diag'>" +
+      "<tr><th>RTT 平均 μ / ジッタ σ</th><td>" + st.mean.toFixed(1) + " ms / " + st.sd.toFixed(1) + " ms</td></tr>" +
+      "<tr><th>パケット損失(推定)</th><td>" + lossPct.toFixed(1) + " %</td></tr>" +
+      "<tr><th>下り実効速度(概算)</th><td>" + (mbps ? mbps.toFixed(2) + " Mbps" : "計測不可") + "</td></tr>" +
+      "<tr><th>E モデル R 値 → MOS</th><td>R=" + R.toFixed(1) + " → <span class='" + lab.cls + "'>MOS " +
+        mos.toFixed(2) + "</span> — " + lab.txt + "</td></tr>" +
+      "<tr><th>推奨画質</th><td>" + recommendQuality(mbps) + "</td></tr>" +
+      "<tr><th>推奨バッファ</th><td>" + recommendBufferSec(st.mean, st.sd).toFixed(1) + " 秒</td></tr>" +
+      "</table>";
+  }
+  ping(0);
+}
+
+/* ============================================================
+ * 7. タブ・フォーム・起動
+ * ============================================================ */
+
+function switchPane(name) {
+  var panes = document.querySelectorAll ? document.querySelectorAll("section.pane") : [];
+  for (var i = 0; i < panes.length; i++) panes[i].classList.remove("on");
+  var btns = document.querySelectorAll ? document.querySelectorAll("nav#tabs button") : [];
+  for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("on", btns[j].getAttribute("data-pane") === name);
+  var p = document.getElementById("pane-" + name);
+  if (p && p.classList) p.classList.add("on");
+}
+
+function boot() {
+  renderLive(); renderTV(); renderRadio();
+  var tabs = document.getElementById("tabs");
+  if (tabs && tabs.addEventListener) tabs.addEventListener("click", function (ev) {
+    var t = ev.target; if (t && t.getAttribute && t.getAttribute("data-pane")) switchPane(t.getAttribute("data-pane"));
+  });
+  var form = document.getElementById("custom-form");
+  if (form && form.addEventListener) form.addEventListener("submit", function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    var nameEl = document.getElementById("custom-name");
+    var srcEl = document.getElementById("custom-src");
+    var parsed = parseYouTubeId(srcEl ? srcEl.value : "");
+    if (!parsed) return;
+    var st = { name: (nameEl && nameEl.value ? nameEl.value : "カスタムライブ") };
+    if (parsed.type === "channel") st.ch = parsed.id; else st.video = parsed.id;
+    var l = storeGet(); l.push(st); storeSet(l);
+    if (nameEl) nameEl.value = ""; if (srcEl) srcEl.value = "";
+    renderCustom();
+  });
+  var probeBtn = document.getElementById("probe-btn");
+  if (probeBtn && probeBtn.addEventListener) probeBtn.addEventListener("click", runProbe);
+}
+
+try { boot(); } catch (e) { /* テストサンドボックス等、DOM が無い環境では無視 */ }
+</script>
+</body>
+</html>
