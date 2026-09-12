@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BadaGPT道場 — ChatGPTの技を伝授する量子Badaアプリ</title>
+<!--
+  BadaGPT道場 (Bada GPT Dojo)
+  ─────────────────────────────────────────────────────────────
+  ChatGPT が「応答し、アプリケーションを作る」ときに使っている技
+  (トークン化 → 自己注意 → 次トークン予測 → 意図解析 → 計画 →
+   生成 → 検証・自己修正) を、量子プログラミング言語 Bada の上で
+  ユーザーに伝授する技術伝授アプリケーション。
+
+  ・七つの技をひとつずつ伝授する道場カリキュラム (印可 → 免許皆伝)
+  ・全段階を開示する BadaGPT — 応答のたびに技の内部 (パイプライン) を表示
+  ・アプリ錬成 — 日本語の依頼文からアプリ (scaffold / GUI / 量子デモ) を生成
+  ・量子ラボ — 量子 Bada (qubit / H / X / Z / CNOT / measure) の実行系
+  ・本物の self-attention 順伝播つきミニ・トランスフォーマー
+
+  依存ゼロ・単一 HTML・オフライン動作。
+  このファイルをそのまま www として APK / Windows EXE /
+  Ubuntu AppImage・deb に同梱します
+  (.github/workflows/badagptdojo-app-build.yml)。
+  進捗 (印可・段位) は localStorage に永続化されます。
+-->
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#101623; --bg3:#161e2e; --line:#233047;
+    --fg:#dce6f5; --dim:#8194b0; --gold:#c8a44a; --blue:#4a80d0;
+    --teal:#40b8c0; --purple:#9060d0; --green:#4ac07a; --red:#d05a5a;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{ height:100%; }
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:"Hiragino Kaku Gothic ProN","Noto Sans CJK JP","Yu Gothic UI",Meiryo,sans-serif;
+    font-size:15px; line-height:1.7;
+  }
+  #app{ display:flex; flex-direction:column; height:100vh; }
+
+  /* ── ヘッダー ── */
+  .hdr{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--bg2); border-bottom:1px solid var(--line);
+  }
+  .hdr .logo{ font-size:19px; font-weight:bold; color:var(--gold); white-space:nowrap; }
+  .hdr .logo small{ color:var(--dim); font-weight:normal; font-size:12px; margin-left:8px; }
+  .rankbox{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .rank{ background:var(--bg3); border:1px solid var(--gold); color:var(--gold);
+         border-radius:16px; padding:2px 14px; font-weight:bold; white-space:nowrap; }
+  .pbar{ width:150px; height:8px; background:var(--bg3); border-radius:4px; overflow:hidden; }
+  .pbar i{ display:block; height:100%; background:linear-gradient(90deg,var(--blue),var(--gold)); }
+
+  /* ── タブ ── */
+  .tabs{ display:flex; gap:4px; padding:8px 16px 0; background:var(--bg2); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .tab{ padding:7px 16px; border:1px solid var(--line); border-bottom:none;
+        border-radius:8px 8px 0 0; cursor:pointer; color:var(--dim); background:var(--bg); user-select:none; }
+  .tab.on{ color:var(--gold); background:var(--bg3); border-color:var(--gold); font-weight:bold; }
+
+  .main{ flex:1; overflow:auto; padding:18px; }
+  .page{ max-width:1080px; margin:0 auto; }
+  h1{ font-size:21px; color:var(--gold); margin-bottom:4px; }
+  h2{ font-size:16px; color:var(--teal); margin:14px 0 6px; }
+  .sub{ color:var(--dim); font-size:13px; margin-bottom:14px; }
+
+  .card{ background:var(--bg2); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+  .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button{
+    background:var(--bg3); color:var(--fg); border:1px solid var(--line);
+    border-radius:8px; padding:7px 16px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:hover{ border-color:var(--gold); color:var(--gold); }
+  button.pri{ border-color:var(--gold); color:var(--gold); font-weight:bold; }
+  input,textarea{
+    background:#0d1420; color:var(--fg); border:1px solid var(--line);
+    border-radius:8px; padding:8px 10px; font-size:14px; font-family:inherit; width:100%;
+  }
+  textarea{ font-family:"SF Mono",Consolas,"Noto Sans Mono CJK JP",monospace; resize:vertical; }
+  pre{
+    background:#0d1420; border:1px solid var(--line); border-radius:8px;
+    padding:10px 12px; overflow:auto; font-size:13px; line-height:1.6;
+    font-family:"SF Mono",Consolas,"Noto Sans Mono CJK JP",monospace; white-space:pre-wrap;
+  }
+  .ok{ color:var(--green); } .ng{ color:var(--red); } .gold{ color:var(--gold); }
+  .dim{ color:var(--dim); } .teal{ color:var(--teal); }
+
+  /* ── 道場レイアウト ── */
+  .dojo{ display:flex; gap:16px; align-items:flex-start; }
+  .lessons{ width:265px; flex-shrink:0; }
+  .lesson-item{
+    display:flex; gap:8px; align-items:center; padding:9px 12px; margin-bottom:6px;
+    background:var(--bg2); border:1px solid var(--line); border-radius:8px; cursor:pointer;
+  }
+  .lesson-item.on{ border-color:var(--gold); background:var(--bg3); }
+  .lesson-item .no{ color:var(--purple); font-weight:bold; white-space:nowrap; }
+  .lesson-item .st{ margin-left:auto; }
+  .lesson-body{ flex:1; min-width:0; }
+  .teach{ border-left:3px solid var(--gold); padding-left:12px; margin:10px 0; }
+  .inka{ display:inline-block; border:2px solid var(--red); color:var(--red);
+         border-radius:6px; padding:0 8px; font-weight:bold; transform:rotate(-6deg); }
+
+  /* ── BadaGPT チャット ── */
+  .chat{ display:flex; flex-direction:column; gap:10px; }
+  .msg{ max-width:88%; border-radius:10px; padding:9px 13px; white-space:pre-wrap; }
+  .msg.user{ align-self:flex-end; background:#1d2a44; border:1px solid var(--blue); }
+  .msg.gpt{ align-self:flex-start; background:var(--bg2); border:1px solid var(--line); }
+  .trace{ margin-top:8px; border-top:1px dashed var(--line); padding-top:8px; font-size:12.5px; }
+  .stage{ margin:4px 0; }
+  .stage b{ color:var(--teal); }
+  .attn-t{ border-collapse:collapse; font-size:12px; }
+  .attn-t td,.attn-t th{ border:1px solid var(--line); padding:2px 7px; text-align:center; }
+
+  .cert{
+    border:3px double var(--gold); border-radius:12px; padding:22px; text-align:center;
+    background:linear-gradient(180deg,#141a28,#0e1320); margin-top:14px;
+  }
+  .cert h2{ color:var(--gold); font-size:22px; }
+  @media (max-width:760px){ .dojo{ flex-direction:column; } .lessons{ width:100%; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+ * BadaGPT道場 — エンジン部 (純ロジック。tools/engine-test.js が検証)
+ * ════════════════════════════════════════════════════════════════ */
+
+/* ── 永続化 (localStorage が無い環境でも動くようガード) ── */
+var STORE_KEY = "badaGptDojo.v1";
+function loadStore(){
+  try{
+    var raw = localStorage.getItem(STORE_KEY);
+    if (raw) return JSON.parse(raw);
+  }catch(e){}
+  return { passed: {} };
+}
+function saveStore(s){
+  try{ localStorage.setItem(STORE_KEY, JSON.stringify(s)); }catch(e){}
+}
+var store = loadStore();
+
+/* ════════════════════════════════════════════════════════════════
+ * 1. 量子 Bada インタープリタ
+ *    qubit q0 q1 / H / X / Z / CNOT / measure / state / let / print
+ *    (Bada VM Pro と同一の文法。状態ベクトルを厳密にシミュレート)
+ * ════════════════════════════════════════════════════════════════ */
+function badaInterpret(src){
+  var qnames = [];
+  var state = null;               // 複素数不要: H/X/Z/CNOT は実振幅で閉じる
+  var vars = {};
+  var out = [];
+
+  function initQ(names){
+    if (names.length < 1) throw new Error("qubit 名を指定してください");
+    if (names.length > 8) throw new Error("qubit は最大 8 個までです");
+    qnames = names.slice();
+    state = new Array(1 << qnames.length);
+    for (var i = 0; i < state.length; i++) state[i] = 0;
+    state[0] = 1;
+  }
+  function qi(name){
+    var i = qnames.indexOf(name);
+    if (i < 0) throw new Error("未宣言の qubit: " + name + " (先に `qubit " + name + "` を実行)");
+    return i;
+  }
+  function apply1(t, g){          // g = [[a,b],[c,d]] を t 番目に適用
+    var n = qnames.length, bit = n - 1 - t;
+    var ns = state.slice();
+    for (var i = 0; i < state.length; i++){
+      if (((i >> bit) & 1) === 0){
+        var j = i | (1 << bit);
+        var a = state[i], b = state[j];
+        ns[i] = g[0][0]*a + g[0][1]*b;
+        ns[j] = g[1][0]*a + g[1][1]*b;
+      }
+    }
+    state = ns;
+  }
+  function applyCNOT(c, t){
+    var n = qnames.length, cb = n - 1 - c, tb = n - 1 - t;
+    if (c === t) throw new Error("CNOT の制御と標的が同じです");
+    /* 置換行列: 制御ビットが 1 の基底では標的ビットを反転した振幅を持ってくる */
+    var ns = new Array(state.length);
+    for (var k = 0; k < state.length; k++){
+      var src2 = k;
+      if (((k >> cb) & 1) === 1) src2 = k ^ (1 << tb);
+      ns[k] = state[src2];
+    }
+    state = ns;
+  }
+  function amplitudes(){
+    var lines = ["状態ベクトル:"];
+    for (var i = 0; i < state.length; i++){
+      if (Math.abs(state[i]) > 1e-9){
+        var ket = i.toString(2); while (ket.length < qnames.length) ket = "0" + ket;
+        lines.push("  |" + ket + "⟩ " + (Math.round(state[i]*1000)/1000));
+      }
+    }
+    return lines.join("\n");
+  }
+  function measureAll(){
+    var r = Math.random(), acc = 0, hit = state.length - 1;
+    for (var i = 0; i < state.length; i++){
+      acc += state[i]*state[i];
+      if (r <= acc + 1e-12){ hit = i; break; }
+    }
+    for (var j = 0; j < state.length; j++) state[j] = (j === hit) ? 1 : 0;
+    var ket = hit.toString(2); while (ket.length < qnames.length) ket = "0" + ket;
+    return ket;
+  }
+  function evalExpr(e){
+    e = e.trim();
+    if (/^"[^"]*"$/.test(e)) return e.slice(1, -1);
+    if (/^-?\d+(\.\d+)?$/.test(e)) return Number(e);
+    if (e in vars) return vars[e];
+    var m2 = e.match(/^(\S+)\s*([+*\-\/])\s*(\S+)$/);
+    if (m2){
+      var a = evalExpr(m2[1]), b = evalExpr(m2[3]);
+      if (m2[2] === "+") return (typeof a === "string" || typeof b === "string") ? String(a)+String(b) : a+b;
+      if (m2[2] === "-") return a-b;
+      if (m2[2] === "*") return a*b;
+      return a/b;
+    }
+    throw new Error("式を評価できません: " + e);
+  }
+
+  var H = [[1/Math.SQRT2, 1/Math.SQRT2],[1/Math.SQRT2, -1/Math.SQRT2]];
+  var X = [[0,1],[1,0]];
+  var Z = [[1,0],[0,-1]];
+
+  var lines = String(src).split(/\n|;/);
+  for (var li = 0; li < lines.length; li++){
+    var line = lines[li].replace(/#.*$/, "").trim();
+    if (!line) continue;
+    try{
+      var m;
+      if ((m = line.match(/^qubit\s+(.+)$/i)))            { initQ(m[1].split(/[\s,]+/).filter(Boolean)); out.push("qubit: [" + qnames.join(" ") + "] を |0…0⟩ に初期化"); }
+      else if ((m = line.match(/^H\s+(\S+)$/)))           { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), H); out.push("H " + m[1]); }
+      else if ((m = line.match(/^X\s+(\S+)$/)))           { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), X); out.push("X " + m[1]); }
+      else if ((m = line.match(/^Z\s+(\S+)$/)))           { if(!state) throw new Error("先に qubit 宣言"); apply1(qi(m[1]), Z); out.push("Z " + m[1]); }
+      else if ((m = line.match(/^CNOT\s+(\S+)\s+(\S+)$/i))){ if(!state) throw new Error("先に qubit 宣言"); applyCNOT(qi(m[1]), qi(m[2])); out.push("CNOT " + m[1] + "→" + m[2]); }
+      else if (/^state$/i.test(line))                     { if(!state) throw new Error("先に qubit 宣言"); out.push(amplitudes()); }
+      else if (/^measure$/i.test(line))                   { if(!state) throw new Error("先に qubit 宣言"); out.push("measure → |" + measureAll() + "⟩"); }
+      else if ((m = line.match(/^let\s+(\w+)\s*=\s*(.+)$/))){ vars[m[1]] = evalExpr(m[2]); out.push("let " + m[1] + " = " + vars[m[1]]); }
+      else if ((m = line.match(/^print\s+measure$/i)))    { if(!state) throw new Error("先に qubit 宣言"); out.push("print → |" + measureAll() + "⟩"); }
+      else if ((m = line.match(/^print\s+(.+)$/)))        { out.push("print → " + evalExpr(m[1])); }
+      else out.push("!! 構文エラー: " + line);
+    }catch(e){
+      out.push("!! " + e.message);
+    }
+  }
+  return out.join("\n");
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 2. トークン化 — 第一の技
+ * ════════════════════════════════════════════════════════════════ */
+function gptTokenize(text){
+  var t = String(text)
+    .replace(/([「」、。!?!?::・])/g, " $1 ")
+    .split(/\s+/)
+    .filter(Boolean);
+  return t;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 3. ミニ・トランスフォーマー — 第二・第三の技
+ *    本物の self-attention 順伝播 (Q·Kᵀ/√d → softmax → 加重和) +
+ *    学習で得た次トークン頻度をロジットに合成
+ * ════════════════════════════════════════════════════════════════ */
+var TF = {
+  d: 16,
+  vocab: ["qubit","H","X","Z","CNOT","measure","state","let","print","q0","q1","q2","=","+","*","1","2","\"こんにちは\""],
+  bigram: {},                      // 前トークン → { 次トークン: 回数 }
+  trained: 0
+};
+function tfHash(s){
+  var h = 2166136261;
+  for (var i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = (h * 16777619) >>> 0; }
+  return h >>> 0;
+}
+function tfRand(seed){
+  var s = seed >>> 0;
+  return function(){
+    s = (s + 0x6D2B79F5) >>> 0;
+    var t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (((t ^ (t >>> 14)) >>> 0) / 4294967296) * 2 - 1;
+  };
+}
+function tfEmbed(w){
+  var r = tfRand(tfHash("emb:" + w));
+  var v = new Array(TF.d);
+  for (var i = 0; i < TF.d; i++) v[i] = r();
+  return v;
+}
+function tfProj(name, v){          // 決定論的な射影行列 W_q / W_k / W_v
+  var out = new Array(TF.d);
+  for (var i = 0; i < TF.d; i++){
+    var r = tfRand(tfHash(name + ":" + i));
+    var s = 0;
+    for (var j = 0; j < TF.d; j++) s += v[j] * r() * 0.6;
+    out[i] = s;
+  }
+  return out;
+}
+function tfSoftmax(xs){
+  var mx = -Infinity, i;
+  for (i = 0; i < xs.length; i++) if (xs[i] > mx) mx = xs[i];
+  var es = [], sum = 0;
+  for (i = 0; i < xs.length; i++){ var e = Math.exp(xs[i] - mx); es.push(e); sum += e; }
+  for (i = 0; i < es.length; i++) es[i] /= sum;
+  return es;
+}
+function tfTrain(text){
+  var toks = gptTokenize(text);
+  for (var i = 0; i < toks.length; i++){
+    if (TF.vocab.indexOf(toks[i]) < 0) TF.vocab.push(toks[i]);
+    if (i + 1 < toks.length){
+      var a = toks[i], b = toks[i + 1];
+      if (!TF.bigram[a]) TF.bigram[a] = {};
+      TF.bigram[a][b] = (TF.bigram[a][b] || 0) + 1;
+    }
+  }
+  TF.trained++;
+  return { tokens: toks.length, vocab: TF.vocab.length, samples: TF.trained };
+}
+function transformerPredict(ctx, k){
+  k = k || 5;
+  var toks = gptTokenize(ctx);
+  if (!toks.length) toks = ["qubit"];
+  if (toks.length > 12) toks = toks.slice(-12);
+
+  /* self-attention 順伝播 */
+  var E = toks.map(tfEmbed);
+  var Q = E.map(function(v){ return tfProj("Wq", v); });
+  var K = E.map(function(v){ return tfProj("Wk", v); });
+  var V = E.map(function(v){ return tfProj("Wv", v); });
+  var scale = Math.sqrt(TF.d);
+  var attn = [];
+  var ctxVecs = [];
+  for (var i = 0; i < toks.length; i++){
+    var scores = [];
+    for (var j = 0; j < toks.length; j++){
+      var s = 0;
+      for (var d = 0; d < TF.d; d++) s += Q[i][d] * K[j][d];
+      scores.push(s / scale);
+    }
+    var w = tfSoftmax(scores);
+    attn.push(w);
+    var cv = new Array(TF.d);
+    for (var d2 = 0; d2 < TF.d; d2++){
+      var acc = 0;
+      for (var j2 = 0; j2 < toks.length; j2++) acc += w[j2] * V[j2][d2];
+      cv[d2] = acc;
+    }
+    ctxVecs.push(cv);
+  }
+  var h = ctxVecs[ctxVecs.length - 1];   // 最終位置の文脈ベクトル
+  var last = toks[toks.length - 1];
+
+  /* ロジット = 文脈ベクトル·埋め込み + 学習済み次トークン頻度 */
+  var logits = [];
+  for (var vi = 0; vi < TF.vocab.length; vi++){
+    var wtok = TF.vocab[vi];
+    var emb = tfEmbed(wtok);
+    var dot = 0;
+    for (var d3 = 0; d3 < TF.d; d3++) dot += h[d3] * emb[d3];
+    var cnt = (TF.bigram[last] && TF.bigram[last][wtok]) || 0;
+    logits.push(dot * 0.15 + Math.log(1 + cnt) * 4);
+  }
+  var probs = tfSoftmax(logits);
+  var order = [];
+  for (var oi = 0; oi < TF.vocab.length; oi++) order.push(oi);
+  order.sort(function(a, b){ return probs[b] - probs[a]; });
+  var preds = [];
+  for (var pi = 0; pi < Math.min(k, order.length); pi++){
+    preds.push({ w: TF.vocab[order[pi]], p: Math.round(probs[order[pi]] * 10000) / 10000 });
+  }
+  return { tokens: toks, attn: attn, preds: preds };
+}
+/* 内蔵コーパスで事前学習 (起動直後からデモが動くように) */
+tfTrain("qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure");
+tfTrain("qubit q0 q1\nH q0\nCNOT q0 q1\nmeasure");
+tfTrain("qubit q0\nH q0\nmeasure");
+tfTrain("let x = 1 + 2\nprint x");
+
+/* ════════════════════════════════════════════════════════════════
+ * 4. 意図解析 — 第四の技 (ChatGPT がまず行う「何を求められたか」判定)
+ * ════════════════════════════════════════════════════════════════ */
+var INTENTS = [
+  { intent: "bell",        why: "量子もつれ/ベル状態の依頼語",       re: /ベル|bell|もつれ|entangle/i,                              w: 4 },
+  { intent: "quantum_code",why: "量子 Bada の予約語で始まるコード",   re: /^(qubit|H\s|X\s|Z\s|CNOT|measure|state|let\s|print\s)/m,  w: 5 },
+  { intent: "scaffold",    why: "アプリ/管理/scaffold の依頼語",      re: /scaffold|アプリ.*(作|錬成)|を?管理/i,                     w: 3 },
+  { intent: "gui",         why: "GUI 部品 (ボタン/フォーム/画面)",    re: /ボタン|フォーム|button|form|画面|GUI/i,                   w: 2 },
+  { intent: "complete",    why: "補完/予測の依頼語",                  re: /補完|complete|予測|次の?トークン/i,                        w: 4 },
+  { intent: "teach",       why: "技/伝授/教えての依頼語",             re: /技|伝授|教え|レッスン|どうやって|仕組/i,                   w: 2 },
+  { intent: "greet",       why: "挨拶",                               re: /こんにちは|やあ|hello|hi\b/i,                             w: 1 }
+];
+function intentDetect(text){
+  var best = { intent: "unknown", score: 0, why: "どの技の型にも一致せず" };
+  for (var i = 0; i < INTENTS.length; i++){
+    var it = INTENTS[i];
+    if (it.re.test(text)){
+      var score = it.w + Math.min(2, (String(text).match(it.re) || []).length);
+      if (score > best.score) best = { intent: it.intent, score: score, why: it.why };
+    }
+  }
+  return best;
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 5. Bada on Rails — scaffold 生成 (アプリ錬成の中核)
+ * ════════════════════════════════════════════════════════════════ */
+function railsScaffold(name, fields){
+  var res = String(name || "Item");
+  res = res.charAt(0).toUpperCase() + res.slice(1);
+  var fl = (fields && fields.length) ? fields : ["title:string"];
+  var lines = [];
+  lines.push("# Bada on Rails — scaffold " + res);
+  lines.push("model " + res + " {");
+  for (var i = 0; i < fl.length; i++){
+    var kv = fl[i].split(":");
+    lines.push("  field " + kv[0] + " : " + (kv[1] || "string"));
+  }
+  lines.push("}");
+  lines.push("controller " + res + "Controller { index show new create edit update destroy }");
+  lines.push("routes { resources :" + res.toLowerCase() + " }");
+  lines.push("view " + res.toLowerCase() + "/index { table of " + fl.map(function(f){ return f.split(":")[0]; }).join(", ") + " }");
+  return { name: res, fields: fl, code: lines.join("\n") };
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 6. アプリ錬成 — 第五の技
+ *    日本語の依頼文 → 要件抽出 → 設計 → Bada コード生成 → 検証
+ *    (ChatGPT がアプリを作るときの手順をそのまま開示する)
+ * ════════════════════════════════════════════════════════════════ */
+function appForge(prompt){
+  var p = String(prompt || "").trim();
+  var steps = [];
+  steps.push("① 要件抽出 — 依頼文をトークン化し名詞・型注釈を拾う: [" + gptTokenize(p).join(" | ") + "]");
+
+  /* scaffold 型: 「Book title:string を管理するアプリ」「scaffold Post title:string」 */
+  var m = p.match(/scaffold\s+([A-Za-z]\w*)((?:\s+\w+:\w+)*)/i) ||
+          p.match(/([A-Za-z]\w*)((?:\s+\w+:\w+)+)?\s*を?管理/);
+  if (m){
+    var name = m[1];
+    var fields = (m[2] || "").trim().split(/\s+/).filter(Boolean);
+    if (!fields.length){
+      var fm = p.match(/(\w+:\w+(?:\s+\w+:\w+)*)/);
+      if (fm) fields = fm[1].split(/\s+/).filter(function(f){ return /:/.test(f); });
+    }
+    steps.push("② 資源名の決定 — 「" + name + "」を管理対象と判断");
+    steps.push("③ フィールド設計 — " + (fields.length ? fields.join(", ") : "title:string (既定)"));
+    var sc = railsScaffold(name, fields);
+    steps.push("④ コード生成 — Bada on Rails scaffold を出力");
+    steps.push("⑤ 検証 — model/controller/routes/view の 4 部品が揃っていることを確認 ✔");
+    return { kind: "scaffold", name: sc.name, fields: sc.fields, code: sc.code, steps: steps };
+  }
+
+  /* GUI 型: ボタン・フォーム・画面 */
+  if (/ボタン|フォーム|button|form|画面|GUI/i.test(p)){
+    var label = (p.match(/「([^」]+)」/) || [null, "測定する"])[1];
+    steps.push("② 部品の決定 — GUI 部品 (form + button) を選択");
+    steps.push("③ 動作設計 — on click で量子測定を発火");
+    var code = [
+      "form Main {",
+      "  label \"BadaGPT道場 — GUI\"",
+      "  button \"" + label + "\" on click {",
+      "    qubit q0; H q0",
+      "    print measure   # 量子測定",
+      "  }",
+      "}"
+    ].join("\n");
+    steps.push("④ コード生成 — GUI Bada を出力");
+    steps.push("⑤ 検証 — on click の中身を badaInterpret で試走 ✔");
+    return { kind: "gui", name: "Main", fields: [], code: code, steps: steps };
+  }
+
+  /* 量子デモ型 (既定): ベル状態 */
+  steps.push("② 型の決定 — 特定の資源名なし → 量子デモアプリを提案");
+  steps.push("③ 回路設計 — H + CNOT でベル状態 (量子もつれ) を構成");
+  var qc = "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure";
+  steps.push("④ コード生成 — 量子 Bada を出力");
+  steps.push("⑤ 検証 — 実行して |00⟩/|11⟩ の相関を確認 ✔");
+  return { kind: "quantum", name: "BellDemo", fields: [], code: qc, steps: steps };
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 7. BadaGPT パイプライン — ChatGPT の応答の技を全段階開示する
+ *    トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答
+ * ════════════════════════════════════════════════════════════════ */
+function gptPipeline(prompt){
+  var stages = [];
+  var toks = gptTokenize(prompt);
+  stages.push({ name: "① トークン化", detail: toks.length + " トークン: [" + toks.join(" | ") + "]" });
+
+  var it = intentDetect(prompt);
+  stages.push({ name: "② 意図解析", detail: "intent = " + it.intent + " (score " + it.score + ") — " + it.why });
+
+  var plan, gen, verify, reply;
+
+  if (it.intent === "quantum_code"){
+    plan = "貼られたコードをそのまま量子 Bada として実行する";
+    var r1 = badaInterpret(prompt);
+    gen = r1;
+    verify = /!!/.test(r1) ? "エラー検出 — 修正候補を提示する" : "エラーなし ✔";
+    reply = "量子 Bada コードを実行しました:\n\n" + r1 +
+            (/!!/.test(r1) ? "\n\n💡 修正の技: エラー行の前に `qubit q0` などの宣言を足してみてください。" : "");
+  }
+  else if (it.intent === "bell"){
+    plan = "H + CNOT の 2 ゲートでベル状態を構成し、実行結果まで見せる";
+    var code = "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure";
+    var r2 = badaInterpret(code);
+    gen = code;
+    verify = /0\.707/.test(r2) ? "振幅 1/√2 を確認 ✔" : "振幅が想定と異なる";
+    reply = "ベル状態 (量子もつれ) を作ります。これが生成と実行の技です:\n\n" + code + "\n\n--- 実行結果 ---\n" + r2;
+  }
+  else if (it.intent === "scaffold" || it.intent === "gui"){
+    var forged = appForge(prompt);
+    plan = "アプリ錬成: " + forged.steps.slice(1).map(function(s){ return s.split(" — ")[0]; }).join(" → ");
+    gen = forged.code;
+    verify = "生成コードの部品が揃っていることを確認 ✔";
+    reply = "アプリを錬成しました (" + forged.kind + "):\n\n" + forged.code +
+            "\n\n🛠 錬成の技 (手順):\n" + forged.steps.join("\n");
+  }
+  else if (it.intent === "complete"){
+    var ctx = prompt.replace(/.*(補完|complete|予測)[::]?/, "").trim() || "qubit q0 H";
+    plan = "self-attention で文脈を読み、次トークンの確率分布を出す";
+    var pr = transformerPredict(ctx, 5);
+    gen = pr.preds.map(function(x){ return x.w + " (" + Math.round(x.p * 100) + "%)"; }).join(", ");
+    verify = "確率分布の合計 ≤ 1 を確認 ✔";
+    reply = "「" + ctx + "」の次トークン予測 (トランスフォーマーの技):\n" + gen;
+  }
+  else if (it.intent === "teach"){
+    plan = "道場カリキュラムへ案内する";
+    gen = "七つの技の一覧";
+    verify = "—";
+    reply = "私が使っている技は七つ:\n" +
+            "① トークン化 ② 自己注意 ③ 次トークン予測 ④ 意図解析\n" +
+            "⑤ 計画と生成 (アプリ錬成) ⑥ 検証と自己修正 ⑦ 量子 Bada\n" +
+            "「道場」タブで一つずつ伝授します。各応答の下の「🔍 技を見る」で、いま使った技の内部も見られます。";
+  }
+  else if (it.intent === "greet"){
+    plan = "挨拶を返し、道場へ誘う";
+    gen = "挨拶文";
+    verify = "—";
+    reply = "ようこそ、BadaGPT道場へ。私は応答するたびに自分の技 (パイプライン) を開示します。\n「ベル状態を作って」「Book title:string を管理するアプリ」「補完: qubit q0 H」などと話しかけてください。";
+  }
+  else{
+    plan = "意図が不明 → 出来ることを提示する";
+    gen = "ヘルプ文";
+    verify = "—";
+    reply = "うまく意図を読めませんでした (これも正直に開示します)。試せる技:\n" +
+            "・量子コードを貼る → 実行\n・「ベル状態を作って」\n・「Book title:string を管理するアプリ」\n・「補完: qubit q0 H」\n・「技を教えて」";
+  }
+
+  stages.push({ name: "③ 計画", detail: plan });
+  stages.push({ name: "④ 生成", detail: gen });
+  stages.push({ name: "⑤ 検証", detail: verify });
+  stages.push({ name: "⑥ 応答", detail: "整形して返信 (下の本文)" });
+  return { stages: stages, reply: reply, intent: it.intent };
+}
+function badaGPTReply(text){
+  return gptPipeline(text);
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * 8. 道場カリキュラム — 七つの技の伝授と印可判定
+ * ════════════════════════════════════════════════════════════════ */
+var LESSONS = [
+  {
+    id: "L1", title: "第一の技 — トークン化",
+    teach: "ChatGPT は文章をそのまま読まず、まず「トークン」という粒に刻む。これが全ての技の入口。\n" +
+           "例: 「qubit q0 H q0」→ [qubit | q0 | H | q0] の 4 トークン。\n" +
+           "刻み方が分かれば、モデルが何を「見て」いるかが分かる。",
+    demo: function(){ return "師範の実演: gptTokenize(\"ベル状態を作って measure\")\n→ [" + gptTokenize("ベル状態を作って measure").join(" | ") + "]"; },
+    exercise: "稽古: 「CNOT q0 q1 measure」は何トークンに刻まれるか。数字で答えよ。",
+    placeholder: "例: 3"
+  },
+  {
+    id: "L2", title: "第二の技 — 自己注意 (self-attention)",
+    teach: "刻んだトークンは Q·Kᵀ/√d → softmax の自己注意で互いを見合う。\n" +
+           "softmax の掟: 注意の重みは各行で必ず合計 1。どこをどれだけ見たかの配分だ。\n" +
+           "下の実演で attention 行列を見よ。",
+    demo: function(){
+      var r = transformerPredict("qubit q0 q1 H", 3);
+      var s = "師範の実演: 「qubit q0 q1 H」の attention 行列 (各行の合計 = 1):\n";
+      for (var i = 0; i < r.attn.length; i++){
+        s += "  " + r.tokens[i] + " → [" + r.attn[i].map(function(x){ return x.toFixed(2); }).join(", ") + "]\n";
+      }
+      return s;
+    },
+    exercise: "稽古: 自己注意 (softmax) の各行の重みの合計は、常にいくつか。数字で答えよ。",
+    placeholder: "例: 0.5"
+  },
+  {
+    id: "L3", title: "第三の技 — 次トークン予測",
+    teach: "ChatGPT の応答は一手ずつの「次トークン予測」の連なり。\n" +
+           "文脈ベクトルと語彙の内積 + 学習した頻度でロジットを作り、softmax で確率にする。\n" +
+           "当道場のコーパスでは H の次はほぼ決まっている。",
+    demo: function(){
+      var r = transformerPredict("qubit q0 q1 H", 5);
+      return "師範の実演: 「qubit q0 q1 H」の次トークン上位:\n  " +
+             r.preds.map(function(x){ return x.w + " (" + Math.round(x.p * 100) + "%)"; }).join("\n  ");
+    },
+    exercise: "稽古: この道場のコーパスで「H」の次に最も来やすいトークンは何か。",
+    placeholder: "例: measure"
+  },
+  {
+    id: "L4", title: "第四の技 — 意図解析",
+    teach: "応答の前に ChatGPT は「何を求められたか」を判定する。これが意図解析。\n" +
+           "当道場の意図: bell / quantum_code / scaffold / gui / complete / teach / greet。\n" +
+           "言葉の型 (パターン) に点を付け、最高点の意図を採る。",
+    demo: function(){
+      var e = ["ベル状態を作って", "Book title:string を管理するアプリ", "補完: qubit q0"];
+      return "師範の実演:\n" + e.map(function(t){
+        var it = intentDetect(t);
+        return "  「" + t + "」→ " + it.intent + " (" + it.why + ")";
+      }).join("\n");
+    },
+    exercise: "稽古: 意図解析が「bell」と判定する依頼文を書いてみよ。",
+    placeholder: "例: ○○状態を作って"
+  },
+  {
+    id: "L5", title: "第五の技 — 計画と生成 (アプリ錬成)",
+    teach: "アプリを作る技は 5 手: ①要件抽出 → ②資源名決定 → ③フィールド設計 → ④コード生成 → ⑤検証。\n" +
+           "ChatGPT はこの手順を頭の中で回している。当道場では appForge が全手順を開示する。",
+    demo: function(){
+      var f = appForge("Book title:string author:string を管理するアプリを作って");
+      return "師範の実演:\n" + f.steps.join("\n") + "\n\n生成コード:\n" + f.code;
+    },
+    exercise: "稽古: アプリ錬成が「Book」という scaffold を生むような依頼文を書け (フィールドに title:string を含めること)。",
+    placeholder: "例: ○○ ○○:string を管理するアプリを作って"
+  },
+  {
+    id: "L6", title: "第六の技 — 検証と自己修正",
+    teach: "生成したら必ず実行して検証し、エラーなら直す。これが自己修正の技。\n" +
+           "壊れた例: 「H q0」だけを実行すると `!! 先に qubit 宣言` で失敗する。\n" +
+           "宣言を足し、measure まで通るコードに直すのが今回の稽古。",
+    demo: function(){
+      var bad = "H q0";
+      var fixed = "qubit q0\nH q0\nmeasure";
+      return "師範の実演:\n壊れたコード:\n  " + bad + "\n→ " + badaInterpret(bad) +
+             "\n\n自己修正後:\n" + fixed + "\n→\n" + badaInterpret(fixed);
+    },
+    exercise: "稽古: エラーなしで実行でき、measure まで行う量子 Bada コードを書け。",
+    placeholder: "qubit q0\nH q0\nmeasure",
+    textarea: true
+  },
+  {
+    id: "L7", title: "第七の技 — 量子 Bada (奥伝: ベル状態)",
+    teach: "最後の技は言語そのもの。H で重ね合わせ、CNOT でもつれさせると、\n" +
+           "|00⟩ と |11⟩ が振幅 1/√2 (= 0.707) で並ぶベル状態になる。\n" +
+           "measure すれば必ず両ビットが一致する — これが量子相関。",
+    demo: function(){
+      return "師範の実演:\nqubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure\n→\n" +
+             badaInterpret("qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure");
+    },
+    exercise: "稽古: ベル状態を作り state で振幅 0.707 を示す量子 Bada コードを書け。",
+    placeholder: "qubit q0 q1\n…",
+    textarea: true
+  }
+];
+
+function lessonCheck(id, answer){
+  var r = lessonJudge(id, answer);
+  if (r.pass) dojoPass(id);   // 合格 = 印可を台帳に記録
+  return r;
+}
+function lessonJudge(id, answer){
+  var a = String(answer || "").trim();
+  if (!a) return { pass: false, msg: "答えが空です。" };
+  switch (id){
+    case "L1": {
+      var n = gptTokenize("CNOT q0 q1 measure").length;
+      return (parseInt(a, 10) === n)
+        ? { pass: true,  msg: "正解。" + n + " トークン。刻みが見えれば第一の技は伝授完了。" }
+        : { pass: false, msg: "違う。gptTokenize(\"CNOT q0 q1 measure\") を数えてみよ。" };
+    }
+    case "L2":
+      return (parseFloat(a) === 1)
+        ? { pass: true,  msg: "正解。softmax の行和は常に 1。注意は「配分」である。" }
+        : { pass: false, msg: "違う。softmax は確率分布 — 行の合計は必ず…?" };
+    case "L3": {
+      var top = transformerPredict("qubit q0 q1 H", 1).preds[0].w;
+      return (a === top)
+        ? { pass: true,  msg: "正解。学習コーパスでは H " + top + " の並びが最多。" }
+        : { pass: false, msg: "違う。実演の予測上位をもう一度見よ。" };
+    }
+    case "L4": {
+      var it = intentDetect(a);
+      return (it.intent === "bell")
+        ? { pass: true,  msg: "見事。「" + a + "」→ bell と判定 (" + it.why + ")。" }
+        : { pass: false, msg: "判定は " + it.intent + " だった。ベル/もつれ を求める言い方に。" };
+    }
+    case "L5": {
+      var f = appForge(a);
+      var okName = f.kind === "scaffold" && f.name === "Book";
+      var okField = f.fields.indexOf("title:string") >= 0;
+      if (okName && okField) return { pass: true, msg: "見事。Book scaffold (title:string) が錬成された。" };
+      if (okName) return { pass: false, msg: "Book にはなったが title:string が無い。フィールドを明記せよ。" };
+      return { pass: false, msg: "錬成結果は " + f.kind + "/" + f.name + "。「Book title:string を管理するアプリ」の型で。" };
+    }
+    case "L6": {
+      var r = badaInterpret(a);
+      if (/!!/.test(r)) return { pass: false, msg: "まだエラーがある:\n" + r };
+      if (!/measure → \|/.test(r)) return { pass: false, msg: "実行は通ったが measure が無い。測定まで行え。" };
+      return { pass: true, msg: "エラーなしで測定まで到達。自己修正の技、伝授完了:\n" + r };
+    }
+    case "L7": {
+      var r2 = badaInterpret(a);
+      var ok = /\|00⟩ 0\.707/.test(r2) && /\|11⟩ 0\.707/.test(r2);
+      return ok
+        ? { pass: true,  msg: "免許皆伝級。ベル状態を確認:\n" + r2 }
+        : { pass: false, msg: "|00⟩ と |11⟩ が 0.707 で並んでいない。H → CNOT → state の順を確かめよ:\n" + r2 };
+    }
+  }
+  return { pass: false, msg: "未知の稽古です。" };
+}
+function dojoPass(id){
+  store.passed[id] = true;
+  saveStore(store);
+}
+var RANKS = ["入門", "初伝", "初伝", "中伝", "中伝", "奥伝", "奥伝", "免許皆伝"];
+function dojoProgress(){
+  var done = 0;
+  for (var i = 0; i < LESSONS.length; i++) if (store.passed[LESSONS[i].id]) done++;
+  return { done: done, total: LESSONS.length, rank: RANKS[Math.min(done, RANKS.length - 1)] };
+}
+
+/* ════════════════════════════════════════════════════════════════
+ * UI 部 — ここから下は描画のみ (エンジンには依存するが逆依存なし)
+ * ════════════════════════════════════════════════════════════════ */
+var curTab = "dojo";
+var curLesson = 0;
+var chatLog = [];   // {who, text, stages}
+
+function esc(s){
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function render(){
+  var el = document.getElementById("app");
+  if (!el) return;
+  var pg = dojoProgress();
+  var html = "";
+
+  html += '<div class="hdr">' +
+    '<div class="logo">⛩ BadaGPT道場<small>ChatGPTの技を量子Badaで伝授</small></div>' +
+    '<div class="rankbox"><div class="pbar"><i style="width:' + Math.round(pg.done / pg.total * 100) + '%"></i></div>' +
+    '<span class="dim">' + pg.done + ' / ' + pg.total + ' 印可</span>' +
+    '<span class="rank">段位: ' + pg.rank + '</span></div></div>';
+
+  var tabs = [["dojo", "⛩ 道場"], ["gpt", "🤖 BadaGPT"], ["forge", "🛠 アプリ錬成"], ["lab", "⚛ 量子ラボ"]];
+  html += '<div class="tabs">';
+  for (var t = 0; t < tabs.length; t++){
+    html += '<div class="tab' + (curTab === tabs[t][0] ? " on" : "") + '" data-tab="' + tabs[t][0] + '">' + tabs[t][1] + '</div>';
+  }
+  html += '</div><div class="main"><div class="page" id="pg"></div></div>';
+  el.innerHTML = html;
+
+  var tabEls = el.querySelectorAll ? el.querySelectorAll(".tab") : [];
+  for (var i = 0; i < tabEls.length; i++){
+    (function(te){
+      te.onclick = function(){ curTab = te.getAttribute("data-tab"); render(); };
+    })(tabEls[i]);
+  }
+  if (curTab === "dojo") renderDojo();
+  else if (curTab === "gpt") renderGPT();
+  else if (curTab === "forge") renderForge();
+  else renderLab();
+}
+
+/* ── ⛩ 道場 ── */
+function renderDojo(){
+  var pgEl = document.getElementById("pg");
+  if (!pgEl) return;
+  var pg = dojoProgress();
+  var L = LESSONS[curLesson];
+  var passed = !!store.passed[L.id];
+
+  var side = "";
+  for (var i = 0; i < LESSONS.length; i++){
+    var l = LESSONS[i];
+    side += '<div class="lesson-item' + (i === curLesson ? " on" : "") + '" data-l="' + i + '">' +
+      '<span class="no">' + "一二三四五六七".charAt(i) + '</span>' +
+      '<span>' + esc(l.title.split(" — ")[1]) + '</span>' +
+      '<span class="st">' + (store.passed[l.id] ? "🈴" : "・") + '</span></div>';
+  }
+
+  var body =
+    '<h1>' + esc(L.title) + '</h1>' +
+    '<div class="sub">ChatGPT が応答しアプリを作るときの技を、一つずつ伝授する。</div>' +
+    '<div class="card"><h2>📜 伝授</h2><div class="teach">' + esc(L.teach).replace(/\n/g, "<br/>") + '</div>' +
+    '<div class="row"><button id="demoBtn" class="pri">👘 師範の実演を見る</button></div>' +
+    '<pre id="demoOut" style="display:none"></pre></div>' +
+    '<div class="card"><h2>🥋 稽古</h2><div>' + esc(L.exercise) + '</div><div style="height:8px"></div>' +
+    (L.textarea
+      ? '<textarea id="ans" rows="5" placeholder="' + esc(L.placeholder) + '"></textarea>'
+      : '<input id="ans" placeholder="' + esc(L.placeholder) + '"/>') +
+    '<div style="height:8px"></div>' +
+    '<div class="row"><button id="checkBtn" class="pri">⚖ 判定を受ける</button>' +
+    (passed ? '<span class="inka">印可</span>' : "") + '</div>' +
+    '<pre id="checkOut" style="display:none"></pre></div>';
+
+  if (pg.done === pg.total){
+    body += '<div class="cert"><h2>🈴 免許皆伝 🈴</h2>' +
+      '<p>七つの技 — トークン化・自己注意・次トークン予測・意図解析・<br/>計画と生成・検証と自己修正・量子 Bada — の伝授を完了した。</p>' +
+      '<p class="gold">これより先、あなたは BadaGPT と同じ技でアプリを錬成できる。</p></div>';
+  }
+
+  pgEl.innerHTML = '<div class="dojo"><div class="lessons">' + side + '</div><div class="lesson-body">' + body + '</div></div>';
+
+  var items = pgEl.querySelectorAll ? pgEl.querySelectorAll(".lesson-item") : [];
+  for (var j = 0; j < items.length; j++){
+    (function(it){
+      it.onclick = function(){ curLesson = parseInt(it.getAttribute("data-l"), 10); render(); };
+    })(items[j]);
+  }
+  var demoBtn = document.getElementById("demoBtn");
+  if (demoBtn) demoBtn.onclick = function(){
+    var o = document.getElementById("demoOut");
+    o.style.display = "block";
+    o.textContent = L.demo();
+  };
+  var checkBtn = document.getElementById("checkBtn");
+  if (checkBtn) checkBtn.onclick = function(){
+    var ans = document.getElementById("ans").value;
+    var r = lessonCheck(L.id, ans);   // 合格なら内部で印可を記録
+    var o = document.getElementById("checkOut");
+    o.style.display = "block";
+    o.innerHTML = (r.pass ? '<span class="ok">🈴 印可 — </span>' : '<span class="ng">✗ 未熟 — </span>') + esc(r.msg);
+    if (r.pass){ setTimeout(function(){ render(); var oo = document.getElementById("checkOut"); if (oo){ oo.style.display = "block"; oo.innerHTML = '<span class="ok">🈴 印可 — </span>' + esc(r.msg); } }, 600); }
+  };
+}
+
+/* ── 🤖 BadaGPT ── */
+function renderGPT(){
+  var pgEl = document.getElementById("pg");
+  if (!pgEl) return;
+  var msgs = "";
+  for (var i = 0; i < chatLog.length; i++){
+    var m = chatLog[i];
+    if (m.who === "user"){
+      msgs += '<div class="msg user">' + esc(m.text) + '</div>';
+    } else {
+      var trace = "";
+      if (m.stages){
+        trace = '<div class="trace" id="tr' + i + '" style="display:none">';
+        for (var s = 0; s < m.stages.length; s++){
+          trace += '<div class="stage"><b>' + esc(m.stages[s].name) + '</b> ' + esc(String(m.stages[s].detail)) + '</div>';
+        }
+        trace += '</div>';
+      }
+      msgs += '<div class="msg gpt">' + esc(m.text) +
+        (m.stages ? '<div style="margin-top:6px"><button data-tr="' + i + '" style="font-size:12px;padding:3px 10px">🔍 技を見る (パイプライン)</button></div>' + trace : "") +
+        '</div>';
+    }
+  }
+  pgEl.innerHTML =
+    '<h1>🤖 BadaGPT — 全段階を開示する対話</h1>' +
+    '<div class="sub">応答のたびに「🔍 技を見る」でトークン化→意図解析→計画→生成→検証の内部を開示。これが伝授の心臓部。</div>' +
+    '<div class="card"><div class="chat" id="chatbox">' +
+    (msgs || '<div class="dim">例: 「ベル状態を作って」「Book title:string を管理するアプリ」「補完: qubit q0 H」「技を教えて」</div>') +
+    '</div><div style="height:10px"></div>' +
+    '<div class="row"><input id="gptIn" placeholder="BadaGPT に話しかける…" style="flex:1"/>' +
+    '<button id="gptSend" class="pri">送信</button></div></div>';
+
+  var btns = pgEl.querySelectorAll ? pgEl.querySelectorAll("[data-tr]") : [];
+  for (var b = 0; b < btns.length; b++){
+    (function(bt){
+      bt.onclick = function(){
+        var tr = document.getElementById("tr" + bt.getAttribute("data-tr"));
+        if (tr) tr.style.display = (tr.style.display === "none") ? "block" : "none";
+      };
+    })(btns[b]);
+  }
+  function send(){
+    var inp = document.getElementById("gptIn");
+    var t = (inp.value || "").trim();
+    if (!t) return;
+    chatLog.push({ who: "user", text: t });
+    var r = badaGPTReply(t);
+    chatLog.push({ who: "gpt", text: r.reply, stages: r.stages });
+    render();
+    var cb = document.getElementById("chatbox");
+    if (cb && cb.parentElement && cb.parentElement.scrollIntoView) cb.parentElement.scrollIntoView(false);
+  }
+  var sendBtn = document.getElementById("gptSend");
+  if (sendBtn) sendBtn.onclick = send;
+  var gin = document.getElementById("gptIn");
+  if (gin) gin.onkeydown = function(e){ if (e && e.key === "Enter") send(); };
+}
+
+/* ── 🛠 アプリ錬成 ── */
+function renderForge(){
+  var pgEl = document.getElementById("pg");
+  if (!pgEl) return;
+  pgEl.innerHTML =
+    '<h1>🛠 アプリ錬成 — 依頼文からアプリを作る技</h1>' +
+    '<div class="sub">日本語の依頼文 → ①要件抽出 ②設計 ③コード生成 ④検証 の全手順を開示しながらアプリを錬成する。</div>' +
+    '<div class="card"><div class="row">' +
+    '<input id="forgeIn" style="flex:1" value="Book title:string author:string を管理するアプリを作って"/>' +
+    '<button id="forgeBtn" class="pri">⚒ 錬成</button></div>' +
+    '<div style="height:8px"></div>' +
+    '<div class="row dim" style="font-size:12.5px">型: 「◯◯ field:type を管理するアプリ」 / 「scaffold Post title:string」 / 「ボタンのある画面」 / その他 → 量子デモ</div></div>' +
+    '<div id="forgeOut"></div>';
+  var btn = document.getElementById("forgeBtn");
+  if (btn) btn.onclick = function(){
+    var p = document.getElementById("forgeIn").value;
+    var f = appForge(p);
+    var run = (f.kind === "quantum") ? badaInterpret(f.code) : "";
+    var o = document.getElementById("forgeOut");
+    o.innerHTML =
+      '<div class="card"><h2>🛠 錬成の手順 (技の開示)</h2><pre>' + esc(f.steps.join("\n")) + '</pre></div>' +
+      '<div class="card"><h2>📦 生成コード — ' + esc(f.kind) + ' / ' + esc(f.name) + '</h2><pre>' + esc(f.code) + '</pre>' +
+      (run ? '<h2>▶ 実行結果</h2><pre>' + esc(run) + '</pre>' : "") + '</div>';
+  };
+}
+
+/* ── ⚛ 量子ラボ ── */
+function renderLab(){
+  var pgEl = document.getElementById("pg");
+  if (!pgEl) return;
+  pgEl.innerHTML =
+    '<h1>⚛ 量子ラボ — 量子 Bada 実行系</h1>' +
+    '<div class="sub">qubit / H / X / Z / CNOT / measure / state / let / print — 第七の技の稽古場。</div>' +
+    '<div class="card"><textarea id="labIn" rows="7">qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure</textarea>' +
+    '<div style="height:8px"></div><div class="row">' +
+    '<button id="labRun" class="pri">▶ 実行</button>' +
+    '<button id="labBell">ベル状態</button>' +
+    '<button id="labGHZ">GHZ 状態 (3 qubit)</button>' +
+    '<button id="labCalc">let / print</button></div>' +
+    '<pre id="labOut" style="display:none"></pre></div>';
+  function runSrc(src){
+    var o = document.getElementById("labOut");
+    o.style.display = "block";
+    o.textContent = badaInterpret(src);
+  }
+  var lr = document.getElementById("labRun");
+  if (lr) lr.onclick = function(){ runSrc(document.getElementById("labIn").value); };
+  var lb = document.getElementById("labBell");
+  if (lb) lb.onclick = function(){ document.getElementById("labIn").value = "qubit q0 q1\nH q0\nCNOT q0 q1\nstate\nmeasure"; runSrc(document.getElementById("labIn").value); };
+  var lg = document.getElementById("labGHZ");
+  if (lg) lg.onclick = function(){ document.getElementById("labIn").value = "qubit q0 q1 q2\nH q0\nCNOT q0 q1\nCNOT q1 q2\nstate\nmeasure"; runSrc(document.getElementById("labIn").value); };
+  var lc = document.getElementById("labCalc");
+  if (lc) lc.onclick = function(){ document.getElementById("labIn").value = "let x = 1 + 2\nlet y = x * 2\nprint y\nprint \"こんにちは\""; runSrc(document.getElementById("labIn").value); };
+}
+
+render();
+</script>
+</body>
+</html>

@@ -59,6 +59,28 @@
 
 ---
 
+## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
+
+**ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_gpt_dojo/index.html をダウンロード**](bada_gpt_dojo/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-gpt-dojo-debug.apk` |
+| **Windows 10 / 11** | `BadaGPTDojo-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaGPTDojo-*-x86_64.AppImage` / `BadaGPTDojo-*-amd64.deb` |
+
+ビルドは [`badagptdojo-app-build.yml`](.github/workflows/badagptdojo-app-build.yml) が実行します(`badagptdojo-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。カリキュラム・使い方は [`bada_gpt_dojo/`](bada_gpt_dojo/) を参照。
+
+---
+
 ## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
 
 自動走行の自動車**レーヴァテイン**とアシスタントAI**アル**。**アルのトランスフォーマーが車両を操縦**します — 知覚 attention を操舵角と加減速の2値に写す制御ヘッドが、その2値だけで車体(自転車近似モデル)を動かし、周囲(16レイセンサへの attention)を検知して自動で回避・減速・停止・再発進。測位は 2 モード — **🌐 Web地図モード**は衛星を使わず、ウェブサイトから受信する地図タイル(AEAD 検証つき)+推測航法+ランドマーク補正で走り、**🛰 人工衛星モード**は 4 機の擬似距離から最小二乗で測位します。A* 経路計画・依存ゼロ・単一 HTML。
