@@ -115,19 +115,26 @@
 
 ---
 
-## 🎹 ダウンロード — Bada Studio(macOS / MacBook 専用 音楽制作アプリ)
+## 🎹 ダウンロード — Bada Studio(音楽制作アプリ: macOS / Android / Windows / Ubuntu)
 
-**Apple の MacBook / Mac 専用**のネイティブ音楽制作アプリ。SwiftUI + **AVAudioEngine(Core Audio)のリアルタイムレンダースレッド上でサンプル単位に波形を合成**します — 🎹 **8 ボイス ポリフォニックシンセ**(サイン/ノコギリ/矩形/三角 + AR エンベロープ、マウス鍵盤 & PC キー演奏)、🥁 **16 ステップ ドラムシーケンサー**(キック/スネア/ハイハットをシンセシスで生成、サンプル精度のタイミング、BPM 60–200)、🎚 **ミキサー + センドエフェクト**(ディレイ → リバーブ)、⏺ **マスターバス録音**(`~/Music/Bada Studio/*.caf`、停止で Finder に表示)。依存ゼロ・Apple 標準フレームワークのみ。
+プロ用 DAW の構成要素を 1 画面に統合した音楽制作アプリ — 🎹 **ポリフォニックシンセ**(サイン/ノコギリ/矩形/三角 + AR エンベロープ、タッチ/マウス鍵盤 & PC キー演奏)、🥁 **16 ステップ ドラムシーケンサー**(キック/スネア/ハイハットをシンセシスで生成、サンプル精度のタイミング、BPM 60–200)、🎚 **ミキサー + センドエフェクト**(ディレイ → リバーブ)、⏺ **マスターバス録音**(macOS = `~/Music/Bada Studio/*.caf`、その他 = アプリ内試聴 + WAV ダウンロード)。**MacBook / Mac 向けは SwiftUI + AVAudioEngine(Core Audio)のネイティブ実装**、Android / Windows / Ubuntu 向けは同機能の Web Audio 実装(依存ゼロ・単一 HTML)です。
 
-#### 💻 ネイティブ アプリ (macOS DMG / ZIP)
+### 👉 [**bada_studio/index.html をダウンロード**](bada_studio/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックでブラウザ起動(インストール不要、Web Audio 版)。
+
+#### 💻📱 ネイティブ アプリ (macOS DMG / APK / Windows / Ubuntu)
 
 [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `badastudio-v*` から:
 
 | プラットフォーム | ファイル |
 |:---|:---|
-| **macOS 13+ (Apple Silicon / Intel universal)** | `BadaStudio-macOS-*.dmg` / `BadaStudio-macOS-*.zip` |
+| **macOS 13+** (MacBook / Mac、Apple Silicon + Intel universal) | ★ `BadaStudio-macOS-*.dmg` / `BadaStudio-macOS-*.zip` |
+| **Android** (APK) | `bada-studio-debug.apk` |
+| **Windows 10 / 11** | `BadaStudio-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaStudio-*-x86_64.AppImage` / `BadaStudio-*-amd64.deb` |
 
-初回のみ Gatekeeper 対策で **右クリック →「開く」**(ad-hoc 署名のため)。ビルドは [`badastudio-app-build.yml`](.github/workflows/badastudio-app-build.yml) が macOS ランナーで実行します(`badastudio-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・機能・ソースからのビルドは [`bada_studio/`](bada_studio/) を参照。
+macOS は初回のみ Gatekeeper 対策で **右クリック →「開く」**(ad-hoc 署名のため)。ビルドは `badastudio-v*` タグ 1 つで 2 本のワークフローが同じ Release に全プラットフォームを添付します — [`badastudio-app-build.yml`](.github/workflows/badastudio-app-build.yml)(macOS ネイティブ)+ [`badastudio-apps-build.yml`](.github/workflows/badastudio-apps-build.yml)(APK / EXE / AppImage・deb。`workflow_dispatch` で手動実行も可)。使い方・機能・ソースからのビルドは [`bada_studio/`](bada_studio/) を参照。
 
 ---
 
@@ -186,7 +193,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
-| **`bada_studio/`** | 🎹 **Bada Studio** — macOS / MacBook 専用の音楽制作アプリ · SwiftUI + AVAudioEngine ネイティブ · 8 ボイス ポリシンセ(波形 4 種 + AR エンベロープ) · 16 ステップ ドラムシーケンサー(サンプル精度) · ディレイ → リバーブ · マスターバス録音 · universal DMG/ZIP 配布 | [→ 開く](bada_studio/) |
+| **`bada_studio/`** | 🎹 **Bada Studio** — 音楽制作アプリ · macOS は SwiftUI + AVAudioEngine ネイティブ、Android/Windows/Ubuntu は Web Audio 版(単一 HTML) · ポリシンセ(波形 4 種 + AR エンベロープ) · 16 ステップ ドラムシーケンサー(サンプル精度) · ディレイ → リバーブ · マスターバス録音(caf / WAV) · DMG/APK/EXE/AppImage 配布 | [→ 開く](bada_studio/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---

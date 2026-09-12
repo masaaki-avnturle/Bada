@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bada Studio — 音楽制作スタジオ</title>
+<!--
+  Bada Studio (Web Audio 版) — 単一 HTML・依存ゼロ・オフライン動作
+
+  macOS ネイティブ版 (bada_studio/Sources — SwiftUI + AVAudioEngine) と同じ構成:
+    - 8+ ボイス ポリフォニックシンセ (サイン / ノコギリ / 矩形 / 三角 + AR エンベロープ)
+    - 16 ステップ ドラムシーケンサー (キック / スネア / ハイハットをシンセシスで生成、
+      Web Audio クロックでサンプル精度スケジューリング)
+    - ミキサー + センドエフェクト (ディレイ → コンボリューションリバーブ)
+    - マスターバス録音 → WAV 書き出し (アプリ内試聴 + ダウンロード)
+
+  この 1 ファイルをそのまま
+    - Android APK (Cordova WebView)
+    - Windows 10/11 EXE (Electron)
+    - Ubuntu AppImage / deb (Electron)
+  に同梱して配布します (.github/workflows/badastudio-apps-build.yml)。
+-->
+<style>
+  :root {
+    --bg0: #191c26;
+    --bg1: #0d0e14;
+    --panel: rgba(255, 255, 255, 0.06);
+    --panel-border: rgba(255, 255, 255, 0.09);
+    --text: #e8eaf2;
+    --dim: rgba(232, 234, 242, 0.62);
+    --faint: rgba(232, 234, 242, 0.38);
+    --accent: #37c8dc;
+    --hot: #ff9330;
+    --rec: #ff4d5a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+    background: linear-gradient(180deg, var(--bg0), var(--bg1));
+    color: var(--text);
+    padding: 14px;
+    min-height: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; letter-spacing: 0.04em; }
+  header .sub { color: var(--faint); font-size: 12px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .panel h2 { font-size: 13px; color: var(--dim); font-weight: 600; margin-bottom: 10px; letter-spacing: 0.03em; }
+  .cols { display: flex; gap: 12px; flex-wrap: wrap; }
+  .cols > .panel { flex: 1 1 340px; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 7px 0; flex-wrap: wrap; }
+  .row label { width: 96px; font-size: 12px; color: var(--dim); flex-shrink: 0; }
+  .row input[type=range] { flex: 1; min-width: 110px; accent-color: var(--accent); }
+  .row .val { width: 64px; text-align: right; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
+  button {
+    font: inherit; font-size: 13px;
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 8px;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  button:active { background: rgba(255, 255, 255, 0.22); }
+  button.primary { background: rgba(55, 200, 220, 0.22); border-color: rgba(55, 200, 220, 0.55); }
+  button.rec-on { background: rgba(255, 77, 90, 0.25); border-color: var(--rec); color: #ffb3b9; }
+  .seg { display: inline-flex; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; padding: 7px 12px; font-size: 12px; background: transparent; }
+  .seg button.on { background: rgba(55, 200, 220, 0.30); color: #d9f6fa; }
+  .status { font-size: 12px; color: var(--dim); }
+  .status.rec { color: var(--rec); font-weight: 700; }
+
+  /* ステップシーケンサー */
+  .drumrow { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+  .drumrow .name { width: 76px; font-size: 12px; color: var(--dim); flex-shrink: 0; }
+  .cells { display: flex; gap: 4px; flex: 1; }
+  .cell {
+    flex: 1; height: 30px; border-radius: 4px;
+    background: rgba(255, 255, 255, 0.07);
+    cursor: pointer;
+  }
+  .cell.beat { background: rgba(255, 255, 255, 0.14); }
+  .cell.on { background: rgba(55, 200, 220, 0.85); }
+  .cell.now { outline: 2px solid var(--hot); outline-offset: -2px; }
+  .cell.on.now { background: var(--hot); }
+
+  /* 鍵盤 */
+  #keyboard { position: relative; height: 150px; touch-action: none; }
+  .wkey, .bkey { position: absolute; top: 0; border: 1px solid rgba(0, 0, 0, 0.75); border-radius: 0 0 5px 5px; cursor: pointer; }
+  .wkey { height: 100%; background: #eef0f4; z-index: 1; }
+  .bkey { height: 60%; background: #16181f; z-index: 2; }
+  .wkey.down, .bkey.down { background: var(--hot); }
+  .hint { font-size: 11px; color: var(--faint); margin-top: 8px; }
+  audio { height: 30px; vertical-align: middle; }
+  a.dl { color: var(--accent); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎹 Bada Studio</h1>
+  <span class="sub">音楽制作スタジオ — シンセ / ドラムマシン / ミキサー / 録音 (単一ファイル・オフライン動作)</span>
+</header>
+
+<div class="panel">
+  <h2>トランスポート</h2>
+  <div class="row">
+    <button id="btnPlay" class="primary">▶ 再生</button>
+    <button id="btnRec">⏺ 録音</button>
+    <span id="recStatus" class="status"></span>
+    <span style="flex:1"></span>
+    <label style="width:auto">BPM</label>
+    <input type="range" id="bpm" min="60" max="200" step="1" value="120" style="max-width:180px">
+    <span class="val" id="bpmVal">120</span>
+    <label style="width:auto">マスター</label>
+    <input type="range" id="master" min="0" max="100" step="1" value="85" style="max-width:140px">
+  </div>
+  <div class="row" id="recOutRow" style="display:none">
+    <span class="status">録音結果:</span>
+    <audio id="recAudio" controls></audio>
+    <a id="recDl" class="dl" download>WAV をダウンロード</a>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <h2>シンセサイザー — ポリフォニック</h2>
+    <div class="row">
+      <label>波形</label>
+      <span class="seg" id="waveSeg">
+        <button data-wave="sine">サイン</button>
+        <button data-wave="sawtooth" class="on">ノコギリ</button>
+        <button data-wave="square">矩形</button>
+        <button data-wave="triangle">三角</button>
+      </span>
+    </div>
+    <div class="row"><label>アタック</label><input type="range" id="attack" min="1" max="1000" value="10"><span class="val" id="attackVal">0.010 s</span></div>
+    <div class="row"><label>リリース</label><input type="range" id="release" min="20" max="3000" value="350"><span class="val" id="releaseVal">0.35 s</span></div>
+    <div class="row"><label>音量</label><input type="range" id="synthVol" min="0" max="100" value="80"><span class="val" id="synthVolVal">80</span></div>
+    <div class="row">
+      <label>オクターブ</label>
+      <button id="octDown">−</button>
+      <span class="val" id="octVal" style="width:44px;text-align:center">C4</span>
+      <button id="octUp">＋</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h2>ミキサー &amp; エフェクト</h2>
+    <div class="row"><label>ドラム音量</label><input type="range" id="drumVol" min="0" max="100" value="90"><span class="val" id="drumVolVal">90</span></div>
+    <div class="row"><label>リバーブ</label><input type="range" id="reverbMix" min="0" max="100" value="18"><span class="val" id="reverbMixVal">18 %</span></div>
+    <div class="row"><label>ディレイ</label><input type="range" id="delayMix" min="0" max="100" value="0"><span class="val" id="delayMixVal">0 %</span></div>
+    <div class="row"><label>遅延時間</label><input type="range" id="delayTime" min="50" max="1000" value="280"><span class="val" id="delayTimeVal">0.28 s</span></div>
+    <div class="row"><label>フィードバック</label><input type="range" id="delayFb" min="0" max="90" value="30"><span class="val" id="delayFbVal">30 %</span></div>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>ステップシーケンサー — 16 ステップ / 3 トラック</h2>
+  <div id="drumGrid"></div>
+  <div class="row" style="margin-top:8px">
+    <button id="btnClear">パターンをクリア</button>
+    <span class="hint">マスを押して打ち込み。再生中はオレンジ枠が現在位置。</span>
+  </div>
+</div>
+
+<div class="panel">
+  <h2>鍵盤 — タッチ / マウス演奏、PC キー (A W S E D F T G Y H U J K O L)</h2>
+  <div id="keyboard"></div>
+  <div class="hint">2 オクターブ。PC キーボードはピアノ配列 (A=ド、W=ド♯ …)。</div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================================================
+ * 純ロジック (engine-test.js が node の vm で検証する部分)
+ * ============================================================ */
+
+var STEPS = 16;
+var TRACKS = 3;
+var DRUM_NAMES = ["キック", "スネア", "ハイハット"];
+
+function clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
+
+/* MIDI ノート番号 → 周波数 (A4 = 69 = 440Hz) */
+function noteToFreq(note) { return 440 * Math.pow(2, (note - 69) / 12); }
+
+/* 16 分音符 1 個の長さ (秒)。BPM は 30〜300 に制限 */
+function secondsPerStep(bpm) {
+  var b = Math.max(30, Math.min(300, +bpm || 120));
+  return 60 / b / 4;
+}
+
+/* 波形サンプル (phase は周期 1.0)。シンセの OscillatorNode と同じ 4 種 */
+function oscSample(shape, phase) {
+  var p = phase - Math.floor(phase);
+  if (shape === "sine") return Math.sin(2 * Math.PI * p);
+  if (shape === "sawtooth") return 2 * p - 1;
+  if (shape === "square") return p < 0.5 ? 1 : -1;
+  if (shape === "triangle") return 1 - 4 * Math.abs(p - 0.5);
+  return 0;
+}
+
+/* 線形合同法による決定論ノイズ [-1, 1)。ドラムのノイズバッファ生成用 */
+function makeNoiseArray(length, seed) {
+  var s = (seed >>> 0) || 0x12345678;
+  var out = new Float32Array(length);
+  for (var i = 0; i < length; i++) {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    out[i] = s / 2147483648 - 1;
+  }
+  return out;
+}
+
+/* 指数減衰エンベロープ e^(-t/τ) */
+function decayEnv(t, tau) { return Math.exp(-t / Math.max(1e-6, tau)); }
+
+/* キックのピッチスイープ: 160Hz → 45Hz */
+function kickFreq(t) { return 45 + 115 * Math.exp(-t * 22); }
+
+/* パターン配列 (TRACKS x STEPS を 1 次元で保持) の添字 */
+function patternIndex(track, step) { return track * STEPS + step; }
+
+/* 定番の 4 つ打ち + バックビート + 8 分ハイハット */
+function defaultPattern() {
+  var p = new Array(TRACKS * STEPS);
+  for (var i = 0; i < p.length; i++) p[i] = false;
+  [0, 4, 8, 12].forEach(function (s) { p[patternIndex(0, s)] = true; });
+  [4, 12].forEach(function (s) { p[patternIndex(1, s)] = true; });
+  for (var s2 = 0; s2 < STEPS; s2 += 2) p[patternIndex(2, s2)] = true;
+  return p;
+}
+
+/* PC キー → MIDI ノート (ピアノ配列)。該当なしは null */
+var KEY_OFFSETS = { a: 0, w: 1, s: 2, e: 3, d: 4, f: 5, t: 6, g: 7, y: 8, h: 9, u: 10, j: 11, k: 12, o: 13, l: 14 };
+function keyToNote(ch, octave) {
+  var off = KEY_OFFSETS[ch];
+  if (off === undefined) return null;
+  return (octave + 1) * 12 + off;
+}
+
+/* Float32 チャンネル群 → 16bit PCM WAV (ArrayBuffer)。録音書き出し用 */
+function encodeWav(channels, sampleRate) {
+  var numCh = channels.length;
+  var len = numCh > 0 ? channels[0].length : 0;
+  var blockAlign = numCh * 2;
+  var dataSize = len * blockAlign;
+  var buf = new ArrayBuffer(44 + dataSize);
+  var dv = new DataView(buf);
+  function wstr(off, str) { for (var i = 0; i < str.length; i++) dv.setUint8(off + i, str.charCodeAt(i)); }
+  wstr(0, "RIFF"); dv.setUint32(4, 36 + dataSize, true); wstr(8, "WAVE");
+  wstr(12, "fmt "); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+  dv.setUint16(22, numCh, true); dv.setUint32(24, sampleRate, true);
+  dv.setUint32(28, sampleRate * blockAlign, true); dv.setUint16(32, blockAlign, true);
+  dv.setUint16(34, 16, true);
+  wstr(36, "data"); dv.setUint32(40, dataSize, true);
+  var off2 = 44;
+  for (var i2 = 0; i2 < len; i2++) {
+    for (var c = 0; c < numCh; c++) {
+      var x = channels[c][i2];
+      x = x < -1 ? -1 : (x > 1 ? 1 : x);
+      dv.setInt16(off2, x < 0 ? x * 32768 : x * 32767, true);
+      off2 += 2;
+    }
+  }
+  return buf;
+}
+
+/* ============================================================
+ * アプリ状態
+ * ============================================================ */
+
+var state = {
+  wave: "sawtooth",
+  attack: 0.01,
+  release: 0.35,
+  octave: 4,
+  bpm: 120,
+  synthVol: 0.8,
+  drumVol: 0.9,
+  masterVol: 0.85,
+  reverbMix: 0.18,
+  delayMix: 0,
+  delayTime: 0.28,
+  delayFb: 0.3,
+  pattern: defaultPattern(),
+  playing: false,
+  recording: false
+};
+
+/* ============================================================
+ * Web Audio エンジン (最初のユーザー操作で初期化)
+ * ============================================================ */
+
+var ctx = null;
+var nodes = null;      // { master, synthBus, drumBus, sub, delay, delayFb, delayWet, revWet, recProc, recMute }
+var noiseBuffer = null;
+var recChunksL = null, recChunksR = null, recLength = 0;
+var voices = {};       // note -> { osc, gain }
+var seqTimer = null, nextStepTime = 0, stepIdx = 0;
+
+function ensureAudio() {
+  if (ctx) {
+    if (ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) { alert("この環境は Web Audio API に対応していません"); return null; }
+  ctx = new AC();
+
+  var master = ctx.createGain();
+  master.gain.value = state.masterVol;
+  master.connect(ctx.destination);
+
+  var sub = ctx.createGain();
+  sub.gain.value = 1;
+  sub.connect(master); // ドライ
+
+  var synthBus = ctx.createGain();
+  synthBus.gain.value = state.synthVol;
+  synthBus.connect(sub);
+
+  var drumBus = ctx.createGain();
+  drumBus.gain.value = state.drumVol;
+  drumBus.connect(sub);
+
+  /* ディレイ (フィードバックループ) */
+  var delay = ctx.createDelay(2.0);
+  delay.delayTime.value = state.delayTime;
+  var delayFb = ctx.createGain();
+  delayFb.gain.value = state.delayFb;
+  var delayWet = ctx.createGain();
+  delayWet.gain.value = state.delayMix;
+  sub.connect(delay);
+  delay.connect(delayFb);
+  delayFb.connect(delay);
+  delay.connect(delayWet);
+  delayWet.connect(master);
+
+  /* コンボリューションリバーブ (減衰ノイズのインパルス応答を生成) */
+  var convolver = ctx.createConvolver();
+  var irLen = Math.floor(ctx.sampleRate * 1.8);
+  var ir = ctx.createBuffer(2, irLen, ctx.sampleRate);
+  for (var ch = 0; ch < 2; ch++) {
+    var data = ir.getChannelData(ch);
+    var noise = makeNoiseArray(irLen, ch === 0 ? 0xBADA0001 : 0xBADA0002);
+    for (var i = 0; i < irLen; i++) data[i] = noise[i] * decayEnv(i / ctx.sampleRate, 0.45) * 0.5;
+  }
+  convolver.buffer = ir;
+  var revWet = ctx.createGain();
+  revWet.gain.value = state.reverbMix;
+  sub.connect(convolver);
+  convolver.connect(revWet);
+  revWet.connect(master);
+
+  /* ドラム用ノイズバッファ (決定論 LCG) */
+  var nbLen = Math.floor(ctx.sampleRate * 0.5);
+  noiseBuffer = ctx.createBuffer(1, nbLen, ctx.sampleRate);
+  noiseBuffer.getChannelData(0).set(makeNoiseArray(nbLen, 0xBADA5EED));
+
+  nodes = {
+    master: master, sub: sub, synthBus: synthBus, drumBus: drumBus,
+    delay: delay, delayFb: delayFb, delayWet: delayWet, revWet: revWet,
+    recProc: null, recMute: null
+  };
+  return ctx;
+}
+
+/* ---------------- シンセ ---------------- */
+
+function noteOn(note) {
+  if (!ensureAudio()) return;
+  if (voices[note]) return;
+  var osc = ctx.createOscillator();
+  osc.type = state.wave;
+  osc.frequency.value = noteToFreq(note);
+  var gain = ctx.createGain();
+  var now = ctx.currentTime;
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.linearRampToValueAtTime(0.25, now + Math.max(0.001, state.attack));
+  osc.connect(gain);
+  gain.connect(nodes.synthBus);
+  osc.start(now);
+  voices[note] = { osc: osc, gain: gain };
+}
+
+function noteOff(note) {
+  var v = voices[note];
+  if (!v || !ctx) return;
+  delete voices[note];
+  var now = ctx.currentTime;
+  var rel = Math.max(0.02, state.release);
+  v.gain.gain.cancelScheduledValues(now);
+  v.gain.gain.setValueAtTime(Math.max(0.0001, v.gain.gain.value), now);
+  v.gain.gain.linearRampToValueAtTime(0.0001, now + rel);
+  v.osc.stop(now + rel + 0.05);
+}
+
+/* ---------------- ドラムシンセ ---------------- */
+
+function playKick(t) {
+  var osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(160, t);
+  osc.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(1.1, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+  osc.connect(g); g.connect(nodes.drumBus);
+  osc.start(t); osc.stop(t + 0.4);
+}
+
+function playSnare(t) {
+  var src = ctx.createBufferSource();
+  src.buffer = noiseBuffer;
+  var bp = ctx.createBiquadFilter();
+  bp.type = "highpass"; bp.frequency.value = 1400;
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.7, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  src.connect(bp); bp.connect(g); g.connect(nodes.drumBus);
+  src.start(t); src.stop(t + 0.2);
+
+  var osc = ctx.createOscillator();
+  osc.type = "triangle"; osc.frequency.value = 190;
+  var g2 = ctx.createGain();
+  g2.gain.setValueAtTime(0.3, t);
+  g2.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  osc.connect(g2); g2.connect(nodes.drumBus);
+  osc.start(t); osc.stop(t + 0.15);
+}
+
+function playHat(t) {
+  var src = ctx.createBufferSource();
+  src.buffer = noiseBuffer;
+  var hp = ctx.createBiquadFilter();
+  hp.type = "highpass"; hp.frequency.value = 6000;
+  var g = ctx.createGain();
+  g.gain.setValueAtTime(0.5, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+  src.connect(hp); hp.connect(g); g.connect(nodes.drumBus);
+  src.start(t); src.stop(t + 0.08);
+}
+
+/* ---------------- シーケンサー (先読みスケジューラ) ---------------- */
+
+function scheduleStep(step, t) {
+  if (state.pattern[patternIndex(0, step)]) playKick(t);
+  if (state.pattern[patternIndex(1, step)]) playSnare(t);
+  if (state.pattern[patternIndex(2, step)]) playHat(t);
+}
+
+function schedulerTick() {
+  while (nextStepTime < ctx.currentTime + 0.12) {
+    scheduleStep(stepIdx, nextStepTime);
+    (function (s, at) {
+      var ms = Math.max(0, (at - ctx.currentTime) * 1000);
+      setTimeout(function () { if (state.playing) highlightStep(s); }, ms);
+    })(stepIdx, nextStepTime);
+    nextStepTime += secondsPerStep(state.bpm);
+    stepIdx = (stepIdx + 1) % STEPS;
+  }
+}
+
+function startSeq() {
+  if (!ensureAudio()) return;
+  state.playing = true;
+  stepIdx = 0;
+  nextStepTime = ctx.currentTime + 0.06;
+  seqTimer = setInterval(schedulerTick, 25);
+}
+
+function stopSeq() {
+  state.playing = false;
+  if (seqTimer !== null) { clearInterval(seqTimer); seqTimer = null; }
+  highlightStep(-1);
+}
+
+/* ---------------- 録音 (マスターバス → WAV) ---------------- */
+
+function startRecording() {
+  if (!ensureAudio()) return false;
+  recChunksL = []; recChunksR = []; recLength = 0;
+  var proc = ctx.createScriptProcessor(4096, 2, 2);
+  proc.onaudioprocess = function (ev) {
+    if (!state.recording) return;
+    recChunksL.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+    recChunksR.push(new Float32Array(ev.inputBuffer.getChannelData(1)));
+    recLength += ev.inputBuffer.length;
+  };
+  var mute = ctx.createGain();
+  mute.gain.value = 0;
+  nodes.master.connect(proc);
+  proc.connect(mute);
+  mute.connect(ctx.destination);
+  nodes.recProc = proc;
+  nodes.recMute = mute;
+  state.recording = true;
+  return true;
+}
+
+function mergeChunks(chunks, total) {
+  var out = new Float32Array(total);
+  var off = 0;
+  for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], off); off += chunks[i].length; }
+  return out;
+}
+
+function stopRecording() {
+  state.recording = false;
+  if (nodes && nodes.recProc) {
+    try { nodes.master.disconnect(nodes.recProc); } catch (e) {}
+    try { nodes.recProc.disconnect(); } catch (e2) {}
+    try { nodes.recMute.disconnect(); } catch (e3) {}
+    nodes.recProc = null; nodes.recMute = null;
+  }
+  if (!recLength) return null;
+  var L = mergeChunks(recChunksL, recLength);
+  var R = mergeChunks(recChunksR, recLength);
+  recChunksL = recChunksR = null;
+  return encodeWav([L, R], ctx.sampleRate);
+}
+
+/* ============================================================
+ * UI
+ * ============================================================ */
+
+function $(id) { return document.getElementById(id); }
+
+function fmt(n, digits, unit) { return n.toFixed(digits) + (unit || ""); }
+
+/* --- ステップシーケンサーのグリッド --- */
+
+var cellEls = [];
+
+function buildDrumGrid() {
+  var grid = $("drumGrid");
+  cellEls = [];
+  for (var track = 0; track < TRACKS; track++) {
+    var row = document.createElement("div");
+    row.className = "drumrow";
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = DRUM_NAMES[track];
+    row.appendChild(name);
+    var cells = document.createElement("div");
+    cells.className = "cells";
+    for (var step = 0; step < STEPS; step++) {
+      var cell = document.createElement("div");
+      cell.className = "cell" + (step % 4 === 0 ? " beat" : "");
+      (function (tr, st, el) {
+        el.addEventListener("pointerdown", function (ev) {
+          ev.preventDefault();
+          state.pattern[patternIndex(tr, st)] = !state.pattern[patternIndex(tr, st)];
+          renderGrid();
+        });
+      })(track, step, cell);
+      cells.appendChild(cell);
+      cellEls.push(cell);
+    }
+    row.appendChild(cells);
+    grid.appendChild(row);
+  }
+  renderGrid();
+}
+
+function renderGrid() {
+  for (var track = 0; track < TRACKS; track++) {
+    for (var step = 0; step < STEPS; step++) {
+      var el = cellEls[track * STEPS + step];
+      if (!el) continue;
+      el.classList.toggle("on", !!state.pattern[patternIndex(track, step)]);
+    }
+  }
+}
+
+var lastLit = -1;
+function highlightStep(step) {
+  if (lastLit >= 0) {
+    for (var t0 = 0; t0 < TRACKS; t0++) {
+      var prev = cellEls[t0 * STEPS + lastLit];
+      if (prev) prev.classList.remove("now");
+    }
+  }
+  lastLit = step;
+  if (step >= 0) {
+    for (var t1 = 0; t1 < TRACKS; t1++) {
+      var cur = cellEls[t1 * STEPS + step];
+      if (cur) cur.classList.add("now");
+    }
+  }
+}
+
+/* --- 鍵盤 --- */
+
+var WHITE_OFFSETS = [0, 2, 4, 5, 7, 9, 11];
+var BLACK_KEYS = [
+  { offset: 1, pos: 1 }, { offset: 3, pos: 2 }, { offset: 6, pos: 4 },
+  { offset: 8, pos: 5 }, { offset: 10, pos: 6 }
+];
+var OCTAVE_SPAN = 2;
+var keyEls = {};   // note -> element (現在のオクターブでの表示)
+
+function buildKeyboard() {
+  var kb = $("keyboard");
+  kb.innerHTML = "";
+  keyEls = {};
+  var whiteCount = OCTAVE_SPAN * 7 + 1;
+  var w = 100 / whiteCount;
+  var base = (state.octave + 1) * 12;
+
+  for (var i = 0; i < whiteCount; i++) {
+    var note = base + Math.floor(i / 7) * 12 + WHITE_OFFSETS[i % 7];
+    var el = document.createElement("div");
+    el.className = "wkey";
+    el.style.left = (i * w) + "%";
+    el.style.width = w + "%";
+    attachKeyHandlers(el, note);
+    kb.appendChild(el);
+    keyEls[note] = el;
+  }
+  for (var oct = 0; oct < OCTAVE_SPAN; oct++) {
+    for (var b = 0; b < BLACK_KEYS.length; b++) {
+      var bk = BLACK_KEYS[b];
+      var bnote = base + oct * 12 + bk.offset;
+      var bel = document.createElement("div");
+      bel.className = "bkey";
+      var center = (oct * 7 + bk.pos) * w;
+      bel.style.left = (center - w * 0.31) + "%";
+      bel.style.width = (w * 0.62) + "%";
+      attachKeyHandlers(bel, bnote);
+      kb.appendChild(bel);
+      keyEls[bnote] = bel;
+    }
+  }
+}
+
+function attachKeyHandlers(el, note) {
+  el.addEventListener("pointerdown", function (ev) {
+    ev.preventDefault();
+    try { el.setPointerCapture(ev.pointerId); } catch (e) {}
+    el.classList.add("down");
+    noteOn(note);
+  });
+  function up() { el.classList.remove("down"); noteOff(note); }
+  el.addEventListener("pointerup", up);
+  el.addEventListener("pointercancel", up);
+  el.addEventListener("lostpointercapture", up);
+}
+
+function setKeyVisual(note, down) {
+  var el = keyEls[note];
+  if (el) el.classList.toggle("down", down);
+}
+
+/* --- コントロール配線 --- */
+
+function bindSlider(id, apply) {
+  var el = $(id);
+  el.addEventListener("input", function () { apply(+el.value); });
+  apply(+el.value);
+}
+
+function initControls() {
+  $("btnPlay").addEventListener("click", function () {
+    if (state.playing) {
+      stopSeq();
+      $("btnPlay").textContent = "▶ 再生";
+    } else {
+      startSeq();
+      $("btnPlay").textContent = "⏹ 停止";
+    }
+  });
+
+  $("btnRec").addEventListener("click", function () {
+    if (state.recording) {
+      var wav = stopRecording();
+      $("btnRec").classList.remove("rec-on");
+      $("btnRec").textContent = "⏺ 録音";
+      $("recStatus").className = "status";
+      if (wav) {
+        var stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+        var name = "BadaStudio-" + stamp + ".wav";
+        var blob = new Blob([wav], { type: "audio/wav" });
+        var url = URL.createObjectURL(blob);
+        $("recAudio").src = url;
+        var dl = $("recDl");
+        dl.href = url;
+        dl.setAttribute("download", name);
+        dl.textContent = name + " をダウンロード";
+        $("recOutRow").style.display = "";
+        $("recStatus").textContent = "保存準備完了: " + name;
+      } else {
+        $("recStatus").textContent = "";
+      }
+    } else if (startRecording()) {
+      $("btnRec").classList.add("rec-on");
+      $("btnRec").textContent = "⏺ 録音停止";
+      $("recStatus").className = "status rec";
+      $("recStatus").textContent = "● REC";
+    }
+  });
+
+  bindSlider("bpm", function (v) { state.bpm = v; $("bpmVal").textContent = v; });
+  bindSlider("master", function (v) {
+    state.masterVol = v / 100;
+    if (nodes) nodes.master.gain.value = state.masterVol;
+  });
+  bindSlider("attack", function (v) { state.attack = v / 1000; $("attackVal").textContent = fmt(state.attack, 3, " s"); });
+  bindSlider("release", function (v) { state.release = v / 1000; $("releaseVal").textContent = fmt(state.release, 2, " s"); });
+  bindSlider("synthVol", function (v) {
+    state.synthVol = v / 100; $("synthVolVal").textContent = v;
+    if (nodes) nodes.synthBus.gain.value = state.synthVol;
+  });
+  bindSlider("drumVol", function (v) {
+    state.drumVol = v / 100; $("drumVolVal").textContent = v;
+    if (nodes) nodes.drumBus.gain.value = state.drumVol;
+  });
+  bindSlider("reverbMix", function (v) {
+    state.reverbMix = v / 100; $("reverbMixVal").textContent = v + " %";
+    if (nodes) nodes.revWet.gain.value = state.reverbMix;
+  });
+  bindSlider("delayMix", function (v) {
+    state.delayMix = v / 100; $("delayMixVal").textContent = v + " %";
+    if (nodes) nodes.delayWet.gain.value = state.delayMix;
+  });
+  bindSlider("delayTime", function (v) {
+    state.delayTime = v / 1000; $("delayTimeVal").textContent = fmt(state.delayTime, 2, " s");
+    if (nodes) nodes.delay.delayTime.setTargetAtTime(state.delayTime, ctx.currentTime, 0.05);
+  });
+  bindSlider("delayFb", function (v) {
+    state.delayFb = v / 100; $("delayFbVal").textContent = v + " %";
+    if (nodes) nodes.delayFb.gain.value = state.delayFb;
+  });
+
+  var seg = $("waveSeg");
+  var segBtns = seg.querySelectorAll("button");
+  for (var i = 0; i < segBtns.length; i++) {
+    (function (btn) {
+      btn.addEventListener("click", function () {
+        state.wave = btn.getAttribute("data-wave");
+        for (var j = 0; j < segBtns.length; j++) segBtns[j].classList.remove("on");
+        btn.classList.add("on");
+      });
+    })(segBtns[i]);
+  }
+
+  $("octDown").addEventListener("click", function () { setOctave(state.octave - 1); });
+  $("octUp").addEventListener("click", function () { setOctave(state.octave + 1); });
+
+  $("btnClear").addEventListener("click", function () {
+    for (var i2 = 0; i2 < state.pattern.length; i2++) state.pattern[i2] = false;
+    renderGrid();
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.repeat) return;
+    var tag = ev.target && ev.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    var note = keyToNote((ev.key || "").toLowerCase(), state.octave);
+    if (note === null) return;
+    ev.preventDefault();
+    noteOn(note);
+    setKeyVisual(note, true);
+  });
+  document.addEventListener("keyup", function (ev) {
+    var note = keyToNote((ev.key || "").toLowerCase(), state.octave);
+    if (note === null) return;
+    noteOff(note);
+    setKeyVisual(note, false);
+  });
+}
+
+function setOctave(oct) {
+  state.octave = Math.max(2, Math.min(6, oct));
+  $("octVal").textContent = "C" + state.octave;
+  buildKeyboard();
+}
+
+/* --- 起動 --- */
+
+function initUI() {
+  buildDrumGrid();
+  buildKeyboard();
+  initControls();
+  setOctave(state.octave);
+}
+
+if (typeof document !== "undefined" && document.getElementById) {
+  initUI();
+}
+</script>
+</body>
+</html>
