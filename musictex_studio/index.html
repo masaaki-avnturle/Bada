@@ -17,237 +17,293 @@
         musixtex -p score.tex
 -->
 <style>
+
+  /* ============================================================
+     macOS デスクトップ専用アプリ風スキン — スペクトルコード制作
+     (タイトルバー + ツールバー/LCD + ライブラリ + インスペクタ)
+     ============================================================ */
   :root {
-    --bg: #0b0e14; --bg2: #121826; --bg3: #1a2234;
-    --fg: #d8dee9; --dim: #8792a8; --line: #263149;
-    --gold: #c8a44a; --blue: #4a80d0; --teal: #40b8c0; --purple: #9060d0;
-    --red: #d06060; --green: #60c080;
+    --win: #28282c; --bar: #323236; --bar2: #2a2a2e;
+    --panel: #1e1e21; --panel2: #232327; --field: #161619;
+    --line: #3a3a3f; --hairline: #0a0a0c;
+    --fg: #e8e8ea; --dim: #98989f; --dim2: #6e6e76;
+    --accent: #0a84ff; --accent-dim: #0a84ff55;
+    --lcd-bg: #1a221a; --lcd-fg: #b9e08e; --lcd-dim: #7a9a5e;
+    --gold: #c8a44a; --teal: #40b8c0; --purple: #b08ae0;
+    --red: #ff5f57; --yellow: #febc2e; --green: #28c840;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--fg);
-    font: 14px/1.6 "Segoe UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+    margin: 0; background: var(--win); color: var(--fg);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+          "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+    display: flex; flex-direction: column; user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: #4a4a50; border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* --- タイトルバー (信号機ボタン) --- */
+  #titlebar {
+    height: 36px; flex: none; display: flex; align-items: center;
+    background: linear-gradient(#3a3a3e, #303034);
+    border-bottom: 1px solid var(--hairline); position: relative;
+    -webkit-app-region: drag;
+  }
+  #titlebar .lights { display: flex; gap: 8px; padding: 0 14px; }
+  .tl { width: 12px; height: 12px; border-radius: 50%; display: inline-block;
+        box-shadow: inset 0 0 1px rgba(0,0,0,.4); }
+  .tl.red { background: var(--red); } .tl.yellow { background: var(--yellow); }
+  .tl.green { background: var(--green); }
+  #titlebar .wintitle {
+    position: absolute; left: 0; right: 0; text-align: center;
+    font-size: 13px; color: var(--dim); pointer-events: none; font-weight: 500;
+  }
+
+  /* --- ツールバー (トランスポート + LCD) --- */
+  #toolbar {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: linear-gradient(var(--bar), var(--bar2));
+    border-bottom: 1px solid var(--hairline); flex-wrap: wrap;
+  }
+  .tb-group { display: flex; align-items: center; gap: 6px; }
+  .tbtn {
+    display: inline-flex; flex-direction: column; align-items: center; gap: 1px;
+    min-width: 52px; padding: 3px 8px; border-radius: 7px; cursor: pointer;
+    background: transparent; border: 1px solid transparent; color: var(--dim);
+    font-size: 15px; line-height: 1.1; font-family: inherit;
+  }
+  .tbtn span { font-size: 10px; }
+  .tbtn:hover { background: #ffffff14; color: var(--fg); }
+  .tbtn:active { background: #ffffff22; }
+  .transport { margin-left: 4px; }
+  .tpbtn {
+    width: 40px; height: 30px; border-radius: 7px; border: 1px solid var(--line);
+    background: linear-gradient(#3c3c40, #303034); color: var(--fg);
+    font-size: 14px; cursor: pointer;
+  }
+  .tpbtn:hover { background: #46464c; }
+  .tpbtn.play { color: var(--green); font-size: 16px; }
+  #lcd {
+    flex: 1 1 240px; min-width: 200px; max-width: 560px; margin: 0 auto;
+    background: var(--lcd-bg); border-radius: 8px; padding: 4px 14px;
+    border: 1px solid #000; box-shadow: inset 0 1px 4px rgba(0,0,0,.6);
+    overflow: hidden;
+  }
+  #lcd .lcd-title {
+    font-size: 9.5px; letter-spacing: .12em; color: var(--lcd-dim);
+    text-transform: uppercase; white-space: nowrap;
+  }
+  #status {
+    font: 12px/1.5 "SF Mono", "Cascadia Code", "Consolas", monospace;
+    color: var(--lcd-fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #toolbar select {
+    background: #3c3c40; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 6px; font-size: 12px; font-family: inherit;
+  }
+
+  /* --- 3 ペイン構成 --- */
+  main { flex: 1; display: flex; min-height: 0; }
+  aside {
+    flex: none; background: var(--panel); overflow-y: auto; overflow-x: hidden;
     display: flex; flex-direction: column;
   }
-  header {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 10px 16px; background: var(--bg2); border-bottom: 1px solid var(--line);
+  #library { width: 176px; border-right: 1px solid var(--hairline); }
+  #inspector { width: 258px; border-left: 1px solid var(--hairline); background: var(--panel2); }
+  .pane-head {
+    flex: none; padding: 8px 12px 4px; font-size: 11px; font-weight: 600;
+    color: var(--dim); letter-spacing: .06em; text-transform: uppercase;
   }
-  header h1 { font-size: 17px; margin: 0; color: var(--gold); white-space: nowrap; }
-  header h1 .sub { color: var(--dim); font-weight: normal; font-size: 12px; }
-  header .spacer { flex: 1; }
-  .btn {
-    background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
-    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  .sec-head {
+    padding: 8px 12px 3px; font-size: 10.5px; font-weight: 600; color: var(--dim2);
   }
-  .btn:hover { border-color: var(--gold); color: var(--gold); }
-  .btn.primary { border-color: var(--gold); color: var(--gold); }
-  .btn.small { padding: 3px 8px; font-size: 12px; }
-  select, input[type="file"] {
-    background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
-    border-radius: 6px; padding: 6px 8px; font-size: 13px;
+  .lib-item {
+    display: flex; align-items: center; gap: 8px; padding: 4px 12px;
+    font-size: 12.5px; cursor: pointer; color: var(--fg); border: 0;
+    background: transparent; width: 100%; text-align: left; font-family: inherit;
   }
-  main { flex: 1; display: flex; min-height: 0; }
-  #left {
-    width: 46%; min-width: 320px; display: flex; flex-direction: column;
-    border-right: 1px solid var(--line); background: var(--bg2);
-  }
-  #palette {
-    padding: 8px 10px; border-bottom: 1px solid var(--line);
-    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  }
-  #palette .grp {
-    display: flex; gap: 3px; align-items: center;
-    background: var(--bg3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px;
-  }
-  #palette .lbl { color: var(--dim); font-size: 11px; margin-right: 2px; white-space: nowrap; }
-  .pbtn {
-    background: transparent; color: var(--fg); border: 1px solid transparent;
-    border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 13px; min-width: 26px;
-  }
-  .pbtn:hover { border-color: var(--gold); color: var(--gold); }
-  .pbtn.on { border-color: var(--teal); color: var(--teal); }
-  #synthPanel {
-    border-bottom: 1px solid var(--line); padding: 6px 10px;
-    display: flex; flex-direction: column; gap: 5px; background: var(--bg2);
-  }
-  .synthrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .synthrow .lbl { color: var(--dim); font-size: 11px; white-space: nowrap; }
-  #harmSliders { display: inline-flex; gap: 2px; align-items: flex-end; }
-  #harmSliders input[type="range"] {
-    writing-mode: vertical-lr; direction: rtl; width: 14px; height: 34px; padding: 0;
-  }
-  #synthPanel input[type="range"]:not(#harmSliders input) { width: 60px; }
-  #chordGrid { border-collapse: collapse; }
-  #chordGrid td, #chordGrid th { padding: 0; }
-  #chordGrid th {
-    color: var(--dim); font-size: 10px; font-weight: normal; padding-right: 4px; text-align: right;
-  }
-  #chordGrid button {
-    width: 30px; height: 20px; margin: 1px; border: 1px solid #000; border-radius: 3px;
-    cursor: pointer; font-size: 9px; color: #000; padding: 0; line-height: 1;
-  }
-  #chordGrid button:hover { outline: 2px solid #fff; }
-  #src {
-    flex: 1; resize: none; border: 0; outline: none; padding: 12px 14px;
-    background: var(--bg2); color: var(--fg); tab-size: 2;
-    font: 13px/1.55 "Cascadia Code", "Consolas", "DejaVu Sans Mono", monospace;
-  }
-  #right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-  #previewbar {
-    display: flex; gap: 8px; align-items: center; padding: 8px 12px;
-    border-bottom: 1px solid var(--line); background: var(--bg2);
-  }
-  #previewbar .title { color: var(--teal); font-size: 13px; }
-  #vision {
-    border-bottom: 1px solid var(--line); background: #05070d; padding: 6px 10px 8px;
-  }
+  .lib-item:hover { background: #ffffff10; }
+  .lib-item.on { background: var(--accent); color: #fff; }
+  .lib-item .ic { width: 16px; text-align: center; flex: none; }
+  .lib-item .sw { width: 10px; height: 10px; border-radius: 3px; flex: none; border: 1px solid #0006; }
+
+  /* --- 中央 --- */
+  #center { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--win); }
+  #vision { flex: none; background: #0b0d12; padding: 8px 12px 10px; border-bottom: 1px solid var(--hairline); }
   #visionbar {
     display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-    font-size: 12px; color: var(--purple); margin-bottom: 4px;
+    font-size: 11.5px; color: var(--purple); margin-bottom: 5px;
   }
-  #visionbar #visionInfo { color: var(--dim); font-size: 11.5px; }
-  #spectral { display: block; width: 100%; height: 112px; border-radius: 6px; }
-  #livespec { display: block; width: 100%; height: 64px; border-radius: 6px; margin-top: 4px; }
+  #visionbar #visionInfo { color: var(--dim); font-size: 11px; }
+  #spectral { display: block; width: 100%; height: 112px; border-radius: 8px; }
+  #livespec { display: block; width: 100%; height: 64px; border-radius: 8px; margin-top: 5px; }
   #colorKeys { display: flex; gap: 2px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; }
   #colorKeys button {
-    flex: 1 0 26px; min-width: 26px; height: 34px; border: 1px solid #000;
-    border-radius: 4px; cursor: pointer; font-size: 9px; color: #000;
+    flex: 1 0 24px; min-width: 24px; height: 32px; border: 1px solid #000;
+    border-radius: 4px 4px 6px 6px; cursor: pointer; font-size: 9px; color: #000;
     display: flex; align-items: flex-end; justify-content: center; padding: 1px;
     font-family: inherit; line-height: 1.1;
   }
   #colorKeys button:hover { outline: 2px solid #fff; }
-  #preview { flex: 1; overflow: auto; padding: 14px; background: #f7f4ec; }
+  #previewbar {
+    flex: none; display: flex; gap: 8px; align-items: baseline; padding: 5px 12px;
+    background: var(--panel); border-bottom: 1px solid var(--hairline);
+    font-size: 11.5px; color: var(--teal);
+  }
+  #previewbar .note { color: var(--dim2); font-size: 10.5px; }
+  #preview { flex: 1; min-height: 120px; overflow: auto; padding: 12px; background: #f4f2ea; }
   #preview svg { display: block; }
-  #status {
-    padding: 4px 12px; font-size: 12px; color: var(--dim);
-    border-top: 1px solid var(--line); background: var(--bg2); white-space: nowrap;
-    overflow: hidden; text-overflow: ellipsis;
+
+  /* --- エディタペイン --- */
+  #editorPane {
+    flex: none; height: 34%; min-height: 150px; display: flex; flex-direction: column;
+    border-top: 1px solid var(--hairline); background: var(--panel);
   }
-  #guide {
-    border-top: 1px solid var(--line); background: var(--bg2);
-    max-height: 34%; overflow: auto; padding: 10px 14px;
+  #palette {
+    flex: none; padding: 5px 8px; border-bottom: 1px solid var(--hairline);
+    display: flex; flex-wrap: wrap; gap: 5px; align-items: center; background: var(--bar2);
   }
-  #guide h2 { font-size: 13px; color: var(--gold); margin: 0 0 6px; }
-  #guide .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  #palette .grp {
+    display: flex; gap: 2px; align-items: center;
+    background: var(--field); border: 1px solid var(--line); border-radius: 7px; padding: 2px 6px;
+  }
+  #palette .lbl { color: var(--dim2); font-size: 10.5px; margin-right: 2px; white-space: nowrap; }
+  .pbtn {
+    background: transparent; color: var(--fg); border: 1px solid transparent;
+    border-radius: 5px; padding: 2px 6px; cursor: pointer; font-size: 13px; min-width: 24px;
+    font-family: inherit;
+  }
+  .pbtn:hover { background: #ffffff14; }
+  .pbtn.on { background: var(--accent); color: #fff; }
+  #palette select.pbtn { background: var(--field); }
+  #src {
+    flex: 1; resize: none; border: 0; outline: none; padding: 10px 14px;
+    background: var(--field); color: var(--fg); tab-size: 2; user-select: text;
+    font: 12.5px/1.55 "SF Mono", "Cascadia Code", "Consolas", "DejaVu Sans Mono", monospace;
+  }
+
+  /* --- インスペクタ (スペクトルコード / 五行コード線) --- */
+  #synthPanel { flex: none; padding: 4px 12px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .synthrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .synthrow .lbl { color: var(--dim2); font-size: 10.5px; white-space: nowrap; }
+  #harmSliders {
+    display: flex; gap: 5px; align-items: flex-end; justify-content: space-between;
+    background: var(--field); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; width: 100%;
+  }
+  #harmSliders input[type="range"] {
+    writing-mode: vertical-lr; direction: rtl; width: 16px; height: 64px; padding: 0;
+    accent-color: var(--accent);
+  }
+  #synthPanel input[type="range"]:not(#harmSliders input) { width: 70px; accent-color: var(--accent); }
+  #chordGrid { border-collapse: collapse; margin: 0 12px 8px; }
+  #chordGrid td, #chordGrid th { padding: 0; }
+  #chordGrid th {
+    color: var(--dim2); font-size: 10px; font-weight: 600; padding-right: 4px; text-align: right;
+  }
+  #chordGrid button {
+    width: 17px; height: 19px; margin: 1px 0; border: 1px solid #0008; border-radius: 3px;
+    cursor: pointer; font-size: 7.5px; color: #000; padding: 0; line-height: 1; font-family: inherit;
+  }
+  #chordGrid button:hover { outline: 2px solid #fff; position: relative; z-index: 1; }
+  .insp-btn {
+    margin: 0 12px 8px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    background: linear-gradient(#3c3c40, #303034); border: 1px solid var(--line);
+    color: var(--fg); font-size: 12px; font-family: inherit;
+  }
+  .insp-btn:hover { background: #46464c; }
+
+  /* --- ガイド / ボタン共通 --- */
+  #guide { margin: 0 12px 12px; font-size: 12px; }
+  #guide summary { cursor: pointer; color: var(--gold); font-size: 12px; padding: 4px 0; }
+  #guide .tabs { display: flex; gap: 5px; margin: 6px 0; }
+  .btn {
+    background: #3c3c40; color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 5px 11px; cursor: pointer; font-size: 12px; font-family: inherit;
+  }
+  .btn:hover { border-color: var(--accent); color: #fff; }
+  .btn.primary { border-color: var(--accent); color: var(--accent); }
+  .btn.small { padding: 2px 8px; font-size: 11px; }
+  .btn.os.on { background: var(--accent); border-color: var(--accent); color: #fff; }
   #guide pre {
-    background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
-    padding: 8px 10px; margin: 6px 0; font-size: 12px; overflow-x: auto;
-    color: var(--green); white-space: pre-wrap;
+    background: var(--field); border: 1px solid var(--line); border-radius: 7px;
+    padding: 7px 9px; margin: 6px 0; font-size: 11px; overflow-x: auto;
+    color: var(--lcd-fg); white-space: pre-wrap; user-select: text;
   }
-  #guide p { margin: 4px 0; font-size: 12.5px; color: var(--fg); }
-  #guide .note { color: var(--dim); font-size: 12px; }
+  #guide p { margin: 4px 0; font-size: 11.5px; }
+  #guide .note { color: var(--dim); font-size: 11px; }
+  a { color: var(--accent); }
+
   dialog {
-    background: var(--bg2); color: var(--fg); border: 1px solid var(--line);
-    border-radius: 10px; max-width: 640px; padding: 20px 24px;
+    background: var(--panel); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 12px; max-width: 660px; padding: 20px 24px; user-select: text;
+    box-shadow: 0 20px 60px rgba(0,0,0,.5);
   }
-  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
   dialog h2 { color: var(--gold); margin-top: 0; font-size: 16px; }
   dialog p, dialog li { font-size: 13px; }
-  a { color: var(--blue); }
-  @media (max-width: 760px) {
-    main { flex-direction: column; }
-    #left { width: 100%; min-width: 0; flex: 1; border-right: 0; border-bottom: 1px solid var(--line); }
-    #right { flex: 1; }
-    #guide { max-height: 40%; }
+
+  @media (max-width: 980px) {
+    main { flex-direction: column; overflow-y: auto; }
+    aside { width: 100% !important; border: 0; border-bottom: 1px solid var(--hairline); max-height: 200px; }
+    #library { order: 2; } #center { order: 1; flex: none; } #inspector { order: 3; max-height: none; }
+    #editorPane { height: auto; } #src { min-height: 160px; }
+    #lcd { max-width: none; }
   }
+
 </style>
 </head>
 <body>
 
-<header>
-  <h1>🎼 MusicTeX Studio <span class="sub">— MusixTeX / texlive-music 楽譜制作</span></h1>
-  <select id="templateSel" title="テンプレート (レポート octave74 の題材)"></select>
-  <button class="btn" id="btnLoadTpl">テンプレート読込</button>
-  <span class="spacer"></span>
-  <button class="btn" id="btnPlay">▶ 試聴</button>
-  <button class="btn" id="btnStop">■ 停止</button>
-  <button class="btn primary" id="btnDownload">⬇ .tex 保存</button>
-  <button class="btn" id="btnCopy">📋 コピー</button>
-  <label class="btn" style="display:inline-block">
-    📂 開く<input type="file" id="fileOpen" accept=".tex,.txt" style="display:none">
-  </label>
-  <label class="btn" style="display:inline-block"
-         title="曲ファイル (MIDI / wav / mp3 / ogg / m4a / flac / aac / opus / mp4 など) から楽譜と音色を自動生成">
-    🎵 曲→楽譜<input type="file" id="songOpen"
-      accept=".mid,.midi,.flac,.aac,.m4a,.opus,.wav,.mp3,.ogg,.weba,.webm,.mp4,audio/*,video/mp4,video/webm" style="display:none">
-  </label>
-  <select id="importMode" title="取り込み方法: いまの楽譜を置き換えるか、重ねる (被せる) か">
-    <option value="replace">取り込み: 置き換え</option>
-    <option value="overlay">取り込み: 重ねる</option>
-  </select>
-  <button class="btn" id="btnAbout">ℹ</button>
-</header>
+<div id="titlebar">
+  <div class="lights"><span class="tl red"></span><span class="tl yellow"></span><span class="tl green"></span></div>
+  <div class="wintitle">MusicTeX Studio — スペクトルコード制作 (MusixTeX / texlive-music)</div>
+</div>
+
+<div id="toolbar">
+  <div class="tb-group">
+    <label class="tbtn" title="曲ファイル (MIDI / wav / mp3 / ogg / m4a / flac / aac / opus / mp4 など) から楽譜と音色を自動生成">
+      🎵<span>曲→楽譜</span><input type="file" id="songOpen"
+        accept=".mid,.midi,.flac,.aac,.m4a,.opus,.wav,.mp3,.ogg,.weba,.webm,.mp4,audio/*,video/mp4,video/webm" style="display:none">
+    </label>
+    <select id="importMode" title="取り込み方法: いまの楽譜を置き換えるか、重ねる (被せる) か">
+      <option value="replace">置き換え</option>
+      <option value="overlay">重ねる</option>
+    </select>
+    <label class="tbtn" title=".tex / .txt を開く">
+      📂<span>開く</span><input type="file" id="fileOpen" accept=".tex,.txt" style="display:none">
+    </label>
+  </div>
+  <div class="tb-group transport">
+    <button id="btnStop" class="tpbtn" title="停止">◼</button>
+    <button id="btnPlay" class="tpbtn play" title="試聴 (シンセで演奏)">▶</button>
+  </div>
+  <div id="lcd">
+    <div class="lcd-title">Spectral Code Studio · MusixTeX / texlive-music</div>
+    <div id="status"></div>
+  </div>
+  <div class="tb-group">
+    <button id="btnChordify" class="tbtn"
+            title="いまの楽譜を小節ごとに解析してコード進行を抽出し、伴奏として重ねる">🧩<span>コード化</span></button>
+    <button id="btnDownload" class="tbtn" title="MusixTeX ソースを .tex として保存">⬇<span>.tex 保存</span></button>
+    <button id="btnCopy" class="tbtn" title="MusixTeX ソースをクリップボードへ">📋<span>コピー</span></button>
+    <button id="btnAbout" class="tbtn" title="このアプリについて">ℹ️<span>情報</span></button>
+  </div>
+</div>
 
 <main>
-  <div id="left">
-    <div id="palette">
-      <div class="grp"><span class="lbl">音価</span>
-        <button class="pbtn dur on" data-dur="qu" title="4分音符">♩</button>
-        <button class="pbtn dur" data-dur="cu" title="8分音符">♪</button>
-        <button class="pbtn dur" data-dur="hu" title="2分音符">𝅗𝅥</button>
-        <button class="pbtn dur" data-dur="wh" title="全音符">𝅝</button>
-        <button class="pbtn dur" data-dur="zq" title="和音の構成音 (次の音符に重ねる)">和</button>
-      </div>
-      <div class="grp"><span class="lbl">変化</span>
-        <button class="pbtn acc" data-acc="" title="なし">–</button>
-        <button class="pbtn acc" data-acc="sh" title="シャープ">♯</button>
-        <button class="pbtn acc" data-acc="fl" title="フラット">♭</button>
-        <button class="pbtn acc" data-acc="na" title="ナチュラル">♮</button>
-      </div>
-      <div class="grp"><span class="lbl">音高</span>
-        <span id="pitchBtns"></span>
-      </div>
-      <div class="grp"><span class="lbl">記号</span>
-        <button class="pbtn" id="btnBar" title="小節線">|</button>
-        <button class="pbtn" id="btnRest" title="4分休符">𝄽</button>
-      </div>
-      <div class="grp"><span class="lbl">調号</span>
-        <select id="sigSel" class="pbtn" style="background:var(--bg3)">
-          <option value="-3">E♭ (♭3)</option>
-          <option value="-2" selected>B♭ (♭2)</option>
-          <option value="-1">F (♭1)</option>
-          <option value="0">C</option>
-          <option value="1">G (♯1)</option>
-          <option value="2">D (♯2)</option>
-          <option value="3">A (♯3)</option>
-        </select>
-      </div>
-    </div>
-    <div id="synthPanel">
-      <div class="synthrow">
-        <span class="lbl">🎹 楽器</span>
-        <select id="presetSel" class="pbtn" style="background:var(--bg3)">
-          <option>ピアノ</option><option>オルガン</option><option>ヴァイオリン</option>
-          <option>チェロ</option><option>フルート</option><option>トランペット</option>
-          <option>クラリネット</option><option>ギター</option><option>ハープ</option>
-          <option>オルゴール</option><option>ベル</option><option>マリンバ</option>
-          <option>ベース</option><option>純音</option><option>三角波</option>
-          <option>ノコギリ</option><option>矩形波</option>
-        </select>
-        <span class="lbl">スペクトルコード (倍音 1〜8)</span>
-        <span id="harmSliders"></span>
-        <span class="lbl">A</span><input type="range" id="atkSlider" min="0.005" max="0.2" step="0.005" value="0.015" title="アタック">
-        <span class="lbl">R</span><input type="range" id="relSlider" min="0.05" max="1" step="0.05" value="0.3" title="リリース">
-      </div>
-      <div class="synthrow">
-        <span class="lbl">五行コード線</span>
-        <table id="chordGrid"></table>
-        <button class="btn small" id="btnChordify"
-                title="いまの楽譜を小節ごとに解析してコード進行を抽出し、伴奏として重ねる">🧩 コード化して重ねる</button>
-      </div>
-    </div>
-    <textarea id="src" spellcheck="false" wrap="off"></textarea>
-  </div>
+  <aside id="library">
+    <div class="pane-head">ライブラリ</div>
+    <div class="sec-head">楽器 (音色 = スペクトルコード)</div>
+    <div id="instList"></div>
+    <div class="sec-head">テンプレート (レポート octave74)</div>
+    <div id="tplList"></div>
+  </aside>
 
-  <div id="right">
-    <div id="previewbar">
-      <span class="title">◈ ライブプレビュー</span>
-      <span class="note" style="color:var(--dim);font-size:11.5px">
-        (簡易表示 — 印刷品質の組版は texlive-music で)
-      </span>
-    </div>
+  <div id="center">
     <div id="vision">
       <div id="visionbar">
         <span>🌈 モーツァルト・ビジョン — 音 = 光の波長帯 (音の周波数 ×2<sup>≈40</sup> = 可視光)</span>
@@ -257,18 +313,71 @@
       <canvas id="livespec" height="64" title="シンセ出力のライブスペクトル (12音階の色)"></canvas>
       <div id="colorKeys"></div>
     </div>
+    <div id="previewbar">
+      <span>◈ 楽譜 — ライブプレビュー</span>
+      <span class="note">(簡易表示 — 印刷品質の組版は texlive-music: musixtex -p score.tex)</span>
+    </div>
     <div id="preview"></div>
-    <div id="status"></div>
-    <div id="guide">
-      <h2>🖨 印刷用 PDF の作り方 (texlive-music でコンパイル)</h2>
+    <div id="editorPane">
+      <div id="palette">
+        <div class="grp"><span class="lbl">音価</span>
+          <button class="pbtn dur on" data-dur="qu" title="4分音符">♩</button>
+          <button class="pbtn dur" data-dur="cu" title="8分音符">♪</button>
+          <button class="pbtn dur" data-dur="hu" title="2分音符">𝅗𝅥</button>
+          <button class="pbtn dur" data-dur="wh" title="全音符">𝅝</button>
+          <button class="pbtn dur" data-dur="zq" title="和音の構成音 (次の音符に重ねる)">和</button>
+        </div>
+        <div class="grp"><span class="lbl">変化</span>
+          <button class="pbtn acc" data-acc="" title="なし">–</button>
+          <button class="pbtn acc" data-acc="sh" title="シャープ">♯</button>
+          <button class="pbtn acc" data-acc="fl" title="フラット">♭</button>
+          <button class="pbtn acc" data-acc="na" title="ナチュラル">♮</button>
+        </div>
+        <div class="grp"><span class="lbl">音高</span>
+          <span id="pitchBtns"></span>
+        </div>
+        <div class="grp"><span class="lbl">記号</span>
+          <button class="pbtn" id="btnBar" title="小節線">|</button>
+          <button class="pbtn" id="btnRest" title="4分休符">𝄽</button>
+        </div>
+        <div class="grp"><span class="lbl">調号</span>
+          <select id="sigSel" class="pbtn">
+            <option value="-3">E♭ (♭3)</option>
+            <option value="-2" selected>B♭ (♭2)</option>
+            <option value="-1">F (♭1)</option>
+            <option value="0">C</option>
+            <option value="1">G (♯1)</option>
+            <option value="2">D (♯2)</option>
+            <option value="3">A (♯3)</option>
+          </select>
+        </div>
+      </div>
+      <textarea id="src" spellcheck="false" wrap="off"></textarea>
+    </div>
+  </div>
+
+  <aside id="inspector">
+    <div class="pane-head">インスペクタ</div>
+    <div class="sec-head">スペクトルコード (倍音 1〜8)</div>
+    <div id="synthPanel">
+      <span id="harmSliders"></span>
+      <div class="synthrow">
+        <span class="lbl">アタック</span><input type="range" id="atkSlider" min="0.005" max="0.2" step="0.005" value="0.015" title="アタック">
+        <span class="lbl">リリース</span><input type="range" id="relSlider" min="0.05" max="1" step="0.05" value="0.3" title="リリース">
+      </div>
+    </div>
+    <div class="sec-head">五行コード線 (M / m / 7 / M7 / sus4 × 12音階)</div>
+    <table id="chordGrid"></table>
+    <details id="guide">
+      <summary>🖨 印刷用 PDF の作り方 (texlive-music)</summary>
       <div class="tabs">
         <button class="btn small os on" data-os="ubuntu">Ubuntu</button>
         <button class="btn small os" data-os="windows">Windows 10 / 11</button>
         <button class="btn small os" data-os="android">Android</button>
       </div>
       <div id="guideBody"></div>
-    </div>
-  </div>
+    </details>
+  </aside>
 </main>
 
 <dialog id="aboutDlg">
@@ -1434,12 +1543,6 @@ function syncSynthUI() {
 
 function buildSynthPanel() {
   syncSynthUI();
-  document.getElementById("presetSel").addEventListener("change", function (e) {
-    SYNTH = instrumentPreset(e.target.value);
-    periodicCache = null;
-    syncSynthUI();
-    playTone(69);
-  });
   document.getElementById("atkSlider").addEventListener("input", function (e) {
     SYNTH.attack = parseFloat(e.target.value);
   });
@@ -1667,13 +1770,53 @@ function showGuide(os) {
 /* ============================================================
  * 初期化・イベント配線
  * ============================================================ */
-(function init() {
-  var sel = document.getElementById("templateSel"), i;
-  for (i = 0; i < TEMPLATES.length; i++) {
-    var opt = document.createElement("option");
-    opt.value = String(i); opt.textContent = TEMPLATES[i].name;
-    sel.appendChild(opt);
+/* ライブラリ (左ペイン): 楽器と octave74 テンプレート */
+function buildLibrary() {
+  var instList = document.getElementById("instList");
+  var instruments = ["ピアノ", "オルガン", "ヴァイオリン", "チェロ", "フルート",
+                     "トランペット", "クラリネット", "ギター", "ハープ", "オルゴール",
+                     "ベル", "マリンバ", "ベース", "純音", "三角波", "ノコギリ", "矩形波"];
+  var icons = { "ピアノ": "🎹", "オルガン": "🎚️", "ヴァイオリン": "🎻", "チェロ": "🎻",
+                "フルート": "🎶", "トランペット": "🎺", "クラリネット": "🎵", "ギター": "🎸",
+                "ハープ": "🎼", "オルゴール": "🎁", "ベル": "🔔", "マリンバ": "🥁",
+                "ベース": "🎸", "純音": "〰️", "三角波": "🔺", "ノコギリ": "🪚", "矩形波": "⬜" };
+  var i;
+  for (i = 0; i < instruments.length; i++) {
+    (function (name, first) {
+      var b = document.createElement("button");
+      b.className = "lib-item" + (first ? " on" : "");
+      b.innerHTML = "<span class='ic'>" + (icons[name] || "🎵") + "</span>" + name;
+      b.addEventListener("click", function () {
+        SYNTH = instrumentPreset(name);
+        periodicCache = null;
+        syncSynthUI();
+        var all = instList.querySelectorAll(".lib-item"), j;
+        for (j = 0; j < all.length; j++) all[j].classList.toggle("on", all[j] === b);
+        playTone(69);
+      });
+      instList.appendChild(b);
+    })(instruments[i], i === 0);
   }
+  var tplList = document.getElementById("tplList");
+  for (i = 0; i < TEMPLATES.length; i++) {
+    (function (idx, first) {
+      var b = document.createElement("button");
+      b.className = "lib-item" + (first ? " on" : "");
+      b.innerHTML = "<span class='ic'>📄</span>" + TEMPLATES[idx].name;
+      b.title = TEMPLATES[idx].name;
+      b.addEventListener("click", function () {
+        applyTemplate(idx);
+        var all = tplList.querySelectorAll(".lib-item"), j;
+        for (j = 0; j < all.length; j++) all[j].classList.toggle("on", all[j] === b);
+      });
+      tplList.appendChild(b);
+    })(i, i === 0);
+  }
+}
+
+(function init() {
+  var i;
+  buildLibrary();
 
   var pb = document.getElementById("pitchBtns");
   var letters = "abcdefghijklmnopq";
@@ -1687,11 +1830,6 @@ function showGuide(os) {
       pb.appendChild(b);
     })(letters[i]);
   }
-
-  document.getElementById("btnLoadTpl").addEventListener("click", function () {
-    applyTemplate(parseInt(sel.value, 10) || 0);
-  });
-  sel.addEventListener("change", function () { applyTemplate(parseInt(sel.value, 10) || 0); });
 
   var durBtns = document.querySelectorAll(".pbtn.dur");
   for (i = 0; i < durBtns.length; i++) {

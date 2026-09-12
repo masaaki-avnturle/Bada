@@ -1,4 +1,10 @@
-# 🎼 MusicTeX Studio — MusixTeX (texlive-music) 楽譜制作アプリ
+# 🎼 MusicTeX Studio — スペクトルコード制作アプリ (MusixTeX / texlive-music)
+
+**画面構成は macOS のデスクトップ専用アプリと同じスタイル**: タイトルバー (信号機ボタン)、
+トランスポート (▶/◼) と LCD ディスプレイを備えたツールバー、左に**ライブラリ**
+(楽器 17 種 + octave74 テンプレート)、中央にモーツァルト・ビジョン / 楽譜プレビュー /
+MusixTeX エディタ、右に**インスペクタ** (スペクトルコードの縦フェーダー・五行コード線・
+PDF ガイド) の 3 ペイン構成です。
 
 **MusixTeX (texlive-music) の楽譜ソースを作成・プレビュー・試聴し、`.tex` として書き出す楽譜制作アプリ。**
 依存ゼロ・単一 HTML・オフライン動作。レポート **「Δと」(Masaaki Yamaguchi, octave74)** の音階理論
