@@ -22,6 +22,10 @@ on:
   push:
     tags:
       - 'zetaport-v*'
+    # 開発ブランチへの push でもビルドし、Release zetaport-v1.0.0 を
+    # 自動作成して添付する (main マージ前からダウンロード可能にするため)。
+    branches:
+      - 'claude/bada-zeta-entropy-simulation-hdy2au'
 
 permissions:
   contents: write
@@ -106,10 +110,10 @@ jobs:
           name: zetaport-android
           path: out/*.apk
       - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/bada-zeta-entropy-simulation-hdy2au'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'zetaport-v1.0.0' }}
           files: out/*.apk
 
   windows-exe:
@@ -136,10 +140,10 @@ jobs:
           name: zetaport-windows
           path: zeta_port/app/electron/dist/*.exe
       - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/bada-zeta-entropy-simulation-hdy2au'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'zetaport-v1.0.0' }}
           files: zeta_port/app/electron/dist/*.exe
 
   linux-app:
@@ -167,10 +171,10 @@ jobs:
             zeta_port/app/electron/dist/*.AppImage
             zeta_port/app/electron/dist/*.deb
       - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '' || github.ref == 'refs/heads/claude/bada-zeta-entropy-simulation-hdy2au'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          tag_name: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'zetaport-v1.0.0' }}
           files: |
             zeta_port/app/electron/dist/*.AppImage
             zeta_port/app/electron/dist/*.deb
