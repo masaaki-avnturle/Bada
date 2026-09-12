@@ -1,0 +1,79 @@
+name: Bada Studio app build (macOS DMG)
+
+# bada_studio/ の「Bada Studio」— macOS (MacBook) 専用の音楽制作アプリ
+#   SwiftUI + AVAudioEngine ネイティブアプリ:
+#   - 8 ボイス ポリフォニックシンセ (波形 4 種 / AR エンベロープ / PC キー & マウス鍵盤)
+#   - 16 ステップ ドラムシーケンサー (キック / スネア / ハイハット、サンプル精度)
+#   - ミキサー + センドエフェクト (ディレイ → リバーブ)
+#   - マスターバス録音 (~/Music/Bada Studio/*.caf)
+# macos ランナーで universal (arm64 + x86_64) バイナリをビルドし、
+# .app を ad-hoc 署名して DMG / ZIP にパッケージします。
+# Actions アーティファクト、および (badastudio-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: badastudio-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'badastudio-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  macos-app:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          swift --version
+          xcodebuild -version
+
+      - name: Determine version
+        id: ver
+        run: |
+          REF="${{ github.event.inputs.release_tag || github.ref_name }}"
+          case "$REF" in
+            badastudio-v*) V="${REF#badastudio-v}" ;;
+            *) V="0.0.0-dev" ;;
+          esac
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "Building version: $V"
+
+      - name: Build & package (.app -> DMG / ZIP)
+        run: bash bada_studio/scripts/make_app.sh "${{ steps.ver.outputs.version }}"
+
+      - name: Verify app bundle
+        run: |
+          set -e
+          APP="bada_studio/dist/Bada Studio.app"
+          test -x "$APP/Contents/MacOS/BadaStudio"
+          plutil -lint "$APP/Contents/Info.plist"
+          codesign --verify --verbose=2 "$APP"
+          file "$APP/Contents/MacOS/BadaStudio"
+          ls -la bada_studio/dist
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: badastudio-macos
+          path: |
+            bada_studio/dist/*.dmg
+            bada_studio/dist/*.zip
+
+      - name: Attach DMG / ZIP to Release
+        if: startsWith(github.ref, 'refs/tags/badastudio-v') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_studio/dist/*.dmg
+            bada_studio/dist/*.zip
