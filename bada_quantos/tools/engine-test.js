@@ -14,6 +14,8 @@
  *   7. 意図解析 (intentDetect) — 電話番号抽出・各機能への振り分け
  *   8. 生成AIカーネル (aiKernel) — 6 段パイプラインと実行
  *   9. 実行系 (osDispatch) — テスト環境では発行せず記述のみ返す
+ *  10. 量子暗号方式 (qcBB84 / qcEncrypt / qcDecrypt) — BB84 鍵配送・
+ *      盗聴検出 (QBER)・ワンタイムパッドの往復・鍵違いの棄却
  */
 "use strict";
 const fs = require("fs");
@@ -150,5 +152,33 @@ const d1 = get("osDispatch")({ action: { type: "tel", number: "0312345678" } });
 assert(d1.performed === false && /tel:0312345678/.test(d1.how), "tel dispatch in test env describes the intent without navigating");
 const d2 = get("osDispatch")({ action: { type: "open", app: "camera" } });
 assert(d2.performed === true && /camera/.test(d2.how), "open dispatch reports the mapped transition");
+
+/* 10. 量子暗号方式 */
+const qc = get("topoMap")("qcrypt");
+assert(qc !== null && qc.ket === "|1110⟩", "qcrypt is mapped to basis |1110⟩ (existing kets unchanged)");
+const bb = get("qcBB84")(64, false);
+assert(bb.qber === 0 && bb.eveDetected === false, "BB84 without Eve: QBER is 0 on a noiseless channel");
+assert(bb.key.length > 0 && bb.sifted >= 10, "BB84 sifting yields a nonempty shared key");
+assert(bb.sifted <= 64 && bb.key.length === bb.sifted - bb.checked, "key = sifted bits minus the check sample");
+const bbE = get("qcBB84")(512, true);
+assert(bbE.qber > 0.03, "intercept-resend eavesdropping leaves errors in the sifted key (QBER ≈ 25%)");
+assert(!bbE.eveDetected || bbE.key.length === 0, "when Eve is detected the key is discarded");
+const key = bb.key;
+const secret = "量子暗号テスト🔐 QuantOS";
+const ct = get("qcEncrypt")(secret, key);
+assert(/^[0-9a-f]+$/.test(ct) && ct.indexOf(secret) < 0, "ciphertext is hex and hides the plaintext");
+assert(get("qcDecrypt")(ct, key) === secret, "one-time-pad round-trip restores UTF-8 text (Japanese + emoji)");
+let leaked = null;
+try { leaked = get("qcDecrypt")(ct, key.map(b => 1 - b)); } catch (e) { leaked = null; }
+assert(leaked !== secret, "a wrong key never reveals the plaintext");
+let noKey = false;
+try { get("qcEncrypt")("x", []); } catch (e) { noKey = true; }
+assert(noKey, "encrypting without a distributed key is rejected");
+const itc = get("intentDetect")("BB84で量子鍵配送して");
+assert(itc.intent === "qcrypt", "intent: 鍵配送 → qcrypt (wins over 量子ラボ)");
+assert(get("intentDetect")("盗聴されていないか暗号を確認").eve === true, "intent: 盗聴 sets the Eve flag");
+const kq = get("aiKernel")("量子暗号の鍵配送をして");
+assert(kq.intent === "qcrypt" && /QBER/.test(kq.reply), "AI kernel runs BB84 and reports the QBER");
+assert(/\|1110⟩/.test(kq.stages[2].detail), "stage③ maps the request onto qcrypt's basis |1110⟩");
 
 console.log("\nALL ENGINE TESTS PASSED");

@@ -121,7 +121,8 @@
       <div id="homeHead">
         <h1>Bada <span>QuantOS</span></h1>
         <p>擬似量子コンピュータ(集大成)のオペレーティングシステム — カーネルは生成AI。<br/>
-        タブレット・スマートフォンの全機能を<b>トポロジーの写像機構</b>(結び目不変量 ↦ 量子レジスタ基底)で移植。</p>
+        タブレット・スマートフォンの全機能を<b>トポロジーの写像機構</b>(結び目不変量 ↦ 量子レジスタ基底)で移植。<br/>
+        通信と保管は <b>BB84 量子鍵配送 + ワンタイムパッド</b>の量子暗号方式で保護。</p>
       </div>
       <div id="grid"></div>
     </div>
@@ -314,7 +315,8 @@ var OS_APPS = [
   { id:"files",    name:"ファイル",   icon:"📁", knot:[1,1,1,-1],         desc:"仮想ファイルシステム" },
   { id:"qlab",     name:"量子ラボ",   icon:"⚛️", knot:[1,1,1,1,1],        desc:"量子 Bada コンソール" },
   { id:"topo",     name:"写像室",     icon:"🪢", knot:[-1,-1,-1,-1],      desc:"トポロジー写像の観測室" },
-  { id:"settings", name:"設定",       icon:"⚙️", knot:[-1,-1,-1,-1,-1],   desc:"端末プロファイル・データ" }
+  { id:"settings", name:"設定",       icon:"⚙️", knot:[-1,-1,-1,-1,-1],   desc:"端末プロファイル・データ" },
+  { id:"qcrypt",   name:"量子暗号",   icon:"🔐", knot:[1,1,-1,1,1],       desc:"BB84 量子鍵配送 + ワンタイムパッド + 量子金庫" }
 ];
 var TOPO_QUBITS = 4;   /* 2^4 = 16 基底 ≥ 機能数 14 → 単射写像が張れる */
 
@@ -415,6 +417,97 @@ function calcEval(expr){
 }
 
 /* ════════════════════════════════════════════════════════════════════
+ * 6b. 量子暗号方式 — BB84 量子鍵配送 + ワンタイムパッド (Vernam)
+ *
+ *   BB84: Alice が乱数ビットを乱択基底 (Z=+ / X=×) で量子ビットとして
+ *   送出し、Bob も乱択基底で測定する。基底が一致した位置だけを残し
+ *   (ふるい)、その一部を照合して量子ビット誤り率 QBER を推定する。
+ *   盗聴者 Eve が途中で測定 (intercept-resend) すると、量子力学の
+ *   複製不可能定理により基底一致位置にも約 25% の誤りが混入するため、
+ *   QBER > 10% で盗聴を検出して鍵を破棄する。
+ *   残りのビットが共有秘密鍵となり、ワンタイムパッド (XOR) で
+ *   メッセージ・保存データ (量子金庫) を暗号化する。
+ * ════════════════════════════════════════════════════════════════════ */
+function qcBB84(n, eavesdrop){
+  n = n || 64;
+  var log = [];
+  var sifted = [];          /* {a: Aliceのビット, b: Bobのビット} 基底一致位置のみ */
+  for (var i = 0; i < n; i++){
+    var aBit   = Math.random() < 0.5 ? 0 : 1;
+    var aBase  = Math.random() < 0.5 ? 0 : 1;      /* 0 = Z(+), 1 = X(×) */
+    var phBit  = aBit, phBase = aBase;             /* 送出中の光子の状態 */
+    var eBase  = null, eBit = null;
+    if (eavesdrop){
+      /* Eve の intercept-resend: 乱択基底で測定 → 測った状態で再送出 */
+      eBase = Math.random() < 0.5 ? 0 : 1;
+      eBit  = (eBase === phBase) ? phBit : (Math.random() < 0.5 ? 0 : 1);
+      phBit = eBit; phBase = eBase;
+    }
+    var bBase = Math.random() < 0.5 ? 0 : 1;
+    var bBit  = (bBase === phBase) ? phBit : (Math.random() < 0.5 ? 0 : 1);
+    var match = (bBase === aBase);
+    if (match) sifted.push({ a: aBit, b: bBit });
+    if (log.length < 12)
+      log.push({ i: i, aBit: aBit, aBase: aBase ? "×" : "+", eve: eavesdrop ? (eBase ? "×" : "+") : "—",
+                 bBase: bBase ? "×" : "+", bBit: bBit, keep: match });
+  }
+  /* ふるい後の前半を照合に消費して QBER を推定、後半が鍵になる */
+  var check = Math.floor(sifted.length / 2), errors = 0;
+  for (var c = 0; c < check; c++){ if (sifted[c].a !== sifted[c].b) errors++; }
+  var qber = check ? errors / check : 0;
+  var eveDetected = qber > 0.1;
+  var key = [];
+  if (!eveDetected){ for (var k = check; k < sifted.length; k++) key.push(sifted[k].a); }
+  var keyHex = "";
+  for (var h = 0; h + 4 <= key.length; h += 4)
+    keyHex += (key[h] * 8 + key[h+1] * 4 + key[h+2] * 2 + key[h+3]).toString(16);
+  return { n: n, sifted: sifted.length, checked: check, errors: errors,
+           qber: qber, eveDetected: eveDetected, key: key, keyHex: keyHex, log: log };
+}
+
+/* ── ワンタイムパッド (XOR ストリーム)。鍵長 ≥ 本文長のとき情報理論的に安全 ── */
+function qcTextBytes(s){
+  var out = [], enc = encodeURIComponent(String(s));
+  for (var i = 0; i < enc.length; i++){
+    if (enc.charAt(i) === "%"){ out.push(parseInt(enc.substr(i + 1, 2), 16)); i += 2; }
+    else out.push(enc.charCodeAt(i));
+  }
+  return out;
+}
+function qcBytesText(bytes){
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += "%" + (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+  return decodeURIComponent(s);
+}
+function qcKeystream(keyBits, nBytes){
+  if (!keyBits || !keyBits.length) throw new Error("鍵がありません — 先に BB84 で鍵配送してください");
+  var out = [], pos = 0;
+  for (var i = 0; i < nBytes; i++){
+    var v = 0;
+    for (var j = 0; j < 8; j++){ v = (v << 1) | keyBits[pos % keyBits.length]; pos++; }
+    out.push(v);
+  }
+  return out;
+}
+function qcEncrypt(text, keyBits){
+  var pt = qcTextBytes(text), ks = qcKeystream(keyBits, pt.length), hex = "";
+  for (var i = 0; i < pt.length; i++){
+    var b = pt[i] ^ ks[i];
+    hex += (b < 16 ? "0" : "") + b.toString(16);
+  }
+  return hex;
+}
+function qcDecrypt(hex, keyBits){
+  hex = String(hex).replace(/\s+/g, "");
+  if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2) throw new Error("暗号文 (16進) が不正です");
+  var ct = [];
+  for (var i = 0; i < hex.length; i += 2) ct.push(parseInt(hex.substr(i, 2), 16));
+  var ks = qcKeystream(keyBits, ct.length), pt = [];
+  for (var j = 0; j < ct.length; j++) pt.push(ct[j] ^ ks[j]);
+  return qcBytesText(pt);
+}
+
+/* ════════════════════════════════════════════════════════════════════
  * 7. 意図解析 — 自然言語 → OS 機能
  * ════════════════════════════════════════════════════════════════════ */
 function qTokenize(text){
@@ -429,6 +522,8 @@ function intentDetect(text){
   var num = extractNumber(t);
   if (/^(qubit|H\s|X\s|Z\s|CNOT|measure|state|let\s|print\s)/m.test(t))
     return { intent: "quantum_code", code: t, why: "量子 Bada の予約語で始まるコード" };
+  if (/暗号|BB84|鍵配送|盗聴|金庫|復号/i.test(t))
+    return { intent: "qcrypt", eve: /盗聴|Eve/i.test(t), why: "量子暗号 (BB84 鍵配送・暗号化) の依頼" };
   if (/アラーム|時計|何時|時刻|起こして/i.test(t))
     return { intent: "clock", hour: (t.match(/(\d{1,2})\s*時/) || [])[1] || null, why: "時計・アラームの依頼" };
   if (/電話|かけて|発信|call/i.test(t))
@@ -470,7 +565,7 @@ function intentDetect(text){
 var INTENT_APP = {
   phone:"phone", sms:"sms", mail:"mail", camera:"camera", gallery:"gallery",
   clock:"clock", calc:"calc", notes:"notes", contacts:"contacts", files:"files",
-  quantum_code:"qlab", qlab:"qlab", topo:"topo", settings:"settings", chat:"ai", home:"ai"
+  quantum_code:"qlab", qlab:"qlab", topo:"topo", settings:"settings", qcrypt:"qcrypt", chat:"ai", home:"ai"
 };
 var CHAT_TEMPLATES = [
   "私は QuantOS の生成AIカーネルです。{n} 個の機能が 4 量子ビットレジスタの基底に写像されています。「電話」「写真を撮って」「1+2*3」のように話しかけてください。",
@@ -519,6 +614,16 @@ function aiKernel(text){
     action = { type: "open", app: "clock", hour: it.hour };
     plan = "時計を開いてアラーム時刻を提案";
     reply = "⏰ " + it.hour + " 時のアラームですね。時計を開きます。";
+  }
+  else if (it.intent === "qcrypt"){
+    plan = "BB84 で鍵配送 → QBER を検査" + (it.eve ? " (盗聴者 Eve を挿入)" : "");
+    var bb = qcBB84(64, !!it.eve);
+    reply = "🔐 BB84 量子鍵配送: " + bb.n + " 量子ビット送出 → ふるい後 " + bb.sifted +
+            " ビット, QBER " + (bb.qber * 100).toFixed(1) + "%\n" +
+            (bb.eveDetected
+              ? "⚠ 盗聴を検出しました — 鍵を破棄します (複製不可能定理により盗聴は必ず誤りを残します)。"
+              : "盗聴なし — 共有鍵 " + bb.key.length + " ビットを確立しました。量子暗号アプリで暗号化に使えます。");
+    verify = "QBER " + (bb.qber * 100).toFixed(1) + "% " + (bb.eveDetected ? "> 10% → 破棄" : "≤ 10% → 採用");
   }
   else if (it.intent === "chat"){
     plan = "テンプレート選択 + 状態の埋め込み (決定論的生成)";
@@ -677,12 +782,19 @@ function smsSend(){
   var res = osDispatch({ action: { type: "sms", number: n, body: b } });
   el("smsMsg").textContent = res.how;
 }
+function smsEncrypt(){
+  try{
+    el("smsBody").value = "[QuantOS量子暗号] " + qcEncrypt(el("smsBody").value, qcKey);
+    el("smsMsg").textContent = "本文を BB84 共有鍵のワンタイムパッドで暗号化しました。受信側は量子暗号アプリで復号します。";
+  }catch(e){ el("smsMsg").textContent = "暗号化できません: " + e.message; }
+}
 RENDER.sms = function(body){
   var prof = deviceProfile(UA, SCREENW);
   body.innerHTML =
     "<div class='card'><div class='row'><input id='smsTo' placeholder='宛先番号'/></div>" +
     "<textarea id='smsBody' placeholder='本文'></textarea>" +
-    "<div class='row'><button class='grn' onclick='smsSend()'>💬 送信 (sms: インテント)</button></div>" +
+    "<div class='row'><button class='grn' onclick='smsSend()'>💬 送信 (sms: インテント)</button>" +
+    "<button onclick='smsEncrypt()'>🔐 量子暗号化</button></div>" +
     "<p class='hint' id='smsMsg'>" + esc(prof.note) + "</p></div>";
 };
 
@@ -900,6 +1012,90 @@ RENDER.topo = function(body){
     "<pre id='topoRouteOut'>2 つの機能を選んで「変形」— ハイパーキューブ上の X ゲート列と検算を表示します。</pre></div>";
 };
 
+/* 量子暗号 (BB84 鍵配送 + ワンタイムパッド + 量子金庫) */
+var qcKey = [];      /* 現在の共有鍵ビット列 — メモリ内のみ (保存しない) */
+function qcRun(){
+  var n = parseInt(el("qcN").value, 10) || 64;
+  var eve = !!el("qcEve").checked;
+  var bb = qcBB84(n, eve);
+  var rows = "";
+  for (var i = 0; i < bb.log.length; i++){
+    var L = bb.log[i];
+    rows += "<tr><td>" + L.i + "</td><td>" + L.aBit + "</td><td>" + L.aBase + "</td><td>" + L.eve +
+            "</td><td>" + L.bBase + "</td><td>" + L.bBit + "</td><td>" + (L.keep ? "✔" : "—") + "</td></tr>";
+  }
+  el("qcLog").innerHTML = rows;
+  var verdict;
+  if (bb.eveDetected){
+    qcKey = [];
+    verdict = "⚠ QBER " + (bb.qber * 100).toFixed(1) + "% > 10% — 盗聴を検出。鍵を破棄しました。" +
+              "(intercept-resend 盗聴は複製不可能定理により基底一致位置に約 25% の誤りを残します)";
+  } else {
+    qcKey = bb.key;
+    verdict = "✅ QBER " + (bb.qber * 100).toFixed(1) + "% — 盗聴なし。共有鍵 " + bb.key.length +
+              " ビットを確立 (鍵 16進: " + (bb.keyHex || "—") + ")。鍵はメモリ内のみに保持します。";
+  }
+  el("qcVerdict").textContent =
+    bb.n + " 量子ビット送出 → 基底一致 (ふるい) " + bb.sifted + " ビット → 照合 " + bb.checked +
+    " ビット中 誤り " + bb.errors + "。 " + verdict;
+}
+function qcEnc(){
+  try{ el("qcCipher").value = qcEncrypt(el("qcPlain").value, qcKey); el("qcMsg2").textContent = "暗号化しました (XOR ワンタイムパッド)。鍵長 ≥ 本文長なら情報理論的に安全です。"; }
+  catch(e){ el("qcMsg2").textContent = "エラー: " + e.message; }
+}
+function qcDec(){
+  try{ el("qcPlain").value = qcDecrypt(el("qcCipher").value, qcKey); el("qcMsg2").textContent = "復号しました。"; }
+  catch(e){ el("qcMsg2").textContent = "復号できません (鍵違いまたは暗号文不正): " + e.message; }
+}
+function vaultAdd(){
+  var t = el("vaultIn").value;
+  if (!t) return;
+  try{
+    var v = load("vault", []);
+    v.unshift({ hex: qcEncrypt(t, qcKey), t: new Date().toLocaleString("ja-JP") });
+    store("vault", v.slice(0, 30));
+    el("vaultIn").value = "";
+    el("vaultMsg").textContent = "暗号化して保管しました。端末内には暗号文 (16進) だけが保存されます。";
+    renderVault();
+  }catch(e){ el("vaultMsg").textContent = "エラー: " + e.message; }
+}
+function vaultOpen(i){
+  var v = load("vault", []) || [];
+  try{ el("vaultMsg").textContent = "復号: " + qcDecrypt(v[i].hex, qcKey); }
+  catch(e){ el("vaultMsg").textContent = "復号できません — 保管時と同じ鍵が必要です (" + e.message + ")"; }
+}
+function vaultDel(i){ var v = load("vault", []) || []; v.splice(i, 1); store("vault", v); renderVault(); }
+function renderVault(){
+  var v = load("vault", []) || [], h = "";
+  for (var i = 0; i < v.length; i++)
+    h += "<tr><td class='mono' style='word-break:break-all'>" + esc(v[i].hex.slice(0, 24)) + "…</td><td>" + esc(v[i].t) + "</td>" +
+         "<td><button onclick='vaultOpen(" + i + ")'>🔓</button> <button onclick='vaultDel(" + i + ")'>🗑</button></td></tr>";
+  el("vaultList").innerHTML = h || "<tr><td colspan='3' class='hint'>金庫は空です</td></tr>";
+}
+RENDER.qcrypt = function(body){
+  body.innerHTML =
+    "<div class='card'><b>① BB84 量子鍵配送</b>" +
+    "<p class='hint'>Alice が乱択基底 (+/×) で量子ビットを送出し、Bob が乱択基底で測定。基底一致分をふるい、" +
+    "前半を照合して QBER を推定 — 盗聴 (intercept-resend) は必ず誤りを残すため QBER &gt; 10% で検出・破棄します。</p>" +
+    "<div class='row'><select id='qcN' style='max-width:130px'><option value='64'>64 qubit</option>" +
+    "<option value='256'>256 qubit</option><option value='1024'>1024 qubit</option></select>" +
+    "<label><input id='qcEve' type='checkbox' style='width:auto'/> 盗聴者 Eve を挿入</label>" +
+    "<button class='acc' onclick='qcRun()'>🔑 鍵配送実行</button></div>" +
+    "<table><thead><tr><th>#</th><th>A bit</th><th>A 基底</th><th>Eve</th><th>B 基底</th><th>B bit</th><th>採用</th></tr></thead>" +
+    "<tbody id='qcLog'><tr><td colspan='7' class='hint'>先頭 12 量子ビットの伝送ログがここに出ます</td></tr></tbody></table>" +
+    "<p class='hint' id='qcVerdict'></p></div>" +
+    "<div class='card'><b>② ワンタイムパッド暗号 (共有鍵で XOR)</b>" +
+    "<textarea id='qcPlain' placeholder='平文'></textarea>" +
+    "<textarea id='qcCipher' placeholder='暗号文 (16進)'></textarea>" +
+    "<div class='row'><button class='grn' onclick='qcEnc()'>🔐 暗号化</button><button onclick='qcDec()'>🔓 復号</button></div>" +
+    "<p class='hint' id='qcMsg2'>鍵はメモリ内のみ。鍵長 ≥ 本文長のときワンタイムパッドとして情報理論的に安全です。</p></div>" +
+    "<div class='card'><b>③ 量子金庫 (暗号化保管)</b>" +
+    "<textarea id='vaultIn' placeholder='秘密のメモ — 現在の共有鍵で暗号化して保管'></textarea>" +
+    "<div class='row'><button class='acc' onclick='vaultAdd()'>🔐 暗号化して保管</button></div>" +
+    "<table><tbody id='vaultList'></tbody></table><p class='hint' id='vaultMsg'>端末内には暗号文だけが残ります。復号には保管時と同じ鍵が必要です。</p></div>";
+  renderVault();
+};
+
 /* AIカーネル (チャット画面) */
 RENDER.ai = function(body){
   body.innerHTML = "<div id='aiLog'></div><p class='hint'>下のコマンドバーから話しかけてください。応答のたびに 6 段パイプライン (トークン化→意図→写像→計画→生成→検証) を開示します。</p>";
@@ -914,7 +1110,7 @@ RENDER.ai = function(body){
 /* 設定 */
 function settingsClear(){
   try{
-    var ks = ["calls","contacts","gallery","notes","files","ailog"];
+    var ks = ["calls","contacts","gallery","notes","files","ailog","vault"];
     for (var i = 0; i < ks.length; i++) localStorage.setItem("quantos:" + ks[i], JSON.stringify(null));
   }catch(e){}
   el("setMsg").textContent = "端末内データを消去しました。";
@@ -928,6 +1124,7 @@ RENDER.settings = function(body){
     "<tr><td>SMS (sms:)</td><td>" + (p.sms ? "✔ 委譲可" : "✖ なし") + "</td></tr>" +
     "<tr><td>量子レジスタ</td><td class='mono'>" + TOPO_QUBITS + " qubit / " + (1 << TOPO_QUBITS) + " 基底</td></tr>" +
     "<tr><td>写像済み機能</td><td>" + OS_APPS.length + " 個 (単射 φ)</td></tr>" +
+    "<tr><td>量子暗号鍵</td><td>" + (qcKey.length ? "🔑 " + qcKey.length + " ビット確立済 (メモリ内のみ)" : "未配送 — 量子暗号アプリで BB84 を実行") + "</td></tr>" +
     "<tr><td>UserAgent</td><td style='word-break:break-all'>" + esc(UA || "(なし)") + "</td></tr>";
   body.innerHTML =
     "<div class='card'><b>端末プロファイル</b><table><tbody>" + rows + "</tbody></table>" +
