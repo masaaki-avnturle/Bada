@@ -33,7 +33,8 @@ function check(name, cond) {
 const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
         estimateKeySignature, midiToTex, parseMidi, midiNotesToEvents,
         notesToMusixTex, detectPitch, pitchFramesToEvents,
-        midiToWavelength, wavelengthToRGB, scoreToSpectral } = sandbox;
+        midiToWavelength, wavelengthToRGB, scoreToSpectral,
+        CHORD_TYPES, chordMidis, chordTexTokens, synthPreset } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -204,6 +205,42 @@ check("イベント総数 16 (休符なし・小節線除く)", spec.eventCount 
 const chordSpec = scoreToSpectral(parseMusixTeX(TEMPLATES[2].body));
 check("和音は同一開始拍に複数の帯",
   chordSpec.items.filter(it => it.startBeat === 0).length === 3);
+
+console.log("[14] シンセサイザー — 五行コード線 (M/m/7/M7/sus4 × 12音階)");
+check("5 つのコード行", CHORD_TYPES.length === 5 &&
+  CHORD_TYPES.map(t => t.key).join(",") === "M,m,7,M7,sus4");
+check("C メジャー = C4-E4-G4", JSON.stringify(chordMidis(0, "M", 4)) === "[60,64,67]");
+check("A マイナー = A4-C5-E5", JSON.stringify(chordMidis(9, "m", 4)) === "[69,72,76]");
+check("G7 = G-B-D-F", JSON.stringify(chordMidis(7, "7", 4)) === "[67,71,74,77]");
+check("Dsus4 = D-G-A", JSON.stringify(chordMidis(2, "sus4", 4)) === "[62,67,69]");
+check("未知タイプ → 空", chordMidis(0, "xxx", 4).length === 0);
+
+console.log("[15] シンセサイザー — 和音 → MusixTeX トークン");
+check("C メジャー (♩) = \\zq{c}\\zq{e}\\qu{g}",
+  chordTexTokens([60, 64, 67], "qu", 0) === "\\zq{c}\\zq{e}\\qu{g}");
+check("C7 の第7音 (B♭) はハ長調で A#4 = \\sh h 表記",
+  chordTexTokens(chordMidis(0, "7", 4), "qu", 0).includes("\\sh h"));
+check("B♭ 長調 (♭2) では B♭ に臨時記号が付かない",
+  chordTexTokens([58, 62, 65], "hu", -2) === "\\zq{b}\\zq{d}\\hu{f}");
+const chordTok = "\\NOtes" + chordTexTokens([60, 64, 67], "qu", 0) + "\\en";
+const chordBack = parseMusixTeX("\\startpiece" + chordTok + "\\endpiece");
+check("生成トークンは 1 つの三和音としてパースし直せる",
+  chordBack.events.length === 1 && chordBack.events[0].pitches.length === 3);
+
+console.log("[16] シンセサイザー — 音色プリセット (スペクトルコード)");
+for (const name of ["純音", "三角波", "ノコギリ", "矩形波", "オルガン", "ピアノ風"]) {
+  const h = synthPreset(name);
+  check(`${name}: 倍音8成分・基音=1・全成分 0〜1`,
+    h.length === 8 && h[0] === 1 && h.every(v => v >= 0 && v <= 1));
+}
+check("純音は基音のみ", synthPreset("純音").slice(1).every(v => v === 0));
+check("ノコギリは 1/n 系列", Math.abs(synthPreset("ノコギリ")[1] - 0.5) < 0.01 &&
+  Math.abs(synthPreset("ノコギリ")[3] - 0.25) < 0.01);
+check("矩形波は偶数倍音ゼロ", synthPreset("矩形波")[1] === 0 && synthPreset("矩形波")[3] === 0);
+check("プリセットは独立コピー (書き換えても汚れない)", (() => {
+  const a = synthPreset("純音"); a[0] = 0.1;
+  return synthPreset("純音")[0] === 1;
+})());
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");

@@ -68,6 +68,27 @@
   }
   .pbtn:hover { border-color: var(--gold); color: var(--gold); }
   .pbtn.on { border-color: var(--teal); color: var(--teal); }
+  #synthPanel {
+    border-bottom: 1px solid var(--line); padding: 6px 10px;
+    display: flex; flex-direction: column; gap: 5px; background: var(--bg2);
+  }
+  .synthrow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .synthrow .lbl { color: var(--dim); font-size: 11px; white-space: nowrap; }
+  #harmSliders { display: inline-flex; gap: 2px; align-items: flex-end; }
+  #harmSliders input[type="range"] {
+    writing-mode: vertical-lr; direction: rtl; width: 14px; height: 34px; padding: 0;
+  }
+  #synthPanel input[type="range"]:not(#harmSliders input) { width: 60px; }
+  #chordGrid { border-collapse: collapse; }
+  #chordGrid td, #chordGrid th { padding: 0; }
+  #chordGrid th {
+    color: var(--dim); font-size: 10px; font-weight: normal; padding-right: 4px; text-align: right;
+  }
+  #chordGrid button {
+    width: 30px; height: 20px; margin: 1px; border: 1px solid #000; border-radius: 3px;
+    cursor: pointer; font-size: 9px; color: #000; padding: 0; line-height: 1;
+  }
+  #chordGrid button:hover { outline: 2px solid #fff; }
   #src {
     flex: 1; resize: none; border: 0; outline: none; padding: 12px 14px;
     background: var(--bg2); color: var(--fg); tab-size: 2;
@@ -88,6 +109,7 @@
   }
   #visionbar #visionInfo { color: var(--dim); font-size: 11.5px; }
   #spectral { display: block; width: 100%; height: 112px; border-radius: 6px; }
+  #livespec { display: block; width: 100%; height: 64px; border-radius: 6px; margin-top: 4px; }
   #colorKeys { display: flex; gap: 2px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; }
   #colorKeys button {
     flex: 1 0 26px; min-width: 26px; height: 34px; border: 1px solid #000;
@@ -187,6 +209,23 @@
         </select>
       </div>
     </div>
+    <div id="synthPanel">
+      <div class="synthrow">
+        <span class="lbl">🎹 シンセ</span>
+        <select id="presetSel" class="pbtn" style="background:var(--bg3)">
+          <option>ピアノ風</option><option>純音</option><option>三角波</option>
+          <option>ノコギリ</option><option>矩形波</option><option>オルガン</option>
+        </select>
+        <span class="lbl">スペクトルコード (倍音 1〜8)</span>
+        <span id="harmSliders"></span>
+        <span class="lbl">A</span><input type="range" id="atkSlider" min="0.005" max="0.2" step="0.005" value="0.015" title="アタック">
+        <span class="lbl">R</span><input type="range" id="relSlider" min="0.05" max="1" step="0.05" value="0.3" title="リリース">
+      </div>
+      <div class="synthrow">
+        <span class="lbl">五行コード線</span>
+        <table id="chordGrid"></table>
+      </div>
+    </div>
     <textarea id="src" spellcheck="false" wrap="off"></textarea>
   </div>
 
@@ -203,6 +242,7 @@
         <span id="visionInfo"></span>
       </div>
       <canvas id="spectral" height="112"></canvas>
+      <canvas id="livespec" height="64" title="シンセ出力のライブスペクトル (12音階の色)"></canvas>
       <div id="colorKeys"></div>
     </div>
     <div id="preview"></div>
@@ -232,6 +272,12 @@
     G と A の和音、HANON 練習など。
   </p>
   <ul>
+    <li><b>シンセサイザー (スペクトルコード)</b>: 音色 = 倍音1〜8の振幅スペクトルを
+        スライダーで設計 (プリセット: 純音/三角波/ノコギリ/矩形波/オルガン/ピアノ風)。
+        ADSR 付き加算合成 (PeriodicWave) で試聴・鍵盤・コードすべての音源になり、
+        出力はライブスペクトル (12音階の色の FFT) として映像化</li>
+    <li><b>五行コード線</b>: M / m / 7 / M7 / sus4 の5行 × 12音階のコード格子。
+        セルは根音の波長色。クリックでシンセ演奏 + 楽譜へ和音 (\zq) を挿入</li>
     <li><b>モーツァルト・ビジョン</b>: 音の周波数を約40オクターブ上げると可視光の周波数帯に
         一致する物理対応 (例: A4 440Hz → 484THz ≒ 620nm 赤) で、楽譜を色の波長帯の映像として
         表示 (試聴と同期して発光)。波長で着色された色鍵盤をクリックすると、その色 (=音) が
@@ -606,12 +652,7 @@ function stopPlayback() {
 
 function playScore(score, onEvent) {
   stopPlayback();
-  if (!audioCtx) {
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    audioCtx = new AC();
-  }
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  if (!ensureAudioGraph()) return;
   var beat = 60 / 96; /* ♩=96 */
   var durBeats = { w: 4, h: 2, q: 1, c: 0.5 };
   var seq = [], i;
@@ -633,14 +674,7 @@ function playScore(score, onEvent) {
       var t0 = audioCtx.currentTime, j;
       for (j = 0; j < ev.pitches.length; j++) {
         var f = 440 * Math.pow(2, (midiOf(ev.pitches[j], score.signature) - 69) / 12);
-        var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-        osc.type = "triangle"; osc.frequency.value = f;
-        gain.gain.setValueAtTime(0.0001, t0);
-        gain.gain.exponentialRampToValueAtTime(0.22 / Math.sqrt(ev.pitches.length), t0 + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + secs * 0.95);
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.start(t0); osc.stop(t0 + secs);
-        playingNodes.push(osc);
+        playingNodes.push(synthVoice(f, t0, secs * 0.95, 0.22 / Math.sqrt(ev.pitches.length)));
       }
     }
     playTimer = setTimeout(step, secs * 1000);
@@ -957,6 +991,112 @@ function scoreToSpectral(score) {
 }
 
 /* ============================================================
+ * シンセサイザー (スペクトルコード) & 五行コード線
+ *   ・シンセの音色 = 倍音スペクトル (スペクトルコード): 倍音 1〜8 の
+ *     振幅列 + ADSR。Web Audio の PeriodicWave で加算合成する
+ *   ・五行コード線: M / m / 7 / M7 / sus4 の 5 行 × 12 音階のコード格子。
+ *     各セルは根音の光の波長色 (モーツァルト・ビジョン)
+ * ============================================================ */
+var CHORD_TYPES = [
+  { key: "M",    label: "M",    intervals: [0, 4, 7] },
+  { key: "m",    label: "m",    intervals: [0, 3, 7] },
+  { key: "7",    label: "7",    intervals: [0, 4, 7, 10] },
+  { key: "M7",   label: "M7",   intervals: [0, 4, 7, 11] },
+  { key: "sus4", label: "sus4", intervals: [0, 5, 7] }
+];
+
+function chordMidis(rootPc, typeKey, baseOctave) {
+  var oct = typeof baseOctave === "number" ? baseOctave : 4;
+  var root = 12 * (oct + 1) + ((rootPc % 12) + 12) % 12;
+  var i, t = null;
+  for (i = 0; i < CHORD_TYPES.length; i++)
+    if (CHORD_TYPES[i].key === typeKey) t = CHORD_TYPES[i];
+  if (!t) return [];
+  var out = [];
+  for (i = 0; i < t.intervals.length; i++) out.push(root + t.intervals[i]);
+  return out;
+}
+
+/* 和音 → MusixTeX トークン (\zq{...}…\qu{...}; 調号を考慮した臨時記号付き) */
+function chordTexTokens(midis, durKey, sig) {
+  if (!midis || !midis.length) return "";
+  var durCmd = { qu: "\\qu", cu: "\\cu", hu: "\\hu", wh: "\\wh" }[durKey] || "\\qu";
+  var sorted = midis.slice().sort(function (a, b) { return a - b; });
+  var tok = "", i, seen = {};
+  var parts = [];
+  for (i = 0; i < sorted.length; i++) {
+    var t = midiToTex(sorted[i], sig || 0);
+    var k = t.letter + (t.acc || "");
+    if (!seen[k]) { seen[k] = 1; parts.push(t); }
+  }
+  for (i = 0; i < parts.length; i++) {
+    if (parts[i].acc) tok += "\\" + parts[i].acc + " " + parts[i].letter;
+    tok += (i < parts.length - 1) ? "\\zq{" + parts[i].letter + "}"
+                                  : durCmd + "{" + parts[i].letter + "}";
+  }
+  return tok;
+}
+
+/* 音色プリセット (倍音スペクトル = スペクトルコード) */
+function synthPreset(name) {
+  var presets = {
+    "純音":     [1, 0, 0, 0, 0, 0, 0, 0],
+    "三角波":   [1, 0, 0.111, 0, 0.04, 0, 0.02, 0],
+    "ノコギリ": [1, 0.5, 0.333, 0.25, 0.2, 0.167, 0.143, 0.125],
+    "矩形波":   [1, 0, 0.333, 0, 0.2, 0, 0.143, 0],
+    "オルガン": [1, 0.6, 0.3, 0.5, 0.1, 0.2, 0.05, 0.3],
+    "ピアノ風": [1, 0.4, 0.2, 0.1, 0.06, 0.04, 0.02, 0.01]
+  };
+  return presets[name] ? presets[name].slice() : presets["ピアノ風"].slice();
+}
+
+var SYNTH = { harmonics: synthPreset("ピアノ風"), attack: 0.015, release: 0.3 };
+var masterGain = null, analyser = null, periodicCache = null;
+
+function ensureAudioGraph() {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  if (!masterGain) {
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.9;
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.75;
+    masterGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+  }
+  return audioCtx;
+}
+
+function synthWave() {
+  if (!periodicCache) {
+    var n = SYNTH.harmonics.length;
+    var real = new Float32Array(n + 1), imag = new Float32Array(n + 1);
+    for (var i = 0; i < n; i++) imag[i + 1] = SYNTH.harmonics[i];
+    periodicCache = audioCtx.createPeriodicWave(real, imag);
+  }
+  return periodicCache;
+}
+
+/* シンセボイス: 倍音スペクトル + ADSR で 1 音を発音 */
+function synthVoice(freq, t0, durSec, level) {
+  var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.setPeriodicWave(synthWave());
+  osc.frequency.value = freq;
+  var a = Math.min(SYNTH.attack, durSec * 0.4);
+  var r = Math.min(SYNTH.release, durSec);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(level, t0 + a);
+  gain.gain.setValueAtTime(level, Math.max(t0 + a, t0 + durSec - r));
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durSec);
+  osc.connect(gain); gain.connect(masterGain);
+  osc.start(t0); osc.stop(t0 + durSec + 0.02);
+  return osc;
+}
+
+/* ============================================================
  * コンパイルガイド (texlive-music)
  * ============================================================ */
 function compileGuide(os) {
@@ -1044,19 +1184,19 @@ function drawSpectral() {
 var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
 function playTone(midi) {
-  var AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return;
-  if (!audioCtx) audioCtx = new AC();
-  if (audioCtx.state === "suspended") audioCtx.resume();
+  if (!ensureAudioGraph()) return;
   var t0 = audioCtx.currentTime;
-  var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.type = "triangle";
-  osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-  gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.015);
-  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
-  osc.connect(gain); gain.connect(audioCtx.destination);
-  osc.start(t0); osc.stop(t0 + 0.42);
+  playingNodes.push(synthVoice(440 * Math.pow(2, (midi - 69) / 12), t0, 0.45, 0.25));
+  startSpectrumLoop();
+}
+
+function playChord(midis) {
+  if (!ensureAudioGraph()) return;
+  var t0 = audioCtx.currentTime, i;
+  for (i = 0; i < midis.length; i++)
+    playingNodes.push(synthVoice(440 * Math.pow(2, (midis[i] - 69) / 12), t0, 0.7,
+                                 0.22 / Math.sqrt(midis.length)));
+  startSpectrumLoop();
 }
 
 /* 色鍵盤クリック → その色 (=波長=音) をエディタに書き込む */
@@ -1089,11 +1229,116 @@ function buildColorKeys() {
   }
 }
 
+/* --- シンセのライブスペクトル (12音階の色で FFT を描画) --- */
+var livespecCanvas = document.getElementById("livespec");
+var spectrumRAF = null, spectrumUntil = 0;
+
+function drawLiveSpectrum() {
+  var cw = livespecCanvas.clientWidth || 600, chh = 64;
+  livespecCanvas.width = cw; livespecCanvas.height = chh;
+  var ctx = livespecCanvas.getContext("2d");
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, cw, chh);
+  if (!analyser) return;
+  var data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  var sr = audioCtx.sampleRate, binHz = sr / analyser.fftSize;
+  /* 55Hz〜3.5kHz を対数軸で描画。各ビンは最も近い音の色 (12音階) */
+  var fLo = 55, fHi = 3520, x;
+  for (x = 0; x < cw; x++) {
+    var f = fLo * Math.pow(fHi / fLo, x / cw);
+    var bin = Math.min(data.length - 1, Math.round(f / binHz));
+    var v = data[bin] / 255;
+    if (v < 0.02) continue;
+    var midi = Math.round(69 + 12 * (Math.log(f / 440) / Math.LN2));
+    ctx.fillStyle = noteColor(midi);
+    ctx.globalAlpha = 0.35 + 0.65 * v;
+    var h = Math.max(1, v * (chh - 4));
+    ctx.fillRect(x, chh - 2 - h, 1, h);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function startSpectrumLoop() {
+  spectrumUntil = Date.now() + 4000;
+  if (spectrumRAF) return;
+  function loop() {
+    drawLiveSpectrum();
+    if (Date.now() < spectrumUntil || playTimer) { spectrumRAF = requestAnimationFrame(loop); }
+    else { spectrumRAF = null; }
+  }
+  spectrumRAF = requestAnimationFrame(loop);
+}
+
+/* --- シンセ操作パネルと五行コード線 --- */
+function buildSynthPanel() {
+  var wrap = document.getElementById("harmSliders"), i;
+  function makeSliders() {
+    wrap.textContent = "";
+    for (i = 0; i < SYNTH.harmonics.length; i++) {
+      (function (idx) {
+        var s = document.createElement("input");
+        s.type = "range"; s.min = "0"; s.max = "1"; s.step = "0.01";
+        s.value = String(SYNTH.harmonics[idx]);
+        s.title = "倍音 " + (idx + 1);
+        s.addEventListener("input", function () {
+          SYNTH.harmonics[idx] = parseFloat(s.value);
+          periodicCache = null;
+        });
+        wrap.appendChild(s);
+      })(i);
+    }
+  }
+  makeSliders();
+  document.getElementById("presetSel").addEventListener("change", function (e) {
+    SYNTH.harmonics = synthPreset(e.target.value);
+    periodicCache = null;
+    makeSliders();
+    playTone(69);
+  });
+  document.getElementById("atkSlider").addEventListener("input", function (e) {
+    SYNTH.attack = parseFloat(e.target.value);
+  });
+  document.getElementById("relSlider").addEventListener("input", function (e) {
+    SYNTH.release = parseFloat(e.target.value);
+  });
+}
+
+function buildChordGrid() {
+  var table = document.getElementById("chordGrid"), r, c;
+  for (r = 0; r < CHORD_TYPES.length; r++) {
+    var tr = document.createElement("tr");
+    var th = document.createElement("th");
+    th.textContent = CHORD_TYPES[r].label;
+    tr.appendChild(th);
+    for (c = 0; c < 12; c++) {
+      (function (type, pc) {
+        var td = document.createElement("td");
+        var b = document.createElement("button");
+        b.style.background = noteColor(60 + pc);
+        b.textContent = NOTE_NAMES[pc];
+        b.title = NOTE_NAMES[pc] + type.label + " — クリックで演奏 + 楽譜へ挿入";
+        b.addEventListener("click", function () {
+          var midis = chordMidis(pc, type.key, 4);
+          playChord(midis);
+          var sig = parseMusixTeX(srcEl.value).signature;
+          var durKey = (curDur === "zq") ? "qu" : curDur;
+          insertSnippet(chordTexTokens(midis, durKey, sig));
+          visionInfoEl.textContent = NOTE_NAMES[pc] + type.label + " = [" + midis.join(",") + "]";
+        });
+        td.appendChild(b);
+        tr.appendChild(td);
+      })(CHORD_TYPES[r], c);
+    }
+    table.appendChild(tr);
+  }
+}
+
 function refresh() {
   var score = parseMusixTeX(srcEl.value);
   renderScore(score, previewEl);
   spectralData = scoreToSpectral(score);
   drawSpectral();
+  drawLiveSpectrum();
   var notes = 0, bars = 1, i;
   for (i = 0; i < score.events.length; i++) {
     if (score.events[i].type === "bar") bars++;
@@ -1315,6 +1560,7 @@ function showGuide(os) {
       playingEventIndex = idx;
       drawSpectral();
     });
+    startSpectrumLoop();
   });
   document.getElementById("btnStop").addEventListener("click", function () {
     stopPlayback();
@@ -1346,6 +1592,8 @@ function showGuide(os) {
   }
 
   buildColorKeys();
+  buildSynthPanel();
+  buildChordGrid();
   srcEl.addEventListener("input", scheduleRefresh);
   window.addEventListener("resize", scheduleRefresh);
 
