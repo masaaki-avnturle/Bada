@@ -27,6 +27,22 @@
 インストール不要で今すぐ試すなら:[`index.html`](index.html) を開いて
 **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックでブラウザ起動でも動きます。
 
+### 📦 Actions からのダウンロード(タグ・リリース不要)
+
+`bada_studio/` に触れる push のたびに 2 本のワークフローが自動でビルドするので、
+リリースを待たずに **Actions タブから直接ダウンロード**できます:
+
+1. [**Actions タブ**](https://github.com/masaaki-avnturle/Bada/actions) を開く
+2. 左のワークフロー一覧から **「Bada Studio app build (macOS DMG)」** または
+   **「Bada Studio apps build (Android APK + Windows EXE + Ubuntu)」** を選ぶ
+3. 一番上の ✅ 実行をクリック → ページ下部の **Artifacts** 欄から取得
+   - `badastudio-macos` (DMG + ZIP) / `badastudio-android` (APK) /
+     `badastudio-windows` (EXE) / `badastudio-linux` (AppImage + deb)
+
+Artifacts は zip で落ちてくるので解凍して中のファイルを使ってください
+(GitHub にログインしている必要があります。保存期間は既定 90 日)。
+Actions タブの「Run workflow」(workflow_dispatch) から手動でビルドを起動することもできます。
+
 ### プラットフォーム別の注意
 
 - **macOS**: Apple Developer 証明書を持たない ad-hoc 署名のため、初回のみ
