@@ -81,6 +81,28 @@
 
 ---
 
+## 𝄌 ダウンロード — Coda Studio(坂本龍一トリビュート音楽制作スタジオ・非公式)
+
+**音楽家・坂本龍一の音楽性 — ピアノの一音、静寂、アンビエンス、ミニマリズム — へのオマージュとして制作されたオリジナルの音楽制作アプリ。** 🎹 4 音色の鍵盤(グランドピアノ / エレピ / パッド / オルゴール、PC キーボード演奏対応)、🎼 映画音楽的ヴォイシングのコードパッド(maj9 / m9 / sus2 …)、◻ スケール・クオンタイズ付き 16 ステップ・アンビエント・シーケンサー(**都節音階・琉球音階**対応、スウィング、おまかせ生成)、🌫 コンボリューション・リバーブ + ディレイ、💾 44.1kHz/16bit ステレオ **WAV 書き出し**。全音源 Web Audio リアルタイム・シンセシス、依存ゼロ・単一 HTML・オフライン動作。※非公式ファン・トリビュートであり、氏が使用した市販ソフトの複製ではありません。
+
+### 👉 [**coda_studio/index.html をダウンロード**](coda_studio/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+**Actions** タブ → 「Coda Studio app build」→ **Run workflow** で以下のアーティファクトが手に入ります([Releases](https://github.com/masaaki-avnturle/Bada/releases) 添付は `codastudio-v*` タグ / `release_tag` 指定時):
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `coda-studio-debug.apk` |
+| **Windows 10 / 11** | `CodaStudio-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `CodaStudio-*-x86_64.AppImage` / `CodaStudio-*-amd64.deb` |
+
+ビルドは [`codastudio-app-build.yml`](.github/workflows/codastudio-app-build.yml) が実行します。機能・使い方は [`coda_studio/`](coda_studio/) を参照。
+
+---
+
 ## ⚔ ダウンロード — Laevateinn(自動走行アシスタントAI「アル」)
 
 自動走行の自動車**レーヴァテイン**とアシスタントAI**アル**。**アルのトランスフォーマーが車両を操縦**します — 知覚 attention を操舵角と加減速の2値に写す制御ヘッドが、その2値だけで車体(自転車近似モデル)を動かし、周囲(16レイセンサへの attention)を検知して自動で回避・減速・停止・再発進。測位は 2 モード — **🌐 Web地図モード**は衛星を使わず、ウェブサイトから受信する地図タイル(AEAD 検証つき)+推測航法+ランドマーク補正で走り、**🛰 人工衛星モード**は 4 機の擬似距離から最小二乗で測位します。A* 経路計画・依存ゼロ・単一 HTML。

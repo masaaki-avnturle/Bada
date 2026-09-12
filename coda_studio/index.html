@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Coda Studio — 音楽制作スタジオ(坂本龍一トリビュート・非公式)</title>
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#11151d; --panel2:#161b25; --line:#232a38;
+    --ink:#e8e6e0; --dim:#8b93a3; --accent:#8fb6c8; --warm:#c8a15a;
+    --white-key:#f2efe9; --black-key:#14161a;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;
+    line-height:1.6; padding-bottom:64px;
+  }
+  header{ padding:34px 20px 10px; text-align:center; }
+  h1{
+    margin:0; font-weight:400; letter-spacing:.14em; font-size:30px;
+    font-family:Georgia,"Hiragino Mincho ProN","Noto Serif JP",serif;
+  }
+  h1 .coda{ color:var(--warm); }
+  .sub{ color:var(--dim); font-size:13px; letter-spacing:.2em; margin-top:6px; }
+  .motto{
+    text-align:center; color:var(--dim); font-size:12px; letter-spacing:.3em;
+    font-family:Georgia,serif; font-style:italic; margin:4px 0 18px;
+  }
+  main{ max-width:980px; margin:0 auto; padding:0 14px; }
+  section{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:18px 18px 20px; margin:16px 0;
+  }
+  h2{
+    margin:0 0 12px; font-size:15px; font-weight:600; letter-spacing:.12em;
+    color:var(--accent); border-bottom:1px solid var(--line); padding-bottom:8px;
+  }
+  .row{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; margin:8px 0; }
+  label.ctl{ font-size:12px; color:var(--dim); display:flex; align-items:center; gap:6px; }
+  select,input[type="number"]{
+    background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:5px 8px; font-size:13px;
+  }
+  input[type="range"]{ accent-color:var(--accent); width:110px; }
+  button{
+    background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer;
+    letter-spacing:.06em; transition:border-color .15s, color .15s;
+  }
+  button:hover{ border-color:var(--accent); color:var(--accent); }
+  button.primary{ border-color:var(--warm); color:var(--warm); }
+  button.primary:hover{ background:#1b1a14; }
+  /* ── 鍵盤 ── */
+  #kbWrap{ overflow-x:auto; padding-bottom:4px; }
+  #kb{ position:relative; height:158px; min-width:640px; user-select:none; touch-action:none; }
+  .key{ position:absolute; top:0; border-radius:0 0 5px 5px; cursor:pointer; }
+  .key.white{
+    background:linear-gradient(#fbf9f4,var(--white-key)); border:1px solid #b8b2a4;
+    height:100%; z-index:1;
+  }
+  .key.black{
+    background:linear-gradient(#2a2d33,var(--black-key)); border:1px solid #000;
+    height:62%; z-index:2;
+  }
+  .key.white.on{ background:#cfe2ea; }
+  .key.black.on{ background:#3f5a66; }
+  .key .kcap{
+    position:absolute; bottom:6px; width:100%; text-align:center;
+    font-size:10px; color:#7a7466; pointer-events:none;
+  }
+  .key.black .kcap{ color:#6d7684; }
+  /* ── コードパッド ── */
+  #pads{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
+  .pad{
+    background:var(--panel2); border:1px solid var(--line); border-radius:8px;
+    padding:14px 8px; text-align:center; cursor:pointer; user-select:none; touch-action:none;
+  }
+  .pad:hover{ border-color:var(--warm); }
+  .pad.on{ border-color:var(--warm); background:#1c1a15; }
+  .pad b{ display:block; font-size:15px; font-weight:600; letter-spacing:.05em; }
+  .pad span{ font-size:11px; color:var(--dim); }
+  /* ── シーケンサー ── */
+  #gridWrap{ overflow-x:auto; }
+  #grid{ border-collapse:collapse; min-width:640px; }
+  #grid td{
+    width:34px; height:22px; border:1px solid var(--line);
+    background:var(--panel2); cursor:pointer;
+  }
+  #grid td.beat{ background:#1a2029; }
+  #grid td.set{ background:var(--accent); border-color:var(--accent); }
+  #grid td.set.playing{ background:var(--warm); border-color:var(--warm); }
+  #grid td.playhead{ box-shadow:inset 0 0 0 1px #3d4a5e; }
+  #grid th{
+    font-size:10px; font-weight:400; color:var(--dim); text-align:right;
+    padding-right:8px; white-space:nowrap;
+  }
+  .hint{ color:var(--dim); font-size:12px; margin-top:10px; }
+  footer{
+    max-width:980px; margin:26px auto 0; padding:0 16px; color:var(--dim);
+    font-size:11px; line-height:1.8;
+  }
+  footer hr{ border:0; border-top:1px solid var(--line); margin-bottom:14px; }
+  a{ color:var(--accent); }
+  #status{ font-size:12px; color:var(--warm); min-height:18px; margin-top:8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="coda">𝄌</span> Coda Studio</h1>
+  <div class="sub">坂本龍一トリビュート 音楽制作スタジオ(非公式)</div>
+</header>
+<div class="motto">Ars longa, vita brevis — 芸術は長く、人生は短い</div>
+
+<main>
+
+<section id="secKeys">
+  <h2>🎹 鍵盤 — ピアノ / エレクトリックピアノ / パッド / オルゴール</h2>
+  <div class="row">
+    <label class="ctl">音色
+      <select id="inst">
+        <option value="piano">グランドピアノ</option>
+        <option value="epiano">エレクトリックピアノ</option>
+        <option value="pad">アナログパッド</option>
+        <option value="bell">オルゴール</option>
+      </select>
+    </label>
+    <label class="ctl">オクターブ
+      <button id="octDown">−</button><span id="octLabel">C4</span><button id="octUp">+</button>
+    </label>
+    <label class="ctl"><input type="checkbox" id="sustain" checked> サステイン</label>
+    <label class="ctl">リバーブ <input type="range" id="revAmt" min="0" max="100" value="45"></label>
+    <label class="ctl">ディレイ <input type="range" id="dlyAmt" min="0" max="100" value="18"></label>
+    <label class="ctl">音量 <input type="range" id="volAmt" min="0" max="100" value="80"></label>
+  </div>
+  <div id="kbWrap"><div id="kb"></div></div>
+  <div class="hint">PCキーボードでも演奏できます: A W S E D F T G Y H U J K O L P ; (Zで1オクターブ下げ / Xで上げ)</div>
+</section>
+
+<section id="secPads">
+  <h2>🎼 コードパッド — 静寂のためのヴォイシング</h2>
+  <div class="row">
+    <label class="ctl">キー
+      <select id="padRoot"></select>
+    </label>
+    <label class="ctl">パッド音色
+      <select id="padInst">
+        <option value="piano">グランドピアノ</option>
+        <option value="epiano">エレクトリックピアノ</option>
+        <option value="pad" selected>アナログパッド</option>
+      </select>
+    </label>
+  </div>
+  <div id="pads"></div>
+  <div class="hint">押さえるだけで、映画音楽のような柔らかな和声が鳴ります。長押しで伸ばせます。</div>
+</section>
+
+<section id="secSeq">
+  <h2>◻ 16ステップ・シーケンサー — アンビエント・スケッチ</h2>
+  <div class="row">
+    <button id="playBtn" class="primary">▶ 再生</button>
+    <button id="clearBtn">クリア</button>
+    <button id="demoBtn">おまかせ生成</button>
+    <label class="ctl">BPM <input type="number" id="bpm" min="40" max="200" value="76" style="width:64px"></label>
+    <label class="ctl">スウィング <input type="range" id="swing" min="0" max="50" value="8"></label>
+  </div>
+  <div class="row">
+    <label class="ctl">スケール
+      <select id="scaleMode">
+        <option value="major">メジャー</option>
+        <option value="minor" selected>ナチュラルマイナー</option>
+        <option value="penta">ペンタトニック</option>
+        <option value="miyako">都節音階(みやこぶし)</option>
+        <option value="ryukyu">琉球音階</option>
+      </select>
+    </label>
+    <label class="ctl">ルート <select id="scaleRoot"></select></label>
+    <label class="ctl">シーケンス音色
+      <select id="seqInst">
+        <option value="piano" selected>グランドピアノ</option>
+        <option value="epiano">エレクトリックピアノ</option>
+        <option value="bell">オルゴール</option>
+        <option value="pad">アナログパッド</option>
+      </select>
+    </label>
+  </div>
+  <div id="gridWrap"><table id="grid"></table></div>
+  <div class="hint">マス目をタップして音を置きます。スケール外の音が出ないので、どこを押しても外れません。</div>
+</section>
+
+<section id="secExport">
+  <h2>💾 書き出し — ループを WAV で保存</h2>
+  <div class="row">
+    <button id="exportBtn" class="primary">⬇ WAV を書き出す (2ループ + 余韻)</button>
+    <label class="ctl">ループ回数 <input type="number" id="loopCount" min="1" max="8" value="2" style="width:56px"></label>
+  </div>
+  <div id="status"></div>
+  <div class="hint">シーケンサーの内容をリバーブ・ディレイ込みで 44.1kHz / 16bit ステレオ WAV にレンダリングします。</div>
+</section>
+
+<section>
+  <h2>📖 このアプリについて</h2>
+  <p style="font-size:13px; color:var(--dim); margin:0;">
+    Coda Studio は、音楽家・坂本龍一(1952–2023)の音楽性 — ピアノの一音、静寂、アンビエンス、
+    ミニマリズム — へのオマージュとして制作された<b>オリジナルの音楽制作アプリ</b>です。
+    依存ライブラリゼロ・単一 HTML・完全オフライン動作。音はすべて Web Audio API による
+    リアルタイム・シンセシスで、サンプル素材を一切含みません。
+    都節音階・琉球音階を選べば、日本的な響きのスケッチもすぐに始められます。
+  </p>
+</section>
+
+</main>
+
+<footer>
+  <hr>
+  <p><b>免責事項:</b> 本アプリは非公式のファン・トリビュートです。坂本龍一氏、ご遺族、
+  所属事務所・レーベル等とはいっさい関係がなく、承認・提携を受けたものではありません。
+  また、氏が実際に使用した市販の音楽制作ソフトウェアの複製・模倣品ではなく、
+  その音楽的精神に敬意を表して独自に設計されたオリジナル作品です。楽曲・音源・商標は一切含みません。</p>
+  <p>Coda Studio — part of the <a href="https://github.com/masaaki-avnturle/Bada">Bada</a> repository · MIT License</p>
+</footer>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════
+   Coda Studio — 音楽制作エンジン
+   前半: 純ロジック (Node 単体テスト対象 / tools/engine-test.js)
+   後半: Web Audio シンセサイザーと UI
+   ════════════════════════════════════════════════════════════════ */
+
+/* ── 音律 ── */
+function noteToFreq(midi){ return 440 * Math.pow(2, (midi - 69) / 12); }
+
+var NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+function noteName(midi){
+  return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+}
+
+/* ── スケール (都節・琉球を含む) ── */
+var SCALE_MODES = {
+  major:  [0,2,4,5,7,9,11],
+  minor:  [0,2,3,5,7,8,10],
+  penta:  [0,2,4,7,9],
+  miyako: [0,1,5,7,8],    /* 都節音階 */
+  ryukyu: [0,4,5,7,11]    /* 琉球音階 */
+};
+function buildScale(rootMidi, mode, count){
+  var iv = SCALE_MODES[mode] || SCALE_MODES.major;
+  var n = count || 13, out = [], i;
+  for (i = 0; out.length < n; i++){
+    out.push(rootMidi + iv[i % iv.length] + 12 * Math.floor(i / iv.length));
+  }
+  return out;
+}
+
+/* ── コード ── */
+var CHORD_TYPES = {
+  maj7:[0,4,7,11], maj9:[0,4,7,11,14], add9:[0,4,7,14],
+  m7:[0,3,7,10],  m9:[0,3,7,10,14],  m11:[0,3,7,10,14,17],
+  sus2:[0,2,7],   six9:[0,4,7,9,14]
+};
+function chordNotes(rootMidi, type){
+  var iv = CHORD_TYPES[type] || CHORD_TYPES.maj7;
+  return iv.map(function(x){ return rootMidi + x; });
+}
+
+/* ── 乱数 (決定的 LCG — テスト可能) ── */
+function lcg(seed){
+  var s = seed >>> 0;
+  return function(){
+    s = (1664525 * s + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/* ── シーケンサー: グリッド → イベント列 (純関数) ──
+   grid[row][step] (row 0 = スケール最低音), swing は 0〜0.5 */
+function seqToEvents(grid, scaleNotes, bpm, swing){
+  var stepDur = 15 / bpm;               /* 16 分音符 1 個の長さ */
+  var events = [], r, s, t;
+  for (s = 0; s < 16; s++){
+    t = s * stepDur + ((s % 2 === 1) ? swing * stepDur : 0);
+    for (r = 0; r < grid.length; r++){
+      if (grid[r][s]){
+        events.push({ time:t, midi:scaleNotes[r], dur:stepDur * 2.2, vel:0.85 });
+      }
+    }
+  }
+  return { events:events, loopLen:16 * stepDur, stepDur:stepDur };
+}
+
+/* ── おまかせ生成 (決定的) ── */
+function demoPattern(rows, steps, seed){
+  var rnd = lcg(seed), g = [], r, s;
+  for (r = 0; r < rows; r++){ g.push(new Array(steps).fill(0)); }
+  for (s = 0; s < steps; s++){
+    if (rnd() < 0.62){
+      var r1 = Math.floor(rnd() * rows);
+      g[r1][s] = 1;
+      if (rnd() < 0.22){ g[Math.floor(rnd() * rows)][s] = 1; }  /* 時々 2 声 */
+    }
+  }
+  g[0][0] = 1;  /* ルートで始める */
+  return g;
+}
+
+/* ── リバーブ用インパルス (純関数・決定的) ── */
+function impulseData(seconds, decay, sampleRate, seed){
+  var len = Math.max(1, Math.floor(seconds * sampleRate));
+  var rnd = lcg(seed || 7), d = new Float32Array(len), i;
+  for (i = 0; i < len; i++){
+    d[i] = (rnd() * 2 - 1) * Math.pow(1 - i / len, decay);
+  }
+  return d;
+}
+
+/* ── WAV エンコード (16bit ステレオ・純関数) ── */
+function encodeWav(chL, chR, sampleRate){
+  var n = chL.length, buf = new ArrayBuffer(44 + n * 4), v = new DataView(buf);
+  function str(off, s){ for (var i = 0; i < s.length; i++){ v.setUint8(off + i, s.charCodeAt(i)); } }
+  str(0, "RIFF"); v.setUint32(4, 36 + n * 4, true); str(8, "WAVE");
+  str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, 2, true); v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 4, true); v.setUint16(32, 4, true); v.setUint16(34, 16, true);
+  str(36, "data"); v.setUint32(40, n * 4, true);
+  var off = 44, i, x;
+  for (i = 0; i < n; i++){
+    x = Math.max(-1, Math.min(1, chL[i]));
+    v.setInt16(off, x < 0 ? x * 32768 : x * 32767, true); off += 2;
+    x = Math.max(-1, Math.min(1, chR[i]));
+    v.setInt16(off, x < 0 ? x * 32768 : x * 32767, true); off += 2;
+  }
+  return new Uint8Array(buf);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   シンセサイザー (Web Audio) — どの AudioContext でも動くよう
+   ctx を引数に取る。ライブ再生とオフライン書き出しで共用。
+   ════════════════════════════════════════════════════════════════ */
+
+/* エフェクトバス: dest へ dry + リバーブ + ディレイを構築して入口を返す */
+function buildBus(ctx, dest, revWetAmt, dlyWetAmt, masterAmt){
+  var input = ctx.createGain();
+  var master = ctx.createGain(); master.gain.value = masterAmt;
+  master.connect(dest);
+  input.connect(master);                                     /* dry */
+  var conv = ctx.createConvolver();
+  var ir = impulseData(2.8, 2.4, ctx.sampleRate, 7);
+  var irBuf = ctx.createBuffer(2, ir.length, ctx.sampleRate);
+  irBuf.getChannelData(0).set(ir);
+  irBuf.getChannelData(1).set(impulseData(2.8, 2.4, ctx.sampleRate, 11));
+  conv.buffer = irBuf;
+  var revWet = ctx.createGain(); revWet.gain.value = revWetAmt;
+  input.connect(conv); conv.connect(revWet); revWet.connect(master);
+  var dly = ctx.createDelay(2.0); dly.delayTime.value = 0.42;
+  var fb = ctx.createGain(); fb.gain.value = 0.34;
+  var dlyWet = ctx.createGain(); dlyWet.gain.value = dlyWetAmt;
+  input.connect(dly); dly.connect(fb); fb.connect(dly);
+  dly.connect(dlyWet); dlyWet.connect(master);
+  return { input:input, master:master, revWet:revWet, dlyWet:dlyWet };
+}
+
+/* 1 音を合成。{stop(t)} を返す (サステインオフ時のリリース用)。
+   inst: piano | epiano | pad | bell */
+function synthVoice(ctx, dest, inst, midi, t0, vel){
+  var f = noteToFreq(midi);
+  var out = ctx.createGain(); out.connect(dest);
+  var oscs = [], ends = t0 + 6;
+
+  function partial(mult, amp, type, detune){
+    var o = ctx.createOscillator(); o.type = type || "sine";
+    o.frequency.value = f * mult;
+    if (detune){ o.detune.value = detune; }
+    var g = ctx.createGain(); g.gain.value = amp;
+    o.connect(g); g.connect(out);
+    oscs.push(o);
+    return g;
+  }
+
+  if (inst === "piano"){
+    var amps = [1, 0.44, 0.22, 0.11, 0.06];
+    for (var i = 0; i < amps.length; i++){
+      partial((i + 1) * (1 + 0.0006 * i * i), amps[i] * vel * 0.28);
+    }
+    var tau = 1.9 * Math.pow(0.5, (midi - 60) / 24);  /* 高音ほど短い減衰 */
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(1, t0 + 0.004);
+    out.gain.setTargetAtTime(0, t0 + 0.004, tau);
+    ends = t0 + tau * 5 + 0.5;
+  } else if (inst === "epiano"){
+    partial(1, vel * 0.30);
+    partial(3.98, vel * 0.06);
+    var trem = ctx.createOscillator(); trem.frequency.value = 4.3;
+    var tg = ctx.createGain(); tg.gain.value = 0.12;
+    trem.connect(tg); tg.connect(out.gain); oscs.push(trem);
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(1, t0 + 0.006);
+    out.gain.setTargetAtTime(0, t0 + 0.006, 1.4);
+    ends = t0 + 6;
+  } else if (inst === "pad"){
+    var lp = ctx.createBiquadFilter(); lp.type = "lowpass";
+    lp.frequency.value = Math.min(f * 5, 4200); lp.Q.value = 0.4;
+    lp.connect(out);
+    var s1 = ctx.createOscillator(); s1.type = "sawtooth"; s1.frequency.value = f; s1.detune.value = -6;
+    var s2 = ctx.createOscillator(); s2.type = "sawtooth"; s2.frequency.value = f; s2.detune.value = 6;
+    var sg = ctx.createGain(); sg.gain.value = vel * 0.10;
+    s1.connect(sg); s2.connect(sg); sg.connect(lp);
+    oscs.push(s1, s2);
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(1, t0 + 0.5);
+    ends = t0 + 30;                                   /* stop() まで持続 */
+  } else { /* bell — オルゴール */
+    partial(1, vel * 0.26);
+    partial(2.76, vel * 0.10);
+    partial(5.40, vel * 0.05);
+    out.gain.setValueAtTime(0, t0);
+    out.gain.linearRampToValueAtTime(1, t0 + 0.002);
+    out.gain.setTargetAtTime(0, t0 + 0.002, 0.55);
+    ends = t0 + 3.5;
+  }
+
+  oscs.forEach(function(o){ o.start(t0); o.stop(ends); });
+  var stopped = false;
+  return {
+    stop: function(t){
+      if (stopped) return; stopped = true;
+      var rel = (inst === "pad") ? 0.9 : 0.25;
+      out.gain.cancelScheduledValues(t);
+      out.gain.setTargetAtTime(0, t, rel);
+      oscs.forEach(function(o){ try { o.stop(t + rel * 5); } catch(e){} });
+    }
+  };
+}
+
+/* イベント列を ctx 上にスケジュール (オフライン書き出し用) */
+function renderEvents(ctx, dest, events, inst, loops, loopLen){
+  for (var k = 0; k < loops; k++){
+    for (var i = 0; i < events.length; i++){
+      var ev = events[i];
+      var v = synthVoice(ctx, dest, inst, ev.midi, ev.time + k * loopLen + 0.05, ev.vel);
+      if (inst === "pad"){ v.stop(ev.time + k * loopLen + 0.05 + ev.dur); }
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UI と ライブ再生
+   ════════════════════════════════════════════════════════════════ */
+var audioCtx = null, liveBus = null;
+function getCtx(){
+  if (!audioCtx){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC){ return null; }
+    audioCtx = new AC();
+    liveBus = buildBus(audioCtx, audioCtx.destination, 0.45, 0.18, 0.8);
+  }
+  if (audioCtx.state === "suspended"){ audioCtx.resume(); }
+  return audioCtx;
+}
+function el(id){ return document.getElementById(id); }
+function applyFx(){
+  if (!liveBus) return;
+  liveBus.revWet.gain.value = el("revAmt").value / 100;
+  liveBus.dlyWet.gain.value = el("dlyAmt").value / 100 * 0.9;
+  liveBus.master.gain.value = el("volAmt").value / 100;
+}
+
+/* ── 鍵盤 ── */
+var kbBase = 60;  /* C4 */
+var WHITE_PC = [0,2,4,5,7,9,11];
+var KEYMAP = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11,
+               k:12, o:13, l:14, p:15, ";":16 };
+var heldVoices = {};   /* midi → voice */
+var keyEls = {};       /* midi → 要素 */
+
+function buildKeyboard(){
+  var kb = el("kb"); kb.innerHTML = ""; keyEls = {};
+  var whites = 0, n, pc, midi;
+  for (n = 0; n < 25; n++){ if (WHITE_PC.indexOf(n % 12) >= 0) whites++; }
+  var ww = 100 / whites, wi = 0;
+  for (n = 0; n < 25; n++){
+    midi = kbBase + n; pc = n % 12;
+    var d = document.createElement("div");
+    d.className = "key " + (WHITE_PC.indexOf(pc) >= 0 ? "white" : "black");
+    if (WHITE_PC.indexOf(pc) >= 0){
+      d.style.left = (wi * ww) + "%"; d.style.width = ww + "%";
+      if (pc === 0){
+        var cap = document.createElement("div");
+        cap.className = "kcap"; cap.textContent = noteName(midi);
+        d.appendChild(cap);
+      }
+      wi++;
+    } else {
+      d.style.left = (wi * ww - ww * 0.30) + "%"; d.style.width = (ww * 0.60) + "%";
+    }
+    d.dataset.midi = midi;
+    keyEls[midi] = d;
+    kb.appendChild(d);
+  }
+  el("octLabel").textContent = noteName(kbBase);
+}
+
+function noteOn(midi, inst){
+  var ctx = getCtx(); if (!ctx) return;
+  applyFx();
+  if (heldVoices[midi]) return;
+  heldVoices[midi] = synthVoice(ctx, liveBus.input, inst || el("inst").value,
+                                midi, ctx.currentTime, 0.9);
+  if (keyEls[midi]) keyEls[midi].classList.add("on");
+}
+function noteOff(midi){
+  var v = heldVoices[midi];
+  if (v){
+    delete heldVoices[midi];
+    var sustain = el("sustain").checked && el("inst").value !== "pad";
+    if (!sustain){ v.stop(audioCtx.currentTime); }
+  }
+  if (keyEls[midi]) keyEls[midi].classList.remove("on");
+}
+
+function bindKeyboard(){
+  var kb = el("kb");
+  kb.addEventListener("pointerdown", function(e){
+    var t = e.target.closest(".key"); if (!t) return;
+    e.preventDefault();
+    noteOn(+t.dataset.midi);
+  });
+  ["pointerup","pointercancel"].forEach(function(evName){
+    window.addEventListener(evName, function(){
+      Object.keys(heldVoices).forEach(function(m){
+        if (!pcHeld[m]) noteOff(+m);
+      });
+    });
+  });
+  kb.addEventListener("pointerleave", function(){
+    Object.keys(heldVoices).forEach(function(m){ if (!pcHeld[m]) noteOff(+m); });
+  });
+}
+
+/* PC キーボード */
+var pcHeld = {};
+function bindPcKeys(){
+  window.addEventListener("keydown", function(e){
+    if (e.repeat) return;
+    var k = e.key.toLowerCase();
+    if (k === "z"){ shiftOct(-12); return; }
+    if (k === "x"){ shiftOct(12); return; }
+    if (k in KEYMAP){
+      var midi = kbBase + KEYMAP[k];
+      pcHeld[midi] = true; noteOn(midi);
+    }
+  });
+  window.addEventListener("keyup", function(e){
+    var k = e.key.toLowerCase();
+    if (k in KEYMAP){
+      var midi = kbBase + KEYMAP[k];
+      delete pcHeld[midi]; noteOff(midi);
+    }
+  });
+}
+function shiftOct(d){
+  var nb = kbBase + d;
+  if (nb < 24 || nb > 84) return;
+  kbBase = nb; buildKeyboard();
+}
+
+/* ── コードパッド ── */
+var PAD_DEFS = [
+  { deg:0,  type:"maj9", label:"Ⅰ maj9" },
+  { deg:5,  type:"maj7", label:"Ⅳ maj7" },
+  { deg:9,  type:"m9",   label:"Ⅵ m9"  },
+  { deg:7,  type:"sus2", label:"Ⅴ sus2" },
+  { deg:4,  type:"m7",   label:"Ⅲ m7"  },
+  { deg:2,  type:"m11",  label:"Ⅱ m11" },
+  { deg:0,  type:"six9", label:"Ⅰ 6/9"  },
+  { deg:10, type:"maj7", label:"♭Ⅶ maj7" }
+];
+var padVoices = {};
+function buildPads(){
+  var wrap = el("pads"); wrap.innerHTML = "";
+  var root = +el("padRoot").value;
+  PAD_DEFS.forEach(function(pd, idx){
+    var d = document.createElement("div");
+    d.className = "pad";
+    d.innerHTML = "<b>" + NOTE_NAMES[(root + pd.deg) % 12] +
+      pd.type.replace("six9","6/9").replace("maj","Δ").replace("sus","sus") +
+      "</b><span>" + pd.label + "</span>";
+    d.addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      var ctx = getCtx(); if (!ctx) return;
+      applyFx();
+      var notes = chordNotes(root + pd.deg, pd.type);
+      padVoices[idx] = notes.map(function(m){
+        return synthVoice(ctx, liveBus.input, el("padInst").value, m, ctx.currentTime, 0.55);
+      });
+      d.classList.add("on");
+    });
+    function up(){
+      if (padVoices[idx]){
+        padVoices[idx].forEach(function(v){ v.stop(audioCtx.currentTime); });
+        delete padVoices[idx];
+      }
+      d.classList.remove("on");
+    }
+    d.addEventListener("pointerup", up);
+    d.addEventListener("pointercancel", up);
+    d.addEventListener("pointerleave", up);
+    wrap.appendChild(d);
+  });
+}
+
+/* ── シーケンサー ── */
+var ROWS = 13, STEPS = 16;
+var seqGrid = [];         /* [row][step], row 0 = 最低音 */
+var seqScale = [];        /* row → midi */
+var playing = false, schedTimer = null, uiTimer = null;
+var loopStart = 0, evIdx = 0, curEvents = null;
+
+function initGridState(){
+  seqGrid = [];
+  for (var r = 0; r < ROWS; r++){ seqGrid.push(new Array(STEPS).fill(0)); }
+}
+function currentScale(){
+  return buildScale(+el("scaleRoot").value, el("scaleMode").value, ROWS);
+}
+function buildGrid(){
+  seqScale = currentScale();
+  var tbl = el("grid"); tbl.innerHTML = "";
+  for (var vr = ROWS - 1; vr >= 0; vr--){
+    var tr = document.createElement("tr");
+    var th = document.createElement("th");
+    th.textContent = noteName(seqScale[vr]);
+    tr.appendChild(th);
+    for (var s = 0; s < STEPS; s++){
+      var td = document.createElement("td");
+      if (s % 4 === 0) td.className = "beat";
+      td.dataset.r = vr; td.dataset.s = s;
+      if (seqGrid[vr][s]) td.classList.add("set");
+      tr.appendChild(td);
+    }
+    tbl.appendChild(tr);
+  }
+}
+function bindGrid(){
+  el("grid").addEventListener("pointerdown", function(e){
+    var td = e.target.closest("td"); if (!td) return;
+    e.preventDefault();
+    var r = +td.dataset.r, s = +td.dataset.s;
+    seqGrid[r][s] = seqGrid[r][s] ? 0 : 1;
+    td.classList.toggle("set", !!seqGrid[r][s]);
+    if (seqGrid[r][s]){                       /* 置いた音を試聴 */
+      var ctx = getCtx(); if (!ctx) return;
+      applyFx();
+      var v = synthVoice(ctx, liveBus.input, el("seqInst").value, seqScale[r], ctx.currentTime, 0.7);
+      if (el("seqInst").value === "pad") v.stop(ctx.currentTime + 0.5);
+      else if (!el("sustain").checked) v.stop(ctx.currentTime + 0.4);
+    }
+  });
+}
+
+function startSeq(){
+  var ctx = getCtx(); if (!ctx){ alert("この環境では Web Audio が使えません"); return; }
+  applyFx();
+  playing = true;
+  el("playBtn").textContent = "■ 停止";
+  loopStart = ctx.currentTime + 0.1;
+  evIdx = 0;
+  curEvents = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
+  schedTimer = setInterval(schedulerTick, 25);
+  uiTimer = setInterval(uiTick, 40);
+}
+function stopSeq(){
+  playing = false;
+  el("playBtn").textContent = "▶ 再生";
+  clearInterval(schedTimer); clearInterval(uiTimer);
+  var cells = document.querySelectorAll("#grid td.playing, #grid td.playhead");
+  for (var i = 0; i < cells.length; i++){ cells[i].classList.remove("playing", "playhead"); }
+}
+function schedulerTick(){
+  if (!playing) return;
+  var ctx = audioCtx, horizon = ctx.currentTime + 0.15;
+  while (true){
+    if (evIdx >= curEvents.events.length){
+      var nextLoop = loopStart + curEvents.loopLen;
+      if (nextLoop > horizon) break;
+      loopStart = nextLoop; evIdx = 0;
+      curEvents = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
+      if (curEvents.events.length === 0) continue;
+    }
+    if (curEvents.events.length === 0) break;
+    var ev = curEvents.events[evIdx];
+    if (loopStart + ev.time > horizon) break;
+    var inst = el("seqInst").value;
+    var v = synthVoice(ctx, liveBus.input, inst, ev.midi, loopStart + ev.time, ev.vel);
+    if (inst === "pad"){ v.stop(loopStart + ev.time + ev.dur); }
+    evIdx++;
+  }
+}
+function uiTick(){
+  if (!playing || !audioCtx) return;
+  var pos = (audioCtx.currentTime - loopStart) / curEvents.stepDur;
+  var step = Math.floor(pos) % STEPS;
+  if (step < 0) step = 0;
+  var cells = el("grid").querySelectorAll("td");
+  for (var i = 0; i < cells.length; i++){
+    var td = cells[i], isCol = (+td.dataset.s === step);
+    td.classList.toggle("playhead", isCol);
+    td.classList.toggle("playing", isCol && td.classList.contains("set"));
+  }
+}
+
+/* ── WAV 書き出し ── */
+function exportWav(){
+  var evs = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
+  if (evs.events.length === 0){ el("status").textContent = "グリッドが空です — まず音を置いてください。"; return; }
+  var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC){ el("status").textContent = "この環境ではオフライン書き出しが使えません。"; return; }
+  var loops = Math.max(1, Math.min(8, +el("loopCount").value || 2));
+  var sr = 44100, tail = 3.5;
+  var len = Math.ceil((evs.loopLen * loops + tail) * sr);
+  var octx = new OAC(2, len, sr);
+  var bus = buildBus(octx, octx.destination,
+                     el("revAmt").value / 100, el("dlyAmt").value / 100 * 0.9,
+                     el("volAmt").value / 100);
+  renderEvents(octx, bus.input, evs.events, el("seqInst").value, loops, evs.loopLen);
+  el("status").textContent = "レンダリング中…";
+  octx.startRendering().then(function(buf){
+    var wav = encodeWav(buf.getChannelData(0), buf.getChannelData(1), sr);
+    var blob = new Blob([wav], { type:"audio/wav" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "coda-studio-loop.wav";
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    el("status").textContent = "書き出し完了 — coda-studio-loop.wav (" +
+      (wav.length / 1024 / 1024).toFixed(1) + " MB)";
+  }).catch(function(err){
+    el("status").textContent = "書き出しに失敗しました: " + err;
+  });
+}
+
+/* ── 初期化 ── */
+function fillRootSelect(sel, base){
+  for (var i = 0; i < 12; i++){
+    var o = document.createElement("option");
+    o.value = base + i; o.textContent = NOTE_NAMES[(base + i) % 12];
+    sel.appendChild(o);
+  }
+}
+function init(){
+  buildKeyboard(); bindKeyboard(); bindPcKeys();
+  fillRootSelect(el("padRoot"), 48);   /* C3 起点 */
+  fillRootSelect(el("scaleRoot"), 45); /* A2 起点 */
+  el("scaleRoot").value = 45;          /* A マイナー既定 */
+  buildPads();
+  initGridState(); buildGrid(); bindGrid();
+  el("padRoot").addEventListener("change", buildPads);
+  el("padInst").addEventListener("change", buildPads);
+  el("scaleMode").addEventListener("change", buildGrid);
+  el("scaleRoot").addEventListener("change", buildGrid);
+  el("octDown").addEventListener("click", function(){ shiftOct(-12); });
+  el("octUp").addEventListener("click", function(){ shiftOct(12); });
+  el("playBtn").addEventListener("click", function(){ playing ? stopSeq() : startSeq(); });
+  el("clearBtn").addEventListener("click", function(){ initGridState(); buildGrid(); });
+  el("demoBtn").addEventListener("click", function(){
+    seqGrid = demoPattern(ROWS, STEPS, Date.now() & 0xffff);
+    buildGrid();
+  });
+  el("exportBtn").addEventListener("click", exportWav);
+  ["revAmt","dlyAmt","volAmt"].forEach(function(id){
+    el(id).addEventListener("input", applyFx);
+  });
+}
+if (typeof document !== "undefined" && document.getElementById){ init(); }
+</script>
+</body>
+</html>
