@@ -79,6 +79,23 @@
     border-bottom: 1px solid var(--line); background: var(--bg2);
   }
   #previewbar .title { color: var(--teal); font-size: 13px; }
+  #vision {
+    border-bottom: 1px solid var(--line); background: #05070d; padding: 6px 10px 8px;
+  }
+  #visionbar {
+    display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    font-size: 12px; color: var(--purple); margin-bottom: 4px;
+  }
+  #visionbar #visionInfo { color: var(--dim); font-size: 11.5px; }
+  #spectral { display: block; width: 100%; height: 112px; border-radius: 6px; }
+  #colorKeys { display: flex; gap: 2px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; }
+  #colorKeys button {
+    flex: 1 0 26px; min-width: 26px; height: 34px; border: 1px solid #000;
+    border-radius: 4px; cursor: pointer; font-size: 9px; color: #000;
+    display: flex; align-items: flex-end; justify-content: center; padding: 1px;
+    font-family: inherit; line-height: 1.1;
+  }
+  #colorKeys button:hover { outline: 2px solid #fff; }
   #preview { flex: 1; overflow: auto; padding: 14px; background: #f7f4ec; }
   #preview svg { display: block; }
   #status {
@@ -180,6 +197,14 @@
         (簡易表示 — 印刷品質の組版は texlive-music で)
       </span>
     </div>
+    <div id="vision">
+      <div id="visionbar">
+        <span>🌈 モーツァルト・ビジョン — 音 = 光の波長帯 (音の周波数 ×2<sup>≈40</sup> = 可視光)</span>
+        <span id="visionInfo"></span>
+      </div>
+      <canvas id="spectral" height="112"></canvas>
+      <div id="colorKeys"></div>
+    </div>
     <div id="preview"></div>
     <div id="status"></div>
     <div id="guide">
@@ -207,6 +232,10 @@
     G と A の和音、HANON 練習など。
   </p>
   <ul>
+    <li><b>モーツァルト・ビジョン</b>: 音の周波数を約40オクターブ上げると可視光の周波数帯に
+        一致する物理対応 (例: A4 440Hz → 484THz ≒ 620nm 赤) で、楽譜を色の波長帯の映像として
+        表示 (試聴と同期して発光)。波長で着色された色鍵盤をクリックすると、その色 (=音) が
+        楽譜に書き込まれ、色から曲を制作できる</li>
     <li><b>曲→楽譜 (自動採譜)</b>: MIDI (.mid) は SMF 解析 (和音対応)、音声 (wav/mp3/ogg/m4a)
         は自己相関ピッチ検出 (単旋律・先頭60秒) で MusixTeX を自動生成。調号は長調15種への
         当てはまりで推定</li>
@@ -575,7 +604,7 @@ function stopPlayback() {
   playingNodes = [];
 }
 
-function playScore(score) {
+function playScore(score, onEvent) {
   stopPlayback();
   if (!audioCtx) {
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -593,7 +622,12 @@ function playScore(score) {
   }
   var pos = 0;
   function step() {
-    if (pos >= seq.length) { playTimer = null; return; }
+    if (pos >= seq.length) {
+      playTimer = null;
+      if (onEvent) onEvent(-1);
+      return;
+    }
+    if (onEvent) onEvent(pos);
     var ev = seq[pos++], secs = durBeats[ev.dur] * beat;
     if (ev.type === "note") {
       var t0 = audioCtx.currentTime, j;
@@ -858,6 +892,71 @@ function pitchFramesToEvents(frames, hopSec) {
 }
 
 /* ============================================================
+ * モーツァルト・ビジョン (音 = 光の波長帯)
+ *   音の周波数を約 40 オクターブ上げると可視光 (380〜780nm) の
+ *   周波数帯に一致する。この物理対応で 音高 → 光の波長 → 色 を
+ *   計算し、楽譜を「色の波長帯の映像」として視る/色から作曲する。
+ *   例: A4 = 440Hz × 2^40 ≒ 484THz → λ ≒ 620nm (赤)
+ * ============================================================ */
+var LIGHT_C = 299792458; /* 光速 m/s */
+
+function midiToWavelength(midi) {
+  var f = 440 * Math.pow(2, (midi - 69) / 12);
+  var fl = f;
+  while (LIGHT_C / fl > 780e-9) fl *= 2; /* 可視域までオクターブを上げる */
+  while (LIGHT_C / fl < 380e-9) fl /= 2;
+  var nm = (LIGHT_C / fl) * 1e9;
+  return { freq: f, thz: fl / 1e12, nm: nm };
+}
+
+/* 波長 (nm) → RGB (可視スペクトル近似; Bruton のアルゴリズム) */
+function wavelengthToRGB(nm) {
+  var r = 0, g = 0, b = 0;
+  if (nm >= 380 && nm < 440) { r = -(nm - 440) / 60; b = 1; }
+  else if (nm < 490) { g = (nm - 440) / 50; b = 1; }
+  else if (nm < 510) { g = 1; b = -(nm - 510) / 20; }
+  else if (nm < 580) { r = (nm - 510) / 70; g = 1; }
+  else if (nm < 645) { r = 1; g = -(nm - 645) / 65; }
+  else if (nm <= 780) { r = 1; }
+  var a = 1;
+  if (nm > 700) a = 0.3 + 0.7 * (780 - nm) / 80;
+  else if (nm < 420) a = 0.3 + 0.7 * (nm - 380) / 40;
+  function q(x) { return Math.max(0, Math.min(255, Math.round(255 * Math.pow(x * a, 0.8)))); }
+  return [q(r), q(g), q(b)];
+}
+
+function noteColor(midi) {
+  var c = wavelengthToRGB(midiToWavelength(midi).nm);
+  return "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")";
+}
+
+/* パース済み楽譜 → スペクトル帯 (拍タイムライン上の色付き帯) */
+function scoreToSpectral(score) {
+  var durBeats = { w: 4, h: 2, q: 1, c: 0.5 };
+  var items = [], pos = 0, eventIndex = 0, i, j;
+  for (i = 0; i < score.events.length; i++) {
+    var ev = score.events[i];
+    if (ev.type === "bar") continue;
+    var d = durBeats[ev.dur] || 1;
+    if (ev.type === "note") {
+      for (j = 0; j < ev.pitches.length; j++) {
+        var m = midiOf(ev.pitches[j], score.signature);
+        var w = midiToWavelength(m);
+        var c = wavelengthToRGB(w.nm);
+        items.push({
+          startBeat: pos, durBeats: d, midi: m,
+          nm: w.nm, thz: w.thz, freq: w.freq,
+          color: "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")",
+          eventIndex: eventIndex
+        });
+      }
+    }
+    pos += d; eventIndex++;
+  }
+  return { items: items, totalBeats: pos, eventCount: eventIndex };
+}
+
+/* ============================================================
  * コンパイルガイド (texlive-music)
  * ============================================================ */
 function compileGuide(os) {
@@ -891,9 +990,110 @@ var previewEl = document.getElementById("preview");
 var statusEl = document.getElementById("status");
 var curDur = "qu", curAcc = "";
 
+/* --- モーツァルト・ビジョン: スペクトル描画と色鍵盤 --- */
+var spectralCanvas = document.getElementById("spectral");
+var visionInfoEl = document.getElementById("visionInfo");
+var spectralData = { items: [], totalBeats: 0 };
+var playingEventIndex = -1;
+
+function drawSpectral() {
+  var cw = spectralCanvas.clientWidth || 600, chh = 112;
+  spectralCanvas.width = cw; spectralCanvas.height = chh;
+  var ctx = spectralCanvas.getContext("2d");
+  ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, cw, chh);
+  /* 下端: 可視スペクトルの波長ものさし (380〜780nm) */
+  var rulerH = 10, i;
+  for (i = 0; i < cw; i++) {
+    var nm = 380 + (780 - 380) * (i / cw);
+    var c = wavelengthToRGB(nm);
+    ctx.fillStyle = "rgba(" + c[0] + "," + c[1] + "," + c[2] + ",0.55)";
+    ctx.fillRect(i, chh - rulerH, 1, rulerH);
+  }
+  var items = spectralData.items;
+  if (!items.length) {
+    ctx.fillStyle = "#3a4560"; ctx.font = "11px sans-serif";
+    ctx.fillText("楽譜を入力すると、音が光の波長帯の映像になります", 10, chh / 2);
+    return;
+  }
+  var total = Math.max(spectralData.totalBeats, 1);
+  var pxPerBeat = Math.max(10, Math.min(64, (cw - 8) / total));
+  var loMidi = 200, hiMidi = 0;
+  for (i = 0; i < items.length; i++) {
+    if (items[i].midi < loMidi) loMidi = items[i].midi;
+    if (items[i].midi > hiMidi) hiMidi = items[i].midi;
+  }
+  loMidi -= 2; hiMidi += 2;
+  var span = Math.max(hiMidi - loMidi, 8);
+  var areaH = chh - rulerH - 6, bandH = Math.max(4, Math.min(12, areaH / span * 1.6));
+  for (i = 0; i < items.length; i++) {
+    var it = items[i];
+    var x = 4 + it.startBeat * pxPerBeat;
+    var w = Math.max(3, it.durBeats * pxPerBeat - 2);
+    var y = 4 + (1 - (it.midi - loMidi) / span) * (areaH - bandH);
+    var lit = it.eventIndex === playingEventIndex;
+    ctx.shadowColor = it.color;
+    ctx.shadowBlur = lit ? 18 : 7;
+    ctx.fillStyle = it.color;
+    ctx.globalAlpha = lit ? 1 : 0.85;
+    ctx.fillRect(x, y, w, bandH);
+    if (lit) { ctx.globalAlpha = 1; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.4; ctx.strokeRect(x - 1, y - 1, w + 2, bandH + 2); }
+  }
+  ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+}
+
+var NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+function playTone(midi) {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  var t0 = audioCtx.currentTime;
+  var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.type = "triangle";
+  osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(0.25, t0 + 0.015);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.start(t0); osc.stop(t0 + 0.42);
+}
+
+/* 色鍵盤クリック → その色 (=波長=音) をエディタに書き込む */
+function insertColorNote(midi) {
+  var sig = parseMusixTeX(srcEl.value).signature;
+  var t = midiToTex(midi, sig);
+  var tok = "";
+  if (t.acc) tok += "\\" + t.acc + " " + t.letter;
+  tok += (curDur === "zq") ? "\\zq{" + t.letter + "}" : "\\" + curDur + "{" + t.letter + "}";
+  var w = midiToWavelength(midi);
+  visionInfoEl.textContent = NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1) +
+    " = " + w.freq.toFixed(1) + "Hz → " + w.thz.toFixed(0) + "THz → " + w.nm.toFixed(0) + "nm";
+  playTone(midi);
+  insertSnippet(tok);
+}
+
+function buildColorKeys() {
+  var wrap = document.getElementById("colorKeys"), m;
+  for (m = 60; m <= 83; m++) {
+    (function (midi) {
+      var w = midiToWavelength(midi);
+      var b = document.createElement("button");
+      b.style.background = noteColor(midi);
+      b.textContent = NOTE_NAMES[midi % 12];
+      b.title = NOTE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1) + " — " +
+        w.freq.toFixed(1) + "Hz / 光: " + w.thz.toFixed(0) + "THz ≒ " + w.nm.toFixed(0) + "nm";
+      b.addEventListener("click", function () { insertColorNote(midi); });
+      wrap.appendChild(b);
+    })(m);
+  }
+}
+
 function refresh() {
   var score = parseMusixTeX(srcEl.value);
   renderScore(score, previewEl);
+  spectralData = scoreToSpectral(score);
+  drawSpectral();
   var notes = 0, bars = 1, i;
   for (i = 0; i < score.events.length; i++) {
     if (score.events[i].type === "bar") bars++;
@@ -915,6 +1115,15 @@ function scheduleRefresh() {
 
 function insertSnippet(text) {
   var el = srcEl, start = el.selectionStart, end = el.selectionEnd;
+  var v = el.value;
+  /* カーソル未設定 (先頭 or 末尾) のときは最後の音符グループ内 (\en の直前) へ */
+  if (start === end && (start === 0 || start >= v.length)) {
+    var pieceEnd = v.lastIndexOf("\\endpiece");
+    if (pieceEnd > 0) {
+      var lastEn = v.lastIndexOf("\\en", pieceEnd - 1);
+      if (lastEn > 0) { start = end = lastEn; }
+    }
+  }
   el.value = el.value.slice(0, start) + text + el.value.slice(end);
   el.selectionStart = el.selectionEnd = start + text.length;
   el.focus();
@@ -1102,9 +1311,16 @@ function showGuide(os) {
   });
 
   document.getElementById("btnPlay").addEventListener("click", function () {
-    playScore(parseMusixTeX(srcEl.value));
+    playScore(parseMusixTeX(srcEl.value), function (idx) {
+      playingEventIndex = idx;
+      drawSpectral();
+    });
   });
-  document.getElementById("btnStop").addEventListener("click", stopPlayback);
+  document.getElementById("btnStop").addEventListener("click", function () {
+    stopPlayback();
+    playingEventIndex = -1;
+    drawSpectral();
+  });
   document.getElementById("btnDownload").addEventListener("click", downloadTex);
   document.getElementById("btnCopy").addEventListener("click", copyTex);
   document.getElementById("btnAbout").addEventListener("click", function () {
@@ -1129,6 +1345,7 @@ function showGuide(os) {
     (function (b) { b.addEventListener("click", function () { showGuide(b.dataset.os); }); })(osBtns[i]);
   }
 
+  buildColorKeys();
   srcEl.addEventListener("input", scheduleRefresh);
   window.addEventListener("resize", scheduleRefresh);
 

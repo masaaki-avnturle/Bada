@@ -32,7 +32,8 @@ function check(name, cond) {
 
 const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
         estimateKeySignature, midiToTex, parseMidi, midiNotesToEvents,
-        notesToMusixTex, detectPitch, pitchFramesToEvents } = sandbox;
+        notesToMusixTex, detectPitch, pitchFramesToEvents,
+        midiToWavelength, wavelengthToRGB, scoreToSpectral } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -170,6 +171,39 @@ const aev = pitchFramesToEvents(seq, 0.05);
 check("2 notes segmented from frames", aev.length === 2 &&
   aev[0].midis[0] === 69 && aev[1].midis[0] === 72);
 check("audio events → MusixTeX doc", (notesToMusixTex(aev, { source: "test.wav" }) || "").includes("\\input musixtex"));
+
+console.log("[12] モーツァルト・ビジョン — 音 → 光の波長帯");
+const a4 = midiToWavelength(69);
+check("A4 440Hz → ≈484THz", Math.abs(a4.thz - 484) < 2);
+check("A4 → ≈620nm (赤)", a4.nm > 610 && a4.nm < 630);
+const c4w = midiToWavelength(60);
+check("C4 → 510〜530nm (緑)", c4w.nm > 510 && c4w.nm < 530);
+check("同じ音名は同じ波長 (オクターブ不変)",
+  Math.abs(midiToWavelength(69).nm - midiToWavelength(81).nm) < 0.01);
+let inRange = true;
+for (let m = 21; m <= 108; m++) {
+  const nm = midiToWavelength(m).nm;
+  if (nm < 380 || nm > 780) inRange = false;
+}
+check("全ピアノ音域 (A0〜C8) が可視域 380〜780nm に収まる", inRange);
+const red = wavelengthToRGB(620), blue = wavelengthToRGB(460), green = wavelengthToRGB(520);
+check("620nm は赤が優勢", red[0] > 200 && red[1] < 150 && red[2] < 60);
+check("460nm は青が優勢", blue[2] > 200 && blue[0] < 100);
+check("520nm は緑が優勢", green[1] > 200 && green[0] < 100 && green[2] < 100);
+
+console.log("[13] モーツァルト・ビジョン — 楽譜 → スペクトル帯");
+const spec = scoreToSpectral(parseMusixTeX(TEMPLATES[0].body));
+check("B♭ 音階 16 音が 16 帯になる", spec.items.length === 16);
+check("帯の開始拍が単調非減少",
+  spec.items.every((it, i) => i === 0 || it.startBeat >= spec.items[i - 1].startBeat));
+check("各帯が色・波長・イベント番号を持つ",
+  spec.items.every(it => /^rgb\(/.test(it.color) && it.nm >= 380 && it.nm <= 780 &&
+                         Number.isInteger(it.eventIndex)));
+check("先頭は B♭3 (MIDI 58) の帯", spec.items[0].midi === 58);
+check("イベント総数 16 (休符なし・小節線除く)", spec.eventCount === 16);
+const chordSpec = scoreToSpectral(parseMusixTeX(TEMPLATES[2].body));
+check("和音は同一開始拍に複数の帯",
+  chordSpec.items.filter(it => it.startBeat === 0).length === 3);
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");
