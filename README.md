@@ -66,6 +66,7 @@
 | **Android** (APK) | `musictex-studio-debug.apk` |
 | **Windows 10 / 11** | `MusicTeXStudio-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | **Ubuntu** | `MusicTeXStudio-*-x86_64.AppImage` / `MusicTeXStudio-*-amd64.deb` |
+| **Squeak 版 (音響制作)** | `MusicTeXStudio-Squeak.zip` — Squeak Smalltalk の Morphic + サウンド合成で同機能・同デザインを実装 (fileIn → `MTSApp open`)。詳細は [`musictex_studio/squeak/`](musictex_studio/squeak/) |
 | **楽譜サンプル PDF** | `octave74_scales.pdf` (texlive-music で実コンパイルした B♭ 長音階 + G・A 和音) |
 
 ビルドは [`musictex-app-build.yml`](.github/workflows/musictex-app-build.yml) が実行します(`musictex-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。CI では **texlive-music を実際に導入し、同梱テンプレート全曲とサンプル楽譜を `musixtex -p` で実コンパイル検証**しています。使い方・MusixTeX 早見表は [`musictex_studio/`](musictex_studio/) を参照。

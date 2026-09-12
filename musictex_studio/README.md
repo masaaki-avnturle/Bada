@@ -21,6 +21,7 @@ PDF ガイド) の 3 ペイン構成です。
 | **Windows 10 / 11** | `MusicTeXStudio-*-x64.exe` (NSIS インストーラ) / `MusicTeXStudio-*-portable.exe` | ダブルクリック |
 | **Ubuntu** | `MusicTeXStudio-*-x86_64.AppImage` / `MusicTeXStudio-*-amd64.deb` | AppImage は `chmod +x` して実行 / deb は `sudo apt install ./MusicTeXStudio-*-amd64.deb` |
 | **楽譜サンプル PDF** | `octave74_scales.pdf` | texlive-music で実コンパイルした B♭ 長音階 + G・A 和音の楽譜 |
+| **Squeak 版 (音響制作)** | `MusicTeXStudio-Squeak.zip` | Squeak Smalltalk 用の同機能アプリ ([squeak/](squeak/) 参照)。fileIn して `MTSApp open` |
 
 ブラウザで直接使うこともできます: [`index.html`](index.html) を「Download raw file」で保存してダブルクリック。
 

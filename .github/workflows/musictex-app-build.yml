@@ -74,6 +74,13 @@ jobs:
         run: |
           set -e
           node musictex_studio/tools/engine-test.js
+      - name: Squeak edition static checks + package
+        run: |
+          set -e
+          node musictex_studio/tools/squeak-check.js
+          mkdir -p out
+          (cd musictex_studio && zip -r ../out/MusicTeXStudio-Squeak.zip squeak)
+          ls -la out
       - name: Install texlive-music (real MusixTeX toolchain)
         run: |
           sudo apt-get update -qq
@@ -110,17 +117,21 @@ jobs:
           mkdir -p ../out
           cp octave74_scales.pdf ../out/octave74_scales.pdf
           ls -la ../out
-      - name: Upload sample score PDF
+      - name: Upload sample score PDF + Squeak edition
         uses: actions/upload-artifact@v4
         with:
           name: musictex-sample-pdf
-          path: out/octave74_scales.pdf
-      - name: Attach sample score PDF to Release
+          path: |
+            out/octave74_scales.pdf
+            out/MusicTeXStudio-Squeak.zip
+      - name: Attach sample score PDF + Squeak edition to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
-          files: out/octave74_scales.pdf
+          files: |
+            out/octave74_scales.pdf
+            out/MusicTeXStudio-Squeak.zip
 
   android-apk:
     runs-on: ubuntu-latest
