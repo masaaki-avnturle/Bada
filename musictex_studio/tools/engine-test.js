@@ -30,7 +30,9 @@ function check(name, cond) {
   else { console.error("  FAIL " + name); failures++; }
 }
 
-const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide } = sandbox;
+const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
+        estimateKeySignature, midiToTex, parseMidi, midiNotesToEvents,
+        notesToMusixTex, detectPitch, pitchFramesToEvents } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -88,6 +90,86 @@ const rests = parseMusixTeX(restSrc);
 check("meter 3/4 parsed", rests.meter[0] === 3 && rests.meter[1] === 4);
 check("quarter + half rests parsed",
   rests.events.filter(e => e.type === "rest").length === 2);
+
+console.log("[8] 自動採譜 — 調号推定と音名変換");
+// B♭ 長音階 (B♭3〜B♭4): 58 60 62 63 65 67 69 70
+check("B flat scale → signature -2",
+  estimateKeySignature([58, 60, 62, 63, 65, 67, 69, 70]) === -2);
+check("C major scale → signature 0",
+  estimateKeySignature([60, 62, 64, 65, 67, 69, 71, 72]) === 0);
+check("midiToTex: 60 in C = c (no accidental)",
+  JSON.stringify(midiToTex(60, 0)) === JSON.stringify({ idx: 28, letter: "c", acc: null }));
+check("midiToTex: 58 in B flat major = b (flat from signature, no accidental)",
+  midiToTex(58, -2).letter === "b" && midiToTex(58, -2).acc === null);
+check("midiToTex: 66 in C = f sharp (explicit \\sh)",
+  midiToTex(66, 0).letter === "f" && midiToTex(66, 0).acc === "sh");
+check("midiToTex: 59 in B flat major = b natural (explicit \\na)",
+  midiToTex(59, -2).letter === "b" && midiToTex(59, -2).acc === "na");
+
+console.log("[9] 自動採譜 — SMF (MIDI) パーサ");
+// 合成 SMF: format 0, division 480。C4(♩) D4(♩) E4(𝅗𝅥) + 和音 C4+E4+G4(♩)
+function vlq(n) { // MIDI 可変長数値
+  const out = [n & 0x7F];
+  while ((n >>= 7) > 0) out.unshift((n & 0x7F) | 0x80);
+  return out;
+}
+function midiFile(track) {
+  const trk = [].concat(...track);
+  return Uint8Array.from([
+    0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, (480 >> 8), (480 & 0xFF),
+    0x4D, 0x54, 0x72, 0x6B,
+    (trk.length >> 24) & 0xFF, (trk.length >> 16) & 0xFF, (trk.length >> 8) & 0xFF, trk.length & 0xFF,
+    ...trk
+  ]);
+}
+const Q = 480;
+const smf = midiFile([
+  [...vlq(0), 0x90, 60, 100], [...vlq(Q), 0x80, 60, 0],       // C4 quarter
+  [...vlq(0), 0x90, 62, 100], [...vlq(Q), 0x80, 62, 0],       // D4 quarter
+  [...vlq(0), 0x90, 64, 100], [...vlq(2 * Q), 0x80, 64, 0],   // E4 half
+  [...vlq(0), 0x90, 60, 100], [...vlq(0), 0x90, 64, 100], [...vlq(0), 0x90, 67, 100], // chord on
+  [...vlq(Q), 0x80, 60, 0], [...vlq(0), 0x80, 64, 0], [...vlq(0), 0x80, 67, 0],       // chord off
+  [...vlq(0), 0xFF, 0x2F, 0x00]                                // end of track
+]);
+const parsed = parseMidi(smf);
+check("SMF parsed: division 480", parsed && parsed.division === 480);
+check("SMF parsed: 6 notes", parsed.notes.length === 6);
+check("first note C4 at tick 0, 1 beat",
+  parsed.notes[0].midi === 60 && parsed.notes[0].startTick === 0 && parsed.notes[0].durTick === Q);
+const mev = midiNotesToEvents(parsed);
+check("events: 4 (chord folded)", mev.length === 4);
+check("chord event = C4+E4+G4", JSON.stringify(mev[3].midis) === "[60,64,67]");
+
+console.log("[10] 自動採譜 — MusixTeX 生成");
+const gen = notesToMusixTex(mev, { source: "test.mid" });
+check("generated doc is complete MusixTeX",
+  gen.includes("\\input musixtex") && gen.trim().endsWith("\\end") &&
+  gen.includes("\\startpiece") && gen.includes("\\endpiece"));
+check("C major signature", gen.includes("\\generalsignature{0}"));
+check("quarter c present", gen.includes("\\qu{c}"));
+check("half e present", gen.includes("\\hu{e}"));
+check("chord uses \\zq c + \\zq e + top g", gen.includes("\\zq{c}\\zq{e}\\qu{g}"));
+const genParsed = parseMusixTeX(gen);
+check("generated doc parses back: 4 note events + no warnings",
+  genParsed.events.filter(e => e.type === "note").length === 4 && genParsed.warnings.length === 0);
+check("empty input → null", notesToMusixTex([], {}) === null);
+
+console.log("[11] 自動採譜 — 音声ピッチ検出 (合成サイン波)");
+const sr = 11025, frame = new Float32Array(1024);
+for (let i = 0; i < frame.length; i++) frame[i] = 0.4 * Math.sin(2 * Math.PI * 440 * i / sr);
+const m440 = detectPitch(frame, sr);
+check("440 Hz sine → MIDI 69 (A4)", Math.abs(m440 - 69) < 0.5);
+const silent = new Float32Array(1024);
+check("silence → 0", detectPitch(silent, sr) === 0);
+// フレーム列 → イベント: A4 を 8 フレーム、休み 8、C5 を 8
+const seq = [];
+for (let i = 0; i < 8; i++) seq.push(69);
+for (let i = 0; i < 8; i++) seq.push(0);
+for (let i = 0; i < 8; i++) seq.push(72);
+const aev = pitchFramesToEvents(seq, 0.05);
+check("2 notes segmented from frames", aev.length === 2 &&
+  aev[0].midis[0] === 69 && aev[1].midis[0] === 72);
+check("audio events → MusixTeX doc", (notesToMusixTex(aev, { source: "test.wav" }) || "").includes("\\input musixtex"));
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");

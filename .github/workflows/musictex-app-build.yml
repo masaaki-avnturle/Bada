@@ -55,7 +55,9 @@ jobs:
             for (const marker of ["function parseMusixTeX", "function renderScore",
                                   "function playScore", "function applyTemplate",
                                   "function insertSnippet", "function downloadTex",
-                                  "function compileGuide"]) {
+                                  "function compileGuide", "function parseMidi",
+                                  "function notesToMusixTex", "function estimateKeySignature",
+                                  "function detectPitch", "function importSongFile"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
@@ -82,6 +84,14 @@ jobs:
             const sb = { window: {}, console }; vm.createContext(sb); vm.runInContext(core, sb);
             sb.TEMPLATES.forEach((t, i) => fs.writeFileSync(`tpl${i}.tex`, t.body + "\n"));
             console.log("wrote", sb.TEMPLATES.length, "templates");
+            // 自動採譜 (曲→楽譜) の生成物も実コンパイル検証する
+            const ev = [
+              { startBeat: 0, durBeats: 1, midis: [58] }, { startBeat: 1, durBeats: 1, midis: [60] },
+              { startBeat: 2, durBeats: 0.5, midis: [62] }, { startBeat: 2.5, durBeats: 0.5, midis: [63] },
+              { startBeat: 3, durBeats: 1, midis: [65] }, { startBeat: 5, durBeats: 1, midis: [67] },
+              { startBeat: 6, durBeats: 2, midis: [58, 62, 65] }, { startBeat: 8, durBeats: 4, midis: [70] }
+            ];
+            fs.writeFileSync("transcribed.tex", sb.notesToMusixTex(ev, { source: "ci-synthetic" }) + "\n");
           '
           cp ../musictex_studio/scores/octave74_scales.tex .
           for f in *.tex; do

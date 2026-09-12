@@ -53,7 +53,7 @@
 
 ## 🎼 ダウンロード — MusicTeX Studio(楽譜制作 / texlive-music)
 
-**MusixTeX (texlive-music) の楽譜ソースを作成・ライブプレビュー・試聴し、`.tex` として書き出す楽譜制作アプリ。** レポート **「Δと」(octave74)** の音階理論(B♭・E♭ 長音階のとりうる音、2音階=2オクターブ、G と A の和音、HANON)をテンプレートとして同梱。依存ゼロ・単一 HTML・オフライン動作。印刷用 PDF は texlive-music の `musixtex -p score.tex` で組版します。
+**MusixTeX (texlive-music) の楽譜ソースを作成・ライブプレビュー・試聴し、`.tex` として書き出す楽譜制作アプリ。** **曲ファイルを入れると楽譜を自動で記述(自動採譜)**: MIDI (.mid) は SMF 解析(和音対応)、音声 (wav/mp3/ogg/m4a) は自己相関ピッチ検出(単旋律)で MusixTeX を生成し、調号・音価・休符・小節割りまで自動で付けます。レポート **「Δと」(octave74)** の音階理論(B♭・E♭ 長音階のとりうる音、2音階=2オクターブ、G と A の和音、HANON)をテンプレートとして同梱。依存ゼロ・単一 HTML・オフライン動作。印刷用 PDF は texlive-music の `musixtex -p score.tex` で組版します。
 
 #### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
 
