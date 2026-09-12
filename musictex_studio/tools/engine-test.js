@@ -37,7 +37,8 @@ const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
         CHORD_TYPES, chordMidis, chordTexTokens, synthPreset,
         instrumentPreset, scoreToEvents, mergeEvents, harmonicAmps,
         chordFromPitchClasses, extractChordLine,
-        badaQuantumRun, quantumScaleMidi, QUANTUM_SAMPLE } = sandbox;
+        badaQuantumRun, quantumScaleMidi, QUANTUM_SAMPLE,
+        eventsToBarTokens, musixTexOrchestra, scoreToStaffEvents, spectralFromEvents } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -352,6 +353,33 @@ const qBack = parseMusixTeX(qTex);
 check("量子作曲の楽譜が完全な MusixTeX として生成・再パース可",
   qTex.includes("\\input musixtex") && qBack.warnings.length === 0 &&
   qBack.events.filter(e => e.type === "note").length === 6);
+
+console.log("[22] オーケストラ多段譜");
+const mkEv = a => a.map(e => ({ startBeat: e[0], durBeats: e[1], midis: e[2] }));
+const barsT = eventsToBarTokens(mkEv([[0,1,[58]],[1,1,[60]],[2,1,[62]],[3,1,[63]],[4,2,[65]],[6,2,[67]]]), -2);
+check("6イベント → 2小節のトークン列", barsT.length === 2 &&
+  barsT[0].includes("\\qu{b}") && barsT[1].includes("\\hu{f}"));
+const stf = scoreToStaffEvents(parseMusixTeX(TEMPLATES[0].body));
+check("scoreToStaffEvents: 16音・16拍・譜表位置保持",
+  stf.events.length === 16 && stf.totalBeats === 16 &&
+  stf.events[0].startBeat === 0 && stf.events[0].pitches[0].idx === 27 &&
+  stf.events[15].startBeat === 15 && stf.signature === -2);
+const spc = spectralFromEvents(mkEv([[0,1,[60]],[1,2,[64,67]]]));
+check("spectralFromEvents: 3帯・3拍", spc.items.length === 3 && spc.totalBeats === 3);
+const oMelody = mkEv([[0,1,[58]],[1,1,[60]],[2,1,[62]],[3,1,[63]],[4,1,[65]],[5,1,[67]],[6,1,[69]],[7,1,[70]]]);
+const oBass = mkEv([[0,2,[46]],[2,2,[51]]]);
+const orch = musixTexOrchestra([
+  { name: "Melody", texName: "Melody", events: oMelody },
+  { name: "Bass", texName: "Bass", events: oBass }
+], -2, "test");
+check("orchestra: instrumentnumber{2}", orch.includes("\\instrumentnumber{2}"));
+check("orchestra: 下の段が instrument 1 (Bass)",
+  orch.includes("\\setname1{Bass}") && orch.includes("\\setname2{Melody}"));
+const noteLines = orch.split("\n").filter(l => l.startsWith("\\NOtes"));
+check("orchestra: 2小節・各行に & 区切り 1 個",
+  noteLines.length === 2 && noteLines.every(l => (l.match(/&/g) || []).length === 1));
+check("orchestra: 短いパートは \\pause で埋まる", noteLines[1].startsWith("\\NOtes\\pause&"));
+check("orchestra: 空 → null", musixTexOrchestra([{ name: "x", events: [] }], 0, "t") === null);
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");

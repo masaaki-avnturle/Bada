@@ -138,7 +138,7 @@
     font-size: 11.5px; color: var(--purple); margin-bottom: 5px;
   }
   #visionbar #visionInfo { color: var(--dim); font-size: 11px; }
-  #spectral { display: block; width: 100%; height: 112px; border-radius: 8px; }
+  #spectral { display: block; width: 100%; height: 84px; border-radius: 8px; }
   #livespec { display: block; width: 100%; height: 64px; border-radius: 8px; margin-top: 5px; }
   #colorKeys { display: flex; gap: 2px; margin-top: 6px; overflow-x: auto; padding-bottom: 2px; }
   #colorKeys button {
@@ -154,8 +154,24 @@
     font-size: 11.5px; color: var(--teal);
   }
   #previewbar .note { color: var(--dim2); font-size: 10.5px; }
-  #preview { flex: 1; min-height: 120px; overflow: auto; padding: 12px; background: #f4f2ea; }
-  #preview svg { display: block; }
+  #preview { flex: 1; min-height: 140px; overflow: auto; padding: 0; background: #f4f2ea; }
+  #scoreWrap { position: relative; display: inline-block; min-width: 100%; cursor: crosshair; }
+  #barcode { display: block; background: #0d0f14; }
+  #orch svg { display: block; }
+  #playline {
+    position: absolute; top: 0; bottom: 0; width: 2px; left: 164px;
+    background: #ff3b30; box-shadow: 0 0 6px #ff3b30; pointer-events: none;
+  }
+  #partTabs {
+    flex: none; display: flex; gap: 4px; padding: 5px 8px 0; background: var(--bar2);
+    border-bottom: 0;
+  }
+  #partTabs button {
+    background: var(--field); color: var(--dim); border: 1px solid var(--line);
+    border-bottom: 0; border-radius: 7px 7px 0 0; padding: 4px 12px; cursor: pointer;
+    font-size: 11.5px; font-family: inherit;
+  }
+  #partTabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 
   /* --- エディタペイン --- */
   #editorPane {
@@ -324,16 +340,23 @@
         <span>🌈 モーツァルト・ビジョン — 音 = 光の波長帯 (音の周波数 ×2<sup>≈40</sup> = 可視光)</span>
         <span id="visionInfo"></span>
       </div>
-      <canvas id="spectral" height="112"></canvas>
-      <canvas id="livespec" height="64" title="シンセ出力のライブスペクトル (12音階の色)"></canvas>
+      <canvas id="spectral" height="84"></canvas>
+      <canvas id="livespec" height="48" title="シンセ出力のライブスペクトル (12音階の色)"></canvas>
       <div id="colorKeys"></div>
     </div>
     <div id="previewbar">
-      <span>◈ 楽譜 — ライブプレビュー</span>
-      <span class="note">(簡易表示 — 印刷品質の組版は texlive-music: musixtex -p score.tex)</span>
+      <span>◈ オーケストラ譜 (多段) + コード進行バーコード</span>
+      <span class="note">クリックで縦の演奏ラインを移動 → ▶ でそこから全パート演奏 ・ 印刷は texlive-music: musixtex -p score.tex</span>
     </div>
-    <div id="preview"></div>
+    <div id="preview">
+      <div id="scoreWrap">
+        <canvas id="barcode" height="46"></canvas>
+        <div id="orch"></div>
+        <div id="playline"></div>
+      </div>
+    </div>
     <div id="editorPane">
+      <div id="partTabs"></div>
       <div id="palette">
         <div class="grp"><span class="lbl">音価</span>
           <button class="pbtn dur on" data-dur="qu" title="4分音符">♩</button>
@@ -415,6 +438,12 @@
     G と A の和音、HANON 練習など。
   </p>
   <ul>
+    <li><b>🎻 オーケストラ多段譜</b>: ヴァイオリン/フルート/トランペット/チェロの4パートを
+        段で重ねた総譜。パートタブで各段の MusixTeX を編集し、ライブラリで段ごとの楽器を切替。
+        譜面上部には<b>コード進行のバーコード音階譜</b> (各小節のコードを12音階位置の
+        波長色の縦線で表示)。譜面をクリックすると<b>赤い縦の演奏ライン</b>が移動し、
+        ▶ でそこから全パートを各楽器の音色で同時演奏 (ラインが譜面上を移動)。
+        .tex 保存は MusixTeX の多段譜 (\instrumentnumber + &amp; 区切り) で書き出し</li>
     <li><b>⚛ 量子作曲 (擬似量子コンピュータ)</b>: Bada VM Pro と互換の量子 Bada 言語
         (qubit / H / X / Z / CNOT / measure / state / let / print、状態ベクトル実行系・
         最大8量子ビット) に音楽命令 note / chord / rest を追加。重ね合わせ・量子もつれの
@@ -953,16 +982,10 @@ function midiNotesToEvents(parsed) {
   return events;
 }
 
-/* イベント列 → 完全な MusixTeX ドキュメント (4/4・調号自動推定・小節割り) */
-function notesToMusixTex(events, opts) {
-  opts = opts || {};
-  if (!events || !events.length) return null;
-  var all = [], i, j;
-  for (i = 0; i < events.length; i++)
-    for (j = 0; j < events[i].midis.length; j++) all.push(events[i].midis[j]);
-  var sig = typeof opts.signature === "number" ? opts.signature : estimateKeySignature(all);
-
+/* イベント列 → 小節ごとのトークン列 (4/4)。オーケストラ生成と共用 */
+function eventsToBarTokens(events, sig) {
   var BAR = 4, pos = 0, bars = [], cur = [];
+  var i, j;
   function snapDur(d) {
     var cand = [0.5, 1, 2, 4], best = 0.5, bd = 1e9, c;
     for (c = 0; c < cand.length; c++) {
@@ -1016,6 +1039,18 @@ function notesToMusixTex(events, opts) {
     closeBarIfFull();
   }
   if (cur.length) bars.push(cur);
+  return bars.map(function (b) { return b.join(""); });
+}
+
+/* イベント列 → 完全な MusixTeX ドキュメント (4/4・調号自動推定・小節割り) */
+function notesToMusixTex(events, opts) {
+  opts = opts || {};
+  if (!events || !events.length) return null;
+  var all = [], i, j;
+  for (i = 0; i < events.length; i++)
+    for (j = 0; j < events[i].midis.length; j++) all.push(events[i].midis[j]);
+  var sig = typeof opts.signature === "number" ? opts.signature : estimateKeySignature(all);
+  var bars = eventsToBarTokens(events, sig);
 
   var lines = [
     "% 自動採譜: " + (opts.source || "曲ファイル") + " — MusicTeX Studio",
@@ -1029,11 +1064,83 @@ function notesToMusixTex(events, opts) {
   ];
   for (i = 0; i < bars.length; i++) {
     if (i > 0) lines.push("\\bar");
-    lines.push("\\NOtes" + bars[i].join("") + "\\en");
+    lines.push("\\NOtes" + bars[i] + "\\en");
   }
   lines.push("\\endpiece");
   lines.push("\\end");
   return lines.join("\n");
+}
+
+/* オーケストラ多段譜の MusixTeX (\instrumentnumber + & 区切り) を生成。
+   parts は上から下の順 {name, events} — MusixTeX は下の楽器が 1 番 */
+function musixTexOrchestra(parts, sigOrNil, sourceName) {
+  var used = parts.filter(function (p) { return p.events && p.events.length; });
+  if (!used.length) return null;
+  var all = [], i, j, k;
+  for (i = 0; i < used.length; i++)
+    for (j = 0; j < used[i].events.length; j++)
+      for (k = 0; k < used[i].events[j].midis.length; k++)
+        all.push(used[i].events[j].midis[k]);
+  var sig = typeof sigOrNil === "number" ? sigOrNil : estimateKeySignature(all);
+  var barsPer = used.map(function (p) { return eventsToBarTokens(p.events, sig); });
+  var nBars = 1;
+  for (i = 0; i < barsPer.length; i++) nBars = Math.max(nBars, barsPer[i].length);
+  var texOrder = used.slice().reverse(); /* 下の段 = instrument 1 */
+  var texBars = barsPer.slice().reverse();
+  var lines = [
+    "% オーケストラ多段譜: " + (sourceName || "orchestra") + " — MusicTeX Studio",
+    "\\input musixtex",
+    "\\instrumentnumber{" + used.length + "}"
+  ];
+  for (i = 0; i < texOrder.length; i++)
+    lines.push("\\setname" + (i + 1) + "{" + (texOrder[i].texName || texOrder[i].name || ("Part" + (i + 1))) + "}");
+  lines.push("\\generalsignature{" + sig + "}");
+  lines.push("\\generalmeter{\\meterfrac44}");
+  lines.push("\\parindent0pt");
+  lines.push("\\startpiece");
+  for (i = 0; i < nBars; i++) {
+    if (i > 0) lines.push("\\bar");
+    var segs = [];
+    for (j = 0; j < texBars.length; j++)
+      segs.push(texBars[j][i] || "\\pause");
+    lines.push("\\NOtes" + segs.join("&") + "\\en");
+  }
+  lines.push("\\endpiece");
+  lines.push("\\end");
+  return lines.join("\n");
+}
+
+/* パース済み楽譜 → 段描画用イベント列 (拍位置 + 譜表位置 idx/acc を保持) */
+function scoreToStaffEvents(score) {
+  var durBeats = { w: 4, h: 2, q: 1, c: 0.5 };
+  var out = [], pos = 0, i;
+  for (i = 0; i < score.events.length; i++) {
+    var ev = score.events[i];
+    if (ev.type === "bar") continue;
+    var d = durBeats[ev.dur] || 1;
+    if (ev.type === "note")
+      out.push({ startBeat: pos, durBeats: d, type: "note", dur: ev.dur,
+                 stemUp: ev.stemUp, pitches: ev.pitches });
+    else
+      out.push({ startBeat: pos, durBeats: d, type: "rest", dur: ev.dur });
+    pos += d;
+  }
+  return { events: out, totalBeats: pos, signature: score.signature };
+}
+
+/* 拍イベント列 → スペクトル帯 (オーケストラ全体・拍ハイライト用) */
+function spectralFromEvents(events) {
+  var items = [], total = 0, i, j;
+  for (i = 0; i < events.length; i++) {
+    var ev = events[i];
+    total = Math.max(total, ev.startBeat + ev.durBeats);
+    for (j = 0; j < ev.midis.length; j++) {
+      var m = ev.midis[j], w = midiToWavelength(m), c = wavelengthToRGB(w.nm);
+      items.push({ startBeat: ev.startBeat, durBeats: ev.durBeats, midi: m,
+                   nm: w.nm, color: "rgb(" + c[0] + "," + c[1] + "," + c[2] + ")" });
+    }
+  }
+  return { items: items, totalBeats: total };
 }
 
 /* 自己相関によるフレーム単位ピッチ検出 (11kHz 程度に間引いた信号用)。
@@ -1337,35 +1444,40 @@ function ensureAudioGraph() {
   return audioCtx;
 }
 
-function synthWave() {
-  if (!periodicCache) {
-    var n = SYNTH.harmonics.length;
+var waveCache = {};
+function waveFor(harmonics) {
+  var key = harmonics.join(",");
+  if (!waveCache[key]) {
+    var n = harmonics.length;
     var real = new Float32Array(n + 1), imag = new Float32Array(n + 1);
-    for (var i = 0; i < n; i++) imag[i + 1] = SYNTH.harmonics[i];
-    periodicCache = audioCtx.createPeriodicWave(real, imag);
+    for (var i = 0; i < n; i++) imag[i + 1] = harmonics[i];
+    waveCache[key] = audioCtx.createPeriodicWave(real, imag);
   }
-  return periodicCache;
+  return waveCache[key];
 }
+function synthWave() { return waveFor(SYNTH.harmonics); }
 
-/* シンセボイス: 倍音スペクトル + ADSR + ビブラートで 1 音を発音 */
-function synthVoice(freq, t0, durSec, level) {
+/* シンセボイス: 倍音スペクトル + ADSR + ビブラートで 1 音を発音。
+   patch 省略時はグローバル SYNTH (オーケストラ再生はパート毎の楽器 patch) */
+function synthVoice(freq, t0, durSec, level, patch) {
+  var p = patch || SYNTH;
   var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
-  osc.setPeriodicWave(synthWave());
+  osc.setPeriodicWave(waveFor(p.harmonics));
   osc.frequency.value = freq;
-  var a = Math.min(SYNTH.attack, durSec * 0.4);
-  var d = Math.min(SYNTH.decay || 0.05, Math.max(0.01, durSec * 0.4));
-  var s = Math.max(0.02, Math.min(1, SYNTH.sustain === undefined ? 0.8 : SYNTH.sustain));
-  var r = Math.min(SYNTH.release, durSec);
+  var a = Math.min(p.attack, durSec * 0.4);
+  var d = Math.min(p.decay || 0.05, Math.max(0.01, durSec * 0.4));
+  var s = Math.max(0.02, Math.min(1, p.sustain === undefined ? 0.8 : p.sustain));
+  var r = Math.min(p.release, durSec);
   gain.gain.setValueAtTime(0.0001, t0);
   gain.gain.exponentialRampToValueAtTime(level, t0 + a);
   gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * s), t0 + a + d);
   gain.gain.setValueAtTime(Math.max(0.0002, level * s), Math.max(t0 + a + d, t0 + durSec - r));
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durSec);
   osc.connect(gain); gain.connect(masterGain);
-  if (SYNTH.vibDepth > 0) {
+  if (p.vibDepth > 0) {
     var lfo = audioCtx.createOscillator(), lfoGain = audioCtx.createGain();
-    lfo.type = "sine"; lfo.frequency.value = SYNTH.vibRate || 5;
-    lfoGain.gain.value = freq * (Math.pow(2, SYNTH.vibDepth / 1200) - 1);
+    lfo.type = "sine"; lfo.frequency.value = p.vibRate || 5;
+    lfoGain.gain.value = freq * (Math.pow(2, p.vibDepth / 1200) - 1);
     lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
     lfo.start(t0); lfo.stop(t0 + durSec + 0.02);
     playingNodes.push(lfo);
@@ -1594,6 +1706,39 @@ var previewEl = document.getElementById("preview");
 var statusEl = document.getElementById("status");
 var curDur = "qu", curAcc = "";
 
+/* --- オーケストラ: パートモデル --- */
+function partDoc(bodyLines) {
+  return ["\\input musixtex", "\\generalsignature{-2}", "\\generalmeter{\\meterfrac44}",
+          "\\parindent0pt", "\\startpiece"].concat(bodyLines)
+          .concat(["\\endpiece", "\\end"]).join("\n");
+}
+function makeDefaultParts() {
+  return [
+    { name: "ヴァイオリン", texName: "Violin", inst: "ヴァイオリン",
+      src: partDoc(["\\NOtes\\qu{bcde}\\en", "\\bar", "\\NOtes\\qu{fghi}\\en", "\\bar",
+                    "\\NOtes\\qu{ihgf}\\en", "\\bar", "\\NOtes\\qu{edcb}\\en"]) },
+    { name: "フルート", texName: "Flute", inst: "フルート",
+      src: partDoc(["\\NOtes\\ql{ijkl}\\en", "\\bar", "\\NOtes\\ql{mnop}\\en", "\\bar",
+                    "\\NOtes\\ql{ponm}\\en", "\\bar", "\\NOtes\\ql{lkji}\\en"]) },
+    { name: "トランペット", texName: "Trumpet", inst: "トランペット",
+      src: partDoc(["\\NOtes\\qu{d}\\qu{e}\\qu{f}\\qu{g}\\en", "\\bar",
+                    "\\NOtes\\qu{h}\\ql{i}\\ql{j}\\ql{k}\\en", "\\bar",
+                    "\\NOtes\\ql{k}\\ql{j}\\ql{i}\\qu{h}\\en", "\\bar",
+                    "\\NOtes\\qu{g}\\qu{f}\\qu{e}\\qu{d}\\en"]) },
+    { name: "チェロ", texName: "Cello", inst: "チェロ",
+      src: partDoc(["\\NOtes\\hu{B}\\hu{F}\\en", "\\bar", "\\NOtes\\hu{E}\\hu{F}\\en", "\\bar",
+                    "\\NOtes\\hu{B}\\hu{F}\\en", "\\bar", "\\NOtes\\hu{F}\\hu{B}\\en"]) }
+  ];
+}
+var PARTS = makeDefaultParts();
+var curPart = 0;
+var parsedPartsCache = [], staffPartsCache = [], partEventsCache = [], mergedEventsCache = [];
+var chordLineCache = [], totalBeatsCache = 4;
+
+/* --- 縦の演奏ライン --- */
+var ORCH_PX = 30, ORCH_X0 = 150;
+var playStartBeat = 0, playheadBeat = 0, orchPlaying = false, playRAF = null;
+
 /* --- モーツァルト・ビジョン: スペクトル描画と色鍵盤 --- */
 var spectralCanvas = document.getElementById("spectral");
 var visionInfoEl = document.getElementById("visionInfo");
@@ -1601,7 +1746,7 @@ var spectralData = { items: [], totalBeats: 0 };
 var playingEventIndex = -1;
 
 function drawSpectral() {
-  var cw = spectralCanvas.clientWidth || 600, chh = 112;
+  var cw = spectralCanvas.clientWidth || 600, chh = spectralCanvas.clientHeight || 84;
   spectralCanvas.width = cw; spectralCanvas.height = chh;
   var ctx = spectralCanvas.getContext("2d");
   ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, cw, chh);
@@ -1634,7 +1779,8 @@ function drawSpectral() {
     var x = 4 + it.startBeat * pxPerBeat;
     var w = Math.max(3, it.durBeats * pxPerBeat - 2);
     var y = 4 + (1 - (it.midi - loMidi) / span) * (areaH - bandH);
-    var lit = it.eventIndex === playingEventIndex;
+    var lit = orchPlaying && it.startBeat <= playheadBeat &&
+              playheadBeat < it.startBeat + it.durBeats;
     ctx.shadowColor = it.color;
     ctx.shadowBlur = lit ? 18 : 7;
     ctx.fillStyle = it.color;
@@ -1696,7 +1842,7 @@ var livespecCanvas = document.getElementById("livespec");
 var spectrumRAF = null, spectrumUntil = 0;
 
 function drawLiveSpectrum() {
-  var cw = livespecCanvas.clientWidth || 600, chh = 64;
+  var cw = livespecCanvas.clientWidth || 600, chh = livespecCanvas.clientHeight || 48;
   livespecCanvas.width = cw; livespecCanvas.height = chh;
   var ctx = livespecCanvas.getContext("2d");
   ctx.fillStyle = "#05070d"; ctx.fillRect(0, 0, cw, chh);
@@ -1792,23 +1938,225 @@ function buildChordGrid() {
   }
 }
 
+/* --- オーケストラ多段譜の描画 --- */
+function noteXOf(beat) { return ORCH_X0 + 14 + beat * ORCH_PX; }
+
+function renderOrchestra() {
+  var orchEl = document.getElementById("orch");
+  orchEl.textContent = "";
+  var n = PARTS.length, rowH = 96, topPad = 8;
+  var width = noteXOf(totalBeatsCache) + 30;
+  var height = topPad + n * rowH + 6;
+  var svg = svgEl("svg", { width: width, height: height,
+                           xmlns: "http://www.w3.org/2000/svg" });
+  var firstTop = topPad + 26, lastBottom = topPad + (n - 1) * rowH + 26 + 8 * STEP;
+  var g = svgEl("g", {}), i, p, b;
+  /* 段をまたぐ小節線 (オーケストラのシステム線) */
+  for (b = 0; b <= totalBeatsCache; b += 4) {
+    var bx = noteXOf(b) - 9;
+    g.appendChild(svgEl("line", { x1: bx, x2: bx, y1: firstTop, y2: lastBottom,
+                                  stroke: "#444", "stroke-width": b === 0 ? 1.4 : 1 }));
+  }
+  var fx = noteXOf(totalBeatsCache) + 6;
+  g.appendChild(svgEl("line", { x1: fx, x2: fx, y1: firstTop, y2: lastBottom, stroke: "#333", "stroke-width": 1.2 }));
+  g.appendChild(svgEl("rect", { x: fx + 2.5, y: firstTop, width: 3, height: lastBottom - firstTop, fill: "#333" }));
+  /* 左ブラケット */
+  g.appendChild(svgEl("rect", { x: 88, y: firstTop - 3, width: 3.5, height: lastBottom - firstTop + 6, fill: "#222" }));
+  for (i = 0; i < n; i++) {
+    p = staffPartsCache[i] || { events: [], signature: 0 };
+    var topY = topPad + i * rowH + 26;
+    /* パート名 */
+    g.appendChild(svgEl("text", { x: 8, y: topY + 12, "font-size": 10.5, fill: "#333",
+      "font-family": "sans-serif" }, PARTS[i].name));
+    g.appendChild(svgEl("text", { x: 8, y: topY + 24, "font-size": 9, fill: "#888",
+      "font-family": "sans-serif" }, PARTS[i].inst));
+    /* 五線 */
+    for (var j = 0; j < 5; j++) {
+      var yy = topY + j * 2 * STEP;
+      g.appendChild(svgEl("line", { x1: 94, x2: fx + 5.5, y1: yy, y2: yy,
+                                    stroke: "#333", "stroke-width": 1 }));
+    }
+    /* ト音記号 + 調号 */
+    g.appendChild(svgEl("text", { x: 96, y: topY + 8 * STEP + 9, "font-size": 46,
+      fill: "#222", "font-family": "'Segoe UI Symbol','Noto Music','DejaVu Sans',serif" }, "𝄞"));
+    var sig = p.signature, sn = Math.abs(sig), sx = ORCH_X0 - 18;
+    for (var s = 0; s < sn && s < 7; s++) {
+      var posn = sig < 0 ? FLAT_POS[s] : SHARP_POS[s];
+      g.appendChild(svgEl("text", { x: sx, y: noteY(topY, posn) + 4.5, "font-size": 14,
+        fill: "#222", "font-family": "serif" }, sig < 0 ? "♭" : "♯"));
+      sx += 8;
+    }
+    /* 音符・休符 (拍位置に揃えて配置) */
+    for (var e = 0; e < p.events.length; e++) {
+      var ev = p.events[e];
+      var x = noteXOf(ev.startBeat);
+      if (ev.type === "rest") drawRest(g, x, topY, ev.dur);
+      else drawNote(g, x, topY, ev);
+    }
+  }
+  svg.appendChild(g);
+  orchEl.appendChild(svg);
+  renderBarcode(width);
+  setPlayline(playStartBeat);
+}
+
+/* コード進行のバーコード音階譜 (12音階位置の色付き縦線) */
+function renderBarcode(width) {
+  var canvas = document.getElementById("barcode");
+  canvas.width = width; canvas.height = 46;
+  var ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#0d0f14"; ctx.fillRect(0, 0, width, 46);
+  ctx.fillStyle = "#5a6478"; ctx.font = "9px sans-serif";
+  ctx.fillText("コード進行", 6, 16);
+  ctx.fillText("(バーコード音階)", 6, 28);
+  var i, j;
+  for (i = 0; i < chordLineCache.length; i++) {
+    var c = chordLineCache[i];
+    var x0 = noteXOf(c.startBeat) - 9, w = c.durBeats * ORCH_PX;
+    ctx.strokeStyle = "#2a3040"; ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, 2.5, w - 1, 41);
+    var slotW = w / 12;
+    for (j = 0; j < 12; j++) {
+      var sx = x0 + (j + 0.5) * slotW;
+      ctx.fillStyle = "#1c2230";
+      ctx.fillRect(sx - 0.5, 14, 1, 28);
+    }
+    var type = null;
+    for (j = 0; j < CHORD_TYPES.length; j++)
+      if (CHORD_TYPES[j].key === c.type) type = CHORD_TYPES[j];
+    if (type) {
+      for (j = 0; j < type.intervals.length; j++) {
+        var pc = (c.rootPc + type.intervals[j]) % 12;
+        var bx = x0 + (pc + 0.5) * slotW;
+        var wdt = type.intervals[j] === 0 ? 4 : 2.5;
+        ctx.shadowColor = noteColor(60 + pc); ctx.shadowBlur = 5;
+        ctx.fillStyle = noteColor(60 + pc);
+        ctx.fillRect(bx - wdt / 2, 14, wdt, 28);
+      }
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = "#d8dee9"; ctx.font = "10px sans-serif";
+      ctx.fillText(NOTE_NAMES[c.rootPc] + (c.type === "M" ? "" : c.type), x0 + 3, 11);
+    }
+  }
+}
+
+function setPlayline(beat) {
+  var line = document.getElementById("playline");
+  line.style.left = (noteXOf(Math.max(0, Math.min(beat, totalBeatsCache))) - 10) + "px";
+}
+
 function refresh() {
-  var score = parseMusixTeX(srcEl.value);
-  renderScore(score, previewEl);
-  spectralData = scoreToSpectral(score);
+  PARTS[curPart].src = srcEl.value;
+  parsedPartsCache = PARTS.map(function (p) { return parseMusixTeX(p.src); });
+  staffPartsCache = parsedPartsCache.map(scoreToStaffEvents);
+  partEventsCache = parsedPartsCache.map(scoreToEvents);
+  mergedEventsCache = partEventsCache.reduce(function (a, b) { return mergeEvents(a, b); }, []);
+  totalBeatsCache = 4;
+  var i;
+  for (i = 0; i < staffPartsCache.length; i++)
+    totalBeatsCache = Math.max(totalBeatsCache, staffPartsCache[i].totalBeats);
+  totalBeatsCache = Math.ceil(totalBeatsCache / 4) * 4;
+  chordLineCache = extractChordLine(mergedEventsCache, 4);
+  spectralData = spectralFromEvents(mergedEventsCache);
+  renderOrchestra();
   drawSpectral();
   drawLiveSpectrum();
-  var notes = 0, bars = 1, i;
-  for (i = 0; i < score.events.length; i++) {
-    if (score.events[i].type === "bar") bars++;
-    else notes++;
-  }
+  var score = parsedPartsCache[curPart];
   var sigName = score.signature === 0 ? "C" :
-    (score.signature < 0 ? "\u266D\u00D7" + (-score.signature) : "\u266F\u00D7" + score.signature);
-  statusEl.textContent = "調号: " + sigName + " ・ 拍子: " + score.meter[0] + "/" + score.meter[1] +
-    " ・ 音符/休符: " + notes + " ・ 小節: " + bars +
+    (score.signature < 0 ? "♭×" + (-score.signature) : "♯×" + score.signature);
+  statusEl.textContent = "パート " + (curPart + 1) + "/" + PARTS.length + ": " + PARTS[curPart].name +
+    " (" + PARTS[curPart].inst + ") ・ 調号: " + sigName +
+    " ・ 小節: " + (totalBeatsCache / 4) + " ・ ライン: " + playStartBeat.toFixed(1) + "拍" +
     (score.warnings.length ? " ・ ⚠ " + score.warnings.join(" / ") : "");
-  try { localStorage.setItem("musictex_studio_src", srcEl.value); } catch (e) { /* private mode */ }
+  try {
+    localStorage.setItem("musictex_studio_v2",
+      JSON.stringify({ cur: curPart, parts: PARTS }));
+  } catch (e) { /* private mode */ }
+}
+
+/* --- 縦の演奏ライン: そこから全パートをそれぞれの楽器で同時演奏 --- */
+function playOrchestra(fromBeat) {
+  if (!ensureAudioGraph()) return;
+  stopPlayback();
+  if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+  var beatSec = 60 / 96;
+  var t0 = audioCtx.currentTime + 0.06;
+  var total = totalBeatsCache, scheduled = 0, i, j, k;
+  for (i = 0; i < PARTS.length; i++) {
+    var patch = instrumentPreset(PARTS[i].inst);
+    var evs = partEventsCache[i] || [];
+    for (j = 0; j < evs.length; j++) {
+      var ev = evs[j];
+      if (ev.startBeat < fromBeat - 1e-6) continue;
+      var when = t0 + (ev.startBeat - fromBeat) * beatSec;
+      for (k = 0; k < ev.midis.length; k++) {
+        var f = 440 * Math.pow(2, (ev.midis[k] - 69) / 12);
+        playingNodes.push(synthVoice(f, when, ev.durBeats * beatSec * 0.95,
+          0.16 / Math.sqrt(ev.midis.length), patch));
+        scheduled++;
+      }
+    }
+  }
+  if (!scheduled) { statusEl.textContent = "⚠ 演奏ラインより後に音符がありません"; return; }
+  orchPlaying = true;
+  var totalSec = (total - fromBeat) * beatSec;
+  playTimer = setTimeout(function () {
+    playTimer = null; orchPlaying = false;
+    playheadBeat = playStartBeat; setPlayline(playStartBeat); drawSpectral();
+  }, totalSec * 1000 + 250);
+  startSpectrumLoop();
+  function anim() {
+    if (!orchPlaying) { playRAF = null; return; }
+    playheadBeat = Math.min(fromBeat + Math.max(0, audioCtx.currentTime - t0) / beatSec, total);
+    setPlayline(playheadBeat);
+    drawSpectral();
+    var px = noteXOf(playheadBeat);
+    if (px > previewEl.scrollLeft + previewEl.clientWidth - 60) previewEl.scrollLeft = px - 140;
+    playRAF = requestAnimationFrame(anim);
+  }
+  playRAF = requestAnimationFrame(anim);
+}
+
+function stopOrchestra() {
+  stopPlayback();
+  orchPlaying = false;
+  if (playRAF) { cancelAnimationFrame(playRAF); playRAF = null; }
+  playheadBeat = playStartBeat;
+  setPlayline(playStartBeat);
+  drawSpectral();
+}
+
+/* 譜面クリック → 縦の演奏ラインを移動 */
+function seekFromClick(e) {
+  var wrap = document.getElementById("scoreWrap");
+  var rect = wrap.getBoundingClientRect();
+  var beat = (e.clientX - rect.left - ORCH_X0 - 14) / ORCH_PX;
+  beat = Math.max(0, Math.min(totalBeatsCache, Math.round(beat * 2) / 2));
+  playStartBeat = beat;
+  playheadBeat = beat;
+  setPlayline(beat);
+  drawSpectral();
+  statusEl.textContent = "▶ 演奏ライン: " + beat.toFixed(1) + " 拍目 (小節 " +
+    (Math.floor(beat / 4) + 1) + ") — ▶ でここから全パート演奏";
+}
+
+/* --- パートタブ (オーケストラの各段を編集) --- */
+function buildPartTabs() {
+  var wrap = document.getElementById("partTabs");
+  wrap.textContent = "";
+  PARTS.forEach(function (p, i) {
+    var b = document.createElement("button");
+    b.textContent = p.name + " · " + p.inst;
+    b.className = i === curPart ? "on" : "";
+    b.addEventListener("click", function () {
+      PARTS[curPart].src = srcEl.value;
+      curPart = i;
+      srcEl.value = PARTS[i].src;
+      buildPartTabs();
+      refresh();
+    });
+    wrap.appendChild(b);
+  });
 }
 
 var refreshTimer = null;
@@ -1851,7 +2199,13 @@ function applyTemplate(i) {
  * 書き出し
  * ============================================================ */
 function downloadTex() {
-  var blob = new Blob([srcEl.value], { type: "application/x-tex" });
+  /* オーケストラ多段譜 (\instrumentnumber + & 区切り) として書き出す */
+  PARTS[curPart].src = srcEl.value;
+  var sig = parsedPartsCache.length ? parsedPartsCache[curPart].signature : -2;
+  var tex = musixTexOrchestra(PARTS.map(function (p, i) {
+    return { name: p.name, texName: p.texName, events: partEventsCache[i] || [] };
+  }), sig, "orchestra") || srcEl.value;
+  var blob = new Blob([tex], { type: "application/x-tex" });
   var a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "score.tex";
@@ -2015,9 +2369,12 @@ function buildLibrary() {
         SYNTH = instrumentPreset(name);
         periodicCache = null;
         syncSynthUI();
+        PARTS[curPart].inst = name; /* 現在のパートの楽器を切替 */
+        buildPartTabs();
         var all = instList.querySelectorAll(".lib-item"), j;
         for (j = 0; j < all.length; j++) all[j].classList.toggle("on", all[j] === b);
         playTone(69);
+        refresh();
       });
       instList.appendChild(b);
     })(instruments[i], i === 0);
@@ -2094,17 +2451,11 @@ function buildLibrary() {
   });
 
   document.getElementById("btnPlay").addEventListener("click", function () {
-    playScore(parseMusixTeX(srcEl.value), function (idx) {
-      playingEventIndex = idx;
-      drawSpectral();
-    });
-    startSpectrumLoop();
+    refresh();
+    playOrchestra(playStartBeat);
   });
-  document.getElementById("btnStop").addEventListener("click", function () {
-    stopPlayback();
-    playingEventIndex = -1;
-    drawSpectral();
-  });
+  document.getElementById("btnStop").addEventListener("click", stopOrchestra);
+  document.getElementById("scoreWrap").addEventListener("click", seekFromClick);
   document.getElementById("btnDownload").addEventListener("click", downloadTex);
   document.getElementById("btnCopy").addEventListener("click", copyTex);
   document.getElementById("btnAbout").addEventListener("click", function () {
@@ -2156,9 +2507,14 @@ function buildLibrary() {
   window.addEventListener("resize", scheduleRefresh);
 
   var saved = null;
-  try { saved = localStorage.getItem("musictex_studio_src"); } catch (e) { /* private mode */ }
-  if (saved) { srcEl.value = saved; refresh(); }
-  else applyTemplate(0);
+  try { saved = JSON.parse(localStorage.getItem("musictex_studio_v2")); } catch (e) { /* private mode */ }
+  if (saved && saved.parts && saved.parts.length) {
+    PARTS = saved.parts;
+    curPart = Math.min(saved.cur || 0, PARTS.length - 1);
+  }
+  buildPartTabs();
+  srcEl.value = PARTS[curPart].src;
+  refresh();
   showGuide("ubuntu");
 })();
 </script>

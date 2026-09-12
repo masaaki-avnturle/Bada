@@ -66,7 +66,11 @@ jobs:
                                   "function mergeEvents", "function harmonicAmps",
                                   "function extractChordLine", "function importEvents",
                                   "function badaQuantumRun", "function quantumScaleMidi",
-                                  "function runQuantumCompose"]) {
+                                  "function runQuantumCompose", "function eventsToBarTokens",
+                                  "function musixTexOrchestra", "function scoreToStaffEvents",
+                                  "function spectralFromEvents", "function renderOrchestra",
+                                  "function renderBarcode", "function playOrchestra",
+                                  "function buildPartTabs"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
@@ -109,6 +113,19 @@ jobs:
               { startBeat: 12, durBeats: 4, midis: [43, 47, 50] } // 低音域和音 (大文字音名 G B D)
             ];
             fs.writeFileSync("transcribed.tex", sb.notesToMusixTex(ev, { source: "ci-synthetic" }) + "\n");
+            // オーケストラ多段譜 (\instrumentnumber + & 区切り) も実コンパイル検証する
+            const mk = a => a.map(e => ({ startBeat: e[0], durBeats: e[1], midis: e[2] }));
+            const orch = sb.musixTexOrchestra([
+              { name: "Violin", texName: "Violin",
+                events: mk([[0,1,[58]],[1,1,[60]],[2,1,[62]],[3,1,[63]],[4,1,[65]],[5,1,[67]],[6,1,[69]],[7,1,[70]]]) },
+              { name: "Flute", texName: "Flute",
+                events: mk([[0,1,[70]],[1,1,[72]],[2,1,[74]],[3,1,[75]],[4,1,[77]],[5,1,[79]],[6,1,[81]],[7,1,[82]]]) },
+              { name: "Trumpet", texName: "Trumpet",
+                events: mk([[0,2,[62,65]],[2,2,[63,67]],[4,2,[65,69]],[6,2,[67,70]]]) },
+              { name: "Cello", texName: "Cello",
+                events: mk([[0,2,[46]],[2,2,[51]],[4,2,[53]],[6,2,[46]]]) }
+            ], -2, "ci-orchestra");
+            fs.writeFileSync("orchestra.tex", orch + "\n");
           '
           cp ../musictex_studio/scores/octave74_scales.tex .
           for f in *.tex; do
