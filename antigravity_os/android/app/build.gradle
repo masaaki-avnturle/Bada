@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.bada.antigravityos'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.bada.antigravityos"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+// agos.bada (the OS init process) rides along as an asset so the on-device
+// interpreter runs the exact same source the desktop builds certify.
+tasks.register('copyAgosAsset', Copy) {
+    from '../../agos.bada'
+    into 'src/main/assets'
+}
+preBuild.dependsOn copyAgosAsset

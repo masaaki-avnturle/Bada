@@ -32,6 +32,22 @@ QuantumBada(ゲートモデル量子計算機向け生成AI OS)の系譜を一�
 | `arm / scram` | インターロック起動/緊急全停止(G3) | 番兵つき全ゼロ化 |
 | `ballast(x, y, V)` | ゼータ/Zipf 曲率バラスト:モード占有 `w_n ∝ (n+y)^(−x)` | 量子カーネル論文の E1 パラメータ `x=2.73037, y=2.32534`(切断ゼータ `zeta_V` 正規化) |
 
+## ダウンロード(ビルド済みパッケージ)
+
+GitHub Releases のタグ **`agos-v1.0.0`** から3プラットフォーム版をダウンロードできます:
+
+| プラットフォーム | ファイル | 使い方 |
+|---|---|---|
+| **Android** (7.0+) | [AntiGravityOS-1.0.0-android.apk](https://github.com/masaaki-avnturle/Bada/releases/download/agos-v1.0.0/AntiGravityOS-1.0.0-android.apk) | APK をサイドロード → 起動すると位相コア上で PID 1 がブートし、フライトログが端末画面に表示(RE-BOOT ボタンで再起動) |
+| **Windows 10 / 11** | [AntiGravityOS-1.0.0-windows-x64.zip](https://github.com/masaaki-avnturle/Bada/releases/download/agos-v1.0.0/AntiGravityOS-1.0.0-windows-x64.zip) | 展開して `AntiGravityOS.bat` をダブルクリック(インストール不要) |
+| **Ubuntu** (22.04/24.04) | [AntiGravityOS-1.0.0-amd64.deb](https://github.com/masaaki-avnturle/Bada/releases/download/agos-v1.0.0/AntiGravityOS-1.0.0-amd64.deb) | `sudo apt install ./AntiGravityOS-1.0.0-amd64.deb` → `antigravity-os`(アプリ一覧にも登録) |
+| **Linux 汎用** | [AntiGravityOS-1.0.0-linux-x64.tar.gz](https://github.com/masaaki-avnturle/Bada/releases/download/agos-v1.0.0/AntiGravityOS-1.0.0-linux-x64.tar.gz) | 展開して `./bada run agos.bada` |
+
+3 形態とも**同一の stage-0 Bada インタープリタと agos.bada(PID 1)**を同梱しており、
+起動のたびに G1〜G4 の不変量を実行時に再導出します。Android 版は NDK でインタープリタ本体を
+そのままコンパイルし、JNI 経由で標準出力を端末風画面へ流します(`android/` ディレクトリ)。
+パッケージは `.github/workflows/agos-app-build.yml` が `agos-v*` タグの push でビルド・添付します。
+
 ## ビルドと認証
 
 ```sh
