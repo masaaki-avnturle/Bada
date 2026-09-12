@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MusicTeX Studio — 楽譜制作 (MusixTeX / texlive-music)</title>
+<!--
+  MusicTeX Studio — MusixTeX (texlive-music) の楽譜制作アプリ。
+  依存ゼロ・単一 HTML・オフライン動作。
+  レポート「Δと」(Masaaki Yamaguchi, octave74) の音階理論
+  (B♭/E♭ 長音階・オクターブ・G と A の和音・HANON) をテンプレートとして同梱。
+
+  ・左: MusixTeX ソースエディタ (テンプレート / 音符パレット / スニペット)
+  ・右: ライブ楽譜プレビュー (SVG 簡易組版) + Web Audio 試聴
+  ・書き出し: .tex ダウンロード / クリップボード
+  ・印刷用 PDF は texlive-music の musixtex コマンドで組版:
+        musixtex -p score.tex
+-->
+<style>
+  :root {
+    --bg: #0b0e14; --bg2: #121826; --bg3: #1a2234;
+    --fg: #d8dee9; --dim: #8792a8; --line: #263149;
+    --gold: #c8a44a; --blue: #4a80d0; --teal: #40b8c0; --purple: #9060d0;
+    --red: #d06060; --green: #60c080;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.6 "Segoe UI", "Hiragino Sans", "Noto Sans CJK JP", sans-serif;
+    display: flex; flex-direction: column;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 16px; background: var(--bg2); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 17px; margin: 0; color: var(--gold); white-space: nowrap; }
+  header h1 .sub { color: var(--dim); font-weight: normal; font-size: 12px; }
+  header .spacer { flex: 1; }
+  .btn {
+    background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px;
+  }
+  .btn:hover { border-color: var(--gold); color: var(--gold); }
+  .btn.primary { border-color: var(--gold); color: var(--gold); }
+  .btn.small { padding: 3px 8px; font-size: 12px; }
+  select, input[type="file"] {
+    background: var(--bg3); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; font-size: 13px;
+  }
+  main { flex: 1; display: flex; min-height: 0; }
+  #left {
+    width: 46%; min-width: 320px; display: flex; flex-direction: column;
+    border-right: 1px solid var(--line); background: var(--bg2);
+  }
+  #palette {
+    padding: 8px 10px; border-bottom: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  }
+  #palette .grp {
+    display: flex; gap: 3px; align-items: center;
+    background: var(--bg3); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px;
+  }
+  #palette .lbl { color: var(--dim); font-size: 11px; margin-right: 2px; white-space: nowrap; }
+  .pbtn {
+    background: transparent; color: var(--fg); border: 1px solid transparent;
+    border-radius: 4px; padding: 2px 6px; cursor: pointer; font-size: 13px; min-width: 26px;
+  }
+  .pbtn:hover { border-color: var(--gold); color: var(--gold); }
+  .pbtn.on { border-color: var(--teal); color: var(--teal); }
+  #src {
+    flex: 1; resize: none; border: 0; outline: none; padding: 12px 14px;
+    background: var(--bg2); color: var(--fg); tab-size: 2;
+    font: 13px/1.55 "Cascadia Code", "Consolas", "DejaVu Sans Mono", monospace;
+  }
+  #right { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #previewbar {
+    display: flex; gap: 8px; align-items: center; padding: 8px 12px;
+    border-bottom: 1px solid var(--line); background: var(--bg2);
+  }
+  #previewbar .title { color: var(--teal); font-size: 13px; }
+  #preview { flex: 1; overflow: auto; padding: 14px; background: #f7f4ec; }
+  #preview svg { display: block; }
+  #status {
+    padding: 4px 12px; font-size: 12px; color: var(--dim);
+    border-top: 1px solid var(--line); background: var(--bg2); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  #guide {
+    border-top: 1px solid var(--line); background: var(--bg2);
+    max-height: 34%; overflow: auto; padding: 10px 14px;
+  }
+  #guide h2 { font-size: 13px; color: var(--gold); margin: 0 0 6px; }
+  #guide .tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+  #guide pre {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 6px;
+    padding: 8px 10px; margin: 6px 0; font-size: 12px; overflow-x: auto;
+    color: var(--green); white-space: pre-wrap;
+  }
+  #guide p { margin: 4px 0; font-size: 12.5px; color: var(--fg); }
+  #guide .note { color: var(--dim); font-size: 12px; }
+  dialog {
+    background: var(--bg2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 10px; max-width: 640px; padding: 20px 24px;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.55); }
+  dialog h2 { color: var(--gold); margin-top: 0; font-size: 16px; }
+  dialog p, dialog li { font-size: 13px; }
+  a { color: var(--blue); }
+  @media (max-width: 760px) {
+    main { flex-direction: column; }
+    #left { width: 100%; min-width: 0; flex: 1; border-right: 0; border-bottom: 1px solid var(--line); }
+    #right { flex: 1; }
+    #guide { max-height: 40%; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎼 MusicTeX Studio <span class="sub">— MusixTeX / texlive-music 楽譜制作</span></h1>
+  <select id="templateSel" title="テンプレート (レポート octave74 の題材)"></select>
+  <button class="btn" id="btnLoadTpl">テンプレート読込</button>
+  <span class="spacer"></span>
+  <button class="btn" id="btnPlay">▶ 試聴</button>
+  <button class="btn" id="btnStop">■ 停止</button>
+  <button class="btn primary" id="btnDownload">⬇ .tex 保存</button>
+  <button class="btn" id="btnCopy">📋 コピー</button>
+  <label class="btn" style="display:inline-block">
+    📂 開く<input type="file" id="fileOpen" accept=".tex,.txt" style="display:none">
+  </label>
+  <button class="btn" id="btnAbout">ℹ</button>
+</header>
+
+<main>
+  <div id="left">
+    <div id="palette">
+      <div class="grp"><span class="lbl">音価</span>
+        <button class="pbtn dur on" data-dur="qu" title="4分音符">♩</button>
+        <button class="pbtn dur" data-dur="cu" title="8分音符">♪</button>
+        <button class="pbtn dur" data-dur="hu" title="2分音符">𝅗𝅥</button>
+        <button class="pbtn dur" data-dur="wh" title="全音符">𝅝</button>
+        <button class="pbtn dur" data-dur="zq" title="和音の構成音 (次の音符に重ねる)">和</button>
+      </div>
+      <div class="grp"><span class="lbl">変化</span>
+        <button class="pbtn acc" data-acc="" title="なし">–</button>
+        <button class="pbtn acc" data-acc="sh" title="シャープ">♯</button>
+        <button class="pbtn acc" data-acc="fl" title="フラット">♭</button>
+        <button class="pbtn acc" data-acc="na" title="ナチュラル">♮</button>
+      </div>
+      <div class="grp"><span class="lbl">音高</span>
+        <span id="pitchBtns"></span>
+      </div>
+      <div class="grp"><span class="lbl">記号</span>
+        <button class="pbtn" id="btnBar" title="小節線">|</button>
+        <button class="pbtn" id="btnRest" title="4分休符">𝄽</button>
+      </div>
+      <div class="grp"><span class="lbl">調号</span>
+        <select id="sigSel" class="pbtn" style="background:var(--bg3)">
+          <option value="-3">E♭ (♭3)</option>
+          <option value="-2" selected>B♭ (♭2)</option>
+          <option value="-1">F (♭1)</option>
+          <option value="0">C</option>
+          <option value="1">G (♯1)</option>
+          <option value="2">D (♯2)</option>
+          <option value="3">A (♯3)</option>
+        </select>
+      </div>
+    </div>
+    <textarea id="src" spellcheck="false" wrap="off"></textarea>
+  </div>
+
+  <div id="right">
+    <div id="previewbar">
+      <span class="title">◈ ライブプレビュー</span>
+      <span class="note" style="color:var(--dim);font-size:11.5px">
+        (簡易表示 — 印刷品質の組版は texlive-music で)
+      </span>
+    </div>
+    <div id="preview"></div>
+    <div id="status"></div>
+    <div id="guide">
+      <h2>🖨 印刷用 PDF の作り方 (texlive-music でコンパイル)</h2>
+      <div class="tabs">
+        <button class="btn small os on" data-os="ubuntu">Ubuntu</button>
+        <button class="btn small os" data-os="windows">Windows 10 / 11</button>
+        <button class="btn small os" data-os="android">Android</button>
+      </div>
+      <div id="guideBody"></div>
+    </div>
+  </div>
+</main>
+
+<dialog id="aboutDlg">
+  <h2>MusicTeX Studio について</h2>
+  <p>
+    <b>MusixTeX (texlive-music)</b> の楽譜ソースを作成・プレビュー・試聴し、
+    <code>.tex</code> として書き出す楽譜制作アプリです。依存ゼロ・単一 HTML で、
+    Android APK / Windows 10・11 / Ubuntu アプリとして配布されています。
+  </p>
+  <p>
+    テンプレートはレポート <b>「Δと」(Masaaki Yamaguchi, octave74)</b> の音階理論に
+    もとづきます: B♭・E♭ 長音階のとりうる音、2音階で 4〜5 オクターブをカバーする考え方、
+    G と A の和音、HANON 練習など。
+  </p>
+  <ul>
+    <li>プレビュー対応コマンド: <code>\NOtes…\en</code>, <code>\qu \ql \hu \hl \wh \cu \cl \zq</code>,
+        <code>\sh \fl \na</code>, <code>\qp \hpause \pause</code>, <code>\bar</code>,
+        <code>\generalsignature</code>, <code>\generalmeter</code> (ト音記号・単一譜表)</li>
+    <li>音高は MusixTeX 表記: <code>a</code>=A3, <code>c</code>=中央C (C4), <code>j</code>=C5, <code>q</code>=C6 …</li>
+    <li>印刷用 PDF: <code>musixtex -p score.tex</code> (texlive-music)</li>
+  </ul>
+  <p class="note">
+    <a href="https://github.com/masaaki-avnturle/Bada" target="_blank" rel="noopener">masaaki-avnturle/Bada</a>
+    · MIT License
+  </p>
+  <form method="dialog" style="text-align:right"><button class="btn primary">閉じる</button></form>
+</dialog>
+
+<script>
+"use strict";
+
+/* ============================================================
+ * テンプレート — レポート「Δと」(octave74) の題材
+ * ============================================================ */
+var TEMPLATES = [
+  { name: "B♭ 長音階 (octave74: とりうる音)", body: [
+    "% B flat major scale — レポート octave74:",
+    "%   B♭ の音階のとりうる音 (フラット2つ) を上行・下行で。",
+    "\\input musixtex",
+    "\\generalsignature{-2}% B flat major",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\qu{bcde}\\en",
+    "\\bar",
+    "\\NOtes\\qu{fghi}\\en",
+    "\\bar",
+    "\\NOtes\\qu{ihgf}\\en",
+    "\\bar",
+    "\\NOtes\\qu{edcb}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") },
+
+  { name: "E♭ 長音階 (octave74)", body: [
+    "% E flat major scale — レポート octave74:",
+    "%   E♭ の音階のとりうる音 (フラット3つ)。",
+    "\\input musixtex",
+    "\\generalsignature{-3}% E flat major",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\qu{efgh}\\en",
+    "\\bar",
+    "\\NOtes\\qu{ijkl}\\en",
+    "\\bar",
+    "\\NOtes\\qu{lkji}\\en",
+    "\\bar",
+    "\\NOtes\\qu{hgfe}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") },
+
+  { name: "G と A の和音 (octave74)", body: [
+    "% レポート octave74: 「G と A の和音の音階の中に G と A を入れる」",
+    "%   G の和音 (g-i-k) と A の和音 (h-j-l)、F# を重ねる例。",
+    "\\input musixtex",
+    "\\generalsignature{0}",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\zq{g}\\zq{i}\\qu{k}\\zq{h}\\zq{j}\\qu{l}\\zq{g}\\zq{i}\\hu{k}\\en",
+    "\\bar",
+    "\\NOtes\\sh f\\zq{f}\\zq{h}\\qu{j}\\zq{g}\\zq{i}\\qu{k}\\zq{h}\\zq{j}\\hu{l}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") },
+
+  { name: "2音階 = 2オクターブ (octave74)", body: [
+    "% レポート octave74: 「二音階は 2オクターブと同じ意味ではない」",
+    "%   1オクターブ + またその上の1オクターブ (c → j → q)。",
+    "\\input musixtex",
+    "\\generalsignature{0}",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\qu{cdef}\\en",
+    "\\bar",
+    "\\NOtes\\qu{ghij}\\en",
+    "\\bar",
+    "\\NOtes\\qu{jklm}\\en",
+    "\\bar",
+    "\\NOtes\\qu{nopq}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") },
+
+  { name: "HANON 風練習 (octave74)", body: [
+    "% レポート octave74: 「HANON を練習していると、弾けるとわかった」",
+    "%   HANON 第1番型 (do-mi-fa-sol-la-sol-fa-mi) の上行パターン。",
+    "\\input musixtex",
+    "\\generalsignature{0}",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\cu{c}\\cu{e}\\cu{f}\\cu{g}\\cu{h}\\cu{g}\\cu{f}\\cu{e}\\en",
+    "\\bar",
+    "\\NOtes\\cu{d}\\cu{f}\\cu{g}\\cu{h}\\cu{i}\\cu{h}\\cu{g}\\cu{f}\\en",
+    "\\bar",
+    "\\NOtes\\cu{e}\\cu{g}\\cu{h}\\cu{i}\\cu{j}\\cu{i}\\cu{h}\\cu{g}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") },
+
+  { name: "空の楽譜", body: [
+    "\\input musixtex",
+    "\\generalsignature{0}",
+    "\\generalmeter{\\meterfrac44}",
+    "\\parindent0pt",
+    "\\startpiece",
+    "\\NOtes\\qu{c}\\qu{d}\\qu{e}\\qu{f}\\en",
+    "\\endpiece",
+    "\\end" ].join("\n") }
+];
+
+/* ============================================================
+ * MusixTeX サブセットのパーサ
+ *   戻り値: { signature, meter:[n,d], events:[
+ *     {type:"note", pitches:[{idx,acc}], dur:"q|c|h|w", stemUp:bool} |
+ *     {type:"rest", dur:"q|h|w"} | {type:"bar"} ] , warnings:[] }
+ *   音高 idx: ダイアトニック番号 (0 = C0)。MusixTeX の 'c' = C4 = 28。
+ * ============================================================ */
+function pitchIndex(ch) {
+  var code = ch.charCodeAt(0);
+  if (code >= 97 && code <= 122) return 26 + (code - 97);      /* a=A3(26), c=C4(28) */
+  if (code >= 65 && code <= 90)  return 26 + (code - 65) - 7;  /* 大文字 = 1オクターブ下 */
+  return null;
+}
+
+function parseMusixTeX(src) {
+  var score = { signature: 0, meter: [4, 4], events: [], warnings: [] };
+  var m;
+
+  m = src.match(/\\generalsignature\s*\{?\s*(-?\d+)/);
+  if (m) score.signature = Math.max(-7, Math.min(7, parseInt(m[1], 10)));
+
+  m = src.match(/\\meterfrac\s*\{?\s*(\d+)\s*\}?\s*\{?\s*(\d+)/);
+  if (m) score.meter = [parseInt(m[1], 10), parseInt(m[2], 10)];
+
+  /* コメント除去 (行末の % 以降; \% は残す) */
+  var clean = src.replace(/([^\\])%.*$/gm, "$1").replace(/^%.*$/gm, "");
+
+  var durMap = { qu:"q", ql:"q", cu:"c", cl:"c", hu:"h", hl:"h", wh:"w" };
+  var restMap = { qp:"q", hpause:"h", pause:"w", ds:"c" };
+  var tokRe = /\\(NOtes|Notes|notes|NOTes|NOTEs|NOTES|en(?:otes)?|bar|qu|ql|cu|cl|hu|hl|wh|zq|zh|sh|fl|na|qp|hpause|pause|ds)\b\s*(\{[a-zA-Z]+\}|[a-zA-Z])?/g;
+
+  var inGroup = false, pendAcc = null, chord = [], t;
+  function argPitches(arg) {
+    if (!arg) return [];
+    var s = arg.replace(/[{}]/g, ""), out = [], i;
+    for (i = 0; i < s.length; i++) {
+      var idx = pitchIndex(s[i]);
+      if (idx !== null) out.push(idx);
+    }
+    return out;
+  }
+  while ((t = tokRe.exec(clean)) !== null) {
+    var cmd = t[1], arg = t[2];
+    if (/^(NOtes|Notes|notes|NOTes|NOTEs|NOTES)$/.test(cmd)) { inGroup = true; continue; }
+    if (/^en(otes)?$/.test(cmd)) { inGroup = false; chord = []; pendAcc = null; continue; }
+    if (cmd === "bar") { score.events.push({ type: "bar" }); continue; }
+    if (!inGroup) continue;
+
+    if (cmd === "sh" || cmd === "fl" || cmd === "na") { pendAcc = cmd; continue; }
+    if (restMap[cmd]) { score.events.push({ type: "rest", dur: restMap[cmd] }); continue; }
+    if (cmd === "zq" || cmd === "zh") {
+      var zp = argPitches(arg);
+      var zi;
+      for (zi = 0; zi < zp.length; zi++) { chord.push({ idx: zp[zi], acc: pendAcc }); pendAcc = null; }
+      continue;
+    }
+    if (durMap[cmd]) {
+      var ps = argPitches(arg);
+      if (ps.length === 0) { score.warnings.push("\\" + cmd + ": 音高がありません"); continue; }
+      var stemUp = cmd.charAt(cmd.length - 1) !== "l";
+      var k;
+      for (k = 0; k < ps.length; k++) {
+        var pitches = chord.concat([{ idx: ps[k], acc: pendAcc }]);
+        pendAcc = null; chord = [];
+        score.events.push({ type: "note", pitches: pitches, dur: durMap[cmd], stemUp: stemUp });
+      }
+      continue;
+    }
+  }
+  return score;
+}
+
+/* ============================================================
+ * SVG 簡易レンダラ (ト音記号・単一譜表)
+ * ============================================================ */
+var STEP = 4;            /* 半ステップ (譜線間隔の半分) px */
+var E4 = 30;             /* 第1線 = E4 のダイアトニック番号 */
+var FLAT_POS  = [34, 37, 33, 36, 32, 35, 31]; /* B4 E5 A4 D5 G4 C5 F4 */
+var SHARP_POS = [38, 35, 39, 36, 33, 37, 34]; /* F5 C5 G5 D5 A4 E5 B4 */
+
+function svgEl(tag, attrs, text) {
+  var el = document.createElementNS("http://www.w3.org/2000/svg", tag), k;
+  for (k in attrs) el.setAttribute(k, attrs[k]);
+  if (text !== undefined) el.textContent = text;
+  return el;
+}
+
+function noteY(topY, idx) { return topY + 8 * STEP - (idx - E4) * STEP; }
+
+function drawNote(g, x, topY, ev) {
+  var i, p, y, minIdx = 99, maxIdx = -99;
+  for (i = 0; i < ev.pitches.length; i++) {
+    p = ev.pitches[i];
+    if (p.idx < minIdx) minIdx = p.idx;
+    if (p.idx > maxIdx) maxIdx = p.idx;
+  }
+  /* 加線 */
+  var li;
+  for (li = 28; li >= minIdx; li -= 2)
+    g.appendChild(svgEl("line", { x1: x - 9, x2: x + 9, y1: noteY(topY, li), y2: noteY(topY, li),
+                                  stroke: "#222", "stroke-width": 1 }));
+  for (li = 40; li <= maxIdx; li += 2)
+    g.appendChild(svgEl("line", { x1: x - 9, x2: x + 9, y1: noteY(topY, li), y2: noteY(topY, li),
+                                  stroke: "#222", "stroke-width": 1 }));
+  /* 符頭 + 臨時記号 */
+  var accGlyph = { sh: "\u266F", fl: "\u266D", na: "\u266E" };
+  for (i = 0; i < ev.pitches.length; i++) {
+    p = ev.pitches[i]; y = noteY(topY, p.idx);
+    var head = svgEl("ellipse", { cx: x, cy: y, rx: 5.6, ry: 4.1,
+      transform: "rotate(-18 " + x + " " + y + ")",
+      fill: (ev.dur === "h" || ev.dur === "w") ? "none" : "#222",
+      stroke: "#222", "stroke-width": 1.6 });
+    g.appendChild(head);
+    if (p.acc) g.appendChild(svgEl("text", { x: x - 15, y: y + 4.5, "font-size": 14,
+      fill: "#222", "font-family": "serif" }, accGlyph[p.acc]));
+  }
+  /* 符幹・符尾 */
+  if (ev.dur !== "w") {
+    var sx, y1, y2;
+    if (ev.stemUp) { sx = x + 5.2; y1 = noteY(topY, minIdx) - 1; y2 = noteY(topY, maxIdx) - 28; }
+    else           { sx = x - 5.2; y1 = noteY(topY, maxIdx) + 1; y2 = noteY(topY, minIdx) + 28; }
+    g.appendChild(svgEl("line", { x1: sx, x2: sx, y1: y1, y2: y2, stroke: "#222", "stroke-width": 1.4 }));
+    if (ev.dur === "c") {
+      var fy = y2, dir = ev.stemUp ? 1 : -1;
+      g.appendChild(svgEl("path", { d: "M " + sx + " " + fy +
+        " q 7 " + (5 * dir) + " 5 " + (16 * dir) + " q 4 -" + (8 * dir) + " -5 -" + (12 * dir),
+        fill: "#222" }));
+    }
+  }
+}
+
+function drawRest(g, x, topY, dur) {
+  var midY = noteY(topY, 34); /* B4 = 中央線 */
+  if (dur === "w") g.appendChild(svgEl("rect", { x: x - 6, y: midY - STEP, width: 12, height: 4, fill: "#222" }));
+  else if (dur === "h") g.appendChild(svgEl("rect", { x: x - 6, y: midY - 4, width: 12, height: 4, fill: "#222" }));
+  else g.appendChild(svgEl("path", { d: "M " + (x - 3) + " " + (midY - 10) +
+    " l 6 7 l -5 5 l 6 7 q -8 -4 -6 3", fill: "none", stroke: "#222", "stroke-width": 1.6 }));
+}
+
+function renderScore(score, container) {
+  container.textContent = "";
+  var noteW = 34, leftPad = 14;
+  var sigN = Math.abs(score.signature);
+  var headW = 46 + sigN * 10 + 24; /* 音部記号 + 調号 + 拍子 */
+  var availW = Math.max(240, (container.clientWidth || 640) - 28);
+  var perLine = Math.max(4, Math.floor((availW - headW - leftPad) / noteW));
+
+  /* 行分割 (小節線は行末に残す) */
+  var lines = [], cur = [], count = 0, i;
+  for (i = 0; i < score.events.length; i++) {
+    var ev = score.events[i];
+    cur.push(ev);
+    if (ev.type !== "bar") count++;
+    if (count >= perLine && (ev.type === "bar" || count >= perLine + 3)) {
+      lines.push(cur); cur = []; count = 0;
+    }
+  }
+  if (cur.length) lines.push(cur);
+  if (!lines.length) lines.push([]);
+
+  var lineH = 128, topPad = 26;
+  var svg = svgEl("svg", { width: availW, height: topPad + lines.length * lineH,
+                           xmlns: "http://www.w3.org/2000/svg" });
+  var ln;
+  for (ln = 0; ln < lines.length; ln++) {
+    var g = svgEl("g", {});
+    var topY = topPad + ln * lineH;
+    var staffW = availW - leftPad - 6;
+    var j;
+    for (j = 0; j < 5; j++) {
+      var yy = topY + j * 2 * STEP;
+      g.appendChild(svgEl("line", { x1: leftPad, x2: leftPad + staffW, y1: yy, y2: yy,
+                                    stroke: "#333", "stroke-width": 1 }));
+    }
+    /* ト音記号 (G clef) */
+    g.appendChild(svgEl("text", { x: leftPad + 2, y: topY + 8 * STEP + 9, "font-size": 46,
+      fill: "#222", "font-family": "'Segoe UI Symbol','Noto Music','DejaVu Sans',serif" }, "\uD834\uDD1E"));
+    var x = leftPad + 40;
+    /* 調号 */
+    var s;
+    for (s = 0; s < sigN; s++) {
+      var pos = score.signature < 0 ? FLAT_POS[s] : SHARP_POS[s];
+      g.appendChild(svgEl("text", { x: x, y: noteY(topY, pos) + 4.5, "font-size": 15,
+        fill: "#222", "font-family": "serif" }, score.signature < 0 ? "\u266D" : "\u266F"));
+      x += 10;
+    }
+    x += 4;
+    /* 拍子 (最初の行のみ) */
+    if (ln === 0) {
+      g.appendChild(svgEl("text", { x: x, y: topY + 2 * 2 * STEP - 2, "font-size": 17,
+        "font-weight": "bold", fill: "#222", "font-family": "serif" }, String(score.meter[0])));
+      g.appendChild(svgEl("text", { x: x, y: topY + 4 * 2 * STEP - 2, "font-size": 17,
+        "font-weight": "bold", fill: "#222", "font-family": "serif" }, String(score.meter[1])));
+    }
+    x += 24;
+    /* イベント */
+    var evs = lines[ln], e;
+    for (e = 0; e < evs.length; e++) {
+      var ev2 = evs[e];
+      if (ev2.type === "bar") {
+        var bx = x - noteW / 2 + 4;
+        g.appendChild(svgEl("line", { x1: bx, x2: bx, y1: topY, y2: topY + 8 * STEP,
+                                      stroke: "#333", "stroke-width": 1.2 }));
+      } else if (ev2.type === "rest") { drawRest(g, x, topY, ev2.dur); x += noteW; }
+      else { drawNote(g, x, topY, ev2); x += noteW; }
+    }
+    /* 最終行の終止線 */
+    if (ln === lines.length - 1) {
+      var fx = leftPad + staffW;
+      g.appendChild(svgEl("line", { x1: fx - 5, x2: fx - 5, y1: topY, y2: topY + 8 * STEP,
+                                    stroke: "#333", "stroke-width": 1.2 }));
+      g.appendChild(svgEl("rect", { x: fx - 2.5, y: topY, width: 3, height: 8 * STEP, fill: "#333" }));
+    }
+    svg.appendChild(g);
+  }
+  container.appendChild(svg);
+}
+
+/* ============================================================
+ * Web Audio 試聴
+ * ============================================================ */
+var audioCtx = null, playTimer = null, playingNodes = [];
+
+function midiOf(pitch, signature) {
+  var idx = pitch.idx, octave = Math.floor(idx / 7), step = idx % 7;
+  var semis = [0, 2, 4, 5, 7, 9, 11];
+  var midi = 12 * (octave + 1) + semis[step];
+  /* 調号: フラット順 B E A D G C F / シャープ順 F C G D A E B */
+  var flatSteps  = [6, 2, 5, 1, 4, 0, 3];
+  var sharpSteps = [3, 0, 4, 1, 5, 2, 6];
+  var n = Math.abs(signature), applied = 0, i;
+  for (i = 0; i < n; i++) {
+    if (signature < 0 && flatSteps[i] === step) applied = -1;
+    if (signature > 0 && sharpSteps[i] === step) applied = 1;
+  }
+  if (pitch.acc === "sh") applied = 1;
+  else if (pitch.acc === "fl") applied = -1;
+  else if (pitch.acc === "na") applied = 0;
+  return midi + applied;
+}
+
+function stopPlayback() {
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  var i;
+  for (i = 0; i < playingNodes.length; i++) {
+    try { playingNodes[i].stop(); } catch (e) { /* already stopped */ }
+  }
+  playingNodes = [];
+}
+
+function playScore(score) {
+  stopPlayback();
+  if (!audioCtx) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === "suspended") audioCtx.resume();
+  var beat = 60 / 96; /* ♩=96 */
+  var durBeats = { w: 4, h: 2, q: 1, c: 0.5 };
+  var seq = [], i;
+  for (i = 0; i < score.events.length; i++) {
+    var ev = score.events[i];
+    if (ev.type === "bar") continue;
+    seq.push(ev);
+  }
+  var pos = 0;
+  function step() {
+    if (pos >= seq.length) { playTimer = null; return; }
+    var ev = seq[pos++], secs = durBeats[ev.dur] * beat;
+    if (ev.type === "note") {
+      var t0 = audioCtx.currentTime, j;
+      for (j = 0; j < ev.pitches.length; j++) {
+        var f = 440 * Math.pow(2, (midiOf(ev.pitches[j], score.signature) - 69) / 12);
+        var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+        osc.type = "triangle"; osc.frequency.value = f;
+        gain.gain.setValueAtTime(0.0001, t0);
+        gain.gain.exponentialRampToValueAtTime(0.22 / Math.sqrt(ev.pitches.length), t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + secs * 0.95);
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.start(t0); osc.stop(t0 + secs);
+        playingNodes.push(osc);
+      }
+    }
+    playTimer = setTimeout(step, secs * 1000);
+  }
+  step();
+}
+
+/* ============================================================
+ * コンパイルガイド (texlive-music)
+ * ============================================================ */
+function compileGuide(os) {
+  if (os === "ubuntu") return [
+    "<p><b>1.</b> texlive-music をインストール:</p>",
+    "<pre>sudo apt update\nsudo apt install texlive-music texlive-fonts-recommended</pre>",
+    "<p><b>2.</b> このアプリで「⬇ .tex 保存」した <code>score.tex</code> をコンパイル:</p>",
+    "<pre>musixtex -p score.tex   # → score.pdf</pre>",
+    "<p class=\"note\">-p は pdfetex で直接 PDF を出力するオプションです。</p>"
+  ].join("");
+  if (os === "windows") return [
+    "<p><b>1.</b> <a href=\"https://miktex.org/\" target=\"_blank\" rel=\"noopener\">MiKTeX</a> または " +
+      "<a href=\"https://tug.org/texlive/\" target=\"_blank\" rel=\"noopener\">TeX Live</a> をインストール " +
+      "(MiKTeX は初回コンパイル時に musixtex パッケージを自動取得)。</p>",
+    "<p><b>2.</b> コマンドプロンプト / PowerShell で:</p>",
+    "<pre>musixtex -p score.tex   # → score.pdf</pre>",
+    "<p class=\"note\">TeX Live の場合はインストーラで collection-music (MusixTeX) を選択してください。</p>"
+  ].join("");
+  return [
+    "<p>Android では TeX の実行が難しいため、このアプリは <b>楽譜の作成・プレビュー・試聴・.tex 書き出し</b> に対応しています。</p>",
+    "<p><b>1.</b> 「📋 コピー」または「⬇ .tex 保存」でソースを取り出す。</p>",
+    "<p><b>2.</b> PC (Ubuntu / Windows) の texlive-music、または <a href=\"https://www.overleaf.com/\" target=\"_blank\" rel=\"noopener\">Overleaf</a> などのオンライン TeX で <code>musixtex -p score.tex</code> 相当のコンパイルを実行。</p>"
+  ].join("");
+}
+
+/* ============================================================
+ * エディタ操作
+ * ============================================================ */
+var srcEl = document.getElementById("src");
+var previewEl = document.getElementById("preview");
+var statusEl = document.getElementById("status");
+var curDur = "qu", curAcc = "";
+
+function refresh() {
+  var score = parseMusixTeX(srcEl.value);
+  renderScore(score, previewEl);
+  var notes = 0, bars = 1, i;
+  for (i = 0; i < score.events.length; i++) {
+    if (score.events[i].type === "bar") bars++;
+    else notes++;
+  }
+  var sigName = score.signature === 0 ? "C" :
+    (score.signature < 0 ? "\u266D\u00D7" + (-score.signature) : "\u266F\u00D7" + score.signature);
+  statusEl.textContent = "調号: " + sigName + " ・ 拍子: " + score.meter[0] + "/" + score.meter[1] +
+    " ・ 音符/休符: " + notes + " ・ 小節: " + bars +
+    (score.warnings.length ? " ・ ⚠ " + score.warnings.join(" / ") : "");
+  try { localStorage.setItem("musictex_studio_src", srcEl.value); } catch (e) { /* private mode */ }
+}
+
+var refreshTimer = null;
+function scheduleRefresh() {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refresh, 180);
+}
+
+function insertSnippet(text) {
+  var el = srcEl, start = el.selectionStart, end = el.selectionEnd;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  el.selectionStart = el.selectionEnd = start + text.length;
+  el.focus();
+  scheduleRefresh();
+}
+
+function insertNote(pitchLetter) {
+  var tok = "";
+  if (curAcc && curDur !== "zq") tok += "\\" + curAcc + " " + pitchLetter;
+  else if (curAcc) tok += "\\" + curAcc + " " + pitchLetter;
+  tok += "\\" + curDur + "{" + pitchLetter + "}";
+  insertSnippet(tok);
+}
+
+function applyTemplate(i) {
+  srcEl.value = TEMPLATES[i].body;
+  refresh();
+}
+
+/* ============================================================
+ * 書き出し
+ * ============================================================ */
+function downloadTex() {
+  var blob = new Blob([srcEl.value], { type: "application/x-tex" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "score.tex";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
+function copyTex() {
+  var done = function () { statusEl.textContent = "📋 MusixTeX ソースをクリップボードにコピーしました"; };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(srcEl.value).then(done, function () { fallbackCopy(); done(); });
+  } else { fallbackCopy(); done(); }
+  function fallbackCopy() {
+    srcEl.select();
+    try { document.execCommand("copy"); } catch (e) { /* ignore */ }
+  }
+}
+
+function showGuide(os) {
+  document.getElementById("guideBody").innerHTML = compileGuide(os);
+  var btns = document.querySelectorAll("#guide .os"), i;
+  for (i = 0; i < btns.length; i++) btns[i].classList.toggle("on", btns[i].dataset.os === os);
+}
+
+/* ============================================================
+ * 初期化・イベント配線
+ * ============================================================ */
+(function init() {
+  var sel = document.getElementById("templateSel"), i;
+  for (i = 0; i < TEMPLATES.length; i++) {
+    var opt = document.createElement("option");
+    opt.value = String(i); opt.textContent = TEMPLATES[i].name;
+    sel.appendChild(opt);
+  }
+
+  var pb = document.getElementById("pitchBtns");
+  var letters = "abcdefghijklmnopq";
+  var names = { a:"A3", b:"B3", c:"C4", d:"D4", e:"E4", f:"F4", g:"G4", h:"A4", i:"B4",
+                j:"C5", k:"D5", l:"E5", m:"F5", n:"G5", o:"A5", p:"B5", q:"C6" };
+  for (i = 0; i < letters.length; i++) {
+    (function (ch) {
+      var b = document.createElement("button");
+      b.className = "pbtn"; b.textContent = ch; b.title = names[ch] + " (MusixTeX: " + ch + ")";
+      b.addEventListener("click", function () { insertNote(ch); });
+      pb.appendChild(b);
+    })(letters[i]);
+  }
+
+  document.getElementById("btnLoadTpl").addEventListener("click", function () {
+    applyTemplate(parseInt(sel.value, 10) || 0);
+  });
+  sel.addEventListener("change", function () { applyTemplate(parseInt(sel.value, 10) || 0); });
+
+  var durBtns = document.querySelectorAll(".pbtn.dur");
+  for (i = 0; i < durBtns.length; i++) {
+    (function (b) {
+      b.addEventListener("click", function () {
+        curDur = b.dataset.dur;
+        var all = document.querySelectorAll(".pbtn.dur"), j;
+        for (j = 0; j < all.length; j++) all[j].classList.toggle("on", all[j] === b);
+      });
+    })(durBtns[i]);
+  }
+  var accBtns = document.querySelectorAll(".pbtn.acc");
+  for (i = 0; i < accBtns.length; i++) {
+    (function (b) {
+      b.addEventListener("click", function () {
+        curAcc = b.dataset.acc;
+        var all = document.querySelectorAll(".pbtn.acc"), j;
+        for (j = 0; j < all.length; j++) all[j].classList.toggle("on", all[j] === b);
+      });
+    })(accBtns[i]);
+  }
+
+  document.getElementById("btnBar").addEventListener("click", function () {
+    insertSnippet("\\en\n\\bar\n\\NOtes");
+  });
+  document.getElementById("btnRest").addEventListener("click", function () {
+    insertSnippet("\\qp");
+  });
+  document.getElementById("sigSel").addEventListener("change", function (e) {
+    var v = e.target.value;
+    if (/\\generalsignature\s*\{?-?\d+/.test(srcEl.value)) {
+      srcEl.value = srcEl.value.replace(/\\generalsignature\s*\{?\s*-?\d+\s*\}?/, "\\generalsignature{" + v + "}");
+    } else {
+      srcEl.value = "\\generalsignature{" + v + "}\n" + srcEl.value;
+    }
+    refresh();
+  });
+
+  document.getElementById("btnPlay").addEventListener("click", function () {
+    playScore(parseMusixTeX(srcEl.value));
+  });
+  document.getElementById("btnStop").addEventListener("click", stopPlayback);
+  document.getElementById("btnDownload").addEventListener("click", downloadTex);
+  document.getElementById("btnCopy").addEventListener("click", copyTex);
+  document.getElementById("btnAbout").addEventListener("click", function () {
+    document.getElementById("aboutDlg").showModal();
+  });
+  document.getElementById("fileOpen").addEventListener("change", function (e) {
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function () { srcEl.value = String(r.result); refresh(); };
+    r.readAsText(f);
+    e.target.value = "";
+  });
+
+  var osBtns = document.querySelectorAll("#guide .os");
+  for (i = 0; i < osBtns.length; i++) {
+    (function (b) { b.addEventListener("click", function () { showGuide(b.dataset.os); }); })(osBtns[i]);
+  }
+
+  srcEl.addEventListener("input", scheduleRefresh);
+  window.addEventListener("resize", scheduleRefresh);
+
+  var saved = null;
+  try { saved = localStorage.getItem("musictex_studio_src"); } catch (e) { /* private mode */ }
+  if (saved) { srcEl.value = saved; refresh(); }
+  else applyTemplate(0);
+  showGuide("ubuntu");
+})();
+</script>
+</body>
+</html>

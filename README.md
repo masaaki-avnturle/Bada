@@ -51,6 +51,25 @@
 
 ---
 
+## 🎼 ダウンロード — MusicTeX Studio(楽譜制作 / texlive-music)
+
+**MusixTeX (texlive-music) の楽譜ソースを作成・ライブプレビュー・試聴し、`.tex` として書き出す楽譜制作アプリ。** レポート **「Δと」(octave74)** の音階理論(B♭・E♭ 長音階のとりうる音、2音階=2オクターブ、G と A の和音、HANON)をテンプレートとして同梱。依存ゼロ・単一 HTML・オフライン動作。印刷用 PDF は texlive-music の `musixtex -p score.tex` で組版します。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) の `musictex-v*` から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `musictex-studio-debug.apk` |
+| **Windows 10 / 11** | `MusicTeXStudio-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `MusicTeXStudio-*-x86_64.AppImage` / `MusicTeXStudio-*-amd64.deb` |
+| **楽譜サンプル PDF** | `octave74_scales.pdf` (texlive-music で実コンパイルした B♭ 長音階 + G・A 和音) |
+
+ビルドは [`musictex-app-build.yml`](.github/workflows/musictex-app-build.yml) が実行します(`musictex-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。CI では **texlive-music を実際に導入し、同梱テンプレート全曲とサンプル楽譜を `musixtex -p` で実コンパイル検証**しています。使い方・MusixTeX 早見表は [`musictex_studio/`](musictex_studio/) を参照。
+
+---
+
 ## 💿 ダウンロード — Bada VM Pro OS(起動可能 ISO / USB ブート)
 
 **USB ブートして実ディスクにインストールできる、Ubuntu 22.04 ベースの本物の Linux ディストロ。** ウィンドウマネージャは **w9wm**、Bada アプリをプリインストール、**Calamares** で実ディスクへインストール、**NAT/DHCP で apt** が使え、**あなたのリポジトリの apt リポジトリ**(`deb [trusted=yes] …/ ./`)から `apt install`。BIOS+UEFI ハイブリッド ISO なので **Rufus でそのまま USB に書けます**。

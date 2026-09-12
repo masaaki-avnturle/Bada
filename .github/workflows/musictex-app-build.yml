@@ -1,0 +1,221 @@
+name: MusicTeX Studio app build (Android APK + Windows EXE + Ubuntu)
+
+# musictex_studio/ の「MusicTeX Studio」— MusixTeX (texlive-music) の
+# 楽譜制作アプリ (レポート octave74 テンプレート / ライブ楽譜プレビュー /
+# Web Audio 試聴 / .tex 書き出し) を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は musictex_studio/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+# さらに test-core では本物の texlive-music を導入し、同梱テンプレート全曲と
+# サンプル楽譜 (scores/octave74_scales.tex) を musixtex -p で実コンパイル検証、
+# 生成された PDF も配布物に含めます。
+# Actions アーティファクト、および (musictex-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: musictex-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'musictex-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f musictex_studio/index.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("musictex_studio/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/mtx.js", m[1]);
+            for (const marker of ["function parseMusixTeX", "function renderScore",
+                                  "function playScore", "function applyTemplate",
+                                  "function insertSnippet", "function downloadTex",
+                                  "function compileGuide"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/mtx.js
+          echo "MusicTeX Studio self-check OK"
+      - name: Engine tests (parser / pitch / MIDI / templates / guide)
+        run: |
+          set -e
+          node musictex_studio/tools/engine-test.js
+      - name: Install texlive-music (real MusixTeX toolchain)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends texlive-music texlive-fonts-recommended
+          musixtex --version
+      - name: Compile all bundled templates + sample score with musixtex
+        run: |
+          set -e
+          mkdir -p texcheck && cd texcheck
+          node -e '
+            const fs = require("fs"), vm = require("vm");
+            const html = fs.readFileSync("../musictex_studio/index.html", "utf8");
+            const s = html.match(/<script>([\s\S]*)<\/script>/)[1];
+            const core = s.slice(0, s.indexOf("var srcEl = document.getElementById"));
+            const sb = { window: {}, console }; vm.createContext(sb); vm.runInContext(core, sb);
+            sb.TEMPLATES.forEach((t, i) => fs.writeFileSync(`tpl${i}.tex`, t.body + "\n"));
+            console.log("wrote", sb.TEMPLATES.length, "templates");
+          '
+          cp ../musictex_studio/scores/octave74_scales.tex .
+          for f in *.tex; do
+            echo "== musixtex -p $f"
+            musixtex -p "$f" > /dev/null
+            test -f "${f%.tex}.pdf"
+          done
+          mkdir -p ../out
+          cp octave74_scales.pdf ../out/octave74_scales.pdf
+          ls -la ../out
+      - name: Upload sample score PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: musictex-sample-pdf
+          path: out/octave74_scales.pdf
+      - name: Attach sample score PDF to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/octave74_scales.pdf
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p musictex_studio/app/www
+          cp musictex_studio/index.html musictex_studio/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="musictex_studio/app"
+          cordova create cordova-build io.github.masaaki_avnturle.musictexstudio MusicTeXStudio
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/musictex-studio-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: musictex-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p musictex_studio/app/www
+          cp musictex_studio/index.html musictex_studio/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: musictex_studio/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: musictex-windows
+          path: musictex_studio/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: musictex_studio/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p musictex_studio/app/www
+          cp musictex_studio/index.html musictex_studio/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: musictex_studio/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: musictex-linux
+          path: |
+            musictex_studio/app/electron/dist/*.AppImage
+            musictex_studio/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            musictex_studio/app/electron/dist/*.AppImage
+            musictex_studio/app/electron/dist/*.deb
