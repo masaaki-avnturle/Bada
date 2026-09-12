@@ -34,7 +34,9 @@ const { TEMPLATES, parseMusixTeX, pitchIndex, midiOf, compileGuide,
         estimateKeySignature, midiToTex, parseMidi, midiNotesToEvents,
         notesToMusixTex, detectPitch, pitchFramesToEvents,
         midiToWavelength, wavelengthToRGB, scoreToSpectral,
-        CHORD_TYPES, chordMidis, chordTexTokens, synthPreset } = sandbox;
+        CHORD_TYPES, chordMidis, chordTexTokens, synthPreset,
+        instrumentPreset, scoreToEvents, mergeEvents, harmonicAmps,
+        chordFromPitchClasses, extractChordLine } = sandbox;
 
 console.log("[1] テンプレート");
 check("6 templates", Array.isArray(TEMPLATES) && TEMPLATES.length === 6);
@@ -241,6 +243,75 @@ check("プリセットは独立コピー (書き換えても汚れない)", (() 
   const a = synthPreset("純音"); a[0] = 0.1;
   return synthPreset("純音")[0] === 1;
 })());
+
+console.log("[17] 楽器プリセット (倍音 + ADSR + ビブラート)");
+const INSTRUMENTS = ["ピアノ", "オルガン", "ヴァイオリン", "チェロ", "フルート", "トランペット",
+                     "クラリネット", "ギター", "ハープ", "オルゴール", "ベル", "マリンバ", "ベース",
+                     "純音", "三角波", "ノコギリ", "矩形波"];
+for (const name of INSTRUMENTS) {
+  const p = instrumentPreset(name);
+  check(`${name}: 倍音8成分 (基音=1) + ADSR 完備`,
+    p.harmonics.length === 8 && p.harmonics[0] === 1 &&
+    p.attack > 0 && p.decay > 0 && p.sustain > 0 && p.sustain <= 1 && p.release > 0 &&
+    typeof p.vibRate === "number" && typeof p.vibDepth === "number");
+}
+check("ヴァイオリンとフルートはビブラート付き",
+  instrumentPreset("ヴァイオリン").vibDepth > 0 && instrumentPreset("フルート").vibDepth > 0);
+check("ギターは撥弦型 (立ち上がり速く減衰)",
+  instrumentPreset("ギター").attack < 0.01 && instrumentPreset("ギター").sustain < 0.3);
+check("プリセットは独立コピー", (() => {
+  const p = instrumentPreset("ピアノ"); p.harmonics[0] = 0;
+  return instrumentPreset("ピアノ").harmonics[0] === 1;
+})());
+
+console.log("[18] 楽譜 → イベント列と重ね合わせ (被せる)");
+const bflatEvents = scoreToEvents(parseMusixTeX(TEMPLATES[0].body));
+check("B♭ 音階 → 16 イベント・連続タイムライン",
+  bflatEvents.length === 16 && bflatEvents[0].startBeat === 0 &&
+  bflatEvents[0].midis[0] === 58 &&
+  bflatEvents.every((e, i) => i === 0 ||
+    Math.abs(e.startBeat - (bflatEvents[i-1].startBeat + bflatEvents[i-1].durBeats)) < 1e-6));
+const melody = [{ startBeat: 0, durBeats: 1, midis: [72] }, { startBeat: 1, durBeats: 1, midis: [74] }];
+const backing = [{ startBeat: 0, durBeats: 1, midis: [60, 64, 67] }, { startBeat: 2, durBeats: 1, midis: [65] }];
+const overlaid = mergeEvents(melody, backing);
+check("重ね合わせ: 同時発音は和音に統合 (3 イベント)",
+  overlaid.length === 3 && overlaid[0].midis.length === 4 &&
+  overlaid[0].midis.indexOf(72) >= 0 && overlaid[0].midis.indexOf(60) >= 0);
+check("重ね合わせ: 音価は先行イベントを維持", overlaid[0].durBeats === 1);
+const overlayTex = notesToMusixTex(overlaid, { source: "overlay-test" });
+const overlayBack = parseMusixTeX(overlayTex);
+check("重ねた楽譜も完全な MusixTeX として生成・再パース可",
+  overlayTex.includes("\\input musixtex") && overlayBack.warnings.length === 0 &&
+  overlayBack.events.filter(e => e.type === "note").length === 3);
+
+console.log("[19] スペクトル分布のコード化 (Goertzel 倍音抽出)");
+const gr = 11025, gf = 220, gframe = new Float32Array(1024);
+for (let i = 0; i < gframe.length; i++)
+  gframe[i] = 0.5 * Math.sin(2 * Math.PI * gf * i / gr)
+            + 0.25 * Math.sin(2 * Math.PI * 2 * gf * i / gr)
+            + 0.125 * Math.sin(2 * Math.PI * 3 * gf * i / gr);
+const amps = harmonicAmps(gframe, gr, gf, 4);
+check("倍音1:2:3 ≒ 1 : 0.5 : 0.25 を検出",
+  Math.abs(amps[1] / amps[0] - 0.5) < 0.08 && Math.abs(amps[2] / amps[0] - 0.25) < 0.08);
+check("存在しない倍音4はほぼゼロ", amps[3] / amps[0] < 0.05);
+
+console.log("[20] コード進行の抽出と被せ");
+const cCounts = [0,0,0,0,0,0,0,0,0,0,0,0];
+cCounts[0] = 3; cCounts[4] = 2; cCounts[7] = 2;
+const cBest = chordFromPitchClasses(cCounts);
+check("C-E-G 分布 → C メジャー", cBest.rootPc === 0 && cBest.type === "M");
+const aCounts = [0,0,0,0,0,0,0,0,0,0,0,0];
+aCounts[9] = 3; aCounts[0] = 2; aCounts[4] = 2;
+const aBest = chordFromPitchClasses(aCounts);
+check("A-C-E 分布 → A マイナー", aBest.rootPc === 9 && aBest.type === "m");
+const lineEvents = [
+  { startBeat: 0, durBeats: 2, midis: [60] }, { startBeat: 2, durBeats: 2, midis: [64, 67] },
+  { startBeat: 4, durBeats: 2, midis: [69] }, { startBeat: 6, durBeats: 2, midis: [72, 76] }
+];
+const chordLine = extractChordLine(lineEvents, 4);
+check("2小節 → 2 コード (C → Am)",
+  chordLine.length === 2 && chordLine[0].rootPc === 0 && chordLine[0].type === "M" &&
+  chordLine[1].rootPc === 9 && chordLine[1].type === "m");
 
 if (failures) { console.error(`\n${failures} failure(s)`); process.exit(1); }
 console.log("\nMusicTeX Studio engine tests: all OK");

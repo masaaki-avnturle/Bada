@@ -168,9 +168,15 @@
   <label class="btn" style="display:inline-block">
     📂 開く<input type="file" id="fileOpen" accept=".tex,.txt" style="display:none">
   </label>
-  <label class="btn" style="display:inline-block" title="曲ファイル (MIDI / 音声) から楽譜を自動生成">
-    🎵 曲→楽譜<input type="file" id="songOpen" accept=".mid,.midi,audio/*" style="display:none">
+  <label class="btn" style="display:inline-block"
+         title="曲ファイル (MIDI / wav / mp3 / ogg / m4a / flac / aac / opus / mp4 など) から楽譜と音色を自動生成">
+    🎵 曲→楽譜<input type="file" id="songOpen"
+      accept=".mid,.midi,.flac,.aac,.m4a,.opus,.wav,.mp3,.ogg,.weba,.webm,.mp4,audio/*,video/mp4,video/webm" style="display:none">
   </label>
+  <select id="importMode" title="取り込み方法: いまの楽譜を置き換えるか、重ねる (被せる) か">
+    <option value="replace">取り込み: 置き換え</option>
+    <option value="overlay">取り込み: 重ねる</option>
+  </select>
   <button class="btn" id="btnAbout">ℹ</button>
 </header>
 
@@ -211,10 +217,14 @@
     </div>
     <div id="synthPanel">
       <div class="synthrow">
-        <span class="lbl">🎹 シンセ</span>
+        <span class="lbl">🎹 楽器</span>
         <select id="presetSel" class="pbtn" style="background:var(--bg3)">
-          <option>ピアノ風</option><option>純音</option><option>三角波</option>
-          <option>ノコギリ</option><option>矩形波</option><option>オルガン</option>
+          <option>ピアノ</option><option>オルガン</option><option>ヴァイオリン</option>
+          <option>チェロ</option><option>フルート</option><option>トランペット</option>
+          <option>クラリネット</option><option>ギター</option><option>ハープ</option>
+          <option>オルゴール</option><option>ベル</option><option>マリンバ</option>
+          <option>ベース</option><option>純音</option><option>三角波</option>
+          <option>ノコギリ</option><option>矩形波</option>
         </select>
         <span class="lbl">スペクトルコード (倍音 1〜8)</span>
         <span id="harmSliders"></span>
@@ -224,6 +234,8 @@
       <div class="synthrow">
         <span class="lbl">五行コード線</span>
         <table id="chordGrid"></table>
+        <button class="btn small" id="btnChordify"
+                title="いまの楽譜を小節ごとに解析してコード進行を抽出し、伴奏として重ねる">🧩 コード化して重ねる</button>
       </div>
     </div>
     <textarea id="src" spellcheck="false" wrap="off"></textarea>
@@ -273,9 +285,15 @@
   </p>
   <ul>
     <li><b>シンセサイザー (スペクトルコード)</b>: 音色 = 倍音1〜8の振幅スペクトルを
-        スライダーで設計 (プリセット: 純音/三角波/ノコギリ/矩形波/オルガン/ピアノ風)。
-        ADSR 付き加算合成 (PeriodicWave) で試聴・鍵盤・コードすべての音源になり、
-        出力はライブスペクトル (12音階の色の FFT) として映像化</li>
+        スライダーで設計。<b>楽器プリセット</b> (ピアノ/オルガン/ヴァイオリン/チェロ/フルート/
+        トランペット/クラリネット/ギター/ハープ/オルゴール/ベル/マリンバ/ベース + 基本波形) は
+        倍音 + ADSR (アタック/ディケイ/サステイン/リリース) + ビブラートまで切り替わる。
+        試聴・鍵盤・コードすべての音源になり、出力はライブスペクトル (12音階の色の FFT) として映像化</li>
+    <li><b>取り込みモード</b>: 曲ファイル (MIDI / wav / mp3 / ogg / m4a / flac / aac / opus / mp4 等) を
+        「置き換え」または<b>「重ねる」</b>で取り込み — 作曲中の楽譜に外部の曲を被せられる
+        (同時発音は和音に統合)。音声取り込み時は曲の<b>スペクトル分布を倍音コード化</b>して
+        シンセの音色にも自動設定。「🧩 コード化して重ねる」で、いまの楽譜から小節ごとの
+        コード進行 (五行コード線の5種×12音階) を抽出して伴奏として重ねる</li>
     <li><b>五行コード線</b>: M / m / 7 / M7 / sus4 の5行 × 12音階のコード格子。
         セルは根音の波長色。クリックでシンセ演奏 + 楽譜へ和音 (\zq) を挿入</li>
     <li><b>モーツァルト・ビジョン</b>: 音の周波数を約40オクターブ上げると可視光の周波数帯に
@@ -1050,8 +1068,121 @@ function synthPreset(name) {
   return presets[name] ? presets[name].slice() : presets["ピアノ風"].slice();
 }
 
-var SYNTH = { harmonics: synthPreset("ピアノ風"), attack: 0.015, release: 0.3 };
+/* 楽器プリセット: 倍音スペクトル + ADSR + ビブラート (vibDepth はセント) */
+function instrumentPreset(name) {
+  var P = {
+    "ピアノ":       { h: [1,.45,.22,.12,.07,.04,.02,.01], a:.008, d:.25, s:.35, r:.35, vr:0,   vd:0  },
+    "オルガン":     { h: [1,.6,.3,.5,.1,.2,.05,.3],       a:.03,  d:.05, s:.9,  r:.15, vr:0,   vd:0  },
+    "ヴァイオリン": { h: [1,.7,.5,.4,.3,.25,.2,.15],      a:.12,  d:.1,  s:.8,  r:.25, vr:5.5, vd:18 },
+    "チェロ":       { h: [1,.8,.5,.35,.2,.15,.1,.05],     a:.1,   d:.1,  s:.8,  r:.3,  vr:5,   vd:14 },
+    "フルート":     { h: [1,.25,.08,.04,.02,.01,0,0],     a:.07,  d:.05, s:.85, r:.2,  vr:5.5, vd:10 },
+    "トランペット": { h: [1,.9,.8,.7,.55,.4,.3,.2],       a:.04,  d:.08, s:.8,  r:.15, vr:0,   vd:0  },
+    "クラリネット": { h: [1,.05,.6,.05,.35,.05,.2,.05],   a:.06,  d:.05, s:.85, r:.2,  vr:0,   vd:0  },
+    "ギター":       { h: [1,.5,.33,.2,.12,.08,.05,.03],   a:.005, d:.4,  s:.15, r:.3,  vr:0,   vd:0  },
+    "ハープ":       { h: [1,.3,.15,.08,.04,.02,.01,0],    a:.004, d:.5,  s:.1,  r:.4,  vr:0,   vd:0  },
+    "オルゴール":   { h: [1,0,.15,0,.4,0,.05,0],          a:.003, d:.6,  s:.05, r:.5,  vr:0,   vd:0  },
+    "ベル":         { h: [1,0,.5,0,0,.7,0,.3],            a:.003, d:.8,  s:.1,  r:.8,  vr:0,   vd:0  },
+    "マリンバ":     { h: [1,0,0,.5,0,0,0,.15],            a:.003, d:.3,  s:.05, r:.2,  vr:0,   vd:0  },
+    "ベース":       { h: [1,.6,.3,.15,.05,.02,0,0],       a:.01,  d:.2,  s:.5,  r:.25, vr:0,   vd:0  },
+    "純音":         { h: synthPreset("純音"),             a:.015, d:.05, s:.9,  r:.3,  vr:0,   vd:0  },
+    "三角波":       { h: synthPreset("三角波"),           a:.015, d:.05, s:.9,  r:.3,  vr:0,   vd:0  },
+    "ノコギリ":     { h: synthPreset("ノコギリ"),         a:.015, d:.05, s:.9,  r:.3,  vr:0,   vd:0  },
+    "矩形波":       { h: synthPreset("矩形波"),           a:.015, d:.05, s:.9,  r:.3,  vr:0,   vd:0  }
+  };
+  var p = P[name] || P["ピアノ"];
+  return { harmonics: p.h.slice(), attack: p.a, decay: p.d, sustain: p.s,
+           release: p.r, vibRate: p.vr, vibDepth: p.vd };
+}
+
+var SYNTH = instrumentPreset("ピアノ");
 var masterGain = null, analyser = null, periodicCache = null;
+
+/* パース済み楽譜 → 拍イベント列 (重ね合わせ・コード化に使う) */
+function scoreToEvents(score) {
+  var durBeats = { w: 4, h: 2, q: 1, c: 0.5 };
+  var out = [], pos = 0, i, j;
+  for (i = 0; i < score.events.length; i++) {
+    var ev = score.events[i];
+    if (ev.type === "bar") continue;
+    var d = durBeats[ev.dur] || 1;
+    if (ev.type === "note") {
+      var midis = [];
+      for (j = 0; j < ev.pitches.length; j++) midis.push(midiOf(ev.pitches[j], score.signature));
+      out.push({ startBeat: pos, durBeats: d, midis: midis });
+    }
+    pos += d;
+  }
+  return out;
+}
+
+/* 2 つのイベント列を重ねる (同時発音は和音へ、最大 6 声) */
+function mergeEvents(a, b) {
+  var all = [], i, j;
+  for (i = 0; i < a.length; i++) all.push({ startBeat: a[i].startBeat, durBeats: a[i].durBeats, midis: a[i].midis.slice() });
+  for (i = 0; i < b.length; i++) all.push({ startBeat: b[i].startBeat, durBeats: b[i].durBeats, midis: b[i].midis.slice() });
+  all.sort(function (x, y) { return x.startBeat - y.startBeat; });
+  var merged = [];
+  for (i = 0; i < all.length; i++) {
+    var ev = all[i], last = merged[merged.length - 1];
+    if (last && Math.abs(ev.startBeat - last.startBeat) < 0.125) {
+      /* 同時発音は和音に。音価はタイムラインを保つため先行イベントを維持 */
+      for (j = 0; j < ev.midis.length; j++)
+        if (last.midis.indexOf(ev.midis[j]) < 0 && last.midis.length < 6) last.midis.push(ev.midis[j]);
+    } else merged.push(ev);
+  }
+  return merged;
+}
+
+/* フレームの各倍音振幅 (Goertzel) — 曲のスペクトル分布 → スペクトルコード化 */
+function harmonicAmps(frame, sampleRate, freq, nHarm) {
+  var out = [], k, i, n = frame.length;
+  for (k = 1; k <= nHarm; k++) {
+    var f = freq * k;
+    if (f >= sampleRate / 2) { out.push(0); continue; }
+    var w = 2 * Math.PI * f / sampleRate, cw = 2 * Math.cos(w), s0, s1 = 0, s2 = 0;
+    for (i = 0; i < n; i++) { s0 = frame[i] + cw * s1 - s2; s2 = s1; s1 = s0; }
+    var power = s1 * s1 + s2 * s2 - cw * s1 * s2;
+    out.push(Math.sqrt(Math.max(power, 0)) / (n / 2));
+  }
+  return out;
+}
+
+/* ピッチクラス分布 → 最も合うコード (五行コード線の 5 種 × 12 音階) */
+function chordFromPitchClasses(counts) {
+  var best = null, bestScore = 0, root, t, i;
+  for (root = 0; root < 12; root++) {
+    for (t = 0; t < CHORD_TYPES.length; t++) {
+      var iv = CHORD_TYPES[t].intervals, sc = 0;
+      for (i = 0; i < iv.length; i++)
+        sc += counts[(root + iv[i]) % 12] * (iv[i] === 0 ? 1.5 : 1);
+      sc /= Math.sqrt(iv.length);
+      if (sc > bestScore + 1e-9) { bestScore = sc; best = { rootPc: root, type: CHORD_TYPES[t].key }; }
+    }
+  }
+  return bestScore > 0 ? best : null;
+}
+
+/* イベント列 → 小節 (windowBeats) ごとのコード進行 */
+function extractChordLine(events, windowBeats) {
+  var w = windowBeats || 4, end = 0, i, t;
+  for (i = 0; i < events.length; i++)
+    end = Math.max(end, events[i].startBeat + events[i].durBeats);
+  var chords = [];
+  for (t = 0; t < end - 1e-6; t += w) {
+    var counts = [0,0,0,0,0,0,0,0,0,0,0,0];
+    for (i = 0; i < events.length; i++) {
+      var ev = events[i];
+      var ov = Math.min(ev.startBeat + ev.durBeats, t + w) - Math.max(ev.startBeat, t);
+      if (ov > 0) {
+        for (var j = 0; j < ev.midis.length; j++)
+          counts[((ev.midis[j] % 12) + 12) % 12] += ov;
+      }
+    }
+    var c = chordFromPitchClasses(counts);
+    if (c) chords.push({ startBeat: t, durBeats: w, rootPc: c.rootPc, type: c.type });
+  }
+  return chords;
+}
 
 function ensureAudioGraph() {
   var AC = window.AudioContext || window.webkitAudioContext;
@@ -1080,18 +1211,29 @@ function synthWave() {
   return periodicCache;
 }
 
-/* シンセボイス: 倍音スペクトル + ADSR で 1 音を発音 */
+/* シンセボイス: 倍音スペクトル + ADSR + ビブラートで 1 音を発音 */
 function synthVoice(freq, t0, durSec, level) {
   var osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
   osc.setPeriodicWave(synthWave());
   osc.frequency.value = freq;
   var a = Math.min(SYNTH.attack, durSec * 0.4);
+  var d = Math.min(SYNTH.decay || 0.05, Math.max(0.01, durSec * 0.4));
+  var s = Math.max(0.02, Math.min(1, SYNTH.sustain === undefined ? 0.8 : SYNTH.sustain));
   var r = Math.min(SYNTH.release, durSec);
   gain.gain.setValueAtTime(0.0001, t0);
   gain.gain.exponentialRampToValueAtTime(level, t0 + a);
-  gain.gain.setValueAtTime(level, Math.max(t0 + a, t0 + durSec - r));
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0002, level * s), t0 + a + d);
+  gain.gain.setValueAtTime(Math.max(0.0002, level * s), Math.max(t0 + a + d, t0 + durSec - r));
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durSec);
   osc.connect(gain); gain.connect(masterGain);
+  if (SYNTH.vibDepth > 0) {
+    var lfo = audioCtx.createOscillator(), lfoGain = audioCtx.createGain();
+    lfo.type = "sine"; lfo.frequency.value = SYNTH.vibRate || 5;
+    lfoGain.gain.value = freq * (Math.pow(2, SYNTH.vibDepth / 1200) - 1);
+    lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+    lfo.start(t0); lfo.stop(t0 + durSec + 0.02);
+    playingNodes.push(lfo);
+  }
   osc.start(t0); osc.stop(t0 + durSec + 0.02);
   return osc;
 }
@@ -1270,29 +1412,32 @@ function startSpectrumLoop() {
 }
 
 /* --- シンセ操作パネルと五行コード線 --- */
-function buildSynthPanel() {
+function syncSynthUI() {
   var wrap = document.getElementById("harmSliders"), i;
-  function makeSliders() {
-    wrap.textContent = "";
-    for (i = 0; i < SYNTH.harmonics.length; i++) {
-      (function (idx) {
-        var s = document.createElement("input");
-        s.type = "range"; s.min = "0"; s.max = "1"; s.step = "0.01";
-        s.value = String(SYNTH.harmonics[idx]);
-        s.title = "倍音 " + (idx + 1);
-        s.addEventListener("input", function () {
-          SYNTH.harmonics[idx] = parseFloat(s.value);
-          periodicCache = null;
-        });
-        wrap.appendChild(s);
-      })(i);
-    }
+  wrap.textContent = "";
+  for (i = 0; i < SYNTH.harmonics.length; i++) {
+    (function (idx) {
+      var s = document.createElement("input");
+      s.type = "range"; s.min = "0"; s.max = "1"; s.step = "0.01";
+      s.value = String(SYNTH.harmonics[idx]);
+      s.title = "倍音 " + (idx + 1);
+      s.addEventListener("input", function () {
+        SYNTH.harmonics[idx] = parseFloat(s.value);
+        periodicCache = null;
+      });
+      wrap.appendChild(s);
+    })(i);
   }
-  makeSliders();
+  document.getElementById("atkSlider").value = String(SYNTH.attack);
+  document.getElementById("relSlider").value = String(SYNTH.release);
+}
+
+function buildSynthPanel() {
+  syncSynthUI();
   document.getElementById("presetSel").addEventListener("change", function (e) {
-    SYNTH.harmonics = synthPreset(e.target.value);
+    SYNTH = instrumentPreset(e.target.value);
     periodicCache = null;
-    makeSliders();
+    syncSynthUI();
     playTone(69);
   });
   document.getElementById("atkSlider").addEventListener("input", function (e) {
@@ -1415,14 +1560,26 @@ function copyTex() {
 /* ============================================================
  * 曲ファイルの取り込み (MIDI / 音声 → エディタへ MusixTeX を生成)
  * ============================================================ */
-function finishTranscription(tex, name) {
-  if (!tex) {
+/* 取り込みイベントを「置き換え」or「重ねる」で楽譜に反映 */
+function importEvents(events, name, extraMsg) {
+  if (!events || !events.length) {
     statusEl.textContent = "⚠ " + name + ": 音符を検出できませんでした";
     return;
   }
+  var mode = document.getElementById("importMode").value;
+  var tex;
+  if (mode === "overlay") {
+    var curScore = parseMusixTeX(srcEl.value);
+    var merged = mergeEvents(scoreToEvents(curScore), events);
+    tex = notesToMusixTex(merged, { source: name + " (重ね合わせ)", signature: curScore.signature });
+  } else {
+    tex = notesToMusixTex(events, { source: name });
+  }
+  if (!tex) { statusEl.textContent = "⚠ " + name + ": 楽譜を生成できませんでした"; return; }
   srcEl.value = tex;
   refresh();
-  statusEl.textContent = "🎵 " + name + " から楽譜を生成しました — プレビューと ▶ 試聴で確認できます";
+  statusEl.textContent = "🎵 " + name + (mode === "overlay" ? " をいまの楽譜に重ねました" : " から楽譜を生成しました") +
+    (extraMsg || "") + " — プレビューと ▶ 試聴で確認できます";
 }
 
 function transcribeAudioFile(file) {
@@ -1445,8 +1602,18 @@ function transcribeAudioFile(file) {
           mono[i] = acc / deci;
         }
         var win = 1024, hop = 256, frames = [];
-        for (i = 0; i + win <= mono.length; i += hop)
-          frames.push(detectPitch(mono.subarray(i, i + win), rate));
+        var harmSum = [0,0,0,0,0,0,0,0], voiced = 0;
+        for (i = 0; i + win <= mono.length; i += hop) {
+          var fr = mono.subarray(i, i + win);
+          var mdet = detectPitch(fr, rate);
+          frames.push(mdet);
+          /* 曲のスペクトル分布 → シンセのスペクトルコード (倍音を平均) */
+          if (mdet > 0) {
+            var amps = harmonicAmps(fr, rate, 440 * Math.pow(2, (mdet - 69) / 12), 8);
+            for (j = 0; j < 8; j++) harmSum[j] += amps[j];
+            voiced++;
+          }
+        }
         /* 3 点メディアンで平滑化 */
         var smooth = frames.slice();
         for (i = 1; i < frames.length - 1; i++) {
@@ -1454,7 +1621,16 @@ function transcribeAudioFile(file) {
           smooth[i] = a[1];
         }
         var events = pitchFramesToEvents(smooth, hop / rate);
-        finishTranscription(notesToMusixTex(events, { source: file.name }), file.name);
+        var timbreMsg = "";
+        if (voiced > 4 && harmSum[0] > 1e-6) {
+          var h = [];
+          for (i = 0; i < 8; i++) h.push(Math.max(0, Math.min(1, harmSum[i] / harmSum[0])));
+          SYNTH.harmonics = h;
+          periodicCache = null;
+          syncSynthUI();
+          timbreMsg = " (スペクトル分布を音色コード化してシンセに設定)";
+        }
+        importEvents(events, file.name, timbreMsg);
       }, 30);
     }, function () {
       statusEl.textContent = "⚠ " + file.name + " をデコードできませんでした (対応: wav/mp3/ogg/m4a など)";
@@ -1474,8 +1650,7 @@ function importSongFile(file) {
         statusEl.textContent = "⚠ " + name + ": MIDI ノートを読み取れませんでした";
         return;
       }
-      var events = midiNotesToEvents(parsed);
-      finishTranscription(notesToMusixTex(events, { source: name }), name);
+      importEvents(midiNotesToEvents(parsed), name);
     };
     reader.readAsArrayBuffer(file);
   } else {
@@ -1594,6 +1769,24 @@ function showGuide(os) {
   buildColorKeys();
   buildSynthPanel();
   buildChordGrid();
+  document.getElementById("btnChordify").addEventListener("click", function () {
+    var score = parseMusixTeX(srcEl.value);
+    var evs = scoreToEvents(score);
+    if (!evs.length) { statusEl.textContent = "⚠ コード化する音符がありません"; return; }
+    var line = extractChordLine(evs, 4);
+    if (!line.length) { statusEl.textContent = "⚠ コードを抽出できませんでした"; return; }
+    var chordEvents = [], i;
+    for (i = 0; i < line.length; i++)
+      chordEvents.push({ startBeat: line[i].startBeat, durBeats: 1,
+                         midis: chordMidis(line[i].rootPc, line[i].type, 3) });
+    var tex = notesToMusixTex(mergeEvents(evs, chordEvents),
+                              { source: "コード化 (伴奏を重ね)", signature: score.signature });
+    if (tex) { srcEl.value = tex; refresh(); }
+    var prog = [];
+    for (i = 0; i < line.length; i++)
+      prog.push(NOTE_NAMES[line[i].rootPc] + (line[i].type === "M" ? "" : line[i].type));
+    statusEl.textContent = "🧩 コード進行 " + prog.join(" → ") + " を小節頭の伴奏として重ねました";
+  });
   srcEl.addEventListener("input", scheduleRefresh);
   window.addEventListener("resize", scheduleRefresh);
 
