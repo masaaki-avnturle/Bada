@@ -115,6 +115,28 @@
 
 ---
 
+## ⬒ ダウンロード — Bada Illustrator(量子建築設計スタジオ)
+
+**建築設計のための Illustrator 流ベクター作図アプリ。** 壁・部屋・柱・ドア・窓・寸法・文字を mm 座標で直接描き(グリッド 100〜1000mm + **910mm 尺モジュール**スナップ、レイヤー、undo/redo、JSON 保存、**SVG/PNG 図面出力**)、**量子プログラミング言語 Bada** のインタプリタで図面をスクリプト操作できます — `qubit / H / X / Z / RY / CNOT` の状態ベクトル量子コア、Born 則の `Measure`、`>> tuplespace` 追記専用台帳、`@reviser : extension` 拡張トランザクション、そして `wall / room / door / dim …` の建築 API。**拡張機能マネージャ**を搭載し、組み込み 6 本(**量子間取りジェネレータ**=3qubit の測定結果が間取りを決める、外周壁ウィザード、通り芯グリッド、面積表、階段ジェネレータ、ベル状態デモ)に加えて自作の Bada 拡張を保存・書き出し・読み込みできます。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_illustrator/index.html をダウンロード**](bada_illustrator/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-illustrator-debug.apk` |
+| **Windows 10 / 11** | `BadaIllustrator-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaIllustrator-*-x86_64.AppImage` / `BadaIllustrator-*-amd64.deb` |
+
+ビルドは [`badaillustrator-app-build.yml`](.github/workflows/badaillustrator-app-build.yml) が実行します(`badaillustrator-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。ツールの使い方・Bada 建築 API・拡張機能の書き方は [`bada_illustrator/`](bada_illustrator/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):

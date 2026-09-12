@@ -1,0 +1,2345 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Bada Illustrator — 量子建築設計スタジオ</title>
+<style>
+  :root{
+    --bg:#05070d; --panel:#0b0f19; --panel2:#0e1422; --line:#1c2536;
+    --ink:#e8ecf5; --dim:#8a93a8; --gold:#c8a44a; --blue:#4a80d0; --teal:#40b8c0;
+    --sel:#ffcc55; --danger:#d05858;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink);
+    font:14px/1.5 system-ui,-apple-system,"Segoe UI","Noto Sans JP",sans-serif;
+    overscroll-behavior:none; }
+  button{ font:inherit; color:var(--ink); background:var(--panel2); border:1px solid var(--line);
+    border-radius:6px; padding:4px 9px; cursor:pointer; }
+  button:hover{ border-color:var(--gold); }
+  button.primary{ background:#20304e; border-color:var(--blue); }
+  button.warn{ border-color:var(--danger); color:#f0b0b0; }
+  input,select,textarea{ font:inherit; color:var(--ink); background:#080b12;
+    border:1px solid var(--line); border-radius:5px; padding:3px 6px; }
+  input[type=color]{ padding:0; width:34px; height:24px; }
+  textarea{ resize:vertical; }
+
+  #hdr{ display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:6px 10px; border-bottom:1px solid var(--line); background:var(--panel); }
+  #hdr .ttl{ font-weight:700; color:var(--gold); white-space:nowrap; }
+  #hdr .sub{ color:var(--dim); font-size:12px; white-space:nowrap; }
+  #hdr .sp{ flex:1; }
+
+  #main{ display:flex; height:calc(100% - 47px); min-height:0; }
+  #toolbar{ width:52px; display:flex; flex-direction:column; gap:4px; padding:6px 4px;
+    border-right:1px solid var(--line); background:var(--panel); overflow-y:auto; flex:none; }
+  #toolbar button{ width:44px; height:40px; padding:0; font-size:17px; position:relative; }
+  #toolbar button.on{ background:#2a2410; border-color:var(--sel); box-shadow:0 0 0 1px var(--sel) inset; }
+  #toolbar button small{ display:block; font-size:8.5px; color:var(--dim); line-height:1; }
+
+  #side{ width:225px; flex:none; border-right:1px solid var(--line); background:var(--panel);
+    overflow-y:auto; padding:8px; display:flex; flex-direction:column; gap:10px; }
+  .box{ border:1px solid var(--line); border-radius:8px; background:var(--panel2); padding:7px 8px; }
+  .box h3{ margin:0 0 6px; font-size:12px; color:var(--gold); letter-spacing:.06em; }
+  .lay{ display:flex; align-items:center; gap:6px; padding:2px 0; font-size:12.5px; }
+  .lay input[type=radio]{ accent-color:var(--gold); }
+  .row{ display:flex; align-items:center; gap:6px; margin:3px 0; font-size:12.5px; flex-wrap:wrap; }
+  .row label{ color:var(--dim); min-width:52px; }
+  .row input[type=number], .row input[type=text]{ width:86px; }
+
+  #cwrap{ flex:1; position:relative; min-width:0; background:#0a0d14; }
+  #cv{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; cursor:crosshair; }
+  #status{ position:absolute; left:0; right:0; bottom:0; display:flex; gap:14px; flex-wrap:wrap;
+    padding:3px 10px; font-size:11.5px; color:var(--dim);
+    background:rgba(5,7,13,.82); border-top:1px solid var(--line); pointer-events:none; }
+  #status b{ color:var(--ink); font-weight:600; }
+
+  #right{ width:360px; flex:none; border-left:1px solid var(--line); background:var(--panel);
+    display:flex; flex-direction:column; min-height:0; }
+  #rtabs{ display:flex; border-bottom:1px solid var(--line); }
+  #rtabs button{ flex:1; border:0; border-radius:0; background:transparent; padding:8px 4px; color:var(--dim); }
+  #rtabs button.on{ color:var(--gold); box-shadow:0 -2px 0 var(--gold) inset; }
+  .rpage{ flex:1; min-height:0; display:flex; flex-direction:column; padding:8px; gap:6px; }
+  #conOut{ flex:1; min-height:60px; overflow-y:auto; background:#060910; border:1px solid var(--line);
+    border-radius:6px; padding:6px 8px; font:12px/1.55 ui-monospace,Consolas,monospace; white-space:pre-wrap; }
+  #conOut .err{ color:#f08080; }
+  #conOut .echo{ color:#6f7a92; }
+  #conIn{ height:130px; font:12px/1.5 ui-monospace,Consolas,monospace; }
+  #extList{ flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; }
+  .ext{ border:1px solid var(--line); border-radius:7px; background:var(--panel2); padding:6px 8px; }
+  .ext .nm{ font-weight:600; font-size:13px; }
+  .ext .ds{ color:var(--dim); font-size:11.5px; margin:2px 0 5px; }
+  .ext .bt{ display:flex; gap:6px; }
+  #extEd{ display:none; flex-direction:column; gap:6px; }
+  #extEd.on{ display:flex; }
+  #extSrc{ height:190px; font:12px/1.5 ui-monospace,Consolas,monospace; }
+
+  .tgl{ display:none; }
+  @media (max-width:980px){
+    #side{ display:none; } #side.open{ display:flex; position:absolute; z-index:30; top:0; bottom:0; left:52px; }
+    #right{ display:none; } #right.open{ display:flex; position:absolute; z-index:30; top:0; bottom:0; right:0; width:min(360px,92vw); }
+    .tgl{ display:inline-block; }
+    #main{ position:relative; }
+  }
+</style>
+</head>
+<body>
+<div id="hdr">
+  <span class="ttl">⬒ Bada Illustrator</span>
+  <span class="sub">量子建築設計スタジオ — 量子プログラミング言語 Bada 搭載</span>
+  <span class="sp"></span>
+  <button id="bNew" title="新規図面">🗋 新規</button>
+  <button id="bSave" title="図面を .badaarch.json で保存">💾 保存</button>
+  <button id="bOpen" title="図面ファイルを開く">📂 開く</button>
+  <button id="bSvg" title="SVG 図面として出力">🖼 SVG</button>
+  <button id="bPng" title="PNG 画像として出力">📷 PNG</button>
+  <button id="bUndo" title="元に戻す (Ctrl+Z)">⟲</button>
+  <button id="bRedo" title="やり直す (Ctrl+Y)">⟳</button>
+  <button id="bFit" title="全体表示">⛶</button>
+  <button class="tgl" id="bSideT">☰</button>
+  <button class="tgl" id="bRightT">⚛</button>
+</div>
+<div id="main">
+  <div id="toolbar"></div>
+  <div id="side">
+    <div class="box">
+      <h3>レイヤー</h3>
+      <div id="layers"></div>
+    </div>
+    <div class="box">
+      <h3>プロパティ</h3>
+      <div id="props"><span style="color:var(--dim);font-size:12px">図形を選択してください</span></div>
+    </div>
+    <div class="box">
+      <h3>グリッド / スナップ</h3>
+      <div class="row"><label>グリッド</label>
+        <select id="gridSel">
+          <option value="100">100 mm</option>
+          <option value="250" selected>250 mm</option>
+          <option value="500">500 mm</option>
+          <option value="910">910 mm (尺モジュール)</option>
+          <option value="1000">1000 mm</option>
+        </select></div>
+      <div class="row"><label>スナップ</label><input type="checkbox" id="snapChk" checked></div>
+      <div class="row"><label>壁厚 既定</label><input type="number" id="wallT" value="200" step="10" min="20" style="width:70px"> mm</div>
+    </div>
+    <div class="box">
+      <h3>操作メモ</h3>
+      <div style="font-size:11.5px;color:var(--dim)">
+        ドラッグ = 作図 / ホイール = ズーム / 中ボタン or ✋ = パン。<br>
+        ⬚選択で図形をドラッグ移動、Delete で削除。<br>
+        寸法・座標はすべて mm。右の ⚛ タブから Bada 言語で図面を操作できます。
+      </div>
+    </div>
+  </div>
+  <div id="cwrap">
+    <canvas id="cv"></canvas>
+    <div id="status">
+      <span>X <b id="stX">0</b> mm</span><span>Y <b id="stY">0</b> mm</span>
+      <span>ズーム <b id="stZ">100%</b></span><span>図形 <b id="stN">0</b></span>
+      <span>延床面積 <b id="stA">0.00</b> m²</span>
+    </div>
+  </div>
+  <div id="right">
+    <div id="rtabs">
+      <button id="tabCon" class="on">⚛ Bada コンソール</button>
+      <button id="tabExt">🧩 拡張機能</button>
+    </div>
+    <div class="rpage" id="pgCon">
+      <div id="conOut"></div>
+      <div class="row" style="margin:0">
+        <select id="samSel" style="flex:1"><option value="">▼ サンプルを挿入…</option></select>
+        <button id="bClearOut">出力消去</button>
+      </div>
+      <textarea id="conIn" spellcheck="false" placeholder="# Bada 量子言語で図面を操作
+# 例:  wall(0,0,9000,0,200)   help() で API 一覧
+reg := qubit(2)
+reg := H(reg, 0)
+reg := CNOT(reg, 0, 1)
+print(&quot;ベル状態:&quot;, Measure(reg))"></textarea>
+      <div class="row" style="margin:0">
+        <button class="primary" id="bRun">▶ 実行 (Ctrl+Enter)</button>
+      </div>
+    </div>
+    <div class="rpage" id="pgExt" style="display:none">
+      <div id="extList"></div>
+      <div class="row" style="margin:0">
+        <button class="primary" id="bExtNew">＋ 新規拡張</button>
+        <button id="bExtExport">📤 書き出し</button>
+        <button id="bExtImport">📥 読み込み</button>
+      </div>
+      <div id="extEd">
+        <input type="text" id="extName" placeholder="拡張機能の名前">
+        <input type="text" id="extDesc" placeholder="説明 (任意)">
+        <textarea id="extSrc" spellcheck="false" placeholder="# Bada スクリプト (実行ボタンで図面に作用します)"></textarea>
+        <div class="row" style="margin:0">
+          <button class="primary" id="bExtSave">💾 保存</button>
+          <button id="bExtRun">▶ 試し実行</button>
+          <button id="bExtClose">閉じる</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<input type="file" id="fOpen" accept=".json,.badaarch,.badaarch.json,application/json" hidden>
+<input type="file" id="fExt" accept=".json,application/json" hidden>
+<script>
+"use strict";
+/* ================================================================
+ * Bada Illustrator — 量子建築設計スタジオ
+ *
+ * 単一 HTML・依存ゼロ・オフライン動作。
+ *  1. ベクター建築 CAD (壁・部屋・柱・ドア・窓・寸法・文字, mm 座標,
+ *     グリッドスナップ, レイヤー, undo/redo, JSON 保存, SVG/PNG 出力)
+ *  2. 量子プログラミング言語 Bada のインタプリタ
+ *     (:=, if/while/for, fun |params|, リスト, >> tuplespace 台帳,
+ *      @reviser : extension 拡張トランザクション,
+ *      qubit / H / X / Z / RY / CNOT / Measure / Sample の量子コア,
+ *      softmax / entropy / unknown_prior / update の情報エンジン)
+ *  3. Bada から図面を操作する建築 API (wall/room/door/... = 拡張機能)
+ *
+ * すべての純ロジックはグローバル関数として定義され、
+ * tools/engine-test.js が Node 上で DOM なしに検証します。
+ * ================================================================ */
+
+/* ================= 1. 幾何・図形モデル ========================== */
+
+var LAYERS = ["壁・構造", "開口部", "部屋", "寸法・注釈", "下書き"];
+
+function snapTo(v, g){ if (!g || g <= 0) return v; return Math.round(v / g) * g; }
+function distMM(x1, y1, x2, y2){ var dx = x2 - x1, dy = y2 - y1; return Math.sqrt(dx * dx + dy * dy); }
+
+/* 点と線分の距離 (mm) */
+function segDist(px, py, x1, y1, x2, y2){
+  var dx = x2 - x1, dy = y2 - y1;
+  var L2 = dx * dx + dy * dy;
+  if (L2 === 0) return distMM(px, py, x1, y1);
+  var t = ((px - x1) * dx + (py - y1) * dy) / L2;
+  t = Math.max(0, Math.min(1, t));
+  return distMM(px, py, x1 + t * dx, y1 + t * dy);
+}
+
+/* 厚みのある壁の外形 4 点ポリゴン */
+function wallPolygon(w){
+  var t = (w.t || 200) / 2;
+  var dx = w.x2 - w.x1, dy = w.y2 - w.y1;
+  var L = Math.sqrt(dx * dx + dy * dy) || 1;
+  var nx = -dy / L * t, ny = dx / L * t;
+  return [[w.x1 + nx, w.y1 + ny], [w.x2 + nx, w.y2 + ny],
+          [w.x2 - nx, w.y2 - ny], [w.x1 - nx, w.y1 - ny]];
+}
+
+/* 靴ひも公式 (mm²) */
+function polygonArea(pts){
+  var s = 0;
+  for (var i = 0; i < pts.length; i++){
+    var j = (i + 1) % pts.length;
+    s += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
+  }
+  return Math.abs(s) / 2;
+}
+
+function shapeArea(s){
+  if (s.type === "room") return Math.abs(s.w * s.h) / 1e6;   /* m² */
+  if (s.type === "wall") return polygonArea(wallPolygon(s)) / 1e6;
+  if (s.type === "column") return Math.PI * s.r * s.r / 1e6;
+  return 0;
+}
+
+/* 延床面積 = 部屋 (room) の合計 m² */
+function totalFloorArea(shapes){
+  var a = 0;
+  for (var i = 0; i < shapes.length; i++)
+    if (shapes[i].type === "room") a += Math.abs(shapes[i].w * shapes[i].h) / 1e6;
+  return Math.round(a * 10000) / 10000;
+}
+
+function shapeBounds(s){
+  switch (s.type){
+    case "wall": case "line": case "window": case "dim": {
+      var t = s.type === "wall" ? (s.t || 200) / 2 : 60;
+      return [Math.min(s.x1, s.x2) - t, Math.min(s.y1, s.y2) - t,
+              Math.max(s.x1, s.x2) + t, Math.max(s.y1, s.y2) + t];
+    }
+    case "room": return [s.x, s.y, s.x + s.w, s.y + s.h];
+    case "column": return [s.cx - s.r, s.cy - s.r, s.cx + s.r, s.cy + s.r];
+    case "door": {
+      var w = s.w || 800;
+      return [s.x - w, s.y - w, s.x + w, s.y + w];
+    }
+    case "text": {
+      var sz = s.size || 300;
+      return [s.x, s.y - sz, s.x + sz * 0.62 * String(s.s).length, s.y + sz * 0.3];
+    }
+  }
+  return [0, 0, 0, 0];
+}
+
+function hitTest(s, x, y, tol){
+  tol = tol || 120;
+  switch (s.type){
+    case "wall":   return segDist(x, y, s.x1, s.y1, s.x2, s.y2) <= (s.t || 200) / 2 + tol;
+    case "line":
+    case "window":
+    case "dim":    return segDist(x, y, s.x1, s.y1, s.x2, s.y2) <= tol;
+    case "column": return distMM(x, y, s.cx, s.cy) <= s.r + tol;
+    case "room": {
+      /* 部屋は輪郭ヒットのみ (内部クリックで下の図形を拾えるように) */
+      var nearX = Math.abs(x - s.x) <= tol || Math.abs(x - (s.x + s.w)) <= tol;
+      var nearY = Math.abs(y - s.y) <= tol || Math.abs(y - (s.y + s.h)) <= tol;
+      var inX = x >= s.x - tol && x <= s.x + s.w + tol;
+      var inY = y >= s.y - tol && y <= s.y + s.h + tol;
+      return (nearX && inY) || (nearY && inX);
+    }
+    case "door": {
+      var b = shapeBounds(s);
+      return x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3] &&
+             distMM(x, y, s.x, s.y) <= (s.w || 800) + tol;
+    }
+    case "text": {
+      var tb = shapeBounds(s);
+      return x >= tb[0] - tol && x <= tb[2] + tol && y >= tb[1] - tol && y <= tb[3] + tol;
+    }
+  }
+  return false;
+}
+
+function moveShape(s, dx, dy){
+  switch (s.type){
+    case "wall": case "line": case "window": case "dim":
+      s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy; break;
+    case "room": s.x += dx; s.y += dy; break;
+    case "column": s.cx += dx; s.cy += dy; break;
+    case "door": case "text": s.x += dx; s.y += dy; break;
+  }
+}
+
+/* ---- 保存 / 読み込み -------------------------------------------- */
+function serializeProject(model){
+  return JSON.stringify({
+    app: "bada-illustrator", version: 1,
+    unit: "mm", shapes: model.shapes, layerVis: model.layerVis || null
+  }, null, 1);
+}
+
+function deserializeProject(json){
+  var o = JSON.parse(json);
+  if (!o || o.app !== "bada-illustrator" || !Array.isArray(o.shapes))
+    throw new Error("Bada Illustrator の図面ファイルではありません");
+  var ok = { wall:1, line:1, room:1, column:1, door:1, window:1, dim:1, text:1 };
+  var shapes = [];
+  for (var i = 0; i < o.shapes.length; i++){
+    var s = o.shapes[i];
+    if (s && ok[s.type]) shapes.push(s);
+  }
+  return { shapes: shapes, layerVis: o.layerVis || null };
+}
+
+/* ---- SVG 出力 (白図面・建築図らしい黒壁) ------------------------- */
+function svgEsc(s){
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function shapesToSVG(shapes){
+  var b = [Infinity, Infinity, -Infinity, -Infinity];
+  for (var i = 0; i < shapes.length; i++){
+    var sb = shapeBounds(shapes[i]);
+    b[0] = Math.min(b[0], sb[0]); b[1] = Math.min(b[1], sb[1]);
+    b[2] = Math.max(b[2], sb[2]); b[3] = Math.max(b[3], sb[3]);
+  }
+  if (!isFinite(b[0])){ b = [0, 0, 10000, 8000]; }
+  var M = 800;
+  var vb = [b[0] - M, b[1] - M, (b[2] - b[0]) + 2 * M, (b[3] - b[1]) + 2 * M];
+  var out = [];
+  out.push('<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + vb.join(" ") +
+           '" font-family="sans-serif">');
+  out.push('<rect x="' + vb[0] + '" y="' + vb[1] + '" width="' + vb[2] + '" height="' + vb[3] + '" fill="#ffffff"/>');
+  for (var k = 0; k < shapes.length; k++){
+    var s = shapes[k];
+    if (s.type === "room"){
+      out.push('<rect x="' + Math.min(s.x, s.x + s.w) + '" y="' + Math.min(s.y, s.y + s.h) +
+        '" width="' + Math.abs(s.w) + '" height="' + Math.abs(s.h) +
+        '" fill="' + (s.color || "#dce8f8") + '" fill-opacity="0.45" stroke="#5580c0" stroke-width="20"/>');
+      var nm = (s.name ? s.name + "  " : "") + (Math.abs(s.w * s.h) / 1e6).toFixed(2) + " m²";
+      out.push('<text x="' + (s.x + s.w / 2) + '" y="' + (s.y + s.h / 2) +
+        '" font-size="320" fill="#446" text-anchor="middle">' + svgEsc(nm) + '</text>');
+    } else if (s.type === "wall"){
+      var p = wallPolygon(s);
+      out.push('<polygon points="' + p.map(function(q){ return q[0] + "," + q[1]; }).join(" ") +
+        '" fill="#222" stroke="none"/>');
+    } else if (s.type === "line"){
+      out.push('<line x1="' + s.x1 + '" y1="' + s.y1 + '" x2="' + s.x2 + '" y2="' + s.y2 +
+        '" stroke="' + (s.color || "#666") + '" stroke-width="25"/>');
+    } else if (s.type === "column"){
+      out.push('<circle cx="' + s.cx + '" cy="' + s.cy + '" r="' + s.r +
+        '" fill="#333" stroke="none"/>');
+    } else if (s.type === "window"){
+      out.push('<line x1="' + s.x1 + '" y1="' + s.y1 + '" x2="' + s.x2 + '" y2="' + s.y2 +
+        '" stroke="#ffffff" stroke-width="160"/>');
+      out.push('<line x1="' + s.x1 + '" y1="' + s.y1 + '" x2="' + s.x2 + '" y2="' + s.y2 +
+        '" stroke="#2090b0" stroke-width="40"/>');
+    } else if (s.type === "door"){
+      var a0 = (s.dir || 0) * Math.PI / 180, w2 = s.w || 800;
+      var ex = s.x + w2 * Math.cos(a0), ey = s.y + w2 * Math.sin(a0);
+      var ax = s.x + w2 * Math.cos(a0 + Math.PI / 2), ay = s.y + w2 * Math.sin(a0 + Math.PI / 2);
+      out.push('<line x1="' + s.x + '" y1="' + s.y + '" x2="' + ex + '" y2="' + ey +
+        '" stroke="#a07820" stroke-width="60"/>');
+      out.push('<path d="M ' + ex + ' ' + ey + ' A ' + w2 + ' ' + w2 + ' 0 0 1 ' + ax + ' ' + ay +
+        '" fill="none" stroke="#a07820" stroke-width="18" stroke-dasharray="60,60"/>');
+    } else if (s.type === "dim"){
+      var len = Math.round(distMM(s.x1, s.y1, s.x2, s.y2));
+      out.push('<line x1="' + s.x1 + '" y1="' + s.y1 + '" x2="' + s.x2 + '" y2="' + s.y2 +
+        '" stroke="#555" stroke-width="15"/>');
+      out.push('<text x="' + ((s.x1 + s.x2) / 2) + '" y="' + ((s.y1 + s.y2) / 2 - 80) +
+        '" font-size="260" fill="#555" text-anchor="middle">' + len + '</text>');
+    } else if (s.type === "text"){
+      out.push('<text x="' + s.x + '" y="' + s.y + '" font-size="' + (s.size || 300) +
+        '" fill="' + (s.color || "#333") + '">' + svgEsc(s.s) + '</text>');
+    }
+  }
+  out.push('</svg>');
+  return out.join("\n");
+}
+
+/* ================= 2. 情報エンジン (softmax / entropy) =========== */
+
+function softmax(z){
+  var m = -Infinity, i;
+  for (i = 0; i < z.length; i++) if (z[i] > m) m = z[i];
+  var s = 0, e = [];
+  for (i = 0; i < z.length; i++){ e[i] = Math.exp(z[i] - m); s += e[i]; }
+  for (i = 0; i < z.length; i++) e[i] /= s;
+  return e;
+}
+
+/* シャノンエントロピー (bit) */
+function entropyBits(p){
+  var h = 0;
+  for (var i = 0; i < p.length; i++)
+    if (p[i] > 0) h -= p[i] * Math.log(p[i]) / Math.LN2;
+  return h;
+}
+
+/* Jaynes 最大エントロピー事前分布 */
+function unknownPrior(n){
+  var p = [];
+  for (var i = 0; i < n; i++) p[i] = 1 / n;
+  return p;
+}
+
+/* 証拠 e による事後化 (ゼロ保存: d_i = 0 は 0 のまま) */
+function updateDist(d, e, rate){
+  if (rate === undefined) rate = 1;
+  var q = [], s = 0, i;
+  for (i = 0; i < d.length; i++){
+    var w = Math.pow(Math.max(e[i] || 0, 0), rate);
+    q[i] = d[i] * w; s += q[i];
+  }
+  if (s <= 0) return d.slice();
+  for (i = 0; i < q.length; i++) q[i] /= s;
+  return q;
+}
+
+function zerosOf(p){
+  var z = [];
+  for (var i = 0; i < p.length; i++) if (p[i] === 0) z.push(i);
+  return z;
+}
+
+/* ================= 3. 量子コア (状態ベクトル) ==================== */
+
+function cAdd(a, b){ return { re: a.re + b.re, im: a.im + b.im }; }
+function cMul(a, b){ return { re: a.re * b.re - a.im * b.im, im: a.re * b.im + a.im * b.re }; }
+function C(re, im){ return { re: re, im: im || 0 }; }
+
+function qubitState(n){
+  if (n < 1 || n > 12) throw new Error("qubit(n): 1 ≤ n ≤ 12");
+  var N = 1 << n, amps = new Array(N);
+  for (var i = 0; i < N; i++) amps[i] = C(0);
+  amps[0] = C(1);
+  return { __qreg: true, n: n, amps: amps };
+}
+
+function gateH(){ var h = Math.SQRT1_2; return [[C(h), C(h)], [C(h), C(-h)]]; }
+function gateX(){ return [[C(0), C(1)], [C(1), C(0)]]; }
+function gateZ(){ return [[C(1), C(0)], [C(0), C(-1)]]; }
+function gateRY(theta){
+  var c = Math.cos(theta / 2), s = Math.sin(theta / 2);
+  return [[C(c), C(-s)], [C(s), C(c)]];
+}
+
+/* 1量子ビットゲート適用 (qubit 0 = 最上位ビット) — 新しい状態を返す */
+function applyGate1(state, target, m){
+  var n = state.n, N = 1 << n;
+  if (target < 0 || target >= n) throw new Error("ゲート対象 qubit が範囲外: " + target);
+  var mask = 1 << (n - 1 - target);
+  var out = new Array(N);
+  for (var i = 0; i < N; i++) out[i] = C(0);
+  for (var k = 0; k < N; k++){
+    if ((k & mask) === 0){
+      var j = k | mask;
+      var a = state.amps[k], b = state.amps[j];
+      out[k] = cAdd(cMul(m[0][0], a), cMul(m[0][1], b));
+      out[j] = cAdd(cMul(m[1][0], a), cMul(m[1][1], b));
+    }
+  }
+  return { __qreg: true, n: n, amps: out };
+}
+
+function applyCNOT(state, ctrl, targ){
+  var n = state.n, N = 1 << n;
+  if (ctrl === targ) throw new Error("CNOT: control と target が同一です");
+  var cm = 1 << (n - 1 - ctrl), tm = 1 << (n - 1 - targ);
+  var out = state.amps.slice();
+  for (var i = 0; i < N; i++){
+    if ((i & cm) !== 0 && (i & tm) === 0){
+      var j = i | tm;
+      var tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+    }
+  }
+  return { __qreg: true, n: n, amps: out };
+}
+
+/* Born 則: 各基底状態の確率 |ψ|² */
+function measureProbs(state){
+  var p = [];
+  for (var i = 0; i < state.amps.length; i++){
+    var a = state.amps[i];
+    var v = a.re * a.re + a.im * a.im;
+    p[i] = Math.round(v * 1e12) / 1e12;
+  }
+  return p;
+}
+
+/* 累積分布からのサンプル (rnd ∈ [0,1) を注入可能 = テスト決定論) */
+function sampleState(state, rnd){
+  var p = measureProbs(state);
+  var r = (rnd === undefined ? Math.random() : rnd), c = 0;
+  for (var i = 0; i < p.length; i++){
+    c += p[i];
+    if (r < c) return i;
+  }
+  return p.length - 1;
+}
+
+/* ================= 4. Bada 言語インタプリタ ====================== */
+/*  文法 (bada_gui_ide/examples と同系):
+ *    x := expr           代入          # コメント
+ *    print(a, b)         出力
+ *    if cond { } else { }   while cond { }   for x in list { }
+ *    fun name |a, b| { ... return v }
+ *    expr >> tuplespace  追記専用台帳へコミット
+ *    @reviser : extension bada { fun name |p| """本体""" }
+ *    @reviser : grammar { ... }   (規則を台帳へ記録)
+ */
+
+var BADA_KEYWORDS = { "if":1, "else":1, "while":1, "for":1, "in":1, "fun":1,
+                      "return":1, "true":1, "false":1, "null":1,
+                      "and":1, "or":1, "not":1 };
+
+function badaTokenize(src){
+  var toks = [], i = 0, line = 1, depth = 0;
+  var n = src.length;
+  function push(t, v){ toks.push({ t: t, v: v, line: line }); }
+  while (i < n){
+    var ch = src[i];
+    if (ch === "\n"){ line++; i++; if (depth === 0) push("nl"); continue; }
+    if (ch === " " || ch === "\t" || ch === "\r"){ i++; continue; }
+    if (ch === "#"){ while (i < n && src[i] !== "\n") i++; continue; }
+    if (src.startsWith('"""', i)){
+      var e3 = src.indexOf('"""', i + 3);
+      if (e3 < 0) throw new Error("行 " + line + ': """ が閉じていません');
+      var raw = src.slice(i + 3, e3);
+      line += (raw.match(/\n/g) || []).length;
+      push("str", raw); i = e3 + 3; continue;
+    }
+    if (ch === '"'){
+      var j = i + 1, buf = "";
+      while (j < n && src[j] !== '"'){
+        if (src[j] === "\\" && j + 1 < n){
+          var esc = src[j + 1];
+          buf += esc === "n" ? "\n" : esc === "t" ? "\t" : esc;
+          j += 2;
+        } else { buf += src[j]; j++; }
+      }
+      if (j >= n) throw new Error("行 " + line + ': 文字列 " が閉じていません');
+      push("str", buf); i = j + 1; continue;
+    }
+    if (ch >= "0" && ch <= "9"){
+      var m2 = /^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?/.exec(src.slice(i));
+      push("num", parseFloat(m2[0])); i += m2[0].length; continue;
+    }
+    var idm = /^[A-Za-z_À-ʯ぀-ヿ㐀-鿿][A-Za-z0-9_À-ʯ぀-ヿ㐀-鿿]*/.exec(src.slice(i));
+    if (idm){
+      var w = idm[0];
+      push(BADA_KEYWORDS[w] ? "kw" : "id", w);
+      i += w.length; continue;
+    }
+    var three = src.substr(i, 2);
+    if (three === ":=" || three === "==" || three === "!=" || three === "<=" ||
+        three === ">=" || three === ">>"){
+      push("op", three); i += 2; continue;
+    }
+    if ("+-*/%()[]{},:|@<>.".indexOf(ch) >= 0){
+      if (ch === "(" || ch === "[") depth++;
+      if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+      push("op", ch); i++; continue;
+    }
+    if (ch === ";"){ push("nl"); i++; continue; }
+    throw new Error("行 " + line + ": 解釈できない文字 '" + ch + "'");
+  }
+  push("eof");
+  return toks;
+}
+
+function badaParse(toks){
+  var pos = 0;
+  function peek(){ return toks[pos]; }
+  function next(){ return toks[pos++]; }
+  function at(t, v){ var k = toks[pos]; return k.t === t && (v === undefined || k.v === v); }
+  function eat(t, v){
+    if (!at(t, v)){
+      var k = toks[pos];
+      throw new Error("行 " + k.line + ": '" + (v || t) + "' が必要です (実際: '" +
+                      (k.v !== undefined ? k.v : k.t) + "')");
+    }
+    return next();
+  }
+  function skipNl(){ while (at("nl")) next(); }
+
+  function parseBlock(){
+    eat("op", "{");
+    var body = [];
+    skipNl();
+    while (!at("op", "}")){
+      body.push(parseStmt());
+      skipNl();
+    }
+    eat("op", "}");
+    return body;
+  }
+
+  function parseReviser(){
+    var ln = peek().line;
+    eat("op", "@"); eat("id", "reviser"); eat("op", ":");
+    var kind = eat("id").v;
+    if (kind === "extension"){
+      var lang = eat("id").v;
+      eat("op", "{");
+      var funs = [];
+      skipNl();
+      while (!at("op", "}")){
+        if (at("kw", "fun")){
+          next();
+          var name = eat("id").v;
+          eat("op", "|");
+          var params = [];
+          while (!at("op", "|")){
+            params.push(eat("id").v);
+            if (at("op", ",")) next();
+          }
+          eat("op", "|");
+          skipNl();
+          var code = eat("str").v;
+          funs.push({ name: name, params: params, code: code });
+        } else next();
+        skipNl();
+      }
+      eat("op", "}");
+      return { k: "reviser", kind: "extension", lang: lang, funs: funs, line: ln };
+    }
+    /* grammar など: 波括弧をバランスさせて読み飛ばし、規則数を数えて台帳に記録 */
+    eat("op", "{");
+    var depth = 1, rules = 0;
+    while (depth > 0 && !at("eof")){
+      if (at("op", "{")) depth++;
+      else if (at("op", "}")) depth--;
+      else if (at("id", "rule")) rules++;
+      if (depth > 0) next(); else next();
+    }
+    return { k: "reviser", kind: kind, rules: rules, line: ln };
+  }
+
+  function parseStmt(){
+    var k = peek(), ln = k.line;
+    if (at("op", "@")) return parseReviser();
+    if (at("kw", "fun")){
+      next();
+      var name = eat("id").v;
+      eat("op", "|");
+      var params = [];
+      while (!at("op", "|")){
+        params.push(eat("id").v);
+        if (at("op", ",")) next();
+      }
+      eat("op", "|");
+      skipNl();
+      return { k: "fun", name: name, params: params, body: parseBlock(), line: ln };
+    }
+    if (at("kw", "if")) return parseIf();
+    if (at("kw", "while")){
+      next();
+      var c = parseExpr();
+      skipNl();
+      return { k: "while", cond: c, body: parseBlock(), line: ln };
+    }
+    if (at("kw", "for")){
+      next();
+      var vn = eat("id").v;
+      eat("kw", "in");
+      var it = parseExpr();
+      skipNl();
+      return { k: "for", name: vn, iter: it, body: parseBlock(), line: ln };
+    }
+    if (at("kw", "return")){
+      next();
+      var val = (at("nl") || at("op", "}") || at("eof")) ? null : parseExpr();
+      return { k: "return", value: val, line: ln };
+    }
+    var e = parseExpr();
+    if (at("op", ":=")){
+      next();
+      if (e.k !== "var" && e.k !== "index")
+        throw new Error("行 " + ln + ": := の左辺は変数か添字が必要です");
+      return { k: "assign", target: e, value: parseExpr(), line: ln };
+    }
+    if (at("op", ">>")){
+      next();
+      var tgt = eat("id").v;
+      return { k: "ledger", value: e, target: tgt, line: ln };
+    }
+    return { k: "expr", expr: e, line: ln };
+  }
+
+  function parseIf(){
+    var ln = peek().line;
+    eat("kw", "if");
+    var c = parseExpr();
+    skipNl();
+    var th = parseBlock();
+    var el = null;
+    var save = pos;
+    skipNl();
+    if (at("kw", "else")){
+      next();
+      skipNl();
+      el = at("kw", "if") ? [parseIf()] : parseBlock();
+    } else pos = save;
+    return { k: "if", cond: c, then: th, "else": el, line: ln };
+  }
+
+  function parseExpr(){ return parseOr(); }
+  function parseOr(){
+    var a = parseAnd();
+    while (at("kw", "or")){ next(); var b = parseAnd(); a = { k: "or", a: a, b: b }; }
+    return a;
+  }
+  function parseAnd(){
+    var a = parseCmp();
+    while (at("kw", "and")){ next(); var b = parseCmp(); a = { k: "and", a: a, b: b }; }
+    return a;
+  }
+  function parseCmp(){
+    var a = parseAdd();
+    while (at("op", "==") || at("op", "!=") || at("op", "<") ||
+           at("op", "<=") || at("op", ">") || at("op", ">=")){
+      var op = next().v;
+      var b = parseAdd();
+      a = { k: "bin", op: op, a: a, b: b };
+    }
+    return a;
+  }
+  function parseAdd(){
+    var a = parseMul();
+    while (at("op", "+") || at("op", "-")){
+      var op = next().v;
+      a = { k: "bin", op: op, a: a, b: parseMul() };
+    }
+    return a;
+  }
+  function parseMul(){
+    var a = parseUnary();
+    while (at("op", "*") || at("op", "/") || at("op", "%")){
+      var op = next().v;
+      a = { k: "bin", op: op, a: a, b: parseUnary() };
+    }
+    return a;
+  }
+  function parseUnary(){
+    if (at("op", "-")){ next(); return { k: "neg", a: parseUnary() }; }
+    if (at("kw", "not")){ next(); return { k: "not", a: parseUnary() }; }
+    return parsePostfix();
+  }
+  function parsePostfix(){
+    var a = parsePrimary();
+    for (;;){
+      if (at("op", "(")){
+        next();
+        var args = [];
+        skipNl();
+        while (!at("op", ")")){
+          args.push(parseExpr());
+          skipNl();
+          if (at("op", ",")){ next(); skipNl(); }
+        }
+        eat("op", ")");
+        a = { k: "call", fn: a, args: args };
+      } else if (at("op", "[")){
+        next();
+        var idx = parseExpr();
+        eat("op", "]");
+        a = { k: "index", obj: a, idx: idx };
+      } else break;
+    }
+    return a;
+  }
+  function parsePrimary(){
+    var k = peek();
+    if (at("num")) return { k: "num", v: next().v };
+    if (at("str")) return { k: "str", v: next().v };
+    if (at("kw", "true")){ next(); return { k: "bool", v: true }; }
+    if (at("kw", "false")){ next(); return { k: "bool", v: false }; }
+    if (at("kw", "null")){ next(); return { k: "null" }; }
+    if (at("id")) return { k: "var", name: next().v };
+    if (at("op", "(")){
+      next();
+      var e = parseExpr();
+      eat("op", ")");
+      return e;
+    }
+    if (at("op", "[")){
+      next();
+      var items = [];
+      skipNl();
+      while (!at("op", "]")){
+        items.push(parseExpr());
+        skipNl();
+        if (at("op", ",")){ next(); skipNl(); }
+      }
+      eat("op", "]");
+      return { k: "list", items: items };
+    }
+    throw new Error("行 " + k.line + ": 式として解釈できません ('" +
+                    (k.v !== undefined ? k.v : k.t) + "')");
+  }
+
+  var prog = [];
+  skipNl();
+  while (!at("eof")){
+    prog.push(parseStmt());
+    skipNl();
+  }
+  return prog;
+}
+
+/* ---- 値の整形 ---------------------------------------------------- */
+function badaFmt(v){
+  if (v === null || v === undefined) return "null";
+  if (typeof v === "number"){
+    if (!isFinite(v)) return String(v);
+    var r = Math.round(v * 1e10) / 1e10;
+    return String(r);
+  }
+  if (typeof v === "boolean") return v ? "true" : "false";
+  if (typeof v === "string") return v;
+  if (Array.isArray(v)) return "[" + v.map(badaFmt).join(", ") + "]";
+  if (v && v.__qreg) return "<qreg " + v.n + " qubits>";
+  if (v && v.__fun) return "<fun |" + v.params.join(", ") + "|>";
+  if (typeof v === "function") return "<builtin>";
+  return String(v);
+}
+
+function badaTruthy(v){
+  if (v === null || v === undefined || v === false) return false;
+  if (v === 0 || v === "") return false;
+  return true;
+}
+
+function badaEq(a, b){
+  if (Array.isArray(a) && Array.isArray(b)) return JSON.stringify(a) === JSON.stringify(b);
+  return a === b;
+}
+
+/* ---- 実行環境 ---------------------------------------------------- */
+function envLookup(scope, name){
+  for (var s = scope; s; s = s.parent)
+    if (Object.prototype.hasOwnProperty.call(s.vars, name)) return s.vars[name];
+  throw new Error("未定義の変数/関数: " + name);
+}
+function envAssign(scope, name, v){
+  for (var s = scope; s; s = s.parent)
+    if (Object.prototype.hasOwnProperty.call(s.vars, name)){ s.vars[name] = v; return; }
+  scope.vars[name] = v;
+}
+
+function badaStdEnv(api){
+  var out = [];
+  var root = { vars: {}, parent: null, __out: out, __steps: { n: 0 } };
+  var V = root.vars;
+  function reg(name, fn){ V[name] = fn; fn.__name = name; }
+  function num(v, who){
+    if (typeof v !== "number" || !isFinite(v))
+      throw new Error(who + ": 数値が必要です (" + badaFmt(v) + ")");
+    return v;
+  }
+  function qreg(v, who){
+    if (!v || !v.__qreg) throw new Error(who + ": qubit レジスタが必要です");
+    return v;
+  }
+
+  reg("print", function(args){ out.push(args.map(badaFmt).join(" ")); return null; });
+  reg("len", function(a){
+    var v = a[0];
+    if (typeof v === "string" || Array.isArray(v)) return v.length;
+    if (v && v.__qreg) return v.n;
+    throw new Error("len: リストか文字列が必要です");
+  });
+  reg("range", function(a){
+    var lo = 0, hi;
+    if (a.length >= 2){ lo = num(a[0], "range"); hi = num(a[1], "range"); }
+    else hi = num(a[0], "range");
+    var r = [];
+    for (var i = lo; i < hi; i++) r.push(i);
+    return r;
+  });
+  reg("push", function(a){
+    if (!Array.isArray(a[0])) throw new Error("push: リストが必要です");
+    a[0].push(a[1]);
+    return a[0];
+  });
+  reg("str", function(a){ return badaFmt(a[0]); });
+  reg("num", function(a){ var v = parseFloat(a[0]); if (isNaN(v)) throw new Error("num: 変換できません"); return v; });
+  reg("abs", function(a){ return Math.abs(num(a[0], "abs")); });
+  reg("sqrt", function(a){ return Math.sqrt(num(a[0], "sqrt")); });
+  reg("floor", function(a){ return Math.floor(num(a[0], "floor")); });
+  reg("ceil", function(a){ return Math.ceil(num(a[0], "ceil")); });
+  reg("round", function(a){ return Math.round(num(a[0], "round")); });
+  reg("min", function(a){ return Math.min.apply(null, a.map(function(v){ return num(v, "min"); })); });
+  reg("max", function(a){ return Math.max.apply(null, a.map(function(v){ return num(v, "max"); })); });
+  reg("pow", function(a){ return Math.pow(num(a[0], "pow"), num(a[1], "pow")); });
+  reg("exp", function(a){ return Math.exp(num(a[0], "exp")); });
+  reg("log", function(a){ return Math.log(num(a[0], "log")); });
+  reg("log2", function(a){ return Math.log(num(a[0], "log2")) / Math.LN2; });
+  reg("sin", function(a){ return Math.sin(num(a[0], "sin")); });
+  reg("cos", function(a){ return Math.cos(num(a[0], "cos")); });
+  reg("tan", function(a){ return Math.tan(num(a[0], "tan")); });
+  reg("random", function(){ return Math.random(); });
+  reg("f5", function(a){ return num(a[0], "f5").toFixed(5); });
+  V["pi"] = Math.PI;
+  V["tuplespace"] = [];
+
+  /* 情報エンジン */
+  reg("softmax", function(a){ return softmax(a[0]); });
+  reg("entropy", function(a){ return entropyBits(a[0]); });
+  reg("unknown_prior", function(a){ return unknownPrior(num(a[0], "unknown_prior")); });
+  reg("update", function(a){ return updateDist(a[0], a[1], a.length > 2 ? a[2] : 1); });
+  reg("zeros_of", function(a){ return zerosOf(a[0]); });
+
+  /* 量子コア */
+  reg("qubit", function(a){ return qubitState(num(a[0], "qubit")); });
+  function g1(name, mat){
+    reg(name, function(a){
+      var st = qreg(a[0], name);
+      var t = a.length > 1 ? num(a[1], name) : 0;
+      return applyGate1(st, t, mat === "RY" ? gateRY(num(a[2], "RY")) : mat());
+    });
+  }
+  g1("H", gateH); g1("Had", gateH); g1("X", gateX); g1("Z", gateZ);
+  reg("RY", function(a){
+    return applyGate1(qreg(a[0], "RY"), num(a[1], "RY"), gateRY(num(a[2], "RY")));
+  });
+  reg("CNOT", function(a){
+    return applyCNOT(qreg(a[0], "CNOT"), num(a[1], "CNOT"), num(a[2], "CNOT"));
+  });
+  reg("Measure", function(a){
+    var p = measureProbs(qreg(a[0], "Measure"));
+    root.vars.tuplespace.push(["measurement", p]);
+    return p;
+  });
+  reg("Obs", V["Measure"]);
+  reg("Sample", function(a){ return sampleState(qreg(a[0], "Sample")); });
+
+  /* 建築 API (図面モデルが接続されているとき) */
+  if (api){
+    var names = Object.keys(api);
+    for (var i = 0; i < names.length; i++){
+      (function(nm){ reg(nm, function(args){ return api[nm].apply(null, args); }); })(names[i]);
+    }
+  }
+  reg("help", function(){
+    out.push("── Bada 建築 API ────────────────────────");
+    out.push("wall(x1,y1,x2,y2 [,厚])      壁 (mm)");
+    out.push("room(x,y,幅,奥行 [,名前])    部屋 (延床面積に算入)");
+    out.push("line(x1,y1,x2,y2)            下書き線");
+    out.push("column(x,y [,半径])          柱");
+    out.push("door(x,y [,幅,向き°])        ドア (吊元 x,y)");
+    out.push("window(x1,y1,x2,y2)          窓");
+    out.push("dim(x1,y1,x2,y2)             寸法線");
+    out.push("label(x,y,文字 [,サイズ])    文字");
+    out.push("stairs(x,y,幅,長さ [,段数])  階段");
+    out.push("clear() / count() / areas() / total_area() / set_layer(名)");
+    out.push("── 量子コア ─────────────────────────────");
+    out.push("qubit(n)  H(reg,i)  X  Z  RY(reg,i,θ)  CNOT(reg,c,t)");
+    out.push("Measure(reg)→確率  Sample(reg)→基底番号  expr >> tuplespace");
+    out.push("softmax / entropy / unknown_prior / update / zeros_of");
+    return null;
+  });
+
+  return root;
+}
+
+/* ---- 評価器 ------------------------------------------------------ */
+var BADA_STEP_LIMIT = 2000000;
+
+function badaCall(fnv, args, root){
+  if (typeof fnv === "function") return fnv(args);
+  if (fnv && fnv.__fun){
+    var scope = { vars: {}, parent: fnv.env, __out: root.__out, __steps: root.__steps };
+    for (var i = 0; i < fnv.params.length; i++) scope.vars[fnv.params[i]] = args[i];
+    try {
+      badaExecBlock(fnv.body, scope, root);
+    } catch (e){
+      if (e && e.__ret !== undefined) return e.__ret;
+      throw e;
+    }
+    return null;
+  }
+  throw new Error("関数ではない値を呼び出しました: " + badaFmt(fnv));
+}
+
+function badaEvalExpr(node, scope, root){
+  if (++root.__steps.n > BADA_STEP_LIMIT)
+    throw new Error("実行ステップ上限に達しました (無限ループ?)");
+  switch (node.k){
+    case "num": return node.v;
+    case "str": return node.v;
+    case "bool": return node.v;
+    case "null": return null;
+    case "var": return envLookup(scope, node.name);
+    case "list": {
+      var arr = [];
+      for (var i = 0; i < node.items.length; i++)
+        arr.push(badaEvalExpr(node.items[i], scope, root));
+      return arr;
+    }
+    case "neg": return -badaEvalExpr(node.a, scope, root);
+    case "not": return !badaTruthy(badaEvalExpr(node.a, scope, root));
+    case "and": {
+      var av = badaEvalExpr(node.a, scope, root);
+      return badaTruthy(av) ? badaEvalExpr(node.b, scope, root) : av;
+    }
+    case "or": {
+      var ov = badaEvalExpr(node.a, scope, root);
+      return badaTruthy(ov) ? ov : badaEvalExpr(node.b, scope, root);
+    }
+    case "bin": {
+      var a = badaEvalExpr(node.a, scope, root);
+      var b = badaEvalExpr(node.b, scope, root);
+      switch (node.op){
+        case "+":
+          if (typeof a === "string" || typeof b === "string") return badaFmt(a) + badaFmt(b);
+          if (Array.isArray(a) && Array.isArray(b)) return a.concat(b);
+          return a + b;
+        case "-": return a - b;
+        case "*": return a * b;
+        case "/": return a / b;
+        case "%": return a % b;
+        case "==": return badaEq(a, b);
+        case "!=": return !badaEq(a, b);
+        case "<": return a < b;
+        case "<=": return a <= b;
+        case ">": return a > b;
+        case ">=": return a >= b;
+      }
+      throw new Error("未知の演算子: " + node.op);
+    }
+    case "index": {
+      var obj = badaEvalExpr(node.obj, scope, root);
+      var idx = badaEvalExpr(node.idx, scope, root);
+      if (Array.isArray(obj) || typeof obj === "string"){
+        var ii = idx < 0 ? obj.length + idx : idx;
+        return obj[ii];
+      }
+      if (obj && obj.__qreg) return measureProbs(obj)[idx];
+      throw new Error("添字はリスト/文字列/qreg にのみ使えます");
+    }
+    case "call": {
+      var fnv = badaEvalExpr(node.fn, scope, root);
+      var args = [];
+      for (var k = 0; k < node.args.length; k++)
+        args.push(badaEvalExpr(node.args[k], scope, root));
+      return badaCall(fnv, args, root);
+    }
+  }
+  throw new Error("評価できないノード: " + node.k);
+}
+
+function badaExecBlock(stmts, scope, root){
+  for (var i = 0; i < stmts.length; i++) badaExecStmt(stmts[i], scope, root);
+}
+
+function badaExecStmt(st, scope, root){
+  if (++root.__steps.n > BADA_STEP_LIMIT)
+    throw new Error("実行ステップ上限に達しました (無限ループ?)");
+  switch (st.k){
+    case "expr": badaEvalExpr(st.expr, scope, root); return;
+    case "assign": {
+      var v = badaEvalExpr(st.value, scope, root);
+      if (st.target.k === "var") envAssign(scope, st.target.name, v);
+      else {
+        var obj = badaEvalExpr(st.target.obj, scope, root);
+        var idx = badaEvalExpr(st.target.idx, scope, root);
+        if (!Array.isArray(obj)) throw new Error("添字代入はリストにのみ使えます");
+        obj[idx < 0 ? obj.length + idx : idx] = v;
+      }
+      return;
+    }
+    case "ledger": {
+      var lv = badaEvalExpr(st.value, scope, root);
+      var space = envLookup(scope, st.target);
+      if (!Array.isArray(space)) throw new Error(">> の先はリスト台帳が必要です: " + st.target);
+      space.push(lv);
+      return;
+    }
+    case "fun":
+      envAssign(scope, st.name, { __fun: true, params: st.params, body: st.body, env: scope });
+      return;
+    case "if": {
+      if (badaTruthy(badaEvalExpr(st.cond, scope, root))) badaExecBlock(st.then, scope, root);
+      else if (st["else"]) badaExecBlock(st["else"], scope, root);
+      return;
+    }
+    case "while":
+      while (badaTruthy(badaEvalExpr(st.cond, scope, root)))
+        badaExecBlock(st.body, scope, root);
+      return;
+    case "for": {
+      var it = badaEvalExpr(st.iter, scope, root);
+      if (typeof it === "number"){ var r = []; for (var q = 0; q < it; q++) r.push(q); it = r; }
+      if (typeof it === "string") it = it.split("");
+      if (!Array.isArray(it)) throw new Error("for ... in にはリストが必要です");
+      for (var j = 0; j < it.length; j++){
+        envAssign(scope, st.name, it[j]);
+        badaExecBlock(st.body, scope, root);
+      }
+      return;
+    }
+    case "return":
+      throw { __ret: st.value ? badaEvalExpr(st.value, scope, root) : null };
+    case "reviser": {
+      var ts = envLookup(scope, "tuplespace");
+      if (st.kind === "extension"){
+        for (var f = 0; f < st.funs.length; f++){
+          var fd = st.funs[f];
+          if (st.lang === "bada"){
+            var body = badaParse(badaTokenize(fd.code));
+            envAssign(scope, fd.name, { __fun: true, params: fd.params, body: body, env: scope });
+          } else {
+            (function(name, lang){
+              envAssign(scope, name, function(){
+                throw new Error("拡張 '" + name + "' (" + lang +
+                  ") はネイティブ環境 (CLI / デスクトップ IDE の FFI ブリッジ) 専用です。" +
+                  "この環境では @reviser : extension bada を使ってください。");
+              });
+            })(fd.name, st.lang);
+          }
+          ts.push(["extension", st.lang, fd.name]);
+        }
+      } else {
+        for (var g = 0; g < (st.rules || 1); g++) ts.push(["grammar", st.kind]);
+      }
+      return;
+    }
+  }
+  throw new Error("実行できない文: " + st.k);
+}
+
+/* badaRun — ソースを実行し { ok, output, error, env } を返す */
+function badaRun(src, env){
+  var root = env || badaStdEnv(null);
+  root.__steps.n = 0;
+  try {
+    var prog = badaParse(badaTokenize(src));
+    badaExecBlock(prog, root, root);
+    return { ok: true, output: root.__out.slice(), env: root };
+  } catch (e){
+    if (e && e.__ret !== undefined)
+      return { ok: true, output: root.__out.slice(), env: root };
+    return { ok: false, output: root.__out.slice(),
+             error: (e && e.message) ? e.message : String(e), env: root };
+  } finally {
+    root.__out.length = 0;
+  }
+}
+
+/* ================= 5. Bada → 図面 の建築 API ===================== */
+
+function addShape(model, s){
+  s.id = model.nextId = (model.nextId || 0) + 1;
+  if (!s.layer) s.layer = model.layer || LAYERS[0];
+  model.shapes.push(s);
+  if (model.onChange) model.onChange();
+  return s.id;
+}
+
+function makeDrawingAPI(model){
+  function fin(v, d){ var n2 = Number(v); return isFinite(n2) ? n2 : d; }
+  return {
+    wall: function(x1, y1, x2, y2, t){
+      return addShape(model, { type: "wall", layer: "壁・構造",
+        x1: fin(x1, 0), y1: fin(y1, 0), x2: fin(x2, 0), y2: fin(y2, 0), t: fin(t, 200) });
+    },
+    line: function(x1, y1, x2, y2){
+      return addShape(model, { type: "line", layer: "下書き",
+        x1: fin(x1, 0), y1: fin(y1, 0), x2: fin(x2, 0), y2: fin(y2, 0) });
+    },
+    room: function(x, y, w, h, name){
+      return addShape(model, { type: "room", layer: "部屋",
+        x: fin(x, 0), y: fin(y, 0), w: fin(w, 1000), h: fin(h, 1000),
+        name: name === undefined ? "" : String(name) });
+    },
+    column: function(x, y, r){
+      return addShape(model, { type: "column", layer: "壁・構造",
+        cx: fin(x, 0), cy: fin(y, 0), r: fin(r, 150) });
+    },
+    door: function(x, y, w, dir){
+      return addShape(model, { type: "door", layer: "開口部",
+        x: fin(x, 0), y: fin(y, 0), w: fin(w, 800), dir: fin(dir, 0) });
+    },
+    window: function(x1, y1, x2, y2){
+      return addShape(model, { type: "window", layer: "開口部",
+        x1: fin(x1, 0), y1: fin(y1, 0), x2: fin(x2, 0), y2: fin(y2, 0) });
+    },
+    dim: function(x1, y1, x2, y2){
+      return addShape(model, { type: "dim", layer: "寸法・注釈",
+        x1: fin(x1, 0), y1: fin(y1, 0), x2: fin(x2, 0), y2: fin(y2, 0) });
+    },
+    label: function(x, y, s, size){
+      return addShape(model, { type: "text", layer: "寸法・注釈",
+        x: fin(x, 0), y: fin(y, 0), s: String(s), size: fin(size, 300) });
+    },
+    stairs: function(x, y, w, len, steps){
+      x = fin(x, 0); y = fin(y, 0); w = fin(w, 900); len = fin(len, 2700);
+      steps = Math.max(2, Math.round(fin(steps, 12)));
+      var ids = [];
+      ids.push(addShape(model, { type: "line", layer: "壁・構造", x1: x, y1: y, x2: x, y2: y + len }));
+      ids.push(addShape(model, { type: "line", layer: "壁・構造", x1: x + w, y1: y, x2: x + w, y2: y + len }));
+      for (var i = 1; i < steps; i++){
+        var yy = y + len * i / steps;
+        ids.push(addShape(model, { type: "line", layer: "壁・構造", x1: x, y1: yy, x2: x + w, y2: yy }));
+      }
+      ids.push(addShape(model, { type: "line", layer: "下書き",
+        x1: x + w / 2, y1: y, x2: x + w / 2, y2: y + len }));
+      return ids.length;
+    },
+    clear: function(){
+      model.shapes.length = 0;
+      if (model.onChange) model.onChange();
+      return null;
+    },
+    set_layer: function(name){
+      var nm = String(name);
+      if (LAYERS.indexOf(nm) < 0) throw new Error("set_layer: レイヤーは " + LAYERS.join(" / "));
+      model.layer = nm;
+      return null;
+    },
+    count: function(){ return model.shapes.length; },
+    total_area: function(){ return totalFloorArea(model.shapes); },
+    areas: function(){
+      var r = [];
+      for (var i = 0; i < model.shapes.length; i++){
+        var s = model.shapes[i];
+        if (s.type === "room")
+          r.push([s.name || ("部屋" + s.id), Math.round(Math.abs(s.w * s.h)) / 1e6]);
+      }
+      return r;
+    }
+  };
+}
+
+/* ================= 6. 組み込み拡張機能 =========================== */
+
+var BUILTIN_EXTENSIONS = [
+  {
+    name: "量子間取りジェネレータ",
+    desc: "3量子ビットの重ね合わせ + CNOT の測定で間取りを決定します",
+    src: [
+      '# 量子間取りジェネレータ — 測定結果が間取りを決めます',
+      'clear()',
+      'reg := qubit(3)',
+      'reg := H(reg, 0)',
+      'reg := H(reg, 1)',
+      'reg := CNOT(reg, 1, 2)',
+      'print("状態確率:", Measure(reg))',
+      'k := Sample(reg)',
+      'print("測定 → |", k, "> に収束")',
+      'b0 := k % 2',
+      'b1 := floor(k / 2) % 2',
+      'b2 := floor(k / 4) % 2',
+      '',
+      'W := 9100 + 910 * b0',
+      'D := 7280 + 910 * b1',
+      '',
+      '# 外周壁',
+      'wall(0, 0, W, 0, 200)',
+      'wall(W, 0, W, D, 200)',
+      'wall(W, D, 0, D, 200)',
+      'wall(0, D, 0, 0, 200)',
+      '',
+      'if b2 == 1 {',
+      '    x := round(W * 0.45 / 100) * 100',
+      '    wall(x, 0, x, D, 120)',
+      '    room(0, 0, x, D, "LDK")',
+      '    room(x, 0, W - x, D, "洋室")',
+      '    door(x, round(D * 0.5), 800, 90)',
+      '    window(round(W*0.15), 0, round(W*0.35), 0)',
+      '} else {',
+      '    y := round(D * 0.5 / 100) * 100',
+      '    wall(0, y, W, y, 120)',
+      '    room(0, 0, W, y, "LDK")',
+      '    room(0, y, W, D - y, "寝室")',
+      '    door(round(W * 0.5), y, 800, 0)',
+      '    window(0, round(D*0.15), 0, round(D*0.35))',
+      '}',
+      'dim(0, -600, W, -600)',
+      'dim(-600, 0, -600, D)',
+      'print("延床面積:", total_area(), "m2")'
+    ].join("\n")
+  },
+  {
+    name: "外周壁ウィザード",
+    desc: "幅・奥行を指定して外周壁 + 寸法 + LDK を一括生成",
+    src: [
+      '# 外周壁ウィザード — W, D を書き換えて実行',
+      'W := 10920   # 幅 (mm)',
+      'D := 8190    # 奥行 (mm)',
+      'T := 200     # 壁厚',
+      'wall(0, 0, W, 0, T)',
+      'wall(W, 0, W, D, T)',
+      'wall(W, D, 0, D, T)',
+      'wall(0, D, 0, 0, T)',
+      'room(0, 0, W, D, "プラン")',
+      'dim(0, -700, W, -700)',
+      'dim(-700, 0, -700, D)',
+      'column(0, 0, 150)',
+      'column(W, 0, 150)',
+      'column(0, D, 150)',
+      'column(W, D, 150)',
+      'print("外周", W, "x", D, "mm / 延床", total_area(), "m2")'
+    ].join("\n")
+  },
+  {
+    name: "通り芯グリッド",
+    desc: "910mm 尺モジュールの通り芯 (下書き線) と符号を描きます",
+    src: [
+      '# 通り芯グリッド (910mm モジュール)',
+      'set_layer("下書き")',
+      'nx := 12',
+      'ny := 9',
+      'g := 910',
+      'for i in range(nx + 1) {',
+      '    x := i * g',
+      '    line(x, -500, x, ny * g + 500)',
+      '    label(x - 120, -800, "X" + str(i), 260)',
+      '}',
+      'for j in range(ny + 1) {',
+      '    y := j * g',
+      '    line(-500, y, nx * g + 500, y)',
+      '    label(-1300, y + 90, "Y" + str(j), 260)',
+      '}',
+      'dim(0, ny * g + 900, nx * g, ny * g + 900)',
+      'print("通り芯", nx + 1, "x", ny + 1, "本を生成")'
+    ].join("\n")
+  },
+  {
+    name: "面積表",
+    desc: "図面上の部屋を集計し、面積表を図面右側に書き込みます",
+    src: [
+      '# 面積表 — room() で描いた部屋を集計します',
+      'lst := areas()',
+      'if len(lst) == 0 {',
+      '    print("部屋がありません。room(x,y,w,h,名前) で部屋を描いてください。")',
+      '} else {',
+      '    x := 14000',
+      '    y := 500',
+      '    label(x, y, "【面積表】", 360)',
+      '    total := 0',
+      '    for r in lst {',
+      '        y := y + 600',
+      '        label(x, y, r[0] + " : " + str(r[1]) + " m2", 300)',
+      '        total := total + r[1]',
+      '        print(r[0], ":", r[1], "m2")',
+      '    }',
+      '    y := y + 700',
+      '    label(x, y, "延床 " + str(total_area()) + " m2", 330)',
+      '    print("延床面積:", total_area(), "m2")',
+      '}'
+    ].join("\n")
+  },
+  {
+    name: "階段ジェネレータ",
+    desc: "幅・長さ・段数から階段を生成します",
+    src: [
+      '# 階段ジェネレータ',
+      'x := 2000',
+      'y := 2000',
+      'w := 910      # 階段幅',
+      'l := 2730     # 水平長さ',
+      'n := 13       # 段数',
+      'stairs(x, y, w, l, n)',
+      'dim(x - 500, y, x - 500, y + l)',
+      'label(x, y - 300, "階段 " + str(n) + "段", 280)',
+      'print("蹴上げ相当:", round(2800 / n), "mm (階高2800想定)")'
+    ].join("\n")
+  },
+  {
+    name: "ベル状態デモ (量子コア)",
+    desc: "H + CNOT でベル状態を作り、台帳へ測定コミットします",
+    src: [
+      '# ベル状態 — 図面には描かず量子コアだけを使うデモ',
+      'bell := qubit(2)',
+      'bell := H(bell, 0)',
+      'bell := CNOT(bell, 0, 1)',
+      'p := Measure(bell)',
+      'print("Bell |psi|^2 :", p)',
+      'print("entropy      :", f5(entropy(p)), "bit")',
+      'p >> tuplespace',
+      'print("台帳ファクト :", len(tuplespace))',
+      '',
+      '# 未知状態の追記専用推論 (Jaynes 最大エントロピー開始)',
+      'est := unknown_prior(4)',
+      'print("prior  :", est, " H =", f5(entropy(est)))',
+      'est := update(est, [0.7, 0.2, 0.1, 0.0])',
+      'print("post   :", est, " H =", f5(entropy(est)))',
+      'print("ゼロ保存 (禁止状態):", zeros_of(est))'
+    ].join("\n")
+  }
+];
+
+var CONSOLE_SAMPLES = [
+  { name: "API 一覧 (help)", src: "help()" },
+  { name: "ベル状態", src: 'reg := qubit(2)\nreg := H(reg, 0)\nreg := CNOT(reg, 0, 1)\nprint("ベル状態:", Measure(reg))' },
+  { name: "量子乱数 (4bit)", src: 'r := qubit(4)\nfor i in range(4) { r := H(r, i) }\nprint("量子乱数:", Sample(r))' },
+  { name: "壁と部屋を描く", src: 'wall(0, 0, 6000, 0, 200)\nwall(6000, 0, 6000, 4500, 200)\nroom(0, 0, 6000, 4500, "アトリエ")\nprint("延床:", total_area(), "m2")' },
+  { name: "reviser 拡張", src: '@reviser : extension bada {\n    fun sharpen |d, e| """\n        return update(d, e, 0.7)\n    """\n}\nprint(sharpen(unknown_prior(4), [0.7, 0.2, 0.1, 0.0]))' }
+];
+
+/* ================= 7. アプリ UI (ブラウザのみ) =================== */
+
+var TOOLS = [
+  { id: "select", icon: "⬚", label: "選択", key: "v" },
+  { id: "pan",    icon: "✋", label: "パン", key: "h" },
+  { id: "wall",   icon: "▬", label: "壁",   key: "w" },
+  { id: "line",   icon: "╱", label: "線",   key: "l" },
+  { id: "room",   icon: "▭", label: "部屋", key: "r" },
+  { id: "column", icon: "◯", label: "柱",   key: "c" },
+  { id: "door",   icon: "🚪", label: "ドア", key: "d" },
+  { id: "window", icon: "▤", label: "窓",   key: "n" },
+  { id: "dim",    icon: "↔", label: "寸法", key: "m" },
+  { id: "text",   icon: "A", label: "文字", key: "t" },
+  { id: "erase",  icon: "⌫", label: "消去", key: "x" }
+];
+
+var appModel = { shapes: [], layer: LAYERS[0], nextId: 0, layerVis: null, onChange: null };
+var view = { x: -1500, y: -1500, scale: 0.07 };  /* world mm → screen px */
+var ui = {
+  tool: "wall", selId: null, drag: null, ctx: null, cv: null,
+  undo: [], redo: [], badaEnv: null, exts: [], editIdx: -1,
+  layerVis: {}, spaceDown: false
+};
+for (var li = 0; li < LAYERS.length; li++) ui.layerVis[LAYERS[li]] = true;
+
+function W2SX(x){ return (x - view.x) * view.scale; }
+function W2SY(y){ return (y - view.y) * view.scale; }
+function S2WX(x){ return x / view.scale + view.x; }
+function S2WY(y){ return y / view.scale + view.y; }
+
+function el(id){ return document.getElementById(id); }
+
+function pushUndo(){
+  ui.undo.push(JSON.stringify(appModel.shapes));
+  if (ui.undo.length > 80) ui.undo.shift();
+  ui.redo.length = 0;
+}
+function doUndo(){
+  if (!ui.undo.length) return;
+  ui.redo.push(JSON.stringify(appModel.shapes));
+  appModel.shapes = JSON.parse(ui.undo.pop());
+  ui.selId = null;
+  modelChanged();
+}
+function doRedo(){
+  if (!ui.redo.length) return;
+  ui.undo.push(JSON.stringify(appModel.shapes));
+  appModel.shapes = JSON.parse(ui.redo.pop());
+  ui.selId = null;
+  modelChanged();
+}
+
+var renderQueued = false;
+function scheduleRender(){
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(function(){ renderQueued = false; render(); });
+}
+
+function modelChanged(){
+  scheduleRender();
+  refreshStatus();
+  renderProps();
+  try {
+    localStorage.setItem("badaIllu.project", serializeProject(appModel));
+  } catch (e){ /* private mode 等 */ }
+}
+
+function refreshStatus(){
+  el("stN").textContent = appModel.shapes.length;
+  el("stA").textContent = totalFloorArea(appModel.shapes).toFixed(2);
+  el("stZ").textContent = Math.round(view.scale / 0.07 * 100) + "%";
+}
+
+function gridStep(){ return parseFloat(el("gridSel").value) || 250; }
+function maybeSnap(v){ return el("snapChk").checked ? snapTo(v, gridStep()) : v; }
+
+function findShape(id){
+  for (var i = 0; i < appModel.shapes.length; i++)
+    if (appModel.shapes[i].id === id) return appModel.shapes[i];
+  return null;
+}
+
+function topHit(x, y){
+  var tol = 8 / view.scale;
+  for (var i = appModel.shapes.length - 1; i >= 0; i--){
+    var s = appModel.shapes[i];
+    if (ui.layerVis[s.layer] === false) continue;
+    if (hitTest(s, x, y, tol)) return s;
+  }
+  return null;
+}
+
+/* ---- 描画 -------------------------------------------------------- */
+function render(){
+  var ctx = ui.ctx, cv = ui.cv;
+  if (!ctx || !cv) return;
+  var w = cv.width, h = cv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = "#0a0d14";
+  ctx.fillRect(0, 0, w, h);
+
+  /* グリッド */
+  var g = gridStep();
+  var pxg = g * view.scale;
+  while (pxg < 9){ g *= 4; pxg = g * view.scale; }
+  var x0 = Math.floor(S2WX(0) / g) * g, y0 = Math.floor(S2WY(0) / g) * g;
+  ctx.lineWidth = 1;
+  for (var gx = x0; W2SX(gx) < w; gx += g){
+    var maj = Math.round(gx / g) % 4 === 0;
+    ctx.strokeStyle = maj ? "#1d2636" : "#141a26";
+    ctx.beginPath(); ctx.moveTo(W2SX(gx) + 0.5, 0); ctx.lineTo(W2SX(gx) + 0.5, h); ctx.stroke();
+  }
+  for (var gy = y0; W2SY(gy) < h; gy += g){
+    var majY = Math.round(gy / g) % 4 === 0;
+    ctx.strokeStyle = majY ? "#1d2636" : "#141a26";
+    ctx.beginPath(); ctx.moveTo(0, W2SY(gy) + 0.5); ctx.lineTo(w, W2SY(gy) + 0.5); ctx.stroke();
+  }
+  /* 原点 */
+  ctx.strokeStyle = "#2a3a5a";
+  ctx.beginPath(); ctx.moveTo(W2SX(0), W2SY(-400)); ctx.lineTo(W2SX(0), W2SY(400)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W2SX(-400), W2SY(0)); ctx.lineTo(W2SX(400), W2SY(0)); ctx.stroke();
+
+  /* 図形 — レイヤー順: 部屋 → 下書き → 壁・構造 → 開口部 → 寸法・注釈 */
+  var order = ["部屋", "下書き", "壁・構造", "開口部", "寸法・注釈"];
+  for (var oi = 0; oi < order.length; oi++){
+    var ln = order[oi];
+    if (ui.layerVis[ln] === false) continue;
+    for (var si = 0; si < appModel.shapes.length; si++){
+      var s = appModel.shapes[si];
+      if (s.layer === ln) drawShape(ctx, s, s.id === ui.selId);
+    }
+  }
+  /* レイヤー未分類の保険 */
+  for (var sj = 0; sj < appModel.shapes.length; sj++){
+    var s2 = appModel.shapes[sj];
+    if (order.indexOf(s2.layer) < 0) drawShape(ctx, s2, s2.id === ui.selId);
+  }
+
+  /* 作図プレビュー */
+  if (ui.drag && ui.drag.preview) drawShape(ctx, ui.drag.preview, false, true);
+}
+
+function drawShape(ctx, s, sel, preview){
+  ctx.save();
+  if (preview) ctx.globalAlpha = 0.65;
+  switch (s.type){
+    case "room": {
+      var x = W2SX(Math.min(s.x, s.x + s.w)), y = W2SY(Math.min(s.y, s.y + s.h));
+      var w = Math.abs(s.w) * view.scale, h = Math.abs(s.h) * view.scale;
+      ctx.fillStyle = s.color ? hexA(s.color, 0.16) : "rgba(74,128,208,0.13)";
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = sel ? "#ffcc55" : "#4a80d0";
+      ctx.lineWidth = sel ? 2 : 1.2;
+      ctx.strokeRect(x, y, w, h);
+      var fs = Math.max(10, Math.min(22, 330 * view.scale));
+      ctx.fillStyle = "#9fb8e0";
+      ctx.font = fs + "px system-ui";
+      ctx.textAlign = "center";
+      var nm = (s.name ? s.name + "  " : "") + (Math.abs(s.w * s.h) / 1e6).toFixed(2) + "m²";
+      ctx.fillText(nm, x + w / 2, y + h / 2 + fs * 0.35);
+      break;
+    }
+    case "wall": {
+      var p = wallPolygon(s);
+      ctx.beginPath();
+      ctx.moveTo(W2SX(p[0][0]), W2SY(p[0][1]));
+      for (var i = 1; i < 4; i++) ctx.lineTo(W2SX(p[i][0]), W2SY(p[i][1]));
+      ctx.closePath();
+      ctx.fillStyle = sel ? "#fff0c0" : "#dfe6f2";
+      ctx.fill();
+      if (sel){ ctx.strokeStyle = "#ffcc55"; ctx.lineWidth = 1.5; ctx.stroke(); }
+      break;
+    }
+    case "line":
+      ctx.strokeStyle = sel ? "#ffcc55" : (s.color || "#55607a");
+      ctx.lineWidth = sel ? 2 : 1;
+      ctx.beginPath(); ctx.moveTo(W2SX(s.x1), W2SY(s.y1)); ctx.lineTo(W2SX(s.x2), W2SY(s.y2)); ctx.stroke();
+      break;
+    case "column": {
+      ctx.beginPath();
+      ctx.arc(W2SX(s.cx), W2SY(s.cy), Math.max(1.5, s.r * view.scale), 0, Math.PI * 2);
+      ctx.fillStyle = sel ? "#fff0c0" : "#c3ccdd";
+      ctx.fill();
+      break;
+    }
+    case "door": {
+      var a0 = (s.dir || 0) * Math.PI / 180, wd = s.w || 800;
+      var hx = W2SX(s.x), hy = W2SY(s.y);
+      var exd = W2SX(s.x + wd * Math.cos(a0)), eyd = W2SY(s.y + wd * Math.sin(a0));
+      ctx.strokeStyle = sel ? "#ffcc55" : "#c8a44a";
+      ctx.lineWidth = sel ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(exd, eyd); ctx.stroke();
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(hx, hy, wd * view.scale, a0, a0 + Math.PI / 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      break;
+    }
+    case "window": {
+      ctx.strokeStyle = "#0a0d14";
+      ctx.lineWidth = Math.max(4, 170 * view.scale);
+      ctx.beginPath(); ctx.moveTo(W2SX(s.x1), W2SY(s.y1)); ctx.lineTo(W2SX(s.x2), W2SY(s.y2)); ctx.stroke();
+      ctx.strokeStyle = sel ? "#ffcc55" : "#40b8c0";
+      ctx.lineWidth = sel ? 3 : 2;
+      ctx.beginPath(); ctx.moveTo(W2SX(s.x1), W2SY(s.y1)); ctx.lineTo(W2SX(s.x2), W2SY(s.y2)); ctx.stroke();
+      break;
+    }
+    case "dim": {
+      var lx1 = W2SX(s.x1), ly1 = W2SY(s.y1), lx2 = W2SX(s.x2), ly2 = W2SY(s.y2);
+      ctx.strokeStyle = sel ? "#ffcc55" : "#8a93a8";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(lx1, ly1); ctx.lineTo(lx2, ly2); ctx.stroke();
+      var ang = Math.atan2(ly2 - ly1, lx2 - lx1);
+      [[lx1, ly1], [lx2, ly2]].forEach(function(pt){
+        ctx.beginPath();
+        ctx.moveTo(pt[0] - 5 * Math.cos(ang + Math.PI / 4), pt[1] - 5 * Math.sin(ang + Math.PI / 4));
+        ctx.lineTo(pt[0] + 5 * Math.cos(ang + Math.PI / 4), pt[1] + 5 * Math.sin(ang + Math.PI / 4));
+        ctx.stroke();
+      });
+      var mm = Math.round(distMM(s.x1, s.y1, s.x2, s.y2));
+      ctx.fillStyle = sel ? "#ffcc55" : "#8a93a8";
+      ctx.font = "11px system-ui";
+      ctx.textAlign = "center";
+      ctx.save();
+      ctx.translate((lx1 + lx2) / 2, (ly1 + ly2) / 2);
+      var ra = ang;
+      if (ra > Math.PI / 2 || ra < -Math.PI / 2) ra += Math.PI;
+      ctx.rotate(ra);
+      ctx.fillText(String(mm), 0, -4);
+      ctx.restore();
+      break;
+    }
+    case "text": {
+      var fs2 = Math.max(9, (s.size || 300) * view.scale);
+      ctx.fillStyle = sel ? "#ffcc55" : (s.color || "#e8ecf5");
+      ctx.font = fs2 + "px system-ui";
+      ctx.textAlign = "left";
+      ctx.fillText(s.s, W2SX(s.x), W2SY(s.y));
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+function hexA(hex, a){
+  var m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return "rgba(74,128,208," + a + ")";
+  var v = parseInt(m[1], 16);
+  return "rgba(" + (v >> 16) + "," + ((v >> 8) & 255) + "," + (v & 255) + "," + a + ")";
+}
+
+/* ---- プロパティパネル ------------------------------------------- */
+function renderProps(){
+  var host = el("props");
+  var s = findShape(ui.selId);
+  if (!s){
+    host.innerHTML = '<span style="color:var(--dim);font-size:12px">図形を選択してください</span>';
+    return;
+  }
+  var jp = { wall: "壁", line: "線", room: "部屋", column: "柱", door: "ドア",
+             window: "窓", dim: "寸法", text: "文字" };
+  var rows = ['<div class="row"><label>種類</label><b>' + (jp[s.type] || s.type) + ' #' + s.id + '</b></div>'];
+  function numRow(label, key){
+    rows.push('<div class="row"><label>' + label + '</label><input type="number" step="10" data-k="' +
+      key + '" value="' + Math.round(s[key]) + '"></div>');
+  }
+  if (s.type === "room"){
+    rows.push('<div class="row"><label>名前</label><input type="text" data-k="name" value="' +
+      String(s.name || "").replace(/"/g, "&quot;") + '"></div>');
+    numRow("X", "x"); numRow("Y", "y"); numRow("幅", "w"); numRow("奥行", "h");
+  } else if (s.type === "wall"){
+    numRow("X1", "x1"); numRow("Y1", "y1"); numRow("X2", "x2"); numRow("Y2", "y2"); numRow("厚", "t");
+  } else if (s.type === "line" || s.type === "window" || s.type === "dim"){
+    numRow("X1", "x1"); numRow("Y1", "y1"); numRow("X2", "x2"); numRow("Y2", "y2");
+  } else if (s.type === "column"){
+    numRow("X", "cx"); numRow("Y", "cy"); numRow("半径", "r");
+  } else if (s.type === "door"){
+    numRow("X", "x"); numRow("Y", "y"); numRow("幅", "w"); numRow("向き°", "dir");
+  } else if (s.type === "text"){
+    rows.push('<div class="row"><label>内容</label><input type="text" data-k="s" value="' +
+      String(s.s || "").replace(/"/g, "&quot;") + '"></div>');
+    numRow("X", "x"); numRow("Y", "y"); numRow("サイズ", "size");
+  }
+  if (s.type === "room" || s.type === "line" || s.type === "text"){
+    rows.push('<div class="row"><label>色</label><input type="color" data-k="color" value="' +
+      (s.color || (s.type === "room" ? "#4a80d0" : "#8a93a8")) + '"></div>');
+  }
+  rows.push('<div class="row"><button class="warn" id="pDel">🗑 削除</button></div>');
+  host.innerHTML = rows.join("");
+  var inputs = host.querySelectorAll("input");
+  for (var i = 0; i < inputs.length; i++){
+    inputs[i].addEventListener("change", function(){
+      var k = this.getAttribute("data-k");
+      pushUndo();
+      if (k === "name" || k === "s" || k === "color") s[k] = this.value;
+      else s[k] = parseFloat(this.value) || 0;
+      modelChanged();
+    });
+  }
+  var dl = host.querySelector("#pDel");
+  if (dl) dl.addEventListener("click", function(){
+    pushUndo();
+    appModel.shapes = appModel.shapes.filter(function(q){ return q.id !== s.id; });
+    ui.selId = null;
+    modelChanged();
+  });
+}
+
+/* ---- レイヤーパネル --------------------------------------------- */
+function renderLayers(){
+  var host = el("layers");
+  host.innerHTML = "";
+  LAYERS.forEach(function(nm){
+    var d = document.createElement("div");
+    d.className = "lay";
+    var vis = document.createElement("input");
+    vis.type = "checkbox"; vis.checked = ui.layerVis[nm] !== false;
+    vis.addEventListener("change", function(){ ui.layerVis[nm] = vis.checked; scheduleRender(); });
+    var act = document.createElement("input");
+    act.type = "radio"; act.name = "actLayer"; act.checked = appModel.layer === nm;
+    act.addEventListener("change", function(){ appModel.layer = nm; });
+    var sp = document.createElement("span");
+    sp.textContent = nm;
+    d.appendChild(vis); d.appendChild(act); d.appendChild(sp);
+    host.appendChild(d);
+  });
+}
+
+/* ---- コンソール -------------------------------------------------- */
+function conPrint(lines, cls){
+  var o = el("conOut");
+  lines.forEach(function(t){
+    var d = document.createElement("div");
+    if (cls) d.className = cls;
+    d.textContent = t;
+    o.appendChild(d);
+  });
+  o.scrollTop = o.scrollHeight;
+}
+
+function freshBadaEnv(){
+  ui.badaEnv = badaStdEnv(makeDrawingAPI(appModel));
+  return ui.badaEnv;
+}
+
+function runBada(src, envOpt){
+  var env = envOpt || ui.badaEnv || freshBadaEnv();
+  pushUndo();
+  var res = badaRun(src, env);
+  if (res.output.length) conPrint(res.output);
+  if (!res.ok) conPrint(["✖ " + res.error], "err");
+  modelChanged();
+  return res;
+}
+
+/* ---- 拡張機能 ---------------------------------------------------- */
+function loadUserExts(){
+  try {
+    var raw = localStorage.getItem("badaIllu.ext");
+    ui.exts = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(ui.exts)) ui.exts = [];
+  } catch (e){ ui.exts = []; }
+}
+function saveUserExts(){
+  try { localStorage.setItem("badaIllu.ext", JSON.stringify(ui.exts)); } catch (e){}
+}
+
+function renderExtList(){
+  var host = el("extList");
+  host.innerHTML = "";
+  function card(ext, idx, builtin){
+    var d = document.createElement("div");
+    d.className = "ext";
+    var nm = document.createElement("div");
+    nm.className = "nm";
+    nm.textContent = (builtin ? "🧬 " : "🧩 ") + ext.name;
+    var ds = document.createElement("div");
+    ds.className = "ds";
+    ds.textContent = ext.desc || "";
+    var bt = document.createElement("div");
+    bt.className = "bt";
+    var run = document.createElement("button");
+    run.className = "primary";
+    run.textContent = "▶ 実行";
+    run.addEventListener("click", function(){
+      switchTab("con");
+      conPrint(["── 拡張『" + ext.name + "』を実行 ──"], "echo");
+      runBada(ext.src);
+    });
+    bt.appendChild(run);
+    var ed = document.createElement("button");
+    ed.textContent = builtin ? "✎ 複製して編集" : "✎ 編集";
+    ed.addEventListener("click", function(){
+      ui.editIdx = builtin ? -1 : idx;
+      el("extName").value = builtin ? ext.name + " (コピー)" : ext.name;
+      el("extDesc").value = ext.desc || "";
+      el("extSrc").value = ext.src;
+      el("extEd").classList.add("on");
+    });
+    bt.appendChild(ed);
+    if (!builtin){
+      var del = document.createElement("button");
+      del.className = "warn";
+      del.textContent = "🗑";
+      del.addEventListener("click", function(){
+        ui.exts.splice(idx, 1);
+        saveUserExts();
+        renderExtList();
+      });
+      bt.appendChild(del);
+    }
+    d.appendChild(nm); d.appendChild(ds); d.appendChild(bt);
+    host.appendChild(d);
+  }
+  BUILTIN_EXTENSIONS.forEach(function(e, i){ card(e, i, true); });
+  ui.exts.forEach(function(e, i){ card(e, i, false); });
+}
+
+function switchTab(which){
+  var con = which === "con";
+  el("tabCon").classList.toggle("on", con);
+  el("tabExt").classList.toggle("on", !con);
+  el("pgCon").style.display = con ? "flex" : "none";
+  el("pgExt").style.display = con ? "none" : "flex";
+}
+
+/* ---- ファイル入出力 ---------------------------------------------- */
+function download(name, text, mime){
+  var blob = new Blob([text], { type: mime || "application/octet-stream" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+}
+
+function exportPNG(){
+  var svg = shapesToSVG(appModel.shapes);
+  var img = new Image();
+  var url = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+  img.onload = function(){
+    var c = document.createElement("canvas");
+    var sc = Math.min(2400 / img.width, 2400 / img.height, 1) || 1;
+    c.width = Math.max(600, Math.round(img.width * sc));
+    c.height = Math.max(400, Math.round(img.height * sc));
+    var cx = c.getContext("2d");
+    cx.fillStyle = "#ffffff";
+    cx.fillRect(0, 0, c.width, c.height);
+    cx.drawImage(img, 0, 0, c.width, c.height);
+    c.toBlob(function(b){
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(b);
+      a.download = "bada-illustrator.png";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 400);
+    }, "image/png");
+  };
+  img.onerror = function(){ alert("PNG 変換に失敗しました。SVG 出力をご利用ください。"); };
+  img.src = url;
+}
+
+/* ---- テキスト入力ダイアログ (Electron は prompt() 非対応のため自前) */
+function askText(title, def, cb){
+  var ov = document.createElement("div");
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99;" +
+    "display:flex;align-items:center;justify-content:center;";
+  var box = document.createElement("div");
+  box.style.cssText = "background:#0e1422;border:1px solid #2a3a5a;border-radius:10px;" +
+    "padding:14px 16px;min-width:min(320px,86vw);display:flex;flex-direction:column;gap:10px;";
+  var h = document.createElement("div");
+  h.textContent = title;
+  h.style.cssText = "color:#c8a44a;font-weight:600;";
+  var inp = document.createElement("input");
+  inp.type = "text";
+  inp.value = def || "";
+  var row = document.createElement("div");
+  row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;";
+  var ok = document.createElement("button");
+  ok.textContent = "OK";
+  ok.className = "primary";
+  var ng = document.createElement("button");
+  ng.textContent = "キャンセル";
+  row.appendChild(ng); row.appendChild(ok);
+  box.appendChild(h); box.appendChild(inp); box.appendChild(row);
+  ov.appendChild(box);
+  document.body.appendChild(ov);
+  function done(v){ ov.remove(); cb(v); }
+  ok.addEventListener("click", function(){ done(inp.value); });
+  ng.addEventListener("click", function(){ done(null); });
+  inp.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter") done(inp.value);
+    if (ev.key === "Escape") done(null);
+  });
+  setTimeout(function(){ inp.focus(); inp.select(); }, 30);
+}
+
+/* ---- ポインタ操作 ------------------------------------------------ */
+function canvasPos(ev){
+  var r = ui.cv.getBoundingClientRect();
+  var cx = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+  var cy = (ev.touches ? ev.touches[0].clientY : ev.clientY) - r.top;
+  return { sx: cx, sy: cy, wx: S2WX(cx), wy: S2WY(cy) };
+}
+
+function beginDraw(p, panForce){
+  var t = ui.tool;
+  if (panForce || t === "pan"){
+    ui.drag = { kind: "pan", sx: p.sx, sy: p.sy, vx: view.x, vy: view.y };
+    return;
+  }
+  var wx = maybeSnap(p.wx), wy = maybeSnap(p.wy);
+  if (t === "select"){
+    var hitS = topHit(p.wx, p.wy);
+    ui.selId = hitS ? hitS.id : null;
+    renderProps();
+    scheduleRender();
+    if (hitS) ui.drag = { kind: "move", id: hitS.id, lx: p.wx, ly: p.wy, moved: false };
+    return;
+  }
+  if (t === "erase"){
+    var hs = topHit(p.wx, p.wy);
+    if (hs){
+      pushUndo();
+      appModel.shapes = appModel.shapes.filter(function(q){ return q.id !== hs.id; });
+      modelChanged();
+    }
+    return;
+  }
+  if (t === "text"){
+    askText("文字を入力してください", "", function(s){
+      if (s){
+        pushUndo();
+        addShape(appModel, { type: "text", layer: "寸法・注釈", x: wx, y: wy, s: s, size: 300 });
+        modelChanged();
+      }
+    });
+    return;
+  }
+  ui.drag = { kind: "draw", tool: t, x0: wx, y0: wy, preview: null };
+}
+
+function updateDraw(p){
+  var d = ui.drag;
+  if (!d) return;
+  if (d.kind === "pan"){
+    view.x = d.vx - (p.sx - d.sx) / view.scale;
+    view.y = d.vy - (p.sy - d.sy) / view.scale;
+    scheduleRender();
+    return;
+  }
+  if (d.kind === "move"){
+    var s = findShape(d.id);
+    if (s){
+      if (!d.moved){ pushUndo(); d.moved = true; }
+      var dx = p.wx - d.lx, dy = p.wy - d.ly;
+      if (el("snapChk").checked){
+        dx = snapTo(dx, gridStep());
+        dy = snapTo(dy, gridStep());
+        if (dx === 0 && dy === 0) return;
+      }
+      moveShape(s, dx, dy);
+      d.lx += dx; d.ly += dy;
+      modelChanged();
+    }
+    return;
+  }
+  var wx = maybeSnap(p.wx), wy = maybeSnap(p.wy);
+  d.preview = previewShape(d.tool, d.x0, d.y0, wx, wy);
+  scheduleRender();
+}
+
+function previewShape(tool, x0, y0, x1, y1){
+  switch (tool){
+    case "wall":
+      return { type: "wall", layer: "壁・構造", x1: x0, y1: y0, x2: x1, y2: y1,
+               t: parseFloat(el("wallT").value) || 200 };
+    case "line": return { type: "line", layer: "下書き", x1: x0, y1: y0, x2: x1, y2: y1 };
+    case "room": return { type: "room", layer: "部屋", x: Math.min(x0, x1), y: Math.min(y0, y1),
+               w: Math.abs(x1 - x0), h: Math.abs(y1 - y0), name: "" };
+    case "column": return { type: "column", layer: "壁・構造", cx: x0, cy: y0,
+               r: Math.max(80, distMM(x0, y0, x1, y1)) };
+    case "door": {
+      var w = Math.max(300, distMM(x0, y0, x1, y1));
+      var dir = Math.round(Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI / 15) * 15;
+      return { type: "door", layer: "開口部", x: x0, y: y0, w: Math.round(w), dir: dir };
+    }
+    case "window": return { type: "window", layer: "開口部", x1: x0, y1: y0, x2: x1, y2: y1 };
+    case "dim": return { type: "dim", layer: "寸法・注釈", x1: x0, y1: y0, x2: x1, y2: y1 };
+  }
+  return null;
+}
+
+function endDraw(p){
+  var d = ui.drag;
+  ui.drag = null;
+  if (!d || d.kind !== "draw") { scheduleRender(); return; }
+  var wx = maybeSnap(p.wx), wy = maybeSnap(p.wy);
+  var s = previewShape(d.tool, d.x0, d.y0, wx, wy);
+  if (!s){ scheduleRender(); return; }
+  /* 意味のない 0 サイズは捨てる */
+  var tooSmall =
+    ((s.type === "wall" || s.type === "line" || s.type === "window" || s.type === "dim") &&
+      distMM(s.x1, s.y1, s.x2, s.y2) < 50) ||
+    (s.type === "room" && (Math.abs(s.w) < 100 || Math.abs(s.h) < 100));
+  if (tooSmall){ scheduleRender(); return; }
+  pushUndo();
+  addShape(appModel, s);
+  ui.selId = s.id;
+  modelChanged();
+  if (s.type === "room"){
+    askText("部屋名 (空欄可)", "", function(nm){
+      if (nm){ s.name = nm; modelChanged(); }
+    });
+  }
+}
+
+function zoomAt(sx, sy, factor){
+  var wx = S2WX(sx), wy = S2WY(sy);
+  view.scale = Math.max(0.005, Math.min(2, view.scale * factor));
+  view.x = wx - sx / view.scale;
+  view.y = wy - sy / view.scale;
+  scheduleRender();
+  refreshStatus();
+}
+
+function zoomFit(){
+  if (!appModel.shapes.length){
+    view.x = -1500; view.y = -1500; view.scale = 0.07;
+  } else {
+    var b = [Infinity, Infinity, -Infinity, -Infinity];
+    appModel.shapes.forEach(function(s){
+      var sb = shapeBounds(s);
+      b[0] = Math.min(b[0], sb[0]); b[1] = Math.min(b[1], sb[1]);
+      b[2] = Math.max(b[2], sb[2]); b[3] = Math.max(b[3], sb[3]);
+    });
+    var w = ui.cv.width, h = ui.cv.height;
+    var bw = b[2] - b[0] + 2000, bh = b[3] - b[1] + 2000;
+    view.scale = Math.max(0.005, Math.min(2, Math.min(w / bw, h / bh)));
+    view.x = b[0] - ((w / view.scale) - (b[2] - b[0])) / 2;
+    view.y = b[1] - ((h / view.scale) - (b[3] - b[1])) / 2;
+  }
+  scheduleRender();
+  refreshStatus();
+}
+
+/* ---- 起動 -------------------------------------------------------- */
+function initUI(){
+  ui.cv = el("cv");
+  ui.ctx = ui.cv.getContext("2d");
+
+  function resize(){
+    var r = ui.cv.parentElement.getBoundingClientRect();
+    ui.cv.width = Math.max(200, Math.round(r.width));
+    ui.cv.height = Math.max(200, Math.round(r.height));
+    scheduleRender();
+  }
+  window.addEventListener("resize", resize);
+
+  /* ツールバー */
+  var tb = el("toolbar");
+  TOOLS.forEach(function(t){
+    var b = document.createElement("button");
+    b.innerHTML = t.icon + "<small>" + t.label + "</small>";
+    b.title = t.label + " (" + t.key.toUpperCase() + ")";
+    b.id = "tool_" + t.id;
+    b.addEventListener("click", function(){ setTool(t.id); });
+    tb.appendChild(b);
+  });
+  function setTool(id){
+    ui.tool = id;
+    TOOLS.forEach(function(t){
+      el("tool_" + t.id).classList.toggle("on", t.id === id);
+    });
+    ui.cv.style.cursor = id === "pan" ? "grab" : id === "select" ? "default" : "crosshair";
+  }
+  setTool("wall");
+
+  renderLayers();
+
+  /* キャンバス操作 */
+  var cv = ui.cv;
+  cv.addEventListener("mousedown", function(ev){
+    ev.preventDefault();
+    var p = canvasPos(ev);
+    beginDraw(p, ev.button === 1 || ui.spaceDown);
+  });
+  window.addEventListener("mousemove", function(ev){
+    if (!ui.cv) return;
+    var p = canvasPos(ev);
+    el("stX").textContent = Math.round(p.wx);
+    el("stY").textContent = Math.round(p.wy);
+    if (ui.drag) updateDraw(p);
+  });
+  window.addEventListener("mouseup", function(ev){
+    if (ui.drag) endDraw(canvasPos(ev));
+  });
+  cv.addEventListener("wheel", function(ev){
+    ev.preventDefault();
+    var p = canvasPos(ev);
+    zoomAt(p.sx, p.sy, ev.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
+
+  /* タッチ: 1本指 = 現在ツール, 2本指 = パン + ピンチズーム */
+  var pinch = null;
+  cv.addEventListener("touchstart", function(ev){
+    if (ev.touches.length === 2){
+      ui.drag = null;
+      var r = cv.getBoundingClientRect();
+      pinch = {
+        d: Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX,
+                      ev.touches[0].clientY - ev.touches[1].clientY),
+        cx: (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - r.left,
+        cy: (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - r.top,
+        vx: view.x, vy: view.y, sc: view.scale
+      };
+    } else {
+      pinch = null;
+      beginDraw(canvasPos(ev), false);
+    }
+    ev.preventDefault();
+  }, { passive: false });
+  cv.addEventListener("touchmove", function(ev){
+    if (pinch && ev.touches.length === 2){
+      var r = cv.getBoundingClientRect();
+      var d2 = Math.hypot(ev.touches[0].clientX - ev.touches[1].clientX,
+                          ev.touches[0].clientY - ev.touches[1].clientY);
+      var cx = (ev.touches[0].clientX + ev.touches[1].clientX) / 2 - r.left;
+      var cy = (ev.touches[0].clientY + ev.touches[1].clientY) / 2 - r.top;
+      var wx = pinch.cx / pinch.sc + pinch.vx, wy = pinch.cy / pinch.sc + pinch.vy;
+      view.scale = Math.max(0.005, Math.min(2, pinch.sc * d2 / pinch.d));
+      view.x = wx - cx / view.scale;
+      view.y = wy - cy / view.scale;
+      scheduleRender();
+    } else if (ui.drag){
+      updateDraw(canvasPos(ev));
+    }
+    ev.preventDefault();
+  }, { passive: false });
+  cv.addEventListener("touchend", function(ev){
+    if (pinch){ if (ev.touches.length < 2) pinch = null; return; }
+    if (ui.drag){
+      var t = ev.changedTouches[0];
+      endDraw(canvasPos({ clientX: t.clientX, clientY: t.clientY }));
+    }
+  });
+
+  /* キーボード */
+  window.addEventListener("keydown", function(ev){
+    var tag = (ev.target && ev.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return;
+    if (ev.key === " "){ ui.spaceDown = true; return; }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "z"){ ev.preventDefault(); doUndo(); return; }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "y"){ ev.preventDefault(); doRedo(); return; }
+    if (ev.key === "Delete" || ev.key === "Backspace"){
+      if (ui.selId !== null){
+        pushUndo();
+        appModel.shapes = appModel.shapes.filter(function(q){ return q.id !== ui.selId; });
+        ui.selId = null;
+        modelChanged();
+      }
+      return;
+    }
+    TOOLS.forEach(function(t){ if (ev.key.toLowerCase() === t.key) setTool(t.id); });
+  });
+  window.addEventListener("keyup", function(ev){ if (ev.key === " ") ui.spaceDown = false; });
+
+  /* ヘッダーボタン */
+  el("bNew").addEventListener("click", function(){
+    if (!appModel.shapes.length || confirm("図面を消去して新規作成しますか?")){
+      pushUndo();
+      appModel.shapes = [];
+      ui.selId = null;
+      modelChanged();
+    }
+  });
+  el("bSave").addEventListener("click", function(){
+    download("plan.badaarch.json", serializeProject(appModel), "application/json");
+  });
+  el("bOpen").addEventListener("click", function(){ el("fOpen").click(); });
+  el("fOpen").addEventListener("change", function(){
+    var f = this.files[0];
+    this.value = "";
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      try {
+        var got = deserializeProject(rd.result);
+        pushUndo();
+        appModel.shapes = got.shapes;
+        ui.selId = null;
+        modelChanged();
+        zoomFit();
+      } catch (e){ alert("読み込み失敗: " + e.message); }
+    };
+    rd.readAsText(f);
+  });
+  el("bSvg").addEventListener("click", function(){
+    download("bada-illustrator.svg", shapesToSVG(appModel.shapes), "image/svg+xml");
+  });
+  el("bPng").addEventListener("click", exportPNG);
+  el("bUndo").addEventListener("click", doUndo);
+  el("bRedo").addEventListener("click", doRedo);
+  el("bFit").addEventListener("click", zoomFit);
+  el("bSideT").addEventListener("click", function(){ el("side").classList.toggle("open"); });
+  el("bRightT").addEventListener("click", function(){ el("right").classList.toggle("open"); });
+
+  /* コンソール */
+  freshBadaEnv();
+  el("bRun").addEventListener("click", function(){
+    var src = el("conIn").value;
+    if (!src.trim()) return;
+    conPrint(src.split("\n").map(function(l){ return "» " + l; }), "echo");
+    runBada(src);
+  });
+  el("conIn").addEventListener("keydown", function(ev){
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter"){ ev.preventDefault(); el("bRun").click(); }
+  });
+  el("bClearOut").addEventListener("click", function(){ el("conOut").innerHTML = ""; });
+  var sam = el("samSel");
+  CONSOLE_SAMPLES.forEach(function(s, i){
+    var o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = s.name;
+    sam.appendChild(o);
+  });
+  sam.addEventListener("change", function(){
+    if (sam.value === "") return;
+    el("conIn").value = CONSOLE_SAMPLES[parseInt(sam.value, 10)].src;
+    sam.value = "";
+  });
+
+  /* タブ / 拡張機能 */
+  el("tabCon").addEventListener("click", function(){ switchTab("con"); });
+  el("tabExt").addEventListener("click", function(){ switchTab("ext"); });
+  loadUserExts();
+  renderExtList();
+  el("bExtNew").addEventListener("click", function(){
+    ui.editIdx = -1;
+    el("extName").value = "";
+    el("extDesc").value = "";
+    el("extSrc").value = "# 新しい拡張機能 (Bada 言語)\n# help() で使える API を確認できます\n";
+    el("extEd").classList.add("on");
+  });
+  el("bExtClose").addEventListener("click", function(){ el("extEd").classList.remove("on"); });
+  el("bExtSave").addEventListener("click", function(){
+    var nm = el("extName").value.trim();
+    if (!nm){ alert("拡張機能の名前を入力してください"); return; }
+    var rec = { name: nm, desc: el("extDesc").value.trim(), src: el("extSrc").value };
+    if (ui.editIdx >= 0) ui.exts[ui.editIdx] = rec;
+    else ui.exts.push(rec);
+    saveUserExts();
+    renderExtList();
+    el("extEd").classList.remove("on");
+  });
+  el("bExtRun").addEventListener("click", function(){
+    switchTab("con");
+    runBada(el("extSrc").value);
+    switchTab("ext");
+  });
+  el("bExtExport").addEventListener("click", function(){
+    download("bada-extensions.json", JSON.stringify(ui.exts, null, 1), "application/json");
+  });
+  el("bExtImport").addEventListener("click", function(){ el("fExt").click(); });
+  el("fExt").addEventListener("change", function(){
+    var f = this.files[0];
+    this.value = "";
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      try {
+        var arr = JSON.parse(rd.result);
+        if (!Array.isArray(arr)) throw new Error("拡張リストではありません");
+        arr.forEach(function(e){
+          if (e && e.name && typeof e.src === "string")
+            ui.exts.push({ name: String(e.name), desc: String(e.desc || ""), src: e.src });
+        });
+        saveUserExts();
+        renderExtList();
+      } catch (e){ alert("読み込み失敗: " + e.message); }
+    };
+    rd.readAsText(f);
+  });
+
+  /* 自動保存の復元 */
+  try {
+    var saved = localStorage.getItem("badaIllu.project");
+    if (saved){
+      var got = deserializeProject(saved);
+      appModel.shapes = got.shapes;
+      var mx = 0;
+      appModel.shapes.forEach(function(s){ mx = Math.max(mx, s.id || 0); });
+      appModel.nextId = mx;
+    }
+  } catch (e){ /* 破損時は無視 */ }
+
+  conPrint([
+    "⬒ Bada Illustrator — 量子建築設計スタジオ",
+    "量子プログラミング言語 Bada で図面を操作できます。",
+    "help() で建築 API 一覧、▼サンプル から例を挿入。",
+    "─────────────────────────────"
+  ], "echo");
+
+  resize();
+  refreshStatus();
+  if (appModel.shapes.length) zoomFit();
+}
+
+if (typeof __BADA_TEST__ === "undefined"){
+  try { initUI(); } catch (e){ console.error("initUI:", e); }
+}
+</script>
+</body>
+</html>

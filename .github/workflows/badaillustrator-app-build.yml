@@ -1,0 +1,191 @@
+name: Bada Illustrator app build (Android APK + Windows EXE + Ubuntu)
+
+# bada_illustrator/ の「Bada Illustrator」— 量子建築設計スタジオ
+#   (Illustrator 流のベクター建築 CAD: 壁・部屋・柱・ドア・窓・寸法・文字,
+#    mm グリッドスナップ, レイヤー, undo/redo, JSON 保存, SVG/PNG 出力。
+#    量子プログラミング言語 Bada のインタプリタを搭載し、
+#    qubit/H/X/Z/RY/CNOT/Measure/Sample の量子コア + tuplespace 台帳 +
+#    @reviser 拡張トランザクション + 建築 API (wall/room/door/...) で
+#    図面をスクリプト操作。拡張機能マネージャつき) を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_illustrator/index.html の
+# 自己完結 HTML で、これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (badaillustrator-v* タグ /
+# release_tag 指定時) GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: badaillustrator-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'badaillustrator-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f bada_illustrator/index.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("bada_illustrator/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/badaillu.js", m[1]);
+            for (const marker of ["function badaTokenize", "function badaParse",
+                                  "function badaRun", "function badaStdEnv",
+                                  "function qubitState", "function applyGate1",
+                                  "function applyCNOT", "function measureProbs",
+                                  "function sampleState", "function entropyBits",
+                                  "function softmax", "function unknownPrior",
+                                  "function updateDist", "function makeDrawingAPI",
+                                  "function wallPolygon", "function polygonArea",
+                                  "function totalFloorArea", "function shapesToSVG",
+                                  "function serializeProject", "function deserializeProject",
+                                  "function snapTo", "function hitTest"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/badaillu.js
+          echo "Bada Illustrator self-check OK"
+      - name: Engine tests (geometry / info engine / quantum core / Bada language / reviser / drawing API / built-in extensions)
+        run: |
+          set -e
+          node bada_illustrator/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_illustrator/app/www
+          cp bada_illustrator/index.html bada_illustrator/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_illustrator/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badaillustrator BadaIllustrator
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-illustrator-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaillustrator-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_illustrator/app/www
+          cp bada_illustrator/index.html bada_illustrator/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_illustrator/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaillustrator-windows
+          path: bada_illustrator/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_illustrator/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_illustrator/app/www
+          cp bada_illustrator/index.html bada_illustrator/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_illustrator/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaillustrator-linux
+          path: |
+            bada_illustrator/app/electron/dist/*.AppImage
+            bada_illustrator/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_illustrator/app/electron/dist/*.AppImage
+            bada_illustrator/app/electron/dist/*.deb
