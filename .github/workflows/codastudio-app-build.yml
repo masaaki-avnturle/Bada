@@ -6,8 +6,10 @@ name: Coda Studio app build (Android APK + Windows EXE + Ubuntu)
 #   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
 #   - Ubuntu 向け AppImage / deb
 # としてビルドします。アプリ本体は coda_studio/index.html の自己完結
-# HTML (ピアノ鍵盤 / コードパッド / 16ステップ・シーケンサー /
-# リバーブ・ディレイ / WAV 書き出し。全音源 Web Audio シンセシス) で、
+# HTML (音符を表示しないスペクトル・コード・シーケンサー — コード記号の行 ×
+# 16 ステップ、4 段階のスペクトル・レベル、縦線プレイヘッド、リアルタイム・
+# スペクトラム表示 / 鍵盤 / コードパッド / リバーブ・ディレイ /
+# WAV 書き出し。全音源 Web Audio シンセシス) で、
 # これをそのまま www として各ラッパーに同梱します。
 # Actions アーティファクト、および (codastudio-v* タグ / release_tag
 # 指定時) GitHub Release に添付します。
@@ -50,11 +52,11 @@ jobs:
             const m = src.match(/<script>([\s\S]*)<\/script>/);
             if (!m) { console.error("no inline <script> found"); process.exit(1); }
             fs.writeFileSync("/tmp/coda.js", m[1]);
-            for (const marker of ["function noteToFreq", "function buildScale",
-                                  "function chordNotes", "function seqToEvents",
+            for (const marker of ["function noteToFreq", "function chordNotes",
+                                  "function chordVoicing", "function chordGridToEvents",
                                   "function encodeWav", "function impulseData",
                                   "function synthVoice", "function buildBus",
-                                  "function demoPattern"]) {
+                                  "function drawSpectrum", "function demoPattern"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '

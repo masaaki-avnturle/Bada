@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Coda Studio — 音楽制作スタジオ(坂本龍一トリビュート・非公式)</title>
+<title>Coda Studio — スペクトル・コード作曲スタジオ(坂本龍一トリビュート・非公式)</title>
 <style>
   :root{
     --bg:#0b0e14; --panel:#11151d; --panel2:#161b25; --line:#232a38;
     --ink:#e8e6e0; --dim:#8b93a3; --accent:#8fb6c8; --warm:#c8a15a;
     --white-key:#f2efe9; --black-key:#14161a;
+    --lv1:#2b5876; --lv2:#3f8fa8; --lv3:#c8a15a; --lv4:#f2e8c9;
   }
   *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   body{
@@ -65,11 +66,6 @@
   }
   .key.white.on{ background:#cfe2ea; }
   .key.black.on{ background:#3f5a66; }
-  .key .kcap{
-    position:absolute; bottom:6px; width:100%; text-align:center;
-    font-size:10px; color:#7a7466; pointer-events:none;
-  }
-  .key.black .kcap{ color:#6d7684; }
   /* ── コードパッド ── */
   #pads{ display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; }
   .pad{
@@ -80,21 +76,47 @@
   .pad.on{ border-color:var(--warm); background:#1c1a15; }
   .pad b{ display:block; font-size:15px; font-weight:600; letter-spacing:.05em; }
   .pad span{ font-size:11px; color:var(--dim); }
-  /* ── シーケンサー ── */
-  #gridWrap{ overflow-x:auto; }
-  #grid{ border-collapse:collapse; min-width:640px; }
-  #grid td{
-    width:34px; height:22px; border:1px solid var(--line);
-    background:var(--panel2); cursor:pointer;
+  /* ── スペクトル・コード・シーケンサー ── */
+  #gridWrap{ overflow-x:auto; padding:6px 0; }
+  #seqFlex{ display:flex; min-width:700px; }
+  #rowLabels{ flex:0 0 auto; padding-right:10px; }
+  .rlabel{
+    height:34px; margin-bottom:3px; display:flex; align-items:center; justify-content:flex-end;
+    font-size:12px; color:var(--accent); white-space:nowrap; letter-spacing:.04em;
   }
-  #grid td.beat{ background:#1a2029; }
-  #grid td.set{ background:var(--accent); border-color:var(--accent); }
-  #grid td.set.playing{ background:var(--warm); border-color:var(--warm); }
-  #grid td.playhead{ box-shadow:inset 0 0 0 1px #3d4a5e; }
-  #grid th{
-    font-size:10px; font-weight:400; color:var(--dim); text-align:right;
-    padding-right:8px; white-space:nowrap;
+  .rlabel small{ color:var(--dim); margin-left:6px; font-size:10px; }
+  #cellsWrap{ position:relative; flex:1 1 auto; }
+  #cellsGrid{
+    display:grid; grid-template-columns:repeat(16, 1fr);
+    grid-auto-rows:34px; gap:3px;
   }
+  .scell{
+    background:var(--panel2); border:1px solid var(--line); border-radius:3px;
+    position:relative; cursor:pointer; overflow:hidden; touch-action:manipulation;
+  }
+  .scell.beat{ background:#1a2029; }
+  .scell::after{
+    content:""; position:absolute; left:0; right:0; bottom:0; height:0;
+    transition:height .1s ease;
+  }
+  .scell[data-level="1"]::after{ height:25%; background:var(--lv1); }
+  .scell[data-level="2"]::after{ height:50%; background:linear-gradient(var(--lv2),var(--lv1)); }
+  .scell[data-level="3"]::after{ height:75%; background:linear-gradient(var(--lv3),var(--lv2),var(--lv1)); }
+  .scell[data-level="4"]::after{ height:100%; background:linear-gradient(var(--lv4),var(--lv3),var(--lv2),var(--lv1)); }
+  .scell.playing{ box-shadow:0 0 9px rgba(200,161,90,.85); border-color:var(--warm); }
+  #playline{
+    position:absolute; top:-4px; bottom:-4px; width:2px; left:0;
+    background:var(--warm); box-shadow:0 0 12px rgba(200,161,90,.95);
+    display:none; pointer-events:none; z-index:3;
+  }
+  .lvLegend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:11px; color:var(--dim); }
+  .lvLegend i{
+    display:inline-block; width:12px; height:12px; border-radius:2px; margin-right:5px;
+    vertical-align:-2px; font-style:normal;
+  }
+  /* ── スペクトラム ── */
+  #specWrap{ background:#0a0d12; border:1px solid var(--line); border-radius:8px; padding:6px; }
+  #spec{ display:block; width:100%; height:120px; }
   .hint{ color:var(--dim); font-size:12px; margin-top:10px; }
   footer{
     max-width:980px; margin:26px auto 0; padding:0 16px; color:var(--dim);
@@ -108,14 +130,61 @@
 <body>
 <header>
   <h1><span class="coda">𝄌</span> Coda Studio</h1>
-  <div class="sub">坂本龍一トリビュート 音楽制作スタジオ(非公式)</div>
+  <div class="sub">スペクトル・コード作曲スタジオ — 坂本龍一トリビュート(非公式)</div>
 </header>
 <div class="motto">Ars longa, vita brevis — 芸術は長く、人生は短い</div>
 
 <main>
 
+<section id="secSeq">
+  <h2>◫ スペクトル・コード・シーケンサー — 音符を使わない作曲</h2>
+  <div class="row">
+    <button id="playBtn" class="primary">▶ 演奏</button>
+    <button id="clearBtn">クリア</button>
+    <button id="demoBtn">おまかせ生成</button>
+    <label class="ctl">BPM <input type="number" id="bpm" min="40" max="200" value="72" style="width:64px"></label>
+    <label class="ctl">スウィング <input type="range" id="swing" min="0" max="50" value="6"></label>
+  </div>
+  <div class="row">
+    <label class="ctl">キー <select id="seqKey"></select></label>
+    <label class="ctl">音色
+      <select id="seqInst">
+        <option value="pad" selected>アナログパッド</option>
+        <option value="piano">グランドピアノ</option>
+        <option value="epiano">エレクトリックピアノ</option>
+        <option value="bell">オルゴール</option>
+      </select>
+    </label>
+  </div>
+  <div id="gridWrap">
+    <div id="seqFlex">
+      <div id="rowLabels"></div>
+      <div id="cellsWrap">
+        <div id="cellsGrid"></div>
+        <div id="playline"></div>
+      </div>
+    </div>
+  </div>
+  <div class="lvLegend">
+    <span><i style="background:var(--lv1)"></i>段階 1 — 深部 (ルート + 5度)</span>
+    <span><i style="background:var(--lv2)"></i>段階 2 — 中域 (基本ヴォイシング)</span>
+    <span><i style="background:var(--lv3)"></i>段階 3 — 上音 (テンション全開)</span>
+    <span><i style="background:var(--lv4)"></i>段階 4 — 輝き (オクターブ重ね)</span>
+  </div>
+  <div class="hint">
+    行はコード記号、列は時間。マス目をタップするたびにスペクトル段階が 1 → 2 → 3 → 4 → 消 と深まり、
+    和音の倍音構成が厚くなります。▶ 演奏で<b style="color:var(--warm)">縦線</b>が移動し、通過したコードが鳴ります。音符は一切表示されません。
+  </div>
+</section>
+
+<section id="secSpec">
+  <h2>▁▃▅▇ リアルタイム・スペクトラム — いま鳴っている音の姿</h2>
+  <div id="specWrap"><canvas id="spec" width="940" height="120"></canvas></div>
+  <div class="hint">演奏中の周波数スペクトルを多段階の色 (深部 → 中域 → 上音 → 輝き) で表示します。</div>
+</section>
+
 <section id="secKeys">
-  <h2>🎹 鍵盤 — ピアノ / エレクトリックピアノ / パッド / オルゴール</h2>
+  <h2>🎹 鍵盤 — 即興用 (表示はコードとスペクトルのみ)</h2>
   <div class="row">
     <label class="ctl">音色
       <select id="inst">
@@ -126,7 +195,7 @@
       </select>
     </label>
     <label class="ctl">オクターブ
-      <button id="octDown">−</button><span id="octLabel">C4</span><button id="octUp">+</button>
+      <button id="octDown">−</button><span id="octLabel">±0</span><button id="octUp">+</button>
     </label>
     <label class="ctl"><input type="checkbox" id="sustain" checked> サステイン</label>
     <label class="ctl">リバーブ <input type="range" id="revAmt" min="0" max="100" value="45"></label>
@@ -140,9 +209,7 @@
 <section id="secPads">
   <h2>🎼 コードパッド — 静寂のためのヴォイシング</h2>
   <div class="row">
-    <label class="ctl">キー
-      <select id="padRoot"></select>
-    </label>
+    <label class="ctl">キー <select id="padRoot"></select></label>
     <label class="ctl">パッド音色
       <select id="padInst">
         <option value="piano">グランドピアノ</option>
@@ -155,43 +222,10 @@
   <div class="hint">押さえるだけで、映画音楽のような柔らかな和声が鳴ります。長押しで伸ばせます。</div>
 </section>
 
-<section id="secSeq">
-  <h2>◻ 16ステップ・シーケンサー — アンビエント・スケッチ</h2>
-  <div class="row">
-    <button id="playBtn" class="primary">▶ 再生</button>
-    <button id="clearBtn">クリア</button>
-    <button id="demoBtn">おまかせ生成</button>
-    <label class="ctl">BPM <input type="number" id="bpm" min="40" max="200" value="76" style="width:64px"></label>
-    <label class="ctl">スウィング <input type="range" id="swing" min="0" max="50" value="8"></label>
-  </div>
-  <div class="row">
-    <label class="ctl">スケール
-      <select id="scaleMode">
-        <option value="major">メジャー</option>
-        <option value="minor" selected>ナチュラルマイナー</option>
-        <option value="penta">ペンタトニック</option>
-        <option value="miyako">都節音階(みやこぶし)</option>
-        <option value="ryukyu">琉球音階</option>
-      </select>
-    </label>
-    <label class="ctl">ルート <select id="scaleRoot"></select></label>
-    <label class="ctl">シーケンス音色
-      <select id="seqInst">
-        <option value="piano" selected>グランドピアノ</option>
-        <option value="epiano">エレクトリックピアノ</option>
-        <option value="bell">オルゴール</option>
-        <option value="pad">アナログパッド</option>
-      </select>
-    </label>
-  </div>
-  <div id="gridWrap"><table id="grid"></table></div>
-  <div class="hint">マス目をタップして音を置きます。スケール外の音が出ないので、どこを押しても外れません。</div>
-</section>
-
 <section id="secExport">
   <h2>💾 書き出し — ループを WAV で保存</h2>
   <div class="row">
-    <button id="exportBtn" class="primary">⬇ WAV を書き出す (2ループ + 余韻)</button>
+    <button id="exportBtn" class="primary">⬇ WAV を書き出す</button>
     <label class="ctl">ループ回数 <input type="number" id="loopCount" min="1" max="8" value="2" style="width:56px"></label>
   </div>
   <div id="status"></div>
@@ -203,9 +237,10 @@
   <p style="font-size:13px; color:var(--dim); margin:0;">
     Coda Studio は、音楽家・坂本龍一(1952–2023)の音楽性 — ピアノの一音、静寂、アンビエンス、
     ミニマリズム — へのオマージュとして制作された<b>オリジナルの音楽制作アプリ</b>です。
+    音符を表示しない<b>スペクトル・コード・シーケンサー</b>を採用: 行はコード記号、
+    マス目の色は 4 段階のスペクトル(倍音の厚み)、縦線の移動が演奏です。
     依存ライブラリゼロ・単一 HTML・完全オフライン動作。音はすべて Web Audio API による
     リアルタイム・シンセシスで、サンプル素材を一切含みません。
-    都節音階・琉球音階を選べば、日本的な響きのスケッチもすぐに始められます。
   </p>
 </section>
 
@@ -223,7 +258,7 @@
 <script>
 "use strict";
 /* ════════════════════════════════════════════════════════════════
-   Coda Studio — 音楽制作エンジン
+   Coda Studio v2 — スペクトル・コード作曲エンジン
    前半: 純ロジック (Node 単体テスト対象 / tools/engine-test.js)
    後半: Web Audio シンセサイザーと UI
    ════════════════════════════════════════════════════════════════ */
@@ -232,26 +267,6 @@
 function noteToFreq(midi){ return 440 * Math.pow(2, (midi - 69) / 12); }
 
 var NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-function noteName(midi){
-  return NOTE_NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
-}
-
-/* ── スケール (都節・琉球を含む) ── */
-var SCALE_MODES = {
-  major:  [0,2,4,5,7,9,11],
-  minor:  [0,2,3,5,7,8,10],
-  penta:  [0,2,4,7,9],
-  miyako: [0,1,5,7,8],    /* 都節音階 */
-  ryukyu: [0,4,5,7,11]    /* 琉球音階 */
-};
-function buildScale(rootMidi, mode, count){
-  var iv = SCALE_MODES[mode] || SCALE_MODES.major;
-  var n = count || 13, out = [], i;
-  for (i = 0; out.length < n; i++){
-    out.push(rootMidi + iv[i % iv.length] + 12 * Math.floor(i / iv.length));
-  }
-  return out;
-}
 
 /* ── コード ── */
 var CHORD_TYPES = {
@@ -263,6 +278,25 @@ function chordNotes(rootMidi, type){
   var iv = CHORD_TYPES[type] || CHORD_TYPES.maj7;
   return iv.map(function(x){ return rootMidi + x; });
 }
+var CHORD_LABELS = { maj7:"Δ7", maj9:"Δ9", add9:"add9", m7:"m7", m9:"m9",
+                     m11:"m11", sus2:"sus2", six9:"6/9" };
+
+/* ── 多段階スペクトル・ヴォイシング (純関数) ──
+   段階 1: 深部 — ルート(1オクターブ下) + 5度
+   段階 2: 中域 — + 基本ヴォイシング (3音)
+   段階 3: 上音 — テンションまで全て
+   段階 4: 輝き — さらに最上音をオクターブ重ね、音量も最大 */
+function chordVoicing(rootMidi, type, level){
+  var full = chordNotes(rootMidi, type);
+  var bass = rootMidi - 12;
+  var lv = Math.max(1, Math.min(4, level | 0));
+  var notes;
+  if (lv === 1){ notes = [bass, rootMidi + 7]; }
+  else if (lv === 2){ notes = [bass].concat(full.slice(0, 3)); }
+  else if (lv === 3){ notes = [bass].concat(full); }
+  else { notes = [bass].concat(full).concat([full[full.length - 1] + 12]); }
+  return { notes: notes, vel: 0.34 + 0.12 * lv };
+}
 
 /* ── 乱数 (決定的 LCG — テスト可能) ── */
 function lcg(seed){
@@ -273,34 +307,40 @@ function lcg(seed){
   };
 }
 
-/* ── シーケンサー: グリッド → イベント列 (純関数) ──
-   grid[row][step] (row 0 = スケール最低音), swing は 0〜0.5 */
-function seqToEvents(grid, scaleNotes, bpm, swing){
+/* ── シーケンサー: レベルグリッド → コードイベント列 (純関数) ──
+   grid[row][step] = 0〜4 (スペクトル段階), chords[row] = {root, type}
+   swing は 0〜0.5 */
+function chordGridToEvents(grid, chords, bpm, swing){
   var stepDur = 15 / bpm;               /* 16 分音符 1 個の長さ */
-  var events = [], r, s, t;
+  var events = [], r, s, t, lv, v;
   for (s = 0; s < 16; s++){
     t = s * stepDur + ((s % 2 === 1) ? swing * stepDur : 0);
     for (r = 0; r < grid.length; r++){
-      if (grid[r][s]){
-        events.push({ time:t, midi:scaleNotes[r], dur:stepDur * 2.2, vel:0.85 });
+      lv = grid[r][s];
+      if (lv > 0){
+        v = chordVoicing(chords[r].root, chords[r].type, lv);
+        events.push({ time:t, midis:v.notes, dur:stepDur * 3.5, vel:v.vel, level:lv });
       }
     }
   }
   return { events:events, loopLen:16 * stepDur, stepDur:stepDur };
 }
 
-/* ── おまかせ生成 (決定的) ── */
+/* ── おまかせ生成 (決定的・レベル 0〜4) ── */
 function demoPattern(rows, steps, seed){
   var rnd = lcg(seed), g = [], r, s;
   for (r = 0; r < rows; r++){ g.push(new Array(steps).fill(0)); }
-  for (s = 0; s < steps; s++){
-    if (rnd() < 0.62){
-      var r1 = Math.floor(rnd() * rows);
-      g[r1][s] = 1;
-      if (rnd() < 0.22){ g[Math.floor(rnd() * rows)][s] = 1; }  /* 時々 2 声 */
+  for (s = 0; s < steps; s += 2){
+    if (rnd() < 0.72){
+      g[Math.floor(rnd() * rows)][s] = 1 + Math.floor(rnd() * 4);
     }
   }
-  g[0][0] = 1;  /* ルートで始める */
+  for (s = 1; s < steps; s += 2){
+    if (rnd() < 0.16){
+      g[Math.floor(rnd() * rows)][s] = 1 + Math.floor(rnd() * 2);  /* 弱拍は浅い段階 */
+    }
+  }
+  if (!g[0][0]){ g[0][0] = 3; }  /* トニックで始める */
   return g;
 }
 
@@ -334,8 +374,8 @@ function encodeWav(chL, chR, sampleRate){
 }
 
 /* ════════════════════════════════════════════════════════════════
-   シンセサイザー (Web Audio) — どの AudioContext でも動くよう
-   ctx を引数に取る。ライブ再生とオフライン書き出しで共用。
+   シンセサイザー (Web Audio) — ctx を引数に取り、
+   ライブ再生とオフライン書き出しで共用。
    ════════════════════════════════════════════════════════════════ */
 
 /* エフェクトバス: dest へ dry + リバーブ + ディレイを構築して入口を返す */
@@ -432,13 +472,15 @@ function synthVoice(ctx, dest, inst, midi, t0, vel){
   };
 }
 
-/* イベント列を ctx 上にスケジュール (オフライン書き出し用) */
+/* コードイベント列を ctx 上にスケジュール (オフライン書き出し用) */
 function renderEvents(ctx, dest, events, inst, loops, loopLen){
   for (var k = 0; k < loops; k++){
     for (var i = 0; i < events.length; i++){
-      var ev = events[i];
-      var v = synthVoice(ctx, dest, inst, ev.midi, ev.time + k * loopLen + 0.05, ev.vel);
-      if (inst === "pad"){ v.stop(ev.time + k * loopLen + 0.05 + ev.dur); }
+      var ev = events[i], t0 = ev.time + k * loopLen + 0.05;
+      for (var j = 0; j < ev.midis.length; j++){
+        var v = synthVoice(ctx, dest, inst, ev.midis[j], t0, ev.vel);
+        if (inst === "pad"){ v.stop(t0 + ev.dur); }
+      }
     }
   }
 }
@@ -446,13 +488,18 @@ function renderEvents(ctx, dest, events, inst, loops, loopLen){
 /* ════════════════════════════════════════════════════════════════
    UI と ライブ再生
    ════════════════════════════════════════════════════════════════ */
-var audioCtx = null, liveBus = null;
+var audioCtx = null, liveBus = null, analyser = null, specBuf = null;
 function getCtx(){
   if (!audioCtx){
     var AC = window.AudioContext || window.webkitAudioContext;
     if (!AC){ return null; }
     audioCtx = new AC();
-    liveBus = buildBus(audioCtx, audioCtx.destination, 0.45, 0.18, 0.8);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    specBuf = new Uint8Array(analyser.frequencyBinCount);
+    liveBus = buildBus(audioCtx, analyser, 0.45, 0.18, 0.8);
+    analyser.connect(audioCtx.destination);
   }
   if (audioCtx.state === "suspended"){ audioCtx.resume(); }
   return audioCtx;
@@ -465,13 +512,13 @@ function applyFx(){
   liveBus.master.gain.value = el("volAmt").value / 100;
 }
 
-/* ── 鍵盤 ── */
-var kbBase = 60;  /* C4 */
+/* ── 鍵盤 (キャップ表示なし — 音符を表示しない方針) ── */
+var kbBase = 60;
 var WHITE_PC = [0,2,4,5,7,9,11];
 var KEYMAP = { a:0, w:1, s:2, e:3, d:4, f:5, t:6, g:7, y:8, h:9, u:10, j:11,
                k:12, o:13, l:14, p:15, ";":16 };
-var heldVoices = {};   /* midi → voice */
-var keyEls = {};       /* midi → 要素 */
+var heldVoices = {};
+var keyEls = {};
 
 function buildKeyboard(){
   var kb = el("kb"); kb.innerHTML = ""; keyEls = {};
@@ -484,11 +531,6 @@ function buildKeyboard(){
     d.className = "key " + (WHITE_PC.indexOf(pc) >= 0 ? "white" : "black");
     if (WHITE_PC.indexOf(pc) >= 0){
       d.style.left = (wi * ww) + "%"; d.style.width = ww + "%";
-      if (pc === 0){
-        var cap = document.createElement("div");
-        cap.className = "kcap"; cap.textContent = noteName(midi);
-        d.appendChild(cap);
-      }
       wi++;
     } else {
       d.style.left = (wi * ww - ww * 0.30) + "%"; d.style.width = (ww * 0.60) + "%";
@@ -497,7 +539,8 @@ function buildKeyboard(){
     keyEls[midi] = d;
     kb.appendChild(d);
   }
-  el("octLabel").textContent = noteName(kbBase);
+  var oct = (kbBase - 60) / 12;
+  el("octLabel").textContent = oct === 0 ? "±0" : (oct > 0 ? "+" + oct : "" + oct);
 }
 
 function noteOn(midi, inst){
@@ -537,7 +580,6 @@ function bindKeyboard(){
   });
 }
 
-/* PC キーボード */
 var pcHeld = {};
 function bindPcKeys(){
   window.addEventListener("keydown", function(e){
@@ -564,7 +606,7 @@ function shiftOct(d){
   kbBase = nb; buildKeyboard();
 }
 
-/* ── コードパッド ── */
+/* ── コード定義 (パッドとシーケンサー行で共用) ── */
 var PAD_DEFS = [
   { deg:0,  type:"maj9", label:"Ⅰ maj9" },
   { deg:5,  type:"maj7", label:"Ⅳ maj7" },
@@ -575,6 +617,11 @@ var PAD_DEFS = [
   { deg:0,  type:"six9", label:"Ⅰ 6/9"  },
   { deg:10, type:"maj7", label:"♭Ⅶ maj7" }
 ];
+function chordSymbol(rootMidi, type){
+  return NOTE_NAMES[((rootMidi % 12) + 12) % 12] + (CHORD_LABELS[type] || type);
+}
+
+/* ── コードパッド ── */
 var padVoices = {};
 function buildPads(){
   var wrap = el("pads"); wrap.innerHTML = "";
@@ -582,8 +629,7 @@ function buildPads(){
   PAD_DEFS.forEach(function(pd, idx){
     var d = document.createElement("div");
     d.className = "pad";
-    d.innerHTML = "<b>" + NOTE_NAMES[(root + pd.deg) % 12] +
-      pd.type.replace("six9","6/9").replace("maj","Δ").replace("sus","sus") +
+    d.innerHTML = "<b>" + chordSymbol(root + pd.deg, pd.type) +
       "</b><span>" + pd.label + "</span>";
     d.addEventListener("pointerdown", function(e){
       e.preventDefault();
@@ -609,51 +655,59 @@ function buildPads(){
   });
 }
 
-/* ── シーケンサー ── */
-var ROWS = 13, STEPS = 16;
-var seqGrid = [];         /* [row][step], row 0 = 最低音 */
-var seqScale = [];        /* row → midi */
-var playing = false, schedTimer = null, uiTimer = null;
-var loopStart = 0, evIdx = 0, curEvents = null;
+/* ── スペクトル・コード・シーケンサー ── */
+var ROWS = 8, STEPS = 16;
+var seqGrid = [];          /* [row][step] = 0〜4 */
+var cellEls = [];          /* [row][step] → 要素 */
+var playing = false, schedTimer = null;
+var loopStart = 0, evIdx = 0, curEvents = null, lastStep = -1;
 
 function initGridState(){
   seqGrid = [];
   for (var r = 0; r < ROWS; r++){ seqGrid.push(new Array(STEPS).fill(0)); }
 }
-function currentScale(){
-  return buildScale(+el("scaleRoot").value, el("scaleMode").value, ROWS);
+function seqChords(){
+  var key = +el("seqKey").value;
+  return PAD_DEFS.map(function(pd){ return { root: key + pd.deg, type: pd.type }; });
 }
 function buildGrid(){
-  seqScale = currentScale();
-  var tbl = el("grid"); tbl.innerHTML = "";
-  for (var vr = ROWS - 1; vr >= 0; vr--){
-    var tr = document.createElement("tr");
-    var th = document.createElement("th");
-    th.textContent = noteName(seqScale[vr]);
-    tr.appendChild(th);
+  var chords = seqChords();
+  var labels = el("rowLabels"); labels.innerHTML = "";
+  var grid = el("cellsGrid"); grid.innerHTML = "";
+  cellEls = [];
+  for (var r = 0; r < ROWS; r++){
+    var lb = document.createElement("div");
+    lb.className = "rlabel";
+    lb.innerHTML = chordSymbol(chords[r].root, chords[r].type) +
+      "<small>" + PAD_DEFS[r].label + "</small>";
+    labels.appendChild(lb);
+    cellEls.push([]);
     for (var s = 0; s < STEPS; s++){
-      var td = document.createElement("td");
-      if (s % 4 === 0) td.className = "beat";
-      td.dataset.r = vr; td.dataset.s = s;
-      if (seqGrid[vr][s]) td.classList.add("set");
-      tr.appendChild(td);
+      var c = document.createElement("div");
+      c.className = "scell" + (s % 4 === 0 ? " beat" : "");
+      c.dataset.r = r; c.dataset.s = s;
+      c.dataset.level = seqGrid[r][s];
+      cellEls[r].push(c);
+      grid.appendChild(c);
     }
-    tbl.appendChild(tr);
   }
 }
 function bindGrid(){
-  el("grid").addEventListener("pointerdown", function(e){
-    var td = e.target.closest("td"); if (!td) return;
+  el("cellsGrid").addEventListener("pointerdown", function(e){
+    var c = e.target.closest(".scell"); if (!c) return;
     e.preventDefault();
-    var r = +td.dataset.r, s = +td.dataset.s;
-    seqGrid[r][s] = seqGrid[r][s] ? 0 : 1;
-    td.classList.toggle("set", !!seqGrid[r][s]);
-    if (seqGrid[r][s]){                       /* 置いた音を試聴 */
+    var r = +c.dataset.r, s = +c.dataset.s;
+    seqGrid[r][s] = (seqGrid[r][s] + 1) % 5;
+    c.dataset.level = seqGrid[r][s];
+    if (seqGrid[r][s] > 0){                    /* 置いた段階を試聴 */
       var ctx = getCtx(); if (!ctx) return;
       applyFx();
-      var v = synthVoice(ctx, liveBus.input, el("seqInst").value, seqScale[r], ctx.currentTime, 0.7);
-      if (el("seqInst").value === "pad") v.stop(ctx.currentTime + 0.5);
-      else if (!el("sustain").checked) v.stop(ctx.currentTime + 0.4);
+      var ch = seqChords()[r];
+      var v = chordVoicing(ch.root, ch.type, seqGrid[r][s]);
+      v.notes.forEach(function(m){
+        var vc = synthVoice(ctx, liveBus.input, el("seqInst").value, m, ctx.currentTime, v.vel);
+        vc.stop(ctx.currentTime + 0.7);
+      });
     }
   });
 }
@@ -663,18 +717,26 @@ function startSeq(){
   applyFx();
   playing = true;
   el("playBtn").textContent = "■ 停止";
+  el("playline").style.display = "block";
   loopStart = ctx.currentTime + 0.1;
-  evIdx = 0;
-  curEvents = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
+  evIdx = 0; lastStep = -1;
+  curEvents = chordGridToEvents(seqGrid, seqChords(), +el("bpm").value, el("swing").value / 100);
   schedTimer = setInterval(schedulerTick, 25);
-  uiTimer = setInterval(uiTick, 40);
 }
 function stopSeq(){
   playing = false;
-  el("playBtn").textContent = "▶ 再生";
-  clearInterval(schedTimer); clearInterval(uiTimer);
-  var cells = document.querySelectorAll("#grid td.playing, #grid td.playhead");
-  for (var i = 0; i < cells.length; i++){ cells[i].classList.remove("playing", "playhead"); }
+  el("playBtn").textContent = "▶ 演奏";
+  el("playline").style.display = "none";
+  clearInterval(schedTimer);
+  clearStepGlow();
+}
+function clearStepGlow(){
+  for (var r = 0; r < cellEls.length; r++){
+    for (var s = 0; s < cellEls[r].length; s++){
+      cellEls[r][s].classList.remove("playing");
+    }
+  }
+  lastStep = -1;
 }
 function schedulerTick(){
   if (!playing) return;
@@ -684,35 +746,68 @@ function schedulerTick(){
       var nextLoop = loopStart + curEvents.loopLen;
       if (nextLoop > horizon) break;
       loopStart = nextLoop; evIdx = 0;
-      curEvents = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
+      curEvents = chordGridToEvents(seqGrid, seqChords(), +el("bpm").value, el("swing").value / 100);
       if (curEvents.events.length === 0) continue;
     }
     if (curEvents.events.length === 0) break;
     var ev = curEvents.events[evIdx];
     if (loopStart + ev.time > horizon) break;
     var inst = el("seqInst").value;
-    var v = synthVoice(ctx, liveBus.input, inst, ev.midi, loopStart + ev.time, ev.vel);
-    if (inst === "pad"){ v.stop(loopStart + ev.time + ev.dur); }
+    for (var j = 0; j < ev.midis.length; j++){
+      var v = synthVoice(ctx, liveBus.input, inst, ev.midis[j], loopStart + ev.time, ev.vel);
+      if (inst === "pad"){ v.stop(loopStart + ev.time + ev.dur); }
+    }
     evIdx++;
   }
 }
-function uiTick(){
-  if (!playing || !audioCtx) return;
-  var pos = (audioCtx.currentTime - loopStart) / curEvents.stepDur;
-  var step = Math.floor(pos) % STEPS;
-  if (step < 0) step = 0;
-  var cells = el("grid").querySelectorAll("td");
-  for (var i = 0; i < cells.length; i++){
-    var td = cells[i], isCol = (+td.dataset.s === step);
-    td.classList.toggle("playhead", isCol);
-    td.classList.toggle("playing", isCol && td.classList.contains("set"));
+
+/* ── 縦線 (プレイヘッド) + スペクトラム描画 ── */
+function drawSpectrum(){
+  var cv = el("spec");
+  if (cv && cv.getContext && analyser && specBuf){
+    var g2 = cv.getContext("2d");
+    var W = cv.width, H = cv.height;
+    analyser.getByteFrequencyData(specBuf);
+    g2.fillStyle = "#0a0d12"; g2.fillRect(0, 0, W, H);
+    var BARS = 96, bw = W / BARS;
+    for (var i = 0; i < BARS; i++){
+      var idx = Math.floor(Math.pow(i / BARS, 1.6) * specBuf.length * 0.72);
+      var v = specBuf[idx] / 255;
+      if (v <= 0.003) continue;
+      /* 多段階スペクトル色: 深部 → 中域 → 上音 → 輝き */
+      g2.fillStyle = v < 0.25 ? "#2b5876" : v < 0.5 ? "#3f8fa8" :
+                     v < 0.75 ? "#c8a15a" : "#f2e8c9";
+      var h = Math.max(1, v * (H - 4));
+      g2.fillRect(i * bw + 1, H - h, bw - 2, h);
+    }
   }
+}
+function animate(){
+  if (playing && audioCtx && curEvents){
+    var prog = (audioCtx.currentTime - loopStart) / curEvents.loopLen;
+    if (prog < 0) prog = 0;
+    prog = prog - Math.floor(prog);
+    var wrap = el("cellsGrid");
+    el("playline").style.left = (prog * wrap.offsetWidth) + "px";
+    var step = Math.floor(prog * STEPS) % STEPS;
+    if (step !== lastStep){
+      lastStep = step;
+      for (var r = 0; r < cellEls.length; r++){
+        for (var s = 0; s < cellEls[r].length; s++){
+          var on = (s === step) && seqGrid[r][s] > 0;
+          cellEls[r][s].classList.toggle("playing", on);
+        }
+      }
+    }
+  }
+  drawSpectrum();
+  requestAnimationFrame(animate);
 }
 
 /* ── WAV 書き出し ── */
 function exportWav(){
-  var evs = seqToEvents(seqGrid, currentScale(), +el("bpm").value, el("swing").value / 100);
-  if (evs.events.length === 0){ el("status").textContent = "グリッドが空です — まず音を置いてください。"; return; }
+  var evs = chordGridToEvents(seqGrid, seqChords(), +el("bpm").value, el("swing").value / 100);
+  if (evs.events.length === 0){ el("status").textContent = "グリッドが空です — まずコードを置いてください。"; return; }
   var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   if (!OAC){ el("status").textContent = "この環境ではオフライン書き出しが使えません。"; return; }
   var loops = Math.max(1, Math.min(8, +el("loopCount").value || 2));
@@ -750,14 +845,13 @@ function fillRootSelect(sel, base){
 function init(){
   buildKeyboard(); bindKeyboard(); bindPcKeys();
   fillRootSelect(el("padRoot"), 48);   /* C3 起点 */
-  fillRootSelect(el("scaleRoot"), 45); /* A2 起点 */
-  el("scaleRoot").value = 45;          /* A マイナー既定 */
+  fillRootSelect(el("seqKey"), 48);
+  el("seqKey").value = 57;             /* A 既定 */
   buildPads();
   initGridState(); buildGrid(); bindGrid();
   el("padRoot").addEventListener("change", buildPads);
   el("padInst").addEventListener("change", buildPads);
-  el("scaleMode").addEventListener("change", buildGrid);
-  el("scaleRoot").addEventListener("change", buildGrid);
+  el("seqKey").addEventListener("change", buildGrid);
   el("octDown").addEventListener("click", function(){ shiftOct(-12); });
   el("octUp").addEventListener("click", function(){ shiftOct(12); });
   el("playBtn").addEventListener("click", function(){ playing ? stopSeq() : startSeq(); });
@@ -770,6 +864,7 @@ function init(){
   ["revAmt","dlyAmt","volAmt"].forEach(function(id){
     el(id).addEventListener("input", applyFx);
   });
+  if (typeof requestAnimationFrame !== "undefined"){ requestAnimationFrame(animate); }
 }
 if (typeof document !== "undefined" && document.getElementById){ init(); }
 </script>

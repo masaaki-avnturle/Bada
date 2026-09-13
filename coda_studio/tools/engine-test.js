@@ -1,17 +1,17 @@
 /*
- * engine-test.js — Coda Studio 音楽エンジンの単体テスト (Node で実行)
+ * engine-test.js — Coda Studio v2 スペクトル・コード・エンジンの単体テスト (Node で実行)
  *
  *   node coda_studio/tools/engine-test.js
  *
  * index.html のインライン <script> を抜き出し、DOM をスタブした上で
  * 純ロジック部分を検証します:
- *   1. 音律 — noteToFreq / noteName
- *   2. スケール構築 — メジャー / マイナー / 都節 / 琉球
- *   3. コード — chordNotes のヴォイシング
- *   4. シーケンサー — seqToEvents のタイミングとスウィング
+ *   1. 音律 — noteToFreq
+ *   2. コード — chordNotes のヴォイシング
+ *   3. 多段階スペクトル・ヴォイシング — chordVoicing (段階 1〜4)
+ *   4. シーケンサー — chordGridToEvents のタイミングとスウィング
  *   5. WAV エンコード — RIFF ヘッダとサイズ
  *   6. リバーブ インパルス — 決定性と減衰
- *   7. おまかせ生成 — 決定性と密度
+ *   7. おまかせ生成 — 決定性・段階範囲・密度
  */
 "use strict";
 const fs = require("fs");
@@ -29,7 +29,7 @@ function stubEl(){
   return new Proxy({
     style: {}, dataset: {},
     classList: { add(){}, remove(){}, toggle(){}, contains(){ return false; } },
-    value: "", textContent: "", innerHTML: "", className: ""
+    value: "", textContent: "", innerHTML: "", className: "", width: 940, height: 120
   }, {
     get(t, p){
       if (p in t) return t[p];
@@ -46,7 +46,7 @@ function stubEl(){
 const els = {};
 const sandbox = {
   console, Math, Function, Date,
-  Float32Array, ArrayBuffer, DataView, Uint8Array, Array, Object, JSON,
+  Float32Array, Uint8Array, ArrayBuffer, DataView, Array, Object, JSON,
   setTimeout: function(fn){ fn(); }, setInterval: function(){ return 0; },
   clearInterval: function(){}, alert: function(){},
   URL: { createObjectURL(){ return "blob:x"; }, revokeObjectURL(){} },
@@ -73,47 +73,53 @@ function ok(cond, name){
 function near(a, b, eps){ return Math.abs(a - b) <= (eps || 1e-6); }
 
 /* 1. 音律 */
-console.log("1. 音律 noteToFreq / noteName");
+console.log("1. 音律 noteToFreq");
 ok(near(sandbox.noteToFreq(69), 440), "A4 (midi 69) = 440 Hz");
 ok(near(sandbox.noteToFreq(60), 261.6255653, 1e-4), "C4 (midi 60) ≈ 261.63 Hz");
 ok(near(sandbox.noteToFreq(81), 880), "A5 = 880 Hz (1 オクターブで 2 倍)");
-ok(sandbox.noteName(60) === "C4", "noteName(60) = C4");
-ok(sandbox.noteName(69) === "A4", "noteName(69) = A4");
 
-/* 2. スケール */
-console.log("2. buildScale — スケール構築");
-const maj = sandbox.buildScale(60, "major", 8);
-ok(maj.length === 8, "要求した音数を返す");
-ok(maj[0] === 60 && maj[7] === 72, "メジャー: ルートで始まり 8 音目がオクターブ上");
-ok(JSON.stringify(maj.slice(0, 7)) === JSON.stringify([60,62,64,65,67,69,71]), "メジャーの音程列");
-const miyako = sandbox.buildScale(57, "miyako", 6);
-ok(JSON.stringify(miyako) === JSON.stringify([57,58,62,64,65,69]), "都節音階 (0,1,5,7,8) + オクターブ");
-const ryu = sandbox.buildScale(60, "ryukyu", 5);
-ok(JSON.stringify(ryu) === JSON.stringify([60,64,65,67,71]), "琉球音階 (0,4,5,7,11)");
-const asc = sandbox.buildScale(45, "minor", 13);
-ok(asc.every((v, i) => i === 0 || v > asc[i-1]), "13 音が単調増加");
-
-/* 3. コード */
-console.log("3. chordNotes — ヴォイシング");
+/* 2. コード */
+console.log("2. chordNotes — ヴォイシング");
 ok(JSON.stringify(sandbox.chordNotes(60, "maj9")) === JSON.stringify([60,64,67,71,74]), "Cmaj9");
 ok(JSON.stringify(sandbox.chordNotes(57, "m7")) === JSON.stringify([57,60,64,67]), "Am7");
 ok(JSON.stringify(sandbox.chordNotes(62, "sus2")) === JSON.stringify([62,64,69]), "Dsus2");
 ok(sandbox.chordNotes(60, "unknown").length === 4, "未知タイプは maj7 にフォールバック");
 
+/* 3. 多段階スペクトル・ヴォイシング */
+console.log("3. chordVoicing — 4 段階のスペクトル");
+const v1 = sandbox.chordVoicing(60, "maj9", 1);
+const v2 = sandbox.chordVoicing(60, "maj9", 2);
+const v3 = sandbox.chordVoicing(60, "maj9", 3);
+const v4 = sandbox.chordVoicing(60, "maj9", 4);
+ok(JSON.stringify(v1.notes) === JSON.stringify([48, 67]), "段階1 = 深部: 低ルート + 5度");
+ok(JSON.stringify(v2.notes) === JSON.stringify([48, 60, 64, 67]), "段階2 = 中域: + 基本 3 音");
+ok(JSON.stringify(v3.notes) === JSON.stringify([48, 60, 64, 67, 71, 74]), "段階3 = 上音: テンション全開");
+ok(JSON.stringify(v4.notes) === JSON.stringify([48, 60, 64, 67, 71, 74, 86]), "段階4 = 輝き: 最上音をオクターブ重ね");
+ok(v1.vel < v2.vel && v2.vel < v3.vel && v3.vel < v4.vel, "段階が深いほど音量が上がる");
+ok(JSON.stringify(sandbox.chordVoicing(60, "maj9", 0).notes) === JSON.stringify(v1.notes) &&
+   JSON.stringify(sandbox.chordVoicing(60, "maj9", 9).notes) === JSON.stringify(v4.notes),
+   "段階は 1〜4 にクランプされる");
+
 /* 4. シーケンサー */
-console.log("4. seqToEvents — タイミングとスウィング");
-const rows = 13, steps = 16;
+console.log("4. chordGridToEvents — タイミングとスウィング");
+const ROWS = 8, STEPS = 16;
 const grid = [];
-for (let r = 0; r < rows; r++) grid.push(new Array(steps).fill(0));
-grid[0][0] = 1; grid[4][1] = 1; grid[2][8] = 1;
-const scale = sandbox.buildScale(45, "minor", rows);
-const res = sandbox.seqToEvents(grid, scale, 120, 0);
-ok(res.events.length === 3, "置いた 3 音がイベントになる");
+for (let r = 0; r < ROWS; r++) grid.push(new Array(STEPS).fill(0));
+grid[0][0] = 3; grid[2][1] = 1; grid[5][8] = 4;
+const chords = [
+  { root:57, type:"maj9" }, { root:62, type:"maj7" }, { root:66, type:"m9" },
+  { root:64, type:"sus2" }, { root:61, type:"m7" },  { root:59, type:"m11" },
+  { root:57, type:"six9" }, { root:55, type:"maj7" }
+];
+const res = sandbox.chordGridToEvents(grid, chords, 120, 0);
+ok(res.events.length === 3, "置いた 3 コードがイベントになる");
 ok(near(res.stepDur, 0.125), "BPM120 の 16 分音符 = 0.125 s");
 ok(near(res.loopLen, 2.0), "1 ループ = 2.0 s");
-ok(near(res.events[0].time, 0) && res.events[0].midi === scale[0], "step0 はルート・時刻 0");
-ok(near(res.events[2].time, 1.0), "step8 は 1.0 s");
-const sw = sandbox.seqToEvents(grid, scale, 120, 0.5);
+ok(near(res.events[0].time, 0) && res.events[0].level === 3, "step0: 時刻 0・段階 3");
+ok(res.events[0].midis.length === 6, "段階 3 は 6 音 (低ルート + maj9 全音)");
+ok(res.events[1].midis.length === 2 && res.events[1].midis[0] === 66 - 12, "段階 1 は 2 音・低ルートから");
+ok(near(res.events[2].time, 1.0) && res.events[2].midis.length === 8, "step8: 1.0 s・段階 4 の m11 は 8 音");
+const sw = sandbox.chordGridToEvents(grid, chords, 120, 0.5);
 ok(near(sw.events[1].time, 0.125 + 0.5 * 0.125), "奇数ステップにスウィングが乗る");
 ok(near(sw.events[0].time, 0) && near(sw.events[2].time, 1.0), "偶数ステップは動かない");
 
@@ -146,18 +152,20 @@ const tail = ir1.slice(3600).reduce((a, v) => a + Math.abs(v), 0) / 400;
 ok(tail < head * 0.2, "末尾が減衰している");
 
 /* 7. おまかせ生成 */
-console.log("7. demoPattern — 決定性と密度");
-const p1 = sandbox.demoPattern(13, 16, 12345);
-const p2 = sandbox.demoPattern(13, 16, 12345);
+console.log("7. demoPattern — 決定性・段階範囲・密度");
+const p1 = sandbox.demoPattern(8, 16, 12345);
+const p2 = sandbox.demoPattern(8, 16, 12345);
 ok(JSON.stringify(p1) === JSON.stringify(p2), "同じ種なら同一パターン");
-ok(p1.length === 13 && p1.every(r => r.length === 16), "13 行 × 16 ステップ");
-ok(p1[0][0] === 1, "ルートで始まる");
-const count = p1.flat().reduce((a, v) => a + v, 0);
-ok(count >= 4 && count <= 40, "密度が疎 (アンビエント向き): " + count + " 音");
+ok(p1.length === 8 && p1.every(r => r.length === 16), "8 行 × 16 ステップ");
+ok(p1.flat().every(v => v >= 0 && v <= 4), "全セルが段階 0〜4 の範囲");
+ok(p1[0][0] >= 1, "トニックで始まる");
+const count = p1.flat().filter(v => v > 0).length;
+ok(count >= 3 && count <= 24, "密度が疎 (アンビエント向き): " + count + " コード");
 
 /* 8. アプリ層の存在確認 */
-console.log("8. アプリ層 — シンセ/バス/書き出し関数の存在");
-["synthVoice", "buildBus", "renderEvents", "exportWav", "startSeq", "stopSeq"].forEach(fn =>
+console.log("8. アプリ層 — シンセ/バス/プレイヘッド/スペクトラム関数の存在");
+["synthVoice", "buildBus", "renderEvents", "exportWav", "startSeq", "stopSeq",
+ "drawSpectrum", "animate", "chordSymbol"].forEach(fn =>
   ok(typeof sandbox[fn] === "function", fn + " が定義されている"));
 
 console.log("");
