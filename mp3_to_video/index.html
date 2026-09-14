@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bada SoundFilm — MP3 → 動画 変換スタジオ</title>
+<!--
+  Bada SoundFilm — MP3 を動画に変換するソフト(依存ゼロ・単一 HTML・オフライン動作)
+
+  ・MP3(ほか WAV / OGG / M4A などブラウザが再生できる音声)を読み込み、
+    ID3v2/ID3v1 タグ(曲名・アーティスト・アルバム・ジャケット画像 APIC)を解析
+  ・Canvas にビジュアライザ(スペクトラムバー / 波形 / サークル / シンプル)を描画し、
+    Web Audio API の音声トラックと合成して MediaRecorder で動画ファイルへ録画
+  ・出力は環境が対応していれば MP4 (H.264/AAC)、それ以外は WebM (VP9/VP8 + Opus)
+  ・解像度 (1080p / 720p / 正方形 / 縦型ショート)、フレームレート、スタイル、
+    背景色・背景画像、複数ファイルの連続変換に対応
+  ・変換はリアルタイム録画(曲の長さと同じ時間がかかります)
+-->
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121722; --panel2:#171d2b; --line:#232c40;
+    --tx:#e8ecf4; --tx2:#8b94a8; --gold:#e8c76a; --cyan:#58c8d8;
+    --ok:#5fd68a; --err:#e87a7a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--tx);
+    font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding:18px 22px 14px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#10141e,#0b0e14);
+  }
+  header h1{ margin:0; font-size:22px; letter-spacing:.5px; }
+  header h1 .gold{ color:var(--gold); }
+  header .sub{ color:var(--tx2); font-size:13px; }
+  #fmtBadge{
+    margin-left:auto; font-size:12px; color:var(--cyan);
+    border:1px solid var(--line); border-radius:999px; padding:4px 12px;
+    background:var(--panel);
+  }
+  main{
+    display:grid; grid-template-columns:minmax(320px,440px) 1fr;
+    gap:18px; padding:18px 22px; max-width:1500px; margin:0 auto;
+  }
+  @media (max-width:980px){ main{ grid-template-columns:1fr; } }
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:16px;
+  }
+  .panel h2{ margin:0 0 12px; font-size:14px; color:var(--gold); letter-spacing:1px; }
+  /* ドロップゾーン */
+  #drop{
+    border:2px dashed #2c3550; border-radius:14px;
+    padding:26px 14px; text-align:center; cursor:pointer; transition:.15s;
+    color:var(--tx2);
+  }
+  #drop:hover,#drop.over{ border-color:var(--gold); color:var(--tx); background:#141a28; }
+  #drop .big{ font-size:34px; }
+  #drop b{ color:var(--gold); }
+  #fileInput,#bgInput{ display:none; }
+  /* トラックリスト */
+  #tracks{ margin-top:12px; display:flex; flex-direction:column; gap:10px; }
+  .track{
+    display:grid; grid-template-columns:56px 1fr auto; gap:12px; align-items:center;
+    background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px;
+  }
+  .track img.cover, .track .nocover{
+    width:56px; height:56px; border-radius:8px; object-fit:cover;
+    background:radial-gradient(circle at 35% 30%,#3a4460,#121622 70%);
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .track .meta .t{ font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:260px; }
+  .track .meta .a{ color:var(--tx2); font-size:12px; margin-top:2px; }
+  .track .meta .st{ font-size:12px; margin-top:4px; color:var(--cyan); }
+  .track .meta .st.done{ color:var(--ok); }
+  .track .meta .st.err{ color:var(--err); }
+  .track .btns{ display:flex; flex-direction:column; gap:6px; }
+  .prog{ height:5px; border-radius:3px; background:#0e1220; overflow:hidden; margin-top:6px; }
+  .prog i{ display:block; height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--cyan)); }
+  button{
+    font:inherit; font-size:12px; color:var(--tx); background:#1d2436;
+    border:1px solid #2d3650; border-radius:8px; padding:6px 12px; cursor:pointer;
+  }
+  button:hover{ background:#252e46; }
+  button:disabled{ opacity:.45; cursor:default; }
+  button.primary{
+    background:linear-gradient(135deg,#b9973f,#e8c76a); color:#14100a; font-weight:700;
+    border:none; font-size:14px; padding:10px 18px;
+  }
+  button.primary:hover{ filter:brightness(1.08); }
+  a.dl{
+    display:inline-block; font-size:12px; color:#0f1a12; font-weight:700;
+    background:linear-gradient(135deg,#3fae66,#5fd68a); border-radius:8px;
+    padding:6px 12px; text-decoration:none; text-align:center;
+  }
+  /* 設定 */
+  .settings{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .field label{ display:block; font-size:12px; color:var(--tx2); margin-bottom:4px; }
+  select,input[type=color]{
+    width:100%; font:inherit; font-size:13px; color:var(--tx);
+    background:#0e1220; border:1px solid var(--line); border-radius:8px; padding:7px 8px;
+  }
+  input[type=color]{ height:36px; padding:3px; }
+  .check{ display:flex; align-items:center; gap:8px; font-size:13px; color:var(--tx); margin-top:8px; }
+  /* プレビュー */
+  #stageWrap{ position:relative; margin-top:12px; }
+  #stage{
+    width:100%; display:block; border-radius:12px; border:1px solid var(--line);
+    background:#05070c; max-height:62vh; object-fit:contain;
+  }
+  #recDot{
+    position:absolute; top:12px; left:14px; display:none; align-items:center; gap:8px;
+    font-size:12px; color:#ff8484; font-weight:700; letter-spacing:1px;
+    background:rgba(10,6,6,.55); padding:4px 10px; border-radius:999px;
+  }
+  #recDot i{ width:9px; height:9px; border-radius:50%; background:#ff4d4d; animation:blink 1s infinite; }
+  @keyframes blink{ 50%{ opacity:.25; } }
+  .controls{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; align-items:center; }
+  .note{ color:var(--tx2); font-size:12px; line-height:1.7; margin-top:10px; }
+  #globalMsg{ font-size:13px; color:var(--cyan); margin-top:8px; min-height:18px; }
+  #globalMsg.err{ color:var(--err); }
+  footer{ text-align:center; color:#4a5266; font-size:12px; padding:20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬 Bada <span class="gold">SoundFilm</span></h1>
+  <span class="sub">MP3 → 動画 変換スタジオ — 音楽をビジュアライザ付き動画に(依存ゼロ・オフライン)</span>
+  <span id="fmtBadge">出力形式: 判定中…</span>
+</header>
+
+<main>
+  <!-- 左: 音楽ファイル -->
+  <section class="panel">
+    <h2>♪ 音楽ファイル</h2>
+    <div id="drop">
+      <div class="big">🎵 ⇢ 🎬</div>
+      <p><b>MP3 をここにドロップ</b><br>またはクリックして選択(複数可 / WAV・OGG・M4A も可)</p>
+    </div>
+    <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac" multiple>
+    <div id="tracks"></div>
+    <div class="controls">
+      <button class="primary" id="convertAll">⚡ すべて変換</button>
+      <button id="clearAll">🗑 クリア</button>
+    </div>
+    <div id="globalMsg"></div>
+    <p class="note">
+      変換は<b>リアルタイム録画</b>です(曲の長さと同じ時間がかかります)。
+      変換中はこのウィンドウ(タブ)を<b>前面に表示したまま</b>にしてください。
+      曲名・アーティスト名・ジャケット画像は MP3 の ID3 タグから自動で読み取ります。
+    </p>
+  </section>
+
+  <!-- 右: 設定 + ステージ -->
+  <section class="panel">
+    <h2>⚙ 動画設定</h2>
+    <div class="settings">
+      <div class="field">
+        <label>解像度</label>
+        <select id="selRes"></select>
+      </div>
+      <div class="field">
+        <label>フレームレート</label>
+        <select id="selFps">
+          <option value="30" selected>30 fps</option>
+          <option value="60">60 fps</option>
+          <option value="24">24 fps</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>ビジュアライザ</label>
+        <select id="selStyle">
+          <option value="bars" selected>スペクトラムバー</option>
+          <option value="circle">サークル</option>
+          <option value="wave">波形</option>
+          <option value="simple">シンプル</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>背景色</label>
+        <input type="color" id="selBg" value="#0b0e14">
+      </div>
+      <div class="field">
+        <label>背景画像</label>
+        <button id="bgBtn" style="width:100%">🖼 画像を選択…</button>
+        <input type="file" id="bgInput" accept="image/*">
+      </div>
+      <div class="field">
+        <label>背景画像を外す</label>
+        <button id="bgClear" style="width:100%">✖ なし(色のみ)</button>
+      </div>
+    </div>
+    <label class="check"><input type="checkbox" id="chkTitle" checked> 曲名・アーティスト名を表示</label>
+    <label class="check"><input type="checkbox" id="chkMonitor"> 変換中に音を再生する(モニター)</label>
+
+    <div id="stageWrap">
+      <canvas id="stage" width="1280" height="720"></canvas>
+      <span id="recDot"><i></i>REC 変換中</span>
+    </div>
+    <div class="controls">
+      <button id="previewBtn">▶ プレビュー再生</button>
+      <button id="stopBtn" disabled>⏹ 停止</button>
+      <span class="note" id="estNote"></span>
+    </div>
+  </section>
+</main>
+
+<footer>Bada SoundFilm — Web Audio API + Canvas + MediaRecorder / 単一 HTML・完全オフライン</footer>
+
+<script>
+"use strict";
+/* ================================================================
+ *  Bada SoundFilm エンジン
+ *  純ロジック部(タグ解析・整形・スペクトラム集計・形式選択)は
+ *  tools/engine-test.js から Node 単体テストされます。
+ * ================================================================ */
+
+/* ── 定数 ─────────────────────────────────────── */
+var RES_PRESETS = [
+  { id:"1080p",  label:"1920 × 1080(フル HD・横)", w:1920, h:1080 },
+  { id:"720p",   label:"1280 × 720(HD・横)",       w:1280, h:720  },
+  { id:"square", label:"1080 × 1080(正方形)",       w:1080, h:1080 },
+  { id:"short",  label:"1080 × 1920(縦・ショート)", w:1080, h:1920 }
+];
+
+var RECORDER_MIMES = [
+  { mime:'video/mp4;codecs="avc1.640028,mp4a.40.2"', ext:"mp4",  label:"MP4 (H.264 + AAC)" },
+  { mime:"video/mp4",                                 ext:"mp4",  label:"MP4" },
+  { mime:"video/webm;codecs=vp9,opus",                ext:"webm", label:"WebM (VP9 + Opus)" },
+  { mime:"video/webm;codecs=vp8,opus",                ext:"webm", label:"WebM (VP8 + Opus)" },
+  { mime:"video/webm",                                ext:"webm", label:"WebM" }
+];
+
+var AUDIO_BPS = 192000;   /* 音声ビットレート */
+var N_BARS    = 64;       /* スペクトラムバー本数 */
+
+/* ── 純ロジック: 整形 ─────────────────────────── */
+function fmtTime(sec){
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  var s = Math.floor(sec);
+  var m = Math.floor(s / 60);
+  var r = s % 60;
+  return m + ":" + (r < 10 ? "0" : "") + r;
+}
+
+function fmtBytes(n){
+  if (!isFinite(n) || n < 0) n = 0;
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + " MB";
+  return (n / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+
+/* "アーティスト - 曲名.mp3" 形式のファイル名から曲情報を推定 */
+function parseTrackMeta(filename){
+  var base = String(filename || "").replace(/\.[A-Za-z0-9]+$/, "").trim();
+  var m = base.match(/^(.+?)\s+-\s+(.+)$/);
+  if (m) return { artist: m[1].trim(), title: m[2].trim() };
+  return { artist: "", title: base };
+}
+
+/* 出力ファイル名(不正文字を除去) */
+function sanitizeName(name){
+  var s = String(name || "").replace(/[\\\/:*?"<>|\u0000-\u001f]/g, "").trim();
+  return s || "video";
+}
+
+/* ── 純ロジック: 録画形式の選択 ───────────────── */
+function pickRecorderMime(isSupported){
+  for (var i = 0; i < RECORDER_MIMES.length; i++){
+    var c = RECORDER_MIMES[i];
+    var ok = false;
+    try { ok = !!isSupported(c.mime); } catch (e) { ok = false; }
+    if (ok) return c;
+  }
+  return { mime:"", ext:"webm", label:"WebM" };
+}
+
+/* 解像度・fps からの推奨映像ビットレート (bps) */
+function videoBitrate(w, h, fps){
+  var bps = Math.round(w * h * fps * 0.08);
+  if (bps < 1000000) bps = 1000000;
+  if (bps > 20000000) bps = 20000000;
+  return bps;
+}
+
+/* おおよその出力サイズ (bytes) */
+function estimateSize(videoBps, audioBps, seconds){
+  if (!isFinite(seconds) || seconds < 0) seconds = 0;
+  return Math.round((videoBps + audioBps) / 8 * seconds);
+}
+
+/* ── 純ロジック: スペクトラム集計 ─────────────── */
+/* FFT の周波数ビン (Uint8Array) を対数スケールで n 本のバー (0..1) に集計 */
+function spectrumBars(data, n){
+  var len = data.length, out = new Array(n);
+  for (var i = 0; i < n; i++){
+    var lo = Math.floor(Math.pow(len, i / n)) - 1;
+    var hi = Math.floor(Math.pow(len, (i + 1) / n));
+    if (lo < 0) lo = 0;
+    if (hi <= lo) hi = lo + 1;
+    if (hi > len) hi = len;
+    var sum = 0;
+    for (var j = lo; j < hi; j++) sum += data[j];
+    out[i] = (sum / (hi - lo)) / 255;
+  }
+  return out;
+}
+
+/* 全体エネルギー 0..1(ジャケットのパルスに使用) */
+function energyOf(data){
+  var sum = 0;
+  for (var i = 0; i < data.length; i++) sum += data[i];
+  return data.length ? (sum / data.length) / 255 : 0;
+}
+
+/* ── 純ロジック: ID3 タグ解析 ─────────────────── */
+function id3SyncSafe(u, p){
+  return ((u[p] & 0x7f) << 21) | ((u[p+1] & 0x7f) << 14) | ((u[p+2] & 0x7f) << 7) | (u[p+3] & 0x7f);
+}
+
+function id3Uint32(u, p){
+  return (u[p] * 0x1000000) + (u[p+1] << 16) + (u[p+2] << 8) + u[p+3];
+}
+
+/* テキストフレームのデコード (encoding byte + 本文) */
+function id3Text(bytes){
+  if (!bytes || bytes.length < 2) return "";
+  var enc = bytes[0];
+  var b = bytes.subarray(1);
+  var s = "";
+  try {
+    if (enc === 0)      s = new TextDecoder("latin1").decode(b);
+    else if (enc === 3) s = new TextDecoder("utf-8").decode(b);
+    else if (enc === 2) s = new TextDecoder("utf-16be").decode(b);
+    else {
+      /* enc === 1: UTF-16 with BOM */
+      if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) s = new TextDecoder("utf-16be").decode(b.subarray(2));
+      else if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) s = new TextDecoder("utf-16le").decode(b.subarray(2));
+      else s = new TextDecoder("utf-16le").decode(b);
+    }
+  } catch (e) { s = ""; }
+  s = s.replace(/^﻿/, "");
+  var z = s.indexOf("\u0000");
+  if (z >= 0) s = s.slice(0, z);
+  return s.trim();
+}
+
+/* APIC (ジャケット画像) フレーム → { mime, data } */
+function id3Apic(bytes){
+  if (!bytes || bytes.length < 4) return null;
+  var enc = bytes[0];
+  var p = 1;
+  var mimeEnd = p;
+  while (mimeEnd < bytes.length && bytes[mimeEnd] !== 0) mimeEnd++;
+  var mime = "";
+  try { mime = new TextDecoder("latin1").decode(bytes.subarray(p, mimeEnd)); } catch (e) {}
+  p = mimeEnd + 1;      /* mime の終端 0 を跨ぐ */
+  p += 1;               /* picture type */
+  /* description をスキップ (enc 0/3: 単一 0 終端, enc 1/2: 二重 0 終端) */
+  if (enc === 1 || enc === 2){
+    while (p + 1 < bytes.length && !(bytes[p] === 0 && bytes[p+1] === 0)) p += 2;
+    p += 2;
+  } else {
+    while (p < bytes.length && bytes[p] !== 0) p++;
+    p += 1;
+  }
+  if (p >= bytes.length) return null;
+  if (!mime) mime = "image/jpeg";
+  if (mime.indexOf("/") < 0) mime = "image/" + mime;   /* ID3v2.2 流の "JPG" 形式 */
+  return { mime: mime, data: bytes.subarray(p) };
+}
+
+/* ID3v2.3 / v2.4 (+ 末尾 ID3v1 フォールバック) を解析
+ * → { title, artist, album, picture: {mime,data} | null } */
+function id3Parse(buf){
+  var u = (buf && buf.constructor && buf.constructor.name === "Uint8Array") ? buf : new Uint8Array(buf);
+  var out = { title:"", artist:"", album:"", picture:null };
+  if (u.length > 10 && u[0] === 0x49 && u[1] === 0x44 && u[2] === 0x33){
+    var ver = u[3];
+    var flags = u[5];
+    var size = id3SyncSafe(u, 6);
+    var pos = 10;
+    var end = Math.min(10 + size, u.length);
+    if (flags & 0x40){ /* 拡張ヘッダをスキップ */
+      var es = (ver >= 4) ? id3SyncSafe(u, pos) : id3Uint32(u, pos) + 4;
+      pos += es;
+    }
+    while (pos + 10 <= end){
+      if (u[pos] === 0) break;   /* パディング領域 */
+      var id = String.fromCharCode(u[pos], u[pos+1], u[pos+2], u[pos+3]);
+      var fsize = (ver >= 4) ? id3SyncSafe(u, pos + 4) : id3Uint32(u, pos + 4);
+      pos += 10;
+      if (fsize <= 0 || pos + fsize > end) break;
+      var frame = u.subarray(pos, pos + fsize);
+      if (id === "TIT2")      out.title  = out.title  || id3Text(frame);
+      else if (id === "TPE1") out.artist = out.artist || id3Text(frame);
+      else if (id === "TALB") out.album  = out.album  || id3Text(frame);
+      else if (id === "APIC" && !out.picture) out.picture = id3Apic(frame);
+      pos += fsize;
+    }
+  }
+  /* ID3v1 フォールバック (末尾 128 byte の "TAG") */
+  if ((!out.title || !out.artist) && u.length >= 128){
+    var t = u.length - 128;
+    if (u[t] === 0x54 && u[t+1] === 0x41 && u[t+2] === 0x47){
+      var dec = function(a, b){
+        var s = "";
+        try { s = new TextDecoder("latin1").decode(u.subarray(a, b)); } catch (e) {}
+        var z = s.indexOf("\u0000");
+        if (z >= 0) s = s.slice(0, z);
+        return s.trim();
+      };
+      if (!out.title)  out.title  = dec(t + 3,  t + 33);
+      if (!out.artist) out.artist = dec(t + 33, t + 63);
+      if (!out.album)  out.album  = dec(t + 63, t + 93);
+    }
+  }
+  return out;
+}
+
+/* ── 描画エンジン ─────────────────────────────── */
+function hexToRgb(hex){
+  var m = String(hex || "").match(/^#?([0-9a-f]{6})$/i);
+  if (!m) return { r:11, g:14, b:20 };
+  var v = parseInt(m[1], 16);
+  return { r:(v >> 16) & 255, g:(v >> 8) & 255, b:v & 255 };
+}
+
+function rgba(c, a){ return "rgba(" + c.r + "," + c.g + "," + c.b + "," + a + ")"; }
+
+function lighten(c, k){
+  return { r: Math.min(255, Math.round(c.r + (255 - c.r) * k)),
+           g: Math.min(255, Math.round(c.g + (255 - c.g) * k)),
+           b: Math.min(255, Math.round(c.b + (255 - c.b) * k)) };
+}
+
+/* 画像を cover フィットで描画 */
+function drawCoverFit(ctx, img, W, H){
+  var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  if (!iw || !ih) return;
+  var s = Math.max(W / iw, H / ih);
+  var dw = iw * s, dh = ih * s;
+  ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+/* 内蔵ジャケット(タグに画像が無いとき): レコード盤 */
+function drawDisc(ctx, cx, cy, r){
+  var g = ctx.createRadialGradient(cx - r * .3, cy - r * .3, r * .1, cx, cy, r);
+  g.addColorStop(0, "#3a4460"); g.addColorStop(.55, "#161b2a"); g.addColorStop(1, "#0a0d16");
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(232,199,106,0.25)";
+  for (var i = 1; i <= 4; i++){
+    ctx.beginPath(); ctx.arc(cx, cy, r * (0.35 + i * 0.13), 0, Math.PI * 2);
+    ctx.lineWidth = r * 0.008 + 1; ctx.stroke();
+  }
+  var g2 = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * .3);
+  g2.addColorStop(0, "#e8c76a"); g2.addColorStop(1, "#8f7326");
+  ctx.fillStyle = g2;
+  ctx.beginPath(); ctx.arc(cx, cy, r * .3, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#0b0e14";
+  ctx.beginPath(); ctx.arc(cx, cy, r * .05, 0, Math.PI * 2); ctx.fill();
+}
+
+function ellipsize(ctx, text, maxW){
+  if (ctx.measureText(text).width <= maxW) return text;
+  while (text.length > 1 && ctx.measureText(text + "…").width > maxW) text = text.slice(0, -1);
+  return text + "…";
+}
+
+/* 1 フレーム描画
+ * s = { W,H, style, bg(hex), bgImage, cover, title, artist, showTitle,
+ *       time, dur, bars[], wave(Uint8Array|null), energy } */
+function drawFrame(ctx, s){
+  var W = s.W, H = s.H;
+  var base = hexToRgb(s.bg);
+  /* 背景 */
+  if (s.bgImage){
+    drawCoverFit(ctx, s.bgImage, W, H);
+    ctx.fillStyle = "rgba(4,6,11,0.62)";
+    ctx.fillRect(0, 0, W, H);
+  } else {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgba(lighten(base, 0.10), 1));
+    g.addColorStop(1, rgba(base, 1));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+    var glow = ctx.createRadialGradient(W / 2, H * 0.42, 0, W / 2, H * 0.42, Math.max(W, H) * 0.6);
+    glow.addColorStop(0, "rgba(232,199,106," + (0.05 + s.energy * 0.10) + ")");
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  var minWH = Math.min(W, H);
+  var cx = W / 2;
+  var coverCy = H * (s.style === "wave" ? 0.36 : 0.40);
+  var coverR = minWH * 0.17 * (1 + s.energy * 0.05);
+
+  /* ビジュアライザ */
+  var bars = s.bars || [];
+  var i, n = bars.length;
+  if (s.style === "bars" && n){
+    var areaH = H * 0.26, baseY = H * 0.985;
+    var bw = W / (n * 1.5);
+    for (i = 0; i < n; i++){
+      var v = bars[i];
+      var bh = Math.max(minWH * 0.004, v * areaH);
+      var x = (i + 0.25) * (W / n);
+      var hue = 45 + (i / n) * 145;
+      ctx.fillStyle = "hsla(" + hue + ",62%," + (52 + v * 18) + "%,0.92)";
+      roundRect(ctx, x, baseY - bh, bw, bh, bw / 2.5);
+      ctx.fill();
+      /* 反射 */
+      ctx.fillStyle = "hsla(" + hue + ",62%,50%,0.14)";
+      roundRect(ctx, x, baseY + minWH * 0.006, bw, bh * 0.3, bw / 2.5);
+      ctx.fill();
+    }
+  } else if (s.style === "circle" && n){
+    var r0 = coverR * 1.18;
+    for (i = 0; i < n; i++){
+      var a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      var len = r0 * 0.12 + bars[i] * minWH * 0.13;
+      var hue2 = 45 + (i / n) * 145;
+      ctx.strokeStyle = "hsla(" + hue2 + ",62%,60%,0.9)";
+      ctx.lineWidth = Math.max(2, (Math.PI * 2 * r0 / n) * 0.45);
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * r0,        coverCy + Math.sin(a) * r0);
+      ctx.lineTo(cx + Math.cos(a) * (r0 + len), coverCy + Math.sin(a) * (r0 + len));
+      ctx.stroke();
+    }
+  } else if (s.style === "wave" && s.wave && s.wave.length){
+    var wy = H * 0.72, amp = H * 0.11;
+    ctx.beginPath();
+    for (i = 0; i < s.wave.length; i++){
+      var px = (i / (s.wave.length - 1)) * W;
+      var py = wy + ((s.wave[i] - 128) / 128) * amp;
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = "rgba(88,200,216,0.9)";
+    ctx.lineWidth = Math.max(2, minWH * 0.004);
+    ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.translate(0, minWH * 0.012);
+    ctx.strokeStyle = "#e8c76a";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* エネルギーリング + ジャケット */
+  ctx.save();
+  ctx.strokeStyle = "rgba(232,199,106," + (0.15 + s.energy * 0.5) + ")";
+  ctx.lineWidth = Math.max(2, minWH * 0.006);
+  ctx.beginPath(); ctx.arc(cx, coverCy, coverR * 1.08, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+  if (s.cover){
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, coverCy, coverR, 0, Math.PI * 2); ctx.clip();
+    var iw = s.cover.naturalWidth || s.cover.width, ih = s.cover.naturalHeight || s.cover.height;
+    if (iw && ih){
+      var sc = Math.max((coverR * 2) / iw, (coverR * 2) / ih);
+      ctx.drawImage(s.cover, cx - iw * sc / 2, coverCy - ih * sc / 2, iw * sc, ih * sc);
+    }
+    ctx.restore();
+  } else {
+    drawDisc(ctx, cx, coverCy, coverR);
+  }
+
+  /* テキスト (circle は下向きバーを避けて下げる / bars は左右の時刻表示を避けて狭める) */
+  if (s.showTitle){
+    var textY = coverCy + coverR + minWH * (s.style === "circle" ? 0.20 : 0.10);
+    var titleMaxW = s.style === "bars" ? W * 0.55 : W * 0.86;
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#f2f5fb";
+    ctx.font = "700 " + Math.round(minWH * 0.055) + "px 'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif";
+    ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = minWH * 0.01;
+    ctx.fillText(ellipsize(ctx, s.title || "", titleMaxW), cx, textY);
+    if (s.artist){
+      ctx.fillStyle = "rgba(200,208,224,0.85)";
+      ctx.font = "400 " + Math.round(minWH * 0.034) + "px 'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif";
+      ctx.fillText(ellipsize(ctx, s.artist, titleMaxW), cx, textY + minWH * 0.055);
+    }
+    ctx.shadowBlur = 0;
+  }
+
+  /* プログレスバー + 時刻 */
+  var pbW = W * 0.6, pbX = (W - pbW) / 2, pbY = H * 0.93;
+  if (s.style === "bars") pbY = H * 0.695;
+  ctx.fillStyle = "rgba(255,255,255,0.16)";
+  roundRect(ctx, pbX, pbY, pbW, Math.max(3, minWH * 0.006), minWH * 0.003); ctx.fill();
+  var frac = s.dur > 0 ? Math.min(1, s.time / s.dur) : 0;
+  var pg = ctx.createLinearGradient(pbX, 0, pbX + pbW, 0);
+  pg.addColorStop(0, "#e8c76a"); pg.addColorStop(1, "#58c8d8");
+  ctx.fillStyle = pg;
+  roundRect(ctx, pbX, pbY, pbW * frac, Math.max(3, minWH * 0.006), minWH * 0.003); ctx.fill();
+  ctx.fillStyle = "rgba(210,217,232,0.8)";
+  ctx.font = "400 " + Math.round(minWH * 0.028) + "px 'Segoe UI',sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText(fmtTime(s.time), pbX, pbY - minWH * 0.018);
+  ctx.textAlign = "right";
+  ctx.fillText(fmtTime(s.dur), pbX + pbW, pbY - minWH * 0.018);
+}
+
+/* ================================================================
+ *  アプリ本体 (UI / 変換)
+ * ================================================================ */
+function boot(){
+  var $ = function(id){ return document.getElementById(id); };
+  var stage = $("stage"), ctx = stage.getContext("2d");
+  var tracksEl = $("tracks"), msgEl = $("globalMsg");
+  var items = [];            /* { file, name, meta, dur, audioBuffer, cover, state, ... } */
+  var bgImage = null;
+  var busy = false;          /* 変換 or プレビュー中 */
+  var previewStop = null;
+
+  /* 出力形式の判定 */
+  var chosen = { mime:"", ext:"webm", label:"—" };
+  if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported){
+    chosen = pickRecorderMime(function(m){ return MediaRecorder.isTypeSupported(m); });
+    $("fmtBadge").textContent = "出力形式: " + chosen.label;
+  } else {
+    $("fmtBadge").textContent = "出力形式: 非対応ブラウザ";
+    setMsg("このブラウザは MediaRecorder に対応していません。Chrome / Edge / Firefox をご利用ください。", true);
+  }
+
+  /* 解像度セレクト */
+  RES_PRESETS.forEach(function(p, i){
+    var o = document.createElement("option");
+    o.value = String(i); o.textContent = p.label;
+    if (p.id === "720p") o.selected = true;
+    $("selRes").appendChild(o);
+  });
+
+  function setting(){
+    var p = RES_PRESETS[parseInt($("selRes").value, 10) || 0];
+    return {
+      w: p.w, h: p.h,
+      fps: parseInt($("selFps").value, 10) || 30,
+      style: $("selStyle").value,
+      bg: $("selBg").value,
+      showTitle: $("chkTitle").checked,
+      monitor: $("chkMonitor").checked
+    };
+  }
+
+  function setMsg(t, isErr){
+    msgEl.textContent = t || "";
+    msgEl.className = isErr ? "err" : "";
+  }
+
+  function updateEst(){
+    var st = setting();
+    var it = items[0];
+    var vb = videoBitrate(st.w, st.h, st.fps);
+    var t = "映像 約" + (vb / 1000000).toFixed(1) + " Mbps";
+    if (it && it.dur) t += " / 1 曲目の予想サイズ 約 " + fmtBytes(estimateSize(vb, AUDIO_BPS, it.dur));
+    $("estNote").textContent = t;
+  }
+
+  /* ── トラックリスト描画 ── */
+  function render(){
+    tracksEl.innerHTML = "";
+    items.forEach(function(it, idx){
+      var d = document.createElement("div");
+      d.className = "track";
+      var cov = it.coverURL
+        ? '<img class="cover" src="' + it.coverURL + '" alt="">'
+        : '<div class="nocover">💿</div>';
+      var st = "", stc = "";
+      if (it.state === "ready")      { st = "待機 — " + fmtTime(it.dur); }
+      else if (it.state === "loading"){ st = "読込中…"; }
+      else if (it.state === "converting"){ st = "変換中 " + Math.round(it.progress * 100) + "%"; }
+      else if (it.state === "done")  { st = "✅ 完了 — " + fmtBytes(it.blobSize) + " (" + it.ext + ")"; stc = "done"; }
+      else if (it.state === "error") { st = "⚠ " + (it.errMsg || "エラー"); stc = "err"; }
+      d.innerHTML =
+        cov +
+        '<div class="meta">' +
+          '<div class="t"></div><div class="a"></div>' +
+          '<div class="st ' + stc + '"></div>' +
+          (it.state === "converting" ? '<div class="prog"><i style="width:' + (it.progress * 100) + '%"></i></div>' : "") +
+        "</div>" +
+        '<div class="btns"></div>';
+      d.querySelector(".t").textContent = it.meta.title || it.name;
+      d.querySelector(".a").textContent = it.meta.artist || "—";
+      d.querySelector(".st").textContent = st;
+      var btns = d.querySelector(".btns");
+      if (it.state === "done" && it.blobURL){
+        var a = document.createElement("a");
+        a.className = "dl"; a.href = it.blobURL;
+        a.download = sanitizeName(it.meta.title || it.name.replace(/\.[^.]+$/, "")) + "." + it.ext;
+        a.textContent = "💾 動画を保存";
+        btns.appendChild(a);
+      } else if (it.state === "ready"){
+        var b = document.createElement("button");
+        b.textContent = "🎬 変換";
+        b.disabled = busy;
+        b.onclick = function(){ convertQueue([it]); };
+        btns.appendChild(b);
+      }
+      var del = document.createElement("button");
+      del.textContent = "✖";
+      del.disabled = busy && it.state === "converting";
+      del.onclick = function(){
+        items.splice(idx, 1);
+        if (it.blobURL) URL.revokeObjectURL(it.blobURL);
+        if (it.coverURL) URL.revokeObjectURL(it.coverURL);
+        render(); updateEst();
+      };
+      btns.appendChild(del);
+      tracksEl.appendChild(d);
+    });
+    $("convertAll").disabled = busy || !items.some(function(i){ return i.state === "ready"; });
+  }
+
+  /* ── ファイル読み込み ── */
+  function addFiles(files){
+    Array.prototype.slice.call(files).forEach(function(f){
+      if (!/audio\/|\.(mp3|wav|ogg|oga|m4a|aac|flac|opus|webm)$/i.test(f.type + " " + f.name)) return;
+      var it = {
+        file: f, name: f.name, dur: 0, state: "loading", progress: 0,
+        meta: parseTrackMeta(f.name), cover: null, coverURL: "",
+        audioBuffer: null, blobURL: "", blobSize: 0, ext: chosen.ext
+      };
+      items.push(it);
+      render();
+      f.arrayBuffer().then(function(buf){
+        /* ID3 タグ */
+        try {
+          var tag = id3Parse(new Uint8Array(buf));
+          if (tag.title)  it.meta.title  = tag.title;
+          if (tag.artist) it.meta.artist = tag.artist;
+          if (tag.picture){
+            var blob = new Blob([tag.picture.data], { type: tag.picture.mime });
+            it.coverURL = URL.createObjectURL(blob);
+            var img = new Image();
+            img.onload = function(){ it.cover = img; drawIdle(); };
+            img.src = it.coverURL;
+          }
+        } catch (e) {}
+        /* デコード */
+        var AC = window.AudioContext || window.webkitAudioContext;
+        var ac = new AC();
+        return ac.decodeAudioData(buf.slice(0)).then(function(ab){
+          it.audioBuffer = ab;
+          it.dur = ab.duration;
+          it.state = "ready";
+          ac.close();
+          render(); updateEst(); drawIdle();
+        }, function(){
+          it.state = "error"; it.errMsg = "デコード失敗(対応していない形式)";
+          ac.close(); render();
+        });
+      }).catch(function(){
+        it.state = "error"; it.errMsg = "読み込み失敗"; render();
+      });
+    });
+  }
+
+  /* ── 待機画面の描画 ── */
+  var idleBars = [];
+  for (var i = 0; i < N_BARS; i++) idleBars.push(0.12 + 0.10 * Math.abs(Math.sin(i * 0.7)));
+  function drawIdle(){
+    if (busy) return;
+    var st = setting();
+    stage.width = st.w; stage.height = st.h;
+    var it = items.find(function(x){ return x.state === "ready" || x.state === "done"; }) || items[0];
+    drawFrame(ctx, {
+      W: st.w, H: st.h, style: st.style, bg: st.bg, bgImage: bgImage,
+      cover: it ? it.cover : null,
+      title: it ? (it.meta.title || it.name) : "Bada SoundFilm",
+      artist: it ? it.meta.artist : "MP3 をドロップしてください",
+      showTitle: st.showTitle,
+      time: it ? it.dur * 0.3 : 47, dur: it ? it.dur : 154,
+      bars: idleBars, wave: null, energy: 0.25
+    });
+  }
+
+  /* ── 再生グラフの構築(プレビュー・変換で共用) ── */
+  function buildGraph(it, withDest, monitor){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ac = new AC();
+    var src = ac.createBufferSource();
+    src.buffer = it.audioBuffer;
+    var analyser = ac.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.82;
+    src.connect(analyser);
+    var dest = null;
+    if (withDest){
+      dest = ac.createMediaStreamDestination();
+      analyser.connect(dest);
+    }
+    if (monitor || !withDest){
+      var g = ac.createGain(); g.gain.value = 1;
+      analyser.connect(g); g.connect(ac.destination);
+    }
+    return { ac: ac, src: src, analyser: analyser, dest: dest };
+  }
+
+  /* ── プレビュー ── */
+  $("previewBtn").onclick = function(){
+    if (busy) return;
+    var it = items.find(function(x){ return x.audioBuffer; });
+    if (!it){ setMsg("先に音楽ファイルを読み込んでください。", true); return; }
+    busy = true; render();
+    $("previewBtn").disabled = true; $("stopBtn").disabled = false;
+    var st = setting();
+    stage.width = st.w; stage.height = st.h;
+    var g = buildGraph(it, false, true);
+    var freq = new Uint8Array(g.analyser.frequencyBinCount);
+    var wave = new Uint8Array(g.analyser.fftSize);
+    var t0 = g.ac.currentTime, raf = 0, stopped = false;
+    function loop(){
+      if (stopped) return;
+      g.analyser.getByteFrequencyData(freq);
+      g.analyser.getByteTimeDomainData(wave);
+      drawFrame(ctx, {
+        W: st.w, H: st.h, style: st.style, bg: st.bg, bgImage: bgImage,
+        cover: it.cover, title: it.meta.title || it.name, artist: it.meta.artist,
+        showTitle: st.showTitle,
+        time: g.ac.currentTime - t0, dur: it.dur,
+        bars: spectrumBars(freq, N_BARS), wave: wave, energy: energyOf(freq)
+      });
+      raf = requestAnimationFrame(loop);
+    }
+    function stop(){
+      if (stopped) return;
+      stopped = true;
+      cancelAnimationFrame(raf);
+      try { g.src.stop(); } catch (e) {}
+      g.ac.close();
+      busy = false; previewStop = null;
+      $("previewBtn").disabled = false; $("stopBtn").disabled = true;
+      render(); drawIdle();
+    }
+    previewStop = stop;
+    g.src.onended = stop;
+    g.src.start();
+    loop();
+  };
+  $("stopBtn").onclick = function(){ if (previewStop) previewStop(); };
+
+  /* ── 変換(録画) ── */
+  function convertItem(it, st){
+    return new Promise(function(resolve){
+      if (typeof MediaRecorder === "undefined"){
+        it.state = "error"; it.errMsg = "MediaRecorder 非対応"; resolve(); return;
+      }
+      stage.width = st.w; stage.height = st.h;
+      var g = buildGraph(it, true, st.monitor);
+      var freq = new Uint8Array(g.analyser.frequencyBinCount);
+      var wave = new Uint8Array(g.analyser.fftSize);
+      var stream = stage.captureStream(st.fps);
+      g.dest.stream.getAudioTracks().forEach(function(t){ stream.addTrack(t); });
+      var opts = {
+        videoBitsPerSecond: videoBitrate(st.w, st.h, st.fps),
+        audioBitsPerSecond: AUDIO_BPS
+      };
+      if (chosen.mime) opts.mimeType = chosen.mime;
+      var rec;
+      try {
+        rec = new MediaRecorder(stream, opts);
+      } catch (e) {
+        try { rec = new MediaRecorder(stream); } catch (e2) {
+          it.state = "error"; it.errMsg = "録画を開始できません"; g.ac.close(); resolve(); return;
+        }
+      }
+      var chunks = [];
+      rec.ondataavailable = function(ev){ if (ev.data && ev.data.size) chunks.push(ev.data); };
+      rec.onstop = function(){
+        var mime = rec.mimeType || chosen.mime || "video/webm";
+        var blob = new Blob(chunks, { type: mime });
+        it.blobURL = URL.createObjectURL(blob);
+        it.blobSize = blob.size;
+        it.ext = /mp4/.test(mime) ? "mp4" : "webm";
+        it.state = "done"; it.progress = 1;
+        try { g.ac.close(); } catch (e) {}
+        render(); resolve();
+      };
+      it.state = "converting"; it.progress = 0; render();
+      $("recDot").style.display = "flex";
+      var t0 = g.ac.currentTime, raf = 0, ended = false;
+      function loop(){
+        if (ended) return;
+        var t = g.ac.currentTime - t0;
+        g.analyser.getByteFrequencyData(freq);
+        g.analyser.getByteTimeDomainData(wave);
+        drawFrame(ctx, {
+          W: st.w, H: st.h, style: st.style, bg: st.bg, bgImage: bgImage,
+          cover: it.cover, title: it.meta.title || it.name, artist: it.meta.artist,
+          showTitle: st.showTitle,
+          time: Math.min(t, it.dur), dur: it.dur,
+          bars: spectrumBars(freq, N_BARS), wave: wave, energy: energyOf(freq)
+        });
+        var p = it.dur ? Math.min(1, t / it.dur) : 0;
+        if (p - it.progress >= 0.01){ it.progress = p; render(); }
+        raf = requestAnimationFrame(loop);
+      }
+      g.src.onended = function(){
+        /* 末尾を取りこぼさないよう少し待って停止 */
+        setTimeout(function(){
+          ended = true;
+          cancelAnimationFrame(raf);
+          $("recDot").style.display = "none";
+          try { rec.stop(); } catch (e) { resolve(); }
+        }, 350);
+      };
+      rec.start(250);
+      g.src.start();
+      loop();
+    });
+  }
+
+  function convertQueue(queue){
+    if (busy) return;
+    var q = queue.filter(function(x){ return x.state === "ready" && x.audioBuffer; });
+    if (!q.length){ setMsg("変換できるファイルがありません。", true); return; }
+    if (previewStop) previewStop();
+    busy = true;
+    setMsg("変換中… ウィンドウを前面に表示したままにしてください。");
+    render();
+    var st = setting();
+    var chain = Promise.resolve();
+    q.forEach(function(it){
+      chain = chain.then(function(){ return convertItem(it, st); });
+    });
+    chain.then(function(){
+      busy = false;
+      $("recDot").style.display = "none";
+      var done = q.filter(function(x){ return x.state === "done"; }).length;
+      setMsg("✅ " + done + " / " + q.length + " 件の変換が完了しました。「💾 動画を保存」で保存できます。");
+      render(); drawIdle();
+    });
+  }
+
+  $("convertAll").onclick = function(){ convertQueue(items); };
+  $("clearAll").onclick = function(){
+    if (busy) return;
+    items.forEach(function(it){
+      if (it.blobURL) URL.revokeObjectURL(it.blobURL);
+      if (it.coverURL) URL.revokeObjectURL(it.coverURL);
+    });
+    items = []; render(); setMsg(""); drawIdle();
+  };
+
+  /* ── 入力イベント ── */
+  var drop = $("drop");
+  drop.onclick = function(){ $("fileInput").click(); };
+  $("fileInput").onchange = function(){ addFiles(this.files); this.value = ""; };
+  ["dragover", "dragenter"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function(e){ addFiles(e.dataTransfer.files); });
+  document.addEventListener("dragover", function(e){ e.preventDefault(); });
+  document.addEventListener("drop", function(e){ e.preventDefault(); });
+
+  $("bgBtn").onclick = function(){ $("bgInput").click(); };
+  $("bgInput").onchange = function(){
+    var f = this.files[0]; this.value = "";
+    if (!f) return;
+    var url = URL.createObjectURL(f);
+    var img = new Image();
+    img.onload = function(){ bgImage = img; drawIdle(); };
+    img.src = url;
+  };
+  $("bgClear").onclick = function(){ bgImage = null; drawIdle(); };
+
+  ["selRes", "selFps", "selStyle", "selBg", "chkTitle"].forEach(function(id){
+    $(id).addEventListener("change", function(){ if (!busy){ drawIdle(); updateEst(); } });
+  });
+
+  updateEst();
+  drawIdle();
+}
+
+/* エンジンテスト (Node) からはロジックのみ検証するため boot は起動しない */
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) boot();
+</script>
+</body>
+</html>
