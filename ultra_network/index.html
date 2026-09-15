@@ -1,0 +1,3039 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada UltraNetwork</title>
+<meta name="description" content="Panasonic HD-PLC で家の電力線を物理層にし、NTT 電話回線へ写像して zone:// ウルトラネットワークを走らせ、LINE / Instagram のメッセージを取り込む — 量子プログラミング言語 Bada 製、AT&amp;T ベル研究所式 STREAMS 構成。">
+<style>
+:root{
+  --bg:#0b0e14; --bg2:#11151f; --bg3:#161b28; --line:#232a3a; --line2:#2e3850;
+  --fg:#dfe6f2; --fg2:#93a0b8; --fg3:#63708a;
+  --gold:#c8a44a; --gold2:#dbb85e;
+  --blue:#4a80d0; --cyan:#40b8c0; --violet:#9060d0; --green:#3fb27f;
+  --line-green:#06c755; --ig:#e1306c; --red:#d05a5a; --amber:#d9a441;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic UI",Meiryo,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--fg); font-family:var(--sans);
+  font-size:14px; line-height:1.7; -webkit-text-size-adjust:100%;
+}
+a{color:var(--gold)}
+
+/* ---- ヘッダ ---- */
+header{
+  position:sticky; top:0; z-index:20; background:rgba(11,14,20,.94);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
+}
+.hwrap{max-width:1180px; margin:0 auto; padding:10px 16px}
+.brand{display:flex; align-items:baseline; gap:10px; flex-wrap:wrap}
+.brand h1{font-size:17px; margin:0; letter-spacing:.02em}
+.brand h1 b{color:var(--gold)}
+.brand .sub{font-size:11.5px; color:var(--fg3); font-family:var(--mono)}
+.linkbar{display:flex; gap:6px; margin-top:8px; overflow-x:auto; scrollbar-width:none}
+.linkbar::-webkit-scrollbar{display:none}
+.tab{
+  flex:0 0 auto; padding:6px 11px; border:1px solid var(--line2); border-radius:999px;
+  background:var(--bg2); color:var(--fg2); cursor:pointer; font-size:12.5px;
+  font-family:var(--sans); white-space:nowrap; transition:.12s;
+}
+.tab:hover{border-color:var(--gold); color:var(--fg)}
+.tab[aria-selected="true"]{background:var(--gold); border-color:var(--gold); color:#0b0e14; font-weight:700}
+
+/* ---- レイアウト ---- */
+main{max-width:1180px; margin:0 auto; padding:16px 16px 72px}
+.panel{display:none}
+.panel.on{display:block}
+.card{
+  background:var(--bg2); border:1px solid var(--line); border-radius:12px;
+  padding:14px 15px; margin-bottom:14px;
+}
+.card > h2{
+  font-size:13px; margin:0 0 10px; color:var(--gold); letter-spacing:.06em;
+  text-transform:none; font-weight:700;
+}
+.card > h2 .n{color:var(--fg3); font-family:var(--mono); font-weight:400; font-size:11px; margin-left:6px}
+.lead{color:var(--fg2); font-size:13px; margin:0 0 12px}
+.grid{display:grid; gap:12px}
+@media(min-width:760px){ .g2{grid-template-columns:1fr 1fr} .g3{grid-template-columns:repeat(3,1fr)} }
+
+/* ---- 部品 ---- */
+label.fld{display:block; font-size:11.5px; color:var(--fg3); margin:0 0 4px; letter-spacing:.04em}
+select,input[type=text],textarea{
+  width:100%; background:var(--bg3); color:var(--fg); border:1px solid var(--line2);
+  border-radius:8px; padding:8px 10px; font-family:var(--sans); font-size:13.5px;
+}
+textarea{font-family:var(--mono); font-size:12.5px; resize:vertical}
+select:focus,input:focus,textarea:focus{outline:none; border-color:var(--gold)}
+button{
+  background:var(--bg3); color:var(--fg); border:1px solid var(--line2);
+  border-radius:8px; padding:8px 13px; cursor:pointer; font-family:var(--sans);
+  font-size:13px; transition:.12s;
+}
+button:hover{border-color:var(--gold); color:var(--gold)}
+button.primary{background:var(--gold); border-color:var(--gold); color:#0b0e14; font-weight:700}
+button.primary:hover{background:#dbb85e; color:#0b0e14}
+button.danger:hover{border-color:var(--red); color:var(--red)}
+.row{display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end}
+.row > *{flex:1 1 150px}
+.row > button{flex:0 0 auto}
+
+/* ---- 統計タイル ---- */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(122px,1fr)); gap:8px}
+.stat{background:var(--bg3); border:1px solid var(--line); border-radius:9px; padding:9px 11px}
+.stat .k{font-size:10.5px; color:var(--fg3); letter-spacing:.05em}
+.stat .v{font-size:17px; font-family:var(--mono); color:var(--gold); margin-top:2px; word-break:break-all}
+.stat .v.sm{font-size:13px}
+.stat .u{font-size:10.5px; color:var(--fg3); margin-left:3px}
+
+/* ---- 表 ---- */
+table{width:100%; border-collapse:collapse; font-size:12.5px}
+th,td{text-align:left; padding:6px 8px; border-bottom:1px solid var(--line)}
+th{color:var(--fg3); font-weight:600; font-size:11px; letter-spacing:.05em}
+td{font-family:var(--mono); font-size:12px}
+td.jp{font-family:var(--sans); font-size:12.5px}
+.tblwrap{overflow-x:auto}
+
+/* ---- バッジ ---- */
+.badge{
+  display:inline-block; padding:1px 7px; border-radius:999px; font-size:11px;
+  font-family:var(--mono); border:1px solid currentColor;
+}
+.b-ok{color:var(--green)} .b-no{color:var(--red)} .b-warn{color:var(--amber)}
+.b-line{color:var(--line-green)} .b-ig{color:var(--ig)} .b-zone{color:var(--gold)}
+
+/* ---- canvas ---- */
+canvas{width:100%; display:block; background:var(--bg3); border:1px solid var(--line); border-radius:9px}
+
+/* ---- pre ---- */
+pre{
+  background:var(--bg3); border:1px solid var(--line); border-radius:9px;
+  padding:10px 12px; overflow-x:auto; font-family:var(--mono); font-size:11.5px;
+  color:var(--fg2); margin:0; line-height:1.55; white-space:pre-wrap; word-break:break-word;
+}
+pre b{color:var(--gold); font-weight:400}
+
+/* ---- STREAMS 図 ---- */
+.stack{display:flex; flex-direction:column; gap:5px}
+.slab{
+  border:1px solid var(--line2); border-radius:9px; padding:9px 12px; background:var(--bg3);
+  display:flex; align-items:center; gap:10px; transition:.15s;
+}
+.slab .tag{font-family:var(--mono); font-size:11px; color:var(--gold); min-width:60px}
+.slab .nm{font-size:12.5px; color:var(--fg)}
+.slab .ds{font-size:11px; color:var(--fg3); margin-left:auto; text-align:right}
+.slab.head{border-color:var(--gold); background:#1a1710}
+.slab.drv{border-color:var(--blue); background:#101725}
+.slab.drv .tag{color:var(--blue)}
+.slab.lit{border-color:var(--cyan); box-shadow:0 0 0 1px var(--cyan) inset}
+.arrows{text-align:center; color:var(--fg3); font-size:11px; font-family:var(--mono); margin:1px 0}
+
+/* ---- 受信箱 ---- */
+.thread{border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; background:var(--bg3)}
+.thread .hd{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+.thread .who{font-size:13px; font-weight:600}
+.thread .cnt{margin-left:auto; font-size:11px; color:var(--fg3); font-family:var(--mono)}
+.bub{
+  background:var(--bg2); border:1px solid var(--line); border-radius:9px;
+  padding:6px 10px; margin:4px 0; font-size:13px;
+}
+.bub.out{background:#16210f; border-color:#2c3f1c}
+.bub .mt{font-size:10.5px; color:var(--fg3); font-family:var(--mono); margin-top:3px}
+
+/* ---- 自己診断 ---- */
+.tst{display:flex; gap:9px; padding:5px 0; border-bottom:1px solid var(--line); font-size:12.5px; align-items:baseline}
+.tst .m{font-family:var(--mono); font-size:11px; width:42px; flex:0 0 auto}
+.tst.p .m{color:var(--green)} .tst.f .m{color:var(--red)}
+.tst .d{color:var(--fg3); font-family:var(--mono); font-size:11px; margin-left:auto; text-align:right}
+
+.note{
+  border-left:2px solid var(--line2); padding:2px 0 2px 11px; color:var(--fg3);
+  font-size:12px; margin:10px 0 0;
+}
+.note b{color:var(--fg2); font-weight:600}
+footer{border-top:1px solid var(--line); color:var(--fg3); font-size:11.5px; padding:14px 16px 26px; text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hwrap">
+    <div class="brand">
+      <h1>⚡ Bada <b>UltraNetwork</b></h1>
+      <span class="sub">HD-PLC → NTT → zone://url.or.jp → LINE / Instagram</span>
+    </div>
+    <div class="linkbar" role="tablist">
+      <button class="tab" role="tab" data-p="plc"    aria-selected="true">🔌 コンセント</button>
+      <button class="tab" role="tab" data-p="ntt"    aria-selected="false">☎ NTT 回線</button>
+      <button class="tab" role="tab" data-p="zone"   aria-selected="false">🌐 zone://</button>
+      <button class="tab" role="tab" data-p="crypto" aria-selected="false">🔐 量子暗号</button>
+      <button class="tab" role="tab" data-p="msg"    aria-selected="false">💬 メッセージ</button>
+      <button class="tab" role="tab" data-p="streams"aria-selected="false">🧩 STREAMS</button>
+      <button class="tab" role="tab" data-p="test"   aria-selected="false">🧪 自己診断</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ========== 🔌 コンセント (HD-PLC) ========== -->
+<section class="panel on" id="p-plc">
+  <div class="card">
+    <h2>家の電力線を物理層にする<span class="n">L0 · Panasonic HD-PLC · IEEE 1901 ウェーブレット OFDM</span></h2>
+    <p class="lead">
+      分電盤から各部屋へ伸びる屋内配線を、そのまま通信路として使います。2–28 MHz を 512 本の
+      サブキャリアに分け、各サブキャリアの SNR に応じて 1〜5 ビットを割り当てる
+      <b>適応ビットローディング</b>を行います。アマチュア無線帯にはノッチを入れて送信しません。
+    </p>
+    <div class="row">
+      <div><label class="fld">送信側コンセント</label><select id="plcFrom"></select></div>
+      <div><label class="fld">受信側コンセント (PC)</label><select id="plcTo"></select></div>
+      <div><label class="fld">回線劣化 (dB)</label><select id="plcMargin">
+        <option value="0">0 — 正常</option><option value="6">6 — 家電ノイズ</option>
+        <option value="12">12 — 劣化</option><option value="20">20 — 不通域</option>
+      </select></div>
+      <button class="primary" id="plcGo">回線を測定</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>リンク状態</h2>
+    <div class="stats" id="plcStats"></div>
+    <div class="note" id="plcPathNote"></div>
+  </div>
+
+  <div class="card">
+    <h2>サブキャリア配分<span class="n">上: SNR [dB] / 下: 割当ビット数</span></h2>
+    <canvas id="plcCanvas" height="260"></canvas>
+    <div class="note">
+      緑の面が各サブキャリアの <b>SNR</b>、下の棒が <b>割当ビット数</b>(0〜5 = 2〜32 PAM)。
+      赤い帯は<b>アマチュア無線帯のノッチ</b>で、ここは送信しません。多重経路の反射で
+      SNR が落ち込む位置(櫛形フェージング)では自動的にビット数が下がります。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>CSMA/CA 優先度解決<span class="n">IEEE 1901 · PRS0 / PRS1 スロット</span></h2>
+    <div class="row">
+      <button id="csmaGo">競合させる</button>
+    </div>
+    <div class="tblwrap"><table id="csmaTbl"></table></div>
+  </div>
+</section>
+
+<!-- ========== ☎ NTT 回線 ========== -->
+<section class="panel" id="p-ntt">
+  <div class="card">
+    <h2>zone アドレスを NTT の電話番号へ写像する<span class="n">L1 · 写像 φ</span></h2>
+    <p class="lead">
+      zone:// のアドレスを、NTT の番号計画上の実在形式へ写します。リング上の位置
+      <span style="font-family:var(--mono)">zone_id</span> が<b>市外局番</b>を決め(近い zone は近い局番になる)、
+      加入者番号は URL のハッシュから採ります。番号ポータビリティと同じ<b>割当表</b>を持つので
+      φ⁻¹ は厳密な逆写像になります。
+    </p>
+    <div class="row">
+      <div><label class="fld">回線種別</label><select id="nttLine">
+        <option value="metal">アナログ加入電話 (メタル) — 300–3400 Hz</option>
+        <option value="isdn">INS ネット 64 (ISDN) — B ch 64 kbps</option>
+        <option value="hikari">ひかり電話 (IP) — G.711 µ-law / RTP</option>
+      </select></div>
+      <div><label class="fld">番号帯</label><select id="nttKind">
+        <option value="geo">0AB-J (加入電話)</option>
+        <option value="ip">050 (IP 電話)</option>
+        <option value="mobile">090 (携帯)</option>
+      </select></div>
+      <button class="primary" id="nttGo">写像する</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>写像表 φ : zone:// ↦ NTT 番号<span class="n">φ⁻¹ で往復を検算</span></h2>
+    <div class="tblwrap"><table id="nttTbl"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>呼制御と音声帯モデム<span class="n">16-QAM · fs 8 kHz · 搬送波 2 kHz · 2000 baud</span></h2>
+    <div class="grid g2">
+      <div>
+        <div class="tblwrap"><table id="nttCallTbl"></table></div>
+        <div class="note">
+          メタル回線は音声帯しか通しません。そこで封筒バイト列を <b>16-QAM</b> に変調して
+          300–3400 Hz に収めます。搬送波が標本化周波数のちょうど 1/4 なので
+          <span style="font-family:var(--mono)">cos/sin</span> が {1,0,−1,0}/{0,1,0,−1} の
+          厳密な直交系になり、相関復調が<b>誤差なし</b>で成立します。
+        </div>
+      </div>
+      <div>
+        <canvas id="nttCanvas" height="260"></canvas>
+        <div class="note">受信コンステレーション。16 点の格子上に乗っていれば復調成功です。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 🌐 zone:// ========== -->
+<section class="panel" id="p-zone">
+  <div class="card">
+    <h2>zone://url.or.jp — ウルトラネットワーク WWW<span class="n">L2 · P2P リング DHT</span></h2>
+    <p class="lead">
+      <span style="font-family:var(--mono)">https:</span> / <span style="font-family:var(--mono)">http:</span>
+      に代わるスキームです。中央サーバも DNS ルートも無く、アドレスは<b>ピア自身のハッシュだけ</b>で
+      作られたリング DHT が解決します。全レコードは追記専用の<b>アカシック台帳</b>に記録されます。
+    </p>
+    <div class="row">
+      <div style="flex:1 1 320px"><label class="fld">アドレス</label>
+        <input type="text" id="zoneUrl" value="zone://url.or.jp/msg/line/U4af4980629" spellcheck="false"></div>
+      <button class="primary" id="zoneGo">解決する</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>リング上の解決経路</h2>
+    <div class="grid g2">
+      <div><canvas id="zoneCanvas" height="300"></canvas></div>
+      <div>
+        <div class="stats" id="zoneStats"></div>
+        <div class="tblwrap" style="margin-top:10px"><table id="zoneTbl"></table></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>@@ ブロック<span class="n">既存の ZoneBrowser が読む形式</span></h2>
+    <pre id="zoneBlock">—</pre>
+    <div class="note">
+      この形式は <b>bada_gui_ide/dist/zone-browser.html</b>(ウルトラネットワーク専用ブラウザ)が
+      解釈するものと同一です。鍵導出・封緘・リング DHT も
+      <b>bada_gui_ide/examples/zone.bada</b> と同じ算法を使っているため、レコードは相互運用できます。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>アカシック台帳<span class="n">追記専用 tuplespace</span></h2>
+    <pre id="zoneLedger">—</pre>
+  </div>
+</section>
+
+<!-- ========== 🔐 量子暗号 ========== -->
+<section class="panel" id="p-crypto">
+  <div class="card">
+    <h2>Jones 多項式量子暗号<span class="n">L3 · 結び目鍵 + Bell 対 QKD + AEAD</span></h2>
+    <p class="lead">
+      ゾーンの秘密は<b>結び目</b>そのものです。結び目図の Kauffman ブラケット
+      ⟨D⟩(A) を複数の A で標本化してハッシュしたものが長期鍵になります。
+      セッションごとのソルトは <b>Bell 対</b>(H + CNOT + 測定)が合意し、
+      禁止状態 |01⟩,|10⟩ の確率が<b>厳密に 0</b> であることが盗聴されていない証拠になります。
+    </p>
+    <div class="row">
+      <div><label class="fld">ゾーン</label><select id="cryHost">
+        <option value="url.or.jp">url.or.jp — 三葉結び目 (交点 3)</option>
+        <option value="bada.or.jp">bada.or.jp — 8 の字結び目 (交点 4)</option>
+      </select></div>
+      <div><label class="fld">平文</label><input type="text" id="cryText" value="コンセントから zone:// が見えてる 🔌"></div>
+      <button class="primary" id="cryGo">封緘する</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>鍵導出 — Kauffman ブラケットの標本</h2>
+    <div class="tblwrap"><table id="cryKauff"></table></div>
+    <div class="stats" id="cryStats" style="margin-top:10px"></div>
+  </div>
+
+  <div class="card">
+    <h2>Bell 対 QKD</h2>
+    <div class="tblwrap"><table id="cryQkd"></table></div>
+  </div>
+
+  <div class="card">
+    <h2>AEAD と攻撃試験</h2>
+    <div class="row">
+      <button id="atkNone">正常に開封</button>
+      <button class="danger" id="atkTamper">暗号文を改竄</button>
+      <button class="danger" id="atkKnot">別の結び目で開封</button>
+      <button class="danger" id="atkTap">量子路を盗聴</button>
+    </div>
+    <pre id="cryOut" style="margin-top:10px">—</pre>
+  </div>
+</section>
+
+<!-- ========== 💬 メッセージ ========== -->
+<section class="panel" id="p-msg">
+  <div class="card">
+    <h2>LINE / Instagram をウルトラネットワークに取り込む<span class="n">L4 · メッセージ多重化</span></h2>
+    <p class="lead">
+      取り込みは各社が公開している<b>公式 API の仕様どおり</b>に行います。LINE は
+      Messaging API の Webhook と reply/push、Instagram は Instagram Graph API の Webhook と
+      <span style="font-family:var(--mono)">/&lt;IG_ID&gt;/messages</span> です。受信本文は
+      <b>HMAC-SHA256 の署名検証</b>を本物の計算で通します。
+    </p>
+    <div class="row">
+      <button class="primary" id="msgLine">LINE の Webhook を受ける</button>
+      <button class="primary" id="msgIg">Instagram の Webhook を受ける</button>
+      <button id="msgClear">受信箱を消す</button>
+    </div>
+    <div class="note">
+      実運用では各プラットフォームで発行した<b>チャネルシークレット / アクセストークン</b>が必要です。
+      資格情報が無いこの画面では、公式仕様と同じ形の本文を組み立てて<b>署名経路まで本物を通す</b>
+      ローカル模擬で動作します。非公開 API の解析や認証の迂回は行いません。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>署名検証<span class="n">X-Line-Signature / X-Hub-Signature-256</span></h2>
+    <pre id="msgSig">—</pre>
+  </div>
+
+  <div class="card">
+    <h2>統合受信箱<span class="n">電力線 → NTT → zone:// を通って届いたもの</span></h2>
+    <div id="msgInbox"><p class="lead">まだ何も受信していません。</p></div>
+  </div>
+
+  <div class="card">
+    <h2>送信<span class="n">統合メッセージ → 公式 API の送信要求</span></h2>
+    <div class="row">
+      <div><label class="fld">宛先</label><select id="msgTo"></select></div>
+      <div style="flex:1 1 280px"><label class="fld">本文</label><input type="text" id="msgText" value="ウルトラネットワークから送信しています"></div>
+      <button class="primary" id="msgSend">送る</button>
+    </div>
+    <pre id="msgOut" style="margin-top:10px">—</pre>
+  </div>
+</section>
+
+<!-- ========== 🧩 STREAMS ========== -->
+<section class="panel" id="p-streams">
+  <div class="card">
+    <h2>AT&amp;T ベル研究所式の組織化<span class="n">STREAMS — Dennis Ritchie の Streams I/O</span></h2>
+    <p class="lead">
+      層をベル研究所の <b>STREAMS</b> と同じ組み方にしています。下端の <b>driver</b>(コンセント)と
+      上端の <b>stream head</b>(アプリ)の間にモジュールを <b>push</b> し、各モジュールは
+      <span style="font-family:var(--mono)">wput</span>(下り)と
+      <span style="font-family:var(--mono)">rput</span>(上り)の対だけを持ちます。
+      上位は下位を知らず、下位は上位を知りません。
+    </p>
+    <div class="stack" id="stStack"></div>
+  </div>
+
+  <div class="card">
+    <h2>1 通を通してみる</h2>
+    <div class="row">
+      <div style="flex:1 1 280px"><label class="fld">本文</label><input type="text" id="stText" value="電力線から NTT を経て zone:// へ"></div>
+      <div><label class="fld">攻撃</label><select id="stAttack">
+        <option value="none">なし</option>
+        <option value="wire">物理層で回線を改竄</option>
+        <option value="peer">悪意あるピアがレコードを改竄</option>
+        <option value="tap">量子路を盗聴</option>
+        <option value="degrade">電力線を劣化させる</option>
+      </select></div>
+      <button class="primary" id="stGo">流す</button>
+    </div>
+    <div class="stats" id="stStats" style="margin-top:12px"></div>
+  </div>
+
+  <div class="card">
+    <h2>メッセージブロックの流れ<span class="n">M_DATA / M_PROTO / M_CTL</span></h2>
+    <div class="tblwrap"><table id="stTrace"></table></div>
+  </div>
+</section>
+
+<!-- ========== 🧪 自己診断 ========== -->
+<section class="panel" id="p-test">
+  <div class="card">
+    <h2>自己診断<span class="n">全層を実際に動かして検算する</span></h2>
+    <p class="lead">
+      既知答えのある検証(SHA-256 / RFC 4231 の HMAC テストベクタ)から、
+      ウェーブレット OFDM の完全往復、音声帯モデムの往復、φ⁻¹ の逆写像、
+      改竄検知まで、この画面の中で実際に計算して確認します。
+    </p>
+    <div class="row"><button class="primary" id="tstGo">全部走らせる</button></div>
+    <div class="stats" id="tstStats" style="margin-top:12px"></div>
+  </div>
+  <div class="card">
+    <h2>結果</h2>
+    <div id="tstList"><p class="lead">「全部走らせる」を押してください。</p></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Bada UltraNetwork — 量子プログラミング言語 <b>Bada</b> 製 · AT&amp;T ベル研究所式 STREAMS 構成 ·
+  依存ゼロ / 単一 HTML / オフライン動作
+</footer>
+
+<script>
+/* ==================================================================
+ * Bada UltraNetwork — エンジン
+ *
+ *   L0  plc    : Panasonic HD-PLC (IEEE 1901 ウェーブレット OFDM)
+ *                家の電力線(コンセント)を物理層にする
+ *   L1  ntt    : NTT 電話回線への写像(番号写像 φ + ボイスバンド modem)
+ *   L2  zone   : zone://url.or.jp ウルトラネットワーク WWW (P2P リング DHT)
+ *   L3  jones  : Jones 多項式量子暗号 AEAD + Bell 対 QKD
+ *   L4  msgmux : LINE / Instagram メッセージ多重化
+ *
+ * 組織化は AT&T ベル研究所の STREAMS(Dennis Ritchie の Streams I/O)に
+ * ならう — 下端の driver と上端の stream head の間に module を push し、
+ * 各 module は wput(下り)/ rput(上り) の対で構成される。
+ *
+ * 本ファイルは自己完結。DOM にも Node にも依存しない純ロジック部分は
+ * tools/engine-test.js が Node で直接検証する。
+ * ================================================================== */
+"use strict";
+
+/* ===== 0. 基本ユーティリティ ===================================== */
+
+var RING = 4096;                       /* zone.bada と同じリング位数 */
+
+/* zone.bada の str_hash と完全に同一(相互運用のため変更不可) */
+function strHash(s) {
+  var h = 7, i = 0, n = s.length;
+  for (i = 0; i < n; i++) h = (h * 31 + s.charCodeAt(i)) % 999983;
+  return h;
+}
+
+function zoneId(s) { return strHash(s) % RING; }
+
+/* 32bit 混合ハッシュ(番号写像・DHT の副次鍵に使う) */
+function mix32(s) {
+  var h = 0x811c9dc5, i;
+  for (i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  h ^= h >>> 15; h = Math.imul(h, 0x2545f491) >>> 0; h ^= h >>> 13;
+  return h >>> 0;
+}
+
+function bytesOfUtf8(s) {
+  var out = [], i, c;
+  for (i = 0; i < s.length; i++) {
+    c = s.codePointAt(i);
+    if (c > 0xffff) i++;
+    if (c < 0x80) out.push(c);
+    else if (c < 0x800) { out.push(0xc0 | (c >> 6), 0x80 | (c & 63)); }
+    else if (c < 0x10000) { out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); }
+    else { out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63)); }
+  }
+  return out;
+}
+
+/* 復号は壊れた入力でも決して例外を投げない。回線から来るバイト列は
+ * 攻撃者に触られうるので、不正な並びは U+FFFD に替えて 1 バイト進む。 */
+function utf8OfBytes(b) {
+  var s = "", i = 0, c, n, need, k, ok;
+  while (i < b.length) {
+    c = b[i] & 255;
+    if (c < 0x80) { s += String.fromCharCode(c); i += 1; continue; }
+    if ((c & 0xe0) === 0xc0) { need = 1; n = c & 31; }
+    else if ((c & 0xf0) === 0xe0) { need = 2; n = c & 15; }
+    else if ((c & 0xf8) === 0xf0) { need = 3; n = c & 7; }
+    else { s += "�"; i += 1; continue; }     /* 継続バイト単独 / 不正な先頭 */
+
+    if (i + need > b.length - 1) { s += "�"; i += 1; continue; }   /* 途中で切れている */
+    ok = true;
+    for (k = 1; k <= need; k++) {
+      if (((b[i + k] & 255) & 0xc0) !== 0x80) { ok = false; break; }
+      n = (n << 6) | (b[i + k] & 63);
+    }
+    if (!ok) { s += "�"; i += 1; continue; }
+    /* 過長符号化・サロゲート・範囲外を排除 */
+    if ((need === 1 && n < 0x80) || (need === 2 && n < 0x800) || (need === 3 && n < 0x10000) ||
+        (n >= 0xd800 && n <= 0xdfff) || n > 0x10ffff) {
+      s += "�"; i += 1; continue;
+    }
+    s += n < 0x10000 ? String.fromCharCode(n) : String.fromCodePoint(n);
+    i += need + 1;
+  }
+  return s;
+}
+
+function toHex(b) {
+  var s = "", i;
+  for (i = 0; i < b.length; i++) s += (b[i] < 16 ? "0" : "") + b[i].toString(16);
+  return s;
+}
+
+var B64AL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function toBase64(b) {
+  var s = "", i, c;
+  for (i = 0; i < b.length; i += 3) {
+    c = (b[i] << 16) | ((b[i + 1] || 0) << 8) | (b[i + 2] || 0);
+    s += B64AL[(c >> 18) & 63] + B64AL[(c >> 12) & 63];
+    s += i + 1 < b.length ? B64AL[(c >> 6) & 63] : "=";
+    s += i + 2 < b.length ? B64AL[c & 63] : "=";
+  }
+  return s;
+}
+
+/* ===== 1. SHA-256 / HMAC-SHA256 ==================================
+ * LINE の X-Line-Signature (HMAC-SHA256 → Base64) と
+ * Instagram の X-Hub-Signature-256 (HMAC-SHA256 → hex) を
+ * 本物の計算で検証するために実装する。RFC 6234 / RFC 2104。
+ * ================================================================= */
+
+var SHA_K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+];
+
+function rotr(x, n) { return ((x >>> n) | (x << (32 - n))) >>> 0; }
+
+/* バイト配列 → 32 バイトのダイジェスト(バイト配列) */
+function sha256(msg) {
+  var h = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+  var len = msg.length, bitLenHi = Math.floor(len / 536870912), bitLenLo = (len * 8) >>> 0;
+  var withPad = msg.slice();
+  withPad.push(0x80);
+  while (withPad.length % 64 !== 56) withPad.push(0);
+  withPad.push((bitLenHi >>> 24) & 255, (bitLenHi >>> 16) & 255, (bitLenHi >>> 8) & 255, bitLenHi & 255);
+  withPad.push((bitLenLo >>> 24) & 255, (bitLenLo >>> 16) & 255, (bitLenLo >>> 8) & 255, bitLenLo & 255);
+
+  var w = new Array(64), i, t, a, b, c, d, e, f, g, hh, s0, s1, ch, maj, t1, t2;
+  for (i = 0; i < withPad.length; i += 64) {
+    for (t = 0; t < 16; t++) {
+      w[t] = ((withPad[i + t * 4] << 24) | (withPad[i + t * 4 + 1] << 16) |
+              (withPad[i + t * 4 + 2] << 8) | withPad[i + t * 4 + 3]) >>> 0;
+    }
+    for (t = 16; t < 64; t++) {
+      s0 = (rotr(w[t - 15], 7) ^ rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3)) >>> 0;
+      s1 = (rotr(w[t - 2], 17) ^ rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10)) >>> 0;
+      w[t] = (w[t - 16] + s0 + w[t - 7] + s1) >>> 0;
+    }
+    a = h[0]; b = h[1]; c = h[2]; d = h[3]; e = h[4]; f = h[5]; g = h[6]; hh = h[7];
+    for (t = 0; t < 64; t++) {
+      s1 = (rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)) >>> 0;
+      ch = ((e & f) ^ (~e & g)) >>> 0;
+      t1 = (hh + s1 + ch + SHA_K[t] + w[t]) >>> 0;
+      s0 = (rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)) >>> 0;
+      maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+      t2 = (s0 + maj) >>> 0;
+      hh = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    h[0] = (h[0] + a) >>> 0; h[1] = (h[1] + b) >>> 0; h[2] = (h[2] + c) >>> 0; h[3] = (h[3] + d) >>> 0;
+    h[4] = (h[4] + e) >>> 0; h[5] = (h[5] + f) >>> 0; h[6] = (h[6] + g) >>> 0; h[7] = (h[7] + hh) >>> 0;
+  }
+  var out = [];
+  for (i = 0; i < 8; i++) out.push((h[i] >>> 24) & 255, (h[i] >>> 16) & 255, (h[i] >>> 8) & 255, h[i] & 255);
+  return out;
+}
+
+/* RFC 2104 HMAC。key/msg ともバイト配列 */
+function hmacSha256(key, msg) {
+  var k = key.slice(), i, ipad = [], opad = [];
+  if (k.length > 64) k = sha256(k);
+  while (k.length < 64) k.push(0);
+  for (i = 0; i < 64; i++) { ipad.push(k[i] ^ 0x36); opad.push(k[i] ^ 0x5c); }
+  return sha256(opad.concat(sha256(ipad.concat(msg))));
+}
+
+/* 定数時間比較(署名検証はタイミング差を漏らさない) */
+function constTimeEq(a, b) {
+  if (a.length !== b.length) return false;
+  var d = 0, i;
+  for (i = 0; i < a.length; i++) d |= a[i] ^ b[i];
+  return d === 0;
+}
+
+/* ===== 2. Jones 多項式量子暗号(zone.bada の移植) ================
+ * 1. KEY  結び目図の Kauffman ブラケット <D>(A) を複数の A で標本化し
+ *         ハッシュしたものがゾーンの長期鍵 (jones_key)
+ * 2. QKD  Bell 対 (H + CNOT + Measure) がセッションソルトを合意。
+ *         禁止状態 |01>,|10> が厳密に 0 であることが盗聴の証拠
+ * 3. AEAD (jones_key, salt) 種の鍵ストリームで暗号化し、鍵付きタグで封緘。
+ *         改竄・偽造は 409 zone-guard-reject
+ * ================================================================= */
+
+function ipow(base, e) {
+  var r = 1.0, k, m;
+  if (e < 0) { m = -e; for (k = 0; k < m; k++) r *= base; return 1.0 / r; }
+  for (k = 0; k < e; k++) r *= base;
+  return r;
+}
+
+function ufFind(parent, x) { var r = x; while (parent[r] >= 0) r = parent[r]; return r; }
+
+/* 交点は [id, e0, e1, e2, e3, sign]。ブラケットは sign を使わない */
+function kauffman(cross, A) {
+  var n = cross.length;
+  if (n === 0) return 1.0;
+  var maxlbl = 0, i, k;
+  for (i = 0; i < n; i++) for (k = 1; k <= 4; k++) if (cross[i][k] > maxlbl) maxlbl = cross[i][k];
+  var U = maxlbl + 1;
+  var d = -A * A - 1.0 / (A * A);
+  var states = 1 << n, sum = 0.0, st, bits = new Array(n).fill(0);
+
+  for (st = 0; st < states; st++) {
+    var parent = new Array(U).fill(-1), aCnt = 0, bCnt = 0;
+    for (i = 0; i < n; i++) {
+      var e0 = cross[i][1], e1 = cross[i][2], e2 = cross[i][3], e3 = cross[i][4];
+      var p, q, r, s;
+      if (bits[i] === 0) { aCnt++; p = e0; q = e1; r = e2; s = e3; }
+      else { bCnt++; p = e0; q = e3; r = e1; s = e2; }
+      var ra = ufFind(parent, p), rb = ufFind(parent, q);
+      if (ra !== rb) parent[rb] = ra;
+      var rc = ufFind(parent, r), rd = ufFind(parent, s);
+      if (rc !== rd) parent[rd] = rc;
+    }
+    var seen = new Array(U).fill(0), loops = 0, lbl;
+    for (lbl = 0; lbl < U; lbl++) {
+      var root = ufFind(parent, lbl);
+      if (seen[root] === 0) { seen[root] = 1; loops++; }
+    }
+    sum += ipow(A, aCnt - bCnt) * ipow(d, loops - 1);
+    var c = 0, carry = 1;
+    while (c < n && carry === 1) {
+      if (bits[c] === 0) { bits[c] = 1; carry = 0; } else { bits[c] = 0; }
+      c++;
+    }
+  }
+  return sum;
+}
+
+function f5(x) { return (Math.round(x * 100000) / 100000).toFixed(5); }
+
+/* 結び目図から鍵を導出(Jones 標本 + ハッシュ) */
+function jonesKey(diagram) {
+  var As = [0.8, 1.0, 1.2, 1.5, 2.0], acc = "jones|", i;
+  for (i = 0; i < As.length; i++) acc += f5(kauffman(diagram, As[i])) + "|";
+  return strHash(acc);
+}
+
+/* 各ゾーンの正体である結び目(=秘密)。zone.bada と同一 */
+function zoneDiagram(host) {
+  if (host === "bada.or.jp") {
+    return [[0, 1, 2, 3, 4, 1], [1, 3, 4, 5, 6, 1], [2, 5, 6, 7, 8, 1], [3, 7, 8, 1, 2, 1]];
+  }
+  return [[0, 1, 2, 3, 4, 1], [1, 3, 4, 5, 6, 1], [2, 5, 6, 1, 2, 1]];
+}
+
+function lcg(state) { return (state * 48271) % 2147483647; }
+
+function keySeed(key, salt) {
+  var state = (key + salt * 2654435761) % 2147483647;
+  if (state <= 0) state += 2147483646;
+  return state;
+}
+
+/* 鍵ストリームは 16bit 符号単位で動くので CJK も往復する */
+function zoneEncrypt(plain, key, salt) {
+  var state = keySeed(key, salt), out = [], i;
+  for (i = 0; i < plain.length; i++) {
+    state = lcg(state);
+    out.push((plain.charCodeAt(i) + (state % 65536)) % 65536);
+  }
+  return out;
+}
+
+function zoneDecrypt(ct, key, salt) {
+  var state = keySeed(key, salt), out = "", i;
+  for (i = 0; i < ct.length; i++) {
+    state = lcg(state);
+    out += String.fromCharCode((ct[i] - (state % 65536) + 65536) % 65536);
+  }
+  return out;
+}
+
+function zoneTag(ct, key, salt) {
+  var h = (key % 999983) + salt + 1, i;
+  for (i = 0; i < ct.length; i++) h = (h * 31 + ct[i] + 7) % 2147483647;
+  return h;
+}
+
+function zoneSeal(plain, key, salt) {
+  var ct = zoneEncrypt(plain, key, salt);
+  return { ct: ct, salt: salt, tag: zoneTag(ct, key, salt) };
+}
+
+/* 開封 → { ok, text } 。タグ不一致は 409 zone-guard-reject */
+function zoneOpen(sealed, key) {
+  if (zoneTag(sealed.ct, key, sealed.salt) !== sealed.tag) {
+    return { ok: false, status: 409, reason: "zone-guard-reject", text: "" };
+  }
+  return { ok: true, status: 200, reason: "", text: zoneDecrypt(sealed.ct, key, sealed.salt) };
+}
+
+/* ===== 3. 擬似量子レジスタ(Bell 対 QKD 用) =====================
+ * 振幅は実数。H と CNOT と Measure(確率分布)だけを持つ最小の実装。
+ * ================================================================= */
+
+function qubit(n) {
+  var amp = new Array(1 << n).fill(0);
+  amp[0] = 1;
+  return { n: n, amp: amp };
+}
+
+function gateH(reg, t) {
+  var out = new Array(reg.amp.length).fill(0), r = Math.SQRT1_2, i, j, bit = 1 << t;
+  for (i = 0; i < reg.amp.length; i++) {
+    if (reg.amp[i] === 0) continue;
+    j = i ^ bit;
+    if ((i & bit) === 0) { out[i] += r * reg.amp[i]; out[j] += r * reg.amp[i]; }
+    else { out[j] += r * reg.amp[i]; out[i] -= r * reg.amp[i]; }
+  }
+  return { n: reg.n, amp: out };
+}
+
+function gateCNOT(reg, c, t) {
+  var out = new Array(reg.amp.length).fill(0), i, cb = 1 << c, tb = 1 << t;
+  for (i = 0; i < reg.amp.length; i++) {
+    if (reg.amp[i] === 0) continue;
+    out[(i & cb) ? (i ^ tb) : i] += reg.amp[i];
+  }
+  return { n: reg.n, amp: out };
+}
+
+function gateX(reg, t) {
+  var out = new Array(reg.amp.length).fill(0), i, bit = 1 << t;
+  for (i = 0; i < reg.amp.length; i++) out[i ^ bit] += reg.amp[i];
+  return { n: reg.n, amp: out };
+}
+
+/* 測定 = 各基底状態の確率分布(zone.bada の Measure と同じ意味) */
+function measure(reg) {
+  var p = [], i;
+  for (i = 0; i < reg.amp.length; i++) p.push(reg.amp[i] * reg.amp[i]);
+  return p;
+}
+
+/* Bell 対 QKD: 新しいセッションソルト + 盗聴の証拠 ---------------
+ * |Φ+> = (|00> + |11>)/√2 では |01> と |10> の確率が厳密に 0。
+ * 盗聴(intercept-resend)はこの相関を壊すので zeroKept が false になる。 */
+function qkdSession(ledgerLen, tapped) {
+  var bell = gateCNOT(gateH(qubit(2), 0), 0, 1);
+  if (tapped) {
+    /* 盗聴者が片側を計算基底で測ってから再送 → 相関の一部が壊れる */
+    bell = { n: 2, amp: [Math.SQRT1_2, 0.35, 0.35, Math.SQRT1_2 * 0.8] };
+  }
+  var p = measure(bell);
+  var forbidden = p[1] + p[2];
+  var zeroKept = forbidden < 1e-12;
+  var salt = ((ledgerLen | 0) * 131 + 17) % 4096;
+  return { ok: zeroKept, salt: salt, dist: p, forbidden: forbidden };
+}
+
+/* ===== 4. zone:// 命名と P2P リング DHT ========================== */
+
+/* zone://host/path → { host, path, labels } / null */
+function zoneParse(url) {
+  if (typeof url !== "string" || url.indexOf("zone://") !== 0) return null;
+  var rest = url.slice(7), cut = rest.indexOf("/");
+  if (cut < 0) return { host: rest, path: "/", labels: rest.split(".") };
+  var host = rest.slice(0, cut);
+  return { host: host, path: rest.slice(cut), labels: host.split(".") };
+}
+
+function ringDist(a, b) {
+  var d = Math.abs(a - b), e = RING - d;
+  return e < d ? e : d;
+}
+
+function peerNew(name) { return { name: name, id: zoneId("peer:" + name), store: {}, idx: 0 }; }
+
+function netSort(net) {
+  var sorted = net.slice().sort(function (x, y) { return x.id - y.id; });
+  sorted.forEach(function (p, i) { p.idx = i; });
+  return sorted;
+}
+
+function peerNeighbors(net, p) {
+  var n = net.length, i = p.idx;
+  return [net[(i + 1) % n], net[(i + n - 1) % n], net[(i + 2) % n]];
+}
+
+/* 鍵に最も近いピア(中央サーバも DNS ルートも無い) */
+function dhtNearest(net, key) {
+  var best = net[0], bd = ringDist(net[0].id, key), i, d;
+  for (i = 1; i < net.length; i++) {
+    d = ringDist(net[i].id, key);
+    if (d < bd) { bd = d; best = net[i]; }
+  }
+  return best;
+}
+
+/* 貪欲ルーティング: 開始ピアから鍵の担当ピアへ、隣接だけを見て進む */
+function dhtRoute(net, from, key) {
+  var cur = from, hops = [cur.name], guard = 0, target = dhtNearest(net, key);
+  while (cur.name !== target.name && guard < net.length * 2) {
+    var nb = peerNeighbors(net, cur), best = cur, bd = ringDist(cur.id, key), i, d;
+    for (i = 0; i < nb.length; i++) {
+      d = ringDist(nb[i].id, key);
+      if (d < bd) { bd = d; best = nb[i]; }
+    }
+    if (best.name === cur.name) { cur = target; } else { cur = best; }
+    hops.push(cur.name);
+    guard++;
+  }
+  return { hops: hops, peer: target };
+}
+
+/* ===== 5. L0 — Panasonic HD-PLC (IEEE 1901 ウェーブレット OFDM) ====
+ * 家の電力線(コンセント)を物理層にして PC をインターネットへつなぐ層。
+ *
+ *   ・帯域 2–28 MHz を 512 本のサブキャリアに分ける (Δf ≒ 50.78 kHz)
+ *   ・変調は QAM ではなく PAM + ウェーブレット変換 (DWMT)。
+ *     ガードインターバルが要らないのが HD-PLC 方式の利点。
+ *   ・電力線の伝達関数は Zimmermann–Dostert の多重経路モデル
+ *         H(f) = Σ g_i · exp(-(a0 + a1 f^k) d_i) · exp(-j2πf d_i / v)
+ *   ・雑音は色付き背景雑音 N(f)[dBm/Hz] = a + b·f_MHz^c
+ *   ・アマチュア無線帯はノッチ(送信しない)
+ *   ・SNR からサブキャリアごとに適応ビットローディングする
+ * ================================================================= */
+
+var PLC = {
+  F_LO: 2.0e6,          /* 下端 2 MHz   */
+  F_HI: 28.0e6,         /* 上端 28 MHz  */
+  N_CARRIER: 512,       /* サブキャリア本数 */
+  TX_PSD_DBM_HZ: -50,   /* 送信電力密度 (規制値相当) */
+  GAP_DB: 9.8,          /* SNR ギャップ Γ (BER 1e-7 相当) */
+  MAX_BITS: 5,          /* 32-PAM まで */
+  VP: 1.5e8             /* 電力線の位相速度 [m/s] */
+};
+
+PLC.DF = (PLC.F_HI - PLC.F_LO) / PLC.N_CARRIER;   /* 50781.25 Hz */
+PLC.SYMBOL_SEC = 1 / PLC.DF;                      /* 19.69 µs (GI なし) */
+
+/* アマチュア無線帯 (MHz) — HD-PLC はここを送信しない */
+var HAM_BANDS = [
+  [1.8, 2.0], [3.5, 3.8], [7.0, 7.2], [10.1, 10.15], [14.0, 14.35],
+  [18.068, 18.168], [21.0, 21.45], [24.89, 24.99], [28.0, 29.7]
+];
+
+function inHamBand(fHz) {
+  var f = fHz / 1e6, i;
+  for (i = 0; i < HAM_BANDS.length; i++) if (f >= HAM_BANDS[i][0] && f <= HAM_BANDS[i][1]) return true;
+  return false;
+}
+
+/* 再現性のある擬似乱数 (同じコンセント対なら常に同じ回線特性) */
+function rngOf(seedStr) {
+  var s = mix32(seedStr) || 1;
+  return function () {
+    s ^= s << 13; s >>>= 0;
+    s ^= s >>> 17;
+    s ^= s << 5; s >>>= 0;
+    return s / 4294967296;
+  };
+}
+
+/* 分電盤から見た各コンセントの距離・分岐。屋内配線のトポロジ */
+var OUTLETS = [
+  { id: "living",  name: "居間 コンセント",     dist: 12, branches: 3, phase: "L1" },
+  { id: "study",   name: "書斎 コンセント (PC)", dist: 21, branches: 4, phase: "L1" },
+  { id: "kitchen", name: "台所 コンセント",      dist: 17, branches: 5, phase: "L2" },
+  { id: "bedroom", name: "寝室 コンセント",      dist: 28, branches: 4, phase: "L2" },
+  { id: "router",  name: "ONU 脇 コンセント (親機)", dist: 5, branches: 2, phase: "L1" }
+];
+
+function outletById(id) {
+  var i;
+  for (i = 0; i < OUTLETS.length; i++) if (OUTLETS[i].id === id) return OUTLETS[i];
+  return OUTLETS[0];
+}
+
+/* Zimmermann–Dostert 多重経路: 経路 i は反射係数 g_i と行程長 d_i を持つ */
+function plcPaths(a, b) {
+  var oa = outletById(a), ob = outletById(b);
+  var rnd = rngOf("plc:" + a + ">" + b);
+  var base = oa.dist + ob.dist;
+  var nPath = 3 + Math.min(4, Math.max(oa.branches, ob.branches) - 1);
+  var paths = [], i, g, d;
+  for (i = 0; i < nPath; i++) {
+    /* 直達波は g≒1、反射波は分岐で減衰し行程が伸びる */
+    g = i === 0 ? 1.0 : (0.75 - 0.12 * i) * (0.6 + 0.4 * rnd());
+    if (i % 2 === 1) g = -g;                       /* 反射で位相反転 */
+    d = base + (i === 0 ? 0 : i * (6 + 14 * rnd()));
+    paths.push({ g: g, d: d });
+  }
+  /* 異相 (L1↔L2) はカプラ越えで一段落ちる */
+  if (oa.phase !== ob.phase) paths.forEach(function (p) { p.g *= 0.45; });
+  return paths;
+}
+
+/* |H(f)| — 減衰 a0 + a1 f^k と経路差による櫛形フェージング */
+function plcTransfer(paths, fHz) {
+  var a0 = 0.0, a1 = 7.8e-10, k = 1.0;
+  var re = 0, im = 0, i, att, tau, ph;
+  for (i = 0; i < paths.length; i++) {
+    att = Math.exp(-(a0 + a1 * Math.pow(fHz, k)) * paths[i].d);
+    tau = paths[i].d / PLC.VP;
+    ph = -2 * Math.PI * fHz * tau;
+    re += paths[i].g * att * Math.cos(ph);
+    im += paths[i].g * att * Math.sin(ph);
+  }
+  return Math.sqrt(re * re + im * im);
+}
+
+/* 色付き背景雑音 N(f) [dBm/Hz] */
+function plcNoiseDbmHz(fHz) {
+  var fM = fHz / 1e6;
+  return -145 + 53.23 * Math.pow(fM, -0.337);
+}
+
+/* 分岐点ごとのインピーダンス不整合損 + コンセント結合損 [dB]。
+ * 屋内配線では減衰の大半がこの不整合で起きる。不整合は無効成分なので
+ * 周波数が上がるほど大きくなり、帯域の上端ほど損失が増える(傾斜)。 */
+function plcCouplingDb(fromId, toId, fHz) {
+  var oa = outletById(fromId), ob = outletById(toId);
+  var junctions = Math.max(0, oa.branches - 1) + Math.max(0, ob.branches - 1);
+  var db = 3.0 * junctions + 5.0;                 /* 分岐 3 dB/箇所 + 機器結合 5 dB */
+  if (oa.phase !== ob.phase) db += 9.0;           /* L1↔L2 の相間カプラ */
+  if (typeof fHz === "number") {
+    /* 上端ほど不整合損が増える。分岐が多いほど傾斜も急になる */
+    var t = (fHz - PLC.F_LO) / (PLC.F_HI - PLC.F_LO);
+    db += (14 + 2.6 * junctions) * t;
+  }
+  return db;
+}
+
+/* コンセント間の回線特性 → サブキャリアごとの SNR */
+function plcChannel(fromId, toId) {
+  var paths = plcPaths(fromId, toId);
+  var freqs = [], hMag = [], hDb = [], noise = [], snrDb = [], coupDb = [], n, f, h, nz, db, cp;
+  for (n = 0; n < PLC.N_CARRIER; n++) {
+    f = PLC.F_LO + (n + 0.5) * PLC.DF;
+    h = plcTransfer(paths, f);
+    nz = plcNoiseDbmHz(f);
+    cp = plcCouplingDb(fromId, toId, f);
+    db = 20 * Math.log10(Math.max(h, 1e-12)) - cp;
+    freqs.push(f); hMag.push(h); hDb.push(db); noise.push(nz); coupDb.push(cp);
+    snrDb.push(PLC.TX_PSD_DBM_HZ + db - nz);
+  }
+  return {
+    from: fromId, to: toId, paths: paths,
+    couplingDb: plcCouplingDb(fromId, toId), couplingDbAt: coupDb,
+    couplingTiltDb: coupDb[coupDb.length - 1] - coupDb[0],
+    freqs: freqs, hMag: hMag, hDb: hDb, noiseDbmHz: noise, snrDb: snrDb
+  };
+}
+
+/* 適応ビットローディング: b_n = floor(log2(1 + SNR_n/Γ)) 、ノッチは 0 */
+function plcToneMap(ch) {
+  var gap = Math.pow(10, PLC.GAP_DB / 10);
+  var bits = [], notched = [], n, lin, b, total = 0, active = 0, nNotch = 0;
+  for (n = 0; n < PLC.N_CARRIER; n++) {
+    if (inHamBand(ch.freqs[n])) { bits.push(0); notched.push(true); nNotch++; continue; }
+    notched.push(false);
+    lin = Math.pow(10, ch.snrDb[n] / 10);
+    b = Math.floor(Math.log2(1 + lin / gap));
+    if (b < 1) b = 0; else if (b > PLC.MAX_BITS) b = PLC.MAX_BITS;
+    bits.push(b);
+    if (b > 0) { active++; total += b; }
+  }
+  return {
+    bits: bits, notched: notched, notchCount: nNotch,
+    activeCarriers: active, bitsPerSymbol: total,
+    phyBps: total / PLC.SYMBOL_SEC,
+    avgBits: active ? total / active : 0
+  };
+}
+
+/* ---- Gray 符号付き PAM ---------------------------------------- */
+function grayEncode(v) { return v ^ (v >> 1); }
+function grayDecode(g) { var v = g, s = g >> 1; while (s) { v ^= s; s >>= 1; } return v; }
+
+/* b ビット → 2^b-PAM の振幅 (…,-3,-1,+1,+3,…) */
+function pamLevel(idx, b) { return 2 * idx - ((1 << b) - 1); }
+function pamIndex(level, b) {
+  var M = 1 << b, i = Math.round((level + (M - 1)) / 2);
+  if (i < 0) i = 0; else if (i > M - 1) i = M - 1;
+  return i;
+}
+
+/* ---- ウェーブレット変換 (正規化 Haar, 多重解像度) --------------
+ * HD-PLC の DWMT フィルタバンクの役割を担う。合成 (synthesis) が
+ * 送信、解析 (analysis) が受信で、両者は厳密な逆変換の対。
+ * ================================================================ */
+var SQ1_2 = Math.SQRT1_2;
+
+/* 解析: 時間波形 → ウェーブレット係数 (サブバンド = サブキャリア) */
+function dwtAnalyze(x) {
+  var a = x.slice(), n = a.length, half, i, out;
+  while (n > 1) {
+    half = n >> 1;
+    out = new Array(n);
+    for (i = 0; i < half; i++) {
+      out[i] = (a[2 * i] + a[2 * i + 1]) * SQ1_2;
+      out[half + i] = (a[2 * i] - a[2 * i + 1]) * SQ1_2;
+    }
+    for (i = 0; i < n; i++) a[i] = out[i];
+    n = half;
+  }
+  return a;
+}
+
+/* 合成: ウェーブレット係数 → 時間波形 (dwtAnalyze の逆) */
+function dwtSynthesize(c) {
+  var a = c.slice(), N = a.length, n = 1, half, i, out;
+  while (n < N) {
+    half = n;
+    n = n << 1;
+    out = new Array(n);
+    for (i = 0; i < half; i++) {
+      out[2 * i] = (a[i] + a[half + i]) * SQ1_2;
+      out[2 * i + 1] = (a[i] - a[half + i]) * SQ1_2;
+    }
+    for (i = 0; i < n; i++) a[i] = out[i];
+  }
+  return a.slice(0, N);
+}
+
+/* ---- ビット列 ↔ バイト列 -------------------------------------- */
+function bytesToBits(bytes) {
+  var bits = [], i, k;
+  for (i = 0; i < bytes.length; i++) for (k = 7; k >= 0; k--) bits.push((bytes[i] >> k) & 1);
+  return bits;
+}
+
+function bitsToBytes(bits) {
+  var out = [], i, b, k;
+  for (i = 0; i + 7 < bits.length; i += 8) {
+    b = 0;
+    for (k = 0; k < 8; k++) b = (b << 1) | (bits[i + k] & 1);
+    out.push(b);
+  }
+  return out;
+}
+
+/* ---- 変調 / 復調 ---------------------------------------------- */
+
+/* バイト列 → ウェーブレット OFDM シンボル列 (時間波形) */
+function plcModulate(bytes, tm) {
+  var bits = bytesToBits(bytes);
+  var per = tm.bitsPerSymbol;
+  if (per <= 0) return { symbols: [], samples: [], nSymbols: 0, padBits: 0, bitLen: bits.length };
+  var nSym = Math.ceil(bits.length / per);
+  var pad = nSym * per - bits.length, i;
+  for (i = 0; i < pad; i++) bits.push(0);
+
+  var symbols = [], samples = [], p = 0, s, n, b, v, idx, coeffs;
+  for (s = 0; s < nSym; s++) {
+    coeffs = new Array(PLC.N_CARRIER).fill(0);
+    for (n = 0; n < PLC.N_CARRIER; n++) {
+      b = tm.bits[n];
+      if (b === 0) continue;
+      v = 0;
+      for (i = 0; i < b; i++) v = (v << 1) | bits[p++];
+      idx = grayDecode(v);
+      coeffs[n] = pamLevel(idx, b);
+    }
+    symbols.push(coeffs);
+    samples = samples.concat(dwtSynthesize(coeffs));
+  }
+  return { symbols: symbols, samples: samples, nSymbols: nSym, padBits: pad, bitLen: bits.length - pad };
+}
+
+/* 時間波形 → バイト列 (plcModulate の逆) */
+function plcDemodulate(samples, tm, bitLen) {
+  var N = PLC.N_CARRIER, nSym = Math.floor(samples.length / N);
+  var bits = [], s, n, b, coeffs, idx, g, i;
+  for (s = 0; s < nSym; s++) {
+    coeffs = dwtAnalyze(samples.slice(s * N, (s + 1) * N));
+    for (n = 0; n < N; n++) {
+      b = tm.bits[n];
+      if (b === 0) continue;
+      idx = pamIndex(coeffs[n], b);      /* 硬判定スライサ */
+      g = grayEncode(idx);
+      for (i = b - 1; i >= 0; i--) bits.push((g >> i) & 1);
+    }
+  }
+  if (typeof bitLen === "number") bits = bits.slice(0, bitLen);
+  return bitsToBytes(bits);
+}
+
+/* 実回線を通す: サブバンドごとに雑音を載せ、受信側で等化する。
+ * ビットローディングの余裕が足りないサブキャリアだけが誤る。
+ * marginDb を下げると(= 回線が劣化すると)誤りが現れる。 */
+function plcThroughChannel(samples, ch, tm, marginDb, seed) {
+  var rnd = rngOf("awgn:" + (seed || "0"));
+  var N = PLC.N_CARRIER, nSym = Math.floor(samples.length / N);
+  var out = [], s, n, coeffs, snr, sigma, u1, u2, gauss, i;
+  var pen = typeof marginDb === "number" ? marginDb : 0;
+  for (s = 0; s < nSym; s++) {
+    coeffs = dwtAnalyze(samples.slice(s * N, (s + 1) * N));
+    for (n = 0; n < N; n++) {
+      if (tm.bits[n] === 0) { coeffs[n] = 0; continue; }
+      /* 等化後の実効 SNR。PAM の平均電力 (M²-1)/3 に対する雑音を作る */
+      snr = Math.pow(10, (ch.snrDb[n] - pen) / 10);
+      sigma = Math.sqrt((Math.pow(2, 2 * tm.bits[n]) - 1) / 3 / snr);
+      u1 = Math.max(rnd(), 1e-12); u2 = rnd();
+      gauss = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+      coeffs[n] += sigma * gauss;
+    }
+    out = out.concat(dwtSynthesize(coeffs));
+  }
+  for (i = nSym * N; i < samples.length; i++) out.push(samples[i]);
+  return out;
+}
+
+/* ---- CRC (IEEE 1901 のフレーム制御 / ペイロード検査) ----------- */
+var CRC32_TAB = (function () {
+  var t = [], c, n, k;
+  for (n = 0; n < 256; n++) {
+    c = n;
+    for (k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes) {
+  var c = 0xffffffff, i;
+  for (i = 0; i < bytes.length; i++) c = CRC32_TAB[(c ^ bytes[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+/* CRC-24 (多項式 0x5D6DCB) — フレーム制御 (FC) の検査に使う */
+function crc24(bytes) {
+  var c = 0xb704ce, i, k;
+  for (i = 0; i < bytes.length; i++) {
+    c ^= bytes[i] << 16;
+    for (k = 0; k < 8; k++) {
+      c <<= 1;
+      if (c & 0x1000000) c ^= 0x5d6dcb;
+    }
+    c &= 0xffffff;
+  }
+  return c >>> 0;
+}
+
+/* ---- CSMA/CA (IEEE 1901 の優先度解決スロット) ------------------
+ * CAP 3 が最優先 (音声)。PRS0/PRS1 の 2 スロットで優先度を解決し、
+ * 同じ優先度なら競合窓 (CW) 内のバックオフで勝者を決める。 */
+function plcCsma(stations, seed) {
+  var rnd = rngOf("csma:" + (seed || "0"));
+  var prs0 = [], prs1 = [], i, st, maxCap = -1;
+  for (i = 0; i < stations.length; i++) {
+    st = stations[i];
+    if (st.cap >= 2) prs0.push(st.name);
+    if (st.cap === 3 || st.cap === 1) prs1.push(st.name);
+    if (st.cap > maxCap) maxCap = st.cap;
+  }
+  var finalists = stations.filter(function (s) { return s.cap === maxCap; });
+  var cw = [7, 15, 15, 31][Math.min(3, Math.max(0, maxCap))];
+  var draws = finalists.map(function (s) { return { name: s.name, cap: s.cap, backoff: Math.floor(rnd() * (cw + 1)) }; });
+  var winner = draws.reduce(function (a, b) { return b.backoff < a.backoff ? b : a; }, draws[0]);
+  return { prs0: prs0, prs1: prs1, maxCap: maxCap, cw: cw, draws: draws, winner: winner ? winner.name : null };
+}
+
+/* ---- フレーム構成 (プリアンブル + FC + PB ブロック) ------------ */
+var PLC_PB_BYTES = 520;                /* IEEE 1901 の PHY ブロック長 */
+var PLC_PREAMBLE = [0x1a, 0xcf, 0xfc, 0x1d, 0x1a, 0xcf, 0xfc, 0x1d];
+
+function plcFrame(payload, opts) {
+  opts = opts || {};
+  var srcId = (opts.src | 0) & 0xffff, dstId = (opts.dst | 0) & 0xffff;
+  var cap = (opts.cap | 0) & 3;
+  var blocks = [], i, pb, c, nBlk;
+  nBlk = Math.max(1, Math.ceil(payload.length / PLC_PB_BYTES));
+  for (i = 0; i < nBlk; i++) {
+    pb = payload.slice(i * PLC_PB_BYTES, (i + 1) * PLC_PB_BYTES);
+    while (pb.length < PLC_PB_BYTES) pb.push(0);
+    c = crc32(pb);
+    blocks.push({ data: pb, crc: c });
+  }
+  /* フレーム制御: 種別/優先度/送受信 ID/ブロック数/ペイロード長 + CRC-24 */
+  var fc = [
+    0x01, cap,
+    (srcId >> 8) & 255, srcId & 255,
+    (dstId >> 8) & 255, dstId & 255,
+    (nBlk >> 8) & 255, nBlk & 255,
+    (payload.length >>> 24) & 255, (payload.length >>> 16) & 255,
+    (payload.length >>> 8) & 255, payload.length & 255
+  ];
+  var fcCrc = crc24(fc);
+  fc = fc.concat([(fcCrc >> 16) & 255, (fcCrc >> 8) & 255, fcCrc & 255]);
+
+  var bytes = PLC_PREAMBLE.slice().concat(fc);
+  for (i = 0; i < blocks.length; i++) {
+    bytes = bytes.concat(blocks[i].data,
+      [(blocks[i].crc >>> 24) & 255, (blocks[i].crc >>> 16) & 255,
+       (blocks[i].crc >>> 8) & 255, blocks[i].crc & 255]);
+  }
+  return { bytes: bytes, nBlocks: nBlk, payloadLen: payload.length, cap: cap, fc: fc, fcCrc: fcCrc };
+}
+
+function plcDeframe(bytes) {
+  var i;
+  for (i = 0; i < PLC_PREAMBLE.length; i++) {
+    if (bytes[i] !== PLC_PREAMBLE[i]) return { ok: false, reason: "no-preamble", bytes: [] };
+  }
+  var p = PLC_PREAMBLE.length;
+  var fc = bytes.slice(p, p + 12), tail = bytes.slice(p + 12, p + 15);
+  var want = crc24(fc), got = (tail[0] << 16) | (tail[1] << 8) | tail[2];
+  if (want !== got) return { ok: false, reason: "fc-crc", bytes: [] };
+  var nBlk = (fc[6] << 8) | fc[7];
+  var payLen = ((fc[8] << 24) | (fc[9] << 16) | (fc[10] << 8) | fc[11]) >>> 0;
+  p += 15;
+  var out = [], b, crcGot, crcWant, bad = 0;
+  for (i = 0; i < nBlk; i++) {
+    b = bytes.slice(p, p + PLC_PB_BYTES); p += PLC_PB_BYTES;
+    crcGot = ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0;
+    p += 4;
+    crcWant = crc32(b);
+    if (crcGot !== crcWant) bad++;
+    out = out.concat(b);
+  }
+  if (bad > 0) return { ok: false, reason: "pb-crc", badBlocks: bad, bytes: [] };
+  return { ok: true, reason: "", bytes: out.slice(0, payLen), nBlocks: nBlk, cap: fc[1] };
+}
+
+/* ===== 6. L1 — NTT 電話回線への写像 ==============================
+ * ウルトラネットワークの zone:// アドレスを NTT の電話番号に写像し、
+ * 実際の加入者線(メタル / INS ネット 64 / ひかり電話)に載せる層。
+ *
+ *   写像 φ : zone://host/path  ↦  NTT 番号
+ *     ・zone_id (リング位置) が市外局番を決める  → 地理的な写像
+ *     ・残りの加入者番号は URL のハッシュから採り、
+ *       番号ポータビリティと同じ「割当表」で衝突を線形探索で解消する
+ *     ・割当表があるので φ⁻¹ は厳密な逆写像になる (全単射)
+ *
+ *   ベアラ (実際に音声帯を通す部分)
+ *     ・メタル加入電話 : 300–3400 Hz の音声帯 → 16-QAM ソフトモデム
+ *                        (fs 8 kHz / 搬送波 2 kHz / 2000 baud / 8000 bps)
+ *     ・INS ネット 64  : B チャネル 64 kbps のディジタル透過
+ *     ・ひかり電話     : G.711 µ-law 64 kbps を RTP で運ぶ
+ * ================================================================= */
+
+/* 市外局番と加入者番号の桁数 (0AB-J は全体で 10 桁) */
+var NTT_AREAS = [
+  { code: "011", city: "札幌",   sub: 7 },
+  { code: "022", city: "仙台",   sub: 7 },
+  { code: "03",  city: "東京",   sub: 8 },
+  { code: "045", city: "横浜",   sub: 7 },
+  { code: "052", city: "名古屋", sub: 7 },
+  { code: "06",  city: "大阪",   sub: 8 },
+  { code: "075", city: "京都",   sub: 7 },
+  { code: "082", city: "広島",   sub: 7 },
+  { code: "092", city: "福岡",   sub: 7 },
+  { code: "098", city: "那覇",   sub: 7 }
+];
+
+var NTT_LINES = {
+  metal:  { id: "metal",  name: "アナログ加入電話 (メタル)", bps: 8000,  band: "300–3400 Hz", bearer: "voiceband-16QAM" },
+  isdn:   { id: "isdn",   name: "INS ネット 64 (ISDN)",      bps: 64000, band: "B ch 64 kbps", bearer: "digital-clear" },
+  hikari: { id: "hikari", name: "ひかり電話 (IP)",            bps: 64000, band: "G.711 µ-law",  bearer: "rtp-pcmu" }
+};
+
+/* ---- 番号写像 φ ------------------------------------------------ */
+
+function nttDigits(n, width) {
+  var s = String(n % Math.pow(10, width));
+  while (s.length < width) s = "0" + s;
+  return s;
+}
+
+/* 表示整形: 03-1234-5678 / 011-234-5678 / 050-1234-5678 */
+function nttFormat(area, sub) {
+  if (sub.length === 8) return area + "-" + sub.slice(0, 4) + "-" + sub.slice(4);
+  return area + "-" + sub.slice(0, 3) + "-" + sub.slice(3);
+}
+
+/* 割当表 (番号ポータビリティ台帳と同じ役割)。追記のみ。 */
+function nttRegistryNew() { return { byZone: {}, byNumber: {}, log: [] }; }
+
+/* φ : zone URL → NTT 番号。kind = "geo" | "ip" | "mobile" */
+function nttMap(reg, url, kind) {
+  kind = kind || "geo";
+  if (reg.byZone[url] && reg.byZone[url].kind === kind) return reg.byZone[url];
+
+  var area, subWidth;
+  if (kind === "ip") { area = "050"; subWidth = 8; }
+  else if (kind === "mobile") { area = "090"; subWidth = 8; }
+  else {
+    /* リング位置 z を市外局番の区画に写す — 近い zone は近い局番になる */
+    var z = zoneId(url);
+    var sector = Math.floor(z * NTT_AREAS.length / RING);
+    if (sector >= NTT_AREAS.length) sector = NTT_AREAS.length - 1;
+    area = NTT_AREAS[sector].code;
+    subWidth = NTT_AREAS[sector].sub;
+  }
+
+  /* 加入者番号の初期候補 + 衝突時は線形探索 (局内の空き番号を順に探す) */
+  var base = mix32("ntt:" + kind + ":" + url) % Math.pow(10, subWidth);
+  var probe = 0, sub, number;
+  while (probe < 1000000) {
+    sub = nttDigits(base + probe, subWidth);
+    number = area + sub;
+    if (!reg.byNumber[number] || reg.byNumber[number] === url) break;
+    probe++;
+  }
+  var rec = {
+    url: url, kind: kind, area: area, sub: sub, number: number,
+    display: nttFormat(area, sub), probe: probe,
+    city: kind === "geo" ? (NTT_AREAS.filter(function (a) { return a.code === area; })[0] || {}).city : (kind === "ip" ? "IP 電話" : "携帯"),
+    e164: "+81" + number.slice(1)
+  };
+  reg.byZone[url] = rec;
+  reg.byNumber[number] = url;
+  reg.log.push(["ntt-assign", url, number, kind]);
+  return rec;
+}
+
+/* φ⁻¹ : NTT 番号 → zone URL (割当表の厳密な逆引き) */
+function nttUnmap(reg, number) {
+  var key = String(number).replace(/[^0-9]/g, "");
+  return reg.byNumber[key] || null;
+}
+
+/* ---- メタル回線: 音声帯 16-QAM ソフトモデム --------------------
+ * fs = 8000 Hz, fc = 2000 Hz → 1 シンボル 4 サンプル、2000 baud。
+ * 2π·fc/fs = π/2 なので搬送波は {1,0,-1,0}/{0,1,0,-1} の厳密な直交系に
+ * なり、相関復調が誤差なしで成立する (V.32 と同型の 16-QAM)。
+ * ================================================================= */
+var NTT_FS = 8000, NTT_FC = 2000, NTT_SPS = 4, NTT_AMP = 2600;
+
+/* Gray 符号の 2 ビット → 振幅 */
+var QAM_GRAY = [-3, -1, 3, 1];          /* 00,01,10,11 */
+function qamLevel(two) { return QAM_GRAY[two & 3]; }
+function qamBits(level) {
+  var i, best = 0, bd = 1e9, d;
+  for (i = 0; i < 4; i++) { d = Math.abs(QAM_GRAY[i] - level); if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+
+/* バイト列 → 音声帯サンプル (-8159..8159 の線形 PCM) */
+function nttModulate(bytes) {
+  var bits = bytesToBits(bytes), i, out = [], I, Q, k;
+  while (bits.length % 4 !== 0) bits.push(0);
+  for (i = 0; i < bits.length; i += 4) {
+    I = qamLevel((bits[i] << 1) | bits[i + 1]);
+    Q = qamLevel((bits[i + 2] << 1) | bits[i + 3]);
+    /* n=0..3 で cos(πn/2)={1,0,-1,0}, sin(πn/2)={0,1,0,-1} */
+    for (k = 0; k < NTT_SPS; k++) {
+      var c = [1, 0, -1, 0][k], s = [0, 1, 0, -1][k];
+      out.push(NTT_AMP * (I * c - Q * s));
+    }
+  }
+  return { samples: out, nSymbols: bits.length / 4, bitLen: bytes.length * 8, baud: NTT_FS / NTT_SPS, bps: (NTT_FS / NTT_SPS) * 4 };
+}
+
+/* 音声帯サンプル → バイト列 (相関復調 + 硬判定) */
+function nttDemodulate(samples, bitLen) {
+  var nSym = Math.floor(samples.length / NTT_SPS), bits = [], s, I, Q, bi, bq;
+  for (s = 0; s < nSym; s++) {
+    var a = samples[s * 4], b = samples[s * 4 + 1], c = samples[s * 4 + 2], d = samples[s * 4 + 3];
+    I = 0.5 * (a - c) / NTT_AMP;        /* (2/N)Σ s·cos */
+    Q = -0.5 * (b - d) / NTT_AMP;       /* -(2/N)Σ s·sin */
+    bi = qamBits(I); bq = qamBits(Q);
+    bits.push((bi >> 1) & 1, bi & 1, (bq >> 1) & 1, bq & 1);
+  }
+  if (typeof bitLen === "number") bits = bits.slice(0, bitLen);
+  return bitsToBytes(bits);
+}
+
+/* コンステレーション上の点 (画面表示・雑音評価用) */
+function nttConstellation(samples, limit) {
+  var nSym = Math.min(Math.floor(samples.length / NTT_SPS), limit || 400), pts = [], s;
+  for (s = 0; s < nSym; s++) {
+    var a = samples[s * 4], b = samples[s * 4 + 1], c = samples[s * 4 + 2], d = samples[s * 4 + 3];
+    pts.push({ i: 0.5 * (a - c) / NTT_AMP, q: -0.5 * (b - d) / NTT_AMP });
+  }
+  return pts;
+}
+
+/* ---- G.711 µ-law (ひかり電話のコーデック) ---------------------- */
+function muLawEncode(sample) {
+  var BIAS = 132, CLIP = 32635, sign = 0, exponent, mantissa, ulaw;
+  if (sample < 0) { sample = -sample; sign = 0x80; }
+  if (sample > CLIP) sample = CLIP;
+  sample += BIAS;
+  exponent = 7;
+  for (var mask = 0x4000; (sample & mask) === 0 && exponent > 0; exponent--, mask >>= 1) { }
+  mantissa = (sample >> (exponent + 3)) & 0x0f;
+  ulaw = ~(sign | (exponent << 4) | mantissa) & 0xff;
+  return ulaw;
+}
+
+function muLawDecode(ulaw) {
+  var BIAS = 132, u = ~ulaw & 0xff;
+  var sign = u & 0x80, exponent = (u >> 4) & 0x07, mantissa = u & 0x0f;
+  var sample = ((mantissa << 3) + BIAS) << exponent;
+  sample -= BIAS;
+  return sign ? -sample : sample;
+}
+
+/* ---- RTP (ひかり電話が音声を運ぶ形式) -------------------------- */
+var RTP_PT_PCMU = 0, RTP_PTIME_SAMPLES = 160;   /* 20 ms @ 8 kHz */
+
+function rtpPacketize(ulawBytes, ssrc, seq0, ts0) {
+  var pkts = [], i, seq = seq0 | 0, ts = ts0 | 0, pay, hdr;
+  for (i = 0; i < ulawBytes.length; i += RTP_PTIME_SAMPLES) {
+    pay = ulawBytes.slice(i, i + RTP_PTIME_SAMPLES);
+    hdr = [
+      0x80, RTP_PT_PCMU,
+      (seq >> 8) & 255, seq & 255,
+      (ts >>> 24) & 255, (ts >>> 16) & 255, (ts >>> 8) & 255, ts & 255,
+      (ssrc >>> 24) & 255, (ssrc >>> 16) & 255, (ssrc >>> 8) & 255, ssrc & 255
+    ];
+    pkts.push({ seq: seq, ts: ts, header: hdr, payload: pay, bytes: hdr.concat(pay) });
+    seq = (seq + 1) & 0xffff;
+    ts = (ts + pay.length) >>> 0;
+  }
+  return pkts;
+}
+
+function rtpDepacketize(pkts) {
+  var sorted = pkts.slice().sort(function (a, b) { return a.seq - b.seq; }), out = [], i;
+  for (i = 0; i < sorted.length; i++) out = out.concat(sorted[i].payload);
+  return out;
+}
+
+/* ---- ベアラ: 回線種別ごとの符号化 / 復号 ----------------------- */
+
+/* バイト列 → 回線上の信号 */
+function nttBearerSend(bytes, lineId, ssrc) {
+  var line = NTT_LINES[lineId] || NTT_LINES.metal;
+  if (line.id === "isdn") {
+    /* B チャネルはディジタル透過 — HDLC のフラグで囲うだけ */
+    return { line: line.id, kind: "digital", bitLen: bytes.length * 8, octets: [0x7e].concat(bytes, [0x7e]) };
+  }
+  var mod = nttModulate(bytes);
+  if (line.id === "metal") {
+    return { line: line.id, kind: "voiceband", bitLen: mod.bitLen, samples: mod.samples, nSymbols: mod.nSymbols, baud: mod.baud, bps: mod.bps };
+  }
+  /* ひかり電話: 音声帯信号を µ-law にしてから RTP に載せる */
+  var ulaw = mod.samples.map(muLawEncode);
+  var pkts = rtpPacketize(ulaw, (ssrc || 0x5a5a5a5a) >>> 0, 1000, 0);
+  return { line: line.id, kind: "rtp", bitLen: mod.bitLen, samples: mod.samples, ulaw: ulaw, packets: pkts, nSymbols: mod.nSymbols };
+}
+
+/* 回線上の信号 → バイト列 */
+function nttBearerRecv(sig) {
+  if (sig.kind === "digital") {
+    var o = sig.octets;
+    return o.slice(1, o.length - 1);
+  }
+  if (sig.kind === "rtp") {
+    var ulaw = rtpDepacketize(sig.packets);
+    var samples = ulaw.map(muLawDecode);
+    return nttDemodulate(samples, sig.bitLen);
+  }
+  return nttDemodulate(sig.samples, sig.bitLen);
+}
+
+/* ---- 呼制御 (発呼 → 接続 → 切断) の状態機械 -------------------- */
+function nttCall(reg, fromUrl, toUrl, lineId) {
+  var a = nttMap(reg, fromUrl, lineId === "hikari" ? "ip" : "geo");
+  var b = nttMap(reg, toUrl, lineId === "hikari" ? "ip" : "geo");
+  var line = NTT_LINES[lineId] || NTT_LINES.metal;
+  var states = [
+    { st: "on-hook",   note: "待機" },
+    { st: "off-hook",  note: "発呼 (" + a.display + ")" },
+    { st: "dial",      note: "選択信号 " + b.display + " (PB 信号)" },
+    { st: "ringing",   note: "呼出中 — 相手交換機へ IAM" },
+    { st: "connected", note: line.name + " 接続 · " + line.band + " · " + line.bps + " bps" },
+    { st: "data",      note: "ベアラ確立 (" + line.bearer + ")" }
+  ];
+  return { from: a, to: b, line: line, states: states };
+}
+
+/* ===== 7. L4 — LINE / Instagram メッセージ多重化 =================
+ * LINE と Instagram のメッセージ機能をウルトラネットワークに取り込む層。
+ *
+ * 取り込みは各社が公開している「公式 API」の仕様どおりに行う:
+ *   ・LINE      : Messaging API の Webhook イベント + reply/push エンドポイント。
+ *                 受信は X-Line-Signature (HMAC-SHA256 → Base64) で検証する。
+ *   ・Instagram : Instagram Graph API (Messenger Platform) の Webhook +
+ *                 /<IG_ID>/messages 送信。受信は X-Hub-Signature-256
+ *                 (HMAC-SHA256 → hex) で検証する。
+ *
+ * 非公開 API の解析や、認証情報を迂回する手口は一切使わない。実運用では
+ * 各プラットフォームで発行したチャネルシークレット / アクセストークンが
+ * 必要で、それが無い場合はローカル模擬 (msgSimulate) で動作する。
+ *
+ * 正規化された「統合メッセージ」は zone:// レコードとして封緘され、
+ * NTT 回線 → 電力線へと下りていく。
+ * ================================================================= */
+
+var MSG_PLATFORMS = {
+  line: {
+    id: "line", name: "LINE", color: "#06c755",
+    webhookSigHeader: "X-Line-Signature",
+    replyEndpoint: "https://api.line.me/v2/bot/message/reply",
+    pushEndpoint: "https://api.line.me/v2/bot/message/push",
+    docs: "https://developers.line.biz/ja/reference/messaging-api/"
+  },
+  instagram: {
+    id: "instagram", name: "Instagram", color: "#e1306c",
+    webhookSigHeader: "X-Hub-Signature-256",
+    sendEndpoint: "https://graph.instagram.com/v21.0/{IG_ID}/messages",
+    docs: "https://developers.facebook.com/docs/messenger-platform/instagram/"
+  },
+  zone: { id: "zone", name: "zone://", color: "#c8a44a", docs: "" }
+};
+
+/* ---- 署名検証 -------------------------------------------------- *
+ * LINE      : Base64( HMAC-SHA256(channelSecret, rawBody) )
+ * Instagram : "sha256=" + hex( HMAC-SHA256(appSecret, rawBody) )      */
+
+function lineSignature(channelSecret, rawBody) {
+  return toBase64(hmacSha256(bytesOfUtf8(channelSecret), bytesOfUtf8(rawBody)));
+}
+
+function lineVerify(channelSecret, rawBody, header) {
+  var want = lineSignature(channelSecret, rawBody);
+  return constTimeEq(bytesOfUtf8(want), bytesOfUtf8(String(header || "")));
+}
+
+function igSignature(appSecret, rawBody) {
+  return "sha256=" + toHex(hmacSha256(bytesOfUtf8(appSecret), bytesOfUtf8(rawBody)));
+}
+
+function igVerify(appSecret, rawBody, header) {
+  var want = igSignature(appSecret, rawBody);
+  return constTimeEq(bytesOfUtf8(want), bytesOfUtf8(String(header || "")));
+}
+
+/* ---- 統合メッセージ形式 ---------------------------------------- */
+function msgNew(o) {
+  return {
+    id: o.id || ("m" + Math.floor(Math.random() * 1e9)),
+    ts: o.ts || Date.now(),
+    platform: o.platform || "zone",
+    direction: o.direction || "in",       /* in = 受信 / out = 送信 */
+    chatId: o.chatId || "",
+    userId: o.userId || "",
+    displayName: o.displayName || o.userId || "",
+    type: o.type || "text",               /* text | sticker | image | audio */
+    text: o.text || "",
+    meta: o.meta || {}
+  };
+}
+
+/* ---- LINE Messaging API: Webhook イベント → 統合メッセージ ------ */
+function msgFromLine(event) {
+  if (!event || event.type !== "message" || !event.message) return null;
+  var src = event.source || {}, m = event.message;
+  var chat = src.groupId || src.roomId || src.userId || "";
+  var out = msgNew({
+    id: "line:" + (m.id || ""),
+    ts: event.timestamp || Date.now(),
+    platform: "line",
+    direction: "in",
+    chatId: chat,
+    userId: src.userId || "",
+    displayName: (event.__profile && event.__profile.displayName) || src.userId || "LINE ユーザー",
+    type: m.type || "text",
+    text: m.type === "text" ? (m.text || "")
+        : m.type === "sticker" ? ("[スタンプ " + (m.packageId || "?") + "/" + (m.stickerId || "?") + "]")
+        : ("[" + (m.type || "unknown") + "]"),
+    meta: { replyToken: event.replyToken || "", sourceType: src.type || "user", messageId: m.id || "" }
+  });
+  return out;
+}
+
+/* Webhook 本文全体 (destination + events[]) を取り込む */
+function msgIngestLine(body, opts) {
+  opts = opts || {};
+  var raw = typeof body === "string" ? body : JSON.stringify(body);
+  var verified = null;
+  if (opts.channelSecret) verified = lineVerify(opts.channelSecret, raw, opts.signature);
+  if (verified === false) return { ok: false, status: 401, reason: "line-signature-mismatch", messages: [] };
+  var obj = typeof body === "string" ? JSON.parse(body) : body;
+  var evs = (obj && obj.events) || [], out = [], i, m;
+  for (i = 0; i < evs.length; i++) { m = msgFromLine(evs[i]); if (m) out.push(m); }
+  return { ok: true, status: 200, verified: verified, destination: obj.destination || "", messages: out };
+}
+
+/* 送信ペイロード (公式仕様どおりの形) */
+function msgToLineReply(replyToken, text) {
+  return {
+    endpoint: MSG_PLATFORMS.line.replyEndpoint,
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer {CHANNEL_ACCESS_TOKEN}" },
+    body: { replyToken: replyToken, messages: [{ type: "text", text: text }] }
+  };
+}
+
+function msgToLinePush(to, text) {
+  return {
+    endpoint: MSG_PLATFORMS.line.pushEndpoint,
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer {CHANNEL_ACCESS_TOKEN}" },
+    body: { to: to, messages: [{ type: "text", text: text }] }
+  };
+}
+
+/* ---- Instagram Graph API: Webhook → 統合メッセージ -------------- */
+function msgFromInstagram(messaging, entryId) {
+  if (!messaging || !messaging.message) return null;
+  var m = messaging.message, sender = messaging.sender || {}, recip = messaging.recipient || {};
+  var att = m.attachments && m.attachments.length ? m.attachments[0] : null;
+  return msgNew({
+    id: "ig:" + (m.mid || ""),
+    ts: messaging.timestamp || Date.now(),
+    platform: "instagram",
+    direction: "in",
+    chatId: sender.id || "",
+    userId: sender.id || "",
+    displayName: (messaging.__profile && messaging.__profile.username) || ("IG:" + (sender.id || "")),
+    type: att ? (att.type || "image") : "text",
+    text: m.text ? m.text : (att ? ("[" + (att.type || "attachment") + "]") : ""),
+    meta: { mid: m.mid || "", igId: recip.id || entryId || "", isEcho: !!m.is_echo }
+  });
+}
+
+function msgIngestInstagram(body, opts) {
+  opts = opts || {};
+  var raw = typeof body === "string" ? body : JSON.stringify(body);
+  var verified = null;
+  if (opts.appSecret) verified = igVerify(opts.appSecret, raw, opts.signature);
+  if (verified === false) return { ok: false, status: 401, reason: "ig-signature-mismatch", messages: [] };
+  var obj = typeof body === "string" ? JSON.parse(body) : body;
+  var entries = (obj && obj.entry) || [], out = [], i, k, ms, m;
+  for (i = 0; i < entries.length; i++) {
+    ms = entries[i].messaging || [];
+    for (k = 0; k < ms.length; k++) {
+      m = msgFromInstagram(ms[k], entries[i].id);
+      if (m && !m.meta.isEcho) out.push(m);
+    }
+  }
+  return { ok: true, status: 200, verified: verified, object: obj.object || "", messages: out };
+}
+
+function msgToInstagramSend(igId, recipientId, text) {
+  return {
+    endpoint: MSG_PLATFORMS.instagram.sendEndpoint.replace("{IG_ID}", igId || "{IG_ID}"),
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": "Bearer {IG_ACCESS_TOKEN}" },
+    body: { recipient: { id: recipientId }, message: { text: text } }
+  };
+}
+
+/* 統合メッセージ → 各プラットフォームの送信要求 */
+function msgToOutbound(msg, cfg) {
+  cfg = cfg || {};
+  if (msg.platform === "line") {
+    return msg.meta && msg.meta.replyToken
+      ? msgToLineReply(msg.meta.replyToken, msg.text)
+      : msgToLinePush(msg.chatId, msg.text);
+  }
+  if (msg.platform === "instagram") return msgToInstagramSend(cfg.igId, msg.chatId, msg.text);
+  return { endpoint: "zone://url.or.jp/msg/zone", method: "PUT", headers: {}, body: { text: msg.text } };
+}
+
+/* ---- ローカル模擬 (資格情報が無くても動かすため) ---------------- */
+var SIM_LINE_USERS = [
+  { id: "U4af4980629...", name: "田中 さくら" },
+  { id: "U9c1f2d7b41...", name: "山口 まさあき" },
+  { id: "Ub2e88a0f53...", name: "研究会グループ" }
+];
+var SIM_IG_USERS = [
+  { id: "17841400000000001", name: "sakura.photo" },
+  { id: "17841400000000002", name: "bada.lang" }
+];
+var SIM_LINE_TEXTS = [
+  "電力線でつながった?", "コンセントから zone:// が見えてる", "今日の実験ログ送るね",
+  "NTT の番号写像うまくいった?", "量子鍵の QBER は 0 だった"
+];
+var SIM_IG_TEXTS = [
+  "配線図の写真あげたよ", "ウルトラネットワークの図が綺麗", "この投稿みて!", "DM ありがとう"
+];
+
+/* LINE Webhook 本文を公式仕様の形で組み立てる */
+function simLineBody(n, seed) {
+  var rnd = rngOf("simline:" + (seed || "0")), evs = [], i, u, t;
+  for (i = 0; i < (n || 1); i++) {
+    u = SIM_LINE_USERS[Math.floor(rnd() * SIM_LINE_USERS.length)];
+    t = SIM_LINE_TEXTS[Math.floor(rnd() * SIM_LINE_TEXTS.length)];
+    evs.push({
+      type: "message", mode: "active",
+      timestamp: Date.now() - Math.floor(rnd() * 3600000),
+      source: { type: "user", userId: u.id },
+      webhookEventId: "01H" + Math.floor(rnd() * 1e9).toString(36).toUpperCase(),
+      deliveryContext: { isRedelivery: false },
+      replyToken: Math.floor(rnd() * 1e16).toString(16),
+      message: { id: String(Math.floor(rnd() * 1e15)), type: "text", text: t },
+      __profile: { displayName: u.name }
+    });
+  }
+  return { destination: "Ubada0000000000000000000000000000", events: evs };
+}
+
+/* Instagram Webhook 本文を公式仕様の形で組み立てる */
+function simInstagramBody(n, seed) {
+  var rnd = rngOf("simig:" + (seed || "0")), ms = [], i, u, t;
+  for (i = 0; i < (n || 1); i++) {
+    u = SIM_IG_USERS[Math.floor(rnd() * SIM_IG_USERS.length)];
+    t = SIM_IG_TEXTS[Math.floor(rnd() * SIM_IG_TEXTS.length)];
+    ms.push({
+      sender: { id: u.id },
+      recipient: { id: "17841499999999999" },
+      timestamp: Date.now() - Math.floor(rnd() * 3600000),
+      message: { mid: "aWc6" + Math.floor(rnd() * 1e12).toString(36), text: t },
+      __profile: { username: u.name }
+    });
+  }
+  return { object: "instagram", entry: [{ id: "17841499999999999", time: Date.now(), messaging: ms }] };
+}
+
+/* 署名まで含めた完全な模擬 Webhook (検証経路も本物を通る) */
+function msgSimulate(platform, n, secret, seed) {
+  var body = platform === "line" ? simLineBody(n, seed) : simInstagramBody(n, seed);
+  var raw = JSON.stringify(body);
+  if (platform === "line") {
+    var sig = lineSignature(secret || "dummy-channel-secret", raw);
+    return msgIngestLine(raw, { channelSecret: secret || "dummy-channel-secret", signature: sig });
+  }
+  var sig2 = igSignature(secret || "dummy-app-secret", raw);
+  return msgIngestInstagram(raw, { appSecret: secret || "dummy-app-secret", signature: sig2 });
+}
+
+/* ---- 統合受信箱 ------------------------------------------------ */
+function inboxNew() { return { messages: [], threads: {} }; }
+
+function inboxAdd(box, msg) {
+  box.messages.push(msg);
+  var key = msg.platform + ":" + msg.chatId;
+  if (!box.threads[key]) {
+    box.threads[key] = { key: key, platform: msg.platform, chatId: msg.chatId, displayName: msg.displayName, messages: [] };
+  }
+  box.threads[key].messages.push(msg);
+  if (msg.direction === "in") box.threads[key].displayName = msg.displayName;
+  return box.threads[key];
+}
+
+function inboxThreads(box) {
+  return Object.keys(box.threads).map(function (k) { return box.threads[k]; })
+    .sort(function (a, b) {
+      return b.messages[b.messages.length - 1].ts - a.messages[a.messages.length - 1].ts;
+    });
+}
+
+/* 統合メッセージが載る zone アドレス (これが NTT 番号へ写像される) */
+function msgZoneUrl(msg) {
+  return "zone://url.or.jp/msg/" + msg.platform + "/" + (msg.chatId || "self");
+}
+
+/* 統合メッセージ ⇄ 転送用の文字列 (封緘対象) */
+function msgSerialize(msg) {
+  return JSON.stringify({
+    v: 1, id: msg.id, ts: msg.ts, p: msg.platform, d: msg.direction,
+    c: msg.chatId, u: msg.userId, n: msg.displayName, t: msg.type, x: msg.text, m: msg.meta
+  });
+}
+
+function msgDeserialize(s) {
+  var o = JSON.parse(s);
+  return msgNew({
+    id: o.id, ts: o.ts, platform: o.p, direction: o.d, chatId: o.c,
+    userId: o.u, displayName: o.n, type: o.t, text: o.x, meta: o.m || {}
+  });
+}
+
+/* ===== 8. zone レコードの封筒とアカシック台帳 ==================== *
+ * 封筒 (envelope) は回線に流す実バイト列。
+ *   magic "ZN" | ver | urlLen(2) | url(utf8) | salt(2) | tag(4) |
+ *   ctLen(2) | ct (16bit BE × ctLen)
+ * ================================================================= */
+
+function envelopeEncode(rec) {
+  var url = bytesOfUtf8(rec.url), out = [0x5a, 0x4e, 1];
+  out.push((url.length >> 8) & 255, url.length & 255);
+  out = out.concat(url);
+  out.push((rec.salt >> 8) & 255, rec.salt & 255);
+  out.push((rec.tag >>> 24) & 255, (rec.tag >>> 16) & 255, (rec.tag >>> 8) & 255, rec.tag & 255);
+  out.push((rec.ct.length >> 8) & 255, rec.ct.length & 255);
+  for (var i = 0; i < rec.ct.length; i++) out.push((rec.ct[i] >> 8) & 255, rec.ct[i] & 255);
+  return out;
+}
+
+function envelopeDecode(bytes) {
+  if (bytes.length < 5 || bytes[0] !== 0x5a || bytes[1] !== 0x4e) {
+    return { ok: false, status: 400, reason: "bad-zone" };
+  }
+  var p = 3, urlLen = (bytes[p] << 8) | bytes[p + 1]; p += 2;
+  var url = utf8OfBytes(bytes.slice(p, p + urlLen)); p += urlLen;
+  var salt = (bytes[p] << 8) | bytes[p + 1]; p += 2;
+  var tag = ((bytes[p] << 24) | (bytes[p + 1] << 16) | (bytes[p + 2] << 8) | bytes[p + 3]) >>> 0; p += 4;
+  var ctLen = (bytes[p] << 8) | bytes[p + 1]; p += 2;
+  var ct = [], i;
+  for (i = 0; i < ctLen; i++) { ct.push((bytes[p] << 8) | bytes[p + 1]); p += 2; }
+  return { ok: true, status: 200, url: url, salt: salt, tag: tag, ct: ct };
+}
+
+/* アカシック台帳 — 追記専用の tuplespace (zone.bada と同じ役割) */
+function ledgerNew() { return []; }
+function ledgerCommit(led, fact) { led.push(fact); return led.length; }
+
+/* 既存の ZoneBrowser が読む "@@" ブロックを出力する (相互運用) */
+function zoneServeBlock(ctx, url, status, body, route, rec, key) {
+  var z = zoneParse(url) || { host: "", path: "" };
+  var L = [];
+  L.push("@@HOST " + z.host);
+  L.push("@@PATH " + z.path);
+  L.push("@@KEY " + zoneId(url));
+  L.push("@@ROUTE " + (route ? route.hops.join(" -> ") : ""));
+  L.push("@@NODE " + (route && route.peer ? route.peer.name : ""));
+  L.push("@@QKD " + (ctx.qkdOk ? "ok" : "compromised"));
+  if (rec) {
+    L.push("@@CIPHER " + (rec.ct[0] || 0) + " " + (rec.ct[1] || 0) + " " + (rec.ct[2] || 0) + " " + rec.ct.length);
+    L.push("@@TAG " + rec.tag);
+  }
+  L.push("@@JONESKEY " + (key || 0));
+  L.push("@@STATUS " + status);
+  L.push("@@BODY_BEGIN");
+  L.push(body || "");
+  L.push("@@BODY_END");
+  return L.join("\n");
+}
+
+var ZONE_STATUS = {
+  200: "zone-delivered",
+  400: "bad-zone",
+  404: "zone-not-found",
+  409: "zone-guard-reject",
+  495: "quantum-channel-compromised"
+};
+
+/* ===== 9. AT&T ベル研究所式 STREAMS =============================
+ * Dennis Ritchie の Streams I/O と同じ組織化:
+ *
+ *      stream head  (アプリケーション)
+ *           ↑ rput        ↓ wput
+ *      ┌─ module ─┐   push した順に積み上がる
+ *      │  msgmux  │   LINE / Instagram 多重化
+ *      │  jones   │   Jones 多項式量子暗号 AEAD
+ *      │  zone    │   zone:// P2P リング DHT
+ *      │  ntt     │   NTT 電話回線への写像
+ *      └──────────┘
+ *           ↑             ↓
+ *        driver (Panasonic HD-PLC = 家のコンセント)
+ *
+ * 各モジュールは wput (下り) と rput (上り) の対を持ち、メッセージ
+ * ブロック (M_DATA / M_PROTO / M_CTL) を受け渡す。上位は下位を知らず、
+ * 下位は上位を知らない。
+ * ================================================================= */
+
+function mblk(type, payload, meta) { return { type: type, payload: payload, meta: meta || {} }; }
+
+function streamNew(name, driver) {
+  return { name: name, modules: [], driver: driver, trace: [] };
+}
+
+/* push は stream head の直下に積む → modules は下から上の順 */
+function streamPush(st, mod) { st.modules.push(mod); return st; }
+
+function streamTrace(st, dir, who, note, m) {
+  st.trace.push({
+    dir: dir, module: who, note: note,
+    type: m ? m.type : "", size: m ? streamSizeOf(m) : 0
+  });
+}
+
+function streamSizeOf(m) {
+  var p = m.payload;
+  if (!p) return 0;
+  if (typeof p === "string") return p.length;
+  if (Array.isArray(p)) return p.length;
+  if (p.samples) return p.samples.length;
+  if (p.bytes) return p.bytes.length;
+  if (p.ct) return p.ct.length;
+  return 1;
+}
+
+/* 下り: stream head → modules(上から下) → driver */
+function streamWrite(st, m, ctx) {
+  var i, mod;
+  st.trace = [];
+  streamTrace(st, "down", "head", "アプリが書き込み", m);
+  for (i = st.modules.length - 1; i >= 0; i--) {
+    mod = st.modules[i];
+    m = mod.wput(m, ctx);
+    if (!m) { streamTrace(st, "down", mod.name, "消費 (これ以上下りない)", null); return null; }
+    streamTrace(st, "down", mod.name, mod.wnote || "", m);
+    if (m.type === "M_CTL" && m.meta.abort) { return m; }
+  }
+  m = st.driver.put(m, ctx);
+  streamTrace(st, "down", st.driver.name, st.driver.wnote || "回線へ送出", m);
+  return m;
+}
+
+/* 上り: driver → modules(下から上) → stream head */
+function streamRead(st, wire, ctx) {
+  var i, mod, m = st.driver.srv(wire, ctx);
+  streamTrace(st, "up", st.driver.name, st.driver.rnote || "回線から受信", m);
+  if (!m || (m.type === "M_CTL" && m.meta.abort)) return m;
+  for (i = 0; i < st.modules.length; i++) {
+    mod = st.modules[i];
+    m = mod.rput(m, ctx);
+    if (!m) { streamTrace(st, "up", mod.name, "消費", null); return null; }
+    streamTrace(st, "up", mod.name, mod.rnote || "", m);
+    if (m.type === "M_CTL" && m.meta.abort) return m;
+  }
+  streamTrace(st, "up", "head", "アプリへ到達", m);
+  return m;
+}
+
+/* ---- driver: Panasonic HD-PLC (家のコンセント) ------------------ */
+function plcDriver() {
+  return {
+    name: "plc",
+    label: "HD-PLC ドライバ (コンセント)",
+    wnote: "ウェーブレット OFDM で電力線へ",
+    rnote: "電力線からウェーブレット OFDM 復調",
+    put: function (m, ctx) {
+      /* 回線信号 → バイト列 → IEEE 1901 フレーム → OFDM シンボル */
+      var bytes = nttSignalToBytes(m.payload);
+      var frame = plcFrame(bytes, { src: 1, dst: 2, cap: ctx.cap || 2 });
+      var mod = plcModulate(frame.bytes, ctx.tonemap);
+      var samples = ctx.marginDb
+        ? plcThroughChannel(mod.samples, ctx.channel, ctx.tonemap, ctx.marginDb, ctx.seed)
+        : mod.samples;
+      ctx.lastPhy = {
+        frame: frame, nSymbols: mod.nSymbols, bitLen: mod.bitLen,
+        phyBps: ctx.tonemap.phyBps, airTimeSec: mod.nSymbols * PLC.SYMBOL_SEC,
+        sampleCount: samples.length
+      };
+      return mblk("M_DATA", { samples: samples, bitLen: mod.bitLen, lineMeta: m.meta.lineMeta }, m.meta);
+    },
+    srv: function (wire, ctx) {
+      var bytes = plcDemodulate(wire.samples, ctx.tonemap, wire.bitLen);
+      var df = plcDeframe(bytes);
+      if (!df.ok) {
+        return mblk("M_CTL", null, { abort: true, status: 503, reason: "plc-" + df.reason });
+      }
+      return mblk("M_DATA", nttBytesToSignal(df.bytes, wire.lineMeta), { lineMeta: wire.lineMeta });
+    }
+  };
+}
+
+/* 回線信号オブジェクト ⇄ バイト列 (PLC はバイト列しか運ばない) */
+function nttSignalToBytes(sig) {
+  if (sig.kind === "digital") return sig.octets;
+  if (sig.kind === "rtp") {
+    var out = [], i;
+    for (i = 0; i < sig.packets.length; i++) out = out.concat(sig.packets[i].bytes);
+    return out;
+  }
+  /* voiceband: 16bit 符号付きサンプルを 2 バイトに詰める */
+  var b = [], k, v;
+  for (k = 0; k < sig.samples.length; k++) {
+    v = Math.round(sig.samples[k]) & 0xffff;
+    b.push((v >> 8) & 255, v & 255);
+  }
+  return b;
+}
+
+function nttBytesToSignal(bytes, meta) {
+  if (meta.kind === "digital") return { kind: "digital", line: meta.line, bitLen: meta.bitLen, octets: bytes };
+  if (meta.kind === "rtp") {
+    var pkts = [], p = 0, hdr, payLen;
+    while (p + 12 <= bytes.length) {
+      hdr = bytes.slice(p, p + 12);
+      payLen = Math.min(RTP_PTIME_SAMPLES, bytes.length - p - 12);
+      pkts.push({
+        seq: (hdr[2] << 8) | hdr[3],
+        ts: ((hdr[4] << 24) | (hdr[5] << 16) | (hdr[6] << 8) | hdr[7]) >>> 0,
+        header: hdr, payload: bytes.slice(p + 12, p + 12 + payLen)
+      });
+      p += 12 + payLen;
+    }
+    return { kind: "rtp", line: meta.line, bitLen: meta.bitLen, packets: pkts };
+  }
+  var s = [], i, v;
+  for (i = 0; i + 1 < bytes.length; i += 2) {
+    v = (bytes[i] << 8) | bytes[i + 1];
+    if (v & 0x8000) v -= 0x10000;
+    s.push(v);
+  }
+  return { kind: "voiceband", line: meta.line, bitLen: meta.bitLen, samples: s };
+}
+
+/* ---- module: ntt — NTT 電話回線への写像 ------------------------ */
+function nttModule() {
+  return {
+    name: "ntt",
+    label: "NTT 回線写像 (φ: zone ↦ 電話番号)",
+    wnote: "番号を割当て、加入者線のベアラに載せる",
+    rnote: "ベアラから取り出し、φ⁻¹ で zone に戻す",
+    wput: function (m, ctx) {
+      var env = m.payload;                       /* { url, salt, tag, ct } */
+      var num = nttMap(ctx.reg, env.url, ctx.numberKind || (ctx.lineId === "hikari" ? "ip" : "geo"));
+      var bytes = envelopeEncode(env);
+      var sig = nttBearerSend(bytes, ctx.lineId || "metal", mix32(env.url));
+      ctx.lastNtt = { number: num, line: NTT_LINES[ctx.lineId || "metal"], envelopeBytes: bytes.length, signal: sig };
+      return mblk("M_DATA", sig, {
+        lineMeta: { kind: sig.kind, line: sig.line, bitLen: sig.bitLen },
+        number: num.number, zoneUrl: env.url
+      });
+    },
+    rput: function (m, ctx) {
+      var bytes = nttBearerRecv(m.payload);
+      var env = envelopeDecode(bytes);
+      if (!env.ok) return mblk("M_CTL", null, { abort: true, status: 400, reason: ZONE_STATUS[400] });
+      var url = nttUnmap(ctx.reg, m.meta.number || "");
+      env.mappedBack = url;                      /* φ⁻¹ の検算 */
+      return mblk("M_DATA", env, m.meta);
+    }
+  };
+}
+
+/* ---- module: zone — zone:// P2P リング DHT ---------------------- */
+function zoneModule() {
+  return {
+    name: "zone",
+    label: "zone:// ウルトラネットワーク (P2P リング DHT)",
+    wnote: "DHT で担当ピアを決め、台帳に追記",
+    rnote: "担当ピアの照合と台帳への追記",
+    wput: function (m, ctx) {
+      var env = m.payload, z = zoneParse(env.url);
+      if (!z) return mblk("M_CTL", null, { abort: true, status: 400, reason: ZONE_STATUS[400] });
+      var key = zoneId(env.url);
+      var route = dhtRoute(ctx.net, ctx.net[0], key);
+      route.peer.store[env.url] = { ct: env.ct, salt: env.salt, tag: env.tag };
+      ledgerCommit(ctx.ledger, ["zone-record", env.url, route.peer.name, key, env.tag]);
+      ctx.lastZone = { key: key, route: route, host: z.host, path: z.path };
+      return mblk("M_DATA", env, m.meta);
+    },
+    rput: function (m, ctx) {
+      var env = m.payload, key = zoneId(env.url);
+      var route = dhtRoute(ctx.net, ctx.net[0], key);
+      if (!route.peer.store[env.url]) {
+        return mblk("M_CTL", null, { abort: true, status: 404, reason: ZONE_STATUS[404] });
+      }
+      /* 悪意あるピアがレコードを書き換える攻撃 — 上の jones が弾くはず */
+      if (ctx.tamperZone) {
+        env = { url: env.url, salt: env.salt, tag: env.tag, ct: env.ct.slice() };
+        env.ct[0] = (env.ct[0] + 1) % 65536;
+      }
+      ledgerCommit(ctx.ledger, ["zone-fetch", env.url, route.peer.name]);
+      ctx.lastZoneUp = { key: key, route: route };
+      return mblk("M_DATA", env, m.meta);
+    }
+  };
+}
+
+/* ---- module: jones — Jones 多項式量子暗号 ---------------------- */
+function jonesModule() {
+  return {
+    name: "jones",
+    label: "Jones 多項式量子暗号 (AEAD + Bell 対 QKD)",
+    wnote: "結び目鍵で封緘 (seal)",
+    rnote: "結び目鍵で開封 — 改竄は 409",
+    wput: function (m, ctx) {
+      var url = m.payload.url, text = m.payload.text;
+      var z = zoneParse(url);
+      if (!z) return mblk("M_CTL", null, { abort: true, status: 400, reason: ZONE_STATUS[400] });
+      var q = qkdSession(ctx.ledger.length, ctx.tapped);
+      ctx.qkdOk = q.ok;
+      if (!q.ok) return mblk("M_CTL", null, { abort: true, status: 495, reason: ZONE_STATUS[495] });
+      var key = jonesKey(zoneDiagram(z.host));
+      var sealed = zoneSeal(text, key, q.salt);
+      ctx.lastCrypto = { host: z.host, key: key, salt: q.salt, tag: sealed.tag, ctLen: sealed.ct.length, qkd: q };
+      return mblk("M_DATA", { url: url, ct: sealed.ct, salt: sealed.salt, tag: sealed.tag }, m.meta);
+    },
+    rput: function (m, ctx) {
+      var env = m.payload, z = zoneParse(env.url);
+      if (!z) return mblk("M_CTL", null, { abort: true, status: 400, reason: ZONE_STATUS[400] });
+      var key = jonesKey(zoneDiagram(z.host));
+      var op = zoneOpen({ ct: env.ct, salt: env.salt, tag: env.tag }, key);
+      if (!op.ok) return mblk("M_CTL", null, { abort: true, status: 409, reason: ZONE_STATUS[409] });
+      return mblk("M_DATA", { url: env.url, text: op.text }, m.meta);
+    }
+  };
+}
+
+/* ---- module: msgmux — LINE / Instagram 多重化 ------------------- */
+function msgmuxModule() {
+  return {
+    name: "msgmux",
+    label: "メッセージ多重化 (LINE / Instagram)",
+    wnote: "統合メッセージを直列化し zone アドレスを付ける",
+    rnote: "統合メッセージへ復元",
+    wput: function (m, ctx) {
+      var msg = m.payload;
+      var url = msg.zoneUrl || msgZoneUrl(msg);
+      return mblk("M_DATA", { url: url, text: msgSerialize(msg) }, { platform: msg.platform, chatId: msg.chatId });
+    },
+    rput: function (m, ctx) {
+      /* AEAD を通った後なので本来は健全だが、復元に失敗しても投げない */
+      var msg;
+      try { msg = msgDeserialize(m.payload.text); }
+      catch (e) { return mblk("M_CTL", null, { abort: true, status: 409, reason: ZONE_STATUS[409] }); }
+      return mblk("M_PROTO", msg, m.meta);
+    }
+  };
+}
+
+/* ===== 10. ウルトラネットワーク本体 ============================== */
+
+var ZONE_PEERS = ["tokyo.zone.jp", "osaka.zone.jp", "nagoya.zone.jp",
+                  "sapporo.zone.jp", "fukuoka.zone.jp", "naha.zone.jp"];
+
+function ultraNew(opts) {
+  opts = opts || {};
+  var fromOutlet = opts.from || "living", toOutlet = opts.to || "study";
+  var channel = plcChannel(fromOutlet, toOutlet);
+  var tonemap = plcToneMap(channel);
+  var st = streamNew("ultra0", plcDriver());
+  /* push の順 = 下から上 */
+  streamPush(st, nttModule());
+  streamPush(st, zoneModule());
+  streamPush(st, jonesModule());
+  streamPush(st, msgmuxModule());
+  return {
+    stream: st,
+    ctx: {
+      reg: nttRegistryNew(),
+      net: netSort(ZONE_PEERS.map(peerNew)),
+      ledger: ledgerNew(),
+      channel: channel,
+      tonemap: tonemap,
+      lineId: opts.lineId || "metal",
+      cap: opts.cap || 2,
+      marginDb: opts.marginDb || 0,
+      tapped: !!opts.tapped,
+      seed: opts.seed || "0",
+      qkdOk: true
+    },
+    inbox: inboxNew(),
+    outlets: { from: fromOutlet, to: toOutlet }
+  };
+}
+
+/* コンセント / 回線種別を変えて張り直す */
+function ultraRelink(u, fromOutlet, toOutlet, lineId) {
+  u.outlets = { from: fromOutlet, to: toOutlet };
+  u.ctx.channel = plcChannel(fromOutlet, toOutlet);
+  u.ctx.tonemap = plcToneMap(u.ctx.channel);
+  if (lineId) u.ctx.lineId = lineId;
+  return u;
+}
+
+/* 1 通のメッセージをスタックの下まで送り、下から上へ戻す(折返し試験) */
+function ultraSend(u, msg) {
+  var t0 = Date.now();
+  var down = streamWrite(u.stream, mblk("M_PROTO", msg), u.ctx);
+  if (!down || down.type === "M_CTL") {
+    return {
+      ok: false, status: (down && down.meta.status) || 500,
+      reason: (down && down.meta.reason) || "write-failed",
+      trace: u.stream.trace.slice(), sent: msg
+    };
+  }
+  var wire = down.payload;
+  /* 改竄試験 (物理層): 回線上のサンプルを 1 つ壊す → PLC の CRC が弾く */
+  if (u.ctx.tamper) {
+    wire = { samples: wire.samples.slice(), bitLen: wire.bitLen, lineMeta: wire.lineMeta };
+    var idx = Math.min(u.ctx.tamperIndex || 40, wire.samples.length - 1);
+    wire.samples[idx] = wire.samples[idx] + 4;
+  }
+  var up = streamRead(u.stream, wire, u.ctx);
+  if (!up || up.type === "M_CTL") {
+    return {
+      ok: false, status: (up && up.meta.status) || 500,
+      reason: (up && up.meta.reason) || "read-failed",
+      trace: u.stream.trace.slice(), sent: msg,
+      phy: u.ctx.lastPhy, ntt: u.ctx.lastNtt, zone: u.ctx.lastZone, crypto: u.ctx.lastCrypto
+    };
+  }
+  var got = up.payload;
+  return {
+    ok: true, status: 200, reason: ZONE_STATUS[200],
+    sent: msg, received: got,
+    identical: msgSerialize(got) === msgSerialize(msg),
+    trace: u.stream.trace.slice(),
+    phy: u.ctx.lastPhy, ntt: u.ctx.lastNtt, zone: u.ctx.lastZone, crypto: u.ctx.lastCrypto,
+    wireSamples: wire.samples ? wire.samples.length : 0,
+    elapsedMs: Date.now() - t0,
+    ledgerLen: u.ctx.ledger.length
+  };
+}
+
+/* Webhook を取り込んで、全メッセージをウルトラネットワークに通す */
+function ultraIngest(u, platform, n, secret, seed) {
+  var res = msgSimulate(platform, n || 1, secret, seed);
+  if (!res.ok) return { ok: false, status: res.status, reason: res.reason, results: [] };
+  var out = [], i, r;
+  for (i = 0; i < res.messages.length; i++) {
+    r = ultraSend(u, res.messages[i]);
+    if (r.ok) inboxAdd(u.inbox, r.received);
+    out.push(r);
+  }
+  return { ok: true, status: 200, verified: res.verified, results: out, count: out.length };
+}
+
+/* ===== 11. 画面 ================================================== */
+
+var UI = { u: null, lastTest: null };
+
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function statTile(k, v, u, small) {
+  return '<div class="stat"><div class="k">' + esc(k) + '</div><div class="v' +
+    (small ? " sm" : "") + '">' + esc(v) + (u ? '<span class="u">' + esc(u) + "</span>" : "") + "</div></div>";
+}
+function fmtBps(bps) {
+  if (bps >= 1e6) return (bps / 1e6).toFixed(1);
+  if (bps >= 1e3) return (bps / 1e3).toFixed(1);
+  return String(Math.round(bps));
+}
+
+/* 高 DPI 対応で canvas を用意。
+ * 意図した CSS 高さは初回に控えておく — el.height は下で DPR 倍した
+ * 実画素数に書き換わるため、そこから読み戻すと再描画のたびに倍増する。 */
+function canvasCtx(el) {
+  if (!el._cssH) el._cssH = parseInt(el.getAttribute("height"), 10) || 260;
+  var dpr = window.devicePixelRatio || 1;
+  var w = el.clientWidth || 600, h = el._cssH;
+  el.width = Math.round(w * dpr); el.height = Math.round(h * dpr);
+  el.style.height = h + "px";
+  var c = el.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  return { c: c, w: w, h: h };
+}
+
+/* ---- タブ ------------------------------------------------------ */
+function initTabs() {
+  var tabs = document.querySelectorAll(".tab"), i;
+  for (i = 0; i < tabs.length; i++) {
+    tabs[i].addEventListener("click", function () {
+      var name = this.getAttribute("data-p"), t = document.querySelectorAll(".tab"), k;
+      for (k = 0; k < t.length; k++) t[k].setAttribute("aria-selected", t[k] === this ? "true" : "false");
+      var ps = document.querySelectorAll(".panel");
+      for (k = 0; k < ps.length; k++) ps[k].classList.toggle("on", ps[k].id === "p-" + name);
+      if (name === "plc") drawPlc();
+      if (name === "ntt") drawNtt();
+      if (name === "zone") drawZone();
+      if (name === "streams") renderStack();
+    });
+  }
+}
+
+/* ================= 🔌 コンセント ================================= */
+
+function initPlcSelects() {
+  var a = $("plcFrom"), b = $("plcTo"), i, o;
+  for (i = 0; i < OUTLETS.length; i++) {
+    o = document.createElement("option"); o.value = OUTLETS[i].id;
+    o.textContent = OUTLETS[i].name + " (" + OUTLETS[i].dist + " m / 分岐 " + OUTLETS[i].branches + " / " + OUTLETS[i].phase + ")";
+    a.appendChild(o);
+    o = o.cloneNode(true); b.appendChild(o);
+  }
+  a.value = "living"; b.value = "study";
+}
+
+function plcRefresh() {
+  var u = UI.u;
+  ultraRelink(u, $("plcFrom").value, $("plcTo").value);
+  u.ctx.marginDb = parseFloat($("plcMargin").value) || 0;
+  var ch = u.ctx.channel, tm = u.ctx.tonemap;
+  var hist = [0, 0, 0, 0, 0, 0], i;
+  for (i = 0; i < tm.bits.length; i++) hist[tm.bits[i]]++;
+  var snrs = ch.snrDb.filter(function (_, k) { return !tm.notched[k]; });
+
+  $("plcStats").innerHTML =
+    statTile("PHY 速度", fmtBps(tm.phyBps), "Mbps") +
+    statTile("有効サブキャリア", tm.activeCarriers + " / " + PLC.N_CARRIER) +
+    statTile("平均ビット", tm.avgBits.toFixed(2), "bit/本") +
+    statTile("1 シンボル", tm.bitsPerSymbol, "bit") +
+    statTile("シンボル長", (PLC.SYMBOL_SEC * 1e6).toFixed(2), "µs") +
+    statTile("SNR 範囲", Math.min.apply(null, snrs).toFixed(0) + "–" + Math.max.apply(null, snrs).toFixed(0), "dB") +
+    statTile("結合損", ch.couplingDb.toFixed(0), "dB") +
+    statTile("ノッチ", tm.notchCount, "本");
+
+  $("plcPathNote").innerHTML =
+    "<b>多重経路</b> " + ch.paths.length + " 本 — " +
+    ch.paths.map(function (p) { return "g=" + p.g.toFixed(2) + " / d=" + p.d.toFixed(0) + "m"; }).join(" · ") +
+    "。<b>ビット配分</b> 0→" + hist[0] + " 1→" + hist[1] + " 2→" + hist[2] +
+    " 3→" + hist[3] + " 4→" + hist[4] + " 5→" + hist[5] + " 本。" +
+    "帯域 " + (PLC.F_LO / 1e6) + "–" + (PLC.F_HI / 1e6) + " MHz を Δf=" + (PLC.DF / 1e3).toFixed(2) + " kHz で分割。";
+  drawPlc();
+}
+
+function drawPlc() {
+  var el = $("plcCanvas"); if (!el || !UI.u) return;
+  var g = canvasCtx(el), c = g.c, W = g.w, H = g.h;
+  var ch = UI.u.ctx.channel, tm = UI.u.ctx.tonemap, N = PLC.N_CARRIER;
+  var padL = 34, padR = 8, padT = 10, midY = Math.round(H * 0.60), botY = H - 18;
+  var plotW = W - padL - padR;
+  var snrTop = 70, snrBot = -10;
+
+  /* ノッチ帯 */
+  var i, x, x2;
+  c.fillStyle = "rgba(208,90,90,.16)";
+  for (i = 0; i < N; i++) {
+    if (!tm.notched[i]) continue;
+    x = padL + (i / N) * plotW; x2 = padL + ((i + 1) / N) * plotW;
+    c.fillRect(x, padT, Math.max(x2 - x, 1), midY - padT);
+  }
+
+  /* SNR 目盛 */
+  c.strokeStyle = "#232a3a"; c.fillStyle = "#63708a";
+  c.font = "10px ui-monospace,monospace"; c.textAlign = "right";
+  for (var v = 0; v <= 60; v += 20) {
+    var y = midY - ((v - snrBot) / (snrTop - snrBot)) * (midY - padT);
+    c.beginPath(); c.moveTo(padL, y); c.lineTo(W - padR, y); c.stroke();
+    c.fillText(v + "dB", padL - 4, y + 3);
+  }
+
+  /* SNR 面 */
+  c.beginPath(); c.moveTo(padL, midY);
+  for (i = 0; i < N; i++) {
+    x = padL + (i / N) * plotW;
+    var yy = midY - ((ch.snrDb[i] - snrBot) / (snrTop - snrBot)) * (midY - padT);
+    c.lineTo(x, Math.max(padT, Math.min(midY, yy)));
+  }
+  c.lineTo(padL + plotW, midY); c.closePath();
+  c.fillStyle = "rgba(63,178,127,.22)"; c.fill();
+  c.strokeStyle = "#3fb27f"; c.lineWidth = 1; c.stroke();
+
+  /* ビット割当の棒 */
+  var bw = plotW / N;
+  var cols = ["#232a3a", "#4a5d80", "#4a80d0", "#40b8c0", "#c8a44a", "#e0c070"];
+  for (i = 0; i < N; i++) {
+    var b = tm.bits[i];
+    x = padL + i * bw;
+    var hgt = (b / PLC.MAX_BITS) * (botY - midY - 6);
+    c.fillStyle = b === 0 ? "rgba(208,90,90,.35)" : cols[b];
+    c.fillRect(x, botY - Math.max(hgt, b === 0 ? 2 : 1), Math.max(bw, 1), Math.max(hgt, b === 0 ? 2 : 1));
+  }
+
+  /* 軸ラベル */
+  c.fillStyle = "#63708a"; c.textAlign = "left"; c.font = "10px ui-monospace,monospace";
+  c.fillText((PLC.F_LO / 1e6) + " MHz", padL, H - 5);
+  c.textAlign = "right"; c.fillText((PLC.F_HI / 1e6) + " MHz", W - padR, H - 5);
+  c.textAlign = "center";
+  c.fillText("割当ビット 0–5 (2–32 PAM)", padL + plotW / 2, H - 5);
+}
+
+function runCsma() {
+  var st = [
+    { name: "居間 テレビ", cap: 3 }, { name: "書斎 PC", cap: 2 },
+    { name: "台所 冷蔵庫", cap: 0 }, { name: "寝室 タブレット", cap: 3 }
+  ];
+  var r = plcCsma(st, String(Date.now()));
+  var h = "<tr><th>局</th><th>CAP</th><th>PRS0</th><th>PRS1</th><th>バックオフ</th><th></th></tr>";
+  h += st.map(function (s) {
+    var d = r.draws.filter(function (x) { return x.name === s.name; })[0];
+    return "<tr><td class='jp'>" + esc(s.name) + "</td><td>" + s.cap + "</td>" +
+      "<td>" + (r.prs0.indexOf(s.name) >= 0 ? "1" : "0") + "</td>" +
+      "<td>" + (r.prs1.indexOf(s.name) >= 0 ? "1" : "0") + "</td>" +
+      "<td>" + (d ? d.backoff + " / " + r.cw : "—") + "</td>" +
+      "<td>" + (r.winner === s.name ? '<span class="badge b-ok">送信権</span>' :
+        (d ? '<span class="badge b-warn">競合負け</span>' : '<span class="badge b-no">優先度負け</span>')) + "</td></tr>";
+  }).join("");
+  $("csmaTbl").innerHTML = h;
+}
+
+/* ================= ☎ NTT 回線 =================================== */
+
+var NTT_SAMPLE_URLS = [
+  "zone://url.or.jp/",
+  "zone://url.or.jp/msg/line/U4af4980629",
+  "zone://url.or.jp/msg/instagram/17841400000000001",
+  "zone://bada.or.jp/",
+  "zone://bada.or.jp/docs/plc"
+];
+
+function nttRefresh() {
+  var u = UI.u;
+  u.ctx.lineId = $("nttLine").value;
+  u.ctx.numberKind = $("nttKind").value;
+  var reg = u.ctx.reg, rows = "", i, rec, back, ok;
+  rows += "<tr><th>zone:// アドレス</th><th>NTT 番号</th><th>E.164</th><th>収容局</th><th>φ⁻¹ 検算</th></tr>";
+  for (i = 0; i < NTT_SAMPLE_URLS.length; i++) {
+    rec = nttMap(reg, NTT_SAMPLE_URLS[i], u.ctx.numberKind);
+    back = nttUnmap(reg, rec.number);
+    ok = back === NTT_SAMPLE_URLS[i];
+    rows += "<tr><td>" + esc(NTT_SAMPLE_URLS[i]) + "</td><td>" + esc(rec.display) + "</td>" +
+      "<td>" + esc(rec.e164) + "</td><td class='jp'>" + esc(rec.city) + (rec.probe ? " (探索+" + rec.probe + ")" : "") + "</td>" +
+      "<td>" + (ok ? '<span class="badge b-ok">一致</span>' : '<span class="badge b-no">不一致</span>') + "</td></tr>";
+  }
+  $("nttTbl").innerHTML = rows;
+
+  var call = nttCall(reg, NTT_SAMPLE_URLS[0], NTT_SAMPLE_URLS[1], u.ctx.lineId);
+  var ch = "<tr><th>状態</th><th>内容</th></tr>";
+  ch += call.states.map(function (s) {
+    return "<tr><td>" + esc(s.st) + "</td><td class='jp'>" + esc(s.note) + "</td></tr>";
+  }).join("");
+  $("nttCallTbl").innerHTML = ch;
+  drawNtt();
+}
+
+function drawNtt() {
+  var el = $("nttCanvas"); if (!el || !UI.u) return;
+  var g = canvasCtx(el), c = g.c, W = g.w, H = g.h;
+  var payload = bytesOfUtf8("NTT 回線に写像したウルトラネットワークの封筒 " + Date.now());
+  var sig = nttBearerSend(payload, "metal");
+  var samples = sig.samples;
+  /* ひかり電話では µ-law を通した後の点を見せる */
+  if (UI.u.ctx.lineId === "hikari") samples = samples.map(muLawEncode).map(muLawDecode);
+  var pts = nttConstellation(samples, 600);
+
+  var cx = W / 2, cy = H / 2, sc = Math.min(W, H) / 9.5;
+  c.strokeStyle = "#232a3a"; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(cx, 8); c.lineTo(cx, H - 8); c.moveTo(8, cy); c.lineTo(W - 8, cy); c.stroke();
+  /* 判定境界 */
+  c.setLineDash([3, 4]); c.strokeStyle = "#2e3850";
+  [-2, 2].forEach(function (v) {
+    c.beginPath(); c.moveTo(cx + v * sc, 8); c.lineTo(cx + v * sc, H - 8);
+    c.moveTo(8, cy - v * sc); c.lineTo(W - 8, cy - v * sc); c.stroke();
+  });
+  c.setLineDash([]);
+  /* 理想点 */
+  c.fillStyle = "rgba(200,164,74,.30)";
+  [-3, -1, 1, 3].forEach(function (i) {
+    [-3, -1, 1, 3].forEach(function (q) {
+      c.beginPath(); c.arc(cx + i * sc, cy - q * sc, 7, 0, 6.2832); c.fill();
+    });
+  });
+  /* 受信点 */
+  c.fillStyle = "#40b8c0";
+  pts.forEach(function (p) {
+    c.beginPath(); c.arc(cx + p.i * sc, cy - p.q * sc, 2.1, 0, 6.2832); c.fill();
+  });
+  c.fillStyle = "#63708a"; c.font = "10px ui-monospace,monospace"; c.textAlign = "left";
+  c.fillText("16-QAM · " + sig.nSymbols + " sym · " + sig.bps + " bps · " +
+    (UI.u.ctx.lineId === "hikari" ? "G.711 µ-law 経由" : "音声帯 300–3400 Hz"), 8, H - 6);
+}
+
+/* ================= 🌐 zone:// =================================== */
+
+function zoneRefresh() {
+  var u = UI.u, url = $("zoneUrl").value.trim();
+  if (url.indexOf("://") < 0) url = "zone://" + url;
+  var z = zoneParse(url);
+  if (!z) {
+    $("zoneStats").innerHTML = statTile("状態", "400 " + ZONE_STATUS[400]);
+    $("zoneTbl").innerHTML = ""; $("zoneBlock").textContent = "400 bad-zone";
+    UI.zoneRoute = null; drawZone(); return;
+  }
+  var key = zoneId(url);
+  var route = dhtRoute(u.ctx.net, u.ctx.net[0], key);
+  var jkey = jonesKey(zoneDiagram(z.host));
+  var q = qkdSession(u.ctx.ledger.length, false);
+  var sealed = zoneSeal("# " + z.host + "\n-> " + z.path + " | ウルトラネットワーク", jkey, q.salt);
+  route.peer.store[url] = { ct: sealed.ct, salt: sealed.salt, tag: sealed.tag };
+  ledgerCommit(u.ctx.ledger, ["zone-record", url, route.peer.name, key, sealed.tag]);
+  var num = nttMap(u.ctx.reg, url, u.ctx.numberKind || "geo");
+
+  UI.zoneRoute = route; UI.zoneKey = key;
+  $("zoneStats").innerHTML =
+    statTile("ホスト", z.host, "", true) +
+    statTile("DHT 鍵", key + " / " + RING) +
+    statTile("担当ピア", route.peer.name, "", true) +
+    statTile("ホップ数", route.hops.length - 1) +
+    statTile("結び目鍵", jkey) +
+    statTile("NTT 番号", num.display, "", true);
+
+  var rows = "<tr><th>ピア</th><th>node-id</th><th>リング距離</th><th></th></tr>";
+  rows += u.ctx.net.map(function (p) {
+    var d = ringDist(p.id, key);
+    var tags = [];
+    if (p.name === route.peer.name) tags.push('<span class="badge b-ok">担当</span>');
+    if (route.hops.indexOf(p.name) >= 0) tags.push('<span class="badge b-zone">経路</span>');
+    return "<tr><td>" + esc(p.name) + "</td><td>" + p.id + "</td><td>" + d + "</td><td>" + tags.join(" ") + "</td></tr>";
+  }).join("");
+  $("zoneTbl").innerHTML = rows;
+
+  u.ctx.qkdOk = q.ok;
+  $("zoneBlock").textContent = zoneServeBlock(u.ctx, url, 200,
+    "# " + z.host + "\n-> " + z.path + " | ウルトラネットワーク", route, sealed, jkey);
+
+  var led = u.ctx.ledger.slice(-14).map(function (f, i) {
+    return String(u.ctx.ledger.length - Math.min(14, u.ctx.ledger.length) + i).padStart(4, " ") + "  " + f.join("  ");
+  }).join("\n");
+  $("zoneLedger").textContent = led + "\n\n追記専用 — 全 " + u.ctx.ledger.length + " 件";
+  drawZone();
+}
+
+function drawZone() {
+  var el = $("zoneCanvas"); if (!el || !UI.u) return;
+  var g = canvasCtx(el), c = g.c, W = g.w, H = g.h;
+  var net = UI.u.ctx.net, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 34;
+  var ang = function (id) { return (id / RING) * 2 * Math.PI - Math.PI / 2; };
+
+  c.strokeStyle = "#232a3a"; c.lineWidth = 1;
+  c.beginPath(); c.arc(cx, cy, R, 0, 6.2832); c.stroke();
+
+  /* 経路 */
+  var route = UI.zoneRoute;
+  if (route) {
+    c.strokeStyle = "#c8a44a"; c.lineWidth = 1.6;
+    c.beginPath();
+    route.hops.forEach(function (nm, i) {
+      var p = net.filter(function (x) { return x.name === nm; })[0];
+      if (!p) return;
+      var a = ang(p.id), x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    });
+    c.stroke(); c.lineWidth = 1;
+    /* 鍵の位置 */
+    var ka = ang(UI.zoneKey);
+    c.fillStyle = "#40b8c0";
+    c.beginPath(); c.arc(cx + R * Math.cos(ka), cy + R * Math.sin(ka), 4, 0, 6.2832); c.fill();
+    c.font = "10px ui-monospace,monospace"; c.textAlign = "center";
+    c.fillText("key " + UI.zoneKey, cx + (R + 16) * Math.cos(ka), cy + (R + 16) * Math.sin(ka) + 3);
+  }
+
+  /* ピア */
+  net.forEach(function (p) {
+    var a = ang(p.id), x = cx + R * Math.cos(a), y = cy + R * Math.sin(a);
+    var isOwner = route && route.peer.name === p.name;
+    var onPath = route && route.hops.indexOf(p.name) >= 0;
+    c.fillStyle = isOwner ? "#c8a44a" : (onPath ? "#9060d0" : "#4a5d80");
+    c.beginPath(); c.arc(x, y, isOwner ? 6.5 : 4.5, 0, 6.2832); c.fill();
+    c.fillStyle = isOwner ? "#e0c070" : "#93a0b8";
+    c.font = "10px ui-monospace,monospace";
+    c.textAlign = Math.cos(a) > 0.25 ? "left" : (Math.cos(a) < -0.25 ? "right" : "center");
+    var lx = x + Math.cos(a) * 11, ly = y + Math.sin(a) * 11 + 3;
+    c.fillText(p.name.replace(".zone.jp", ""), lx, ly);
+  });
+
+  c.fillStyle = "#63708a"; c.textAlign = "center"; c.font = "10px ui-monospace,monospace";
+  c.fillText("P2P リング DHT (位数 " + RING + ") — 中央サーバ / DNS ルート無し", cx, H - 6);
+}
+
+/* ================= 🔐 量子暗号 ================================== */
+
+function cryRefresh() {
+  var host = $("cryHost").value, dia = zoneDiagram(host);
+  var As = [0.8, 1.0, 1.2, 1.5, 2.0];
+  var rows = "<tr><th>ループ変数 A</th><th>Kauffman ブラケット ⟨D⟩(A)</th></tr>";
+  rows += As.map(function (a) {
+    return "<tr><td>" + a.toFixed(1) + "</td><td>" + f5(kauffman(dia, a)) + "</td></tr>";
+  }).join("");
+  $("cryKauff").innerHTML = rows;
+
+  var key = jonesKey(dia);
+  $("cryStats").innerHTML =
+    statTile("交点数", dia.length) +
+    statTile("結び目", host === "bada.or.jp" ? "8 の字" : "三葉", "", true) +
+    statTile("長期鍵", key) +
+    statTile("もう一方の鍵", jonesKey(zoneDiagram(host === "bada.or.jp" ? "url.or.jp" : "bada.or.jp")));
+
+  var q = qkdSession(UI.u.ctx.ledger.length, false);
+  var names = ["|00⟩", "|01⟩", "|10⟩", "|11⟩"];
+  var qr = "<tr><th>基底状態</th><th>確率 |ψ|²</th><th></th></tr>";
+  qr += q.dist.map(function (p, i) {
+    var forb = (i === 1 || i === 2);
+    return "<tr><td>" + names[i] + "</td><td>" + p.toFixed(6) + "</td><td>" +
+      (forb ? (p < 1e-12 ? '<span class="badge b-ok">禁止状態 = 0</span>' : '<span class="badge b-no">相関が壊れている</span>')
+            : '<span class="badge b-zone">許容</span>') + "</td></tr>";
+  }).join("");
+  qr += "<tr><td>セッションソルト</td><td>" + q.salt + "</td><td>" +
+    (q.ok ? '<span class="badge b-ok">盗聴なし</span>' : '<span class="badge b-no">盗聴あり</span>') + "</td></tr>";
+  $("cryQkd").innerHTML = qr;
+  cryAttack("none");
+}
+
+function cryAttack(mode) {
+  var host = $("cryHost").value, text = $("cryText").value;
+  var key = jonesKey(zoneDiagram(host));
+  var q = qkdSession(UI.u.ctx.ledger.length, mode === "tap");
+  var L = [];
+  L.push("ゾーン        : " + host);
+  L.push("結び目長期鍵  : " + key);
+  L.push("平文          : " + text);
+
+  if (!q.ok) {
+    L.push("");
+    L.push("QKD           : |01⟩+|10⟩ = " + q.forbidden.toFixed(6) + "  (厳密な 0 ではない)");
+    L.push("");
+    L.push("結果          : 495 " + ZONE_STATUS[495]);
+    L.push("               複製不可能定理により盗聴は相関を壊す。鍵を破棄し送信しない。");
+    $("cryOut").textContent = L.join("\n"); return;
+  }
+
+  var sealed = zoneSeal(text, key, q.salt);
+  L.push("セッションソルト: " + q.salt + "  (Bell 対が合意)");
+  L.push("暗号文        : [" + sealed.ct.slice(0, 8).join(", ") + (sealed.ct.length > 8 ? ", …" : "") + "]  " + sealed.ct.length + " ユニット");
+  L.push("認証タグ      : " + sealed.tag);
+  L.push("");
+
+  var use = { ct: sealed.ct.slice(), salt: sealed.salt, tag: sealed.tag }, useKey = key, what;
+  if (mode === "tamper") { use.ct[0] = (use.ct[0] + 1) % 65536; what = "暗号文の 1 ユニットを反転した"; }
+  else if (mode === "knot") { useKey = jonesKey(zoneDiagram(host === "bada.or.jp" ? "url.or.jp" : "bada.or.jp")); what = "別の結び目の鍵で開封を試みた"; }
+  else what = "正規の鍵で開封した";
+  L.push("攻撃          : " + what);
+
+  var op = zoneOpen(use, useKey);
+  L.push("");
+  if (op.ok) {
+    L.push("結果          : 200 " + ZONE_STATUS[200]);
+    L.push("復号          : " + op.text);
+    L.push("往復一致      : " + (op.text === text ? "はい" : "いいえ"));
+  } else {
+    L.push("結果          : 409 " + ZONE_STATUS[409]);
+    L.push("               認証タグが合わない。改竄または鍵違いとして排除する。");
+    L.push("               結び目を持たないピアは平文を読むことすらできない。");
+  }
+  $("cryOut").textContent = L.join("\n");
+}
+
+/* ================= 💬 メッセージ ================================= */
+
+function msgIngest(platform) {
+  var u = UI.u;
+  var secret = platform === "line" ? "demo-channel-secret" : "demo-app-secret";
+  var seed = String(Date.now());
+  var body = platform === "line" ? simLineBody(2, seed) : simInstagramBody(2, seed);
+  var raw = JSON.stringify(body);
+  var sig = platform === "line" ? lineSignature(secret, raw) : igSignature(secret, raw);
+  var ing = platform === "line"
+    ? msgIngestLine(raw, { channelSecret: secret, signature: sig })
+    : msgIngestInstagram(raw, { appSecret: secret, signature: sig });
+
+  var p = MSG_PLATFORMS[platform];
+  var L = [];
+  L.push("プラットフォーム : " + p.name);
+  L.push("署名ヘッダ       : " + p.webhookSigHeader);
+  L.push("算法             : HMAC-SHA256(" + (platform === "line" ? "channelSecret" : "appSecret") + ", 生の本文)" +
+    (platform === "line" ? " → Base64" : " → hex, 接頭辞 sha256="));
+  L.push("受信した署名     : " + sig.slice(0, 48) + (sig.length > 48 ? "…" : ""));
+  L.push("検証             : " + (ing.verified ? "一致 — 受理" : "不一致 — 401 で拒否"));
+  L.push("偽署名での検証   : " + ((platform === "line"
+    ? lineVerify(secret, raw, lineSignature("wrong-secret", raw))
+    : igVerify(secret, raw, igSignature("wrong-secret", raw))) ? "通ってしまった (異常)" : "正しく拒否"));
+  L.push("");
+  L.push("Webhook 本文 (公式仕様どおりの形):");
+  L.push(JSON.stringify(body, null, 2).split("\n").slice(0, 22).join("\n"));
+  L.push("…");
+  L.push("");
+  L.push("仕様: " + p.docs);
+  $("msgSig").textContent = L.join("\n");
+
+  if (!ing.ok) return;
+  var i, r, okCount = 0;
+  for (i = 0; i < ing.messages.length; i++) {
+    r = ultraSend(u, ing.messages[i]);
+    if (r.ok) { inboxAdd(u.inbox, r.received); okCount++; }
+  }
+  renderInbox();
+}
+
+function renderInbox() {
+  var u = UI.u, ths = inboxThreads(u.inbox);
+  var box = $("msgInbox"), sel = $("msgTo");
+  if (!ths.length) { box.innerHTML = '<p class="lead">まだ何も受信していません。</p>'; sel.innerHTML = ""; return; }
+  box.innerHTML = ths.map(function (t) {
+    var p = MSG_PLATFORMS[t.platform] || MSG_PLATFORMS.zone;
+    var cls = t.platform === "line" ? "b-line" : (t.platform === "instagram" ? "b-ig" : "b-zone");
+    return '<div class="thread"><div class="hd">' +
+      '<span class="badge ' + cls + '">' + esc(p.name) + "</span>" +
+      '<span class="who">' + esc(t.displayName) + "</span>" +
+      '<span class="cnt">' + t.messages.length + " 件 · " + esc(t.chatId.slice(0, 18)) + "</span></div>" +
+      t.messages.slice(-4).map(function (m) {
+        return '<div class="bub' + (m.direction === "out" ? " out" : "") + '">' + esc(m.text) +
+          '<div class="mt">' + (m.direction === "out" ? "送信" : "受信") + " · " +
+          new Date(m.ts).toLocaleTimeString("ja-JP") + " · " + esc(msgZoneUrl(m)) + "</div></div>";
+      }).join("") + "</div>";
+  }).join("");
+
+  var cur = sel.value;
+  sel.innerHTML = ths.map(function (t) {
+    return '<option value="' + esc(t.key) + '">' +
+      esc((MSG_PLATFORMS[t.platform] || {}).name || t.platform) + " · " + esc(t.displayName) + "</option>";
+  }).join("");
+  if (cur) sel.value = cur;
+}
+
+function msgSend() {
+  var u = UI.u, key = $("msgTo").value, text = $("msgText").value;
+  var th = u.inbox.threads[key];
+  if (!th) { $("msgOut").textContent = "宛先がありません。先に Webhook を受けてください。"; return; }
+  var last = th.messages[th.messages.length - 1];
+  var msg = msgNew({
+    platform: th.platform, direction: "out", chatId: th.chatId,
+    userId: th.chatId, displayName: "自分", text: text,
+    meta: { replyToken: (last.meta && last.meta.replyToken) || "" }
+  });
+  var r = ultraSend(u, msg);
+  var out = msgToOutbound(msg, { igId: "17841499999999999" });
+  var L = [];
+  L.push("— ウルトラネットワーク経由 —");
+  L.push("状態        : " + r.status + " " + r.reason + (r.identical ? "  (往復一致)" : ""));
+  if (r.ok) {
+    L.push("zone        : " + msgZoneUrl(msg));
+    L.push("NTT 番号    : " + r.ntt.number.display + "  (" + r.ntt.number.city + ") / " + r.ntt.line.name);
+    L.push("担当ピア    : " + r.zone.route.peer.name + "  経路 " + r.zone.route.hops.join(" → "));
+    L.push("結び目鍵    : " + r.crypto.key + "  ソルト " + r.crypto.salt + "  タグ " + r.crypto.tag);
+    L.push("物理層      : " + r.phy.nSymbols + " OFDM シンボル / " +
+      fmtBps(r.phy.phyBps) + " Mbps / 占有 " + (r.phy.airTimeSec * 1e6).toFixed(0) + " µs");
+    inboxAdd(u.inbox, r.received);
+    renderInbox();
+  }
+  L.push("");
+  L.push("— 公式 API への送信要求 —");
+  L.push(out.method + " " + out.endpoint);
+  Object.keys(out.headers).forEach(function (k) { L.push(k + ": " + out.headers[k]); });
+  L.push("");
+  L.push(JSON.stringify(out.body, null, 2));
+  L.push("");
+  L.push("※ 実送信には各プラットフォームで発行したアクセストークンが必要です。");
+  $("msgOut").textContent = L.join("\n");
+}
+
+/* ================= 🧩 STREAMS =================================== */
+
+function renderStack(lit) {
+  var u = UI.u, st = u.stream;
+  var rows = ['<div class="slab head"><span class="tag">head</span><span class="nm">アプリケーション (統合受信箱)</span><span class="ds">M_PROTO</span></div>'];
+  var i, m;
+  for (i = st.modules.length - 1; i >= 0; i--) {
+    m = st.modules[i];
+    rows.push('<div class="arrows">↓ wput &nbsp;&nbsp; rput ↑</div>');
+    rows.push('<div class="slab' + (lit && lit.indexOf(m.name) >= 0 ? " lit" : "") + '">' +
+      '<span class="tag">' + esc(m.name) + '</span><span class="nm">' + esc(m.label) + "</span>" +
+      '<span class="ds">L' + (4 - (st.modules.length - 1 - i)) + "</span></div>");
+  }
+  rows.push('<div class="arrows">↓ put &nbsp;&nbsp; srv ↑</div>');
+  rows.push('<div class="slab drv' + (lit && lit.indexOf("plc") >= 0 ? " lit" : "") + '">' +
+    '<span class="tag">' + esc(st.driver.name) + '</span><span class="nm">' + esc(st.driver.label) + "</span>" +
+    '<span class="ds">L0 driver</span></div>');
+  rows.push('<div class="arrows">≈ 家の電力線 (2–28 MHz) ≈</div>');
+  $("stStack").innerHTML = rows.join("");
+}
+
+function streamsRun() {
+  var u = UI.u, mode = $("stAttack").value;
+  u.ctx.tamper = (mode === "wire");
+  u.ctx.tamperZone = (mode === "peer");
+  u.ctx.tapped = (mode === "tap");
+  u.ctx.marginDb = (mode === "degrade") ? 20 : (parseFloat($("plcMargin").value) || 0);
+  u.ctx.seed = String(Date.now());
+
+  var msg = msgNew({
+    platform: "line", chatId: "U4af4980629", userId: "U4af4980629",
+    displayName: "山口 まさあき", text: $("stText").value, direction: "out"
+  });
+  var r = ultraSend(u, msg);
+
+  var ok = r.ok && r.identical;
+  $("stStats").innerHTML =
+    statTile("結果", r.status + " " + r.reason, "", true) +
+    statTile("往復一致", ok ? "はい" : "いいえ") +
+    (r.ntt ? statTile("NTT 番号", r.ntt.number.display, "", true) : "") +
+    (r.zone ? statTile("担当ピア", r.zone.route.peer.name, "", true) : "") +
+    (r.crypto ? statTile("認証タグ", r.crypto.tag) : "") +
+    (r.phy ? statTile("OFDM", r.phy.nSymbols, "シンボル") : "") +
+    (r.phy ? statTile("PHY 速度", fmtBps(r.phy.phyBps), "Mbps") : "") +
+    statTile("台帳", u.ctx.ledger.length, "件");
+
+  var rows = "<tr><th>向き</th><th>層</th><th>ブロック</th><th>大きさ</th><th>動作</th></tr>";
+  rows += r.trace.map(function (t) {
+    return "<tr><td>" + (t.dir === "down" ? "↓ 下り" : "↑ 上り") + "</td><td>" + esc(t.module) + "</td>" +
+      "<td>" + esc(t.type || "—") + "</td><td>" + (t.size || "—") + "</td>" +
+      "<td class='jp'>" + esc(t.note || "") + "</td></tr>";
+  }).join("");
+  $("stTrace").innerHTML = rows;
+  renderStack(r.trace.map(function (t) { return t.module; }));
+
+  u.ctx.tamper = false; u.ctx.tamperZone = false; u.ctx.tapped = false;
+}
+
+/* ================= 🧪 自己診断 ================================== */
+
+function runSelfTest() {
+  var T = [], t0 = Date.now();
+  function chk(name, fn) {
+    var s = Date.now(), pass = false, detail = "";
+    try { var r = fn(); pass = !!(r && r.ok !== false ? (r.ok === undefined ? r : true) : false); detail = (r && r.detail) || ""; }
+    catch (e) { pass = false; detail = String(e && e.message || e); }
+    T.push({ name: name, pass: pass, ms: Date.now() - s, detail: detail });
+  }
+
+  chk("SHA-256 — 既知答え \"\" と \"abc\"", function () {
+    return toHex(sha256([])) === "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" &&
+           toHex(sha256(bytesOfUtf8("abc"))) === "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+  });
+  chk("HMAC-SHA256 — RFC 4231 テストベクタ 1・2", function () {
+    var k1 = [], i; for (i = 0; i < 20; i++) k1.push(0x0b);
+    return toHex(hmacSha256(k1, bytesOfUtf8("Hi There"))) === "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7" &&
+      toHex(hmacSha256(bytesOfUtf8("Jefe"), bytesOfUtf8("what do ya want for nothing?"))) ===
+      "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843";
+  });
+  chk("LINE 署名 — 正しい秘密は通り、誤った秘密は落ちる", function () {
+    var raw = JSON.stringify(simLineBody(1, "t"));
+    return lineVerify("s", raw, lineSignature("s", raw)) && !lineVerify("s", raw, lineSignature("x", raw));
+  });
+  chk("Instagram 署名 — sha256= 接頭辞つき hex", function () {
+    var raw = JSON.stringify(simInstagramBody(1, "t"));
+    var sg = igSignature("a", raw);
+    return sg.indexOf("sha256=") === 0 && igVerify("a", raw, sg) && !igVerify("a", raw, igSignature("b", raw));
+  });
+  chk("ウェーブレット変換 — 解析と合成が厳密な逆変換", function () {
+    var x = [], i; for (i = 0; i < 512; i++) x.push(Math.sin(i / 7) * 3 + Math.cos(i / 3));
+    var y = dwtSynthesize(dwtAnalyze(x)), mx = 0;
+    for (i = 0; i < 512; i++) mx = Math.max(mx, Math.abs(y[i] - x[i]));
+    return { ok: mx < 1e-9, detail: "最大誤差 " + mx.toExponential(1) };
+  });
+  chk("HD-PLC — 適応ビットローディングとノッチ", function () {
+    var ch = plcChannel("living", "kitchen"), tm = plcToneMap(ch), i, notchOk = true;
+    for (i = 0; i < PLC.N_CARRIER; i++) if (tm.notched[i] && tm.bits[i] !== 0) notchOk = false;
+    return { ok: notchOk && tm.activeCarriers > 50, detail: fmtBps(tm.phyBps) + " Mbps / 有効 " + tm.activeCarriers + " 本 / ノッチ " + tm.notchCount + " 本" };
+  });
+  chk("HD-PLC — ウェーブレット OFDM の完全往復", function () {
+    var ch = plcChannel("router", "study"), tm = plcToneMap(ch);
+    var p = bytesOfUtf8("ウルトラネットワーク payload 0123456789 ✓");
+    var m = plcModulate(p, tm), b = plcDemodulate(m.samples, tm, m.bitLen);
+    return { ok: utf8OfBytes(b) === utf8OfBytes(p), detail: m.nSymbols + " シンボル / " + m.samples.length + " 標本" };
+  });
+  chk("IEEE 1901 フレーム — CRC が破損を検出", function () {
+    var p = bytesOfUtf8("frame test"), f = plcFrame(p, { src: 1, dst: 2, cap: 2 });
+    var good = plcDeframe(f.bytes);
+    var bad = f.bytes.slice(); bad[40] = bad[40] ^ 0xff;
+    return good.ok && utf8OfBytes(good.bytes) === "frame test" && plcDeframe(bad).ok === false;
+  });
+  chk("NTT — 音声帯 16-QAM の往復 (メタル)", function () {
+    var p = bytesOfUtf8("音声帯 300–3400 Hz を通す封筒 #42");
+    var s = nttBearerSend(p, "metal");
+    return { ok: utf8OfBytes(nttBearerRecv(s)) === utf8OfBytes(p), detail: s.bps + " bps / " + s.nSymbols + " シンボル" };
+  });
+  chk("NTT — G.711 µ-law + RTP の往復 (ひかり電話)", function () {
+    var p = bytesOfUtf8("ひかり電話で運ぶ封筒 #42");
+    var s = nttBearerSend(p, "hikari");
+    return { ok: utf8OfBytes(nttBearerRecv(s)) === utf8OfBytes(p), detail: s.packets.length + " RTP パケット (PCMU 20 ms)" };
+  });
+  chk("NTT — INS ネット 64 のディジタル透過", function () {
+    var p = bytesOfUtf8("B チャネル 64 kbps");
+    var s = nttBearerSend(p, "isdn");
+    return utf8OfBytes(nttBearerRecv(s)) === utf8OfBytes(p);
+  });
+  chk("写像 φ — φ⁻¹ が厳密な逆写像", function () {
+    var reg = nttRegistryNew(), i, u, ok = true, ex = "";
+    for (i = 0; i < NTT_SAMPLE_URLS.length; i++) {
+      u = NTT_SAMPLE_URLS[i];
+      var rec = nttMap(reg, u, "geo");
+      if (nttUnmap(reg, rec.number) !== u) ok = false;
+      if (i === 0) ex = u + " ↦ " + rec.display;
+    }
+    return { ok: ok, detail: ex };
+  });
+  chk("Jones 鍵 — 異なる結び目は異なる鍵を与える", function () {
+    var a = jonesKey(zoneDiagram("url.or.jp")), b = jonesKey(zoneDiagram("bada.or.jp"));
+    return { ok: a !== b, detail: "三葉 " + a + " / 8 の字 " + b };
+  });
+  chk("AEAD — 日本語と絵文字が往復し、改竄は 409", function () {
+    var k = jonesKey(zoneDiagram("url.or.jp")), txt = "コンセントから zone:// が見えてる 🔌";
+    var s = zoneSeal(txt, k, 7);
+    var t = { ct: s.ct.slice(), salt: s.salt, tag: s.tag }; t.ct[0] = (t.ct[0] + 1) % 65536;
+    return zoneOpen(s, k).text === txt && zoneOpen(t, k).status === 409 &&
+           zoneOpen(s, jonesKey(zoneDiagram("bada.or.jp"))).status === 409;
+  });
+  chk("Bell 対 QKD — 禁止状態が厳密に 0、盗聴は検出される", function () {
+    return qkdSession(3, false).ok === true && qkdSession(3, true).ok === false;
+  });
+  chk("リング DHT — 担当ピアへ到達する", function () {
+    var net = netSort(ZONE_PEERS.map(peerNew));
+    var r = dhtRoute(net, net[0], zoneId("zone://url.or.jp/"));
+    return { ok: !!r.peer && r.hops.length >= 1, detail: r.hops.join(" → ") };
+  });
+  chk("STREAMS — 全 5 層を通した往復が完全一致", function () {
+    var u = ultraNew({ lineId: "metal" });
+    var m = msgNew({ platform: "line", chatId: "U1", displayName: "試験", text: "全層往復 ✓" });
+    var r = ultraSend(u, m);
+    return { ok: r.ok && r.identical, detail: r.trace.length + " 段 / " + r.wireSamples + " 標本" };
+  });
+  chk("攻撃 — 物理層の改竄は PLC の CRC が弾く", function () {
+    var u = ultraNew(); u.ctx.tamper = true;
+    var r = ultraSend(u, msgNew({ platform: "line", chatId: "U1", text: "x" }));
+    return { ok: !r.ok, detail: r.status + " " + r.reason };
+  });
+  chk("攻撃 — 悪意あるピアの書換えは AEAD が 409 で弾く", function () {
+    var u = ultraNew(); u.ctx.tamperZone = true;
+    var r = ultraSend(u, msgNew({ platform: "line", chatId: "U1", text: "x" }));
+    return { ok: !r.ok && r.status === 409, detail: r.status + " " + r.reason };
+  });
+  chk("攻撃 — 量子路の盗聴は 495 で送信を止める", function () {
+    var u = ultraNew(); u.ctx.tapped = true;
+    var r = ultraSend(u, msgNew({ platform: "line", chatId: "U1", text: "x" }));
+    return { ok: !r.ok && r.status === 495, detail: r.status + " " + r.reason };
+  });
+  chk("取り込み — LINE / Instagram が受信箱まで届く", function () {
+    var u = ultraNew({ lineId: "hikari" });
+    var a = ultraIngest(u, "line", 2, "cs", "s1"), b = ultraIngest(u, "instagram", 2, "as", "s2");
+    var allOk = a.ok && b.ok &&
+      a.results.every(function (x) { return x.ok && x.identical; }) &&
+      b.results.every(function (x) { return x.ok && x.identical; });
+    return { ok: allOk && u.inbox.messages.length === 4, detail: u.inbox.messages.length + " 通 / " + inboxThreads(u.inbox).length + " スレッド" };
+  });
+  chk("相互運用 — ZoneBrowser 形式の @@ ブロックを出力", function () {
+    var u = ultraNew();
+    var route = dhtRoute(u.ctx.net, u.ctx.net[0], zoneId("zone://url.or.jp/"));
+    var blk = zoneServeBlock(u.ctx, "zone://url.or.jp/", 200, "body", route, { ct: [1, 2, 3], tag: 9 }, 123);
+    return blk.indexOf("@@STATUS 200") >= 0 && blk.indexOf("@@HOST url.or.jp") >= 0 && blk.indexOf("@@BODY_BEGIN") >= 0;
+  });
+
+  var pass = T.filter(function (t) { return t.pass; }).length;
+  UI.lastTest = { total: T.length, pass: pass, ms: Date.now() - t0 };
+  $("tstStats").innerHTML =
+    statTile("項目", T.length) + statTile("合格", pass) +
+    statTile("不合格", T.length - pass) + statTile("所要", (Date.now() - t0), "ms");
+  $("tstList").innerHTML = T.map(function (t) {
+    return '<div class="tst ' + (t.pass ? "p" : "f") + '"><span class="m">' + (t.pass ? "PASS" : "FAIL") + "</span>" +
+      "<span>" + esc(t.name) + (t.detail ? ' <span style="color:var(--fg3)">— ' + esc(t.detail) + "</span>" : "") + "</span>" +
+      '<span class="d">' + t.ms + "ms</span></div>";
+  }).join("");
+}
+
+/* ================= 起動 ========================================= */
+
+function boot() {
+  UI.u = ultraNew({ from: "living", to: "study", lineId: "metal" });
+  initTabs();
+  initPlcSelects();
+
+  $("plcGo").addEventListener("click", plcRefresh);
+  $("plcFrom").addEventListener("change", plcRefresh);
+  $("plcTo").addEventListener("change", plcRefresh);
+  $("plcMargin").addEventListener("change", plcRefresh);
+  $("csmaGo").addEventListener("click", runCsma);
+
+  $("nttGo").addEventListener("click", nttRefresh);
+  $("nttLine").addEventListener("change", nttRefresh);
+  $("nttKind").addEventListener("change", nttRefresh);
+
+  $("zoneGo").addEventListener("click", zoneRefresh);
+  $("zoneUrl").addEventListener("keydown", function (e) { if (e.key === "Enter") zoneRefresh(); });
+
+  $("cryGo").addEventListener("click", cryRefresh);
+  $("cryHost").addEventListener("change", cryRefresh);
+  $("atkNone").addEventListener("click", function () { cryAttack("none"); });
+  $("atkTamper").addEventListener("click", function () { cryAttack("tamper"); });
+  $("atkKnot").addEventListener("click", function () { cryAttack("knot"); });
+  $("atkTap").addEventListener("click", function () { cryAttack("tap"); });
+
+  $("msgLine").addEventListener("click", function () { msgIngest("line"); });
+  $("msgIg").addEventListener("click", function () { msgIngest("instagram"); });
+  $("msgClear").addEventListener("click", function () { UI.u.inbox = inboxNew(); renderInbox(); });
+  $("msgSend").addEventListener("click", msgSend);
+
+  $("stGo").addEventListener("click", streamsRun);
+  $("tstGo").addEventListener("click", runSelfTest);
+
+  window.addEventListener("resize", function () {
+    drawPlc(); drawNtt(); drawZone();
+  });
+
+  plcRefresh();
+  runCsma();
+  nttRefresh();
+  zoneRefresh();
+  cryRefresh();
+  renderStack();
+}
+
+if (typeof document !== "undefined" && document.getElementById) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+</script>
+</body>
+</html>

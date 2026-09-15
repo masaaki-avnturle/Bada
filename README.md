@@ -81,6 +81,28 @@
 
 ---
 
+## ⚡ ダウンロード — Bada UltraNetwork(電力線 → NTT 回線 → zone://)
+
+**Panasonic HD-PLC の技術で家の電力線(コンセント)を物理層にして PC をインターネットにつなぎ、そのフレームを NTT の電話回線へ写像し、そこに以前作った zone://url.or.jp のウルトラネットワークを通し、LINE と Instagram のメッセージ機能を取り込む通信システム。** 層の組み方は **AT&T ベル研究所と同じ組織化 — STREAMS**(Dennis Ritchie の Streams I/O)で、下端の driver(コンセント)と上端の stream head(アプリ)の間に `ntt` / `zone` / `jones` / `msgmux` を push し、各モジュールは **wput(下り)と rput(上り)の対だけ**を持ちます。**L0** は IEEE 1901 ウェーブレット OFDM(2–28 MHz を 512 サブキャリアに分割、Zimmermann–Dostert 多重経路モデル、色付き背景雑音、**適応ビットローディング** b=⌊log₂(1+SNR/Γ)⌋、アマチュア無線帯 9 本にノッチ、CRC-24/CRC-32 フレーム、CSMA/CA 優先度解決)。**L1** は写像 φ で zone アドレスを NTT 番号へ写し(リング位置が市外局番を決め、割当表により **φ⁻¹ は厳密な逆写像**)、ベアラは**メタル回線の音声帯 16-QAM ソフトモデム**(fs 8 kHz / 搬送波 2 kHz — 搬送波が標本化周波数のちょうど 1/4 なので相関復調が**誤差なし**)/ **INS ネット 64 のディジタル透過** / **ひかり電話の G.711 µ-law + RTP** の 3 種。**L2** は中央サーバも DNS ルートも無い P2P リング DHT。**L3** は **Jones 多項式量子暗号**(結び目図の Kauffman ブラケットから導く長期鍵 + Bell 対 QKD + AEAD)。**L4** は LINE Messaging API と Instagram Graph API の Webhook を**公式仕様どおり**に取り込み、**HMAC-SHA256 の署名検証を本物の計算**(RFC 4231 検証済)で通して 1 つの受信箱にまとめます。回線改竄は `503`、悪意あるピアの書換えは `409 zone-guard-reject`、量子路の盗聴は `495` で**送信そのものを止め**ます。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**ultra_network/index.html をダウンロード**](ultra_network/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-ultranetwork-debug.apk` |
+| **Windows 10 / 11** | `BadaUltraNetwork-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaUltraNetwork-*-x86_64.AppImage` / `BadaUltraNetwork-*-amd64.deb` |
+
+ビルドは [`ultranet-app-build.yml`](.github/workflows/ultranet-app-build.yml) が実行します(`ultranet-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。全層を Bada 言語自身で書いたリファレンスは [`ultra_network/ultra.bada`](ultra_network/ultra.bada) — `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` で走ります。詳細は [`ultra_network/`](ultra_network/) を参照。
+
+---
+
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
 
 **MP3 を動画に変換するソフト。** MP3(ほか WAV / OGG / M4A / FLAC)を読み込むと、**ID3v2/ID3v1 タグ**(曲名 / アーティスト / アルバム / ジャケット画像 APIC)を自前実装のパーサで解析し、音に反応する**ビジュアライザ**(スペクトラムバー / サークル / 波形 / シンプル — FFT を対数スケールで 64 バーに集計)を Canvas に描画、Web Audio API の音声トラックと合成して **MediaRecorder** で動画ファイルへ録画します。出力は対応環境で **MP4 (H.264 + AAC)**、それ以外は **WebM (VP9/VP8 + Opus)**。解像度プリセット(フル HD / HD / 正方形 / 縦型ショート 1080×1920)、24/30/60 fps、背景色・背景画像、複数ファイルの連続変換、プレビュー再生に対応。音楽ファイルは端末の外に出ません。依存ゼロ・単一 HTML・オフライン動作。
@@ -232,6 +254,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`Bada++/`** | Bada言語C++拡張版 · 多様体演算子テンプレート · π(χ,x)非可換作用素 | [→ 開く](https://masaaki-avnturle.github.io/Bada/Bada%2B%2B/) |
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
+| **`ultra_network/`** | ⚡ **Bada UltraNetwork** — 家の電力線(Panasonic HD-PLC / IEEE 1901 ウェーブレット OFDM)を物理層にし、NTT 電話回線へ写像 φ(音声帯 16-QAM モデム / ISDN / ひかり電話 G.711+RTP)して **zone:// ウルトラネットワーク**を通し、**LINE / Instagram** のメッセージを取り込む · **AT&T ベル研式 STREAMS** 構成 · Jones 多項式量子暗号 · APK/EXE/AppImage 配布 | [→ 開く](ultra_network/) |
 | **`cpp_builder/`** | **Bada C++Builder** — Inprise/Borland C++Builder 風 RAD IDE のブラウザ再現(オマージュ) · フォームデザイナ + Object Inspector + コンポーネントパレット · Unit1.cpp/h/dfm 自動生成 · C++サブセット実行系 (F9) · 単一HTML/依存ゼロ | [→ 開く](cpp_builder/) |
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |

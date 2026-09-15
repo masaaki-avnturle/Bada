@@ -1,0 +1,1171 @@
+# ============================================================
+# ultra.bada -- the BADA ULTRA NETWORK
+#
+# Panasonic HD-PLC turns the house wiring into the physical
+# layer; the frames are mapped onto an NTT subscriber line;
+# they carry the zone://url.or.jp ultra-network WWW; the
+# payload is sealed with the Jones-polynomial quantum cipher;
+# and the thing being carried is a LINE / Instagram message.
+#
+# The whole stack is organised the way AT&T Bell Laboratories
+# organised device I/O -- STREAMS (Dennis Ritchie's Streams
+# I/O system): a driver at the bottom, a stream head at the
+# top, and modules PUSHed in between, each one nothing but a
+# pair of queues, wput (downstream) and rput (upstream).
+#
+#        stream head   (the application: unified inbox)
+#             | wput              rput |
+#        +--- msgmux ---+   LINE / Instagram multiplexing
+#        +--- jones  ---+   Jones-polynomial AEAD + Bell QKD
+#        +--- zone   ---+   zone:// P2P ring DHT
+#        +--- ntt    ---+   mapping onto the NTT phone line
+#             | put                srv |
+#          driver  plc   (Panasonic HD-PLC = the wall socket)
+#          ~~~~~~ the house wiring, 2-28 MHz ~~~~~~
+#
+# Every layer is written here in Bada itself. The algorithms
+# are the same ones the single-file app (ultra_network/
+# index.html) runs, and the naming, the key schedule and the
+# ring are identical to examples/zone.bada, so records made
+# here are readable by the ZoneBrowser.
+#
+# NOTE ON SIZE. The app uses 512 subcarriers; this reference
+# uses 64 so the interpreter finishes quickly. The wavelet
+# transform, the bit loading and the framing are otherwise
+# the same construction.
+#
+# NOTE ON OPERATORS. Bada has no bitwise operators, so where
+# a wire format would normally use XOR (CRC-32, Gray coding)
+# this reference uses the modular rolling hash / plain binary
+# indexing instead. Everything is arithmetic.
+# ============================================================
+
+print("================================================================")
+print("BADA ULTRA NETWORK -- HD-PLC -> NTT -> zone:// -> LINE/Instagram")
+print("================================================================")
+
+RING    := 4096      # zone:// ring order (same as zone.bada)
+NCARR   := 64        # subcarriers in this reference
+FLO     := 2000000   # 2 MHz
+FHI     := 28000000  # 28 MHz
+TXPSD   := 0 - 50    # transmit PSD, dBm/Hz
+MAXBITS := 5         # 32-PAM ceiling
+
+# ---- grammar transaction: teach the parser the ultra verbs ---------
+@reviser : grammar {
+    rule "ultra-send" stmt [ 'SEND' expr expr ] => ultra_send(_1, _2)
+    rule "ultra-link" stmt [ 'LINK' expr ]      => ultra_link(_1)
+}
+print("ultra verbs committed to the grammar ledger:", len(tuplespace), "facts")
+
+# ====================================================================
+# 0. arithmetic helpers (Bada has sqrt/log/exp/abs but no floor/trig)
+# ====================================================================
+
+# truncation toward zero; we only ever use it on non-negatives
+def u_trunc(x) { return x - (x % 1) }
+
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+
+TWO_PI := 6.283185307179586
+
+# sine by range reduction + Taylor series (7 terms is ample here)
+def u_sin(x) {
+    t := x % TWO_PI
+    if (t > 3.141592653589793) { t := t - TWO_PI }
+    if (t < 0 - 3.141592653589793) { t := t + TWO_PI }
+    term := t
+    sum := t
+    k := 1
+    while (k < 9) {
+        term := 0 - term * t * t / ((2 * k) * (2 * k + 1))
+        sum := sum + term
+        k := k + 1
+    }
+    return sum
+}
+
+def u_cos(x) { return u_sin(x + 1.5707963267948966) }
+
+def u_log2(x) { return log(x) / 0.6931471805599453 }
+
+# integer division and the k-th binary digit, without bit operators.
+# POW2 is precomputed: ipow() in an inner loop is what makes an
+# interpreted physical layer slow.
+POW2 := [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096,
+         8192, 16384, 32768, 65536]
+
+def u_div(a, b) { return u_trunc(a / b) }
+def u_bit(v, k) { return u_trunc(v / POW2[k]) % 2 }
+
+# ====================================================================
+# L3 (key schedule): the Jones-polynomial quantum cipher
+# --------------------------------------------------------------------
+# A zone's long-term key is DERIVED FROM A KNOT. The Kauffman bracket
+# state sum  <D>(A) = sum over A/B smoothings of A^(a-b) d^(loops-1),
+# d = -A^2 - 1/A^2, is sampled at several A and hashed. The knot is
+# the zone's secret; the polynomial is its key schedule.
+# ====================================================================
+
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) {
+        h := (h * 31 + ord(s, i)) % 999983
+        i := i + 1
+    }
+    return h
+}
+
+def zone_id(s) { return str_hash(s) % RING }
+
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+
+# a crossing is [id, e0, e1, e2, e3, sign]; the bracket ignores sign
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    d := 0 - A * A - 1.0 / (A * A)
+    states := ipow(2, n)
+    sum := 0.0
+    bits := []
+    q := 0
+    while (q < n) { bits <- 0; q := q + 1 }
+
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            if (bits[i] == 0) {
+                a_cnt := a_cnt + 1
+                p := e0; qq := e1; r := e2; s := e3
+            } else {
+                b_cnt := b_cnt + 1
+                p := e0; qq := e3; r := e1; s := e2
+            }
+            ra := uf_find(parent, p)
+            rb := uf_find(parent, qq)
+            if (ra != rb) { parent[rb] = ra }
+            rc := uf_find(parent, r)
+            rd := uf_find(parent, s)
+            if (rc != rd) { parent[rd] = rc }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r2 := uf_find(parent, lbl)
+            if (seen[r2] == 0) { seen[r2] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        sum := sum + ipow(A, a_cnt - b_cnt) * ipow(d, loops - 1)
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+
+def jones_key(diagram) {
+    As := [0.8, 1.0, 1.2, 1.5, 2.0]
+    acc := "jones|"
+    i := 0
+    while (i < len(As)) {
+        acc := acc + f5(kauffman(diagram, As[i])) + "|"
+        i := i + 1
+    }
+    return str_hash(acc)
+}
+
+# the zone's identity knots (its secret) -- same as zone.bada
+def zone_diagram(host) {
+    if (host == "bada.or.jp") {
+        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]
+    }
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+def lcg(state) { return (state * 48271) % 2147483647 }
+
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+
+# the keystream works on 16-bit code units so CJK round-trips
+def zone_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+
+def zone_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+
+def zone_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) {
+        h := (h * 31 + ct[i] + 7) % 2147483647
+        i := i + 1
+    }
+    return h
+}
+
+def zone_seal(plain, key, salt) {
+    ct := zone_encrypt(plain, key, salt)
+    return [ct, salt, zone_tag(ct, key, salt)]
+}
+
+# open -> [plaintext] ; [] means 409 zone-guard-reject
+def zone_open(sealed, key) {
+    ct := sealed[0]
+    salt := sealed[1]
+    tag := sealed[2]
+    if (zone_tag(ct, key, salt) != tag) { return [] }
+    return [zone_decrypt(ct, key, salt)]
+}
+
+# ---- Bell-pair QKD: session salt + channel-tamper evidence ----------
+# |Phi+> = (|00> + |11>)/sqrt(2). The forbidden outcomes |01>,|10>
+# stay EXACTLY 0; an intercept-resend tap breaks that correlation.
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt, outcome]
+}
+
+# ====================================================================
+# L2: zone:// naming and the P2P ring DHT (no DNS, no origin server)
+# ====================================================================
+
+# zone://host/path -> [host, path, labels]  ([] if not a zone URL)
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) { return [] }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) { return [rest, "/", split(rest, ".")] }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+
+# a peer is [name, node-id, ring-index]
+def peer_new(name) { return [name, zone_id("peer:" + name), 0] }
+
+def zone_boot() {
+    names := ["tokyo.zone.jp", "osaka.zone.jp", "nagoya.zone.jp",
+              "sapporo.zone.jp", "fukuoka.zone.jp", "naha.zone.jp"]
+    net := []
+    i := 0
+    while (i < len(names)) { net <- peer_new(names[i]); i := i + 1 }
+    # insertion sort by node-id
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) {
+                if (p[1] < sorted[j][1]) { pos := j; found := true }
+            }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) { sorted[m][2] = m; m := m + 1 }
+    return sorted
+}
+
+def dht_nearest(net, key) {
+    best := 0
+    bd := ring_dist(net[0][1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# greedy routing over the +1 / -1 / +2 fingers
+def zone_route(net, key) {
+    n := len(net)
+    target := dht_nearest(net, key)
+    cur := 0
+    hops := [net[0][0]]
+    guard := 0
+    while (cur != target && guard < 2 * n) {
+        nb := [(cur + 1) % n, (cur + n - 1) % n, (cur + 2) % n]
+        best := cur
+        bd := ring_dist(net[cur][1], key)
+        i := 0
+        while (i < len(nb)) {
+            d := ring_dist(net[nb[i]][1], key)
+            if (d < bd) { bd := d; best := nb[i] }
+            i := i + 1
+        }
+        if (best == cur) { cur := target } else { cur := best }
+        hops <- net[cur][0]
+        guard := guard + 1
+    }
+    return [target, hops]
+}
+
+# ====================================================================
+# L1: the mapping onto an NTT subscriber line
+# --------------------------------------------------------------------
+# phi : zone URL |-> NTT number.  The ring position picks the area
+# code (so neighbouring zones land in neighbouring exchanges) and the
+# subscriber digits come from the URL hash. A registry -- the same
+# device number portability uses -- makes phi^-1 an exact inverse.
+# ====================================================================
+
+AREA_CODE := ["011", "022",  "03",  "045", "052",  "06",  "075", "082", "092", "098"]
+AREA_CITY := ["札幌", "仙台", "東京", "横浜", "名古屋", "大阪", "京都", "広島", "福岡", "那覇"]
+AREA_SUB  := [    7,     7,     8,     7,     7,     8,     7,     7,     7,     7]
+
+REG_URL := []      # the allocation ledger: parallel arrays
+REG_NUM := []
+REG_SEC := []
+
+def pad_digits(v, width) {
+    s := "" + (v % ipow(10, width))
+    while (len(s) < width) { s := "0" + s }
+    return s
+}
+
+def reg_find_num(number) {
+    i := 0
+    while (i < len(REG_NUM)) {
+        if (REG_NUM[i] == number) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+def reg_find_url(url) {
+    i := 0
+    while (i < len(REG_URL)) {
+        if (REG_URL[i] == url) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+# phi
+def ntt_map(url) {
+    hit := reg_find_url(url)
+    if (hit >= 0) { return [REG_NUM[hit], REG_SEC[hit]] }
+    z := zone_id(url)
+    sector := u_trunc(z * len(AREA_CODE) / RING)
+    if (sector >= len(AREA_CODE)) { sector := len(AREA_CODE) - 1 }
+    area := AREA_CODE[sector]
+    width := AREA_SUB[sector]
+    base := str_hash("ntt:" + url) * 7919 % ipow(10, width)
+    probe := 0
+    number := area + pad_digits(base, width)
+    while (reg_find_num(number) >= 0 && probe < 1000) {
+        probe := probe + 1
+        number := area + pad_digits(base + probe, width)
+    }
+    REG_URL <- url
+    REG_SEC <- sector
+    REG_NUM <- number;
+    ["ntt-assign", url, number] >> tuplespace
+    return [number, sector]
+}
+
+# display form: 03-1234-5678 / 082-199-4512
+def ntt_format(number) {
+    n := len(number)
+    if (n != 10) { return number }
+    a3 := substr(number, 0, 3)
+    if (substr(number, 1, 1) == "3") { a3 := substr(number, 0, 2) }
+    if (substr(number, 1, 1) == "6") { a3 := substr(number, 0, 2) }
+    head := len(a3)
+    mid := 10 - head - 4
+    return a3 + "-" + substr(number, head, mid) + "-" + substr(number, head + mid, 4)
+}
+
+# phi^-1 -- exact, because the registry recorded the allocation
+def ntt_unmap(number) {
+    hit := reg_find_num(number)
+    if (hit < 0) { return "" }
+    return REG_URL[hit]
+}
+
+# ---- the bearer: a voiceband 16-QAM soft modem ----------------------
+# A metallic subscriber line passes only 300-3400 Hz, so the envelope
+# is modulated into it. fs = 8000 Hz and fc = 2000 Hz, so fc/fs = 1/4
+# and the carrier samples are exactly {1,0,-1,0} and {0,1,0,-1}: the
+# correlator is then an exact orthogonal pair and demodulation is
+# error-free. 2000 baud x 4 bits = 8000 bps.
+QAM_LVL := [0 - 3, 0 - 1, 1, 3]
+QAM_AMP := 2600
+
+def qam_index(level) {
+    best := 0
+    bd := 9999
+    i := 0
+    while (i < 4) {
+        d := abs(QAM_LVL[i] - level)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# byte array -> voiceband samples
+def ntt_modulate(bytes) {
+    out := []
+    i := 0
+    while (i < len(bytes)) {
+        b := bytes[i]
+        # one byte = two 16-QAM symbols (4 bits each)
+        s := 0
+        while (s < 2) {
+            nib := b % 16
+            if (s == 0) { nib := u_trunc(b / 16) }
+            I := QAM_LVL[u_trunc(nib / 4)]
+            Q := QAM_LVL[nib % 4]
+            out <- QAM_AMP * I
+            out <- 0 - QAM_AMP * Q
+            out <- 0 - QAM_AMP * I
+            out <- QAM_AMP * Q
+            s := s + 1
+        }
+        i := i + 1
+    }
+    return out
+}
+
+# voiceband samples -> byte array
+def ntt_demodulate(samples) {
+    out := []
+    nsym := u_trunc(len(samples) / 4)
+    k := 0
+    acc := 0
+    half := 0
+    while (k < nsym) {
+        a := samples[k * 4]
+        b := samples[k * 4 + 1]
+        c := samples[k * 4 + 2]
+        d := samples[k * 4 + 3]
+        I := 0.5 * (a - c) / QAM_AMP
+        Q := 0 - 0.5 * (b - d) / QAM_AMP
+        nib := qam_index(I) * 4 + qam_index(Q)
+        if (half == 0) { acc := nib * 16; half := 1 }
+        else { out <- (acc + nib); half := 0 }
+        k := k + 1
+    }
+    return out
+}
+
+# ====================================================================
+# L0: Panasonic HD-PLC -- the house wiring as the physical layer
+# --------------------------------------------------------------------
+# Zimmermann-Dostert multipath transfer function, colored background
+# noise, amateur-band notches, adaptive PAM bit loading, and a
+# wavelet (Haar) filter bank standing in for HD-PLC's DWMT.
+# ====================================================================
+
+HAM_LO := [1.8, 3.5, 7.0, 10.1, 14.0, 18.068, 21.0, 24.89, 28.0]
+HAM_HI := [2.0, 3.8, 7.2, 10.15, 14.35, 18.168, 21.45, 24.99, 29.7]
+
+def in_ham_band(f_hz) {
+    f := f_hz / 1000000
+    i := 0
+    while (i < len(HAM_LO)) {
+        if (f >= HAM_LO[i] && f <= HAM_HI[i]) { return true }
+        i := i + 1
+    }
+    return false
+}
+
+# outlets: [name, distance m, branches]
+def outlet(which) {
+    if (which == "living")  { return ["居間 コンセント", 12, 3] }
+    if (which == "kitchen") { return ["台所 コンセント", 17, 5] }
+    if (which == "bedroom") { return ["寝室 コンセント", 28, 4] }
+    if (which == "router")  { return ["ONU 脇 コンセント", 5, 2] }
+    return ["書斎 コンセント (PC)", 21, 4]
+}
+
+# the multipath set for a pair of outlets: [gain, path length]
+def plc_paths(a, b) {
+    oa := outlet(a)
+    ob := outlet(b)
+    base := oa[1] + ob[1]
+    nb := oa[2]
+    if (ob[2] > nb) { nb := ob[2] }
+    npath := 3 + nb - 1
+    if (npath > 6) { npath := 6 }
+    paths := []
+    i := 0
+    while (i < npath) {
+        g := 1.0
+        if (i > 0) { g := 0.75 - 0.12 * i }
+        if (i % 2 == 1) { g := 0 - g }
+        d := base
+        if (i > 0) { d := base + i * 11 }
+        paths <- [g, d]
+        i := i + 1
+    }
+    return paths
+}
+
+# |H(f)| : attenuation exp(-a1 f d) and comb fading from path delays
+def plc_transfer(paths, f_hz) {
+    a1 := 0.00000000078
+    vp := 150000000
+    re := 0.0
+    im := 0.0
+    i := 0
+    while (i < len(paths)) {
+        att := exp(0 - a1 * f_hz * paths[i][1])
+        ph := 0 - TWO_PI * f_hz * paths[i][1] / vp
+        re := re + paths[i][0] * att * u_cos(ph)
+        im := im + paths[i][0] * att * u_sin(ph)
+        i := i + 1
+    }
+    return sqrt(re * re + im * im)
+}
+
+# impedance mismatch at every branch; the loss rises with frequency
+def plc_coupling_db(a, b, f_hz) {
+    oa := outlet(a)
+    ob := outlet(b)
+    j := (oa[2] - 1) + (ob[2] - 1)
+    db := 3.0 * j + 5.0
+    t := (f_hz - FLO) / (FHI - FLO)
+    return db + (14 + 2.6 * j) * t
+}
+
+# colored background noise, dBm/Hz
+def plc_noise_db(f_hz) {
+    fm := f_hz / 1000000
+    return 0 - 145 + 53.23 * exp(0 - 0.337 * log(fm))
+}
+
+# the tone map: bits for each subcarrier, 0 where notched or too weak
+def plc_tonemap(a, b) {
+    paths := plc_paths(a, b)
+    df := (FHI - FLO) / NCARR
+    gap := 9.55                      # SNR gap for 1e-7 BER
+    bits := []
+    snrs := []
+    total := 0
+    active := 0
+    notches := 0
+    n := 0
+    while (n < NCARR) {
+        f := FLO + (n + 0.5) * df
+        if (in_ham_band(f)) {
+            bits <- 0
+            snrs <- 0
+            notches := notches + 1
+        } else {
+            h := plc_transfer(paths, f)
+            if (h < 0.000000000001) { h := 0.000000000001 }
+            hdb := 20 * log(h) / 2.302585092994046 - plc_coupling_db(a, b, f)
+            snr := TXPSD + hdb - plc_noise_db(f)
+            lin := exp(snr * 0.23025850929940458)
+            bq := u_trunc(u_log2(1 + lin / gap))
+            if (bq < 1) { bq := 0 }
+            if (bq > MAXBITS) { bq := MAXBITS }
+            bits <- bq
+            snrs <- snr
+            if (bq > 0) { active := active + 1; total := total + bq }
+        }
+        n := n + 1
+    }
+    sym_sec := 1.0 / df
+    return [bits, total, active, notches, total / sym_sec, snrs]
+}
+
+# ---- the wavelet filter bank (normalised Haar; exact inverse) -------
+SQ1_2 := 0.7071067811865476
+
+# time waveform -> wavelet coefficients (subbands = subcarriers)
+def dwt_analyze(x) {
+    a := []
+    i := 0
+    while (i < len(x)) { a <- x[i]; i := i + 1 }
+    n := len(a)
+    while (n > 1) {
+        half := u_trunc(n / 2)
+        out := []
+        i := 0
+        while (i < half) { out <- (a[2 * i] + a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < half) { out <- (a[2 * i] - a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+        n := half
+    }
+    return a
+}
+
+# wavelet coefficients -> time waveform (the exact inverse)
+def dwt_synthesize(c) {
+    a := []
+    i := 0
+    while (i < len(c)) { a <- c[i]; i := i + 1 }
+    N := len(a)
+    n := 1
+    while (n < N) {
+        half := n
+        n := n * 2
+        out := []
+        i := 0
+        while (i < n) { out <- 0; i := i + 1 }
+        i := 0
+        while (i < half) {
+            out[2 * i] = (a[i] + a[half + i]) * SQ1_2
+            out[2 * i + 1] = (a[i] - a[half + i]) * SQ1_2
+            i := i + 1
+        }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+    }
+    return a
+}
+
+# ---- bytes <-> bits ------------------------------------------------
+def bytes_to_bits(bytes) {
+    bits := []
+    i := 0
+    while (i < len(bytes)) {
+        v := bytes[i]
+        k := 7
+        while (k >= 0) {
+            p := POW2[k]
+            if (v >= p) { bits <- 1; v := v - p } else { bits <- 0 }
+            k := k - 1
+        }
+        i := i + 1
+    }
+    return bits
+}
+
+def bits_to_bytes(bits) {
+    out := []
+    i := 0
+    while (i + 7 < len(bits)) {
+        v := 0
+        k := 0
+        while (k < 8) { v := v * 2 + bits[i + k]; k := k + 1 }
+        out <- v
+        i := i + 8
+    }
+    return out
+}
+
+# ---- wavelet OFDM --------------------------------------------------
+def plc_modulate(bytes, tm) {
+    tone := tm[0]
+    per := tm[1]
+    bits := bytes_to_bits(bytes)
+    nsym := u_trunc((len(bits) + per - 1) / per)
+    pad := nsym * per - len(bits)
+    i := 0
+    while (i < pad) { bits <- 0; i := i + 1 }
+
+    samples := []
+    p := 0
+    s := 0
+    while (s < nsym) {
+        coeffs := []
+        n := 0
+        while (n < NCARR) { coeffs <- 0; n := n + 1 }
+        n := 0
+        while (n < NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                v := 0
+                k := 0
+                while (k < bq) { v := v * 2 + bits[p]; p := p + 1; k := k + 1 }
+                coeffs[n] = 2 * v - (POW2[bq] - 1)   # PAM level
+            }
+            n := n + 1
+        }
+        wave := dwt_synthesize(coeffs)
+        i := 0
+        while (i < NCARR) { samples <- wave[i]; i := i + 1 }
+        s := s + 1
+    }
+    return [samples, nsym, len(bits) - pad]
+}
+
+def plc_demodulate(samples, tm, bitlen) {
+    tone := tm[0]
+    nsym := u_trunc(len(samples) / NCARR)
+    bits := []
+    s := 0
+    while (s < nsym) {
+        chunk := []
+        i := 0
+        while (i < NCARR) { chunk <- samples[s * NCARR + i]; i := i + 1 }
+        coeffs := dwt_analyze(chunk)
+        n := 0
+        while (n < NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                M := POW2[bq]
+                idx := u_trunc((coeffs[n] + (M - 1) + 1) / 2)   # hard slicer
+                if (idx < 0) { idx := 0 }
+                if (idx > M - 1) { idx := M - 1 }
+                k := bq - 1
+                while (k >= 0) {
+                    p := POW2[k]
+                    if (idx >= p) { bits <- 1; idx := idx - p } else { bits <- 0 }
+                    k := k - 1
+                }
+            }
+            n := n + 1
+        }
+        s := s + 1
+    }
+    trimmed := []
+    i := 0
+    while (i < bitlen && i < len(bits)) { trimmed <- bits[i]; i := i + 1 }
+    return bits_to_bytes(trimmed)
+}
+
+# ---- framing (IEEE 1901 style; modular hash stands in for CRC-32) ---
+PREAMBLE := [26, 207, 252, 29]
+
+def plc_check(bytes) {
+    h := 216
+    i := 0
+    while (i < len(bytes)) {
+        h := (h * 33 + bytes[i] + 11) % 16777213
+        i := i + 1
+    }
+    return h
+}
+
+def plc_frame(payload) {
+    out := []
+    i := 0
+    while (i < len(PREAMBLE)) { out <- PREAMBLE[i]; i := i + 1 }
+    n := len(payload)
+    out <- u_trunc(n / 256)
+    out <- n % 256
+    i := 0
+    while (i < n) { out <- payload[i]; i := i + 1 }
+    c := plc_check(payload)
+    out <- u_trunc(c / 65536) % 256
+    out <- u_trunc(c / 256) % 256
+    out <- c % 256
+    return out
+}
+
+# -> [status, payload]; status 200 delivered / 503 physical error
+def plc_deframe(bytes) {
+    i := 0
+    while (i < len(PREAMBLE)) {
+        if (bytes[i] != PREAMBLE[i]) { return [503, []] }
+        i := i + 1
+    }
+    n := bytes[4] * 256 + bytes[5]
+    payload := []
+    i := 0
+    while (i < n) { payload <- bytes[6 + i]; i := i + 1 }
+    got := bytes[6 + n] * 65536 + bytes[7 + n] * 256 + bytes[8 + n]
+    if (got != plc_check(payload)) { return [503, []] }
+    return [200, payload]
+}
+
+# ====================================================================
+# L4: the unified message (what LINE and Instagram both become)
+# --------------------------------------------------------------------
+# The app ingests real LINE Messaging API and Instagram Graph API
+# webhook events and verifies their HMAC-SHA256 signatures. Here we
+# carry the normalised result: platform, chat id, display name, text.
+# ====================================================================
+
+def msg_new(platform, chat, who, text) { return [platform, chat, who, text] }
+
+def msg_serialize(m) { return m[0] + "~" + m[1] + "~" + m[2] + "~" + m[3] }
+
+def msg_deserialize(s) {
+    f := split(s, "~")
+    if (len(f) < 4) { return ["zone", "", "", s] }
+    return [f[0], f[1], f[2], f[3]]
+}
+
+def msg_zone_url(m) { return "zone://url.or.jp/msg/" + m[0] + "/" + m[1] }
+
+# ====================================================================
+# The STREAMS stack itself
+# --------------------------------------------------------------------
+# Each module is a pair wput (downstream) / rput (upstream). The
+# stream head hands a message down; the driver puts it on the wire;
+# coming back up every module undoes exactly what its twin did.
+# ====================================================================
+
+NET := zone_boot()
+PLC_LINK := ["living", "study"]
+TONEMAP := plc_tonemap("living", "study")
+
+# --- msgmux ---------------------------------------------------------
+def msgmux_wput(m) { return [msg_zone_url(m), msg_serialize(m)] }
+def msgmux_rput(pair) { return msg_deserialize(pair[1]) }
+
+# --- jones ----------------------------------------------------------
+# -> [status, url, sealed] ; 495 if the quantum channel was tapped
+def jones_wput(pair) {
+    url := pair[0]
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, url, []] }
+    q := qkd_session()
+    if (!q[0]) { return [495, url, []] }
+    key := jones_key(zone_diagram(z[0]))
+    return [200, url, zone_seal(pair[1], key, q[1])]
+}
+
+# -> [status, url, plaintext] ; 409 if the seal does not verify
+def jones_rput(env) {
+    url := env[1]
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, url, ""] }
+    key := jones_key(zone_diagram(z[0]))
+    opened := zone_open(env[2], key)
+    if (len(opened) == 0) { return [409, url, ""] }
+    return [200, url, opened[0]]
+}
+
+# --- zone -----------------------------------------------------------
+def zone_wput(env) {
+    url := env[1]
+    key := zone_id(url)
+    r := zone_route(NET, key);
+    ["zone-record", url, NET[r[0]][0], key, env[2][2]] >> tuplespace
+    return r
+}
+
+def zone_rput(url) {
+    key := zone_id(url)
+    r := zone_route(NET, key);
+    ["zone-fetch", url, NET[r[0]][0]] >> tuplespace
+    return r
+}
+
+# --- ntt ------------------------------------------------------------
+# the sealed record becomes a byte envelope, then a voiceband signal
+def envelope_encode(url, sealed) {
+    out := []
+    ub := []
+    i := 0
+    while (i < len(url)) { ub <- ord(url, i); i := i + 1 }
+    out <- 90            # 'Z'
+    out <- 78            # 'N'
+    out <- len(ub)
+    i := 0
+    while (i < len(ub)) { out <- ub[i]; i := i + 1 }
+    out <- u_trunc(sealed[1] / 256)
+    out <- sealed[1] % 256
+    t := sealed[2]
+    out <- u_trunc(t / 16777216) % 256
+    out <- u_trunc(t / 65536) % 256
+    out <- u_trunc(t / 256) % 256
+    out <- t % 256
+    ct := sealed[0]
+    out <- u_trunc(len(ct) / 256)
+    out <- len(ct) % 256
+    i := 0
+    while (i < len(ct)) {
+        out <- u_trunc(ct[i] / 256)
+        out <- ct[i] % 256
+        i := i + 1
+    }
+    return out
+}
+
+def envelope_decode(bytes) {
+    if (bytes[0] != 90) { return [400, "", []] }
+    if (bytes[1] != 78) { return [400, "", []] }
+    ulen := bytes[2]
+    url := ""
+    i := 0
+    while (i < ulen) { url := url + chr(bytes[3 + i]); i := i + 1 }
+    p := 3 + ulen
+    salt := bytes[p] * 256 + bytes[p + 1]
+    tag := bytes[p + 2] * 16777216 + bytes[p + 3] * 65536 + bytes[p + 4] * 256 + bytes[p + 5]
+    clen := bytes[p + 6] * 256 + bytes[p + 7]
+    p := p + 8
+    ct := []
+    i := 0
+    while (i < clen) { ct <- (bytes[p + 2 * i] * 256 + bytes[p + 2 * i + 1]); i := i + 1 }
+    return [200, url, [ct, salt, tag]]
+}
+
+# ====================================================================
+# ultra_send -- one message all the way down and all the way back
+# ====================================================================
+
+def ultra_send(m, note) {
+    print("")
+    print("---------------------------------------------------------------")
+    print("SEND", note)
+    print("  message   :", m[0], "/", m[2], ":", m[3])
+
+    # ---- down the stream ----
+    pair := msgmux_wput(m)
+    print("  msgmux ->  zone address", pair[0])
+
+    env := jones_wput(pair)
+    if (env[0] != 200) {
+        print("  jones  ->  STATUS", env[0], "quantum-channel-compromised")
+        print("             the Bell pair lost its correlation: do not transmit")
+        return env[0]
+    }
+    sealed := env[2]
+    z := zone_parse(pair[0])
+    print("  jones  ->  knot key", jones_key(zone_diagram(z[0])),
+          " salt", sealed[1], " tag", sealed[2], " ct", len(sealed[0]), "units")
+
+    r := zone_wput(env)
+    print("  zone   ->  key", zone_id(pair[0]), " owner", NET[r[0]][0])
+
+    num := ntt_map(pair[0])
+    bytes := envelope_encode(pair[0], sealed)
+    vb := ntt_modulate(bytes)
+    print("  ntt    ->  phi =", ntt_format(num[0]), "(" + AREA_CITY[num[1]] + ")",
+          " envelope", len(bytes), "bytes ->", len(vb), "voiceband samples")
+
+    frame := plc_frame(vb_to_bytes(vb))
+    mod := plc_modulate(frame, TONEMAP)
+    print("  plc    ->", mod[1], "wavelet OFDM symbols,",
+          "PHY", u_trunc(TONEMAP[4] / 1000000), "Mbps,",
+          TONEMAP[2], "active /", TONEMAP[3], "notched")
+
+    # ---- the wire ----
+    wire := mod[0]
+    if (TAMPER_WIRE) { wire[10] = wire[10] + 4000 }
+
+    # ---- up the stream ----
+    back := plc_demodulate(wire, TONEMAP, mod[2])
+    df := plc_deframe(back)
+    if (df[0] != 200) {
+        print("  plc    <-  STATUS 503 plc-check-failed (the wire was altered)")
+        return 503
+    }
+    vb2 := bytes_to_vb(df[1])
+    bytes2 := ntt_demodulate(vb2)
+    dec := envelope_decode(bytes2)
+    if (dec[0] != 200) { print("  ntt    <-  STATUS 400 bad-zone"); return 400 }
+    print("  ntt    <-  phi^-1(", ntt_format(num[0]), ") =", ntt_unmap(num[0]))
+
+    r2 := zone_rput(dec[1])
+    print("  zone   <-  owner", NET[r2[0]][0], " route", r2[1])
+
+    sealed2 := dec[2]
+    if (TAMPER_PEER) { sealed2[0][0] = (sealed2[0][0] + 1) % 65536 }
+
+    op := jones_rput([200, dec[1], sealed2])
+    if (op[0] != 200) {
+        print("  jones  <-  STATUS 409 zone-guard-reject")
+        print("             the tag does not verify: tampered, or the wrong knot")
+        return 409
+    }
+    got := msgmux_rput([dec[1], op[2]])
+    print("  msgmux <-  message", got[0], "/", got[2], ":", got[3])
+
+    same := (got[3] == m[3]) && (got[2] == m[2]) && (got[0] == m[0])
+    print("  STATUS 200 zone-delivered  round-trip identical:", same)
+    return 200
+}
+
+# the PLC driver carries bytes, so pack the voiceband samples into
+# byte pairs and back (16-bit two's complement, big endian)
+def vb_to_bytes(vb) {
+    out := []
+    i := 0
+    while (i < len(vb)) {
+        v := vb[i]
+        if (v < 0) { v := v + 65536 }
+        out <- u_trunc(v / 256) % 256
+        out <- v % 256
+        i := i + 1
+    }
+    return out
+}
+
+def bytes_to_vb(bytes) {
+    out := []
+    i := 0
+    while (i + 1 < len(bytes)) {
+        v := bytes[i] * 256 + bytes[i + 1]
+        if (v >= 32768) { v := v - 65536 }
+        out <- v
+        i := i + 2
+    }
+    return out
+}
+
+# measure a candidate outlet pair (":=" inside a def is local, so this
+# reports the link rather than rebinding the running one)
+def ultra_link(which) {
+    tm := plc_tonemap(which, "study")
+    print("LINK", which, "-> study :", tm[2], "active subcarriers,",
+          tm[3], "notched,", u_trunc(tm[4] / 1000000), "Mbps")
+    return tm[2]
+}
+
+# ====================================================================
+# the demonstration
+# ====================================================================
+
+TAMPER_WIRE := false
+TAMPER_PEER := false
+
+print("")
+print("ultra-network ring (RING =", RING, ", built from peer hashes):")
+i := 0
+while (i < len(NET)) {
+    print("  node", i, ":", NET[i][0], " id =", NET[i][1])
+    i := i + 1
+}
+
+print("")
+print("zone identity knots -> Jones keys:")
+print("  url.or.jp  (trefoil)      key =", jones_key(zone_diagram("url.or.jp")))
+print("  bada.or.jp (figure-eight) key =", jones_key(zone_diagram("bada.or.jp")))
+
+print("")
+print("HD-PLC link", PLC_LINK[0], "->", PLC_LINK[1], ":")
+print("  subcarriers   :", NCARR, "over 2-28 MHz")
+print("  active        :", TONEMAP[2])
+print("  notched (ham) :", TONEMAP[3])
+print("  bits / symbol :", TONEMAP[1])
+print("  PHY rate      :", u_trunc(TONEMAP[4] / 1000000), "Mbps")
+
+# --- the grammar verbs the reviser transaction installed --------------
+print("")
+print("LINK -- measuring candidate outlets (the reviser verb):")
+LINK "router"
+LINK "living"
+LINK "kitchen"
+
+# --- the happy path, once per messaging platform ---------------------
+SEND msg_new("line", "U4af4980629", "田中 さくら", "コンセントから zone:// が見えてる") "LINE over the power line"
+SEND msg_new("instagram", "17841400000000001", "sakura.photo", "配線図の写真あげたよ") "Instagram over the power line"
+
+# --- the attacks -----------------------------------------------------
+print("")
+print("===============================================================")
+print("ATTACKS -- each one is rejected by a different layer")
+print("===============================================================")
+
+TAMPER_WIRE := true
+SEND msg_new("line", "U4af4980629", "田中 さくら", "改竄試験") "someone alters the wire"
+TAMPER_WIRE := false
+
+TAMPER_PEER := true
+SEND msg_new("line", "U4af4980629", "田中 さくら", "改竄試験") "a malicious peer rewrites the record"
+TAMPER_PEER := false
+
+# --- the mapping table ----------------------------------------------
+print("")
+print("phi : zone:// |-> NTT number    (phi^-1 checked against the registry)")
+i := 0
+while (i < len(REG_URL)) {
+    print("  ", ntt_format(REG_NUM[i]), " <-  ", REG_URL[i],
+          "   inverse ok:", ntt_unmap(REG_NUM[i]) == REG_URL[i])
+    i := i + 1
+}
+
+print("")
+print("akashic ledger:", len(tuplespace), "facts (append-only)")
+print("===============================================================")
+print("BADA ULTRA NETWORK -- done")
+print("===============================================================")
