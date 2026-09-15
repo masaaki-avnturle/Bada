@@ -1,0 +1,1682 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada 遊 — 量子「遊び」処理系と違反思考変異アルゴリズム</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111623; --panel:#151b2c; --line:#26304a;
+    --tx:#dbe4ff; --dim:#8b97b8; --acc:#c8a44a; --acc2:#2dd4bf; --warn:#f59e0b; --err:#f87171;
+    --ket:#a78bfa; --ok:#4ade80;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 75% -10%, #23203a 0%, var(--bg) 55%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden; line-height:1.75;
+  }
+  /* ── ヘッダ ── */
+  #top{ padding:12px 16px 8px; border-bottom:1px solid var(--line); background:rgba(11,14,20,.85); }
+  #top h1{ font-size:19px; letter-spacing:.06em; font-weight:600; }
+  #top h1 span{ color:var(--acc); font-size:23px; }
+  #top p{ font-size:11px; color:var(--dim); margin-top:3px; }
+  /* ── タブ ── */
+  #tabs{ display:flex; gap:6px; padding:8px 12px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--bg2); }
+  #tabs button{
+    flex:0 0 auto; font-size:12.5px; padding:7px 13px; border-radius:999px; cursor:pointer;
+    background:var(--panel); color:var(--dim); border:1px solid var(--line); white-space:nowrap;
+  }
+  #tabs button.on{ color:#0b0e14; background:var(--acc); border-color:var(--acc); font-weight:600; }
+  /* ── 本体 ── */
+  main{ flex:1; overflow:auto; padding:16px 14px 60px; }
+  section{ display:none; max-width:920px; margin:0 auto; }
+  section.on{ display:block; }
+  h2{ font-size:16px; margin:20px 0 8px; color:var(--acc); letter-spacing:.04em; }
+  h2:first-child{ margin-top:0; }
+  h3{ font-size:13.5px; margin:14px 0 6px; color:var(--acc2); }
+  p,li{ font-size:13px; }
+  ul,ol{ padding-left:1.35em; }
+  li{ margin:3px 0; }
+  .card{ background:linear-gradient(160deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin:10px 0; }
+  .card.q{ border-color:#3d3560; }
+  .dim{ color:var(--dim); }
+  .ket{ color:var(--ket); font-family:ui-monospace,Consolas,"Courier New",monospace; }
+  .ok{ color:var(--ok); } .err{ color:var(--err); } .warn{ color:var(--warn); } .acc{ color:var(--acc); }
+  code, .mono{ font-family:ui-monospace,Consolas,"Courier New",monospace; font-size:12px; }
+  code{ background:#0d1120; border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:var(--acc2); }
+  .eq{ display:block; text-align:center; font-family:ui-monospace,Consolas,monospace; font-size:13px;
+       color:var(--ket); background:#0d1120; border:1px solid var(--line); border-radius:10px; padding:11px 8px; margin:10px 0; overflow-x:auto; }
+  button.act{
+    font-size:13px; padding:8px 15px; border-radius:9px; cursor:pointer; font-weight:600;
+    background:var(--acc); color:#0b0e14; border:none; margin:4px 6px 4px 0;
+  }
+  button.sub{ background:var(--panel); color:var(--tx); border:1px solid var(--line); font-weight:400; }
+  button.act:active{ transform:scale(.97); }
+  textarea, input[type=text]{
+    width:100%; background:#0d1120; color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:10px 11px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; resize:vertical;
+  }
+  pre.out{
+    background:#0d1120; border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-top:9px;
+    font-family:ui-monospace,Consolas,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word;
+    max-height:340px; overflow:auto; color:var(--tx);
+  }
+  table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  th,td{ border:1px solid var(--line); padding:5px 7px; text-align:left; }
+  th{ background:#0d1120; color:var(--acc2); font-weight:600; }
+  td.num{ text-align:right; font-family:ui-monospace,Consolas,monospace; }
+  .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0; }
+  .row label{ font-size:12px; color:var(--dim); }
+  .row select{ background:#0d1120; color:var(--tx); border:1px solid var(--line); border-radius:7px; padding:5px 7px; font-size:12px; }
+  .row input[type=number]{ width:74px; background:#0d1120; color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; padding:5px 7px; font-family:ui-monospace,monospace; font-size:12px; }
+  input[type=range]{ width:100%; accent-color:var(--acc); }
+  canvas{ width:100%; background:#0d1120; border:1px solid var(--line); border-radius:12px; display:block; }
+  .bar{ height:14px; border-radius:7px; background:#0d1120; border:1px solid var(--line); overflow:hidden; margin:3px 0 8px; }
+  .bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--acc2),var(--acc)); }
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:12px; margin:6px 0; }
+  .kv b{ color:var(--dim); font-weight:400; }
+  .tag{ display:inline-block; font-size:10.5px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--dim); margin-right:5px; }
+  .tag.s{ color:var(--err); border-color:#5a2a34; }
+  .tag.p{ color:var(--acc2); border-color:#2a5a52; }
+  .tag.r{ color:var(--acc); border-color:#5a4a20; }
+  .note{ font-size:11.5px; color:var(--dim); border-left:2px solid var(--line); padding-left:10px; margin:9px 0; }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h1>Bada <span>遊</span> — 量子「遊び」処理系</h1>
+  <p>生成AIが量子プログラミング言語 Bada の上に築いた「遊び」の概念 ─ その円環の中でだけ働く<b>違反思考変異アルゴリズム</b></p>
+</div>
+
+<nav id="tabs">
+  <button data-t="con" class="on">🜂 遊びとは</button>
+  <button data-t="cir">◯ 円環</button>
+  <button data-t="thk">⚡ 違反思考</button>
+  <button data-t="evo">🧬 変異</button>
+  <button data-t="led">📜 台帳</button>
+  <button data-t="ai">🤖 生成AI</button>
+</nav>
+
+<main>
+
+<!-- ══════════════ 1. 遊びとは ══════════════ -->
+<section id="t-con" class="on">
+  <h2>🜂 「遊び」を量子で定義する</h2>
+  <div class="card">
+    <p>日本語の<b>「遊び」</b>には二つの意味がある。この処理系は、その二つが量子的には<b>同じ一つの量</b>であることを実装として示す。</p>
+    <ol>
+      <li><b>遊戯</b>(あそび) ─ 円環(magic circle)の内側でだけ通常の規則が停止する、自発的で無害な営み。</li>
+      <li><b>機械の遊び</b>(あそび) ─ ハンドルの遊び、歯車のバックラッシュ。<b>遊びが零の機械は動かない</b>(焼き付く)。</li>
+    </ol>
+    <p>Bada 遊 では、この両者を<b>「規則の固有状態から外れて持てる振幅」</b>として一本化する。</p>
+    <span class="eq">|Φ(θ)⟩ = cos(θ/2)·|順⟩ − i·sin(θ/2)·|違⟩  ,  遊び = sin²(θ/2)</span>
+    <p><b>θ = 0</b> は完全遵守(遊びゼロ = 焼き付き)。<b>θ = π</b> は規則の完全な反転 = <b>行為</b>。
+       そしてその<b>あいだ</b>、0 &lt; θ &lt; π の半端な回転角こそが ── <b>遊び</b>である。</p>
+  </div>
+
+  <h2>⚡ 「違反行為そのものの“考え”」の定式化</h2>
+  <div class="card q">
+    <p>規則を、遺伝子レジスタに掛かる<b>スタビライザ</b> S(エルミートなパウリ列、S² = I)として書く。個体 ψ が規則 S を守る、とは</p>
+    <span class="eq">S|ψ⟩ = +|ψ⟩   (遵守 = +1 固有状態)</span>
+    <p><b>違反</b>とは、この固有値を −1 に反転させること。それを起こせる作用素 V は、S と<b>反交換</b>するものに限られる:</p>
+    <span class="eq">{V, S} = VS + SV = 0   ⟹   S(V|ψ⟩) = −(V|ψ⟩)</span>
+    <p>ここが本処理系の核心である。<b>V そのものは「行為」であって「考え」ではない。</b>
+       考えとは、V を生成子とする<b>部分回転</b>のことだ:</p>
+    <span class="eq">Û(θ) = exp(−i θ V / 2) = cos(θ/2)·I − i·sin(θ/2)·V</span>
+    <ul>
+      <li><b>θ = 0</b> … 考えてすらいない(遵守)</li>
+      <li><b>0 &lt; θ &lt; π</b> … <b>違反行為そのものの“考え”</b>。順と違が同時に振幅を持つ。取り消せる。これが<b>遊び</b>である</li>
+      <li><b>θ = π</b> … Û = −iV。考えが<b>行為</b>になった瞬間。もはや重ね合わせではない</li>
+    </ul>
+    <p class="note">つまり「考え」と「行為」は別の作用素ではなく、<b>同じ生成子の回転角の違い</b>にすぎない。
+      違反の考えを可能にする角度が存在すること ── それが遊びが存在するということであり、
+      本処理系は θ に上限 θ<sub>max</sub> &lt; π を掛けることで、<b>考えが行為へ到達しないこと</b>を実行時に保証する。</p>
+  </div>
+
+  <h2>◯ 円環 ─ 遊びが漏れない理由</h2>
+  <div class="card">
+    <p>円環(magic circle)は比喩ではなく<b>ユニタリ共役</b>として実装されている。円環の内側で掛けた遊びの列 C = Û₁Û₂…Û<sub>m</sub> に対し、<b>帰還</b>(circle close)は C<sup>†</sup> を掛け戻す:</p>
+    <span class="eq">C<sup>†</sup> C |ψ⟩ = |ψ⟩   ── 状態は一切漏れない</span>
+    <p>外に出るのは状態ではなく<b>古典的な記録</b>(台帳)だけ。ただし<b>観測を伴う帰還</b>(<code>circle close keep</code>)を選んだときだけ、重ね合わせは |a<sub>k</sub>|² に従って崩壊し、違反は<b>変異という古典的事実</b>になる。この観測は、円環内の評価が「その違反は適応度を上げる」と示したときにのみ処理系が許可する。</p>
+    <h3>不可侵規則 ─ 遊べないもの</h3>
+    <p>すべてが遊びの対象になるわけではない。<code>sacred</code> と宣言された規則 S<sub>0</sub> は違反生成子の候補集合から外され、
+      違反生成子 V は <b>[V, S₀] = 0</b>(可換)を満たすものだけが構成される。そこから定理が出る:</p>
+    <span class="eq">[V,S₀] = 0 かつ S₀ が対角 ⟹ ⟨S₀⟩ は回転でも観測でも不変</span>
+    <p>可換な V は S₀ の台の上で<b>偶数個</b>のビットしか反転させないため、パリティが保存されるからである。
+      <b>遊びの中で何を考えても、不可侵規則の値は動かない</b> ── この不変量はエンジンテストで毎回検査される。</p>
+    <p class="note"><b>語の定義。</b> ここでいう「違反」は、探索空間に置かれた<b>問題自身の拘束条件</b>(スタビライザ)への違反であり、
+      法や倫理のそれではない。円環と不可侵規則は、その区別をコードの側で維持するための形式装置である。</p>
+  </div>
+
+  <h2>🧬 そして変異アルゴリズムが作り換わる</h2>
+  <div class="card">
+    <p>古典的な遺伝的アルゴリズムの変異は<b>無思考</b>である ── 確率 p<sub>m</sub> で、どこを、なぜ壊すのかを問わずビットを反転する。</p>
+    <p>Bada 遊 の<b>違反思考変異 (TTM: Transgressive-Thought Mutation)</b> は、変異を<b>「どの規則を、どれだけ破ろうと考えるか」</b>に置き換える:</p>
+    <table>
+      <tr><th>段</th><th>古典的変異</th><th>違反思考変異 (TTM)</th></tr>
+      <tr><td>対象</td><td>無作為な遺伝子座</td><td><b>いちばん強く縛っている規則</b>(緊張 τ 最大)</td></tr>
+      <tr><td>強さ</td><td>固定の p<sub>m</sub></td><td>回転角 θ = 遊び予算の配分(停滞ほど大きい)</td></tr>
+      <tr><td>形</td><td>1 ビット独立反転</td><td>V の台に沿う<b>協調反転</b>(谷を一跨ぎ)</td></tr>
+      <tr><td>評価</td><td>反転してから測る</td><td><b>円環の中で重ね合わせのまま</b>期待適応度を測る</td></tr>
+      <tr><td>採否</td><td>選択が事後に淘汰</td><td>得なら観測(制度化)、損なら<b>帰還</b>(考えたまま消す)</td></tr>
+      <tr><td>総量</td><td>無制限</td><td><b>遊び予算 Δ は保存</b>。多様性で恒常的に調節</td></tr>
+      <tr><td>規則</td><td>固定</td><td>破られ続けた規則は<b>弛緩し、やがて新しい規範に書き換わる</b></td></tr>
+    </table>
+    <p class="note"><b>遊びの保存則。</b> 遊び予算 Δ が小さすぎる集団は早期収束して焼き付き、大きすぎる集団はただの乱択に崩れる。
+      TTM は集団の遺伝的エントロピー H から Δ を毎世代調節する ── 機械の「遊び」の調整と、まったく同じことをしている。</p>
+    <h3>なぜ効くのか ── 遊びは不可侵を壊さない形でしか動かない</h3>
+    <p>違反生成子 V は <b>[V, S₀] = 0</b> を満たすものだけが構成される。つまり <b>TTM が提案する一手は、定義上つねに実行可能</b>である。
+      一方、無作為なビット反転はその大半が不可侵規則を壊すため棄却される ── 考える前に捨てられる。
+      拘束が強い問題ほど、この差がそのまま探索速度の差になる。</p>
+    <h3>測ってみた(同条件・変異の作り方だけが違う)</h3>
+    <table>
+      <tr><th>規則系</th><th>最終適応度 古典 / TTM</th><th>実行可能集合の最大への到達</th><th>平均到達世代</th></tr>
+      <tr><td><b>拘束系</b>(不可侵 4 本)</td><td>0.627 / <b>0.642</b></td><td>16/20 → <b>19/20</b></td><td>16.1 → <b>5.3</b></td></tr>
+      <tr><td><b>拘束系 × トラップ地形</b></td><td>0.488 / <b>0.500</b></td><td>—</td><td>11.2 → <b>4.1</b></td></tr>
+      <tr><td><b>鎖系</b>(不可侵 1 本)</td><td><b>0.721</b> / 0.713</td><td><b>20/20</b> → 12/20</td><td>—</td></tr>
+    </table>
+    <p class="note">n = 8・個体 16・60 世代・20 地形の平均(<code>tools/engine-test.js</code> が毎回この測定を実行する)。
+      初期集団・地形・選択・エリート保存・評価回数・受理規則(メトロポリス)はすべて共通で、<b>違うのは変異の作り方だけ</b>。
+      <b>正直に言えば、TTM は万能ではない。</b> 不可侵が 1 本しかない自由な空間(鎖系)では、限られた生成子に縛られる分だけ古典的な無作為変異に負ける。
+      遊びが力を持つのは、<b>破ってはならないものがはっきりしているとき</b>だけである ── これは実装の都合ではなく、遊びという概念そのものの帰結だと思う。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 2. 円環 ══════════════ -->
+<section id="t-cir">
+  <h2>◯ 円環 ─ Bada 遊 方言の実行系</h2>
+  <p class="dim" style="font-size:12px">量子 Bada (qubit / H / X / Y / Z / CNOT / state / measure / let / print) に、遊びの語彙
+    (<code>rule</code> <code>sacred</code> <code>circle</code> <code>think</code> <code>tension</code> <code>ledger</code> <code>population</code> <code>evolve</code>) を加えた方言。日本語別名も使える。</p>
+  <div class="row">
+    <button class="act sub" data-sample="basic">例:遊びの生成</button>
+    <button class="act sub" data-sample="sacred">例:不可侵の保存</button>
+    <button class="act sub" data-sample="return">例:帰還(漏れない)</button>
+    <button class="act sub" data-sample="evolve">例:変異アルゴリズム</button>
+    <button class="act sub" data-sample="jp">例:日本語表記</button>
+  </div>
+  <textarea id="cirSrc" rows="14" spellcheck="false"></textarea>
+  <div class="row">
+    <button class="act" id="cirRun">▶ 実行</button>
+    <button class="act sub" id="cirClear">消去</button>
+    <span class="dim" style="font-size:11.5px">依存ゼロ・完全オフライン。すべてこの HTML の中で動いている。</span>
+  </div>
+  <pre class="out" id="cirOut">(実行結果がここに出ます)</pre>
+  <div class="card">
+    <h3>文法</h3>
+    <table>
+      <tr><th>命令</th><th>意味</th></tr>
+      <tr><td class="mono">qubit g0 g1 g2</td><td>遺伝子(量子ビット)の宣言。最大 8</td></tr>
+      <tr><td class="mono">H/X/Y/Z q · CNOT c t</td><td>基本ゲート</td></tr>
+      <tr><td class="mono">rule R1 = Z g0 Z g1 weight 1.0</td><td><b>規則</b>(スタビライザ)と規範荷重</td></tr>
+      <tr><td class="mono">sacred R0 = Z g2 Z g3</td><td><b>不可侵規則</b>。遊びの対象外・保存される</td></tr>
+      <tr><td class="mono">circle open budget 0.9</td><td><b>円環を開く</b>。遊び予算 Δ を置く</td></tr>
+      <tr><td class="mono">think R1 angle 0.6</td><td><b>違反思考</b> exp(−iθV/2)。θ は θ<sub>max</sub> で切り詰められる</td></tr>
+      <tr><td class="mono">tension / conform / play</td><td>緊張 τ / 遵守 ⟨S⟩ / 遊びの残高</td></tr>
+      <tr><td class="mono">circle close [keep]</td><td><b>帰還</b>。keep なら観測して記録を残す(制度化)</td></tr>
+      <tr><td class="mono">population 16 genes 6 k 2 seed 7</td><td>個体群と NK 適応度地形</td></tr>
+      <tr><td class="mono">evolve 40</td><td><b>違反思考変異</b>を世代回す</td></tr>
+      <tr><td class="mono">norms / ledger</td><td>書き換わった規範 / 遊び台帳</td></tr>
+      <tr><td class="mono">let x = 1+2 · print x</td><td>古典の変数と出力</td></tr>
+    </table>
+    <p class="note">日本語別名: 規則 / 不可侵 / 円環 開く・閉じる・観測 / 違反思考 / 緊張 / 遵守 / 遊び / 個体群 / 変異 / 規範 / 台帳 / 観測 / 状態</p>
+  </div>
+</section>
+
+<!-- ══════════════ 3. 違反思考 ══════════════ -->
+<section id="t-thk">
+  <h2>⚡ 違反思考ダイヤル ─ 考えが行為になる手前</h2>
+  <div class="card">
+    <p class="dim" style="font-size:12px">規則 <span class="mono">R = Z g0 Z g1</span>(g0 と g1 の偶パリティ)に対する違反生成子 <span class="mono">V = X g0</span> を、角 θ だけ回す。</p>
+    <canvas id="thkCv" height="230"></canvas>
+    <div class="row" style="margin-top:12px">
+      <label style="flex:0 0 auto">回転角 θ</label>
+      <span class="mono acc" id="thkTh" style="flex:0 0 auto">0.00 π</span>
+    </div>
+    <input type="range" id="thkR" min="0" max="100" value="0"/>
+    <div class="kv" style="margin-top:12px">
+      <b>状態</b><span class="ket mono" id="thkState">cos(0)|00⟩</span>
+      <b>遵守 ⟨R⟩</b><span class="mono" id="thkConf">+1.000</span>
+      <b>違反の確率 sin²(θ/2)</b><span class="mono" id="thkPv">0.000</span>
+      <b>遊び(規則からの外れ)</b><span class="mono" id="thkPlay">0.000</span>
+      <b>不可侵 ⟨S₀=Z g2 Z g3⟩</b><span class="mono ok" id="thkSac">+1.000 (保存)</span>
+      <b>位相</b><span class="mono dim" id="thkPhase">実振幅のみ</span>
+      <b>判定</b><span id="thkVerdict" class="ok">遵守 ─ 遊びなし(焼き付き)</span>
+    </div>
+    <div class="bar"><i id="thkBar" style="width:0%"></i></div>
+    <p class="note" id="thkNote">θ を上げると「違反しようという考え」が振幅として立ち上がる。θ<sub>max</sub> = 0.85π を超えると処理系は回転を拒否する
+      ── 考えは考えのままでなければならず、行為(θ = π)は円環の外の出来事だからである。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 4. 変異 ══════════════ -->
+<section id="t-evo">
+  <h2>🧬 個体の変異アルゴリズム ─ 作り換え</h2>
+  <p class="dim" style="font-size:12px">同じ適応度地形・同じ初期集団・同じ乱数種・同じ評価回数・同じ受理規則で、<b>古典的な無作為変異</b>と<b>違反思考変異 (TTM)</b> を並走させる。違うのは変異の作り方だけ。</p>
+  <div class="card">
+    <div class="row">
+      <label>規則系
+        <select id="evRules">
+          <option value="constrained">拘束系(不可侵な対パリティ + 橋渡しの規範)</option>
+          <option value="chain">鎖系(規範の鎖 + 末端の不可侵)</option>
+        </select>
+      </label>
+      <label>地形
+        <select id="evLand">
+          <option value="nk">NK (Kauffman)</option>
+          <option value="trap">トラップ(欺瞞的)</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>遺伝子長 n <input type="number" id="evN" value="8" min="4" max="8"/></label>
+      <label>K / ブロック長 <input type="number" id="evK" value="3" min="0" max="4"/></label>
+      <label>個体数 <input type="number" id="evPop" value="16" min="4" max="48"/></label>
+      <label>世代 <input type="number" id="evGen" value="60" min="5" max="400"/></label>
+      <label>種 <input type="number" id="evSeed" value="7" min="1" max="99999"/></label>
+      <label>遊び予算 Δ₀ <input type="number" id="evBud" value="1.2" step="0.1" min="0.1" max="8"/></label>
+    </div>
+    <div class="row">
+      <button class="act" id="evRun">▶ 走らせる</button>
+      <button class="act sub" id="evSweep">🎲 10 種で比較</button>
+      <button class="act sub" id="evFreeze">❄ 遊びゼロで走らせる</button>
+    </div>
+    <canvas id="evCv" height="260"></canvas>
+    <div class="row" style="gap:16px;font-size:12px;margin-top:6px">
+      <span><span style="color:#f87171">━</span> 古典的無作為変異</span>
+      <span><span style="color:#2dd4bf">━</span> 違反思考変異 (TTM)</span>
+      <span><span style="color:#c8a44a">┈</span> 遊び予算 Δ</span>
+      <span><span style="color:#a78bfa">┈</span> 多様性 H</span>
+    </div>
+    <pre class="out" id="evOut">(結果がここに出ます)</pre>
+  </div>
+  <div class="card">
+    <h3>読み方</h3>
+    <p style="font-size:12.5px">初期集団・地形・選択・エリート保存・評価回数・受理規則はすべて両者で共通。<b>違うのは変異の作り方だけ</b> ──
+      古典側は各遺伝子を確率 1/n で反転した候補を同数だけ試し、TTM は最小違反生成子で協調反転した候補を試す。
+      どちらも不可侵規則を破る候補は使えない(古典側は棄却、TTM は構成上そもそも作らない)。
+      <b>拘束系</b>では TTM が数倍速く最適へ届き、<b>鎖系</b>(不可侵 1 本)では逆に古典が勝つ。
+      「🎲 10 種で比較」で自分で確かめられる。</p>
+  </div>
+  <div class="card">
+    <h3>アルゴリズム(1 個体 1 世代)</h3>
+    <ol style="font-size:12.5px">
+      <li><b>遵守の測定</b> ─ すべての規則 j について ⟨S<sub>j</sub>⟩ を測り、遵守度 c<sub>j</sub> = (1+⟨S<sub>j</sub>⟩)/2 を得る</li>
+      <li><b>緊張の算出</b> ─ τ<sub>j</sub> = w<sub>j</sub> · c<sub>j</sub> · 停滞度 · 記憶減衰。<b>よく守っているのに適応度が伸びない規則ほど、破る考えの価値が高い</b></li>
+      <li><b>違反生成子の構成</b> ─ {V,S<sub>j</sub>}=0 かつ [V,S₀]=0 なる V を探す。存在しなければ τ<sub>j</sub> := 0(遊べない規則)</li>
+      <li><b>遊び角の配分</b> ─ 集団の遊び予算 Δ を τ に比例配分。θ = min(θ<sub>max</sub>, 配分, 残高)</li>
+      <li><b>円環を開き、探る</b> ─ ごく小さな角で候補すべてに Û(θ)=exp(−iθV/2) を掛け、<b>重ね合わせのまま</b>
+          期待適応度 ⟨f⟩ = cos²(θ/2)·f(順) + sin²(θ/2)·f(違) を測る。得失の符号は θ に依らないので、<b>小さな角で十分に「考え」られる</b></li>
+      <li><b>決断</b> ─ 値打ち τ·exp(Δf/T) に比例した重ね合わせから一つが選ばれ、残りの遊びを注いで観測する。
+          <b>損な違反ほど振幅 sin²(θ/2) が絞られる</b>(= 違反の振幅がそのまま受理確率になる「量子メトロポリス」)。
+          得がなければ C<sup>†</sup> で<b>完全に巻き戻し</b>、記憶だけが残る</li>
+      <li><b>規範の更新</b> ─ 破って生き延びた規則は<b>その個体にとって新しい規範</b>になり(だから次の違反の考えが生まれる)、
+          集団の過半がそう思うようになれば<b>規則そのものが書き換わる</b></li>
+      <li><b>遊びの恒常性</b> ─ 多様性 H が落ちたら Δ を開き、H が高すぎたら Δ を締める(保存則の下での再配分)</li>
+    </ol>
+  </div>
+</section>
+
+<!-- ══════════════ 5. 台帳 ══════════════ -->
+<section id="t-led">
+  <h2>📜 遊び台帳と規範の履歴</h2>
+  <p class="dim" style="font-size:12px">「変異」タブを走らせると、どの規則が、いつ、誰に、どれだけの角度で破られようと<b>考えられた</b>かが、ここに残る。
+     状態は円環の外へ漏れないが、記録は残る ── それが遊びが学習になる唯一の経路である。</p>
+  <div class="card">
+    <h3>規則表</h3>
+    <div id="ledRules"><p class="dim" style="font-size:12px">(まだ走らせていません)</p></div>
+  </div>
+  <div class="card">
+    <h3>台帳(直近 60 件)</h3>
+    <pre class="out" id="ledLog" style="max-height:420px">(まだ走らせていません)</pre>
+  </div>
+</section>
+
+<!-- ══════════════ 6. 生成AI ══════════════ -->
+<section id="t-ai">
+  <h2>🤖 生成AIカーネル ─ 遊びの概念を Bada に書かせる</h2>
+  <p class="dim" style="font-size:12px">日本語の依頼から Bada 遊 のプログラムを組み立てるカーネル。応答のたびに
+     <b>トークン化 → 意図解析 → 遊びの設計 → 生成 → 検証</b> の 5 段を開示する(全段この HTML 内で決定論的に動作)。</p>
+  <div class="card">
+    <input type="text" id="aiIn" value="不可侵な規則を守ったまま、いちばん強く縛っている規則を破る考えを個体に持たせて変異させたい"/>
+    <div class="row" style="margin-top:8px">
+      <button class="act" id="aiGo">✨ 生成させる</button>
+      <button class="act sub" data-ai="遊びとは何かを最小の例で示して">例:遊びの最小例</button>
+      <button class="act sub" data-ai="違反の考えが行為にならないことを確かめたい">例:考えと行為の境界</button>
+      <button class="act sub" data-ai="遊びが円環の外に漏れないことを証明して">例:帰還の証明</button>
+    </div>
+    <pre class="out" id="aiOut">(生成結果がここに出ます)</pre>
+    <div class="row"><button class="act sub" id="aiSend">◯ 円環タブへ送って実行</button></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════
+ * Bada 遊 (asobi) — 量子「遊び」処理系
+ *
+ *   遊び   = 規則の固有状態から外れて持てる振幅 sin²(θ/2)
+ *   考え   = 違反生成子 V の部分回転 exp(−iθV/2)  (0 < θ < π)
+ *   行為   = θ = π  (円環の外。処理系は θ ≤ θmax < π に切り詰める)
+ *   円環   = ユニタリ共役。帰還 C† で状態は完全に巻き戻り、
+ *            外へ出るのは観測が許された場合の古典的記録だけ
+ *   不可侵 = 違反生成子が可換であることを要求される規則。
+ *            対角なので回転でも観測でも期待値が保存される
+ *
+ * このファイルは依存ゼロ・単一 HTML。エンジン部は DOM に触れないため
+ * tools/engine-test.js が Node 上でそのまま検証できる。
+ * ════════════════════════════════════════════════════════════════════ */
+
+/* ════ 0. 決定論的乱数 (mulberry32) ════ */
+function asobiRng(seed){
+  var s = (seed >>> 0) || 1;
+  return function(){
+    s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ════ 1. 複素振幅の状態ベクトル ════ */
+function qsNew(n, k){
+  var N = 1 << n;
+  var st = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  st.re[(k || 0) & (N - 1)] = 1;
+  return st;
+}
+function qsClone(st){ return { n:st.n, re:Float64Array.from(st.re), im:Float64Array.from(st.im) }; }
+function qsNormSq(st){
+  var s = 0;
+  for (var k = 0; k < st.re.length; k++) s += st.re[k]*st.re[k] + st.im[k]*st.im[k];
+  return s;
+}
+function qsProbs(st){
+  var p = new Float64Array(st.re.length);
+  for (var k = 0; k < p.length; k++) p[k] = st.re[k]*st.re[k] + st.im[k]*st.im[k];
+  return p;
+}
+function qsDiff(a, b){
+  var d = 0;
+  for (var k = 0; k < a.re.length; k++){
+    var dr = a.re[k] - b.re[k], di = a.im[k] - b.im[k];
+    d += dr*dr + di*di;
+  }
+  return Math.sqrt(d);
+}
+function bitOf(k, i, n){ return (k >> (n - 1 - i)) & 1; }
+function ketStr(k, n){
+  var s = "";
+  for (var i = 0; i < n; i++) s += bitOf(k, i, n);
+  return "|" + s + "⟩";
+}
+function qsMeasure(st, rnd){
+  var p = qsProbs(st), r = (rnd || Math.random)(), acc = 0, hit = 0;
+  for (var k = 0; k < p.length; k++){ acc += p[k]; if (r <= acc + 1e-12){ hit = k; break; } }
+  st.re = new Float64Array(p.length); st.im = new Float64Array(p.length);
+  st.re[hit] = 1;
+  return hit;
+}
+
+/* ════ 2. パウリ列 (規則 = スタビライザ, 違反 = 生成子) ════
+ *   terms = [{q:添字, p:"X"|"Y"|"Z"}] — 各量子ビットに高々ひとつ */
+function parsePauli(spec, names){
+  var toks = String(spec).trim().split(/\s+/), terms = [], seen = {};
+  if (toks.length % 2 !== 0) throw new Error("パウリ列の形式: Z g0 Z g1 …");
+  for (var i = 0; i < toks.length; i += 2){
+    var p = toks[i].toUpperCase();
+    if (p !== "X" && p !== "Y" && p !== "Z") throw new Error("パウリは X/Y/Z: " + toks[i]);
+    var q = names.indexOf(toks[i+1]);
+    if (q < 0) throw new Error("未宣言の遺伝子: " + toks[i+1]);
+    if (seen[q]) throw new Error("同じ遺伝子に二つのパウリ: " + toks[i+1]);
+    seen[q] = 1;
+    terms.push({ q:q, p:p });
+  }
+  if (!terms.length) throw new Error("空のパウリ列");
+  return terms;
+}
+function pauliStr(terms, names){
+  return terms.map(function(t){ return t.p + " " + (names ? names[t.q] : "g" + t.q); }).join(" ");
+}
+function pauliWeight(terms){ return terms.length; }
+/* P|ψ⟩ */
+function pauliApply(st, terms){
+  var n = st.n, N = st.re.length;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  var mask = 0;
+  for (var t = 0; t < terms.length; t++){
+    if (terms[t].p === "X" || terms[t].p === "Y") mask |= 1 << (n - 1 - terms[t].q);
+  }
+  for (var k = 0; k < N; k++){
+    var ar = st.re[k], ai = st.im[k];
+    if (ar === 0 && ai === 0) continue;
+    var fr = 1, fi = 0;                            /* 係数 (複素) */
+    for (var j = 0; j < terms.length; j++){
+      var b = bitOf(k, terms[j].q, n), gr, gi;
+      if (terms[j].p === "Z"){ gr = b ? -1 : 1; gi = 0; }
+      else if (terms[j].p === "X"){ gr = 1; gi = 0; }
+      else { gr = 0; gi = b ? -1 : 1; }            /* Y|0⟩ = i|1⟩, Y|1⟩ = −i|0⟩ */
+      var nr = fr*gr - fi*gi, ni = fr*gi + fi*gr;
+      fr = nr; fi = ni;
+    }
+    var kk = k ^ mask;
+    out.re[kk] += fr*ar - fi*ai;
+    out.im[kk] += fr*ai + fi*ar;
+  }
+  return out;
+}
+/* ⟨ψ|P|ψ⟩ (エルミートなので実数) */
+function pauliExpect(st, terms){
+  var p = pauliApply(st, terms), s = 0;
+  for (var k = 0; k < st.re.length; k++) s += st.re[k]*p.re[k] + st.im[k]*p.im[k];
+  return s;
+}
+/* 反交換判定: 文字が食い違う台の個数が奇数 ⟺ {A,B}=0 */
+function pauliAnticommute(a, b){
+  var map = {}, odd = 0, i;
+  for (i = 0; i < a.length; i++) map[a[i].q] = a[i].p;
+  for (i = 0; i < b.length; i++){
+    var o = map[b[i].q];
+    if (o && o !== b[i].p) odd++;
+  }
+  return (odd % 2) === 1;
+}
+/* 部分回転 exp(−iθP/2) = cos(θ/2)·I − i·sin(θ/2)·P  ── 「違反行為そのものの考え」 */
+function rotApply(st, terms, theta){
+  var c = Math.cos(theta/2), s = Math.sin(theta/2);
+  var p = pauliApply(st, terms);
+  var out = { n:st.n, re:new Float64Array(st.re.length), im:new Float64Array(st.re.length) };
+  for (var k = 0; k < st.re.length; k++){
+    out.re[k] = c*st.re[k] + s*p.im[k];            /* −i(pr+i·pi) = pi − i·pr */
+    out.im[k] = c*st.im[k] - s*p.re[k];
+  }
+  return out;
+}
+/* 基本ゲート */
+function gateH(st, t){
+  var n = st.n, N = st.re.length, r = Math.SQRT1_2;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){
+    var ar = st.re[k], ai = st.im[k];
+    if (ar === 0 && ai === 0) continue;
+    var f = k ^ (1 << (n - 1 - t));
+    if (bitOf(k, t, n) === 0){ out.re[k] += r*ar; out.im[k] += r*ai; out.re[f] += r*ar; out.im[f] += r*ai; }
+    else { out.re[f] += r*ar; out.im[f] += r*ai; out.re[k] -= r*ar; out.im[k] -= r*ai; }
+  }
+  return out;
+}
+function gatePauli(st, t, p){ return pauliApply(st, [{ q:t, p:p }]); }
+function gateCNOT(st, c, t){
+  if (c === t) throw new Error("CNOT の制御と標的が同じです");
+  var n = st.n, N = st.re.length;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){
+    var kk = bitOf(k, c, n) === 1 ? (k ^ (1 << (n - 1 - t))) : k;
+    out.re[kk] += st.re[k]; out.im[kk] += st.im[k];
+  }
+  return out;
+}
+
+/* ════ 3. 違反生成子 ════════════════════════════════════════════════
+ * 最小違反生成子 V:
+ *    {V, S_target} = 0            … 狙った規則ひとつを反転する (= 違反)
+ *    [V, S] = 0  (S ∈ preserve)   … ほかの規範と不可侵規則は保つ
+ *    重み最小                      … 必要以上に壊さない
+ * 「ほかの規範をすべて守ったまま、その一つだけを破る考え」— これが
+ * 単一ビット反転ではなく協調反転になるため、古典的変異が越えられない
+ * 適応度の谷を一跨ぎできる。preserve を減らすほど遊びは深くなる。
+ * ════════════════════════════════════════════════════════════════════ */
+function violationGens(target, preserve, nq, limit){
+  var letters = ["X", "Y", "Z"], found = [], best = Infinity;
+  var total = Math.pow(4, nq);
+  for (var code = 1; code < total; code++){
+    var terms = [], c = code, w = 0;
+    for (var q = 0; q < nq; q++){
+      var d = c & 3; c >>= 2;
+      if (d){ terms.push({ q:q, p:letters[d-1] }); w++; }
+    }
+    if (w > best) continue;
+    if (!pauliAnticommute(terms, target)) continue;
+    var ok = true;
+    for (var i = 0; i < preserve.length; i++){
+      if (pauliAnticommute(terms, preserve[i])){ ok = false; break; }
+    }
+    if (!ok) continue;
+    if (w < best){ best = w; found = []; }
+    found.push(terms);
+    if (limit && found.length >= limit && w === best) { /* 収集は続けるが重みは確定 */ }
+  }
+  return found;
+}
+function violationGen(target, preserve, nq){
+  var g = violationGens(target, preserve, nq);
+  return g.length ? g[0] : null;
+}
+
+/* ════ 4. NK 適応度地形 (Kauffman) ════ */
+function nkLandscape(n, K, seed){
+  var rnd = asobiRng(seed), tables = [], i, j;
+  for (i = 0; i < n; i++){
+    var t = new Float64Array(1 << (K + 1));
+    for (j = 0; j < t.length; j++) t[j] = rnd();
+    tables.push(t);
+  }
+  var vals = new Float64Array(1 << n);
+  for (var g = 0; g < vals.length; g++){
+    var s = 0;
+    for (i = 0; i < n; i++){
+      var idx = 0;
+      for (var d = 0; d <= K; d++) idx = (idx << 1) | bitOf(g, (i + d) % n, n);
+      s += tables[i][idx];
+    }
+    vals[g] = s / n;
+  }
+  var mx = 0;
+  for (g = 0; g < vals.length; g++) if (vals[g] > mx) mx = vals[g];
+  return { n:n, K:K, vals:vals, max:mx };
+}
+
+/* トラップ地形 (concatenated deceptive traps)
+ *   規範の鎖が刻むブロックごとに、単独のビット反転はすべて適応度を下げ、
+ *   ブロックが「揃って裏返る」ときだけ最大になる。すなわち、
+ *   ひとつの規則だけを破る協調反転 = 最小違反生成子と、地形の相互作用構造が
+ *   一致している地形。規範が問題の構造から生まれたものであるとき、これが起きる。 */
+function trapLandscape(n, b, seed){
+  var rnd = asobiRng(seed), nb = Math.floor(n / b), masks = [], i;
+  for (i = 0; i < nb; i++){
+    var mk = 0;
+    for (var j = 0; j < b; j++) if (rnd() < 0.5) mk |= 1 << (n - 1 - (i*b + j));
+    masks.push(mk);
+  }
+  var vals = new Float64Array(1 << n), norm = nb * b;
+  for (var g = 0; g < vals.length; g++){
+    var s = 0;
+    for (i = 0; i < nb; i++){
+      var blockMask = 0;
+      for (var q = 0; q < b; q++) blockMask |= 1 << (n - 1 - (i*b + q));
+      var v = (g ^ masks[i]) & blockMask, u = 0;
+      while (v){ u += v & 1; v >>= 1; }
+      s += (u === b) ? b : (b - 1 - u);            /* 欺瞞的トラップ: 全員裏返るときだけ最大 */
+    }
+    vals[g] = s / norm;
+  }
+  var mx = 0;
+  for (g = 0; g < vals.length; g++) if (vals[g] > mx) mx = vals[g];
+  return { n:n, K:b, vals:vals, max:mx, trap:b };
+}
+
+/* ════ 5. 規則・個体群 ════ */
+var THETA_MAX = 0.85 * Math.PI;      /* 考えが行為 (θ=π) に届かないための上限 */
+var ASOBI_MARGIN = 1e-9;
+var ASOBI_TEMP0 = 0.045;             /* 遊びの温度 — 損な違反をどこまで振幅として許すか */
+function asobiTemp(ind){ return ASOBI_TEMP0 * (1 + Math.min(4, (ind ? ind.stag : 0) / 4)); }
+
+function defaultRules(n){
+  /* 規範の鎖 R1…R(n-2) = 隣接遺伝子の偶パリティ。末端は不可侵規則の台と接するため、
+   * 鎖の内側の規則ほど「ひとつだけ破る」のに広い協調反転を要する。 */
+  var rs = [], i;
+  for (i = 0; i + 1 < n - 1; i++){
+    rs.push({ id:"R" + (i+1), terms:[{q:i,p:"Z"},{q:i+1,p:"Z"}], w:1.0, sign:1, sacred:false, born:0, broken:0 });
+  }
+  rs.push({ id:"S0", terms:[{q:n-2,p:"Z"},{q:n-1,p:"Z"}], w:1.0, sign:1, sacred:true, born:0, broken:0 });
+  return rs;
+}
+/* 拘束の強い規則系: 不可侵な対パリティ (問題そのものの拘束条件) と、
+ * その対どうしを橋渡しする遊べる規範。無作為なビット反転はそのほとんどが
+ * 不可侵を壊して棄却されるが、違反生成子は構成上つねに不可侵と可換なので
+ * 一手も無駄にならない。 */
+function constrainedRules(n){
+  var rs = [], i, k = 1;
+  for (i = 0; i + 1 < n; i += 2)
+    rs.push({ id:"S" + (i/2), terms:[{q:i,p:"Z"},{q:i+1,p:"Z"}], w:1.0, sign:1, sacred:true, born:0, broken:0 });
+  for (i = 1; i + 1 < n; i += 2)
+    rs.push({ id:"R" + (k++), terms:[{q:i,p:"Z"},{q:i+1,p:"Z"}], w:1.0, sign:1, sacred:false, born:0, broken:0 });
+  return rs;
+}
+
+function ruleConform(st, rule, ind){
+  /* 個体は、自分が破って生き延びた規則については符号の反転した規範を持つ
+   * (= その違反はその個体にとって新しい規範になった)。sg がその個体的符号。 */
+  var sg = (ind && ind.sg && ind.sg[rule.id]) ? ind.sg[rule.id] : 1;
+  return (1 + rule.sign * sg * pauliExpect(st, rule.terms)) / 2;
+}
+function conformingGenomes(n, rules){
+  var out = [];
+  for (var g = 0; g < (1 << n); g++){
+    var st = qsNew(n, g), ok = true;
+    for (var i = 0; i < rules.length; i++){
+      if (ruleConform(st, rules[i]) < 0.5 + 1e-9){ ok = false; break; }
+    }
+    if (ok) out.push(g);
+  }
+  return out;
+}
+function initPop(n, rules, P, rnd){
+  var pool = conformingGenomes(n, rules);
+  if (!pool.length) pool = [0];
+  var inds = [];
+  for (var i = 0; i < P; i++){
+    inds.push({ g: pool[Math.floor(rnd() * pool.length) % pool.length], fit:0, stag:0, memo:{}, sg:{}, born:0 });
+  }
+  return inds;
+}
+function popEntropy(inds, n){
+  var h = 0;
+  for (var q = 0; q < n; q++){
+    var ones = 0;
+    for (var i = 0; i < inds.length; i++) ones += bitOf(inds[i].g, q, n);
+    var p = ones / inds.length;
+    if (p > 0 && p < 1) h += -(p*Math.log2(p) + (1-p)*Math.log2(1-p));
+  }
+  return h / n;                                  /* 0 (完全収束) … 1 (最大多様) */
+}
+
+/* ════ 6. 違反思考変異アルゴリズム (TTM) ════ */
+function ttmInit(opt){
+  var o = opt || {};
+  var n = o.n || 6, K = (o.k == null ? 2 : o.k), P = o.pop || 16, seed = o.seed || 7;
+  var rules = o.rules || defaultRules(n);
+  var land = o.land || nkLandscape(n, K, seed * 131 + 7);
+  var w = {
+    n:n, K:K, P:P, seed:seed, rules:rules, land:land,
+    rnd: asobiRng(seed * 7919 + 13),
+    budget0: (o.budget == null ? 1.2 : o.budget),           /* 個体あたりの遊び幅 */
+    budget: (o.budget == null ? 1.2 : o.budget) * P,       /* 集団全体の遊び予算 Δ */
+    gen:0, ledger:[], hist:[], gens:{}, thought:0, acted:0, returned:0, rewrites:0,
+    inds: initPop(n, rules, P, asobiRng(seed))
+  };
+  for (var i = 0; i < w.inds.length; i++) w.inds[i].fit = land.vals[w.inds[i].g];
+  return w;
+}
+/* 個体の停滞に応じて「同時に守る規範」を減らしながら生成子を選ぶ */
+function genFor(w, ind, rule){
+  var others = [], i;
+  for (i = 0; i < w.rules.length; i++){
+    var r = w.rules[i];
+    if (r.sacred){ others.push(r); continue; }        /* 不可侵は常に保つ */
+    if (r.id !== rule.id) others.push(r);
+  }
+  /* 停滞が深まるほど「同時に守る規範」を減らす = 遊びが深くなる。
+   * ただし不可侵規則だけは、どれだけ遊びが深まっても必ず保たれる。 */
+  var soft = others.filter(function(r){ return !r.sacred; }).sort(function(a, b){ return b.w - a.w; });
+  var loose = Math.min(Math.floor(ind.stag / 2), soft.length);
+  var keep = others.filter(function(r){ return r.sacred; })
+                   .concat(soft.slice(0, Math.max(0, soft.length - loose)));
+  var key = rule.id + "|" + rule.terms.map(function(t){ return t.p + t.q; }).join("") + "|" +
+            keep.map(function(r){ return r.id + r.sign + r.terms.map(function(t){ return t.p + t.q; }).join(""); }).join(",");
+  if (!(key in w.gens)) w.gens[key] = violationGens(rule.terms, keep.map(function(r){ return r.terms; }), w.n);
+  var list = w.gens[key];
+  if (!list.length) return null;
+  return { V: list[Math.floor(w.rnd() * list.length) % list.length], keep: keep.length, weight: list[0].length };
+}
+function ttmStep(w){
+  var n = w.n, i, j;
+  var active = w.rules.filter(function(r){ return !r.sacred; });
+  var plans = [], sumTau = 0;
+
+  /* ① 遵守の測定 → ② 緊張 τ → ③ 違反生成子 (個体ごとに候補を揃える) */
+  for (i = 1; i < w.inds.length; i++){        /* 添字 0 は最良個体 (エリート保存 — 遊びの外に置く) */
+    var ind = w.inds[i], st = qsNew(n, ind.g), cands = [], tot = 0;
+    for (j = 0; j < active.length; j++){
+      var rule = active[j];
+      var g = genFor(w, ind, rule);
+      if (!g) continue;                                     /* 遊べない規則 */
+      var conf = ruleConform(st, rule, ind);
+      var stag = Math.min(1, ind.stag / 5);
+      var mem = (ind.memo[rule.id] == null) ? 1 : ind.memo[rule.id];
+      var tau = rule.w * conf * (0.25 + 0.75 * stag) * mem;
+      if (tau > 1e-9){ cands.push({ rule:rule, tau:tau, gen:g }); tot += tau; }
+    }
+    if (!cands.length) continue;
+    plans.push({ ind:ind, idx:i, cands:cands, st:st, tau:tot });
+    sumTau += tot;
+  }
+
+  /* ④ 遊び予算 Δ の比例配分 (保存則: Σθ ≤ Δ) */
+  for (i = 0; i < plans.length; i++){
+    plans[i].share = sumTau > 0 ? w.budget * plans[i].tau / sumTau : 0;
+  }
+
+  /* ⑤ 円環の中で「探る」— 小さな角ですべての違反を同時に考える
+   *    期待適応度 ⟨f⟩ = cos²(θ/2)·f(順) + sin²(θ/2)·f(違) なので、
+   *    利得の符号は θ に依らない。小さな角で十分に「考え」られる。 */
+  var spent = 0, brokeThisGen = {};
+  for (i = 0; i < plans.length; i++){
+    var p = plans[i], confFit = w.land.vals[p.ind.g];
+    var probe = Math.min(0.06, p.share / (2 * p.cands.length + 1));
+    var temp = asobiTemp(p.ind);
+    var used = 0, best = null, sumVal = 0;
+    for (j = 0; j < p.cands.length; j++){
+      var c = p.cands[j];
+      var pst = rotApply(p.st, c.gen.V, probe); used += probe;
+      var pr = qsProbs(pst), inFit = 0;
+      for (var k2 = 0; k2 < pr.length; k2++) if (pr[k2] > 1e-15) inFit += pr[k2] * w.land.vals[k2];
+      w.thought++;
+      /* ⟨f⟩ = cos²(θ/2)·f(順) + sin²(θ/2)·f(違) なので、探り角から違反枝の得失が出る */
+      var s2 = Math.sin(probe/2) * Math.sin(probe/2);
+      var df = s2 > 1e-12 ? (inFit - confFit) / s2 : 0;
+      c.df = df;
+      c.value = c.tau * Math.exp(df / temp);                /* 縛りの強さ × 遊びの振幅 */
+      sumVal += c.value;
+      if (df <= ASOBI_MARGIN){
+        /* この違反は考えても得でない — 記憶が次の緊張を下げる */
+        p.ind.memo[c.rule.id] = ((p.ind.memo[c.rule.id] == null) ? 1 : p.ind.memo[c.rule.id]) * 0.6;
+      }
+    }
+    /* 考えは決め打ちされない — 値打ちに比例した重ね合わせから一つが選ばれる */
+    if (sumVal > 0){
+      var rv = w.rnd() * sumVal, accv = 0;
+      for (j = 0; j < p.cands.length; j++){
+        accv += p.cands[j].value;
+        if (rv <= accv){ best = { c:p.cands[j], value:p.cands[j].value, df:p.cands[j].df }; break; }
+      }
+      if (!best){ var lastc = p.cands[p.cands.length - 1]; best = { c:lastc, value:lastc.value, df:lastc.df }; }
+    }
+    if (!best){
+      /* ⑥-a 帰還: C† を掛け戻す。状態は完全に元へ戻り、記憶だけが残る */
+      w.returned++;
+      spent += used;
+      w.ledger.push({ gen:w.gen + 1, ind:p.idx, rule:"—", theta:used, V:"—", kept:0, kind:"帰還",
+                      fit:confFit, note:"考える相手がいなかった — 円環の外へは何も出ない" });
+      continue;
+    }
+    /* ⑥-b 決断: いちばん値打ちのある考えに遊びを注ぐ。
+     *   得な違反には遊びを全部注ぎ、損な違反ほど振幅を絞る
+     *   (= 違反の振幅 sin²(θ/2) がそのまま受理確率になる「量子メトロポリス」)。 */
+    var damp = Math.min(1, Math.exp(best.df / temp));
+    var theta = Math.min(THETA_MAX, Math.max(0, p.share - used)) * damp;
+    if (theta <= 1e-9){
+      w.returned++; spent += used;
+      w.ledger.push({ gen:w.gen + 1, ind:p.idx, rule:best.c.rule.id, theta:used, V:pauliStr(best.c.gen.V),
+                      kept:best.c.gen.keep, kind:"予算切れ", fit:confFit,
+                      note:"考えはしたが遊びが足りず、観測に至らなかった (Δf " + best.df.toFixed(4) + ")" });
+      continue;
+    }
+    var inside = rotApply(p.st, best.c.gen.V, theta);
+    used += theta; spent += used;
+    var kk = qsMeasure(inside, w.rnd);
+    if (kk !== p.ind.g){
+      p.ind.g = kk; p.ind.fit = w.land.vals[kk];
+      p.ind.memo[best.c.rule.id] = 1;
+      /* 破られた規則は、その個体にとって新しい規範になる —
+       * だからこそ「次の違反」の考えが生まれる余地が戻る (遊びの再生産) */
+      p.ind.sg[best.c.rule.id] = -((p.ind.sg[best.c.rule.id] || 1));
+      w.acted++;
+      best.c.rule.broken++;
+      brokeThisGen[best.c.rule.id] = (brokeThisGen[best.c.rule.id] || 0) + 1;
+      w.ledger.push({ gen:w.gen + 1, ind:p.idx, rule:best.c.rule.id, theta:theta,
+                      V:pauliStr(best.c.gen.V), kept:best.c.gen.keep, kind:"観測", fit:p.ind.fit,
+                      note:(best.df > 0 ? "得な違反を観測 — 遊びが変異として確定"
+                                        : "損を承知の観測 — 遊びの振幅 sin²(θ/2) が受理した") +
+                           " (適応度 " + confFit.toFixed(4) + " → " + p.ind.fit.toFixed(4) + ")" });
+    } else {
+      w.returned++;
+      w.ledger.push({ gen:w.gen + 1, ind:p.idx, rule:best.c.rule.id, theta:theta,
+                      V:pauliStr(best.c.gen.V), kept:best.c.gen.keep, kind:"崩壊", fit:confFit,
+                      note:"観測が遵守枝 (確率 cos²(θ/2)) へ落ちた — 考えは消えた" });
+    }
+  }
+
+  /* 停滞度と記憶の回復 */
+  for (i = 0; i < w.inds.length; i++){
+    var ii = w.inds[i], f = w.land.vals[ii.g];
+    if (f > ii.fit + 1e-12){ ii.stag = 0; } else { ii.stag++; }
+    ii.fit = f;
+    for (var rid in ii.memo) ii.memo[rid] = ii.memo[rid] + (1 - ii.memo[rid]) * 0.2;   /* 忘却 = 遊びの回復 */
+  }
+
+  /* 選択 (トーナメント 2 + エリート 1) — TTM / 古典で共通 */
+  w.inds = selectNext(w.inds, w.rnd);
+
+  /* ⑦ 規範の更新: 破られた規則は弛緩し、集団の過半が反転した規範を持てば制度化される */
+  for (i = 0; i < active.length; i++){
+    var ru = active[i];
+    if (brokeThisGen[ru.id]){
+      ru.w = Math.max(0.2, ru.w * 0.88);
+      w.ledger.push({ gen:w.gen + 1, ind:-1, rule:ru.id, theta:0, V:"—", kept:0,
+                      kind:"弛緩", fit:0, note:"破られた規範の荷重 w → " + ru.w.toFixed(2) });
+    }
+    var flipped = 0;
+    for (j = 0; j < w.inds.length; j++) if ((w.inds[j].sg[ru.id] || 1) < 0) flipped++;
+    if (flipped * 2 > w.inds.length){                       /* 過半が反転した規範に住んでいる */
+      ru.sign = -ru.sign; ru.w = 1.0; ru.born = w.gen + 1; w.rewrites++;
+      for (j = 0; j < w.inds.length; j++) w.inds[j].sg[ru.id] = -(w.inds[j].sg[ru.id] || 1);
+      w.ledger.push({ gen:w.gen + 1, ind:-1, rule:ru.id, theta:0, V:"—", kept:0,
+                      kind:"制度化", fit:0, note:"違反が集団の新しい規範になった (符号反転・荷重を回復)" });
+    }
+  }
+
+  /* ⑧ 遊びの恒常性: 多様性 H から Δ を調節 (保存則の下での再配分) */
+  var H = popEntropy(w.inds, n);
+  var dTot = w.budget0 * w.P;
+  w.budget = Math.max(0.2 * dTot, Math.min(4 * dTot, dTot * (1 + 2 * (0.6 - H))));
+
+  var best2 = 0, mean = 0;
+  for (i = 0; i < w.inds.length; i++){
+    var v = w.land.vals[w.inds[i].g];
+    if (v > best2) best2 = v; mean += v;
+  }
+  w.gen++;
+  w.hist.push({ gen:w.gen, best:best2, mean:mean / w.inds.length, H:H, budget:w.budget, spent:spent, plans:plans.length });
+  return w.hist[w.hist.length - 1];
+}
+function selectNext(inds, rnd){
+  var out = [], best = inds[0];
+  for (var i = 1; i < inds.length; i++) if (inds[i].fit > best.fit) best = inds[i];
+  out.push({ g:best.g, fit:best.fit, stag:best.stag, memo:Object.assign({}, best.memo),
+             sg:Object.assign({}, best.sg), born:best.born });
+  while (out.length < inds.length){
+    var a = inds[Math.floor(rnd() * inds.length) % inds.length];
+    var b = inds[Math.floor(rnd() * inds.length) % inds.length];
+    var s = (a.fit >= b.fit) ? a : b;
+    out.push({ g:s.g, fit:s.fit, stag:s.stag, memo:Object.assign({}, s.memo),
+               sg:Object.assign({}, s.sg), born:s.born });
+  }
+  return out;
+}
+function ttmRun(opt){
+  var w = ttmInit(opt), G = (opt && opt.gens) || 60;
+  for (var g = 0; g < G; g++) ttmStep(w);
+  return w;
+}
+/* 比較対象: 変異作用素だけを古典的な無作為ビット反転に差し替えた同一の GA
+ * (初期集団・地形・選択・採択条件はすべて TTM と共通) */
+function gaClassicRun(opt){
+  var o = opt || {};
+  var n = o.n || 6, K = (o.k == null ? 2 : o.k), P = o.pop || 16, G = o.gens || 60, seed = o.seed || 7;
+  var rules = o.rules || defaultRules(n);
+  var land = o.land || nkLandscape(n, K, seed * 131 + 7);
+  var rnd = asobiRng(seed * 7919 + 13);
+  var inds = initPop(n, rules, P, asobiRng(seed)), i, j;
+  for (i = 0; i < inds.length; i++) inds[i].fit = land.vals[inds[i].g];
+  var hist = [], pm = 1 / n;
+  var trials = Math.max(1, rules.filter(function(r){ return !r.sacred; }).length);
+  var sacreds = rules.filter(function(r){ return r.sacred; });
+  function feasible(g){                      /* 古典側も不可侵規則だけは尊重する (棄却法) */
+    for (var s2 = 0; s2 < sacreds.length; s2++){
+      if (ruleConform(qsNew(n, g), sacreds[s2]) < 0.5) return false;
+    }
+    return true;
+  }
+  for (var g = 0; g < G; g++){
+    for (i = 1; i < inds.length; i++){        /* 同じエリート保存 */
+      /* TTM が円環の中で試す候補数と同じだけ、無作為な変異体を同じ親から試し、
+       * いちばん良いものを一つだけ確定する。受理規則も TTM と同じメトロポリス —
+       * 違うのは「どう変異を作るか」(無作為なビット反転 か 最小違反生成子) だけ。 */
+      var temp = asobiTemp(inds[i]);
+      var base = inds[i].g, bestC = null, bestDf = -Infinity;
+      for (var tr = 0; tr < trials; tr++){
+        var cand = base;
+        for (j = 0; j < n; j++) if (rnd() < pm) cand ^= 1 << (n - 1 - j);
+        if (cand === base || !feasible(cand)) continue;                               /* 不可侵違反は棄却 */
+        var df = land.vals[cand] - land.vals[base];
+        if (df > bestDf){ bestDf = df; bestC = cand; }
+      }
+      if (bestC !== null && (bestDf > ASOBI_MARGIN || rnd() < Math.exp(bestDf / temp))) inds[i].g = bestC;
+    }
+    for (i = 0; i < inds.length; i++){
+      var f = land.vals[inds[i].g];
+      if (f > inds[i].fit + 1e-12) inds[i].stag = 0; else inds[i].stag++;
+      inds[i].fit = f;
+    }
+    inds = selectNext(inds, rnd);
+    var best = 0, mean = 0;
+    for (i = 0; i < inds.length; i++){ var v = land.vals[inds[i].g]; if (v > best) best = v; mean += v; }
+    hist.push({ gen:g + 1, best:best, mean:mean / inds.length, H:popEntropy(inds, n) });
+  }
+  return { hist:hist, inds:inds, land:land, rules:rules };
+}
+
+/* ════ 7. Bada 遊 方言インタプリタ ════════════════════════════════════
+ * 量子 Bada (qubit/H/X/Y/Z/CNOT/state/measure/let/print) に遊びの語彙を
+ * 加えた方言。think は円環の中でしか実行できず、θ は θmax で拒否される。
+ * ════════════════════════════════════════════════════════════════════ */
+function asobiInterpret(src, opt){
+  var out = [];
+  var names = [], st = null, vars = {}, rules = [], circle = null, ledger = [], world = null;
+  var rnd = (opt && opt.rnd) || asobiRng((opt && opt.seed) || 20260915);
+  function findRule(id){
+    for (var i = 0; i < rules.length; i++) if (rules[i].id === id) return rules[i];
+    throw new Error("未定義の規則: " + id);
+  }
+  function need(){ if (!st) throw new Error("先に qubit 宣言が必要です"); }
+  function preserveOf(target){
+    return rules.filter(function(r){ return r.sacred || r.id !== target.id; })
+                .filter(function(r){ return r.id !== target.id; })
+                .map(function(r){ return r.terms; });
+  }
+  function evalExpr(e){
+    var toks = e.match(/\d+\.?\d*|[A-Za-z_]\w*|[+\-*/()]/g) || [], pos = 0;
+    function peek(){ return toks[pos]; }
+    function factor(){
+      var t = toks[pos++];
+      if (t === "("){ var v = addsub(); if (toks[pos++] !== ")") throw new Error("括弧が閉じていません"); return v; }
+      if (t === "-") return -factor();
+      if (/^\d/.test(t)) return parseFloat(t);
+      if (t in vars) return vars[t];
+      throw new Error("未定義の変数: " + t);
+    }
+    function muldiv(){ var v = factor(); while (peek() === "*" || peek() === "/"){ var o = toks[pos++]; var r = factor(); v = o === "*" ? v*r : v/r; } return v; }
+    function addsub(){ var v = muldiv(); while (peek() === "+" || peek() === "-"){ var o = toks[pos++]; var r = muldiv(); v = o === "+" ? v+r : v-r; } return v; }
+    var res = addsub();
+    if (pos < toks.length) throw new Error("式を解釈できません: " + e);
+    return res;
+  }
+  function stateLines(s){
+    var L = [];
+    for (var k = 0; k < s.re.length; k++){
+      var a = Math.sqrt(s.re[k]*s.re[k] + s.im[k]*s.im[k]);
+      if (a > 1e-9){
+        var ph = Math.abs(s.im[k]) > 1e-9 ? (s.im[k] > 0 ? " (+i)" : " (−i)") : (s.re[k] < 0 ? " (−)" : "");
+        L.push("  " + ketStr(k, s.n) + " " + a.toFixed(3) + ph);
+      }
+    }
+    return L.length ? L : ["  (零ベクトル)"];
+  }
+  /* 日本語別名 → 正規形 */
+  function normalize(line){
+    return line
+      .replace(/^遺伝子\s+/, "qubit ").replace(/^規則\s+/, "rule ").replace(/^不可侵\s+/, "sacred ")
+      .replace(/^円環\s*開く/, "circle open").replace(/^円環\s*閉じる/, "circle close")
+      .replace(/^円環\s*観測/, "circle close keep")
+      .replace(/^違反思考\s+/, "think ").replace(/^緊張$/, "tension").replace(/^遵守$/, "conform")
+      .replace(/^遊び$/, "play").replace(/^状態$/, "state").replace(/^観測$/, "measure")
+      .replace(/^個体群\s+/, "population ").replace(/^変異\s+/, "evolve ")
+      .replace(/^規範$/, "norms").replace(/^台帳$/, "ledger")
+      .replace(/\s+荷重\s+/, " weight ").replace(/\s+角\s+/, " angle ")
+      .replace(/\s+予算\s+/, " budget ").replace(/\s+遺伝子長\s+/, " genes ").replace(/\s+種\s+/, " seed ");
+  }
+  var lines = String(src).split(/\n/), m;
+  try{
+    for (var li = 0; li < lines.length; li++){
+      var line = normalize(lines[li].trim());
+      if (!line || line.charAt(0) === "#") continue;
+
+      if ((m = line.match(/^qubit\s+(.+)$/i))){
+        names = m[1].trim().split(/\s+/);
+        if (names.length > 8) throw new Error("遺伝子 (量子ビット) は 8 個まで");
+        st = qsNew(names.length, 0);
+        out.push("qubit " + names.join(" ") + "  (" + names.length + " 遺伝子, 状態 " + ketStr(0, names.length) + ")");
+      }
+      else if ((m = line.match(/^(H|X|Y|Z)\s+(\S+)$/i))){
+        need();
+        var q = names.indexOf(m[2]); if (q < 0) throw new Error("未宣言の遺伝子: " + m[2]);
+        st = (m[1].toUpperCase() === "H") ? gateH(st, q) : gatePauli(st, q, m[1].toUpperCase());
+        out.push(m[1].toUpperCase() + " " + m[2]);
+      }
+      else if ((m = line.match(/^CNOT\s+(\S+)\s+(\S+)$/i))){
+        need();
+        var c = names.indexOf(m[1]), t = names.indexOf(m[2]);
+        if (c < 0 || t < 0) throw new Error("未宣言の遺伝子");
+        st = gateCNOT(st, c, t);
+        out.push("CNOT " + m[1] + "→" + m[2]);
+      }
+      else if ((m = line.match(/^(rule|sacred)\s+([A-Za-z_]\w*)\s*=\s*([^=]+?)(?:\s+weight\s+([\d.]+))?$/i))){
+        need();
+        var sac = m[1].toLowerCase() === "sacred";
+        var r = { id:m[2], terms:parsePauli(m[3], names), w: m[4] ? parseFloat(m[4]) : 1.0,
+                  sign:1, sacred:sac, born:0, broken:0 };
+        rules = rules.filter(function(x){ return x.id !== r.id; }).concat([r]);
+        out.push((sac ? "不可侵規則 " : "規則 ") + r.id + " = " + pauliStr(r.terms, names) +
+                 (sac ? "  ← 遊びの対象外。違反生成子は常にこれと可換" : "  荷重 " + r.w.toFixed(2)));
+      }
+      else if ((m = line.match(/^circle\s+open(?:\s+budget\s+([\d.]+))?$/i))){
+        need();
+        if (circle) throw new Error("円環はすでに開いています");
+        circle = { snap:qsClone(st), ops:[], budget: m[1] ? parseFloat(m[1]) : 1.0, spent:0 };
+        out.push("◯ 円環を開いた — 遊び予算 Δ = " + circle.budget.toFixed(2) +
+                 " / 内側で起きたことは帰還すれば残らない");
+      }
+      else if ((m = line.match(/^think\s+([A-Za-z_]\w*)(?:\s+angle\s+([\d.]+))?$/i))){
+        need();
+        if (!circle) throw new Error("違反思考は円環の中でしか行えません (先に circle open)");
+        var tr = findRule(m[1]);
+        if (tr.sacred) throw new Error("不可侵規則 " + tr.id + " は遊びの対象外です");
+        var th = m[2] ? parseFloat(m[2]) : 0.5;
+        if (th > THETA_MAX){
+          out.push("!! θ = " + th.toFixed(3) + " は行為の域 (θmax = " + THETA_MAX.toFixed(3) +
+                   " = 0.85π)。考えは考えに留める — 回転を拒否しました");
+          continue;
+        }
+        var rest = rules.filter(function(x){ return x.id !== tr.id; }).map(function(x){ return x.terms; });
+        var V = violationGen(tr.terms, rest, names.length);
+        var kept = rest.length;
+        if (!V){                                    /* 全部を保ったままでは破れない → 不可侵だけ保つ */
+          var sacOnly = rules.filter(function(x){ return x.sacred; }).map(function(x){ return x.terms; });
+          V = violationGen(tr.terms, sacOnly, names.length);
+          kept = sacOnly.length;
+          if (!V) throw new Error("不可侵規則を保ったまま " + tr.id + " を破る生成子は存在しません (遊べない規則)");
+          out.push("  … ほかの規範をすべて保つ生成子は無い。不可侵だけを保って探索");
+        }
+        var before = ruleConform(st, tr);
+        st = rotApply(st, V, th);
+        circle.ops.push({ V:V, theta:th, rule:tr.id });
+        circle.spent += th;
+        var after = ruleConform(st, tr);
+        ledger.push({ kind:"思考", rule:tr.id, theta:th, V:pauliStr(V, names) });
+        out.push("⚡ 違反思考 " + tr.id + " : V = " + pauliStr(V, names) + " (重み " + V.length +
+                 ", 同時に保つ規範 " + kept + ")");
+        out.push("   exp(−i·" + th.toFixed(3) + "·V/2) → 遵守 " + before.toFixed(3) + " → " + after.toFixed(3) +
+                 " / 違反の振幅² = " + (Math.sin(th/2)*Math.sin(th/2)).toFixed(3) +
+                 " / 遊び予算 残 " + Math.max(0, circle.budget - circle.spent).toFixed(2));
+      }
+      else if ((m = line.match(/^circle\s+close(\s+keep)?$/i))){
+        need();
+        if (!circle) throw new Error("円環が開いていません");
+        if (m[1]){
+          var k = qsMeasure(st, rnd);
+          out.push("👁 観測を伴う帰還 — 崩壊先 " + ketStr(k, names.length) +
+                   " / 遊びが古典的事実 (変異) になった");
+          ledger.push({ kind:"観測", rule:"—", theta:0, V:"—" });
+        } else {
+          var back = qsClone(st);
+          for (var oi = circle.ops.length - 1; oi >= 0; oi--){
+            back = rotApply(back, circle.ops[oi].V, -circle.ops[oi].theta);   /* C† */
+          }
+          var resid = qsDiff(back, circle.snap);
+          st = back;
+          out.push("↩ 帰還 C† — 残差 ‖C†C|ψ⟩ − |ψ⟩‖ = " + resid.toExponential(2) +
+                   " / 状態は円環の外へ一切漏れていない (残るのは台帳の記録だけ)");
+          ledger.push({ kind:"帰還", rule:"—", theta:0, V:"—" });
+        }
+        circle = null;
+      }
+      else if (/^tension$/i.test(line)){
+        need();
+        out.push("緊張 τ (= 荷重 × 遵守):");
+        rules.forEach(function(r){
+          var cf = ruleConform(st, r);
+          out.push("  " + r.id + (r.sacred ? " [不可侵]" : "") + "  ⟨S⟩ " + (r.sign*pauliExpect(st, r.terms)).toFixed(3) +
+                   "  遵守 " + cf.toFixed(3) + "  τ " + (r.sacred ? "—  (遊べない)" : (r.w*cf).toFixed(3)));
+        });
+      }
+      else if (/^conform$/i.test(line)){
+        need();
+        rules.forEach(function(r){
+          out.push("  " + r.id + " = " + pauliStr(r.terms, names) + (r.sign < 0 ? " (符号反転済)" : "") +
+                   "  ⟨S⟩ = " + (r.sign*pauliExpect(st, r.terms)).toFixed(4) +
+                   (r.sacred ? "  ← 不可侵・保存量" : ""));
+        });
+      }
+      else if (/^play$/i.test(line)){
+        need();
+        if (!circle) out.push("遊び: 円環は閉じている (θ = 0 — 焼き付きの状態)");
+        else out.push("遊び: 予算 Δ = " + circle.budget.toFixed(2) + " / 使用 " + circle.spent.toFixed(3) +
+                      " / 残 " + Math.max(0, circle.budget - circle.spent).toFixed(3) +
+                      " / θmax = " + THETA_MAX.toFixed(3) + " (= 0.85π < π = 行為)");
+      }
+      else if (/^state$/i.test(line)){ need(); out.push.apply(out, stateLines(st)); }
+      else if (/^measure$/i.test(line)){
+        need();
+        var mk = qsMeasure(st, rnd);
+        out.push("measure → " + ketStr(mk, names.length));
+      }
+      else if ((m = line.match(/^population\s+(\d+)(?:\s+genes\s+(\d+))?(?:\s+k\s+(\d+))?(?:\s+seed\s+(\d+))?(?:\s+budget\s+([\d.]+))?(?:\s+trap\s+(\d+))?$/i))){
+        var pn = m[2] ? parseInt(m[2], 10) : (names.length || 6);
+        var useRules = (rules.length && names.length === pn) ? rules.map(function(r){
+          return { id:r.id, terms:r.terms, w:r.w, sign:r.sign, sacred:r.sacred, born:0, broken:0 };
+        }) : constrainedRules(pn);
+        var pk = m[3] ? parseInt(m[3], 10) : 3, pseed = m[4] ? parseInt(m[4], 10) : 7;
+        var pland = m[6] ? trapLandscape(pn, parseInt(m[6], 10), pseed * 131 + 7)
+                         : nkLandscape(pn, pk, pseed * 131 + 7);
+        world = ttmInit({ n:pn, k:pk, pop:parseInt(m[1], 10), seed:pseed,
+                          budget:m[5] ? parseFloat(m[5]) : 1.2, rules:useRules, land:pland });
+        out.push("個体群 " + world.P + " 個体 / 遺伝子長 " + world.n + " / " +
+                 (m[6] ? "トラップ地形 ブロック " + m[6] : "NK 地形 K = " + pk) +
+                 " / 規則 " + useRules.length + " (うち不可侵 " + useRules.filter(function(r){ return r.sacred; }).length + ")");
+        out.push("  初期集団はすべての規則を遵守する部分空間から抽出 (= 規範に従う社会)");
+      }
+      else if ((m = line.match(/^evolve\s+(\d+)$/i))){
+        if (!world) throw new Error("先に population 宣言が必要です");
+        var G = parseInt(m[1], 10);
+        var sacRules = world.rules.filter(function(r){ return r.sacred; });
+        var h0 = world.land.vals[world.inds[0].g];
+        for (var gg = 0; gg < G; gg++) ttmStep(world);
+        var h = world.hist;
+        out.push("🧬 違反思考変異を " + G + " 世代:");
+        for (var z = 0; z < h.length; z += Math.max(1, Math.ceil(h.length / 8))){
+          out.push("  世代 " + String(h[z].gen).padStart(3) + "  最良 " + h[z].best.toFixed(4) +
+                   "  平均 " + h[z].mean.toFixed(4) + "  多様性 " + h[z].H.toFixed(3) +
+                   "  遊び予算 " + h[z].budget.toFixed(2) + "  消費 " + h[z].spent.toFixed(2));
+        }
+        var last = h[h.length - 1];
+        out.push("  → 最良 " + h0.toFixed(4) + " → " + last.best.toFixed(4) +
+                 " (地形の最大 " + world.land.max.toFixed(4) + ")");
+        out.push("  円環の中で考えた回数 " + world.thought + " (候補の探り) / 観測して確定 " + world.acted +
+                 " / 帰還・崩壊 " + world.returned + " / 制度化 " + world.rewrites);
+        if (sacRules.length){
+          var ok = true;
+          for (var q2 = 0; q2 < world.inds.length; q2++){
+            for (var q3 = 0; q3 < sacRules.length; q3++){
+              if (ruleConform(qsNew(world.n, world.inds[q2].g), sacRules[q3]) < 0.5) ok = false;
+            }
+          }
+          out.push("  不可侵 " + sacRules.map(function(r){ return r.id; }).join(" ") + " : 全個体で " +
+                   (ok ? "保存 ✓" : "破れた ✗") + " (遊びの中で何を考えても動かない)");
+        }
+      }
+      else if (/^norms$/i.test(line)){
+        if (!world){ rules.forEach(function(r){ out.push("  " + r.id + " w=" + r.w.toFixed(2) + (r.sacred ? " [不可侵]" : "")); }); }
+        else world.rules.forEach(function(r){
+          out.push("  " + r.id + " = " + pauliStr(r.terms, names.length === world.n ? names : null) + (r.sign < 0 ? " (符号反転 = 制度化済)" : "") +
+                   "  荷重 " + r.w.toFixed(2) + "  破られた回数 " + r.broken + (r.sacred ? "  [不可侵]" : ""));
+        });
+      }
+      else if (/^ledger$/i.test(line)){
+        var src2 = world ? world.ledger.slice(-12) : ledger.slice(-12);
+        if (!src2.length) out.push("  (台帳は空)");
+        src2.forEach(function(e){
+          out.push("  " + (e.gen ? "世代 " + String(e.gen).padStart(3) + " " : "") + (e.kind || "") +
+                   "  規則 " + (e.rule || "—") + "  θ " + (e.theta || 0).toFixed(3) + "  V " + (e.V || "—") +
+                   (e.note ? "  — " + e.note : ""));
+        });
+      }
+      else if ((m = line.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/i))){ vars[m[1]] = evalExpr(m[2]); }
+      else if ((m = line.match(/^print\s+(.+)$/i))){ out.push("print → " + evalExpr(m[1])); }
+      else throw new Error("解釈できない行: " + line);
+    }
+    if (circle) out.push("!! 円環が開いたままです — circle close で帰還してください (遊びは閉じて初めて遊びになる)");
+  }catch(e){
+    out.push("!! " + e.message);
+  }
+  return out.join("\n");
+}
+
+/* ════ 8. 生成AIカーネル — 遊びの概念を Bada 遊 に書き下ろす ════ */
+function aiTokenize(s){
+  /* 漢字列 / 片仮名列 / 平仮名列 / 英数字列 / 記号 を 1 トークンに刻む */
+  return String(s).match(/[一-龠々]+|[ァ-ヴー]+|[ぁ-ん]+|[A-Za-z0-9._]+|[^\s]/g) || [];
+}
+function aiIntent(s){
+  var t = String(s);
+  if (/変異|進化|個体|アルゴリズム|世代|集団/.test(t)) return "evolve";
+  if (/不可侵|保存|守|侵さ|聖域/.test(t))             return "sacred";
+  if (/漏れ|帰還|証明|戻|痕跡|残らない/.test(t))       return "return";
+  if (/行為|境界|考えのまま|限界|越え/.test(t))        return "boundary";
+  return "basic";
+}
+function aiCompose(text){
+  var intent = aiIntent(text), toks = aiTokenize(text);
+  var design = {
+    basic:    { n:4, why:"遊びの最小構成 — 規則ひとつ、円環ひとつ、考えひとつ" },
+    sacred:   { n:6, why:"不可侵規則を置き、遊びの中で期待値が動かないことを示す" },
+    "return": { n:4, why:"円環の共役 C†C = I を残差で数値的に確かめる" },
+    boundary: { n:4, why:"θ を θmax 超へ振り、処理系が行為を拒否することを示す" },
+    evolve:   { n:8, why:"規範に従う初期社会に違反思考変異を掛け、規範の書き換えまで見る" }
+  }[intent];
+  var code;
+  if (intent === "basic"){
+    code = [
+      "# 遊びの最小例 — 規則を破る「考え」を持たせる",
+      "qubit g0 g1 g2 g3",
+      "rule R1 = Z g0 Z g1 weight 1.0",
+      "sacred S0 = Z g2 Z g3",
+      "conform",
+      "circle open budget 1.0",
+      "think R1 angle 0.6",
+      "state",
+      "play",
+      "circle close",
+      "conform"
+    ].join("\n");
+  } else if (intent === "sacred"){
+    code = [
+      "# 不可侵規則は、遊びの中で何を考えても動かない",
+      "qubit g0 g1 g2 g3 g4 g5",
+      "rule R1 = Z g0 Z g1 weight 1.0",
+      "rule R2 = Z g1 Z g2 weight 0.9",
+      "sacred S0 = Z g4 Z g5",
+      "conform",
+      "circle open budget 2.0",
+      "think R1 angle 0.7",
+      "think R2 angle 0.7",
+      "conform",
+      "circle close keep",
+      "conform"
+    ].join("\n");
+  } else if (intent === "return"){
+    code = [
+      "# 円環は漏れない — C† を掛け戻して残差を見る",
+      "qubit g0 g1 g2 g3",
+      "rule R1 = Z g0 Z g1",
+      "sacred S0 = Z g2 Z g3",
+      "state",
+      "circle open budget 2.0",
+      "think R1 angle 0.8",
+      "think R1 angle 0.5",
+      "state",
+      "circle close",
+      "state",
+      "ledger"
+    ].join("\n");
+  } else if (intent === "boundary"){
+    code = [
+      "# 考えは考えに留まる — θ = π (行為) は処理系が拒否する",
+      "qubit g0 g1 g2 g3",
+      "rule R1 = Z g0 Z g1",
+      "sacred S0 = Z g2 Z g3",
+      "circle open budget 4.0",
+      "think R1 angle 1.5",
+      "think R1 angle 2.6",
+      "think R1 angle 3.14159",
+      "play",
+      "circle close"
+    ].join("\n");
+  } else {
+    code = [
+      "# 規範に従う社会に、違反思考変異を掛ける",
+      "qubit g0 g1 g2 g3 g4 g5 g6 g7",
+      "sacred S0 = Z g0 Z g1",
+      "sacred S1 = Z g2 Z g3",
+      "sacred S2 = Z g4 Z g5",
+      "sacred S3 = Z g6 Z g7",
+      "rule R1 = Z g1 Z g2 weight 1.0",
+      "rule R2 = Z g3 Z g4 weight 1.0",
+      "rule R3 = Z g5 Z g6 weight 1.0",
+      "population 16 genes 8 k 3 seed 7 budget 1.2",
+      "evolve 60",
+      "norms",
+      "ledger"
+    ].join("\n");
+  }
+  var run = asobiInterpret(code, { seed: 424242 });
+  var stages = [
+    { n:"① トークン化", d: toks.slice(0, 14).join(" · ") + (toks.length > 14 ? " …" : "") + "  (" + toks.length + " トークン)" },
+    { n:"② 意図解析",   d: "意図 = " + intent + " — " + design.why },
+    { n:"③ 遊びの設計", d: "遺伝子 " + design.n + " 本 / 規則を置き、不可侵を分離 / 円環と遊び予算を用意 / θ ≤ θmax = 0.85π" },
+    { n:"④ 生成",       d: code.split("\n").length + " 行の Bada 遊 プログラムを生成" },
+    { n:"⑤ 検証",       d: (run.indexOf("!!") < 0 ? "実行して誤りなし ✓" : "実行時の注記あり(拒否・警告を含む)") }
+  ];
+  return { intent:intent, stages:stages, code:code, run:run, ok: run.indexOf("!! ") < 0 };
+}
+
+/* ════ 9. UI ════════════════════════════════════════════════════════ */
+var SAMPLES = {
+  basic: [
+    "# 遊びの生成 — 規則から外れて持てる振幅",
+    "qubit g0 g1 g2 g3",
+    "rule R1 = Z g0 Z g1 weight 1.0",
+    "rule R2 = Z g1 Z g2 weight 0.8",
+    "sacred S0 = Z g2 Z g3",
+    "conform",
+    "circle open budget 1.5",
+    "think R1 angle 0.6",
+    "state",
+    "tension",
+    "play",
+    "circle close",
+    "conform"
+  ].join("\n"),
+  sacred: [
+    "# 不可侵規則は遊びの中でも観測の後でも動かない",
+    "qubit g0 g1 g2 g3 g4 g5",
+    "rule R1 = Z g0 Z g1",
+    "rule R2 = Z g1 Z g2",
+    "rule R3 = Z g2 Z g3",
+    "sacred S0 = Z g4 Z g5",
+    "circle open budget 3.0",
+    "think R1 angle 0.9",
+    "think R3 angle 0.9",
+    "conform",
+    "circle close keep",
+    "conform"
+  ].join("\n"),
+  "return": [
+    "# 帰還 — 円環の内側は外へ漏れない (C†C = I)",
+    "qubit g0 g1 g2 g3",
+    "rule R1 = Z g0 Z g1",
+    "sacred S0 = Z g2 Z g3",
+    "state",
+    "circle open budget 3.0",
+    "think R1 angle 0.8",
+    "think R1 angle 1.2",
+    "state",
+    "circle close",
+    "state",
+    "ledger"
+  ].join("\n"),
+  evolve: [
+    "# 個体の変異アルゴリズム — 違反思考変異 (TTM)",
+    "#   不可侵 S0..S3 = 対のパリティ (問題そのものの拘束条件)",
+    "#   規範 R1..R3   = 対どうしを橋渡しする、破ってよい規則",
+    "qubit g0 g1 g2 g3 g4 g5 g6 g7",
+    "sacred S0 = Z g0 Z g1",
+    "sacred S1 = Z g2 Z g3",
+    "sacred S2 = Z g4 Z g5",
+    "sacred S3 = Z g6 Z g7",
+    "rule R1 = Z g1 Z g2 weight 1.0",
+    "rule R2 = Z g3 Z g4 weight 1.0",
+    "rule R3 = Z g5 Z g6 weight 1.0",
+    "population 16 genes 8 k 3 seed 7 budget 1.2",
+    "evolve 60",
+    "norms",
+    "ledger"
+  ].join("\n"),
+  jp: [
+    "# 日本語表記でも書ける",
+    "遺伝子 g0 g1 g2 g3",
+    "規則 R1 = Z g0 Z g1 荷重 1.0",
+    "不可侵 S0 = Z g2 Z g3",
+    "遵守",
+    "円環 開く 予算 1.5",
+    "違反思考 R1 角 0.7",
+    "状態",
+    "緊張",
+    "遊び",
+    "円環 閉じる",
+    "遵守"
+  ].join("\n")
+};
+
+function $(id){ return document.getElementById(id); }
+var EV = { last:null };
+
+function drawThink(theta){
+  var cv = $("thkCv"), W = cv.clientWidth || 600, H = 230;
+  cv.width = W * 2; cv.height = H * 2;
+  var x = cv.getContext("2d"); x.scale(2, 2);
+  x.clearRect(0, 0, W, H);
+  var cx = W/2, cy = H - 26, R = Math.min(W/2 - 30, H - 52);
+  /* 円環 */
+  x.strokeStyle = "#26304a"; x.lineWidth = 1.5;
+  x.beginPath(); x.arc(cx, cy, R, Math.PI, 0); x.stroke();
+  /* 行為の域 (θ > θmax) */
+  x.strokeStyle = "rgba(248,113,113,.55)"; x.lineWidth = 12;
+  x.beginPath(); x.arc(cx, cy, R - 7, Math.PI + THETA_MAX, 0); x.stroke();
+  /* 遊びの域 */
+  x.strokeStyle = "rgba(45,212,191,.35)"; x.lineWidth = 12;
+  x.beginPath(); x.arc(cx, cy, R - 7, Math.PI + 0.02, Math.PI + THETA_MAX); x.stroke();
+  /* 針 */
+  var a = Math.PI + theta;
+  x.strokeStyle = theta > THETA_MAX ? "#f87171" : "#c8a44a"; x.lineWidth = 3;
+  x.beginPath(); x.moveTo(cx, cy); x.lineTo(cx + R*Math.cos(a), cy + R*Math.sin(a)); x.stroke();
+  x.fillStyle = "#c8a44a"; x.beginPath(); x.arc(cx, cy, 4, 0, 7); x.fill();
+  /* 目盛 */
+  x.fillStyle = "#8b97b8"; x.font = "11px ui-monospace,monospace"; x.textAlign = "center";
+  x.fillText("θ=0 遵守", cx - R + 4, cy + 16);
+  x.fillText("θ=π 行為", cx + R - 4, cy + 16);
+  x.fillText("遊び (考え)", cx, cy - R - 8);
+  x.textAlign = "left";
+  x.fillStyle = "#f87171"; x.font = "10.5px ui-monospace,monospace";
+  x.fillText("θmax = 0.85π ─ ここから先は円環の外", cx + R*Math.cos(Math.PI + THETA_MAX) - 40, cy + R*Math.sin(Math.PI + THETA_MAX) - 8);
+  /* 振幅バー */
+  var c = Math.cos(theta/2), s = Math.sin(theta/2);
+  var bw = 70, bx = 14, by = 20;
+  x.fillStyle = "#2dd4bf"; x.fillRect(bx, by, bw * c * c, 12);
+  x.fillStyle = "#a78bfa"; x.fillRect(bx, by + 18, bw * s * s, 12);
+  x.fillStyle = "#8b97b8"; x.font = "10.5px ui-monospace,monospace";
+  x.fillText("|順⟩ " + (c*c).toFixed(3), bx + bw + 6, by + 10);
+  x.fillText("|違⟩ " + (s*s).toFixed(3), bx + bw + 6, by + 28);
+}
+function updateThink(){
+  var th = (+$("thkR").value / 100) * Math.PI;
+  var c = Math.cos(th/2), s = Math.sin(th/2);
+  $("thkTh").textContent = (th/Math.PI).toFixed(2) + " π  (" + th.toFixed(3) + " rad)";
+  $("thkState").textContent = c.toFixed(3) + "|00⟩ − i·" + s.toFixed(3) + "|10⟩";
+  $("thkConf").textContent = (c*c - s*s >= 0 ? "+" : "") + (c*c - s*s).toFixed(3);
+  $("thkPv").textContent = (s*s).toFixed(3);
+  $("thkPlay").textContent = (s*s).toFixed(3);
+  $("thkPhase").textContent = s > 1e-6 ? "違反枝に −i の位相 (考えである徴)" : "実振幅のみ";
+  $("thkBar").style.width = (s*s*100).toFixed(1) + "%";
+  var v = $("thkVerdict");
+  if (th < 1e-6){ v.className = "err"; v.textContent = "遵守 ─ 遊びゼロ。機械なら焼き付いている"; }
+  else if (th > THETA_MAX){ v.className = "err"; v.textContent = "行為の域 ─ 処理系はこの回転を拒否する"; }
+  else if (s*s > 0.5){ v.className = "warn"; v.textContent = "深い遊び ─ 違反が優勢だが、まだ取り消せる「考え」"; }
+  else { v.className = "ok"; v.textContent = "遊び ─ 順と違が同時に振幅を持つ。取り消せる"; }
+  /* 不可侵は Z g2 Z g3 の台に触れないため厳密に保存 */
+  $("thkSac").textContent = "+1.000 (保存 — V = X g0 と可換)";
+  drawThink(th);
+}
+
+function drawEvo(ttm, cls, fmax){
+  var cv = $("evCv"), W = cv.clientWidth || 700, H = 260;
+  cv.width = W * 2; cv.height = H * 2;
+  var x = cv.getContext("2d"); x.scale(2, 2);
+  x.clearRect(0, 0, W, H);
+  var L = 42, R = 12, T = 12, B = 26, w = W - L - R, h = H - T - B;
+  var n = Math.max(ttm.hist.length, cls.hist.length);
+  var lo = 1, hi = 0, i;
+  [ttm.hist, cls.hist].forEach(function(hh){ hh.forEach(function(p){ if (p.best > hi) hi = p.best; if (p.mean < lo) lo = p.mean; }); });
+  var ref = (fmax == null) ? ttm.land.max : fmax;
+  var top = Math.max(hi, ref), bot = Math.max(0, lo - 0.02);
+  function px(g){ return L + w * (g - 1) / Math.max(1, n - 1); }
+  function py(v){ return T + h * (1 - (v - bot) / Math.max(1e-9, top - bot)); }
+  /* 枠と最大値 */
+  x.strokeStyle = "#26304a"; x.lineWidth = 1;
+  x.strokeRect(L, T, w, h);
+  x.setLineDash([4,3]); x.strokeStyle = "#4b5a80";
+  x.beginPath(); x.moveTo(L, py(ref)); x.lineTo(L + w, py(ref)); x.stroke();
+  x.setLineDash([]);
+  x.fillStyle = "#8b97b8"; x.font = "10px ui-monospace,monospace";
+  x.fillText("実行可能集合の最大 " + ref.toFixed(3), L + 4, py(ref) - 3);
+  x.fillText(bot.toFixed(2), 6, T + h); x.fillText(top.toFixed(2), 6, T + 8);
+  x.fillText("世代", L + w/2 - 10, H - 8);
+  /* 補助線: 遊び予算 Δ と多様性 H */
+  x.lineWidth = 1; x.setLineDash([3,3]);
+  x.strokeStyle = "rgba(200,164,74,.55)"; x.beginPath();
+  ttm.hist.forEach(function(p, i2){ var y = T + h*(1 - Math.min(1, p.budget/(4*ttm.budget0*ttm.P))); i2 ? x.lineTo(px(p.gen), y) : x.moveTo(px(p.gen), y); });
+  x.stroke();
+  x.strokeStyle = "rgba(167,139,250,.55)"; x.beginPath();
+  ttm.hist.forEach(function(p, i2){ var y = T + h*(1 - p.H); i2 ? x.lineTo(px(p.gen), y) : x.moveTo(px(p.gen), y); });
+  x.stroke();
+  x.setLineDash([]);
+  /* 適応度 */
+  function line(hh, col, key, wd){
+    x.strokeStyle = col; x.lineWidth = wd; x.beginPath();
+    hh.forEach(function(p, i2){ i2 ? x.lineTo(px(p.gen), py(p[key])) : x.moveTo(px(p.gen), py(p[key])); });
+    x.stroke();
+  }
+  line(cls.hist, "rgba(248,113,113,.45)", "mean", 1);
+  line(ttm.hist, "rgba(45,212,191,.45)", "mean", 1);
+  line(cls.hist, "#f87171", "best", 2);
+  line(ttm.hist, "#2dd4bf", "best", 2);
+  /* 制度化の印 */
+  x.fillStyle = "#c8a44a";
+  ttm.ledger.forEach(function(e){
+    if (e.kind === "制度化"){ x.fillRect(px(e.gen) - 1, T + 2, 2, 8); }
+  });
+}
+function evoParams(){
+  var n = Math.max(4, Math.min(8, +$("evN").value || 8));
+  return {
+    n:n,
+    K: Math.max(0, Math.min(n - 1, +$("evK").value || 3)),
+    P: Math.max(4, Math.min(48, +$("evPop").value || 16)),
+    G: Math.max(5, Math.min(400, +$("evGen").value || 60)),
+    seed: Math.max(1, +$("evSeed").value || 7),
+    bud: Math.max(0.01, +$("evBud").value || 1.2),
+    rulesKind: $("evRules").value,
+    landKind: $("evLand").value
+  };
+}
+function makeRules(kind, n){ return kind === "chain" ? defaultRules(n) : constrainedRules(n); }
+function makeLand(kind, n, K, seed){
+  return kind === "trap" ? trapLandscape(n, Math.max(2, Math.min(n, K || 4)), seed * 131 + 7)
+                         : nkLandscape(n, K, seed * 131 + 7);
+}
+function feasibleMax(land, rules, n){
+  var sac = rules.filter(function(r){ return r.sacred; }), mx = 0;
+  for (var g = 0; g < (1 << n); g++){
+    var st = qsNew(n, g), ok = true;
+    for (var i = 0; i < sac.length; i++) if (ruleConform(st, sac[i]) < 0.5){ ok = false; break; }
+    if (ok && land.vals[g] > mx) mx = land.vals[g];
+  }
+  return mx;
+}
+function runEvo(opts){
+  var o = opts || {}, prm = evoParams();
+  var n = prm.n, K = prm.K, P = prm.P, G = prm.G, seed = prm.seed;
+  var bud = o.freeze ? 0.0001 : prm.bud;
+  var rules = makeRules(prm.rulesKind, n);
+  var land = makeLand(prm.landKind, n, K, seed);
+  var common = { n:n, k:K, pop:P, gens:G, seed:seed, land:land };
+  var ttm = ttmRun(Object.assign({}, common, { budget:bud, rules:makeRules(prm.rulesKind, n) }));
+  var cls = gaClassicRun(Object.assign({}, common, { rules:makeRules(prm.rulesKind, n) }));
+  var fmax = feasibleMax(land, ttm.rules, n);
+  EV.last = { ttm:ttm, cls:cls, fmax:fmax };
+  drawEvo(ttm, cls, fmax);
+  var t = ttm.hist[ttm.hist.length - 1], c = cls.hist[cls.hist.length - 1];
+  var sacs = ttm.rules.filter(function(r){ return r.sacred; });
+  var sacOK = true, i, j;
+  for (i = 0; i < ttm.inds.length; i++){
+    for (j = 0; j < sacs.length; j++) if (ruleConform(qsNew(n, ttm.inds[i].g), sacs[j]) < 0.5) sacOK = false;
+  }
+  var maxSpent = 0;
+  ttm.hist.forEach(function(p){ if (p.spent > maxSpent) maxSpent = p.spent; });
+  function reachGen(h){ for (var z = 0; z < h.length; z++) if (h[z].best >= fmax - 1e-12) return h[z].gen; return null; }
+  var tg = reachGen(ttm.hist), cg = reachGen(cls.hist);
+  var L = [];
+  L.push("── 結果 (" + (prm.landKind === "trap" ? "トラップ地形 ブロック " + K : "NK 地形 K = " + K) +
+         " / " + (prm.rulesKind === "chain" ? "鎖系" : "拘束系") + " 規則 / n = " + n +
+         " / 個体 " + P + " / " + G + " 世代 / 種 " + seed + ") ──");
+  L.push("古典的無作為変異   最良 " + c.best.toFixed(4) + "  平均 " + c.mean.toFixed(4) + "  多様性 " + c.H.toFixed(3) +
+         "   最適到達 " + (cg ? "第 " + cg + " 世代" : "未到達"));
+  L.push("違反思考変異 TTM   最良 " + t.best.toFixed(4) + "  平均 " + t.mean.toFixed(4) + "  多様性 " + t.H.toFixed(3) +
+         "   最適到達 " + (tg ? "第 " + tg + " 世代" : "未到達"));
+  L.push("実行可能集合の最大 " + fmax.toFixed(4) + " (不可侵規則を満たす範囲の最大値)" +
+         "   差 " + (t.best - c.best >= 0 ? "+" : "") + (t.best - c.best).toFixed(4) +
+         (o.freeze ? "   ← 遊び予算をほぼ零にした場合" : ""));
+  L.push("");
+  var decided = ttm.acted + ttm.returned;
+  L.push("円環の中で考えた回数 " + ttm.thought + " (候補の探り) → 決断 " + decided +
+         " / 観測して変異が確定 " + ttm.acted + " / 帰還・崩壊で消えた " + ttm.returned +
+         " (= " + (100*ttm.returned/Math.max(1,decided)).toFixed(0) + "% は考えのまま終わった)");
+  L.push("規範の制度化 " + ttm.rewrites + " 回 / 遊び予算の消費 最大 " + maxSpent.toFixed(2) +
+         " ≤ Δ 上限 " + (4 * ttm.budget0 * ttm.P).toFixed(2) +
+         " (集団全体の保存則 Σθ ≤ Δ / 個体あたり Δ₀ = " + ttm.budget0.toFixed(2) + ")");
+  L.push("不可侵 " + sacs.map(function(r){ return r.id; }).join(" ") + " (" + sacs.length + " 本) : 全個体で " +
+         (sacOK ? "保存 ✓" : "破れた ✗") + " — 違反生成子は構成上つねに不可侵と可換");
+  $("evOut").textContent = L.join("\n");
+  renderLedger(ttm);
+}
+function sweepEvo(){
+  var prm = evoParams(), n = prm.n, K = prm.K, P = prm.P, G = prm.G, bud = prm.bud;
+  var rows = [], wins = 0, losses = 0, sumT = 0, sumC = 0, hitT = 0, hitC = 0, genT = 0, genC = 0, N = 10;
+  for (var s = 1; s <= N; s++){
+    var land = makeLand(prm.landKind, n, K, s);
+    var common = { n:n, k:K, pop:P, gens:G, seed:s, land:land };
+    var t = ttmRun(Object.assign({}, common, { budget:bud, rules:makeRules(prm.rulesKind, n) }));
+    var c = gaClassicRun(Object.assign({}, common, { rules:makeRules(prm.rulesKind, n) }));
+    var tb = t.hist[t.hist.length-1].best, cb = c.hist[c.hist.length-1].best;
+    var fmax = feasibleMax(land, t.rules, n);
+    function rg(h){ for (var z = 0; z < h.length; z++) if (h[z].best >= fmax - 1e-12) return h[z].gen; return null; }
+    var tg = rg(t.hist), cg = rg(c.hist);
+    if (tg){ hitT++; genT += tg; } else genT += G;
+    if (cg){ hitC++; genC += cg; } else genC += G;
+    if (tb > cb + 1e-12) wins++; else if (tb < cb - 1e-12) losses++;
+    sumT += tb; sumC += cb;
+    rows.push("種 " + String(s).padStart(2) + "   古典 " + cb.toFixed(4) + " (" + (cg ? "第" + cg + "世代" : "未到達") + ")" +
+              "   TTM " + tb.toFixed(4) + " (" + (tg ? "第" + tg + "世代" : "未到達") + ")" +
+              "   " + (tb > cb ? "TTM 勝ち" : (tb < cb ? "古典 勝ち" : "引き分け")) +
+              "   実行可能最大 " + fmax.toFixed(4));
+  }
+  rows.unshift("── " + N + " 種の比較 (" + (prm.rulesKind === "chain" ? "鎖系" : "拘束系") + " / " +
+               (prm.landKind === "trap" ? "トラップ" : "NK") + " / n=" + n + " K=" + K + " 個体 " + P + " " + G + " 世代) ──");
+  rows.push("");
+  rows.push("TTM " + wins + " 勝 " + losses + " 敗 " + (N - wins - losses) + " 分   平均最良: 古典 " + (sumC/N).toFixed(4) +
+            "  TTM " + (sumT/N).toFixed(4) + "  差 " + ((sumT-sumC) >= 0 ? "+" : "") + ((sumT-sumC)/N).toFixed(4));
+  rows.push("実行可能集合の最大への到達: 古典 " + hitC + "/" + N + " (平均 " + (genC/N).toFixed(1) + " 世代)  " +
+            "TTM " + hitT + "/" + N + " (平均 " + (genT/N).toFixed(1) + " 世代)");
+  $("evOut").textContent = rows.join("\n");
+}
+function renderLedger(w){
+  var rows = ["<table><tr><th>規則</th><th>パウリ列</th><th>荷重 w</th><th>破られた回数</th><th>状態</th></tr>"];
+  w.rules.forEach(function(r){
+    rows.push("<tr><td class='mono'>" + r.id + "</td><td class='mono'>" + pauliStr(r.terms) + "</td>" +
+      "<td class='num'>" + r.w.toFixed(2) + "</td><td class='num'>" + r.broken + "</td><td>" +
+      (r.sacred ? "<span class='tag s'>不可侵</span>遊べない・保存される"
+                : (r.sign < 0 ? "<span class='tag r'>制度化</span>違反が新しい規範になった (世代 " + r.born + ")"
+                              : "<span class='tag p'>遊べる</span>")) + "</td></tr>");
+  });
+  rows.push("</table>");
+  $("ledRules").innerHTML = rows.join("");
+  var L = w.ledger.slice(-60).map(function(e){
+    return "世代 " + String(e.gen).padStart(3) + "  " + (e.kind + "　").slice(0, 4) +
+           "  個体 " + (e.ind >= 0 ? String(e.ind).padStart(2) : "--") +
+           "  規則 " + e.rule + "  θ " + e.theta.toFixed(3) +
+           "  V " + (e.V || "—") + "  保った規範 " + e.kept + "  — " + e.note;
+  });
+  $("ledLog").textContent = L.length ? L.join("\n") : "(台帳は空)";
+}
+
+function boot(){
+  /* タブ */
+  var btns = document.querySelectorAll("#tabs button");
+  for (var i = 0; i < btns.length; i++){
+    btns[i].addEventListener("click", function(){
+      for (var j = 0; j < btns.length; j++) btns[j].className = "";
+      this.className = "on";
+      var secs = document.querySelectorAll("main section");
+      for (var k = 0; k < secs.length; k++) secs[k].className = "";
+      var el = $("t-" + this.getAttribute("data-t"));
+      el.className = "on";
+      if (this.getAttribute("data-t") === "thk") updateThink();
+      if (this.getAttribute("data-t") === "evo" && EV.last) drawEvo(EV.last.ttm, EV.last.cls, EV.last.fmax);
+    });
+  }
+  /* 円環タブ */
+  $("cirSrc").value = SAMPLES.basic;
+  var sb = document.querySelectorAll("[data-sample]");
+  for (i = 0; i < sb.length; i++){
+    sb[i].addEventListener("click", function(){
+      $("cirSrc").value = SAMPLES[this.getAttribute("data-sample")];
+      $("cirOut").textContent = "(実行してください)";
+    });
+  }
+  $("cirRun").addEventListener("click", function(){
+    $("cirOut").textContent = asobiInterpret($("cirSrc").value, { seed: (Date.now() % 100000) + 1 });
+  });
+  $("cirClear").addEventListener("click", function(){ $("cirSrc").value = ""; $("cirOut").textContent = ""; });
+  /* 違反思考タブ */
+  $("thkR").addEventListener("input", updateThink);
+  /* 変異タブ */
+  $("evRun").addEventListener("click", function(){ runEvo({}); });
+  $("evSweep").addEventListener("click", function(){ sweepEvo(); });
+  $("evFreeze").addEventListener("click", function(){ runEvo({ freeze:true }); });
+  /* 生成AI タブ */
+  function compose(text){
+    var r = aiCompose(text);
+    var L = [];
+    r.stages.forEach(function(s){ L.push(s.n + "  " + s.d); });
+    L.push("");
+    L.push("── 生成された Bada 遊 プログラム ──");
+    L.push(r.code);
+    L.push("");
+    L.push("── 検証実行 ──");
+    L.push(r.run);
+    $("aiOut").textContent = L.join("\n");
+    $("aiOut").setAttribute("data-code", r.code);
+  }
+  $("aiGo").addEventListener("click", function(){ compose($("aiIn").value); });
+  var ab = document.querySelectorAll("[data-ai]");
+  for (i = 0; i < ab.length; i++){
+    ab[i].addEventListener("click", function(){ $("aiIn").value = this.getAttribute("data-ai"); compose($("aiIn").value); });
+  }
+  $("aiSend").addEventListener("click", function(){
+    var code = $("aiOut").getAttribute("data-code");
+    if (!code){ compose($("aiIn").value); code = $("aiOut").getAttribute("data-code"); }
+    $("cirSrc").value = code;
+    for (var j = 0; j < btns.length; j++){ btns[j].className = ""; if (btns[j].getAttribute("data-t") === "cir") btns[j].className = "on"; }
+    var secs = document.querySelectorAll("main section");
+    for (var k = 0; k < secs.length; k++) secs[k].className = "";
+    $("t-cir").className = "on";
+    $("cirOut").textContent = asobiInterpret(code, { seed: (Date.now() % 100000) + 1 });
+  });
+  window.addEventListener("resize", function(){
+    if ($("t-thk").className === "on") updateThink();
+    if ($("t-evo").className === "on" && EV.last) drawEvo(EV.last.ttm, EV.last.cls, EV.last.fmax);
+  });
+  updateThink();
+}
+if (typeof document !== "undefined" && document.getElementById) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+</script>
+</body>
+</html>
