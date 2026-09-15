@@ -27,7 +27,7 @@
   #sbDev{ color:var(--acc2); }
   /* ── ホーム画面 ── */
   #screen{ flex:1; overflow:auto; position:relative; }
-  #home{ padding:18px 14px 90px; }
+  #home{ padding:18px 14px 28px; }
   #homeHead{ text-align:center; margin:10px 0 16px; }
   #homeHead h1{ font-size:22px; letter-spacing:.06em; }
   #homeHead h1 span{ color:var(--acc); }
@@ -47,7 +47,7 @@
   .app .nm{ font-size:11.5px; margin-top:6px; }
   .app .kt{ font-size:9.5px; color:var(--ket); font-family:ui-monospace,Consolas,monospace; margin-top:3px; }
   /* ── アプリパネル ── */
-  #panel{ display:none; position:absolute; inset:0; background:var(--bg); overflow:auto; padding-bottom:90px; }
+  #panel{ display:none; position:absolute; inset:0; background:var(--bg); overflow:auto; padding-bottom:24px; }
   #panelBar{
     position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px;
     padding:10px 14px; background:rgba(11,14,20,.92); border-bottom:1px solid var(--line); backdrop-filter:blur(6px);
@@ -97,8 +97,10 @@
   details{ margin-top:7px; font-size:11.5px; color:var(--dim); }
   details pre{ margin-top:6px; }
   /* ── コマンドバー ── */
+  /* 下部は フロー配置で「タスクバー → コマンドバー」の順に積む
+     (固定配置にすると フリーフォームのタスクバーを覆ってしまう) */
   #cmdbar{
-    position:fixed; left:0; right:0; bottom:0; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    flex:none; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
     background:rgba(13,17,28,.95); border-top:1px solid var(--line); backdrop-filter:blur(8px); z-index:20;
   }
   #cmdbar input{ flex:1; border-radius:99px; padding:10px 16px; }
@@ -106,6 +108,54 @@
   .gitem{ display:inline-block; margin:5px; }
   .gitem img{ max-width:150px; border-radius:10px; border:1px solid var(--line); display:block; }
   video,canvas{ max-width:100%; border-radius:12px; border:1px solid var(--line); }
+  /* ── フリーフォーム / マルチウィンドウ (Samsung DeX 風) ── */
+  #sbMode{ cursor:pointer; border:1px solid var(--line); border-radius:99px; padding:2px 10px; font-size:11px; }
+  #sbMode:hover{ border-color:var(--acc); color:var(--tx); }
+  /* デスクトップ層は素通し。窓とツールバーだけが操作を受ける
+     → 背後のホーム(アイコン)からいつでも次のアプリを開ける */
+  #desktop{ display:none; position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  /* フリーフォーム中のホームは、タスクバーの「⊞ アプリ」で呼び出す
+     ランチャー(アプリ一覧)として窓の上に重ねる */
+  #home.launcher{
+    position:absolute; inset:0; z-index:9000; overflow:auto;
+    background:rgba(11,14,20,.96); padding-top:60px;
+  }
+  #tbApps{ border-color:var(--acc); color:var(--tx); font-weight:600; }
+  #wmBar{
+    pointer-events:auto;   /* 窓より前面 — 整列ボタンが窓に隠れないこと */
+    position:absolute; left:0; right:0; top:0; z-index:8000; display:flex; gap:6px; flex-wrap:wrap;
+    align-items:center; padding:7px 12px; background:rgba(13,17,28,.82); border-bottom:1px solid var(--line);
+    backdrop-filter:blur(6px); font-size:11.5px; color:var(--dim);
+  }
+  #wmBar button{ font-size:11.5px; padding:4px 10px; border-radius:8px; }
+  #wmBraid{ margin-left:auto; color:var(--ket); font-family:ui-monospace,Consolas,monospace; }
+  .win{
+    pointer-events:auto;
+    position:absolute; display:flex; flex-direction:column; background:var(--bg);
+    border:1px solid var(--line); border-radius:12px; overflow:hidden;
+    box-shadow:0 18px 44px rgba(0,0,0,.55);
+  }
+  .win.focus{ border-color:var(--acc); box-shadow:0 22px 52px rgba(0,0,0,.65), 0 0 0 1px var(--acc); }
+  .winbar{
+    display:flex; align-items:center; gap:8px; padding:7px 9px; cursor:move; user-select:none;
+    background:linear-gradient(180deg,#1b2338,#151b2c); border-bottom:1px solid var(--line); font-size:12.5px;
+  }
+  .winbar .wt{ font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .winbar .wk{ color:var(--ket); font-family:ui-monospace,Consolas,monospace; font-size:10px; margin-left:auto; }
+  .winbar button{ padding:1px 7px; font-size:12px; border-radius:6px; line-height:1.5; }
+  .winbody{ flex:1; overflow:auto; padding:10px 12px; }
+  .grip{ position:absolute; right:0; bottom:0; width:20px; height:20px; cursor:nwse-resize;
+         background:linear-gradient(135deg,transparent 48%,var(--line) 50%,transparent 58%,var(--line) 62%,transparent 70%); }
+  #snapHint{ position:absolute; display:none; border:2px dashed var(--acc); border-radius:12px;
+             background:rgba(124,92,255,.14); pointer-events:none; z-index:9999; }
+  #taskbar{
+    flex:none; display:none; gap:7px; align-items:center; overflow-x:auto; padding:7px 12px;
+    background:rgba(13,17,28,.95); border-top:1px solid var(--line); font-size:11.5px;
+  }
+  #taskbar .tb{ display:flex; align-items:center; gap:5px; border:1px solid var(--line); border-radius:9px;
+                padding:4px 10px; cursor:pointer; white-space:nowrap; background:var(--bg2); }
+  #taskbar .tb.on{ border-color:var(--acc); color:var(--tx); }
+  #taskbar .tb.mini{ opacity:.55; }
 </style>
 </head>
 <body>
@@ -113,6 +163,7 @@
     <b>⚛ QuantOS</b>
     <span id="sbDev"></span>
     <span id="sbTime"></span>
+    <span id="sbMode" onclick="wmToggleMode()" title="全画面 ⇄ フリーフォーム (マルチウィンドウ)">🗖 全画面</span>
     <span id="sbKet">Ψ = |0000⟩</span>
   </div>
 
@@ -122,7 +173,9 @@
         <h1>Bada <span>QuantOS</span></h1>
         <p>擬似量子コンピュータ(集大成)のオペレーティングシステム — カーネルは生成AI。<br/>
         タブレット・スマートフォンの全機能を<b>トポロジーの写像機構</b>(結び目不変量 ↦ 量子レジスタ基底)で移植。<br/>
-        通信と保管は <b>BB84 量子鍵配送 + ワンタイムパッド</b>の量子暗号方式で保護。</p>
+        通信と保管は <b>BB84 量子鍵配送 + ワンタイムパッド</b>の量子暗号方式で保護。<br/>
+        <b>インストール済みアプリの起動と Play ストア</b>にも対応(market: インテント)。<br/>
+        <b>Samsung フリーフォーム / マルチウィンドウ</b>対応 — 窓の重なりは組み紐として不変量を計算。</p>
       </div>
       <div id="grid"></div>
     </div>
@@ -134,7 +187,23 @@
       </div>
       <div id="panelBody"></div>
     </div>
+    <div id="desktop">
+      <div id="wmBar">
+        <b style="color:var(--tx)">🗔 フリーフォーム</b>
+        <button onclick="wmDo('split2')">▥ 左右2分割</button>
+        <button onclick="wmDo('vsplit2')">▤ 上下2分割</button>
+        <button onclick="wmDo('split3')">⬒ 3分割</button>
+        <button onclick="wmDo('grid4')">▦ 格子4</button>
+        <button onclick="wmDo('cascade')">🗗 カスケード</button>
+        <button onclick="wmDo('max')">⛶ 最大化</button>
+        <button onclick="wmCloseAll()">✕ すべて閉じる</button>
+        <span id="wmBraid"></span>
+      </div>
+      <div id="snapHint"></div>
+    </div>
   </div>
+
+  <div id="taskbar"></div>
 
   <div id="cmdbar">
     <input id="cmdInput" placeholder="AIカーネルへ — 例:「090-1234-5678 に電話」「写真を撮って」「1+2*3」"
@@ -316,7 +385,8 @@ var OS_APPS = [
   { id:"qlab",     name:"量子ラボ",   icon:"⚛️", knot:[1,1,1,1,1],        desc:"量子 Bada コンソール" },
   { id:"topo",     name:"写像室",     icon:"🪢", knot:[-1,-1,-1,-1],      desc:"トポロジー写像の観測室" },
   { id:"settings", name:"設定",       icon:"⚙️", knot:[-1,-1,-1,-1,-1],   desc:"端末プロファイル・データ" },
-  { id:"qcrypt",   name:"量子暗号",   icon:"🔐", knot:[1,1,-1,1,1],       desc:"BB84 量子鍵配送 + ワンタイムパッド + 量子金庫" }
+  { id:"qcrypt",   name:"量子暗号",   icon:"🔐", knot:[1,1,-1,1,1],       desc:"BB84 量子鍵配送 + ワンタイムパッド + 量子金庫" },
+  { id:"apps",     name:"アプリ",     icon:"🛒", knot:[1,1,1,-1,-1,-1],   desc:"インストール済みアプリの起動 + Play ストア" }
 ];
 var TOPO_QUBITS = 4;   /* 2^4 = 16 基底 ≥ 機能数 14 → 単射写像が張れる */
 
@@ -372,13 +442,253 @@ function deviceProfile(ua, width){
   else                                kind = "desktop";
   var label = kind === "smartphone" ? "スマートフォン" : kind === "tablet" ? "タブレット" : "デスクトップ";
   var tel = kind !== "desktop";
+  var android = /Android/i.test(ua);
+  /* Samsung 端末判定 (Galaxy の型番 SM-xxxx / SamsungBrowser / Samsung)。
+     DeX は Android でありながら Mobile を名乗らないデスクトップ相当の
+     UA になるため、Samsung かつ Android かつ非 Mobile を DeX とみなす。 */
+  var samsung = /Samsung|SM-[A-Z]\d|SamsungBrowser|SAMSUNG/i.test(ua);
+  var dex = samsung && android && !/Mobile/i.test(ua);
   return {
     kind: kind, label: label, width: width,
-    tel: tel, sms: tel,
+    tel: tel, sms: tel, android: android,
+    samsung: samsung, dex: dex,
+    /* Android 7 (API 24) 以降はマルチウィンドウ (分割画面) が標準。
+       Samsung One UI / DeX はさらにフリーフォーム (自由配置ウィンドウ) に対応。 */
+    multiWindow: android, freeform: samsung && android,
     note: tel
       ? "電話回線・SMS は端末 OS へ tel:/sms: インテントとして委譲します"
       : "この端末には電話回線がないため、発信内容の表示のみ行います"
   };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 5b. アプリランチャー + Play ストア
+ *   端末にインストールされているアプリケーションを URL スキーム /
+ *   market: インテントで起動し、Play ストア (com.android.vending) を
+ *   market://details?id= (アプリページ) / market://search?q= (検索) で
+ *   開く。Android APK では Cordova の allow-intent により端末 OS が
+ *   対応アプリへディスパッチする (未インストールなら Play ストアの
+ *   アプリページが開き、そこからインストールできる)。
+ * ════════════════════════════════════════════════════════════════════ */
+var APP_CATALOG = [
+  { id:"playstore", name:"Play ストア", icon:"🛒", pkg:"com.android.vending",          scheme:"https://play.google.com/store",            alias:["play","プレイストア","playストア"] },
+  { id:"youtube",   name:"YouTube",     icon:"▶️", pkg:"com.google.android.youtube",   scheme:"vnd.youtube://www.youtube.com",            alias:["youtube","ユーチューブ"] },
+  { id:"line",      name:"LINE",        icon:"🟢", pkg:"jp.naver.line.android",        scheme:"line://",                                  alias:["line","ライン"] },
+  { id:"maps",      name:"マップ",      icon:"🗺", pkg:"com.google.android.apps.maps", scheme:"geo:35.6812,139.7671",                     alias:["マップ","地図","maps"] },
+  { id:"gmail",     name:"Gmail",       icon:"📮", pkg:"com.google.android.gm",        scheme:"googlegmail://",                           alias:["gmail","ジーメール"] },
+  { id:"chrome",    name:"Chrome",      icon:"🌐", pkg:"com.android.chrome",           scheme:"googlechrome://navigate?url=https://www.google.com", alias:["chrome","クローム","ブラウザ"] },
+  { id:"twitter",   name:"X (Twitter)", icon:"🐦", pkg:"com.twitter.android",          scheme:"twitter://timeline",                       alias:["twitter","ツイッター","エックス"] },
+  { id:"instagram", name:"Instagram",   icon:"📸", pkg:"com.instagram.android",        scheme:"instagram://app",                          alias:["instagram","インスタ"] },
+  { id:"facebook",  name:"Facebook",    icon:"📘", pkg:"com.facebook.katana",          scheme:"fb://feed",                                alias:["facebook","フェイスブック"] },
+  { id:"whatsapp",  name:"WhatsApp",    icon:"💚", pkg:"com.whatsapp",                 scheme:"whatsapp://send",                          alias:["whatsapp","ワッツアップ"] },
+  { id:"spotify",   name:"Spotify",     icon:"🎵", pkg:"com.spotify.music",            scheme:"spotify://",                               alias:["spotify","スポティファイ"] },
+  { id:"tiktok",    name:"TikTok",      icon:"🎬", pkg:"com.zhiliaoapp.musically",     scheme:null,                                       alias:["tiktok","ティックトック"] }
+];
+function appCatalogFind(text){
+  var t = String(text || "").toLowerCase();
+  for (var i = 0; i < APP_CATALOG.length; i++){
+    var c = APP_CATALOG[i];
+    var names = [c.name.toLowerCase()].concat(c.alias);
+    for (var j = 0; j < names.length; j++){
+      if (names[j] && t.indexOf(String(names[j]).toLowerCase()) >= 0) return c;
+    }
+  }
+  return null;
+}
+/* 隣接ウィンドウ起動 — Samsung マルチウィンドウ / DeX で「もう一方の窓」に開く。
+   FLAG_ACTIVITY_LAUNCH_ADJACENT (0x00001000) + FLAG_ACTIVITY_NEW_TASK (0x10000000) を
+   intent: URI の launchFlags に載せると、端末 OS が分割画面の隣に起動する。 */
+function appAdjacentIntent(pkg){
+  if (!pkg) return null;
+  return "intent:#Intent;action=android.intent.action.MAIN;" +
+         "category=android.intent.category.LAUNCHER;package=" + pkg +
+         ";launchFlags=0x10001000;end";
+}
+function appLaunch(query){
+  var q = String(query || "").trim();
+  if (!q){
+    var ps = APP_CATALOG[0];
+    return { found: true, app: ps, launch: ps.scheme, store: ps.scheme, adjacent: appAdjacentIntent(ps.pkg) };
+  }
+  var hit = appCatalogFind(q);
+  if (hit){
+    var store = "market://details?id=" + hit.pkg;
+    return { found: true, app: hit, launch: hit.scheme || store, store: store, adjacent: appAdjacentIntent(hit.pkg) };
+  }
+  var search = "market://search?q=" + encodeURIComponent(q);
+  return { found: false, query: q, launch: search, store: search, adjacent: null };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 5c. ウィンドウマネージャ — フリーフォーム / マルチウィンドウ
+ *
+ *   Samsung DeX・One UI のフリーフォーム (自由配置ウィンドウ) と
+ *   マルチウィンドウ (分割画面) を QuantOS 自身のシェルとして実装する。
+ *   重なり合うウィンドウは「組み紐 (braid)」として扱う: x 座標順に
+ *   並べたストランドを重なり順 (z) へ並べ替える隣接互換の列が組み紐語
+ *   σ₁σ₂… であり、上を通る窓が正の交差を作る。交差数は置換の転倒数に
+ *   等しく一意に定まるので、その閉包の Kauffman ブラケット (−A³)^w を
+ *   トポロジー写像機構と同じ不変量で計算できる。
+ * ════════════════════════════════════════════════════════════════════ */
+var WM_MIN_W = 260, WM_MIN_H = 180;
+
+function wmNewState(vw, vh){
+  return { mode: "fullscreen", wins: [], seq: 0, zTop: 0, focus: null,
+           vw: vw || 1280, vh: vh || 800 };
+}
+function wmGet(st, id){
+  for (var i = 0; i < st.wins.length; i++) if (st.wins[i].id === id) return st.wins[i];
+  return null;
+}
+function wmFindApp(st, appId){
+  for (var i = 0; i < st.wins.length; i++) if (st.wins[i].appId === appId) return st.wins[i];
+  return null;
+}
+function wmVisible(st){
+  var v = [];
+  for (var i = 0; i < st.wins.length; i++) if (!st.wins[i].min) v.push(st.wins[i]);
+  return v;
+}
+function wmDefaultRect(st, n){
+  var w = Math.max(WM_MIN_W, Math.min(st.vw, Math.round(st.vw * 0.56)));
+  var h = Math.max(WM_MIN_H, Math.min(st.vh, Math.round(st.vh * 0.64)));
+  var x = 18 + (n % 6) * 26, y = 44 + (n % 6) * 24;
+  if (x + w > st.vw) x = Math.max(0, st.vw - w);
+  if (y + h > st.vh) y = Math.max(0, st.vh - h);
+  return { x: x, y: y, w: w, h: h };
+}
+function wmFocus(st, id){
+  var w = wmGet(st, id);
+  if (!w) return st;
+  st.zTop++; w.z = st.zTop; w.min = false; st.focus = id;
+  return st;
+}
+function wmOpen(st, appId){
+  var ex = wmFindApp(st, appId);
+  if (ex) return wmFocus(st, ex.id);          /* 同じアプリは二重に開かない */
+  var r = wmDefaultRect(st, st.seq);
+  st.seq++; st.zTop++;
+  var id = "w" + st.seq;
+  st.wins.push({ id: id, appId: appId, x: r.x, y: r.y, w: r.w, h: r.h, z: st.zTop, min: false });
+  st.focus = id;
+  return st;
+}
+function wmClose(st, id){
+  var rest = [];
+  for (var i = 0; i < st.wins.length; i++) if (st.wins[i].id !== id) rest.push(st.wins[i]);
+  st.wins = rest;
+  if (st.focus === id){
+    var top = null;
+    for (var j = 0; j < st.wins.length; j++) if (!st.wins[j].min && (!top || st.wins[j].z > top.z)) top = st.wins[j];
+    st.focus = top ? top.id : null;
+  }
+  return st;
+}
+function wmMinimize(st, id){
+  var w = wmGet(st, id);
+  if (!w) return st;
+  w.min = true;
+  if (st.focus === id){
+    var top = null;
+    for (var j = 0; j < st.wins.length; j++) if (!st.wins[j].min && (!top || st.wins[j].z > top.z)) top = st.wins[j];
+    st.focus = top ? top.id : null;
+  }
+  return st;
+}
+function wmMove(st, id, x, y){
+  var w = wmGet(st, id);
+  if (!w) return st;
+  w.x = Math.max(0, Math.min(x, st.vw - 40));
+  w.y = Math.max(0, Math.min(y, st.vh - 32));
+  return st;
+}
+function wmResize(st, id, width, height){
+  var w = wmGet(st, id);
+  if (!w) return st;
+  w.w = Math.max(WM_MIN_W, Math.min(width, st.vw));
+  w.h = Math.max(WM_MIN_H, Math.min(height, st.vh));
+  return st;
+}
+/* 画面端へのスナップ (Samsung の分割画面ドロップと同じ操作感) */
+function wmSnap(st, id, edge){
+  var w = wmGet(st, id);
+  if (!w) return st;
+  var W = st.vw, H = st.vh, half2 = Math.round(W / 2), halfV = Math.round(H / 2);
+  if (edge === "left")       { w.x = 0;      w.y = 0;     w.w = half2;     w.h = H; }
+  else if (edge === "right") { w.x = half2;  w.y = 0;     w.w = W - half2; w.h = H; }
+  else if (edge === "top")   { w.x = 0;      w.y = 0;     w.w = W;         w.h = halfV; }
+  else if (edge === "bottom"){ w.x = 0;      w.y = halfV; w.w = W;         w.h = H - halfV; }
+  else if (edge === "max")   { w.x = 0;      w.y = 0;     w.w = W;         w.h = H; }
+  return st;
+}
+/* 分割レイアウト (Samsung マルチウィンドウ相当) */
+var WM_LAYOUTS = {
+  split2:  [[0,0,.5,1],[.5,0,.5,1]],
+  vsplit2: [[0,0,1,.5],[0,.5,1,.5]],
+  split3:  [[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.5,.5]],
+  grid4:   [[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]]
+};
+function wmTile(st, layout){
+  var vis = wmVisible(st);
+  vis.sort(function(a, b){ return a.z - b.z; });
+  if (layout === "max"){
+    var f = (st.focus && wmGet(st, st.focus)) || vis[vis.length - 1];
+    if (f) wmSnap(st, f.id, "max");
+    return st;
+  }
+  if (layout === "cascade"){
+    for (var c = 0; c < vis.length; c++){
+      var r = wmDefaultRect(st, c);
+      vis[c].x = r.x; vis[c].y = r.y; vis[c].w = r.w; vis[c].h = r.h;
+    }
+    return st;
+  }
+  var cells = WM_LAYOUTS[layout];
+  if (!cells) return st;
+  for (var i = 0; i < vis.length && i < cells.length; i++){
+    var cel = cells[i];
+    vis[i].x = Math.round(cel[0] * st.vw); vis[i].y = Math.round(cel[1] * st.vh);
+    vis[i].w = Math.round(cel[2] * st.vw); vis[i].h = Math.round(cel[3] * st.vh);
+  }
+  return st;
+}
+/* 重なり (z 順) を組み紐語にする。交差数 = 置換の転倒数 (一意)。 */
+function wmBraidWord(st){
+  var vis = wmVisible(st);
+  vis.sort(function(a, b){ return (a.x - b.x) || (a.z - b.z); });
+  var order = [], i;
+  for (i = 0; i < vis.length; i++) order.push(vis[i].z);
+  var word = [], sub = ["₀","₁","₂","₃","₄","₅","₆","₇","₈","₉"];
+  for (i = 0; i < order.length; i++){
+    for (var j = 0; j < order.length - 1 - i; j++){
+      if (order[j] > order[j + 1]){
+        var t = order[j]; order[j] = order[j + 1]; order[j + 1] = t;
+        word.push("σ" + (String(j + 1).replace(/\d/g, function(d){ return sub[+d]; })));
+      }
+    }
+  }
+  var signs = [];
+  for (i = 0; i < word.length; i++) signs.push(1);
+  return {
+    strands: vis.length, word: word, crossings: word.length,
+    text: word.length ? word.join("") : "e (自明な組み紐 — 左右の並びと重なり順が一致)",
+    invariant: topoInvariant(signs)
+  };
+}
+
+/* 端末側マルチウィンドウの可否 (Android 7+ / Samsung フリーフォーム) */
+function wmDeviceSupport(prof){
+  if (!prof.android)
+    return { multiWindow: false, freeform: false,
+             note: prof.label + " では QuantOS 内蔵のフリーフォームで複数アプリを同時表示します" };
+  if (prof.dex)
+    return { multiWindow: true, freeform: true,
+             note: "Samsung DeX を検出 — 端末側でも自由配置ウィンドウとして扱えます" };
+  if (prof.samsung)
+    return { multiWindow: true, freeform: true,
+             note: "Samsung 端末 — 分割画面/ポップアップ表示 (フリーフォーム) に対応しています" };
+  return { multiWindow: true, freeform: false,
+           note: "Android のマルチウィンドウ (分割画面) に対応しています" };
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -524,6 +834,20 @@ function intentDetect(text){
     return { intent: "quantum_code", code: t, why: "量子 Bada の予約語で始まるコード" };
   if (/暗号|BB84|鍵配送|盗聴|金庫|復号/i.test(t))
     return { intent: "qcrypt", eve: /盗聴|Eve/i.test(t), why: "量子暗号 (BB84 鍵配送・暗号化) の依頼" };
+  if (/フリーフォーム|マルチウィンドウ|分割画面|ウィンドウ|窓|並べて|タイル|DeX|デックス/i.test(t)){
+    var lay = /上下|縦/.test(t) ? "vsplit2" : /3\s*分割|三分割/.test(t) ? "split3"
+            : /4|格子|田/.test(t) ? "grid4" : /カスケード|重ね/.test(t) ? "cascade"
+            : /最大/.test(t) ? "max" : /分割|左右|並べ|タイル/.test(t) ? "split2" : null;
+    return { intent: "window", layout: lay, why: "フリーフォーム / マルチウィンドウの依頼" +
+             (lay ? " (レイアウト: " + lay + ")" : "") };
+  }
+  var capp = appCatalogFind(t);
+  if (/インストール|プレイストア|playストア|play\s*store|ストア/i.test(t))
+    return { intent: "store", query: capp ? capp.name
+             : t.replace(/(を|の|で)?(プレイストア|playストア|play\s*store|ストア|インストール|検索|開いて|開く|使いたい|使う)(して|する)?(ください)?/gi, "").trim(),
+             why: "Play ストアの依頼" };
+  if (capp && /開|起動|使|見|聴|再生/.test(t))
+    return { intent: "launch", query: capp.name, why: "インストール済みアプリの起動依頼 (" + capp.name + ")" };
   if (/アラーム|時計|何時|時刻|起こして/i.test(t))
     return { intent: "clock", hour: (t.match(/(\d{1,2})\s*時/) || [])[1] || null, why: "時計・アラームの依頼" };
   if (/電話|かけて|発信|call/i.test(t))
@@ -552,6 +876,8 @@ function intentDetect(text){
     return { intent: "qlab", why: "量子計算の依頼" };
   if (/設定|プロファイル|端末情報/i.test(t))
     return { intent: "settings", why: "設定の依頼" };
+  if (/アプリ/.test(t))
+    return { intent: "apps", why: "アプリ一覧の依頼" };
   if (/ホーム|home/i.test(t))
     return { intent: "home", why: "ホームへ戻る" };
   return { intent: "chat", why: "対話 (機能語なし) — 生成応答" };
@@ -565,7 +891,8 @@ function intentDetect(text){
 var INTENT_APP = {
   phone:"phone", sms:"sms", mail:"mail", camera:"camera", gallery:"gallery",
   clock:"clock", calc:"calc", notes:"notes", contacts:"contacts", files:"files",
-  quantum_code:"qlab", qlab:"qlab", topo:"topo", settings:"settings", qcrypt:"qcrypt", chat:"ai", home:"ai"
+  quantum_code:"qlab", qlab:"qlab", topo:"topo", settings:"settings", qcrypt:"qcrypt",
+  apps:"apps", launch:"apps", store:"apps", window:"ai", chat:"ai", home:"ai"
 };
 var CHAT_TEMPLATES = [
   "私は QuantOS の生成AIカーネルです。{n} 個の機能が 4 量子ビットレジスタの基底に写像されています。「電話」「写真を撮って」「1+2*3」のように話しかけてください。",
@@ -615,6 +942,33 @@ function aiKernel(text){
     plan = "時計を開いてアラーム時刻を提案";
     reply = "⏰ " + it.hour + " 時のアラームですね。時計を開きます。";
   }
+  else if (it.intent === "window"){
+    var sup = wmDeviceSupport(deviceProfile(UA, SCREENW));
+    action = { type: "window", app: "ai", layout: it.layout };
+    plan = "シェルをフリーフォームに切り替え" + (it.layout ? " → " + it.layout + " で整列" : "");
+    reply = "🗔 フリーフォーム (マルチウィンドウ) に切り替えます。" +
+            (it.layout ? "ウィンドウを " +
+              (it.layout === "split2" ? "左右2分割" : it.layout === "vsplit2" ? "上下2分割" :
+               it.layout === "split3" ? "3分割" : it.layout === "grid4" ? "格子4分割" :
+               it.layout === "max" ? "最大化" : "カスケード") + "で並べます。" : "") +
+            "\n" + sup.note;
+    verify = sup.freeform ? "端末側もフリーフォーム対応" : (sup.multiWindow ? "端末側は分割画面に対応" : "QuantOS 内蔵のフリーフォームで動作");
+  }
+  else if (it.intent === "launch"){
+    var la = appLaunch(it.query);
+    action = { type: "launch", app: "apps", launch: la };
+    plan = "カタログ照合 → URL スキーム / market: インテントを端末 OS へ発行";
+    reply = "🚀 " + (la.app ? la.app.icon + " " + la.app.name : it.query) + " を起動します (" + la.launch + ")。" +
+            (la.app && !la.app.scheme ? " 未インストールなら Play ストアのページが開きます。" : "");
+    verify = la.found ? "カタログ照合 OK" : "カタログ外 → Play ストア検索に切替";
+  }
+  else if (it.intent === "store"){
+    var st = appLaunch(it.query);
+    action = { type: "market", app: "apps", launch: st };
+    plan = "Play ストアの market: インテントを構成";
+    reply = "🛒 Play ストアで「" + (st.app ? st.app.name : it.query || "ストア") + "」を開きます (" + st.store + ")。";
+    verify = "market: インテント構成 OK";
+  }
   else if (it.intent === "qcrypt"){
     plan = "BB84 で鍵配送 → QBER を検査" + (it.eve ? " (盗聴者 Eve を挿入)" : "");
     var bb = qcBB84(64, !!it.eve);
@@ -662,6 +1016,24 @@ function osDispatch(k){
     location.href = mh;
     return { performed: true, how: mh + " を発行しました" };
   }
+  if (a.type === "launch" || a.type === "market" || a.type === "adjacent"){
+    var la = a.launch || {};
+    var lhref = (a.type === "market") ? la.store
+              : (a.type === "adjacent") ? (la.adjacent || la.launch) : la.launch;
+    if (!prof.android)
+      return { performed: false, how: "インストール済みアプリの起動 / Play ストアは Android 端末 (" + prof.label + " は対象外) で動作します。発行予定のインテント: " + lhref };
+    if (typeof location === "undefined")
+      return { performed: false, how: "(テスト環境) " + lhref };
+    location.href = lhref;
+    return { performed: true, how: lhref + " を端末 OS へ発行しました (未インストールなら Play ストアが開きます)" };
+  }
+  if (a.type === "window"){
+    if (typeof document === "undefined" || typeof wmToggleMode !== "function")
+      return { performed: false, how: "(テスト環境) フリーフォーム切替" + (a.layout ? " + " + a.layout : "") };
+    if (WMS.mode !== "freeform") wmToggleMode();
+    if (a.layout) wmDo(a.layout);
+    return { performed: true, how: "フリーフォーム (マルチウィンドウ) へ切替" + (a.layout ? " → " + a.layout + " で整列" : "") };
+  }
   if (a.type === "open"){
     if (typeof document !== "undefined" && typeof openApp === "function") openApp(a.app);
     return { performed: true, how: "アプリ「" + a.app + "」へ写像遷移" };
@@ -680,6 +1052,7 @@ function el(id){ return document.getElementById(id); }
 function openApp(id){
   var tm = topoMap(id);
   if (!tm) return;
+  if (WMS.mode === "freeform"){ wmOpenWindow(id); return; }
   currentApp = id;
   el("home").style.display = "none";
   el("panel").style.display = "block";
@@ -701,6 +1074,246 @@ function closeApp(){
 function appById(id){
   for (var i = 0; i < OS_APPS.length; i++) if (OS_APPS[i].id === id) return OS_APPS[i];
   return {};
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * フリーフォーム / マルチウィンドウ の UI 層
+ * ════════════════════════════════════════════════════════════════════ */
+var WMS = wmNewState(SCREENW, 800);
+var wmEls = {};          /* ウィンドウ id → DOM 要素 */
+var wmDrag = null;       /* ドラッグ / リサイズ中の状態 */
+
+/* ツールバーの高さ。ウィンドウはその下 (クライアント領域) に配置し、
+   WM エンジンにはクライアント領域の寸法だけを渡す。 */
+function wmBarH(){
+  var b = el("wmBar");
+  var h = (b && b.offsetHeight) || 0;
+  return (typeof h === "number" && h > 0 && h < 200) ? h : 38;
+}
+function wmViewport(){
+  var d = el("desktop");
+  var w = d.clientWidth || SCREENW, h = d.clientHeight || 700;
+  if (typeof w === "number" && w > 40) WMS.vw = w;
+  if (typeof h === "number" && h > 40) WMS.vh = Math.max(200, h - wmBarH());
+}
+function wmToggleMode(){
+  if (WMS.mode === "fullscreen"){
+    WMS.mode = "freeform";
+    var was = currentApp;
+    closeApp();
+    el("desktop").style.display = "block";
+    el("taskbar").style.display = "flex";
+    el("sbMode").textContent = "🗔 フリーフォーム";
+    wmViewport();
+    if (was) wmOpenWindow(was);
+    wmLauncher(!was);              /* 窓がまだ無ければアプリ一覧を出す */
+    wmRender();
+  } else {
+    var keep = WMS.focus ? (wmGet(WMS, WMS.focus) || {}).appId : null;
+    wmCloseAll();
+    WMS.mode = "fullscreen";
+    el("home").className = "";
+    el("desktop").style.display = "none";
+    el("taskbar").style.display = "none";
+    el("sbMode").textContent = "🗖 全画面";
+    el("home").style.display = "block";
+    if (keep) openApp(keep);
+  }
+}
+/* ランチャー (アプリ一覧) の開閉 — DeX のアプリボタン相当 */
+function wmLauncher(show){
+  var h = el("home");
+  if (show){ h.className = "launcher"; h.style.display = "block"; }
+  else { h.className = ""; h.style.display = "none"; }
+  var b = el("tbApps");
+  if (b) b.textContent = show ? "⊞ アプリ一覧を閉じる" : "⊞ アプリ";
+}
+function wmLauncherToggle(){ wmLauncher(el("home").className !== "launcher"); }
+function wmOpenWindow(appId){
+  wmViewport();
+  var before = WMS.wins.length;
+  wmOpen(WMS, appId);
+  el("desktop").style.display = "block";
+  el("taskbar").style.display = "flex";
+  wmLauncher(false);              /* 起動したらランチャーは畳む */
+  wmRender();
+  if (WMS.wins.length > before){
+    var w = wmFindApp(WMS, appId);
+    if (w) wmRenderContent(w);
+  }
+}
+function wmDo(layout){ wmViewport(); wmTile(WMS, layout); wmRender(); }
+function wmCloseAll(){
+  for (var i = 0; i < WMS.wins.length; i++){
+    if (WMS.wins[i].appId === "camera") stopCamera();
+  }
+  WMS.wins = []; WMS.focus = null;
+  wmRender();
+}
+function wmCloseWin(id){
+  var w = wmGet(WMS, id);
+  if (w && w.appId === "camera") stopCamera();
+  wmClose(WMS, id);
+  wmRender();
+}
+function wmMinWin(id){ wmMinimize(WMS, id); wmRender(); }
+function wmMaxWin(id){ wmFocus(WMS, id); wmSnap(WMS, id, "max"); wmRender(); }
+function wmFocusWin(id){
+  var w = wmGet(WMS, id);
+  if (!w) return;
+  var wasMin = w.min;
+  wmFocus(WMS, id);
+  wmRender();
+  if (wasMin) wmRenderContent(w);
+}
+function wmRenderContent(w){
+  var elem = wmEls[w.id];
+  if (!elem) return;
+  var body = elem.querySelector(".winbody");
+  if (!body) return;
+  body.innerHTML = "";
+  var tm = topoMap(w.appId), r = RENDER[w.appId];
+  if (r) r(body, tm);
+}
+function wmCreateEl(w){
+  var tm = topoMap(w.appId), app = appById(w.appId);
+  var d = document.createElement("div");
+  d.className = "win";
+  d.id = "win-" + w.id;
+  d.innerHTML =
+    "<div class='winbar'><span class='wt'>" + (app.icon || "") + " " + esc(tm ? tm.name : w.appId) + "</span>" +
+    "<span class='wk'>" + (tm ? tm.ket : "") + "</span>" +
+    "<button title='最小化' onclick=\"event.stopPropagation();wmMinWin('" + w.id + "')\">—</button>" +
+    "<button title='最大化' onclick=\"event.stopPropagation();wmMaxWin('" + w.id + "')\">▣</button>" +
+    "<button title='閉じる' onclick=\"event.stopPropagation();wmCloseWin('" + w.id + "')\">✕</button></div>" +
+    "<div class='winbody'></div><div class='grip'></div>";
+  d.addEventListener("pointerdown", function(){ wmFocusWin(w.id); });
+  var bar = d.querySelector(".winbar");
+  if (bar && bar.addEventListener)
+    bar.addEventListener("pointerdown", function(e){ wmDragStart(e, w.id, "move"); });
+  var grip = d.querySelector(".grip");
+  if (grip && grip.addEventListener)
+    grip.addEventListener("pointerdown", function(e){ wmDragStart(e, w.id, "resize"); });
+  el("desktop").appendChild(d);
+  wmEls[w.id] = d;
+  return d;
+}
+function wmDragStart(e, id, kind){
+  var w = wmGet(WMS, id);
+  if (!w) return;
+  if (e.preventDefault) e.preventDefault();
+  wmFocusWin(id);
+  wmDrag = { id: id, kind: kind, px: e.clientX, py: e.clientY, x: w.x, y: w.y, w: w.w, h: w.h };
+  if (e.target && e.target.setPointerCapture && e.pointerId !== undefined){
+    try{ e.target.setPointerCapture(e.pointerId); }catch(err){}
+  }
+}
+function wmDragMove(e){
+  if (!wmDrag) return;
+  if (e.preventDefault) e.preventDefault();
+  var dx = e.clientX - wmDrag.px, dy = e.clientY - wmDrag.py;
+  if (wmDrag.kind === "move"){
+    wmMove(WMS, wmDrag.id, wmDrag.x + dx, wmDrag.y + dy);
+    wmShowSnapHint(e);
+  } else {
+    wmResize(WMS, wmDrag.id, wmDrag.w + dx, wmDrag.h + dy);
+  }
+  wmSyncGeom();
+}
+function wmDragEnd(e){
+  if (!wmDrag) return;
+  var edge = (wmDrag.kind === "move") ? wmEdgeAt(e) : null;
+  var id = wmDrag.id;
+  wmDrag = null;
+  el("snapHint").style.display = "none";
+  if (edge) wmSnap(WMS, id, edge);
+  wmRender();
+}
+/* ドラッグ先が画面端なら分割スナップ (Samsung の分割画面ドロップ相当) */
+function wmEdgeAt(e){
+  var d = el("desktop");
+  var rect = (d.getBoundingClientRect && d.getBoundingClientRect()) || { left:0, top:0, width: WMS.vw, height: WMS.vh };
+  var x = e.clientX - rect.left, y = e.clientY - rect.top - wmBarH();
+  var m = 28;
+  if (x < m) return "left";
+  if (x > rect.width - m) return "right";
+  if (y > WMS.vh - m) return "bottom";
+  if (y < m) return "top";
+  return null;
+}
+function wmShowSnapHint(e){
+  var edge = wmEdgeAt(e), hint = el("snapHint");
+  if (!edge){ hint.style.display = "none"; return; }
+  var W = WMS.vw, H = WMS.vh, h2 = Math.round(W / 2), v2 = Math.round(H / 2);
+  var r = edge === "left"  ? [0, 0, h2, H] : edge === "right" ? [h2, 0, W - h2, H]
+        : edge === "top"   ? [0, 0, W, v2] : [0, v2, W, H - v2];
+  hint.style.display = "block";
+  hint.style.left = r[0] + "px"; hint.style.top = (r[1] + wmBarH()) + "px";
+  hint.style.width = r[2] + "px"; hint.style.height = r[3] + "px";
+}
+function wmSyncGeom(){
+  var off = wmBarH();
+  for (var i = 0; i < WMS.wins.length; i++){
+    var w = WMS.wins[i], d = wmEls[w.id];
+    if (!d) continue;
+    d.style.display = w.min ? "none" : "flex";
+    d.style.left = w.x + "px"; d.style.top = (w.y + off) + "px";
+    d.style.width = w.w + "px"; d.style.height = w.h + "px";
+    d.style.zIndex = String(10 + w.z);
+    d.className = "win" + (WMS.focus === w.id ? " focus" : "");
+  }
+}
+function wmRender(){
+  var desk = el("desktop");
+  /* 閉じたウィンドウの DOM を破棄 */
+  for (var id in wmEls){
+    if (!wmGet(WMS, id)){
+      try{ desk.removeChild(wmEls[id]); }catch(e){}
+      delete wmEls[id];
+    }
+  }
+  /* 新規ウィンドウの DOM を生成 */
+  for (var i = 0; i < WMS.wins.length; i++){
+    if (!wmEls[WMS.wins[i].id]) wmCreateEl(WMS.wins[i]);
+  }
+  wmSyncGeom();
+  /* タスクバー (DeX 風) — 先頭はアプリ一覧ボタン */
+  var tb = "<div class='tb' id='tbApps' onclick='wmLauncherToggle()'>⊞ アプリ</div>";
+  for (var j = 0; j < WMS.wins.length; j++){
+    var w2 = WMS.wins[j], a = appById(w2.appId), t2 = topoMap(w2.appId);
+    tb += "<div class='tb" + (WMS.focus === w2.id ? " on" : "") + (w2.min ? " mini" : "") +
+          "' onclick=\"wmFocusWin('" + w2.id + "')\">" + (a.icon || "") + " " + esc(t2 ? t2.name : w2.appId) +
+          " <span class='mono' style='font-size:9.5px'>" + (t2 ? t2.ket : "") + "</span></div>";
+  }
+  if (!WMS.wins.length)
+    tb += "<span class='hint'>「⊞ アプリ」からアプリを選ぶとフリーフォームの窓で開きます（複数同時に開けます）</span>";
+  el("taskbar").innerHTML = tb;
+  var ab = el("tbApps");
+  if (ab) ab.textContent = (el("home").className === "launcher") ? "⊞ アプリ一覧を閉じる" : "⊞ アプリ";
+  /* 組み紐 (重なり) の表示 */
+  var b = wmBraidWord(WMS);
+  el("wmBraid").textContent = "組み紐 " + b.text + " · " + b.strands + " 本 / 交差 " +
+                              b.crossings + " · ⟨K⟩=" + b.invariant.bracket;
+}
+function wmInit(){
+  if (typeof document === "undefined" || !document.addEventListener) return;
+  document.addEventListener("pointermove", wmDragMove);
+  document.addEventListener("pointerup", wmDragEnd);
+  document.addEventListener("pointercancel", wmDragEnd);
+  if (typeof window !== "undefined" && window.addEventListener){
+    window.addEventListener("resize", function(){
+      wmViewport();
+      if (WMS.mode === "freeform"){
+        /* 端末側で分割画面に入りウィンドウが縮んでも窓が画面外に出ないよう戻す */
+        for (var i = 0; i < WMS.wins.length; i++){
+          var w = WMS.wins[i];
+          wmResize(WMS, w.id, w.w, w.h);
+          wmMove(WMS, w.id, w.x, w.y);
+        }
+        wmRender();
+      }
+    });
+  }
 }
 
 /* ── 各アプリの描画 ── */
@@ -1012,6 +1625,55 @@ RENDER.topo = function(body){
     "<pre id='topoRouteOut'>2 つの機能を選んで「変形」— ハイパーキューブ上の X ゲート列と検算を表示します。</pre></div>";
 };
 
+/* アプリ (インストール済みアプリの起動 + Play ストア) */
+function apMsgSet(res){ el("apMsg").textContent = res.how; }
+function apLaunch(idx){
+  var c = APP_CATALOG[idx];
+  apMsgSet(osDispatch({ action: { type: "launch", app: "apps", launch: appLaunch(c.name) } }));
+}
+function apAdjacent(idx){
+  var c = APP_CATALOG[idx];
+  apMsgSet(osDispatch({ action: { type: "adjacent", app: "apps", launch: appLaunch(c.name) } }));
+}
+function apStore(idx){
+  var c = APP_CATALOG[idx];
+  apMsgSet(osDispatch({ action: { type: "market", app: "apps", launch: { store: "market://details?id=" + c.pkg } } }));
+}
+function apSearch(){
+  var q = el("apQ").value.trim();
+  if (!q) return;
+  apMsgSet(osDispatch({ action: { type: "market", app: "apps", launch: { store: "market://search?q=" + encodeURIComponent(q) } } }));
+}
+function apPkg(){
+  var p = el("apP").value.trim();
+  if (!p) return;
+  apMsgSet(osDispatch({ action: { type: "market", app: "apps", launch: { store: "market://details?id=" + p } } }));
+}
+RENDER.apps = function(body){
+  var prof = deviceProfile(UA, SCREENW);
+  var rows = "";
+  for (var i = 0; i < APP_CATALOG.length; i++){
+    var c = APP_CATALOG[i];
+    rows += "<tr><td>" + c.icon + " " + esc(c.name) + "</td><td class='mono' style='word-break:break-all'>" + esc(c.pkg) + "</td>" +
+            "<td><button class='grn' onclick='apLaunch(" + i + ")'>🚀 起動</button> " +
+            "<button onclick='apAdjacent(" + i + ")' title='分割画面のもう一方に開く'>🗔 分割</button> " +
+            "<button onclick='apStore(" + i + ")'>🛒 ストア</button></td></tr>";
+  }
+  body.innerHTML =
+    "<div class='card'><b>インストール済みアプリを起動</b>" +
+    "<p class='hint'>URL スキーム / market: インテントを端末 OS へ発行してアプリを起動します。未インストールのアプリは Play ストアのページが開き、そこからインストールできます。" +
+    (prof.android ? "" : " (この端末は " + esc(prof.label) + " のため発行内容の表示のみ)") + "</p>" +
+    "<table><thead><tr><th>アプリ</th><th>パッケージ</th><th></th></tr></thead><tbody>" + rows + "</tbody></table></div>" +
+    "<div class='card'><b>🛒 Play ストア</b>" +
+    "<div class='row'><input id='apQ' placeholder='Play ストアで検索 (例: 量子コンピュータ)' style='flex:1' onkeydown=\"if(event.key==='Enter')apSearch()\"/>" +
+    "<button class='acc' onclick='apSearch()'>検索</button></div>" +
+    "<div class='row'><input id='apP' placeholder='パッケージ名で開く (例: com.google.android.youtube)' style='flex:1' onkeydown=\"if(event.key==='Enter')apPkg()\"/>" +
+    "<button onclick='apPkg()'>ページを開く</button></div>" +
+    "<p class='hint' id='apMsg'>market://search?q=… / market://details?id=… インテントで Play ストアを開きます。" +
+    "「🗔 分割」は FLAG_ACTIVITY_LAUNCH_ADJACENT を載せた intent: URI で、Samsung のマルチウィンドウ (分割画面) のもう一方に起動します。" +
+    "AIカーネルに「YouTube を開いて」「LINE をインストールして」と話しかけても同じことができます。</p></div>";
+};
+
 /* 量子暗号 (BB84 鍵配送 + ワンタイムパッド + 量子金庫) */
 var qcKey = [];      /* 現在の共有鍵ビット列 — メモリ内のみ (保存しない) */
 function qcRun(){
@@ -1125,10 +1787,14 @@ RENDER.settings = function(body){
     "<tr><td>量子レジスタ</td><td class='mono'>" + TOPO_QUBITS + " qubit / " + (1 << TOPO_QUBITS) + " 基底</td></tr>" +
     "<tr><td>写像済み機能</td><td>" + OS_APPS.length + " 個 (単射 φ)</td></tr>" +
     "<tr><td>量子暗号鍵</td><td>" + (qcKey.length ? "🔑 " + qcKey.length + " ビット確立済 (メモリ内のみ)" : "未配送 — 量子暗号アプリで BB84 を実行") + "</td></tr>" +
+    "<tr><td>アプリ起動 / Play ストア</td><td>" + (p.android ? "✔ market:/URL スキーム委譲可" : "✖ Android 端末のみ") + "</td></tr>" +
+    "<tr><td>Samsung / DeX</td><td>" + (p.dex ? "🖥 DeX モードを検出" : p.samsung ? "✔ Samsung 端末" : "— (非 Samsung)") + "</td></tr>" +
+    "<tr><td>マルチウィンドウ</td><td>" + (p.freeform ? "✔ フリーフォーム対応" : p.multiWindow ? "✔ 分割画面対応" : "QuantOS 内蔵のみ") + "</td></tr>" +
     "<tr><td>UserAgent</td><td style='word-break:break-all'>" + esc(UA || "(なし)") + "</td></tr>";
   body.innerHTML =
     "<div class='card'><b>端末プロファイル</b><table><tbody>" + rows + "</tbody></table>" +
-    "<p class='hint'>" + esc(p.note) + "</p></div>" +
+    "<p class='hint'>" + esc(p.note) + "<br/>" + esc(wmDeviceSupport(p).note) + "</p>" +
+    "<div class='row'><button class='acc' onclick='wmToggleMode()'>🗔 フリーフォーム / 全画面 を切り替え</button></div></div>" +
     "<div class='card'><b>データ</b><div class='row'><button onclick='settingsClear()'>端末内データを消去</button></div>" +
     "<p class='hint' id='setMsg'>発信履歴・連絡先・写真・メモ・ファイル・AIログを消去します。</p></div>";
 };
@@ -1171,9 +1837,12 @@ function initHome(){
   }
   g.innerHTML = h;
   var p = deviceProfile(UA, SCREENW);
-  el("sbDev").textContent = p.label;
+  el("sbDev").textContent = p.label + (p.dex ? " · DeX" : p.samsung ? " · Samsung" : "");
   updateClock();
   setInterval(updateClock, 1000);
+  wmInit();
+  /* Samsung DeX / タブレットの広い画面では最初からフリーフォームで開く */
+  if (p.dex || (p.freeform && SCREENW >= 900)) wmToggleMode();
 }
 initHome();
 </script>
