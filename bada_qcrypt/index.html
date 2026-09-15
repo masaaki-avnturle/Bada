@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada QCrypt — 量子暗号ソフト (量子プログラミング言語 Bada 版)</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111623; --panel:#151b2c; --line:#26304a;
+    --tx:#dbe4ff; --dim:#8b97b8; --acc:#7c5cff; --acc2:#2dd4bf; --warn:#f59e0b; --err:#f87171;
+    --ok:#34d399; --ket:#a78bfa;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 70% -10%, #1a2340 0%, var(--bg) 55%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  #statusbar{
+    display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:12px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:rgba(11,14,20,.8); backdrop-filter:blur(6px); flex-wrap:wrap;
+  }
+  #statusbar b{ color:var(--tx); font-weight:600; }
+  #sbKey{ margin-left:auto; font-family:ui-monospace,Consolas,monospace; color:var(--acc2); }
+  #sbKey.nokey{ color:var(--warn); }
+  #tabs{
+    display:flex; gap:6px; padding:9px 12px 0; border-bottom:1px solid var(--line);
+    overflow-x:auto; background:rgba(11,14,20,.6); flex-shrink:0;
+  }
+  #tabs button{
+    background:transparent; border:1px solid transparent; border-bottom:none; color:var(--dim);
+    border-radius:11px 11px 0 0; padding:9px 14px; font-size:13px; cursor:pointer; white-space:nowrap; font-family:inherit;
+  }
+  #tabs button.on{ background:var(--panel); border-color:var(--line); color:var(--tx); }
+  #main{ flex:1; overflow:auto; }
+  .page{ display:none; padding:16px 14px 60px; max-width:860px; margin:0 auto; }
+  .page.on{ display:block; }
+  h2{ font-size:17px; margin:6px 0 4px; }
+  h2 span{ color:var(--acc); }
+  .sub{ font-size:11.5px; color:var(--dim); line-height:1.8; margin-bottom:10px; }
+  button{
+    background:linear-gradient(160deg,#232c48,#1a2136); color:var(--tx); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:active{ transform:scale(.96); }
+  button.acc{ background:linear-gradient(160deg,var(--acc),#5a3fd8); border-color:transparent; }
+  button.grn{ background:linear-gradient(160deg,#0f9d84,#0b7a67); border-color:transparent; }
+  button.red{ background:linear-gradient(160deg,#b53b3b,#8c2b2b); border-color:transparent; }
+  button.sm{ font-size:12px; padding:5px 10px; border-radius:8px; }
+  input,textarea,select{
+    background:var(--bg2); color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; font-size:14px; font-family:inherit; width:100%;
+  }
+  textarea{ font-family:ui-monospace,Consolas,monospace; min-height:110px; font-size:13px; line-height:1.6; }
+  textarea.code{ min-height:260px; white-space:pre; }
+  pre{
+    background:#0a0d16; border:1px solid var(--line); border-radius:10px; padding:11px;
+    font-size:12.5px; line-height:1.6; overflow:auto; font-family:ui-monospace,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .row{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin:10px 0; }
+  .hint{ font-size:11.5px; color:var(--dim); line-height:1.8; }
+  .tag{ display:inline-block; font-size:10.5px; color:var(--acc2); border:1px solid var(--line); border-radius:99px; padding:1px 9px; margin:2px 3px 2px 0; }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ border-bottom:1px solid var(--line); padding:6px 5px; text-align:left; }
+  th{ color:var(--dim); font-weight:500; }
+  .mono{ font-family:ui-monospace,Consolas,monospace; color:var(--ket); }
+  .ok{ color:var(--ok); } .bad{ color:var(--err); } .wrn{ color:var(--warn); }
+  label.chk{ display:flex; align-items:center; gap:6px; font-size:13px; width:auto; }
+  input[type=checkbox]{ width:auto; }
+</style>
+</head>
+<body>
+  <div id="statusbar">
+    <b>⚛🔐 Bada QCrypt</b>
+    <span>量子暗号ソフト — 暗号処理はすべて量子プログラミング言語 Bada で記述</span>
+    <span id="sbKey" class="nokey">鍵: なし</span>
+  </div>
+
+  <div id="tabs">
+    <button data-p="bb84" class="on">🔑 鍵配送 (BB84)</button>
+    <button data-p="otp">✉ 暗号化 (OTP)</button>
+    <button data-p="vault">🗄 量子金庫</button>
+    <button data-p="seal">🧪 量子検疫室</button>
+    <button data-p="prog">⚛ Bada プログラム室</button>
+  </div>
+
+  <div id="main">
+    <!-- ═══════════ 🔑 BB84 ═══════════ -->
+    <div class="page on" id="pg-bb84">
+      <h2>🔑 BB84 <span>量子鍵配送</span></h2>
+      <p class="sub">Alice が量子乱数ビット (H|0⟩ の測定) を乱択基底 (Z=+ / X=×) で光子に符号化して送出し、Bob が乱択基底で測定します。
+      光子 1 個ずつが <b>Bada の量子プログラム</b>としてゲート列 (X / H / 測定) に通されます。基底一致分をふるい、前半を照合して
+      <b>QBER (量子ビット誤り率)</b> を推定 — 盗聴者 Eve が intercept-resend で割り込むと複製不可能定理により約 25% の誤りが混入し、
+      QBER &gt; 10% で盗聴を検出して鍵を破棄します。</p>
+      <div class="row">
+        <label>光子数
+          <select id="bbN" style="width:auto">
+            <option value="256">256 (鍵 約 8 バイト — 実験用)</option>
+            <option value="4096" selected>4096 (鍵 約 128 バイト)</option>
+            <option value="16384">16384 (鍵 約 500 バイト)</option>
+            <option value="65536">65536 (鍵 約 2 KB — 少し時間がかかります)</option>
+          </select>
+        </label>
+        <label class="chk"><input type="checkbox" id="bbEve"/> 盗聴者 Eve を挿入 (intercept-resend)</label>
+        <button class="acc" onclick="uiBB84()">⚛ 鍵配送を実行</button>
+      </div>
+      <div id="bbOut"></div>
+    </div>
+
+    <!-- ═══════════ ✉ OTP ═══════════ -->
+    <div class="page" id="pg-otp">
+      <h2>✉ ワンタイムパッド<span>暗号</span></h2>
+      <p class="sub">BB84 で確立した共有鍵で本文を XOR します (Bada プログラム)。鍵長 ≥ 本文長のとき情報理論的に安全 (Shannon 1949)。
+      鍵はメモリ内のみに保持し、保存しません。</p>
+      <div class="card">
+        <b>平文</b>
+        <textarea id="otPlain" placeholder="暗号化する本文"></textarea>
+        <div class="row">
+          <button class="acc" onclick="uiEncrypt()">🔐 暗号化 →</button>
+          <button onclick="uiDecrypt()">← 🔓 復号</button>
+          <span id="otMsg" class="hint"></span>
+        </div>
+        <b>暗号文 (16進)</b>
+        <textarea id="otCipher" placeholder="16進の暗号文"></textarea>
+      </div>
+    </div>
+
+    <!-- ═══════════ 🗄 金庫 ═══════════ -->
+    <div class="page" id="pg-vault">
+      <h2>🗄 量子<span>金庫</span></h2>
+      <p class="sub">メモを共有鍵で暗号化してから端末に保管します。端末内に残るのは暗号文だけで、復号には保管時と同じ鍵が必要です。</p>
+      <div class="card">
+        <textarea id="vaultIn" placeholder="金庫に入れるメモ"></textarea>
+        <div class="row">
+          <button class="grn" onclick="uiVaultPut()">🔐 暗号化して保管</button>
+          <span id="vaultMsg" class="hint"></span>
+        </div>
+      </div>
+      <div id="vaultList"></div>
+    </div>
+
+    <!-- ═══════════ 🧪 検疫 ═══════════ -->
+    <div class="page" id="pg-seal">
+      <h2>🧪 量子<span>検疫室</span> — 感染の検出と解除 (封印時の状態への復元)</h2>
+      <p class="sub">大切なテキスト・ファイルを<b>量子封印</b>すると、ワンタイムパッド暗号文と<b>検疫タグ</b>(鍵付きハッシュ — Bada プログラム)の組で保管されます。
+      あとから<b>検査</b>すると、ウイルス感染・改竄など<b>いかなる改変も 1 バイトから検出</b>(何バイト変わり最初の改変がどこかまで提示)し、
+      <b>解除</b>で封印時の清浄な状態へ<b>バイト単位で復元</b>します。ウイルスの種類・手口を問わないのは、正体を調べるのではなく
+      <b>「清浄だったときの姿」を基準に差分を見る</b>方式だからです。<br/>
+      ⚠ 原理的な限界: 任意のプログラムがウイルスか否かを判定する万能ソフトは存在しないことが証明されています (F. Cohen, 1987 — ウイルス判定の決定不能性)。
+      本室が保証するのは「<b>封印済みのもの</b>に対する、あらゆる改変の検出と封印時点への解除・復元」であって、未封印のものの判定ではありません。</p>
+      <div class="card">
+        <b>① 量子封印 — 守りたいものを封じる</b>
+        <div class="row">
+          <input id="sealName" placeholder="封印名 (省略時はファイル名)" style="max-width:240px"/>
+        </div>
+        <textarea id="sealData" placeholder="テキストを封印する場合はここに入力 (メモ・設定・コードなど)"></textarea>
+        <div class="row">
+          <button class="acc" onclick="uiSealMake()">🔏 テキストを量子封印</button>
+          <button class="sm" onclick="uiInfect()">⚠ ウイルス感染を模擬</button>
+        </div>
+        <div class="row">
+          <input type="file" id="sealFile" style="max-width:320px"/>
+          <button class="acc" onclick="uiSealMakeFile()">🔏 ファイルを量子封印</button>
+        </div>
+        <div class="hint">ファイルは端末の外に出ません (読み込みも復元もすべて端末内)。1 件あたり <b id="sealCap">256</b> KB まで。</div>
+      </div>
+      <div class="card">
+        <b>② 検査するファイル</b>
+        <div class="row"><input type="file" id="scanFile" style="max-width:320px"/></div>
+        <div class="hint">感染が疑われる<b>現物</b>を選び、下の封印の「🔬 検査」を押してください。テキスト封印は上のテキスト欄と照合します。</div>
+      </div>
+      <div class="card"><b>検疫結果</b><div id="sealMsg" class="hint">— まだ検査していません —</div></div>
+      <div id="sealList"></div>
+    </div>
+
+    <!-- ═══════════ ⚛ プログラム室 ═══════════ -->
+    <div class="page" id="pg-prog">
+      <h2>⚛ Bada <span>プログラム室</span></h2>
+      <p class="sub">このソフトの暗号処理を実装している<b>量子プログラミング言語 Bada のソースコード</b>そのものです。
+      編集するとアプリの各機能はその場で編集後のプログラムを使います (「既定に戻す」で復帰)。
+      「自由実行」ではベル状態など任意の Bada プログラムを走らせて print / state 出力を観測できます。</p>
+      <div class="row">
+        <select id="progSel" style="width:auto" onchange="uiProgShow()">
+          <option value="bb84">BB84 量子鍵配送</option>
+          <option value="otp">ワンタイムパッド (XOR)</option>
+          <option value="tag">検疫タグ (鍵付き FNV-1a)</option>
+          <option value="lab">自由実行 (ベル状態)</option>
+        </select>
+        <button class="acc" onclick="uiProgRun()">▶ 実行</button>
+        <button onclick="uiProgReset()">既定に戻す</button>
+      </div>
+      <textarea id="progSrc" class="code" spellcheck="false"></textarea>
+      <pre id="progOut" style="margin-top:10px">— 実行結果 —</pre>
+      <div class="card hint">
+        <b>Bada 言語 (量子暗号方言) リファレンス</b><br/>
+        <span class="tag">qubit a b</span><span class="tag">H q</span><span class="tag">X q</span><span class="tag">Z q</span><span class="tag">CNOT c t</span><span class="tag">measure q -&gt; v</span><span class="tag">reset [q]</span><span class="tag">state</span><br/>
+        <span class="tag">let x = 式</span><span class="tag">let a[i] = 式</span><span class="tag">for i = 0 to n - 1 … end</span><span class="tag">if 式 … else … end</span><span class="tag">while 式 … end</span><span class="tag">print 式, "文字列"</span><br/>
+        演算子: <span class="mono">+ - * / % == != &lt; &gt; &lt;= &gt;= and or not</span> / 組み込み関数: <span class="mono">xor(a,b) mul32(a,b) floor(x) abs(x) min(a,b) max(a,b) len(配列)</span><br/>
+        量子乱数は <span class="mono">H q</span> のあと <span class="mono">measure q -&gt; v</span> で得ます (アダマール変換した |0⟩ の測定 = 確率 1/2 ずつの真性乱数)。
+      </div>
+    </div>
+  </div>
+
+<script>
+"use strict";
+/* =====================================================================
+ * Bada QCrypt — 量子暗号ソフト (量子プログラミング言語 Bada 版)
+ *
+ *  今までの論文 (Bada#/Bada++ ほか) とアプリケーション (Bada QuantOS の
+ *  量子暗号アプリ等) の量子暗号ソフトを、量子プログラミング言語 Bada で
+ *  作り換えたもの。旧版は BB84 を JavaScript の確率則で模擬していたが、
+ *  本版では暗号処理そのもの (BB84 鍵配送 / ワンタイムパッド / 検疫タグ)
+ *  を Bada 言語のプログラムとして記述し、光子 1 個ずつを実振幅の
+ *  状態ベクトル実行系 (X / H / Z / CNOT / 測定) に実際に通す。
+ *
+ *  依存ゼロ・単一 HTML・オフライン動作。
+ *
+ *  エンジン構成 (純ロジック — tools/engine-test.js が Node で検証):
+ *   1. badaParse / badaRun — Bada 量子言語インタープリタ
+ *        量子: qubit / H / X / Z / CNOT / measure→変数 / reset / state
+ *        古典: let (配列可) / for / while / if-else / print /
+ *              xor / mul32 / floor / abs / min / max / len
+ *   2. BADA_SRC     — Bada で書かれた暗号プログラム本体
+ *        bb84: BB84 量子鍵配送 (量子乱数 + intercept-resend 盗聴 + QBER)
+ *        otp : ワンタイムパッド (XOR — 暗号化と復号は同一プログラム)
+ *        tag : 検疫タグ (鍵付き FNV-1a 32bit — 封印データの改竄検出)
+ *   3. qcTextBytes / qcBytesText / qcHex / qcUnhex — バイト列変換
+ *   4. qcRunBB84 / qcRunOTPBytes / qcEncrypt / qcDecrypt / qcRunTag
+ *      — Bada プログラムを実行するホスト側の入出力ラッパー
+ *
+ *  「どんなウイルス感染でも解除」について (誠実な注記):
+ *   あらゆるウイルスを検出する万能プログラムが存在しないことは
+ *   F. Cohen (1987) により決定不能問題として証明されている。本ソフトが
+ *   保証するのは、量子封印したデータに対する「いかなる改変 (ウイルス
+ *   感染・改竄を含む) の検出」と「封印時の清浄な状態への解除・復元」。
+ * ===================================================================== */
+
+/* ── 環境ガード (Node テスト環境では DOM / localStorage が無い) ── */
+function store(k, v){ try{ localStorage.setItem("qcrypt:" + k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+function load(k, d){ try{ var s = localStorage.getItem("qcrypt:" + k); return s === null || s === undefined ? d : JSON.parse(s); }catch(e){ return d; } }
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ════════════════════════════════════════════════════════════════════
+ * 1. Bada 量子言語インタープリタ
+ *    実振幅の状態ベクトル (H/X/Z/CNOT は実数で閉じる)。measure は
+ *    ボルン則で確率的に収縮する — seed を与えると再現可能 (テスト用)。
+ * ════════════════════════════════════════════════════════════════════ */
+function badaMulberry(seed){
+  var a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t = (t + Math.imul(t ^ (t >>> 7), t | 61)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function badaParse(src){
+  var lines = String(src).split("\n");
+  var pos = 0;
+  function clean(ln){
+    var q = false, out = "";
+    for (var i = 0; i < ln.length; i++){
+      var c = ln.charAt(i);
+      if (c === '"') q = !q;
+      if (c === "#" && !q) break;
+      out += c;
+    }
+    return out.trim();
+  }
+  function head(s){ var m = s.match(/^[A-Za-z_]\w*/); return m ? m[0] : ""; }
+  function parseBlock(stops){
+    var stmts = [];
+    while (pos < lines.length){
+      var no = pos + 1, raw = clean(lines[pos]);
+      if (!raw){ pos++; continue; }
+      var h = head(raw);
+      if (stops.indexOf(h) >= 0 && raw === h) return stmts;   /* end / else は単独行 */
+      pos++;
+      if (h === "for"){
+        var mf = raw.match(/^for\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s+to\s+(.+)$/);
+        if (!mf) throw new Error("行 " + no + ": for の書式は「for i = 開始 to 終了」です");
+        var body = parseBlock(["end"]);
+        if (clean(lines[pos] || "") !== "end") throw new Error("行 " + no + ": for に対応する end がありません");
+        pos++;
+        stmts.push({ t: "for", v: mf[1], from: mf[2], to: mf[3], body: body, line: no });
+      } else if (h === "while"){
+        var mw = raw.match(/^while\s+(.+)$/);
+        var wbody = parseBlock(["end"]);
+        if (clean(lines[pos] || "") !== "end") throw new Error("行 " + no + ": while に対応する end がありません");
+        pos++;
+        stmts.push({ t: "while", cond: mw[1], body: wbody, line: no });
+      } else if (h === "if"){
+        var mi = raw.match(/^if\s+(.+)$/);
+        var tbody = parseBlock(["else", "end"]);
+        var ebody = [];
+        if (clean(lines[pos] || "") === "else"){
+          pos++;
+          ebody = parseBlock(["end"]);
+        }
+        if (clean(lines[pos] || "") !== "end") throw new Error("行 " + no + ": if に対応する end がありません");
+        pos++;
+        stmts.push({ t: "if", cond: mi[1], body: tbody, els: ebody, line: no });
+      } else if (h === "end" || h === "else"){
+        throw new Error("行 " + no + ": 対応するブロックの無い " + h + " です");
+      } else {
+        stmts.push({ t: "stmt", raw: raw, line: no });
+      }
+    }
+    return stmts;
+  }
+  var prog = parseBlock([]);
+  if (pos < lines.length) throw new Error("行 " + (pos + 1) + ": 予期しない " + clean(lines[pos]));
+  return prog;
+}
+
+function badaRun(src, opts){
+  opts = opts || {};
+  var rand = (opts.seed !== undefined && opts.seed !== null) ? badaMulberry(opts.seed) : Math.random;
+  var maxSteps = opts.maxSteps || 3000000;
+  var prints = [];
+  var vars = {};
+  if (opts.vars){ for (var vk in opts.vars){ vars[vk] = opts.vars[vk]; } }
+  var names = [];          /* 量子ビット名 → 添字 (先頭が最上位ビット) */
+  var state = null;        /* 実振幅の状態ベクトル (長さ 2^n) */
+  var steps = 0;
+
+  function qi(name, no){
+    var i = names.indexOf(name);
+    if (i < 0) throw new Error("行 " + no + ": 未宣言の量子ビット " + name + " (先に qubit 宣言)");
+    return i;
+  }
+  function bitOf(k, i){ return (k >> (names.length - 1 - i)) & 1; }
+  function ketStr(k){
+    var s = "";
+    for (var i = 0; i < names.length; i++) s += bitOf(k, i);
+    return "|" + s + "⟩";
+  }
+  function applyH(t){
+    var n = names.length, ns = new Float64Array(1 << n), r = Math.SQRT1_2;
+    for (var k = 0; k < state.length; k++){
+      if (!state[k]) continue;
+      var flip = k ^ (1 << (n - 1 - t));
+      if (bitOf(k, t) === 0){ ns[k] += r * state[k]; ns[flip] += r * state[k]; }
+      else                  { ns[flip] += r * state[k]; ns[k] -= r * state[k]; }
+    }
+    state = ns;
+  }
+  function applyX(t){
+    var n = names.length, ns = new Float64Array(1 << n);
+    for (var k = 0; k < state.length; k++){ if (state[k]) ns[k ^ (1 << (n - 1 - t))] += state[k]; }
+    state = ns;
+  }
+  function applyZ(t){
+    for (var k = 0; k < state.length; k++){ if (bitOf(k, t) === 1) state[k] = -state[k]; }
+  }
+  function applyCNOT(c, t, no){
+    if (c === t) throw new Error("行 " + no + ": CNOT の制御と標的が同じです");
+    var n = names.length, ns = new Float64Array(1 << n);
+    for (var k = 0; k < state.length; k++){
+      if (!state[k]) continue;
+      ns[bitOf(k, c) === 1 ? (k ^ (1 << (n - 1 - t))) : k] += state[k];
+    }
+    state = ns;
+  }
+  function doMeasure(t){
+    /* ボルン則: P(1) = Σ|α|², 測定後は部分空間へ収縮して再規格化 */
+    var p1 = 0, k;
+    for (k = 0; k < state.length; k++){ if (bitOf(k, t) === 1) p1 += state[k] * state[k]; }
+    var one = rand() < p1 ? 1 : 0;
+    var p = one ? p1 : 1 - p1;
+    if (p < 1e-12){ one = 1 - one; p = 1 - p; }
+    var norm = Math.sqrt(p);
+    for (k = 0; k < state.length; k++){
+      if (bitOf(k, t) !== one) state[k] = 0; else state[k] /= norm;
+    }
+    return one;
+  }
+  function resetQubit(t){ if (doMeasure(t) === 1) applyX(t); }
+  function stateLines(){
+    var out = [];
+    for (var k = 0; k < state.length; k++){
+      if (Math.abs(state[k]) > 1e-9) out.push("  " + ketStr(k) + " " + state[k].toFixed(3));
+    }
+    return out.length ? out : ["  (零ベクトル)"];
+  }
+
+  /* ── 式評価 (再帰下降。eval 不使用)。
+   *    同じ式文字列が for/while で何万回も評価されるため字句解析結果を再利用する ── */
+  var tokCache = Object.create(null);
+  function evalExpr(e, no){
+    var toks = tokCache[e];
+    if (toks === undefined){
+      toks = String(e).match(/\d+\.?\d*|[A-Za-z_]\w*|==|!=|<=|>=|[-+*\/%()\[\],<>]/g) || [];
+      tokCache[e] = toks;
+    }
+    var p = 0;
+    function peek(){ return toks[p]; }
+    function expect(t){ if (toks[p++] !== t) throw new Error("行 " + no + ": " + t + " が必要です (式: " + e + ")"); }
+    function primary(){
+      var t = toks[p++];
+      if (t === undefined) throw new Error("行 " + no + ": 式が途中で終わっています (" + e + ")");
+      if (t === "("){ var v = orExpr(); expect(")"); return v; }
+      if (t === "-") return -primary();
+      if (/^\d/.test(t)) return parseFloat(t);
+      if (/^[A-Za-z_]/.test(t)){
+        if (t === "not") return primary() ? 0 : 1;
+        if (peek() === "("){                      /* 関数呼び出し */
+          p++;
+          if (t === "len"){                       /* len(配列名) は特別扱い */
+            var an = toks[p++];
+            expect(")");
+            var arr = vars[an];
+            return (arr && arr.length !== undefined) ? arr.length : 0;
+          }
+          var args = [];
+          if (peek() !== ")"){
+            args.push(orExpr());
+            while (peek() === ","){ p++; args.push(orExpr()); }
+          }
+          expect(")");
+          switch (t){
+            case "xor":   return ((args[0] >>> 0) ^ (args[1] >>> 0)) >>> 0;
+            case "mul32": return Math.imul(args[0] >>> 0, args[1] >>> 0) >>> 0;
+            case "floor": return Math.floor(args[0]);
+            case "abs":   return Math.abs(args[0]);
+            case "min":   return Math.min(args[0], args[1]);
+            case "max":   return Math.max(args[0], args[1]);
+            default: throw new Error("行 " + no + ": 未定義の関数 " + t);
+          }
+        }
+        if (peek() === "["){                      /* 配列参照 */
+          p++;
+          var idx = orExpr();
+          expect("]");
+          var a = vars[t];
+          if (!a || a.length === undefined) throw new Error("行 " + no + ": 未定義の配列 " + t);
+          var iv = a[Math.floor(idx)];
+          if (iv === undefined) throw new Error("行 " + no + ": 配列 " + t + "[" + Math.floor(idx) + "] は未定義です");
+          return iv;
+        }
+        if (t in vars){
+          if (vars[t] !== null && vars[t] !== undefined && vars[t].length !== undefined && typeof vars[t] !== "number")
+            throw new Error("行 " + no + ": " + t + " は配列です — " + t + "[i] で参照してください");
+          return vars[t];
+        }
+        throw new Error("行 " + no + ": 未定義の変数 " + t);
+      }
+      throw new Error("行 " + no + ": 式を解釈できません: " + t);
+    }
+    function mul(){
+      var v = primary();
+      while (peek() === "*" || peek() === "/" || peek() === "%"){
+        var op = toks[p++], r = primary();
+        v = op === "*" ? v * r : op === "/" ? v / r : v % r;
+      }
+      return v;
+    }
+    function add(){
+      var v = mul();
+      while (peek() === "+" || peek() === "-"){ var op = toks[p++]; var r = mul(); v = op === "+" ? v + r : v - r; }
+      return v;
+    }
+    function cmp(){
+      var v = add(), op = peek();
+      if (op === "==" || op === "!=" || op === "<" || op === ">" || op === "<=" || op === ">="){
+        p++;
+        var r = add();
+        switch (op){
+          case "==": return v === r ? 1 : 0;
+          case "!=": return v !== r ? 1 : 0;
+          case "<":  return v <  r ? 1 : 0;
+          case ">":  return v >  r ? 1 : 0;
+          case "<=": return v <= r ? 1 : 0;
+          case ">=": return v >= r ? 1 : 0;
+        }
+      }
+      return v;
+    }
+    function andE(){
+      var v = cmp();
+      while (peek() === "and"){ p++; var r = cmp(); v = (v && r) ? 1 : 0; }
+      return v;
+    }
+    function orExpr(){
+      var v = andE();
+      while (peek() === "or"){ p++; var r = andE(); v = (v || r) ? 1 : 0; }
+      return v;
+    }
+    var out = orExpr();
+    if (p < toks.length) throw new Error("行 " + no + ": 式の末尾に余分なトークン " + toks[p] + " があります");
+    return out;
+  }
+
+  /* ── print の引数分割 (括弧・文字列の外側のカンマで区切る) ── */
+  function splitArgs(s){
+    var out = [], depth = 0, q = false, cur = "";
+    for (var i = 0; i < s.length; i++){
+      var c = s.charAt(i);
+      if (c === '"') q = !q;
+      if (!q){
+        if (c === "(" || c === "[") depth++;
+        if (c === ")" || c === "]") depth--;
+        if (c === "," && depth === 0){ out.push(cur.trim()); cur = ""; continue; }
+      }
+      cur += c;
+    }
+    if (cur.trim()) out.push(cur.trim());
+    return out;
+  }
+
+  function execStmt(st){
+    if (++steps > maxSteps) throw new Error("行 " + st.line + ": 実行ステップ上限 (" + maxSteps + ") を超えました");
+    var no = st.line, m;
+    if (st.t === "for"){
+      var from = evalExpr(st.from, no), to = evalExpr(st.to, no);
+      for (var iv = from; iv <= to; iv++){
+        vars[st.v] = iv;
+        execBlock(st.body);
+      }
+      return;
+    }
+    if (st.t === "while"){
+      while (evalExpr(st.cond, no)){
+        if (++steps > maxSteps) throw new Error("行 " + no + ": 実行ステップ上限を超えました");
+        execBlock(st.body);
+      }
+      return;
+    }
+    if (st.t === "if"){
+      execBlock(evalExpr(st.cond, no) ? st.body : st.els);
+      return;
+    }
+    var raw = st.raw;
+    if ((m = raw.match(/^qubit\s+(.+)$/))){
+      var qs = m[1].split(/\s+/);
+      for (var qn = 0; qn < qs.length; qn++){
+        if (!/^[A-Za-z_]\w*$/.test(qs[qn])) throw new Error("行 " + no + ": 量子ビット名が不正です: " + qs[qn]);
+        if (names.indexOf(qs[qn]) >= 0) throw new Error("行 " + no + ": 量子ビット " + qs[qn] + " は宣言済みです");
+        names.push(qs[qn]);
+        if (names.length > 10) throw new Error("行 " + no + ": 量子ビットは 10 個までです");
+        if (state === null){ state = new Float64Array(2); state[0] = 1; }
+        else {
+          var ns2 = new Float64Array(state.length * 2);
+          for (var k2 = 0; k2 < state.length; k2++) ns2[k2 << 1] = state[k2];
+          state = ns2;
+        }
+      }
+      return;
+    }
+    if ((m = raw.match(/^(H|X|Z)\s+([A-Za-z_]\w*)$/))){
+      var t1 = qi(m[2], no);
+      if (m[1] === "H") applyH(t1); else if (m[1] === "X") applyX(t1); else applyZ(t1);
+      return;
+    }
+    if ((m = raw.match(/^CNOT\s+([A-Za-z_]\w*)\s+([A-Za-z_]\w*)$/))){
+      applyCNOT(qi(m[1], no), qi(m[2], no), no);
+      return;
+    }
+    if ((m = raw.match(/^measure\s+([A-Za-z_]\w*)\s*->\s*([A-Za-z_]\w*)$/))){
+      vars[m[2]] = doMeasure(qi(m[1], no));
+      return;
+    }
+    if ((m = raw.match(/^measure\s+([A-Za-z_]\w*)$/))){
+      prints.push("measure " + m[1] + " → " + doMeasure(qi(m[1], no)));
+      return;
+    }
+    if ((m = raw.match(/^reset(?:\s+([A-Za-z_]\w*))?$/))){
+      if (state === null) throw new Error("行 " + no + ": 量子ビットが未宣言です");
+      if (m[1]) resetQubit(qi(m[1], no));
+      else { state = new Float64Array(state.length); state[0] = 1; }
+      return;
+    }
+    if (raw === "state"){
+      prints.push("state:");
+      var sl = stateLines();
+      for (var si = 0; si < sl.length; si++) prints.push(sl[si]);
+      return;
+    }
+    if ((m = raw.match(/^let\s+([A-Za-z_]\w*)\s*\[([^\]]+)\]\s*=\s*(.+)$/))){
+      var an2 = m[1];
+      if (!(an2 in vars) || vars[an2] === undefined || vars[an2] === null || vars[an2].length === undefined) vars[an2] = [];
+      vars[an2][Math.floor(evalExpr(m[2], no))] = evalExpr(m[3], no);
+      return;
+    }
+    if ((m = raw.match(/^let\s+([A-Za-z_]\w*)\s*=\s*(.+)$/))){
+      vars[m[1]] = evalExpr(m[2], no);
+      return;
+    }
+    if ((m = raw.match(/^print\s+(.+)$/))){
+      var parts = splitArgs(m[1]), outp = [];
+      for (var pi = 0; pi < parts.length; pi++){
+        var a2 = parts[pi];
+        if (/^".*"$/.test(a2)) outp.push(a2.slice(1, -1));
+        else {
+          var pv = evalExpr(a2, no);
+          outp.push(typeof pv === "number" && !Number.isInteger(pv) ? pv.toFixed(4) : String(pv));
+        }
+      }
+      prints.push(outp.join(" "));
+      return;
+    }
+    throw new Error("行 " + no + ": 解釈できない文: " + raw);
+  }
+  function execBlock(stmts){
+    for (var i = 0; i < stmts.length; i++) execStmt(stmts[i]);
+  }
+
+  execBlock(badaParse(src));
+  return { vars: vars, prints: prints, steps: steps };
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 2. Bada で書かれた暗号プログラム本体
+ * ════════════════════════════════════════════════════════════════════ */
+var BADA_SRC_DEFAULT = {
+
+bb84: '# ══════════════════════════════════════════════════════\n' +
+'#  BB84 量子鍵配送 — 量子プログラミング言語 Bada\n' +
+'#  入力: n (光子数), eve (盗聴者 1/0)\n' +
+'#  出力: sift, chk, err, qber, detected, keylen, key[]\n' +
+'#        la[] lba[] le[] lbb[] lb[] lk[] (伝送ログ 先頭12光子)\n' +
+'# ══════════════════════════════════════════════════════\n' +
+'qubit ph rng          # ph = 光子, rng = 量子乱数源\n' +
+'let s = 0\n' +
+'for i = 0 to n - 1\n' +
+'  # ── 量子乱数: H|0⟩ を測定 (確率 1/2 の真性乱数) ──\n' +
+'  reset\n' +
+'  H rng\n' +
+'  measure rng -> abit    # Alice のビット\n' +
+'  reset rng\n' +
+'  H rng\n' +
+'  measure rng -> abase   # Alice の基底 0=Z(+) 1=X(×)\n' +
+'  # ── Alice: ビットを基底で光子に符号化して送出 ──\n' +
+'  if abit == 1\n' +
+'    X ph\n' +
+'  end\n' +
+'  if abase == 1\n' +
+'    H ph                 # X 基底 (|+⟩/|−⟩) へ\n' +
+'  end\n' +
+'  # ── Eve の intercept-resend 盗聴 ──\n' +
+'  # 複製不可能定理により、測って再送出すると痕跡が残る\n' +
+'  let ebase = -1\n' +
+'  if eve == 1\n' +
+'    reset rng\n' +
+'    H rng\n' +
+'    measure rng -> ebase\n' +
+'    if ebase == 1\n' +
+'      H ph\n' +
+'    end\n' +
+'    measure ph -> ebit   # Eve の測定で光子が収縮する\n' +
+'    if ebase == 1\n' +
+'      H ph               # 測った状態のまま再送出\n' +
+'    end\n' +
+'  end\n' +
+'  # ── Bob: 乱数基底で測定 ──\n' +
+'  reset rng\n' +
+'  H rng\n' +
+'  measure rng -> bbase\n' +
+'  if bbase == 1\n' +
+'    H ph\n' +
+'  end\n' +
+'  measure ph -> bbit\n' +
+'  # ── ふるい: 基底一致位置のみ残す ──\n' +
+'  let keep = 0\n' +
+'  if abase == bbase\n' +
+'    let sa[s] = abit\n' +
+'    let sb[s] = bbit\n' +
+'    let s = s + 1\n' +
+'    let keep = 1\n' +
+'  end\n' +
+'  if i < 12\n' +
+'    let la[i] = abit\n' +
+'    let lba[i] = abase\n' +
+'    let le[i] = ebase\n' +
+'    let lbb[i] = bbase\n' +
+'    let lb[i] = bbit\n' +
+'    let lk[i] = keep\n' +
+'  end\n' +
+'end\n' +
+'# ── ふるい前半を照合に使い QBER (量子ビット誤り率) を推定 ──\n' +
+'let chk = floor(s / 2)\n' +
+'let err = 0\n' +
+'for c = 0 to chk - 1\n' +
+'  if sa[c] != sb[c]\n' +
+'    let err = err + 1\n' +
+'  end\n' +
+'end\n' +
+'let qber = 0\n' +
+'if chk > 0\n' +
+'  let qber = err / chk\n' +
+'end\n' +
+'# ── QBER > 10% なら盗聴と判定し鍵を破棄 ──\n' +
+'let detected = 0\n' +
+'if qber > 0.1\n' +
+'  let detected = 1\n' +
+'end\n' +
+'let keylen = 0\n' +
+'if detected == 0\n' +
+'  for k = chk to s - 1\n' +
+'    let key[keylen] = sa[k]\n' +
+'    let keylen = keylen + 1\n' +
+'  end\n' +
+'end\n' +
+'let sift = s\n' +
+'print "ふるい:", sift, " 照合:", chk, " 誤り:", err\n' +
+'print "QBER:", qber\n',
+
+otp: '# ══════════════════════════════════════════════════════\n' +
+'#  ワンタイムパッド (Vernam / XOR) — 量子プログラミング言語 Bada\n' +
+'#  入力: buf[] (バイト列), buflen, key[] (鍵ビット列), keylen\n' +
+'#  出力: out[] (バイト列), outlen\n' +
+'#  鍵ビット列を 8bit ずつバイトへ束ね、本文と XOR する。\n' +
+'#  XOR は対合なので暗号化と復号は同一プログラムである。\n' +
+'#  鍵長 ≥ 本文長のとき情報理論的に安全 (Shannon 1949)。\n' +
+'# ══════════════════════════════════════════════════════\n' +
+'#  鍵ビットの参照位置 (i*8+j) % keylen は i について keylen 周期で\n' +
+'#  巡回するので、鍵バイト表 kbyte[] を keylen 個だけ先に作れば\n' +
+'#  本文は 1 バイトあたり 1 手で済む (大きなファイルでも実用速度)。\n' +
+'for i = 0 to keylen - 1\n' +
+'  let v = 0\n' +
+'  for j = 0 to 7\n' +
+'    let v = v * 2 + key[(i * 8 + j) % keylen]\n' +
+'  end\n' +
+'  let kbyte[i] = v\n' +
+'end\n' +
+'for i = 0 to buflen - 1\n' +
+'  let out[i] = xor(buf[i], kbyte[i % keylen])\n' +
+'end\n' +
+'let outlen = buflen\n',
+
+tag: '# ══════════════════════════════════════════════════════\n' +
+'#  検疫タグ (鍵付き FNV-1a 32bit) — 量子プログラミング言語 Bada\n' +
+'#  入力: buf[] (バイト列), buflen, key[] (鍵ビット列), keylen\n' +
+'#  出力: tag\n' +
+'#  量子封印時にデータへ添えるタグ。1 バイトの改変でも値が変わる\n' +
+'#  ため、ウイルス感染・改竄を検査で検出できる (教育用実装 —\n' +
+'#  実運用では HMAC-SHA256 等の暗号学的 MAC を使うこと)。\n' +
+'# ══════════════════════════════════════════════════════\n' +
+'let h = 2166136261\n' +
+'for i = 0 to keylen - 1\n' +
+'  let h = mul32(xor(h, key[i]), 16777619)\n' +
+'end\n' +
+'for i = 0 to buflen - 1\n' +
+'  let h = mul32(xor(h, buf[i]), 16777619)\n' +
+'end\n' +
+'let tag = h\n',
+
+lab: '# ══ 自由実行 — ベル状態 (量子もつれ) のデモ ══\n' +
+'qubit q0 q1\n' +
+'H q0\n' +
+'CNOT q0 q1\n' +
+'state                 # (|00⟩+|11⟩)/√2 を観測\n' +
+'measure q0 -> a\n' +
+'measure q1 -> b\n' +
+'print "測定:", a, b, " (必ず一致 = もつれの相関)"\n'
+};
+
+/* 実行時に使うソース (プログラム室で編集可能) */
+var BADA_SRC = {};
+(function(){ for (var k in BADA_SRC_DEFAULT) BADA_SRC[k] = BADA_SRC_DEFAULT[k]; })();
+
+/* ════════════════════════════════════════════════════════════════════
+ * 3. バイト列変換 (UTF-8 / 16進)
+ * ════════════════════════════════════════════════════════════════════ */
+function qcTextBytes(s){
+  var out = [], enc = encodeURIComponent(String(s));
+  for (var i = 0; i < enc.length; i++){
+    if (enc.charAt(i) === "%"){ out.push(parseInt(enc.substr(i + 1, 2), 16)); i += 2; }
+    else out.push(enc.charCodeAt(i));
+  }
+  return out;
+}
+function qcBytesText(bytes){
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += "%" + (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+  /* 鍵が違うと復号結果は UTF-8 として成立しない — 利用者に伝わる言葉で返す */
+  try{ return decodeURIComponent(s); }
+  catch(e){ throw new Error("復号結果が文字として成立しません — 鍵が違います (暗号化・封印したときと同じ鍵が必要です)"); }
+}
+function qcHex(bytes){
+  var s = "";
+  for (var i = 0; i < bytes.length; i++) s += (bytes[i] < 16 ? "0" : "") + bytes[i].toString(16);
+  return s;
+}
+function qcUnhex(hex){
+  hex = String(hex).replace(/\s+/g, "");
+  if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2) throw new Error("暗号文 (16進) が不正です");
+  var out = [];
+  for (var i = 0; i < hex.length; i += 2) out.push(parseInt(hex.substr(i, 2), 16));
+  return out;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 4. ホスト側ラッパー — Bada プログラムの入出力
+ * ════════════════════════════════════════════════════════════════════ */
+function qcRunBB84(n, eve, seed){
+  n = n || 64;
+  var r = badaRun(BADA_SRC.bb84, { vars: { n: n, eve: eve ? 1 : 0 }, seed: seed });
+  var v = r.vars;
+  var key = [];
+  for (var i = 0; i < (v.keylen | 0); i++) key.push(v.key[i]);
+  var keyHex = "";
+  for (var h = 0; h + 4 <= key.length; h += 4)
+    keyHex += (key[h] * 8 + key[h + 1] * 4 + key[h + 2] * 2 + key[h + 3]).toString(16);
+  var log = [];
+  for (var li = 0; li < Math.min(12, n); li++){
+    log.push({
+      i: li, aBit: v.la[li], aBase: v.lba[li] ? "×" : "+",
+      eve: v.le[li] < 0 ? "—" : (v.le[li] ? "×" : "+"),
+      bBase: v.lbb[li] ? "×" : "+", bBit: v.lb[li], keep: v.lk[li] === 1
+    });
+  }
+  return { n: n, sifted: v.sift, checked: v.chk, errors: v.err, qber: v.qber,
+           eveDetected: v.detected === 1, key: key, keyHex: keyHex, log: log, prints: r.prints };
+}
+function qcRunOTPBytes(buf, keyBits, seed){
+  if (!keyBits || !keyBits.length) throw new Error("鍵がありません — 先に BB84 で鍵配送してください");
+  if (!buf.length) return [];
+  var r = badaRun(BADA_SRC.otp, {
+    vars: { buf: buf, buflen: buf.length, key: keyBits, keylen: keyBits.length }, seed: seed,
+    maxSteps: (buf.length + keyBits.length * 10) * 4 + 100000
+  });
+  var out = [];
+  for (var i = 0; i < (r.vars.outlen | 0); i++) out.push(r.vars.out[i]);
+  return out;
+}
+function qcEncrypt(text, keyBits){ return qcHex(qcRunOTPBytes(qcTextBytes(text), keyBits)); }
+function qcDecrypt(hex, keyBits){ return qcBytesText(qcRunOTPBytes(qcUnhex(hex), keyBits)); }
+function qcRunTag(bytes, keyBits){
+  if (!keyBits || !keyBits.length) throw new Error("鍵がありません — 先に BB84 で鍵配送してください");
+  var r = badaRun(BADA_SRC.tag, {
+    vars: { buf: bytes, buflen: bytes.length, key: keyBits, keylen: keyBits.length },
+    maxSteps: (bytes.length + keyBits.length) * 4 + 100000
+  });
+  var t = (r.vars.tag >>> 0).toString(16);
+  while (t.length < 8) t = "0" + t;
+  return t;
+}
+/* ── 量子封印 = ワンタイムパッド暗号文 + 検疫タグ の組 ──
+ *   検査 = タグの再計算 (1 バイトの改変でも不一致になる)
+ *   解除 = 暗号文の復号 (封印時のバイト列がそのまま戻る)
+ *   テキストもファイルも同じバイト列の経路で扱う。            */
+function qcSealMakeBytes(name, bytes, keyBits, kind){
+  return { name: String(name || "無題"), kind: kind || "text", size: bytes.length,
+           hex: qcHex(qcRunOTPBytes(bytes, keyBits)), tag: qcRunTag(bytes, keyBits), ts: Date.now() };
+}
+function qcSealCheckBytes(seal, bytes, keyBits){ return qcRunTag(bytes, keyBits) === seal.tag; }
+function qcSealRestoreBytes(seal, keyBits){ return qcRunOTPBytes(qcUnhex(seal.hex), keyBits); }
+/* 検査結果を具体化 — 何バイト変わり、最初の改変がどこかまで示す */
+function qcSealDiff(seal, bytes, keyBits){
+  var same = qcSealCheckBytes(seal, bytes, keyBits);
+  var orig = qcSealRestoreBytes(seal, keyBits);
+  var n = Math.max(orig.length, bytes.length), diff = 0, first = -1;
+  for (var i = 0; i < n; i++){
+    if (orig[i] !== bytes[i]){ diff++; if (first < 0) first = i; }
+  }
+  return { same: same, diffCount: diff, firstAt: first, origLen: orig.length, curLen: bytes.length };
+}
+/* テキスト用の薄い包み */
+function qcSealMake(name, text, keyBits){ return qcSealMakeBytes(name, qcTextBytes(text), keyBits, "text"); }
+function qcSealCheck(seal, currentText, keyBits){ return qcSealCheckBytes(seal, qcTextBytes(currentText), keyBits); }
+function qcSealRestore(seal, keyBits){ return qcBytesText(qcSealRestoreBytes(seal, keyBits)); }
+/* 本文が鍵より長いと鍵が巡回し、ワンタイムパッドの前提が崩れることを警告する */
+function qcOtpWarn(nBytes, keyBits){
+  var kb = Math.floor((keyBits ? keyBits.length : 0) / 8);
+  return nBytes > kb
+    ? "⚠ 本文 " + nBytes + " バイト > 鍵 " + kb + " バイト — 鍵が巡回するためワンタイムパッドの情報理論的安全性は失われます" +
+      " (完全性の検査と復元は有効)。光子数を増やして鍵を長くしてください。"
+    : "";
+}
+
+/* ════════════════════════════════════════════════════════════════════
+ * 5. UI (Node テスト環境では実行されない)
+ * ════════════════════════════════════════════════════════════════════ */
+var qcKey = [];         /* 共有鍵 (メモリ内のみ — 保存しない) */
+
+function el(id){ return document.getElementById(id); }
+
+function uiKeyStatus(qber){
+  var sb = el("sbKey");
+  if (qcKey.length){
+    sb.textContent = "鍵: " + Math.floor(qcKey.length / 8) + " バイト" +
+                     (qber !== undefined ? " (QBER " + (qber * 100).toFixed(1) + "%)" : "");
+    sb.className = "";
+  } else {
+    sb.textContent = "鍵: なし";
+    sb.className = "nokey";
+  }
+}
+
+function uiBB84(){
+  var n = parseInt(el("bbN").value, 10) || 4096;
+  var eve = el("bbEve").checked;
+  el("bbOut").innerHTML = "<div class='card hint'>⚛ " + n + " 個の光子を Bada の量子プログラムに通しています…</div>";
+  var bb;
+  try{ bb = qcRunBB84(n, eve); }
+  catch(e){ el("bbOut").innerHTML = "<div class='card bad'>!! " + esc(e.message) + "</div>"; return; }
+  var rows = "";
+  for (var i = 0; i < bb.log.length; i++){
+    var L = bb.log[i];
+    rows += "<tr><td>" + L.i + "</td><td class='mono'>" + L.aBit + "</td><td class='mono'>" + L.aBase +
+            "</td><td class='mono'>" + L.eve + "</td><td class='mono'>" + L.bBase + "</td><td class='mono'>" + L.bBit +
+            "</td><td>" + (L.keep ? "✔" : "—") + "</td></tr>";
+  }
+  var verdict;
+  if (bb.eveDetected){
+    qcKey = [];
+    verdict = "<div class='card'><b class='bad'>🚨 盗聴を検出 — 鍵を破棄しました</b><div class='hint'>QBER " +
+              (bb.qber * 100).toFixed(1) + "% &gt; 10%。intercept-resend の測定痕跡 (複製不可能定理) が現れています。回線を確かめて再配送してください。</div></div>";
+  } else {
+    qcKey = bb.key;
+    verdict = "<div class='card'><b class='ok'>✅ 盗聴なし — 共有鍵を確立しました</b><div class='hint'>QBER " +
+              (bb.qber * 100).toFixed(1) + "% ≤ 10%。鍵 " + bb.key.length + " ビットをメモリに保持します (保存はしません)。</div>" +
+              "<pre>鍵 (16進): " + esc(bb.keyHex || "(短すぎます — 光子数を増やしてください)") + "</pre></div>";
+  }
+  el("bbOut").innerHTML =
+    "<div class='card'><b>伝送ログ (先頭 12 光子)</b>" +
+    "<table><tr><th>#</th><th>Alice bit</th><th>基底</th><th>Eve</th><th>Bob 基底</th><th>Bob bit</th><th>採用</th></tr>" +
+    rows + "</table>" +
+    "<div class='hint'>送出 " + bb.n + " 光子 / ふるい後 " + bb.sifted + " / 照合 " + bb.checked +
+    " ビット中 誤り " + bb.errors + "</div></div>" + verdict;
+  uiKeyStatus(bb.qber);
+}
+
+function uiEncrypt(){
+  try{
+    var n = qcTextBytes(el("otPlain").value).length;
+    el("otCipher").value = qcEncrypt(el("otPlain").value, qcKey);
+    el("otMsg").textContent = "暗号化しました (Bada の XOR ワンタイムパッド)。" + qcOtpWarn(n, qcKey);
+  }catch(e){ el("otMsg").textContent = "!! " + e.message; }
+}
+function uiDecrypt(){
+  try{
+    el("otPlain").value = qcDecrypt(el("otCipher").value, qcKey);
+    el("otMsg").textContent = "復号しました。";
+  }catch(e){ el("otMsg").textContent = "!! " + e.message; }
+}
+
+function uiVaultRender(){
+  var v = load("vault", []), html = "";
+  for (var i = 0; i < v.length; i++){
+    html += "<div class='card'><div class='hint'>" + esc(v[i].t) + "</div><pre>" + esc(v[i].hex) + "</pre>" +
+            "<div class='row'><button class='sm' onclick='uiVaultOpen(" + i + ")'>🔓 復号</button>" +
+            "<button class='sm red' onclick='uiVaultDel(" + i + ")'>削除</button></div></div>";
+  }
+  el("vaultList").innerHTML = html || "<p class='hint'>金庫は空です。</p>";
+}
+function uiVaultPut(){
+  try{
+    var t = el("vaultIn").value;
+    if (!t){ el("vaultMsg").textContent = "メモが空です。"; return; }
+    var v = load("vault", []);
+    v.unshift({ hex: qcEncrypt(t, qcKey), t: new Date().toLocaleString("ja-JP") });
+    if (!store("vault", v)){ el("vaultMsg").textContent = "端末の保管領域が足りません。不要な項目を削除してください。"; return; }
+    el("vaultIn").value = "";
+    el("vaultMsg").textContent = "暗号文だけを保管しました。" + qcOtpWarn(qcTextBytes(t).length, qcKey);
+    uiVaultRender();
+  }catch(e){ el("vaultMsg").textContent = "!! " + e.message; }
+}
+function uiVaultOpen(i){
+  var v = load("vault", []);
+  try{ el("vaultMsg").textContent = "復号: " + qcDecrypt(v[i].hex, qcKey); }
+  catch(e){ el("vaultMsg").textContent = "!! " + e.message + " (保管時と同じ鍵が必要です)"; }
+}
+function uiVaultDel(i){
+  var v = load("vault", []);
+  v.splice(i, 1);
+  store("vault", v);
+  uiVaultRender();
+}
+
+var QC_FILE_CAP = 256 * 1024;
+
+/* 端末内でファイルをバイト列として読む (外部へは一切送らない) */
+function qcReadFileBytes(input, cb){
+  var f = input && input.files && input.files[0];
+  if (!f){ cb("ファイルが選ばれていません"); return; }
+  if (f.size > QC_FILE_CAP){
+    cb("ファイルが大きすぎます (" + Math.ceil(f.size / 1024) + " KB > " + (QC_FILE_CAP / 1024) + " KB)");
+    return;
+  }
+  var r = new FileReader();
+  r.onload = function(){
+    var u = new Uint8Array(r.result), b = new Array(u.length);
+    for (var i = 0; i < u.length; i++) b[i] = u[i];
+    cb(null, b, f.name);
+  };
+  r.onerror = function(){ cb("ファイルを読めませんでした"); };
+  r.readAsArrayBuffer(f);
+}
+/* 復元したバイト列を端末へ書き出す */
+function qcSaveBytes(name, bytes){
+  var u = new Uint8Array(bytes.length);
+  for (var i = 0; i < bytes.length; i++) u[i] = bytes[i];
+  var url = URL.createObjectURL(new Blob([u], { type: "application/octet-stream" }));
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+}
+function uiSealMsg(html){ el("sealMsg").innerHTML = html; }
+
+function uiSealRender(){
+  var s = load("seals", []), html = "";
+  for (var i = 0; i < s.length; i++){
+    var kind = s[i].kind === "file" ? "📄 ファイル" : "📝 テキスト";
+    html += "<div class='card'><b>🔏 " + esc(s[i].name) + "</b>" +
+            "<div class='hint'>" + kind + " / " + (s[i].size || 0) + " バイト / " +
+            new Date(s[i].ts).toLocaleString("ja-JP") +
+            " / 検疫タグ <span class='mono'>" + esc(s[i].tag) + "</span></div>" +
+            "<div class='row'>" +
+            "<button class='sm acc' onclick='uiSealScan(" + i + ")'>🔬 検査</button>" +
+            "<button class='sm grn' onclick='uiSealRestore(" + i + ")'>♻ 解除 — 封印時の状態へ復元</button>" +
+            "<button class='sm red' onclick='uiSealDel(" + i + ")'>削除</button></div></div>";
+  }
+  el("sealList").innerHTML = html ||
+    "<p class='hint'>封印はまだありません。テキストかファイルを選んで「量子封印」を押してください。</p>";
+}
+function uiSealStore(seal, what){
+  var s = load("seals", []);
+  s.unshift(seal);
+  if (!store("seals", s)){
+    uiSealMsg("<b class='bad'>!! 端末の保管領域が足りません</b> — 不要な封印を削除してから、もう一度お試しください。");
+    return;
+  }
+  uiSealMsg("<b class='ok'>🔏 " + esc(what) + " を量子封印しました</b> (暗号文 + 検疫タグ)。" +
+            seal.size + " バイト / タグ <span class='mono'>" + esc(seal.tag) + "</span>。" +
+            "解除にはいまの鍵が必要です。" + esc(qcOtpWarn(seal.size, qcKey)));
+  uiSealRender();
+}
+function uiSealMake(){
+  try{
+    var t = el("sealData").value;
+    if (!t){ uiSealMsg("テキストが空です。"); return; }
+    var s = load("seals", []);
+    uiSealStore(qcSealMake(el("sealName").value || ("封印 " + (s.length + 1)), t, qcKey), "テキスト");
+  }catch(e){ uiSealMsg("!! " + esc(e.message)); }
+}
+function uiSealMakeFile(){
+  qcReadFileBytes(el("sealFile"), function(err, bytes, fname){
+    if (err){ uiSealMsg("!! " + esc(err)); return; }
+    try{
+      uiSealStore(qcSealMakeBytes(el("sealName").value || fname, bytes, qcKey, "file"), fname);
+    }catch(e){ uiSealMsg("!! " + esc(e.message)); }
+  });
+}
+function uiInfect(){
+  var t = el("sealData").value;
+  if (!t){ uiSealMsg("先にテキストを入力してください。"); return; }
+  var pos = Math.floor(t.length / 2);
+  el("sealData").value = t.slice(0, pos) + "☠VIRUS☠" + t.slice(pos);
+  uiSealMsg("ウイルス感染を模擬しました (テキスト中央へ不正な断片を注入)。「🔬 検査」で検出できます。");
+}
+function uiSealVerdict(seal, bytes){
+  try{
+    var d = qcSealDiff(seal, bytes, qcKey);
+    if (d.same){
+      uiSealMsg("<b class='ok'>✅ 清浄</b> — 「" + esc(seal.name) + "」は封印時とバイト単位で完全に一致しています (" +
+                d.origLen + " バイト)。");
+    } else {
+      uiSealMsg("<b class='bad'>🚨 感染・改竄を検出</b> — 「" + esc(seal.name) + "」の検疫タグが一致しません。" +
+                "<br/>封印時 " + d.origLen + " バイト → 現在 " + d.curLen + " バイト / 相違 " + d.diffCount + " バイト" +
+                (d.firstAt < 0 ? "" : " (最初の改変はオフセット " + d.firstAt + ")") + "。" +
+                "<br/><b>「♻ 解除」で封印時の清浄な状態へ戻せます。</b>");
+    }
+  }catch(e){ uiSealMsg("!! " + esc(e.message) + " (封印時と同じ鍵が必要です)"); }
+}
+function uiSealScan(i){
+  var seal = load("seals", [])[i];
+  if (!seal) return;
+  if (seal.kind === "file"){
+    qcReadFileBytes(el("scanFile"), function(err, bytes){
+      if (err){ uiSealMsg("!! " + esc(err) + " — ②「検査するファイル」で現物を選んでください。"); return; }
+      uiSealVerdict(seal, bytes);
+    });
+  } else {
+    uiSealVerdict(seal, qcTextBytes(el("sealData").value));
+  }
+}
+function uiSealRestore(i){
+  var seal = load("seals", [])[i];
+  if (!seal) return;
+  try{
+    var b = qcSealRestoreBytes(seal, qcKey);
+    if (seal.kind === "file"){
+      qcSaveBytes(seal.name, b);
+      uiSealMsg("<b class='ok'>♻ 解除しました</b> — 封印時の清浄なファイル「" + esc(seal.name) +
+                "」(" + b.length + " バイト) を書き出しました。感染した断片は含まれていません。");
+    } else {
+      el("sealData").value = qcBytesText(b);
+      uiSealMsg("<b class='ok'>♻ 解除しました</b> — 封印時の清浄な状態へ復元しました。感染した断片は残っていません。");
+    }
+  }catch(e){ uiSealMsg("!! " + esc(e.message) + " (封印時と同じ鍵が必要です)"); }
+}
+function uiSealDel(i){
+  var s = load("seals", []);
+  s.splice(i, 1);
+  store("seals", s);
+  uiSealRender();
+}
+
+function uiProgShow(){
+  el("progSrc").value = BADA_SRC[el("progSel").value];
+  el("progOut").textContent = "— 実行結果 —";
+}
+function uiProgSave(){
+  BADA_SRC[el("progSel").value] = el("progSrc").value;
+}
+function uiProgRun(){
+  uiProgSave();
+  var kind = el("progSel").value, vars = {};
+  if (kind === "bb84") vars = { n: 32, eve: 0 };
+  if (kind === "otp")  vars = { buf: qcTextBytes("BADA"), buflen: 4, key: [1,0,1,1,0,0,1,0], keylen: 8 };
+  if (kind === "tag")  vars = { buf: qcTextBytes("BADA"), buflen: 4, key: [1,0,1,1,0,0,1,0], keylen: 8 };
+  try{
+    var r = badaRun(el("progSrc").value, { vars: vars });
+    var lines = r.prints.slice();
+    if (kind === "otp"){
+      var ob = [];
+      for (var i = 0; i < (r.vars.outlen | 0); i++) ob.push(r.vars.out[i]);
+      lines.push("out[] = " + qcHex(ob));
+    }
+    if (kind === "tag") lines.push("tag = " + ((r.vars.tag >>> 0).toString(16)));
+    lines.push("(" + r.steps + " ステップ実行)");
+    el("progOut").textContent = lines.join("\n");
+  }catch(e){ el("progOut").textContent = "!! " + e.message; }
+}
+function uiProgReset(){
+  BADA_SRC[el("progSel").value] = BADA_SRC_DEFAULT[el("progSel").value];
+  uiProgShow();
+}
+
+/* ── タブ切替 / 初期化 ── */
+if (typeof document !== "undefined" && document.getElementById && typeof window !== "undefined"){
+  (function(){
+    var tabs = document.querySelectorAll("#tabs button");
+    for (var i = 0; i < tabs.length; i++){
+      tabs[i].addEventListener("click", function(){
+        for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("on");
+        this.classList.add("on");
+        var pages = document.querySelectorAll(".page");
+        for (var k = 0; k < pages.length; k++) pages[k].classList.remove("on");
+        var pg = el("pg-" + this.getAttribute("data-p"));
+        if (pg) pg.classList.add("on");
+        if (this.getAttribute("data-p") === "prog") uiProgShow();
+      });
+    }
+    var src = el("progSrc");
+    if (src) src.addEventListener("input", uiProgSave);
+    try{ uiVaultRender(); uiSealRender(); uiProgShow(); uiKeyStatus(); }catch(e){}
+  })();
+}
+</script>
+</body>
+</html>
