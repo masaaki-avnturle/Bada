@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bada AudioForge — オーディオエディタ</title>
+<!--
+  Bada AudioForge — 波形編集ができるオーディオエディタ
+  (依存ゼロ・単一 HTML・完全オフライン動作)
+
+  ・MP3 / WAV / OGG / M4A / FLAC / WebM を読み込み、波形を描画
+  ・ドラッグで範囲選択 → 切り取り / コピー / 貼り付け(挿入・ミックス)/
+    削除 / 切り抜き(トリム)/ 無音化 / 繰り返し / 無音挿入
+  ・エフェクト: 音量(dB)・ノーマライズ・フェードイン/アウト(3 カーブ)・
+    逆再生・速度変更(リサンプル)・エコー・ローパス/ハイパスフィルタ・
+    DC オフセット除去・モノラル化・パン・無音トリム
+  ・元に戻す / やり直し(履歴 30 段)、ゼロクロス スナップ、ズーム、ループ再生
+  ・書き出し: WAV (16bit / 24bit / 32bit float) を自前エンコーダで生成。
+    サンプルレート変換つき。圧縮書き出し (M4A/AAC・WebM/Opus) にも対応
+  ・音声ファイルが端末の外に出ることは一切ありません
+-->
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121722; --panel2:#171d2b; --line:#232c40;
+    --tx:#e8ecf4; --tx2:#8b94a8; --gold:#e8c76a; --cyan:#58c8d8;
+    --ok:#5fd68a; --err:#e87a7a; --wave:#58c8d8; --selbg:rgba(232,199,106,.16);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--tx);
+    font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    min-height:100vh; -webkit-text-size-adjust:100%;
+  }
+  header{
+    padding:16px 20px 12px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#10141e,#0b0e14);
+  }
+  header h1{ margin:0; font-size:21px; letter-spacing:.5px; }
+  header h1 .gold{ color:var(--gold); }
+  header .sub{ color:var(--tx2); font-size:12.5px; }
+  #infoBadge{
+    margin-left:auto; font-size:12px; color:var(--cyan);
+    border:1px solid var(--line); border-radius:999px; padding:4px 12px;
+    background:var(--panel); white-space:nowrap;
+  }
+  main{
+    display:grid; grid-template-columns:minmax(300px,380px) 1fr;
+    gap:16px; padding:16px 20px 40px; max-width:1680px; margin:0 auto;
+  }
+  @media (max-width:1040px){ main{ grid-template-columns:1fr; } }
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:14px;
+  }
+  .panel h2{
+    margin:0 0 10px; font-size:13px; color:var(--gold); letter-spacing:1px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .side{ display:flex; flex-direction:column; gap:14px; background:transparent;
+         border:none; padding:0; }
+  .side > .panel{ margin:0; }
+  /* ドロップゾーン */
+  #drop{
+    border:2px dashed #2c3550; border-radius:12px;
+    padding:20px 12px; text-align:center; cursor:pointer; transition:.15s;
+    color:var(--tx2);
+  }
+  #drop:hover, #drop.over{ border-color:var(--gold); background:#161b28; color:var(--tx); }
+  #drop .big{ font-size:14px; color:var(--tx); margin-bottom:4px; }
+  #drop .sm{ font-size:11.5px; }
+  .info{
+    margin-top:10px; font-size:12px; color:var(--tx2); line-height:1.75;
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; word-break:break-all;
+  }
+  .info b{ color:var(--tx); font-weight:600; }
+  /* 汎用コントロール */
+  .row{ display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+  .row:last-child{ margin-bottom:0; }
+  .row label{ font-size:11.5px; color:var(--tx2); min-width:62px; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+  .grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+  button{
+    background:var(--panel2); color:var(--tx); border:1px solid var(--line);
+    border-radius:9px; padding:8px 11px; font-size:12.5px; cursor:pointer;
+    font-family:inherit; transition:.12s; white-space:nowrap;
+  }
+  button:hover:not(:disabled){ border-color:var(--gold); color:var(--gold); }
+  button:disabled{ opacity:.38; cursor:not-allowed; }
+  button.primary{ background:var(--gold); color:#14171f; border-color:var(--gold); font-weight:700; }
+  button.primary:hover:not(:disabled){ filter:brightness(1.08); color:#14171f; }
+  button.wide{ width:100%; }
+  input[type=number], input[type=text], select{
+    background:#0d1119; color:var(--tx); border:1px solid var(--line);
+    border-radius:8px; padding:7px 9px; font-size:12.5px; font-family:inherit;
+    min-width:0; width:100%;
+  }
+  input[type=range]{ width:100%; accent-color:var(--gold); }
+  .chk{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--tx2); cursor:pointer; }
+  .chk input{ accent-color:var(--gold); }
+  .hint{ font-size:11px; color:var(--tx2); line-height:1.6; margin-top:7px; }
+  /* エディタ側 */
+  .editor{ display:flex; flex-direction:column; gap:12px; }
+  .transport{
+    display:flex; gap:7px; align-items:center; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px 12px;
+  }
+  .transport .time{
+    font-variant-numeric:tabular-nums; font-size:13px; color:var(--cyan);
+    margin-left:auto; white-space:nowrap;
+  }
+  .waveWrap{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:10px; position:relative;
+  }
+  #ruler{ width:100%; height:26px; display:block; }
+  #wave{
+    width:100%; height:340px; display:block; border-radius:8px;
+    background:#080b11; cursor:text; touch-action:none;
+  }
+  @media (max-width:1040px){ #wave{ height:240px; } }
+  #scrollWrap{ margin-top:9px; display:flex; gap:8px; align-items:center; }
+  #scrollWrap .z{ font-size:11px; color:var(--tx2); white-space:nowrap; }
+  #status{
+    font-size:12px; color:var(--tx2); min-height:18px; padding:2px 2px 0;
+  }
+  #status.ok{ color:var(--ok); } #status.err{ color:var(--err); }
+  details summary{ cursor:pointer; font-size:13px; color:var(--gold); letter-spacing:1px; }
+  details[open] summary{ margin-bottom:10px; }
+  .sep{ height:1px; background:var(--line); margin:10px 0; border:0; }
+  .kbd{
+    font-size:10.5px; color:var(--tx2); border:1px solid var(--line);
+    border-radius:5px; padding:1px 5px; background:#0d1119;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎚 Bada <span class="gold">AudioForge</span></h1>
+  <span class="sub">オーディオエディタ — 波形編集・エフェクト・WAV 書き出し(依存ゼロ / 完全オフライン)</span>
+  <span id="infoBadge">音声ファイル未読み込み</span>
+</header>
+
+<main>
+  <!-- ══════════ 左サイド ══════════ -->
+  <section class="side">
+
+    <div class="panel">
+      <h2>📂 ファイル</h2>
+      <div id="drop">
+        <div class="big">音声ファイルをドロップ</div>
+        <div class="sm">またはタップして選択 — MP3 / WAV / OGG / M4A / FLAC / WebM</div>
+      </div>
+      <input id="fileInput" type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a,.flac,.aac,.webm" style="display:none">
+      <div id="fileInfo" class="info">読み込み前です。音声ファイルを選ぶと波形が表示されます。</div>
+    </div>
+
+    <div class="panel">
+      <h2>✂ 編集</h2>
+      <div class="row">
+        <label>選択開始</label>
+        <div style="flex:1"><input id="selStart" type="number" step="0.001" min="0" value="0"></div>
+        <label style="min-width:auto">秒</label>
+      </div>
+      <div class="row">
+        <label>選択終了</label>
+        <div style="flex:1"><input id="selEnd" type="number" step="0.001" min="0" value="0"></div>
+        <label style="min-width:auto">秒</label>
+      </div>
+      <div class="grid3">
+        <button id="btnSelAll">全選択</button>
+        <button id="btnSelNone">選択解除</button>
+        <button id="btnZoomSel">選択へズーム</button>
+      </div>
+      <label class="chk" style="margin-top:8px">
+        <input id="chkSnap" type="checkbox" checked> ゼロクロス点にスナップ(ノイズ防止)
+      </label>
+      <hr class="sep">
+      <div class="grid3">
+        <button id="btnCut">✂ 切り取り</button>
+        <button id="btnCopy">⧉ コピー</button>
+        <button id="btnDelete">🗑 削除</button>
+        <button id="btnPasteIns">📥 貼付(挿入)</button>
+        <button id="btnPasteMix">🔀 貼付(ミックス)</button>
+        <button id="btnCrop">⛶ 切り抜き</button>
+        <button id="btnSilence">🔇 無音化</button>
+        <button id="btnUndo">↶ 元に戻す</button>
+        <button id="btnRedo">↷ やり直し</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>繰り返し</label>
+        <div style="width:78px"><input id="numRepeat" type="number" min="1" max="99" step="1" value="2"></div>
+        <button id="btnRepeat" style="flex:1">🔁 選択を繰り返す</button>
+      </div>
+      <div class="row">
+        <label>無音挿入</label>
+        <div style="width:78px"><input id="numSilence" type="number" min="0.01" max="600" step="0.1" value="1"></div>
+        <button id="btnInsSilence" style="flex:1">＋ カーソル位置へ挿入</button>
+      </div>
+      <div class="hint">
+        <span class="kbd">Space</span> 再生/停止　<span class="kbd">Ctrl+Z</span> 元に戻す　
+        <span class="kbd">Ctrl+X/C/V</span> 切取/コピー/貼付　<span class="kbd">Delete</span> 削除　
+        <span class="kbd">Ctrl+A</span> 全選択
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🎛 エフェクト<span style="color:var(--tx2);font-size:11px;letter-spacing:0">(選択範囲 / 未選択なら全体)</span></h2>
+
+      <div class="row">
+        <label>音量</label>
+        <div style="width:84px"><input id="numGain" type="number" step="0.5" value="3"></div>
+        <label style="min-width:auto">dB</label>
+        <button id="btnGain" style="flex:1">適用</button>
+      </div>
+
+      <div class="row">
+        <label>ノーマライズ</label>
+        <div style="width:84px"><input id="numNorm" type="number" step="0.5" max="0" value="-1"></div>
+        <label style="min-width:auto">dB</label>
+        <button id="btnNorm" style="flex:1">適用</button>
+      </div>
+
+      <div class="row">
+        <label>フェード</label>
+        <div style="flex:1">
+          <select id="selCurve">
+            <option value="linear">リニア</option>
+            <option value="scurve" selected>S カーブ</option>
+            <option value="exp">指数(自然)</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <button id="btnFadeIn">◢ フェードイン</button>
+        <button id="btnFadeOut">◣ フェードアウト</button>
+      </div>
+
+      <hr class="sep">
+
+      <div class="row">
+        <label>速度</label>
+        <div style="width:84px"><input id="numSpeed" type="number" step="0.05" min="0.25" max="4" value="1.25"></div>
+        <label style="min-width:auto">倍</label>
+        <button id="btnSpeed" style="flex:1">変更(全体)</button>
+      </div>
+
+      <div class="row">
+        <label>エコー</label>
+        <div style="width:72px"><input id="numEchoDelay" type="number" step="0.01" min="0.01" max="2" value="0.25"></div>
+        <div style="width:72px"><input id="numEchoDecay" type="number" step="0.05" min="0.05" max="0.95" value="0.4"></div>
+        <button id="btnEcho" style="flex:1">適用</button>
+      </div>
+      <div class="hint" style="margin:-3px 0 8px">エコー: 左=遅延(秒) / 右=減衰(0〜0.95)</div>
+
+      <div class="row">
+        <label>フィルタ</label>
+        <div style="flex:1">
+          <select id="selFilter">
+            <option value="lowpass">ローパス(高音カット)</option>
+            <option value="highpass">ハイパス(低音カット)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <label>カットオフ</label>
+        <div style="width:90px"><input id="numCutoff" type="number" step="50" min="20" max="20000" value="3000"></div>
+        <label style="min-width:auto">Hz</label>
+        <button id="btnFilter" style="flex:1">適用</button>
+      </div>
+
+      <div class="row">
+        <label>パン</label>
+        <div style="flex:1"><input id="numPan" type="range" min="-1" max="1" step="0.05" value="0"></div>
+        <span id="panVal" style="font-size:11.5px;color:var(--tx2);width:34px;text-align:right">C</span>
+        <button id="btnPan">適用</button>
+      </div>
+
+      <div class="grid2" style="margin-top:8px">
+        <button id="btnReverse">◀ 逆再生</button>
+        <button id="btnDc">DC 除去</button>
+        <button id="btnMono">モノラル化</button>
+        <button id="btnTrim">無音トリム</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label>無音しきい値</label>
+        <div style="width:84px"><input id="numTrimDb" type="number" step="1" min="-90" max="-10" value="-50"></div>
+        <label style="min-width:auto">dB</label>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>💾 書き出し</h2>
+      <div class="row">
+        <label>形式</label>
+        <div style="flex:1">
+          <select id="selBits">
+            <option value="16" selected>WAV 16bit PCM(標準)</option>
+            <option value="24">WAV 24bit PCM(高精度)</option>
+            <option value="32">WAV 32bit float(無劣化)</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <label>サンプルレート</label>
+        <div style="flex:1">
+          <select id="selRate">
+            <option value="0" selected>元のまま</option>
+            <option value="48000">48000 Hz</option>
+            <option value="44100">44100 Hz</option>
+            <option value="32000">32000 Hz</option>
+            <option value="22050">22050 Hz</option>
+            <option value="16000">16000 Hz</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <label>範囲</label>
+        <div style="flex:1">
+          <select id="selScope">
+            <option value="all" selected>全体</option>
+            <option value="sel">選択範囲のみ</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <label>ファイル名</label>
+        <div style="flex:1"><input id="txtName" type="text" value="edited"></div>
+      </div>
+      <div id="estInfo" class="info" style="margin-bottom:9px">—</div>
+      <button id="btnExport" class="primary wide">💾 WAV で保存</button>
+      <button id="btnExportC" class="wide" style="margin-top:7px">🗜 圧縮で保存(M4A / WebM)</button>
+      <div class="hint">圧縮保存はリアルタイム録音のため、音声の長さと同じ時間がかかります。</div>
+    </div>
+
+  </section>
+
+  <!-- ══════════ 右: 波形エディタ ══════════ -->
+  <section class="editor">
+    <div class="transport">
+      <button id="btnPlay">▶ 再生</button>
+      <button id="btnPlaySel">▶ 選択を再生</button>
+      <button id="btnStop">■ 停止</button>
+      <label class="chk"><input id="chkLoop" type="checkbox"> ループ</label>
+      <span class="time" id="timeRead">0:00.000 / 0:00.000</span>
+    </div>
+
+    <div class="waveWrap">
+      <canvas id="ruler"></canvas>
+      <canvas id="wave"></canvas>
+      <div id="scrollWrap">
+        <button id="btnZoomOut">➖</button>
+        <button id="btnZoomIn">➕</button>
+        <button id="btnZoomFit">全体</button>
+        <input id="rngScroll" type="range" min="0" max="1000" value="0" step="1">
+        <span class="z" id="zoomRead">×1</span>
+      </div>
+      <div id="status">音声ファイルを読み込んでください。</div>
+    </div>
+
+    <div class="panel">
+      <h2>📊 選択範囲の解析</h2>
+      <div id="analysis" class="info" style="margin:0">—</div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Bada AudioForge — オーディオエンジン
+   ここから下の「純ロジック」関数群は DOM に依存しないため、
+   tools/engine-test.js から Node 単体テストで直接検証できます。
+
+   音声データは AudioBuffer ではなく、以下の素の Clip 表現で扱います:
+     { sampleRate, numberOfChannels, length, channels:[Float32Array,...] }
+   ═══════════════════════════════════════════════════════════════════════ */
+"use strict";
+
+var MAX_HISTORY = 30;          /* 元に戻す履歴の段数 */
+var DB_FLOOR = -120;           /* dB 表示の下限 */
+
+/* ────────── 整形ユーティリティ ────────── */
+
+/* 秒 → "m:ss.mmm" */
+function fmtTime(sec){
+  if (typeof sec !== "number" || !isFinite(sec) || sec < 0) sec = 0;
+  /* 総ミリ秒で計算する (浮動小数の誤差で 1 ms ずれるのを防ぐ) */
+  var total = Math.round(sec * 1000);
+  var ms = total % 1000;
+  var whole = (total - ms) / 1000;
+  var m = Math.floor(whole / 60);
+  var s = whole % 60;
+  return m + ":" + (s < 10 ? "0" : "") + s + "." +
+         (ms < 10 ? "00" : (ms < 100 ? "0" : "")) + ms;
+}
+
+/* バイト数 → 人が読める単位 */
+function fmtBytes(n){
+  if (typeof n !== "number" || !isFinite(n) || n < 0) n = 0;
+  if (n < 1024) return Math.round(n) + " B";
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1024 * 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + " MB";
+  return (n / 1024 / 1024 / 1024).toFixed(2) + " GB";
+}
+
+/* dB 値の表示 (-Infinity は -∞ dB) */
+function fmtDb(db){
+  if (!isFinite(db) || db <= DB_FLOOR) return "-∞ dB";
+  return (db >= 0 ? "+" : "") + db.toFixed(1) + " dB";
+}
+
+/* 保存ファイル名の無害化 */
+function sanitizeName(s){
+  var t = String(s == null ? "" : s)
+            .replace(/[<>:"/\\|?*]/g, "")
+            .replace(/[\x00-\x1f]/g, "")
+            .replace(/^\s+|\s+$/g, "");
+  return t || "audio";
+}
+
+/* 拡張子を除いた名前 */
+function baseName(name){
+  return String(name == null ? "" : name).replace(/\.[A-Za-z0-9]{1,5}$/, "");
+}
+
+/* ────────── dB ⇔ 線形 ────────── */
+function dbToLin(db){
+  if (!isFinite(db)) return db < 0 ? 0 : 1;
+  return Math.pow(10, db / 20);
+}
+function linToDb(v){
+  v = Math.abs(v);
+  if (!(v > 0) || v < 1e-6) return DB_FLOOR;
+  var db = 20 * Math.log10(v);
+  return db < DB_FLOOR ? DB_FLOOR : db;
+}
+/* -1..1 にクリップ */
+function clampSample(v){ return v > 1 ? 1 : (v < -1 ? -1 : v); }
+
+/* ────────── Clip の生成・複製 ────────── */
+function makeClip(sampleRate, channels){
+  var chs = [];
+  for (var i = 0; i < channels.length; i++) chs.push(channels[i]);
+  return {
+    sampleRate: sampleRate,
+    channels: chs,
+    numberOfChannels: chs.length,
+    length: chs.length ? chs[0].length : 0
+  };
+}
+function emptyClip(sampleRate, numCh, len){
+  var chs = [];
+  for (var i = 0; i < numCh; i++) chs.push(new Float32Array(Math.max(0, len | 0)));
+  return makeClip(sampleRate, chs);
+}
+function cloneClip(clip){
+  var chs = [];
+  for (var i = 0; i < clip.numberOfChannels; i++) chs.push(new Float32Array(clip.channels[i]));
+  return makeClip(clip.sampleRate, chs);
+}
+function clipDuration(clip){
+  return (!clip || !clip.sampleRate) ? 0 : clip.length / clip.sampleRate;
+}
+
+/* ────────── 時間 ⇔ サンプル / 範囲の正規化 ────────── */
+function secToSample(clip, t){
+  var n = Math.round((t || 0) * clip.sampleRate);
+  return Math.max(0, Math.min(clip.length, n));
+}
+function sampleToSec(clip, n){ return n / clip.sampleRate; }
+
+/* 開始・終了を昇順かつ [0,length] に収めた範囲 */
+function normRange(clip, s, e){
+  s = Math.round(s || 0); e = Math.round(e || 0);
+  if (e < s){ var t = s; s = e; e = t; }
+  s = Math.max(0, Math.min(clip.length, s));
+  e = Math.max(0, Math.min(clip.length, e));
+  return { start: s, end: e, len: e - s };
+}
+
+/* ────────── 切り出し・削除・貼り付け ────────── */
+
+/* 範囲を新しい Clip として複製 */
+function sliceClip(clip, s, e){
+  var r = normRange(clip, s, e), chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    chs.push(new Float32Array(clip.channels[c].subarray(r.start, r.end)));
+  }
+  return makeClip(clip.sampleRate, chs);
+}
+
+/* 範囲を削除して前後を詰める */
+function deleteRange(clip, s, e){
+  var r = normRange(clip, s, e);
+  if (r.len <= 0) return cloneClip(clip);
+  var newLen = clip.length - r.len, chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    var src = clip.channels[c], dst = new Float32Array(newLen);
+    dst.set(src.subarray(0, r.start), 0);
+    dst.set(src.subarray(r.end), r.start);
+    chs.push(dst);
+  }
+  return makeClip(clip.sampleRate, chs);
+}
+
+/* チャンネル数を合わせる (1ch → 複製 / 多ch → ダウンミックス) */
+function matchChannels(src, numCh){
+  if (src.numberOfChannels === numCh) return src;
+  var chs = [], c, i;
+  if (numCh === 1){
+    var mono = new Float32Array(src.length);
+    for (c = 0; c < src.numberOfChannels; c++){
+      var d = src.channels[c];
+      for (i = 0; i < src.length; i++) mono[i] += d[i] / src.numberOfChannels;
+    }
+    chs.push(mono);
+  } else {
+    for (c = 0; c < numCh; c++){
+      chs.push(new Float32Array(src.channels[Math.min(c, src.numberOfChannels - 1)]));
+    }
+  }
+  return makeClip(src.sampleRate, chs);
+}
+
+/* 位置 pos に other を挿入 (サンプルレート・チャンネル数は自動整合) */
+function insertClip(clip, other, pos){
+  pos = Math.max(0, Math.min(clip.length, Math.round(pos || 0)));
+  var src = matchChannels(resampleTo(other, clip.sampleRate), clip.numberOfChannels);
+  var newLen = clip.length + src.length, chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    var a = clip.channels[c], b = src.channels[c], dst = new Float32Array(newLen);
+    dst.set(a.subarray(0, pos), 0);
+    dst.set(b, pos);
+    dst.set(a.subarray(pos), pos + src.length);
+    chs.push(dst);
+  }
+  return makeClip(clip.sampleRate, chs);
+}
+
+/* 位置 pos に other を重ねる (長さが足りなければ伸ばす) */
+function mixClip(clip, other, pos){
+  pos = Math.max(0, Math.round(pos || 0));
+  var src = matchChannels(resampleTo(other, clip.sampleRate), clip.numberOfChannels);
+  var newLen = Math.max(clip.length, pos + src.length), chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    var dst = new Float32Array(newLen);
+    dst.set(clip.channels[c], 0);
+    var b = src.channels[c];
+    for (var i = 0; i < b.length; i++) dst[pos + i] = clampSample(dst[pos + i] + b[i]);
+    chs.push(dst);
+  }
+  return makeClip(clip.sampleRate, chs);
+}
+
+/* pos に dur 秒の無音を挿入 */
+function insertSilence(clip, pos, sec){
+  var n = Math.max(1, Math.round((sec || 0) * clip.sampleRate));
+  return insertClip(clip, emptyClip(clip.sampleRate, clip.numberOfChannels, n), pos);
+}
+
+/* 選択範囲を times 回に増やす (times=2 で 1 回複製) */
+function repeatRange(clip, s, e, times){
+  var r = normRange(clip, s, e);
+  times = Math.max(1, Math.min(99, Math.round(times || 1)));
+  if (r.len <= 0 || times === 1) return cloneClip(clip);
+  var piece = sliceClip(clip, r.start, r.end), out = cloneClip(clip);
+  for (var k = 1; k < times; k++) out = insertClip(out, piece, r.start + r.len * k);
+  return out;
+}
+
+/* ────────── リサンプル / 速度 ────────── */
+
+/* 線形補間で newLen サンプルへ伸縮 */
+function resampleChannel(data, newLen){
+  newLen = Math.max(0, Math.round(newLen));
+  var out = new Float32Array(newLen);
+  if (newLen === 0 || data.length === 0) return out;
+  if (data.length === 1 || newLen === 1){ out.fill(data[0]); return out; }
+  var step = (data.length - 1) / (newLen - 1);
+  for (var i = 0; i < newLen; i++){
+    var x = i * step, i0 = Math.floor(x);
+    var i1 = Math.min(data.length - 1, i0 + 1), f = x - i0;
+    out[i] = data[i0] * (1 - f) + data[i1] * f;
+  }
+  return out;
+}
+
+/* サンプルレート変換 (音程・長さは保たれる) */
+function resampleTo(clip, rate){
+  if (!rate || rate === clip.sampleRate) return clip;
+  var newLen = Math.max(1, Math.round(clip.length * (rate / clip.sampleRate))), chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    chs.push(resampleChannel(clip.channels[c], newLen));
+  }
+  return makeClip(rate, chs);
+}
+
+/* 再生速度の変更 (音程も一緒に変わる = テープ早送り方式) */
+function changeSpeed(clip, speed){
+  if (!isFinite(speed) || speed <= 0 || speed === 1) return cloneClip(clip);
+  var newLen = Math.max(1, Math.round(clip.length / speed)), chs = [];
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    chs.push(resampleChannel(clip.channels[c], newLen));
+  }
+  return makeClip(clip.sampleRate, chs);
+}
+
+/* ────────── 解析 (ピーク / RMS) ────────── */
+function peakOf(clip, s, e){
+  var r = normRange(clip, s, e), peak = 0;
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    var d = clip.channels[c];
+    for (var i = r.start; i < r.end; i++){
+      var v = d[i] < 0 ? -d[i] : d[i];
+      if (v > peak) peak = v;
+    }
+  }
+  return peak;
+}
+function rmsOf(clip, s, e){
+  var r = normRange(clip, s, e);
+  if (r.len <= 0) return 0;
+  var sum = 0, n = 0;
+  for (var c = 0; c < clip.numberOfChannels; c++){
+    var d = clip.channels[c];
+    for (var i = r.start; i < r.end; i++){ sum += d[i] * d[i]; n++; }
+  }
+  return n ? Math.sqrt(sum / n) : 0;
+}
+
+/* ────────── 振幅系エフェクト ────────── */
+
+/* 範囲に線形ゲインを掛ける */
+function applyGainRange(clip, s, e, lin){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c];
+    for (var i = r.start; i < r.end; i++) d[i] = clampSample(d[i] * lin);
+  }
+  return out;
+}
+
+/* ピークを targetDb に合わせる */
+function normalizeRange(clip, s, e, targetDb){
+  var peak = peakOf(clip, s, e);
+  if (!(peak > 0)) return cloneClip(clip);
+  return applyGainRange(clip, s, e, dbToLin(targetDb) / peak);
+}
+
+/* フェードのカーブ形状 (t:0→1 の進行度 → ゲイン) */
+function fadeGain(t, curve){
+  if (!(t > 0)) t = 0; else if (t > 1) t = 1;
+  if (curve === "exp") return t * t;
+  if (curve === "scurve") return (1 - Math.cos(Math.PI * t)) / 2;
+  return t;
+}
+
+/* 範囲にフェードを掛ける (dir: "in" | "out") */
+function fadeRange(clip, s, e, dir, curve){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  if (r.len <= 0) return out;
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c];
+    for (var i = 0; i < r.len; i++){
+      var t = (r.len === 1) ? 1 : i / (r.len - 1);
+      d[r.start + i] = d[r.start + i] * fadeGain(dir === "out" ? 1 - t : t, curve);
+    }
+  }
+  return out;
+}
+
+/* 範囲を無音に */
+function silenceRange(clip, s, e){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  for (var c = 0; c < out.numberOfChannels; c++) out.channels[c].fill(0, r.start, r.end);
+  return out;
+}
+
+/* 範囲を前後反転 */
+function reverseRange(clip, s, e){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c];
+    for (var i = 0, j = r.len - 1; i < j; i++, j--){
+      var t = d[r.start + i]; d[r.start + i] = d[r.start + j]; d[r.start + j] = t;
+    }
+  }
+  return out;
+}
+
+/* DC オフセット (直流成分) の除去 */
+function removeDcOffset(clip, s, e){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  if (r.len <= 0) return out;
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c], sum = 0, i;
+    for (i = r.start; i < r.end; i++) sum += d[i];
+    var mean = sum / r.len;
+    for (i = r.start; i < r.end; i++) d[i] = clampSample(d[i] - mean);
+  }
+  return out;
+}
+
+/* 定パワー パン (-1=左 / 0=中央 / +1=右)。ステレオ以上で有効 */
+function panRange(clip, s, e, pan){
+  var out = cloneClip(clip);
+  if (out.numberOfChannels < 2) return out;
+  if (!isFinite(pan)) pan = 0;
+  pan = Math.max(-1, Math.min(1, pan));
+  var r = normRange(clip, s, e);
+  var ang = (pan + 1) * Math.PI / 4;
+  var gl = Math.cos(ang) * Math.SQRT2, gr = Math.sin(ang) * Math.SQRT2;
+  for (var i = r.start; i < r.end; i++){
+    out.channels[0][i] = clampSample(out.channels[0][i] * gl);
+    out.channels[1][i] = clampSample(out.channels[1][i] * gr);
+  }
+  return out;
+}
+
+/* 全チャンネルを 1ch に混合 */
+function toMono(clip){
+  return matchChannels(cloneClip(clip), 1);
+}
+
+/* ────────── フィルタ / エコー ────────── */
+
+/* 1 次 IIR の極係数 (カットオフ周波数 → 0..1) */
+function onePoleCoef(cutoffHz, sampleRate){
+  if (!(cutoffHz > 0)) cutoffHz = 1;
+  var a = Math.exp(-2 * Math.PI * cutoffHz / sampleRate);
+  return Math.max(0, Math.min(0.999999, a));
+}
+
+/* ローパス / ハイパス (1 次) */
+function filterRange(clip, s, e, type, cutoffHz){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  if (r.len <= 0) return out;
+  var a = onePoleCoef(cutoffHz, clip.sampleRate);
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c], y = d[r.start];
+    for (var i = r.start; i < r.end; i++){
+      y = (1 - a) * d[i] + a * y;                       /* ローパス成分 */
+      d[i] = clampSample(type === "highpass" ? d[i] - y : y);
+    }
+  }
+  return out;
+}
+
+/* フィードバック エコー (山びこ) */
+function echoRange(clip, s, e, delaySec, decay){
+  var r = normRange(clip, s, e), out = cloneClip(clip);
+  var d0 = Math.max(1, Math.round((delaySec || 0.25) * clip.sampleRate));
+  if (!isFinite(decay)) decay = 0.4;
+  decay = Math.max(0, Math.min(0.95, decay));
+  if (r.len <= 0 || decay === 0) return out;
+  for (var c = 0; c < out.numberOfChannels; c++){
+    var d = out.channels[c];
+    for (var i = r.start + d0; i < r.end; i++){
+      d[i] = clampSample(d[i] + decay * d[i - d0]);
+    }
+  }
+  return out;
+}
+
+/* ────────── 無音トリム / ゼロクロス ────────── */
+
+/* しきい値を超える最初と最後のサンプル位置 */
+function trimSilenceRange(clip, thresholdDb){
+  var th = dbToLin(isFinite(thresholdDb) ? thresholdDb : -50);
+  var first = -1, last = -1, c, i, v;
+  for (c = 0; c < clip.numberOfChannels; c++){
+    var d = clip.channels[c];
+    for (i = 0; i < clip.length; i++){
+      v = d[i] < 0 ? -d[i] : d[i];
+      if (v > th){ if (first < 0 || i < first) first = i; break; }
+    }
+    for (i = clip.length - 1; i >= 0; i--){
+      v = d[i] < 0 ? -d[i] : d[i];
+      if (v > th){ if (i > last) last = i; break; }
+    }
+  }
+  if (first < 0 || last < 0) return { start: 0, end: clip.length };
+  return { start: first, end: Math.min(clip.length, last + 1) };
+}
+
+/* index 付近のゼロクロス点 (符号が変わる位置) を探す */
+function findZeroCrossing(clip, index, maxSearch){
+  if (!clip || clip.length === 0) return 0;
+  var d = clip.channels[0];
+  index = Math.max(0, Math.min(clip.length, Math.round(index)));
+  if (!maxSearch) maxSearch = Math.round(clip.sampleRate * 0.02);
+  for (var off = 0; off <= maxSearch; off++){
+    var i = index + off, j = index - off;
+    if (i > 0 && i < clip.length && ((d[i-1] <= 0 && d[i] >= 0) || (d[i-1] >= 0 && d[i] <= 0))) return i;
+    if (j > 0 && j < clip.length && ((d[j-1] <= 0 && d[j] >= 0) || (d[j-1] >= 0 && d[j] <= 0))) return j;
+  }
+  return index;
+}
+
+/* ────────── 波形描画用ピーク集計 ────────── */
+
+/* [start,end) を buckets 本に集計し [min0,max0,min1,max1,…] を返す */
+function channelPeaks(data, start, end, buckets){
+  buckets = Math.max(1, Math.round(buckets));
+  var out = new Float32Array(buckets * 2);
+  start = Math.max(0, Math.round(start));
+  end = Math.min(data.length, Math.round(end));
+  var span = end - start;
+  if (span <= 0) return out;
+  var per = span / buckets;
+  for (var b = 0; b < buckets; b++){
+    var i0 = start + Math.floor(b * per);
+    var i1 = start + Math.floor((b + 1) * per);
+    if (i1 <= i0) i1 = i0 + 1;
+    if (i1 > end) i1 = end;
+    var mn = Infinity, mx = -Infinity;
+    for (var i = i0; i < i1; i++){
+      var v = data[i];
+      if (v < mn) mn = v;
+      if (v > mx) mx = v;
+    }
+    if (mn === Infinity){ mn = 0; mx = 0; }
+    out[b * 2] = mn; out[b * 2 + 1] = mx;
+  }
+  return out;
+}
+
+/* 目盛り間隔を「きりの良い秒数」から選ぶ */
+function niceTimeStep(spanSec, targetTicks){
+  var steps = [0.001,0.002,0.005,0.01,0.02,0.05,0.1,0.2,0.5,1,2,5,10,15,30,60,120,300,600,900,1800,3600];
+  var want = spanSec / Math.max(1, targetTicks || 8);
+  for (var i = 0; i < steps.length; i++){ if (steps[i] >= want) return steps[i]; }
+  return steps[steps.length - 1];
+}
+
+/* ────────── WAV エンコーダ / デコーダ (自前実装) ────────── */
+
+function wavWriteStr(view, offset, str){
+  for (var i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i) & 0xff);
+}
+function wavReadStr(view, offset, len){
+  var s = "";
+  for (var i = 0; i < len; i++) s += String.fromCharCode(view.getUint8(offset + i));
+  return s;
+}
+
+/* 書き出しサイズの見積り (バイト) */
+function estimateWavSize(clip, bitDepth){
+  return 44 + clip.length * clip.numberOfChannels * ((bitDepth || 16) / 8);
+}
+
+/* Clip → WAV バイト列 (16 / 24bit PCM, 32bit float) */
+function encodeWav(clip, bitDepth){
+  bitDepth = (bitDepth === 24 || bitDepth === 32) ? bitDepth : 16;
+  var isFloat = (bitDepth === 32);
+  var numCh = clip.numberOfChannels, len = clip.length, rate = clip.sampleRate;
+  var bytesPer = bitDepth / 8;
+  var blockAlign = numCh * bytesPer;
+  var dataSize = len * blockAlign;
+  var buf = new ArrayBuffer(44 + dataSize);
+  var view = new DataView(buf);
+
+  wavWriteStr(view, 0, "RIFF");
+  view.setUint32(4, 36 + dataSize, true);
+  wavWriteStr(view, 8, "WAVE");
+  wavWriteStr(view, 12, "fmt ");
+  view.setUint32(16, 16, true);                 /* fmt チャンク長 */
+  view.setUint16(20, isFloat ? 3 : 1, true);    /* 3=IEEE float / 1=PCM */
+  view.setUint16(22, numCh, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * blockAlign, true);  /* バイト/秒 */
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitDepth, true);
+  wavWriteStr(view, 36, "data");
+  view.setUint32(40, dataSize, true);
+
+  var off = 44;
+  for (var i = 0; i < len; i++){
+    for (var c = 0; c < numCh; c++){
+      var v = clampSample(clip.channels[c][i]);
+      if (isFloat){ view.setFloat32(off, v, true); off += 4; }
+      else if (bitDepth === 24){
+        var n24 = Math.max(-8388608, Math.min(8388607, Math.round(v * 8388607)));
+        view.setUint8(off, n24 & 0xff);
+        view.setUint8(off + 1, (n24 >> 8) & 0xff);
+        view.setUint8(off + 2, (n24 >> 16) & 0xff);
+        off += 3;
+      } else {
+        view.setInt16(off, Math.max(-32768, Math.min(32767, Math.round(v * 32767))), true);
+        off += 2;
+      }
+    }
+  }
+  return new Uint8Array(buf);
+}
+
+/* WAV バイト列 → Clip (PCM 8/16/24/32bit, IEEE float 32bit) */
+function parseWav(bytes){
+  var view = new DataView(bytes.buffer, bytes.byteOffset || 0, bytes.byteLength);
+  if (view.byteLength < 12 || wavReadStr(view, 0, 4) !== "RIFF" || wavReadStr(view, 8, 4) !== "WAVE"){
+    throw new Error("WAV ではありません");
+  }
+  var pos = 12, fmt = null, dataOff = -1, dataLen = 0;
+  while (pos + 8 <= view.byteLength){
+    var id = wavReadStr(view, pos, 4);
+    var size = view.getUint32(pos + 4, true);
+    var body = pos + 8;
+    if (id === "fmt " && size >= 16){
+      fmt = {
+        format: view.getUint16(body, true),
+        channels: view.getUint16(body + 2, true),
+        rate: view.getUint32(body + 4, true),
+        bits: view.getUint16(body + 14, true)
+      };
+    } else if (id === "data"){
+      dataOff = body;
+      dataLen = Math.min(size, view.byteLength - body);
+    }
+    pos = body + size + (size % 2);            /* チャンクは偶数境界 */
+  }
+  if (!fmt || dataOff < 0) throw new Error("fmt / data チャンクがありません");
+  var numCh = Math.max(1, fmt.channels), bits = fmt.bits;
+  var bytesPer = bits / 8, blockAlign = numCh * bytesPer;
+  var frames = Math.floor(dataLen / blockAlign);
+  var chs = [], c;
+  for (c = 0; c < numCh; c++) chs.push(new Float32Array(frames));
+  for (var i = 0; i < frames; i++){
+    for (c = 0; c < numCh; c++){
+      var o = dataOff + i * blockAlign + c * bytesPer, v = 0;
+      if (fmt.format === 3 && bits === 32) v = view.getFloat32(o, true);
+      else if (bits === 16) v = view.getInt16(o, true) / 32768;
+      else if (bits === 24){
+        var n = view.getUint8(o) | (view.getUint8(o + 1) << 8) | (view.getUint8(o + 2) << 16);
+        if (n & 0x800000) n |= ~0xffffff;      /* 符号拡張 */
+        v = n / 8388608;
+      }
+      else if (bits === 8) v = (view.getUint8(o) - 128) / 128;
+      else if (bits === 32) v = view.getInt32(o, true) / 2147483648;
+      chs[c][i] = v;
+    }
+  }
+  return makeClip(fmt.rate, chs);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ここから下は UI (DOM / Web Audio)。エンジンテストでは実行されません。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+var clip = null;                    /* 編集中の音声 */
+var clipboard = null;               /* 内部クリップボード */
+var undoStack = [], redoStack = [];
+var view = { start: 0, end: 0 };    /* 表示範囲 (サンプル) */
+var sel = { start: 0, end: 0 };     /* 選択範囲 (サンプル) */
+var cursor = 0;                     /* 挿入カーソル (サンプル) */
+var srcName = "audio";
+
+var actx = null, srcNode = null, playing = false;
+var playFrom = 0, playTo = 0, playT0 = 0, rafId = 0, playPos = 0;
+var dragging = false, dragAnchor = 0;
+var recording = false;
+
+function $(id){ return document.getElementById(id); }
+
+function setStatus(msg, cls){
+  var el = $("status");
+  el.textContent = msg;
+  el.className = cls || "";
+}
+
+/* ────────── AudioContext ────────── */
+function audioCtx(){
+  if (!actx){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+  }
+  if (actx.state === "suspended" && actx.resume) actx.resume();
+  return actx;
+}
+function clipToBuffer(c){
+  var ctx = audioCtx();
+  var b = ctx.createBuffer(c.numberOfChannels, Math.max(1, c.length), c.sampleRate);
+  for (var i = 0; i < c.numberOfChannels; i++){
+    if (b.copyToChannel) b.copyToChannel(c.channels[i], i);
+    else b.getChannelData(i).set(c.channels[i]);
+  }
+  return b;
+}
+function bufferToClip(b){
+  var chs = [];
+  for (var i = 0; i < b.numberOfChannels; i++) chs.push(new Float32Array(b.getChannelData(i)));
+  return makeClip(b.sampleRate, chs);
+}
+
+/* ────────── 履歴 ────────── */
+function pushUndo(){
+  if (!clip) return;
+  undoStack.push(cloneClip(clip));
+  if (undoStack.length > MAX_HISTORY) undoStack.shift();
+  redoStack.length = 0;
+}
+function commit(newClip, label, newSel){
+  pushUndo();
+  clip = newClip;
+  if (newSel){ sel.start = newSel.start; sel.end = newSel.end; }
+  clampState();
+  refresh();
+  setStatus("✔ " + label, "ok");
+}
+function doUndo(){
+  if (!undoStack.length) return;
+  redoStack.push(cloneClip(clip));
+  clip = undoStack.pop();
+  clampState(); refresh();
+  setStatus("↶ 元に戻しました(残り " + undoStack.length + " 段)", "");
+}
+function doRedo(){
+  if (!redoStack.length) return;
+  undoStack.push(cloneClip(clip));
+  clip = redoStack.pop();
+  clampState(); refresh();
+  setStatus("↷ やり直しました", "");
+}
+
+/* 選択・表示範囲を現在の長さに収める */
+function clampState(){
+  if (!clip){ view.start = view.end = sel.start = sel.end = cursor = 0; return; }
+  var L = clip.length;
+  sel.start = Math.max(0, Math.min(L, sel.start));
+  sel.end = Math.max(sel.start, Math.min(L, sel.end));
+  cursor = Math.max(0, Math.min(L, cursor));
+  if (view.end <= view.start || view.end > L || view.start < 0){ view.start = 0; view.end = L; }
+  if (view.end - view.start < 16) view.end = Math.min(L, view.start + 16);
+}
+
+/* 効果の適用対象: 選択があれば選択、なければ全体 */
+function targetRange(){
+  if (!clip) return { start: 0, end: 0, len: 0 };
+  if (sel.end > sel.start) return { start: sel.start, end: sel.end, len: sel.end - sel.start };
+  return { start: 0, end: clip.length, len: clip.length };
+}
+function rangeLabel(){
+  return (sel.end > sel.start) ? "選択範囲" : "全体";
+}
+
+/* ────────── 描画 ────────── */
+function canvasSize(cv, cssH){
+  var dpr = window.devicePixelRatio || 1;
+  var w = cv.clientWidth || 600;
+  var h = cssH || cv.clientHeight || 100;
+  cv.width = Math.max(1, Math.round(w * dpr));
+  cv.height = Math.max(1, Math.round(h * dpr));
+  var g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { g: g, w: w, h: h };
+}
+function xOfSample(n, w){
+  var span = view.end - view.start;
+  if (span <= 0) return 0;
+  return (n - view.start) / span * w;
+}
+function sampleOfX(x, w){
+  var span = view.end - view.start;
+  return view.start + (x / Math.max(1, w)) * span;
+}
+
+function drawRuler(){
+  var cv = $("ruler"), s = canvasSize(cv, 26), g = s.g, w = s.w, h = s.h;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "#0d1119"; g.fillRect(0, 0, w, h);
+  if (!clip) return;
+  var t0 = sampleToSec(clip, view.start), t1 = sampleToSec(clip, view.end);
+  var step = niceTimeStep(t1 - t0, Math.max(4, Math.round(w / 110)));
+  g.strokeStyle = "#2a3350"; g.fillStyle = "#8b94a8";
+  g.font = "10px ui-monospace,Menlo,Consolas,monospace";
+  g.beginPath();
+  var first = Math.ceil(t0 / step) * step;
+  for (var t = first; t <= t1 + 1e-9; t += step){
+    var x = Math.round(xOfSample(secToSample(clip, t), w)) + 0.5;
+    g.moveTo(x, h - 7); g.lineTo(x, h);
+    g.fillText(fmtTime(t).replace(/\.000$/, ""), x + 3, 11);
+  }
+  g.stroke();
+}
+
+function drawWave(){
+  var cv = $("wave"), s = canvasSize(cv), g = s.g, w = s.w, h = s.h;
+  g.clearRect(0, 0, w, h);
+  g.fillStyle = "#080b11"; g.fillRect(0, 0, w, h);
+
+  if (!clip || clip.length === 0){
+    g.fillStyle = "#4a5468";
+    g.font = "14px system-ui,sans-serif";
+    g.textAlign = "center";
+    g.fillText("音声ファイルを読み込むと、ここに波形が表示されます", w / 2, h / 2);
+    g.textAlign = "left";
+    return;
+  }
+
+  /* 選択範囲の帯 */
+  if (sel.end > sel.start){
+    var sx = xOfSample(sel.start, w), ex = xOfSample(sel.end, w);
+    g.fillStyle = "rgba(232,199,106,.14)";
+    g.fillRect(sx, 0, Math.max(1, ex - sx), h);
+    g.strokeStyle = "rgba(232,199,106,.55)";
+    g.beginPath();
+    g.moveTo(Math.round(sx) + 0.5, 0); g.lineTo(Math.round(sx) + 0.5, h);
+    g.moveTo(Math.round(ex) + 0.5, 0); g.lineTo(Math.round(ex) + 0.5, h);
+    g.stroke();
+  }
+
+  var nch = clip.numberOfChannels, chH = h / nch;
+  for (var c = 0; c < nch; c++){
+    var top = c * chH, mid = top + chH / 2, amp = (chH / 2) - 4;
+    /* 中心線と区切り */
+    g.strokeStyle = "#1c2438";
+    g.beginPath();
+    g.moveTo(0, Math.round(mid) + 0.5); g.lineTo(w, Math.round(mid) + 0.5);
+    if (c > 0){ g.moveTo(0, Math.round(top) + 0.5); g.lineTo(w, Math.round(top) + 0.5); }
+    g.stroke();
+
+    var peaks = channelPeaks(clip.channels[c], view.start, view.end, Math.max(1, Math.round(w)));
+    var span = view.end - view.start;
+    g.fillStyle = "#58c8d8";
+    if (span > w){
+      /* 縮小表示: 各ピクセルの min/max を縦線で */
+      for (var x = 0; x < peaks.length / 2; x++){
+        var mn = peaks[x * 2], mx = peaks[x * 2 + 1];
+        var y0 = mid - mx * amp, y1 = mid - mn * amp;
+        g.fillRect(x, y0, 1, Math.max(1, y1 - y0));
+      }
+    } else {
+      /* 拡大表示: サンプル点を折れ線で */
+      g.strokeStyle = "#58c8d8"; g.lineWidth = 1.4;
+      g.beginPath();
+      var d = clip.channels[c];
+      for (var i = Math.floor(view.start); i <= Math.ceil(view.end) && i < clip.length; i++){
+        var px = xOfSample(i, w), py = mid - d[i] * amp;
+        if (i === Math.floor(view.start)) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.stroke(); g.lineWidth = 1;
+    }
+  }
+
+  /* 選択範囲を波形の上からも淡く重ねる (密な波形でも範囲が読み取れるように) */
+  if (sel.end > sel.start){
+    var sx2 = xOfSample(sel.start, w), ex2 = xOfSample(sel.end, w);
+    g.fillStyle = "rgba(232,199,106,.10)";
+    g.fillRect(sx2, 0, Math.max(1, ex2 - sx2), h);
+  }
+
+  /* チャンネル名 (波形に隠れないよう最後に、下地つきで描く) */
+  g.font = "10px system-ui,sans-serif";
+  for (var ci = 0; ci < nch; ci++){
+    var lbl = nch === 1 ? "MONO" : (ci === 0 ? "L" : (ci === 1 ? "R" : "CH" + (ci + 1)));
+    var lw = g.measureText(lbl).width + 10;
+    g.fillStyle = "rgba(8,11,17,.82)";
+    g.fillRect(4, ci * chH + 4, lw, 15);
+    g.fillStyle = "#8b94a8";
+    g.fillText(lbl, 9, ci * chH + 15);
+  }
+
+  /* カーソル */
+  var cx = Math.round(xOfSample(cursor, w)) + 0.5;
+  if (cx >= 0 && cx <= w){
+    g.strokeStyle = "#e8ecf4"; g.beginPath();
+    g.moveTo(cx, 0); g.lineTo(cx, h); g.stroke();
+  }
+  /* 再生位置 */
+  if (playing){
+    var px2 = Math.round(xOfSample(secToSample(clip, playPos), w)) + 0.5;
+    g.strokeStyle = "#5fd68a"; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(px2, 0); g.lineTo(px2, h); g.stroke();
+    g.lineWidth = 1;
+  }
+}
+
+/* ────────── 情報表示 ────────── */
+function refreshInfo(){
+  if (!clip){
+    $("infoBadge").textContent = "音声ファイル未読み込み";
+    $("fileInfo").textContent = "読み込み前です。音声ファイルを選ぶと波形が表示されます。";
+    $("analysis").textContent = "—";
+    $("estInfo").textContent = "—";
+    $("timeRead").textContent = "0:00.000 / 0:00.000";
+    $("zoomRead").textContent = "×1";
+    return;
+  }
+  var dur = clipDuration(clip);
+  var chName = clip.numberOfChannels === 1 ? "モノラル" :
+               (clip.numberOfChannels === 2 ? "ステレオ" : clip.numberOfChannels + "ch");
+  $("infoBadge").textContent = fmtTime(dur) + " ／ " + clip.sampleRate + " Hz ／ " + chName;
+  $("fileInfo").innerHTML =
+    "<b>" + escapeHtml(srcName) + "</b><br>" +
+    "長さ " + fmtTime(dur) + " ／ " + clip.sampleRate + " Hz ／ " + chName + "<br>" +
+    "サンプル数 " + clip.length.toLocaleString() + " ／ 履歴 " + undoStack.length + " 段";
+
+  var t = targetRange();
+  var pk = peakOf(clip, t.start, t.end), rms = rmsOf(clip, t.start, t.end);
+  $("analysis").innerHTML =
+    "対象: <b>" + rangeLabel() + "</b> " +
+    fmtTime(sampleToSec(clip, t.start)) + " 〜 " + fmtTime(sampleToSec(clip, t.end)) +
+    " (" + fmtTime(t.len / clip.sampleRate) + ")<br>" +
+    "ピーク <b>" + fmtDb(linToDb(pk)) + "</b> (" + pk.toFixed(4) + ")　" +
+    "RMS <b>" + fmtDb(linToDb(rms)) + "</b><br>" +
+    (pk >= 0.999 ? "<span style='color:var(--err)'>⚠ クリッピングの可能性があります</span>"
+                 : "余裕 " + fmtDb(-linToDb(pk)) + " まで音量を上げられます");
+
+  var bits = parseInt($("selBits").value, 10);
+  var rate = parseInt($("selRate").value, 10) || clip.sampleRate;
+  var scope = $("selScope").value;
+  var expLen = (scope === "sel" && sel.end > sel.start) ? (sel.end - sel.start) : clip.length;
+  expLen = Math.round(expLen * (rate / clip.sampleRate));
+  var size = 44 + expLen * clip.numberOfChannels * (bits / 8);
+  $("estInfo").innerHTML =
+    "書き出し: <b>" + (scope === "sel" ? "選択範囲" : "全体") + "</b> " +
+    fmtTime(expLen / rate) + " ／ " + rate + " Hz ／ " + bits + "bit<br>" +
+    "推定サイズ <b>" + fmtBytes(size) + "</b>";
+
+  $("selStart").value = sampleToSec(clip, sel.start).toFixed(3);
+  $("selEnd").value = sampleToSec(clip, sel.end).toFixed(3);
+  $("timeRead").textContent = fmtTime(playing ? playPos : sampleToSec(clip, cursor)) + " / " + fmtTime(dur);
+  var zoom = clip.length / Math.max(1, view.end - view.start);
+  $("zoomRead").textContent = "×" + (zoom < 10 ? zoom.toFixed(1) : Math.round(zoom));
+
+  /* スクロールバー */
+  var span = view.end - view.start;
+  var maxStart = Math.max(0, clip.length - span);
+  $("rngScroll").disabled = (maxStart <= 0);
+  $("rngScroll").value = maxStart > 0 ? Math.round(view.start / maxStart * 1000) : 0;
+
+  $("btnUndo").disabled = !undoStack.length;
+  $("btnRedo").disabled = !redoStack.length;
+  $("btnPasteIns").disabled = !clipboard;
+  $("btnPasteMix").disabled = !clipboard;
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, function(ch){
+    return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch];
+  });
+}
+function refresh(){ drawRuler(); drawWave(); refreshInfo(); }
+
+/* ────────── ファイル読み込み ────────── */
+function loadFile(file){
+  if (!file) return;
+  setStatus("読み込み中… " + file.name, "");
+  var fr = new FileReader();
+  fr.onerror = function(){ setStatus("✘ ファイルを読み込めませんでした", "err"); };
+  fr.onload = function(){
+    var bytes = new Uint8Array(fr.result);
+    var done = function(c){
+      clip = c;
+      srcName = file.name;
+      undoStack.length = 0; redoStack.length = 0;
+      sel.start = sel.end = cursor = 0;
+      view.start = 0; view.end = c.length;
+      $("txtName").value = sanitizeName(baseName(file.name)) + "-edited";
+      clampState(); refresh();
+      setStatus("✔ 読み込み完了: " + fmtTime(clipDuration(c)) + " / " +
+                c.sampleRate + " Hz / " + c.numberOfChannels + "ch", "ok");
+    };
+    /* WAV は自前パーサ (デコード誤差なし)。それ以外はブラウザのデコーダ */
+    try {
+      if (bytes.length > 12 &&
+          String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === "RIFF"){
+        done(parseWav(bytes));
+        return;
+      }
+    } catch (e){ /* 自前パースに失敗したら decodeAudioData に回す */ }
+    var ctx = audioCtx();
+    var p = ctx.decodeAudioData(fr.result.slice(0));
+    if (p && p.then){
+      p.then(function(buf){ done(bufferToClip(buf)); },
+             function(){ setStatus("✘ この形式はデコードできませんでした", "err"); });
+    } else {
+      ctx.decodeAudioData(fr.result.slice(0),
+        function(buf){ done(bufferToClip(buf)); },
+        function(){ setStatus("✘ この形式はデコードできませんでした", "err"); });
+    }
+  };
+  fr.readAsArrayBuffer(file);
+}
+
+/* ────────── 再生 ────────── */
+function stopPlay(silentUpdate){
+  if (srcNode){
+    try { srcNode.onended = null; srcNode.stop(); } catch (e){}
+    try { srcNode.disconnect(); } catch (e){}
+    srcNode = null;
+  }
+  playing = false;
+  if (rafId){ cancelAnimationFrame(rafId); rafId = 0; }
+  $("btnPlay").textContent = "▶ 再生";
+  if (!silentUpdate) refresh();
+}
+function startPlay(fromSec, toSec){
+  if (!clip || clip.length === 0) return;
+  stopPlay(true);
+  var ctx = audioCtx();
+  var loop = $("chkLoop").checked;
+  var dur = Math.max(0, toSec - fromSec);
+  if (dur < 0.005) return;
+  srcNode = ctx.createBufferSource();
+  srcNode.buffer = clipToBuffer(clip);
+  srcNode.connect(ctx.destination);
+  if (loop){
+    srcNode.loop = true;
+    srcNode.loopStart = fromSec;
+    srcNode.loopEnd = toSec;
+    srcNode.start(0, fromSec);
+  } else {
+    srcNode.start(0, fromSec, dur);
+    srcNode.onended = function(){ cursor = secToSample(clip, toSec); stopPlay(); };
+  }
+  playFrom = fromSec; playTo = toSec; playT0 = ctx.currentTime;
+  playing = true; playPos = fromSec;
+  $("btnPlay").textContent = "⏸ 停止";
+  tick();
+}
+function tick(){
+  if (!playing) return;
+  var el = audioCtx().currentTime - playT0;
+  var dur = playTo - playFrom;
+  playPos = $("chkLoop").checked && dur > 0
+          ? playFrom + (el % dur)
+          : Math.min(playTo, playFrom + el);
+  drawWave();
+  $("timeRead").textContent = fmtTime(playPos) + " / " + fmtTime(clipDuration(clip));
+  rafId = requestAnimationFrame(tick);
+}
+function togglePlay(){
+  if (playing){ stopPlay(); return; }
+  var from = (sel.end > sel.start) ? sampleToSec(clip, sel.start) : sampleToSec(clip, cursor);
+  startPlay(from, clipDuration(clip));
+}
+
+/* ────────── 書き出し ────────── */
+function exportClip(){
+  if (!clip) return clip;
+  var scope = $("selScope").value;
+  var c = (scope === "sel" && sel.end > sel.start) ? sliceClip(clip, sel.start, sel.end) : cloneClip(clip);
+  var rate = parseInt($("selRate").value, 10);
+  if (rate && rate !== c.sampleRate) c = resampleTo(c, rate);
+  return c;
+}
+function anchorDownload(blob, name){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+}
+/* 保存: Android など「共有」しか使えない環境では共有シートへ回す */
+function downloadBlob(blob, name){
+  var file = null;
+  try { file = new File([blob], name, { type: blob.type }); } catch (e){}
+  if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+    navigator.share({ files: [file], title: name })
+      .catch(function(){ anchorDownload(blob, name); });
+    return;
+  }
+  anchorDownload(blob, name);
+}
+function doExportWav(){
+  if (!clip){ setStatus("✘ 先に音声ファイルを読み込んでください", "err"); return; }
+  var bits = parseInt($("selBits").value, 10);
+  var c = exportClip();
+  var bytes = encodeWav(c, bits);
+  var name = sanitizeName($("txtName").value) + ".wav";
+  downloadBlob(new Blob([bytes], { type: "audio/wav" }), name);
+  setStatus("✔ 保存しました: " + name + " (" + fmtBytes(bytes.length) + ")", "ok");
+}
+
+/* 圧縮書き出し (MediaRecorder。対応形式は環境依存) */
+function pickRecorderMime(isSupported){
+  var cands = ["audio/mp4;codecs=mp4a.40.2", "audio/mp4",
+               "audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus"];
+  for (var i = 0; i < cands.length; i++){
+    if (isSupported(cands[i])) return { mime: cands[i], ext: /mp4/.test(cands[i]) ? "m4a" : (/ogg/.test(cands[i]) ? "ogg" : "webm") };
+  }
+  return { mime: "", ext: "webm" };
+}
+function doExportCompressed(){
+  if (!clip){ setStatus("✘ 先に音声ファイルを読み込んでください", "err"); return; }
+  if (recording) return;
+  if (typeof MediaRecorder === "undefined"){
+    setStatus("✘ この環境では圧縮書き出しに対応していません(WAV をお使いください)", "err");
+    return;
+  }
+  var c = exportClip();
+  var ctx = audioCtx();
+  var pick = pickRecorderMime(function(m){
+    try { return MediaRecorder.isTypeSupported(m); } catch (e){ return false; }
+  });
+  var dest = ctx.createMediaStreamDestination();
+  var node = ctx.createBufferSource();
+  node.buffer = clipToBuffer(c);
+  node.connect(dest);
+  var rec;
+  try { rec = new MediaRecorder(dest.stream, pick.mime ? { mimeType: pick.mime } : undefined); }
+  catch (e){ setStatus("✘ 録音を開始できませんでした: " + e.message, "err"); return; }
+  var chunks = [];
+  rec.ondataavailable = function(ev){ if (ev.data && ev.data.size) chunks.push(ev.data); };
+  rec.onstop = function(){
+    recording = false;
+    $("btnExportC").disabled = false;
+    var blob = new Blob(chunks, { type: pick.mime || "audio/webm" });
+    var name = sanitizeName($("txtName").value) + "." + pick.ext;
+    downloadBlob(blob, name);
+    setStatus("✔ 保存しました: " + name + " (" + fmtBytes(blob.size) + ")", "ok");
+  };
+  recording = true;
+  $("btnExportC").disabled = true;
+  rec.start();
+  node.start();
+  node.onended = function(){ try { rec.stop(); } catch (e){} };
+  setStatus("🗜 圧縮書き出し中… " + fmtTime(clipDuration(c)) + " (リアルタイム録音)", "");
+}
+
+/* ────────── 選択・ズーム操作 ────────── */
+function snap(n){
+  if (!clip || !$("chkSnap").checked) return Math.round(n);
+  return findZeroCrossing(clip, n, Math.round(clip.sampleRate * 0.01));
+}
+function setSel(a, b){
+  var r = normRange(clip, a, b);
+  sel.start = r.start; sel.end = r.end;
+}
+function zoomBy(factor, centerSample){
+  if (!clip) return;
+  var span = view.end - view.start;
+  var newSpan = Math.max(16, Math.min(clip.length, Math.round(span / factor)));
+  var center = (centerSample == null) ? (view.start + span / 2) : centerSample;
+  var start = Math.round(center - newSpan * ((center - view.start) / Math.max(1, span)));
+  start = Math.max(0, Math.min(clip.length - newSpan, start));
+  view.start = start; view.end = start + newSpan;
+  refresh();
+}
+function zoomFit(){
+  if (!clip) return;
+  view.start = 0; view.end = clip.length; refresh();
+}
+function zoomToSel(){
+  if (!clip || sel.end <= sel.start) return;
+  var pad = Math.round((sel.end - sel.start) * 0.08);
+  view.start = Math.max(0, sel.start - pad);
+  view.end = Math.min(clip.length, sel.end + pad);
+  if (view.end - view.start < 16) view.end = Math.min(clip.length, view.start + 16);
+  refresh();
+}
+
+/* ────────── 編集コマンド ────────── */
+function cmdCopy(){
+  if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+  clipboard = sliceClip(clip, sel.start, sel.end);
+  refreshInfo();
+  setStatus("⧉ コピーしました (" + fmtTime(clipDuration(clipboard)) + ")", "ok");
+}
+function cmdCut(){
+  if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+  clipboard = sliceClip(clip, sel.start, sel.end);
+  var at = sel.start;
+  cursor = at;
+  commit(deleteRange(clip, sel.start, sel.end), "切り取りました", { start: at, end: at });
+}
+function cmdDelete(){
+  if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+  var at = sel.start;
+  cursor = at;
+  commit(deleteRange(clip, sel.start, sel.end), "削除しました", { start: at, end: at });
+}
+function cmdCrop(){
+  if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+  var c = sliceClip(clip, sel.start, sel.end);
+  cursor = 0;
+  view.start = 0; view.end = c.length;
+  commit(c, "選択範囲で切り抜きました", { start: 0, end: 0 });
+}
+function cmdPaste(mix){
+  if (!clip || !clipboard){ setStatus("✘ クリップボードが空です", "err"); return; }
+  var at = (sel.end > sel.start) ? sel.start : cursor;
+  var base = (!mix && sel.end > sel.start) ? deleteRange(clip, sel.start, sel.end) : clip;
+  var out = mix ? mixClip(base, clipboard, at) : insertClip(base, clipboard, at);
+  var pasted = Math.round(clipboard.length * (clip.sampleRate / clipboard.sampleRate));
+  commit(out, mix ? "ミックス貼り付けしました" : "貼り付けました",
+         { start: at, end: at + pasted });
+}
+function cmdRepeat(){
+  if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+  var times = parseInt($("numRepeat").value, 10) || 2;
+  var len = sel.end - sel.start;
+  commit(repeatRange(clip, sel.start, sel.end, times), times + " 回に増やしました",
+         { start: sel.start, end: sel.start + len * times });
+}
+function cmdInsertSilence(){
+  if (!clip){ setStatus("✘ 先に音声ファイルを読み込んでください", "err"); return; }
+  var sec = parseFloat($("numSilence").value) || 1;
+  var at = (sel.end > sel.start) ? sel.start : cursor;
+  var n = Math.max(1, Math.round(sec * clip.sampleRate));
+  commit(insertSilence(clip, at, sec), fmtTime(sec) + " の無音を挿入しました",
+         { start: at, end: at + n });
+}
+
+/* エフェクトの共通ラッパ (対象範囲を渡して新しい Clip を得る) */
+function applyFx(fn, label){
+  if (!clip){ setStatus("✘ 先に音声ファイルを読み込んでください", "err"); return; }
+  var t = targetRange();
+  if (t.len <= 0){ setStatus("✘ 対象範囲がありません", "err"); return; }
+  var out;
+  try { out = fn(t); }
+  catch (e){ setStatus("✘ " + e.message, "err"); return; }
+  commit(out, label + " (" + rangeLabel() + ")");
+}
+
+/* ────────── 起動 ────────── */
+function boot(){
+  /* ファイル */
+  var drop = $("drop");
+  drop.onclick = function(){ $("fileInput").click(); };
+  $("fileInput").onchange = function(){
+    var f = this.files && this.files[0];
+    this.value = "";
+    if (f) loadFile(f);
+  };
+  ["dragenter", "dragover"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); });
+  });
+  ["dragleave", "drop"].forEach(function(ev){
+    drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); });
+  });
+  drop.addEventListener("drop", function(e){
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+  });
+  document.addEventListener("dragover", function(e){ e.preventDefault(); });
+  document.addEventListener("drop", function(e){ e.preventDefault(); });
+
+  /* トランスポート */
+  $("btnPlay").onclick = function(){ if (clip) togglePlay(); };
+  $("btnStop").onclick = function(){ stopPlay(); };
+  $("btnPlaySel").onclick = function(){
+    if (!clip) return;
+    if (sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+    startPlay(sampleToSec(clip, sel.start), sampleToSec(clip, sel.end));
+  };
+
+  /* 選択 */
+  $("btnSelAll").onclick = function(){
+    if (!clip) return;
+    setSel(0, clip.length); refresh();
+    setStatus("全体を選択しました", "");
+  };
+  $("btnSelNone").onclick = function(){ setSel(0, 0); refresh(); };
+  $("selStart").onchange = function(){
+    if (!clip) return;
+    setSel(secToSample(clip, parseFloat(this.value) || 0), sel.end); refresh();
+  };
+  $("selEnd").onchange = function(){
+    if (!clip) return;
+    setSel(sel.start, secToSample(clip, parseFloat(this.value) || 0)); refresh();
+  };
+
+  /* 編集 */
+  $("btnCut").onclick = cmdCut;
+  $("btnCopy").onclick = cmdCopy;
+  $("btnDelete").onclick = cmdDelete;
+  $("btnCrop").onclick = cmdCrop;
+  $("btnPasteIns").onclick = function(){ cmdPaste(false); };
+  $("btnPasteMix").onclick = function(){ cmdPaste(true); };
+  $("btnSilence").onclick = function(){
+    if (!clip || sel.end <= sel.start){ setStatus("✘ 先に範囲を選択してください", "err"); return; }
+    commit(silenceRange(clip, sel.start, sel.end), "選択範囲を無音にしました");
+  };
+  $("btnRepeat").onclick = cmdRepeat;
+  $("btnInsSilence").onclick = cmdInsertSilence;
+  $("btnUndo").onclick = doUndo;
+  $("btnRedo").onclick = doRedo;
+
+  /* エフェクト */
+  $("btnGain").onclick = function(){
+    var db = parseFloat($("numGain").value) || 0;
+    applyFx(function(t){ return applyGainRange(clip, t.start, t.end, dbToLin(db)); },
+            "音量を " + (db > 0 ? "+" : "") + db + " dB 変更");
+  };
+  $("btnNorm").onclick = function(){
+    var db = parseFloat($("numNorm").value);
+    if (!isFinite(db)) db = -1;
+    applyFx(function(t){ return normalizeRange(clip, t.start, t.end, db); },
+            "ピークを " + db + " dB にノーマライズ");
+  };
+  $("btnFadeIn").onclick = function(){
+    applyFx(function(t){ return fadeRange(clip, t.start, t.end, "in", $("selCurve").value); },
+            "フェードイン");
+  };
+  $("btnFadeOut").onclick = function(){
+    applyFx(function(t){ return fadeRange(clip, t.start, t.end, "out", $("selCurve").value); },
+            "フェードアウト");
+  };
+  $("btnReverse").onclick = function(){
+    applyFx(function(t){ return reverseRange(clip, t.start, t.end); }, "逆再生");
+  };
+  $("btnDc").onclick = function(){
+    applyFx(function(t){ return removeDcOffset(clip, t.start, t.end); }, "DC オフセット除去");
+  };
+  $("btnEcho").onclick = function(){
+    var dly = parseFloat($("numEchoDelay").value) || 0.25;
+    var dec = parseFloat($("numEchoDecay").value) || 0.4;
+    applyFx(function(t){ return echoRange(clip, t.start, t.end, dly, dec); },
+            "エコー (" + dly + "秒 / 減衰 " + dec + ")");
+  };
+  $("btnFilter").onclick = function(){
+    var type = $("selFilter").value;
+    var hz = parseFloat($("numCutoff").value) || 3000;
+    applyFx(function(t){ return filterRange(clip, t.start, t.end, type, hz); },
+            (type === "lowpass" ? "ローパス" : "ハイパス") + " " + hz + " Hz");
+  };
+  $("btnPan").onclick = function(){
+    if (clip && clip.numberOfChannels < 2){
+      setStatus("✘ パンはステレオ音声でのみ使えます", "err"); return;
+    }
+    var p = parseFloat($("numPan").value) || 0;
+    applyFx(function(t){ return panRange(clip, t.start, t.end, p); }, "パン " + p.toFixed(2));
+  };
+  $("numPan").oninput = function(){
+    var p = parseFloat(this.value) || 0;
+    $("panVal").textContent = Math.abs(p) < 0.03 ? "C" :
+      (p < 0 ? "L" + Math.round(-p * 100) : "R" + Math.round(p * 100));
+  };
+  $("btnMono").onclick = function(){
+    if (!clip) return;
+    if (clip.numberOfChannels === 1){ setStatus("既にモノラルです", ""); return; }
+    commit(toMono(clip), "モノラルに変換しました", { start: 0, end: 0 });
+  };
+  $("btnSpeed").onclick = function(){
+    if (!clip) return;
+    var sp = parseFloat($("numSpeed").value) || 1;
+    if (sp <= 0){ setStatus("✘ 速度は 0 より大きい値にしてください", "err"); return; }
+    var out = changeSpeed(clip, sp);
+    cursor = 0; view.start = 0; view.end = out.length;
+    commit(out, "速度を ×" + sp + " に変更しました (全体)", { start: 0, end: 0 });
+  };
+  $("btnTrim").onclick = function(){
+    if (!clip) return;
+    var db = parseFloat($("numTrimDb").value);
+    if (!isFinite(db)) db = -50;
+    var r = trimSilenceRange(clip, db);
+    if (r.start === 0 && r.end === clip.length){
+      setStatus("トリムする無音は見つかりませんでした", ""); return;
+    }
+    var out = sliceClip(clip, r.start, r.end);
+    cursor = 0; view.start = 0; view.end = out.length;
+    commit(out, "前後の無音 " + fmtTime((clip.length - out.length) / clip.sampleRate) + " を除去しました",
+           { start: 0, end: 0 });
+  };
+
+  /* 書き出し */
+  $("btnExport").onclick = doExportWav;
+  $("btnExportC").onclick = doExportCompressed;
+  ["selBits", "selRate", "selScope"].forEach(function(id){
+    $(id).addEventListener("change", refreshInfo);
+  });
+
+  /* ズーム / スクロール */
+  $("btnZoomIn").onclick = function(){ zoomBy(1.8, cursor); };
+  $("btnZoomOut").onclick = function(){ zoomBy(1 / 1.8, cursor); };
+  $("btnZoomFit").onclick = zoomFit;
+  $("btnZoomSel").onclick = zoomToSel;
+  $("rngScroll").oninput = function(){
+    if (!clip) return;
+    var span = view.end - view.start;
+    var maxStart = Math.max(0, clip.length - span);
+    view.start = Math.round(maxStart * (parseInt(this.value, 10) / 1000));
+    view.end = view.start + span;
+    refresh();
+  };
+
+  /* 波形のポインタ操作 (マウス / タッチ共通) */
+  var cv = $("wave");
+  cv.addEventListener("pointerdown", function(e){
+    if (!clip) return;
+    cv.setPointerCapture(e.pointerId);
+    var x = e.clientX - cv.getBoundingClientRect().left;
+    dragAnchor = snap(sampleOfX(x, cv.clientWidth));
+    dragging = true;
+    cursor = dragAnchor;
+    setSel(dragAnchor, dragAnchor);
+    refresh();
+  });
+  cv.addEventListener("pointermove", function(e){
+    if (!dragging || !clip) return;
+    var x = e.clientX - cv.getBoundingClientRect().left;
+    setSel(dragAnchor, snap(sampleOfX(x, cv.clientWidth)));
+    refresh();
+  });
+  var endDrag = function(){
+    if (!dragging) return;
+    dragging = false;
+    if (clip && sel.end > sel.start){
+      setStatus("選択: " + fmtTime(sampleToSec(clip, sel.start)) + " 〜 " +
+                fmtTime(sampleToSec(clip, sel.end)) +
+                " (" + fmtTime((sel.end - sel.start) / clip.sampleRate) + ")", "");
+    }
+    refresh();
+  };
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+  cv.addEventListener("dblclick", function(){
+    if (!clip) return;
+    setSel(0, clip.length); refresh();
+  });
+  cv.addEventListener("wheel", function(e){
+    if (!clip) return;
+    e.preventDefault();
+    var x = e.clientX - cv.getBoundingClientRect().left;
+    zoomBy(e.deltaY < 0 ? 1.25 : 1 / 1.25, sampleOfX(x, cv.clientWidth));
+  }, { passive: false });
+
+  /* キーボード ショートカット */
+  document.addEventListener("keydown", function(e){
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    var ctrl = e.ctrlKey || e.metaKey;
+    if (e.code === "Space"){ e.preventDefault(); if (clip) togglePlay(); return; }
+    if (!ctrl && (e.key === "Delete" || e.key === "Backspace")){ e.preventDefault(); cmdDelete(); return; }
+    if (!ctrl) return;
+    var k = e.key.toLowerCase();
+    if (k === "z" && !e.shiftKey){ e.preventDefault(); doUndo(); }
+    else if ((k === "z" && e.shiftKey) || k === "y"){ e.preventDefault(); doRedo(); }
+    else if (k === "x"){ e.preventDefault(); cmdCut(); }
+    else if (k === "c"){ e.preventDefault(); cmdCopy(); }
+    else if (k === "v"){ e.preventDefault(); cmdPaste(false); }
+    else if (k === "a"){ e.preventDefault(); if (clip){ setSel(0, clip.length); refresh(); } }
+    else if (k === "s"){ e.preventDefault(); doExportWav(); }
+  });
+
+  window.addEventListener("resize", function(){ refresh(); });
+
+  refresh();
+  setStatus("音声ファイルを読み込んでください(ドラッグ&ドロップ、またはタップして選択)。", "");
+}
+
+/* エンジンテスト (Node) からは純ロジックのみ検証するため boot は起動しない */
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) boot();
+</script>
+</body>
+</html>

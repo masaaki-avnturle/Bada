@@ -81,6 +81,28 @@
 
 ---
 
+## 🎚 ダウンロード — Bada AudioForge(オーディオエディタ)
+
+**音声ファイルを波形で編集するソフト。** MP3 / WAV / OGG / M4A / FLAC を読み込んで**波形を描画**し、ドラッグ(マウス / 指)で範囲を選んで **切り取り・コピー・貼り付け(挿入/ミックス)・削除・切り抜き・無音化・繰り返し・無音挿入** ができます。選択端は**ゼロクロス点に自動スナップ**するので、切り貼りのプチノイズが出ません。エフェクトは **音量(dB)/ ノーマライズ / フェードイン・アウト(リニア・S カーブ・指数)/ 逆再生 / 速度変更 / エコー / ローパス・ハイパスフィルタ / DC オフセット除去 / パン / モノラル化 / 無音トリム**。選択範囲の**ピーク・RMS を dB 表示**してクリッピングを警告し、**30 段の元に戻す/やり直し**、ループ再生、ズームに対応。書き出しは自前エンコーダによる **WAV(16bit / 24bit PCM / 32bit float)** + サンプルレート変換、環境が対応していれば M4A/WebM の圧縮保存も可能。**音声が端末の外に出ることは一切ありません。** 依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**audio_editor/index.html をダウンロード**](audio_editor/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-audioforge-debug.apk` |
+| **Windows 10 / 11** | `BadaAudioForge-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaAudioForge-*-x86_64.AppImage` / `BadaAudioForge-*-amd64.deb` |
+
+ビルドは [`audioeditor-app-build.yml`](.github/workflows/audioeditor-app-build.yml) が実行します(`audioforge-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。使い方・ショートカット・仕組みは [`audio_editor/`](audio_editor/) を参照。
+
+---
+
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
 
 **MP3 を動画に変換するソフト。** MP3(ほか WAV / OGG / M4A / FLAC)を読み込むと、**ID3v2/ID3v1 タグ**(曲名 / アーティスト / アルバム / ジャケット画像 APIC)を自前実装のパーサで解析し、音に反応する**ビジュアライザ**(スペクトラムバー / サークル / 波形 / シンプル — FFT を対数スケールで 64 バーに集計)を Canvas に描画、Web Audio API の音声トラックと合成して **MediaRecorder** で動画ファイルへ録画します。出力は対応環境で **MP4 (H.264 + AAC)**、それ以外は **WebM (VP9/VP8 + Opus)**。解像度プリセット(フル HD / HD / 正方形 / 縦型ショート 1080×1920)、24/30/60 fps、背景色・背景画像、複数ファイルの連続変換、プレビュー再生に対応。音楽ファイルは端末の外に出ません。依存ゼロ・単一 HTML・オフライン動作。
