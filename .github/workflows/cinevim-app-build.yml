@@ -21,6 +21,8 @@ name: Bada CineVim app build (Android APK + Windows EXE + Ubuntu)
 # 指定時) GitHub Release に添付します。
 
 on:
+  # 手動実行 (workflow_dispatch のボタンはデフォルトブランチにある workflow に
+  # しか出ないため、main へ取り込んだあとに使えます)
   workflow_dispatch:
     inputs:
       release_tag:
@@ -28,6 +30,13 @@ on:
         required: false
         default: ''
   push:
+    # 作業ブランチへの push でも自動ビルドし、Actions の「Artifacts」から
+    # APK / EXE / AppImage / deb をそのままダウンロードできるようにする
+    # (push イベントはそのブランチ上の workflow ファイルで実行されるため、
+    #  デフォルトブランチへ取り込む前でも Actions に現れます)
+    branches:
+      - 'claude/bada-countdown-editor-**'
+    # タグを打つと同じ成果物を GitHub Release にも添付する
     tags:
       - 'cinevim-v*'
 
