@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada Relativity Lens — 相対論レンズ(見た目のズレ防止)</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111623; --panel:#151b2c; --line:#26304a;
+    --tx:#dbe4ff; --dim:#8b97b8;
+    --blue:#38bdf8;   /* 青方偏移 = 進行方向 */
+    --red:#fb7185;    /* 赤方偏移 = 後方 */
+    --acc:#7c5cff; --ok:#2dd4bf; --warn:#f59e0b;
+    --paper:#f4f2ec;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1100px 620px at 78% -12%, #16233d 0%, var(--bg) 58%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  /* ── ステータスバー ── */
+  #statusbar{
+    flex:none; display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:12px;
+    color:var(--dim); border-bottom:1px solid var(--line);
+    background:rgba(11,14,20,.85); backdrop-filter:blur(6px);
+  }
+  #statusbar b{ color:var(--tx); font-weight:600; }
+  #sbBeta{ color:var(--blue); font-family:ui-monospace,Consolas,monospace; }
+  #sbGamma{ color:var(--acc); font-family:ui-monospace,Consolas,monospace; }
+  #sbFix{ margin-left:auto; font-family:ui-monospace,Consolas,monospace; }
+  #sbFix.on{ color:var(--ok); } #sbFix.off{ color:var(--warn); }
+  /* ── 本体 ── */
+  #main{ flex:1; overflow:auto; padding:14px 12px 26px; }
+  #wrap{ max-width:1040px; margin:0 auto; }
+  h1{ font-size:20px; letter-spacing:.05em; text-align:center; }
+  h1 span{ color:var(--blue); }
+  #lead{ font-size:11.5px; color:var(--dim); text-align:center; margin:7px 0 16px; line-height:1.85; }
+  h2{ font-size:14px; margin:0 0 9px; letter-spacing:.04em; }
+  h2 em{ font-style:normal; color:var(--dim); font-size:11px; font-weight:400; margin-left:7px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin:11px 0; }
+  .row{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .hint{ font-size:11.5px; color:var(--dim); line-height:1.85; }
+  .tag{ display:inline-block; font-size:10.5px; color:var(--ok); border:1px solid var(--line);
+        border-radius:99px; padding:1px 9px; margin:2px 3px 2px 0; }
+  button{
+    background:linear-gradient(160deg,#232c48,#1a2136); color:var(--tx); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; font-size:13.5px; cursor:pointer; font-family:inherit;
+  }
+  button:active{ transform:scale(.96); }
+  button.acc{ background:linear-gradient(160deg,var(--blue),#0b82c4); border-color:transparent; color:#04121c; font-weight:600; }
+  button.grn{ background:linear-gradient(160deg,#0f9d84,#0b7a67); border-color:transparent; }
+  button.sm{ padding:5px 10px; font-size:12px; border-radius:8px; }
+  input,select{
+    background:var(--bg2); color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:8px 11px; font-size:13.5px; font-family:inherit;
+  }
+  input[type=range]{ padding:0; -webkit-appearance:none; appearance:none; background:transparent; border:0; }
+  input[type=range]::-webkit-slider-runnable-track{ height:5px; border-radius:99px;
+    background:linear-gradient(90deg,var(--red),#8b93b8 45%,var(--blue)); }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:17px; height:17px; margin-top:-6px;
+    border-radius:50%; background:var(--tx); border:2px solid var(--blue); cursor:pointer; }
+  input[type=range]::-moz-range-track{ height:5px; border-radius:99px;
+    background:linear-gradient(90deg,var(--red),#8b93b8 45%,var(--blue)); }
+  input[type=range]::-moz-range-thumb{ width:15px; height:15px; border-radius:50%;
+    background:var(--tx); border:2px solid var(--blue); cursor:pointer; }
+  label.ck{ display:inline-flex; align-items:center; gap:6px; font-size:12.5px; cursor:pointer; }
+  label.ck input{ width:auto; accent-color:var(--blue); }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ border-bottom:1px solid var(--line); padding:6px 5px; text-align:left; }
+  th{ color:var(--dim); font-weight:500; }
+  td.mono,.mono{ font-family:ui-monospace,Consolas,monospace; }
+  td.good{ color:var(--ok); } td.bad{ color:var(--warn); }
+  pre{
+    background:#0a0d16; border:1px solid var(--line); border-radius:10px; padding:11px;
+    font-size:12px; line-height:1.65; overflow:auto; font-family:ui-monospace,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-word;
+  }
+  /* ── 3 面ビュー ── */
+  #views{ display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:11px; }
+  .view{ background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:9px; }
+  .view h3{ font-size:12.5px; font-weight:600; margin-bottom:2px; }
+  .view h3 b{ font-size:10.5px; font-weight:400; color:var(--dim); margin-left:6px; }
+  .view canvas{ width:100%; display:block; border-radius:8px; border:1px solid var(--line);
+                margin-top:7px; background:#05070c; image-rendering:auto; }
+  .view .cap{ font-size:10.5px; color:var(--dim); margin-top:6px; line-height:1.6; min-height:2.6em; }
+  .view.fix{ border-color:var(--ok); }
+  .view.obs{ border-color:var(--red); }
+  /* ── 光時計 (写真の絵) ── */
+  #clockWrap{ display:grid; grid-template-columns:minmax(260px,1.25fr) minmax(220px,1fr); gap:12px; align-items:start; }
+  #clockCv{ width:100%; display:block; border-radius:10px; border:1px solid var(--line); background:var(--paper); }
+  /* ── コマンドバー ── */
+  #cmdbar{
+    flex:none; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    background:rgba(13,17,28,.95); border-top:1px solid var(--line); backdrop-filter:blur(8px);
+  }
+  #cmdbar input{ flex:1; border-radius:99px; padding:10px 16px; }
+  #cmdbar button{ border-radius:99px; }
+  #log{ max-height:190px; overflow:auto; }
+  .msgU,.msgA{ border-radius:12px; padding:8px 12px; margin:7px 0; max-width:92%;
+               font-size:12.5px; line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+  .msgU{ background:#233054; margin-left:auto; }
+  .msgA{ background:#0f1424; border:1px solid var(--line); }
+  @media (max-width:620px){ #clockWrap{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div id="statusbar">
+  <b>🔭 Relativity Lens</b>
+  <span>β=<span id="sbBeta">0.600</span></span>
+  <span>γ=<span id="sbGamma">1.250</span></span>
+  <span id="sbFix" class="on">ズレ防止 ON</span>
+</div>
+
+<div id="main"><div id="wrap">
+
+  <h1>🔭 Bada <span>Relativity Lens</span> — 相対論レンズ</h1>
+  <p id="lead">
+    任意の画像を<b>特殊相対性理論の光学</b>(光行差・ドップラー・ビーミング・テレル回転)に通し、<br/>
+    そこで生じる<b>見た目のズレ</b>を厳密な逆変換で打ち消す「<b>ズレ防止</b>」アプリケーション。<br/>
+    中核の光時計は、原図のスケッチ(鏡のバー+交差する光線)をそのまま実装しています。
+  </p>
+
+  <!-- ── 速度 ── -->
+  <div class="card">
+    <h2>🚀 観測者の速度 <em>ブーストは光軸 +z(画面奥)方向</em></h2>
+    <div class="row">
+      <input type="range" id="betaRange" min="0" max="1000" value="198" style="flex:1;min-width:190px"/>
+      <span class="mono" id="betaTxt" style="min-width:132px;text-align:right">β=0.600  γ=1.250</span>
+    </div>
+    <div class="row">
+      <button class="sm" data-beta="0">静止</button>
+      <button class="sm" data-beta="0.1">0.1c</button>
+      <button class="sm" data-beta="0.5">0.5c</button>
+      <button class="sm" data-beta="0.8">0.8c</button>
+      <button class="sm" data-beta="0.95">0.95c</button>
+      <button class="sm" data-beta="0.99">0.99c</button>
+    </div>
+    <p class="hint" id="betaNote"></p>
+  </div>
+
+  <!-- ── 入力画像 ── -->
+  <div class="card">
+    <h2>🖼 入力画像 <em>任意の画像に適用できます</em></h2>
+    <div class="row">
+      <input type="file" id="fileIn" accept="image/*" style="flex:1;min-width:190px"/>
+      <button class="sm" data-sample="sketch">原図(光時計)</button>
+      <button class="sm" data-sample="grid">格子</button>
+      <button class="sm" data-sample="bars">カラーバー</button>
+      <button class="sm" data-sample="stars">星野</button>
+    </div>
+    <p class="hint">
+      端末内だけで処理します(画像はどこにも送信されません)。既定の「原図」は、
+      写真のスケッチ — <b>上の鏡のバー</b>と<b>交差する 2 本の光線</b> — をベクタで再現したものです。
+    </p>
+  </div>
+
+  <!-- ── 3 面ビュー ── -->
+  <div class="card">
+    <h2>🔬 原画 → 観測像 → 補正像</h2>
+    <div id="views">
+      <div class="view">
+        <h3>① 原画<b>静止系の真の像</b></h3>
+        <canvas id="cvSrc" width="320" height="240"></canvas>
+        <p class="cap" id="capSrc">入力そのもの。物体の固有の幾何。</p>
+      </div>
+      <div class="view obs">
+        <h3>② 観測像<b>β で飛ぶ観測者が見る像</b></h3>
+        <canvas id="cvObs" width="320" height="240"></canvas>
+        <p class="cap" id="capObs"></p>
+      </div>
+      <div class="view fix">
+        <h3>③ 補正像<b>ズレ防止 ON</b></h3>
+        <canvas id="cvFix" width="320" height="240"></canvas>
+        <p class="cap" id="capFix"></p>
+      </div>
+    </div>
+    <div class="row" style="margin-top:11px">
+      <label class="ck"><input type="checkbox" id="ckAber" checked/>光行差</label>
+      <label class="ck"><input type="checkbox" id="ckDop" checked/>ドップラー</label>
+      <label class="ck"><input type="checkbox" id="ckBeam" checked/>ビーミング</label>
+      <label class="ck"><input type="checkbox" id="ckFix" checked/><b>ズレ防止</b></label>
+      <label class="ck"><input type="checkbox" id="ckArrow"/>ズレベクトル表示</label>
+      <label class="ck"><input type="checkbox" id="ckAutoFov" checked/>観測画角を自動追尾</label>
+    </div>
+    <div class="row">
+      <span class="hint">補正目標</span>
+      <select id="selTarget">
+        <option value="rest">静止系整合(固有の幾何へ戻す)</option>
+        <option value="now">同時刻整合(いま実際にある向きへ)</option>
+      </select>
+      <span class="hint">画角</span>
+      <select id="selFov">
+        <option value="60">60°</option>
+        <option value="90">90°</option>
+        <option value="100" selected>100°</option>
+        <option value="130">130°</option>
+      </select>
+      <span class="hint">色モード</span>
+      <select id="selColor">
+        <option value="vivid" selected>可視域ラップ(可逆)</option>
+        <option value="spectral">分光(厳密)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ── ズレ計測 ── -->
+  <div class="card">
+    <h2>📐 ズレ計測 <em>補正前 / 補正後の残差</em></h2>
+    <table id="zureTbl">
+      <thead><tr><th>ズレの種類</th><th>補正前</th><th>補正後</th><th>由来</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <p class="hint" id="zureNote" style="margin-top:9px"></p>
+  </div>
+
+  <!-- ── 光時計 (写真の絵) ── -->
+  <div class="card">
+    <h2>🕰 光時計 — 原図のスケッチ <em>鏡のバー + 交差する光線</em></h2>
+    <div id="clockWrap">
+      <canvas id="clockCv" width="520" height="330"></canvas>
+      <div>
+        <pre id="clockTxt"></pre>
+        <p class="hint">
+          スケッチの<b>横棒</b>は上の鏡、<b>交差する 2 本</b>は上りと下りの光線です。
+          観測者から見ると光は斜辺 γL を走るので、1 チックは γ 倍に伸びます
+          (これが時間の遅れ)。同じ γ が、上の像のズレ量をそのまま決めています。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 対話ログ ── -->
+  <div class="card">
+    <h2>💬 操作ログ <em>下のバーに日本語で指示できます</em></h2>
+    <div id="log"></div>
+    <p class="hint" style="margin-top:8px">
+      例:<span class="tag">0.9c にして</span><span class="tag">ズレは?</span>
+      <span class="tag">補正オフ</span><span class="tag">ドップラー切って</span>
+      <span class="tag">画角 130</span><span class="tag">同時刻整合</span><span class="tag">γ は?</span>
+    </p>
+  </div>
+
+</div></div>
+
+<div id="cmdbar">
+  <input id="cmdIn" placeholder="例: 0.95c にして / ズレは? / 補正オン" autocomplete="off"/>
+  <button class="acc" id="cmdGo">実行</button>
+</div>
+
+<script>
+"use strict";
+/* ══════════════════════════════════════════════════════════════════════
+   Bada Relativity Lens — 特殊相対性理論の光学による画像処理エンジン
+   ----------------------------------------------------------------------
+   ブーストは光軸 +z (画面奥) 方向。角度 θ は「視線 (光源を見る向き)」と
+   進行方向のなす角で、静止系の値を θ、観測者が見る見かけの値を θ' と書く。
+
+     ローレンツ因子     γ   = 1/√(1−β²)
+     ドップラー因子     D   = γ(1 + β cosθ)            … 1/(γ(1−β cosθ'))と同値
+     光行差             cosθ' = (cosθ + β)/(1 + β cosθ)
+                       sinθ' = sinθ / D                 … 横成分は 1/D 倍
+     ビーミング         I'   = D⁴ I
+     同時刻の真の向き   tanθ_now = γ tanθ               … z がローレンツ収縮
+     テレル回転         Δ    = θ_now − θ'                … これが「見た目のズレ」
+
+   光行差は β → −β がそのまま逆写像になる (下の aberrateDir で証明済みの
+   恒等式)。この厳密な可逆性が「ズレ防止」機能の土台。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ───────── 1. 数学ユーティリティ ───────── */
+
+function clamp(v, a, b){ return v < a ? a : (v > b ? b : v); }
+
+/** ローレンツ因子 γ = 1/√(1−β²) */
+function gammaOf(beta){
+  var b = clamp(Math.abs(beta), 0, 0.9999999);
+  return 1 / Math.sqrt(1 - b * b);
+}
+
+function mat3mul(A, B){
+  var R = [[0,0,0],[0,0,0],[0,0,0]];
+  for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++){
+    var s = 0;
+    for (var k = 0; k < 3; k++) s += A[i][k] * B[k][j];
+    R[i][j] = s;
+  }
+  return R;
+}
+
+function mat3inv(M){
+  var a=M[0][0],b=M[0][1],c=M[0][2],d=M[1][0],e=M[1][1],f=M[1][2],g=M[2][0],h=M[2][1],i=M[2][2];
+  var A = e*i - f*h, B = -(d*i - f*g), C = d*h - e*g;
+  var det = a*A + b*B + c*C;
+  if (Math.abs(det) < 1e-12) return [[1,0,0],[0,1,0],[0,0,1]];
+  var id = 1 / det;
+  return [
+    [A*id, (c*h - b*i)*id, (b*f - c*e)*id],
+    [B*id, (a*i - c*g)*id, (c*d - a*f)*id],
+    [C*id, (b*g - a*h)*id, (a*e - b*d)*id]
+  ];
+}
+
+function mat3det(M){
+  return M[0][0]*(M[1][1]*M[2][2] - M[1][2]*M[2][1])
+       - M[0][1]*(M[1][0]*M[2][2] - M[1][2]*M[2][0])
+       + M[0][2]*(M[1][0]*M[2][1] - M[1][1]*M[2][0]);
+}
+
+function mat3T(M){
+  return [[M[0][0],M[1][0],M[2][0]],[M[0][1],M[1][1],M[2][1]],[M[0][2],M[1][2],M[2][2]]];
+}
+
+/**
+ * ティホノフ正則化つき擬似逆行列 (MᵀM + λI)⁻¹Mᵀ。
+ * 良条件なら通常の逆行列と実質同じ。特異 (= 情報が本当に失われている) 場合も
+ * 発散せずに最小二乗解を返すので、ズレ防止側が黙って壊れない。
+ */
+function mat3pinv(M, eps){
+  eps = (eps === undefined) ? 1e-9 : eps;
+  var Mt = mat3T(M), A = mat3mul(Mt, M);
+  var lam = eps * ((A[0][0] + A[1][1] + A[2][2]) / 3 || 1);
+  A[0][0] += lam; A[1][1] += lam; A[2][2] += lam;
+  return mat3mul(mat3inv(A), Mt);
+}
+
+function mat3apply(M, v){
+  return [ M[0][0]*v[0] + M[0][1]*v[1] + M[0][2]*v[2],
+           M[1][0]*v[0] + M[1][1]*v[1] + M[1][2]*v[2],
+           M[2][0]*v[0] + M[2][1]*v[1] + M[2][2]*v[2] ];
+}
+
+function vnorm(d){
+  var n = Math.sqrt(d.x*d.x + d.y*d.y + d.z*d.z) || 1;
+  return { x:d.x/n, y:d.y/n, z:d.z/n };
+}
+
+/**
+ * 2 つの単位ベクトルのなす角 (rad)。acos(dot) は角が 0 に近いほど精度が落ち
+ * (acos(1−ε) ≈ √(2ε))、補正後の残差がまるごと丸め誤差に埋もれてしまう。
+ * atan2(|a×b|, a·b) なら 0 付近でも大きい角でも一様に正確。
+ */
+function angBetween(a, b){
+  var cx = a.y*b.z - a.z*b.y, cy = a.z*b.x - a.x*b.z, cz = a.x*b.y - a.y*b.x;
+  return Math.atan2(Math.sqrt(cx*cx + cy*cy + cz*cz), a.x*b.x + a.y*b.y + a.z*b.z);
+}
+
+/* ───────── 2. 特殊相対性理論の光学 ───────── */
+
+/**
+ * ドップラー因子 D = γ(1 + β cosθ)  (θ は静止系での視線角)
+ * D > 1 で青方偏移 (進行方向)、D < 1 で赤方偏移 (後方)。
+ */
+function dopplerFactor(cosTheta, beta){
+  return gammaOf(beta) * (1 + beta * clamp(cosTheta, -1, 1));
+}
+
+/**
+ * 相対論的光行差: 静止系の視線方向 d を、β で飛ぶ観測者の見かけの方向へ写す。
+ *   cosθ' = (cosθ+β)/(1+β cosθ),  横成分は 1/D 倍
+ * β → −β が厳密な逆写像 (aberrateDir(aberrateDir(d,β),−β) === d)。
+ */
+function aberrateDir(d, beta){
+  var u = vnorm(d);
+  var c = clamp(u.z, -1, 1);
+  var den = 1 + beta * c;
+  if (Math.abs(den) < 1e-12) return { x:0, y:0, z:-1 };   /* 後方の特異点 */
+  var k = 1 / (gammaOf(beta) * den);                       /* = 1/D  横成分の縮み */
+  return vnorm({ x: u.x * k, y: u.y * k, z: (c + beta) / den });
+}
+
+/**
+ * 同時刻の真の向き: 観測者の「いま」において物体が実際にある方向。
+ * 進行方向 z だけがローレンツ収縮するので tanθ_now = γ tanθ。
+ */
+function contractDir(d, beta){
+  var u = vnorm(d);
+  return vnorm({ x:u.x, y:u.y, z: u.z / gammaOf(beta) });
+}
+
+/** contractDir の逆 (同時刻の向き → 静止系の向き) */
+function uncontractDir(d, beta){
+  var u = vnorm(d);
+  return vnorm({ x:u.x, y:u.y, z: u.z * gammaOf(beta) });
+}
+
+/**
+ * ★ズレ防止の核★  見かけの方向 → ズレのない方向。
+ *   target 'rest' : 静止系整合 — 光行差を厳密に打ち消し、物体固有の幾何へ戻す
+ *   target 'now'  : 同時刻整合 — さらに収縮を入れ、いま実際にある向きへ
+ */
+function correctDir(dApp, beta, target){
+  var rest = aberrateDir(dApp, -beta);                      /* 光行差の逆写像 */
+  return target === "now" ? contractDir(rest, beta) : rest;
+}
+
+/** correctDir の逆 (ズレのない方向 → 見かけの方向) */
+function uncorrectDir(dTgt, beta, target){
+  var rest = target === "now" ? uncontractDir(dTgt, beta) : dTgt;
+  return aberrateDir(rest, beta);
+}
+
+/**
+ * テレル回転角 (rad): 見かけの方向と同時刻の真の方向の差。
+ * 静止系で θ にある物体は、見かけ θ' に対し実際は θ_now にいる。
+ */
+function terrellAngle(d, beta){
+  return angBetween(aberrateDir(d, beta), contractDir(d, beta));
+}
+
+/**
+ * 原画の画角が、飛ぶ観測者にはどれだけの画角に見えるか。
+ * 光行差は像を前方へ寄せるので、静止系で画角 fov の場面は、観測者には
+ * もっと狭い画角に詰め込まれて見える。観測像のフレームをこの値に合わせると、
+ * 同じ場面がちょうど収まる (= 画面が圏外だらけにならない)。
+ */
+function aberratedFov(fovDeg, beta){
+  var half = (fovDeg * Math.PI / 180) / 2;
+  var c = Math.cos(half);
+  var c2 = clamp((c + beta) / (1 + beta * c), -1, 1);
+  return Math.acos(c2) * 2 * 180 / Math.PI;
+}
+
+/** ビーミング (サーチライト効果): 全波長輝度は D⁴ 倍 */
+function beamFactor(D){ return D * D * D * D; }
+
+/* ───────── 3. ピンホールカメラモデル ───────── */
+
+function makeCam(w, h, fovDeg){
+  var f = (w / 2) / Math.tan((fovDeg * Math.PI / 180) / 2);
+  return { w:w, h:h, fx:f, fy:f, cx:w/2, cy:h/2, fov:fovDeg };
+}
+
+/** 画素 → 視線方向 (単位ベクトル、+z が光軸) */
+function pixelToDir(px, py, cam){
+  return vnorm({ x:(px - cam.cx) / cam.fx, y:(py - cam.cy) / cam.fy, z:1 });
+}
+
+/** 視線方向 → 画素 (z<=0 は視野の裏側なので null) */
+function dirToPixel(d, cam){
+  if (d.z <= 1e-9) return null;
+  return { x: cam.cx + cam.fx * d.x / d.z, y: cam.cy + cam.fy * d.y / d.z };
+}
+
+/* ───────── 4. 分光ドップラー (色のズレ) ───────── */
+
+/* CIE 1931 等色関数の多ローブ・ガウス近似 (Wyman-Sloan-Shirley) */
+function _g(x, mu, s1, s2){
+  var t = (x - mu) * (x < mu ? 1 / s1 : 1 / s2);
+  return Math.exp(-0.5 * t * t);
+}
+function cieCMF(lambda){
+  return {
+    X: 1.056 * _g(lambda, 599.8, 37.9, 31.0)
+     + 0.362 * _g(lambda, 442.0, 16.0, 26.7)
+     - 0.065 * _g(lambda, 501.1, 20.4, 26.2),
+    Y: 0.821 * _g(lambda, 568.8, 46.9, 40.5)
+     + 0.286 * _g(lambda, 530.9, 16.3, 31.1),
+    Z: 1.217 * _g(lambda, 437.0, 11.8, 36.0)
+     + 0.681 * _g(lambda, 459.0, 26.0, 13.8)
+  };
+}
+
+var XYZ2RGB = [[ 3.2406, -1.5372, -0.4986],
+               [-0.9689,  1.8758,  0.0415],
+               [ 0.0557, -0.2040,  1.0570]];
+
+/* ── 放射スペクトルの再構成 ──
+   RGB 画像が持つ情報は 3 数値だけなので、そこから連続スペクトル L(λ) を
+   復元して初めて波長シフトが計算できる。3 本のガウスローブを「1 の分割」
+   (どの λ でも重みの和が 1) に正規化して基底とする。指数の最大値を引いて
+   から exp するため、可視域の外へ出ても数値的に破綻せず、遠赤外では自然に
+   R 成分、遠紫外では B 成分へ連続的に漸近する (= 平坦外挿)。 */
+var BAND_NM  = [612, 549, 465];   /* sRGB 原色の代表波長 (nm) */
+var BAND_SIG = [ 52,  42,  38];
+
+function spectralBasis(lambda){
+  var e = [], i, mx = -Infinity;
+  for (i = 0; i < 3; i++){
+    var t = (lambda - BAND_NM[i]) / BAND_SIG[i];
+    e.push(-0.5 * t * t);
+    if (e[i] > mx) mx = e[i];
+  }
+  var w = [], sum = 0;
+  for (i = 0; i < 3; i++){ w.push(Math.exp(e[i] - mx)); sum += w[i]; }
+  return [w[0]/sum, w[1]/sum, w[2]/sum];
+}
+
+function srgbToLin(u){
+  u = u / 255;
+  return u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
+}
+function linToSrgb(u){
+  u = u <= 0 ? 0 : (u >= 1 ? 1 : u);
+  return 255 * (u <= 0.0031308 ? 12.92 * u : 1.055 * Math.pow(u, 1/2.4) - 0.055);
+}
+
+/**
+ * 分光モデル (厳密): 観測波長 λ の光は、放射時には λ·D の光だった。
+ * 可視域 380-780nm を走査し、放射側の基底重みを等色関数で積分する。
+ * D が大きいと可視域が丸ごと赤外側から来るため、G/B の情報は原理的に
+ * 失われる (行列が悪条件になる)。これは近似ではなく物理そのもの。
+ */
+function dopplerMatrixSpectral(D){
+  var M = [[0,0,0],[0,0,0],[0,0,0]];
+  for (var lam = 380; lam <= 780; lam += 5){
+    var cmf = cieCMF(lam), b = spectralBasis(lam * D);
+    for (var k = 0; k < 3; k++){
+      M[0][k] += cmf.X * b[k];
+      M[1][k] += cmf.Y * b[k];
+      M[2][k] += cmf.Z * b[k];
+    }
+  }
+  return mat3mul(XYZ2RGB, M);
+}
+
+/**
+ * 可視域ラップ (強調): 3 本の細い帯だけを動かす簡易モデル。ただし帯が
+ * 等色関数の応答が弱い端へ寄ると行列が悪条件になり色を戻せなくなるので、
+ * log D を tanh で [1/1.055, 1.055] へ圧縮して 440-645nm に留める
+ * (D=1 では恒等)。常に良条件 = 完全に可逆。
+ * 物理的に厳密ではなく、低速でも偏移の向きを見せるための可視化モード。
+ */
+var VIVID_A = Math.log(1.055);
+function dopplerMatrixVivid(D){
+  var Deff = Math.exp(VIVID_A * Math.tanh(Math.log(Math.max(D, 1e-6)) / VIVID_A));
+  var cols = [], i;
+  for (i = 0; i < 3; i++) cols.push(cieCMF(BAND_NM[i] / Deff));
+  var M = [[cols[0].X, cols[1].X, cols[2].X],
+           [cols[0].Y, cols[1].Y, cols[2].Y],
+           [cols[0].Z, cols[1].Z, cols[2].Z]];
+  return mat3mul(XYZ2RGB, M);
+}
+
+function dopplerMatrixRaw(D, mode){
+  return mode === "vivid" ? dopplerMatrixVivid(D) : dopplerMatrixSpectral(D);
+}
+
+var _M0INV = {};
+/** D=1 で厳密に単位行列になるよう正規化したドップラー色変換 */
+function dopplerMatrixExact(D, mode){
+  mode = mode === "vivid" ? "vivid" : "spectral";
+  if (!_M0INV[mode]) _M0INV[mode] = mat3inv(dopplerMatrixRaw(1, mode));
+  return mat3mul(_M0INV[mode], dopplerMatrixRaw(D, mode));
+}
+
+/* D は画素ごとに連続に変わるので、log D を量子化してキャッシュする */
+var _dopCache = new Map();
+function dopplerMatrix(D, mode){
+  mode = mode === "vivid" ? "vivid" : "spectral";
+  var key = mode + ":" + Math.round(Math.log(Math.max(D, 1e-6)) * 240);
+  var m = _dopCache.get(key);
+  if (!m){
+    if (_dopCache.size > 4096) _dopCache.clear();
+    m = dopplerMatrixExact(Math.exp(Math.round(Math.log(Math.max(D, 1e-6)) * 240) / 240), mode);
+    _dopCache.set(key, m);
+  }
+  return m;
+}
+
+/** 条件数 (1-ノルム)。大きいほど色情報が潰れていて元に戻せない */
+function matNorm1(M){
+  var best = 0;
+  for (var j = 0; j < 3; j++){
+    var s = Math.abs(M[0][j]) + Math.abs(M[1][j]) + Math.abs(M[2][j]);
+    if (s > best) best = s;
+  }
+  return best;
+}
+function matCond(M){
+  /* mat3inv は特異行列で単位行列を返す安全弁を持つので、det を直接見る */
+  var scale = matNorm1(M);
+  if (!(scale > 0)) return Infinity;
+  if (Math.abs(mat3det(M)) < 1e-12 * scale * scale * scale) return Infinity;
+  return scale * matNorm1(mat3inv(M));
+}
+
+/** 色の可逆性: 条件数から「どこまで戻せるか」を判定する */
+function colorReversibility(D, mode){
+  var k = matCond(dopplerMatrix(D, mode));
+  return {
+    cond: k,
+    ok: k < 50,
+    label: k < 12 ? "完全" : (k < 50 ? "良好" : (k < 1000 ? "劣化" : "不可"))
+  };
+}
+
+/**
+ * 色の逆変換。2 段構え:
+ *  可逆 (条件数が小さい)           → 厳密な逆行列。色は完全に戻る。
+ *  不可逆 (可視域の外から来ている) → 「観測された色」を事前分布に置いた
+ *                                    正則化解 (MᵀM+λI)⁻¹(Mᵀ+λI)。
+ *
+ * 素朴な最小二乗 (MᵀM+λI)⁻¹Mᵀ は、情報が残っていない方向に 0 を書き込む。
+ * D≈2 では行列が階数 1 (可視域が丸ごと赤外から来ている) なので、これだと
+ * G と B が 0 になって画面が真っ赤に潰れる — 「わからない」を「0」として
+ * 描いてしまうため。事前分布を観測色そのものにすると、復元できる方向だけ
+ * 直り、復元できない方向は観測されたままの色が残る。λ→0 では M⁻¹ に一致。
+ */
+function dopplerUnshiftMatrix(D, mode){
+  var M = dopplerMatrix(D, mode);
+  if (matCond(M) < 1e3) return mat3inv(M);
+  var Mt = mat3T(M), A = mat3mul(Mt, M);
+  var lam = 2e-2 * ((A[0][0] + A[1][1] + A[2][2]) / 3 || 1);
+  var B = [Mt[0].slice(), Mt[1].slice(), Mt[2].slice()];
+  A[0][0] += lam; A[1][1] += lam; A[2][2] += lam;
+  B[0][0] += lam; B[1][1] += lam; B[2][2] += lam;
+  return mat3mul(mat3inv(A), B);
+}
+
+/** 0-255 sRGB を D でドップラー変換 (ズレ防止側は inv=true で打ち消す) */
+function dopplerRGB(rgb, D, inv, mode){
+  var M = inv ? dopplerUnshiftMatrix(D, mode) : dopplerMatrix(D, mode);
+  var v = mat3apply(M, [srgbToLin(rgb[0]), srgbToLin(rgb[1]), srgbToLin(rgb[2])]);
+  return [linToSrgb(v[0]), linToSrgb(v[1]), linToSrgb(v[2])];
+}
+
+/* ───────── 5. 画像ワープ (エンジン本体) ───────── */
+
+function makeImg(w, h){
+  return { w:w, h:h, data:new Uint8ClampedArray(w * h * 4) };
+}
+
+/**
+ * 双線形サンプリング。α を混ぜて運ぶのが要点:
+ * 画枠の外や、前段のワープで圏外になった画素は α=0 として重みから外す。
+ * ここで端の画素を clamp して代用すると、圏外が「黒い被写体」に化けて
+ * 次段のワープに混ざり込む (= 存在しない像を作ってしまう)。
+ */
+function bilinearSample(img, x, y){
+  var x0 = Math.floor(x), y0 = Math.floor(y);
+  var fx = x - x0, fy = y - y0;
+  var r = 0, g = 0, b = 0, aSum = 0;
+  for (var j = 0; j < 2; j++) for (var i = 0; i < 2; i++){
+    var xi = x0 + i, yj = y0 + j;
+    if (xi < 0 || yj < 0 || xi >= img.w || yj >= img.h) continue;   /* 圏外は寄与 0 */
+    var o = (yj * img.w + xi) * 4;
+    var a = img.data[o+3] / 255;
+    if (a <= 0) continue;
+    var wgt = (i ? fx : 1 - fx) * (j ? fy : 1 - fy) * a;
+    r += wgt * img.data[o]; g += wgt * img.data[o+1]; b += wgt * img.data[o+2];
+    aSum += wgt;
+  }
+  if (aSum <= 1e-6) return [0,0,0,0];
+  return [r / aSum, g / aSum, b / aSum, 255 * aSum];
+}
+
+function nearestSample(img, x, y){
+  var xi = Math.round(x), yi = Math.round(y);
+  if (xi < 0 || yi < 0 || xi >= img.w || yi >= img.h) return [0,0,0,0];
+  var o = (yi * img.w + xi) * 4;
+  return [img.data[o], img.data[o+1], img.data[o+2], img.data[o+3]];
+}
+
+/**
+ * ★画像処理の本体★ 任意の画像を特殊相対性理論の光学に通す。
+ *
+ *   mode 'observe' — 静止系の像 (原画) から、β で飛ぶ観測者が見る像を作る
+ *   mode 'correct' — 観測像から、ズレを打ち消した像を作る (ズレ防止)
+ *
+ * 出力画素の方向から入力画素の方向を逆に辿る (inverse mapping) ので、
+ * 穴の開かない連続な再標本化になる。opt.aberration を切ると幾何変換だけ、
+ * opt.doppler / opt.beaming を切るとその成分だけ無効化できる。
+ *
+ * observe と correct(target:'rest') は互いに厳密な逆変換になっている。
+ * 輝度は光軸方向で正規化した相対ビーミング (D/Dref)⁴ を使う (白飛びを避け、
+ * 割り戻しで厳密に戻せるようにするため)。
+ */
+function warpImage(src, opt){
+  opt = opt || {};
+  var beta    = clamp(opt.beta || 0, -0.9999999, 0.9999999);
+  var mode    = opt.mode === "correct" ? "correct" : "observe";
+  var target  = opt.target === "now" ? "now" : "rest";
+  var useAber = opt.aberration !== false;
+  var useDop  = opt.doppler    !== false;
+  var useBeam = opt.beaming    !== false;
+  var sample  = opt.interp === "nearest" ? nearestSample : bilinearSample;
+  var cmode   = opt.colorMode === "vivid" ? "vivid" : "spectral";
+
+  /* 静止系の像が載っているフレームと、観測像が載っているフレームは画角が違う。
+     observe は camRest から読んで camView へ書き、correct はその逆を行う。 */
+  var camRest = makeCam(src.w, src.h, opt.fov || 100);
+  var camView = makeCam(src.w, src.h, opt.fovView || opt.fov || 100);
+  var camOut  = (mode === "observe") ? camView : camRest;
+  var camIn   = (mode === "observe") ? camRest : camView;
+  /* 露出は光軸方向 (cosθ=1) で正規化する。D⁴ をそのまま掛けると画面全体が
+     白飛びし、割り戻しても戻らない (= 情報が消える)。基準を割ることで
+     ビーミングの「視野内の相対的な明暗差」は完全に保たれ、かつ可逆になる。 */
+  var Dref = dopplerFactor(1, beta);
+  var out = makeImg(src.w, src.h);
+  var inv = (mode === "correct");
+  var mcache = new Map();
+  var covered = 0;
+
+  for (var py = 0; py < src.h; py++){
+    for (var px = 0; px < src.w; px++){
+      var dOut = pixelToDir(px + 0.5, py + 0.5, camOut);
+
+      /* 静止系での方向 dRest と、入力画像を叩く方向 dSample を決める */
+      var dRest, dSample;
+      if (mode === "observe"){
+        dRest   = useAber ? aberrateDir(dOut, -beta) : dOut;
+        dSample = dRest;
+      } else {
+        dRest   = (target === "now") ? uncontractDir(dOut, beta) : dOut;
+        dSample = useAber ? aberrateDir(dRest, beta) : dRest;
+      }
+
+      var o = (py * src.w + px) * 4;
+      var p = dirToPixel(dSample, camIn);
+      if (!p){ out.data[o+3] = 0; continue; }              /* 視野の裏側 */
+      var c = sample(src, p.x - 0.5, p.y - 0.5);
+      if (c[3] < 1){ out.data[o+3] = 0; continue; }        /* 圏外 */
+      if (c[3] >= 128) covered++;
+
+      if (useDop || useBeam){
+        var D = dopplerFactor(dRest.z, beta);
+        var lin = [srgbToLin(c[0]), srgbToLin(c[1]), srgbToLin(c[2])];
+        if (useDop){
+          var key = Math.round(Math.log(Math.max(D, 1e-6)) * 240);
+          var M = mcache.get(key);
+          if (M === undefined){
+            M = inv ? dopplerUnshiftMatrix(D, cmode) : dopplerMatrix(D, cmode);
+            mcache.set(key, M);
+          }
+          lin = mat3apply(M, lin);
+        }
+        if (useBeam){
+          var bf = beamFactor(D / Dref);
+          var s = inv ? 1 / bf : bf;
+          lin = [lin[0]*s, lin[1]*s, lin[2]*s];
+        }
+        c = [linToSrgb(lin[0]), linToSrgb(lin[1]), linToSrgb(lin[2]), c[3]];   /* α を落とさない */
+      }
+
+      out.data[o]   = c[0];
+      out.data[o+1] = c[1];
+      out.data[o+2] = c[2];
+      out.data[o+3] = c[3];   /* 圏外との境目は半透明のまま次段へ渡す */
+    }
+  }
+  out.coverage = covered / (src.w * src.h);
+  return out;
+}
+
+/* ───────── 6. ズレ計測 ───────── */
+
+/**
+ * 格子点ごとのズレベクトル。
+ *   p    静止系での真の画素位置 (物体固有の幾何)
+ *   pApp 見かけの画素位置 (光行差後) — ここに写ってしまう
+ *   pNow 同時刻に実際にある向きの画素位置 (ローレンツ収縮後)
+ */
+function zureField(cam, beta, n, camView){
+  n = n || 9;
+  var pts = [];
+  for (var j = 1; j < n; j++) for (var i = 1; i < n; i++){
+    var p = { x: cam.w * i / n, y: cam.h * j / n };
+    var d = pixelToDir(p.x, p.y, cam);
+    var pApp = dirToPixel(aberrateDir(d, beta), cam);
+    var pNow = dirToPixel(contractDir(d, beta), cam);
+    if (!pApp || !pNow) continue;
+    pts.push({
+      p:p, pApp:pApp, pNow:pNow, d:d,
+      /* 観測像を別画角で表示しているときの、その画面上での位置 */
+      pView: camView ? dirToPixel(aberrateDir(d, beta), camView) : pApp,
+      px:   Math.hypot(pApp.x - p.x, pApp.y - p.y),
+      deg:  angBetween(aberrateDir(d, beta), d) * 180 / Math.PI,
+      terr: terrellAngle(d, beta) * 180 / Math.PI,
+      D:    dopplerFactor(d.z, beta)
+    });
+  }
+  return pts;
+}
+
+/**
+ * 補正前 / 補正後のズレ収支。after は correctDir を通した後の残差で、
+ * 静止系整合なら光行差ズレは数値誤差まで 0 に落ちる。
+ */
+function zureReport(cam, beta, target, colorMode){
+  target = target === "now" ? "now" : "rest";
+  var cmode = colorMode === "vivid" ? "vivid" : "spectral";
+  var f = zureField(cam, beta, 9);
+  /* 灰色 (等エネルギースペクトル) は形が偏移しても変わらないので probe にならない。
+     彩度のある色でこそ色ズレが出る。 */
+  var PROBES = [[255,40,40],[40,255,40],[40,40,255],[220,180,140]];
+  var r = {
+    target: target, n: f.length,
+    before: { px:0, deg:0, terrDeg:0, colr:0, beamMin:Infinity, beamMax:0 },
+    after:  { px:0, deg:0, terrDeg:0, colr:0, beamMin:Infinity, beamMax:0 },
+    meanBeforePx:0, meanAfterPx:0, Dmin:Infinity, Dmax:0, colorMode:cmode, rev:null
+  };
+  if (!f.length) return r;
+
+  for (var i = 0; i < f.length; i++){
+    var e = f[i];
+    /* ── 補正前: 見かけ pApp と、あるべき位置 (target) との差 ── */
+    var want  = (target === "now") ? e.pNow : e.p;
+    var wantD = (target === "now") ? contractDir(e.d, beta) : e.d;
+    var b = Math.hypot(e.pApp.x - want.x, e.pApp.y - want.y);
+    r.before.px = Math.max(r.before.px, b);
+    r.meanBeforePx += b;
+    r.before.deg     = Math.max(r.before.deg, angBetween(aberrateDir(e.d, beta), wantD) * 180 / Math.PI);
+    r.before.terrDeg = Math.max(r.before.terrDeg, e.terr);
+
+    /* ── 補正後: 見かけの方向を correctDir に通した残差 ── */
+    var fixed  = correctDir(aberrateDir(e.d, beta), beta, target);
+    var pFixed = dirToPixel(fixed, cam);
+    var a = pFixed ? Math.hypot(pFixed.x - want.x, pFixed.y - want.y) : 0;
+    r.after.px = Math.max(r.after.px, a);
+    r.meanAfterPx += a;
+    r.after.deg = Math.max(r.after.deg, angBetween(fixed, wantD) * 180 / Math.PI);
+    /* 同時刻整合ならテレル回転も消えるが、静止系整合では残る (固有の幾何を優先) */
+    r.after.terrDeg = Math.max(r.after.terrDeg,
+      (target === "now") ? angBetween(fixed, contractDir(e.d, beta)) * 180 / Math.PI : e.terr);
+
+    /* ── 色と輝度 ── */
+    r.Dmin = Math.min(r.Dmin, e.D); r.Dmax = Math.max(r.Dmax, e.D);
+    var M = dopplerMatrix(e.D, cmode), Mi = dopplerUnshiftMatrix(e.D, cmode);
+    for (var q = 0; q < PROBES.length; q++){
+      var pr = PROBES[q];
+      var shifted = dopplerRGB(pr, e.D, false, cmode);
+      for (var ch = 0; ch < 3; ch++)
+        r.before.colr = Math.max(r.before.colr, Math.abs(shifted[ch] - pr[ch]));
+      /* 往復の残差。0-255 に丸めず線形量で戻し、飽和で誤魔化さない */
+      var lin = [srgbToLin(pr[0]), srgbToLin(pr[1]), srgbToLin(pr[2])];
+      var rt  = mat3apply(Mi, mat3apply(M, lin));
+      for (ch = 0; ch < 3; ch++)
+        r.after.colr = Math.max(r.after.colr, Math.abs(linToSrgb(rt[ch]) - pr[ch]));
+    }
+    var bf = beamFactor(e.D);
+    r.before.beamMin = Math.min(r.before.beamMin, bf);
+    r.before.beamMax = Math.max(r.before.beamMax, bf);
+  }
+  r.meanBeforePx /= f.length;
+  r.meanAfterPx  /= f.length;
+  r.after.beamMin = r.after.beamMax = 1;
+  /* 視野内で最も偏移の強い点で、色をどこまで戻せるかを判定する */
+  var Dworst = (Math.abs(Math.log(r.Dmax)) > Math.abs(Math.log(r.Dmin))) ? r.Dmax : r.Dmin;
+  r.rev = colorReversibility(Dworst, cmode);
+  r.beforeBeamRatio = r.before.beamMax / (r.before.beamMin || 1);
+  r.afterBeamRatio  = 1;
+  return r;
+}
+
+/* ───────── 7. 光時計 — 写真のスケッチ ───────── */
+
+/**
+ * 光時計。鏡の間隔 L は進行方向に直交するので不変。観測者から見ると
+ * 光は斜辺を走る:  L² + (βγL)² = (γL)²  → 1 チックは γ 倍に伸びる。
+ */
+function lightClock(beta, L){
+  L = L || 1;
+  var g = gammaOf(beta);
+  return {
+    beta: beta, gamma: g, L: L,
+    tickRest:   2 * L,        /* c=1 単位の往復時間 (静止系) */
+    tickMoving: 2 * L * g,    /* 観測者が測る往復時間 */
+    halfHyp:    g * L,        /* 斜辺 = 光が走る距離 */
+    drift:      beta * g * L, /* 半チックあたりの水平移動 */
+    dilation:   g
+  };
+}
+
+/**
+ * 原図のスケッチ (上の鏡のバー + 交差する 2 本の光線) を正規化座標 [0,1]²
+ * で再現する。up は下の発光点から鏡へ上がって戻る光、down は半チックずれた
+ * 光で、2 本は 2 点で交差する — これがスケッチの X。
+ */
+function sketchGeometry(beta){
+  var ck = lightClock(beta, 1);
+  var d = ck.drift, W = 2 * d;
+  var pad = 0.12, span = Math.max(W, 0.42), inner = 1 - 2 * pad;
+  function X(x){ return 0.5 + ((x - W / 2) / span) * inner; }
+  function Y(y){ return 1 - (pad + y * inner); }
+  function P(x, y){ return { x:X(x), y:Y(y) }; }
+
+  return {
+    beta: beta, clock: ck,
+    mirror:  { x0:pad, y0:Y(1),   x1:1-pad, y1:Y(1)   },   /* 上の鏡 (横棒) */
+    floor:   { x0:pad, y0:Y(0),   x1:1-pad, y1:Y(0)   },   /* 下の鏡 */
+    rest:    [ P(d, 0), P(d, 1) ],                          /* 静止系: 垂直往復 */
+    up:      [ P(0, 0), P(d, 1), P(W, 0) ],                 /* 上り → 折返し */
+    down:    [ P(0, 1), P(d, 0), P(W, 1) ],                 /* 半チックずれた光 */
+    cross:   [ P(d / 2, 0.5), P(1.5 * d, 0.5) ],            /* スケッチの X */
+    apex:    P(d, 1),
+    emit:    P(0, 0)
+  };
+}
+
+/* ───────── 8. 内蔵サンプル画像 ───────── */
+
+function putPx(img, x, y, rgb){
+  x = Math.round(x); y = Math.round(y);
+  if (x < 0 || y < 0 || x >= img.w || y >= img.h) return;
+  var o = (y * img.w + x) * 4;
+  img.data[o] = rgb[0]; img.data[o+1] = rgb[1]; img.data[o+2] = rgb[2]; img.data[o+3] = 255;
+}
+function fillRect(img, x0, y0, x1, y1, rgb){
+  for (var y = Math.round(y0); y <= Math.round(y1); y++)
+    for (var x = Math.round(x0); x <= Math.round(x1); x++) putPx(img, x, y, rgb);
+}
+function rasterLine(img, x0, y0, x1, y1, rgb, th){
+  th = th || 1;
+  var n = Math.ceil(Math.max(Math.abs(x1-x0), Math.abs(y1-y0))) * 2 + 1;
+  var h = (th - 1) / 2;
+  for (var i = 0; i <= n; i++){
+    var t = i / n, cx = x0 + (x1-x0)*t, cy = y0 + (y1-y0)*t;
+    for (var dy = -h; dy <= h; dy += 1) for (var dx = -h; dx <= h; dx += 1)
+      putPx(img, cx + dx, cy + dy, rgb);
+  }
+}
+function rasterPath(img, pts, w, h, rgb, th){
+  for (var i = 0; i + 1 < pts.length; i++)
+    rasterLine(img, pts[i].x*w, pts[i].y*h, pts[i+1].x*w, pts[i+1].y*h, rgb, th);
+}
+/* 決定論的な擬似乱数 (星野を再現可能にする) */
+function prng(seed){
+  var s = seed >>> 0;
+  return function(){ s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+}
+
+/** 内蔵サンプル: 'sketch' | 'grid' | 'bars' | 'stars' */
+function sampleImage(kind, w, h){
+  var img = makeImg(w, h), x, y, i;
+
+  if (kind === "sketch"){
+    /* 写真のノート — 罫線の紙に、鏡のバーと交差する光線 */
+    fillRect(img, 0, 0, w-1, h-1, [244, 242, 236]);
+    for (y = Math.round(h * 0.08); y < h; y += Math.max(6, Math.round(h / 22)))
+      rasterLine(img, 0, y, w-1, y, [196, 206, 224], 1);
+    var g = sketchGeometry(0.6), ink = [26, 28, 34];
+    /* 上の鏡は二重線 (スケッチの横棒) */
+    rasterLine(img, g.mirror.x0*w, g.mirror.y0*h, g.mirror.x1*w, g.mirror.y1*h, ink, 2);
+    rasterLine(img, g.mirror.x0*w, g.mirror.y0*h - Math.round(h*0.03),
+                    g.mirror.x1*w, g.mirror.y1*h - Math.round(h*0.03), ink, 2);
+    rasterPath(img, g.up,   w, h, ink, 2);
+    rasterPath(img, g.down, w, h, ink, 2);
+    for (i = 0; i < g.cross.length; i++)
+      fillRect(img, g.cross[i].x*w - 2, g.cross[i].y*h - 2, g.cross[i].x*w + 2, g.cross[i].y*h + 2, [200, 40, 60]);
+    return img;
+  }
+
+  if (kind === "grid"){
+    fillRect(img, 0, 0, w-1, h-1, [10, 13, 22]);
+    var step = Math.max(12, Math.round(Math.min(w, h) / 10));
+    for (x = 0; x < w; x += step) rasterLine(img, x, 0, x, h-1, [58, 72, 108], 1);
+    for (y = 0; y < h; y += step) rasterLine(img, 0, y, w-1, y, [58, 72, 108], 1);
+    for (y = step; y < h; y += step) for (x = step; x < w; x += step){
+      var q = ((x / step) + (y / step)) % 3;
+      var col = q === 0 ? [248, 113, 133] : (q === 1 ? [56, 189, 248] : [45, 212, 191]);
+      fillRect(img, x-2, y-2, x+2, y+2, col);
+    }
+    rasterLine(img, w/2, 0, w/2, h-1, [255, 255, 255], 1);
+    rasterLine(img, 0, h/2, w-1, h/2, [255, 255, 255], 1);
+    return img;
+  }
+
+  if (kind === "bars"){
+    var cols = [[255,64,64],[255,160,48],[248,224,64],[72,224,120],
+                [56,189,248],[96,112,248],[200,96,232],[236,236,236]];
+    for (i = 0; i < cols.length; i++)
+      fillRect(img, i*w/cols.length, 0, (i+1)*w/cols.length - 1, h-1, cols[i]);
+    for (x = 0; x < w; x++){
+      var v = Math.round(255 * x / (w - 1));
+      fillRect(img, x, h*0.78, x, h-1, [v, v, v]);
+    }
+    return img;
+  }
+
+  /* 'stars' — 星野。光行差とビーミングが最も見やすい */
+  fillRect(img, 0, 0, w-1, h-1, [6, 8, 16]);
+  var rnd = prng(20260916);
+  for (i = 0; i < Math.round(w * h / 90); i++){
+    var sx = rnd() * w, sy = rnd() * h, mag = 0.25 + 0.75 * Math.pow(rnd(), 2.2);
+    var tint = rnd();
+    var c = tint < 0.33 ? [255, 236, 210] : (tint < 0.66 ? [214, 230, 255] : [255, 214, 196]);
+    var r = mag > 0.8 ? 2 : (mag > 0.5 ? 1 : 0);
+    fillRect(img, sx-r, sy-r, sx+r, sy+r, [c[0]*mag, c[1]*mag, c[2]*mag]);
+  }
+  return img;
+}
+
+/* ───────── 9. 意図解析 (日本語コマンド) ───────── */
+
+/** 「0.9c」「β=0.5」「95%」「光速の 8 割」などから β を読む */
+function parseBeta(t){
+  var m = t.match(/([0-9]*\.?[0-9]+)\s*c\b/i) || t.match(/[βb]\s*=?\s*([0-9]*\.?[0-9]+)/i);
+  if (m) return clamp(parseFloat(m[1]), 0, 0.999999);
+  m = t.match(/([0-9]*\.?[0-9]+)\s*[%％]/);
+  if (m) return clamp(parseFloat(m[1]) / 100, 0, 0.999999);
+  m = t.match(/光速の\s*([0-9]*\.?[0-9]+)\s*割/);
+  if (m) return clamp(parseFloat(m[1]) / 10, 0, 0.999999);
+  m = t.match(/([0-9]*\.?[0-9]+)/);
+  if (m){
+    var v = parseFloat(m[1]);
+    if (v > 0 && v < 1) return v;
+  }
+  return null;
+}
+
+var ON_RE  = /オン|on|入れ|つけ|有効|ON|する$/i;
+var OFF_RE = /オフ|off|切っ|外し|消し|無効|止め|やめ|なし/i;
+function onOff(t, dflt){
+  if (OFF_RE.test(t)) return false;
+  if (ON_RE.test(t))  return true;
+  return dflt;
+}
+
+/**
+ * 指示文 → 状態の差分 (patch) と intent。UI から独立した純関数なので
+ * そのままテストできる。
+ */
+function lensIntent(text){
+  var t = String(text || "").trim();
+  if (!t) return { intent:"none" };
+
+  if (/ズレ|ずれ|誤差|残差|どれくらい|どのくらい|報告|レポート/.test(t) && !/防止|補正/.test(t))
+    return { intent:"report" };
+  if (/γ|ガンマ|ローレンツ|遅れ|光時計|チック/.test(t))
+    return { intent:"clock" };
+  if (/使い方|ヘルプ|help|何ができ/i.test(t))
+    return { intent:"help" };
+
+  /* 補正目標は「ズレ防止」より先に見る。「静止系に戻して」の "戻し" が
+     ズレ防止の言い回しと衝突するため、限定的な語を持つ方を先に通す。 */
+  if (/同時刻|テレル|いまある|実際の位置/.test(t))
+    return { intent:"target", patch:{ target:"now" } };
+  if (/静止系|固有|元の幾何|原画に/.test(t))
+    return { intent:"target", patch:{ target:"rest" } };
+  if (/ズレ防止|補正|矯正/.test(t))
+    return { intent:"fix", patch:{ fix: onOff(t, true) } };
+  if (/ドップラー|色|波長|偏移/.test(t)){
+    if (/厳密|分光|スペクトル/.test(t)) return { intent:"colorMode", patch:{ colorMode:"spectral" } };
+    if (/強調|可視|鮮やか|ラップ/.test(t)) return { intent:"colorMode", patch:{ colorMode:"vivid" } };
+    return { intent:"doppler", patch:{ doppler: onOff(t, true) } };
+  }
+  if (/光行差|収差|曲が/.test(t))
+    return { intent:"aberration", patch:{ aberration: onOff(t, true) } };
+  if (/ビーミング|輝度|明るさ|サーチライト/.test(t))
+    return { intent:"beaming", patch:{ beaming: onOff(t, true) } };
+  if (/画角|視野|fov/i.test(t)){
+    var f = t.match(/([0-9]+)/);
+    if (f) return { intent:"fov", patch:{ fov: clamp(parseInt(f[1], 10), 20, 170) } };
+  }
+  if (/原図|スケッチ|光時計の絵/.test(t)) return { intent:"sample", patch:{ sample:"sketch" } };
+  if (/格子|グリッド/.test(t))            return { intent:"sample", patch:{ sample:"grid" } };
+  if (/カラーバー|バー|色見本/.test(t))   return { intent:"sample", patch:{ sample:"bars" } };
+  if (/星|スター|星野/.test(t))           return { intent:"sample", patch:{ sample:"stars" } };
+  if (/静止|止ま|停止/.test(t))           return { intent:"speed", patch:{ beta: 0 } };
+
+  var b = parseBeta(t);
+  if (b !== null) return { intent:"speed", patch:{ beta: b } };
+  return { intent:"unknown" };
+}
+
+function fmt(v, n){ return Number(v).toFixed(n === undefined ? 3 : n); }
+
+/** 指示文への応答文を作る (状態は呼び出し側が patch を当てて更新する) */
+function lensReply(text, st){
+  var r = lensIntent(text), p = r.patch || {};
+  var next = Object.assign({}, st, p);
+  var cam = makeCam(st.w || 320, st.h || 240, next.fov);
+  var rep = zureReport(cam, next.beta, next.target, next.colorMode);
+  var ck  = lightClock(next.beta, 1);
+
+  switch (r.intent){
+    case "speed":
+      return { patch:p, reply:
+        "β = " + fmt(next.beta) + " (γ = " + fmt(ck.gamma) + ") に設定しました。\n" +
+        "光行差による最大ズレは " + fmt(rep.before.px, 1) + " px (" + fmt(rep.before.deg, 2) + "°)。" +
+        (next.fix ? "ズレ防止は ON なので、補正像では " + rep.after.px.toExponential(1) + " px まで落ちます。"
+                  : "ズレ防止は OFF です。") };
+    case "fix":
+      return { patch:p, reply: next.fix
+        ? "ズレ防止を ON にしました。見かけの方向を光行差の逆写像に通し、最大 "
+          + fmt(rep.before.px, 1) + " px のズレを " + rep.after.px.toExponential(1) + " px まで打ち消します。"
+        : "ズレ防止を OFF にしました。補正像にも観測像と同じズレが残ります。" };
+    case "doppler":
+      return { patch:p, reply: next.doppler
+        ? "ドップラー効果を有効にしました (D = " + fmt(rep.Dmin, 2) + "〜" + fmt(rep.Dmax, 2) + ")。"
+        : "ドップラー効果を無効にしました。幾何変換だけを見ます。" };
+    case "colorMode":
+      return { patch:p, reply: next.colorMode === "vivid"
+        ? "色モードを「可視域ラップ (強調)」にしました。物理的には近似ですが、帯が可視域に留まるので色は完全に元へ戻せます。"
+        : "色モードを「分光 (厳密)」にしました。可視域の外から来た光は RGB 3 値では表せないため、"
+          + "高速では色情報が原理的に失われます (現在の可逆性: " + rep.rev.label + ")。" };
+    case "aberration":
+      return { patch:p, reply: next.aberration ? "光行差を有効にしました。" : "光行差を無効にしました (色と輝度だけ適用)。" };
+    case "beaming":
+      return { patch:p, reply: next.beaming
+        ? "ビーミング (I' = D⁴I) を有効にしました。視野内の輝度比は " + fmt(rep.beforeBeamRatio, 2) + " 倍です。"
+        : "ビーミングを無効にしました。" };
+    case "target":
+      return { patch:p, reply: next.target === "now"
+        ? "補正目標を「同時刻整合」にしました。テレル回転まで含めて、いま実際にある向きへ戻します。"
+        : "補正目標を「静止系整合」にしました。物体固有の幾何 (原画) へ厳密に戻します。" };
+    case "fov":
+      return { patch:p, reply: "画角を " + next.fov + "° にしました。最大ズレは " + fmt(rep.before.px, 1) + " px です。" };
+    case "sample":
+      return { patch:p, reply: "入力画像を切り替えました。" };
+    case "report":
+      return { patch:p, reply:
+        "β = " + fmt(next.beta) + " / γ = " + fmt(ck.gamma) + " / 画角 " + next.fov + "° でのズレ収支:\n" +
+        "・光行差  最大 " + fmt(rep.before.px, 1) + " px (" + fmt(rep.before.deg, 2) + "°) → 補正後 " + rep.after.px.toExponential(1) + " px\n" +
+        "・テレル回転  最大 " + fmt(rep.before.terrDeg, 2) + "°\n" +
+        "・ドップラー  D = " + fmt(rep.Dmin, 2) + "〜" + fmt(rep.Dmax, 2) + " / 色ズレ最大 " + fmt(rep.before.colr, 0) + " (可逆性 " + rep.rev.label + ")\n" +
+        "・ビーミング  輝度比 " + fmt(rep.beforeBeamRatio, 2) + " 倍 → 補正後 1.00 倍" };
+    case "clock":
+      return { patch:p, reply:
+        "光時計 (原図のスケッチ): 鏡の間隔 L は進行方向と直交するので不変です。\n" +
+        "観測者から見た光路は斜辺 γL = " + fmt(ck.halfHyp) + "L、水平移動は βγL = " + fmt(ck.drift) + "L。\n" +
+        "L² + (βγL)² = (γL)² が成り立ち、1 チックは " + fmt(ck.gamma) + " 倍に伸びます。\n" +
+        "同じ γ が、上の像の最大ズレ " + fmt(rep.before.px, 1) + " px をそのまま決めています。" };
+    case "help":
+      return { patch:p, reply:
+        "任意の画像を特殊相対性理論の光学に通し、生じた見た目のズレを逆変換で打ち消します。\n" +
+        "「0.9c にして」「ズレは?」「補正オフ」「ドップラー切って」「画角 130」「同時刻整合」「γ は?」などと言えます。" };
+    case "none":
+      return { patch:{}, reply:"" };
+    default:
+      return { patch:{}, reply:"指示を解釈できませんでした。「使い方」と入力すると例を表示します。" };
+  }
+}
+
+/* ───────── 10. UI ───────── */
+
+var CV_W = 320, CV_H = 240;
+
+var state = {
+  beta:0.6, fov:100, target:"rest", colorMode:"vivid",
+  aberration:true, doppler:true, beaming:true, fix:true, arrows:false, autoFov:true,
+  sample:"sketch", w:CV_W, h:CV_H
+};
+var srcImg = null, obsImg = null, fixImg = null, pending = false;
+
+function byId(id){ return document.getElementById(id); }
+function betaFromSlider(v){ return Math.tanh(3.5 * v / 1000); }
+function sliderFromBeta(b){
+  b = clamp(b, 0, 0.9999);
+  return Math.round((0.5 * Math.log((1 + b) / (1 - b))) / 3.5 * 1000);
+}
+
+function drawImg(cv, img){
+  var ctx = cv.getContext("2d");
+  if (cv.width !== img.w || cv.height !== img.h){ cv.width = img.w; cv.height = img.h; }
+  var id = ctx.createImageData(img.w, img.h);
+  id.data.set(img.data);
+  ctx.putImageData(id, 0, 0);
+}
+
+/** 観測像の上に「どこからどこへズレたか」の矢印を重ねる */
+function drawArrows(cv, beta, fov, fovView){
+  if (!state.arrows) return;
+  var ctx = cv.getContext("2d");
+  var camRest = makeCam(cv.width, cv.height, fov);
+  var camView = makeCam(cv.width, cv.height, fovView === undefined ? fov : fovView);
+  var f = zureField(camRest, beta, 8, camView);
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "rgba(251,113,133,.92)";
+  ctx.fillStyle   = "rgba(56,189,248,.95)";
+  for (var i = 0; i < f.length; i++){
+    var e = f[i];
+    if (!e.pView) continue;
+    ctx.beginPath(); ctx.moveTo(e.p.x, e.p.y); ctx.lineTo(e.pView.x, e.pView.y); ctx.stroke();
+    ctx.beginPath(); ctx.arc(e.p.x, e.p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+/** 光時計 — 写真のスケッチをそのまま描く */
+function drawClock(cv, beta){
+  var ctx = cv.getContext("2d"), W = cv.width, H = cv.height;
+  var g = sketchGeometry(beta);
+  function px(p){ return { x: p.x * W, y: p.y * H }; }
+  function path(pts, col, w, dash){
+    ctx.save(); ctx.strokeStyle = col; ctx.lineWidth = w;
+    ctx.setLineDash(dash || []); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (var i = 0; i < pts.length; i++){
+      var q = px(pts[i]);
+      if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke(); ctx.restore();
+  }
+
+  ctx.fillStyle = "#f4f2ec"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "#c9d3e6"; ctx.lineWidth = 1;          /* ノートの罫線 */
+  for (var y = H * 0.1; y < H; y += H / 11){
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  /* 上下の鏡 (スケッチの横棒) */
+  ctx.strokeStyle = "#1a1c22"; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(g.mirror.x0*W, g.mirror.y0*H); ctx.lineTo(g.mirror.x1*W, g.mirror.y1*H); ctx.stroke();
+  ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.moveTo(g.mirror.x0*W, g.mirror.y0*H - 7); ctx.lineTo(g.mirror.x1*W, g.mirror.y1*H - 7); ctx.stroke();
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(g.floor.x0*W, g.floor.y0*H); ctx.lineTo(g.floor.x1*W, g.floor.y1*H); ctx.stroke();
+
+  path(g.rest, "#8b93a8", 1.4, [5, 4]);          /* 静止系の垂直往復 */
+  path(g.up,   "#1a1c22", 2.4);                  /* 上りの光線 */
+  path(g.down, "#1a1c22", 2.4);                  /* 半チックずれた光線 */
+
+  ctx.fillStyle = "#c8283c";                     /* スケッチの交差点 */
+  for (var i = 0; i < g.cross.length; i++){
+    var c = px(g.cross[i]);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.fillStyle = "#1a1c22";
+  ctx.font = "12px ui-monospace,Consolas,monospace";
+  ctx.fillText("γ = " + fmt(gammaOf(beta)) + "   β = " + fmt(beta), 10, 16);
+  ctx.fillText("斜辺 γL / 水平 βγL / 高さ L", 10, H - 8);
+}
+
+function renderClockText(){
+  var ck = lightClock(state.beta, 1);
+  byId("clockTxt").textContent =
+    "β  = " + fmt(ck.beta) + "\n" +
+    "γ  = " + fmt(ck.gamma, 5) + "\n" +
+    "──────────────────\n" +
+    "鏡の間隔   L       = 1.000  (不変)\n" +
+    "水平移動   βγL     = " + fmt(ck.drift, 5) + "\n" +
+    "光路 (斜辺) γL      = " + fmt(ck.halfHyp, 5) + "\n" +
+    "検算 L²+(βγL)²     = " + fmt(1 + ck.drift * ck.drift, 5) + "\n" +
+    "       (γL)²       = " + fmt(ck.halfHyp * ck.halfHyp, 5) + "\n" +
+    "──────────────────\n" +
+    "1 チック (静止)     = " + fmt(ck.tickRest, 5) + "\n" +
+    "1 チック (観測)     = " + fmt(ck.tickMoving, 5) + "\n" +
+    "時間の遅れ          = " + fmt(ck.gamma, 5) + " 倍";
+}
+
+function renderZure(){
+  var cam = makeCam(CV_W, CV_H, state.fov);
+  var r = zureReport(cam, state.beta, state.target, state.colorMode);
+  var tb = byId("zureTbl").querySelector("tbody");
+  var terrAfter = (state.target === "now")
+    ? "0.00°" : fmt(r.after.terrDeg, 2) + "°";
+  var rows = [
+    ["光行差ズレ (画素)", fmt(r.before.px, 2) + " px", r.after.px.toExponential(2) + " px",
+     "cosθ′=(cosθ+β)/(1+β cosθ)"],
+    ["光行差ズレ (角度)", fmt(r.before.deg, 3) + "°", r.after.deg.toExponential(2) + "°",
+     "視線方向のローレンツ変換"],
+    ["テレル回転 (同時刻との差)", fmt(r.before.terrDeg, 3) + "°", terrAfter,
+     "光の飛行時間 + ローレンツ収縮"],
+    ["ドップラー色ズレ", fmt(r.before.colr, 1) + " / 255",
+     (r.after.colr < 1 ? r.after.colr.toExponential(2) : fmt(r.after.colr, 1)) + " / 255",
+     "λ′ = λ/D, D = γ(1+β cosθ)"],
+    ["ビーミング輝度比", fmt(r.beforeBeamRatio, 3) + " 倍", "1.000 倍", "I′ = D⁴ I"]
+  ];
+  var html = "";
+  for (var i = 0; i < rows.length; i++){
+    var a = rows[i];
+    var good = /^0\.00|e-/.test(a[2]) || a[2] === "1.000 倍" || a[2] === "0.00°";
+    html += "<tr><td>" + a[0] + "</td><td class='mono bad'>" + a[1] + "</td>" +
+            "<td class='mono " + (good ? "good" : "bad") + "'>" + a[2] + "</td>" +
+            "<td class='mono' style='color:var(--dim)'>" + a[3] + "</td></tr>";
+  }
+  tb.innerHTML = html;
+
+  var note = "格子 " + r.n + " 点で計測。補正目標は「" +
+    (state.target === "now" ? "同時刻整合" : "静止系整合") + "」。";
+  note += state.target === "now"
+    ? " 光行差とテレル回転の両方を消し、いま実際にある向きへ揃えます (原画とはローレンツ収縮の分だけ異なります)。"
+    : " 光行差を厳密に打ち消し、物体固有の幾何 = 原画へ戻します。テレル回転はこの目標では扱わないため残ります (「同時刻整合」を選ぶと消えます)。";
+  note += " 色の可逆性: <b>" + r.rev.label + "</b> (条件数 " +
+    (isFinite(r.rev.cond) ? fmt(r.rev.cond, 1) : "∞") + ")。";
+  if (!r.rev.ok)
+    note += " 可視域の外へ出た光は RGB 3 値に残っていないため、この速度では色を完全には戻せません" +
+            (state.colorMode === "spectral" ? "(「可視域ラップ」に切り替えると常に可逆になります)" : "") + "。";
+  byId("zureNote").innerHTML = note;
+  return r;
+}
+
+function render(){
+  pending = false;
+  if (!srcImg) return;
+  var t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : 0;
+  /* 観測フレームの画角。自動追尾だと、光行差で詰め込まれた場面がちょうど
+     収まる画角になり、圏外の黒が出ない。切ると同じ画角で撮り続けた場合の
+     「実際にどれだけ視野から溢れるか」がそのまま見える。 */
+  var fovView = (state.autoFov && state.aberration)
+    ? aberratedFov(state.fov, state.beta) : state.fov;
+  var common = {
+    beta: state.beta, fov: state.fov, fovView: fovView,
+    target: state.target, colorMode: state.colorMode,
+    aberration: state.aberration, doppler: state.doppler, beaming: state.beaming
+  };
+  obsImg = warpImage(srcImg, Object.assign({ mode:"observe" }, common));
+  fixImg = state.fix
+    ? warpImage(obsImg, Object.assign({ mode:"correct" }, common))
+    : obsImg;
+
+  drawImg(byId("cvSrc"), srcImg);
+  drawImg(byId("cvObs"), obsImg);
+  drawArrows(byId("cvObs"), state.beta, state.fov, fovView);
+  drawImg(byId("cvFix"), fixImg);
+
+  var r = renderZure();
+  var ms = ((typeof performance !== "undefined" && performance.now) ? performance.now() : 0) - t0;
+
+  byId("capObs").innerHTML =
+    "光行差で最大 <b>" + fmt(r.before.px, 1) + " px</b> ズレ、D = " + fmt(r.Dmin, 2) + "〜" + fmt(r.Dmax, 2) +
+    " の偏移と " + fmt(r.beforeBeamRatio, 2) + " 倍の輝度差。" +
+    (state.autoFov && state.aberration
+      ? "場面は画角 " + fmt(fovView, 1) + "° に詰め込まれて見えます (原画は " + state.fov + "°)。"
+      : "同じ画角 " + state.fov + "° で撮ると、視野に残るのは " + fmt(obsImg.coverage * 100, 1) + "% だけです。");
+  byId("capFix").innerHTML = state.fix
+    ? "逆写像で残差 <b>" + r.after.px.toExponential(1) + " px</b>。" +
+      (state.target === "now" ? "同時刻の向きへ整合。" : "原画の幾何へ厳密に一致。")
+    : "ズレ防止 OFF — 観測像のままです。";
+  byId("capSrc").textContent = "入力そのもの。物体の固有の幾何。" +
+    CV_W + "×" + CV_H + " / 処理 " + fmt(ms, 1) + " ms";
+
+  byId("sbBeta").textContent  = fmt(state.beta);
+  byId("sbGamma").textContent = fmt(gammaOf(state.beta));
+  var sf = byId("sbFix");
+  sf.textContent = state.fix ? "ズレ防止 ON" : "ズレ防止 OFF";
+  sf.className = state.fix ? "on" : "off";
+  byId("betaTxt").textContent = "β=" + fmt(state.beta) + "  γ=" + fmt(gammaOf(state.beta));
+  byId("betaNote").innerHTML =
+    "γ = 1/√(1−β²) = <b>" + fmt(gammaOf(state.beta), 4) + "</b>。" +
+    "進行方向の前方が圧縮されて青方偏移し (D &gt; 1)、後方は引き伸ばされて赤方偏移します (D &lt; 1)。";
+
+  drawClock(byId("clockCv"), state.beta);
+  renderClockText();
+}
+
+function scheduleRender(){
+  if (pending) return;
+  pending = true;
+  (typeof requestAnimationFrame === "function" ? requestAnimationFrame : setTimeout)(render, 16);
+}
+
+function loadSample(kind){
+  state.sample = kind;
+  srcImg = sampleImage(kind, CV_W, CV_H);
+  scheduleRender();
+}
+
+function loadFile(file){
+  var url = URL.createObjectURL(file);
+  var im = new Image();
+  im.onload = function(){
+    var cv = document.createElement("canvas");
+    cv.width = CV_W; cv.height = CV_H;
+    var ctx = cv.getContext("2d");
+    ctx.fillStyle = "#05070c"; ctx.fillRect(0, 0, CV_W, CV_H);
+    /* アスペクト比を保って内接させる (ここで歪ませると光学のズレと混ざる) */
+    var s = Math.min(CV_W / im.width, CV_H / im.height);
+    var dw = im.width * s, dh = im.height * s;
+    ctx.drawImage(im, (CV_W - dw) / 2, (CV_H - dh) / 2, dw, dh);
+    var id = ctx.getImageData(0, 0, CV_W, CV_H);
+    srcImg = { w:CV_W, h:CV_H, data:id.data };
+    URL.revokeObjectURL(url);
+    say("画像を読み込みました (" + im.width + "×" + im.height + " → " + CV_W + "×" + CV_H + ")。", true);
+    scheduleRender();
+  };
+  im.onerror = function(){ URL.revokeObjectURL(url); say("画像を読み込めませんでした。", true); };
+  im.src = url;
+}
+
+function say(text, isApp){
+  var log = byId("log");
+  var d = document.createElement("div");
+  d.className = isApp ? "msgA" : "msgU";
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+function runCommand(text){
+  if (!text.trim()) return;
+  say(text, false);
+  var res = lensReply(text, state);
+  Object.assign(state, res.patch);
+  if (res.patch && res.patch.sample) loadSample(res.patch.sample);
+  syncControls();
+  scheduleRender();
+  if (res.reply) say(res.reply, true);
+}
+
+/** 状態 → コントロールの表示を合わせる (コマンドで変えたときにも効かせる) */
+function syncControls(){
+  byId("betaRange").value = sliderFromBeta(state.beta);
+  byId("ckAber").checked  = state.aberration;
+  byId("ckDop").checked   = state.doppler;
+  byId("ckBeam").checked  = state.beaming;
+  byId("ckFix").checked   = state.fix;
+  byId("ckArrow").checked = state.arrows;
+  byId("ckAutoFov").checked = state.autoFov;
+  byId("selTarget").value = state.target;
+  byId("selFov").value    = String(state.fov);
+  var cm = byId("selColor");
+  if (cm) cm.value = state.colorMode;
+}
+
+function wire(){
+  byId("betaRange").addEventListener("input", function(){
+    state.beta = betaFromSlider(parseInt(this.value, 10));
+    scheduleRender();
+  });
+  var presets = document.querySelectorAll("button[data-beta]");
+  for (var i = 0; i < presets.length; i++){
+    presets[i].addEventListener("click", function(){
+      state.beta = parseFloat(this.getAttribute("data-beta"));
+      syncControls(); scheduleRender();
+    });
+  }
+  var samples = document.querySelectorAll("button[data-sample]");
+  for (i = 0; i < samples.length; i++){
+    samples[i].addEventListener("click", function(){ loadSample(this.getAttribute("data-sample")); });
+  }
+  byId("fileIn").addEventListener("change", function(){
+    if (this.files && this.files[0]) loadFile(this.files[0]);
+  });
+  function bindCk(id, key){
+    byId(id).addEventListener("change", function(){ state[key] = this.checked; scheduleRender(); });
+  }
+  bindCk("ckAber", "aberration"); bindCk("ckDop", "doppler");
+  bindCk("ckBeam", "beaming");    bindCk("ckFix", "fix");
+  bindCk("ckArrow", "arrows"); bindCk("ckAutoFov", "autoFov");
+  byId("selTarget").addEventListener("change", function(){ state.target = this.value; scheduleRender(); });
+  byId("selFov").addEventListener("change", function(){ state.fov = parseInt(this.value, 10); scheduleRender(); });
+  var sc = byId("selColor");
+  if (sc) sc.addEventListener("change", function(){ state.colorMode = this.value; scheduleRender(); });
+  byId("cmdGo").addEventListener("click", function(){
+    var el = byId("cmdIn"); runCommand(el.value); el.value = "";
+  });
+  byId("cmdIn").addEventListener("keydown", function(e){
+    if (e.key === "Enter"){ runCommand(this.value); this.value = ""; }
+  });
+}
+
+function init(){
+  wire();
+  syncControls();
+  loadSample(state.sample);
+  say("相対論レンズを起動しました。β = " + fmt(state.beta) + " (γ = " + fmt(gammaOf(state.beta)) +
+      ")。スライダを動かすか、下のバーに「0.9c にして」「ズレは?」などと入力してください。", true);
+}
+
+if (typeof document !== "undefined" && document.addEventListener)
+  document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

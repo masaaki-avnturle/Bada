@@ -81,6 +81,28 @@
 
 ---
 
+## 🔭 ダウンロード — Bada Relativity Lens(相対論レンズ / 見た目のズレ防止)
+
+**任意の画像処理を特殊相対性理論の光学に適用し、そこで生じる見た目のズレを厳密な逆変換で打ち消すアプリケーション。** 画面は **原画 → 観測像 → 補正像** の 3 面で、入力した任意の画像(ギャラリー・カメラ・内蔵サンプル)を **相対論的光行差** cos θ′=(cos θ+β)/(1+β cos θ)、**相対論的ドップラー** D=γ(1+β cos θ)・λ′=λ/D、**ビーミング** I′=D⁴I、**テレル回転** tan θ_now=γ tan θ に通します。光行差は **β → −β がそのまま逆写像**になるため、ズレ防止は数学的に厳密 — 実測で **補正前 90.7 px のズレが補正後 5.5×10⁻¹⁴ px** まで落ちます(β=0.6, 画角 100°)。ズレ計測表が**光行差(画素/角度)・テレル回転・ドップラー色ズレ・ビーミング輝度比**の補正前/補正後を並べ、静止系整合では残るテレル回転もそのまま表示します(同時刻整合を選ぶと消えます)。色は **RGB 3 値に情報が無い方向は原理的に戻らない**ため、条件数から**完全/良好/劣化/不可**を判定し、逆変換には観測色を事前分布に置いた正則化解を使って破綻した絵を出しません。中核の**光時計**は原図のスケッチ(**上の鏡のバーと交差する 2 本の光線**)をそのまま実装し、L²+(βγL)²=(γL)² の検算を数値で並べます。下のバーに「0.95c にして」「ズレは?」「補正オフ」「同時刻整合」等の日本語で操作可能。依存ゼロ・単一 HTML・オフライン動作、画像は端末外に出ません。
+
+### 👉 [**relativity_lens/index.html をダウンロード**](relativity_lens/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-relativity-lens-debug.apk` |
+| **Windows 10 / 11** | `BadaRelativityLens-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaRelativityLens-*-x86_64.AppImage` / `BadaRelativityLens-*-amd64.deb` |
+
+ビルドは [`relativitylens-app-build.yml`](.github/workflows/relativitylens-app-build.yml) が実行します(`relativitylens-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。光学の式・色の可逆性・設計上の判断は [`relativity_lens/`](relativity_lens/) を参照。
+
+---
+
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
 
 **MP3 を動画に変換するソフト。** MP3(ほか WAV / OGG / M4A / FLAC)を読み込むと、**ID3v2/ID3v1 タグ**(曲名 / アーティスト / アルバム / ジャケット画像 APIC)を自前実装のパーサで解析し、音に反応する**ビジュアライザ**(スペクトラムバー / サークル / 波形 / シンプル — FFT を対数スケールで 64 バーに集計)を Canvas に描画、Web Audio API の音声トラックと合成して **MediaRecorder** で動画ファイルへ録画します。出力は対応環境で **MP4 (H.264 + AAC)**、それ以外は **WebM (VP9/VP8 + Opus)**。解像度プリセット(フル HD / HD / 正方形 / 縦型ショート 1080×1920)、24/30/60 fps、背景色・背景画像、複数ファイルの連続変換、プレビュー再生に対応。音楽ファイルは端末の外に出ません。依存ゼロ・単一 HTML・オフライン動作。
@@ -236,6 +258,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
+| **`relativity_lens/`** | 🔭 **Bada Relativity Lens(相対論レンズ)** — 任意の画像処理を特殊相対論の光学に適用し**見た目のズレを防止** · 光行差 cos θ′=(cos θ+β)/(1+β cos θ) · ドップラー D=γ(1+β cos θ), λ′=λ/D · ビーミング I′=D⁴I · テレル回転 tan θ_now=γ tan θ · β→−β が厳密な逆写像(残差 5.5×10⁻¹⁴ px) · 原画/観測像/補正像の 3 面 + ズレ計測表 + 色の可逆性判定 · 光時計 L²+(βγL)²=(γL)² · APK/EXE/AppImage 配布 | [→ 開く](relativity_lens/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---
