@@ -16,6 +16,11 @@
  *   9. 実行系 (osDispatch) — テスト環境では発行せず記述のみ返す
  *  10. 量子暗号方式 (qcBB84 / qcEncrypt / qcDecrypt) — BB84 鍵配送・
  *      盗聴検出 (QBER)・ワンタイムパッドの往復・鍵違いの棄却
+ *  11. アプリランチャー + Play ストア (appLaunch / appCatalogFind) —
+ *      カタログ照合・market: インテント・意図解析・実行系
+ *  12. フリーフォーム / マルチウィンドウ (wmOpen / wmTile / wmSnap /
+ *      wmBraidWord / wmDeviceSupport) — Samsung DeX 判定・分割配置・
+ *      ウィンドウの重なりを組み紐不変量として計算
  */
 "use strict";
 const fs = require("fs");
@@ -180,5 +185,106 @@ assert(get("intentDetect")("盗聴されていないか暗号を確認").eve ===
 const kq = get("aiKernel")("量子暗号の鍵配送をして");
 assert(kq.intent === "qcrypt" && /QBER/.test(kq.reply), "AI kernel runs BB84 and reports the QBER");
 assert(/\|1110⟩/.test(kq.stages[2].detail), "stage③ maps the request onto qcrypt's basis |1110⟩");
+
+/* 11. アプリランチャー + Play ストア */
+const ap = get("topoMap")("apps");
+assert(ap !== null && ap.ket === "|1111⟩", "apps launcher is mapped to basis |1111⟩ (register is now fully populated)");
+assert(get("deviceProfile")("Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile Safari", 412).android === true, "Android UA sets the android capability flag");
+assert(get("deviceProfile")("Mozilla/5.0 (Windows NT 10.0)", 1920).android === false, "desktop UA has no android capability");
+const yt = get("appLaunch")("YouTube");
+assert(yt.found && yt.store === "market://details?id=com.google.android.youtube", "YouTube resolves to its Play Store page");
+assert(/^vnd\.youtube:/.test(yt.launch), "YouTube launches via its URL scheme");
+const unk = get("appLaunch")("謎のアプリ999");
+assert(!unk.found && /^market:\/\/search\?q=/.test(unk.store), "unknown apps fall back to a Play Store search");
+const home = get("appLaunch")("");
+assert(home.found && /play\.google\.com/.test(home.launch), "empty query opens the Play Store itself");
+const tk = get("appLaunch")("TikTok");
+assert(tk.found && tk.launch === tk.store, "an app without a URL scheme launches via its Play Store page");
+assert(get("intentDetect")("YouTubeを開いて").intent === "launch", "intent: YouTubeを開いて → launch");
+assert(get("intentDetect")("LINEをインストールして").intent === "store", "intent: インストール → store");
+assert(get("intentDetect")("Playストアを開いて").intent === "store", "intent: Play ストア → store");
+assert(get("intentDetect")("アプリ一覧を見せて").intent === "apps", "intent: アプリ一覧 → apps panel");
+const kl = get("aiKernel")("YouTubeを開いて");
+assert(kl.action.type === "launch" && /vnd\.youtube/.test(kl.action.launch.launch), "AI kernel produces a launch action with the app's scheme");
+assert(/\|1111⟩/.test(kl.stages[2].detail), "stage③ maps the launch request onto |1111⟩");
+const ks = get("aiKernel")("LINEをインストールして");
+assert(ks.action.type === "market" && ks.action.launch.store === "market://details?id=jp.naver.line.android", "install request produces a market: action for LINE");
+const dl = get("osDispatch")({ action: { type: "launch", app: "apps", launch: yt } });
+assert(dl.performed === false && /vnd\.youtube/.test(dl.how), "launch dispatch outside Android describes the intent without navigating");
+assert(get("intentDetect")("カメラを起動して").intent === "camera", "built-in functions still win over the app catalog (カメラ → camera)");
+
+/* 12. フリーフォーム / マルチウィンドウ */
+const dex = get("deviceProfile")("Mozilla/5.0 (Linux; Android 13; SM-X910) AppleWebKit Chrome/120 Safari", 1920);
+assert(dex.samsung && dex.dex && dex.freeform, "Samsung tablet UA without 'Mobile' is detected as DeX with freeform support");
+const galaxy = get("deviceProfile")("Mozilla/5.0 (Linux; Android 14; SM-S928B) Mobile Safari", 412);
+assert(galaxy.samsung && !galaxy.dex && galaxy.freeform && galaxy.multiWindow, "Galaxy phone: Samsung freeform yes, DeX no");
+const pixel = get("deviceProfile")("Mozilla/5.0 (Linux; Android 14; Pixel 8) Mobile Safari", 412);
+assert(!pixel.samsung && pixel.multiWindow && !pixel.freeform, "non-Samsung Android: split-screen only, no Samsung freeform");
+assert(/DeX/.test(get("wmDeviceSupport")(dex).note), "wmDeviceSupport names DeX when detected");
+assert(get("wmDeviceSupport")(get("deviceProfile")("Windows NT 10.0", 1920)).multiWindow === false, "desktop reports no device-side multi-window");
+
+const st = get("wmNewState")(1000, 600);
+assert(st.mode === "fullscreen" && st.wins.length === 0, "window manager starts empty in fullscreen mode");
+get("wmOpen")(st, "phone"); get("wmOpen")(st, "camera"); get("wmOpen")(st, "qlab");
+assert(st.wins.length === 3 && st.focus === st.wins[2].id, "three windows open, the last one holds focus");
+get("wmOpen")(st, "phone");
+assert(st.wins.length === 3 && get("wmGet")(st, st.focus).appId === "phone", "re-opening an app focuses its existing window instead of duplicating");
+const phoneId = st.focus;
+get("wmTile")(st, "split2");
+const vis = st.wins.slice().sort((a, b) => a.z - b.z);
+assert(vis[0].x === 0 && vis[0].w === 500 && vis[1].x === 500 && vis[1].w === 500, "split2 tiles the two lowest windows into left/right halves");
+get("wmTile")(st, "grid4");
+const cells = st.wins.map(w => w.x + "," + w.y + "," + w.w + "," + w.h);
+assert(new Set(cells).size === 3, "grid4 gives every window a distinct cell");
+assert(st.wins.every(w => w.w === 500 && w.h === 300), "grid4 cells are quarter-sized");
+get("wmSnap")(st, phoneId, "left");
+const ph = get("wmGet")(st, phoneId);
+assert(ph.x === 0 && ph.y === 0 && ph.w === 500 && ph.h === 600, "snapping to the left edge fills the left half");
+get("wmSnap")(st, phoneId, "max");
+assert(get("wmGet")(st, phoneId).w === 1000 && get("wmGet")(st, phoneId).h === 600, "maximize fills the viewport");
+get("wmResize")(st, phoneId, 10, 10);
+assert(get("wmGet")(st, phoneId).w === 260 && get("wmGet")(st, phoneId).h === 180, "windows cannot be resized below the minimum");
+get("wmMove")(st, phoneId, -500, -500);
+assert(get("wmGet")(st, phoneId).x === 0 && get("wmGet")(st, phoneId).y === 0, "windows cannot be dragged off the top-left");
+get("wmMinimize")(st, phoneId);
+assert(get("wmGet")(st, phoneId).min === true && st.focus !== phoneId, "minimizing hands focus to another window");
+assert(get("wmVisible")(st).length === 2, "minimized windows are not visible");
+get("wmFocus")(st, phoneId);
+assert(get("wmGet")(st, phoneId).min === false && st.focus === phoneId, "focusing restores a minimized window");
+
+/* 重なり = 組み紐 */
+const bs = get("wmNewState")(1200, 700);
+get("wmOpen")(bs, "phone"); get("wmOpen")(bs, "camera"); get("wmOpen")(bs, "qlab");
+const ws = bs.wins;
+ws[0].x = 0; ws[1].x = 100; ws[2].x = 200;          /* x 昇順, z も昇順 → 交差なし */
+ws[0].z = 1; ws[1].z = 2; ws[2].z = 3;
+let br = get("wmBraidWord")(bs);
+assert(br.strands === 3 && br.crossings === 0 && /自明/.test(br.text), "windows stacked in x-order form the trivial braid");
+assert(br.invariant.bracket === "1", "the trivial braid closes to the unknot bracket 1");
+ws[0].z = 3; ws[1].z = 2; ws[2].z = 1;               /* z を反転 → 転倒数 3 */
+br = get("wmBraidWord")(bs);
+assert(br.crossings === 3 && br.word.length === 3, "fully reversed stacking gives 3 crossings (n(n-1)/2)");
+assert(br.invariant.writhe === 3 && /\(−A³\)\^3/.test(br.invariant.bracket), "the braid's writhe feeds the same Kauffman bracket as the topology mapping");
+ws[0].z = 1; ws[1].z = 3; ws[2].z = 2;               /* 1 転倒 */
+br = get("wmBraidWord")(bs);
+assert(br.crossings === 1 && br.word[0] === "σ₂", "a single overlap is the generator σ₂");
+
+/* 隣接ウィンドウ起動 (Samsung マルチウィンドウ) */
+const ytA = get("appLaunch")("YouTube");
+assert(/launchFlags=0x10001000/.test(ytA.adjacent) && /package=com\.google\.android\.youtube/.test(ytA.adjacent),
+       "adjacent launch builds an intent: URI with FLAG_ACTIVITY_LAUNCH_ADJACENT");
+assert(get("appLaunch")("謎のアプリ999").adjacent === null, "unknown apps have no adjacent-launch intent");
+const dAdj = get("osDispatch")({ action: { type: "adjacent", app: "apps", launch: ytA } });
+assert(dAdj.performed === false && /launchFlags=0x10001000/.test(dAdj.how), "adjacent dispatch outside Android describes the split-screen intent");
+
+/* 意図解析 + AIカーネル */
+assert(get("intentDetect")("マルチウィンドウにして").intent === "window", "intent: マルチウィンドウ → window");
+assert(get("intentDetect")("ウィンドウを左右に分割して").layout === "split2", "intent: 左右に分割 → split2 layout");
+assert(get("intentDetect")("窓を上下に並べて").layout === "vsplit2", "intent: 上下に並べて → vsplit2 layout");
+assert(get("intentDetect")("4分割の格子に並べて").layout === "grid4", "intent: 格子4 → grid4 layout");
+assert(get("intentDetect")("フリーフォームにして").layout === null, "plain freeform request carries no forced layout");
+const kw = get("aiKernel")("ウィンドウを左右に分割して");
+assert(kw.action.type === "window" && kw.action.layout === "split2", "AI kernel produces a window action with the split2 layout");
+assert(/フリーフォーム/.test(kw.reply) && /左右2分割/.test(kw.reply), "AI kernel explains the freeform switch and the layout");
 
 console.log("\nALL ENGINE TESTS PASSED");
