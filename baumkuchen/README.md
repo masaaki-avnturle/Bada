@@ -90,6 +90,8 @@ g(k) = b₁( L_1 .. L_{N−k} )     残りの種数
 - **Actions からダウンロード** — リポジトリの **Actions** タブ → 左の *Bada Baumkuchen app build* → **Run workflow**(タグ名は空欄のまま)→ 完了後、実行ページ下部の **Artifacts** から `baumkuchen-android` / `baumkuchen-windows` / `baumkuchen-linux` を取得(zip)
 - **Release に添付** — `baumkuchen-v1.0.0` のようなタグを push するか、Run workflow のタグ名欄にタグを入れると、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に直接添付されます
 
+> **Run workflow のボタンが出ないとき** — GitHub は `workflow_dispatch` のワークフローを **既定ブランチ (`main`) にあるファイルだけ** Actions タブに出します。作業ブランチに置いた段階では一覧に現れないので、`main` へマージしてください(マージ後はブランチを選んで実行できます)。マージ前に動かしたい場合は、そのブランチのコミットに `baumkuchen-v*` タグを打って push すれば、タグ側のトリガでそのまま走ります。
+
 ビルドは 4 ジョブ構成です。`test-core`(インライン JS の構文チェック + エンジン単体テスト 98 項目)が通ってから、`android-apk` / `windows-exe` / `linux-app` が並列に走ります。
 
 ### ラッパーの中身
