@@ -230,7 +230,19 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 
 ### 👉 [**baumkuchen/index.html をダウンロード**](baumkuchen/index.html)
 
-上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。初回は見本 14 層が入っています。方程式・仕組み・テストは [`baumkuchen/`](baumkuchen/) を参照。
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。初回は見本 14 層が入っています。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-baumkuchen-debug.apk` |
+| **Windows 10 / 11** | `BadaBaumkuchen-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaBaumkuchen-*-x86_64.AppImage` / `BadaBaumkuchen-*-amd64.deb` |
+
+ビルドは [`baumkuchen-app-build.yml`](.github/workflows/baumkuchen-app-build.yml) が実行します(`baumkuchen-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。方程式・仕組み・テストは [`baumkuchen/`](baumkuchen/) を参照。
 
 ---
 

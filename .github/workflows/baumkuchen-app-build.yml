@@ -1,0 +1,197 @@
+name: Bada Baumkuchen app build (Android APK + Windows EXE + Ubuntu)
+
+# baumkuchen/ の「Bada Baumkuchen」— 優しさのソース検索・蓄積アプリ。
+# 出来事ひとつを一層として焼き重ね、後ろから (外側から) 剥いて読みます。
+#   ・値札   price(L) = 100(1+c)(1+b/10)·rho·(1+k/8)
+#   ・DNA    優しさ遺伝子 8 本の ON/OFF・発現率・最後の反転
+#   ・種数   g = b1(G) = E - V + C (輪を閉じた層の閉路を Union-Find + BFS で復元)
+#   ・検索   全文 + DNA マスク + 値札帯 + 向き + 輪を閉じた層だけ
+# これを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は baumkuchen/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (baumkuchen-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: baumkuchen-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'baumkuchen-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f baumkuchen/index.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("baumkuchen/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/baumkuchen.js", m[1]);
+            for (const marker of ["function normJa", "function tokenize",
+                                  "function detectGenes", "function popcount",
+                                  "function rarityOf", "function priceTag",
+                                  "function repriceAll", "function buildGraph",
+                                  "function genusOf", "function handleClosers",
+                                  "function reverseRead", "function geneExpression",
+                                  "function lastFlips", "function searchSources",
+                                  "function seedRecords", "function toCsv",
+                                  "function drawCake", "function boot"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/baumkuchen.js
+          echo "Bada Baumkuchen self-check OK"
+      - name: Engine tests (normalize / DNA switches / price tag / genus / reverse read / search)
+        run: |
+          set -e
+          node baumkuchen/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p baumkuchen/app/www
+          cp baumkuchen/index.html baumkuchen/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="baumkuchen/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badabaumkuchen BadaBaumkuchen
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          # config.xml がランチャーアイコンとして参照する res/ を渡す
+          mkdir -p cordova-build/res
+          cp "$APP"/cordova/res/*.png cordova-build/res/
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-baumkuchen-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baumkuchen-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p baumkuchen/app/www
+          cp baumkuchen/index.html baumkuchen/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: baumkuchen/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: baumkuchen-windows
+          path: baumkuchen/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: baumkuchen/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p baumkuchen/app/www
+          cp baumkuchen/index.html baumkuchen/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: baumkuchen/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: baumkuchen-linux
+          path: |
+            baumkuchen/app/electron/dist/*.AppImage
+            baumkuchen/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            baumkuchen/app/electron/dist/*.AppImage
+            baumkuchen/app/electron/dist/*.deb

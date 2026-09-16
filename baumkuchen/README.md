@@ -77,6 +77,34 @@ g(k) = b₁( L_1 .. L_{N−k} )     残りの種数
 
 初回は見本 14 層が入っています。**全消去** で空にでき、**見本を入れる** でいつでも戻せます。
 
+## 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-baumkuchen-debug.apk` |
+| **Windows 10 / 11** | `BadaBaumkuchen-*-x64.exe`(NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaBaumkuchen-*-x86_64.AppImage` / `BadaBaumkuchen-*-amd64.deb` |
+
+ビルドは [`baumkuchen-app-build.yml`](../.github/workflows/baumkuchen-app-build.yml) が実行します。
+
+- **Actions からダウンロード** — リポジトリの **Actions** タブ → 左の *Bada Baumkuchen app build* → **Run workflow**(タグ名は空欄のまま)→ 完了後、実行ページ下部の **Artifacts** から `baumkuchen-android` / `baumkuchen-windows` / `baumkuchen-linux` を取得(zip)
+- **Release に添付** — `baumkuchen-v1.0.0` のようなタグを push するか、Run workflow のタグ名欄にタグを入れると、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に直接添付されます
+
+ビルドは 4 ジョブ構成です。`test-core`(インライン JS の構文チェック + エンジン単体テスト 98 項目)が通ってから、`android-apk` / `windows-exe` / `linux-app` が並列に走ります。
+
+### ラッパーの中身
+
+| ファイル | 役割 |
+|:---|:---|
+| [`app/cordova/config.xml`](app/cordova/config.xml) | Android (Cordova 12 / cordova-android 12.0.1)。`app/cordova/res/` のランチャーアイコン(6 密度)を同梱 |
+| [`app/electron/main.js`](app/electron/main.js) | Windows / Ubuntu (Electron 31)。`www/` を **`app://` 独自スキーム**で配信 |
+| [`app/electron/package.json`](app/electron/package.json) | electron-builder 設定(NSIS / portable / AppImage / deb) |
+| [`app/electron/build/icon.png`](app/electron/build/icon.png) | アプリアイコン(1024×1024) |
+
+`www/` は CI が `index.html` をコピーして作る生成物です(リポジトリには含まれません)。
+
+デスクトップ版で `file://` ではなく `app://` を使っているのは、**蓄積を確実に残すため**です。`file://` の Chromium は origin が不定で localStorage を拒むことがあり、層が保存されません。`app://baumkuchen` という固定 origin を与えることで、アプリを終了しても・OS を再起動しても蓄積が残ります。
+
 ## 🧪 テスト
 
 ```
