@@ -89,17 +89,17 @@
 
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
 
-#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+#### 📱💻 ネイティブ アプリ — ⚙️ [**Actions からダウンロード**](https://github.com/masaaki-avnturle/Bada/actions/workflows/cinevim-app-build.yml)
 
-[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+**👉 [Actions › Bada CineVim app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/cinevim-app-build.yml)** を開き、**一番上の緑チェック ✅ の実行** → ページ下部の **「Artifacts」** から zip をダウンロード(展開して使います)。
 
-| プラットフォーム | ファイル |
-|:---|:---|
-| **Android** (APK) | `bada-cinevim-debug.apk` |
-| **Windows 10 / 11** | `BadaCineVim-*-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu** | `BadaCineVim-*-x86_64.AppImage` / `BadaCineVim-*-amd64.deb` |
+| アーティファクト | 中身 | プラットフォーム |
+|:---|:---|:---|
+| **`cinevim-android`** | `bada-cinevim-debug.apk` | Android |
+| **`cinevim-windows`** | `BadaCineVim-1.0.0-x64.exe`(NSIS インストーラ)/ `BadaCineVim-1.0.0-portable.exe`(ポータブル) | Windows 10 / 11 |
+| **`cinevim-linux`** | `BadaCineVim-1.0.0-x86_64.AppImage` / `BadaCineVim-1.0.0-amd64.deb` | Ubuntu |
 
-ビルドは [`cinevim-app-build.yml`](.github/workflows/cinevim-app-build.yml) が実行します(`cinevim-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。キーバインド一覧・演出の数理・量子 Bada の文法は [`bada_cinevim/`](bada_cinevim/) を参照(アプリ内 `:help` でも全一覧が出ます)。
+ビルドは [`cinevim-app-build.yml`](.github/workflows/cinevim-app-build.yml) が実行します — `bada_cinevim/` を含むブランチへの **push で自動ビルド**(Actions の Artifacts)、Actions の **「Run workflow」** で手動実行、**`cinevim-v*` タグ**なら [Releases](https://github.com/masaaki-avnturle/Bada/releases) にも添付されます。アーティファクトの保存期間は 90 日です。キーバインド一覧・演出の数理・量子 Bada の文法は [`bada_cinevim/`](bada_cinevim/) を参照(アプリ内 `:help` でも全一覧が出ます)。
 
 ---
 

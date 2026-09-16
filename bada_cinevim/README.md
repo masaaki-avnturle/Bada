@@ -14,18 +14,56 @@
 
 👉 [**bada_cinevim/index.html をダウンロード**](index.html) → 「Download raw file」(⬇) で保存 → ダブルクリック。
 
-### ネイティブ アプリ
+### ネイティブ アプリ — ⚙️ Actions からダウンロード
 
-[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+**👉 [Actions › Bada CineVim app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/cinevim-app-build.yml)**
 
-| プラットフォーム | ファイル |
+1. 上のリンクを開き、**一番上の緑チェック ✅ の実行**をクリック
+2. ページ下部の **「Artifacts」** に 3 つ並んでいます
+3. クリックすると **zip** で落ちてくるので、展開して中身を使います
+
+| アーティファクト | 中身 | プラットフォーム | zip サイズ |
+|:---|:---|:---|---:|
+| **`cinevim-android`** | `bada-cinevim-debug.apk` | Android | 約 2.9 MB |
+| **`cinevim-windows`** | `BadaCineVim-1.0.0-x64.exe`(NSIS インストーラ)<br>`BadaCineVim-1.0.0-portable.exe`(ポータブル) | Windows 10 / 11 | 約 149 MB |
+| **`cinevim-linux`** | `BadaCineVim-1.0.0-x86_64.AppImage`<br>`BadaCineVim-1.0.0-amd64.deb` | Ubuntu | 約 173 MB |
+
+> ✅ [**実行 #1**](https://github.com/masaaki-avnturle/Bada/actions/runs/35145305960) で
+> 4 ジョブ (`test-core` / `android-apk` / `windows-exe` / `linux-app`) すべて成功し、
+> 上記 3 アーティファクトの生成を確認済みです。
+
+> **アーティファクトの保存期間は 90 日**です。期限が切れていたら、Actions のページで
+> **「Re-run all jobs」** を押すか、下記の手動実行でビルドし直してください。
+
+#### 各プラットフォームでの導入
+
+```sh
+# Android — 「提供元不明のアプリ」を許可してから APK を開く (デバッグ署名です)
+adb install bada-cinevim-debug.apk
+
+# Windows 10 / 11 — インストーラ、またはポータブル版をそのまま実行
+#   SmartScreen が出たら「詳細情報」→「実行」(コード署名はしていません)
+BadaCineVim-1.0.0-x64.exe
+
+# Ubuntu — AppImage は実行権をつけるだけ
+chmod +x BadaCineVim-1.0.0-x86_64.AppImage
+./BadaCineVim-1.0.0-x86_64.AppImage
+# もしくは deb でインストール
+sudo apt install ./BadaCineVim-1.0.0-amd64.deb
+```
+
+#### ビルドの起動方法
+
+ビルドは [`cinevim-app-build.yml`](../.github/workflows/cinevim-app-build.yml) が実行します。
+
+| きっかけ | 成果物の置き場所 |
 |:---|:---|
-| **Android** (APK) | `bada-cinevim-debug.apk` |
-| **Windows 10 / 11** | `BadaCineVim-*-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu** | `BadaCineVim-*-x86_64.AppImage` / `BadaCineVim-*-amd64.deb` |
+| `bada_cinevim/` を含むブランチへの **push** | Actions の **Artifacts**(自動) |
+| Actions ページの **「Run workflow」**(`workflow_dispatch`) | Actions の **Artifacts**(手動)※ボタンはデフォルトブランチ上の workflow にのみ表示 |
+| **`cinevim-v*` タグ**の push | Actions の Artifacts + [**Releases**](https://github.com/masaaki-avnturle/Bada/releases) に添付 |
 
-ビルドは [`cinevim-app-build.yml`](../.github/workflows/cinevim-app-build.yml) が実行します
-(`cinevim-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+3 つのジョブは共通の `test-core`(エンジン単体テスト 228 件)に依存しているため、
+**テストが落ちると APK も EXE も AppImage も作られません**。
 
 ---
 
