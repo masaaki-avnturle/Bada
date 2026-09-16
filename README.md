@@ -77,7 +77,7 @@
 | **Windows 10 / 11** | `BadaQCrypt-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | **Ubuntu** | `BadaQCrypt-*-x86_64.AppImage` / `BadaQCrypt-*-amd64.deb` |
 
-ビルドは [`qcrypt-app-build.yml`](.github/workflows/qcrypt-app-build.yml) が実行します(`qcrypt-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。Bada 言語の仕様・検疫の原理・限界は [`bada_qcrypt/`](bada_qcrypt/) を参照。
+**Actions からダウンロード**: リポジトリの **Actions** タブ → **Bada QCrypt app build (Android APK + Windows EXE + Ubuntu)** → 最新の実行 → 下部の **Artifacts** から `qcrypt-android`(APK)/ `qcrypt-windows`(EXE)/ `qcrypt-linux`(AppImage・deb)を取得できます(GitHub の仕様で zip 形式なので展開してから実行してください)。ビルドは [`qcrypt-app-build.yml`](.github/workflows/qcrypt-app-build.yml) が実行し、`qcrypt-v*` タグを push すると Release へも添付されます。Bada 言語の仕様・検疫の原理・限界は [`bada_qcrypt/`](bada_qcrypt/) を参照。
 
 ---
 

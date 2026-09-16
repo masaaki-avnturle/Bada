@@ -75,7 +75,28 @@ print "測定:", a, b   # 必ず一致する
 | **Windows 10 / 11** | `BadaQCrypt-*-x64.exe`(NSIS インストーラ / ポータブル) |
 | **Ubuntu** | `BadaQCrypt-*-x86_64.AppImage` / `BadaQCrypt-*-amd64.deb` |
 
-ビルドは [`qcrypt-app-build.yml`](../.github/workflows/qcrypt-app-build.yml) が実行します(`qcrypt-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+### ⬇ GitHub Actions からダウンロードする
+
+ビルドは [`qcrypt-app-build.yml`](../.github/workflows/qcrypt-app-build.yml) が実行します。**このブランチへ push するたびに自動でビルドが走り、3 種類すべてが Actions のアーティファクトとして残ります。**
+
+1. リポジトリの **Actions** タブを開く
+2. 左の一覧から **Bada QCrypt app build (Android APK + Windows EXE + Ubuntu)** を選ぶ
+3. 最新の実行(緑のチェック)を開く
+4. ページ下部の **Artifacts** から必要なものを選んでダウンロード
+
+| アーティファクト名 | 中身 |
+|:---|:---|
+| `qcrypt-android` | `bada-qcrypt-debug.apk` |
+| `qcrypt-windows` | `BadaQCrypt-1.0.0-x64.exe`(NSIS インストーラ)/ `BadaQCrypt-1.0.0-portable.exe` |
+| `qcrypt-linux` | `BadaQCrypt-1.0.0-x86_64.AppImage` / `BadaQCrypt-1.0.0-amd64.deb` |
+
+アーティファクトは **zip で固めて配布される GitHub の仕様**なので、ダウンロード後に展開してから実行してください。保存期間は既定で 90 日です。恒久的に配布したい場合は `qcrypt-v1.0.0` のようなタグを push すると、同じ成果物が Release へ添付されます。
+
+**各プラットフォームでの実行**
+
+- **Android**: APK は開発用の未署名(debug)ビルドです。端末の「提供元不明のアプリ / このソースを許可」を有効にしてインストールしてください。
+- **Windows 10 / 11**: 署名していないため SmartScreen が出ます。「詳細情報」→「実行」で進めてください。インストール不要で使うならポータブル版が手軽です。
+- **Ubuntu**: AppImage は `chmod +x BadaQCrypt-*.AppImage` の後に実行。deb は `sudo apt install ./BadaQCrypt-*.deb` で入ります。
 
 **手順**:「🔑 鍵配送」で鍵を作る → 「✉ 暗号化」「🗄 量子金庫」「🧪 量子検疫室」で使う。鍵は保存されないので、**同じ鍵が要る操作(解除・復号)は同じセッションで行うか、鍵の 16 進を控えておいてください**。
 
