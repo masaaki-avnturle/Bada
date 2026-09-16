@@ -81,6 +81,28 @@
 
 ---
 
+## 🎞 ダウンロード — Bada CineVim(映画カウントダウンの VIM エディタ)
+
+**量子プログラミング言語 Bada 用の、映画的な VIM エディタ。** 映画のカウントダウン場面に出てくるエディタのように、**画面内の文章がどアップにフォーカス**され、**ポイントされた文章が浮き上がるクラッシュ効果**とともに秒読みが進みます。カーソル行はガウス核 `k = exp(-d²/2σ²)` で最大 2.6 倍に拡大され、離れた行ほど縮小・ぼかし・減光される**被写界深度**表現。`Space` を押す・行をタップする・秒が刻まれるたびに、その行が **3D で浮き上がり**、画面が揺れ、文字がマゼンタとシアンに**色収差で割れ**、**衝撃波リングと破片**が飛び、Web Audio で合成した**重低音**が鳴ります。`:countdown 5` で**アカデミー・リーダー**(同心円 + 掃引指針 + フィルムグレイン)が起動し、**T-0 で最大の衝撃**が落ちます。編集は本物のモーダル VIM — `hjkl w b e f t % { }` のモーション、`d c y > <` のオペレータとカウント、名前付きレジスタ、`u` / `Ctrl-R` / `.` リピート、ビジュアル、`:%s/pat/rep/g` などの Ex コマンド。**量子 Bada ランタイム**(状態ベクトルシミュレータ / `qubit` `H` `X` `CNOT` `measure` / `<-` `-<` `>-` / β(p,q)・Γ(s))を `:run` で実行できます。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_cinevim/index.html をダウンロード**](bada_cinevim/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-cinevim-debug.apk` |
+| **Windows 10 / 11** | `BadaCineVim-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Ubuntu** | `BadaCineVim-*-x86_64.AppImage` / `BadaCineVim-*-amd64.deb` |
+
+ビルドは [`cinevim-app-build.yml`](.github/workflows/cinevim-app-build.yml) が実行します(`cinevim-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。キーバインド一覧・演出の数理・量子 Bada の文法は [`bada_cinevim/`](bada_cinevim/) を参照(アプリ内 `:help` でも全一覧が出ます)。
+
+---
+
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
 
 **MP3 を動画に変換するソフト。** MP3(ほか WAV / OGG / M4A / FLAC)を読み込むと、**ID3v2/ID3v1 タグ**(曲名 / アーティスト / アルバム / ジャケット画像 APIC)を自前実装のパーサで解析し、音に反応する**ビジュアライザ**(スペクトラムバー / サークル / 波形 / シンプル — FFT を対数スケールで 64 バーに集計)を Canvas に描画、Web Audio API の音声トラックと合成して **MediaRecorder** で動画ファイルへ録画します。出力は対応環境で **MP4 (H.264 + AAC)**、それ以外は **WebM (VP9/VP8 + Opus)**。解像度プリセット(フル HD / HD / 正方形 / 縦型ショート 1080×1920)、24/30/60 fps、背景色・背景画像、複数ファイルの連続変換、プレビュー再生に対応。音楽ファイルは端末の外に出ません。依存ゼロ・単一 HTML・オフライン動作。
@@ -236,6 +258,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
+| **`bada_cinevim/`** | 🎞 **Bada CineVim** — 映画カウントダウンの VIM エディタ · どアップ フォーカス(ガウス減衰の被写界深度) · ポイント行が 3D で浮き上がるクラッシュ効果(画面揺れ + 色収差 + 衝撃波 + 破片 + 合成重低音) · アカデミー・リーダーの秒読み · 本物のモーダル編集(モーション/オペレータ/レジスタ/`.` リピート/Ex) · 量子 Bada 実行系(状態ベクトル 14 qubit) · APK/EXE/AppImage 配布 | [→ 開く](bada_cinevim/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---

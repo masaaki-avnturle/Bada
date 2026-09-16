@@ -1,0 +1,2543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bada CineVim — 映画カウントダウンの VIM エディタ</title>
+<!--
+  Bada CineVim — 量子プログラミング言語 Bada 用の映画的 VIM エディタ
+  (依存ゼロ・単一 HTML・オフライン動作)
+
+  ・本物のモーダル編集 (ノーマル / 挿入 / ビジュアル / ビジュアル行 /
+    コマンドライン / 置換) — hjkl w b e 0 ^ $ gg G { } % f t F T、
+    オペレータ d c y > <、カウント、レジスタ、u / Ctrl-R、. リピート、
+    / 検索、:%s/// 置換、:w :q :set などの Ex コマンド
+  ・Bada 言語シンタックスハイライト (<- / -< / >- / Ω:: / qubit / gate …)
+  ・🎬 シネマフォーカス — カーソル行を「どアップ」に拡大し、
+    離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
+  ・💥 クラッシュ効果 — ポイントされた行が 3D で浮き上がり、
+    画面が揺れ、色収差が割れ、衝撃波リングと破片が飛ぶ
+  ・⏱ 映画のカウントダウン — アカデミー・リーダー (5→4→3→2→1) の
+    スイープ + 走査線 + フィルムグレイン。T-0 で最大クラッシュ
+  ・⚛ 量子 Bada 実行系 — 状態ベクトルシミュレータ (H X Y Z S T CNOT
+    CZ SWAP / measure)、β(p,q)・Γ(s) の実装、<- -< >- の数値意味論
+-->
+<style>
+  :root{
+    --bg:#05070c; --panel:#0c111c; --panel2:#111827; --line:#1e2740;
+    --tx:#e6ecf7; --tx2:#7f8aa3; --gold:#e8c76a; --cyan:#5ad7e8;
+    --mag:#ff4d7e; --ok:#5fd68a; --err:#ff6b6b; --amber:#ffb454;
+    --base-h:30px;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; padding:0; height:100%; overflow:hidden; }
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% 38%, #101a2c 0%, #05070c 68%),
+      var(--bg);
+    color:var(--tx);
+    font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    display:flex; flex-direction:column;
+  }
+  /* ── ヘッダ ── */
+  header{
+    flex:0 0 auto; padding:9px 14px; border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#0d1421,#080c15); z-index:40;
+  }
+  header h1{ margin:0; font-size:16px; letter-spacing:1.2px; white-space:nowrap; }
+  header h1 .gold{ color:var(--gold); }
+  header h1 .cy{ color:var(--cyan); }
+  header .sub{ color:var(--tx2); font-size:11.5px; }
+  .spacer{ flex:1 1 auto; }
+  button.tb{
+    background:var(--panel2); color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; padding:6px 11px; font-size:12.5px; cursor:pointer;
+    font-family:inherit; white-space:nowrap;
+  }
+  button.tb:hover{ border-color:var(--cyan); color:#fff; }
+  button.tb.on{ border-color:var(--gold); color:var(--gold); box-shadow:0 0 12px rgba(232,199,106,.22) inset; }
+  button.tb:active{ transform:translateY(1px); }
+
+  /* ── ステージ (どアップの舞台) ── */
+  /* position:relative — 狭い画面で重ねる出力パネル (#side.force) を
+     ヘッダの下、この領域の中だけに収めるための基準にする */
+  #wrap{ flex:1 1 auto; display:flex; min-height:0; position:relative; }
+  #stage{
+    flex:1 1 auto; position:relative; overflow:hidden;
+    perspective:1000px; perspective-origin:50% 50%;
+    background:
+      repeating-linear-gradient(0deg, rgba(255,255,255,.017) 0 1px, transparent 1px 3px),
+      radial-gradient(900px 520px at 50% 50%, rgba(90,215,232,.07), transparent 70%);
+  }
+  /* ビネット (映画的な周辺減光) */
+  #stage::after{
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:12;
+    background:radial-gradient(ellipse at 50% 50%, transparent 38%, rgba(0,0,0,.62) 100%);
+  }
+  #shaker{ position:absolute; inset:0; will-change:transform; }
+  #doc{
+    position:absolute; left:0; right:0; top:0;
+    /* flex-column にするのは見た目のためではなく、隣接する .ln の上下
+       マージンが相殺(margin collapsing)されるのを防ぐため。相殺されると
+       docLayout() が計算した占有高さ (baseH × scale) と実レイアウトがずれ、
+       どアップの行が中央からずれて重なる。 */
+    display:flex; flex-direction:column;
+    transform-style:preserve-3d; will-change:transform;
+    font-family:"Cascadia Mono","Consolas","SF Mono","Noto Sans Mono CJK JP","DejaVu Sans Mono",monospace;
+    font-size:17px; line-height:var(--base-h);
+    padding:0 clamp(10px,4vw,64px);
+  }
+  .ln{
+    display:flex; align-items:center; height:var(--base-h);
+    transform-origin:8% 50%; will-change:transform,filter,opacity;
+    white-space:pre; position:relative;
+  }
+  .ln .gut{
+    flex:0 0 auto; width:3.6ch; text-align:right; margin-right:1.2ch;
+    color:#3b4763; font-size:.82em; user-select:none;
+  }
+  .ln.cur .gut{ color:var(--gold); }
+  .ln .code{ flex:0 1 auto; position:relative; }
+  .ln.cur .code{ text-shadow:0 0 22px rgba(90,215,232,.30); }
+  /* 浮き上がり + クラッシュ (色収差) */
+  .ln.lift .code{
+    text-shadow:
+      calc(var(--ab,0px) * -1) 0 0 rgba(255,77,126,.75),
+      var(--ab,0px) 0 0 rgba(90,215,232,.75),
+      0 0 26px rgba(255,255,255,.35);
+  }
+  .ln .hair{
+    position:absolute; left:-1.4ch; right:-1.2ch; top:50%; height:1px;
+    background:linear-gradient(90deg,transparent,rgba(232,199,106,.55),transparent);
+    opacity:0; pointer-events:none;
+  }
+  .ln.cur .hair{ opacity:.5; }
+
+  /* シンタックス */
+  .t-kw{ color:#ff8fb0; font-weight:600; }
+  .t-op{ color:var(--gold); font-weight:700; }
+  .t-qop{ color:#ff4d7e; font-weight:700; text-shadow:0 0 10px rgba(255,77,126,.45); }
+  .t-num{ color:#9ae6a0; }
+  .t-str{ color:#e8c76a; }
+  .t-com{ color:#4d5a75; font-style:italic; }
+  .t-fn{ color:var(--cyan); }
+  .t-ns{ color:#c792ea; font-weight:700; }
+  .t-ket{ color:#7ee0ff; text-shadow:0 0 12px rgba(126,224,255,.55); }
+  .t-id{ color:var(--tx); }
+  .t-punct{ color:#8d99b5; }
+  .t-ws{ color:inherit; }
+  .t-match{ background:rgba(232,199,106,.22); border-radius:2px; }
+
+  /* カーソル */
+  #caret{
+    position:absolute; z-index:14; pointer-events:none;
+    background:var(--gold); mix-blend-mode:screen; border-radius:1px;
+    box-shadow:0 0 18px rgba(232,199,106,.8);
+    transition:opacity .08s linear;
+  }
+  #caret.ins{ background:var(--cyan); box-shadow:0 0 18px rgba(90,215,232,.9); }
+  #caret.blink{ opacity:.18; }
+
+  /* 選択 */
+  #selLayer{ position:absolute; inset:0; z-index:8; pointer-events:none; }
+  .selbox{ position:absolute; background:rgba(90,215,232,.18); border-radius:2px; }
+
+  /* FX / リーダー キャンバス */
+  #fx,#leader{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+  #fx{ z-index:13; }
+  #leader{ z-index:30; display:none; }
+
+  /* 出力パネル */
+  #side{
+    flex:0 0 340px; min-width:0; border-left:1px solid var(--line);
+    background:linear-gradient(180deg,#0a0f1a,#070a12);
+    display:flex; flex-direction:column; z-index:20;
+  }
+  #side.hide{ display:none !important; }
+  #side h2{
+    margin:0; padding:7px 8px 7px 12px; font-size:12px; letter-spacing:1px;
+    color:var(--tx2); border-bottom:1px solid var(--line); text-transform:uppercase;
+    display:flex; align-items:center; gap:8px;
+  }
+  #sideClose{
+    margin-left:auto; background:transparent; color:var(--tx2); border:1px solid var(--line);
+    border-radius:6px; padding:3px 9px; font-size:12px; cursor:pointer; font-family:inherit;
+  }
+  #sideClose:hover{ color:var(--err); border-color:var(--err); }
+  #out{
+    flex:1 1 auto; overflow:auto; padding:10px 12px; font-size:12.5px;
+    font-family:"Cascadia Mono","Consolas","DejaVu Sans Mono",monospace;
+    white-space:pre-wrap; word-break:break-word; line-height:1.65;
+  }
+  #out .o-ok{ color:var(--ok); }
+  #out .o-err{ color:var(--err); }
+  #out .o-dim{ color:var(--tx2); }
+  #out .o-key{ color:var(--gold); }
+  #out .o-q{ color:var(--cyan); }
+  #out .bar{ display:inline-block; height:7px; background:linear-gradient(90deg,var(--cyan),var(--mag)); border-radius:3px; vertical-align:middle; }
+
+  /* ステータスライン */
+  #status{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:5px 12px; border-top:1px solid var(--line);
+    background:#0a0f1a; font-size:12.5px; z-index:40;
+    font-family:"Cascadia Mono","Consolas","DejaVu Sans Mono",monospace;
+  }
+  #mode{
+    padding:2px 10px; border-radius:5px; font-weight:800; letter-spacing:1.5px;
+    background:var(--gold); color:#12161f; font-size:11.5px;
+  }
+  #mode.m-insert{ background:var(--ok); }
+  #mode.m-visual,#mode.m-vline{ background:var(--mag); color:#fff; }
+  #mode.m-command,#mode.m-search{ background:var(--cyan); color:#0a1016; }
+  #mode.m-replace{ background:var(--amber); color:#12161f; }
+  #fname{ color:var(--tx2); }
+  #msg{ flex:1 1 auto; color:var(--cyan); white-space:pre; overflow:hidden; text-overflow:ellipsis; }
+  #msg.err{ color:var(--err); }
+  #pos{ color:var(--tx2); white-space:nowrap; }
+  #cmdline{
+    display:none; flex:1 1 auto; color:var(--tx); white-space:pre;
+  }
+  #cmdline.show{ display:block; }
+  #cmdline .cc{ background:var(--gold); color:#12161f; }
+
+  /* タッチ用キーバー (APK / タブレット) */
+  #keys{
+    flex:0 0 auto; display:none; gap:5px; padding:6px 7px; overflow-x:auto;
+    border-top:1px solid var(--line); background:#080c15; z-index:40;
+  }
+  #keys.show{ display:flex; }
+  #keys button{
+    flex:0 0 auto; min-width:40px; padding:9px 9px; font-size:13px;
+    background:#141c2c; color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; font-family:"Consolas",monospace; cursor:pointer;
+  }
+  #keys button:active{ background:var(--gold); color:#12161f; }
+  #hidden{
+    position:absolute; opacity:0; width:1px; height:1px; left:-9999px; top:0;
+    border:0; padding:0;
+  }
+
+  /* カウントダウン HUD */
+  #hud{
+    position:absolute; right:14px; top:12px; z-index:31; text-align:right;
+    font-family:"Cascadia Mono","Consolas",monospace; pointer-events:none;
+    display:none;
+  }
+  #hud.show{ display:block; }
+  #hudNum{ font-size:44px; font-weight:800; color:var(--mag); text-shadow:0 0 26px rgba(255,77,126,.7); line-height:1; }
+  #hudLbl{ font-size:11px; letter-spacing:3px; color:var(--tx2); }
+
+  /* ヘルプ オーバーレイ */
+  #help{
+    position:absolute; inset:0; z-index:50; display:none;
+    background:rgba(3,5,10,.93); padding:18px; overflow:auto;
+  }
+  #help.show{ display:block; }
+  #help .inner{ max-width:860px; margin:0 auto; }
+  #help h3{ color:var(--gold); margin:16px 0 6px; font-size:14px; }
+  #help table{ border-collapse:collapse; width:100%; font-size:12.5px; }
+  #help td{ padding:3px 8px; border-bottom:1px solid #131a2a; vertical-align:top; }
+  #help td:first-child{
+    color:var(--cyan); white-space:nowrap; width:170px;
+    font-family:"Cascadia Mono","Consolas",monospace;
+  }
+  #help .close{ float:right; }
+
+  @media (max-width:900px){
+    #side{ display:none; }
+    #side.force{ display:flex; position:absolute; right:0; top:0; bottom:0; width:min(88vw,340px); }
+    header h1 .sub{ display:none; }
+    #doc{ font-size:15px; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .ln{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="gold">Bada</span> <span class="cy">CineVim</span></h1>
+  <span class="sub">量子言語 Bada の映画的 VIM エディタ</span>
+  <span class="spacer"></span>
+  <button class="tb on" id="btnFocus" title="カーソル行をどアップに (:focus)">🎬 シネマ</button>
+  <button class="tb on" id="btnCrash" title="浮き上がりクラッシュ効果 (:crash)">💥 クラッシュ</button>
+  <button class="tb" id="btnCount" title="映画のカウントダウン (:countdown 5)">⏱ カウントダウン</button>
+  <button class="tb" id="btnRun" title="量子 Bada を実行 (:run)">▶ 実行</button>
+  <button class="tb on" id="btnOut" title="量子 Bada 出力パネルの表示切替">⚛ 出力</button>
+  <button class="tb" id="btnOpen" title="ファイルを開く (:e)">📂 開く</button>
+  <button class="tb" id="btnSave" title="保存 (:w)">💾 保存</button>
+  <button class="tb" id="btnHelp" title="キーバインド一覧 (:help)">？</button>
+</header>
+
+<div id="wrap">
+  <div id="stage">
+    <div id="shaker">
+      <div id="selLayer"></div>
+      <div id="doc"></div>
+      <div id="caret"></div>
+    </div>
+    <canvas id="fx"></canvas>
+    <canvas id="leader"></canvas>
+    <div id="hud"><div id="hudNum">5</div><div id="hudLbl">T-MINUS</div></div>
+    <div id="help"><div class="inner"></div></div>
+  </div>
+  <div id="side">
+    <h2>⚛ 量子 Bada 出力<button id="sideClose" title="出力パネルを閉じる">✕</button></h2>
+    <div id="out"></div>
+  </div>
+</div>
+
+<div id="status">
+  <span id="mode">NORMAL</span>
+  <span id="fname">quantum.bada</span>
+  <span id="msg"></span>
+  <span id="cmdline"></span>
+  <span id="pos">1:1</span>
+</div>
+
+<div id="keys"></div>
+<input id="hidden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+<input id="fileIn" type="file" accept=".bada,.om,.txt,.md,.js,.c,.py,*/*" style="display:none">
+
+<script>
+"use strict";
+/* =====================================================================
+ *  Bada CineVim — エンジン
+ *  すべて純関数として定義し、boot() だけが DOM に触れます
+ *  (tools/engine-test.js が Node の vm でこのブロックを直接読み込みます)
+ * ===================================================================== */
+
+/* ---------------------------------------------------------------------
+ * 0. 既定のサンプル — 量子プログラミング言語 Bada
+ * ------------------------------------------------------------------ */
+var DEMO_SRC = [
+  "// Bada v3 — 映画カウントダウン・シーケンス",
+  "// ζ(s) = β(p,q) / log x    非可換作用素環プログラミング",
+  "",
+  "import Omega::Manifold;",
+  "",
+  "class CountdownNode <- TupleSpace {",
+  "",
+  "  operator <- (input) {",
+  "    return beta(2, 3) / log(input);      // 非可換左作用 π(χ,x)",
+  "  }",
+  "",
+  "  operator -< (state) {",
+  "    return state -< 12.0;                // 多様体積分 ∬1/(x·log x)²",
+  "  }",
+  "",
+  "  operator >- (output) {",
+  "    return output >- 0.5;                // 量子作用素右作用 ⊕(iℏ∇)^⊕L",
+  "  }",
+  "}",
+  "",
+  "/* ---- T-5 : 量子レジスタを起こす ---- */",
+  "qubit q[3];",
+  "",
+  "H q[0];              // 重ね合わせ  |0⟩ → (|0⟩+|1⟩)/√2",
+  "CNOT q[0], q[1];     // もつれ      → ベル状態 Φ+",
+  "X q[2];",
+  "",
+  "/* ---- T-0 : 崩壊させて観測する ---- */",
+  "let shot = measure q;",
+  "print shot;",
+  "",
+  "let zeta = 4.0 <- 2.0;",
+  "let area = 2.0 -< 12.0;",
+  "let grad = 1.0 >- 0.5;",
+  "print zeta;",
+  "print area;",
+  "print grad;",
+  "",
+  "Omega::DATABASE[tuplespace] {",
+  "  push(CountdownNode);   // Akashic Record への書き込み",
+  "}"
+].join("\n");
+
+/* ---------------------------------------------------------------------
+ * 1. Bada シンタックス トークナイザ
+ * ------------------------------------------------------------------ */
+var BADA_KW = ["class","operator","return","if","elif","else","for","while","do",
+  "let","const","var","fn","func","def","import","export","module","new","this",
+  "super","null","nil","true","false","break","continue","in","of","match","case",
+  "yield","async","await","spawn","observe","collapse","entangle","superpose",
+  "measure","qubit","qreg","gate","circuit","manifold","tuplespace","struct",
+  "enum","trait","impl","pub","use","where","with","end"];
+
+var BADA_FN = ["beta","gamma","zeta","log","ln","exp","sin","cos","tan","atan",
+  "sqrt","abs","floor","ceil","round","pow","min","max","norm","trace","det",
+  "tensor","kron","pi_operator","chi","psi","print","printf","push","pull","emit",
+  "H","X","Y","Z","S","T","CNOT","CZ","SWAP","RX","RY","RZ","TOFFOLI"];
+
+/* 量子/多様体オペレータ (長いものから照合すること) */
+var BADA_QOPS = ["<-","-<",">-","::","⊕","⊗","∬","∇","√","ℏ"];
+var BADA_OPS  = ["->","=>","===","!==","==","!=","<=",">=","&&","||","**",
+  "+=","-=","*=","/=","%=","<<",">>","+","-","*","/","%","=","<",">","!","&","|","^","~","?"];
+
+function isIdStart(ch){ return /[A-Za-z_$À-ɏͰ-Ͽ぀-ヿ一-鿿]/.test(ch); }
+function isIdPart(ch){ return isIdStart(ch) || /[0-9]/.test(ch); }
+
+/* badaTokenize(line, inBlock)
+ *   -> { toks:[{t,v}], inBlock:Boolean }
+ *   t: kw | fn | ns | qop | op | num | str | com | ket | id | punct | ws  */
+function badaTokenize(line, inBlock){
+  line = (line == null ? "" : String(line));
+  var toks = [], i = 0, n = line.length, block = !!inBlock;
+
+  /* ブロックコメントの継続 */
+  if (block){
+    var endAt = line.indexOf("*/");
+    if (endAt < 0){ if (n) toks.push({t:"com", v:line}); return {toks:toks, inBlock:true}; }
+    toks.push({t:"com", v:line.slice(0, endAt+2)});
+    i = endAt + 2; block = false;
+  }
+
+  while (i < n){
+    var ch = line[i], two = line.substr(i,2);
+
+    /* 空白 */
+    if (ch === " " || ch === "\t"){
+      var j = i; while (j < n && (line[j] === " " || line[j] === "\t")) j++;
+      toks.push({t:"ws", v:line.slice(i,j)}); i = j; continue;
+    }
+    /* 行コメント */
+    if (two === "//" || ch === "#"){ toks.push({t:"com", v:line.slice(i)}); i = n; continue; }
+    /* ブロックコメント開始 */
+    if (two === "/*"){
+      var e = line.indexOf("*/", i+2);
+      if (e < 0){ toks.push({t:"com", v:line.slice(i)}); return {toks:toks, inBlock:true}; }
+      toks.push({t:"com", v:line.slice(i, e+2)}); i = e + 2; continue;
+    }
+    /* 量子ケット |0⟩ |1⟩ |ψ⟩ |01> */
+    if (ch === "|"){
+      var km = /^\|[^|<>⟩\s]{0,8}(?:⟩|>)/.exec(line.slice(i));
+      if (km){ toks.push({t:"ket", v:km[0]}); i += km[0].length; continue; }
+    }
+    /* 文字列 */
+    if (ch === '"' || ch === "'" || ch === "`"){
+      var k = i + 1, esc = false;
+      while (k < n){
+        if (esc){ esc = false; k++; continue; }
+        if (line[k] === "\\"){ esc = true; k++; continue; }
+        if (line[k] === ch){ k++; break; }
+        k++;
+      }
+      toks.push({t:"str", v:line.slice(i,k)}); i = k; continue;
+    }
+    /* 数値 (16進 / 小数 / 指数 / 虚数 i) */
+    if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(line[i+1] || ""))){
+      var nm = /^(?:0[xX][0-9a-fA-F_]+|(?:[0-9][0-9_]*)?\.?[0-9][0-9_]*(?:[eE][+-]?[0-9]+)?)i?/.exec(line.slice(i));
+      var v = nm ? nm[0] : ch;
+      toks.push({t:"num", v:v}); i += v.length; continue;
+    }
+    /* 識別子 / 名前空間 / キーワード */
+    if (isIdStart(ch)){
+      var s = i; while (i < n && isIdPart(line[i])) i++;
+      var w = line.slice(s, i);
+      if (line.substr(i,2) === "::"){ toks.push({t:"ns", v:w}); continue; }
+      if (BADA_KW.indexOf(w) >= 0) toks.push({t:"kw", v:w});
+      else if (BADA_FN.indexOf(w) >= 0) toks.push({t:"fn", v:w});
+      else toks.push({t:"id", v:w});
+      continue;
+    }
+    /* 量子/多様体オペレータ (優先) */
+    var hit = null, z;
+    for (z = 0; z < BADA_QOPS.length; z++){
+      var q = BADA_QOPS[z];
+      if (line.substr(i, q.length) === q){ hit = q; break; }
+    }
+    if (hit){ toks.push({t:"qop", v:hit}); i += hit.length; continue; }
+    /* 通常オペレータ */
+    for (z = 0; z < BADA_OPS.length; z++){
+      var o = BADA_OPS[z];
+      if (line.substr(i, o.length) === o){ hit = o; break; }
+    }
+    if (hit){ toks.push({t:"op", v:hit}); i += hit.length; continue; }
+    /* 区切り */
+    toks.push({t:"punct", v:ch}); i++;
+  }
+  return {toks:toks, inBlock:block};
+}
+
+/* 全行をまとめてトークナイズ (ブロックコメント状態を持ち越す) */
+function badaTokenizeAll(lines){
+  var out = [], blk = false;
+  for (var i = 0; i < lines.length; i++){
+    var r = badaTokenize(lines[i], blk);
+    blk = r.inBlock; out.push(r.toks);
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+ * 2. Bada の数学 — Γ(s) / β(p,q) / ζ(s) と 3 つの非可換オペレータ
+ * ------------------------------------------------------------------ */
+var HBAR_EFF = 1.0;   /* 自然単位系の実効 ℏ */
+
+/* Lanczos 近似によるガンマ関数 */
+var LANCZOS = [676.5203681218851, -1259.1392167224028, 771.32342877765313,
+  -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+  9.9843695780195716e-6, 1.5056327351493116e-7];
+
+function gammaFn(z){
+  if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gammaFn(1 - z));
+  z -= 1;
+  var x = 0.99999999999980993;
+  for (var i = 0; i < LANCZOS.length; i++) x += LANCZOS[i] / (z + i + 1);
+  var t = z + LANCZOS.length - 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+}
+
+/* β(p,q) = Γ(p)Γ(q)/Γ(p+q) */
+function betaFn(p, q){ return gammaFn(p) * gammaFn(q) / gammaFn(p + q); }
+
+/* ζ(s) = β(p,q) / log x  (README の核心設計思想より) */
+function zetaBeta(p, q, x){
+  var l = Math.log(x);
+  if (!isFinite(l) || l === 0) return NaN;
+  return betaFn(p, q) / l;
+}
+
+/* `<-` 非可換左作用 π(χ,x) = [iπ, f(x)] の実数表現 */
+function badaLeft(a, b){ return a * Math.cos(b) - b * Math.sin(a); }
+
+/* `-<` 多様体積分 ∬ 1/(x·log x)² dx を [a,b] でシンプソン則により数値積分 */
+function badaMani(a, b, steps){
+  steps = steps || 200;
+  if (steps % 2) steps++;
+  if (!(a > 1) || !(b > 1)) return NaN;
+  if (b === a) return 0;
+  var sign = 1;
+  if (b < a){ var t = a; a = b; b = t; sign = -1; }
+  var f = function(x){ var L = Math.log(x); return 1 / (x * L * x * L); };
+  var h = (b - a) / steps, s = f(a) + f(b);
+  for (var i = 1; i < steps; i++) s += f(a + i * h) * (i % 2 ? 4 : 2);
+  return sign * s * h / 3;
+}
+
+/* `>-` 量子作用素右作用 ⊕(iℏ∇)^⊕L — ℏ × 数値勾配 ∇sin(a) */
+function badaRight(a, b){
+  if (!b) return HBAR_EFF * Math.cos(a);
+  return HBAR_EFF * (Math.sin(a + b) - Math.sin(a)) / b;
+}
+
+/* ---------------------------------------------------------------------
+ * 3. 量子 Bada 実行系 — 状態ベクトルシミュレータ
+ * ------------------------------------------------------------------ */
+function qnew(n){
+  var size = 1 << n;
+  var re = new Array(size), im = new Array(size);
+  for (var i = 0; i < size; i++){ re[i] = 0; im[i] = 0; }
+  re[0] = 1;
+  return {n:n, re:re, im:im};
+}
+
+/* 1 量子ビット ゲート: 2x2 行列 [[a,b],[c,d]] を複素数の平坦配列で */
+var QGATES = {
+  H: [Math.SQRT1_2,0, Math.SQRT1_2,0, Math.SQRT1_2,0, -Math.SQRT1_2,0],
+  X: [0,0, 1,0, 1,0, 0,0],
+  Y: [0,0, 0,-1, 0,1, 0,0],
+  Z: [1,0, 0,0, 0,0, -1,0],
+  S: [1,0, 0,0, 0,0, 0,1],
+  T: [1,0, 0,0, 0,0, Math.SQRT1_2, Math.SQRT1_2]
+};
+
+function qapply1(st, g, q){
+  if (q < 0 || q >= st.n) throw new Error("量子ビット番号が範囲外: " + q);
+  var bit = 1 << q, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if (i & bit) continue;
+    var j = i | bit;
+    var ar = st.re[i], ai = st.im[i], br = st.re[j], bi = st.im[j];
+    st.re[i] = g[0]*ar - g[1]*ai + g[2]*br - g[3]*bi;
+    st.im[i] = g[0]*ai + g[1]*ar + g[2]*bi + g[3]*br;
+    st.re[j] = g[4]*ar - g[5]*ai + g[6]*br - g[7]*bi;
+    st.im[j] = g[4]*ai + g[5]*ar + g[6]*bi + g[7]*br;
+  }
+  return st;
+}
+
+function qgate1(st, name, q){
+  var g = QGATES[name];
+  if (!g) throw new Error("未知のゲート: " + name);
+  return qapply1(st, g, q);
+}
+
+/* 回転ゲート RX / RY / RZ (角度 θ) */
+function qrot(st, axis, q, theta){
+  var c = Math.cos(theta/2), s = Math.sin(theta/2), g;
+  if (axis === "RX") g = [c,0, 0,-s, 0,-s, c,0];
+  else if (axis === "RY") g = [c,0, -s,0, s,0, c,0];
+  else g = [c,-s, 0,0, 0,0, c,s];
+  return qapply1(st, g, q);
+}
+
+function qcnot(st, c, t){
+  if (c === t) throw new Error("CNOT の制御と標的が同じです");
+  if (c < 0 || c >= st.n || t < 0 || t >= st.n) throw new Error("量子ビット番号が範囲外");
+  var cb = 1 << c, tb = 1 << t, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if ((i & cb) && !(i & tb)){
+      var j = i | tb;
+      var r = st.re[i], m = st.im[i];
+      st.re[i] = st.re[j]; st.im[i] = st.im[j];
+      st.re[j] = r; st.im[j] = m;
+    }
+  }
+  return st;
+}
+
+function qcz(st, c, t){
+  var cb = 1 << c, tb = 1 << t, size = 1 << st.n;
+  for (var i = 0; i < size; i++){
+    if ((i & cb) && (i & tb)){ st.re[i] = -st.re[i]; st.im[i] = -st.im[i]; }
+  }
+  return st;
+}
+
+function qswap(st, a, b){ qcnot(st,a,b); qcnot(st,b,a); qcnot(st,a,b); return st; }
+
+function qprobs(st){
+  var size = 1 << st.n, p = new Array(size);
+  for (var i = 0; i < size; i++) p[i] = st.re[i]*st.re[i] + st.im[i]*st.im[i];
+  return p;
+}
+
+/* 決定的な擬似乱数 (テスト再現性のため) */
+function mulberry32(seed){
+  var a = seed >>> 0;
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* 観測 — 状態を固有状態へ collapse させ、測定値 (整数) を返す */
+function qmeasure(st, rng){
+  var p = qprobs(st), r = (rng ? rng() : Math.random()), acc = 0, idx = p.length - 1;
+  for (var i = 0; i < p.length; i++){ acc += p[i]; if (r < acc){ idx = i; break; } }
+  for (var k = 0; k < p.length; k++){ st.re[k] = 0; st.im[k] = 0; }
+  st.re[idx] = 1;
+  return idx;
+}
+
+function qbits(idx, n){
+  var s = "";
+  for (var i = n - 1; i >= 0; i--) s += ((idx >> i) & 1);
+  return s;
+}
+
+/* ---------------------------------------------------------------------
+ * 4. Bada 式評価器 — 再帰下降パーサ
+ *    優先順位 (低→高):  <- -< >-   |  + -  |  * / %  |  **  |  単項  |  一次
+ * ------------------------------------------------------------------ */
+var BADA_MATHFN = {
+  log:  function(a){ return Math.log(a); },
+  ln:   function(a){ return Math.log(a); },
+  exp:  function(a){ return Math.exp(a); },
+  sin:  function(a){ return Math.sin(a); },
+  cos:  function(a){ return Math.cos(a); },
+  tan:  function(a){ return Math.tan(a); },
+  atan: function(a){ return Math.atan(a); },
+  sqrt: function(a){ return Math.sqrt(a); },
+  abs:  function(a){ return Math.abs(a); },
+  floor:function(a){ return Math.floor(a); },
+  ceil: function(a){ return Math.ceil(a); },
+  round:function(a){ return Math.round(a); },
+  pow:  function(a,b){ return Math.pow(a,b); },
+  min:  function(a,b){ return Math.min(a,b); },
+  max:  function(a,b){ return Math.max(a,b); },
+  gamma:function(a){ return gammaFn(a); },
+  beta: function(a,b){ return betaFn(a,b); },
+  zeta: function(a,b,c){ return zetaBeta(a,b,c); },
+  pi_operator: function(a,b){ return badaLeft(a,b); },
+  norm: function(a){ return Math.abs(a); }
+};
+
+function badaApplyQop(op, a, b){
+  if (op === "<-") return badaLeft(a, b);
+  if (op === "-<") return badaMani(a, b);
+  if (op === ">-") return badaRight(a, b);
+  throw new Error("未知の作用素: " + op);
+}
+
+function _peek(p){ return p.i < p.toks.length ? p.toks[p.i] : null; }
+function _isOp(t, v){ return t && (t.t === "op" || t.t === "qop" || t.t === "punct") && t.v === v; }
+
+function _parsePrimary(p, env){
+  var t = _peek(p);
+  if (!t) throw new Error("式が途中で終わっています");
+  if (t.t === "num"){ p.i++; return parseFloat(String(t.v).replace(/_/g, "").replace(/i$/, "")); }
+  if (t.t === "str"){ p.i++; return t.v.slice(1, -1); }
+  if (_isOp(t, "(")){
+    p.i++;
+    var v = _parseQop(p, env);
+    if (!_isOp(_peek(p), ")")) throw new Error("')' がありません");
+    p.i++; return v;
+  }
+  if (t.t === "kw" && t.v === "measure"){
+    p.i++;
+    var nm = _peek(p);
+    if (nm) p.i++;
+    if (!env.q) throw new Error("観測する量子レジスタがありません (qubit q[n]; が必要)");
+    var idx = qmeasure(env.q, env.rng);
+    env.lastShot = idx;
+    return idx;
+  }
+  if (t.t === "id" || t.t === "fn" || t.t === "ns" || t.t === "kw"){
+    var name = t.v; p.i++;
+    if (_isOp(_peek(p), "(")){
+      p.i++;
+      var args = [];
+      if (!_isOp(_peek(p), ")")){
+        for (;;){
+          args.push(_parseQop(p, env));
+          if (_isOp(_peek(p), ",")){ p.i++; continue; }
+          break;
+        }
+      }
+      if (!_isOp(_peek(p), ")")) throw new Error("')' がありません: " + name);
+      p.i++;
+      var f = BADA_MATHFN[name];
+      if (!f) throw new Error("未知の関数: " + name);
+      return f.apply(null, args);
+    }
+    /* q[3] のような添字は測定値のビット取り出しとして扱う */
+    if (_isOp(_peek(p), "[")){
+      p.i++;
+      var ix = _parseQop(p, env);
+      if (_isOp(_peek(p), "]")) p.i++;
+      var base = env.vars.hasOwnProperty(name) ? env.vars[name] : (env.lastShot || 0);
+      return (Number(base) >> Number(ix)) & 1;
+    }
+    if (env.vars.hasOwnProperty(name)) return env.vars[name];
+    if (name === "PI" || name === "pi" || name === "π") return Math.PI;
+    if (name === "E" || name === "e") return Math.E;
+    if (name === "hbar" || name === "ℏ") return HBAR_EFF;
+    throw new Error("未定義の識別子: " + name);
+  }
+  if (t.t === "ket"){ /* |0⟩ → そのビット列の整数値 */
+    p.i++;
+    var body = t.v.replace(/^\||[⟩>]$/g, "");
+    return /^[01]+$/.test(body) ? parseInt(body, 2) : 0;
+  }
+  throw new Error("解釈できないトークン: " + t.v);
+}
+
+function _parseUnary(p, env){
+  var t = _peek(p);
+  if (_isOp(t, "-")){ p.i++; return -_parseUnary(p, env); }
+  if (_isOp(t, "+")){ p.i++; return _parseUnary(p, env); }
+  if (_isOp(t, "!")){ p.i++; return _parseUnary(p, env) ? 0 : 1; }
+  if (_isOp(t, "√")){ p.i++; return Math.sqrt(_parseUnary(p, env)); }
+  return _parsePrimary(p, env);
+}
+
+function _parsePow(p, env){
+  var a = _parseUnary(p, env);
+  if (_isOp(_peek(p), "**")){ p.i++; return Math.pow(a, _parsePow(p, env)); }
+  return a;
+}
+
+function _parseMul(p, env){
+  var a = _parsePow(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (_isOp(t, "*")){ p.i++; a = a * _parsePow(p, env); }
+    else if (_isOp(t, "/")){ p.i++; a = a / _parsePow(p, env); }
+    else if (_isOp(t, "%")){ p.i++; a = a % _parsePow(p, env); }
+    else if (_isOp(t, "⊗")){ p.i++; a = a * _parsePow(p, env); }   /* テンソル積 */
+    else return a;
+  }
+}
+
+function _parseAdd(p, env){
+  var a = _parseMul(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (_isOp(t, "+")){ p.i++; a = a + _parseMul(p, env); }
+    else if (_isOp(t, "-")){ p.i++; a = a - _parseMul(p, env); }
+    else if (_isOp(t, "⊕")){ p.i++; a = a + _parseMul(p, env); }   /* 直和 */
+    else return a;
+  }
+}
+
+function _parseQop(p, env){
+  var a = _parseAdd(p, env);
+  for (;;){
+    var t = _peek(p);
+    if (t && t.t === "qop" && (t.v === "<-" || t.v === "-<" || t.v === ">-")){
+      p.i++; a = badaApplyQop(t.v, a, _parseAdd(p, env));
+    } else return a;
+  }
+}
+
+/* badaEval("4.0 <- 2.0", env) -> Number */
+function badaEval(src, env){
+  env = env || {vars:{}};
+  var toks = badaTokenize(src).toks.filter(function(t){ return t.t !== "ws" && t.t !== "com"; });
+  if (!toks.length) throw new Error("空の式");
+  var p = {toks:toks, i:0};
+  var v = _parseQop(p, env);
+  return v;
+}
+
+/* 数値の表示整形 */
+function fmtNum(v){
+  if (typeof v === "string") return v;
+  if (v == null || (typeof v === "number" && !isFinite(v))) return String(v);
+  if (Number.isInteger(v)) return String(v);
+  var a = Math.abs(v);
+  if (a !== 0 && (a < 1e-4 || a >= 1e7)) return v.toExponential(6);
+  return String(Math.round(v * 1e9) / 1e9);
+}
+
+/* ---------------------------------------------------------------------
+ * 5. 量子 Bada プログラム実行
+ *    quantumRun(src, seed) -> { out:[{cls,text}], vars, state, err }
+ * ------------------------------------------------------------------ */
+function stripComments(line){
+  var r = badaTokenize(line), s = "";
+  for (var i = 0; i < r.toks.length; i++){
+    if (r.toks[i].t !== "com") s += r.toks[i].v;
+  }
+  return s;
+}
+
+function quantumRun(src, seed){
+  var env = {
+    vars:{}, q:null, rng: mulberry32(seed === undefined ? 0x5EED : (seed >>> 0)),
+    lastShot: 0
+  };
+  var out = [], err = null;
+  var push = function(cls, text){ out.push({cls:cls, text:text}); };
+
+  var lines = String(src == null ? "" : src).replace(/\r\n?/g, "\n").split("\n");
+  var depth = 0, blockComment = false, classes = [], ops = [];
+
+  push("o-dim", "⚛ Bada 量子ランタイム — 起動");
+
+  for (var li = 0; li < lines.length; li++){
+    var raw = lines[li];
+    /* ブロックコメントの追跡 */
+    var tk = badaTokenize(raw, blockComment);
+    blockComment = tk.inBlock;
+    var text = "";
+    for (var ti = 0; ti < tk.toks.length; ti++) if (tk.toks[ti].t !== "com") text += tk.toks[ti].v;
+    text = text.trim();
+    if (!text) continue;
+
+    var opens = (text.match(/\{/g) || []).length;
+    var closes = (text.match(/\}/g) || []).length;
+
+    try {
+      if (depth > 0){
+        /* 定義ブロックの内部は宣言として記録するだけ */
+        depth += opens - closes;
+        if (depth < 0) depth = 0;
+        continue;
+      }
+
+      var m;
+      if ((m = /^import\s+(.+?);?$/.exec(text))){
+        push("o-dim", "  import " + m[1]);
+      } else if ((m = /^class\s+([A-Za-z_]\w*)/.exec(text))){
+        classes.push(m[1]);
+        push("o-key", "  class " + m[1] + " を定義");
+      } else if ((m = /^operator\s+(\S+)/.exec(text))){
+        ops.push(m[1]);
+        push("o-key", "  operator " + m[1] + " を定義");
+      } else if (/^Omega::|^Ω::/.test(text)){
+        push("o-key", "  Ω::TupleSpace — Akashic Record へ接続");
+      } else if ((m = /^qubit\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        var n = parseInt(m[2], 10);
+        if (n < 1 || n > 14) throw new Error("量子ビット数は 1〜14 の範囲で指定してください");
+        env.q = qnew(n); env.qname = m[1];
+        push("o-q", "  qubit " + m[1] + "[" + n + "]  → |" + new Array(n + 1).join("0") + "⟩");
+      } else if ((m = /^(H|X|Y|Z|S|T)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        qgate1(env.q, m[1], parseInt(m[3], 10));
+        push("o-q", "  " + m[1] + " → q[" + m[3] + "]");
+      } else if ((m = /^(RX|RY|RZ)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*,\s*(.+?)\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        var th = badaEval(m[4], env);
+        qrot(env.q, m[1], parseInt(m[3], 10), th);
+        push("o-q", "  " + m[1] + "(" + fmtNum(th) + ") → q[" + m[3] + "]");
+      } else if ((m = /^(CNOT|CZ|SWAP)\s+([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*,\s*([A-Za-z_]\w*)\s*\[\s*(\d+)\s*\]\s*;?$/.exec(text))){
+        if (!env.q) throw new Error("量子レジスタが未宣言です");
+        var a = parseInt(m[3], 10), b = parseInt(m[5], 10);
+        if (m[1] === "CNOT") qcnot(env.q, a, b);
+        else if (m[1] === "CZ") qcz(env.q, a, b);
+        else qswap(env.q, a, b);
+        push("o-q", "  " + m[1] + " q[" + a + "] , q[" + b + "]");
+      } else if ((m = /^(?:let|const|var)\s+([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?$/.exec(text))){
+        env.vars[m[1]] = badaEval(m[2], env);
+        push("", "  let " + m[1] + " = " + fmtNum(env.vars[m[1]]));
+      } else if ((m = /^print\s*\(?\s*(.+?)\s*\)?\s*;?$/.exec(text))){
+        var pv = badaEval(m[1], env);
+        push("o-ok", "  ▸ " + fmtNum(pv));
+      } else if ((m = /^measure\s+([A-Za-z_]\w*)\s*(?:->\s*([A-Za-z_]\w*)\s*)?;?$/.exec(text))){
+        if (!env.q) throw new Error("観測する量子レジスタがありません");
+        var sh = qmeasure(env.q, env.rng);
+        env.lastShot = sh;
+        if (m[2]) env.vars[m[2]] = sh;
+        push("o-q", "  measure → |" + qbits(sh, env.q.n) + "⟩  (" + sh + ")");
+      } else if ((m = /^([A-Za-z_]\w*)\s*=\s*(.+?)\s*;?$/.exec(text))){
+        env.vars[m[1]] = badaEval(m[2], env);
+        push("", "  " + m[1] + " = " + fmtNum(env.vars[m[1]]));
+      } else if (/^[}{;]+$/.test(text)){
+        /* 括弧のみの行 */
+      } else {
+        var val = badaEval(text.replace(/;$/, ""), env);
+        push("", "  = " + fmtNum(val));
+      }
+    } catch (e){
+      err = "行 " + (li + 1) + ": " + e.message;
+      push("o-err", "  ✘ " + err);
+      break;
+    }
+    depth += opens - closes;
+    if (depth < 0) depth = 0;
+  }
+
+  /* 終了時の量子状態 */
+  if (env.q){
+    var probs = qprobs(env.q), rows = [];
+    for (var i = 0; i < probs.length; i++){
+      if (probs[i] > 1e-9) rows.push({ket: qbits(i, env.q.n), p: probs[i]});
+    }
+    rows.sort(function(a, b){ return b.p - a.p; });
+    push("o-dim", "── 終状態 |ψ⟩ ──");
+    for (var r = 0; r < Math.min(rows.length, 8); r++){
+      push("o-q", "  |" + rows[r].ket + "⟩  " + (rows[r].p * 100).toFixed(2) + " %");
+    }
+  }
+  push(err ? "o-err" : "o-ok", err ? "⚠ 実行中断" : "✔ 実行完了");
+  return {out:out, vars:env.vars, state:env.q, err:err, classes:classes, ops:ops};
+}
+
+/* =====================================================================
+ * 6. VIM エンジン
+ *    モーダル編集の純ロジック。DOM に一切触れません。
+ * ================================================================== */
+
+function vimNew(text, name){
+  var st = {
+    lines: String(text == null ? "" : text).replace(/\r\n?/g, "\n").split("\n"),
+    cur:{l:0, c:0}, mode:"normal", pending:"", cmdline:"", msg:"", msgErr:false,
+    regs:{}, undo:[], redo:[], visStart:null, search:{pat:"", dir:1},
+    lastFind:null, desired:0, fname:name || "quantum.bada", dirty:false,
+    insertLog:null, lastChange:null, events:[], shiftwidth:2,
+    opts:{ number:true, focus:true, crash:true, sound:true,
+           depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26 }
+  };
+  if (!st.lines.length) st.lines = [""];
+  return st;
+}
+function vimText(st){ return st.lines.join("\n"); }
+function emit(st, type, data){ st.events.push(Object.assign({type:type}, data || {})); }
+
+function _len(st, l){ return (st.lines[l] || "").length; }
+function _maxCol(st, l){
+  var n = _len(st, l);
+  return (st.mode === "insert" || st.mode === "replace" || st.mode === "visual" || st.mode === "vline")
+    ? n : Math.max(0, n - 1);
+}
+function clampCur(st){
+  if (!st.lines.length) st.lines = [""];
+  if (st.cur.l < 0) st.cur.l = 0;
+  if (st.cur.l > st.lines.length - 1) st.cur.l = st.lines.length - 1;
+  if (st.cur.c < 0) st.cur.c = 0;
+  var mx = _maxCol(st, st.cur.l);
+  if (st.cur.c > mx) st.cur.c = mx;
+}
+function snapshot(st){
+  st.undo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  if (st.undo.length > 500) st.undo.shift();
+  st.redo.length = 0;
+}
+function doUndo(st){
+  if (!st.undo.length){ st.msg = "既に最古の変更です"; return false; }
+  var s = st.undo.pop();
+  st.redo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  st.lines = s.lines; st.cur = {l:s.cur.l, c:s.cur.c};
+  st.dirty = true; clampCur(st); st.msg = "元に戻しました"; return true;
+}
+function doRedo(st){
+  if (!st.redo.length){ st.msg = "やり直す変更がありません"; return false; }
+  var s = st.redo.pop();
+  st.undo.push({lines:st.lines.slice(), cur:{l:st.cur.l, c:st.cur.c}});
+  st.lines = s.lines; st.cur = {l:s.cur.l, c:s.cur.c};
+  st.dirty = true; clampCur(st); st.msg = "やり直しました"; return true;
+}
+
+/* ── 文字クラスと位置の前後移動 ── */
+function chClass(ch){
+  if (ch === undefined || ch === null || ch === "") return 0;
+  if (/\s/.test(ch)) return 0;
+  if (/[A-Za-z0-9_À-ɏͰ-Ͽ぀-ヿ一-鿿]/.test(ch)) return 2;
+  return 1;
+}
+function charAt(st, p){ var s = st.lines[p.l] || ""; return p.c < s.length ? s.charAt(p.c) : ""; }
+function posAdvance(st, p){
+  if (p.c < _len(st, p.l)) return {l:p.l, c:p.c + 1};
+  if (p.l < st.lines.length - 1) return {l:p.l + 1, c:0};
+  return null;
+}
+function posRetreat(st, p){
+  if (p.c > 0) return {l:p.l, c:p.c - 1};
+  if (p.l > 0) return {l:p.l - 1, c:_len(st, p.l - 1)};
+  return null;
+}
+function _cls(st, p, big){ var k = chClass(charAt(st, p)); return (big && k === 1) ? 2 : k; }
+
+function wordFwd(st, p, big){
+  var q = {l:p.l, c:p.c}, cur = _cls(st, q, big), nx;
+  if (cur !== 0){
+    for (;;){
+      nx = posAdvance(st, q); if (!nx) return q;
+      q = nx; if (_cls(st, q, big) !== cur) break;
+    }
+  }
+  for (;;){
+    if (_cls(st, q, big) !== 0) return q;
+    if (q.c === 0 && _len(st, q.l) === 0) return q;   /* 空行で停止 */
+    nx = posAdvance(st, q); if (!nx) return q; q = nx;
+  }
+}
+function wordBack(st, p, big){
+  var q = posRetreat(st, p); if (!q) return {l:p.l, c:p.c};
+  var pv;
+  for (;;){
+    if (_cls(st, q, big) !== 0) break;
+    if (q.c === 0 && _len(st, q.l) === 0) return q;
+    pv = posRetreat(st, q); if (!pv) return q; q = pv;
+  }
+  var cls = _cls(st, q, big);
+  for (;;){
+    pv = posRetreat(st, q); if (!pv) return q;
+    if (_cls(st, pv, big) !== cls) return q;
+    q = pv;
+  }
+}
+function wordEnd(st, p, big){
+  var q = posAdvance(st, p); if (!q) return {l:p.l, c:p.c};
+  var nx;
+  for (;;){
+    if (_cls(st, q, big) !== 0) break;
+    nx = posAdvance(st, q); if (!nx) return q; q = nx;
+  }
+  var cls = _cls(st, q, big);
+  for (;;){
+    nx = posAdvance(st, q); if (!nx) return q;
+    if (_cls(st, nx, big) !== cls) return q;
+    q = nx;
+  }
+}
+function firstNonBlank(st, l){
+  var s = st.lines[l] || "", m = /\S/.exec(s);
+  return m ? m.index : 0;
+}
+function paraMove(st, l, dir){
+  var N = st.lines.length, i = l + dir;
+  var blank = function(k){ return /^\s*$/.test(st.lines[k] || ""); };
+  while (i > 0 && i < N - 1 && blank(i)) i += dir;
+  while (i > 0 && i < N - 1 && !blank(i)) i += dir;
+  return Math.max(0, Math.min(N - 1, i));
+}
+function matchPair(st, p){
+  var open = "([{", close = ")]}", line = st.lines[p.l] || "";
+  var c = -1, ch = null, i;
+  for (i = p.c; i < line.length; i++){
+    if (open.indexOf(line.charAt(i)) >= 0 || close.indexOf(line.charAt(i)) >= 0){
+      c = i; ch = line.charAt(i); break;
+    }
+  }
+  if (ch === null) return null;
+  var oi = open.indexOf(ch), pos = {l:p.l, c:c}, depth = 0, step, target, cc;
+  if (oi >= 0){ step = posAdvance; target = close.charAt(oi); }
+  else { step = posRetreat; target = open.charAt(close.indexOf(ch)); }
+  for (;;){
+    cc = charAt(st, pos);
+    if (cc === ch) depth++;
+    else if (cc === target){ depth--; if (depth === 0) return pos; }
+    var nx = step(st, pos); if (!nx) return null; pos = nx;
+  }
+}
+function findChar(st, p, cmd, ch, count){
+  var line = st.lines[p.l] || "", c = p.c, k, idx;
+  var fwd = (cmd === "f" || cmd === "t");
+  /* c は常に「実際に当たった文字の位置」を保持し、t/T の調整は最後に一度だけ行う */
+  for (k = 0; k < count; k++){
+    idx = fwd ? line.indexOf(ch, c + 1) : line.lastIndexOf(ch, c - 1);
+    if (idx < 0) return null;
+    c = idx;
+  }
+  if (cmd === "t") c = Math.max(0, c - 1);
+  if (cmd === "T") c = Math.min(Math.max(0, line.length - 1), c + 1);
+  return {l:p.l, c:c};
+}
+function searchFrom(st, pat, dir, from){
+  var re;
+  try { re = new RegExp(pat, "g"); } catch (e){ return null; }
+  var N = st.lines.length, k, l, line, m;
+  if (dir > 0){
+    for (k = 0; k <= N; k++){
+      l = (from.l + k) % N; line = st.lines[l] || "";
+      re.lastIndex = (k === 0) ? from.c + 1 : 0;
+      if (re.lastIndex > line.length) continue;
+      m = re.exec(line);
+      if (m) return {l:l, c:m.index};
+    }
+  } else {
+    for (k = 0; k <= N; k++){
+      l = ((from.l - k) % N + N) % N; line = st.lines[l] || "";
+      var limit = (k === 0) ? from.c : line.length + 1, best = null;
+      re.lastIndex = 0;
+      while ((m = re.exec(line))){
+        if (m.index >= limit) break;
+        best = m.index;
+        if (re.lastIndex === m.index) re.lastIndex++;
+      }
+      if (best !== null) return {l:l, c:best};
+    }
+  }
+  return null;
+}
+
+/* ── モーション評価 ──
+ * evalMotion -> { pos:{l,c}, linewise:Boolean, inclusive:Boolean } | null  */
+function evalMotion(st, m, count, arg){
+  var p = {l:st.cur.l, c:st.cur.c}, i, r;
+  var rawCount = count;          /* 0 = カウント指定なし */
+  count = count || 1;
+  switch (m){
+    case "h": return {pos:{l:p.l, c:Math.max(0, p.c - count)}, linewise:false, inclusive:false};
+    case "l": return {pos:{l:p.l, c:Math.min(_len(st, p.l), p.c + count)}, linewise:false, inclusive:false};
+    case " ": return {pos:{l:p.l, c:Math.min(_len(st, p.l), p.c + count)}, linewise:false, inclusive:false};
+    case "j": case "+":
+      r = Math.min(st.lines.length - 1, p.l + count);
+      return {pos:{l:r, c:Math.min(st.desired, Math.max(0, _len(st, r) - 1))}, linewise:true, inclusive:false};
+    case "k": case "-":
+      r = Math.max(0, p.l - count);
+      return {pos:{l:r, c:Math.min(st.desired, Math.max(0, _len(st, r) - 1))}, linewise:true, inclusive:false};
+    case "w": for (i = 0; i < count; i++) p = wordFwd(st, p, false); return {pos:p, linewise:false, inclusive:false};
+    case "W": for (i = 0; i < count; i++) p = wordFwd(st, p, true);  return {pos:p, linewise:false, inclusive:false};
+    case "b": for (i = 0; i < count; i++) p = wordBack(st, p, false); return {pos:p, linewise:false, inclusive:false};
+    case "B": for (i = 0; i < count; i++) p = wordBack(st, p, true);  return {pos:p, linewise:false, inclusive:false};
+    case "e": for (i = 0; i < count; i++) p = wordEnd(st, p, false); return {pos:p, linewise:false, inclusive:true};
+    case "E": for (i = 0; i < count; i++) p = wordEnd(st, p, true);  return {pos:p, linewise:false, inclusive:true};
+    case "0": return {pos:{l:p.l, c:0}, linewise:false, inclusive:false};
+    case "^": return {pos:{l:p.l, c:firstNonBlank(st, p.l)}, linewise:false, inclusive:false};
+    case "$":
+      r = Math.min(st.lines.length - 1, p.l + count - 1);
+      return {pos:{l:r, c:Math.max(0, _len(st, r) - 1)}, linewise:false, inclusive:true};
+    case "G":
+      r = rawCount ? Math.min(st.lines.length - 1, rawCount - 1) : st.lines.length - 1;
+      return {pos:{l:r, c:firstNonBlank(st, r)}, linewise:true, inclusive:false};
+    case "gg":
+      r = Math.min(st.lines.length - 1, (count || 1) - 1);
+      return {pos:{l:r, c:firstNonBlank(st, r)}, linewise:true, inclusive:false};
+    case "}": r = p.l; for (i = 0; i < count; i++) r = paraMove(st, r, 1); return {pos:{l:r, c:0}, linewise:false, inclusive:false};
+    case "{": r = p.l; for (i = 0; i < count; i++) r = paraMove(st, r, -1); return {pos:{l:r, c:0}, linewise:false, inclusive:false};
+    case "%": { var mp = matchPair(st, p); return mp ? {pos:mp, linewise:false, inclusive:true} : null; }
+    case "f": case "t": case "F": case "T": {
+      var fp = findChar(st, p, m, arg, count);
+      if (!fp) return null;
+      st.lastFind = {cmd:m, ch:arg};
+      return {pos:fp, linewise:false, inclusive:(m === "f" || m === "t")};
+    }
+    case ";": case ",": {
+      if (!st.lastFind) return null;
+      var cmd = st.lastFind.cmd;
+      if (m === ","){ cmd = {f:"F", F:"f", t:"T", T:"t"}[cmd]; }
+      var fp2 = findChar(st, p, cmd, st.lastFind.ch, count);
+      return fp2 ? {pos:fp2, linewise:false, inclusive:(cmd === "f" || cmd === "t")} : null;
+    }
+    case "n": case "N": {
+      if (!st.search.pat){ st.msg = "検索パターンがありません"; return null; }
+      var dir = st.search.dir * (m === "n" ? 1 : -1), sp = {l:p.l, c:p.c};
+      for (i = 0; i < count; i++){
+        var f = searchFrom(st, st.search.pat, dir, sp);
+        if (!f) return null; sp = f;
+      }
+      return {pos:sp, linewise:false, inclusive:false};
+    }
+  }
+  return null;
+}
+
+/* ── 範囲操作 ── */
+function cmpPos(a, b){ return a.l !== b.l ? a.l - b.l : a.c - b.c; }
+function makeRange(st, from, to, linewise, inclusive){
+  var a = from, b = to;
+  if (cmpPos(a, b) > 0){ var t = a; a = b; b = t; }
+  if (linewise) return {a:{l:a.l, c:0}, b:{l:b.l, c:_len(st, b.l)}, linewise:true};
+  return {a:{l:a.l, c:a.c}, b:{l:b.l, c:inclusive ? b.c + 1 : b.c}, linewise:false};
+}
+function extractRange(st, r){
+  if (r.linewise) return st.lines.slice(r.a.l, r.b.l + 1);
+  if (r.a.l === r.b.l) return [(st.lines[r.a.l] || "").slice(r.a.c, r.b.c)];
+  var out = [(st.lines[r.a.l] || "").slice(r.a.c)];
+  for (var l = r.a.l + 1; l < r.b.l; l++) out.push(st.lines[l] || "");
+  out.push((st.lines[r.b.l] || "").slice(0, r.b.c));
+  return out;
+}
+function deleteRange(st, r){
+  if (r.linewise){
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1);
+    if (!st.lines.length) st.lines = [""];
+    st.cur.l = Math.min(r.a.l, st.lines.length - 1);
+    st.cur.c = firstNonBlank(st, st.cur.l);
+  } else {
+    var head = (st.lines[r.a.l] || "").slice(0, r.a.c);
+    var tail = (st.lines[r.b.l] || "").slice(r.b.c);
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1, head + tail);
+    st.cur.l = r.a.l; st.cur.c = r.a.c;
+  }
+  st.dirty = true;
+}
+function setReg(st, name, text, linewise){
+  var rec = {text:text.slice(), linewise:!!linewise};
+  st.regs['"'] = rec;
+  if (name && name !== '"') st.regs[name] = {text:text.slice(), linewise:!!linewise};
+}
+function getReg(st, name){ return st.regs[name || '"'] || {text:[""], linewise:false}; }
+
+function indentLines(st, l0, l1, dir){
+  var pad = new Array(st.shiftwidth + 1).join(" ");
+  for (var l = l0; l <= l1 && l < st.lines.length; l++){
+    if (dir > 0) st.lines[l] = pad + st.lines[l];
+    else st.lines[l] = st.lines[l].replace(new RegExp("^(?: {1," + st.shiftwidth + "}|\\t)"), "");
+  }
+  st.cur.l = l0; st.cur.c = firstNonBlank(st, l0); st.dirty = true;
+}
+
+function applyOp(st, op, r, reg){
+  var txt = extractRange(st, r);
+  if (op === "y"){
+    setReg(st, reg, txt, r.linewise);
+    st.cur = {l:r.a.l, c:r.linewise ? firstNonBlank(st, r.a.l) : r.a.c};
+    st.msg = (r.linewise ? txt.length + " 行" : txt.join("").length + " 文字") + "をヤンクしました";
+    clampCur(st); return;
+  }
+  if (op === ">" || op === "<"){
+    snapshot(st); indentLines(st, r.a.l, r.b.l, op === ">" ? 1 : -1); return;
+  }
+  snapshot(st);
+  setReg(st, reg, txt, r.linewise);
+  if (op === "c" && r.linewise){
+    /* cc — 行を空にして挿入モードへ (インデントは保持) */
+    var ind = (st.lines[r.a.l] || "").match(/^\s*/)[0];
+    st.lines.splice(r.a.l, r.b.l - r.a.l + 1, ind);
+    st.cur = {l:r.a.l, c:ind.length};
+    st.mode = "insert"; st.dirty = true; return;
+  }
+  deleteRange(st, r);
+  if (op === "c"){ st.mode = "insert"; }
+  clampCur(st);
+}
+
+function doPut(st, after, count, reg){
+  var R = getReg(st, reg);
+  if (!R.text.length) return;
+  snapshot(st); count = count || 1;
+  var i, k;
+  if (R.linewise){
+    var ins = [];
+    for (k = 0; k < count; k++) for (i = 0; i < R.text.length; i++) ins.push(R.text[i]);
+    var at = st.cur.l + (after ? 1 : 0);
+    st.lines.splice.apply(st.lines, [at, 0].concat(ins));
+    st.cur.l = at; st.cur.c = firstNonBlank(st, at);
+  } else {
+    var line = st.lines[st.cur.l] || "";
+    var at2 = st.cur.c + (after && line.length ? 1 : 0);
+    if (R.text.length === 1){
+      var piece = "";
+      for (k = 0; k < count; k++) piece += R.text[0];
+      st.lines[st.cur.l] = line.slice(0, at2) + piece + line.slice(at2);
+      st.cur.c = at2 + piece.length - 1;
+    } else {
+      var head = line.slice(0, at2), tail = line.slice(at2), blk = R.text.slice();
+      var nl = [head + blk[0]];
+      for (i = 1; i < blk.length - 1; i++) nl.push(blk[i]);
+      nl.push(blk[blk.length - 1] + tail);
+      st.lines.splice.apply(st.lines, [st.cur.l, 1].concat(nl));
+      st.cur.l = st.cur.l + blk.length - 1;
+      st.cur.c = Math.max(0, blk[blk.length - 1].length - 1);
+    }
+  }
+  st.dirty = true; clampCur(st);
+}
+
+/* ── 挿入モード ── */
+function insertKey(st, key){
+  var line = st.lines[st.cur.l] || "";
+  if (key === "<Esc>"){
+    st.mode = "normal";
+    if (st.lastChange && st.insertLog) st.lastChange.insert = st.insertLog.slice();
+    st.insertLog = null;
+    st.cur.c = Math.max(0, st.cur.c - 1);
+    clampCur(st); st.desired = st.cur.c;
+    return;
+  }
+  if (st.insertLog) st.insertLog.push(key);
+  if (key === "<CR>"){
+    var ind = line.slice(0, st.cur.c).match(/^\s*/)[0];
+    var head = line.slice(0, st.cur.c), tail = ind + line.slice(st.cur.c);
+    st.lines.splice(st.cur.l, 1, head, tail);
+    st.cur.l++; st.cur.c = ind.length; st.dirty = true; return;
+  }
+  if (key === "<BS>"){
+    if (st.cur.c > 0){
+      st.lines[st.cur.l] = line.slice(0, st.cur.c - 1) + line.slice(st.cur.c);
+      st.cur.c--;
+    } else if (st.cur.l > 0){
+      var prev = st.lines[st.cur.l - 1] || "";
+      st.lines.splice(st.cur.l - 1, 2, prev + line);
+      st.cur.l--; st.cur.c = prev.length;
+    }
+    st.dirty = true; return;
+  }
+  if (key === "<Del>"){
+    if (st.cur.c < line.length) st.lines[st.cur.l] = line.slice(0, st.cur.c) + line.slice(st.cur.c + 1);
+    else if (st.cur.l < st.lines.length - 1) st.lines.splice(st.cur.l, 2, line + (st.lines[st.cur.l + 1] || ""));
+    st.dirty = true; return;
+  }
+  var ins = (key === "<Tab>") ? new Array(st.shiftwidth + 1).join(" ") : key;
+  if (ins.length !== 1 && key !== "<Tab>") return;      /* 未知の特殊キーは無視 */
+  if (st.mode === "replace"){
+    st.lines[st.cur.l] = line.slice(0, st.cur.c) + ins + line.slice(st.cur.c + ins.length);
+  } else {
+    st.lines[st.cur.l] = line.slice(0, st.cur.c) + ins + line.slice(st.cur.c);
+  }
+  st.cur.c += ins.length; st.dirty = true;
+}
+
+/* ── コマンドライン / 検索モード ── */
+function cmdlineKey(st, key){
+  if (key === "<Esc>"){ st.mode = "normal"; st.cmdline = ""; return; }
+  if (key === "<BS>"){
+    st.cmdline = st.cmdline.slice(0, -1);
+    if (!st.cmdline){ st.mode = "normal"; }
+    return;
+  }
+  if (key === "<CR>"){
+    var line = st.cmdline, kind = line.charAt(0), body = line.slice(1);
+    st.cmdline = ""; st.mode = "normal";
+    if (kind === ":") execEx(st, body);
+    else {
+      st.search.pat = body || st.search.pat;
+      st.search.dir = (kind === "/") ? 1 : -1;
+      var f = searchFrom(st, st.search.pat, st.search.dir, st.cur);
+      if (f){ st.cur = f; st.desired = f.c; st.msg = kind + st.search.pat; emit(st, "jump", {line:f.l}); }
+      else { st.msg = "パターンが見つかりません: " + st.search.pat; st.msgErr = true; }
+    }
+    clampCur(st); return;
+  }
+  if (key === "<Tab>") return;
+  if (key.length === 1) st.cmdline += key;
+}
+
+/* ── Ex コマンド ── */
+function execEx(st, cmd){
+  cmd = String(cmd || "").trim();
+  st.msgErr = false;
+  if (!cmd) return;
+  var m;
+
+  /* 行番号ジャンプ  :42  :$  */
+  if ((m = /^(\d+)$/.exec(cmd))){
+    st.cur.l = Math.max(0, Math.min(st.lines.length - 1, parseInt(m[1], 10) - 1));
+    st.cur.c = firstNonBlank(st, st.cur.l); st.desired = st.cur.c;
+    emit(st, "jump", {line:st.cur.l}); return;
+  }
+  if (cmd === "$"){ st.cur.l = st.lines.length - 1; st.cur.c = 0; emit(st, "jump", {line:st.cur.l}); return; }
+
+  /* 置換  :%s/pat/rep/g   :s/pat/rep/   :3,9s/pat/rep/g */
+  if ((m = /^(%|\d+\s*,\s*\d+|\.)?\s*s\/((?:[^\/\\]|\\.)*)\/((?:[^\/\\]|\\.)*)\/?([gi]*)$/.exec(cmd))){
+    var lo = st.cur.l, hi = st.cur.l;
+    if (m[1] === "%"){ lo = 0; hi = st.lines.length - 1; }
+    else if (m[1] && m[1].indexOf(",") >= 0){
+      var pr = m[1].split(",");
+      lo = Math.max(0, parseInt(pr[0], 10) - 1);
+      hi = Math.min(st.lines.length - 1, parseInt(pr[1], 10) - 1);
+    }
+    var flags = m[4] || "", re;
+    try { re = new RegExp(m[2], flags.indexOf("g") >= 0 ? "g" + (flags.indexOf("i") >= 0 ? "i" : "") : (flags.indexOf("i") >= 0 ? "i" : "")); }
+    catch (e){ st.msg = "不正な正規表現: " + m[2]; st.msgErr = true; return; }
+    var rep = m[3].replace(/\\\//g, "/"), hits = 0, hitLines = 0;
+    snapshot(st);
+    for (var l = lo; l <= hi; l++){
+      var before = st.lines[l];
+      var after = before.replace(re, function(){
+        hits++; return rep.replace(/\$(\d)|\\(\d)/g, function(_, a, b){ return arguments[parseInt(a || b, 10)] || ""; });
+      });
+      if (after !== before){ st.lines[l] = after; hitLines++; }
+    }
+    if (!hits){ st.undo.pop(); st.msg = "パターンが見つかりません: " + m[2]; st.msgErr = true; }
+    else { st.dirty = true; st.msg = hits + " 件を " + hitLines + " 行で置換しました"; }
+    clampCur(st); return;
+  }
+
+  var parts = cmd.split(/\s+/), head = parts[0], arg = cmd.slice(head.length).trim();
+
+  switch (head){
+    case "w": case "write":
+      emit(st, "write", {name:arg || st.fname});
+      if (arg) st.fname = arg;
+      st.dirty = false; st.msg = '"' + st.fname + '" を保存しました'; return;
+    case "wq": case "x":
+      emit(st, "write", {name:arg || st.fname}); emit(st, "quit", {});
+      st.dirty = false; st.msg = '"' + st.fname + '" を保存して終了'; return;
+    case "q": case "quit": case "q!":
+      if (st.dirty && head === "q"){ st.msg = "変更が保存されていません (:q! で破棄)"; st.msgErr = true; return; }
+      emit(st, "quit", {}); st.msg = "終了"; return;
+    case "e": case "edit":
+      emit(st, "open", {name:arg}); st.msg = "ファイルを開きます…"; return;
+    case "new": case "enew":
+      snapshot(st); st.lines = [""]; st.cur = {l:0, c:0}; st.dirty = false;
+      st.fname = arg || "untitled.bada"; st.msg = "新規バッファ"; return;
+    case "demo":
+      snapshot(st); st.lines = DEMO_SRC.split("\n"); st.cur = {l:0, c:0};
+      st.fname = "quantum.bada"; st.msg = "デモを読み込みました"; return;
+    case "run": case "q!run": case "quantum":
+      emit(st, "run", {}); st.msg = "⚛ 量子 Bada を実行"; return;
+    case "slam": case "crash!":
+      emit(st, "crash", {line:st.cur.l, mag:1});
+      st.msg = "💥 " + (st.cur.l + 1) + " 行目をクラッシュ"; return;
+    case "countdown": case "cd": {
+      var sec = parseFloat(arg);
+      if (!isFinite(sec) || sec <= 0) sec = 5;
+      sec = Math.min(60, sec);
+      emit(st, "countdown", {seconds:sec});
+      st.msg = "⏱ T-" + sec + " カウントダウン開始"; return;
+    }
+    case "focus":
+      st.opts.focus = !st.opts.focus;
+      st.msg = "シネマフォーカス: " + (st.opts.focus ? "ON" : "OFF"); return;
+    case "crash":
+      st.opts.crash = !st.opts.crash;
+      st.msg = "クラッシュ効果: " + (st.opts.crash ? "ON" : "OFF"); return;
+    case "noh": case "nohl": case "nohlsearch":
+      st.search.pat = ""; st.msg = ""; return;
+    case "help": case "h":
+      emit(st, "help", {}); return;
+    case "reg": case "registers":
+      st.msg = "レジスタ: " + Object.keys(st.regs).join(" "); return;
+    case "set": {
+      if (!arg){ st.msg = "使い方: :set number / :set nonumber / :set peak=3.0"; st.msgErr = true; return; }
+      var toks = arg.split(/\s+/);
+      for (var ti = 0; ti < toks.length; ti++){
+        var t = toks[ti], mm;
+        if ((mm = /^(\w+)=([-\d.]+)$/.exec(t))){
+          var key = {sw:"shiftwidth", shiftwidth:"shiftwidth"}[mm[1]] || mm[1];
+          if (key === "shiftwidth"){ st.shiftwidth = Math.max(1, Math.min(8, parseFloat(mm[2]))); }
+          else if (st.opts.hasOwnProperty(key)) st.opts[key] = parseFloat(mm[2]);
+          else { st.msg = "未知のオプション: " + mm[1]; st.msgErr = true; return; }
+        } else {
+          var on = true, nm = t;
+          if (/^no/.test(t) && !st.opts.hasOwnProperty(t)){ on = false; nm = t.slice(2); }
+          nm = {nu:"number", number:"number", so:"sound", sound:"sound"}[nm] || nm;
+          if (!st.opts.hasOwnProperty(nm)){ st.msg = "未知のオプション: " + t; st.msgErr = true; return; }
+          st.opts[nm] = on;
+        }
+      }
+      st.msg = "set " + arg; emit(st, "opts", {}); return;
+    }
+  }
+  st.msg = "未知のコマンド: " + cmd; st.msgErr = true;
+}
+
+/* ── ビジュアルモードの範囲 ── */
+function visualRange(st){
+  var a = st.visStart, b = st.cur;
+  if (cmpPos(a, b) > 0){ var t = a; a = b; b = t; }
+  if (st.mode === "vline") return {a:{l:a.l, c:0}, b:{l:b.l, c:_len(st, b.l)}, linewise:true};
+  return {a:{l:a.l, c:a.c}, b:{l:b.l, c:Math.min(_len(st, b.l), b.c + 1)}, linewise:false};
+}
+
+/* ── ノーマル/ビジュアルモードのパース ──
+ * runNormal は "incomplete" を返した場合のみ pending を保持します。  */
+function parseMotionKeys(s){
+  if (!s) return "incomplete";
+  var c = s.charAt(0);
+  if ("hjklwWbBeE0^$G{}%;,nN+-".indexOf(c) >= 0) return {m:c, len:1};
+  if (c === "g"){
+    if (s.length < 2) return "incomplete";
+    if (s.charAt(1) === "g") return {m:"gg", len:2};
+    return null;
+  }
+  if ("ftFT".indexOf(c) >= 0){
+    if (s.length < 2) return "incomplete";
+    return {m:c, arg:s.charAt(1), len:2};
+  }
+  return null;
+}
+
+function runNormal(st, seq){
+  var vis = (st.mode === "visual" || st.mode === "vline");
+  var cm = /^([1-9][0-9]*)/.exec(seq), count = cm ? parseInt(cm[1], 10) : 0;
+  var rest = seq.slice(cm ? cm[1].length : 0);
+  if (rest === "") return "incomplete";
+  var n = count || 1, c0 = rest.charAt(0), i;
+  /* <Esc> <CR> <BS> <Space> <C-r> … は単一の特殊キー。
+     先頭の '<' を unindent オペレータと取り違えないよう先に切り分ける。 */
+  var isSpecial = /^<[A-Za-z][A-Za-z-]*>$/.test(rest);
+
+  /* レジスタ指定 "a */
+  if (c0 === '"'){
+    if (rest.length < 2) return "incomplete";
+    var reg = rest.charAt(1);
+    var sub = runNormal(st, (count ? String(count) : "") + rest.slice(2));
+    if (sub === "incomplete") return "incomplete";
+    return sub;
+  }
+
+  /* ── オペレータ (ビジュアルモードでは即時適用) ── */
+  if (!vis && !isSpecial && "dcy><".indexOf(c0) >= 0){
+    var after = rest.slice(1);
+    if (after === "") return "incomplete";
+    var cm2 = /^([1-9][0-9]*)/.exec(after);
+    var n2 = cm2 ? parseInt(cm2[1], 10) : 1;
+    after = after.slice(cm2 ? cm2[1].length : 0);
+    if (after === "") return "incomplete";
+    var total = n * n2;
+    if (after.charAt(0) === c0){                       /* dd yy cc >> << */
+      var l1 = Math.min(st.lines.length - 1, st.cur.l + total - 1);
+      st.lastChange = {seq:seq, insert:null};
+      applyOp(st, c0, {a:{l:st.cur.l, c:0}, b:{l:l1, c:_len(st, l1)}, linewise:true}, null);
+      if (st.mode === "insert") st.insertLog = [];
+      clampCur(st); return "done";
+    }
+    var mo = parseMotionKeys(after);
+    if (mo === "incomplete") return "incomplete";
+    if (!mo) return "done";
+    /* vim の特例: cw / cW は ce / cE として振る舞い、末尾の空白を食わない */
+    var mk = mo.m;
+    if (c0 === "c" && (mk === "w" || mk === "W")) mk = (mk === "w") ? "e" : "E";
+    var res = evalMotion(st, mk, (mk === "G" && !cm2 && !count) ? 0 : total, mo.arg);
+    if (!res){ st.msg = "移動できません"; st.msgErr = true; return "done"; }
+    var lw = res.linewise || (mk === "gg" || mk === "G");
+    st.lastChange = {seq:seq, insert:null};
+    applyOp(st, c0, makeRange(st, st.cur, res.pos, lw, res.inclusive), null);
+    if (st.mode === "insert") st.insertLog = [];
+    clampCur(st); return "done";
+  }
+
+  /* ── モーション単体 ── */
+  var mo2 = isSpecial ? null : parseMotionKeys(rest);
+  if (mo2 === "incomplete") return "incomplete";
+  if (mo2 && mo2.len === rest.length){
+    var r2 = evalMotion(st, mo2.m, (mo2.m === "G" && !count) ? 0 : n, mo2.arg);
+    if (!r2){ if (!st.msg) { st.msg = "見つかりません"; st.msgErr = true; } return "done"; }
+    var prevL = st.cur.l;
+    st.cur = {l:r2.pos.l, c:r2.pos.c};
+    if (mo2.m !== "j" && mo2.m !== "k") st.desired = st.cur.c;
+    clampCur(st);
+    if (st.cur.l !== prevL) emit(st, "moveline", {line:st.cur.l, from:prevL});
+    return "done";
+  }
+
+  /* ── 単発コマンド ── */
+  switch (rest){
+    case "i": snapshot(st); st.mode = "insert"; st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "a": snapshot(st); st.mode = "insert"; st.cur.c = Math.min(_len(st, st.cur.l), st.cur.c + 1); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "I": snapshot(st); st.mode = "insert"; st.cur.c = firstNonBlank(st, st.cur.l); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "A": snapshot(st); st.mode = "insert"; st.cur.c = _len(st, st.cur.l); st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "o": case "O": {
+      snapshot(st);
+      var at = st.cur.l + (rest === "o" ? 1 : 0);
+      var ind = (st.lines[st.cur.l] || "").match(/^\s*/)[0];
+      st.lines.splice(at, 0, ind);
+      st.cur.l = at; st.cur.c = ind.length; st.mode = "insert"; st.dirty = true;
+      st.lastChange = {seq:seq, insert:null}; st.insertLog = [];
+      emit(st, "crash", {line:at, mag:0.55});
+      return "done";
+    }
+    case "R": snapshot(st); st.mode = "replace"; st.lastChange = {seq:seq, insert:null}; st.insertLog = []; return "done";
+    case "v": st.mode = (st.mode === "visual") ? "normal" : "visual"; st.visStart = {l:st.cur.l, c:st.cur.c}; return "done";
+    case "V": st.mode = (st.mode === "vline") ? "normal" : "vline"; st.visStart = {l:st.cur.l, c:st.cur.c}; return "done";
+    case ":": st.mode = "command"; st.cmdline = ":"; return "done";
+    case "/": st.mode = "search"; st.cmdline = "/"; return "done";
+    case "?": st.mode = "search"; st.cmdline = "?"; return "done";
+    case "u": doUndo(st); return "done";
+    case "<C-r>": doRedo(st); return "done";
+    case "x": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var line = st.lines[st.cur.l] || "";
+      var cut = line.slice(st.cur.c, st.cur.c + n);
+      if (cut){ setReg(st, null, [cut], false);
+        st.lines[st.cur.l] = line.slice(0, st.cur.c) + line.slice(st.cur.c + n); st.dirty = true; }
+      clampCur(st); return "done";
+    }
+    case "X": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var line2 = st.lines[st.cur.l] || "", from = Math.max(0, st.cur.c - n);
+      if (st.cur.c > 0){
+        setReg(st, null, [line2.slice(from, st.cur.c)], false);
+        st.lines[st.cur.l] = line2.slice(0, from) + line2.slice(st.cur.c);
+        st.cur.c = from; st.dirty = true;
+      }
+      clampCur(st); return "done";
+    }
+    case "D": st.lastChange = {seq:seq, insert:null};
+      applyOp(st, "d", makeRange(st, st.cur, {l:st.cur.l, c:_len(st, st.cur.l)}, false, false), null); clampCur(st); return "done";
+    case "C": st.lastChange = {seq:seq, insert:null};
+      applyOp(st, "c", makeRange(st, st.cur, {l:st.cur.l, c:_len(st, st.cur.l)}, false, false), null);
+      st.insertLog = []; return "done";
+    case "Y": applyOp(st, "y", {a:{l:st.cur.l, c:0}, b:{l:st.cur.l, c:_len(st, st.cur.l)}, linewise:true}, null); return "done";
+    case "p": st.lastChange = {seq:seq, insert:null}; doPut(st, true, n, null); emit(st, "crash", {line:st.cur.l, mag:0.6}); return "done";
+    case "P": st.lastChange = {seq:seq, insert:null}; doPut(st, false, n, null); emit(st, "crash", {line:st.cur.l, mag:0.6}); return "done";
+    case "J": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      for (i = 0; i < Math.max(1, n - 1) && st.cur.l < st.lines.length - 1; i++){
+        var a1 = st.lines[st.cur.l], b1 = (st.lines[st.cur.l + 1] || "").replace(/^\s+/, "");
+        st.cur.c = a1.length;
+        st.lines.splice(st.cur.l, 2, a1 + (a1 && b1 ? " " : "") + b1);
+      }
+      st.dirty = true; clampCur(st); return "done";
+    }
+    case "~": {
+      snapshot(st); st.lastChange = {seq:seq, insert:null};
+      var l3 = st.lines[st.cur.l] || "", e3 = Math.min(l3.length, st.cur.c + n);
+      var mid = l3.slice(st.cur.c, e3).replace(/./g, function(ch){
+        return ch === ch.toUpperCase() ? ch.toLowerCase() : ch.toUpperCase();
+      });
+      st.lines[st.cur.l] = l3.slice(0, st.cur.c) + mid + l3.slice(e3);
+      st.cur.c = Math.min(Math.max(0, l3.length - 1), e3); st.dirty = true; return "done";
+    }
+    case "ZZ": emit(st, "write", {name:st.fname}); emit(st, "quit", {}); return "done";
+    case "Z": return "incomplete";
+    case ".": {
+      if (!st.lastChange){ st.msg = "繰り返す変更がありません"; return "done"; }
+      var lc = st.lastChange;
+      runNormal(st, lc.seq);
+      if (lc.insert && st.mode === "insert"){
+        for (i = 0; i < lc.insert.length; i++) insertKey(st, lc.insert[i]);
+        insertKey(st, "<Esc>");
+      } else if (st.mode === "insert") insertKey(st, "<Esc>");
+      st.lastChange = lc; return "done";
+    }
+    case "<Esc>":
+      if (vis){ st.mode = "normal"; st.visStart = null; }
+      st.msg = ""; st.msgErr = false; return "done";
+    case "<CR>": {
+      var pl = st.cur.l;
+      st.cur.l = Math.min(st.lines.length - 1, st.cur.l + n);
+      st.cur.c = firstNonBlank(st, st.cur.l); clampCur(st);
+      if (st.cur.l !== pl) emit(st, "moveline", {line:st.cur.l, from:pl});
+      return "done";
+    }
+    case "<Space>":
+      emit(st, "crash", {line:st.cur.l, mag:1});
+      st.msg = "💥 " + (st.cur.l + 1) + " 行目が浮き上がる";
+      return "done";
+    case "<C-d>": st.cur.l = Math.min(st.lines.length - 1, st.cur.l + 12); clampCur(st); emit(st, "moveline", {line:st.cur.l}); return "done";
+    case "<C-u>": st.cur.l = Math.max(0, st.cur.l - 12); clampCur(st); emit(st, "moveline", {line:st.cur.l}); return "done";
+    case "<C-b>": st.cur.l = Math.max(0, st.cur.l - 24); clampCur(st); emit(st, "moveline", {line:st.cur.l}); return "done";
+    case "<C-f>": st.cur.l = Math.min(st.lines.length - 1, st.cur.l + 24); clampCur(st); emit(st, "moveline", {line:st.cur.l}); return "done";
+  }
+
+  /* r<char> — 一文字置換 */
+  if (rest.charAt(0) === "r"){
+    if (rest.length < 2) return "incomplete";
+    snapshot(st); st.lastChange = {seq:seq, insert:null};
+    var rl = st.lines[st.cur.l] || "", rep = new Array(n + 1).join(rest.charAt(1));
+    if (st.cur.c + n <= rl.length){
+      st.lines[st.cur.l] = rl.slice(0, st.cur.c) + rep + rl.slice(st.cur.c + n);
+      st.cur.c += n - 1; st.dirty = true;
+    }
+    clampCur(st); return "done";
+  }
+
+  /* ── ビジュアルモードの操作 ── */
+  if (vis){
+    switch (rest){
+      case "d": case "x": case "y": case "c": case ">": case "<": {
+        var vr = visualRange(st), wasLine = st.mode === "vline";
+        st.mode = "normal"; st.visStart = null;
+        applyOp(st, (rest === "x" ? "d" : rest), vr, null);
+        if (rest === "c") st.insertLog = [];
+        if (wasLine && rest === "y") st.msg = (vr.b.l - vr.a.l + 1) + " 行をヤンクしました";
+        clampCur(st); return "done";
+      }
+      case "o": {
+        var t2 = st.visStart; st.visStart = {l:st.cur.l, c:st.cur.c}; st.cur = {l:t2.l, c:t2.c};
+        clampCur(st); return "done";
+      }
+      case "u": case "U": {
+        snapshot(st);
+        var vr2 = visualRange(st), txt2 = extractRange(st, vr2);
+        var f2 = (rest === "u") ? "toLowerCase" : "toUpperCase";
+        if (vr2.linewise){
+          for (i = vr2.a.l; i <= vr2.b.l; i++) st.lines[i] = st.lines[i][f2]();
+        } else {
+          st.lines[vr2.a.l] = st.lines[vr2.a.l].slice(0, vr2.a.c) +
+            txt2.join("")[f2]() + (st.lines[vr2.b.l] || "").slice(vr2.b.c);
+        }
+        st.mode = "normal"; st.visStart = null; st.dirty = true; clampCur(st); return "done";
+      }
+      case "💥": case "<Space>":
+        emit(st, "crash", {line:st.cur.l, mag:1}); return "done";
+    }
+  }
+
+  /* 認識できないキー列 */
+  st.msg = ""; return "done";
+}
+
+/* ── 単一キーの入力 ── */
+function feedKey(st, key){
+  st.events.length = 0;
+  if (st.mode === "insert" || st.mode === "replace"){ insertKey(st, key); clampCur(st); return st; }
+  if (st.mode === "command" || st.mode === "search"){ cmdlineKey(st, key); return st; }
+  if (key === "<Esc>"){ st.pending = ""; }
+  st.pending += key;
+  var r = runNormal(st, st.pending);
+  if (r !== "incomplete") st.pending = "";
+  if (st.pending.length > 12) st.pending = "";
+  clampCur(st);
+  return st;
+}
+function feedKeys(st, keys){
+  for (var i = 0; i < keys.length; i++) feedKey(st, keys[i]);
+  return st;
+}
+/* "ciw" のような文字列をキー列として流し込む (テスト用のショートハンド) */
+function feedString(st, s){
+  var i = 0;
+  while (i < s.length){
+    if (s.charAt(i) === "<"){
+      var e = s.indexOf(">", i);
+      if (e > 0){ feedKey(st, s.slice(i, e + 1)); i = e + 1; continue; }
+    }
+    feedKey(st, s.charAt(i)); i++;
+  }
+  return st;
+}
+
+/* =====================================================================
+ * 7. シネマ演出の数理
+ * ================================================================== */
+
+/* focusStyle(dist, o)
+ *   カーソル行からの距離 dist に対する被写界深度。
+ *   dist=0 (ポイントされた行) が最大倍率・ぼかし 0・最前面。
+ *   ガウス核 k = exp(-d²/2σ²) で滑らかに減衰します。
+ *     -> { scale, blur, opacity, z, k }                                */
+function focusStyle(dist, o){
+  o = o || {};
+  var depth   = (o.depth   === undefined) ? 1    : Math.max(0, Math.min(1, o.depth));
+  var peak    = (o.peak    === undefined) ? 2.6  : o.peak;
+  var spread  = (o.spread  === undefined) ? 2.2  : Math.max(0.35, o.spread);
+  var maxBlur = (o.maxBlur === undefined) ? 3.2  : o.maxBlur;
+  var minOp   = (o.minOpacity === undefined) ? 0.13 : o.minOpacity;
+  var maxZ    = (o.maxZ    === undefined) ? 26   : o.maxZ;
+  var d = Math.abs(dist);
+  var k = Math.exp(-(d * d) / (2 * spread * spread));
+  return {
+    k: k,
+    scale:   1 + (peak - 1) * k * depth,
+    blur:    maxBlur * (1 - k) * depth,
+    opacity: 1 - (1 - minOp) * (1 - k) * depth,
+    z:       maxZ * k * depth
+  };
+}
+
+/* docLayout(scales, baseH)
+ *   拡大した行が重ならないよう、行ごとの占有高さと中心位置を求めます。
+ *     -> { tops:[], heights:[], centers:[], total }                    */
+function docLayout(scales, baseH){
+  var tops = [], heights = [], centers = [], y = 0;
+  for (var i = 0; i < scales.length; i++){
+    var h = baseH * scales[i];
+    tops.push(y); heights.push(h); centers.push(y + h / 2);
+    y += h;
+  }
+  return {tops:tops, heights:heights, centers:centers, total:y};
+}
+
+/* crashFrame(t, mag)
+ *   衝撃の 1 フレーム。t は 0→1 の進行、mag は強さ 0→1。
+ *   lift が「浮き上がり」、shakeX/Y が画面の揺れ、aberr が色収差の割れ幅、
+ *   ring が衝撃波の半径比、alpha が残光。
+ *     -> { shakeX, shakeY, lift, aberr, ring, alpha, tilt }            */
+function crashFrame(t, mag){
+  mag = (mag === undefined) ? 1 : Math.max(0, Math.min(1, mag));
+  if (!(t > 0) || t >= 1) return {shakeX:0, shakeY:0, lift:0, aberr:0, ring:0, alpha:0, tilt:0};
+  var env  = (1 - t) * (1 - t);                       /* 衝撃の減衰 */
+  var pop  = Math.sin(Math.PI * Math.pow(t, 0.45));   /* 立ち上がりの速い浮上 */
+  return {
+    shakeX: mag * 18 * env * Math.sin(t * Math.PI * 14),
+    shakeY: mag * 10 * env * Math.sin(t * Math.PI * 11 + 1.1),
+    lift:   mag * 54 * pop,
+    aberr:  mag * 7  * env,
+    ring:   t,
+    alpha:  mag * Math.pow(1 - t, 1.6),
+    tilt:   mag * 2.4 * env * Math.sin(t * Math.PI * 9 + 0.4)
+  };
+}
+
+/* shardField(n, seed) — 決定的な破片 (角度 / 速度 / 回転 / 長さ) */
+function shardField(n, seed){
+  var rnd = mulberry32((seed === undefined ? 1 : seed) >>> 0), out = [];
+  for (var i = 0; i < n; i++){
+    out.push({
+      ang:  rnd() * Math.PI * 2,
+      spd:  0.35 + rnd() * 0.95,
+      rot:  (rnd() - 0.5) * 9,
+      len:  6 + rnd() * 26,
+      hue:  rnd() < 0.5 ? 188 : 340
+    });
+  }
+  return out;
+}
+
+/* countdownState(elapsed, total)
+ *   映画のアカデミー・リーダー。残り秒 n と、その 1 秒間の進行 phase、
+ *   掃引する指針の角度 sweep を返します。
+ *     -> { n, label, phase, sweep, done, remaining }                   */
+function countdownState(elapsed, total){
+  var remaining = total - elapsed;
+  if (!(remaining > 0)){
+    return {n:0, label:"0", phase:1, sweep:Math.PI * 2, done:true, remaining:0};
+  }
+  var n = Math.ceil(remaining);
+  var frac = remaining - (n - 1);              /* 1 → 0 でその秒が進む */
+  var phase = 1 - frac;                        /* 0 → 1 */
+  return {
+    n: n, label: String(n), phase: phase,
+    sweep: phase * Math.PI * 2, done: false, remaining: remaining
+  };
+}
+
+/* 行番号の桁数 (ガター幅) */
+function gutterWidth(n){ return String(Math.max(1, n)).length; }
+
+/* =====================================================================
+ * 8. UI — ここから下だけが DOM / Canvas / Audio に触れます
+ * ================================================================== */
+function boot(){
+  var $ = function(id){ return document.getElementById(id); };
+  var stage = $("stage"), shaker = $("shaker"), doc = $("doc"), caret = $("caret"),
+      selLayer = $("selLayer"), fx = $("fx"), leader = $("leader"), out = $("out"),
+      hud = $("hud"), hudNum = $("hudNum"), hudLbl = $("hudLbl"), helpEl = $("help"),
+      keysBar = $("keys"), hidden = $("hidden"), fileIn = $("fileIn"),
+      side = $("side");
+
+  var ST = vimNew(DEMO_SRC, "quantum.bada");
+  var BASE_H = 30, WIN = 70;
+  var lineEls = [], winLo = 0, winHi = 0, lastText = null, lastCurL = -1;
+  var crashes = [];                     /* {line, mag, t0} */
+  var CD = null;                        /* {total, t0, lastTick, flash} */
+  var AC = null, blinkT = 0, dirtyDom = true, docX = 0;
+  var fxc = fx.getContext("2d"), ldc = leader.getContext("2d");
+  var DPR = Math.min(2, window.devicePixelRatio || 1);
+  var CRASH_MS = 620;
+
+  /* ── 音 (合成: 外部ファイルなし) ── */
+  function audio(){
+    if (!AC){
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      try { AC = new C(); } catch (e){ return null; }
+    }
+    if (AC.state === "suspended") AC.resume();
+    return AC;
+  }
+  function boom(mag){
+    if (!ST.opts.sound) return;
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.02, 0.34 * mag), t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.52);
+    g.connect(ac.destination);
+    var o = ac.createOscillator();
+    o.type = "sine";
+    o.frequency.setValueAtTime(150 * (0.7 + mag * 0.5), t);
+    o.frequency.exponentialRampToValueAtTime(36, t + 0.45);
+    o.connect(g); o.start(t); o.stop(t + 0.55);
+    /* 破砕ノイズ */
+    var n = Math.floor(ac.sampleRate * 0.16), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3);
+    var src = ac.createBufferSource(); src.buffer = buf;
+    var bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = 1900; bp.Q.value = 0.8;
+    var ng = ac.createGain(); ng.gain.value = 0.16 * mag;
+    src.connect(bp); bp.connect(ng); ng.connect(ac.destination); src.start(t);
+  }
+  function beep(freq, dur){
+    if (!ST.opts.sound) return;
+    var ac = audio(); if (!ac) return;
+    var t = ac.currentTime, g = ac.createGain(), o = ac.createOscillator();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (dur || 0.1));
+    o.type = "square"; o.frequency.value = freq;
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + (dur || 0.1) + 0.02);
+  }
+
+  /* ── クラッシュを起こす ── */
+  function crash(line, mag){
+    if (!ST.opts.crash) return;
+    mag = Math.max(0.15, Math.min(1, mag === undefined ? 1 : mag));
+    crashes.push({line:line, mag:mag, t0:performance.now(), seed:(line * 2654435761 + crashes.length) >>> 0});
+    if (crashes.length > 14) crashes.shift();
+    if (mag > 0.5) boom(mag);
+  }
+
+  /* ── 行の描画 ── */
+  function escHtml(s){
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function renderTokens(toks){
+    if (!toks.length) return '<span class="t-ws"> </span>';
+    var h = "";
+    for (var i = 0; i < toks.length; i++){
+      h += '<span class="t-' + toks[i].t + '">' + escHtml(toks[i].v) + "</span>";
+    }
+    return h;
+  }
+  function rebuild(){
+    var N = ST.lines.length, cl = ST.cur.l;
+    winLo = Math.max(0, cl - WIN); winHi = Math.min(N - 1, cl + WIN);
+    /* ブロックコメント状態を先頭から積み上げる */
+    var blk = false;
+    for (var i = 0; i < winLo; i++) blk = badaTokenize(ST.lines[i], blk).inBlock;
+    var gw = gutterWidth(N), html = [];
+    for (var l = winLo; l <= winHi; l++){
+      var r = badaTokenize(ST.lines[l], blk); blk = r.inBlock;
+      var num = ST.opts.number ? String(l + 1) : "";
+      html.push('<div class="ln' + (l === cl ? " cur" : "") + '" data-l="' + l + '">' +
+                '<span class="hair"></span>' +
+                '<span class="gut" style="width:' + (gw + 0.6) + 'ch">' + num + "</span>" +
+                '<span class="code">' + renderTokens(r.toks) + "</span></div>");
+    }
+    doc.innerHTML = html.join("");
+    lineEls = doc.children;
+    dirtyDom = false;
+  }
+
+  /* ── 1 フレーム ── */
+  function styleLines(now){
+    var cl = ST.cur.l, o = ST.opts;
+    var fo = {depth:o.focus ? o.depth : 0, peak:o.peak, spread:o.spread,
+              maxBlur:o.maxBlur, minOpacity:o.minOpacity, maxZ:o.maxZ};
+    var count = winHi - winLo + 1, scales = new Array(count), styles = new Array(count), i;
+    for (i = 0; i < count; i++){
+      styles[i] = focusStyle((winLo + i) - cl, fo);
+      scales[i] = styles[i].scale;
+    }
+    var lay = docLayout(scales, BASE_H);
+
+    /* 行ごとのクラッシュ量 */
+    var lift = {}, aberr = {};
+    for (i = 0; i < crashes.length; i++){
+      var c = crashes[i], t = (now - c.t0) / CRASH_MS;
+      if (t >= 1) continue;
+      var cf = crashFrame(t, c.mag);
+      lift[c.line] = Math.max(lift[c.line] || 0, cf.lift);
+      aberr[c.line] = Math.max(aberr[c.line] || 0, cf.aberr);
+    }
+
+    for (i = 0; i < count; i++){
+      var el = lineEls[i]; if (!el) continue;
+      var s = styles[i], l = winLo + i;
+      var extra = (lay.heights[i] - BASE_H) / 2;
+      var lf = lift[l] || 0, ab = aberr[l] || 0;
+      el.style.marginTop = extra + "px";
+      el.style.marginBottom = extra + "px";
+      el.style.transform = "translateY(" + (-lf * 0.42) + "px) translateZ(" + (s.z + lf) + "px) scale(" + s.scale + ")";
+      el.style.filter = s.blur > 0.04 ? "blur(" + s.blur.toFixed(2) + "px)" : "";
+      el.style.opacity = s.opacity.toFixed(3);
+      if (ab > 0.05){ el.classList.add("lift"); el.style.setProperty("--ab", ab.toFixed(2) + "px"); }
+      else if (el.classList.contains("lift")){ el.classList.remove("lift"); el.style.removeProperty("--ab"); }
+    }
+    /* カーソル行をステージ中央へ */
+    var idx = cl - winLo;
+    var offset = (stage.clientHeight / 2) - (lay.centers[idx] || 0);
+    doc.style.transform = "translate(" + docX.toFixed(2) + "px," + offset.toFixed(2) + "px)";
+    return {lay:lay, styles:styles, offset:offset};
+  }
+
+  function placeCaret(){
+    var idx = ST.cur.l - winLo, el = lineEls[idx];
+    if (!el){ caret.style.opacity = "0"; return null; }
+    var code = el.querySelector(".code");
+    var sr = stage.getBoundingClientRect();
+    var rect = null, cw = 9, chH = BASE_H;
+    var walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT, null, false);
+    var node = null, off = 0, acc = 0, t;
+    while ((t = walker.nextNode())){
+      var len = t.nodeValue.length;
+      if (acc + len > ST.cur.c){ node = t; off = ST.cur.c - acc; break; }
+      acc += len; node = t; off = len;
+    }
+    try {
+      if (node && node.nodeValue.length){
+        var rg = document.createRange(), past = false;
+        if (off < node.nodeValue.length){ rg.setStart(node, off); rg.setEnd(node, off + 1); }
+        else { rg.setStart(node, off - 1); rg.setEnd(node, off); past = true; }
+        var r = rg.getBoundingClientRect();
+        rect = {left:r.left + (past ? r.width : 0), top:r.top, w:r.width || cw, h:r.height || chH};
+      } else {
+        var cr = code.getBoundingClientRect();
+        rect = {left:cr.left, top:cr.top, w:cr.width || cw, h:cr.height || chH};
+      }
+    } catch (e){ rect = null; }
+    if (!rect){ caret.style.opacity = "0"; return null; }
+    var thin = (ST.mode === "insert" || ST.mode === "replace");
+    caret.style.left = (rect.left - sr.left) + "px";
+    caret.style.top = (rect.top - sr.top) + "px";
+    caret.style.width = (thin ? Math.max(2, rect.w * 0.16) : rect.w) + "px";
+    caret.style.height = rect.h + "px";
+    caret.style.opacity = (ST.mode === "command" || ST.mode === "search") ? "0.35" : "1";
+    caret.className = thin ? "ins" : "";
+
+    /* 拡大した行は画面幅をはみ出すので、カーソルが常に見えるよう横に追従する */
+    var x = rect.left - sr.left, padL = 44, padR = 90;
+    if (x < padL) docX = Math.min(0, docX + (padL - x));
+    else if (x + rect.w > sr.width - padR) docX -= (x + rect.w) - (sr.width - padR);
+    if (docX > 0) docX = 0;
+    return {rect:rect, sr:sr};
+  }
+
+  function drawSelection(){
+    if (ST.mode !== "visual" && ST.mode !== "vline"){ selLayer.innerHTML = ""; return; }
+    var r = visualRange(ST), sr = stage.getBoundingClientRect(), html = "";
+    for (var l = r.a.l; l <= r.b.l; l++){
+      var el = lineEls[l - winLo]; if (!el) continue;
+      var code = el.querySelector(".code");
+      var from = (l === r.a.l && !r.linewise) ? r.a.c : 0;
+      var to = (l === r.b.l && !r.linewise) ? r.b.c : (ST.lines[l] || "").length;
+      var box = charBox(code, from, to) || code.getBoundingClientRect();
+      html += '<div class="selbox" style="left:' + (box.left - sr.left) + "px;top:" + (box.top - sr.top) +
+              "px;width:" + Math.max(4, box.width) + "px;height:" + box.height + 'px"></div>';
+    }
+    selLayer.innerHTML = html;
+  }
+  function charBox(code, from, to){
+    if (to <= from) to = from + 1;
+    var walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT, null, false);
+    var acc = 0, sN = null, sO = 0, eN = null, eO = 0, t;
+    while ((t = walker.nextNode())){
+      var len = t.nodeValue.length;
+      if (!sN && acc + len > from){ sN = t; sO = from - acc; }
+      if (acc + len >= to){ eN = t; eO = Math.min(len, to - acc); break; }
+      acc += len; eN = t; eO = len;
+    }
+    if (!sN) return null;
+    try {
+      var rg = document.createRange();
+      rg.setStart(sN, sO); rg.setEnd(eN || sN, eO);
+      var b = rg.getBoundingClientRect();
+      return b.width ? b : null;
+    } catch (e){ return null; }
+  }
+
+  /* ── FX キャンバス (衝撃波 / 破片 / グレイン) ── */
+  function sizeCanvas(cv){
+    var w = stage.clientWidth, h = stage.clientHeight;
+    if (cv.width !== Math.round(w * DPR) || cv.height !== Math.round(h * DPR)){
+      cv.width = Math.round(w * DPR); cv.height = Math.round(h * DPR);
+    }
+    return {w:w, h:h};
+  }
+  function drawFx(now){
+    var d = sizeCanvas(fx);
+    fxc.setTransform(DPR, 0, 0, DPR, 0, 0);
+    fxc.clearRect(0, 0, d.w, d.h);
+    var alive = [];
+    for (var i = 0; i < crashes.length; i++){
+      var c = crashes[i], t = (now - c.t0) / CRASH_MS;
+      if (t >= 1) continue;
+      alive.push(c);
+      var cf = crashFrame(t, c.mag);
+      var el = lineEls[c.line - winLo];
+      var sr = stage.getBoundingClientRect(), cx = d.w / 2, cy = d.h / 2;
+      if (el){
+        var b = el.getBoundingClientRect();
+        cx = b.left - sr.left + Math.min(b.width, d.w * 0.7) * 0.42;
+        cy = b.top - sr.top + b.height / 2;
+      }
+      /* 衝撃波リング */
+      var R = 30 + cf.ring * Math.max(d.w, d.h) * 0.55;
+      fxc.save();
+      fxc.globalCompositeOperation = "lighter";
+      fxc.strokeStyle = "rgba(90,215,232," + (cf.alpha * 0.55).toFixed(3) + ")";
+      fxc.lineWidth = Math.max(1, 5 * cf.alpha);
+      fxc.beginPath(); fxc.ellipse(cx, cy, R, R * 0.42, 0, 0, Math.PI * 2); fxc.stroke();
+      fxc.strokeStyle = "rgba(255,77,126," + (cf.alpha * 0.4).toFixed(3) + ")";
+      fxc.lineWidth = Math.max(1, 3 * cf.alpha);
+      fxc.beginPath(); fxc.ellipse(cx, cy, R * 0.72, R * 0.3, 0, 0, Math.PI * 2); fxc.stroke();
+      /* 破片 */
+      var sh = shardField(Math.round(10 + 16 * c.mag), c.seed);
+      for (var k = 0; k < sh.length; k++){
+        var s = sh[k], dist = cf.ring * s.spd * Math.max(d.w, d.h) * 0.42;
+        var x = cx + Math.cos(s.ang) * dist, y = cy + Math.sin(s.ang) * dist * 0.5;
+        fxc.save();
+        fxc.translate(x, y);
+        fxc.rotate(s.ang + s.rot * cf.ring);
+        fxc.fillStyle = "hsla(" + s.hue + ",85%,68%," + (cf.alpha * 0.85).toFixed(3) + ")";
+        fxc.fillRect(0, 0, s.len * (1 - cf.ring * 0.6), Math.max(1, 2.4 * cf.alpha));
+        fxc.restore();
+      }
+      /* 閃光 */
+      if (t < 0.18){
+        var fa = (1 - t / 0.18) * 0.28 * c.mag;
+        var gr = fxc.createRadialGradient(cx, cy, 0, cx, cy, Math.max(d.w, d.h) * 0.5);
+        gr.addColorStop(0, "rgba(255,255,255," + fa.toFixed(3) + ")");
+        gr.addColorStop(1, "rgba(255,255,255,0)");
+        fxc.fillStyle = gr; fxc.fillRect(0, 0, d.w, d.h);
+      }
+      fxc.restore();
+    }
+    crashes = alive;
+    return alive.length > 0;
+  }
+
+  /* ── 映画のカウントダウン (アカデミー・リーダー) ── */
+  function drawLeader(now){
+    if (!CD) return false;
+    var d = sizeCanvas(leader);
+    var elapsed = (now - CD.t0) / 1000;
+    var cs = countdownState(elapsed, CD.total);
+    ldc.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ldc.clearRect(0, 0, d.w, d.h);
+
+    /* 秒の刻み — 数字が変わるたびにポイント行をクラッシュ */
+    if (!cs.done && cs.n !== CD.lastTick){
+      CD.lastTick = cs.n;
+      beep(1000, 0.08);
+      crash(ST.cur.l, 0.45 + (CD.total - cs.n) * 0.06);
+    }
+    if (cs.done && !CD.zeroDone){
+      CD.zeroDone = true; CD.zeroAt = now;
+      beep(440, 0.35);
+      crash(ST.cur.l, 1);
+      ST.msg = "💥 T-0 — " + (ST.cur.l + 1) + " 行目が炸裂";
+      paintStatus();
+    }
+
+    var cx = d.w / 2, cy = d.h / 2, R = Math.min(d.w, d.h) * 0.32;
+    ldc.save();
+    /* 暗幕 */
+    ldc.fillStyle = "rgba(3,5,10,0.55)"; ldc.fillRect(0, 0, d.w, d.h);
+    /* 掃引ウェッジ */
+    if (!cs.done){
+      ldc.beginPath(); ldc.moveTo(cx, cy);
+      ldc.arc(cx, cy, R * 2.4, -Math.PI / 2, -Math.PI / 2 + cs.sweep);
+      ldc.closePath();
+      ldc.fillStyle = "rgba(255,255,255,0.055)"; ldc.fill();
+    }
+    /* 同心円 */
+    ldc.strokeStyle = "rgba(232,236,247,0.30)"; ldc.lineWidth = 1.5;
+    ldc.beginPath(); ldc.arc(cx, cy, R, 0, Math.PI * 2); ldc.stroke();
+    ldc.beginPath(); ldc.arc(cx, cy, R * 1.55, 0, Math.PI * 2); ldc.stroke();
+    /* 十字の走査線 */
+    ldc.strokeStyle = "rgba(232,236,247,0.22)"; ldc.lineWidth = 1;
+    ldc.beginPath(); ldc.moveTo(0, cy); ldc.lineTo(d.w, cy);
+    ldc.moveTo(cx, 0); ldc.lineTo(cx, d.h); ldc.stroke();
+    /* 指針 */
+    if (!cs.done){
+      ldc.save(); ldc.translate(cx, cy); ldc.rotate(cs.sweep);
+      ldc.strokeStyle = "rgba(255,77,126,0.85)"; ldc.lineWidth = 2.5;
+      ldc.beginPath(); ldc.moveTo(0, 0); ldc.lineTo(0, -R * 1.55); ldc.stroke();
+      ldc.restore();
+    }
+    /* 数字 */
+    var zt = CD.zeroDone ? (now - CD.zeroAt) / 900 : 0;
+    var num = cs.done ? "0" : cs.label;
+    var pop = cs.done ? (1 + 0.8 * Math.max(0, 1 - zt)) : (1 + 0.22 * (1 - cs.phase));
+    ldc.save();
+    ldc.translate(cx, cy); ldc.scale(pop, pop);
+    ldc.font = "800 " + Math.round(R * 1.25) + 'px "Cascadia Mono",Consolas,monospace';
+    ldc.textAlign = "center"; ldc.textBaseline = "middle";
+    ldc.shadowColor = "rgba(90,215,232,0.85)"; ldc.shadowBlur = 40;
+    ldc.fillStyle = cs.done ? "#ff4d7e" : "#e8ecf7";
+    ldc.globalAlpha = cs.done ? Math.max(0, 1 - zt) : 1;
+    ldc.fillText(num, 0, 0);
+    ldc.restore();
+    /* フィルムグレイン + キズ */
+    ldc.globalAlpha = 0.09;
+    for (var g = 0; g < 140; g++){
+      ldc.fillStyle = Math.random() < 0.5 ? "#fff" : "#000";
+      ldc.fillRect(Math.random() * d.w, Math.random() * d.h, 1.6, 1.6);
+    }
+    if (Math.random() < 0.22){
+      ldc.globalAlpha = 0.16; ldc.fillStyle = "#fff";
+      var sx = Math.random() * d.w;
+      ldc.fillRect(sx, 0, 1, d.h);
+    }
+    ldc.restore();
+
+    if (CD.zeroDone && (now - CD.zeroAt) > 1000){
+      CD = null; leader.style.display = "none"; hud.classList.remove("show");
+      return false;
+    }
+    hudNum.textContent = cs.done ? "0" : cs.label;
+    hudLbl.textContent = cs.done ? "IMPACT" : "T-MINUS";
+    return true;
+  }
+
+  function startCountdown(sec){
+    CD = {total:sec, t0:performance.now(), lastTick:-1, zeroDone:false, zeroAt:0};
+    leader.style.display = "block"; hud.classList.add("show");
+    $("btnCount").classList.add("on");
+    audio();
+  }
+
+  /* ── メインループ ── */
+  function frame(now){
+    if (dirtyDom) rebuild();
+    styleLines(now);
+    placeCaret();
+    drawSelection();
+    var busy = drawFx(now);
+    var cdBusy = drawLeader(now);
+    if (!cdBusy && !CD) $("btnCount").classList.remove("on");
+
+    /* 画面全体の揺れ */
+    var sx = 0, sy = 0, tilt = 0;
+    for (var i = 0; i < crashes.length; i++){
+      var cf = crashFrame((now - crashes[i].t0) / CRASH_MS, crashes[i].mag);
+      sx += cf.shakeX; sy += cf.shakeY; tilt += cf.tilt;
+    }
+    shaker.style.transform = (sx || sy || tilt)
+      ? "translate(" + sx.toFixed(2) + "px," + sy.toFixed(2) + "px) rotate(" + tilt.toFixed(3) + "deg)"
+      : "";
+
+    /* カーソル点滅 (挿入モードのみ) */
+    if (ST.mode === "insert" || ST.mode === "replace"){
+      if (now - blinkT > 530){ caret.classList.toggle("blink"); blinkT = now; }
+    } else caret.classList.remove("blink");
+
+    requestAnimationFrame(frame);
+  }
+
+  /* ── ステータスライン ── */
+  var MODE_LABEL = {normal:"NORMAL", insert:"INSERT", visual:"VISUAL", vline:"V-LINE",
+                    command:"COMMAND", search:"SEARCH", replace:"REPLACE"};
+  function paintStatus(){
+    var mEl = $("mode");
+    mEl.textContent = MODE_LABEL[ST.mode] || ST.mode.toUpperCase();
+    mEl.className = "m-" + ST.mode;
+    $("fname").textContent = ST.fname + (ST.dirty ? " [+]" : "");
+    $("pos").textContent = (ST.cur.l + 1) + ":" + (ST.cur.c + 1) + "  " + ST.lines.length + "L";
+    var msgEl = $("msg"), cmdEl = $("cmdline");
+    if (ST.mode === "command" || ST.mode === "search"){
+      msgEl.textContent = "";
+      cmdEl.classList.add("show");
+      cmdEl.innerHTML = escHtml(ST.cmdline) + '<span class="cc"> </span>';
+    } else {
+      cmdEl.classList.remove("show"); cmdEl.textContent = "";
+      msgEl.textContent = ST.msg + (ST.pending ? "   " + ST.pending : "");
+      msgEl.className = ST.msgErr ? "err" : "";
+    }
+    $("btnFocus").classList.toggle("on", !!ST.opts.focus);
+    $("btnCrash").classList.toggle("on", !!ST.opts.crash);
+  }
+
+  /* ── 出力パネル ── */
+  /* 狭い画面では出力パネルがエディタに重なるため、開閉できるようにする */
+  function showSide(on){
+    if (on){ side.classList.remove("hide"); side.classList.add("force"); }
+    else { side.classList.add("hide"); side.classList.remove("force"); }
+    $("btnOut").classList.toggle("on", on);
+  }
+  function sideOpen(){ return !side.classList.contains("hide"); }
+  function printOut(rows, clear, reveal){
+    if (clear) out.innerHTML = "";
+    var h = "";
+    for (var i = 0; i < rows.length; i++){
+      h += '<div class="' + (rows[i].cls || "") + '">' + escHtml(rows[i].text) + "</div>";
+    }
+    out.innerHTML += h;
+    out.scrollTop = out.scrollHeight;
+    if (reveal) showSide(true);
+  }
+  function runQuantum(){
+    var t0 = performance.now();
+    var r;
+    try { r = quantumRun(vimText(ST), 0x5EED); }
+    catch (e){ r = {out:[{cls:"o-err", text:"内部エラー: " + e.message}], err:e.message}; }
+    printOut([{cls:"o-dim", text:"── " + new Date().toLocaleTimeString() + " ──"}], true, true);
+    printOut(r.out, false);
+    printOut([{cls:"o-dim", text:"(" + (performance.now() - t0).toFixed(1) + " ms)"}], false);
+    ST.msg = r.err ? "⚠ " + r.err : "✔ 量子 Bada 実行完了";
+    ST.msgErr = !!r.err;
+    crash(ST.cur.l, r.err ? 0.85 : 0.5);
+    paintStatus();
+  }
+
+  /* ── エンジンイベントの処理 ── */
+  function drainEvents(){
+    for (var i = 0; i < ST.events.length; i++){
+      var e = ST.events[i];
+      if (e.type === "crash") crash(e.line, e.mag);
+      else if (e.type === "countdown") startCountdown(e.seconds);
+      else if (e.type === "run") runQuantum();
+      else if (e.type === "write") saveFile(e.name);
+      else if (e.type === "open") fileIn.click();
+      else if (e.type === "quit"){ ST.msg = "🎬 カット。(:e で再開 / :demo でデモ)"; }
+      else if (e.type === "help") showHelp(true);
+      else if (e.type === "moveline" && ST.opts.crash) crash(e.line, 0.42);
+      else if (e.type === "jump") crash(e.line, 0.7);
+      else if (e.type === "opts") dirtyDom = true;
+    }
+    ST.events.length = 0;
+  }
+
+  /* ── ファイル入出力 ── */
+  function saveFile(name){
+    name = name || ST.fname || "quantum.bada";
+    var blob = new Blob([vimText(ST)], {type:"text/plain;charset=utf-8"});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  fileIn.addEventListener("change", function(){
+    var f = fileIn.files && fileIn.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function(){
+      snapshot(ST);
+      ST.lines = String(rd.result).replace(/\r\n?/g, "\n").split("\n");
+      if (!ST.lines.length) ST.lines = [""];
+      ST.cur = {l:0, c:0}; ST.fname = f.name; ST.dirty = false;
+      ST.msg = '"' + f.name + '" ' + ST.lines.length + " 行を読み込みました";
+      dirtyDom = true; paintStatus(); crash(0, 0.8);
+    };
+    rd.readAsText(f);
+    fileIn.value = "";
+  });
+
+  /* ── キー入力 ── */
+  function keyName(e){
+    var k = e.key;
+    if (e.ctrlKey || e.metaKey){
+      if (k.length === 1) return "<C-" + k.toLowerCase() + ">";
+      return null;
+    }
+    switch (k){
+      case "Escape": return "<Esc>";
+      case "Enter": return "<CR>";
+      case "Backspace": return "<BS>";
+      case "Delete": return "<Del>";
+      case "Tab": return "<Tab>";
+      case " ": return (ST.mode === "insert" || ST.mode === "replace" ||
+                        ST.mode === "command" || ST.mode === "search") ? " " : "<Space>";
+    }
+    if (k.length === 1) return k;
+    return null;
+  }
+  function arrowMove(dx, dy){
+    var prev = ST.cur.l;
+    if (dy){ ST.cur.l = Math.max(0, Math.min(ST.lines.length - 1, ST.cur.l + dy)); ST.cur.c = Math.min(ST.desired, _maxCol(ST, ST.cur.l)); }
+    if (dx){ ST.cur.c = Math.max(0, Math.min(_maxCol(ST, ST.cur.l), ST.cur.c + dx)); ST.desired = ST.cur.c; }
+    clampCur(ST);
+    if (ST.cur.l !== prev && ST.opts.crash) crash(ST.cur.l, 0.42);
+    after();
+  }
+  function after(){
+    if (vimText(ST) !== lastText || ST.cur.l !== lastCurL){ dirtyDom = true; }
+    lastText = vimText(ST); lastCurL = ST.cur.l;
+    drainEvents();
+    paintStatus();
+  }
+  function send(key){
+    var prevL = ST.cur.l, prevMode = ST.mode;
+    feedKey(ST, key);
+    var evs = ST.events.slice();
+    /* 行が移動したら「ポイントされた行」が浮き上がる */
+    var moved = ST.cur.l !== prevL;
+    var hasCrash = false;
+    for (var i = 0; i < evs.length; i++) if (evs[i].type === "crash" || evs[i].type === "moveline") hasCrash = true;
+    after();
+    if (moved && !hasCrash && ST.opts.crash) crash(ST.cur.l, prevMode === "command" || prevMode === "search" ? 0.7 : 0.42);
+  }
+
+  document.addEventListener("keydown", function(e){
+    if (helpEl.classList.contains("show")){
+      if (e.key === "Escape" || e.key === "?" || e.key === "q"){ showHelp(false); e.preventDefault(); }
+      return;
+    }
+    if (e.key === "ArrowLeft"){ e.preventDefault(); return arrowMove(-1, 0); }
+    if (e.key === "ArrowRight"){ e.preventDefault(); return arrowMove(1, 0); }
+    if (e.key === "ArrowUp"){ e.preventDefault(); return arrowMove(0, -1); }
+    if (e.key === "ArrowDown"){ e.preventDefault(); return arrowMove(0, 1); }
+    if (e.key === "PageUp"){ e.preventDefault(); return arrowMove(0, -20); }
+    if (e.key === "PageDown"){ e.preventDefault(); return arrowMove(0, 20); }
+    if ((e.ctrlKey || e.metaKey) && ["c", "v", "a", "x"].indexOf(e.key) >= 0 && ST.mode !== "normal") return;
+    var k = keyName(e);
+    if (k === null) return;
+    e.preventDefault();
+    audio();                       /* 初回キーで音声コンテキストを解錠 */
+    send(k);
+  });
+
+  /* ソフトキーボード / IME 対策 — 隠し input に入った文字を流し込む */
+  hidden.addEventListener("input", function(){
+    var v = hidden.value; hidden.value = "";
+    for (var i = 0; i < v.length; i++) send(v.charAt(i));
+  });
+  stage.addEventListener("pointerdown", function(e){
+    /* タップした行へカーソルを移動 (どアップの焦点が移る) */
+    var el = e.target.closest ? e.target.closest(".ln") : null;
+    if (el && el.dataset && el.dataset.l !== undefined){
+      var l = parseInt(el.dataset.l, 10);
+      if (l !== ST.cur.l){
+        ST.cur.l = l; ST.cur.c = Math.min(ST.desired, _maxCol(ST, l));
+        clampCur(ST); crash(l, 0.75); after();
+      } else {
+        crash(l, 1); after();
+      }
+    }
+    if (isTouch) hidden.focus();
+  });
+
+  /* ── タッチ用キーバー ── */
+  var isTouch = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+  var KEYS = [
+    ["Esc", "<Esc>"], ["i", "i"], ["a", "a"], ["o", "o"], ["：", ":"], ["/", "/"],
+    ["h", "h"], ["j", "j"], ["k", "k"], ["l", "l"], ["w", "w"], ["b", "b"],
+    ["0", "0"], ["$", "$"], ["gg", "gg"], ["G", "G"], ["x", "x"], ["dd", "dd"],
+    ["yy", "yy"], ["p", "p"], ["u", "u"], ["💥", "<Space>"], ["⏎", "<CR>"], ["⌫", "<BS>"]
+  ];
+  function buildKeys(){
+    var h = "";
+    for (var i = 0; i < KEYS.length; i++){
+      h += '<button data-k="' + KEYS[i][1].replace(/"/g, "&quot;") + '">' + KEYS[i][0] + "</button>";
+    }
+    h += '<button data-k="__kbd">⌨</button>';
+    keysBar.innerHTML = h;
+    keysBar.addEventListener("click", function(e){
+      var b = e.target.closest("button"); if (!b) return;
+      var k = b.dataset.k;
+      if (k === "__kbd"){ hidden.focus(); return; }
+      if (k.length > 1 && k.charAt(0) !== "<"){
+        for (var i = 0; i < k.length; i++) send(k.charAt(i));
+      } else send(k);
+    });
+    if (isTouch) keysBar.classList.add("show");
+  }
+
+  /* ── ヘルプ ── */
+  var HELP_ROWS = [
+    ["§", "モード"],
+    ["i a I A o O", "挿入モードへ (o / O は行を起こしてクラッシュ)"],
+    ["v  V", "ビジュアル / ビジュアル行"],
+    ["R", "置換モード"],
+    ["Esc", "ノーマルモードへ戻る"],
+    ["§", "移動"],
+    ["h j k l", "左 下 上 右 (矢印キーも可)"],
+    ["w W b B e E", "単語単位の前後移動"],
+    ["0 ^ $", "行頭 / 最初の非空白 / 行末"],
+    ["gg  G  42G", "先頭 / 末尾 / 42 行目"],
+    ["{ }", "段落 (空行) 単位で移動"],
+    ["%", "対応する括弧へジャンプ"],
+    ["f x  t x  F x  T x", "行内で文字 x を検索 ( ; , で繰り返し)"],
+    ["/pat  ?pat  n  N", "検索 (JavaScript 正規表現)"],
+    ["Ctrl-D Ctrl-U", "半画面 下 / 上"],
+    ["§", "編集"],
+    ["x X  r c", "一文字削除 / 一文字置換"],
+    ["d{motion}  dd  D", "削除 (3dd, dw, d$ など)"],
+    ["c{motion}  cc  C", "変更して挿入モードへ"],
+    ["y{motion}  yy  Y  p P", "ヤンクと貼り付け"],
+    [">> <<", "インデント / アンインデント"],
+    ["J  ~", "行連結 / 大小文字反転"],
+    ['"a yy   "a p', "名前付きレジスタ"],
+    ["u  Ctrl-R  .", "取り消し / やり直し / 直前の変更を繰り返し"],
+    ["§", "🎬 シネマ演出"],
+    ["Space", "ポイントした行を浮き上がらせてクラッシュ"],
+    ["行をタップ / クリック", "その行へ焦点を移して衝撃"],
+    [":focus", "どアップ (被写界深度) の ON / OFF"],
+    [":crash", "クラッシュ効果の ON / OFF"],
+    [":countdown 5", "映画のカウントダウン開始 (T-0 で最大衝撃)"],
+    [":slam", "現在行を強制クラッシュ"],
+    [":set peak=3.2", "どアップの最大倍率 (既定 2.6)"],
+    [":set spread=1.4", "焦点の狭さ = 被写界深度 (既定 2.2)"],
+    [":set maxBlur=5", "背景のぼかし量 (既定 3.2)"],
+    [":set nosound", "効果音を切る"],
+    ["§", "⚛ 量子 Bada"],
+    [":run", "バッファを量子 Bada として実行"],
+    ["qubit q[3];", "量子レジスタの確保"],
+    ["H q[0];  X  Y  Z  S  T", "1 量子ビットゲート"],
+    ["CNOT q[0], q[1];", "もつれ (CZ / SWAP も可)"],
+    ["RX q[0], 1.57;", "回転ゲート (RY / RZ)"],
+    ["let s = measure q;", "観測して collapse"],
+    ["let z = 4.0 <- 2.0;", "非可換左作用 π(χ,x)"],
+    ["let a = 2.0 -< 12.0;", "多様体積分 ∬1/(x·log x)²"],
+    ["let g = 1.0 >- 0.5;", "量子作用素右作用 ⊕(iℏ∇)^⊕L"],
+    ["print beta(2,3);", "β(p,q) = Γ(p)Γ(q)/Γ(p+q)"],
+    ["§", "ファイル"],
+    [":w [name]  :wq  :q  :q!", "保存 / 保存して終了 / 終了"],
+    [":e", "ファイルを開く"],
+    [":demo  :new", "デモを読み込む / 新規バッファ"],
+    [":%s/pat/rep/g", "全体置換 (:3,9s/// で範囲指定)"],
+    [":set number / :set nonumber", "行番号"],
+    [":help", "このヘルプ (Esc で閉じる)"]
+  ];
+  function showHelp(on){
+    if (on){
+      var h = '<button class="tb close" id="helpClose">✕ 閉じる (Esc)</button>' +
+              '<h3 style="margin-top:0">Bada CineVim — キーバインド</h3><table>';
+      for (var i = 0; i < HELP_ROWS.length; i++){
+        if (HELP_ROWS[i][0] === "§"){ h += '<tr><td colspan="2"><h3>' + HELP_ROWS[i][1] + "</h3></td></tr>"; continue; }
+        h += "<tr><td>" + escHtml(HELP_ROWS[i][0]) + "</td><td>" + escHtml(HELP_ROWS[i][1]) + "</td></tr>";
+      }
+      h += "</table>";
+      helpEl.querySelector(".inner").innerHTML = h;
+      helpEl.classList.add("show");
+      helpEl.querySelector("#helpClose").onclick = function(){ showHelp(false); };
+    } else helpEl.classList.remove("show");
+  }
+
+  /* ── ツールバー ── */
+  $("btnFocus").onclick = function(){ ST.opts.focus = !ST.opts.focus; ST.msg = "シネマフォーカス: " + (ST.opts.focus ? "ON" : "OFF"); paintStatus(); };
+  $("btnCrash").onclick = function(){ ST.opts.crash = !ST.opts.crash; ST.msg = "クラッシュ効果: " + (ST.opts.crash ? "ON" : "OFF"); paintStatus(); if (ST.opts.crash) crash(ST.cur.l, 0.8); };
+  $("btnCount").onclick = function(){ audio(); startCountdown(5); ST.msg = "⏱ T-5 カウントダウン開始"; paintStatus(); };
+  $("btnRun").onclick = function(){ runQuantum(); };
+  $("btnOpen").onclick = function(){ fileIn.click(); };
+  $("btnSave").onclick = function(){ saveFile(ST.fname); ST.dirty = false; paintStatus(); };
+  $("btnHelp").onclick = function(){ showHelp(!helpEl.classList.contains("show")); };
+  $("btnOut").onclick = function(){ showSide(!sideOpen()); };
+  $("sideClose").onclick = function(){ showSide(false); };
+  window.addEventListener("resize", function(){ docX = 0; dirtyDom = true; });
+
+  /* ── 画面幅に応じた演出量 ── */
+  function fitOpts(){
+    var w = window.innerWidth;
+    if (w < 560){ ST.opts.peak = 1.75; ST.opts.spread = 2.6; ST.opts.maxZ = 16; }
+    else if (w < 900){ ST.opts.peak = 2.1; ST.opts.spread = 2.4; ST.opts.maxZ = 20; }
+    BASE_H = w < 560 ? 26 : 30;
+    document.documentElement.style.setProperty("--base-h", BASE_H + "px");
+  }
+
+  /* ── 起動 ── */
+  fitOpts();
+  buildKeys();
+  lastText = vimText(ST); lastCurL = ST.cur.l;
+  ST.msg = "Space で行を浮き上がらせる ・ :countdown 5 ・ :run ・ :help";
+  dirtyDom = true;
+  paintStatus();
+  printOut([
+    {cls:"o-dim", text:"Bada CineVim — 量子 Bada ランタイム待機中"},
+    {cls:"o-key", text:"▶ 実行 または :run でバッファを実行します"},
+    {cls:"o-dim", text:"⏱ カウントダウン または :countdown 5 で映画の秒読み"}
+  ], true, false);
+  requestAnimationFrame(frame);
+  setTimeout(function(){ crash(0, 0.9); }, 420);
+}
+
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) boot();
+</script>
+</body>
+</html>
