@@ -111,6 +111,18 @@
 
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。計算核の自己テストは `node omega_konnyaku_dialog/tools/selftest.mjs`。しくみ・ノートとの対応表は [`omega_konnyaku_dialog/`](omega_konnyaku_dialog/) を参照。
 
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+**Actions → [Konnyaku Collator app build](../../actions/workflows/konnyaku-app-build.yml) → Run workflow** を実行し、実行ページ下部の Artifacts からダウンロード:
+
+| プラットフォーム | ファイル | アーティファクト名 |
+|:---|:---|:---|
+| **Android** (APK) | `konnyaku-collator-debug.apk` | `konnyaku-android` |
+| **Windows 10 / 11** | `KonnyakuCollator-*-x64.exe` (NSIS インストーラ / ポータブル) | `konnyaku-windows` |
+| **Ubuntu** | `KonnyakuCollator-*-x86_64.AppImage` / `KonnyakuCollator-*-amd64.deb` | `konnyaku-linux` |
+
+ビルドは [`konnyaku-app-build.yml`](.github/workflows/konnyaku-app-build.yml) が実行します(`konnyaku-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+
 ---
 
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)

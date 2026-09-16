@@ -11,6 +11,20 @@
 
 単一 HTML。ダブルクリックで開くだけで動く（サーバ不要・通信なし・インストール不要）。入力と台帳はその端末の `localStorage` にだけ残る。
 
+### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+リポジトリの **Actions → [Konnyaku Collator app build](../../actions/workflows/konnyaku-app-build.yml) → Run workflow** を実行すると、実行ページ下部の Artifacts からダウンロードできます（`konnyaku-v*` タグを push するか、Run workflow の `release_tag` に値を入れると Release にも添付されます）。
+
+| プラットフォーム | ファイル | アーティファクト名 |
+|:---|:---|:---|
+| **Android** (APK) | `konnyaku-collator-debug.apk` | `konnyaku-android` |
+| **Windows 10 / 11** | `KonnyakuCollator-1.0.0-x64.exe`（NSIS インストーラ）/ `KonnyakuCollator-1.0.0-portable.exe` | `konnyaku-windows` |
+| **Ubuntu / Linux** | `KonnyakuCollator-1.0.0-x86_64.AppImage` / `KonnyakuCollator-1.0.0-amd64.deb` | `konnyaku-linux` |
+
+Android は Cordova（cordova-android 12.0.1 / Gradle 7.6.4 固定・debug 署名）、デスクトップは Electron + electron-builder のラッパーで、いずれも中身は同じ `index.html`。ビルド前に `tools/check-html.mjs`（インライン JS の構文・計算核のマーカー・ダイアログ配線・単一ファイル性）と `tools/selftest.mjs`（43 項目）が走り、落ちたらパッケージは作られません。
+
+---
+
 ---
 
 ## ノートのどこが、どの操作になったか
@@ -68,9 +82,12 @@
 
 ```
 omega_konnyaku_dialog/
-├── index.html            本体（計算核 + ダイアログ UI、単一ファイル）
-├── tools/selftest.mjs    index.html の計算核だけを抜き出して Node で検証
-├── assets/source_note.jpg 元になった手帳の見開き
+├── index.html              本体（計算核 + ダイアログ UI、単一ファイル）
+├── tools/selftest.mjs      index.html の計算核だけを抜き出して Node で検証
+├── tools/check-html.mjs    インライン JS の構文・計算核のマーカー・ダイアログ配線・単一ファイル性を検査
+├── app/electron/           Windows EXE / Ubuntu AppImage・deb のラッパー（Electron）
+├── app/cordova/config.xml  Android APK のラッパー設定（Cordova）
+├── assets/source_note.jpg  元になった手帳の見開き
 └── README.md
 ```
 
@@ -79,8 +96,9 @@ omega_konnyaku_dialog/
 計算核（`index.html` の `KONNYAKU CORE BEGIN … END` の区間）は、コピーを持たず本体から直接抜き出して試験する。
 
 ```sh
+node tools/check-html.mjs        # index.html の健全性検査（CI のビルド前ゲート）
 node tools/selftest.mjs          # 自己テスト（43 項目）
-node tools/selftest.mjs --demo    # 4 つの箱に既定値を入れた照合結果を表示
+node tools/selftest.mjs --demo   # 4 つの箱に既定値を入れた照合結果を表示
 ```
 
 ## 式を読み替えたいとき
