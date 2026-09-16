@@ -97,8 +97,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
       - name: Install Android SDK packages (+ accept licenses)
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
