@@ -224,6 +224,16 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 
 ---
 
+## ◎ ダウンロード — Bada Baumkuchen(優しさのソース検索・蓄積アプリ)
+
+**受けた優しさ・贈った優しさを「一層」として焼き重ね、後ろから(外側から)読み直すアプリケーション。** ノートの左ページの方程式と絵を、右ページの**バームクーヘンの後ろからの意味合い**で読む —— 層ひとつが出来事ひとつ(内側 = 古い / 外側 = 新しい)、各層には **値札**(払った手間 c・受け取った利得 b・蓄積の中での希少性 rho から `price = 100(1+c)(1+b/10)·rho·(1+k/8)`)が付き、**DNA のスイッチ**(優しさ遺伝子 8 本 聴/譲/贈/赦/護/教/待/黙)が層ごとに ON/OFF して**いつ点いたか・いつ消えたか**を記録し、人と人の結びつきは**種数** `g = b₁(G) = E − V + C`(グラフを太らせたハンドル体の穴の数)として数えられます。**後ろから読む**と、外側から k 層を剥くたびに 剥いた分 P(k)・残った芯 R(k)・残りの種数 g(k) が出て、**輪を閉じた層**(返礼が届き、贈与が木から輪になった層)とその閉路が Union-Find + BFS で復元されます。本文・ソース名・遺伝子名の全文検索に、DNA マスク(不問 → ON必須 → OFF必須)・値札の帯・向き・輪を閉じた層だけ、の絞り込み。蓄積は localStorage、JSON / CSV で持ち出せます。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**baumkuchen/index.html をダウンロード**](baumkuchen/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。初回は見本 14 層が入っています。方程式・仕組み・テストは [`baumkuchen/`](baumkuchen/) を参照。
+
+---
+
 ## 📁 フォルダ構成 — Repository Structure
 
 | フォルダ | 内容 | リンク |
@@ -236,6 +246,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
+| **`baumkuchen/`** | ◎ **Bada Baumkuchen** — 優しさのソース検索・蓄積 · 出来事ひとつを一層として焼き重ね、**後ろから(外側から)剥いて読む** · 値札 `100(1+c)(1+b/10)·rho·(1+k/8)` · DNA スイッチ 8 本(聴/譲/贈/赦/護/教/待/黙)の発現率と最後の反転 · 種数 `g = E − V + C` と輪を閉じた層の閉路復元(Union-Find + BFS) · 全文検索 + DNA マスク · 単一HTML/依存ゼロ | [→ 開く](baumkuchen/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---

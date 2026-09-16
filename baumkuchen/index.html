@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bada Baumkuchen — 優しさのソース検索・蓄積</title>
+<!--
+  Bada Baumkuchen — 優しさのソースを検索し、蓄積するアプリケーション
+  (依存ゼロ・単一 HTML・オフライン動作)
+
+  ノートの左ページ(方程式と絵)を、右ページのバームクーヘンの
+  「後ろからの意味合い」で読む、という着想をそのまま実装したもの。
+
+    ・層(バームクーヘン) … 優しさの出来事ひとつが一層。内側=古い、外側=新しい。
+    ・後ろからの意味合い   … 外側(新しい層)から内側へ剥いて読む逆走査。
+                             剥くたびに「残りの値札」と「残りの種数」が出る。
+    ・値札                 … 各層に付く価格。払った手間 c と受け取った利得 b、
+                             希少性 rho、点いた遺伝子数 k から決まる。
+    ・DNA のスイッチ       … 8 本の「優しさ遺伝子」の ON/OFF ベクトル d in {0,1}^8。
+                             オン・オフした方法(いつ、どの層で反転したか)を記録する。
+    ・種数                 … 人と人を結んだグラフの第一ベッチ数 b1 = E - V + C。
+                             グラフを太らせるとハンドル体になり、その種数がこれ。
+                             後ろから読むと「輪を閉じた層」(返礼が届いた層)が出る。
+    ・検索                 … 本文・ソース・DNA マスク(ON必須/OFF必須/不問)・
+                             値札帯・輪を閉じた層のみ、で優しさのソースを検索。
+    ・蓄積                 … localStorage に保存。JSON / CSV で書き出し、JSON で取り込み。
+
+  データは端末の外に出ません。
+-->
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121722; --panel2:#171d2b; --line:#232c40;
+    --tx:#e8ecf4; --tx2:#8b94a8; --gold:#e8c76a; --cyan:#58c8d8;
+    --ok:#5fd68a; --err:#e87a7a; --dough:#c89a5a;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg); color:var(--tx);
+    font-family:"Segoe UI","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+    min-height:100vh;
+  }
+  header{
+    padding:18px 22px 14px; border-bottom:1px solid var(--line);
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    background:linear-gradient(180deg,#10141e,#0b0e14);
+  }
+  header h1{ margin:0; font-size:22px; letter-spacing:.5px; }
+  header h1 .gold{ color:var(--gold); }
+  header .sub{ color:var(--tx2); font-size:13px; }
+  #badges{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .badge{
+    font-size:12px; color:var(--cyan); border:1px solid var(--line);
+    border-radius:999px; padding:4px 12px; background:var(--panel); white-space:nowrap;
+  }
+  .badge b{ color:var(--gold); font-weight:600; }
+  main{
+    display:grid; grid-template-columns:minmax(320px,430px) 1fr;
+    gap:18px; padding:18px 22px; max-width:1600px; margin:0 auto;
+  }
+  @media (max-width:1040px){ main{ grid-template-columns:1fr; } }
+  .col{ display:flex; flex-direction:column; gap:18px; min-width:0; }
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px;
+  }
+  .panel h2{
+    margin:0 0 12px; font-size:14px; color:var(--gold); letter-spacing:1px;
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  }
+  .panel h2 .hint{ color:var(--tx2); font-size:11px; letter-spacing:0; font-weight:400; }
+  label.f{ display:block; font-size:12px; color:var(--tx2); margin:10px 0 4px; }
+  input[type=text],input[type=search],input[type=number],textarea,select{
+    width:100%; font:inherit; font-size:13px; color:var(--tx); background:#0e1220;
+    border:1px solid #2d3650; border-radius:8px; padding:8px 10px;
+  }
+  textarea{ resize:vertical; min-height:64px; line-height:1.6; }
+  input:focus,textarea:focus,select:focus{ outline:none; border-color:var(--gold); }
+  input[type=range]{ width:100%; accent-color:#e8c76a; }
+  button{
+    font:inherit; font-size:12px; color:var(--tx); background:#1d2436;
+    border:1px solid #2d3650; border-radius:8px; padding:6px 12px; cursor:pointer;
+  }
+  button:hover{ background:#252e46; }
+  button:disabled{ opacity:.45; cursor:default; }
+  button.pri{
+    background:#28324c; border-color:var(--gold); color:var(--gold);
+    font-weight:600; padding:9px 16px; font-size:13px;
+  }
+  button.pri:hover{ background:#313d5c; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .grow{ flex:1 1 auto; min-width:0; }
+  .sliderRow{ display:grid; grid-template-columns:1fr 46px; gap:8px; align-items:center; }
+  .sliderRow .v{ text-align:right; font-size:12px; color:var(--gold); }
+  .genes{ display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:6px; }
+  .gene{
+    border:1px solid var(--line); border-radius:9px; background:#0e1220; cursor:pointer;
+    padding:7px 4px; text-align:center; user-select:none; transition:.12s;
+  }
+  .gene .k{ font-size:15px; font-weight:600; color:var(--tx2); }
+  .gene .n{ font-size:10px; color:#6b7488; margin-top:2px; }
+  .gene.on{ background:#16241d; border-color:var(--ok); }
+  .gene.on .k{ color:var(--ok); }
+  .gene.req{ background:#241f12; border-color:var(--gold); }
+  .gene.req .k{ color:var(--gold); }
+  .gene.forbid{ background:#241616; border-color:var(--err); }
+  .gene.forbid .k{ color:var(--err); }
+  .eq{
+    background:#0e1220; border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; margin-bottom:8px;
+  }
+  .eq .name{ font-size:11px; color:var(--tx2); margin-bottom:4px; }
+  .eq .body{
+    font-family:"Cascadia Mono","Consolas","Menlo",monospace; font-size:12.5px;
+    color:var(--cyan); line-height:1.75; word-break:break-word;
+  }
+  .eq .val{ color:var(--gold); }
+  #cakeWrap{ display:grid; grid-template-columns:1fr minmax(210px,290px); gap:16px; }
+  @media (max-width:760px){ #cakeWrap{ grid-template-columns:1fr; } }
+  #cake{ width:100%; height:auto; background:#0a0d15; border:1px solid var(--line); border-radius:12px; }
+  #peelOut{ font-size:12px; line-height:1.95; color:var(--tx2); }
+  #peelOut .big{ font-size:15px; color:var(--gold); font-weight:600; }
+  #peelOut .k{ color:var(--tx); }
+  #peelOut hr{ border:none; border-top:1px solid var(--line); margin:8px 0; }
+  #results{ margin-top:12px; display:flex; flex-direction:column; gap:10px; max-height:620px; overflow:auto; }
+  .rec{
+    background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+    padding:10px 12px; display:grid; grid-template-columns:1fr auto; gap:10px;
+  }
+  .rec.handle{ border-color:#3d5541; box-shadow:inset 3px 0 0 var(--ok); }
+  .rec .hd{ font-size:12px; color:var(--cyan); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .rec .hd .dir{ color:var(--tx2); }
+  .rec .hd .seed{ font-size:10px; color:#7b85a0; border:1px solid var(--line); border-radius:6px; padding:0 5px; }
+  .rec .tx{ font-size:13px; line-height:1.65; margin:5px 0 4px; white-space:pre-wrap; word-break:break-word; }
+  .rec .ft{ font-size:11px; color:var(--tx2); display:flex; gap:10px; flex-wrap:wrap; }
+  .rec .ft .g{ color:var(--ok); }
+  .rec mark{ background:#3a3320; color:var(--gold); border-radius:3px; padding:0 2px; }
+  .tag{
+    text-align:right; display:flex; flex-direction:column; align-items:flex-end;
+    justify-content:space-between; gap:6px;
+  }
+  .tag .price{
+    font-family:"Cascadia Mono","Consolas",monospace; font-size:15px; color:var(--gold);
+    border:1px dashed #5a4a2a; border-radius:8px; padding:4px 9px; background:#181408;
+    white-space:nowrap;
+  }
+  .tag .del{ font-size:11px; padding:3px 8px; }
+  .empty{ color:var(--tx2); font-size:13px; padding:18px 4px; text-align:center; line-height:1.8; }
+  .expr{ display:flex; flex-direction:column; gap:7px; }
+  .expr .e{ display:grid; grid-template-columns:80px 1fr 96px; gap:9px; align-items:center; font-size:12px; }
+  .expr .e .bar{ height:7px; border-radius:4px; background:#0e1220; overflow:hidden; }
+  .expr .e .bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--gold),var(--cyan)); }
+  .expr .e .flip{ color:var(--tx2); font-size:10.5px; text-align:right; white-space:nowrap; }
+  .expr .e .flip.on{ color:var(--ok); }
+  .expr .e .flip.off{ color:var(--err); }
+  .loop{
+    background:#0e1220; border:1px solid var(--line); border-left:3px solid var(--ok);
+    border-radius:9px; padding:8px 10px; margin-bottom:8px; font-size:12px; line-height:1.75;
+  }
+  .loop .path{ color:var(--cyan); font-family:"Cascadia Mono","Consolas",monospace; word-break:break-all; }
+  .loop .when{ color:var(--tx2); font-size:11px; }
+  .note{ font-size:11.5px; color:var(--tx2); line-height:1.8; margin-top:10px; }
+  #toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:#1b2233; border:1px solid var(--gold); color:var(--tx);
+    padding:9px 18px; border-radius:999px; font-size:13px; opacity:0;
+    pointer-events:none; transition:opacity .25s; z-index:50;
+  }
+  #toast.show{ opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="gold">◎ Bada Baumkuchen</span></h1>
+  <span class="sub">優しさのソースを検索し、層として蓄積する — 後ろからの意味合いで読む</span>
+  <div id="badges">
+    <span class="badge">層 <b id="bCount">0</b></span>
+    <span class="badge">種数 g = <b id="bGenus">0</b></span>
+    <span class="badge">総額 <b id="bTotal">¥0</b></span>
+  </div>
+</header>
+
+<main>
+  <!-- ══ 左列: ノートの左ページ(方程式と絵)に対応 ══ -->
+  <div class="col">
+
+    <section class="panel">
+      <h2>⊕ 層を焼く <span class="hint">出来事ひとつ = 一層</span></h2>
+
+      <label class="f">優しさのソース(誰が / どこが)</label>
+      <input type="text" id="fSrc" placeholder="例: 母 / 隣の席の人 / 図書館の司書 / 自分" autocomplete="off">
+
+      <label class="f">向き</label>
+      <select id="fDir">
+        <option value="in">受け取った(ソース → 自分)</option>
+        <option value="out">贈った(自分 → ソース)</option>
+      </select>
+
+      <label class="f">何があったか</label>
+      <textarea id="fText" placeholder="例: 落とした荷物を黙って拾って、何も言わずに行ってしまった。"></textarea>
+
+      <label class="f">c — 贈った側が払った手間(コスト)</label>
+      <div class="sliderRow">
+        <input type="range" id="fCost" min="0" max="10" step="1" value="3">
+        <span class="v" id="vCost">3</span>
+      </div>
+
+      <label class="f">b — 受け取った側の利得</label>
+      <div class="sliderRow">
+        <input type="range" id="fBen" min="0" max="10" step="1" value="5">
+        <span class="v" id="vBen">5</span>
+      </div>
+
+      <label class="f">
+        🧬 DNA スイッチ(クリックで ON / OFF)
+        <span id="autoNote"></span>
+      </label>
+      <div class="genes" id="geneBox"></div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnAuto">本文から自動判定</button>
+        <button id="btnClearGenes">全部 OFF</button>
+        <span class="grow"></span>
+        <span class="badge">値札 <b id="vPrice">¥0</b></span>
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <button class="pri" id="btnAdd">⊕ この層を焼く</button>
+        <span class="hint" style="font-size:11px;color:var(--tx2)">外側に一層ぶん積まれます</span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>∮ 方程式 <span class="hint">この画面が実際に計算している式</span></h2>
+      <div class="eq">
+        <div class="name">値札 — 層 L に付く価格</div>
+        <div class="body">
+          price(L) = 100 · (1+c) · (1 + b/10) · rho · (1 + k/8)<br>
+          rho = 1 + (1/k)·&Sigma;<sub>j:d&#8339;=1</sub> (1 &minus; f&#8339;/N) &nbsp; (希少性 1 &le; rho &le; 2)<br>
+          <span class="val" id="eqPrice">—</span>
+        </div>
+      </div>
+      <div class="eq">
+        <div class="name">種数 — 人を結んだグラフのハンドル数</div>
+        <div class="body">
+          G = (V, E),&nbsp; g = b<sub>1</sub>(G) = E &minus; V + C<br>
+          <span class="val" id="eqGenus">—</span>
+        </div>
+      </div>
+      <div class="eq">
+        <div class="name">DNA スイッチ — 発現率(半減期 90 日)</div>
+        <div class="body">
+          e<sub>j</sub> = &Sigma;<sub>i</sub> w<sub>i</sub>·d<sub>ij</sub> / &Sigma;<sub>i</sub> w<sub>i</sub>,&nbsp;
+          w<sub>i</sub> = 2<sup>&minus;&Delta;t<sub>i</sub>/90d</sup><br>
+          <span class="val" id="eqDna">—</span>
+        </div>
+      </div>
+      <div class="eq">
+        <div class="name">後ろからの意味合い — 外側から k 層を剥く</div>
+        <div class="body">
+          P(k) = &Sigma;<sub>i&gt;N&minus;k</sub> price<sub>i</sub>,&nbsp;
+          R(k) = &Sigma;<sub>i</sub> price<sub>i</sub> &minus; P(k)<br>
+          g(k) = b<sub>1</sub>(&nbsp;L<sub>1..N&minus;k</sub>&nbsp;)<br>
+          <span class="val" id="eqPeel">—</span>
+        </div>
+      </div>
+      <div class="note">
+        値札は「優しさを売買する」ためのものではなく、<b>払われた手間を見落とさないための目盛り</b>です。
+        単位は円で表示しますが、意味は相対的な重みです。
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>📦 蓄積 <span class="hint">端末内(localStorage)に保存</span></h2>
+      <div class="row">
+        <button id="btnExport">JSON 書き出し</button>
+        <button id="btnCsv">CSV 書き出し</button>
+        <button id="btnImport">JSON 取り込み</button>
+        <button id="btnSeed">見本を入れる</button>
+        <button id="btnWipe">全消去</button>
+      </div>
+      <input type="file" id="fileIn" accept=".json,application/json" style="display:none">
+      <div class="note" id="statNote">—</div>
+    </section>
+  </div>
+
+  <!-- ══ 右列: ノートの右ページ(バームクーヘン)に対応 ══ -->
+  <div class="col">
+
+    <section class="panel">
+      <h2>◎ バームクーヘン <span class="hint">内側 = 古い層 / 外側 = 新しい層</span></h2>
+      <div id="cakeWrap">
+        <canvas id="cake" width="620" height="620"></canvas>
+        <div>
+          <label class="f" style="margin-top:0">← 後ろから(外側から)剥く</label>
+          <div class="sliderRow">
+            <input type="range" id="peel" min="0" max="0" step="1" value="0">
+            <span class="v" id="vPeel">0</span>
+          </div>
+          <div id="peelOut">層がまだありません。</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>🔍 優しさのソースを検索</h2>
+      <input type="search" id="q" placeholder="本文・ソース名で検索(空欄なら新しい順にすべて)" autocomplete="off">
+
+      <label class="f">🧬 DNA マスク(クリックで 不問 → ON必須 → OFF必須)</label>
+      <div class="genes" id="maskBox"></div>
+
+      <div class="row" style="margin-top:12px">
+        <div style="flex:1 1 130px">
+          <label class="f" style="margin-top:0">値札 下限</label>
+          <input type="number" id="fMin" placeholder="0" min="0" step="10">
+        </div>
+        <div style="flex:1 1 130px">
+          <label class="f" style="margin-top:0">値札 上限</label>
+          <input type="number" id="fMax" placeholder="上限なし" min="0" step="10">
+        </div>
+        <div style="flex:1 1 150px">
+          <label class="f" style="margin-top:0">向き</label>
+          <select id="fDirQ">
+            <option value="">すべて</option>
+            <option value="in">受け取った</option>
+            <option value="out">贈った</option>
+          </select>
+        </div>
+        <div style="flex:1 1 150px">
+          <label class="f" style="margin-top:0">並び</label>
+          <select id="fSort">
+            <option value="rel">関連度</option>
+            <option value="new">新しい順(外側から)</option>
+            <option value="old">古い順(芯から)</option>
+            <option value="price">値札の高い順</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="font-size:12px;color:var(--tx2);display:flex;gap:6px;align-items:center">
+          <input type="checkbox" id="fLoop" style="width:auto"> 輪を閉じた層だけ(種数に寄与した層)
+        </label>
+        <span class="grow"></span>
+        <button id="btnReset">条件をクリア</button>
+      </div>
+
+      <div id="results"></div>
+    </section>
+
+    <section class="panel">
+      <h2>🧬 DNA スイッチのオンオフした方法 <span class="hint">発現率と、最後に反転した層</span></h2>
+      <div class="expr" id="exprBox"></div>
+      <div class="note">
+        各遺伝子は層ごとに ON / OFF を持ちます。「最後の反転」は、<b>後ろから読んで最初に見つかる切り替え</b> ——
+        つまりその優しさが直近でいつ点いた/消えたかです。
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>⊗ 種数の後ろからの意味合い <span class="hint">外側から読んで、輪を閉じた層</span></h2>
+      <div id="loopBox"></div>
+      <div class="note">
+        新しい層から順に読み、すでに繋がっている二人をもう一度結んだ層が <b>輪を閉じた層</b> です。
+        輪が一つ増えるごとに、バームクーヘンの穴(ハンドル)が一つ増えます —— これが種数 g。
+        返礼が届いた瞬間、贈与は木から輪になります。
+      </div>
+    </section>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════════════════
+   1. 優しさ遺伝子 — DNA スイッチ 8 本
+   ══════════════════════════════════════════════════════════════════ */
+
+var GENES = [
+  { k:"聴", n:"傾聴",  hue: 192,
+    kw:["聞い","聴い","話を","相談","耳を","うなず","頷い","聞いて","聞いてくれ"] },
+  { k:"譲", n:"譲る",  hue: 152,
+    kw:["譲っ","譲り","席を","順番","先にどうぞ","どうぞ","代わっ","ゆずっ"] },
+  { k:"贈", n:"贈る",  hue:  42,
+    kw:["くれた","もらっ","渡し","贈っ","おごっ","奢っ","差し入れ","プレゼント","分けて","出してくれ"] },
+  { k:"赦", n:"赦す",  hue: 288,
+    kw:["赦し","許し","ゆるし","怒らな","責めな","見逃","大丈夫だよ","気にしないで","咎めな"] },
+  { k:"護", n:"護る",  hue:   8,
+    kw:["かばっ","庇っ","守っ","助け","支え","送ってくれ","付き添","傘","肩を","抱え"] },
+  { k:"教", n:"教える", hue: 218,
+    kw:["教え","教わ","見せてくれ","説明","手ほどき","アドバイス","コツ","教えてくれ"] },
+  { k:"待", n:"待つ",  hue: 108,
+    kw:["待っ","待ち","急かさ","ゆっくり","焦らせ","せかさ","急がせ"] },
+  { k:"黙", n:"黙る",  hue: 328,
+    kw:["黙っ","何も言わ","そっと","さりげ","言わずに","無言","そっとして","静かに"] }
+];
+var NG = GENES.length;
+
+/* ══════════════════════════════════════════════════════════════════
+   2. 日本語の正規化とトークン化
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 全角英数→半角、カタカナ→ひらがな、小文字化。検索の揺れを吸収する。 */
+function normJa(s){
+  if (s == null) return "";
+  var out = "";
+  var str = String(s);
+  for (var i = 0; i < str.length; i++){
+    var c = str.charCodeAt(i);
+    /* 全角英数字・記号 (U+FF01–U+FF5E) → 半角 */
+    if (c >= 0xFF01 && c <= 0xFF5E) c -= 0xFEE0;
+    /* 全角スペース → 半角 */
+    else if (c === 0x3000) c = 0x20;
+    /* カタカナ (U+30A1–U+30F6) → ひらがな */
+    else if (c >= 0x30A1 && c <= 0x30F6) c -= 0x60;
+    /* 長音・中黒はそのまま */
+    out += String.fromCharCode(c);
+  }
+  return out.toLowerCase();
+}
+
+/* 空白区切り。日本語は部分一致で拾うので形態素解析はしない。 */
+function tokenize(q){
+  var n = normJa(q).replace(/[、。,.]/g, " ");
+  var raw = n.split(/\s+/);
+  var out = [];
+  for (var i = 0; i < raw.length; i++){ if (raw[i]) out.push(raw[i]); }
+  return out;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   3. DNA スイッチ — 自動判定 / ビット操作
+   ══════════════════════════════════════════════════════════════════ */
+
+function emptyDna(){
+  var d = [];
+  for (var i = 0; i < NG; i++) d.push(0);
+  return d;
+}
+
+/* 本文のキーワードから ON/OFF を推定(メチル化に相当) */
+function detectGenes(text){
+  var t = normJa(text);
+  var d = emptyDna();
+  for (var j = 0; j < NG; j++){
+    var kw = GENES[j].kw;
+    for (var m = 0; m < kw.length; m++){
+      if (t.indexOf(normJa(kw[m])) >= 0){ d[j] = 1; break; }
+    }
+  }
+  return d;
+}
+
+function popcount(d){
+  var n = 0;
+  for (var i = 0; i < NG; i++) if (d && d[i]) n++;
+  return n;
+}
+
+/* 最も強く点いている遺伝子(表示色に使う)。全 OFF なら -1。 */
+function dominantGene(d){
+  for (var i = 0; i < NG; i++) if (d && d[i]) return i;
+  return -1;
+}
+
+function dnaString(d){
+  var s = "";
+  for (var i = 0; i < NG; i++) s += (d && d[i]) ? "1" : "0";
+  return s;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   4. 値札 — price(L) = 100 (1+c)(1+b/10) rho (1+k/8)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 希少性 rho: 点いている遺伝子が蓄積の中で珍しいほど 2 に近づく (1<=rho<=2) */
+function rarityOf(dna, freq, total){
+  var k = popcount(dna);
+  if (!k || !total) return 1;
+  var acc = 0;
+  for (var j = 0; j < NG; j++){
+    if (dna[j]) acc += (1 - (freq[j] || 0) / total);
+  }
+  return 1 + acc / k;
+}
+
+/* 蓄積全体の遺伝子頻度 */
+function geneFreq(records){
+  var f = emptyDna();
+  for (var i = 0; i < records.length; i++){
+    var d = records[i].dna || [];
+    for (var j = 0; j < NG; j++) if (d[j]) f[j]++;
+  }
+  return f;
+}
+
+function clamp(v, lo, hi){ v = Number(v); if (isNaN(v)) v = lo; return v < lo ? lo : (v > hi ? hi : v); }
+
+function priceTag(rec, freq, total){
+  var c = clamp(rec.cost, 0, 10);
+  var b = clamp(rec.benefit, 0, 10);
+  var k = popcount(rec.dna);
+  var rho = rarityOf(rec.dna || emptyDna(), freq || emptyDna(), total || 0);
+  var raw = 100 * (1 + c) * (1 + b / 10) * rho * (1 + k / NG);
+  return Math.round(raw / 10) * 10;
+}
+
+/* 全レコードの値札を一括で付け直す(希少性は蓄積全体に依存するため) */
+function repriceAll(records){
+  var freq = geneFreq(records);
+  var total = records.length;
+  for (var i = 0; i < records.length; i++){
+    records[i].price = priceTag(records[i], freq, total);
+  }
+  return records;
+}
+
+function totalPrice(records){
+  var s = 0;
+  for (var i = 0; i < records.length; i++) s += (records[i].price || 0);
+  return s;
+}
+
+function fmtYen(n){
+  n = Math.round(Number(n) || 0);
+  var s = String(Math.abs(n)), out = "", c = 0;
+  for (var i = s.length - 1; i >= 0; i--){
+    out = s.charAt(i) + out;
+    if ((++c) % 3 === 0 && i > 0) out = "," + out;
+  }
+  return (n < 0 ? "-¥" : "¥") + out;
+}
+
+function fmtDate(ts){
+  var d = new Date(Number(ts) || 0);
+  function p(x){ return (x < 10 ? "0" : "") + x; }
+  return d.getFullYear() + "/" + p(d.getMonth() + 1) + "/" + p(d.getDate());
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   5. 種数 — 人を結んだグラフのハンドル数 g = b1 = E - V + C
+
+   グラフを太らせた立体(ハンドル体)の種数は第一ベッチ数に等しい。
+   バームクーヘンの穴がいくつ空いているか、がこれ。
+   ══════════════════════════════════════════════════════════════════ */
+
+var ME = "自分";
+
+function nodesOf(rec){
+  var a = (rec.src || "").trim() || "(無名)";
+  return [a, ME];
+}
+
+/* Union-Find */
+function UF(){ this.p = {}; }
+UF.prototype.find = function(x){
+  if (this.p[x] === undefined){ this.p[x] = x; return x; }
+  while (this.p[x] !== x){ this.p[x] = this.p[this.p[x]]; x = this.p[x]; }
+  return x;
+};
+UF.prototype.union = function(a, b){
+  var ra = this.find(a), rb = this.find(b);
+  if (ra === rb) return false;
+  this.p[ra] = rb;
+  return true;
+};
+
+function buildGraph(records){
+  var nodeSet = {}, V = 0, E = 0;
+  var uf = new UF();
+  for (var i = 0; i < records.length; i++){
+    var nv = nodesOf(records[i]);
+    for (var t = 0; t < 2; t++){
+      if (!nodeSet[nv[t]]){ nodeSet[nv[t]] = 1; V++; }
+    }
+    uf.find(nv[0]); uf.find(nv[1]);
+    uf.union(nv[0], nv[1]);
+    E++;
+  }
+  var roots = {}, C = 0;
+  for (var n in nodeSet){
+    if (!nodeSet.hasOwnProperty(n)) continue;
+    var r = uf.find(n);
+    if (!roots[r]){ roots[r] = 1; C++; }
+  }
+  var names = [];
+  for (var n2 in nodeSet) if (nodeSet.hasOwnProperty(n2)) names.push(n2);
+  return { V:V, E:E, C:C, genus: E - V + C, nodes: names };
+}
+
+function genusOf(records){ return buildGraph(records).genus; }
+
+/* 与えられた順に辺を足していき、輪を閉じた層を拾う。
+   既に繋がっている二人をもう一度結んだ辺が、ハンドルを一つ作る。
+   閉じた輪(閉路)は、その時点の森を BFS して復元する。 */
+function handleClosers(records){
+  var uf = new UF();
+  var adj = {};                       /* 森の隣接リスト */
+  var out = [];
+  function link(a, b){
+    if (!adj[a]) adj[a] = [];
+    if (!adj[b]) adj[b] = [];
+    adj[a].push(b); adj[b].push(a);
+  }
+  function pathInForest(a, b){
+    if (a === b) return [a];
+    var prev = {}, seen = {}, queue = [a];
+    seen[a] = 1;
+    while (queue.length){
+      var cur = queue.shift();
+      var nb = adj[cur] || [];
+      for (var i = 0; i < nb.length; i++){
+        var nx = nb[i];
+        if (seen[nx]) continue;
+        seen[nx] = 1; prev[nx] = cur;
+        if (nx === b){
+          var p = [b], c = b;
+          while (c !== a){ c = prev[c]; p.unshift(c); }
+          return p;
+        }
+        queue.push(nx);
+      }
+    }
+    return null;
+  }
+  for (var i = 0; i < records.length; i++){
+    var nv = nodesOf(records[i]);
+    var a = nv[0], b = nv[1];
+    if (uf.find(a) === uf.find(b)){
+      var cyc = pathInForest(a, b);
+      if (!cyc) cyc = [a, b];
+      out.push({ rec: records[i], index: i, cycle: cyc.concat([a]) });
+    } else {
+      uf.union(a, b);
+      link(a, b);
+    }
+  }
+  return out;
+}
+
+/* 新しい層から読む = 後ろからの意味合い */
+function handleClosersReverse(records){
+  return handleClosers(records.slice().reverse());
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   6. 後ろからの意味合い — 外側から k 層を剥く逆走査
+   ══════════════════════════════════════════════════════════════════ */
+
+/* records は古い順(index 0 = 芯)。k 層剥いた各段を返す。 */
+function reverseRead(records){
+  var N = records.length;
+  var total = totalPrice(records);
+  var steps = [];
+  for (var k = 1; k <= N; k++){
+    var peeled = records.slice(N - k);
+    var remain = records.slice(0, N - k);
+    var pp = totalPrice(peeled);
+    var gRemain = genusOf(remain);
+    var gPeel = genusOf(peeled);
+    /* 剥いた側にしか無い遺伝子 = この深さより外側でしか点いていない優しさ */
+    var fr = geneFreq(remain), fp = geneFreq(peeled), lost = [];
+    for (var j = 0; j < NG; j++){ if (fp[j] > 0 && fr[j] === 0) lost.push(j); }
+    steps.push({
+      depth: k,
+      layer: records[N - k],
+      peeledPrice: pp,
+      residual: total - pp,
+      genusRemain: gRemain,
+      genusPeeled: gPeel,
+      lostGenes: lost
+    });
+  }
+  return steps;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   7. DNA スイッチのオンオフした方法 — 発現率と最後の反転
+   ══════════════════════════════════════════════════════════════════ */
+
+var HALFLIFE_MS = 90 * 24 * 3600 * 1000;   /* 半減期 90 日 */
+
+function recencyWeight(ts, now){
+  var dt = (now - (Number(ts) || 0));
+  if (dt < 0) dt = 0;
+  return Math.pow(2, -dt / HALFLIFE_MS);
+}
+
+function geneExpression(records, now){
+  var e = [], wsum = 0, acc = emptyDna();
+  for (var i = 0; i < records.length; i++){
+    var w = recencyWeight(records[i].ts, now);
+    wsum += w;
+    var d = records[i].dna || [];
+    for (var j = 0; j < NG; j++) if (d[j]) acc[j] += w;
+  }
+  for (var j2 = 0; j2 < NG; j2++) e.push(wsum > 0 ? acc[j2] / wsum : 0);
+  return e;
+}
+
+/* 古い順に走査し、前の層から状態が変わった層を反転とみなす。
+   返すのは各遺伝子の「最後の反転」= 後ろから読んで最初に出会う切り替え。 */
+function lastFlips(records){
+  var res = [];
+  for (var j = 0; j < NG; j++){
+    var prev = 0, last = null;
+    for (var i = 0; i < records.length; i++){
+      var cur = (records[i].dna && records[i].dna[j]) ? 1 : 0;
+      if (cur !== prev){
+        last = { index: i, dir: cur ? "on" : "off", ts: records[i].ts, rec: records[i] };
+        prev = cur;
+      }
+    }
+    res.push(last);
+  }
+  return res;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   8. 優しさのソースを検索
+   ══════════════════════════════════════════════════════════════════ */
+
+/* mask[j]: -1 = 不問 / 1 = ON 必須 / 0 = OFF 必須 */
+function maskPass(dna, mask){
+  if (!mask) return true;
+  for (var j = 0; j < NG; j++){
+    if (mask[j] === -1) continue;
+    var bit = (dna && dna[j]) ? 1 : 0;
+    if (bit !== mask[j]) return false;
+  }
+  return true;
+}
+
+function searchSources(records, query, opts){
+  opts = opts || {};
+  var mask = opts.mask || null;
+  var now = opts.now || Date.now();
+  var loopIds = opts.loopIds || null;
+  var toks = tokenize(query || "");
+  var hits = [];
+
+  for (var i = 0; i < records.length; i++){
+    var r = records[i];
+    /* ── 絞り込み(ハード条件) ── */
+    if (!maskPass(r.dna, mask)) continue;
+    if (opts.min != null && opts.min !== "" && (r.price || 0) < Number(opts.min)) continue;
+    if (opts.max != null && opts.max !== "" && (r.price || 0) > Number(opts.max)) continue;
+    if (opts.dir && r.dir !== opts.dir) continue;
+    if (opts.onlyLoop && loopIds && !loopIds[r.id]) continue;
+
+    /* ── 関連度 ── */
+    var nsrc = normJa(r.src), ntx = normJa(r.text);
+    var score = 0, matched = true;
+    for (var t = 0; t < toks.length; t++){
+      var q = toks[t], hit = 0;
+      if (nsrc === q) { score += 4; hit = 1; }
+      else if (nsrc.indexOf(q) >= 0){ score += 2.4; hit = 1; }
+      if (ntx.indexOf(q) >= 0){
+        score += 1.6;
+        if (ntx.indexOf(q) === 0) score += 0.5;
+        hit = 1;
+      }
+      /* 遺伝子名・キーでも引ける(例: 「傾聴」「黙」) */
+      for (var j = 0; j < NG; j++){
+        if (!(r.dna && r.dna[j])) continue;
+        if (normJa(GENES[j].n).indexOf(q) >= 0 || normJa(GENES[j].k) === q){ score += 1.2; hit = 1; }
+      }
+      if (!hit){ matched = false; break; }
+    }
+    if (!matched) continue;
+
+    score += recencyWeight(r.ts, now);               /* 新しさ */
+    score += (r.price || 0) / 100000;                /* 値札は同点時の僅差だけ */
+    if (loopIds && loopIds[r.id]) score += 0.4;      /* 輪を閉じた層は少し上へ */
+    hits.push({ rec: r, score: score });
+  }
+
+  var sort = opts.sort || "rel";
+  hits.sort(function(a, b){
+    if (sort === "new")   return (b.rec.ts || 0) - (a.rec.ts || 0);
+    if (sort === "old")   return (a.rec.ts || 0) - (b.rec.ts || 0);
+    if (sort === "price") return (b.rec.price || 0) - (a.rec.price || 0);
+    if (b.score !== a.score) return b.score - a.score;
+    return (b.rec.ts || 0) - (a.rec.ts || 0);
+  });
+  return hits;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   9. 見本の層(初回だけ焼いておく種)
+   ══════════════════════════════════════════════════════════════════ */
+
+var SEED = [
+  { src:"母",           dir:"in",  cost:6, benefit:7, days:900,
+    text:"熱を出した日、何も聞かずに枕元に水を置いて、そっと部屋を出ていった。" },
+  { src:"母",           dir:"out", cost:4, benefit:6, days:300,
+    text:"帰りに好きだった和菓子を買って渡した。何も言わずにお茶を淹れてくれた。" },
+  { src:"隣の席の人",   dir:"in",  cost:2, benefit:5, days:640,
+    text:"落とした消しゴムを黙って拾って、机の端に置いてくれた。" },
+  { src:"図書館の司書", dir:"in",  cost:5, benefit:8, days:520,
+    text:"探していた本が見つからないと相談したら、閉架まで降りて三冊持ってきて、調べ方を教えてくれた。" },
+  { src:"担任の先生",   dir:"in",  cost:7, benefit:9, days:480,
+    text:"提出が遅れたことを責めないで、書けなかった理由を最後まで聞いてくれた。待っていてくれた。" },
+  { src:"見知らぬ人",   dir:"in",  cost:3, benefit:6, days:410,
+    text:"急な雨のバス停で、傘に入れてくれた。名前も聞かずに行ってしまった。" },
+  { src:"弟",           dir:"out", cost:5, benefit:7, days:360,
+    text:"うまくいかない話を、口を挟まずに最後まで聞いた。アドバイスはしなかった。" },
+  { src:"弟",           dir:"in",  cost:4, benefit:6, days:120,
+    text:"引っ越しの日、何も言わずに朝から来て、重い荷物ばかり運んでいった。" },
+  { src:"同僚",         dir:"in",  cost:6, benefit:7, days:250,
+    text:"自分のミスなのに一緒に謝ってくれて、あとで一度も蒸し返さなかった。" },
+  { src:"同僚",         dir:"out", cost:3, benefit:5, days:90,
+    text:"残っていたので、先に帰っていいと席を譲って、続きを引き受けた。" },
+  { src:"コンビニの店員", dir:"in", cost:1, benefit:4, days:200,
+    text:"小銭を数えるのに手間取っても、急かさないで待ってくれた。" },
+  { src:"昔の友人",     dir:"in",  cost:8, benefit:9, days:1500,
+    text:"誰にも言えない失敗を打ち明けたとき、驚きもせず、誰にも言わないままでいてくれた。" },
+  { src:"自分",         dir:"out", cost:4, benefit:5, days:30,
+    text:"今日はここまででいい、と自分に言って、早く休んだ。責めなかった。" },
+  { src:"見知らぬ人",   dir:"out", cost:2, benefit:4, days:14,
+    text:"階段でベビーカーを持ち上げるのを手伝った。お礼を言われる前に離れた。" }
+];
+
+function seedRecords(now){
+  now = now || Date.now();
+  var out = [];
+  for (var i = 0; i < SEED.length; i++){
+    var s = SEED[i];
+    out.push({
+      id: "seed-" + i,
+      ts: now - s.days * 24 * 3600 * 1000,
+      src: s.src, dir: s.dir, text: s.text,
+      cost: s.cost, benefit: s.benefit,
+      dna: detectGenes(s.text),
+      seed: true
+    });
+  }
+  out.sort(function(a, b){ return a.ts - b.ts; });
+  return repriceAll(out);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   10. 蓄積 — localStorage への保存と入出力
+   ══════════════════════════════════════════════════════════════════ */
+
+var STORE_KEY = "bada.baumkuchen.v1";
+
+function sanitizeRecord(o, i){
+  var text = String(o && o.text != null ? o.text : "");
+  var dna = (o && o.dna && o.dna.length === NG) ? o.dna.slice() : detectGenes(text);
+  for (var j = 0; j < NG; j++) dna[j] = dna[j] ? 1 : 0;
+  var ts = Number(o && o.ts);
+  if (!isFinite(ts) || ts <= 0) ts = Date.now();
+  return {
+    id: String(o && o.id ? o.id : ("r-" + ts + "-" + i)),
+    ts: ts,
+    src: String(o && o.src ? o.src : "").trim() || "(無名)",
+    dir: (o && o.dir === "out") ? "out" : "in",
+    text: text,
+    cost: clamp(o && o.cost, 0, 10),
+    benefit: clamp(o && o.benefit, 0, 10),
+    dna: dna,
+    seed: !!(o && o.seed)
+  };
+}
+
+function normalizeAll(list){
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(sanitizeRecord(list[i], i));
+  out.sort(function(a, b){ return a.ts - b.ts; });
+  return repriceAll(out);
+}
+
+function loadStore(){
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    var list = (o && o.records) ? o.records : (o instanceof Array ? o : null);
+    if (!list) return null;
+    return normalizeAll(list);
+  } catch (e){ return null; }
+}
+
+function saveStore(records){
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ v:1, savedAt: Date.now(), records: records }));
+    return true;
+  } catch (e){ return false; }
+}
+
+function toCsv(records){
+  function q(s){ return '"' + String(s == null ? "" : s).replace(/"/g, '""') + '"'; }
+  var lines = ["date,source,direction,cost,benefit,dna,price,text"];
+  for (var i = 0; i < records.length; i++){
+    var r = records[i];
+    lines.push([
+      q(fmtDate(r.ts)), q(r.src), q(r.dir === "out" ? "given" : "received"),
+      r.cost, r.benefit, q(dnaString(r.dna)), (r.price || 0), q(r.text)
+    ].join(","));
+  }
+  return lines.join("\n");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   11. 画面
+   ══════════════════════════════════════════════════════════════════ */
+
+var records = [];
+var formDna = emptyDna();
+var mask = [];
+var peelK = 0;
+var lastQueryToks = [];
+
+function $(id){ return document.getElementById(id); }
+function esc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/* normJa は 1 文字 → 1 文字の写像なので、正規化後の位置を元の文字列にそのまま使える */
+function highlight(text, toks){
+  if (!toks || !toks.length) return esc(text);
+  var n = normJa(text), ranges = [];
+  for (var t = 0; t < toks.length; t++){
+    var q = toks[t];
+    if (!q) continue;
+    var from = 0;
+    while (true){
+      var at = n.indexOf(q, from);
+      if (at < 0) break;
+      ranges.push([at, at + q.length]);
+      from = at + Math.max(1, q.length);
+    }
+  }
+  if (!ranges.length) return esc(text);
+  ranges.sort(function(a, b){ return a[0] - b[0]; });
+  var merged = [ranges[0]];
+  for (var i = 1; i < ranges.length; i++){
+    var last = merged[merged.length - 1];
+    if (ranges[i][0] <= last[1]) last[1] = Math.max(last[1], ranges[i][1]);
+    else merged.push(ranges[i]);
+  }
+  var out = "", pos = 0;
+  for (var m = 0; m < merged.length; m++){
+    out += esc(text.slice(pos, merged[m][0]));
+    out += "<mark>" + esc(text.slice(merged[m][0], merged[m][1])) + "</mark>";
+    pos = merged[m][1];
+  }
+  out += esc(text.slice(pos));
+  return out;
+}
+
+function toast(msg){
+  var t = $("toast");
+  t.textContent = msg; t.className = "show";
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function(){ t.className = ""; }, 1900);
+}
+
+function geneHtml(j, cls){
+  return '<div class="gene ' + cls + '" data-g="' + j + '">' +
+         '<div class="k">' + GENES[j].k + '</div><div class="n">' + GENES[j].n + '</div></div>';
+}
+
+function renderGeneBoxes(){
+  var a = "", b = "";
+  for (var j = 0; j < NG; j++){
+    a += geneHtml(j, formDna[j] ? "on" : "");
+    b += geneHtml(j, mask[j] === 1 ? "req" : (mask[j] === 0 ? "forbid" : ""));
+  }
+  $("geneBox").innerHTML = a;
+  $("maskBox").innerHTML = b;
+}
+
+/* ── バームクーヘンの描画 ── */
+var ringGeom = [];   /* [{r0, r1, rec, idx}] クリック判定に使う */
+
+function drawCake(){
+  var cv = $("cake"), g = cv.getContext("2d");
+  var W = cv.width, H = cv.height, cx = W / 2, cy = H / 2;
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = "#0a0d15"; g.fillRect(0, 0, W, H);
+
+  var N = records.length;
+  ringGeom = [];
+  if (!N){
+    g.fillStyle = "#6b7488"; g.font = "15px sans-serif"; g.textAlign = "center";
+    g.fillText("まだ一層も焼かれていません", cx, cy - 6);
+    g.font = "12px sans-serif";
+    g.fillText("左の「⊕ この層を焼く」から始めてください", cx, cy + 18);
+    return;
+  }
+
+  var hole = 34, budget = Math.min(W, H) / 2 - 46 - hole;   /* 上端に矢印の余白を残す */
+  var ws = [], sum = 0;
+  for (var i = 0; i < N; i++){
+    var w = 1 + Math.log(1 + (records[i].price || 0) / 250);
+    ws.push(w); sum += w;
+  }
+  var closers = {}, cl = handleClosersReverse(records);
+  for (var c = 0; c < cl.length; c++) closers[cl[c].rec.id] = 1;
+
+  var r = hole;
+  for (var i2 = 0; i2 < N; i2++){
+    var rec = records[i2];
+    var th = Math.max(3.5, Math.min(40, budget * ws[i2] / sum));
+    var r0 = r, r1 = r + th;
+    r = r1;
+    ringGeom.push({ r0:r0, r1:r1, rec:rec, idx:i2 });
+
+    var peeled = (i2 >= N - peelK);
+    /* 生地(hue 32)へ寄せた色。遺伝子ごとの差は残しつつ、焼き菓子の色に収める。 */
+    var dg = dominantGene(rec.dna);
+    var gh = dg < 0 ? 32 : GENES[dg].hue;
+    var hue = 32 + ((gh - 32 + 540) % 360 - 180) * 0.34;
+    var sat = dg < 0 ? 30 : 34;
+    var lig = 23 + 9 * (popcount(rec.dna) / NG) + (i2 % 2 ? 3.5 : 0);
+
+    g.beginPath(); g.arc(cx, cy, (r0 + r1) / 2, 0, Math.PI * 2);
+    g.lineWidth = th - 1.2;
+    if (peeled){
+      g.strokeStyle = "hsla(" + hue + "," + sat + "%," + lig + "%,0.14)";
+      g.setLineDash([5, 7]);
+    } else {
+      g.strokeStyle = "hsl(" + hue + "," + sat + "%," + lig + "%)";
+      g.setLineDash([]);
+    }
+    g.stroke();
+    g.setLineDash([]);
+
+    /* 焼き目 — 層と層のあいだの線 */
+    g.beginPath(); g.arc(cx, cy, r1, 0, Math.PI * 2);
+    g.lineWidth = 1;
+    g.strokeStyle = peeled ? "rgba(90,100,125,.18)" : "rgba(10,13,21,.85)";
+    g.stroke();
+
+    /* 輪を閉じた層(種数 +1)には穴の印を打つ */
+    if (closers[rec.id]){
+      var ang = -Math.PI / 2 + (i2 * 0.83);
+      var mr = (r0 + r1) / 2;
+      g.beginPath();
+      g.arc(cx + Math.cos(ang) * mr, cy + Math.sin(ang) * mr, Math.max(2.2, Math.min(5, th / 2.6)), 0, Math.PI * 2);
+      g.fillStyle = peeled ? "rgba(95,214,138,.25)" : "#5fd68a";
+      g.fill();
+    }
+  }
+
+  /* 芯(バームクーヘンの穴) */
+  g.beginPath(); g.arc(cx, cy, hole, 0, Math.PI * 2);
+  g.fillStyle = "#0a0d15"; g.fill();
+  g.lineWidth = 1; g.strokeStyle = "#2a3350"; g.stroke();
+  g.fillStyle = "#8b94a8"; g.font = "12px sans-serif"; g.textAlign = "center";
+  g.fillText("芯", cx, cy - 2);
+  g.font = "10px sans-serif";
+  g.fillText(String(records[0].src).slice(0, 6), cx, cy + 13);
+
+  /* 後ろから読む矢印(キャンバス上端に固定) */
+  var top = cy - r;                       /* 一番外の層の上端 */
+  g.strokeStyle = "#e8c76a"; g.fillStyle = "#e8c76a"; g.lineWidth = 1.4;
+  g.beginPath(); g.moveTo(cx, top - 26); g.lineTo(cx, top - 10); g.stroke();
+  g.beginPath();
+  g.moveTo(cx, top - 3); g.lineTo(cx - 5, top - 13); g.lineTo(cx + 5, top - 13);
+  g.closePath(); g.fill();
+  g.font = "11px sans-serif"; g.textAlign = "center";
+  g.fillText("後ろから読む", cx, top - 32);
+}
+
+/* ── 後ろからの意味合いの読み出し ── */
+function renderPeel(){
+  var box = $("peelOut"), N = records.length;
+  $("peel").max = String(N);
+  if (peelK > N) peelK = N;
+  $("peel").value = String(peelK);
+  $("vPeel").textContent = String(peelK);
+
+  if (!N){ box.innerHTML = "層がまだありません。"; $("eqPeel").textContent = "—"; return; }
+
+  var total = totalPrice(records), gAll = genusOf(records);
+  if (peelK === 0){
+    box.innerHTML =
+      '<div class="big">丸ごと ' + N + ' 層</div>' +
+      '総額 <span class="k">' + fmtYen(total) + '</span><br>' +
+      '種数 <span class="k">g = ' + gAll + '</span><br>' +
+      '芯 <span class="k">' + esc(records[0].src) + '</span> / ' + fmtDate(records[0].ts) + '<br>' +
+      '外側 <span class="k">' + esc(records[N - 1].src) + '</span> / ' + fmtDate(records[N - 1].ts) +
+      '<hr>スライダーを動かすと、外側(新しい層)から剥いて読みます。';
+    $("eqPeel").textContent = "k = 0 → P = ¥0, R = " + fmtYen(total) + ", g(0) = " + gAll;
+    return;
+  }
+
+  var steps = reverseRead(records), st = steps[peelK - 1];
+  var lost = "";
+  for (var i = 0; i < st.lostGenes.length; i++){
+    lost += (i ? "・" : "") + GENES[st.lostGenes[i]].k + "(" + GENES[st.lostGenes[i]].n + ")";
+  }
+  box.innerHTML =
+    '<div class="big">外側から ' + peelK + ' 層を剥いた</div>' +
+    'いま剥いた層 <span class="k">' + esc(st.layer.src) + '</span> ' +
+    '<span style="color:#6b7488">' + fmtDate(st.layer.ts) + '</span><br>' +
+    '<span style="color:#6b7488">' + esc(String(st.layer.text).slice(0, 44)) +
+      (String(st.layer.text).length > 44 ? "…" : "") + '</span>' +
+    '<hr>' +
+    '剥いた分 P(' + peelK + ') <span class="k">' + fmtYen(st.peeledPrice) + '</span><br>' +
+    '残った芯 R(' + peelK + ') <span class="k">' + fmtYen(st.residual) + '</span><br>' +
+    '残りの種数 <span class="k">g = ' + st.genusRemain + '</span>' +
+    ' <span style="color:#6b7488">(剥いた側 ' + st.genusPeeled + ')</span><br>' +
+    (lost ? 'ここから外にしか無い優しさ <span class="k">' + lost + '</span>' :
+            '<span style="color:#6b7488">外側にしか無い遺伝子はありません</span>');
+
+  $("eqPeel").textContent =
+    "k = " + peelK + " → P = " + fmtYen(st.peeledPrice) + ", R = " + fmtYen(st.residual) +
+    ", g(" + peelK + ") = " + st.genusRemain;
+}
+
+/* ── 検索結果 ── */
+function currentMaskArr(){ return mask.slice(); }
+
+function loopIdMap(){
+  var m = {}, cl = handleClosersReverse(records);
+  for (var i = 0; i < cl.length; i++) m[cl[i].rec.id] = 1;
+  return m;
+}
+
+function renderResults(){
+  var q = $("q").value;
+  lastQueryToks = tokenize(q);
+  var lm = loopIdMap();
+  var hits = searchSources(records, q, {
+    mask: currentMaskArr(),
+    min: $("fMin").value, max: $("fMax").value,
+    dir: $("fDirQ").value,
+    onlyLoop: $("fLoop").checked,
+    sort: $("fSort").value,
+    loopIds: lm,
+    now: Date.now()
+  });
+
+  var box = $("results");
+  if (!hits.length){
+    box.innerHTML = '<div class="empty">' +
+      (records.length ? "条件に合う層はありません。<br>DNA マスクや値札の帯をゆるめてみてください。"
+                      : "まだ蓄積がありません。<br>左から層を焼くか、「見本を入れる」を押してください。") +
+      '</div>';
+    return;
+  }
+
+  var html = "";
+  for (var i = 0; i < hits.length; i++){
+    var r = hits[i].rec;
+    var genes = "";
+    for (var j = 0; j < NG; j++){
+      if (r.dna && r.dna[j]) genes += (genes ? " " : "") + GENES[j].k;
+    }
+    var isLoop = !!lm[r.id];
+    html +=
+      '<div class="rec' + (isLoop ? ' handle' : '') + '">' +
+        '<div>' +
+          '<div class="hd">' +
+            '<b>' + highlight(r.src, lastQueryToks) + '</b>' +
+            '<span class="dir">' + (r.dir === "out" ? "自分 → ソース(贈った)" : "ソース → 自分(受け取った)") + '</span>' +
+            (r.seed ? '<span class="seed">見本</span>' : '') +
+          '</div>' +
+          '<div class="tx">' + highlight(r.text, lastQueryToks) + '</div>' +
+          '<div class="ft">' +
+            '<span>' + fmtDate(r.ts) + '</span>' +
+            '<span>c=' + r.cost + ' b=' + r.benefit + '</span>' +
+            '<span>🧬 ' + (genes || "—") + '</span>' +
+            (isLoop ? '<span class="g">⊗ 輪を閉じた層</span>' : '') +
+          '</div>' +
+        '</div>' +
+        '<div class="tag">' +
+          '<div class="price">' + fmtYen(r.price) + '</div>' +
+          '<button class="del" data-del="' + esc(r.id) + '">削除</button>' +
+        '</div>' +
+      '</div>';
+  }
+  box.innerHTML = html;
+
+  var btns = box.querySelectorAll("button[data-del]");
+  for (var b = 0; b < btns.length; b++){
+    btns[b].onclick = function(){ removeRecord(this.getAttribute("data-del")); };
+  }
+}
+
+/* ── DNA スイッチの発現プロファイル ── */
+function renderExpr(){
+  var now = Date.now();
+  var e = geneExpression(records, now), flips = lastFlips(records);
+  var html = "";
+  for (var j = 0; j < NG; j++){
+    var pct = Math.round(e[j] * 100);
+    var f = flips[j], ftx = "反転なし", fcls = "";
+    if (f){
+      ftx = (f.dir === "on" ? "ON " : "OFF ") + fmtDate(f.ts);
+      fcls = f.dir;
+    }
+    html +=
+      '<div class="e">' +
+        '<div>' + GENES[j].k + ' <span style="color:#6b7488">' + GENES[j].n + '</span></div>' +
+        '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="flip ' + fcls + '">' + pct + '% / ' + ftx + '</div>' +
+      '</div>';
+  }
+  $("exprBox").innerHTML = html;
+
+  /* 方程式パネルへ発現トップ 3 */
+  var order = [];
+  for (var k = 0; k < NG; k++) order.push({ j:k, v:e[k] });
+  order.sort(function(a, b){ return b.v - a.v; });
+  var top = [];
+  for (var t = 0; t < 3; t++){
+    if (order[t] && order[t].v > 0){
+      top.push(GENES[order[t].j].k + " " + Math.round(order[t].v * 100) + "%");
+    }
+  }
+  $("eqDna").textContent = top.length ? ("発現上位  " + top.join("  /  ")) : "—";
+}
+
+/* ── 種数の後ろからの意味合い ── */
+function renderLoops(){
+  var cl = handleClosersReverse(records), box = $("loopBox");
+  if (!cl.length){
+    box.innerHTML = '<div class="empty">まだ輪が閉じていません(種数 g = 0)。<br>' +
+      '同じ相手との二度目の層、あるいは自分から自分への層が、最初のハンドルを作ります。</div>';
+    return;
+  }
+  var html = "";
+  for (var i = 0; i < cl.length; i++){
+    var c = cl[i], r = c.rec;
+    html +=
+      '<div class="loop">' +
+        '<div><b style="color:#5fd68a">輪 ' + (i + 1) + '</b> ' +
+          '<span class="when">' + fmtDate(r.ts) + ' / ' + esc(r.src) + '</span></div>' +
+        '<div class="path">' + esc(c.cycle.join(" → ")) + '</div>' +
+        '<div>' + esc(String(r.text).slice(0, 60)) + (String(r.text).length > 60 ? "…" : "") + '</div>' +
+      '</div>';
+  }
+  box.innerHTML = html;
+}
+
+/* ── 方程式パネルの実測値 ── */
+function renderEquations(){
+  var gi = buildGraph(records);
+  $("eqGenus").textContent =
+    "V = " + gi.V + ", E = " + gi.E + ", C = " + gi.C + "  →  g = " + gi.genus;
+
+  var freq = geneFreq(records);
+  var draft = {
+    cost: Number($("fCost").value), benefit: Number($("fBen").value), dna: formDna
+  };
+  var rho = rarityOf(formDna, freq, records.length);
+  var p = priceTag(draft, freq, records.length);
+  $("eqPrice").textContent =
+    "c = " + draft.cost + ", b = " + draft.benefit + ", k = " + popcount(formDna) +
+    ", rho = " + rho.toFixed(2) + "  →  price = " + fmtYen(p);
+  $("vPrice").textContent = fmtYen(p);
+}
+
+/* ── 蓄積の統計 ── */
+function renderStats(){
+  var n = records.length;
+  if (!n){ $("statNote").textContent = "蓄積: 0 層"; return; }
+  var srcs = {}, ns = 0, own = 0;
+  for (var i = 0; i < n; i++){
+    if (!srcs[records[i].src]){ srcs[records[i].src] = 1; ns++; }
+    if (records[i].dir === "out") own++;
+  }
+  var total = totalPrice(records);
+  $("statNote").innerHTML =
+    "蓄積: <b>" + n + "</b> 層 / ソース <b>" + ns + "</b> 人 / 種数 <b>" + genusOf(records) + "</b><br>" +
+    "総額 <b>" + fmtYen(total) + "</b> / 平均 <b>" + fmtYen(total / n) + "</b><br>" +
+    "受け取った " + (n - own) + " 層・贈った " + own + " 層 / " +
+    fmtDate(records[0].ts) + " 〜 " + fmtDate(records[n - 1].ts);
+}
+
+function renderAll(){
+  $("bCount").textContent = String(records.length);
+  $("bGenus").textContent = String(genusOf(records));
+  $("bTotal").textContent = fmtYen(totalPrice(records));
+  drawCake();
+  renderPeel();
+  renderResults();
+  renderExpr();
+  renderLoops();
+  renderEquations();
+  renderStats();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   12. 操作
+   ══════════════════════════════════════════════════════════════════ */
+
+function commit(){
+  records = repriceAll(records);
+  saveStore(records);
+  renderAll();
+}
+
+function addRecord(){
+  var src = $("fSrc").value.trim();
+  var text = $("fText").value.trim();
+  if (!src && !text){ toast("ソースか本文のどちらかは書いてください"); return; }
+  var rec = sanitizeRecord({
+    id: "r-" + Date.now() + "-" + Math.floor(Math.random() * 1e6),
+    ts: Date.now(),
+    src: src || "(無名)",
+    dir: $("fDir").value,
+    text: text,
+    cost: Number($("fCost").value),
+    benefit: Number($("fBen").value),
+    dna: formDna.slice()
+  }, records.length);
+
+  var before = genusOf(records);
+  records.push(rec);
+  records.sort(function(a, b){ return a.ts - b.ts; });
+  var after = genusOf(records);
+  peelK = 0;
+  commit();
+
+  $("fText").value = "";
+  formDna = emptyDna();
+  renderGeneBoxes();
+  renderEquations();
+  toast(after > before
+    ? "一層焼けました — 輪が閉じました(種数 g = " + after + ")"
+    : "一層焼けました — " + fmtYen(rec.price));
+}
+
+function removeRecord(id){
+  for (var i = 0; i < records.length; i++){
+    if (records[i].id === id){
+      records.splice(i, 1);
+      if (peelK > records.length) peelK = records.length;
+      commit();
+      toast("一層剥がしました");
+      return;
+    }
+  }
+}
+
+function download(name, text, mime){
+  var blob = new Blob([text], { type: mime || "application/json" });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+}
+
+function stamp(){
+  var d = new Date();
+  function p(x){ return (x < 10 ? "0" : "") + x; }
+  return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes());
+}
+
+function importJson(txt){
+  var o;
+  try { o = JSON.parse(txt); }
+  catch (e){ toast("JSON として読めませんでした"); return; }
+  var list = (o && o.records) ? o.records : (o instanceof Array ? o : null);
+  if (!list || !list.length){ toast("層が入っていません"); return; }
+
+  var have = {};
+  for (var i = 0; i < records.length; i++) have[records[i].id] = 1;
+  var incoming = normalizeAll(list), added = 0;
+  for (var k = 0; k < incoming.length; k++){
+    if (have[incoming[k].id]) continue;
+    records.push(incoming[k]); added++;
+  }
+  records.sort(function(a, b){ return a.ts - b.ts; });
+  commit();
+  toast(added + " 層を取り込みました(重複 " + (incoming.length - added) + " 層は据え置き)");
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   13. 起動
+   ══════════════════════════════════════════════════════════════════ */
+
+function boot(){
+  for (var j = 0; j < NG; j++) mask.push(-1);
+
+  var loaded = loadStore();
+  if (loaded && loaded.length){ records = loaded; }
+  else { records = seedRecords(Date.now()); saveStore(records); }
+
+  renderGeneBoxes();
+
+  /* 層を焼くフォーム */
+  $("fCost").oninput = function(){ $("vCost").textContent = this.value; renderEquations(); };
+  $("fBen").oninput  = function(){ $("vBen").textContent  = this.value; renderEquations(); };
+  $("fText").oninput = function(){
+    if (formDna.join("") === emptyDna().join("")){
+      var d = detectGenes(this.value);
+      if (popcount(d)){
+        formDna = d;
+        renderGeneBoxes();
+        $("autoNote").innerHTML = ' <span style="color:var(--ok)">自動判定しました</span>';
+        renderEquations();
+      }
+    }
+  };
+  $("btnAuto").onclick = function(){
+    formDna = detectGenes($("fText").value);
+    renderGeneBoxes(); renderEquations();
+    toast(popcount(formDna) ? popcount(formDna) + " 本のスイッチが入りました" : "手がかりが見つかりませんでした");
+  };
+  $("btnClearGenes").onclick = function(){
+    formDna = emptyDna(); renderGeneBoxes(); renderEquations();
+  };
+  $("geneBox").onclick = function(ev){
+    var el = ev.target;
+    while (el && el !== this && !el.getAttribute("data-g")) el = el.parentNode;
+    if (!el || el === this) return;
+    var j = Number(el.getAttribute("data-g"));
+    formDna[j] = formDna[j] ? 0 : 1;
+    renderGeneBoxes(); renderEquations();
+  };
+  $("btnAdd").onclick = addRecord;
+
+  /* 検索 */
+  $("maskBox").onclick = function(ev){
+    var el = ev.target;
+    while (el && el !== this && !el.getAttribute("data-g")) el = el.parentNode;
+    if (!el || el === this) return;
+    var j = Number(el.getAttribute("data-g"));
+    mask[j] = (mask[j] === -1) ? 1 : (mask[j] === 1 ? 0 : -1);
+    renderGeneBoxes(); renderResults();
+  };
+  ["q", "fMin", "fMax"].forEach(function(id){ $(id).oninput = renderResults; });
+  ["fDirQ", "fSort"].forEach(function(id){ $(id).onchange = renderResults; });
+  $("fLoop").onchange = renderResults;
+  $("btnReset").onclick = function(){
+    $("q").value = ""; $("fMin").value = ""; $("fMax").value = "";
+    $("fDirQ").value = ""; $("fSort").value = "rel"; $("fLoop").checked = false;
+    for (var j = 0; j < NG; j++) mask[j] = -1;
+    renderGeneBoxes(); renderResults();
+  };
+
+  /* 後ろから剥く */
+  $("peel").oninput = function(){ peelK = Number(this.value); drawCake(); renderPeel(); };
+  $("cake").onclick = function(ev){
+    var rect = this.getBoundingClientRect();
+    var scale = this.width / rect.width;
+    var x = (ev.clientX - rect.left) * scale - this.width / 2;
+    var y = (ev.clientY - rect.top) * scale - this.height / 2;
+    var d = Math.sqrt(x * x + y * y);
+    for (var i = 0; i < ringGeom.length; i++){
+      if (d >= ringGeom[i].r0 && d <= ringGeom[i].r1){
+        peelK = records.length - ringGeom[i].idx;   /* その層まで外側から剥く */
+        drawCake(); renderPeel();
+        return;
+      }
+    }
+    peelK = 0; drawCake(); renderPeel();
+  };
+
+  /* 蓄積 */
+  $("btnExport").onclick = function(){
+    download("baumkuchen-" + stamp() + ".json",
+      JSON.stringify({ v:1, savedAt: Date.now(), records: records }, null, 2));
+    toast("JSON を書き出しました");
+  };
+  $("btnCsv").onclick = function(){
+    download("baumkuchen-" + stamp() + ".csv", "﻿" + toCsv(records), "text/csv");
+    toast("CSV を書き出しました");
+  };
+  $("btnImport").onclick = function(){ $("fileIn").click(); };
+  $("fileIn").onchange = function(){
+    var f = this.files[0]; this.value = "";
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function(){ importJson(String(fr.result)); };
+    fr.readAsText(f);
+  };
+  $("btnSeed").onclick = function(){
+    var have = {};
+    for (var i = 0; i < records.length; i++) have[records[i].id] = 1;
+    var s = seedRecords(Date.now()), added = 0;
+    for (var k = 0; k < s.length; k++){
+      if (have[s[k].id]) continue;
+      records.push(s[k]); added++;
+    }
+    records.sort(function(a, b){ return a.ts - b.ts; });
+    commit();
+    toast(added ? added + " 層の見本を焼きました" : "見本はすでに入っています");
+  };
+  $("btnWipe").onclick = function(){
+    if (!records.length){ toast("すでに空です"); return; }
+    if (!confirm("蓄積した " + records.length + " 層をすべて消します。よろしいですか?")) return;
+    records = []; peelK = 0;
+    commit();
+    toast("すべて消しました");
+  };
+
+  renderAll();
+}
+
+/* エンジンテスト (Node) からはロジックのみ検証するため boot は起動しない */
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) boot();
+</script>
+</body>
+</html>
