@@ -87,10 +87,23 @@ g(k) = b₁( L_1 .. L_{N−k} )     残りの種数
 
 ビルドは [`baumkuchen-app-build.yml`](../.github/workflows/baumkuchen-app-build.yml) が実行します。
 
-- **Actions からダウンロード** — リポジトリの **Actions** タブ → 左の *Bada Baumkuchen app build* → **Run workflow**(タグ名は空欄のまま)→ 完了後、実行ページ下部の **Artifacts** から `baumkuchen-android` / `baumkuchen-windows` / `baumkuchen-linux` を取得(zip)
+- **Actions からダウンロード** — リポジトリの **[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/baumkuchen-app-build.yml)** タブ → *Bada Baumkuchen app build* の実行を開く → ページ下部の **Artifacts** から取得(zip)
+
+| アーティファクト | 中身 |
+|:---|:---|
+| `baumkuchen-android` | `bada-baumkuchen-debug.apk` |
+| `baumkuchen-windows` | `BadaBaumkuchen-1.0.0-x64.exe`(NSIS)/ `BadaBaumkuchen-1.0.0-portable.exe` |
+| `baumkuchen-linux` | `BadaBaumkuchen-1.0.0-x86_64.AppImage` / `BadaBaumkuchen-1.0.0-amd64.deb` |
+
 - **Release に添付** — `baumkuchen-v1.0.0` のようなタグを push するか、Run workflow のタグ名欄にタグを入れると、[Releases](https://github.com/masaaki-avnturle/Bada/releases) に直接添付されます
 
-> **Run workflow のボタンが出ないとき** — GitHub は `workflow_dispatch` のワークフローを **既定ブランチ (`main`) にあるファイルだけ** Actions タブに出します。作業ブランチに置いた段階では一覧に現れないので、`main` へマージしてください(マージ後はブランチを選んで実行できます)。マージ前に動かしたい場合は、そのブランチのコミットに `baumkuchen-v*` タグを打って push すれば、タグ側のトリガでそのまま走ります。
+ビルドが走るきっかけは三つです。
+
+1. **この作業ブランチへの push**(`branches: claude/equation-image-app-5tyv9a`)—— いま Actions に実行が出ているのはこれです
+2. **`baumkuchen-v*` タグの push** —— Release に添付されます
+3. **Run workflow(手動)** —— ただし GitHub は `workflow_dispatch` のワークフローを **既定ブランチ (`main`) にあるファイルだけ** Actions タブに出すため、**このボタンは `main` へマージするまで現れません**。マージすれば任意のブランチを選んで押せるようになり、そのとき 1 の `branches:` は削除して構いません。
+
+APK と deb は、アプリ本体とランチャーアイコンが実際に同梱されたかを毎回ビルド内で検証しています(Cordova はアイコンが見つからなくても警告だけで素通りするため)。
 
 ビルドは 4 ジョブ構成です。`test-core`(インライン JS の構文チェック + エンジン単体テスト 98 項目)が通ってから、`android-apk` / `windows-exe` / `linux-app` が並列に走ります。
 

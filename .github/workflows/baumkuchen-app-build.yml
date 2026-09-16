@@ -130,6 +130,19 @@ jobs:
           mkdir -p out
           cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-baumkuchen-debug.apk
           ls -la out
+      # APK にアプリ本体とランチャーアイコンが実際に入っているかを毎回確かめる。
+      # Cordova はアイコンが見つからなくても警告だけで素通りするため、
+      # ビルドが緑になったことだけでは同梱を保証できない。
+      - name: Verify APK contents (app + launcher icons)
+        run: |
+          set -e
+          echo "--- assets/www ---"
+          unzip -l out/bada-baumkuchen-debug.apk | grep 'assets/www/index.html'
+          echo "--- launcher icons ---"
+          unzip -l out/bada-baumkuchen-debug.apk | grep -E 'res/mipmap[^/]*/ic_launcher[^/]*\.png'
+          ICONS=$(unzip -l out/bada-baumkuchen-debug.apk | grep -cE 'res/mipmap[^/]*/ic_launcher[^/]*\.png')
+          test "$ICONS" -ge 6 || { echo "ランチャーアイコンが $ICONS 個しかありません (6 密度を期待)"; exit 1; }
+          echo "OK: アプリ本体とランチャーアイコン $ICONS 個を確認"
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -189,6 +202,13 @@ jobs:
         run: |
           npm install
           npm run dist:linux
+      - name: Verify Linux package contents (app inside the deb)
+        run: |
+          set -e
+          DEB=$(ls baumkuchen/app/electron/dist/*.deb)
+          dpkg-deb -c "$DEB" | grep 'resources/www/index.html'
+          dpkg-deb -c "$DEB" | grep -E 'icons/hicolor/512x512/apps/.*\.png'
+          echo "OK: deb にアプリ本体とアイコンを確認"
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
