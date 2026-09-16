@@ -89,17 +89,17 @@
 
 上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
 
-#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
 
-[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+**[→ Actions からダウンロード](https://github.com/masaaki-avnturle/Bada/actions/workflows/ultranet-app-build.yml)** — 最新の実行(緑チェック)を開き、ページ下部の **Artifacts** から取得します(要 GitHub ログイン / zip で降ってくるので展開してください)。
 
-| プラットフォーム | ファイル |
-|:---|:---|
-| **Android** (APK) | `bada-ultranetwork-debug.apk` |
-| **Windows 10 / 11** | `BadaUltraNetwork-*-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu** | `BadaUltraNetwork-*-x86_64.AppImage` / `BadaUltraNetwork-*-amd64.deb` |
+| プラットフォーム | アーティファクト | ファイル |
+|:---|:---|:---|
+| **Android** | `ultranet-android` | `bada-ultranetwork-debug.apk` |
+| **Windows 10 / 11** | `ultranet-windows` | `BadaUltraNetwork-1.0.0-x64.exe` (NSIS インストーラ) / `BadaUltraNetwork-1.0.0-portable.exe` |
+| **Ubuntu** | `ultranet-linux` | `BadaUltraNetwork-1.0.0-x86_64.AppImage` / `BadaUltraNetwork-1.0.0-amd64.deb` |
 
-ビルドは [`ultranet-app-build.yml`](.github/workflows/ultranet-app-build.yml) が実行します(`ultranet-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。全層を Bada 言語自身で書いたリファレンスは [`ultra_network/ultra.bada`](ultra_network/ultra.bada) — `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` で走ります。詳細は [`ultra_network/`](ultra_network/) を参照。
+ビルドは [`ultranet-app-build.yml`](.github/workflows/ultranet-app-build.yml) が実行します(開発ブランチへの push で Actions アーティファクト / `ultranet-v*` タグで [Releases](https://github.com/masaaki-avnturle/Bada/releases) へ添付)。全層を Bada 言語自身で書いたリファレンスは [`ultra_network/ultra.bada`](ultra_network/ultra.bada) — `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` で走ります。詳細は [`ultra_network/`](ultra_network/) を参照。
 
 ---
 

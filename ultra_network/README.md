@@ -135,17 +135,31 @@
 | 🧩 **STREAMS** | 層の図とメッセージブロックの流れ。攻撃を選んで 1 通流せる |
 | 🧪 **自己診断** | 22 項目をその場で実際に計算して検証 |
 
-### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Ubuntu)
 
-[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+| プラットフォーム | ファイル | 使い方 |
+|:---|:---|:---|
+| **Android** (APK) | `bada-ultranetwork-debug.apk` | 端末にコピーして開く(提供元不明のアプリの許可が必要) |
+| **Windows 10 / 11** | `BadaUltraNetwork-1.0.0-x64.exe`(NSIS インストーラ)<br>`BadaUltraNetwork-1.0.0-portable.exe`(ポータブル) | インストーラは実行してインストール。ポータブル版はそのまま実行 |
+| **Ubuntu** | `BadaUltraNetwork-1.0.0-x86_64.AppImage`<br>`BadaUltraNetwork-1.0.0-amd64.deb` | AppImage は `chmod +x` して実行。deb は `sudo apt install ./BadaUltraNetwork-*-amd64.deb` |
 
-| プラットフォーム | ファイル |
+#### 🔽 GitHub Actions からダウンロードする
+
+1. リポジトリの **[Actions タブ](https://github.com/masaaki-avnturle/Bada/actions/workflows/ultranet-app-build.yml)** を開く
+2. **Bada UltraNetwork app build** の最新の実行(緑チェック)を選ぶ
+3. ページ下部の **Artifacts** から取得する
+
+| アーティファクト名 | 中身 |
 |:---|:---|
-| **Android** (APK) | `bada-ultranetwork-debug.apk` |
-| **Windows 10 / 11** | `BadaUltraNetwork-*-x64.exe`(NSIS インストーラ / ポータブル) |
-| **Ubuntu** | `BadaUltraNetwork-*-x86_64.AppImage` / `BadaUltraNetwork-*-amd64.deb` |
+| `ultranet-android` | APK |
+| `ultranet-windows` | Windows の EXE 2 種 |
+| `ultranet-linux` | AppImage と deb |
 
-ビルドは [`ultranet-app-build.yml`](../.github/workflows/ultranet-app-build.yml) が実行します(`ultranet-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+> Artifacts は zip で降ってくるので、展開してから実行してください。
+> ダウンロードには GitHub へのログインが必要です(Actions の仕様)。
+> 保存期間は既定で 90 日です。
+
+ビルドは [`ultranet-app-build.yml`](../.github/workflows/ultranet-app-build.yml) が実行します。トリガーは 3 つ — 開発ブランチへの push(Actions アーティファクト)/ `workflow_dispatch`(ワークフローが既定ブランチに入ってから)/ `ultranet-v*` タグ([Releases](https://github.com/masaaki-avnturle/Bada/releases) へ添付)。
 
 ### Bada 言語のリファレンス実装を走らせる
 
