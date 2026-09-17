@@ -21,6 +21,9 @@
  *   14. 対象者プロファイルと視野負荷
    15. 読み手の取り込み (肌色・顔・目・視線)
    16. 視線の追跡 (停留 / サッカード / 逆行 / 瞬き)
+   17. 読み手の見え方 (解像力の落ち方 / 知覚スパンの非対称 / サッカード抑制)
+   18. 本文の組版 (頁に組んでから視野をかける)
+   19. 多行ブロック (複数行を一度に見る単位) と、その見え方
  */
 "use strict";
 const fs = require("fs");
@@ -77,7 +80,10 @@ const {
   textChunks, groupTextChunks, normalizeText, orpIndex, scrambleInner, stripLatex,
   buildSchedule, stepAt, profileFrom, sessionStats, loadIndex, charClass,
   skinMask, motionMap, readerPatchFeatures, locateEyes, gazeFrom, analyzeReaderFrame,
-  trackerNew, trackerPush, trackerStats
+  trackerNew, trackerPush, trackerStats,
+  acuityModel, perceptualSpan, viewEcc, blurChars, viewBlurPx, viewContrast,
+  eccForBlur, saccadeVisibility, layoutTextPage, paginateText,
+  groupChunksMulti, isoEllipse
 } = sandbox;
 
 let failures = 0, checks = 0;
@@ -746,6 +752,168 @@ console.log("\n── 16. 視線の追跡 (停留 / サッカード / 逆行 / �
   trackerPush(tl, { t: 100, x: null, y: null });
   assert(trackerStats(tl).lost === 1, "顔を見失ったフレームは lost として数え、跳びには数えない");
   assert(trackerStats(tl).saccades === 0, "見失いでサッカードを誤検出しない");
+}
+
+/* ═══════════════ 17. 読み手の見え方 ═══════════════ */
+console.log("\n── 17. 読み手の見え方 (解像力・知覚スパン・サッカード抑制) ──");
+{
+  const m6 = acuityModel(6), m14 = acuityModel(14);
+  assert(m14.f0 > m6.f0 && m14.E2 > m6.E2, "視野幅の広い読み手ほど中心窩の平地も E2 も大きい");
+  assert(acuityModel(6, 2).E2 > m6.E2, "誇張の倍率が効く");
+
+  const sp = perceptualSpan(6);
+  assert(sp.fwd === 6 && sp.bwd < sp.fwd, "知覚スパンは前に広く後ろに狭い (" + sp.fwd + " / " + sp.bwd.toFixed(1) + ")");
+
+  const geom = { dir: "h", pitch: 20, lineH: 34, span: sp };
+  near(viewEcc(0, 0, geom), 0, 1e-12, "注視点そのものの離心率は 0");
+  const fwd5 = viewEcc(5 * 20, 0, geom), bwd5 = viewEcc(-5 * 20, 0, geom);
+  assert(bwd5 > fwd5 * 2.5, "同じ距離でも後ろへ戻るほうがずっと見えにくい (" +
+         fwd5.toFixed(2) + " / " + bwd5.toFixed(2) + ")");
+  const oneLine = viewEcc(0, 34, geom);
+  assert(oneLine > fwd5, "1 行離れるのは 5 字先へ進むより見えにくい (" + oneLine.toFixed(2) + ")");
+  assert(Math.abs(viewEcc(0, 34, geom) - viewEcc(0, -34, geom)) < 1e-12, "行をまたぐ向きは上下で対称");
+
+  const gv = { dir: "v", pitch: 20, lineH: 34, span: sp };
+  assert(Math.abs(viewEcc(0, 5 * 20, gv) - fwd5) < 1e-9, "縦書きでは下へ進むのが「前」");
+  assert(viewEcc(0, -5 * 20, gv) > viewEcc(0, 5 * 20, gv), "縦書きで上へ戻るのは見えにくい");
+  assert(viewEcc(34, 0, gv) > viewEcc(0, 5 * 20, gv), "縦書きで隣の列は行またぎと同じ扱い");
+
+  assert(blurChars(0, m6) === 0 && blurChars(m6.f0, m6) === 0, "中心窩の平地ではぼけない");
+  assert(blurChars(m6.f0 + m6.E2, m6) > 0.9 && blurChars(m6.f0 + m6.E2, m6) < 1.1,
+         "E2 だけ離れると字 1 個ぶんぼける");
+  assert(blurChars(10, m14) < blurChars(10, m6), "視野幅の広い読み手は同じ距離でもぼけが小さい");
+  near(eccForBlur(blurChars(7, m6), m6), 7, 1e-9, "ぼけ→離心率の逆算が一致する (輪の半径)");
+
+  near(viewBlurPx(0, 0, geom, m6), 0, 1e-12, "注視点はぼけない");
+  assert(viewBlurPx(-5 * 20, 0, geom, m6) > viewBlurPx(5 * 20, 0, geom, m6),
+         "同じ距離なら後ろのほうが大きくぼける");
+  assert(viewContrast(0, m6) === 1 && viewContrast(20, m6) < 0.5, "周辺ほどコントラストも落ちる");
+
+  assert(saccadeVisibility(0, 0.12) < 0.2, "跳びはじめは見えていない (サッカード抑制)");
+  assert(saccadeVisibility(0.12, 0.12) === 1 && saccadeVisibility(0.6, 0.12) === 1, "着地したら見えている");
+  assert(saccadeVisibility(0.06, 0.12) > saccadeVisibility(0.01, 0.12), "抑制は着地に向けて解ける");
+  assert(saccadeVisibility(0, 0) === 1, "抑制を切れば常に見えている");
+}
+
+/* ═══════════════ 18. 本文の組版 ═══════════════ */
+console.log("\n── 18. 本文を頁に組む ──");
+{
+  const cs = textChunks(
+    "速読とは、字を速く見る技術ではない。視点を送る順番を先に知っている状態のことである。" +
+    "本の頁は、文字の海ではなく、固まりの列である。切れ目を目が先に知っていれば、視点は迷わず次へ渡る。", {});
+  const pg = layoutTextPage(cs, { dir: "h", fontSize: 30, perLine: 20, maxLines: 10 });
+  assert(pg.glyphs.length > 50, "字が頁に置かれる (" + pg.glyphs.length + " 字)");
+  assert(pg.units.length > 0 && pg.units.length <= cs.length, "固まりが単位として置かれる (" + pg.units.length + ")");
+  let inside = true;
+  pg.glyphs.forEach(function(g){ if (g.x < 0 || g.y < 0 || g.x + g.size > pg.w || g.y + g.size > pg.h) inside = false; });
+  assert(inside, "字がすべて頁の内側に収まる");
+  let unitsInside = true;
+  pg.units.forEach(function(u){ if (u.x < 0 || u.y < 0 || u.x + u.w > pg.w + 1 || u.y + u.h > pg.h + 1) unitsInside = false; });
+  assert(unitsInside, "単位の矩形も頁の内側");
+  assert(pg.pitch === 30, "字送りは字の大きさ");
+  let order = true;
+  for (let i = 1; i < pg.units.length; i++){
+    const a = pg.units[i - 1], b = pg.units[i];
+    if (b.line < a.line) order = false;
+    if (b.line === a.line && b.x < a.x - 1e-6) order = false;
+  }
+  assert(order, "単位は行の順・行内は左から右に並ぶ");
+  let sameLine = 0;
+  for (let i = 0; i < pg.units.length; i++) if (pg.units[i].h <= pg.lineH + 1) sameLine++;
+  assert(sameLine === pg.units.length, "固まりは行をまたがない (またぐと固まりとして見えなくなる)");
+
+  const vpg = layoutTextPage(cs, { dir: "v", fontSize: 30, perLine: 14, maxLines: 8 });
+  assert(vpg.glyphs.length > 30, "縦書きでも字が置かれる");
+  const l0 = vpg.glyphs.filter(function(g){ return g.line === 0; });
+  const l1 = vpg.glyphs.filter(function(g){ return g.line === 1; });
+  assert(l0.length && l1.length && l1[0].x < l0[0].x, "縦書きの二列目は一列目の左に来る");
+  assert(l0[1].y > l0[0].y, "縦書きは列の中を上から下へ進む");
+
+  const pages = paginateText(cs, { dir: "h", fontSize: 30, perLine: 12, maxLines: 4 });
+  assert(pages.length > 1, "収まらないぶんは次の頁へ (" + pages.length + " 頁)");
+  const total = pages.reduce(function(a, p){ return a + p.units.length; }, 0);
+  assert(total === cs.length, "全部の固まりがどこかの頁に載る (" + total + " / " + cs.length + ")");
+  let joined = "";
+  pages.forEach(function(p){ p.units.forEach(function(u){ joined += u.show; }); });
+  assert(joined === cs.map(function(c){ return c.show; }).join(""), "頁に組んでも本文は一字も落ちない");
+}
+
+/* ═══════════════ 19. 多行ブロックと、その見え方 ═══════════════ */
+console.log("\n── 19. 多行ブロック (複数行を一度に見る) ──");
+{
+  /* 4 行 × 6 固まりの版面を作る */
+  const lines = [];
+  for (let li = 0; li < 4; li++){
+    const chunks = [];
+    for (let ci = 0; ci < 6; ci++)
+      chunks.push({ x: 10 + ci * 30, y: 10 + li * 40, w: 26, h: 30, chars: 3, line: li, block: 0,
+                    show: "あ" + li + ci });
+    lines.push({ chunks: chunks });
+  }
+  const one = groupChunksMulti(lines, 3, 1, "h");
+  assert(one.length === 8, "1 行ブロックなら 4 行 × 2 = 8 ブロック (" + one.length + ")");
+  assert(one.every(function(b){ return b.h <= 31; }), "1 行ブロックは 1 行の高さに収まる");
+  const two = groupChunksMulti(lines, 3, 2, "h");
+  assert(two.length === 4, "2 行ずつ束ねると 2 帯 × 2 列 = 4 ブロック (" + two.length + ")");
+  assert(two.every(function(b){ return b.lines === 2 && b.h > 40; }), "多行ブロックは 2 行ぶんの高さを持つ");
+  assert(two.every(function(b){ return b.chars === 18; }), "1 ブロックの字数は 3 固まり × 2 行 = 18 字");
+  const all = groupChunksMulti(lines, 6, 4, "h");
+  assert(all.length === 1 && all[0].chars === 72 && all[0].lines === 4,
+         "頁ぜんぶを一度に見る指定もできる (1 ブロック 72 字 / 4 行)");
+  /* 取りこぼしと重複がない */
+  const seen = {};
+  let dup = false, total = 0;
+  [one, two, all].forEach(function(gs, k){
+    const count = {};
+    gs.forEach(function(b){ total += b.chars; });
+  });
+  assert(one.reduce(function(a, b){ return a + b.chars; }, 0) === 72 &&
+         two.reduce(function(a, b){ return a + b.chars; }, 0) === 72,
+         "どの束ね方でも字は一字も落ちず、重複もしない");
+  /* 読み順 */
+  assert(two[0].y < two[2].y, "帯は上から下へ");
+  assert(two[0].x < two[1].x, "帯の中は左から右へ");
+  const vlines = [];
+  for (let li = 0; li < 4; li++){
+    const chunks = [];
+    for (let ci = 0; ci < 6; ci++)
+      chunks.push({ x: 200 - li * 40, y: 10 + ci * 30, w: 30, h: 26, chars: 3, line: li, block: 0 });
+    vlines.push({ chunks: chunks });
+  }
+  const vtwo = groupChunksMulti(vlines, 3, 2, "v");
+  assert(vtwo.length === 4, "縦書きでも 2 列ずつ × 2 段 = 4 ブロック");
+  assert(vtwo[0].y < vtwo[1].y, "縦書きの帯の中は上から下へ");
+  assert(vtwo[0].x > vtwo[2].x, "縦書きの帯は右から左へ");
+
+  /* 多行を取れる読み手は、行をまたいでも見える */
+  const sp1 = perceptualSpan(6, 1), sp3 = perceptualSpan(6, 3);
+  assert(sp3.acrossPlateau > sp1.acrossPlateau, "取れる行数ぶんだけ平地が広がる");
+  const g1 = { dir: "h", pitch: 20, lineH: 34, span: sp1 };
+  const g3 = { dir: "h", pitch: 20, lineH: 34, span: sp3 };
+  assert(viewEcc(0, 34, g1) > 5 && viewEcc(0, 34, g3) === 0,
+         "1 行しか取れない読み手には隣の行が見えず、3 行取れる読み手には見えている");
+  assert(blurChars(viewEcc(0, 34, g3), acuityModel(6)) === 0, "3 行取れる読み手は隣の行もぼけない");
+
+  /* 等離心率の楕円は viewEcc の逆写像である (中心までぼける不具合を捕まえる検査) */
+  [1.5, 3, 6, 10].forEach(function(ecc){
+    [g1, g3].forEach(function(gm){
+      const el = isoEllipse(ecc, gm);
+      const fwd = viewEcc(el.ox + el.rx, 0, gm);
+      const bwd = viewEcc(el.ox - el.rx, 0, gm);
+      /* 等離心率の輪郭は前後で半径が違う「卵形」なので、楕円はその近似である。
+         前端・後端・(注視点を通る) 上端の三軸では厳密に一致していなければならない。 */
+      const acr = viewEcc(0, el.ry, gm);
+      near(fwd, ecc, 1e-6, "楕円の前端が離心率 " + ecc + " に一致");
+      near(bwd, ecc, 1e-6, "楕円の後端が離心率 " + ecc + " に一致");
+      near(acr, ecc, 1e-6, "楕円の上端 (行をまたぐ向き) が離心率 " + ecc + " に一致");
+    });
+  });
+
+  /* 対象者プロファイルにも行数が乗る */
+  const pr = profileFrom({ cpm: 600, span: 8, reg: 10, goal: 3, lines: 3 });
+  assert(pr.perLines === 3 && /面で読める/.test(pr.note), "面で読める対象者には多行ブロックを勧める");
+  const pr1 = profileFrom({ cpm: 600, span: 8, reg: 10, goal: 3 });
+  assert(pr1.perLines === 1, "行数を言われなければ 1 行のまま");
 }
 
 console.log("");
