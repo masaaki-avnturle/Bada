@@ -39,13 +39,16 @@
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 
-[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+**▶ [Actions のビルド成果物からダウンロード](https://github.com/masaaki-avnturle/Bada/actions/workflows/sokudoku-app-build.yml)**
+(ページで最新の実行を開き、いちばん下の **Artifacts** から。ZIP を展開すると中に本体が入っています)
 
-| プラットフォーム | ファイル |
+| アーティファクト | 中身 |
 |:---|:---|
-| **Android** (APK) | `bada-sokudoku-debug.apk` |
-| **Windows 10 / 11** | `BadaSokudoku-*-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu / Linux** | `BadaSokudoku-*-x86_64.AppImage` / `BadaSokudoku-*-amd64.deb` |
+| `sokudoku-android-apk` | `bada-sokudoku-debug.apk` (Android) |
+| `sokudoku-windows-exe` | `BadaSokudoku-*-x64.exe` (Windows 10 / 11 — NSIS インストーラ / ポータブル) |
+| `sokudoku-linux-appimage-deb` | `BadaSokudoku-*-x86_64.AppImage` / `BadaSokudoku-*-amd64.deb` (Ubuntu / Linux) |
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) には `sokudoku-v*` タグを押したときに同じものが添付されます。
 
 ビルドは [`sokudoku-app-build.yml`](.github/workflows/sokudoku-app-build.yml) が実行します(`sokudoku-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。解析の式・検査 219 項目・使い方は [`bada_sokudoku/`](bada_sokudoku/) を参照。
 

@@ -202,16 +202,26 @@ XY-cut の読み順 (縦書きは右から左) / 正規化座標が 0..1 に収�
 **組版**(字と単位が頁の内側に収まること・固まりが行をまたがないこと・縦書きの二列目が左に来ること・
 頁に組んでも本文が一字も落ちないこと)。
 
-## ネイティブ アプリ
+## ネイティブ アプリ — Actions から落とす
 
-| プラットフォーム | ファイル |
+**▶ [Bada Sokudoku app build の実行一覧](https://github.com/masaaki-avnturle/Bada/actions/workflows/sokudoku-app-build.yml)**
+を開き、最新の実行 → ページ下部の **Artifacts**。
+
+| アーティファクト | 中身 |
 |:---|:---|
-| **Android** (APK) | `bada-sokudoku-debug.apk` |
-| **Windows 10 / 11** | `BadaSokudoku-*-x64.exe` (NSIS インストーラ / ポータブル) |
-| **Ubuntu / Linux** | `BadaSokudoku-*-x86_64.AppImage` / `BadaSokudoku-*-amd64.deb` |
+| `sokudoku-android-apk` | `bada-sokudoku-debug.apk` (Android) |
+| `sokudoku-windows-exe` | `BadaSokudoku-*-x64.exe` (Windows 10 / 11 — NSIS インストーラ / ポータブル) |
+| `sokudoku-linux-appimage-deb` | `BadaSokudoku-*-x86_64.AppImage` / `BadaSokudoku-*-amd64.deb` (Ubuntu / Linux) |
 
-`sokudoku-app-build.yml` を `workflow_dispatch` で実行すると Actions のアーティファクトに、
-`sokudoku-v*` タグを押すと Release に添付されます。
+走らせ方は三つ:
+
+1. **作業ブランチ (`claude/speed-reading-app-multiplatform-*`) へ push** → そのまま走り、Artifacts に並ぶ
+   (`workflow_dispatch` のボタンは GitHub の仕様上、このファイルが既定ブランチ `main` に入ってからでないと出ないため)
+2. `main` に入ったあと、**Actions タブの「Run workflow」**
+3. **`sokudoku-v*` タグ**を押す → ビルドして GitHub Release に添付
+
+APK は debug 署名なので、端末側で「提供元不明のアプリ」の許可が要ります。
+AppImage は `chmod +x` してから実行、deb は `sudo apt install ./BadaSokudoku-*-amd64.deb`。
 
 > 録画は `MediaRecorder` と `canvas.captureStream()` に依存します。古い Android WebView など
 > これらを持たない環境では録画ボタンがその旨を表示し、静止画 (PNG) 書き出しに退避します。
