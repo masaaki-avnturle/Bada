@@ -4,9 +4,10 @@
      この config.xml と ../www (自己完結アプリ = bada_sokudoku/index.html) を差し込みます。
      アプリはネットワークを一切使わず、頁の画像も解析も録画もすべて端末内で完結します。 -->
 <widget id="io.github.masaaki_avnturle.badasokudoku" version="1.0.0"
-        xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+        xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0"
+        xmlns:android="http://schemas.android.com/apk/res/android">
   <name>BadaSokudoku</name>
-  <description>Bada 瞬読 — 対象者の本の頁を画像処理トランスフォーマー (Swin 型の窓自己注意 + 注意ロールアウト) で解析し、文字の固まり・行・ブロック・読み順を復元して、視野幅と目標速度に合わせてブロックを順に照らす速読スタジオ。速読している画面はそのまま WebM 動画として録画できる。文字認識は行わず、頁の画像の上で「どこを見るか」だけを解く。</description>
+  <description>Bada 瞬読 — 対象者の本の頁を画像処理トランスフォーマー (Swin 型の窓自己注意 + 注意ロールアウト) で解析し、文字の固まり・行・ブロック・読み順を復元して、視野幅と目標速度に合わせてブロックを順に照らす速読スタジオ。同じエンジンをカメラの向こうの読み手にも向け、肌色・暗さ・動きのパッチ特徴から顔と目と視線指標を掴んで画面に映し出し、停留・サッカード・逆行・瞬き・追従率を数える。速読している画面と読み手の像は 1 枚の canvas に合成され、そのまま WebM 動画として録画できる。文字認識は行わず、頁の画像の上で「どこを見るか」だけを解く。カメラの像も測定値も端末の外へ出ない。</description>
   <author email="masaaki.tabu4@gmail.com" href="https://github.com/masaaki-avnturle/Bada">Masaaki Yamaguchi</author>
   <content src="index.html" />
   <allow-intent href="http://*/*" />
@@ -17,5 +18,11 @@
   <preference name="Orientation" value="default" />
   <platform name="android">
     <preference name="AndroidXEnabled" value="true" />
+    <!-- 読み手 (対象者) を捉えるためのカメラ。像は端末から出ない。
+         カメラを使わなくても速読と録画は動く。 -->
+    <config-file target="AndroidManifest.xml" parent="/manifest" mode="merge">
+      <uses-permission android:name="android.permission.CAMERA" />
+      <uses-feature android:name="android.hardware.camera" android:required="false" />
+    </config-file>
   </platform>
 </widget>

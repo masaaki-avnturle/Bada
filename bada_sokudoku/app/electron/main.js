@@ -4,10 +4,11 @@
  *
  * アプリ本体は www/index.html に完全自己完結しています
  * (Sauvola 適応二値化 + パッチ埋め込み + 窓自己注意 (Swin 型) + 注意ロールアウト +
- *  行と固まりの投影分割 + XY-cut の読み順 + 速読スケジューラ + canvas 録画)。
+ *  行と固まりの投影分割 + XY-cut の読み順 + 速読スケジューラ +
+ *  読み手の捕捉 (肌色・動き・窓注意 → 顔・目・視線) + canvas 録画)。
  * ここではデスクトップウィンドウとして読み込むだけです。ネットワークは一切使いません。
  */
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, session } = require("electron");
 const path = require("path");
 
 function indexPath(){
@@ -42,6 +43,12 @@ function createWindow(){
   win.loadFile(indexPath());
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  /* 読み手を捉えるためのカメラ (media) だけを許可し、他の権限は一切与えない */
+  session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+    callback(permission === "media");
+  });
+  createWindow();
+});
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });

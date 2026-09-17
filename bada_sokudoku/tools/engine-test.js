@@ -19,6 +19,8 @@
  *   12. LaTeX 剥がし / 語中シャッフル
  *   13. 速読スケジューラ (目標 cpm の再現 / 二分探索)
  *   14. 対象者プロファイルと視野負荷
+   15. 読み手の取り込み (肌色・顔・目・視線)
+   16. 視線の追跡 (停留 / サッカード / 逆行 / 瞬き)
  */
 "use strict";
 const fs = require("fs");
@@ -73,7 +75,9 @@ const {
   rolloutHat, attentionRollout, blocksFromAttention,
   splitLines, splitChunks, xyCut, groupChunks, analyzePage,
   textChunks, groupTextChunks, normalizeText, orpIndex, scrambleInner, stripLatex,
-  buildSchedule, stepAt, profileFrom, sessionStats, loadIndex, charClass
+  buildSchedule, stepAt, profileFrom, sessionStats, loadIndex, charClass,
+  skinMask, motionMap, readerPatchFeatures, locateEyes, gazeFrom, analyzeReaderFrame,
+  trackerNew, trackerPush, trackerStats
 } = sandbox;
 
 let failures = 0, checks = 0;
@@ -588,6 +592,160 @@ console.log("\n── 14. 対象者プロファイル ──");
   const st = sessionStats(buildSchedule([{ chars: 6 }, { chars: 6 }], { cpm: 600, minMs: 1, ramp: 0 }), 6);
   assert(st.units === 2 && st.chars === 12 && st.cpm === 600, "セッション成績の集計");
   assert(st.load === 1, "1 ブロック 6 字 / 視野幅 6 字 = 負荷 1.0 (ちょうど見切れる)");
+}
+
+/* ═════════ 合成した読み手のフレーム ═════════ */
+/* 明るい壁を背景に、肌色の楕円 (顔) と、その上半分に二つの暗い楕円 (目)。
+   瞳の左右のずれ・目の開き具合・顔の位置を引数で動かせる。 */
+function makeFaceFrame(w, h, o){
+  o = o || {};
+  const cx = o.cx === undefined ? w / 2 : o.cx;
+  const cy = o.cy === undefined ? h / 2 : o.cy;
+  const rx = o.rx || Math.round(w * 0.25), ry = o.ry || Math.round(h * 0.38);
+  const pupil = o.pupil || 0;              /* 瞳の水平ずれ (画素) */
+  const lid = o.lid === undefined ? 4 : o.lid;   /* 目の縦半径。小さいほど閉じている */
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++){
+    for (let x = 0; x < w; x++){
+      const p = (y * w + x) * 4;
+      let r = 200, g = 205, b = 215;                     /* 明るい壁 (肌色ではない) */
+      const dx = (x - cx) / rx, dy = (y - cy) / ry;
+      if (dx * dx + dy * dy <= 1){ r = 222; g = 178; b = 148; }   /* 肌 */
+      rgba[p] = r; rgba[p + 1] = g; rgba[p + 2] = b; rgba[p + 3] = 255;
+    }
+  }
+  if (!o.noEyes){
+    const ey = cy - ry * 0.25;
+    [-1, 1].forEach(function(sgn){
+      const ex = cx + sgn * rx * 0.45 + pupil;
+      for (let y = Math.round(ey - lid); y <= Math.round(ey + lid); y++){
+        for (let x = Math.round(ex - 7); x <= Math.round(ex + 7); x++){
+          if (x < 0 || y < 0 || x >= w || y >= h) continue;
+          const u = (x - ex) / 7, v = (y - ey) / Math.max(1, lid);
+          if (u * u + v * v > 1) continue;
+          const p = (y * w + x) * 4;
+          rgba[p] = 25; rgba[p + 1] = 22; rgba[p + 2] = 20;
+        }
+      }
+    });
+  }
+  return rgba;
+}
+
+/* ═══════════════ 15. 読み手の取り込み ═══════════════ */
+console.log("\n── 15. 読み手 (対象者) の取り込み ──");
+{
+  const w = 160, h = 120;
+  const frame = makeFaceFrame(w, h, {});
+  const skin = skinMask(frame, w, h);
+  let sk = 0;
+  for (let i = 0; i < skin.length; i++) sk += skin[i];
+  assert(sk > w * h * 0.10 && sk < w * h * 0.45, "肌色規則が顔だけを拾う (" + (sk / (w * h) * 100).toFixed(1) + "%)");
+  assert(skin[2 * w + 2] === 0, "背景の壁は肌色ではない");
+  assert(skin[(h / 2 | 0) * w + (w / 2 | 0)] === 1, "顔の中心は肌色");
+
+  const r = analyzeReaderFrame(frame, w, h, {});
+  assert(r.face !== null, "顔が一つの連結成分として掴まれる");
+  const fcx = r.face.x + r.face.w / 2, fcy = r.face.y + r.face.h / 2;
+  assert(Math.abs(fcx - w / 2) < 14 && Math.abs(fcy - h / 2) < 14,
+         "顔の中心が合っている (" + Math.round(fcx) + "," + Math.round(fcy) + " / 期待 80,60)");
+  assert(r.face.w > 50 && r.face.w < 110, "顔の幅が妥当 (" + r.face.w + " px)");
+  assert(r.eyes !== null, "目が二つ見つかる");
+  assert(r.eyes.left.cx < fcx && r.eyes.right.cx > fcx, "目は顔の中心の左右に分かれている");
+  assert(r.eyes.left.cy < fcy && r.eyes.right.cy < fcy, "目は顔の上半分にある");
+  assert(r.meta.patches > 100 && r.meta.windows > 0, "パッチと窓が立っている (" + r.meta.patches + " パッチ / " + r.meta.windows + " 窓)");
+
+  /* 瞳を右へずらすと視線指標が右へ動く */
+  const right = analyzeReaderFrame(makeFaceFrame(w, h, { pupil: 9 }), w, h, {});
+  const left = analyzeReaderFrame(makeFaceFrame(w, h, { pupil: -9 }), w, h, {});
+  assert(right.gaze.pupilX > left.gaze.pupilX, "瞳のずれが視線指標に出る (" +
+         right.gaze.pupilX.toFixed(3) + " > " + left.gaze.pupilX.toFixed(3) + ")");
+  assert(right.gaze.x > left.gaze.x, "総合の視線指標も同じ向きに動く");
+
+  /* 顔ごと右へ寄せると頭の偏りが出る */
+  const moved = analyzeReaderFrame(makeFaceFrame(w, h, { cx: w / 2 + 22 }), w, h, {});
+  assert(moved.gaze.headX > r.gaze.headX + 0.1, "顔の位置が頭の偏りとして出る");
+
+  /* 前面カメラは左右が逆 — 読み進む向きに合わせて符号が反転する */
+  assert(Math.abs(right.gaze.readX + right.gaze.x) < 1e-12, "前面カメラでは readX = −x");
+  const back = gazeFrom(r.face, r.eyes, w, h, { front: false });
+  assert(Math.abs(back.readX - back.x) < 1e-12, "背面カメラでは readX = x");
+
+  /* 瞬き — 目が縦につぶれると開き具合が落ちる */
+  const blink = analyzeReaderFrame(makeFaceFrame(w, h, { lid: 1 }), w, h, {});
+  assert(blink.eyes !== null && blink.eyes.openness < r.eyes.openness,
+         "閉じた目は開き具合が下がる (" + blink.eyes.openness.toFixed(2) + " < " + r.eyes.openness.toFixed(2) + ")");
+  assert(r.eyes.openness > 0.45 && blink.eyes.openness < 0.45,
+         "開閉が瞬きの閾値 0.45 をまたぐ");
+
+  /* 顔がないフレーム */
+  const empty = new Uint8ClampedArray(w * h * 4);
+  for (let i = 0; i < w * h; i++){ empty[i * 4] = 200; empty[i * 4 + 1] = 205; empty[i * 4 + 2] = 215; empty[i * 4 + 3] = 255; }
+  const none = analyzeReaderFrame(empty, w, h, {});
+  assert(none.face === null && none.gaze === null, "顔のないフレームでは何も掴まず、落ちない");
+
+  /* 動き — 前フレームを渡すと差分が効く */
+  const g0 = analyzeReaderFrame(frame, w, h, {});
+  const g1 = analyzeReaderFrame(makeFaceFrame(w, h, { cx: w / 2 + 10 }), w, h, { prevGray: g0.gray });
+  assert(g1.motion > 0 && g0.motion === 0, "前フレームとの差が動きとして出る (" + g1.motion.toFixed(4) + ")");
+  const feats = readerPatchFeatures(g0.gray, skinMask(frame, w, h), motionMap(g0.gray, null), w, h, 8);
+  assert(feats.F === 10 && feats.feat.length === feats.n * 10, "読み手のパッチは 10 次元");
+  assert(feats.dens[Math.floor(feats.rows / 2) * feats.cols + Math.floor(feats.cols / 2)] > 0.9,
+         "顔の中心のパッチは肌色密度がほぼ 1");
+}
+
+/* ═══════════════ 16. 視線の追跡 ═══════════════ */
+console.log("\n── 16. 視線の追跡 (停留 / サッカード / 逆行 / 瞬き) ──");
+{
+  /* 横書き: 右へ 4 回進み、1 回だけ左へ戻る */
+  const tr = trackerNew({ dir: "h", sacThr: 0.10 });
+  const xs = [-0.6, -0.3, 0.0, 0.3, -0.2, 0.1];
+  for (let i = 0; i < xs.length; i++)
+    trackerPush(tr, { t: i * 250, x: xs[i], y: 0, open: 1, chars: 6, target: xs[i] });
+  const st = trackerStats(tr);
+  assert(st.saccades === 5, "跳んだ回数 = 5 (" + st.saccades + ")");
+  assert(st.regressions === 1, "左へ戻ったのは 1 回 = 逆行 1 (" + st.regressions + ")");
+  assert(st.regRate === 20, "逆行率 20% (" + st.regRate + "%)");
+  assert(st.fixations === 5 && st.meanFixMs === 250, "停留 5 回・中央値 250 ms");
+  assert(st.span === 7.2, "測れた視野幅 = 字数/停留 = 36/5 = 7.2 (" + st.span + ")");
+  assert(st.fixPerMin > 0, "1 分あたりの停留数が出る (" + st.fixPerMin + ")");
+
+  /* 微動だけなら跳んだことにしない */
+  const tr2 = trackerNew({ dir: "h" });
+  for (let i = 0; i < 10; i++) trackerPush(tr2, { t: i * 100, x: 0.01 * (i % 2), y: 0, open: 1 });
+  assert(trackerStats(tr2).saccades === 0, "閾値以下の揺れはサッカードに数えない");
+
+  /* 縦書き: 下へ進むのが順、上へ戻るか右の列へ跳ぶのが逆行 */
+  const tv = trackerNew({ dir: "v", sacThr: 0.10 });
+  const pts = [[0, -0.5], [0, -0.2], [0, 0.2], [0, -0.1], [0.4, 0.0]];
+  for (let i = 0; i < pts.length; i++)
+    trackerPush(tv, { t: i * 200, x: pts[i][0], y: pts[i][1], open: 1 });
+  const sv = trackerStats(tv);
+  assert(sv.regressions === 2, "縦書きでは上へ戻る跳びと右の列へ戻る跳びが逆行 (" + sv.regressions + ")");
+
+  /* 瞬き */
+  const tb = trackerNew({});
+  const opens = [1, 1, 0.2, 0.2, 1, 1, 0.1, 1];
+  for (let i = 0; i < opens.length; i++)
+    trackerPush(tb, { t: i * 120, x: 0, y: 0, open: opens[i] });
+  assert(trackerStats(tb).blinks === 2, "閉じている連続は 1 回と数える (" + trackerStats(tb).blinks + " 回)");
+
+  /* 追従率 — 照らしている所と視線が合っているか */
+  const tsame = trackerNew({});
+  const tfar = trackerNew({});
+  for (let i = 0; i < 5; i++){
+    trackerPush(tsame, { t: i * 200, x: -0.5 + i * 0.25, y: 0, open: 1, target: -0.5 + i * 0.25 });
+    trackerPush(tfar, { t: i * 200, x: -1, y: 0, open: 1, target: 1 });
+  }
+  assert(trackerStats(tsame).sync === 100, "視線が照らした所に乗っていれば追従率 100%");
+  assert(trackerStats(tfar).sync === 0, "正反対を見ていれば追従率 0%");
+
+  /* 顔を見失ったフレーム */
+  const tl = trackerNew({});
+  trackerPush(tl, { t: 0, x: 0, y: 0, open: 1 });
+  trackerPush(tl, { t: 100, x: null, y: null });
+  assert(trackerStats(tl).lost === 1, "顔を見失ったフレームは lost として数え、跳びには数えない");
+  assert(trackerStats(tl).saccades === 0, "見失いでサッカードを誤検出しない");
 }
 
 console.log("");

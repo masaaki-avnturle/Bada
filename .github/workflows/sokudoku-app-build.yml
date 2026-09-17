@@ -5,8 +5,11 @@ name: Bada Sokudoku app build (Android APK + Windows EXE + Ubuntu)
 #     (Swin 型の窓自己注意 + ずらし窓 + 注意ロールアウト) で版面を解析し、
 #     文字の固まり → 行 → ブロック → 読み順を復元する (文字認識は行わない)
 #   ・復元したブロックを、視野幅と目標速度から決めた滞留時間で順に照らす
-#   ・その速読画面は 1 枚の canvas に合成されるので captureStream + MediaRecorder で
-#     そのまま WebM 動画として録画できる
+#   ・同じエンジンをカメラの向こうの読み手 (対象者) にも向け、肌色・暗さ・動きの
+#     パッチ特徴から顔・目・視線指標を掴んで画面に映し出し、停留・サッカード・
+#     逆行・瞬き・追従率を数える (像も測定値も端末から出ない)
+#   ・速読画面と読み手の像は 1 枚の canvas に合成されるので captureStream +
+#     MediaRecorder でそのまま WebM 動画として録画できる
 # これを
 #   - Android 向け APK
 #   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
@@ -59,7 +62,11 @@ jobs:
                                   "function groupChunks", "function analyzePage",
                                   "function textChunks", "function stripLatex", "function scrambleInner",
                                   "function buildSchedule", "function stepAt", "function profileFrom",
-                                  "function renderFrame", "function startRec", "function boot"]) {
+                                  "function skinMask", "function motionMap", "function readerPatchFeatures",
+                                  "function locateEyes", "function gazeFrom", "function analyzeReaderFrame",
+                                  "function trackerNew", "function trackerPush", "function trackerStats",
+                                  "function renderFrame", "function drawReaderView", "function startCam",
+                                  "function startRec", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
             if (!m[1].includes("captureStream")) {
@@ -69,7 +76,7 @@ jobs:
           '
           node --check /tmp/sokudoku.js
           echo "Bada Sokudoku self-check OK"
-      - name: Engine tests (binarization / windowed attention / rollout / layout / chunker / schedule)
+      - name: Engine tests (binarization / attention / layout / chunker / schedule / reader capture / gaze)
         run: |
           set -e
           node bada_sokudoku/tools/engine-test.js
@@ -120,6 +127,10 @@ jobs:
           cp "$APP/cordova/config.xml" cordova-build/config.xml
           cd cordova-build
           cordova platform add android@12.0.1
+          # 読み手を捉えるカメラの実行時権限 (Android 6+)。入らなくてもアプリは動く
+          # (カメラなしで速読と録画は使える) ので、失敗してもビルドは止めない。
+          cordova plugin add cordova-plugin-android-permissions@1.1.5 || \
+            echo "permissions plugin unavailable — camera will rely on the WebView prompt"
           cordova build android --verbose
       - name: Collect APK
         run: |
