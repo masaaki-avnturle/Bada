@@ -16,8 +16,9 @@
  *   9. Ex コマンド       — :42 :%s/// :set :w :countdown :emit :flash
  *  10. イベントバス      — key / motion / edit / mode の発行とディスパッチ順
  *  11. シネマ数理        — focusStyle / docLayout / flashFrame / countdownState
- *  12. 多段落と拡大鏡    — splitParagraphs / paragraphText / wordAt /
- *                          sentenceAt / loupeTransform / markRange
+ *  12. 多段落とブロック  — splitParagraphs / paragraphText / wordAt /
+ *                          sentenceAt / splitSentences / blockPlan /
+ *                          blockLayout / waveFrame / markRange
  */
 "use strict";
 const fs = require("fs");
@@ -622,7 +623,7 @@ console.log("11. focusStyle / docLayout / flashFrame / countdownState");
 }
 
 /* ═════ 12. 多段落の文章と拡大鏡 ═════ */
-console.log("12. 段落分け / 語と文の切り出し / 拡大鏡の写像");
+console.log("12. 段落分け / 語と文の切り出し / 文のブロックとどアップ・波打ち");
 {
   /* ── 段落分け ── */
   const paras = E.splitParagraphs(["一行目", "二行目", "", "次の段落", "", "", "最後"]);
@@ -702,41 +703,111 @@ console.log("12. 段落分け / 語と文の切り出し / 拡大鏡の写像");
   /* 閉じ括弧は文末に含める */
   eq(E.sentenceAt("「そうだ。」と言った。", 2).text, "「そうだ。」", "閉じ括弧まで 1 文");
 
-  /* ── 拡大鏡の写像 ── */
+  /* ── 文のブロックへの切り分け ── */
   {
-    /* (px,py) が半径 r のレンズ中心 (r,r) に来ること */
-    const check = (px, py, r, z) => {
-      const t = E.loupeTransform(px, py, r, z);
-      return {x:t.scale * (px + t.tx), y:t.scale * (py + t.ty)};
-    };
-    let m = check(441.5, 382, 150, 3);
-    near(m.x, 150, 1e-9, "拡大しても指した点がレンズ中心に来る (x)");
-    near(m.y, 150, 1e-9, "拡大しても指した点がレンズ中心に来る (y)");
-    m = check(0, 0, 100, 7);
-    near(m.x, 100, 1e-9, "原点を指しても中心に来る");
-    m = check(50, 80, 120, 1);
-    near(m.x, 120, 1e-9, "等倍でも中心に来る");
-    eq(E.loupeTransform(10, 10, 100, 0).scale, 1, "倍率 0 は等倍に丸める");
-    eq(E.loupeTransform(10, 10, 100).scale, 1, "倍率なしは等倍");
-    /* 倍率が上がるほど、ずらし量は中心へ寄る */
-    ok(E.loupeTransform(400, 300, 150, 6).tx < E.loupeTransform(400, 300, 150, 3).tx,
-       "倍率が上がるほど、ずらし量は負に大きくなる (r/z が小さくなるため)");
+    const T2 = "一つ目の文。二つ目の文！三つ目？";
+    const bs = E.splitSentences(T2);
+    eq(bs.length, 3, "3 つの文に分かれる");
+    eq(bs.map(x => x.text).join(""), T2, "連結すると元の文章に戻る (取りこぼしなし)");
+    eq(bs[0].text, "一つ目の文。", "句点まで 1 ブロック");
+    eq(bs[1].text, "二つ目の文！", "感嘆符まで 1 ブロック");
+    for (let i = 1; i < bs.length; i++) eq(bs[i].from, bs[i - 1].to, "ブロックに隙間がない (" + i + ")");
+    eq(E.splitSentences("").length, 0, "空文字列");
+    eq(E.splitSentences("終止符なし")[0].text, "終止符なし", "終止符がなければ 1 ブロック");
+    eq(E.splitSentences("「そうだ。」と言った。").length, 2, "閉じ括弧は前のブロックに付く");
+    eq(E.splitSentences("「そうだ。」と言った。")[0].text, "「そうだ。」", "閉じ括弧まで 1 ブロック");
+    eq(E.splitSentences("円周率は 3.14 です。").length, 1, "小数点では切れない");
   }
 
-  /* ── レンズのはみ出し防止 ── */
-  eq(E.clampLoupe(500, 300, 1000, 700, 150).x, 500, "中央付近はそのまま");
-  eq(E.clampLoupe(10, 300, 1000, 700, 150).x, 150, "左にはみ出さない");
-  eq(E.clampLoupe(990, 300, 1000, 700, 150).x, 850, "右にはみ出さない");
-  eq(E.clampLoupe(500, 5, 1000, 700, 150).y, 150, "上にはみ出さない");
-  eq(E.clampLoupe(500, 695, 1000, 700, 150).y, 550, "下にはみ出さない");
-  eq(E.clampLoupe(500, 300, 200, 700, 150).x, 100, "レンズより狭ければ中央に置く");
+  /* ── ブロックと行の対応 ── */
+  {
+    const lines = ["一つ目の文。二つ目の", "文です。三つ目。"];
+    const plan = E.blockPlan(lines);
+    eq(plan.length, 3, "行をまたぐ文も含めて 3 ブロック");
+    const pt2 = E.paragraphText(lines);
+    let joined = "";
+    for (const bk of plan) for (const pr of bk.parts) joined += (pr.sep || "") + pr.text;
+    eq(joined, pt2.text, "ブロックの断片をつなぐと段落に戻る");
+    eq(plan[1].parts.length, 2, "行をまたぐ文は断片が 2 つ");
+    eq(plan[1].parts[0].l, 0, "前半は 1 行目");
+    eq(plan[1].parts[1].l, 1, "後半は 2 行目");
+    eq(plan[1].parts[0].c0, 6, "前半の開始桁");
+    eq(plan[1].parts[1].c0, 0, "後半は行頭から");
+    eq(plan[2].parts[0].c0, 4, "3 番目の文は 2 行目の 4 桁目から");
+    const ep = E.blockPlan(["the quick brown", "fox jumps."]);
+    let ej = "";
+    for (const bk of ep) for (const pr of bk.parts) ej += (pr.sep || "") + pr.text;
+    eq(ej, "the quick brown fox jumps.", "欧文でも行を継ぐ空白が失われない");
+    eq(E.blockPlan([""]).length, 1, "空行でもブロックが 1 つできる");
+  }
 
-  /* ── 倍率の段階 ── */
-  eq(E.zoomStep(3, 1), 4, "1 段上げる");
-  eq(E.zoomStep(3, -1), 2.2, "1 段下げる");
-  eq(E.zoomStep(1.6, -1), 1.6, "最小で止まる");
-  eq(E.zoomStep(7, 1), 7, "最大で止まる");
-  eq(E.zoomStep(3.1, 0), 3, "近い段に吸着する");
+  /* ── その場で拡大しても重ならない配置 ── */
+  {
+    const heights = [40, 60, 40, 50];
+    const scales = [1, 2, 1.5, 1];
+    const lay = E.blockLayout(heights, scales);
+    eq(lay.extras.join(","), "0,60,20,0", "余分な高さ = h(s-1)");
+    eq(lay.offsets.join(","), "0,30,70,80", "ずらし量 = 前までの余分 + 自分の半分");
+    eq(lay.total, 80, "全体の伸び");
+    let prevBottom = -1e9, natural = 0;
+    for (let i = 0; i < heights.length; i++){
+      const vTop = natural + lay.offsets[i] - heights[i] * (scales[i] - 1) / 2;
+      const vBottom = vTop + heights[i] * scales[i];
+      ok(vTop >= prevBottom - 1e-9, "ブロック " + i + " が前のブロックと重ならない");
+      prevBottom = vBottom; natural += heights[i];
+    }
+    eq(E.blockLayout([], []).total, 0, "空の入力");
+    eq(E.blockLayout([30], [1]).offsets[0], 0, "等倍ならずらさない");
+  }
+
+  /* ── どアップと波打ち ── */
+  {
+    const o = {peak:1.9, spread:1.5, amp:22, lambda:3.2, omega:3.4};
+    const f0 = E.waveFrame(0, 1, o), f1 = E.waveFrame(1, 1, o), f4 = E.waveFrame(4, 1, o);
+    near(f0.scale, 1.9, 1e-9, "焦点のブロックが最大倍率 (どアップ)");
+    ok(f1.scale < f0.scale && f4.scale < f1.scale, "離れるほど小さくなる");
+    eq(E.waveFrame(-2, 1, o).scale, E.waveFrame(2, 1, o).scale, "前後で対称");
+    ok(E.waveFrame(20, 1, o).scale < 1.001, "遠くは等倍に戻る");
+    near(E.waveFrame(0, 1, {peak:1.9, depth:0}).scale, 1, 1e-9, "depth=0 ならどアップしない");
+
+    eq(E.waveFrame(2, 0, o).x, 0, "t=0 では揺れていない");
+    eq(E.waveFrame(2, 1, o).x, 0, "t=1 で凪ぐ");
+    eq(E.waveFrame(2, 1.4, o).x, 0, "t>1 は無効");
+    eq(E.waveFrame(2, -0.2, o).x, 0, "t<0 は無効");
+    eq(E.waveFrame(2, 1, o).glow, 0, "凪いだら光らない");
+    ok(Math.abs(E.waveFrame(2, 0.15, o).x) > 1, "伝わっている途中は揺れている");
+    ok(Math.abs(E.waveFrame(6, 0.1, o).x) < Math.abs(E.waveFrame(1, 0.1, o).x),
+       "遠いブロックほど揺れが小さい");
+    let prevEnv = 1e9;
+    for (let t = 0.02; t < 1; t += 0.02){
+      const e = E.waveFrame(1, t, o).env;
+      ok(e <= prevEnv + 1e-12, "t=" + t.toFixed(2) + " で包絡が単調に減衰");
+      prevEnv = e;
+    }
+    /* 縦ゆれは横ゆれの WAVE_Y 倍に抑えてある (積み上げたブロックが重ならないように) */
+    for (let t = 0.05; t < 1; t += 0.05){
+      const f = E.waveFrame(3, t, o);
+      ok(Math.abs(f.y) <= o.amp * 0.16 + 1e-9,
+         "縦ゆれが行間に収まる (t=" + t.toFixed(2) + ", y=" + f.y.toFixed(2) + ")");
+    }
+    near(Math.abs(E.waveFrame(1, 0.2, {amp:40, spread:1.5, lambda:3.2, omega:3.4}).x),
+         Math.abs(E.waveFrame(1, 0.2, {amp:20, spread:1.5, lambda:3.2, omega:3.4}).x) * 2,
+         1e-9, "振幅は amp に比例");
+    /* 進行波: 位相 k·d - ω·t·2π が 0 になる点が、時間とともに外へ移る */
+    {
+      const k = 1.15, om = 3.4;
+      const front = t => (om * t * Math.PI * 2) / k;
+      ok(front(0.2) > front(0.1), "波面が時間とともに外へ進む");
+      const t1 = 0.1, d1 = front(t1);
+      near(E.waveFrame(d1, t1, {amp:10, lambda:1e9, k:k, omega:om, spread:1.5}).x, 0, 1e-9,
+           "波面の上では横ゆれが 0 (位相 0)");
+    }
+    eq(E.peakStep(1.9, 1), 2.4, "1 段上げる");
+    eq(E.peakStep(1.9, -1), 1.5, "1 段下げる");
+    eq(E.peakStep(1.25, -1), 1.25, "最小で止まる");
+    eq(E.peakStep(3.8, 1), 3.8, "最大で止まる");
+    eq(E.peakStep(2.0, 0), 1.9, "近い段に吸着する");
+  }
 
   /* ── 強調範囲の切り出し (行にまたがる文を、行ごとに包む) ── */
   eq(E.markRange("abcdef", 0, 2, 4), "ab<span class=\"snap\">cd</span>ef", "行の途中を包む");
