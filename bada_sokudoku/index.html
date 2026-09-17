@@ -99,7 +99,7 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
 <body>
 <header>
   <h1><span class="k">Bada 瞬読</span> — 速読スタジオ</h1>
-  <p>対象者の本を頁ごと取り込み、<b>画像処理トランスフォーマー</b>(窓自己注意 + 注意ロールアウト)で
+  <p>対象者の本を <b>PDF・画像・docx・epub・そのほか何の拡張子でも</b>取り込み、<b>画像処理トランスフォーマー</b>(窓自己注意 + 注意ロールアウト)で
      <b>文字の固まり・行・多行ブロック・読み順</b>を復元し、そのブロックを視野と目標速度に合わせて順に送る。
      そして画面に映すのは<b>読み手の姿ではなく、その本文が読み手にどう見えているか</b> ──
      中心窩の解像力・読み進む向きに非対称な知覚スパン・サッカード抑制を頁に掛けた像である。
@@ -123,18 +123,22 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
   <div class="card">
     <h2>本の頁を取り込む</h2>
     <div class="row">
-      <button class="act pri" id="btnPickImg">📷 頁の画像を選ぶ / 撮る</button>
-      <button class="act" id="btnPickTxt">📄 テキスト (.txt)</button>
-      <button class="act" id="btnPickTex">📚 論文 (.tex)</button>
+      <button class="act pri" id="btnPickAny">📥 ファイルを取り込む(何でも)</button>
+      <button class="act" id="btnPickCam">📷 頁をその場で撮る</button>
       <button class="act" id="btnSample">🧪 内蔵サンプル本文</button>
       <button class="act" id="btnDemoPage">🖼 デモ頁を合成</button>
     </div>
-    <input type="file" id="fileImg" accept="image/*" multiple hidden />
-    <input type="file" id="fileTxt" accept=".txt,.md,text/plain" hidden />
-    <input type="file" id="fileTex" accept=".tex,.txt" hidden />
+    <input type="file" id="fileAny" accept="*/*" multiple hidden />
+    <input type="file" id="fileCam" accept="image/*" capture="environment" hidden />
     <div class="drop" id="drop" style="margin-top:10px">
-      ここに画像 / .txt / .tex を落としても取り込めます(すべて端末内で処理。外に出ません)
+      ここに落としても取り込めます —
+      <b>PDF</b>(本文も、走査した頁の JPEG も)・<b>画像</b>(png / jpeg / gif / webp / bmp / heif)・
+      <b>docx</b> / <b>odt</b> / <b>pptx</b> / <b>xlsx</b> / <b>epub</b> / <b>zip</b> ・
+      <b>tex</b> / <b>html</b> / <b>xml</b> / <b>rtf</b> / <b>srt</b>・<b>vtt</b> / <b>csv</b>・<b>tsv</b> /
+      <b>json</b> / <b>txt</b> / <b>md</b> ・ そのほかの拡張子も、文字として読めれば本文として受けます
+      (すべて端末内で処理。外に出ません)
     </div>
+    <pre class="log" id="intakeLog" style="margin-top:10px;display:none"></pre>
     <div class="thumbs" id="thumbs" style="margin-top:10px"></div>
     <p class="muted" id="intakeInfo" style="margin-top:8px">まだ何も取り込まれていません。</p>
   </div>
@@ -369,6 +373,28 @@ hr{border:0;border-top:1px solid var(--line);margin:14px 0}
       <b>「どこからどこまでが一つの固まりか」「次はどこへ視点を送るか」</b>であって、
       その固まりが何という字であるかではありません。だから本アプリは文字認識(OCR)を経由せず、
       <b>頁の画像そのものの上で固まりと読み順だけを復元</b>し、その順に視点を送ります。</p>
+
+    <h3>0. 取り込み — 本はどんな形でも来る</h3>
+    <p>本は PDF で来ることも、docx で来ることも、epub で来ることもある。依存ゼロ・オフラインのまま
+      受けるために、必要なものは全部この 1 枚の中に書いてあります。</p>
+    <ul>
+      <li><b>deflate の展開</b>を内蔵しています(環境に <code>DecompressionStream</code> があればそれを使い、
+        無ければ内蔵実装に落ちます。どちらでも結果が一致することを検査しています)。</li>
+      <li><b>ZIP</b> を読めるので、<b>docx</b>(段落の順)・<b>odt</b>・<b>pptx</b>(枚の順)・
+        <b>xlsx</b>(共有文字列を解く)・<b>epub</b>(<b>綴じ (spine) の順</b>)・ただの <b>zip</b> が開きます。</li>
+      <li><b>PDF</b> は、オブジェクトとオブジェクトストリームを解き、頁木から頁の順を取り、
+        各頁の資源辞書からフォントを引いて、<b>ToUnicode CMap</b>(<code>bfchar</code> /
+        <code>bfrange</code> / <code>codespacerange</code>)で符号を文字に戻します。
+        1 バイト符号 (Type1/Type3) と 2 バイト符号 (Type0 / Identity-H) の両方に対応します。
+        送りの空きを空白に変えるのは直前が和字でないときだけ ── 和文は字間が空いていても語の切れ目ではないからです。
+        紙を撮った PDF には文字がないので、そのときは<b>埋め込み JPEG を頁の画像として</b>取り出します。
+        ベクタ描画の再現はしません(要るのは本文と版面であって、見た目の再現ではない)。</li>
+      <li><b>tex</b> は前文と命令と数式を剥がし、<b>html/xml</b> はタグと実体参照を、<b>rtf</b> は制御語を、
+        <b>srt/vtt</b> は番号と時刻を、<b>csv/tsv</b> は区切りを、<b>json</b> は文字列だけを取り出します。</li>
+      <li>どれにも当てはまらない拡張子でも、<b>文字として読めれば本文として受けます</b>
+        (UTF-8 / UTF-16 の BOM / Shift_JIS を見ます)。読めないものは、読めないと言って受け取りません。</li>
+      <li>判定は<b>拡張子より中身</b>を優先します(魔法数を見るので、名前が違っていても正しく開きます)。</li>
+    </ul>
 
     <h3>1. 前処理 — 照明を落とす</h3>
     <p>本の写真は必ず照明が傾いています。積分画像 (integral image) を 1 度だけ作り、
@@ -1702,6 +1728,836 @@ function paginateText(chunks, opts){
   }
   return pages;
 }
+/* ══════════ 8.9 どんなファイルでも取り込む ══════════
+   本は PDF で来ることも、docx で来ることも、epub で来ることもある。
+   依存ゼロ・オフラインのまま受けるために、必要なものは全部この中に書いてある:
+     ・deflate の展開 (内蔵。環境に DecompressionStream があればそちらを使う)
+     ・ZIP の読み出し (docx / epub / odt / pptx / xlsx / zip はすべて ZIP)
+     ・PDF の読み出し (オブジェクト・オブジェクトストリーム・ページ木・
+       ToUnicode CMap による文字復元・埋め込み JPEG の取り出し)
+     ・マークアップ / RTF / 字幕 / CSV / JSON の剥がし
+   どれも当てはまらなければ、文字として読めるかどうかを見て、読めれば本文として受ける。 */
+
+/* ── deflate (RFC 1951) の展開 — 内蔵実装 ──
+   ZIP も PDF の FlateDecode もこれ一つで開く。 */
+function inflateRawSync(src){
+  let out = new Uint8Array(Math.max(1024, src.length * 4));
+  let len = 0;
+  function push(b){
+    if (len === out.length){
+      const n = new Uint8Array(out.length * 2);
+      n.set(out); out = n;
+    }
+    out[len++] = b;
+  }
+  let bitPos = 0;
+  function bits(n){
+    let v = 0;
+    for (let i = 0; i < n; i++){
+      const by = src[bitPos >> 3];
+      if (by === undefined) throw new Error("deflate: 入力が尽きた");
+      v |= ((by >> (bitPos & 7)) & 1) << i;
+      bitPos++;
+    }
+    return v;
+  }
+  /* 正準ハフマン表 (長さの列から作る) */
+  function buildTree(lengths){
+    const counts = new Int32Array(16);
+    for (let i = 0; i < lengths.length; i++) counts[lengths[i]]++;
+    counts[0] = 0;
+    const offs = new Int32Array(16);
+    for (let i = 1; i < 16; i++) offs[i] = offs[i - 1] + counts[i - 1];
+    const symbols = new Int32Array(lengths.length);
+    for (let i = 0; i < lengths.length; i++) if (lengths[i]) symbols[offs[lengths[i]]++] = i;
+    return { counts: counts, symbols: symbols };
+  }
+  function decodeSym(tree){
+    let code = 0, first = 0, index = 0;
+    for (let l = 1; l <= 15; l++){
+      code |= bits(1);
+      const count = tree.counts[l];
+      if (code - first < count) return tree.symbols[index + (code - first)];
+      index += count;
+      first = (first + count) << 1;
+      code <<= 1;
+    }
+    throw new Error("deflate: 符号が壊れている");
+  }
+  const LBASE = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  const LEXT  = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DBASE = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,
+                 4097,6145,8193,12289,16385,24577];
+  const DEXT  = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  let fixedLit = null, fixedDist = null;
+  for (;;){
+    const last = bits(1), type = bits(2);
+    if (type === 0){
+      /* 無圧縮 */
+      bitPos = (bitPos + 7) & ~7;
+      const p = bitPos >> 3;
+      const n = src[p] | (src[p + 1] << 8);
+      bitPos = (p + 4) << 3;
+      for (let i = 0; i < n; i++) push(src[(bitPos >> 3) + i]);
+      bitPos += n << 3;
+    } else if (type === 1 || type === 2){
+      let lit, dist;
+      if (type === 1){
+        if (!fixedLit){
+          const l = new Uint8Array(288);
+          for (let i = 0; i < 144; i++) l[i] = 8;
+          for (let i = 144; i < 256; i++) l[i] = 9;
+          for (let i = 256; i < 280; i++) l[i] = 7;
+          for (let i = 280; i < 288; i++) l[i] = 8;
+          fixedLit = buildTree(l);
+          fixedDist = buildTree(new Uint8Array(30).fill(5));
+        }
+        lit = fixedLit; dist = fixedDist;
+      } else {
+        const hlit = bits(5) + 257, hdist = bits(5) + 1, hclen = bits(4) + 4;
+        const ord = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+        const clen = new Uint8Array(19);
+        for (let i = 0; i < hclen; i++) clen[ord[i]] = bits(3);
+        const ctree = buildTree(clen);
+        const lens = new Uint8Array(hlit + hdist);
+        for (let i = 0; i < lens.length; ){
+          const sym = decodeSym(ctree);
+          if (sym < 16) lens[i++] = sym;
+          else if (sym === 16){
+            const prev = lens[i - 1], r = 3 + bits(2);
+            for (let k = 0; k < r; k++) lens[i++] = prev;
+          } else if (sym === 17){
+            const r = 3 + bits(3);
+            for (let k = 0; k < r; k++) lens[i++] = 0;
+          } else {
+            const r = 11 + bits(7);
+            for (let k = 0; k < r; k++) lens[i++] = 0;
+          }
+        }
+        lit = buildTree(lens.subarray(0, hlit));
+        dist = buildTree(lens.subarray(hlit));
+      }
+      for (;;){
+        const sym = decodeSym(lit);
+        if (sym < 256) push(sym);
+        else if (sym === 256) break;
+        else {
+          const li = sym - 257;
+          const length = LBASE[li] + bits(LEXT[li]);
+          const ds = decodeSym(dist);
+          const d = DBASE[ds] + bits(DEXT[ds]);
+          for (let i = 0; i < length; i++) push(out[len - d]);
+        }
+      }
+    } else throw new Error("deflate: 未知のブロック種別");
+    if (last) break;
+  }
+  return out.subarray(0, len);
+}
+/* zlib 包み (PDF の FlateDecode はこちら) */
+function inflateSync(bytes){
+  if (bytes.length > 2 && (bytes[0] & 0x0f) === 8 && ((bytes[0] << 8 | bytes[1]) % 31) === 0)
+    return inflateRawSync(bytes.subarray(2));
+  return inflateRawSync(bytes);
+}
+/* 環境に DecompressionStream があればそれを使い、無ければ内蔵実装に落ちる */
+function inflateBytes(bytes, raw){
+  if (typeof DecompressionStream === "function" && typeof ReadableStream === "function"){
+    try {
+      const rs = new ReadableStream({ start: function(c){ c.enqueue(bytes); c.close(); } });
+      const ds = rs.pipeThrough(new DecompressionStream(raw ? "deflate-raw" : "deflate"));
+      const reader = ds.getReader();
+      const chunks = [];
+      return (function pump(){
+        return reader.read().then(function(r){
+          if (r.done){
+            let n = 0;
+            for (let i = 0; i < chunks.length; i++) n += chunks[i].length;
+            const outv = new Uint8Array(n);
+            let o = 0;
+            for (let i = 0; i < chunks.length; i++){ outv.set(chunks[i], o); o += chunks[i].length; }
+            return outv;
+          }
+          chunks.push(r.value);
+          return pump();
+        });
+      })().catch(function(){ return raw ? inflateRawSync(bytes) : inflateSync(bytes); });
+    } catch (e){ /* 下の同期版へ */ }
+  }
+  return Promise.resolve(raw ? inflateRawSync(bytes) : inflateSync(bytes));
+}
+
+/* ── ZIP (docx / epub / odt / pptx / xlsx / zip) ── */
+function u16(b, i){ return b[i] | (b[i + 1] << 8); }
+function u32(b, i){ return (b[i] | (b[i + 1] << 8) | (b[i + 2] << 16) | (b[i + 3] << 24)) >>> 0; }
+function zipList(bytes){
+  /* 末尾から End of Central Directory を探す */
+  let eo = -1;
+  for (let i = bytes.length - 22; i >= 0 && i > bytes.length - 66000; i--){
+    if (bytes[i] === 0x50 && bytes[i + 1] === 0x4b && bytes[i + 2] === 0x05 && bytes[i + 3] === 0x06){ eo = i; break; }
+  }
+  if (eo < 0) return [];
+  const n = u16(bytes, eo + 10);
+  let p = u32(bytes, eo + 16);
+  const out = [];
+  for (let k = 0; k < n && p + 46 <= bytes.length; k++){
+    if (u32(bytes, p) !== 0x02014b50) break;
+    const method = u16(bytes, p + 10);
+    const csize = u32(bytes, p + 20), size = u32(bytes, p + 24);
+    const nlen = u16(bytes, p + 28), elen = u16(bytes, p + 30), clen = u16(bytes, p + 32);
+    const lho = u32(bytes, p + 42);
+    let name = "";
+    for (let i = 0; i < nlen; i++) name += String.fromCharCode(bytes[p + 46 + i]);
+    try { name = decodeURIComponent(escape(name)); } catch (e){ /* そのまま */ }
+    out.push({ name: name, method: method, csize: csize, size: size, offset: lho });
+    p += 46 + nlen + elen + clen;
+  }
+  return out;
+}
+function zipEntryData(bytes, e){
+  const p = e.offset;
+  if (u32(bytes, p) !== 0x04034b50) return Promise.resolve(new Uint8Array(0));
+  const nlen = u16(bytes, p + 26), elen = u16(bytes, p + 28);
+  const start = p + 30 + nlen + elen;
+  const raw = bytes.subarray(start, start + e.csize);
+  if (e.method === 0) return Promise.resolve(raw);
+  if (e.method === 8) return inflateBytes(raw, true);
+  return Promise.reject(new Error("ZIP: 未対応の圧縮方式 " + e.method));
+}
+function zipFind(list, re){
+  for (let i = 0; i < list.length; i++) if (re.test(list[i].name)) return list[i];
+  return null;
+}
+
+/* ── 文字の取り出し ── */
+function latin1(bytes){
+  let s = "";
+  for (let i = 0; i < bytes.length; i += 8192)
+    s += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(bytes.length, i + 8192)));
+  return s;
+}
+function bytesToText(bytes){
+  if (bytes.length > 2 && bytes[0] === 0xFF && bytes[1] === 0xFE)
+    return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes.length > 2 && bytes[0] === 0xFE && bytes[1] === 0xFF)
+    return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  const t = new TextDecoder("utf-8").decode(bytes);
+  /* UTF-8 として壊れているなら Shift_JIS も試す (日本語の古いテキスト) */
+  if (/�/.test(t)){
+    try {
+      const sj = new TextDecoder("shift_jis").decode(bytes);
+      if (!/�/.test(sj)) return sj;
+    } catch (e){ /* 無い環境ではそのまま */ }
+  }
+  return t;
+}
+/* 文字として読めるか (制御バイトの割合で見る) */
+function looksBinary(bytes){
+  const n = Math.min(bytes.length, 4096);
+  if (!n) return false;
+  let bad = 0;
+  for (let i = 0; i < n; i++){
+    const b = bytes[i];
+    if (b === 0) return true;
+    if (b < 9 || (b > 13 && b < 32)) bad++;
+  }
+  return bad / n > 0.06;
+}
+const HTML_ENT = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ", "#39": "'", "#160": " " };
+function decodeEntities(s){
+  return String(s).replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z]+);/g, function(m, e){
+    if (e[0] === "#"){
+      const code = (e[1] === "x" || e[1] === "X") ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+      return isNaN(code) ? m : String.fromCodePoint(code);
+    }
+    return HTML_ENT[e] !== undefined ? HTML_ENT[e] : m;
+  });
+}
+/* html / xhtml / xml → 本文 */
+function stripMarkup(src){
+  let s = String(src);
+  s = s.replace(/<!--[\s\S]*?-->/g, " ");
+  s = s.replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, " ");
+  s = s.replace(/<\/(p|div|h[1-6]|li|tr|section|article|blockquote)>/gi, "\n");
+  s = s.replace(/<br\s*\/?>/gi, "\n");
+  s = s.replace(/<[^>]*>/g, "");
+  s = decodeEntities(s);
+  return s.replace(/[ \t]+/g, " ").replace(/\n[ \t]+/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function stripRtf(src){
+  let s = String(src);
+  s = s.replace(/\\'([0-9a-fA-F]{2})/g, function(m, h){ return String.fromCharCode(parseInt(h, 16)); });
+  s = s.replace(/\\u(-?\d+)\s?\??/g, function(m, d){
+    let c = parseInt(d, 10);
+    if (c < 0) c += 65536;
+    return String.fromCharCode(c);
+  });
+  s = s.replace(/\\par[d]?\b/g, "\n").replace(/\\line\b/g, "\n");
+  s = s.replace(/\\[a-zA-Z]+-?\d*\s?/g, "");
+  s = s.replace(/[{}]/g, "");
+  return s.replace(/\n{3,}/g, "\n\n").trim();
+}
+/* 字幕 (srt / vtt) — 番号と時刻を落として台詞だけにする */
+function subsToText(src){
+  return String(src).replace(/\r/g, "")
+    .split("\n")
+    .filter(function(l){
+      if (/^WEBVTT/.test(l)) return false;
+      if (/^\d+$/.test(l.trim())) return false;
+      if (/-->/.test(l)) return false;
+      return true;
+    })
+    .join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function csvToText(src){
+  return String(src).replace(/\r/g, "").split("\n")
+    .map(function(l){ return l.split(/[,\t]/).map(function(c){ return c.replace(/^"|"$/g, "").trim(); })
+                              .filter(function(c){ return c !== ""; }).join(" "); })
+    .filter(function(l){ return l !== ""; }).join("\n");
+}
+function jsonToText(src){
+  try {
+    const v = JSON.parse(src);
+    const out = [];
+    (function walk(x){
+      if (typeof x === "string") out.push(x);
+      else if (Array.isArray(x)) x.forEach(walk);
+      else if (x && typeof x === "object") Object.keys(x).forEach(function(k){ walk(x[k]); });
+    })(v);
+    return out.join("\n");
+  } catch (e){ return String(src); }
+}
+/* ── PDF ──
+   本は PDF で来ることが多い。文字が入っている PDF からは本文を、
+   紙を撮った PDF (埋め込み JPEG) からは頁の画像を取り出す。
+   ベクタ描画の再現はしない — 本アプリに要るのは本文と版面であって、見た目の再現ではない。 */
+
+/* 順番に約束をつなぐ (展開が非同期のため) */
+function seqMap(items, fn){
+  const out = [];
+  return items.reduce(function(p, it, i){
+    return p.then(function(){ return fn(it, i); }).then(function(r){ out.push(r); });
+  }, Promise.resolve()).then(function(){ return out; });
+}
+function pdfIsEncrypted(head){ return /\/Encrypt\s+\d+\s+\d+\s+R/.test(head); }
+/* 生の PDF → オブジェクト表 (辞書の文字列と、ストリームの生バイト) */
+function pdfScanObjects(bytes){
+  const s = latin1(bytes);
+  const objs = new Map();
+  const re = /(\d+)\s+(\d+)\s+obj\b/g;
+  let m;
+  while ((m = re.exec(s)) !== null){
+    const num = parseInt(m[1], 10);
+    const bodyStart = m.index + m[0].length;
+    const end = s.indexOf("endobj", bodyStart);
+    if (end < 0) continue;
+    const body = s.slice(bodyStart, end);
+    const si = body.indexOf("stream");
+    if (si < 0){ objs.set(num, { dict: body, raw: null }); continue; }
+    let ds = bodyStart + si + 6;
+    if (s.charCodeAt(ds) === 13) ds++;
+    if (s.charCodeAt(ds) === 10) ds++;
+    /* このオブジェクトの endobj より手前にある endstream を後ろから探す
+       (先の位置から探すと次のオブジェクトの endstream を拾ってしまう) */
+    const de = s.lastIndexOf("endstream", end);
+    const dend = (de > ds) ? de : end;
+    objs.set(num, { dict: body.slice(0, si), raw: bytes.subarray(ds, dend) });
+  }
+  return { objs: objs, head: s.slice(0, Math.min(s.length, 4096)) + s.slice(Math.max(0, s.length - 4096)) };
+}
+/* ストリームを filter に従って開く */
+function pdfStream(o){
+  if (!o || !o.raw) return Promise.resolve(new Uint8Array(0));
+  if (/\/Filter\s*\/FlateDecode/.test(o.dict) || /\/Filter\s*\[\s*\/FlateDecode/.test(o.dict))
+    return inflateBytes(o.raw, false).catch(function(){ return new Uint8Array(0); });
+  return Promise.resolve(o.raw);
+}
+/* オブジェクトストリーム (PDF 1.5 以降。ページ辞書がこの中に入っていることがある) を展開して足す */
+function pdfExpandObjStm(objs){
+  const targets = [];
+  objs.forEach(function(o, num){ if (/\/Type\s*\/ObjStm/.test(o.dict)) targets.push(o); });
+  return seqMap(targets, function(o){
+    return pdfStream(o).then(function(data){
+      const txt = latin1(data);
+      const n = parseInt((o.dict.match(/\/N\s+(\d+)/) || [])[1] || "0", 10);
+      const first = parseInt((o.dict.match(/\/First\s+(\d+)/) || [])[1] || "0", 10);
+      const head = txt.slice(0, first).trim().split(/\s+/);
+      for (let i = 0; i < n; i++){
+        const num = parseInt(head[i * 2], 10), off = parseInt(head[i * 2 + 1], 10);
+        if (isNaN(num) || isNaN(off)) continue;
+        const endOff = (i + 1 < n) ? first + parseInt(head[(i + 1) * 2 + 1], 10) : txt.length;
+        if (!objs.has(num)) objs.set(num, { dict: txt.slice(first + off, endOff), raw: null });
+      }
+    });
+  }).then(function(){ return objs; });
+}
+/* 値そのものが間接参照 (「12 0 R」) のときだけ番号を返す。
+   辞書の中に参照が含まれているだけの場合に拾ってしまうと、
+   フォント辞書まるごとを参照と取り違える。 */
+function pdfRef(str){
+  const m = String(str).match(/^\s*(\d+)\s+\d+\s+R\s*$/);
+  return m ? parseInt(m[1], 10) : null;
+}
+/* 辞書から /Key の値 (そのままの文字列) を取り出す */
+function pdfGet(dict, key){
+  const i = dict.indexOf("/" + key);
+  if (i < 0) return null;
+  let j = i + key.length + 1;
+  while (j < dict.length && /\s/.test(dict[j])) j++;
+  if (dict[j] === "["){
+    let d = 0;
+    for (let k = j; k < dict.length; k++){
+      if (dict[k] === "[") d++;
+      else if (dict[k] === "]"){ d--; if (!d) return dict.slice(j, k + 1); }
+    }
+    return dict.slice(j);
+  }
+  if (dict[j] === "<" && dict[j + 1] === "<"){
+    let d = 0;
+    for (let k = j; k < dict.length - 1; k++){
+      if (dict[k] === "<" && dict[k + 1] === "<"){ d++; k++; }
+      else if (dict[k] === ">" && dict[k + 1] === ">"){ d--; k++; if (!d) return dict.slice(j, k + 1); }
+    }
+    return dict.slice(j);
+  }
+  const m = dict.slice(j).match(/^(\/[^\s\/\[\]<>()]+|\d+\s+\d+\s+R|-?[\d.]+|\([^)]*\))/);
+  return m ? m[1] : null;
+}
+/* ToUnicode CMap → {width: 1|2, map} 。これが文字の復元そのもの。 */
+function pdfParseCMap(text){
+  let width = 1;
+  const cs = text.match(/begincodespacerange([\s\S]*?)endcodespacerange/);
+  if (cs){
+    const h = cs[1].match(/<([0-9a-fA-F]+)>/);
+    if (h) width = Math.max(1, Math.round(h[1].length / 2));
+  }
+  const map = new Map();
+  const hexToStr = function(h){
+    let out = "";
+    for (let i = 0; i + 3 < h.length + 1; i += 4){
+      const u = parseInt(h.slice(i, i + 4), 16);
+      if (!isNaN(u)) out += String.fromCharCode(u);
+    }
+    if (!out && h.length >= 2) out = String.fromCharCode(parseInt(h.slice(0, 2), 16));
+    return out;
+  };
+  const bc = text.match(/beginbfchar([\s\S]*?)endbfchar/g) || [];
+  bc.forEach(function(blk){
+    const re = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>/g;
+    let m;
+    while ((m = re.exec(blk)) !== null) map.set(parseInt(m[1], 16), hexToStr(m[2]));
+  });
+  const br = text.match(/beginbfrange([\s\S]*?)endbfrange/g) || [];
+  br.forEach(function(blk){
+    const re = /<([0-9a-fA-F]+)>\s*<([0-9a-fA-F]+)>\s*(<([0-9a-fA-F]+)>|\[([\s\S]*?)\])/g;
+    let m;
+    while ((m = re.exec(blk)) !== null){
+      const lo = parseInt(m[1], 16), hi = parseInt(m[2], 16);
+      if (m[4] !== undefined){
+        const base = parseInt(m[4], 16);
+        const pad = m[4].length;
+        for (let c = lo; c <= hi && c - lo < 65536; c++)
+          map.set(c, hexToStr((base + (c - lo)).toString(16).padStart(pad, "0")));
+      } else {
+        const items = (m[5].match(/<([0-9a-fA-F]+)>/g) || []);
+        for (let i = 0; i < items.length && lo + i <= hi; i++)
+          map.set(lo + i, hexToStr(items[i].replace(/[<>]/g, "")));
+      }
+    }
+  });
+  return { width: width, map: map };
+}
+/* 1 ページ分の内容ストリームから本文を取り出す */
+/* 送りの空きを空白に変えてよいのは、直前が和字でないときだけ。
+   和文は字と字のあいだが空いていても語の切れ目ではない。 */
+function gapSpace(out){
+  if (!out) return "";
+  return /[\u3000-\u30FF\u3400-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]$/.test(out) ? "" : " ";
+}
+function pdfContentText(content, fonts){
+  let out = "";
+  let font = null, size = 12, lastY = null, i = 0;
+  const stack = [];
+  const n = content.length;
+  function decode(codes){
+    if (!font || !font.map || !font.map.size){
+      let s = "";
+      for (let k = 0; k < codes.length; k++) s += String.fromCharCode(codes[k]);
+      return s;
+    }
+    let s = "";
+    const w = font.width || 1;
+    for (let k = 0; k + w <= codes.length; k += w){
+      let c = 0;
+      for (let j = 0; j < w; j++) c = (c << 8) | codes[k + j];
+      const u = font.map.get(c);
+      s += (u !== undefined) ? u : (w === 1 ? String.fromCharCode(c) : "");
+    }
+    return s;
+  }
+  while (i < n){
+    const ch = content[i];
+    if (ch === "(" ){
+      const codes = [];
+      let depth = 1;
+      i++;
+      while (i < n && depth > 0){
+        const c = content[i];
+        if (c === "\\"){
+          const e = content[i + 1];
+          const oct = content.slice(i + 1, i + 4).match(/^[0-7]{1,3}/);
+          if (oct){ codes.push(parseInt(oct[0], 8)); i += 1 + oct[0].length; continue; }
+          const esc = { n: 10, r: 13, t: 9, b: 8, f: 12 };
+          codes.push(esc[e] !== undefined ? esc[e] : e.charCodeAt(0));
+          i += 2; continue;
+        }
+        if (c === "("){ depth++; codes.push(40); i++; continue; }
+        if (c === ")"){ depth--; if (!depth){ i++; break; } codes.push(41); i++; continue; }
+        codes.push(content.charCodeAt(i)); i++;
+      }
+      stack.push({ t: "str", v: codes });
+      continue;
+    }
+    if (ch === "<" && content[i + 1] !== "<"){
+      const e = content.indexOf(">", i);
+      const hex = content.slice(i + 1, e < 0 ? n : e).replace(/[^0-9a-fA-F]/g, "");
+      const codes = [];
+      for (let k = 0; k + 1 < hex.length + 1; k += 2) codes.push(parseInt(hex.substr(k, 2).padEnd(2, "0"), 16));
+      stack.push({ t: "str", v: codes });
+      i = (e < 0 ? n : e + 1);
+      continue;
+    }
+    if (ch === "<" || ch === "["){ stack.push({ t: "mark", v: ch }); i++; continue; }
+    if (ch === "]"){
+      /* TJ の配列: 直前の mark まで巻き戻して文字と大きな送りを拾う */
+      const parts = [];
+      while (stack.length){
+        const it = stack.pop();
+        if (it.t === "mark" && it.v === "[") break;
+        parts.unshift(it);
+      }
+      stack.push({ t: "arr", v: parts });
+      i++; continue;
+    }
+    if (/\s/.test(ch)){ i++; continue; }
+    /* 名前 / 数 / 演算子 */
+    const m = content.slice(i).match(/^(\/[^\s\/\[\]<>(){}]*|-?[\d.]+|[A-Za-z'"*]+)/);
+    if (!m){ i++; continue; }
+    const tok = m[1];
+    i += tok.length;
+    if (tok[0] === "/"){ stack.push({ t: "name", v: tok.slice(1) }); continue; }
+    if (/^-?[\d.]+$/.test(tok)){ stack.push({ t: "num", v: parseFloat(tok) }); continue; }
+    /* 演算子 */
+    if (tok === "Tf"){
+      const sz = stack.pop(), nm = stack.pop();
+      size = (sz && sz.t === "num") ? sz.v : size;
+      font = (nm && nm.t === "name" && fonts[nm.v]) ? fonts[nm.v] : null;
+      stack.length = 0;
+      continue;
+    }
+    if (tok === "Tj" || tok === "'" || tok === '"'){
+      const st = stack.pop();
+      if (st && st.t === "str") out += decode(st.v);
+      if (tok !== "Tj") out += "\n";
+      stack.length = 0;
+      continue;
+    }
+    if (tok === "TJ"){
+      const arr = stack.pop();
+      if (arr && arr.t === "arr"){
+        for (let k = 0; k < arr.v.length; k++){
+          const it = arr.v[k];
+          if (it.t === "str") out += decode(it.v);
+          else if (it.t === "num" && it.v < -250) out += gapSpace(out);
+        }
+      }
+      stack.length = 0;
+      continue;
+    }
+    if (tok === "Tm" || tok === "Td" || tok === "TD" || tok === "T*"){
+      let y = null, dx = 0;
+      if (tok === "Tm" && stack.length >= 6){
+        y = stack[stack.length - 1].v;
+      } else if ((tok === "Td" || tok === "TD") && stack.length >= 2){
+        const dy = stack[stack.length - 1].v;
+        dx = stack[stack.length - 2].v;
+        if (dy !== 0) y = (lastY === null ? 0 : lastY) + dy;
+      } else if (tok === "T*"){
+        y = (lastY === null ? 0 : lastY) - 1;
+      }
+      if (y !== null && lastY !== null && Math.abs(y - lastY) > 0.01) out += "\n";
+      if (y !== null) lastY = y;
+      else if (dx > size * 2.2) out += gapSpace(out);
+      stack.length = 0;
+      continue;
+    }
+    if (tok === "ET"){ stack.length = 0; continue; }
+    stack.length = 0;
+  }
+  return out.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n");
+}
+/* PDF 全体 → 頁ごとの本文 + 埋め込み JPEG */
+function pdfExtract(bytes){
+  const scan = pdfScanObjects(bytes);
+  if (pdfIsEncrypted(scan.head))
+    return Promise.resolve({ pages: [], images: [], note: "暗号化された PDF は開けません" });
+  return pdfExpandObjStm(scan.objs).then(function(objs){
+    /* ページの並びを頁木から取る (取れなければ番号順) */
+    const pageNums = [];
+    objs.forEach(function(o, num){ if (/\/Type\s*\/Page[^s]/.test(o.dict)) pageNums.push(num); });
+    pageNums.sort(function(a, b){ return a - b; });
+    let order = pageNums;
+    objs.forEach(function(o, num){
+      if (/\/Type\s*\/Pages/.test(o.dict) && /\/Kids/.test(o.dict) && order === pageNums){
+        const kids = (pdfGet(o.dict, "Kids") || "").match(/\d+\s+\d+\s+R/g) || [];
+        const ids = kids.map(function(k){ return parseInt(k, 10); })
+                        .filter(function(k){ return pageNums.indexOf(k) >= 0; });
+        if (ids.length === pageNums.length) order = ids;
+      }
+    });
+    /* フォントごとの ToUnicode を集める */
+    const toUni = new Map();
+    const fontObjs = [];
+    objs.forEach(function(o, num){
+      if (/\/Type\s*\/Font/.test(o.dict) || /\/ToUnicode/.test(o.dict)) fontObjs.push(num);
+    });
+    return seqMap(fontObjs, function(num){
+      const ref = pdfRef(pdfGet(objs.get(num).dict, "ToUnicode") || "");
+      if (ref === null || !objs.has(ref)) return null;
+      return pdfStream(objs.get(ref)).then(function(d){
+        toUni.set(num, pdfParseCMap(latin1(d)));
+      });
+    }).then(function(){
+      /* 頁ごとに内容を開いて本文にする */
+      return seqMap(order, function(pnum){
+        const page = objs.get(pnum);
+        if (!page) return "";
+        /* /Resources /Font (間接参照のこともある) */
+        let res = pdfGet(page.dict, "Resources") || "";
+        const rref = pdfRef(res);
+        if (rref !== null && objs.has(rref)) res = objs.get(rref).dict;
+        let fdict = pdfGet(res, "Font") || "";
+        const fref = pdfRef(fdict);
+        if (fref !== null && objs.has(fref)) fdict = objs.get(fref).dict;
+        const fonts = {};
+        const fre = /\/([^\s\/]+)\s+(\d+)\s+\d+\s+R/g;
+        let fm;
+        while ((fm = fre.exec(fdict)) !== null){
+          const cm = toUni.get(parseInt(fm[2], 10));
+          const fo = objs.get(parseInt(fm[2], 10));
+          const isCID = fo && /\/Type0|Identity-H|Identity-V/.test(fo.dict);
+          fonts[fm[1]] = cm ? { width: cm.width, map: cm.map }
+                            : { width: isCID ? 2 : 1, map: new Map() };
+        }
+        /* /Contents は 1 本のことも配列のことも */
+        const cval = pdfGet(page.dict, "Contents") || "";
+        const crefs = (cval.match(/\d+\s+\d+\s+R/g) || []).map(function(r){ return parseInt(r, 10); });
+        return seqMap(crefs, function(cn){
+          return objs.has(cn) ? pdfStream(objs.get(cn)).then(latin1) : "";
+        }).then(function(parts){
+          return pdfContentText(parts.join("\n"), fonts);
+        });
+      }).then(function(texts){
+        /* 埋め込み JPEG (紙を撮った PDF はこれが頁そのもの) */
+        const jpegs = [];
+        objs.forEach(function(o, num){
+          if (o.raw && /\/Subtype\s*\/Image/.test(o.dict) && /DCTDecode/.test(o.dict))
+            jpegs.push({ num: num, bytes: o.raw });
+        });
+        jpegs.sort(function(a, b){ return a.num - b.num; });
+        return {
+          pages: texts.map(function(t, i){ return { index: i, text: t.trim() }; }),
+          images: jpegs.map(function(j){ return j.bytes; }),
+          note: ""
+        };
+      });
+    });
+  });
+}
+
+/* ── 取り込みの入口: 拡張子と中身から種別を決めて、本文と画像に開く ── */
+function sniffFormat(name, bytes){
+  const ext = (String(name).match(/\.([A-Za-z0-9]+)$/) || [, ""])[1].toLowerCase();
+  const b = bytes || new Uint8Array(0);
+  const magic4 = (b[0] << 24 | b[1] << 16 | b[2] << 8 | b[3]) >>> 0;
+  if (b[0] === 0x25 && b[1] === 0x50 && b[2] === 0x44 && b[3] === 0x46) return { kind: "pdf", ext: ext, label: "PDF" };
+  if (b[0] === 0x50 && b[1] === 0x4b && (b[2] === 3 || b[2] === 5 || b[2] === 7)){
+    if (ext === "docx" || ext === "dotx") return { kind: "docx", ext: ext, label: "Word (docx)" };
+    if (ext === "epub") return { kind: "epub", ext: ext, label: "EPUB" };
+    if (ext === "odt" || ext === "ods" || ext === "odp") return { kind: "odf", ext: ext, label: "OpenDocument" };
+    if (ext === "pptx") return { kind: "pptx", ext: ext, label: "PowerPoint (pptx)" };
+    if (ext === "xlsx") return { kind: "xlsx", ext: ext, label: "Excel (xlsx)" };
+    return { kind: "zip", ext: ext, label: "ZIP" };
+  }
+  if (magic4 === 0x89504E47) return { kind: "image", ext: ext, label: "PNG" };
+  if (b[0] === 0xFF && b[1] === 0xD8) return { kind: "image", ext: ext, label: "JPEG" };
+  if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return { kind: "image", ext: ext, label: "GIF" };
+  if (b[0] === 0x42 && b[1] === 0x4D) return { kind: "image", ext: ext, label: "BMP" };
+  if (b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { kind: "image", ext: ext, label: "WebP" };
+  if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return { kind: "image", ext: ext, label: "HEIF/AVIF" };
+  if (/^(svg)$/.test(ext)) return { kind: "image", ext: ext, label: "SVG" };
+  if (/^(tex|latex|sty|cls)$/.test(ext)) return { kind: "latex", ext: ext, label: "LaTeX" };
+  if (/^(html?|xhtml|xml|opf|ncx)$/.test(ext)) return { kind: "markup", ext: ext, label: "マークアップ" };
+  if (/^rtf$/.test(ext)) return { kind: "rtf", ext: ext, label: "RTF" };
+  if (/^(srt|vtt|ass|ssa)$/.test(ext)) return { kind: "subs", ext: ext, label: "字幕" };
+  if (/^(csv|tsv)$/.test(ext)) return { kind: "csv", ext: ext, label: "表 (CSV/TSV)" };
+  if (/^json$/.test(ext)) return { kind: "json", ext: ext, label: "JSON" };
+  if (b[0] === 0x7b && /json/.test(ext)) return { kind: "json", ext: ext, label: "JSON" };
+  if (/^<(\?xml|!DOCTYPE html|html)/i.test(latin1(b.subarray(0, 64)))) return { kind: "markup", ext: ext, label: "マークアップ" };
+  if (/^\{\\rtf/.test(latin1(b.subarray(0, 8)))) return { kind: "rtf", ext: ext, label: "RTF" };
+  return { kind: "text", ext: ext, label: ext ? ext.toUpperCase() : "テキスト" };
+}
+/* ZIP を開いて、その形式らしい本文を取り出す */
+function zipDocText(bytes, kind){
+  const list = zipList(bytes);
+  if (!list.length) return Promise.resolve({ text: "", note: "ZIP を読めませんでした" });
+  const pick = function(re){ return zipFind(list, re); };
+  if (kind === "docx"){
+    const e = pick(/^word\/document\.xml$/);
+    if (!e) return Promise.resolve({ text: "", note: "word/document.xml がありません" });
+    return zipEntryData(bytes, e).then(function(d){
+      const xml = bytesToText(d);
+      const paras = xml.split(/<\/w:p>/).map(function(p){
+        const ts = p.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g) || [];
+        return decodeEntities(ts.map(function(t){ return t.replace(/<[^>]*>/g, ""); }).join(""));
+      });
+      return { text: paras.filter(function(t){ return t.trim() !== ""; }).join("\n"), note: "" };
+    });
+  }
+  if (kind === "odf"){
+    const e = pick(/^content\.xml$/);
+    if (!e) return Promise.resolve({ text: "", note: "content.xml がありません" });
+    return zipEntryData(bytes, e).then(function(d){
+      const xml = bytesToText(d);
+      const paras = (xml.match(/<text:(p|h)[^>]*>([\s\S]*?)<\/text:(p|h)>/g) || [])
+        .map(function(p){ return decodeEntities(p.replace(/<[^>]*>/g, "")); });
+      return { text: paras.filter(function(t){ return t.trim() !== ""; }).join("\n"), note: "" };
+    });
+  }
+  if (kind === "pptx"){
+    const slides = list.filter(function(e){ return /^ppt\/slides\/slide\d+\.xml$/.test(e.name); })
+      .sort(function(a, b){
+        return parseInt(a.name.replace(/\D+/g, ""), 10) - parseInt(b.name.replace(/\D+/g, ""), 10);
+      });
+    return seqMap(slides, function(e){
+      return zipEntryData(bytes, e).then(function(d){
+        const xml = bytesToText(d);
+        const ts = xml.match(/<a:t>([\s\S]*?)<\/a:t>/g) || [];
+        return decodeEntities(ts.map(function(t){ return t.replace(/<[^>]*>/g, ""); }).join("\n"));
+      });
+    }).then(function(parts){ return { text: parts.join("\n\n"), note: "" }; });
+  }
+  if (kind === "xlsx"){
+    const shared = pick(/^xl\/sharedStrings\.xml$/);
+    const sheets = list.filter(function(e){ return /^xl\/worksheets\/sheet\d+\.xml$/.test(e.name); });
+    const strs = [];
+    const readShared = shared ? zipEntryData(bytes, shared).then(function(d){
+      const xml = bytesToText(d);
+      (xml.match(/<si>([\s\S]*?)<\/si>/g) || []).forEach(function(si){
+        const ts = si.match(/<t[^>]*>([\s\S]*?)<\/t>/g) || [];
+        strs.push(decodeEntities(ts.map(function(t){ return t.replace(/<[^>]*>/g, ""); }).join("")));
+      });
+    }) : Promise.resolve();
+    return readShared.then(function(){
+      return seqMap(sheets, function(e){
+        return zipEntryData(bytes, e).then(function(d){
+          const xml = bytesToText(d);
+          const rows = (xml.match(/<row[\s\S]*?<\/row>/g) || []).map(function(r){
+            const cells = (r.match(/<c[^>]*>[\s\S]*?<\/c>|<c[^>]*\/>/g) || []).map(function(c){
+              const v = (c.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+              if (v === undefined) return "";
+              if (/t=['"]s['"]/.test(c)) return strs[parseInt(v, 10)] || "";
+              return v;
+            });
+            return cells.filter(function(x){ return x !== ""; }).join(" ");
+          });
+          return rows.filter(function(x){ return x !== ""; }).join("\n");
+        });
+      }).then(function(parts){ return { text: parts.join("\n\n"), note: "" }; });
+    });
+  }
+  if (kind === "epub"){
+    /* 背 (spine) の順に xhtml を読む */
+    const opf = zipFind(list, /\.opf$/);
+    const readOrder = function(){
+      if (!opf) return Promise.resolve(null);
+      return zipEntryData(bytes, opf).then(function(d){
+        const xml = bytesToText(d);
+        const base = opf.name.replace(/[^\/]*$/, "");
+        const items = {};
+        const attr = function(t, k){
+          const m = t.match(new RegExp(k + "\\s*=\\s*[\"']([^\"']+)[\"']"));
+          return m ? m[1] : undefined;
+        };
+        (xml.match(/<item\b[^>]*>/g) || []).forEach(function(t){
+          const id = attr(t, "id"), href = attr(t, "href");
+          if (id && href) items[id] = base + href.replace(/^\.\//, "");
+        });
+        const refs = (xml.match(/<itemref\b[^>]*>/g) || [])
+          .map(function(t){ return attr(t, "idref"); })
+          .map(function(id){ return items[id]; })
+          .filter(Boolean);
+        return refs.length ? refs : null;
+      });
+    };
+    return readOrder().then(function(order){
+      const files = order
+        ? order.map(function(n){ return zipFind(list, new RegExp("^" + n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$")); }).filter(Boolean)
+        : list.filter(function(e){ return /\.x?html?$/i.test(e.name); });
+      return seqMap(files, function(e){
+        return zipEntryData(bytes, e).then(function(d){ return stripMarkup(bytesToText(d)); });
+      }).then(function(parts){ return { text: parts.join("\n\n"), note: "" }; });
+    });
+  }
+  /* ただの ZIP: 中の読めるものを全部 */
+  const inner = list.filter(function(e){ return !/\/$/.test(e.name) && e.size > 0; });
+  return seqMap(inner, function(e){
+    return zipEntryData(bytes, e).then(function(d){
+      const f = sniffFormat(e.name, d);
+      if (f.kind === "image") return { image: d, name: e.name };
+      if (f.kind === "text" || f.kind === "markup" || f.kind === "latex")
+        return { text: (f.kind === "markup" ? stripMarkup(bytesToText(d))
+                : f.kind === "latex" ? stripLatex(bytesToText(d)) : bytesToText(d)) };
+      return {};
+    }).catch(function(){ return {}; });
+  }).then(function(items){
+    return {
+      text: items.map(function(i){ return i.text || ""; }).filter(Boolean).join("\n\n"),
+      images: items.map(function(i){ return i.image; }).filter(Boolean),
+      note: ""
+    };
+  });
+}
+/* どんなファイルでも受ける入口。返り値: {kind, text, images, label, note} */
+function extractFile(name, bytes){
+  const f = sniffFormat(name, bytes);
+  const asText = function(fn){ return Promise.resolve({ text: fn(bytesToText(bytes)) }); };
+  let job;
+  switch (f.kind){
+    case "image": job = Promise.resolve({ images: [bytes] }); break;
+    case "pdf": job = pdfExtract(bytes).then(function(r){
+        return { text: r.pages.map(function(p){ return p.text; }).filter(Boolean).join("\n\n"),
+                 pages: r.pages, images: r.images, note: r.note };
+      }); break;
+    case "docx": case "odf": case "pptx": case "xlsx": case "epub": case "zip":
+      job = zipDocText(bytes, f.kind); break;
+    case "latex": job = asText(stripLatex); break;
+    case "markup": job = asText(stripMarkup); break;
+    case "rtf": job = asText(stripRtf); break;
+    case "subs": job = asText(subsToText); break;
+    case "csv": job = asText(csvToText); break;
+    case "json": job = asText(jsonToText); break;
+    default:
+      if (looksBinary(bytes))
+        job = Promise.resolve({ text: "", note: "文字として読めない形式です (" + (f.ext || "不明") + ")" });
+      else job = asText(function(t){ return t; });
+  }
+  return job.then(function(r){
+    return { kind: f.kind, label: f.label, ext: f.ext,
+             text: (r.text || "").trim(), pages: r.pages || null,
+             images: r.images || [], note: r.note || "" };
+  });
+}
 /* ══════════ 8.5 読み手 (対象者) の取り込み ══════════
    頁に向けた同じ窓自己注意エンジンを、こんどは読み手そのものに向ける。
    カメラのフレームからパッチ特徴 (肌色・暗さ・勾配・動き) を取り、
@@ -2743,33 +3599,93 @@ function refreshThumbs(){
     ? S.pages.length + " 頁を取り込み済み(" + S.pages.filter(function(p){ return p.ana; }).length + " 頁 解析済)。"
     : "まだ何も取り込まれていません。";
 }
-function readFiles(files, kind){
-  const list = Array.prototype.slice.call(files || []);
-  let pending = list.length;
-  if (!pending) return;
-  list.forEach(function(f){
-    const r = new FileReader();
-    if (kind === "img" || /^image\//.test(f.type)){
-      r.onload = function(){
-        const img = new Image();
-        img.onload = function(){
-          addPageFromImage(img, f.name);
-          if (--pending === 0) { drawAnalysis(); }
-        };
-        img.src = r.result;
-      };
-      r.readAsDataURL(f);
-    } else {
-      r.onload = function(){
-        let t = String(r.result);
-        if (/\.tex$/i.test(f.name) || kind === "tex") t = stripLatex(t);
-        document.getElementById("txtBody").value = t;
-        buildText();
-        pending--;
-      };
-      r.readAsText(f);
-    }
+/* 画像のバイト列から MIME を決める (Blob にして img に渡すため) */
+function imageMime(name, bytes){
+  if (bytes[0] === 0x89) return "image/png";
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8) return "image/jpeg";
+  if (bytes[0] === 0x47) return "image/gif";
+  if (bytes[0] === 0x42 && bytes[1] === 0x4D) return "image/bmp";
+  if (bytes[8] === 0x57) return "image/webp";
+  if (bytes[4] === 0x66) return "image/avif";
+  if (/\.svg$/i.test(name)) return "image/svg+xml";
+  return "image/*";
+}
+/* 画像のバイト列を頁として足す (読み込み完了まで待つ) */
+function addImageBytes(bytes, name){
+  return new Promise(function(resolve){
+    const url = URL.createObjectURL(new Blob([bytes], { type: imageMime(name, bytes) }));
+    const img = new Image();
+    img.onload = function(){ addPageFromImage(img, name); URL.revokeObjectURL(url); resolve(true); };
+    img.onerror = function(){ URL.revokeObjectURL(url); resolve(false); };
+    img.src = url;
   });
+}
+function intakeLog(line){
+  const el = document.getElementById("intakeLog");
+  el.style.display = "block";
+  el.textContent += (el.textContent ? "\n" : "") + line;
+  el.scrollTop = el.scrollHeight;
+}
+/* どんなファイルでも受ける入口。
+   画像は頁として、本文は組版して頁として取り込む。 */
+function readFiles(files){
+  const list = Array.prototype.slice.call(files || []);
+  if (!list.length) return;
+  const texts = [];
+  let added = 0;
+  const step = function(i){
+    if (i >= list.length){
+      if (texts.length){
+        const box = document.getElementById("txtBody");
+        const cur = box.value.trim();
+        box.value = (cur && cur !== SAMPLE_TEXT.trim() ? cur + "\n\n" : "") + texts.join("\n\n");
+        buildText();
+      } else {
+        refreshThumbs();
+        drawAnalysis();
+        rebuild();
+      }
+      if (added) intakeLog("→ 画像の頁を " + added + " 枚 取り込みました。「版面解析」で解析してください。");
+      return;
+    }
+    const f = list[i];
+    const r = new FileReader();
+    r.onerror = function(){ intakeLog("✗ " + f.name + " — 読み込めませんでした"); step(i + 1); };
+    r.onload = function(){
+      const bytes = new Uint8Array(r.result);
+      extractFile(f.name, bytes).then(function(res){
+        const chars = Array.from(res.text).length;
+        /* 文字が十分に取れていれば本文として、そうでなければ画像 (走査した頁) として */
+        const useText = chars >= 120 || (chars > 0 && !res.images.length);
+        let note = "✓ " + f.name + " [" + res.label + "] ";
+        if (useText){
+          texts.push(res.text);
+          note += chars + " 字" + (res.pages ? " / " + res.pages.length + " 頁" : "");
+          if (res.images.length) note += " (画像 " + res.images.length + " 枚は使いません)";
+          if (res.note) note += " — " + res.note;
+          intakeLog(note);
+          step(i + 1);
+          return;
+        }
+        if (res.images.length){
+          note += "画像 " + res.images.length + " 枚を頁として取り込みます";
+          if (chars) note += " (本文 " + chars + " 字は短いので使いません)";
+          intakeLog(note);
+          return seqMap(res.images, function(b, k){
+            return addImageBytes(b, f.name + "#" + (k + 1)).then(function(ok){ if (ok) added++; });
+          }).then(function(){ step(i + 1); });
+        }
+        intakeLog("✗ " + f.name + " [" + res.label + "] — " +
+                  (res.note || "本文も画像も取り出せませんでした"));
+        step(i + 1);
+      }).catch(function(e){
+        intakeLog("✗ " + f.name + " — " + (e && e.message ? e.message : e));
+        step(i + 1);
+      });
+    };
+    r.readAsArrayBuffer(f);
+  };
+  step(0);
 }
 /* デモ頁 — 内蔵本文を画像として描き、画像経路をそのまま試せるようにする
    (アプリはこの画像から文字を復元せず、固まりの配置だけを解く) */
@@ -3048,8 +3964,12 @@ function buildText(){
   const K = 2, fs = fs0 * K;
   const layouts = paginateText(S.chunks, { dir: dir, fontSize: fs, w: 1000 * K, h: 1400 * K,
                                            margin: Math.round(fs * 2) });
-  S.pages = layouts.map(function(L, i){ return textPageObject(L, i); });
-  S.cur = 0;
+  /* 画像として取り込んだ頁 (写真・走査・PDF の中の JPEG) は残す。
+     組み直すのは本文から起こした頁だけ。 */
+  const keep = S.pages.filter(function(pg){ return pg.kind === "image"; });
+  S.pages = keep.concat(layouts.map(function(L, i){ return textPageObject(L, i); }));
+  S.cur = clamp(S.cur, 0, Math.max(0, S.pages.length - 1));
+  if (!keep.length) S.cur = 0;
   S.vision.key = "";
   document.getElementById("chunkInfo").textContent =
     Array.from(normalizeText(t)).length + " 字 → " + S.chunks.length + " 固まり → " +
@@ -3197,12 +4117,10 @@ function boot(){
   for (let i = 0; i < tabs.length; i++)
     tabs[i].onclick = (function(b){ return function(){ setTab(b.getAttribute("data-t")); }; })(tabs[i]);
 
-  g("btnPickImg").onclick = function(){ g("fileImg").click(); };
-  g("btnPickTxt").onclick = function(){ g("fileTxt").click(); };
-  g("btnPickTex").onclick = function(){ g("fileTex").click(); };
-  g("fileImg").onchange = function(e){ readFiles(e.target.files, "img"); };
-  g("fileTxt").onchange = function(e){ readFiles(e.target.files, "txt"); };
-  g("fileTex").onchange = function(e){ readFiles(e.target.files, "tex"); };
+  g("btnPickAny").onclick = function(){ g("fileAny").click(); };
+  g("btnPickCam").onclick = function(){ g("fileCam").click(); };
+  g("fileAny").onchange = function(e){ readFiles(e.target.files); };
+  g("fileCam").onchange = function(e){ readFiles(e.target.files); };
   g("btnSample").onclick = function(){ g("txtBody").value = SAMPLE_TEXT; buildText(); setTab("read"); };
   g("btnDemoPage").onclick = function(){ makeDemoPage(S.pages.length % 2 === 1); setTab("analyze"); };
   g("btnChunkText").onclick = buildText;

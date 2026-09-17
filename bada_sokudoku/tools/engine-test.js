@@ -24,6 +24,8 @@
    17. 読み手の見え方 (解像力の落ち方 / 知覚スパンの非対称 / サッカード抑制)
    18. 本文の組版 (頁に組んでから視野をかける)
    19. 多行ブロック (複数行を一度に見る単位) と、その見え方
+   20. 取り込み — deflate / ZIP / docx・epub・odt・pptx・xlsx
+   21. 取り込み — 実物の PDF (本文 / 走査した頁の JPEG) と、そのほかの拡張子
  */
 "use strict";
 const fs = require("fs");
@@ -51,8 +53,12 @@ function stubEl(){
   });
 }
 const sandbox = {
-  console, Math, Date, Object, Array, String, Number, JSON, Boolean, RegExp, Error,
-  Float64Array, Float32Array, Uint8Array, Uint8ClampedArray, Int32Array, Map, Set, Proxy,
+  console, Math, Date, Object, Array, String, Number, JSON, Boolean, RegExp, Error, Promise,
+  Float64Array, Float32Array, Uint8Array, Uint8ClampedArray, Int32Array, Int8Array, Int16Array,
+  DataView, ArrayBuffer, Map, Set, Proxy, TextDecoder, TextEncoder,
+  escape, unescape, decodeURIComponent, encodeURIComponent,
+  DecompressionStream: typeof DecompressionStream !== "undefined" ? DecompressionStream : undefined,
+  ReadableStream: typeof ReadableStream !== "undefined" ? ReadableStream : undefined,
   isNaN, parseInt, parseFloat, performance: { now: () => Date.now() },
   setTimeout: fn => fn(), setInterval: () => 0, clearInterval(){},
   requestAnimationFrame: null,
@@ -79,6 +85,9 @@ const {
   splitLines, splitChunks, xyCut, groupChunks, analyzePage,
   textChunks, groupTextChunks, normalizeText, orpIndex, scrambleInner, stripLatex,
   buildSchedule, stepAt, profileFrom, sessionStats, loadIndex, charClass,
+  inflateRawSync, inflateSync, inflateBytes, zipList, zipEntryData, zipFind,
+  bytesToText, latin1, looksBinary, stripMarkup, stripRtf, subsToText, csvToText, jsonToText,
+  sniffFormat, extractFile, pdfParseCMap, pdfGet, pdfRef, pdfScanObjects,
   skinMask, motionMap, readerPatchFeatures, locateEyes, gazeFrom, analyzeReaderFrame,
   trackerNew, trackerPush, trackerStats,
   acuityModel, perceptualSpan, viewEcc, blurChars, viewBlurPx, viewContrast,
@@ -916,7 +925,201 @@ console.log("\n── 19. 多行ブロック (複数行を一度に見る) ─�
   assert(pr1.perLines === 1, "行数を言われなければ 1 行のまま");
 }
 
-console.log("");
-console.log(checks + " 項目を検査。");
-if (failures){ console.error("FAILURES: " + failures); process.exit(1); }
-console.log("すべて通過 — Bada 瞬読 のエンジンは、頁の画像から固まりと読み順を復元し、時間に載せられる。");
+/* ═══════════ ここから非同期 (取り込みは展開を伴うため) ═══════════ */
+
+const zlib = require("zlib");
+/* 検査用に ZIP を組む (Node の zlib で deflate するので、読み側とは別実装) */
+function makeZip(files){
+  const parts = [], central = [];
+  let offset = 0;
+  files.forEach(function(f){
+    const raw = Buffer.from(f.data, "utf8");
+    const comp = f.store ? raw : zlib.deflateRawSync(raw);
+    const name = Buffer.from(f.name, "utf8");
+    const crc = zlib.crc32 ? zlib.crc32(raw) : 0;
+    const lh = Buffer.alloc(30);
+    lh.writeUInt32LE(0x04034b50, 0); lh.writeUInt16LE(20, 4); lh.writeUInt16LE(0, 6);
+    lh.writeUInt16LE(f.store ? 0 : 8, 8); lh.writeUInt32LE(crc, 14);
+    lh.writeUInt32LE(comp.length, 18); lh.writeUInt32LE(raw.length, 22);
+    lh.writeUInt16LE(name.length, 26); lh.writeUInt16LE(0, 28);
+    parts.push(lh, name, comp);
+    const ch = Buffer.alloc(46);
+    ch.writeUInt32LE(0x02014b50, 0); ch.writeUInt16LE(20, 4); ch.writeUInt16LE(20, 6);
+    ch.writeUInt16LE(f.store ? 0 : 8, 10); ch.writeUInt32LE(crc, 16);
+    ch.writeUInt32LE(comp.length, 20); ch.writeUInt32LE(raw.length, 24);
+    ch.writeUInt16LE(name.length, 28); ch.writeUInt32LE(offset, 42);
+    central.push(ch, name);
+    offset += lh.length + name.length + comp.length;
+  });
+  const cd = Buffer.concat(central);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(files.length, 8); eocd.writeUInt16LE(files.length, 10);
+  eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(offset, 16);
+  return new Uint8Array(Buffer.concat([Buffer.concat(parts), cd, eocd]));
+}
+const T1 = "速読とは、字を速く見る技術ではない。";
+const T2 = "視点を送る順番を先に知っている状態のことである。";
+
+async function asyncChecks(){
+  /* ═══════════════ 20. 取り込み (deflate / ZIP / 文書形式) ═══════════════ */
+  console.log("\n── 20. 取り込み: deflate と ZIP と文書形式 ──");
+  {
+    /* 内蔵 deflate — Node の zlib が作った本物の圧縮を開く */
+    const src = Buffer.from((T1 + T2).repeat(40) + "0123456789".repeat(30), "utf8");
+    const raw = new Uint8Array(zlib.deflateRawSync(src));
+    const wrapped = new Uint8Array(zlib.deflateSync(src));
+    const a = inflateRawSync(raw), b = inflateSync(wrapped);
+    assert(Buffer.compare(Buffer.from(a), src) === 0, "内蔵 deflate が生の圧縮を元に戻す (" + src.length + " 字節)");
+    assert(Buffer.compare(Buffer.from(b), src) === 0, "zlib 包みも元に戻す");
+    const stored = new Uint8Array(zlib.deflateRawSync(src, { level: 0 }));
+    assert(Buffer.compare(Buffer.from(inflateRawSync(stored)), src) === 0, "無圧縮ブロックも読める");
+    const big = Buffer.alloc(70000);
+    for (let i = 0; i < big.length; i++) big[i] = (i * 7 + (i >> 5)) & 0xff;
+    assert(Buffer.compare(Buffer.from(inflateRawSync(new Uint8Array(zlib.deflateRawSync(big)))), big) === 0,
+           "70 KB でも一致する (後方参照と動的ハフマン)");
+    const viaApi = await inflateBytes(raw, true);
+    assert(Buffer.compare(Buffer.from(viaApi), src) === 0,
+           "環境の DecompressionStream を使う経路も同じ結果になる");
+
+    /* ZIP */
+    const zip = makeZip([{ name: "a.txt", data: T1 }, { name: "b/c.txt", data: T2, store: true }]);
+    const list = zipList(zip);
+    assert(list.length === 2 && list[0].name === "a.txt" && list[1].name === "b/c.txt",
+           "ZIP の中身が一覧できる");
+    assert(bytesToText(await zipEntryData(zip, list[0])) === T1, "圧縮された項目を取り出せる");
+    assert(bytesToText(await zipEntryData(zip, list[1])) === T2, "無圧縮の項目も取り出せる");
+
+    /* docx */
+    const docx = makeZip([{ name: "[Content_Types].xml", data: "<Types/>" },
+      { name: "word/document.xml", data: "<w:document><w:body>" +
+        "<w:p><w:r><w:t>" + T1 + "</w:t></w:r></w:p>" +
+        "<w:p><w:r><w:t>" + T2 + "</w:t><w:t>&amp;続き</w:t></w:r></w:p></w:body></w:document>" }]);
+    const rdocx = await extractFile("本.docx", docx);
+    assert(rdocx.kind === "docx" && rdocx.text.indexOf(T1) === 0, "docx の本文が段落の順に出る");
+    assert(/続き$/.test(rdocx.text) && !/&amp;/.test(rdocx.text), "実体参照が戻り、同じ段落の断片が繋がる");
+
+    /* odt */
+    const odt = makeZip([{ name: "content.xml", data:
+      "<office><text:h>見出し</text:h><text:p>" + T1 + "</text:p><text:p>" + T2 + "</text:p></office>" }]);
+    const rodt = await extractFile("本.odt", odt);
+    assert(rodt.kind === "odf" && /^見出し\n/.test(rodt.text) && rodt.text.indexOf(T2) > 0, "odt の見出しと段落が出る");
+
+    /* pptx — 枚の順に */
+    const pptx = makeZip([
+      { name: "ppt/slides/slide10.xml", data: "<a:t>十枚目</a:t>" },
+      { name: "ppt/slides/slide2.xml", data: "<a:t>二枚目</a:t>" },
+      { name: "ppt/slides/slide1.xml", data: "<a:t>一枚目</a:t>" }]);
+    const rp = await extractFile("発表.pptx", pptx);
+    assert(rp.text.indexOf("一枚目") < rp.text.indexOf("二枚目") &&
+           rp.text.indexOf("二枚目") < rp.text.indexOf("十枚目"), "pptx は枚数の順に並ぶ (10 が 2 より後)");
+
+    /* xlsx — 共有文字列を解く */
+    const xlsx = makeZip([
+      { name: "xl/sharedStrings.xml", data: "<sst><si><t>" + T1 + "</t></si><si><t>" + T2 + "</t></si></sst>" },
+      { name: "xl/worksheets/sheet1.xml", data:
+        "<worksheet><sheetData><row><c t=\"s\"><v>0</v></c><c><v>42</v></c></row>" +
+        "<row><c t=\"s\"><v>1</v></c></row></sheetData></worksheet>" }]);
+    const rx = await extractFile("表.xlsx", xlsx);
+    assert(rx.text.indexOf(T1) >= 0 && rx.text.indexOf(T2) >= 0 && /42/.test(rx.text),
+           "xlsx は共有文字列を解いて値と一緒に出す");
+
+    /* epub — 背 (spine) の順に */
+    const epub = makeZip([
+      { name: "mimetype", data: "application/epub+zip", store: true },
+      { name: "OEBPS/book.opf", data:
+        "<package><manifest><item id='c2' href='ch2.xhtml'/><item id='c1' href='ch1.xhtml'/></manifest>" +
+        "<spine><itemref idref='c1'/><itemref idref='c2'/></spine></package>" },
+      { name: "OEBPS/ch2.xhtml", data: "<html><body><p>" + T2 + "</p></body></html>" },
+      { name: "OEBPS/ch1.xhtml", data: "<html><body><h1>第一章</h1><p>" + T1 + "</p></body></html>" }]);
+    const re = await extractFile("本.epub", epub);
+    assert(re.kind === "epub" && re.text.indexOf("第一章") >= 0, "epub の本文が出る");
+    assert(re.text.indexOf(T1) < re.text.indexOf(T2), "epub は綴じの順 (spine) に読む — 収録順ではない");
+
+    /* ただの zip — 中の読めるものを拾う */
+    const plain = makeZip([{ name: "note.txt", data: T1 }, { name: "readme.md", data: T2 }]);
+    const rz = await extractFile("まとめ.zip", plain);
+    assert(rz.text.indexOf(T1) >= 0 && rz.text.indexOf(T2) >= 0, "ただの ZIP は中の文書をすべて拾う");
+  }
+
+  /* ═══════════════ 21. 実物の PDF とそのほかの拡張子 ═══════════════ */
+  console.log("\n── 21. 実物の PDF と、そのほかの拡張子 ──");
+  {
+    const fxdir = path.join(__dirname, "fixtures");
+    const pdf = new Uint8Array(fs.readFileSync(path.join(fxdir, "real-chromium.pdf")));
+    const rp = await extractFile("real-chromium.pdf", pdf);
+    assert(rp.kind === "pdf", "PDF と判定される");
+    assert(rp.pages.length === 2, "頁の数が合う (" + rp.pages.length + " 頁)");
+    assert(/速読とは、視点を送る順番である。/.test(rp.text),
+           "和文が ToUnicode で正しく戻る: " + JSON.stringify(rp.text.split("\n")[0]));
+    assert(/The span is asymmetric\./.test(rp.text), "欧文は語間の空白を保つ");
+    assert(!/\s速読\s*とは/.test(rp.text), "和文に余分な空白を入れない (送りの空きは語の切れ目ではない)");
+    assert(rp.pages[0].text.indexOf("速読") >= 0 && rp.pages[1].text.indexOf("span") >= 0,
+           "頁ごとに本文が分かれている");
+
+    const scan = new Uint8Array(fs.readFileSync(path.join(fxdir, "scanned-jpeg.pdf")));
+    const rs = await extractFile("scanned-jpeg.pdf", scan);
+    assert(rs.images.length === 1, "走査した頁の PDF から埋め込み JPEG が出る");
+    assert(rs.images[0][0] === 0xFF && rs.images[0][1] === 0xD8, "取り出したものが JPEG そのもの");
+    assert(rs.text === "", "走査した頁には文字がない (画像として扱われる)");
+
+    /* ToUnicode CMap の解釈 */
+    const cm = pdfParseCMap(
+      "1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n" +
+      "1 beginbfchar\n<0041> <901F>\nendbfchar\n" +
+      "1 beginbfrange\n<0050> <0052> <3042>\nendbfrange\n");
+    assert(cm.width === 2, "codespacerange から符号の幅 (2 バイト) を読む");
+    assert(cm.map.get(0x41) === "速", "bfchar が写る");
+    assert(cm.map.get(0x50) === "あ" && cm.map.get(0x51) === "ぃ" && cm.map.get(0x52) === "い",
+           "bfrange が符号位置の連番で写る (あ ぃ い)");
+    assert(pdfRef("12 0 R") === 12 && pdfRef("<</F1 4 0 R>>") === null,
+           "間接参照は値そのものが参照のときだけ (辞書を参照と取り違えない)");
+    assert(pdfGet("<</A 1 /Font <</F1 4 0 R>> /B 2>>", "Font") === "<</F1 4 0 R>>",
+           "入れ子の辞書を正しく切り出す");
+
+    /* そのほかの拡張子 */
+    const enc = new TextEncoder();
+    const html = await extractFile("x.html", enc.encode(
+      "<html><head><style>p{}</style></head><body><h1>題</h1><p>" + T1 + "</p><p>" + T2 + "&amp;も</p></body></html>"));
+    assert(html.kind === "markup" && html.text.indexOf("p{}") < 0 && /も$/.test(html.text),
+           "html は style を捨て、実体参照を戻す");
+    const rtf = await extractFile("x.rtf", enc.encode("{\\rtf1\\ansi Hello\\par \\u36895 \\u35501 \\par}"));
+    assert(/Hello/.test(rtf.text) && /速読/.test(rtf.text), "rtf の \\u 表記が日本語に戻る");
+    const srt = await extractFile("x.srt", enc.encode("1\n00:00:01,000 --> 00:00:03,000\n" + T1 + "\n"));
+    assert(srt.kind === "subs" && srt.text === T1, "字幕は番号と時刻を落として台詞だけになる");
+    const csv = await extractFile("x.csv", enc.encode("見出し,値\n" + T1 + ",1\n"));
+    assert(csv.kind === "csv" && csv.text.indexOf(T1) >= 0, "csv は行ごとに繋がる");
+    const json = await extractFile("x.json", enc.encode(JSON.stringify({ a: T1, b: [T2], n: 3 })));
+    assert(json.text.indexOf(T1) >= 0 && json.text.indexOf(T2) >= 0, "json は文字列だけを拾う");
+    const tex = await extractFile("paper.tex", enc.encode("\\documentclass{article}\\begin{document}" + T1 + "\\end{document}"));
+    assert(tex.kind === "latex" && tex.text === T1, "tex は本文だけになる");
+    const unknown = await extractFile("memo.badaext", enc.encode(T1));
+    assert(unknown.kind === "text" && unknown.text === T1, "知らない拡張子でも、文字として読めれば本文になる");
+    const bin = new Uint8Array(512);
+    for (let i = 0; i < bin.length; i++) bin[i] = i & 0xff;
+    const rb = await extractFile("x.bin", bin);
+    assert(rb.text === "" && /読めない/.test(rb.note), "文字でないものは、そうと言って受け取らない");
+
+    /* 拡張子より中身を優先する */
+    assert(sniffFormat("book.txt", pdf).kind === "pdf", "拡張子が違っても中身が PDF なら PDF");
+    assert(sniffFormat("a.docx", makeZip([{ name: "word/document.xml", data: "<w:t>x</w:t>" }])).kind === "docx",
+           "ZIP の中身で docx を見分ける");
+    assert(sniffFormat("photo.png", new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 0])).kind === "image", "PNG の魔法数");
+    assert(sniffFormat("photo.jpg", new Uint8Array([0xff, 0xd8, 0xff, 0xe0])).kind === "image", "JPEG の魔法数");
+    const bom = new Uint8Array([0xFF, 0xFE, 0x42, 0x00]);
+    assert(bytesToText(bom) === "B", "UTF-16 の BOM を見て読む");
+    assert(looksBinary(bin) && !looksBinary(enc.encode(T1)), "文字かどうかの判定");
+  }
+}
+
+function finish(){
+  console.log("");
+  console.log(checks + " 項目を検査。");
+  if (failures){ console.error("FAILURES: " + failures); process.exit(1); }
+  console.log("すべて通過 — Bada 瞬読 のエンジンは、どんなファイルからでも本文と版面を取り出し、");
+  console.log("固まりと読み順を復元し、読み手にどう見えているかまで描ける。");
+}
+asyncChecks().then(finish, function(e){
+  console.error("非同期の検査で例外: " + (e && e.stack ? e.stack : e));
+  process.exit(1);
+});
