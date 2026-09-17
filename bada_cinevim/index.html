@@ -13,7 +13,12 @@
     オペレータ d c y > <、カウント、レジスタ、u / Ctrl-R、. リピート、
     / 検索、:%s/// 置換、:w :q :set などの Ex コマンド
   ・Bada 言語シンタックスハイライト (<- / -< / >- / Ω:: / qubit / gate …)
-  ・🎬 シネマフォーカス — カーソル行を「どアップ」に拡大し、
+  ・📄 多段落の文章ビュー — 空行で段落に分け、折り返して組む。内側は
+    行のままなので VIM のモーションもオペレータもそのまま効く
+  ・🔍 拡大鏡ポインタ — ポインタの下の文章が、レンズの中でどアップになる。
+    #page と同じ幅・同じ書体の複製を loupeTransform() の写像で拡大する
+    本物の拡大鏡。ポイントされた語 / 文だけを切り出して明るくする
+  ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
     イベントバスに投入し、ディスパッチされた瞬間にその行が発光する。
@@ -140,6 +145,88 @@
     opacity:0; pointer-events:none;
   }
   .ln.cur .hair{ opacity:.5; }
+
+  /* ── 多段落の文章ビュー ──
+     行ではなく段落として流し込み、ブラウザに折り返させる。
+     各行は .src として残るので、VIM の (行, 桁) はそのまま使える。 */
+  #page{
+    position:absolute; left:50%; top:0; transform:translateX(-50%);
+    width:min(74ch, calc(100% - 2 * clamp(14px,5vw,72px)));
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Georgia",serif;
+    font-size:var(--prose-size,19px); line-height:2.0;
+    color:#c3cde0; letter-spacing:.02em; text-align:justify;
+    padding:calc(50vh - 3em) 0 60vh;
+  }
+  #page.mono{
+    font-family:"Cascadia Mono","Consolas","Noto Sans Mono CJK JP",monospace;
+    line-height:1.9; text-align:left; letter-spacing:0;
+  }
+  .para{ margin:0 0 1.55em; text-indent:1em; }
+  .para:first-child{ text-indent:0; }
+  .gap{ height:.5em; }
+  .src{ white-space:pre-wrap; }
+  /* ルーペが当たっている段落以外は、静かに退く */
+  #page.dim .para{ opacity:.34; transition:opacity .18s ease; }
+  #page.dim .para.near{ opacity:.72; }
+  #page.dim .para.hit{ opacity:1; }
+  /* ポイントされた部分 (語 / 文) */
+  .snap{
+    background:linear-gradient(180deg, rgba(90,215,232,.10), rgba(90,215,232,.19));
+    border-radius:3px; box-shadow:0 0 0 1px rgba(90,215,232,.22);
+    color:#eaf2ff;
+  }
+
+  /* ── 拡大鏡 (ルーペ) ──
+     #lensGlass の中に #page とまったく同じ幅・同じ書体の複製 (#pageMag) を
+     置き、loupeTransform() の写像で拡大する。これで「ポインタの下の文章が
+     どアップになる」本物の拡大鏡になる。 */
+  #lens{
+    position:absolute; z-index:26; pointer-events:none; display:none;
+    will-change:transform;
+  }
+  #lens.on{ display:block; }
+  #lensGlass{
+    position:absolute; inset:0; overflow:hidden;
+    background:radial-gradient(circle at 34% 28%, #131c2c, #070b13 72%);
+    box-shadow:
+      0 0 0 2px rgba(232,199,106,.75),
+      0 0 0 7px rgba(18,24,38,.95),
+      0 0 0 8px rgba(255,255,255,.10),
+      0 18px 46px rgba(0,0,0,.72),
+      inset 0 0 40px rgba(0,0,0,.55);
+  }
+  #lens.circle #lensGlass{ border-radius:50%; }
+  #lens.band   #lensGlass{ border-radius:16px; }
+  #pageMag{
+    position:absolute; left:0; top:0; transform-origin:0 0;
+    /* 幅と書体は #page と完全に一致させる (折り返しを一致させるため) */
+    font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP","Georgia",serif;
+    line-height:2.0; letter-spacing:.02em; text-align:justify;
+    color:#eef3fb;
+  }
+  #pageMag.mono{
+    font-family:"Cascadia Mono","Consolas","Noto Sans Mono CJK JP",monospace;
+    line-height:1.9; text-align:left; letter-spacing:0;
+  }
+  #pageMag .para{ margin:0 0 1.55em; text-indent:1em; }
+  #pageMag .gap{ height:.5em; }
+  #pageMag .snap{ background:rgba(90,215,232,.16); box-shadow:none; }
+  /* ガラスの映り込みと縁のにじみ */
+  #lensSheen{
+    position:absolute; inset:0; pointer-events:none;
+    background:
+      radial-gradient(circle at 30% 24%, rgba(255,255,255,.16), rgba(255,255,255,0) 44%),
+      radial-gradient(circle at 50% 50%, rgba(0,0,0,0) 58%, rgba(0,0,0,.42) 100%);
+  }
+  #lens.circle #lensSheen{ border-radius:50%; }
+  #lens.band   #lensSheen{ border-radius:16px; }
+  /* 取っ手 */
+  #lensGrip{
+    position:absolute; width:16px; border-radius:8px;
+    background:linear-gradient(90deg,#3a2f18,#e8c76a,#3a2f18);
+    box-shadow:0 8px 22px rgba(0,0,0,.6);
+  }
+  #lens.band #lensGrip{ display:none; }
 
   /* シンタックス */
   .t-kw{ color:#ff8fb0; font-weight:600; }
@@ -330,7 +417,9 @@
   <h1><span class="gold">Bada</span> <span class="cy">CineVim</span></h1>
   <span class="sub">量子言語 Bada の映画的 VIM エディタ</span>
   <span class="spacer"></span>
-  <button class="tb on" id="btnFocus" title="カーソル行をどアップに (:focus)">🎬 シネマ</button>
+  <button class="tb on" id="btnLoupe" title="拡大鏡ポインタ (:loupe)">🔍 拡大鏡</button>
+  <button class="tb" id="btnView" title="文章ビュー / コードビュー (:prose / :code)">📄 文章</button>
+  <button class="tb" id="btnFocus" title="コードビューのどアップ (:focus)">🎬 シネマ</button>
   <button class="tb on" id="btnFlash" title="イベント処理のフラッシュ効果 (:flash)">✨ フラッシュ</button>
   <button class="tb" id="btnCount" title="映画のカウントダウン (:countdown 5)">⏱ カウントダウン</button>
   <button class="tb" id="btnRun" title="量子 Bada を実行 (:run)">▶ 実行</button>
@@ -345,9 +434,15 @@
     <div id="layers">
       <div id="selLayer"></div>
       <div id="doc"></div>
+      <div id="page"></div>
       <div id="caret"></div>
     </div>
     <canvas id="fx"></canvas>
+    <div id="lens" class="circle">
+      <div id="lensGrip"></div>
+      <div id="lensGlass"><div id="pageMag"></div></div>
+      <div id="lensSheen"></div>
+    </div>
     <div id="blast"></div>
     <div id="bus"></div>
     <div id="meter"></div>
@@ -384,6 +479,37 @@
 /* ---------------------------------------------------------------------
  * 0. 既定のサンプル — 量子プログラミング言語 Bada
  * ------------------------------------------------------------------ */
+var PROSE_SRC = [
+  "量子プログラミング言語 Bada の読み方",
+  "",
+  "　文章は、目で追うものではなく、光を当てて読むものだ。Bada CineVim は",
+  "そのために作られた。画面の上をポインタが動くと、その下にある文章だけが",
+  "拡大鏡の中で大きくなる。まわりの段落は静かに退き、いま読んでいる一文だけが",
+  "手前に浮かび上がる。",
+  "",
+  "　拡大鏡はマウスでもタッチでも動く。指を滑らせれば、レンズはその指を追い、",
+  "触れた場所の文章がどアップになる。キーボードだけで読むこともできる。",
+  "j と k で行を送れば、レンズはカーソルを追いかけて、読んでいる位置から離れない。",
+  "ホイールを回せば倍率が変わり、1.6 倍から 7 倍までの間を行き来する。",
+  "",
+  "　ポイントされた部分は、語の単位でも文の単位でも切り出せる。既定は文の単位で、",
+  "句点や疑問符を手がかりに、いま読んでいる一文の始まりと終わりを見つけ、",
+  "その範囲だけを明るくする。段落をまたいでも、行をまたいでも、文は文として",
+  "扱われる。和文の行は詰めて継ぎ、欧文が混ざるところにだけ空白を入れる。",
+  "",
+  "　編集はそのまま VIM である。hjkl で動き、w と b で語を渡り、dd で行を消し、",
+  "u で戻す。文章は段落として折り返して表示されているが、内側では行のままなので、",
+  "モーションもオペレータも、いつもどおりに効く。",
+  "",
+  "　そして、すべての操作はイベントとしてイベントバスへ流れる。キーを押せば KEY、",
+  "行を移れば MOTION、文字を消せば EDIT。ディスパッチされた瞬間に、その行が",
+  "種別の色で光る。何が処理されたのかが、読んでいる文章の上に直接現れる。",
+  "",
+  "　:code と打てば、同じ文書を等幅のコードとして開き直す。:demo で量子 Bada の",
+  "サンプルが読み込まれ、:run でそれを実行できる。qubit を確保し、H で重ね合わせ、",
+  "CNOT でもつれさせ、measure で観測する。文章も、コードも、同じレンズの下にある。"
+].join("\n");
+
 var DEMO_SRC = [
   "// Bada v3 — 映画カウントダウン・シーケンス",
   "// ζ(s) = β(p,q) / log x    非可換作用素環プログラミング",
@@ -1007,7 +1133,10 @@ function vimNew(text, name){
     insertLog:null, lastChange:null, events:[], shiftwidth:2,
     seq:0, rev:0, dispatched:0,
     opts:{ number:true, focus:true, flash:true, sound:true, bus:true,
-           depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26 }
+           depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26,
+           /* 文章ビューと拡大鏡 */
+           view:"prose", loupe:true, zoom:3, lensr:150, lens:"circle",
+           snap:"sentence", dim:true }
   };
   if (!st.lines.length) st.lines = [""];
   return st;
@@ -1502,6 +1631,15 @@ function execEx(st, cmd){
     case "focus":
       st.opts.focus = !st.opts.focus;
       st.msg = "シネマフォーカス: " + (st.opts.focus ? "ON" : "OFF"); return;
+    case "prose": case "text":
+      st.opts.view = "prose"; st.msg = "📄 文章ビュー (多段落 + 拡大鏡)";
+      emit(st, "view", {to:"prose"}); return;
+    case "code": case "mono":
+      st.opts.view = "code"; st.msg = "💻 コードビュー";
+      emit(st, "view", {to:"code"}); return;
+    case "loupe": case "lens": case "mag":
+      st.opts.loupe = !st.opts.loupe;
+      st.msg = "🔍 拡大鏡: " + (st.opts.loupe ? "ON" : "OFF"); return;
     case "flash":
       st.opts.flash = !st.opts.flash;
       st.msg = "イベントフラッシュ: " + (st.opts.flash ? "ON" : "OFF"); return;
@@ -1520,6 +1658,16 @@ function execEx(st, cmd){
       var toks = arg.split(/\s+/);
       for (var ti = 0; ti < toks.length; ti++){
         var t = toks[ti], mm;
+        /* 文字列を取るオプション (view / lens / snap) */
+        if ((mm = /^(view|lens|snap)=(\w+)$/.exec(t))){
+          var ok = {view:["prose", "code"], lens:["circle", "band"], snap:["word", "sentence", "off"]};
+          if (ok[mm[1]].indexOf(mm[2]) < 0){
+            st.msg = mm[1] + " は " + ok[mm[1]].join(" / ") + " のいずれかです";
+            st.msgErr = true; return;
+          }
+          st.opts[mm[1]] = mm[2];
+          continue;
+        }
         if ((mm = /^(\w+)=([-\d.]+)$/.exec(t))){
           var key = {sw:"shiftwidth", shiftwidth:"shiftwidth"}[mm[1]] || mm[1];
           if (key === "shiftwidth"){ st.shiftwidth = Math.max(1, Math.min(8, parseFloat(mm[2]))); }
@@ -1932,6 +2080,196 @@ function flashFrame(t, intensity){
   };
 }
 
+/* =====================================================================
+ * 7b. 多段落の文章と拡大鏡 (ルーペ)
+ * ================================================================== */
+
+/* splitParagraphs(lines)
+ *   空行を区切りとして、行の並びを段落に分けます。空行そのものも
+ *   「段落の隙間」として 1 件返すので、どの行にもカーソルを置けます。
+ *     -> [{kind:"para"|"gap", from, to, lines:[…]}]                   */
+function splitParagraphs(lines){
+  var out = [], cur = null;
+  for (var i = 0; i < lines.length; i++){
+    var blank = /^\s*$/.test(lines[i]);
+    if (blank){
+      cur = null;
+      out.push({kind:"gap", from:i, to:i, lines:[lines[i]]});
+    } else {
+      if (!cur){ cur = {kind:"para", from:i, to:i, lines:[]}; out.push(cur); }
+      cur.to = i; cur.lines.push(lines[i]);
+    }
+  }
+  return out;
+}
+
+/* CJK かどうか (行を継ぐときに空白を入れるかの判定に使う) */
+function isCJK(ch){
+  if (!ch) return false;
+  return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uff60]/.test(ch);
+}
+
+/* lineSeparator(prev, next)
+ *   段落内で行を継ぐときの区切り。和文どうしは詰めて continue し、
+ *   欧文が絡むところだけ空白を入れます (日本語に余計な空白を入れない)。 */
+function lineSeparator(prev, next){
+  if (!prev || !next) return "";
+  var a = prev.charAt(prev.length - 1), b = next.charAt(0);
+  if (isCJK(a) || isCJK(b)) return "";
+  return " ";
+}
+
+/* paragraphText(lines)
+ *   段落を 1 本の文章に連結し、段落内オフセット → 行/桁 の対応表も返します。
+ *     -> { text, map:[{l, start, len, sep}] }   l は lines 内の添字        */
+function paragraphText(lines){
+  var text = "", map = [];
+  for (var i = 0; i < lines.length; i++){
+    var sep = (i === 0) ? "" : lineSeparator(lines[i - 1], lines[i]);
+    text += sep;
+    map.push({l:i, start:text.length, len:lines[i].length, sep:sep});
+    text += lines[i];
+  }
+  return {text:text, map:map};
+}
+
+/* offsetToLine(map, off) — 段落内オフセットを {l, c} に戻す */
+function offsetToLine(map, off){
+  if (!map.length) return {l:0, c:0};
+  for (var i = 0; i < map.length; i++){
+    var m = map[i];
+    if (off < m.start) return {l:m.l, c:0};
+    /* 行境界のオフセットは「次の行の先頭」に属する
+       (そこにある文字は次の行の 1 文字目なので) */
+    if (off < m.start + m.len) return {l:m.l, c:off - m.start};
+  }
+  var last = map[map.length - 1];
+  return {l:last.l, c:last.len};
+}
+
+/* 文字クラス — 語の切れ目を見るために、ひらがな/カタカナ/漢字/ラテンを分ける */
+function textClass(ch){
+  if (!ch) return 0;
+  if (/\s/.test(ch)) return 0;
+  if (/[\u3040-\u309f]/.test(ch)) return 1;                    /* ひらがな */
+  if (/[\u30a0-\u30ff\uff66-\uff9f]/.test(ch)) return 2;      /* カタカナ */
+  if (/[\u3400-\u4dbf\u4e00-\u9fff]/.test(ch)) return 3;      /* 漢字 */
+  if (/[A-Za-z0-9_'\u00c0-\u024f]/.test(ch)) return 4;         /* ラテン/数字 */
+  return 5;                                                    /* 約物 */
+}
+
+/* wordAt(text, idx) — idx の位置にある「語」
+ *   規則: ひらがな / カタカナ / 漢字 / ラテン・数字 / 約物 をそれぞれ 1 つの
+ *   類とし、同じ類の連なりを 1 語とする。ただし漢字の直後に続くひらがなは
+ *   送り仮名として同じ語に含める (「動く」「文章は」)。辞書は使わないため、
+ *   カタカナと漢字の境目 (「カタカナ|語」) では語が分かれる。            */
+function wordAt(text, idx){
+  text = String(text == null ? "" : text);
+  if (!text.length) return {from:0, to:0, text:""};
+  idx = Math.max(0, Math.min(text.length - 1, idx));
+  var cls = textClass(text.charAt(idx));
+  if (cls === 0) return {from:idx, to:idx + 1, text:text.charAt(idx)};
+  var a = idx, b = idx;
+  while (a > 0 && textClass(text.charAt(a - 1)) === cls) a--;
+  while (b < text.length - 1 && textClass(text.charAt(b + 1)) === cls) b++;
+
+  /* 送り仮名 — 漢字の直後に続くひらがなは同じ語として扱う
+     (「動く」「浮かび」のように、漢字とひらがなで 1 語になるため) */
+  if (cls === 3){
+    while (b < text.length - 1 && textClass(text.charAt(b + 1)) === 1) b++;
+  } else if (cls === 1 && a > 0 && textClass(text.charAt(a - 1)) === 3){
+    while (a > 0 && textClass(text.charAt(a - 1)) === 3) a--;
+  }
+  return {from:a, to:b + 1, text:text.slice(a, b + 1)};
+}
+
+/* 文の終止符か (ASCII の '.' は数値の小数点と紛れるので後続を見る) */
+function isSentenceEnd(text, i){
+  var ch = text.charAt(i);
+  if ("。！？．…‥".indexOf(ch) >= 0) return true;
+  if ("!?".indexOf(ch) >= 0) return true;
+  if (ch === "."){
+    var nx = text.charAt(i + 1);
+    return nx === "" || /[\s"'\)\]」』]/.test(nx);
+  }
+  return false;
+}
+
+/* sentenceAt(text, idx) — idx を含む「文」。閉じ括弧は文末に含めます。 */
+function sentenceAt(text, idx){
+  text = String(text == null ? "" : text);
+  if (!text.length) return {from:0, to:0, text:""};
+  idx = Math.max(0, Math.min(text.length - 1, idx));
+  var a = 0, i;
+  for (i = idx - 1; i >= 0; i--){
+    if (isSentenceEnd(text, i)){
+      a = i + 1;
+      while (a < text.length && /[\s」』\)\]”’]/.test(text.charAt(a))) a++;
+      break;
+    }
+  }
+  var b = text.length;
+  for (i = idx; i < text.length; i++){
+    if (isSentenceEnd(text, i)){
+      b = i + 1;
+      while (b < text.length && /[」』\)\]”’]/.test(text.charAt(b))) b++;
+      break;
+    }
+  }
+  if (a > idx) a = 0;
+  return {from:a, to:b, text:text.slice(a, b)};
+}
+
+/* HTML エスケープ (描画とテストの両方から使う) */
+function escapeHtml(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/* markRange(lineText, lineStart, from, to)
+ *   段落座標 [from,to) の強調範囲のうち、この行に掛かる部分だけを
+ *   <span class="snap"> で包んだ HTML を返します。掛からなければ素の行。 */
+function markRange(lineText, lineStart, from, to){
+  lineText = String(lineText == null ? "" : lineText);
+  if (from == null || to == null || !(to > from)) return escapeHtml(lineText);
+  var end = lineStart + lineText.length;
+  if (to <= lineStart || from >= end) return escapeHtml(lineText);
+  var a = Math.max(0, from - lineStart);
+  var b = Math.min(lineText.length, to - lineStart);
+  return escapeHtml(lineText.slice(0, a)) +
+         '<span class="snap">' + escapeHtml(lineText.slice(a, b)) + "</span>" +
+         escapeHtml(lineText.slice(b));
+}
+
+/* loupeTransform(px, py, r, z)
+ *   拡大鏡の写像。ページ座標 (px,py) にある点が、半径 r のレンズの
+ *   中心 (r,r) に来るように、倍率 z で拡大したページをずらします。
+ *     CSS: transform: scale(z) translate(tx px, ty px)
+ *     -> { scale, tx, ty }                                            */
+function loupeTransform(px, py, r, z){
+  z = (z === undefined || !(z > 0)) ? 1 : z;
+  return {scale:z, tx:(r / z) - px, ty:(r / z) - py};
+}
+
+/* clampLoupe(px, py, w, h, r) — レンズが表示領域からはみ出さないよう中心を丸める */
+function clampLoupe(px, py, w, h, r){
+  var x = (w < r * 2) ? w / 2 : Math.max(r, Math.min(w - r, px));
+  var y = (h < r * 2) ? h / 2 : Math.max(r, Math.min(h - r, py));
+  return {x:x, y:y};
+}
+
+/* zoomSteps — 倍率の段階 (+ / - で行き来する) */
+var ZOOM_STEPS = [1.6, 2.2, 3, 4, 5.5, 7];
+function zoomStep(z, dir){
+  var i = 0, best = 1e9, k;
+  for (k = 0; k < ZOOM_STEPS.length; k++){
+    var d = Math.abs(ZOOM_STEPS[k] - z);
+    if (d < best){ best = d; i = k; }
+  }
+  i = Math.max(0, Math.min(ZOOM_STEPS.length - 1, i + dir));
+  return ZOOM_STEPS[i];
+}
+
 /* countdownState(elapsed, total)
  *   映画のアカデミー・リーダー。残り秒 n と、その 1 秒間の進行 phase、
  *   掃引する指針の角度 sweep を返します。
@@ -1962,9 +2300,10 @@ function boot(){
       selLayer = $("selLayer"), fx = $("fx"), leader = $("leader"), out = $("out"),
       hud = $("hud"), hudNum = $("hudNum"), hudLbl = $("hudLbl"), helpEl = $("help"),
       keysBar = $("keys"), hidden = $("hidden"), fileIn = $("fileIn"),
-      side = $("side"), busEl = $("bus"), meterEl = $("meter"), blast = $("blast");
+      side = $("side"), busEl = $("bus"), meterEl = $("meter"), blast = $("blast"),
+      page = $("page"), pageMag = $("pageMag"), lens = $("lens"), lensGrip = $("lensGrip");
 
-  var ST = vimNew(DEMO_SRC, "quantum.bada");
+  var ST = vimNew(PROSE_SRC, "bada-reader.txt");
   var BASE_H = 30, WIN = 70;
   var lineEls = [], winLo = 0, winHi = 0, lastText = null, lastCurL = -1;
   var live = [];        /* ディスパッチ中のイベント {line, type, mag, t0, seq} */
@@ -2046,9 +2385,7 @@ function boot(){
   }
 
   /* ── 行の描画 ── */
-  function escHtml(s){
-    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  }
+  function escHtml(s){ return escapeHtml(s); }
   function renderTokens(toks){
     if (!toks.length) return '<span class="t-ws"> </span>';
     var h = "";
@@ -2399,12 +2736,303 @@ function boot(){
     audio();
   }
 
+  /* ═══ 文章ビュー (多段落) ═══ */
+  var paras = [], proseDirty = true, snapPara = -1;
+
+  /* 段落 1 つ分の HTML。snapFrom/To は段落内オフセットでの強調範囲。 */
+  function renderPara(para, snapFrom, snapTo){
+    var pt = paragraphText(para.lines), html = "";
+    for (var k = 0; k < para.lines.length; k++){
+      var m = pt.map[k];
+      if (m.sep) html += '<span class="sep">' + escHtml(m.sep) + "</span>";
+      html += '<span class="src" data-l="' + (para.from + k) + '">' +
+              markRange(para.lines[k], m.start, snapFrom, snapTo) + "</span>";
+    }
+    return html;
+  }
+
+  function buildProse(){
+    paras = splitParagraphs(ST.lines);
+    var html = [];
+    for (var i = 0; i < paras.length; i++){
+      var pa = paras[i];
+      if (pa.kind === "gap"){
+        html.push('<div class="gap" data-p="' + i + '"><span class="src" data-l="' + pa.from + '"></span></div>');
+      } else {
+        html.push('<p class="para" data-p="' + i + '">' + renderPara(pa, null, null) + "</p>");
+      }
+    }
+    var h = html.join("");
+    page.innerHTML = h;
+    pageMag.innerHTML = h;
+    snapPara = -1;
+    proseDirty = false;
+    syncMag();
+  }
+
+  /* 複製側の幅・書体・余白を本体と完全に一致させる (折り返しを揃えるため) */
+  function syncMag(){
+    var cs = getComputedStyle(page);
+    pageMag.style.width = page.clientWidth + "px";
+    pageMag.style.fontSize = cs.fontSize;
+    pageMag.style.paddingTop = cs.paddingTop;
+    pageMag.style.paddingBottom = cs.paddingBottom;
+    pageMag.className = page.classList.contains("mono") ? "mono" : "";
+  }
+
+  /* ═══ 拡大鏡 (ルーペ) ═══ */
+  var lensPt = null, lensFromPointer = false;
+
+  function lensRadius(){
+    var sr = stage.getBoundingClientRect();
+    var base = ST.opts.lensr || 150;
+    return Math.max(56, Math.min(base, Math.min(sr.width, sr.height) * 0.46));
+  }
+
+  function caretCenter(){
+    var cr = caret.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    if (!cr.width && !cr.height) return null;
+    return {x:cr.left - sr.left + cr.width / 2, y:cr.top - sr.top + cr.height / 2};
+  }
+
+  function updateLens(){
+    var proseView = ST.opts.view === "prose";
+    if (!ST.opts.loupe || !proseView){
+      lens.classList.remove("on");
+      page.classList.remove("dim");
+      if (snapPara >= 0) clearSnap();
+      return;
+    }
+    if (!lensPt) lensPt = caretCenter() || {x:stage.clientWidth / 2, y:stage.clientHeight / 2};
+
+    var sr = stage.getBoundingClientRect(), R = lensRadius();
+    var c = clampLoupe(lensPt.x, lensPt.y, sr.width, sr.height, R);
+
+    lens.classList.add("on");
+    lens.className = "on " + (ST.opts.lens === "band" ? "band" : "circle");
+    var w = (ST.opts.lens === "band") ? Math.min(sr.width * 0.86, R * 3.4) : R * 2;
+    var h = (ST.opts.lens === "band") ? R * 1.05 : R * 2;
+    c = clampLoupe(lensPt.x, lensPt.y, sr.width, sr.height, Math.max(w, h) / 2);
+    lens.style.width = w + "px";
+    lens.style.height = h + "px";
+    lens.style.left = (c.x - w / 2) + "px";
+    lens.style.top = (c.y - h / 2) + "px";
+
+    /* 取っ手 (円のときだけ) */
+    var gx = w / 2 + (w / 2) * 0.707, gy = h / 2 + (h / 2) * 0.707;
+    lensGrip.style.left = (gx - 8) + "px";
+    lensGrip.style.top = gy + "px";
+    lensGrip.style.height = (R * 0.8) + "px";
+    lensGrip.style.transformOrigin = "50% 0";
+    lensGrip.style.transform = "rotate(-45deg)";
+
+    /* ページ座標に直してから写像する */
+    syncMag();
+    var pr = page.getBoundingClientRect();
+    var px = (c.x + sr.left) - pr.left;
+    var py = (c.y + sr.top) - pr.top;
+    var t = loupeTransform(px - w / 2 + w / 2, py - h / 2 + h / 2, 0, ST.opts.zoom);
+    /* レンズ中心 (w/2, h/2) に (px,py) を持ってくる */
+    t.tx = (w / 2) / ST.opts.zoom - px;
+    t.ty = (h / 2) / ST.opts.zoom - py;
+    pageMag.style.transform = "scale(" + ST.opts.zoom + ") translate(" + t.tx.toFixed(2) + "px," + t.ty.toFixed(2) + "px)";
+
+    updateSnap(c.x + sr.left, c.y + sr.top);
+    page.classList.toggle("dim", !!ST.opts.dim);
+  }
+
+  /* ポインタ直下のテキスト位置 */
+  function caretPosFromPoint(cx, cy){
+    var p, r;
+    if (document.caretPositionFromPoint){
+      try { p = document.caretPositionFromPoint(cx, cy); } catch (e){ p = null; }
+      if (p && p.offsetNode && p.offsetNode.nodeType === 3) return {node:p.offsetNode, offset:p.offset};
+    }
+    if (document.caretRangeFromPoint){
+      try { r = document.caretRangeFromPoint(cx, cy); } catch (e){ r = null; }
+      if (r && r.startContainer && r.startContainer.nodeType === 3) return {node:r.startContainer, offset:r.startOffset};
+    }
+    return null;
+  }
+  /* 位置 -> {paraIndex, offset, line, col} */
+  function locateAt(cx, cy){
+    var pos = caretPosFromPoint(cx, cy);
+    if (!pos) return null;
+    var el = pos.node.parentElement;
+    var span = el && el.closest ? el.closest(".src") : null;
+    if (!span || !page.contains(span)) return null;
+    var host = span.closest("[data-p]");
+    if (!host) return null;
+    var pi = parseInt(host.dataset.p, 10), pa = paras[pi];
+    if (!pa) return null;
+    var l = parseInt(span.dataset.l, 10);
+    /* .snap で分割されている場合に備え、span 内での通し offset を数える */
+    var off = 0, walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT, null, false), t;
+    while ((t = walker.nextNode())){
+      if (t === pos.node){ off += pos.offset; break; }
+      off += t.nodeValue.length;
+    }
+    var pt = paragraphText(pa.lines);
+    var k = l - pa.from;
+    var paraOff = (pa.kind === "para" && pt.map[k]) ? pt.map[k].start + off : 0;
+    return {pi:pi, para:pa, paraOff:paraOff, line:l, col:off, ptext:pt};
+  }
+
+  function clearSnap(){
+    if (snapPara < 0) return;
+    var pa = paras[snapPara];
+    if (pa && pa.kind === "para"){
+      var h = renderPara(pa, null, null);
+      var a = page.querySelector('[data-p="' + snapPara + '"]');
+      var b = pageMag.querySelector('[data-p="' + snapPara + '"]');
+      if (a) a.innerHTML = h;
+      if (b) b.innerHTML = h;
+    }
+    var hits = page.querySelectorAll(".para.hit, .para.near");
+    for (var i = 0; i < hits.length; i++) hits[i].classList.remove("hit", "near");
+    snapPara = -1;
+  }
+
+  function updateSnap(cx, cy){
+    if (ST.opts.snap === "off"){ clearSnap(); return; }
+    var loc = locateAt(cx, cy);
+    if (!loc || loc.para.kind !== "para"){ clearSnap(); return; }
+    var r = (ST.opts.snap === "word")
+      ? wordAt(loc.ptext.text, loc.paraOff)
+      : sentenceAt(loc.ptext.text, loc.paraOff);
+    if (snapPara !== loc.pi) clearSnap();
+    var html = renderPara(loc.para, r.from, r.to);
+    var a = page.querySelector('[data-p="' + loc.pi + '"]');
+    var b = pageMag.querySelector('[data-p="' + loc.pi + '"]');
+    if (a) a.innerHTML = html;
+    if (b) b.innerHTML = html;
+    snapPara = loc.pi;
+    /* 当たっている段落と隣を明るく */
+    var all = page.querySelectorAll(".para");
+    for (var i = 0; i < all.length; i++){
+      var pi = parseInt(all[i].dataset.p, 10);
+      all[i].classList.toggle("hit", pi === loc.pi);
+      all[i].classList.toggle("near", Math.abs(pi - loc.pi) === 1);
+    }
+  }
+
+  /* 文章ビューのカーソル / 選択 */
+  function proseSpan(l){ return page.querySelector('.src[data-l="' + l + '"]'); }
+
+  function placeCaretProse(){
+    var span = proseSpan(ST.cur.l);
+    if (!span){ caret.style.opacity = "0"; return; }
+    var sr = stage.getBoundingClientRect(), rect = null;
+    var box = charBox(span, ST.cur.c, ST.cur.c + 1);
+    if (!box){
+      var past = charBox(span, Math.max(0, ST.cur.c - 1), ST.cur.c);
+      if (past) box = {left:past.right, top:past.top, width:past.width, height:past.height};
+    }
+    if (!box){
+      var sb = span.getBoundingClientRect();
+      box = {left:sb.left, top:sb.top, width:Math.max(6, sb.width || 8), height:sb.height || 20};
+    }
+    rect = {left:box.left, top:box.top, w:box.width || 8, h:box.height || 20};
+    var thin = (ST.mode === "insert" || ST.mode === "replace");
+    caret.style.left = (rect.left - sr.left) + "px";
+    caret.style.top = (rect.top - sr.top) + "px";
+    caret.style.width = (thin ? Math.max(2, rect.w * 0.16) : rect.w) + "px";
+    caret.style.height = rect.h + "px";
+    caret.style.opacity = (ST.mode === "command" || ST.mode === "search") ? "0.35" : "1";
+    caret.className = thin ? "ins" : "";
+  }
+
+  function drawSelectionProse(){
+    if (ST.mode !== "visual" && ST.mode !== "vline"){ selLayer.innerHTML = ""; return; }
+    var r = visualRange(ST), sr = stage.getBoundingClientRect(), html = "";
+    for (var l = r.a.l; l <= r.b.l; l++){
+      var span = proseSpan(l); if (!span) continue;
+      var from = (l === r.a.l && !r.linewise) ? r.a.c : 0;
+      var to = (l === r.b.l && !r.linewise) ? r.b.c : (ST.lines[l] || "").length;
+      var box = charBox(span, from, to) || span.getBoundingClientRect();
+      html += '<div class="selbox" style="left:' + (box.left - sr.left) + "px;top:" + (box.top - sr.top) +
+              "px;width:" + Math.max(4, box.width) + "px;height:" + box.height + 'px"></div>';
+    }
+    selLayer.innerHTML = html;
+  }
+
+  /* 文章ビューのイベントフラッシュ — 対象行の .src を光らせる */
+  function styleProse(now){
+    var fx2 = {}, i;
+    for (i = 0; i < live.length; i++){
+      var c = live[i], t = (now - c.t0) / FLASH_MS;
+      if (t >= 1) continue;
+      var ff = flashFrame(t, c.mag);
+      var cur = fx2[c.line];
+      if (!cur || ff.env > cur.env) fx2[c.line] = {env:ff.env, glow:ff.glow, wash:ff.wash, sweep:ff.sweep, hue:c.hue};
+    }
+    var lit = page.querySelectorAll(".src.flash");
+    for (i = 0; i < lit.length; i++){
+      var l0 = parseInt(lit[i].dataset.l, 10);
+      if (!fx2[l0] || fx2[l0].env <= 0.004){
+        lit[i].classList.remove("flash");
+        lit[i].style.removeProperty("--fh"); lit[i].style.removeProperty("--fw");
+        lit[i].style.removeProperty("--fg"); lit[i].style.removeProperty("--fs");
+      }
+    }
+    for (var key in fx2){
+      var f = fx2[key]; if (f.env <= 0.004) continue;
+      var sp = proseSpan(key); if (!sp) continue;
+      sp.classList.add("flash");
+      sp.style.setProperty("--fh", f.hue.toFixed(0));
+      sp.style.setProperty("--fw", f.wash.toFixed(3));
+      sp.style.setProperty("--fg", f.glow.toFixed(1) + "px");
+      sp.style.setProperty("--fs", f.sweep.toFixed(3));
+    }
+  }
+
+  /* 文章ビューでカーソル行が画面外なら、そこへスクロールする */
+  function followCaretProse(){
+    var span = proseSpan(ST.cur.l); if (!span) return;
+    var sb = span.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+    var y = sb.top - sr.top;
+    if (y < sr.height * 0.18 || y > sr.height * 0.82){
+      pageTop -= (y - sr.height * 0.5);
+      applyPageTop();
+    }
+  }
+  var pageTop = 0;
+  function applyPageTop(){
+    var maxUp = -(page.scrollHeight - stage.clientHeight * 0.5);
+    pageTop = Math.max(maxUp, Math.min(0, pageTop));
+    page.style.transform = "translateX(-50%) translateY(" + pageTop.toFixed(1) + "px)";
+    pageMag.style.marginTop = pageTop.toFixed(1) + "px";
+  }
+
+  /* ビューの切り替え */
+  function setView(v){
+    ST.opts.view = v;
+    var prose = (v === "prose");
+    page.style.display = prose ? "" : "none";
+    doc.style.display = prose ? "none" : "";
+    $("btnView").textContent = prose ? "📄 文章" : "💻 コード";
+    $("btnView").classList.toggle("on", prose);
+    $("btnFocus").disabled = prose;
+    if (prose){ proseDirty = true; pageTop = 0; }
+    else { lens.classList.remove("on"); page.classList.remove("dim"); }
+    dirtyDom = true;
+  }
+
   /* ── メインループ ── */
   function frame(now){
-    if (dirtyDom) rebuild();
-    styleLines(now);
-    placeCaret();
-    drawSelection();
+    var prose = ST.opts.view === "prose";
+    if (prose){
+      if (dirtyDom || proseDirty){ buildProse(); applyPageTop(); dirtyDom = false; }
+      styleProse(now);
+      placeCaretProse();
+      drawSelectionProse();
+      updateLens();
+    } else {
+      if (dirtyDom) rebuild();
+      styleLines(now);
+      placeCaret();
+      drawSelection();
+    }
     drawFx(now);
     drawBus(now);
     var cdBusy = drawLeader(now);
@@ -2439,6 +3067,7 @@ function boot(){
     }
     $("btnFocus").classList.toggle("on", !!ST.opts.focus);
     $("btnFlash").classList.toggle("on", !!ST.opts.flash);
+    $("btnLoupe").classList.toggle("on", !!ST.opts.loupe);
   }
 
   /* ── 出力パネル ── */
@@ -2480,7 +3109,7 @@ function boot(){
   /* エンジンが発行したイベントを順にディスパッチする。
      副作用を伴うもの (run / write / open / …) はここでハンドラを呼び、
      それ以外は「処理された」という表示 (フラッシュ + バス) だけを行う。 */
-  var SIDE_EFFECT = {countdown:1, run:1, write:1, open:1, quit:1, help:1, opts:1};
+  var SIDE_EFFECT = {countdown:1, run:1, write:1, open:1, quit:1, help:1, opts:1, view:1};
   function drainEvents(){
     for (var i = 0; i < ST.events.length; i++){
       var e = ST.events[i];
@@ -2492,6 +3121,7 @@ function boot(){
         case "quit":      dispatch({type:"ex", line:e.line, what:"quit"}); ST.msg = "🎬 カット。(:e で再開 / :demo でデモ)"; break;
         case "help":      dispatch({type:"ex", line:e.line, what:"help"}); showHelp(true); break;
         case "opts":      dirtyDom = true; break;
+        case "view":      setView(e.to); dispatch({type:"ex", line:e.line, what:"view " + e.to}); break;
         case "jump":      dispatch({type:"search", line:e.line, what:"jump"}); break;
         default:
           if (!SIDE_EFFECT[e.type]) dispatch(e);
@@ -2553,10 +3183,19 @@ function boot(){
     after();
   }
   function after(){
-    if (vimText(ST) !== lastText || ST.cur.l !== lastCurL){ dirtyDom = true; }
-    lastText = vimText(ST); lastCurL = ST.cur.l;
+    var txt = vimText(ST);
+    if (txt !== lastText){ dirtyDom = true; proseDirty = true; }
+    else if (ST.cur.l !== lastCurL){ dirtyDom = true; }
+    var moved = ST.cur.l !== lastCurL;
+    lastText = txt; lastCurL = ST.cur.l;
     drainEvents();
     paintStatus();
+    /* 文章ビューでは、キーで動いたらルーペをカーソルへ連れて行く */
+    if (ST.opts.view === "prose" && moved && !lensFromPointer){
+      followCaretProse();
+      var c = caretCenter();
+      if (c) lensPt = c;
+    }
   }
   /* 1 キー = 1 ディスパッチ。feedKey が key / motion / edit / mode を
      すべてイベントとして積むので、ここでは drain するだけでよい。 */
@@ -2589,7 +3228,49 @@ function boot(){
     var v = hidden.value; hidden.value = "";
     for (var i = 0; i < v.length; i++) send(v.charAt(i));
   });
+  /* 拡大鏡はポインタを追う (マウス・スタイラス・指) */
+  stage.addEventListener("pointermove", function(e){
+    if (ST.opts.view !== "prose" || !ST.opts.loupe) return;
+    var sr = stage.getBoundingClientRect();
+    lensPt = {x:e.clientX - sr.left, y:e.clientY - sr.top};
+    lensFromPointer = true;
+  }, {passive:true});
+  stage.addEventListener("pointerleave", function(){ lensFromPointer = false; }, {passive:true});
+
+  /* ホイールで倍率 (拡大鏡らしい操作) */
+  stage.addEventListener("wheel", function(e){
+    if (ST.opts.view !== "prose" || !ST.opts.loupe) return;
+    if (e.ctrlKey) return;
+    e.preventDefault();
+    ST.opts.zoom = zoomStep(ST.opts.zoom, e.deltaY < 0 ? 1 : -1);
+    ST.msg = "🔍 倍率 " + ST.opts.zoom + "×";
+    paintStatus();
+  }, {passive:false});
+
+  /* 文章ビューのスクロール (レンズは画面に固定、紙が動く) */
+  stage.addEventListener("wheel", function(e){
+    if (ST.opts.view !== "prose") return;
+    if (!ST.opts.loupe || e.ctrlKey){
+      pageTop -= e.deltaY; applyPageTop();
+    }
+  }, {passive:true});
+
   stage.addEventListener("pointerdown", function(e){
+    if (ST.opts.view === "prose"){
+      var sr0 = stage.getBoundingClientRect();
+      lensPt = {x:e.clientX - sr0.left, y:e.clientY - sr0.top};
+      lensFromPointer = true;
+      var loc = locateAt(e.clientX, e.clientY);
+      if (loc){
+        ST.cur.l = loc.line;
+        ST.cur.c = Math.min(loc.col, Math.max(0, (ST.lines[loc.line] || "").length - 1));
+        ST.desired = ST.cur.c; clampCur(ST);
+        ST.dispatched++; dispatch({type:"motion", line:loc.line, what:"point"});
+        after();
+      }
+      if (isTouch) hidden.focus();
+      return;
+    }
     /* タップした行へカーソルを移動 (どアップの焦点が移る) */
     var el = e.target.closest ? e.target.closest(".ln") : null;
     if (el && el.dataset && el.dataset.l !== undefined){
@@ -2656,10 +3337,22 @@ function boot(){
     ["J  ~", "行連結 / 大小文字反転"],
     ['"a yy   "a p', "名前付きレジスタ"],
     ["u  Ctrl-R  .", "取り消し / やり直し / 直前の変更を繰り返し"],
+    ["§", "🔍 拡大鏡 (文章ビュー)"],
+    ["ポインタを動かす", "その下の文章がレンズの中でどアップになる"],
+    ["ホイール", "倍率を変える (1.6× 〜 7×)"],
+    ["クリック / タップ", "そこへカーソルを移す"],
+    ["j k で移動", "レンズがカーソルを追いかける (キーボードだけでも読める)"],
+    [":loupe", "拡大鏡の ON / OFF"],
+    [":prose  :code", "文章ビュー (多段落) / コードビュー (等幅)"],
+    [":set zoom=4", "倍率 (1 〜 12)"],
+    [":set lensr=200", "レンズの大きさ (半径 px)"],
+    [":set lens=circle", "レンズの形 (circle / band)"],
+    [":set snap=sentence", "強調する単位 (sentence / word / off)"],
+    [":set nodim", "まわりの段落を暗くしない"],
     ["§", "🎬 シネマ演出 / ✨ イベント処理"],
     ["Space", "現在行へ SIGNAL イベントをディスパッチ"],
     ["行をタップ / クリック", "その行へ焦点を移して MOTION イベント"],
-    [":focus", "どアップ (被写界深度) の ON / OFF"],
+    [":focus", "コードビューのどアップ (被写界深度) の ON / OFF"],
     [":flash", "イベント処理フラッシュの ON / OFF"],
     [":bus", "イベントバス HUD の表示切替"],
     [":emit [名前]", "現在行へ手動で SIGNAL を発行"],
@@ -2717,27 +3410,42 @@ function boot(){
   $("btnSave").onclick = function(){ saveFile(ST.fname); ST.dirty = false; paintStatus(); };
   $("btnHelp").onclick = function(){ showHelp(!helpEl.classList.contains("show")); };
   $("btnOut").onclick = function(){ showSide(!sideOpen()); };
+  $("btnLoupe").onclick = function(){
+    ST.opts.loupe = !ST.opts.loupe;
+    $("btnLoupe").classList.toggle("on", ST.opts.loupe);
+    ST.msg = "🔍 拡大鏡: " + (ST.opts.loupe ? "ON" : "OFF");
+    paintStatus();
+  };
+  $("btnView").onclick = function(){ setView(ST.opts.view === "prose" ? "code" : "prose"); paintStatus(); };
   $("sideClose").onclick = function(){ showSide(false); };
   window.addEventListener("resize", function(){ docX = 0; dirtyDom = true; });
 
   /* ── 画面幅に応じた演出量 ── */
   function fitOpts(){
     var w = window.innerWidth;
-    if (w < 560){ ST.opts.peak = 1.75; ST.opts.spread = 2.6; ST.opts.maxZ = 16; }
-    else if (w < 900){ ST.opts.peak = 2.1; ST.opts.spread = 2.4; ST.opts.maxZ = 20; }
+    if (w < 560){
+      ST.opts.peak = 1.75; ST.opts.spread = 2.6; ST.opts.maxZ = 16;
+      ST.opts.lensr = 112;            /* 電話では画面を覆いすぎないレンズに */
+      ST.opts.zoom = Math.min(ST.opts.zoom, 2.2);
+    } else if (w < 900){
+      ST.opts.peak = 2.1; ST.opts.spread = 2.4; ST.opts.maxZ = 20;
+      ST.opts.lensr = 130;
+    }
     BASE_H = w < 560 ? 26 : 30;
     document.documentElement.style.setProperty("--base-h", BASE_H + "px");
+    document.documentElement.style.setProperty("--prose-size", (w < 560 ? 17 : 19) + "px");
   }
 
   /* ── 起動 ── */
   fitOpts();
   buildKeys();
+  setView(ST.opts.view);
   lastText = vimText(ST); lastCurL = ST.cur.l;
-  ST.msg = "Space でイベント発火 ・ :countdown 5 ・ :run ・ :bus ・ :help";
+  ST.msg = "ポインタを動かすと拡大鏡 ・ ホイールで倍率 ・ :code ・ :run ・ :help";
   dirtyDom = true;
   paintStatus();
   printOut([
-    {cls:"o-dim", text:"Bada CineVim — 量子 Bada ランタイム待機中"},
+    {cls:"o-dim", text:"Bada CineVim — 文章ビュー (多段落 + 拡大鏡)"},
     {cls:"o-key", text:"▶ 実行 または :run でバッファを実行します"},
     {cls:"o-dim", text:"⏱ カウントダウン または :countdown 5 で映画の秒読み (毎秒 TICK イベント)"}
   ], true, false);

@@ -5,8 +5,12 @@ name: Bada CineVim app build (Android APK + Windows EXE + Ubuntu)
 #   ・本物のモーダル編集 (hjkl / w b e / f t % { } / d c y / レジスタ /
 #     u / Ctrl-R / . リピート / ビジュアル / :%s/// などの Ex コマンド)
 #   ・Bada シンタックスハイライト (<- / -< / >- / Ω:: / qubit / |0⟩)
-#   ・🎬 シネマフォーカス — カーソル行を「どアップ」に拡大し、離れた行ほど
-#     ガウス減衰で縮小・ぼかし・減光する被写界深度表現
+#   ・📄 多段落の文章ビュー — 空行で段落に分けて折り返して組む
+#   ・🔍 拡大鏡ポインタ — ポインタの下の文章がレンズの中でどアップになる
+#     (同じ幅・同じ書体の複製を loupeTransform() の写像で拡大する本物の拡大鏡)。
+#     ポイントされた語 / 文だけを切り出して明るくする
+#   ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
+#     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
 #   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
 #     イベントバスへ投入し、ディスパッチされた瞬間にその行が発光する。
 #     種別ごとに色が変わり (KEY / MOTION / EDIT / MODE / EX / SEARCH /
@@ -74,6 +78,10 @@ jobs:
                                   "function execEx", "function runNormal", "function feedKey",
                                   "function focusStyle", "function docLayout",
                                   "function flashFrame", "function eventStyle",
+                                  "function splitParagraphs", "function paragraphText",
+                                  "function offsetToLine", "function wordAt",
+                                  "function sentenceAt", "function loupeTransform",
+                                  "function clampLoupe", "function markRange",
                                   "function eventMag",
                                   "function countdownState", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
@@ -81,7 +89,7 @@ jobs:
           '
           node --check /tmp/cinevim.js
           echo "Bada CineVim self-check OK"
-      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / cinema math)
+      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / prose + loupe)
         run: |
           set -e
           node bada_cinevim/tools/engine-test.js

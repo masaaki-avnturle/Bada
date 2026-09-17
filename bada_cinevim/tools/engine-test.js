@@ -16,6 +16,8 @@
  *   9. Ex コマンド       — :42 :%s/// :set :w :countdown :emit :flash
  *  10. イベントバス      — key / motion / edit / mode の発行とディスパッチ順
  *  11. シネマ数理        — focusStyle / docLayout / flashFrame / countdownState
+ *  12. 多段落と拡大鏡    — splitParagraphs / paragraphText / wordAt /
+ *                          sentenceAt / loupeTransform / markRange
  */
 "use strict";
 const fs = require("fs");
@@ -617,6 +619,154 @@ console.log("11. focusStyle / docLayout / flashFrame / countdownState");
 
   eq(E.gutterWidth(9), 1, "ガター幅 (1 桁)");
   eq(E.gutterWidth(150), 3, "ガター幅 (3 桁)");
+}
+
+/* ═════ 12. 多段落の文章と拡大鏡 ═════ */
+console.log("12. 段落分け / 語と文の切り出し / 拡大鏡の写像");
+{
+  /* ── 段落分け ── */
+  const paras = E.splitParagraphs(["一行目", "二行目", "", "次の段落", "", "", "最後"]);
+  eq(paras.filter(p => p.kind === "para").length, 3, "段落は 3 つ");
+  eq(paras.filter(p => p.kind === "gap").length, 3, "空行も隙間として保持される");
+  eq(paras[0].from, 0, "第 1 段落の開始行");
+  eq(paras[0].to, 1, "第 1 段落の終了行");
+  eq(paras[0].lines.join("/"), "一行目/二行目", "第 1 段落の中身");
+  eq(E.splitParagraphs([]).length, 0, "空の入力");
+  eq(E.splitParagraphs(["   "]).length, 1, "空白だけの行は隙間");
+  eq(E.splitParagraphs(["   "])[0].kind, "gap", "空白だけの行の種別");
+  /* すべての行がどこかに現れる (カーソルを置けなくなる行がない) */
+  {
+    const src = ["a", "b", "", "c", "", "d"];
+    const seen = new Set();
+    for (const p of E.splitParagraphs(src)) for (let l = p.from; l <= p.to; l++) seen.add(l);
+    eq(seen.size, src.length, "全行が段落か隙間に含まれる");
+  }
+
+  /* ── 行の継ぎ方 (和文は詰める / 欧文は空白) ── */
+  ok(E.isCJK("文"), "漢字は CJK");
+  ok(E.isCJK("あ"), "ひらがなは CJK");
+  ok(E.isCJK("。"), "句点は CJK");
+  ok(!E.isCJK("a"), "ラテン文字は CJK ではない");
+  eq(E.lineSeparator("読むものだ", "そのために"), "", "和文どうしは詰める");
+  eq(E.lineSeparator("the quick", "brown fox"), " ", "欧文どうしは空白を入れる");
+  eq(E.lineSeparator("Bada", "の読み方"), "", "片方が和文なら詰める");
+  eq(E.lineSeparator("", "next"), "", "空行のあとは空白なし");
+
+  /* ── 段落の連結とオフセット対応 ── */
+  const pt = E.paragraphText(["文章は、", "光を当てて読む。"]);
+  eq(pt.text, "文章は、光を当てて読む。", "和文の段落は詰めて連結される");
+  eq(pt.map[0].start, 0, "1 行目の開始オフセット");
+  eq(pt.map[1].start, 4, "2 行目の開始オフセット");
+  eq(pt.map[1].sep, "", "和文の区切りは空");
+  const pe = E.paragraphText(["the quick", "brown fox"]);
+  eq(pe.text, "the quick brown fox", "欧文の段落は空白で連結される");
+  eq(pe.map[1].start, 10, "空白ぶんだけ開始位置がずれる");
+  eq(pe.map[1].sep, " ", "欧文の区切りは空白");
+  /* オフセット -> 行/桁 の往復 */
+  eq(E.offsetToLine(pt.map, 0).l, 0, "先頭は 1 行目");
+  eq(E.offsetToLine(pt.map, 3).l, 0, "1 行目の末尾");
+  eq(E.offsetToLine(pt.map, 4).l, 1, "2 行目の先頭");
+  eq(E.offsetToLine(pt.map, 4).c, 0, "2 行目の桁");
+  eq(E.offsetToLine(pt.map, 6).c, 2, "2 行目の途中");
+  eq(E.offsetToLine(pt.map, 999).l, 1, "範囲外は最終行へ丸める");
+  eq(E.offsetToLine([], 5).l, 0, "空の対応表でも壊れない");
+
+  /* ── 語の切り出し (和欧混在) ── */
+  eq(E.wordAt("文章は、目で追う", 0).text, "文章は", "漢字 + 送り仮名で 1 語");
+  eq(E.wordAt("文章は、目で追う", 3).text, "、", "約物は 1 文字");
+  eq(E.wordAt("Bada CineVim は", 5).text, "CineVim", "ラテン語");
+  eq(E.wordAt("カタカナ語です", 1).text, "カタカナ", "辞書を使わないので カタカナ|漢字 の境目で語が分かれる");
+  eq(E.wordAt("カタカナ語です", 4).text, "語です", "漢字 + 送り仮名はまとまる");
+  eq(E.wordAt("動く", 0).text, "動く", "送り仮名を含む");
+  eq(E.wordAt("動く", 1).text, "動く", "送り仮名の側から引いても同じ語");
+  eq(E.wordAt("", 0).text, "", "空文字列");
+  eq(E.wordAt("abc", 99).text, "abc", "範囲外は末尾に丸める");
+  eq(E.wordAt("abc", -5).text, "abc", "負の位置は先頭に丸める");
+  ok(E.wordAt("a b", 1).text === " ", "空白は 1 文字として返す");
+
+  /* ── 文の切り出し ── */
+  const T = "文章は目で追う。光を当てて読むものだ。次の文。";
+  eq(E.sentenceAt(T, 0).text, "文章は目で追う。", "1 文目");
+  eq(E.sentenceAt(T, 3).text, "文章は目で追う。", "1 文目の途中から引いても同じ");
+  eq(E.sentenceAt(T, 8).text, "光を当てて読むものだ。", "2 文目");
+  eq(E.sentenceAt(T, T.length - 1).text, "次の文。", "最後の文");
+  eq(E.sentenceAt("終止符なし", 2).text, "終止符なし", "終止符がなければ全体が 1 文");
+  eq(E.sentenceAt("", 0).text, "", "空文字列");
+  eq(E.sentenceAt("Hello there. Next one.", 2).text, "Hello there.", "欧文の文");
+  /* 小数点は文末ではない */
+  ok(!E.isSentenceEnd("3.14 です", 1), "数値の小数点は文末ではない");
+  ok(E.isSentenceEnd("end. next", 3), "空白が続く '.' は文末");
+  ok(E.isSentenceEnd("終わり。", 3), "句点は文末");
+  ok(E.isSentenceEnd("なぜ？", 2), "疑問符は文末");
+  eq(E.sentenceAt("円周率は 3.14 です。次。", 4).text, "円周率は 3.14 です。", "小数点で切れない");
+  /* 閉じ括弧は文末に含める */
+  eq(E.sentenceAt("「そうだ。」と言った。", 2).text, "「そうだ。」", "閉じ括弧まで 1 文");
+
+  /* ── 拡大鏡の写像 ── */
+  {
+    /* (px,py) が半径 r のレンズ中心 (r,r) に来ること */
+    const check = (px, py, r, z) => {
+      const t = E.loupeTransform(px, py, r, z);
+      return {x:t.scale * (px + t.tx), y:t.scale * (py + t.ty)};
+    };
+    let m = check(441.5, 382, 150, 3);
+    near(m.x, 150, 1e-9, "拡大しても指した点がレンズ中心に来る (x)");
+    near(m.y, 150, 1e-9, "拡大しても指した点がレンズ中心に来る (y)");
+    m = check(0, 0, 100, 7);
+    near(m.x, 100, 1e-9, "原点を指しても中心に来る");
+    m = check(50, 80, 120, 1);
+    near(m.x, 120, 1e-9, "等倍でも中心に来る");
+    eq(E.loupeTransform(10, 10, 100, 0).scale, 1, "倍率 0 は等倍に丸める");
+    eq(E.loupeTransform(10, 10, 100).scale, 1, "倍率なしは等倍");
+    /* 倍率が上がるほど、ずらし量は中心へ寄る */
+    ok(E.loupeTransform(400, 300, 150, 6).tx < E.loupeTransform(400, 300, 150, 3).tx,
+       "倍率が上がるほど、ずらし量は負に大きくなる (r/z が小さくなるため)");
+  }
+
+  /* ── レンズのはみ出し防止 ── */
+  eq(E.clampLoupe(500, 300, 1000, 700, 150).x, 500, "中央付近はそのまま");
+  eq(E.clampLoupe(10, 300, 1000, 700, 150).x, 150, "左にはみ出さない");
+  eq(E.clampLoupe(990, 300, 1000, 700, 150).x, 850, "右にはみ出さない");
+  eq(E.clampLoupe(500, 5, 1000, 700, 150).y, 150, "上にはみ出さない");
+  eq(E.clampLoupe(500, 695, 1000, 700, 150).y, 550, "下にはみ出さない");
+  eq(E.clampLoupe(500, 300, 200, 700, 150).x, 100, "レンズより狭ければ中央に置く");
+
+  /* ── 倍率の段階 ── */
+  eq(E.zoomStep(3, 1), 4, "1 段上げる");
+  eq(E.zoomStep(3, -1), 2.2, "1 段下げる");
+  eq(E.zoomStep(1.6, -1), 1.6, "最小で止まる");
+  eq(E.zoomStep(7, 1), 7, "最大で止まる");
+  eq(E.zoomStep(3.1, 0), 3, "近い段に吸着する");
+
+  /* ── 強調範囲の切り出し (行にまたがる文を、行ごとに包む) ── */
+  eq(E.markRange("abcdef", 0, 2, 4), "ab<span class=\"snap\">cd</span>ef", "行の途中を包む");
+  eq(E.markRange("abcdef", 0, null, null), "abcdef", "範囲なしは素の行");
+  eq(E.markRange("abcdef", 0, 10, 20), "abcdef", "行に掛からない範囲");
+  eq(E.markRange("abcdef", 10, 8, 14), "<span class=\"snap\">abcd</span>ef",
+     "前の行から続く範囲は行頭から包む");
+  eq(E.markRange("abcdef", 0, 4, 99), "abcd<span class=\"snap\">ef</span>",
+     "次の行へ続く範囲は行末まで包む");
+  eq(E.markRange("a<b>", 0, null, null), "a&lt;b&gt;", "HTML をエスケープする");
+  eq(E.markRange("a<b>", 0, 1, 4), "a<span class=\"snap\">&lt;b&gt;</span>",
+     "強調の内側もエスケープする");
+  eq(E.markRange("abc", 0, 2, 2), "abc", "空の範囲は無視する");
+  eq(E.escapeHtml("<&>"), "&lt;&amp;&gt;", "escapeHtml");
+  eq(E.escapeHtml(null), "", "escapeHtml(null)");
+
+  /* 段落全体を行ごとに包み直すと、元の文章に戻る */
+  {
+    const lines = ["まわりの段落は静かに退き、", "いま読んでいる一文だけが浮かぶ。"];
+    const t = E.paragraphText(lines);
+    const s2 = E.sentenceAt(t.text, 5);
+    let joined = "";
+    for (let k = 0; k < lines.length; k++){
+      joined += E.markRange(lines[k], t.map[k].start, s2.from, s2.to).replace(/<[^>]+>/g, "");
+    }
+    eq(joined, lines.join(""), "行ごとに包んでも文字は失われない");
+    ok(E.markRange(lines[0], t.map[0].start, s2.from, s2.to).indexOf("snap") >= 0 &&
+       E.markRange(lines[1], t.map[1].start, s2.from, s2.to).indexOf("snap") >= 0,
+       "行をまたぐ文は両方の行が包まれる");
+  }
 }
 
 /* ═════ 結果 ═════ */
