@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>エアシャトル・ゴーグル — AirShuttle Goggle</title>
+<!--
+  エアシャトル・ゴーグル (AirShuttle Goggle)
+  ──────────────────────────────────────────
+  ゴーグル型コンピュータの HUD で「実写映像」を再生し、
+  カメラに写った手を空中で “かき分ける” 動作だけで
+  巻き戻し (REW) / 早送り (FF) / コマ送り / ホールドを行うスクラブ卓。
+
+  アニメ作品に登場する、ゴーグル型端末を着けたエンジニアが
+  ホログラムの映像を手で掻き分けて時間軸を操る演出に着想を得た
+  オリジナル実装です (作品・権利者とは一切関係ありません)。
+
+  単一 HTML・依存ゼロ・外部通信ゼロ。映像はすべて端末内で処理し、
+  カメラ画像はどこにも送信しません (ハンド認識はすべてローカル)。
+
+  搭載エンジン:
+    1. ハンド・セグメンテーション — YCbCr 肌色クロマ帯 + フレーム間動きエネルギー
+    2. 連結成分ラベリング (4 近傍) による最大ブロブ抽出 → 手の位置・大きさ・充填率
+    3. One Euro Filter (Casiez et al. 2012) による低遅延スムージング
+    4. シャトル則 — 不感帯 + べき乗カーブ + 編集卓デテント (×0.25〜×16)
+    5. スワイプ/フリック検出 — 窓内ピーク速度・移動量・方向一貫率
+    6. トランスポート状態機械 — HOLD / SHUTTLE / FLICK / LOST を純関数で決定
+-->
+<style>
+  :root {
+    --bg: #04060b; --panel: #0a0f1a; --panel2: #0e1626; --line: #1b2a44;
+    --cyan: #49e0e8; --amber: #e0a23c; --rose: #e05a72; --green: #55d08a;
+    --text: #d8e6f4; --dim: #7f93ad; --grid: rgba(73,224,232,.16);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text);
+    font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif; }
+  body { padding: 0 14px 44px; max-width: 1180px; margin: 0 auto; }
+  header { padding: 20px 0 10px; text-align: center; }
+  header h1 { font-size: 1.5rem; letter-spacing: .08em; }
+  header h1 .k { color: var(--cyan); }
+  header p.sub { color: var(--dim); margin-top: 6px; font-size: .86rem; line-height: 1.7; }
+  nav#tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+  nav#tabs button { background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 15px; font-size: .9rem; cursor: pointer; }
+  nav#tabs button.on { background: var(--cyan); color: #04121a; border-color: var(--cyan); font-weight: 700; }
+  main { margin-top: 16px; }
+  section.pane { display: none; }
+  section.pane.on { display: block; }
+  h2.sec { font-size: 1.05rem; color: var(--cyan); margin: 18px 0 10px; letter-spacing: .05em; }
+  p.note { color: var(--dim); font-size: .83rem; line-height: 1.75; margin: 6px 0 12px; }
+
+  /* ---- ゴーグル HUD ---- */
+  .goggle { position: relative; width: 100%; aspect-ratio: 16/9; background: #000;
+    border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(73,224,232,.12), 0 18px 46px rgba(0,0,0,.6); }
+  .goggle video, .goggle canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .goggle video { object-fit: contain; background: #000; }
+  #stage { object-fit: contain; }
+  #hud { pointer-events: none; }
+  #touchpad { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+  .goggle::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.18) 2px 3px);
+    mix-blend-mode: multiply; }
+  .goggle .vig { position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,.72) 100%); }
+
+  .strip { margin-top: 10px; width: 100%; height: 76px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; display: block; touch-action: none; }
+
+  .readout { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin-top: 10px; }
+  .ro { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  .ro .lbl { color: var(--dim); font-size: .72rem; letter-spacing: .1em; }
+  .ro .val { font-size: 1.15rem; margin-top: 3px; font-variant-numeric: tabular-nums;
+    font-family: "SFMono-Regular", Consolas, "Courier New", monospace; color: var(--cyan); }
+  .ro .val.amber { color: var(--amber); } .ro .val.rose { color: var(--rose); }
+  .ro .val.green { color: var(--green); } .ro .val.dim { color: var(--dim); }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; align-items: center; }
+  .btn { background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+    border-radius: 9px; padding: 8px 13px; font-size: .86rem; cursor: pointer; }
+  .btn.cy { border-color: var(--cyan); color: var(--cyan); }
+  .btn.am { border-color: var(--amber); color: var(--amber); }
+  .btn.on { background: var(--cyan); color: #04121a; border-color: var(--cyan); font-weight: 700; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  label.file { display: inline-block; }
+  label.file input { display: none; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { background: var(--panel2); color: var(--dim); border: 0; padding: 8px 13px;
+    font-size: .84rem; cursor: pointer; }
+  .seg button.on { background: var(--cyan); color: #04121a; font-weight: 700; }
+
+  .row2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  .card h3 { font-size: .98rem; color: var(--cyan); margin-bottom: 8px; }
+  .slider { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center;
+    margin: 10px 0 2px; font-size: .84rem; }
+  .slider .nm { color: var(--dim); grid-column: 1 / -1; font-size: .78rem; }
+  .slider input[type=range] { width: 100%; accent-color: var(--cyan); }
+  .slider .v { font-family: Consolas, monospace; color: var(--cyan); min-width: 56px; text-align: right; }
+  canvas.mono { width: 100%; background: #000; border: 1px solid var(--line); border-radius: 8px; display: block; }
+  table.t { width: 100%; border-collapse: collapse; font-size: .86rem; margin-top: 6px; }
+  table.t th, table.t td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; }
+  table.t th { color: var(--dim); font-weight: 500; width: 46%; }
+  table.t td { font-family: Consolas, monospace; color: var(--cyan); }
+  .about { background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; line-height: 1.95; font-size: .89rem; }
+  .about h3 { color: var(--cyan); margin: 15px 0 6px; font-size: 1rem; }
+  .about ul { margin: 4px 0 8px 22px; } .about li { margin: 3px 0; }
+  .about code { background: var(--panel2); border-radius: 5px; padding: 1px 6px; font-size: .82rem; }
+  .warn { border-color: var(--amber); color: var(--amber); }
+  footer { text-align: center; color: var(--dim); font-size: .78rem; margin-top: 26px; line-height: 1.9; }
+  @media (max-width: 560px) { header h1 { font-size: 1.22rem; } .ro .val { font-size: 1rem; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="k">エアシャトル</span>・ゴーグル <span class="k">—</span> AirShuttle Goggle</h1>
+  <p class="sub">ゴーグル HUD の実写映像を、空中で手を<strong>かき分ける</strong>だけで巻き戻し・早送り。<br>
+    カメラ映像は端末内だけで処理し、外部には一切送信しません。</p>
+</header>
+
+<nav id="tabs">
+  <button data-pane="scrub" class="on">🎞 スクラブ卓</button>
+  <button data-pane="cal">✋ ハンド較正</button>
+  <button data-pane="tele">📊 テレメトリ</button>
+  <button data-pane="about">📖 原理と使い方</button>
+</nav>
+
+<main>
+<!-- ================= スクラブ卓 ================= -->
+<section class="pane on" id="pane-scrub">
+  <div class="goggle" id="goggle">
+    <video id="stage" playsinline webkit-playsinline muted></video>
+    <canvas id="demo"></canvas>
+    <canvas id="hud"></canvas>
+    <div class="vig"></div>
+    <div id="touchpad"></div>
+  </div>
+
+  <canvas id="strip" class="strip"></canvas>
+
+  <div class="readout">
+    <div class="ro"><div class="lbl">TIMECODE</div><div class="val" id="ro-tc">00:00:00:00</div></div>
+    <div class="ro"><div class="lbl">TRANSPORT</div><div class="val amber" id="ro-rate">⏸ HOLD</div></div>
+    <div class="ro"><div class="lbl">HAND</div><div class="val dim" id="ro-hand">— 未検出</div></div>
+    <div class="ro"><div class="lbl">GESTURE</div><div class="val green" id="ro-ges">IDLE</div></div>
+  </div>
+
+  <div class="bar">
+    <label class="file btn cy">🎬 実写映像を開く<input type="file" id="file" accept="video/*"></label>
+    <button class="btn" id="btn-demo">🌆 デモ映像</button>
+    <button class="btn am" id="btn-cam">📷 ハンド認識 開始</button>
+    <div class="seg" id="seg-input">
+      <button data-mode="hand" class="on">✋ 手</button>
+      <button data-mode="pointer">🖱 ポインタ</button>
+    </div>
+    <button class="btn" id="btn-play">▶ 再生 / 停止</button>
+    <button class="btn" id="btn-full">⛶ 全画面</button>
+  </div>
+  <p class="note" id="msg">映像を開くか「デモ映像」を押し、<strong>ハンド認識 開始</strong>でカメラを許可してください。
+    画面中央が中立位置です — 手を<strong>左へかき分ける</strong>と巻き戻し、<strong>右へかき分ける</strong>と早送り。
+    素早く払うと<strong>フリック跳躍</strong>、手を握ると<strong>ホールド</strong>。手を上げるほど高速、下げるほど微調整になります。</p>
+</section>
+
+<!-- ================= ハンド較正 ================= -->
+<section class="pane" id="pane-cal">
+  <h2 class="sec">✋ ハンド較正 — 認識と操作感の調整</h2>
+  <p class="note">左は認識マスク (白 = 手と判定された画素、十字 = 重心)。肌色クロマ帯と動きエネルギーの
+    2 条件で抽出しているため、背景に肌色の壁や木目があるときは「動き必須」を強めてください。</p>
+  <div class="row2">
+    <div class="card">
+      <h3>認識モニタ</h3>
+      <canvas id="mask" class="mono" width="160" height="120"></canvas>
+      <table class="t">
+        <tr><th>ブロブ面積 (画素)</th><td id="cal-area">—</td></tr>
+        <tr><th>正規化位置 x / y</th><td id="cal-pos">—</td></tr>
+        <tr><th>充填率 (握り判定)</th><td id="cal-fill">—</td></tr>
+        <tr><th>動きエネルギー</th><td id="cal-motion">—</td></tr>
+        <tr><th>処理フレームレート</th><td id="cal-fps">—</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>操作感パラメータ</h3>
+      <div class="slider"><span class="nm">不感帯 (中立幅) — 大きいほど誤爆しにくい</span>
+        <input type="range" id="p-dz" min="0.02" max="0.25" step="0.01" value="0.07"><span class="v" id="v-dz">0.07</span></div>
+      <div class="slider"><span class="nm">最大シャトル速度 (×)</span>
+        <input type="range" id="p-max" min="2" max="32" step="1" value="16"><span class="v" id="v-max">16</span></div>
+      <div class="slider"><span class="nm">カーブ指数 γ — 大きいほど中央が繊細</span>
+        <input type="range" id="p-gamma" min="1" max="4" step="0.1" value="2.2"><span class="v" id="v-gamma">2.2</span></div>
+      <div class="slider"><span class="nm">フリック感度 (跳躍秒/速度)</span>
+        <input type="range" id="p-flick" min="1" max="20" step="0.5" value="6"><span class="v" id="v-flick">6.0</span></div>
+      <div class="slider"><span class="nm">平滑化 One Euro β — 大きいほど追従優先</span>
+        <input type="range" id="p-beta" min="0" max="1.2" step="0.05" value="0.35"><span class="v" id="v-beta">0.35</span></div>
+      <div class="slider"><span class="nm">動き必須しきい値 (背景の肌色を除去)</span>
+        <input type="range" id="p-motion" min="0" max="60" step="2" value="14"><span class="v" id="v-motion">14</span></div>
+      <div class="bar">
+        <button class="btn" id="p-detent">デテント: ON</button>
+        <button class="btn" id="p-mirror">鏡像: ON</button>
+        <button class="btn" id="p-reset">既定値に戻す</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= テレメトリ ================= -->
+<section class="pane" id="pane-tele">
+  <h2 class="sec">📊 テレメトリ — 手の軌跡とシャトル出力</h2>
+  <p class="note">上段: 手の水平位置 x (シアン) と One Euro 平滑後 (白)。下段: 決定されたシャトル速度 (正 = 早送り / 負 = 巻き戻し)。
+    フリック検出はマゼンタの縦線で示されます。</p>
+  <canvas id="plot" class="mono" width="900" height="300"></canvas>
+  <div class="readout">
+    <div class="ro"><div class="lbl">PEAK SPEED (/s)</div><div class="val" id="t-peak">0.00</div></div>
+    <div class="ro"><div class="lbl">TRAVEL</div><div class="val" id="t-travel">0.00</div></div>
+    <div class="ro"><div class="lbl">FLICKS</div><div class="val amber" id="t-flicks">0</div></div>
+    <div class="ro"><div class="lbl">LOST FRAMES</div><div class="val rose" id="t-lost">0</div></div>
+  </div>
+</section>
+
+<!-- ================= 原理と使い方 ================= -->
+<section class="pane" id="pane-about">
+  <h2 class="sec">📖 原理と使い方</h2>
+  <div class="about">
+    <h3>1. 何をするアプリか</h3>
+    ゴーグル型コンピュータの HUD 風画面で<strong>実写映像</strong>を再生し、
+    Web カメラに写った<strong>手の動き</strong>だけで時間軸を操作します。
+    マウス・キーボード・タッチにも同じエンジンが割り当てられているので、カメラが無い環境でも同じ操作感で使えます。
+
+    <h3>2. ジェスチャ仕様</h3>
+    <ul>
+      <li><strong>かき分け (シャトル)</strong> — 画面中央が中立。手を左右へずらすと、変位に応じた速度で
+        巻き戻し / 早送り。速度は <code>r = ±R·((|dx|−dz)/(span−dz))^γ</code> で、
+        編集卓のデテント <code>×0.25 / 0.5 / 1 / 2 / 4 / 8 / 16</code> に吸着します。</li>
+      <li><strong>高さ = 精度</strong> — 手を上げるほど最大速度に近づき、下げるほど微速。
+        <code>scale(y) = lo + (hi−lo)·(1−y)</code>。コマ単位の追い込みは手を下げて行います。</li>
+      <li><strong>フリック (跳躍)</strong> — 素早く払うと窓内ピーク速度に応じて
+        <code>clamp(k·v^1.3, 2s, 120s)</code> 秒だけ一気に飛びます。</li>
+      <li><strong>ホールド</strong> — 手を握る (ブロブ充填率が上がる) と即停止。手が画面外に出た場合も安全側で停止します。</li>
+    </ul>
+
+    <h3>3. ハンド認識パイプライン (すべて端末内)</h3>
+    <ul>
+      <li><strong>肌色抽出</strong> — RGB を YCbCr に変換し <code>77 ≤ Cb ≤ 133</code>、<code>133 ≤ Cr ≤ 177</code>、
+        かつ彩度のある画素のみ採用 (無彩色の壁・紙を除外)。</li>
+      <li><strong>動きエネルギー</strong> — 直前フレームとの差分が閾値未満の肌色は背景とみなし棄却。</li>
+      <li><strong>連結成分ラベリング</strong> — 4 近傍フラッドフィルで領域を数え、最大面積のブロブを手とする。
+        面積 → 距離代理、外接矩形に対する充填率 → 握り / 開き判定。</li>
+      <li><strong>One Euro Filter</strong> — 速度適応カットオフ <code>fc = fc_min + β·|ẋ|</code> により、
+        静止時のふるえを消しつつ素早い払いには遅れない。</li>
+    </ul>
+
+    <h3>4. 再生系</h3>
+    <ul>
+      <li><code>×1〜×4</code> の順再生はブラウザ内蔵の <code>playbackRate</code>、
+        それを超える早送りと<strong>すべての巻き戻し</strong>は
+        <code>currentTime += r·Δt</code> の手動シークで駆動します
+        (HTML5 の playbackRate は負値を取れないため)。</li>
+      <li>下部の<strong>フィルムストリップ</strong>は、スクラブ中に通過したフレームを実際に焼き付けていきます。
+        手を近づけるとフィルムが左右に<strong>かき分けられ</strong>、その隙間に現在位置の拡大コマが現れます。</li>
+    </ul>
+
+    <h3>5. プライバシー</h3>
+    カメラ映像・映像ファイルはいずれも端末のメモリ内でのみ処理され、ネットワーク送信・保存は行いません。
+    アプリは外部 CDN も参照しない単一 HTML です (完全オフライン動作)。
+
+    <h3>6. 権利表記</h3>
+    本アプリは、ゴーグル型端末で映像を手で操作するという<strong>演出に着想を得た独自実装</strong>であり、
+    特定のアニメ作品・登場人物・権利者とは一切関係がなく、作品の素材も一切含みません。
+    再生される映像は利用者自身が選んだファイルです。
+  </div>
+</section>
+</main>
+
+<footer>
+  エアシャトル・ゴーグル — AirShuttle Goggle / MIT License / Bada プロジェクト<br>
+  ハンド認識・映像処理はすべて端末内で完結します。
+</footer>
+
+<script>
+/* ==========================================================================
+ *  エアシャトル・ゴーグル — エンジン
+ *  ここから下のトップレベル関数は tools/engine-test.js から単体テストされます。
+ *  DOM に触れる処理はすべて init() 以下 (DOMContentLoaded) に閉じ込めてあります。
+ * ========================================================================== */
+
+/* ---------- 共通ユーティリティ ---------- */
+function clamp(v, lo, hi){ return v < lo ? lo : (v > hi ? hi : v); }
+function lerp(a, b, t){ return a + (b - a) * t; }
+function pad2(n){ n = Math.floor(n); return (n < 10 ? "0" : "") + n; }
+function nowMs(){
+  if (typeof performance !== "undefined" && performance && performance.now) return performance.now();
+  return Date.now();
+}
+
+/* ==========================================================================
+ *  1. ハンド・セグメンテーション (肌色クロマ + 動きエネルギー)
+ * ========================================================================== */
+
+/* ITU-R BT.601 の RGB → YCbCr 変換 (0-255 スケール)。 */
+function rgbToYCbCr(r, g, b){
+  return {
+    y:  0.299 * r + 0.587 * g + 0.114 * b,
+    cb: 128 - 0.168736 * r - 0.331264 * g + 0.5 * b,
+    cr: 128 + 0.5 * r - 0.418688 * g - 0.081312 * b
+  };
+}
+
+/* 肌色判定。クロマ帯 (Cb 77-133 / Cr 133-177) に加え、
+   無彩色 (壁・紙・白飛び) と暗部を弾く RGB 側の補助条件を併用する。 */
+function isSkinPixel(r, g, b){
+  var c = rgbToYCbCr(r, g, b);
+  if (c.y < 45 || c.y > 240) return false;
+  if (c.cb < 77 || c.cb > 133) return false;
+  if (c.cr < 133 || c.cr > 177) return false;
+  var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  if (mx - mn < 12) return false;
+  return r > 55 && g > 30 && b > 15 && r > b && r > g;
+}
+
+/* 2 フレーム間の平均動きエネルギー (0-255)。手が止まっているかの指標。 */
+function frameMotion(cur, prev){
+  if (!prev || prev.length !== cur.length) return 255;
+  var sum = 0, n = 0;
+  for (var p = 0; p < cur.length; p += 4){
+    sum += Math.abs(cur[p] - prev[p]) + Math.abs(cur[p + 1] - prev[p + 1]) + Math.abs(cur[p + 2] - prev[p + 2]);
+    n++;
+  }
+  return n ? sum / (n * 3) : 0;
+}
+
+/* 手マスクを作る。cur/prev は RGBA の画素配列 (長さ w*h*4)。
+   opt.motionThreshold > 0 のときは「直前フレームから動いた肌色」だけを採用する
+   (背景の肌色っぽい壁・木目を排除するため)。戻り値は 0/1 の長さ w*h 配列。 */
+function segmentHand(cur, prev, w, h, opt){
+  opt = opt || {};
+  var th = opt.motionThreshold == null ? 14 : opt.motionThreshold;
+  var useMotion = th > 0 && prev && prev.length === cur.length;
+  var mask = new Uint8Array(w * h);
+  for (var i = 0, p = 0; i < w * h; i++, p += 4){
+    var r = cur[p], g = cur[p + 1], b = cur[p + 2];
+    if (!isSkinPixel(r, g, b)) continue;
+    if (useMotion){
+      var d = Math.abs(r - prev[p]) + Math.abs(g - prev[p + 1]) + Math.abs(b - prev[p + 2]);
+      if (d < th) continue;
+    }
+    mask[i] = 1;
+  }
+  return mask;
+}
+
+/* 4 近傍フラッドフィルによる連結成分ラベリング。
+   面積の降順にソートした {area, cx, cy, x0, y0, x1, y1} の配列を返す。 */
+function labelBlobs(mask, w, h, minArea){
+  minArea = minArea || 1;
+  var n = w * h;
+  var seen = new Uint8Array(n);
+  var stack = new Int32Array(n);
+  var out = [];
+  for (var s = 0; s < n; s++){
+    if (!mask[s] || seen[s]) continue;
+    var sp = 0; stack[sp++] = s; seen[s] = 1;
+    var area = 0, sx = 0, sy = 0, x0 = w, y0 = h, x1 = -1, y1 = -1;
+    while (sp > 0){
+      var idx = stack[--sp];
+      var x = idx % w, y = (idx - x) / w;
+      area++; sx += x; sy += y;
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x > 0     && mask[idx - 1] && !seen[idx - 1]) { seen[idx - 1] = 1; stack[sp++] = idx - 1; }
+      if (x < w - 1 && mask[idx + 1] && !seen[idx + 1]) { seen[idx + 1] = 1; stack[sp++] = idx + 1; }
+      if (y > 0     && mask[idx - w] && !seen[idx - w]) { seen[idx - w] = 1; stack[sp++] = idx - w; }
+      if (y < h - 1 && mask[idx + w] && !seen[idx + w]) { seen[idx + w] = 1; stack[sp++] = idx + w; }
+    }
+    if (area >= minArea) out.push({ area: area, cx: sx / area, cy: sy / area, x0: x0, y0: y0, x1: x1, y1: y1 });
+  }
+  out.sort(function(a, b){ return b.area - a.area; });
+  return out;
+}
+
+/* ブロブ → 手の状態。x/y は 0..1 に正規化 (カメラは鏡像なので既定で左右反転)。
+   size は距離の代理 (√(面積比))、fill は外接矩形の充填率で握り判定に使う。 */
+function handFromBlob(blob, w, h, mirror){
+  if (!blob) return null;
+  var bw = blob.x1 - blob.x0 + 1, bh = blob.y1 - blob.y0 + 1;
+  var nx = (blob.cx + 0.5) / w, ny = (blob.cy + 0.5) / h;
+  return {
+    present: true,
+    x: (mirror === false) ? nx : 1 - nx,
+    y: ny,
+    size: Math.sqrt(blob.area / (w * h)),
+    fill: blob.area / (bw * bh),
+    aspect: bw / bh,
+    area: blob.area
+  };
+}
+
+/* 手のポーズ判定: 開いた手は指の隙間で充填率が下がり、握るとほぼ矩形を埋める。 */
+function classifyPose(hand, cfg){
+  cfg = cfg || {};
+  var grabTh = cfg.grabFill == null ? 0.72 : cfg.grabFill;
+  var openTh = cfg.openFill == null ? 0.58 : cfg.openFill;
+  if (!hand || !hand.present) return "none";
+  if (hand.fill >= grabTh) return "grab";
+  if (hand.fill <= openTh) return "open";
+  return "half";
+}
+
+/* ==========================================================================
+ *  2. One Euro Filter (Casiez, Roussel, Vogel 2012)
+ * ========================================================================== */
+function oneEuroAlpha(cutoff, dt){
+  var tau = 1 / (2 * Math.PI * cutoff);
+  return 1 / (1 + tau / dt);
+}
+function oneEuroFilter(cfg){
+  cfg = cfg || {};
+  var minCutoff = cfg.minCutoff == null ? 1.0 : cfg.minCutoff;
+  var beta      = cfg.beta      == null ? 0.35 : cfg.beta;
+  var dCutoff   = cfg.dCutoff   == null ? 1.0 : cfg.dCutoff;
+  var xPrev = null, dxPrev = 0;
+  return {
+    setBeta: function(b){ beta = b; },
+    reset: function(){ xPrev = null; dxPrev = 0; },
+    value: function(){ return xPrev; },
+    filter: function(x, dt){
+      if (!(dt > 0)) dt = 1 / 60;
+      if (xPrev === null){ xPrev = x; dxPrev = 0; return x; }
+      var dx = (x - xPrev) / dt;
+      var dxHat = dxPrev + oneEuroAlpha(dCutoff, dt) * (dx - dxPrev);
+      var a = oneEuroAlpha(minCutoff + beta * Math.abs(dxHat), dt);
+      var xHat = xPrev + a * (x - xPrev);
+      xPrev = xHat; dxPrev = dxHat;
+      return xHat;
+    }
+  };
+}
+
+/* ==========================================================================
+ *  3. シャトル則 (かき分け → 速度)
+ * ========================================================================== */
+
+/* 編集卓のシャトルリング相当のデテント。0 を含む。 */
+function shuttleDetents(){ return [0, 0.25, 0.5, 1, 2, 4, 8, 16, 32]; }
+
+/* 速度を最寄りのデテントへ吸着 (上限 max を超えない)。 */
+function snapRate(r, max){
+  var d = shuttleDetents(), best = 0, bestErr = Infinity;
+  for (var i = 0; i < d.length; i++){
+    if (max != null && d[i] > max) continue;
+    var e = Math.abs(d[i] - r);
+    if (e < bestErr){ bestErr = e; best = d[i]; }
+  }
+  return best;
+}
+
+/* 手を上げるほど高速・下げるほど微調整。y は 0 (上) .. 1 (下)。 */
+function precisionScale(y, cfg){
+  cfg = cfg || {};
+  var lo = cfg.min == null ? 0.15 : cfg.min;
+  var hi = cfg.max == null ? 1.0 : cfg.max;
+  return lo + (hi - lo) * (1 - clamp(y, 0, 1));
+}
+
+/* 中立位置からの変位 dx (-1..1) をシャトル速度に写像する。
+   不感帯の外側で r = ±R·((|dx|-dz)/(span-dz))^γ、既定ではデテントに吸着。 */
+function shuttleRate(dx, cfg){
+  cfg = cfg || {};
+  var dz    = cfg.deadzone == null ? 0.07 : cfg.deadzone;
+  var max   = cfg.maxRate  == null ? 16 : cfg.maxRate;
+  var gamma = cfg.gamma    == null ? 2.2 : cfg.gamma;
+  var span  = cfg.span     == null ? 0.45 : cfg.span;
+  var a = Math.abs(dx);
+  if (!(a > dz)) return 0;
+  var u = clamp((a - dz) / Math.max(1e-6, span - dz), 0, 1);
+  var r = max * Math.pow(u, gamma);
+  if (cfg.detent !== false) r = snapRate(r, max);
+  return dx < 0 ? -r : r;
+}
+
+/* ==========================================================================
+ *  4. スワイプ / フリック検出
+ *  samples: [{t: ミリ秒, x: 0..1}, ...] (古い→新しい)
+ * ========================================================================== */
+function detectSwipe(samples, cfg){
+  cfg = cfg || {};
+  var winMs     = cfg.windowMs    == null ? 260 : cfg.windowMs;
+  var minTravel = cfg.minTravel   == null ? 0.20 : cfg.minTravel;
+  var minSpeed  = cfg.minSpeed    == null ? 1.6 : cfg.minSpeed;
+  var minRatio  = cfg.minRatio    == null ? 0.75 : cfg.minRatio;
+  if (!samples || samples.length < 3) return null;
+  var last = samples[samples.length - 1];
+  var win = [];
+  for (var i = samples.length - 1; i >= 0; i--){
+    if (last.t - samples[i].t > winMs) break;
+    win.unshift(samples[i]);
+  }
+  if (win.length < 3) return null;
+  var travel = last.x - win[0].x;
+  if (Math.abs(travel) < minTravel) return null;
+  var dir = travel > 0 ? 1 : -1;
+  var peak = 0, agree = 0, steps = 0;
+  for (var k = 1; k < win.length; k++){
+    var dt = (win[k].t - win[k - 1].t) / 1000;
+    if (!(dt > 0)) continue;
+    var v = (win[k].x - win[k - 1].x) / dt;
+    if (Math.abs(v) > Math.abs(peak)) peak = v;
+    steps++;
+    if (v * dir > 0) agree++;
+  }
+  if (!steps) return null;
+  if (agree / steps < minRatio) return null;
+  if (Math.abs(peak) < minSpeed) return null;
+  return { dir: dir, travel: travel, speed: Math.abs(peak), samples: win.length };
+}
+
+/* フリックの跳躍量 (秒)。ピーク速度のべき乗を上下限で締める。 */
+function flickJumpSeconds(speed, cfg){
+  cfg = cfg || {};
+  var k   = cfg.flickGain == null ? 6 : cfg.flickGain;
+  var lo  = cfg.flickMin  == null ? 2 : cfg.flickMin;
+  var hi  = cfg.flickMax  == null ? 120 : cfg.flickMax;
+  var s = Math.max(0, speed || 0);
+  return clamp(k * Math.pow(s, 1.3), lo, hi);
+}
+
+/* ==========================================================================
+ *  5. トランスポート (時間軸) — 純関数の状態遷移
+ * ========================================================================== */
+
+/* 時刻を進める。duration が有効なら 0..duration にクランプ (loop 時は巻き戻し)。 */
+function advanceTime(t, rate, dt, duration, loop){
+  var nt = (t || 0) + (rate || 0) * (dt || 0);
+  if (!(duration > 0)) return Math.max(0, nt);
+  if (loop){ nt = nt % duration; if (nt < 0) nt += duration; return nt; }
+  return clamp(nt, 0, duration);
+}
+
+/* 状態 st = {time, rate, hold} と入力 input = {present, x, y, pose, swipe} から
+   次のトランスポート状態を決める。副作用なし = テスト可能な操作仕様そのもの。 */
+function nextTransport(st, input, dt, cfg){
+  st = st || { time: 0, rate: 0, hold: false };
+  cfg = cfg || {};
+  var anchor = cfg.anchor == null ? 0.5 : cfg.anchor;
+  var out = { time: st.time || 0, rate: 0, hold: false, jump: 0, event: "idle" };
+
+  if (!input || !input.present){
+    out.event = "lost";                       // 手を見失ったら安全側で停止
+  } else if (input.pose === "grab"){
+    out.hold = true; out.event = "hold";       // 握り = ホールド
+  } else {
+    if (input.swipe){
+      out.jump = input.swipe.dir * flickJumpSeconds(input.swipe.speed, cfg);
+      out.event = "flick";
+    }
+    var scale = cfg.useVertical === false ? 1 : precisionScale(input.y, cfg.precision);
+    var sub = {
+      deadzone: cfg.deadzone, gamma: cfg.gamma, span: cfg.span, detent: cfg.detent,
+      maxRate: (cfg.maxRate == null ? 16 : cfg.maxRate) * scale
+    };
+    out.rate = shuttleRate(input.x - anchor, sub);
+    if (out.event !== "flick") out.event = out.rate === 0 ? "neutral" : "shuttle";
+  }
+  out.time = advanceTime((st.time || 0) + out.jump, out.rate, dt, cfg.duration, !!cfg.loop);
+  return out;
+}
+
+/* 速度をどう <video> に流し込むか。
+   HTML5 の playbackRate は負値不可・高速域も不安定なため、
+   巻き戻しと高速早送りは手動シーク (manual) に切り替える。 */
+function videoDriveMode(rate, cfg){
+  cfg = cfg || {};
+  var nativeMax = cfg.nativeMax == null ? 4 : cfg.nativeMax;
+  if (!rate) return { mode: "paused", playbackRate: 1 };
+  if (rate > 0 && rate <= nativeMax) return { mode: "native", playbackRate: rate };
+  return { mode: "manual", playbackRate: 1 };
+}
+
+/* ==========================================================================
+ *  6. 表示ヘルパ
+ * ========================================================================== */
+function formatTimecode(sec, fps){
+  fps = fps || 30;
+  var neg = sec < 0, s = Math.abs(sec || 0);
+  var total = Math.floor(s);
+  var fr = Math.min(Math.floor((s - total) * fps), fps - 1);
+  return (neg ? "-" : "") + pad2(Math.floor(total / 3600)) + ":" +
+         pad2(Math.floor(total / 60) % 60) + ":" + pad2(total % 60) + ":" + pad2(fr);
+}
+function rateLabel(rate, hold){
+  if (hold) return "⏸ HOLD";
+  if (!rate) return "⏸ STOP";
+  var x = Math.abs(rate) >= 1 ? Math.abs(rate).toFixed(1) : Math.abs(rate).toFixed(2);
+  return (rate < 0 ? "⏪ ×" : "⏩ ×") + x;
+}
+function rateClass(rate, hold){
+  if (hold) return "amber";
+  if (!rate) return "dim";
+  return rate < 0 ? "rose" : "green";
+}
+/* フィルムストリップの各コマの代表時刻。 */
+function filmstripTimes(duration, n){
+  var out = [];
+  if (!(duration > 0) || !(n > 0)) return out;
+  for (var i = 0; i < n; i++) out.push((i + 0.5) / n * duration);
+  return out;
+}
+/* 現在時刻が何番目のコマに焼き付くか。 */
+function stripCellIndex(time, duration, n){
+  if (!(duration > 0) || !(n > 0)) return 0;
+  return clamp(Math.floor(time / duration * n), 0, n - 1);
+}
+/* “かき分け” 変位: 手に近いコマほど左右へ押し退けられる (ガウス窓)。 */
+function partOffset(cellX, handX, strength, radius){
+  var r = radius || 0.18;
+  var d = cellX - handX;
+  var g = Math.exp(-(d * d) / (2 * r * r));
+  var dir = d === 0 ? 0 : (d > 0 ? 1 : -1);
+  return dir * (strength == null ? 1 : strength) * g;
+}
+/* HUD 用のゾーン名。 */
+function zoneLabel(x, cfg){
+  cfg = cfg || {};
+  var dz = cfg.deadzone == null ? 0.07 : cfg.deadzone;
+  var anchor = cfg.anchor == null ? 0.5 : cfg.anchor;
+  var d = x - anchor;
+  if (Math.abs(d) <= dz) return "NEUTRAL";
+  return d < 0 ? "REW" : "FF";
+}
+
+/* 手が中立のとき、基本再生 (ユーザーが ▶ を押した状態) なら ×1 で流す。
+   ホールド中は何があっても停止。 */
+function effectiveRate(nt, playing){
+  if (!nt) return 0;
+  if (nt.hold) return 0;
+  if (nt.rate) return nt.rate;
+  return playing ? 1 : 0;
+}
+
+/* デモ映像 (実写素材を持たない環境でも操作感を確かめられる手続き生成クリップ)。
+   時刻 t (秒) だけの純粋な関数として 1 フレームを描くので、
+   巻き戻し・早送り・コマ送りがそのまま成立する。 */
+function demoSceneState(t, duration){
+  var u = duration > 0 ? (t / duration) : 0;
+  return {
+    sun: { x: 0.12 + 0.76 * u, y: 0.74 - 0.52 * Math.sin(Math.PI * u) },
+    sky: clamp(1 - Math.abs(0.5 - u) * 2, 0, 1),
+    car: (t * 0.14) % 1.4 - 0.2,
+    tick: Math.floor(t * 30)
+  };
+}
+
+/* ==========================================================================
+ *  アプリケーション層 (DOM)
+ * ========================================================================== */
+var ST = {
+  mode: "hand", camOn: false, source: "none", playing: false,
+  time: 0, rate: 0, hold: false, duration: 0, fps: 30,
+  demoDuration: 150,
+  hand: null, handRaw: null, pose: "none", lost: 0, flicks: 0,
+  samples: [], trail: [], tele: [], lastMask: null, maskDims: [0, 0],
+  motion: 0, procFps: 0, lastEvent: "idle",
+  cfg: { deadzone: 0.07, maxRate: 16, gamma: 2.2, span: 0.45, flickGain: 6,
+         beta: 0.35, motionThreshold: 14, detent: true, mirror: true },
+  pointer: { active: false, x: 0.5, y: 0.5, grab: false }
+};
+var EL = {}, camVideo = null, camStream = null, work = null, workCtx = null,
+    prevPixels = null, filtX = null, filtY = null, thumbs = [], thumbW = 112, thumbH = 63,
+    lastThumbAt = 0, flickCooldownUntil = 0, lastProcAt = 0, procAcc = 0, procN = 0;
+var STRIP_CELLS = 26;
+
+function $(id){ return document.getElementById(id); }
+
+function init(){
+  ["stage", "demo", "hud", "strip", "touchpad", "goggle", "mask", "plot", "msg", "file",
+   "ro-tc", "ro-rate", "ro-hand", "ro-ges", "btn-demo", "btn-cam", "btn-play", "btn-full",
+   "cal-area", "cal-pos", "cal-fill", "cal-motion", "cal-fps",
+   "t-peak", "t-travel", "t-flicks", "t-lost", "seg-input",
+   "p-dz", "p-max", "p-gamma", "p-flick", "p-beta", "p-motion",
+   "p-detent", "p-mirror", "p-reset"].forEach(function(id){ EL[id] = $(id); });
+
+  filtX = oneEuroFilter({ minCutoff: 1.0, beta: ST.cfg.beta });
+  filtY = oneEuroFilter({ minCutoff: 1.0, beta: ST.cfg.beta });
+  work = document.createElement("canvas"); work.width = 160; work.height = 120;
+  workCtx = work.getContext("2d", { willReadFrequently: true });
+
+  bindTabs(); bindControls(); bindPointer(); bindKeys(); bindSliders();
+  resizeCanvases();
+  window.addEventListener("resize", resizeCanvases);
+  requestAnimationFrame(tick);
+}
+
+function bindTabs(){
+  var btns = document.querySelectorAll("nav#tabs button");
+  for (var i = 0; i < btns.length; i++){
+    (function(b){
+      b.addEventListener("click", function(){
+        for (var j = 0; j < btns.length; j++) btns[j].classList.remove("on");
+        b.classList.add("on");
+        var panes = document.querySelectorAll("section.pane");
+        for (var k = 0; k < panes.length; k++) panes[k].classList.remove("on");
+        $("pane-" + b.getAttribute("data-pane")).classList.add("on");
+        resizeCanvases();
+      });
+    })(btns[i]);
+  }
+}
+
+function setMsg(text, warn){
+  EL.msg.innerHTML = text;
+  EL.msg.className = warn ? "note warn" : "note";
+}
+
+function bindControls(){
+  EL.file.addEventListener("change", function(e){
+    var f = e.target.files && e.target.files[0];
+    if (!f) return;
+    loadVideoFile(f);
+  });
+  EL["btn-demo"].addEventListener("click", startDemo);
+  EL["btn-cam"].addEventListener("click", function(){ ST.camOn ? stopCamera() : startCamera(); });
+  EL["btn-play"].addEventListener("click", function(){
+    ST.playing = !ST.playing;
+    EL["btn-play"].classList.toggle("on", ST.playing);
+  });
+  EL["btn-full"].addEventListener("click", function(){
+    var g = EL.goggle;
+    if (document.fullscreenElement) { document.exitFullscreen(); }
+    else if (g.requestFullscreen) { g.requestFullscreen(); }
+  });
+  var segs = EL["seg-input"].querySelectorAll("button");
+  for (var i = 0; i < segs.length; i++){
+    (function(b){
+      b.addEventListener("click", function(){
+        for (var j = 0; j < segs.length; j++) segs[j].classList.remove("on");
+        b.classList.add("on");
+        ST.mode = b.getAttribute("data-mode");
+        ST.hand = null; ST.samples = []; ST.trail = [];
+      });
+    })(segs[i]);
+  }
+}
+
+function loadVideoFile(f){
+  var url = URL.createObjectURL(f);
+  ST.source = "file"; ST.time = 0; thumbs = [];
+  EL.stage.style.display = "block"; EL.demo.style.display = "none";
+  EL.stage.src = url;
+  EL.stage.addEventListener("loadedmetadata", function onmeta(){
+    EL.stage.removeEventListener("loadedmetadata", onmeta);
+    ST.duration = EL.stage.duration || 0;
+    ST.time = 0;
+    setMsg("読み込み完了: <strong>" + f.name + "</strong> (" + formatTimecode(ST.duration, ST.fps) +
+           ")。手を左右にかき分けてスクラブしてください。", false);
+  });
+  EL.stage.load();
+}
+
+function startDemo(){
+  ST.source = "demo"; ST.duration = ST.demoDuration; ST.time = 0; thumbs = [];
+  EL.stage.pause(); EL.stage.removeAttribute("src"); EL.stage.load();
+  EL.stage.style.display = "none"; EL.demo.style.display = "block";
+  buildDemoThumbs();
+  setMsg("デモ映像 (手続き生成・" + ST.demoDuration + "秒) を読み込みました。" +
+         "実写ファイルは「🎬 実写映像を開く」から。", false);
+}
+
+/* Android (Cordova) 版では WebView の getUserMedia より前に
+   端末の実行時パーミッションを取得しておく必要がある。
+   ブラウザ / Electron ではプラグインが無いのでそのまま次へ進む。 */
+function ensureCameraPermission(next){
+  var g = (typeof window !== "undefined") ? window : null;
+  var perms = g && g.cordova && g.cordova.plugins && g.cordova.plugins.permissions;
+  if (!perms || !perms.CAMERA){ next(); return; }
+  var done = function(){ next(); };
+  try {
+    perms.checkPermission(perms.CAMERA, function(st){
+      if (st && st.hasPermission) { done(); return; }
+      perms.requestPermission(perms.CAMERA, done, done);
+    }, done);
+  } catch (e) { done(); }
+}
+
+function startCamera(){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setMsg("この環境ではカメラ API が使えません。<strong>🖱 ポインタ</strong>モードで同じ操作ができます。", true);
+    return;
+  }
+  ensureCameraPermission(doStartCamera);
+}
+
+function doStartCamera(){
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 }, audio: false })
+    .then(function(stream){
+      camStream = stream;
+      camVideo = document.createElement("video");
+      camVideo.srcObject = stream; camVideo.muted = true;
+      camVideo.setAttribute("playsinline", ""); camVideo.play();
+      ST.camOn = true; ST.mode = "hand";
+      EL["btn-cam"].textContent = "📷 ハンド認識 停止";
+      EL["btn-cam"].classList.add("on");
+      setMsg("ハンド認識 ON。画面中央が中立です — 手を左へかき分けると<strong>巻き戻し</strong>、" +
+             "右へで<strong>早送り</strong>。素早く払うと<strong>フリック跳躍</strong>、握ると<strong>ホールド</strong>。", false);
+    })
+    .catch(function(err){
+      setMsg("カメラを開始できませんでした (" + (err && err.name ? err.name : "error") +
+             ")。<strong>🖱 ポインタ</strong>モードなら同じジェスチャ則をマウス/指で操作できます。", true);
+    });
+}
+
+function stopCamera(){
+  if (camStream) camStream.getTracks().forEach(function(t){ t.stop(); });
+  camStream = null; camVideo = null; ST.camOn = false; ST.hand = null; prevPixels = null;
+  EL["btn-cam"].textContent = "📷 ハンド認識 開始";
+  EL["btn-cam"].classList.remove("on");
+}
+
+function bindPointer(){
+  var pad = EL.touchpad;
+  function pos(e){
+    var r = pad.getBoundingClientRect();
+    return { x: clamp((e.clientX - r.left) / r.width, 0, 1), y: clamp((e.clientY - r.top) / r.height, 0, 1) };
+  }
+  pad.addEventListener("pointerdown", function(e){
+    pad.setPointerCapture(e.pointerId);
+    var p = pos(e);
+    ST.pointer.active = true; ST.pointer.x = p.x; ST.pointer.y = p.y;
+    ST.pointer.grab = e.shiftKey || e.button === 2;
+    if (ST.mode !== "pointer"){
+      ST.mode = "pointer";
+      var segs = EL["seg-input"].querySelectorAll("button");
+      for (var j = 0; j < segs.length; j++)
+        segs[j].classList.toggle("on", segs[j].getAttribute("data-mode") === "pointer");
+    }
+    e.preventDefault();
+  });
+  pad.addEventListener("pointermove", function(e){
+    if (!ST.pointer.active) return;
+    var p = pos(e); ST.pointer.x = p.x; ST.pointer.y = p.y;
+    ST.pointer.grab = e.shiftKey;
+  });
+  function up(){ ST.pointer.active = false; ST.pointer.grab = false; }
+  pad.addEventListener("pointerup", up);
+  pad.addEventListener("pointercancel", up);
+  pad.addEventListener("contextmenu", function(e){ e.preventDefault(); });
+  EL.strip.addEventListener("pointerdown", function(e){
+    var r = EL.strip.getBoundingClientRect();
+    var u = clamp((e.clientX - r.left) / r.width, 0, 1);
+    if (ST.duration > 0) seekTo(u * ST.duration);
+  });
+}
+
+function bindKeys(){
+  document.addEventListener("keydown", function(e){
+    var d = ST.duration || 0;
+    if (e.key === " "){ ST.playing = !ST.playing; EL["btn-play"].classList.toggle("on", ST.playing); e.preventDefault(); }
+    else if (e.key === "ArrowLeft")  seekTo(currentTime() - (e.shiftKey ? 10 : 1 / ST.fps));
+    else if (e.key === "ArrowRight") seekTo(currentTime() + (e.shiftKey ? 10 : 1 / ST.fps));
+    else if (e.key === "j" || e.key === "J") seekTo(currentTime() - 10);
+    else if (e.key === "l" || e.key === "L") seekTo(currentTime() + 10);
+    else if (e.key === "k" || e.key === "K") ST.playing = false;
+    else if (e.key === "Home") seekTo(0);
+    else if (e.key === "End" && d) seekTo(d);
+  });
+}
+
+function bindSliders(){
+  function wire(id, vid, key, fmt){
+    EL[id].addEventListener("input", function(){
+      var v = parseFloat(EL[id].value);
+      ST.cfg[key] = v;
+      $(vid).textContent = fmt ? fmt(v) : String(v);
+      if (key === "beta"){ filtX.setBeta(v); filtY.setBeta(v); }
+    });
+  }
+  wire("p-dz", "v-dz", "deadzone", function(v){ return v.toFixed(2); });
+  wire("p-max", "v-max", "maxRate", function(v){ return String(v); });
+  wire("p-gamma", "v-gamma", "gamma", function(v){ return v.toFixed(1); });
+  wire("p-flick", "v-flick", "flickGain", function(v){ return v.toFixed(1); });
+  wire("p-beta", "v-beta", "beta", function(v){ return v.toFixed(2); });
+  wire("p-motion", "v-motion", "motionThreshold", function(v){ return String(v); });
+  EL["p-detent"].addEventListener("click", function(){
+    ST.cfg.detent = !ST.cfg.detent;
+    EL["p-detent"].textContent = "デテント: " + (ST.cfg.detent ? "ON" : "OFF");
+  });
+  EL["p-mirror"].addEventListener("click", function(){
+    ST.cfg.mirror = !ST.cfg.mirror;
+    EL["p-mirror"].textContent = "鏡像: " + (ST.cfg.mirror ? "ON" : "OFF");
+  });
+  EL["p-reset"].addEventListener("click", function(){
+    var d = { deadzone: 0.07, maxRate: 16, gamma: 2.2, flickGain: 6, beta: 0.35, motionThreshold: 14 };
+    ST.cfg.deadzone = d.deadzone; ST.cfg.maxRate = d.maxRate; ST.cfg.gamma = d.gamma;
+    ST.cfg.flickGain = d.flickGain; ST.cfg.beta = d.beta; ST.cfg.motionThreshold = d.motionThreshold;
+    EL["p-dz"].value = d.deadzone; $("v-dz").textContent = d.deadzone.toFixed(2);
+    EL["p-max"].value = d.maxRate; $("v-max").textContent = String(d.maxRate);
+    EL["p-gamma"].value = d.gamma; $("v-gamma").textContent = d.gamma.toFixed(1);
+    EL["p-flick"].value = d.flickGain; $("v-flick").textContent = d.flickGain.toFixed(1);
+    EL["p-beta"].value = d.beta; $("v-beta").textContent = d.beta.toFixed(2);
+    EL["p-motion"].value = d.motionThreshold; $("v-motion").textContent = String(d.motionThreshold);
+    filtX.setBeta(d.beta); filtY.setBeta(d.beta);
+  });
+}
+
+function resizeCanvases(){
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  [EL.demo, EL.hud].forEach(function(c){
+    if (!c) return;
+    var r = EL.goggle.getBoundingClientRect();
+    c.width = Math.max(320, Math.round(r.width * dpr));
+    c.height = Math.max(180, Math.round(r.height * dpr));
+  });
+  var sr = EL.strip.getBoundingClientRect();
+  EL.strip.width = Math.max(320, Math.round(sr.width * dpr));
+  EL.strip.height = Math.max(60, Math.round(sr.height * dpr));
+  var pr = EL.plot.getBoundingClientRect();
+  if (pr.width > 10){ EL.plot.width = Math.round(pr.width * dpr); EL.plot.height = Math.round(300 * dpr); }
+}
+
+/* ---------- 時間軸アクセス ---------- */
+function currentTime(){
+  if (ST.source === "file" && EL.stage.readyState >= 1) return EL.stage.currentTime || 0;
+  return ST.time;
+}
+function seekTo(t){
+  var d = ST.duration || 0;
+  t = d > 0 ? clamp(t, 0, d) : Math.max(0, t);
+  ST.time = t;
+  if (ST.source === "file" && EL.stage.readyState >= 1) EL.stage.currentTime = t;
+}
+
+/* ---------- 入力: カメラからの手 ---------- */
+function readHandFromCamera(dt){
+  if (!camVideo || camVideo.readyState < 2) return null;
+  var w = work.width, h = work.height;
+  workCtx.drawImage(camVideo, 0, 0, w, h);
+  var img = workCtx.getImageData(0, 0, w, h);
+  var px = img.data;
+  ST.motion = frameMotion(px, prevPixels);
+  var mask = segmentHand(px, prevPixels, w, h, { motionThreshold: ST.cfg.motionThreshold });
+  prevPixels = new Uint8ClampedArray(px);
+  ST.lastMask = mask; ST.maskDims = [w, h];
+  var blobs = labelBlobs(mask, w, h, Math.round(w * h * 0.004));
+  var hand = handFromBlob(blobs[0], w, h, ST.cfg.mirror);
+  if (!hand) return null;
+  ST.handRaw = { x: hand.x, y: hand.y };
+  hand.x = filtX.filter(hand.x, dt);
+  hand.y = filtY.filter(hand.y, dt);
+  hand.pose = classifyPose(hand);
+  return hand;
+}
+
+/* ---------- 入力: ポインタ / タッチ (カメラ無しでも同じ操作則) ---------- */
+function readHandFromPointer(dt){
+  if (!ST.pointer.active){ filtX.reset(); filtY.reset(); return null; }
+  ST.handRaw = { x: ST.pointer.x, y: ST.pointer.y };
+  var hand = {
+    present: true, x: filtX.filter(ST.pointer.x, dt), y: filtY.filter(ST.pointer.y, dt),
+    size: 0.3, fill: ST.pointer.grab ? 0.9 : 0.5, aspect: 1, area: 0
+  };
+  hand.pose = ST.pointer.grab ? "grab" : "open";
+  return hand;
+}
+
+function pushSample(hand, t){
+  ST.samples.push({ t: t, x: hand.x, y: hand.y });
+  while (ST.samples.length > 90) ST.samples.shift();
+  ST.trail.push({ x: hand.x, y: hand.y, t: t });
+  while (ST.trail.length > 28) ST.trail.shift();
+}
+
+/* ---------- メインループ ---------- */
+var lastTs = 0;
+function tick(ts){
+  requestAnimationFrame(tick);
+  var dt = lastTs ? clamp((ts - lastTs) / 1000, 0, 0.1) : 0;
+  lastTs = ts;
+  var t0 = nowMs();
+
+  var hand = (ST.mode === "hand" && ST.camOn) ? readHandFromCamera(dt) : readHandFromPointer(dt);
+  var input = { present: false, x: 0.5, y: 0.5, pose: "none", swipe: null };
+  if (hand){
+    ST.hand = hand; ST.pose = hand.pose;
+    pushSample(hand, ts);
+    input.present = true; input.x = hand.x; input.y = hand.y; input.pose = hand.pose;
+    if (hand.pose !== "grab" && ts > flickCooldownUntil){
+      var sw = detectSwipe(ST.samples, {});
+      if (sw){ input.swipe = sw; ST.flicks++; flickCooldownUntil = ts + 420; ST.samples = []; }
+    }
+  } else {
+    ST.hand = null; ST.pose = "none"; ST.lost++;
+  }
+
+  var cfg = {
+    deadzone: ST.cfg.deadzone, maxRate: ST.cfg.maxRate, gamma: ST.cfg.gamma, span: ST.cfg.span,
+    detent: ST.cfg.detent, flickGain: ST.cfg.flickGain, duration: ST.duration, loop: false
+  };
+  var st = { time: currentTime(), rate: ST.rate, hold: ST.hold };
+  var nt = nextTransport(st, input, dt, cfg);
+  var rate = effectiveRate(nt, ST.playing);
+  ST.rate = nt.rate; ST.hold = nt.hold; ST.lastEvent = nt.event;
+
+  applyTransport(nt, rate, dt);
+  captureThumb(ts);
+  drawHUD(input, nt, rate);
+  drawStrip(input, rate);
+  updateReadouts(nt, rate);
+  if ($("pane-cal").classList.contains("on")) drawMask();
+  if ($("pane-tele").classList.contains("on")) drawPlot();
+
+  ST.tele.push({ t: ts, raw: ST.handRaw ? ST.handRaw.x : null,
+                 filt: hand ? hand.x : null, rate: rate, flick: input.swipe ? 1 : 0 });
+  while (ST.tele.length > 600) ST.tele.shift();
+
+  procAcc += nowMs() - t0; procN++;
+  if (procN >= 30){ ST.procFps = procN / Math.max(1e-6, (ts - lastProcAt) / 1000); lastProcAt = ts; procN = 0; procAcc = 0; }
+}
+
+function applyTransport(nt, rate, dt){
+  if (ST.source === "demo"){
+    ST.time = advanceTime(currentTime() + nt.jump, rate, dt, ST.duration, false);
+    drawDemo(EL.demo.getContext("2d"), ST.time, EL.demo.width, EL.demo.height);
+    return;
+  }
+  if (ST.source !== "file" || EL.stage.readyState < 1){
+    drawIdle(EL.demo.getContext("2d"), EL.demo.width, EL.demo.height);
+    return;
+  }
+  var v = EL.stage;
+  if (nt.jump) { v.currentTime = clamp(v.currentTime + nt.jump, 0, ST.duration); }
+  var drive = videoDriveMode(rate, { nativeMax: 4 });
+  if (drive.mode === "native"){
+    v.playbackRate = drive.playbackRate;
+    if (v.paused) { var pr = v.play(); if (pr && pr.catch) pr.catch(function(){}); }
+  } else if (drive.mode === "manual"){
+    if (!v.paused) v.pause();
+    v.currentTime = advanceTime(v.currentTime, rate, dt, ST.duration, false);
+  } else {
+    if (!v.paused) v.pause();
+  }
+  ST.time = v.currentTime;
+}
+
+/* ---------- デモ映像の描画 (時刻の純関数) ---------- */
+function drawDemo(ctx, t, W, H){
+  var s = demoSceneState(t, ST.duration || ST.demoDuration);
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "rgb(" + Math.round(12 + 40 * s.sky) + "," + Math.round(20 + 60 * s.sky) + "," + Math.round(48 + 90 * s.sky) + ")");
+  g.addColorStop(1, "rgb(" + Math.round(60 + 120 * s.sky) + "," + Math.round(40 + 70 * s.sky) + "," + Math.round(50 + 40 * s.sky) + ")");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "rgba(255,225,170," + (0.55 + 0.4 * s.sky) + ")";
+  ctx.beginPath(); ctx.arc(s.sun.x * W, s.sun.y * H, H * 0.055, 0, Math.PI * 2); ctx.fill();
+  for (var layer = 0; layer < 3; layer++){
+    var shade = 18 + layer * 16, base = H * (0.66 + layer * 0.08);
+    ctx.fillStyle = "rgb(" + shade + "," + (shade + 6) + "," + (shade + 16) + ")";
+    for (var i = -1; i < 22; i++){
+      var seed = Math.sin((i + layer * 31) * 12.9898) * 43758.5453;
+      var rnd = seed - Math.floor(seed);
+      var bw = W * (0.035 + rnd * 0.03);
+      var bh = H * (0.10 + rnd * 0.30) * (1 - layer * 0.18);
+      var bx = ((i * W * 0.055) - t * W * 0.004 * (layer + 1)) % (W * 1.3);
+      if (bx < -bw) bx += W * 1.3;
+      ctx.fillRect(bx, base - bh, bw, bh + H);
+      ctx.fillStyle = "rgba(255,220,140,.5)";
+      for (var wy = 0; wy < 5; wy++)
+        for (var wx = 0; wx < 3; wx++)
+          if ((Math.floor(rnd * 1000) + wy * 7 + wx * 3 + Math.floor(t * 2)) % 5 === 0)
+            ctx.fillRect(bx + bw * (0.18 + wx * 0.28), base - bh + H * 0.02 + wy * H * 0.035, bw * 0.14, H * 0.018);
+      ctx.fillStyle = "rgb(" + shade + "," + (shade + 6) + "," + (shade + 16) + ")";
+    }
+  }
+  ctx.fillStyle = "#0c0e14"; ctx.fillRect(0, H * 0.88, W, H * 0.12);
+  var cx = s.car * W;
+  ctx.fillStyle = "#d84a5a"; ctx.fillRect(cx, H * 0.90, W * 0.09, H * 0.045);
+  ctx.fillStyle = "#ffd98a"; ctx.fillRect(cx + W * 0.088, H * 0.912, W * 0.012, H * 0.012);
+  ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(W * 0.02, H * 0.02, W * 0.34, H * 0.085);
+  ctx.fillStyle = "#49e0e8";
+  ctx.font = "bold " + Math.round(H * 0.055) + "px Consolas, monospace";
+  ctx.textBaseline = "middle";
+  ctx.fillText(formatTimecode(t, ST.fps), W * 0.035, H * 0.062);
+}
+
+function drawIdle(ctx, W, H){
+  ctx.fillStyle = "#04060b"; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = "rgba(73,224,232,.25)"; ctx.lineWidth = Math.max(1, W / 900);
+  for (var i = 1; i < 4; i++){
+    ctx.beginPath(); ctx.moveTo(W * i / 4, 0); ctx.lineTo(W * i / 4, H); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, H * i / 4); ctx.lineTo(W, H * i / 4); ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(216,230,244,.75)";
+  ctx.font = Math.round(H * 0.05) + "px 'Hiragino Sans','Noto Sans JP',sans-serif";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText("NO SIGNAL — 実写映像を開くか、デモ映像を選択", W / 2, H / 2);
+  ctx.textAlign = "left";
+}
+
+/* ---------- ゴーグル HUD ---------- */
+function drawHUD(input, nt, rate){
+  var c = EL.hud, ctx = c.getContext("2d"), W = c.width, H = c.height;
+  var u = W / 900;
+  ctx.clearRect(0, 0, W, H);
+
+  /* コーナーブラケット */
+  ctx.strokeStyle = "rgba(73,224,232,.55)"; ctx.lineWidth = 2 * u;
+  var m = 16 * u, L = 46 * u;
+  [[m, m, 1, 1], [W - m, m, -1, 1], [m, H - m, 1, -1], [W - m, H - m, -1, -1]].forEach(function(k){
+    ctx.beginPath();
+    ctx.moveTo(k[0] + k[2] * L, k[1]); ctx.lineTo(k[0], k[1]); ctx.lineTo(k[0], k[1] + k[3] * L);
+    ctx.stroke();
+  });
+
+  /* 中立帯 (不感帯) と中心軸 */
+  var dz = ST.cfg.deadzone;
+  ctx.fillStyle = "rgba(73,224,232,.07)";
+  ctx.fillRect(W * (0.5 - dz), 0, W * dz * 2, H);
+  ctx.strokeStyle = "rgba(73,224,232,.35)"; ctx.lineWidth = 1 * u;
+  ctx.beginPath(); ctx.moveTo(W / 2, 0); ctx.lineTo(W / 2, H); ctx.stroke();
+
+  /* 左右のゾーン表示 */
+  ctx.font = "bold " + Math.round(15 * u) + "px Consolas, monospace";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = rate < 0 ? "rgba(224,90,114,.95)" : "rgba(224,90,114,.28)";
+  ctx.fillText("◀◀ REW", 26 * u, 26 * u);
+  ctx.textAlign = "right";
+  ctx.fillStyle = rate > 1 ? "rgba(85,208,138,.95)" : "rgba(85,208,138,.28)";
+  ctx.fillText("FF ▶▶", W - 26 * u, 26 * u);
+  ctx.textAlign = "left";
+
+  /* シャトルバー (中央から伸びる速度計 + デテント目盛) */
+  var barY = H - 54 * u, half = W * 0.40;
+  ctx.strokeStyle = "rgba(73,224,232,.30)"; ctx.lineWidth = 1 * u;
+  ctx.beginPath(); ctx.moveTo(W / 2 - half, barY); ctx.lineTo(W / 2 + half, barY); ctx.stroke();
+  var det = shuttleDetents(), maxR = Math.max(1, ST.cfg.maxRate);
+  for (var i = 0; i < det.length; i++){
+    if (det[i] > maxR) continue;
+    var f = Math.pow(det[i] / maxR, 1 / 2.2);
+    [-1, 1].forEach(function(sg){
+      var x = W / 2 + sg * f * half;
+      ctx.beginPath(); ctx.moveTo(x, barY - 6 * u); ctx.lineTo(x, barY + 6 * u); ctx.stroke();
+    });
+  }
+  if (rate){
+    var fr = Math.pow(Math.min(Math.abs(rate), maxR) / maxR, 1 / 2.2) * half;
+    ctx.strokeStyle = rate < 0 ? "#e05a72" : "#55d08a"; ctx.lineWidth = 5 * u;
+    ctx.beginPath(); ctx.moveTo(W / 2, barY); ctx.lineTo(W / 2 + (rate < 0 ? -fr : fr), barY); ctx.stroke();
+  }
+  ctx.fillStyle = "#d8e6f4"; ctx.font = "bold " + Math.round(17 * u) + "px Consolas, monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "bottom";
+  ctx.fillText(rateLabel(rate, nt.hold), W / 2, barY - 12 * u);
+
+  /* タイムコード (焼き込み) */
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = "rgba(73,224,232,.92)";
+  ctx.font = "bold " + Math.round(22 * u) + "px Consolas, monospace";
+  ctx.fillText(formatTimecode(currentTime(), ST.fps), 26 * u, H - 22 * u);
+  if (ST.duration > 0){
+    ctx.fillStyle = "rgba(127,147,173,.9)";
+    ctx.font = Math.round(13 * u) + "px Consolas, monospace";
+    ctx.fillText("/ " + formatTimecode(ST.duration, ST.fps), 26 * u + 150 * u, H - 22 * u);
+  }
+
+  /* 手の残像トレイル + レティクル */
+  for (var k = 0; k < ST.trail.length; k++){
+    var p = ST.trail[k], a = (k + 1) / ST.trail.length;
+    ctx.fillStyle = "rgba(73,224,232," + (0.05 + a * 0.22) + ")";
+    ctx.beginPath(); ctx.arc(p.x * W, p.y * H, (6 + 16 * a) * u, 0, Math.PI * 2); ctx.fill();
+  }
+  if (input.present){
+    var hx = input.x * W, hy = input.y * H;
+    var col = input.pose === "grab" ? "#e0a23c" : (Math.abs(input.x - 0.5) > dz ? (input.x < 0.5 ? "#e05a72" : "#55d08a") : "#49e0e8");
+    ctx.strokeStyle = col; ctx.lineWidth = 2 * u;
+    ctx.beginPath(); ctx.arc(hx, hy, 30 * u, 0, Math.PI * 2); ctx.stroke();
+    if (input.pose === "grab"){
+      ctx.beginPath(); ctx.arc(hx, hy, 15 * u, 0, Math.PI * 2); ctx.stroke();
+    } else {
+      /* 開いた手 = 5 本の指を模した放射線 (かき分けの向きに傾ける) */
+      var tilt = (input.x - 0.5) * 1.1;
+      for (var f2 = 0; f2 < 5; f2++){
+        var ang = -Math.PI / 2 + (f2 - 2) * 0.30 + tilt;
+        ctx.beginPath();
+        ctx.moveTo(hx + Math.cos(ang) * 14 * u, hy + Math.sin(ang) * 14 * u);
+        ctx.lineTo(hx + Math.cos(ang) * 40 * u, hy + Math.sin(ang) * 40 * u);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = col; ctx.font = "bold " + Math.round(12 * u) + "px Consolas, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(zoneLabel(input.x, ST.cfg), hx, hy + 52 * u);
+    ctx.textAlign = "left";
+  }
+
+  /* フリック表示 */
+  if (nt.event === "flick"){
+    ctx.fillStyle = "rgba(224,162,60,.92)";
+    ctx.font = "bold " + Math.round(30 * u) + "px Consolas, monospace";
+    ctx.textAlign = "center";
+    ctx.fillText((nt.jump < 0 ? "⏪ " : "⏩ ") + Math.abs(nt.jump).toFixed(1) + "s FLICK", W / 2, H * 0.30);
+    ctx.textAlign = "left";
+  }
+}
+
+/* ---------- フィルムストリップ (手でかき分けられるコマ) ---------- */
+function captureThumb(ts){
+  if (!(ST.duration > 0)) return;
+  if (ts - lastThumbAt < 90) return;
+  lastThumbAt = ts;
+  var idx = stripCellIndex(currentTime(), ST.duration, STRIP_CELLS);
+  if (thumbs[idx]) return;
+  var cv = document.createElement("canvas");
+  cv.width = thumbW; cv.height = thumbH;
+  var cx = cv.getContext("2d");
+  if (ST.source === "file" && EL.stage.readyState >= 2){
+    try { cx.drawImage(EL.stage, 0, 0, thumbW, thumbH); } catch (e) { return; }
+  } else if (ST.source === "demo"){
+    drawDemo(cx, filmstripTimes(ST.duration, STRIP_CELLS)[idx], thumbW, thumbH);
+  } else return;
+  thumbs[idx] = cv;
+}
+function buildDemoThumbs(){
+  thumbs = [];
+  var times = filmstripTimes(ST.duration, STRIP_CELLS);
+  for (var i = 0; i < times.length; i++){
+    var cv = document.createElement("canvas");
+    cv.width = thumbW; cv.height = thumbH;
+    drawDemo(cv.getContext("2d"), times[i], thumbW, thumbH);
+    thumbs[i] = cv;
+  }
+}
+function drawStrip(input, rate){
+  var c = EL.strip, ctx = c.getContext("2d"), W = c.width, H = c.height;
+  ctx.fillStyle = "#0a0f1a"; ctx.fillRect(0, 0, W, H);
+  var pad = H * 0.16, cw = W / STRIP_CELLS, ch = H - pad * 2;
+  var handX = input.present ? input.x : -1;
+  var strength = input.present ? (input.pose === "grab" ? 0.2 : 1) * cw * 1.25 : 0;
+  var cur = ST.duration > 0 ? stripCellIndex(currentTime(), ST.duration, STRIP_CELLS) : -1;
+
+  for (var i = 0; i < STRIP_CELLS; i++){
+    var cellX = (i + 0.5) / STRIP_CELLS;
+    var off = handX >= 0 ? partOffset(cellX, handX, strength, 0.16) : 0;
+    var x = i * cw + off + 1;
+    var w = cw - 2;
+    if (thumbs[i]) ctx.drawImage(thumbs[i], x, pad, w, ch);
+    else { ctx.fillStyle = "#0e1626"; ctx.fillRect(x, pad, w, ch); }
+    ctx.strokeStyle = (i === cur) ? "#49e0e8" : "rgba(27,42,68,.9)";
+    ctx.lineWidth = (i === cur) ? 2 : 1;
+    ctx.strokeRect(x, pad, w, ch);
+  }
+  /* パーフォレーション (フィルムの送り穴) */
+  ctx.fillStyle = "rgba(216,230,244,.28)";
+  for (var px = 0; px < W; px += Math.max(8, cw / 3)){
+    ctx.fillRect(px, pad * 0.28, Math.max(3, cw / 8), pad * 0.42);
+    ctx.fillRect(px, H - pad * 0.7, Math.max(3, cw / 8), pad * 0.42);
+  }
+  /* 再生ヘッド */
+  if (ST.duration > 0){
+    var hx = currentTime() / ST.duration * W;
+    ctx.strokeStyle = rate < 0 ? "#e05a72" : (rate > 0 ? "#55d08a" : "#49e0e8");
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(hx, 0); ctx.lineTo(hx, H); ctx.stroke();
+  }
+}
+
+/* ---------- 読み取り値 ---------- */
+function updateReadouts(nt, rate){
+  EL["ro-tc"].textContent = formatTimecode(currentTime(), ST.fps);
+  EL["ro-rate"].textContent = rateLabel(rate, nt.hold);
+  EL["ro-rate"].className = "val " + rateClass(rate, nt.hold);
+  if (ST.hand){
+    EL["ro-hand"].textContent = "x " + ST.hand.x.toFixed(2) + " / y " + ST.hand.y.toFixed(2);
+    EL["ro-hand"].className = "val";
+  } else {
+    EL["ro-hand"].textContent = ST.mode === "hand" && !ST.camOn ? "— カメラ停止中" : "— 未検出";
+    EL["ro-hand"].className = "val dim";
+  }
+  var ev = { flick: "FLICK", hold: "HOLD", shuttle: "SHUTTLE", neutral: "NEUTRAL", lost: "LOST", idle: "IDLE" };
+  EL["ro-ges"].textContent = ev[nt.event] || nt.event;
+
+  EL["cal-area"].textContent = ST.hand ? String(ST.hand.area) : "—";
+  EL["cal-pos"].textContent = ST.hand ? (ST.hand.x.toFixed(3) + " / " + ST.hand.y.toFixed(3)) : "—";
+  EL["cal-fill"].textContent = ST.hand ? (ST.hand.fill.toFixed(3) + "  (" + ST.pose + ")") : "—";
+  EL["cal-motion"].textContent = ST.camOn ? ST.motion.toFixed(1) : "—";
+  EL["cal-fps"].textContent = ST.procFps ? ST.procFps.toFixed(0) + " fps" : "—";
+
+  var sw = detectSwipe(ST.samples, {});
+  EL["t-peak"].textContent = sw ? sw.speed.toFixed(2) : "0.00";
+  EL["t-travel"].textContent = sw ? sw.travel.toFixed(2) : "0.00";
+  EL["t-flicks"].textContent = String(ST.flicks);
+  EL["t-lost"].textContent = String(ST.lost);
+}
+
+/* ---------- 較正タブ: 認識マスク ---------- */
+function drawMask(){
+  var c = EL.mask, ctx = c.getContext("2d");
+  var w = ST.maskDims[0], h = ST.maskDims[1];
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, c.width, c.height);
+  if (!ST.lastMask || !w) {
+    ctx.fillStyle = "rgba(127,147,173,.9)"; ctx.font = "11px Consolas, monospace";
+    ctx.fillText("camera off", 8, 18);
+    return;
+  }
+  var img = ctx.createImageData(w, h);
+  for (var i = 0, p = 0; i < w * h; i++, p += 4){
+    var v = ST.lastMask[i] ? 255 : 12;
+    img.data[p] = v; img.data[p + 1] = v; img.data[p + 2] = ST.lastMask[i] ? 255 : 26; img.data[p + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  if (ST.hand){
+    var mx = (ST.cfg.mirror ? (1 - ST.hand.x) : ST.hand.x) * c.width, my = ST.hand.y * c.height;
+    ctx.strokeStyle = "#e0a23c"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(mx - 8, my); ctx.lineTo(mx + 8, my);
+    ctx.moveTo(mx, my - 8); ctx.lineTo(mx, my + 8); ctx.stroke();
+  }
+}
+
+/* ---------- テレメトリ ---------- */
+function drawPlot(){
+  var c = EL.plot, ctx = c.getContext("2d"), W = c.width, H = c.height;
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  var top = H * 0.5;
+  ctx.strokeStyle = "rgba(27,42,68,.9)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, top); ctx.lineTo(W, top); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, top + (H - top) / 2); ctx.lineTo(W, top + (H - top) / 2); ctx.stroke();
+  var n = ST.tele.length; if (n < 2) return;
+  function px(i){ return i / (n - 1) * W; }
+  ctx.strokeStyle = "#49e0e8"; ctx.beginPath();
+  for (var i = 0; i < n; i++){
+    var v = ST.tele[i].raw; if (v == null) continue;
+    var y = v * top;
+    if (i === 0) ctx.moveTo(px(i), y); else ctx.lineTo(px(i), y);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.beginPath();
+  for (var j = 0; j < n; j++){
+    var f = ST.tele[j].filt; if (f == null) continue;
+    var y2 = f * top;
+    if (j === 0) ctx.moveTo(px(j), y2); else ctx.lineTo(px(j), y2);
+  }
+  ctx.stroke();
+  var maxR = Math.max(1, ST.cfg.maxRate), mid = top + (H - top) / 2;
+  ctx.strokeStyle = "#55d08a"; ctx.beginPath();
+  for (var k = 0; k < n; k++){
+    var r = ST.tele[k].rate || 0;
+    var y3 = mid - clamp(r / maxR, -1, 1) * (H - top) / 2 * 0.92;
+    if (k === 0) ctx.moveTo(px(k), y3); else ctx.lineTo(px(k), y3);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(224,90,180,.8)";
+  for (var q = 0; q < n; q++){
+    if (!ST.tele[q].flick) continue;
+    ctx.beginPath(); ctx.moveTo(px(q), 0); ctx.lineTo(px(q), H); ctx.stroke();
+  }
+  ctx.fillStyle = "rgba(127,147,173,.9)"; ctx.font = "12px Consolas, monospace";
+  ctx.fillText("hand x (raw / filtered)", 8, 16);
+  ctx.fillText("shuttle rate  ±" + maxR + "×", 8, top + 16);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

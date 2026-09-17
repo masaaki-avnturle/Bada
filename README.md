@@ -203,6 +203,28 @@
 
 ---
 
+## 🥽 ダウンロード — エアシャトル・ゴーグル(手のかき分けで映像を巻き戻し・早送り)
+
+**ゴーグル型コンピュータの HUD に映した「実写映像」を、空中で手を “かき分ける” だけで操作するスクラブ卓。** ゴーグル型端末を着けたエンジニアがホログラムの映像を手で掻き分けて時間軸を操る——というアニメ的演出に着想を得た独自実装です(特定作品・権利者とは無関係、作品素材は一切含みません)。手を左へかき分けると**巻き戻し**、右へで**早送り**、素早く払うと**フリック跳躍**、握ると**ホールド**、手を上げるほど高速・下げるほど微速。ハンド認識は **YCbCr 肌色クロマ帯 + フレーム間動きエネルギー** → **4 近傍連結成分ラベリング**(最大ブロブ = 手、充填率で握り判定)→ **One Euro Filter** `fc = fc_min + β·|ẋ|` で平滑化し、**シャトル則** `r = ±R·((|dx|−dz)/(span−dz))^γ` を編集卓デテント `×0.25〜×16` に吸着。巻き戻しと高速早送りは `currentTime += r·Δt` の手動シークで駆動します(HTML5 の `playbackRate` は負値不可)。カメラが無くても🖱ポインタ/タッチで同じジェスチャ則が使えます。**カメラ映像は端末内処理のみ・送信ゼロ**、依存ゼロ・単一 HTML・完全オフライン。
+
+### 👉 [**airshuttle_goggle/index.html をダウンロード**](airshuttle_goggle/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Linux)
+
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `airshuttle-goggle-debug.apk` |
+| **Windows 10 / 11** | `AirShuttleGoggle-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Linux** | `AirShuttleGoggle-*-x86_64.AppImage` / `AirShuttleGoggle-*-amd64.deb` |
+
+ビルドは [`airshuttle-app-build.yml`](.github/workflows/airshuttle-app-build.yml) が実行します(`airshuttle-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。ジェスチャ仕様・認識パイプライン・テストは [`airshuttle_goggle/`](airshuttle_goggle/) を参照。
+
+---
+
 ## ⬇️ ダウンロード — ウルトラネットワーク専用ブラウザ (ZoneBrowser)
 
 `https:`/`http:` に代わる暗号化 zone:// を閲覧する**専用ブラウザ**。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
