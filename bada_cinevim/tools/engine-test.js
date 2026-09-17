@@ -13,8 +13,9 @@
  *   6. quantumRun        — Bada プログラムの実行
  *   7. VIM モーション    — w b e $ ^ gg G f t % { }
  *   8. VIM オペレータ    — dd dw cw yy p x J >> u Ctrl-R . ビジュアル
- *   9. Ex コマンド       — :42 :%s/// :set :w :countdown
- *  10. シネマ数理        — focusStyle / docLayout / crashFrame / countdownState
+ *   9. Ex コマンド       — :42 :%s/// :set :w :countdown :emit :flash
+ *  10. イベントバス      — key / motion / edit / mode の発行とディスパッチ順
+ *  11. シネマ数理        — focusStyle / docLayout / flashFrame / countdownState
  */
 "use strict";
 const fs = require("fs");
@@ -405,9 +406,11 @@ console.log("9. Ex コマンド");
   eq(st.events[0].seconds, 5, ":countdown の既定は 5 秒");
   st.events.length = 0; E.execEx(st, "run");
   eq(st.events[0].type, "run", ":run がイベントを発行");
-  st.events.length = 0; E.execEx(st, "slam");
-  eq(st.events[0].type, "crash", ":slam がクラッシュを発行");
-  eq(st.events[0].mag, 1, ":slam は最大強度");
+  st.events.length = 0; E.execEx(st, "emit");
+  eq(st.events[0].type, "signal", ":emit が SIGNAL イベントを発行");
+  eq(st.events[0].mag, 1, ":emit は最大強度");
+  st.events.length = 0; E.execEx(st, "emit deploy");
+  eq(st.events[0].what, "deploy", ":emit に名前を渡せる");
   st.events.length = 0; E.execEx(st, "w out.bada");
   eq(st.events[0].type, "write", ":w が保存イベントを発行");
   eq(st.fname, "out.bada", ":w name でファイル名が変わる");
@@ -420,18 +423,97 @@ console.log("9. Ex コマンド");
 
   st = ed("a");
   E.execEx(st, "focus"); eq(st.opts.focus, false, ":focus でトグル");
-  E.execEx(st, "crash"); eq(st.opts.crash, false, ":crash でトグル");
+  E.execEx(st, "flash"); eq(st.opts.flash, false, ":flash でトグル");
+  E.execEx(st, "flash"); eq(st.opts.flash, true, ":flash で戻る");
+  E.execEx(st, "bus"); eq(st.opts.bus, false, ":bus でトグル");
   E.execEx(st, "bogus-cmd"); ok(st.msgErr, "未知のコマンドはエラー");
-
-  /* Space はスラム (クラッシュ) */
-  st = ed("line one\nline two");
-  st.events.length = 0; E.feedKey(st, "<Space>");
-  eq(st.events[0].type, "crash", "Space でポイント行がクラッシュ");
-  eq(st.events[0].mag, 1, "Space は最大強度");
 }
 
-/* ═════ 10. シネマ数理 ═════ */
-console.log("10. focusStyle / docLayout / crashFrame / countdownState");
+/* ═════ 10. イベントバス ═════ */
+console.log("10. イベントの発行とディスパッチ");
+{
+  /* 1 キー = 1 ディスパッチ。key が必ず先頭に来る */
+  let st = ed("alpha beta\nsecond\nthird");
+  E.feedKey(st, "j");
+  eq(st.events[0].type, "key", "先頭は必ず key イベント");
+  eq(st.events[0].key, "j", "押されたキーが載る");
+  ok(st.events.some(e => e.type === "motion"), "j は motion イベントを発行");
+  eq(st.events.filter(e => e.type === "motion")[0].line, 1, "motion の対象行");
+  eq(st.events.filter(e => e.type === "motion")[0].from, 0, "motion の移動元");
+
+  /* 連番は単調増加する (バスの並び順) */
+  const seqs = st.events.map(e => e.seq);
+  for (let i = 1; i < seqs.length; i++) ok(seqs[i] > seqs[i - 1], "seq が単調増加 (" + i + ")");
+
+  /* 行内の移動では motion は出ない */
+  st = ed("alpha beta");
+  E.feedKey(st, "l");
+  eq(st.events.filter(e => e.type === "motion").length, 0, "同じ行の移動では motion なし");
+
+  /* 編集は edit イベント */
+  st = ed("abc");
+  E.feedKey(st, "x");
+  ok(st.events.some(e => e.type === "edit"), "x は edit イベントを発行");
+
+  /* モード遷移は mode イベント */
+  st = ed("abc");
+  E.feedKey(st, "i");
+  const mev = st.events.filter(e => e.type === "mode")[0];
+  ok(mev, "i は mode イベントを発行");
+  eq(mev.from, "normal", "遷移元");
+  eq(mev.to, "insert", "遷移先");
+
+  /* 挿入した文字も edit として拾われる */
+  st = ed("abc");
+  E.feedString(st, "i");
+  st.events.length = 0;
+  E.feedKey(st, "Z");
+  ok(st.events.some(e => e.type === "edit"), "挿入モードの文字入力も edit");
+
+  /* o は open-below の edit を 1 件だけ出す (二重発行しない) */
+  st = ed("one\ntwo");
+  E.feedKey(st, "o");
+  eq(st.events.filter(e => e.type === "edit").length, 1, "o の edit は 1 件だけ");
+  eq(st.events.filter(e => e.type === "edit")[0].what, "open-below", "o の内容");
+
+  /* p / P も edit */
+  st = ed("one\ntwo");
+  E.feedString(st, "yy");
+  st.events.length = 0;
+  E.feedKey(st, "p");
+  eq(st.events.filter(e => e.type === "edit")[0].what, "put-after", "p の内容");
+
+  /* Space は SIGNAL */
+  st = ed("line one\nline two");
+  E.feedKey(st, "<Space>");
+  const sig = st.events.filter(e => e.type === "signal")[0];
+  ok(sig, "Space は SIGNAL イベントを発行");
+  eq(sig.mag, 1, "SIGNAL は最大強度");
+  eq(sig.line, 0, "SIGNAL の対象は現在行");
+
+  /* dispatched は累計される */
+  st = ed("a\nb\nc");
+  const before = st.dispatched;
+  E.feedString(st, "jjx");
+  ok(st.dispatched > before, "dispatched が累計される");
+
+  /* 検索も jump を出す */
+  st = ed("one\ntwo target\nthree");
+  E.feedString(st, "/target<CR>");
+  ok(st.events.some(e => e.type === "jump"), "検索一致で jump イベント");
+
+  /* イベント種別の見た目は決定的 */
+  eq(E.eventStyle("edit").label, "EDIT", "eventStyle のラベル");
+  eq(E.eventStyle("edit").hue, E.eventStyle("edit").hue, "同じ種別なら同じ色相");
+  ok(E.eventStyle("edit").hue !== E.eventStyle("error").hue, "種別が違えば色相も違う");
+  eq(E.eventStyle("nosuchtype").label, "NOSUCHTYPE", "未知の種別もラベル化される");
+  ok(E.eventStyle(undefined).hue >= 0, "種別なしでも色相が返る");
+  ok(E.eventMag("signal") > E.eventMag("key"), "SIGNAL は KEY より強い");
+  eq(E.eventMag("nosuchtype"), 0.5, "未知の種別は既定の強さ");
+}
+
+/* ═════ 11. シネマ数理 ═════ */
+console.log("11. focusStyle / docLayout / flashFrame / countdownState");
 {
   const o = {depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26};
   const f0 = E.focusStyle(0, o);
@@ -465,25 +547,48 @@ console.log("10. focusStyle / docLayout / crashFrame / countdownState");
     ok(lay.tops[i] >= lay.tops[i - 1] + lay.heights[i - 1] - 1e-9, "行 " + i + " が前の行と重ならない");
   }
 
-  /* クラッシュの包絡 */
-  const c0 = E.crashFrame(0, 1), cm = E.crashFrame(0.25, 1), c1 = E.crashFrame(1, 1);
-  eq(c0.lift, 0, "t=0 では浮き上がっていない");
-  ok(cm.lift > 20, "立ち上がりで大きく浮き上がる");
-  eq(c1.lift, 0, "t=1 で完全に収まる");
-  eq(c1.shakeX, 0, "t=1 で揺れが止まる");
-  eq(c1.alpha, 0, "t=1 で残光が消える");
-  ok(E.crashFrame(0.1, 1).alpha > E.crashFrame(0.8, 1).alpha, "残光は減衰する");
-  ok(Math.abs(E.crashFrame(0.15, 0.3).shakeX) < Math.abs(E.crashFrame(0.15, 1).shakeX),
-     "mag が小さいほど揺れも小さい");
-  eq(E.crashFrame(1.5, 1).lift, 0, "t>1 は無効");
-  eq(E.crashFrame(-0.2, 1).lift, 0, "t<0 は無効");
-  ok(E.crashFrame(0.5, 1).ring > E.crashFrame(0.2, 1).ring, "衝撃波は広がる");
+  /* イベント処理フラッシュの包絡 */
+  eq(E.flashFrame(0, 1).env, 0, "t=0 ではまだ光らない");
+  eq(E.flashFrame(1, 1).env, 0, "t=1 で消灯する");
+  eq(E.flashFrame(1.5, 1).env, 0, "t>1 は無効");
+  eq(E.flashFrame(-0.2, 1).env, 0, "t<0 は無効");
+  eq(E.flashFrame(1, 1).glow, 0, "t=1 でにじみも消える");
+  eq(E.flashFrame(1, 1).rise, 0, "t=1 で浮きも戻る");
 
-  /* 破片は決定的 */
-  const s1 = JSON.stringify(E.shardField(8, 3)), s2 = JSON.stringify(E.shardField(8, 3));
-  eq(s1, s2, "同じ種なら同じ破片");
-  ok(E.shardField(8, 3)[0].ang !== E.shardField(8, 9)[0].ang, "種が違えば破片も違う");
-  eq(E.shardField(12, 1).length, 12, "指定した数の破片");
+  /* 立ち上がりが速く、その後は単調に減衰する (信号ランプの包絡) */
+  const peak = E.flashFrame(0.12, 1).env;
+  ok(peak > 0.8, "ピークは立ち上がり直後 (t=0.12)");
+  ok(E.flashFrame(0.06, 1).env < peak, "ピーク前は立ち上がり途中");
+  let prevEnv = peak;
+  for (let t = 0.14; t < 1; t += 0.02){
+    const e = E.flashFrame(t, 1).env;
+    ok(e <= prevEnv + 1e-12, "t=" + t.toFixed(2) + " で単調に減衰");
+    prevEnv = e;
+  }
+  /* 立ち上がり区間でも単調増加 */
+  let prevUp = 0;
+  for (let t = 0.01; t <= 0.12; t += 0.01){
+    const e = E.flashFrame(t, 1).env;
+    ok(e >= prevUp - 1e-12, "t=" + t.toFixed(2) + " で単調に立ち上がる");
+    prevUp = e;
+  }
+  /* 強さは線形にスケールする */
+  near(E.flashFrame(0.3, 0.5).env, E.flashFrame(0.3, 1).env * 0.5, 1e-12, "intensity は線形");
+  near(E.flashFrame(0.3, 0).env, 0, 1e-12, "intensity=0 なら光らない");
+  ok(E.flashFrame(0.3, 1.8).env === E.flashFrame(0.3, 1).env, "intensity は 1 で頭打ち");
+  ok(E.flashFrame(0.3, -1).env === 0, "負の intensity は 0 に丸める");
+
+  /* 各出力は包絡に比例する */
+  const f = E.flashFrame(0.2, 1);
+  near(f.glow, 30 * f.env, 1e-12, "glow は包絡に比例");
+  near(f.wash, 0.9 * f.env, 1e-12, "wash は包絡に比例");
+  near(f.edge, 5 * f.env, 1e-12, "edge は包絡に比例");
+  near(f.rise, 7 * f.env, 1e-12, "rise は包絡に比例");
+  ok(f.rise < 10, "浮き上がりは控えめ (クラッシュのような跳ね上げではない)");
+
+  /* 処理の光は行を左から右へ走る */
+  eq(E.flashFrame(0.25, 1).sweep, 0.25, "sweep は進行そのもの");
+  ok(E.flashFrame(0.7, 1).sweep > E.flashFrame(0.3, 1).sweep, "sweep は単調に進む");
 
   /* 映画のカウントダウン */
   let cd = E.countdownState(0, 5);

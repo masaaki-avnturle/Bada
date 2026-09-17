@@ -7,9 +7,12 @@ name: Bada CineVim app build (Android APK + Windows EXE + Ubuntu)
 #   ・Bada シンタックスハイライト (<- / -< / >- / Ω:: / qubit / |0⟩)
 #   ・🎬 シネマフォーカス — カーソル行を「どアップ」に拡大し、離れた行ほど
 #     ガウス減衰で縮小・ぼかし・減光する被写界深度表現
-#   ・💥 クラッシュ効果 — ポイントされた行が 3D で浮き上がり、画面が揺れ、
-#     色収差が割れ、衝撃波リングと破片が飛ぶ
+#   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
+#     イベントバスへ投入し、ディスパッチされた瞬間にその行が発光する。
+#     種別ごとに色が変わり (KEY / MOTION / EDIT / MODE / EX / SEARCH /
+#     SIGNAL / TICK / RUN / IO / ERROR)、処理の光が行を走り抜ける
 #   ・⏱ 映画のカウントダウン — アカデミー・リーダーの掃引 + フィルムグレイン
+#     (毎秒 TICK イベント、T-0 で全画面フラッシュ)
 #   ・⚛ 量子 Bada 実行系 — 状態ベクトルシミュレータと β(p,q) / Γ(s)
 # これを
 #   - Android 向け APK
@@ -70,14 +73,15 @@ jobs:
                                   "function vimNew", "function evalMotion", "function applyOp",
                                   "function execEx", "function runNormal", "function feedKey",
                                   "function focusStyle", "function docLayout",
-                                  "function crashFrame", "function shardField",
+                                  "function flashFrame", "function eventStyle",
+                                  "function eventMag",
                                   "function countdownState", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
           node --check /tmp/cinevim.js
           echo "Bada CineVim self-check OK"
-      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / cinema math)
+      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / cinema math)
         run: |
           set -e
           node bada_cinevim/tools/engine-test.js
