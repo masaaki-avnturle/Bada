@@ -6,10 +6,10 @@ name: Bada CineVim app build (Android APK + Windows EXE + Ubuntu)
 #     u / Ctrl-R / . リピート / ビジュアル / :%s/// などの Ex コマンド)
 #   ・Bada シンタックスハイライト (<- / -< / >- / Ω:: / qubit / |0⟩)
 #   ・📄 多段落の文章ビュー — 空行で段落に分けて折り返して組む
-#   ・🌊 ブロックのどアップと波打ち — 文章を文のブロックに分け、ポイント
-#     されたブロックが「その場で」拡大される (拡大鏡は要らない)。焦点が
-#     移ると、そこから外へ進行波が伝わって文章が波打ち、波の腹が光る。
-#     段落をまたいでも波は伝わる
+#   ・🔎 ポイント位置のどアップ — 1 行を語のまとまりに切り分け、ポインタや
+#     カーソルが指した位置が「その場で」拡大される (拡大鏡は要らない)。
+#     右へ左へ動かすと、どアップがその位置に沿って滑っていく。縦は行の
+#     距離、横は px の距離で減衰する二軸の魚眼
 #   ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
 #     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
 #   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
@@ -79,11 +79,10 @@ jobs:
                                   "function execEx", "function runNormal", "function feedKey",
                                   "function focusStyle", "function docLayout",
                                   "function flashFrame", "function eventStyle",
-                                  "function splitParagraphs", "function paragraphText",
-                                  "function offsetToLine", "function wordAt",
-                                  "function sentenceAt", "function splitSentences",
-                                  "function blockPlan", "function blockLayout",
-                                  "function waveFrame", "function markRange",
+                                  "function splitParagraphs", "function wordAt",
+                                  "function segmentLine", "function gaussScale",
+                                  "function blockLayout", "function segmentCenters",
+                                  "function displayToNatural", "function nearestIndex",
                                   "function eventMag",
                                   "function countdownState", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
@@ -91,7 +90,7 @@ jobs:
           '
           node --check /tmp/cinevim.js
           echo "Bada CineVim self-check OK"
-      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / blocks + wave)
+      - name: Engine tests (tokenizer / Γ β ζ / quantum sim / VIM / Ex / event bus / segments + fisheye)
         run: |
           set -e
           node bada_cinevim/tools/engine-test.js

@@ -15,10 +15,10 @@
   ・Bada 言語シンタックスハイライト (<- / -< / >- / Ω:: / qubit / gate …)
   ・📄 多段落の文章ビュー — 空行で段落に分け、折り返して組む。内側は
     行のままなので VIM のモーションもオペレータもそのまま効く
-  ・🌊 ブロックのどアップと波打ち — 文章を文のブロックに分け、ポイント
-    されたブロックが「その場で」拡大される (拡大鏡は要らない)。
-    焦点が移ると、そこから外へ進行波が伝わって文章が波打ち、波の腹が
-    フラッシュする。段落をまたいでも波は伝わる
+  ・🔎 ポイント位置のどアップ — 1 行を語のまとまりに切り分け、ポインタや
+    カーソルが指した位置がその場で拡大される (拡大鏡は要らない)。
+    右へ左へ動かすと、どアップがその位置に沿って滑っていく。
+    縦は行の距離、横は px の距離で減衰する二軸の魚眼
   ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
@@ -164,35 +164,35 @@
   }
   .para{ margin:0 0 1.55em; text-indent:1em; }
   .para:first-child{ text-indent:0; }
-  .gap{ height:.5em; }
+  .gap{ line-height:.6em; }
   .src{ white-space:pre-wrap; }
 
-  /* ── 文章のブロック ──
-     文ごとにブロックへ分ける。ポイントされたブロックはその場で拡大され
-     (どアップ)、移動すると焦点から外へ波が伝わる。上下が重ならないよう、
-     ずらし量は blockLayout() が求める (マージンは動かさないので、
-     毎フレームのレイアウト再計算が起きない)。 */
-  .blk{
-    display:block; transform-origin:0 50%;   /* 行頭を動かさずに拡大する */
-    will-change:transform, filter, opacity;
+  /* ── 行とセグメント ──
+     1 行を語のまとまり (.seg) に切り分ける。ポイントされた位置の
+     セグメントがその場で拡大され、左右に離れるほど 1 倍へ戻る (魚眼)。
+     縦は行の距離、横は px の距離で同じガウス式を使う。
+     はみ出しの補正は blockLayout() が縦横どちらにも効く。 */
+  .row{
+    display:block; white-space:pre;
+    will-change:transform; transform-origin:0 50%;
   }
-  .blk .src{ white-space:pre-wrap; }
-  /* 焦点から離れたブロックは静かに退く */
-  #page.dim .blk{ opacity:.38; }
-  #page.dim .blk.near{ opacity:.66; }
-  #page.dim .blk.hit{ opacity:1; }
-  /* 波の腹で光る (フラッシュ効果) */
-  .blk.wave .src{
-    color:#f2f7ff;
-    text-shadow:0 0 calc(var(--wg,0px)) rgba(120,220,255,.85);
+  .seg{
+    display:inline-block; transform-origin:0 50%;
+    will-change:transform;
   }
-  /* ポイントされたブロック */
-  .blk.hit .src{ color:#eef4ff; }
-  .blk.hit{
-    background:linear-gradient(90deg,
-      rgba(90,215,232,.10), rgba(90,215,232,.03) 72%, transparent);
-    border-radius:4px;
-    box-shadow:-3px 0 0 0 rgba(232,199,106,.8);
+  /* 空行 — 行ボックスの高さを隙間の高さに合わせる。
+     合っていないと、空の行が次の段落へはみ出して配置計算が狂う。 */
+  .gap .row{ height:.6em; line-height:.6em; }
+  .gap .seg{ height:.6em; line-height:.6em; }
+  /* 焦点から離れた行は静かに退く */
+  #page.dim .row{ opacity:.4; }
+  #page.dim .row.near{ opacity:.7; }
+  #page.dim .row.hit{ opacity:1; }
+  .row.hit{ color:#eef4ff; }
+  /* ポイントされたセグメント */
+  .seg.hit{
+    color:#fff;
+    text-shadow:0 0 18px rgba(120,220,255,.55);
   }
 
   /* シンタックス */
@@ -384,7 +384,7 @@
   <h1><span class="gold">Bada</span> <span class="cy">CineVim</span></h1>
   <span class="sub">量子言語 Bada の映画的 VIM エディタ</span>
   <span class="spacer"></span>
-  <button class="tb on" id="btnWave" title="ブロックのどアップと波打ち (:wave)">🌊 波どアップ</button>
+  <button class="tb on" id="btnZoom" title="ポイント位置のどアップ (:mag)">🔎 どアップ</button>
   <button class="tb" id="btnView" title="文章ビュー / コードビュー (:prose / :code)">📄 文章</button>
   <button class="tb" id="btnFocus" title="コードビューのどアップ (:focus)">🎬 シネマ</button>
   <button class="tb on" id="btnFlash" title="イベント処理のフラッシュ効果 (:flash)">✨ フラッシュ</button>
@@ -444,35 +444,33 @@
 var PROSE_SRC = [
   "量子プログラミング言語 Bada の読み方",
   "",
-  "　文章は、目で追うものではなく、光を当てて読むものだ。Bada CineVim は",
-  "そのために作られた。拡大鏡は要らない。ポインタが触れた文章のブロックが、",
-  "その場でどアップに開く。まわりのブロックは静かに退き、いま読んでいる",
-  "一文だけが手前に立つ。",
+  "　文章は、目で追うものではなく、光を当てて読むものだ。ポインタが指した",
+  "その一点が、その場で大きくなる。拡大鏡は要らない。指した位置から離れるほど、",
+  "文字はもとの大きさに戻っていく。",
   "",
-  "　読み進めると、文章が波打つ。焦点が次のブロックへ移った瞬間、そこから",
-  "外へ波が伝わり、前後の文がゆっくりと揺れて、波の腹が光る。波は距離とともに",
-  "弱まり、一秒たらずで凪ぐ。読む速さがそのまま波の速さになる。",
+  "　右へ動かせば、どアップは右へ滑る。左へ戻せば、左へ戻ってくる。",
+  "読んでいる位置がそのまま焦点になり、焦点はいつも指先の下にある。",
+  "行を切り替えるときも同じで、上下に動かせば、その行が手前に立ち上がる。",
   "",
-  "　波は段落の切れ目で止まらない。ブロックは段落をまたいで一続きに並んで",
-  "いるので、} で次の段落へ跳んでも、波はそこから同じように広がっていく。",
-  "段落の中を一文ずつ進んでも、段落から段落へ跳んでも、見え方は変わらない。",
+  "　キーボードだけでも読める。h と l で一文字ずつ、w と b で語ごとに、",
+  "焦点は左右へ動く。j と k で行を、} と { で段落を送る。ポインタでも",
+  "キーでも、指した位置が大きくなるという一点は変わらない。",
   "",
-  "　どアップの倍率は Ctrl とホイールで変えられる。倍率を変えると、段組の幅が",
-  "その倍率から逆算して組み直されるので、いちばん大きく開いたブロックでも",
-  "画面から出ない。行頭は動かない。だから、どれだけ拡大しても読み始めの位置は",
-  "いつも同じところにある。",
+  "　倍率は Ctrl とホイールで変えられる。どれだけ大きくしても、文字どうしが",
+  "重なることはない。拡大したぶんの余白を前後へ配り直しているからで、",
+  "その配り直しは縦にも横にも同じ式で効く。",
   "",
   "　編集はそのまま VIM である。hjkl で動き、w と b で語を渡り、dd で行を消し、",
-  "u で戻す。文章は文のブロックに分けて表示されているが、内側では行のままなので、",
-  "モーションもオペレータも、いつもどおりに効く。",
+  "u で戻す。文章は語のまとまりに切り分けて表示されているが、内側では行の",
+  "ままなので、モーションもオペレータも、いつもどおりに効く。",
   "",
   "　そして、すべての操作はイベントとしてイベントバスへ流れる。キーを押せば KEY、",
-  "ブロックを移れば MOTION、文字を消せば EDIT。ディスパッチされた瞬間に、",
+  "行を移れば MOTION、文字を消せば EDIT。ディスパッチされた瞬間に、",
   "その行が種別の色で光る。何が処理されたのかが、読んでいる文章の上に直接現れる。",
   "",
   "　:code と打てば、同じ文書を等幅のコードとして開き直す。:demo で量子 Bada の",
   "サンプルが読み込まれ、:run でそれを実行できる。qubit を確保し、H で重ね合わせ、",
-  "CNOT でもつれさせ、measure で観測する。文章も、コードも、同じ波の上にある。"
+  "CNOT でもつれさせ、measure で観測する。文章も、コードも、同じ焦点の下にある。"
 ].join("\n");
 
 var DEMO_SRC = [
@@ -1099,10 +1097,10 @@ function vimNew(text, name){
     seq:0, rev:0, dispatched:0,
     opts:{ number:true, focus:true, flash:true, sound:true, bus:true,
            depth:1, peak:2.6, spread:2.2, maxBlur:3.2, minOpacity:0.13, maxZ:26,
-           /* 文章ビュー: ブロックのどアップと波打ち
-              bpeak / bspread はコードビューの peak / spread とは別物 */
-           view:"prose", wave:true, bpeak:1.7, bspread:1.5,
-           amp:22, lambda:3.2, omega:3.4, dim:true }
+           /* 文章ビュー: ポイント位置のどアップ (二軸の魚眼)
+              zpeak / vspread / hspread はコードビューの peak / spread とは別物。
+              vspread は行数、hspread は px で測る */
+           view:"prose", zoom:true, zpeak:2.2, vspread:1.5, hspread:110, dim:true }
   };
   if (!st.lines.length) st.lines = [""];
   return st;
@@ -1173,17 +1171,19 @@ function posRetreat(st, p){
 function _cls(st, p, big){ var k = chClass(charAt(st, p)); return (big && k === 1) ? 2 : k; }
 
 function wordFwd(st, p, big){
-  var q = {l:p.l, c:p.c}, cur = _cls(st, q, big), nx;
+  var q = {l:p.l, c:p.c}, cur = _cls(st, q, big), nx, moved = false;
   if (cur !== 0){
     for (;;){
       nx = posAdvance(st, q); if (!nx) return q;
-      q = nx; if (_cls(st, q, big) !== cur) break;
+      q = nx; moved = true; if (_cls(st, q, big) !== cur) break;
     }
   }
   for (;;){
     if (_cls(st, q, big) !== 0) return q;
-    if (q.c === 0 && _len(st, q.l) === 0) return q;   /* 空行で停止 */
-    nx = posAdvance(st, q); if (!nx) return q; q = nx;
+    /* 空行では止まる (vim と同じ)。ただし「もともと空行にいた」場合は
+       そこで止まると動けなくなるので、動いたあとにだけ止まる。 */
+    if (moved && q.c === 0 && _len(st, q.l) === 0) return q;
+    nx = posAdvance(st, q); if (!nx) return q; q = nx; moved = true;
   }
 }
 function wordBack(st, p, big){
@@ -1598,14 +1598,14 @@ function execEx(st, cmd){
       st.opts.focus = !st.opts.focus;
       st.msg = "シネマフォーカス: " + (st.opts.focus ? "ON" : "OFF"); return;
     case "prose": case "text":
-      st.opts.view = "prose"; st.msg = "📄 文章ビュー (文のブロック + どアップと波打ち)";
+      st.opts.view = "prose"; st.msg = "📄 文章ビュー (ポイント位置のどアップ)";
       emit(st, "view", {to:"prose"}); return;
     case "code": case "mono":
       st.opts.view = "code"; st.msg = "💻 コードビュー";
       emit(st, "view", {to:"code"}); return;
-    case "wave": case "ripple":
-      st.opts.wave = !st.opts.wave;
-      st.msg = "🌊 どアップと波打ち: " + (st.opts.wave ? "ON" : "OFF"); return;
+    case "mag": case "zoom": case "wave":
+      st.opts.zoom = !st.opts.zoom;
+      st.msg = "🔎 どアップ: " + (st.opts.zoom ? "ON" : "OFF"); return;
     case "flash":
       st.opts.flash = !st.opts.flash;
       st.msg = "イベントフラッシュ: " + (st.opts.flash ? "ON" : "OFF"); return;
@@ -2069,49 +2069,6 @@ function splitParagraphs(lines){
   return out;
 }
 
-/* CJK かどうか (行を継ぐときに空白を入れるかの判定に使う) */
-function isCJK(ch){
-  if (!ch) return false;
-  return /[\u3000-\u303f\u3040-\u309f\u30a0-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uff60]/.test(ch);
-}
-
-/* lineSeparator(prev, next)
- *   段落内で行を継ぐときの区切り。和文どうしは詰めて continue し、
- *   欧文が絡むところだけ空白を入れます (日本語に余計な空白を入れない)。 */
-function lineSeparator(prev, next){
-  if (!prev || !next) return "";
-  var a = prev.charAt(prev.length - 1), b = next.charAt(0);
-  if (isCJK(a) || isCJK(b)) return "";
-  return " ";
-}
-
-/* paragraphText(lines)
- *   段落を 1 本の文章に連結し、段落内オフセット → 行/桁 の対応表も返します。
- *     -> { text, map:[{l, start, len, sep}] }   l は lines 内の添字        */
-function paragraphText(lines){
-  var text = "", map = [];
-  for (var i = 0; i < lines.length; i++){
-    var sep = (i === 0) ? "" : lineSeparator(lines[i - 1], lines[i]);
-    text += sep;
-    map.push({l:i, start:text.length, len:lines[i].length, sep:sep});
-    text += lines[i];
-  }
-  return {text:text, map:map};
-}
-
-/* offsetToLine(map, off) — 段落内オフセットを {l, c} に戻す */
-function offsetToLine(map, off){
-  if (!map.length) return {l:0, c:0};
-  for (var i = 0; i < map.length; i++){
-    var m = map[i];
-    if (off < m.start) return {l:m.l, c:0};
-    /* 行境界のオフセットは「次の行の先頭」に属する
-       (そこにある文字は次の行の 1 文字目なので) */
-    if (off < m.start + m.len) return {l:m.l, c:off - m.start};
-  }
-  var last = map[map.length - 1];
-  return {l:last.l, c:last.len};
-}
 
 /* 文字クラス — 語の切れ目を見るために、ひらがな/カタカナ/漢字/ラテンを分ける */
 function textClass(ch){
@@ -2149,42 +2106,6 @@ function wordAt(text, idx){
   return {from:a, to:b + 1, text:text.slice(a, b + 1)};
 }
 
-/* 文の終止符か (ASCII の '.' は数値の小数点と紛れるので後続を見る) */
-function isSentenceEnd(text, i){
-  var ch = text.charAt(i);
-  if ("。！？．…‥".indexOf(ch) >= 0) return true;
-  if ("!?".indexOf(ch) >= 0) return true;
-  if (ch === "."){
-    var nx = text.charAt(i + 1);
-    return nx === "" || /[\s"'\)\]」』]/.test(nx);
-  }
-  return false;
-}
-
-/* sentenceAt(text, idx) — idx を含む「文」。閉じ括弧は文末に含めます。 */
-function sentenceAt(text, idx){
-  text = String(text == null ? "" : text);
-  if (!text.length) return {from:0, to:0, text:""};
-  idx = Math.max(0, Math.min(text.length - 1, idx));
-  var a = 0, i;
-  for (i = idx - 1; i >= 0; i--){
-    if (isSentenceEnd(text, i)){
-      a = i + 1;
-      while (a < text.length && /[\s」』\)\]”’]/.test(text.charAt(a))) a++;
-      break;
-    }
-  }
-  var b = text.length;
-  for (i = idx; i < text.length; i++){
-    if (isSentenceEnd(text, i)){
-      b = i + 1;
-      while (b < text.length && /[」』\)\]”’]/.test(text.charAt(b))) b++;
-      break;
-    }
-  }
-  if (a > idx) a = 0;
-  return {from:a, to:b, text:text.slice(a, b)};
-}
 
 /* HTML エスケープ (描画とテストの両方から使う) */
 function escapeHtml(s){
@@ -2192,130 +2113,100 @@ function escapeHtml(s){
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-/* markRange(lineText, lineStart, from, to)
- *   段落座標 [from,to) の強調範囲のうち、この行に掛かる部分だけを
- *   <span class="snap"> で包んだ HTML を返します。掛からなければ素の行。 */
-function markRange(lineText, lineStart, from, to){
-  lineText = String(lineText == null ? "" : lineText);
-  if (from == null || to == null || !(to > from)) return escapeHtml(lineText);
-  var end = lineStart + lineText.length;
-  if (to <= lineStart || from >= end) return escapeHtml(lineText);
-  var a = Math.max(0, from - lineStart);
-  var b = Math.min(lineText.length, to - lineStart);
-  return escapeHtml(lineText.slice(0, a)) +
-         '<span class="snap">' + escapeHtml(lineText.slice(a, b)) + "</span>" +
-         escapeHtml(lineText.slice(b));
-}
 
-/* splitSentences(text)
- *   文章を「文」のブロックに切り分けます。連結すると必ず元の文章に戻る
- *   (取りこぼしがない) ことをテストで保証しています。
+/* segmentLine(text)
+ *   1 行を「語のまとまり」に切り分けます。wordAt と同じ規則 (ひらがな /
+ *   カタカナ / 漢字 / ラテン / 約物、漢字の直後のひらがなは送り仮名) で、
+ *   連結すると必ず元の行に戻ります (取りこぼしがない)。
+ *   これがどアップの最小単位になります。
  *     -> [{from, to, text}]                                           */
-function splitSentences(text){
+function segmentLine(text){
   text = String(text == null ? "" : text);
-  if (!text.length) return [];
-  var out = [], start = 0, i, e;
-  for (i = 0; i < text.length; i++){
-    if (!isSentenceEnd(text, i)) continue;
-    e = i + 1;
-    while (e < text.length && /[」』\)\]”’]/.test(text.charAt(e))) e++;
-    out.push({from:start, to:e, text:text.slice(start, e)});
-    start = e; i = e - 1;
+  var out = [], i = 0;
+  while (i < text.length){
+    var w = wordAt(text, i);
+    var to = Math.max(w.to, i + 1);
+    if (to > text.length) to = text.length;
+    out.push({from:i, to:to, text:text.slice(i, to)});
+    i = to;
   }
-  if (start < text.length) out.push({from:start, to:text.length, text:text.slice(start)});
   return out;
 }
 
-/* blockPlan(lines)
- *   段落の行から「文のブロック」を組み立てます。1 つの文が複数行に
- *   またがることも、1 行が複数の文を含むこともあるので、ブロックは
- *   行の断片 (parts) の列として持ちます。
- *     -> [{from, to, parts:[{l, c0, text, sep}]}]
- *        l は lines 内の添字、c0 はその行の中での開始桁               */
-function blockPlan(lines){
-  var pt = paragraphText(lines);
-  var sents = splitSentences(pt.text);
-  if (!sents.length) sents = [{from:0, to:pt.text.length, text:pt.text}];
-  var blocks = [], s, k;
-  for (s = 0; s < sents.length; s++){
-    var parts = [];
-    for (k = 0; k < pt.map.length; k++){
-      var m = pt.map[k];
-      var a = Math.max(sents[s].from, m.start);
-      var b = Math.min(sents[s].to, m.start + m.len);
-      var touches = (b > a) || (m.len === 0 && m.start >= sents[s].from && m.start < sents[s].to);
-      if (!touches) continue;
-      /* 行を継ぐ区切り (欧文の空白) は、その位置を含むブロックが持つ */
-      var sep = (m.sep && a === m.start && sents[s].from < m.start) ? m.sep : "";
-      parts.push({l:k, c0:a - m.start, text:lines[k].slice(a - m.start, b - m.start), sep:sep});
-    }
-    blocks.push({from:sents[s].from, to:sents[s].to, parts:parts});
-  }
-  return blocks;
-}
-
-/* blockLayout(heights, scales)
- *   ブロックをその場で拡大したとき、上下が重ならないように各ブロックを
- *   どれだけ下へずらすかを求めます。マージンを動かさず transform だけで
- *   済ませるので、毎フレームのレイアウト再計算が起きません。
- *     offsets[i] = Σ_{j<i} h_j(s_j-1) + h_i(s_i-1)/2
+/* blockLayout(sizes, scales, anchor)
+ *   その場で拡大したときに隣どうしが重ならないよう、各要素をどれだけ
+ *   ずらすかを求めます。縦 (行の高さ) にも横 (セグメントの幅) にも
+ *   そのまま使えます。
+ *     offsets[i] = Σ_{j<i} s_j(k_j-1) + s_i(k_i-1)·anchor
+ *   anchor は拡大の基準点:
+ *     0.5 — 中心から拡大する場合 (transform-origin が中央。既定)
+ *     0   — 始点から拡大する場合 (transform-origin:0。横方向はこちら)
+ *   マージンを動かさず transform だけで済むので、毎フレームのレイアウト
+ *   再計算が起きません。
  *     -> { offsets:[], extras:[], total }                             */
-function blockLayout(heights, scales){
+function blockLayout(sizes, scales, anchor){
+  anchor = (anchor === undefined) ? 0.5 : anchor;
   var offsets = [], extras = [], acc = 0;
-  for (var i = 0; i < heights.length; i++){
-    var extra = heights[i] * ((scales[i] === undefined ? 1 : scales[i]) - 1);
+  for (var i = 0; i < sizes.length; i++){
+    var extra = sizes[i] * ((scales[i] === undefined ? 1 : scales[i]) - 1);
     extras.push(extra);
-    offsets.push(acc + extra / 2);
+    offsets.push(acc + extra * anchor);
     acc += extra;
   }
   return {offsets:offsets, extras:extras, total:acc};
 }
 
-/* waveFrame(d, t, o)
- *   ポイントされたブロックから d ブロック離れたところの見え方。
- *   t は焦点が移ってからの進行 (0→1)。
- *     scale — その場のどアップ (ガウス核。d=0 が最大)
- *     x     — 波打ちの横ゆれ (焦点から外へ伝わる進行波。距離と時間で減衰)
- *     y     — 縦ゆれ。横の WAVE_Y 倍に抑えてある。ブロックは上下に
- *             隙間なく積まれているので、縦に大きく振ると文字が重なる。
- *             行間に収まる範囲だけ動かし、波の主役は横ゆれに任せる
- *     glow  — 波の腹で明るくなるフラッシュ量
- *     -> { scale, x, y, glow, gauss, env }                            */
-var WAVE_Y = 0.15;
-function waveFrame(d, t, o){
-  o = o || {};
-  var peak   = (o.peak   === undefined) ? 1.9  : o.peak;
-  var spread = (o.spread === undefined) ? 1.6  : Math.max(0.3, o.spread);
-  var amp    = (o.amp    === undefined) ? 22   : o.amp;
-  var kNum   = (o.k      === undefined) ? 1.15 : o.k;
-  var omega  = (o.omega  === undefined) ? 3.4  : o.omega;
-  var lambda = (o.lambda === undefined) ? 3.2  : Math.max(0.3, o.lambda);
-  var depth  = (o.depth  === undefined) ? 1    : Math.max(0, Math.min(1, o.depth));
-
-  var ad = Math.abs(d);
-  var gauss = Math.exp(-(ad * ad) / (2 * spread * spread));
-  var scale = 1 + (peak - 1) * gauss * depth;
-
-  var tt = t;
-  if (!(tt > 0) || tt >= 1) return {scale:scale, x:0, y:0, glow:0, gauss:gauss, env:0};
-  var env = Math.pow(1 - tt, 1.6);
-  var phase = kNum * ad - omega * tt * Math.PI * 2;
-  var swing = Math.sin(phase);
-  var fall = Math.exp(-ad / lambda);
-  var a = amp * fall * env * depth;
-  return {
-    scale: scale,
-    x:     a * swing,
-    /* 1/4 周期ずらすことで、横ゆれと合わせて緩やかな楕円を描く */
-    y:     a * WAVE_Y * Math.sin(phase + Math.PI / 2),
-    glow:  Math.abs(swing) * fall * env * depth,
-    gauss: gauss,
-    env:   env
-  };
+/* displayToNatural(lefts, widths, scales, dx)
+ *   拡大後の表示位置 dx が、拡大していないときのどの位置に当たるかを
+ *   求めます (横方向の写像の逆)。ポインタの狙いをこの自然位置で持つと、
+ *   「自分が作った拡大に焦点が追われて暴れる」のを防げます。
+ *     -> セグメントの添字                                             */
+function displayToNatural(lefts, widths, scales, dx){
+  var lay = blockLayout(widths, scales, 0);
+  for (var i = 0; i < widths.length; i++){
+    var left = lefts[i] + lay.offsets[i];
+    var right = left + widths[i] * (scales[i] === undefined ? 1 : scales[i]);
+    if (dx < right) return i;
+  }
+  return Math.max(0, widths.length - 1);
 }
 
-/* どアップの倍率の段階 (ホイールや :set peak= で行き来する) */
-var PEAK_STEPS = [1.25, 1.5, 1.9, 2.4, 3, 3.8];
+/* gaussScale(d, peak, spread)
+ *   焦点からの距離 d に対する倍率。d=0 で peak、離れるほど 1 に戻ります。
+ *     scale = 1 + (peak - 1) · exp(-d² / 2σ²)
+ *   縦 (行の距離) にも横 (px の距離) にも同じ式を使います。            */
+function gaussScale(d, peak, spread){
+  peak = (peak === undefined) ? 2.2 : peak;
+  spread = (spread === undefined || !(spread > 0)) ? 1 : spread;
+  return 1 + (peak - 1) * Math.exp(-(d * d) / (2 * spread * spread));
+}
+
+/* segmentCenters(widths)
+ *   各セグメントの「拡大していないときの」中心位置。横方向の距離を
+ *   測る基準になります (拡大後の位置ではなく自然位置で測るのが要点で、
+ *   そうしないと焦点が自分の作った拡大に追われて暴れます)。
+ *     -> { centers:[], lefts:[], total }                              */
+function segmentCenters(widths){
+  var centers = [], lefts = [], x = 0;
+  for (var i = 0; i < widths.length; i++){
+    lefts.push(x); centers.push(x + widths[i] / 2); x += widths[i];
+  }
+  return {centers:centers, lefts:lefts, total:x};
+}
+
+/* nearestIndex(centers, x) — 自然位置 x にいちばん近いセグメント */
+function nearestIndex(centers, x){
+  if (!centers.length) return 0;
+  var best = 0, bd = Infinity;
+  for (var i = 0; i < centers.length; i++){
+    var d = Math.abs(centers[i] - x);
+    if (d < bd){ bd = d; best = i; }
+  }
+  return best;
+}
+
+/* どアップ倍率の段階 (Ctrl + ホイールで行き来する) */
+var PEAK_STEPS = [1.4, 1.8, 2.2, 2.8, 3.5, 4.4];
 function peakStep(v, dir){
   var i = 0, best = 1e9, k;
   for (k = 0; k < PEAK_STEPS.length; k++){
@@ -2368,7 +2259,6 @@ function boot(){
   var blastT0 = 0, blastMag = 0;
   var CD = null;                        /* {total, t0, lastTick, flash} */
   var AC = null, blinkT = 0, dirtyDom = true, docX = 0, busDirty = true;
-  var WAVE_MS = 900;    /* 波が伝わって収まるまで */
   var fxc = fx.getContext("2d"), ldc = leader.getContext("2d");
   var DPR = Math.min(2, window.devicePixelRatio || 1);
   var FLASH_MS = 520;   /* 1 イベントの処理表示時間 */
@@ -2793,187 +2683,223 @@ function boot(){
     audio();
   }
 
-  /* ═══ 文章ビュー (多段落 + 文のブロック) ═══ */
-  var paras = [], blocks = [], proseDirty = true;
-  var focusBlk = 0, waveT0 = -1, blkH = [];
-
-  /* ブロック 1 つ分の HTML。行の断片ごとに .src を出すので、
-     1 つの文が複数行にまたがっても VIM の (行,桁) が保てる。 */
-  function renderBlock(blk){
-    var html = "";
-    for (var i = 0; i < blk.parts.length; i++){
-      var pt = blk.parts[i];
-      if (pt.sep) html += '<span class="sep">' + escHtml(pt.sep) + "</span>";
-      html += '<span class="src" data-l="' + pt.line + '" data-c0="' + pt.c0 + '">' +
-              escHtml(pt.text) + "</span>";
-    }
-    return html || "&#8203;";
-  }
-
-  /* 段組の幅を「どアップ倍率から逆算」して決める。
-     こうしておくと、いちばん拡大されたブロックでも画面に収まる。 */
-  function fitColumn(){
-    var sw = stage.clientWidth;
-    if (!sw) return;
-    var gutter = Math.min(72, Math.max(14, sw * 0.05));
-    var avail = sw - gutter * 2;
-    var byZoom = Math.floor((sw - 44) / Math.max(1, ST.opts.bpeak));
-    page.style.width = Math.max(220, Math.min(avail, byZoom, 620)) + "px";
-  }
+  /* ═══ 文章ビュー (多段落 · 行 · セグメント) ═══ */
+  var paras = [], rows = [], proseDirty = true;
+  /* 焦点は「行」と「その行の中の自然位置 x(px)」。どちらも滑らかに追う */
+  var focusRow = 0, focusX = 0, aimRow = 0, aimX = 0;
+  var rowH = [], rowW = [], segW = [], segCenters = [], segLefts = [], segC0 = [];
+  var lastScales = [], lastVOffsets = [], lastRowScales = [], rowTop = [], lastHTotal = [];
 
   function buildProse(){
     fitColumn();
     paras = splitParagraphs(ST.lines);
-    blocks = [];
+    rows = [];
     var html = [], i, k;
     for (i = 0; i < paras.length; i++){
       var pa = paras[i];
       if (pa.kind === "gap"){
-        blocks.push({kind:"gap", para:i, parts:[{line:pa.from, c0:0, text:"", sep:""}], first:pa.from});
-        html.push('<div class="blk gap" data-b="' + (blocks.length - 1) + '" data-p="' + i + '">' +
-                  '<span class="src" data-l="' + pa.from + '" data-c0="0"></span></div>');
+        rows.push({line:pa.from, para:i, gap:true, segs:[]});
+        html.push('<div class="gap" data-r="' + (rows.length - 1) + '" data-p="' + i + '">' +
+                  '<span class="row" data-l="' + pa.from + '">' +
+                  '<span class="seg src" data-l="' + pa.from + '" data-c0="0"></span></span></div>');
         continue;
       }
-      var plan = blockPlan(pa.lines);
       var open = '<p class="para" data-p="' + i + '">';
-      for (k = 0; k < plan.length; k++){
-        var parts = [];
-        for (var q = 0; q < plan[k].parts.length; q++){
-          var pp = plan[k].parts[q];
-          parts.push({line:pa.from + pp.l, c0:pp.c0, text:pp.text, sep:pp.sep});
+      for (k = 0; k < pa.lines.length; k++){
+        var l = pa.from + k;
+        var segs = segmentLine(pa.lines[k]);
+        if (!segs.length) segs = [{from:0, to:0, text:""}];
+        rows.push({line:l, para:i, gap:false, segs:segs});
+        var h = '<span class="row" data-r="' + (rows.length - 1) + '" data-l="' + l + '">';
+        for (var q = 0; q < segs.length; q++){
+          h += '<span class="seg src" data-l="' + l + '" data-c0="' + segs[q].from + '">' +
+               escHtml(segs[q].text) + "</span>";
         }
-        var blk = {kind:"text", para:i, parts:parts, first:parts.length ? parts[0].line : pa.from};
-        blocks.push(blk);
-        open += '<div class="blk" data-b="' + (blocks.length - 1) + '" data-p="' + i + '">' +
-                renderBlock(blk) + "</div>";
+        open += h + "</span>";
       }
       html.push(open + "</p>");
     }
     page.innerHTML = html.join("");
     proseDirty = false;
-    measureBlocks();
+    measureRows();
   }
 
-  /* 自然な高さを 1 度だけ測っておく (拡大は transform で行うので、
-     この高さは拡大しても変わらない) */
-  function measureBlocks(){
-    blkH = [];
-    var els = page.querySelectorAll(".blk");
-    for (var i = 0; i < els.length; i++){
-      els[i].style.transform = "";
-      blkH.push(els[i].offsetHeight || 1);
+  /* 段組の幅を、いちばん拡大したときでも収まるように決める */
+  function fitColumn(){
+    var sw = stage.clientWidth;
+    if (!sw) return;
+    var gutter = Math.min(72, Math.max(14, sw * 0.05));
+    page.style.width = Math.max(220, sw - gutter * 2) + "px";
+  }
+
+  /* 自然な (拡大していないときの) 寸法を測っておく。
+     横の距離はこの自然位置で測る — 拡大後の位置で測ると、焦点が
+     自分の作った拡大に追われて暴れるため。 */
+  function measureRows(){
+    rowH = []; rowW = []; segW = []; segCenters = []; segLefts = []; segC0 = [];
+    rowTop = []; lastScales = []; lastVOffsets = []; lastRowScales = []; lastHTotal = [];
+    var rowEls = page.querySelectorAll(".row");
+    for (var i = 0; i < rowEls.length; i++){
+      var segs = rowEls[i].querySelectorAll(".seg"), ws = [], cs = [];
+      for (var j = 0; j < segs.length; j++){
+        segs[j].style.transform = "";
+        ws.push(segs[j].offsetWidth || 1);
+        cs.push(parseInt(segs[j].dataset.c0 || "0", 10));
+      }
+      rowEls[i].style.transform = "";
+      var m = segmentCenters(ws);
+      segW.push(ws); segCenters.push(m.centers); segLefts.push(m.lefts); segC0.push(cs);
+      rowW.push(m.total);
+      rowH.push(rowEls[i].offsetHeight || 1);
+      rowTop.push(rowEls[i].offsetTop);
     }
   }
 
-  /* 行/桁 -> その桁を含む .src 断片 */
-  function proseFrag(l, c){
-    var list = page.querySelectorAll('.src[data-l="' + l + '"]');
-    if (!list.length) return null;
-    for (var i = 0; i < list.length; i++){
-      var c0 = parseInt(list[i].dataset.c0 || "0", 10);
-      var len = list[i].textContent.length;
-      if (c >= c0 && c <= c0 + len) return {el:list[i], c0:c0};
+  /* 行と桁 -> その桁を含むセグメントの添字 */
+  function segIndexAt(ri, col){
+    var cs = segC0[ri]; if (!cs || !cs.length) return 0;
+    for (var i = cs.length - 1; i >= 0; i--) if (col >= cs[i]) return i;
+    return 0;
+  }
+  function rowIndexOfLine(l){
+    for (var i = 0; i < rows.length; i++) if (rows[i].line === l) return i;
+    return Math.min(focusRow, Math.max(0, rows.length - 1));
+  }
+  /* カーソル位置を焦点の目標にする (h / l で左右へ動かすとどアップも滑る) */
+  function aimAtCursor(){
+    var ri = rowIndexOfLine(ST.cur.l);
+    var si = segIndexAt(ri, ST.cur.c);
+    aimRow = ri;
+    aimX = (segCenters[ri] && segCenters[ri][si] !== undefined) ? segCenters[ri][si] : 0;
+  }
+  /* 表示位置 (画面座標) -> 自然な行番号。拡大で行が動くので、
+     当たり判定ではなく前フレームの写像を逆に解いて求める。 */
+  function rowAtDisplayY(cy){
+    if (!rowTop.length) return -1;
+    var pr = page.getBoundingClientRect();
+    var dy = cy - pr.top;
+    for (var i = 0; i < rowTop.length; i++){
+      var sc = lastRowScales[i] === undefined ? 1 : lastRowScales[i];
+      var off = lastVOffsets[i] === undefined ? 0 : lastVOffsets[i];
+      var top = rowTop[i] + off - rowH[i] * (sc - 1) / 2;
+      if (dy < top + rowH[i] * sc) return i;
     }
-    var last = list[list.length - 1];
-    return {el:last, c0:parseInt(last.dataset.c0 || "0", 10)};
-  }
-  /* 行を含むブロックの添字 */
-  function blockOfLine(l, c){
-    var f = proseFrag(l, c === undefined ? 0 : c);
-    if (!f) return focusBlk;
-    var host = f.el.closest(".blk");
-    return host ? parseInt(host.dataset.b, 10) : focusBlk;
+    return rowTop.length - 1;
   }
 
-  /* ═══ どアップ + 波打ち ═══ */
-  function setFocusBlock(bi, force){
-    if (bi === undefined || bi < 0 || bi >= blocks.length) return;
-    if (bi === focusBlk && !force) return;
-    focusBlk = bi;
-    waveT0 = performance.now();          /* ここから波が伝わる */
+  function aimAtPoint(cx, cy){
+    var ri = rowAtDisplayY(cy);
+    if (ri < 0) return false;
+    var rowEl = page.querySelector('.row[data-r="' + ri + '"]');
+    if (!rowEl) return false;
+    aimRow = ri;
+    /* 表示位置 -> 自然位置。拡大後の DOM を当たり判定に使うと、
+       拡大が自分の焦点を押しのけて焦点が暴れるため。 */
+    var rr = rowEl.getBoundingClientRect();
+    var dx = cx - rr.left;
+    var ws = segW[ri] || [], sc = lastScales[ri] || [], lf = segLefts[ri] || [];
+    if (ws.length){
+      var j = displayToNatural(lf, ws, sc.length === ws.length ? sc : ws.map(function(){ return 1; }), dx);
+      aimX = segCenters[ri][j];
+    } else aimX = 0;
+    return true;
   }
 
-  function styleBlocks(now){
-    var els = page.querySelectorAll(".blk");
-    if (!els.length) return;
-    if (blkH.length !== els.length) measureBlocks();
+  /* ═══ 二軸の魚眼 — 縦は行の距離、横は px の距離 ═══ */
+  function styleRows(now){
+    var rowEls = page.querySelectorAll(".row");
+    if (!rowEls.length) return;
+    if (rowH.length !== rowEls.length){ measureRows(); }
 
-    var t = (waveT0 < 0) ? 1 : (now - waveT0) / WAVE_MS;
-    var o = {peak:ST.opts.bpeak, spread:ST.opts.bspread, amp:ST.opts.amp,
-             lambda:ST.opts.lambda, omega:ST.opts.omega,
-             depth:ST.opts.wave ? 1 : 0};
-    var i, scales = [], frames = [];
-    for (i = 0; i < els.length; i++){
-      var f = waveFrame(i - focusBlk, t, o);
-      frames.push(f); scales.push(f.scale);
+    /* 焦点をなめらかに追う (右へ左へ動かすと、どアップが滑っていく) */
+    var ease = ST.opts.zoom ? 0.28 : 1;
+    focusRow += (aimRow - focusRow) * ease;
+    focusX += (aimX - focusX) * ease;
+    if (Math.abs(aimRow - focusRow) < 0.002) focusRow = aimRow;
+    if (Math.abs(aimX - focusX) < 0.4) focusX = aimX;
+
+    var peak = ST.opts.zoom ? ST.opts.zpeak : 1;
+    var vs = ST.opts.vspread, hs = ST.opts.hspread;
+    var i, j, rowScales = [], perRow = [];
+
+    for (i = 0; i < rowEls.length; i++){
+      var gv = gaussScale(i - focusRow, peak, vs) - 1;   /* 縦の寄与 (0 〜 peak-1) */
+      var ws = segW[i] || [], cs = segCenters[i] || [];
+      var scales = [], maxS = 1;
+      for (j = 0; j < ws.length; j++){
+        /* 横は自然位置での px 距離。焦点の行から離れるほど横の効きも弱まる */
+        var gh = Math.exp(-Math.pow(cs[j] - focusX, 2) / (2 * hs * hs));
+        var sc = 1 + gv * gh;
+        scales.push(sc);
+        if (sc > maxS) maxS = sc;
+      }
+      perRow.push(scales);
+      rowScales.push(maxS);
     }
-    var lay = blockLayout(blkH, scales);
-    for (i = 0; i < els.length; i++){
-      var el = els[i], fr = frames[i];
-      el.style.transform = "translate(" + fr.x.toFixed(2) + "px," + (lay.offsets[i] + fr.y).toFixed(2) +
-                           "px) scale(" + fr.scale.toFixed(4) + ")";
-      var d = Math.abs(i - focusBlk);
-      el.classList.toggle("hit", i === focusBlk);
-      el.classList.toggle("near", d === 1);
-      if (fr.glow > 0.02){
-        el.classList.add("wave");
-        el.style.setProperty("--wg", (fr.glow * 26).toFixed(1) + "px");
-      } else if (el.classList.contains("wave")){
-        el.classList.remove("wave");
-        el.style.removeProperty("--wg");
+
+    var vlay = blockLayout(rowH, rowScales);
+    var hitRow = Math.round(focusRow);
+    for (i = 0; i < rowEls.length; i++){
+      rowEls[i].style.transform = "translateY(" + vlay.offsets[i].toFixed(2) + "px)";
+      var d = Math.abs(i - hitRow);
+      rowEls[i].classList.toggle("hit", i === hitRow);
+      rowEls[i].classList.toggle("near", d === 1);
+
+      var segs = rowEls[i].children, scales = perRow[i];
+      var hlay = blockLayout(segW[i] || [], scales, 0);   /* 横は左端が基準 */
+      lastHTotal[i] = hlay.total;
+      var hitSeg = (i === hitRow) ? nearestIndex(segCenters[i] || [], focusX) : -1;
+      for (j = 0; j < segs.length && j < scales.length; j++){
+        segs[j].style.transform = "translateX(" + hlay.offsets[j].toFixed(2) +
+                                  "px) scale(" + scales[j].toFixed(4) + ")";
+        segs[j].classList.toggle("hit", j === hitSeg);
       }
     }
+    lastScales = perRow; lastVOffsets = vlay.offsets; lastRowScales = rowScales;
     page.classList.toggle("dim", !!ST.opts.dim);
-    /* 焦点ブロックを画面の中ほどへ (縦) と、はみ出さない位置へ (横) */
-    var hit = els[focusBlk];
-    if (hit){
-      var hb = hit.getBoundingClientRect(), sr = stage.getBoundingClientRect();
-      var want = sr.top + sr.height * 0.42;
-      var dy = (hb.top + hb.height / 2) - want;
-      if (Math.abs(dy) > 1) pageTop -= dy * 0.18;
-      followWide(hit);
-      applyPageTop();
-    }
+    followFocus(rowEls[hitRow], vlay, hitRow);
   }
 
-  /* ポインタ直下のテキスト位置 */
-  function caretPosFromPoint(cx, cy){
-    var p, r;
-    if (document.caretPositionFromPoint){
-      try { p = document.caretPositionFromPoint(cx, cy); } catch (e){ p = null; }
-      if (p && p.offsetNode && p.offsetNode.nodeType === 3) return {node:p.offsetNode, offset:p.offset};
+  /* 焦点を画面の中ほどへ。横は、拡大で伸びた行の中の焦点位置を追う。 */
+  function followFocus(rowEl, vlay, hitRow){
+    if (!rowEl) return;
+    var sr = stage.getBoundingClientRect();
+    var rb = rowEl.getBoundingClientRect();
+    var dy = (rb.top + rb.height / 2) - (sr.top + sr.height * 0.45);
+    if (Math.abs(dy) > 1) pageTop -= dy * 0.18;
+
+    /* 焦点セグメントを画面の中に保つ。
+       .row は display:block なので box の幅では内容の広がりが測れない。
+       自然な幅 + 拡大で増えたぶん (hlay.total) が実際の内容幅になる。 */
+    var segs = rowEl.children;
+    var hitSeg = nearestIndex(segCenters[hitRow] || [], focusX);
+    var target = segs[hitSeg];
+    var contentW = (rowW[hitRow] || 0) + (lastHTotal[hitRow] || 0);
+    if (target){
+      if (contentW <= sr.width - 48){
+        /* 行がまるごと収まるなら、横はずらさない */
+        pageX += (0 - pageX) * 0.15;
+      } else {
+        var tb = target.getBoundingClientRect(), pad = 28, dx = 0;
+        if (tb.right > sr.right - pad) dx = tb.right - (sr.right - pad);
+        else if (tb.left < sr.left + pad) dx = tb.left - (sr.left + pad);
+        if (dx) pageX -= dx * 0.25;
+      }
     }
-    if (document.caretRangeFromPoint){
-      try { r = document.caretRangeFromPoint(cx, cy); } catch (e){ r = null; }
-      if (r && r.startContainer && r.startContainer.nodeType === 3) return {node:r.startContainer, offset:r.startOffset};
-    }
-    return null;
-  }
-  /* 位置 -> {bi, line, col} */
-  function locateAt(cx, cy){
-    var pos = caretPosFromPoint(cx, cy);
-    var span = null, host = null;
-    if (pos){
-      var el = pos.node.parentElement;
-      span = el && el.closest ? el.closest(".src") : null;
-    }
-    if (!span || !page.contains(span)){
-      /* 文字の上でなくても、いちばん近いブロックを拾う */
-      var e2 = document.elementFromPoint(cx, cy);
-      host = e2 && e2.closest ? e2.closest(".blk") : null;
-      if (!host) return null;
-      return {bi:parseInt(host.dataset.b, 10), line:blocks[host.dataset.b].first, col:0};
-    }
-    host = span.closest(".blk");
-    var c0 = parseInt(span.dataset.c0 || "0", 10);
-    return {
-      bi: host ? parseInt(host.dataset.b, 10) : focusBlk,
-      line: parseInt(span.dataset.l, 10),
-      col: c0 + (pos ? pos.offset : 0)
-    };
+    applyPageTop();
   }
 
   /* 文章ビューのカーソル / 選択 */
+  function proseFrag(l, c){
+    var list = page.querySelectorAll('.src[data-l="' + l + '"]');
+    if (!list.length) return null;
+    for (var i = list.length - 1; i >= 0; i--){
+      var c0 = parseInt(list[i].dataset.c0 || "0", 10);
+      if (c >= c0) return {el:list[i], c0:c0};
+    }
+    return {el:list[0], c0:parseInt(list[0].dataset.c0 || "0", 10)};
+  }
+
   function placeCaretProse(){
     var f = proseFrag(ST.cur.l, ST.cur.c);
     if (!f){ caret.style.opacity = "0"; return; }
@@ -3016,7 +2942,7 @@ function boot(){
     selLayer.innerHTML = html;
   }
 
-  /* イベントフラッシュ — 対象行の断片を光らせる */
+  /* イベントフラッシュ — 対象行のセグメントを光らせる */
   function styleProse(now){
     var fx2 = {}, i;
     for (i = 0; i < live.length; i++){
@@ -3056,18 +2982,6 @@ function boot(){
                            pageTop.toFixed(1) + "px)";
   }
 
-  /* 拡大したブロックが画面からはみ出さないよう、紙を横にずらす。
-     行頭 (transform-origin:0) は必ず見えるほうを優先する。 */
-  function followWide(hit){
-    if (!hit) return;
-    var hb = hit.getBoundingClientRect(), sr = stage.getBoundingClientRect();
-    var padL = 18, padR = 26, dx = 0;
-    var over = hb.right - (sr.right - padR);
-    if (over > 0) dx = -over;
-    if (hb.left + dx < sr.left + padL) dx = (sr.left + padL) - hb.left;
-    if (Math.abs(dx) > 0.5) pageX += dx * 0.22;
-  }
-
   /* ビューの切り替え */
   function setView(v){
     ST.opts.view = v;
@@ -3077,7 +2991,7 @@ function boot(){
     $("btnView").textContent = prose ? "📄 文章" : "💻 コード";
     $("btnView").classList.toggle("on", prose);
     $("btnFocus").disabled = prose;
-    if (prose){ proseDirty = true; pageTop = 0; }
+    if (prose){ proseDirty = true; pageTop = 0; pageX = 0; }
     else { page.classList.remove("dim"); }
     dirtyDom = true;
   }
@@ -3088,11 +3002,10 @@ function boot(){
     if (prose){
       if (dirtyDom || proseDirty){
         buildProse(); applyPageTop(); dirtyDom = false;
-        /* 組み直すとブロックの番号が変わるので、カーソルから焦点を取り直す
-           (編集した直後に焦点が古いブロックに残らないように) */
-        setFocusBlock(blockOfLine(ST.cur.l, ST.cur.c));
+        /* 組み直すと行・セグメントの番号が変わるので、カーソルから取り直す */
+        aimAtCursor();
       }
-      styleBlocks(now);
+      styleRows(now);
       styleProse(now);
       placeCaretProse();
       drawSelectionProse();
@@ -3137,7 +3050,7 @@ function boot(){
     }
     $("btnFocus").classList.toggle("on", !!ST.opts.focus);
     $("btnFlash").classList.toggle("on", !!ST.opts.flash);
-    $("btnWave").classList.toggle("on", !!ST.opts.wave);
+    $("btnZoom").classList.toggle("on", !!ST.opts.zoom);
   }
 
   /* ── 出力パネル ── */
@@ -3260,12 +3173,9 @@ function boot(){
     lastText = txt; lastCurL = ST.cur.l;
     drainEvents();
     paintStatus();
-    /* 文章ビューでは、カーソルが別のブロックへ入ったら波を起こす */
-    if (ST.opts.view === "prose" && !proseDirty){
-      var bi = blockOfLine(ST.cur.l, ST.cur.c);
-      if (bi !== focusBlk) setFocusBlock(bi);
-      else if (moved) setFocusBlock(bi, true);   /* 同じブロック内でも段落移動なら波を出す */
-    }
+    /* 文章ビューでは、カーソルの位置がそのまま どアップ の焦点になる。
+       h / l で左右へ動かせば、どアップもその位置へ滑っていく。 */
+    if (ST.opts.view === "prose" && !proseDirty && rows.length) aimAtCursor();
   }
   /* 1 キー = 1 ディスパッチ。feedKey が key / motion / edit / mode を
      すべてイベントとして積むので、ここでは drain するだけでよい。 */
@@ -3315,17 +3225,14 @@ function boot(){
   document.querySelectorAll("header button").forEach(function(btn){
     btn.addEventListener("click", function(){ setTimeout(grabInput, 0); });
   });
-  /* ポインタが触れたブロックが焦点になる (拡大鏡は要らない) */
+  /* ポインタが指した位置が焦点になる。右へ左へ動かすと、どアップが
+     その位置に沿って滑っていく (拡大鏡は要らない)。 */
   var hoverRaf = 0;
   stage.addEventListener("pointermove", function(e){
     if (ST.opts.view !== "prose") return;
     if (hoverRaf) return;
     var cx = e.clientX, cy = e.clientY;
-    hoverRaf = requestAnimationFrame(function(){
-      hoverRaf = 0;
-      var loc = locateAt(cx, cy);
-      if (loc) setFocusBlock(loc.bi);
-    });
+    hoverRaf = requestAnimationFrame(function(){ hoverRaf = 0; aimAtPoint(cx, cy); });
   }, {passive:true});
 
   /* ホイール: そのままスクロール、Ctrl + ホイールでどアップの倍率 */
@@ -3333,10 +3240,8 @@ function boot(){
     if (ST.opts.view !== "prose") return;
     if (e.ctrlKey){
       e.preventDefault();
-      ST.opts.bpeak = peakStep(ST.opts.bpeak, e.deltaY < 0 ? 1 : -1);
-      ST.msg = "🌊 どアップ " + ST.opts.bpeak + "×";
-      proseDirty = true;              /* 幅を倍率に合わせて組み直す */
-      setFocusBlock(focusBlk, true);
+      ST.opts.zpeak = peakStep(ST.opts.zpeak, e.deltaY < 0 ? 1 : -1);
+      ST.msg = "🔎 どアップ " + ST.opts.zpeak + "×";
       paintStatus();
     } else {
       pageTop -= e.deltaY; applyPageTop();
@@ -3345,15 +3250,17 @@ function boot(){
 
   stage.addEventListener("pointerdown", function(e){
     if (ST.opts.view === "prose"){
-      var loc = locateAt(e.clientX, e.clientY);
-      if (loc){
-        ST.cur.l = loc.line;
-        ST.cur.c = Math.min(loc.col, Math.max(0, (ST.lines[loc.line] || "").length - 1));
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      var seg = el && el.closest ? el.closest(".seg") : null;
+      if (seg){
+        var l = parseInt(seg.dataset.l, 10), c0 = parseInt(seg.dataset.c0 || "0", 10);
+        ST.cur.l = l;
+        ST.cur.c = Math.min(c0, Math.max(0, (ST.lines[l] || "").length - 1));
         ST.desired = ST.cur.c; clampCur(ST);
-        setFocusBlock(loc.bi, true);
-        ST.dispatched++; dispatch({type:"motion", line:loc.line, what:"point"});
+        ST.dispatched++; dispatch({type:"motion", line:l, what:"point"});
         after();
       }
+      aimAtPoint(e.clientX, e.clientY);
       grabInput();
       return;
     }
@@ -3423,21 +3330,19 @@ function boot(){
     ["J  ~", "行連結 / 大小文字反転"],
     ['"a yy   "a p', "名前付きレジスタ"],
     ["u  Ctrl-R  .", "取り消し / やり直し / 直前の変更を繰り返し"],
-    ["§", "🌊 どアップと波打ち (文章ビュー)"],
-    ["ポインタを動かす", "触れた文章のブロックがその場でどアップになる"],
-    ["j k で移動", "次のブロックへ焦点が移り、そこから波が伝わる"],
-    ["} {", "段落を移動。波は段落をまたいで同じように広がる"],
-    ["クリック / タップ", "そこへカーソルを移して波を起こす"],
-    ["Ctrl + ホイール", "どアップの倍率 (1.25× 〜 3.8×)。段組の幅も組み直される"],
+    ["§", "🔎 ポイント位置のどアップ (文章ビュー)"],
+    ["ポインタを動かす", "指した位置がその場でどアップ。右へ左へ動かすと追ってくる"],
+    ["h l  w b", "カーソルを左右へ。どアップもその位置へ滑る"],
+    ["j k  } {", "行と段落を上下へ。どアップがその行へ移る"],
+    ["クリック / タップ", "そこへカーソルを移す"],
+    ["Ctrl + ホイール", "どアップの倍率 (1.4× 〜 4.4×)"],
     ["ホイール", "文章をスクロール"],
-    [":wave", "どアップと波打ちの ON / OFF"],
-    [":prose  :code", "文章ビュー (文のブロック) / コードビュー (等幅)"],
-    [":set bpeak=2.4", "どアップの最大倍率"],
-    [":set bspread=2", "どアップが及ぶ範囲 (ブロック数)"],
-    [":set amp=30", "波の大きさ (px)"],
-    [":set lambda=4", "波が届く距離 (ブロック数)"],
-    [":set omega=5", "波の速さ"],
-    [":set nodim", "まわりのブロックを暗くしない"],
+    [":mag", "どアップの ON / OFF"],
+    [":prose  :code", "文章ビュー / コードビュー (等幅)"],
+    [":set zpeak=2.8", "どアップの最大倍率"],
+    [":set vspread=2", "縦の効き (行数)"],
+    [":set hspread=140", "横の効き (px)"],
+    [":set nodim", "まわりの行を暗くしない"],
     ["§", "🎬 シネマ演出 / ✨ イベント処理"],
     ["Space", "現在行へ SIGNAL イベントをディスパッチ"],
     ["行をタップ / クリック", "その行へ焦点を移して MOTION イベント"],
@@ -3499,11 +3404,10 @@ function boot(){
   $("btnSave").onclick = function(){ saveFile(ST.fname); ST.dirty = false; paintStatus(); };
   $("btnHelp").onclick = function(){ showHelp(!helpEl.classList.contains("show")); };
   $("btnOut").onclick = function(){ showSide(!sideOpen()); };
-  $("btnWave").onclick = function(){
-    ST.opts.wave = !ST.opts.wave;
-    $("btnWave").classList.toggle("on", ST.opts.wave);
-    ST.msg = "🌊 どアップと波打ち: " + (ST.opts.wave ? "ON" : "OFF");
-    setFocusBlock(focusBlk, true);
+  $("btnZoom").onclick = function(){
+    ST.opts.zoom = !ST.opts.zoom;
+    $("btnZoom").classList.toggle("on", ST.opts.zoom);
+    ST.msg = "🔎 どアップ: " + (ST.opts.zoom ? "ON" : "OFF");
     paintStatus();
   };
   $("btnView").onclick = function(){ setView(ST.opts.view === "prose" ? "code" : "prose"); paintStatus(); };
@@ -3517,10 +3421,10 @@ function boot(){
     var w = window.innerWidth;
     if (w < 560){
       ST.opts.peak = 1.75; ST.opts.spread = 2.6; ST.opts.maxZ = 16;
-      ST.opts.bpeak = 1.25; ST.opts.amp = 12;   /* 電話ではどアップも波も控えめに */
+      ST.opts.zpeak = 1.8; ST.opts.hspread = 70;   /* 電話では効きを狭く */
     } else if (w < 900){
       ST.opts.peak = 2.1; ST.opts.spread = 2.4; ST.opts.maxZ = 20;
-      ST.opts.bpeak = 1.45; ST.opts.amp = 17;
+      ST.opts.zpeak = 2.0; ST.opts.hspread = 90;
     }
     BASE_H = w < 560 ? 26 : 30;
     document.documentElement.style.setProperty("--base-h", BASE_H + "px");
@@ -3532,11 +3436,11 @@ function boot(){
   buildKeys();
   setView(ST.opts.view);
   lastText = vimText(ST); lastCurL = ST.cur.l;
-  ST.msg = "ポイントした文章がどアップ ・ 動かすと波打つ ・ Ctrl+ホイールで倍率 ・ :help";
+  ST.msg = "ポイントした位置がどアップ ・ 右左に動かすと追う ・ Ctrl+ホイールで倍率 ・ :help";
   dirtyDom = true;
   paintStatus();
   printOut([
-    {cls:"o-dim", text:"Bada CineVim — 文章ビュー (文のブロック + どアップと波打ち)"},
+    {cls:"o-dim", text:"Bada CineVim — 文章ビュー (ポイント位置のどアップ)"},
     {cls:"o-key", text:"▶ 実行 または :run でバッファを実行します"},
     {cls:"o-dim", text:"⏱ カウントダウン または :countdown 5 で映画の秒読み (毎秒 TICK イベント)"}
   ], true, false);
