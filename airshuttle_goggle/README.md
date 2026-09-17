@@ -50,9 +50,12 @@
 
 ビルドは [`airshuttle-app-build.yml`](../.github/workflows/airshuttle-app-build.yml) が実行します:
 
+- 作業ブランチ (`claude/**`) への push → 3 プラットフォームをビルドし、
+  **Actions の該当実行の「Artifacts」から直接ダウンロード**
+  (`airshuttle-android` / `airshuttle-windows` / `airshuttle-linux`)
 - `airshuttle-v*` タグを push → 3 プラットフォームをビルドして **GitHub Release に添付**
-- Actions の **workflow_dispatch** で手動実行 → Actions アーティファクトとして取得
-  (`release_tag` を指定すれば Release にも添付)
+- Actions の **workflow_dispatch** で手動実行 (ワークフローが既定ブランチにある場合)
+  → `release_tag` を指定すれば Release にも添付
 
 Android 版はインカメラ使用のため実行時パーミッション (`CAMERA`) を要求します。
 許可しない場合でもポインタ(タッチ)モードで全機能が使えます。

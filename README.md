@@ -221,7 +221,7 @@
 | **Windows 10 / 11** | `AirShuttleGoggle-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | **Linux** | `AirShuttleGoggle-*-x86_64.AppImage` / `AirShuttleGoggle-*-amd64.deb` |
 
-ビルドは [`airshuttle-app-build.yml`](.github/workflows/airshuttle-app-build.yml) が実行します(`airshuttle-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。ジェスチャ仕様・認識パイプライン・テストは [`airshuttle_goggle/`](airshuttle_goggle/) を参照。
+ビルドは [`airshuttle-app-build.yml`](.github/workflows/airshuttle-app-build.yml) が実行します(作業ブランチへの push で **Actions の Artifacts から直接ダウンロード** / `airshuttle-v*` タグで Release へ添付)。ジェスチャ仕様・認識パイプライン・テストは [`airshuttle_goggle/`](airshuttle_goggle/) を参照。
 
 ---
 
