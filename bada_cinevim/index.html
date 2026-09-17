@@ -17,8 +17,9 @@
     行のままなので VIM のモーションもオペレータもそのまま効く
   ・🔎 ポイント位置のどアップ — 1 行を語のまとまりに切り分け、ポインタや
     カーソルが指した位置がその場で拡大される (拡大鏡は要らない)。
-    右へ左へ動かすと、どアップがその位置に沿って滑っていく。
-    縦は行の距離、横は px の距離で減衰する二軸の魚眼
+    上下に動かせばその行がまるごと持ち上がり、右へ左へ動かせば行の中で
+    指した位置がさらに大きくなる。縦は行の距離、横は px の距離で減衰する
+    二軸の魚眼 (縦の効きのうち vmix の割合が行全体に及ぶ)
   ・🎬 シネマフォーカス (コードビュー) — カーソル行を「どアップ」に拡大し、
     離れた行ほどガウス減衰で縮小・ぼかし・減光する被写界深度表現
   ・✨ イベント処理のフラッシュ効果 — すべての操作をイベントとして
@@ -1100,7 +1101,8 @@ function vimNew(text, name){
            /* 文章ビュー: ポイント位置のどアップ (二軸の魚眼)
               zpeak / vspread / hspread はコードビューの peak / spread とは別物。
               vspread は行数、hspread は px で測る */
-           view:"prose", zoom:true, zpeak:2.2, vspread:1.5, hspread:110, dim:true }
+           view:"prose", zoom:true, zpeak:2.2, vspread:1.6, hspread:110,
+           vmix:0.45, dim:true }
   };
   if (!st.lines.length) st.lines = [""];
   return st;
@@ -2171,14 +2173,36 @@ function displayToNatural(lefts, widths, scales, dx){
   return Math.max(0, widths.length - 1);
 }
 
-/* gaussScale(d, peak, spread)
- *   焦点からの距離 d に対する倍率。d=0 で peak、離れるほど 1 に戻ります。
- *     scale = 1 + (peak - 1) · exp(-d² / 2σ²)
- *   縦 (行の距離) にも横 (px の距離) にも同じ式を使います。            */
-function gaussScale(d, peak, spread){
-  peak = (peak === undefined) ? 2.2 : peak;
+/* gauss(d, spread)
+ *   焦点からの距離 d に対する重み (d=0 で 1、離れるほど 0 へ)。
+ *   縦 (行数) にも横 (px) にも同じ式を使います。                      */
+function gauss(d, spread){
   spread = (spread === undefined || !(spread > 0)) ? 1 : spread;
-  return 1 + (peak - 1) * Math.exp(-(d * d) / (2 * spread * spread));
+  return Math.exp(-(d * d) / (2 * spread * spread));
+}
+
+/* segScale(dRow, dxPx, o)
+ *   縦 (行の距離) と横 (px の距離) を合わせた、そのセグメントの倍率。
+ *
+ *     gv = exp(-dRow² / 2·vspread²)      縦の効き
+ *     gh = exp(-dxPx² / 2·hspread²)      横の効き
+ *     scale = 1 + (zpeak - 1) · gv · (vmix + (1 - vmix)·gh)
+ *
+ *   要は、縦の効きのうち vmix の割合は「行全体」に及び、残りが「指した
+ *   位置」に集まります。こうしておくと:
+ *     ・上下に動かす → その行がまるごと持ち上がる (行全体のどアップ)
+ *     ・左右に動かす → その行の中で、指した位置がさらに大きくなる
+ *   vmix=0 なら純粋な積 (指した一点だけ)、vmix=1 なら行単位のどアップ。
+ *     -> 倍率 (1 以上)                                                 */
+function segScale(dRow, dxPx, o){
+  o = o || {};
+  var peak = (o.peak === undefined) ? 2.2 : o.peak;
+  var vs = (o.vspread === undefined || !(o.vspread > 0)) ? 1.5 : o.vspread;
+  var hs = (o.hspread === undefined || !(o.hspread > 0)) ? 110 : o.hspread;
+  var vmix = (o.vmix === undefined) ? 0.45 : Math.max(0, Math.min(1, o.vmix));
+  var gv = gauss(dRow, vs);
+  var gh = gauss(dxPx, hs);
+  return 1 + (peak - 1) * gv * (vmix + (1 - vmix) * gh);
 }
 
 /* segmentCenters(widths)
@@ -2822,17 +2846,19 @@ function boot(){
     var vs = ST.opts.vspread, hs = ST.opts.hspread;
     var i, j, rowScales = [], perRow = [];
 
+    var so = {peak:peak, vspread:vs, hspread:hs, vmix:ST.opts.vmix};
     for (i = 0; i < rowEls.length; i++){
-      var gv = gaussScale(i - focusRow, peak, vs) - 1;   /* 縦の寄与 (0 〜 peak-1) */
       var ws = segW[i] || [], cs = segCenters[i] || [];
       var scales = [], maxS = 1;
       for (j = 0; j < ws.length; j++){
-        /* 横は自然位置での px 距離。焦点の行から離れるほど横の効きも弱まる */
-        var gh = Math.exp(-Math.pow(cs[j] - focusX, 2) / (2 * hs * hs));
-        var sc = 1 + gv * gh;
+        /* 縦は行の距離、横は自然位置での px 距離 */
+        var sc = segScale(i - focusRow, cs[j] - focusX, so);
         scales.push(sc);
         if (sc > maxS) maxS = sc;
       }
+      /* 空行など、セグメントが無い行にも縦の効きは与えておく
+         (上下に動かしたときに間延びしないように) */
+      if (!ws.length) maxS = segScale(i - focusRow, 0, so);
       perRow.push(scales);
       rowScales.push(maxS);
     }
@@ -3332,8 +3358,8 @@ function boot(){
     ["u  Ctrl-R  .", "取り消し / やり直し / 直前の変更を繰り返し"],
     ["§", "🔎 ポイント位置のどアップ (文章ビュー)"],
     ["ポインタを動かす", "指した位置がその場でどアップ。右へ左へ動かすと追ってくる"],
-    ["h l  w b", "カーソルを左右へ。どアップもその位置へ滑る"],
-    ["j k  } {", "行と段落を上下へ。どアップがその行へ移る"],
+    ["h l  w b", "カーソルを左右へ。行の中で、指した位置がさらに大きくなる"],
+    ["j k  } {", "行と段落を上下へ。その行がまるごと持ち上がる"],
     ["クリック / タップ", "そこへカーソルを移す"],
     ["Ctrl + ホイール", "どアップの倍率 (1.4× 〜 4.4×)"],
     ["ホイール", "文章をスクロール"],
@@ -3342,6 +3368,7 @@ function boot(){
     [":set zpeak=2.8", "どアップの最大倍率"],
     [":set vspread=2", "縦の効き (行数)"],
     [":set hspread=140", "横の効き (px)"],
+    [":set vmix=0.7", "縦の効きのうち行全体に及ぶ割合 (0=指した一点だけ / 1=行単位)"],
     [":set nodim", "まわりの行を暗くしない"],
     ["§", "🎬 シネマ演出 / ✨ イベント処理"],
     ["Space", "現在行へ SIGNAL イベントをディスパッチ"],
@@ -3436,7 +3463,7 @@ function boot(){
   buildKeys();
   setView(ST.opts.view);
   lastText = vimText(ST); lastCurL = ST.cur.l;
-  ST.msg = "ポイントした位置がどアップ ・ 右左に動かすと追う ・ Ctrl+ホイールで倍率 ・ :help";
+  ST.msg = "上下で行ごと・左右で指した位置がどアップ ・ Ctrl+ホイールで倍率 ・ :help";
   dirtyDom = true;
   paintStatus();
   printOut([

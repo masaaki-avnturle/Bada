@@ -17,7 +17,7 @@
  *  10. イベントバス      — key / motion / edit / mode の発行とディスパッチ順
  *  11. シネマ数理        — focusStyle / docLayout / flashFrame / countdownState
  *  12. 段落・語・魚眼    — splitParagraphs / wordAt / segmentLine /
- *                          gaussScale / blockLayout / segmentCenters /
+ *                          gauss / segScale / blockLayout / segmentCenters /
  *                          displayToNatural / nearestIndex
  */
 "use strict";
@@ -685,16 +685,59 @@ console.log("12. 段落分け / 語の切り出し / ポイント位置のどア
     eq(s2[1].from, s2[0].to, "次のセグメントの桁");
   }
 
-  /* ── 焦点からの距離に対する倍率 ── */
-  near(E.gaussScale(0, 2.2, 1.5), 2.2, 1e-12, "焦点が最大倍率 (どアップ)");
-  ok(E.gaussScale(1, 2.2, 1.5) < E.gaussScale(0, 2.2, 1.5), "離れるほど小さい");
-  ok(E.gaussScale(3, 2.2, 1.5) < E.gaussScale(1, 2.2, 1.5), "さらに離れるともっと小さい");
-  eq(E.gaussScale(-2, 2.2, 1.5), E.gaussScale(2, 2.2, 1.5), "左右 (上下) で対称");
-  ok(E.gaussScale(40, 2.2, 1.5) < 1.0001, "遠くは等倍に戻る");
-  ok(E.gaussScale(1, 2.2, 1.5) > 1, "近くは必ず 1 より大きい");
-  near(E.gaussScale(0, 1, 1.5), 1, 1e-12, "peak=1 なら拡大しない");
-  ok(E.gaussScale(2, 2.2, 0.8) < E.gaussScale(2, 2.2, 3), "spread が小さいほど効きが狭い");
-  near(E.gaussScale(5, 2.2, 0), E.gaussScale(5, 2.2, 1), 1e-12, "spread=0 は 1 に丸める");
+  /* ── 焦点からの距離に対する重み ── */
+  near(E.gauss(0, 1.5), 1, 1e-12, "焦点では重み 1");
+  ok(E.gauss(1, 1.5) < 1, "離れると小さくなる");
+  ok(E.gauss(3, 1.5) < E.gauss(1, 1.5), "さらに離れるともっと小さい");
+  eq(E.gauss(-2, 1.5), E.gauss(2, 1.5), "左右 (上下) で対称");
+  ok(E.gauss(40, 1.5) < 1e-6, "遠くはほぼ 0");
+  ok(E.gauss(2, 0.8) < E.gauss(2, 3), "spread が小さいほど効きが狭い");
+  near(E.gauss(5, 0), E.gauss(5, 1), 1e-12, "spread=0 は 1 に丸める");
+
+  /* ── 縦と横を合わせた倍率 ── */
+  {
+    const o = {peak:2.2, vspread:1.6, hspread:110, vmix:0.45};
+    near(E.segScale(0, 0, o), 2.2, 1e-12, "焦点そのものが最大倍率");
+    /* 上下に動かすと「行まるごと」が持ち上がる */
+    const rowLift = E.segScale(0, 9999, o);
+    near(rowLift, 1 + 1.2 * 0.45, 1e-9, "同じ行なら、横に遠くても vmix ぶんは拡大される");
+    ok(rowLift > 1.4, "行全体のどアップが体感できる大きさ");
+    ok(E.segScale(1, 9999, o) > 1, "隣の行も行ごと少し持ち上がる");
+    ok(E.segScale(1, 9999, o) < rowLift, "焦点の行がいちばん持ち上がる");
+    ok(E.segScale(4, 9999, o) < E.segScale(1, 9999, o), "離れた行ほど戻る");
+    near(E.segScale(40, 0, o), 1, 1e-6, "遠い行は等倍");
+    /* 左右に動かすと、その行の中で指した位置がさらに大きくなる */
+    ok(E.segScale(0, 0, o) > E.segScale(0, 200, o), "同じ行では、指した位置がいちばん大きい");
+    ok(E.segScale(0, 60, o) > E.segScale(0, 200, o), "横に離れるほど小さい");
+    eq(E.segScale(0, -80, o), E.segScale(0, 80, o), "左右で対称");
+    eq(E.segScale(-2, 0, o), E.segScale(2, 0, o), "上下で対称");
+    /* vmix の両端 */
+    const pure = {peak:2.2, vspread:1.6, hspread:110, vmix:0};
+    near(E.segScale(0, 9999, pure), 1, 1e-9, "vmix=0 なら純粋な積 (指した一点だけ)");
+    const rowOnly = {peak:2.2, vspread:1.6, hspread:110, vmix:1};
+    near(E.segScale(0, 9999, rowOnly), 2.2, 1e-9, "vmix=1 なら行単位のどアップ");
+    eq(E.segScale(0, 0, rowOnly), E.segScale(0, 500, rowOnly), "vmix=1 では横で変わらない");
+    /* 縦横それぞれ単調に減る */
+    let prev = E.segScale(0, 0, o);
+    for (let d = 0.25; d <= 5; d += 0.25){
+      const v = E.segScale(d, 0, o);
+      ok(v <= prev + 1e-12, "縦 d=" + d + " で単調に減る");
+      prev = v;
+    }
+    prev = E.segScale(0, 0, o);
+    for (let x = 20; x <= 400; x += 20){
+      const v = E.segScale(0, x, o);
+      ok(v <= prev + 1e-12, "横 x=" + x + " で単調に減る");
+      prev = v;
+    }
+    /* 倍率はどこでも 1 以上 peak 以下 */
+    for (const d of [0, 1, 3, 10]) for (const x of [0, 50, 300, 5000]){
+      const v = E.segScale(d, x, o);
+      ok(v >= 1 - 1e-12 && v <= 2.2 + 1e-12, "倍率が 1〜peak に収まる (" + d + "," + x + ")");
+    }
+    near(E.segScale(0, 0, {peak:1}), 1, 1e-12, "peak=1 なら拡大しない");
+    ok(E.segScale(0, 0, {}) > 1, "既定値でも拡大する");
+  }
 
   /* ── 拡大しても重ならないずらし量 (縦横どちらにも使う) ── */
   {
