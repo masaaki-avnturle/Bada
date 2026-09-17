@@ -21,6 +21,13 @@ name: Bada Sokudoku app build (Android APK + Windows EXE + Ubuntu)
 # Actions アーティファクト、および (sokudoku-v* タグ / release_tag 指定時)
 # GitHub Release に添付します。
 
+# 走らせ方は三つ:
+#   1. この作業ブランチ (claude/speed-reading-app-multiplatform-*) へ push する
+#      → そのまま走って Actions の「Artifacts」に APK / EXE / AppImage・deb が並ぶ
+#      (workflow_dispatch のボタンは、GitHub の仕様上このファイルが既定ブランチ
+#       main に入ってからでないと出ないため、入る前でも落とせるようにしてある)
+#   2. main に入ったあと、Actions タブの「Run workflow」(workflow_dispatch)
+#   3. sokudoku-v* タグを押す → ビルドして GitHub Release に添付
 on:
   workflow_dispatch:
     inputs:
@@ -29,6 +36,8 @@ on:
         required: false
         default: ''
   push:
+    branches:
+      - 'claude/speed-reading-app-multiplatform-**'
     tags:
       - 'sokudoku-v*'
 
@@ -145,8 +154,10 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sokudoku-android
+          name: sokudoku-android-apk
           path: out/*.apk
+          retention-days: 90
+          if-no-files-found: error
       - name: Attach APK to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
@@ -175,8 +186,10 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sokudoku-windows
+          name: sokudoku-windows-exe
           path: bada_sokudoku/app/electron/dist/*.exe
+          retention-days: 90
+          if-no-files-found: error
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
@@ -204,10 +217,12 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: sokudoku-linux
+          name: sokudoku-linux-appimage-deb
           path: |
             bada_sokudoku/app/electron/dist/*.AppImage
             bada_sokudoku/app/electron/dist/*.deb
+          retention-days: 90
+          if-no-files-found: error
       - name: Attach Linux builds to Release
         if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
