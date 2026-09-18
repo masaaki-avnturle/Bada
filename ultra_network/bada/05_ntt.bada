@@ -1,0 +1,362 @@
+# ============================================================
+# 05_ntt.bada -- BADA ULTRA NETWORK / L1 NTT 電話回線への写像
+#
+# 写像 φ : zone:// アドレス |-> NTT 番号
+#   リング上の位置 zone_id が市外局番を決める (近い zone は近い収容局
+#   になる)。加入者番号は URL のハッシュから採り、衝突は局内の空き
+#   番号を線形探索して解消する。番号ポータビリティと同じ「割当表」を
+#   持つので φ⁻¹ は厳密な逆写像になる。
+#
+# ベアラ (実際に加入者線を通す部分) は 3 種類:
+#   メタル      300-3400 Hz の音声帯 16-QAM ソフトモデム
+#               fs 8 kHz / 搬送波 2 kHz / 2000 baud / 8000 bps
+#   INS ネット64 B チャネル 64 kbps のディジタル透過 (HDLC)
+#   ひかり電話   G.711 µ-law に符号化して RTP (PT=0 PCMU / 20 ms)
+#
+# 搬送波が標本化周波数のちょうど 1/4 なので cos/sin は
+# {1,0,-1,0} と {0,1,0,-1} という厳密な直交系になり、相関復調に
+# 近似が入らない。だから音声帯を通しても誤差なしで往復する。
+# ============================================================
+
+AREA_CODE := ["011", "022",  "03",  "045", "052",  "06",  "075", "082", "092", "098"]
+AREA_CITY := ["札幌", "仙台", "東京", "横浜", "名古屋", "大阪", "京都", "広島", "福岡", "那覇"]
+AREA_SUB  := [    7,     7,     8,     7,     7,     8,     7,     7,     7,     7]
+
+# 割当表 (追記専用の平行配列)
+NTT_REG_URL  := []
+NTT_REG_NUM  := []
+NTT_REG_KIND := []
+NTT_REG_SEC  := []
+
+def ntt_pad(v, width) {
+    s := "" + (v % POW10[width])
+    while (len(s) < width) { s := "0" + s }
+    return s
+}
+
+def ntt_find_num(number) {
+    i := 0
+    while (i < len(NTT_REG_NUM)) {
+        if (NTT_REG_NUM[i] == number) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+def ntt_find_url(url, kind) {
+    i := 0
+    while (i < len(NTT_REG_URL)) {
+        if (NTT_REG_URL[i] == url && NTT_REG_KIND[i] == kind) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+# φ。kind は "geo" (0AB-J) / "ip" (050) / "mobile" (090)
+# -> [番号, 区画添字, 探索回数]
+def ntt_map(url, kind) {
+    hit := ntt_find_url(url, kind)
+    if (hit >= 0) { return [NTT_REG_NUM[hit], NTT_REG_SEC[hit], 0] }
+    area := "050"
+    width := 8
+    sector := 0 - 1
+    if (kind == "mobile") { area := "090"; width := 8 }
+    else {
+        if (kind != "ip") {
+            z := zone_id(url)
+            sector := u_trunc(z * len(AREA_CODE) / RING)
+            if (sector >= len(AREA_CODE)) { sector := len(AREA_CODE) - 1 }
+            area := AREA_CODE[sector]
+            width := AREA_SUB[sector]
+        }
+    }
+    base := mix32("ntt:" + kind + ":" + url) % POW10[width]
+    probe := 0
+    number := area + ntt_pad(base, width)
+    while (ntt_find_num(number) >= 0 && probe < 100000) {
+        probe := probe + 1
+        number := area + ntt_pad(base + probe, width)
+    }
+    NTT_REG_URL  <- url
+    NTT_REG_KIND <- kind
+    NTT_REG_SEC  <- sector
+    NTT_REG_NUM  <- number
+    fact := ["ntt-assign", url, number, kind]
+    fact >> tuplespace
+    return [number, sector, probe]
+}
+
+# φ⁻¹ -- 割当表の厳密な逆引き。未割当なら ""
+def ntt_unmap(number) {
+    digits := ""
+    i := 0
+    while (i < len(number)) {
+        c := ord(number, i)
+        if (c >= 48 && c <= 57) { digits := digits + chr(c) }
+        i := i + 1
+    }
+    hit := ntt_find_num(digits)
+    if (hit < 0) { return "" }
+    return NTT_REG_URL[hit]
+}
+
+# 表示整形
+#   10 桁 0AB-J : 03-1234-5678 (市外 2 桁) / 011-234-5678 (市外 3 桁)
+#   11 桁       : 050-1234-5678 / 090-1234-5678 (IP 電話・携帯)
+def ntt_format(number) {
+    n := len(number)
+    if (n == 11) {
+        return substr(number, 0, 3) + "-" + substr(number, 3, 4) + "-" + substr(number, 7, 4)
+    }
+    if (n != 10) { return number }
+    head := 3
+    d1 := substr(number, 1, 1)
+    if (d1 == "3") { head := 2 }
+    if (d1 == "6") { head := 2 }
+    mid := 10 - head - 4
+    return substr(number, 0, head) + "-" + substr(number, head, mid) + "-" +
+           substr(number, head + mid, 4)
+}
+
+def ntt_e164(number) { return "+81" + substr(number, 1, len(number) - 1) }
+
+def ntt_city(sector) {
+    if (sector < 0) { return "IP / 携帯" }
+    return AREA_CITY[sector]
+}
+
+# ---- 回線種別 -------------------------------------------------------
+def ntt_line_name(id) {
+    if (id == "isdn")   { return "INS ネット 64 (ISDN)" }
+    if (id == "hikari") { return "ひかり電話 (IP)" }
+    return "アナログ加入電話 (メタル)"
+}
+
+def ntt_line_bps(id) {
+    if (id == "metal") { return 8000 }
+    return 64000
+}
+
+# ---- 音声帯 16-QAM ソフトモデム -------------------------------------
+NTT_FS  := 8000
+NTT_FC  := 2000
+NTT_SPS := 4
+NTT_AMP := 2600
+# Gray 符号の 2 ビット -> 振幅。00,01,10,11 -> -3,-1,+3,+1
+QAM_GRAY := [0 - 3, 0 - 1, 3, 1]
+
+def qam_level(two) { return QAM_GRAY[two % 4] }
+
+def qam_bits(level) {
+    best := 0
+    bd := 99999
+    i := 0
+    while (i < 4) {
+        d := abs(QAM_GRAY[i] - level)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# バイト列 -> 音声帯サンプル列
+def ntt_modulate(bytes) {
+    bits := bytes_to_bits(bytes)
+    while (len(bits) % 4 != 0) { bits <- 0 }
+    out := []
+    i := 0
+    while (i < len(bits)) {
+        I := qam_level(bits[i] * 2 + bits[i + 1])
+        Q := qam_level(bits[i + 2] * 2 + bits[i + 3])
+        # n=0..3 で cos(πn/2)={1,0,-1,0}, sin(πn/2)={0,1,0,-1}
+        out <- NTT_AMP * I
+        out <- 0 - NTT_AMP * Q
+        out <- 0 - NTT_AMP * I
+        out <- NTT_AMP * Q
+        i := i + 4
+    }
+    return out
+}
+
+# 音声帯サンプル列 -> バイト列 (相関復調 + 硬判定)
+def ntt_demodulate(samples, bitlen) {
+    nsym := u_trunc(len(samples) / NTT_SPS)
+    bits := []
+    k := 0
+    while (k < nsym) {
+        s0 := samples[k * 4]
+        s1 := samples[k * 4 + 1]
+        s2 := samples[k * 4 + 2]
+        s3 := samples[k * 4 + 3]
+        I := 0.5 * (s0 - s2) / NTT_AMP
+        Q := 0 - 0.5 * (s1 - s3) / NTT_AMP
+        bi := qam_bits(I)
+        bq := qam_bits(Q)
+        bits <- u_trunc(bi / 2)
+        bits <- (bi % 2)
+        bits <- u_trunc(bq / 2)
+        bits <- (bq % 2)
+        k := k + 1
+    }
+    trimmed := []
+    i := 0
+    while (i < bitlen && i < len(bits)) { trimmed <- bits[i]; i := i + 1 }
+    return bits_to_bytes(trimmed)
+}
+
+# 画面表示・雑音評価のためのコンステレーション点
+def ntt_constellation(samples, limit) {
+    nsym := u_min(u_trunc(len(samples) / NTT_SPS), limit)
+    pts := []
+    k := 0
+    while (k < nsym) {
+        s0 := samples[k * 4]
+        s1 := samples[k * 4 + 1]
+        s2 := samples[k * 4 + 2]
+        s3 := samples[k * 4 + 3]
+        pts <- [0.5 * (s0 - s2) / NTT_AMP, 0 - 0.5 * (s1 - s3) / NTT_AMP]
+        k := k + 1
+    }
+    return pts
+}
+
+# ---- G.711 µ-law (ひかり電話のコーデック) ---------------------------
+MULAW_BIAS := 132
+MULAW_CLIP := 32635
+
+def mulaw_encode(sample) {
+    sign := 0
+    s := sample
+    if (s < 0) { s := 0 - s; sign := 128 }
+    if (s > MULAW_CLIP) { s := MULAW_CLIP }
+    s := s + MULAW_BIAS
+    exponent := 7
+    mask := 16384
+    while (u_and(s, mask) == 0 && exponent > 0) {
+        exponent := exponent - 1
+        mask := u_trunc(mask / 2)
+    }
+    mantissa := u_and(u_trunc(s / POW2[exponent + 3]), 15)
+    return 255 - u_or(u_or(sign, exponent * 16), mantissa)
+}
+
+def mulaw_decode(ulaw) {
+    u := 255 - ulaw
+    sign := u_and(u, 128)
+    exponent := u_and(u_trunc(u / 16), 7)
+    mantissa := u_and(u, 15)
+    s := (mantissa * 8 + MULAW_BIAS) * POW2[exponent]
+    s := s - MULAW_BIAS
+    if (sign != 0) { return 0 - s }
+    return s
+}
+
+# ---- RTP (ひかり電話が音声を運ぶ形式) -------------------------------
+RTP_PT_PCMU := 0
+RTP_PTIME   := 160      # 20 ms @ 8 kHz
+
+# -> パケットの並び。各要素は [seq, ts, header, payload]
+def rtp_packetize(ulaw, ssrc, seq0, ts0) {
+    pkts := []
+    i := 0
+    seq := seq0
+    ts := ts0
+    while (i < len(ulaw)) {
+        pay := []
+        k := 0
+        while (k < RTP_PTIME && i + k < len(ulaw)) { pay <- ulaw[i + k]; k := k + 1 }
+        hdr := [128, RTP_PT_PCMU, u_trunc(seq / 256) % 256, seq % 256]
+        j := 3
+        while (j >= 0) { hdr <- (u_trunc(ts / POW2[8 * j]) % 256); j := j - 1 }
+        j := 3
+        while (j >= 0) { hdr <- (u_trunc(ssrc / POW2[8 * j]) % 256); j := j - 1 }
+        pkts <- [seq, ts, hdr, pay]
+        seq := (seq + 1) % 65536
+        ts := (ts + len(pay)) % TWO32
+        i := i + RTP_PTIME
+    }
+    return pkts
+}
+
+# 順序が乱れていても seq で並べ直してから連結する
+def rtp_depacketize(pkts) {
+    n := len(pkts)
+    order := []
+    i := 0
+    while (i < n) { order <- i; i := i + 1 }
+    i := 1
+    while (i < n) {
+        j := i
+        while (j > 0 && pkts[order[j - 1]][0] > pkts[order[j]][0]) {
+            t := order[j - 1]
+            order[j - 1] = order[j]
+            order[j] = t
+            j := j - 1
+        }
+        i := i + 1
+    }
+    out := []
+    i := 0
+    while (i < n) {
+        pay := pkts[order[i]][3]
+        k := 0
+        while (k < len(pay)) { out <- pay[k]; k := k + 1 }
+        i := i + 1
+    }
+    return out
+}
+
+# ---- ベアラ ---------------------------------------------------------
+# バイト列 -> 回線上の信号
+#   [kind, line, bitLen, データ] 。kind は "digital" / "voiceband" / "rtp"
+def ntt_bearer_send(bytes, line, ssrc) {
+    if (line == "isdn") {
+        oct := [126]
+        i := 0
+        while (i < len(bytes)) { oct <- bytes[i]; i := i + 1 }
+        oct <- 126
+        return ["digital", line, len(bytes) * 8, oct]
+    }
+    vb := ntt_modulate(bytes)
+    if (line == "metal") { return ["voiceband", line, len(bytes) * 8, vb] }
+    ulaw := []
+    i := 0
+    while (i < len(vb)) { ulaw <- mulaw_encode(vb[i]); i := i + 1 }
+    return ["rtp", line, len(bytes) * 8, rtp_packetize(ulaw, ssrc, 1000, 0)]
+}
+
+# 回線上の信号 -> バイト列
+def ntt_bearer_recv(sig) {
+    kind := sig[0]
+    if (kind == "digital") {
+        oct := sig[3]
+        out := []
+        i := 1
+        while (i < len(oct) - 1) { out <- oct[i]; i := i + 1 }
+        return out
+    }
+    if (kind == "rtp") {
+        ulaw := rtp_depacketize(sig[3])
+        vb := []
+        i := 0
+        while (i < len(ulaw)) { vb <- mulaw_decode(ulaw[i]); i := i + 1 }
+        return ntt_demodulate(vb, sig[2])
+    }
+    return ntt_demodulate(sig[3], sig[2])
+}
+
+# ---- 呼制御 (発呼 -> 接続 -> ベアラ確立) ----------------------------
+def ntt_call(from_url, to_url, line) {
+    kind := "geo"
+    if (line == "hikari") { kind := "ip" }
+    a := ntt_map(from_url, kind)
+    b := ntt_map(to_url, kind)
+    st := []
+    st <- ["on-hook",   "待機"]
+    st <- ["off-hook",  "発呼 (" + ntt_format(a[0]) + ")"]
+    st <- ["dial",      "選択信号 " + ntt_format(b[0]) + " (PB 信号)"]
+    st <- ["ringing",   "呼出中 — 相手交換機へ IAM"]
+    st <- ["connected", ntt_line_name(line) + " 接続 · " + ntt_line_bps(line) + " bps"]
+    st <- ["data",      "ベアラ確立"]
+    return [a, b, st]
+}

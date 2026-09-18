@@ -1,0 +1,308 @@
+# ============================================================
+# 08_msgmux.bada -- BADA ULTRA NETWORK / L4 メッセージ多重化
+#
+# LINE と Instagram のメッセージ機能をウルトラネットワークに取り込む層。
+# 取り込みは各社が公開している「公式 API の仕様どおり」に行う。
+#
+#   LINE      Messaging API の Webhook イベント
+#             署名 X-Line-Signature = Base64(HMAC-SHA256(channelSecret, 生の本文))
+#             送信 /v2/bot/message/reply · /v2/bot/message/push
+#   Instagram Instagram Graph API (Messenger Platform) の Webhook
+#             署名 X-Hub-Signature-256 = "sha256=" + hex(HMAC-SHA256(appSecret, 生の本文))
+#             送信 /<IG_ID>/messages
+#
+# 非公開 API の解析や認証の迂回は一切しない。実運用には各
+# プラットフォームで発行したチャネルシークレット / アクセストークンが
+# 要る。それが無い場合は、公式仕様と同じ形の本文を組み立てて
+# 署名経路まで本物を通すローカル模擬 (msg_simulate) で動かす。
+#
+# 統合メッセージの表現:
+#   ["msg", platform, chatId, userId, displayName, type, text, replyToken, ts]
+# ============================================================
+
+LINE_REPLY_EP := "https://api.line.me/v2/bot/message/reply"
+LINE_PUSH_EP  := "https://api.line.me/v2/bot/message/push"
+IG_SEND_EP    := "https://graph.instagram.com/v21.0/{IG_ID}/messages"
+LINE_DOCS     := "https://developers.line.biz/ja/reference/messaging-api/"
+IG_DOCS       := "https://developers.facebook.com/docs/messenger-platform/instagram/"
+
+# ---- 署名 -----------------------------------------------------------
+def line_signature(secret, raw_body) {
+    return base64_of_bytes(hmac_sha256(utf8_of_str(secret), utf8_of_str(raw_body)))
+}
+
+def line_verify(secret, raw_body, header) {
+    return const_time_eq_str(line_signature(secret, raw_body), header)
+}
+
+def ig_signature(secret, raw_body) {
+    return "sha256=" + hex_of_bytes(hmac_sha256(utf8_of_str(secret), utf8_of_str(raw_body)))
+}
+
+def ig_verify(secret, raw_body, header) {
+    return const_time_eq_str(ig_signature(secret, raw_body), header)
+}
+
+# ---- 統合メッセージ -------------------------------------------------
+def msg_new(platform, chat, user, name, type, text, reply, ts) {
+    return ["msg", platform, chat, user, name, type, text, reply, ts]
+}
+
+def msg_platform(m) { return m[1] }
+def msg_chat(m)     { return m[2] }
+def msg_user(m)     { return m[3] }
+def msg_name(m)     { return m[4] }
+def msg_type(m)     { return m[5] }
+def msg_text(m)     { return m[6] }
+def msg_reply(m)    { return m[7] }
+def msg_ts(m)       { return m[8] }
+
+# 統合メッセージが載る zone アドレス (これが NTT 番号へ写像される)
+def msg_zone_url(m) {
+    chat := m[2]
+    if (chat == "") { chat := "self" }
+    return "zone://url.or.jp/msg/" + m[1] + "/" + chat
+}
+
+# 転送用の直列化 (封緘の対象になる)
+def msg_serialize(m) {
+    return json_stringify(jobj(["v","p","c","u","n","t","x","r","ts"],
+        [jnum(1), jstr(m[1]), jstr(m[2]), jstr(m[3]), jstr(m[4]),
+         jstr(m[5]), jstr(m[6]), jstr(m[7]), jnum(m[8])]))
+}
+
+def msg_deserialize(s) {
+    v := json_parse(s)
+    return msg_new(json_str(json_get(v, "p")), json_str(json_get(v, "c")),
+                   json_str(json_get(v, "u")), json_str(json_get(v, "n")),
+                   json_str(json_get(v, "t")), json_str(json_get(v, "x")),
+                   json_str(json_get(v, "r")), json_num(json_get(v, "ts")))
+}
+
+# ---- LINE Messaging API の Webhook イベント -> 統合メッセージ --------
+def msg_from_line_event(ev) {
+    if (json_str(json_get(ev, "type")) != "message") { return [] }
+    msgo := json_get(ev, "message")
+    if (json_is(msgo, "null")) { return [] }
+    src := json_get(ev, "source")
+    chat := json_str(json_get(src, "groupId"))
+    if (chat == "") { chat := json_str(json_get(src, "roomId")) }
+    if (chat == "") { chat := json_str(json_get(src, "userId")) }
+    mtype := json_str(json_get(msgo, "type"))
+    text := ""
+    if (mtype == "text") { text := json_str(json_get(msgo, "text")) }
+    else {
+        if (mtype == "sticker") {
+            text := "[スタンプ " + json_str(json_get(msgo, "packageId")) + "/" +
+                    json_str(json_get(msgo, "stickerId")) + "]"
+        } else { text := "[" + mtype + "]" }
+    }
+    name := json_str(json_path(ev, "__profile.displayName"))
+    if (name == "") { name := "LINE ユーザー" }
+    return [msg_new("line", chat, json_str(json_get(src, "userId")), name, mtype, text,
+                    json_str(json_get(ev, "replyToken")), json_num(json_get(ev, "timestamp")))]
+}
+
+# -> [status, メッセージの並び, 署名が検証されたか]
+def msg_ingest_line(raw_body, secret, sig_header) {
+    verified := true
+    if (secret != "") {
+        verified := line_verify(secret, raw_body, sig_header)
+        if (!verified) { return [401, [], false] }
+    }
+    body := json_parse(raw_body)
+    evs := json_get(body, "events")
+    out := []
+    i := 0
+    while (i < json_len(evs)) {
+        m := msg_from_line_event(json_at(evs, i))
+        if (len(m) == 1) { out <- m[0] }
+        i := i + 1
+    }
+    return [200, out, verified]
+}
+
+# ---- Instagram Graph API の Webhook -> 統合メッセージ ----------------
+def msg_from_ig_messaging(mg, entry_id) {
+    msgo := json_get(mg, "message")
+    if (json_is(msgo, "null")) { return [] }
+    if (json_bool(json_get(msgo, "is_echo"))) { return [] }
+    sender := json_str(json_path(mg, "sender.id"))
+    text := json_str(json_get(msgo, "text"))
+    mtype := "text"
+    atts := json_get(msgo, "attachments")
+    if (json_len(atts) > 0) {
+        mtype := json_str(json_path(msgo, "attachments.0.type"))
+        if (mtype == "") { mtype := "image" }
+        if (text == "") { text := "[" + mtype + "]" }
+    }
+    name := json_str(json_path(mg, "__profile.username"))
+    if (name == "") { name := "IG:" + sender }
+    return [msg_new("instagram", sender, sender, name, mtype, text, "",
+                    json_num(json_get(mg, "timestamp")))]
+}
+
+def msg_ingest_instagram(raw_body, secret, sig_header) {
+    verified := true
+    if (secret != "") {
+        verified := ig_verify(secret, raw_body, sig_header)
+        if (!verified) { return [401, [], false] }
+    }
+    body := json_parse(raw_body)
+    entries := json_get(body, "entry")
+    out := []
+    i := 0
+    while (i < json_len(entries)) {
+        entry := json_at(entries, i)
+        eid := json_str(json_get(entry, "id"))
+        ms := json_get(entry, "messaging")
+        k := 0
+        while (k < json_len(ms)) {
+            m := msg_from_ig_messaging(json_at(ms, k), eid)
+            if (len(m) == 1) { out <- m[0] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    return [200, out, verified]
+}
+
+# ---- 公式 API への送信要求 ------------------------------------------
+# -> [endpoint, method, 認可ヘッダ, 本文 JSON]
+def msg_to_line_reply(reply_token, text) {
+    body := jobj(["replyToken", "messages"],
+                 [jstr(reply_token),
+                  jarr([jobj(["type", "text"], [jstr("text"), jstr(text)])])])
+    return [LINE_REPLY_EP, "POST", "Bearer {CHANNEL_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_line_push(to, text) {
+    body := jobj(["to", "messages"],
+                 [jstr(to),
+                  jarr([jobj(["type", "text"], [jstr("text"), jstr(text)])])])
+    return [LINE_PUSH_EP, "POST", "Bearer {CHANNEL_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_instagram_send(ig_id, recipient, text) {
+    ep := IG_SEND_EP
+    cut := str_find(ep, "{IG_ID}")
+    if (cut >= 0) {
+        ep := substr(ep, 0, cut) + ig_id + substr(ep, cut + 7, len(ep) - cut - 7)
+    }
+    body := jobj(["recipient", "message"],
+                 [jobj(["id"], [jstr(recipient)]),
+                  jobj(["text"], [jstr(text)])])
+    return [ep, "POST", "Bearer {IG_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_outbound(m, ig_id) {
+    if (m[1] == "line") {
+        if (m[7] != "") { return msg_to_line_reply(m[7], m[6]) }
+        return msg_to_line_push(m[2], m[6])
+    }
+    if (m[1] == "instagram") { return msg_to_instagram_send(ig_id, m[2], m[6]) }
+    return [msg_zone_url(m), "PUT", "", json_stringify(jstr(m[6]))]
+}
+
+# ---- ローカル模擬 (資格情報が無くても署名経路を本物で通す) -----------
+SIM_LINE_ID   := ["U4af4980629...", "U9c1f2d7b41...", "Ub2e88a0f53..."]
+SIM_LINE_NAME := ["田中 さくら", "山口 まさあき", "研究会グループ"]
+SIM_LINE_TEXT := ["電力線でつながった?", "コンセントから zone:// が見えてる",
+                  "今日の実験ログ送るね", "NTT の番号写像うまくいった?",
+                  "量子鍵の QBER は 0 だった"]
+SIM_IG_ID     := ["17841400000000001", "17841400000000002"]
+SIM_IG_NAME   := ["sakura.photo", "bada.lang"]
+SIM_IG_TEXT   := ["配線図の写真あげたよ", "ウルトラネットワークの図が綺麗",
+                  "この投稿みて!", "DM ありがとう"]
+
+# LINE の Webhook 本文を公式仕様の形で組み立てて、生の JSON 文字列を返す
+def sim_line_body(n, seed) {
+    rnd := rng_new("simline:" + seed)
+    evs := []
+    i := 0
+    while (i < n) {
+        who := u_trunc(rng_next(rnd) * len(SIM_LINE_ID)) % len(SIM_LINE_ID)
+        wht := u_trunc(rng_next(rnd) * len(SIM_LINE_TEXT)) % len(SIM_LINE_TEXT)
+        ev := jobj(["type", "mode", "timestamp", "source", "webhookEventId",
+                    "deliveryContext", "replyToken", "message", "__profile"],
+            [jstr("message"), jstr("active"), jnum(1700000000000 + i * 60000),
+             jobj(["type", "userId"], [jstr("user"), jstr(SIM_LINE_ID[who])]),
+             jstr("01H" + (1000000 + i * 7)),
+             jobj(["isRedelivery"], [jbool(false)]),
+             jstr(hex_of_word32(mix32("rt:" + seed + ":" + i))),
+             jobj(["id", "type", "text"],
+                  [jstr("" + (100000000000000 + i)), jstr("text"), jstr(SIM_LINE_TEXT[wht])]),
+             jobj(["displayName"], [jstr(SIM_LINE_NAME[who])])])
+        evs <- ev
+        i := i + 1
+    }
+    return json_stringify(jobj(["destination", "events"],
+        [jstr("Ubada0000000000000000000000000000"), jarr(evs)]))
+}
+
+# Instagram の Webhook 本文を公式仕様の形で組み立てる
+def sim_instagram_body(n, seed) {
+    rnd := rng_new("simig:" + seed)
+    ms := []
+    i := 0
+    while (i < n) {
+        who := u_trunc(rng_next(rnd) * len(SIM_IG_ID)) % len(SIM_IG_ID)
+        wht := u_trunc(rng_next(rnd) * len(SIM_IG_TEXT)) % len(SIM_IG_TEXT)
+        mg := jobj(["sender", "recipient", "timestamp", "message", "__profile"],
+            [jobj(["id"], [jstr(SIM_IG_ID[who])]),
+             jobj(["id"], [jstr("17841499999999999")]),
+             jnum(1700000000000 + i * 60000),
+             jobj(["mid", "text"],
+                  [jstr("aWc6" + hex_of_word32(mix32("mid:" + seed + ":" + i))),
+                   jstr(SIM_IG_TEXT[wht])]),
+             jobj(["username"], [jstr(SIM_IG_NAME[who])])])
+        ms <- mg
+        i := i + 1
+    }
+    entry := jobj(["id", "time", "messaging"],
+        [jstr("17841499999999999"), jnum(1700000000), jarr(ms)])
+    return json_stringify(jobj(["object", "entry"], [jstr("instagram"), jarr([entry])]))
+}
+
+# 署名まで含めた完全な模擬 Webhook -> [status, メッセージの並び, 検証, 生本文, 署名]
+def msg_simulate(platform, n, secret, seed) {
+    if (platform == "line") {
+        raw := sim_line_body(n, seed)
+        sig := line_signature(secret, raw)
+        r := msg_ingest_line(raw, secret, sig)
+        return [r[0], r[1], r[2], raw, sig]
+    }
+    raw := sim_instagram_body(n, seed)
+    sig := ig_signature(secret, raw)
+    r := msg_ingest_instagram(raw, secret, sig)
+    return [r[0], r[1], r[2], raw, sig]
+}
+
+# ---- 統合受信箱 ------------------------------------------------------
+# [キーの並び, スレッドの並び] 。各スレッドは [platform, chatId, 表示名, メッセージの並び]
+def inbox_new() { return [[], []] }
+
+def inbox_add(box, m) {
+    key := m[1] + ":" + m[2]
+    i := 0
+    while (i < len(box[0])) {
+        if (box[0][i] == key) {
+            box[1][i][3] <- m
+            box[1][i][2] = m[4]
+            return i
+        }
+        i := i + 1
+    }
+    box[0] <- key
+    box[1] <- [m[1], m[2], m[4], [m]]
+    return len(box[0]) - 1
+}
+
+def inbox_count(box) {
+    n := 0
+    i := 0
+    while (i < len(box[1])) { n := n + len(box[1][i][3]); i := i + 1 }
+    return n
+}
+
+def inbox_threads(box) { return box[1] }

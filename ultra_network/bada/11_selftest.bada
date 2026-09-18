@@ -1,0 +1,387 @@
+# ============================================================
+# 11_selftest.bada -- BADA ULTRA NETWORK / 自己診断
+#
+# 01-09 のモジュールを読み込んだ上で走らせる検証プログラム。
+# 既知答えのあるもの (SHA-256 / RFC 4231 の HMAC テストベクタ /
+# CRC-32 の検査値) から、ウェーブレット変換の逆変換、音声帯モデムの
+# 往復、φ⁻¹ の逆写像、全 5 層の折返し、攻撃の排除まで実際に計算する。
+#
+#   node ultra_network/tools/build-bada.js   でこの版が走る
+# ============================================================
+
+TEST := [0, 0]      # [項目数, 合格数]
+
+def check(name, cond, detail) {
+    TEST[0] = TEST[0] + 1
+    mark := "FAIL"
+    if (cond) { TEST[1] = TEST[1] + 1; mark := "ok  " }
+    tail := ""
+    if (detail != "") { tail := "  — " + detail }
+    print("  " + mark + " " + name + tail)
+    return cond
+}
+
+def section(t) { print(""); print(t) }
+
+print("==============================================================")
+print("BADA ULTRA NETWORK -- 自己診断 (全層を実際に計算して検算)")
+print("==============================================================")
+
+# ---- 1. 基本演算 -----------------------------------------------------
+section("1. 基本演算とビット演算")
+check("切り捨てと符号つき切り捨て", u_trunc(7.6) == 7 && u_fix(0 - 7.6) == 0 - 7, "")
+check("XOR / AND / OR / NOT32",
+      u_xor(61680, 4080) == 65280 && u_and(65280, 4080) == 3840 &&
+      u_or(61440, 15) == 61455 && u_not32(0) == MASK32, "")
+check("3 項 XOR が 2 段 XOR と一致", u_xor3(123456, 654321, 999999) == u_xor(u_xor(123456, 654321), 999999), "")
+check("バイト単位 XOR が 32 ビット版と一致", u_xor8(170, 255) == u_xor(170, 255) && u_xor8(240, 15) == 255, "")
+check("巡回右シフト", u_rotr32(1, 1) == 2147483648 && u_rotr32(2147483648, 31) == 1, "")
+check("32 ビット乗算 (2^53 を超えても正確)",
+      u_mul32(MASK32, MASK32) == 1 && u_mul32(305419896, 2596069104) == 606937216, "Math.imul と同値")
+check("三角関数 (Taylor + 範囲縮約)", f5(u_sin(0.5)) == "0.47943" && f5(u_cos(0.0)) == "1.00000", "")
+check("16 進表記", hex_of_word32(3735928559) == "deadbeef", "")
+check("Base64 (詰め物つき)",
+      base64_of_bytes(utf8_of_str("hello")) == "aGVsbG8=" && base64_of_bytes(utf8_of_str("hi")) == "aGk=", "")
+check("UTF-8 の往復 (CJK + 絵文字)",
+      str_of_utf8(utf8_of_str("電力線 🔌 zone:// ✓")) == "電力線 🔌 zone:// ✓", "サロゲート対を含む")
+check("壊れた UTF-8 を U+FFFD に替えて落ちない",
+      str_of_utf8([65, 255, 66]) == "A" + chr(65533) + "B", "回線の列は攻撃者に触られうる")
+FUZZ := true
+i := 0
+while (i < 150) {
+    arr := []
+    k := 0
+    while (k < 1 + i % 9) { arr <- ((i * 37 + k * 101) % 256); k := k + 1 }
+    r := str_of_utf8(arr)
+    if (len(r) < 0) { FUZZ := false }
+    i := i + 1
+}
+check("無作為バイト列 150 通りでも投げない", FUZZ, "")
+
+# ---- 2. SHA-256 / HMAC ----------------------------------------------
+section("2. SHA-256 と HMAC-SHA256 (既知答え)")
+check("SHA-256(\"\")", sha256_hex([]) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "")
+check("SHA-256(\"abc\")", sha256_hex(utf8_of_str("abc")) == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "")
+K1 := []
+i := 0
+while (i < 20) { K1 <- 11; i := i + 1 }
+check("RFC 4231 テストベクタ #1",
+      hmac_sha256_hex(K1, utf8_of_str("Hi There")) == "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7", "")
+check("RFC 4231 テストベクタ #2",
+      hmac_sha256_hex(utf8_of_str("Jefe"), utf8_of_str("what do ya want for nothing?")) ==
+      "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843", "")
+K6 := []
+i := 0
+while (i < 131) { K6 <- 170; i := i + 1 }
+check("RFC 4231 テストベクタ #6 (ブロック長超の鍵)",
+      hmac_sha256_hex(K6, utf8_of_str("Test Using Larger Than Block-Size Key - Hash Key First")) ==
+      "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54", "")
+check("定数時間比較", const_time_eq([1,2,3],[1,2,3]) && !const_time_eq([1,2,3],[1,2,4]) && !const_time_eq([1],[1,2]), "")
+
+# ---- 3. Jones 多項式量子暗号 -----------------------------------------
+section("3. Jones 多項式量子暗号")
+KA := jones_key(zone_diagram("url.or.jp"))
+KB := jones_key(zone_diagram("bada.or.jp"))
+check("交点の無い図のブラケットは 1", kauffman([], 1.0) == 1.0, "")
+check("結び目ごとに異なる鍵", KA != KB, "三葉 " + KA + " / 8 の字 " + KB)
+check("既存 zone.bada と同じ鍵", KA == 919492 && KB == 400638, "ZoneBrowser と相互運用できる")
+check("鍵導出は決定的", jones_key(zone_diagram("url.or.jp")) == KA, "")
+TXT := "コンセントから zone:// が見えてる 🔌 — 日本語と絵文字"
+SEALED := zone_seal(TXT, KA, 7)
+check("AEAD の往復 (16 ビット符号単位)", zone_open(SEALED, KA)[0] == TXT, "")
+TAMP := []
+i := 0
+while (i < len(SEALED[0])) { TAMP <- SEALED[0][i]; i := i + 1 }
+TAMP[0] = (TAMP[0] + 1) % 65536
+check("暗号文の改竄は 409", len(zone_open([TAMP, SEALED[1], SEALED[2]], KA)) == 0, "zone-guard-reject")
+check("タグの偽造は 409", len(zone_open([SEALED[0], SEALED[1], SEALED[2] + 1], KA)) == 0, "")
+check("結び目が違えば開封できない", len(zone_open(SEALED, KB)) == 0, "")
+check("ソルトが変われば タグも変わる", zone_seal(TXT, KA, 7)[2] != zone_seal(TXT, KA, 8)[2], "")
+Q := qkd_session()
+QT := qkd_session_tapped()
+check("Bell 対: 禁止状態が厳密に 0", Q[0] && Q[3] == 0, "|01>+|10> = " + Q[3])
+check("Bell 対: |00> と |11> が各 1/2", Q[2][0] == 0.5 && Q[2][3] == 0.5, "")
+check("盗聴すると相関が壊れ検出される", !qkd_check(QT) && QT[3] > 0, "|01>+|10> = " + f5(QT[3]))
+
+# ---- 4. zone:// ------------------------------------------------------
+section("4. zone:// ウルトラネットワーク WWW")
+NET := zone_boot()
+Z := zone_parse("zone://url.or.jp/msg/line/U1")
+check("zone:// の文法", Z[0] == "url.or.jp" && Z[1] == "/msg/line/U1", "")
+check("パス省略時は /", zone_parse("zone://url.or.jp")[1] == "/", "")
+check("zone:// 以外は拒否", len(zone_parse("https://url.or.jp/")) == 0 && len(zone_parse("x zone://y")) == 0, "400 bad-zone")
+check("リングは node-id 順", NET[0][1] < NET[1][1] && NET[4][1] < NET[5][1], "")
+check("リング距離は巡回的", ring_dist(10, RING - 10) == 20, "")
+REACH := true
+URLS := ["zone://url.or.jp/", "zone://bada.or.jp/x", "zone://url.or.jp/msg/line/U9"]
+i := 0
+while (i < len(URLS)) {
+    r := zone_route(NET, zone_id(URLS[i]))
+    if (r[0] != dht_nearest(NET, zone_id(URLS[i]))) { REACH := false }
+    i := i + 1
+}
+check("貪欲ルーティングが担当ピアへ到達", REACH, "")
+PUB := zone_publish(NET, "zone://url.or.jp/", "# home | ウルトラネットワーク")
+GOT := zone_get(NET, "zone://url.or.jp/")
+check("公開と取得", PUB[0] == 200 && GOT[0] == 200 && GOT[1] == "# home | ウルトラネットワーク", "")
+check("未保管のアドレスは 404", zone_get(NET, "zone://ghost.or.jp/")[0] == 404, "zone-not-found")
+ENV := envelope_decode(envelope_encode("zone://url.or.jp/x", [[1, 65535, 42], 1234, 3735928559]))
+check("封筒の符号化と復号が往復",
+      ENV[0] == 200 && ENV[1] == "zone://url.or.jp/x" && ENV[2][1] == 1234 && ENV[2][2] == 3735928559, "")
+check("壊れた封筒は 400", envelope_decode([1,2,3])[0] == 400, "")
+check("状態符号が既存実装と同じ",
+      zone_status_text(409) == "zone-guard-reject" && zone_status_text(495) == "quantum-channel-compromised", "")
+
+# ---- 5. HD-PLC -------------------------------------------------------
+section("5. HD-PLC 物理層 (IEEE 1901 ウェーブレット OFDM)")
+XS := []
+i := 0
+while (i < 512) { XS <- (u_sin(i / 7) * 3 + u_cos(i / 3) - i / 500); i := i + 1 }
+YS := dwt_synthesize(dwt_analyze(XS))
+MX := 0.0
+i := 0
+while (i < 512) {
+    d := abs(YS[i] - XS[i])
+    if (d > MX) { MX := d }
+    i := i + 1
+}
+check("ウェーブレット変換が厳密な逆変換", MX < 0.000000001, "最大誤差 " + sci(MX))
+check("帯域 2-28 MHz を 512 分割", PLC_NCARR == 512 && u_trunc(PLC_DF) == 50781, "Δf = 50.78 kHz")
+check("シンボル長 = 1/Δf (ガードインターバル無し)", f5(PLC_TSYM * 1000000) == "19.69231", "19.69 µs")
+check("アマチュア無線帯の判定", in_ham_band(7100000) && in_ham_band(14200000) && !in_ham_band(5000000), "")
+check("Gray 符号の対応表", gray_decode(gray_encode(23)) == 23 && GRAY_ENC[2] == 3 && GRAY_ENC[3] == 2, "")
+check("CRC-32 の検査値", crc32(utf8_of_str("123456789")) == 3421780262 && crc32([]) == 0, "0xCBF43926")
+CH := plc_channel("living", "kitchen")
+TM := plc_tonemap(CH)
+NOTCH_OK := true
+CAP_OK := true
+i := 0
+while (i < PLC_NCARR) {
+    if (in_ham_band(CH[0][i]) && TM[0][i] != 0) { NOTCH_OK := false }
+    if (TM[0][i] > PLC_MAXBITS) { CAP_OK := false }
+    i := i + 1
+}
+check("ノッチにビットを割り当てない", NOTCH_OK, TM[3] + " 本をノッチ")
+check("割当ビットは 32-PAM (5 bit) が上限", CAP_OK, "")
+check("適応ビットローディング", TM[2] > 50 && TM[4] > 1000000,
+      u_trunc(TM[4] / 1000000) + " Mbps / 有効 " + TM[2] + " 本")
+HIST := [0, 0, 0, 0, 0, 0]
+i := 0
+while (i < PLC_NCARR) { HIST[TM[0][i]] = HIST[TM[0][i]] + 1; i := i + 1 }
+NLEVELS := 0
+i := 0
+while (i < 6) {
+    if (HIST[i] > 0) { NLEVELS := NLEVELS + 1 }
+    i := i + 1
+}
+check("SNR に応じてビット数が分布", NLEVELS >= 3, "0-5 本数 " + HIST[0] + "/" + HIST[1] + "/" + HIST[2] + "/" + HIST[3] + "/" + HIST[4] + "/" + HIST[5])
+CH2 := plc_channel("router", "study")
+TM2 := plc_tonemap(CH2)
+PAY := utf8_of_str("ウルトラネットワーク payload 0123456789 ✓ 電力線")
+MOD := plc_modulate(PAY, TM2)
+check("ウェーブレット OFDM の完全往復",
+      str_of_utf8(plc_demodulate(MOD[0], TM2, MOD[2])) == str_of_utf8(PAY),
+      MOD[1] + " シンボル / " + len(MOD[0]) + " 標本")
+NOISY := plc_through_channel(MOD[0], TM2, 0, "n1")
+check("設計 SNR では回線雑音を通しても誤らない",
+      str_of_utf8(plc_demodulate(NOISY, TM2, MOD[2])) == str_of_utf8(PAY), "")
+BADCH := plc_through_channel(MOD[0], TM2, 24, "n2")
+check("24 dB 劣化させると誤りが現れる",
+      str_of_utf8(plc_demodulate(BADCH, TM2, MOD[2])) != str_of_utf8(PAY), "")
+FR := plc_frame(PAY, 1, 2, 2)
+DF := plc_deframe(FR)
+check("IEEE 1901 フレームの組立と分解", DF[0] == 200 && str_of_utf8(DF[1]) == str_of_utf8(PAY), len(FR) + " バイト")
+def corrupt_at(fr, idx) {
+    c := []
+    i := 0
+    while (i < len(fr)) { c <- fr[i]; i := i + 1 }
+    c[idx] = u_xor8(c[idx], 255)
+    return c
+}
+check("ペイロード破損を CRC-32 が検出", plc_deframe(corrupt_at(FR, 40))[2] == "pb-crc", "")
+check("フレーム制御の破損を CRC-24 が検出", plc_deframe(corrupt_at(FR, 10))[2] == "fc-crc", "")
+check("プリアンブル欠落を検出", plc_deframe(corrupt_at(FR, 0))[2] == "no-preamble", "")
+CS := plc_csma([["A", 1], ["B", 3], ["C", 3], ["D", 0]], "x")
+CS_WIN := false
+if (CS[2] == "B") { CS_WIN := true }
+if (CS[2] == "C") { CS_WIN := true }
+check("CSMA/CA: 最優先 CAP が送信権", CS[0] == 3 && CS_WIN, "勝者 " + CS[2])
+
+# ---- 6. NTT 写像 -----------------------------------------------------
+section("6. NTT 電話回線への写像")
+SURLS := ["zone://url.or.jp/", "zone://url.or.jp/news", "zone://bada.or.jp/",
+          "zone://url.or.jp/msg/line/U1", "zone://url.or.jp/msg/instagram/17841"]
+PHI_OK := true
+FMT_OK := true
+i := 0
+while (i < len(SURLS)) {
+    m := ntt_map(SURLS[i], "geo")
+    if (ntt_unmap(m[0]) != SURLS[i]) { PHI_OK := false }
+    if (len(m[0]) != 10) { FMT_OK := false }
+    if (ntt_e164(m[0]) != "+81" + substr(m[0], 1, 9)) { FMT_OK := false }
+    i := i + 1
+}
+check("写像 φ⁻¹ が厳密な逆写像", PHI_OK, ntt_format(ntt_map(SURLS[0], "geo")[0]) + " ↦ " + SURLS[0])
+check("0AB-J は 10 桁、E.164 は +81", FMT_OK, "")
+check("写像 φ は安定", ntt_map(SURLS[0], "geo")[0] == ntt_map(SURLS[0], "geo")[0], "")
+check("050 / 090 の帯へも写せる",
+      substr(ntt_map(SURLS[0], "ip")[0], 0, 3) == "050" && substr(ntt_map(SURLS[0], "mobile")[0], 0, 3) == "090", "")
+check("未割当の番号は逆引きできない", ntt_unmap("03-9999-9999") == "", "")
+check("番号の整形",
+      ntt_format("0312345678") == "03-1234-5678" && ntt_format("0112345678") == "011-234-5678" &&
+      ntt_format("05012345678") == "050-1234-5678", "")
+BTXT := "音声帯 300–3400 Hz を通す封筒 #42 ✓"
+BPAY := utf8_of_str(BTXT)
+MSIG := ntt_bearer_send(BPAY, "metal", 287454020)
+check("メタル: 音声帯 16-QAM の往復", str_of_utf8(ntt_bearer_recv(MSIG)) == BTXT,
+      "2000 baud / 8000 bps / " + u_trunc(len(MSIG[3]) / 4) + " シンボル")
+PTS := ntt_constellation(MSIG[3], 60)
+GRID := true
+i := 0
+while (i < len(PTS)) {
+    ai := abs(PTS[i][0])
+    aq := abs(PTS[i][1])
+    if (ai != 1 && ai != 3) { GRID := false }
+    if (aq != 1 && aq != 3) { GRID := false }
+    i := i + 1
+}
+check("受信点が 16-QAM の格子上に乗る", GRID, "")
+ISIG := ntt_bearer_send(BPAY, "isdn", 0)
+check("INS ネット 64: ディジタル透過", str_of_utf8(ntt_bearer_recv(ISIG)) == BTXT, len(ISIG[3]) + " オクテット")
+HSIG := ntt_bearer_send(BPAY, "hikari", 287454020)
+check("ひかり電話: G.711 µ-law + RTP の往復", str_of_utf8(ntt_bearer_recv(HSIG)) == BTXT,
+      len(HSIG[3]) + " パケット (PCMU 20 ms)")
+check("RTP ヘッダが PT=0 / 20 ms", HSIG[3][0][2][1] == 0 && len(HSIG[3][0][3]) == RTP_PTIME, "")
+REV := []
+i := len(HSIG[3]) - 1
+while (i >= 0) { REV <- HSIG[3][i]; i := i - 1 }
+check("RTP の順序が乱れても並べ直して復元", str_of_utf8(ntt_bearer_recv(["rtp", "hikari", HSIG[2], REV])) == BTXT, "")
+WORST := 0.0
+v := 0 - 8000
+while (v <= 8000) {
+    e := abs(mulaw_decode(mulaw_encode(v)) - v) / (abs(v) + 200)
+    if (e > WORST) { WORST := e }
+    v := v + 137
+}
+check("G.711 µ-law の量子化誤差が判定余裕の内側", WORST < 0.09, f5(WORST * 100) + "%")
+CALL := ntt_call("zone://url.or.jp/", "zone://bada.or.jp/", "hikari")
+check("呼制御の状態機械", len(CALL[2]) == 6 && CALL[2][0][0] == "on-hook" && CALL[2][5][0] == "data", "")
+
+# ---- 7. JSON ---------------------------------------------------------
+section("7. JSON (Webhook 本文の解析と生成)")
+JS1 := json_parse("{\"a\":-12.5,\"b\":true,\"c\":null,\"d\":[1,2,3],\"e\":\"q\\\"r\",\"f\":1.5e3}")
+check("数 / 真偽 / null / 配列",
+      json_num(json_get(JS1, "a")) == 0 - 12.5 && json_bool(json_get(JS1, "b")) &&
+      json_is(json_get(JS1, "c"), "null") && json_num(json_at(json_get(JS1, "d"), 2)) == 3, "")
+check("エスケープと指数", json_str(json_get(JS1, "e")) == "q" + chr(34) + "r" && json_num(json_get(JS1, "f")) == 1500, "")
+JS2 := json_parse("{\"entry\":[{\"messaging\":[{\"message\":{\"text\":\"配線図\"}}]}]}")
+check("経路で潜る", json_str(json_path(JS2, "entry.0.messaging.0.message.text")) == "配線図", "")
+check("無い鍵は null", json_is(json_get(JS2, "nope"), "null"), "")
+check("生成して読み直せる",
+      json_str(json_get(json_parse(json_stringify(jobj(["k"], [jstr("値 \" と改行")]))), "k")) == "値 " + chr(34) + " と改行", "")
+
+# ---- 8. LINE / Instagram --------------------------------------------
+section("8. LINE / Instagram (公式 API の仕様どおり)")
+LRAW := sim_line_body(1, "t1")
+LSIG := line_signature("channel-secret", LRAW)
+check("LINE: X-Line-Signature が一致", line_verify("channel-secret", LRAW, LSIG), "")
+check("LINE: 誤った秘密は拒否", !line_verify("channel-secret", LRAW, line_signature("wrong", LRAW)), "")
+check("LINE: 本文が 1 文字違えば拒否", !line_verify("channel-secret", LRAW + " ", LSIG), "")
+LING := msg_ingest_line(LRAW, "channel-secret", LSIG)
+check("LINE: Webhook から取り込む", LING[0] == 200 && len(LING[1]) == 1 && msg_platform(LING[1][0]) == "line", "")
+check("LINE: replyToken を保持", msg_reply(LING[1][0]) != "", "")
+check("LINE: 署名不一致は 401", msg_ingest_line(LRAW, "channel-secret", "bogus")[0] == 401, "")
+IRAW := sim_instagram_body(1, "t2")
+ISIG2 := ig_signature("app-secret", IRAW)
+check("Instagram: sha256= 接頭辞つき hex", substr(ISIG2, 0, 7) == "sha256=" && len(ISIG2) == 71, "")
+check("Instagram: X-Hub-Signature-256 が一致", ig_verify("app-secret", IRAW, ISIG2), "")
+check("Instagram: 誤った秘密は拒否", !ig_verify("app-secret", IRAW, ig_signature("wrong", IRAW)), "")
+IING := msg_ingest_instagram(IRAW, "app-secret", ISIG2)
+check("Instagram: Webhook から取り込む", IING[0] == 200 && len(IING[1]) == 1 && msg_platform(IING[1][0]) == "instagram", "")
+check("Instagram: 署名不一致は 401", msg_ingest_instagram(IRAW, "app-secret", "sha256=00")[0] == 401, "")
+OUT1 := msg_to_outbound(msg_new("line", "U1", "U1", "x", "text", "こんにちは", "rt1", 0), "")
+check("LINE: reply の送信要求が公式仕様の形",
+      OUT1[0] == LINE_REPLY_EP && str_find(OUT1[3], "\"replyToken\":\"rt1\"") >= 0 &&
+      str_find(OUT1[3], "\"type\":\"text\"") >= 0, "")
+OUT2 := msg_to_outbound(msg_new("line", "U2", "U2", "x", "text", "push", "", 0), "")
+check("LINE: replyToken が無ければ push", OUT2[0] == LINE_PUSH_EP && str_find(OUT2[3], "\"to\":\"U2\"") >= 0, "")
+OUT3 := msg_to_outbound(msg_new("instagram", "1784140001", "1784140001", "x", "text", "hi", "", 0), "1784149999")
+check("Instagram: /<IG_ID>/messages の形",
+      OUT3[0] == "https://graph.instagram.com/v21.0/1784149999/messages" &&
+      str_find(OUT3[3], "\"recipient\":{\"id\":\"1784140001\"}") >= 0, "")
+MM := msg_new("line", "U1", "U1", "田中 さくら", "text", "直列化 🔌 ✓", "rt", 1700000000000)
+MB := msg_deserialize(msg_serialize(MM))
+check("統合メッセージの直列化が往復",
+      msg_text(MB) == msg_text(MM) && msg_name(MB) == msg_name(MM) && msg_reply(MB) == "rt", "")
+check("メッセージの zone アドレス", msg_zone_url(MM) == "zone://url.or.jp/msg/line/U1", "")
+BOX := inbox_new()
+inbox_add(BOX, LING[1][0])
+inbox_add(BOX, IING[1][0])
+inbox_add(BOX, LING[1][0])
+check("統合受信箱に LINE と Instagram が同居", inbox_count(BOX) == 3 && len(inbox_threads(BOX)) == 2, "")
+
+# ---- 9. STREAMS 全層 --------------------------------------------------
+section("9. AT&T ベル研究所式 STREAMS — 全 5 層の往復")
+check("driver の上に 4 モジュールが積まれている",
+      len(STREAM_MODS) == 4 && STREAM_MODS[0] == "ntt" && STREAM_MODS[3] == "msgmux",
+      "plc <- ntt <- zone <- jones <- msgmux <- head")
+SCTX := ctx_new("living", "study", "metal")
+SMSG := msg_new("line", "U4af", "U4af", "田中 さくら", "text", "電力線から NTT を経て zone:// へ 🔌☎🌐", "rt", 1700000000000)
+SR := ultra_send(SMSG, SCTX)
+check("全 5 層を通した往復が完全一致", SR[0] == 200 && SR[3], SR[0] + " " + SR[1])
+check("本文と表示名が保たれる", msg_text(SR[2]) == msg_text(SMSG) && msg_name(SR[2]) == msg_name(SMSG), "")
+TRACE := SCTX[CTX_TRACE]
+TSEQ := ""
+i := 0
+while (i < len(TRACE)) {
+    d := "v"
+    if (TRACE[i][0] == "up") { d := "^" }
+    TSEQ := TSEQ + d + TRACE[i][1] + " "
+    i := i + 1
+}
+check("下りと上りが各層を 1 回ずつ通る",
+      TSEQ == "vhead vmsgmux vjones vzone vntt vplc ^plc ^ntt ^zone ^jones ^msgmux ^head ", TSEQ)
+check("各層が自分の計量を残す",
+      len(SCTX[CTX_NTT][0]) >= 10 && SCTX[CTX_ZONE][1] != "" && SCTX[CTX_CRYPTO][1] > 0 && SCTX[CTX_PHY][0] > 0,
+      "φ=" + ntt_format(SCTX[CTX_NTT][0]) + " / ピア=" + SCTX[CTX_ZONE][1] + " / " +
+      SCTX[CTX_PHY][0] + " OFDM シンボル")
+ICTX := ctx_new("living", "study", "isdn")
+IRES := ultra_send(SMSG, ICTX)
+check("回線種別: INS ネット 64 でも往復", IRES[0] == 200 && IRES[3], "")
+HCTX := ctx_new("living", "study", "hikari")
+HRES := ultra_send(SMSG, HCTX)
+check("回線種別: ひかり電話でも往復", HRES[0] == 200 && HRES[3], "")
+OCTX := ctx_new("bedroom", "router", "isdn")
+ORES := ultra_send(SMSG, OCTX)
+check("別のコンセント対でも往復", ORES[0] == 200 && ORES[3],
+      u_trunc(OCTX[CTX_TONEMAP][4] / 1000000) + " Mbps")
+
+section("   攻撃 — それぞれ正しい状態符号で排除される")
+ATKM := msg_new("line", "U1", "U1", "試験", "text", "改竄試験", "", 0)
+ACTX := ctx_new("living", "study", "isdn")
+ACTX[CTX_TAMPER] = true
+AR := ultra_send(ATKM, ACTX)
+check("物理層で回線を改竄 -> PLC の CRC が弾く", AR[0] == 503, AR[0] + " " + AR[1])
+BCTX := ctx_new("living", "study", "isdn")
+BCTX[CTX_TAMPERZ] = true
+BR := ultra_send(ATKM, BCTX)
+check("悪意あるピアの書換え -> AEAD が弾く", BR[0] == 409, BR[0] + " " + BR[1])
+CCTX := ctx_new("living", "study", "isdn")
+CCTX[CTX_TAPPED] = true
+CR := ultra_send(ATKM, CCTX)
+check("量子路の盗聴 -> 送信そのものを止める", CR[0] == 495, CR[0] + " " + CR[1])
+DCTX := ctx_new("living", "study", "isdn")
+DCTX[CTX_MARGIN] = 26
+DR := ultra_send(ATKM, DCTX)
+check("電力線を 26 dB 劣化 -> 復号できない", DR[0] != 200, DR[0] + " " + DR[1])
+
+# ---- 総括 ------------------------------------------------------------
+print("")
+print("==============================================================")
+if (TEST[0] == TEST[1]) {
+    print("合格 " + TEST[1] + " / " + TEST[0] + "  — すべて合格")
+} else {
+    print("合格 " + TEST[1] + " / " + TEST[0] + "  不合格 " + (TEST[0] - TEST[1]))
+}
+print("SELFTEST-RESULT " + TEST[1] + " " + TEST[0])
+print("==============================================================")

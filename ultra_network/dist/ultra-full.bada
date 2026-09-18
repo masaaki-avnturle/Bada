@@ -1,0 +1,3189 @@
+# ==============================================================
+#  ultra-full.bada
+#  Bada UltraNetwork — 自動生成。編集しないこと。
+#  元は ultra_network/bada/ の各モジュール:
+#    01_core.bada
+#    02_sha256.bada
+#    03_jones.bada
+#    04_zone.bada
+#    05_ntt.bada
+#    06_plc.bada
+#    07_json.bada
+#    08_msgmux.bada
+#    09_streams.bada
+#    10_main.bada
+#  作り直すには: node ultra_network/tools/build-bada.js
+# ==============================================================
+# ============================================================
+# 01_core.bada -- BADA ULTRA NETWORK / 基本演算
+#
+# Bada には床関数・三角関数・ビット演算子が無い。この層でそれを
+# 全部こしらえる。以降のすべてのモジュールがここに乗る。
+#
+#   u_trunc / u_div   切り捨て・整数除算
+#   ipow / POW2 / POW16 / POW10   べき乗表
+#   u_sin / u_cos     Taylor 級数 (範囲縮約つき)
+#   u_log2
+#   u_and / u_or / u_xor / u_not32   ニブル表による論理演算
+#   u_shr / u_shl32 / u_rotr32       シフトと巡回シフト
+#   hex / Base64 / UTF-8 の相互変換
+#
+# ビット演算は 1 ビットずつ回すと遅いので、4 ビット (ニブル) の
+# 表を最初に作り、32 ビット語を 8 ニブルに割って引く。
+# ============================================================
+
+# ---- 切り捨て (非負のみ。負には u_fix を使う) ----------------------
+def u_trunc(x) { return x - (x % 1) }
+
+def u_fix(x) {
+    if (x < 0) { return 0 - ((0 - x) - ((0 - x) % 1)) }
+    return x - (x % 1)
+}
+
+def u_div(a, b) { return u_trunc(a / b) }
+
+def u_min(a, b) { if (a < b) { return a } return b }
+def u_max(a, b) { if (a > b) { return a } return b }
+
+# ---- べき乗 --------------------------------------------------------
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+
+POW2 := []
+p := 1
+i := 0
+while (i <= 32) { POW2 <- p; p := p * 2; i := i + 1 }
+
+POW16 := []
+p := 1
+i := 0
+while (i < 8) { POW16 <- p; p := p * 16; i := i + 1 }
+
+POW10 := []
+p := 1
+i := 0
+while (i <= 10) { POW10 <- p; p := p * 10; i := i + 1 }
+
+TWO32 := 4294967296
+MASK32 := 4294967295
+
+# ---- 三角関数 (Taylor 級数 + 範囲縮約) ------------------------------
+TWO_PI := 6.283185307179586
+PI     := 3.141592653589793
+HALF_PI := 1.5707963267948966
+
+def u_sin(x) {
+    t := x % TWO_PI
+    if (t > PI) { t := t - TWO_PI }
+    if (t < 0 - PI) { t := t + TWO_PI }
+    term := t
+    sum := t
+    k := 1
+    while (k < 9) {
+        term := 0 - term * t * t / ((2 * k) * (2 * k + 1))
+        sum := sum + term
+        k := k + 1
+    }
+    return sum
+}
+
+def u_cos(x) { return u_sin(x + HALF_PI) }
+
+LN2 := 0.6931471805599453
+LN10 := 2.302585092994046
+def u_log2(x)  { return log(x) / LN2 }
+def u_log10(x) { return log(x) / LN10 }
+
+# dB <-> 線形 (10^(d/10) を exp で)
+def db_to_lin(d) { return exp(d * LN10 / 10) }
+def lin_to_db(v) { return 10 * log(v) / LN10 }
+
+# ---- ニブル表による論理演算 ----------------------------------------
+# XOR4[a * 16 + b] のような平坦配列を最初に作っておく。
+XOR4 := []
+AND4 := []
+OR4  := []
+a := 0
+while (a < 16) {
+    b := 0
+    while (b < 16) {
+        av := a
+        bv := b
+        xr := 0
+        an := 0
+        orv := 0
+        pw := 1
+        n := 0
+        while (n < 4) {
+            ab := av % 2
+            bb := bv % 2
+            if (ab != bb) { xr := xr + pw }
+            if (ab == 1 && bb == 1) { an := an + pw }
+            if (ab == 1) { orv := orv + pw }
+            else { if (bb == 1) { orv := orv + pw } }
+            av := u_trunc(av / 2)
+            bv := u_trunc(bv / 2)
+            pw := pw * 2
+            n := n + 1
+        }
+        XOR4 <- xr
+        AND4 <- an
+        OR4  <- orv
+        b := b + 1
+    }
+    a := a + 1
+}
+
+def u_xor(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + XOR4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_and(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + AND4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_or(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + OR4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+# 8 ビット / 16 ビットだけ要るときの近道 (ニブルを 2 枚・4 枚しか引かない)。
+# CRC の内側ループのように何千回も回る場所で効く。
+def u_xor8(x, y) {
+    return XOR4[(u_trunc(x / 16) % 16) * 16 + (u_trunc(y / 16) % 16)] * 16 +
+           XOR4[(x % 16) * 16 + (y % 16)]
+}
+
+def u_and8(x, y) {
+    return AND4[(u_trunc(x / 16) % 16) * 16 + (u_trunc(y / 16) % 16)] * 16 +
+           AND4[(x % 16) * 16 + (y % 16)]
+}
+
+# 3 項 XOR を 1 パスで。SHA-256 の sigma 群はこの形が多く、
+# 2 回に分けるより通り道が半分で済む。
+def u_xor3(x, y, z) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        zn := u_trunc(z / pw) % 16
+        r := r + XOR4[XOR4[xn * 16 + yn] * 16 + zn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_not32(x) { return MASK32 - x }
+
+def u_shr(x, n)   { return u_trunc(x / POW2[n]) }
+def u_shl32(x, n) { return (x * POW2[n]) % TWO32 }
+
+# 巡回右シフト。2 つの断片はビットが重ならないので加算でよい。
+def u_rotr32(x, n) { return u_shr(x, n) + u_shl32(x, 32 - n) }
+
+def u_add32(x, y) { return (x + y) % TWO32 }
+
+# 32 ビット同士の乗算 (mod 2^32)。
+# そのまま掛けると積が 2^53 を超えて倍精度の正確整数範囲から外れ、
+# 下位ビットが失われる。16 ビットずつに割れば各部分積が 2^32 未満に
+# 収まるので厳密に計算できる (JS の Math.imul と同じ結果になる)。
+def u_mul32(a, b) {
+    ah := u_trunc(a / 65536) % 65536
+    al := a % 65536
+    bh := u_trunc(b / 65536) % 65536
+    bl := b % 65536
+    lo := al * bl
+    mid := (ah * bl + al * bh) % 65536
+    return (lo + mid * 65536) % TWO32
+}
+
+# ---- 16 進 ---------------------------------------------------------
+HEXD := "0123456789abcdef"
+
+def hex_byte(v) {
+    return substr(HEXD, u_trunc(v / 16) % 16, 1) + substr(HEXD, v % 16, 1)
+}
+
+def hex_of_bytes(bytes) {
+    s := ""
+    i := 0
+    while (i < len(bytes)) { s := s + hex_byte(bytes[i]); i := i + 1 }
+    return s
+}
+
+def hex_of_word32(w) {
+    s := ""
+    i := 3
+    while (i >= 0) { s := s + hex_byte(u_trunc(w / POW2[8 * i]) % 256); i := i - 1 }
+    return s
+}
+
+# ---- Base64 --------------------------------------------------------
+B64AL := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+def base64_of_bytes(bytes) {
+    s := ""
+    i := 0
+    n := len(bytes)
+    while (i < n) {
+        b0 := bytes[i]
+        b1 := 0
+        b2 := 0
+        if (i + 1 < n) { b1 := bytes[i + 1] }
+        if (i + 2 < n) { b2 := bytes[i + 2] }
+        c := b0 * 65536 + b1 * 256 + b2
+        s := s + substr(B64AL, u_trunc(c / 262144) % 64, 1)
+        s := s + substr(B64AL, u_trunc(c / 4096) % 64, 1)
+        if (i + 1 < n) { s := s + substr(B64AL, u_trunc(c / 64) % 64, 1) }
+        else { s := s + "=" }
+        if (i + 2 < n) { s := s + substr(B64AL, c % 64, 1) }
+        else { s := s + "=" }
+        i := i + 3
+    }
+    return s
+}
+
+# ---- UTF-8 ---------------------------------------------------------
+# Bada の文字列は 16 ビット符号単位。サロゲート対も正しく畳む。
+def utf8_of_str(s) {
+    out := []
+    i := 0
+    n := len(s)
+    while (i < n) {
+        c := ord(s, i)
+        if (c >= 55296 && c <= 56319 && i + 1 < n) {
+            lo := ord(s, i + 1)
+            if (lo >= 56320 && lo <= 57343) {
+                c := 65536 + (c - 55296) * 1024 + (lo - 56320)
+                i := i + 1
+            }
+        }
+        if (c < 128) { out <- c }
+        else {
+            if (c < 2048) {
+                out <- (192 + u_trunc(c / 64))
+                out <- (128 + c % 64)
+            } else {
+                if (c < 65536) {
+                    out <- (224 + u_trunc(c / 4096))
+                    out <- (128 + u_trunc(c / 64) % 64)
+                    out <- (128 + c % 64)
+                } else {
+                    out <- (240 + u_trunc(c / 262144))
+                    out <- (128 + u_trunc(c / 4096) % 64)
+                    out <- (128 + u_trunc(c / 64) % 64)
+                    out <- (128 + c % 64)
+                }
+            }
+        }
+        i := i + 1
+    }
+    return out
+}
+
+# 壊れた並びは U+FFFD に替えて 1 バイト進む (回線から来る列は
+# 攻撃者に触られうるので、復号器は決して落ちてはならない)。
+def str_of_utf8(bytes) {
+    s := ""
+    i := 0
+    n := len(bytes)
+    while (i < n) {
+        c := bytes[i] % 256
+        if (c < 128) { s := s + chr(c); i := i + 1 }
+        else {
+            need := 0
+            acc := 0
+            if (c >= 192 && c < 224) { need := 1; acc := c - 192 }
+            else { if (c >= 224 && c < 240) { need := 2; acc := c - 224 }
+                   else { if (c >= 240 && c < 248) { need := 3; acc := c - 240 }
+                          else { need := 0 - 1 } } }
+            if (need < 0) { s := s + chr(65533); i := i + 1 }
+            else {
+                if (i + need >= n) { s := s + chr(65533); i := i + 1 }
+                else {
+                    ok := true
+                    k := 1
+                    while (k <= need) {
+                        cb := bytes[i + k] % 256
+                        if (cb < 128) { ok := false }
+                        if (cb >= 192) { ok := false }
+                        acc := acc * 64 + (cb % 64)
+                        k := k + 1
+                    }
+                    bad := false
+                    if (!ok) { bad := true }
+                    if (need == 1 && acc < 128) { bad := true }
+                    if (need == 2 && acc < 2048) { bad := true }
+                    if (need == 3 && acc < 65536) { bad := true }
+                    if (acc >= 55296 && acc <= 57343) { bad := true }
+                    if (acc > 1114111) { bad := true }
+                    if (bad) { s := s + chr(65533); i := i + 1 }
+                    else {
+                        if (acc < 65536) { s := s + chr(acc) }
+                        else {
+                            v := acc - 65536
+                            s := s + chr(55296 + u_trunc(v / 1024)) + chr(56320 + v % 1024)
+                        }
+                        i := i + need + 1
+                    }
+                }
+            }
+        }
+    }
+    return s
+}
+
+# ---- バイト列 <-> ビット列 -----------------------------------------
+def bytes_to_bits(bytes) {
+    bits := []
+    i := 0
+    while (i < len(bytes)) {
+        v := bytes[i]
+        k := 7
+        while (k >= 0) {
+            pw := POW2[k]
+            if (v >= pw) { bits <- 1; v := v - pw } else { bits <- 0 }
+            k := k - 1
+        }
+        i := i + 1
+    }
+    return bits
+}
+
+def bits_to_bytes(bits) {
+    out := []
+    i := 0
+    while (i + 7 < len(bits)) {
+        v := 0
+        k := 0
+        while (k < 8) { v := v * 2 + bits[i + k]; k := k + 1 }
+        out <- v
+        i := i + 8
+    }
+    return out
+}
+
+# ---- 文字列ハッシュ (zone.bada と完全に同一。相互運用のため不変) ----
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) {
+        h := (h * 31 + ord(s, i)) % 999983
+        i := i + 1
+    }
+    return h
+}
+
+# 32 ビット混合ハッシュ (番号写像・疑似乱数の種に使う)。
+# FNV-1a に最終撹拌を足したもの。索引 index.html の JS 実装 mix32 と
+# 定数まで同一にしてあるので、両者は同じ乱数列 = 同じ回線特性を出す。
+def mix32(s) {
+    h := 2166136261
+    i := 0
+    while (i < len(s)) {
+        h := u_xor(h, ord(s, i))
+        h := u_mul32(h, 16777619)        # FNV 素数
+        i := i + 1
+    }
+    h := u_xor(h, u_shr(h, 15))
+    h := u_mul32(h, 625341585)      # 0x2545F491
+    h := u_xor(h, u_shr(h, 13))
+    return h
+}
+
+# 再現性のある擬似乱数 (同じ種なら常に同じ列)
+def rng_new(seed) {
+    s := mix32(seed)
+    if (s == 0) { s := 1 }
+    return [s]
+}
+
+def rng_next(st) {
+    s := st[0]
+    s := u_xor(s, u_shl32(s, 13))
+    s := u_xor(s, u_shr(s, 17))
+    s := u_xor(s, u_shl32(s, 5))
+    st[0] = s
+    return s / TWO32
+}
+
+# ============================================================
+# 02_sha256.bada -- BADA ULTRA NETWORK / SHA-256 と HMAC-SHA256
+#
+# LINE の X-Line-Signature (HMAC-SHA256 -> Base64) と Instagram の
+# X-Hub-Signature-256 (HMAC-SHA256 -> hex) を、本物の計算で検証する
+# ために要る。RFC 6234 (SHA-2) と RFC 2104 (HMAC) のとおり。
+#
+# Bada にビット演算子は無いので、01_core.bada のニブル表による
+# u_xor / u_and / u_not32 / u_rotr32 の上に組む。1 ブロックあたり
+# およそ 9 万ステップで回る。
+# ============================================================
+
+SHA_K := [
+  1116352408, 1899447441, 3049323471, 3921009573,  961987163, 1508970993,
+  2453635748, 2870763221, 3624381080,  310598401,  607225278, 1426881987,
+  1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774,
+   264347078,  604807628,  770255983, 1249150122, 1555081692, 1996064986,
+  2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711,
+   113926993,  338241895,  666307205,  773529912, 1294757372, 1396182291,
+  1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411,
+  3259730800, 3345764771, 3516065817, 3600352804, 4094571909,  275423344,
+   430227734,  506948616,  659060556,  883997877,  958139571, 1322822218,
+  1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424,
+  2428436474, 2756734187, 3204031479, 3329325298
+]
+
+SHA_H0 := [1779033703, 3144134277, 1013904242, 2773480762,
+           1359893119, 2600822924,  528734635, 1541459225]
+
+# 小文字 sigma (メッセージスケジュール用)
+def sha_s0(x) { return u_xor3(u_rotr32(x, 7), u_rotr32(x, 18), u_shr(x, 3)) }
+def sha_s1(x) { return u_xor3(u_rotr32(x, 17), u_rotr32(x, 19), u_shr(x, 10)) }
+
+# 大文字 Sigma (圧縮関数用)
+def sha_S0(x) { return u_xor3(u_rotr32(x, 2), u_rotr32(x, 13), u_rotr32(x, 22)) }
+def sha_S1(x) { return u_xor3(u_rotr32(x, 6), u_rotr32(x, 11), u_rotr32(x, 25)) }
+
+# ch と maj はニブル 1 パスに融合する。and/not/xor を別々に呼ぶと
+# 32 ビット語を 3 度も 5 度も舐め直すことになり、そこが一番効く。
+# 4 ビットの NOT は 15 - n。
+def sha_ch(e, f, g) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        en := u_trunc(e / pw) % 16
+        fn := u_trunc(f / pw) % 16
+        gn := u_trunc(g / pw) % 16
+        r := r + XOR4[AND4[en * 16 + fn] * 16 + AND4[(15 - en) * 16 + gn]] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def sha_maj(a, b, c) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        an := u_trunc(a / pw) % 16
+        bn := u_trunc(b / pw) % 16
+        cn := u_trunc(c / pw) % 16
+        r := r + XOR4[XOR4[AND4[an * 16 + bn] * 16 + AND4[an * 16 + cn]] * 16 +
+                      AND4[bn * 16 + cn]] * pw
+        i := i + 1
+    }
+    return r
+}
+
+# バイト列 -> 32 バイトのダイジェスト (バイト列)
+def sha256(msg) {
+    n := len(msg)
+    m := []
+    i := 0
+    while (i < n) { m <- msg[i]; i := i + 1 }
+    m <- 128
+    while (len(m) % 64 != 56) { m <- 0 }
+    # ビット長を 64 ビット ビッグエンディアンで
+    bits_hi := u_trunc(n / 536870912)
+    bits_lo := (n * 8) % TWO32
+    k := 3
+    while (k >= 0) { m <- (u_trunc(bits_hi / POW2[8 * k]) % 256); k := k - 1 }
+    k := 3
+    while (k >= 0) { m <- (u_trunc(bits_lo / POW2[8 * k]) % 256); k := k - 1 }
+
+    h := []
+    i := 0
+    while (i < 8) { h <- SHA_H0[i]; i := i + 1 }
+
+    w := []
+    i := 0
+    while (i < 64) { w <- 0; i := i + 1 }
+
+    blk := 0
+    nblk := u_trunc(len(m) / 64)
+    while (blk < nblk) {
+        base := blk * 64
+        t := 0
+        while (t < 16) {
+            w[t] = m[base + t * 4] * 16777216 + m[base + t * 4 + 1] * 65536 +
+                   m[base + t * 4 + 2] * 256 + m[base + t * 4 + 3]
+            t := t + 1
+        }
+        t := 16
+        while (t < 64) {
+            w[t] = (sha_s1(w[t - 2]) + w[t - 7] + sha_s0(w[t - 15]) + w[t - 16]) % TWO32
+            t := t + 1
+        }
+        av := h[0]
+        bv := h[1]
+        cv := h[2]
+        dv := h[3]
+        ev := h[4]
+        fv := h[5]
+        gv := h[6]
+        hv := h[7]
+        t := 0
+        while (t < 64) {
+            t1 := (hv + sha_S1(ev) + sha_ch(ev, fv, gv) + SHA_K[t] + w[t]) % TWO32
+            t2 := (sha_S0(av) + sha_maj(av, bv, cv)) % TWO32
+            hv := gv
+            gv := fv
+            fv := ev
+            ev := (dv + t1) % TWO32
+            dv := cv
+            cv := bv
+            bv := av
+            av := (t1 + t2) % TWO32
+            t := t + 1
+        }
+        h[0] = (h[0] + av) % TWO32
+        h[1] = (h[1] + bv) % TWO32
+        h[2] = (h[2] + cv) % TWO32
+        h[3] = (h[3] + dv) % TWO32
+        h[4] = (h[4] + ev) % TWO32
+        h[5] = (h[5] + fv) % TWO32
+        h[6] = (h[6] + gv) % TWO32
+        h[7] = (h[7] + hv) % TWO32
+        blk := blk + 1
+    }
+
+    out := []
+    i := 0
+    while (i < 8) {
+        k := 3
+        while (k >= 0) { out <- (u_trunc(h[i] / POW2[8 * k]) % 256); k := k - 1 }
+        i := i + 1
+    }
+    return out
+}
+
+def sha256_hex(msg) { return hex_of_bytes(sha256(msg)) }
+
+# ---- HMAC (RFC 2104) -----------------------------------------------
+def hmac_sha256(key, msg) {
+    k := []
+    i := 0
+    if (len(key) > 64) {
+        kk := sha256(key)
+        i := 0
+        while (i < len(kk)) { k <- kk[i]; i := i + 1 }
+    } else {
+        i := 0
+        while (i < len(key)) { k <- key[i]; i := i + 1 }
+    }
+    while (len(k) < 64) { k <- 0 }
+
+    inner := []
+    outer := []
+    i := 0
+    while (i < 64) {
+        inner <- u_xor(k[i], 54)
+        outer <- u_xor(k[i], 92)
+        i := i + 1
+    }
+    i := 0
+    while (i < len(msg)) { inner <- msg[i]; i := i + 1 }
+    ih := sha256(inner)
+    i := 0
+    while (i < len(ih)) { outer <- ih[i]; i := i + 1 }
+    return sha256(outer)
+}
+
+def hmac_sha256_hex(key, msg)    { return hex_of_bytes(hmac_sha256(key, msg)) }
+def hmac_sha256_b64(key, msg)    { return base64_of_bytes(hmac_sha256(key, msg)) }
+
+# 署名照合はタイミング差を漏らさない
+def const_time_eq(a, b) {
+    if (len(a) != len(b)) { return false }
+    d := 0
+    i := 0
+    while (i < len(a)) { d := u_or(d, u_xor(a[i], b[i])); i := i + 1 }
+    return d == 0
+}
+
+def const_time_eq_str(a, b) {
+    return const_time_eq(utf8_of_str(a), utf8_of_str(b))
+}
+
+# ============================================================
+# 03_jones.bada -- BADA ULTRA NETWORK / L3 Jones 多項式量子暗号
+#
+# ゾーンの秘密は「結び目」そのもの。
+#
+#  1. 鍵   結び目図の Kauffman ブラケット
+#          <D>(A) = Σ (A/B 平滑化について) A^(a-b) · d^(loops-1),
+#          d = -A² - 1/A²  を複数の A で標本化してハッシュしたものが
+#          そのゾーンの長期鍵になる。結び目が秘密で、多項式が鍵スケジュール。
+#  2. QKD  セッションソルトは Bell 対 (H + CNOT + 測定) が合意する。
+#          禁止状態 |01>,|10> の確率が厳密に 0 であることが盗聴されて
+#          いない証拠。複製不可能定理により盗聴は相関を壊す。
+#  3. AEAD (結び目鍵, ソルト) を種とする鍵ストリームで暗号化し、
+#          鍵付きタグで封緘する。改竄・鍵違いは 409 zone-guard-reject。
+#
+# 算法は bada_gui_ide/examples/zone.bada と完全に同一。よって
+# ここで作ったレコードは ZoneBrowser がそのまま開ける。
+# ============================================================
+
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+
+# 交点は [id, e0, e1, e2, e3, sign]。ブラケットは sign を使わない。
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    d := 0 - A * A - 1.0 / (A * A)
+    states := POW2[n]
+    sum := 0.0
+    bits := []
+    q := 0
+    while (q < n) { bits <- 0; q := q + 1 }
+
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            # A 平滑化は (e0,e1)(e2,e3)、B 平滑化は (e0,e3)(e1,e2)
+            if (bits[i] == 0) {
+                a_cnt := a_cnt + 1
+                p := e0; qq := e1; r := e2; s := e3
+            } else {
+                b_cnt := b_cnt + 1
+                p := e0; qq := e3; r := e1; s := e2
+            }
+            ra := uf_find(parent, p)
+            rb := uf_find(parent, qq)
+            if (ra != rb) { parent[rb] = ra }
+            rc := uf_find(parent, r)
+            rd := uf_find(parent, s)
+            if (rc != rd) { parent[rd] = rc }
+            i := i + 1
+        }
+        # 閉ループの本数を数える
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r2 := uf_find(parent, lbl)
+            if (seen[r2] == 0) { seen[r2] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        sum := sum + ipow(A, a_cnt - b_cnt) * ipow(d, loops - 1)
+        # 次の状態へ (2 進の繰り上がり)
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+
+JONES_A := [0.8, 1.0, 1.2, 1.5, 2.0]
+
+def jones_key(diagram) {
+    acc := "jones|"
+    i := 0
+    while (i < len(JONES_A)) {
+        acc := acc + f5(kauffman(diagram, JONES_A[i])) + "|"
+        i := i + 1
+    }
+    return str_hash(acc)
+}
+
+# 各ゾーンの正体である結び目 (= その秘密)。zone.bada と同一。
+#   url.or.jp  三葉結び目   (交点 3)
+#   bada.or.jp 8 の字結び目 (交点 4)
+def zone_diagram(host) {
+    if (host == "bada.or.jp") {
+        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]
+    }
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+# ---- 鍵ストリーム AEAD ---------------------------------------------
+def lcg(state) { return (state * 48271) % 2147483647 }
+
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+
+# 16 ビット符号単位で動くので CJK も絵文字も往復する
+def zone_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+
+def zone_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+
+# 暗号文にかける鍵付き認証タグ
+def zone_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) {
+        h := (h * 31 + ct[i] + 7) % 2147483647
+        i := i + 1
+    }
+    return h
+}
+
+# 封緘 -> [ciphertext, salt, tag]
+def zone_seal(plain, key, salt) {
+    ct := zone_encrypt(plain, key, salt)
+    return [ct, salt, zone_tag(ct, key, salt)]
+}
+
+# 開封 -> [plaintext] 、[] なら 409 zone-guard-reject
+def zone_open(sealed, key) {
+    ct := sealed[0]
+    salt := sealed[1]
+    tag := sealed[2]
+    if (zone_tag(ct, key, salt) != tag) { return [] }
+    return [zone_decrypt(ct, key, salt)]
+}
+
+# ---- Bell 対 QKD ----------------------------------------------------
+# |Φ+> = (|00> + |11>)/√2 では |01> と |10> の確率が厳密に 0。
+# intercept-resend の盗聴はこの相関を壊すので、そこで検出できる。
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    forbidden := outcome[1] + outcome[2]
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt, outcome, forbidden]
+}
+
+# 盗聴された量子路の模擬 (片側を計算基底で測って再送した後の分布)。
+# 禁止状態が 0 でなくなるので qkd_check が弾く。
+def qkd_session_tapped() {
+    dist := [0.5, 0.1225, 0.1225, 0.32]
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [false, salt, dist, dist[1] + dist[2]]
+}
+
+def qkd_check(q) { return q[0] }
+
+# ============================================================
+# 04_zone.bada -- BADA ULTRA NETWORK / L2 zone:// ウルトラネットワーク WWW
+#
+# https: / http: に代わるスキーム。中央サーバも DNS ルートも無い。
+# アドレスは「ピア自身のハッシュだけ」から作ったリング DHT が解決し、
+# 全レコードは追記専用の tuplespace (アカシック台帳) に載る。
+#
+#   zone://<host>[/<path>]
+#
+# 出力する "@@" ブロックは既存の ZoneBrowser
+# (bada_gui_ide/dist/zone-browser.html) が読む形式と同じ。
+# ============================================================
+
+RING := 4096      # リングの位数 (zone.bada と同一)
+
+def zone_id(s) { return str_hash(s) % RING }
+
+# zone://host/path -> [host, path, labels]  ([] なら zone URL ではない)
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) { return [] }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) { return [rest, "/", split(rest, ".")] }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+# リング上の巡回距離
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+
+# ピアは [name, node-id, ring-index, store_urls, store_recs]
+def peer_new(name) { return [name, zone_id("peer:" + name), 0, [], []] }
+
+ZONE_PEERS := ["tokyo.zone.jp", "osaka.zone.jp", "nagoya.zone.jp",
+               "sapporo.zone.jp", "fukuoka.zone.jp", "naha.zone.jp"]
+
+def zone_boot() {
+    net := []
+    i := 0
+    while (i < len(ZONE_PEERS)) { net <- peer_new(ZONE_PEERS[i]); i := i + 1 }
+    # node-id の昇順へ挿入ソート
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) {
+                if (p[1] < sorted[j][1]) { pos := j; found := true }
+            }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) { sorted[m][2] = m; m := m + 1 }
+    return sorted
+}
+
+# 鍵を担当するピアの添字
+def dht_nearest(net, key) {
+    best := 0
+    bd := ring_dist(net[0][1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# 貪欲ルーティング。隣接 (+1 / -1 / +2 のフィンガ) だけを見て進む。
+# -> [担当ピアの添字, ホップした名前の並び]
+def zone_route(net, key) {
+    n := len(net)
+    target := dht_nearest(net, key)
+    cur := 0
+    hops := [net[0][0]]
+    guard := 0
+    while (cur != target && guard < 2 * n) {
+        nb := [(cur + 1) % n, (cur + n - 1) % n, (cur + 2) % n]
+        best := cur
+        bd := ring_dist(net[cur][1], key)
+        i := 0
+        while (i < len(nb)) {
+            d := ring_dist(net[nb[i]][1], key)
+            if (d < bd) { bd := d; best := nb[i] }
+            i := i + 1
+        }
+        if (best == cur) { cur := target } else { cur := best }
+        hops <- net[cur][0]
+        guard := guard + 1
+    }
+    return [target, hops]
+}
+
+# ---- ピアの保管庫 ---------------------------------------------------
+def peer_store_put(peer, url, sealed) {
+    i := 0
+    while (i < len(peer[3])) {
+        if (peer[3][i] == url) { peer[4][i] = sealed; return i }
+        i := i + 1
+    }
+    peer[3] <- url
+    peer[4] <- sealed
+    return len(peer[3]) - 1
+}
+
+# -> [sealed] 、[] なら 404 zone-not-found
+def peer_store_get(peer, url) {
+    i := 0
+    while (i < len(peer[3])) {
+        if (peer[3][i] == url) { return [peer[4][i]] }
+        i := i + 1
+    }
+    return []
+}
+
+# ---- 状態符号 -------------------------------------------------------
+def zone_status_text(code) {
+    if (code == 200) { return "zone-delivered" }
+    if (code == 400) { return "bad-zone" }
+    if (code == 404) { return "zone-not-found" }
+    if (code == 409) { return "zone-guard-reject" }
+    if (code == 495) { return "quantum-channel-compromised" }
+    if (code == 503) { return "plc-link-failure" }
+    if (code == 401) { return "webhook-signature-mismatch" }
+    return "unknown"
+}
+
+# ---- 公開と取得 -----------------------------------------------------
+# NET を渡して url を封緘・保管し、台帳に追記する -> [status, ownerIdx, hops]
+def zone_publish(net, url, content) {
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, 0 - 1, []] }
+    q := qkd_session()
+    if (!qkd_check(q)) { return [495, 0 - 1, []] }
+    key := jones_key(zone_diagram(z[0]))
+    sealed := zone_seal(content, key, q[1])
+    r := zone_route(net, zone_id(url))
+    peer_store_put(net[r[0]], url, sealed)
+    fact := ["zone-record", url, net[r[0]][0], zone_id(url), sealed[2]]
+    fact >> tuplespace
+    return [200, r[0], r[1]]
+}
+
+# -> [status, 本文, ownerIdx, hops]
+def zone_get(net, url) {
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, "", 0 - 1, []] }
+    r := zone_route(net, zone_id(url))
+    hit := peer_store_get(net[r[0]], url)
+    if (len(hit) == 0) { return [404, "", r[0], r[1]] }
+    key := jones_key(zone_diagram(z[0]))
+    opened := zone_open(hit[0], key)
+    fact := ["zone-fetch", url, net[r[0]][0]]
+    fact >> tuplespace
+    if (len(opened) == 0) { return [409, "", r[0], r[1]] }
+    return [200, opened[0], r[0], r[1]]
+}
+
+# ---- "@@" ブロック (ZoneBrowser が読む形式) -------------------------
+def zone_serve_block(net, url, status, body, sealed, key, qkd_ok) {
+    z := zone_parse(url)
+    host := ""
+    path := ""
+    if (len(z) > 0) { host := z[0]; path := z[1] }
+    r := zone_route(net, zone_id(url))
+    hops := ""
+    i := 0
+    while (i < len(r[1])) {
+        if (i > 0) { hops := hops + " -> " }
+        hops := hops + r[1][i]
+        i := i + 1
+    }
+    print("@@HOST " + host)
+    print("@@PATH " + path)
+    print("@@KEY " + zone_id(url))
+    print("@@ROUTE " + hops)
+    print("@@NODE " + net[r[0]][0])
+    if (qkd_ok) { print("@@QKD ok") } else { print("@@QKD compromised") }
+    if (len(sealed) == 3) {
+        ct := sealed[0]
+        c0 := 0
+        c1 := 0
+        c2 := 0
+        if (len(ct) > 0) { c0 := ct[0] }
+        if (len(ct) > 1) { c1 := ct[1] }
+        if (len(ct) > 2) { c2 := ct[2] }
+        print("@@CIPHER " + c0 + " " + c1 + " " + c2 + " " + len(ct))
+        print("@@TAG " + sealed[2])
+    }
+    print("@@JONESKEY " + key)
+    print("@@STATUS " + status)
+    print("@@BODY_BEGIN")
+    print(body)
+    print("@@BODY_END")
+    return status
+}
+
+# ---- 封筒 (回線に流す実バイト列) ------------------------------------
+#   "Z" "N" | ver | urlLen | url(utf8) | salt(2) | tag(4) | ctLen(2) | ct(2 each)
+def envelope_encode(url, sealed) {
+    ub := utf8_of_str(url)
+    out := [90, 78, 1]
+    out <- u_trunc(len(ub) / 256)
+    out <- len(ub) % 256
+    i := 0
+    while (i < len(ub)) { out <- ub[i]; i := i + 1 }
+    out <- u_trunc(sealed[1] / 256)
+    out <- sealed[1] % 256
+    t := sealed[2]
+    k := 3
+    while (k >= 0) { out <- (u_trunc(t / POW2[8 * k]) % 256); k := k - 1 }
+    ct := sealed[0]
+    out <- u_trunc(len(ct) / 256)
+    out <- len(ct) % 256
+    i := 0
+    while (i < len(ct)) {
+        out <- u_trunc(ct[i] / 256)
+        out <- ct[i] % 256
+        i := i + 1
+    }
+    return out
+}
+
+# -> [status, url, sealed]
+def envelope_decode(bytes) {
+    if (len(bytes) < 13) { return [400, "", []] }
+    if (bytes[0] != 90) { return [400, "", []] }
+    if (bytes[1] != 78) { return [400, "", []] }
+    ulen := bytes[3] * 256 + bytes[4]
+    if (len(bytes) < 5 + ulen + 8) { return [400, "", []] }
+    ub := []
+    i := 0
+    while (i < ulen) { ub <- bytes[5 + i]; i := i + 1 }
+    url := str_of_utf8(ub)
+    p := 5 + ulen
+    salt := bytes[p] * 256 + bytes[p + 1]
+    tag := bytes[p + 2] * 16777216 + bytes[p + 3] * 65536 + bytes[p + 4] * 256 + bytes[p + 5]
+    clen := bytes[p + 6] * 256 + bytes[p + 7]
+    p := p + 8
+    if (len(bytes) < p + 2 * clen) { return [400, "", []] }
+    ct := []
+    i := 0
+    while (i < clen) { ct <- (bytes[p + 2 * i] * 256 + bytes[p + 2 * i + 1]); i := i + 1 }
+    return [200, url, [ct, salt, tag]]
+}
+
+# ============================================================
+# 05_ntt.bada -- BADA ULTRA NETWORK / L1 NTT 電話回線への写像
+#
+# 写像 φ : zone:// アドレス |-> NTT 番号
+#   リング上の位置 zone_id が市外局番を決める (近い zone は近い収容局
+#   になる)。加入者番号は URL のハッシュから採り、衝突は局内の空き
+#   番号を線形探索して解消する。番号ポータビリティと同じ「割当表」を
+#   持つので φ⁻¹ は厳密な逆写像になる。
+#
+# ベアラ (実際に加入者線を通す部分) は 3 種類:
+#   メタル      300-3400 Hz の音声帯 16-QAM ソフトモデム
+#               fs 8 kHz / 搬送波 2 kHz / 2000 baud / 8000 bps
+#   INS ネット64 B チャネル 64 kbps のディジタル透過 (HDLC)
+#   ひかり電話   G.711 µ-law に符号化して RTP (PT=0 PCMU / 20 ms)
+#
+# 搬送波が標本化周波数のちょうど 1/4 なので cos/sin は
+# {1,0,-1,0} と {0,1,0,-1} という厳密な直交系になり、相関復調に
+# 近似が入らない。だから音声帯を通しても誤差なしで往復する。
+# ============================================================
+
+AREA_CODE := ["011", "022",  "03",  "045", "052",  "06",  "075", "082", "092", "098"]
+AREA_CITY := ["札幌", "仙台", "東京", "横浜", "名古屋", "大阪", "京都", "広島", "福岡", "那覇"]
+AREA_SUB  := [    7,     7,     8,     7,     7,     8,     7,     7,     7,     7]
+
+# 割当表 (追記専用の平行配列)
+NTT_REG_URL  := []
+NTT_REG_NUM  := []
+NTT_REG_KIND := []
+NTT_REG_SEC  := []
+
+def ntt_pad(v, width) {
+    s := "" + (v % POW10[width])
+    while (len(s) < width) { s := "0" + s }
+    return s
+}
+
+def ntt_find_num(number) {
+    i := 0
+    while (i < len(NTT_REG_NUM)) {
+        if (NTT_REG_NUM[i] == number) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+def ntt_find_url(url, kind) {
+    i := 0
+    while (i < len(NTT_REG_URL)) {
+        if (NTT_REG_URL[i] == url && NTT_REG_KIND[i] == kind) { return i }
+        i := i + 1
+    }
+    return 0 - 1
+}
+
+# φ。kind は "geo" (0AB-J) / "ip" (050) / "mobile" (090)
+# -> [番号, 区画添字, 探索回数]
+def ntt_map(url, kind) {
+    hit := ntt_find_url(url, kind)
+    if (hit >= 0) { return [NTT_REG_NUM[hit], NTT_REG_SEC[hit], 0] }
+    area := "050"
+    width := 8
+    sector := 0 - 1
+    if (kind == "mobile") { area := "090"; width := 8 }
+    else {
+        if (kind != "ip") {
+            z := zone_id(url)
+            sector := u_trunc(z * len(AREA_CODE) / RING)
+            if (sector >= len(AREA_CODE)) { sector := len(AREA_CODE) - 1 }
+            area := AREA_CODE[sector]
+            width := AREA_SUB[sector]
+        }
+    }
+    base := mix32("ntt:" + kind + ":" + url) % POW10[width]
+    probe := 0
+    number := area + ntt_pad(base, width)
+    while (ntt_find_num(number) >= 0 && probe < 100000) {
+        probe := probe + 1
+        number := area + ntt_pad(base + probe, width)
+    }
+    NTT_REG_URL  <- url
+    NTT_REG_KIND <- kind
+    NTT_REG_SEC  <- sector
+    NTT_REG_NUM  <- number
+    fact := ["ntt-assign", url, number, kind]
+    fact >> tuplespace
+    return [number, sector, probe]
+}
+
+# φ⁻¹ -- 割当表の厳密な逆引き。未割当なら ""
+def ntt_unmap(number) {
+    digits := ""
+    i := 0
+    while (i < len(number)) {
+        c := ord(number, i)
+        if (c >= 48 && c <= 57) { digits := digits + chr(c) }
+        i := i + 1
+    }
+    hit := ntt_find_num(digits)
+    if (hit < 0) { return "" }
+    return NTT_REG_URL[hit]
+}
+
+# 表示整形
+#   10 桁 0AB-J : 03-1234-5678 (市外 2 桁) / 011-234-5678 (市外 3 桁)
+#   11 桁       : 050-1234-5678 / 090-1234-5678 (IP 電話・携帯)
+def ntt_format(number) {
+    n := len(number)
+    if (n == 11) {
+        return substr(number, 0, 3) + "-" + substr(number, 3, 4) + "-" + substr(number, 7, 4)
+    }
+    if (n != 10) { return number }
+    head := 3
+    d1 := substr(number, 1, 1)
+    if (d1 == "3") { head := 2 }
+    if (d1 == "6") { head := 2 }
+    mid := 10 - head - 4
+    return substr(number, 0, head) + "-" + substr(number, head, mid) + "-" +
+           substr(number, head + mid, 4)
+}
+
+def ntt_e164(number) { return "+81" + substr(number, 1, len(number) - 1) }
+
+def ntt_city(sector) {
+    if (sector < 0) { return "IP / 携帯" }
+    return AREA_CITY[sector]
+}
+
+# ---- 回線種別 -------------------------------------------------------
+def ntt_line_name(id) {
+    if (id == "isdn")   { return "INS ネット 64 (ISDN)" }
+    if (id == "hikari") { return "ひかり電話 (IP)" }
+    return "アナログ加入電話 (メタル)"
+}
+
+def ntt_line_bps(id) {
+    if (id == "metal") { return 8000 }
+    return 64000
+}
+
+# ---- 音声帯 16-QAM ソフトモデム -------------------------------------
+NTT_FS  := 8000
+NTT_FC  := 2000
+NTT_SPS := 4
+NTT_AMP := 2600
+# Gray 符号の 2 ビット -> 振幅。00,01,10,11 -> -3,-1,+3,+1
+QAM_GRAY := [0 - 3, 0 - 1, 3, 1]
+
+def qam_level(two) { return QAM_GRAY[two % 4] }
+
+def qam_bits(level) {
+    best := 0
+    bd := 99999
+    i := 0
+    while (i < 4) {
+        d := abs(QAM_GRAY[i] - level)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# バイト列 -> 音声帯サンプル列
+def ntt_modulate(bytes) {
+    bits := bytes_to_bits(bytes)
+    while (len(bits) % 4 != 0) { bits <- 0 }
+    out := []
+    i := 0
+    while (i < len(bits)) {
+        I := qam_level(bits[i] * 2 + bits[i + 1])
+        Q := qam_level(bits[i + 2] * 2 + bits[i + 3])
+        # n=0..3 で cos(πn/2)={1,0,-1,0}, sin(πn/2)={0,1,0,-1}
+        out <- NTT_AMP * I
+        out <- 0 - NTT_AMP * Q
+        out <- 0 - NTT_AMP * I
+        out <- NTT_AMP * Q
+        i := i + 4
+    }
+    return out
+}
+
+# 音声帯サンプル列 -> バイト列 (相関復調 + 硬判定)
+def ntt_demodulate(samples, bitlen) {
+    nsym := u_trunc(len(samples) / NTT_SPS)
+    bits := []
+    k := 0
+    while (k < nsym) {
+        s0 := samples[k * 4]
+        s1 := samples[k * 4 + 1]
+        s2 := samples[k * 4 + 2]
+        s3 := samples[k * 4 + 3]
+        I := 0.5 * (s0 - s2) / NTT_AMP
+        Q := 0 - 0.5 * (s1 - s3) / NTT_AMP
+        bi := qam_bits(I)
+        bq := qam_bits(Q)
+        bits <- u_trunc(bi / 2)
+        bits <- (bi % 2)
+        bits <- u_trunc(bq / 2)
+        bits <- (bq % 2)
+        k := k + 1
+    }
+    trimmed := []
+    i := 0
+    while (i < bitlen && i < len(bits)) { trimmed <- bits[i]; i := i + 1 }
+    return bits_to_bytes(trimmed)
+}
+
+# 画面表示・雑音評価のためのコンステレーション点
+def ntt_constellation(samples, limit) {
+    nsym := u_min(u_trunc(len(samples) / NTT_SPS), limit)
+    pts := []
+    k := 0
+    while (k < nsym) {
+        s0 := samples[k * 4]
+        s1 := samples[k * 4 + 1]
+        s2 := samples[k * 4 + 2]
+        s3 := samples[k * 4 + 3]
+        pts <- [0.5 * (s0 - s2) / NTT_AMP, 0 - 0.5 * (s1 - s3) / NTT_AMP]
+        k := k + 1
+    }
+    return pts
+}
+
+# ---- G.711 µ-law (ひかり電話のコーデック) ---------------------------
+MULAW_BIAS := 132
+MULAW_CLIP := 32635
+
+def mulaw_encode(sample) {
+    sign := 0
+    s := sample
+    if (s < 0) { s := 0 - s; sign := 128 }
+    if (s > MULAW_CLIP) { s := MULAW_CLIP }
+    s := s + MULAW_BIAS
+    exponent := 7
+    mask := 16384
+    while (u_and(s, mask) == 0 && exponent > 0) {
+        exponent := exponent - 1
+        mask := u_trunc(mask / 2)
+    }
+    mantissa := u_and(u_trunc(s / POW2[exponent + 3]), 15)
+    return 255 - u_or(u_or(sign, exponent * 16), mantissa)
+}
+
+def mulaw_decode(ulaw) {
+    u := 255 - ulaw
+    sign := u_and(u, 128)
+    exponent := u_and(u_trunc(u / 16), 7)
+    mantissa := u_and(u, 15)
+    s := (mantissa * 8 + MULAW_BIAS) * POW2[exponent]
+    s := s - MULAW_BIAS
+    if (sign != 0) { return 0 - s }
+    return s
+}
+
+# ---- RTP (ひかり電話が音声を運ぶ形式) -------------------------------
+RTP_PT_PCMU := 0
+RTP_PTIME   := 160      # 20 ms @ 8 kHz
+
+# -> パケットの並び。各要素は [seq, ts, header, payload]
+def rtp_packetize(ulaw, ssrc, seq0, ts0) {
+    pkts := []
+    i := 0
+    seq := seq0
+    ts := ts0
+    while (i < len(ulaw)) {
+        pay := []
+        k := 0
+        while (k < RTP_PTIME && i + k < len(ulaw)) { pay <- ulaw[i + k]; k := k + 1 }
+        hdr := [128, RTP_PT_PCMU, u_trunc(seq / 256) % 256, seq % 256]
+        j := 3
+        while (j >= 0) { hdr <- (u_trunc(ts / POW2[8 * j]) % 256); j := j - 1 }
+        j := 3
+        while (j >= 0) { hdr <- (u_trunc(ssrc / POW2[8 * j]) % 256); j := j - 1 }
+        pkts <- [seq, ts, hdr, pay]
+        seq := (seq + 1) % 65536
+        ts := (ts + len(pay)) % TWO32
+        i := i + RTP_PTIME
+    }
+    return pkts
+}
+
+# 順序が乱れていても seq で並べ直してから連結する
+def rtp_depacketize(pkts) {
+    n := len(pkts)
+    order := []
+    i := 0
+    while (i < n) { order <- i; i := i + 1 }
+    i := 1
+    while (i < n) {
+        j := i
+        while (j > 0 && pkts[order[j - 1]][0] > pkts[order[j]][0]) {
+            t := order[j - 1]
+            order[j - 1] = order[j]
+            order[j] = t
+            j := j - 1
+        }
+        i := i + 1
+    }
+    out := []
+    i := 0
+    while (i < n) {
+        pay := pkts[order[i]][3]
+        k := 0
+        while (k < len(pay)) { out <- pay[k]; k := k + 1 }
+        i := i + 1
+    }
+    return out
+}
+
+# ---- ベアラ ---------------------------------------------------------
+# バイト列 -> 回線上の信号
+#   [kind, line, bitLen, データ] 。kind は "digital" / "voiceband" / "rtp"
+def ntt_bearer_send(bytes, line, ssrc) {
+    if (line == "isdn") {
+        oct := [126]
+        i := 0
+        while (i < len(bytes)) { oct <- bytes[i]; i := i + 1 }
+        oct <- 126
+        return ["digital", line, len(bytes) * 8, oct]
+    }
+    vb := ntt_modulate(bytes)
+    if (line == "metal") { return ["voiceband", line, len(bytes) * 8, vb] }
+    ulaw := []
+    i := 0
+    while (i < len(vb)) { ulaw <- mulaw_encode(vb[i]); i := i + 1 }
+    return ["rtp", line, len(bytes) * 8, rtp_packetize(ulaw, ssrc, 1000, 0)]
+}
+
+# 回線上の信号 -> バイト列
+def ntt_bearer_recv(sig) {
+    kind := sig[0]
+    if (kind == "digital") {
+        oct := sig[3]
+        out := []
+        i := 1
+        while (i < len(oct) - 1) { out <- oct[i]; i := i + 1 }
+        return out
+    }
+    if (kind == "rtp") {
+        ulaw := rtp_depacketize(sig[3])
+        vb := []
+        i := 0
+        while (i < len(ulaw)) { vb <- mulaw_decode(ulaw[i]); i := i + 1 }
+        return ntt_demodulate(vb, sig[2])
+    }
+    return ntt_demodulate(sig[3], sig[2])
+}
+
+# ---- 呼制御 (発呼 -> 接続 -> ベアラ確立) ----------------------------
+def ntt_call(from_url, to_url, line) {
+    kind := "geo"
+    if (line == "hikari") { kind := "ip" }
+    a := ntt_map(from_url, kind)
+    b := ntt_map(to_url, kind)
+    st := []
+    st <- ["on-hook",   "待機"]
+    st <- ["off-hook",  "発呼 (" + ntt_format(a[0]) + ")"]
+    st <- ["dial",      "選択信号 " + ntt_format(b[0]) + " (PB 信号)"]
+    st <- ["ringing",   "呼出中 — 相手交換機へ IAM"]
+    st <- ["connected", ntt_line_name(line) + " 接続 · " + ntt_line_bps(line) + " bps"]
+    st <- ["data",      "ベアラ確立"]
+    return [a, b, st]
+}
+
+# ============================================================
+# 06_plc.bada -- BADA ULTRA NETWORK / L0 Panasonic HD-PLC
+#
+# 家の電力線 (コンセント) を物理層にして PC をインターネットへつなぐ層。
+#
+#   ・帯域 2-28 MHz を 512 本のサブキャリアに分ける (Δf ≒ 50.78 kHz)
+#   ・変調は QAM ではなく PAM + ウェーブレット変換 (DWMT)。
+#     ガードインターバルが要らないのが HD-PLC 方式の利点。ここでは
+#     正規化 Haar の多重解像度フィルタバンクがその役を務める
+#     (解析と合成は厳密な逆変換の対)
+#   ・電力線の伝達関数は Zimmermann-Dostert の多重経路モデル
+#       H(f) = Σ g_i · exp(-(a0 + a1 f^k) d_i) · exp(-j2πf d_i / v)
+#   ・分岐点のインピーダンス不整合損は周波数とともに増える
+#   ・雑音は色付き背景雑音 N(f)[dBm/Hz] = a + b·f_MHz^c
+#   ・SNR から適応ビットローディング b = floor(log2(1 + SNR/Γ))
+#   ・アマチュア無線帯にはノッチを入れて送信しない
+#   ・IEEE 1901 のフレーム (プリアンブル + FC/CRC-24 + PB/CRC-32)
+#   ・CSMA/CA の優先度解決 (PRS0 / PRS1 + 競合窓バックオフ)
+# ============================================================
+
+PLC_FLO     := 2000000
+PLC_FHI     := 28000000
+PLC_NCARR   := 512
+PLC_TXPSD   := 0 - 50       # 送信電力密度 dBm/Hz (規制値相当)
+PLC_GAP_DB  := 9.8          # SNR ギャップ Γ (BER 1e-7 相当)
+PLC_MAXBITS := 5            # 32-PAM まで
+PLC_VP      := 150000000    # 電力線の位相速度 m/s
+
+PLC_DF   := (PLC_FHI - PLC_FLO) / PLC_NCARR
+PLC_TSYM := 1.0 / PLC_DF
+
+# アマチュア無線帯 (MHz)。HD-PLC はここを送信しない。
+HAM_LO := [1.8, 3.5, 7.0, 10.1, 14.0, 18.068, 21.0, 24.89, 28.0]
+HAM_HI := [2.0, 3.8, 7.2, 10.15, 14.35, 18.168, 21.45, 24.99, 29.7]
+
+def in_ham_band(f_hz) {
+    f := f_hz / 1000000
+    i := 0
+    while (i < len(HAM_LO)) {
+        if (f >= HAM_LO[i] && f <= HAM_HI[i]) { return true }
+        i := i + 1
+    }
+    return false
+}
+
+# ---- 屋内配線のトポロジ ---------------------------------------------
+# コンセントは [id, 表示名, 分電盤からの距離 m, 分岐数, 相]
+OUTLETS := [
+  ["living",  "居間 コンセント",           12, 3, "L1"],
+  ["study",   "書斎 コンセント (PC)",       21, 4, "L1"],
+  ["kitchen", "台所 コンセント",            17, 5, "L2"],
+  ["bedroom", "寝室 コンセント",            28, 4, "L2"],
+  ["router",  "ONU 脇 コンセント (親機)",    5, 2, "L1"]
+]
+
+def outlet_of(id) {
+    i := 0
+    while (i < len(OUTLETS)) {
+        if (OUTLETS[i][0] == id) { return OUTLETS[i] }
+        i := i + 1
+    }
+    return OUTLETS[0]
+}
+
+# 多重経路。経路 i は反射係数 g_i と行程長 d_i を持つ。-> [[g, d], ...]
+def plc_paths(a, b) {
+    oa := outlet_of(a)
+    ob := outlet_of(b)
+    rnd := rng_new("plc:" + a + ">" + b)
+    base := oa[2] + ob[2]
+    nb := u_max(oa[3], ob[3])
+    npath := 3 + nb - 1
+    if (npath > 6) { npath := 6 }
+    paths := []
+    i := 0
+    while (i < npath) {
+        g := 1.0
+        d := base
+        if (i > 0) {
+            # 反射波は分岐で減衰し、行程が伸びる
+            g := (0.75 - 0.12 * i) * (0.6 + 0.4 * rng_next(rnd))
+            d := base + i * (6 + 14 * rng_next(rnd))
+        }
+        if (i % 2 == 1) { g := 0 - g }      # 反射で位相反転
+        paths <- [g, d]
+        i := i + 1
+    }
+    # 異相 (L1 <-> L2) はカプラ越えで一段落ちる
+    if (oa[4] != ob[4]) {
+        i := 0
+        while (i < len(paths)) { paths[i][0] = paths[i][0] * 0.45; i := i + 1 }
+    }
+    return paths
+}
+
+# |H(f)| — 減衰 exp(-a1 f d) と経路差による櫛形フェージング
+def plc_transfer(paths, f_hz) {
+    a1 := 0.00000000078
+    re := 0.0
+    im := 0.0
+    i := 0
+    while (i < len(paths)) {
+        g := paths[i][0]
+        d := paths[i][1]
+        att := exp(0 - a1 * f_hz * d)
+        ph := 0 - TWO_PI * f_hz * d / PLC_VP
+        re := re + g * att * u_cos(ph)
+        im := im + g * att * u_sin(ph)
+        i := i + 1
+    }
+    return sqrt(re * re + im * im)
+}
+
+# 分岐のインピーダンス不整合損 [dB]。無効成分なので周波数とともに増える。
+def plc_coupling_db(a, b, f_hz) {
+    oa := outlet_of(a)
+    ob := outlet_of(b)
+    j := (oa[3] - 1) + (ob[3] - 1)
+    db := 3.0 * j + 5.0
+    if (oa[4] != ob[4]) { db := db + 9.0 }
+    t := (f_hz - PLC_FLO) / (PLC_FHI - PLC_FLO)
+    return db + (14 + 2.6 * j) * t
+}
+
+# 色付き背景雑音 [dBm/Hz]
+def plc_noise_db(f_hz) {
+    fm := f_hz / 1000000
+    return 0 - 145 + 53.23 * exp(0 - 0.337 * log(fm))
+}
+
+# コンセント間の回線特性 -> [freqs, snrDb, paths]
+def plc_channel(a, b) {
+    paths := plc_paths(a, b)
+    freqs := []
+    snrs := []
+    n := 0
+    while (n < PLC_NCARR) {
+        f := PLC_FLO + (n + 0.5) * PLC_DF
+        h := plc_transfer(paths, f)
+        if (h < 0.000000000001) { h := 0.000000000001 }
+        hdb := 20 * log(h) / LN10 - plc_coupling_db(a, b, f)
+        freqs <- f
+        snrs <- (PLC_TXPSD + hdb - plc_noise_db(f))
+        n := n + 1
+    }
+    return [freqs, snrs, paths]
+}
+
+# 適応ビットローディング b = floor(log2(1 + SNR/Γ))、ノッチは 0
+# -> [bits, bitsPerSymbol, active, notched, phyBps, snrs]
+def plc_tonemap(ch) {
+    gap := db_to_lin(PLC_GAP_DB)
+    freqs := ch[0]
+    snrs := ch[1]
+    bits := []
+    total := 0
+    active := 0
+    notched := 0
+    n := 0
+    while (n < PLC_NCARR) {
+        if (in_ham_band(freqs[n])) {
+            bits <- 0
+            notched := notched + 1
+        } else {
+            lin := db_to_lin(snrs[n])
+            bq := u_trunc(u_log2(1 + lin / gap))
+            if (bq < 1) { bq := 0 }
+            if (bq > PLC_MAXBITS) { bq := PLC_MAXBITS }
+            bits <- bq
+            if (bq > 0) { active := active + 1; total := total + bq }
+        }
+        n := n + 1
+    }
+    return [bits, total, active, notched, total / PLC_TSYM, snrs]
+}
+
+# ---- Gray 符号つき PAM ----------------------------------------------
+# PAM は 5 ビット (32-PAM) までなので、0..31 の対応表を先に作る。
+# OFDM の内側では 1 シンボルあたり 512 回引かれるので、ここを
+# 逐次 XOR のままにすると全体の costs の大半を食う。
+GRAY_ENC := []
+i := 0
+while (i < 32) { GRAY_ENC <- u_xor(i, u_trunc(i / 2)); i := i + 1 }
+GRAY_DEC := []
+i := 0
+while (i < 32) { GRAY_DEC <- 0; i := i + 1 }
+i := 0
+while (i < 32) { GRAY_DEC[GRAY_ENC[i]] = i; i := i + 1 }
+
+def gray_encode(v) { return GRAY_ENC[v] }
+def gray_decode(g) { return GRAY_DEC[g] }
+
+# b ビット -> 2^b-PAM の振幅 (..., -3, -1, +1, +3, ...)
+def pam_level(idx, b) { return 2 * idx - (POW2[b] - 1) }
+
+def pam_index(level, b) {
+    M := POW2[b]
+    i := u_fix((level + (M - 1) + 1) / 2)
+    if (i < 0) { i := 0 }
+    if (i > M - 1) { i := M - 1 }
+    return i
+}
+
+# ---- ウェーブレット変換 (正規化 Haar、厳密な逆変換の対) -------------
+SQ1_2 := 0.7071067811865476
+
+# 時間波形 -> ウェーブレット係数 (サブバンド = サブキャリア)
+def dwt_analyze(x) {
+    a := []
+    i := 0
+    while (i < len(x)) { a <- x[i]; i := i + 1 }
+    n := len(a)
+    while (n > 1) {
+        half := u_trunc(n / 2)
+        out := []
+        i := 0
+        while (i < half) { out <- (a[2 * i] + a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < half) { out <- (a[2 * i] - a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+        n := half
+    }
+    return a
+}
+
+# ウェーブレット係数 -> 時間波形 (dwt_analyze の逆)
+def dwt_synthesize(c) {
+    a := []
+    i := 0
+    while (i < len(c)) { a <- c[i]; i := i + 1 }
+    N := len(a)
+    n := 1
+    while (n < N) {
+        half := n
+        n := n * 2
+        out := []
+        i := 0
+        while (i < n) { out <- 0; i := i + 1 }
+        i := 0
+        while (i < half) {
+            out[2 * i]     = (a[i] + a[half + i]) * SQ1_2
+            out[2 * i + 1] = (a[i] - a[half + i]) * SQ1_2
+            i := i + 1
+        }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+    }
+    return a
+}
+
+# ---- ウェーブレット OFDM --------------------------------------------
+# -> [samples, nSymbols, bitLen]
+def plc_modulate(bytes, tm) {
+    tone := tm[0]
+    per := tm[1]
+    bits := bytes_to_bits(bytes)
+    reallen := len(bits)
+    nsym := u_trunc((reallen + per - 1) / per)
+    pad := nsym * per - reallen
+    i := 0
+    while (i < pad) { bits <- 0; i := i + 1 }
+
+    samples := []
+    p := 0
+    s := 0
+    while (s < nsym) {
+        coeffs := []
+        n := 0
+        while (n < PLC_NCARR) { coeffs <- 0; n := n + 1 }
+        n := 0
+        while (n < PLC_NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                v := 0
+                k := 0
+                while (k < bq) { v := v * 2 + bits[p]; p := p + 1; k := k + 1 }
+                coeffs[n] = pam_level(gray_decode(v), bq)
+            }
+            n := n + 1
+        }
+        wave := dwt_synthesize(coeffs)
+        i := 0
+        while (i < PLC_NCARR) { samples <- wave[i]; i := i + 1 }
+        s := s + 1
+    }
+    return [samples, nsym, reallen]
+}
+
+def plc_demodulate(samples, tm, bitlen) {
+    tone := tm[0]
+    nsym := u_trunc(len(samples) / PLC_NCARR)
+    bits := []
+    s := 0
+    while (s < nsym) {
+        chunk := []
+        i := 0
+        while (i < PLC_NCARR) { chunk <- samples[s * PLC_NCARR + i]; i := i + 1 }
+        coeffs := dwt_analyze(chunk)
+        n := 0
+        while (n < PLC_NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                g := gray_encode(pam_index(coeffs[n], bq))
+                k := bq - 1
+                while (k >= 0) {
+                    pw := POW2[k]
+                    if (g >= pw) { bits <- 1; g := g - pw } else { bits <- 0 }
+                    k := k - 1
+                }
+            }
+            n := n + 1
+        }
+        s := s + 1
+    }
+    trimmed := []
+    i := 0
+    while (i < bitlen && i < len(bits)) { trimmed <- bits[i]; i := i + 1 }
+    return bits_to_bytes(trimmed)
+}
+
+# 実回線を通す: サブバンドごとに雑音を載せ、受信側で等化する。
+# ビットローディングの余裕が足りないサブキャリアだけが誤る。
+def plc_through_channel(samples, tm, margin_db, seed) {
+    rnd := rng_new("awgn:" + seed)
+    tone := tm[0]
+    snrs := tm[5]
+    nsym := u_trunc(len(samples) / PLC_NCARR)
+    out := []
+    s := 0
+    while (s < nsym) {
+        chunk := []
+        i := 0
+        while (i < PLC_NCARR) { chunk <- samples[s * PLC_NCARR + i]; i := i + 1 }
+        coeffs := dwt_analyze(chunk)
+        n := 0
+        while (n < PLC_NCARR) {
+            if (tone[n] == 0) { coeffs[n] = 0 }
+            else {
+                snr := db_to_lin(snrs[n] - margin_db)
+                sigma := sqrt((POW2[2 * tone[n]] - 1) / 3 / snr)
+                u1 := rng_next(rnd)
+                if (u1 < 0.000000000001) { u1 := 0.000000000001 }
+                u2 := rng_next(rnd)
+                gauss := sqrt(0 - 2 * log(u1)) * u_cos(TWO_PI * u2)
+                coeffs[n] = coeffs[n] + sigma * gauss
+            }
+            n := n + 1
+        }
+        wave := dwt_synthesize(coeffs)
+        i := 0
+        while (i < PLC_NCARR) { out <- wave[i]; i := i + 1 }
+        s := s + 1
+    }
+    return out
+}
+
+# ---- CRC (IEEE 1901 のフレーム検査) ---------------------------------
+CRC32_TAB := []
+n := 0
+while (n < 256) {
+    c := n
+    k := 0
+    while (k < 8) {
+        if (c % 2 == 1) { c := u_xor(3988292384, u_trunc(c / 2)) }
+        else { c := u_trunc(c / 2) }
+        k := k + 1
+    }
+    CRC32_TAB <- c
+    n := n + 1
+}
+
+def crc32(bytes) {
+    c := MASK32
+    i := 0
+    while (i < len(bytes)) {
+        c := u_xor(CRC32_TAB[u_xor8(c % 256, bytes[i])], u_trunc(c / 256))
+        i := i + 1
+    }
+    return MASK32 - c
+}
+
+# CRC-24 (多項式 0x5D6DCB) — フレーム制御の検査
+def crc24(bytes) {
+    c := 11994830
+    i := 0
+    while (i < len(bytes)) {
+        c := u_xor(c, bytes[i] * 65536)
+        k := 0
+        while (k < 8) {
+            c := c * 2
+            if (c >= 16777216) { c := u_xor(c, 6122955) }
+            c := c % 16777216
+            k := k + 1
+        }
+        i := i + 1
+    }
+    return c
+}
+
+# ---- フレーム (プリアンブル + FC + PB ブロック) ----------------------
+PLC_PB_BYTES := 520
+PLC_PREAMBLE := [26, 207, 252, 29, 26, 207, 252, 29]
+
+def plc_frame(payload, src, dst, cap) {
+    n := len(payload)
+    nblk := u_trunc((n + PLC_PB_BYTES - 1) / PLC_PB_BYTES)
+    if (nblk < 1) { nblk := 1 }
+    # フレーム制御: 種別 / 優先度 / 送受信 ID / ブロック数 / ペイロード長
+    fc := [1, cap % 4,
+           u_trunc(src / 256) % 256, src % 256,
+           u_trunc(dst / 256) % 256, dst % 256,
+           u_trunc(nblk / 256) % 256, nblk % 256]
+    k := 3
+    while (k >= 0) { fc <- (u_trunc(n / POW2[8 * k]) % 256); k := k - 1 }
+    fcc := crc24(fc)
+
+    out := []
+    i := 0
+    while (i < len(PLC_PREAMBLE)) { out <- PLC_PREAMBLE[i]; i := i + 1 }
+    i := 0
+    while (i < len(fc)) { out <- fc[i]; i := i + 1 }
+    out <- u_trunc(fcc / 65536) % 256
+    out <- u_trunc(fcc / 256) % 256
+    out <- fcc % 256
+
+    b := 0
+    while (b < nblk) {
+        pb := []
+        i := 0
+        while (i < PLC_PB_BYTES) {
+            idx := b * PLC_PB_BYTES + i
+            if (idx < n) { pb <- payload[idx] } else { pb <- 0 }
+            i := i + 1
+        }
+        c := crc32(pb)
+        i := 0
+        while (i < PLC_PB_BYTES) { out <- pb[i]; i := i + 1 }
+        k := 3
+        while (k >= 0) { out <- (u_trunc(c / POW2[8 * k]) % 256); k := k - 1 }
+        b := b + 1
+    }
+    return out
+}
+
+# -> [status, payload, 理由]  status 200 / 503
+def plc_deframe(bytes) {
+    i := 0
+    while (i < len(PLC_PREAMBLE)) {
+        if (i >= len(bytes)) { return [503, [], "no-preamble"] }
+        if (bytes[i] != PLC_PREAMBLE[i]) { return [503, [], "no-preamble"] }
+        i := i + 1
+    }
+    p := len(PLC_PREAMBLE)
+    if (len(bytes) < p + 15) { return [503, [], "truncated"] }
+    fc := []
+    i := 0
+    while (i < 12) { fc <- bytes[p + i]; i := i + 1 }
+    got := bytes[p + 12] * 65536 + bytes[p + 13] * 256 + bytes[p + 14]
+    if (got != crc24(fc)) { return [503, [], "fc-crc"] }
+    nblk := fc[6] * 256 + fc[7]
+    paylen := fc[8] * 16777216 + fc[9] * 65536 + fc[10] * 256 + fc[11]
+    p := p + 15
+    acc := []
+    b := 0
+    while (b < nblk) {
+        if (len(bytes) < p + PLC_PB_BYTES + 4) { return [503, [], "truncated"] }
+        pb := []
+        i := 0
+        while (i < PLC_PB_BYTES) { pb <- bytes[p + i]; i := i + 1 }
+        p := p + PLC_PB_BYTES
+        c := bytes[p] * 16777216 + bytes[p + 1] * 65536 + bytes[p + 2] * 256 + bytes[p + 3]
+        p := p + 4
+        if (c != crc32(pb)) { return [503, [], "pb-crc"] }
+        i := 0
+        while (i < PLC_PB_BYTES) { acc <- pb[i]; i := i + 1 }
+        b := b + 1
+    }
+    out := []
+    i := 0
+    while (i < paylen && i < len(acc)) { out <- acc[i]; i := i + 1 }
+    return [200, out, ""]
+}
+
+# ---- CSMA/CA (IEEE 1901 の優先度解決スロット) ------------------------
+# 局は [name, CAP]。CAP 3 が最優先。
+# -> [maxCap, cw, 勝者, PRS0 の並び, PRS1 の並び, 抽選結果]
+def plc_csma(stations, seed) {
+    rnd := rng_new("csma:" + seed)
+    prs0 := []
+    prs1 := []
+    maxcap := 0 - 1
+    i := 0
+    while (i < len(stations)) {
+        nm := stations[i][0]
+        cp := stations[i][1]
+        if (cp >= 2) { prs0 <- nm }
+        if (cp == 3) { prs1 <- nm }
+        if (cp == 1) { prs1 <- nm }
+        if (cp > maxcap) { maxcap := cp }
+        i := i + 1
+    }
+    cwtab := [7, 15, 15, 31]
+    cw := cwtab[u_min(3, u_max(0, maxcap))]
+    draws := []
+    winner := ""
+    bestb := 999999
+    i := 0
+    while (i < len(stations)) {
+        if (stations[i][1] == maxcap) {
+            b := u_trunc(rng_next(rnd) * (cw + 1))
+            draws <- [stations[i][0], b]
+            if (b < bestb) { bestb := b; winner := stations[i][0] }
+        }
+        i := i + 1
+    }
+    return [maxcap, cw, winner, prs0, prs1, draws]
+}
+
+# ============================================================
+# 07_json.bada -- BADA ULTRA NETWORK / JSON の解析と生成
+#
+# LINE Messaging API と Instagram Graph API の Webhook 本文は JSON で
+# 届く。署名 (HMAC-SHA256) は「生の本文そのもの」に対して計算するので、
+# 本文の文字列と、そこから取り出した値の両方が要る。
+#
+# Bada に連想配列は無いので、値はタグつきの配列で表す:
+#   ["obj", 鍵の並び, 値の並び]
+#   ["arr", 要素の並び]
+#   ["str", 文字列]  ["num", 数]  ["bool", 真偽]  ["null"]
+# ============================================================
+
+def json_is(v, tag) {
+    if (len(v) == 0) { return false }
+    return v[0] == tag
+}
+
+def json_num(v)  { if (json_is(v, "num"))  { return v[1] } return 0 }
+def json_str(v)  { if (json_is(v, "str"))  { return v[1] } return "" }
+def json_bool(v) { if (json_is(v, "bool")) { return v[1] } return false }
+
+# オブジェクトから鍵で引く。無ければ ["null"]
+def json_get(v, key) {
+    if (!json_is(v, "obj")) { return ["null"] }
+    keys := v[1]
+    i := 0
+    while (i < len(keys)) {
+        if (keys[i] == key) { return v[2][i] }
+        i := i + 1
+    }
+    return ["null"]
+}
+
+def json_has(v, key) { return !json_is(json_get(v, key), "null") }
+
+# 配列の i 番目。範囲外なら ["null"]
+def json_at(v, i) {
+    if (!json_is(v, "arr")) { return ["null"] }
+    if (i < 0) { return ["null"] }
+    if (i >= len(v[1])) { return ["null"] }
+    return v[1][i]
+}
+
+def json_len(v) {
+    if (json_is(v, "arr")) { return len(v[1]) }
+    if (json_is(v, "obj")) { return len(v[1]) }
+    return 0
+}
+
+# "entry.0.messaging.0.message.text" のような経路で潜る
+def json_path(v, path) {
+    parts := split(path, ".")
+    cur := v
+    i := 0
+    while (i < len(parts)) {
+        p := parts[i]
+        c0 := ord(p, 0)
+        if (c0 >= 48 && c0 <= 57) {
+            n := 0
+            k := 0
+            while (k < len(p)) { n := n * 10 + (ord(p, k) - 48); k := k + 1 }
+            cur := json_at(cur, n)
+        } else {
+            cur := json_get(cur, p)
+        }
+        i := i + 1
+    }
+    return cur
+}
+
+# ---- 解析 ----------------------------------------------------------
+# st は [text, pos] 。pos を進めながら読む。
+def js_peek(st) {
+    if (st[1] >= len(st[0])) { return 0 }
+    return ord(st[0], st[1])
+}
+
+def js_skip_ws(st) {
+    while (st[1] < len(st[0])) {
+        c := ord(st[0], st[1])
+        ws := false
+        if (c == 32) { ws := true }
+        if (c == 9)  { ws := true }
+        if (c == 10) { ws := true }
+        if (c == 13) { ws := true }
+        if (ws) { st[1] = st[1] + 1 } else { return 0 }
+    }
+    return 0
+}
+
+def js_hexval(c) {
+    if (c >= 48 && c <= 57) { return c - 48 }
+    if (c >= 97 && c <= 102) { return c - 87 }
+    if (c >= 65 && c <= 70) { return c - 55 }
+    return 0
+}
+
+def js_parse_string(st) {
+    st[1] = st[1] + 1               # 開きの "
+    out := ""
+    while (st[1] < len(st[0])) {
+        c := ord(st[0], st[1])
+        if (c == 34) { st[1] = st[1] + 1; return out }
+        if (c == 92) {
+            st[1] = st[1] + 1
+            e := ord(st[0], st[1])
+            if (e == 110) { out := out + chr(10) }
+            else { if (e == 116) { out := out + chr(9) }
+            else { if (e == 114) { out := out + chr(13) }
+            else { if (e == 98)  { out := out + chr(8) }
+            else { if (e == 102) { out := out + chr(12) }
+            else { if (e == 117) {
+                     v := js_hexval(ord(st[0], st[1] + 1)) * 4096 +
+                          js_hexval(ord(st[0], st[1] + 2)) * 256 +
+                          js_hexval(ord(st[0], st[1] + 3)) * 16 +
+                          js_hexval(ord(st[0], st[1] + 4))
+                     out := out + chr(v)
+                     st[1] = st[1] + 4
+                   }
+            else { out := out + chr(e) } } } } } }
+            st[1] = st[1] + 1
+        } else {
+            out := out + chr(c)
+            st[1] = st[1] + 1
+        }
+    }
+    return out
+}
+
+# 数の字句を切り出す。JSON では数の切れ目は必ず区切り文字なので、
+# 数字・小数点・指数・符号が続くかぎり読めばよい。
+def js_parse_number(st) {
+    text := st[0]
+    n := len(text)
+    start := st[1]
+    e := start
+    scanning := true
+    while (scanning && e < n) {
+        c := ord(text, e)
+        good := false
+        if (c >= 48 && c <= 57) { good := true }
+        if (c == 46) { good := true }
+        if (c == 101) { good := true }
+        if (c == 69)  { good := true }
+        if (c == 43)  { good := true }
+        if (c == 45)  { good := true }
+        if (good) { e := e + 1 } else { scanning := false }
+    }
+    st[1] = e
+    return str_to_num(substr(text, start, e - start))
+}
+
+# 十進文字列 -> 数 (符号・小数・指数に対応)
+def str_to_num(txt) {
+    n := len(txt)
+    i := 0
+    sign := 1
+    if (i < n) {
+        c := ord(txt, i)
+        if (c == 45) { sign := 0 - 1; i := i + 1 }
+        else { if (c == 43) { i := i + 1 } }
+    }
+    # 整数部
+    ip := 0.0
+    reading := true
+    while (reading && i < n) {
+        c := ord(txt, i)
+        if (c >= 48 && c <= 57) { ip := ip * 10 + (c - 48); i := i + 1 }
+        else { reading := false }
+    }
+    # 小数部
+    frac := 0.0
+    if (i < n) {
+        if (ord(txt, i) == 46) {
+            i := i + 1
+            scale := 0.1
+            reading := true
+            while (reading && i < n) {
+                c := ord(txt, i)
+                if (c >= 48 && c <= 57) { frac := frac + (c - 48) * scale; scale := scale / 10; i := i + 1 }
+                else { reading := false }
+            }
+        }
+    }
+    v := (ip + frac) * sign
+    # 指数部
+    if (i < n) {
+        c := ord(txt, i)
+        isexp := false
+        if (c == 101) { isexp := true }
+        if (c == 69)  { isexp := true }
+        if (isexp) {
+            i := i + 1
+            esign := 1
+            if (i < n) {
+                c2 := ord(txt, i)
+                if (c2 == 45) { esign := 0 - 1; i := i + 1 }
+                else { if (c2 == 43) { i := i + 1 } }
+            }
+            ev := 0
+            reading := true
+            while (reading && i < n) {
+                c3 := ord(txt, i)
+                if (c3 >= 48 && c3 <= 57) { ev := ev * 10 + (c3 - 48); i := i + 1 }
+                else { reading := false }
+            }
+            v := v * ipow(10, ev * esign)
+        }
+    }
+    return v
+}
+
+def js_parse_value(st) {
+    js_skip_ws(st)
+    c := js_peek(st)
+    if (c == 123) { return js_parse_object(st) }
+    if (c == 91)  { return js_parse_array(st) }
+    if (c == 34)  { return ["str", js_parse_string(st)] }
+    if (c == 116) { st[1] = st[1] + 4; return ["bool", true] }
+    if (c == 102) { st[1] = st[1] + 5; return ["bool", false] }
+    if (c == 110) { st[1] = st[1] + 4; return ["null"] }
+    return ["num", js_parse_number(st)]
+}
+
+def js_parse_object(st) {
+    st[1] = st[1] + 1
+    keys := []
+    vals := []
+    js_skip_ws(st)
+    if (js_peek(st) == 125) { st[1] = st[1] + 1; return ["obj", keys, vals] }
+    while (st[1] < len(st[0])) {
+        js_skip_ws(st)
+        k := js_parse_string(st)
+        js_skip_ws(st)
+        st[1] = st[1] + 1            # :
+        v := js_parse_value(st)
+        keys <- k
+        vals <- v
+        js_skip_ws(st)
+        c := js_peek(st)
+        if (c == 44) { st[1] = st[1] + 1 }
+        else { st[1] = st[1] + 1; return ["obj", keys, vals] }
+    }
+    return ["obj", keys, vals]
+}
+
+def js_parse_array(st) {
+    st[1] = st[1] + 1
+    items := []
+    js_skip_ws(st)
+    if (js_peek(st) == 93) { st[1] = st[1] + 1; return ["arr", items] }
+    while (st[1] < len(st[0])) {
+        v := js_parse_value(st)
+        items <- v
+        js_skip_ws(st)
+        c := js_peek(st)
+        if (c == 44) { st[1] = st[1] + 1 }
+        else { st[1] = st[1] + 1; return ["arr", items] }
+    }
+    return ["arr", items]
+}
+
+def json_parse(text) {
+    st := [text, 0]
+    return js_parse_value(st)
+}
+
+# ---- 生成 ----------------------------------------------------------
+def json_escape(s) {
+    out := ""
+    i := 0
+    while (i < len(s)) {
+        c := ord(s, i)
+        if (c == 34) { out := out + chr(92) + chr(34) }
+        else { if (c == 92) { out := out + chr(92) + chr(92) }
+        else { if (c == 10) { out := out + chr(92) + "n" }
+        else { if (c == 13) { out := out + chr(92) + "r" }
+        else { if (c == 9)  { out := out + chr(92) + "t" }
+        else { out := out + chr(c) } } } } }
+        i := i + 1
+    }
+    return out
+}
+
+def json_q(s) { return chr(34) + json_escape(s) + chr(34) }
+
+def json_stringify(v) {
+    if (json_is(v, "str"))  { return json_q(v[1]) }
+    if (json_is(v, "num"))  { return "" + v[1] }
+    if (json_is(v, "bool")) { if (v[1]) { return "true" } return "false" }
+    if (json_is(v, "null")) { return "null" }
+    if (json_is(v, "arr")) {
+        out := "["
+        i := 0
+        while (i < len(v[1])) {
+            if (i > 0) { out := out + "," }
+            out := out + json_stringify(v[1][i])
+            i := i + 1
+        }
+        return out + "]"
+    }
+    if (json_is(v, "obj")) {
+        out := "{"
+        i := 0
+        while (i < len(v[1])) {
+            if (i > 0) { out := out + "," }
+            out := out + json_q(v[1][i]) + ":" + json_stringify(v[2][i])
+            i := i + 1
+        }
+        return out + "}"
+    }
+    return "null"
+}
+
+# 組み立ての補助
+def jobj(keys, vals) { return ["obj", keys, vals] }
+def jarr(items)      { return ["arr", items] }
+def jstr(s)          { return ["str", s] }
+def jnum(n)          { return ["num", n] }
+def jbool(b)         { return ["bool", b] }
+
+# ============================================================
+# 08_msgmux.bada -- BADA ULTRA NETWORK / L4 メッセージ多重化
+#
+# LINE と Instagram のメッセージ機能をウルトラネットワークに取り込む層。
+# 取り込みは各社が公開している「公式 API の仕様どおり」に行う。
+#
+#   LINE      Messaging API の Webhook イベント
+#             署名 X-Line-Signature = Base64(HMAC-SHA256(channelSecret, 生の本文))
+#             送信 /v2/bot/message/reply · /v2/bot/message/push
+#   Instagram Instagram Graph API (Messenger Platform) の Webhook
+#             署名 X-Hub-Signature-256 = "sha256=" + hex(HMAC-SHA256(appSecret, 生の本文))
+#             送信 /<IG_ID>/messages
+#
+# 非公開 API の解析や認証の迂回は一切しない。実運用には各
+# プラットフォームで発行したチャネルシークレット / アクセストークンが
+# 要る。それが無い場合は、公式仕様と同じ形の本文を組み立てて
+# 署名経路まで本物を通すローカル模擬 (msg_simulate) で動かす。
+#
+# 統合メッセージの表現:
+#   ["msg", platform, chatId, userId, displayName, type, text, replyToken, ts]
+# ============================================================
+
+LINE_REPLY_EP := "https://api.line.me/v2/bot/message/reply"
+LINE_PUSH_EP  := "https://api.line.me/v2/bot/message/push"
+IG_SEND_EP    := "https://graph.instagram.com/v21.0/{IG_ID}/messages"
+LINE_DOCS     := "https://developers.line.biz/ja/reference/messaging-api/"
+IG_DOCS       := "https://developers.facebook.com/docs/messenger-platform/instagram/"
+
+# ---- 署名 -----------------------------------------------------------
+def line_signature(secret, raw_body) {
+    return base64_of_bytes(hmac_sha256(utf8_of_str(secret), utf8_of_str(raw_body)))
+}
+
+def line_verify(secret, raw_body, header) {
+    return const_time_eq_str(line_signature(secret, raw_body), header)
+}
+
+def ig_signature(secret, raw_body) {
+    return "sha256=" + hex_of_bytes(hmac_sha256(utf8_of_str(secret), utf8_of_str(raw_body)))
+}
+
+def ig_verify(secret, raw_body, header) {
+    return const_time_eq_str(ig_signature(secret, raw_body), header)
+}
+
+# ---- 統合メッセージ -------------------------------------------------
+def msg_new(platform, chat, user, name, type, text, reply, ts) {
+    return ["msg", platform, chat, user, name, type, text, reply, ts]
+}
+
+def msg_platform(m) { return m[1] }
+def msg_chat(m)     { return m[2] }
+def msg_user(m)     { return m[3] }
+def msg_name(m)     { return m[4] }
+def msg_type(m)     { return m[5] }
+def msg_text(m)     { return m[6] }
+def msg_reply(m)    { return m[7] }
+def msg_ts(m)       { return m[8] }
+
+# 統合メッセージが載る zone アドレス (これが NTT 番号へ写像される)
+def msg_zone_url(m) {
+    chat := m[2]
+    if (chat == "") { chat := "self" }
+    return "zone://url.or.jp/msg/" + m[1] + "/" + chat
+}
+
+# 転送用の直列化 (封緘の対象になる)
+def msg_serialize(m) {
+    return json_stringify(jobj(["v","p","c","u","n","t","x","r","ts"],
+        [jnum(1), jstr(m[1]), jstr(m[2]), jstr(m[3]), jstr(m[4]),
+         jstr(m[5]), jstr(m[6]), jstr(m[7]), jnum(m[8])]))
+}
+
+def msg_deserialize(s) {
+    v := json_parse(s)
+    return msg_new(json_str(json_get(v, "p")), json_str(json_get(v, "c")),
+                   json_str(json_get(v, "u")), json_str(json_get(v, "n")),
+                   json_str(json_get(v, "t")), json_str(json_get(v, "x")),
+                   json_str(json_get(v, "r")), json_num(json_get(v, "ts")))
+}
+
+# ---- LINE Messaging API の Webhook イベント -> 統合メッセージ --------
+def msg_from_line_event(ev) {
+    if (json_str(json_get(ev, "type")) != "message") { return [] }
+    msgo := json_get(ev, "message")
+    if (json_is(msgo, "null")) { return [] }
+    src := json_get(ev, "source")
+    chat := json_str(json_get(src, "groupId"))
+    if (chat == "") { chat := json_str(json_get(src, "roomId")) }
+    if (chat == "") { chat := json_str(json_get(src, "userId")) }
+    mtype := json_str(json_get(msgo, "type"))
+    text := ""
+    if (mtype == "text") { text := json_str(json_get(msgo, "text")) }
+    else {
+        if (mtype == "sticker") {
+            text := "[スタンプ " + json_str(json_get(msgo, "packageId")) + "/" +
+                    json_str(json_get(msgo, "stickerId")) + "]"
+        } else { text := "[" + mtype + "]" }
+    }
+    name := json_str(json_path(ev, "__profile.displayName"))
+    if (name == "") { name := "LINE ユーザー" }
+    return [msg_new("line", chat, json_str(json_get(src, "userId")), name, mtype, text,
+                    json_str(json_get(ev, "replyToken")), json_num(json_get(ev, "timestamp")))]
+}
+
+# -> [status, メッセージの並び, 署名が検証されたか]
+def msg_ingest_line(raw_body, secret, sig_header) {
+    verified := true
+    if (secret != "") {
+        verified := line_verify(secret, raw_body, sig_header)
+        if (!verified) { return [401, [], false] }
+    }
+    body := json_parse(raw_body)
+    evs := json_get(body, "events")
+    out := []
+    i := 0
+    while (i < json_len(evs)) {
+        m := msg_from_line_event(json_at(evs, i))
+        if (len(m) == 1) { out <- m[0] }
+        i := i + 1
+    }
+    return [200, out, verified]
+}
+
+# ---- Instagram Graph API の Webhook -> 統合メッセージ ----------------
+def msg_from_ig_messaging(mg, entry_id) {
+    msgo := json_get(mg, "message")
+    if (json_is(msgo, "null")) { return [] }
+    if (json_bool(json_get(msgo, "is_echo"))) { return [] }
+    sender := json_str(json_path(mg, "sender.id"))
+    text := json_str(json_get(msgo, "text"))
+    mtype := "text"
+    atts := json_get(msgo, "attachments")
+    if (json_len(atts) > 0) {
+        mtype := json_str(json_path(msgo, "attachments.0.type"))
+        if (mtype == "") { mtype := "image" }
+        if (text == "") { text := "[" + mtype + "]" }
+    }
+    name := json_str(json_path(mg, "__profile.username"))
+    if (name == "") { name := "IG:" + sender }
+    return [msg_new("instagram", sender, sender, name, mtype, text, "",
+                    json_num(json_get(mg, "timestamp")))]
+}
+
+def msg_ingest_instagram(raw_body, secret, sig_header) {
+    verified := true
+    if (secret != "") {
+        verified := ig_verify(secret, raw_body, sig_header)
+        if (!verified) { return [401, [], false] }
+    }
+    body := json_parse(raw_body)
+    entries := json_get(body, "entry")
+    out := []
+    i := 0
+    while (i < json_len(entries)) {
+        entry := json_at(entries, i)
+        eid := json_str(json_get(entry, "id"))
+        ms := json_get(entry, "messaging")
+        k := 0
+        while (k < json_len(ms)) {
+            m := msg_from_ig_messaging(json_at(ms, k), eid)
+            if (len(m) == 1) { out <- m[0] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    return [200, out, verified]
+}
+
+# ---- 公式 API への送信要求 ------------------------------------------
+# -> [endpoint, method, 認可ヘッダ, 本文 JSON]
+def msg_to_line_reply(reply_token, text) {
+    body := jobj(["replyToken", "messages"],
+                 [jstr(reply_token),
+                  jarr([jobj(["type", "text"], [jstr("text"), jstr(text)])])])
+    return [LINE_REPLY_EP, "POST", "Bearer {CHANNEL_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_line_push(to, text) {
+    body := jobj(["to", "messages"],
+                 [jstr(to),
+                  jarr([jobj(["type", "text"], [jstr("text"), jstr(text)])])])
+    return [LINE_PUSH_EP, "POST", "Bearer {CHANNEL_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_instagram_send(ig_id, recipient, text) {
+    ep := IG_SEND_EP
+    cut := str_find(ep, "{IG_ID}")
+    if (cut >= 0) {
+        ep := substr(ep, 0, cut) + ig_id + substr(ep, cut + 7, len(ep) - cut - 7)
+    }
+    body := jobj(["recipient", "message"],
+                 [jobj(["id"], [jstr(recipient)]),
+                  jobj(["text"], [jstr(text)])])
+    return [ep, "POST", "Bearer {IG_ACCESS_TOKEN}", json_stringify(body)]
+}
+
+def msg_to_outbound(m, ig_id) {
+    if (m[1] == "line") {
+        if (m[7] != "") { return msg_to_line_reply(m[7], m[6]) }
+        return msg_to_line_push(m[2], m[6])
+    }
+    if (m[1] == "instagram") { return msg_to_instagram_send(ig_id, m[2], m[6]) }
+    return [msg_zone_url(m), "PUT", "", json_stringify(jstr(m[6]))]
+}
+
+# ---- ローカル模擬 (資格情報が無くても署名経路を本物で通す) -----------
+SIM_LINE_ID   := ["U4af4980629...", "U9c1f2d7b41...", "Ub2e88a0f53..."]
+SIM_LINE_NAME := ["田中 さくら", "山口 まさあき", "研究会グループ"]
+SIM_LINE_TEXT := ["電力線でつながった?", "コンセントから zone:// が見えてる",
+                  "今日の実験ログ送るね", "NTT の番号写像うまくいった?",
+                  "量子鍵の QBER は 0 だった"]
+SIM_IG_ID     := ["17841400000000001", "17841400000000002"]
+SIM_IG_NAME   := ["sakura.photo", "bada.lang"]
+SIM_IG_TEXT   := ["配線図の写真あげたよ", "ウルトラネットワークの図が綺麗",
+                  "この投稿みて!", "DM ありがとう"]
+
+# LINE の Webhook 本文を公式仕様の形で組み立てて、生の JSON 文字列を返す
+def sim_line_body(n, seed) {
+    rnd := rng_new("simline:" + seed)
+    evs := []
+    i := 0
+    while (i < n) {
+        who := u_trunc(rng_next(rnd) * len(SIM_LINE_ID)) % len(SIM_LINE_ID)
+        wht := u_trunc(rng_next(rnd) * len(SIM_LINE_TEXT)) % len(SIM_LINE_TEXT)
+        ev := jobj(["type", "mode", "timestamp", "source", "webhookEventId",
+                    "deliveryContext", "replyToken", "message", "__profile"],
+            [jstr("message"), jstr("active"), jnum(1700000000000 + i * 60000),
+             jobj(["type", "userId"], [jstr("user"), jstr(SIM_LINE_ID[who])]),
+             jstr("01H" + (1000000 + i * 7)),
+             jobj(["isRedelivery"], [jbool(false)]),
+             jstr(hex_of_word32(mix32("rt:" + seed + ":" + i))),
+             jobj(["id", "type", "text"],
+                  [jstr("" + (100000000000000 + i)), jstr("text"), jstr(SIM_LINE_TEXT[wht])]),
+             jobj(["displayName"], [jstr(SIM_LINE_NAME[who])])])
+        evs <- ev
+        i := i + 1
+    }
+    return json_stringify(jobj(["destination", "events"],
+        [jstr("Ubada0000000000000000000000000000"), jarr(evs)]))
+}
+
+# Instagram の Webhook 本文を公式仕様の形で組み立てる
+def sim_instagram_body(n, seed) {
+    rnd := rng_new("simig:" + seed)
+    ms := []
+    i := 0
+    while (i < n) {
+        who := u_trunc(rng_next(rnd) * len(SIM_IG_ID)) % len(SIM_IG_ID)
+        wht := u_trunc(rng_next(rnd) * len(SIM_IG_TEXT)) % len(SIM_IG_TEXT)
+        mg := jobj(["sender", "recipient", "timestamp", "message", "__profile"],
+            [jobj(["id"], [jstr(SIM_IG_ID[who])]),
+             jobj(["id"], [jstr("17841499999999999")]),
+             jnum(1700000000000 + i * 60000),
+             jobj(["mid", "text"],
+                  [jstr("aWc6" + hex_of_word32(mix32("mid:" + seed + ":" + i))),
+                   jstr(SIM_IG_TEXT[wht])]),
+             jobj(["username"], [jstr(SIM_IG_NAME[who])])])
+        ms <- mg
+        i := i + 1
+    }
+    entry := jobj(["id", "time", "messaging"],
+        [jstr("17841499999999999"), jnum(1700000000), jarr(ms)])
+    return json_stringify(jobj(["object", "entry"], [jstr("instagram"), jarr([entry])]))
+}
+
+# 署名まで含めた完全な模擬 Webhook -> [status, メッセージの並び, 検証, 生本文, 署名]
+def msg_simulate(platform, n, secret, seed) {
+    if (platform == "line") {
+        raw := sim_line_body(n, seed)
+        sig := line_signature(secret, raw)
+        r := msg_ingest_line(raw, secret, sig)
+        return [r[0], r[1], r[2], raw, sig]
+    }
+    raw := sim_instagram_body(n, seed)
+    sig := ig_signature(secret, raw)
+    r := msg_ingest_instagram(raw, secret, sig)
+    return [r[0], r[1], r[2], raw, sig]
+}
+
+# ---- 統合受信箱 ------------------------------------------------------
+# [キーの並び, スレッドの並び] 。各スレッドは [platform, chatId, 表示名, メッセージの並び]
+def inbox_new() { return [[], []] }
+
+def inbox_add(box, m) {
+    key := m[1] + ":" + m[2]
+    i := 0
+    while (i < len(box[0])) {
+        if (box[0][i] == key) {
+            box[1][i][3] <- m
+            box[1][i][2] = m[4]
+            return i
+        }
+        i := i + 1
+    }
+    box[0] <- key
+    box[1] <- [m[1], m[2], m[4], [m]]
+    return len(box[0]) - 1
+}
+
+def inbox_count(box) {
+    n := 0
+    i := 0
+    while (i < len(box[1])) { n := n + len(box[1][i][3]); i := i + 1 }
+    return n
+}
+
+def inbox_threads(box) { return box[1] }
+
+# ============================================================
+# 09_streams.bada -- BADA ULTRA NETWORK / AT&T ベル研究所式 STREAMS
+#
+# 層の組み方は、ベル研究所が UNIX の装置入出力に使った STREAMS
+# (Dennis Ritchie の Streams I/O) と同じにしてある。
+#
+#        stream head   アプリケーション (統合受信箱)
+#             | wput               rput |
+#        +--- msgmux ---+  L4  LINE / Instagram 多重化
+#        +--- jones  ---+  L3  Jones 多項式量子暗号
+#        +--- zone   ---+  L2  zone:// P2P リング DHT
+#        +--- ntt    ---+  L1  NTT 電話回線への写像
+#             | put                 srv |
+#          driver  plc   L0  Panasonic HD-PLC (家のコンセント)
+#
+# 各モジュールは wput (下り) と rput (上り) の対だけを持つ。上位は
+# 下位を知らず、下位は上位を知らない。下りで各層がしたことを、
+# 上りで対になる層がちょうど元に戻す。
+#
+# Bada は関数を配列に入れて呼べないので、モジュールの呼び分けは
+# 名前による明示的なディスパッチで行う (stream_wput / stream_rput)。
+#
+# メッセージブロック:  ["blk", 種別, 中身, status, 理由]
+#   種別は "M_DATA" / "M_PROTO" / "M_CTL"
+# ============================================================
+
+def blk_new(kind, payload)      { return ["blk", kind, payload, 200, ""] }
+def blk_ctl(status, reason)     { return ["blk", "M_CTL", [], status, reason] }
+def blk_kind(b)    { return b[1] }
+def blk_payload(b) { return b[2] }
+def blk_status(b)  { return b[3] }
+def blk_is_ctl(b)  { return b[1] == "M_CTL" }
+
+# ---- 文脈 (層をまたいで共有する状態) --------------------------------
+# 添字で引く。Bada に連想配列は無いので定数で名前をつける。
+CTX_NET     := 0    # zone のピア環
+CTX_TONEMAP := 1    # HD-PLC のトーンマップ
+CTX_LINE    := 2    # 回線種別 metal / isdn / hikari
+CTX_CAP     := 3    # CSMA/CA の優先度
+CTX_MARGIN  := 4    # 電力線の劣化 dB
+CTX_TAPPED  := 5    # 量子路を盗聴するか
+CTX_TAMPER  := 6    # 物理層で回線を改竄するか
+CTX_TAMPERZ := 7    # 悪意あるピアがレコードを書き換えるか
+CTX_SEED    := 8
+CTX_QKDOK   := 9
+CTX_PHY     := 10   # 最後の物理層の計量
+CTX_NTT     := 11   # 最後の番号写像
+CTX_ZONE    := 12   # 最後の DHT 解決
+CTX_CRYPTO  := 13   # 最後の封緘
+CTX_TRACE   := 14   # ブロックの流れ
+CTX_FROM    := 15
+CTX_TO      := 16
+
+def ctx_new(from_outlet, to_outlet, line) {
+    ch := plc_channel(from_outlet, to_outlet)
+    tm := plc_tonemap(ch)
+    return [zone_boot(), tm, line, 2, 0, false, false, false, "0", true,
+            [], [], [], [], [], from_outlet, to_outlet]
+}
+
+def ctx_relink(ctx, from_outlet, to_outlet, line) {
+    ctx[CTX_FROM] = from_outlet
+    ctx[CTX_TO] = to_outlet
+    ctx[CTX_LINE] = line
+    ctx[CTX_TONEMAP] = plc_tonemap(plc_channel(from_outlet, to_outlet))
+    return ctx
+}
+
+def trace_add(ctx, dir, mod, note, b) {
+    size := 0
+    if (len(b) > 2) {
+        pl := b[2]
+        if (len(pl) > 0) { size := len(pl) }
+    }
+    ctx[CTX_TRACE] <- [dir, mod, note, b[1], size]
+    return 0
+}
+
+# ============================================================
+# L4 msgmux -- 統合メッセージ <-> [url, 本文]
+# ============================================================
+def msgmux_wput(b, ctx) {
+    m := blk_payload(b)
+    return blk_new("M_DATA", [msg_zone_url(m), msg_serialize(m)])
+}
+
+def msgmux_rput(b, ctx) {
+    p := blk_payload(b)
+    return blk_new("M_PROTO", msg_deserialize(p[1]))
+}
+
+# ============================================================
+# L3 jones -- 結び目鍵で封緘 / 開封
+# ============================================================
+def jones_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    z := zone_parse(url)
+    if (len(z) == 0) { return blk_ctl(400, zone_status_text(400)) }
+    q := qkd_session()
+    if (ctx[CTX_TAPPED]) { q := qkd_session_tapped() }
+    ctx[CTX_QKDOK] = q[0]
+    if (!qkd_check(q)) { return blk_ctl(495, zone_status_text(495)) }
+    key := jones_key(zone_diagram(z[0]))
+    sealed := zone_seal(p[1], key, q[1])
+    ctx[CTX_CRYPTO] = [z[0], key, q[1], sealed[2], len(sealed[0])]
+    return blk_new("M_DATA", [url, sealed])
+}
+
+def jones_rput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    z := zone_parse(url)
+    if (len(z) == 0) { return blk_ctl(400, zone_status_text(400)) }
+    key := jones_key(zone_diagram(z[0]))
+    opened := zone_open(p[1], key)
+    if (len(opened) == 0) { return blk_ctl(409, zone_status_text(409)) }
+    return blk_new("M_DATA", [url, opened[0]])
+}
+
+# ============================================================
+# L2 zone -- DHT で担当ピアを決め、台帳に追記する
+# ============================================================
+def zone_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    net := ctx[CTX_NET]
+    key := zone_id(url)
+    r := zone_route(net, key)
+    peer_store_put(net[r[0]], url, sealed)
+    fact := ["zone-record", url, net[r[0]][0], key, sealed[2]]
+    fact >> tuplespace
+    ctx[CTX_ZONE] = [key, net[r[0]][0], r[1]]
+    return blk_new("M_DATA", [url, sealed])
+}
+
+def zone_rput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    net := ctx[CTX_NET]
+    key := zone_id(url)
+    r := zone_route(net, key)
+    hit := peer_store_get(net[r[0]], url)
+    if (len(hit) == 0) { return blk_ctl(404, zone_status_text(404)) }
+    fact := ["zone-fetch", url, net[r[0]][0]]
+    fact >> tuplespace
+    # 悪意あるピアがレコードを書き換える攻撃。上の jones が弾くはず。
+    if (ctx[CTX_TAMPERZ]) {
+        ct := []
+        i := 0
+        while (i < len(sealed[0])) { ct <- sealed[0][i]; i := i + 1 }
+        ct[0] = (ct[0] + 1) % 65536
+        sealed := [ct, sealed[1], sealed[2]]
+    }
+    return blk_new("M_DATA", [url, sealed])
+}
+
+# ============================================================
+# L1 ntt -- 番号を割り当て、加入者線のベアラに載せる
+# ============================================================
+def ntt_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    kind := "geo"
+    if (ctx[CTX_LINE] == "hikari") { kind := "ip" }
+    num := ntt_map(url, kind)
+    bytes := envelope_encode(url, sealed)
+    sig := ntt_bearer_send(bytes, ctx[CTX_LINE], mix32(url))
+    ctx[CTX_NTT] = [num[0], num[1], ctx[CTX_LINE], len(bytes)]
+    return blk_new("M_DATA", [sig, num[0]])
+}
+
+def ntt_rput(b, ctx) {
+    p := blk_payload(b)
+    sig := p[0]
+    bytes := ntt_bearer_recv(sig)
+    env := envelope_decode(bytes)
+    if (env[0] != 200) { return blk_ctl(400, zone_status_text(400)) }
+    return blk_new("M_DATA", [env[1], env[2]])
+}
+
+# ============================================================
+# L0 plc driver -- ウェーブレット OFDM で電力線へ出し入れする
+# ============================================================
+def plc_put(b, ctx) {
+    p := blk_payload(b)
+    sig := p[0]
+    # 回線信号をバイト列に詰める
+    bytes := ntt_signal_to_bytes(sig)
+    frame := plc_frame(bytes, 1, 2, ctx[CTX_CAP])
+    m := plc_modulate(frame, ctx[CTX_TONEMAP])
+    samples := m[0]
+    if (ctx[CTX_MARGIN] > 0) {
+        samples := plc_through_channel(samples, ctx[CTX_TONEMAP], ctx[CTX_MARGIN], ctx[CTX_SEED])
+    }
+    ctx[CTX_PHY] = [m[1], ctx[CTX_TONEMAP][4], m[1] * PLC_TSYM, len(samples), len(frame)]
+    return blk_new("M_DATA", [samples, m[2], sig[0], sig[1], sig[2]])
+}
+
+def plc_srv(wire, ctx) {
+    samples := wire[0]
+    bitlen := wire[1]
+    bytes := plc_demodulate(samples, ctx[CTX_TONEMAP], bitlen)
+    df := plc_deframe(bytes)
+    if (df[0] != 200) { return blk_ctl(503, "plc-" + df[2]) }
+    sig := ntt_bytes_to_signal(df[1], wire[2], wire[3], wire[4])
+    return blk_new("M_DATA", [sig, ""])
+}
+
+# 回線信号オブジェクト <-> バイト列 (PLC はバイト列しか運ばない)
+def ntt_signal_to_bytes(sig) {
+    kind := sig[0]
+    if (kind == "digital") { return sig[3] }
+    if (kind == "rtp") {
+        out := []
+        pkts := sig[3]
+        i := 0
+        while (i < len(pkts)) {
+            hdr := pkts[i][2]
+            pay := pkts[i][3]
+            k := 0
+            while (k < len(hdr)) { out <- hdr[k]; k := k + 1 }
+            k := 0
+            while (k < len(pay)) { out <- pay[k]; k := k + 1 }
+            i := i + 1
+        }
+        return out
+    }
+    # voiceband: 16 ビット符号付きサンプルを 2 バイトに詰める
+    out := []
+    s := sig[3]
+    i := 0
+    while (i < len(s)) {
+        v := u_fix(s[i])
+        if (v < 0) { v := v + 65536 }
+        out <- u_trunc(v / 256) % 256
+        out <- v % 256
+        i := i + 1
+    }
+    return out
+}
+
+def ntt_bytes_to_signal(bytes, kind, line, bitlen) {
+    if (kind == "digital") { return ["digital", line, bitlen, bytes] }
+    if (kind == "rtp") {
+        pkts := []
+        p := 0
+        while (p + 12 <= len(bytes)) {
+            hdr := []
+            i := 0
+            while (i < 12) { hdr <- bytes[p + i]; i := i + 1 }
+            paylen := u_min(RTP_PTIME, len(bytes) - p - 12)
+            pay := []
+            i := 0
+            while (i < paylen) { pay <- bytes[p + 12 + i]; i := i + 1 }
+            pkts <- [hdr[2] * 256 + hdr[3],
+                     hdr[4] * 16777216 + hdr[5] * 65536 + hdr[6] * 256 + hdr[7],
+                     hdr, pay]
+            p := p + 12 + paylen
+        }
+        return ["rtp", line, bitlen, pkts]
+    }
+    s := []
+    i := 0
+    while (i + 1 < len(bytes)) {
+        v := bytes[i] * 256 + bytes[i + 1]
+        if (v >= 32768) { v := v - 65536 }
+        s <- v
+        i := i + 2
+    }
+    return ["voiceband", line, bitlen, s]
+}
+
+# ============================================================
+# ストリームの往復
+# ============================================================
+STREAM_MODS := ["ntt", "zone", "jones", "msgmux"]     # 下から上
+
+def stream_wput(mod, b, ctx) {
+    if (mod == "msgmux") { return msgmux_wput(b, ctx) }
+    if (mod == "jones")  { return jones_wput(b, ctx) }
+    if (mod == "zone")   { return zone_wput(b, ctx) }
+    return ntt_wput(b, ctx)
+}
+
+def stream_rput(mod, b, ctx) {
+    if (mod == "msgmux") { return msgmux_rput(b, ctx) }
+    if (mod == "jones")  { return jones_rput(b, ctx) }
+    if (mod == "zone")   { return zone_rput(b, ctx) }
+    return ntt_rput(b, ctx)
+}
+
+def stream_note_w(mod) {
+    if (mod == "msgmux") { return "統合メッセージを直列化し zone アドレスを付ける" }
+    if (mod == "jones")  { return "結び目鍵で封緘" }
+    if (mod == "zone")   { return "DHT で担当ピアを決め、台帳に追記" }
+    return "番号を割当て、加入者線のベアラに載せる"
+}
+
+def stream_note_r(mod) {
+    if (mod == "msgmux") { return "統合メッセージへ復元" }
+    if (mod == "jones")  { return "結び目鍵で開封 — 改竄は 409" }
+    if (mod == "zone")   { return "担当ピアの照合と台帳への追記" }
+    return "ベアラから取り出し、φ⁻¹ で zone に戻す"
+}
+
+# 下り: stream head -> modules (上から下) -> driver
+def stream_write(b, ctx) {
+    ctx[CTX_TRACE] = []
+    trace_add(ctx, "down", "head", "アプリが書き込み", b)
+    i := len(STREAM_MODS) - 1
+    while (i >= 0) {
+        mod := STREAM_MODS[i]
+        b := stream_wput(mod, b, ctx)
+        trace_add(ctx, "down", mod, stream_note_w(mod), b)
+        if (blk_is_ctl(b)) { return b }
+        i := i - 1
+    }
+    b := plc_put(b, ctx)
+    trace_add(ctx, "down", "plc", "ウェーブレット OFDM で電力線へ", b)
+    return b
+}
+
+# 上り: driver -> modules (下から上) -> stream head
+def stream_read(wire, ctx) {
+    b := plc_srv(wire, ctx)
+    trace_add(ctx, "up", "plc", "電力線からウェーブレット OFDM 復調", b)
+    if (blk_is_ctl(b)) { return b }
+    i := 0
+    while (i < len(STREAM_MODS)) {
+        mod := STREAM_MODS[i]
+        b := stream_rput(mod, b, ctx)
+        trace_add(ctx, "up", mod, stream_note_r(mod), b)
+        if (blk_is_ctl(b)) { return b }
+        i := i + 1
+    }
+    trace_add(ctx, "up", "head", "アプリへ到達", b)
+    return b
+}
+
+# 1 通をスタックの下まで送り、下から上へ戻す (折返し試験)
+# -> [status, 理由, 受信した統合メッセージ, 往復一致か]
+def ultra_send(m, ctx) {
+    down := stream_write(blk_new("M_PROTO", m), ctx)
+    if (blk_is_ctl(down)) { return [down[3], down[4], [], false] }
+    wire := blk_payload(down)
+    # 物理層での改竄試験: 回線上の標本を 1 つ壊す
+    if (ctx[CTX_TAMPER]) {
+        s := []
+        i := 0
+        while (i < len(wire[0])) { s <- wire[0][i]; i := i + 1 }
+        idx := u_min(40, len(s) - 1)
+        s[idx] = s[idx] + 4
+        wire := [s, wire[1], wire[2], wire[3], wire[4]]
+    }
+    up := stream_read(wire, ctx)
+    if (blk_is_ctl(up)) { return [up[3], up[4], [], false] }
+    got := blk_payload(up)
+    same := msg_serialize(got) == msg_serialize(m)
+    return [200, zone_status_text(200), got, same]
+}
+
+# ============================================================
+# 10_main.bada -- BADA ULTRA NETWORK / デモ本体
+#
+# ここまでの層を全部つないで、実際に動かして見せる。
+#
+#   1. @reviser 文法トランザクションで SEND / LINK の動詞を parser に足す
+#   2. リングと結び目鍵を表示
+#   3. コンセント対ごとの HD-PLC リンクを測る (LINK 動詞)
+#   4. LINE と Instagram の Webhook を公式仕様どおりに受け、署名を
+#      HMAC-SHA256 で検証してから、全 5 層を通して折返す (SEND 動詞)
+#   5. 3 種類の攻撃が、それぞれ別の層で弾かれることを見せる
+#   6. 写像表 φ と φ⁻¹ の検算、アカシック台帳の件数
+# ============================================================
+
+print("================================================================")
+print("BADA ULTRA NETWORK -- HD-PLC -> NTT -> zone:// -> LINE/Instagram")
+print("  家のコンセントを物理層にして、NTT の加入者線へ写像し、")
+print("  zone:// を通し、LINE と Instagram のメッセージを運ぶ。")
+print("  層の組み方は AT&T ベル研究所の STREAMS と同じ。")
+print("================================================================")
+
+# ---- 文法トランザクション: ウルトラネットワークの動詞を parser に足す
+@reviser : grammar {
+    rule "ultra-send" stmt [ 'SEND' expr expr ] => ultra_demo_send(_1, _2)
+    rule "ultra-link" stmt [ 'LINK' expr ]      => ultra_demo_link(_1)
+}
+
+# 実行の文脈 (全部の SEND がこれを共有する)
+UCTX := ctx_new("living", "study", "metal")
+# 集計。def の中の ":=" は局所変数になるので、書き換えたい値は
+# 配列の要素に置く (要素への代入なら呼び出し側にも届く)。
+STATS := [0, 0]     # [SEND した回数, 往復一致した回数]
+
+# LINK 動詞: コンセント対を測る
+def ultra_demo_link(which) {
+    tm := plc_tonemap(plc_channel(which, "study"))
+    print("  LINK", which, "-> study :",
+          u_trunc(tm[4] / 1000000), "Mbps,",
+          tm[2], "本有効,", tm[3], "本ノッチ,", tm[1], "bit/シンボル")
+    return tm[2]
+}
+
+# SEND 動詞: 1 通を全 5 層に通して折返す
+def ultra_demo_send(m, note) {
+    print("")
+    print("--------------------------------------------------------------")
+    print("SEND", note)
+    print("  平文     :", msg_platform(m), "/", msg_name(m), ":", msg_text(m))
+    r := ultra_send(m, UCTX)
+    STATS[0] = STATS[0] + 1
+    if (r[0] == 200) {
+        c := UCTX[CTX_CRYPTO]
+        n := UCTX[CTX_NTT]
+        z := UCTX[CTX_ZONE]
+        p := UCTX[CTX_PHY]
+        print("  msgmux   -> zone アドレス", msg_zone_url(m))
+        print("  jones    -> 結び目鍵", c[1], " ソルト", c[2], " タグ", c[3], " 暗号文", c[4], "ユニット")
+        print("  zone     -> 鍵", z[0], " 担当ピア", z[1])
+        print("  ntt      -> φ =", ntt_format(n[0]), "(" + ntt_city(n[1]) + ")",
+              ntt_line_name(n[2]), " 封筒", n[3], "バイト")
+        print("  plc      ->", p[0], "OFDM シンボル,", u_trunc(p[1] / 1000000), "Mbps,",
+              u_trunc(p[2] * 1000000), "µs 占有,", p[3], "標本")
+        print("  ntt     <-  φ⁻¹(" + ntt_format(n[0]) + ") =", ntt_unmap(n[0]))
+        print("  msgmux  <-  ", msg_name(r[2]), ":", msg_text(r[2]))
+        print("  STATUS 200 zone-delivered   往復一致:", r[3])
+        if (r[3]) { STATS[1] = STATS[1] + 1 }
+    } else {
+        print("  STATUS", r[0], r[1])
+        if (r[0] == 409) { print("             タグが合わない。改竄か鍵違いとして排除する。") }
+        if (r[0] == 495) { print("             Bell 対の相関が壊れている。鍵を破棄し送信しない。") }
+        if (r[0] == 503) { print("             物理層の検査に失敗。回線が荒れている。") }
+    }
+    return r[0]
+}
+
+# ---- リングと結び目 --------------------------------------------------
+print("")
+print("ウルトラネットワークのリング (RING =", RING, ", ピアのハッシュだけで作る):")
+NET := UCTX[CTX_NET]
+i := 0
+while (i < len(NET)) {
+    print("  node", i, ":", NET[i][0], " id =", NET[i][1])
+    i := i + 1
+}
+
+print("")
+print("ゾーンの正体である結び目 -> Jones 鍵:")
+print("  url.or.jp  (三葉結び目 / 交点 3)  鍵 =", jones_key(zone_diagram("url.or.jp")))
+print("  bada.or.jp (8 の字結び目 / 交点 4) 鍵 =", jones_key(zone_diagram("bada.or.jp")))
+
+# ---- HD-PLC のリンク -------------------------------------------------
+print("")
+print("HD-PLC (帯域", PLC_FLO / 1000000, "-", PLC_FHI / 1000000, "MHz /", PLC_NCARR, "サブキャリア /",
+      "Δf", u_trunc(PLC_DF), "Hz / シンボル長", f5(PLC_TSYM * 1000000), "µs):")
+LINK "living"
+LINK "kitchen"
+
+# ---- LINE / Instagram の Webhook を受ける -----------------------------
+print("")
+print("--------------------------------------------------------------")
+print("LINE Messaging API の Webhook を受ける")
+LINE_SECRET := "demo-channel-secret"
+LR := msg_simulate("line", 1, LINE_SECRET, "d1")
+print("  署名ヘッダ : X-Line-Signature")
+print("  算法       : Base64(HMAC-SHA256(channelSecret, 生の本文))")
+print("  本文       :", len(LR[3]), "バイト")
+print("  受信署名   :", substr(LR[4], 0, 32) + "...")
+print("  検証       :", LR[2], " (status", LR[0], ")")
+BAD := msg_ingest_line(LR[3], LINE_SECRET, line_signature("wrong-secret", LR[3]))
+print("  偽署名     : status", BAD[0], zone_status_text(BAD[0]), " — 正しく拒否")
+
+print("")
+print("Instagram Graph API の Webhook を受ける")
+IG_SECRET := "demo-app-secret"
+IR := msg_simulate("instagram", 1, IG_SECRET, "d2")
+print("  署名ヘッダ : X-Hub-Signature-256")
+print("  算法       : \"sha256=\" + hex(HMAC-SHA256(appSecret, 生の本文))")
+print("  本文       :", len(IR[3]), "バイト")
+print("  受信署名   :", substr(IR[4], 0, 32) + "...")
+print("  検証       :", IR[2], " (status", IR[0], ")")
+
+# ---- 全 5 層を通す ---------------------------------------------------
+INBOX := inbox_new()
+
+if (len(LR[1]) > 0) {
+    SEND LR[1][0] "LINE — メタル回線 (音声帯 16-QAM) 経由"
+    inbox_add(INBOX, LR[1][0])
+}
+
+UCTX[CTX_LINE] = "hikari"
+if (len(IR[1]) > 0) {
+    SEND IR[1][0] "Instagram — ひかり電話 (G.711 µ-law + RTP) 経由"
+    inbox_add(INBOX, IR[1][0])
+}
+
+UCTX[CTX_LINE] = "isdn"
+SEND msg_new("zone", "self", "me", "山口 まさあき", "text", "INS ネット 64 の透過", "", 0) "zone:// — INS ネット 64 (ディジタル透過) 経由"
+
+# ---- 攻撃 ------------------------------------------------------------
+print("")
+print("==============================================================")
+print("攻撃 — それぞれ別の層が弾く")
+print("==============================================================")
+
+ATK := msg_new("line", "U4af4980629", "U4af4980629", "田中 さくら", "text", "改竄試験", "", 0)
+
+UCTX[CTX_TAMPER] = true
+SEND ATK "物理層で回線の標本を 1 つ壊す"
+UCTX[CTX_TAMPER] = false
+
+UCTX[CTX_TAMPERZ] = true
+SEND ATK "悪意あるピアが保管中のレコードを書き換える"
+UCTX[CTX_TAMPERZ] = false
+
+UCTX[CTX_TAPPED] = true
+SEND ATK "量子路を盗聴する (intercept-resend)"
+UCTX[CTX_TAPPED] = false
+
+# ---- 写像表と台帳 ----------------------------------------------------
+print("")
+print("==============================================================")
+print("写像 φ : zone:// |-> NTT 番号   (φ⁻¹ を割当表で検算)")
+print("==============================================================")
+PHI_OK := true
+i := 0
+while (i < len(NTT_REG_URL)) {
+    back := ntt_unmap(NTT_REG_NUM[i])
+    if (back != NTT_REG_URL[i]) { PHI_OK := false }
+    print("  ", ntt_format(NTT_REG_NUM[i]), " <- ", NTT_REG_URL[i])
+    i := i + 1
+}
+print("  φ⁻¹ が厳密な逆写像 : inverse ok:", PHI_OK)
+
+print("")
+print("統合受信箱 :", inbox_count(INBOX), "通 /", len(inbox_threads(INBOX)), "スレッド")
+i := 0
+while (i < len(inbox_threads(INBOX))) {
+    th := inbox_threads(INBOX)[i]
+    print("   [" + th[0] + "]", th[2], "—", len(th[3]), "件")
+    i := i + 1
+}
+
+print("")
+print("アカシック台帳 :", len(tuplespace), "件 (追記専用)")
+print("SEND 実行", STATS[0], "回 / うち往復一致", STATS[1], "回")
+print("==============================================================")
+print("BADA ULTRA NETWORK -- done")
+print("==============================================================")

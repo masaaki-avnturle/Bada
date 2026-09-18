@@ -99,7 +99,17 @@
 | **Windows 10 / 11** | `ultranet-windows` | `BadaUltraNetwork-1.0.0-x64.exe` (NSIS インストーラ) / `BadaUltraNetwork-1.0.0-portable.exe` |
 | **Ubuntu** | `ultranet-linux` | `BadaUltraNetwork-1.0.0-x86_64.AppImage` / `BadaUltraNetwork-1.0.0-amd64.deb` |
 
-ビルドは [`ultranet-app-build.yml`](.github/workflows/ultranet-app-build.yml) が実行します(開発ブランチへの push で Actions アーティファクト / `ultranet-v*` タグで [Releases](https://github.com/masaaki-avnturle/Bada/releases) へ添付)。全層を Bada 言語自身で書いたリファレンスは [`ultra_network/ultra.bada`](ultra_network/ultra.bada) — `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` で走ります。詳細は [`ultra_network/`](ultra_network/) を参照。
+ビルドは [`ultranet-app-build.yml`](.github/workflows/ultranet-app-build.yml) が実行します(開発ブランチへの push で Actions アーティファクト / `ultranet-v*` タグで [Releases](https://github.com/masaaki-avnturle/Bada/releases) へ添付)。
+
+#### 📜 Bada 言語による全ソースコード
+
+**全層を量子プログラミング言語 Bada 自身で記述**しています([`ultra_network/bada/`](ultra_network/bada/) — 12 ファイル 4,722 行)。ニブル表によるビット演算の上に **SHA-256 / HMAC-SHA256**(RFC 4231 検証済)、JSON の再帰下降パーサ、512 サブキャリアのウェーブレット OFDM、Jones 多項式量子暗号、STREAMS の骨組みまで Bada で書き、**自己診断 107 項目が全合格**します。JS 版と同じ擬似乱数を使うので回線特性まで一致します。
+
+| | |
+|:---|:---|
+| **📕 全ソースコードの PDF (71 ページ)** | [`ultra_network/dist/BadaUltraNetwork-source.pdf`](ultra_network/dist/BadaUltraNetwork-source.pdf) |
+| 連結して走らせる | `node ultra_network/tools/build-bada.js` → `node ultra_network/tools/run-bada.js ultra_network/dist/ultra-full.bada` |
+| 縮小版をそのまま走らせる | `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` |全層を Bada 言語自身で書いたリファレンスは [`ultra_network/ultra.bada`](ultra_network/ultra.bada) — `node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada` で走ります。詳細は [`ultra_network/`](ultra_network/) を参照。
 
 ---
 

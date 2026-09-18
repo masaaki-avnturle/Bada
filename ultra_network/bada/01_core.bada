@@ -1,0 +1,432 @@
+# ============================================================
+# 01_core.bada -- BADA ULTRA NETWORK / 基本演算
+#
+# Bada には床関数・三角関数・ビット演算子が無い。この層でそれを
+# 全部こしらえる。以降のすべてのモジュールがここに乗る。
+#
+#   u_trunc / u_div   切り捨て・整数除算
+#   ipow / POW2 / POW16 / POW10   べき乗表
+#   u_sin / u_cos     Taylor 級数 (範囲縮約つき)
+#   u_log2
+#   u_and / u_or / u_xor / u_not32   ニブル表による論理演算
+#   u_shr / u_shl32 / u_rotr32       シフトと巡回シフト
+#   hex / Base64 / UTF-8 の相互変換
+#
+# ビット演算は 1 ビットずつ回すと遅いので、4 ビット (ニブル) の
+# 表を最初に作り、32 ビット語を 8 ニブルに割って引く。
+# ============================================================
+
+# ---- 切り捨て (非負のみ。負には u_fix を使う) ----------------------
+def u_trunc(x) { return x - (x % 1) }
+
+def u_fix(x) {
+    if (x < 0) { return 0 - ((0 - x) - ((0 - x) % 1)) }
+    return x - (x % 1)
+}
+
+def u_div(a, b) { return u_trunc(a / b) }
+
+def u_min(a, b) { if (a < b) { return a } return b }
+def u_max(a, b) { if (a > b) { return a } return b }
+
+# ---- べき乗 --------------------------------------------------------
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+
+POW2 := []
+p := 1
+i := 0
+while (i <= 32) { POW2 <- p; p := p * 2; i := i + 1 }
+
+POW16 := []
+p := 1
+i := 0
+while (i < 8) { POW16 <- p; p := p * 16; i := i + 1 }
+
+POW10 := []
+p := 1
+i := 0
+while (i <= 10) { POW10 <- p; p := p * 10; i := i + 1 }
+
+TWO32 := 4294967296
+MASK32 := 4294967295
+
+# ---- 三角関数 (Taylor 級数 + 範囲縮約) ------------------------------
+TWO_PI := 6.283185307179586
+PI     := 3.141592653589793
+HALF_PI := 1.5707963267948966
+
+def u_sin(x) {
+    t := x % TWO_PI
+    if (t > PI) { t := t - TWO_PI }
+    if (t < 0 - PI) { t := t + TWO_PI }
+    term := t
+    sum := t
+    k := 1
+    while (k < 9) {
+        term := 0 - term * t * t / ((2 * k) * (2 * k + 1))
+        sum := sum + term
+        k := k + 1
+    }
+    return sum
+}
+
+def u_cos(x) { return u_sin(x + HALF_PI) }
+
+LN2 := 0.6931471805599453
+LN10 := 2.302585092994046
+def u_log2(x)  { return log(x) / LN2 }
+def u_log10(x) { return log(x) / LN10 }
+
+# dB <-> 線形 (10^(d/10) を exp で)
+def db_to_lin(d) { return exp(d * LN10 / 10) }
+def lin_to_db(v) { return 10 * log(v) / LN10 }
+
+# ---- ニブル表による論理演算 ----------------------------------------
+# XOR4[a * 16 + b] のような平坦配列を最初に作っておく。
+XOR4 := []
+AND4 := []
+OR4  := []
+a := 0
+while (a < 16) {
+    b := 0
+    while (b < 16) {
+        av := a
+        bv := b
+        xr := 0
+        an := 0
+        orv := 0
+        pw := 1
+        n := 0
+        while (n < 4) {
+            ab := av % 2
+            bb := bv % 2
+            if (ab != bb) { xr := xr + pw }
+            if (ab == 1 && bb == 1) { an := an + pw }
+            if (ab == 1) { orv := orv + pw }
+            else { if (bb == 1) { orv := orv + pw } }
+            av := u_trunc(av / 2)
+            bv := u_trunc(bv / 2)
+            pw := pw * 2
+            n := n + 1
+        }
+        XOR4 <- xr
+        AND4 <- an
+        OR4  <- orv
+        b := b + 1
+    }
+    a := a + 1
+}
+
+def u_xor(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + XOR4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_and(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + AND4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_or(x, y) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        r := r + OR4[xn * 16 + yn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+# 8 ビット / 16 ビットだけ要るときの近道 (ニブルを 2 枚・4 枚しか引かない)。
+# CRC の内側ループのように何千回も回る場所で効く。
+def u_xor8(x, y) {
+    return XOR4[(u_trunc(x / 16) % 16) * 16 + (u_trunc(y / 16) % 16)] * 16 +
+           XOR4[(x % 16) * 16 + (y % 16)]
+}
+
+def u_and8(x, y) {
+    return AND4[(u_trunc(x / 16) % 16) * 16 + (u_trunc(y / 16) % 16)] * 16 +
+           AND4[(x % 16) * 16 + (y % 16)]
+}
+
+# 3 項 XOR を 1 パスで。SHA-256 の sigma 群はこの形が多く、
+# 2 回に分けるより通り道が半分で済む。
+def u_xor3(x, y, z) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        xn := u_trunc(x / pw) % 16
+        yn := u_trunc(y / pw) % 16
+        zn := u_trunc(z / pw) % 16
+        r := r + XOR4[XOR4[xn * 16 + yn] * 16 + zn] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def u_not32(x) { return MASK32 - x }
+
+def u_shr(x, n)   { return u_trunc(x / POW2[n]) }
+def u_shl32(x, n) { return (x * POW2[n]) % TWO32 }
+
+# 巡回右シフト。2 つの断片はビットが重ならないので加算でよい。
+def u_rotr32(x, n) { return u_shr(x, n) + u_shl32(x, 32 - n) }
+
+def u_add32(x, y) { return (x + y) % TWO32 }
+
+# 32 ビット同士の乗算 (mod 2^32)。
+# そのまま掛けると積が 2^53 を超えて倍精度の正確整数範囲から外れ、
+# 下位ビットが失われる。16 ビットずつに割れば各部分積が 2^32 未満に
+# 収まるので厳密に計算できる (JS の Math.imul と同じ結果になる)。
+def u_mul32(a, b) {
+    ah := u_trunc(a / 65536) % 65536
+    al := a % 65536
+    bh := u_trunc(b / 65536) % 65536
+    bl := b % 65536
+    lo := al * bl
+    mid := (ah * bl + al * bh) % 65536
+    return (lo + mid * 65536) % TWO32
+}
+
+# ---- 16 進 ---------------------------------------------------------
+HEXD := "0123456789abcdef"
+
+def hex_byte(v) {
+    return substr(HEXD, u_trunc(v / 16) % 16, 1) + substr(HEXD, v % 16, 1)
+}
+
+def hex_of_bytes(bytes) {
+    s := ""
+    i := 0
+    while (i < len(bytes)) { s := s + hex_byte(bytes[i]); i := i + 1 }
+    return s
+}
+
+def hex_of_word32(w) {
+    s := ""
+    i := 3
+    while (i >= 0) { s := s + hex_byte(u_trunc(w / POW2[8 * i]) % 256); i := i - 1 }
+    return s
+}
+
+# ---- Base64 --------------------------------------------------------
+B64AL := "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+def base64_of_bytes(bytes) {
+    s := ""
+    i := 0
+    n := len(bytes)
+    while (i < n) {
+        b0 := bytes[i]
+        b1 := 0
+        b2 := 0
+        if (i + 1 < n) { b1 := bytes[i + 1] }
+        if (i + 2 < n) { b2 := bytes[i + 2] }
+        c := b0 * 65536 + b1 * 256 + b2
+        s := s + substr(B64AL, u_trunc(c / 262144) % 64, 1)
+        s := s + substr(B64AL, u_trunc(c / 4096) % 64, 1)
+        if (i + 1 < n) { s := s + substr(B64AL, u_trunc(c / 64) % 64, 1) }
+        else { s := s + "=" }
+        if (i + 2 < n) { s := s + substr(B64AL, c % 64, 1) }
+        else { s := s + "=" }
+        i := i + 3
+    }
+    return s
+}
+
+# ---- UTF-8 ---------------------------------------------------------
+# Bada の文字列は 16 ビット符号単位。サロゲート対も正しく畳む。
+def utf8_of_str(s) {
+    out := []
+    i := 0
+    n := len(s)
+    while (i < n) {
+        c := ord(s, i)
+        if (c >= 55296 && c <= 56319 && i + 1 < n) {
+            lo := ord(s, i + 1)
+            if (lo >= 56320 && lo <= 57343) {
+                c := 65536 + (c - 55296) * 1024 + (lo - 56320)
+                i := i + 1
+            }
+        }
+        if (c < 128) { out <- c }
+        else {
+            if (c < 2048) {
+                out <- (192 + u_trunc(c / 64))
+                out <- (128 + c % 64)
+            } else {
+                if (c < 65536) {
+                    out <- (224 + u_trunc(c / 4096))
+                    out <- (128 + u_trunc(c / 64) % 64)
+                    out <- (128 + c % 64)
+                } else {
+                    out <- (240 + u_trunc(c / 262144))
+                    out <- (128 + u_trunc(c / 4096) % 64)
+                    out <- (128 + u_trunc(c / 64) % 64)
+                    out <- (128 + c % 64)
+                }
+            }
+        }
+        i := i + 1
+    }
+    return out
+}
+
+# 壊れた並びは U+FFFD に替えて 1 バイト進む (回線から来る列は
+# 攻撃者に触られうるので、復号器は決して落ちてはならない)。
+def str_of_utf8(bytes) {
+    s := ""
+    i := 0
+    n := len(bytes)
+    while (i < n) {
+        c := bytes[i] % 256
+        if (c < 128) { s := s + chr(c); i := i + 1 }
+        else {
+            need := 0
+            acc := 0
+            if (c >= 192 && c < 224) { need := 1; acc := c - 192 }
+            else { if (c >= 224 && c < 240) { need := 2; acc := c - 224 }
+                   else { if (c >= 240 && c < 248) { need := 3; acc := c - 240 }
+                          else { need := 0 - 1 } } }
+            if (need < 0) { s := s + chr(65533); i := i + 1 }
+            else {
+                if (i + need >= n) { s := s + chr(65533); i := i + 1 }
+                else {
+                    ok := true
+                    k := 1
+                    while (k <= need) {
+                        cb := bytes[i + k] % 256
+                        if (cb < 128) { ok := false }
+                        if (cb >= 192) { ok := false }
+                        acc := acc * 64 + (cb % 64)
+                        k := k + 1
+                    }
+                    bad := false
+                    if (!ok) { bad := true }
+                    if (need == 1 && acc < 128) { bad := true }
+                    if (need == 2 && acc < 2048) { bad := true }
+                    if (need == 3 && acc < 65536) { bad := true }
+                    if (acc >= 55296 && acc <= 57343) { bad := true }
+                    if (acc > 1114111) { bad := true }
+                    if (bad) { s := s + chr(65533); i := i + 1 }
+                    else {
+                        if (acc < 65536) { s := s + chr(acc) }
+                        else {
+                            v := acc - 65536
+                            s := s + chr(55296 + u_trunc(v / 1024)) + chr(56320 + v % 1024)
+                        }
+                        i := i + need + 1
+                    }
+                }
+            }
+        }
+    }
+    return s
+}
+
+# ---- バイト列 <-> ビット列 -----------------------------------------
+def bytes_to_bits(bytes) {
+    bits := []
+    i := 0
+    while (i < len(bytes)) {
+        v := bytes[i]
+        k := 7
+        while (k >= 0) {
+            pw := POW2[k]
+            if (v >= pw) { bits <- 1; v := v - pw } else { bits <- 0 }
+            k := k - 1
+        }
+        i := i + 1
+    }
+    return bits
+}
+
+def bits_to_bytes(bits) {
+    out := []
+    i := 0
+    while (i + 7 < len(bits)) {
+        v := 0
+        k := 0
+        while (k < 8) { v := v * 2 + bits[i + k]; k := k + 1 }
+        out <- v
+        i := i + 8
+    }
+    return out
+}
+
+# ---- 文字列ハッシュ (zone.bada と完全に同一。相互運用のため不変) ----
+def str_hash(s) {
+    h := 7
+    i := 0
+    n := len(s)
+    while (i < n) {
+        h := (h * 31 + ord(s, i)) % 999983
+        i := i + 1
+    }
+    return h
+}
+
+# 32 ビット混合ハッシュ (番号写像・疑似乱数の種に使う)。
+# FNV-1a に最終撹拌を足したもの。索引 index.html の JS 実装 mix32 と
+# 定数まで同一にしてあるので、両者は同じ乱数列 = 同じ回線特性を出す。
+def mix32(s) {
+    h := 2166136261
+    i := 0
+    while (i < len(s)) {
+        h := u_xor(h, ord(s, i))
+        h := u_mul32(h, 16777619)        # FNV 素数
+        i := i + 1
+    }
+    h := u_xor(h, u_shr(h, 15))
+    h := u_mul32(h, 625341585)      # 0x2545F491
+    h := u_xor(h, u_shr(h, 13))
+    return h
+}
+
+# 再現性のある擬似乱数 (同じ種なら常に同じ列)
+def rng_new(seed) {
+    s := mix32(seed)
+    if (s == 0) { s := 1 }
+    return [s]
+}
+
+def rng_next(st) {
+    s := st[0]
+    s := u_xor(s, u_shl32(s, 13))
+    s := u_xor(s, u_shr(s, 17))
+    s := u_xor(s, u_shl32(s, 5))
+    st[0] = s
+    return s / TWO32
+}

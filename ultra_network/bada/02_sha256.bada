@@ -1,0 +1,198 @@
+# ============================================================
+# 02_sha256.bada -- BADA ULTRA NETWORK / SHA-256 と HMAC-SHA256
+#
+# LINE の X-Line-Signature (HMAC-SHA256 -> Base64) と Instagram の
+# X-Hub-Signature-256 (HMAC-SHA256 -> hex) を、本物の計算で検証する
+# ために要る。RFC 6234 (SHA-2) と RFC 2104 (HMAC) のとおり。
+#
+# Bada にビット演算子は無いので、01_core.bada のニブル表による
+# u_xor / u_and / u_not32 / u_rotr32 の上に組む。1 ブロックあたり
+# およそ 9 万ステップで回る。
+# ============================================================
+
+SHA_K := [
+  1116352408, 1899447441, 3049323471, 3921009573,  961987163, 1508970993,
+  2453635748, 2870763221, 3624381080,  310598401,  607225278, 1426881987,
+  1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774,
+   264347078,  604807628,  770255983, 1249150122, 1555081692, 1996064986,
+  2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711,
+   113926993,  338241895,  666307205,  773529912, 1294757372, 1396182291,
+  1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411,
+  3259730800, 3345764771, 3516065817, 3600352804, 4094571909,  275423344,
+   430227734,  506948616,  659060556,  883997877,  958139571, 1322822218,
+  1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424,
+  2428436474, 2756734187, 3204031479, 3329325298
+]
+
+SHA_H0 := [1779033703, 3144134277, 1013904242, 2773480762,
+           1359893119, 2600822924,  528734635, 1541459225]
+
+# 小文字 sigma (メッセージスケジュール用)
+def sha_s0(x) { return u_xor3(u_rotr32(x, 7), u_rotr32(x, 18), u_shr(x, 3)) }
+def sha_s1(x) { return u_xor3(u_rotr32(x, 17), u_rotr32(x, 19), u_shr(x, 10)) }
+
+# 大文字 Sigma (圧縮関数用)
+def sha_S0(x) { return u_xor3(u_rotr32(x, 2), u_rotr32(x, 13), u_rotr32(x, 22)) }
+def sha_S1(x) { return u_xor3(u_rotr32(x, 6), u_rotr32(x, 11), u_rotr32(x, 25)) }
+
+# ch と maj はニブル 1 パスに融合する。and/not/xor を別々に呼ぶと
+# 32 ビット語を 3 度も 5 度も舐め直すことになり、そこが一番効く。
+# 4 ビットの NOT は 15 - n。
+def sha_ch(e, f, g) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        en := u_trunc(e / pw) % 16
+        fn := u_trunc(f / pw) % 16
+        gn := u_trunc(g / pw) % 16
+        r := r + XOR4[AND4[en * 16 + fn] * 16 + AND4[(15 - en) * 16 + gn]] * pw
+        i := i + 1
+    }
+    return r
+}
+
+def sha_maj(a, b, c) {
+    r := 0
+    i := 0
+    while (i < 8) {
+        pw := POW16[i]
+        an := u_trunc(a / pw) % 16
+        bn := u_trunc(b / pw) % 16
+        cn := u_trunc(c / pw) % 16
+        r := r + XOR4[XOR4[AND4[an * 16 + bn] * 16 + AND4[an * 16 + cn]] * 16 +
+                      AND4[bn * 16 + cn]] * pw
+        i := i + 1
+    }
+    return r
+}
+
+# バイト列 -> 32 バイトのダイジェスト (バイト列)
+def sha256(msg) {
+    n := len(msg)
+    m := []
+    i := 0
+    while (i < n) { m <- msg[i]; i := i + 1 }
+    m <- 128
+    while (len(m) % 64 != 56) { m <- 0 }
+    # ビット長を 64 ビット ビッグエンディアンで
+    bits_hi := u_trunc(n / 536870912)
+    bits_lo := (n * 8) % TWO32
+    k := 3
+    while (k >= 0) { m <- (u_trunc(bits_hi / POW2[8 * k]) % 256); k := k - 1 }
+    k := 3
+    while (k >= 0) { m <- (u_trunc(bits_lo / POW2[8 * k]) % 256); k := k - 1 }
+
+    h := []
+    i := 0
+    while (i < 8) { h <- SHA_H0[i]; i := i + 1 }
+
+    w := []
+    i := 0
+    while (i < 64) { w <- 0; i := i + 1 }
+
+    blk := 0
+    nblk := u_trunc(len(m) / 64)
+    while (blk < nblk) {
+        base := blk * 64
+        t := 0
+        while (t < 16) {
+            w[t] = m[base + t * 4] * 16777216 + m[base + t * 4 + 1] * 65536 +
+                   m[base + t * 4 + 2] * 256 + m[base + t * 4 + 3]
+            t := t + 1
+        }
+        t := 16
+        while (t < 64) {
+            w[t] = (sha_s1(w[t - 2]) + w[t - 7] + sha_s0(w[t - 15]) + w[t - 16]) % TWO32
+            t := t + 1
+        }
+        av := h[0]
+        bv := h[1]
+        cv := h[2]
+        dv := h[3]
+        ev := h[4]
+        fv := h[5]
+        gv := h[6]
+        hv := h[7]
+        t := 0
+        while (t < 64) {
+            t1 := (hv + sha_S1(ev) + sha_ch(ev, fv, gv) + SHA_K[t] + w[t]) % TWO32
+            t2 := (sha_S0(av) + sha_maj(av, bv, cv)) % TWO32
+            hv := gv
+            gv := fv
+            fv := ev
+            ev := (dv + t1) % TWO32
+            dv := cv
+            cv := bv
+            bv := av
+            av := (t1 + t2) % TWO32
+            t := t + 1
+        }
+        h[0] = (h[0] + av) % TWO32
+        h[1] = (h[1] + bv) % TWO32
+        h[2] = (h[2] + cv) % TWO32
+        h[3] = (h[3] + dv) % TWO32
+        h[4] = (h[4] + ev) % TWO32
+        h[5] = (h[5] + fv) % TWO32
+        h[6] = (h[6] + gv) % TWO32
+        h[7] = (h[7] + hv) % TWO32
+        blk := blk + 1
+    }
+
+    out := []
+    i := 0
+    while (i < 8) {
+        k := 3
+        while (k >= 0) { out <- (u_trunc(h[i] / POW2[8 * k]) % 256); k := k - 1 }
+        i := i + 1
+    }
+    return out
+}
+
+def sha256_hex(msg) { return hex_of_bytes(sha256(msg)) }
+
+# ---- HMAC (RFC 2104) -----------------------------------------------
+def hmac_sha256(key, msg) {
+    k := []
+    i := 0
+    if (len(key) > 64) {
+        kk := sha256(key)
+        i := 0
+        while (i < len(kk)) { k <- kk[i]; i := i + 1 }
+    } else {
+        i := 0
+        while (i < len(key)) { k <- key[i]; i := i + 1 }
+    }
+    while (len(k) < 64) { k <- 0 }
+
+    inner := []
+    outer := []
+    i := 0
+    while (i < 64) {
+        inner <- u_xor(k[i], 54)
+        outer <- u_xor(k[i], 92)
+        i := i + 1
+    }
+    i := 0
+    while (i < len(msg)) { inner <- msg[i]; i := i + 1 }
+    ih := sha256(inner)
+    i := 0
+    while (i < len(ih)) { outer <- ih[i]; i := i + 1 }
+    return sha256(outer)
+}
+
+def hmac_sha256_hex(key, msg)    { return hex_of_bytes(hmac_sha256(key, msg)) }
+def hmac_sha256_b64(key, msg)    { return base64_of_bytes(hmac_sha256(key, msg)) }
+
+# 署名照合はタイミング差を漏らさない
+def const_time_eq(a, b) {
+    if (len(a) != len(b)) { return false }
+    d := 0
+    i := 0
+    while (i < len(a)) { d := u_or(d, u_xor(a[i], b[i])); i := i + 1 }
+    return d == 0
+}
+
+def const_time_eq_str(a, b) {
+    return const_time_eq(utf8_of_str(a), utf8_of_str(b))
+}

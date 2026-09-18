@@ -1,0 +1,267 @@
+# ============================================================
+# 04_zone.bada -- BADA ULTRA NETWORK / L2 zone:// ウルトラネットワーク WWW
+#
+# https: / http: に代わるスキーム。中央サーバも DNS ルートも無い。
+# アドレスは「ピア自身のハッシュだけ」から作ったリング DHT が解決し、
+# 全レコードは追記専用の tuplespace (アカシック台帳) に載る。
+#
+#   zone://<host>[/<path>]
+#
+# 出力する "@@" ブロックは既存の ZoneBrowser
+# (bada_gui_ide/dist/zone-browser.html) が読む形式と同じ。
+# ============================================================
+
+RING := 4096      # リングの位数 (zone.bada と同一)
+
+def zone_id(s) { return str_hash(s) % RING }
+
+# zone://host/path -> [host, path, labels]  ([] なら zone URL ではない)
+def zone_parse(url) {
+    if (str_find(url, "zone://") != 0) { return [] }
+    rest := substr(url, 7, len(url) - 7)
+    cut := str_find(rest, "/")
+    if (cut < 0) { return [rest, "/", split(rest, ".")] }
+    host := substr(rest, 0, cut)
+    path := substr(rest, cut, len(rest) - cut)
+    return [host, path, split(host, ".")]
+}
+
+# リング上の巡回距離
+def ring_dist(a, b) {
+    d := a - b
+    if (d < 0) { d := 0 - d }
+    e := RING - d
+    if (e < d) { return e }
+    return d
+}
+
+# ピアは [name, node-id, ring-index, store_urls, store_recs]
+def peer_new(name) { return [name, zone_id("peer:" + name), 0, [], []] }
+
+ZONE_PEERS := ["tokyo.zone.jp", "osaka.zone.jp", "nagoya.zone.jp",
+               "sapporo.zone.jp", "fukuoka.zone.jp", "naha.zone.jp"]
+
+def zone_boot() {
+    net := []
+    i := 0
+    while (i < len(ZONE_PEERS)) { net <- peer_new(ZONE_PEERS[i]); i := i + 1 }
+    # node-id の昇順へ挿入ソート
+    sorted := []
+    i := 0
+    while (i < len(net)) {
+        p := net[i]
+        pos := len(sorted)
+        found := false
+        j := 0
+        while (j < len(sorted)) {
+            if (!found) {
+                if (p[1] < sorted[j][1]) { pos := j; found := true }
+            }
+            j := j + 1
+        }
+        out := []
+        k := 0
+        while (k < len(sorted)) {
+            if (k == pos) { out <- p }
+            out <- sorted[k]
+            k := k + 1
+        }
+        if (pos == len(sorted)) { out <- p }
+        sorted := out
+        i := i + 1
+    }
+    m := 0
+    while (m < len(sorted)) { sorted[m][2] = m; m := m + 1 }
+    return sorted
+}
+
+# 鍵を担当するピアの添字
+def dht_nearest(net, key) {
+    best := 0
+    bd := ring_dist(net[0][1], key)
+    i := 1
+    while (i < len(net)) {
+        d := ring_dist(net[i][1], key)
+        if (d < bd) { bd := d; best := i }
+        i := i + 1
+    }
+    return best
+}
+
+# 貪欲ルーティング。隣接 (+1 / -1 / +2 のフィンガ) だけを見て進む。
+# -> [担当ピアの添字, ホップした名前の並び]
+def zone_route(net, key) {
+    n := len(net)
+    target := dht_nearest(net, key)
+    cur := 0
+    hops := [net[0][0]]
+    guard := 0
+    while (cur != target && guard < 2 * n) {
+        nb := [(cur + 1) % n, (cur + n - 1) % n, (cur + 2) % n]
+        best := cur
+        bd := ring_dist(net[cur][1], key)
+        i := 0
+        while (i < len(nb)) {
+            d := ring_dist(net[nb[i]][1], key)
+            if (d < bd) { bd := d; best := nb[i] }
+            i := i + 1
+        }
+        if (best == cur) { cur := target } else { cur := best }
+        hops <- net[cur][0]
+        guard := guard + 1
+    }
+    return [target, hops]
+}
+
+# ---- ピアの保管庫 ---------------------------------------------------
+def peer_store_put(peer, url, sealed) {
+    i := 0
+    while (i < len(peer[3])) {
+        if (peer[3][i] == url) { peer[4][i] = sealed; return i }
+        i := i + 1
+    }
+    peer[3] <- url
+    peer[4] <- sealed
+    return len(peer[3]) - 1
+}
+
+# -> [sealed] 、[] なら 404 zone-not-found
+def peer_store_get(peer, url) {
+    i := 0
+    while (i < len(peer[3])) {
+        if (peer[3][i] == url) { return [peer[4][i]] }
+        i := i + 1
+    }
+    return []
+}
+
+# ---- 状態符号 -------------------------------------------------------
+def zone_status_text(code) {
+    if (code == 200) { return "zone-delivered" }
+    if (code == 400) { return "bad-zone" }
+    if (code == 404) { return "zone-not-found" }
+    if (code == 409) { return "zone-guard-reject" }
+    if (code == 495) { return "quantum-channel-compromised" }
+    if (code == 503) { return "plc-link-failure" }
+    if (code == 401) { return "webhook-signature-mismatch" }
+    return "unknown"
+}
+
+# ---- 公開と取得 -----------------------------------------------------
+# NET を渡して url を封緘・保管し、台帳に追記する -> [status, ownerIdx, hops]
+def zone_publish(net, url, content) {
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, 0 - 1, []] }
+    q := qkd_session()
+    if (!qkd_check(q)) { return [495, 0 - 1, []] }
+    key := jones_key(zone_diagram(z[0]))
+    sealed := zone_seal(content, key, q[1])
+    r := zone_route(net, zone_id(url))
+    peer_store_put(net[r[0]], url, sealed)
+    fact := ["zone-record", url, net[r[0]][0], zone_id(url), sealed[2]]
+    fact >> tuplespace
+    return [200, r[0], r[1]]
+}
+
+# -> [status, 本文, ownerIdx, hops]
+def zone_get(net, url) {
+    z := zone_parse(url)
+    if (len(z) == 0) { return [400, "", 0 - 1, []] }
+    r := zone_route(net, zone_id(url))
+    hit := peer_store_get(net[r[0]], url)
+    if (len(hit) == 0) { return [404, "", r[0], r[1]] }
+    key := jones_key(zone_diagram(z[0]))
+    opened := zone_open(hit[0], key)
+    fact := ["zone-fetch", url, net[r[0]][0]]
+    fact >> tuplespace
+    if (len(opened) == 0) { return [409, "", r[0], r[1]] }
+    return [200, opened[0], r[0], r[1]]
+}
+
+# ---- "@@" ブロック (ZoneBrowser が読む形式) -------------------------
+def zone_serve_block(net, url, status, body, sealed, key, qkd_ok) {
+    z := zone_parse(url)
+    host := ""
+    path := ""
+    if (len(z) > 0) { host := z[0]; path := z[1] }
+    r := zone_route(net, zone_id(url))
+    hops := ""
+    i := 0
+    while (i < len(r[1])) {
+        if (i > 0) { hops := hops + " -> " }
+        hops := hops + r[1][i]
+        i := i + 1
+    }
+    print("@@HOST " + host)
+    print("@@PATH " + path)
+    print("@@KEY " + zone_id(url))
+    print("@@ROUTE " + hops)
+    print("@@NODE " + net[r[0]][0])
+    if (qkd_ok) { print("@@QKD ok") } else { print("@@QKD compromised") }
+    if (len(sealed) == 3) {
+        ct := sealed[0]
+        c0 := 0
+        c1 := 0
+        c2 := 0
+        if (len(ct) > 0) { c0 := ct[0] }
+        if (len(ct) > 1) { c1 := ct[1] }
+        if (len(ct) > 2) { c2 := ct[2] }
+        print("@@CIPHER " + c0 + " " + c1 + " " + c2 + " " + len(ct))
+        print("@@TAG " + sealed[2])
+    }
+    print("@@JONESKEY " + key)
+    print("@@STATUS " + status)
+    print("@@BODY_BEGIN")
+    print(body)
+    print("@@BODY_END")
+    return status
+}
+
+# ---- 封筒 (回線に流す実バイト列) ------------------------------------
+#   "Z" "N" | ver | urlLen | url(utf8) | salt(2) | tag(4) | ctLen(2) | ct(2 each)
+def envelope_encode(url, sealed) {
+    ub := utf8_of_str(url)
+    out := [90, 78, 1]
+    out <- u_trunc(len(ub) / 256)
+    out <- len(ub) % 256
+    i := 0
+    while (i < len(ub)) { out <- ub[i]; i := i + 1 }
+    out <- u_trunc(sealed[1] / 256)
+    out <- sealed[1] % 256
+    t := sealed[2]
+    k := 3
+    while (k >= 0) { out <- (u_trunc(t / POW2[8 * k]) % 256); k := k - 1 }
+    ct := sealed[0]
+    out <- u_trunc(len(ct) / 256)
+    out <- len(ct) % 256
+    i := 0
+    while (i < len(ct)) {
+        out <- u_trunc(ct[i] / 256)
+        out <- ct[i] % 256
+        i := i + 1
+    }
+    return out
+}
+
+# -> [status, url, sealed]
+def envelope_decode(bytes) {
+    if (len(bytes) < 13) { return [400, "", []] }
+    if (bytes[0] != 90) { return [400, "", []] }
+    if (bytes[1] != 78) { return [400, "", []] }
+    ulen := bytes[3] * 256 + bytes[4]
+    if (len(bytes) < 5 + ulen + 8) { return [400, "", []] }
+    ub := []
+    i := 0
+    while (i < ulen) { ub <- bytes[5 + i]; i := i + 1 }
+    url := str_of_utf8(ub)
+    p := 5 + ulen
+    salt := bytes[p] * 256 + bytes[p + 1]
+    tag := bytes[p + 2] * 16777216 + bytes[p + 3] * 65536 + bytes[p + 4] * 256 + bytes[p + 5]
+    clen := bytes[p + 6] * 256 + bytes[p + 7]
+    p := p + 8
+    if (len(bytes) < p + 2 * clen) { return [400, "", []] }
+    ct := []
+    i := 0
+    while (i < clen) { ct <- (bytes[p + 2 * i] * 256 + bytes[p + 2 * i + 1]); i := i + 1 }
+    return [200, url, [ct, salt, tag]]
+}

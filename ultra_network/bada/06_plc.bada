@@ -1,0 +1,518 @@
+# ============================================================
+# 06_plc.bada -- BADA ULTRA NETWORK / L0 Panasonic HD-PLC
+#
+# 家の電力線 (コンセント) を物理層にして PC をインターネットへつなぐ層。
+#
+#   ・帯域 2-28 MHz を 512 本のサブキャリアに分ける (Δf ≒ 50.78 kHz)
+#   ・変調は QAM ではなく PAM + ウェーブレット変換 (DWMT)。
+#     ガードインターバルが要らないのが HD-PLC 方式の利点。ここでは
+#     正規化 Haar の多重解像度フィルタバンクがその役を務める
+#     (解析と合成は厳密な逆変換の対)
+#   ・電力線の伝達関数は Zimmermann-Dostert の多重経路モデル
+#       H(f) = Σ g_i · exp(-(a0 + a1 f^k) d_i) · exp(-j2πf d_i / v)
+#   ・分岐点のインピーダンス不整合損は周波数とともに増える
+#   ・雑音は色付き背景雑音 N(f)[dBm/Hz] = a + b·f_MHz^c
+#   ・SNR から適応ビットローディング b = floor(log2(1 + SNR/Γ))
+#   ・アマチュア無線帯にはノッチを入れて送信しない
+#   ・IEEE 1901 のフレーム (プリアンブル + FC/CRC-24 + PB/CRC-32)
+#   ・CSMA/CA の優先度解決 (PRS0 / PRS1 + 競合窓バックオフ)
+# ============================================================
+
+PLC_FLO     := 2000000
+PLC_FHI     := 28000000
+PLC_NCARR   := 512
+PLC_TXPSD   := 0 - 50       # 送信電力密度 dBm/Hz (規制値相当)
+PLC_GAP_DB  := 9.8          # SNR ギャップ Γ (BER 1e-7 相当)
+PLC_MAXBITS := 5            # 32-PAM まで
+PLC_VP      := 150000000    # 電力線の位相速度 m/s
+
+PLC_DF   := (PLC_FHI - PLC_FLO) / PLC_NCARR
+PLC_TSYM := 1.0 / PLC_DF
+
+# アマチュア無線帯 (MHz)。HD-PLC はここを送信しない。
+HAM_LO := [1.8, 3.5, 7.0, 10.1, 14.0, 18.068, 21.0, 24.89, 28.0]
+HAM_HI := [2.0, 3.8, 7.2, 10.15, 14.35, 18.168, 21.45, 24.99, 29.7]
+
+def in_ham_band(f_hz) {
+    f := f_hz / 1000000
+    i := 0
+    while (i < len(HAM_LO)) {
+        if (f >= HAM_LO[i] && f <= HAM_HI[i]) { return true }
+        i := i + 1
+    }
+    return false
+}
+
+# ---- 屋内配線のトポロジ ---------------------------------------------
+# コンセントは [id, 表示名, 分電盤からの距離 m, 分岐数, 相]
+OUTLETS := [
+  ["living",  "居間 コンセント",           12, 3, "L1"],
+  ["study",   "書斎 コンセント (PC)",       21, 4, "L1"],
+  ["kitchen", "台所 コンセント",            17, 5, "L2"],
+  ["bedroom", "寝室 コンセント",            28, 4, "L2"],
+  ["router",  "ONU 脇 コンセント (親機)",    5, 2, "L1"]
+]
+
+def outlet_of(id) {
+    i := 0
+    while (i < len(OUTLETS)) {
+        if (OUTLETS[i][0] == id) { return OUTLETS[i] }
+        i := i + 1
+    }
+    return OUTLETS[0]
+}
+
+# 多重経路。経路 i は反射係数 g_i と行程長 d_i を持つ。-> [[g, d], ...]
+def plc_paths(a, b) {
+    oa := outlet_of(a)
+    ob := outlet_of(b)
+    rnd := rng_new("plc:" + a + ">" + b)
+    base := oa[2] + ob[2]
+    nb := u_max(oa[3], ob[3])
+    npath := 3 + nb - 1
+    if (npath > 6) { npath := 6 }
+    paths := []
+    i := 0
+    while (i < npath) {
+        g := 1.0
+        d := base
+        if (i > 0) {
+            # 反射波は分岐で減衰し、行程が伸びる
+            g := (0.75 - 0.12 * i) * (0.6 + 0.4 * rng_next(rnd))
+            d := base + i * (6 + 14 * rng_next(rnd))
+        }
+        if (i % 2 == 1) { g := 0 - g }      # 反射で位相反転
+        paths <- [g, d]
+        i := i + 1
+    }
+    # 異相 (L1 <-> L2) はカプラ越えで一段落ちる
+    if (oa[4] != ob[4]) {
+        i := 0
+        while (i < len(paths)) { paths[i][0] = paths[i][0] * 0.45; i := i + 1 }
+    }
+    return paths
+}
+
+# |H(f)| — 減衰 exp(-a1 f d) と経路差による櫛形フェージング
+def plc_transfer(paths, f_hz) {
+    a1 := 0.00000000078
+    re := 0.0
+    im := 0.0
+    i := 0
+    while (i < len(paths)) {
+        g := paths[i][0]
+        d := paths[i][1]
+        att := exp(0 - a1 * f_hz * d)
+        ph := 0 - TWO_PI * f_hz * d / PLC_VP
+        re := re + g * att * u_cos(ph)
+        im := im + g * att * u_sin(ph)
+        i := i + 1
+    }
+    return sqrt(re * re + im * im)
+}
+
+# 分岐のインピーダンス不整合損 [dB]。無効成分なので周波数とともに増える。
+def plc_coupling_db(a, b, f_hz) {
+    oa := outlet_of(a)
+    ob := outlet_of(b)
+    j := (oa[3] - 1) + (ob[3] - 1)
+    db := 3.0 * j + 5.0
+    if (oa[4] != ob[4]) { db := db + 9.0 }
+    t := (f_hz - PLC_FLO) / (PLC_FHI - PLC_FLO)
+    return db + (14 + 2.6 * j) * t
+}
+
+# 色付き背景雑音 [dBm/Hz]
+def plc_noise_db(f_hz) {
+    fm := f_hz / 1000000
+    return 0 - 145 + 53.23 * exp(0 - 0.337 * log(fm))
+}
+
+# コンセント間の回線特性 -> [freqs, snrDb, paths]
+def plc_channel(a, b) {
+    paths := plc_paths(a, b)
+    freqs := []
+    snrs := []
+    n := 0
+    while (n < PLC_NCARR) {
+        f := PLC_FLO + (n + 0.5) * PLC_DF
+        h := plc_transfer(paths, f)
+        if (h < 0.000000000001) { h := 0.000000000001 }
+        hdb := 20 * log(h) / LN10 - plc_coupling_db(a, b, f)
+        freqs <- f
+        snrs <- (PLC_TXPSD + hdb - plc_noise_db(f))
+        n := n + 1
+    }
+    return [freqs, snrs, paths]
+}
+
+# 適応ビットローディング b = floor(log2(1 + SNR/Γ))、ノッチは 0
+# -> [bits, bitsPerSymbol, active, notched, phyBps, snrs]
+def plc_tonemap(ch) {
+    gap := db_to_lin(PLC_GAP_DB)
+    freqs := ch[0]
+    snrs := ch[1]
+    bits := []
+    total := 0
+    active := 0
+    notched := 0
+    n := 0
+    while (n < PLC_NCARR) {
+        if (in_ham_band(freqs[n])) {
+            bits <- 0
+            notched := notched + 1
+        } else {
+            lin := db_to_lin(snrs[n])
+            bq := u_trunc(u_log2(1 + lin / gap))
+            if (bq < 1) { bq := 0 }
+            if (bq > PLC_MAXBITS) { bq := PLC_MAXBITS }
+            bits <- bq
+            if (bq > 0) { active := active + 1; total := total + bq }
+        }
+        n := n + 1
+    }
+    return [bits, total, active, notched, total / PLC_TSYM, snrs]
+}
+
+# ---- Gray 符号つき PAM ----------------------------------------------
+# PAM は 5 ビット (32-PAM) までなので、0..31 の対応表を先に作る。
+# OFDM の内側では 1 シンボルあたり 512 回引かれるので、ここを
+# 逐次 XOR のままにすると全体の costs の大半を食う。
+GRAY_ENC := []
+i := 0
+while (i < 32) { GRAY_ENC <- u_xor(i, u_trunc(i / 2)); i := i + 1 }
+GRAY_DEC := []
+i := 0
+while (i < 32) { GRAY_DEC <- 0; i := i + 1 }
+i := 0
+while (i < 32) { GRAY_DEC[GRAY_ENC[i]] = i; i := i + 1 }
+
+def gray_encode(v) { return GRAY_ENC[v] }
+def gray_decode(g) { return GRAY_DEC[g] }
+
+# b ビット -> 2^b-PAM の振幅 (..., -3, -1, +1, +3, ...)
+def pam_level(idx, b) { return 2 * idx - (POW2[b] - 1) }
+
+def pam_index(level, b) {
+    M := POW2[b]
+    i := u_fix((level + (M - 1) + 1) / 2)
+    if (i < 0) { i := 0 }
+    if (i > M - 1) { i := M - 1 }
+    return i
+}
+
+# ---- ウェーブレット変換 (正規化 Haar、厳密な逆変換の対) -------------
+SQ1_2 := 0.7071067811865476
+
+# 時間波形 -> ウェーブレット係数 (サブバンド = サブキャリア)
+def dwt_analyze(x) {
+    a := []
+    i := 0
+    while (i < len(x)) { a <- x[i]; i := i + 1 }
+    n := len(a)
+    while (n > 1) {
+        half := u_trunc(n / 2)
+        out := []
+        i := 0
+        while (i < half) { out <- (a[2 * i] + a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < half) { out <- (a[2 * i] - a[2 * i + 1]) * SQ1_2; i := i + 1 }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+        n := half
+    }
+    return a
+}
+
+# ウェーブレット係数 -> 時間波形 (dwt_analyze の逆)
+def dwt_synthesize(c) {
+    a := []
+    i := 0
+    while (i < len(c)) { a <- c[i]; i := i + 1 }
+    N := len(a)
+    n := 1
+    while (n < N) {
+        half := n
+        n := n * 2
+        out := []
+        i := 0
+        while (i < n) { out <- 0; i := i + 1 }
+        i := 0
+        while (i < half) {
+            out[2 * i]     = (a[i] + a[half + i]) * SQ1_2
+            out[2 * i + 1] = (a[i] - a[half + i]) * SQ1_2
+            i := i + 1
+        }
+        i := 0
+        while (i < n) { a[i] = out[i]; i := i + 1 }
+    }
+    return a
+}
+
+# ---- ウェーブレット OFDM --------------------------------------------
+# -> [samples, nSymbols, bitLen]
+def plc_modulate(bytes, tm) {
+    tone := tm[0]
+    per := tm[1]
+    bits := bytes_to_bits(bytes)
+    reallen := len(bits)
+    nsym := u_trunc((reallen + per - 1) / per)
+    pad := nsym * per - reallen
+    i := 0
+    while (i < pad) { bits <- 0; i := i + 1 }
+
+    samples := []
+    p := 0
+    s := 0
+    while (s < nsym) {
+        coeffs := []
+        n := 0
+        while (n < PLC_NCARR) { coeffs <- 0; n := n + 1 }
+        n := 0
+        while (n < PLC_NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                v := 0
+                k := 0
+                while (k < bq) { v := v * 2 + bits[p]; p := p + 1; k := k + 1 }
+                coeffs[n] = pam_level(gray_decode(v), bq)
+            }
+            n := n + 1
+        }
+        wave := dwt_synthesize(coeffs)
+        i := 0
+        while (i < PLC_NCARR) { samples <- wave[i]; i := i + 1 }
+        s := s + 1
+    }
+    return [samples, nsym, reallen]
+}
+
+def plc_demodulate(samples, tm, bitlen) {
+    tone := tm[0]
+    nsym := u_trunc(len(samples) / PLC_NCARR)
+    bits := []
+    s := 0
+    while (s < nsym) {
+        chunk := []
+        i := 0
+        while (i < PLC_NCARR) { chunk <- samples[s * PLC_NCARR + i]; i := i + 1 }
+        coeffs := dwt_analyze(chunk)
+        n := 0
+        while (n < PLC_NCARR) {
+            bq := tone[n]
+            if (bq > 0) {
+                g := gray_encode(pam_index(coeffs[n], bq))
+                k := bq - 1
+                while (k >= 0) {
+                    pw := POW2[k]
+                    if (g >= pw) { bits <- 1; g := g - pw } else { bits <- 0 }
+                    k := k - 1
+                }
+            }
+            n := n + 1
+        }
+        s := s + 1
+    }
+    trimmed := []
+    i := 0
+    while (i < bitlen && i < len(bits)) { trimmed <- bits[i]; i := i + 1 }
+    return bits_to_bytes(trimmed)
+}
+
+# 実回線を通す: サブバンドごとに雑音を載せ、受信側で等化する。
+# ビットローディングの余裕が足りないサブキャリアだけが誤る。
+def plc_through_channel(samples, tm, margin_db, seed) {
+    rnd := rng_new("awgn:" + seed)
+    tone := tm[0]
+    snrs := tm[5]
+    nsym := u_trunc(len(samples) / PLC_NCARR)
+    out := []
+    s := 0
+    while (s < nsym) {
+        chunk := []
+        i := 0
+        while (i < PLC_NCARR) { chunk <- samples[s * PLC_NCARR + i]; i := i + 1 }
+        coeffs := dwt_analyze(chunk)
+        n := 0
+        while (n < PLC_NCARR) {
+            if (tone[n] == 0) { coeffs[n] = 0 }
+            else {
+                snr := db_to_lin(snrs[n] - margin_db)
+                sigma := sqrt((POW2[2 * tone[n]] - 1) / 3 / snr)
+                u1 := rng_next(rnd)
+                if (u1 < 0.000000000001) { u1 := 0.000000000001 }
+                u2 := rng_next(rnd)
+                gauss := sqrt(0 - 2 * log(u1)) * u_cos(TWO_PI * u2)
+                coeffs[n] = coeffs[n] + sigma * gauss
+            }
+            n := n + 1
+        }
+        wave := dwt_synthesize(coeffs)
+        i := 0
+        while (i < PLC_NCARR) { out <- wave[i]; i := i + 1 }
+        s := s + 1
+    }
+    return out
+}
+
+# ---- CRC (IEEE 1901 のフレーム検査) ---------------------------------
+CRC32_TAB := []
+n := 0
+while (n < 256) {
+    c := n
+    k := 0
+    while (k < 8) {
+        if (c % 2 == 1) { c := u_xor(3988292384, u_trunc(c / 2)) }
+        else { c := u_trunc(c / 2) }
+        k := k + 1
+    }
+    CRC32_TAB <- c
+    n := n + 1
+}
+
+def crc32(bytes) {
+    c := MASK32
+    i := 0
+    while (i < len(bytes)) {
+        c := u_xor(CRC32_TAB[u_xor8(c % 256, bytes[i])], u_trunc(c / 256))
+        i := i + 1
+    }
+    return MASK32 - c
+}
+
+# CRC-24 (多項式 0x5D6DCB) — フレーム制御の検査
+def crc24(bytes) {
+    c := 11994830
+    i := 0
+    while (i < len(bytes)) {
+        c := u_xor(c, bytes[i] * 65536)
+        k := 0
+        while (k < 8) {
+            c := c * 2
+            if (c >= 16777216) { c := u_xor(c, 6122955) }
+            c := c % 16777216
+            k := k + 1
+        }
+        i := i + 1
+    }
+    return c
+}
+
+# ---- フレーム (プリアンブル + FC + PB ブロック) ----------------------
+PLC_PB_BYTES := 520
+PLC_PREAMBLE := [26, 207, 252, 29, 26, 207, 252, 29]
+
+def plc_frame(payload, src, dst, cap) {
+    n := len(payload)
+    nblk := u_trunc((n + PLC_PB_BYTES - 1) / PLC_PB_BYTES)
+    if (nblk < 1) { nblk := 1 }
+    # フレーム制御: 種別 / 優先度 / 送受信 ID / ブロック数 / ペイロード長
+    fc := [1, cap % 4,
+           u_trunc(src / 256) % 256, src % 256,
+           u_trunc(dst / 256) % 256, dst % 256,
+           u_trunc(nblk / 256) % 256, nblk % 256]
+    k := 3
+    while (k >= 0) { fc <- (u_trunc(n / POW2[8 * k]) % 256); k := k - 1 }
+    fcc := crc24(fc)
+
+    out := []
+    i := 0
+    while (i < len(PLC_PREAMBLE)) { out <- PLC_PREAMBLE[i]; i := i + 1 }
+    i := 0
+    while (i < len(fc)) { out <- fc[i]; i := i + 1 }
+    out <- u_trunc(fcc / 65536) % 256
+    out <- u_trunc(fcc / 256) % 256
+    out <- fcc % 256
+
+    b := 0
+    while (b < nblk) {
+        pb := []
+        i := 0
+        while (i < PLC_PB_BYTES) {
+            idx := b * PLC_PB_BYTES + i
+            if (idx < n) { pb <- payload[idx] } else { pb <- 0 }
+            i := i + 1
+        }
+        c := crc32(pb)
+        i := 0
+        while (i < PLC_PB_BYTES) { out <- pb[i]; i := i + 1 }
+        k := 3
+        while (k >= 0) { out <- (u_trunc(c / POW2[8 * k]) % 256); k := k - 1 }
+        b := b + 1
+    }
+    return out
+}
+
+# -> [status, payload, 理由]  status 200 / 503
+def plc_deframe(bytes) {
+    i := 0
+    while (i < len(PLC_PREAMBLE)) {
+        if (i >= len(bytes)) { return [503, [], "no-preamble"] }
+        if (bytes[i] != PLC_PREAMBLE[i]) { return [503, [], "no-preamble"] }
+        i := i + 1
+    }
+    p := len(PLC_PREAMBLE)
+    if (len(bytes) < p + 15) { return [503, [], "truncated"] }
+    fc := []
+    i := 0
+    while (i < 12) { fc <- bytes[p + i]; i := i + 1 }
+    got := bytes[p + 12] * 65536 + bytes[p + 13] * 256 + bytes[p + 14]
+    if (got != crc24(fc)) { return [503, [], "fc-crc"] }
+    nblk := fc[6] * 256 + fc[7]
+    paylen := fc[8] * 16777216 + fc[9] * 65536 + fc[10] * 256 + fc[11]
+    p := p + 15
+    acc := []
+    b := 0
+    while (b < nblk) {
+        if (len(bytes) < p + PLC_PB_BYTES + 4) { return [503, [], "truncated"] }
+        pb := []
+        i := 0
+        while (i < PLC_PB_BYTES) { pb <- bytes[p + i]; i := i + 1 }
+        p := p + PLC_PB_BYTES
+        c := bytes[p] * 16777216 + bytes[p + 1] * 65536 + bytes[p + 2] * 256 + bytes[p + 3]
+        p := p + 4
+        if (c != crc32(pb)) { return [503, [], "pb-crc"] }
+        i := 0
+        while (i < PLC_PB_BYTES) { acc <- pb[i]; i := i + 1 }
+        b := b + 1
+    }
+    out := []
+    i := 0
+    while (i < paylen && i < len(acc)) { out <- acc[i]; i := i + 1 }
+    return [200, out, ""]
+}
+
+# ---- CSMA/CA (IEEE 1901 の優先度解決スロット) ------------------------
+# 局は [name, CAP]。CAP 3 が最優先。
+# -> [maxCap, cw, 勝者, PRS0 の並び, PRS1 の並び, 抽選結果]
+def plc_csma(stations, seed) {
+    rnd := rng_new("csma:" + seed)
+    prs0 := []
+    prs1 := []
+    maxcap := 0 - 1
+    i := 0
+    while (i < len(stations)) {
+        nm := stations[i][0]
+        cp := stations[i][1]
+        if (cp >= 2) { prs0 <- nm }
+        if (cp == 3) { prs1 <- nm }
+        if (cp == 1) { prs1 <- nm }
+        if (cp > maxcap) { maxcap := cp }
+        i := i + 1
+    }
+    cwtab := [7, 15, 15, 31]
+    cw := cwtab[u_min(3, u_max(0, maxcap))]
+    draws := []
+    winner := ""
+    bestb := 999999
+    i := 0
+    while (i < len(stations)) {
+        if (stations[i][1] == maxcap) {
+            b := u_trunc(rng_next(rnd) * (cw + 1))
+            draws <- [stations[i][0], b]
+            if (b < bestb) { bestb := b; winner := stations[i][0] }
+        }
+        i := i + 1
+    }
+    return [maxcap, cw, winner, prs0, prs1, draws]
+}

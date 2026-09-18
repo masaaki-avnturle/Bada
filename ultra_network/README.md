@@ -161,15 +161,78 @@
 
 ビルドは [`ultranet-app-build.yml`](../.github/workflows/ultranet-app-build.yml) が実行します。トリガーは 3 つ — 開発ブランチへの push(Actions アーティファクト)/ `workflow_dispatch`(ワークフローが既定ブランチに入ってから)/ `ultranet-v*` タグ([Releases](https://github.com/masaaki-avnturle/Bada/releases) へ添付)。
 
-### Bada 言語のリファレンス実装を走らせる
+---
 
-全層を Bada 自身で書いたリファレンスが [`ultra.bada`](ultra.bada) です:
+## 📜 Bada 言語による全ソースコード
+
+**この通信システムは、全層を量子プログラミング言語 Bada 自身で書いてあります。** JavaScript 版(`index.html`)は同じ算法をブラウザで動かすためのもので、Bada 版が本体です。
+
+### 📕 PDF — 全ソースコードを 1 冊に
+
+### 👉 [**BadaUltraNetwork-source.pdf**](dist/BadaUltraNetwork-source.pdf)
+
+表紙・目次・層の図に続けて、**12 ファイル 4,722 行**の全ソースを行番号つき・色分けで収録した **71 ページ**の PDF です(A4)。生成は `node ultra_network/tools/build-pdf.js`。
+
+### 📂 モジュール構成 — `bada/`
+
+| | ファイル | 内容 | 行 |
+|---:|:---|:---|---:|
+| 01 | [`01_core.bada`](bada/01_core.bada) | 基本演算 — 床関数・三角関数・**ニブル表によるビット演算**・16 進 / Base64 / UTF-8・32 ビット乗算・擬似乱数 | 432 |
+| 02 | [`02_sha256.bada`](bada/02_sha256.bada) | **SHA-256 / HMAC-SHA256**(RFC 6234 / RFC 2104) | 198 |
+| 03 | [`03_jones.bada`](bada/03_jones.bada) | L3 Jones 多項式量子暗号 — Kauffman ブラケット・Bell 対 QKD・AEAD | 206 |
+| 04 | [`04_zone.bada`](bada/04_zone.bada) | L2 zone:// — URL 文法・リング DHT・アカシック台帳・`@@` ブロック・封筒 | 267 |
+| 05 | [`05_ntt.bada`](bada/05_ntt.bada) | L1 NTT 写像 — φ と割当表・音声帯 16-QAM・G.711 µ-law・RTP・ISDN・呼制御 | 362 |
+| 06 | [`06_plc.bada`](bada/06_plc.bada) | L0 HD-PLC — 多重経路伝達関数・適応ビットローディング・ウェーブレット OFDM・CRC-32/24・IEEE 1901・CSMA/CA | 518 |
+| 07 | [`07_json.bada`](bada/07_json.bada) | JSON の再帰下降パーサと生成器(Webhook 本文用) | 321 |
+| 08 | [`08_msgmux.bada`](bada/08_msgmux.bada) | L4 LINE / Instagram — 公式 API の取り込み・署名検証・送信要求・統合受信箱 | 308 |
+| 09 | [`09_streams.bada`](bada/09_streams.bada) | AT&T ベル研究所式 STREAMS — wput / rput の対と全 5 層の往復 | 364 |
+| 10 | [`10_main.bada`](bada/10_main.bada) | デモ本体 — `@reviser` で `SEND` / `LINK` を parser に足す | 188 |
+| 11 | [`11_selftest.bada`](bada/11_selftest.bada) | 自己診断 **107 項目**(全合格) | 387 |
+| 12 | [`ultra.bada`](ultra.bada) | 単一ファイル版(64 サブキャリアの縮小版) | 1171 |
+
+### ▶ 走らせる
+
+Bada にモジュール読み込みの仕組みは無いので、実行時は順に**連結して 1 本**にします。
 
 ```sh
+# モジュールを連結し、実際に走らせて検査してから dist/ に書き出す
+node ultra_network/tools/build-bada.js
+
+# 出来上がった全層プログラムを走らせる
+node ultra_network/tools/run-bada.js ultra_network/dist/ultra-full.bada
+node ultra_network/tools/run-bada.js ultra_network/dist/ultra-selftest.bada
+
+# 縮小版はそのまま bada-cli で動く
 node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada
 ```
 
-`@reviser` 文法トランザクションで `SEND` / `LINK` という文の動詞を parser に追加し、LINE と Instagram のメッセージを 1 通ずつ全層に通してから、2 種類の攻撃がそれぞれ別の層で弾かれることを示します。
+`build-bada.js` は出力に決められた印(`STATUS 200 zone-delivered` / `409` / `495` / `503` / `inverse ok: true` / `SELFTEST-RESULT 107 107`)が揃うまで `dist/*.bada` を書き出しません。
+
+### ⚠ Bada で書くうえで踏んだところ
+
+| | 対処 |
+|:---|:---|
+| **ビット演算子が無い** | 4 ビット(ニブル)の XOR / AND / OR 表を起動時に作り、32 ビット語を 8 ニブルに割って引く。SHA-256 の `ch` / `maj` はニブル 1 パスに融合 |
+| **`\|\|` が無い** | `&&` と `!`、または入れ子の `if` で書く |
+| **`for x in arr` が束縛されない** | `while` で回す |
+| **`def` の中の `:=` は局所変数** | 書き換えたい値は配列の要素に置く(要素への代入は呼び出し側に届く) |
+| **行頭の `[` は前行の添字と読まれる** | 台帳への追記は一度変数に束ねてから `>> tuplespace` |
+| **`a * b` が 2^53 を超えると精度を失う** | `u_mul32` で 16 ビットずつに割って正確に計算(JS の `Math.imul` と同値) |
+| **既定のステップ上限 2000 万** | 全層版は約 6,600 万ステップ要る(SHA-256 と HMAC をソフトウェアのビット演算で回すため)。`run-bada.js` で上限を上げる |
+
+### 🔗 JavaScript 版との相互検証
+
+Bada 版と `index.html` の JS 版は**同じ擬似乱数(FNV-1a + xorshift32、定数まで同一)**を使うので、同じ回線特性を出します。実測:
+
+| コンセント対 | Bada 版 | JS 版 |
+|:---|---:|---:|
+| 居間 → 書斎 | 120.30 Mbps / 有効 483 本 / 2369 bit/シンボル | 同一 |
+| ONU 脇 → 書斎 | 122.48 Mbps / 有効 483 本 / 2412 bit/シンボル | 同一 |
+| 居間 → 台所 | 50.83 Mbps / 有効 364 本 | 50.78 Mbps / 有効 363 本 |
+
+3 組目だけ 512 本中 1 本ずれます。`floor(log2(1 + SNR/Γ))` の閾値ちょうどに乗ったサブキャリアが、`Math.log2` と `log(x)/ln2` の丸め差で反対側に倒れるためで、両者とも正しい計算です。
+
+結び目鍵(三葉 919492 / 8 の字 400638)とピアの node-id は既存の [`bada_gui_ide/examples/zone.bada`](../bada_gui_ide/examples/zone.bada) と一致するので、**ここで作ったレコードは ZoneBrowser がそのまま開けます**。
 
 ---
 
@@ -195,14 +258,34 @@ node ultra_network/tools/engine-test.js
 
 ```
 ultra_network/
-├── README.md              # この文書
-├── index.html             # アプリ本体 (自己完結・依存ゼロ・オフライン可)
-├── ultra.bada             # 全層の Bada 言語リファレンス実装
+├── README.md                  # この文書
+├── index.html                 # アプリ本体 (自己完結・依存ゼロ・オフライン可)
+├── ultra.bada                 # 単一ファイル版の Bada 実装 (縮小版)
+├── bada/                      # ★ 全層の Bada ソース (12 ファイル 4,722 行)
+│   ├── 01_core.bada           #   基本演算・ビット演算・UTF-8
+│   ├── 02_sha256.bada         #   SHA-256 / HMAC-SHA256
+│   ├── 03_jones.bada          #   L3 Jones 多項式量子暗号
+│   ├── 04_zone.bada           #   L2 zone:// リング DHT
+│   ├── 05_ntt.bada            #   L1 NTT 写像・音声帯モデム・RTP
+│   ├── 06_plc.bada            #   L0 HD-PLC ウェーブレット OFDM
+│   ├── 07_json.bada           #   JSON 解析・生成
+│   ├── 08_msgmux.bada         #   L4 LINE / Instagram
+│   ├── 09_streams.bada        #   STREAMS の骨組み
+│   ├── 10_main.bada           #   デモ本体
+│   └── 11_selftest.bada       #   自己診断 107 項目
+├── dist/                      # 生成物 (build-bada.js / build-pdf.js が作る)
+│   ├── BadaUltraNetwork-source.pdf   # ★ 全ソースコードの PDF (71 ページ)
+│   ├── ultra-full.bada        #   連結済みデモ本体
+│   ├── ultra-selftest.bada    #   連結済み自己診断
+│   └── *.out.txt              #   それぞれの実行結果
 ├── tools/
-│   └── engine-test.js     # Node での単体テスト (115 項目)
+│   ├── engine-test.js         # JS エンジンの単体テスト (115 項目)
+│   ├── build-bada.js          # Bada モジュールの連結と検証
+│   ├── run-bada.js            # ステップ上限を上げて .bada を走らせる
+│   └── build-pdf.js           # 全ソースコードの PDF を組む
 └── app/
-    ├── cordova/config.xml # Android APK の設定
-    └── electron/          # Windows EXE / Ubuntu AppImage・deb のラッパー
+    ├── cordova/config.xml     # Android APK の設定
+    └── electron/              # Windows EXE / Ubuntu AppImage・deb のラッパー
         ├── main.js
         ├── preload.js
         └── package.json

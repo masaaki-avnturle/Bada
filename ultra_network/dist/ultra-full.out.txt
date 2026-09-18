@@ -1,0 +1,115 @@
+================================================================
+BADA ULTRA NETWORK -- HD-PLC -> NTT -> zone:// -> LINE/Instagram
+  家のコンセントを物理層にして、NTT の加入者線へ写像し、
+  zone:// を通し、LINE と Instagram のメッセージを運ぶ。
+  層の組み方は AT&T ベル研究所の STREAMS と同じ。
+================================================================
+
+ウルトラネットワークのリング (RING = 4096 , ピアのハッシュだけで作る):
+  node 0 : osaka.zone.jp  id = 1220
+  node 1 : nagoya.zone.jp  id = 1520
+  node 2 : naha.zone.jp  id = 1847
+  node 3 : sapporo.zone.jp  id = 2523
+  node 4 : tokyo.zone.jp  id = 3587
+  node 5 : fukuoka.zone.jp  id = 4051
+
+ゾーンの正体である結び目 -> Jones 鍵:
+  url.or.jp  (三葉結び目 / 交点 3)  鍵 = 919492
+  bada.or.jp (8 の字結び目 / 交点 4) 鍵 = 400638
+
+HD-PLC (帯域 2 - 28 MHz / 512 サブキャリア / Δf 50781 Hz / シンボル長 19.69231 µs):
+  LINK living -> study : 120 Mbps, 483 本有効, 29 本ノッチ, 2369 bit/シンボル
+  LINK kitchen -> study : 31 Mbps, 264 本有効, 29 本ノッチ, 625 bit/シンボル
+
+--------------------------------------------------------------
+LINE Messaging API の Webhook を受ける
+  署名ヘッダ : X-Line-Signature
+  算法       : Base64(HMAC-SHA256(channelSecret, 生の本文))
+  本文       : 382 バイト
+  受信署名   : qPwFdUVW1lUjJzhyPGmn43J+rRJ/Z4xx...
+  検証       : true  (status 200 )
+  偽署名     : status 401 webhook-signature-mismatch  — 正しく拒否
+
+Instagram Graph API の Webhook を受ける
+  署名ヘッダ : X-Hub-Signature-256
+  算法       : "sha256=" + hex(HMAC-SHA256(appSecret, 生の本文))
+  本文       : 281 バイト
+  受信署名   : sha256=3a3c1fc803763c9b8c51ccf87...
+  検証       : true  (status 200 )
+
+--------------------------------------------------------------
+SEND LINE — メタル回線 (音声帯 16-QAM) 経由
+  平文     : line / 山口 まさあき : NTT の番号写像うまくいった?
+  msgmux   -> zone アドレス zone://url.or.jp/msg/line/U9c1f2d7b41...
+  jones    -> 結び目鍵 919492  ソルト 410  タグ 1191939269  暗号文 142 ユニット
+  zone     -> 鍵 1586  担当ピア nagoya.zone.jp
+  ntt      -> φ = 045-330-2491 (横浜) アナログ加入電話 (メタル)  封筒 337 バイト
+  plc      -> 20 OFDM シンボル, 120 Mbps, 393 µs 占有, 10240 標本
+  ntt     <-  φ⁻¹(045-330-2491) = zone://url.or.jp/msg/line/U9c1f2d7b41...
+  msgmux  <-   山口 まさあき : NTT の番号写像うまくいった?
+  STATUS 200 zone-delivered   往復一致: true
+
+--------------------------------------------------------------
+SEND Instagram — ひかり電話 (G.711 µ-law + RTP) 経由
+  平文     : instagram / bada.lang : この投稿みて!
+  msgmux   -> zone アドレス zone://url.or.jp/msg/instagram/17841400000000002
+  jones    -> 結び目鍵 919492  ソルト 934  タグ 275935245  暗号文 138 ユニット
+  zone     -> 鍵 2948  担当ピア sapporo.zone.jp
+  ntt      -> φ = 050-6162-2856 (IP / 携帯) ひかり電話 (IP)  封筒 337 バイト
+  plc      -> 11 OFDM シンボル, 120 Mbps, 216 µs 占有, 5632 標本
+  ntt     <-  φ⁻¹(050-6162-2856) = zone://url.or.jp/msg/instagram/17841400000000002
+  msgmux  <-   bada.lang : この投稿みて!
+  STATUS 200 zone-delivered   往復一致: true
+
+--------------------------------------------------------------
+SEND zone:// — INS ネット 64 (ディジタル透過) 経由
+  平文     : zone / 山口 まさあき : INS ネット 64 の透過
+  msgmux   -> zone アドレス zone://url.or.jp/msg/zone/self
+  jones    -> 結び目鍵 919492  ソルト 1458  タグ 662725341  暗号文 98 ユニット
+  zone     -> 鍵 3508  担当ピア tokyo.zone.jp
+  ntt      -> φ = 092-262-0565 (福岡) INS ネット 64 (ISDN)  封筒 239 バイト
+  plc      -> 2 OFDM シンボル, 120 Mbps, 39 µs 占有, 1024 標本
+  ntt     <-  φ⁻¹(092-262-0565) = zone://url.or.jp/msg/zone/self
+  msgmux  <-   山口 まさあき : INS ネット 64 の透過
+  STATUS 200 zone-delivered   往復一致: true
+
+==============================================================
+攻撃 — それぞれ別の層が弾く
+==============================================================
+
+--------------------------------------------------------------
+SEND 物理層で回線の標本を 1 つ壊す
+  平文     : line / 田中 さくら : 改竄試験
+  STATUS 503 plc-pb-crc
+             物理層の検査に失敗。回線が荒れている。
+
+--------------------------------------------------------------
+SEND 悪意あるピアが保管中のレコードを書き換える
+  平文     : line / 田中 さくら : 改竄試験
+  STATUS 409 zone-guard-reject
+             タグが合わない。改竄か鍵違いとして排除する。
+
+--------------------------------------------------------------
+SEND 量子路を盗聴する (intercept-resend)
+  平文     : line / 田中 さくら : 改竄試験
+  STATUS 495 quantum-channel-compromised
+             Bell 対の相関が壊れている。鍵を破棄し送信しない。
+
+==============================================================
+写像 φ : zone:// |-> NTT 番号   (φ⁻¹ を割当表で検算)
+==============================================================
+   045-330-2491  <-  zone://url.or.jp/msg/line/U9c1f2d7b41...
+   050-6162-2856  <-  zone://url.or.jp/msg/instagram/17841400000000002
+   092-262-0565  <-  zone://url.or.jp/msg/zone/self
+   082-300-3322  <-  zone://url.or.jp/msg/line/U4af4980629
+  φ⁻¹ が厳密な逆写像 : inverse ok: true
+
+統合受信箱 : 2 通 / 2 スレッド
+   [line] 山口 まさあき — 1 件
+   [instagram] bada.lang — 1 件
+
+アカシック台帳 : 21 件 (追記専用)
+SEND 実行 6 回 / うち往復一致 3 回
+==============================================================
+BADA ULTRA NETWORK -- done
+==============================================================

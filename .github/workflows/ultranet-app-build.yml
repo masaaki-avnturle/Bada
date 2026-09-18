@@ -83,7 +83,7 @@ jobs:
         run: |
           set -e
           node ultra_network/tools/engine-test.js
-      - name: Bada reference source runs (ultra.bada)
+      - name: Bada reference source runs (ultra.bada, 既定のステップ上限で)
         run: |
           set -e
           node bada_gui_ide/cli/bada-cli.js run ultra_network/ultra.bada > /tmp/ultra-bada.out
@@ -93,6 +93,24 @@ jobs:
           grep -q "STATUS 503 plc-check-failed"   /tmp/ultra-bada.out
           grep -q "inverse ok: true"              /tmp/ultra-bada.out
           echo "ultra.bada OK"
+      # ultra_network/bada/ の全モジュール (全層を Bada 言語で書いたもの) を
+      # 連結して実際に走らせ、デモ本体と 107 項目の自己診断が通ることを確かめる。
+      # 通らなければ dist/*.bada は書き出されず、ここで落ちる。
+      - name: Bada full source build + self-test (ultra_network/bada/)
+        run: |
+          set -e
+          node ultra_network/tools/build-bada.js
+          test -f ultra_network/dist/ultra-full.bada
+          test -f ultra_network/dist/ultra-selftest.bada
+          grep -q "SELFTEST-RESULT 107 107" ultra_network/dist/ultra-selftest.out.txt
+          echo "Bada full source OK"
+      # 生成物がコミット済みのものと一致するか (ソースだけ直して dist を
+      # 作り直し忘れる、の取りこぼしを防ぐ)
+      - name: dist/*.bada is up to date
+        run: |
+          set -e
+          git diff --exit-code -- ultra_network/dist/ultra-full.bada ultra_network/dist/ultra-selftest.bada \
+            || { echo "ultra_network/dist/*.bada が古い。node ultra_network/tools/build-bada.js を実行してコミットしてください。"; exit 1; }
 
   android-apk:
     runs-on: ubuntu-latest

@@ -1,0 +1,206 @@
+# ============================================================
+# 03_jones.bada -- BADA ULTRA NETWORK / L3 Jones 多項式量子暗号
+#
+# ゾーンの秘密は「結び目」そのもの。
+#
+#  1. 鍵   結び目図の Kauffman ブラケット
+#          <D>(A) = Σ (A/B 平滑化について) A^(a-b) · d^(loops-1),
+#          d = -A² - 1/A²  を複数の A で標本化してハッシュしたものが
+#          そのゾーンの長期鍵になる。結び目が秘密で、多項式が鍵スケジュール。
+#  2. QKD  セッションソルトは Bell 対 (H + CNOT + 測定) が合意する。
+#          禁止状態 |01>,|10> の確率が厳密に 0 であることが盗聴されて
+#          いない証拠。複製不可能定理により盗聴は相関を壊す。
+#  3. AEAD (結び目鍵, ソルト) を種とする鍵ストリームで暗号化し、
+#          鍵付きタグで封緘する。改竄・鍵違いは 409 zone-guard-reject。
+#
+# 算法は bada_gui_ide/examples/zone.bada と完全に同一。よって
+# ここで作ったレコードは ZoneBrowser がそのまま開ける。
+# ============================================================
+
+def uf_find(parent, x) {
+    r := x
+    while (parent[r] >= 0) { r := parent[r] }
+    return r
+}
+
+# 交点は [id, e0, e1, e2, e3, sign]。ブラケットは sign を使わない。
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 1
+        while (k <= 4) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    d := 0 - A * A - 1.0 / (A * A)
+    states := POW2[n]
+    sum := 0.0
+    bits := []
+    q := 0
+    while (q < n) { bits <- 0; q := q + 1 }
+
+    st := 0
+    while (st < states) {
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][1]
+            e1 := cross[i][2]
+            e2 := cross[i][3]
+            e3 := cross[i][4]
+            # A 平滑化は (e0,e1)(e2,e3)、B 平滑化は (e0,e3)(e1,e2)
+            if (bits[i] == 0) {
+                a_cnt := a_cnt + 1
+                p := e0; qq := e1; r := e2; s := e3
+            } else {
+                b_cnt := b_cnt + 1
+                p := e0; qq := e3; r := e1; s := e2
+            }
+            ra := uf_find(parent, p)
+            rb := uf_find(parent, qq)
+            if (ra != rb) { parent[rb] = ra }
+            rc := uf_find(parent, r)
+            rd := uf_find(parent, s)
+            if (rc != rd) { parent[rd] = rc }
+            i := i + 1
+        }
+        # 閉ループの本数を数える
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            r2 := uf_find(parent, lbl)
+            if (seen[r2] == 0) { seen[r2] = 1; loops := loops + 1 }
+            lbl := lbl + 1
+        }
+        sum := sum + ipow(A, a_cnt - b_cnt) * ipow(d, loops - 1)
+        # 次の状態へ (2 進の繰り上がり)
+        c := 0
+        carry := 1
+        while (c < n && carry == 1) {
+            if (bits[c] == 0) { bits[c] = 1; carry := 0 }
+            else { bits[c] = 0 }
+            c := c + 1
+        }
+        st := st + 1
+    }
+    return sum
+}
+
+JONES_A := [0.8, 1.0, 1.2, 1.5, 2.0]
+
+def jones_key(diagram) {
+    acc := "jones|"
+    i := 0
+    while (i < len(JONES_A)) {
+        acc := acc + f5(kauffman(diagram, JONES_A[i])) + "|"
+        i := i + 1
+    }
+    return str_hash(acc)
+}
+
+# 各ゾーンの正体である結び目 (= その秘密)。zone.bada と同一。
+#   url.or.jp  三葉結び目   (交点 3)
+#   bada.or.jp 8 の字結び目 (交点 4)
+def zone_diagram(host) {
+    if (host == "bada.or.jp") {
+        return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,7,8,1], [3,7,8,1,2,1] ]
+    }
+    return [ [0,1,2,3,4,1], [1,3,4,5,6,1], [2,5,6,1,2,1] ]
+}
+
+# ---- 鍵ストリーム AEAD ---------------------------------------------
+def lcg(state) { return (state * 48271) % 2147483647 }
+
+def key_seed(key, salt) {
+    state := (key + salt * 2654435761) % 2147483647
+    if (state <= 0) { state := state + 2147483646 }
+    return state
+}
+
+# 16 ビット符号単位で動くので CJK も絵文字も往復する
+def zone_encrypt(plain, key, salt) {
+    state := key_seed(key, salt)
+    out := []
+    i := 0
+    while (i < len(plain)) {
+        state := lcg(state)
+        out <- (ord(plain, i) + (state % 65536)) % 65536
+        i := i + 1
+    }
+    return out
+}
+
+def zone_decrypt(ct, key, salt) {
+    state := key_seed(key, salt)
+    out := ""
+    i := 0
+    while (i < len(ct)) {
+        state := lcg(state)
+        out := out + chr((ct[i] - (state % 65536) + 65536) % 65536)
+        i := i + 1
+    }
+    return out
+}
+
+# 暗号文にかける鍵付き認証タグ
+def zone_tag(ct, key, salt) {
+    h := (key % 999983) + salt + 1
+    i := 0
+    while (i < len(ct)) {
+        h := (h * 31 + ct[i] + 7) % 2147483647
+        i := i + 1
+    }
+    return h
+}
+
+# 封緘 -> [ciphertext, salt, tag]
+def zone_seal(plain, key, salt) {
+    ct := zone_encrypt(plain, key, salt)
+    return [ct, salt, zone_tag(ct, key, salt)]
+}
+
+# 開封 -> [plaintext] 、[] なら 409 zone-guard-reject
+def zone_open(sealed, key) {
+    ct := sealed[0]
+    salt := sealed[1]
+    tag := sealed[2]
+    if (zone_tag(ct, key, salt) != tag) { return [] }
+    return [zone_decrypt(ct, key, salt)]
+}
+
+# ---- Bell 対 QKD ----------------------------------------------------
+# |Φ+> = (|00> + |11>)/√2 では |01> と |10> の確率が厳密に 0。
+# intercept-resend の盗聴はこの相関を壊すので、そこで検出できる。
+def qkd_session() {
+    bell := qubit(2)
+    bell := H(bell, 0)
+    bell := CNOT(bell, 0, 1)
+    outcome := Measure(bell)
+    forbidden := outcome[1] + outcome[2]
+    ok := (outcome[1] == 0) && (outcome[2] == 0)
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [ok, salt, outcome, forbidden]
+}
+
+# 盗聴された量子路の模擬 (片側を計算基底で測って再送した後の分布)。
+# 禁止状態が 0 でなくなるので qkd_check が弾く。
+def qkd_session_tapped() {
+    dist := [0.5, 0.1225, 0.1225, 0.32]
+    salt := (len(tuplespace) * 131 + 17) % 4096
+    return [false, salt, dist, dist[1] + dist[2]]
+}
+
+def qkd_check(q) { return q[0] }

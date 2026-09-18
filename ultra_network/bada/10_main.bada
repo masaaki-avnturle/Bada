@@ -1,0 +1,188 @@
+# ============================================================
+# 10_main.bada -- BADA ULTRA NETWORK / デモ本体
+#
+# ここまでの層を全部つないで、実際に動かして見せる。
+#
+#   1. @reviser 文法トランザクションで SEND / LINK の動詞を parser に足す
+#   2. リングと結び目鍵を表示
+#   3. コンセント対ごとの HD-PLC リンクを測る (LINK 動詞)
+#   4. LINE と Instagram の Webhook を公式仕様どおりに受け、署名を
+#      HMAC-SHA256 で検証してから、全 5 層を通して折返す (SEND 動詞)
+#   5. 3 種類の攻撃が、それぞれ別の層で弾かれることを見せる
+#   6. 写像表 φ と φ⁻¹ の検算、アカシック台帳の件数
+# ============================================================
+
+print("================================================================")
+print("BADA ULTRA NETWORK -- HD-PLC -> NTT -> zone:// -> LINE/Instagram")
+print("  家のコンセントを物理層にして、NTT の加入者線へ写像し、")
+print("  zone:// を通し、LINE と Instagram のメッセージを運ぶ。")
+print("  層の組み方は AT&T ベル研究所の STREAMS と同じ。")
+print("================================================================")
+
+# ---- 文法トランザクション: ウルトラネットワークの動詞を parser に足す
+@reviser : grammar {
+    rule "ultra-send" stmt [ 'SEND' expr expr ] => ultra_demo_send(_1, _2)
+    rule "ultra-link" stmt [ 'LINK' expr ]      => ultra_demo_link(_1)
+}
+
+# 実行の文脈 (全部の SEND がこれを共有する)
+UCTX := ctx_new("living", "study", "metal")
+# 集計。def の中の ":=" は局所変数になるので、書き換えたい値は
+# 配列の要素に置く (要素への代入なら呼び出し側にも届く)。
+STATS := [0, 0]     # [SEND した回数, 往復一致した回数]
+
+# LINK 動詞: コンセント対を測る
+def ultra_demo_link(which) {
+    tm := plc_tonemap(plc_channel(which, "study"))
+    print("  LINK", which, "-> study :",
+          u_trunc(tm[4] / 1000000), "Mbps,",
+          tm[2], "本有効,", tm[3], "本ノッチ,", tm[1], "bit/シンボル")
+    return tm[2]
+}
+
+# SEND 動詞: 1 通を全 5 層に通して折返す
+def ultra_demo_send(m, note) {
+    print("")
+    print("--------------------------------------------------------------")
+    print("SEND", note)
+    print("  平文     :", msg_platform(m), "/", msg_name(m), ":", msg_text(m))
+    r := ultra_send(m, UCTX)
+    STATS[0] = STATS[0] + 1
+    if (r[0] == 200) {
+        c := UCTX[CTX_CRYPTO]
+        n := UCTX[CTX_NTT]
+        z := UCTX[CTX_ZONE]
+        p := UCTX[CTX_PHY]
+        print("  msgmux   -> zone アドレス", msg_zone_url(m))
+        print("  jones    -> 結び目鍵", c[1], " ソルト", c[2], " タグ", c[3], " 暗号文", c[4], "ユニット")
+        print("  zone     -> 鍵", z[0], " 担当ピア", z[1])
+        print("  ntt      -> φ =", ntt_format(n[0]), "(" + ntt_city(n[1]) + ")",
+              ntt_line_name(n[2]), " 封筒", n[3], "バイト")
+        print("  plc      ->", p[0], "OFDM シンボル,", u_trunc(p[1] / 1000000), "Mbps,",
+              u_trunc(p[2] * 1000000), "µs 占有,", p[3], "標本")
+        print("  ntt     <-  φ⁻¹(" + ntt_format(n[0]) + ") =", ntt_unmap(n[0]))
+        print("  msgmux  <-  ", msg_name(r[2]), ":", msg_text(r[2]))
+        print("  STATUS 200 zone-delivered   往復一致:", r[3])
+        if (r[3]) { STATS[1] = STATS[1] + 1 }
+    } else {
+        print("  STATUS", r[0], r[1])
+        if (r[0] == 409) { print("             タグが合わない。改竄か鍵違いとして排除する。") }
+        if (r[0] == 495) { print("             Bell 対の相関が壊れている。鍵を破棄し送信しない。") }
+        if (r[0] == 503) { print("             物理層の検査に失敗。回線が荒れている。") }
+    }
+    return r[0]
+}
+
+# ---- リングと結び目 --------------------------------------------------
+print("")
+print("ウルトラネットワークのリング (RING =", RING, ", ピアのハッシュだけで作る):")
+NET := UCTX[CTX_NET]
+i := 0
+while (i < len(NET)) {
+    print("  node", i, ":", NET[i][0], " id =", NET[i][1])
+    i := i + 1
+}
+
+print("")
+print("ゾーンの正体である結び目 -> Jones 鍵:")
+print("  url.or.jp  (三葉結び目 / 交点 3)  鍵 =", jones_key(zone_diagram("url.or.jp")))
+print("  bada.or.jp (8 の字結び目 / 交点 4) 鍵 =", jones_key(zone_diagram("bada.or.jp")))
+
+# ---- HD-PLC のリンク -------------------------------------------------
+print("")
+print("HD-PLC (帯域", PLC_FLO / 1000000, "-", PLC_FHI / 1000000, "MHz /", PLC_NCARR, "サブキャリア /",
+      "Δf", u_trunc(PLC_DF), "Hz / シンボル長", f5(PLC_TSYM * 1000000), "µs):")
+LINK "living"
+LINK "kitchen"
+
+# ---- LINE / Instagram の Webhook を受ける -----------------------------
+print("")
+print("--------------------------------------------------------------")
+print("LINE Messaging API の Webhook を受ける")
+LINE_SECRET := "demo-channel-secret"
+LR := msg_simulate("line", 1, LINE_SECRET, "d1")
+print("  署名ヘッダ : X-Line-Signature")
+print("  算法       : Base64(HMAC-SHA256(channelSecret, 生の本文))")
+print("  本文       :", len(LR[3]), "バイト")
+print("  受信署名   :", substr(LR[4], 0, 32) + "...")
+print("  検証       :", LR[2], " (status", LR[0], ")")
+BAD := msg_ingest_line(LR[3], LINE_SECRET, line_signature("wrong-secret", LR[3]))
+print("  偽署名     : status", BAD[0], zone_status_text(BAD[0]), " — 正しく拒否")
+
+print("")
+print("Instagram Graph API の Webhook を受ける")
+IG_SECRET := "demo-app-secret"
+IR := msg_simulate("instagram", 1, IG_SECRET, "d2")
+print("  署名ヘッダ : X-Hub-Signature-256")
+print("  算法       : \"sha256=\" + hex(HMAC-SHA256(appSecret, 生の本文))")
+print("  本文       :", len(IR[3]), "バイト")
+print("  受信署名   :", substr(IR[4], 0, 32) + "...")
+print("  検証       :", IR[2], " (status", IR[0], ")")
+
+# ---- 全 5 層を通す ---------------------------------------------------
+INBOX := inbox_new()
+
+if (len(LR[1]) > 0) {
+    SEND LR[1][0] "LINE — メタル回線 (音声帯 16-QAM) 経由"
+    inbox_add(INBOX, LR[1][0])
+}
+
+UCTX[CTX_LINE] = "hikari"
+if (len(IR[1]) > 0) {
+    SEND IR[1][0] "Instagram — ひかり電話 (G.711 µ-law + RTP) 経由"
+    inbox_add(INBOX, IR[1][0])
+}
+
+UCTX[CTX_LINE] = "isdn"
+SEND msg_new("zone", "self", "me", "山口 まさあき", "text", "INS ネット 64 の透過", "", 0) "zone:// — INS ネット 64 (ディジタル透過) 経由"
+
+# ---- 攻撃 ------------------------------------------------------------
+print("")
+print("==============================================================")
+print("攻撃 — それぞれ別の層が弾く")
+print("==============================================================")
+
+ATK := msg_new("line", "U4af4980629", "U4af4980629", "田中 さくら", "text", "改竄試験", "", 0)
+
+UCTX[CTX_TAMPER] = true
+SEND ATK "物理層で回線の標本を 1 つ壊す"
+UCTX[CTX_TAMPER] = false
+
+UCTX[CTX_TAMPERZ] = true
+SEND ATK "悪意あるピアが保管中のレコードを書き換える"
+UCTX[CTX_TAMPERZ] = false
+
+UCTX[CTX_TAPPED] = true
+SEND ATK "量子路を盗聴する (intercept-resend)"
+UCTX[CTX_TAPPED] = false
+
+# ---- 写像表と台帳 ----------------------------------------------------
+print("")
+print("==============================================================")
+print("写像 φ : zone:// |-> NTT 番号   (φ⁻¹ を割当表で検算)")
+print("==============================================================")
+PHI_OK := true
+i := 0
+while (i < len(NTT_REG_URL)) {
+    back := ntt_unmap(NTT_REG_NUM[i])
+    if (back != NTT_REG_URL[i]) { PHI_OK := false }
+    print("  ", ntt_format(NTT_REG_NUM[i]), " <- ", NTT_REG_URL[i])
+    i := i + 1
+}
+print("  φ⁻¹ が厳密な逆写像 : inverse ok:", PHI_OK)
+
+print("")
+print("統合受信箱 :", inbox_count(INBOX), "通 /", len(inbox_threads(INBOX)), "スレッド")
+i := 0
+while (i < len(inbox_threads(INBOX))) {
+    th := inbox_threads(INBOX)[i]
+    print("   [" + th[0] + "]", th[2], "—", len(th[3]), "件")
+    i := i + 1
+}
+
+print("")
+print("アカシック台帳 :", len(tuplespace), "件 (追記専用)")
+print("SEND 実行", STATS[0], "回 / うち往復一致", STATS[1], "回")
+print("==============================================================")
+print("BADA ULTRA NETWORK -- done")
+print("==============================================================")

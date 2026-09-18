@@ -1,0 +1,135 @@
+==============================================================
+BADA ULTRA NETWORK -- 自己診断 (全層を実際に計算して検算)
+==============================================================
+
+1. 基本演算とビット演算
+  ok   切り捨てと符号つき切り捨て
+  ok   XOR / AND / OR / NOT32
+  ok   3 項 XOR が 2 段 XOR と一致
+  ok   バイト単位 XOR が 32 ビット版と一致
+  ok   巡回右シフト
+  ok   32 ビット乗算 (2^53 を超えても正確)  — Math.imul と同値
+  ok   三角関数 (Taylor + 範囲縮約)
+  ok   16 進表記
+  ok   Base64 (詰め物つき)
+  ok   UTF-8 の往復 (CJK + 絵文字)  — サロゲート対を含む
+  ok   壊れた UTF-8 を U+FFFD に替えて落ちない  — 回線の列は攻撃者に触られうる
+  ok   無作為バイト列 150 通りでも投げない
+
+2. SHA-256 と HMAC-SHA256 (既知答え)
+  ok   SHA-256("")
+  ok   SHA-256("abc")
+  ok   RFC 4231 テストベクタ #1
+  ok   RFC 4231 テストベクタ #2
+  ok   RFC 4231 テストベクタ #6 (ブロック長超の鍵)
+  ok   定数時間比較
+
+3. Jones 多項式量子暗号
+  ok   交点の無い図のブラケットは 1
+  ok   結び目ごとに異なる鍵  — 三葉 919492 / 8 の字 400638
+  ok   既存 zone.bada と同じ鍵  — ZoneBrowser と相互運用できる
+  ok   鍵導出は決定的
+  ok   AEAD の往復 (16 ビット符号単位)
+  ok   暗号文の改竄は 409  — zone-guard-reject
+  ok   タグの偽造は 409
+  ok   結び目が違えば開封できない
+  ok   ソルトが変われば タグも変わる
+  ok   Bell 対: 禁止状態が厳密に 0  — |01>+|10> = 0
+  ok   Bell 対: |00> と |11> が各 1/2
+  ok   盗聴すると相関が壊れ検出される  — |01>+|10> = 0.24500
+
+4. zone:// ウルトラネットワーク WWW
+  ok   zone:// の文法
+  ok   パス省略時は /
+  ok   zone:// 以外は拒否  — 400 bad-zone
+  ok   リングは node-id 順
+  ok   リング距離は巡回的
+  ok   貪欲ルーティングが担当ピアへ到達
+  ok   公開と取得
+  ok   未保管のアドレスは 404  — zone-not-found
+  ok   封筒の符号化と復号が往復
+  ok   壊れた封筒は 400
+  ok   状態符号が既存実装と同じ
+
+5. HD-PLC 物理層 (IEEE 1901 ウェーブレット OFDM)
+  ok   ウェーブレット変換が厳密な逆変換  — 最大誤差 4.44e-15
+  ok   帯域 2-28 MHz を 512 分割  — Δf = 50.78 kHz
+  ok   シンボル長 = 1/Δf (ガードインターバル無し)  — 19.69 µs
+  ok   アマチュア無線帯の判定
+  ok   Gray 符号の対応表
+  ok   CRC-32 の検査値  — 0xCBF43926
+  ok   ノッチにビットを割り当てない  — 29 本をノッチ
+  ok   割当ビットは 32-PAM (5 bit) が上限
+  ok   適応ビットローディング  — 50 Mbps / 有効 364 本
+  ok   SNR に応じてビット数が分布  — 0-5 本数 148/75/64/123/81/21
+  ok   ウェーブレット OFDM の完全往復  — 1 シンボル / 512 標本
+  ok   設計 SNR では回線雑音を通しても誤らない
+  ok   24 dB 劣化させると誤りが現れる
+  ok   IEEE 1901 フレームの組立と分解  — 547 バイト
+  ok   ペイロード破損を CRC-32 が検出
+  ok   フレーム制御の破損を CRC-24 が検出
+  ok   プリアンブル欠落を検出
+  ok   CSMA/CA: 最優先 CAP が送信権  — 勝者 B
+
+6. NTT 電話回線への写像
+  ok   写像 φ⁻¹ が厳密な逆写像  — 045-866-5615 ↦ zone://url.or.jp/
+  ok   0AB-J は 10 桁、E.164 は +81
+  ok   写像 φ は安定
+  ok   050 / 090 の帯へも写せる
+  ok   未割当の番号は逆引きできない
+  ok   番号の整形
+  ok   メタル: 音声帯 16-QAM の往復  — 2000 baud / 8000 bps / 94 シンボル
+  ok   受信点が 16-QAM の格子上に乗る
+  ok   INS ネット 64: ディジタル透過  — 49 オクテット
+  ok   ひかり電話: G.711 µ-law + RTP の往復  — 3 パケット (PCMU 20 ms)
+  ok   RTP ヘッダが PT=0 / 20 ms
+  ok   RTP の順序が乱れても並べ直して復元
+  ok   G.711 µ-law の量子化誤差が判定余裕の内側  — 2.54982%
+  ok   呼制御の状態機械
+
+7. JSON (Webhook 本文の解析と生成)
+  ok   数 / 真偽 / null / 配列
+  ok   エスケープと指数
+  ok   経路で潜る
+  ok   無い鍵は null
+  ok   生成して読み直せる
+
+8. LINE / Instagram (公式 API の仕様どおり)
+  ok   LINE: X-Line-Signature が一致
+  ok   LINE: 誤った秘密は拒否
+  ok   LINE: 本文が 1 文字違えば拒否
+  ok   LINE: Webhook から取り込む
+  ok   LINE: replyToken を保持
+  ok   LINE: 署名不一致は 401
+  ok   Instagram: sha256= 接頭辞つき hex
+  ok   Instagram: X-Hub-Signature-256 が一致
+  ok   Instagram: 誤った秘密は拒否
+  ok   Instagram: Webhook から取り込む
+  ok   Instagram: 署名不一致は 401
+  ok   LINE: reply の送信要求が公式仕様の形
+  ok   LINE: replyToken が無ければ push
+  ok   Instagram: /<IG_ID>/messages の形
+  ok   統合メッセージの直列化が往復
+  ok   メッセージの zone アドレス
+  ok   統合受信箱に LINE と Instagram が同居
+
+9. AT&T ベル研究所式 STREAMS — 全 5 層の往復
+  ok   driver の上に 4 モジュールが積まれている  — plc <- ntt <- zone <- jones <- msgmux <- head
+  ok   全 5 層を通した往復が完全一致  — 200 zone-delivered
+  ok   本文と表示名が保たれる
+  ok   下りと上りが各層を 1 回ずつ通る  — vhead vmsgmux vjones vzone vntt vplc ^plc ^ntt ^zone ^jones ^msgmux ^head 
+  ok   各層が自分の計量を残す  — φ=06-7923-9390 / ピア=sapporo.zone.jp / 18 OFDM シンボル
+  ok   回線種別: INS ネット 64 でも往復
+  ok   回線種別: ひかり電話でも往復
+  ok   別のコンセント対でも往復  — 95 Mbps
+
+   攻撃 — それぞれ正しい状態符号で排除される
+  ok   物理層で回線を改竄 -> PLC の CRC が弾く  — 503 plc-pb-crc
+  ok   悪意あるピアの書換え -> AEAD が弾く  — 409 zone-guard-reject
+  ok   量子路の盗聴 -> 送信そのものを止める  — 495 quantum-channel-compromised
+  ok   電力線を 26 dB 劣化 -> 復号できない  — 503 plc-no-preamble
+
+==============================================================
+合格 107 / 107  — すべて合格
+SELFTEST-RESULT 107 107
+==============================================================

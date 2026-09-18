@@ -1,0 +1,364 @@
+# ============================================================
+# 09_streams.bada -- BADA ULTRA NETWORK / AT&T ベル研究所式 STREAMS
+#
+# 層の組み方は、ベル研究所が UNIX の装置入出力に使った STREAMS
+# (Dennis Ritchie の Streams I/O) と同じにしてある。
+#
+#        stream head   アプリケーション (統合受信箱)
+#             | wput               rput |
+#        +--- msgmux ---+  L4  LINE / Instagram 多重化
+#        +--- jones  ---+  L3  Jones 多項式量子暗号
+#        +--- zone   ---+  L2  zone:// P2P リング DHT
+#        +--- ntt    ---+  L1  NTT 電話回線への写像
+#             | put                 srv |
+#          driver  plc   L0  Panasonic HD-PLC (家のコンセント)
+#
+# 各モジュールは wput (下り) と rput (上り) の対だけを持つ。上位は
+# 下位を知らず、下位は上位を知らない。下りで各層がしたことを、
+# 上りで対になる層がちょうど元に戻す。
+#
+# Bada は関数を配列に入れて呼べないので、モジュールの呼び分けは
+# 名前による明示的なディスパッチで行う (stream_wput / stream_rput)。
+#
+# メッセージブロック:  ["blk", 種別, 中身, status, 理由]
+#   種別は "M_DATA" / "M_PROTO" / "M_CTL"
+# ============================================================
+
+def blk_new(kind, payload)      { return ["blk", kind, payload, 200, ""] }
+def blk_ctl(status, reason)     { return ["blk", "M_CTL", [], status, reason] }
+def blk_kind(b)    { return b[1] }
+def blk_payload(b) { return b[2] }
+def blk_status(b)  { return b[3] }
+def blk_is_ctl(b)  { return b[1] == "M_CTL" }
+
+# ---- 文脈 (層をまたいで共有する状態) --------------------------------
+# 添字で引く。Bada に連想配列は無いので定数で名前をつける。
+CTX_NET     := 0    # zone のピア環
+CTX_TONEMAP := 1    # HD-PLC のトーンマップ
+CTX_LINE    := 2    # 回線種別 metal / isdn / hikari
+CTX_CAP     := 3    # CSMA/CA の優先度
+CTX_MARGIN  := 4    # 電力線の劣化 dB
+CTX_TAPPED  := 5    # 量子路を盗聴するか
+CTX_TAMPER  := 6    # 物理層で回線を改竄するか
+CTX_TAMPERZ := 7    # 悪意あるピアがレコードを書き換えるか
+CTX_SEED    := 8
+CTX_QKDOK   := 9
+CTX_PHY     := 10   # 最後の物理層の計量
+CTX_NTT     := 11   # 最後の番号写像
+CTX_ZONE    := 12   # 最後の DHT 解決
+CTX_CRYPTO  := 13   # 最後の封緘
+CTX_TRACE   := 14   # ブロックの流れ
+CTX_FROM    := 15
+CTX_TO      := 16
+
+def ctx_new(from_outlet, to_outlet, line) {
+    ch := plc_channel(from_outlet, to_outlet)
+    tm := plc_tonemap(ch)
+    return [zone_boot(), tm, line, 2, 0, false, false, false, "0", true,
+            [], [], [], [], [], from_outlet, to_outlet]
+}
+
+def ctx_relink(ctx, from_outlet, to_outlet, line) {
+    ctx[CTX_FROM] = from_outlet
+    ctx[CTX_TO] = to_outlet
+    ctx[CTX_LINE] = line
+    ctx[CTX_TONEMAP] = plc_tonemap(plc_channel(from_outlet, to_outlet))
+    return ctx
+}
+
+def trace_add(ctx, dir, mod, note, b) {
+    size := 0
+    if (len(b) > 2) {
+        pl := b[2]
+        if (len(pl) > 0) { size := len(pl) }
+    }
+    ctx[CTX_TRACE] <- [dir, mod, note, b[1], size]
+    return 0
+}
+
+# ============================================================
+# L4 msgmux -- 統合メッセージ <-> [url, 本文]
+# ============================================================
+def msgmux_wput(b, ctx) {
+    m := blk_payload(b)
+    return blk_new("M_DATA", [msg_zone_url(m), msg_serialize(m)])
+}
+
+def msgmux_rput(b, ctx) {
+    p := blk_payload(b)
+    return blk_new("M_PROTO", msg_deserialize(p[1]))
+}
+
+# ============================================================
+# L3 jones -- 結び目鍵で封緘 / 開封
+# ============================================================
+def jones_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    z := zone_parse(url)
+    if (len(z) == 0) { return blk_ctl(400, zone_status_text(400)) }
+    q := qkd_session()
+    if (ctx[CTX_TAPPED]) { q := qkd_session_tapped() }
+    ctx[CTX_QKDOK] = q[0]
+    if (!qkd_check(q)) { return blk_ctl(495, zone_status_text(495)) }
+    key := jones_key(zone_diagram(z[0]))
+    sealed := zone_seal(p[1], key, q[1])
+    ctx[CTX_CRYPTO] = [z[0], key, q[1], sealed[2], len(sealed[0])]
+    return blk_new("M_DATA", [url, sealed])
+}
+
+def jones_rput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    z := zone_parse(url)
+    if (len(z) == 0) { return blk_ctl(400, zone_status_text(400)) }
+    key := jones_key(zone_diagram(z[0]))
+    opened := zone_open(p[1], key)
+    if (len(opened) == 0) { return blk_ctl(409, zone_status_text(409)) }
+    return blk_new("M_DATA", [url, opened[0]])
+}
+
+# ============================================================
+# L2 zone -- DHT で担当ピアを決め、台帳に追記する
+# ============================================================
+def zone_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    net := ctx[CTX_NET]
+    key := zone_id(url)
+    r := zone_route(net, key)
+    peer_store_put(net[r[0]], url, sealed)
+    fact := ["zone-record", url, net[r[0]][0], key, sealed[2]]
+    fact >> tuplespace
+    ctx[CTX_ZONE] = [key, net[r[0]][0], r[1]]
+    return blk_new("M_DATA", [url, sealed])
+}
+
+def zone_rput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    net := ctx[CTX_NET]
+    key := zone_id(url)
+    r := zone_route(net, key)
+    hit := peer_store_get(net[r[0]], url)
+    if (len(hit) == 0) { return blk_ctl(404, zone_status_text(404)) }
+    fact := ["zone-fetch", url, net[r[0]][0]]
+    fact >> tuplespace
+    # 悪意あるピアがレコードを書き換える攻撃。上の jones が弾くはず。
+    if (ctx[CTX_TAMPERZ]) {
+        ct := []
+        i := 0
+        while (i < len(sealed[0])) { ct <- sealed[0][i]; i := i + 1 }
+        ct[0] = (ct[0] + 1) % 65536
+        sealed := [ct, sealed[1], sealed[2]]
+    }
+    return blk_new("M_DATA", [url, sealed])
+}
+
+# ============================================================
+# L1 ntt -- 番号を割り当て、加入者線のベアラに載せる
+# ============================================================
+def ntt_wput(b, ctx) {
+    p := blk_payload(b)
+    url := p[0]
+    sealed := p[1]
+    kind := "geo"
+    if (ctx[CTX_LINE] == "hikari") { kind := "ip" }
+    num := ntt_map(url, kind)
+    bytes := envelope_encode(url, sealed)
+    sig := ntt_bearer_send(bytes, ctx[CTX_LINE], mix32(url))
+    ctx[CTX_NTT] = [num[0], num[1], ctx[CTX_LINE], len(bytes)]
+    return blk_new("M_DATA", [sig, num[0]])
+}
+
+def ntt_rput(b, ctx) {
+    p := blk_payload(b)
+    sig := p[0]
+    bytes := ntt_bearer_recv(sig)
+    env := envelope_decode(bytes)
+    if (env[0] != 200) { return blk_ctl(400, zone_status_text(400)) }
+    return blk_new("M_DATA", [env[1], env[2]])
+}
+
+# ============================================================
+# L0 plc driver -- ウェーブレット OFDM で電力線へ出し入れする
+# ============================================================
+def plc_put(b, ctx) {
+    p := blk_payload(b)
+    sig := p[0]
+    # 回線信号をバイト列に詰める
+    bytes := ntt_signal_to_bytes(sig)
+    frame := plc_frame(bytes, 1, 2, ctx[CTX_CAP])
+    m := plc_modulate(frame, ctx[CTX_TONEMAP])
+    samples := m[0]
+    if (ctx[CTX_MARGIN] > 0) {
+        samples := plc_through_channel(samples, ctx[CTX_TONEMAP], ctx[CTX_MARGIN], ctx[CTX_SEED])
+    }
+    ctx[CTX_PHY] = [m[1], ctx[CTX_TONEMAP][4], m[1] * PLC_TSYM, len(samples), len(frame)]
+    return blk_new("M_DATA", [samples, m[2], sig[0], sig[1], sig[2]])
+}
+
+def plc_srv(wire, ctx) {
+    samples := wire[0]
+    bitlen := wire[1]
+    bytes := plc_demodulate(samples, ctx[CTX_TONEMAP], bitlen)
+    df := plc_deframe(bytes)
+    if (df[0] != 200) { return blk_ctl(503, "plc-" + df[2]) }
+    sig := ntt_bytes_to_signal(df[1], wire[2], wire[3], wire[4])
+    return blk_new("M_DATA", [sig, ""])
+}
+
+# 回線信号オブジェクト <-> バイト列 (PLC はバイト列しか運ばない)
+def ntt_signal_to_bytes(sig) {
+    kind := sig[0]
+    if (kind == "digital") { return sig[3] }
+    if (kind == "rtp") {
+        out := []
+        pkts := sig[3]
+        i := 0
+        while (i < len(pkts)) {
+            hdr := pkts[i][2]
+            pay := pkts[i][3]
+            k := 0
+            while (k < len(hdr)) { out <- hdr[k]; k := k + 1 }
+            k := 0
+            while (k < len(pay)) { out <- pay[k]; k := k + 1 }
+            i := i + 1
+        }
+        return out
+    }
+    # voiceband: 16 ビット符号付きサンプルを 2 バイトに詰める
+    out := []
+    s := sig[3]
+    i := 0
+    while (i < len(s)) {
+        v := u_fix(s[i])
+        if (v < 0) { v := v + 65536 }
+        out <- u_trunc(v / 256) % 256
+        out <- v % 256
+        i := i + 1
+    }
+    return out
+}
+
+def ntt_bytes_to_signal(bytes, kind, line, bitlen) {
+    if (kind == "digital") { return ["digital", line, bitlen, bytes] }
+    if (kind == "rtp") {
+        pkts := []
+        p := 0
+        while (p + 12 <= len(bytes)) {
+            hdr := []
+            i := 0
+            while (i < 12) { hdr <- bytes[p + i]; i := i + 1 }
+            paylen := u_min(RTP_PTIME, len(bytes) - p - 12)
+            pay := []
+            i := 0
+            while (i < paylen) { pay <- bytes[p + 12 + i]; i := i + 1 }
+            pkts <- [hdr[2] * 256 + hdr[3],
+                     hdr[4] * 16777216 + hdr[5] * 65536 + hdr[6] * 256 + hdr[7],
+                     hdr, pay]
+            p := p + 12 + paylen
+        }
+        return ["rtp", line, bitlen, pkts]
+    }
+    s := []
+    i := 0
+    while (i + 1 < len(bytes)) {
+        v := bytes[i] * 256 + bytes[i + 1]
+        if (v >= 32768) { v := v - 65536 }
+        s <- v
+        i := i + 2
+    }
+    return ["voiceband", line, bitlen, s]
+}
+
+# ============================================================
+# ストリームの往復
+# ============================================================
+STREAM_MODS := ["ntt", "zone", "jones", "msgmux"]     # 下から上
+
+def stream_wput(mod, b, ctx) {
+    if (mod == "msgmux") { return msgmux_wput(b, ctx) }
+    if (mod == "jones")  { return jones_wput(b, ctx) }
+    if (mod == "zone")   { return zone_wput(b, ctx) }
+    return ntt_wput(b, ctx)
+}
+
+def stream_rput(mod, b, ctx) {
+    if (mod == "msgmux") { return msgmux_rput(b, ctx) }
+    if (mod == "jones")  { return jones_rput(b, ctx) }
+    if (mod == "zone")   { return zone_rput(b, ctx) }
+    return ntt_rput(b, ctx)
+}
+
+def stream_note_w(mod) {
+    if (mod == "msgmux") { return "統合メッセージを直列化し zone アドレスを付ける" }
+    if (mod == "jones")  { return "結び目鍵で封緘" }
+    if (mod == "zone")   { return "DHT で担当ピアを決め、台帳に追記" }
+    return "番号を割当て、加入者線のベアラに載せる"
+}
+
+def stream_note_r(mod) {
+    if (mod == "msgmux") { return "統合メッセージへ復元" }
+    if (mod == "jones")  { return "結び目鍵で開封 — 改竄は 409" }
+    if (mod == "zone")   { return "担当ピアの照合と台帳への追記" }
+    return "ベアラから取り出し、φ⁻¹ で zone に戻す"
+}
+
+# 下り: stream head -> modules (上から下) -> driver
+def stream_write(b, ctx) {
+    ctx[CTX_TRACE] = []
+    trace_add(ctx, "down", "head", "アプリが書き込み", b)
+    i := len(STREAM_MODS) - 1
+    while (i >= 0) {
+        mod := STREAM_MODS[i]
+        b := stream_wput(mod, b, ctx)
+        trace_add(ctx, "down", mod, stream_note_w(mod), b)
+        if (blk_is_ctl(b)) { return b }
+        i := i - 1
+    }
+    b := plc_put(b, ctx)
+    trace_add(ctx, "down", "plc", "ウェーブレット OFDM で電力線へ", b)
+    return b
+}
+
+# 上り: driver -> modules (下から上) -> stream head
+def stream_read(wire, ctx) {
+    b := plc_srv(wire, ctx)
+    trace_add(ctx, "up", "plc", "電力線からウェーブレット OFDM 復調", b)
+    if (blk_is_ctl(b)) { return b }
+    i := 0
+    while (i < len(STREAM_MODS)) {
+        mod := STREAM_MODS[i]
+        b := stream_rput(mod, b, ctx)
+        trace_add(ctx, "up", mod, stream_note_r(mod), b)
+        if (blk_is_ctl(b)) { return b }
+        i := i + 1
+    }
+    trace_add(ctx, "up", "head", "アプリへ到達", b)
+    return b
+}
+
+# 1 通をスタックの下まで送り、下から上へ戻す (折返し試験)
+# -> [status, 理由, 受信した統合メッセージ, 往復一致か]
+def ultra_send(m, ctx) {
+    down := stream_write(blk_new("M_PROTO", m), ctx)
+    if (blk_is_ctl(down)) { return [down[3], down[4], [], false] }
+    wire := blk_payload(down)
+    # 物理層での改竄試験: 回線上の標本を 1 つ壊す
+    if (ctx[CTX_TAMPER]) {
+        s := []
+        i := 0
+        while (i < len(wire[0])) { s <- wire[0][i]; i := i + 1 }
+        idx := u_min(40, len(s) - 1)
+        s[idx] = s[idx] + 4
+        wire := [s, wire[1], wire[2], wire[3], wire[4]]
+    }
+    up := stream_read(wire, ctx)
+    if (blk_is_ctl(up)) { return [up[3], up[4], [], false] }
+    got := blk_payload(up)
+    same := msg_serialize(got) == msg_serialize(m)
+    return [200, zone_status_text(200), got, same]
+}
