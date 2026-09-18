@@ -416,7 +416,10 @@
   Parser.prototype.parsePostfix = function () {
     var e = this.parsePrimary();
     for (;;) {
-      if (this.match("LPAREN")) {
+      /* call の '(' は直前トークンと同じ行にある場合のみ — 行頭の '(' は
+         矢印条件文 (条件) -> { … } の開始であり、呼び出しに貪らせない */
+      if (this.check("LPAREN") && this.i > 0 && this.cur().line === this.toks[this.i - 1].line) {
+        this.advance();
         var call = node("CALL", e.line);
         call.kids.push(e);
         while (!this.check("RPAREN") && !this.check("EOF")) {
@@ -784,6 +787,36 @@
       b.kids.push(this.parseExpr());
       this.match("SEMI");
       return b;
+    }
+    /* 矢印オブジェクト (代入): name <- expr — := の矢印形。器 (配列) が
+       相手なら従来どおり流し込み (追記)、それ以外の名前へは束縛する。 */
+    if (this.check("IDENT") && this.peekn(1).type === "LARROW") {
+      var ab = node("ARROWBIND", line);
+      ab.str = this.cur().lexeme;
+      this.advance(); this.advance();
+      ab.kids.push(this.parseExpr());
+      this.match("SEMI");
+      return ab;
+    }
+    /* 矢印オブジェクト (条件文): (条件) -> { ... } [else { ... } / else (…) -> { … }]
+       — if の矢印形。条件文でなければ巻き戻して通常の式として解析する。 */
+    if (this.check("LPAREN")) {
+      var save = this.i, errLen = this.errors.length;
+      this.advance();
+      var cond = this.parseExpr();
+      if (this.match("RPAREN") && this.check("QUERY") && this.peekn(1).type === "LBRACE") {
+        this.advance();
+        var fi = node("IF", line);
+        fi.kids.push(cond);
+        fi.kids.push(this.parseBlock());
+        if (this.match("ELSE")) {
+          if (this.check("LBRACE")) fi.kids.push(this.parseBlock());
+          else fi.kids.push(this.parseStmt());
+        }
+        return fi;
+      }
+      this.i = save;
+      this.errors.length = errLen;
     }
     var e = this.parseExpr();
     if (this.check("ASSIGN")) {
@@ -1353,7 +1386,11 @@
       case "ARRAY": {
         var items = [];
         for (var i = 0; i < n.kids.length; i++) items.push(this.eval(n.kids[i], env));
-        return Varr(items);
+        var av0 = Varr(items);
+        /* 空リテラル [] で生まれた配列は「器 (flow vessel)」— 矢印代入
+           name <- 式 の相手がこの器のときだけ流し込み (追記) になる */
+        if (items.length === 0) av0.flow = true;
+        return av0;
       }
       case "UNARY": {
         var u = this.eval(n.kids[0], env);
@@ -1480,6 +1517,15 @@
         var v = this.eval(n.kids[0], env);
         env.set(n.str, v);
         return { ret: false, val: v };
+      }
+      case "ARROWBIND": {
+        /* 矢印オブジェクト: [] で生まれた器へは流し込み (追記・従来の <- と
+           同じ)、それ以外の名前へは束縛 (:= の矢印形)。 */
+        var curv = env.get(n.str);
+        var av2 = this.eval(n.kids[0], env);
+        if (curv && curv.t === "arr" && curv.flow) { curv.items.push(av2); return { ret: false, val: curv }; }
+        env.set(n.str, av2);
+        return { ret: false, val: av2 };
       }
       case "ASSIGN": {
         var lhs = n.kids[0];
@@ -1825,7 +1871,7 @@
 
   function lowerStmt(E, n) {
     switch (n.type) {
-      case "BIND": {
+      case "BIND": case "ARROWBIND": {
         var e = lowerExpr(E, n.kids[0], null);
         if (E.declared[n.str]) E.push("  v_" + n.str + "=" + e + ";");
         else { E.declared[n.str] = true; E.push("  BV v_" + n.str + "=" + e + "; (void)v_" + n.str + ";"); }

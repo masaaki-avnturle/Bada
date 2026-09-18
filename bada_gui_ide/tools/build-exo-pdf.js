@@ -39,7 +39,9 @@ function hlLine(line) {
   if (ci >= 0) { codePart = line.slice(0, ci); comment = line.slice(ci); }
   let h = esc(codePart);
   h = h.replace(/"([^"]*)"/g, '<span class="s">"$1"</span>');
-  h = h.replace(/\b(def|return|while|if)\b(?![^<]*<\/span>)/g, '<span class="k">$1</span>');
+  h = h.replace(/&lt;-/g, '<span class="k">&lt;-</span>');          // 矢印代入
+  h = h.replace(/-&gt;/g, '<span class="k">-&gt;</span>');          // 矢印条件文
+  h = h.replace(/\b(def|return|while|if|else)\b(?![^<]*<\/span>)/g, '<span class="k">$1</span>');
   h = h.replace(/\b(qubit|H|CNOT|Measure|softmax)\b(?=\s*\()/g, '<span class="q">$1</span>');
   h = h.replace(/\b(print|len|sqrt|log|exp|abs|f5|sci)\b(?=\s*\()/g, '<span class="b">$1</span>');
   if (comment) h += '<span class="c">' + esc(comment) + "</span>";
@@ -87,6 +89,8 @@ const html = '<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"/>' +
 "<tr><td>生命体候補の発見</td><td>SETIスコア = ESI × 電波地平 (120光年) で「聞くべき候補」を順位付け — 検出は2026年時点でゼロと明記</td></tr>" +
 "<tr><td>Bada量子エンジン</td><td>qubit(2) → H×2 → softmax振幅 → Measure (測定台帳へコミット)、CNOT の Bell対で零保存=盗聴なしを確認</td></tr>" +
 "</table>" +
+"<b>矢印オブジェクト構文</b>: 代入 <code>name &lt;- 式</code> (:= の矢印形。[]で生まれた器へは流し込み追記) / " +
+"条件文 <code>(条件) -&gt; { … } else { … }</code> (if の矢印形。従来の := / if も後方互換)。 " +
 "<b>実行方法</b>: <code>node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/exo/exo-gamma.bada</code>" +
 " / ブラウザ内: GammaTwin (earth-twin.html)・PlanetCinema (planet-cinema.html) の「Bada量子エンジン」カード。" +
 " 完走センチネル: @@EXO-GAMMA-OK / @@GRAV-CHANNEL-OK / @@CIV-OK" +
