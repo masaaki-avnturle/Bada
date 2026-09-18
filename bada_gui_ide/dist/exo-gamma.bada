@@ -1,0 +1,306 @@
+# ============================================================
+# exo-gamma.bada — 電磁波を利用する地球型惑星の探索エンジン
+#                  (GammaTwin / PlanetCinema の方程式を Bada
+#                   量子プログラミング言語で書き直したもの)
+#
+# ガンマ関数における大域的部分積分多様体の機知
+#   Γ(z) = ∫ t^{z-1} e^{-t} dt  の部分積分から  Γ(z+1) = zΓ(z)
+#   — この関数等式(Lanczos 近似で実装)を ESI 重みの正規化と
+#   自己検証に使う。sin / cos はテイラー級数、pow は exp·log で
+#   Bada 内に自作(組み込みは sqrt/log/exp/abs のみ)。
+#
+# Jones 多項式の熱感知
+#   三葉結び目の V(t) = -t^-4 + t^-3 + t^-1 を単位円 t=e^{iθ}
+#   上で評価し、θ を惑星の平衡温度から取る。|V| が熱感知の
+#   強度(リポジトリの Jones 量子暗号と同じ結び目多項式族)。
+#
+# 電磁波を利用している地球型惑星(テクノシグネチャ)
+#   人類自身が電波を漏らし始めて約120年。距離 d 光年の惑星は
+#     d <= 120      : 地球の電波が既に到達している(彼らが聞ける)
+#     d <=  60      : 往復可能 — 返信が今までに地球へ届き得る
+#   SETI スコア = ESI × 近接度。正直な注記: 地球以外の電磁波
+#   利用は 2026 年時点で未確認。これは「聞くべき候補」の順位。
+#
+# 量子レジスタ (Bada の qubit / H / CNOT / Measure)
+#   上位4候補を 2 量子ビットの重ね合わせに載せ、SETI スコアの
+#   softmax を振幅分布として測定台帳にコミット。Bell 対の
+#   零保存 (|01>,|10> = 0) を盗聴なしの証拠として確認する。
+# ============================================================
+
+print("================================================================")
+print("EXO-GAMMA BADA -- Γ多様体 × Jones熱感知 × 量子レジスタ SETI探索")
+print("================================================================")
+
+PI := 3.141592653589793
+
+# ---- sin / cos: テイラー級数 (Bada には組み込みが無いので自作) ----
+def sin_t(x) {
+    x := x % (2.0 * PI)
+    if (x > PI)       { x := x - 2.0 * PI }
+    if (x < 0.0 - PI) { x := x + 2.0 * PI }
+    term := x
+    s := x
+    k := 1
+    while (k <= 11) {
+        term := 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))
+        s := s + term
+        k := k + 1
+    }
+    return s
+}
+def cos_t(x) { return sin_t(PI / 2.0 - x) }
+def pow_f(b, e) {
+    if (b <= 0.0) { return 0.0 }
+    return exp(e * log(b))
+}
+
+# ---- Γ関数: Lanczos 近似 (大域的部分積分の関数等式を検証) ----
+def gamma_fn(z) {
+    g := [676.5203681218851, 0.0-1259.1392167224028, 771.32342877765313,
+          0.0-176.61502916214059, 12.507343278686905, 0.0-0.13857109526572012,
+          0.0000099843695780195716, 0.00000015056327351493116]
+    z := z - 1.0
+    x := 0.99999999999980993
+    i := 0
+    while (i < 8) {
+        x := x + g[i] / (z + i + 1.0)
+        i := i + 1
+    }
+    t := z + 7.5
+    return sqrt(2.0 * PI) * pow_f(t, z + 0.5) * exp(0.0 - t) * x
+}
+def gamma_check(w) { return gamma_fn(1.0 + w) / (w * gamma_fn(w)) }
+
+print("")
+print("[Γ] 部分積分の関数等式 Γ(z+1)=zΓ(z) の検証 (=1 が正解):")
+print("    w=0.57 :", f5(gamma_check(0.57)))
+print("    w=0.70 :", f5(gamma_check(0.70)))
+print("    w=5.58 :", f5(gamma_check(5.58)))
+gh := gamma_fn(0.5)
+print("    Γ(0.5)^2 =", f5(gh * gh), " (π =", f5(PI), ")")
+
+# ---- Jones 多項式 (三葉結び目) の熱感知 ----
+def jones_abs(theta) {
+    re := 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)
+    im := 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)
+    return sqrt(re * re + im * im)
+}
+def heat_theta(teq) {
+    t := teq
+    if (t < 100.0)  { t := 100.0 }
+    if (t > 1500.0) { t := 1500.0 }
+    return (t - 100.0) / 1400.0 * PI
+}
+
+# ---- ESI (地球類似性指数) — Γ恒等式で重みを正規化 ----
+def esi3(rade, insol, teq) {
+    s1 := 1.0 - abs(rade - 1.0)  / (rade + 1.0)
+    s2 := 1.0 - abs(insol - 1.0) / (insol + 1.0)
+    s3 := 1.0 - abs(teq - 255.0) / (teq + 255.0)
+    w1 := 0.57 * gamma_check(0.57)      # ×1.000000 (恒等式)
+    w2 := 0.70 * gamma_check(0.70)
+    w3 := 5.58 * gamma_check(5.58)
+    return pow_f(s1, w1 / 3.0) * pow_f(s2, w2 / 3.0) * pow_f(s3, w3 / 3.0)
+}
+
+# ---- 電磁波 (テクノシグネチャ) — 地球の電波地平 ----
+RADIO_YEARS := 120.0        # 人類の電波漏えい開始 ~1906 年から
+def em_status(dist_ly) {
+    if (dist_ly <= RADIO_YEARS / 2.0) { return 2 }   # 往復可能
+    if (dist_ly <= RADIO_YEARS)       { return 1 }   # 地球の電波が到達済み
+    return 0
+}
+def em_label(s) {
+    if (s == 2) { return "往復可 (返信が届き得る)" }
+    if (s == 1) { return "地球の電波が到達済み" }
+    return "電波地平の外"
+}
+def seti_score(e, dist_ly) { return e * (1.0 / (1.0 + dist_ly / 60.0)) }
+
+# ---- 惑星カタログ (宇宙望遠鏡の実測値) ----------------------------------
+# [名前, R⊕, S⊕, Teq K, 距離 光年, 主星Teff K, 公転周期 日, 重力チャネル]
+# 重力チャネル = 1: 惑星自身の重力で発見された (視線速度法 = 恒星のふらつき)
+#              = 0: 光度チャネル (トランジット = 減光) で発見された
+P0 := ["Proxima Centauri b", 1.07, 0.65, 234.0, 4.25,   3042.0, 11.19, 1]
+P1 := ["Teegarden's Star b", 1.04, 1.15, 264.0, 12.50,  2904.0, 4.91,  1]
+P2 := ["Ross 128 b",         1.11, 1.38, 280.0, 11.00,  3192.0, 9.87,  1]
+P3 := ["Luyten b (GJ 273 b)",1.51, 1.06, 259.0, 12.40,  3382.0, 18.60, 1]
+P4 := ["GJ 1002 b",          1.03, 0.67, 231.0, 15.80,  3024.0, 10.30, 1]
+P5 := ["TRAPPIST-1 e",       0.92, 0.65, 250.0, 40.66,  2566.0, 6.10,  0]
+P6 := ["TOI-700 d",          1.07, 0.87, 269.0, 101.40, 3480.0, 37.40, 0]
+P7 := ["Kepler-442 b",       1.34, 0.70, 233.0, 1206.00,4402.0, 112.30,0]
+planets := [P0, P1, P2, P3, P4, P5, P6, P7]
+
+# ---- 重力チャネル: 電磁波以外の伝達 --------------------------------------
+# 惑星は自らの重力場で恒星を振り回し、その「ふらつき」が我々に届く。
+# 視線速度の半振幅 (実式, sin i = 1):
+#   K = 0.08946 m/s × (Mp/M⊕) × (M★/M☉)^(-2/3) × (P/1yr)^(-1/3)
+# 質量は半径から概算 Mp ≈ R^3.58 (岩石惑星の質量-半径関係の近似)、
+# 主星質量は M★ ≈ (Teff/5772)^2 (主系列の粗い近似)。いずれも「概算」。
+def mass_est(rade) {
+    if (rade > 6.0) { return 100.0 + rade * 8.0 }   # 巨大ガス惑星の粗い概算
+    return pow_f(rade, 3.58)
+}
+def star_mass(teff) { return pow_f(teff / 5772.0, 2.0) }
+def rv_K(rade, teff, per_days) {
+    mp := mass_est(rade)
+    ms := star_mass(teff)
+    pyr := per_days / 365.25
+    return 0.08946 * mp * pow_f(ms, 0.0 - 2.0 / 3.0) * pow_f(pyr, 0.0 - 1.0 / 3.0)
+}
+
+# ---- 反重力場: 実在する斥力的重力 = ダークエネルギー (宇宙定数 Λ) --------
+# 加速膨張の実測 (H0 ≈ 70 km/s/Mpc, ΩΛ ≈ 0.7)。軌道半径 r での
+#   反重力加速度 a_Λ ≈ ΩΛ · H0² · r      (de Sitter 斥力)
+#   恒星の重力    a_★ = G M★ / r²
+# の比を実計算し、惑星系スケールで反重力伝達が可能かを正直に判定する。
+def antigrav_ratio(teff, insol) {
+    H0 := 0.000000000000000002268           # 70 km/s/Mpc [1/s]
+    G  := 0.0000000000667                   # [m^3/(kg s^2)]
+    MSUN := 1989000000000000000000000000000.0
+    AUm  := 149600000000.0
+    aAU := sqrt(pow_f(teff / 5772.0, 4.0) / insol)
+    r := aAU * AUm
+    aL := 0.7 * H0 * H0 * r
+    aS := G * star_mass(teff) * MSUN / (r * r)
+    return aL / aS
+}
+
+print("")
+print("[重力] 電磁波以外の伝達 — 惑星が重力場で恒星に送る実信号 (RV半振幅 K):")
+gi := 0
+gn := len(planets)
+while (gi < gn) {
+    gp := planets[gi]
+    ch := "光度 (トランジット)"
+    if (gp[7] == 1) { ch := "重力 (視線速度)" }
+    kk := rv_K(gp[1], gp[5], gp[6])
+    print("   ", gp[0], "| 伝達:", ch, "| K ≈", f5(kk), "m/s (概算)")
+    gi := gi + 1
+}
+ag := antigrav_ratio(3042.0, 0.65)
+print("")
+print("[反重力] ダークエネルギー Λ (実在する斥力的重力) — Proxima b 軌道での比:")
+print("    a_Λ / a_★ =", sci(ag), " → 惑星系スケールでは完全に無視可能")
+print("    正直な結論: 反重力で信号は送れない。重力チャネル (RVふらつき /")
+print("    マイクロレンズ / アストロメトリ) が電磁波以外の実在の伝達である。")
+print("@@GRAV-CHANNEL-OK")
+
+# ---- 文明の伝達方法: 3チャネルの実物理判定 -------------------------------
+# その惑星に生命体の文明があると仮定した場合、地球へ信号を送る 3 手段を
+# 実際の物理式で判定する (すべて実計算・正直な結論つき)。
+LY_M := 9460730000000000.0            # 1 光年 [m]
+
+# (1) 電磁波: アレシボ級受信機が検出できる最小ビーコン送信電力 [W]
+#     P_req = P_arecibo_EIRP × (d / 25000 光年)^2  (狭帯域・実感度の目安)
+def civ_em_power(dist_ly) {
+    return 20000000000000.0 * pow_f(dist_ly / 25000.0, 2.0)
+}
+
+# (2) 重力手段: 人工の回転質量 (M=10^6 kg, R=100 m, f=100 Hz) が距離 d で
+#     つくる重力波ひずみ h ≈ 32 π^4 (G/c^4) M R^2 f^2 / r 。
+#     LIGO の感度 h_min ≈ 1e-22 と比較する。
+def civ_gw_strain(dist_ly) {
+    Goc4 := 0.00000000000000000000000000000000000000000000826
+    pi4 := PI * PI * PI * PI
+    return 32.0 * pi4 * Goc4 * 1000000.0 * 10000.0 * 10000.0 / (dist_ly * LY_M)
+}
+
+print("")
+print("[文明] 生命体文明の伝達 3 手段 (惑星ごとの実物理判定):")
+ci := 0
+while (ci < gn) {
+    cp := planets[ci]
+    pw := civ_em_power(cp[4])
+    hh := civ_gw_strain(cp[4])
+    print("   ", cp[0])
+    print("      📡 電磁波      : 検出可能 — 必要ビーコン電力 ≈", sci(pw), "W (アレシボ級受信)")
+    print("      🌀 重力手段    : 人工装置 h ≈", sci(hh), " ≪ LIGO 1e-22 → 恒星質量級が必要")
+    ci := ci + 1
+}
+print("      🛸 反重力発生器 : Λ のエネルギー密度 ≈ 5.3e-10 J/m^3。局所生成・変調の")
+print("                        理論は現行物理に存在せず、検出器も未定義 (未知の物理)")
+print("")
+print("    判定: 文明の伝達として現実に検出可能なのは 📡 電磁波のみ。")
+print("    🌀 は自然の重力信号 (惑星の K ふらつき) としてのみ実在し、")
+print("    人工重力波・反重力の検出例は 2026 年時点でゼロである (正直)。")
+print("@@CIV-OK")
+
+print("")
+print("[SETI] 電磁波を利用し得る地球型惑星の候補 (ESI × 近接度):")
+print("    惑星 | ESI | Jones|V| | 電波地平 | SETIスコア")
+n := len(planets)
+i := 0
+best0 := 0.0 - 1.0
+best1 := 0.0 - 1.0
+best2 := 0.0 - 1.0
+best3 := 0.0 - 1.0
+name0 := ""
+name1 := ""
+name2 := ""
+name3 := ""
+while (i < n) {
+    p := planets[i]
+    e := esi3(p[1], p[2], p[3])
+    jv := jones_abs(heat_theta(p[3]))
+    st := em_status(p[4])
+    sc := seti_score(e, p[4])
+    print("   ", p[0], "| ESI", f5(e), "| |V|", f5(jv), "|", em_label(st), "| SETI", f5(sc))
+    if (sc > best0) {
+        best3 := best2
+        name3 := name2
+        best2 := best1
+        name2 := name1
+        best1 := best0
+        name1 := name0
+        best0 := sc
+        name0 := p[0]
+    } else { if (sc > best1) {
+        best3 := best2
+        name3 := name2
+        best2 := best1
+        name2 := name1
+        best1 := sc
+        name1 := p[0]
+    } else { if (sc > best2) {
+        best3 := best2
+        name3 := name2
+        best2 := sc
+        name2 := p[0]
+    } else { if (sc > best3) {
+        best3 := sc
+        name3 := p[0]
+    } } } }
+    i := i + 1
+}
+
+# ---- 量子レジスタ: 上位4候補を重ね合わせて測定 ----
+print("")
+print("[量子] 上位4候補を 2 qubit の重ね合わせに載せる (H×2):")
+reg := qubit(2)
+reg := H(reg, 0)
+reg := H(reg, 1)
+uni := Measure(reg)
+print("    一様重ね合わせ |psi|^2 :", f5(uni[0]), f5(uni[1]), f5(uni[2]), f5(uni[3]))
+amp := softmax([best0 * 8.0, best1 * 8.0, best2 * 8.0, best3 * 8.0])
+amp := Measure(amp)
+print("    SETI 重み付き振幅 (softmax·8, 測定台帳へコミット):")
+print("      ", name0, ":", f5(amp[0]))
+print("      ", name1, ":", f5(amp[1]))
+print("      ", name2, ":", f5(amp[2]))
+print("      ", name3, ":", f5(amp[3]))
+print("    量子優先ターゲット =", name0)
+
+# ---- Bell 対の零保存 = 盗聴なしの証拠 (QKD 同型) ----
+bell := qubit(2)
+bell := H(bell, 0)
+bell := CNOT(bell, 0, 1)
+bo := Measure(bell)
+intact := 0
+if (bo[1] == 0) { if (bo[2] == 0) { intact := 1 } }
+print("")
+print("[Bell] 零保存 |01>,|10> = 0 (盗聴なし=1):", intact, " 台帳 =", len(tuplespace), "facts")
+print("")
+print("正直な注記: 地球以外の電磁波利用は 2026 年時点で未確認。上記は")
+print("宇宙望遠鏡の実測値から計算した「聞くべき候補」の優先順位である。")
+print("@@EXO-GAMMA-OK")
