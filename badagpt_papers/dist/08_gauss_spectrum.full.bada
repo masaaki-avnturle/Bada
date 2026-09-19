@@ -1,0 +1,687 @@
+# ---- generated: 00_prelude.bada + 08_gauss_spectrum.bada (tools/run-papers.js) ----
+# ============================================================
+# 00_prelude.bada -- BadaGPT 未知事前エンジン論文集 / 共通核
+#
+# 量子プログラミング言語 Bada の組み込みは softmax / entropy /
+# unknown_prior / update / cognitive_system / dist / zeros_of /
+# maxdiff / len / sqrt / log / exp / abs / f5 / sci と、量子部分言語
+# qubit / H / X / S / T / Rz / CNOT / Measure / commit_measurement、
+# 追記専用台帳 tuplespace だけである。床関数も三角関数も Γ も ζ も
+# 無い。この核でそれを全部こしらえ、各巻はこの上に乗る。
+#
+#   数値      floor_ round_ pow_ ipow sin_ cos_ atan_ sinh_ cosh_ log1p_
+#   Γ 族      log_gamma gamma_ inv_gamma log_beta beta_ digamma_
+#   Bernoulli BERN bernoulli_poly
+#   Hurwitz ζ hurwitz (Euler–Maclaurin)  zeta_r  dirichlet_beta
+#   二重指数  de_default de_gamma_zeta zeta_de lambda_de zeta_V zm_dist_raw
+#   修正核    lambda_em kappa_      (ζ(x,y) = B(y,x−1)·Λ(x,y))
+#   配列      arr_zeros set_at arr_sum arr_max arr_maxabs rel_err ...
+#   表示      fx f3 f8 f10 f12 pad
+#   検査      check check_close check_rel verdict  (結果は台帳へ commit)
+#
+# 方言上の注意 (この処理系で実測した制約):
+#   * 配列の索引代入 a[i] := v は無い -> set_at / 再構築で書く
+#   * 論理和 or / || は無い -> && と ! と入れ子の if で書く
+#   * 関数の中から大域変数へ := しても外へ出ない -> 配列への <- 追記だけが届く
+#   * for は本体の代入を外へ出さない -> 累積は while で書く
+# ============================================================
+
+PI          := 3.141592653589793
+TWO_PI      := 6.283185307179586
+HALF_PI     := 1.5707963267948966
+LN2         := 0.6931471805599453
+LN10        := 2.302585092994046
+SQRT_2PI    := 2.5066282746310002
+EULER_GAMMA := 0.5772156649015329
+GLAISHER    := 1.2824271291006226
+INF         := exp(800)
+
+# ---- 床・丸め・べき --------------------------------------------------
+def floor_(x) { r := x - (x % 1)  if (r > x) { r := r - 1 }  return r }
+def ceil_(x)  { r := floor_(x)  if (r < x) { r := r + 1 }  return r }
+def round_(x) { return floor_(x + 0.5) }
+def max_(a, b) { if (a > b) { return a }  return b }
+def min_(a, b) { if (a < b) { return a }  return b }
+def is_int(x) { return abs(x - round_(x)) < 0.000000000001 }
+def sign_(x) { if (x < 0) { return -1 }  if (x > 0) { return 1 }  return 0 }
+
+def ipow(b, n) {                      # 整数べき (n >= 0)
+    r := 1.0  k := 0
+    while (k < n) { r := r * b  k := k + 1 }
+    return r
+}
+def pow_(b, e) {                      # 実数べき: exp(e log b)  (小さな整数べきは乗算で厳密に)
+    if (e % 1 == 0) { if (abs(e) <= 64) {
+        if (e >= 0) { return ipow(b, e) }
+        return 1.0 / ipow(b, 0 - e)
+    } }
+    if (b > 0) { return exp(e * log(b)) }
+    if (b == 0) { if (e > 0) { return 0.0 }  if (e == 0) { return 1.0 }  return INF }
+    if (is_int(e)) {
+        n := round_(e)
+        if (n >= 0) { return ipow(b, n) }
+        return 1.0 / ipow(b, 0 - n)
+    }
+    return 0 / 0
+}
+
+# ---- 三角関数 (Taylor 級数 + 範囲縮約 [-pi/2, pi/2]) ---------------------
+def sin_(x) {
+    x := x % TWO_PI
+    if (x > PI) { x := x - TWO_PI }
+    if (x < 0 - PI) { x := x + TWO_PI }
+    if (x > HALF_PI) { x := PI - x }
+    if (x < 0 - HALF_PI) { x := 0 - PI - x }
+    term := x  s := x  k := 1
+    while (k <= 12) {
+        term := 0 - term * x * x / ((2 * k) * (2 * k + 1))
+        s := s + term
+        k := k + 1
+    }
+    return s
+}
+def cos_(x) { return sin_(HALF_PI - x) }
+def tan_(x) { return sin_(x) / cos_(x) }
+def sinh_(t) {
+    if (abs(t) < 0.5) {               # 桁落ちを避ける級数
+        t2 := t * t
+        return t * (1 + t2 / 6 * (1 + t2 / 20 * (1 + t2 / 42 * (1 + t2 / 72 * (1 + t2 / 110)))))
+    }
+    return (exp(t) - exp(0 - t)) / 2
+}
+def cosh_(t) { return (exp(t) + exp(0 - t)) / 2 }
+def atan_(z) {
+    neg := false  inv := false
+    if (z < 0) { z := 0 - z  neg := true }
+    if (z > 1) { z := 1 / z  inv := true }
+    z := z / (1 + sqrt(1 + z * z))    # 半角に二度縮約: |z| <= tan(pi/16)
+    z := z / (1 + sqrt(1 + z * z))
+    s := 0.0  t := z  k := 0  sg := 1
+    while (k < 18) { s := s + sg * t / (2 * k + 1)  t := t * z * z  sg := 0 - sg  k := k + 1 }
+    s := 4 * s
+    if (inv) { s := HALF_PI - s }
+    if (neg) { s := 0 - s }
+    return s
+}
+def log1p_(z) {
+    if (abs(z) > 0.01) { return log(1 + z) }
+    return z * (1 - z * (1/2 - z * (1/3 - z * (1/4 - z * (1/5 - z * (1/6 - z * (1/7 - z * (1/8 - z / 9))))))))
+}
+def log2_(x)  { return log(x) / LN2 }
+def log10_(x) { return log(x) / LN10 }
+
+# ---- 階乗・二項 ----------------------------------------------------------
+def fact_(n) { r := 1.0  k := 2  while (k <= n) { r := r * k  k := k + 1 }  return r }
+def binom_(n, k) {                    # C(n,k) 整数
+    if (k < 0) { return 0 }  if (k > n) { return 0 }
+    r := 1.0  j := 0
+    while (j < k) { r := r * (n - j) / (j + 1)  j := j + 1 }
+    return round_(r)
+}
+def binom_gen(s, k) {                 # 一般二項係数 C(s+k-1, k) = Γ(s+k)/(Γ(s) k!)
+    p := 1.0  j := 0
+    while (j < k) { p := p * (s + j)  j := j + 1 }
+    return p / fact_(k)
+}
+
+# ---- Γ 関数族 (Lanczos g=7, n=9 / 反射公式) -------------------------------
+LANCZOS := [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+            771.32342877765313, -176.61502916214059, 12.507343278686905,
+            -0.13857109526572012, 0.0000099843695780195716,
+            0.00000015056327351493116]
+def log_gamma_pos(z) {                # z >= 0.5
+    zz := z - 1  a := LANCZOS[0]  t := zz + 7.5  i := 1
+    while (i < 9) { a := a + LANCZOS[i] / (zz + i)  i := i + 1 }
+    return 0.5 * log(TWO_PI) + (zz + 0.5) * log(t) - t + log(a)
+}
+def log_gamma(z) {                    # log |Γ(z)|
+    if (z >= 0.5) { return log_gamma_pos(z) }
+    return log(PI / abs(sin_(PI * z))) - log_gamma_pos(1 - z)
+}
+def gamma_(z) {                       # Γ(z) 符号つき
+    if (z >= 0.5) { return exp(log_gamma_pos(z)) }
+    return PI / (sin_(PI * z) * exp(log_gamma_pos(1 - z)))
+}
+def inv_gamma(z) {                    # 1/Γ(z) 整関数 (非正整数で 0)
+    if (z > 0.5) { return exp(0 - log_gamma_pos(z)) }
+    return exp(log_gamma_pos(1 - z)) * sin_(PI * z) / PI
+}
+def log_beta(p, q) { return log_gamma(p) + log_gamma(q) - log_gamma(p + q) }
+def beta_(p, q)    { return exp(log_beta(p, q)) }
+def digamma_(z) {                     # ψ(z): 漸化式で z >= 10 に上げて漸近展開
+    r := 0.0
+    while (z < 10) { r := r - 1 / z  z := z + 1 }
+    f := 1 / (z * z)
+    return r + log(z) - 0.5 / z - f * (1/12 - f * (1/120 - f * (1/252 - f * (1/240 - f / 132))))
+}
+
+# ---- Bernoulli 数と多項式 ----------------------------------------------------
+BERN := [1, -0.5, 1/6, 0, -1/30, 0, 1/42, 0, -1/30, 0, 5/66, 0, -691/2730, 0, 7/6, 0, -3617/510]
+B2K  := [1/6, -1/30, 1/42, -1/30, 5/66, -691/2730, 7/6, -3617/510]
+def bernoulli_poly(n, x) {            # B_n(x) = Σ C(n,k) B_k x^{n-k}
+    s := 0.0  k := 0
+    while (k <= n) { s := s + binom_(n, k) * BERN[k] * pow_(x, n - k)  k := k + 1 }
+    return s
+}
+
+# ---- Hurwitz ζ(s,a) — Euler–Maclaurin (s != 1 の全域で解析接続として妥当) ----
+def hurwitz_nk(s, a, N, K) {
+    tot := 0.0  n := 0
+    while (n < N) { tot := tot + pow_(n + a, 0 - s)  n := n + 1 }
+    A := N + a
+    tot := tot + pow_(A, 1 - s) / (s - 1) + 0.5 * pow_(A, 0 - s)
+    k := 1
+    while (k <= K) {
+        p := 1.0  j := 0
+        while (j < 2 * k - 1) { p := p * (s + j)  j := j + 1 }
+        tot := tot + B2K[k - 1] / fact_(2 * k) * p * pow_(A, 0 - s - 2 * k + 1)
+        k := k + 1
+    }
+    return tot
+}
+def hurwitz(s, a)      { return hurwitz_nk(s, a, 30, 8) }
+def zeta_r(s)          { return hurwitz(s, 1.0) }                 # Riemann ζ
+def dirichlet_beta(s)  { return pow_(4, 0 - s) * (hurwitz(s, 0.25) - hurwitz(s, 0.75)) }
+
+# ---- 二重指数節点 (Takahasi–Mori, ロジスティック変換) -------------------------
+#   u_k = σ(π sinh(k h)),  w_k = π cosh(k h) h,  h = 2^-5, |k| <= 195 -> 391 節点
+#   節点表は (log u, log(1-u), log w) の三つ組で持つ。
+def de_nodes(h, kmax) {
+    LU := []  LV := []  LW := []
+    k := 0 - kmax
+    while (k <= kmax) {
+        t := k * h
+        s := PI * sinh_(t)
+        if (s < 700) { if (s > -700) {
+            lu := 0.0  lv := 0.0
+            if (s >= 0) {
+                e := exp(0 - s)
+                lu := 0 - log1p_(e)
+                lv := (0 - s) - log1p_(e)
+            } else {
+                e := exp(s)
+                lu := s - log1p_(e)
+                lv := 0 - log1p_(e)
+            }
+            if (lu < 0) {
+                LU <- lu
+                LV <- lv
+                LW <- log(PI * cosh_(t) * h)
+            }
+        } }
+        k := k + 1
+    }
+    return [LU, LV, LW]
+}
+def de_default() { return de_nodes(0.03125, 195) }
+
+# Σ_k w_k (1-u_k) u_k^{n+y} (log 1/u_k)^{s-1} = Γ(s)/(n+y)^s
+def de_moment(nd, s, y, n) {
+    LU := nd[0]  LV := nd[1]  LW := nd[2]
+    acc := 0.0  i := 0
+    while (i < len(LU)) {
+        lu := LU[i]
+        c := LW[i] + (s - 1) * log(0 - lu) + LV[i] + (n + y) * lu
+        if (c > -700) { acc := acc + exp(c) }
+        i := i + 1
+    }
+    return acc
+}
+# Σ_k w_k u_k^{y} (log 1/u_k)^{s-1} = Γ(s) ζ(s,y)   (1/(1-u) はヤコビアンと相殺)
+def de_gamma_zeta(nd, s, y) {
+    LU := nd[0]  LW := nd[2]
+    acc := 0.0  i := 0
+    while (i < len(LU)) {
+        lu := LU[i]
+        c := LW[i] + (s - 1) * log(0 - lu) + y * lu
+        if (c > -700) { acc := acc + exp(c) }
+        i := i + 1
+    }
+    return acc
+}
+def zeta_de(nd, s, y)   { return exp(log(de_gamma_zeta(nd, s, y)) - log_gamma(s)) }
+def zeta_V(nd, x, y, V) { return zeta_de(nd, x, y) - zeta_de(nd, x, y + V) }   # 離散 Newton–Leibniz
+
+# ---- 修正核  ζ(x,y) = B(y,x−1)·Λ(x,y),  Λ = E_Beta(y,x−1)[κ^{x−1}]/Γ(x) ------
+def kappa_(u) {                       # κ(u) = log(1/u)/(1−u) = 情報量 ÷ 残余質量
+    if (1 - u < 0.000000000001) { e := 1 - u  return 1 + e / 2 + e * e / 3 }
+    return (0 - log(u)) / (1 - u)
+}
+def lambda_de(nd, x, y) { return exp(log(zeta_de(nd, x, y)) - log_beta(y, x - 1)) }
+def lambda_em(x, y)     { return hurwitz(x, y) / beta_(y, x - 1) }
+def poch_ratio(x, y) {                # Γ(x+y−1)/Γ(x−1) (y が正整数なら多項式で厳密)
+    if (is_int(y)) { if (y >= 1) {
+        k := round_(y)  p := 1.0  j := 0
+        while (j < k) { p := p * (x - 1 + j)  j := j + 1 }
+        return p
+    } }
+    b := x + y - 1
+    if (b > 0) { return gamma_(b) * inv_gamma(x - 1) }
+    return inv_gamma(x - 1) * PI / (sin_(PI * b) * gamma_(1 - b))
+}
+def lambda_cont(x, y) { return hurwitz(x, y) * poch_ratio(x, y) / gamma_(y) }   # 解析接続版 Λ
+
+# Zipf–Mandelbrot 分布 (未規格化): P(n) ∝ Σ_k w_k (1-u_k) u_k^{n+y} (log 1/u_k)^{x-1}
+def zm_dist_raw(nd, x, y, V) {
+    p := []  n := 0
+    while (n < V) { p <- de_moment(nd, x, y, n)  n := n + 1 }
+    return p
+}
+def zm_exact(x, y, V) {               # 厳密 (n+y)^{-x} を V 項で切って規格化
+    p := []  n := 0
+    while (n < V) { p <- pow_(n + y, 0 - x)  n := n + 1 }
+    return dist(p)
+}
+
+# ---- 複素数 [re, im] (第十巻 Mellin 畳み込み・第十三巻 偏角原理で使う) ------------------
+def atan2_(y, x) {
+    if (x > 0) { return atan_(y / x) }
+    if (x < 0) { if (y >= 0) { return atan_(y / x) + PI }  return atan_(y / x) - PI }
+    if (y > 0) { return HALF_PI }
+    if (y < 0) { return 0 - HALF_PI }
+    return 0.0
+}
+def c_add(a, b)   { return [a[0] + b[0], a[1] + b[1]] }
+def c_sub(a, b)   { return [a[0] - b[0], a[1] - b[1]] }
+def c_mul(a, b)   { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]] }
+def c_div(a, b)   { d := b[0] * b[0] + b[1] * b[1]  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d] }
+def c_scale(a, k) { return [a[0] * k, a[1] * k] }
+def c_abs(a)      { return sqrt(a[0] * a[0] + a[1] * a[1]) }
+def c_arg(a)      { return atan2_(a[1], a[0]) }
+def c_exp(a)      { r := exp(a[0])  return [r * cos_(a[1]), r * sin_(a[1])] }
+def c_log(a)      { return [log(c_abs(a)), atan2_(a[1], a[0])] }
+def c_pow(a, z)   { return c_exp(c_mul(z, c_log(a))) }              # a^z (主値)
+def c_powr(b, z)  { l := log(b)  return c_exp([z[0] * l, z[1] * l]) } # 実数 b > 0 の複素べき b^z
+def c_sin(a)      { return [sin_(a[0]) * cosh_(a[1]), cos_(a[0]) * sinh_(a[1])] }
+def c_gamma(z) {                       # 複素 Γ (Lanczos g=7, Re z < 1/2 は反射公式)
+    if (z[0] < 0.5) {
+        s := c_sin(c_scale(z, PI))
+        return c_div([PI, 0], c_mul(s, c_gamma([1 - z[0], 0 - z[1]])))
+    }
+    zz := [z[0] - 1, z[1]]
+    x := [LANCZOS[0], 0]  i := 1
+    while (i < 9) { x := c_add(x, c_div([LANCZOS[i], 0], [zz[0] + i, zz[1]]))  i := i + 1 }
+    t := [zz[0] + 7.5, zz[1]]
+    return c_mul(c_mul(c_scale(c_pow(t, [zz[0] + 0.5, zz[1]]), SQRT_2PI), c_exp([0 - t[0], 0 - t[1]])), x)
+}
+def c_hurwitz(s, a, N, K) {            # 複素 s の Hurwitz ζ(s,a) (a 実、Euler–Maclaurin)
+    tot := [0, 0]  n := 0
+    while (n < N) { tot := c_add(tot, c_powr(n + a, [0 - s[0], 0 - s[1]]))  n := n + 1 }
+    A := N + a
+    tot := c_add(tot, c_div(c_powr(A, [1 - s[0], 0 - s[1]]), [s[0] - 1, s[1]]))
+    tot := c_add(tot, c_scale(c_powr(A, [0 - s[0], 0 - s[1]]), 0.5))
+    k := 1
+    while (k <= K) {
+        p := [1, 0]  j := 0
+        while (j < 2 * k - 1) { p := c_mul(p, [s[0] + j, s[1]])  j := j + 1 }
+        tot := c_add(tot, c_scale(c_mul(p, c_powr(A, [0 - s[0] - 2 * k + 1, 0 - s[1]])), B2K[k - 1] / fact_(2 * k)))
+        k := k + 1
+    }
+    return tot
+}
+
+# ---- 配列補助 ---------------------------------------------------------------
+def arr_zeros(n) { a := []  i := 0  while (i < n) { a <- 0.0  i := i + 1 }  return a }
+def arr_fill(n, v) { a := []  i := 0  while (i < n) { a <- v  i := i + 1 }  return a }
+def set_at(a, i, v) {
+    b := []  k := 0
+    while (k < len(a)) { if (k == i) { b <- v } else { b <- a[k] }  k := k + 1 }
+    return b
+}
+def arr_copy(a)  { b := []  i := 0  while (i < len(a)) { b <- a[i]  i := i + 1 }  return b }
+def arr_sum(a)   { s := 0.0  i := 0  while (i < len(a)) { s := s + a[i]  i := i + 1 }  return s }
+def arr_max(a)   { m := a[0]  i := 1  while (i < len(a)) { if (a[i] > m) { m := a[i] }  i := i + 1 }  return m }
+def arr_min(a)   { m := a[0]  i := 1  while (i < len(a)) { if (a[i] < m) { m := a[i] }  i := i + 1 }  return m }
+def arr_maxabs(a){ m := 0.0  i := 0  while (i < len(a)) { if (abs(a[i]) > m) { m := abs(a[i]) }  i := i + 1 }  return m }
+def arr_argmax(a){ m := 0  i := 1  while (i < len(a)) { if (a[i] > a[m]) { m := i }  i := i + 1 }  return m }
+def arr_scale(a, c) { b := []  i := 0  while (i < len(a)) { b <- a[i] * c  i := i + 1 }  return b }
+def arr_add(a, b)   { c := []  i := 0  while (i < len(a)) { c <- a[i] + b[i]  i := i + 1 }  return c }
+def arr_dot(a, b)   { s := 0.0  i := 0  while (i < len(a)) { s := s + a[i] * b[i]  i := i + 1 }  return s }
+def arr_maxdiff(a, b) {
+    m := 0.0  i := 0
+    while (i < len(a)) { d := abs(a[i] - b[i])  if (d > m) { m := d }  i := i + 1 }
+    return m
+}
+def arr_maxrel(a, b) {               # max |a_i - b_i| / |b_i|
+    m := 0.0  i := 0
+    while (i < len(a)) { if (b[i] != 0) { d := abs(a[i] - b[i]) / abs(b[i])  if (d > m) { m := d } }  i := i + 1 }
+    return m
+}
+def rel_err(got, want) { if (want == 0) { return abs(got) }  return abs(got - want) / abs(want) }
+def arr_order_desc(a) {               # 値の降順の添字列 (選択ソート)
+    idx := []  i := 0
+    while (i < len(a)) { idx <- i  i := i + 1 }
+    out := []  used := arr_fill(len(a), false)
+    k := 0
+    while (k < len(a)) {
+        best := -1  j := 0
+        while (j < len(a)) {
+            if (!used[j]) { if (best < 0) { best := j } else { if (a[j] > a[best]) { best := j } } }
+            j := j + 1
+        }
+        out <- best
+        used := set_at(used, best, true)
+        k := k + 1
+    }
+    return out
+}
+def shannon_(p) {                     # −Σ q log q  (x log x 核, 零は寄与ゼロ)
+    h := 0.0  i := 0
+    while (i < len(p)) { q := p[i]  if (q > 0) { h := h - q * log(q) }  i := i + 1 }
+    return h
+}
+
+# ---- 表示 (組み込みは f5 / sci のみ。桁を選べる固定小数を自作) ------------------
+def fx(x, d) {
+    if (x != x) { return "nan" }
+    if (x > 1e300) { return "inf" }
+    if (x < -1e300) { return "-inf" }
+    s := ""
+    if (x < 0) { s := "-"  x := 0 - x }
+    x := x + 0.5 * pow_(10, 0 - d)
+    ip := floor_(x)  fr := x - ip
+    s := s + ip
+    if (d > 0) { s := s + "." }
+    k := 0
+    while (k < d) { fr := fr * 10  dg := floor_(fr)  if (dg > 9) { dg := 9 }  s := s + dg  fr := fr - dg  k := k + 1 }
+    return s
+}
+def f3(x)  { return fx(x, 3) }
+def f8(x)  { return fx(x, 8) }
+def f10(x) { return fx(x, 10) }
+def f12(x) { return fx(x, 12) }
+def arr_str(a) {                      # 配列を "[a, b, c]" の文字列に (文字列連結では配列が潰れるため)
+    s := "["  i := 0
+    while (i < len(a)) { if (i > 0) { s := s + ", " }  s := s + a[i]  i := i + 1 }
+    return s + "]"
+}
+def bstr(b)    { if (b) { return "true" }  return "false" }   # 真偽値を文字列連結すると潰れるため
+def pad(s, n)  { s := "" + s  while (len(s) < n) { s := " " + s }  return s }
+def padr(s, n) { s := "" + s  while (len(s) < n) { s := s + " " }  return s }
+
+# ---- 検査台帳 -------------------------------------------------------------------
+#   関数の中から大域の数を書き換えられないので、結果は配列 CHECKS に積み、
+#   同時に追記専用台帳 tuplespace へ ["check", label, ok] として commit する。
+CHECKS := []
+def check(label, ok) {
+    if (ok) { print("  [OK] " + label) } else { print("  [NG] " + label) }
+    fact := ["check", label, ok]      # 改行は文の区切りではないので、配列リテラルは束縛してから commit する
+    fact >> tuplespace
+    CHECKS <- ok
+    return ok
+}
+def check_close(label, got, want, tol) {
+    err := abs(got - want)
+    return check(label + "  got " + fx(got, 10) + "  want " + fx(want, 10) + "  |err| " + sci(err) + " <= " + sci(tol), err <= tol)
+}
+def check_rel(label, got, want, tol) {
+    err := rel_err(got, want)
+    return check(label + "  got " + fx(got, 10) + "  want " + fx(want, 10) + "  rel " + sci(err) + " <= " + sci(tol), err <= tol)
+}
+def checks_failed() {
+    n := 0  i := 0
+    while (i < len(CHECKS)) { if (!CHECKS[i]) { n := n + 1 }  i := i + 1 }
+    return n
+}
+def verdict(sentinel) {
+    total := len(CHECKS)  bad := checks_failed()
+    print("")
+    print("---- 検査 " + (total - bad) + " / " + total + " 合格  (台帳 " + len(tuplespace) + " facts) ----")
+    if (bad == 0) { print(sentinel) } else { print("@@FAILED " + bad + " check(s)") }
+}
+def section(title) {
+    print("")
+    print("================================================================")
+    print(title)
+    print("================================================================")
+}
+
+
+# ================= 08_gauss_spectrum.bada =================
+# ============================================================
+# 08_gauss_spectrum.bada -- 第八巻
+# ガウスの曲面論の量子化 — 空間概念の量子化としての重力の量子化について
+# — オイラー標数はスペクトルの s = 0 の値であり、そして形は決まらない —
+#
+#   定理1 熱核版 Gauss–Bonnet: 閉曲面で a_1 = (1/12π)∫K dA = χ(M)/6                            (表1)
+#   定理2 主定理: χ(M) = 6·(ζ_Δ(0) + 1) — 計量も座標も多様体も要らない、固有値の列だけ           (表2・3)
+#   定理3 位相と幾何の分離: ζ(0) はスケールにも形にも依らず、ζ'(0) だけが動く                     (表4・5)
+#   定理4 スペクトルは形を決めない: Milnor の 16 次元トーラス対 E8⊕E8 / D16⁺ のテータ級数が一致  (表6)
+#   量子化の単位は多様体ではなく等スペクトル類 [M] であり、Milnor 対はその類が一点でないことを示す。
+# ============================================================
+
+section("第八巻  ガウスの曲面論の量子化 — χ = 6(ζ(0)+1)、そして形は決まらない")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "euler" postfix [ 'euler' '(' expr ')' ] => euler_char(_1)             # 定理2
+    rule "genus" postfix [ 'genus' '(' expr ')' ] => genus_of(_1)
+    rule "shape" postfix [ 'shape' '(' expr ')' ] => log_det(_1)                # 定理3
+    rule "hear"  stmt    [ 'hear'  '(' expr ')' ] => commit_measurement(isospectral_class(_1))
+}
+print("grammar rules committed :", len(tuplespace), "facts (euler / genus / shape / hear)")
+
+# ---- S²: 第六巻の Hurwitz 級数表示 -------------------------------------------------------------------------
+def zeta_S2(s) {
+    tot := 0.0  k := 0
+    while (k < 80) { tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * hurwitz_nk(2 * s + 2 * k - 1, 1.5, 40, 8)  k := k + 1 }
+    return 2 * tot
+}
+def heat_S2(t) { L := floor_(sqrt(60 / t)) + 5  s := 0.0  l := 0  while (l < L) { s := s + (2 * l + 1) * exp(0 - t * l * (l + 1))  l := l + 1 }  return s }
+
+# ---- 平坦トーラス: テータ函数の Poisson 変換つき Mellin 分割 ----------------------------------------------------
+def theta1(x) {                                  # Σ_m e^{−x m²}  (小さい x では Poisson 変換で機械精度)
+    if (x >= 1) {
+        s := 1.0  m := 1  term := exp(0 - x)
+        while (term > 0.000000000000000001) { s := s + 2 * term  m := m + 1  term := exp(0 - x * m * m) }
+        return s
+    }
+    y := PI * PI / x
+    s := 1.0  k := 1  term := exp(0 - y)
+    while (term > 0.000000000000000001) { s := s + 2 * term  k := k + 1  term := exp(0 - y * k * k) }
+    return sqrt(PI / x) * s
+}
+def theta1_reg(x) {                              # θ₁(x) − √(π/x) を桁落ちなしで (Poisson 側では級数そのもの)
+    if (x >= 1) { return theta1(x) - sqrt(PI / x) }
+    y := PI * PI / x
+    s := 0.0  k := 1  term := exp(0 - y)
+    while (term > 0.000000000000000001) { s := s + 2 * term  k := k + 1  term := exp(0 - y * k * k) }
+    return sqrt(PI / x) * s
+}
+def simpson(f, a, b, n) {
+    h := (b - a) / n  s := f(a) + f(b)  i := 1
+    while (i < n) { w := 2  if (i % 2 == 1) { w := 4 }  s := s + w * f(a + i * h)  i := i + 1 }
+    return s * h / 3
+}
+def zeta_T2(s, L1, L2) {                          # Γ(s)ζ(s) = ∫₀¹ t^{s−1}[(θ−1) − A/(4πt) + 1]dt + (A/4π)/(s−1) − 1/s + ∫₁^∞ t^{s−1}(θ−1)dt
+    A := L1 * L2  k1 := TWO_PI / L1  k2 := TWO_PI / L2
+    def fR(t) {                                   # θ₁(x₁)θ₁(x₂) − A/(4πt) = s₁d₂ + s₂d₁ + d₁d₂  (s_i = √(π/x_i), d_i = θ₁ − s_i) — 安定
+        x1 := t * k1 * k1  x2 := t * k2 * k2
+        s1 := sqrt(PI / x1)  s2 := sqrt(PI / x2)  d1 := theta1_reg(x1)  d2 := theta1_reg(x2)
+        return pow_(t, s - 1) * (s1 * d2 + s2 * d1 + d1 * d2)
+    }
+    def fT(t) { return pow_(t, s - 1) * (theta1(t * k1 * k1) * theta1(t * k2 * k2) - 1) }
+    R := simpson(fR, 0.00000001, 1.0, 2000)
+    T := simpson(fT, 1.0, 120.0, 3000)
+    return (R + (A / (4 * PI)) / (s - 1) - 1 / s + T) / gamma_(s)
+}
+
+# ---- 定理2: χ = 6(ζ(0)+1) ---------------------------------------------------------------------------------------
+def zeta0_of(zf) { h := 0.001  return (zf(h) + zf(0 - h)) / 2 }          # ζ(0) を s = ±h の中点で
+def euler_char(zf) { return 6 * (zeta0_of(zf) + 1) }
+def genus_of(zf) { return 1 - euler_char(zf) / 2 }
+def log_det(zf) {                                 # −ζ'(0): 中心差分 + Richardson
+    h := 0.001
+    d1 := (zf(h) - zf(0 - h)) / (2 * h)
+    d2 := (zf(h / 2) - zf(0 - h / 2)) / h
+    return 0 - (4 * d2 - d1) / 3
+}
+def isospectral_class(spec) {
+    print("  WARNING: 等長でない空間が同じ類に落ちうる (Milnor 対) — 固有値の列そのものが同一性の全部である")
+    return dist(spec)
+}
+
+section("定理1  熱核版 Gauss–Bonnet  a_1 = (1/4π)∫√g R/6 dA = (1/12π)∫K dA = χ(M)/6")
+a1_S2 := 2 * (heat_S2(0.01) - 1 / 0.01) - (heat_S2(0.02) - 1 / 0.02)
+def heat_T2(t, L1, L2) { return theta1(t * pow_(TWO_PI / L1, 2)) * theta1(t * pow_(TWO_PI / L2, 2)) }
+def a1_T2(L1, L2) { A := L1 * L2  a0 := A / (4 * PI)  return 2 * (heat_T2(0.01, L1, L2) - a0 / 0.01) - (heat_T2(0.02, L1, L2) - a0 / 0.02) }
+print("表1.  多様体          χ    χ/6        a_1 実測 (Richardson)   相対誤差")
+print("  S² (単位球面)      2    " + fx(1 / 3, 6) + "   " + fx(a1_S2, 10) + "           " + sci(rel_err(a1_S2, 1 / 3)))
+print("  T² (2π × 2π)       0    0.000000   " + fx(a1_T2(TWO_PI, TWO_PI), 10) + "           —")
+print("  T² (2π × 4π)       0    0.000000   " + fx(a1_T2(TWO_PI, 2 * TWO_PI), 10) + "           —")
+check_rel("定理1  S²: a_1 = χ/6 = 1/3 (rel <= 1e-5)", a1_S2, 1 / 3, 0.00001)
+check("定理1  平坦トーラスで a_1 = 0 (面積によらず、|a_1| <= 1e-12)", abs(a1_T2(TWO_PI, TWO_PI)) < 0.000000000001 && abs(a1_T2(TWO_PI, 2 * TWO_PI)) < 0.000000000001)
+
+section("定理2 (主定理)  χ(M) = 6·(ζ_Δ(0) + 1) — 入力は固有値の列だけ")
+print("表2.  多様体            面積        ζ_Δ(0) 実測       6(ζ(0)+1)       χ 真値   差")
+chiS2 := euler(zeta_S2)
+print("  S²                  " + padr(fx(4 * PI, 5), 11) + " " + fx(zeta0_of(zeta_S2), 10) + "     " + fx(chiS2, 10) + "     2        " + sci(abs(chiS2 - 2)))
+check_close("定理2  χ(S²) = 2 (差 <= 1e-5)", chiS2, 2.0, 0.00001)
+TORI := [[TWO_PI, TWO_PI], [TWO_PI, 2 * TWO_PI], [PI, 6 * PI], [1.0, 1.0], [1.0, 3.0]]
+TN   := ["T² 2π × 2π", "T² 2π × 4π", "T² π × 6π ", "T² 1 × 1  ", "T² 1 × 3  "]
+tori_ok := true  i := 0
+while (i < 5) {
+    L1 := TORI[i][0]  L2 := TORI[i][1]
+    def zT(s) { return zeta_T2(s, L1, L2) }
+    z0 := zeta0_of(zT)  chi := 6 * (z0 + 1)
+    if (abs(chi) > 0.0001) { tori_ok := false }
+    print("  " + TN[i] + "          " + padr(fx(L1 * L2, 5), 11) + " " + fx(z0, 10) + "     " + pad(fx(chi, 10), 11) + "     0        " + sci(abs(chi)))
+    i := i + 1
+}
+check("定理2  平坦トーラス 5 例すべてで χ = 0 (|差| <= 1e-4、縦横比によらず)", tori_ok)
+print("  トーラスの χ = 0 は形に依らない: Epstein ゼータの Γ(s)ζ(s) の s = 0 の極はゼロモードの −1 だけから来る。位相はスペクトルの中で剛的である。")
+print("")
+print("表3. 正方トーラスの厳密公式との照合  ζ(s) = (L/2π)^{2s}·4ζ_R(s)β(s)")
+def beta_prime0() { return log(gamma_(0.25) * gamma_(0.25) / (TWO_PI * sqrt(2))) }   # β'(0) = log(Γ(1/4)²/(2π√2))
+sq_ok := true  i := 0
+LS := [TWO_PI, 1.0]
+while (i < 2) {
+    L := LS[i]
+    def zS(s) { return zeta_T2(s, L, L) }
+    z0 := zeta0_of(zS)  zp := 0 - log_det(zS)
+    exact := 0 - 2 * log(L / TWO_PI) - log(TWO_PI) - 2 * beta_prime0()
+    if (abs(z0 + 1) > 0.0001) { sq_ok := false }
+    if (abs(zp - exact) > 0.0001) { sq_ok := false }
+    print("  L = " + padr(fx(L, 5), 8) + " ζ(0) 数値 " + fx(z0, 10) + " (厳密 −1)   ζ'(0) 数値 " + fx(zp, 10) + "   厳密 " + fx(exact, 10) + "   差 " + sci(abs(zp - exact)))
+    i := i + 1
+}
+check("表3    正方トーラス L = 2π, 1 で ζ(0) = −1、ζ'(0) が厳密式 −2log(L/2π) − log 2π − 2β'(0) と 1e-4 以内", sq_ok)
+
+section("定理3  位相と幾何の分離 — ζ(0) はスケールにも形にも依らず、ζ'(0) だけが動く")
+print("表4. 球面のスケール変換 g → a²g: ζ_a(s) = a^{2s}ζ_1(s)  ⇒  ζ_a(0) = ζ_1(0),  ζ_a'(0) = 2 log(a)·ζ_1(0) + ζ_1'(0)")
+z0S2 := 0 - 2 / 3  ldS2 := shape(zeta_S2)          # ζ_1(0) = −2/3 は定理 (第六巻 定理4)、ζ_1'(0) は本巻の数値
+print("  (ζ_1(0) の数値 " + fx(zeta0_of(zeta_S2), 10) + " → 定理値 −2/3 を用い、ζ_1'(0) = " + fx(0 - ldS2, 10) + " は本巻の Richardson 値)")
+print("  a       ζ_a(0)          χ = 6(ζ(0)+1)   log det_ζ = −ζ_a'(0)   det_ζ")
+AS := [0.5, 1.0, 2.0, 5.0]
+DET_PAPER := [1.26806021, 3.19531149, 8.05168042, 27.31952896]
+t4_ok := true  i := 0
+while (i < 4) {
+    a := AS[i]
+    ld := ldS2 - 2 * log(a) * z0S2
+    if (abs(exp(ld) - DET_PAPER[i]) > 0.00002 * DET_PAPER[i]) { t4_ok := false }
+    print("  " + padr(fx(a, 2), 6) + "  " + fx(z0S2, 10) + "    " + fx(6 * (z0S2 + 1), 10) + "     " + pad(fx(ld, 10), 12) + "           " + fx(exp(ld), 8))
+    i := i + 1
+}
+check("定理3  半径 0.5, 1, 2, 5 で χ = 2 は不変、det_ζ は 1.268 → 3.195 → 8.052 → 27.32 (論文値と相対 2e-5 以内)", t4_ok && abs(6 * (z0S2 + 1) - 2) < 0.00001)
+print("")
+def eta_iy(y) {                                  # Dedekind η(iy) = e^{−πy/12} Π (1 − e^{−2πny})
+    q := exp(0 - TWO_PI * y)  p := 1.0  n := 1  t := q
+    while (t > 0.000000000000000001) { p := p * (1 - t)  n := n + 1  t := pow_(q, n) }
+    return exp(0 - PI * y / 12) * p
+}
+def log_det_torus_exact(L1, L2) { y := L2 / L1  return log(L1 * L2 * y * pow_(eta_iy(y), 4)) }   # Kronecker 極限公式: det_ζ Δ = A·τ₂·|η(τ)|⁴
+print("表5. 面積を 4π² に固定して縦横比だけ変えた平坦トーラス  (厳密値は Kronecker の極限公式 log det = log(A·τ₂·|η(iτ₂)|⁴))")
+print("  L1 × L2              縦横比   ζ(0)           χ           log det_ζ (数値)  厳密           差         論文の数値")
+RATIOS := [1.0, 1.5, 2.0, 3.0, 5.0]
+LD_PAPER := [2.6210689464, 2.5104342956, 2.2751575372, 1.6331075031, 0.0495373861]
+t5_ok := true  ld_prev := 99.0  i := 0
+while (i < 5) {
+    r := RATIOS[i]  L1 := sqrt(4 * PI * PI / r)  L2 := r * L1
+    def zT(s) { return zeta_T2(s, L1, L2) }
+    z0 := zeta0_of(zT)  ld := shape(zT)
+    if (abs(6 * (z0 + 1)) > 0.0001) { t5_ok := false }
+    ex := log_det_torus_exact(L1, L2)
+    if (abs(ld - ex) > 0.0005) { t5_ok := false }
+    if (ld > ld_prev) { t5_ok := false }
+    ld_prev := ld
+    print("  " + padr(fx(L1, 5) + " × " + fx(L2, 5), 20) + " " + padr(fx(r, 1), 7) + "  " + fx(z0, 9) + "   " + pad(fx(6 * (z0 + 1), 6), 9) + "   " + fx(ld, 10) + "      " + fx(ex, 10) + "   " + pad(sci(abs(ld - ex)), 9) + "  " + fx(LD_PAPER[i], 7))
+    i := i + 1
+}
+check("定理3  面積も χ も同じ、log det だけが 2.621 → 0.0492 と単調に動く (Kronecker の厳密値と 5e-4 以内)", t5_ok)
+print("  注: 論文の表5 (Simpson 6000 分割の Mellin 分割) は厳密値から 3e-4 ほどずれている。本実装 (桁落ちなしの正則化) の方が厳密値に近い。")
+check_close("表3再照合  正方トーラス L = 2π の厳密値は Kronecker 公式でも 2.6210658518", log_det_torus_exact(TWO_PI, TWO_PI), 2.6210658518, 0.000000001)
+print("  ζ(0) が位相、ζ'(0) が幾何を担う。s = 0 のごく近傍だけを見れば、値が位相、傾きが幾何という分離が成り立つ。")
+
+# ---- 定理4: Milnor の等スペクトル対 ---------------------------------------------------------------------------------
+section("定理4  スペクトルは形を決めない — Milnor の 16 次元トーラス対 E8⊕E8 と D16⁺ (厳密な整数計算)")
+E := 64                                           # x = q^{1/4}: 指数 = ノルム × 4、ノルム 0..16
+def poly_mul_trunc(a, b) {
+    out := []  k := 0
+    while (k <= E) {
+        s := 0.0  i := 0
+        while (i <= k) { if (i < len(a)) { j := k - i  if (j < len(b)) { s := s + a[i] * b[j] } }  i := i + 1 }
+        out <- s
+        k := k + 1
+    }
+    return out
+}
+def poly_pow_trunc(a, n) { r := set_at(arr_zeros(E + 1), 0, 1.0)  i := 0  while (i < n) { r := poly_mul_trunc(r, a)  i := i + 1 }  return r }
+TH2 := arr_zeros(E + 1)  TH3 := arr_zeros(E + 1)  TH4 := arr_zeros(E + 1)
+m := -12
+while (m <= 12) {
+    e := (2 * m + 1) * (2 * m + 1)
+    if (e <= E) { TH2 := set_at(TH2, e, TH2[e] + 1) }              # θ₂ = Σ q^{(2m+1)²/4}
+    e := 4 * m * m
+    if (e <= E) {
+        TH3 := set_at(TH3, e, TH3[e] + 1)                            # θ₃ = Σ q^{m²}
+        sgn := 1  if (abs(m) % 2 == 1) { sgn := -1 }
+        TH4 := set_at(TH4, e, TH4[e] + sgn)                          # θ₄ = Σ (−1)^m q^{m²}
+    }
+    m := m + 1
+}
+def theta_Dplus(n) {                              # D_n⁺ のテータ級数 = ½[θ₂ⁿ + θ₃ⁿ + θ₄ⁿ]
+    a := poly_pow_trunc(TH2, n)  b := poly_pow_trunc(TH3, n)  c := poly_pow_trunc(TH4, n)
+    out := []  i := 0
+    while (i <= E) { out <- round_((a[i] + b[i] + c[i]) / 2)  i := i + 1 }
+    return out
+}
+THE8   := theta_Dplus(8)                          # E8 = D8⁺
+THE8E8 := poly_mul_trunc(THE8, THE8)              # E8 ⊕ E8
+THD16  := theta_Dplus(16)                         # D16⁺
+print("表6.  ノルム N   E8⊕E8 のベクトル数   D16⁺ のベクトル数   一致")
+MILNOR_PAPER := [1, 480, 61920, 1050240, 7926240, 37500480, 135480960, 395301120, 1014559200]
+milnor_ok := true  n := 0
+while (n <= 16) {
+    a := THE8E8[4 * n]  b := THD16[4 * n]
+    if (a != b) { milnor_ok := false }
+    if (n % 2 == 0) {
+        if (a != MILNOR_PAPER[n / 2]) { milnor_ok := false }
+        print("  " + pad(n, 6) + "     " + pad(a, 14) + "        " + pad(b, 14) + "        " + bstr(a == b))
+    } else { if (a != 0) { milnor_ok := false } }
+    n := n + 1
+}
+check("定理4  ノルム 0..16 のすべてで完全一致 (1, 480, 61920, …, 1014559200)、奇数ノルムは 0 (偶格子)", milnor_ok)
+E8_PAPER := [1, 240, 2160, 6720, 17520]
+e8_ok := true  n := 0
+while (n <= 4) { if (THE8[8 * n] != E8_PAPER[n]) { e8_ok := false }  n := n + 1 }   # E8 のノルムは偶数 2n → 指数 8n
+check("対照   E8 単独のテータ級数 1, 240, 2160, 6720, 17520 (= 240·σ₃(m))", e8_ok)
+print("  理論的な理由: 両者のテータ級数は重さ 8 のモジュラー形式で、その空間は 1 次元 (E₄²)。二つの格子は同型でない (根系 E8+E8 と D16)。")
+print("  ⇒ 写像 空間 ↦ スペクトル は単射でない。固有値の列は位相・体積・全曲率を決めるが、計量そのものは決めない。")
+led0 := len(tuplespace)
+hear([1.0, 480.0, 61920.0])                       # 規則 hear: 等スペクトル類を commit (警告つき)
+check("hear    規則 hear が等スペクトル類を台帳へ commit (等長性は記録されない)", len(tuplespace) == led0 + 1)
+
+section("スペクトルから読み取れるもの / 読み取れないもの、そして四つの壁")
+READ := [["次元 d", "Weyl 則 N(λ) ~ Cλ^{d/2}", "古典"], ["体積 Vol(M)", "熱核の主要項 a_0 = Vol/(4π)^{d/2}", "古典"],
+         ["全曲率 ∫K dA", "a_1 = (1/12π)∫K dA (定理1)", "検証済"], ["オイラー標数 χ", "χ = 6(ζ(0)+1) (定理2)", "検証済"],
+         ["種数 g", "g = 1 − χ/2 = 1 − 3(ζ(0)+1)", "検証済"], ["スケール (大きさ)", "ζ'(0) のシフト (定理3)", "検証済"],
+         ["曲率の高次不変量", "a_2, a_3, … (∫R², ∫R_μν², …)", "古典"], ["計量そのもの", "読み取れない (定理4)", "検証済 (否定)"]]
+i := 0
+while (i < 8) { fact := ["readout", READ[i][0], READ[i][1], READ[i][2]]  fact >> tuplespace  print("  " + padr(READ[i][0], 18) + padr(READ[i][1], 40) + READ[i][2])  i := i + 1 }
+print("  壁 (a) 背景独立性 (b) 拘束代数 (c) 非繰り込み可能性 — 動かず。 (d) 新規: 等スペクトル性 — 本巻で厳密に確定 (定理4)。")
+check("読み出し表 8 行と genus = 1 − χ/2 = 0 (S²)", abs(genus(zeta_S2)) < 0.00001 && len(tuplespace) >= led0 + 10)
+
+section("結論 (第八巻)")
+print("  ガウスは曲率を測るのに外の空間を見なくてよいことを示した。本巻は曲面を見なくてもよいことまで示した — 固有値の列があれば種数は出る。")
+print("  だが同じ計算がその代償も測った。固有値の列は種数を決め、形を決めない。量子化の単位は等スペクトル類であり、Milnor 対はそれが一点でないことを示す。")
+print("  位相はゼータの原点に、形はその傾きに宿る — ただし傾きも、形を一意には決めない。")
+verdict("@@PAPER-08-OK")

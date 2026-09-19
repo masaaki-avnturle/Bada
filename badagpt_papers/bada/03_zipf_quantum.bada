@@ -1,0 +1,331 @@
+# ============================================================
+# 03_zipf_quantum.bada -- 第三巻
+# 修正核 Λ(x,y) の量子計算への応用
+# — Zipf 振幅状態の LCU 準備、Zipf 源の量子暗号パラメータ、
+#   および Bada 量子言語への実装 —
+#
+#   定理1 規格化 = 修正方程式  ‖ψ‖² = ζ(x,y) = B(y,x−1)·Λ(x,y)
+#   定理2 幾何振幅状態 Σ u^n|n⟩ は積状態 (Ry(2 arctan u^{2^j})、CNOT 0 個)   (表1)
+#   定理3 LCU 分解: 391 節点の重ね合わせで目標振幅が機械精度 (表2・12)
+#   定理4 有限レジスタ ζ_V = ζ(x,y) − ζ(x,y+V) (離散 Newton–Leibniz)        (表3)
+#   定理5 min エントロピー H∞ = x·log₂y + log₂B + log₂Λ の三項分解            (表4)
+#   否定的結果 16 量子ビットの Zipf 源から抽出できる鍵ビットは 0            (表5〜7)
+#   定理6 エントロピー欠損は平坦度 r = y/V だけで決まる                      (表9)
+#   定理7 忠実度 F = ζ_V((x₁+x₂)/2,y)/√(ζ_V(x₁)ζ_V(x₂))、Helstrom 限界    (表10・11)
+#   第III部 zstate / minent / fidel / extract の四規則と位相核との整合
+# ============================================================
+
+section("第三巻  修正核 Λ(x,y) の量子計算への応用 — Zipf 振幅状態と量子暗号")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "zstate"  postfix [ 'zstate'  '(' expr ',' expr ',' expr ',' expr ')' ] => zipf_amplitudes(_1, _2, _3, _4)
+    rule "minent"  postfix [ 'minent'  '(' expr ',' expr ',' expr ',' expr ')' ] => min_entropy(_1, _2, _3, _4)
+    rule "fidel"   postfix [ 'fidel'   '(' expr ',' expr ',' expr ',' expr ',' expr ')' ] => fidelity(_1, _2, _3, _4, _5)
+    rule "extract" stmt    [ 'extract' '(' expr ',' expr ',' expr ',' expr ',' expr ')' ] => commit_measurement(lhl(_1, _2, _3, _4, _5))
+}
+ND := de_default()
+print("grammar rules committed :", len(tuplespace), "facts   節点 =", len(ND[0]))
+
+# ---- 補助 -------------------------------------------------------------------------------------------
+def zipf_amplitudes(nd, x, y, V) {              # 定理3: 振幅 = Σ_k w_k(1−u_k)u_k^{n+y}(log 1/u_k)^{x/2−1} = Γ(x/2)(n+y)^{−x/2}
+    amps := []  n := 0
+    while (n < V) { amps <- de_moment(nd, x / 2, y, n)  n := n + 1 }
+    return amps
+}
+def zeta_V_em(x, y, V) { return hurwitz(x, y) - hurwitz(x, y + V) }      # 定理4 (Euler–Maclaurin 経路)
+def min_entropy(nd, x, y, V) { return x * log2_(y) + log2_(zeta_V_em(x, y, V)) }   # 定理5: −log₂ P(0)
+def renyi(alpha, x, y, V) { return (log2_(zeta_V_em(alpha * x, y, V)) - alpha * log2_(zeta_V_em(x, y, V))) / (1 - alpha) }
+def shannon_bits(x, y, V) {                     # H1 (bit) を V 項の直和で
+    Z := zeta_V_em(x, y, V)  h := 0.0  n := 0
+    while (n < V) { p := pow_(n + y, 0 - x) / Z  h := h - p * log(p)  n := n + 1 }
+    return h / LN2
+}
+def fidelity(nd, x1, x2, y, V) {
+    return zeta_V_em((x1 + x2) / 2, y, V) / sqrt(zeta_V_em(x1, y, V) * zeta_V_em(x2, y, V))
+}
+def lhl(nd, x, y, V, eps_bits) {                # Leftover Hash Lemma: ℓ ≤ H∞ − 2 log₂(1/ε)
+    Hinf := min_entropy(nd, x, y, V)
+    l := Hinf - 2 * eps_bits
+    if (l <= 0) {
+        print("  REFUSED : H_inf = " + fx(Hinf, 3) + " bit < " + fx(2 * eps_bits, 3) + " bit -- 鍵を出さない")
+        return dist([1.0])                      # 空の鍵 (縮退分布)
+    }
+    print("  key budget : " + fx(l, 3) + " bit  (H_inf = " + fx(Hinf, 3) + ", 支払い " + fx(2 * eps_bits, 0) + " bit)")
+    return dist([l, Hinf - l])
+}
+
+# ---- 定理1・3: 規格化と LCU 準備 ----------------------------------------------------------------------
+section("定理1・3  ‖ψ‖² = Γ(x/2)²·ζ_V(x,y) と LCU 状態準備 (節点 391、補助 9 量子ビット)")
+def lcu_prepare(nd, x, y, m) {                  # → [amps, C]   C = Σ_k c_k, c_k = w_k(1−u_k)u_k^y(log 1/u_k)^{x/2−1}·N_m(u_k)
+    V := ipow(2, m)  half := x / 2
+    LU := nd[0]  LV := nd[1]  LW := nd[2]
+    C := 0.0  k := 0
+    while (k < len(LU)) {
+        lu := LU[k]
+        base := LW[k] + (half - 1) * log(0 - lu) + LV[k] + y * lu
+        u := exp(lu)  u2 := u * u
+        Nu := sqrt(V)
+        if (1 - u2 > 0.0000000000001) { Nu := sqrt((1 - pow_(u2, V)) / (1 - u2)) }
+        if (base + log(Nu) > -700) { C := C + exp(base + log(Nu)) }
+        k := k + 1
+    }
+    return [zipf_amplitudes(nd, x, y, V), C]
+}
+print("表2.  x      y      m   振幅最大相対誤差   ‖ψ‖²           Γ(x/2)²ζ_V        C          p_succ     増幅回数")
+T2 := [[2.0, 1.0, 6], [2.73037, 2.32534, 6], [3.0, 1.2, 6], [1.5, 1.0, 8], [4.0, 2.0, 6]]
+PSUCC_PAPER := [0.731634, 0.794254, 0.833518, 0.619652, 0.875671]
+worst_amp := 0.0  worst_norm := 0.0  psucc_ok := true  i := 0
+while (i < 5) {
+    x := T2[i][0]  y := T2[i][1]  m := T2[i][2]  V := ipow(2, m)
+    r := lcu_prepare(ND, x, y, m)  amps := r[0]  C := r[1]
+    G := gamma_(x / 2)
+    ref := []  n := 0
+    while (n < V) { ref <- G * pow_(n + y, 0 - x / 2)  n := n + 1 }
+    ea := arr_maxrel(amps, ref)
+    if (ea > worst_amp) { worst_amp := ea }
+    norm2 := arr_dot(amps, amps)
+    th := G * G * zeta_V_em(x, y, V)
+    en := rel_err(norm2, th)
+    if (en > worst_norm) { worst_norm := en }
+    ps := norm2 / (C * C)
+    if (abs(ps - PSUCC_PAPER[i]) > 0.000002) { psucc_ok := false }
+    print("  " + padr(fx(x, 3), 6) + " " + padr(fx(y, 3), 6) + " " + pad(m, 2) + "     " + pad(sci(ea), 9) + "        " + fx(norm2, 8) + "      " + fx(th, 8) + "     " + fx(C, 6) + "   " + fx(ps, 6) + "   " + fx(PI / 4 / sqrt(ps), 3))
+    i := i + 1
+}
+check("定理3  目標振幅 Γ(x/2)(n+y)^{−x/2} との最大相対誤差 <= 1e-14", worst_amp <= 0.00000000000001)
+check("定理1  ‖ψ‖² = Γ(x/2)²ζ_V(x,y) (rel <= 1e-13)", worst_norm <= 0.0000000000001)
+check("表2    成功確率 p_succ が論文値と 2e-6 以内で一致 (0.62〜0.88、振幅増幅は高々 1 ラウンド)", psucc_ok)
+
+print("")
+print("表12. 節点数 391 を固定して m を増やす (x = 2.73037, y = 2.32534)")
+print("  m    V      振幅最大相対誤差   p_succ     増幅回数")
+ps_prev := 1.0  ps_conv := true  m := 4
+while (m <= 10) {
+    r := lcu_prepare(ND, 2.73037, 2.32534, m)  amps := r[0]  C := r[1]  V := ipow(2, m)
+    G := gamma_(2.73037 / 2)  ref := []  n := 0
+    while (n < V) { ref <- G * pow_(n + 2.32534, -2.73037 / 2)  n := n + 1 }
+    ps := arr_dot(amps, amps) / (C * C)
+    if (ps > ps_prev + 0.000001) { ps_conv := false }
+    ps_prev := ps
+    print("  " + pad(m, 2) + "  " + pad(V, 5) + "     " + pad(sci(arr_maxrel(amps, ref)), 9) + "         " + fx(ps, 6) + "   " + fx(PI / 4 / sqrt(ps), 3))
+    m := m + 2
+}
+check("表12   m = 4→10 で p_succ は単調に極限値 (0.7708) へ収束、精度は劣化しない", ps_conv && abs(ps_prev - 0.7724) < 0.002)
+
+# ---- 定理2: 幾何振幅状態は積状態 (CNOT 0 個) — Bada の量子レジスタで実演 ------------------------------------
+section("定理2  幾何振幅状態 Σ_{n<2^m} u^n |n⟩ = ⊗_j (|0⟩ + u^{2^j}|1⟩) — 量子レジスタで実演")
+def geom_angles(u, m) { th := []  j := 0  p := u  while (j < m) { th <- 2 * atan_(p)  p := p * p  j := j + 1 }  return th }
+def geom_product(u, m) {                        # 積表現: n の二進展開 b_j に沿って u^{2^j} を掛ける
+    V := ipow(2, m)  out := []  n := 0
+    while (n < V) {
+        p := 1.0  j := 0  nn := n
+        while (j < m) { if (nn % 2 == 1) { p := p * pow_(u, ipow(2, j)) }  nn := floor_(nn / 2)  j := j + 1 }
+        out <- p
+        n := n + 1
+    }
+    return out
+}
+def ry_(reg, theta, q) {                        # Ry(θ)|0⟩ と同じ Born 確率 cos²(θ/2), sin²(θ/2) を H·Rz(θ)·H で
+    H(reg, q)  Rz(reg, theta, q)  H(reg, q)
+    return reg
+}
+print("表1.  u      m   max|直接 − 積|   回転角 θ_j = 2 arctan(u^{2^j}) (rad)")
+T1 := [[0.5, 4], [0.9, 5], [0.25, 6], [0.99, 4]]
+prod_ok := true  i := 0
+while (i < 4) {
+    u := T1[i][0]  m := T1[i][1]  V := ipow(2, m)
+    direct := []  n := 0
+    while (n < V) { direct <- pow_(u, n)  n := n + 1 }
+    d := arr_maxdiff(direct, geom_product(u, m))
+    if (d > 0.0000000000000005) { prod_ok := false }
+    th := geom_angles(u, m)  ths := ""  j := 0
+    while (j < m) { ths := ths + fx(th[j], 4) + " "  j := j + 1 }
+    print("  " + padr(u, 5) + "  " + m + "   " + pad(sci(d), 9) + "        " + ths)
+    i := i + 1
+}
+check("定理2  直接展開と積表現の最大差 <= 5e-16 (u = 0.5, 0.9, 0.25, 0.99)", prod_ok)
+u := 0.5  m := 4
+reg := qubit(m)
+th := geom_angles(u, m)  j := 0
+while (j < m) { reg := ry_(reg, th[j], j)  j := j + 1 }     # 単一量子ビット回転のみ、CNOT ゼロ個
+probs := Measure(reg)                                        # 測定 = 台帳 commit
+want := dist(geom_product(u * u, m))                         # |u^n|² ∝ (u²)^n
+print("  qubit(4) に Ry(θ_j) を 4 個 (CNOT 0 個) → Measure:  P(n) ∝ u^{2n} との最大差 =", sci(maxdiff(probs, want)))
+print("  P(0..3) =", fx(probs[0], 5), fx(probs[1], 5), fx(probs[2], 5), fx(probs[3], 5), "  (幾何比 u² = 0.25)")
+check("定理2  Bada レジスタ上の積状態の Born 確率が u^{2n}/N² と一致 (maxdiff <= 1e-15)", maxdiff(probs, want) <= 0.000000000000001)
+
+# ---- 定理4: 有限レジスタ ---------------------------------------------------------------------------------
+section("定理4  ζ_V(x,y) = ζ(x,y) − ζ(x,y+V) = B(y,x−1)Λ(x,y) − B(y+V,x−1)Λ(x,y+V)")
+print("表3.  x      y      m    ζ_V (直和)        B·Λ − B·Λ (因数分解)   相対誤差")
+T3 := [[2.0, 1.0, 6], [2.73037, 2.32534, 6], [3.0, 1.2, 8], [1.5, 1.0, 10], [4.0, 2.0, 6]]
+worst3 := 0.0  i := 0
+while (i < 5) {
+    x := T3[i][0]  y := T3[i][1]  V := ipow(2, T3[i][2])
+    direct := 0.0  n := 0
+    while (n < V) { direct := direct + pow_(n + y, 0 - x)  n := n + 1 }
+    fac := beta_(y, x - 1) * lambda_em(x, y) - beta_(y + V, x - 1) * lambda_em(x, y + V)
+    e := rel_err(fac, direct)
+    if (e > worst3) { worst3 := e }
+    print("  " + padr(fx(x, 3), 6) + " " + padr(fx(y, 3), 6) + " " + pad(T3[i][2], 2) + "    " + fx(direct, 10) + "      " + fx(fac, 10) + "        " + sci(e))
+    i := i + 1
+}
+check("定理4  直和と因数分解経路の相対誤差 <= 1e-13", worst3 <= 0.0000000000001)
+
+# ---- 定理5: min エントロピーの分解 (m = 16) ---------------------------------------------------------------
+section("定理5  H∞ = x·log₂y + log₂B(y,x−1) + log₂Λ(x,y) − (切断項)   [bit, m = 16]")
+V16 := 65536
+print("表4.  x      y       H∞       x·log₂y   log₂B     log₂Λ    照合       H2       H1")
+T4 := [[2.73037, 2.32534], [2.0, 1.0], [1.5, 1.0], [1.1, 1.0], [1.02, 1.0], [1.5, 50.0], [1.1, 500.0]]
+HINF_PAPER := [0.9539, 0.7180, 1.3810, 2.8651, 3.3958, 6.6109, 10.9161]
+t4_ok := true  i := 0  hinf_e1 := 0.0
+while (i < 7) {
+    x := T4[i][0]  y := T4[i][1]
+    Hinf := minent(ND, x, y, V16)
+    if (i == 0) { hinf_e1 := Hinf }
+    tB := log2_(beta_(y, x - 1))  tL := log2_(lambda_em(x, y))
+    trunc := log2_(zeta_V_em(x, y, V16)) - log2_(hurwitz(x, y))
+    recon := x * log2_(y) + tB + tL + trunc
+    if (abs(Hinf - HINF_PAPER[i]) > 0.0001) { t4_ok := false }
+    if (abs(Hinf - recon) > 0.000000001) { t4_ok := false }
+    print("  " + padr(fx(x, 3), 6) + " " + padr(fx(y, 2), 7) + " " + fx(Hinf, 4) + "   " + pad(fx(x * log2_(y), 4), 7) + "   " + pad(fx(tB, 4), 7) + "   " + pad(fx(tL, 4), 6) + "   " + fx(recon, 4) + "   " + pad(fx(renyi(2.0, x, y, V16), 4), 7) + "  " + pad(fx(shannon_bits(x, y, V16), 4), 7))
+    i := i + 1
+}
+check("表4    H∞ が論文値と 1e-4 以内で一致し、三項分解 (+切断項) で全桁再構成される", t4_ok)
+print("")
+print("表5. 抽出可能ビット (m = 16, Leftover Hash Lemma  ℓ ≤ H∞ − 2 log₂(1/ε))")
+print("  x      y       H∞       ℓ(ε=2^-32)  ℓ(ε=2^-64)  効率 H∞/m")
+all_zero := true  i := 0
+while (i < 7) {
+    x := T4[i][0]  y := T4[i][1]
+    Hinf := minent(ND, x, y, V16)
+    l32 := max_(Hinf - 64, 0)  l64 := max_(Hinf - 128, 0)
+    if (l32 > 0) { all_zero := false }
+    print("  " + padr(fx(x, 3), 6) + " " + padr(fx(y, 1), 7) + " " + fx(Hinf, 4) + "   " + pad(fx(l32, 1), 8) + "    " + pad(fx(l64, 1), 8) + "    " + fx(Hinf / 16, 4))
+    i := i + 1
+}
+check("否定的結果1  16 量子ビットの Zipf 源から抽出可能な鍵ビットは全パラメータで 0", all_zero)
+print("")
+print("表6・7. y = 1: x → 1+ でも H∞ は上限に張り付く / 逆問題")
+print("  x−1      Λ(x,1)        H∞        H∞/m")
+hmax := 0.0  d := 0.5
+while (d > 0.001) {
+    hh := minent(ND, 1 + d, 1.0, V16)
+    if (hh > hmax) { hmax := hh }
+    print("  " + padr(d, 7) + "  " + fx(lambda_em(1 + d, 1.0), 8) + "   " + fx(hh, 5) + "   " + fx(hh / 16, 5))
+    if (d > 0.4) { d := 0.1 } else { if (d > 0.05) { d := 0.02 } else { if (d > 0.01) { d := 0.005 } else { d := 0.0005 } } }
+}
+hlim := log2_(digamma_(1 + V16) - digamma_(1))   # x → 1+: ζ_V(1,1) = ψ(1+V) − ψ(1) = H_V (調和数)
+print("  x → 1+ の上限 log₂(ψ(1+V) − ψ(1)) =", fx(hlim, 5), "bit  (調和数 H_65536 =", fx(digamma_(1 + V16) - digamma_(1), 5) + ")")
+def solve_hinf(target) {                         # H∞(x,1) = target を x について二分法 (H∞ は x の減少関数)
+    lo := 1.0001  hi := 4.0
+    if (minent(ND, lo, 1.0, V16) < target) { return -1 }
+    k := 0
+    while (k < 60) { mid := (lo + hi) / 2  if (minent(ND, mid, 1.0, V16) > target) { lo := mid } else { hi := mid }  k := k + 1 }
+    return (lo + hi) / 2
+}
+x1 := solve_hinf(1.0)  x2 := solve_hinf(2.0)  x4 := solve_hinf(4.0)
+print("  目標 H∞ = 1 → x* =", fx(x1, 10), " (論文 1.7284131079)   H∞ = 2 → x* =", fx(x2, 10), " (論文 1.2808343057)")
+check_close("表7    H∞ = 1 bit の解 x* = 1.7284131079", x1, 1.7284131079, 0.0000001)
+check_close("表7    H∞ = 2 bit の解 x* = 1.2808343057", x2, 1.2808343057, 0.0000001)
+check("否定的結果2  y = 1 では H∞ <= 3.55 bit (目標 4 bit は解なし)", x4 < 0 && hmax < 3.55 && hlim < 3.55)
+
+# ---- 定理6: エントロピー欠損は r = y/V だけで決まる ----------------------------------------------------------------
+section("定理6  m − H∞_max → −log₂[ r·ln(1+1/r) ]  (r = y/V、レジスタ幅 m に依らない)")
+def deficit_num(m, r) {                          # x → 1+: H∞_max = log₂y + log₂(ψ(y+V) − ψ(y))
+    V := ipow(2, m)  y := r * V
+    return m - (log2_(y) + log2_(digamma_(y + V) - digamma_(y)))
+}
+def deficit_theory(r) { return 0 - log2_(r * log(1 + 1 / r)) }
+print("表9.  r = y/V   欠損(m=16)   欠損(m=64)   欠損(m=256)   理論値")
+RS := [0.000001, 0.001, 1.0, 1000.0, 1000000.0]
+def6_ok := true  i := 0
+while (i < 5) {
+    r := RS[i]
+    d16 := deficit_num(16, r)  d64 := deficit_num(64, r)  d256 := deficit_num(256, r)  th := deficit_theory(r)
+    if (abs(d64 - th) > 0.00002) { def6_ok := false }
+    if (abs(d256 - th) > 0.00002) { def6_ok := false }
+    print("  " + padr(r, 9) + " " + pad(fx(d16, 5), 9) + "    " + pad(fx(d64, 5), 9) + "    " + pad(fx(d256, 5), 9) + "     " + fx(th, 6))
+    i := i + 1
+}
+check("定理6  m = 64, 256 で欠損が理論値と 2e-5 以内で一致 (r = 1 で 0.528766 = −log₂ ln 2)", def6_ok)
+check_close("定理6  r = 1 の理論値 −log₂(ln 2) = 0.528766", deficit_theory(1.0), 0.528766, 0.0000006)
+print("")
+print("表8. 大レジスタでの鍵抽出 (ε = 2^-64, ℓ ≤ H∞ − 128) — 定理4 が無ければ V = 2^512 は列挙できない")
+print("  m     x      y         H∞          欠損 m−H∞    ℓ         効率")
+T8 := [[64, 2.0, 1.0], [64, 1.1, ipow(2, 60)], [256, 2.0, 1.0], [256, 1.1, ipow(2, 250)], [512, 1.5, ipow(2, 500)]]
+i := 0  key512 := 0.0
+while (i < 5) {
+    m := T8[i][0]  x := T8[i][1]  y := T8[i][2]  V := ipow(2, m)
+    Hinf := minent(ND, x, y, V)
+    l := max_(Hinf - 128, 0)
+    if (i == 4) { key512 := l }
+    ys := "" + y  if (y > 1000) { ys := "2^" + round_(log2_(y)) }
+    print("  " + pad(m, 3) + "   " + padr(fx(x, 1), 5) + "  " + padr(ys, 7) + "   " + pad(fx(Hinf, 4), 10) + "   " + pad(fx(m - Hinf, 4), 10) + "   " + pad(fx(l, 2), 8) + "  " + fx(Hinf / m, 4))
+    i := i + 1
+}
+check_close("表8    m = 512, x = 1.5, y = 2^500 で ℓ = 372.98 bit (256 bit 鍵が取れる)", key512, 372.98, 0.02)
+
+# ---- 定理7: 忠実度と識別 ---------------------------------------------------------------------------------------
+section("定理7  F = ζ_V((x₁+x₂)/2, y) / √(ζ_V(x₁,y) ζ_V(x₂,y))  と Helstrom 限界")
+print("表11. 因数分解経路との一致 (y = 1, m = 12)")
+V12 := 4096
+T11 := [[2.0, 2.5], [2.0, 3.0], [1.5, 1.6], [2.7304, 2.7218]]
+worst11 := 0.0  i := 0
+while (i < 4) {
+    x1 := T11[i][0]  x2 := T11[i][1]
+    num := 0.0  d1 := 0.0  d2 := 0.0  n := 0
+    while (n < V12) { a1 := pow_(n + 1, 0 - x1 / 2)  a2 := pow_(n + 1, 0 - x2 / 2)  num := num + a1 * a2  d1 := d1 + a1 * a1  d2 := d2 + a2 * a2  n := n + 1 }
+    Fdirect := num / sqrt(d1 * d2)
+    Ffac := fidel(ND, x1, x2, 1.0, V12)
+    e := rel_err(Ffac, Fdirect)
+    if (e > worst11) { worst11 := e }
+    print("  x₁ = " + fx(x1, 4) + "  x₂ = " + fx(x2, 4) + "   F(直和) " + fx(Fdirect, 11) + "   F(B·Λ 経由) " + fx(Ffac, 11) + "   rel " + sci(e))
+    i := i + 1
+}
+check("定理7  直和経路と因数分解経路の相対誤差 <= 1e-13", worst11 <= 0.0000000000001)
+print("")
+print("表10. Zipf 状態間の忠実度と識別コスト (m = 16)")
+print("  x₁       x₂       y      F              1−F        Helstrom 識別確率   必要コピー数 ~1/(1−F²)")
+T10 := [[2.0, 3.0, 1.0], [2.0, 2.5, 1.0], [1.5, 1.6, 1.0], [2.0, 2.1, 1.0], [2.73037, 2.72184, 2.32534], [2.0, 2.001, 1.0]]
+F_e1e2 := 0.0  i := 0
+while (i < 6) {
+    x1 := T10[i][0]  x2 := T10[i][1]  y := T10[i][2]
+    F := fidel(ND, x1, x2, y, V16)
+    if (i == 4) { F_e1e2 := F }
+    hel := (1 + sqrt(1 - F * F)) / 2
+    print("  " + padr(fx(x1, 4), 8) + " " + padr(fx(x2, 4), 8) + " " + padr(fx(y, 2), 6) + " " + fx(F, 10) + "   " + pad(sci(1 - F), 9) + "   " + fx(hel, 6) + "            " + fx(1 / (1 - F * F), 1))
+    i := i + 1
+}
+check_close("表10   E1/E2 (x = 2.73037 / 2.72184, y = 2.32534) の忠実度 F = 0.9999971224", F_e1e2, 0.9999971224, 0.0000000005)
+print("  形状エントロピーが 0.00853 しか違わない二つの方程式は、量子状態としてもほとんど区別できない (約 17.4 万コピー)。")
+
+# ---- 第 III 部  位相核との整合と extract ----------------------------------------------------------------------------
+section("第III部  位相核との整合 — 切断が生む禁止順位は復活しない / extract は鍵予算が非正なら鍵を出さない")
+x := 2.73037  y := 2.32534
+amps := zstate(ND, x, y, 32)                      # 上位 32 順位の振幅
+p32 := dist(amps)                                  # 規格化すると確率 (|amp|² ではなく amp を dist に渡すのは論文 付録A の流儀)
+padded := []  n := 0
+while (n < 64) { if (n < 32) { padded <- amps[n] * amps[n] } else { padded <- 0.0 }  n := n + 1 }
+pz := dist(padded)                                 # 64 順位のレジスタを V = 32 で切断: n >= 32 は厳密零
+qz := cognitive_system(pz, [[dist([0.5, 0.5]), arr_fill(64, 0.3)]], [1.0])   # 位相核を一度通す
+print("  Λ(x,y)            :", fx(lambda_de(ND, x, y), 6))
+print("  ζ(x,y)            :", fx(zeta_de(ND, x, y), 6), "  B(y,x−1) :", fx(beta_(y, x - 1), 6), "  check B·Λ − ζ :", sci(beta_(y, x - 1) * lambda_de(ND, x, y) - zeta_de(ND, x, y)))
+print("  H_inf (bit)       :", fx(minent(ND, x, y, V16), 3), "/ 16")
+print("  H_2   (bit)       :", fx(renyi(2.0, x, y, V16), 3))
+print("  fidelity vs E2    :", fx(fidel(ND, x, 2.72184, y, V16), 7))
+print("  truncation zeros  :", len(zeros_of(pz)), "個 (n = 32..63)  位相核通過後も", len(zeros_of(qz)), "個  maxdiff(q, p) =", sci(maxdiff(qz, pz)))
+check("整合   切断で生じた 32 個の禁止基底は cognitive_system 通過後も厳密零 (非復活)", len(zeros_of(pz)) == 32 && len(zeros_of(qz)) == 32 && maxdiff(qz, pz) <= 0.0000000000000005)
+led0 := len(tuplespace)
+extract(ND, x, y, V16, 32.0)                       # ε = 2^-32 → 拒否されるはず
+led1 := len(tuplespace)
+extract(ND, 1.5, ipow(2, 500), ipow(2, 512), 64.0) # m = 512 の実用領域 → 鍵予算 372.98 bit
+led2 := len(tuplespace)
+check("extract 16 量子ビット (ε = 2^-32) は REFUSED を出しつつ縮退分布を台帳へ commit", led1 == led0 + 1)
+check("extract m = 512 は鍵予算を台帳へ commit", led2 == led1 + 1)
+
+section("結論 (第三巻)")
+print("  1. 量子アルゴリズム: 修正方程式は Zipf 振幅状態の規格化そのもの。積状態 (CNOT 0) + 391 節点の LCU で算術回路なしの厳密準備。")
+print("  2. 量子暗号: H∞ は三項に厳密分解。16 量子ビットの Zipf 源から鍵ビットは 0、y = 1 では上限 3.5 bit。欠損は r = y/V だけで決まる。")
+print("  3. Bada: 四つの reviser 規則で表層構文になり、新しい数値カーネルは不要。切断の零は復活せず、extract は予算が非正なら鍵を出さない。")
+print("  主張しないこと: 新しい暗号方式・攻撃・Grover–Rudolph に対する漸近的優位・量子的敵の側情報つき条件付き min エントロピー。")
+verdict("@@PAPER-03-OK")

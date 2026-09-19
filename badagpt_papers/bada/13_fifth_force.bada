@@ -1,0 +1,146 @@
+# ============================================================
+# 13_fifth_force.bada -- 第十三巻 (プレビュー)
+# 第5の力の構造的仮説
+# — カタストロフィ理論の 7 基本型、ミレニアム懸賞問題、およびゼータ関数上の大域的微分多様体としての 4 種のボソン力 —
+#
+# 本巻は確立された事実 (§2) と Yamaguchi Framework 固有の未検証の仮説 (§4〜6) を明確に区別する。
+# Bada への作り換えでは、その区別をそのまま台帳の状態標識にする:
+#   確立   Thom の 7 基本カタストロフィ (余次元・状態変数)、7 懸賞問題 (P7 のみ解決済)、4 種の力、ζ の関数等式
+#   検証   §7 の「検証可能」行だけを実際に計算する — 偏角原理 (arg ζ の巻き数 = 零点の重複度)、関数等式 ξ(s) = ξ(1−s)
+#   仮説   7 カタストロフィ ↔ 7 懸賞問題の対応表 (仮説A)、4 力 ↔ 4 接続 (仮説B)、第5の力 = 放物的臍点 D₅ (仮説C)
+# 仮説は check() の対象にしない。数えるのは、検証できたことだけである。
+# ============================================================
+
+section("第十三巻  第5の力の構造的仮説 — 7 カタストロフィ・7 懸賞問題・4 力・ζ の臨界帯")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "catastrophe" stmt    [ 'catastrophe' '(' expr ',' expr ',' expr ',' expr ')' ] => commit_measurement(catastrophe_fact(_1, _2, _3, _4))
+    rule "winding"     postfix [ 'winding' '(' expr ',' expr ',' expr ')' ]              => arg_winding(_1, _2, _3)
+    rule "xi"          postfix [ 'xi' '(' expr ',' expr ')' ]                            => xi_complete(_1, _2)
+    rule "hypothesis"  stmt    [ 'hypothesis' '(' expr ',' expr ',' expr ')' ]           => commit_measurement(hypothesis_fact(_1, _2, _3))
+}
+print("grammar rules committed :", len(tuplespace), "facts (catastrophe / winding / xi / hypothesis)")
+
+# ---- §2 確立された事実 ----------------------------------------------------------------------------------------------------
+section("§2  確立された事実 — Thom の 7 基本カタストロフィ (制御パラメータ <= 4、状態変数 <= 2)")
+def catastrophe_fact(name, normal_form, codim, nstate) { return dist([codim, nstate]) }
+CAT := [["折り目 (Fold, A2)",            "x³ + ax",                        1, 1],
+        ["尖点 (Cusp, A3)",              "x⁴ + ax² + bx",                  2, 1],
+        ["燕の尾 (Swallowtail, A4)",     "x⁵ + ax³ + bx² + cx",            3, 1],
+        ["蝶 (Butterfly, A5)",           "x⁶ + ax⁴ + bx³ + cx² + dx",      4, 1],
+        ["双曲的臍点 (D4+)",             "x³ + y³ + axy + bx + cy",        3, 2],
+        ["楕円的臍点 (D4−)",             "x³ − 3xy² + a(x²+y²) + bx + cy", 3, 2],
+        ["放物的臍点 (D5)",              "x²y + y⁴ + ax² + by² + cx + dy", 4, 2]]
+print("  #  名称                        標準形 V(x; a,b,c,d)                余次元  状態変数")
+led0 := len(tuplespace)  i := 0
+while (i < 7) {
+    c := CAT[i]
+    catastrophe(c[0], c[1], c[2], c[3])
+    print("  " + (i + 1) + "  " + padr(c[0], 28) + padr(c[1], 36) + pad(c[2], 4) + "     " + c[3])
+    i := i + 1
+}
+check("§2.1  7 基本カタストロフィが (余次元, 状態変数) とともに台帳へ commit された", len(tuplespace) == led0 + 7)
+# 余次元の和の検算: 状態変数 1 の A 系列は 1+2+3+4 = 10、状態変数 2 の D 系列は 3+3+4 = 10
+codA := 0  codD := 0  i := 0
+while (i < 7) { if (CAT[i][3] == 1) { codA := codA + CAT[i][2] } else { codD := codD + CAT[i][2] }  i := i + 1 }
+check("§2.1  A 系列 (A2〜A5) の余次元の和 = D 系列 (D4±, D5) の余次元の和 = 10", codA == 10 && codD == 10)
+print("")
+print("§2.2  ミレニアム懸賞問題 (7 題): P1 リーマン予想 / P2 P vs NP / P3 Yang–Mills / P4 Navier–Stokes / P5 Hodge / P6 BSD — 未解決;  P7 ポアンカレ予想 — 解決済 (Perelman 2003)")
+PROBLEMS := ["P1 リーマン予想", "P2 P vs NP", "P3 Yang–Mills の存在と質量ギャップ", "P4 Navier–Stokes の存在と滑らかさ", "P5 Hodge 予想", "P6 Birch–Swinnerton-Dyer 予想", "P7 ポアンカレ予想"]
+STATUS   := ["未解決", "未解決", "未解決", "未解決", "未解決", "未解決", "解決済 (Perelman 2003)"]
+n_solved := 0  i := 0
+while (i < 7) { fact := ["millennium", PROBLEMS[i], STATUS[i]]  fact >> tuplespace  if (STATUS[i] != "未解決") { n_solved := n_solved + 1 }  i := i + 1 }
+check("§2.2  7 題のうち解決済は P7 のみ (唯一の解決済問題が、対応表では唯一の最単純型 A2 に割り当てられる)", n_solved == 1)
+print("§2.3  標準模型の 4 力: 電磁 U(1) 光子 / 弱 SU(2) W±, Z / 強 SU(3) グルーオン 8 種 / 重力 (Diff, 未量子化) 重力子 (仮説)")
+
+# ---- §2.4 ζ の関連事実 — 検証できるものは計算する ------------------------------------------------------------------------------------
+section("§2.4  ζ の関連事実 (検証可能) — 関数等式 ξ(s) = ξ(1−s) と、零点周りの arg ζ の巻き数 = 重複度 (偏角原理)")
+def c_zeta(s) { return c_hurwitz(s, 1.0, 40, 8) }                 # 複素 Riemann ζ (Euler–Maclaurin N = 40, K = 8)
+def xi_complete(re, im) {                          # ξ(s) = ½ s(s−1) π^{−s/2} Γ(s/2) ζ(s)
+    s := [re, im]
+    pref := c_scale(c_mul(s, [re - 1, im]), 0.5)
+    return c_mul(c_mul(c_mul(pref, c_powr(PI, [0 - re / 2, 0 - im / 2])), c_gamma([re / 2, im / 2])), c_zeta(s))
+}
+print("  s                ξ(s)                            ξ(1−s)                          |ξ(s) − ξ(1−s)|")
+fe_ok := true  i := 0
+PTS := [[0.3, 5.0], [0.7, 12.5], [2.0, 3.0], [0.25, 20.0]]
+while (i < 4) {
+    re := PTS[i][0]  im := PTS[i][1]
+    a := xi(re, im)  b := xi(1 - re, 0 - im)
+    d := c_abs(c_sub(a, b))
+    if (d > 0.00000000001 * c_abs(a)) { fe_ok := false }
+    print("  " + padr(fx(re, 2) + " + " + fx(im, 1) + "i", 16) + " " + padr("(" + fx(a[0], 10) + ", " + fx(a[1], 10) + ")", 31) + " " + padr("(" + fx(b[0], 10) + ", " + fx(b[1], 10) + ")", 31) + " " + sci(d))
+    i := i + 1
+}
+check("§2.4  関数等式 ξ(s) = ξ(1−s) が 4 点で相対 1e-11 以内 (複素 Hurwitz ζ + 複素 Γ)", fe_ok)
+def arg_winding(re0, im0, r) {                     # 中心 (re0, im0)、半径 r の円周に沿った arg ζ の総変化 / 2π = 内部の零点数 (偏角原理)
+    n := 96  prev := c_arg(c_zeta([re0 + r, im0]))  total := 0.0  k := 1
+    while (k <= n) {
+        th := TWO_PI * k / n
+        a := c_arg(c_zeta([re0 + r * cos_(th), im0 + r * sin_(th)]))
+        d := a - prev
+        if (d > PI) { d := d - TWO_PI }
+        if (d < 0 - PI) { d := d + TWO_PI }
+        total := total + d
+        prev := a
+        k := k + 1
+    }
+    return total / TWO_PI
+}
+RHO1 := 14.134725141734693                         # 最初の非自明零点 ½ + 14.1347i
+w1 := winding(0.5, RHO1, 0.5)
+w0 := winding(0.5, 10.0, 0.5)                      # 零点を含まない円
+w2 := winding(0.5, (14.134725141734693 + 21.022039638771555) / 2, 4.0)   # 最初の 2 零点を囲む円 (半径 4)
+print("  零点 ρ₁ = ½ + 14.1347i を囲む半径 0.5 の円:  巻き数 =", fx(w1, 6), " (重複度 1)")
+print("  零点を含まない点 ½ + 10i の周り:                巻き数 =", fx(w0, 6), " (0)")
+print("  ρ₁, ρ₂ = ½ + 21.0220i を囲む半径 4 の円:        巻き数 =", fx(w2, 6), " (2)")
+check("§2.4  偏角原理: arg ζ の巻き数 = 内部の零点数 (1, 0, 2) — U(1) 行の「巻き数 = 重複度」は既知の事実として確認", abs(w1 - 1) < 0.000001 && abs(w0) < 0.000001 && abs(w2 - 2) < 0.000001)
+z1 := c_zeta([0.5, RHO1])
+print("  |ζ(½ + 14.1347i)| =", sci(c_abs(z1)), " (零点)。Montgomery–Odlyzko (GUE 統計)、Hilbert–Pólya、Berry–Keating H = xp は未証明の事実として台帳へ。")
+fact := ["zeta-fact", "非自明零点はすべて臨界帯 0 < Re s < 1 内、RH は Re s = ½ を主張", "未解決"]  fact >> tuplespace
+fact := ["zeta-fact", "Montgomery–Odlyzko: 零点間隔の統計は GUE と一致", "数値的事実、証明なし"]  fact >> tuplespace
+fact := ["zeta-fact", "Hilbert–Pólya: 零点を固有値とする自己共役作用素の存在", "未証明"]  fact >> tuplespace
+fact := ["zeta-fact", "Berry–Keating: そのハミルトニアンの古典極限は H = xp", "未証明"]  fact >> tuplespace
+
+# ---- §4〜6 仮説 — check の対象にしない ---------------------------------------------------------------------------------------------
+section("§4  仮説A  7 カタストロフィ ↔ 7 懸賞問題 (キー = 余次元 = 問題が本質的に扱う制御パラメータの個数)")
+def hypothesis_fact(label, content, status) { print("  [" + status + "] " + padr(label, 24) + content)  return dist([1.0]) }
+HA := [["折り目 A2 (余次元1)", "P7 ポアンカレ — 1 パラメータ (Ricci 流の時間 t) で特異点が折れて消滅"],
+       ["尖点 A3 (余次元2)", "P2 P vs NP — 2 つの制御量 (入力長 n, 時間 t) の計算相転移。SAT の相転移は尖点型の双安定性"],
+       ["燕の尾 A4 (余次元3)", "P4 Navier–Stokes — 3 次元空間での渦の崩壊。自己交差面は特異点形成の候補"],
+       ["蝶 A5 (余次元4)", "P1 リーマン予想 — 4 パラメータ (Re s, Im s, 関数等式の 2 対称) の下で零点が蝶の翼として折り畳まれる"],
+       ["双曲的臍点 D4+ (余次元3)", "P3 Yang–Mills — 2 状態変数 = 非可換ゲージ場の 2 成分、余次元 3 = rank SU(3) + 1"],
+       ["楕円的臍点 D4− (余次元3)", "P6 BSD — D4− の 3 回対称と楕円曲線の 3 分点構造"],
+       ["放物的臍点 D5 (余次元4)", "P5 Hodge — 最高余次元 4 = 最も一般的な特異点"]]
+led1 := len(tuplespace)  i := 0
+while (i < 7) { hypothesis(HA[i][0], HA[i][1], "仮説 (形式的・比喩的)")  i := i + 1 }
+print("  評価: 各行を定理に格上げするには、各問題に付随する変分問題のポテンシャルを構成し、その特異点型を計算する必要がある。本巻はその計算を行っていない。")
+section("§5  仮説B  4 種のボソン力をゼータ臨界帯上の大域的微分多様体 M = {0 < Re s < 1}/(s ~ 1−s) の 4 つの接続として読む")
+HB := [["電磁 U(1)", "arg ζ(s) が定める U(1) 接続 — 零点で arg ζ が 2π 巻く (巻き数 = 重複度) = U(1) ホロノミー   ← §2.4 で巻き数は確認済 (接続の同定は仮説)"],
+       ["弱 SU(2)", "関数等式 s ↔ 1−s の Z₂ 対称の SU(2) 化 — 対称性の破れ (Re s ≠ ½ の零点) が質量を生む。RH = 対称性が破れないことの主張"],
+       ["強 SU(3)", "オイラー積側 Σ_p log p·p^{−s} の 3 成分 (p, p², p^{≥3}) を色荷として読む。閉じ込め = 個々の素数が零点分布に独立に現れないこと"],
+       ["重力", "計量 g = |ζ'(s)/ζ(s)|²|ds|² の曲率 — 対数微分の特異点 (零点) を質量点とする。零点密度が Im s とともに増えることが曲率の増大"]]
+i := 0
+while (i < 4) { hypothesis(HB[i][0], HB[i][1], "類推 (未検証)")  i := i + 1 }
+print("  「大域的」の意味: 明示公式 Σ_ρ h(ρ) = h(0) + h(1) − Σ_n Λ(n)/√n g(log n) + (Γ 項) が M 上の Gauss–Bonnet 型関係式に相当する、というのが仮説の核心。")
+section("§6  仮説C  第5の力 = 4 接続に還元されない、放物的臍点 D5 型 V(x,y) = x²y + y⁴ + ax² + by² + cx + dy をポテンシャルとする成分")
+hypothesis("第5の力 (定義1)", "残余 3 型 (燕の尾 / 楕円的臍点 / 放物的臍点) のうち余次元 4・状態変数 2 の最も一般の型 D5", "仮説")
+hypothesis("到達距離", "4 力の変換点でのみ有効、通常のエネルギースケールでは観測されない (第5の力探索実験の未検出と矛盾しない)", "仮説")
+hypothesis("担体", "スピン 0 の場 (ポテンシャルの分類はスカラー場に自然に対応)。Higgs 場との関係は要検討", "仮説")
+hypothesis("ゼータ側の対応物", "零点の重複度が 2 以上となる点 (現在まで発見されていない)。RH に加えて全零点が単純であることが非自明性の必要条件", "仮説")
+hypothesis("余次元 4 = 時空次元 4", "数の一致のみ。偶然であるかもしれない", "検証不能")
+check("§4〜6  仮説 16 行が状態標識つきで台帳へ commit された (仮説は検査の対象ではない)", len(tuplespace) == led1 + 16)
+
+section("§7  検証可能な主張と検証不能な主張の一覧")
+print("  主張                                                   検証可能性                          本巻での扱い")
+print("  arg ζ(s) の零点周りの巻き数が重複度に一致               可能・既知の事実 (偏角原理)          計算した → 1, 0, 2")
+print("  明示公式が M 上の Gauss–Bonnet 型関係式                 可能 (定式化次第)                   未実施 (曲率形式の明示的構成と N(T) の比較が必要)")
+print("  7 カタストロフィ ↔ 7 懸賞問題の対応                     現状では検証不能                    仮説として台帳へ")
+print("  第5の力の存在                                          物理的には検証不能 (本巻の範囲で)    仮説として台帳へ")
+print("  余次元 4 = 時空次元 4 の一致に意味がある                 検証不能                            数の一致のみ")
+
+section("結論 (第十三巻)")
+print("  7 基本カタストロフィ・7 懸賞問題・4 ボソン力・ζ の臨界帯を、余次元と特異点型をキーとする一つの対応表に載せ、残余として第5の力を D5 型の接続として定義した。")
+print("  構成されたのは対応表であって定理ではない。本巻の作り換えで実際に計算できたのは §2.4 の既知の事実 (関数等式・偏角原理) だけであり、それ以外は仮説のまま台帳に残る。")
+print("  次の一歩は U(1) 行と重力行について曲率と零点密度の関係を数値実験することであり、複素 ζ・Γ は本核 (00_prelude) に既にある。")
+verdict("@@PAPER-13-OK")

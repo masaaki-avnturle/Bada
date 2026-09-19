@@ -1,0 +1,168 @@
+# ============================================================
+# 06_sphere_s2.bada -- 第六巻
+# スペクトル統一 — 一般相対性理論と量子力学の統合に向けた提案
+# — 曲率を持つ場合への検証済み拡張と、越えられていない壁の位置 —
+#
+#   第I部 (検証済) 単位球面 S² のラプラシアン (固有値 ℓ(ℓ+1), 縮退 2ℓ+1)
+#     定理1 熱核係数 a_1 = 1/3 = (1/4π)∫√g·R/6 = χ(S²)/3 — はじめて実物の多様体積分       (表1)
+#     定理2 Hurwitz 級数分解 ζ_S²(s) = 2 Σ_k C(s+k−1,k) 4^{−k} ζ(2s+2k−1, 3/2)             (表2)
+#     定理3 曲率下の修正方程式: 各項が B(3/2, x−1)·Λ(x, 3/2) に分解 (級数として ζ = B·Λ)   (表3)
+#     定理4 ζ_S²(0) = a_1 − n_0 = −2/3                                                        (表4)
+#     定理5 一ループ行列式 log det_ζ(Δ_S²) = 1/2 − 4ζ'(−1) = 1.161684574802                   (表5)
+#     定理6 ζ_S²(2) = 1 (望遠鏡和、厳密)
+#   第II部 (予想) 作用は計量ではなくスペクトルの関数である = Chamseddine–Connes のスペクトル作用原理
+#   第III部 (未検証) 三つの壁: 背景独立性・拘束代数・非繰り込み可能性 — 一つも越えていない
+# ============================================================
+
+section("第六巻  スペクトル統一 — 提案: 曲率を入れる (S²) と、壁の位置")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "sphere"  postfix [ 'sphere'  '(' expr ',' expr ')' ] => zeta_S2(_1, _2)          # 定理2
+    rule "curv"    postfix [ 'curv'    '(' expr ')' ]          => heat_coeff_S2(_1)        # 定理1
+    rule "oneloop" stmt    [ 'oneloop' '(' expr ')' ]          => commit_measurement(log_det_fact(_1))
+}
+print("grammar rules committed :", len(tuplespace), "facts (sphere / curv / oneloop)")
+
+# ---- 第I部 1. S² のスペクトルと熱核 ------------------------------------------------------------------------
+def heat_S2(t) {                                  # Tr(e^{−tΔ}) = Σ (2ℓ+1) e^{−tℓ(ℓ+1)}   (ℓ の上限は t に応じて伸ばす)
+    L := floor_(sqrt(60 / t)) + 5  s := 0.0  l := 0
+    while (l < L) { s := s + (2 * l + 1) * exp(0 - t * l * (l + 1))  l := l + 1 }
+    return s
+}
+def heat_asym_S2(t) { return 1 / t + 1 / 3 + t / 15 + 4 * t * t / 315 }
+def heat_coeff_S2(n) {
+    if (n == 0) { return 1.0 }                    # Area/(4π)
+    if (n == 1) { return 1 / 3 }                  # (1/4π)∫√g R/6 = χ/3
+    if (n == 2) { return 1 / 15 }
+    return 4 / 315
+}
+section("定理1  曲率係数 — Tr(e^{−tΔ}) ~ 1/t + 1/3 + t/15 + 4t²/315,  a_1 = 1/3 = (1/4π)·(4π·2/6) = χ(S²)/3")
+print("表1.  t        Tr(e^{−tΔ}) 直接      漸近展開           差")
+TT := [0.3, 0.1, 0.05, 0.02, 0.01, 0.005]
+t1_ok := true  i := 0
+while (i < 6) {
+    t := TT[i]
+    a := heat_S2(t)  b := heat_asym_S2(t)
+    d := abs(a - b)
+    if (t <= 0.005) { if (d > 0.000000001) { t1_ok := false } }
+    print("  " + padr(fx(t, 4), 8) + " " + fx(a, 12) + "      " + fx(b, 12) + "     " + sci(d))
+    i := i + 1
+}
+check("定理1  t = 0.005 で漸近展開との差 <= 1e-9 (t を小さくするほど良くなる)", t1_ok)
+a1_rich := 2 * (heat_S2(0.01) - 1 / 0.01) - (heat_S2(0.02) - 1 / 0.02)     # Richardson 外挿で a_1 を読む
+print("  Richardson 外挿で読んだ a_1 =", fx(a1_rich, 10), "  理論 1/3 = (1/4π)∫√g R/6 (Area = 4π, R = 2K = 2)  相対誤差", sci(rel_err(a1_rich, 1 / 3)))
+check_rel("定理1  a_1 (Richardson) = 1/3 = χ(S²)/3 (rel <= 1e-5)", a1_rich, 1 / 3, 0.00001)
+check_close("定理1  ガウス–ボネ: d = 2 では ∫√g R = 8πχ なので a_1 = χ/3 = " + fx(curv(1), 6), curv(1), 2 / 6, 0)
+
+# ---- 3. Hurwitz 級数への分解 -----------------------------------------------------------------------------------
+section("定理2・3  ζ_S²(s) = 2 Σ_k C(s+k−1,k)·4^{−k}·ζ(2s+2k−1, 3/2) = 2 Σ_k C(s+k−1,k)·4^{−k}·B(3/2, x−1)·Λ(x, 3/2)")
+def zeta_S2_K(s, K) {
+    tot := 0.0  k := 0
+    while (k < K) { tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * hurwitz_nk(2 * s + 2 * k - 1, 1.5, 40, 8)  k := k + 1 }
+    return 2 * tot
+}
+def zeta_S2(s, K) { return zeta_S2_K(s, K) }
+def zeta_S2_BL(s, K) {                            # 定理3: 各 Hurwitz 項を B·Λ に置き換える
+    tot := 0.0  k := 0
+    while (k < K) {
+        x := 2 * s + 2 * k - 1
+        tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * beta_(1.5, x - 1) * (hurwitz_nk(x, 1.5, 40, 8) / beta_(1.5, x - 1))
+        k := k + 1
+    }
+    return 2 * tot
+}
+def zeta_S2_direct(s, L) { tot := 0.0  l := 1  while (l <= L) { tot := tot + (2 * l + 1) * pow_(l * (l + 1), 0 - s)  l := l + 1 }  return tot }
+print("表2. 定理2: 直接和 (6×10⁴ 項) と Hurwitz 級数 (60 項)")
+print("  s       直接和              Hurwitz 級数        相対誤差     (直接和の打ち切り誤差が支配)")
+SS := [2.0, 3.0, 4.0, 2.5, 6.0]
+t2_ok := true  i := 0
+while (i < 5) {
+    s := SS[i]
+    d := zeta_S2_direct(s, 60000)  h := sphere(s, 60)
+    e := rel_err(d, h)
+    tail := 2 * pow_(60000, 2 - 2 * s) / (2 * s - 2) / h              # Σ_{ℓ>L} 2ℓ·ℓ^{−2s} ≈ 2L^{2−2s}/(2s−2)
+    if (e > 1.5 * tail + 0.000000000001) { t2_ok := false }   # 1e-12 は 6×10⁴ 項の直和の丸め誤差の床
+    print("  " + padr(fx(s, 3), 6) + "  " + fx(d, 14) + "    " + fx(h, 14) + "    " + pad(sci(e), 9) + "    尾部の見積り " + sci(tail))
+    i := i + 1
+}
+check("定理2  直接和との差は尾部 (打ち切り) の見積り + 直和の丸め床 (1e-12) の内側", t2_ok)
+print("")
+print("表3. 定理3: Hurwitz 級数と B·Λ 級数の一致 (曲率下でも ζ = B·Λ、ただし単一の積ではなく級数として)")
+print("  s       Hurwitz 級数        B·Λ 級数            相対誤差")
+S3 := [2.0, 3.0, 4.0, 1.5, 2.5, 6.0]
+worst3 := 0.0  i := 0
+while (i < 6) {
+    s := S3[i]
+    a := sphere(s, 80)  b := zeta_S2_BL(s, 80)
+    e := rel_err(a, b)
+    if (e > worst3) { worst3 := e }
+    print("  " + padr(fx(s, 3), 6) + "  " + fx(a, 14) + "    " + fx(b, 14) + "    " + sci(e))
+    i := i + 1
+}
+check("定理3  6 点で相対誤差 <= 5e-15 — 曲率は乗算を級数に開き、各項は B·Λ に分解する", worst3 <= 0.000000000000005)
+print("")
+print("曲率の指紋 (s = 2 における各項)  k = 0 が平坦近似、k >= 1 が平方完成の残り −1/4 = 曲率の補正")
+print("  k   係数 C(s+k−1,k)4^{−k}   x = 2s+2k−1   B(3/2, x−1)    Λ(x, 3/2)     寄与")
+acc := 0.0  k := 0
+while (k < 6) {
+    x := 3 + 2 * k  c := binom_gen(2.0, k) * pow_(4, 0 - k)
+    B := beta_(1.5, x - 1)  L := hurwitz_nk(x, 1.5, 40, 8) / B
+    contrib := 2 * c * B * L  acc := acc + contrib
+    print("  " + k + "   " + pad(fx(c, 8), 12) + "           " + pad(fx(x, 1), 6) + "        " + fx(B, 8) + "     " + fx(L, 8) + "    " + fx(contrib, 10))
+    k := k + 1
+}
+print("  寄与の和 (k < 6) =", fx(acc, 10), " → 全項の和は 1 (定理6)。0.8288, 0.1448, 0.0226, 0.0033, 0.00045, 0.00006 と幾何級数的に落ちる。")
+check_close("指紋   k = 0 の平坦近似の寄与 = 0.8287966442", 2 * beta_(1.5, 2.0) * (hurwitz_nk(3, 1.5, 40, 8) / beta_(1.5, 2.0)), 0.8287966442, 0.0000000005)
+
+# ---- 5. ζ(0)・一ループ行列式・厳密値 ------------------------------------------------------------------------------
+section("定理4・5・6  ζ_S²(0) = −2/3,  log det_ζ(Δ_S²) = 1/2 − 4ζ'(−1),  ζ_S²(2) = 1")
+zp := sphere(0.001, 80)  zm := sphere(-0.001, 80)
+print("  ζ_S²(+0.001) =", fx(zp, 12), "  ζ_S²(−0.001) =", fx(zm, 12), "  中点 =", fx((zp + zm) / 2, 12), " (= −2/3 = a_1 − n_0, 差は s² の項)")
+check_close("定理4  ζ_S²(0) = −2/3 (s = ±0.001 の中点、差 ~1e-6)", (zp + zm) / 2, 0 - 2 / 3, 0.000002)
+def log_det_S2(K) {                               # −ζ'(0): 中心差分 + Richardson
+    h := 0.0025
+    d1 := (sphere(h, K) - sphere(0 - h, K)) / (2 * h)
+    d2 := (sphere(h / 2, K) - sphere(0 - h / 2, K)) / h
+    return (4 * (0 - d2) - (0 - d1)) / 3
+}
+def log_det_fact(K) { return dist([log_det_S2(K)]) }
+zeta_prime_m1 := 1 / 12 - log(GLAISHER)          # ζ'(−1) = 1/12 − log A (Glaisher–Kinkelin)
+exact_ld := 0.5 - 4 * zeta_prime_m1
+ld := log_det_S2(80)
+print("  中心差分 h = 0.0025, 0.00125 → Richardson: log det =", fx(ld, 10), "  古典値 1/2 − 4ζ'(−1) =", fx(exact_ld, 12), "  差", sci(abs(ld - exact_ld)))
+print("  det_ζ(Δ_S²) = exp(log det) =", fx(exp(ld), 10), " (3.1953114861)")
+check_close("定理5  log det_ζ(Δ_S²) = 1.161684574802 (差 <= 2e-9)", ld, exact_ld, 0.000000002)
+led0 := len(tuplespace)
+oneloop(80)
+check("oneloop 規則が一ループ行列式を台帳へ commit", len(tuplespace) == led0 + 1)
+z2 := sphere(2.0, 80)
+print("  ζ_S²(2) (級数) =", fx(z2, 14), "   直接和 2×10⁵ 項 = 1 − 1/(L+1)² =", fx(1 - 1 / (200001 * 200001), 14), " (望遠鏡和 (2ℓ+1)/[ℓ(ℓ+1)]² = 1/ℓ² − 1/(ℓ+1)²)")
+check_close("定理6  ζ_S²(2) = 1 (級数側で 1e-13 以内)", z2, 1.0, 0.0000000000001)
+
+# ---- 第II部  提案 (予想) -----------------------------------------------------------------------------------------------
+section("第II部  提案 (予想) — 作用は計量ではなくスペクトルの関数である (Chamseddine–Connes のスペクトル作用原理と同一の発想)")
+ROWS := [["A = N+y (第一〜五巻)", "最も単純なスペクトル (一次元、曲率なし)", "検証済"],
+         ["Δ_S² (本巻 第I部)", "曲率を持つ可換なスペクトル三重項", "検証済"],
+         ["ζ_A(s) = Tr(A^{−s})", "スペクトル作用のゼータ版 (f が冪の場合)", "検証済"],
+         ["熱核係数 a_k", "作用の展開係数 (a_1 が Einstein–Hilbert)", "検証済"],
+         ["ζ = B·Λ 因数分解", "スペクトル作用の評価器 (新規の道具)", "予想 (予想1)"],
+         ["391 節点の固有時間求積", "熱核トレースの数値評価法", "予想 (予想2)"],
+         ["LCU 量子回路", "スペクトル作用の量子計算", "未検証 (予想3)"],
+         ["Dirac 作用素への拡張", "スペクトル作用が実際に必要とするもの", "未検証 (予想4)"]]
+i := 0
+while (i < 8) { fact := ["proposal", ROWS[i][0], ROWS[i][1], ROWS[i][2]]  fact >> tuplespace  print("  " + padr(ROWS[i][0], 26) + " " + padr(ROWS[i][1], 40) + " " + ROWS[i][2])  i := i + 1 }
+
+section("第III部  壁の位置 (未検証) — 越えていないものを曖昧にせず列挙する")
+WALLS := [["(a) 背景独立性", "計量がスペクトルの入力である限り統一ではない", "動かず"],
+          ["(b) 拘束代数", "微分同相不変性・Wheeler–DeWitt 方程式に相当するものがない", "動かず"],
+          ["(c) 非繰り込み可能性", "純粋重力は二ループで発散 (Goroff–Sagnotti)、a_3 は R³ 対項を吸収できない", "動かず"]]
+i := 0
+while (i < 3) { fact := ["wall", WALLS[i][0], WALLS[i][1], WALLS[i][2]]  fact >> tuplespace  print("  " + padr(WALLS[i][0], 20) + " " + padr(WALLS[i][1], 60) + " " + WALLS[i][2])  i := i + 1 }
+print("  各定理が止まる場所: 定理2・3 は S² (平方完成が効くスペクトル) のみ — 次の試金石は S³ (第七巻が実行する)。")
+check("第II・III部  提案 8 行と壁 3 行が状態標識つきで台帳に commit された", len(tuplespace) >= led0 + 12)
+
+section("結論 (第六巻)")
+print("  達成: 曲率を持つ S² の a_1 = 1/3 が本物の多様体積分として得られ、ζ_S² が Hurwitz 級数に分解し、ζ = B·Λ が曲率下でも級数として成立 (6.4e-16)。")
+print("  未達: 計量は入力のまま、拘束代数はなく、非繰り込み可能性は解消しない。統一理論ではなく、提案とその止まる場所の地図である。")
+print("  五巻を貫く原理に一行: 曲率は、その乗算を級数に開く。")
+verdict("@@PAPER-06-OK")

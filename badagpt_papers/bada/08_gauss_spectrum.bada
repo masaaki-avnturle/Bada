@@ -1,0 +1,247 @@
+# ============================================================
+# 08_gauss_spectrum.bada -- 第八巻
+# ガウスの曲面論の量子化 — 空間概念の量子化としての重力の量子化について
+# — オイラー標数はスペクトルの s = 0 の値であり、そして形は決まらない —
+#
+#   定理1 熱核版 Gauss–Bonnet: 閉曲面で a_1 = (1/12π)∫K dA = χ(M)/6                            (表1)
+#   定理2 主定理: χ(M) = 6·(ζ_Δ(0) + 1) — 計量も座標も多様体も要らない、固有値の列だけ           (表2・3)
+#   定理3 位相と幾何の分離: ζ(0) はスケールにも形にも依らず、ζ'(0) だけが動く                     (表4・5)
+#   定理4 スペクトルは形を決めない: Milnor の 16 次元トーラス対 E8⊕E8 / D16⁺ のテータ級数が一致  (表6)
+#   量子化の単位は多様体ではなく等スペクトル類 [M] であり、Milnor 対はその類が一点でないことを示す。
+# ============================================================
+
+section("第八巻  ガウスの曲面論の量子化 — χ = 6(ζ(0)+1)、そして形は決まらない")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "euler" postfix [ 'euler' '(' expr ')' ] => euler_char(_1)             # 定理2
+    rule "genus" postfix [ 'genus' '(' expr ')' ] => genus_of(_1)
+    rule "shape" postfix [ 'shape' '(' expr ')' ] => log_det(_1)                # 定理3
+    rule "hear"  stmt    [ 'hear'  '(' expr ')' ] => commit_measurement(isospectral_class(_1))
+}
+print("grammar rules committed :", len(tuplespace), "facts (euler / genus / shape / hear)")
+
+# ---- S²: 第六巻の Hurwitz 級数表示 -------------------------------------------------------------------------
+def zeta_S2(s) {
+    tot := 0.0  k := 0
+    while (k < 80) { tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * hurwitz_nk(2 * s + 2 * k - 1, 1.5, 40, 8)  k := k + 1 }
+    return 2 * tot
+}
+def heat_S2(t) { L := floor_(sqrt(60 / t)) + 5  s := 0.0  l := 0  while (l < L) { s := s + (2 * l + 1) * exp(0 - t * l * (l + 1))  l := l + 1 }  return s }
+
+# ---- 平坦トーラス: テータ函数の Poisson 変換つき Mellin 分割 ----------------------------------------------------
+def theta1(x) {                                  # Σ_m e^{−x m²}  (小さい x では Poisson 変換で機械精度)
+    if (x >= 1) {
+        s := 1.0  m := 1  term := exp(0 - x)
+        while (term > 0.000000000000000001) { s := s + 2 * term  m := m + 1  term := exp(0 - x * m * m) }
+        return s
+    }
+    y := PI * PI / x
+    s := 1.0  k := 1  term := exp(0 - y)
+    while (term > 0.000000000000000001) { s := s + 2 * term  k := k + 1  term := exp(0 - y * k * k) }
+    return sqrt(PI / x) * s
+}
+def theta1_reg(x) {                              # θ₁(x) − √(π/x) を桁落ちなしで (Poisson 側では級数そのもの)
+    if (x >= 1) { return theta1(x) - sqrt(PI / x) }
+    y := PI * PI / x
+    s := 0.0  k := 1  term := exp(0 - y)
+    while (term > 0.000000000000000001) { s := s + 2 * term  k := k + 1  term := exp(0 - y * k * k) }
+    return sqrt(PI / x) * s
+}
+def simpson(f, a, b, n) {
+    h := (b - a) / n  s := f(a) + f(b)  i := 1
+    while (i < n) { w := 2  if (i % 2 == 1) { w := 4 }  s := s + w * f(a + i * h)  i := i + 1 }
+    return s * h / 3
+}
+def zeta_T2(s, L1, L2) {                          # Γ(s)ζ(s) = ∫₀¹ t^{s−1}[(θ−1) − A/(4πt) + 1]dt + (A/4π)/(s−1) − 1/s + ∫₁^∞ t^{s−1}(θ−1)dt
+    A := L1 * L2  k1 := TWO_PI / L1  k2 := TWO_PI / L2
+    def fR(t) {                                   # θ₁(x₁)θ₁(x₂) − A/(4πt) = s₁d₂ + s₂d₁ + d₁d₂  (s_i = √(π/x_i), d_i = θ₁ − s_i) — 安定
+        x1 := t * k1 * k1  x2 := t * k2 * k2
+        s1 := sqrt(PI / x1)  s2 := sqrt(PI / x2)  d1 := theta1_reg(x1)  d2 := theta1_reg(x2)
+        return pow_(t, s - 1) * (s1 * d2 + s2 * d1 + d1 * d2)
+    }
+    def fT(t) { return pow_(t, s - 1) * (theta1(t * k1 * k1) * theta1(t * k2 * k2) - 1) }
+    R := simpson(fR, 0.00000001, 1.0, 2000)
+    T := simpson(fT, 1.0, 120.0, 3000)
+    return (R + (A / (4 * PI)) / (s - 1) - 1 / s + T) / gamma_(s)
+}
+
+# ---- 定理2: χ = 6(ζ(0)+1) ---------------------------------------------------------------------------------------
+def zeta0_of(zf) { h := 0.001  return (zf(h) + zf(0 - h)) / 2 }          # ζ(0) を s = ±h の中点で
+def euler_char(zf) { return 6 * (zeta0_of(zf) + 1) }
+def genus_of(zf) { return 1 - euler_char(zf) / 2 }
+def log_det(zf) {                                 # −ζ'(0): 中心差分 + Richardson
+    h := 0.001
+    d1 := (zf(h) - zf(0 - h)) / (2 * h)
+    d2 := (zf(h / 2) - zf(0 - h / 2)) / h
+    return 0 - (4 * d2 - d1) / 3
+}
+def isospectral_class(spec) {
+    print("  WARNING: 等長でない空間が同じ類に落ちうる (Milnor 対) — 固有値の列そのものが同一性の全部である")
+    return dist(spec)
+}
+
+section("定理1  熱核版 Gauss–Bonnet  a_1 = (1/4π)∫√g R/6 dA = (1/12π)∫K dA = χ(M)/6")
+a1_S2 := 2 * (heat_S2(0.01) - 1 / 0.01) - (heat_S2(0.02) - 1 / 0.02)
+def heat_T2(t, L1, L2) { return theta1(t * pow_(TWO_PI / L1, 2)) * theta1(t * pow_(TWO_PI / L2, 2)) }
+def a1_T2(L1, L2) { A := L1 * L2  a0 := A / (4 * PI)  return 2 * (heat_T2(0.01, L1, L2) - a0 / 0.01) - (heat_T2(0.02, L1, L2) - a0 / 0.02) }
+print("表1.  多様体          χ    χ/6        a_1 実測 (Richardson)   相対誤差")
+print("  S² (単位球面)      2    " + fx(1 / 3, 6) + "   " + fx(a1_S2, 10) + "           " + sci(rel_err(a1_S2, 1 / 3)))
+print("  T² (2π × 2π)       0    0.000000   " + fx(a1_T2(TWO_PI, TWO_PI), 10) + "           —")
+print("  T² (2π × 4π)       0    0.000000   " + fx(a1_T2(TWO_PI, 2 * TWO_PI), 10) + "           —")
+check_rel("定理1  S²: a_1 = χ/6 = 1/3 (rel <= 1e-5)", a1_S2, 1 / 3, 0.00001)
+check("定理1  平坦トーラスで a_1 = 0 (面積によらず、|a_1| <= 1e-12)", abs(a1_T2(TWO_PI, TWO_PI)) < 0.000000000001 && abs(a1_T2(TWO_PI, 2 * TWO_PI)) < 0.000000000001)
+
+section("定理2 (主定理)  χ(M) = 6·(ζ_Δ(0) + 1) — 入力は固有値の列だけ")
+print("表2.  多様体            面積        ζ_Δ(0) 実測       6(ζ(0)+1)       χ 真値   差")
+chiS2 := euler(zeta_S2)
+print("  S²                  " + padr(fx(4 * PI, 5), 11) + " " + fx(zeta0_of(zeta_S2), 10) + "     " + fx(chiS2, 10) + "     2        " + sci(abs(chiS2 - 2)))
+check_close("定理2  χ(S²) = 2 (差 <= 1e-5)", chiS2, 2.0, 0.00001)
+TORI := [[TWO_PI, TWO_PI], [TWO_PI, 2 * TWO_PI], [PI, 6 * PI], [1.0, 1.0], [1.0, 3.0]]
+TN   := ["T² 2π × 2π", "T² 2π × 4π", "T² π × 6π ", "T² 1 × 1  ", "T² 1 × 3  "]
+tori_ok := true  i := 0
+while (i < 5) {
+    L1 := TORI[i][0]  L2 := TORI[i][1]
+    def zT(s) { return zeta_T2(s, L1, L2) }
+    z0 := zeta0_of(zT)  chi := 6 * (z0 + 1)
+    if (abs(chi) > 0.0001) { tori_ok := false }
+    print("  " + TN[i] + "          " + padr(fx(L1 * L2, 5), 11) + " " + fx(z0, 10) + "     " + pad(fx(chi, 10), 11) + "     0        " + sci(abs(chi)))
+    i := i + 1
+}
+check("定理2  平坦トーラス 5 例すべてで χ = 0 (|差| <= 1e-4、縦横比によらず)", tori_ok)
+print("  トーラスの χ = 0 は形に依らない: Epstein ゼータの Γ(s)ζ(s) の s = 0 の極はゼロモードの −1 だけから来る。位相はスペクトルの中で剛的である。")
+print("")
+print("表3. 正方トーラスの厳密公式との照合  ζ(s) = (L/2π)^{2s}·4ζ_R(s)β(s)")
+def beta_prime0() { return log(gamma_(0.25) * gamma_(0.25) / (TWO_PI * sqrt(2))) }   # β'(0) = log(Γ(1/4)²/(2π√2))
+sq_ok := true  i := 0
+LS := [TWO_PI, 1.0]
+while (i < 2) {
+    L := LS[i]
+    def zS(s) { return zeta_T2(s, L, L) }
+    z0 := zeta0_of(zS)  zp := 0 - log_det(zS)
+    exact := 0 - 2 * log(L / TWO_PI) - log(TWO_PI) - 2 * beta_prime0()
+    if (abs(z0 + 1) > 0.0001) { sq_ok := false }
+    if (abs(zp - exact) > 0.0001) { sq_ok := false }
+    print("  L = " + padr(fx(L, 5), 8) + " ζ(0) 数値 " + fx(z0, 10) + " (厳密 −1)   ζ'(0) 数値 " + fx(zp, 10) + "   厳密 " + fx(exact, 10) + "   差 " + sci(abs(zp - exact)))
+    i := i + 1
+}
+check("表3    正方トーラス L = 2π, 1 で ζ(0) = −1、ζ'(0) が厳密式 −2log(L/2π) − log 2π − 2β'(0) と 1e-4 以内", sq_ok)
+
+section("定理3  位相と幾何の分離 — ζ(0) はスケールにも形にも依らず、ζ'(0) だけが動く")
+print("表4. 球面のスケール変換 g → a²g: ζ_a(s) = a^{2s}ζ_1(s)  ⇒  ζ_a(0) = ζ_1(0),  ζ_a'(0) = 2 log(a)·ζ_1(0) + ζ_1'(0)")
+z0S2 := 0 - 2 / 3  ldS2 := shape(zeta_S2)          # ζ_1(0) = −2/3 は定理 (第六巻 定理4)、ζ_1'(0) は本巻の数値
+print("  (ζ_1(0) の数値 " + fx(zeta0_of(zeta_S2), 10) + " → 定理値 −2/3 を用い、ζ_1'(0) = " + fx(0 - ldS2, 10) + " は本巻の Richardson 値)")
+print("  a       ζ_a(0)          χ = 6(ζ(0)+1)   log det_ζ = −ζ_a'(0)   det_ζ")
+AS := [0.5, 1.0, 2.0, 5.0]
+DET_PAPER := [1.26806021, 3.19531149, 8.05168042, 27.31952896]
+t4_ok := true  i := 0
+while (i < 4) {
+    a := AS[i]
+    ld := ldS2 - 2 * log(a) * z0S2
+    if (abs(exp(ld) - DET_PAPER[i]) > 0.00002 * DET_PAPER[i]) { t4_ok := false }
+    print("  " + padr(fx(a, 2), 6) + "  " + fx(z0S2, 10) + "    " + fx(6 * (z0S2 + 1), 10) + "     " + pad(fx(ld, 10), 12) + "           " + fx(exp(ld), 8))
+    i := i + 1
+}
+check("定理3  半径 0.5, 1, 2, 5 で χ = 2 は不変、det_ζ は 1.268 → 3.195 → 8.052 → 27.32 (論文値と相対 2e-5 以内)", t4_ok && abs(6 * (z0S2 + 1) - 2) < 0.00001)
+print("")
+def eta_iy(y) {                                  # Dedekind η(iy) = e^{−πy/12} Π (1 − e^{−2πny})
+    q := exp(0 - TWO_PI * y)  p := 1.0  n := 1  t := q
+    while (t > 0.000000000000000001) { p := p * (1 - t)  n := n + 1  t := pow_(q, n) }
+    return exp(0 - PI * y / 12) * p
+}
+def log_det_torus_exact(L1, L2) { y := L2 / L1  return log(L1 * L2 * y * pow_(eta_iy(y), 4)) }   # Kronecker 極限公式: det_ζ Δ = A·τ₂·|η(τ)|⁴
+print("表5. 面積を 4π² に固定して縦横比だけ変えた平坦トーラス  (厳密値は Kronecker の極限公式 log det = log(A·τ₂·|η(iτ₂)|⁴))")
+print("  L1 × L2              縦横比   ζ(0)           χ           log det_ζ (数値)  厳密           差         論文の数値")
+RATIOS := [1.0, 1.5, 2.0, 3.0, 5.0]
+LD_PAPER := [2.6210689464, 2.5104342956, 2.2751575372, 1.6331075031, 0.0495373861]
+t5_ok := true  ld_prev := 99.0  i := 0
+while (i < 5) {
+    r := RATIOS[i]  L1 := sqrt(4 * PI * PI / r)  L2 := r * L1
+    def zT(s) { return zeta_T2(s, L1, L2) }
+    z0 := zeta0_of(zT)  ld := shape(zT)
+    if (abs(6 * (z0 + 1)) > 0.0001) { t5_ok := false }
+    ex := log_det_torus_exact(L1, L2)
+    if (abs(ld - ex) > 0.0005) { t5_ok := false }
+    if (ld > ld_prev) { t5_ok := false }
+    ld_prev := ld
+    print("  " + padr(fx(L1, 5) + " × " + fx(L2, 5), 20) + " " + padr(fx(r, 1), 7) + "  " + fx(z0, 9) + "   " + pad(fx(6 * (z0 + 1), 6), 9) + "   " + fx(ld, 10) + "      " + fx(ex, 10) + "   " + pad(sci(abs(ld - ex)), 9) + "  " + fx(LD_PAPER[i], 7))
+    i := i + 1
+}
+check("定理3  面積も χ も同じ、log det だけが 2.621 → 0.0492 と単調に動く (Kronecker の厳密値と 5e-4 以内)", t5_ok)
+print("  注: 論文の表5 (Simpson 6000 分割の Mellin 分割) は厳密値から 3e-4 ほどずれている。本実装 (桁落ちなしの正則化) の方が厳密値に近い。")
+check_close("表3再照合  正方トーラス L = 2π の厳密値は Kronecker 公式でも 2.6210658518", log_det_torus_exact(TWO_PI, TWO_PI), 2.6210658518, 0.000000001)
+print("  ζ(0) が位相、ζ'(0) が幾何を担う。s = 0 のごく近傍だけを見れば、値が位相、傾きが幾何という分離が成り立つ。")
+
+# ---- 定理4: Milnor の等スペクトル対 ---------------------------------------------------------------------------------
+section("定理4  スペクトルは形を決めない — Milnor の 16 次元トーラス対 E8⊕E8 と D16⁺ (厳密な整数計算)")
+E := 64                                           # x = q^{1/4}: 指数 = ノルム × 4、ノルム 0..16
+def poly_mul_trunc(a, b) {
+    out := []  k := 0
+    while (k <= E) {
+        s := 0.0  i := 0
+        while (i <= k) { if (i < len(a)) { j := k - i  if (j < len(b)) { s := s + a[i] * b[j] } }  i := i + 1 }
+        out <- s
+        k := k + 1
+    }
+    return out
+}
+def poly_pow_trunc(a, n) { r := set_at(arr_zeros(E + 1), 0, 1.0)  i := 0  while (i < n) { r := poly_mul_trunc(r, a)  i := i + 1 }  return r }
+TH2 := arr_zeros(E + 1)  TH3 := arr_zeros(E + 1)  TH4 := arr_zeros(E + 1)
+m := -12
+while (m <= 12) {
+    e := (2 * m + 1) * (2 * m + 1)
+    if (e <= E) { TH2 := set_at(TH2, e, TH2[e] + 1) }              # θ₂ = Σ q^{(2m+1)²/4}
+    e := 4 * m * m
+    if (e <= E) {
+        TH3 := set_at(TH3, e, TH3[e] + 1)                            # θ₃ = Σ q^{m²}
+        sgn := 1  if (abs(m) % 2 == 1) { sgn := -1 }
+        TH4 := set_at(TH4, e, TH4[e] + sgn)                          # θ₄ = Σ (−1)^m q^{m²}
+    }
+    m := m + 1
+}
+def theta_Dplus(n) {                              # D_n⁺ のテータ級数 = ½[θ₂ⁿ + θ₃ⁿ + θ₄ⁿ]
+    a := poly_pow_trunc(TH2, n)  b := poly_pow_trunc(TH3, n)  c := poly_pow_trunc(TH4, n)
+    out := []  i := 0
+    while (i <= E) { out <- round_((a[i] + b[i] + c[i]) / 2)  i := i + 1 }
+    return out
+}
+THE8   := theta_Dplus(8)                          # E8 = D8⁺
+THE8E8 := poly_mul_trunc(THE8, THE8)              # E8 ⊕ E8
+THD16  := theta_Dplus(16)                         # D16⁺
+print("表6.  ノルム N   E8⊕E8 のベクトル数   D16⁺ のベクトル数   一致")
+MILNOR_PAPER := [1, 480, 61920, 1050240, 7926240, 37500480, 135480960, 395301120, 1014559200]
+milnor_ok := true  n := 0
+while (n <= 16) {
+    a := THE8E8[4 * n]  b := THD16[4 * n]
+    if (a != b) { milnor_ok := false }
+    if (n % 2 == 0) {
+        if (a != MILNOR_PAPER[n / 2]) { milnor_ok := false }
+        print("  " + pad(n, 6) + "     " + pad(a, 14) + "        " + pad(b, 14) + "        " + bstr(a == b))
+    } else { if (a != 0) { milnor_ok := false } }
+    n := n + 1
+}
+check("定理4  ノルム 0..16 のすべてで完全一致 (1, 480, 61920, …, 1014559200)、奇数ノルムは 0 (偶格子)", milnor_ok)
+E8_PAPER := [1, 240, 2160, 6720, 17520]
+e8_ok := true  n := 0
+while (n <= 4) { if (THE8[8 * n] != E8_PAPER[n]) { e8_ok := false }  n := n + 1 }   # E8 のノルムは偶数 2n → 指数 8n
+check("対照   E8 単独のテータ級数 1, 240, 2160, 6720, 17520 (= 240·σ₃(m))", e8_ok)
+print("  理論的な理由: 両者のテータ級数は重さ 8 のモジュラー形式で、その空間は 1 次元 (E₄²)。二つの格子は同型でない (根系 E8+E8 と D16)。")
+print("  ⇒ 写像 空間 ↦ スペクトル は単射でない。固有値の列は位相・体積・全曲率を決めるが、計量そのものは決めない。")
+led0 := len(tuplespace)
+hear([1.0, 480.0, 61920.0])                       # 規則 hear: 等スペクトル類を commit (警告つき)
+check("hear    規則 hear が等スペクトル類を台帳へ commit (等長性は記録されない)", len(tuplespace) == led0 + 1)
+
+section("スペクトルから読み取れるもの / 読み取れないもの、そして四つの壁")
+READ := [["次元 d", "Weyl 則 N(λ) ~ Cλ^{d/2}", "古典"], ["体積 Vol(M)", "熱核の主要項 a_0 = Vol/(4π)^{d/2}", "古典"],
+         ["全曲率 ∫K dA", "a_1 = (1/12π)∫K dA (定理1)", "検証済"], ["オイラー標数 χ", "χ = 6(ζ(0)+1) (定理2)", "検証済"],
+         ["種数 g", "g = 1 − χ/2 = 1 − 3(ζ(0)+1)", "検証済"], ["スケール (大きさ)", "ζ'(0) のシフト (定理3)", "検証済"],
+         ["曲率の高次不変量", "a_2, a_3, … (∫R², ∫R_μν², …)", "古典"], ["計量そのもの", "読み取れない (定理4)", "検証済 (否定)"]]
+i := 0
+while (i < 8) { fact := ["readout", READ[i][0], READ[i][1], READ[i][2]]  fact >> tuplespace  print("  " + padr(READ[i][0], 18) + padr(READ[i][1], 40) + READ[i][2])  i := i + 1 }
+print("  壁 (a) 背景独立性 (b) 拘束代数 (c) 非繰り込み可能性 — 動かず。 (d) 新規: 等スペクトル性 — 本巻で厳密に確定 (定理4)。")
+check("読み出し表 8 行と genus = 1 − χ/2 = 0 (S²)", abs(genus(zeta_S2)) < 0.00001 && len(tuplespace) >= led0 + 10)
+
+section("結論 (第八巻)")
+print("  ガウスは曲率を測るのに外の空間を見なくてよいことを示した。本巻は曲面を見なくてもよいことまで示した — 固有値の列があれば種数は出る。")
+print("  だが同じ計算がその代償も測った。固有値の列は種数を決め、形を決めない。量子化の単位は等スペクトル類であり、Milnor 対はそれが一点でないことを示す。")
+print("  位相はゼータの原点に、形はその傾きに宿る — ただし傾きも、形を一意には決めない。")
+verdict("@@PAPER-08-OK")

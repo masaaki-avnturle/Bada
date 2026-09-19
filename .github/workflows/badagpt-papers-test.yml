@@ -1,0 +1,33 @@
+name: badagpt-papers-test
+
+# BadaGPT 未知事前エンジン論文集 (量子 Bada 版) の全巻を実行し、252 の検査と完走センチネルを確認する。
+# 各巻は共通核と連結され bada_gui_ide/www/bada.js のインタープリタで走る (約 1 分)。
+
+on:
+  push:
+    paths:
+      - "badagpt_papers/**"
+      - "bada_gui_ide/www/bada.js"
+      - ".github/workflows/badagpt-papers-test.yml"
+  pull_request:
+    paths:
+      - "badagpt_papers/**"
+      - "bada_gui_ide/www/bada.js"
+  workflow_dispatch:
+
+jobs:
+  run-papers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run all papers (Bada interpreter)
+        run: node badagpt_papers/tools/run-papers.js --quiet
+      - name: Upload outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: badagpt-papers-dist
+          path: badagpt_papers/dist/

@@ -1,0 +1,269 @@
+# ============================================================
+# 04_trihedron.bada -- 第四巻
+# ゼータ・エントロピー・生成 — 論文集
+# 修正核 Λ(x,y) をめぐる四つの報告と、脳との対応についての一つの否定的検討
+#
+#   第I論文  ζ の三面体 — 作用素・Mellin・Newton 差分
+#     定理1・2 ζ(x,y) = Tr((N+y)^{−x}) は熱核 Tr(e^{−tA}) = e^{−ty}/(1−e^{−t}) の Mellin 変換 (表1)
+#     定理3    Δ_y ζ(x,y) = −y^{−x}、離散 Newton–Leibniz  Σ_{n<V} = ζ(x,y) − ζ(x,y+V)      (表2)
+#     定理4    ∂_x ζ = −Σ log(n+y)(n+y)^{−x} — log 核は指数方向の微分としてのみ現れる    (表3)
+#   第II論文 生成器 — 分配関数の因数分解と GPT 型生成
+#     定理5    u·κ(u) = E[N]·log(1/u) = 期待累積サプライザル                                   (表4)
+#     定理6    温度は Zipf 指数のスケーリング x → x/T、臨界温度 T_c = x                         (表5)
+#     定理7    nucleus (top-p) 打ち切り順位の閉形式と k* ∝ (1−p)^{−1/(x−1)}                  (表6〜9)
+#   第III論文 Shannon 解析器 — Rényi 族 H_α = [log ζ_V(αx) − α log ζ_V(x)]/(1−α)
+#   第V論文  脳との対応 — 成立する成分と成立しない結論を台帳へ分けて commit
+# ============================================================
+
+section("第四巻  ゼータ・エントロピー・生成 — ζ の三面体、温度、top-p、そして脳")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "trace" postfix [ 'trace' '(' expr ',' expr ')' ]                     => spectral_zeta(_1, _2)
+    rule "delta" postfix [ 'delta' '(' expr ',' expr ')' ]                     => newton_diff(_1, _2)
+    rule "temp"  postfix [ 'temp'  '(' expr ',' expr ',' expr ',' expr ')' ]   => zipf_at_temp(_1, _2, _3, _4)
+    rule "topp"  stmt    [ 'topp'  '(' expr ',' expr ',' expr ',' expr ')' ]   => commit_measurement(nucleus_fact(_1, _2, _3, _4))
+}
+ND := de_default()
+print("grammar rules committed :", len(tuplespace), "facts (trace / delta / temp / topp)")
+
+# ---- 第I論文  ζ の三面体 -----------------------------------------------------------------------------------
+section("第I論文  ζ(x,y) = Tr((N+y)^{−x}) — Mellin (積分) / 指数 (微分) / オフセット (差分)")
+def spectral_zeta(x, y) { return hurwitz(x, y) }                     # 定理1: スペクトルゼータ = Hurwitz ζ
+def heat_trace_A(t, y) { return exp(0 - t * y) / (1 - exp(0 - t)) }  # 定理2: Tr(e^{−tA}) = e^{−ty}/(1−e^{−t})
+def direct_trace(x, y, M) { s := 0.0  n := 0  while (n < M) { s := s + pow_(n + y, 0 - x)  n := n + 1 }  return s }
+print("表1. 定理1・2: 直和 Tr(A^{−x}) (M 項) と 熱核 Mellin 表示 / Γ(x) (391 節点)")
+print("  x       y       直和 (M=1e5)        熱核 Mellin/Γ(x)    相対差       打ち切り上界 (尾部の EM 評価)   EM 級数との差")
+T1 := [[2.0, 1.0], [3.0, 1.0], [2.5, 0.5], [4.0, 2.0], [2.73037, 2.32534]]
+M := 100000
+t1_ok := true  i := 0
+while (i < 5) {
+    x := T1[i][0]  y := T1[i][1]
+    d := direct_trace(x, y, M)
+    h := zeta_de(ND, x, y)                                       # ∫ t^{x−1} Tr(e^{−tA}) dt / Γ(x) の二重指数求積
+    e := rel_err(d, h)
+    bound := (pow_(M + y, 1 - x) / (x - 1) + 0.5 * pow_(M + y, 0 - x)) / h   # 尾部 Σ_{n>=M} の Euler–Maclaurin 上界
+    eem := rel_err(h, hurwitz(x, y))
+    if (e > 1.01 * bound + 0.000000000001) { t1_ok := false }   # 1e-12 は 10⁵ 項の直和の丸め誤差の床
+    if (eem > 0.000000000001) { t1_ok := false }
+    print("  " + padr(fx(x, 3), 7) + " " + padr(fx(y, 3), 7) + " " + fx(d, 12) + "      " + fx(h, 12) + "      " + pad(sci(e), 9) + "    " + pad(sci(bound), 9) + "                   " + sci(eem))
+    i := i + 1
+}
+check("定理1・2  直和との差は打ち切り上界 (+丸め床 1e-12) の内側、熱核 Mellin 表示は Euler–Maclaurin と 1e-12 で一致", t1_ok)
+def direct_heat(t, y) { s := 0.0  n := 0  while (n < 400) { s := s + exp(0 - t * (n + y))  n := n + 1 }  return s }
+print("  熱核 Tr(e^{−tA}) の実物: t = 0.5, y = 1 →", fx(heat_trace_A(0.5, 1.0), 12), " (Σ e^{−t(n+y)} 直和 =", fx(direct_heat(0.5, 1.0), 12) + ")")
+check_close("定理2  Tr(e^{−tA}) 閉形式 = 直和 (t = 0.5, y = 1)", heat_trace_A(0.5, 1.0), direct_heat(0.5, 1.0), 0.000000000001)
+
+print("")
+print("表2. 定理3: Newton 差分  Δ_y ζ(x,y) = −y^{−x}  と 離散 Newton–Leibniz (V = 64)")
+def newton_diff(x, y) { return hurwitz(x, y + 1) - hurwitz(x, y) }
+print("  x       y       Δ_y ζ(x,y)          −y^{−x}             絶対誤差    定和分の残差")
+T2 := [[2.0, 1.0], [3.0, 1.5], [1.5, 0.7], [4.0, 2.0], [2.73037, 2.32534]]
+worst_d := 0.0  worst_t := 0.0  i := 0
+while (i < 5) {
+    x := T2[i][0]  y := T2[i][1]
+    dz := delta(x, y)  w := 0 - pow_(y, 0 - x)
+    e := abs(dz - w)
+    if (e > worst_d) { worst_d := e }
+    tel := direct_trace(x, y, 64) - (hurwitz(x, y) - hurwitz(x, y + 64))
+    if (abs(tel) > worst_t) { worst_t := abs(tel) }
+    print("  " + padr(fx(x, 3), 7) + " " + padr(fx(y, 3), 7) + " " + pad(fx(dz, 12), 16) + "    " + pad(fx(w, 12), 16) + "    " + pad(sci(e), 9) + "   " + sci(tel))
+    i := i + 1
+}
+check("定理3  |Δ_y ζ + y^{−x}| <= 2e-15 (差分は Zipf 重みそのものを返す)", worst_d <= 0.000000000000002)
+check("定理3  定和分 Σ_{n<64}(n+y)^{−x} = ζ(x,y) − ζ(x,y+64) の残差 <= 2e-15", worst_t <= 0.000000000000002)
+
+print("")
+print("表3. 定理4: 指数方向の微分 ∂_x ζ = −Σ log(n+y)(n+y)^{−x} (級数 M 項) vs 中心差分 (h = 1e-5)")
+def dzeta_series(x, y, M) { s := 0.0  n := 0  while (n < M) { s := s - log(n + y) * pow_(n + y, 0 - x)  n := n + 1 }  return s }
+def dzeta_cd(x, y) { h := 0.00001  return (hurwitz(x + h, y) - hurwitz(x - h, y)) / (2 * h) }
+T3 := [[2.0, 1.0], [3.0, 1.0], [2.5, 1.5], [4.0, 2.0]]
+t3_ok := true  i := 0
+while (i < 4) {
+    x := T3[i][0]  y := T3[i][1]
+    a := dzeta_series(x, y, M)  b := dzeta_cd(x, y)
+    e := rel_err(a, b)
+    if (x >= 3) { if (e > 0.00000001) { t3_ok := false } }
+    print("  x = " + fx(x, 1) + "  y = " + fx(y, 1) + "   級数 " + fx(a, 12) + "   中心差分 " + fx(b, 12) + "   相対差 " + sci(e))
+    i := i + 1
+}
+check("定理4  x = 3, 4 で級数と中心差分が 1e-8 以内 (x = 2 は級数の打ち切り log(n)n^{−2} が遅い)", t3_ok)
+print("")
+print("  三面体:  Mellin 面  A^{−x} = (1/Γ(x))∫t^{x−1}e^{−tA}dt   核 κ(u) = log(1/u)/(1−u)")
+print("           指数面    ∂_x ζ = −Σ log(n+y)(n+y)^{−x}          核 log(n+y)  (x log x 族の在処)")
+print("           差分面    Δ_y ζ = −y^{−x}                        核 Zipf 重みそのもの")
+print("  「大域的部分積分多様体」の厳密な住所 = Seeley の複素冪 x ↦ A^{−x} の解析族。新しい多様体は現れない。")
+
+# ---- 第II論文  生成器 ------------------------------------------------------------------------------------------
+section("第II論文  定理5  κ は期待累積サプライザルである")
+print("表4.  u      κ(u)          E[N]=u/(1−u)   E[N]·log(1/u)   u·κ(u)          絶対誤差   総期待サプライザル = 幾何分布の Shannon エントロピー")
+def geom_entropy(u) {                        # −Σ (1−u)u^n log((1−u)u^n)  (収束まで直和)
+    h := 0.0  n := 0  p := 1 - u
+    while (p > 0.0000000000000000001) { h := h - p * log(p)  p := p * u  n := n + 1  if (n > 200000) { p := 0 } }
+    return h
+}
+US := [0.1, 0.3, 0.5, 0.7, 0.9, 0.99]
+t4_ok := true  i := 0
+while (i < 6) {
+    u := US[i]
+    EN := u / (1 - u)  lhs := EN * log(1 / u)  rhs := u * kappa_(u)
+    tot := rhs + log(1 / (1 - u))  ge := geom_entropy(u)
+    if (abs(lhs - rhs) > 0.00000000000001) { t4_ok := false }
+    if (rel_err(tot, ge) > 0.0000000001) { t4_ok := false }
+    print("  " + padr(u, 5) + "  " + fx(kappa_(u), 9) + "   " + pad(fx(EN, 6), 10) + "     " + fx(lhs, 10) + "    " + fx(rhs, 10) + "    " + pad(sci(abs(lhs - rhs)), 9) + "  " + fx(tot, 10) + " = " + fx(ge, 10))
+    i := i + 1
+}
+check("定理5  u·κ(u) = E[N]·log(1/u) (誤差 <= 1e-14) かつ 停止分を足すと幾何分布の Shannon エントロピー", t4_ok)
+print("  Λ = E_Beta[κ^{x−1}]/Γ(x) は「継続確率が Beta に従うときの蓄積サプライザルの (x−1) 次モーメント」と読める。")
+
+section("第II論文  定理6  温度は Zipf 指数のスケーリング x → x/T、臨界温度 T_c = x")
+def zeta_V_em(x, y, V) { return hurwitz(x, y) - hurwitz(x, y + V) }
+def zipf_at_temp(nd, x, y, T) {              # 規則 temp: 温度 T での分布 (V = 32) — T >= x なら警告
+    xe := x / T
+    if (xe <= 1) { print("  WARNING: T >= x  -- 無限語彙では分配関数が発散する (有限語彙が支えている)") }
+    return dist(zm_dist_raw(nd, xe, y, 32))
+}
+def h1_bits(x, y, V) {                        # Shannon (bit) を V 項の直和で
+    Z := zeta_V_em(x, y, V)  h := 0.0  n := 0
+    while (n < V) { p := pow_(n + y, 0 - x) / Z  h := h - p * log(p)  n := n + 1 }
+    return h / LN2
+}
+x0 := 2.73037  y0 := 2.32534  V15 := 32768
+print("表5. x = 2.73037, y = 2.32534, V = 2^15  (一様上限 log₂V = 15 bit)")
+print("  T      x/T        ζ_V          H1 (bit)    H∞ (bit)   P(順位0)")
+TS := [0.25, 0.5, 1.0, 1.5, 2.0, 2.73, 3.0, 5.0]
+H1_PAPER := [0.15425, 0.85258, 2.46783, 4.40071, 7.14789, 11.23323, 12.20926, 14.47871]
+t5_ok := true  h_prev := -1.0  i := 0
+while (i < 8) {
+    T := TS[i]  xe := x0 / T
+    Z := zeta_V_em(xe, y0, V15)
+    h1 := h1_bits(xe, y0, V15)
+    hinf := xe * log2_(y0) + log2_(Z)
+    p0 := pow_(y0, 0 - xe) / Z
+    if (abs(h1 - H1_PAPER[i]) > 0.0001) { t5_ok := false }
+    if (h1 < h_prev) { t5_ok := false }
+    h_prev := h1
+    mark := ""  if (abs(T - 2.73) < 0.001) { mark := "  ← 臨界温度 T_c = x" }
+    print("  " + padr(T, 5) + "  " + pad(fx(xe, 5), 8) + "   " + pad(fx(Z, 4), 9) + "   " + pad(fx(h1, 5), 9) + "   " + pad(fx(hinf, 5), 8) + "   " + fx(p0, 6) + mark)
+    i := i + 1
+}
+check("定理6  温度 8 点で H1 (bit) が論文表5 と 1e-4 以内で一致し、T とともに単調増加", t5_ok)
+pT := temp(ND, x0, y0, 5.0)                     # x/T < 1: 警告が出る
+check("定理6  T = 5 > x では規則 temp が警告を出しつつ有限語彙の分布を返す", len(pT) == 32 && abs(arr_sum(pT) - 1) < 0.000000000001)
+
+section("第II論文  定理7  nucleus (top-p) 打ち切りの閉形式  ζ(x,y+k*) <= (1−p)·ζ_V")
+def nucleus_exact(x, y, p, V) {              # 累積質量 S_k = ζ(x,y) − ζ(x,y+k) (定理3) が単調なので整数 k を二分法
+    Z := zeta_V_em(x, y, V)  tgt := p * Z  zxy := hurwitz(x, y)
+    lo := 0  hi := V                             # S_lo < tgt <= S_hi を保つ
+    while (hi - lo > 1) {
+        mid := floor_((lo + hi) / 2)
+        if (zxy - hurwitz(x, y + mid) >= tgt) { hi := mid } else { lo := mid }
+    }
+    return hi
+}
+def nucleus_asym(x, y, p) { return pow_((x - 1) * (1 - p) * hurwitz(x, y), 0 - 1 / (x - 1)) - y }
+def nucleus_asym2(x, y, p) {                 # 二次漸近: ζ(x,y+k) ≈ (y+k)^{1−x}/(x−1) + (y+k)^{−x}/2 を k について二分法
+    tgt := (1 - p) * hurwitz(x, y)  lo := 0.0  hi := 100000000.0  it := 0
+    while (it < 200) {
+        mid := (lo + hi) / 2  a := y + mid
+        if (pow_(a, 1 - x) / (x - 1) + pow_(a, 0 - x) / 2 > tgt) { lo := mid } else { hi := mid }
+        it := it + 1
+    }
+    return (lo + hi) / 2
+}
+def nucleus_fact(nd, x, y, p) { k := nucleus_exact(x, y, p, 262144)  return dist([k, 262144 - k]) }
+V18 := 262144
+print("表6.  x      y      p      k*(厳密)   一次漸近     相対差    二次漸近     相対差    H1(切断後, bit)")
+T6 := [[2.73037, 2.32534, 0.90, 6], [2.73037, 2.32534, 0.95, 9], [2.73037, 2.32534, 0.99, 26],
+       [2.0, 1.0, 0.90, 6], [2.0, 1.0, 0.99, 61], [1.5, 1.0, 0.90, 57], [3.0, 1.2, 0.95, 3], [1.2, 1.0, 0.90, 4485]]
+t6_ok := true  i := 0
+while (i < 8) {
+    x := T6[i][0]  y := T6[i][1]  p := T6[i][2]
+    k := nucleus_exact(x, y, p, V18)
+    ka := nucleus_asym(x, y, p)  kb := nucleus_asym2(x, y, p)
+    if (k != T6[i][3]) { t6_ok := false }
+    hk := h1_bits(x, y, k)
+    print("  " + padr(fx(x, 3), 6) + " " + padr(fx(y, 3), 6) + " " + fx(p, 2) + "   " + pad(k, 6) + "     " + pad(fx(ka, 2), 9) + "   " + pad(fx(abs(ka - k) / k, 3), 7) + "   " + pad(fx(kb, 2), 9) + "   " + pad(fx(abs(kb - k) / k, 3), 7) + "   " + fx(hk, 5))
+    i := i + 1
+}
+check("定理7  厳密な打ち切り順位 k* が 8 行すべて論文値と一致 (6, 9, 26, 6, 61, 57, 3, 4485)", t6_ok)
+print("  最終行 (x = 1.2) は漸近形の妥当性条件 (x−1) log k ≫ 1 の破れ: 一次漸近は 12 倍を出す。厳密な二分法が必要。")
+print("")
+print("表8. スケーリング指数 d log k*/d log(1/(1−p)) (V = 2^20, p = 0.99, 0.999, 0.9999 の回帰) vs 1/(x−1)")
+def slope_fit(x, y) {                        # 最小二乗の傾き (3 点)
+    PS := [0.99, 0.999, 0.9999]  sx := 0.0  sy := 0.0  sxx := 0.0  sxy := 0.0  i := 0
+    while (i < 3) {
+        k := nucleus_exact(x, y, PS[i], 1048576)
+        lx := log(1 / (1 - PS[i]))  ly := log(k)
+        sx := sx + lx  sy := sy + ly  sxx := sxx + lx * lx  sxy := sxy + lx * ly
+        i := i + 1
+    }
+    return (3 * sxy - sx * sy) / (3 * sxx - sx * sx)
+}
+T8 := [[3.0, 1.2], [2.73037, 2.32534], [2.5, 1.0], [2.0, 1.0], [1.8, 1.0], [1.5, 1.0]]
+t8_ok := true  i := 0
+while (i < 6) {
+    x := T8[i][0]  y := T8[i][1]
+    sl := slope_fit(x, y)  th := 1 / (x - 1)
+    e := abs(sl - th) / th
+    note := ""
+    if (x > 1.6) { if (e > 0.03) { t8_ok := false } } else { note := "  ← V = 2^20 の切断に当たる人工物 (k*(0.9999) ≈ 5.9e7 ≫ 2^20)" }
+    print("  x = " + fx(x, 3) + "  y = " + fx(y, 3) + "   傾き " + fx(sl, 6) + "   理論 " + fx(th, 6) + "   相対誤差 " + fx(e, 4) + note)
+    i := i + 1
+}
+check("定理7  x = 1.8〜3.0 でスケーリング指数が 1/(x−1) と 3% 以内で一致", t8_ok)
+print("  実務: p = 0.9 → 0.99 で nucleus は 10^{1/(x−1)} 倍。x = 2 なら 10 倍、x = 3 なら 3.2 倍、x = 1.5 なら 100 倍。")
+print("")
+print("表7. 温度 × top-p の合成 (x = 2.73037, y = 2.32534, V = 2^18)")
+print("  T      x/T       k*(p=0.9)   k*(p=0.95)   k*(p=0.99)   H1(p=0.9 切断後, bit)")
+T7 := [0.5, 0.7, 1.0, 1.3, 1.6, 2.0, 2.4]
+K7_PAPER := [2, 3, 6, 14, 47, 746, 21403]
+t7_ok := true  i := 0
+while (i < 7) {
+    T := T7[i]  xe := x0 / T
+    k9 := nucleus_exact(xe, y0, 0.9, V18)  k95 := nucleus_exact(xe, y0, 0.95, V18)  k99 := nucleus_exact(xe, y0, 0.99, V18)
+    if (k9 != K7_PAPER[i]) { t7_ok := false }
+    print("  " + padr(T, 5) + "  " + pad(fx(xe, 4), 7) + "   " + pad(k9, 7) + "     " + pad(k95, 7) + "      " + pad(k99, 7) + "      " + fx(h1_bits(xe, y0, k9), 5))
+    i := i + 1
+}
+check("定理6×7  温度 7 点で k*(p = 0.9) が論文表7 と一致 (2 → 21403、四桁動く)", t7_ok)
+led0 := len(tuplespace)
+topp(ND, x0, y0, 0.9)                            # 規則 topp: 打ち切り順位を測定として台帳へ
+check("topp    規則 topp が nucleus の打ち切りを台帳へ commit", len(tuplespace) == led0 + 1)
+
+# ---- 第III論文  Shannon 解析器 ----------------------------------------------------------------------------------
+section("第III論文  Shannon 解析器 — エントロピー族はすべて指数をスケールした同じ ζ で書ける")
+def renyi_bits(alpha, x, y, V) { return (log2_(zeta_V_em(alpha * x, y, V)) - alpha * log2_(zeta_V_em(x, y, V))) / (1 - alpha) }
+print("  H_α(x,y,V) = [log₂ζ_V(αx,y) − α log₂ζ_V(x,y)]/(1−α),  H∞ = x log₂y + log₂B + log₂Λ − 切断項,  温度は x → x/T")
+print("  T      H_1 (Shannon)  H_2 (衝突)   H_∞ (min)    H_1 >= H_2 >= H_∞")
+t_r_ok := true  i := 0
+while (i < 4) {
+    T := [1.0, 1.5, 2.0, 2.73][i]  xe := x0 / T
+    h1 := h1_bits(xe, y0, V15)  h2 := renyi_bits(2.0, xe, y0, V15)  hinf := xe * log2_(y0) + log2_(zeta_V_em(xe, y0, V15))
+    ok := (h1 >= h2) && (h2 >= hinf)
+    if (!ok) { t_r_ok := false }
+    print("  " + padr(T, 5) + "  " + pad(fx(h1, 5), 10) + "     " + pad(fx(h2, 5), 9) + "    " + pad(fx(hinf, 5), 9) + "    " + bstr(ok))
+    i := i + 1
+}
+check("第III論文  Rényi の単調性 H_1 >= H_2 >= H_∞ が全温度で成立", t_r_ok)
+
+# ---- 第V論文  脳との対応 ---------------------------------------------------------------------------------------------
+section("第V論文  脳との対応 — 何が言えて、何が言えないか (判定を台帳へ)")
+CLAIMS := ["方程式が言語の統計を生成する", "方程式がサプライザルを計算する", "そのサプライザルが人間の読解負荷と対応する",
+           "方程式が最大エントロピー推論を行う", "脳も最大エントロピー統計で記述できる", "ゆえに方程式が大脳の機能を持つ"]
+VERD   := ["成立 (定理6・7, Zipf–Mandelbrot 則)", "成立 (定理5, κ = 期待累積サプライザル)", "文献上成立 (サプライザル理論; 本巻の寄与ではない)",
+           "成立 (未知事前エンジンの設計, Jaynes)", "部分的に文献上成立 (神経集団の最大エントロピー模型)", "不成立 — 上の五つから帰結しない (§14 (b)(c))"]
+i := 0
+while (i < 6) {
+    fact := ["brain", CLAIMS[i], VERD[i]]
+    fact >> tuplespace
+    print("  " + (i + 1) + ". " + padr(CLAIMS[i], 26) + " → " + VERD[i])
+    i := i + 1
+}
+check("第V論文  六つの判定が台帳事実として commit された (結論だけが不成立)", len(tuplespace) >= led0 + 7)
+print("  温度計は体温と相関するが、体ではない。方程式は大脳ではなく、大脳が扱っているのと同じ量を計算する道具である。")
+
+section("結論 (第四巻)")
+print("  「大域的部分積分多様体」= Seeley の複素冪、「ニュートン形式」= 離散 Newton–Leibniz、「x log x 核」= 指数方向の微分、「κ」= 期待累積サプライザル。")
+print("  名前が付いた分だけ使えるようになった — 温度が Zipf 指数であること、top-p が閉形式で解けること。")
+print("  統一原理: 零を保存するのは、非零因子による乗算だけである。")
+verdict("@@PAPER-04-OK")

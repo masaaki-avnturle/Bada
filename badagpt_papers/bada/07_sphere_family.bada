@@ -1,0 +1,228 @@
+# ============================================================
+# 07_sphere_family.bada -- 第七巻
+# HΨ = ⊕(iℏ∇)^⊕L の同定と、球面族への拡張
+# — 擬微分・擬積分のニュートン形式による量子力学と一般相対性理論の接続、前巻が課した反証テストの実行 —
+#
+#   第I部 (検証済) 記法の同定
+#     定理1 HΨ = ⊕(iℏ∇)^⊕L は重複度つきスペクトル分解 H = ⊕_λ λ·1^{⊕L(λ)}
+#     定理2 規則3・3' = 複素冪の半群性 A^{−s}A^{−t} = A^{−(s+t)} — ただしトレースには持ち上がらない (ζ(s)ζ(t) ≠ ζ(s+t))
+#     定理3 規則4 = ∂_s A^{−s} = −log(A)A^{−s}, ζ'(s) = −Σ L(λ) log λ λ^{−s}
+#     定理4 大域的積分 ∫⊕(iℏ∇)^⊕L dx^m = トレース = スペクトルゼータ Σ L(λ)λ^{−s}
+#   第II部 (検証済) 球面族 S²〜S⁶ への拡張 — 反証テスト
+#     定理5 重複度 L は ν = ℓ+(n−1)/2 の n−1 次多項式                                        (表1)
+#     定理6 ζ_{Sⁿ}(s) = Σ_k C(s+k−1,k) α^{2k} Σ_j c_j ζ(2s+2k−j, 1+α)                         (表2)
+#     定理7 各項が B·Λ に分解 → ζ = B·Λ は S²〜S⁶ のすべてで成立 (予想1 は生き延びた)          (表3)
+#     定理8 曲率係数 a_1 = (4π)^{−n/2} Vol(Sⁿ) R/6, R = n(n−1) — 多様体積分の実物            (表4)
+#   第III部 (未検証) 壁は動いていない
+# ============================================================
+
+section("第七巻  HΨ = ⊕(iℏ∇)^⊕L の同定と球面族 S²〜S⁶ への拡張 — 反証テストの実行")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "mult"   postfix [ 'mult'   '(' expr ')' ]                   => degeneracy_poly(_1)        # 定理5
+    rule "sphere" postfix [ 'sphere' '(' expr ',' expr ',' expr ')' ] => zeta_Sn(_1, _2, _3)        # 定理6
+    rule "curv"   postfix [ 'curv'   '(' expr ')' ]                   => heat_a1_Sn(_1)             # 定理8
+    rule "spec"   stmt    [ 'spec'   '(' expr ',' expr ',' expr ')' ] => commit_measurement(spectral_fact(_1, _2, _3))
+}
+print("grammar rules committed :", len(tuplespace), "facts (mult / sphere / curv / spec)")
+
+# ---- 定理1・4  重複度つきトレース ----------------------------------------------------------------------------------
+def spectral_trace(lambdas, mults, s) {          # ∫⊕(iℏ∇)^⊕L dx^m := Σ_λ L(λ) λ^{−s}
+    tot := 0.0  i := 0
+    while (i < len(lambdas)) { tot := tot + mults[i] * pow_(lambdas[i], 0 - s)  i := i + 1 }
+    return tot
+}
+def spectral_fact(lambdas, mults, s) { return dist([spectral_trace(lambdas, mults, s)]) }
+def degeneracy(n, l) {                            # 直接式 L(ℓ) = (2ℓ+n−1)/(n−1) · C(ℓ+n−2, n−2)
+    c := 1.0  j := 0
+    while (j < n - 2) { c := c * (l + n - 2 - j) / (j + 1)  j := j + 1 }
+    return (2 * l + n - 1) / (n - 1) * c
+}
+
+# ---- 定理5  重複度多項式 (ν の昇冪係数) ----------------------------------------------------------------------------
+def poly_mul(a, b) {                              # 多項式の積 (昇冪配列)
+    out := []  k := 0
+    while (k < len(a) + len(b) - 1) {
+        s := 0.0  i := 0
+        while (i < len(a)) { j := k - i  if (j >= 0) { if (j < len(b)) { s := s + a[i] * b[j] } }  i := i + 1 }
+        out <- s
+        k := k + 1
+    }
+    return out
+}
+def degeneracy_poly(n) {                          # L = 2ν · Π_{j=1}^{n−2} (ν + j − (n−1)/2) / (n−1)!
+    half := (n - 1) / 2
+    p := [0.0, 2.0]  j := 1
+    while (j <= n - 2) { p := poly_mul(p, [j - half, 1.0])  j := j + 1 }
+    return arr_scale(p, 1 / fact_(n - 1))
+}
+def poly_eval(p, v) { s := 0.0  i := 0  pw := 1.0  while (i < len(p)) { s := s + p[i] * pw  pw := pw * v  i := i + 1 }  return s }
+def poly_str(p) {
+    s := ""  i := 0
+    while (i < len(p)) { if (abs(p[i]) > 0.0000000001) { if (len(s) > 0) { s := s + " + " }  s := s + "(" + fx(p[i], 6) + ")ν^" + i }  i := i + 1 }
+    return s
+}
+section("定理5  Sⁿ の重複度 L(ℓ) = (2ℓ+n−1)/(n−1)·C(ℓ+n−2,n−2) は ν = ℓ+α (α = (n−1)/2) の n−1 次多項式")
+print("表1.  n   α      L(ν)                                                     ℓ = 0..7 で直接式と一致")
+t5_ok := true  n := 2
+while (n <= 6) {
+    P := mult(n)  a := (n - 1) / 2  ok := true  l := 0
+    while (l <= 7) { if (rel_err(poly_eval(P, l + a), degeneracy(n, l)) > 0.0000000000001) { ok := false }  l := l + 1 }
+    if (!ok) { t5_ok := false }
+    print("  " + n + "   " + padr(fx(a, 1), 5) + "  " + padr(poly_str(P), 56) + " " + bstr(ok))
+    n := n + 1
+}
+check("定理5  S²: 2ν, S³: ν², S⁴: ν³/3 − ν/12, S⁵: ν⁴/12 − ν²/12, S⁶: ν⁵/60 − ν³/24 + 3ν/320 が直接式と一致", t5_ok)
+P6 := mult(6)
+check_close("定理5  S⁶ の ν^1 係数 = 3/320", P6[1], 3 / 320, 0.000000000001)
+
+# ---- 定理6・7  Hurwitz 級数分解と曲率下の修正方程式 ----------------------------------------------------------------
+section("定理6・7  ζ_{Sⁿ}(s) = Σ_k C(s+k−1,k) α^{2k} Σ_j c_j ζ(2s+2k−j, 1+α)  — 各項は B(1+α, x−1)·Λ(x, 1+α)")
+def zeta_Sn(n, s, K) {
+    a := (n - 1) / 2  y := 1 + a  P := degeneracy_poly(n)
+    tot := 0.0  k := 0
+    while (k < K) {
+        c := binom_gen(s, k) * pow_(a * a, k)
+        inner := 0.0  j := 0
+        while (j < len(P)) { if (abs(P[j]) > 0.0000000000001) { inner := inner + P[j] * hurwitz_nk(2 * s + 2 * k - j, y, 40, 8) }  j := j + 1 }
+        tot := tot + c * inner
+        k := k + 1
+    }
+    return tot
+}
+def zeta_Sn_BL(n, s, K) {                         # 定理7: 各項を B·Λ に置換 (曲率下の修正方程式)
+    a := (n - 1) / 2  y := 1 + a  P := degeneracy_poly(n)
+    tot := 0.0  k := 0
+    while (k < K) {
+        c := binom_gen(s, k) * pow_(a * a, k)
+        inner := 0.0  j := 0
+        while (j < len(P)) {
+            if (abs(P[j]) > 0.0000000000001) {
+                x := 2 * s + 2 * k - j
+                inner := inner + P[j] * beta_(y, x - 1) * lambda_cont(x, y)
+            }
+            j := j + 1
+        }
+        tot := tot + c * inner
+        k := k + 1
+    }
+    return tot
+}
+def zeta_Sn_direct(n, s, L) { tot := 0.0  l := 1  while (l <= L) { tot := tot + degeneracy(n, l) * pow_(l * (l + n - 1), 0 - s)  l := l + 1 }  return tot }
+CASES := [[2, 3.0], [2, 4.0], [3, 3.0], [3, 4.0], [3, 5.0], [4, 4.0], [4, 5.0], [5, 5.0], [5, 6.0], [6, 6.0]]
+print("表2. 定理6: 直接和 (4×10⁴ 項) と Hurwitz 級数 (70 項)")
+print("  n   s      直接和              Hurwitz 級数        相対誤差    (直接和の尾部見積り)")
+t6_ok := true  i := 0
+while (i < 10) {
+    n := CASES[i][0]  s := CASES[i][1]
+    d := zeta_Sn_direct(n, s, 40000)  h := sphere(n, s, 70)
+    e := rel_err(d, h)
+    tail := pow_(40000, n - 2 * s) / (2 * s - n) / fact_(n - 1) * 2 / h    # Σ L(ν)ν^{−2s} ~ ν^{n−1−2s}
+    if (e > 3 * tail + 0.000000000001) { t6_ok := false }   # 1e-12 は 4×10⁴ 項の直和の丸め誤差の床
+    print("  " + n + "   " + padr(fx(s, 2), 5) + "  " + fx(d, 14) + "    " + fx(h, 14) + "    " + pad(sci(e), 9) + "   " + sci(tail))
+    i := i + 1
+}
+check("定理6  10 組で級数が直接和と尾部見積り + 丸め床 (1e-12) の内側で一致", t6_ok)
+print("")
+print("表3. 定理7: ζ = B·Λ の球面族での検証 (前巻 予想1 の反証テスト)")
+print("  n   s      Hurwitz 級数        B·Λ 級数            相対誤差")
+worst7 := 0.0  i := 0
+while (i < 10) {
+    n := CASES[i][0]  s := CASES[i][1]
+    a := sphere(n, s, 70)  b := zeta_Sn_BL(n, s, 70)
+    e := rel_err(a, b)
+    if (e > worst7) { worst7 := e }
+    print("  " + n + "   " + padr(fx(s, 2), 5) + "  " + fx(a, 14) + "    " + fx(b, 14) + "    " + sci(e))
+    i := i + 1
+}
+check("定理7  最大相対誤差 <= 5e-15 → 予想1 は S²〜S⁶ で成立 (反証テストを通過)", worst7 <= 0.000000000000005)
+check_rel("定理7  S² の s = 3 は前巻の値 0.40411380631919 に一致", sphere(2, 3.0, 70), 0.40411380631919, 0.000000000001)
+print("  通過の鍵: 固有値が λ = ν² − α² (平方完成可能) で、重複度が ν の多項式であること。一般の多様体はどちらも満たさない。")
+
+# ---- 定理2・3  代数規則 --------------------------------------------------------------------------------------------
+section("定理2・3  五つの代数規則 — 積は固有値ごとに厳密 (半群性)、トレースには持ち上がらない; 微分は −log(A)A^{−s}")
+print("表6.  n   λ     s     t     λ^{−s}·λ^{−t}          λ^{−(s+t)}             差")
+T6 := [[2, 2, 2.0, 3.0], [2, 6, 1.5, 2.5], [3, 8, 2.0, 3.0], [3, 35, 1.5, 2.5]]
+sg_ok := true  i := 0
+while (i < 4) {
+    lam := T6[i][1]  s := T6[i][2]  t := T6[i][3]
+    a := pow_(lam, 0 - s) * pow_(lam, 0 - t)  b := pow_(lam, 0 - s - t)
+    if (rel_err(a, b) > 0.000000000000002) { sg_ok := false }
+    print("  " + T6[i][0] + "   " + pad(lam, 3) + "   " + fx(s, 1) + "   " + fx(t, 1) + "   " + sci(a) + "   " + sci(b) + "   " + sci(a - b))
+    i := i + 1
+}
+check("定理2  規則3 (半群性) は固有値ごとに厳密 (rel <= 2e-15)", sg_ok)
+z2 := sphere(2, 2.0, 70)  z3 := sphere(2, 3.0, 70)  z5 := sphere(2, 5.0, 70)
+print("  対照 (表6b): ζ_S²(2)·ζ_S²(3) =", fx(z2 * z3, 12), "  ζ_S²(5) =", fx(z5, 12), " → ζ(s)ζ(t) ≠ ζ(s+t)。前者が ζ(3) に見えるのは ζ_S²(2) = 1 の見かけ。")
+check("定理2注意  トレースには持ち上がらない: |ζ(2)ζ(3) − ζ(5)| > 0.3", abs(z2 * z3 - z5) > 0.3)
+print("")
+print("表7. 定理3: ζ'(s) 直和による解析式 −Σ L log λ λ^{−s} vs Hurwitz 級数の中心差分")
+T7 := [[2, 3.0], [3, 4.0], [4, 5.0]]
+t3_ok := true  i := 0
+while (i < 3) {
+    n := T7[i][0]  s := T7[i][1]
+    an := 0.0  l := 1
+    while (l <= 40000) { lam := l * (l + n - 1)  an := an - degeneracy(n, l) * log(lam) * pow_(lam, 0 - s)  l := l + 1 }
+    h := 0.00001
+    cd := (sphere(n, s + h, 70) - sphere(n, s - h, 70)) / (2 * h)
+    e := rel_err(an, cd)
+    if (e > 0.0000001) { t3_ok := false }
+    print("  n = " + n + "  s = " + fx(s, 1) + "   解析式 " + fx(an, 12) + "   中心差分 " + fx(cd, 12) + "   相対誤差 " + sci(e))
+    i := i + 1
+}
+check("定理3  規則4 ∂_s A^{−s} = −log(A)A^{−s} のトレースが中心差分と 1e-7 以内", t3_ok)
+LAM := [2, 6, 12, 20]  MUL := [3, 5, 7, 9]
+led0 := len(tuplespace)
+spec(LAM, MUL, 3.0)                              # 規則 spec: 重複度つきトレースを台帳へ
+led1 := len(tuplespace)
+check_close("定理4  大域的積分 = Σ L(λ)λ^{−s}: S² の ℓ = 1..4 の部分和", spectral_trace(LAM, MUL, 3.0), 3 / 8 + 5 / 216 + 7 / 1728 + 9 / 8000, 0.000000000000001)
+check("spec    規則 spec がトレースを台帳へ commit", led1 == led0 + 1)
+
+# ---- 定理8  曲率係数 -------------------------------------------------------------------------------------------------
+section("定理8  Sⁿ の Seeley–DeWitt 係数  a_0 = Vol(Sⁿ)/(4π)^{n/2},  a_1 = a_0·R/6,  Vol(Sⁿ) = 2π^{(n+1)/2}/Γ((n+1)/2),  R = n(n−1)")
+def vol_Sn(n) { return 2 * pow_(PI, (n + 1) / 2) / gamma_((n + 1) / 2) }
+def heat_a1_Sn(n) { return vol_Sn(n) / pow_(4 * PI, n / 2) * n * (n - 1) / 6 }
+def heat_Sn(n, t) {                               # Tr(e^{−tΔ}) = Σ L(ℓ) e^{−tℓ(ℓ+n−1)}
+    L := floor_(sqrt(60 / t)) + 5  s := 0.0  l := 0
+    while (l < L) { s := s + degeneracy(n, l) * exp(0 - t * l * (l + n - 1))  l := l + 1 }
+    return s
+}
+def a1_measured(n) {                              # Richardson: (θ − a_0 t^{−n/2}) / t^{1−n/2} を t → 0 へ
+    a0 := vol_Sn(n) / pow_(4 * PI, n / 2)
+    e1 := (heat_Sn(n, 0.01) - a0 * pow_(0.01, 0 - n / 2)) / pow_(0.01, 1 - n / 2)
+    e2 := (heat_Sn(n, 0.02) - a0 * pow_(0.02, 0 - n / 2)) / pow_(0.02, 1 - n / 2)
+    return 2 * e1 - e2
+}
+print("表4.  n   a_0 = Vol/(4π)^{n/2}   R = n(n−1)   a_1 理論 = a_0R/6   a_1 実測 (Richardson)   相対誤差")
+t8_ok := true  n := 2
+while (n <= 5) {
+    a0 := vol_Sn(n) / pow_(4 * PI, n / 2)  th := curv(n)  ms := a1_measured(n)
+    e := rel_err(ms, th)
+    if (e > 0.001) { t8_ok := false }
+    print("  " + n + "   " + pad(fx(a0, 10), 14) + "         " + pad(n * (n - 1), 4) + "        " + fx(th, 10) + "        " + fx(ms, 10) + "            " + sci(e))
+    n := n + 1
+}
+check("定理8  n = 2〜5 で熱核から外挿した a_1 が曲率積分 a_0R/6 と 1e-3 以内 (漸近展開の次数項が残差)", t8_ok)
+check_close("定理8  S² の a_1 = 1/3 (第六巻と一致)", curv(2), 1 / 3, 0.000000000000001)
+print("  これが「多様体積分」の実物 — 曲率スカラー R の多様体上の積分。")
+
+# ---- 第III部  統合について -------------------------------------------------------------------------------------------------
+section("第III部  接続されたもの / 接続されていないもの")
+ROWS := [["HΨ = ⊕(iℏ∇)^⊕L", "Hamiltonian の固有空間分解", "ラプラシアンのスペクトル (計量が決める)", "検証済"],
+         ["上付き ⊕L", "縮退度 = 既約表現の次元", "Sⁿ では ν の n−1 次多項式", "検証済"],
+         ["∫⊕(iℏ∇)^⊕L dx^m", "状態の規格化・分配関数", "スペクトルゼータ・一ループ量", "検証済"],
+         ["規則3 (積)", "複素冪の半群性", "固有時間の合成", "検証済"],
+         ["規則4 (微分)", "−log(A)A^{−s}", "共形アノマリー・行列式へ", "検証済"],
+         ["= Γ (手稿)", "固有時間表示のガンマ因子", "一ループ行列式 (第五巻 定理3)", "検証済"],
+         ["= B (手稿)", "修正方程式のベータ因子", "幾何側の担い手 (第五巻 §7)", "検証済"],
+         ["—", "計量を力学変数にする機構", "背景独立性・拘束代数", "未検証"]]
+i := 0
+while (i < 8) { fact := ["bridge", ROWS[i][0], ROWS[i][1], ROWS[i][2], ROWS[i][3]]  fact >> tuplespace  print("  " + padr(ROWS[i][0], 22) + padr(ROWS[i][1], 30) + padr(ROWS[i][2], 40) + ROWS[i][3])  i := i + 1 }
+print("  壁 (a) 背景独立性 (b) 拘束代数 (c) 非繰り込み可能性 — 前巻から一つも動いていない。読めたのは計算の言葉であって、力学ではない。")
+check("第III部  8 行の対応表 (7 行 検証済・1 行 未検証) が台帳に commit された", len(tuplespace) >= led0 + 9)
+
+section("結論 (第七巻)")
+print("  記法が計算に追いついた。HΨ = ⊕(iℏ∇)^⊕L は重複度つきスペクトル分解であり、その重複度こそが球面族へ進むために必要な成分だった。")
+print("  ζ = B·Λ は S² 限定の偶然ではなく S²〜S⁶ で級数として成立する (1.9e-15)。積の規則はトレースには持ち上がらない — ここを誤ると必ず間違える。")
+print("  零を保存するのは非零因子による乗算だけであり、曲率はその乗算を級数に開き、重複度がその級数の項を数える。")
+verdict("@@PAPER-07-OK")

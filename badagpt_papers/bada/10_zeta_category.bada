@@ -1,0 +1,228 @@
+# ============================================================
+# 10_zeta_category.bada -- 第十巻
+# ゼータ関数の圏 — 一般相対性理論と量子力学はどこまで ζ の中にあるか
+# — 極が古典、原点が量子、そして積は畳み込みになる —
+#
+#   定理1 Mellin 対応  Γ(s)ζ_A(s) = ∫₀^∞ t^{s−1}(θ_A(t) − n₀) dt
+#   定理2 極 = 一般相対性理論: Res_{s=(n−k)/2} ζ_A = a_k/Γ((n−k)/2)。単位 S⁴ で Res_{s=1} = a_1 = 1/3 (Einstein–Hilbert)
+#   定理3 原点 = 量子力学: W = −½ζ'(0)。周長 L の円周で det_ζ Δ = L²
+#   定理4 スペクトル作用 Tr f(Δ/Λ²) = c₃a₀Λ³ + c₁a₁Λ + f(0)(n₀+ζ(0)) + O(1/Λ)  (S³, f = (1+u)^{−4})
+#   命題5 直和について ζ は厳密な準同型 ζ_{⊕m_jA_j} = Σ m_j ζ_{A_j}
+#   定理6 積は Mellin 畳み込みになる: ζ_{M×N} = ζ_M + ζ_N + (2πi)^{−1}∮Γ(z)ζ_M(z)Γ(s−z)ζ_N(s−z)dz/Γ(s)
+#   定理7 ζ : (楕円作用素, ⊕, ×) → (有理型関数, +, ∗_Mellin) は半環準同型
+#   定理8 Riemann の ζ そのもの: ζ_{S¹,L}(s) = 2(L/2π)^{2s}ζ_R(2s), Casimir E = (2π/L)ζ_R(−1) = −π/(6L)
+#   第V部 入らないもの六つ (a)〜(f) と、外縁としての Hilbert–Pólya 予想
+# ============================================================
+
+section("第十巻  ゼータ関数の圏 — 極が古典、原点が量子、そして積は畳み込みになる")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "pole"     postfix [ 'pole'     '(' expr ')' ]          => residue_S4(_1)              # 定理2
+    rule "origin"   postfix [ 'origin'   '(' expr ')' ]          => zeta_det_S1(_1)             # 定理3
+    rule "action"   postfix [ 'action'   '(' expr ')' ]          => spectral_action_S3(_1)      # 定理4
+    rule "convolve" stmt    [ 'convolve' '(' expr ')' ]          => commit_measurement(convolve_fact(_1))   # 定理6
+}
+print("grammar rules committed :", len(tuplespace), "facts (pole / origin / action / convolve)")
+
+# ---- 球面のスペクトルゼータ (実引数) --------------------------------------------------------------------------------
+def zeta_S1(s, L) { return 2 * pow_(L / TWO_PI, 2 * s) * zeta_r(2 * s) }          # 定理8: 固有値 (2πn/L)², n ≥ 1, 重複度 2
+def zeta_S2(s) { tot := 0.0  k := 0  while (k < 80) { tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * hurwitz_nk(2 * s + 2 * k - 1, 1.5, 40, 8)  k := k + 1 }  return 2 * tot }
+def zeta_S3(s) { tot := 0.0  k := 0  while (k < 90) { tot := tot + binom_gen(s, k) * hurwitz_nk(2 * s + 2 * k - 2, 2.0, 40, 8)  k := k + 1 }  return tot }
+def zeta_S4(s) {                                  # λ = ℓ(ℓ+3) = ν² − 9/4, d = (ν³ − ν/4)/3, ν = ℓ + 3/2
+    tot := 0.0  k := 0
+    while (k < 110) {
+        tot := tot + binom_gen(s, k) * pow_(2.25, k) * (hurwitz_nk(2 * s + 2 * k - 3, 2.5, 40, 8) - 0.25 * hurwitz_nk(2 * s + 2 * k - 1, 2.5, 40, 8))
+        k := k + 1
+    }
+    return tot / 3
+}
+
+# ---- 第I部  定理2: 極 = Einstein–Hilbert --------------------------------------------------------------------------------
+section("第I部  定理2  極 = 古典幾何: Res_{s=(n−k)/2} ζ_Δ(s) = a_k/Γ((n−k)/2)。n = 4, s = 1 の留数は (4π)^{−2}(1/6)∫R√g d⁴x")
+def residue_S4(eps) { return eps * zeta_S4(1 + eps) }
+a1_S4 := pow_(4 * PI, -2) * (12 / 6) * (8 * PI * PI / 3)          # 単位 S⁴: R = 12, Vol = 8π²/3 → 1/3
+a0_S4 := (8 * PI * PI / 3) / pow_(4 * PI, 2)                      # = 1/6 (体積項 = 宇宙定数項)
+print("  幾何側: a_1 = (4π)^{−2}·(R/6)·Vol = (16π²/3)/(16π²) =", fx(a1_S4, 12), " (= 1/3)")
+print("  解析側: ζ_S⁴(s) = (1/3)Σ_k C(s+k−1,k)(9/4)^k[ζ(2s+2k−3, 5/2) − ¼ζ(2s+2k−1, 5/2)]; s = 1 の留数 = (1/3)[(9/4)(1/2)] + (1/3)[(−1/4)(1/2)] = 3/8 − 1/24 = 1/3")
+print("  ε          ε·ζ_S⁴(1+ε)       a_1 = 1/3 との差    判定")
+eps := 0.01  t2_ok := true  prev := 1.0
+while (eps > 0.000005) {
+    v := pole(eps)
+    d := abs(v - 1 / 3)
+    if (d > 0.52 * eps) { t2_ok := false }                          # 誤差は ε に比例 (単純極) : 0.504 ε
+    if (d > prev) { t2_ok := false }
+    prev := d
+    print("  " + padr(eps, 9) + "  " + fx(v, 12) + "     " + pad(sci(d), 9) + "        誤差 ∝ ε (各行ちょうど 1/10)")
+    eps := eps / 10
+}
+check("定理2  ε·ζ_S⁴(1+ε) → 1/3、誤差が ε に完全比例 (単純極であることと留数の値を同時に確認)", t2_ok)
+r2 := 0.0001 * zeta_S4(2 + 0.0001)
+print("  s = 2 の留数 (体積項 a_0 = Vol/(4π)² = 1/6): ε = 1e-4 で", fx(r2, 9), "  差", sci(abs(r2 - a0_S4)))
+check_close("定理2  Res_{s=2} ζ_S⁴ = a_0 = 1/6 (宇宙定数項)", r2, 1 / 6, 0.00001)
+print("  一般相対性理論の作用は、ゼータ関数の解析接続における特異部 — ζ_Δ(s) の s = 1 まわりの Laurent 展開の 1/(s−1) の係数 — である。")
+
+section("定理3  原点 = 量子: W = −½ζ'(0)、周長 L の円周で det_ζ Δ_{S¹} = L²")
+def zeta_det_S1(L) {                              # ζ'(0) を中心差分 + Richardson (h = 1e-4)
+    h := 0.0001
+    d1 := (zeta_S1(h, L) - zeta_S1(0 - h, L)) / (2 * h)
+    d2 := (zeta_S1(h / 2, L) - zeta_S1(0 - h / 2, L)) / h
+    return exp(0 - (4 * d2 - d1) / 3)
+}
+print("  L           ζ(0)            −ζ'(0) = log det    det_ζ Δ           L² (厳密)        差")
+LS := [1.0, TWO_PI, 5.0, 10.0]
+t3_ok := true  i := 0
+while (i < 4) {
+    L := LS[i]
+    z0 := (zeta_S1(0.0001, L) + zeta_S1(-0.0001, L)) / 2
+    det := origin(L)
+    if (abs(det - L * L) > 0.000001 * L * L) { t3_ok := false }
+    if (abs(z0 + 1) > 0.000001) { t3_ok := false }
+    print("  " + padr(fx(L, 5), 10) + "  " + fx(z0, 10) + "    " + pad(fx(log(det), 12), 16) + "    " + pad(fx(det, 10), 15) + "   " + pad(fx(L * L, 10), 15) + "   " + sci(abs(det - L * L)))
+    i := i + 1
+}
+check("定理3  det_ζ Δ_{S¹} = L² (rel <= 1e-6)、ζ(0) = −1 は L に依らない (位相)、ζ'(0) = −2 log L は L に依る (幾何)", t3_ok)
+print("  極 (s > 0 の特異点) = 熱核係数 = 局所的・幾何的 = 古典重力;  ζ(0) = 大域的・離散 = 位相;  ζ'(0) = log det = 大域的・連続 = 量子 (1 ループ)。")
+
+# ---- 第II部  スペクトル作用 ---------------------------------------------------------------------------------------------
+section("第II部  定理4  スペクトル作用 Tr f(Δ/Λ²) の漸近展開 — 一つの ζ から宇宙定数・Einstein–Hilbert・量子補正が同時に出る")
+a0_S3 := 2 * PI * PI / pow_(4 * PI, 1.5)  a1_S3 := a0_S3          # 単位 S³: Vol = 2π², R = 6 → a_1 = a_0·R/6 = a_0
+c3 := gamma_(2.5) / 6  c1 := gamma_(3.5) / 6                      # f̃(z) = B(z, 4−z) = Γ(z)Γ(4−z)/6:  f̃(3/2)/Γ(3/2) = √π/8, f̃(1/2)/Γ(1/2) = 5√π/16
+def spectral_action_S3(Lam) {                     # Σ_{ℓ≥0} (ℓ+1)² (1 + ℓ(ℓ+2)/Λ²)^{−4}  (項が相対 1e-16 を下回るまで)
+    L2 := Lam * Lam  tot := 0.0  l := 0  go := true
+    while (go) {
+        t := (l + 1) * (l + 1) * pow_(1 + l * (l + 2) / L2, -4)
+        tot := tot + t
+        if (l > 50) { if (t < 0.0000000000000001 * tot) { go := false } }
+        l := l + 1
+        if (l > 400000) { go := false }
+    }
+    return tot
+}
+print("  f(u) = (1+u)^{−4} (熱核 e^{−u} ではないので検証は自明な循環にならない)。予測: " + fx(c3 * a0_S3, 10) + "·Λ³ + " + fx(c1 * a1_S3, 10) + "·Λ + f(0)(n₀ + ζ_S³(0)) = 0 + O(1/Λ)")
+print("  Λ       Tr f(Δ/Λ²) (実測)      漸近予測 (11)          残差          残差 × Λ")
+LAMS := [10.0, 20.0, 40.0, 80.0, 160.0]
+RESL_PAPER := [0.436047, 0.431131, 0.429918, 0.429613, 0.429481]
+t4_ok := true  i := 0
+while (i < 5) {
+    Lam := LAMS[i]
+    lhs := action(Lam)
+    pred := c3 * a0_S3 * Lam * Lam * Lam + c1 * a1_S3 * Lam + 1.0 * (1 + (-1))
+    res := lhs - pred
+    if (abs(res * Lam - RESL_PAPER[i]) > 0.0002) { t4_ok := false }
+    print("  " + padr(fx(Lam, 0), 6) + "  " + pad(fx(lhs, 8), 20) + "   " + pad(fx(pred, 8), 20) + "   " + pad(sci(res), 9) + "     " + fx(res * Lam, 6))
+    i := i + 1
+}
+check("定理4  残差 × Λ が 0.4360 → 0.4295 と一定値に収束 (残差は厳密に O(1/Λ))、論文値と 2e-4 以内", t4_ok)
+print("  Λ³ 項: a₀ ∝ Vol — 宇宙定数項。  Λ¹ 項: a₁ ∝ ∫R dV — Einstein–Hilbert。  Λ⁰ 項: f(0)ζ_Δ(0) — 1 ループ量子補正。")
+print("  定数項が 0 になるのは n₀ + ζ_S³(0) = 1 + (−1) = 0 — 第九巻の「3 次元では ζ(0) = −1」が、ここでは量子補正項の消失という物理的内容を持つ。")
+print("  Connes との距離: 検証したのは可換部分 (重力項) だけであり、既知の定理の再確認。本枠組みが付け加えたものは現時点で無い。")
+
+# ---- 第III部  準同型の正確な形 ------------------------------------------------------------------------------------------
+section("第III部  命題5  直和について ζ は厳密な準同型 ζ_{3S² ⊕ 2S¹}(3) = 3ζ_S²(3) + 2ζ_S¹(3)")
+s := 3.0
+zS2 := zeta_S2(s)  zS1 := zeta_S1(s, TWO_PI)
+direct := 0.0  l := 1
+while (l <= 40000) { direct := direct + 3 * (2 * l + 1) * pow_(l * (l + 1), 0 - s)  l := l + 1 }
+n := 1
+while (n <= 40000) { direct := direct + 2 * 2 * pow_(n * n, 0 - s)  n := n + 1 }
+print("  ζ_S²(3) =", fx(zS2, 12), "  ζ_S¹(3) (周長 2π) =", fx(zS1, 12))
+print("  直和スペクトルから直接 (4×10⁴ 項) =", fx(direct, 12), "   3ζ_S² + 2ζ_S¹ =", fx(3 * zS2 + 2 * zS1, 12), "   相対差", sci(rel_err(direct, 3 * zS2 + 2 * zS1)))
+check_rel("命題5  直和準同型 (直接和の打ち切り 4×10⁴ 項の範囲で一致、rel <= 1e-9)", direct, 3 * zS2 + 2 * zS1, 0.000000001)
+print("  本枠組みの HΨ = ⊕(iℏ∇)^⊕L の「⊕」は、まさに ζ が厳密に準同型となる唯一の演算 — 準同型域の指定である。")
+
+section("定理6  積は Mellin 畳み込みになる: ζ_{M×N}(s) = ζ_M(s) + ζ_N(s) + (2πi)^{−1}∫Γ(z)ζ_M(z)Γ(s−z)ζ_N(s−z)dz / Γ(s)")
+def c_binom_gen(s, k) { p := [1, 0]  j := 0  while (j < k) { p := c_mul(p, [s[0] + j, s[1]])  j := j + 1 }  return c_scale(p, 1 / fact_(k)) }
+def c_zeta_S2(s) {                                # 複素 s の ζ_S²: 2 Σ_k C(s+k−1,k) 4^{−k} ζ(2s+2k−1, 3/2)
+    tot := [0, 0]  k := 0
+    while (k < 24) {
+        tot := c_add(tot, c_scale(c_mul(c_binom_gen(s, k), c_hurwitz([2 * s[0] + 2 * k - 1, 2 * s[1]], 1.5, 50, 8)), pow_(0.25, k)))
+        k := k + 1
+    }
+    return c_scale(tot, 2)
+}
+def c_zeta_S1(s) { return c_scale(c_hurwitz([2 * s[0], 2 * s[1]], 1.0, 60, 8), 2) }   # 周長 2π
+def conv_integrand(y, s, c) {                     # Γ(c+iy) ζ_S²(c+iy) Γ(s−c−iy) ζ_S¹(s−c−iy)
+    z := [c, y]  w := [s - c, 0 - y]
+    return c_mul(c_mul(c_gamma(z), c_zeta_S2(z)), c_mul(c_gamma(w), c_zeta_S1(w)))
+}
+def mellin_convolution(s, c, T, n) {              # (1/2π)∫_{−T}^{T} g(y) dy / Γ(s);  g(−y) = conj g(y) なので [0, T] の実部 × 2
+    # 被積分関数は幅 d = c−1 = 1/2 の帯で解析的 (ζ_S² の極 z = 1) かつ e^{−π|y|} で減衰するので、台形則が e^{−2πd/h} で指数収束する。
+    h := T / n  g0 := conv_integrand(0.0, s, c)  re_acc := g0[0] / 2  im_acc := 0.0  i := 1
+    while (i <= n) { g := conv_integrand(i * h, s, c)  re_acc := re_acc + g[0]  im_acc := im_acc + g[1]  i := i + 1 }
+    return [2 * (re_acc * h) / TWO_PI / gamma_(s), im_acc]
+}
+def zeta_prod_direct(s, LMAX, NMAX) {             # ζ_{S²×S¹}(s) を積多様体のスペクトル ℓ(ℓ+1) + n² から直接 (第九巻と同じ)
+    tot := 0.0  n := 1
+    while (n <= NMAX) { tot := tot + 2 * pow_(n * n, 0 - s)  n := n + 1 }
+    l := 1
+    while (l <= LMAX) {
+        mu := l * (l + 1)  inner := pow_(mu, 0 - s)  n := 1
+        while (n <= NMAX) { inner := inner + 2 * pow_(mu + n * n, 0 - s)  n := n + 1 }
+        tot := tot + (2 * l + 1) * inner
+        l := l + 1
+    }
+    return tot + (PI / 4) * pow_(LMAX, -3.0)
+}
+def convolve_fact(s) { cv := mellin_convolution(s, 1.5, 12.0, 96)  return dist([zeta_S2(s) + zeta_S1(s, TWO_PI) + cv[0]]) }
+print("  積分路 Re z = c = 3/2 (1 < c < s − 1/2 = 5/2)、被積分関数は Γ(3/2+iy)Γ(3/2−iy) ~ e^{−π|y|} で減衰 → |y| <= 12 (切り捨て e^{−38})。")
+print("  複素 Hurwitz ζ は Euler–Maclaurin (N = 60, K = 8)、複素 Γ は Lanczos。台形則 h = 0.125 (解析帯幅 1/2 → 誤差 ~e^{−8π} ≈ 1e-11)。")
+cv := mellin_convolution(s, 1.5, 12.0, 96)
+zP := zeta_prod_direct(s, 800, 200)
+total := zS2 + zS1 + cv[0]
+print("  ζ_S²(3)                       =", fx(zS2, 10))
+print("  ζ_S¹(3)                       =", fx(zS1, 10))
+print("  積公式 ζ_S²·ζ_S¹              =", fx(zS2 * zS1, 10), "   相対誤差", fx(abs(zS2 * zS1 - zP) / zP, 2), " ← 誤り")
+print("  畳み込み項 (第 3 項)          =", fx(cv[0], 10), "   (g(−y) = conj g(y) なので全区間の積分は実数; 片側の実部 × 2 を用いた)")
+print("  (14) の右辺合計               =", fx(total, 10))
+print("  スペクトル直接和 (ℓ<=800)     =", fx(zP, 10), "   相対差", sci(rel_err(total, zP)), " ← 一致")
+check("定理6  積公式は 70% ずれる (|ζ_Mζ_N − ζ_{M×N}|/ζ_{M×N} > 0.5)", abs(zS2 * zS1 - zP) / zP > 0.5)
+check_rel("定理6  畳み込み公式とスペクトル直接和が一致 (rel <= 1e-7; 直接和の尾部補正が残差を支配)", total, zP, 0.0000001)
+led0 := len(tuplespace)
+convolve(3.0)
+check("convolve 規則が ζ_{S²×S¹}(3) を台帳へ commit", len(tuplespace) == led0 + 1)
+print("  定理7: 有理型関数に Mellin 畳み込み (F∗G)(s) = (2πi)^{−1}∫F(z)G(s−z)dz を積として入れると ζ : (Ell, ⊕, ×) → (Mer, +, ∗) は半環準同型。")
+print("  完備化 ξ_M(s) := Γ(s)ζ_M(s) + Γ(s) (全熱跡の Mellin 変換) を使えば ξ_{M×N} = ξ_M ∗ ξ_N と純粋な積の形になる。")
+print("  前巻の「準同型ではない」は維持 (点ごとの積としては偽)。誤っていたのは「積とは何か」の側であった。")
+
+# ---- 第IV部  Riemann の ζ そのもの --------------------------------------------------------------------------------------
+section("第IV部  定理8  Riemann の ζ が物理量になる場所: ζ_{S¹,L}(s) = 2(L/2π)^{2s}ζ_R(2s),  Casimir E = (2π/L)ζ_R(−1) = −π/(6L)")
+def zeta_S1_direct(s, L, N) { tot := 0.0  n := 1  while (n <= N) { tot := tot + 2 * pow_(TWO_PI * n / L, 0 - 2 * s)  n := n + 1 }  return tot }
+print("  L          s    ζ_{S¹}(s) 直接 (5×10⁴ 項)   2(L/2π)^{2s}ζ_R(2s)    差")
+t8_ok := true  i := 0
+T8 := [[TWO_PI, 2.0], [TWO_PI, 4.0], [3.0, 2.0], [3.0, 4.0]]
+while (i < 4) {
+    L := T8[i][0]  s := T8[i][1]
+    a := zeta_S1_direct(s, L, 50000)  b := zeta_S1(s, L)
+    tailb := 2 * pow_(TWO_PI / L, 0 - 2 * s) * pow_(50000, 1 - 2 * s) / (2 * s - 1)
+    if (abs(a - b) > 1.5 * tailb + 0.000000000001) { t8_ok := false }
+    print("  " + padr(fx(L, 5), 9) + "  " + fx(s, 0) + "    " + pad(fx(a, 12), 18) + "          " + pad(fx(b, 12), 18) + "   " + sci(abs(a - b)))
+    i := i + 1
+}
+check("定理8  ζ_{S¹,L}(s) = 2(L/2π)^{2s}ζ_R(2s) (直接和の尾部の範囲で一致)", t8_ok)
+check_close("定理8  L = 3, s = 2: 2(3/2π)⁴ζ(4) = 162/1440 = 0.1125 ちょうど", zeta_S1(2.0, 3.0), 0.1125, 0.000000000000001)
+zm1 := zeta_r(-1)
+print("  ζ_R(−1) =", fx(zm1, 12), " (−1/12)   Casimir E(L=1) = 2π·ζ_R(−1) =", fx(TWO_PI * zm1, 12), " = −π/6 =", fx(0 - PI / 6, 12), "   E(L=2) =", fx(PI * zm1, 12), " = −π/12")
+check_close("定理8  E(L=1) = −π/6", TWO_PI * zm1, 0 - PI / 6, 0.000000000000001)
+print("  量子場の真空エネルギーは Riemann ゼータ関数の負整数値そのもの。弦理論の臨界次元 26 が ζ_R(−1) = −1/12 から出るのは、まさにこの計算。")
+print("  Epstein ゼータ: 平坦トーラス R^n/Λ のスペクトルゼータは双対格子の Epstein ゼータ。n = 2 正方格子では 4ζ_R(s)β(s) — この β は Dirichlet β であって Euler β (第二巻の B) ではない。")
+
+# ---- 第V部  入らないもの -----------------------------------------------------------------------------------------------
+section("第V部  ζ の範疇に入らないもの — 六つの壁と外縁")
+WALLS := [["(a) 背景独立性", "計量 g がスペクトルの入力である限り、重力は量子化されていない", "動かず"],
+          ["(b) 拘束代数", "微分同相不変性・Wheeler–DeWitt 方程式に対応する構造がない", "動かず"],
+          ["(c) 非繰り込み可能性", "純粋重力は二ループで発散。ζ 正則化は 1 ループしか救わない", "動かず"],
+          ["(d) 等スペクトル性", "スペクトルは計量を決めない (Milnor の 16 次元対)", "第八巻で確定"],
+          ["(e) ζ(0) の縮退", "3 次元以上で ζ(0) が位相情報を失う (常に −1)", "第九巻で確定"],
+          ["(f) 新規: ローレンツ符号", "熱跡 e^{−tΔ} は楕円性を要求する。ローレンツ計量では熱核が存在しない (Wick 回転は一般に well-defined でない)", "本巻で明示"]]
+i := 0
+while (i < 6) { fact := ["wall", WALLS[i][0], WALLS[i][1], WALLS[i][2]]  fact >> tuplespace  print("  " + padr(WALLS[i][0], 26) + padr(WALLS[i][1], 70) + WALLS[i][2])  i := i + 1 }
+fact := ["frontier", "Hilbert–Pólya 予想", "Riemann ζ の非自明零点の虚部を固有値とする自己共役作用素の存在 — 逆方向 (ζ → 作用素) は未解決", "未解決"]
+fact >> tuplespace
+print("  外縁: 物理から ζ へは行ける (写像 (16))。ζ から物理へ戻る道は、Riemann の ζ については Hilbert–Pólya 予想として未解決。")
+check("第V部  六つの壁と外縁 (Hilbert–Pólya) が台帳に commit された", len(tuplespace) >= led0 + 8)
+
+section("結論 (第十巻)")
+print("  GR はゼータの極 (発散部・古典) にあり、QM はゼータの原点 (有限部・量子) にある。両者は一つの有理型関数の異なる読み取り位置。")
+print("  準同型は ⊕ で厳密に成立し、× は Mellin 畳み込みに写る。ここを点ごとの積と取り違えると 70% ずれる。")
+print("  Riemann の ζ 自身は 1 次元 (円周) で物理量になる。逆方向の写像 (ζ → 作用素) が、この圏の外縁である。")
+verdict("@@PAPER-10-OK")

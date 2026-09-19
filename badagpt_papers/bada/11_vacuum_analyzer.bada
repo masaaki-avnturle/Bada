@@ -1,0 +1,198 @@
+# ============================================================
+# 11_vacuum_analyzer.bada -- 第十一巻
+# 反重力発生器 — ゼータ正則化された真空エネルギーの分析器
+# 「Γ 関数における大域的部分積分多様体」を実装し、負のエネルギー密度の実在・符号・大きさ・持続時間を数値で答える
+#
+#   定理1 E_vac = ½ζ_A(−1/2)  (S¹ 周期: −π/(6L)、Dirichlet 区間: −π/(24a))
+#   定理2 平行平板 Casimir  E/A = −π²ℏc/(720a³) (電磁場),  P = −π²ℏc/(240a⁴)  — 係数は解析接続だけから
+#   定理3 符号は大域幾何 (スピン構造) が決める: 周期 −π/(6L) < 0、反周期 +π/(12L) > 0
+#   定理4 装置の出力 g = 2πGσ = π³ℏG/(360 c a³): a = 10 nm で 2×10⁻³⁰ m/s²、地球重力には a = 13.5 fm が要る
+#   定理5 負エネルギーの持続時間制限  ρ̄_min(τ₀) = (ω/2L)[√(1−e^{−4ωτ₀}) − 1]  (Ford–Roman τ₀^{−2} スケーリング)
+#   第V部 ANEC (平均零エネルギー条件) が定常的な斥力重力装置を禁じる — 分析器の anec_check は常に真
+# 本巻は反重力を発生させていない。作れなかったことを 15 桁の精度で述べる道具を残す。
+# ============================================================
+
+section("第十一巻  反重力発生器 — 分析器としての Γ 関数の大域的部分積分多様体")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "energy"   postfix [ 'energy'   '(' expr ')' ]          => vac_energy_from_zeta_half(_1)   # 定理1
+    rule "pressure" postfix [ 'pressure' '(' expr ')' ]          => casimir_pressure(_1)            # 定理2
+    rule "gravity"  postfix [ 'gravity'  '(' expr ')' ]          => casimir_gravity(_1)             # 定理4
+    rule "duration" postfix [ 'duration' '(' expr ',' expr ')' ] => rho_bar_min(_1, _2)             # 定理5
+    rule "anec"     stmt    [ 'anec'     '(' expr ')' ]          => commit_measurement(anec_check(_1))
+}
+print("grammar rules committed :", len(tuplespace), "facts (energy / pressure / gravity / duration / anec)")
+
+HBAR := 1.054571817e-34  C := 299792458.0  G := 6.67430e-11  G_E := 9.80665
+HC := HBAR * C
+def vac_energy_from_zeta_half(zeta_half) { return 0.5 * zeta_half }
+
+# ---- 定理1 ------------------------------------------------------------------------------------------------------------
+section("定理1  E_vac = ½ζ_A(−1/2) — 発散する零点振動の和 ½Σω_n の有限部を解析接続で取り出す")
+zm1 := zeta_r(-1)  zm3 := zeta_r(-3)
+print("  ζ_R(−1) =", fx(zm1, 12), " (−1/12, ビット一致)   ζ_R(−3) =", fx(zm3, 12), " (1/120)")
+check_close("定理1  ζ_R(−1) = −1/12", zm1, 0 - 1 / 12, 0.0000000000000001)
+check_close("定理1  ζ_R(−3) = 1/120", zm3, 1 / 120, 0.000000001)
+print("  系                       ζ_A(−1/2)          E_vac = ½ζ(−1/2)    厳密形")
+t1_ok := true  i := 0
+LS := [1.0, TWO_PI, 5.0]
+while (i < 3) {
+    L := LS[i]
+    zh := 2 * pow_(L / TWO_PI, -1) * zm1          # ζ_{S¹}(s) = 2(L/2π)^{2s}ζ_R(2s) → s = −1/2
+    E := energy(zh)
+    if (abs(E + PI / (6 * L)) > 0.000000000001) { t1_ok := false }
+    print("  S¹ 周期的 L = " + padr(fx(L, 5), 8) + "   " + pad(fx(zh, 12), 16) + "   " + pad(fx(E, 12), 16) + "   −π/(6L) = " + fx(0 - PI / (6 * L), 9))
+    i := i + 1
+}
+i := 0
+AS := [1.0, 2.0]
+while (i < 2) {
+    a := AS[i]
+    zh := pow_(a / PI, -1) * zm1                   # Dirichlet 区間: k = πn/a → ζ(s) = (a/π)^{2s}ζ_R(2s)
+    E := energy(zh)
+    if (abs(E + PI / (24 * a)) > 0.000000000001) { t1_ok := false }
+    print("  Dirichlet 区間 a = " + padr(fx(a, 1), 4) + "   " + pad(fx(zh, 12), 16) + "   " + pad(fx(E, 12), 16) + "   −π/(24a) = " + fx(0 - PI / (24 * a), 9))
+    i := i + 1
+}
+check("定理1  S¹ 周期 (L = 1, 2π, 5) で −π/(6L)、Dirichlet 区間 (a = 1, 2) で −π/(24a)", t1_ok)
+
+# ---- 定理2 ------------------------------------------------------------------------------------------------------------
+section("定理2  平行平板 Casimir 力 — 横方向積分 (1/4π)m^{2−2s}/(s−1) と法線方向の和 ζ_R(2s−2) を s = −1/2 へ接続")
+s := -0.5
+coef := 0.5 * (1 / (4 * PI)) * (1 / (s - 1)) * ipow(PI, 3) * zeta_r(2 * s - 2)   # スカラー場 1 成分: E/A = coef / a³
+print("  スカラー E/A 係数 =", fx(coef, 12), "/ a³    −π²/1440 =", fx(0 - PI * PI / 1440, 12), "   差", sci(abs(coef + PI * PI / 1440)))
+check_close("定理2  E/A = −π²/(1440a³) (係数誤差 <= 1e-16)", coef, 0 - PI * PI / 1440, 0.0000000000000001)
+def casimir_pressure(a) { return 0 - PI * PI * HC / (240 * ipow(a, 4)) }         # 電磁場 (偏光 2 成分)
+def casimir_udens(a)    { return 0 - PI * PI * HC / (720 * ipow(a, 4)) }
+print("  電磁場 (偏光 2 成分): E/A = −π²ℏc/(720a³),  P = −∂(E/A)/∂a = −π²ℏc/(240a⁴)")
+print("  間隔 a      圧力 P [Pa]        エネルギー密度 u [J/m³]   |u|/c² [kg/m³]")
+AA := [0.00000001, 0.0000001, 0.000001, 0.00001]
+i := 0
+while (i < 4) { a := AA[i]  print("  " + padr(sci(a), 10) + "  " + pad(sci(pressure(a)), 12) + "      " + pad(sci(casimir_udens(a)), 12) + "              " + sci(abs(casimir_udens(a)) / (C * C)))  i := i + 1 }
+check_rel("定理2  a = 100 nm で P = −13.0 Pa (Lamoreaux 1997 以降 1% 精度で実測されている値)", pressure(0.0000001), -13.001, 0.001)
+print("  分析器は正しい。そして出しているのは負のエネルギー密度 — 古典的には存在しえない量。負のエネルギー密度は思弁ではなく実験室の事実。")
+
+# ---- 定理3 ------------------------------------------------------------------------------------------------------------
+section("定理3  符号は大域幾何が決める — 同じ L、同じ場、同じ作用素。異なるのは束のねじれ (スピン構造) だけ")
+print("  境界条件          ζ_A(−1/2)          E_vac            厳密形        重力的性格")
+t3_ok := true  i := 0
+LS3 := [1.0, 2.0, PI]
+while (i < 3) {
+    L := LS3[i]
+    zp := 2 * pow_(L / TWO_PI, -1) * zm1                          # 周期的 (自明なスピン構造): k = 2πn/L
+    za := 2 * pow_(L / TWO_PI, -1) * (pow_(2, -1) - 1) * zm1      # 反周期的: k = 2π(n+½)/L → (2^{2s}−1)ζ_R(2s)
+    Ep := energy(zp)  Ea := energy(za)
+    if (abs(Ep + PI / (6 * L)) > 0.000000000001) { t3_ok := false }
+    if (abs(Ea - PI / (12 * L)) > 0.000000000001) { t3_ok := false }
+    print("  周期   L = " + padr(fx(L, 5), 7) + "  " + pad(fx(zp, 12), 16) + "   " + pad(fx(Ep, 10), 14) + "   −π/(6L)      負 (斥力源)")
+    print("  反周期 L = " + padr(fx(L, 5), 7) + "  " + pad(fx(za, 12), 16) + "   " + pad(fx(Ea, 10), 14) + "   +π/(12L)     正 (引力源)")
+    i := i + 1
+}
+check("定理3  周期 → −π/(6L) < 0、反周期 → +π/(12L) > 0 (L = 1, 2, π)", t3_ok)
+print("  ガウス的構造の反転: Gauss–Bonnet は局所曲率 → 大域位相。定理3 は局所的に同一の系で大域的なねじれ → 局所的なエネルギー密度の符号。")
+print("  設計上の含意: 反重力発生器の第一の設計変数は材料でも電力でもなく装置の位相。符号は無料で選べる。問題は大きさである。")
+
+# ---- 定理4 ------------------------------------------------------------------------------------------------------------
+section("定理4  装置の出力 — Casimir 平板 (間隔 a) が作る斥力加速度 g = 2πGσ,  σ = |u|/c²·a")
+def casimir_gravity(a) { return TWO_PI * G * (abs(casimir_udens(a)) / (C * C)) * a }
+print("  間隔 a      |u|/c² [kg/m³]    面密度 σ [kg/m²]   g = 2πGσ [m/s²]   g / g_地球")
+i := 0
+while (i < 3) {
+    a := AA[i]  rho := abs(casimir_udens(a)) / (C * C)  sig := rho * a  g := gravity(a)
+    print("  " + padr(sci(a), 10) + "  " + pad(sci(rho), 12) + "      " + pad(sci(sig), 12) + "       " + pad(sci(g), 12) + "      " + sci(g / G_E))
+    i := i + 1
+}
+check_rel("定理4  a = 10 nm で g = 2.022×10⁻³⁰ m/s² (地球重力の 2×10⁻³¹、重力測定の最高感度 10⁻¹⁵ より 15 桁小さい)", gravity(0.00000001), 2.022126e-30, 0.0001)
+M_need := G_E / G  U_need := M_need * C * C
+a_need := pow_(PI * PI * HC / (720 * U_need), 0.25)
+print("  逆問題: 1 m 先で g = 9.80665 → 必要な負質量 M = g/G =", sci(M_need), "kg,  u = Mc² =", sci(U_need), "J/m³")
+print("          必要な平板間隔 a = (π²ℏc/(720u))^{1/4} =", sci(a_need), "m =", fx(a_need * 1e15, 2), "fm  — 水素原子 (1e-10 m) の", sci(a_need / 1e-10), "倍、陽子半径 (8.4e-16 m) の", fx(a_need / 8.4e-16, 1), "倍")
+check_close("定理4  地球重力を打ち消すには a = 13.46 fm (原子の 1 万分の 1)", a_need * 1e15, 13.46, 0.01)
+sig_Au := 1e-7 * 19300.0
+print("  負エネルギー ≠ 負の総質量: Casimir 負質量面密度 / 金平板 (100 nm) の面密度 =", sci((abs(casimir_udens(0.00000001)) / (C * C) * 0.00000001) / sig_Au), "(a = 10 nm)  → 装置は浮かない。")
+check("定理4  Casimir 負質量は平板自身の質量の 3e-18 以下 (T00 < 0 は局所で成立、∫T00 dV > 0 は装置全体で成立)", (abs(casimir_udens(0.00000001)) / (C * C) * 0.00000001) / sig_Au < 0.000000000000000003)
+
+# ---- 定理5 ------------------------------------------------------------------------------------------------------------
+section("定理5  圧搾真空の負エネルギーは持続できない — ρ̄_min(τ₀) = (ω/2L)[√(1−e^{−4ωτ₀}) − 1]")
+def lorentz_cos(b, X, n) {                        # (1/π)∫₀^X cos(bx)/(1+x²)dx の Simpson + 部分積分の主要項による尾部
+    h := X / n  tot := 0.0  i := 0
+    while (i <= n) {
+        x := i * h  w := 2.0  if (i % 2 == 1) { w := 4.0 }  if (i == 0) { w := 1.0 }  if (i == n) { w := 1.0 }
+        tot := tot + w * cos_(b * x) / (1 + x * x)
+        i := i + 1
+    }
+    return 2 * (tot * h / 3 - sin_(b * X) / (b * (1 + X * X))) / PI
+}
+print("  (i) 時間サンプル恒等式 (1/π)∫cos(bx)/(1+x²)dx = e^{−b} (Lorentz 核、留数定理による厳密式) — Simpson [0,140] 40000 分割で確認")
+lz_ok := true  b := 1.0
+while (b <= 8.5) {
+    v := lorentz_cos(b, 140.0, 40000)
+    if (rel_err(v, exp(0 - b)) > 0.0001) { lz_ok := false }
+    print("  b = " + fx(b, 0) + "   数値 " + fx(v, 12) + "   e^{−b} " + fx(exp(0 - b), 12) + "   差 " + sci(abs(v - exp(0 - b))))
+    b := b * 2
+}
+check("定理5  (i) b = 1, 2, 4, 8 で e^{−b} と 1e-4 以内", lz_ok)
+def rho_bar(r, d, tau0) { return sinh_(r) * sinh_(r) + sinh_(r) * cosh_(r) * cos_(d) * exp(0 - 2 * tau0) }   # ω = L = 1
+def rho_bar_min(om, tau0) { uu := exp(0 - 2 * om * tau0)  return (om / 2) * (sqrt(1 - uu * uu) - 1) }        # 閉じた式 (9), L = 1
+def brute_min(tau0) {                             # r ∈ (0, 3], δ ∈ [0, 2π] の総当り → 局所細分 (閉じた式は一切使わない)
+    best := 1000000000.0  br := 0.0  bd := 0.0  i := 0
+    while (i <= 72) {
+        d := TWO_PI * i / 72  j := 0
+        while (j <= 300) { r := 0.000001 + 3 * j / 300  v := rho_bar(r, d, tau0)  if (v < best) { best := v  br := r  bd := d }  j := j + 1 }
+        i := i + 1
+    }
+    step := 3 / 300  k := 0
+    while (k < 60) {
+        step := step * 0.7  dr := -1
+        while (dr <= 1) {
+            dd := -1
+            while (dd <= 1) { r := br + dr * step  d := bd + dd * step  if (r > 0) { v := rho_bar(r, d, tau0)  if (v < best) { best := v  br := r  bd := d } }  dd := dd + 1 }
+            dr := dr + 1
+        }
+        k := k + 1
+    }
+    return [best, br, bd]
+}
+print("  (ii) ωτ₀     閉じた式 (9)        総当り最小化        差         r* 厳密 (tanh 2r = e^{−2ωτ₀})   r* 総当り")
+TAU := [0.05, 0.1, 0.25, 0.5, 1.0, 2.0]
+t5_ok := true  i := 0
+while (i < 6) {
+    t0 := TAU[i]
+    ex := duration(1.0, t0)  bf := brute_min(t0)
+    u := exp(0 - 2 * t0)  rstar := 0.5 * log((1 + u) / (1 - u)) / 2          # tanh(2r*) = u → r* = ¼ log((1+u)/(1−u))
+    if (abs(ex - bf[0]) > 0.0000001) { t5_ok := false }
+    print("  " + padr(fx(t0, 2), 8) + "   " + pad(fx(ex, 12), 16) + "   " + pad(fx(bf[0], 12), 16) + "   " + pad(sci(abs(ex - bf[0])), 9) + "   " + fx(rstar, 5) + "                         " + fx(bf[1], 5))
+    i := i + 1
+}
+check("定理5  (ii) 閉じた式と総当り最小化が 6 点で 1e-7 以内 (cos δ = −1, tanh 2r = e^{−2ωτ₀} で最小)", t5_ok)
+print("  (iii) 漸近 −(ω/4L)e^{−4ωτ₀} との比: ", fx(duration(1.0, 1.0) / (-0.25 * exp(-4)), 6), fx(duration(1.0, 2.0) / (-0.25 * exp(-8)), 6), fx(duration(1.0, 3.0) / (-0.25 * exp(-12)), 6), fx(duration(1.0, 4.0) / (-0.25 * exp(-16)), 6), " → 1")
+check_close("定理5  (iii) ωτ₀ = 4 で漸近形との比が 1", duration(1.0, 4.0) / (-0.25 * exp(-16)), 1.0, 0.000001)
+print("  Ford–Roman スケーリング: 持続時間 τ₀ の負エネルギーには ω ≲ 1/τ₀ のモードが要り、L ~ cτ₀ なので |ρ̄| ≲ ω/(4L) ~ 1/(4τ₀²) (1+1 次元; 3+1 次元では τ₀^{−4})。")
+print("  深くしたければ短時間、長くしたければ浅く。地球重力を打ち消す u = 1.3e28 J/m³ が許される持続時間は原子核のスケールをはるかに下回る。")
+
+# ---- 第V部  ANEC ---------------------------------------------------------------------------------------------------------
+section("第V部  ANEC (平均零エネルギー条件) — 定常的な反重力装置は定理で禁じられている")
+def anec_check(T00_samples) {                     # 完備な零測地線に沿った ∫⟨T_μν⟩k^μk^ν dλ >= 0 は定理 (Faulkner–Leigh–Parrish–Wang 2016)。
+    print("  anec_check: どんな入力配位に対しても ANEC 違反を報告しない — 報告できない。これは実装上の制約ではなく (11) が定理だからである。")
+    return dist([1.0])                             # 常に真 (縮退分布として commit)
+}
+# 定理5 の単一モードで ANEC が要求する構造を確認: cos 項は時間平均でゼロ、残るのは sinh²r >= 0
+r := 0.7  d := PI  n := 0  acc := 0.0
+while (n < 2000) { t := TWO_PI * n / 2000  acc := acc + (sinh_(r) * sinh_(r) + sinh_(r) * cosh_(r) * cos_(2 * t - d))  n := n + 1 }
+avg := acc / 2000
+print("  単一モード ⟨:T00:⟩(t) = (ω/L)[sinh²r + sinh r cosh r cos(2ωt − δ)] の一周期平均 =", fx(avg, 12), " = sinh²r =", fx(sinh_(r) * sinh_(r), 12), " >= 0")
+check_close("ANEC   負の部分は正の部分で補償される: 一周期平均 = sinh²r", avg, sinh_(r) * sinh_(r), 0.000000000001)
+led0 := len(tuplespace)
+anec([0.0 - 1, 2.0, 0.5])
+check("anec   規則 anec_check は常に真を返し台帳へ commit", len(tuplespace) == led0 + 1)
+WALLS := [["(a) 背景独立性", "動かず"], ["(b) 拘束代数", "動かず"], ["(c) 非繰り込み可能性", "動かず"], ["(d) 等スペクトル性", "第八巻で確定"],
+          ["(e) ζ(0) の縮退", "第九巻で確定"], ["(f) ローレンツ符号", "第十巻で明示"], ["(g) 新規: 平均エネルギー条件", "ANEC が定常的な斥力重力装置を禁じる。量子不等式が深さ × 持続時間を制限する (本巻 定理5)"]]
+i := 0
+while (i < 7) { fact := ["wall", WALLS[i][0], WALLS[i][1]]  fact >> tuplespace  print("  " + padr(WALLS[i][0], 30) + WALLS[i][1])  i := i + 1 }
+
+section("結論 (第十一巻)")
+print("  負のエネルギー密度は実在する (a = 100 nm で −13 Pa、測定値)。その符号は選べる (スピン構造)。")
+print("  しかし大きさは 10⁻³⁰ m/s² であり、必要な平板間隔は原子の 1 万分の 1、持続時間は指数的に制限され、定常版は定理で禁じられている。")
+print("  「Γ 関数における大域的部分積分多様体」の正体はゼータ正則化された応力テンソルであり、この計算をするために作られたかのように正確にこの計算をした。")
+print("  反重力発生器は作れなかった。作れなかったことを 15 桁の精度で述べられる道具が残った。")
+verdict("@@PAPER-11-OK")

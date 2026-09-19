@@ -1,0 +1,350 @@
+# ============================================================
+# 02_beta_zeta.bada -- 第二巻
+# 修正されたベータ・ゼータ方程式と、その言語生成アルゴリズム
+# — β(p,q) = ζ(x,y)/Λ(x,y) の求解、Zipf–Mandelbrot 分配関数の因数分解、
+#   および Bada 上の表を持たない生成器 —
+#
+#   定理1 Mellin 分解  Γ(x)ζ(x,y) = ∫ u^{y−1}(log 1/u)^{x−1}/(1−u) du   (表1)
+#   定理2 修正方程式の解  Λ(x,y) = E_Beta(y,x−1)[κ^{x−1}]/Γ(x) = ζ(x,y)/B(y,x−1)  (表2)
+#   表11  初等的な二変数対数では書けない (候補 4 種すべて不一致)
+#   系1   極の系: (Λ(1+ε,y)−1)/ε → γ (オイラー定数、y に依らない)  (表3・7)
+#   系2   対角の系: Λ(2−y,y) = ζ(2−y,y)·sin(πy)/π  (表4)
+#   系3   臨界指数: ζ(x,y) = B(y,x−1) の解 x*(y)、閾値 y_c = 1.0766323907  (表6)
+#         + 訂正: その閾値は x の探索上限の産物で、y > 1 なら x を広げれば必ず解がある
+#   定理3 生成分解: Zipf–Mandelbrot は幾何分布の Beta×κ^{x−1} 混合
+#   §6.2  標本版 (重点再標本 SIR)  §6.3 決定論版 (391 節点、exp/log のみ)  (表8・12)
+#   §8    H_form との結合 x = 1 + H_form, y = 1 + H1  (表9)
+# 旧主張 ζ(s) = β(p,q)/log x は偽であり、本巻はこれに一切依拠しない。
+# ============================================================
+
+section("第二巻  修正されたベータ・ゼータ方程式と、その言語生成アルゴリズム")
+
+# ---- §7 文法拡張: nodes / zipf / kernel / emit --------------------------------------
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "nodes"  postfix [ 'nodes'  '(' expr ',' expr ')' ]              => de_nodes(_1, _2)
+    rule "zipf"   postfix [ 'zipf'   '(' expr ',' expr ',' expr ',' expr ')' ] => zm_dist(_1, _2, _3, _4)
+    rule "kernel" postfix [ 'kernel' '(' expr ',' expr ',' expr ')' ]     => lambda_de(_1, _2, _3)
+    rule "emit"   stmt    [ 'emit'   '(' expr ')' ]                       => commit_measurement(_1)
+}
+def zm_dist(nd, x, y, V) { return dist(zm_dist_raw(nd, x, y, V)) }   # 式(10): dist() が規格化
+ND := nodes(0.03125, 195)
+print("grammar rules committed :", len(tuplespace), "facts   二重指数節点 =", len(ND[0]))
+
+# ---- 第 I 部  修正方程式を解く ------------------------------------------------------------
+section("定理1・2  Mellin 分解と修正核 Λ(x,y) = ζ(x,y)/B(y,x−1)")
+PTS := [[2.0, 1.0], [3.0, 1.0], [1.5, 1.0], [2.0, 0.5], [2.5, 0.3], [4.0, 2.0],
+        [1.2, 0.8], [3.5, 1.7], [2.0, 2.0], [6.0, 0.25], [1.05, 1.0], [8.0, 3.0]]
+print("表1. I(x,y) ≡ ∫u^{y−1}(log 1/u)^{x−1}/(1−u)du (二重指数求積) = Γ(x)ζ(x,y) (Euler–Maclaurin)")
+print("  x     y      I (求積)              Γ(x)ζ(x,y) (級数)      相対誤差")
+worst1 := 0.0  i := 0
+while (i < 12) {
+    x := PTS[i][0]  y := PTS[i][1]
+    I := de_gamma_zeta(ND, x, y)
+    R := gamma_(x) * hurwitz(x, y)
+    e := rel_err(I, R)
+    if (e > worst1) { worst1 := e }
+    print("  " + padr(x, 5) + " " + padr(y, 5) + "  " + pad(fx(I, 10), 20) + "  " + pad(fx(R, 10), 20) + "   " + sci(e))
+    i := i + 1
+}
+check("定理1  12 点で最大相対誤差 <= 5e-14 (値域 1e-1〜1e5)", worst1 <= 0.00000000000005)
+
+print("")
+print("表2. Λ = ζ(x,y)/B(y,x−1) (閉形式・級数) と Beta モーメント E[κ^{x−1}]/Γ(x) (求積) の一致")
+print("  x     y      ζ(x,y)          B(y,x−1)        Λ (閉形式)        Λ (求積)          相対誤差")
+worst2 := 0.0  i := 0
+while (i < 12) {
+    x := PTS[i][0]  y := PTS[i][1]
+    z := hurwitz(x, y)  B := beta_(y, x - 1)
+    Lc := z / B                                  # 閉形式 ζ/B
+    Lq := lambda_de(ND, x, y)                    # 求積: Σ w u^{y}(log 1/u)^{x−1} / (Γ(x) B)
+    e := rel_err(Lq, Lc)
+    if (e > worst2) { worst2 := e }
+    print("  " + padr(x, 5) + " " + padr(y, 5) + "  " + pad(fx(z, 9), 14) + "  " + pad(fx(B, 9), 14) + "  " + pad(fx(Lc, 9), 16) + "  " + pad(fx(Lq, 9), 16) + "   " + sci(e))
+    i := i + 1
+}
+check("定理2  Λ の閉形式と Beta モーメントが 12 点で一致 (rel <= 5e-14, 値域 0.043〜1658)", worst2 <= 0.00000000000005)
+
+print("")
+print("表11. 記法 log(x1,y2) の素朴な読みは解ではない (12 点の平均相対誤差)")
+def mean_rel(kind) {
+    s := 0.0  m := 0.0  i := 0
+    while (i < 12) {
+        x := PTS[i][0]  y := PTS[i][1]
+        L := lambda_em(x, y)
+        c := 0.0
+        if (kind == 1) { c := x * log(x) }
+        if (kind == 2) { c := x * log(x) * log(y) }
+        if (kind == 3) { c := x * log(x * y * y) }
+        if (kind == 4) { c := log(x) + 2 * log(y) }
+        e := rel_err(c, L)
+        s := s + e  if (e > m) { m := e }
+        i := i + 1
+    }
+    return [s / 12, m]
+}
+CAND := ["x·log x (旧核)", "x·log(x)·log(y)", "x·log(x·y²)", "log(x) + 2·log(y)"]
+naive_all_bad := true  k := 1
+while (k <= 4) {
+    r := mean_rel(k)
+    print("  C" + k + "  " + padr(CAND[k - 1], 20) + " 平均 " + fx(r[0], 4) + "  最大 " + fx(r[1], 4))
+    if (r[0] < 0.1) { naive_all_bad := false }
+    k := k + 1
+}
+check("表11  候補 4 種すべて平均相対誤差 > 0.1 (Λ は初等関数では書けない)", naive_all_bad)
+
+# ---- 系1: 極における γ の普遍性 ----------------------------------------------------------------
+section("系1  極の系 — (Λ(1+ε,y) − 1)/ε → γ (オイラー定数、y に依らない)")
+def lambda_pole(eps, y) { return hurwitz(1 + eps, y) / beta_(y, eps) }
+YS := [0.5, 1.0, 2.0, 3.0, 5.0]
+print("  ε        y=0.5        y=1.0        y=2.0        y=3.0        y=5.0")
+eps := 0.1  gamma_ok := true
+while (eps > 0.000005) {
+    row := "  " + padr(eps, 8)
+    j := 0
+    while (j < 5) {
+        v := (lambda_pole(eps, YS[j]) - 1) / eps
+        row := row + " " + fx(v, 9) + " "
+        if (eps < 0.00002) { if (abs(v - EULER_GAMMA) > 0.00003) { gamma_ok := false } }
+        j := j + 1
+    }
+    print(row)
+    eps := eps / 10
+}
+print("  γ = " + fx(EULER_GAMMA, 16))
+check("系1    ε = 1e-5 で 5 つの y すべて |(Λ−1)/ε − γ| < 3e-5 (y 依存性が消える)", gamma_ok)
+
+# ---- 系2: 対角 x = 2−y での反射公式 ----------------------------------------------------------------
+section("系2  対角 x = 2−y — Λ(2−y,y) = ζ(2−y,y)·sin(πy)/π")
+print("  y     x=2−y   ζ(x,y)          B(y,1−y)=π/sin πy   Λ (閉形式)      Λ (求積)        相対誤差")
+worst4 := 0.0  y := 0.2
+while (y < 0.95) {
+    x := 2 - y
+    z := hurwitz(x, y)
+    Lc := z * sin_(PI * y) / PI
+    Lq := lambda_de(ND, x, y)
+    e := rel_err(Lq, Lc)
+    if (e > worst4) { worst4 := e }
+    print("  " + padr(fx(y, 2), 5) + " " + padr(fx(x, 2), 7) + " " + pad(fx(z, 9), 14) + "  " + pad(fx(PI / sin_(PI * y), 9), 18) + "  " + pad(fx(Lc, 9), 14) + "  " + pad(fx(Lq, 9), 14) + "   " + sci(e))
+    y := y + 0.1
+}
+check("系2    y = 0.2〜0.9 の 8 点で反射公式と求積が一致 (rel <= 1e-13)", worst4 <= 0.0000000000001)
+check_close("系2    y = 0.5 では B = π ちょうど", beta_(0.5, 0.5), PI, 0.000000000001)
+
+# ---- 系3: 臨界指数 x*(y) と閾値 y_c ------------------------------------------------------------------
+section("系3  臨界指数 — Λ(x,y) = 1 すなわち ζ(x,y) = B(y,x−1) を解く")
+def log_lambda(x, y) { return log(hurwitz(x, y)) - log_beta(y, x - 1) }
+def solve_xstar(y, hi) {                          # x ∈ (1, hi] で Λ = 1 を二分法 (Λ は極から離れると単調減少)
+    lo := 1.0001
+    if (log_lambda(hi, y) > 0) { return -1 }      # 探索範囲内に解なし
+    k := 0
+    while (k < 80) {
+        mid := (lo + hi) / 2
+        if (log_lambda(mid, y) > 0) { lo := mid } else { hi := mid }
+        k := k + 1
+    }
+    return (lo + hi) / 2
+}
+def min_log_lambda(y, hi) {                       # min_x log Λ(x,y) (黄金分割探索、x ∈ [1.0001, hi])
+    a := 1.0001  b := hi  g := 0.6180339887498949
+    c := b - g * (b - a)  d := a + g * (b - a)
+    fc := log_lambda(c, y)  fd := log_lambda(d, y)
+    k := 0
+    while (k < 90) {
+        if (fc < fd) { b := d  d := c  fd := fc  c := b - g * (b - a)  fc := log_lambda(c, y) }
+        else         { a := c  c := d  fc := fd  d := a + g * (b - a)  fd := log_lambda(d, y) }
+        k := k + 1
+    }
+    return min_(fc, fd)
+}
+def solve_yc(hi) {                                # min_x Λ(x,y) = 1 を y について二分法 (x の探索上限 hi)
+    lo := 1.0  up := 1.3  k := 0
+    while (k < 45) { mid := (lo + up) / 2  if (min_log_lambda(mid, hi) > 0) { lo := mid } else { up := mid }  k := k + 1 }
+    return (lo + up) / 2
+}
+XS_Y    := [1.2, 1.4, 1.5, 1.6, 1.8, 2.0, 2.5, 3.0, 4.0, 6.0]
+XS_PAPER:= [19.8197386620, 9.2580513189, 7.3232979946, 6.0984457980, 4.6935904777,
+            3.9515482084, 3.1164954581, 2.7705289513, 2.4712709292, 2.2635049088]
+print("表6.  y      x*(y)            ζ(x*,y)        B(y,x*−1)      Λ(x*,y)        論文値")
+xs_ok := true  i := 0
+while (i < 10) {
+    y := XS_Y[i]
+    xs := solve_xstar(y, 60)
+    if (abs(xs - XS_PAPER[i]) > 0.000001) { xs_ok := false }
+    print("  " + padr(y, 5) + "  " + pad(fx(xs, 10), 15) + "  " + fx(hurwitz(xs, y), 10) + "   " + fx(beta_(y, xs - 1), 10) + "   " + fx(lambda_em(xs, y), 10) + "   " + fx(XS_PAPER[i], 10))
+    i := i + 1
+}
+check("系3    x*(y) が 10 点で論文値と 1e-6 以内で一致", xs_ok)
+check("系3    y = 1 では x > 1 の全域で Λ = (x−1)ζ(x) > 1 (解なし)", solve_xstar(1.0, 400) < 0 && min_log_lambda(1.0, 400) > 0)
+yc60 := solve_yc(60)
+print("  x ∈ (1, 60] で探索した閾値 y_c =", fx(yc60, 10), "  論文 1.0766323907")
+check_close("系3    論文の閾値 y_c = 1.0766323907 は x <= 60 の探索で再現される", yc60, 1.0766323907, 0.000001)
+print("")
+print("  ── 訂正 (本巻の作り換えで見つかったこと) ──────────────────────────────────────")
+print("  大きな x で ζ(x,y) ≈ y^{−x}, B(y,x−1) ≈ Γ(y)·x^{−y} なので Λ(x,y) ≈ y^{−x}·x^{y}/Γ(y) → 0 (y > 1)。")
+print("  したがって y > 1 なら十分大きな x で必ず Λ = 1 の解がある。論文の閾値 1.0766 は x の探索上限 (≈60) の産物。")
+print("  y        x* (x<=60)      x* (x<=400)     x* (x<=4000)")
+YCHK := [1.0766323907, 1.05, 1.02, 1.01]
+yc_artifact := true  i := 0
+while (i < 4) {
+    y := YCHK[i]
+    a60 := solve_xstar(y, 60)  a400 := solve_xstar(y, 400)  a4k := solve_xstar(y, 4000)
+    s60 := "解なし"  if (a60 > 0) { s60 := fx(a60, 6) }
+    s400 := "解なし"  if (a400 > 0) { s400 := fx(a400, 6) }
+    s4k := "解なし"  if (a4k > 0) { s4k := fx(a4k, 6) }
+    if (a4k < 0) { yc_artifact := false }
+    print("  " + padr(y, 8) + " " + padr(s60, 15) + " " + padr(s400, 15) + " " + padr(s4k, 15))
+    i := i + 1
+}
+check("系3訂正 y = 1.0766, 1.05, 1.02, 1.01 のすべてで x を広げれば解が存在する (真の閾値は y_c → 1+)", yc_artifact)
+yc := 1.0                                          # 以降 (表9 の判定) では真の閾値 y > 1 を用いる
+
+# ---- 第 II 部  言語生成アルゴリズム ------------------------------------------------------------------
+section("定理3  Zipf–Mandelbrot は幾何分布の Beta(y,x−1)×κ^{x−1} 混合 — 表を持たない生成器")
+print("§6.3 決定論版: 390 節点の重み付き和 (式10)。ζ も Γ もトークン表も要らない。")
+print("表12.  x       y       最大相対誤差 (n<32)   切断質量 ζ(x,y+32)/ζ(x,y)")
+T12 := [[2.0, 1.0], [2.73037, 2.32534], [3.0, 1.2], [4.0, 2.0], [1.6, 0.8]]
+worst12 := 0.0  i := 0
+while (i < 5) {
+    x := T12[i][0]  y := T12[i][1]
+    p := zipf(ND, x, y, 32)
+    ex := zm_exact(x, y, 32)
+    e := arr_maxrel(p, ex)
+    if (e > worst12) { worst12 := e }
+    tail := hurwitz(x, y + 32) / hurwitz(x, y)
+    print("  " + padr(fx(x, 3), 7) + " " + padr(fx(y, 3), 7) + " " + pad(sci(e), 16) + "          " + fx(tail, 6))
+    i := i + 1
+}
+check("表12  決定論版が厳密値 (n+y)^{-x} と最大相対誤差 <= 1e-14 で一致 (論文 1.3e-15; 本実装の sinh/cos は級数で自作)", worst12 <= 0.00000000000001)
+
+# ---- §6.2 標本版 (重点再標本 SIR) --------------------------------------------------------------------
+print("")
+print("§6.2 標本版 (SIR):  u_1..u_K ~ Beta(y,x−1) → w_i = κ(u_i)^{x−1} → 再標本 u* → n = floor(log(1−V)/log u*)")
+print("     副産物 mean(w)/Γ(x) は Λ(x,y) の不偏推定量 — 生成器は走りながら自分の恒等式を検算する。")
+# 乱数は関数から大域を書けないので、状態を明示的に受け渡す (Park–Miller 最小標準 LCG)。
+def rng_next(st) { return (st * 48271) % 2147483647 }
+def rng_u(st)    { return st / 2147483647 }
+def draw_normal(st) {                             # Box–Muller → [z, st']
+    st := rng_next(st)  u1 := rng_u(st)
+    st := rng_next(st)  u2 := rng_u(st)
+    if (u1 < 0.000000001) { u1 := 0.000000001 }
+    return [sqrt(0 - 2 * log(u1)) * cos_(TWO_PI * u2), st]
+}
+def draw_gamma(shape, st) {                       # Marsaglia–Tsang (shape >= 1)、shape < 1 は boost
+    if (shape < 1) {
+        r := draw_gamma(shape + 1, st)
+        st := rng_next(r[1])
+        return [r[0] * pow_(rng_u(st), 1 / shape), st]
+    }
+    d := shape - 1 / 3  c := 1 / sqrt(9 * d)
+    guard := 0
+    while (guard < 1000) {
+        zn := draw_normal(st)  z := zn[0]  st := zn[1]
+        v := 1 + c * z
+        if (v > 0) {
+            v := v * v * v
+            st := rng_next(st)  u := rng_u(st)
+            if (log(u) < 0.5 * z * z + d - d * v + d * log(v)) { return [d * v, st] }
+        }
+        guard := guard + 1
+    }
+    return [d, st]
+}
+def draw_beta(a, b, st) {
+    g1 := draw_gamma(a, st)  g2 := draw_gamma(b, g1[1])
+    return [g1[0] / (g1[0] + g2[0]), g2[1]]
+}
+def sir_generate(x, y, K, nsamp, seed) {          # → [counts(V=40), mean_w, st]
+    V := 40  counts := arr_zeros(V)  wsum := 0.0  st := seed  s := 0
+    while (s < nsamp) {
+        us := []  ws := []  i := 0
+        while (i < K) {
+            r := draw_beta(y, x - 1, st)  st := r[1]  u := r[0]
+            if (u > 0.999999999999) { u := 0.999999999999 }
+            if (u < 0.000000000001) { u := 0.000000000001 }
+            us <- u
+            ws <- pow_(kappa_(u), x - 1)
+            i := i + 1
+        }
+        W := arr_sum(ws)  wsum := wsum + W / K
+        st := rng_next(st)  r := rng_u(st) * W  acc := 0.0  pick := K - 1  i := 0  found := false
+        while (i < K) { if (!found) { acc := acc + ws[i]  if (acc >= r) { pick := i  found := true } }  i := i + 1 }
+        ustar := us[pick]
+        st := rng_next(st)  Vv := rng_u(st)
+        n := floor_(log(1 - Vv) / log(ustar))
+        if (n < V) { counts := set_at(counts, n, counts[n] + 1) }
+        s := s + 1
+    }
+    return [counts, wsum / nsamp, st]
+}
+def tv_dist(p, q) { s := 0.0  i := 0  while (i < len(p)) { s := s + abs(p[i] - q[i])  i := i + 1 }  return s / 2 }
+NSAMP := 2000  KPOOL := 32
+print("     (本実装は " + NSAMP + " 標本・プール幅 " + KPOOL + "。論文の 40000×64 より小さく、ノイズ床 TV ~ 1/sqrt(N) は高い)")
+print("表8.  x     y     Λ (厳密)     E[w]/Γ(x) (標本)   相対誤差   TV(経験, ZM)")
+T8 := [[2.0, 1.0], [3.0, 1.0], [2.0, 2.0], [1.6, 0.8]]
+sir_ok := true  i := 0  seed := 20260906
+while (i < 4) {
+    x := T8[i][0]  y := T8[i][1]
+    g := sir_generate(x, y, KPOOL, NSAMP, seed)  seed := g[2]
+    Lhat := g[1] / gamma_(x)
+    L := lambda_em(x, y)
+    emp := dist(g[0])
+    ex := zm_exact(x, y, 40)
+    tv := tv_dist(emp, ex)
+    if (rel_err(Lhat, L) > 0.05) { sir_ok := false }
+    if (tv > 0.08) { sir_ok := false }
+    print("  " + padr(x, 5) + " " + padr(y, 5) + " " + fx(L, 7) + "    " + fx(Lhat, 7) + "            " + fx(rel_err(Lhat, L), 4) + "     " + fx(tv, 4))
+    i := i + 1
+}
+check("表8   SIR 生成器: Λ 推定 5% 以内・全変動距離 < 0.08 (小標本のノイズ床内)", sir_ok)
+
+# ---- §8 H_form との結合 (表9) ---------------------------------------------------------------------------
+section("§8  前巻の H_form との結合  x(E) = 1 + H_form(E),  y(E) = 1 + H1(E)")
+EQN  := ["E1", "E2", "E3", "E4", "E5", "E6", "E7"]
+HFORM := [1.73037, 1.72184, 1.63797, 1.48759, 1.55994, 1.58399, 1.46404]   # 第一巻 表1 (検証済)
+H1S   := [1.32534, 1.26772, 1.32692, 1.09861, 1.09283, 1.31078, 1.21489]
+print("表9.  式   x        y        ζ(x,y)      B(y,x−1)    Λ         H(ZM,n<400)  P(順位0)")
+hzm_E1 := 0.0  hzm_E7 := 0.0  p0_E1 := 0.0  all_above_yc := true  i := 0
+while (i < 7) {
+    x := 1 + HFORM[i]  y := 1 + H1S[i]
+    z := hurwitz(x, y)  B := beta_(y, x - 1)  L := z / B
+    hz := 0.0  pn := 0                            # 論文の規約: p_n = (n+y)^{-x}/ζ(x,y) を n < 400 で打ち切り (再規格化なし)
+    while (pn < 400) { q := pow_(pn + y, 0 - x) / z  hz := hz - q * log(q)  pn := pn + 1 }
+    p := [pow_(y, 0 - x) / z]                     # P(順位0) = y^{-x}/ζ(x,y)
+    if (i == 0) { hzm_E1 := hz  p0_E1 := p[0] }
+    if (i == 6) { hzm_E7 := hz }
+    if (y <= yc) { all_above_yc := false }
+    print("  " + EQN[i] + "  " + fx(x, 5) + "  " + fx(y, 5) + "  " + fx(z, 7) + "   " + fx(B, 7) + "   " + fx(L, 6) + "  " + fx(hz, 5) + "      " + fx(p[0], 5))
+    i := i + 1
+}
+check_close("表9   E1: Λ = 1.148929", lambda_em(1 + HFORM[0], 1 + H1S[0]), 1.148929, 0.000003)
+check_close("表9   E1: H(ZM) = 1.70905 (n < 400 の台、再規格化なし)", hzm_E1, 1.70905, 0.00002)
+check_close("表9   E1: P(順位0) = 0.51624", p0_E1, 0.51624, 0.00002)
+check("表9   形が複雑な方程式ほど順位減衰が急 (H(ZM): E1 < E7)", hzm_E1 < hzm_E7)
+check("表9   7 本の (x,y) はすべて y > 1 かつ Λ > 1 (臨界曲線 x*(y) より左側)", all_above_yc)
+
+# ---- 実行: E1 のパラメータで生成器を走らせ、台帳へ emit -----------------------------------------------------
+section("実行  E1 のパラメータ (x = 1 + H_form, y = 1 + H1) で生成器を走らせる")
+x := 1 + HFORM[0]  y := 1 + H1S[0]  V := 32
+p := zipf(ND, x, y, V)
+L := kernel(ND, x, y)
+led0 := len(tuplespace)
+emit(p)                                            # 台帳へ commit
+led1 := len(tuplespace)
+print("  x, y             :", fx(x, 5), fx(y, 5))
+print("  Λ(x,y)           :", fx(L, 6))
+print("  ζ(x,y)           :", fx(zeta_de(ND, x, y), 6))
+print("  B(y,x−1)         :", fx(beta_(y, x - 1), 6))
+print("  check Λ·B − ζ    :", sci(L * beta_(y, x - 1) - zeta_de(ND, x, y)))
+print("  P(rank 0..4)     :", fx(p[0], 5), fx(p[1], 5), fx(p[2], 5), fx(p[3], 5), fx(p[4], 5))
+print("  H(p) (V=32 の台) :", fx(entropy(p), 5))
+print("  forbidden ranks  :", zeros_of(p), " (Λ > 0 は正の乗算因子: 一度禁止された順位は復活しない)")
+print("  台帳              :", led0, "→", len(tuplespace), "facts")
+check("実行   Λ·B − ζ が機械精度で 0", abs(L * beta_(y, x - 1) - zeta_de(ND, x, y)) <= 0.000000000000005)
+check("実行   emit(p) が台帳へ 1 fact 追記", led1 == led0 + 1)
+
+section("結論 (第二巻)")
+print("  1. 解いた: p = y, q = x−1 の同定のもとで Λ = E_Beta[κ^{x−1}]/Γ(x) = ζ/B。独立二経路で機械精度 (表1・2)。")
+print("  2. 作り換えた: ζ(x,y) = B(y,x−1)·Λ(x,y) — Zipf–Mandelbrot 分配関数の因数分解。系1〜3 を得た。")
+print("  3. 生成アルゴリズムにした: 決定論版は exp/log と 391 節点だけ (表12)、標本版は走りながら Λ を検算する (表8)。")
+print("  β と ζ を結ぶのは値の比ではなく測度の取り替えであり、その Radon–Nikodym 密度が κ^{x−1} である。")
+verdict("@@PAPER-02-OK")

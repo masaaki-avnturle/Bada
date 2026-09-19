@@ -1,0 +1,365 @@
+# ============================================================
+# 01_form_entropy.bada -- 第一巻
+# 方程式の記号形状エントロピーによるアプリケーション合成
+# — Bada 量子言語の位相核上に BadaGPT を構成する機構 —
+#
+# 論文の主張を、そのまま実行できる Bada プログラムに作り換えたもの。
+#   §3  記号形状エントロピー H_form = (H0 + H1 + (H2+H3)/2)/3   (式5)
+#   命題0 α 変換不変性 (名前の付け替えで H0, Hshape が厳密に不変)
+#   定理1 単一位相は不活性 (cognitive_system で q = a を機械精度で確認)
+#   定理2 二分岐干渉の閉形式 p_i = a_i(1+cos(β ΔH φ_i))/Z   (式7)
+#   系1・2 零点の単調増加 (非復活・最大破壊的干渉が厳密零を生む)
+#   命題1 共通位相場では順位が変わらない (否定的結果2)
+#   §6  設計行列 W と方程式由来の位相場 φ(E) による合成パイプライン (表E)
+#   §5  @reviser : grammar による eqload / shape / synth 規則の台帳 commit
+# 予備知識は持たない: 事前分布は unknown_prior(8) の一様 (Jaynes) から出発し、
+# 方程式の「形」だけが干渉係数として確率へ作用する。
+# ============================================================
+
+section("第一巻  方程式の記号形状エントロピーによるアプリケーション合成")
+
+# ---- §5 文法拡張: 三規則を台帳へ commit ---------------------------------------
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "eqload" postfix [ 'eq'    '(' expr ')' ] => eq_parse(_1)
+    rule "shape"  postfix [ 'shape' '(' expr ')' ] => form_entropy(_1)
+    rule "synth"  stmt    [ 'synth' '(' expr ',' expr ',' expr ',' expr ')' ] => commit_measurement(interfere2(_1, _2, _3, _4))
+}
+print("grammar rules committed :", len(tuplespace), "facts (eqload / shape / synth)")
+
+# ---- S 式 -> 記号木 ----------------------------------------------------------------
+# 木は ["N", head, kids] / 葉は ["L", token] で表す (Bada に型判別が無いため)。
+def sx_tokenize(s) {
+    toks := []  cur := ""  i := 0  n := len(s)
+    while (i < n) {
+        c := substr(s, i, 1)
+        if (c == "(") { if (len(cur) > 0) { toks <- cur  cur := "" }  toks <- "(" }
+        else { if (c == ")") { if (len(cur) > 0) { toks <- cur  cur := "" }  toks <- ")" }
+        else { if (c == " ") { if (len(cur) > 0) { toks <- cur  cur := "" } }
+        else { cur := cur + c } } }
+        i := i + 1
+    }
+    if (len(cur) > 0) { toks <- cur }
+    return toks
+}
+def sx_read(toks, pos) {                     # -> [node, next_pos]
+    t := toks[pos]
+    if (t == "(") {
+        head := toks[pos + 1]
+        kids := []
+        p := pos + 2
+        while (toks[p] != ")") {
+            r := sx_read(toks, p)
+            kids <- r[0]
+            p := r[1]
+        }
+        return [["N", head, kids], p + 1]
+    }
+    return [["L", t], pos + 1]
+}
+def eq_parse(s) {
+    toks := sx_tokenize(s)
+    r := sx_read(toks, 0)
+    fact := ["eq", s]
+    fact >> tuplespace                       # 木化は決定的で、方程式は台帳事実になる
+    return r[0]
+}
+def sx_tokens(node, out) {                   # 前順走査
+    if (node[0] == "L") { out <- node[1]  return out }
+    out <- node[1]
+    kids := node[2]  i := 0
+    while (i < len(kids)) { sx_tokens(kids[i], out)  i := i + 1 }
+    return out
+}
+def sx_depths(node, d, out) {
+    out <- d
+    if (node[0] == "N") { kids := node[2]  i := 0  while (i < len(kids)) { sx_depths(kids[i], d + 1, out)  i := i + 1 } }
+    return out
+}
+def sx_arities(node, out) {
+    if (node[0] == "L") { out <- 0  return out }
+    kids := node[2]
+    out <- len(kids)
+    i := 0
+    while (i < len(kids)) { sx_arities(kids[i], out)  i := i + 1 }
+    return out
+}
+def flatten(node) { return sx_tokens(node, []) }
+
+# ---- 記号類 (付録 B.1) ---------------------------------------------------------------
+BIND_SYMS := ["Sum", "Int", "Prod", "lim", "d/ds", "partial", "nabla"]
+FN_SYMS   := ["zeta", "beta", "Gamma", "psi", "sin", "cos", "log", "exp", "sqrt", "softmax", "H"]
+OP_SYMS   := ["+", "-", "*", "/", "^", "="]
+NUM_SYMS  := ["1", "2", "pi", "e", "0", "1/2"]
+DEL_SYMS  := ["(", ")", "[", "]", ",", "_"]
+CLASS_NAMES := ["BIND", "FN", "OP", "VAR", "NUM", "DEL"]
+def in_list(xs, v) { i := 0  while (i < len(xs)) { if (xs[i] == v) { return true }  i := i + 1 }  return false }
+def klass(tok) {
+    if (in_list(BIND_SYMS, tok)) { return 0 }
+    if (in_list(FN_SYMS, tok))   { return 1 }
+    if (in_list(OP_SYMS, tok))   { return 2 }
+    if (in_list(NUM_SYMS, tok))  { return 4 }
+    if (in_list(DEL_SYMS, tok))  { return 5 }
+    return 3                                  # 未登録の名前は一律 VAR (命題0 を壊さない)
+}
+
+# ---- 頻度分布と Shannon 核 -------------------------------------------------------------
+def counts_of(items) {                         # 相異なる値ごとの出現数 (順不同)
+    keys := []  cnt := []  i := 0
+    while (i < len(items)) {
+        v := items[i]  j := 0  found := -1
+        while (j < len(keys)) { if (keys[j] == v) { found := j }  j := j + 1 }
+        if (found < 0) { keys <- v  cnt <- 1 } else { cnt := set_at(cnt, found, cnt[found] + 1) }
+        i := i + 1
+    }
+    return cnt
+}
+def class_counts(toks) {
+    c := arr_zeros(6)  i := 0
+    while (i < len(toks)) { k := klass(toks[i])  c := set_at(c, k, c[k] + 1)  i := i + 1 }
+    return c
+}
+def counts_to_dist(c) { return dist(c) }       # dist() が規格化する
+
+# ---- §3 三階層の測定 (式2〜5) -----------------------------------------------------------
+def form_layers(tree) {                          # [H0, H1, Hshape, N]
+    toks := flatten(tree)
+    H0 := shannon_(counts_to_dist(counts_of(toks)))
+    H1 := shannon_(counts_to_dist(class_counts(toks)))
+    H2 := shannon_(counts_to_dist(counts_of(sx_depths(tree, 0, []))))
+    H3 := shannon_(counts_to_dist(counts_of(sx_arities(tree, []))))
+    return [H0, H1, (H2 + H3) / 2, len(toks)]
+}
+def form_entropy(tree) {
+    L := form_layers(tree)
+    return (L[0] + L[1] + L[2]) / 3            # 式(5)
+}
+
+# ---- 表1: 出典論文から採取した方程式 6 本 + 1 -----------------------------------------------
+E1 := eq("(= (zeta s) (* (^ 2 s) (* (^ pi (- s 1)) (* (sin (/ (* pi s) 2)) (* (/ (beta s (- 1 s)) (Gamma s)) (zeta (- 1 s)))))))")
+E2 := eq("(= (log (beta (+ 1 alpha) (+ 1 beta_v))) (+ (- (log (+ 1 (+ alpha beta_v)))) (Sum n (* (/ (* (^ (- 1) n) (zeta n)) n) (- (+ (^ alpha n) (^ beta_v n)) (^ (+ alpha beta_v) n))))))")
+E3 := eq("(= gamma_v (Sum n (/ (* (^ (- 1) n) (zeta n)) n)))")
+E4 := eq("(= psi (* (sqrt a) (exp (* i theta))))")
+E5 := eq("(= (zeta s) (* (zeta s) (exp (* i (* beta_v (H sigma))))))")
+E6 := eq("(= H (- (Sum i (* q (log q)))))")
+E7 := eq("(= theta (Sum m (* beta_v (* H phi))))")
+EQS   := [E1, E2, E3, E4, E5, E6, E7]
+NAMES := ["E1", "E2", "E3", "E4", "E5", "E6", "E7"]
+DESC  := ["ζ(s) のベータ型関数等式", "log B(1+α,1+β) のゼータ差分展開", "γ = Σ(−1)^n ζ(n)/n",
+          "psi = sqrt(a)·exp(iθ) (エンジン核)", "ζ_NS = ζ·exp(iβH)", "H = −Σ q log q", "θ = Σ β_m H_m φ_m"]
+# 論文 表1 の実測値 (H0, H1, Hshape, H_form) — 本実装が同じ S 式から同じ値を返すことを検査する
+PAPER_T1 := [[2.33875, 1.32534, 1.52700, 1.73037],
+             [2.41643, 1.26772, 1.48136, 1.72184],
+             [2.13840, 1.32692, 1.44860, 1.63797],
+             [2.04319, 1.09861, 1.32098, 1.48759],
+             [2.09815, 1.09283, 1.48885, 1.55994],
+             [2.04319, 1.31078, 1.39799, 1.58399],
+             [2.04319, 1.21489, 1.13403, 1.46404]]
+
+print("")
+print("表1. 記号形状エントロピー (nat)")
+print("  式   N    H0       H1       Hshape   H_form   Ĥ=H/log N")
+HF := []
+t1_ok := true
+i := 0
+while (i < 7) {
+    L := form_layers(EQS[i])
+    hf := (L[0] + L[1] + L[2]) / 3
+    HF <- hf
+    print("  " + NAMES[i] + "  " + pad(L[3], 2) + "  " + fx(L[0], 5) + "  " + fx(L[1], 5) + "  " + fx(L[2], 5) + "  " + fx(hf, 5) + "  " + fx(hf / log(L[3]), 5) + "   " + DESC[i])
+    row := PAPER_T1[i]
+    if (abs(L[0] - row[0]) > 0.000006) { t1_ok := false }
+    if (abs(L[1] - row[1]) > 0.000006) { t1_ok := false }
+    if (abs(L[2] - row[2]) > 0.000006) { t1_ok := false }
+    if (abs(hf - row[3]) > 0.000006) { t1_ok := false }
+    i := i + 1
+}
+check("表1  7 本すべて論文値 (H0, H1, Hshape, H_form) と 5 桁一致", t1_ok)
+Href  := HF[3]                                   # 参照式 E4 = エンジン核
+dHmax := abs(HF[0] - Href)                       # 参照からの最大乖離 (E1)
+print("  参照 E4 の H_form =", fx(Href, 5), "  ΔHmax = |H(E1) − H(E4)| =", fx(dHmax, 5))
+check_close("ΔHmax = 0.24277 (論文)", dHmax, 0.24277, 0.000006)
+
+# ---- 命題0: α 変換不変性 -------------------------------------------------------------------
+E1r := eq("(= (Z w) (* (^ 2 w) (* (^ pi (- w 1)) (* (sin (/ (* pi w) 2)) (* (/ (B w (- 1 w)) (G w)) (Z (- 1 w)))))))")
+La := form_layers(E1)  Lb := form_layers(E1r)
+print("")
+print("表2. α 変換不変性 (E1: s→w, ζ→Z, β→B, Γ→G)")
+print("  H0     原式", fx(La[0], 12), " 改名後", fx(Lb[0], 12), " 差", sci(abs(La[0] - Lb[0])))
+print("  Hshape 原式", fx(La[2], 12), " 改名後", fx(Lb[2], 12), " 差", sci(abs(La[2] - Lb[2])))
+check("命題0  H0 が厳密に不変 (差 0)", La[0] == Lb[0])
+check("命題0  Hshape が厳密に不変 (差 0)", La[2] == Lb[2])
+print("  (注: Z, B, G は未登録なので VAR に落ち、類階層 H1 は変わる — 命題0 は類を保存する付け替えについての主張)")
+
+# ---- 定理1: 単一位相は不活性 (エンジン第二定理の直接の帰結) -------------------------------------
+section("定理1  単一位相は不活性 — 方程式の形は出力分布を変えない")
+z := [3.0, 1.5, 0.0, -40.0, 1.0, -3.0, -40.0, 0.75]
+a := softmax(z)                                  # 確信零 {3, 6} を含む基底分布 (表3 の a を再現)
+phi_cos := []  i := 0
+while (i < 8) { phi_cos <- cos_(i)  i := i + 1 }
+qmod := dist([0.5, 0.5])                         # H(q) = log 2
+beta1 := HF[0] / LN2                             # → θ_i = β·H(q)·φ_i = H_form(E1)·cos(i)
+q_hat := cognitive_system(a, [[qmod, phi_cos]], [beta1])
+print("  index :   0        1        2        3        4        5        6        7")
+print("  a     :", fx(a[0], 5), fx(a[1], 5), fx(a[2], 5), fx(a[3], 5), fx(a[4], 5), fx(a[5], 5), fx(a[6], 5), fx(a[7], 5))
+print("  q     :", fx(q_hat[0], 5), fx(q_hat[1], 5), fx(q_hat[2], 5), fx(q_hat[3], 5), fx(q_hat[4], 5), fx(q_hat[5], 5), fx(q_hat[6], 5), fx(q_hat[7], 5))
+print("  maxdiff(q, a) =", sci(maxdiff(q_hat, a)), "  零点", zeros_of(a), "→", zeros_of(q_hat))
+check("定理1  q = a (maxdiff <= 2.3e-16)", maxdiff(q_hat, a) <= 0.00000000000000023)
+check("定理1  零点 [3,6] が保存", len(zeros_of(q_hat)) == 2 && zeros_of(q_hat)[0] == 3 && zeros_of(q_hat)[1] == 6)
+
+# ---- 定理2: 二分岐干渉の閉形式 -------------------------------------------------------------------
+section("定理2  二分岐干渉  p_i = a_i (1 + cos(β ΔH φ_i)) / Z")
+def interf_factor(theta) { c := cos_(theta / 2)  return 2 * c * c }   # = 1 + cos θ (θ = ±π で厳密零)
+def interfere2(prior, dH, beta, phi) {           # 式(7) 閉形式。dist() が規格化する
+    w := []  i := 0
+    while (i < len(prior)) { w <- prior[i] * interf_factor(beta * dH * phi[i])  i := i + 1 }
+    return dist(w)
+}
+def interfere2_direct(prior, H1, H2, beta, phi) { # 式(6) 振幅を二乗前に加算
+    w := []  i := 0
+    while (i < len(prior)) {
+        u := beta * H1 * phi[i]  v := beta * H2 * phi[i]
+        re := cos_(u) + cos_(v)  im := sin_(u) + sin_(v)
+        w <- prior[i] * (re * re + im * im) / 2
+        i := i + 1
+    }
+    return dist(w)
+}
+BETAS := [0.5, 1.0, 2.0, 5.0, 12.0]
+PAIRS := [[0, 1], [3, 6], [0, 3], [1, 6]]
+worst := 0.0  bi := 0
+while (bi < 5) {
+    pi_ := 0
+    while (pi_ < 4) {
+        pr := PAIRS[pi_]
+        pd := interfere2_direct(a, HF[pr[0]], HF[pr[1]], BETAS[bi], phi_cos)
+        pc := interfere2(a, HF[pr[0]] - HF[pr[1]], BETAS[bi], phi_cos)
+        d := maxdiff(pd, pc)
+        if (d > worst) { worst := d }
+        pi_ := pi_ + 1
+    }
+    bi := bi + 1
+}
+print("  β ∈ {0.5,1,2,5,12} × 4 方程式対 = 20 ケース: 式(6) 直接振幅和 vs 式(7) 閉形式 の最大差 =", sci(worst))
+check("定理2  閉形式と直接計算が一致 (max diff <= 5e-16)", worst <= 0.0000000000000005)
+
+# ---- 命題1 / 表4: 共通位相場では順位が変わらない ------------------------------------------------------
+print("")
+print("表4. 共通位相モジュール (φ_i = cos i, β = 2) — ΔH 昇順")
+def kl_(p, q) {
+    s := 0.0  i := 0
+    while (i < len(p)) { if (p[i] > 0) { s := s + p[i] * log(p[i] / q[i]) }  i := i + 1 }
+    return s
+}
+def top3_(p) { o := arr_order_desc(p)  return [o[0], o[1], o[2]] }
+T4 := [[3, 3], [0, 1], [3, 6], [5, 4], [2, 4], [0, 5], [0, 3], [1, 6]]
+print("  対      ΔH_form   maxdiff   KL(p‖a)   厳密零   上位3部品")
+prev := -1.0  mono := true  ranks_same := true  zeros_kept := true
+ref_top := top3_(a)
+ti := 0
+while (ti < 8) {
+    pr := T4[ti]
+    dH := HF[pr[0]] - HF[pr[1]]
+    p := interfere2(a, dH, 2.0, phi_cos)
+    md := maxdiff(p, a)
+    if (md + 0.0000000000001 < prev) { mono := false }
+    prev := md
+    t3 := top3_(p)
+    if (t3[0] != ref_top[0]) { ranks_same := false }
+    if (t3[1] != ref_top[1]) { ranks_same := false }
+    if (t3[2] != ref_top[2]) { ranks_same := false }
+    zs := zeros_of(p)
+    if (len(zs) != 2) { zeros_kept := false }
+    print("  " + NAMES[pr[0]] + "/" + NAMES[pr[1]] + "   " + fx(dH, 5) + "   " + fx(md, 5) + "   " + fx(kl_(p, a), 5) + "   " + arr_str(zs) + "   " + arr_str(t3))
+    ti := ti + 1
+}
+check("命題1  |ΔH| 昇順で maxdiff は単調非減少", mono)
+check("命題1  上位 3 部品の順位は全ケース同一 (否定的結果2)", ranks_same)
+check("系1    零点 [3,6] は全ケースで保存", zeros_kept)
+
+# ---- 系2 / 表F: 最大破壊的干渉は新たな厳密零を作る --------------------------------------------------------
+print("")
+print("表F. 最大破壊的干渉における零点の扱い")
+aF := dist([0.30, 0.25, 0.0, 0.20, 0.15, 0.0, 0.06, 0.04])   # 厳密零 {2, 5}
+phiF := [0.3, -0.2, 0.1, 0.5, 1.0, -0.4, 0.2, -0.6]          # 最大絶対値成分 index 4 = +1
+pF := interfere2(aF, dHmax, PI / dHmax, phiF)               # β = π/ΔHmax (分解ゲイン)
+print("  a =", aF)
+print("  p =", pF)
+print("  β·ΔH·φ_4 =", fx(PI / dHmax * dHmax * phiF[4], 6), "rad  厳密零 {2,5} →", zeros_of(pF))
+zF := zeros_of(pF)
+check("系2    a の零 {2,5} ⊂ p の零 かつ index 4 に新たな厳密零", len(zF) == 3 && zF[0] == 2 && zF[1] == 4 && zF[2] == 5)
+
+# ---- §6 BadaGPT 合成パイプライン ------------------------------------------------------------------------------
+section("§6  BadaGPT 合成パイプライン — 方程式由来の位相場 φ(E) と設計行列 W")
+PARTS := ["chat_stream", "pdf_ingest", "plot_panel", "ledger_view", "gate_editor", "tomography", "export_md", "settings"]
+W := [ [0, 1, 0, 2, 0, 1],   # chat_stream : 変数の多い式は対話的な同定を要する
+       [1, 2, 0, 1, 0, 2],   # pdf_ingest  : 名前付き関数と添字が多い = 出典参照が必要
+       [2, 2, 1, 1, 2, 0],   # plot_panel  : 和・積分と定数 = 数値プロットの対象
+       [2, 0, 1, 0, 1, 1],   # ledger_view : 束縛作用素 = 逐次的な commit の履歴
+       [1, 1, 2, 1, 1, 0],   # gate_editor : 演算子密度 = ゲート列の編集
+       [2, 1, 0, 1, 2, 0],   # tomography  : 和と定数 = 反復測定による推定
+       [0, 1, 1, 1, 0, 2],   # export_md   : 区切りの多い式 = 整形出力の需要
+       [0, 0, 1, 0, 1, 1] ]  # settings    : 既定 (残余)
+# W は設計者の宣言であって、データから推定したものではない (§8-3)。
+def phi_of(tree) {                               # 式(8): raw = W f(E), 中心化・最大絶対値 1 に正規化
+    f := counts_to_dist(class_counts(flatten(tree)))
+    raw := []  i := 0
+    while (i < 8) { s := 0.0  j := 0  while (j < 6) { s := s + W[i][j] * f[j]  j := j + 1 }  raw <- s  i := i + 1 }
+    m := arr_sum(raw) / 8
+    dev := []  i := 0
+    while (i < 8) { dev <- raw[i] - m  i := i + 1 }
+    sc := arr_maxabs(dev)
+    out := []  i := 0
+    while (i < 8) { out <- dev[i] / sc  i := i + 1 }
+    return out
+}
+def synth_app(tree, ref_H, dHmax_) {
+    prior := unknown_prior(8)                    # 一様 = 最大エントロピー (Jaynes)。予備知識なし
+    Hf    := form_entropy(tree)
+    phi   := phi_of(tree)
+    beta  := PI / dHmax_                         # 分解ゲイン
+    p     := interfere2(prior, Hf - ref_H, beta, phi)
+    synth(prior, Hf - ref_H, beta, phi)          # 台帳へ測定として追記 (reviser 規則 synth)
+    return p
+}
+print("  事前分布 unknown_prior(8): H = log 8 =", fx(entropy(unknown_prior(8)), 5), "  β = π/ΔHmax =", fx(PI / dHmax, 5))
+print("")
+print("表E. 方程式由来位相場での部品分布 (参照 E4)")
+print("  式   ΔH        H(p)     chat    pdf     plot    ledger  gate    tomo    export  set    上位3")
+ORDER := [6, 4, 5, 2, 1, 0]                       # ΔH 昇順 (E7, E5, E6, E3, E2, E1)
+PAPER_E := [[0.1258, 0.1259, 0.1246, 0.1250, 0.1237, 0.1259, 0.1260, 0.1231],
+            [0.1336, 0.1360, 0.1206, 0.1094, 0.1206, 0.1343, 0.1360, 0.1094],
+            [0.1426, 0.1426, 0.1065, 0.1242, 0.1065, 0.1409, 0.1426, 0.0940],
+            [0.1626, 0.1359, 0.0959, 0.1359, 0.0515, 0.1595, 0.1626, 0.0959],
+            [0.2042, 0.1245, 0.0661, 0.1245, 0.0006, 0.1779, 0.2025, 0.0997],
+            [0.1595, 0.1001, 0.0017, 0.1402, 0.0000, 0.2315, 0.2267, 0.1402]]
+prevH := 99.0  hp_mono := true  tE_ok := true  ledger0 := len(tuplespace)
+oi := 0
+while (oi < 6) {
+    k := ORDER[oi]
+    p := synth_app(EQS[k], Href, dHmax)
+    hp := entropy(p)
+    if (hp > prevH + 0.0000001) { hp_mono := false }
+    prevH := hp
+    t3 := top3_(p)
+    row := PAPER_E[oi]  j := 0
+    while (j < 8) { if (abs(p[j] - row[j]) > 0.00006) { tE_ok := false }  j := j + 1 }
+    print("  " + NAMES[k] + "  " + pad(fx(HF[k] - Href, 5), 8) + "  " + fx(hp, 5) + "  " + fx(p[0], 4) + "  " + fx(p[1], 4) + "  " + fx(p[2], 4) + "  " + fx(p[3], 4) + "  " + fx(p[4], 4) + "  " + fx(p[5], 4) + "  " + fx(p[6], 4) + "  " + fx(p[7], 4) + "  " + PARTS[t3[0]] + " / " + PARTS[t3[1]] + " / " + PARTS[t3[2]])
+    if (k == 0) {
+        print("       E1 の禁止部品 zeros_of(p) =", zeros_of(p), "→ " + PARTS[4] + " は以後の合成から恒久的に排除される")
+        check("表E   E1 で gate_editor が厳密零", len(zeros_of(p)) == 1 && zeros_of(p)[0] == 4)
+    }
+    oi := oi + 1
+}
+check("表E   6 本の部品分布が論文値と 4 桁一致", tE_ok)
+check("表E   |ΔH| の増加とともに H(p) が単調減少 (2.07941 → 1.76036)", hp_mono)
+check("表E   上位 3 部品の順位が方程式ごとに変化 (φ(E) が方程式依存)", top3_(synth_app(E1, Href, dHmax))[0] != top3_(synth_app(E5, Href, dHmax))[0])
+print("  合成 6 回 + 検算 2 回で台帳は", ledger0, "→", len(tuplespace), "facts (文法規則・方程式・測定が同一の追記専用ストアに載る)")
+
+# ---- 結論 ----------------------------------------------------------------------------------------------------
+section("結論 (第一巻)")
+print("  1. 測る   : 三階層に x log x 核を当て、α 変換不変な H_form を得た (表1・命題0)。")
+print("  2. 干渉させる: 単一位相では何も起きず (定理1)、二乗前の振幅加算だけが確率に作用する (定理2)。")
+print("              作用は非負因子の乗算であり、確信された零は復活せず、最大破壊的干渉は新たな零を作る (系1・2)。")
+print("  3. commit する: 合成結果は測定として台帳に追記され、零点集合は単調に増大する。")
+print("  主張しないこと: H_form が方程式の意味を捉えていること。W は宣言であり発見ではない (§8)。")
+verdict("@@PAPER-01-OK")

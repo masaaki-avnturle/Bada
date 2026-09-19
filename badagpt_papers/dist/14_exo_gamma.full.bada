@@ -1,0 +1,654 @@
+# ---- generated: 00_prelude.bada + 14_exo_gamma.bada (tools/run-papers.js) ----
+# ============================================================
+# 00_prelude.bada -- BadaGPT 未知事前エンジン論文集 / 共通核
+#
+# 量子プログラミング言語 Bada の組み込みは softmax / entropy /
+# unknown_prior / update / cognitive_system / dist / zeros_of /
+# maxdiff / len / sqrt / log / exp / abs / f5 / sci と、量子部分言語
+# qubit / H / X / S / T / Rz / CNOT / Measure / commit_measurement、
+# 追記専用台帳 tuplespace だけである。床関数も三角関数も Γ も ζ も
+# 無い。この核でそれを全部こしらえ、各巻はこの上に乗る。
+#
+#   数値      floor_ round_ pow_ ipow sin_ cos_ atan_ sinh_ cosh_ log1p_
+#   Γ 族      log_gamma gamma_ inv_gamma log_beta beta_ digamma_
+#   Bernoulli BERN bernoulli_poly
+#   Hurwitz ζ hurwitz (Euler–Maclaurin)  zeta_r  dirichlet_beta
+#   二重指数  de_default de_gamma_zeta zeta_de lambda_de zeta_V zm_dist_raw
+#   修正核    lambda_em kappa_      (ζ(x,y) = B(y,x−1)·Λ(x,y))
+#   配列      arr_zeros set_at arr_sum arr_max arr_maxabs rel_err ...
+#   表示      fx f3 f8 f10 f12 pad
+#   検査      check check_close check_rel verdict  (結果は台帳へ commit)
+#
+# 方言上の注意 (この処理系で実測した制約):
+#   * 配列の索引代入 a[i] := v は無い -> set_at / 再構築で書く
+#   * 論理和 or / || は無い -> && と ! と入れ子の if で書く
+#   * 関数の中から大域変数へ := しても外へ出ない -> 配列への <- 追記だけが届く
+#   * for は本体の代入を外へ出さない -> 累積は while で書く
+# ============================================================
+
+PI          := 3.141592653589793
+TWO_PI      := 6.283185307179586
+HALF_PI     := 1.5707963267948966
+LN2         := 0.6931471805599453
+LN10        := 2.302585092994046
+SQRT_2PI    := 2.5066282746310002
+EULER_GAMMA := 0.5772156649015329
+GLAISHER    := 1.2824271291006226
+INF         := exp(800)
+
+# ---- 床・丸め・べき --------------------------------------------------
+def floor_(x) { r := x - (x % 1)  if (r > x) { r := r - 1 }  return r }
+def ceil_(x)  { r := floor_(x)  if (r < x) { r := r + 1 }  return r }
+def round_(x) { return floor_(x + 0.5) }
+def max_(a, b) { if (a > b) { return a }  return b }
+def min_(a, b) { if (a < b) { return a }  return b }
+def is_int(x) { return abs(x - round_(x)) < 0.000000000001 }
+def sign_(x) { if (x < 0) { return -1 }  if (x > 0) { return 1 }  return 0 }
+
+def ipow(b, n) {                      # 整数べき (n >= 0)
+    r := 1.0  k := 0
+    while (k < n) { r := r * b  k := k + 1 }
+    return r
+}
+def pow_(b, e) {                      # 実数べき: exp(e log b)  (小さな整数べきは乗算で厳密に)
+    if (e % 1 == 0) { if (abs(e) <= 64) {
+        if (e >= 0) { return ipow(b, e) }
+        return 1.0 / ipow(b, 0 - e)
+    } }
+    if (b > 0) { return exp(e * log(b)) }
+    if (b == 0) { if (e > 0) { return 0.0 }  if (e == 0) { return 1.0 }  return INF }
+    if (is_int(e)) {
+        n := round_(e)
+        if (n >= 0) { return ipow(b, n) }
+        return 1.0 / ipow(b, 0 - n)
+    }
+    return 0 / 0
+}
+
+# ---- 三角関数 (Taylor 級数 + 範囲縮約 [-pi/2, pi/2]) ---------------------
+def sin_(x) {
+    x := x % TWO_PI
+    if (x > PI) { x := x - TWO_PI }
+    if (x < 0 - PI) { x := x + TWO_PI }
+    if (x > HALF_PI) { x := PI - x }
+    if (x < 0 - HALF_PI) { x := 0 - PI - x }
+    term := x  s := x  k := 1
+    while (k <= 12) {
+        term := 0 - term * x * x / ((2 * k) * (2 * k + 1))
+        s := s + term
+        k := k + 1
+    }
+    return s
+}
+def cos_(x) { return sin_(HALF_PI - x) }
+def tan_(x) { return sin_(x) / cos_(x) }
+def sinh_(t) {
+    if (abs(t) < 0.5) {               # 桁落ちを避ける級数
+        t2 := t * t
+        return t * (1 + t2 / 6 * (1 + t2 / 20 * (1 + t2 / 42 * (1 + t2 / 72 * (1 + t2 / 110)))))
+    }
+    return (exp(t) - exp(0 - t)) / 2
+}
+def cosh_(t) { return (exp(t) + exp(0 - t)) / 2 }
+def atan_(z) {
+    neg := false  inv := false
+    if (z < 0) { z := 0 - z  neg := true }
+    if (z > 1) { z := 1 / z  inv := true }
+    z := z / (1 + sqrt(1 + z * z))    # 半角に二度縮約: |z| <= tan(pi/16)
+    z := z / (1 + sqrt(1 + z * z))
+    s := 0.0  t := z  k := 0  sg := 1
+    while (k < 18) { s := s + sg * t / (2 * k + 1)  t := t * z * z  sg := 0 - sg  k := k + 1 }
+    s := 4 * s
+    if (inv) { s := HALF_PI - s }
+    if (neg) { s := 0 - s }
+    return s
+}
+def log1p_(z) {
+    if (abs(z) > 0.01) { return log(1 + z) }
+    return z * (1 - z * (1/2 - z * (1/3 - z * (1/4 - z * (1/5 - z * (1/6 - z * (1/7 - z * (1/8 - z / 9))))))))
+}
+def log2_(x)  { return log(x) / LN2 }
+def log10_(x) { return log(x) / LN10 }
+
+# ---- 階乗・二項 ----------------------------------------------------------
+def fact_(n) { r := 1.0  k := 2  while (k <= n) { r := r * k  k := k + 1 }  return r }
+def binom_(n, k) {                    # C(n,k) 整数
+    if (k < 0) { return 0 }  if (k > n) { return 0 }
+    r := 1.0  j := 0
+    while (j < k) { r := r * (n - j) / (j + 1)  j := j + 1 }
+    return round_(r)
+}
+def binom_gen(s, k) {                 # 一般二項係数 C(s+k-1, k) = Γ(s+k)/(Γ(s) k!)
+    p := 1.0  j := 0
+    while (j < k) { p := p * (s + j)  j := j + 1 }
+    return p / fact_(k)
+}
+
+# ---- Γ 関数族 (Lanczos g=7, n=9 / 反射公式) -------------------------------
+LANCZOS := [0.99999999999980993, 676.5203681218851, -1259.1392167224028,
+            771.32342877765313, -176.61502916214059, 12.507343278686905,
+            -0.13857109526572012, 0.0000099843695780195716,
+            0.00000015056327351493116]
+def log_gamma_pos(z) {                # z >= 0.5
+    zz := z - 1  a := LANCZOS[0]  t := zz + 7.5  i := 1
+    while (i < 9) { a := a + LANCZOS[i] / (zz + i)  i := i + 1 }
+    return 0.5 * log(TWO_PI) + (zz + 0.5) * log(t) - t + log(a)
+}
+def log_gamma(z) {                    # log |Γ(z)|
+    if (z >= 0.5) { return log_gamma_pos(z) }
+    return log(PI / abs(sin_(PI * z))) - log_gamma_pos(1 - z)
+}
+def gamma_(z) {                       # Γ(z) 符号つき
+    if (z >= 0.5) { return exp(log_gamma_pos(z)) }
+    return PI / (sin_(PI * z) * exp(log_gamma_pos(1 - z)))
+}
+def inv_gamma(z) {                    # 1/Γ(z) 整関数 (非正整数で 0)
+    if (z > 0.5) { return exp(0 - log_gamma_pos(z)) }
+    return exp(log_gamma_pos(1 - z)) * sin_(PI * z) / PI
+}
+def log_beta(p, q) { return log_gamma(p) + log_gamma(q) - log_gamma(p + q) }
+def beta_(p, q)    { return exp(log_beta(p, q)) }
+def digamma_(z) {                     # ψ(z): 漸化式で z >= 10 に上げて漸近展開
+    r := 0.0
+    while (z < 10) { r := r - 1 / z  z := z + 1 }
+    f := 1 / (z * z)
+    return r + log(z) - 0.5 / z - f * (1/12 - f * (1/120 - f * (1/252 - f * (1/240 - f / 132))))
+}
+
+# ---- Bernoulli 数と多項式 ----------------------------------------------------
+BERN := [1, -0.5, 1/6, 0, -1/30, 0, 1/42, 0, -1/30, 0, 5/66, 0, -691/2730, 0, 7/6, 0, -3617/510]
+B2K  := [1/6, -1/30, 1/42, -1/30, 5/66, -691/2730, 7/6, -3617/510]
+def bernoulli_poly(n, x) {            # B_n(x) = Σ C(n,k) B_k x^{n-k}
+    s := 0.0  k := 0
+    while (k <= n) { s := s + binom_(n, k) * BERN[k] * pow_(x, n - k)  k := k + 1 }
+    return s
+}
+
+# ---- Hurwitz ζ(s,a) — Euler–Maclaurin (s != 1 の全域で解析接続として妥当) ----
+def hurwitz_nk(s, a, N, K) {
+    tot := 0.0  n := 0
+    while (n < N) { tot := tot + pow_(n + a, 0 - s)  n := n + 1 }
+    A := N + a
+    tot := tot + pow_(A, 1 - s) / (s - 1) + 0.5 * pow_(A, 0 - s)
+    k := 1
+    while (k <= K) {
+        p := 1.0  j := 0
+        while (j < 2 * k - 1) { p := p * (s + j)  j := j + 1 }
+        tot := tot + B2K[k - 1] / fact_(2 * k) * p * pow_(A, 0 - s - 2 * k + 1)
+        k := k + 1
+    }
+    return tot
+}
+def hurwitz(s, a)      { return hurwitz_nk(s, a, 30, 8) }
+def zeta_r(s)          { return hurwitz(s, 1.0) }                 # Riemann ζ
+def dirichlet_beta(s)  { return pow_(4, 0 - s) * (hurwitz(s, 0.25) - hurwitz(s, 0.75)) }
+
+# ---- 二重指数節点 (Takahasi–Mori, ロジスティック変換) -------------------------
+#   u_k = σ(π sinh(k h)),  w_k = π cosh(k h) h,  h = 2^-5, |k| <= 195 -> 391 節点
+#   節点表は (log u, log(1-u), log w) の三つ組で持つ。
+def de_nodes(h, kmax) {
+    LU := []  LV := []  LW := []
+    k := 0 - kmax
+    while (k <= kmax) {
+        t := k * h
+        s := PI * sinh_(t)
+        if (s < 700) { if (s > -700) {
+            lu := 0.0  lv := 0.0
+            if (s >= 0) {
+                e := exp(0 - s)
+                lu := 0 - log1p_(e)
+                lv := (0 - s) - log1p_(e)
+            } else {
+                e := exp(s)
+                lu := s - log1p_(e)
+                lv := 0 - log1p_(e)
+            }
+            if (lu < 0) {
+                LU <- lu
+                LV <- lv
+                LW <- log(PI * cosh_(t) * h)
+            }
+        } }
+        k := k + 1
+    }
+    return [LU, LV, LW]
+}
+def de_default() { return de_nodes(0.03125, 195) }
+
+# Σ_k w_k (1-u_k) u_k^{n+y} (log 1/u_k)^{s-1} = Γ(s)/(n+y)^s
+def de_moment(nd, s, y, n) {
+    LU := nd[0]  LV := nd[1]  LW := nd[2]
+    acc := 0.0  i := 0
+    while (i < len(LU)) {
+        lu := LU[i]
+        c := LW[i] + (s - 1) * log(0 - lu) + LV[i] + (n + y) * lu
+        if (c > -700) { acc := acc + exp(c) }
+        i := i + 1
+    }
+    return acc
+}
+# Σ_k w_k u_k^{y} (log 1/u_k)^{s-1} = Γ(s) ζ(s,y)   (1/(1-u) はヤコビアンと相殺)
+def de_gamma_zeta(nd, s, y) {
+    LU := nd[0]  LW := nd[2]
+    acc := 0.0  i := 0
+    while (i < len(LU)) {
+        lu := LU[i]
+        c := LW[i] + (s - 1) * log(0 - lu) + y * lu
+        if (c > -700) { acc := acc + exp(c) }
+        i := i + 1
+    }
+    return acc
+}
+def zeta_de(nd, s, y)   { return exp(log(de_gamma_zeta(nd, s, y)) - log_gamma(s)) }
+def zeta_V(nd, x, y, V) { return zeta_de(nd, x, y) - zeta_de(nd, x, y + V) }   # 離散 Newton–Leibniz
+
+# ---- 修正核  ζ(x,y) = B(y,x−1)·Λ(x,y),  Λ = E_Beta(y,x−1)[κ^{x−1}]/Γ(x) ------
+def kappa_(u) {                       # κ(u) = log(1/u)/(1−u) = 情報量 ÷ 残余質量
+    if (1 - u < 0.000000000001) { e := 1 - u  return 1 + e / 2 + e * e / 3 }
+    return (0 - log(u)) / (1 - u)
+}
+def lambda_de(nd, x, y) { return exp(log(zeta_de(nd, x, y)) - log_beta(y, x - 1)) }
+def lambda_em(x, y)     { return hurwitz(x, y) / beta_(y, x - 1) }
+def poch_ratio(x, y) {                # Γ(x+y−1)/Γ(x−1) (y が正整数なら多項式で厳密)
+    if (is_int(y)) { if (y >= 1) {
+        k := round_(y)  p := 1.0  j := 0
+        while (j < k) { p := p * (x - 1 + j)  j := j + 1 }
+        return p
+    } }
+    b := x + y - 1
+    if (b > 0) { return gamma_(b) * inv_gamma(x - 1) }
+    return inv_gamma(x - 1) * PI / (sin_(PI * b) * gamma_(1 - b))
+}
+def lambda_cont(x, y) { return hurwitz(x, y) * poch_ratio(x, y) / gamma_(y) }   # 解析接続版 Λ
+
+# Zipf–Mandelbrot 分布 (未規格化): P(n) ∝ Σ_k w_k (1-u_k) u_k^{n+y} (log 1/u_k)^{x-1}
+def zm_dist_raw(nd, x, y, V) {
+    p := []  n := 0
+    while (n < V) { p <- de_moment(nd, x, y, n)  n := n + 1 }
+    return p
+}
+def zm_exact(x, y, V) {               # 厳密 (n+y)^{-x} を V 項で切って規格化
+    p := []  n := 0
+    while (n < V) { p <- pow_(n + y, 0 - x)  n := n + 1 }
+    return dist(p)
+}
+
+# ---- 複素数 [re, im] (第十巻 Mellin 畳み込み・第十三巻 偏角原理で使う) ------------------
+def atan2_(y, x) {
+    if (x > 0) { return atan_(y / x) }
+    if (x < 0) { if (y >= 0) { return atan_(y / x) + PI }  return atan_(y / x) - PI }
+    if (y > 0) { return HALF_PI }
+    if (y < 0) { return 0 - HALF_PI }
+    return 0.0
+}
+def c_add(a, b)   { return [a[0] + b[0], a[1] + b[1]] }
+def c_sub(a, b)   { return [a[0] - b[0], a[1] - b[1]] }
+def c_mul(a, b)   { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]] }
+def c_div(a, b)   { d := b[0] * b[0] + b[1] * b[1]  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d] }
+def c_scale(a, k) { return [a[0] * k, a[1] * k] }
+def c_abs(a)      { return sqrt(a[0] * a[0] + a[1] * a[1]) }
+def c_arg(a)      { return atan2_(a[1], a[0]) }
+def c_exp(a)      { r := exp(a[0])  return [r * cos_(a[1]), r * sin_(a[1])] }
+def c_log(a)      { return [log(c_abs(a)), atan2_(a[1], a[0])] }
+def c_pow(a, z)   { return c_exp(c_mul(z, c_log(a))) }              # a^z (主値)
+def c_powr(b, z)  { l := log(b)  return c_exp([z[0] * l, z[1] * l]) } # 実数 b > 0 の複素べき b^z
+def c_sin(a)      { return [sin_(a[0]) * cosh_(a[1]), cos_(a[0]) * sinh_(a[1])] }
+def c_gamma(z) {                       # 複素 Γ (Lanczos g=7, Re z < 1/2 は反射公式)
+    if (z[0] < 0.5) {
+        s := c_sin(c_scale(z, PI))
+        return c_div([PI, 0], c_mul(s, c_gamma([1 - z[0], 0 - z[1]])))
+    }
+    zz := [z[0] - 1, z[1]]
+    x := [LANCZOS[0], 0]  i := 1
+    while (i < 9) { x := c_add(x, c_div([LANCZOS[i], 0], [zz[0] + i, zz[1]]))  i := i + 1 }
+    t := [zz[0] + 7.5, zz[1]]
+    return c_mul(c_mul(c_scale(c_pow(t, [zz[0] + 0.5, zz[1]]), SQRT_2PI), c_exp([0 - t[0], 0 - t[1]])), x)
+}
+def c_hurwitz(s, a, N, K) {            # 複素 s の Hurwitz ζ(s,a) (a 実、Euler–Maclaurin)
+    tot := [0, 0]  n := 0
+    while (n < N) { tot := c_add(tot, c_powr(n + a, [0 - s[0], 0 - s[1]]))  n := n + 1 }
+    A := N + a
+    tot := c_add(tot, c_div(c_powr(A, [1 - s[0], 0 - s[1]]), [s[0] - 1, s[1]]))
+    tot := c_add(tot, c_scale(c_powr(A, [0 - s[0], 0 - s[1]]), 0.5))
+    k := 1
+    while (k <= K) {
+        p := [1, 0]  j := 0
+        while (j < 2 * k - 1) { p := c_mul(p, [s[0] + j, s[1]])  j := j + 1 }
+        tot := c_add(tot, c_scale(c_mul(p, c_powr(A, [0 - s[0] - 2 * k + 1, 0 - s[1]])), B2K[k - 1] / fact_(2 * k)))
+        k := k + 1
+    }
+    return tot
+}
+
+# ---- 配列補助 ---------------------------------------------------------------
+def arr_zeros(n) { a := []  i := 0  while (i < n) { a <- 0.0  i := i + 1 }  return a }
+def arr_fill(n, v) { a := []  i := 0  while (i < n) { a <- v  i := i + 1 }  return a }
+def set_at(a, i, v) {
+    b := []  k := 0
+    while (k < len(a)) { if (k == i) { b <- v } else { b <- a[k] }  k := k + 1 }
+    return b
+}
+def arr_copy(a)  { b := []  i := 0  while (i < len(a)) { b <- a[i]  i := i + 1 }  return b }
+def arr_sum(a)   { s := 0.0  i := 0  while (i < len(a)) { s := s + a[i]  i := i + 1 }  return s }
+def arr_max(a)   { m := a[0]  i := 1  while (i < len(a)) { if (a[i] > m) { m := a[i] }  i := i + 1 }  return m }
+def arr_min(a)   { m := a[0]  i := 1  while (i < len(a)) { if (a[i] < m) { m := a[i] }  i := i + 1 }  return m }
+def arr_maxabs(a){ m := 0.0  i := 0  while (i < len(a)) { if (abs(a[i]) > m) { m := abs(a[i]) }  i := i + 1 }  return m }
+def arr_argmax(a){ m := 0  i := 1  while (i < len(a)) { if (a[i] > a[m]) { m := i }  i := i + 1 }  return m }
+def arr_scale(a, c) { b := []  i := 0  while (i < len(a)) { b <- a[i] * c  i := i + 1 }  return b }
+def arr_add(a, b)   { c := []  i := 0  while (i < len(a)) { c <- a[i] + b[i]  i := i + 1 }  return c }
+def arr_dot(a, b)   { s := 0.0  i := 0  while (i < len(a)) { s := s + a[i] * b[i]  i := i + 1 }  return s }
+def arr_maxdiff(a, b) {
+    m := 0.0  i := 0
+    while (i < len(a)) { d := abs(a[i] - b[i])  if (d > m) { m := d }  i := i + 1 }
+    return m
+}
+def arr_maxrel(a, b) {               # max |a_i - b_i| / |b_i|
+    m := 0.0  i := 0
+    while (i < len(a)) { if (b[i] != 0) { d := abs(a[i] - b[i]) / abs(b[i])  if (d > m) { m := d } }  i := i + 1 }
+    return m
+}
+def rel_err(got, want) { if (want == 0) { return abs(got) }  return abs(got - want) / abs(want) }
+def arr_order_desc(a) {               # 値の降順の添字列 (選択ソート)
+    idx := []  i := 0
+    while (i < len(a)) { idx <- i  i := i + 1 }
+    out := []  used := arr_fill(len(a), false)
+    k := 0
+    while (k < len(a)) {
+        best := -1  j := 0
+        while (j < len(a)) {
+            if (!used[j]) { if (best < 0) { best := j } else { if (a[j] > a[best]) { best := j } } }
+            j := j + 1
+        }
+        out <- best
+        used := set_at(used, best, true)
+        k := k + 1
+    }
+    return out
+}
+def shannon_(p) {                     # −Σ q log q  (x log x 核, 零は寄与ゼロ)
+    h := 0.0  i := 0
+    while (i < len(p)) { q := p[i]  if (q > 0) { h := h - q * log(q) }  i := i + 1 }
+    return h
+}
+
+# ---- 表示 (組み込みは f5 / sci のみ。桁を選べる固定小数を自作) ------------------
+def fx(x, d) {
+    if (x != x) { return "nan" }
+    if (x > 1e300) { return "inf" }
+    if (x < -1e300) { return "-inf" }
+    s := ""
+    if (x < 0) { s := "-"  x := 0 - x }
+    x := x + 0.5 * pow_(10, 0 - d)
+    ip := floor_(x)  fr := x - ip
+    s := s + ip
+    if (d > 0) { s := s + "." }
+    k := 0
+    while (k < d) { fr := fr * 10  dg := floor_(fr)  if (dg > 9) { dg := 9 }  s := s + dg  fr := fr - dg  k := k + 1 }
+    return s
+}
+def f3(x)  { return fx(x, 3) }
+def f8(x)  { return fx(x, 8) }
+def f10(x) { return fx(x, 10) }
+def f12(x) { return fx(x, 12) }
+def arr_str(a) {                      # 配列を "[a, b, c]" の文字列に (文字列連結では配列が潰れるため)
+    s := "["  i := 0
+    while (i < len(a)) { if (i > 0) { s := s + ", " }  s := s + a[i]  i := i + 1 }
+    return s + "]"
+}
+def bstr(b)    { if (b) { return "true" }  return "false" }   # 真偽値を文字列連結すると潰れるため
+def pad(s, n)  { s := "" + s  while (len(s) < n) { s := " " + s }  return s }
+def padr(s, n) { s := "" + s  while (len(s) < n) { s := s + " " }  return s }
+
+# ---- 検査台帳 -------------------------------------------------------------------
+#   関数の中から大域の数を書き換えられないので、結果は配列 CHECKS に積み、
+#   同時に追記専用台帳 tuplespace へ ["check", label, ok] として commit する。
+CHECKS := []
+def check(label, ok) {
+    if (ok) { print("  [OK] " + label) } else { print("  [NG] " + label) }
+    fact := ["check", label, ok]      # 改行は文の区切りではないので、配列リテラルは束縛してから commit する
+    fact >> tuplespace
+    CHECKS <- ok
+    return ok
+}
+def check_close(label, got, want, tol) {
+    err := abs(got - want)
+    return check(label + "  got " + fx(got, 10) + "  want " + fx(want, 10) + "  |err| " + sci(err) + " <= " + sci(tol), err <= tol)
+}
+def check_rel(label, got, want, tol) {
+    err := rel_err(got, want)
+    return check(label + "  got " + fx(got, 10) + "  want " + fx(want, 10) + "  rel " + sci(err) + " <= " + sci(tol), err <= tol)
+}
+def checks_failed() {
+    n := 0  i := 0
+    while (i < len(CHECKS)) { if (!CHECKS[i]) { n := n + 1 }  i := i + 1 }
+    return n
+}
+def verdict(sentinel) {
+    total := len(CHECKS)  bad := checks_failed()
+    print("")
+    print("---- 検査 " + (total - bad) + " / " + total + " 合格  (台帳 " + len(tuplespace) + " facts) ----")
+    if (bad == 0) { print(sentinel) } else { print("@@FAILED " + bad + " check(s)") }
+}
+def section(title) {
+    print("")
+    print("================================================================")
+    print(title)
+    print("================================================================")
+}
+
+
+# ================= 14_exo_gamma.bada =================
+# ============================================================
+# 14_exo_gamma.bada -- 第十四巻
+# exo-gamma — Γ 関数における大域的部分積分多様体の機知 × Jones 多項式の熱感知
+# 地球と同位 (同型) の地球外惑星と、電磁波を利用し得る生命体候補を探索する Bada 量子エンジン
+#
+# 原論文 (exo-gamma.pdf, 311 行) は矢印オブジェクト構文 (name <- 式 / (条件) -> { … }) で書かれている。
+# 本巻はそれを本リポジトリの処理系が受理する束縛 := と if へ写し、内容 (方程式・惑星カタログ・
+# 正直な注記) はそのまま保つ。sin / cos / pow / Γ は原論文どおり自前で持つ (共通核に頼らない)。
+#   Γ の大域的部分積分   gamma_fn (Lanczos) + gamma_check: Γ(z+1) = zΓ(z) を実行時に検証し ESI の重み正規化に使う
+#   Jones 多項式の熱感知  三葉結び目 V(t) = −t⁻⁴ + t⁻³ + t⁻¹ を t = e^{iθ} で評価、θ は惑星の平衡温度から
+#   地球と同位の惑星     ESI (地球類似性指数) × 宇宙望遠鏡の実測カタログ 8 惑星
+#   生命体候補           SETI スコア = ESI × 電波地平 (120 光年) — 検出は 2026 年時点でゼロと明記
+#   量子エンジン         qubit(2) → H×2 → softmax 振幅 → Measure (台帳へ commit)、Bell 対の零保存 = 盗聴なし
+# ============================================================
+
+section("第十四巻  EXO-GAMMA — Γ 多様体 × Jones 熱感知 × 量子レジスタ SETI 探索")
+
+PI_X := 3.141592653589793
+
+# ---- sin / cos: テイラー級数 (原論文どおり自作) ----
+def sin_t(x) {
+    x := x % (2.0 * PI_X)
+    if (x > PI_X) { x := x - 2.0 * PI_X }
+    if (x < 0.0 - PI_X) { x := x + 2.0 * PI_X }
+    term := x  s := x  k := 1
+    while (k <= 11) { term := 0.0 - term * x * x / ((2.0 * k) * (2.0 * k + 1.0))  s := s + term  k := k + 1 }
+    return s
+}
+def cos_t(x) { return sin_t(PI_X / 2.0 - x) }
+def pow_f(b, e) { if (b <= 0.0) { return 0.0 }  return exp(e * log(b)) }
+
+# ---- Γ 関数: Lanczos 近似 (大域的部分積分の関数等式を検証) ----
+def gamma_fn(z) {
+    g := [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+          12.507343278686905, -0.13857109526572012, 0.0000099843695780195716, 0.00000015056327351493116]
+    z := z - 1.0  x := 0.99999999999980993  i := 0
+    while (i < 8) { x := x + g[i] / (z + i + 1.0)  i := i + 1 }
+    t := z + 7.5
+    return sqrt(2.0 * PI_X) * pow_f(t, z + 0.5) * exp(0.0 - t) * x
+}
+def gamma_check(w) { return gamma_fn(1.0 + w) / (w * gamma_fn(w)) }
+print("")
+print("[Γ] 部分積分の関数等式 Γ(z+1) = zΓ(z) の検証 (= 1 が正解):")
+print("    w = 0.57 :", fx(gamma_check(0.57), 12), "   w = 0.70 :", fx(gamma_check(0.70), 12), "   w = 5.58 :", fx(gamma_check(5.58), 12))
+gh := gamma_fn(0.5)
+print("    Γ(0.5)² =", fx(gh * gh, 12), " (π =", fx(PI_X, 12) + ")")
+check("[Γ]  Γ(z+1)/(zΓ(z)) = 1 が w = 0.57, 0.70, 5.58 で 1e-12 以内", abs(gamma_check(0.57) - 1) < 0.000000000001 && abs(gamma_check(0.70) - 1) < 0.000000000001 && abs(gamma_check(5.58) - 1) < 0.000000000001)
+check_close("[Γ]  Γ(1/2)² = π", gh * gh, PI_X, 0.00000000000001)
+
+# ---- Jones 多項式 (三葉結び目) の熱感知 ----
+def jones_abs(theta) {
+    re := 0.0 - cos_t(0.0 - 4.0 * theta) + cos_t(0.0 - 3.0 * theta) + cos_t(0.0 - theta)
+    im := 0.0 - sin_t(0.0 - 4.0 * theta) + sin_t(0.0 - 3.0 * theta) + sin_t(0.0 - theta)
+    return sqrt(re * re + im * im)
+}
+def heat_theta(teq) {
+    t := teq
+    if (t < 100.0) { t := 100.0 }
+    if (t > 1500.0) { t := 1500.0 }
+    return (t - 100.0) / 1400.0 * PI_X
+}
+check_close("[Jones] V(1) = −1 + 1 + 1 = 1 (θ = 0 で |V| = 1)", jones_abs(0.0), 1.0, 0.000000000001)
+
+# ---- ESI (地球類似性指数) — Γ 恒等式で重みを正規化 ----
+def esi3(rade, insol, teq) {
+    s1 := 1.0 - abs(rade - 1.0) / (rade + 1.0)
+    s2 := 1.0 - abs(insol - 1.0) / (insol + 1.0)
+    s3 := 1.0 - abs(teq - 255.0) / (teq + 255.0)
+    w1 := 0.57 * gamma_check(0.57)      # × 1.000000 (恒等式)
+    w2 := 0.70 * gamma_check(0.70)
+    w3 := 5.58 * gamma_check(5.58)
+    return pow_f(s1, w1 / 3.0) * pow_f(s2, w2 / 3.0) * pow_f(s3, w3 / 3.0)
+}
+check_close("[ESI] 地球自身 (R = 1, S = 1, Teq = 255 K) の ESI = 1", esi3(1.0, 1.0, 255.0), 1.0, 0.000000000001)
+
+# ---- 電磁波 (テクノシグネチャ) — 地球の電波地平 ----
+RADIO_YEARS := 120.0        # 人類の電波漏えい開始 ~1906 年から
+def em_status(dist_ly) {
+    if (dist_ly <= RADIO_YEARS / 2.0) { return 2 }   # 往復可能
+    if (dist_ly <= RADIO_YEARS) { return 1 }          # 地球の電波が到達済み
+    return 0
+}
+def em_label(s) {
+    if (s == 2) { return "往復可 (返信が届き得る)" }
+    if (s == 1) { return "地球の電波が到達済み" }
+    return "電波地平の外"
+}
+def seti_score(e, dist_ly) { return e * (1.0 / (1.0 + dist_ly / 60.0)) }
+
+# ---- 惑星カタログ (宇宙望遠鏡の実測値) ----------------------------------
+# [名前, R⊕, S⊕, Teq K, 距離 光年, 主星 Teff K, 公転周期 日, 重力チャネル]
+#  重力チャネル = 1: 惑星自身の重力で発見された (視線速度法 = 恒星のふらつき) / 0: 光度チャネル (トランジット)
+P0 := ["Proxima Centauri b", 1.07, 0.65, 234.0, 4.25,    3042.0, 11.19,  1]
+P1 := ["Teegarden's Star b", 1.04, 1.15, 264.0, 12.50,   2904.0, 4.91,   1]
+P2 := ["Ross 128 b",         1.11, 1.38, 280.0, 11.00,   3192.0, 9.87,   1]
+P3 := ["Luyten b (GJ 273 b)",1.51, 1.06, 259.0, 12.40,   3382.0, 18.60,  1]
+P4 := ["GJ 1002 b",          1.03, 0.67, 231.0, 15.80,   3024.0, 10.30,  1]
+P5 := ["TRAPPIST-1 e",       0.92, 0.65, 250.0, 40.66,   2566.0, 6.10,   0]
+P6 := ["TOI-700 d",          1.07, 0.87, 269.0, 101.40,  3480.0, 37.40,  0]
+P7 := ["Kepler-442 b",       1.34, 0.70, 233.0, 1206.00, 4402.0, 112.30, 0]
+planets := [P0, P1, P2, P3, P4, P5, P6, P7]
+
+# ---- 重力チャネル: 電磁波以外の伝達 --------------------------------------
+#  視線速度の半振幅 (sin i = 1): K = 0.08946 m/s × (Mp/M⊕) × (M★/M☉)^(−2/3) × (P/1yr)^(−1/3)
+#  Mp ≈ R^3.58 (岩石惑星の質量–半径関係の近似)、M★ ≈ (Teff/5772)² (主系列の粗い近似) — いずれも概算
+def mass_est(rade) { if (rade > 6.0) { return 100.0 + rade * 8.0 }  return pow_f(rade, 3.58) }
+def star_mass(teff) { return pow_f(teff / 5772.0, 2.0) }
+def rv_K(rade, teff, per_days) {
+    mp := mass_est(rade)  ms := star_mass(teff)  pyr := per_days / 365.25
+    return 0.08946 * mp * pow_f(ms, 0.0 - 2.0 / 3.0) * pow_f(pyr, 0.0 - 1.0 / 3.0)
+}
+# ---- 反重力場: 実在する斥力的重力 = ダークエネルギー (宇宙定数 Λ) --------
+#  a_Λ ≈ Ω_Λ H0² r (de Sitter 斥力) と a_★ = G M★/r² の比を実計算する
+def antigrav_ratio(teff, insol) {
+    H0 := 2.268e-18                              # 70 km/s/Mpc [1/s]
+    Gc := 6.67e-11  MSUN := 1.989e30  AUm := 1.496e11
+    aAU := sqrt(pow_f(teff / 5772.0, 4.0) / insol)
+    r := aAU * AUm
+    aL := 0.7 * H0 * H0 * r
+    aS := Gc * star_mass(teff) * MSUN / (r * r)
+    return aL / aS
+}
+print("")
+print("[重力] 電磁波以外の伝達 — 惑星が重力場で恒星に送る実信号 (RV 半振幅 K):")
+gi := 0  gn := len(planets)  rv_ok := true
+while (gi < gn) {
+    gp := planets[gi]
+    ch := "光度 (トランジット)"  if (gp[7] == 1) { ch := "重力 (視線速度)" }
+    kk := rv_K(gp[1], gp[5], gp[6])
+    if (kk <= 0) { rv_ok := false }
+    print("    " + padr(gp[0], 22) + " | 伝達: " + padr(ch, 20) + " | K ≈ " + fx(kk, 3) + " m/s (概算)")
+    gi := gi + 1
+}
+ag := antigrav_ratio(3042.0, 0.65)
+print("")
+print("[反重力] ダークエネルギー Λ (実在する斥力的重力) — Proxima b 軌道での比: a_Λ / a_★ =", sci(ag), " → 惑星系スケールでは完全に無視可能")
+print("    正直な結論: 反重力で信号は送れない。重力チャネル (RV ふらつき / マイクロレンズ / アストロメトリ) が電磁波以外の実在の伝達である。")
+check("[重力] 8 惑星すべてで RV 半振幅 K > 0、Λ の斥力は恒星重力の 1e-20 未満", rv_ok && ag < 0.00000000000000000001)
+print("@@GRAV-CHANNEL-OK")
+
+# ---- 文明の伝達方法: 3 チャネルの実物理判定 -------------------------------
+LY_M := 9460730000000000.0
+def civ_em_power(dist_ly) { return 20000000000000.0 * pow_f(dist_ly / 25000.0, 2.0) }   # アレシボ級受信機が検出できる最小ビーコン電力 [W]
+def civ_gw_strain(dist_ly) {                       # 人工回転質量 (M = 1e6 kg, R = 100 m, f = 100 Hz) の重力波ひずみ h ≈ 32π⁴(G/c⁴)MR²f²/r
+    Goc4 := 8.26e-45  pi4 := PI_X * PI_X * PI_X * PI_X
+    return 32.0 * pi4 * Goc4 * 1000000.0 * 10000.0 * 10000.0 / (dist_ly * LY_M)
+}
+print("")
+print("[文明] 生命体文明の伝達 3 手段 (惑星ごとの実物理判定):")
+ci := 0  gw_ok := true
+while (ci < gn) {
+    cp := planets[ci]
+    pw := civ_em_power(cp[4])  hh := civ_gw_strain(cp[4])
+    if (hh >= 1e-22) { gw_ok := false }
+    print("    " + cp[0])
+    print("       📡 電磁波      : 検出可能 — 必要ビーコン電力 ≈ " + sci(pw) + " W (アレシボ級受信)")
+    print("       🌀 重力手段    : 人工装置 h ≈ " + sci(hh) + " ≪ LIGO 1e-22 → 恒星質量級が必要")
+    ci := ci + 1
+}
+print("       🛸 反重力発生器 : Λ のエネルギー密度 ≈ 5.3e-10 J/m³。局所生成・変調の理論は現行物理に存在せず、検出器も未定義 (未知の物理)")
+print("    判定: 文明の伝達として現実に検出可能なのは 📡 電磁波のみ。🌀 は自然の重力信号 (惑星の K ふらつき) としてのみ実在し、人工重力波・反重力の検出例は 2026 年時点でゼロ (正直)。")
+check("[文明] 人工装置の重力波ひずみは 8 惑星すべてで LIGO 感度 1e-22 を下回る", gw_ok)
+print("@@CIV-OK")
+
+# ---- SETI: 電磁波を利用し得る地球型惑星の候補 ----------------------------------
+print("")
+print("[SETI] 電磁波を利用し得る地球型惑星の候補 (ESI × 近接度):")
+print("    惑星                 | ESI     | Jones|V| | 電波地平                | SETI スコア")
+n := len(planets)  scores := []  i := 0
+while (i < n) {
+    p := planets[i]
+    e := esi3(p[1], p[2], p[3])  jv := jones_abs(heat_theta(p[3]))  st := em_status(p[4])  sc := seti_score(e, p[4])
+    scores <- sc
+    print("    " + padr(p[0], 20) + " | " + fx(e, 5) + " | " + fx(jv, 5) + "   | " + padr(em_label(st), 22) + " | " + fx(sc, 5))
+    i := i + 1
+}
+order := arr_order_desc(scores)
+name0 := planets[order[0]][0]  name1 := planets[order[1]][0]  name2 := planets[order[2]][0]  name3 := planets[order[3]][0]
+best0 := scores[order[0]]  best1 := scores[order[1]]  best2 := scores[order[2]]  best3 := scores[order[3]]
+check("[SETI] 上位 4 候補が降順に並ぶ (best0 >= best1 >= best2 >= best3)", best0 >= best1 && best1 >= best2 && best2 >= best3)
+check("[SETI] 電波地平: 4.25 光年は往復可 (2)、101.4 光年は到達済み (1)、1206 光年は外 (0)", em_status(4.25) == 2 && em_status(101.4) == 1 && em_status(1206.0) == 0)
+
+# ---- 量子レジスタ: 上位 4 候補を重ね合わせて測定 ----
+print("")
+print("[量子] 上位 4 候補を 2 qubit の重ね合わせに載せる (H×2):")
+reg := qubit(2)
+reg := H(reg, 0)
+reg := H(reg, 1)
+uni := Measure(reg)
+print("    一様重ね合わせ |ψ|² :", fx(uni[0], 5), fx(uni[1], 5), fx(uni[2], 5), fx(uni[3], 5))
+amp := softmax([best0 * 8.0, best1 * 8.0, best2 * 8.0, best3 * 8.0])
+amp := Measure(amp)                                  # dist の測定 = 台帳へ commit
+print("    SETI 重み付き振幅 (softmax·8, 測定台帳へコミット):")
+print("       " + padr(name0, 22) + " : " + fx(amp[0], 5))
+print("       " + padr(name1, 22) + " : " + fx(amp[1], 5))
+print("       " + padr(name2, 22) + " : " + fx(amp[2], 5))
+print("       " + padr(name3, 22) + " : " + fx(amp[3], 5))
+print("    量子優先ターゲット =", name0)
+check("[量子] H×2 の一様重ね合わせは 4 基底とも 1/4、softmax 振幅の最大は名前 0 の候補", abs(uni[0] - 0.25) < 0.000000000000001 && abs(uni[3] - 0.25) < 0.000000000000001 && arr_argmax(amp) == 0)
+
+# ---- Bell 対の零保存 = 盗聴なしの証拠 (QKD 同型) ----
+bell := qubit(2)
+bell := H(bell, 0)
+bell := CNOT(bell, 0, 1)
+bo := Measure(bell)
+intact := 0
+if (bo[1] == 0) { if (bo[2] == 0) { intact := 1 } }
+print("")
+print("[Bell] 零保存 |01⟩,|10⟩ = 0 (盗聴なし = 1):", intact, "  台帳 =", len(tuplespace), "facts")
+check("[Bell] Bell 対の禁制基底 |01⟩,|10⟩ が厳密零 (零の保存 = 盗聴なしの証拠)", intact == 1 && len(zeros_of(bo)) == 2)
+print("")
+print("正直な注記: 地球以外の電磁波利用は 2026 年時点で未確認。上記は宇宙望遠鏡の実測値から計算した「聞くべき候補」の優先順位である。")
+print("@@EXO-GAMMA-OK")
+verdict("@@PAPER-14-OK")

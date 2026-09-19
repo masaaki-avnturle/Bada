@@ -1,0 +1,220 @@
+# ============================================================
+# 05_heat_kernel.bada -- 第五巻
+# 多様体積分と量子工学の結婚
+# — 熱核・固有時間・一ループ行列式と、それを実行する量子回路 —
+#
+#   定理1 熱核係数はベルヌーイ多項式  Tr(e^{−tA}) = Σ a_n t^{n−1},  a_n = B_n(1−y)/n!      (表1・2)
+#   定理2 ζ_A(0) = a_1 = 1/2 − y (共形アノマリー), ζ_A(−1) = −a_2 (Casimir), ζ_A(−k) = (−1)^k k! a_{k+1} (表3・5)
+#   定理3 Lerch: ζ'(0,y) = log Γ(y) − ½ log 2π,  det_ζ(N+y) = √(2π)/Γ(y)                   (表4)
+#   定理4 自己言及形  ζ_A(x)·det_ζ(A) = √(2π)·Γ(x−1)·Λ(x,y)/Γ(x+y−1)                   (表9)
+#   定理5 y が正整数でないとき Λ(x,y) = 0 が x = 0, −1, −2, … で成立                         (表10)
+#   定理6 y = 1 では Λ(x,1) = (x−1)ζ(x) — 零点はリーマンゼータの自明零点                     (表11)
+#   定理7 幾何振幅状態 = 虚時間発展 e^{−tN}|uniform⟩、可換和ゆえ Trotter 誤差 0 (CNOT 0 個) (表7)
+#   定理8 LCU = Schwinger 固有時間積分 Γ(s)A^{−s} = ∫τ^{s−1}e^{−τA}dτ の二重指数求積      (表8)
+#   表12  物理的特殊点では Λ が沈黙し、B (幾何 = 一ループ行列式) がすべてを担う
+# 結婚するのは方法であって理論ではない。重力も時空も量子化されない。
+# ============================================================
+
+section("第五巻  多様体積分と量子工学の結婚 — 熱核・固有時間・一ループ行列式と、それを実行する量子回路")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "heat"    postfix [ 'heat'    '(' expr ',' expr ')' ] => heat_trace(_1, _2)
+    rule "coeff"   postfix [ 'coeff'   '(' expr ',' expr ')' ] => heat_coeff(_1, _2)
+    rule "logdet"  postfix [ 'logdet'  '(' expr ')' ]          => zeta_logdet(_1)
+    rule "casimir" stmt    [ 'casimir' '(' expr ')' ]          => commit_measurement(vacuum_energy(_1))
+}
+ND := de_default()
+print("grammar rules committed :", len(tuplespace), "facts (heat / coeff / logdet / casimir)")
+
+def heat_trace(t, y) { return exp(0 - t * y) / (1 - exp(0 - t)) }          # 式(3)
+def heat_coeff(n, y) { return bernoulli_poly(n, 1 - y) / fact_(n) }        # 定理1
+def heat_series(t, y, Mterms) { s := 0.0  n := 0  while (n <= Mterms) { s := s + heat_coeff(n, y) * pow_(t, n - 1)  n := n + 1 }  return s }
+def zeta_logdet(y) { return 0.5 * log(TWO_PI) - log_gamma(y) }           # 定理3: log det = −ζ'(0) = ½log 2π − log Γ(y)
+def vacuum_energy(y) { return dist([0 - 0.5 * heat_coeff(2, y)]) }         # 定理2: E = ½ζ(−1,y) = −½ a_2  (縮退分布として commit)
+
+# ---- 第I論文  熱核 --------------------------------------------------------------------------------------
+section("第I論文  熱核 — 定理1  Tr(e^{−tA}) の小 t 展開係数はベルヌーイ多項式 a_n = B_n(1−y)/n!")
+print("表1.  y       t        Tr(e^{−tA}) 直接        ベルヌーイ級数 (12 項)   相対誤差")
+T1 := [[1.0, 0.5], [1.0, 0.05], [0.5, 0.2], [0.5, 0.01], [2.325, 0.5], [2.325, 0.05]]
+t1_ok := true  i := 0
+while (i < 6) {
+    y := T1[i][0]  t := T1[i][1]
+    a := heat(t, y)  b := heat_series(t, y, 12)
+    e := rel_err(b, a)
+    if (t <= 0.2) { if (e > 0.00000000000001) { t1_ok := false } }
+    print("  " + padr(fx(y, 3), 7) + " " + padr(fx(t, 4), 8) + " " + fx(a, 14) + "      " + fx(b, 14) + "        " + sci(e))
+    i := i + 1
+}
+check("定理1  t <= 0.2 でベルヌーイ級数 12 項が直接評価と 1e-14 で一致 (t = 0.5, y = 2.325 は級数打ち切り)", t1_ok)
+print("")
+print("表2. 熱核係数 a_n = B_n(1−y)/n!   (a_0 = 1 は Weyl 項 = 体積、a_1 = 1/2 − y)")
+print("  y         a_0 (Weyl)   a_1          a_2          a_3          a_4")
+YS := [1.0, 0.5, 2.0, 2.32534]
+i := 0
+while (i < 4) {
+    y := YS[i]
+    print("  " + padr(fx(y, 5), 9) + " " + pad(fx(coeff(0, y), 7), 10) + "   " + pad(fx(coeff(1, y), 7), 10) + "   " + pad(fx(coeff(2, y), 7), 10) + "   " + pad(fx(coeff(3, y), 7), 10) + "   " + pad(fx(coeff(4, y), 7), 10))
+    i := i + 1
+}
+check_close("表2    a_0 = 1 (Weyl 項)", coeff(0, 2.32534), 1.0, 0)
+check_close("表2    a_1 = 1/2 − y", coeff(1, 2.32534), 0.5 - 2.32534, 0.000000000000001)
+check_close("表2    y = 2.32534 の a_2 = 1.6242664", coeff(2, 2.32534), 1.6242664, 0.00000005)
+print("  曲がった時空ではこの列に Vol(M), ∫√g R, ∫√g(R², R_μν², R_μνρσ²) … (Seeley–DeWitt 係数) が入る。本モデルは曲率ゼロの一次元極限。")
+
+section("定理2  ζ_A(0) = a_1 (共形アノマリー),  ζ_A(−1) = −a_2 (Casimir),  ζ_A(−k) = (−1)^k k! a_{k+1}")
+print("表3.  y         ζ(0,y) 数値      a_1 = 1/2−y     誤差       ζ(−1,y) 数値      −a_2            誤差       ζ(−2,y)          2!a_3")
+T3Y := [1.0, 0.5, 2.0, 3.0, 2.32534]
+t3_ok := true  i := 0
+while (i < 5) {
+    y := T3Y[i]
+    z0 := hurwitz(0.0, y)  z1 := hurwitz(-1.0, y)  z2 := hurwitz(-2.0, y)
+    e0 := abs(z0 - coeff(1, y))  e1 := abs(z1 + coeff(2, y))  e2 := abs(z2 - 2 * coeff(3, y))
+    if (e0 > 0.00000000000005) { t3_ok := false }  if (e1 > 0.0000000000005) { t3_ok := false }  if (e2 > 0.00000000005) { t3_ok := false }
+    print("  " + padr(fx(y, 5), 9) + " " + pad(fx(z0, 12), 15) + "  " + pad(fx(coeff(1, y), 9), 12) + "  " + pad(sci(e0), 9) + "  " + pad(fx(z1, 12), 16) + "  " + pad(fx(0 - coeff(2, y), 9), 12) + "  " + pad(sci(e1), 9) + "  " + pad(fx(z2, 12), 16) + "  " + fx(2 * coeff(3, y), 9))
+    i := i + 1
+}
+check("定理2  ζ(0,y) = a_1 (5e-14), ζ(−1,y) = −a_2 (5e-13), ζ(−2,y) = 2a_3 (5e-11) — Euler–Maclaurin 解析接続は負の x で精度を落とす", t3_ok)
+print("")
+print("表5. ゼータ正則化した真空エネルギー E = ½ζ_A(−1)")
+print("  y        境界条件の意味               ζ(−1,y)             E = ½ζ(−1)          古典的な値")
+print("  1.0      整数モード (周期的)          " + fx(hurwitz(-1, 1.0), 12) + "     " + fx(0.5 * hurwitz(-1, 1.0), 12) + "     −1/12 (Casimir、弦の臨界次元)")
+print("  0.5      半整数モード (反周期的)      " + fx(hurwitz(-1, 0.5), 12) + "      " + fx(0.5 * hurwitz(-1, 0.5), 12) + "      +1/24 (符号反転)")
+print("  2.0      整数モード n >= 2            " + fx(hurwitz(-1, 2.0), 12) + "     " + fx(0.5 * hurwitz(-1, 2.0), 12) + "     −13/12")
+print("  2.32534  第一報 E1 のパラメータ       " + fx(hurwitz(-1, 2.32534), 12) + "     " + fx(0.5 * hurwitz(-1, 2.32534), 12) + "     —")
+check_close("表5    ζ(−1, 1) = −1/12", hurwitz(-1, 1.0), 0 - 1 / 12, 0.00000000000001)
+check_close("表5    ζ(−1, 1/2) = +1/24 (反周期境界で符号反転)", hurwitz(-1, 0.5), 1 / 24, 0.00000000000001)
+led0 := len(tuplespace)
+casimir(1.0)                                     # 規則 casimir: E = −½a_2 = −1/24 を台帳へ
+check("casimir 規則が真空エネルギーを台帳へ commit", len(tuplespace) == led0 + 1)
+
+# ---- 第II論文  一ループ行列式 -----------------------------------------------------------------------------
+section("第II論文  一ループ行列式 — 定理3 (Lerch)  ζ'(0,y) = log Γ(y) − ½log 2π,  det_ζ(N+y) = √(2π)/Γ(y)")
+def dzeta0(y) { h := 0.00001  return (hurwitz(h, y) - hurwitz(0 - h, y)) / (2 * h) }
+print("表4.  y        ζ'(0,y) (中心差分)     log Γ(y) − ½log 2π     相対誤差     det_ζ = √(2π)/Γ(y)")
+T4Y := [0.5, 1.0, 1.5, 2.0, 3.0, 2.32534]
+t4_ok := true  i := 0
+while (i < 6) {
+    y := T4Y[i]
+    a := dzeta0(y)  b := log_gamma(y) - 0.5 * log(TWO_PI)
+    e := rel_err(a, b)
+    if (e > 0.00000001) { t4_ok := false }
+    print("  " + padr(fx(y, 5), 8) + " " + pad(fx(a, 12), 16) + "       " + pad(fx(b, 12), 16) + "       " + pad(sci(e), 9) + "    " + fx(exp(0 - logdet(y)) * 0 + SQRT_2PI / gamma_(y), 12))
+    i := i + 1
+}
+check("定理3  ζ'(0,y) の中心差分が Lerch の閉形式と 1e-8 以内 (差分の打ち切りが支配)", t4_ok)
+check_close("定理3  y = 1 で det_ζ = √(2π) = 2.5066282746", SQRT_2PI / gamma_(1.0), 2.5066282746, 0.0000000001)
+print("  Γ の正体: Γ(y) は作用素 N+y の一ループ行列式の (√(2π) 倍の) 逆数である。")
+
+print("")
+print("表9. 定理4 (自己言及形): ζ_A(x)·det_ζ(A) = √(2π)·Γ(x−1)·Λ(x,y)/Γ(x+y−1)")
+print("  x        y         det_ζ(A)        ζ_A(x)·det_ζ(A)     √(2π)Γ(x−1)Λ/Γ(x+y−1)   相対誤差")
+T9 := [[2.0, 1.0], [3.0, 1.0], [2.73037, 2.32534], [4.0, 2.0], [1.5, 0.5], [2.5, 3.0]]
+worst9 := 0.0  i := 0
+while (i < 6) {
+    x := T9[i][0]  y := T9[i][1]
+    det := SQRT_2PI / gamma_(y)
+    lhs := hurwitz(x, y) * det
+    rhs := SQRT_2PI * gamma_(x - 1) * lambda_em(x, y) / gamma_(x + y - 1)
+    e := rel_err(lhs, rhs)
+    if (e > worst9) { worst9 := e }
+    print("  " + padr(fx(x, 4), 8) + " " + padr(fx(y, 5), 9) + " " + fx(det, 10) + "    " + pad(fx(lhs, 11), 16) + "    " + pad(fx(rhs, 11), 20) + "    " + sci(e))
+    i := i + 1
+}
+check("定理4  自己言及形が 6 組で相対誤差 <= 1e-14", worst9 <= 0.00000000000001)
+
+section("定理5・6  核 Λ の零 — 物理点で生成側が沈黙し、幾何側 (Γ = 一ループ行列式) がすべてを担う")
+print("表10. y が正整数でないとき Λ(x,y) = ζ(x,y)Γ(x+y−1)/(Γ(y)Γ(x−1)) は x = 0,−1,−2,−3,−4 で消える")
+print("  y         Λ(0,y)       Λ(−1,y)      Λ(−2,y)      Λ(−3,y)      Λ(−4,y)")
+T10Y := [2.32534, 0.5, 1.5, 3.7]
+t10_ok := true  i := 0
+while (i < 4) {
+    y := T10Y[i]  row := "  " + padr(fx(y, 5), 9)  k := 0
+    while (k <= 4) { v := lambda_cont(0 - k, y)  if (abs(v) > 0.0000000001) { t10_ok := false }  row := row + " " + pad(fx(v, 10), 12)  k := k + 1 }
+    print(row)
+    i := i + 1
+}
+check("定理5  4 つの非整数 y × 5 つの非正整数 x で Λ = 0 (機械零)", t10_ok)
+print("")
+print("表11. y = 1 の特別な場合: Λ(x,1) = (x−1)ζ(x) — 零点はリーマンゼータの自明零点 x = −2, −4, −6, …")
+print("  x     Λ(x,1)             (x−1)ζ(x)          意味")
+MEAN := ["ζ(0) = −1/2", "Casimir ζ(−1) = −1/12", "自明零点", "ζ(−3) = 1/120", "自明零点", "ζ(−5) = −1/252", "自明零点"]
+t11_ok := true  x := 0
+while (x >= -6) {
+    a := lambda_cont(x, 1.0)  b := (x - 1) * zeta_r(x)
+    if (abs(a - b) > 0.0000000001) { t11_ok := false }
+    if (x % 2 == 0) { if (x < 0) { if (abs(a) > 0.00001) { t11_ok := false } } }
+    print("  " + pad(x, 3) + "   " + pad(fx(a, 12), 16) + "   " + pad(fx(b, 12), 16) + "   " + MEAN[0 - x])
+    x := x - 1
+}
+check("定理6  Λ(x,1) = (x−1)ζ(x)、x = −2,−4,−6 で零 (残差は EM 解析接続が負の x で精度を失うため)", t11_ok)
+check_close("定理6  Λ(−1,1) = 1/6", lambda_cont(-1, 1.0), 1 / 6, 0.0000000001)
+check_close("定理6  Λ(−3,1) = −1/30", lambda_cont(-3, 1.0), 0 - 1 / 30, 0.000000001)
+
+# ---- 第III論文  量子工学 ------------------------------------------------------------------------------------
+section("第III論文  量子工学 — 定理7  幾何振幅状態 Σ u^n|n⟩ = e^{−tN}|uniform⟩ (u = e^{−t})、Trotter 誤差 0")
+def imag_time_amps(t, m) { V := ipow(2, m)  a := []  n := 0  while (n < V) { a <- exp(0 - t * n)  n := n + 1 }  return a }
+def imag_time_product(t, m) {                # e^{−tN} = ⊗_j e^{−t 2^j n_j}: 各ビットが独立に因子 e^{−t2^j} を掛ける
+    V := ipow(2, m)  out := []  n := 0
+    while (n < V) {
+        p := 1.0  j := 0  nn := n
+        while (j < m) { if (nn % 2 == 1) { p := p * exp(0 - t * ipow(2, j)) }  nn := floor_(nn / 2)  j := j + 1 }
+        out <- p
+        n := n + 1
+    }
+    return out
+}
+def imag_time_angles(t, m) { th := []  j := 0  p := exp(0 - t)  while (j < m) { th <- 2 * atan_(p)  p := p * p  j := j + 1 }  return th }
+def ry_(reg, theta, q) { H(reg, q)  Rz(reg, theta, q)  H(reg, q)  return reg }
+print("表7.  t        u = e^{−t}    m   max|虚時間 − 積|   Ry 角 θ_j (rad)")
+T7 := [[0.6931471805599453, 4], [0.1054, 5], [1.386, 4]]
+t7_ok := true  i := 0
+while (i < 3) {
+    t := T7[i][0]  m := T7[i][1]
+    d := arr_maxdiff(imag_time_amps(t, m), imag_time_product(t, m))
+    if (d > 0.0000000000000005) { t7_ok := false }
+    th := imag_time_angles(t, m)  ths := ""  j := 0
+    while (j < m) { ths := ths + fx(th[j], 4) + " "  j := j + 1 }
+    print("  " + padr(fx(t, 4), 8) + " " + fx(exp(0 - t), 8) + "    " + m + "   " + pad(sci(d), 9) + "          " + ths)
+    i := i + 1
+}
+check("定理7  虚時間発展の振幅と積表現の最大差 <= 5e-16 (N が可換な局所項の和なので Trotter 誤差ゼロ)", t7_ok)
+t := 0.6931471805599453  m := 4
+reg := qubit(m)  th := imag_time_angles(t, m)  j := 0
+while (j < m) { reg := ry_(reg, th[j], j)  j := j + 1 }
+probs := Measure(reg)
+want := dist(imag_time_product(2 * t, m))       # Born 確率 ∝ e^{−2tn}
+print("  qubit(4) に Ry(2 arctan e^{−t2^j}) を 4 個 (二量子ビットゲート 0) → Measure と e^{−2tn}/N² の最大差 =", sci(maxdiff(probs, want)))
+check("定理7  Bada レジスタ上の虚時間発展 (t = log 2) の Born 確率が一致 (maxdiff <= 1e-15)", maxdiff(probs, want) <= 0.000000000000001)
+
+section("定理8  LCU は Schwinger 固有時間積分 Γ(s)A^{−s} = ∫τ^{s−1}e^{−τA}dτ の二重指数求積である")
+print("表8.  s        y         固有時間求積 Σ w_k τ_k^{s−1} Tr(e^{−τ_k A})   Γ(s)ζ(s,y)          相対誤差")
+T8 := [[2.0, 1.0], [3.0, 1.0], [2.73037, 2.32534], [1.5, 0.5], [4.0, 2.0]]
+worst8 := 0.0  i := 0
+while (i < 5) {
+    s := T8[i][0]  y := T8[i][1]
+    q := de_gamma_zeta(ND, s, y)                 # 節点 τ_k = −log u_k、重み w_k: Σ w e^{−τ y}τ^{s−1} (1/(1−u) はヤコビアンと相殺)
+    r := gamma_(s) * hurwitz(s, y)
+    e := rel_err(q, r)
+    if (e > worst8) { worst8 := e }
+    print("  " + padr(fx(s, 3), 8) + " " + padr(fx(y, 5), 9) + " " + pad(fx(q, 14), 22) + "                         " + pad(fx(r, 14), 18) + "   " + sci(e))
+    i := i + 1
+}
+check("定理8  固有時間求積と Γ(s)ζ(s,y) の相対誤差 <= 1e-14 (391 節点、補助 9 量子ビット)", worst8 <= 0.00000000000001)
+print("  回路 PROPER-TIME-PREPARE: 補助レジスタは固有時間 τ_k の重ね合わせ、SELECT は虚時間発展 e^{−τ_k N} (定理7 により Trotter 誤差 0)。")
+print("  資源: 補助 9 qubit (m 非依存)・制御付き回転 391×m・コヒーレント算術回路 0・振幅増幅 高々 1 ラウンド。量子的優位はない (§10)。")
+
+section("表12  物理的特殊点における Λ と B の役割分担 (y = 2.32534)")
+y := 2.32534
+print("  x        意味                          ζ(x,y)          Λ(x,y)         担い手")
+print("  →1       分配関数の極 (言語生成)        " + pad(fx(hurwitz(1.0001, y), 3), 12) + "    " + fx(lambda_em(1.0001, y), 7) + "      Λ と B が釣り合う (Λ → 1 + γε)")
+print("   0       共形アノマリー a_1             " + pad(fx(hurwitz(0.0, y), 7), 12) + "    " + fx(lambda_cont(0.0, y), 7) + "      B (幾何) が全部")
+print("  −1       Casimir −a_2                  " + pad(fx(hurwitz(-1.0, y), 7), 12) + "    " + fx(lambda_cont(-1.0, y), 7) + "      B (幾何) が全部")
+print("  −2       熱核係数 a_3                   " + pad(fx(hurwitz(-2.0, y), 7), 12) + "    " + fx(lambda_cont(-2.0, y), 7) + "      B (幾何) が全部")
+check_close("表12   x → 1 で Λ → 1 + γε (ε = 1e-4)", lambda_em(1.0001, y), 1 + EULER_GAMMA * 0.0001, 0.00000005)
+check("表12   x = 0, −1, −2 で Λ = 0 かつ ζ ≠ 0 (零が生じる場所で幾何が引き継ぐ)", abs(lambda_cont(0, y)) < 0.0000000001 && abs(hurwitz(0, y)) > 1)
+
+section("結論 (第五巻)")
+print("  結婚は成立した — ただし方法の結婚である。Schwinger の固有時間積分が、片側で一ループ有効作用を、他方で状態準備回路を定義する。")
+print("  Γ 関数は一ループ行列式であり、Casimir の −1/12 は熱核係数であり、量子回路の補助レジスタは固有時間の重ね合わせである。")
+print("  結婚しなかったもの: 曲率、時空、重力の量子化、計算優位、非自明零点。零が生じる場所で、幾何が引き継ぐ。")
+verdict("@@PAPER-05-OK")

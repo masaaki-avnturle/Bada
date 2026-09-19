@@ -1,0 +1,178 @@
+# ============================================================
+# 12_gamma_analyzer.bada -- 第十二巻 (第九巻別稿)
+# ガンマ関数の大域的部分積分多様体の解析器としての「反重力発生器」
+# — ガウスの曲面論の量子化において、重力枝 e^f+e^{−f} と反重力枝 e^f−e^{−f} が厳密に意味するもの、
+#   および物理的反重力が本枠組みから出ないことの確定 —
+#
+#   補題C  Γ の部分積分 Γ(s+1) = sΓ(s)、Γ'(1) = ψ(1) = −γ (数値積分で確認)
+#   定理B  解析器: Γ(s)ζ_Δ(s) = a₀/(s−1) + (a₁−n₀)/s + I_reg(s)。s = 0 の留数 = χ/6 − 1 (位相)、有限部 FP → ζ'(0) = FP + γζ(0) (幾何)
+#   命題A  cosh/sinh 分解 (重力枝・反重力枝) は枝ごとに発散し、和だけが Γ(s)ζ(s) に収束する
+#   定理D  収束する唯一の反重力枝は関数等式の奇部 D_M(s) = Λ_M(s) − Λ_M(1−s)、Λ_M = π^{−s}Γ(s)ζ_Δ(s):
+#          正方トーラスで D ≡ 0 (Epstein の関数等式)、球面で D ≠ 0 — 反重力枝を非零にするのは曲率
+#   第III部 antigravity.pdf の主張の判定 (否定 / 未検証) — 名前の一致以外の対応はない
+# ============================================================
+
+section("第十二巻  Γ 関数の大域的部分積分多様体の解析器としての「反重力発生器」")
+
+@reviser : grammar < Omega::DATABASE[grammar].mechanism {
+    rule "analyze"     postfix [ 'analyze'  '(' expr ',' expr ',' expr ')' ] => gamma_analyzer(_1, _2, _3)   # 式(2)
+    rule "residue"     postfix [ 'residue'  '(' expr ')' ]                   => residue0(_1)                 # 定理B(i)
+    rule "finitepart"  postfix [ 'fp'       '(' expr ')' ]                   => finite_part(_1)              # 定理B(ii)
+    rule "antigravity" postfix [ 'antigrav' '(' expr ',' expr ')' ]          => odd_part(_1, _2)             # 定理D
+    rule "branch"      stmt    [ 'branch'   '(' expr ')' ]                   => commit_measurement(refuse_branch(_1))   # 命題A
+}
+print("grammar rules committed :", len(tuplespace), "facts (analyze / residue / fp / antigrav / branch)")
+
+# ---- 熱核トレース ----------------------------------------------------------------------------------------------------
+def K_S2(t) {                                     # S² 熱核トレース: t < 0.05 では漸近展開 (Mulholland) を使う
+    if (t < 0.05) { return 1 / t + 1 / 3 + t / 15 + 4 * t * t / 315 + t * t * t / 315 }
+    L := floor_(sqrt(60 / t)) + 3  s := 0.0  l := 0
+    while (l < L) { s := s + (2 * l + 1) * exp(0 - t * l * (l + 1))  l := l + 1 }
+    return s
+}
+def theta1(x) {
+    if (x >= 1) { s := 1.0  m := 1  term := exp(0 - x)  while (term > 0.000000000000000001) { s := s + 2 * term  m := m + 1  term := exp(0 - x * m * m) }  return s }
+    y := PI * PI / x  s := 1.0  k := 1  term := exp(0 - y)
+    while (term > 0.000000000000000001) { s := s + 2 * term  k := k + 1  term := exp(0 - y * k * k) }
+    return sqrt(PI / x) * s
+}
+def K_T2(t) { return theta1(t) * theta1(t) }      # 2π × 2π トーラス (固有値 m² + n²)
+def zeta_S2(s) { tot := 0.0  k := 0  while (k < 80) { tot := tot + binom_gen(s, k) * pow_(4, 0 - k) * hurwitz_nk(2 * s + 2 * k - 1, 1.5, 40, 8)  k := k + 1 }  return 2 * tot }
+def simpson(f, a, b, n) {
+    h := (b - a) / n  s := f(a) + f(b)  i := 1
+    while (i < n) { w := 2  if (i % 2 == 1) { w := 4 }  s := s + w * f(a + i * h)  i := i + 1 }
+    return s * h / 3
+}
+
+# ---- 補題C -------------------------------------------------------------------------------------------------------------
+section("補題C  Γ の部分積分 Γ(s+1) = [−e^{−x}x^s]₀^∞ + sΓ(s) — 境界項が消えて解析接続を担う")
+def gamma_int(s) { def f(y) { return 2 * exp(0 - y * y) * pow_(y, 2 * s + 1) }  return simpson(f, 0.0, 8.0, 20000) }   # x = y² で端点特異性を除く (Simpson 20000 分割)
+print("表3.  s      Γ(s+1) (求積)      sΓ(s) (求積)       差")
+c_ok := true  i := 0
+SV := [0.5, 1.3, 2.7]
+while (i < 3) {
+    sv := SV[i]
+    lhs := gamma_int(sv)  rhs := sv * gamma_int(sv - 1)
+    if (abs(lhs - rhs) > 0.000000001) { c_ok := false }
+    print("  " + padr(sv, 5) + "  " + fx(lhs, 12) + "     " + fx(rhs, 12) + "     " + sci(lhs - rhs) + "     (Γ(" + fx(sv + 1, 1) + ") = " + fx(gamma_(sv + 1), 12) + ")")
+    i := i + 1
+}
+check("補題C  Γ(s+1) − sΓ(s) = 0 が s = 0.5, 1.3, 2.7 で 1e-9 以内 (境界項は Re s > 0 で消える)", c_ok)
+def f_g1(y) { if (y <= 0) { return 0.0 }  return 2 * exp(0 - y * y) * y * log(y * y) }
+g1 := simpson(f_g1, 0.0, 8.0, 40000)
+print("  Γ'(1) = ∫e^{−x} log x dx =", fx(g1, 10), "   −γ =", fx(0 - EULER_GAMMA, 10), "   差", sci(abs(g1 + EULER_GAMMA)))
+check_close("補題C  Γ'(1) = ψ(1) = −γ (差 <= 1e-6; 端点の対数特異性で Simpson の収束は遅い)", g1, 0 - EULER_GAMMA, 0.000001)
+print("  よって s → 0 で Γ(s) = 1/s − γ + O(s): 極 (境界項の痕跡) が位相を切り出し、有限部 −γ が幾何に混入する。")
+
+# ---- 定理B  解析器 ----------------------------------------------------------------------------------------------------------
+section("定理B  解析器  Γ(s)ζ_Δ(s) = a₀/(s−1) + (a₁−n₀)/s + I_reg(s):  留数 = χ/6 − 1 (位相)、ζ'(0) = FP + γζ(0) (幾何)")
+def gamma_analyzer(K, area, n0) {                 # → [a0, c = a1 − n0 (Richardson), FP(s = 1e-4)]
+    a0 := area / (4 * PI)
+    c := (2 * (K(0.005) - a0 / 0.005) - (K(0.01) - a0 / 0.01)) - n0
+    s := 0.0001
+    def fR(t) { return pow_(t, s - 1) * ((K(t) - n0) - a0 / t - c) }
+    def fT(t) { return pow_(t, s - 1) * (K(t) - n0) }
+    R := simpson(fR, 0.0000001, 1.0, 3000)
+    T := simpson(fT, 1.0, 60.0, 3000)
+    return [a0, c, R + a0 / (s - 1) + T]
+}
+def residue0(an) { return an[1] }
+def finite_part(an) { return an[2] + EULER_GAMMA * an[1] }        # = ζ'(0)
+anS2 := analyze(K_S2, 4 * PI, 1)
+anT2 := analyze(K_T2, 4 * PI * PI, 1)
+h := 0.001
+zp_S2 := (zeta_S2(h) - zeta_S2(0 - h)) / (2 * h)                                 # 参照: Hurwitz 表示の中心差分
+bp0 := log(gamma_(0.25) * gamma_(0.25) / (TWO_PI * sqrt(2)))
+zp_T2 := 0 - log(TWO_PI) - 2 * bp0                                                # 参照: 厳密 (第八巻 表3)
+print("表1. 定理B (i): 留数 c = a₁ − n₀ から読んだ χ = 6(c+1)")
+print("  S²  留数 c =", fx(residue(anS2), 10), "  理論 χ/6 − 1 = −2/3   χ =", fx(6 * (residue(anS2) + 1), 10), "  真値 2  差", sci(abs(6 * (residue(anS2) + 1) - 2)))
+print("  T²  留数 c =", fx(residue(anT2), 10), "  理論 −1            χ =", fx(6 * (residue(anT2) + 1), 10), "  真値 0  差", sci(abs(6 * (residue(anT2) + 1))))
+check("定理B(i)  S² で χ = 2 (差 <= 1e-4)、T² で χ = 0 (差 <= 1e-8)", abs(6 * (residue(anS2) + 1) - 2) < 0.0001 && abs(6 * (residue(anT2) + 1)) < 0.00000001)
+print("")
+print("表2. 定理B (ii): 有限部からの ζ'(0) の回復 — γ の混入 γζ(0) を含む")
+print("  多様体   有限部 FP        γζ(0)          FP + γζ(0)      ζ'(0) 参照値     差")
+print("  S²       " + pad(fx(anS2[2], 10), 14) + "   " + pad(fx(EULER_GAMMA * anS2[1], 10), 12) + "   " + pad(fx(fp(anS2), 10), 14) + "   " + pad(fx(zp_S2, 10), 14) + "   " + sci(abs(fp(anS2) - zp_S2)))
+print("  T²       " + pad(fx(anT2[2], 10), 14) + "   " + pad(fx(EULER_GAMMA * anT2[1], 10), 12) + "   " + pad(fx(fp(anT2), 10), 14) + "   " + pad(fx(zp_T2, 10), 14) + "   " + sci(abs(fp(anT2) - zp_T2)))
+check("定理B(ii)  ζ'(0) = FP + γζ(0) が S² と T² で参照値と 1e-3 以内 (留数の外挿誤差が有限部へ伝播)", abs(fp(anS2) - zp_S2) < 0.001 && abs(fp(anT2) - zp_T2) < 0.001)
+print("  γ を混入させない場合 (FP をそのまま ζ'(0) と読む) の誤差は S² で", fx(abs(anS2[2] - zp_S2), 3), "、T² で", fx(abs(anT2[2] - zp_T2), 3), "— γ の混入は数値的にも不可欠。")
+check("定理B(ii)  γ を混入させなければ 0.38 / 0.58 ずれる (第七巻の log B では相殺した同じ γ が、スペクトル側では幾何項に残る)", abs(anS2[2] - zp_S2) > 0.3 && abs(anT2[2] - zp_T2) > 0.5)
+
+# ---- 命題A  枝ごとの発散 ------------------------------------------------------------------------------------------------------
+section("命題A  cosh/sinh 分解 — 重力枝 G(s) と反重力枝 A(s) は個別に発散し、和だけが Γ(s)ζ(s) に収束する")
+def refuse_branch(s) {
+    print("  REFUSED: 重力枝・反重力枝は個別には発散する (命題A)。和のみが Γ(s)ζ(s) である。")
+    print("  NOTE: 本装置は力を発生させない (第III部)。")
+    return dist([1.0])
+}
+def Ktil(u) { return K_S2(exp(u)) - 1 }           # K̃(u) = K(e^u) − n₀
+print("  u = log t と置くと Γ(s)ζ(s) = 2∫₀^∞[cosh(su)K̃₊(u) + sinh(su)K̃₋(u)]du。f = su で cosh f = (e^f+e^{−f})/2 が重力枝、sinh f が反重力枝。")
+print("表4. S², s = 2 (厳密値 Γ(2)ζ_S²(2) = 1)")
+print("  U     重力枝 G_U        反重力枝 A_U       和 G_U + A_U     厳密")
+pa_ok := true  U := 2.0  prevG := 0.0
+while (U <= 8.5) {
+    def gp(u) { return cosh_(2 * u) * 0.5 * (Ktil(u) + Ktil(0 - u)) }
+    def gm(u) { return sinh_(2 * u) * 0.5 * (Ktil(u) - Ktil(0 - u)) }
+    Gu := 2 * simpson(gp, 0.0, U, 2000)  Au := 2 * simpson(gm, 0.0, U, 2000)
+    if (abs(Gu) < 10 * prevG) { pa_ok := false }                    # 枝は e^{3U} で増大 (U が 2 増えるごとに 400 倍)
+    prevG := abs(Gu)
+    if (abs(Gu + Au - 1) > 0.2) { pa_ok := false }
+    print("  " + padr(fx(U, 0), 4) + "  " + pad(sci(Gu), 12) + "     " + pad(sci(Au), 12) + "     " + fx(Gu + Au, 10) + "     1")
+    U := U + 2
+}
+check("命題A  枝は e^{(s+1)U} で発散し (U = 8 で ~4×10⁹)、和だけが 1 に収束 (0.87 → 0.98 → 0.9975 → 0.9997)", pa_ok)
+led0 := len(tuplespace)
+branch(2.0)
+check("branch  規則 branch は値を返さず拒否を台帳へ commit", len(tuplespace) == led0 + 1)
+print("  『Proof of the Deep Riemann Hypothesis』補題4 が依拠した両枝の幾何平均は、スペクトル側では対象が定義されない — 五つ目の壁 (枝の発散)。")
+
+# ---- 定理D  関数等式の奇部 ----------------------------------------------------------------------------------------------------------
+section("定理D  収束する反重力枝 = 関数等式の奇部 D_M(s) = Λ_M(s) − Λ_M(1−s),  Λ_M(s) = π^{−s}Γ(s)ζ_Δ(s)")
+def lam_T2(s) { return pow_(PI, 0 - s) * gamma_(s) * 4 * zeta_r(s) * dirichlet_beta(s) }   # Z² 格子の Epstein ζ = 4ζ_R(s)β(s)
+def lam_S2(s) { return pow_(PI, 0 - s) * gamma_(s) * zeta_S2(s) }
+def odd_part(lam, s) { return lam(s) - lam(1 - s) }
+print("表5.  s      Λ_T²(s)        Λ_T²(1−s)      D_T²(s)       Λ_S²(s)        Λ_S²(1−s)      D_S²(s)")
+SS := [0.2, 0.3, 0.4, 0.5, 0.6, 0.75, 0.9]
+DS2_PAPER := [-1.2293, -0.6131, -0.2654, 0.0, 0.2654, 0.8654, 2.9909]
+d_ok := true  i := 0
+while (i < 7) {
+    sv := SS[i]
+    dT := antigrav(lam_T2, sv)  dS := antigrav(lam_S2, sv)
+    if (abs(dT) > 0.000000000001) { d_ok := false }
+    if (abs(dS - DS2_PAPER[i]) > 0.001) { d_ok := false }
+    print("  " + padr(fx(sv, 2), 5) + "  " + pad(fx(lam_T2(sv), 8), 13) + "  " + pad(fx(lam_T2(1 - sv), 8), 13) + "  " + pad(sci(dT), 10) + "   " + pad(fx(lam_S2(sv), 8), 13) + "  " + pad(fx(lam_S2(1 - sv), 8), 13) + "  " + pad(fx(dS, 4), 8))
+    i := i + 1
+}
+check("定理D  正方トーラスで D ≡ 0 (|D| <= 1e-12、Epstein の関数等式)、球面で D ≠ 0 (論文値と 1e-3 以内、s = ½ を中心に反対称)", d_ok)
+check("定理D  D_S²(0.4) = −D_S²(0.6) (反対称性は定義から自明)", abs(antigrav(lam_S2, 0.4) + antigrav(lam_S2, 0.6)) < 0.000000000001)
+print("  機構: 平坦トーラスでは a₁ = a₂ = … = 0 で Poisson 変換が K(t) と K(π²/t) を厳密に結ぶ (s ↔ 1−s)。球面では a₁ = 1/3 ≠ 0 に始まる曲率の係数列が対称性を破る。")
+print("  極の位置で既に読める: Res_{s=1}Λ = a₀/π と Res_{s=0}Λ = a₁ − n₀ が、トーラス (1, −1) では釣り合い、球面 (1/π, −2/3) では釣り合わない。")
+print("  「反重力発生器」の定義 (式4): Spec(Δ) ↦ (Area/4π, χ/6 − 1, ζ'(0) − γζ(0), D_M(·))。発生させるのは函数 D_M であって、力ではない。")
+
+# ---- 第III部  物理的反重力との距離 -------------------------------------------------------------------------------------------------------
+section("第III部  antigravity.pdf の主張の判定 (根拠は確立された物理であり、本枠組みの外にある)")
+CLAIMS := [["慣性力と同時に逆向きの重力を生成して打ち消す力を反重力と呼ぶ", "否定", "等価原理: 慣性力と一様重力場は局所的に区別できない。打ち消されているのは慣性であって重力ではない (単なる推進)"],
+           ["反重力の本質は重力のベクトルの違いである", "否定", "重力は計量の曲率であり、向きを持つベクトル場ではない。反転は負の重力質量を要求する"],
+           ["負の重力質量 (反発する重力)", "否定", "ALPHA-g (CERN, Nature 621, 716, 2023): 反水素は通常物質と同じく下向きに落下"],
+           ["Higgs 場は重力であり、周りを反重力が覆っている", "否定", "Higgs 場は素粒子の慣性質量の起源であって重力場ではない。核子の質量の大部分は QCD の束縛エネルギー"],
+           ["重力は熱エネルギーである", "未検証", "重力の熱力学的解釈 (Jacobson 1995, Verlinde 2011) は「熱エネルギーである」という主張ではない"],
+           ["回転体の電磁気力 (ローレンツ力) が機体内部で反重力を生成する", "否定", "ローレンツ力は電磁気力。回転超伝導体の重力遮蔽 (Podkletnov 1992) は独立追試で再現されていない"],
+           ["核エネルギーのリサイクル・放射性物質吸収体の結晶石", "未検証", "検証可能な定式化がない"],
+           ["UFO・宇宙人がこの原理を知っている", "未検証", "本稿の方法 (証明と数値検証) の対象外。判定しない"],
+           ["量子コンピュータが差分を使って慣性の法則を変える", "否定", "量子計算は情報処理であり、力を生成しない。本枠組みの量子回路は数を計算する"]]
+n_neg := 0  n_unv := 0  i := 0
+while (i < 9) {
+    fact := ["claim", CLAIMS[i][0], CLAIMS[i][1], CLAIMS[i][2]]
+    fact >> tuplespace
+    if (CLAIMS[i][1] == "否定") { n_neg := n_neg + 1 } else { n_unv := n_unv + 1 }
+    print("  [" + CLAIMS[i][1] + "] " + CLAIMS[i][0])
+    print("         " + CLAIMS[i][2])
+    i := i + 1
+}
+check("第III部  9 主張のうち 否定 6・未検証 3、成立 0 — 名前の一致以外の対応はない", n_neg == 6 && n_unv == 3)
+print("  壁 (a)〜(d) は動かず。(e) 新規: 枝の発散 (命題A) — 収束する形は関数等式の奇部に限られる。")
+
+section("結論 (第十二巻)")
+print("  Mellin 変換の cosh/sinh 分解は枝ごとに発散し、定義されない。生き残ったのは関数等式の奇部だけで、平坦な空間では消え、曲率のある空間では消えない。")
+print("  反重力枝とは、曲率が関数等式を破る度合いである。そしてそれは力ではない。")
+print("  Γ の部分積分がゼータの原点と傾きを切り分け、関数等式の奇部が曲率の在処を告げる。ただし、力は生まれない。")
+verdict("@@PAPER-12-OK")
