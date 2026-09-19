@@ -746,7 +746,7 @@ function vecNormSq(re, im){ var s = 0; for (var i = 0; i < re.length; i++) s += 
 
 /* ════ 5. 模型 (プリセット) ══════════════════════════════════════════ */
 var PRESETS = {
-  center: { label:"思考中枢", ja:"思考中枢",
+  center: { label:"思考中枢", ja:"思考中枢", chain:"感覚-意味 意味-判断 判断-発話 発話-行動 行動-感覚",
     build: function(cx){
       ["感覚","意味","記憶","判断","発話","行動"].forEach(function(v){ cxVertex(cx, v); });
       cxAdd(cx, ["感覚","意味"]); cxAdd(cx, ["意味","判断"]); cxAdd(cx, ["判断","発話"]);
@@ -754,24 +754,24 @@ var PRESETS = {
       cxAdd(cx, ["意味","記憶","判断"]);
     },
     pos: { "感覚":[0.18,0.30], "意味":[0.42,0.14], "記憶":[0.50,0.50], "判断":[0.74,0.22], "発話":[0.82,0.66], "行動":[0.30,0.80] } },
-  triangle: { label:"三角形 (問い)", ja:"三角形",
+  triangle: { label:"三角形 (問い)", ja:"三角形", chain:"a-b b-c a-c",
     build: function(cx){ ["a","b","c"].forEach(function(v){ cxVertex(cx, v); }); cxAdd(cx, ["a","b"]); cxAdd(cx, ["b","c"]); cxAdd(cx, ["a","c"]); } },
-  filled: { label:"充填三角形 (理解)", ja:"充填",
+  filled: { label:"充填三角形 (理解)", ja:"充填", chain:"a-b b-c a-c",
     build: function(cx){ ["a","b","c"].forEach(function(v){ cxVertex(cx, v); }); cxAdd(cx, ["a","b","c"]); } },
-  sphere: { label:"球面 (四面体の表面)", ja:"球面",
+  sphere: { label:"球面 (四面体の表面)", ja:"球面", chain:"a-b-c a-b-d a-c-d b-c-d",
     build: function(cx){
       ["a","b","c","d"].forEach(function(v){ cxVertex(cx, v); });
       cxAdd(cx, ["a","b","c"]); cxAdd(cx, ["a","b","d"]); cxAdd(cx, ["a","c","d"]); cxAdd(cx, ["b","c","d"]);
     },
     pos: { a:[0.5,0.12], b:[0.14,0.82], c:[0.86,0.82], d:[0.5,0.55] } },
-  eight: { label:"二つの環 (8 の字)", ja:"二環",
+  eight: { label:"二つの環 (8 の字)", ja:"二環", chain:"a-b b-o a-o",
     build: function(cx){
       ["a","b","o","c","d"].forEach(function(v){ cxVertex(cx, v); });
       cxAdd(cx, ["a","b"]); cxAdd(cx, ["b","o"]); cxAdd(cx, ["a","o"]);
       cxAdd(cx, ["o","c"]); cxAdd(cx, ["c","d"]); cxAdd(cx, ["o","d"]);
     },
     pos: { a:[0.12,0.25], b:[0.12,0.75], o:[0.5,0.5], c:[0.88,0.25], d:[0.88,0.75] } },
-  split: { label:"分裂した中枢", ja:"分裂",
+  split: { label:"分裂した中枢", ja:"分裂", chain:"p-q q-r p-r",
     build: function(cx){
       ["a","b","c","p","q","r"].forEach(function(v){ cxVertex(cx, v); });
       cxAdd(cx, ["a","b","c"]); cxAdd(cx, ["p","q"]); cxAdd(cx, ["q","r"]); cxAdd(cx, ["p","r"]);
@@ -1074,6 +1074,8 @@ function loadPreset(key){
   renderCx();
   var e1 = cxSimplices(CX, 1)[0];
   if (e1) $("wlkFrom").value = cxName(CX, e1);
+  if (PRESETS[key].chain) $("cxChain").value = PRESETS[key].chain;
+  $("cxOut").textContent = "(思考 = 単体名の並び。辺は 頂点-頂点、面は 頂点-頂点-頂点)";
   $("cirOut").textContent = "(模型 " + CX.name + " に対して境界回路を組みます)";
   wlkReset();
 }
