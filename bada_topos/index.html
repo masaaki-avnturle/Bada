@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada 位相 — 思考中枢の量子回路 (位相幾何学の作り換え)</title>
+<style>
+  :root{
+    --bg:#0b0e14; --bg2:#111623; --panel:#151b2c; --line:#26304a;
+    --tx:#dbe4ff; --dim:#8b97b8; --acc:#c8a44a; --acc2:#2dd4bf; --warn:#f59e0b; --err:#f87171;
+    --ket:#a78bfa; --ok:#4ade80; --face:#3a2f6e;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 75% -10%, #1f2a3a 0%, var(--bg) 55%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden; line-height:1.75;
+  }
+  #top{ padding:12px 16px 8px; border-bottom:1px solid var(--line); background:rgba(11,14,20,.85); }
+  #top h1{ font-size:19px; letter-spacing:.06em; font-weight:600; }
+  #top h1 span{ color:var(--acc); font-size:23px; }
+  #top p{ font-size:11px; color:var(--dim); margin-top:3px; }
+  #tabs{ display:flex; gap:6px; padding:8px 12px; overflow-x:auto; border-bottom:1px solid var(--line); background:var(--bg2); }
+  #tabs button{
+    flex:0 0 auto; font-size:12.5px; padding:7px 13px; border-radius:999px; cursor:pointer;
+    background:var(--panel); color:var(--dim); border:1px solid var(--line); white-space:nowrap;
+  }
+  #tabs button.on{ color:#0b0e14; background:var(--acc); border-color:var(--acc); font-weight:600; }
+  main{ flex:1; overflow:auto; padding:16px 14px 60px; }
+  section{ display:none; max-width:920px; margin:0 auto; }
+  section.on{ display:block; }
+  h2{ font-size:16px; margin:20px 0 8px; color:var(--acc); letter-spacing:.04em; }
+  h2:first-child{ margin-top:0; }
+  h3{ font-size:13.5px; margin:14px 0 6px; color:var(--acc2); }
+  p,li{ font-size:13px; }
+  ul,ol{ padding-left:1.35em; }
+  li{ margin:3px 0; }
+  .card{ background:linear-gradient(160deg,var(--panel),var(--bg2)); border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin:10px 0; }
+  .card.q{ border-color:#3d3560; }
+  .dim{ color:var(--dim); }
+  .ket{ color:var(--ket); font-family:ui-monospace,Consolas,"Courier New",monospace; }
+  .ok{ color:var(--ok); } .err{ color:var(--err); } .warn{ color:var(--warn); } .acc{ color:var(--acc); }
+  code, .mono{ font-family:ui-monospace,Consolas,"Courier New",monospace; font-size:12px; }
+  code{ background:#0d1120; border:1px solid var(--line); border-radius:5px; padding:1px 5px; color:var(--acc2); }
+  .eq{ display:block; text-align:center; font-family:ui-monospace,Consolas,monospace; font-size:13px;
+       color:var(--ket); background:#0d1120; border:1px solid var(--line); border-radius:10px; padding:11px 8px; margin:10px 0; overflow-x:auto; }
+  button.act{
+    font-size:13px; padding:8px 15px; border-radius:9px; cursor:pointer; font-weight:600;
+    background:var(--acc); color:#0b0e14; border:none; margin:4px 6px 4px 0;
+  }
+  button.sub{ background:var(--panel); color:var(--tx); border:1px solid var(--line); font-weight:400; }
+  button.act:active{ transform:scale(.97); }
+  textarea, input[type=text]{
+    width:100%; background:#0d1120; color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:10px 11px; font-family:ui-monospace,Consolas,monospace; font-size:12.5px; resize:vertical;
+  }
+  pre.out{
+    background:#0d1120; border:1px solid var(--line); border-radius:10px; padding:11px 12px; margin-top:9px;
+    font-family:ui-monospace,Consolas,monospace; font-size:12px; white-space:pre-wrap; word-break:break-word;
+    max-height:360px; overflow:auto; color:var(--tx);
+  }
+  table{ width:100%; border-collapse:collapse; font-size:12px; margin-top:8px; }
+  th,td{ border:1px solid var(--line); padding:5px 7px; text-align:left; }
+  th{ background:#0d1120; color:var(--acc2); font-weight:600; }
+  td.num{ text-align:right; font-family:ui-monospace,Consolas,monospace; }
+  .row{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0; }
+  .row label{ font-size:12px; color:var(--dim); }
+  .row select{ background:#0d1120; color:var(--tx); border:1px solid var(--line); border-radius:7px; padding:5px 7px; font-size:12px; }
+  .row input[type=number]{ width:74px; background:#0d1120; color:var(--tx); border:1px solid var(--line);
+    border-radius:7px; padding:5px 7px; font-family:ui-monospace,monospace; font-size:12px; }
+  .row input.short{ width:220px; }
+  input[type=range]{ width:100%; accent-color:var(--acc); }
+  canvas{ width:100%; background:#0d1120; border:1px solid var(--line); border-radius:12px; display:block; }
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:3px 12px; font-size:12px; margin:6px 0; }
+  .kv b{ color:var(--dim); font-weight:400; }
+  .tag{ display:inline-block; font-size:10.5px; padding:1px 7px; border-radius:999px; border:1px solid var(--line); color:var(--dim); margin-right:5px; }
+  .tag.s{ color:var(--err); border-color:#5a2a34; }
+  .tag.p{ color:var(--acc2); border-color:#2a5a52; }
+  .tag.r{ color:var(--acc); border-color:#5a4a20; }
+  .note{ font-size:11.5px; color:var(--dim); border-left:2px solid var(--line); padding-left:10px; margin:9px 0; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div id="top">
+  <h1>Bada <span>位相</span> — 思考中枢の量子回路</h1>
+  <p>数学のトポロジー(位相幾何学)を、<b>人間の思考中枢の量子回路</b>として作り換えた処理系 ─ 単体 = 量子ビット、境界作用素 ∂ = CNOT 回路、観念 = ker ∂ / im ∂</p>
+</div>
+
+<nav id="tabs">
+  <button data-t="con" class="on">🧠 思考中枢とは</button>
+  <button data-t="cx">🔺 複体</button>
+  <button data-t="cir">⚡ 回路</button>
+  <button data-t="wlk">🌊 歩行</button>
+  <button data-t="bada">◯ 位相 Bada</button>
+  <button data-t="ai">🤖 生成AI</button>
+</nav>
+
+<main>
+
+<!-- ══════════════ 1. 思考中枢とは ══════════════ -->
+<section id="t-con" class="on">
+  <h2>🧠 位相幾何学を、思考中枢の量子回路として作り換える</h2>
+  <div class="card">
+    <p>これまでのレポートでは、大域的多様体・コホモロジー・Jones 多項式を「思考中枢」(言語の受容野と発生器、機知の座、行動選択の核)と結びつけて書いてきた。
+       本処理系はその主張を<b>実行できる形式</b>に作り換える。<b>比喩ではなく、位相幾何学の定義そのものを量子回路として実装する。</b></p>
+    <ol>
+      <li><b>思考中枢 = 単体的複体 K</b>。頂点は中枢の要素(感覚の受容 / 意味 / 記憶 / 判断 / 発話 / 行動)、辺はそのあいだの<b>連想</b>、面は三つ組がひとつの<b>理解</b>に閉じたこと。</li>
+      <li><b>思考 = 鎖 c ∈ C<sub>k</sub>(K)</b>。同時に活性化している k-単体の集合。量子回路では<b>単体ひとつが量子ビットひとつ</b>で、鎖は基底状態 |c⟩、<b>思考の重ね合わせ</b>はそのまま量子状態である。</li>
+      <li><b>閉じた思考 = 閉路</b> (∂c = 0)。<b>導かれた思考 = 境界</b> (c = ∂d)。そして<b>閉じているのに、どこからも導かれない思考</b> ── それが<b>観念</b>である。</li>
+    </ol>
+    <span class="eq">観念 = H<sub>k</sub>(K) = ker ∂<sub>k</sub> / im ∂<sub>k+1</sub>   (レポートの  ker / im f = ∂  をそのまま実装する)</span>
+    <p>独立な観念の個数が<b>ベッチ数</b> β<sub>k</sub> である。β<sub>0</sub> は<b>分裂した中枢の数</b>(つながっていない思考のまとまり)、β<sub>1</sub> は<b>閉じたまま解けていない問い</b>(環をなす連想で、どの理解にも埋められていないもの)の数、β<sub>2</sub> は<b>空洞</b>(理解の面で囲まれた内側)の数。</p>
+  </div>
+
+  <h2>⚡ 境界作用素 ∂ を CNOT 回路にする</h2>
+  <div class="card q">
+    <p>∂ は Z<sub>2</sub> 上の線形写像 C<sub>k</sub> → C<sub>k−1</sub> なので、<b>CNOT だけで組める</b>。k-単体 σ の量子ビットを制御、その各面 τ ⊂ σ の量子ビットを標的とした CNOT を並べれば</p>
+    <span class="eq">∂̂ : |c⟩|0⟩  ⟼  |c⟩|∂c⟩</span>
+    <p>ここで H<sup>⊗n</sup> を k-単体レジスタに掛けると<b>すべての思考が同時に</b>載る。∂̂ を通し、面レジスタを観測して <b>0 が出た瞬間、残るのは閉じた思考だけ</b>である:</p>
+    <span class="eq">Pr[面レジスタ = 0] = |Z<sub>k</sub>| / 2<sup>n<sub>k</sub></sup> = 2<sup>dim Z<sub>k</sub> − n<sub>k</sub></sup>   ⟹   dim Z<sub>k</sub> = n<sub>k</sub> + log<sub>2</sub> Pr</span>
+    <p>閉路空間の次元は<b>観測確率から読める</b>。処理系は同じ量を古典的なガウス消去でも計算し、両者が一致することをテストで毎回確かめる。観測後の状態は閉路の一様な重ね合わせで、そこから観測した思考は<b>境界</b>(理解から導かれる)か<b>観念</b>(導かれない)かに分類される。</p>
+  </div>
+
+  <h2>🌊 思考の動力学 ─ 観念は動かない</h2>
+  <div class="card">
+    <p>レポートの <span class="ket">e<sub>n</sub> = ker f ⊕ im f</span> は、実係数では<b>ホッジ分解</b>として厳密になる:</p>
+    <span class="eq">C<sub>k</sub> = im ∂<sub>k+1</sub> ⊕ ker Δ<sub>k</sub> ⊕ im ∂<sub>k</sub><sup>T</sup> ,   Δ<sub>k</sub> = ∂<sub>k</sub><sup>T</sup>∂<sub>k</sub> + ∂<sub>k+1</sub>∂<sub>k+1</sub><sup>T</sup> ,   ker Δ<sub>k</sub> ≅ H<sub>k</sub></span>
+    <p>思考中枢の動力学を、ホッジ・ラプラシアン Δ<sub>k</sub> をハミルトニアンとする<b>量子歩行</b> ψ(t) = exp(−iΔ<sub>k</sub>t) ψ(0) とする。固有展開の各項は e<sup>−iλt</sup> = cos λt − i sin λt ── <b>オイラーの式</b>で回る。そして λ = 0 の成分、すなわち<b>調和成分 = 観念</b>は位相も振幅も動かない:</p>
+    <span class="eq">‖P<sub>H</sub> ψ(t)‖² = ‖P<sub>H</sub> ψ(0)‖²   (すべての t で不変 — テストで検査)</span>
+    <p>連想(導かれる成分)と問い(導く成分)は時間とともに揺れ動くが、<b>観念だけは思考の流れの中で保存される</b>。これが本処理系の中心的な不変量である。</p>
+  </div>
+
+  <h2>🧮 二つのオイラー</h2>
+  <div class="card">
+    <p>回路の位相ゲートは e<sup>iθ</sup> = cos θ + i sin θ(<b>オイラーの式</b>)、複体の不変量は χ = Σ(−1)<sup>k</sup> n<sub>k</sub>(<b>オイラー標数</b>)。両者は同じ処理系の中で出会う。オイラー・ポアンカレの公式</p>
+    <span class="eq">χ(K) = Σ (−1)<sup>k</sup> n<sub>k</sub> = Σ (−1)<sup>k</sup> β<sub>k</sub></span>
+    <p>により、単体の<b>個数</b>だけから出る χ と、<b>観念の個数</b>だけから出る χ は一致する。思考中枢の形は、その要素を数えるだけで観念の総和を知らせる。</p>
+  </div>
+
+  <h2>🧩 理解と分裂</h2>
+  <div class="card">
+    <ul>
+      <li><b>理解</b> (<code>fill a b c</code> / <code>理解 a b c</code>) ── 三つの連想が環をなして解けていない問いに、面を張る。その瞬間、その環は境界となり β<sub>1</sub> が 1 減る。<b>観念が一つ、理解に変わる。</b></li>
+      <li><b>分裂</b> (<code>cut a b</code> / <code>切断 a b</code>) ── 連想を切る。中枢が二つに分かれれば β<sub>0</sub> が増え、環が切れれば β<sub>1</sub> が減る(問いは解けたのではなく、<b>問えなくなった</b>)。</li>
+    </ul>
+    <p class="note"><b>語の定義。</b> ここでの「思考中枢」「観念」「理解」は、単体的複体・ホモロジー類・面の添加という<b>数学的対象に付けた名前</b>であり、神経科学上の主張ではない。本処理系が保証するのは定理(∂∂ = 0、オイラー・ポアンカレ、ホッジ分解、観念の保存)がコードの上で成り立つことである。関連: QuantOS は Kauffman ブラケット ⟨K⟩ = (−A³)<sup>w</sup> で端末機能を写像したが、本処理系はその上位にあたる<b>ホモロジー</b>を回路にする。</p>
+  </div>
+</section>
+
+<!-- ══════════════ 2. 複体 ══════════════ -->
+<section id="t-cx">
+  <h2>🔺 思考中枢を複体として組む</h2>
+  <div class="card">
+    <div class="row">
+      <label>模型</label>
+      <button class="act sub" data-preset="center">🧠 思考中枢</button>
+      <button class="act sub" data-preset="triangle">△ 三角形 (問い)</button>
+      <button class="act sub" data-preset="filled">▲ 充填三角形 (理解)</button>
+      <button class="act sub" data-preset="sphere">◯ 球面 (四面体の表面)</button>
+      <button class="act sub" data-preset="eight">∞ 二つの環</button>
+      <button class="act sub" data-preset="split">⫽ 分裂した中枢</button>
+    </div>
+    <canvas id="cxCanvas" height="340"></canvas>
+    <div class="grid2" style="margin-top:10px">
+      <div>
+        <h3>不変量</h3>
+        <div class="kv" id="cxInv"></div>
+      </div>
+      <div>
+        <h3>単体</h3>
+        <pre class="out" id="cxList" style="max-height:170px;margin-top:0"></pre>
+      </div>
+    </div>
+    <h3>編集</h3>
+    <div class="row">
+      <input type="text" class="short" id="cxEdit" value="意味 記憶 判断"/>
+      <button class="act" id="cxFill">理解 (面を張る)</button>
+      <button class="act sub" id="cxEdge">連想 (辺)</button>
+      <button class="act sub" id="cxCut">切断 (単体と上位を除く)</button>
+      <button class="act sub" id="cxVert">頂点を加える</button>
+    </div>
+    <h3>思考を分類する</h3>
+    <div class="row">
+      <input type="text" class="short" id="cxChain" value="感覚-意味 意味-判断 判断-発話 発話-行動 行動-感覚"/>
+      <button class="act" id="cxClassify">分類</button>
+    </div>
+    <pre class="out" id="cxOut" style="max-height:160px">(思考 = 単体名の並び。辺は 頂点-頂点、面は 頂点-頂点-頂点)</pre>
+  </div>
+</section>
+
+<!-- ══════════════ 3. 回路 ══════════════ -->
+<section id="t-cir">
+  <h2>⚡ 境界回路と閉路フィルタ</h2>
+  <div class="card q">
+    <div class="row">
+      <label>次数 k</label>
+      <select id="cirK"><option value="1" selected>1 (連想 → 要素)</option><option value="2">2 (理解 → 連想)</option><option value="0">0 (要素)</option></select>
+      <label>種</label><input type="number" id="cirSeed" value="7" min="1"/>
+      <button class="act" id="cirRun">▶ 重ね合わせ → ∂̂ → 面レジスタを観測</button>
+    </div>
+    <canvas id="cirCanvas" height="260"></canvas>
+    <pre class="out" id="cirOut">(複体タブの模型に対して境界回路を組み、閉じた思考だけを残します)</pre>
+  </div>
+</section>
+
+<!-- ══════════════ 4. 歩行 ══════════════ -->
+<section id="t-wlk">
+  <h2>🌊 ホッジ量子歩行 ─ 観念は動かない</h2>
+  <div class="card">
+    <div class="row">
+      <label>次数 k</label>
+      <select id="wlkK"><option value="1" selected>1 (連想の上を歩く)</option><option value="0">0 (要素の上を歩く)</option></select>
+      <label>始点</label><input type="text" class="short" id="wlkFrom" value="感覚-意味"/>
+      <button class="act" id="wlkSet">始点に置く</button>
+    </div>
+    <div class="row" style="display:block">
+      <label>時間 t = <span id="wlkTv">0.00</span></label>
+      <input type="range" id="wlkT" min="0" max="12" step="0.05" value="0"/>
+    </div>
+    <div class="grid2">
+      <canvas id="wlkCanvas" height="300"></canvas>
+      <canvas id="wlkPlot" height="300"></canvas>
+    </div>
+    <div class="kv" id="wlkInv" style="margin-top:8px"></div>
+  </div>
+</section>
+
+<!-- ══════════════ 5. 位相 Bada ══════════════ -->
+<section id="t-bada">
+  <h2>◯ 位相 Bada 方言 ─ 実行系</h2>
+  <div class="card">
+    <div class="row">
+      <button class="act sub" data-sample="center">思考中枢</button>
+      <button class="act sub" data-sample="filter">閉路フィルタ</button>
+      <button class="act sub" data-sample="fill">理解</button>
+      <button class="act sub" data-sample="walk">歩行</button>
+      <button class="act sub" data-sample="ja">日本語表記</button>
+    </div>
+    <textarea id="badaSrc" rows="12"></textarea>
+    <div class="row">
+      <button class="act" id="badaRun">▶ 実行</button>
+      <button class="act sub" id="badaClear">消去</button>
+    </div>
+    <pre class="out" id="badaOut">(実行してください)</pre>
+    <h3>文法</h3>
+    <pre class="out" style="max-height:none">complex NAME            # 複体を新しく作る          / 複体
+preset center|triangle|filled|sphere|eight|split   / 模型 思考中枢|三角形|充填|球面|二環|分裂
+vertex a b c            # 頂点 (0-単体)              / 頂点
+edge a b · face a b c   # 連想 (辺) / 理解 (面)。面は閉包を自動で加える   / 辺 · 面
+fill a b c              # 理解 = 面を張る (β₁ の変化を報告)   / 理解
+cut a b                 # 切断 = 単体と上位単体を除く            / 切断
+chains · betti · euler  # 各次数の単体数 / ベッチ数 / オイラー標数 (両方の式)   / 鎖 · ベッチ · オイラー
+think a-b b-c c-a       # 思考 = 鎖。∂ と分類 (開いた鎖 / 境界 / 観念)   / 思考
+circuit 1               # ∂̂ を CNOT 回路に組む             / 回路
+filter 1 [seed N]       # 重ね合わせ→∂̂→観測 0 で閉路を残す  / 閉路
+harmonic 1              # dim ker Δ_k = β_k (ホッジの定理)   / 調和
+walk 1 from a-b time 2  # ホッジ量子歩行。観念の保存を報告  / 歩行 1 始点 a-b 時間 2
+state                   # 複体の一覧                / 状態
+let x = 1+2 · print x   # 古典の変数と出力</pre>
+  </div>
+</section>
+
+<!-- ══════════════ 6. 生成AI ══════════════ -->
+<section id="t-ai">
+  <h2>🤖 生成AIカーネル ─ 思考中枢の回路を Bada に書かせる</h2>
+  <p class="dim" style="font-size:12px">日本語の依頼から 位相 Bada のプログラムを組み立てるカーネル。応答のたびに
+     <b>トークン化 → 意図解析 → 位相の設計 → 生成 → 検証</b> の 5 段を開示する(全段この HTML 内で決定論的に動作)。</p>
+  <div class="card">
+    <input type="text" id="aiIn" value="思考中枢を組んで、閉じているのに解けていない問いを回路で取り出して"/>
+    <div class="row" style="margin-top:8px">
+      <button class="act" id="aiGo">✨ 生成させる</button>
+      <button class="act sub" data-ai="三角形の問いを理解して解いて">例:理解</button>
+      <button class="act sub" data-ai="思考中枢を歩かせて観念が動かないことを見せて">例:歩行</button>
+      <button class="act sub" data-ai="連想を切って中枢を分裂させて">例:分裂</button>
+    </div>
+    <pre class="out" id="aiOut">(生成結果がここに出ます)</pre>
+    <div class="row"><button class="act sub" id="aiSend">◯ 位相 Bada タブへ送って実行</button></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+"use strict";
+/* ════════════════════════════════════════════════════════════════════
+ * Bada 位相 (topos) — 思考中枢の量子回路
+ *
+ *   思考中枢 = 単体的複体 K       (頂点=要素, 辺=連想, 面=理解)
+ *   思考     = 鎖 c ∈ C_k(K)      (単体ひとつ = 量子ビットひとつ, |c⟩)
+ *   ∂       = CNOT 回路           |c⟩|0⟩ ↦ |c⟩|∂c⟩
+ *   観念     = H_k = ker ∂ / im ∂  (閉じているのに導かれない思考)
+ *   動力学   = exp(−iΔ_k t)        (ホッジ・ラプラシアン。調和成分 = 観念 は不変)
+ *
+ * 依存ゼロ・単一 HTML。エンジン部は DOM に触れないため
+ * tools/engine-test.js が Node 上でそのまま検証できる。
+ * ════════════════════════════════════════════════════════════════════ */
+
+/* ════ 0. 決定論的乱数 (mulberry32) ════ */
+function toposRng(seed){
+  var s = (seed >>> 0) || 1;
+  return function(){
+    s = (s + 0x6D2B79F5) | 0;
+    var t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* ════ 1. 複素振幅の状態ベクトル (量子 Bada 互換) ════ */
+var QMAX = 18;   /* 回路に載せられる量子ビット数の上限 (2^18 振幅) */
+function qsNew(n, k){
+  if (n > QMAX) throw new Error("量子ビット数 " + n + " は上限 " + QMAX + " を超えます");
+  var N = 1 << n;
+  var st = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  st.re[(k || 0) & (N - 1)] = 1;
+  return st;
+}
+function qsClone(st){ return { n:st.n, re:Float64Array.from(st.re), im:Float64Array.from(st.im) }; }
+function qsNormSq(st){
+  var s = 0;
+  for (var k = 0; k < st.re.length; k++) s += st.re[k]*st.re[k] + st.im[k]*st.im[k];
+  return s;
+}
+function qsProbs(st){
+  var p = new Float64Array(st.re.length);
+  for (var k = 0; k < p.length; k++) p[k] = st.re[k]*st.re[k] + st.im[k]*st.im[k];
+  return p;
+}
+function bitOf(k, i, n){ return (k >> (n - 1 - i)) & 1; }
+function ketStr(k, n){
+  var s = "";
+  for (var i = 0; i < n; i++) s += bitOf(k, i, n);
+  return "|" + s + "⟩";
+}
+function gateH(st, t){
+  var n = st.n, N = st.re.length, r = Math.SQRT1_2;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){
+    var ar = st.re[k], ai = st.im[k];
+    if (ar === 0 && ai === 0) continue;
+    var f = k ^ (1 << (n - 1 - t));
+    if (bitOf(k, t, n) === 0){ out.re[k] += r*ar; out.im[k] += r*ai; out.re[f] += r*ar; out.im[f] += r*ai; }
+    else { out.re[f] += r*ar; out.im[f] += r*ai; out.re[k] -= r*ar; out.im[k] -= r*ai; }
+  }
+  return out;
+}
+function gateX(st, t){
+  var n = st.n, N = st.re.length;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){ var f = k ^ (1 << (n - 1 - t)); out.re[f] = st.re[k]; out.im[f] = st.im[k]; }
+  return out;
+}
+/* オイラーの式 e^{iθ} を |1⟩ に掛ける位相ゲート */
+function gatePhase(st, t, theta){
+  var n = st.n, N = st.re.length, c = Math.cos(theta), s = Math.sin(theta);
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){
+    if (bitOf(k, t, n) === 1){ out.re[k] = c*st.re[k] - s*st.im[k]; out.im[k] = s*st.re[k] + c*st.im[k]; }
+    else { out.re[k] = st.re[k]; out.im[k] = st.im[k]; }
+  }
+  return out;
+}
+function gateCNOT(st, c, t){
+  if (c === t) throw new Error("CNOT の制御と標的が同じです");
+  var n = st.n, N = st.re.length;
+  var out = { n:n, re:new Float64Array(N), im:new Float64Array(N) };
+  for (var k = 0; k < N; k++){
+    var kk = bitOf(k, c, n) === 1 ? (k ^ (1 << (n - 1 - t))) : k;
+    out.re[kk] += st.re[k]; out.im[kk] += st.im[k];
+  }
+  return out;
+}
+function qsMeasure(st, rnd){
+  var p = qsProbs(st), r = (rnd || Math.random)(), acc = 0, hit = 0;
+  for (var k = 0; k < p.length; k++){ acc += p[k]; if (r <= acc + 1e-12){ hit = k; break; } }
+  st.re = new Float64Array(p.length); st.im = new Float64Array(p.length);
+  st.re[hit] = 1;
+  return hit;
+}
+/* 部分レジスタ qubits が値 value (全ビット同じ値) を示す確率 */
+function qsSubProb(st, qubits, value){
+  if (!qubits.length) return 1;
+  var n = st.n, s = 0;
+  for (var k = 0; k < st.re.length; k++){
+    var ok = true;
+    for (var j = 0; j < qubits.length; j++){ if (bitOf(k, qubits[j], n) !== value){ ok = false; break; } }
+    if (ok) s += st.re[k]*st.re[k] + st.im[k]*st.im[k];
+  }
+  return s;
+}
+/* 部分レジスタを value に射影して規格化 (観測でその値が出た後の状態)。戻り値は確率 */
+function qsProject(st, qubits, value){
+  var n = st.n, p = qsSubProb(st, qubits, value);
+  if (p <= 1e-15) throw new Error("確率 0 の観測結果には射影できません");
+  var r = 1 / Math.sqrt(p);
+  for (var k = 0; k < st.re.length; k++){
+    var ok = true;
+    for (var j = 0; j < qubits.length; j++){ if (bitOf(k, qubits[j], n) !== value){ ok = false; break; } }
+    if (ok){ st.re[k] *= r; st.im[k] *= r; } else { st.re[k] = 0; st.im[k] = 0; }
+  }
+  return p;
+}
+
+/* ════ 2. 単体的複体 ═════════════════════════════════════════════════
+ *   cx.vnames : 頂点名の配列 (添字が頂点 id)
+ *   cx.simp   : 単体 (頂点 id の昇順配列) の配列。閉包で閉じている
+ * ════════════════════════════════════════════════════════════════════ */
+function cxNew(name){ return { name: name || "K", vnames: [], simp: [], keys: {} }; }
+function cxKey(ids){ return ids.join(","); }
+function cxSort(cx){
+  cx.simp.sort(function(a, b){
+    if (a.length !== b.length) return a.length - b.length;
+    for (var i = 0; i < a.length; i++){ if (a[i] !== b[i]) return a[i] - b[i]; }
+    return 0;
+  });
+}
+function cxVertex(cx, name){
+  var id = cx.vnames.indexOf(name);
+  if (id >= 0) return id;
+  if (!/^[^\s,\-]+$/.test(name)) throw new Error("頂点名に空白・カンマ・ハイフンは使えません: " + name);
+  cx.vnames.push(name); id = cx.vnames.length - 1;
+  cx.simp.push([id]); cx.keys[cxKey([id])] = 1;
+  cxSort(cx);
+  return id;
+}
+function cxIds(cx, names){
+  var ids = [], seen = {};
+  for (var i = 0; i < names.length; i++){
+    var id = cx.vnames.indexOf(names[i]);
+    if (id < 0) throw new Error("未宣言の頂点: " + names[i]);
+    if (!seen[id]){ seen[id] = 1; ids.push(id); }
+  }
+  ids.sort(function(a, b){ return a - b; });
+  return ids;
+}
+function cxHas(cx, ids){ return !!cx.keys[cxKey(ids)]; }
+/* 単体を加える (閉包 = すべての面も加える) */
+function cxAdd(cx, names){
+  var ids = cxIds(cx, names);
+  var added = [];
+  (function rec(s){
+    if (cx.keys[cxKey(s)]) return;
+    cx.keys[cxKey(s)] = 1; cx.simp.push(s.slice()); added.push(s.slice());
+    if (s.length > 1){
+      for (var i = 0; i < s.length; i++){ var f = s.slice(); f.splice(i, 1); rec(f); }
+    }
+  })(ids);
+  cxSort(cx);
+  return { simplex: ids, added: added };
+}
+/* 単体とそれを含む上位単体をすべて除く */
+function cxRemove(cx, names){
+  var ids = cxIds(cx, names), removed = [];
+  cx.simp = cx.simp.filter(function(s){
+    var sub = ids.every(function(v){ return s.indexOf(v) >= 0; });
+    if (sub){ removed.push(s); delete cx.keys[cxKey(s)]; }
+    return !sub;
+  });
+  return removed;
+}
+function cxSimplices(cx, k){ return cx.simp.filter(function(s){ return s.length === k + 1; }); }
+function cxDim(cx){ var d = -1; for (var i = 0; i < cx.simp.length; i++) d = Math.max(d, cx.simp[i].length - 1); return d; }
+function cxCounts(cx){
+  var d = cxDim(cx), c = [];
+  for (var k = 0; k <= d; k++) c.push(cxSimplices(cx, k).length);
+  return c;
+}
+function cxName(cx, ids){ return ids.map(function(i){ return cx.vnames[i]; }).join("-"); }
+/* "a-b-c" → 頂点 id 列 (複体に存在することを要求) */
+function cxParse(cx, token){
+  var ids = cxIds(cx, String(token).split("-"));
+  if (!cxHas(cx, ids)) throw new Error("複体にない単体: " + token);
+  return ids;
+}
+/* 向き付き境界行列 ∂_k : C_k → C_{k-1}  (M[i][j] = ±1) */
+function cxBoundary(cx, k){
+  var rows = cxSimplices(cx, k - 1), cols = cxSimplices(cx, k), rindex = {}, i, j;
+  for (i = 0; i < rows.length; i++) rindex[cxKey(rows[i])] = i;
+  var M = [];
+  for (i = 0; i < rows.length; i++){ M.push([]); for (j = 0; j < cols.length; j++) M[i].push(0); }
+  for (j = 0; j < cols.length && k > 0; j++){        /* ∂_0 = 0 (面レジスタなし) */
+    for (i = 0; i <= k; i++){
+      var f = cols[j].slice(); f.splice(i, 1);
+      var r = rindex[cxKey(f)];
+      if (r === undefined) throw new Error("閉包が壊れています: " + cxName(cx, f));
+      M[r][j] = (i % 2 === 0) ? 1 : -1;
+    }
+  }
+  return { k:k, rows:rows, cols:cols, M:M };
+}
+/* Z_2 上の階数 (ガウス消去) */
+function z2Rank(M){
+  if (!M.length || !M[0].length) return 0;
+  var A = M.map(function(r){ return r.map(function(v){ return Math.abs(v) % 2; }); });
+  var rows = A.length, cols = A[0].length, rank = 0, i, j, r;
+  for (j = 0; j < cols && rank < rows; j++){
+    var piv = -1;
+    for (i = rank; i < rows; i++){ if (A[i][j]){ piv = i; break; } }
+    if (piv < 0) continue;
+    var t = A[piv]; A[piv] = A[rank]; A[rank] = t;
+    for (i = 0; i < rows; i++){
+      if (i !== rank && A[i][j]){ for (r = 0; r < cols; r++) A[i][r] ^= A[rank][r]; }
+    }
+    rank++;
+  }
+  return rank;
+}
+/* Ax = b (Z_2) が解けるか */
+function z2Solvable(M, b){
+  if (!M.length) return b.every(function(v){ return (Math.abs(v) % 2) === 0; });
+  var aug = M.map(function(r, i){ return r.concat([b[i]]); });
+  return z2Rank(aug) === z2Rank(M);
+}
+/* 鎖 c (列添字の集合) の境界 ∂c (Z_2, 行添字の集合) */
+function cxChainBoundary(B, cols){
+  var out = [];
+  for (var i = 0; i < B.rows.length; i++){
+    var s = 0;
+    for (var j = 0; j < cols.length; j++) s += Math.abs(B.M[i][cols[j]]);
+    if (s % 2) out.push(i);
+  }
+  return out;
+}
+function cxRanks(cx){
+  var d = cxDim(cx), r = [];
+  for (var k = 0; k <= d + 1; k++) r.push(k > d ? 0 : z2Rank(cxBoundary(cx, k).M));
+  return r;
+}
+/* ベッチ数 β_k = n_k − rank ∂_k − rank ∂_{k+1} */
+function cxBetti(cx){
+  var n = cxCounts(cx), r = cxRanks(cx), b = [];
+  for (var k = 0; k < n.length; k++) b.push(n[k] - r[k] - r[k + 1]);
+  return b;
+}
+/* オイラー標数 — 単体数からと、ベッチ数から (オイラー・ポアンカレ) */
+function cxEuler(cx){
+  var n = cxCounts(cx), b = cxBetti(cx), a = 0, c = 0;
+  for (var k = 0; k < n.length; k++){ a += (k % 2 ? -1 : 1) * n[k]; c += (k % 2 ? -1 : 1) * b[k]; }
+  return { byCount: a, byBetti: c };
+}
+/* ∂∂ = 0 の検算 (向き付き実係数と Z_2 の両方) */
+function cxDDZero(cx, k){
+  if (k < 2) return true;
+  var A = cxBoundary(cx, k - 1).M, B = cxBoundary(cx, k).M;
+  for (var i = 0; i < A.length; i++){
+    for (var j = 0; j < (B[0] || []).length; j++){
+      var s = 0;
+      for (var m = 0; m < B.length; m++) s += A[i][m] * B[m][j];
+      if (s !== 0) return false;
+    }
+  }
+  return true;
+}
+/* 思考 (鎖) の分類 */
+function cxClassify(cx, k, cols){
+  var B = cxBoundary(cx, k);
+  if (!cols.length) return { kind:"zero", label:"零鎖 (何も考えていない)", boundary:[] };
+  var bd = cxChainBoundary(B, cols);
+  if (bd.length) return { kind:"open", label:"開いた鎖 — 閉じていない思考 (∂c ≠ 0)", boundary:bd, B:B };
+  var up = (k < cxDim(cx)) ? cxBoundary(cx, k + 1) : null;
+  var vec = [];
+  for (var j = 0; j < B.cols.length; j++) vec.push(cols.indexOf(j) >= 0 ? 1 : 0);
+  var derived = up ? z2Solvable(up.M, vec) : (k === 0 ? false : false);
+  if (derived) return { kind:"boundary", label:"境界 — 閉じており、上位の理解から導かれる思考 (c = ∂d)", boundary:[], B:B };
+  return { kind:"idea", label:"観念 — 閉じているのに、どこからも導かれない思考 (H_" + k + " の代表)", boundary:[], B:B };
+}
+
+/* ════ 3. 境界回路 ───────────────────────────────────────────────────
+ *   量子ビット 0..n_k−1 = k-単体、n_k..n_k+n_{k−1}−1 = (k−1)-単体 (面レジスタ)
+ *   ∂ の非零成分ごとに CNOT(制御 = 単体, 標的 = その面)
+ * ════════════════════════════════════════════════════════════════════ */
+function boundaryCircuit(cx, k){
+  var B = cxBoundary(cx, k), nk = B.cols.length, nk1 = B.rows.length, gates = [];
+  if (!nk) throw new Error("次数 " + k + " の単体がありません");
+  for (var j = 0; j < nk; j++){
+    for (var i = 0; i < nk1; i++){
+      if (Math.abs(B.M[i][j]) % 2) gates.push({ c:j, t:nk + i, cn:cxName(cx, B.cols[j]), tn:cxName(cx, B.rows[i]) });
+    }
+  }
+  return { k:k, nk:nk, nk1:nk1, qubits:nk + nk1, gates:gates, B:B,
+           names: B.cols.map(function(s){ return cxName(cx, s); }).concat(B.rows.map(function(s){ return cxName(cx, s); })) };
+}
+function circuitApply(st, gates){
+  for (var g = 0; g < gates.length; g++) st = gateCNOT(st, gates[g].c, gates[g].t);
+  return st;
+}
+/* 基底添字 → k-単体レジスタで 1 になっている列添字 */
+function chainOfIndex(idx, circ){
+  var cols = [];
+  for (var j = 0; j < circ.nk; j++){ if (bitOf(idx, j, circ.qubits)) cols.push(j); }
+  return cols;
+}
+/* 閉路フィルタ: H^{⊗n_k} → ∂̂ → 面レジスタを観測して 0 に射影 */
+function cycleFilter(cx, k, opt){
+  opt = opt || {};
+  var circ = boundaryCircuit(cx, k), rnd = toposRng(opt.seed || 1);
+  var st = qsNew(circ.qubits, 0), j;
+  for (j = 0; j < circ.nk; j++) st = gateH(st, j);
+  st = circuitApply(st, circ.gates);
+  var anc = [];
+  for (j = 0; j < circ.nk1; j++) anc.push(circ.nk + j);
+  var p0 = qsSubProb(st, anc, 0);
+  var dimZq = circ.nk + Math.log2(p0);
+  var dimZc = circ.nk - z2Rank(circ.B.M);
+  var post = qsClone(st);
+  qsProject(post, anc, 0);
+  var samples = [], count = opt.samples || 4;
+  for (var s = 0; s < count; s++){
+    var idx = qsMeasure(qsClone(post), rnd);
+    var cols = chainOfIndex(idx, circ);
+    samples.push({ index: idx, cols: cols, names: cols.map(function(c){ return cxName(cx, circ.B.cols[c]); }),
+                   cls: cxClassify(cx, k, cols) });
+  }
+  return { circuit: circ, prob0: p0, dimZq: dimZq, dimZc: dimZc, state: post, samples: samples,
+           nCycles: Math.round(Math.pow(2, dimZc)) };
+}
+
+/* ════ 4. ホッジ分解と量子歩行 ═══════════════════════════════════════ */
+function matT(A){
+  if (!A.length) return [];
+  var T = [];
+  for (var j = 0; j < A[0].length; j++){ T.push([]); for (var i = 0; i < A.length; i++) T[j].push(A[i][j]); }
+  return T;
+}
+function matMul(A, B, n){
+  var C = [], i, j, m;
+  for (i = 0; i < n; i++){ C.push([]); for (j = 0; j < n; j++) C[i].push(0); }
+  if (!A.length || !B.length) return C;
+  for (i = 0; i < A.length; i++){
+    for (j = 0; j < B[0].length; j++){
+      var s = 0;
+      for (m = 0; m < B.length; m++) s += A[i][m] * B[m][j];
+      C[i][j] = s;
+    }
+  }
+  return C;
+}
+/* Δ_k = ∂_kᵀ ∂_k + ∂_{k+1} ∂_{k+1}ᵀ  (n_k × n_k) */
+function cxHodge(cx, k){
+  var n = cxSimplices(cx, k).length;
+  if (!n) throw new Error("次数 " + k + " の単体がありません");
+  var Bk = cxBoundary(cx, k).M;
+  var L = matMul(matT(Bk), Bk, n), i, j;
+  if (k < cxDim(cx)){
+    var Bu = cxBoundary(cx, k + 1).M, U = matMul(Bu, matT(Bu), n);
+    for (i = 0; i < n; i++) for (j = 0; j < n; j++) L[i][j] += U[i][j];
+  }
+  return L;
+}
+/* 対称行列の固有分解 (ヤコビ法)。vecs[j] = j 番目の固有ベクトル */
+function symEig(A){
+  var n = A.length, a = A.map(function(r){ return r.slice(); }), V = [], i, j, k;
+  for (i = 0; i < n; i++){ V.push([]); for (j = 0; j < n; j++) V[i].push(i === j ? 1 : 0); }
+  for (var sweep = 0; sweep < 100; sweep++){
+    var off = 0;
+    for (i = 0; i < n; i++) for (j = i + 1; j < n; j++) off += a[i][j]*a[i][j];
+    if (off < 1e-22) break;
+    for (i = 0; i < n; i++){
+      for (j = i + 1; j < n; j++){
+        if (Math.abs(a[i][j]) < 1e-14) continue;
+        var th = 0.5 * Math.atan2(2*a[i][j], a[j][j] - a[i][i]);
+        var c = Math.cos(th), s = Math.sin(th);
+        for (k = 0; k < n; k++){
+          var aki = a[k][i], akj = a[k][j];
+          a[k][i] = c*aki - s*akj; a[k][j] = s*aki + c*akj;
+        }
+        for (k = 0; k < n; k++){
+          var aik = a[i][k], ajk = a[j][k];
+          a[i][k] = c*aik - s*ajk; a[j][k] = s*aik + c*ajk;
+        }
+        for (k = 0; k < n; k++){
+          var vki = V[k][i], vkj = V[k][j];
+          V[k][i] = c*vki - s*vkj; V[k][j] = s*vki + c*vkj;
+        }
+      }
+    }
+  }
+  var vals = [], vecs = [];
+  for (j = 0; j < n; j++){
+    vals.push(a[j][j]);
+    var v = [];
+    for (i = 0; i < n; i++) v.push(V[i][j]);
+    vecs.push(v);
+  }
+  return { vals: vals, vecs: vecs };
+}
+function dot(a, b){ var s = 0; for (var i = 0; i < a.length; i++) s += a[i]*b[i]; return s; }
+/* 列空間の正規直交基底 (グラム・シュミット) */
+function orthoBasis(cols){
+  var basis = [];
+  for (var j = 0; j < cols.length; j++){
+    var v = cols[j].slice();
+    for (var b = 0; b < basis.length; b++){ var d = dot(v, basis[b]); for (var i = 0; i < v.length; i++) v[i] -= d*basis[b][i]; }
+    var nn = Math.sqrt(dot(v, v));
+    if (nn > 1e-9){ for (var q = 0; q < v.length; q++) v[q] /= nn; basis.push(v); }
+  }
+  return basis;
+}
+function projectOn(basis, v){
+  var out = v.map(function(){ return 0; });
+  for (var b = 0; b < basis.length; b++){ var d = dot(v, basis[b]); for (var i = 0; i < v.length; i++) out[i] += d*basis[b][i]; }
+  return out;
+}
+/* ホッジ分解 v = 完全 (im ∂_{k+1}) + 調和 (ker Δ) + 余完全 (im ∂_kᵀ) */
+function hodgeDecompose(cx, k, v){
+  var L = cxHodge(cx, k), eig = symEig(L), n = L.length, i;
+  var harm = v.map(function(){ return 0; }), dimH = 0;
+  for (var j = 0; j < n; j++){
+    if (Math.abs(eig.vals[j]) < 1e-9){
+      dimH++;
+      var d = dot(v, eig.vecs[j]);
+      for (i = 0; i < n; i++) harm[i] += d*eig.vecs[j][i];
+    }
+  }
+  var exactBasis = (k < cxDim(cx)) ? orthoBasis(matT(cxBoundary(cx, k + 1).M)) : [];
+  var exact = projectOn(exactBasis, v);
+  var coexBasis = orthoBasis(cxBoundary(cx, k).M);         /* im ∂_kᵀ = 行空間 */
+  var coexact = projectOn(coexBasis, v);
+  return { harmonic: harm, exact: exact, coexact: coexact, dims: { harmonic: dimH, exact: exactBasis.length, coexact: coexBasis.length },
+           eig: eig, L: L };
+}
+/* ψ(t) = Σ e^{−iλ_j t} ⟨u_j|ψ0⟩ u_j */
+function walkEvolve(eig, re0, im0, t){
+  var n = re0.length, re = [], im = [], i, j;
+  for (i = 0; i < n; i++){ re.push(0); im.push(0); }
+  for (j = 0; j < n; j++){
+    var u = eig.vecs[j], cr = dot(u, re0), ci = dot(u, im0);
+    var c = Math.cos(eig.vals[j]*t), s = Math.sin(eig.vals[j]*t);
+    var ar = cr*c + ci*s, ai = ci*c - cr*s;              /* (cos − i sin)(cr + i ci) */
+    for (i = 0; i < n; i++){ re[i] += ar*u[i]; im[i] += ai*u[i]; }
+  }
+  return { re: re, im: im };
+}
+function harmonicNorm(eig, re, im){
+  var s = 0;
+  for (var j = 0; j < eig.vals.length; j++){
+    if (Math.abs(eig.vals[j]) < 1e-9){ var cr = dot(eig.vecs[j], re), ci = dot(eig.vecs[j], im); s += cr*cr + ci*ci; }
+  }
+  return s;
+}
+function vecNormSq(re, im){ var s = 0; for (var i = 0; i < re.length; i++) s += re[i]*re[i] + im[i]*im[i]; return s; }
+
+/* ════ 5. 模型 (プリセット) ══════════════════════════════════════════ */
+var PRESETS = {
+  center: { label:"思考中枢", ja:"思考中枢",
+    build: function(cx){
+      ["感覚","意味","記憶","判断","発話","行動"].forEach(function(v){ cxVertex(cx, v); });
+      cxAdd(cx, ["感覚","意味"]); cxAdd(cx, ["意味","判断"]); cxAdd(cx, ["判断","発話"]);
+      cxAdd(cx, ["発話","行動"]); cxAdd(cx, ["行動","感覚"]);
+      cxAdd(cx, ["意味","記憶","判断"]);
+    },
+    pos: { "感覚":[0.18,0.30], "意味":[0.42,0.14], "記憶":[0.50,0.50], "判断":[0.74,0.22], "発話":[0.82,0.66], "行動":[0.30,0.80] } },
+  triangle: { label:"三角形 (問い)", ja:"三角形",
+    build: function(cx){ ["a","b","c"].forEach(function(v){ cxVertex(cx, v); }); cxAdd(cx, ["a","b"]); cxAdd(cx, ["b","c"]); cxAdd(cx, ["a","c"]); } },
+  filled: { label:"充填三角形 (理解)", ja:"充填",
+    build: function(cx){ ["a","b","c"].forEach(function(v){ cxVertex(cx, v); }); cxAdd(cx, ["a","b","c"]); } },
+  sphere: { label:"球面 (四面体の表面)", ja:"球面",
+    build: function(cx){
+      ["a","b","c","d"].forEach(function(v){ cxVertex(cx, v); });
+      cxAdd(cx, ["a","b","c"]); cxAdd(cx, ["a","b","d"]); cxAdd(cx, ["a","c","d"]); cxAdd(cx, ["b","c","d"]);
+    },
+    pos: { a:[0.5,0.12], b:[0.14,0.82], c:[0.86,0.82], d:[0.5,0.55] } },
+  eight: { label:"二つの環 (8 の字)", ja:"二環",
+    build: function(cx){
+      ["a","b","o","c","d"].forEach(function(v){ cxVertex(cx, v); });
+      cxAdd(cx, ["a","b"]); cxAdd(cx, ["b","o"]); cxAdd(cx, ["a","o"]);
+      cxAdd(cx, ["o","c"]); cxAdd(cx, ["c","d"]); cxAdd(cx, ["o","d"]);
+    },
+    pos: { a:[0.12,0.25], b:[0.12,0.75], o:[0.5,0.5], c:[0.88,0.25], d:[0.88,0.75] } },
+  split: { label:"分裂した中枢", ja:"分裂",
+    build: function(cx){
+      ["a","b","c","p","q","r"].forEach(function(v){ cxVertex(cx, v); });
+      cxAdd(cx, ["a","b","c"]); cxAdd(cx, ["p","q"]); cxAdd(cx, ["q","r"]); cxAdd(cx, ["p","r"]);
+    },
+    pos: { a:[0.12,0.2], b:[0.4,0.2], c:[0.26,0.75], p:[0.62,0.2], q:[0.9,0.2], r:[0.76,0.75] } }
+};
+var PRESET_JA = { "思考中枢":"center", "中枢":"center", "三角形":"triangle", "充填":"filled", "充填三角形":"filled",
+                  "球面":"sphere", "二環":"eight", "8の字":"eight", "分裂":"split" };
+function presetComplex(key){
+  var k = PRESETS[key] ? key : PRESET_JA[key];
+  if (!k) throw new Error("未知の模型: " + key);
+  var cx = cxNew(PRESETS[k].label); cx.preset = k;
+  PRESETS[k].build(cx);
+  return cx;
+}
+
+/* ════ 6. 位相 Bada 方言インタプリタ ═════════════════════════════════ */
+function fmtChain(cx, B, cols){
+  if (!cols.length) return "0";
+  return cols.map(function(j){ return cxName(cx, B.cols[j]); }).join(" + ");
+}
+function fmtBoundary(cx, B, rows){
+  if (!rows.length) return "0";
+  return rows.map(function(i){ return cxName(cx, B.rows[i]); }).join(" + ");
+}
+function colsOfTokens(cx, k, tokens){
+  var B = cxBoundary(cx, k), cols = [];
+  for (var t = 0; t < tokens.length; t++){
+    var ids = cxParse(cx, tokens[t]);
+    if (ids.length !== k + 1) throw new Error("次数が揃っていません: " + tokens[t] + " は " + (ids.length - 1) + "-単体");
+    var key = cxKey(ids), j = -1;
+    for (var c = 0; c < B.cols.length; c++){ if (cxKey(B.cols[c]) === key){ j = c; break; } }
+    if (cols.indexOf(j) >= 0) cols.splice(cols.indexOf(j), 1); else cols.push(j);   /* Z_2: 二度書けば消える */
+  }
+  cols.sort(function(a, b){ return a - b; });
+  return { B:B, cols:cols };
+}
+function evalArith(expr, vars){
+  var s = String(expr).replace(/[A-Za-z_][A-Za-z0-9_]*/g, function(v){
+    if (!(v in vars)) throw new Error("未定義の変数: " + v);
+    return "(" + vars[v] + ")";
+  });
+  if (!/^[\d\s+\-*/().%]+$/.test(s)) throw new Error("式に使えない文字: " + expr);
+  /* 安全な再帰下降パーサ */
+  var i = 0;
+  function ws(){ while (s[i] === " ") i++; }
+  function num(){ ws(); if (s[i] === "("){ i++; var v = add(); ws(); if (s[i] !== ")") throw new Error("括弧"); i++; return v; }
+    if (s[i] === "-"){ i++; return -num(); }
+    var m = /^\d+(\.\d+)?/.exec(s.slice(i)); if (!m) throw new Error("数が必要: " + expr); i += m[0].length; return parseFloat(m[0]); }
+  function mul(){ var v = num(); for (;;){ ws(); if (s[i] === "*"){ i++; v *= num(); } else if (s[i] === "/"){ i++; v /= num(); } else if (s[i] === "%"){ i++; v %= num(); } else return v; } }
+  function add(){ var v = mul(); for (;;){ ws(); if (s[i] === "+"){ i++; v += mul(); } else if (s[i] === "-"){ i++; v -= mul(); } else return v; } }
+  var r = add(); ws(); if (i < s.length) throw new Error("式の末尾が読めません: " + expr);
+  return r;
+}
+var JA_WORDS = {
+  "複体":"complex", "模型":"preset", "頂点":"vertex", "辺":"edge", "面":"face", "単体":"simplex", "理解":"fill", "切断":"cut",
+  "鎖":"chains", "ベッチ":"betti", "オイラー":"euler", "思考":"think", "回路":"circuit", "閉路":"filter", "調和":"harmonic",
+  "歩行":"walk", "状態":"state", "境界":"boundary", "出力":"print", "変数":"let",
+  "始点":"from", "時間":"time", "種":"seed"
+};
+function toposInterpret(src, opt){
+  opt = opt || {};
+  var out = [], vars = {}, cx = cxNew("K"), lines = String(src).split(/\r?\n/);
+  function say(s){ out.push(s); }
+  function betti(){ return cxBetti(cx); }
+  function fmtB(b){ return "β = (" + b.join(", ") + ")"; }
+  for (var ln = 0; ln < lines.length; ln++){
+    var raw = lines[ln].replace(/#.*$/, "").trim();
+    if (!raw) continue;
+    var toks = raw.split(/\s+/).map(function(t){ return JA_WORDS[t] || t; });
+    var cmd = toks[0].toLowerCase(), args = toks.slice(1);
+    try {
+      if (cmd === "complex"){ cx = cxNew(args[0] || "K"); say("複体 " + cx.name + " を作成"); }
+      else if (cmd === "preset"){ cx = presetComplex(args[0]); var n0 = cxCounts(cx); say("模型 " + cx.name + " : 単体数 (" + n0.join(", ") + ")  " + fmtB(betti())); }
+      else if (cmd === "vertex"){ args.forEach(function(v){ cxVertex(cx, v); }); say("頂点 " + args.join(" ") + "  (n₀ = " + cxSimplices(cx, 0).length + ")"); }
+      else if (cmd === "edge" || cmd === "face" || cmd === "simplex"){
+        var need = cmd === "edge" ? 2 : cmd === "face" ? 3 : 0;
+        if (need && args.length !== need) throw new Error(cmd + " には頂点 " + need + " 個");
+        var r = cxAdd(cx, args);
+        say((cmd === "edge" ? "連想 " : cmd === "face" ? "理解 " : "単体 ") + cxName(cx, r.simplex) + "  (+" + r.added.length + " 単体)");
+      }
+      else if (cmd === "fill"){
+        var b0 = betti(), rr = cxAdd(cx, args), b1 = betti();
+        var msg = "理解 " + cxName(cx, rr.simplex) + " を張った: " + fmtB(b0) + " → " + fmtB(b1);
+        if ((b0[1] || 0) > (b1[1] || 0)) msg += "  ── 問いが " + ((b0[1] || 0) - (b1[1] || 0)) + " つ解けて理解になった";
+        else if (!rr.added.length) msg += "  ── 既にあった (何も変わらない)";
+        else msg += "  ── 観念は変わらない (新しい問いを埋めてはいない)";
+        say(msg);
+      }
+      else if (cmd === "cut"){
+        var c0 = betti(), rem = cxRemove(cx, args), c1 = betti();
+        var m2 = "切断 " + args.join("-") + " : " + rem.length + " 単体を除去。" + fmtB(c0) + " → " + fmtB(c1);
+        if ((c1[0] || 0) > (c0[0] || 0)) m2 += "  ── 中枢が分裂した";
+        else if ((c0[1] || 0) > (c1[1] || 0)) m2 += "  ── 問いが問えなくなった";
+        say(m2);
+      }
+      else if (cmd === "chains"){ var cc = cxCounts(cx); say("単体数 n = (" + cc.join(", ") + ")  次元 " + cxDim(cx)); }
+      else if (cmd === "betti"){
+        var bb = betti();
+        var expl = [];
+        if (bb.length) expl.push("β₀ = " + bb[0] + " (つながった中枢の数)");
+        if (bb.length > 1) expl.push("β₁ = " + bb[1] + " (解けていない問い)");
+        if (bb.length > 2) expl.push("β₂ = " + bb[2] + " (理解に囲まれた空洞)");
+        say(fmtB(bb) + "   " + expl.join(" / "));
+      }
+      else if (cmd === "euler"){
+        var e = cxEuler(cx);
+        say("χ = Σ(−1)^k n_k = " + e.byCount + " ,  Σ(−1)^k β_k = " + e.byBetti + (e.byCount === e.byBetti ? "   (オイラー・ポアンカレ ✓)" : "   !! 不一致"));
+      }
+      else if (cmd === "boundary"){
+        var ids = cxParse(cx, args[0]), kk = ids.length - 1;
+        var B = cxBoundary(cx, kk), col = -1;
+        for (var q = 0; q < B.cols.length; q++){ if (cxKey(B.cols[q]) === cxKey(ids)){ col = q; break; } }
+        var terms = [];
+        for (var rI = 0; rI < B.rows.length; rI++){ if (B.M[rI][col]) terms.push((B.M[rI][col] > 0 ? "+" : "−") + cxName(cx, B.rows[rI])); }
+        say("∂(" + args[0] + ") = " + (terms.length ? terms.join(" ") : "0"));
+      }
+      else if (cmd === "think"){
+        if (!args.length) throw new Error("思考には単体を並べます");
+        var k0 = cxParse(cx, args[0]).length - 1, ch = colsOfTokens(cx, k0, args), cls = cxClassify(cx, k0, ch.cols);
+        say("思考 c = " + fmtChain(cx, ch.B, ch.cols) + "  (" + k0 + "-鎖)");
+        say("  ∂c = " + fmtBoundary(cx, ch.B, cls.boundary) + "   → " + cls.label);
+      }
+      else if (cmd === "circuit"){
+        var kc = parseInt(args[0] || "1", 10), circ = boundaryCircuit(cx, kc);
+        say("∂̂_" + kc + " : 量子ビット " + circ.qubits + " (単体 " + circ.nk + " + 面 " + circ.nk1 + ") , CNOT " + circ.gates.length + " 個");
+        circ.gates.forEach(function(g){ say("  CNOT  q" + g.c + " [" + g.cn + "]  →  q" + g.t + " [" + g.tn + "]"); });
+        say("  ∂∂ = 0 : " + (cxDDZero(cx, kc) && cxDDZero(cx, kc + 1) ? "✓" : "!! 破れ"));
+      }
+      else if (cmd === "filter"){
+        var kf = parseInt(args[0] || "1", 10), seed = opt.seed || 1;
+        var si = args.indexOf("seed"); if (si >= 0) seed = parseInt(args[si + 1], 10) || 1;
+        var f = cycleFilter(cx, kf, { seed: seed, samples: 4 });
+        say("閉路フィルタ k=" + kf + " : 量子ビット " + f.circuit.qubits + " , Pr[面 = 0] = " + f.prob0.toFixed(6) +
+            "  ⟹  dim Z_" + kf + " = " + f.circuit.nk + " + log₂ Pr = " + f.dimZq.toFixed(3) + "  (古典 " + f.dimZc + (Math.abs(f.dimZq - f.dimZc) < 1e-6 ? " ✓)" : " !!)"));
+        say("  閉じた思考は全部で " + f.nCycles + " 通り。観測した思考:");
+        f.samples.forEach(function(sm){ say("    " + (sm.names.length ? sm.names.join(" + ") : "0") + "   → " + sm.cls.label); });
+      }
+      else if (cmd === "harmonic"){
+        var kh = parseInt(args[0] || "1", 10), nh = cxSimplices(cx, kh).length;
+        var v0 = []; for (var z = 0; z < nh; z++) v0.push(0);
+        var hd = hodgeDecompose(cx, kh, v0), bh = betti()[kh] || 0;
+        say("Δ_" + kh + " (" + nh + "×" + nh + ") : dim ker Δ = " + hd.dims.harmonic + " , β_" + kh + " = " + bh + (hd.dims.harmonic === bh ? "   (ホッジの定理 ✓)" : "   !! 不一致"));
+        say("  C_" + kh + " = im ∂_" + (kh + 1) + " (" + hd.dims.exact + ") ⊕ ker Δ (" + hd.dims.harmonic + ") ⊕ im ∂_" + kh + "ᵀ (" + hd.dims.coexact + ")  = " + (hd.dims.exact + hd.dims.harmonic + hd.dims.coexact) + (hd.dims.exact + hd.dims.harmonic + hd.dims.coexact === nh ? " ✓" : " !!"));
+      }
+      else if (cmd === "walk"){
+        var kw = parseInt(args[0] || "1", 10), from = null, tw = 2.0;
+        var fi = args.indexOf("from"); if (fi >= 0) from = args[fi + 1];
+        var ti = args.indexOf("time"); if (ti >= 0) tw = parseFloat(args[ti + 1]);
+        var cw = cxSimplices(cx, kw), nw = cw.length;
+        if (!nw) throw new Error("次数 " + kw + " の単体がありません");
+        var re0 = [], im0 = [];
+        for (var w0 = 0; w0 < nw; w0++){ re0.push(0); im0.push(0); }
+        var start = 0;
+        if (from){ var fid = cxParse(cx, from); for (var w1 = 0; w1 < nw; w1++){ if (cxKey(cw[w1]) === cxKey(fid)) start = w1; } }
+        re0[start] = 1;
+        var hd2 = hodgeDecompose(cx, kw, re0), h0 = harmonicNorm(hd2.eig, re0, im0);
+        var pt = walkEvolve(hd2.eig, re0, im0, tw), ht = harmonicNorm(hd2.eig, pt.re, pt.im);
+        say("歩行 k=" + kw + " 始点 " + cxName(cx, cw[start]) + " , t = " + tw + " : ‖ψ‖² = " + vecNormSq(pt.re, pt.im).toFixed(6));
+        var dist = [];
+        for (var w2 = 0; w2 < nw; w2++){ dist.push(cxName(cx, cw[w2]) + " " + (pt.re[w2]*pt.re[w2] + pt.im[w2]*pt.im[w2]).toFixed(3)); }
+        say("  |ψ(t)|² : " + dist.join(" · "));
+        say("  観念成分 ‖P_H ψ‖² : t=0 → " + h0.toFixed(6) + " , t=" + tw + " → " + ht.toFixed(6) + (Math.abs(h0 - ht) < 1e-8 ? "   (観念は動かない ✓)" : "   !! 変化"));
+      }
+      else if (cmd === "state"){
+        say("複体 " + cx.name + " : 頂点 " + cx.vnames.join(" "));
+        for (var d = 1; d <= cxDim(cx); d++) say("  " + d + "-単体: " + cxSimplices(cx, d).map(function(s){ return cxName(cx, s); }).join(" "));
+        say("  " + fmtB(betti()) + "  χ = " + cxEuler(cx).byCount);
+      }
+      else if (cmd === "let"){
+        var eqi = raw.indexOf("=");
+        if (eqi < 0) throw new Error("let 名 = 式");
+        var name = raw.slice(3, eqi).trim().split(/\s+/).pop();
+        vars[name] = evalArith(raw.slice(eqi + 1), vars);
+        say(name + " = " + vars[name]);
+      }
+      else if (cmd === "print"){ say(String(evalArith(args.join(" "), vars))); }
+      else throw new Error("未知の命令: " + toks[0]);
+    } catch (e){ say("!! " + (ln + 1) + " 行目: " + e.message); }
+  }
+  return out.join("\n");
+}
+
+/* ════ 7. 生成AIカーネル ═════════════════════════════════════════════ */
+function aiTokenize(s){
+  return String(s).match(/[一-龠々]+|[ァ-ヴー]+|[ぁ-ん]+|[A-Za-z0-9._]+|[^\s]/g) || [];
+}
+function aiIntent(s){
+  var t = String(s);
+  if (/分裂|切っ|切断|離れ|ばらば/.test(t))                 return "split";
+  if (/理解|埋め|解いて|統合|面を/.test(t))                  return "fill";
+  if (/歩|流れ|動か|時間|伝播|動かない|保存/.test(t))         return "walk";
+  if (/閉じ|取り出|回路|観測|重ね合わせ|フィルタ|問い/.test(t)) return "filter";
+  if (/中枢|脳|思考|観念|ベッチ|オイラー/.test(t))            return "center";
+  return "basic";
+}
+function aiCompose(text){
+  var intent = aiIntent(text), toks = aiTokenize(text);
+  var design = {
+    basic:  { q:6,  why:"最小の複体 — 三角形ひとつ。問いがあることを β₁ で示す" },
+    center: { q:13, why:"思考中枢の模型を組み、ベッチ数とオイラー標数で形を読む" },
+    filter: { q:13, why:"連想の重ね合わせに ∂̂ を通し、面レジスタの観測 0 で閉じた思考だけを残す" },
+    fill:   { q:6,  why:"解けていない問いに理解 (面) を張り、β₁ が減るのを確かめる" },
+    walk:   { q:0,  why:"ホッジ・ラプラシアンで歩かせ、観念成分が時間で動かないことを示す" },
+    split:  { q:13, why:"連想を切って中枢を分裂させ、β₀ が増えるのを見る" }
+  }[intent];
+  var code;
+  if (intent === "basic"){
+    code = ["# 最小の思考中枢 — 三つの連想が環をなす", "preset triangle", "chains", "betti", "euler", "think a-b b-c a-c", "circuit 1"].join("\n");
+  } else if (intent === "center"){
+    code = ["# 思考中枢を組み、形を不変量で読む", "preset center", "state", "betti", "euler",
+            "think 感覚-意味 意味-判断 判断-発話 発話-行動 行動-感覚", "think 意味-記憶 記憶-判断 意味-判断", "harmonic 1"].join("\n");
+  } else if (intent === "filter"){
+    code = ["# すべての思考を重ね合わせ、閉じた思考だけを回路で取り出す", "preset center", "betti", "circuit 1", "filter 1 seed 11"].join("\n");
+  } else if (intent === "fill"){
+    code = ["# 問いを理解に変える — 面を張ると β₁ が減る", "preset triangle", "betti", "think a-b b-c a-c", "fill a b c", "think a-b b-c a-c", "betti", "euler"].join("\n");
+  } else if (intent === "walk"){
+    code = ["# 思考の流れの中で観念は動かない", "preset center", "harmonic 1", "walk 1 from 感覚-意味 time 1.5", "walk 1 from 感覚-意味 time 6.0", "walk 1 from 意味-記憶 time 3.0"].join("\n");
+  } else {
+    code = ["# 連想を切ると中枢は分裂する", "preset center", "betti", "cut 判断 発話", "betti", "cut 意味 判断", "betti", "state"].join("\n");
+  }
+  var run = toposInterpret(code, { seed: 424242 });
+  var stages = [
+    { n:"① トークン化",   d: toks.slice(0, 14).join(" · ") + (toks.length > 14 ? " …" : "") + "  (" + toks.length + " トークン)" },
+    { n:"② 意図解析",     d: "意図 = " + intent + " — " + design.why },
+    { n:"③ 位相の設計",   d: "単体 = 量子ビット / ∂ = CNOT 回路 / 観念 = ker ∂ / im ∂" + (design.q ? " / 回路 " + design.q + " 量子ビット" : " / 単一励起の量子歩行") },
+    { n:"④ 生成",         d: code.split("\n").length + " 行の 位相 Bada プログラムを生成" },
+    { n:"⑤ 検証",         d: (run.indexOf("!!") < 0 ? "実行して誤りなし ✓" : "実行時の注記あり") }
+  ];
+  return { intent:intent, stages:stages, code:code, run:run, ok: run.indexOf("!! ") < 0 };
+}
+
+/* ════ 8. UI ═════════════════════════════════════════════════════════ */
+var SAMPLES = {
+  center: ["# 思考中枢 — 頂点は要素、辺は連想、面は理解", "preset center", "state", "betti", "euler",
+           "think 感覚-意味 意味-判断 判断-発話 発話-行動 行動-感覚", "think 意味-記憶 記憶-判断 意味-判断", "harmonic 1"].join("\n"),
+  filter: ["# 境界回路: すべての連想の重ね合わせ → ∂̂ → 面レジスタ観測 0", "preset center", "circuit 1", "filter 1 seed 5"].join("\n"),
+  fill:   ["# 理解 — 面を張ると問いが解ける", "preset triangle", "betti", "think a-b b-c a-c", "fill a b c", "think a-b b-c a-c", "betti", "euler"].join("\n"),
+  walk:   ["# 観念は思考の流れの中で動かない", "preset center", "harmonic 1", "walk 1 from 感覚-意味 time 2.0", "walk 1 from 感覚-意味 time 7.5"].join("\n"),
+  ja:     ["複体 中枢", "頂点 感覚 意味 記憶 判断 発話 行動", "辺 感覚 意味", "辺 意味 判断", "辺 判断 発話", "辺 発話 行動", "辺 行動 感覚",
+           "面 意味 記憶 判断", "ベッチ", "オイラー", "思考 感覚-意味 意味-判断 判断-発話 発話-行動 行動-感覚", "閉路 1 種 3", "歩行 1 始点 感覚-意味 時間 2"].join("\n")
+};
+function $(id){ return document.getElementById(id); }
+var CX = null, WLK = { k:1, re0:null, im0:null, hd:null, cols:null, start:0 };
+
+function vertexPos(cx, id, W, H){
+  var name = cx.vnames[id], pre = cx.preset && PRESETS[cx.preset].pos;
+  var p = pre && pre[name];
+  if (!p){ var n = cx.vnames.length, a = -Math.PI/2 + 2*Math.PI*id/Math.max(1, n); p = [0.5 + 0.4*Math.cos(a), 0.5 + 0.4*Math.sin(a)]; }
+  return [24 + p[0]*(W - 48), 24 + p[1]*(H - 48)];
+}
+/* 複体の描画。weights: {単体名: 0..1} で強度、hi: {単体名: 1} で強調 */
+function drawComplex(cv, cx, weights, hi){
+  var W = cv.clientWidth || 600, H = cv.height, ctx = cv.getContext("2d");
+  cv.width = W;
+  ctx.clearRect(0, 0, W, H);
+  if (!cx) return;
+  var pos = cx.vnames.map(function(_, i){ return vertexPos(cx, i, W, H); });
+  cxSimplices(cx, 2).forEach(function(s){
+    var nm = cxName(cx, s), w = weights && weights[nm] != null ? weights[nm] : 0;
+    ctx.beginPath(); ctx.moveTo(pos[s[0]][0], pos[s[0]][1]); ctx.lineTo(pos[s[1]][0], pos[s[1]][1]); ctx.lineTo(pos[s[2]][0], pos[s[2]][1]); ctx.closePath();
+    ctx.fillStyle = hi && hi[nm] ? "rgba(200,164,74,.45)" : "rgba(90,70,160," + (0.25 + 0.6*w) + ")"; ctx.fill();
+  });
+  cxSimplices(cx, 1).forEach(function(s){
+    var nm = cxName(cx, s), w = weights && weights[nm] != null ? weights[nm] : -1;
+    ctx.beginPath(); ctx.moveTo(pos[s[0]][0], pos[s[0]][1]); ctx.lineTo(pos[s[1]][0], pos[s[1]][1]);
+    if (hi && hi[nm]){ ctx.strokeStyle = "#c8a44a"; ctx.lineWidth = 4; }
+    else if (w >= 0){ ctx.strokeStyle = "rgba(45,212,191," + (0.25 + 0.75*w) + ")"; ctx.lineWidth = 1.5 + 6*w; }
+    else { ctx.strokeStyle = "#6b7aa3"; ctx.lineWidth = 2; }
+    ctx.stroke();
+  });
+  ctx.font = "12px sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  cxSimplices(cx, 0).forEach(function(s){
+    var nm = cx.vnames[s[0]], w = weights && weights[nm] != null ? weights[nm] : -1, p = pos[s[0]];
+    ctx.beginPath(); ctx.arc(p[0], p[1], 6 + (w > 0 ? 8*w : 0), 0, 2*Math.PI);
+    ctx.fillStyle = hi && hi[nm] ? "#c8a44a" : (w >= 0 ? "rgba(45,212,191," + (0.3 + 0.7*w) + ")" : "#a78bfa"); ctx.fill();
+    ctx.fillStyle = "#dbe4ff"; ctx.fillText(nm, p[0], p[1] - 16);
+  });
+}
+function renderCx(){
+  drawComplex($("cxCanvas"), CX, null, null);
+  var n = cxCounts(CX), b = cxBetti(CX), e = cxEuler(CX), ok = true;
+  for (var k = 2; k <= cxDim(CX); k++) ok = ok && cxDDZero(CX, k);
+  $("cxInv").innerHTML =
+    "<b>模型</b><span>" + CX.name + "</span>" +
+    "<b>単体数 n</b><span class='mono'>(" + n.join(", ") + ")</span>" +
+    "<b>ベッチ数 β</b><span class='mono'>(" + b.join(", ") + ")</span>" +
+    "<b>β₀ 中枢の数</b><span>" + (b[0] || 0) + "</span>" +
+    "<b>β₁ 解けていない問い</b><span>" + (b[1] || 0) + "</span>" +
+    "<b>β₂ 空洞</b><span>" + (b[2] || 0) + "</span>" +
+    "<b>χ (単体数)</b><span class='mono'>" + e.byCount + "</span>" +
+    "<b>χ (ベッチ数)</b><span class='mono'>" + e.byBetti + (e.byCount === e.byBetti ? " <span class='ok'>✓ オイラー・ポアンカレ</span>" : " <span class='err'>!!</span>") + "</span>" +
+    "<b>∂∂ = 0</b><span>" + (ok ? "<span class='ok'>✓</span>" : "<span class='err'>破れ</span>") + "</span>";
+  var L = ["頂点: " + CX.vnames.join(" ")];
+  for (var d = 1; d <= cxDim(CX); d++) L.push(d + "-単体: " + cxSimplices(CX, d).map(function(s){ return cxName(CX, s); }).join(" "));
+  $("cxList").textContent = L.join("\n");
+}
+function loadPreset(key){
+  CX = presetComplex(key);
+  renderCx();
+  var e1 = cxSimplices(CX, 1)[0];
+  if (e1) $("wlkFrom").value = cxName(CX, e1);
+  $("cirOut").textContent = "(模型 " + CX.name + " に対して境界回路を組みます)";
+  wlkReset();
+}
+function cxEditVerts(){ return $("cxEdit").value.trim().split(/\s+/).filter(Boolean); }
+function drawCircuit(cv, circ, res){
+  var W = cv.clientWidth || 600, ctx = cv.getContext("2d");
+  var n = circ.qubits, rowH = Math.max(16, Math.min(26, 230 / n)), H = 30 + rowH*n;
+  cv.width = W; cv.height = H;
+  ctx.clearRect(0, 0, W, H);
+  var x0 = 110, x1 = W - 20, g = circ.gates.length, dx = (x1 - x0 - 60) / Math.max(1, g + 1);
+  ctx.font = "11px monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (var q = 0; q < n; q++){
+    var y = 20 + rowH*q;
+    ctx.strokeStyle = q < circ.nk ? "#2dd4bf" : "#a78bfa"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke();
+    ctx.fillStyle = q < circ.nk ? "#2dd4bf" : "#a78bfa";
+    ctx.fillText(circ.names[q].slice(0, 9), x0 - 6, y);
+    if (q < circ.nk){ ctx.fillStyle = "#c8a44a"; ctx.fillRect(x0 + 8, y - 7, 14, 14); ctx.fillStyle = "#0b0e14"; ctx.textAlign = "center"; ctx.fillText("H", x0 + 15, y); ctx.textAlign = "right"; }
+  }
+  circ.gates.forEach(function(gt, i){
+    var x = x0 + 40 + dx*(i + 1), yc = 20 + rowH*gt.c, yt = 20 + rowH*gt.t;
+    ctx.strokeStyle = "#dbe4ff"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(x, yc); ctx.lineTo(x, yt); ctx.stroke();
+    ctx.fillStyle = "#dbe4ff"; ctx.beginPath(); ctx.arc(x, yc, 3.5, 0, 2*Math.PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(x, yt, 6, 0, 2*Math.PI); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 6, yt); ctx.lineTo(x + 6, yt); ctx.moveTo(x, yt - 6); ctx.lineTo(x, yt + 6); ctx.stroke();
+  });
+  ctx.textAlign = "left"; ctx.fillStyle = "#8b97b8";
+  for (var a = circ.nk; a < n; a++){ ctx.fillText("⟶ 観測 0", x1 - 58, 20 + rowH*a); }
+  if (res){ ctx.fillStyle = "#c8a44a"; ctx.fillText("Pr[面=0] = " + res.prob0.toFixed(4) + "   dim Z = " + res.dimZq.toFixed(2), x0, H - 8); }
+}
+function runCircuit(){
+  var k = parseInt($("cirK").value, 10), seed = parseInt($("cirSeed").value, 10) || 1;
+  try {
+    var f = cycleFilter(CX, k, { seed: seed, samples: 6 });
+    drawCircuit($("cirCanvas"), f.circuit, f);
+    var L = ["境界回路 ∂̂_" + k + " : 量子ビット " + f.circuit.qubits + " (単体 " + f.circuit.nk + " + 面 " + f.circuit.nk1 + ") , H " + f.circuit.nk + " 個 , CNOT " + f.circuit.gates.length + " 個",
+             "Pr[面レジスタ = 0] = " + f.prob0.toFixed(6),
+             "dim Z_" + k + " (量子: n_k + log₂ Pr) = " + f.dimZq.toFixed(4) + "    dim Z_" + k + " (古典: n_k − rank ∂) = " + f.dimZc + (Math.abs(f.dimZq - f.dimZc) < 1e-6 ? "   ✓ 一致" : "   !! 不一致"),
+             "閉じた思考は " + f.nCycles + " 通り (零鎖を含む)。観測後の状態から観測した思考:"];
+    f.samples.forEach(function(s){ L.push("  " + (s.names.length ? s.names.join(" + ") : "0") + "\n      → " + s.cls.label); });
+    $("cirOut").textContent = L.join("\n");
+    var hi = {}; f.samples.forEach(function(s){ if (s.cls.kind === "idea") s.names.forEach(function(nm){ hi[nm] = 1; }); });
+    drawComplex($("cxCanvas"), CX, null, hi);
+  } catch (e){ $("cirOut").textContent = "!! " + e.message; }
+}
+function wlkReset(){
+  var k = parseInt($("wlkK").value, 10), cols = cxSimplices(CX, k);
+  if (!cols.length){ $("wlkInv").innerHTML = "<b>注記</b><span>次数 " + k + " の単体がありません</span>"; return; }
+  var start = 0, from = $("wlkFrom").value.trim();
+  try { if (from){ var fid = cxParse(CX, from); for (var i = 0; i < cols.length; i++){ if (cxKey(cols[i]) === cxKey(fid)) start = i; } } } catch (e){}
+  var re0 = cols.map(function(){ return 0; }), im0 = cols.map(function(){ return 0; });
+  re0[start] = 1;
+  WLK = { k:k, cols:cols, re0:re0, im0:im0, hd:hodgeDecompose(CX, k, re0), start:start };
+  WLK.h0 = harmonicNorm(WLK.hd.eig, re0, im0);
+  updateWalk();
+}
+function updateWalk(){
+  if (!WLK.hd) return;
+  var t = parseFloat($("wlkT").value); $("wlkTv").textContent = t.toFixed(2);
+  var p = walkEvolve(WLK.hd.eig, WLK.re0, WLK.im0, t), w = {}, i;
+  for (i = 0; i < WLK.cols.length; i++) w[cxName(CX, WLK.cols[i])] = p.re[i]*p.re[i] + p.im[i]*p.im[i];
+  drawComplex($("wlkCanvas"), CX, w, null);
+  /* 右: 観念成分 (一定) と非観念成分の時間変化 */
+  var cv = $("wlkPlot"), W = cv.clientWidth || 400, H = cv.height, ctx = cv.getContext("2d");
+  cv.width = W; ctx.clearRect(0, 0, W, H);
+  var T = 12, N = 160;
+  ctx.strokeStyle = "#26304a"; ctx.beginPath(); ctx.moveTo(30, H - 24); ctx.lineTo(W - 10, H - 24); ctx.moveTo(30, 10); ctx.lineTo(30, H - 24); ctx.stroke();
+  ctx.font = "11px sans-serif"; ctx.fillStyle = "#8b97b8"; ctx.fillText("t", W - 16, H - 8); ctx.fillText("1", 14, 16); ctx.fillText("0", 14, H - 22);
+  function plot(fn, color){
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+    for (var s = 0; s <= N; s++){
+      var tt = T*s/N, v = fn(tt), x = 30 + (W - 40)*s/N, y = (H - 24) - (H - 34)*Math.max(0, Math.min(1, v));
+      if (s === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  plot(function(tt){ var q = walkEvolve(WLK.hd.eig, WLK.re0, WLK.im0, tt); return harmonicNorm(WLK.hd.eig, q.re, q.im); }, "#c8a44a");
+  plot(function(tt){ var q = walkEvolve(WLK.hd.eig, WLK.re0, WLK.im0, tt); return q.re[WLK.start]*q.re[WLK.start] + q.im[WLK.start]*q.im[WLK.start]; }, "#2dd4bf");
+  var xt = 30 + (W - 40)*t/T; ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(xt, 10); ctx.lineTo(xt, H - 24); ctx.stroke();
+  ctx.fillStyle = "#c8a44a"; ctx.fillText("── 観念成分 ‖P_H ψ‖² (不変)", 40, 24);
+  ctx.fillStyle = "#2dd4bf"; ctx.fillText("── 始点に留まる確率", 40, 40);
+  var ht = harmonicNorm(WLK.hd.eig, p.re, p.im), b = cxBetti(CX)[WLK.k] || 0;
+  $("wlkInv").innerHTML =
+    "<b>始点</b><span>" + cxName(CX, WLK.cols[WLK.start]) + " (単一励起)</span>" +
+    "<b>‖ψ(t)‖²</b><span class='mono'>" + vecNormSq(p.re, p.im).toFixed(6) + " (ユニタリ)</span>" +
+    "<b>dim ker Δ = β</b><span class='mono'>" + WLK.hd.dims.harmonic + " = " + b + (WLK.hd.dims.harmonic === b ? " <span class='ok'>✓ ホッジの定理</span>" : " <span class='err'>!!</span>") + "</span>" +
+    "<b>観念成分 (t=0 / t)</b><span class='mono'>" + WLK.h0.toFixed(6) + " / " + ht.toFixed(6) + (Math.abs(ht - WLK.h0) < 1e-8 ? " <span class='ok'>✓ 動かない</span>" : " <span class='err'>!!</span>") + "</span>" +
+    "<b>分解</b><span class='mono'>im ∂ " + WLK.hd.dims.exact + " ⊕ ker Δ " + WLK.hd.dims.harmonic + " ⊕ im ∂ᵀ " + WLK.hd.dims.coexact + "</span>";
+}
+function switchTab(id){
+  var btns = document.querySelectorAll("#tabs button"), secs = document.querySelectorAll("main section"), i;
+  for (i = 0; i < btns.length; i++) btns[i].className = btns[i].getAttribute("data-t") === id ? "on" : "";
+  for (i = 0; i < secs.length; i++) secs[i].className = "";
+  $("t-" + id).className = "on";
+  if (id === "cx") renderCx();
+  if (id === "wlk") updateWalk();
+}
+function boot(){
+  var btns = document.querySelectorAll("#tabs button"), i;
+  for (i = 0; i < btns.length; i++){ btns[i].addEventListener("click", function(){ switchTab(this.getAttribute("data-t")); }); }
+  CX = presetComplex("center");
+  renderCx();
+  var pb = document.querySelectorAll("[data-preset]");
+  for (i = 0; i < pb.length; i++){ pb[i].addEventListener("click", function(){ loadPreset(this.getAttribute("data-preset")); }); }
+  function edit(fn){ try { fn(); renderCx(); wlkReset(); } catch (e){ $("cxOut").textContent = "!! " + e.message; } }
+  $("cxFill").addEventListener("click", function(){ edit(function(){ var b0 = cxBetti(CX); cxAdd(CX, cxEditVerts()); var b1 = cxBetti(CX); $("cxOut").textContent = "理解を張った: β (" + b0.join(",") + ") → (" + b1.join(",") + ")"; }); });
+  $("cxEdge").addEventListener("click", function(){ edit(function(){ var v = cxEditVerts(); if (v.length !== 2) throw new Error("連想には頂点 2 個"); cxAdd(CX, v); $("cxOut").textContent = "連想 " + v.join("-") + " を加えた"; }); });
+  $("cxCut").addEventListener("click", function(){ edit(function(){ var b0 = cxBetti(CX); var r = cxRemove(CX, cxEditVerts()); var b1 = cxBetti(CX); $("cxOut").textContent = "切断: " + r.length + " 単体を除去。β (" + b0.join(",") + ") → (" + b1.join(",") + ")"; }); });
+  $("cxVert").addEventListener("click", function(){ edit(function(){ cxEditVerts().forEach(function(v){ cxVertex(CX, v); }); $("cxOut").textContent = "頂点を加えた"; }); });
+  $("cxClassify").addEventListener("click", function(){
+    try {
+      var toks = $("cxChain").value.trim().split(/\s+/).filter(Boolean);
+      var k = cxParse(CX, toks[0]).length - 1, ch = colsOfTokens(CX, k, toks), cls = cxClassify(CX, k, ch.cols);
+      $("cxOut").textContent = "c = " + fmtChain(CX, ch.B, ch.cols) + "\n∂c = " + fmtBoundary(CX, ch.B, cls.boundary) + "\n→ " + cls.label;
+      var hi = {}; ch.cols.forEach(function(j){ hi[cxName(CX, ch.B.cols[j])] = 1; });
+      drawComplex($("cxCanvas"), CX, null, hi);
+    } catch (e){ $("cxOut").textContent = "!! " + e.message; }
+  });
+  $("cirRun").addEventListener("click", runCircuit);
+  $("wlkSet").addEventListener("click", wlkReset);
+  $("wlkK").addEventListener("change", wlkReset);
+  $("wlkT").addEventListener("input", updateWalk);
+  $("badaSrc").value = SAMPLES.center;
+  var sb = document.querySelectorAll("[data-sample]");
+  for (i = 0; i < sb.length; i++){ sb[i].addEventListener("click", function(){ $("badaSrc").value = SAMPLES[this.getAttribute("data-sample")]; $("badaOut").textContent = "(実行してください)"; }); }
+  $("badaRun").addEventListener("click", function(){ $("badaOut").textContent = toposInterpret($("badaSrc").value, { seed: (Date.now() % 100000) + 1 }); });
+  $("badaClear").addEventListener("click", function(){ $("badaSrc").value = ""; $("badaOut").textContent = ""; });
+  function compose(text){
+    var r = aiCompose(text), L = [];
+    r.stages.forEach(function(s){ L.push(s.n + "  " + s.d); });
+    L.push(""); L.push("── 生成された 位相 Bada プログラム ──"); L.push(r.code);
+    L.push(""); L.push("── 検証実行 ──"); L.push(r.run);
+    $("aiOut").textContent = L.join("\n");
+    $("aiOut").setAttribute("data-code", r.code);
+  }
+  $("aiGo").addEventListener("click", function(){ compose($("aiIn").value); });
+  var ab = document.querySelectorAll("[data-ai]");
+  for (i = 0; i < ab.length; i++){ ab[i].addEventListener("click", function(){ $("aiIn").value = this.getAttribute("data-ai"); compose($("aiIn").value); }); }
+  $("aiSend").addEventListener("click", function(){
+    var code = $("aiOut").getAttribute("data-code");
+    if (!code){ compose($("aiIn").value); code = $("aiOut").getAttribute("data-code"); }
+    $("badaSrc").value = code;
+    switchTab("bada");
+    $("badaOut").textContent = toposInterpret(code, { seed: (Date.now() % 100000) + 1 });
+  });
+  window.addEventListener("resize", function(){
+    if ($("t-cx").className === "on") renderCx();
+    if ($("t-wlk").className === "on") updateWalk();
+  });
+  wlkReset();
+}
+if (typeof document !== "undefined" && document.getElementById) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+}
+</script>
+</body>
+</html>
