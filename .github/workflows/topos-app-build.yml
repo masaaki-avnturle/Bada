@@ -13,8 +13,8 @@ name: Bada Topos app build (Android APK + Windows EXE + Ubuntu)
 #   - Ubuntu 向け AppImage / deb
 # としてビルドします。アプリ本体は bada_topos/index.html の自己完結 HTML で、
 # これをそのまま www として各ラッパーに同梱します。
-# Actions アーティファクト、および (topos-v* タグ / release_tag 指定時)
-# GitHub Release に添付します。
+# bada_topos/ への push ごとに Actions アーティファクトとして保存し、
+# (topos-v* タグ / release_tag 指定時) GitHub Release にも添付します。
 
 on:
   workflow_dispatch:
@@ -24,6 +24,14 @@ on:
         required: false
         default: ''
   push:
+    # bada_topos/ (またはこのワークフロー) に変更が push されるたびにビルドし、
+    # APK / EXE / AppImage・deb を Actions アーティファクトとして残す。
+    # Release への添付はタグ (topos-v*) または release_tag 指定時のみ。
+    branches:
+      - '**'
+    paths:
+      - 'bada_topos/**'
+      - '.github/workflows/topos-app-build.yml'
     tags:
       - 'topos-v*'
 

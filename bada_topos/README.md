@@ -24,7 +24,7 @@
 | **Windows 10 / 11** | `BadaTopos-*-x64.exe` (NSIS インストーラ / ポータブル) |
 | **Ubuntu** | `BadaTopos-*-x86_64.AppImage` / `BadaTopos-*-amd64.deb` |
 
-ビルドは [`topos-app-build.yml`](../.github/workflows/topos-app-build.yml) が実行します (`topos-v*` タグで Release へ添付 / `workflow_dispatch` で Actions アーティファクト)。
+ビルドは [`topos-app-build.yml`](../.github/workflows/topos-app-build.yml) が実行します。`bada_topos/` に変更が push されるたびに自動でビルドされ、[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/topos-app-build.yml) の各実行ページ下部 **Artifacts** から `topos-android` (APK) / `topos-windows` (EXE) / `topos-linux` (AppImage・deb) をダウンロードできます (`topos-v*` タグまたは `workflow_dispatch` の `release_tag` で Release にも添付)。
 
 ---
 
