@@ -42,6 +42,19 @@
 | [`lambda_driver.js`](bada_gui_ide/www/lambda_driver.js) | モデルコア(GUI と CLI が共有) |
 | [`lambda_driver.bada`](bada_gui_ide/examples/lambda_driver.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
 
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+ブラウザ不要のインストール型アプリも用意しています。[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/laevatein-app-build.yml) の Artifacts(タグ不要・要ログイン・90 日)、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル | インストール |
+|:---|:---|:---|
+| **Android** (APK) | `laevatein-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
+| **Windows 10 / 11** | `LAEVATEIN-1.0.0-x64-setup.exe`(インストーラ)<br>`LAEVATEIN-1.0.0-x64-portable.exe`(ポータブル) | ダブルクリック |
+| **Ubuntu** | `LAEVATEIN-1.0.0-x86_64.AppImage` | `chmod +x` して実行 |
+| **Ubuntu** | `LAEVATEIN-1.0.0-amd64.deb` | `sudo dpkg -i` |
+
+ビルドは [`laevatein-app-build.yml`](.github/workflows/laevatein-app-build.yml)。詳細は [`bada_gui_ide/laevatein-app/`](bada_gui_ide/laevatein-app/) を参照。
+
 **三層モデル** — **(A) 暴走系[抽象]**: `P(t) = P₀e^{λt}`、初期出力・倍加時間・総エネルギーの 3 つだけで書ける装置非依存の指数関数的暴走(特定の装置の設計量は一切含みません)。**(B) 抑制層**: `Γ(s,x)` を繰り返し部分積分して得られる境界項の漸近級数を吸収層とみなし、**最適打ち切り(superasymptotics)**で止める — 残る最小項が漏れ比 `ρ ~ e^{−x}`。Λ ドライバは Dalanversian 作用素 `Λ = cos(iu) − i sin(iu) = e^u`。抑制手順の交差を Kauffman ブラケットで評価し、**非可逆ビット操作数 × Landauer 限界 `k_B T ln2`** が制御計算の発熱。**(C) 冷却層[実在]**: 青色 LED の電界発光冷却 — `V < ħω/q` で駆動すると 1 光子あたり `(η·ħω − qV)` だけ格子から熱を奪う熱ポンプになります(冷却条件 `η > qV/ħω`)。
 
 **このアプリが出す答え** — 抑制の数学は成立します(既定条件で `ρ ≈ 10⁻¹⁶`)。**破綻するのは排熱**です。深さ `x` を上げれば漏れは指数関数的に減りますが、排熱要求は `2.9×10²⁰ W` のまま動きません。実証済みの電界発光冷却(pW オーダー, Santhanam et al. 2012, *PRL* **108**, 097403)との差は **10³⁰ 規模**です。

@@ -1,0 +1,319 @@
+name: LAEVATEIN app build (Windows EXE + Ubuntu + Android APK)
+
+# laevatein-app/ から「Λ ドライバ無力化シミュレータ (LÆVATEIN)」を
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+#   - Android 向け APK
+# としてビルドします。本体 (www/index.html) は
+# tools/build-lambda-driver.js が生成する自己完結 HTML です。
+#
+# ダウンロード方法:
+#   1) Actions から — 関連ブランチ / main への push で自動実行され、実行ページ
+#      下部の Artifacts から取得できます (要ログイン・保存期間 90 日)。
+#   2) Releases から — laevatein-app-v* タグの push、または workflow_dispatch の
+#      release_tag 入力で Release に添付されます (期限なし)。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release に添付するタグ名 (例: laevatein-app-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - main
+      - '**laevatein**'
+      - '**lambda**'
+      - '**atomic-critical**'
+    tags:
+      - 'laevatein-app-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: laevatein-app-${{ github.ref }}-${{ github.event.inputs.release_tag || 'ci' }}
+  cancel-in-progress: true
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: モデルコアのセルフテスト (実在の物理量と照合)
+        working-directory: bada_gui_ide
+        run: node cli/lambda-driver-cli.js selftest
+      - name: www をビルド + 生成物を確認
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node tools/build-lambda-driver.js
+          test -f laevatein-app/www/index.html
+          test -f dist/lambda-driver.html
+          grep -q "LambdaDriver" laevatein-app/www/index.html
+      - name: Bada リファレンス実装のスモークテスト
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node cli/bada-cli.js run examples/lambda_driver.bada | tee /tmp/ld.out
+          grep -q "Γ 大域的部分積分多様体" /tmp/ld.out
+          grep -q "収支は閉じない" /tmp/ld.out
+          BADA_OPS=$(grep 'ops(raw)' /tmp/ld.out | grep -oE '[0-9]+$')
+          JS_OPS=$(node -e "console.log(require('./www/lambda_driver.js').simulate({crossings:8}).jones.ops)")
+          echo "Bada=$BADA_OPS  JS=$JS_OPS"
+          test -n "$BADA_OPS" && test "$BADA_OPS" = "$JS_OPS" \
+            || { echo "操作数が一致しません"; exit 1; }
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate www
+        working-directory: bada_gui_ide
+        run: node tools/build-lambda-driver.js
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_gui_ide/laevatein-app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: 生成物を確認 (インストーラ + ポータブルの 2 本)
+        working-directory: bada_gui_ide/laevatein-app/electron
+        shell: bash
+        run: |
+          set -e
+          ls -la dist
+          ls dist/*-x64-setup.exe
+          ls dist/*-x64-portable.exe
+          n=$(ls dist/*.exe | wc -l)
+          test "$n" -eq 2 || { echo "EXE が $n 本しかありません (2 本必要)"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laevatein-windows-exe
+          retention-days: 90
+          if-no-files-found: error
+          path: bada_gui_ide/laevatein-app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate www
+        working-directory: bada_gui_ide
+        run: node tools/build-lambda-driver.js
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_gui_ide/laevatein-app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: 生成物を確認 (AppImage + deb)
+        working-directory: bada_gui_ide/laevatein-app/electron
+        run: |
+          set -e
+          ls -la dist
+          ls dist/*.AppImage
+          ls dist/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laevatein-ubuntu-appimage-deb
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            bada_gui_ide/laevatein-app/electron/dist/*.AppImage
+            bada_gui_ide/laevatein-app/electron/dist/*.deb
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Generate www
+        working-directory: bada_gui_ide
+        run: node tools/build-lambda-driver.js
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_gui_ide/laevatein-app"
+          cordova create cordova-build io.github.masaaki_avnturle.laevatein LAEVATEIN
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          set -e
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/laevatein-debug.apk
+          ls -la out
+          # APK は zip。中に本体とモデルコアが入っていることを確認する。
+          unzip -l out/laevatein-debug.apk | grep -q 'assets/www/index.html'
+          unzip -p out/laevatein-debug.apk assets/www/index.html | grep -q 'LambdaDriver'
+          echo "APK に本体が含まれていることを確認しました"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laevatein-android-apk
+          retention-days: 90
+          if-no-files-found: error
+          path: out/*.apk
+
+  bundle:
+    runs-on: ubuntu-latest
+    needs: [windows-exe, linux-app, android-apk]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 単一 HTML も同梱するため生成
+        working-directory: bada_gui_ide
+        run: node tools/build-lambda-driver.js
+      - name: 各プラットフォームの成果物を回収
+        uses: actions/download-artifact@v4
+        with:
+          path: incoming
+          pattern: laevatein-*
+          merge-multiple: true
+      - name: まとめる
+        run: |
+          set -e
+          mkdir -p bundle
+          find incoming -type f \( -name '*.apk' -o -name '*.exe' -o -name '*.AppImage' -o -name '*.deb' \) \
+            -exec cp {} bundle/ \;
+          cp bada_gui_ide/dist/lambda-driver.html bundle/
+          cp bada_gui_ide/dist/LAEVATEIN-README.txt bundle/
+          cp bada_gui_ide/cli/lambda-driver-cli.js bundle/
+          cp bada_gui_ide/www/lambda_driver.js bundle/
+          cp bada_gui_ide/examples/lambda_driver.bada bundle/
+          ls -la bundle
+      - uses: actions/upload-artifact@v4
+        with:
+          name: laevatein-all-platforms
+          retention-days: 90
+          if-no-files-found: warn
+          path: bundle/*
+      - name: 実行ページにダウンロード手順を書き出す
+        run: |
+          {
+            echo "## LÆVATEIN — Λ ドライバ無力化シミュレータ"
+            echo ""
+            echo "実行ページ下部の **Artifacts** から zip でダウンロードできます"
+            echo "(要ログイン・保存期間 90 日)。"
+            echo ""
+            echo "| Artifact | 中身 |"
+            echo "|---|---|"
+            echo "| \`laevatein-android-apk\` | \`laevatein-debug.apk\` |"
+            echo "| \`laevatein-windows-exe\` | \`LAEVATEIN-*-x64-setup.exe\` / \`LAEVATEIN-*-x64-portable.exe\` |"
+            echo "| \`laevatein-ubuntu-appimage-deb\` | \`LAEVATEIN-*-x86_64.AppImage\` / \`LAEVATEIN-*-amd64.deb\` |"
+            echo "| \`laevatein-all-platforms\` | 上記すべて + 単一 HTML + CLI + Bada 実装 |"
+            echo ""
+            echo "| ジョブ | 結果 |"
+            echo "|---|---|"
+            echo "| Windows EXE | ${{ needs.windows-exe.result }} |"
+            echo "| Ubuntu AppImage / deb | ${{ needs.linux-app.result }} |"
+            echo "| Android APK | ${{ needs.android-apk.result }} |"
+            echo ""
+            echo '```'
+            ls -la bundle | sed 's/^/  /'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Release へ添付
+        if: (startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != '') && needs.windows-exe.result == 'success' && needs.linux-app.result == 'success' && needs.android-apk.result == 'success'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: LÆVATEIN ${{ github.event.inputs.release_tag || github.ref_name }}
+          body: |
+            **LÆVATEIN — Λ ドライバ無力化シミュレータ**
+
+            指数関数的に暴走する系を抑制したとき、吸収したエネルギーを
+            どれだけの速さで捨てられるかを計算する熱収支シミュレータです。
+
+            ### インストールなしで使う
+
+            | ファイル | 使い方 |
+            |---|---|
+            | `lambda-driver.html` | ダウンロードして開くだけ (依存なし・オフライン可) |
+
+            ### ネイティブ アプリ
+
+            | プラットフォーム | ファイル | インストール |
+            |---|---|---|
+            | Android | `laevatein-debug.apk` | 「提供元不明のアプリ」を許可してタップ |
+            | Windows 10 / 11 | `LAEVATEIN-*-x64-setup.exe` | インストーラ |
+            | Windows 10 / 11 | `LAEVATEIN-*-x64-portable.exe` | インストール不要・ダブルクリック |
+            | Ubuntu | `LAEVATEIN-*-x86_64.AppImage` | `chmod +x` して実行 |
+            | Ubuntu | `LAEVATEIN-*-amd64.deb` | `sudo dpkg -i` |
+
+            ### 三層モデル
+
+            **(A) 暴走系 [抽象]** — `P(t) = P₀e^{λt}`。初期出力・倍加時間・総エネルギーの
+            3 つだけで書ける装置非依存の指数関数的暴走で、特定の装置の設計量は含みません。
+
+            **(B) 抑制層** — `Γ(s,x)` を繰り返し部分積分して得られる境界項の漸近級数を
+            吸収層とみなし、最適打ち切り (superasymptotics) で止めます。残る最小項が
+            抑制を抜ける漏れ比 `ρ ~ e^{−x}`。Λ ドライバは Dalanversian 作用素
+            `Λ = cos(iu) − i sin(iu) = e^u`。抑制手順の交差を Kauffman ブラケットで
+            評価し、その非可逆ビット操作数に Landauer 限界 `k_B T ln2` を掛けたものが
+            制御計算の発熱になります。
+
+            **(C) 冷却層 [実在の物理]** — 青色 LED の電界発光冷却。`V < ħω/q` で駆動すると
+            1 光子あたり `(η·ħω − qV)` だけ格子から熱を奪う熱ポンプになります
+            (冷却条件 `η > qV/ħω`)。
+
+            ### このアプリが出す答え
+
+            抑制の数学は成立します (既定条件で `ρ ≈ 10⁻¹⁶`)。**破綻するのは排熱**です。
+            部分積分の深さを上げれば漏れは指数関数的に減りますが、排熱要求は
+            `2.9×10²⁰ W` のまま動きません。実証済みの電界発光冷却
+            (pW オーダー, Santhanam, Gray & Ram, *PRL* **108**, 097403 (2012)) との差は
+            **10³⁰ 規模**です。
+
+            > Λ ドライバ・レーバテイン・アルは『フルメタル・パニック!』(賀東招二) の
+            > 架空の装置とキャラクタです。作中の封じ込めの筋立てを手順の骨格として
+            > 借りていますが、**この構成は現実の装置にはなりません**。主眼は
+            > 「うまくいく」ことではなく、要求排熱と実在の熱力学の間に何桁の隔たりが
+            > あるかを数えることにあります。
+          files: bundle/*
+      - name: いずれかのビルドが失敗していたら落とす
+        if: needs.windows-exe.result != 'success' || needs.linux-app.result != 'success' || needs.android-apk.result != 'success'
+        run: |
+          echo "windows-exe = ${{ needs.windows-exe.result }}"
+          echo "linux-app   = ${{ needs.linux-app.result }}"
+          echo "android-apk = ${{ needs.android-apk.result }}"
+          exit 1

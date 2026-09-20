@@ -392,6 +392,22 @@ Release への添付は [`atom-critical-dist.yml`](../.github/workflows/atom-cri
 | [`examples/lambda_driver.bada`](examples/lambda_driver.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
 | [`tools/build-lambda-driver.js`](tools/build-lambda-driver.js) | 単一 HTML のビルダ (実在物理とのセルフチェック付き) |
 
+### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+インストール型のアプリとしても配布します。
+[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/laevatein-app-build.yml)
+の Artifacts (タグ不要・要ログイン・90 日)、または
+[Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `laevatein-debug.apk` |
+| **Windows 10 / 11** | `LAEVATEIN-1.0.0-x64-setup.exe` (インストーラ) / `LAEVATEIN-1.0.0-x64-portable.exe` (ポータブル) |
+| **Ubuntu** | `LAEVATEIN-1.0.0-x86_64.AppImage` / `LAEVATEIN-1.0.0-amd64.deb` |
+
+パッケージ定義は [`laevatein-app/`](laevatein-app/) (Electron + Cordova)、ビルドは
+[`laevatein-app-build.yml`](../.github/workflows/laevatein-app-build.yml) が実行します。
+
 ### 三層モデル
 
 **(A) 暴走系 — 抽象**
@@ -509,6 +525,7 @@ bada_gui_ide/
   dist/       配布用の単一 HTML (zone-browser.html / bada-zone.html /
               atom-critical.html / lambda-driver.html)
   acpi-app/   ACPI のネイティブ アプリ (Windows EXE / Ubuntu AppImage・deb / Android APK)
+  laevatein-app/    LÆVATEIN のネイティブ アプリ
   zonebrowser-app/  ZoneBrowser のネイティブ アプリ
 ```
 
