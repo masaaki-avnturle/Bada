@@ -1,0 +1,168 @@
+name: Konnyaku Collator app build (Android APK + Windows EXE + Ubuntu)
+
+# omega_konnyaku_dialog/ の「こんにゃく照合器」— 手帳の見開き (左ページの
+# 方程式と絵 / 右ページの箱・段落・三本線 ≡) を、箱ごとに任意の数値を
+# 入れて「絵の形のエントロピー」と「数値のエントロピー」を照合し、
+# こんにゃく弾力性・優しさ・カインの門を判定して、ハッシュ連鎖の
+# アカシックレコードに綴じるダイアログボックス・アプリを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は omega_konnyaku_dialog/index.html の
+# 自己完結 HTML で、これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (konnyaku-v* タグ / release_tag
+# 指定時) GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: konnyaku-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'konnyaku-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check app HTML (inline JS syntax + core markers + dialog wiring)
+        run: node omega_konnyaku_dialog/tools/check-html.mjs
+      - name: Core self-test (entropy / collation / equivalence / elasticity / akashic chain)
+        run: node omega_konnyaku_dialog/tools/selftest.mjs
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p omega_konnyaku_dialog/app/www
+          cp omega_konnyaku_dialog/index.html omega_konnyaku_dialog/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="omega_konnyaku_dialog/app"
+          cordova create cordova-build io.github.masaaki_avnturle.konnyaku KonnyakuCollator
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/konnyaku-collator-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: konnyaku-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p omega_konnyaku_dialog/app/www
+          cp omega_konnyaku_dialog/index.html omega_konnyaku_dialog/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: omega_konnyaku_dialog/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: konnyaku-windows
+          path: omega_konnyaku_dialog/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: omega_konnyaku_dialog/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p omega_konnyaku_dialog/app/www
+          cp omega_konnyaku_dialog/index.html omega_konnyaku_dialog/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: omega_konnyaku_dialog/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: konnyaku-linux
+          path: |
+            omega_konnyaku_dialog/app/electron/dist/*.AppImage
+            omega_konnyaku_dialog/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            omega_konnyaku_dialog/app/electron/dist/*.AppImage
+            omega_konnyaku_dialog/app/electron/dist/*.deb

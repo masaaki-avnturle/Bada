@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>こんにゃく照合器 — 方程式の形 × 数値エントロピー</title>
+<meta name="description" content="手帳ノートの方程式と絵を、段落＝箱ごとの数値入力ダイアログに作り換え、形のエントロピーと数値のエントロピーを照合して同値類(≡)・弾力性・優しさを判定し、アカシックレコード(ハッシュ連鎖台帳)に記録する単一ファイル・アプリ。">
+<style>
+:root{
+  --bg:#0b0f14; --panel:#121924; --panel2:#0f1520; --line:#22304a;
+  --ink:#e7eef7; --dim:#93a4bd; --accent:#5ad1e6; --accent2:#b58cf0;
+  --ok:#57d99a; --warn:#f0c674; --bad:#f07a7a;
+  --paper:#f3f1e7; --paperline:#c9d6e8; --pen:#2f4fd8; --pencil:#4a4a52;
+  --radius:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:radial-gradient(1200px 700px at 15% -10%,#16233a 0%,var(--bg) 60%) fixed;
+  color:var(--ink);
+  font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",system-ui,-apple-system,"Segoe UI",sans-serif;
+  line-height:1.6; -webkit-text-size-adjust:100%;
+}
+.wrap{max-width:1060px;margin:0 auto;padding:16px 16px 72px}
+header.app{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;justify-content:space-between;
+  padding:18px 0 14px;border-bottom:1px solid var(--line);margin-bottom:18px}
+h1{font-size:20px;margin:0;letter-spacing:.02em}
+h1 small{display:block;font-size:12px;font-weight:400;color:var(--dim);letter-spacing:.06em;margin-top:4px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px}
+button{
+  font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+  border-radius:10px;padding:9px 14px;cursor:pointer;min-height:40px;
+}
+button:hover{border-color:var(--accent);}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.primary{background:linear-gradient(180deg,#1d4f63,#17394a);border-color:#2b7c93}
+button.ghost{background:transparent}
+button.danger{border-color:#5b2b2b;background:#241417}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+
+/* ---- 箱の絵（ノート右ページの矩形）＝ 段落カード ---- */
+.box{
+  background:
+    repeating-linear-gradient(180deg,transparent 0 27px,rgba(201,214,232,.35) 27px 28px),
+    linear-gradient(180deg,#fbfaf3,var(--paper));
+  color:#1b2430;border:1px solid #aab6c8;border-radius:var(--radius);
+  padding:14px;position:relative;box-shadow:0 8px 24px rgba(0,0,0,.35);
+  display:flex;flex-direction:column;gap:10px;
+}
+.box .tag{position:absolute;top:10px;right:12px;font-size:11px;letter-spacing:.14em;color:#7d8798}
+.box h2{font-size:15px;margin:0;color:#16202c}
+.box .eq{
+  font-family:"Cambria Math","Latin Modern Math",Georgia,"Times New Roman",serif;
+  font-size:15px;color:var(--pen);background:rgba(47,79,216,.06);
+  border-left:3px solid var(--pen);padding:8px 10px;border-radius:0 8px 8px 0;overflow-x:auto;white-space:nowrap
+}
+.box canvas{width:100%;height:132px;display:block;background:transparent}
+.box .state{font-size:12.5px;color:#41506a;min-height:38px}
+.box .state b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.box .row{display:flex;gap:8px;flex-wrap:wrap}
+.box button{color:#16202c;background:#e7e3d6;border-color:#b3bccb}
+.box button.primary{background:linear-gradient(180deg,#dfe9ff,#cfdcfb);border-color:#7d97e0;color:#17233c}
+.chip{display:inline-block;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
+.chip.ok{color:#177a4c}.chip.warn{color:#8a6100}.chip.bad{color:#a22}
+.equiv{font-family:ui-monospace,monospace}
+
+/* ---- ダイアログボックス ---- */
+dialog{
+  border:1px solid var(--line);border-radius:var(--radius);padding:0;color:var(--ink);
+  background:linear-gradient(180deg,var(--panel),var(--panel2));
+  width:min(560px,calc(100vw - 24px));max-height:calc(100dvh - 32px);box-shadow:0 24px 70px rgba(0,0,0,.6)
+}
+dialog.wide{width:min(860px,calc(100vw - 24px))}
+dialog::backdrop{background:rgba(4,7,12,.72);backdrop-filter:blur(2px)}
+dialog .dlg-head{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:13px 16px;border-bottom:1px solid var(--line);background:#0e1622;border-radius:var(--radius) var(--radius) 0 0}
+dialog .dlg-head h3{margin:0;font-size:15px}
+dialog .dlg-body{padding:16px;overflow:auto;max-height:calc(100dvh - 170px)}
+dialog .dlg-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px;border-top:1px solid var(--line);background:#0e1622;
+  border-radius:0 0 var(--radius) var(--radius);position:sticky;bottom:0}
+.field{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center;margin-bottom:10px}
+.field label{font-size:13.5px;color:var(--ink)}
+.field .hint{display:block;font-size:11.5px;color:var(--dim)}
+input[type=text],input[type=number],textarea{
+  font:inherit;background:#0a1017;color:var(--ink);border:1px solid var(--line);border-radius:9px;padding:9px 10px;width:100%;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px
+}
+input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+textarea{min-height:74px;resize:vertical}
+.err{color:var(--bad);font-size:12.5px;margin:6px 0 0}
+.note{color:var(--dim);font-size:12.5px}
+table.kv{width:100%;border-collapse:collapse;font-size:13.5px}
+table.kv th,table.kv td{border-bottom:1px solid var(--line);padding:7px 6px;text-align:left;vertical-align:top}
+table.kv th{color:var(--dim);font-weight:500;width:42%}
+table.kv td b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.meter{height:9px;border-radius:99px;background:#0a1017;border:1px solid var(--line);overflow:hidden}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.verdict{border:1px solid var(--line);border-radius:12px;padding:12px;margin-top:12px;background:#0d141e}
+.verdict.ok{border-color:#1f6b4a}
+.verdict.bad{border-color:#6b2f2f}
+.verdict h4{margin:0 0 6px;font-size:14px}
+.verdict ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--dim)}
+.cmp{width:100%;height:190px;display:block;background:#0a1017;border:1px solid var(--line);border-radius:12px}
+.ledger{width:100%;border-collapse:collapse;font-size:12.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.ledger th,.ledger td{border-bottom:1px solid var(--line);padding:6px 5px;text-align:left;white-space:nowrap}
+.ledger td.hash{color:var(--dim)}
+.scroll-x{overflow-x:auto}
+.classmap{display:grid;gap:10px}
+.classrow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#0d141e}
+.classrow h4{margin:0 0 4px;font-size:14px;font-family:ui-monospace,monospace;color:var(--accent)}
+footer.app{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+@media (max-width:420px){ .field{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="app">
+  <h1>こんにゃく照合器 <small>KONNYAKU COLLATOR — 方程式の形 ⟷ 数値のエントロピー ⟷ 同値類 ≡</small></h1>
+  <div class="toolbar">
+    <button id="btnAll" class="primary">全体照合（同値類マップ）</button>
+    <button id="btnLedger">アカシックレコード</button>
+    <button id="btnHelp" class="ghost">読み方</button>
+  </div>
+</header>
+
+<p class="note" id="lead">
+  ノート左ページの 4 本の方程式と 4 枚の絵を、右ページの「箱の絵・段落・三本線 ≡」に合わせて 4 つの箱に畳み込みました。
+  箱をひらいて任意の数値を入れると、後ろ側で <b>形のエントロピー</b> と <b>数値のエントロピー</b> を照合し、
+  こんにゃくの<b>弾力性</b>・<b>優しさ</b>・<b>カインの刻印</b>を判定して、消せない台帳（アカシックレコード）に綴じます。
+</p>
+
+<main id="boxes" class="grid" aria-label="段落の箱"></main>
+
+<footer class="app">
+  Bada / omega_konnyaku_dialog — 単一ファイル。オフラインで動作し、入力と台帳はこの端末の localStorage にのみ保存されます。
+</footer>
+</div>
+
+<!-- ============ 入力ダイアログ ============ -->
+<dialog id="dlgInput" aria-labelledby="inTitle">
+  <form method="dialog" id="formInput">
+    <div class="dlg-head">
+      <h3 id="inTitle">数値入力</h3>
+      <button type="submit" value="cancel" class="ghost" aria-label="閉じる">✕</button>
+    </div>
+    <div class="dlg-body">
+      <p class="note" id="inEq"></p>
+      <div id="inFields"></div>
+      <div class="field" style="grid-template-columns:1fr">
+        <label for="inSeq">追加の数列（任意・カンマ / 空白区切り）
+          <span class="hint">段落に流し込む任意の数値列。変数値と合わせてエントロピーを測ります。</span></label>
+        <textarea id="inSeq" inputmode="decimal" placeholder="例: 1, 1.5, 2, 3, 5, 8"></textarea>
+      </div>
+      <p class="err" id="inErr" hidden></p>
+    </div>
+    <div class="dlg-foot">
+      <button type="submit" value="cancel">キャンセル</button>
+      <button type="submit" value="ok" class="primary">照合する</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ 照合結果ダイアログ ============ -->
+<dialog id="dlgResult" class="wide" aria-labelledby="rsTitle">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h3 id="rsTitle">照合結果</h3>
+      <button type="submit" value="close" class="ghost" aria-label="閉じる">✕</button>
+    </div>
+    <div class="dlg-body">
+      <canvas class="cmp" id="cmpCanvas" width="820" height="190"></canvas>
+      <table class="kv" id="rsTable"></table>
+      <div id="rsVerdict"></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="btnReopen">入力し直す</button>
+      <button type="submit" value="close" class="primary">閉じる</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ 同値類マップ ============ -->
+<dialog id="dlgClasses" class="wide" aria-labelledby="clTitle">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h3 id="clTitle">同値類マップ — x ≡ y (mod τ)</h3>
+      <button type="submit" value="close" class="ghost" aria-label="閉じる">✕</button>
+    </div>
+    <div class="dlg-body">
+      <p class="note">残差 r = H<sub>数値</sub> − H<sub>形</sub> を刻み幅 τ = 0.25 bit で丸めた k が等しい箱同士を、三本線 ≡ で結びます（反射律・対称律・推移律を満たす同値関係）。</p>
+      <div class="classmap" id="classMap"></div>
+    </div>
+    <div class="dlg-foot"><button type="submit" value="close" class="primary">閉じる</button></div>
+  </form>
+</dialog>
+
+<!-- ============ アカシックレコード ============ -->
+<dialog id="dlgLedger" class="wide" aria-labelledby="lgTitle">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h3 id="lgTitle">アカシックレコード（追記専用・ハッシュ連鎖）</h3>
+      <button type="submit" value="close" class="ghost" aria-label="閉じる">✕</button>
+    </div>
+    <div class="dlg-body">
+      <p class="note" id="lgSummary"></p>
+      <div class="scroll-x"><table class="ledger" id="lgTable"></table></div>
+    </div>
+    <div class="dlg-foot">
+      <button type="button" id="btnVerify">連鎖を検証</button>
+      <button type="button" id="btnExport">JSONL 書き出し</button>
+      <button type="button" id="btnClear" class="danger">消去</button>
+      <button type="submit" value="close" class="primary">閉じる</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ============ 読み方（ノート対応表） ============ -->
+<dialog id="dlgHelp" class="wide" aria-labelledby="hpTitle">
+  <form method="dialog">
+    <div class="dlg-head">
+      <h3 id="hpTitle">ノートのどこが、どの操作になったか</h3>
+      <button type="submit" value="close" class="ghost" aria-label="閉じる">✕</button>
+    </div>
+    <div class="dlg-body" id="hpBody"></div>
+    <div class="dlg-foot"><button type="submit" value="close" class="primary">閉じる</button></div>
+  </form>
+</dialog>
+
+<!-- ============ 汎用メッセージ／確認ダイアログ ============ -->
+<dialog id="dlgMsg" aria-labelledby="msTitle">
+  <form method="dialog">
+    <div class="dlg-head"><h3 id="msTitle">確認</h3></div>
+    <div class="dlg-body"><p id="msBody" style="margin:0"></p></div>
+    <div class="dlg-foot">
+      <button type="submit" value="cancel" id="msCancel">キャンセル</button>
+      <button type="submit" value="ok" class="primary" id="msOk">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+/* =================================================================
+   KONNYAKU CORE BEGIN
+   ここから KONNYAKU CORE END までは DOM に触れない純粋な計算核。
+   tools/selftest.mjs がこの区間だけを抜き出して Node 上で検証します。
+   ================================================================= */
+
+/** 同値類の刻み幅 [bit]。三本線 ≡ は「τ を法として等しい」の意。 */
+const TAU = 0.25;
+/** 数値ヒストグラムのビン数。形シグネチャの成分数と一致させ、両者を同じ 0〜2 bit の物差しに載せる。 */
+const BINS = 4;
+/** 弾力性テストの摂動率（レンジ比）。こんにゃくを 5% つまんで戻りを見る。 */
+const DELTA = 0.05;
+/** カインの門のしきい値。 */
+const GATE = { match: 0.60, elasticity: 0.60, kindness: 0.50 };
+
+/** 形シグネチャの 4 軸（左ページの絵から読み取る成分）。 */
+const FORM_AXES = ['鞍 saddle', '軸 axial', '葉 lobe', '閉 closure'];
+
+/** 左ページの 4 本の方程式 ＝ 右ページの 4 つの箱（段落）。 */
+const BOXES = [
+  {
+    id: 'B1',
+    title: '第1段落 — 砂時計（カテノイド）',
+    equation: '∂ = |t| · ∫₀ᵗ √(ζ·x + a) dx',
+    source: '左ページ上段「∂ = ∫√(∂ζ(x)+a)|t|」＋ くびれた砂時計の絵',
+    figure: 'catenoid',
+    weights: [0.55, 0.28, 0.12, 0.05],
+    seqDef: '1, 2, 3, 4, 5, 6',
+    vars: [
+      { key:'zeta', label:'ζ（くびれの曲率）', def: 1 },
+      { key:'a',    label:'a（下駄・底上げ）', def: 2 },
+      { key:'t',    label:'t（時刻・高さ）',   def: 3 }
+    ],
+    evaluate: v => {
+      const z = v.zeta, a = Math.max(v.a, 0), t = v.t;
+      const inner = Math.abs(z) < 1e-12
+        ? Math.sqrt(a) * t
+        : (2 / (3 * z)) * (Math.pow(Math.max(z * t + a, 0), 1.5) - Math.pow(a, 1.5));
+      return Math.abs(t) * inner;
+    }
+  },
+  {
+    id: 'B2',
+    title: '第2段落 — 球と測地線',
+    equation: '∂ζ ⁄ ∂√( ∬ ∂n ∂t_a )  =  ζ ⁄ √|n · t_a|',
+    source: '左ページ中段「∂ζ/∂√(∫∂n·∂t_a)」＋ 球に測地線が巻く絵',
+    figure: 'sphere',
+    weights: [0.08, 0.22, 0.30, 0.40],
+    seqDef: '1, 2, 3, 4, 5, 6',
+    vars: [
+      { key:'zeta', label:'ζ（面の張り）',        def: 4 },
+      { key:'n',    label:'n（法線方向の刻み）',  def: 2 },
+      { key:'ta',   label:'t_a（固有時）',        def: 8 }
+    ],
+    evaluate: v => {
+      const d = Math.sqrt(Math.abs(v.n * v.ta));
+      return d < 1e-12 ? 0 : v.zeta / d;
+    }
+  },
+  {
+    id: 'B3',
+    title: '第3段落 — レンズ（二楕円の交わり）',
+    equation: '∮₀^θ (6 + x² − 9x) du,  x = r·cos u',
+    source: '左ページ右「∮(6+x²−9(x))」＋ 二つの楕円が重なるレンズの絵。θ=2π で閉じて 12π + π r² に戻る。',
+    figure: 'lens',
+    weights: [0.18, 0.30, 0.42, 0.10],
+    seqDef: '1, 2, 3, 4, 5, 6',
+    vars: [
+      { key:'r',  label:'r（周回半径）',            def: 2 },
+      { key:'th', label:'θ（周回角・ラジアン、2π で一周）', def: 6.2832 }
+    ],
+    evaluate: v => {
+      const t = v.th, r = v.r;
+      // ∫₀^θ (6 + r²cos²u − 9r cos u) du。θ=2π でレンズが閉じ 12π + πr² に戻る。
+      return 6 * t + r * r * (t / 2 + Math.sin(2 * t) / 4) - 9 * r * Math.sin(t);
+    }
+  },
+  {
+    id: 'B4',
+    title: '第4段落 — 二葉（∞）とガウス周回',
+    equation: 'd⁄dt ∮ σ·e^(−t²) dx  =  −2 t σ √π · e^(−t²)',
+    source: '左ページ下段「d/dt ∮ e^(−x²)」＋ 二つの輪が捻れて重なる ∞ の絵',
+    figure: 'infinity',
+    weights: [0.30, 0.32, 0.30, 0.08],
+    seqDef: '1, 2, 3, 4, 5, 6',
+    vars: [
+      { key:'t',     label:'t（時刻）',        def: 1 },
+      { key:'sigma', label:'σ（拡がり）',      def: 2 },
+      { key:'k',     label:'k（巻き数・整数）', def: 2 }
+    ],
+    evaluate: v => -2 * v.t * v.sigma * Math.sqrt(Math.PI) * Math.exp(-v.t * v.t) * (v.k || 1)
+  }
+];
+
+const ZERO_HASH = '0'.repeat(64);
+
+/** シャノンエントロピー [bit]。 */
+function shannon(ps) {
+  let h = 0;
+  for (const p of ps) if (p > 0) h -= p * Math.log2(p);
+  return h;
+}
+
+/** 形シグネチャ（重み）のエントロピー。0 bit＝一軸に尖った形、2 bit＝四軸に均された形。 */
+function formEntropy(weights) {
+  const s = weights.reduce((a, b) => a + b, 0);
+  return s <= 0 ? 0 : shannon(weights.map(w => w / s));
+}
+
+/**
+ * 数値列を min–max で正規化し、BINS 個のビンに線形補間で配る（柔らかいヒストグラム）。
+ * 階段状に数えると微小な摂動に反応せず弾力性が測れないため、境界をなめらかに跨がせる。
+ */
+function softHistogram(values, bins = BINS) {
+  const p = new Array(bins).fill(0);
+  const v = values.filter(Number.isFinite);
+  if (v.length < 2) return p;
+  const min = Math.min(...v), max = Math.max(...v);
+  if (max - min < 1e-12) return p;
+  for (const x of v) {
+    const u = ((x - min) / (max - min)) * (bins - 1);
+    const i = Math.max(0, Math.min(bins - 2, Math.floor(u)));
+    const f = u - i;
+    p[i] += 1 - f;
+    p[i + 1] += f;
+  }
+  return p.map(c => c / v.length);
+}
+
+/** 数値列のエントロピー [bit]。0＝一点に固まった列、2＝四つのビンに均された列。 */
+function numericEntropy(values, bins = BINS) {
+  return shannon(softHistogram(values, bins));
+}
+
+/** 照合率 = exp(−|ΔH|)。形と数値がぴたり重なると 1。 */
+function matchRate(hNum, hForm) { return Math.exp(-Math.abs(hNum - hForm)); }
+
+/** 残差 r を τ で丸めた同値類インデックス k（−2〜+2 にクリップ）。 */
+function equivClass(residual, tau = TAU) {
+  const k = Math.round(residual / tau);
+  return Math.max(-2, Math.min(2, k));
+}
+
+function classLabel(k) {
+  const sub = { '-2': '₋₂', '-1': '₋₁', '0': '₀', '1': '₊₁', '2': '₊₂' };
+  return 'E' + sub[String(k)];
+}
+
+/**
+ * こんにゃく弾力性。数列を ±DELTA·レンジ で互い違いにつまみ、
+ * エントロピーの戻り具合 1/(1+応答) を返す。1 に近いほど千切れず戻る。
+ */
+function elasticity(values) {
+  const v = values.filter(Number.isFinite);
+  if (v.length < 2) return 0;
+  const min = Math.min(...v), max = Math.max(...v);
+  const span = (max - min) || Math.max(Math.abs(max), 1e-9);
+  const h0 = numericEntropy(v);
+  const d = DELTA * span;
+  const up = numericEntropy(v.map((x, i) => (i % 2 ? x + d : x - d)));
+  const dn = numericEntropy(v.map((x, i) => (i % 2 ? x - d : x + d)));
+  const response = ((Math.abs(up - h0) + Math.abs(dn - h0)) / 2) / DELTA;
+  return 1 / (1 + response);
+}
+
+/** 優しさ。隣り合う数の跳ね（全変動）が小さいほど 1 に近い。 */
+function kindness(values) {
+  const v = values.filter(Number.isFinite);
+  if (v.length < 2) return 1;
+  const min = Math.min(...v), max = Math.max(...v);
+  const span = (max - min) || 1;
+  let tv = 0;
+  for (let i = 1; i < v.length; i++) tv += Math.abs(v[i] - v[i - 1]);
+  return 1 / (1 + tv / (span * (v.length - 1)));
+}
+
+/** カインの門。三条件をすべて満たせば刻印なし、欠けた分だけ理由が残る。 */
+function cainGate(match, elas, kind) {
+  const reasons = [];
+  if (match < GATE.match)      reasons.push('照合率 < ' + GATE.match.toFixed(2) + '（形と数値が噛み合っていない）');
+  if (elas  < GATE.elasticity) reasons.push('弾力性 < ' + GATE.elasticity.toFixed(2) + '（つまむと千切れる＝こんにゃくでない）');
+  if (kind  < GATE.kindness)   reasons.push('優しさ < ' + GATE.kindness.toFixed(2) + '（数列の跳ねが荒い）');
+  return { marked: reasons.length > 0, reasons };
+}
+
+function getBox(id) { return BOXES.find(b => b.id === id); }
+
+/** 箱ひとつぶんの照合。変数値＋追加数列をひとつの標本とみなす。 */
+function collate(boxId, varValues, extraSeq = []) {
+  const box = getBox(boxId);
+  if (!box) throw new Error('unknown box: ' + boxId);
+  const sample = box.vars.map(v => Number(varValues[v.key])).concat(extraSeq.map(Number));
+  const hForm = formEntropy(box.weights);
+  const hNum = numericEntropy(sample);
+  const residual = hNum - hForm;
+  const k = equivClass(residual);
+  const match = matchRate(hNum, hForm);
+  const elas = elasticity(sample);
+  const kind = kindness(sample);
+  const value = Number(box.evaluate(varValues));
+  return {
+    boxId, sample, hForm, hNum, residual, k, label: classLabel(k),
+    match, elasticity: elas, kindness: kind,
+    value: Number.isFinite(value) ? value : NaN,
+    gate: cainGate(match, elas, kind)
+  };
+}
+
+/** 同値類ごとの束ね直し。k が等しい箱同士が ≡ で結ばれる。 */
+function groupByClass(results) {
+  const map = new Map();
+  for (const r of results) {
+    if (!map.has(r.k)) map.set(r.k, []);
+    map.get(r.k).push(r);
+  }
+  return [...map.entries()].sort((a, b) => a[0] - b[0])
+    .map(([k, members]) => ({ k, label: classLabel(k), members }));
+}
+
+/** 台帳用の安定シリアライズ（キー順固定）。 */
+function canonical(obj) {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return '[' + obj.map(canonical).join(',') + ']';
+  return '{' + Object.keys(obj).sort()
+    .map(k => JSON.stringify(k) + ':' + canonical(obj[k])).join(',') + '}';
+}
+
+async function sha256hex(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** レコードを前段のハッシュに綴じる（アカシックレコード＝後から書き換えられない）。 */
+async function sealRecord(prevHash, body) {
+  const prev = prevHash || ZERO_HASH;
+  const hash = await sha256hex(prev + canonical(body));
+  return { ...body, prev, hash };
+}
+
+/** 連鎖検証。壊れている最初の位置を返す。 */
+async function verifyChain(records) {
+  let prev = ZERO_HASH;
+  for (let i = 0; i < records.length; i++) {
+    const { prev: p, hash, ...body } = records[i];
+    const expect = await sha256hex(prev + canonical(body));
+    if (p !== prev || hash !== expect) return { ok: false, brokenAt: i };
+    prev = hash;
+  }
+  return { ok: true, brokenAt: -1 };
+}
+
+/** 文字列から数値列を取り出す（カンマ・空白・改行区切り）。 */
+function parseSeq(text) {
+  if (!text) return [];
+  return String(text).split(/[\s,、]+/).filter(s => s !== '')
+    .map(Number).filter(Number.isFinite);
+}
+
+/* ===== KONNYAKU CORE END ===== */
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { TAU, BINS, DELTA, GATE, FORM_AXES, BOXES, shannon, formEntropy,
+    softHistogram, numericEntropy, matchRate, equivClass, classLabel, elasticity, kindness, cainGate,
+    getBox, collate, groupByClass, canonical, sha256hex, sealRecord, verifyChain, parseSeq };
+}
+</script>
+
+<script>
+/* =================================================================
+   UI — ダイアログボックスの操作技術（モーダル・OK/キャンセル・検証・確認）
+   ================================================================= */
+const LS_LEDGER = 'bada.konnyaku.ledger.v1';
+const LS_INPUT  = 'bada.konnyaku.input.v1';
+
+const state = {           // boxId -> { values, seqText, result }
+  results: {},
+  inputs: JSON.parse(localStorage.getItem(LS_INPUT) || '{}'),
+  ledger: JSON.parse(localStorage.getItem(LS_LEDGER) || '[]'),
+  current: null
+};
+
+/* ---------- 絵（左ページの図）を描く ---------- */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cv.clientWidth || cv.width, h = cv.clientHeight || cv.height;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function pen(ctx, col, lw) {
+  ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+}
+function ellipse(ctx, cx, cy, rx, ry, rot, dash) {
+  ctx.save(); ctx.setLineDash(dash || []); ctx.beginPath();
+  ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), rot || 0, 0, Math.PI * 2);
+  ctx.stroke(); ctx.restore();
+}
+function drawFigure(ctx, kind, cx, cy, s, col) {
+  pen(ctx, col, 1.7);
+  if (kind === 'catenoid') {
+    ellipse(ctx, cx, cy - s * 0.92, s * 0.72, s * 0.20);
+    ellipse(ctx, cx, cy + s * 0.92, s * 0.72, s * 0.20);
+    for (const sign of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(cx + sign * s * 0.72, cy - s * 0.92);
+      ctx.bezierCurveTo(cx + sign * s * 0.20, cy - s * 0.35,
+                        cx + sign * s * 0.20, cy + s * 0.35,
+                        cx + sign * s * 0.72, cy + s * 0.92);
+      ctx.stroke();
+    }
+    pen(ctx, col, 1.0);
+    ellipse(ctx, cx, cy, s * 0.22, s * 0.07, 0, [4, 3]);
+  } else if (kind === 'sphere') {
+    ellipse(ctx, cx, cy, s * 0.85, s * 0.85);
+    ellipse(ctx, cx, cy, s * 0.85, s * 0.30, -0.35);
+    ellipse(ctx, cx, cy, s * 0.32, s * 0.85, 0.20);
+    pen(ctx, col, 1.0);
+    ellipse(ctx, cx + s * 0.18, cy - s * 0.10, s * 0.52, s * 0.22, 0.9, [4, 3]);
+  } else if (kind === 'lens') {
+    ellipse(ctx, cx - s * 0.26, cy, s * 0.62, s * 0.86, 0.55);
+    ellipse(ctx, cx + s * 0.26, cy, s * 0.62, s * 0.86, -0.55);
+    pen(ctx, col, 1.0);
+    ctx.beginPath(); ctx.moveTo(cx, cy - s * 0.80); ctx.lineTo(cx, cy + s * 0.80); ctx.stroke();
+  } else if (kind === 'infinity') {
+    ctx.beginPath();
+    for (let i = 0; i <= 240; i++) {
+      const t = (i / 240) * Math.PI * 2;
+      const d = 1 + Math.sin(t) * Math.sin(t);
+      const x = cx + (s * 0.95 * Math.cos(t)) / d;
+      const y = cy + (s * 0.95 * Math.sin(t) * Math.cos(t)) / d;
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    }
+    ctx.stroke();
+    pen(ctx, col, 1.0);
+    ellipse(ctx, cx - s * 0.47, cy, s * 0.30, s * 0.42, 0, [4, 3]);
+    ellipse(ctx, cx + s * 0.47, cy, s * 0.30, s * 0.42, 0, [4, 3]);
+  }
+}
+
+/* ---------- 箱（段落カード）の描画 ---------- */
+const boxesEl = document.getElementById('boxes');
+function renderBoxes() {
+  boxesEl.innerHTML = '';
+  for (const box of BOXES) {
+    const r = state.results[box.id];
+    const el = document.createElement('section');
+    el.className = 'box';
+    el.innerHTML = `
+      <span class="tag">${box.id}</span>
+      <h2>${box.title}</h2>
+      <canvas data-fig="${box.figure}"></canvas>
+      <div class="eq">${box.equation}</div>
+      <div class="state">${r ? stateLine(r) : '<span class="note">未入力 — 任意の数値を入れると照合が始まります。</span>'}</div>
+      <div class="row">
+        <button type="button" class="primary" data-open="${box.id}">数値を入力…</button>
+        <button type="button" data-result="${box.id}" ${r ? '' : 'disabled'}>結果を見る</button>
+      </div>`;
+    boxesEl.appendChild(el);
+    const cv = el.querySelector('canvas');
+    requestAnimationFrame(() => {
+      const { ctx, w, h } = fitCanvas(cv);
+      drawFigure(ctx, box.figure, w / 2, h / 2, Math.min(w, h) * 0.42, '#2f4fd8');
+    });
+  }
+}
+function stateLine(r) {
+  const cls = r.gate.marked ? 'bad' : 'ok';
+  return `<span class="chip ${cls}">${r.gate.marked ? 'カインの刻印' : '刻印なし'}</span>
+    <span class="chip warn equiv">≡ ${r.label}</span><br>
+    照合率 <b>${(r.match * 100).toFixed(1)}%</b> ／ H<sub>形</sub> <b>${r.hForm.toFixed(3)}</b>
+    ／ H<sub>数値</sub> <b>${r.hNum.toFixed(3)}</b> bit ／ 方程式値 <b>${fmt(r.value)}</b>`;
+}
+function fmt(x) {
+  if (!Number.isFinite(x)) return '—';
+  const a = Math.abs(x);
+  return (a !== 0 && (a < 1e-3 || a >= 1e6)) ? x.toExponential(4) : x.toFixed(4);
+}
+
+/* ---------- 入力ダイアログ ---------- */
+const dlgInput = document.getElementById('dlgInput');
+const formInput = document.getElementById('formInput');
+const inFields = document.getElementById('inFields');
+const inErr = document.getElementById('inErr');
+
+function openInput(boxId) {
+  const box = getBox(boxId);
+  state.current = boxId;
+  const saved = state.inputs[boxId] || {};
+  document.getElementById('inTitle').textContent = `${box.id}｜${box.title}`;
+  document.getElementById('inEq').innerHTML = `方程式：<b>${box.equation}</b><br><span class="note">ノート対応：${box.source}</span>`;
+  inFields.innerHTML = box.vars.map(v => `
+    <div class="field">
+      <label for="f_${v.key}">${v.label}<span class="hint">任意の実数</span></label>
+      <input type="text" inputmode="decimal" id="f_${v.key}" data-key="${v.key}" data-label="${v.label}"
+             value="${saved.values && saved.values[v.key] !== undefined ? saved.values[v.key] : v.def}">
+    </div>`).join('');
+  document.getElementById('inSeq').value = saved.seqText !== undefined ? saved.seqText : (box.seqDef || '');
+  inErr.hidden = true;
+  dlgInput.showModal();
+  setTimeout(() => inFields.querySelector('input')?.focus(), 30);
+}
+
+formInput.addEventListener('submit', ev => {
+  if (ev.submitter && ev.submitter.value === 'cancel') return;   // キャンセルはそのまま閉じる
+  const box = getBox(state.current);
+  const values = {}; const bad = [];
+  for (const inp of inFields.querySelectorAll('input')) {
+    const n = Number(inp.value.trim());
+    if (inp.value.trim() === '' || !Number.isFinite(n)) bad.push(inp.dataset.label);
+    values[inp.dataset.key] = n;
+  }
+  if (bad.length) {
+    ev.preventDefault();
+    inErr.hidden = false;
+    inErr.textContent = '数値として読めない欄があります：' + bad.join(' / ');
+    return;
+  }
+  const seqText = document.getElementById('inSeq').value;
+  const seq = parseSeq(seqText);
+  state.inputs[box.id] = { values, seqText };
+  localStorage.setItem(LS_INPUT, JSON.stringify(state.inputs));
+  const result = collate(box.id, values, seq);
+  state.results[box.id] = result;
+  renderBoxes();
+  appendLedger(box, values, seq, result).then(() => openResult(result));
+});
+
+/* ---------- 照合結果ダイアログ ---------- */
+const dlgResult = document.getElementById('dlgResult');
+function openResult(r) {
+  const box = getBox(r.boxId);
+  document.getElementById('rsTitle').textContent = `照合結果｜${box.id} ${box.title}`;
+  document.getElementById('rsTable').innerHTML = `
+    <tr><th>入力標本（変数＋数列）</th><td><b>${r.sample.map(fmt).join(', ')}</b></td></tr>
+    <tr><th>方程式値</th><td><b>${fmt(r.value)}</b></td></tr>
+    <tr><th>形のエントロピー H<sub>形</sub>（絵の重み ${box.weights.join(' / ')}）</th><td><b>${r.hForm.toFixed(4)}</b> bit</td></tr>
+    <tr><th>数値のエントロピー H<sub>数値</sub>（${BINS} ビン・線形補間）</th><td><b>${r.hNum.toFixed(4)}</b> bit</td></tr>
+    <tr><th>残差 r = H<sub>数値</sub> − H<sub>形</sub></th><td><b>${r.residual >= 0 ? '+' : ''}${r.residual.toFixed(4)}</b> bit</td></tr>
+    <tr><th>照合率 exp(−|r|)</th><td><b>${(r.match * 100).toFixed(2)}%</b><div class="meter"><i style="width:${(r.match * 100).toFixed(1)}%"></i></div></td></tr>
+    <tr><th>こんにゃく弾力性</th><td><b>${r.elasticity.toFixed(4)}</b><div class="meter"><i style="width:${(r.elasticity * 100).toFixed(1)}%"></i></div></td></tr>
+    <tr><th>優しさ</th><td><b>${r.kindness.toFixed(4)}</b><div class="meter"><i style="width:${(r.kindness * 100).toFixed(1)}%"></i></div></td></tr>
+    <tr><th>同値類（τ = ${TAU} bit）</th><td><b class="equiv">${r.boxId} ≡ ${r.label}</b>（k = ${r.k}）</td></tr>`;
+  const v = document.getElementById('rsVerdict');
+  v.className = 'verdict ' + (r.gate.marked ? 'bad' : 'ok');
+  v.innerHTML = r.gate.marked
+    ? `<h4>カインの刻印 — 記録は残るが、門は開かない</h4>
+       <p class="note">次の条件が欠けています。数値を変えて入れ直せば、同じ台帳の続きに新しい行が綴られます。</p>
+       <ul>${r.gate.reasons.map(x => `<li>${x}</li>`).join('')}</ul>`
+    : `<h4>刻印なし — 優しさの側で受理</h4>
+       <p class="note">照合率・弾力性・優しさの三条件がそろいました。この行はアカシックレコードに封じられています。</p>`;
+  dlgResult.showModal();
+  requestAnimationFrame(() => drawCompare(r));
+}
+function drawCompare(r) {
+  const cv = document.getElementById('cmpCanvas');
+  const { ctx, w, h } = fitCanvas(cv);
+  const box = getBox(r.boxId);
+  // 左：左ページの絵
+  drawFigure(ctx, box.figure, w * 0.15, (h - 26) / 2, Math.min(w * 0.12, h * 0.32), '#5ad1e6');
+  ctx.font = '12px system-ui'; ctx.fillStyle = '#93a4bd'; ctx.textAlign = 'center';
+  ctx.fillText('左ページの形', w * 0.15, h - 10);
+  // 中央：エントロピー 2 本（0〜2 bit）
+  const bx = w * 0.34, bw = w * 0.30, top = 34, bh = h - 76;
+  const bars = [
+    { label: 'H形', val: r.hForm, col: '#5ad1e6' },
+    { label: 'H数値', val: r.hNum, col: '#b58cf0' }
+  ];
+  ctx.strokeStyle = '#22304a'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = top + bh - (bh * i) / 4;
+    ctx.beginPath(); ctx.moveTo(bx - 6, y); ctx.lineTo(bx + bw + 6, y); ctx.stroke();
+    ctx.fillStyle = '#5c6d87'; ctx.textAlign = 'right'; ctx.font = '10px ui-monospace,monospace';
+    ctx.fillText((i / 2).toFixed(1), bx - 10, y + 3);
+  }
+  bars.forEach((b, i) => {
+    const bwEach = bw * 0.30, x = bx + bw * (0.16 + i * 0.42);
+    const hh = Math.max(2, (Math.min(b.val, 2) / 2) * bh);
+    ctx.fillStyle = b.col; ctx.fillRect(x, top + bh - hh, bwEach, hh);
+    ctx.fillStyle = '#e7eef7'; ctx.textAlign = 'center'; ctx.font = '11px system-ui';
+    ctx.fillText(b.label, x + bwEach / 2, h - 24);
+    ctx.font = '11px ui-monospace,monospace';
+    ctx.fillText(b.val.toFixed(3), x + bwEach / 2, top + bh - hh - 6);
+  });
+  ctx.fillStyle = '#93a4bd'; ctx.font = '12px system-ui';
+  ctx.fillText('エントロピー照合 [bit]', bx + bw / 2, h - 10);
+  // 右：三本線 ≡ と同値類
+  const rx = w * 0.84;
+  ctx.strokeStyle = r.gate.marked ? '#f0c674' : '#57d99a'; ctx.lineWidth = 3;
+  for (let i = -1; i <= 1; i++) {
+    ctx.beginPath(); ctx.moveTo(rx - 34, h / 2 - 22 + i * 13); ctx.lineTo(rx + 34, h / 2 - 22 + i * 13); ctx.stroke();
+  }
+  ctx.fillStyle = '#e7eef7'; ctx.textAlign = 'center'; ctx.font = 'bold 19px ui-monospace,monospace';
+  ctx.fillText(r.label, rx, h / 2 + 22);
+  ctx.font = '12px system-ui'; ctx.fillStyle = '#93a4bd';
+  ctx.fillText(`照合率 ${(r.match * 100).toFixed(1)}%`, rx, h / 2 + 44);
+  ctx.fillText('同値類（三本線）', rx, h - 10);
+}
+document.getElementById('btnReopen').addEventListener('click', () => {
+  const id = state.current; dlgResult.close(); setTimeout(() => openInput(id), 60);
+});
+
+/* ---------- アカシックレコード ---------- */
+async function appendLedger(box, values, seq, r) {
+  const prev = state.ledger.length ? state.ledger[state.ledger.length - 1].hash : null;
+  const body = {
+    seq: state.ledger.length + 1,
+    ts: new Date().toISOString(),
+    box: box.id,
+    values,
+    series: seq,
+    hForm: Number(r.hForm.toFixed(6)),
+    hNum: Number(r.hNum.toFixed(6)),
+    match: Number(r.match.toFixed(6)),
+    elasticity: Number(r.elasticity.toFixed(6)),
+    kindness: Number(r.kindness.toFixed(6)),
+    klass: r.label,
+    value: Number.isFinite(r.value) ? Number(r.value.toFixed(6)) : null,
+    mark: r.gate.marked ? 'cain' : 'none'
+  };
+  const rec = await sealRecord(prev, body);
+  state.ledger.push(rec);
+  localStorage.setItem(LS_LEDGER, JSON.stringify(state.ledger));
+  return rec;
+}
+const dlgLedger = document.getElementById('dlgLedger');
+function renderLedger() {
+  const t = document.getElementById('lgTable');
+  document.getElementById('lgSummary').innerHTML =
+    `全 <b>${state.ledger.length}</b> 行。各行は直前の行のハッシュを内に含むため、途中を書き換えると以降すべてが壊れます（追記専用）。`;
+  t.innerHTML = state.ledger.length
+    ? `<tr><th>#</th><th>時刻</th><th>箱</th><th>≡</th><th>照合率</th><th>弾力性</th><th>優しさ</th><th>刻印</th><th>hash</th></tr>` +
+      state.ledger.slice().reverse().map(r => `<tr>
+        <td>${r.seq}</td><td>${r.ts.replace('T', ' ').slice(0, 19)}</td><td>${r.box}</td>
+        <td>${r.klass}</td><td>${(r.match * 100).toFixed(1)}%</td>
+        <td>${r.elasticity.toFixed(3)}</td><td>${r.kindness.toFixed(3)}</td>
+        <td>${r.mark === 'cain' ? 'カイン' : '—'}</td>
+        <td class="hash">${r.hash.slice(0, 12)}…</td></tr>`).join('')
+    : '<tr><td class="hash">まだ 1 行も記されていません。</td></tr>';
+}
+document.getElementById('btnVerify').addEventListener('click', async () => {
+  const v = await verifyChain(state.ledger);
+  msg('連鎖の検証', v.ok
+    ? `全 ${state.ledger.length} 行のハッシュ連鎖は無傷です。`
+    : `${v.brokenAt + 1} 行目で連鎖が切れています（書き換えの痕跡）。`);
+});
+document.getElementById('btnExport').addEventListener('click', () => {
+  const jsonl = state.ledger.map(r => JSON.stringify(r)).join('\n');
+  const url = URL.createObjectURL(new Blob([jsonl], { type: 'application/x-ndjson' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'akashic_record.jsonl'; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+document.getElementById('btnClear').addEventListener('click', async () => {
+  if (await msg('消去の確認', 'この端末の台帳をすべて消去します。書き出していない行は戻りません。', true)) {
+    state.ledger = []; localStorage.removeItem(LS_LEDGER); renderLedger();
+  }
+});
+
+/* ---------- 同値類マップ ---------- */
+document.getElementById('btnAll').addEventListener('click', () => {
+  const rs = Object.values(state.results);
+  const map = document.getElementById('classMap');
+  map.innerHTML = rs.length
+    ? groupByClass(rs).map(g => `
+      <div class="classrow">
+        <h4>${g.label}（k = ${g.k}）</h4>
+        <div class="equiv">${g.members.map(m => m.boxId).join(' ≡ ')}</div>
+        <div class="note">${g.members.map(m =>
+          `${m.boxId}: 照合率 ${(m.match * 100).toFixed(1)}% ／ r = ${m.residual >= 0 ? '+' : ''}${m.residual.toFixed(3)} bit ／ ${m.gate.marked ? 'カインの刻印' : '刻印なし'}`
+        ).join('<br>')}</div>
+      </div>`).join('')
+    : '<p class="note">まだどの箱にも数値が入っていません。箱をひらいて数値を入れてください。</p>';
+  document.getElementById('dlgClasses').showModal();
+});
+
+/* ---------- 読み方 ---------- */
+document.getElementById('btnHelp').addEventListener('click', () => {
+  document.getElementById('hpBody').innerHTML = `
+    <table class="kv">
+      <tr><th>左ページの方程式と絵</th><td>4 つの箱（段落）。絵は形シグネチャ ${FORM_AXES.join(' / ')} の重みに写し、そのシャノンエントロピーが H<sub>形</sub>。</td></tr>
+      <tr><th>右ページの箱の絵</th><td>段落カード。タップすると入力ダイアログ（OK／キャンセル、Esc で取り消し）が開きます。</td></tr>
+      <tr><th>三本線 ≡</th><td>同値類。残差 r を τ=${TAU} bit で丸めた k が等しい箱同士が ≡ で結ばれます。</td></tr>
+      <tr><th>こんにゃく＝弾力性</th><td>入力を ±${(DELTA * 100).toFixed(0)}% つまんだときのエントロピーの戻り 1/(1+応答)。</td></tr>
+      <tr><th>優しさのカイン</th><td>照合率 ${GATE.match}／弾力性 ${GATE.elasticity}／優しさ ${GATE.kindness} の三条件。欠けると「カインの刻印」が付き、理由も残ります。</td></tr>
+      <tr><th>アカシックレコード</th><td>後ろ側の分析結果を SHA-256 の連鎖で綴じた追記専用台帳。検証・JSONL 書き出しができます。</td></tr>
+    </table>
+    <p class="note" style="margin-top:12px">※ 方程式はノートの手書きを正規化した読みです。読み替えたい場合は index.html 冒頭の BOXES 定義（equation / weights / vars / evaluate）を直せば、そのまま箱の挙動が変わります。</p>`;
+  document.getElementById('dlgHelp').showModal();
+});
+
+/* ---------- 汎用メッセージ／確認 ---------- */
+const dlgMsg = document.getElementById('dlgMsg');
+function msg(title, body, confirm = false) {
+  document.getElementById('msTitle').textContent = title;
+  document.getElementById('msBody').textContent = body;
+  document.getElementById('msCancel').hidden = !confirm;
+  dlgMsg.showModal();
+  return new Promise(res => {
+    dlgMsg.addEventListener('close', () => res(dlgMsg.returnValue === 'ok'), { once: true });
+  });
+}
+
+/* ---------- 起動 ---------- */
+function restoreResults() {
+  for (const box of BOXES) {
+    const saved = state.inputs[box.id];
+    if (!saved || !saved.values) continue;
+    try { state.results[box.id] = collate(box.id, saved.values, parseSeq(saved.seqText)); }
+    catch (e) { delete state.inputs[box.id]; }
+  }
+}
+
+boxesEl.addEventListener('click', ev => {
+  const open = ev.target.closest('[data-open]');
+  if (open) return openInput(open.dataset.open);
+  const res = ev.target.closest('[data-result]');
+  if (res && state.results[res.dataset.result]) {
+    state.current = res.dataset.result;
+    openResult(state.results[res.dataset.result]);
+  }
+});
+document.getElementById('btnLedger').addEventListener('click', () => { renderLedger(); dlgLedger.showModal(); });
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderBoxes, 150);
+});
+restoreResults();
+renderBoxes();
+</script>
+</body>
+</html>
