@@ -93,11 +93,12 @@
     border:none; font-size:14px; padding:10px 18px;
   }
   button.primary:hover{ filter:brightness(1.08); }
-  a.dl{
-    display:inline-block; font-size:12px; color:#0f1a12; font-weight:700;
-    background:linear-gradient(135deg,#3fae66,#5fd68a); border-radius:8px;
-    padding:6px 12px; text-decoration:none; text-align:center;
+  .dl{
+    display:inline-block; font:inherit; font-size:12px; color:#0f1a12; font-weight:700;
+    background:linear-gradient(135deg,#3fae66,#5fd68a); border:none; border-radius:8px;
+    padding:6px 12px; text-decoration:none; text-align:center; cursor:pointer;
   }
+  .dl:hover{ filter:brightness(1.08); }
   /* 設定 */
   .settings{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
   .field label{ display:block; font-size:12px; color:var(--tx2); margin-bottom:4px; }
@@ -153,6 +154,8 @@
       変換は<b>リアルタイム録画</b>です(曲の長さと同じ時間がかかります)。
       変換中はこのウィンドウ(タブ)を<b>前面に表示したまま</b>にしてください。
       曲名・アーティスト名・ジャケット画像は MP3 の ID3 タグから自動で読み取ります。
+      「💾 動画を保存」を押すと<b>保存ダイアログ</b>が開き、保存先を選べます
+      (Android では保存先を選択、対応していない環境ではダウンロードとして保存されます)。
     </p>
   </section>
 
@@ -212,6 +215,9 @@
 
 <footer>Bada SoundFilm — Web Audio API + Canvas + MediaRecorder / 単一 HTML・完全オフライン</footer>
 
+<!-- Android APK (Cordova) 内でのみ実体が存在し、保存ダイアログの
+     プラグインブリッジを提供します。ブラウザ/Electron では 404 になるだけで無害。 -->
+<script src="cordova.js"></script>
 <script>
 "use strict";
 /* ================================================================
@@ -675,6 +681,67 @@ function boot(){
     $("estNote").textContent = t;
   }
 
+  /* ── 保存 ──
+   * 環境ごとに確実な経路で保存する:
+   *  1) Android APK (Cordova) — SAF 保存ダイアログ (cordova-plugin-save-dialog)。
+   *     WebView は <a download href="blob:"> を処理しないため必須。
+   *  2) デスクトップ (Chrome/Edge/Electron) — showSaveFilePicker (ネイティブ保存ダイアログ)
+   *  3) フォールバック — <a download> リンク */
+  function outFileName(it){
+    return sanitizeName(it.meta.title || it.name.replace(/\.[^.]+$/, "")) + "." + it.ext;
+  }
+
+  function anchorDownload(it, name){
+    var a = document.createElement("a");
+    a.href = it.blobURL || URL.createObjectURL(it.blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); }, 0);
+    setMsg("💾 " + name + " をダウンロードしました(ブラウザのダウンロード先を確認してください)。");
+  }
+
+  function saveItem(it){
+    if (!it.blob){ setMsg("保存できる動画がありません。", true); return; }
+    var name = outFileName(it);
+    var plainType = it.ext === "mp4" ? "video/mp4" : "video/webm";
+
+    /* 1) Cordova (Android APK): SAF の保存ダイアログで保存先を選択 */
+    var cdv = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
+    if (cdv && typeof cdv.saveFile === "function"){
+      setMsg("保存先を選択してください…");
+      try {
+        cdv.saveFile(it.blob, name).then(
+          function(){ setMsg("✅ 保存しました: " + name); },
+          function(err){
+            if (err && !/cancel/i.test(String(err))) setMsg("保存に失敗しました: " + err, true);
+            else setMsg("");
+          }
+        );
+      } catch (e) { setMsg("保存に失敗しました: " + e.message, true); }
+      return;
+    }
+
+    /* 2) File System Access API (Chrome / Edge / Electron) */
+    if (typeof window.showSaveFilePicker === "function"){
+      (function(){
+        var acc = {}; acc[plainType] = ["." + it.ext];
+        window.showSaveFilePicker({ suggestedName: name, types: [{ description: "動画ファイル", accept: acc }] })
+          .then(function(handle){ return handle.createWritable(); })
+          .then(function(w){ return w.write(it.blob).then(function(){ return w.close(); }); })
+          .then(function(){ setMsg("✅ 保存しました: " + name); })
+          .catch(function(e){
+            if (e && e.name === "AbortError") return;      /* ユーザーがキャンセル */
+            anchorDownload(it, name);                       /* 3) フォールバック */
+          });
+      })();
+      return;
+    }
+
+    /* 3) <a download> フォールバック */
+    anchorDownload(it, name);
+  }
+
   /* ── トラックリスト描画 ── */
   function render(){
     tracksEl.innerHTML = "";
@@ -702,12 +769,12 @@ function boot(){
       d.querySelector(".a").textContent = it.meta.artist || "—";
       d.querySelector(".st").textContent = st;
       var btns = d.querySelector(".btns");
-      if (it.state === "done" && it.blobURL){
-        var a = document.createElement("a");
-        a.className = "dl"; a.href = it.blobURL;
-        a.download = sanitizeName(it.meta.title || it.name.replace(/\.[^.]+$/, "")) + "." + it.ext;
-        a.textContent = "💾 動画を保存";
-        btns.appendChild(a);
+      if (it.state === "done" && it.blob){
+        var sv = document.createElement("button");
+        sv.className = "dl";
+        sv.textContent = "💾 動画を保存";
+        sv.onclick = function(){ saveItem(it); };
+        btns.appendChild(sv);
       } else if (it.state === "ready"){
         var b = document.createElement("button");
         b.textContent = "🎬 変換";
@@ -737,7 +804,7 @@ function boot(){
       var it = {
         file: f, name: f.name, dur: 0, state: "loading", progress: 0,
         meta: parseTrackMeta(f.name), cover: null, coverURL: "",
-        audioBuffer: null, blobURL: "", blobSize: 0, ext: chosen.ext
+        audioBuffer: null, blob: null, blobURL: "", blobSize: 0, ext: chosen.ext
       };
       items.push(it);
       render();
@@ -888,6 +955,7 @@ function boot(){
       rec.onstop = function(){
         var mime = rec.mimeType || chosen.mime || "video/webm";
         var blob = new Blob(chunks, { type: mime });
+        it.blob = blob;
         it.blobURL = URL.createObjectURL(blob);
         it.blobSize = blob.size;
         it.ext = /mp4/.test(mime) ? "mp4" : "webm";
