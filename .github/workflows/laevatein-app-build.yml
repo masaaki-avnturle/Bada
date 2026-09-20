@@ -145,8 +145,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Set up Android SDK
+      # setup-android@v3 は既定で旧 'tools' パッケージを入れようとするが、
+      # Google が SDK リポジトリから削除したため sdkmanager が失敗する。
+      # packages: '' で既定インストールを止め、必要なものは次の手順で明示的に入れる。
+      - name: Set up Android SDK (既定パッケージのインストールは行わない)
         uses: android-actions/setup-android@v3
+        with:
+          packages: ''
       - name: Install Android SDK packages (+ accept licenses)
         run: |
           yes | sdkmanager --licenses > /dev/null 2>&1 || true
