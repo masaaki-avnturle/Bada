@@ -52,7 +52,8 @@ jobs:
                                   "function estimateSize", "function spectrumBars",
                                   "function energyOf", "function id3Parse",
                                   "function id3Text", "function id3Apic",
-                                  "function drawFrame", "function boot"]) {
+                                  "function drawFrame", "function saveItem",
+                                  "function anchorDownload", "function boot"]) {
               if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
             }
           '
@@ -109,6 +110,9 @@ jobs:
           cp "$APP/cordova/config.xml" cordova-build/config.xml
           cd cordova-build
           cordova platform add android@12.0.1
+          # WebView は <a download href="blob:"> を処理しないため、
+          # SAF (ACTION_CREATE_DOCUMENT) の保存ダイアログで動画を保存する。
+          cordova plugin add cordova-plugin-save-dialog
           cordova build android --verbose
       - name: Collect APK
         run: |
