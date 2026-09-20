@@ -376,6 +376,123 @@ node bada_gui_ide/tools/build-atom-critical.js
 Release への添付は [`atom-critical-dist.yml`](../.github/workflows/atom-critical-dist.yml)
 が行います (`acpi-v*` タグで Release へ / `workflow_dispatch` で Actions アーティファクト)。
 
+## 🜂 LÆVATEIN — Λ ドライバ無力化シミュレータ (`dist/lambda-driver.html`)
+
+指数関数的に暴走する系を抑制したとき、**吸収したエネルギーをどれだけの速さで
+捨てられるか**を計算する熱収支シミュレータです。ダウンロードしてダブルクリック
+するだけで動きます (依存なし・オフライン可)。
+
+### 👉 [**dist/lambda-driver.html をダウンロード**](dist/lambda-driver.html)
+
+| ファイル | 内容 |
+|:---|:---|
+| [`dist/lambda-driver.html`](dist/lambda-driver.html) | ★ 本体 (単一 HTML)。4 枚の図 + 判定パネル + CSV/JSON 出力 |
+| [`cli/lambda-driver-cli.js`](cli/lambda-driver-cli.js) | CLI (`run` / `csv` / `json` / `gamma` / `sweep` / `cooling` / `selftest`) |
+| [`www/lambda_driver.js`](www/lambda_driver.js) | モデルコア (GUI と CLI が共有する UMD モジュール) |
+| [`examples/lambda_driver.bada`](examples/lambda_driver.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
+| [`tools/build-lambda-driver.js`](tools/build-lambda-driver.js) | 単一 HTML のビルダ (実在物理とのセルフチェック付き) |
+
+### 三層モデル
+
+**(A) 暴走系 — 抽象**
+
+```
+P(t) = P₀ e^{λt},   λ = ln2 / τ_d
+```
+
+初期出力 `P₀`・倍加時間 `τ_d`・総エネルギー `E_max` の 3 つだけで書ける、
+装置に依存しない指数関数的暴走です。**特定の装置の設計量 (質量・幾何・材料) は
+一切含みません** — 電池の熱暴走でも雪崩増倍でも同じ式になります。
+
+**(B) 抑制層 — 山口フレームワーク + 架空**
+
+| 要素 | 内容 |
+|:---|:---|
+| **Γ 大域的部分積分多様体** | `Γ(s,x) = ∫ₓ^∞ t^{s−1}e^{−t}dt` を繰り返し部分積分して得られる境界項の漸近級数 `a₀=1, a_k = a_{k−1}(s−k)/x`。収束せず `k ≈ s+x` で最小になってから発散するので、そこで打ち切るのが最適 (**superasymptotics**)。残る最小項が抑制を抜ける漏れ比 `ρ ~ e^{−x}` |
+| **Λ ドライバ** | Dalanversian 作用素 `Λ = cos(iu) − i sin(iu) = e^u`, `u = x log x` |
+| **Jones 多項式の熱エネルギー消費** | 抑制手順の交差を閉ブレイドとみなして Kauffman ブラケット `⟨D⟩(A)` を状態和で評価し、その**非可逆ビット操作数 × Landauer 限界 `k_B T ln2`** が制御計算の発熱。状態和は `2^c` で増えるので、倍加時間内に評価し切れる交差数に上限が出ます |
+
+**(C) 冷却層 — 実在の物理**
+
+青色 LED の**電界発光冷却**。順方向バイアス `V` が光子エネルギー `ħω/q` を下回る
+領域で駆動すると、LED は 1 光子あたり `(η·ħω − qV)` だけ格子から熱を奪う熱ポンプに
+なります。
+
+```
+冷却条件   η > qV / ħω
+冷却能力   P_cool = I·(η·ħω/q − V)
+COP        η·ħω/(qV) − 1
+```
+
+450 nm では `ħω = 2.7552 eV` なので、`η = 0.7` なら `V < 1.93 V` で冷却します。
+
+### このアプリが出す答え
+
+**抑制の数学は成立します。破綻するのは排熱です。**
+
+```
+$ node bada_gui_ide/cli/lambda-driver-cli.js sweep --from 5 --to 60 --points 8
+x          k*        最小項      漏れ比 ρ      漏れ [J]   排熱要求 [W]       判定
+5           7      2.835e-4      2.124e-4      8.885e+8      2.900e+20 cooling-power
+21         23     1.820e-12     1.696e-12      7.096e+0      2.900e+20 cooling-power
+44         46     4.259e-23     4.117e-23     1.723e-10      2.900e+20 cooling-power
+60         62     2.578e-30     2.515e-30     1.052e-17      2.900e+20 cooling-power
+```
+
+部分積分の深さ `x` を上げれば漏れは指数関数的に減りますが (10⁹ J → 10⁻¹⁷ J)、
+**排熱要求は 2.9×10²⁰ W のまま動かず、律速は常に冷却能力**です。
+既定条件でこの要求と実証済みの電界発光冷却 (pW オーダー,
+Santhanam, Gray & Ram, *Phys. Rev. Lett.* **108**, 097403 (2012)) の差は
+**10³⁰ 規模**になります。室温の青色 InGaN での正味電界発光冷却は未実証で、
+低バイアス域では非発光再結合が EQE を潰します。
+
+> **創作についての注記** — Λ ドライバ・レーバテイン・アルは『フルメタル・パニック!』
+> (賀東招二) の架空の装置とキャラクタです。作中の封じ込めの筋立てを手順の骨格として
+> 借りていますが、装置そのものは完全な創作であり、この構成は現実の装置にはなりません。
+> このアプリの主眼は「うまくいく」ことではなく、**要求排熱と実在の熱力学の間に何桁の
+> 隔たりがあるかを数えること**にあります。
+
+### 検証
+
+ビルダと CLI の `selftest` が、**実在する部分**をすべて既知の値と突き合わせます
+(架空の Λ ドライバは検証対象外):
+
+| 項目 | 照合先 |
+|:---|:---|
+| 光子エネルギー `hc/λ` | 450 nm → 2.7552 eV |
+| Landauer 限界 `k_B T ln2` | 300 K → 2.871×10⁻²¹ J/bit |
+| 電界発光冷却の条件・COP | `η > qV/ħω`, `COP = η·ħω/(qV) − 1` |
+| Kauffman ブラケット | 1 交差の閉ブレイド → `−A⁻³` |
+| Γ の最適打ち切り | `k* ≈ s+x` (x = 20/30/50 で検証) |
+| **Γ の漸近評価** | **Simpson 積分と相対 10⁻⁸ で一致** (超漸近精度) |
+| Λ(e) | `e^e` |
+
+Bada 実装は JS コアと独立に同じ結果を出し、Kauffman の非可逆操作数が
+**31,224 で厳密に一致**することを CI が確認します。
+
+### 使い方
+
+```sh
+# GUI — ダウンロードして開くだけ
+open bada_gui_ide/dist/lambda-driver.html
+
+# CLI
+node bada_gui_ide/cli/lambda-driver-cli.js run
+node bada_gui_ide/cli/lambda-driver-cli.js gamma --x 40      # Γ 部分積分層の表
+node bada_gui_ide/cli/lambda-driver-cli.js cooling           # LED 冷却の成立範囲
+node bada_gui_ide/cli/lambda-driver-cli.js sweep             # 深さ x を掃引
+node bada_gui_ide/cli/lambda-driver-cli.js selftest          # 実在の物理量と照合
+
+# Bada 言語版 (同じ結果を独立に再現する)
+node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/lambda_driver.bada
+
+# 単一 HTML を再ビルド
+node bada_gui_ide/tools/build-lambda-driver.js
+```
+
+配布は [`laevatein-dist.yml`](../.github/workflows/laevatein-dist.yml) が行います
+(ブランチ push で Actions アーティファクト / `laevatein-v*` タグで Release へ添付)。
+
 ## ディレクトリ構成
 
 ```
@@ -386,9 +503,11 @@ bada_gui_ide/
   cli/        CLI アプリ:  run|build|emit|tokens|ast|repl|examples|version
               (node cli/bada-cli.js … で実行、Release では単一バイナリ
                bada-cli.exe / bada-cli-linux-x64 として配布)
-  examples/   hello / engine / core / quantum / zone / atom_critical の各 .bada
+  examples/   hello / engine / core / quantum / zone / atom_critical /
+              lambda_driver の各 .bada
   tools/      単一 HTML ビルダ (build-zone-browser.js / build-atom-critical.js)
-  dist/       配布用の単一 HTML (zone-browser.html / bada-zone.html / atom-critical.html)
+  dist/       配布用の単一 HTML (zone-browser.html / bada-zone.html /
+              atom-critical.html / lambda-driver.html)
   acpi-app/   ACPI のネイティブ アプリ (Windows EXE / Ubuntu AppImage・deb / Android APK)
   zonebrowser-app/  ZoneBrowser のネイティブ アプリ
 ```

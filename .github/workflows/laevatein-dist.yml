@@ -1,0 +1,165 @@
+name: LAEVATEIN Λ ドライバ無力化シミュレータ (downloadable)
+
+# 暴走エネルギーの熱収支シミュレータ LÆVATEIN をダウンロード可能な形に固める:
+#   - bada_gui_ide/dist/lambda-driver.html  (単一 HTML — 開くだけで動く)
+#   - CLI + モデルコア + Bada リファレンス実装 + サンプル出力 + README を zip
+#
+# ダウンロード方法:
+#   1) Actions から — 関連ブランチ / main への push で自動実行され、実行ページ
+#      下部の Artifacts から取得できる (要ログイン・保存期間 90 日)。
+#   2) Releases から — laevatein-v* タグの push、または workflow_dispatch の
+#      release_tag 入力で Release に添付される (期限なし)。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release に添付するタグ名 (例: laevatein-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - main
+      - '**laevatein**'
+      - '**lambda**'
+      - '**atomic-critical**'
+    tags:
+      - 'laevatein-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: laevatein-${{ github.ref }}-${{ github.event.inputs.release_tag || 'ci' }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: モデルコアのセルフテスト (実在の物理量と照合)
+        working-directory: bada_gui_ide
+        run: node cli/lambda-driver-cli.js selftest
+
+      - name: Bada リファレンス実装のスモークテスト
+        working-directory: bada_gui_ide
+        run: |
+          set -e
+          node cli/bada-cli.js run examples/lambda_driver.bada | tee /tmp/ld.out
+          grep -q "Γ 大域的部分積分多様体" /tmp/ld.out
+          grep -q "最適打ち切り" /tmp/ld.out
+          grep -q "電界発光冷却" /tmp/ld.out
+          grep -q "収支は閉じない" /tmp/ld.out
+          grep -q "現実との差" /tmp/ld.out
+          # Bada 実装と JS コアで Kauffman の非可逆操作数が厳密に一致すること
+          BADA_OPS=$(grep 'ops(raw)' /tmp/ld.out | grep -oE '[0-9]+$')
+          JS_OPS=$(node -e "console.log(require('./www/lambda_driver.js').simulate({crossings:8}).jones.ops)")
+          echo "Bada=$BADA_OPS  JS=$JS_OPS"
+          test -n "$BADA_OPS" && test "$BADA_OPS" = "$JS_OPS" \
+            || { echo "操作数が一致しません (Bada=$BADA_OPS JS=$JS_OPS)"; exit 1; }
+
+      - name: 単一 HTML をビルド
+        working-directory: bada_gui_ide
+        run: node tools/build-lambda-driver.js
+
+      - name: 生成物が変更されていないことを確認
+        run: git diff --exit-code -- bada_gui_ide/dist/lambda-driver.html
+
+      - name: サンプル出力を生成
+        working-directory: bada_gui_ide
+        run: |
+          node cli/lambda-driver-cli.js run     > dist/laevatein-summary.txt
+          node cli/lambda-driver-cli.js gamma   > dist/laevatein-gamma-layers.txt
+          node cli/lambda-driver-cli.js cooling > dist/laevatein-el-cooling.txt
+          node cli/lambda-driver-cli.js sweep   > dist/laevatein-depth-sweep.txt
+          node cli/lambda-driver-cli.js csv     dist/laevatein-sample.csv
+
+      - name: zip にまとめる
+        working-directory: bada_gui_ide/dist
+        run: |
+          cp ../cli/lambda-driver-cli.js ../cli/bada-cli.js ../www/lambda_driver.js \
+             ../www/bada.js ../www/examples.js ../examples/lambda_driver.bada .
+          zip -j laevatein-dist.zip lambda-driver.html lambda-driver-cli.js lambda_driver.js \
+                 lambda_driver.bada bada.js bada-cli.js examples.js LAEVATEIN-README.txt \
+                 laevatein-summary.txt laevatein-gamma-layers.txt laevatein-el-cooling.txt \
+                 laevatein-depth-sweep.txt laevatein-sample.csv
+          ls -la
+
+      - name: Actions アーティファクトをアップロード
+        uses: actions/upload-artifact@v4
+        with:
+          name: laevatein
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            bada_gui_ide/dist/lambda-driver.html
+            bada_gui_ide/dist/laevatein-dist.zip
+
+      - name: 実行ページにダウンロード手順を書き出す
+        run: |
+          {
+            echo "## LÆVATEIN — Λ ドライバ無力化シミュレータ"
+            echo ""
+            echo "実行ページ下部の **Artifacts** → \`laevatein\` から取得できます"
+            echo "(要ログイン・保存期間 90 日)。"
+            echo ""
+            echo "- \`lambda-driver.html\` — 本体。開くだけで動きます (依存なし・オフライン可)"
+            echo "- \`laevatein-dist.zip\` — 上記 + CLI + モデルコア + Bada 実装 + サンプル出力"
+            echo ""
+            echo "抑制対象は**指数関数的に暴走する系**という抽象モデルです"
+            echo "(初期出力・倍加時間・総エネルギーのみ)。特定の装置の設計量は含みません。"
+            echo "Λ ドライバは『フルメタル・パニック!』の架空装置です。"
+            echo "冷却側の電界発光冷却のみ実在の物理で、このアプリの主眼は"
+            echo "**要求排熱と実在の冷却能力が何桁離れているかを数えること**にあります。"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Release へ添付
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          name: LÆVATEIN ${{ github.event.inputs.release_tag || github.ref_name }}
+          body: |
+            **LÆVATEIN — Λ ドライバ無力化シミュレータ**
+
+            指数関数的に暴走する系を抑制したとき、吸収したエネルギーを
+            どれだけの速さで捨てられるかを計算する熱収支シミュレータです。
+
+            | ファイル | 使い方 |
+            |---|---|
+            | `lambda-driver.html` | ダウンロードして開くだけ (依存なし・オフライン可) |
+            | `laevatein-dist.zip` | 上記 + CLI + モデルコア + Bada 実装 + サンプル出力 |
+
+            ### 三層モデル
+
+            **(A) 暴走系 [抽象]** — 初期出力・倍加時間・総エネルギーの 3 つだけで
+            書ける、装置に依存しない指数関数的暴走。特定の装置の設計量は含みません。
+
+            **(B) 抑制層 [山口フレームワーク + 架空]** — 不完全ガンマ関数 Γ(s,x) を
+            繰り返し部分積分して得られる境界項の漸近級数を「吸収層」とみなし、
+            最適打ち切り (superasymptotics) で級数を止めます。そこに残る最小項が
+            抑制を抜ける漏れ比 ρ ~ e^{−x}。Λ ドライバは Dalanversian 作用素
+            Λ = cos(iu) − i sin(iu) = e^u (u = x log x)。抑制手順の交差を
+            Kauffman ブラケットで評価し、その非可逆ビット操作数に Landauer 限界
+            k_B T ln2 を掛けたものが制御計算の発熱になります。
+
+            **(C) 冷却層 [実在の物理]** — 青色 LED の電界発光冷却。順方向バイアス V が
+            ħω/q を下回る領域では、LED は 1 光子あたり (η·ħω − qV) だけ格子から熱を
+            奪う熱ポンプになります (冷却条件 η > qV/ħω)。
+
+            ### このアプリが出す答え
+
+            抑制の数学は成立します (既定条件で ρ ≈ 10⁻¹⁶)。**破綻するのは排熱**です。
+            要求される冷却能力は、実証済みの電界発光冷却
+            (pW オーダー, Santhanam et al. 2012, PRL 108, 097403) と
+            **10³⁰ 規模で隔たっています**。Λ ドライバ・レーバテイン・アルは
+            『フルメタル・パニック!』(賀東招二) の架空の装置とキャラクタであり、
+            この構成は現実の装置にはなりません。
+          files: |
+            bada_gui_ide/dist/lambda-driver.html
+            bada_gui_ide/dist/laevatein-dist.zip

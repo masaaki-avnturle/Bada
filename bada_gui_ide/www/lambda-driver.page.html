@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>LÆVATEIN — Λ ドライバ無力化シミュレータ (Bada / Ω)</title>
+<style>
+  :root { color-scheme: dark; --bg:#04060a; --panel:#0a1220; --panel2:#070c15; --line:#1c2838;
+          --ink:#d6e2ee; --dim:#8aa0b8; --gold:#c8a44a; --green:#2e9e57; --red:#d0574a;
+          --blue:#4a80d0; --violet:#9060d0; --cyan:#40b8c0; }
+  * { box-sizing:border-box; }
+  html,body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+         font-family: system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif; font-size:13px; }
+  code,.mono { font-family:"SFMono-Regular",Consolas,"DejaVu Sans Mono",monospace; }
+
+  header { display:flex; align-items:center; gap:12px; padding:9px 14px;
+           background:linear-gradient(180deg,#0a1220,#070c15); border-bottom:1px solid var(--line); }
+  header .o { color:var(--gold); font-size:19px; font-weight:700; }
+  header .sub { color:var(--dim); font-size:12px; }
+  header .sp { flex:1; }
+  header .tag { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:2px 9px; }
+
+  main { display:grid; grid-template-columns:292px 1fr 318px; height:calc(100% - 45px); }
+  #side { border-right:1px solid var(--line); padding:12px; overflow:auto; background:var(--panel2); }
+  #view { overflow:auto; padding:12px 14px; }
+  #out  { border-left:1px solid var(--line); padding:12px; overflow:auto; background:var(--panel2); }
+  @media (max-width:1180px){ main{ grid-template-columns:1fr; height:auto; } body{ overflow:auto; } #side,#out{ border:0; border-bottom:1px solid var(--line); } }
+
+  h3 { margin:0 0 9px; font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--dim); font-weight:600; }
+  h3:not(:first-child) { margin-top:18px; }
+  h3 small { text-transform:none; letter-spacing:0; color:#5f7488; }
+  label { display:block; margin:9px 0 3px; color:var(--dim); font-size:11.5px; }
+  select,input[type=number] { width:100%; background:#020407; color:var(--ink);
+    border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12.5px; }
+  input[type=range] { width:100%; accent-color:var(--gold); margin:4px 0 0; }
+  .val { float:right; color:var(--gold); font-family:"SFMono-Regular",Consolas,monospace; }
+  button { border:0; border-radius:7px; padding:8px 10px; cursor:pointer; font-weight:600; font-size:12.5px;
+           background:#132033; color:var(--ink); border:1px solid var(--line); }
+  button:hover { filter:brightness(1.25); }
+  button.go { background:var(--green); color:#eafff0; border-color:#1d6b3b; }
+  button.alt { background:#16223a; }
+  .btns { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-top:14px; }
+  .btns .wide { grid-column:1/-1; }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .card > .cap { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; gap:10px; }
+  .card .cap b { font-size:12.5px; font-weight:600; }
+  .card .cap span { color:var(--dim); font-size:11px; text-align:right; }
+  canvas { display:block; width:100%; border-radius:6px; background:#02040a; }
+
+  .kv { display:flex; justify-content:space-between; gap:8px; padding:4px 0; border-bottom:1px dashed #16222f; }
+  .kv b { color:var(--dim); font-weight:500; font-size:11.5px; }
+  .kv span { text-align:right; font-family:"SFMono-Regular",Consolas,monospace; font-size:11.5px; word-break:break-all; }
+  .kv span.hi { color:var(--gold); } .kv span.ok { color:#7ce0a3; } .kv span.bad { color:#f2a49b; }
+
+  .legend { display:flex; flex-wrap:wrap; gap:10px; font-size:11px; color:var(--dim); margin-top:6px; }
+  .legend i { display:inline-block; width:11px; height:3px; border-radius:2px; vertical-align:middle; margin-right:4px; }
+  .note { color:var(--dim); font-size:11px; line-height:1.65; margin-top:8px; }
+  .banner { border-radius:9px; padding:10px 12px; font-size:12.5px; margin-bottom:12px; line-height:1.65; }
+  .banner.fail { background:#2a1008; border:1px solid #6b3312; color:#f0b183; }
+  .banner.ok   { background:#0d1f14; border:1px solid #235838; color:#9de0b4; }
+  .banner b { color:#fff; }
+  .gap { background:#1a0d0d; border:1px solid #57232a; border-radius:9px; padding:10px 12px;
+         color:#f0a9a0; font-size:12px; line-height:1.7; margin-bottom:12px; }
+  .gap b { color:#ffd9d2; }
+  .fiction { background:#141024; border:1px solid #33285c; border-radius:9px; padding:9px 12px;
+             color:#b9aee0; font-size:11.5px; line-height:1.7; }
+
+  ol.steps { margin:4px 0 0; padding-left:0; list-style:none; counter-reset:s; }
+  ol.steps li { counter-increment:s; position:relative; padding:6px 0 6px 30px; font-size:11.5px;
+                border-bottom:1px dashed #16222f; }
+  ol.steps li::before { content:counter(s); position:absolute; left:0; top:6px; width:20px; height:20px;
+    border-radius:50%; background:#132033; border:1px solid var(--line); color:var(--dim);
+    font-size:10px; display:flex; align-items:center; justify-content:center; font-family:monospace; }
+  ol.steps li.pass::before { background:#123a24; border-color:#2e9e57; color:#7ce0a3; content:"✓"; }
+  ol.steps li.fail::before { background:#3a1614; border-color:#d0574a; color:#f2a49b; content:"✕"; }
+  ol.steps li .d { color:var(--dim); display:block; margin-top:2px; font-family:"SFMono-Regular",Consolas,monospace; font-size:10.5px; }
+  details summary { color:var(--dim); cursor:pointer; font-size:11.5px; }
+  details pre { background:#02040a; border:1px solid var(--line); border-radius:7px; padding:9px;
+                font-size:10.5px; line-height:1.55; overflow:auto; max-height:320px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <span class="o">Ω</span>
+  <div>
+    <div><b>LÆVATEIN</b> — Λ ドライバ無力化シミュレータ</div>
+    <div class="sub">暴走エネルギーの熱収支 · Γ 大域的部分積分多様体 + Jones/Landauer 熱勘定 + 青色 LED 電界発光冷却</div>
+  </div>
+  <span class="sp"></span>
+  <span class="tag mono" id="ver">v–</span>
+  <span class="tag" id="runtime">単一 HTML · 依存なし · オフライン可</span>
+</header>
+
+<main>
+<!-- ============================ 入力 ============================ -->
+<section id="side">
+  <h3>A. 暴走系 <small>(装置非依存)</small></h3>
+  <label>初期出力 P₀ <span class="val" id="p0V">–</span></label>
+  <input type="range" id="p0" min="0" max="12" step="0.1" value="6"/>
+  <label>倍加時間 τ_d <span class="val" id="tdV">10 ns</span></label>
+  <input type="range" id="td" min="1" max="200" step="1" value="10"/>
+  <label>総エネルギー E_max <span class="val" id="emV">–</span></label>
+  <input type="range" id="em" min="9" max="16" step="0.1" value="12.62"/>
+  <label>観測時間 <span class="val" id="hzV">600 ns</span></label>
+  <input type="range" id="hz" min="50" max="3000" step="50" value="600"/>
+
+  <h3>B. 抑制層 <small>(Γ / Λ / Jones)</small></h3>
+  <label>部分積分の深さ x <span class="val" id="dxV">30</span></label>
+  <input type="range" id="dx" min="4" max="120" step="1" value="30"/>
+  <label>不完全ガンマの s <span class="val" id="gsV">2.5</span></label>
+  <input type="range" id="gs" min="0.5" max="8" step="0.1" value="2.5"/>
+  <label>Λ 場再整形の交差数 c <span class="val" id="crV">14</span></label>
+  <input type="range" id="cr" min="1" max="22" step="1" value="14"/>
+  <label>Kauffman ループ変数 A <span class="val" id="kaV">1.0699</span></label>
+  <input type="range" id="ka" min="0.5" max="1.8" step="0.0001" value="1.0699"/>
+  <label>制御系の演算速度 <span class="val" id="orV">–</span></label>
+  <input type="range" id="or" min="9" max="24" step="0.5" value="18"/>
+  <label>制御系の温度 <span class="val" id="tkV">300 K</span></label>
+  <input type="range" id="tk" min="4" max="600" step="1" value="300"/>
+
+  <h3>C. 青色 LED 冷却 <small>(実在)</small></h3>
+  <label>波長 λ <span class="val" id="lmV">450 nm</span></label>
+  <input type="range" id="lm" min="380" max="700" step="5" value="450"/>
+  <label>順方向バイアス V <span class="val" id="bvV">0.10 V</span></label>
+  <input type="range" id="bv" min="0.01" max="3" step="0.01" value="0.10"/>
+  <label>外部量子効率 η <span class="val" id="eqV">0.70</span></label>
+  <input type="range" id="eq" min="0.01" max="1" step="0.01" value="0.70"/>
+  <label>素子あたり電流 <span class="val" id="icV">–</span></label>
+  <input type="range" id="ic" min="-12" max="0" step="0.1" value="-3"/>
+  <label>素子数 <span class="val" id="ndV">–</span></label>
+  <input type="range" id="nd" min="0" max="24" step="0.5" value="12"/>
+
+  <div class="btns">
+    <button class="go wide" id="run">▶ 実行</button>
+    <button id="csv">⬇ CSV</button>
+    <button id="json">⬇ JSON</button>
+  </div>
+  <div class="note">
+    抑制対象は<b>指数関数的に暴走する系</b>という抽象モデルです
+    (初期出力・倍加時間・総エネルギーのみ)。特定の装置の設計量は含みません。
+  </div>
+</section>
+
+<!-- ============================ 図 ============================ -->
+<section id="view">
+  <div id="banner"></div>
+  <div id="gapbox"></div>
+
+  <div class="card">
+    <div class="cap"><b>① 出力と冷却能力</b><span id="cap1">–</span></div>
+    <canvas id="c1" height="230"></canvas>
+    <div class="legend">
+      <span><i style="background:#d0574a"></i>P(t) 暴走出力</span>
+      <span><i style="background:#c8a44a"></i>排熱要求 (吸収+制御)</span>
+      <span><i style="background:#40b8c0"></i>LED 冷却能力</span>
+      <span><i style="background:#9060d0"></i>実証済み素子 1 台</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>② Γ 大域的部分積分多様体 — 境界項の層</b><span id="cap2">–</span></div>
+    <canvas id="c2" height="215"></canvas>
+    <div class="legend">
+      <span><i style="background:#c8a44a"></i>|a_k| 第 k 層の境界項</span>
+      <span><i style="background:#2e9e57"></i>最適打ち切り k*</span>
+      <span><i style="background:#d0574a"></i>最小項 = 漏れの桁</span>
+    </div>
+    <div class="note">
+      Γ(s,x) = ∫ₓ<sup>∞</sup> t<sup>s−1</sup>e<sup>−t</sup>dt を繰り返し部分積分すると境界項の漸近級数
+      a₀=1, a_k = a_{k−1}(s−k)/x が現れます。級数は収束せず k ≈ s+x で最小になってから発散するので、
+      そこで打ち切るのが最適 (superasymptotics)。残る最小項が抑制を抜ける漏れ比 ρ になります。
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>③ エネルギー収支</b><span id="cap3">–</span></div>
+    <canvas id="c3" height="200"></canvas>
+    <div class="legend">
+      <span><i style="background:#4a80d0"></i>解放 E(t)</span>
+      <span><i style="background:#2e9e57"></i>吸収 (1−ρ)E</span>
+      <span><i style="background:#d0574a"></i>漏れ ρE</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>④ 冷却スケールの比較</b><span id="cap4">対数目盛</span></div>
+    <canvas id="c4" height="180"></canvas>
+    <div class="note" id="cap4b"></div>
+  </div>
+
+  <div class="card">
+    <div class="cap"><b>⑤ 実行手順 — レーバテインの AI「アル」の筋立て</b><span>各段の成否</span></div>
+    <ol class="steps" id="steps"></ol>
+    <div class="fiction" style="margin-top:10px">
+      <b>これは創作の設定です。</b> Λ ドライバ・レーバテイン・アルは『フルメタル・パニック!』
+      (賀東招二) の架空の装置とキャラクタで、作中の封じ込めの筋立てを手順の骨格として借りています。
+      実在の装置ではなく、このアプリはその手順を山口フレームワークの作用素で定式化したうえで、
+      <b>実在の熱力学で何桁足りないかを数えるため</b>のものです。
+    </div>
+  </div>
+</section>
+
+<!-- ============================ 出力 ============================ -->
+<section id="out">
+  <h3>判定</h3>
+  <div id="kVerdict"></div>
+  <h3>A. 暴走系</h3>
+  <div id="kRun"></div>
+  <h3>B1. Γ 部分積分多様体</h3>
+  <div id="kGamma"></div>
+  <h3>B2. Λ ドライバ</h3>
+  <div id="kLambda"></div>
+  <h3>B3. Jones / Landauer</h3>
+  <div id="kJones"></div>
+  <h3>C. 青色 LED 冷却</h3>
+  <div id="kLed"></div>
+  <h3>テキスト要約</h3>
+  <details open><summary>summary()</summary><pre id="sum" class="mono"></pre></details>
+</section>
+</main>
+
+<script>
+/*<<LAMBDA_DRIVER_CORE>>*/
+</script>
+<script>
+"use strict";
+(function () {
+  var LD = window.LambdaDriver;
+  var $ = function (id) { return document.getElementById(id); };
+  $("ver").textContent = "v" + LD.VERSION;
+
+  var NATIVE = (function () {
+    if (window.ldNative && window.ldNative.platform) return { kind: "electron", name: "デスクトップ アプリ (" + window.ldNative.platform + ")" };
+    if (window.cordova || /\bwv\b/.test(navigator.userAgent)) return { kind: "webview", name: "Android アプリ" };
+    return { kind: "browser", name: "ブラウザ" };
+  })();
+  var canDownload = NATIVE.kind !== "webview" && ("download" in document.createElement("a"));
+
+  function sciTxt(v, d) {
+    if (v === null || v === undefined) return "–";
+    if (!isFinite(v)) return v > 0 ? "∞" : "-∞";
+    return Number(v).toExponential(d === undefined ? 3 : d);
+  }
+  function sup(v, d) { return sciTxt(v, d).replace(/e([+-])(\d+)/, "×10<sup>$1$2</sup>").replace("+", ""); }
+
+  function params() {
+    return {
+      p0W: Math.pow(10, +$("p0").value),
+      doublingNs: +$("td").value,
+      emaxJ: Math.pow(10, +$("em").value),
+      horizonNs: +$("hz").value,
+      depthX: +$("dx").value,
+      gammaS: +$("gs").value,
+      crossings: +$("cr").value,
+      kauffmanA: +$("ka").value,
+      opsRate: Math.pow(10, +$("or").value),
+      tempK: +$("tk").value,
+      ledLambdaNm: +$("lm").value,
+      ledBiasV: +$("bv").value,
+      ledEQE: +$("eq").value,
+      ledCurrentA: Math.pow(10, +$("ic").value),
+      ledCount: Math.pow(10, +$("nd").value),
+      steps: 1800
+    };
+  }
+  function syncLabels() {
+    $("p0V").innerHTML = sup(Math.pow(10, +$("p0").value), 1) + " W";
+    $("tdV").textContent = $("td").value + " ns";
+    $("emV").innerHTML = sup(Math.pow(10, +$("em").value), 1) + " J";
+    $("hzV").textContent = $("hz").value + " ns";
+    $("dxV").textContent = $("dx").value;
+    $("gsV").textContent = (+$("gs").value).toFixed(1);
+    $("crV").textContent = $("cr").value;
+    $("kaV").textContent = (+$("ka").value).toFixed(4);
+    $("orV").innerHTML = sup(Math.pow(10, +$("or").value), 1) + " ops/s";
+    $("tkV").textContent = $("tk").value + " K";
+    $("lmV").textContent = $("lm").value + " nm";
+    $("bvV").textContent = (+$("bv").value).toFixed(2) + " V";
+    $("eqV").textContent = (+$("eq").value).toFixed(2);
+    $("icV").innerHTML = sup(Math.pow(10, +$("ic").value), 1) + " A";
+    $("ndV").innerHTML = sup(Math.pow(10, +$("nd").value), 1) + " 個";
+  }
+
+  /* ---------------- 描画ヘルパ ---------------- */
+  function setup(cv) {
+    var dpr = window.devicePixelRatio || 1;
+    var w = cv.clientWidth || 700, h = +cv.getAttribute("height");
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.height = h + "px";
+    var g = cv.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    return { g: g, w: w, h: h };
+  }
+  function Plot(cv, xmin, xmax, pad) {
+    var s = setup(cv);
+    pad = pad || { l: 62, r: 16, t: 12, b: 24 };
+    var P = { g: s.g, w: s.w, h: s.h, pad: pad, xmin: xmin, xmax: xmax,
+      iw: s.w - pad.l - pad.r, ih: s.h - pad.t - pad.b };
+    P.X = function (x) { return pad.l + (x - xmin) / (xmax - xmin || 1) * P.iw; };
+    P.frame = function (xlabel, fmtX) {
+      var g = P.g;
+      g.strokeStyle = "#16222f"; g.lineWidth = 1;
+      g.strokeRect(pad.l + .5, pad.t + .5, P.iw, P.ih);
+      g.fillStyle = "#7b8ea3"; g.font = "10px monospace"; g.textAlign = "center";
+      for (var k = 0; k <= 4; k++) {
+        var xv = xmin + (xmax - xmin) * k / 4, px = P.X(xv);
+        g.strokeStyle = "#0f1a26"; g.beginPath(); g.moveTo(px, pad.t); g.lineTo(px, pad.t + P.ih); g.stroke();
+        g.fillText(fmtX ? fmtX(xv) : xv.toFixed(1), px, s.h - 8);
+      }
+      if (xlabel) { g.textAlign = "right"; g.fillStyle = "#7b8ea3"; g.fillText(xlabel, s.w - pad.r, pad.t - 2); }
+    };
+    /* 対数目盛の Y 軸 (lo, hi は log10 値) */
+    P.axisLog = function (lo, hi, color, label) {
+      var g = P.g;
+      g.fillStyle = color; g.font = "10px monospace"; g.textAlign = "right";
+      var n = 5;
+      for (var k = 0; k <= n; k++) {
+        var v = lo + (hi - lo) * k / n, py = pad.t + P.ih - (k / n) * P.ih;
+        g.fillText("1e" + Math.round(v), pad.l - 5, py + 3);
+        g.strokeStyle = "#0f1a26"; g.beginPath(); g.moveTo(pad.l, py); g.lineTo(pad.l + P.iw, py); g.stroke();
+      }
+      if (label) {
+        g.save(); g.translate(13, pad.t + P.ih / 2); g.rotate(-Math.PI / 2);
+        g.textAlign = "center"; g.fillText(label, 0, 0); g.restore();
+      }
+      return function (v) {
+        var lv = v > 0 ? Math.log10(v) : lo - 99;
+        return pad.t + P.ih - (lv - lo) / ((hi - lo) || 1) * P.ih;
+      };
+    };
+    P.line = function (xs, ys, Y, color, width, dash) {
+      var g = P.g; g.save();
+      g.beginPath(); g.rect(pad.l, pad.t, P.iw, P.ih); g.clip();
+      g.strokeStyle = color; g.lineWidth = width || 1.4;
+      if (dash) g.setLineDash(dash);
+      g.beginPath();
+      var started = false;
+      for (var i = 0; i < xs.length; i++) {
+        var v = ys[i]; if (!isFinite(v)) { started = false; continue; }
+        var px = P.X(xs[i]), py = Y(v);
+        if (!started) { g.moveTo(px, py); started = true; } else g.lineTo(px, py);
+      }
+      g.stroke(); g.restore();
+    };
+    P.hline = function (Y, v, color, label) {
+      var g = P.g, py = Y(v);
+      if (py < pad.t - 2 || py > pad.t + P.ih + 2) return;
+      g.save(); g.beginPath(); g.rect(pad.l, pad.t, P.iw, P.ih); g.clip();
+      g.strokeStyle = color; g.lineWidth = 1; g.setLineDash([5, 4]);
+      g.beginPath(); g.moveTo(pad.l, py); g.lineTo(pad.l + P.iw, py); g.stroke();
+      g.restore();
+      if (label) { g.fillStyle = color; g.font = "10px monospace"; g.textAlign = "left"; g.fillText(label, pad.l + 5, py - 3); }
+    };
+    P.vline = function (x, color, label) {
+      var g = P.g, px = P.X(x);
+      if (px < pad.l || px > pad.l + P.iw) return;
+      g.strokeStyle = color; g.lineWidth = 1; g.setLineDash([4, 3]);
+      g.beginPath(); g.moveTo(px, pad.t); g.lineTo(px, pad.t + P.ih); g.stroke(); g.setLineDash([]);
+      if (label) { g.fillStyle = color; g.font = "10px monospace"; g.textAlign = "left"; g.fillText(label, px + 4, pad.t + 11); }
+    };
+    return P;
+  }
+  function logRange(vals, padDec) {
+    var lo = Infinity, hi = -Infinity;
+    for (var i = 0; i < vals.length; i++) {
+      var v = vals[i]; if (!(v > 0) || !isFinite(v)) continue;
+      var l = Math.log10(v); if (l < lo) lo = l; if (l > hi) hi = l;
+    }
+    if (!isFinite(lo)) { lo = 0; hi = 1; }
+    padDec = padDec === undefined ? 1 : padDec;
+    lo = Math.floor(lo) - padDec; hi = Math.ceil(hi) + padDec;
+    if (hi - lo > 60) lo = hi - 60;
+    return [lo, hi];
+  }
+
+  var LAST = null;
+
+  function draw1(r) {
+    var s = r.series, t = s.t, n = t.length;
+    var load = new Float64Array(n);
+    for (var i = 0; i < n; i++) load[i] = s.power[i] * (1 - r.budget.leakFraction) + r.jones.controlW;
+    var P = Plot($("c1"), t[0], t[n - 1]);
+    P.frame("t [ns]", function (v) { return v.toFixed(0); });
+    var all = [r.runaway.pPeakW, r.led.totalW, r.led.demonstratedW, r.jones.controlW];
+    var rg = logRange(all, 1);
+    var Y = P.axisLog(rg[0], rg[1], "#c8a44a", "電力 [W]");
+    P.hline(Y, r.led.demonstratedW, "#9060d0", "実証済み素子 1 台 " + sciTxt(r.led.demonstratedW, 1) + " W");
+    P.hline(Y, r.led.totalW, "#40b8c0", "LED 配列 " + sciTxt(r.led.totalW, 2) + " W");
+    P.line(t, s.power, Y, "#d0574a", 1.6);
+    P.line(t, load, Y, "#c8a44a", 1.5, [5, 3]);
+    if (r.budget.breakNs !== null) P.vline(r.budget.breakNs, "#d0574a", "冷却破綻 " + r.budget.breakNs.toFixed(1) + " ns");
+    $("cap1").innerHTML = "ピーク " + sup(r.runaway.pPeakW, 2) + " W ／ 冷却 " + sup(r.led.totalW, 2) + " W";
+  }
+
+  function draw2(r) {
+    var g = r.gamma, L = g.layers;
+    var ks = [], av = [];
+    for (var i = 0; i < L.length; i++) { ks.push(L[i].k); av.push(Math.max(L[i].abs, 1e-300)); }
+    var P = Plot($("c2"), 0, ks[ks.length - 1] || 1);
+    P.frame("部分積分の層 k", function (v) { return v.toFixed(0); });
+    var rg = logRange(av, 1);
+    var Y = P.axisLog(rg[0], rg[1], "#c8a44a", "|a_k| 境界項");
+    P.hline(Y, g.minTerm, "#d0574a", "最小項 " + sciTxt(g.minTerm, 2));
+    P.line(ks, av, Y, "#c8a44a", 1.6);
+    P.vline(g.optimalTruncation, "#2e9e57", "k* = " + g.optimalTruncation);
+    $("cap2").innerHTML = "s = " + g.s + ", x = " + g.x + " ／ ρ = " + sup(g.leakFraction, 3);
+  }
+
+  function draw3(r) {
+    var s = r.series, t = s.t, n = t.length;
+    var P = Plot($("c3"), t[0], t[n - 1]);
+    P.frame("t [ns]", function (v) { return v.toFixed(0); });
+    var rg = logRange([r.runaway.eReleasedJ, r.budget.eLeakJ], 1);
+    var Y = P.axisLog(rg[0], rg[1], "#4a80d0", "エネルギー [J]");
+    P.line(t, s.energy, Y, "#4a80d0", 1.7);
+    P.line(t, s.absorbed, Y, "#2e9e57", 1.4, [6, 3]);
+    P.line(t, s.leaked, Y, "#d0574a", 1.5);
+    $("cap3").innerHTML = "解放 " + sup(r.runaway.eReleasedJ, 2) + " J ／ 漏れ " + sup(r.budget.eLeakJ, 2) + " J";
+  }
+
+  function draw4(r) {
+    var s = setup($("c4")), g = s.g;
+    var items = [
+      { label: "排熱要求 (ピーク)", v: r.budget.loadW, c: "#d0574a" },
+      { label: "LED 配列 " + sciTxt(r.led.count, 1) + " 個", v: r.led.totalW, c: "#40b8c0" },
+      { label: "LED 1 素子", v: r.led.perDeviceW, c: "#c8a44a" },
+      { label: "実証済み素子 1 台", v: r.led.demonstratedW, c: "#9060d0" },
+      { label: "制御計算の発熱", v: r.jones.controlW, c: "#4a80d0" }
+    ].filter(function (x) { return x.v > 0 && isFinite(x.v); });
+    var rg = logRange(items.map(function (x) { return x.v; }), 1);
+    var x0 = 150, x1 = s.w - 90, bh = 20, gap = 12;
+    g.font = "11px system-ui,sans-serif";
+    for (var i = 0; i < items.length; i++) {
+      var y = 14 + i * (bh + gap);
+      var frac = (Math.log10(items[i].v) - rg[0]) / (rg[1] - rg[0]);
+      var wpx = Math.max(2, frac * (x1 - x0));
+      g.fillStyle = "#101c2b"; g.fillRect(x0, y, x1 - x0, bh);
+      g.fillStyle = items[i].c; g.fillRect(x0, y, wpx, bh);
+      g.fillStyle = "#d6e2ee"; g.textAlign = "right"; g.fillText(items[i].label, x0 - 8, y + 14);
+      g.fillStyle = "#8aa0b8"; g.font = "10px monospace"; g.textAlign = "left";
+      g.fillText(sciTxt(items[i].v, 2) + " W", x0 + wpx + 6, y + 14);
+      g.font = "11px system-ui,sans-serif";
+    }
+    $("cap4b").innerHTML = "対数目盛 (1e" + rg[0] + " … 1e" + rg[1] + " W)。" +
+      "排熱要求と実証済み素子の差は <b>10<sup>" + r.led.realityGapOrders.toFixed(1) + "</sup></b> 倍です。";
+  }
+
+  function kv(host, rows) {
+    host.innerHTML = rows.map(function (x) {
+      return '<div class="kv"><b>' + x[0] + '</b><span class="' + (x[2] || "") + '">' + x[1] + "</span></div>";
+    }).join("");
+  }
+
+  function render(r) {
+    var b = r.budget, j = r.jones, d = r.led, g = r.gamma, ra = r.runaway, v = r.verdict;
+    var why = { "control-compute": "制御計算が倍加時間内に終わらない",
+                "el-cooling-condition": "EQE が冷却条件 η > qV/ħω を満たさない",
+                "cooling-power": "冷却能力が排熱要求に届かない" }[v.limiting];
+
+    $("banner").innerHTML = v.result === "closes"
+      ? '<div class="banner ok">✔ <b>モデル上は熱収支が閉じます</b> — 漏れ ' + sup(b.eLeakJ, 2)
+        + ' J (ρ = ' + sup(b.leakFraction, 2) + ')、排熱要求 ' + sup(b.loadW, 2)
+        + ' W に対し冷却能力 ' + sup(d.totalW, 2) + ' W。下の「現実との差」を必ず併せて読んでください。</div>'
+      : '<div class="banner fail">✕ <b>熱収支は閉じません</b> — 律速は<b>' + why + '</b>。'
+        + '抑制側 (Γ 多様体) は漏れを ρ = ' + sup(b.leakFraction, 2) + ' まで落とせていますが、'
+        + '吸収した ' + sup(b.eAbsorbJ, 2) + ' J を捨てる速度が足りません'
+        + (b.breakNs !== null ? '（t = ' + b.breakNs.toFixed(1) + ' ns で破綻）' : '') + '。</div>';
+
+    $("gapbox").innerHTML = '<div class="gap">⚠ <b>現実との差</b> — この排熱要求 '
+      + sup(b.loadW, 2) + ' W を、実証済みの電界発光冷却 (' + sciTxt(d.demonstratedW, 1)
+      + ' W/素子, Santhanam et al. 2012, PRL 108, 097403) だけで賄うには <b>'
+      + sup(d.demonstratedDevices, 2) + ' 台</b>、すなわち <b>10<sup>'
+      + d.realityGapOrders.toFixed(1) + '</sup></b> のスケール差が必要です。'
+      + 'しかも室温の青色 InGaN での正味電界発光冷却は未実証で、低バイアス域では'
+      + '非発光再結合が EQE を潰します。<b>この構成は現実の装置にはなりません。</b></div>';
+
+    kv($("kVerdict"), [
+      ["結果", v.result === "closes" ? "収支が閉じる" : "収支が閉じない", v.result === "closes" ? "ok" : "bad"],
+      ["律速", why || "なし", v.limiting ? "bad" : "ok"],
+      ["Γ 抑制", "ρ = " + sciTxt(b.leakFraction, 3), "hi"],
+      ["制御計算", v.computeCloses ? "間に合う" : "間に合わない", v.computeCloses ? "ok" : "bad"],
+      ["LED 冷却条件", v.elCondition ? "成立" : "不成立", v.elCondition ? "ok" : "bad"],
+      ["冷却能力", v.coolingCloses ? "足りる" : "足りない", v.coolingCloses ? "ok" : "bad"],
+      ["現実との差", "10^" + d.realityGapOrders.toFixed(1) + " 倍", "bad"]
+    ]);
+
+    kv($("kRun"), [
+      ["初期出力 P₀", sup(r.params.p0W, 2) + " W"],
+      ["倍加時間 τ_d", r.params.doublingNs + " ns"],
+      ["成長率 λ", sciTxt(ra.lambdaRate, 4) + " s⁻¹"],
+      ["解放エネルギー", sup(ra.eReleasedJ, 3) + " J", "hi"],
+      ["TNT 換算の桁", sciTxt(ra.ktEquivalent, 2) + " kt 相当"],
+      ["ピーク出力", sup(ra.pPeakW, 3) + " W", "hi"],
+      ["自己消滅まで", ra.tQuenchNs.toFixed(2) + " ns"]
+    ]);
+
+    kv($("kGamma"), [
+      ["s / x", g.s + " / " + g.x],
+      ["最適打ち切り k*", String(g.optimalTruncation), "hi"],
+      ["理論位置 s+x", String(g.predictedTruncation)],
+      ["吸収容量 Σ|a_k|", sciTxt(g.capacity, 5)],
+      ["最小項 (超漸近残差)", sciTxt(g.minTerm, 4), "hi"],
+      ["漏れ比 ρ", sciTxt(g.leakFraction, 4), "hi"],
+      ["漏れたエネルギー", sup(b.eLeakJ, 3) + " J", "bad"],
+      ["吸収したエネルギー", sup(b.eAbsorbJ, 3) + " J"],
+      ["Γ(s,x) 漸近評価", sciTxt(g.gammaAsym, 4)]
+    ]);
+
+    kv($("kLambda"), [
+      ["u = x log x", r.lambda.u.toFixed(5)],
+      ["Λ = e^u", sciTxt(r.lambda.Lambda, 4), "hi"],
+      ["Λ⁻ = 2 cosh u", sciTxt(r.lambda.antigravity, 4)],
+      ["均衡余裕 2e^{−u}", sciTxt(r.lambda.margin, 4), r.lambda.margin < 1e-3 ? "bad" : ""]
+    ]);
+
+    kv($("kJones"), [
+      ["交差数 c", String(j.crossings)],
+      ["⟨D⟩(A)", sciTxt(j.bracket, 5), "hi"],
+      ["非可逆操作数", sciTxt(j.ops, 4) + " ops"],
+      ["Landauer 量子", sciTxt(j.landauerQuantumJ, 4) + " J/bit"],
+      ["制御計算の発熱", sciTxt(j.heatJ, 4) + " J"],
+      ["定常発熱", sciTxt(j.controlW, 4) + " W"],
+      ["評価所要時間", sciTxt(j.computeS, 4) + " s", j.computeCloses ? "ok" : "bad"],
+      ["間に合う最大 c", String(j.maxFeasibleCrossings), "hi"],
+      ["H(σ)", (j.entropy >= 1e-4 ? j.entropy.toFixed(5) : sciTxt(j.entropy, 3)) + " nats"],
+      ["E(σ)", sciTxt(j.Esigma, 5), "hi"]
+    ]);
+
+    kv($("kLed"), [
+      ["波長 λ", d.lambdaNm + " nm"],
+      ["光子 ħω", d.photonEV.toFixed(4) + " eV", "hi"],
+      ["バイアス V", d.biasV.toFixed(3) + " V"],
+      ["EQE η", d.eqe.toFixed(3)],
+      ["冷却条件 η > qV/ħω", d.etaThreshold.toFixed(5), d.cools ? "ok" : "bad"],
+      ["1 電子あたり吸熱", d.perElectronEV.toFixed(4) + " eV", d.cools ? "ok" : "bad"],
+      ["1 素子の冷却能力", sciTxt(d.perDeviceW, 4) + " W"],
+      ["素子数", sup(d.count, 2) + " 個"],
+      ["総冷却能力", sup(d.totalW, 3) + " W", "hi"],
+      ["COP", isFinite(d.cop) ? d.cop.toFixed(3) : "–"],
+      ["必要素子数", sup(d.devicesNeeded, 3) + " 個", d.devicesNeeded > d.count ? "bad" : "ok"],
+      ["必要総電流", sup(d.currentNeededA, 3) + " A", "bad"]
+    ]);
+
+    /* 実行手順 */
+    var steps = [
+      { ok: true, t: "観測 — 暴走の成長率を測る",
+        d: "λ = " + sciTxt(ra.lambdaRate, 3) + " s⁻¹, 倍加 " + r.params.doublingNs + " ns" },
+      { ok: j.computeCloses, t: "Jones 熱勘定 — 抑制手順の交差を決める",
+        d: "c = " + j.crossings + ", ⟨D⟩ = " + sciTxt(j.bracket, 3) + ", 評価 " + sciTxt(j.computeS, 2) + " s" },
+      { ok: true, t: "Λ 場展開 — Dalanversian 作用素を立てる",
+        d: "u = " + r.lambda.u.toFixed(3) + ", Λ = " + sciTxt(r.lambda.Lambda, 3) },
+      { ok: g.leakFraction < 1e-6, t: "Γ 部分積分層の積み上げ — 最適打ち切りまで",
+        d: "k* = " + g.optimalTruncation + " 層, ρ = " + sciTxt(g.leakFraction, 3) },
+      { ok: d.cools, t: "LED 冷却起動 — 電界発光で格子熱を汲み出す",
+        d: "η = " + d.eqe.toFixed(2) + " > " + d.etaThreshold.toFixed(4) + " (" + (d.cools ? "成立" : "不成立") + ")" },
+      { ok: v.coolingCloses, t: "排熱 — 吸収分を捨て切る",
+        d: "要求 " + sciTxt(b.loadW, 2) + " W に対し能力 " + sciTxt(d.totalW, 2) + " W" },
+      { ok: v.result === "closes", t: "判定",
+        d: v.result === "closes" ? "モデル上は収支が閉じる" : "律速: " + why }
+    ];
+    $("steps").innerHTML = steps.map(function (s) {
+      return '<li class="' + (s.ok ? "pass" : "fail") + '">' + s.t + '<span class="d">' + s.d + "</span></li>";
+    }).join("");
+
+    $("sum").textContent = LD.summary(r);
+  }
+
+  function run() {
+    syncLabels();
+    var r;
+    try { r = LD.simulate(params()); }
+    catch (e) { $("banner").innerHTML = '<div class="banner fail">エラー: ' + e.message + "</div>"; return; }
+    LAST = r;
+    render(r); draw1(r); draw2(r); draw3(r); draw4(r);
+  }
+
+  function download(name, text, mime) {
+    if (!canDownload) {
+      var w = window.open("", "_blank");
+      if (w) { w.document.write("<pre>" + text.replace(/[<&]/g, function (c) { return c === "<" ? "&lt;" : "&amp;"; }) + "</pre>"); }
+      return;
+    }
+    var bl = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+    var u = URL.createObjectURL(bl), a = document.createElement("a");
+    a.href = u; a.download = name; document.body.appendChild(a); a.click();
+    document.body.removeChild(a); setTimeout(function () { URL.revokeObjectURL(u); }, 1500);
+  }
+  function stem() {
+    var p = params();
+    return "laevatein_" + Number(p.emaxJ).toExponential(1).replace("+", "")
+      + "J_" + p.doublingNs + "ns_x" + p.depthX;
+  }
+  $("csv").onclick = function () { if (LAST) download(stem() + ".csv", LD.toCSV(LAST), "text/csv;charset=utf-8"); };
+  $("json").onclick = function () {
+    if (!LAST) return;
+    var o = { version: LAST.version, params: LAST.params, runaway: LAST.runaway,
+              gamma: { s: LAST.gamma.s, x: LAST.gamma.x, optimalTruncation: LAST.gamma.optimalTruncation,
+                       predictedTruncation: LAST.gamma.predictedTruncation, minTerm: LAST.gamma.minTerm,
+                       capacity: LAST.gamma.capacity, leakFraction: LAST.gamma.leakFraction },
+              lambda: LAST.lambda, jones: LAST.jones, budget: LAST.budget,
+              led: LAST.led, verdict: LAST.verdict, series: {} };
+    ["t", "power", "energy", "absorbed", "leaked", "coolCap"].forEach(function (k) {
+      o.series[k] = Array.prototype.slice.call(LAST.series[k]);
+    });
+    download(stem() + ".json", JSON.stringify(o, null, 2), "application/json");
+  };
+
+  $("run").onclick = run;
+  ["p0","td","em","hz","dx","gs","cr","ka","or","tk","lm","bv","eq","ic","nd"].forEach(function (id) {
+    $(id).addEventListener("input", syncLabels);
+    $(id).addEventListener("change", run);
+  });
+  window.addEventListener("resize", function () { if (LAST) { draw1(LAST); draw2(LAST); draw3(LAST); draw4(LAST); } });
+
+  $("runtime").textContent = NATIVE.kind === "browser"
+    ? "単一 HTML · 依存なし · オフライン可" : NATIVE.name + " · オフライン可";
+  syncLabels();
+  run();
+})();
+</script>
+</body>
+</html>

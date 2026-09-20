@@ -29,6 +29,35 @@
 
 ---
 
+## ⬇️ ダウンロード — Λ ドライバ無力化シミュレータ (LÆVATEIN)
+
+指数関数的に暴走する系を抑制したとき、**吸収したエネルギーをどれだけの速さで捨てられるか**を計算する熱収支シミュレータ。**下のファイルを 1 つダウンロードして開くだけ**で動きます(インストール不要・依存なし・オフライン可):
+
+### 👉 [**bada_gui_ide/dist/lambda-driver.html をダウンロード**](bada_gui_ide/dist/lambda-driver.html)
+
+| ファイル | 内容 |
+|:---|:---|
+| [`lambda-driver.html`](bada_gui_ide/dist/lambda-driver.html) | ★ 本体(単一 HTML)。4 枚の図 + 判定パネル + CSV/JSON 出力 |
+| [`lambda-driver-cli.js`](bada_gui_ide/cli/lambda-driver-cli.js) | CLI — `run` / `csv` / `json` / `gamma` / `sweep` / `cooling` / `selftest` |
+| [`lambda_driver.js`](bada_gui_ide/www/lambda_driver.js) | モデルコア(GUI と CLI が共有) |
+| [`lambda_driver.bada`](bada_gui_ide/examples/lambda_driver.bada) | 同じモデルの **Bada 言語**リファレンス実装 |
+
+**三層モデル** — **(A) 暴走系[抽象]**: `P(t) = P₀e^{λt}`、初期出力・倍加時間・総エネルギーの 3 つだけで書ける装置非依存の指数関数的暴走(特定の装置の設計量は一切含みません)。**(B) 抑制層**: `Γ(s,x)` を繰り返し部分積分して得られる境界項の漸近級数を吸収層とみなし、**最適打ち切り(superasymptotics)**で止める — 残る最小項が漏れ比 `ρ ~ e^{−x}`。Λ ドライバは Dalanversian 作用素 `Λ = cos(iu) − i sin(iu) = e^u`。抑制手順の交差を Kauffman ブラケットで評価し、**非可逆ビット操作数 × Landauer 限界 `k_B T ln2`** が制御計算の発熱。**(C) 冷却層[実在]**: 青色 LED の電界発光冷却 — `V < ħω/q` で駆動すると 1 光子あたり `(η·ħω − qV)` だけ格子から熱を奪う熱ポンプになります(冷却条件 `η > qV/ħω`)。
+
+**このアプリが出す答え** — 抑制の数学は成立します(既定条件で `ρ ≈ 10⁻¹⁶`)。**破綻するのは排熱**です。深さ `x` を上げれば漏れは指数関数的に減りますが、排熱要求は `2.9×10²⁰ W` のまま動きません。実証済みの電界発光冷却(pW オーダー, Santhanam et al. 2012, *PRL* **108**, 097403)との差は **10³⁰ 規模**です。
+
+> **創作についての注記** — Λ ドライバ・レーバテイン・アルは『フルメタル・パニック!』(賀東招二)の架空の装置とキャラクタです。作中の封じ込めの筋立てを手順の骨格として借りていますが、装置そのものは創作であり、**この構成は現実の装置にはなりません**。主眼は「うまくいく」ことではなく、要求排熱と実在の熱力学の間に何桁の隔たりがあるかを数えることにあります。
+
+```sh
+node bada_gui_ide/cli/lambda-driver-cli.js run
+node bada_gui_ide/cli/lambda-driver-cli.js cooling    # LED 冷却の成立範囲
+node bada_gui_ide/cli/bada-cli.js run bada_gui_ide/examples/lambda_driver.bada
+```
+
+配布は [`laevatein-dist.yml`](.github/workflows/laevatein-dist.yml)(ブランチ push で [Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/laevatein-dist.yml) アーティファクト / `laevatein-v*` タグで Release へ添付)。詳細は [`bada_gui_ide/README.md`](bada_gui_ide/README.md) の「LÆVATEIN」節を参照。
+
+---
+
 ## ⬇️ ダウンロード — 原子の臨界期の強度シミュレータ (ACPI)
 
 強レーザー場のなかで原子の**クーロン障壁が完全に抑制される時間窓 (= 臨界期)** と、
@@ -169,6 +198,7 @@ zip 一式(CLI + コア + Bada 実装 + サンプル出力)は [Releases](https:
 | **`omega/`** | omega_llm エンジン · π-softmax · ℏ_eff注意 · gamma-deprivation · Omega::DATABASE | [→ 開く](https://masaaki-avnturle.github.io/Bada/omega/) |
 | **`bada_gui_ide/`** | **Bada GUI IDE** — .badaをドラッグ&ドロップで自動コンパイル(Bada→C→ネイティブリンク)+インタープリタ実行 · @reviser文法拡張 · 量子サブ言語(qubit/H/CNOT/Measure) · **zone:// ウルトラネットワークWWW** (P2P DHT + Jones多項式量子暗号 AEAD, `examples/zone.bada`) | [→ 開く](bada_gui_ide/) |
 | **`bada_gui_ide/dist/atom-critical.html`** | **ACPI — 原子の臨界期の強度シミュレータ** · 障壁抑制場 F_cr=I_p²/4Z_c · ADK トンネル電離 · Keldysh γ · Ω 作用素層 (ζ/β(p,q)/Γ-deprivation/Dalanversian/Euler 極均衡/Kauffman ⟨D⟩/E(σ)) · 単一 HTML | [→ 開く](bada_gui_ide/dist/atom-critical.html) |
+| **`bada_gui_ide/dist/lambda-driver.html`** | **LÆVATEIN — Λ ドライバ無力化シミュレータ** · Γ 大域的部分積分多様体 (superasymptotics) · Jones/Kauffman の Landauer 熱勘定 · 青色 LED 電界発光冷却 [実在] · 単一 HTML | [→ 開く](bada_gui_ide/dist/lambda-driver.html) |
 
 ---
 

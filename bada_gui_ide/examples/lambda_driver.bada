@@ -1,0 +1,352 @@
+# ============================================================
+# lambda_driver.bada -- LÆVATEIN: Λ ドライバ無力化の熱収支を
+# Bada 言語で記述したリファレンス実装。
+#
+# 問いは一つだけ: 抑制した分のエネルギーを、どこへ、どれだけの
+# 速さで捨てられるか。
+#
+#   (A) 暴走系 [抽象] P(t) = P0 e^{λt}, λ = ln2/τ_d
+#       初期出力・倍加時間・総エネルギーの 3 つだけで書ける、
+#       装置に依存しない指数関数的暴走。特定の装置の設計量は
+#       一切含まない。
+#
+#   (B) 抑制層
+#       Γ 大域的部分積分多様体:
+#         Γ(s,x) = ∫_x^∞ t^{s-1} e^{-t} dt を繰り返し部分積分すると
+#         境界項の漸近級数 a_0 = 1, a_k = a_{k-1}(s-k)/x が出る。
+#         収束せず k ≈ s+x で最小になってから発散するので、そこで
+#         打ち切るのが最適 (superasymptotics)。残る最小項が抑制を
+#         抜ける漏れ比 ρ になる。
+#       Λ ドライバ: Λ = cos(i·u) - i·sin(i·u) = e^u, u = x log x
+#         (『フルメタル・パニック!』賀東招二 の架空装置。作中で
+#          レーバテインの AI「アル」が行う封じ込めの筋立てを借用)
+#       Jones 多項式の熱エネルギー消費:
+#         Kauffman ブラケットの状態和に要する非可逆ビット操作数に
+#         Landauer 限界 k_B T ln2 を掛けたものが制御計算の発熱。
+#
+#   (C) 冷却層 [実在の物理] 青色 LED の電界発光冷却
+#         1 電子あたり吸熱 = η·ħω - qV   (正なら冷却)
+#         冷却条件 η > qV/ħω
+#
+# 実行:  node cli/bada-cli.js run examples/lambda_driver.bada
+# 同一モデルの GUI 版:  dist/lambda-driver.html
+# ============================================================
+
+print("================================================================")
+print("LAEVATEIN BADA -- Λ ドライバ無力化の熱収支")
+print("================================================================")
+
+@reviser : grammar {
+    rule "suppress" stmt [ 'SUPPRESS' expr expr ] => gamma_manifold(_1, _2)
+    rule "budget"   stmt [ 'BUDGET' expr ]        => heat_budget(_1)
+}
+print("抑制動詞を文法へ commit:", len(tuplespace), "facts")
+
+# ====================================================================
+# 定数
+# ====================================================================
+K_B       := 0.0000000000000000000000138064900   # J/K
+HC_EVNM   := 1239.841984                          # eV*nm
+LN2       := 0.6931471805599453
+PI        := 3.14159265358979
+
+# ====================================================================
+# 数学プリミティブ
+# ====================================================================
+def ipow(base, e) {
+    if (e < 0) {
+        r := 1.0
+        k := 0
+        m := 0 - e
+        while (k < m) { r := r * base; k := k + 1 }
+        return 1.0 / r
+    }
+    r := 1.0
+    k := 0
+    while (k < e) { r := r * base; k := k + 1 }
+    return r
+}
+def fpow(x, y) {
+    if (x <= 0.0) { return 0.0 }
+    return exp(y * log(x))
+}
+def xlogx(x) {
+    if (x <= 0.0) { return 0.0 }
+    return x * log(x)
+}
+
+# ====================================================================
+# (B1) Γ 大域的部分積分多様体
+#   a_0 = 1,  a_k = a_{k-1} (s-k)/x
+#   |a_k| は k ≈ s+x で最小 -> そこが最適打ち切り。
+#   返り値: [k*, 最小項, 抑制容量 Σ|a_k|, 漏れ比 ρ]
+# ====================================================================
+def gamma_manifold(s, x) {
+    a := 1.0
+    sum_abs := 1.0
+    min_abs := 1.0
+    min_k := 0
+    kmax := s + x + 12
+    # 第 1 周: 最小項の位置を見つける
+    k := 1
+    while (k <= kmax) {
+        a := a * (s - k) / x
+        av := a
+        if (av < 0.0) { av := 0.0 - av }
+        if (av < min_abs) { min_abs := av; min_k := k }
+        k := k + 1
+    }
+    # 第 2 周: 最小項までの層で抑制容量を積む
+    a := 1.0
+    sum_abs := 1.0
+    k := 1
+    while (k <= min_k) {
+        a := a * (s - k) / x
+        av := a
+        if (av < 0.0) { av := 0.0 - av }
+        sum_abs := sum_abs + av
+        k := k + 1
+    }
+    rho := min_abs / sum_abs
+    return [min_k, min_abs, sum_abs, rho]
+}
+
+# ====================================================================
+# (B2) Λ ドライバ (Dalanversian)
+#   Λ = cos(i u) - i sin(i u) = cosh u + sinh u = e^u
+# ====================================================================
+def dalanversian(x) { return exp(xlogx(x)) }
+def antigravity(x)  { u := xlogx(x); return exp(u) + exp(0.0 - u) }
+def balance_margin(x) { return 2.0 * exp(0.0 - xlogx(x)) }
+
+# ====================================================================
+# (B3) Kauffman ブラケット + 非可逆操作の計数
+#
+#   Bada では def の中の := はローカル束縛を作るので、グローバルな
+#   カウンタは関数から更新できない。操作数は戻り値で引き回す:
+#     uf_find  -> [root, steps]
+#     kauffman -> [value, ops]
+# ====================================================================
+def uf_find(parent, x) {
+    r := x
+    steps := 1
+    while (parent[r] >= 0) { r := parent[r]; steps := steps + 1 }
+    return [r, steps]
+}
+def kauffman(cross, A) {
+    n := len(cross)
+    if (n == 0) { return 1.0 }
+    maxlbl := 0
+    i := 0
+    while (i < n) {
+        k := 0
+        while (k <= 3) {
+            if (cross[i][k] > maxlbl) { maxlbl := cross[i][k] }
+            k := k + 1
+        }
+        i := i + 1
+    }
+    U := maxlbl + 1
+    states := 1
+    p := 0
+    while (p < n) { states := states * 2; p := p + 1 }
+    d := (0.0 - (A * A)) - (1.0 / (A * A))
+    sum := 0.0
+    ops := 0
+    st := 0
+    while (st < states) {
+        bits := []
+        v := st
+        i := 0
+        while (i < n) { bits <- (v % 2); v := (v - (v % 2)) / 2; i := i + 1 }
+        parent := []
+        q := 0
+        while (q < U) { parent <- (0 - 1); ops := ops + 1; q := q + 1 }
+        a_cnt := 0
+        b_cnt := 0
+        i := 0
+        while (i < n) {
+            e0 := cross[i][0]
+            e1 := cross[i][1]
+            e2 := cross[i][2]
+            e3 := cross[i][3]
+            ops := ops + 1
+            if (bits[i] == 0) { p1 := e0; p2 := e1; p3 := e2; p4 := e3; a_cnt := a_cnt + 1 }
+            else              { p1 := e1; p2 := e2; p3 := e3; p4 := e0; b_cnt := b_cnt + 1 }
+            fa := uf_find(parent, p1); fb := uf_find(parent, p2)
+            ops := ops + fa[1] + fb[1]
+            if (fa[0] != fb[0]) { parent[fa[0]] = fb[0]; ops := ops + 1 }
+            fa := uf_find(parent, p3); fb := uf_find(parent, p4)
+            ops := ops + fa[1] + fb[1]
+            if (fa[0] != fb[0]) { parent[fa[0]] = fb[0]; ops := ops + 1 }
+            i := i + 1
+        }
+        seen := []
+        q := 0
+        while (q < U) { seen <- 0; q := q + 1 }
+        loops := 0
+        lbl := 0
+        while (lbl < U) {
+            fr := uf_find(parent, lbl)
+            ops := ops + fr[1]
+            if (seen[fr[0]] == 0) { seen[fr[0]] = 1; loops := loops + 1; ops := ops + 1 }
+            lbl := lbl + 1
+        }
+        sum := sum + ipow(A, a_cnt - b_cnt) * ipow(d, loops - 1)
+        ops := ops + 1
+        st := st + 1
+    }
+    return [sum, ops]
+}
+def braid(c) {
+    cross := []
+    i := 0
+    while (i < c) {
+        j := (i + 1) % c
+        cross <- [i, c + i, c + j, j]
+        i := i + 1
+    }
+    return cross
+}
+
+# ====================================================================
+# (C) 青色 LED 電界発光冷却 [実在]
+#   1 電子あたり吸熱 [eV] = η·ħω - qV,  冷却条件 η > qV/ħω
+#   冷却能力 [W] = I × (η·ħω/q - V)
+# ====================================================================
+def photon_ev(lambda_nm) { return HC_EVNM / lambda_nm }
+def el_cool_per_electron(lambda_nm, bias_v, eqe) {
+    return eqe * photon_ev(lambda_nm) - bias_v
+}
+
+# ====================================================================
+# 条件 (GUI の既定値と同じ)
+# ====================================================================
+P0       := 1000000.0          # 初期出力 [W]
+TAU_D_NS := 10.0               # 倍加時間 [ns]
+EMAX     := 4184000000000.0    # 総エネルギー [J] (1 kt TNT 相当の桁)
+GS       := 2.5                # 不完全ガンマの s
+DX       := 30.0               # 部分積分の深さ x
+CROSS    := 8                  # Λ 場の交差数 (Bada 版は 2^8 = 256 状態まで)
+KA       := 1.0699             # Kauffman ループ変数
+OPSRATE  := 1000000000000000000.0   # 1e18 ops/s
+TEMPK    := 300.0
+LED_NM   := 450.0
+LED_V    := 0.10
+LED_EQE  := 0.70
+LED_I    := 0.001              # 素子あたり電流 [A]
+LED_N    := 1000000000000.0    # 素子数 1e12
+DEMO_W   := 0.0000000001       # 実証済み電界発光冷却 1e-10 W/素子
+
+print("")
+print("---- (A) 暴走系 [装置非依存の抽象モデル] ----------------")
+tau := TAU_D_NS / 1000000000.0
+lam_rate := LN2 / tau
+t_quench := log(1.0 + EMAX * lam_rate / P0) / lam_rate
+p_peak := P0 * exp(lam_rate * t_quench)
+print("  初期出力    :", sci(P0), "W   倍加時間", f5(TAU_D_NS), "ns")
+print("  成長率 λ    :", sci(lam_rate), "s^-1")
+print("  解放 E      :", sci(EMAX), "J")
+print("  ピーク出力  :", sci(p_peak), "W   自己消滅まで", f5(t_quench * 1000000000.0), "ns")
+
+print("")
+print("---- (B1) Γ 大域的部分積分多様体 -----------------------")
+GM := gamma_manifold(GS, DX)
+k_star := GM[0]
+min_term := GM[1]
+capacity := GM[2]
+rho := GM[3]
+print("  s, x        :", f5(GS), ",", f5(DX))
+print("  最適打ち切り: k* =", k_star, " (理論位置 s+x =", f5(GS + DX), ")")
+print("  吸収容量    :", sci(capacity))
+print("  最小項      :", sci(min_term))
+print("  漏れ比 ρ    :", sci(rho))
+e_leak := EMAX * rho
+e_absorb := EMAX - e_leak
+print("  漏れた E    :", sci(e_leak), "J    吸収した E :", sci(e_absorb), "J")
+
+print("")
+print("---- (B2) Λ ドライバ [架空: フルメタル・パニック!] ------")
+u := xlogx(DX)
+print("  u = x log x :", f5(u))
+print("  Λ = e^u     :", sci(dalanversian(DX)))
+print("  Λ^- = 2cosh :", sci(antigravity(DX)))
+print("  均衡余裕    :", sci(balance_margin(DX)))
+
+print("")
+print("---- (B3) Jones 多項式の熱エネルギー消費 ---------------")
+KR := kauffman(braid(CROSS), KA)
+K := KR[0]
+OPS := KR[1]
+landauer := K_B * TEMPK * LN2
+heat := OPS * landauer
+t_compute := OPS / OPSRATE
+p_control := OPSRATE * landauer
+print("  交差数 c    :", CROSS, "  <D>(A) =", sci(K))
+print("  非可逆操作  :", sci(OPS), "ops")
+print("  ops(raw)    :", OPS)          # JS コアとの厳密照合用
+print("  Landauer 量子:", sci(landauer), "J/bit  (k_B T ln2, T =", f5(TEMPK), "K)")
+print("  制御の発熱  :", sci(heat), "J    定常発熱:", sci(p_control), "W")
+print("  評価所要時間:", sci(t_compute), "s")
+compute_ok := 0
+if (t_compute <= tau) { compute_ok := 1 }
+if (compute_ok == 1) { print("  -> 倍加時間内に間に合う") }
+else                 { print("  -> 倍加時間内に間に合わない") }
+
+print("")
+print("---- (C) 青色 LED 電界発光冷却 [実在の物理] ------------")
+hw := photon_ev(LED_NM)
+eta_th := LED_V / hw
+per_e := el_cool_per_electron(LED_NM, LED_V, LED_EQE)
+cools := 0
+if (per_e > 0.0) { cools := 1 }
+cool_per_device := LED_I * per_e
+cool_total := cool_per_device * LED_N
+print("  波長 / 光子 :", f5(LED_NM), "nm  ->  ħω =", f5(hw), "eV")
+print("  V / η       :", f5(LED_V), "V ,", f5(LED_EQE), "  (冷却条件 η > qV/ħω =", f5(eta_th), ")")
+if (cools == 1) { print("  冷却成立    : はい   1 電子あたり吸熱", f5(per_e), "eV") }
+else            { print("  冷却成立    : いいえ (η が足りない)") }
+print("  1 素子の能力:", sci(cool_per_device), "W")
+print("  素子数/総能力:", sci(LED_N), "個  ->", sci(cool_total), "W")
+
+print("")
+print("---- 熱収支 -------------------------------------------")
+p_absorb_peak := p_peak * (1.0 - rho)
+load := p_absorb_peak + p_control
+print("  排熱要求    :", sci(load), "W  (吸収", sci(p_absorb_peak), "+ 制御", sci(p_control), ")")
+print("  冷却能力    :", sci(cool_total), "W")
+cool_ok := 0
+if (cool_total >= load) { cool_ok := 1 }
+if (cool_ok == 0) { print("  不足        :", sci(load / cool_total), "倍の能力が必要") }
+else              { print("  不足        : なし") }
+
+print("")
+print("---- 判定 ---------------------------------------------")
+if (compute_ok == 0) {
+    print("  収支は閉じない -- 律速: 制御計算が倍加時間内に終わらない")
+} else {
+    if (cools == 0) {
+        print("  収支は閉じない -- 律速: EQE が冷却条件を満たさない")
+    } else {
+        if (cool_ok == 0) {
+            print("  収支は閉じない -- 律速: 冷却能力が排熱要求に届かない")
+        } else {
+            print("  モデル上は収支が閉じる (現実との差は下を参照)")
+        }
+    }
+}
+
+print("")
+print("---- 現実との差 ---------------------------------------")
+demo_devices := load / DEMO_W
+gap_orders := log(demo_devices) / log(10.0)
+print("  実証済みの電界発光冷却は", sci(DEMO_W), "W/素子 のオーダー")
+print("  (Santhanam et al. 2012, PRL 108, 097403 -- 赤外 InGaAs・高温動作)")
+print("  この排熱要求を実証済み素子だけで賄うと", sci(demo_devices), "台、")
+print("  すなわち 10^", f5(gap_orders), "のスケール差になる。")
+print("  室温の青色 InGaN での正味電界発光冷却は未実証であり、")
+print("  低バイアス域では非発光再結合が EQE を潰すため、")
+print("  この構成は現実の装置にはならない。")
+print("")
+print("ledger =", len(tuplespace), "facts")
+print("================================================================")
