@@ -72,3 +72,21 @@ Omega::push levitation as antigravity_levitation               # アカシック
 ---
 
 *本 OS は山口フレームワーク（論文集第九巻・BadaUFO-OS 応用篇）に基づく理論的・思弁的シミュレーションであり、実在の超電導リニアの設計・安全性を評価するものではありません。*
+
+---
+
+## 論文 · 3D シミュレータ · ネイティブ配布
+
+| 成果物 | 場所 |
+|:--|:--|
+| 論文（日本語／英語） | [`paper/BadaLinear_OS_paper.pdf`](paper/BadaLinear_OS_paper.pdf) · [`paper/BadaLinear_OS_paper_EN.pdf`](paper/BadaLinear_OS_paper_EN.pdf) |
+| 3D 運行シミュレータ＋設計図（Three.js） | [`app/badalinear_3d.html`](app/badalinear_3d.html)（Artifact 版・CDN） |
+| Windows / Ubuntu / Android パッケージ | [`linear-app/`](linear-app/)（Electron・Cordova）＋ [`tools/build-linear-www.js`](tools/build-linear-www.js) |
+| CI（Release 添付） | [`.github/workflows/badalinear-app-build.yml`](../.github/workflows/badalinear-app-build.yml) — `badalinear-v*` タグ push または手動実行 |
+
+```bash
+node tools/build-linear-www.js          # オフライン www/index.html を生成（three.min.js 同梱）
+cd linear-app/electron && npm install && npm run dist        # Windows EXE
+                                        npm run dist:linux   # Ubuntu AppImage + deb
+```
+Release 生成物：`BadaLinear-1.0.0-x64.exe` / `BadaLinear-1.0.0-x64.AppImage` / `.deb` / `badalinear-debug.apk`
