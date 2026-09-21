@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada Serenace — 病気予防機構の解明</title>
+<style>
+  :root{
+    --bg:#070b12; --bg2:#0e1524; --panel:#131c2e; --line:#243350;
+    --tx:#dce7ff; --dim:#8494b8; --acc:#38bdf8; --acc2:#34d399; --warn:#fbbf24; --err:#fb7185;
+    --ket:#c084fc; --hot:#fb923c;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 72% -12%, #14253f 0%, var(--bg) 58%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  #statusbar{
+    display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:12px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:rgba(7,11,18,.85); backdrop-filter:blur(6px); flex:none;
+  }
+  #statusbar b{ color:var(--tx); font-weight:600; }
+  #sbInv{ margin-left:auto; color:var(--ket); font-family:ui-monospace,Consolas,monospace; }
+  #screen{ flex:1; overflow:auto; position:relative; }
+  #home{ padding:18px 14px 28px; }
+  #homeHead{ text-align:center; margin:8px 0 16px; }
+  #homeHead h1{ font-size:21px; letter-spacing:.05em; }
+  #homeHead h1 span{ color:var(--acc); }
+  #homeHead p{ font-size:11.5px; color:var(--dim); margin-top:7px; line-height:1.8; max-width:720px; margin-inline:auto; }
+  #grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:13px; max-width:680px; margin:0 auto; }
+  .app{
+    background:linear-gradient(160deg,var(--panel),var(--bg2)); border:1px solid var(--line);
+    border-radius:18px; padding:12px 6px 9px; text-align:center; cursor:pointer; user-select:none;
+    transition:transform .08s, border-color .15s;
+  }
+  .app:active{ transform:scale(.94); }
+  .app:hover{ border-color:var(--acc); }
+  .app .ic{ font-size:28px; line-height:1.2; }
+  .app .nm{ font-size:11.5px; margin-top:6px; }
+  .app .kt{ font-size:9px; color:var(--ket); font-family:ui-monospace,Consolas,monospace; margin-top:3px; word-break:break-all; }
+  #panel{ display:none; position:absolute; inset:0; background:var(--bg); overflow:auto; padding-bottom:24px; }
+  #panelBar{
+    position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px;
+    padding:10px 14px; background:rgba(7,11,18,.94); border-bottom:1px solid var(--line); backdrop-filter:blur(6px);
+  }
+  #panelTitle{ font-size:15px; font-weight:600; }
+  #panelKet{ margin-left:auto; font-size:10.5px; color:var(--ket); font-family:ui-monospace,Consolas,monospace; }
+  #panelBody{ padding:14px; max-width:820px; margin:0 auto; }
+  button{
+    background:linear-gradient(160deg,#1e2c48,#16203a); color:var(--tx); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:active{ transform:scale(.96); }
+  button.acc{ background:linear-gradient(160deg,var(--acc),#0369a1); border-color:transparent; color:#04121f; font-weight:600; }
+  button.grn{ background:linear-gradient(160deg,#10b981,#047857); border-color:transparent; color:#03140d; font-weight:600; }
+  input,textarea,select{
+    background:var(--bg2); color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; font-size:14px; font-family:inherit; width:100%;
+  }
+  textarea{ font-family:ui-monospace,Consolas,monospace; min-height:92px; }
+  input[type=range]{ padding:0; }
+  pre{
+    background:#050810; border:1px solid var(--line); border-radius:10px; padding:11px;
+    font-size:12.5px; line-height:1.65; overflow:auto; font-family:ui-monospace,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .row{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .row > label{ font-size:12px; color:var(--dim); min-width:126px; }
+  .row > input, .row > select{ flex:1; min-width:120px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin:10px 0; }
+  .card h3{ font-size:13.5px; margin-bottom:7px; color:var(--acc); }
+  .hint{ font-size:11.5px; color:var(--dim); line-height:1.85; }
+  .warn{ border-color:#7c2d12; background:linear-gradient(160deg,#1c1206,#140c04); }
+  .warn .hint{ color:#fcd34d; }
+  .tag{ display:inline-block; font-size:10.5px; color:var(--acc2); border:1px solid var(--line); border-radius:99px; padding:1px 9px; margin:2px 3px 2px 0; }
+  .tag.bad{ color:var(--err); } .tag.hot{ color:var(--hot); } .tag.ket{ color:var(--ket); }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ border-bottom:1px solid var(--line); padding:6px 5px; text-align:left; vertical-align:top; }
+  th{ color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:ui-monospace,Consolas,monospace; color:var(--ket); }
+  canvas{ width:100%; border:1px solid var(--line); border-radius:12px; background:#050810; display:block; }
+  .bar{ height:9px; border-radius:99px; background:#0b1220; border:1px solid var(--line); overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--acc),var(--acc2)); }
+  .bar > i.bad{ background:linear-gradient(90deg,#f59e0b,var(--err)); }
+  .msgU,.msgA{ border-radius:14px; padding:10px 13px; margin:8px 0; max-width:93%; font-size:13.5px; line-height:1.8; white-space:pre-wrap; word-break:break-word; }
+  .msgU{ background:#1c2c4e; margin-left:auto; }
+  .msgA{ background:var(--panel); border:1px solid var(--line); }
+  details{ margin-top:7px; font-size:11.5px; color:var(--dim); }
+  details pre{ margin-top:6px; }
+  #cmdbar{
+    flex:none; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line); background:rgba(7,11,18,.94); backdrop-filter:blur(6px);
+  }
+  #cmdbar input{ flex:1; }
+  .stage{ display:flex; gap:9px; align-items:flex-start; padding:7px 0; border-bottom:1px dashed var(--line); font-size:12.5px; }
+  .stage b{ color:var(--acc2); font-weight:600; white-space:nowrap; }
+  .stage.ng b{ color:var(--err); }
+</style>
+</head>
+<body>
+
+<div id="statusbar">
+  <b>⚕ Bada Serenace</b>
+  <span id="sbMode">予防機構 解明</span>
+  <span id="sbInv">V(t) = 1</span>
+</div>
+
+<div id="screen">
+  <div id="home">
+    <div id="homeHead">
+      <h1>⚕ Bada <span>Serenace</span></h1>
+      <p>
+        <b>積み木の真逆</b>(組み上げではなく、出来上がった形から生成語を読み戻す逆写像)から、
+        <b>Jones 多項式</b>の<b>Γ 熱感知</b>・<b>大域的部分積分多様体</b> ∫Γ(γ)′dx<sub>m</sub> = 2e<sup>−x log x</sup> の機知の仕組みを通し、
+        <b>構築可能な RNA 干渉</b>と<b>セレネース</b>の作用機序を突き合わせて、病気予防の機構を解明する概念シミュレータ。
+      </p>
+    </div>
+    <div id="grid"></div>
+    <div class="card warn" style="max-width:680px;margin:18px auto 0">
+      <div class="hint">
+        ⚠ <b>概念シミュレーション・非医療</b> — 実在の人体・検体は一切計測しません。合成データ上の数値実験です。
+        診断・治療・投薬の判断には使用できません。薬(セレネース/ハロペリドール等)の内容・量・継続や中止は、
+        必ず主治医にご相談ください。本アプリは服薬をやめる根拠にはなりません。
+      </div>
+    </div>
+  </div>
+  <div id="panel">
+    <div id="panelBar">
+      <button onclick="goHome()">← 戻る</button>
+      <span id="panelTitle"></span>
+      <span id="panelKet"></span>
+    </div>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<div id="cmdbar">
+  <input id="cmd" placeholder="例: 熱を感知して / 積み木の真逆 / 暗号を解いて / RNA干渉を設計して / セレネースを比べて" />
+  <button class="acc" onclick="shellSend()">実行</button>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ *  Bada Serenace — 病気予防機構の解明エンジン
+ *  すべて純関数。DOM に依存しない部分だけで tools/engine-test.js が回ります。
+ * ===================================================================== */
+
+/* ──────────────────────────────────────────────────────────────
+ * 0. ローラン多項式(変数 A / t の四半冪)
+ * ────────────────────────────────────────────────────────────── */
+function lpMono(e, c){ const m = new Map(); if (c !== 0) m.set(e, c); return m; }
+function lpAdd(p, q){
+  const r = new Map(p);
+  for (const [e, c] of q){ const v = (r.get(e) || 0) + c; if (v === 0) r.delete(e); else r.set(e, v); }
+  return r;
+}
+function lpMul(p, q){
+  const r = new Map();
+  for (const [e1, c1] of p) for (const [e2, c2] of q){
+    const e = e1 + e2, v = (r.get(e) || 0) + c1 * c2;
+    if (v === 0) r.delete(e); else r.set(e, v);
+  }
+  return r;
+}
+function lpEqual(p, q){
+  if (p.size !== q.size) return false;
+  for (const [e, c] of p) if (q.get(e) !== c) return false;
+  return true;
+}
+/* 指数を A の冪として表示 */
+function lpStrA(p){
+  const es = [...p.keys()].sort((a, b) => b - a);
+  if (!es.length) return "0";
+  return es.map((e, i) => {
+    const c = p.get(e), a = Math.abs(c);
+    const sign = c < 0 ? (i ? " − " : "−") : (i ? " + " : "");
+    const co = (a === 1 && e !== 0) ? "" : String(a);
+    const pw = e === 0 ? "" : (e === 1 ? "A" : "A^" + e);
+    return sign + co + pw;
+  }).join("");
+}
+/* t の四半冪 (キー = 4·指数) で表示 */
+function lpStrT(p){
+  const es = [...p.keys()].sort((a, b) => a - b);
+  if (!es.length) return "0";
+  const g = (a, b) => b ? g(b, a % b) : Math.abs(a);
+  return es.map((q, i) => {
+    const c = p.get(q), a = Math.abs(c);
+    const sign = c < 0 ? (i ? " − " : "−") : (i ? " + " : "");
+    const co = (a === 1 && q !== 0) ? "" : String(a);
+    let pw = "";
+    if (q !== 0){
+      const d = g(q, 4), num = q / d, den = 4 / d;
+      pw = "t" + ((den === 1 && num === 1) ? "" : "^" + (den === 1 ? String(num) : num + "/" + den));
+    }
+    return sign + co + pw;
+  }).join("");
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 1. Γ 大域的部分積分多様体
+ *      dx_m = dx / log x          (大域的微分変数)
+ *      ∫Γ(γ)′dx_m = 2 e^{−x log x} = 2(cos(ix log x) − i sin(ix log x))
+ *    論文「放射性物質吸収体とRNA干渉としてのオイラーの公式」の主式。
+ *    これを熱伝導率の空間変調へ渡したものが「Γ 熱感知」。
+ * ────────────────────────────────────────────────────────────── */
+function gammaManifold(x){
+  if (!(x > 0)) return null;
+  return 2 * Math.exp(-x * Math.log(x));
+}
+function gammaMeasure(x){                 /* dx_m の密度 1/log x */
+  if (!(x > 0) || x === 1) return null;   /* x = 1 は log x = 0 で特異 */
+  return 1 / Math.log(x);
+}
+/* 熱伝導率 k(r) = k0 (½ + ½ e^{−κ r log r}) を [0.02, 1] に収めたもの */
+function gammaKernel(r, kappa){
+  if (!(r > 0)) return 1;
+  const v = 0.5 + 0.5 * Math.exp(-kappa * r * Math.log(r));
+  return Math.max(0.02, Math.min(1, v));
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 2. 熱感知 — ∂T/∂t = ∇·(k∇T) + S を陽解法で解き、熱流束 q = −k∇T の
+ *    極大点(炎症/代謝の熱源)を感知する。面伝導は調和平均。
+ * ────────────────────────────────────────────────────────────── */
+function thermalSolve(opts){
+  const o = opts || {};
+  const w = o.w || 28, h = o.h || 28;
+  const kappa = (o.kappa === undefined) ? 1.2 : o.kappa;
+  const steps = o.steps || 220;
+  const dt = 0.18;
+  const sources = o.sources || [];
+  const k = new Float64Array(w * h), T = new Float64Array(w * h), S = new Float64Array(w * h);
+  const cx = (w - 1) / 2, cy = (h - 1) / 2, rmax = Math.hypot(cx, cy);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const r = Math.hypot(x - cx, y - cy) / rmax * 2.2 + 1e-6;
+    k[y * w + x] = gammaKernel(r, kappa);
+  }
+  for (const s of sources){
+    const xi = Math.max(0, Math.min(w - 1, Math.round(s.x)));
+    const yi = Math.max(0, Math.min(h - 1, Math.round(s.y)));
+    S[yi * w + xi] += (s.q === undefined ? 1 : s.q);
+  }
+  const face = (a, b) => (2 * a * b) / (a + b);
+  const Tn = new Float64Array(w * h);
+  for (let it = 0; it < steps; it++){
+    for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++){
+      const i = y * w + x;
+      const kE = face(k[i], k[i + 1]), kW = face(k[i], k[i - 1]);
+      const kN = face(k[i], k[i - w]), kS = face(k[i], k[i + w]);
+      const lap = kE * (T[i + 1] - T[i]) + kW * (T[i - 1] - T[i])
+                + kN * (T[i - w] - T[i]) + kS * (T[i + w] - T[i]);
+      Tn[i] = T[i] + dt * (lap + S[i]);
+    }
+    for (let x = 0; x < w; x++){ Tn[x] = 0; Tn[(h - 1) * w + x] = 0; }
+    for (let y = 0; y < h; y++){ Tn[y * w] = 0; Tn[y * w + w - 1] = 0; }
+    T.set(Tn);
+  }
+  return { T: T, k: k, w: w, h: h, kappa: kappa, steps: steps };
+}
+function thermalSense(field, opts){
+  const o = opts || {}, thr = (o.threshold === undefined) ? 0.02 : o.threshold;
+  const { T, k, w, h } = field;
+  let maxT = 0, totalFlux = 0;
+  const flux = new Float64Array(w * h);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++){
+    const i = y * w + x;
+    const gx = (T[i + 1] - T[i - 1]) / 2, gy = (T[i + w] - T[i - w]) / 2;
+    flux[i] = k[i] * Math.hypot(gx, gy);
+    totalFlux += flux[i];
+    if (T[i] > maxT) maxT = T[i];
+  }
+  const hotspots = [];
+  for (let y = 2; y < h - 2; y++) for (let x = 2; x < w - 2; x++){
+    const i = y * w + x;
+    if (T[i] < thr * Math.max(maxT, 1e-12) || T[i] <= 0) continue;
+    let peak = true;
+    for (let dy = -1; dy <= 1 && peak; dy++) for (let dx = -1; dx <= 1; dx++){
+      if (!dx && !dy) continue;
+      if (T[i + dy * w + dx] > T[i]) { peak = false; break; }
+    }
+    if (peak) hotspots.push({ x: x, y: y, T: T[i], flux: flux[i] });
+  }
+  hotspots.sort((a, b) => b.T - a.T);
+  /* 外部へ漏れる熱 = 境界近傍の流束和 (思考漏洩チャネルの物理量) */
+  let edge = 0;
+  for (let y = 2; y < h - 2; y++){ edge += flux[y * w + 2] + flux[y * w + w - 3]; }
+  for (let x = 2; x < w - 2; x++){ edge += flux[2 * w + x] + flux[(h - 3) * w + x]; }
+  return { hotspots: hotspots, maxT: maxT, totalFlux: totalFlux, edgeFlux: edge, flux: flux, w: w, h: h };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 3. Jones 多項式 — Kauffman ブラケットの状態和。
+ *    組み紐語 word (±1..±(n−1)) の閉包を図式とし、各交点を
+ *    A 平滑化 / B 平滑化に振って輪の数を Union-Find で数える。
+ *      ⟨K⟩ = Σ_s A^{a−b} δ^{|s|−1},  δ = −A² − A⁻²
+ *      f(A) = (−A)^{−3w} ⟨K⟩,  V_L(t) = f(t^{−1/4})
+ * ────────────────────────────────────────────────────────────── */
+function ufMake(n){
+  const p = new Int32Array(n);
+  for (let i = 0; i < n; i++) p[i] = i;
+  function find(x){ while (p[x] !== x){ p[x] = p[p[x]]; x = p[x]; } return x; }
+  return {
+    find: find,
+    union: function(a, b){ a = find(a); b = find(b); if (a !== b) p[a] = b; },
+    count: function(){ const s = new Set(); for (let i = 0; i < n; i++) s.add(find(i)); return s.size; }
+  };
+}
+function braidStrands(word){
+  let n = 1;
+  for (const g of word) n = Math.max(n, Math.abs(g) + 1);
+  return n;
+}
+function kauffmanBracket(word, strands){
+  const n = Math.max(strands || braidStrands(word), 1), m = word.length;
+  if (m > 16) throw new Error("交点数が多すぎます (16 まで): " + m);
+  const N = (m + 1) * n, idx = (t, s) => t * n + (s - 1);
+  const delta = lpAdd(lpMono(2, -1), lpMono(-2, -1));
+  let poly = new Map();
+  const total = 1 << m;
+  for (let st = 0; st < total; st++){
+    const u = ufMake(N);
+    let a = 0, b = 0;
+    for (let t = 0; t < m; t++){
+      const g = word[t], i = Math.abs(g), identity = ((st >> t) & 1) === 0;
+      if (g > 0){ if (identity) a++; else b++; } else { if (identity) b++; else a++; }
+      for (let s = 1; s <= n; s++) if (s !== i && s !== i + 1) u.union(idx(t, s), idx(t + 1, s));
+      if (identity){ u.union(idx(t, i), idx(t + 1, i)); u.union(idx(t, i + 1), idx(t + 1, i + 1)); }
+      else { u.union(idx(t, i), idx(t, i + 1)); u.union(idx(t + 1, i), idx(t + 1, i + 1)); }
+    }
+    for (let s = 1; s <= n; s++) u.union(idx(m, s), idx(0, s));
+    let term = lpMono(a - b, 1);
+    const loops = u.count();
+    for (let q = 0; q < loops - 1; q++) term = lpMul(term, delta);
+    poly = lpAdd(poly, term);
+  }
+  return poly;
+}
+function braidWrithe(word){ return word.reduce((s, g) => s + (g > 0 ? 1 : -1), 0); }
+const JONES_CACHE = new Map();
+function jonesPolynomial(word, strands){
+  const n = strands || braidStrands(word);
+  const ck = n + "|" + word.join(",");
+  const hit = JONES_CACHE.get(ck);
+  if (hit) return hit;
+  const br = kauffmanBracket(word, n);
+  const w = braidWrithe(word);
+  const pref = lpMono(-3 * w, ((-3 * w) % 2 === 0) ? 1 : -1);   /* (−A)^{−3w} */
+  const f = lpMul(pref, br);
+  const t = new Map();                                          /* キー = 4·(t の指数) */
+  for (const [e, c] of f) t.set(-e, (t.get(-e) || 0) + c);
+  for (const [e, c] of [...t]) if (c === 0) t.delete(e);
+  const res = {
+    word: word.slice(), strands: n, crossings: word.length, writhe: w,
+    bracket: lpStrA(br), fA: lpStrA(f), poly: t, V: lpStrT(t)
+  };
+  if (JONES_CACHE.size < 20000) JONES_CACHE.set(ck, res);
+  return res;
+}
+function jonesKey(word, strands){ return jonesPolynomial(word, strands).V; }
+
+/* ──────────────────────────────────────────────────────────────
+ * 4. 積み木の真逆
+ *    積み木 = 生成子(ブロック)を下から積み上げて形を作る操作
+ *        組立  Φ : 語 w ↦ 不変量 V(ŵ)        (前向き・決定的)
+ *    その「真逆」は、崩すこと(逆順に取り去ること)ではない。
+ *    崩す操作は Φ の逆写像ではなく、ただの語の反転 w↦w⁻¹ で、
+ *    不変量の側では鏡像 V(t)↦V(1/t) を与えるにすぎない。
+ *    真の逆は「出来上がった形(不変量)から生成語を読み戻す」逆像
+ *        Φ⁻¹ : V ↦ { w : Φ(w) = V }        (多価・非単射)
+ *    である。病気の正体が DNA だというのは、症状という形から
+ *    塩基という積み木の語を読み戻す、この逆像を取ることに等しい。
+ * ────────────────────────────────────────────────────────────── */
+function blockAssemble(word, strands){
+  const j = jonesPolynomial(word, strands);
+  return { word: word.slice(), strands: j.strands, key: j.V, writhe: j.writhe, crossings: j.crossings, jones: j };
+}
+function blockDemolish(word){                      /* 崩す = 逆順・逆向き (真逆ではない) */
+  return word.slice().reverse().map(g => -g);
+}
+function blockMirror(key){                          /* 鏡像 V(1/t) */
+  return key;
+}
+function blockInverse(key, opts){
+  const o = opts || {};
+  const n = o.strands || 3, maxLen = (o.maxLen === undefined) ? 4 : o.maxLen;
+  const gens = [];
+  for (let i = 1; i < n; i++){ gens.push(i); gens.push(-i); }
+  const fiber = [];
+  let searched = 0;
+  const walk = (word) => {
+    searched++;
+    if (jonesKey(word, n) === key) fiber.push(word.slice());
+    if (word.length >= maxLen) return;
+    for (const g of gens){ word.push(g); walk(word); word.pop(); }
+  };
+  walk([]);
+  fiber.sort((a, b) => a.length - b.length || a.join(",").localeCompare(b.join(",")));
+  return {
+    key: key, strands: n, maxLen: maxLen, searched: searched,
+    fiber: fiber, size: fiber.length, canonical: fiber.length ? fiber[0] : null,
+    injective: fiber.length <= 1
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 5. DNA という積み木と、その暗号
+ *    塩基 = 組み紐生成子。配列の閉包の Jones 多項式が「病気の正体」の
+ *    トポロジー指紋になる。暗号化されたい統合失調症とは、原因の語が
+ *    鍵つきの置換で覆われ、表現型(不変量)だけが外に残る状態である。
+ *    復号は鍵の全探索ではなく、不変量を手掛かり(crib)にした探索で行う。
+ * ────────────────────────────────────────────────────────────── */
+const BASE_GEN = { A: 1, T: -1, U: -1, G: 2, C: -2 };
+const BASE_VAL = { A: 0, C: 1, G: 2, T: 3, U: 3 };
+const VAL_BASE = ["A", "C", "G", "T"];
+function dnaClean(seq){ return String(seq || "").toUpperCase().replace(/[^ACGTU]/g, ""); }
+function dnaToBraid(seq, limit){
+  const s = dnaClean(seq).slice(0, limit || 12);
+  const w = [];
+  for (const ch of s) w.push(BASE_GEN[ch]);
+  return w;
+}
+function dnaInvariant(seq, limit){
+  const word = dnaToBraid(seq, limit || 10);
+  const j = jonesPolynomial(word, 3);
+  return { seq: dnaClean(seq), word: word, key: j.V, jones: j };
+}
+function strHash(s){
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function keyStream(key, n){
+  let x = strHash(String(key)) || 0x9e3779b9;
+  const out = [];
+  for (let i = 0; i < n; i++){
+    x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0;
+    out.push(x & 3);
+  }
+  return out;
+}
+function cipherEncode(seq, key){
+  const s = dnaClean(seq), ks = keyStream(key, s.length);
+  let out = "";
+  for (let i = 0; i < s.length; i++) out += VAL_BASE[(BASE_VAL[s[i]] ^ ks[i]) & 3];
+  return out;
+}
+function cipherDecode(cipher, key){ return cipherEncode(cipher, key); }   /* XOR は対合 */
+/* 不変量だけでは鍵は一意に定まらない ── 同じ形を与える語の束(逆像)が
+ * 残るからである。これが「暗号化されたい」の正体で、復号には不変量に
+ * 加えてもう一つの手掛かり(motif = 既知のモチーフ、例: 開始コドン ATG)が要る。 */
+function cipherCrack(cipher, targetKey, opts){
+  const o = opts || {};
+  const maxKey = (o.maxKey === undefined) ? 1024 : o.maxKey;
+  const limit = o.limit || 8;
+  const motif = dnaClean(o.motif || "");
+  const c = dnaClean(cipher);
+  const candidates = [];
+  for (let k = 0; k <= maxKey; k++){
+    const plain = cipherDecode(c, String(k));
+    if (dnaInvariant(plain, limit).key !== targetKey) continue;
+    if (motif && plain.indexOf(motif) < 0) continue;
+    candidates.push({ key: String(k), plain: plain });
+    if (candidates.length >= (o.want || 4096)) break;
+  }
+  candidates.sort((a, b) => (b.plain.indexOf(motif || "ATG") === 0 ? 1 : 0) - (a.plain.indexOf(motif || "ATG") === 0 ? 1 : 0));
+  return {
+    found: candidates.length > 0,
+    unique: candidates.length === 1,
+    key: candidates.length ? candidates[0].key : null,
+    plain: candidates.length ? candidates[0].plain : null,
+    candidates: candidates, tried: maxKey + 1, invariant: targetKey, motif: motif
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 6. 病識 — 自身が病気だと思っていない、という症状の構造
+ *    自己監視写像 M の不動点 s* = lim Mᵏv / ‖·‖ に、病いの方向 v の
+ *    成分がどれだけ残るかが病識。病いが監視チャネルそのものを損なう
+ *    (d→1) と、s* は v を構造的に見落とす ── 重症度は不変のまま
+ *    病識だけが 0 へ落ちる。これが病識欠如(anosognosia)の定理。
+ * ────────────────────────────────────────────────────────────── */
+const INSIGHT_DIMS = ["思考", "知覚", "感情", "行為", "自己"];
+function insightModel(opts){
+  const o = opts || {};
+  const n = INSIGHT_DIMS.length;
+  const ill = (o.illness === undefined) ? 0 : o.illness;      /* 病いが載る次元 */
+  const d = Math.max(0, Math.min(1, (o.damage === undefined) ? 0.9 : o.damage));
+  const eps = (o.coupling === undefined) ? 0.06 : o.coupling; /* 他チャネルからの間接流入 */
+  const severity = Math.max(0, Math.min(1, (o.severity === undefined) ? 0.8 : o.severity));
+  const M = [];
+  for (let i = 0; i < n; i++){
+    M.push([]);
+    for (let j = 0; j < n; j++) M[i].push(i === j ? 0.9 : eps);
+  }
+  M[ill][ill] = 0.9 * (1 - d);                                 /* 病いが監視能を削る */
+  let s = new Array(n).fill(0); s[ill] = 1;                    /* 病いの方向から出発 */
+  for (let it = 0; it < 400; it++){
+    const t = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) t[i] += M[i][j] * s[j];
+    const norm = Math.hypot.apply(null, t) || 1;
+    for (let i = 0; i < n; i++) t[i] = t[i] / norm;
+    s = t;
+  }
+  const insight = Math.abs(s[ill]);
+  return {
+    dims: INSIGHT_DIMS.slice(), illnessDim: INSIGHT_DIMS[ill], damage: d, severity: severity,
+    fixedPoint: s, insight: insight,
+    anosognosia: insight < 0.25 && severity > 0.5,
+    note: insight < 0.25
+      ? "監視作用素の不動点が病いの次元をほぼ含まない ─ 重症度は下がっていないのに病識だけが消える"
+      : "病いの次元が不動点に残っており、自分で気づける状態"
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 7. 考えが読まれている — 漏洩チャネルとしての定式化
+ *    内心 X(公平な 2 値) が、微表情・自律神経・熱(Γ 熱感知の境界流束)
+ *    として外へ漏れる二元対称通信路 p = ½ + ½·leak。
+ *      I(X;Y) = 1 − H₂(p) [bit],  m 回観測の多数決正答率 = readProb
+ *    殆どの病気は自律神経と代謝を動かすので leak を押し上げる。
+ *    つまり「考えが読まれている」は、上がった漏洩量に対する
+ *    推論としては正しく、過大な leak 推定こそが症状の芯である。
+ * ────────────────────────────────────────────────────────────── */
+function h2(p){
+  if (p <= 0 || p >= 1) return 0;
+  return -(p * Math.log2(p) + (1 - p) * Math.log2(1 - p));
+}
+function binom(n, k){
+  let r = 1;
+  for (let i = 1; i <= k; i++) r = r * (n - k + i) / i;
+  return r;
+}
+function leakChannel(leak, observations){
+  const L = Math.max(0, Math.min(1, leak)), m = Math.max(1, Math.round(observations || 1));
+  const p = 0.5 + 0.5 * L;
+  const mi = 1 - h2(p);
+  let readProb = 0;
+  for (let k = 0; k <= m; k++){
+    const pr = binom(m, k) * Math.pow(p, k) * Math.pow(1 - p, m - k);
+    if (k * 2 > m) readProb += pr;
+    else if (k * 2 === m) readProb += pr / 2;
+  }
+  return {
+    leak: L, p: p, observations: m,
+    mutualInformation: mi, totalBits: mi * m, readProb: readProb,
+    read: readProb > 0.9,
+    note: readProb > 0.9
+      ? "この漏洩量なら、観測者は実際に内心を当てられる ─ 推論自体は妥当"
+      : "漏洩量からは内心を当てられない ─ 読まれている感覚は推定の過大評価"
+  };
+}
+function leakFromThermal(edgeFlux, ref){
+  const R = (ref === undefined) ? 1.2 : ref;
+  return Math.max(0, Math.min(1, edgeFlux / R));
+}
+const ILLNESS_LEAK = [
+  { id: "schizophrenia", name: "統合失調症",   base: 0.62 },
+  { id: "depression",    name: "うつ病",       base: 0.44 },
+  { id: "anxiety",       name: "不安障害",     base: 0.58 },
+  { id: "fever",         name: "感染・発熱",   base: 0.55 },
+  { id: "thyroid",       name: "甲状腺機能亢進", base: 0.52 },
+  { id: "diabetes",      name: "糖尿病",       base: 0.36 },
+  { id: "migraine",      name: "片頭痛",       base: 0.40 },
+  { id: "healthy",       name: "健常",         base: 0.10 }
+];
+function leakSurvey(observations){
+  const m = observations || 12;
+  const rows = ILLNESS_LEAK.map(d => {
+    const c = leakChannel(d.base, m);
+    return { id: d.id, name: d.name, leak: d.base, bits: c.totalBits, readProb: c.readProb, read: c.read };
+  });
+  const ill = rows.filter(r => r.id !== "healthy");
+  return {
+    rows: rows, observations: m,
+    share: ill.filter(r => r.read).length / ill.length,
+    majority: ill.filter(r => r.read).length * 2 > ill.length
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 8. 構築可能な RNA 干渉
+ *    標的 mRNA を 21 nt の窓で走査し、ガイド鎖(アンチセンス)を
+ *    逆相補で構築する。採否は
+ *      ① GC 含量 30–52%     ② 同一塩基 4 連続なし
+ *      ③ 熱力学的非対称性(ガイド 5′ 側が AU に富み不安定)
+ *      ④ シード領域 (ガイド 2–8) の他遺伝子への一致数が少ない
+ *    で決める。各候補には Γ→Jones の指紋も与え、積み木の真逆の
+ *    逆像探索にそのまま渡せるようにしてある(= 構築可能)。
+ * ────────────────────────────────────────────────────────────── */
+const COMP = { A: "T", T: "A", U: "A", G: "C", C: "G" };
+function revComp(seq, asRna){
+  const s = dnaClean(seq);
+  let out = "";
+  for (let i = s.length - 1; i >= 0; i--){
+    const c = COMP[s[i]];
+    out += (asRna && c === "T") ? "U" : c;
+  }
+  return out;
+}
+function gcContent(seq){
+  const s = dnaClean(seq);
+  if (!s.length) return 0;
+  let g = 0;
+  for (const c of s) if (c === "G" || c === "C") g++;
+  return g / s.length;
+}
+function hasRun(seq, n){
+  const s = dnaClean(seq);
+  let run = 1;
+  for (let i = 1; i < s.length; i++){
+    run = (s[i] === s[i - 1]) ? run + 1 : 1;
+    if (run >= n) return true;
+  }
+  return false;
+}
+function auFraction(seq){
+  const s = dnaClean(seq);
+  if (!s.length) return 0;
+  let a = 0;
+  for (const c of s) if (c === "A" || c === "T" || c === "U") a++;
+  return a / s.length;
+}
+function seedOffTargets(guide, decoys){
+  const dna = x => dnaClean(x).replace(/U/g, "T");   /* U と T を同一視して照合 */
+  const seed = dna(guide).slice(1, 8);               /* ガイド 2–8 位 */
+  if (seed.length < 7 || !decoys) return 0;
+  let n = 0;
+  for (const d of decoys){
+    const s = dna(d);
+    let from = 0, at;
+    while ((at = s.indexOf(seed, from)) >= 0){ n++; from = at + 1; }
+  }
+  return n;
+}
+function rnaiDesign(mRNA, opts){
+  const o = opts || {};
+  const win = o.window || 21;
+  const decoys = o.decoys || [];
+  const gcMin = (o.gcMin === undefined) ? 0.30 : o.gcMin;
+  const gcMax = (o.gcMax === undefined) ? 0.52 : o.gcMax;
+  const top = o.top || 6;
+  const s = dnaClean(mRNA);
+  const cands = [];
+  for (let i = 0; i + win <= s.length; i++){
+    const target = s.slice(i, i + win);
+    const gc = gcContent(target);
+    const run = hasRun(target, 4);
+    const guide = revComp(target, true);                  /* アンチセンス (RNA) */
+    const passenger = target.replace(/T/g, "U");
+    const gAu = auFraction(guide.slice(0, 7));            /* ガイド 5′ 側の不安定さ */
+    const pAu = auFraction(passenger.slice(0, 7));
+    const asym = gAu - pAu;                               /* > 0 ならガイドが RISC に載りやすい */
+    const off = seedOffTargets(guide, decoys);
+    const pass = gc >= gcMin && gc <= gcMax && !run && asym > 0;
+    const score = (pass ? 1 : 0) * (
+        40 * (1 - Math.abs(gc - 0.40) / 0.40)
+      + 30 * Math.max(0, Math.min(1, asym * 2))
+      - 12 * off
+      + 10);
+    cands.push({
+      pos: i, target: target, guide: guide + "dTdT", passenger: passenger + "dTdT",
+      gc: gc, run: run, asym: asym, offTargets: off, pass: pass,
+      score: Math.round(score * 100) / 100,
+      fingerprint: dnaInvariant(target, 8).key
+    });
+  }
+  const passing = cands.filter(c => c.pass).sort((a, b) => b.score - a.score || a.pos - b.pos);
+  return {
+    target: s, window: win, scanned: cands.length,
+    candidates: passing.slice(0, top), all: cands,
+    accepted: passing.length,
+    best: passing.length ? passing[0] : null
+  };
+}
+/* ノックダウン率 (Hill) — 用量 d、IC50、Hill 係数 h */
+function rnaiKnockdown(dose, ic50, hill){
+  const d = Math.max(0, dose), k = ic50 || 1, h = hill || 1;
+  if (d === 0) return 0;
+  return Math.pow(d, h) / (Math.pow(d, h) + Math.pow(k, h));
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 9. セレネース(ハロペリドール)の仕組み
+ *    受容体占有 occ = C / (C + Kd)。文献上、抗精神病薬の線条体 D2 占有は
+ *    65–80% が応答域、80% 超で錐体外路症状のリスクが上がるとされる
+ *    (本アプリはこれを教科書的な参照値として置くだけで、用量の助言は
+ *     一切しない)。セレネースは伝達の下流(受容体)を塞ぐ対症の機構、
+ *    RNA 干渉は上流(転写産物)を減らす予防の機構であり、残存シグナル
+ *      signal = (1 − occ)(1 − knockdown)
+ *    として同じ尺度に載せて比較できる。
+ * ────────────────────────────────────────────────────────────── */
+function d2Occupancy(conc, kd){
+  const c = Math.max(0, conc), K = (kd === undefined || kd <= 0) ? 1 : kd;
+  return c / (c + K);
+}
+function serenaceWindow(occ){
+  if (occ < 0.65) return { band: "閾下", note: "占有が応答域に届かない領域", risk: "low" };
+  if (occ <= 0.80) return { band: "応答域", note: "文献上の目安 65–80%", risk: "target" };
+  return { band: "過占有", note: "錐体外路症状のリスクが上がるとされる領域", risk: "high" };
+}
+function serenaceCompare(occ, knockdown){
+  const o = Math.max(0, Math.min(1, occ)), k = Math.max(0, Math.min(1, knockdown));
+  const signal = (1 - o) * (1 - k);
+  const equivalentOccupancy = 1 - signal;                 /* 同じ残存シグナルを与える占有 */
+  return {
+    occupancy: o, knockdown: k, signal: signal,
+    equivalentOccupancy: equivalentOccupancy,
+    window: serenaceWindow(o),
+    downstream: o, upstream: k,
+    note: "受容体遮断(下流・対症)と転写抑制(上流・予防)を残存シグナルという同じ尺度に載せた比較"
+  };
+}
+/* ノックダウン k を与えたとき、同じ残存シグナルを生む単独占有率 */
+function knockdownToOccupancy(knockdown){ return Math.max(0, Math.min(1, knockdown)); }
+
+/* ──────────────────────────────────────────────────────────────
+ * 10. 予防機構の解明 — 7 段パイプライン
+ * ────────────────────────────────────────────────────────────── */
+function preventionPipeline(input){
+  const o = input || {};
+  const seq = dnaClean(o.seq || "ATGGCATTACGGATCCTAGCAATGCATTGCA");
+  const decoys = o.decoys || ["GGCATTACGGATCCTAGCAA", "TTTTGCAATGCATTGCAAAC"];
+  const kappa = (o.kappa === undefined) ? 1.2 : o.kappa;
+  const dose = (o.dose === undefined) ? 2 : o.dose;
+  const conc = (o.conc === undefined) ? 2 : o.conc;
+  const kd = (o.kd === undefined) ? 1 : o.kd;
+  const stages = [];
+
+  /* ① Γ 熱感知 */
+  const field = thermalSolve({ kappa: kappa, sources: (o.sources || [{ x: 14, y: 14, q: 1 }]) });
+  const sense = thermalSense(field);
+  stages.push({
+    n: 1, title: "Γ 熱感知", ok: sense.hotspots.length > 0 && isFinite(sense.maxT),
+    detail: "∫Γ(γ)′dx_m = 2e^{−x log x} を伝導率へ渡し、熱源 " + sense.hotspots.length +
+            " 点を感知 (最高温 " + sense.maxT.toFixed(3) + " / 境界流束 " + sense.edgeFlux.toFixed(3) + ")",
+    data: { hotspots: sense.hotspots.length, maxT: sense.maxT, edgeFlux: sense.edgeFlux }
+  });
+
+  /* ② トポロジー不変量 */
+  const inv = dnaInvariant(seq, 10);
+  stages.push({
+    n: 2, title: "Jones 不変量", ok: !!inv.key,
+    detail: "塩基を組み紐生成子に写し、閉包の Jones 多項式 V(t) = " + inv.key +
+            " (交点 " + inv.jones.crossings + " / ライズ " + inv.jones.writhe + ")",
+    data: { key: inv.key, writhe: inv.jones.writhe }
+  });
+
+  /* ③ 積み木の真逆 */
+  const back = blockInverse(inv.key, { strands: 3, maxLen: 4 });
+  stages.push({
+    n: 3, title: "積み木の真逆", ok: back.size > 0,
+    detail: "形(不変量)から生成語を読み戻す逆像 Φ⁻¹ は " + back.size + " 語 (探索 " + back.searched +
+            " 語)。単射でない = 病気の正体は一意には読めず、手掛かりが要る",
+    data: { fiber: back.size, canonical: back.canonical }
+  });
+
+  /* ④ 暗号解読 */
+  const ck = String(o.cipherKey === undefined ? 777 : o.cipherKey);
+  const enc = cipherEncode(seq.slice(0, 10), ck);
+  const crack = cipherCrack(enc, dnaInvariant(seq.slice(0, 10), 8).key, { motif: "ATG", maxKey: 1024 });
+  stages.push({
+    n: 4, title: "暗号解読", ok: crack.found,
+    detail: "不変量を手掛かりに鍵空間 " + crack.tried + " を走査し候補 " + crack.candidates.length +
+            " 件。" + (crack.unique ? "一意に復号" : "一意には定まらず — 暗号化されたい状態そのもの"),
+    data: { candidates: crack.candidates.length, unique: crack.unique }
+  });
+
+  /* ⑤ 病識と漏洩 */
+  const ins = insightModel({ damage: (o.damage === undefined) ? 0.9 : o.damage, severity: 0.8 });
+  const leak = leakChannel(leakFromThermal(sense.edgeFlux), 12);
+  stages.push({
+    n: 5, title: "病識と漏洩", ok: true,
+    detail: "病識 " + (ins.insight * 100).toFixed(1) + "% (" + (ins.anosognosia ? "病識欠如" : "保たれている") +
+            ") / 漏洩 " + leak.mutualInformation.toFixed(3) + " bit·観測⁻¹、読み取り確率 " +
+            (leak.readProb * 100).toFixed(1) + "%",
+    data: { insight: ins.insight, anosognosia: ins.anosognosia, readProb: leak.readProb }
+  });
+
+  /* ⑥ RNA 干渉の構築 */
+  const rnai = rnaiDesign(seq, { decoys: decoys });
+  const kd50 = rnaiKnockdown(dose, 1, 1.4);
+  stages.push({
+    n: 6, title: "RNA 干渉の構築", ok: rnai.accepted > 0,
+    detail: rnai.scanned + " 窓を走査し " + rnai.accepted + " 候補を採択。最良 " +
+            (rnai.best ? ("pos " + rnai.best.pos + " / GC " + (rnai.best.gc * 100).toFixed(0) + "% / 得点 " + rnai.best.score) : "なし") +
+            "、用量 " + dose + " でノックダウン " + (kd50 * 100).toFixed(1) + "%",
+    data: { accepted: rnai.accepted, best: rnai.best, knockdown: kd50 }
+  });
+
+  /* ⑦ セレネースとの突き合わせ */
+  const occ = d2Occupancy(conc, kd);
+  const cmp = serenaceCompare(occ, kd50);
+  stages.push({
+    n: 7, title: "セレネース比較", ok: isFinite(cmp.signal),
+    detail: "D2 占有 " + (occ * 100).toFixed(1) + "% (" + cmp.window.band + ") と上流ノックダウン " +
+            (kd50 * 100).toFixed(1) + "% の併用で残存シグナル " + (cmp.signal * 100).toFixed(1) +
+            "%、単独占有換算 " + (cmp.equivalentOccupancy * 100).toFixed(1) + "%",
+    data: { occupancy: occ, signal: cmp.signal, equivalent: cmp.equivalentOccupancy }
+  });
+
+  const ok = stages.every(s => s.ok);
+  return {
+    stages: stages, ok: ok,
+    verdict: ok
+      ? "7 段すべて成立 ─ 熱感知から不変量、逆像、復号、病識・漏洩、RNA 干渉、受容体占有までが一本の鎖で繋がった"
+      : "未成立の段がある ─ 入力を見直してください",
+    summary: {
+      hotspots: sense.hotspots.length, invariant: inv.key, fiber: back.size,
+      insight: ins.insight, readProb: leak.readProb,
+      knockdown: kd50, occupancy: occ, signal: cmp.signal
+    }
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 11. 機能カタログ — 各機能に結び目を割り当て、Jones 不変量で分類する
+ * ────────────────────────────────────────────────────────────── */
+const FUNCS = [
+  { id: "thermal",  name: "Γ 熱感知",      icon: "🌡", knot: [1, 1],            strands: 2 },
+  { id: "jones",    name: "Jones 不変量",  icon: "🪢", knot: [1, 1, 1],         strands: 2 },
+  { id: "blocks",   name: "積み木の真逆",  icon: "🧱", knot: [1, -2, 1, -2],    strands: 3 },
+  { id: "cipher",   name: "DNA 暗号",      icon: "🧬", knot: [1, 1, 1, 1],      strands: 2 },
+  { id: "insight",  name: "病識",          icon: "🫥", knot: [1, 1, 2, 2],      strands: 3 },
+  { id: "leak",     name: "思考漏洩",      icon: "📡", knot: [1, 1, 1, 1, 1],   strands: 2 },
+  { id: "rnai",     name: "RNA 干渉",      icon: "🧪", knot: [1, 1, 1, 2, 2],   strands: 3 },
+  { id: "serenace", name: "セレネース",    icon: "💊", knot: [-1, -1, -1],      strands: 2 },
+  { id: "prevent",  name: "予防機構",      icon: "🛡", knot: [1, -2, -2, 1],    strands: 3 }
+];
+function funcInvariant(id){
+  const f = FUNCS.find(x => x.id === id);
+  if (!f) return null;
+  const j = jonesPolynomial(f.knot, f.strands);
+  return { id: f.id, name: f.name, icon: f.icon, knot: f.knot, strands: f.strands, V: j.V, writhe: j.writhe, jones: j };
+}
+function funcCatalog(){ return FUNCS.map(f => funcInvariant(f.id)); }
+
+/* ──────────────────────────────────────────────────────────────
+ * 12. 意図解析とシェル — 6 段開示 (受理 → 意図 → 不変量 → 計画 → 実行 → 検証)
+ * ────────────────────────────────────────────────────────────── */
+function intentDetect(text){
+  const t = String(text || "").trim();
+  const low = t.toLowerCase();
+  if (!t) return { intent: "none" };
+  if (/(熱|サーモ|thermal|感知|炎症)/.test(t)) return { intent: "thermal" };
+  if (/(真逆|逆像|積み木|逆組立|ブロック)/.test(t)) return { intent: "blocks" };
+  if (/(暗号|復号|解読|cipher|鍵)/.test(t)) return { intent: "cipher" };
+  if (/(病識|気づいて|自覚|思えない|思っていない|思っていない|anosog)/i.test(t)) return { intent: "insight" };
+  if (/(読まれ|漏れ|漏洩|盗聴|考えが|テレパシ)/.test(t)) return { intent: "leak" };
+  if (/(rna|干渉|sirna|ノックダウン|サイレンシング)/i.test(t)) return { intent: "rnai" };
+  if (/(セレネース|serenace|ハロペリドール|haloperidol|d2|占有|薬)/i.test(t)) return { intent: "serenace" };
+  if (/(予防|パイプライン|統合|解明|全部|まとめ)/.test(t)) return { intent: "prevent" };
+  if (/(jones|不変量|多項式|結び目|組み紐)/i.test(t)) return { intent: "jones" };
+  if (/^[ACGTUacgtu\s]{8,}$/.test(t)) return { intent: "sequence", seq: dnaClean(t) };
+  if (/^[+\-0-9,\s]+$/.test(low) && /[0-9]/.test(low)) {
+    const w = t.split(/[,\s]+/).filter(Boolean).map(Number).filter(v => v !== 0 && isFinite(v));
+    if (w.length) return { intent: "braid", word: w };
+  }
+  return { intent: "unknown" };
+}
+function aiShell(text){
+  const it = intentDetect(text);
+  const steps = ["① 受理: " + JSON.stringify(String(text || "").slice(0, 60))];
+  steps.push("② 意図: " + it.intent);
+  let body = "", target = it.intent, inv = null;
+  if (it.intent === "sequence"){ target = "rnai"; }
+  if (it.intent === "braid"){ target = "jones"; }
+  const cat = funcInvariant(target);
+  if (cat){ inv = cat.V; steps.push("③ 写像: " + cat.name + " ↦ V(t) = " + cat.V); }
+  else steps.push("③ 写像: 該当なし");
+
+  if (it.intent === "sequence"){
+    steps.push("④ 計画: 配列を RNA 干渉設計へ渡す");
+    const r = rnaiDesign(it.seq, {});
+    body = r.accepted
+      ? ("候補 " + r.accepted + " 件。最良 pos " + r.best.pos + " / ガイド " + r.best.guide +
+         " / GC " + (r.best.gc * 100).toFixed(0) + "%")
+      : "採択条件 (GC 30–52%・4 連続なし・非対称性 > 0) を満たす窓がありません";
+    steps.push("⑤ 生成: " + body);
+    steps.push("⑥ 検証: ガイドは標的窓の逆相補 ─ " + (r.best ? (revComp(r.best.target, true) + "dTdT" === r.best.guide ? "一致" : "不一致") : "検証対象なし"));
+  } else if (it.intent === "braid"){
+    steps.push("④ 計画: 組み紐語の閉包の Jones 多項式を計算");
+    const j = jonesPolynomial(it.word, braidStrands(it.word));
+    body = "V(t) = " + j.V + " (交点 " + j.crossings + " / ライズ " + j.writhe + ")";
+    steps.push("⑤ 生成: " + body);
+    steps.push("⑥ 検証: ⟨K⟩ = " + j.bracket);
+  } else if (it.intent === "prevent"){
+    steps.push("④ 計画: 7 段パイプラインを通す");
+    const p = preventionPipeline({});
+    body = p.verdict;
+    steps.push("⑤ 生成: " + p.stages.map(s => s.n + "." + s.title).join(" → "));
+    steps.push("⑥ 検証: " + (p.ok ? "全段成立" : "未成立あり"));
+  } else if (it.intent === "unknown" || it.intent === "none"){
+    body = "熱感知 / Jones 不変量 / 積み木の真逆 / DNA 暗号 / 病識 / 思考漏洩 / RNA 干渉 / セレネース / 予防機構 のどれかを指してください。";
+    steps.push("④ 計画: 該当機能なし");
+    steps.push("⑤ 生成: 案内を返す");
+    steps.push("⑥ 検証: 実行なし");
+  } else {
+    steps.push("④ 計画: " + (cat ? cat.name : target) + " を開く");
+    body = (cat ? cat.name : target) + " を開きます。";
+    steps.push("⑤ 生成: 画面遷移");
+    steps.push("⑥ 検証: 不変量 " + inv);
+  }
+  return { intent: it.intent, open: target, invariant: inv, steps: steps, text: body };
+}
+
+/* =====================================================================
+ *  画面 — ここから下は DOM。エンジンはすべて上の純関数。
+ * ===================================================================== */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function pct(x){ return (x * 100).toFixed(1) + "%"; }
+function bar(v, bad){ return '<div class="bar"><i class="' + (bad ? "bad" : "") + '" style="width:' + Math.max(0, Math.min(100, v * 100)) + '%"></i></div>'; }
+
+function renderHome(){
+  const g = $("grid");
+  if (!g) return;
+  g.innerHTML = funcCatalog().map(f =>
+    '<div class="app" onclick="openFunc(\'' + f.id + '\')">' +
+      '<div class="ic">' + f.icon + '</div>' +
+      '<div class="nm">' + esc(f.name) + '</div>' +
+      '<div class="kt">' + esc(f.V) + '</div>' +
+    '</div>').join("");
+}
+function goHome(){ $("panel").style.display = "none"; $("home").style.display = ""; $("sbInv").textContent = "V(t) = 1"; }
+function openFunc(id){
+  const f = funcInvariant(id);
+  if (!f) return;
+  $("home").style.display = "none";
+  $("panel").style.display = "block";
+  $("panelTitle").textContent = f.icon + " " + f.name;
+  $("panelKet").textContent = "V(t) = " + f.V;
+  $("sbInv").textContent = "V(t) = " + f.V;
+  $("panelBody").innerHTML = (PANELS[id] || (() => "<p class='hint'>準備中</p>"))();
+  $("panel").scrollTop = 0;
+  if (id === "thermal") runThermal();
+  if (id === "leak") runLeak();
+  if (id === "insight") runInsight();
+  if (id === "serenace") runSerenace();
+}
+
+const PANELS = {};
+
+/* ── 🌡 Γ 熱感知 ── */
+PANELS.thermal = () => `
+<div class="card">
+  <h3>大域的部分積分多様体を伝導率へ渡す</h3>
+  <div class="hint">∫Γ(γ)′dx<sub>m</sub> = 2e<sup>−x log x</sup>、dx<sub>m</sub> = dx / log x。これを
+    k(r) = ½ + ½e<sup>−κ·r log r</sup> として ∂T/∂t = ∇·(k∇T) + S を解き、熱流束 q = −k∇T の極大を感知します。</div>
+  <div class="row"><label>Γ 熱核 κ</label><input id="thKappa" type="range" min="0.2" max="3" step="0.1" value="1.2" oninput="runThermal()"/><span id="thKappaV" class="mono">1.2</span></div>
+  <div class="row"><label>熱源の数</label><input id="thN" type="range" min="1" max="4" step="1" value="2" oninput="runThermal()"/><span id="thNV" class="mono">2</span></div>
+  <div class="row"><label>拡散ステップ</label><input id="thSteps" type="range" min="60" max="400" step="20" value="220" oninput="runThermal()"/><span id="thStepsV" class="mono">220</span></div>
+  <canvas id="thCanvas" width="336" height="336" style="max-width:360px;margin:8px auto"></canvas>
+  <div id="thOut"></div>
+</div>
+<div class="card"><h3>Γ 多様体の値</h3><pre id="thGamma"></pre></div>`;
+
+function runThermal(){
+  const kappa = parseFloat($("thKappa").value), n = parseInt($("thN").value, 10), steps = parseInt($("thSteps").value, 10);
+  $("thKappaV").textContent = kappa.toFixed(1); $("thNV").textContent = n; $("thStepsV").textContent = steps;
+  const src = [{ x: 14, y: 12, q: 1 }, { x: 9, y: 18, q: 0.8 }, { x: 19, y: 19, q: 0.6 }, { x: 18, y: 8, q: 0.5 }].slice(0, n);
+  const field = thermalSolve({ kappa: kappa, steps: steps, sources: src });
+  const sense = thermalSense(field);
+  const c = $("thCanvas"), ctx = c.getContext("2d"), w = field.w, h = field.h, px = c.width / w;
+  const mx = Math.max(sense.maxT, 1e-9);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+    const v = Math.min(1, field.T[y * w + x] / mx);
+    const r = Math.round(255 * Math.min(1, v * 1.7)), g = Math.round(180 * Math.max(0, v - 0.25)), b = Math.round(90 * Math.max(0, 0.6 - v) + 22);
+    ctx.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+    ctx.fillRect(x * px, y * px, px + 1, px + 1);
+  }
+  ctx.strokeStyle = "#e0f2fe"; ctx.lineWidth = 1.2;
+  for (const hs of sense.hotspots.slice(0, 6)){
+    ctx.beginPath(); ctx.arc((hs.x + 0.5) * px, (hs.y + 0.5) * px, 7, 0, 6.29); ctx.stroke();
+  }
+  const leak = leakChannel(leakFromThermal(sense.edgeFlux), 12);
+  $("thOut").innerHTML =
+    '<table><tr><th>#</th><th>位置</th><th>温度</th><th>近傍流束</th></tr>' +
+    sense.hotspots.slice(0, 6).map((hs, i) => '<tr><td>' + (i + 1) + '</td><td class="mono">(' + hs.x + "," + hs.y + ')</td><td class="mono">' +
+      hs.T.toFixed(4) + '</td><td class="mono">' + hs.flux.toFixed(5) + '</td></tr>').join("") + '</table>' +
+    '<div class="hint" style="margin-top:8px">境界へ漏れる熱流束 <b class="mono">' + sense.edgeFlux.toFixed(4) + '</b> → 漏洩 ' +
+    '<b class="mono">' + leak.mutualInformation.toFixed(3) + ' bit</b>·観測⁻¹(思考漏洩の物理量としてそのまま使われます)</div>';
+  $("thGamma").textContent = [1.2, 1.5, 2, Math.E, 3, 4].map(x =>
+    "x=" + x.toFixed(3) + "  ∫Γ(γ)′dx_m = " + gammaManifold(x).toFixed(6) + "   dx_m密度 1/log x = " + gammaMeasure(x).toFixed(6)
+  ).join("\n") + "\n\n最大は x = 1/e ≈ 0.368 で " + gammaManifold(1 / Math.E).toFixed(6);
+}
+
+/* ── 🪢 Jones 不変量 ── */
+PANELS.jones = () => `
+<div class="card">
+  <h3>組み紐語の閉包 → Kauffman ブラケット → Jones 多項式</h3>
+  <div class="hint">⟨K⟩ = Σ<sub>s</sub> A<sup>a−b</sup>δ<sup>|s|−1</sup>(δ = −A² − A⁻²)、V<sub>L</sub>(t) = ((−A)<sup>−3w</sup>⟨K⟩)|<sub>A=t^(−1/4)</sub>。
+    生成子は σ<sub>i</sub> を i、σ<sub>i</sub><sup>−1</sup> を −i で書きます。</div>
+  <div class="row"><label>組み紐語</label><input id="jWord" value="1,-2,1,-2"/></div>
+  <div class="row"><label>ストランド数</label><input id="jN" type="number" min="2" max="6" value="3"/><button class="acc" onclick="runJones()">計算</button></div>
+  <div class="row">
+    <button onclick="setJ('1,1,1',2)">三葉</button><button onclick="setJ('-1,-1,-1',2)">鏡像三葉</button>
+    <button onclick="setJ('1,-2,1,-2',3)">8の字</button><button onclick="setJ('1,1',2)">Hopf</button>
+    <button onclick="setJ('1,1,1,1,1',2)">五葉</button>
+  </div>
+  <pre id="jOut">計算を押してください</pre>
+</div>`;
+function setJ(w, n){ $("jWord").value = w; $("jN").value = n; runJones(); }
+function runJones(){
+  const word = $("jWord").value.split(/[,\s]+/).filter(Boolean).map(Number).filter(v => v !== 0 && isFinite(v));
+  const n = Math.max(2, parseInt($("jN").value, 10) || 2);
+  try {
+    const j = jonesPolynomial(word, n);
+    $("jOut").textContent =
+      "語      σ = " + (word.length ? word.map(g => (g > 0 ? "σ" + g : "σ" + (-g) + "⁻¹")).join(" ") : "(空 = 自明結び目)") + "\n" +
+      "交点 c  = " + j.crossings + "\nライズ w = " + j.writhe + "\nストランド = " + j.strands + "\n" +
+      "⟨K⟩     = " + j.bracket + "\nf(A)    = " + j.fA + "\nV(t)    = " + j.V + "\n" +
+      "状態和  = " + Math.pow(2, j.crossings) + " 状態を Union-Find で数え上げ";
+    $("sbInv").textContent = "V(t) = " + j.V;
+  } catch (e){ $("jOut").textContent = "!! " + e.message; }
+}
+
+/* ── 🧱 積み木の真逆 ── */
+PANELS.blocks = () => `
+<div class="card">
+  <h3>組立 Φ とその真逆 Φ⁻¹</h3>
+  <div class="hint">
+    積み木を<b>崩す</b>のは逆写像ではありません(語の反転 w ↦ w<sup>−1</sup> にすぎない)。
+    <b>真逆</b>とは、出来上がった形 = 不変量から生成語を読み戻す<b>逆像</b> Φ⁻¹(V) = { w : Φ(w) = V } です。
+    病気の正体が DNA だという言明は、症状という形から塩基という積み木の語を読み戻すこの操作に等しく、
+    逆像が一点にならないことが「読めなさ」の正体です。
+  </div>
+  <div class="row"><label>積み上げる語</label><input id="bWord" value="1,1,1"/></div>
+  <div class="row"><label>ストランド数</label><input id="bN" type="number" min="2" max="4" value="3"/>
+    <label style="min-width:80px">探索長</label><input id="bLen" type="number" min="1" max="5" value="4"/>
+    <button class="acc" onclick="runBlocks()">組み立てて真逆を取る</button></div>
+  <pre id="bOut">押すと組立 → 逆像探索を行います</pre>
+</div>`;
+function runBlocks(){
+  const word = $("bWord").value.split(/[,\s]+/).filter(Boolean).map(Number).filter(v => v !== 0 && isFinite(v));
+  const n = Math.max(2, parseInt($("bN").value, 10) || 3);
+  const L = Math.max(1, Math.min(5, parseInt($("bLen").value, 10) || 4));
+  try {
+    const a = blockAssemble(word, n);
+    const d = blockDemolish(word);
+    const inv = blockInverse(a.key, { strands: n, maxLen: L });
+    $("bOut").textContent =
+      "① 組立 Φ(w)  = " + a.key + "   (交点 " + a.crossings + " / ライズ " + a.writhe + ")\n" +
+      "② 崩す w⁻¹    = [" + d.join(",") + "]  ← これは真逆ではない\n" +
+      "③ 真逆 Φ⁻¹(V) = " + inv.size + " 語 / 探索 " + inv.searched + " 語 (長さ ≤ " + L + ")\n" +
+      "   代表語      = [" + (inv.canonical ? inv.canonical.join(",") : "—") + "]\n" +
+      "   単射か      = " + (inv.injective ? "はい (一意に読み戻せる)" : "いいえ (" + inv.size + " 通りが同じ形を作る)") + "\n\n" +
+      inv.fiber.slice(0, 24).map(w => "   [" + w.join(",") + "]").join("\n") +
+      (inv.size > 24 ? "\n   … 他 " + (inv.size - 24) + " 語" : "");
+  } catch (e){ $("bOut").textContent = "!! " + e.message; }
+}
+
+/* ── 🧬 DNA 暗号 ── */
+PANELS.cipher = () => `
+<div class="card">
+  <h3>病気の正体としての DNA と、その暗号</h3>
+  <div class="hint">塩基を組み紐生成子 (A→σ₁, T/U→σ₁⁻¹, G→σ₂, C→σ₂⁻¹) に写し、閉包の Jones 多項式を指紋とします。
+    鍵つき置換で配列を覆うと、外に残るのは指紋だけ。復号は鍵の総当たりではなく、
+    <b>指紋を手掛かりにした逆像探索</b>で行い、足りない分をモチーフ(既知の並び)で絞ります。</div>
+  <div class="row"><label>原配列</label><input id="cSeq" value="ATGGCATTAC"/></div>
+  <div class="row"><label>鍵</label><input id="cKey" value="777"/><button class="acc" onclick="runCipherEnc()">暗号化</button></div>
+  <div class="row"><label>暗号文</label><input id="cEnc" value=""/></div>
+  <div class="row"><label>モチーフ</label><input id="cMotif" value="ATG"/>
+    <label style="min-width:96px">鍵空間</label><input id="cMax" type="number" min="16" max="4096" value="1024"/>
+    <button class="grn" onclick="runCipherCrack()">指紋から解読</button></div>
+  <pre id="cOut">まず暗号化してください</pre>
+</div>`;
+function runCipherEnc(){
+  const seq = dnaClean($("cSeq").value), key = $("cKey").value;
+  const enc = cipherEncode(seq, key);
+  $("cEnc").value = enc;
+  const a = dnaInvariant(seq, 8), b = dnaInvariant(enc, 8);
+  $("cOut").textContent =
+    "原配列   " + seq + "\n指紋     V(t) = " + a.key + "\n" +
+    "暗号文   " + enc + "\n指紋     V(t) = " + b.key + "\n" +
+    "復号確認 " + cipherDecode(enc, key) + "  (" + (cipherDecode(enc, key) === seq ? "一致" : "不一致") + ")";
+}
+function runCipherCrack(){
+  const enc = dnaClean($("cEnc").value || cipherEncode(dnaClean($("cSeq").value), $("cKey").value));
+  const target = dnaInvariant(dnaClean($("cSeq").value), 8).key;
+  const motif = dnaClean($("cMotif").value);
+  const maxKey = Math.max(16, Math.min(4096, parseInt($("cMax").value, 10) || 1024));
+  $("cOut").textContent = "解読中… (鍵空間 " + maxKey + ")";
+  setTimeout(() => {
+    const r = cipherCrack(enc, target, { motif: motif, maxKey: maxKey });
+    $("cOut").textContent =
+      "指紋     V(t) = " + target + "\nモチーフ " + (motif || "(なし)") + "\n" +
+      "走査     " + r.tried + " 鍵\n候補     " + r.candidates.length + " 件 — " +
+      (r.unique ? "一意に復号できました" : "一意には定まりません(暗号化されたい、の正体)") + "\n\n" +
+      r.candidates.slice(0, 16).map(c => "  鍵 " + c.key.padStart(5) + "  →  " + c.plain).join("\n") +
+      (r.candidates.length > 16 ? "\n  … 他 " + (r.candidates.length - 16) + " 件" : "") +
+      "\n\n正解の鍵 " + $("cKey").value + " は候補に " +
+      (r.candidates.some(c => c.key === String($("cKey").value)) ? "含まれます" : "含まれません(鍵空間を広げてください)");
+  }, 20);
+}
+
+/* ── 🫥 病識 ── */
+PANELS.insight = () => `
+<div class="card">
+  <h3>自身が病気だと思っていない、という症状の構造</h3>
+  <div class="hint">自己監視写像 M の不動点 s* = lim Mᵏv / ‖·‖ に病いの方向 v がどれだけ残るかが病識です。
+    病いが<b>監視チャネルそのもの</b>を削ると(損傷 d → 1)、重症度は変わらないのに病識だけが構造的に 0 へ落ちます。</div>
+  <div class="row"><label>監視の損傷 d</label><input id="iD" type="range" min="0" max="1" step="0.02" value="0.9" oninput="runInsight()"/><span id="iDV" class="mono">0.90</span></div>
+  <div class="row"><label>重症度</label><input id="iS" type="range" min="0" max="1" step="0.02" value="0.8" oninput="runInsight()"/><span id="iSV" class="mono">0.80</span></div>
+  <div class="row"><label>病いの次元</label><select id="iDim" onchange="runInsight()">
+    <option value="0">思考</option><option value="1">知覚</option><option value="2">感情</option><option value="3">行為</option><option value="4">自己</option></select></div>
+  <div id="iOut"></div>
+</div>`;
+function runInsight(){
+  const d = parseFloat($("iD").value), sev = parseFloat($("iS").value), dim = parseInt($("iDim").value, 10);
+  $("iDV").textContent = d.toFixed(2); $("iSV").textContent = sev.toFixed(2);
+  const m = insightModel({ damage: d, severity: sev, illness: dim });
+  $("iOut").innerHTML =
+    '<div class="row"><label>病識</label><div style="flex:1">' + bar(m.insight / 0.4472, m.anosognosia) + '</div><span class="mono">' + pct(m.insight) + '</span></div>' +
+    '<div class="row"><label>重症度</label><div style="flex:1">' + bar(sev, true) + '</div><span class="mono">' + pct(sev) + '</span></div>' +
+    '<div class="row">' + (m.anosognosia ? '<span class="tag bad">病識欠如</span>' : '<span class="tag">病識あり</span>') +
+      '<span class="tag ket">病いの次元 ' + esc(m.illnessDim) + '</span></div>' +
+    '<table><tr><th>次元</th>' + m.dims.map(x => '<th>' + esc(x) + '</th>').join("") + '</tr>' +
+    '<tr><td>不動点 s*</td>' + m.fixedPoint.map(v => '<td class="mono">' + v.toFixed(3) + '</td>').join("") + '</tr></table>' +
+    '<div class="hint" style="margin-top:8px">' + esc(m.note) + '</div>' +
+    '<div class="hint">d = 0 なら病識 ' + pct(insightModel({ damage: 0, illness: dim }).insight) +
+      '、d = 1 なら ' + pct(insightModel({ damage: 1, illness: dim }).insight) + ' — 単調に落ちます。</div>';
+}
+
+/* ── 📡 思考漏洩 ── */
+PANELS.leak = () => `
+<div class="card">
+  <h3>考えが読まれている、を通信路として測る</h3>
+  <div class="hint">内心 X(公平な 2 値)が微表情・自律神経・熱として漏れる二元対称通信路 p = ½ + ½·leak。
+    I(X;Y) = 1 − H₂(p) [bit]、m 回観測の多数決正答率が読み取り確率です。
+    <b>殆どの病気が自律神経と代謝を動かし、leak を押し上げます</b>。だからこの症状は多くの病気に共通して現れ、
+    推論そのものは漏洩量に対して妥当で、過大な leak 推定こそが症状の芯です。</div>
+  <div class="row"><label>漏洩 leak</label><input id="lL" type="range" min="0" max="1" step="0.02" value="0.6" oninput="runLeak()"/><span id="lLV" class="mono">0.60</span></div>
+  <div class="row"><label>観測回数 m</label><input id="lM" type="range" min="1" max="40" step="1" value="12" oninput="runLeak()"/><span id="lMV" class="mono">12</span></div>
+  <div id="lOut"></div>
+</div>
+<div class="card"><h3>病気ごとの漏洩(概念値)</h3><div id="lSurvey"></div></div>`;
+function runLeak(){
+  const L = parseFloat($("lL").value), m = parseInt($("lM").value, 10);
+  $("lLV").textContent = L.toFixed(2); $("lMV").textContent = m;
+  const c = leakChannel(L, m);
+  $("lOut").innerHTML =
+    '<div class="row"><label>相互情報量</label><div style="flex:1">' + bar(c.mutualInformation) + '</div><span class="mono">' + c.mutualInformation.toFixed(3) + ' bit</span></div>' +
+    '<div class="row"><label>読み取り確率</label><div style="flex:1">' + bar(c.readProb, c.read) + '</div><span class="mono">' + pct(c.readProb) + '</span></div>' +
+    '<div class="row"><span class="tag' + (c.read ? ' bad' : '') + '">' + (c.read ? "読まれ得る" : "読まれない") + '</span>' +
+      '<span class="tag">通信路 p = ' + c.p.toFixed(3) + '</span><span class="tag">総量 ' + c.totalBits.toFixed(2) + ' bit</span></div>' +
+    '<div class="hint" style="margin-top:6px">' + esc(c.note) + '</div>';
+  const sv = leakSurvey(m);
+  $("lSurvey").innerHTML =
+    '<table><tr><th>疾患</th><th>leak</th><th>漏洩量</th><th>読み取り確率</th><th></th></tr>' +
+    sv.rows.map(r => '<tr><td>' + esc(r.name) + '</td><td class="mono">' + r.leak.toFixed(2) + '</td><td class="mono">' +
+      r.bits.toFixed(2) + ' bit</td><td class="mono">' + pct(r.readProb) + '</td><td>' +
+      (r.read ? '<span class="tag bad">読まれ得る</span>' : '') + '</td></tr>').join("") + '</table>' +
+    '<div class="hint" style="margin-top:8px">疾患のうち ' + pct(sv.share) + ' が閾値 90% を超えます' +
+    (sv.majority ? '（殆どの病気がこの症状を起こす、を数として示したもの）' : '') + '</div>';
+}
+
+/* ── 🧪 RNA 干渉 ── */
+PANELS.rnai = () => `
+<div class="card">
+  <h3>構築可能な RNA 干渉 — siRNA の設計</h3>
+  <div class="hint">標的 mRNA を 21 nt 窓で走査し、ガイド鎖を逆相補で構築します。採択条件は
+    GC 30–52%・同一塩基 4 連続なし・熱力学的非対称性(ガイド 5′ が AU に富む)・シード(2–8 位)の
+    他遺伝子一致が少ないこと。各候補には Γ→Jones の指紋を付し、積み木の真逆へそのまま渡せます。</div>
+  <div class="row"><label>標的 mRNA</label></div>
+  <textarea id="rSeq">ATGGCATTACGGATCCTAGCAATGCATTGCAAGGCTTAACGTTAGCCATGACTGCATTAGC</textarea>
+  <div class="row"><label>オフターゲット配列</label></div>
+  <textarea id="rDec" style="min-height:56px">GGCATTACGGATCCTAGCAA
+TTTTGCAATGCATTGCAAAC</textarea>
+  <div class="row"><button class="acc" onclick="runRnai()">設計する</button>
+    <label style="min-width:96px">用量</label><input id="rDose" type="range" min="0" max="8" step="0.1" value="2" oninput="runRnai()"/><span id="rDoseV" class="mono">2.0</span></div>
+  <div id="rOut"></div>
+</div>`;
+function runRnai(){
+  const seq = $("rSeq").value, dec = $("rDec").value.split(/\s+/).filter(Boolean);
+  const dose = parseFloat($("rDose").value);
+  $("rDoseV").textContent = dose.toFixed(1);
+  const r = rnaiDesign(seq, { decoys: dec });
+  const kd = rnaiKnockdown(dose, 1, 1.4);
+  $("rOut").innerHTML =
+    '<div class="row"><span class="tag">走査 ' + r.scanned + ' 窓</span><span class="tag">採択 ' + r.accepted + ' 件</span>' +
+    '<span class="tag hot">用量 ' + dose.toFixed(1) + ' → ノックダウン ' + pct(kd) + '</span></div>' +
+    (r.candidates.length
+      ? '<table><tr><th>位置</th><th>ガイド鎖 (5′→3′)</th><th>GC</th><th>非対称</th><th>オフ</th><th>得点</th><th>指紋</th></tr>' +
+        r.candidates.map(c => '<tr><td class="mono">' + c.pos + '</td><td class="mono">' + esc(c.guide) + '</td><td class="mono">' +
+          (c.gc * 100).toFixed(0) + '%</td><td class="mono">' + c.asym.toFixed(2) + '</td><td class="mono">' + c.offTargets +
+          '</td><td class="mono">' + c.score + '</td><td class="mono">' + esc(c.fingerprint) + '</td></tr>').join("") + '</table>'
+      : '<div class="hint">採択条件を満たす窓がありません。配列を長くするか GC の偏りを減らしてください。</div>') +
+    (r.best ? '<pre>最良候補\n  標的     ' + r.best.target + '\n  ガイド   ' + r.best.guide +
+      '\n  パッセンジャー ' + r.best.passenger + '\n  検証     ガイドは標的の逆相補 — ' +
+      (revComp(r.best.target, true) + "dTdT" === r.best.guide ? "一致" : "不一致") + '</pre>' : "");
+}
+
+/* ── 💊 セレネース ── */
+PANELS.serenace = () => `
+<div class="card warn">
+  <div class="hint">⚠ この画面は受容体占有の<b>概念モデル</b>です。用量・服薬の助言は一切行いません。
+    薬の内容や量、続けるか止めるかは必ず主治医にご相談ください。</div>
+</div>
+<div class="card">
+  <h3>セレネース(ハロペリドール)の仕組み — 下流の遮断</h3>
+  <div class="hint">占有 occ = C/(C + K<sub>d</sub>)。文献上、抗精神病薬の線条体 D2 占有は 65–80% が応答域、
+    80% 超で錐体外路症状のリスクが上がるとされます。ここではその教科書的な区分を目盛りとして置くだけです。</div>
+  <div class="row"><label>相対濃度 C</label><input id="sC" type="range" min="0" max="8" step="0.1" value="2" oninput="runSerenace()"/><span id="sCV" class="mono">2.0</span></div>
+  <div class="row"><label>K<sub>d</sub></label><input id="sK" type="range" min="0.2" max="4" step="0.1" value="1" oninput="runSerenace()"/><span id="sKV" class="mono">1.0</span></div>
+  <div class="row"><label>上流ノックダウン</label><input id="sKd" type="range" min="0" max="1" step="0.02" value="0.5" oninput="runSerenace()"/><span id="sKdV" class="mono">0.50</span></div>
+  <div id="sOut"></div>
+</div>
+<div class="card">
+  <h3>対症(下流)と予防(上流)を同じ尺度に載せる</h3>
+  <div class="hint">残存シグナル = (1 − 占有)(1 − ノックダウン)。受容体を塞ぐ経路と、転写産物を減らす経路は、
+    この一つの数の上で足し合わされます。予防機構の解明とは、同じ残存シグナルを<b>より低い占有で</b>達成する道を探すことです。</div>
+  <pre id="sCmp"></pre>
+</div>`;
+function runSerenace(){
+  const C = parseFloat($("sC").value), K = parseFloat($("sK").value), kd = parseFloat($("sKd").value);
+  $("sCV").textContent = C.toFixed(1); $("sKV").textContent = K.toFixed(1); $("sKdV").textContent = kd.toFixed(2);
+  const occ = d2Occupancy(C, K), cmp = serenaceCompare(occ, kd), win = cmp.window;
+  $("sOut").innerHTML =
+    '<div class="row"><label>D2 占有</label><div style="flex:1">' + bar(occ, win.risk === "high") + '</div><span class="mono">' + pct(occ) + '</span></div>' +
+    '<div class="row"><span class="tag' + (win.risk === "high" ? " bad" : win.risk === "target" ? "" : " hot") + '">' + esc(win.band) + '</span>' +
+    '<span class="tag">' + esc(win.note) + '</span></div>';
+  const rows = [0.1, 0.3, 0.5, 0.7, 0.9].map(k =>
+    "  ノックダウン " + (k * 100).toFixed(0).padStart(3) + "%  →  残存 " +
+    (serenaceCompare(occ, k).signal * 100).toFixed(1).padStart(5) + "%   単独占有換算 " +
+    (serenaceCompare(occ, k).equivalentOccupancy * 100).toFixed(1) + "%").join("\n");
+  $("sCmp").textContent =
+    "下流 D2 占有        " + pct(occ) + "  (" + win.band + ")\n" +
+    "上流ノックダウン    " + pct(kd) + "\n" +
+    "残存シグナル        " + pct(cmp.signal) + "\n" +
+    "単独占有換算        " + pct(cmp.equivalentOccupancy) + "\n\n" + rows;
+}
+
+/* ── 🛡 予防機構 ── */
+PANELS.prevent = () => `
+<div class="card">
+  <h3>7 段パイプライン</h3>
+  <div class="hint">Γ 熱感知 → Jones 不変量 → 積み木の真逆 → 暗号解読 → 病識と漏洩 → RNA 干渉の構築 → セレネース比較。
+    各段が前段の出力だけを入力に取り、最後に全段の成立を検証します。</div>
+  <div class="row"><label>配列</label><input id="pSeq" value="ATGGCATTACGGATCCTAGCAATGCATTGCA"/></div>
+  <div class="row"><label>Γ 熱核 κ</label><input id="pK" type="number" step="0.1" value="1.2"/>
+    <label style="min-width:96px">用量</label><input id="pDose" type="number" step="0.1" value="2"/>
+    <button class="grn" onclick="runPrevent()">解明する</button></div>
+  <div id="pOut"><div class="hint">押すと 7 段を通します(数秒かかります)。</div></div>
+</div>`;
+function runPrevent(){
+  $("pOut").innerHTML = '<div class="hint">解明中…</div>';
+  setTimeout(() => {
+    const r = preventionPipeline({
+      seq: $("pSeq").value, kappa: parseFloat($("pK").value), dose: parseFloat($("pDose").value)
+    });
+    $("pOut").innerHTML = r.stages.map(s =>
+      '<div class="stage' + (s.ok ? "" : " ng") + '"><b>' + s.n + ". " + esc(s.title) + '</b><span>' + esc(s.detail) + '</span></div>'
+    ).join("") + '<div class="card" style="margin-top:12px"><div class="hint"><b>' + esc(r.verdict) + '</b></div></div>';
+  }, 20);
+}
+
+/* ── シェル ── */
+function shellSend(){
+  const input = $("cmd"), text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  const r = aiShell(text);
+  if (r.open && PANELS[r.open]) openFunc(r.open);
+  const host = $("panelBody") && $("panel").style.display === "block" ? $("panelBody") : null;
+  const box = document.createElement("div");
+  box.className = "card";
+  box.innerHTML = '<div class="msgU">' + esc(text) + '</div><div class="msgA">' + esc(r.text) +
+    '<details open><summary>6 段の開示</summary><pre>' + esc(r.steps.join("\n")) + '</pre></details></div>';
+  if (host){ host.appendChild(box); box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+  else { const h = $("home"); h.appendChild(box); box.scrollIntoView({ behavior: "smooth", block: "nearest" }); }
+}
+
+if (typeof document !== "undefined" && document.getElementById){
+  const cmdEl = $("cmd");
+  if (cmdEl) cmdEl.addEventListener("keydown", e => { if (e.key === "Enter") shellSend(); });
+  renderHome();
+}
+</script>
+</body>
+</html>
