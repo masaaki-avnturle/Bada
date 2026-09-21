@@ -246,6 +246,9 @@ def card(path, title, sub="", big=64):
     d.rectangle([0, top, W, bot], fill=(10, 10, 20, 150))          # 半透明の帯
     w1 = d.textlength(title, font=f1); d.text(((W - w1) / 2, H * 0.40), title, font=f1, fill=(255, 250, 235, 255))
     if sub:
+        size = 30
+        while d.textlength(sub, font=f2) > W - 80 and size > 14:
+            size -= 1; f2 = ImageFont.truetype(FONT, size)
         w2 = d.textlength(sub, font=f2); d.text(((W - w2) / 2, H * 0.40 + big + 24), sub, font=f2, fill=(225, 220, 205, 230))
     im.save(path)
 
@@ -290,6 +293,9 @@ def render_section(name, main_inputs, main_filter, dur, cards_local):
         chain = f"o{k}"
     fc.append(f"[{chain}]format=yuv420p,trim=duration={dur},setpts=PTS-STARTPTS[vout]")
     out = os.path.join(OUT, f"vid_{name}.mp4")
+    rerender = os.environ.get("RERENDER", "").split(",")
+    if os.environ.get("SKIP_EXISTING") == "1" and os.path.exists(out) and name not in rerender:
+        print("reuse", name); return out
     cmd = [FF, "-y", "-loglevel", "error", "-stats"] + main_inputs + cins + [
         "-filter_complex", ";".join(fc), "-map", "[vout]", "-an", "-t", f"{dur:.3f}"] + ENC + [out]
     print("render", name); subprocess.run(cmd, check=True)
@@ -310,7 +316,8 @@ for i, sd in enumerate(SECTIONS):
     elif v.startswith("spectrum:"):
         color = v.split(":")[1]
         ins = ["-loop", "1", "-framerate", str(FPS), "-i", os.path.join(OUT, f"bg_{color}.png"), "-i", wav]
-        flt = (f"[1:a]showspectrum=s={W}x400:mode=combined:color={color}:slide=scroll:scale=log:fps={FPS},format=rgba,colorchannelmixer=aa=0.9[sp];"
+        flt = (f"[1:a]showspectrum=s={W}x400:mode=combined:color={color}:slide=scroll:scale=log:win_size=1024:fps={FPS},"
+               f"format=rgba,colorkey=0x000000:0.12:0.25,colorchannelmixer=aa=0.92[sp];"
                f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p[bg];[bg][sp]overlay=0:{H-400}:shortest=1,format=yuv420p")
     elif v == "requiem_pair":
         half = 129
