@@ -316,7 +316,7 @@ for i, sd in enumerate(SECTIONS):
     elif v.startswith("spectrum:"):
         color = v.split(":")[1]
         ins = ["-loop", "1", "-framerate", str(FPS), "-i", os.path.join(OUT, f"bg_{color}.png"), "-i", wav]
-        flt = (f"[1:a]showspectrum=s={W}x400:mode=combined:color={color}:slide=scroll:scale=log:win_size=1024:fps={FPS},"
+        flt = (f"[1:a]showspectrum=s={W}x400:mode=combined:color={color}:slide=scroll:scale=log:fscale=log:overlap=0.8:fps={FPS},"
                f"format=rgba,colorkey=0x000000:0.12:0.25,colorchannelmixer=aa=0.92[sp];"
                f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p[bg];[bg][sp]overlay=0:{H-400}:shortest=1,format=yuv420p")
     elif v == "requiem_pair":
