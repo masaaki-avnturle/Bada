@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bada Pharma — 薬剤製造装置</title>
+<style>
+  :root{
+    --bg:#080a10; --bg2:#101522; --panel:#151d2e; --line:#26344f;
+    --tx:#e2e9f7; --dim:#8b99b8; --acc:#f59e0b; --acc2:#22d3ee; --ok:#34d399; --err:#fb7185;
+    --ket:#c084fc; --api:#fbbf24;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    background:radial-gradient(1200px 700px at 70% -12%, #232a12 0%, var(--bg) 58%);
+    color:var(--tx); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+  #statusbar{
+    display:flex; align-items:center; gap:10px; padding:8px 14px; font-size:12px; color:var(--dim);
+    border-bottom:1px solid var(--line); background:rgba(8,10,16,.86); backdrop-filter:blur(6px); flex:none;
+  }
+  #statusbar b{ color:var(--tx); font-weight:600; }
+  #sbLot{ margin-left:auto; color:var(--api); font-family:ui-monospace,Consolas,monospace; }
+  #screen{ flex:1; overflow:auto; position:relative; }
+  #home{ padding:18px 14px 28px; }
+  #homeHead{ text-align:center; margin:8px 0 16px; }
+  #homeHead h1{ font-size:21px; letter-spacing:.05em; }
+  #homeHead h1 span{ color:var(--acc); }
+  #homeHead p{ font-size:11.5px; color:var(--dim); margin-top:7px; line-height:1.8; max-width:740px; margin-inline:auto; }
+  #grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:13px; max-width:700px; margin:0 auto; }
+  .app{
+    background:linear-gradient(160deg,var(--panel),var(--bg2)); border:1px solid var(--line);
+    border-radius:18px; padding:12px 6px 9px; text-align:center; cursor:pointer; user-select:none;
+    transition:transform .08s, border-color .15s;
+  }
+  .app:active{ transform:scale(.94); }
+  .app:hover{ border-color:var(--acc); }
+  .app .ic{ font-size:27px; line-height:1.2; }
+  .app .nm{ font-size:11.5px; margin-top:6px; }
+  .app .st{ font-size:9.5px; color:var(--acc2); font-family:ui-monospace,Consolas,monospace; margin-top:3px; }
+  #panel{ display:none; position:absolute; inset:0; background:var(--bg); overflow:auto; padding-bottom:24px; }
+  #panelBar{
+    position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px;
+    padding:10px 14px; background:rgba(8,10,16,.95); border-bottom:1px solid var(--line); backdrop-filter:blur(6px);
+  }
+  #panelTitle{ font-size:15px; font-weight:600; }
+  #panelTag{ margin-left:auto; font-size:10.5px; color:var(--acc2); font-family:ui-monospace,Consolas,monospace; }
+  #panelBody{ padding:14px; max-width:840px; margin:0 auto; }
+  button{
+    background:linear-gradient(160deg,#1d2740,#151d31); color:var(--tx); border:1px solid var(--line);
+    border-radius:10px; padding:8px 14px; font-size:14px; cursor:pointer; font-family:inherit;
+  }
+  button:active{ transform:scale(.96); }
+  button.acc{ background:linear-gradient(160deg,var(--acc),#b45309); border-color:transparent; color:#1a1103; font-weight:600; }
+  button.grn{ background:linear-gradient(160deg,#10b981,#047857); border-color:transparent; color:#03140d; font-weight:600; }
+  input,textarea,select{
+    background:var(--bg2); color:var(--tx); border:1px solid var(--line); border-radius:10px;
+    padding:9px 11px; font-size:14px; font-family:inherit; width:100%;
+  }
+  textarea{ font-family:ui-monospace,Consolas,monospace; min-height:86px; }
+  input[type=range]{ padding:0; }
+  pre{
+    background:#05070d; border:1px solid var(--line); border-radius:10px; padding:11px;
+    font-size:12.5px; line-height:1.65; overflow:auto; font-family:ui-monospace,Consolas,monospace;
+    white-space:pre-wrap; word-break:break-all;
+  }
+  .row{ display:flex; gap:8px; margin:8px 0; flex-wrap:wrap; align-items:center; }
+  .row > label{ font-size:12px; color:var(--dim); min-width:132px; }
+  .row > input, .row > select{ flex:1; min-width:110px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:13px; margin:10px 0; }
+  .card h3{ font-size:13.5px; margin-bottom:7px; color:var(--acc); }
+  .hint{ font-size:11.5px; color:var(--dim); line-height:1.85; }
+  .warn{ border-color:#7c2d12; background:linear-gradient(160deg,#1d1206,#150c04); }
+  .warn .hint{ color:#fcd34d; }
+  .tag{ display:inline-block; font-size:10.5px; color:var(--acc2); border:1px solid var(--line); border-radius:99px; padding:1px 9px; margin:2px 3px 2px 0; }
+  .tag.bad{ color:var(--err); } .tag.ok{ color:var(--ok); } .tag.api{ color:var(--api); }
+  table{ width:100%; border-collapse:collapse; font-size:12px; }
+  th,td{ border-bottom:1px solid var(--line); padding:6px 5px; text-align:left; vertical-align:top; }
+  th{ color:var(--dim); font-weight:500; }
+  td.mono, .mono{ font-family:ui-monospace,Consolas,monospace; color:var(--ket); }
+  canvas{ width:100%; border:1px solid var(--line); border-radius:12px; background:#05070d; display:block; }
+  .bar{ height:9px; border-radius:99px; background:#0b1220; border:1px solid var(--line); overflow:hidden; }
+  .bar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--acc),var(--ok)); }
+  .bar > i.bad{ background:linear-gradient(90deg,#f59e0b,var(--err)); }
+  .msgU,.msgA{ border-radius:14px; padding:10px 13px; margin:8px 0; max-width:93%; font-size:13.5px; line-height:1.8; white-space:pre-wrap; word-break:break-word; }
+  .msgU{ background:#2a2410; margin-left:auto; }
+  .msgA{ background:var(--panel); border:1px solid var(--line); }
+  details{ margin-top:7px; font-size:11.5px; color:var(--dim); }
+  details pre{ margin-top:6px; }
+  #cmdbar{
+    flex:none; display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--line); background:rgba(8,10,16,.95); backdrop-filter:blur(6px);
+  }
+  #cmdbar input{ flex:1; }
+  .stage{ display:flex; gap:9px; align-items:flex-start; padding:7px 0; border-bottom:1px dashed var(--line); font-size:12.5px; }
+  .stage b{ color:var(--ok); font-weight:600; white-space:nowrap; }
+  .stage.ng b{ color:var(--err); }
+  .mods{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; }
+  .mod{ border:1px solid var(--line); border-radius:12px; padding:9px 10px; background:var(--bg2); }
+  .mod b{ font-size:12px; } .mod .v{ font-family:ui-monospace,Consolas,monospace; color:var(--acc2); font-size:12px; }
+</style>
+</head>
+<body>
+
+<div id="statusbar">
+  <b>⚗ Bada Pharma</b>
+  <span id="sbMode">薬剤製造装置</span>
+  <span id="sbLot">LOT —</span>
+</div>
+
+<div id="screen">
+  <div id="home">
+    <div id="homeHead">
+      <h1>⚗ Bada <span>Pharma</span></h1>
+      <p>
+        これまでに作った計測器アプリ ── <b>MRI / fMRI</b>(Ω-Tomograph)・<b>DNA 解析</b>・<b>血液検査</b>・
+        <b>脳電磁場</b>・<b>脳トポグラフィー</b>・<b>Γ 熱感知</b>(Ω-Thermal Trace) ── の読みを一本の
+        <b>個体プロファイル</b>に束ね、<b>標的同定 → 分子設計 → 逆合成(積み木の真逆) → 製剤化 →
+        薬物動態 → 品質管理 → 製造記録</b>までを通す、<b>8 段の製造ラインのシミュレータ</b>。
+      </p>
+    </div>
+    <div id="grid"></div>
+    <div class="card warn" style="max-width:700px;margin:18px auto 0">
+      <div class="hint">
+        ⚠ <b>概念シミュレーション・非医療・実製造不可</b> — 実在の人体も検体も計測せず、合成データ上の
+        数値実験だけを行います。<b>試薬・反応条件・操作手順は一切出しません</b>(逆合成は収率と原子効率の
+        計画だけを扱う抽象モデルです)。医薬品の製造は薬機法と GMP に基づく許可と設備が必要で、
+        本アプリはその代わりにはなりません。診断・治療・投薬の判断にも使えません。
+        薬の内容・量・継続や中止は必ず主治医にご相談ください。
+      </div>
+    </div>
+  </div>
+  <div id="panel">
+    <div id="panelBar">
+      <button onclick="goHome()">← 戻る</button>
+      <span id="panelTitle"></span>
+      <span id="panelTag"></span>
+    </div>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<div id="cmdbar">
+  <input id="cmd" placeholder="例: 計測を取り込んで / 標的を決めて / アスピリンを設計 / 製剤化して / 血中濃度 / 品質を見て / 全部通して" />
+  <button class="acc" onclick="shellSend()">実行</button>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+ *  Bada Pharma — 薬剤製造装置
+ *  計測器アプリ群の読み → 標的 → 分子 → 逆合成 → 製剤 → 動態 → 品質 → 記録
+ *  すべて純関数。DOM に依存しない部分だけで tools/engine-test.js が回ります。
+ *
+ *  ⚠ 試薬・反応条件・操作手順は一切扱いません。逆合成は「収率と原子効率の
+ *     計画」だけを抽象フラグメント上で行うモデルです。
+ * ===================================================================== */
+
+/* ──────────────────────────────────────────────────────────────
+ * 0. Γ 大域的部分積分多様体 (bio_medicine 各アプリと同じ核)
+ *      ∫Γ(γ)′dx_m = 2e^{−x log x},  k(r) = ½ + ½e^{−κ·r log r}
+ * ────────────────────────────────────────────────────────────── */
+function gammaManifold(x){
+  if (!(x > 0)) return null;
+  return 2 * Math.exp(-x * Math.log(x));
+}
+function gammaKernel(r, kappa){
+  if (!(r > 0)) return 1;
+  return Math.max(0.02, Math.min(1, 0.5 + 0.5 * Math.exp(-kappa * r * Math.log(r))));
+}
+function strHash(s){
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < String(s).length; i++){ h ^= String(s).charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h >>> 0;
+}
+function mulberry32(a){
+  return function(){
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+function mean(a){ return a.reduce((s, v) => s + v, 0) / (a.length || 1); }
+function sd(a){
+  if (a.length < 2) return 0;
+  const m = mean(a);
+  return Math.sqrt(a.reduce((s, v) => s + (v - m) * (v - m), 0) / (a.length - 1));
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 1. 計測取込 — これまでに作った計測器アプリの読みを束ねる
+ *
+ *   MRI / fMRI      … bio_medicine/omega_tomograph (ラドン変換 + FBP)
+ *   DNA 解析        … bada_serenace (塩基 ↦ 組み紐生成子 ↦ Jones 指紋)
+ *   血液検査        … 生化学パネル (CRP / ALT / Cre / eGFR / Alb)
+ *   脳電磁場        … EEG/MEG 帯域パワー (δ θ α β γ)
+ *   脳トポグラフィー … 皮質チャネルの空間分布
+ *   Γ 熱感知        … bio_medicine/omega_thermal_trace (熱流束)
+ *
+ * 各モダリティは 0–1 に正規化した寄与と、品質(欠損・飽和)の旗を持つ。
+ * 重みは Γ 核 k(r) で与え、距離 r が大きいモダリティほど緩やかに効かせる。
+ * ────────────────────────────────────────────────────────────── */
+const MODALITIES = [
+  { id: "mri",   name: "MRI",            unit: "コントラスト比", ref: [0.2, 1.4], r: 0.8, app: "bio_medicine/omega_tomograph" },
+  { id: "fmri",  name: "fMRI",           unit: "BOLD %変化",     ref: [0.1, 3.0], r: 1.0, app: "bio_medicine/omega_tomograph" },
+  { id: "dna",   name: "DNA 解析",        unit: "変異負荷",       ref: [0.0, 1.0], r: 1.4, app: "bada_serenace" },
+  { id: "blood", name: "血液検査",        unit: "CRP mg/dL",      ref: [0.0, 10.0], r: 1.2, app: "bio_medicine (生化学)" },
+  { id: "meg",   name: "脳電磁場",        unit: "α/β 比",         ref: [0.3, 3.0], r: 1.6, app: "bio_medicine/omega_telepathy" },
+  { id: "topo",  name: "脳トポグラフィー", unit: "偏差 z",         ref: [0.0, 4.0], r: 1.8, app: "bio_medicine/omega_tomograph" },
+  { id: "therm", name: "Γ 熱感知",        unit: "境界熱流束",     ref: [0.0, 1.2], r: 2.0, app: "bio_medicine/omega_thermal_trace" }
+];
+function modalityNormalize(id, value){
+  const m = MODALITIES.find(x => x.id === id);
+  if (!m) return null;
+  const [lo, hi] = m.ref;
+  const v = Number(value);
+  if (!isFinite(v)) return null;
+  return { id: id, raw: v, norm: clamp01((v - lo) / (hi - lo)), saturated: v > hi || v < lo };
+}
+function modalityIntake(readings, kappa){
+  const k = (kappa === undefined) ? 1.2 : kappa;
+  const rows = [], missing = [];
+  let wsum = 0, acc = 0;
+  for (const m of MODALITIES){
+    const has = readings && readings[m.id] !== undefined && readings[m.id] !== null && readings[m.id] !== "";
+    if (!has){ missing.push(m.id); continue; }
+    const n = modalityNormalize(m.id, readings[m.id]);
+    if (!n){ missing.push(m.id); continue; }
+    const w = gammaKernel(m.r, k);
+    rows.push({ id: m.id, name: m.name, unit: m.unit, raw: n.raw, norm: n.norm, weight: w, saturated: n.saturated });
+    wsum += w; acc += w * n.norm;
+  }
+  const coverage = rows.length / MODALITIES.length;
+  return {
+    rows: rows, missing: missing, coverage: coverage,
+    burden: wsum > 0 ? acc / wsum : 0,                 /* Γ 重み付き総合負荷 0–1 */
+    usable: coverage >= 0.5,
+    vector: MODALITIES.map(m => { const r = rows.find(x => x.id === m.id); return r ? r.norm : 0; }),
+    note: coverage >= 0.5 ? "取り込み十分 — 標的同定へ進めます"
+                          : "モダリティが足りません (半数以上の計測が要ります)"
+  };
+}
+/* 平均を抜いたコサイン類似度 (= ピアソン相関)。生のコサインは成分が
+   すべて正のため軒並み 0.9 を超えて標的を見分けられないので、形だけを見る。 */
+function profileSimilarity(a, b){
+  const n = Math.min(a.length, b.length);
+  if (!n) return 0;
+  let ma = 0, mb = 0;
+  for (let i = 0; i < n; i++){ ma += a[i]; mb += b[i]; }
+  ma /= n; mb /= n;
+  let d = 0, na = 0, nb = 0;
+  for (let i = 0; i < n; i++){
+    const x = a[i] - ma, y = b[i] - mb;
+    d += x * y; na += x * x; nb += y * y;
+  }
+  return d / (Math.sqrt(na * nb) + 1e-9);
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 2. 標的同定 — プロファイルに最も近い標的を選ぶ
+ *    各標的は 7 モダリティ上の署名ベクトルを持ち、コサイン類似度で照合する
+ *    (Ω-Tomograph の Whispered 合致率と同じ道具立て)。
+ * ────────────────────────────────────────────────────────────── */
+const TARGETS = [
+  { id: "d2",    name: "ドパミン D2 受容体", cls: "GPCR",   sig: [0.30, 0.75, 0.55, 0.20, 0.80, 0.70, 0.35], route: "受容体遮断 (下流)" },
+  { id: "drd2m", name: "DRD2 転写産物",      cls: "mRNA",   sig: [0.25, 0.60, 0.85, 0.20, 0.65, 0.55, 0.30], route: "RNA 干渉 (上流)" },
+  { id: "cox",   name: "COX-2",             cls: "酵素",   sig: [0.35, 0.20, 0.30, 0.90, 0.15, 0.20, 0.85], route: "酵素阻害" },
+  { id: "gaba",  name: "GABA-A 受容体",      cls: "イオンチャネル", sig: [0.20, 0.45, 0.30, 0.15, 0.85, 0.60, 0.25], route: "アロステリック調節" },
+  { id: "sert",  name: "セロトニン輸送体",   cls: "輸送体", sig: [0.25, 0.70, 0.40, 0.25, 0.55, 0.65, 0.30], route: "再取り込み阻害" },
+  { id: "hmgcr", name: "HMG-CoA 還元酵素",   cls: "酵素",   sig: [0.30, 0.15, 0.55, 0.75, 0.10, 0.15, 0.45], route: "酵素阻害" }
+];
+function targetIdentify(profile){
+  const v = profile.vector || profile;
+  const scored = TARGETS.map(t => ({
+    id: t.id, name: t.name, cls: t.cls, route: t.route,
+    score: profileSimilarity(v, t.sig)
+  })).sort((a, b) => b.score - a.score);
+  const best = scored[0], second = scored[1];
+  const margin = best.score - (second ? second.score : 0);
+  const confident = margin > 0.05 && best.score > 0.5;
+  return {
+    ranking: scored, best: best, margin: margin, confident: confident,
+    note: confident ? "標的を一意に決められます"
+        : (best.score <= 0.5 ? "どの署名とも相関が弱い — 計測を足してください"
+                             : "上位が拮抗しています — 上流と下流を並行して設計してください")
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 3. 分子設計 — 積み木(フラグメント)から分子を組み上げる
+ *    原子量は IUPAC の標準原子量。分子量・水素結合供与/受容数・
+ *    回転可能結合数・TPSA(Ertl のフラグメント寄与)・logP(フラグメント和)
+ *    を積み上げ、Lipinski の Rule of Five と望ましさ指標で評価する。
+ * ────────────────────────────────────────────────────────────── */
+const ATOMIC = { C: 12.011, H: 1.008, N: 14.007, O: 15.999, F: 18.998, Cl: 35.45, Br: 79.904, S: 32.06, P: 30.974 };
+function molWeight(formula){
+  let mw = 0;
+  for (const el in formula){
+    if (!(el in ATOMIC)) throw new Error("未知の元素: " + el);
+    mw += ATOMIC[el] * formula[el];
+  }
+  return mw;
+}
+/* Hill 表記: C, H のあとは元素記号のアルファベット順 (C21H23ClFNO2) */
+function formulaString(formula){
+  const rest = ["Br", "Cl", "F", "N", "O", "P", "S"];
+  const order = ["C", "H"].concat(rest);
+  return order.filter(e => formula[e]).map(e => e + (formula[e] > 1 ? formula[e] : "")).join("");
+}
+function formulaAdd(a, b){
+  const r = Object.assign({}, a);
+  for (const el in b) r[el] = (r[el] || 0) + b[el];
+  for (const el in r) if (!r[el]) delete r[el];
+  return r;
+}
+/* フラグメント積み木。logP は Crippen 流のフラグメント寄与の粗い近似、
+   tpsa は Ertl の極性表面積寄与 (Å²)。結合手 (bonds) は接続数。 */
+const FRAGMENTS = [
+  { id: "phenyl",    name: "フェニル環",      f: { C: 6, H: 4 },        logP: 1.90, tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 2 },
+  { id: "phenylEnd", name: "フェニル (末端)",  f: { C: 6, H: 5 },        logP: 2.00, tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 1 },
+  { id: "pyridine",  name: "ピリジン環",      f: { C: 5, H: 3, N: 1 },  logP: 0.65, tpsa: 12.89, hbd: 0, hba: 1, rot: 0, bonds: 2 },
+  { id: "piperidine",name: "ピペリジン",      f: { C: 5, H: 9, N: 1 },  logP: 0.84, tpsa: 12.03, hbd: 1, hba: 1, rot: 0, bonds: 2 },
+  { id: "piperidine4", name: "4,4-二置換ピペリジン", f: { C: 5, H: 8, N: 1 }, logP: 0.70, tpsa: 3.24, hbd: 0, hba: 1, rot: 0, bonds: 3 },
+  { id: "carboxyl",  name: "カルボキシル",    f: { C: 1, H: 1, O: 2 },  logP: -0.32, tpsa: 37.30, hbd: 1, hba: 2, rot: 1, bonds: 1 },
+  { id: "amide",     name: "アミド",          f: { C: 1, H: 2, N: 1, O: 1 }, logP: -1.26, tpsa: 43.09, hbd: 1, hba: 1, rot: 1, bonds: 1 },
+  { id: "acetamido", name: "アセトアミド",    f: { C: 2, H: 4, N: 1, O: 1 }, logP: -0.80, tpsa: 29.10, hbd: 1, hba: 1, rot: 2, bonds: 1 },
+  { id: "acetyloxy", name: "アセチルオキシ",  f: { C: 2, H: 3, O: 2 },  logP: 0.23,  tpsa: 26.30, hbd: 0, hba: 2, rot: 2, bonds: 1 },
+  { id: "hydroxyl",  name: "ヒドロキシル",    f: { O: 1, H: 1 },        logP: -0.67, tpsa: 20.23, hbd: 1, hba: 1, rot: 0, bonds: 1 },
+  { id: "amine",     name: "第一級アミン",    f: { N: 1, H: 2 },        logP: -1.02, tpsa: 26.02, hbd: 2, hba: 1, rot: 0, bonds: 1 },
+  { id: "methyl",    name: "メチル",          f: { C: 1, H: 3 },        logP: 0.50,  tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 1 },
+  { id: "methylene", name: "メチレン鎖",      f: { C: 1, H: 2 },        logP: 0.50,  tpsa: 0,     hbd: 0, hba: 0, rot: 1, bonds: 2 },
+  { id: "ether",     name: "エーテル酸素",    f: { O: 1 },              logP: -0.20, tpsa: 9.23,  hbd: 0, hba: 1, rot: 1, bonds: 2 },
+  { id: "ketone",    name: "ケトン",          f: { C: 1, O: 1 },        logP: -0.28, tpsa: 17.07, hbd: 0, hba: 1, rot: 1, bonds: 2 },
+  { id: "fluoro",    name: "フッ素",          f: { F: 1 },              logP: 0.14,  tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 1 },
+  { id: "chloro",    name: "塩素",            f: { Cl: 1 },             logP: 0.71,  tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 1 },
+  { id: "cf3",       name: "トリフルオロメチル", f: { C: 1, F: 3 },     logP: 1.10,  tpsa: 0,     hbd: 0, hba: 0, rot: 0, bonds: 1 },
+  { id: "sulfonamide", name: "スルホンアミド", f: { S: 1, O: 2, N: 1, H: 2 }, logP: -1.18, tpsa: 60.16, hbd: 2, hba: 3, rot: 1, bonds: 1 },
+  { id: "nitrile",   name: "ニトリル",        f: { C: 1, N: 1 },        logP: -0.34, tpsa: 23.79, hbd: 0, hba: 1, rot: 0, bonds: 1 }
+];
+function fragment(id){ return FRAGMENTS.find(f => f.id === id) || null; }
+function molBuild(blocks){
+  const used = [];
+  let f = {}, logP = 0, tpsa = 0, hbd = 0, hba = 0, rot = 0;
+  for (const id of blocks){
+    const fr = fragment(id);
+    if (!fr) throw new Error("未知のフラグメント: " + id);
+    used.push(fr);
+    f = formulaAdd(f, fr.f);
+    logP += fr.logP; tpsa += fr.tpsa; hbd += fr.hbd; hba += fr.hba; rot += fr.rot;
+  }
+  /* 連結手の数 − 1 が回転しうる結合として加わる (環は数えない) */
+  const links = Math.max(0, used.length - 1);
+  const mw = molWeight(f);
+  return {
+    blocks: blocks.slice(), formula: f, formulaText: formulaString(f),
+    mw: mw, logP: logP, tpsa: tpsa, hbd: hbd, hba: hba,
+    rotatable: rot + links, heavyAtoms: Object.keys(f).filter(e => e !== "H").reduce((s, e) => s + f[e], 0)
+  };
+}
+/* Lipinski の Rule of Five */
+function lipinski(desc){
+  const v = [];
+  if (desc.mw > 500) v.push("分子量 > 500");
+  if (desc.logP > 5) v.push("logP > 5");
+  if (desc.hbd > 5) v.push("水素結合供与 > 5");
+  if (desc.hba > 10) v.push("水素結合受容 > 10");
+  return { violations: v, count: v.length, pass: v.length <= 1 };
+}
+/* Veber 則 (経口吸収): 回転可能結合 ≤ 10 かつ TPSA ≤ 140 Å² */
+function veber(desc){
+  const v = [];
+  if (desc.rotatable > 10) v.push("回転可能結合 > 10");
+  if (desc.tpsa > 140) v.push("TPSA > 140 Å²");
+  return { violations: v, pass: v.length === 0 };
+}
+/* 望ましさ — 各指標の台形スコアの幾何平均 (QED の考え方の簡略版) */
+function desirability(desc){
+  const tri = (x, lo, best1, best2, hi) => {
+    if (x <= lo || x >= hi) return 0.02;
+    if (x >= best1 && x <= best2) return 1;
+    return x < best1 ? (x - lo) / (best1 - lo) : (hi - x) / (hi - best2);
+  };
+  const parts = [
+    tri(desc.mw, 100, 250, 400, 600),
+    tri(desc.logP, -2, 1, 3.5, 6),
+    tri(desc.tpsa, 0, 40, 100, 160),
+    tri(desc.hbd, -1, 0, 3, 6),
+    tri(desc.hba, -1, 1, 7, 12),
+    tri(desc.rotatable, -1, 0, 7, 12)
+  ];
+  const q = Math.pow(parts.reduce((s, v) => s * v, 1), 1 / parts.length);
+  return { score: q, parts: parts, grade: q > 0.7 ? "良" : q > 0.45 ? "可" : "要再設計" };
+}
+/* 参照医薬品 (実在の分子式・分子量の照合用。製法は一切扱わない) */
+const DRUG_REF = [
+  { id: "aspirin",     name: "アスピリン",     f: { C: 9, H: 8, O: 4 },                   mw: 180.16, blocks: ["phenyl", "carboxyl", "acetyloxy"] },
+  { id: "paracetamol", name: "パラセタモール", f: { C: 8, H: 9, N: 1, O: 2 },             mw: 151.16, blocks: ["phenyl", "hydroxyl", "acetamido"] },
+  { id: "caffeine",    name: "カフェイン",     f: { C: 8, H: 10, N: 4, O: 2 },            mw: 194.19, blocks: null },
+  { id: "haloperidol", name: "ハロペリドール", f: { C: 21, H: 23, Cl: 1, F: 1, N: 1, O: 2 }, mw: 375.86,
+    blocks: ["phenyl", "fluoro", "ketone", "methylene", "methylene", "methylene", "piperidine4", "hydroxyl", "phenyl", "chloro"] }
+];
+function drugRef(id){ return DRUG_REF.find(d => d.id === id) || null; }
+
+/* ──────────────────────────────────────────────────────────────
+ * 4. 逆合成 — 積み木の真逆
+ *    組み上げ(順)は フラグメント列 ↦ 分子。逆合成はその逆像で、
+ *    分子を切り口(disconnection)で二つに割る操作の木である。
+ *    ここで扱うのは収率・原子効率・工程数の計画だけで、
+ *    試薬・条件・操作は一切扱わない(扱えない)。
+ * ────────────────────────────────────────────────────────────── */
+const COUPLINGS = [
+  { id: "cn",    name: "C–N 結合形成",   yield: 0.82, lossFormula: { H: 1 } },
+  { id: "cc",    name: "C–C 結合形成",   yield: 0.74, lossFormula: { H: 1 } },
+  { id: "ester", name: "エステル形成",   yield: 0.88, lossFormula: { H: 2, O: 1 } },
+  { id: "amide", name: "アミド形成",     yield: 0.90, lossFormula: { H: 2, O: 1 } },
+  { id: "ether", name: "エーテル形成",   yield: 0.79, lossFormula: { H: 1 } },
+  { id: "redox", name: "酸化還元",       yield: 0.85, lossFormula: {} }
+];
+function couplingFor(blockId){
+  const map = { amide: "amide", acetamido: "amide", carboxyl: "ester", acetyloxy: "ester",
+                ether: "ether", hydroxyl: "redox", amine: "cn", piperidine: "cn",
+                pyridine: "cc", phenyl: "cc", phenylEnd: "cc", methyl: "cc", methylene: "cc",
+                ketone: "redox", nitrile: "cc", sulfonamide: "cn", fluoro: "cc", chloro: "cc", cf3: "cc" };
+  return COUPLINGS.find(c => c.id === (map[blockId] || "cc"));
+}
+function retroRoute(blocks, opts){
+  const o = opts || {};
+  const scale = (o.scale === undefined) ? 1 : o.scale;          /* 仕込み mol */
+  if (!blocks || blocks.length === 0) throw new Error("分子が空です");
+  const target = molBuild(blocks);
+  /* 逆合成: 末端の積み木から順に切り離す (切り口の木を線形に取る) */
+  const steps = [];
+  let carried = blocks.slice();
+  while (carried.length > 1){
+    const cut = carried[carried.length - 1];
+    const cp = couplingFor(cut);
+    const remain = carried.slice(0, -1);
+    steps.push({
+      n: steps.length + 1,
+      disconnect: fragment(cut).name,
+      coupling: cp.name, couplingId: cp.id, yield: cp.yield,
+      left: molBuild(remain).formulaText, right: fragment(cut).f
+    });
+    carried = remain;
+  }
+  steps.reverse().forEach((s, i) => { s.n = i + 1; });          /* 前向き(合成)の順に直す */
+  const overall = steps.reduce((y, s) => y * s.yield, 1);
+  /* 原子効率 = 目的物の質量 / 投入質量。各結合形成は脱離分子 (水など) を
+     出すので、投入側にはその分の原子も乗る。 */
+  const lossMass = steps.reduce((m, s) => {
+    const cp = COUPLINGS.find(c => c.id === s.couplingId);
+    return m + molWeight(cp.lossFormula || {});
+  }, 0);
+  const inputMass = target.mw + lossMass;
+  const atomEconomy = target.mw / (inputMass || 1);
+  return {
+    target: target, steps: steps, stepCount: steps.length,
+    overallYield: overall, atomEconomy: atomEconomy, lossMass: lossMass,
+    startingMaterials: blocks.map(b => ({ id: b, name: fragment(b).name, mw: molWeight(fragment(b).f) })),
+    requiredInput: scale / (overall || 1),                      /* 必要仕込み mol */
+    note: "収率と原子効率の計画のみ。試薬・反応条件・操作手順は扱いません"
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 5. 製剤化 — 錠剤の質量収支と溶出
+ *    原薬 + 賦形剤 (充填剤・崩壊剤・結合剤・滑沢剤) の質量収支が閉じること、
+ *    溶出は Weibull 式 F(t) = 1 − exp(−(t/τ)^β) と
+ *    Noyes–Whitney 式 dC/dt = k(Cs − C) で記述する。
+ * ────────────────────────────────────────────────────────────── */
+function formulate(apiMg, opts){
+  const o = opts || {};
+  const tablet = (o.tabletMg === undefined) ? 250 : o.tabletMg;
+  const api = Math.max(0, apiMg);
+  if (api > tablet) throw new Error("原薬量が錠剤質量を超えています");
+  const disintegrantPct = (o.disintegrant === undefined) ? 0.05 : o.disintegrant;
+  const binderPct = (o.binder === undefined) ? 0.03 : o.binder;
+  const lubricantPct = (o.lubricant === undefined) ? 0.01 : o.lubricant;
+  const disintegrant = tablet * disintegrantPct;
+  const binder = tablet * binderPct;
+  const lubricant = tablet * lubricantPct;
+  const filler = tablet - api - disintegrant - binder - lubricant;
+  if (filler < 0) throw new Error("賦形剤の配合が錠剤質量を超えています");
+  const drugLoad = api / tablet;
+  /* 崩壊剤が多いほど、原薬含量が高いほど溶出は速い (τ が短い) */
+  const tau = (o.tau === undefined) ? 12 / (0.5 + disintegrantPct * 8 + drugLoad) : o.tau;
+  const beta = (o.beta === undefined) ? 0.9 : o.beta;
+  return {
+    tabletMg: tablet, api: api, filler: filler, disintegrant: disintegrant,
+    binder: binder, lubricant: lubricant, drugLoad: drugLoad,
+    total: api + filler + disintegrant + binder + lubricant,
+    balanced: Math.abs((api + filler + disintegrant + binder + lubricant) - tablet) < 1e-9,
+    tau: tau, beta: beta,
+    composition: [
+      { name: "原薬 (API)", mg: api, pct: api / tablet },
+      { name: "充填剤",     mg: filler, pct: filler / tablet },
+      { name: "崩壊剤",     mg: disintegrant, pct: disintegrantPct },
+      { name: "結合剤",     mg: binder, pct: binderPct },
+      { name: "滑沢剤",     mg: lubricant, pct: lubricantPct }
+    ]
+  };
+}
+/* Weibull 溶出: F(τ) = 1 − 1/e ≈ 0.632 が τ の定義 */
+function dissolution(t, tau, beta){
+  if (t <= 0) return 0;
+  return 1 - Math.exp(-Math.pow(t / tau, beta === undefined ? 1 : beta));
+}
+function dissolutionProfile(form, times){
+  const ts = times || [5, 10, 15, 20, 30, 45, 60];
+  return ts.map(t => ({ t: t, f: dissolution(t, form.tau, form.beta) }));
+}
+/* Noyes–Whitney: C(t) = Cs(1 − e^{−kt}) + C0 e^{−kt} */
+function noyesWhitney(t, k, Cs, C0){
+  const c0 = C0 || 0;
+  return Cs * (1 - Math.exp(-k * t)) + c0 * Math.exp(-k * t);
+}
+/* 溶出規格 Q: 指定時刻で Q% 以上溶けているか */
+function dissolutionQ(form, tQ, Q){
+  const f = dissolution(tQ, form.tau, form.beta);
+  return { t: tQ, f: f, Q: Q, pass: f >= Q };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 6. 薬物動態 — 1 コンパートメント・一次吸収モデル
+ *      C(t) = F·D·ka / (V(ka − ke)) · (e^{−ke·t} − e^{−ka·t})
+ *      Tmax = ln(ka/ke)/(ka − ke),  AUC = F·D/(V·ke) = F·D/CL
+ *      t½ = ln2/ke,  反復投与の蓄積率 R = 1/(1 − e^{−ke·τ})
+ * ────────────────────────────────────────────────────────────── */
+function pkConc(t, p){
+  const { dose, F, ka, ke, V } = p;
+  if (t <= 0) return 0;
+  if (Math.abs(ka - ke) < 1e-12){                 /* ka = ke の極限 (flip-flop) */
+    return (F * dose * ka * t / V) * Math.exp(-ka * t);
+  }
+  return (F * dose * ka) / (V * (ka - ke)) * (Math.exp(-ke * t) - Math.exp(-ka * t));
+}
+function pkMetrics(p){
+  const { dose, F, ka, ke, V } = p;
+  const tmax = Math.abs(ka - ke) < 1e-12 ? 1 / ka : Math.log(ka / ke) / (ka - ke);
+  return {
+    tmax: tmax,
+    cmax: pkConc(tmax, p),
+    auc: F * dose / (V * ke),
+    halfLife: Math.LN2 / ke,
+    clearance: V * ke,
+    volume: V
+  };
+}
+function pkCurve(p, tEnd, n){
+  const N = n || 120, end = tEnd || 24, out = [];
+  for (let i = 0; i <= N; i++){ const t = end * i / N; out.push({ t: t, c: pkConc(t, p) }); }
+  return out;
+}
+/* 反復投与: 投与間隔 tau で n 回、重ね合わせ */
+function pkMultiDose(t, p, tauDose, n){
+  let c = 0;
+  for (let i = 0; i < n; i++){
+    const dt = t - i * tauDose;
+    if (dt > 0) c += pkConc(dt, p);
+  }
+  return c;
+}
+function accumulationRatio(ke, tauDose){ return 1 / (1 - Math.exp(-ke * tauDose)); }
+/* 受容体占有 (Bada Serenace と同じ式) と治療域 */
+function occupancy(conc, kd){
+  const c = Math.max(0, conc), K = (kd === undefined || kd <= 0) ? 1 : kd;
+  return c / (c + K);
+}
+function therapeuticWindow(occ){
+  if (occ < 0.65) return { band: "閾下", risk: "low" };
+  if (occ <= 0.80) return { band: "応答域", risk: "target" };
+  return { band: "過占有", risk: "high" };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 7. 品質管理 — 含量均一性・工程能力
+ *    含量均一性 (USP <905> の考え方): 判定値 AV = |M − X̄| + k·s
+ *      M は基準値 (X̄ が 98.5–101.5% なら X̄ 自身、外れればその境界)
+ *      k は n=10 で 2.4、n=30 で 2.0。AV ≤ L1 = 15 で適合。
+ *    工程能力: Cp = (USL − LSL)/6σ、Cpk = min(USL − μ, μ − LSL)/3σ
+ * ────────────────────────────────────────────────────────────── */
+function contentUniformity(values, opts){
+  const o = opts || {};
+  const n = values.length;
+  if (n < 3) throw new Error("含量均一性には 3 点以上が要ります");
+  const T = (o.target === undefined) ? 100 : o.target;          /* 表示量 % */
+  const xbar = mean(values), s = sd(values);
+  const k = (o.k !== undefined) ? o.k : (n <= 10 ? 2.4 : 2.0);
+  let M;
+  if (xbar < 98.5) M = 98.5; else if (xbar > 101.5) M = 101.5; else M = xbar;
+  const av = Math.abs(M - xbar) + k * s;
+  const L1 = (o.L1 === undefined) ? 15 : o.L1;
+  return {
+    n: n, mean: xbar, sd: s, rsd: s / (xbar || 1) * 100, k: k, M: M,
+    av: av, L1: L1, pass: av <= L1, target: T,
+    note: av <= L1 ? "含量均一性は適合" : "判定値が L1 を超過 — 混合か打錠を見直してください"
+  };
+}
+function processCapability(values, lsl, usl){
+  const mu = mean(values), s = sd(values);
+  if (s === 0) return { mean: mu, sd: 0, cp: Infinity, cpk: Infinity, capable: true };
+  const cp = (usl - lsl) / (6 * s);
+  const cpk = Math.min(usl - mu, mu - lsl) / (3 * s);
+  return { mean: mu, sd: s, cp: cp, cpk: cpk, capable: cpk >= 1.33 };
+}
+/* 分析法の直線性 (最小二乗) — 検量線 y = a x + b と決定係数 R² */
+function calibration(xs, ys){
+  const n = Math.min(xs.length, ys.length);
+  if (n < 3) throw new Error("検量線には 3 点以上が要ります");
+  const mx = mean(xs.slice(0, n)), my = mean(ys.slice(0, n));
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++){
+    const dx = xs[i] - mx, dy = ys[i] - my;
+    sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+  }
+  const a = sxy / (sxx || 1e-12), b = my - a * mx;
+  const r2 = (sxy * sxy) / ((sxx * syy) || 1e-12);
+  return { slope: a, intercept: b, r2: r2, linear: r2 >= 0.99 };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 8. 製造記録 — ロット番号・質量収支・記録の指紋
+ * ────────────────────────────────────────────────────────────── */
+function lotNumber(seed){
+  const h = strHash(String(seed));
+  const a = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  return "BP-" + a[h % 24] + a[(h >>> 5) % 24] + "-" + String(h % 100000).padStart(5, "0");
+}
+function batchRecord(input){
+  const o = input || {};
+  const tablets = Math.max(1, Math.round(o.tablets || 1000));
+  const form = o.formulation || formulate(100, {});
+  const routeYield = (o.overallYield === undefined) ? 1 : o.overallYield;
+  const apiNeededMg = form.api * tablets;
+  const apiChargedMg = apiNeededMg / (routeYield || 1);
+  const totalMassMg = form.tabletMg * tablets;
+  const lossMg = apiChargedMg - apiNeededMg;
+  const rec = {
+    lot: lotNumber(o.seed || (tablets + "|" + form.api + "|" + routeYield)),
+    tablets: tablets, tabletMg: form.tabletMg,
+    apiPerTabletMg: form.api, apiNeededMg: apiNeededMg, apiChargedMg: apiChargedMg,
+    processLossMg: lossMg, totalMassMg: totalMassMg,
+    overallYield: routeYield,
+    massBalanceClosed: Math.abs(form.total - form.tabletMg) < 1e-9,
+    composition: form.composition
+  };
+  rec.fingerprint = (strHash(JSON.stringify(rec)) >>> 0).toString(16).padStart(8, "0");
+  return rec;
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 9. 製造ライン — 8 段を一本に通す
+ *    ① 計測取込 → ② 標的同定 → ③ 分子設計 → ④ 逆合成 →
+ *    ⑤ 製剤化 → ⑥ 薬物動態 → ⑦ 品質管理 → ⑧ 製造記録
+ *    各段は前段の出力だけを入力に取り、最後に全段の成立を検証する。
+ * ────────────────────────────────────────────────────────────── */
+const DEFAULT_READINGS = { mri: 0.7, fmri: 2.1, dna: 0.75, blood: 1.2, meg: 2.2, topo: 2.8, therm: 0.45 };
+function manufacturePipeline(input){
+  const o = input || {};
+  const readings = o.readings || DEFAULT_READINGS;
+  const blocks = o.blocks || ["phenyl", "carboxyl", "acetyloxy"];
+  const apiMg = (o.apiMg === undefined) ? 100 : o.apiMg;
+  const tabletMg = (o.tabletMg === undefined) ? 250 : o.tabletMg;
+  const tablets = (o.tablets === undefined) ? 1000 : o.tablets;
+  const pkParams = o.pk || { dose: apiMg, F: 0.8, ka: 1.2, ke: 0.15, V: 30 };
+  const assays = o.assays || [99.2, 101.3, 98.7, 100.5, 99.8, 100.9, 98.2, 101.0, 99.5, 100.1];
+  const stages = [];
+
+  /* ① 計測取込 */
+  const intake = modalityIntake(readings, o.kappa);
+  stages.push({
+    n: 1, title: "計測取込", ok: intake.usable,
+    detail: intake.rows.length + " / " + MODALITIES.length + " モダリティを取り込み、Γ 重み付き総合負荷 " +
+            (intake.burden * 100).toFixed(1) + "%" + (intake.missing.length ? " (欠測: " + intake.missing.join(",") + ")" : ""),
+    data: { burden: intake.burden, coverage: intake.coverage }
+  });
+
+  /* ② 標的同定 */
+  const target = targetIdentify(intake);
+  stages.push({
+    n: 2, title: "標的同定", ok: target.best.score > 0.5,
+    detail: "標的 " + target.best.name + " (" + target.best.cls + " / " + target.best.route + ")、相関 " +
+            target.best.score.toFixed(3) + "、次点との差 " + target.margin.toFixed(3) +
+            (target.confident ? " — 一意に確定" : " — 拮抗"),
+    data: { target: target.best.id, score: target.best.score, confident: target.confident }
+  });
+
+  /* ③ 分子設計 */
+  const mol = molBuild(blocks);
+  const lip = lipinski(mol), veb = veber(mol), des = desirability(mol);
+  stages.push({
+    n: 3, title: "分子設計", ok: lip.pass,
+    detail: mol.formulaText + " / MW " + mol.mw.toFixed(2) + " / logP " + mol.logP.toFixed(2) +
+            " / TPSA " + mol.tpsa.toFixed(1) + " Å² — Lipinski 違反 " + lip.count +
+            "、Veber " + (veb.pass ? "適合" : "不適合") + "、望ましさ " + des.score.toFixed(3) + " (" + des.grade + ")",
+    data: { mw: mol.mw, logP: mol.logP, desirability: des.score }
+  });
+
+  /* ④ 逆合成 */
+  const route = retroRoute(blocks, { scale: 1 });
+  stages.push({
+    n: 4, title: "逆合成", ok: route.stepCount >= 1 && route.overallYield > 0,
+    detail: route.stepCount + " 工程、通算収率 " + (route.overallYield * 100).toFixed(1) +
+            "%、原子効率 " + (route.atomEconomy * 100).toFixed(1) + "% (脱離分子 " + route.lossMass.toFixed(1) +
+            " g/mol) — 収率と原子効率の計画のみ",
+    data: { steps: route.stepCount, yield: route.overallYield, atomEconomy: route.atomEconomy }
+  });
+
+  /* ⑤ 製剤化 */
+  const form = formulate(apiMg, { tabletMg: tabletMg });
+  const q30 = dissolutionQ(form, 30, 0.8);
+  stages.push({
+    n: 5, title: "製剤化", ok: form.balanced,
+    detail: "錠剤 " + form.tabletMg + " mg 中 原薬 " + form.api + " mg (含量 " + (form.drugLoad * 100).toFixed(1) +
+            "%)、質量収支 " + (form.balanced ? "閉じる" : "破れる") + "、30 分溶出 " + (q30.f * 100).toFixed(1) +
+            "% (規格 Q80 " + (q30.pass ? "適合" : "不適合") + ")",
+    data: { drugLoad: form.drugLoad, dissolution30: q30.f, qPass: q30.pass }
+  });
+
+  /* ⑥ 薬物動態 */
+  const pk = pkMetrics(pkParams);
+  const occ = occupancy(pk.cmax, o.kd === undefined ? 1.5 : o.kd);
+  const win = therapeuticWindow(occ);
+  stages.push({
+    n: 6, title: "薬物動態", ok: isFinite(pk.cmax) && pk.cmax > 0,
+    detail: "Tmax " + pk.tmax.toFixed(2) + " h / Cmax " + pk.cmax.toFixed(3) +
+            " / AUC " + pk.auc.toFixed(2) + " / t½ " + pk.halfLife.toFixed(2) +
+            " h — Cmax での占有 " + (occ * 100).toFixed(1) + "% (" + win.band + ")",
+    data: { tmax: pk.tmax, cmax: pk.cmax, auc: pk.auc, occupancy: occ, band: win.band }
+  });
+
+  /* ⑦ 品質管理 */
+  const cu = contentUniformity(assays);
+  const cap = processCapability(assays, 95, 105);
+  stages.push({
+    n: 7, title: "品質管理", ok: cu.pass,
+    detail: "含量均一性 n=" + cu.n + "、平均 " + cu.mean.toFixed(2) + "%、RSD " + cu.rsd.toFixed(2) +
+            "%、判定値 AV " + cu.av.toFixed(2) + " (L1=" + cu.L1 + " " + (cu.pass ? "適合" : "不適合") +
+            ")、Cpk " + cap.cpk.toFixed(2) + (cap.capable ? " (工程能力あり)" : " (工程能力不足)"),
+    data: { av: cu.av, pass: cu.pass, cpk: cap.cpk }
+  });
+
+  /* ⑧ 製造記録 */
+  const rec = batchRecord({ tablets: tablets, formulation: form, overallYield: route.overallYield, seed: mol.formulaText + tablets });
+  stages.push({
+    n: 8, title: "製造記録", ok: rec.massBalanceClosed,
+    detail: "ロット " + rec.lot + "、" + rec.tablets + " 錠、原薬 仕込み " + (rec.apiChargedMg / 1000).toFixed(1) +
+            " g → 製品中 " + (rec.apiNeededMg / 1000).toFixed(1) + " g (工程損失 " +
+            (rec.processLossMg / 1000).toFixed(1) + " g)、記録指紋 " + rec.fingerprint,
+    data: { lot: rec.lot, fingerprint: rec.fingerprint }
+  });
+
+  const ok = stages.every(s => s.ok);
+  return {
+    stages: stages, ok: ok,
+    verdict: ok
+      ? "8 段すべて成立 ─ 計測から標的、分子、経路、製剤、動態、品質、記録までが一本の製造ラインで繋がった"
+      : "未成立の段があります ─ 入力を見直してください",
+    summary: {
+      burden: intake.burden, target: target.best.name, formula: mol.formulaText, mw: mol.mw,
+      yield: route.overallYield, drugLoad: form.drugLoad, cmax: pk.cmax, auc: pk.auc,
+      av: cu.av, lot: rec.lot
+    },
+    artifacts: { intake: intake, target: target, mol: mol, route: route, form: form, pk: pk, cu: cu, record: rec }
+  };
+}
+
+/* ──────────────────────────────────────────────────────────────
+ * 10. 装置カタログ
+ * ────────────────────────────────────────────────────────────── */
+const UNITS = [
+  { id: "intake",   name: "計測取込",   icon: "📡", stat: MODALITIES.length + " モダリティ" },
+  { id: "target",   name: "標的同定",   icon: "🎯", stat: TARGETS.length + " 標的" },
+  { id: "design",   name: "分子設計",   icon: "🧩", stat: FRAGMENTS.length + " 積み木" },
+  { id: "retro",    name: "逆合成",     icon: "🔁", stat: COUPLINGS.length + " 結合形成" },
+  { id: "formulate",name: "製剤化",     icon: "💊", stat: "質量収支 + 溶出" },
+  { id: "pk",       name: "薬物動態",   icon: "📈", stat: "1 コンパートメント" },
+  { id: "qc",       name: "品質管理",   icon: "🔬", stat: "AV / Cpk / 検量線" },
+  { id: "record",   name: "製造記録",   icon: "📋", stat: "ロット + 指紋" },
+  { id: "line",     name: "製造ライン", icon: "🏭", stat: "8 段一括" }
+];
+function unitCatalog(){ return UNITS.slice(); }
+function unitInfo(id){ return UNITS.find(u => u.id === id) || null; }
+
+/* ──────────────────────────────────────────────────────────────
+ * 11. 意図解析とシェル — 6 段開示 (受理 → 意図 → 装置 → 計画 → 生成 → 検証)
+ * ────────────────────────────────────────────────────────────── */
+function intentDetect(text){
+  const t = String(text || "").trim();
+  if (!t) return { intent: "none" };
+  if (/(計測|取り込|取込|MRI|fMRI|脳波|脳電磁|トポグラフ|血液|検査値)/i.test(t)) return { intent: "intake" };
+  if (/(標的|ターゲット|受容体|どこに効)/.test(t)) return { intent: "target" };
+  if (/(逆合成|合成経路|経路|工程|収率|原子効率)/.test(t)) return { intent: "retro" };
+  if (/(設計|分子|構造|フラグメント|積み木|Lipinski|リピンスキ)/i.test(t)) return { intent: "design" };
+  if (/(製剤|錠剤|賦形|溶出|打錠)/.test(t)) return { intent: "formulate" };
+  if (/(動態|血中濃度|PK|Cmax|AUC|半減期|吸収)/i.test(t)) return { intent: "pk" };
+  if (/(品質|均一性|規格|試験|Cpk|検量)/i.test(t)) return { intent: "qc" };
+  if (/(記録|ロット|バッチ|出荷)/.test(t)) return { intent: "record" };
+  if (/(全部|通して|製造ライン|一括|ライン|作って)/.test(t)) return { intent: "line" };
+  for (const d of DRUG_REF) if (t.indexOf(d.name) >= 0) return { intent: "drug", drug: d.id };
+  return { intent: "unknown" };
+}
+function aiShell(text){
+  const it = intentDetect(text);
+  const steps = ["① 受理: " + JSON.stringify(String(text || "").slice(0, 60))];
+  steps.push("② 意図: " + it.intent);
+  let open = it.intent, body = "";
+  if (it.intent === "drug") open = "design";
+  const u = unitInfo(open);
+  steps.push("③ 装置: " + (u ? u.icon + " " + u.name + " (" + u.stat + ")" : "該当なし"));
+
+  if (it.intent === "drug"){
+    const d = drugRef(it.drug);
+    steps.push("④ 計画: 参照分子の分子式と分子量を照合し、積み木があれば組み上げる");
+    if (d.blocks){
+      const mol = molBuild(d.blocks);
+      const lip = lipinski(mol);
+      body = d.name + " = " + mol.formulaText + " / MW " + mol.mw.toFixed(2) +
+             " (参照 " + d.mw + ")、Lipinski 違反 " + lip.count;
+      steps.push("⑤ 生成: " + body);
+      steps.push("⑥ 検証: 参照分子量との差 " + Math.abs(mol.mw - d.mw).toFixed(3) + " — " +
+                 (Math.abs(mol.mw - d.mw) < 0.05 ? "一致" : "不一致"));
+    } else {
+      const mw = molWeight(d.f);
+      body = d.name + " = " + formulaString(d.f) + " / MW " + mw.toFixed(2) + " (参照 " + d.mw + ")。積み木からの組み上げは未登録です。";
+      steps.push("⑤ 生成: " + body);
+      steps.push("⑥ 検証: 標準原子量からの分子量と参照値の差 " + Math.abs(mw - d.mw).toFixed(3));
+    }
+  } else if (it.intent === "line"){
+    steps.push("④ 計画: 8 段の製造ラインを通す");
+    const r = manufacturePipeline({});
+    body = r.verdict + " (ロット " + r.summary.lot + ")";
+    steps.push("⑤ 生成: " + r.stages.map(s => s.n + "." + s.title).join(" → "));
+    steps.push("⑥ 検証: " + (r.ok ? "全段成立" : "未成立あり"));
+  } else if (it.intent === "unknown" || it.intent === "none"){
+    body = "計測取込 / 標的同定 / 分子設計 / 逆合成 / 製剤化 / 薬物動態 / 品質管理 / 製造記録 / 製造ライン のどれかを指してください。";
+    steps.push("④ 計画: 該当装置なし");
+    steps.push("⑤ 生成: 案内を返す");
+    steps.push("⑥ 検証: 実行なし");
+  } else {
+    steps.push("④ 計画: " + u.name + " を開く");
+    body = u.name + " を開きます。";
+    steps.push("⑤ 生成: 画面遷移");
+    steps.push("⑥ 検証: 装置 " + u.id + " — " + u.stat);
+  }
+  return { intent: it.intent, open: open, steps: steps, text: body };
+}
+
+/* =====================================================================
+ *  画面 — ここから下は DOM。エンジンはすべて上の純関数。
+ * ===================================================================== */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+function pct(x, d){ return (x * 100).toFixed(d === undefined ? 1 : d) + "%"; }
+function bar(v, bad){ return '<div class="bar"><i class="' + (bad ? "bad" : "") + '" style="width:' + Math.max(0, Math.min(100, v * 100)) + '%"></i></div>'; }
+function num(id, def){ const e = $(id); const v = e ? parseFloat(e.value) : NaN; return isFinite(v) ? v : def; }
+
+function renderHome(){
+  const g = $("grid");
+  if (!g) return;
+  g.innerHTML = unitCatalog().map(u =>
+    '<div class="app" onclick="openUnit(\'' + u.id + '\')">' +
+      '<div class="ic">' + u.icon + '</div>' +
+      '<div class="nm">' + esc(u.name) + '</div>' +
+      '<div class="st">' + esc(u.stat) + '</div>' +
+    '</div>').join("");
+}
+function goHome(){ $("panel").style.display = "none"; $("home").style.display = ""; }
+function openUnit(id){
+  const u = unitInfo(id);
+  if (!u) return;
+  $("home").style.display = "none";
+  $("panel").style.display = "block";
+  $("panelTitle").textContent = u.icon + " " + u.name;
+  $("panelTag").textContent = u.stat;
+  $("panelBody").innerHTML = (PANELS[id] || (() => "<p class='hint'>準備中</p>"))();
+  $("panel").scrollTop = 0;
+  if (id === "intake") runIntake();
+  if (id === "target") runTarget();
+  if (id === "design") runDesign();
+  if (id === "retro") runRetro();
+  if (id === "formulate") runFormulate();
+  if (id === "pk") runPk();
+  if (id === "qc") runQc();
+  if (id === "record") runRecord();
+}
+const PANELS = {};
+let LAST = {};   /* 段から段へ渡す途中結果 */
+
+/* ── 📡 計測取込 ── */
+PANELS.intake = () => `
+<div class="card">
+  <h3>これまでに作った計測器アプリの読みを束ねる</h3>
+  <div class="hint">各モダリティを参照範囲で 0–1 に正規化し、Γ 核 k(r) = ½ + ½e<sup>−κ·r log r</sup> を重みにして
+    総合負荷を出します。半数以上のモダリティが揃えば標的同定へ進めます。</div>
+  ${MODALITIES.map(m => `
+  <div class="row"><label>${esc(m.name)}<br><span style="font-size:10px">${esc(m.unit)}</span></label>
+    <input id="in_${m.id}" type="number" step="0.01" value="${DEFAULT_READINGS[m.id]}" oninput="runIntake()"/>
+    <span class="mono" style="min-width:150px;font-size:10.5px">${esc(m.app)}</span></div>`).join("")}
+  <div class="row"><label>Γ 熱核 κ</label><input id="in_kappa" type="range" min="0.2" max="3" step="0.1" value="1.2" oninput="runIntake()"/><span id="in_kappaV" class="mono">1.2</span></div>
+  <div id="inOut"></div>
+</div>`;
+function readReadings(){
+  const r = {};
+  for (const m of MODALITIES){ const e = $("in_" + m.id); if (e && e.value !== "") r[m.id] = parseFloat(e.value); }
+  return r;
+}
+function runIntake(){
+  const kappa = num("in_kappa", 1.2);
+  $("in_kappaV").textContent = kappa.toFixed(1);
+  const intake = modalityIntake(readReadings(), kappa);
+  LAST.intake = intake;
+  $("inOut").innerHTML =
+    '<div class="row"><label>総合負荷</label><div style="flex:1">' + bar(intake.burden, intake.burden > 0.7) + '</div><span class="mono">' + pct(intake.burden) + '</span></div>' +
+    '<div class="mods" style="margin-top:8px">' + intake.rows.map(r =>
+      '<div class="mod"><b>' + esc(r.name) + '</b><div class="v">' + r.raw + ' → ' + r.norm.toFixed(3) +
+      '</div><div class="hint" style="font-size:10.5px">重み ' + r.weight.toFixed(3) + (r.saturated ? ' · <span style="color:var(--err)">範囲外</span>' : '') + '</div></div>').join("") + '</div>' +
+    '<div class="hint" style="margin-top:8px">' + esc(intake.note) + '</div>' +
+    '<div class="row"><button class="acc" onclick="openUnit(\'target\')">標的同定へ →</button></div>';
+}
+
+/* ── 🎯 標的同定 ── */
+PANELS.target = () => `
+<div class="card">
+  <h3>プロファイルに最も近い標的を選ぶ</h3>
+  <div class="hint">各標的は 7 モダリティ上の署名ベクトルを持ち、平均を抜いたコサイン類似度(= ピアソン相関)で
+    照合します。上位との差が小さいときは、上流(転写)と下流(受容体)を並行して設計します。</div>
+  <div id="tgOut"></div>
+</div>`;
+function runTarget(){
+  const intake = LAST.intake || modalityIntake(DEFAULT_READINGS);
+  const t = targetIdentify(intake);
+  LAST.target = t;
+  $("tgOut").innerHTML =
+    '<table><tr><th>標的</th><th>種別</th><th>介入</th><th>相関</th><th></th></tr>' +
+    t.ranking.map((r, i) => '<tr><td>' + (i === 0 ? '<b>' + esc(r.name) + '</b>' : esc(r.name)) + '</td><td>' + esc(r.cls) +
+      '</td><td>' + esc(r.route) + '</td><td class="mono">' + r.score.toFixed(3) + '</td><td style="width:34%">' +
+      bar((r.score + 1) / 2) + '</td></tr>').join("") + '</table>' +
+    '<div class="row" style="margin-top:8px"><span class="tag' + (t.confident ? ' ok' : ' bad') + '">' +
+      (t.confident ? "一意に確定" : "拮抗") + '</span><span class="tag">次点との差 ' + t.margin.toFixed(3) + '</span></div>' +
+    '<div class="hint">' + esc(t.note) + '</div>' +
+    '<div class="row"><button class="acc" onclick="openUnit(\'design\')">分子設計へ →</button></div>';
+}
+
+/* ── 🧩 分子設計 ── */
+PANELS.design = () => `
+<div class="card">
+  <h3>積み木(フラグメント)から分子を組み上げる</h3>
+  <div class="hint">原子量は標準原子量。分子量・logP・TPSA・水素結合供与/受容数・回転可能結合数を積み上げ、
+    <b>Lipinski の Rule of Five</b> と <b>Veber 則</b>、望ましさ指標で評価します。</div>
+  <div class="row"><label>積み木を足す</label>
+    <select id="dsPick">${FRAGMENTS.map(f => '<option value="' + f.id + '">' + esc(f.name) + ' (' + formulaString(f.f) + ')</option>').join("")}</select>
+    <button onclick="dsAdd()">＋</button><button onclick="dsClear()">全消去</button></div>
+  <div class="row">
+    <button onclick="dsPreset('aspirin')">アスピリン</button>
+    <button onclick="dsPreset('paracetamol')">パラセタモール</button>
+    <button onclick="dsPreset('haloperidol')">ハロペリドール (セレネース)</button>
+  </div>
+  <div id="dsBlocks" class="row"></div>
+  <div id="dsOut"></div>
+</div>`;
+let DS_BLOCKS = ["phenyl", "carboxyl", "acetyloxy"];
+function dsAdd(){ DS_BLOCKS.push($("dsPick").value); runDesign(); }
+function dsClear(){ DS_BLOCKS = []; runDesign(); }
+function dsDel(i){ DS_BLOCKS.splice(i, 1); runDesign(); }
+function dsPreset(id){
+  DS_BLOCKS = drugRef(id).blocks.slice();
+  runDesign();
+}
+function runDesign(){
+  $("dsBlocks").innerHTML = DS_BLOCKS.length
+    ? DS_BLOCKS.map((b, i) => '<span class="tag api" onclick="dsDel(' + i + ')" style="cursor:pointer">' + esc(fragment(b).name) + ' ✕</span>').join("")
+    : '<span class="hint">積み木がありません</span>';
+  if (!DS_BLOCKS.length){ $("dsOut").innerHTML = ""; return; }
+  const mol = molBuild(DS_BLOCKS);
+  const lip = lipinski(mol), veb = veber(mol), des = desirability(mol);
+  LAST.mol = mol;
+  const ref = DRUG_REF.find(d => d.blocks && d.blocks.join(",") === DS_BLOCKS.join(","));
+  $("dsOut").innerHTML =
+    '<pre>分子式   ' + mol.formulaText + '\n分子量   ' + mol.mw.toFixed(3) + ' g/mol' +
+    (ref ? '   (参照 ' + ref.name + ' ' + ref.mw + ' — 差 ' + Math.abs(mol.mw - ref.mw).toFixed(3) + ')' : '') +
+    '\nlogP     ' + mol.logP.toFixed(2) + '\nTPSA     ' + mol.tpsa.toFixed(1) + ' Å²' +
+    '\n水素結合 供与 ' + mol.hbd + ' / 受容 ' + mol.hba + '\n回転可能結合 ' + mol.rotatable +
+    '\n重原子数 ' + mol.heavyAtoms + '</pre>' +
+    '<div class="row"><span class="tag' + (lip.pass ? ' ok' : ' bad') + '">Lipinski ' + (lip.pass ? '適合' : '違反 ' + lip.count) + '</span>' +
+    '<span class="tag' + (veb.pass ? ' ok' : ' bad') + '">Veber ' + (veb.pass ? '適合' : '不適合') + '</span>' +
+    '<span class="tag api">望ましさ ' + des.score.toFixed(3) + ' (' + des.grade + ')</span></div>' +
+    (lip.violations.length ? '<div class="hint">違反: ' + lip.violations.map(esc).join(" / ") + '</div>' : '') +
+    (veb.violations.length ? '<div class="hint">Veber: ' + veb.violations.map(esc).join(" / ") + '</div>' : '') +
+    '<div class="row"><button class="acc" onclick="openUnit(\'retro\')">逆合成へ →</button></div>';
+}
+
+/* ── 🔁 逆合成 ── */
+PANELS.retro = () => `
+<div class="card warn">
+  <div class="hint">⚠ この装置は<b>収率・原子効率・工程数の計画</b>だけを扱います。試薬・反応条件・操作手順は
+    一切出力しません。実際の製造は薬機法と GMP に基づく許可と設備が必要です。</div>
+</div>
+<div class="card">
+  <h3>積み木の真逆 — 分子を切り口で割る</h3>
+  <div class="hint">組み上げが「積み木 ↦ 分子」なら、逆合成はその逆像です。末端の積み木から順に切り離し、
+    各切り口に対応する結合形成の収率を掛け合わせて通算収率を、脱離分子の質量から原子効率を出します。</div>
+  <div class="row"><label>仕込み (mol)</label><input id="rtScale" type="number" step="0.1" value="1" oninput="runRetro()"/></div>
+  <div id="rtOut"></div>
+</div>`;
+function runRetro(){
+  const blocks = (LAST.mol && LAST.mol.blocks) || DS_BLOCKS;
+  if (!blocks.length){ $("rtOut").innerHTML = '<div class="hint">先に分子を設計してください。</div>'; return; }
+  try {
+    const r = retroRoute(blocks, { scale: num("rtScale", 1) });
+    LAST.route = r;
+    $("rtOut").innerHTML =
+      '<div class="row"><span class="tag">目的物 ' + esc(r.target.formulaText) + '</span>' +
+      '<span class="tag api">通算収率 ' + pct(r.overallYield) + '</span>' +
+      '<span class="tag">原子効率 ' + pct(r.atomEconomy) + '</span>' +
+      '<span class="tag">' + r.stepCount + ' 工程</span></div>' +
+      '<table><tr><th>工程</th><th>結合形成</th><th>接続する積み木</th><th>工程収率</th></tr>' +
+      r.steps.map(s => '<tr><td class="mono">' + s.n + '</td><td>' + esc(s.coupling) + '</td><td>' + esc(s.disconnect) +
+        '</td><td class="mono">' + pct(s.yield) + '</td></tr>').join("") + '</table>' +
+      '<pre>出発物質\n' + r.startingMaterials.map(m => "  " + m.name + "  " + m.mw.toFixed(2) + " g/mol").join("\n") +
+      '\n\n脱離分子の合計 ' + r.lossMass.toFixed(2) + ' g/mol\n必要仕込み ' + r.requiredInput.toFixed(3) +
+      ' mol (目的 ' + num("rtScale", 1) + ' mol を得るため)</pre>' +
+      '<div class="hint">' + esc(r.note) + '</div>' +
+      '<div class="row"><button class="acc" onclick="openUnit(\'formulate\')">製剤化へ →</button></div>';
+  } catch (e){ $("rtOut").innerHTML = '<div class="hint">!! ' + esc(e.message) + '</div>'; }
+}
+
+/* ── 💊 製剤化 ── */
+PANELS.formulate = () => `
+<div class="card">
+  <h3>錠剤の質量収支と溶出</h3>
+  <div class="hint">原薬 + 充填剤 + 崩壊剤 + 結合剤 + 滑沢剤 の質量収支が閉じることを確かめ、
+    溶出を Weibull 式 F(t) = 1 − exp(−(t/τ)<sup>β</sup>) で描きます(τ は 63.2% 溶出時間)。</div>
+  <div class="row"><label>原薬 (mg/錠)</label><input id="fmApi" type="number" step="1" value="100" oninput="runFormulate()"/></div>
+  <div class="row"><label>錠剤質量 (mg)</label><input id="fmTab" type="number" step="10" value="250" oninput="runFormulate()"/></div>
+  <div class="row"><label>崩壊剤 (%)</label><input id="fmDis" type="range" min="1" max="12" step="0.5" value="5" oninput="runFormulate()"/><span id="fmDisV" class="mono">5.0</span></div>
+  <div class="row"><label>β (形状)</label><input id="fmBeta" type="range" min="0.5" max="2" step="0.05" value="0.9" oninput="runFormulate()"/><span id="fmBetaV" class="mono">0.90</span></div>
+  <canvas id="fmCanvas" width="640" height="220"></canvas>
+  <div id="fmOut"></div>
+</div>`;
+function runFormulate(){
+  const dis = num("fmDis", 5) / 100, beta = num("fmBeta", 0.9);
+  $("fmDisV").textContent = (dis * 100).toFixed(1); $("fmBetaV").textContent = beta.toFixed(2);
+  try {
+    const f = formulate(num("fmApi", 100), { tabletMg: num("fmTab", 250), disintegrant: dis, beta: beta });
+    LAST.form = f;
+    const prof = dissolutionProfile(f, [5, 10, 15, 20, 30, 45, 60, 90]);
+    const q = dissolutionQ(f, 30, 0.8);
+    const c = $("fmCanvas"), ctx = c.getContext("2d"), W = c.width, H = c.height, pad = 30;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#26344f"; ctx.lineWidth = 1;
+    ctx.strokeRect(pad, 10, W - pad - 12, H - pad - 10);
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = "#f59e0b";
+    const yQ = 10 + (H - pad - 10) * (1 - 0.8);
+    ctx.beginPath(); ctx.moveTo(pad, yQ); ctx.lineTo(W - 12, yQ); ctx.stroke(); ctx.setLineDash([]);
+    ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 2; ctx.beginPath();
+    for (let i = 0; i <= 120; i++){
+      const t = 90 * i / 120, v = dissolution(t, f.tau, f.beta);
+      const x = pad + (W - pad - 12) * (t / 90), y = 10 + (H - pad - 10) * (1 - v);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.fillStyle = "#8b99b8"; ctx.font = "11px system-ui";
+    ctx.fillText("溶出率", 4, 18); ctx.fillText("0", pad - 8, H - pad + 16); ctx.fillText("90 分", W - 40, H - pad + 16);
+    ctx.fillStyle = "#f59e0b"; ctx.fillText("Q80", W - 42, yQ - 4);
+    $("fmOut").innerHTML =
+      '<table><tr><th>成分</th><th>mg/錠</th><th>%</th></tr>' +
+      f.composition.map(c2 => '<tr><td>' + esc(c2.name) + '</td><td class="mono">' + c2.mg.toFixed(1) + '</td><td class="mono">' + pct(c2.pct) + '</td></tr>').join("") +
+      '<tr><td><b>合計</b></td><td class="mono">' + f.total.toFixed(1) + '</td><td class="mono">' + pct(f.total / f.tabletMg) + '</td></tr></table>' +
+      '<div class="row"><span class="tag' + (f.balanced ? ' ok' : ' bad') + '">質量収支 ' + (f.balanced ? '閉じる' : '破れる') + '</span>' +
+      '<span class="tag">τ ' + f.tau.toFixed(2) + ' 分</span>' +
+      '<span class="tag' + (q.pass ? ' ok' : ' bad') + '">30 分 ' + pct(q.f) + ' (Q80 ' + (q.pass ? '適合' : '不適合') + ')</span></div>' +
+      '<pre>' + prof.map(p => "  " + String(p.t).padStart(3) + " 分   " + pct(p.f)).join("\n") + '</pre>' +
+      '<div class="row"><button class="acc" onclick="openUnit(\'pk\')">薬物動態へ →</button></div>';
+  } catch (e){ $("fmOut").innerHTML = '<div class="hint">!! ' + esc(e.message) + '</div>'; }
+}
+
+/* ── 📈 薬物動態 ── */
+PANELS.pk = () => `
+<div class="card">
+  <h3>1 コンパートメント・一次吸収モデル</h3>
+  <div class="hint">C(t) = F·D·k<sub>a</sub> / (V(k<sub>a</sub> − k<sub>e</sub>)) · (e<sup>−k<sub>e</sub>t</sup> − e<sup>−k<sub>a</sub>t</sup>)、
+    T<sub>max</sub> = ln(k<sub>a</sub>/k<sub>e</sub>)/(k<sub>a</sub> − k<sub>e</sub>)、AUC = F·D/(V·k<sub>e</sub>)、
+    反復投与の蓄積率 R = 1/(1 − e<sup>−k<sub>e</sub>τ</sup>)。</div>
+  <div class="row"><label>用量 D (mg)</label><input id="pkD" type="number" step="10" value="100" oninput="runPk()"/></div>
+  <div class="row"><label>生物学的利用能 F</label><input id="pkF" type="range" min="0.1" max="1" step="0.05" value="0.8" oninput="runPk()"/><span id="pkFV" class="mono">0.80</span></div>
+  <div class="row"><label>吸収 k<sub>a</sub> (/h)</label><input id="pkKa" type="range" min="0.2" max="3" step="0.05" value="1.2" oninput="runPk()"/><span id="pkKaV" class="mono">1.20</span></div>
+  <div class="row"><label>消失 k<sub>e</sub> (/h)</label><input id="pkKe" type="range" min="0.02" max="1" step="0.01" value="0.15" oninput="runPk()"/><span id="pkKeV" class="mono">0.15</span></div>
+  <div class="row"><label>分布容積 V (L)</label><input id="pkV" type="number" step="1" value="30" oninput="runPk()"/></div>
+  <div class="row"><label>投与間隔 τ (h)</label><input id="pkTau" type="number" step="1" value="12" oninput="runPk()"/>
+    <label style="min-width:70px">回数</label><input id="pkN" type="number" step="1" value="5" oninput="runPk()"/></div>
+  <canvas id="pkCanvas" width="640" height="240"></canvas>
+  <div id="pkOut"></div>
+</div>`;
+function runPk(){
+  const p = { dose: num("pkD", 100), F: num("pkF", 0.8), ka: num("pkKa", 1.2), ke: num("pkKe", 0.15), V: num("pkV", 30) };
+  $("pkFV").textContent = p.F.toFixed(2); $("pkKaV").textContent = p.ka.toFixed(2); $("pkKeV").textContent = p.ke.toFixed(2);
+  const tauDose = num("pkTau", 12), n = Math.max(1, Math.round(num("pkN", 5)));
+  const m = pkMetrics(p);
+  LAST.pk = { params: p, metrics: m };
+  const end = Math.max(24, tauDose * n + 12);
+  const c = $("pkCanvas"), ctx = c.getContext("2d"), W = c.width, H = c.height, pad = 34;
+  const pts = [];
+  let cmaxMulti = 0;
+  for (let i = 0; i <= 300; i++){
+    const t = end * i / 300, v = pkMultiDose(t, p, tauDose, n);
+    pts.push([t, v]); if (v > cmaxMulti) cmaxMulti = v;
+  }
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = "#26344f"; ctx.strokeRect(pad, 10, W - pad - 12, H - pad - 10);
+  const X = t => pad + (W - pad - 12) * (t / end), Y = v => 10 + (H - pad - 10) * (1 - v / (cmaxMulti || 1));
+  ctx.strokeStyle = "#f59e0b"; ctx.lineWidth = 2; ctx.beginPath();
+  pts.forEach((q, i) => { if (i === 0) ctx.moveTo(X(q[0]), Y(q[1])); else ctx.lineTo(X(q[0]), Y(q[1])); });
+  ctx.stroke();
+  ctx.strokeStyle = "#22d3ee"; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let i = 0; i <= 300; i++){ const t = end * i / 300, v = pkConc(t, p); if (i === 0) ctx.moveTo(X(t), Y(v)); else ctx.lineTo(X(t), Y(v)); }
+  ctx.stroke();
+  ctx.fillStyle = "#8b99b8"; ctx.font = "11px system-ui";
+  ctx.fillText("血中濃度", 4, 18); ctx.fillText("0", pad - 8, H - pad + 16); ctx.fillText(end.toFixed(0) + " h", W - 44, H - pad + 16);
+  ctx.fillStyle = "#f59e0b"; ctx.fillText("反復投与", pad + 6, 24);
+  ctx.fillStyle = "#22d3ee"; ctx.fillText("単回投与", pad + 66, 24);
+  const R = accumulationRatio(p.ke, tauDose);
+  const occ = occupancy(m.cmax, 1.5), win = therapeuticWindow(occ);
+  $("pkOut").innerHTML =
+    '<table><tr><th>T<sub>max</sub></th><th>C<sub>max</sub></th><th>AUC</th><th>t½</th><th>CL</th><th>蓄積率 R</th></tr>' +
+    '<tr><td class="mono">' + m.tmax.toFixed(2) + ' h</td><td class="mono">' + m.cmax.toFixed(3) +
+    '</td><td class="mono">' + m.auc.toFixed(2) + '</td><td class="mono">' + m.halfLife.toFixed(2) +
+    ' h</td><td class="mono">' + m.clearance.toFixed(2) + ' L/h</td><td class="mono">' + R.toFixed(3) + '</td></tr></table>' +
+    '<div class="row"><span class="tag api">反復時の最高濃度 ' + cmaxMulti.toFixed(3) + '</span>' +
+    '<span class="tag' + (win.risk === "high" ? ' bad' : win.risk === "target" ? ' ok' : '') + '">Cmax 占有 ' + pct(occ) + ' — ' + esc(win.band) + '</span></div>' +
+    '<div class="hint">占有の区分は Bada Serenace と同じ目盛り (応答域 65–80%) を概念として置いたものです。用量の助言ではありません。</div>' +
+    '<div class="row"><button class="acc" onclick="openUnit(\'qc\')">品質管理へ →</button></div>';
+}
+
+/* ── 🔬 品質管理 ── */
+PANELS.qc = () => `
+<div class="card">
+  <h3>含量均一性・工程能力・検量線</h3>
+  <div class="hint">含量均一性の判定値 AV = |M − X̄| + k·s(n ≤ 10 で k = 2.4、L1 = 15 で適合)。
+    工程能力 C<sub>p</sub> = (USL − LSL)/6σ、C<sub>pk</sub> = min(USL − μ, μ − LSL)/3σ。
+    検量線は最小二乗で、R² ≥ 0.99 を直線性の目安とします。</div>
+  <div class="row"><label>含量 (%表示量)</label></div>
+  <textarea id="qcVals">99.2 101.3 98.7 100.5 99.8 100.9 98.2 101.0 99.5 100.1</textarea>
+  <div class="row"><label>規格下限 / 上限</label><input id="qcL" type="number" step="1" value="95"/><input id="qcU" type="number" step="1" value="105"/>
+    <button class="acc" onclick="runQc()">判定</button></div>
+  <div class="row"><label>検量線 x (濃度)</label></div>
+  <textarea id="qcX" style="min-height:44px">1 2 3 4 5</textarea>
+  <div class="row"><label>検量線 y (応答)</label></div>
+  <textarea id="qcY" style="min-height:44px">2.1 4.0 6.2 7.9 10.1</textarea>
+  <div id="qcOut"></div>
+</div>`;
+function parseNums(id){ return ($(id).value || "").split(/[\s,]+/).filter(Boolean).map(Number).filter(v => isFinite(v)); }
+function runQc(){
+  try {
+    const vals = parseNums("qcVals");
+    const cu = contentUniformity(vals);
+    const cap = processCapability(vals, num("qcL", 95), num("qcU", 105));
+    const cal = calibration(parseNums("qcX"), parseNums("qcY"));
+    LAST.qc = { cu: cu, cap: cap, cal: cal };
+    $("qcOut").innerHTML =
+      '<pre>含量均一性\n  n = ' + cu.n + '   平均 ' + cu.mean.toFixed(2) + '%   標準偏差 ' + cu.sd.toFixed(3) +
+      '   RSD ' + cu.rsd.toFixed(2) + '%\n  基準値 M = ' + cu.M.toFixed(2) + '   k = ' + cu.k +
+      '\n  判定値 AV = |M − X̄| + k·s = ' + cu.av.toFixed(3) + '  (L1 = ' + cu.L1 + ')  → ' + (cu.pass ? "適合" : "不適合") +
+      '\n\n工程能力\n  μ = ' + cap.mean.toFixed(3) + '   σ = ' + cap.sd.toFixed(3) +
+      '\n  Cp = ' + cap.cp.toFixed(3) + '   Cpk = ' + cap.cpk.toFixed(3) + '  → ' + (cap.capable ? "工程能力あり (Cpk ≥ 1.33)" : "工程能力不足") +
+      '\n\n検量線\n  y = ' + cal.slope.toFixed(4) + ' x + ' + cal.intercept.toFixed(4) +
+      '\n  R² = ' + cal.r2.toFixed(5) + '  → ' + (cal.linear ? "直線性あり" : "直線性不足") + '</pre>' +
+      '<div class="row"><span class="tag' + (cu.pass ? ' ok' : ' bad') + '">含量均一性 ' + (cu.pass ? '適合' : '不適合') + '</span>' +
+      '<span class="tag' + (cap.capable ? ' ok' : ' bad') + '">Cpk ' + cap.cpk.toFixed(2) + '</span>' +
+      '<span class="tag' + (cal.linear ? ' ok' : ' bad') + '">R² ' + cal.r2.toFixed(4) + '</span></div>' +
+      '<div class="hint">' + esc(cu.note) + '</div>' +
+      '<div class="row"><button class="acc" onclick="openUnit(\'record\')">製造記録へ →</button></div>';
+  } catch (e){ $("qcOut").innerHTML = '<div class="hint">!! ' + esc(e.message) + '</div>'; }
+}
+
+/* ── 📋 製造記録 ── */
+PANELS.record = () => `
+<div class="card">
+  <h3>ロット・質量収支・記録の指紋</h3>
+  <div class="hint">製剤の組成と通算収率から、必要な原薬の仕込み量と工程損失を計算し、決定的なロット番号と
+    記録の指紋(内容が 1 文字変われば変わる)を付けます。</div>
+  <div class="row"><label>製造錠数</label><input id="rcN" type="number" step="100" value="1000" oninput="runRecord()"/></div>
+  <div id="rcOut"></div>
+</div>`;
+function runRecord(){
+  const form = LAST.form || formulate(100, {});
+  const route = LAST.route || retroRoute(DS_BLOCKS.length ? DS_BLOCKS : ["phenyl", "carboxyl", "acetyloxy"], {});
+  const rec = batchRecord({ tablets: num("rcN", 1000), formulation: form, overallYield: route.overallYield, seed: form.api + "|" + num("rcN", 1000) });
+  LAST.record = rec;
+  $("sbLot").textContent = "LOT " + rec.lot;
+  $("rcOut").innerHTML =
+    '<pre>ロット番号   ' + rec.lot + '\n製造錠数     ' + rec.tablets + ' 錠 × ' + rec.tabletMg + ' mg' +
+    '\n原薬/錠      ' + rec.apiPerTabletMg + ' mg\n製品中の原薬 ' + (rec.apiNeededMg / 1000).toFixed(2) + ' g' +
+    '\n通算収率     ' + pct(rec.overallYield) + '\n原薬 仕込み  ' + (rec.apiChargedMg / 1000).toFixed(2) + ' g' +
+    '\n工程損失     ' + (rec.processLossMg / 1000).toFixed(2) + ' g' +
+    '\n総質量       ' + (rec.totalMassMg / 1000).toFixed(1) + ' g' +
+    '\n質量収支     ' + (rec.massBalanceClosed ? "閉じる" : "破れる") +
+    '\n記録指紋     ' + rec.fingerprint + '</pre>' +
+    '<table><tr><th>成分</th><th>1 錠 (mg)</th><th>全ロット (g)</th></tr>' +
+    rec.composition.map(c => '<tr><td>' + esc(c.name) + '</td><td class="mono">' + c.mg.toFixed(1) +
+      '</td><td class="mono">' + (c.mg * rec.tablets / 1000).toFixed(1) + '</td></tr>').join("") + '</table>' +
+    '<div class="card warn"><div class="hint">この記録は数値実験の帳票であり、実際の製造記録ではありません。</div></div>';
+}
+
+/* ── 🏭 製造ライン ── */
+PANELS.line = () => `
+<div class="card">
+  <h3>8 段を一本に通す</h3>
+  <div class="hint">計測取込 → 標的同定 → 分子設計 → 逆合成 → 製剤化 → 薬物動態 → 品質管理 → 製造記録。
+    各段は前段の出力だけを入力に取り、最後に全段の成立を検証します。</div>
+  <div class="row"><label>原薬 (mg/錠)</label><input id="lnApi" type="number" step="1" value="100"/>
+    <label style="min-width:96px">錠数</label><input id="lnN" type="number" step="100" value="1000"/>
+    <button class="grn" onclick="runLine()">製造する</button></div>
+  <div id="lnOut"><div class="hint">押すと 8 段を通します。</div></div>
+</div>`;
+function runLine(){
+  $("lnOut").innerHTML = '<div class="hint">製造中…</div>';
+  setTimeout(() => {
+    const r = manufacturePipeline({
+      readings: LAST.intake ? readReadingsSafe() : DEFAULT_READINGS,
+      blocks: DS_BLOCKS.length ? DS_BLOCKS : undefined,
+      apiMg: num("lnApi", 100), tablets: num("lnN", 1000)
+    });
+    $("sbLot").textContent = "LOT " + r.summary.lot;
+    $("lnOut").innerHTML = r.stages.map(s =>
+      '<div class="stage' + (s.ok ? "" : " ng") + '"><b>' + s.n + ". " + esc(s.title) + '</b><span>' + esc(s.detail) + '</span></div>'
+    ).join("") + '<div class="card" style="margin-top:12px"><div class="hint"><b>' + esc(r.verdict) + '</b></div></div>';
+  }, 20);
+}
+function readReadingsSafe(){
+  try { return (LAST.intake && LAST.intake.rows.length) ? LAST.intake.rows.reduce((o, r) => { o[r.id] = r.raw; return o; }, {}) : DEFAULT_READINGS; }
+  catch (e){ return DEFAULT_READINGS; }
+}
+
+/* ── シェル ── */
+function shellSend(){
+  const input = $("cmd"), text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  const r = aiShell(text);
+  if (r.open && PANELS[r.open]) openUnit(r.open);
+  const host = ($("panel").style.display === "block") ? $("panelBody") : $("home");
+  const box = document.createElement("div");
+  box.className = "card";
+  box.innerHTML = '<div class="msgU">' + esc(text) + '</div><div class="msgA">' + esc(r.text) +
+    '<details open><summary>6 段の開示</summary><pre>' + esc(r.steps.join("\n")) + '</pre></details></div>';
+  host.appendChild(box);
+  box.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+if (typeof document !== "undefined" && document.getElementById){
+  const cmdEl = $("cmd");
+  if (cmdEl) cmdEl.addEventListener("keydown", e => { if (e.key === "Enter") shellSend(); });
+  renderHome();
+}
+</script>
+</body>
+</html>

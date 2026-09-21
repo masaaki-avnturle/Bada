@@ -1,0 +1,217 @@
+name: Bada Pharma app build (Android APK + Windows EXE + Ubuntu)
+
+# bada_pharma/ の「Bada Pharma」— 薬剤製造装置のシミュレータ。
+#   計測取込  = これまでの計測器アプリ (MRI/fMRI = omega_tomograph、DNA 解析 =
+#               bada_pharma、血液検査、脳電磁場、脳トポグラフィー、Γ 熱感知 =
+#               omega_thermal_trace) の読みを、Γ 核 k(r)=½+½e^{−κ r log r} を
+#               重みとして一本のプロファイルに束ねる。
+#   標的同定  = 平均を抜いたコサイン類似度で 6 標的の署名と照合する。
+#   分子設計  = 積み木(フラグメント)から分子式・分子量・logP・TPSA を積み上げ、
+#               Lipinski の Rule of Five と Veber 則で評価する。標準原子量から
+#               アスピリン C9H8O4 180.16、パラセタモール C8H9NO2 151.16、
+#               ハロペリドール C21H23ClFNO2 375.86 を再現することを検証する。
+#   逆合成    = 積み木の真逆。収率の積と原子効率だけを扱い、試薬・反応条件・
+#               操作手順は一切扱わない。
+#   製剤化    = 錠剤の質量収支と Weibull 溶出 F(t)=1−exp(−(t/τ)^β)。
+#   薬物動態  = 1 コンパートメント一次吸収。Tmax=ln(ka/ke)/(ka−ke)、
+#               AUC=F·D/(V·ke)、蓄積率 R=1/(1−e^{−ke τ}) を数値積分で検証。
+#   品質管理  = 含量均一性の判定値 AV=|M−X̄|+k·s、工程能力 Cp/Cpk、検量線 R²。
+#   製造記録  = ロット番号・仕込み量・工程損失・記録指紋。
+# これを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Ubuntu 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_pharma/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (pharma-v* タグ / release_tag 指定時)
+# GitHub Release に添付します。
+#
+# ⚠ 概念シミュレーション・非医療・実製造不可。医薬品の製造は薬機法と GMP に
+#    基づく許可と設備が必要で、本アプリはその代わりにはなりません。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: pharma-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    # main へ取り込む前でも Actions から成果物を取れるように、作業ブランチの
+    # push でもビルドします (main へマージ後、この branches: は外して構いません。
+    # 既定ブランチに置かれた時点で Actions の Run workflow ボタンが出ます)。
+    branches:
+      - 'claude/disease-prevention-app-fmcf8c'
+    tags:
+      - 'pharma-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Self-check app HTML (inline JS syntax + engine markers)
+        run: |
+          set -e
+          test -f bada_pharma/index.html
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("bada_pharma/index.html", "utf8");
+            const m = src.match(/<script>([\s\S]*)<\/script>/);
+            if (!m) { console.error("no inline <script> found"); process.exit(1); }
+            fs.writeFileSync("/tmp/pharma.js", m[1]);
+            for (const marker of ["function gammaManifold", "function gammaKernel",
+                                  "function modalityNormalize", "function modalityIntake",
+                                  "function profileSimilarity", "function targetIdentify",
+                                  "function molWeight", "function formulaString", "function molBuild",
+                                  "function lipinski", "function veber", "function desirability",
+                                  "function retroRoute", "function formulate", "function dissolution",
+                                  "function noyesWhitney", "function dissolutionQ",
+                                  "function pkConc", "function pkMetrics", "function pkMultiDose",
+                                  "function accumulationRatio", "function occupancy",
+                                  "function contentUniformity", "function processCapability",
+                                  "function calibration", "function lotNumber", "function batchRecord",
+                                  "function manufacturePipeline", "function unitCatalog",
+                                  "function intentDetect", "function aiShell"]) {
+              if (!m[1].includes(marker)) { console.error("missing: " + marker); process.exit(1); }
+            }
+          '
+          node --check /tmp/pharma.js
+          echo "Bada Pharma self-check OK"
+      - name: Engine tests (intake / target ID / molecular design vs known drug formulas / retrosynthetic yield plan / formulation & dissolution / pharmacokinetics vs numerical integration / content uniformity & Cpk / batch record / 8-stage line)
+        run: |
+          set -e
+          node bada_pharma/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_pharma/app/www
+          cp bada_pharma/index.html bada_pharma/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_pharma/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badapharma BadaPharma
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-pharma-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pharma-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_pharma/app/www
+          cp bada_pharma/index.html bada_pharma/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_pharma/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pharma-windows
+          path: bada_pharma/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_pharma/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_pharma/app/www
+          cp bada_pharma/index.html bada_pharma/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_pharma/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pharma-linux
+          path: |
+            bada_pharma/app/electron/dist/*.AppImage
+            bada_pharma/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_pharma/app/electron/dist/*.AppImage
+            bada_pharma/app/electron/dist/*.deb
