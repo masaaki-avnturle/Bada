@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Bada Suite — ユーザー自身の素材だけで組曲を編曲して mp4 に書き出す。
 
-構成 (4 秒の等パワー・クロスフェードで接続):
-  I.   Ave (SATB MIDI)         … MIDI を合唱シンセ + ピアノ層で新規レンダリング (D-dur)
+構成 (4 秒の等パワー・クロスフェードで接続, 調性でつなぐ):
+  I.   Ave (SATB MIDI, D)      … MIDI を合唱シンセ + ピアノ層で新規レンダリング
   II.  Requiem in F minor      … 原音ピアノ + 1 オクターブ下のゴースト層 + ホール残響
-  III. Contrapunctus 14        … 同上 (La Japonaise)
-  IV.  Coda: 20260920_154001 / 20260920_154118 … 録音 2 本を残響で包む
+  III. トラック 18 (Fm)         … 同上 (任意: WMA があれば)
+  IV.  Contrapunctus 14 (Dm)   … 同上 (La Japonaise)
+  V.   トラック 8 (Gm)          … 同上 (任意)
+  VI.  MOTHER — LUNA SEA (Gm)  … 原曲の歌声をそのまま, 軽い残響のみ (任意)
+  VII. Coda: 20260920_154001 / 20260920_154118 … 録音 2 本を残響で包む
 
 依存: python3, numpy, scipy, mido, pillow, imageio-ffmpeg (静的 ffmpeg)
 使い方: python3 make_suite.py <素材ディレクトリ> <出力ディレクトリ>
@@ -166,37 +169,65 @@ def ghost(path, dur):
     g = load(path, dur, "rubberband=pitch=0.5:pitchq=quality,lowpass=f=520,adelay=45|45")
     return g
 
-# ---------------------------------------------------------------- build sections
+# ---------------------------------------------------------------- section table
+def has(name):
+    try: src(name); return True
+    except FileNotFoundError: return False
+
+# (key, 表示名, 副題, 音源, 長さ秒, ghost 量, 残響 wet, 追加 af, 映像種別)
+SECTIONS = [
+    dict(key="ave", title="I. Ave (SATB)", sub="MIDI から合唱シンセ + ピアノで新規レンダリング", dur=161.0,
+         audio="synth", rev=0.32, video="waves"),
+    dict(key="requiem", title="II. Requiem in F minor", sub="ピアノ + オクターブ下のゴースト層 + ホール残響", dur=250.0,
+         audio="requiem_piano.mp3", ghost=0.16, rev=0.20, video="requiem_pair"),
+]
+if has("18______18.wma"):
+    SECTIONS.append(dict(key="track18", title="III. トラック 18 (F minor)", sub="CD 取り込み音源 + ゴースト層 + 残響", dur=143.5,
+                         audio="18______18.wma", ghost=0.14, rev=0.18, video="spectrum:fire"))
+SECTIONS.append(dict(key="contrapunctus", title="IV. Contrapunctus 14 — La Japonaise", sub="ピアノ + ゴースト層 + 残響", dur=141.0,
+                     audio="La_Japonaise_Contrapunctus14.mp4", ghost=0.14, rev=0.20, video="La_Japonaise_Contrapunctus14.mp4"))
+if has("08______8.wma"):
+    SECTIONS.append(dict(key="track8", title="V. トラック 8 (G minor)", sub="CD 取り込み音源 + ゴースト層 + 残響", dur=240.0,
+                         audio="08______8.wma", ghost=0.12, rev=0.18, video="spectrum:cool"))
+if has("10_MOTHER.wma"):
+    SECTIONS.append(dict(key="mother", title="VI. MOTHER — LUNA SEA", sub="原曲の歌声をそのまま, 軽い残響のみ", dur=312.0,
+                         audio="10_MOTHER.wma", rev=0.10, video="spectrum:magma"))
+SECTIONS += [
+    dict(key="coda1", title="VII. Coda", sub="20260920_154001 / 20260920_154118", dur=74.0,
+         audio="20260920_154001.mp4", rev=0.26, af="highpass=f=70", video="20260920_154001.mp4"),
+    dict(key="coda2", title="", sub="", dur=80.5,
+         audio="20260920_154118.mp4", rev=0.26, af="highpass=f=70", video="20260920_154118.mp4"),
+]
+# 番号を実際の順序で振り直す
+roman = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX"]
+n = 0
+for sd in SECTIONS:
+    if sd["title"]:
+        n += 1; sd["title"] = f"{roman[n-1]}. " + sd["title"].split(". ", 1)[1]
+lens = [sd["dur"] for sd in SECTIONS]
+starts = [0.0]
+for Lk in lens[:-1]: starts.append(starts[-1] + Lk - XF)
+total = sum(lens) - XF * (len(lens) - 1)
+
 REUSE = os.environ.get("REUSE_AUDIO") == "1" and os.path.exists(os.path.join(OUT, "bada_suite_master.wav"))
 
 def build_audio():
-    sec = []
-    print("I. Ave")
-    ave = fit(render_ave(src("ave_satb.mid")), int(161 * SR))
-    ave = rms_norm(reverb(ave, 0.32), -21.0)
-    sec.append(("ave", fade(ave, 0.5, 3.0)))
-
-    print("II. Requiem")
-    D = 250.0
-    req = fit(load(src("requiem_piano.mp3"), D), int(D * SR))
-    req = req + 0.16 * fit(ghost(src("requiem_piano.mp3"), D), int(D * SR))
-    sec.append(("requiem", fade(rms_norm(reverb(req, 0.20), -20.0), 0.0, 2.0)))
-
-    print("III. Contrapunctus 14")
-    D = 141.0
-    cp = fit(load(src("La_Japonaise_Contrapunctus14.mp4"), D), int(D * SR))
-    cp = cp + 0.14 * fit(ghost(src("La_Japonaise_Contrapunctus14.mp4"), D), int(D * SR))
-    sec.append(("contrapunctus", fade(rms_norm(reverb(cp, 0.20), -20.0), 0.0, 2.0)))
-
-    print("IV. Coda")
-    for name, D in (("20260920_154001.mp4", 74.0), ("20260920_154118.mp4", 80.5)):
-        r = fit(load(src(name), D, "highpass=f=70"), int(D * SR))
-        sec.append((name[:-4], fade(rms_norm(reverb(r, 0.26), -21.0), 0.3, 3.0)))
-
-    master = soft_limit(crossfade_concat([x for _, x in sec]))
+    parts = []
+    for sd in SECTIONS:
+        print("audio:", sd["key"]); D = sd["dur"]; N = int(D * SR)
+        if sd["audio"] == "synth":
+            x = fit(render_ave(src("ave_satb.mid")), N)
+        else:
+            x = fit(load(src(sd["audio"]), D, sd.get("af")), N)
+            if sd.get("ghost"):
+                x = x + sd["ghost"] * fit(ghost(src(sd["audio"]), D), N)
+        x = rms_norm(reverb(x, sd["rev"]), -20.5)
+        x = fade(x, 0.5 if sd["audio"] == "synth" else 0.3, 3.0)
+        save_wav(os.path.join(OUT, f"sec_{sd['key']}.wav"), x)
+        parts.append(x)
+    master = soft_limit(crossfade_concat(parts))
     master *= 0.97 / (np.abs(master).max() + 1e-9)
     save_wav(os.path.join(OUT, "bada_suite_master.wav"), master)
-    save_wav(os.path.join(OUT, "sec_ave.wav"), sec[0][1])
     return master
 
 if REUSE:
@@ -204,73 +235,55 @@ if REUSE:
     master = wavfile.read(os.path.join(OUT, "bada_suite_master.wav"))[1]
 else:
     master = build_audio()
-lens = [161.0, 250.0, 141.0, 74.0, 80.5]
-total = len(master) / SR
+assert abs(len(master) / SR - total) < 0.01, (len(master) / SR, total)
 print("section lengths", lens, "total", total)
 
 # ---------------------------------------------------------------- title cards
-def card(path, title, sub="", big=64, alpha_bg=0):
-    im = Image.new("RGBA", (W, H), (0, 0, 0, alpha_bg)); d = ImageDraw.Draw(im)
+def card(path, title, sub="", big=64):
+    im = Image.new("RGBA", (W, H), (0, 0, 0, 0)); d = ImageDraw.Draw(im)
     f1 = ImageFont.truetype(FONT, big); f2 = ImageFont.truetype(FONT, 30)
-    # 文字の背後に半透明の帯 (明るい映像上でも読めるように)
     top = int(H * 0.40) - 36; bot = int(H * 0.40) + big + (70 if sub else 20)
-    d.rectangle([0, top, W, bot], fill=(10, 10, 20, 150))
+    d.rectangle([0, top, W, bot], fill=(10, 10, 20, 150))          # 半透明の帯
     w1 = d.textlength(title, font=f1); d.text(((W - w1) / 2, H * 0.40), title, font=f1, fill=(255, 250, 235, 255))
     if sub:
         w2 = d.textlength(sub, font=f2); d.text(((W - w2) / 2, H * 0.40 + big + 24), sub, font=f2, fill=(225, 220, 205, 230))
     im.save(path)
 
-bg = Image.new("RGB", (W, H)); px = bg.load()
-for y in range(H):
-    for x in range(W):
-        v = (x / W) * 0.5 + (y / H) * 0.5
-        px[x, y] = (int(14 + 20 * v), int(12 + 16 * v), int(28 + 40 * v))
-bg.save(os.path.join(OUT, "bg.png"))
+def make_bg(path, c0, c1):
+    bg = Image.new("RGB", (W, H)); px = bg.load()
+    for y in range(H):
+        for x in range(W):
+            v = (x / W) * 0.5 + (y / H) * 0.5
+            px[x, y] = tuple(int(a + (b - a) * v) for a, b in zip(c0, c1))
+    bg.save(path)
+make_bg(os.path.join(OUT, "bg.png"), (14, 12, 28), (34, 28, 68))
+make_bg(os.path.join(OUT, "bg_fire.png"), (18, 8, 8), (52, 22, 16))
+make_bg(os.path.join(OUT, "bg_cool.png"), (6, 14, 22), (14, 40, 58))
+make_bg(os.path.join(OUT, "bg_magma.png"), (12, 6, 16), (48, 14, 40))
 
-cards = [
-    ("card0.png", "Bada Suite", "Ave · Requiem in F minor · Contrapunctus 14 · Coda", 0.0, 7.0),
-    ("card1.png", "I. Ave (SATB)", "MIDI から合唱シンセ + ピアノで新規レンダリング", 8.0, 14.0),
-    ("card2.png", "II. Requiem in F minor", "ピアノ + オクターブ下のゴースト層 + ホール残響", 0, 0),
-    ("card3.png", "III. Contrapunctus 14 — La Japonaise", "同編成", 0, 0),
-    ("card4.png", "IV. Coda", "20260920_154001 / 20260920_154118", 0, 0),
-    ("card5.png", "Bada Suite", "素材はすべてアップロードされた自作音源・MIDI から編曲", 0, 0),
-]
-starts = [0]
-for L in lens[:-1]: starts.append(starts[-1] + L - XF)
-cards[2] = cards[2][:3] + (starts[1] + 1, starts[1] + 7)
-cards[3] = cards[3][:3] + (starts[2] + 1, starts[2] + 7)
-cards[4] = cards[4][:3] + (starts[3] + 1, starts[3] + 7)
-cards[5] = cards[5][:3] + (total - 9, total - 1)
-for fn, t, s, a, b in cards:
-    card(os.path.join(OUT, fn), t, s, big=(72 if fn in ("card0.png", "card5.png") else 56))
+sub_all = " · ".join(sd["title"].split(". ", 1)[1].split(" — ")[0] for sd in SECTIONS if sd["title"])
+card(os.path.join(OUT, "card_open.png"), "Bada Suite", sub_all, big=72)
+card(os.path.join(OUT, "card_end.png"), "Bada Suite", "自作音源・MIDI と手持ちの音源からの編曲 (私的利用)", big=72)
+for sd in SECTIONS:
+    if sd["title"]:
+        card(os.path.join(OUT, f"card_{sd['key']}.png"), sd["title"], sd["sub"], big=56)
 
 # ---------------------------------------------------------------- video
-# 1) 各楽章を個別にレンダリング (タイトルカードは表示時間ぶんだけ読み込む)
-# 2) 5 本を xfade で連結してマスター音声を載せる
-L = lens
 ENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-r", str(FPS)]
 
 def norm(idx):
     return (f"[{idx}:v]scale={W}:{H}:force_original_aspect_ratio=decrease,pad={W}:{H}:-1:-1,"
             f"fps={FPS},format=yuv420p")
 
-def card_inputs(cards_local):
-    """cards_local: [(png, start, end)] → (inputs, filter parts, first card input index offset needed)"""
-    ins, parts = [], []
-    for k, (fn, a, b) in enumerate(cards_local):
-        d = b - a
-        ins += ["-loop", "1", "-framerate", str(FPS), "-t", f"{d:.2f}", "-i", os.path.join(OUT, fn)]
-        parts.append((k, a, b))
-    return ins, parts
-
 def render_section(name, main_inputs, main_filter, dur, cards_local):
-    """main_filter は [vmain] を出す。cards_local は楽章内時刻。"""
-    ci = len(main_inputs) // 2  # -i の数 (単純な "-i path" 入力のみを想定)
+    """main_filter は最後にラベル無しで終わる。cards_local: [(png, start, end)] 楽章内時刻。"""
     ci = sum(1 for x in main_inputs if x == "-i")
-    cins, parts = card_inputs(cards_local)
+    cins = []
+    for fn, a, b in cards_local:
+        cins += ["-loop", "1", "-framerate", str(FPS), "-t", f"{b-a:.2f}", "-i", os.path.join(OUT, fn)]
     fc = [main_filter + f",trim=duration={dur},setpts=PTS-STARTPTS,fps={FPS}[vmain]"]
     chain = "vmain"
-    for k, a, b in parts:
+    for k, (fn, a, b) in enumerate(cards_local):
         fc.append(f"[{ci+k}:v]format=rgba,fps={FPS},fade=t=in:st=0:d=1:alpha=1,fade=t=out:st={b-a-1:.2f}:d=1:alpha=1,"
                   f"tpad=start_duration={a:.2f}:start_mode=add:color=black@0.0,setpts=PTS-STARTPTS[c{k}]")
         fc.append(f"[{chain}][c{k}]overlay=0:0:eof_action=pass[o{k}]")
@@ -282,43 +295,74 @@ def render_section(name, main_inputs, main_filter, dur, cards_local):
     print("render", name); subprocess.run(cmd, check=True)
     return out
 
-# I. 背景 + 波形
-vA = render_section("ave",
-    ["-loop", "1", "-framerate", str(FPS), "-i", os.path.join(OUT, "bg.png"), "-i", os.path.join(OUT, "sec_ave.wav")],
-    f"[1:a]showwaves=s={W}x360:mode=cline:rate={FPS}:colors=0xE8D9A0|0x8FB8C8:scale=sqrt,format=rgba,colorchannelmixer=aa=0.85[wv];"
-    f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p[bg];[bg][wv]overlay=0:{H-360}:shortest=1,format=yuv420p",
-    L[0], [("card0.png", 0.0, 7.0), ("card1.png", 8.0, 14.0)])
-# II. SoundFilm → ピアノロール (同じ音源のタイムライン上で切替)
-half = 129
-vB = render_section("requiem",
-    ["-i", src("Requiem_in_F_minor_Grand_Piano.mp4"), "-i", src("requiem_piano.mp4")],
-    f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p,trim=duration={half},setpts=PTS-STARTPTS,fps={FPS}[vB1];"
-    f"[1:v]scale={W}:{H},fps={FPS},format=yuv420p,trim=start={half-XF}:duration={L[1]-half+XF},setpts=PTS-STARTPTS,fps={FPS}[vB2];"
-    f"[vB1][vB2]xfade=transition=fade:duration={XF}:offset={half-XF},fps={FPS}",
-    L[1], [("card2.png", 1.0, 7.0)])
-vC = render_section("contrapunctus", ["-i", src("La_Japonaise_Contrapunctus14.mp4")],
-    norm(0) + ",tpad=stop_mode=clone:stop_duration=6", L[2], [("card3.png", 1.0, 7.0)])
-vD1 = render_section("coda1", ["-i", src("20260920_154001.mp4")],
-    norm(0) + ",tpad=stop_mode=clone:stop_duration=6", L[3], [("card4.png", 1.0, 7.0)])
-vD2 = render_section("coda2", ["-i", src("20260920_154118.mp4")],
-    norm(0) + ",tpad=stop_mode=clone:stop_duration=6", L[4], [("card5.png", L[4] - 9.0, L[4] - 1.0)])
+vids = []
+for i, sd in enumerate(SECTIONS):
+    D = sd["dur"]; wav = os.path.join(OUT, f"sec_{sd['key']}.wav")
+    cards_local = []
+    if i == 0: cards_local.append(("card_open.png", 0.0, 7.0))
+    if sd["title"]: cards_local.append((f"card_{sd['key']}.png", 8.0 if i == 0 else 1.0, 14.0 if i == 0 else 7.0))
+    if i == len(SECTIONS) - 1: cards_local.append(("card_end.png", D - 9.0, D - 1.0))
+    v = sd["video"]
+    if v == "waves":
+        ins = ["-loop", "1", "-framerate", str(FPS), "-i", os.path.join(OUT, "bg.png"), "-i", wav]
+        flt = (f"[1:a]showwaves=s={W}x360:mode=cline:rate={FPS}:colors=0xE8D9A0|0x8FB8C8:scale=sqrt,format=rgba,colorchannelmixer=aa=0.85[wv];"
+               f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p[bg];[bg][wv]overlay=0:{H-360}:shortest=1,format=yuv420p")
+    elif v.startswith("spectrum:"):
+        color = v.split(":")[1]
+        ins = ["-loop", "1", "-framerate", str(FPS), "-i", os.path.join(OUT, f"bg_{color}.png"), "-i", wav]
+        flt = (f"[1:a]showspectrum=s={W}x400:mode=combined:color={color}:slide=scroll:scale=log:fps={FPS},format=rgba,colorchannelmixer=aa=0.9[sp];"
+               f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p[bg];[bg][sp]overlay=0:{H-400}:shortest=1,format=yuv420p")
+    elif v == "requiem_pair":
+        half = 129
+        ins = ["-i", src("Requiem_in_F_minor_Grand_Piano.mp4"), "-i", src("requiem_piano.mp4")]
+        flt = (f"[0:v]scale={W}:{H},fps={FPS},format=yuv420p,trim=duration={half},setpts=PTS-STARTPTS,fps={FPS}[vB1];"
+               f"[1:v]scale={W}:{H},fps={FPS},format=yuv420p,trim=start={half-XF}:duration={D-half+XF},setpts=PTS-STARTPTS,fps={FPS}[vB2];"
+               f"[vB1][vB2]xfade=transition=fade:duration={XF}:offset={half-XF},fps={FPS}")
+    else:
+        ins = ["-i", src(v)]
+        flt = norm(0) + ",tpad=stop_mode=clone:stop_duration=6"
+    vids.append(render_section(sd["key"], ins, flt, D, cards_local))
 
-# 連結
-vids = [vA, vB, vC, vD1, vD2]
+# 連結 + マスター音声
 inputs = []
 for v in vids: inputs += ["-i", v]
 inputs += ["-i", os.path.join(OUT, "bada_suite_master.wav")]
-fc = [f"[{k}:v]fps={FPS},format=yuv420p,setpts=PTS-STARTPTS,fps={FPS}[v{k}]" for k in range(5)]
-chain = "v0"; off = 0.0
-for k in range(1, 5):
-    off += L[k - 1] - XF
-    fc.append(f"[{chain}][v{k}]xfade=transition=fade:duration={XF}:offset={off:.3f},fps={FPS}[x{k}]")
+A = len(vids)
+fc = [f"[{k}:v]fps={FPS},format=yuv420p,setpts=PTS-STARTPTS,fps={FPS}[v{k}]" for k in range(A)]
+chain = "v0"
+for k in range(1, A):
+    fc.append(f"[{chain}][v{k}]xfade=transition=fade:duration={XF}:offset={starts[k]:.3f},fps={FPS}[x{k}]")
     chain = f"x{k}"
 fc.append(f"[{chain}]format=yuv420p,trim=duration={total:.3f}[vout]")
 out_mp4 = os.path.join(OUT, "Bada_Suite.mp4")
 cmd = [FF, "-y", "-loglevel", "error", "-stats"] + inputs + [
-    "-filter_complex", ";".join(fc), "-map", "[vout]", "-map", "5:a"] + ENC + [
+    "-filter_complex", ";".join(fc), "-map", "[vout]", "-map", f"{A}:a"] + ENC + [
     "-crf", "21", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", "-t", f"{total:.3f}", out_mp4]
 print("concat + mux ...")
 subprocess.run(cmd, check=True)
 print("done:", out_mp4)
+
+# ---------------------------------------------------------------- 配布用: 前半/後半 (540p, 2 パス) と mp3
+split_at = os.environ.get("SPLIT_AT")   # 楽章 key を指定するとその楽章の頭で前後に分ける
+def small(src_mp4, out, ss, t, vfade_in, afade_in, fade_out):
+    vf = f"scale=960:540"
+    af = ""
+    if vfade_in: vf += ",fade=t=in:d=2"; af = "afade=t=in:d=2"
+    if fade_out:
+        vf += f",fade=t=out:st={t-3:.2f}:d=3"; af = (af + "," if af else "") + f"afade=t=out:st={t-3:.2f}:d=3"
+    base = [FF, "-y", "-loglevel", "error", "-ss", f"{ss:.3f}", "-t", f"{t:.3f}", "-i", src_mp4, "-vf", vf, "-r", "24",
+            "-c:v", "libx264", "-preset", "medium", "-b:v", "225k", "-maxrate", "280k", "-bufsize", "560k", "-passlogfile", os.path.join(OUT, "x264pass")]
+    subprocess.run(base + ["-pass", "1", "-an", "-f", "null", "-"], check=True)
+    subprocess.run(base + ["-pass", "2"] + (["-af", af] if af else []) + ["-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", out], check=True)
+    print("wrote", out, os.path.getsize(out) / 2 ** 20, "MiB")
+
+if split_at:
+    k = [sd["key"] for sd in SECTIONS].index(split_at)
+    cut = starts[k] + XF / 2
+    small(out_mp4, os.path.join(OUT, "Bada_Suite_part1_540p.mp4"), 0, cut, False, False, True)
+    small(out_mp4, os.path.join(OUT, "Bada_Suite_part2_540p.mp4"), cut, total - cut, True, True, False)
+else:
+    small(out_mp4, os.path.join(OUT, "Bada_Suite_540p.mp4"), 0, total, False, False, False)
+subprocess.run([FF, "-y", "-loglevel", "error", "-i", os.path.join(OUT, "bada_suite_master.wav"), "-c:a", "libmp3lame", "-b:a", "160k",
+                os.path.join(OUT, "Bada_Suite_audio.mp3")], check=True)
+print("all done")
