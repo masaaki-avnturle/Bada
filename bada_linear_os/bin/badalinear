@@ -1,0 +1,47 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# BadaLinear-OS ランチャ
+#   bin/badalinear              対話 REPL
+#   bin/badalinear demo         自動デモ（ブート→比較→物理→出発→AI）
+#   bin/badalinear run FILE     Bada 言語スクリプト実行（bada_ruby 同梱時）
+#   bin/badalinear "compare"    単発コマンド
+
+$LOAD_PATH.unshift(File.expand_path("../lib", __dir__))
+require "badalinear"
+
+def run_bada(path)
+  lib = File.expand_path("../../bada_ruby/lib", __dir__)
+  abort "bada_ruby が見つかりません" unless File.directory?(lib)
+  $LOAD_PATH.unshift(lib)
+  require "bada/language"; require "bada/tuplespace"
+  puts BadaLinear::OS.new.boot
+  puts "── Bada 言語ブートシーケンス実行: #{File.basename(path)} ──"
+  Bada::Interpreter.new.run(File.read(path, encoding: "UTF-8")).each { |l| puts "  #{l}" }
+end
+
+def demo
+  os = BadaLinear::OS.new
+  puts os.boot
+  ["compare", "physics", "route 1000", "depart 1000", "depart 1000", "status",
+   "ask 空気抵抗はなぜゼロなのですか？", "akashic depart"].each do |c|
+    puts "\nBadaLinear> #{c}"; puts os.command(c)
+  end
+end
+
+def repl
+  os = BadaLinear::OS.new; puts os.boot
+  puts "\n反重力リニア コンソール。'help' で一覧、'exit' で終了。"
+  loop do
+    print "\nBadaLinear> "; line = $stdin.gets or break
+    line = line.strip; next if line.empty?; break if %w[exit quit q].include?(line)
+    begin; puts os.command(line); rescue => e; puts "エラー: #{e.message}"; end
+  end
+end
+
+case ARGV[0]
+when nil    then repl
+when "demo" then demo
+when "run"  then run_bada(ARGV[1] || File.expand_path("../linear_boot.bada", __dir__))
+else os = BadaLinear::OS.new; puts os.boot; puts os.command(ARGV.join(" "))
+end

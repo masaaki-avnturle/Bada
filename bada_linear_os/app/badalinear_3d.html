@@ -1,0 +1,235 @@
+<title>反重力リニア BadaLinear</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Shippori+Mincho:wght@500;700&display=swap">
+<style>
+:root{--ground:#0a2748;--sheet:#0b2c53;--stage:#061a30;--ink:#dbeafc;--ink-2:#a9c8ea;--dim:#6f98c4;--line:#7fa8d4;
+ --amber:#e8b24c;--cyan:#57c9e2;--rose:#e0798f;--green:#7fd6a6;--grid:rgba(219,234,252,.09);--gridf:rgba(219,234,252,.045);
+ --edge:rgba(127,168,212,.35);--mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;--disp:"Oswald","Arial Narrow",system-ui,sans-serif;--min:"Shippori Mincho",serif}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:linear-gradient(0deg,rgba(4,16,32,.55),rgba(4,16,32,.55)),var(--ground);color:var(--ink);font-family:var(--mono);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;padding:16px;min-height:100vh}
+.sheet{max-width:1240px;margin:0 auto;background:var(--sheet);border:1.5px solid var(--edge);box-shadow:0 20px 60px rgba(0,0,0,.5),inset 0 0 0 6px rgba(11,44,83,.9),inset 0 0 0 7px var(--edge);position:relative;overflow:hidden}
+.sheet::before{content:"";position:absolute;inset:7px;pointer-events:none;z-index:0;background-image:linear-gradient(var(--gridf) 1px,transparent 1px),linear-gradient(90deg,var(--gridf) 1px,transparent 1px),linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:14px 14px,14px 14px,70px 70px,70px 70px}
+.pad{position:relative;padding:20px 24px 0;z-index:1}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;border-bottom:1.5px solid var(--edge);padding-bottom:13px}
+.eyebrow{font-family:var(--disp);letter-spacing:.26em;text-transform:uppercase;color:var(--dim);font-size:11px}
+.tt h1{font-family:var(--disp);font-weight:600;letter-spacing:.04em;font-size:28px;margin:0;line-height:1;text-wrap:balance}
+.tt .en{font-family:var(--disp);font-weight:300;letter-spacing:.32em;text-transform:uppercase;color:var(--ink-2);font-size:12px;margin-top:7px}
+.tt .sub{color:var(--dim);font-size:12px;margin-top:8px;max-width:62ch}.tt .sub b{color:var(--ink-2);font-weight:400}
+.meta{font-size:11px;color:var(--ink-2);text-align:right;line-height:1.85;white-space:nowrap}.meta b{color:var(--amber);font-weight:600}
+.modebar{position:relative;z-index:1;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 24px;border-bottom:1.5px solid var(--edge)}
+.seg{display:inline-flex;border:1.5px solid var(--edge);border-radius:3px;overflow:hidden}
+.seg button{font-family:var(--disp);letter-spacing:.13em;text-transform:uppercase;font-size:12px;padding:8px 15px;background:transparent;color:var(--ink-2);border:none;cursor:pointer;transition:.15s}
+.seg button+button{border-left:1.5px solid var(--edge)}.seg button.on{background:var(--amber);color:var(--ground)}.seg button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+.modebar .hint{color:var(--dim);font-size:11px}
+.grid{position:relative;z-index:1;display:grid;grid-template-columns:1fr 372px}@media(max-width:920px){.grid{grid-template-columns:1fr}}
+.stagewrap{border-right:1.5px solid var(--edge);padding:12px 18px 16px;min-width:0}@media(max-width:920px){.stagewrap{border-right:none;border-bottom:1.5px solid var(--edge)}}
+.viewhead{display:flex;justify-content:space-between;align-items:baseline;margin:2px 2px 8px}.viewhead .name{font-family:var(--disp);letter-spacing:.14em;text-transform:uppercase;font-size:13px}.viewhead .scale{color:var(--dim);font-size:11px}
+.stage{position:relative;width:100%;aspect-ratio:4/3;background:radial-gradient(120% 90% at 50% 12%,#0d3055 0%,var(--stage) 60%,#04101f 100%);border:1px solid var(--edge);border-radius:2px;overflow:hidden}@media(max-width:920px){.stage{aspect-ratio:1/1}}
+#view3d{position:absolute;inset:0}#view3d canvas{display:block;width:100%!important;height:100%!important;touch-action:none;cursor:grab}
+#viewbp{position:absolute;inset:0;padding:6px}#viewbp svg{width:100%;height:100%;display:block;overflow:visible}
+.hud{position:absolute;top:10px;left:12px;pointer-events:none;font-size:11px;line-height:1.7}
+.hud .big{font-family:var(--disp);font-size:26px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}.hud .big small{font-size:12px;color:var(--dim);font-weight:300;letter-spacing:.1em}
+.hud .cap{color:var(--dim);letter-spacing:.16em;text-transform:uppercase;font-family:var(--disp);font-size:10px}.hud .c{color:var(--cyan)}.hud .a{color:var(--amber)}
+.ann{position:absolute;left:12px;right:12px;bottom:10px;pointer-events:none;font-family:var(--min);font-size:12.5px;color:var(--ink);background:rgba(6,26,48,.72);border:1px solid var(--edge);border-left:3px solid var(--amber);padding:7px 10px;border-radius:2px}
+.ann small{display:block;font-family:var(--disp);letter-spacing:.16em;text-transform:uppercase;color:var(--amber);font-size:9.5px}
+.stamp{position:absolute;right:10px;top:10px;pointer-events:none;color:var(--dim);font-size:10px;font-family:var(--disp);letter-spacing:.2em;text-transform:uppercase}
+.controls{padding:14px 20px 18px}.controls h2{font-family:var(--disp);font-weight:500;letter-spacing:.12em;text-transform:uppercase;font-size:13px;color:var(--ink-2);margin:2px 0}
+.controls .note{color:var(--dim);font-size:11px;margin:0 0 8px}
+.formula{background:rgba(4,16,32,.35);border:1px solid var(--edge);border-left-width:3px;padding:7px 11px;margin:7px 0;border-radius:2px}
+.formula.lev{border-left-color:var(--amber)}.formula.drag{border-left-color:var(--cyan)}.formula.pow{border-left-color:var(--ink)}.formula.cmp{border-left-color:var(--rose)}
+.formula .tag{font-family:var(--disp);letter-spacing:.08em;text-transform:uppercase;font-size:11px}.formula .tag small{font-family:var(--min);letter-spacing:0;text-transform:none;color:var(--ink-2);margin-left:6px;font-size:11px}
+.formula .eq{font-size:11.5px;margin:5px 0 1px;color:var(--ink);word-break:break-word}.formula .eq b{color:var(--amber);font-weight:600;font-variant-numeric:tabular-nums}.formula .eq b.c{color:var(--cyan)}.formula .eq b.r{color:var(--rose)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:middle}
+label.sld{display:block;font-size:11px;color:var(--ink-2);margin:11px 0 0}label.sld .rd{float:right;color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;background:var(--edge);border-radius:2px;margin:6px 0 2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--ground);cursor:pointer}input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid var(--ground);cursor:pointer}
+input[type=range]:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}.rng-amber::-webkit-slider-thumb{background:var(--amber)}.rng-cyan::-webkit-slider-thumb{background:var(--cyan)}
+.btnrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.opbtn{font-family:var(--disp);letter-spacing:.13em;text-transform:uppercase;font-size:12px;padding:10px 6px;background:transparent;border:1.5px solid var(--edge);border-radius:2px;cursor:pointer;transition:.15s;color:var(--ink-2)}
+.opbtn:hover{border-color:var(--ink-2);color:var(--ink)}.opbtn:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.opbtn.amber{color:var(--amber);border-color:var(--amber)}.opbtn.amber.on{background:var(--amber);color:var(--ground)}.opbtn.cyan{color:var(--cyan);border-color:var(--cyan)}.opbtn.wide{grid-column:span 2}
+.lower{position:relative;z-index:1;display:grid;grid-template-columns:1fr 1fr;border-top:1.5px solid var(--edge)}@media(max-width:760px){.lower{grid-template-columns:1fr}}
+.panel{padding:13px 22px}.panel+.panel{border-left:1.5px solid var(--edge)}@media(max-width:760px){.panel+.panel{border-left:none;border-top:1.5px solid var(--edge)}}
+.panel h2{font-family:var(--disp);letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--ink-2);margin:0 0 9px}
+table{border-collapse:collapse;width:100%;font-size:11px;font-variant-numeric:tabular-nums}th{font-family:var(--disp);letter-spacing:.1em;text-transform:uppercase;font-weight:400;color:var(--dim);font-size:10px;text-align:left;padding:4px 6px;border-bottom:1px solid var(--edge)}
+td{padding:4px 6px;border-bottom:1px solid rgba(127,168,212,.15);color:var(--ink-2)}td.k{color:var(--ink);white-space:nowrap}td.hi{color:var(--amber)}td.cy{color:var(--cyan)}tr.now td{background:rgba(232,178,76,.12)}
+.foot{position:relative;z-index:1;padding:10px 24px 18px;color:var(--dim);font-size:10.5px;line-height:1.7}.foot b{color:var(--ink-2);font-weight:400}
+.cl{stroke:var(--line);stroke-width:.6;stroke-dasharray:10 3 2 3;opacity:.5}.dim{stroke:var(--ink-2);stroke-width:.7}.dtxt{fill:var(--ink);font-family:var(--mono);font-size:10px}.dtxt.a{fill:var(--amber)}.dtxt.c{fill:var(--cyan)}.dtxt.r{fill:var(--rose)}
+.lbl{fill:var(--ink-2);font-family:var(--disp);font-size:11px;letter-spacing:.1em;text-transform:uppercase}
+.carB{fill:rgba(127,168,212,.10);stroke:var(--ink);stroke-width:1.3}.gwB{fill:rgba(127,168,212,.06);stroke:var(--line);stroke-width:1}.envB{fill:rgba(87,201,226,.08);stroke:var(--cyan);stroke-width:1}.agB{stroke:var(--amber);stroke-width:1.2;fill:none}
+</style>
+<div class="sheet">
+ <div class="pad"><header>
+  <div class="tt"><div class="eyebrow">BadaLinear-OS より作図 · Sheet LN</div><h1>反重力リニア新幹線</h1><div class="en">Antigravity Maglev — BadaLinear</div>
+   <div class="sub"><b>超伝導磁石 → 反重力浮上 E_ag=U_grav·cosh(x log x)</b>／<b>空気抵抗 → 補空間包絡 σ=1/cosh(x log x)²</b>／<b>地上コイル → 相対論補空間 E⊥=mc²−½mv² と無尽蔵の真空</b>。品川→新大阪を走る操作可能な3D運行シミュレータと設計図面。</div></div>
+  <div class="meta">DWG&nbsp;NO. <b>YMG-LN01</b><br>REV. 1.0.0 · A2 横<br>典拠 <b>BadaLinear-OS</b><br>Antigravity maglev<br>著者 <b>Masaaki Yamaguchi</b></div>
+ </header></div>
+ <div class="modebar"><div class="seg" role="tablist"><button id="mode3d" class="on" role="tab" aria-selected="true">▣ 3D 運行</button><button id="modebp" role="tab" aria-selected="false">▤ 設計図</button></div>
+  <span class="hint" id="modehint">出発ボタンで走行 · ドラッグで旋回 · スライダで反重力方程式を駆動</span></div>
+ <div class="grid">
+  <div class="stagewrap"><div class="viewhead"><span class="name" id="stagename">運行図 · 3D Chase</span><span class="scale">品川 0 km → 新大阪 438 km</span></div>
+   <div class="stage"><div id="view3d"></div><div id="viewbp" hidden></div>
+    <div class="hud"><div class="cap">速度 Speed</div><div class="big"><span id="hudV">0</span><small> km/h</small></div>
+     <div style="margin-top:6px" class="cap">位置 · 次駅</div><div class="big" style="font-size:16px"><span id="hudPos">0.0</span><small> km</small> <span id="hudNext" class="a" style="font-size:13px"></span></div>
+     <div style="margin-top:6px" class="cap">抗力 Drag</div><div style="font-size:12px"><span id="hudDrag0"></span> → <span class="c" id="hudDrag1"></span></div>
+     <div class="cap" style="margin-top:4px">浮上 L=<span class="a" id="hudL">2.125</span> · 真空 ∞</div></div>
+    <div class="ann" id="ann"><small>🎙 車掌AI</small><span id="annT">本日は反重力リニアをご利用いただきありがとうございます。超伝導磁石の代わりに重力方程式の補空間が車体を浮上させています。</span></div>
+    <div class="stamp">YMG-LN01</div></div></div>
+  <aside class="controls"><div class="eyebrow" style="margin-bottom:2px">反重力方程式 ドライバ</div><h2>BadaLinear-OS 軌道物理コア</h2>
+   <p class="note">巡航速度・補空間包絡 x_env・加速度を動かすと、浮上力・抗力・所要時間が再導出され、3D の包絡・反重力場・走行に反映されます。</p>
+   <div id="cards"></div>
+   <label class="sld">巡航速度 v <span class="rd" id="rd-v"></span><input class="rng" id="s-v" type="range" min="300" max="1500" step="50" value="1000"></label>
+   <label class="sld">補空間包絡 x_env <span class="rd" id="rd-x"></span><input class="rng rng-cyan" id="s-x" type="range" min="1.5" max="5" step="0.1" value="4"></label>
+   <label class="sld">快適加速度 a <span class="rd" id="rd-a"></span><input class="rng rng-amber" id="s-a" type="range" min="0.5" max="3" step="0.1" value="1.0"></label>
+   <div class="btnrow"><button class="opbtn amber" id="btnRun" aria-pressed="false">▶ 出発</button><button class="opbtn cyan" id="btnView">視点</button><button class="opbtn wide" id="btnReset">■ 品川へ戻す</button></div>
+  </aside></div>
+ <div class="lower">
+  <div class="panel"><h2>時刻表 · 品川→新大阪（各駅 60 s）</h2><table id="tt"></table></div>
+  <div class="panel"><h2>超電導リニア L0 との比較</h2><table id="cmp"></table>
+   <p style="color:var(--dim);font-size:10.5px;margin:8px 0 0">浮上：NbTi/液体He 4.2K・150km/h未満は車輪 → 反重力 L=2.125・停車中も浮上。無停車台形プロファイル。</p></div></div>
+ <div class="foot">本図は <b>BadaLinear-OS</b>（bada_linear_os · 論文集第九巻・BadaUFO-OS 応用篇）を典拠に、超電導リニアの三つの中核を反重力理論で置き換えた<b>概念設計・3Dシミュレーション</b>です。実在の超電導リニアの設計・安全性を評価するものではありません。</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ===== BadaLinear 物理コア（lib/badalinear/guideway.rb 移植） ===== */
+const C=299792458,G=6.6743e-11,ME=5.972e24,R0=6.371e6,RHO=1.225,G0=9.80665;
+const TRAIN={mass:3.0e5,cd:0.35,area:9.5,cars:12};
+const ST=[["品川",0],["神奈川県（橋本）",36],["山梨県（甲府）",121],["長野県（飯田）",190],["岐阜県（中津川）",246],["名古屋",285.6],["奈良",380],["新大阪",438]];
+const P={v:1000,x:4.0,a:1.0};
+const xlogx=x=>x<=0?0:x*Math.log(x), alpha=x=>Math.cosh(xlogx(x));
+const liftRatio=()=>alpha(1+R0/R0);                         // x=2 at ground → 2.125
+const baseDrag=v=>0.5*RHO*TRAIN.cd*TRAIN.area*v*v;
+const sigma=x=>1/(alpha(x)*alpha(x));
+const effDrag=(v,x)=>baseDrag(v)*sigma(x);
+const relComp=v=>TRAIN.mass*C*C-0.5*TRAIN.mass*v*v;
+function travelTime(dkm,vkmh,a){const d=dkm*1000,v=vkmh/3.6,r=v/a,rd=.5*a*r*r;return 2*rd>=d?2*Math.sqrt(d/a):2*r+(d-2*rd)/v;}
+const fmt=(x,d=2)=>{const f=Math.pow(10,d);return(Math.round(x*f)/f).toString();};
+const sci=(v,d=2)=>{if(v===0)return"0";const e=Math.floor(Math.log10(Math.abs(v)));return Math.abs(e)>3?(v/Math.pow(10,e)).toFixed(d)+"e"+e:v.toLocaleString(undefined,{maximumFractionDigits:d});};
+const $=id=>document.getElementById(id);
+
+/* ===== 運行状態 ===== */
+const S={pos:0,vel:0,running:false,dwell:0,nextIdx:1};
+function nextStation(){for(let i=0;i<ST.length;i++)if(ST[i][1]>S.pos+1e-6)return i;return -1;}
+
+/* ===== 3D ===== */
+const HOST=$("view3d");let renderer,scene,camera,train,envelope,agGlow,gw,posts=[],stars;
+const KM=4;  // 1 km = 4 units
+const cam={theta:0.55,phi:1.15,rad:150,follow:true};
+function initThree(){
+  renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));HOST.appendChild(renderer.domElement);
+  scene=new THREE.Scene();scene.fog=new THREE.Fog(0x061a30,260,900);camera=new THREE.PerspectiveCamera(40,1,.1,4000);
+  scene.add(new THREE.HemisphereLight(0x9fc4f0,0x081222,.9));const key=new THREE.DirectionalLight(0xe8f0ff,1.0);key.position.set(80,120,-60);scene.add(key);
+  const rim=new THREE.DirectionalLight(0x57c9e2,.45);rim.position.set(-60,30,80);scene.add(rim);
+  // guideway: U-trough along +z
+  const L=ST[ST.length-1][1]*KM+400;
+  const gwMat=new THREE.MeshStandardMaterial({color:0x2b4f78,metalness:.4,roughness:.7});
+  gw=new THREE.Group();
+  const base=new THREE.Mesh(new THREE.BoxGeometry(14,1.2,L),gwMat);base.position.set(0,-4.2,L/2-200);gw.add(base);
+  [-7,7].forEach(x=>{const w=new THREE.Mesh(new THREE.BoxGeometry(1,5,L),gwMat);w.position.set(x,-1.5,L/2-200);gw.add(w);});
+  const rail=new THREE.Mesh(new THREE.BoxGeometry(0.5,0.3,L),new THREE.MeshBasicMaterial({color:0x57c9e2,transparent:true,opacity:.55}));rail.position.set(0,-3.5,L/2-200);gw.add(rail);
+  scene.add(gw);
+  const grid=new THREE.GridHelper(2400,120,0x1f4a74,0x163a5c);grid.position.y=-4.9;grid.material.transparent=true;grid.material.opacity=.45;scene.add(grid);
+  // stations
+  ST.forEach(([n,km],i)=>{const g=new THREE.Group();const p=new THREE.Mesh(new THREE.BoxGeometry(2,16,2),new THREE.MeshStandardMaterial({color:0xe8b24c,emissive:0xe8b24c,emissiveIntensity:.25}));p.position.set(-14,3,0);g.add(p);
+    const roof=new THREE.Mesh(new THREE.BoxGeometry(32,.8,26),new THREE.MeshStandardMaterial({color:0x9ab6da,metalness:.5,roughness:.4,transparent:true,opacity:.5}));roof.position.set(0,11,0);g.add(roof);
+    g.position.z=km*KM;scene.add(g);posts.push(g);});
+  // train: 12 cars
+  train=new THREE.Group();const carMat=new THREE.MeshStandardMaterial({color:0xd9e6f5,metalness:.75,roughness:.3});
+  const stripe=new THREE.MeshBasicMaterial({color:0x57c9e2});
+  for(let i=0;i<TRAIN.cars;i++){const c=new THREE.Mesh(new THREE.BoxGeometry(9,7.2,24),carMat);c.position.z=-i*25.2;train.add(c);
+    const s=new THREE.Mesh(new THREE.BoxGeometry(9.1,.5,24),stripe);s.position.set(0,-1.2,-i*25.2);train.add(s);}
+  const nose=new THREE.Mesh(new THREE.ConeGeometry(4.6,22,24),carMat);nose.rotation.x=Math.PI/2;nose.position.set(0,0,23);nose.scale.set(1,0.78,1);train.add(nose);
+  const tail=nose.clone();tail.rotation.x=-Math.PI/2;tail.position.z=-(TRAIN.cars-1)*25.2-23;train.add(tail);
+  // antigravity glow under train
+  agGlow=new THREE.Mesh(new THREE.BoxGeometry(11,.6,TRAIN.cars*25.2+40),new THREE.MeshBasicMaterial({color:0xe8b24c,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false}));agGlow.position.set(0,-4.0,-(TRAIN.cars-1)*12.6);train.add(agGlow);
+  // complementary envelope
+  envelope=new THREE.Mesh(new THREE.CapsuleGeometry(9,TRAIN.cars*25.2+30,8,24),new THREE.MeshBasicMaterial({color:0x57c9e2,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,side:THREE.BackSide,depthWrite:false}));
+  envelope.rotation.x=Math.PI/2;envelope.position.z=-(TRAIN.cars-1)*12.6;train.add(envelope);
+  train.position.y=0.8;scene.add(train);
+  const sg=new THREE.BufferGeometry(),pts=[];for(let i=0;i<500;i++){const r=600+Math.random()*900,t=Math.random()*Math.PI*2,p=Math.acos(2*Math.random()-1);pts.push(r*Math.sin(p)*Math.cos(t),Math.abs(r*Math.cos(p))*.6+60,r*Math.sin(p)*Math.sin(t));}
+  sg.setAttribute("position",new THREE.Float32BufferAttribute(pts,3));stars=new THREE.Points(sg,new THREE.PointsMaterial({color:0x9fc4f0,size:1.6,transparent:true,opacity:.7}));scene.add(stars);
+  orbit();resize();window.addEventListener("resize",resize);requestAnimationFrame(loop);
+}
+function orbit(){const cv=renderer.domElement;let drag=false,px=0,py=0;cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);drag=true;px=e.clientX;py=e.clientY;});
+  cv.addEventListener("pointermove",e=>{if(!drag)return;cam.theta-=(e.clientX-px)*.008;cam.phi=Math.max(.2,Math.min(1.5,cam.phi-(e.clientY-py)*.007));px=e.clientX;py=e.clientY;});
+  cv.addEventListener("pointerup",()=>drag=false);cv.addEventListener("pointercancel",()=>drag=false);
+  cv.addEventListener("wheel",e=>{e.preventDefault();cam.rad=Math.max(60,Math.min(500,cam.rad+e.deltaY*.25));},{passive:false});}
+function resize(){const w=HOST.clientWidth,h=HOST.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+function applyCam(){const tz=train.position.z-((TRAIN.cars-1)*12.6),s=Math.sin(cam.phi);camera.position.set(cam.rad*s*Math.cos(cam.theta),cam.rad*Math.cos(cam.phi)+6,tz+cam.rad*s*Math.sin(cam.theta));camera.lookAt(0,2,tz);}
+
+/* ===== 走行積分 ===== */
+let last=performance.now(),annTimer=0;
+function loop(now){const dt=Math.min((now-last)/1000,.05);last=now;
+  const vmax=P.v/3.6,a=P.a;
+  if(S.running){const ni=nextStation();
+    if(ni<0){S.running=false;S.vel=0;setRun(false);announce("終点 新大阪です。反重力リニアをご利用いただきありがとうございました。");}
+    else if(S.dwell>0){S.dwell-=dt;}
+    else{const remain=(ST[ni][1]-S.pos)*1000;const brake=S.vel*S.vel/(2*a);
+      if(remain<=brake+0.5){S.vel=Math.max(0,S.vel-a*dt*1.02);if(remain<=0.6||S.vel<=0.05){S.vel=0;S.pos=ST[ni][1];S.dwell=3;announce(`${ST[ni][1].toFixed(0)} km 地点、${ST[ni][0]}に到着。抗力残存 ${fmt(sigma(P.x)*100,4)}%、浮上比 L=${fmt(liftRatio(),3)}。`);}}
+      else S.vel=Math.min(vmax,S.vel+a*dt*40);   // 40× time scale for the simulator
+      S.pos+=S.vel*dt*40/1000;}
+  }
+  train.position.z=S.pos*KM;
+  const sg=sigma(P.x);envelope.material.opacity=.05+.30*Math.min(1,(1-sg));envelope.scale.setScalar(1+(P.x-1.5)*.08);
+  agGlow.material.opacity=.25+.2*Math.sin(now*.004);
+  posts.forEach((g,i)=>g.visible=Math.abs(g.position.z-train.position.z)<1500);
+  stars.rotation.y+=dt*.01;
+  hud();applyCam();renderer.render(scene,camera);requestAnimationFrame(loop);}
+function hud(){const kmh=S.vel*3.6,ni=nextStation();$("hudV").textContent=Math.round(kmh);$("hudPos").textContent=S.pos.toFixed(1);
+  $("hudNext").textContent=ni<0?"終点":"次は "+ST[ni][0];const v=Math.max(S.vel,P.v/3.6*(S.vel>1?0:1));
+  $("hudDrag0").textContent=fmt(baseDrag(v)/1e3,1)+" kN";$("hudDrag1").textContent=fmt(effDrag(v,P.x),2)+" N";$("hudL").textContent=fmt(liftRatio(),3);}
+/* 車掌AI（エントロピー駆動の小型生成器） */
+const VOC=["反重力","補空間","真空","浮上","包絡","抗力ゼロ","量子作用素","アカシック","無尽蔵","相対論","揚力比","x log x"];
+function announce(t){$("annT").textContent=t;}
+function aiLine(seed){const r=mulberry(seed);const n=3+Math.floor(r()*3);const w=[];for(let i=0;i<n;i++)w.push(VOC[Math.floor(r()*VOC.length)]);return w.join("・")+"を確認。";}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ===== カード・表 ===== */
+function card(o){return `<div class="formula ${o.cls}"><div class="tag"><span class="dot" style="background:${o.dot}"></span>${o.tag}<small>${o.jp}</small></div><div class="eq">${o.eq}</div></div>`;}
+function renderCards(){const v=P.v/3.6,L=liftRatio(),bd=baseDrag(v),sg=sigma(P.x);let h="";
+  h+=card({cls:"lev",dot:"var(--amber)",tag:"浮上",jp:"超伝導磁石→反重力",eq:`L=cosh(x log x)=<b>${fmt(L,3)}</b>　浮上力 <b>${sci(L*TRAIN.mass*G0)}</b> N（停車中も浮上・極低温不要）`});
+  h+=card({cls:"drag",dot:"var(--cyan)",tag:"抗力",jp:"空気抵抗→補空間包絡",eq:`F_d=½ρC_dAv²=<b>${fmt(bd/1e3,1)}</b> kN × σ=1/cosh(x log x)²=<b class="c">${sci(sg)}</b> → <b class="c">${fmt(bd*sg,2)}</b> N`});
+  h+=card({cls:"pow",dot:"var(--ink)",tag:"動力",jp:"地上コイル→相対論補空間",eq:`E⊥=mc²−½mv²=<b>${sci(relComp(v))}</b> J　× α_ag=${fmt(alpha(2),3)}　真空 ρ·x^x（∞）`});
+  const t285=travelTime(285.6,P.v,P.a)/60,t438=travelTime(438,P.v,P.a)/60;
+  h+=card({cls:"cmp",dot:"var(--rose)",tag:"所要",jp:"無停車",eq:`品川–名古屋 <b class="r">${fmt(t285,1)}</b> 分 · 品川–新大阪 <b class="r">${fmt(t438,1)}</b> 分（L0 500km/h: ${fmt(travelTime(285.6,500,1)/60,1)} / ${fmt(travelTime(438,500,1)/60,1)} 分）`});
+  $("cards").innerHTML=h;renderTables();if(bpMode)renderBP();}
+function renderTables(){let t=0,h="<tr><th>区間</th><th>km</th><th>分</th><th>累計</th></tr>";const ni=nextStation();
+  for(let i=1;i<ST.length;i++){const d=ST[i][1]-ST[i-1][1],s=travelTime(d,P.v,P.a);t+=s+60;h+=`<tr class="${i===ni?'now':''}"><td class="k">${ST[i-1][0]}→${ST[i][0]}</td><td>${fmt(d,1)}</td><td>${fmt(s/60,1)}</td><td class="hi">${fmt((t-60)/60,1)}</td></tr>`;}
+  $("tt").innerHTML=h;
+  let c="<tr><th>区間</th><th>L0 500km/h</th><th>Bada "+P.v+"km/h</th><th>抗力エネルギー</th></tr>";
+  [285.6,438].forEach(d=>{const e0=baseDrag(500/3.6)*d*1000/3.6e9,e1=effDrag(P.v/3.6,P.x)*d*1000/3.6e9;c+=`<tr><td class="k">${d} km</td><td>${fmt(travelTime(d,500,1)/60,1)} 分 · ${fmt(e0,2)} MWh</td><td class="hi">${fmt(travelTime(d,P.v,P.a)/60,1)} 分</td><td class="cy">${sci(e1)} MWh</td></tr>`;});
+  $("cmp").innerHTML=c;}
+
+/* ===== 設計図 ===== */
+function renderBP(){const cx=360,cy=300,v=P.v/3.6,sg=sigma(P.x),L=liftRatio();const gap=8+L*6,envR=48+(P.x-1.5)*14;
+  let s=`<svg viewBox="0 0 720 600" role="img" aria-label="反重力リニアの側面図。車体・軌道・反重力浮上・補空間包絡を反重力方程式で寸法化。">
+  <defs><marker id="ah" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0.5,0.8 L8,4 L0.5,7.2" fill="none" stroke="#a9c8ea" stroke-width="1"/></marker></defs>
+  <line class="cl" x1="40" y1="${cy}" x2="680" y2="${cy}"/>
+  <path class="gwB" d="M60,${cy+gap+14} h600 v18 h-600 z M60,${cy+gap-30} h14 v44 h-14 z M646,${cy+gap-30} h14 v44 h-14 z"/>
+  <ellipse cx="${cx}" cy="${cy-6}" rx="${300}" ry="${envR}" class="envB"/>
+  <path class="carB" d="M110,${cy-24} h500 q40,0 50,24 q-10,24 -50,24 h-500 q-40,0 -50,-24 q10,-24 50,-24 z"/>
+  <line x1="150" y1="${cy-8}" x2="590" y2="${cy-8}" stroke="#57c9e2" stroke-width="1.2" opacity=".8"/>`;
+  for(let x=90;x<=630;x+=36)s+=`<path class="agB" d="M${x},${cy+24} q6,${gap/2} 0,${gap} q-6,${gap/2} 0,${gap}" opacity=".7"/>`;
+  s+=`<line class="dim" x1="680" y1="${cy+24}" x2="680" y2="${cy+gap+14}" marker-start="url(#ah)" marker-end="url(#ah)"/><text class="dtxt a" x="686" y="${cy+gap/2+22}">反重力ギャップ ∝ L=${fmt(L,3)}</text>
+  <line class="dim" x1="60" y1="${cy-envR-16}" x2="660" y2="${cy-envR-16}" marker-start="url(#ah)" marker-end="url(#ah)"/><text class="dtxt c" x="${cx}" y="${cy-envR-22}" text-anchor="middle">補空間包絡 x_env=${fmt(P.x,1)} · σ=${sci(sg)} · 抗力 ${fmt(baseDrag(v)/1e3,1)} kN → ${fmt(baseDrag(v)*sg,2)} N</text>
+  <text class="lbl" x="60" y="${cy+gap+60}">GUIDEWAY · 地上コイル不要 → 相対論補空間 E⊥ + 真空 x^x</text>
+  <text class="dtxt" x="${cx}" y="${cy+gap+84}" text-anchor="middle">L0系 12両相当 m=300 t · C_d=0.35 · A=9.5 m² · 巡航 ${P.v} km/h</text>
+  <text class="dtxt r" x="60" y="80">超伝導磁石 NbTi / 液体He 4.2 K → 撤去（反重力浮上）</text></svg>`;
+  $("viewbp").innerHTML=s;}
+
+/* ===== UI ===== */
+function readouts(){$("rd-v").textContent=P.v+" km/h";$("rd-x").textContent=fmt(P.x,1);$("rd-a").textContent=fmt(P.a,1)+" m/s²";}
+[["s-v","v"],["s-x","x"],["s-a","a"]].forEach(([id,k])=>$(id).addEventListener("input",e=>{P[k]=+e.target.value;readouts();renderCards();}));
+function setRun(on){S.running=on;const b=$("btnRun");b.classList.toggle("on",on);b.setAttribute("aria-pressed",on);b.textContent=on?"◼ 停止":"▶ 出発";}
+$("btnRun").addEventListener("click",()=>{if(nextStation()<0)return;setRun(!S.running);if(S.running)announce("まもなく発車します。"+aiLine(Date.now()|0)+" 空気抵抗は補空間包絡によりゼロです。");});
+$("btnReset").addEventListener("click",()=>{setRun(false);S.pos=0;S.vel=0;S.dwell=0;announce("品川に戻りました。反重力浮上を維持しています（L=2.125）。");renderCards();});
+$("btnView").addEventListener("click",()=>{cam.theta=0.55;cam.phi=1.15;cam.rad=150;});
+let bpMode=false;function setMode(bp){bpMode=bp;$("view3d").hidden=bp;$("viewbp").hidden=!bp;$("mode3d").classList.toggle("on",!bp);$("modebp").classList.toggle("on",bp);
+  $("mode3d").setAttribute("aria-selected",!bp);$("modebp").setAttribute("aria-selected",bp);$("stagename").textContent=bp?"側面図 · Side Elevation":"運行図 · 3D Chase";
+  $("modehint").textContent=bp?"寸法は反重力方程式から自動導出 · スライダで再描画":"出発ボタンで走行 · ドラッグで旋回 · スライダで反重力方程式を駆動";if(bp)renderBP();else resize();}
+$("mode3d").addEventListener("click",()=>setMode(false));$("modebp").addEventListener("click",()=>setMode(true));
+try{initThree();}catch(e){HOST.innerHTML='<div style="padding:20px;color:#e0798f;font-size:12px">3D初期化エラー: '+e.message+'</div>';}
+readouts();renderCards();
+</script>
