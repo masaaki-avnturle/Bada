@@ -104,6 +104,23 @@ I(X;Y) = 1 − H₂(p) [bit]、m 回観測の多数決正答率が読み取り�
 
 ビルドは [`serenace-app-build.yml`](../.github/workflows/serenace-app-build.yml) が実行します。**Actions** タブ →「Bada Serenace app build」→ **Run workflow** で、`serenace-android` / `serenace-windows` / `serenace-linux` のアーティファクトをダウンロードできます。`serenace-v*` タグを push すると Release にも添付されます。
 
+## ⬇ Actions からダウンロードする手順
+
+1. リポジトリの **Actions** タブを開く
+2. 左の一覧から **「Bada Serenace app build」** を選ぶ
+3. 一番上(最新)の実行をクリック
+4. ページ下部の **Artifacts** から取得する
+
+| アーティファクト | 中身 |
+|:--|:--|
+| `serenace-android` | `bada-serenace-debug.apk`(Android) |
+| `serenace-windows` | `BadaSerenace-*-x64.exe`(NSIS インストーラ)と `BadaSerenace-*-portable.exe` |
+| `serenace-linux` | `BadaSerenace-*-x86_64.AppImage` と `BadaSerenace-*-amd64.deb` |
+
+- アーティファクトは **GitHub にログインしている人だけ**がダウンロードできます。保存期限は 90 日です。
+- 誰でも(ログイン無しで)落とせるようにするには、`serenace-v1.0.0` のような **タグを push** してください。同じワークフローが走り、**Releases** に APK / EXE / AppImage / deb が添付されます。
+- このワークフローが既定ブランチ(main)に入ると、Actions に **「Run workflow」ボタン**が出て、いつでも手動でビルドを起動できるようになります。
+
 ## 🧪 テスト
 
 ```bash

@@ -41,7 +41,7 @@
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 
-**Actions** タブ →「**Bada Pharma app build**」から、`pharma-android` / `pharma-windows` / `pharma-linux` のアーティファクトをダウンロードできます。[Releases](https://github.com/masaaki-avnturle/Bada/releases) からも:
+**[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/pharma-app-build.yml)** タブ →「**Bada Pharma app build**」→ 一番上の実行 → ページ下部の **Artifacts** から `pharma-android` / `pharma-windows` / `pharma-linux` をダウンロードできます(GitHub にログインした状態で。保存期限 90 日)。`pharma-v1.0.0` のようなタグを push すれば [Releases](https://github.com/masaaki-avnturle/Bada/releases) にも添付され、ログイン無しで配布できます:
 
 | プラットフォーム | ファイル |
 |:---|:---|
@@ -65,7 +65,7 @@
 
 #### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
 
-**Actions** タブ →「**Bada Serenace app build**」→ **Run workflow** で、`serenace-android` / `serenace-windows` / `serenace-linux` のアーティファクトをダウンロードできます。[Releases](https://github.com/masaaki-avnturle/Bada/releases) からも:
+**[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/serenace-app-build.yml)** タブ →「**Bada Serenace app build**」→ 一番上の実行 → ページ下部の **Artifacts** から `serenace-android` / `serenace-windows` / `serenace-linux` をダウンロードできます(GitHub にログインした状態で。保存期限 90 日)。`serenace-v1.0.0` のようなタグを push すれば [Releases](https://github.com/masaaki-avnturle/Bada/releases) にも添付され、ログイン無しで配布できます:
 
 | プラットフォーム | ファイル |
 |:---|:---|

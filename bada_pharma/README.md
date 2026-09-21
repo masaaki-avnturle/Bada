@@ -94,6 +94,23 @@ C(t) = F·D·k<sub>a</sub> / (V(k<sub>a</sub> − k<sub>e</sub>)) · (e<sup>−k
 
 ビルドは [`pharma-app-build.yml`](../.github/workflows/pharma-app-build.yml) が実行します。**Actions** タブ →「Bada Pharma app build」から、`pharma-android` / `pharma-windows` / `pharma-linux` のアーティファクトをダウンロードできます。`pharma-v*` タグを push すると Release にも添付されます。
 
+## ⬇ Actions からダウンロードする手順
+
+1. リポジトリの **Actions** タブを開く
+2. 左の一覧から **「Bada Pharma app build」** を選ぶ
+3. 一番上(最新)の実行をクリック
+4. ページ下部の **Artifacts** から取得する
+
+| アーティファクト | 中身 |
+|:--|:--|
+| `pharma-android` | `bada-pharma-debug.apk`(Android) |
+| `pharma-windows` | `BadaPharma-*-x64.exe`(NSIS インストーラ)と `BadaPharma-*-portable.exe` |
+| `pharma-linux` | `BadaPharma-*-x86_64.AppImage` と `BadaPharma-*-amd64.deb` |
+
+- アーティファクトは **GitHub にログインしている人だけ**がダウンロードできます。保存期限は 90 日です。
+- 誰でも(ログイン無しで)落とせるようにするには、`pharma-v1.0.0` のような **タグを push** してください。同じワークフローが走り、**Releases** に APK / EXE / AppImage / deb が添付されます。
+- このワークフローが既定ブランチ(main)に入ると、Actions に **「Run workflow」ボタン**が出て、いつでも手動でビルドを起動できるようになります。
+
 ## 🧪 テスト
 
 ```bash
