@@ -140,6 +140,30 @@ python3 video.py score_lamento.json lamento.wav lamento.mp4
 - 木琴シンセ: 木琴の非整数倍音 (1 : 3.93 : 9.5) の速い減衰に、正弦波の持続成分 (弱いトレモロ付き) を重ねたもの。
   高音の鐘 (H) は明るめ、刻み (W) は柔らかめの倍音構成。
 
+## 🎹🎛 Requiem BADA V — Dolore (B♭ minor, ♩=36, ピアノの点描 + 電子シンセの不協和音)
+
+Lamento 版から木琴シンセを外し、ピアノ演奏に戻した版。電子シンセサイザーは
+根音 + 短 2 度 + 三全音 + 長 7 度 の **不協和音クラスター**を各小節で持続させ、
+ピアノは各音符を半分の長さで切って間を空ける (点描)。その隙間をシンセの持続と 4.5 秒の残響がつなぎ、
+離れているのに繋がっている悲哀感をつくる。全体を **B♭ 短調**へ移調 (B-A-D-A は G♭-F-B♭-F)。
+
+- 🎬 **[grief.mp4](grief.mp4)** — 9 分 27 秒 · 1280×720 · 30fps
+
+| 層 | 内容 |
+|:--|:--|
+| S / A / T / B | フーガ + 嘆きのバス (ピアノ、点描) |
+| H | 高音の B-A-D-A (ピアノ、点描) |
+| C | 電子シンセの不協和音クラスター (3 本のデチューン鋸歯波、遅い立ち上がり、ゆっくりした揺れ) |
+| L | 低音オクターヴ (ピアノ) |
+
+構成は Lamento 版と同じ (Introitus → Fuga → Ritornello → Fuga a tre soggetti → Lacrimosa)。
+
+```bash
+python3 compose_grief.py score_grief.json
+python3 synth.py score_grief.json grief.wav
+python3 video.py score_grief.json grief.wav grief.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

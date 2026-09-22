@@ -492,7 +492,7 @@ def transpose_h(H, semis):
         out.append(row)
     return out
 
-def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None):
+def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None, transpose_semis=0):
     P = builder() if builder else build()
     rng = random.Random(seed)
     skel, cov, isfree = generate(P, seed)
@@ -513,6 +513,10 @@ def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None)
     for v in VOICES:
         for s, d, m, lab in events[v]:
             notes.append({'v': v, 't': round(s * spb, 4), 'd': round(d * spb, 4), 'm': m, 'label': lab, 'beat': s, 'dyn': P.dyn_at(s)})
+    if transpose_semis:
+        for nt in notes: nt['m'] += transpose_semis
+        for e in (extras or []): e['m'] += transpose_semis
+        P.harm = [row[0] for row in transpose_h([[h] for h in P.harm], transpose_semis)]
     data = {'bpm': bpm, 'beats_per_bar': BPB, 'nbars': P.nbars, 'duration': P.N * spb,
             'notes': notes,
             'entries': [{'t': b * spb, 'label': lab, 'v': v, 'bar': b // BPB + 1} for b, lab, v in P.entries],
