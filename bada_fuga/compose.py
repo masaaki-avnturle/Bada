@@ -493,7 +493,7 @@ def transpose_h(H, semis):
         out.append(row)
     return out
 
-def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None, transpose_semis=0):
+def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None, transpose_semis=0, post=None):
     P = builder() if builder else build()
     rng = random.Random(seed)
     skel, cov, isfree = generate(P, seed)
@@ -503,6 +503,7 @@ def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None,
         ev += [(s, d, m, lab) for s, d, m, lab in P.fixed[v]]
         ev.sort()
         events[v] = ev
+    if post: post(P, events, extras)          # 生成後の全声部を見て追加 (管弦楽の重ねなど)
     diss, par = check(P, events)
     print('bars', P.nbars, 'beats', P.N, 'duration %.1fs' % (P.N * 60 / bpm))
     print('strong-beat dissonances:', len(diss))

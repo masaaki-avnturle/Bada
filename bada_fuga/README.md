@@ -199,6 +199,33 @@ python3 synth.py score_dialogo.json dialogo.wav
 python3 video.py score_dialogo.json dialogo.wav dialogo.mp4
 ```
 
+## 🎻 Requiem BADA VIII — Concerto (for Piano and Orchestra, B♭ minor, ♩=30)
+
+Dialogo 版をピアノ協奏曲に作り換えた版。バロック協奏曲のリトルネッロ形式と重ね、
+**トゥッティ** (前奏・回帰句・終結 = 嘆きのパッサカリア) では弦 5 部・オーボエ・フルート・ホルン・ティンパニが
+ピアノの全声部を重ね、**ソロ** (三重フーガ) ではピアノ独奏が主体で弦は主題の入りだけをそっと重ねる。
+テンポは ♩=30 (1 小節 8 秒)。
+
+- 🎬 **[concerto.mp4](concerto.mp4)** — 9 分 59 秒 · 1280×720 · 30fps
+
+| 小節 | 内容 |
+|:--|:--|
+| 1–6 | **I. Introitus — Tutti** |
+| 7–28 | **II. Solo — Fuga** (主題 I の 4 声提示) |
+| 29–34 | **Ritornello — Tutti** |
+| 35–60 | **III. Solo — Fuga a tre soggetti** (三重結合 ×3、休止) |
+| 61–74 | **IV. Lacrimosa — Tutti** (嘆きのパッサカリア ×4、ティンパニと低弦の上で消える) |
+
+```bash
+python3 compose_concerto.py score_concerto.json
+python3 synth.py score_concerto.json concerto.wav
+python3 video.py score_concerto.json concerto.wav concerto.mp4
+```
+
+- 管弦楽の音色: 弦は鋸歯波の波形テーブルを 5 本デチューンで重ねビブラートと弓圧のうねりを付けたもの (Va/Vc/Cb は暗め)、
+  オーボエは奇数倍音を強めた明るい音、フルートは少ない倍音+息の雑音、ホルンは丸い倍音構成、ティンパニは音程の落ちる打音のロール。
+- `compose.main(..., post=...)`: 自由声部の生成後に全声部を見て管弦楽の重ねを追加するフック。
+
 ## 作り方 (再現)
 
 ```bash
