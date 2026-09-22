@@ -97,6 +97,26 @@ def pulse_tone(sr=SR):
     y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
     return y
 
+def mallet_tone(freq, dur, vel=0.5, bright=True, sr=SR):
+    """木琴系シンセ: 木琴の非整数倍音 (1, 3.93, 9.5 ...) の速い減衰 + 正弦波の持続 (シンセ成分)"""
+    ring = 1.6 if freq < 700 else 1.1
+    nsamp = int((dur + ring) * sr)
+    t = np.arange(nsamp, dtype=np.float32) / sr
+    parts = [(1.0, 1.0, 1.0), (3.93, 0.42 if bright else 0.25, 3.2), (9.5, 0.15 if bright else 0.06, 7.0), (2.0, 0.08, 4.0)]
+    out = np.zeros(nsamp, dtype=np.float32)
+    for ratio, amp, dr in parts:
+        if freq * ratio > sr * 0.45: continue
+        out += amp * np.sin(2 * np.pi * freq * ratio * t) * np.exp(-t * dr * (0.9 + freq / 2500.0))
+    # シンセの持続成分 (弱いサイン + わずかなトレモロ) を音価のあいだ保つ
+    sus = 0.22 * np.sin(2 * np.pi * freq * t) * (1 + 0.12 * np.sin(2 * np.pi * 5.5 * t))
+    gate = np.ones(nsamp, dtype=np.float32); i0 = int(dur * sr)
+    if i0 < nsamp: gate[i0:] = np.exp(-(t[i0:] - t[i0]) / 0.25)
+    out += sus * gate * np.clip(t / 0.05, 0, 1)
+    nh = int(0.002 * sr)
+    out[:nh] += np.random.default_rng(int(freq) + 7).standard_normal(nh).astype(np.float32) * np.linspace(1, 0, nh) * 0.5 * vel
+    att = int(0.0012 * sr); out[:att] *= np.linspace(0, 1, att)
+    return out * (0.3 + 0.7 * vel)
+
 def drone_tone(freq, dur, sr=SR):
     a, r = 2.5, 3.0
     nsamp = int((dur + r) * sr)
@@ -146,13 +166,14 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR):
 
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
     requiem = style == 'requiem'
-    piano = style == 'piano'
+    piano = style in ('piano', 'mallet')
+    mallet = style == 'mallet'
     global VOWEL
     VOWEL = d.get('meta', {}).get('vowel', 'a')
     for nt in d['notes']:
@@ -183,7 +204,10 @@ def main(score='score.json', out='fuga.wav'):
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
         if ex['v'] in ('H', 'W', 'L'):
             vel = ex.get('gain', 0.5)
-            y = piano_tone(freq, ex['d'], vel, pedal=(2.2 if ex['v'] == 'H' else 1.4)) * 0.9
+            if mallet and ex['v'] in ('H', 'W'):
+                y = mallet_tone(freq, ex['d'], vel, bright=(ex['v'] == 'H')) * (1.1 if ex['v'] == 'H' else 0.9)
+            else:
+                y = piano_tone(freq, ex['d'], vel, pedal=(2.2 if ex['v'] == 'H' else 1.4)) * 0.9
             pan = {'H': 0.35, 'W': 0.1, 'L': -0.35}[ex['v']]
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
@@ -197,7 +221,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))
+    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((3.6, 1.15, 0.34) if mallet else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30)))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):

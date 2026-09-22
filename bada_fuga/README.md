@@ -114,6 +114,32 @@ python3 video.py score_piano.json piano.wav piano.mp4
 - ピアノ音色: 弦の剛性による非整数倍音 (f_k = k·f₀·√(1+Bk²))、倍音ごとの二段減衰、2 本弦のうなり、
   ハンマー雑音、低音の胴鳴り、ペダルによる長い離鍵減衰を加算合成で再現。音高に応じて左右に定位。
 
+## 🎼 Requiem BADA IV — Lamento (♩=36, 木琴シンセ + グランドピアノ)
+
+ピアノ版の高音層を木琴系シンセサイザーに置き換え、テンポを ♩=36 まで落とし、
+「悲しい出来事を想起させる」レクイエム・フーガにした版。悲しみの核は古来の **嘆きのバス**
+(D C# C B B♭ A の半音下行) によるパッサカリアで、前奏・回帰句・終結に置いた。
+ピカルディ終止を捨て、短調のまま空虚 5 度 (D–A) と木琴の残響で終わる。
+
+- 🎬 **[lamento.mp4](lamento.mp4)** — 9 分 27 秒 · 1280×720 · 30fps
+
+| 小節 | 内容 |
+|:--|:--|
+| 1–6 | **I. Introitus — Lamento** — 嘆きのバス ×2 周期、木琴シンセの刻み、B-A-D-A の唱えと木琴のカノン |
+| 7–38 | **II. Fuga** — 主題 I の 4 声フーガ (第 I 部前半) |
+| 39–44 | **Ritornello — Lamento** — 嘆きのバスの回帰、B-A-D-A をテノール → アルト |
+| 45–70 | **III. Fuga a tre soggetti** — 三重結合 ×3、最後の休止で途切れる |
+| 71–84 | **IV. Lacrimosa — Passacaglia** — 嘆きのバス ×4、B-A-D-A が声部を渡り、次第に消える |
+
+```bash
+python3 compose_lamento.py score_lamento.json
+python3 synth.py score_lamento.json lamento.wav
+python3 video.py score_lamento.json lamento.wav lamento.mp4
+```
+
+- 木琴シンセ: 木琴の非整数倍音 (1 : 3.93 : 9.5) の速い減衰に、正弦波の持続成分 (弱いトレモロ付き) を重ねたもの。
+  高音の鐘 (H) は明るめ、刻み (W) は柔らかめの倍音構成。
+
 ## 作り方 (再現)
 
 ```bash

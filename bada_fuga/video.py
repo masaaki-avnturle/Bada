@@ -42,6 +42,7 @@ THEMES = {
                   pause_bar=126),
     'requiem': dict(bg=(16, 8, 24), bg2=(34, 14, 44), roll=(10, 5, 16), title='Requiem BADA', subtitle='', footer=[], pause_bar=138),
     'piano': dict(bg=(20, 14, 12), bg2=(40, 28, 22), roll=(12, 8, 7), title='Requiem BADA III', subtitle='', footer=[], pause_bar=86),
+    'mallet': dict(bg=(8, 12, 22), bg2=(18, 28, 46), roll=(5, 8, 16), title='Requiem BADA IV', subtitle='', footer=[], pause_bar=68),
 }
 
 def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
@@ -53,7 +54,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     notes = d['notes'] + [dict(e, label=e.get('label')) for e in d.get('extras', [])]
     COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70), 'H': (250, 240, 200), 'W': (170, 150, 120), 'L': (150, 110, 90)})
     VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍', 'H': '鐘のカノン', 'W': '分散和音', 'L': '低音の心拍'})
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L']}[meta.get('style', 'organ')]
+    if meta.get('style') == 'mallet':
+        COL.update({'H': (150, 230, 255), 'W': (110, 180, 210)}); VNAME.update({'H': '木琴シンセ (鐘)', 'W': '木琴シンセ (刻み)', 'L': '低音 (ピアノ)'})
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
     order = np.argsort(T); T, D, M = T[order], D[order], M[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]
@@ -92,7 +95,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in LEGEND:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += 110 if v in 'SATB' else (120 if v in 'HWL' else 80)
+        lx += 110 if v in 'SATB' else (150 if v in 'HWL' else 80)
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
