@@ -110,21 +110,59 @@ def drone_tone(freq, dur, sr=SR):
     e = env(nsamp, a, r, sr)
     return out * e
 
+def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR):
+    """グランドピアノ風: 非整数倍音 (弦の剛性 B)、倍音ごとの減衰、2 本弦のうなり、ハンマー雑音、ペダル残響"""
+    rel = pedal
+    nsamp = int((dur + rel) * sr)
+    t = np.arange(nsamp, dtype=np.float32) / sr
+    B = 0.00025 + 0.0006 * (freq / 1000.0)            # 高音ほど剛性の影響が大きい
+    bright = 1.05 + 0.9 * (1.0 - vel)                # 弱打ほど倍音が少ない
+    d0 = 0.35 + 0.9 * (freq / 440.0) ** 0.6          # 基本減衰 (低音は長く鳴る)
+    out = np.zeros(nsamp, dtype=np.float32)
+    nparts = int(min(40, 7000.0 / freq))
+    for k in range(1, max(2, nparts) + 1):
+        fk = freq * k * math.sqrt(1 + B * k * k)
+        if fk > sr * 0.45: break
+        amp = 1.0 / (k ** bright)
+        if k == 1: amp *= 1.0
+        dk = d0 * (1 + 0.12 * k * k) ** 0.5
+        # 二段減衰: 立ち上がり直後に速く落ち、その後ゆっくり
+        e = 0.55 * np.exp(-t * dk * 3.2) + 0.45 * np.exp(-t * dk)
+        det = 1.0 + (0.0012 if (k % 2 == 0 and freq > 130) else 0.0)
+        out += amp * e * (np.sin(2 * np.pi * fk * t) + (0.55 * np.sin(2 * np.pi * fk * det * t + 0.9) if freq > 130 else 0.0))
+    # ハンマー雑音 (5 ms) と胴鳴り
+    nh = int(0.006 * sr)
+    out[:nh] += np.random.default_rng(int(freq)).standard_normal(nh).astype(np.float32) * np.linspace(1, 0, nh) * 0.35 * vel
+    if freq < 200:
+        out += 0.25 * np.sin(2 * np.pi * freq * 0.5 * t) * np.exp(-t * 2.5)
+    # 鍵を離す: ペダルで長めに減衰
+    key = np.ones(nsamp, dtype=np.float32)
+    i0 = int(dur * sr)
+    if i0 < nsamp:
+        key[i0:] = np.exp(-(t[i0:] - t[i0]) / (rel * 0.35))
+    att = int(0.0025 * sr)
+    key[:att] *= np.linspace(0, 1, att) ** 0.5
+    return out * key * (0.35 + 0.65 * vel)
+
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') == 'requiem' else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
     requiem = style == 'requiem'
+    piano = style == 'piano'
     global VOWEL
     VOWEL = d.get('meta', {}).get('vowel', 'a')
     for nt in d['notes']:
         tb = TIMBRE[nt['v']]
         freq = 440.0 * 2 ** ((nt['m'] - 69) / 12.0)
         dur = max(nt['d'] - 0.035, 0.06)
-        if requiem:
+        if piano:
+            vel = min(1.0, 0.62 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0) + 0.08)
+            y = piano_tone(freq, nt['d'], vel)
+        elif requiem:
             # 合唱 (フォルマント) + オルガンの混合。長い音ほど合唱が前へ
             y = tone(freq, dur, tb) * 0.45
             yc = choir_tone(freq, dur + 0.05)
@@ -133,15 +171,23 @@ def main(score='score.json', out='fuga.wav'):
             y = tone(freq, dur, tb)
         # 主題の音は少し強く
         g = tb['g'] * (1.18 if nt['label'] else 1.0) * (1.0 + 0.04 * rng.standard_normal()) * nt.get('dyn', 1.0)
+        if piano: g = 0.9 * (1.0 + 0.03 * rng.standard_normal())
         # 高音域は少し控えめに
         g *= min(1.0, (72.0 / max(freq, 72.0)) ** 0.25)
         i0 = int(nt['t'] * SR); i1 = min(i0 + len(y), N)
-        pan = tb['pan']
+        pan = tb['pan'] if not piano else max(-0.6, min(0.6, (nt['m'] - 60) / 40.0))
         L[i0:i1] += y[:i1 - i0] * g * math.cos((pan + 1) * math.pi / 4)
         R[i0:i1] += y[:i1 - i0] * g * math.sin((pan + 1) * math.pi / 4)
     # 鐘・ドローン
     for ex in d.get('extras', []):
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
+        if ex['v'] in ('H', 'W', 'L'):
+            vel = ex.get('gain', 0.5)
+            y = piano_tone(freq, ex['d'], vel, pedal=(2.2 if ex['v'] == 'H' else 1.4)) * 0.9
+            pan = {'H': 0.35, 'W': 0.1, 'L': -0.35}[ex['v']]
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if ex['v'] == 'X':
             y = bell_tone(freq, ex['d'] + 3.0) * 0.55 * ex.get('gain', 1.0); pan = 0.0
         elif ex['v'] == 'P':
@@ -151,7 +197,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else (2.2, 0.75, 0.30)
+    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
@@ -171,7 +217,7 @@ def main(score='score.json', out='fuga.wav'):
     # soft knee
     st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
-    tail = int((5.0 if requiem else 2.5) * SR)
+    tail = int((5.0 if (requiem or piano) else 2.5) * SR)
     st[-tail:] *= np.linspace(1, 0, tail)[:, None]
     sf.write(out, st, SR, subtype='PCM_16')
     print('wrote', out, '%.1fs' % total, 'peak', peak)

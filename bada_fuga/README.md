@@ -82,6 +82,38 @@ python3 video.py score_requiem2.json requiem2.wav requiem2.mp4
 - 心拍は 80→38 Hz へ落ちる正弦波 + 短いノイズ。前奏・回帰句・コーダでは 1・3 拍目、フーガ中は各小節の 1 拍目に弱く。
 - `compose.build_fugue(P, off, gaps)` でフーガ本体の第 II 部・第 III 部の前に回帰句用の隙間を空けている。
 
+## 🎹 Requiem BADA III — Grave, for Grand Piano (à six mains et plus)
+
+レクイエムを ♩=44 の極めて遅いテンポ (Grave) でグランドピアノ独奏に書き直した版。
+フーガより安心感のある響き (分散和音のうねり、ニ長調への帰着) を保ちながら、
+4 声のフーガの上下に 3 つの層を重ねて **7 層 (4 本の手を超える)** の多層書法にした。
+
+- 🎬 **[piano.mp4](piano.mp4)** — 10 分 12 秒 · 1280×720 · 30fps
+
+| 層 | 内容 |
+|:--|:--|
+| S / A / T / B | 三重フーガ (第 I 部 と、エピソード 7 以降の三重結合 ×3・休止・ピカルディ を抜粋) |
+| H 鐘のカノン | 高音域 (B♭6 A6 D7 A6) で B-A-D-A を全音符で唱え、2 小節遅れに追走が重なる。フーガ中は 4 小節ごとに D7 の鐘 |
+| W 分散和音 | 各拍の和音を 8 分音符で上下に洗い流す層 (安心感の源) |
+| L 低音の心拍 | 和音の根音を C1〜B1 のオクターヴで打つ心拍 |
+
+| 小節 | 内容 |
+|:--|:--|
+| 1–8 | **I. Introitus** — ニ長調と短調のあいだで、聖歌 Requiem aeternam と B-A-D-A |
+| 9–52 | **II. Fuga** — 主題 I の 4 声フーガ (第 I 部) |
+| 53–60 | **Ritornello** — B-A-D-A の回帰句 (中声の唱え + 鐘のカノン) |
+| 61–93 | **III. Fuga a tre soggetti** — 三重結合 ×3、休止、ピカルディ |
+| 94–111 | **IV. Lux aeterna** — B-A-D-A → ニ長調の B♮-A-D-A へ移り、鐘のカノンの中で消える |
+
+```bash
+python3 compose_piano.py score_piano.json
+python3 synth.py score_piano.json piano.wav
+python3 video.py score_piano.json piano.wav piano.mp4
+```
+
+- ピアノ音色: 弦の剛性による非整数倍音 (f_k = k·f₀·√(1+Bk²))、倍音ごとの二段減衰、2 本弦のうなり、
+  ハンマー雑音、低音の胴鳴り、ペダルによる長い離鍵減衰を加算合成で再現。音高に応じて左右に定位。
+
 ## 作り方 (再現)
 
 ```bash

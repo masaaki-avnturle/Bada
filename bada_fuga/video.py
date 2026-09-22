@@ -10,7 +10,7 @@ W, H, FPS = 1280, 720, 30
 NOW_X = 360
 PPS = 110.0            # pixels per second
 ROLL_Y0, ROLL_Y1 = 150, 592
-M_LO, M_HI = 34, 90
+M_LO, M_HI = 24, 100
 COL = {'S': (240, 196, 110), 'A': (232, 122, 142), 'T': (96, 206, 196), 'B': (122, 152, 255)}
 VNAME = {'S': 'Soprano', 'A': 'Alto', 'T': 'Tenore', 'B': 'Basso'}
 JP = '/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf'
@@ -41,6 +41,7 @@ THEMES = {
                           '第 127 小節の休止は、バッハの自筆譜が第 239 小節で途切れることへのオマージュ。その後コーダで完結させた。'],
                   pause_bar=126),
     'requiem': dict(bg=(16, 8, 24), bg2=(34, 14, 44), roll=(10, 5, 16), title='Requiem BADA', subtitle='', footer=[], pause_bar=138),
+    'piano': dict(bg=(20, 14, 12), bg2=(40, 28, 22), roll=(12, 8, 7), title='Requiem BADA III', subtitle='', footer=[], pause_bar=86),
 }
 
 def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
@@ -49,8 +50,10 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     th = dict(THEMES[meta.get('style', 'organ')])
     for k in ('title', 'subtitle', 'footer'):
         if meta.get(k): th[k] = meta[k]
-    notes = d['notes'] + [dict(e, label=None) for e in d.get('extras', [])]
-    COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70)}); VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍'})
+    notes = d['notes'] + [dict(e, label=e.get('label')) for e in d.get('extras', [])]
+    COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70), 'H': (250, 240, 200), 'W': (170, 150, 120), 'L': (150, 110, 90)})
+    VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍', 'H': '鐘のカノン', 'W': '分散和音', 'L': '低音の心拍'})
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
     order = np.argsort(T); T, D, M = T[order], D[order], M[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]
@@ -87,9 +90,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     bd.text((32, 66), th['subtitle'], font=f_sub, fill=(150, 156, 176))
     # 凡例
     lx = 30
-    for v in (['S', 'A', 'T', 'B', 'X', 'D', 'P'] if meta.get('style') == 'requiem' else ['S', 'A', 'T', 'B']):
+    for v in LEGEND:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += 110 if v in 'SATB' else 80
+        lx += 110 if v in 'SATB' else (120 if v in 'HWL' else 80)
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
