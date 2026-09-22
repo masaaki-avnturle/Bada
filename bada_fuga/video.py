@@ -62,6 +62,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         COL.update({'H': (250, 240, 200), 'L': (150, 110, 90)}); VNAME.update({'H': 'ピアノ高音', 'L': 'ピアノ低音'})
     if meta.get('style') == 'grief':
         COL.update({'H': (250, 240, 200), 'C': (190, 90, 200), 'L': (150, 110, 90)}); VNAME.update({'H': 'ピアノ高音', 'C': 'シンセ不協和音', 'L': 'ピアノ低音'})
+    present = {x['v'] for x in notes}
     LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
@@ -99,7 +100,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     bd.text((32, 66), th['subtitle'], font=f_sub, fill=(150, 156, 176))
     # 凡例
     lx = 30
-    for v in LEGEND:
+    for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
         lx += 110 if v in 'SATB' else (150 if v in 'HWLC' else 80)
     for i, line in enumerate(th['footer']):

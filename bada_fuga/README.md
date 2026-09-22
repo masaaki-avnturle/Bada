@@ -181,6 +181,24 @@ python3 synth.py score_elegia.json elegia.wav
 python3 video.py score_elegia.json elegia.wav elegia.mp4
 ```
 
+## 🎹🎹 Requiem BADA VII — Dialogo (B♭ minor, ♩=36, ピアノ独奏・左手も主題を歌う)
+
+Elegia 版の左手を「伴奏」から解放した版。
+
+- 低音オクターヴの打音層を廃止
+- 嘆きのバス (D C# C B B♭ A) は、各根音から音階を 2 音のぼる歌う音型 (D E F | C# D E | C D E | …) に
+- 左手のテノールは右手のアルトの B-A-D-A と 1 小節遅れのカノンで対話 (前奏では左手が先に唱える)
+- 持続和音 (全音符の保持) をやめ、自由声部はすべて動く対位法に
+- 高音の B-A-D-A (B♭5–D6) は右手の最上声として残す
+
+- 🎬 **[dialogo.mp4](dialogo.mp4)** — 9 分 27 秒 · 1280×720 · 30fps
+
+```bash
+python3 compose_dialogo.py score_dialogo.json
+python3 synth.py score_dialogo.json dialogo.wav
+python3 video.py score_dialogo.json dialogo.wav dialogo.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

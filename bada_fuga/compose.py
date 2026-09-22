@@ -222,6 +222,7 @@ def choose_note(v, b, c, now, prev, prev_self, prev_chord, rng, strong):
             if om == m: cost += 6.0
             diff = abs(om - m) % 12
             if diff in (1, 11): cost += 8.0 if strong else 3.0
+            if diff in (2, 10) and strong and om % 12 not in c['pcs']: cost += 4.0   # 固定声部の非和声音に 2 度でぶつからない
             if diff == 0 and strong and om != m: cost += 1.0
             # spacing between adjacent upper voices
             if abs(ORDER[o] - ORDER[v]) == 1 and 'B' not in (o, v) and abs(om - m) > 12: cost += 2.5
