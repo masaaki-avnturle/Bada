@@ -123,6 +123,7 @@ class Piece:
         self.dyn = {}                            # bar -> gain (default 1.0)
         self.tempo = {}                          # bar -> bpm (default: main() の bpm)
         self.det = {}                            # bar -> 音の長さの比率 (奏法, default 1.0)
+        self.role = {}                           # bar -> 'solo' / 'tutti' / 'both' / 'cadenza' (協奏曲用)
 
     def dyn_at(self, beat):
         return self.dyn.get(int(beat // BPB), 1.0)
@@ -527,7 +528,7 @@ def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None,
         for s, d, m, lab in events[v]:
             t0 = time_of(s)
             notes.append({'v': v, 't': round(t0, 4), 'd': round(time_of(s + d) - t0, 4), 'm': m, 'label': lab, 'beat': s,
-                          'dyn': P.dyn_at(s), 'det': P.det.get(int(s // BPB), 1.0)})
+                          'dyn': P.dyn_at(s), 'det': P.det.get(int(s // BPB), 1.0), 'role': P.role.get(int(s // BPB), '')})
     if transpose_semis:
         for nt in notes: nt['m'] += transpose_semis
         for e in (extras or []): e['m'] += transpose_semis

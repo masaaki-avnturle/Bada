@@ -249,6 +249,27 @@ python3 video.py score_symphony.json symphony.wav symphony.mp4
 - `compose.py`: 小節ごとのテンポ (`P.tempo`) と奏法 (`P.det`, 音の長さの比率) を指定できるテンポ・マップを追加。
   `score.json` に各小節の開始時刻 (`bar_times`) を出力し、動画もそれに従う。
 
+## 🎹🎻 Piano Concerto BADA — ピアノ協奏曲 ニ短調 (3 楽章)
+
+交響曲版の素材を、独奏ピアノと管弦楽のための 3 楽章の協奏曲に作り換えた版。
+小節ごとに **solo** (ピアノ) / **tutti** (管弦楽) / **both** (合奏) / **cadenza** (ピアノのみ) の役割を切り替える。
+
+- 🎬 **[pconcerto.mp4](pconcerto.mp4)** — 1280×720 · 30fps
+
+| 楽章 | 小節 | テンポ | 内容 |
+|:--|:--|:--|:--|
+| I. Allegro moderato | 1–58 | ♩=40 → 76 → 52 → 76 | 管弦楽の序奏 (嘆きのパッサカリア) → 主題 I のフーガ (提示はピアノ、エピソードは管弦楽) → **カデンツァ** (左手に主題 I、右手に B-A-D-A、半音階の走句とトリル) → 管弦楽の結び |
+| II. Adagio — Lamento | 59–72 | ♩=40 | 嘆きのバス ×4 を 管弦楽 → ピアノ → 合奏 → ピアノ と交替 |
+| III. Finale — Maestoso | 73–123 | ♩=84 → 60 | B-A-D-A 主題の提示 (ピアノ) → 三重結合 ×3 (ピアノ → ピアノ → 合奏)、エピソードは管弦楽、休止、D 長調のコーダ |
+
+```bash
+python3 compose_pconcerto.py score_pconcerto.json
+python3 synth.py score_pconcerto.json pconcerto.wav
+python3 video.py score_pconcerto.json pconcerto.wav pconcerto.mp4
+```
+
+- `P.role` (小節 → 役割) を追加。合成側は役割に応じて同じ声部をピアノ / 弦 / 両方で鳴らし、動画はトゥッティの小節を弦の色で描く。
+
 ## 作り方 (再現)
 
 ```bash

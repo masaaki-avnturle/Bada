@@ -279,17 +279,18 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
     requiem = style == 'requiem'
     symphony = style == 'symphony'
-    piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto')
+    pconcerto = style == 'pconcerto'
+    piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto')
     mallet = style == 'mallet'
     grief = style == 'grief'
-    elegia = style in ('elegia', 'concerto')
+    elegia = style in ('elegia', 'concerto', 'pconcerto')
     concerto = style == 'concerto'
     detach = d.get('meta', {}).get('detach', 1.0)
     humanize = bool(d.get('meta', {}).get('humanize', False))
@@ -302,7 +303,8 @@ def main(score='score.json', out='fuga.wav'):
         freq = 440.0 * 2 ** ((nt['m'] - 69) / 12.0)
         dur = max(nt['d'] - 0.035, 0.06)
         t_off = 0.0
-        if symphony:
+        role = nt.get('role', '')
+        if symphony or (pconcerto and role in ('tutti', 'both')):
             # 弦 5 部: S→Vn I, A→Vn II, T→Va, B→Vc (+Cb 1 オクターヴ下)
             dyn = nt.get('dyn', 1.0); det = nt.get('det', 1.0)
             vel = min(1.0, 0.5 * (1.15 if nt['label'] else 1.0) * dyn + 0.05)
@@ -320,7 +322,8 @@ def main(score='score.json', out='fuga.wav'):
                 yb = string_tone(freq / 2, dd, vel * 0.8, dark=1.0)
                 i1 = min(i0 + len(yb), N)
                 L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
-            continue
+            if not (pconcerto and role == 'both'): continue
+        if pconcerto and role == 'tutti': continue
         if piano:
             vel = min(1.0, 0.62 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0) + 0.08)
             if humanize:
@@ -350,7 +353,7 @@ def main(score='score.json', out='fuga.wav'):
     # 鐘・ドローン
     for ex in d.get('extras', []):
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
-        if (concerto or symphony) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):
+        if (concerto or symphony or pconcerto) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v in ('V1', 'V2'): y = string_tone(freq, ex['d'], vel, dark=0.0)
             elif v == 'VA': y = string_tone(freq, ex['d'], vel, dark=0.4)
@@ -394,7 +397,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
