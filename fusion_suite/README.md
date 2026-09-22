@@ -61,6 +61,37 @@ MODE=concerto OUT=/tmp/con python3 fusion_suite/compose_flower.py && python3 fus
 
 `video.py` は `marks.json` の `title / subtitle / movements` を読んでタイトルカードを描く(前作は既定値)。新しい楽器 `flute / horn / timpani` は [`synth.py`](synth.py) に追加した。
 
+## 🎹 第 3 作 — 本物の楽器版(静かで悲しい版): Symphony / Concerto
+
+第 2 作の交響曲版・協奏曲版を、**録音された本物の楽器(サウンドフォント FluidR3 GM)** で演奏し直し、坂本龍一《A Flower Is Not a Flower》と《Little Buddha》(Acceptance)の**静かで悲しい**様式に作り換えたもの。加算合成の電子音は使わず、Yamaha グランドピアノ・ヴァイオリン / ヴィオラ / チェロ / コントラバス・Slow Strings・フルート / オーボエ / クラリネット / ファゴット / ホルン・ハープ・合唱・ティンパニ・グロッケンのサンプルを [`sampler.py`](sampler.py)(tinysoundfont)で鳴らす。
+
+### 👉 [**bada_flower_symphony_real.mp4**](bada_flower_symphony_real.mp4)(交響曲版 5:17)· [**bada_flower_concerto_real.mp4**](bada_flower_concerto_real.mp4)(ピアノ協奏曲版 5:44)
+
+**静かで悲しい版への変更**
+- テンポを落とす: 前奏 ♩=48、フーガ ♩=58、レクイエムのバスによるフーガ ♩=54、後奏 ♩=46。
+- ピカルディ(長調)終止をやめ、フーガの終わりも全曲の終わりも **A minor(add9)** のまま消える。
+- 全奏とティンパニの打撃を減らし、弦は Slow Strings のパッド、旋律はオーボエ / フルート / チェロ、合唱は遠く。強弱は pp〜mp。
+- 協奏曲版はグランドピアノが花の主題・フーガ 3 声・カデンツァ・拡大主題を担い、チェロとヴァイオリンが入りを重ねる。
+
+| # | 楽章 | 交響曲版(楽器) | 協奏曲版(楽器) |
+|:-:|:--|:--|:--|
+| I | 花の前奏 | オーボエ → フルート、Slow Strings、チェロ、ハープ、ヴィオラの対旋律 | グランドピアノ独奏 → Slow Strings とチェロ、フルートのオクターブ |
+| II | 静かなフーガ | ヴァイオリン / ヴィオラ / チェロ、フルート・オーボエ・ファゴット・コントラバスの重ね、Slow Strings の枠 | ピアノ 3 声、チェロ・ヴァイオリンの重ね、Slow Strings の枠 |
+| II' | カデンツァ | — | ピアノ独奏(Slow Strings が E7 を支える) |
+| III | レクイエムのバスによるフーガ | チェロ+コントラバスの地のバス、ヴィオラ+クラリネット → オーボエ+ヴァイオリン → ホルン+ファゴット、合唱、ハープ | 同構成 + ピアノ(拡大主題・分散和音) |
+| IV | 花の後奏 — Acceptance | フルートとヴァイオリン、Slow Strings、ハープ、チェロの主題頭 | ピアノ、Slow Strings、チェロの主題頭 |
+
+### 再生成(サウンドフォントが必要)
+
+```bash
+pip install --no-deps tinysoundfont
+curl -L -o fusion_suite/FluidR3_GM.sf2 "https://raw.githubusercontent.com/urish/cinto/master/media/FluidR3%20GM.sf2"   # 148 MB(リポジトリには含めない)
+MODE=symphony OUT=/tmp/rs python3 fusion_suite/compose_flower_real.py && python3 fusion_suite/video.py /tmp/rs/bada_flower_symphony_real.wav /tmp/rs/bada_flower_symphony_real.mp4
+MODE=concerto OUT=/tmp/rc python3 fusion_suite/compose_flower_real.py && python3 fusion_suite/video.py /tmp/rc/bada_flower_concerto_real.wav /tmp/rc/bada_flower_concerto_real.mp4
+```
+
+別のサウンドフォントを使うときは環境変数 `SF2` にパスを渡す(GM 配列なら差し替え可能)。
+
 ## 仕組み
 
 - [`synth.py`](synth.py) — 加算合成の楽器(piano / strings / pad / organ / choir / bell / drone / harp)、ADSR、畳み込みリバーブ(合成インパルス応答)、パン付きミキサー

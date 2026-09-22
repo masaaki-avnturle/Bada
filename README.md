@@ -113,6 +113,8 @@
 
 **第 2 作 — 交響曲版 / ピアノ協奏曲版:** フーガとレクイエムを坂本龍一《A Flower Is Not a Flower》様式で統合し直した [**bada_flower_symphony.mp4**](fusion_suite/bada_flower_symphony.mp4)(4:31)と [**bada_flower_concerto.mp4**](fusion_suite/bada_flower_concerto.mp4)(4:54)。「花」の主題の頭 E–C–B はフーガ主題 A–E–C–B の動機、第 III 楽章はフーガ主題の 2 倍拡大形をレクイエムの地のバスの上に乗せる「レクイエムのバスによるフーガ」。
 
+**第 3 作 — 本物の楽器版(静かで悲しい版):** 録音された本物の楽器(サウンドフォント FluidR3 GM: グランドピアノ・弦・木管・ホルン・ハープ・合唱)で演奏し直し、《A Flower Is Not a Flower》と《Little Buddha》の静かで悲しい様式に作り換えた [**bada_flower_symphony_real.mp4**](fusion_suite/bada_flower_symphony_real.mp4)(5:17)と [**bada_flower_concerto_real.mp4**](fusion_suite/bada_flower_concerto_real.mp4)(5:44)。長調終止をやめ、A minor(add9)のまま消える。
+
 ---
 
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
