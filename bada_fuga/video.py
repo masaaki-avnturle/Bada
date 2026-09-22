@@ -33,9 +33,24 @@ def y_of(m):
 def dim(c, k):
     return tuple(int(x * k) for x in c)
 
+THEMES = {
+    'organ': dict(bg=(12, 15, 26), bg2=(22, 23, 42), roll=(9, 11, 20), title='Contrapunctus BADA',
+                  subtitle='Fuga a tre soggetti — ニ短調 ／ J.S.バッハ《フーガの技法》コントラプンクトゥス XIV へのオマージュ',
+                  footer=['主題 I ← MOTHER (LUNA SEA) の旋律輪郭  ／  主題 II ← トラック18 の反復音型  ／  主題 III ← B♭-A-D-A (BADA) + 録音 090933 の半音隣接音型',
+                          'エピソード ← LOVELESS の隣接音型 ／ トラック17 の上行音階 ／ トラック8 のため息音型 ／ 録音 090146    ｜  合成: 加算合成オルガン 4 声',
+                          '第 127 小節の休止は、バッハの自筆譜が第 239 小節で途切れることへのオマージュ。その後コーダで完結させた。'],
+                  pause_bar=126),
+    'requiem': dict(bg=(16, 8, 24), bg2=(34, 14, 44), roll=(10, 5, 16), title='Requiem BADA', subtitle='', footer=[], pause_bar=138),
+}
+
 def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     d = json.load(open(score))
-    notes = d['notes']
+    meta = d.get('meta', {})
+    th = dict(THEMES[meta.get('style', 'organ')])
+    for k in ('title', 'subtitle', 'footer'):
+        if meta.get(k): th[k] = meta[k]
+    notes = d['notes'] + [dict(e, label=None) for e in d.get('extras', [])]
+    COL.update({'X': (236, 214, 150), 'D': (120, 70, 140)}); VNAME.update({'X': '弔鐘', 'D': 'ドローン'})
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
     order = np.argsort(T); T, D, M = T[order], D[order], M[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]
@@ -55,12 +70,12 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     f_small = font(JP, 14); f_lab = font(JP, 15); f_chord = font(SERIF_I, 22); f_num = font(SERIF, 20)
 
     # 背景 (固定部分) を一度描いて再利用
-    bg = Image.new('RGB', (W, H), (12, 15, 26))
+    bg = Image.new('RGB', (W, H), th['bg'])
     bd = ImageDraw.Draw(bg)
     for y in range(0, H):
         k = y / H
-        bd.line([(0, y), (W, y)], fill=(int(12 + 10 * k), int(15 + 8 * k), int(26 + 16 * k)))
-    bd.rectangle([0, ROLL_Y0 - 6, W, ROLL_Y1 + 6], fill=(9, 11, 20))
+        bd.line([(0, y), (W, y)], fill=tuple(int(th['bg'][i] + (th['bg2'][i] - th['bg'][i]) * k) for i in range(3)))
+    bd.rectangle([0, ROLL_Y0 - 6, W, ROLL_Y1 + 6], fill=th['roll'])
     for m in range(M_LO, M_HI + 1):
         y = y_of(m)
         if m % 12 == 0:
@@ -68,16 +83,15 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             bd.text((8, y - 16), 'C%d' % (m // 12 - 1), font=f_small, fill=(110, 118, 140))
         elif m % 12 in (2, 5, 9):  # D, F, A (ニ短調の主和音)
             bd.line([(0, y), (W, y)], fill=(22, 26, 40))
-    bd.text((30, 18), 'Contrapunctus BADA', font=f_title, fill=(236, 228, 210))
-    bd.text((32, 66), 'Fuga a tre soggetti — ニ短調 ／ J.S.バッハ《フーガの技法》コントラプンクトゥス XIV へのオマージュ', font=f_sub, fill=(150, 156, 176))
+    bd.text((30, 18), th['title'], font=f_title, fill=(236, 228, 210))
+    bd.text((32, 66), th['subtitle'], font=f_sub, fill=(150, 156, 176))
     # 凡例
     lx = 30
-    for v in 'SATB':
+    for v in (['S', 'A', 'T', 'B', 'X', 'D'] if meta.get('style') == 'requiem' else ['S', 'A', 'T', 'B']):
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
         lx += 110
-    bd.text((30, 640), '主題 I ← MOTHER (LUNA SEA) の旋律輪郭  ／  主題 II ← トラック18 の反復音型  ／  主題 III ← B♭-A-D-A (BADA) + 録音 090933 の半音隣接音型', font=f_small, fill=(150, 156, 176))
-    bd.text((30, 662), 'エピソード ← LOVELESS の隣接音型 ／ トラック17 の上行音階 ／ トラック8 のため息音型 ／ 録音 090146    ｜  合成: 加算合成オルガン 4 声', font=f_small, fill=(150, 156, 176))
-    bd.text((30, 684), '第 127 小節の休止は、バッハの自筆譜が第 239 小節で途切れることへのオマージュ。その後コーダで完結させた。', font=f_small, fill=(120, 126, 146))
+    for i, line in enumerate(th['footer']):
+        bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
     ff = ffmpeg_exe()
     cmd = [ff, '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '%dx%d' % (W, H), '-r', str(FPS), '-i', '-',
@@ -85,7 +99,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
            '-movflags', '+faststart', '-shortest', out]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
     ahead = (W - NOW_X) / PPS; back = NOW_X / PPS
-    pause_t = (126 * bpb) * spb
+    pause_t = (th['pause_bar'] * bpb) * spb
     for fi in range(nframes):
         now = fi / FPS
         im = bg.copy(); dr = ImageDraw.Draw(im)
@@ -115,6 +129,13 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             x0 = NOW_X + (T[i] - now) * PPS; x1 = NOW_X + (T[i] + D[i] - now) * PPS
             y = y_of(M[i]); v = V[i]; c = COL[v]
             sounding = T[i] <= now < T[i] + D[i]
+            if v == 'X':
+                cx = x0; s = 9 if sounding else 6
+                dr.polygon([(cx, y - s), (cx + s, y), (cx, y + s), (cx - s, y)], fill=c if sounding else dim(c, 0.6))
+                dr.line([(cx, y), (min(x1, W), y)], fill=dim(c, 0.35)); continue
+            if v == 'D':
+                y = min(y, ROLL_Y1 + 2)
+                dr.rectangle([x0, y - 2, x1 - 1, y + 2], fill=dim(c, 0.9 if sounding else 0.6)); continue
             if LAB[i]:
                 fill = c if not sounding else tuple(min(255, int(x * 1.25 + 30)) for x in c)
                 if sounding: dr.rectangle([x0 - 2, y - 6, x1 + 2, y + 6], fill=dim(c, 0.35))

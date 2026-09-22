@@ -120,6 +120,10 @@ class Piece:
         self.hold = set()                        # bars where free voices hold whole notes
         self.entries = []                        # (beat, label, voice)
         self.sections = []                       # (bar, title, subtitle)
+        self.dyn = {}                            # bar -> gain (default 1.0)
+
+    def dyn_at(self, beat):
+        return self.dyn.get(int(beat // BPB), 1.0)
 
     def set_harm(self, bar, spec):
         if isinstance(spec, str): spec = [spec]
@@ -364,7 +368,17 @@ def check(piece, events):
 # ---------------------------------------------------------------- the piece
 def build():
     P = Piece(130)
-    # default harmony: D minor
+    build_fugue(P, 0)
+    return P
+
+def build_fugue(P, off=0, sec_titles=None):
+    """フーガ本体 (130 小節) を P の小節 off から書き込む。"""
+    _place, _set_harms, _rest, _section, _set_harm = P.place, P.set_harms, P.rest_bars, P.section, P.set_harm
+    P.place = lambda v, bar, m, semis=0, label=None, beat=0: _place(v, bar + off, m, semis, label, beat)
+    P.set_harms = lambda bar, specs: [_set_harm(bar + off + i, sp) for i, sp in enumerate(specs)]
+    P.set_harm = lambda bar, spec: _set_harm(bar + off, spec)
+    P.rest_bars = lambda v, b0, b1, beats=None: _rest(v, b0 + off, b1 + off, beats)
+    P.section = lambda bar, t, s: _section(bar + off, t, s)
     # ---------- Section I : Soggetto I (MOTHER)
     P.section(0, 'I. Soggetto I 〈MOTHER〉', '主題 I の提示 — 4 声フーガ (ニ短調)')
     P.set_harms(0, H_S1);  P.place('A', 0, S1, 0, 'S1')
@@ -453,8 +467,9 @@ def build():
     # bar 126: general pause (バッハの自筆譜が途切れる場所へのオマージュ) then coda
     P.set_harms(126, [['Dm','Dm','Dm','Dm'], ['Gm/D','Gm/D','Bb/D','Bb/D'], ['A7/D','A7/D','A7','A7'], ['D','D','D','D']])
     for v in VOICES: P.rest_bars(v, 126, 127, beats=[0, 1])
-    P.hold.update({127, 128, 129})
+    P.hold.update({127 + off, 128 + off, 129 + off})
     P.set_harm(129, 'D')
+    P.place, P.set_harms, P.rest_bars, P.section, P.set_harm = _place, _set_harms, _rest, _section, _set_harm
     return P
 
 def transpose_h(H, semis):
@@ -474,8 +489,8 @@ def transpose_h(H, semis):
         out.append(row)
     return out
 
-def main(out='score.json', seed=7, bpm=96):
-    P = build()
+def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None):
+    P = builder() if builder else build()
     rng = random.Random(seed)
     skel, cov, isfree = generate(P, seed)
     events = {}
@@ -494,12 +509,12 @@ def main(out='score.json', seed=7, bpm=96):
     notes = []
     for v in VOICES:
         for s, d, m, lab in events[v]:
-            notes.append({'v': v, 't': round(s * spb, 4), 'd': round(d * spb, 4), 'm': m, 'label': lab, 'beat': s})
+            notes.append({'v': v, 't': round(s * spb, 4), 'd': round(d * spb, 4), 'm': m, 'label': lab, 'beat': s, 'dyn': P.dyn_at(s)})
     data = {'bpm': bpm, 'beats_per_bar': BPB, 'nbars': P.nbars, 'duration': P.N * spb,
             'notes': notes,
             'entries': [{'t': b * spb, 'label': lab, 'v': v, 'bar': b // BPB + 1} for b, lab, v in P.entries],
             'sections': [{'t': bar * BPB * spb, 'bar': bar + 1, 'title': t, 'sub': s} for bar, t, s in P.sections],
-            'harm': P.harm}
+            'harm': P.harm, 'meta': meta or {}, 'extras': [dict(e, t=round(e['beat'] * spb, 4), d=round(e['dbeats'] * spb, 4)) for e in (extras or [])]}
     json.dump(data, open(out, 'w'), ensure_ascii=False, indent=0)
     print('wrote', out, len(notes), 'notes')
 
