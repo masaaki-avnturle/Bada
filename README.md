@@ -111,6 +111,8 @@
 
 楽章構成・録音の配置・再生成手順は [`fusion_suite/`](fusion_suite/) を参照。
 
+**第 2 作 — 交響曲版 / ピアノ協奏曲版:** フーガとレクイエムを坂本龍一《A Flower Is Not a Flower》様式で統合し直した [**bada_flower_symphony.mp4**](fusion_suite/bada_flower_symphony.mp4)(4:31)と [**bada_flower_concerto.mp4**](fusion_suite/bada_flower_concerto.mp4)(4:54)。「花」の主題の頭 E–C–B はフーガ主題 A–E–C–B の動機、第 III 楽章はフーガ主題の 2 倍拡大形をレクイエムの地のバスの上に乗せる「レクイエムのバスによるフーガ」。
+
 ---
 
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)

@@ -33,6 +33,34 @@
 | V バラード | Bada_Suite_audio(F maj)、20260922_175429・175316(B♭ min) | LPF 4 kHz / 霧 |
 | VI コーダ | 20260922_175644(息)、Bada_Suite_audio-1(C maj)、20260922_175951(G maj)、20260920_154001.mp4 音声 | 半速、LPF 1.5 kHz |
 
+## 🌸 第 2 作 — Bada Flower Symphony / Bada Flower Concerto
+
+前作のフーガ主題とレクイエムの嘆きのバスを、**坂本龍一《A Flower Is Not a Flower》様式**(♩=54、疎らな旋律、長い休符、add9 / maj7♯11 の和声、ペダルの残響)で統合し直し、**交響曲版**と**ピアノ協奏曲版**の 2 本に作り換えたもの。旋律・和声はオリジナル(原曲の旋律は引用していない)。
+
+### 👉 [**bada_flower_symphony.mp4**](bada_flower_symphony.mp4)(交響曲版 4:31)· [**bada_flower_concerto.mp4**](bada_flower_concerto.mp4)(ピアノ協奏曲版 4:54)
+
+**統合の仕掛け**
+- 「花」の主題の頭 **E–C–B** は、フーガ主題 **A–E–C–B** の頭の 3 音。前奏の 2 回目にはフーガ主題頭の拡大形が対旋律として重なる。
+- 第 III 楽章「レクイエムのバスによるフーガ」では、フーガ主題を **2 倍に拡大した 16 拍** を、レクイエムの **地のバス(16 拍)** の上に乗せる。各拍が地のバス・合唱和声・弦の哀歌と協和するよう配置した(導音 G♯ の拍だけ第 4 和音を Bm/F♯ に、哀歌を B に変えている)。
+- 後奏ではバスにフーガ主題の頭(A–E–C–B の全音符)が沈み、A major の鐘で閉じる。
+
+| # | 楽章 | 交響曲版 | 協奏曲版 |
+|:-:|:--|:--|:--|
+| I | 花の前奏 ♩=54 | 弦 → フルート、パッド、ハープの分散和音、ホルンの対旋律 | ピアノ独奏(2 回目に弦とパッドが加わる) |
+| II | フーガ ♩=69 | 弦 3 声。応答をフルート、バスをホルンが重ね、ティンパニとオルガンの属音保続 | ピアノが 3 声を担い、弦とホルンが入りを重ねる |
+| II' | カデンツァ | — | ピアノ独奏: 主題を 2 拍遅れで追うストレッタ → E–C–B の溜息 → E7 の上行で III へ |
+| III | レクイエムのバスによるフーガ ♩=60 | 弦アルト → フルート+弦 → 全奏(ホルンが拡大主題をバスで)→ 合唱と花の溜息、ティンパニ | 同構成 + ピアノが拡大主題と分散和音 |
+| IV | 花の後奏 ♩=54 | フルートと弦、ハープ、ホルンの主題頭 | ピアノ、弦の主題頭、A major の鐘 |
+
+### 再生成
+
+```bash
+MODE=symphony OUT=/tmp/sym python3 fusion_suite/compose_flower.py && python3 fusion_suite/video.py /tmp/sym/bada_flower_symphony.wav /tmp/sym/bada_flower_symphony.mp4
+MODE=concerto OUT=/tmp/con python3 fusion_suite/compose_flower.py && python3 fusion_suite/video.py /tmp/con/bada_flower_concerto.wav /tmp/con/bada_flower_concerto.mp4
+```
+
+`video.py` は `marks.json` の `title / subtitle / movements` を読んでタイトルカードを描く(前作は既定値)。新しい楽器 `flute / horn / timpani` は [`synth.py`](synth.py) に追加した。
+
 ## 仕組み
 
 - [`synth.py`](synth.py) — 加算合成の楽器(piano / strings / pad / organ / choir / bell / drone / harp)、ADSR、畳み込みリバーブ(合成インパルス応答)、パン付きミキサー

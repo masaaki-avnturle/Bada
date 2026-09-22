@@ -36,7 +36,7 @@ def font(size):
     return ImageFont.truetype(FONT, size)
 
 
-def background():
+def background(title="Bada Fusion Suite", subtitle="Fuga · Requiem · Ave Verum · Acceptance"):
     y = np.linspace(0, 1, H)[:, None]
     r = 6 + 14 * (1 - y) ** 2
     g = 9 + 20 * (1 - y) ** 1.5
@@ -53,8 +53,8 @@ def background():
     d.line([(0, 470), (W, 470)], fill=(60, 70, 120), width=1)
     for x in range(0, W, 64):
         d.line([(x, 470), (x + 32, 470)], fill=(110, 120, 170), width=2)
-    d.text((40, 24), "Bada Fusion Suite", font=font(26), fill=(200, 190, 150))
-    d.text((40, 58), "Fuga · Requiem · Ave Verum · Acceptance", font=font(18), fill=(140, 140, 170))
+    d.text((40, 24), title, font=font(26), fill=(200, 190, 150))
+    d.text((40, 58), subtitle, font=font(18), fill=(140, 140, 170))
     return np.asarray(pil).astype(np.float32)
 
 
@@ -117,22 +117,28 @@ def movement_color(t, marks):
 
 
 def main(wav, mp4):
+    global MOVEMENTS
     marks = json.load(open(os.path.join(OUT, "marks.json")))
     total = marks["end"]
+    # marks.json に楽章一覧があればそれを使う(交響曲版 / 協奏曲版など)
+    if "movements" in marks:
+        MOVEMENTS = [tuple(m[:4]) + (tuple(m[4]),) for m in marks["movements"]]
+    title = marks.get("title", "Bada Fusion Suite")
+    subtitle = marks.get("subtitle", "Fuga · Requiem · Ave Verum · Acceptance")
+    note = marks.get("note", "バッハ / モーツァルト様式 × 坂本龍一様式 × 16 本の録音")
     n_frames = int(total * FPS)
     sr, x = wavfile.read(wav)
     x = x.astype(np.float32) / 32768
     print("spectrum...")
     bars = spectrum_frames(x, sr, n_frames)
-    bg = background()
+    bg = background(title, subtitle)
 
     cards = []
-    rgb, a = card("Bada Fusion Suite", "Fuga · Requiem · Ave Verum · Acceptance",
-                  "バッハ / モーツァルト様式 × 坂本龍一様式 × 16 本の録音", big=True)
+    rgb, a = card(title, subtitle, note, big=True)
     cards.append((rgb, a, 0.5, 10.5))
     for key, title, sub, note, _ in MOVEMENTS:
         rgb, a = card(title, sub, note)
-        st = marks[key] + (11.5 if key == "prelude" else 0.5)
+        st = marks[key] + (11.5 if marks[key] < 1.0 else 0.5)
         cards.append((rgb, a, st, st + 9.0))
 
     cmd = [FFMPEG, "-hide_banner", "-loglevel", "error", "-y",
@@ -140,7 +146,7 @@ def main(wav, mp4):
            "-i", wav, "-map", "0:v", "-map", "1:a", "-t", f"{total:.2f}",
            "-c:v", "libx264", "-preset", "medium", "-crf", "25", "-pix_fmt", "yuv420p",
            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
-           "-metadata", "title=Bada Fusion Suite — Fuga · Requiem · Ave Verum · Acceptance", mp4]
+           "-metadata", f"title={title} — {subtitle}", mp4]
     proc = subprocess.Popen(cmd, stdin=subprocess.PIPE)
 
     bar_w = W / NBARS
