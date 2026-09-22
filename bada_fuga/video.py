@@ -148,7 +148,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             v = V[i]
             dd = D[i] if v in ('C', 'X', 'D', 'P') else max(0.18, D[i] * detach)
             x0 = NOW_X + (T[i] - now) * PPS; x1 = NOW_X + (T[i] + dd - now) * PPS
-            y = y_of(M[i]); c = COL[v]
+            y = max(ROLL_Y0 + 2, min(ROLL_Y1 - 2, y_of(M[i]))); c = COL[v]     # 音域外の音はロールの端に寄せる
             sounding = T[i] <= now < T[i] + dd
             if v == 'X':
                 cx = x0; s = 9 if sounding else 6
