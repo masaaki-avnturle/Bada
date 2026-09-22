@@ -44,6 +44,7 @@ THEMES = {
     'piano': dict(bg=(20, 14, 12), bg2=(40, 28, 22), roll=(12, 8, 7), title='Requiem BADA III', subtitle='', footer=[], pause_bar=86),
     'mallet': dict(bg=(8, 12, 22), bg2=(18, 28, 46), roll=(5, 8, 16), title='Requiem BADA IV', subtitle='', footer=[], pause_bar=68),
     'grief': dict(bg=(14, 10, 18), bg2=(30, 20, 36), roll=(8, 6, 12), title='Requiem BADA V', subtitle='', footer=[], pause_bar=68),
+    'elegia': dict(bg=(18, 14, 14), bg2=(38, 28, 26), roll=(11, 8, 8), title='Requiem BADA VI', subtitle='', footer=[], pause_bar=68),
 }
 
 def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
@@ -57,9 +58,11 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍', 'H': '鐘のカノン', 'W': '分散和音', 'L': '低音の心拍'})
     if meta.get('style') == 'mallet':
         COL.update({'H': (150, 230, 255), 'W': (110, 180, 210)}); VNAME.update({'H': '木琴シンセ (鐘)', 'W': '木琴シンセ (刻み)', 'L': '低音 (ピアノ)'})
+    if meta.get('style') == 'elegia':
+        COL.update({'H': (250, 240, 200), 'L': (150, 110, 90)}); VNAME.update({'H': 'ピアノ高音', 'L': 'ピアノ低音'})
     if meta.get('style') == 'grief':
         COL.update({'H': (250, 240, 200), 'C': (190, 90, 200), 'L': (150, 110, 90)}); VNAME.update({'H': 'ピアノ高音', 'C': 'シンセ不協和音', 'L': 'ピアノ低音'})
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L']}[meta.get('style', 'organ')]
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
     order = np.argsort(T); T, D, M = T[order], D[order], M[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]

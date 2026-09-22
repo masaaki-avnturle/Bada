@@ -164,6 +164,23 @@ python3 synth.py score_grief.json grief.wav
 python3 video.py score_grief.json grief.wav grief.mp4
 ```
 
+## 🎹 Requiem BADA VI — Elegia (B♭ minor, ♩=36, ピアノ独奏・シンセ不使用)
+
+Dolore 版からシンセサイザーを完全に外し、ピアノ独奏だけにした版。
+高音の B-A-D-A は B♭5–D6 に下げて長く保ち、打鍵雑音を抑え減衰を長くして木琴に聞こえないようにした。
+音符の間は点描ではなく、ペダルの共鳴 (長い離鍵減衰)・声部ごとの打鍵の時間差 (低音が先)・
+拍節に沿った強弱の起伏 (ルバート) と控えめな内声で、間そのものが音楽として聞こえるフレージングにした。
+
+- 🎬 **[elegia.mp4](elegia.mp4)** — 9 分 27 秒 · 1280×720 · 30fps
+
+構成は Lamento / Dolore 版と同じ (Introitus → Fuga → Ritornello → Fuga a tre soggetti → Lacrimosa)。
+
+```bash
+python3 compose_elegia.py score_elegia.json
+python3 synth.py score_elegia.json elegia.wav
+python3 video.py score_elegia.json elegia.wav elegia.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
