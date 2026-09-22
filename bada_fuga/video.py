@@ -50,7 +50,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     for k in ('title', 'subtitle', 'footer'):
         if meta.get(k): th[k] = meta[k]
     notes = d['notes'] + [dict(e, label=None) for e in d.get('extras', [])]
-    COL.update({'X': (236, 214, 150), 'D': (120, 70, 140)}); VNAME.update({'X': '弔鐘', 'D': 'ドローン'})
+    COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70)}); VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍'})
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]
     order = np.argsort(T); T, D, M = T[order], D[order], M[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]
@@ -87,9 +87,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     bd.text((32, 66), th['subtitle'], font=f_sub, fill=(150, 156, 176))
     # 凡例
     lx = 30
-    for v in (['S', 'A', 'T', 'B', 'X', 'D'] if meta.get('style') == 'requiem' else ['S', 'A', 'T', 'B']):
+    for v in (['S', 'A', 'T', 'B', 'X', 'D', 'P'] if meta.get('style') == 'requiem' else ['S', 'A', 'T', 'B']):
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += 110
+        lx += 110 if v in 'SATB' else 80
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
@@ -133,6 +133,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                 cx = x0; s = 9 if sounding else 6
                 dr.polygon([(cx, y - s), (cx + s, y), (cx, y + s), (cx - s, y)], fill=c if sounding else dim(c, 0.6))
                 dr.line([(cx, y), (min(x1, W), y)], fill=dim(c, 0.35)); continue
+            if v == 'P':
+                y = ROLL_Y1 + 2; s = 7 if sounding else 4
+                dr.ellipse([x0 - s, y - s, x0 + s, y + s], fill=c if sounding else dim(c, 0.55)); continue
             if v == 'D':
                 y = min(y, ROLL_Y1 + 2)
                 dr.rectangle([x0, y - 2, x1 - 1, y + 2], fill=dim(c, 0.9 if sounding else 0.6)); continue

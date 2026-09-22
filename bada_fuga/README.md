@@ -56,6 +56,32 @@ python3 video.py score_requiem.json requiem.wav requiem.mp4
 - 合唱音色は母音「ア」のフォルマント (730/1090/2440/3400 Hz) で倍音を整形し、3 本のデチューン+ビブラートで重ねたもの。
 - 弔鐘は非整数倍音 (0.56, 0.92, 1.19, 1.71, 2.0, 2.74 …) の減衰和で合成。ドローンは D1/D2 の倍音にゆっくりした揺れを付けたもの。
 
+## 🕯🕯 Requiem BADA II — 荘厳な洗脳のレクイエム
+
+レクイエム版をさらに催眠的にした版。全曲を通して心拍のような低い脈拍と弔鐘が続き、
+B-A-D-A のマントラがフーガの各部の間に回帰句として戻ってくる。合唱は暗い母音「オ」。
+
+- 🎬 **[requiem2.mp4](requiem2.mp4)** — 11 分 09 秒 · 1280×720 · 30fps
+
+| 小節 | 内容 |
+|:--|:--|
+| 1–12 | **I. Introitus** — ドローン・心拍・弔鐘の上に、Requiem aeternam 風の聖歌 (S)、ディエス・イレ (T)、B-A-D-A の唱え (A) |
+| 13–56 | **II. Kyrie** — 三重フーガ 第 I 部 (主題 I) |
+| 57–64 | **Ritornello — Mantra I** — B-A-D-A の回帰句 (アルト → ソプラノ)、心拍と鐘 |
+| 65–105 | 第 II 部 (主題 II と二重結合) |
+| 106–113 | **Ritornello — Mantra II** — B-A-D-A の回帰句 (テノール → アルト) |
+| 114–158 | 第 III 部 (B-A-D-A 主題と三重結合、休止、ピカルディ終止) |
+| 159–182 | **III. Lux aeterna — Mantra ×12** — 声部交替でマントラを 12 回反復、うねる強弱で鐘の残響へ消える |
+
+```bash
+python3 compose_requiem2.py score_requiem2.json
+python3 synth.py score_requiem2.json requiem2.wav
+python3 video.py score_requiem2.json requiem2.wav requiem2.mp4
+```
+
+- 心拍は 80→38 Hz へ落ちる正弦波 + 短いノイズ。前奏・回帰句・コーダでは 1・3 拍目、フーガ中は各小節の 1 拍目に弱く。
+- `compose.build_fugue(P, off, gaps)` でフーガ本体の第 II 部・第 III 部の前に回帰句用の隙間を空けている。
+
 ## 作り方 (再現)
 
 ```bash

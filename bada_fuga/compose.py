@@ -371,14 +371,17 @@ def build():
     build_fugue(P, 0)
     return P
 
-def build_fugue(P, off=0, sec_titles=None):
-    """フーガ本体 (130 小節) を P の小節 off から書き込む。"""
+def build_fugue(P, off=0, gaps=(0, 0)):
+    """フーガ本体 (130 小節) を P の小節 off から書き込む。
+    gaps=(g1, g2): 第 II 部 (44 小節目〜) の前に g1 小節、第 III 部 (85 小節目〜) の前に g2 小節の隙間を空ける。"""
+    def f(bar):
+        return bar + off + (gaps[0] if bar >= 44 else 0) + (gaps[1] if bar >= 85 else 0)
     _place, _set_harms, _rest, _section, _set_harm = P.place, P.set_harms, P.rest_bars, P.section, P.set_harm
-    P.place = lambda v, bar, m, semis=0, label=None, beat=0: _place(v, bar + off, m, semis, label, beat)
-    P.set_harms = lambda bar, specs: [_set_harm(bar + off + i, sp) for i, sp in enumerate(specs)]
-    P.set_harm = lambda bar, spec: _set_harm(bar + off, spec)
-    P.rest_bars = lambda v, b0, b1, beats=None: _rest(v, b0 + off, b1 + off, beats)
-    P.section = lambda bar, t, s: _section(bar + off, t, s)
+    P.place = lambda v, bar, m, semis=0, label=None, beat=0: _place(v, f(bar), m, semis, label, beat)
+    P.set_harms = lambda bar, specs: [_set_harm(f(bar + i), sp) for i, sp in enumerate(specs)]
+    P.set_harm = lambda bar, spec: _set_harm(f(bar), spec)
+    P.rest_bars = lambda v, b0, b1, beats=None: _rest(v, f(b0), f(b0) + (b1 - b0), beats)
+    P.section = lambda bar, t, s: _section(f(bar), t, s)
     # ---------- Section I : Soggetto I (MOTHER)
     P.section(0, 'I. Soggetto I 〈MOTHER〉', '主題 I の提示 — 4 声フーガ (ニ短調)')
     P.set_harms(0, H_S1);  P.place('A', 0, S1, 0, 'S1')
@@ -467,7 +470,7 @@ def build_fugue(P, off=0, sec_titles=None):
     # bar 126: general pause (バッハの自筆譜が途切れる場所へのオマージュ) then coda
     P.set_harms(126, [['Dm','Dm','Dm','Dm'], ['Gm/D','Gm/D','Bb/D','Bb/D'], ['A7/D','A7/D','A7','A7'], ['D','D','D','D']])
     for v in VOICES: P.rest_bars(v, 126, 127, beats=[0, 1])
-    P.hold.update({127 + off, 128 + off, 129 + off})
+    P.hold.update({f(127), f(128), f(129)})
     P.set_harm(129, 'D')
     P.place, P.set_harms, P.rest_bars, P.section, P.set_harm = _place, _set_harms, _rest, _section, _set_harm
     return P
@@ -513,7 +516,7 @@ def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None)
     data = {'bpm': bpm, 'beats_per_bar': BPB, 'nbars': P.nbars, 'duration': P.N * spb,
             'notes': notes,
             'entries': [{'t': b * spb, 'label': lab, 'v': v, 'bar': b // BPB + 1} for b, lab, v in P.entries],
-            'sections': [{'t': bar * BPB * spb, 'bar': bar + 1, 'title': t, 'sub': s} for bar, t, s in P.sections],
+            'sections': [{'t': bar * BPB * spb, 'bar': bar + 1, 'title': t, 'sub': s} for bar, t, s in sorted(P.sections)],
             'harm': P.harm, 'meta': meta or {}, 'extras': [dict(e, t=round(e['beat'] * spb, 4), d=round(e['dbeats'] * spb, 4)) for e in (extras or [])]}
     json.dump(data, open(out, 'w'), ensure_ascii=False, indent=0)
     print('wrote', out, len(notes), 'notes')

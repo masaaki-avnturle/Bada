@@ -41,9 +41,12 @@ def tone(freq, dur, tb, sr=SR):
     e[:int(dur * sr)] *= 1.0
     return out * e
 
+VOWELS = {'a': ([(730, 130), (1090, 160), (2440, 240), (3400, 320)], [1.0, 0.75, 0.35, 0.12]),
+          'o': ([(450, 110), (800, 130), (2600, 260), (3200, 320)], [1.0, 0.6, 0.18, 0.06])}
+VOWEL = 'a'
 def formant_amps(f0, nh=60):
-    """母音「ア」のフォルマントで整形した倍音振幅 (合唱風)"""
-    F = [(730, 130), (1090, 160), (2440, 240), (3400, 320)]; Wt = [1.0, 0.75, 0.35, 0.12]
+    """母音のフォルマントで整形した倍音振幅 (合唱風)"""
+    F, Wt = VOWELS[VOWEL]
     amps = []
     for k in range(1, nh + 1):
         f = k * f0
@@ -82,6 +85,18 @@ def bell_tone(freq, dur, sr=SR):
     out[:int(0.003 * sr)] *= np.linspace(0, 1, int(0.003 * sr))
     return out * np.exp(-t * 0.15)
 
+def pulse_tone(sr=SR):
+    """心拍のような低い打音: 80→38 Hz へ落ちるサイン + 短いノイズ"""
+    nsamp = int(0.42 * sr)
+    t = np.arange(nsamp, dtype=np.float32) / sr
+    f = 38 + 42 * np.exp(-t * 18)
+    ph = 2 * np.pi * np.cumsum(f) / sr
+    body = np.sin(ph) * np.exp(-t * 9)
+    noise = np.random.default_rng(5).standard_normal(nsamp).astype(np.float32) * np.exp(-t * 90) * 0.15
+    y = body + noise
+    y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
+    return y
+
 def drone_tone(freq, dur, sr=SR):
     a, r = 2.5, 3.0
     nsamp = int((dur + r) * sr)
@@ -103,6 +118,8 @@ def main(score='score.json', out='fuga.wav'):
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
     requiem = style == 'requiem'
+    global VOWEL
+    VOWEL = d.get('meta', {}).get('vowel', 'a')
     for nt in d['notes']:
         tb = TIMBRE[nt['v']]
         freq = 440.0 * 2 ** ((nt['m'] - 69) / 12.0)
@@ -127,6 +144,8 @@ def main(score='score.json', out='fuga.wav'):
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
         if ex['v'] == 'X':
             y = bell_tone(freq, ex['d'] + 3.0) * 0.55 * ex.get('gain', 1.0); pan = 0.0
+        elif ex['v'] == 'P':
+            y = pulse_tone() * 0.9 * ex.get('gain', 1.0)
         else:
             y = drone_tone(freq, ex['d']) * 0.30 * ex.get('gain', 1.0); pan = 0.0
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
