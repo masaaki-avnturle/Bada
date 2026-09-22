@@ -226,6 +226,29 @@ python3 video.py score_concerto.json concerto.wav concerto.mp4
   オーボエは奇数倍音を強めた明るい音、フルートは少ない倍音+息の雑音、ホルンは丸い倍音構成、ティンパニは音程の落ちる打音のロール。
 - `compose.main(..., post=...)`: 自由声部の生成後に全声部を見て管弦楽の重ねを追加するフック。
 
+## 🎼🎻 Symphony BADA — 交響曲 ニ短調 (4 楽章)
+
+協奏曲版を交響曲に作り換えた版。独奏はなく、弦 5 部 (Vn I / Vn II / Va / Vc+Cb) がフーガの 4 声を担い、
+木管 (Fl / Ob / Cl) が主題の入りを重ね、金管 (Hn / Tp / Tb) は終楽章とコーダで加わる。楽章ごとにテンポが変わる。
+
+- 🎬 **[symphony.mp4](symphony.mp4)** — 1280×720 · 30fps
+
+| 楽章 | 小節 | テンポ | 内容 |
+|:--|:--|:--|:--|
+| I. Grave — Allegro moderato | 1–50 | ♩=40 → 76 | 嘆きのパッサカリアの序奏 → 主題 I 〈MOTHER〉の 4 声フーガ |
+| II. Adagio — Lamento | 51–64 | ♩=40 | 嘆きのバスのパッサカリア ×4、B-A-D-A のカノン、木管 |
+| III. Scherzo | 65–105 | ♩=126 | 主題 II 〈トラック18〉の提示と主題 I との二重結合 ×3、スタッカート気味の弦とティンパニ |
+| IV. Finale — Maestoso | 106–156 | ♩=84 → 60 | B-A-D-A 主題と三重結合 ×3、休止、D 長調のコーダ (金管の和音、B♮-A-D-A、ティンパニ) |
+
+```bash
+python3 compose_symphony.py score_symphony.json
+python3 synth.py score_symphony.json symphony.wav
+python3 video.py score_symphony.json symphony.wav symphony.mp4
+```
+
+- `compose.py`: 小節ごとのテンポ (`P.tempo`) と奏法 (`P.det`, 音の長さの比率) を指定できるテンポ・マップを追加。
+  `score.json` に各小節の開始時刻 (`bar_times`) を出力し、動画もそれに従う。
+
 ## 作り方 (再現)
 
 ```bash

@@ -121,6 +121,8 @@ class Piece:
         self.entries = []                        # (beat, label, voice)
         self.sections = []                       # (bar, title, subtitle)
         self.dyn = {}                            # bar -> gain (default 1.0)
+        self.tempo = {}                          # bar -> bpm (default: main() の bpm)
+        self.det = {}                            # bar -> 音の長さの比率 (奏法, default 1.0)
 
     def dyn_at(self, beat):
         return self.dyn.get(int(beat // BPB), 1.0)
@@ -505,25 +507,37 @@ def main(out='score.json', seed=7, bpm=96, builder=None, meta=None, extras=None,
         events[v] = ev
     if post: post(P, events, extras)          # 生成後の全声部を見て追加 (管弦楽の重ねなど)
     diss, par = check(P, events)
-    print('bars', P.nbars, 'beats', P.N, 'duration %.1fs' % (P.N * 60 / bpm))
+    print('bars', P.nbars, 'beats', P.N)
     print('strong-beat dissonances:', len(diss))
     for d in diss[:60]: print('  ', d)
     print('parallels:', len(par))
     for p in par[:40]: print('  ', p)
     spb = 60.0 / bpm
+    # テンポ・マップ: 小節ごとの bpm から各拍の開始時刻を求める
+    beat_t = [0.0]
+    for bar in range(P.nbars):
+        sb = 60.0 / P.tempo.get(bar, bpm)
+        for k in range(BPB): beat_t.append(beat_t[-1] + sb)
+    def time_of(beat):
+        i = int(math.floor(beat)); i = max(0, min(i, len(beat_t) - 2))
+        return beat_t[i] + (beat - i) * (beat_t[i + 1] - beat_t[i])
+    bar_times = [beat_t[b * BPB] for b in range(P.nbars + 1)]
     notes = []
     for v in VOICES:
         for s, d, m, lab in events[v]:
-            notes.append({'v': v, 't': round(s * spb, 4), 'd': round(d * spb, 4), 'm': m, 'label': lab, 'beat': s, 'dyn': P.dyn_at(s)})
+            t0 = time_of(s)
+            notes.append({'v': v, 't': round(t0, 4), 'd': round(time_of(s + d) - t0, 4), 'm': m, 'label': lab, 'beat': s,
+                          'dyn': P.dyn_at(s), 'det': P.det.get(int(s // BPB), 1.0)})
     if transpose_semis:
         for nt in notes: nt['m'] += transpose_semis
         for e in (extras or []): e['m'] += transpose_semis
         P.harm = [row[0] for row in transpose_h([[h] for h in P.harm], transpose_semis)]
-    data = {'bpm': bpm, 'beats_per_bar': BPB, 'nbars': P.nbars, 'duration': P.N * spb,
+    data = {'bpm': bpm, 'beats_per_bar': BPB, 'nbars': P.nbars, 'duration': bar_times[-1], 'bar_times': [round(x, 4) for x in bar_times],
             'notes': notes,
-            'entries': [{'t': b * spb, 'label': lab, 'v': v, 'bar': b // BPB + 1} for b, lab, v in P.entries],
-            'sections': [{'t': bar * BPB * spb, 'bar': bar + 1, 'title': t, 'sub': s} for bar, t, s in sorted(P.sections)],
-            'harm': P.harm, 'meta': meta or {}, 'extras': [dict(e, t=round(e['beat'] * spb, 4), d=round(e['dbeats'] * spb, 4)) for e in (extras or [])]}
+            'entries': [{'t': time_of(b), 'label': lab, 'v': v, 'bar': b // BPB + 1} for b, lab, v in P.entries],
+            'sections': [{'t': bar_times[bar], 'bar': bar + 1, 'title': t, 'sub': s} for bar, t, s in sorted(P.sections)],
+            'harm': P.harm, 'meta': meta or {},
+            'extras': [dict(e, t=round(time_of(e['beat']), 4), d=round(time_of(e['beat'] + e['dbeats']) - time_of(e['beat']), 4)) for e in (extras or [])]}
     json.dump(data, open(out, 'w'), ensure_ascii=False, indent=0)
     print('wrote', out, len(notes), 'notes')
 

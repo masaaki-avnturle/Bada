@@ -209,6 +209,26 @@ def timp_tone(freq, dur, vel=0.5, sr=SR):
         st = stroke(1.0); out[:len(st)] += st[:nsamp]
     return out * vel
 
+def brass_tone(freq, dur, vel=0.45, kind='trumpet', sr=SR):
+    a, r = (0.06, 0.2) if kind == 'trumpet' else (0.1, 0.3)
+    nsamp = int((dur + r) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    if kind == 'trumpet':
+        tab = _table('tp', int(max(6, min(30, 9000.0 / freq))), 0.95)
+        out = _wavetable_voice(freq, nsamp, tab, [(0.0, 0.0), (3.0, 1.0), (-3.0, 2.0)], 0.003, 5.8, t, sr)
+    else:
+        tab = _table('tb', int(max(6, min(24, 6000.0 / freq))), 1.2)
+        out = _wavetable_voice(freq, nsamp, tab, [(0.0, 0.0), (4.0, 1.0), (-4.0, 2.0)], 0.002, 5.0, t, sr)
+    # 金管の立ち上がりで倍音が開く感じ: 最初の 80ms を少し強く
+    e = env(nsamp, a, r, sr); e[:int(0.08 * sr)] *= np.linspace(1.15, 1.0, int(0.08 * sr))
+    return out * e * vel
+
+def clarinet_tone(freq, dur, vel=0.45, sr=SR):
+    a, r = 0.1, 0.2
+    nsamp = int((dur + r) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    tab = _table('cl', int(max(4, min(16, 6000.0 / freq))), 1.1, odd_boost=2.2)   # 奇数倍音が強い
+    out = _wavetable_voice(freq, nsamp, tab, [(0.0, 0.0), (2.0, 1.0)], 0.003, 5.2, t, sr)
+    return out * env(nsamp, a, r, sr) * vel
+
 def drone_tone(freq, dur, sr=SR):
     a, r = 2.5, 3.0
     nsamp = int((dur + r) * sr)
@@ -259,12 +279,13 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
     requiem = style == 'requiem'
+    symphony = style == 'symphony'
     piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto')
     mallet = style == 'mallet'
     grief = style == 'grief'
@@ -281,6 +302,25 @@ def main(score='score.json', out='fuga.wav'):
         freq = 440.0 * 2 ** ((nt['m'] - 69) / 12.0)
         dur = max(nt['d'] - 0.035, 0.06)
         t_off = 0.0
+        if symphony:
+            # 弦 5 部: S→Vn I, A→Vn II, T→Va, B→Vc (+Cb 1 オクターヴ下)
+            dyn = nt.get('dyn', 1.0); det = nt.get('det', 1.0)
+            vel = min(1.0, 0.5 * (1.15 if nt['label'] else 1.0) * dyn + 0.05)
+            dd = max(0.12, nt['d'] * det)
+            dark = {'S': 0.0, 'A': 0.15, 'T': 0.45, 'B': 0.75}[nt['v']]
+            y = string_tone(freq, dd, vel, dark=dark)
+            if det < 0.8:   # スタッカート気味: 立ち上がりを速く
+                y = y * np.minimum(1.0, np.arange(len(y)) / (0.04 * SR))
+            t_off = 0.012 * VORD[nt['v']] + rng.uniform(-0.006, 0.006)
+            g = 0.85
+            pan = {'S': -0.45, 'A': -0.2, 'T': 0.15, 'B': 0.4}[nt['v']]
+            i0 = max(0, int((nt['t'] + t_off) * SR)); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * g * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * g * math.sin((pan + 1) * math.pi / 4)
+            if nt['v'] == 'B':
+                yb = string_tone(freq / 2, dd, vel * 0.8, dark=1.0)
+                i1 = min(i0 + len(yb), N)
+                L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
+            continue
         if piano:
             vel = min(1.0, 0.62 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0) + 0.08)
             if humanize:
@@ -303,14 +343,14 @@ def main(score='score.json', out='fuga.wav'):
         if piano: g = 0.9 * (1.0 + 0.03 * rng.standard_normal())
         # 高音域は少し控えめに
         g *= min(1.0, (72.0 / max(freq, 72.0)) ** 0.25)
-        i0 = int((nt['t'] + t_off) * SR); i1 = min(i0 + len(y), N)
+        i0 = max(0, int((nt['t'] + t_off) * SR)); i1 = min(i0 + len(y), N)
         pan = tb['pan'] if not piano else max(-0.6, min(0.6, (nt['m'] - 60) / 40.0))
         L[i0:i1] += y[:i1 - i0] * g * math.cos((pan + 1) * math.pi / 4)
         R[i0:i1] += y[:i1 - i0] * g * math.sin((pan + 1) * math.pi / 4)
     # 鐘・ドローン
     for ex in d.get('extras', []):
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
-        if concerto and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'):
+        if (concerto or symphony) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v in ('V1', 'V2'): y = string_tone(freq, ex['d'], vel, dark=0.0)
             elif v == 'VA': y = string_tone(freq, ex['d'], vel, dark=0.4)
@@ -319,8 +359,11 @@ def main(score='score.json', out='fuga.wav'):
             elif v == 'WW': y = wind_tone(freq, ex['d'], vel, 'oboe')
             elif v == 'FL': y = wind_tone(freq, ex['d'], vel, 'flute')
             elif v == 'HN': y = horn_tone(freq, ex['d'], vel)
+            elif v == 'TR': y = brass_tone(freq, ex['d'], vel, 'trumpet')
+            elif v == 'TB': y = brass_tone(freq, ex['d'], vel, 'trombone')
+            elif v == 'CL': y = clarinet_tone(freq, ex['d'], vel)
             else: y = timp_tone(freq, ex['d'], vel)
-            pan = {'V1': -0.45, 'V2': -0.25, 'VA': 0.15, 'VC': 0.35, 'CB': 0.5, 'WW': 0.1, 'FL': -0.1, 'HN': 0.3, 'TP': 0.2}[v]
+            pan = {'V1': -0.45, 'V2': -0.25, 'VA': 0.15, 'VC': 0.35, 'CB': 0.5, 'WW': 0.1, 'FL': -0.1, 'HN': 0.3, 'TP': 0.2, 'TR': 0.35, 'TB': 0.45, 'CL': -0.05}[v]
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
@@ -351,7 +394,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if concerto else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
@@ -371,7 +414,7 @@ def main(score='score.json', out='fuga.wav'):
     # soft knee
     st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
-    tail = int((5.0 if (requiem or piano) else 2.5) * SR)
+    tail = int((5.0 if (requiem or piano or symphony) else 2.5) * SR)
     st[-tail:] *= np.linspace(1, 0, tail)[:, None]
     sf.write(out, st, SR, subtype='PCM_16')
     print('wrote', out, '%.1fs' % total, 'peak', peak)
