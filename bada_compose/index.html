@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data: blob:; media-src 'self' data: blob:; img-src 'self' data: blob:">
+<title>BADA Compose — 作曲スタジオ</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#141925; --panel2:#1b2231; --line:#2a3246; --text:#e6e2d6; --dim:#9aa2b6; --accent:#f0c46e;
+          --solo:#f0c46e; --tutti:#c8785a; --both:#a883d8; --cadenza:#eeeeee; --err:#ff7a7a; --ok:#8fd8a0; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif; font-size:14px; }
+  body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header { padding:10px 14px 6px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; }
+  header h1 { margin:0; font-size:20px; font-weight:600; letter-spacing:.02em; }
+  header .sub { color:var(--dim); font-size:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:4px 14px; }
+  button, select, input, textarea { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; }
+  button { padding:6px 10px; cursor:pointer; min-height:34px; }
+  button:hover { border-color:#4a5575; }
+  button.primary { background:#3a3120; border-color:#7a6230; color:#ffe2a6; }
+  button.big { font-size:16px; min-width:46px; }
+  select, input { padding:5px 6px; min-height:34px; }
+  input[type=number] { width:72px; }
+  input[type=range] { padding:0; }
+  textarea { width:100%; padding:6px; min-height:64px; resize:vertical; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
+  label.f { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--dim); }
+  label.c { display:inline-flex; gap:4px; align-items:center; font-size:13px; }
+  #pos { font-variant-numeric:tabular-nums; color:var(--dim); min-width:150px; }
+  #rollWrap { position:relative; margin:4px 0; }
+  #roll { display:block; width:100%; height:300px; background:#07090e; touch-action:pan-y; }
+  #strip { display:flex; gap:3px; overflow-x:auto; padding:6px 14px 8px; scroll-behavior:smooth; }
+  .bar { flex:0 0 auto; min-width:66px; padding:4px 5px 5px; border-radius:6px; background:var(--panel); border:1px solid var(--line); border-top:4px solid var(--solo); text-align:left; line-height:1.25; }
+  .bar b { display:block; font-size:11px; color:var(--dim); font-weight:500; }
+  .bar span { font-size:12px; white-space:nowrap; }
+  .bar.sel { background:#27304a; border-color:#8b97c0; }
+  .bar.now { box-shadow:0 0 0 2px var(--accent) inset; }
+  .bar.sec b::after { content:" §"; color:var(--accent); }
+  .bar.r-tutti { border-top-color:var(--tutti); } .bar.r-both { border-top-color:var(--both); } .bar.r-cadenza { border-top-color:var(--cadenza); }
+  .tabs { display:flex; gap:4px; padding:4px 14px 0; border-bottom:1px solid var(--line); overflow-x:auto; }
+  .tabs button { border-bottom:none; border-radius:6px 6px 0 0; background:var(--panel); white-space:nowrap; flex:0 0 auto; }
+  .tabs button.on { background:var(--panel2); color:var(--accent); }
+  .panel { display:none; padding:10px 14px 16px; background:var(--panel2); }
+  .panel.on { display:block; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px 12px; align-items:end; }
+  .palette { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+  .palette button { min-height:30px; padding:3px 8px; font-size:13px; }
+  .list { margin:6px 0; display:flex; flex-direction:column; gap:4px; }
+  .item { display:flex; gap:8px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:4px 8px; }
+  .item .grow { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .hint { color:var(--dim); font-size:12px; line-height:1.55; }
+  .bad { border-color:var(--err) !important; }
+  h3 { margin:12px 0 6px; font-size:14px; color:var(--accent); font-weight:600; }
+  #status { position:sticky; bottom:0; padding:7px 14px; background:#0e1320; border-top:1px solid var(--line); font-size:13px; min-height:32px; }
+  #status.err { color:var(--err); } #status.ok { color:var(--ok); }
+  #check { color:var(--dim); font-size:12px; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 10px; padding:0 14px; font-size:11px; color:var(--dim); }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+  @media (max-width:640px) { #roll { height:220px; } header h1 { font-size:17px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎼 BADA Compose — 作曲スタジオ</h1>
+  <span class="sub" id="projTitle">Piano Concerto BADA — in D minor</span>
+</header>
+<div class="row">
+  <button class="big primary" id="btnPlay" title="選択した小節から再生 (Space)">▶</button>
+  <button class="big" id="btnStop" title="停止">⏹</button>
+  <button id="btnTop" title="1 小節目へ">⏮ 1</button>
+  <span id="pos">Bar 1 / – · 0:00</span>
+  <label class="c">様式
+    <select id="selStyle">
+      <option value="concerto">協奏曲 (ピアノ + 管弦楽)</option>
+      <option value="piano">ピアノ独奏</option>
+      <option value="strings">弦楽合奏</option>
+    </select></label>
+  <label class="c">出力の調
+    <select id="selKey"></select></label>
+  <label class="c">テンポ
+    <select id="selTempo">
+      <option value="0.5">50%</option><option value="0.75">75%</option><option value="1" selected>100%</option>
+      <option value="1.25">125%</option><option value="1.5">150%</option>
+    </select></label>
+  <label class="c">乱数 <input type="number" id="inSeed" min="0" max="99999" value="13"></label>
+  <button id="btnDice" title="別の乱数で対位法を作り直す">🎲 作り直す</button>
+</div>
+<div id="rollWrap"><canvas id="roll"></canvas></div>
+<div class="legend" id="legend"></div>
+<div id="strip"></div>
+<div class="tabs" id="tabs">
+  <button data-tab="bar" class="on">🎹 小節</button>
+  <button data-tab="theme">🎵 主題</button>
+  <button data-tab="song">📁 曲</button>
+  <button data-tab="export">💾 書き出し</button>
+  <button data-tab="help">❔ 使い方</button>
+</div>
+
+<section class="panel on" id="p-bar">
+  <div class="row" style="padding:0 0 6px">
+    <strong id="barTitle">第 1 小節</strong>
+    <button id="btnInsBefore">＋ 前に挿入</button>
+    <button id="btnInsAfter">＋ 後に挿入</button>
+    <button id="btnDup">⧉ 複製</button>
+    <button id="btnDel">🗑 削除</button>
+    <button id="btnLoop4">↻ 末尾に 4 小節 (この小節から)</button>
+  </div>
+  <div class="grid">
+    <label class="f" style="grid-column:span 2"><span>和音 (1・2・4 個。例: <code>Dm</code> / <code>Gm A7</code> / <code>Dm Dm A/C# A/C#</code>)</span>
+      <input id="inChords" spellcheck="false" autocomplete="off"></label>
+    <label class="f">役割
+      <select id="selRole">
+        <option value="solo">ソロ (ピアノ)</option><option value="tutti">トゥッティ (管弦楽)</option>
+        <option value="both">合奏 (両方)</option><option value="cadenza">カデンツァ (ピアノのみ)</option>
+      </select></label>
+    <label class="f">テンポ ♩=<input type="number" id="inBpm" min="20" max="240"></label>
+    <label class="f">強弱 <input type="range" id="inDyn" min="0.2" max="1.2" step="0.05"></label>
+    <label class="f">奏法
+      <select id="selDet"><option value="1">レガート</option><option value="0.95">ふつう</option><option value="0.8">ノン・レガート</option><option value="0.6">スタッカート</option></select></label>
+    <label class="f">休む声部
+      <span><label class="c"><input type="checkbox" data-rest="S">S</label> <label class="c"><input type="checkbox" data-rest="A">A</label>
+            <label class="c"><input type="checkbox" data-rest="T">T</label> <label class="c"><input type="checkbox" data-rest="B">B</label></span></label>
+    <label class="f">和音を保持 <span><label class="c"><input type="checkbox" id="chkHold">全音符で伸ばす</label></span></label>
+    <label class="f">金管
+      <select id="selBrass"><option value="0">なし</option><option value="1">主題を重ねる</option><option value="2">和音のファンファーレ</option></select></label>
+    <label class="f">ティンパニ
+      <select id="selTimp"><option value="">なし</option><option value="0.6">1 打</option><option value="2">2 拍のロール</option><option value="4">4 拍のロール</option><option value="8">8 拍のロール</option></select></label>
+    <label class="f" style="grid-column:span 2">見出し (空欄で見出しなし)
+      <input id="inSecTitle" placeholder="例: II. Adagio — Lamento"></label>
+  </div>
+  <div class="palette" id="palette"></div>
+  <h3>この小節に置いた主題</h3>
+  <div class="list" id="entryList"></div>
+  <div class="grid">
+    <label class="f">声部
+      <select id="selEntryV"><option>S</option><option>A</option><option>T</option><option>B</option><option value="H">H (最上声の鐘)</option></select></label>
+    <label class="f">主題 <select id="selEntryTheme"></select></label>
+    <label class="f">移調 (半音) <input type="number" id="inEntrySemis" value="0" min="-36" max="36"></label>
+    <label class="f">開始拍
+      <select id="selEntryBeat"><option value="0">1 拍目</option><option value="1">2 拍目</option><option value="2">3 拍目</option><option value="3">4 拍目</option></select></label>
+    <label class="f">表示名 <input id="inEntryLabel" placeholder="空欄なら主題名"></label>
+    <button id="btnAddEntry" class="primary">＋ 主題を置く</button>
+  </div>
+  <p class="hint">和音は記譜の調 (既定 ニ短調) で書きます。聞こえる調は上の「出力の調」で移せます。和音の種類: 無印 m 7 m7 maj7 dim dim7 m7b5 sus4 sus2 aug 6 m6、転回は <code>/</code> で低音 (例 <code>A7/C#</code>)。</p>
+</section>
+
+<section class="panel" id="p-theme">
+  <h3>主題の一覧</h3>
+  <div class="list" id="themeList"></div>
+  <h3 id="themeEdTitle">新しい主題</h3>
+  <div class="grid">
+    <label class="f">名前 <input id="inThemeName" placeholder="例: わたしの主題"></label>
+    <button id="btnGenMel">🎲 選択小節の和音から旋律を作る (4 小節)</button>
+  </div>
+  <label class="f" style="margin-top:8px"><span>音符 (音名オクターヴ:拍数、休符は R:拍数。例 <code>D4:3 E4:1 F4:2 F#4:1 G4:1 A4:4</code>)</span>
+    <textarea id="inThemeNotes" spellcheck="false"></textarea></label>
+  <div class="row" style="padding:6px 0">
+    <button id="btnThemePreview">▶ 試聴</button>
+    <button id="btnThemeSave" class="primary">💾 主題を保存</button>
+    <button id="btnThemeNew">＋ 新規</button>
+  </div>
+  <p class="hint">保存した主題は「小節」タブの「主題」から選んで、好きな声部・小節・拍に置けます。対位法エンジンは置かれた主題に合わせて他の声部を作ります。</p>
+</section>
+
+<section class="panel" id="p-song">
+  <div class="grid">
+    <label class="f" style="grid-column:span 2">曲名 <input id="inTitle"></label>
+    <label class="f">基本テンポ ♩= <input type="number" id="inSongBpm" min="20" max="240"></label>
+    <label class="f">記譜の調
+      <select id="selWrittenKey"></select></label>
+  </div>
+  <h3>ひな形から始める</h3>
+  <div class="grid">
+    <label class="f">ひな形
+      <select id="selPreset">
+        <option value="pconcerto">Piano Concerto BADA — 全 3 楽章 (123 小節)</option>
+        <option value="mov1">I. Allegro moderato (1–58 小節)</option>
+        <option value="mov2">II. Adagio — Lamento (59–72 小節)</option>
+        <option value="mov3">III. Finale (73–123 小節)</option>
+        <option value="blank">新規 — 8 小節 (Dm Gm A7 Dm)</option>
+      </select></label>
+    <button id="btnPreset" class="primary">この ひな形 を開く</button>
+  </div>
+  <h3>プロジェクト</h3>
+  <div class="row" style="padding:0">
+    <button id="btnSaveProj">💾 プロジェクトを保存 (.json)</button>
+    <button id="btnOpenProj">📂 プロジェクトを開く</button>
+    <input type="file" id="fileProj" accept=".json,application/json" hidden>
+  </div>
+  <p class="hint">編集内容はこの端末に自動保存されます。別の端末へ移すときはプロジェクトを保存してください。</p>
+</section>
+
+<section class="panel" id="p-export">
+  <div class="grid">
+    <label class="f">範囲 (開始小節) <input type="number" id="inFrom" min="1" value="1"></label>
+    <label class="f">範囲 (終了小節) <input type="number" id="inTo" min="1" value="1"></label>
+    <button id="btnRangeAll">全曲</button>
+  </div>
+  <h3>書き出し</h3>
+  <div class="row" style="padding:0">
+    <button id="btnWav" class="primary">🔊 WAV (音声)</button>
+    <button id="btnMidi">🎼 MIDI (.mid)</button>
+    <button id="btnVideo">🎬 動画を録画 (MP4 / WebM)</button>
+    <button id="btnScore">📄 score.json (Python 版で高音質合成)</button>
+  </div>
+  <p class="hint">WAV はオフラインで一気に合成します (長い曲は数十秒かかります)。動画はピアノロールと音を再生しながら実時間で録画し、対応する環境では MP4、それ以外は WebM で保存します。
+  score.json はリポジトリの <code>bada_fuga/synth.py</code> と <code>video.py</code> でそのまま音声・mp4 にできます。</p>
+</section>
+
+<section class="panel" id="p-help">
+  <p class="hint">
+  <b>1.</b> 起動すると Piano Concerto BADA (ニ短調・3 楽章) のコード進行と主題が読み込まれ、対位法エンジンが 4 声を作ります。▶ で再生。<br>
+  <b>2.</b> 下の小節の列をタップして選び、「小節」タブで和音・役割 (ソロ / トゥッティ / 合奏 / カデンツァ)・テンポ・強弱を変えると、すぐに 4 声が作り直されます。<br>
+  <b>3.</b> 小節の挿入・複製・削除で形式を変え、「主題」タブで自分の主題を書いて (または和音から旋律を作って) 好きな声部に置きます。<br>
+  <b>4.</b> 🎲 は同じ和音・主題のまま、自由声部の選び方を変えます。上の欄に 平行 5 度・8 度 と 強拍の不協和 の数が出ます。<br>
+  <b>5.</b> 「書き出し」で WAV・MIDI・動画・score.json に保存します。<br>
+  主題 I ← MOTHER (LUNA SEA) の旋律輪郭 ／ 主題 II ← トラック18 の反復音型 ／ 主題 III ← B♭-A-D-A ／ 嘆きのバス ← 半音下行。
+  </p>
+</section>
+<div id="check"></div>
+<div id="status">準備中…</div>
+
+<!-- Android APK (Cordova) 内でのみ実体があり、保存ダイアログのプラグインを提供する。ブラウザ / Electron では 404 になるだけで無害。 -->
+<script src="cordova.js"></script>
+<script>
+"use strict";
+/* ================================================================ 音名・和音 */
+var PC = { C:0, "C#":1, Db:1, D:2, "D#":3, Eb:3, E:4, F:5, "F#":6, Gb:6, G:7, "G#":8, Ab:8, A:9, "A#":10, Bb:10, B:11 };
+var NAMES = ["C","C#","D","Eb","E","F","F#","G","G#","A","Bb","B"];
+var KEYNAMES_JP = { 0:"ハ", 1:"嬰ハ", 2:"ニ", 3:"変ホ", 4:"ホ", 5:"ヘ", 6:"嬰ヘ", 7:"ト", 8:"変イ", 9:"イ", 10:"変ロ", 11:"ロ" };
+function mod12(x) { return ((x % 12) + 12) % 12; }
+function n(name) {
+  var m = /^([A-G](?:#|b)?)(-?\d)$/.exec(name);
+  if (!m || !(m[1] in PC)) return null;
+  return 12 * (parseInt(m[2], 10) + 1) + PC[m[1]];
+}
+function nameOf(m) { return NAMES[mod12(m)] + (Math.floor(m / 12) - 1); }
+var QUAL = { "":[0,4,7], m:[0,3,7], "7":[0,4,7,10], m7:[0,3,7,10], maj7:[0,4,7,11], dim:[0,3,6], dim7:[0,3,6,9],
+             m7b5:[0,3,6,10], sus4:[0,5,7], sus2:[0,2,7], aug:[0,4,8], "6":[0,4,7,9], m6:[0,3,7,9] };
+/* 記譜の調: 自由声部の経過音に使う音階の基準 (Python 版の「ニ短調 + 和音の臨時記号」を一般化) */
+var KEY = { tonic: 2, minor: true };
+var REPL_MINOR_D = { 1:0, 8:7, 6:5, 3:4, 11:10 };   /* ニ短調: C#→C を外す … (Python と同じ) */
+var REPL_MAJOR_C = { 1:0, 3:4, 6:5, 8:7, 10:11 };
+var _chordCache = {};
+function setKey(tonic, minor) { KEY = { tonic: mod12(tonic), minor: !!minor }; _chordCache = {}; }
+function keyBase() {
+  var iv = KEY.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11];
+  return iv.map(function (x) { return mod12(x + KEY.tonic); });
+}
+function keyRepl() {
+  var out = {}, src = KEY.minor ? REPL_MINOR_D : REPL_MAJOR_C, t = KEY.minor ? KEY.tonic - 2 : KEY.tonic;
+  Object.keys(src).forEach(function (k) { out[mod12(+k + t)] = mod12(src[k] + t); });
+  return out;
+}
+function chord(s) {
+  if (typeof s !== "string") return null;
+  if (_chordCache.hasOwnProperty(s)) return _chordCache[s];
+  var m = /^([A-G](?:#|b)?)([^\/]*)(?:\/([A-G](?:#|b)?))?$/.exec(s.trim());
+  if (!m || !(m[1] in PC) || !QUAL.hasOwnProperty(m[2]) || (m[3] && !(m[3] in PC))) { _chordCache[s] = null; return null; }
+  var root = PC[m[1]], q = QUAL[m[2]];
+  var pcs = q.map(function (x) { return (root + x) % 12; });
+  var c = { name: s, root: root, pcs: pcs, bass: m[3] ? PC[m[3]] : root, third: pcs[1], fifth: pcs[2],
+            seventh: pcs.length > 3 ? pcs[3] : null, major3: q[1] === 4, slash: !!m[3] };
+  var base = keyBase(), repl = keyRepl();
+  pcs.forEach(function (p) {
+    if (base.indexOf(p) < 0 && repl.hasOwnProperty(p)) {
+      var i = base.indexOf(repl[p]); if (i >= 0) base.splice(i, 1);
+      base.push(p);
+    }
+  });
+  c.scale = base.slice().sort(function (a, b) { return a - b; });
+  _chordCache[s] = c;
+  return c;
+}
+function transposeChordName(cs, semis) {
+  var m = /^([A-G](?:#|b)?)([^\/]*)(?:\/([A-G](?:#|b)?))?$/.exec(cs);
+  if (!m) return cs;
+  var s = NAMES[mod12(PC[m[1]] + semis)] + m[2];
+  if (m[3]) s += "/" + NAMES[mod12(PC[m[3]] + semis)];
+  return s;
+}
+function transposeH(H, semis) { return H.map(function (bar) { return bar.map(function (c) { return transposeChordName(c, semis); }); }); }
+function mat(items) { return items.map(function (it) { return [it[1], it[0] ? n(it[0]) : null]; }); }
+
+/* ================================================================ 乱数 (再現可能) */
+function makeRng(seed) {
+  var a = (seed >>> 0) || 1;
+  return { random: function () {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  } };
+}
+
+/* ================================================================ 対位法エンジン (compose.py の移植) */
+var VOICES = ["S", "A", "T", "B"];
+var RANGE = { S:[60,84], A:[55,77], T:[48,69], B:[36,58] };
+var CENTER = { S:71, A:65, T:58, B:46 };
+var ORDER = { S:3, A:2, T:1, B:0 };
+var BPB = 4;
+
+function Piece(nbars) {
+  this.nbars = nbars; this.N = nbars * BPB;
+  this.harm = []; for (var i = 0; i < this.N; i++) this.harm.push("Dm");
+  this.fixed = { S:[], A:[], T:[], B:[] };
+  this.rest = { S:{}, A:{}, T:{}, B:{} };
+  this.hold = {}; this.entries = []; this.sections = [];
+  this.dyn = {}; this.tempo = {}; this.det = {}; this.role = {};
+}
+Piece.prototype.fixedCover = function (v) {
+  var cov = new Array(this.N).fill(null);
+  this.fixed[v].forEach(function (f) {
+    var s = f[0], d = f[1], m = f[2];
+    var b = Math.floor(s), e = Math.ceil(s + d - 1e-9);
+    for (var k = b; k < Math.min(e, this.N); k++) if (cov[k] === null || s <= k) cov[k] = m;
+  }, this);
+  return cov;
+};
+function melodicCost(d) {
+  d = Math.abs(d);
+  if (d === 0) return 0.9; if (d <= 2) return 0.0; if (d <= 4) return 0.5; if (d === 5) return 1.0;
+  if (d === 6) return 2.5; if (d === 7) return 1.3; if (d <= 9) return 2.4; if (d <= 11) return 4.0;
+  if (d === 12) return 2.0; return 7.0;
+}
+function chooseNote(v, b, c, now, prev, prevSelf, prevChord, rng, strong) {
+  var lo = RANGE[v][0], hi = RANGE[v][1], best = null, bestc = 1e9;
+  var present = []; Object.keys(now).forEach(function (o) { if (now[o] !== null) present.push(mod12(now[o])); });
+  for (var m = lo; m <= hi; m++) {
+    var pc = mod12(m);
+    if (c.pcs.indexOf(pc) < 0) continue;
+    var cost = rng.random() * 0.5;
+    if (prevSelf !== null) {
+      cost += melodicCost(m - prevSelf);
+      if (prevChord) {
+        if (prevChord.major3 && mod12(prevSelf) === prevChord.third && mod12(prevChord.root - prevSelf) !== 0) {
+          if (m - prevSelf === 1) cost -= 1.2; else if (Math.abs(m - prevSelf) > 2) cost += 1.0;
+        }
+        if (prevChord.seventh !== null && mod12(prevSelf) === prevChord.seventh) {
+          if (prevSelf - m === 1 || prevSelf - m === 2) cost -= 1.0; else if (m > prevSelf) cost += 1.5;
+        }
+      }
+    } else cost += Math.abs(m - CENTER[v]) / 6.0;
+    cost += Math.abs(m - CENTER[v]) / 10.0;
+    if (m < lo + 3 || m > hi - 3) cost += 2.0;
+    if (v === "B") {
+      if (pc === c.bass) cost -= 0.8; else if (c.slash) cost += 6.0; else if (pc === c.third) cost += 1.2;
+      else if (pc === c.fifth) cost += 3.5; else cost += 3.0;
+    } else {
+      if (c.seventh !== null && pc === c.seventh && present.indexOf(pc) >= 0) cost += 3.0;
+      if (c.major3 && pc === c.third && present.indexOf(pc) >= 0) cost += 3.5;
+      if (present.indexOf(pc) < 0) cost -= 1.3;
+    }
+    for (var o in now) {
+      var om = now[o]; if (om === null || om === undefined) continue;
+      if ((ORDER[o] > ORDER[v] && om <= m) || (ORDER[o] < ORDER[v] && om >= m)) cost += 40.0;
+      if (om === m) cost += 6.0;
+      var diff = Math.abs(om - m) % 12;
+      if (diff === 1 || diff === 11) cost += strong ? 8.0 : 3.0;
+      if ((diff === 2 || diff === 10) && strong && c.pcs.indexOf(mod12(om)) < 0) cost += 4.0;
+      if (diff === 0 && strong && om !== m) cost += 1.0;
+      var adj = Math.abs(ORDER[o] - ORDER[v]) === 1;
+      if (adj && o !== "B" && v !== "B" && Math.abs(om - m) > 12) cost += 2.5;
+      if (adj && (o === "B" || v === "B") && Math.abs(om - m) > 19) cost += 2.0;
+      var op = prev[o];
+      if (op !== null && op !== undefined && prevSelf !== null && op !== om && prevSelf !== m) {
+        var i1 = Math.abs(prevSelf - op) % 12, i2 = Math.abs(m - om) % 12;
+        if (i1 === i2 && (i1 === 0 || i1 === 7)) cost += 30.0;
+        if ((i2 === 0 || i2 === 7) && (m - prevSelf) * (om - op) > 0 && Math.abs(m - prevSelf) > 2 &&
+            ((o === "S" && v === "B") || (o === "B" && v === "S"))) cost += 4.0;
+      }
+    }
+    if (cost < bestc) { best = m; bestc = cost; }
+  }
+  return best;
+}
+function generate(piece, seed) {
+  var rng = makeRng(seed), cov = {}, skel = {}, isfree = {}, prevNote = {}, prevChord = null;
+  VOICES.forEach(function (v) {
+    cov[v] = piece.fixedCover(v); skel[v] = new Array(piece.N).fill(null); prevNote[v] = null;
+    isfree[v] = []; for (var b = 0; b < piece.N; b++) isfree[v].push(cov[v][b] === null && !piece.rest[v][b]);
+  });
+  var order = VOICES.slice().sort(function (a, b) { return ORDER[a] - ORDER[b]; });
+  for (var b = 0; b < piece.N; b++) {
+    var c = chord(piece.harm[b]) || chord("Dm"), strong = (b % BPB) === 0 || (b % BPB) === 2, now = {}, prev = {};
+    VOICES.forEach(function (v) { if (cov[v][b] !== null) now[v] = cov[v][b]; prev[v] = prevNote[v]; });
+    order.forEach(function (v) {
+      if (!isfree[v][b]) return;
+      var ps = (b > 0 && (isfree[v][b - 1] || cov[v][b - 1] !== null)) ? prevNote[v] : null;
+      var m = chooseNote(v, b, c, now, prev, ps, prevChord, rng, strong);
+      skel[v][b] = m; now[v] = m;
+    });
+    VOICES.forEach(function (v) {
+      if (now[v] !== undefined && now[v] !== null) prevNote[v] = now[v];
+      else if (piece.rest[v][b]) prevNote[v] = null;
+    });
+    prevChord = c;
+  }
+  return { skel: skel, cov: cov, isfree: isfree };
+}
+function neighbor(m, c, up) {
+  var x = m + (up ? 1 : -1), guard = 0;
+  while (c.scale.indexOf(mod12(x)) < 0 && guard++ < 12) x += up ? 1 : -1;
+  return x;
+}
+function realize(piece, v, g, rng) {
+  var skel = g.skel[v], isfree = g.isfree[v], ev = [], N = piece.N, b = 0, firsts = {};
+  piece.fixed[v].forEach(function (f) { var k = Math.floor(f[0]); if (!(k in firsts)) firsts[k] = f[2]; });
+  while (b < N) {
+    var m = skel[b];
+    if (m === null) { b++; continue; }
+    var bar = Math.floor(b / BPB), c = chord(piece.harm[b]) || chord("Dm");
+    if (piece.hold[bar]) {
+      var e = b;
+      while (e < N && Math.floor(e / BPB) === bar && isfree[e] && skel[e] === m) e++;
+      ev.push([b, e - b, m, null]); b = e; continue;
+    }
+    var nxt = null;
+    if (b + 1 < N) nxt = skel[b + 1] !== null ? skel[b + 1] : (firsts.hasOwnProperty(b + 1) ? firsts[b + 1] : null);
+    var d = nxt === null ? null : nxt - m, r = rng.random(), strong = (b % BPB) === 0 || (b % BPB) === 2;
+    if (d !== null && (Math.abs(d) === 3 || Math.abs(d) === 4) && r < 0.72) {
+      var step = d > 0 ? 1 : -1, ok = [m + step, m + 2 * step].filter(function (x) { return c.scale.indexOf(mod12(x)) >= 0; });
+      ev.push([b, 0.5, m, null], [b + 0.5, 0.5, ok.length ? ok[0] : m + 2 * step, null]); b += 1;
+    } else if (d === 0 && b + 1 < N && skel[b + 1] === m && isfree[b + 1]) {
+      if (r < 0.30) { ev.push([b, 2, m, null]); b += 2; }
+      else if (r < 0.75) { ev.push([b, 0.5, m, null], [b + 0.5, 0.5, neighbor(m, c, m < CENTER[v]), null]); b += 1; }
+      else { ev.push([b, 1, m, null]); b += 1; }
+    } else if (d !== null && Math.abs(d) >= 5 && Math.abs(d) <= 9 && r < 0.5) {
+      var mids = []; for (var x = Math.min(m, nxt) + 1; x < Math.max(m, nxt); x++) if (c.pcs.indexOf(mod12(x)) >= 0) mids.push(x);
+      if (mids.length) ev.push([b, 0.5, m, null], [b + 0.5, 0.5, d > 0 ? mids[mids.length - 1] : mids[0], null]);
+      else ev.push([b, 1, m, null]);
+      b += 1;
+    } else if (d !== null && (Math.abs(d) === 1 || Math.abs(d) === 2) && !strong && r < 0.22) {
+      ev.push([b, 0.5, m, null], [b + 0.5, 0.5, neighbor(m, c, d < 0), null]); b += 1;
+    } else { ev.push([b, 1, m, null]); b += 1; }
+  }
+  return ev;
+}
+function check(piece, events) {
+  var N = piece.N, sound = {}, diss = 0, par = 0, list = [];
+  VOICES.forEach(function (v) {
+    sound[v] = new Array(N * 2).fill(null);
+    events[v].forEach(function (e) {
+      for (var k = Math.round(e[0] * 2); k < Math.min(Math.round((e[0] + e[1]) * 2), N * 2); k++) sound[v][k] = e[2];
+    });
+  });
+  for (var k = 0; k < N * 2; k += 2) {
+    var b = k / 2, strong = (b % BPB) === 0 || (b % BPB) === 2, ch = chord(piece.harm[b]) || chord("Dm");
+    var vs = VOICES.filter(function (v) { return sound[v][k] !== null; });
+    for (var i = 0; i < vs.length; i++) for (var j = i + 1; j < vs.length; j++) {
+      var a = sound[vs[i]][k], c2 = sound[vs[j]][k], iv = Math.abs(a - c2) % 12;
+      var nct = ch.pcs.indexOf(mod12(a)) < 0 || ch.pcs.indexOf(mod12(c2)) < 0;
+      if ((strong && [1, 2, 11, 10, 6].indexOf(iv) >= 0 && nct) || iv === 1 || iv === 11) diss++;
+      if (k >= 2 && sound[vs[i]][k - 2] !== null && sound[vs[j]][k - 2] !== null) {
+        var a0 = sound[vs[i]][k - 2], c0 = sound[vs[j]][k - 2];
+        if (a0 !== a && c0 !== c2 && mod12(a0 - c0) === mod12(a - c2) && (mod12(a - c2) === 0 || mod12(a - c2) === 7)) {
+          par++; if (list.length < 8) list.push((Math.floor(b / BPB) + 1) + "." + (b % BPB + 1) + " " + vs[i] + "–" + vs[j]);
+        }
+      }
+    }
+  }
+  return { diss: diss, par: par, parList: list };
+}
+function seqLine(chords, pattern, start, lo, hi) {
+  var out = [], cur = start;
+  chords.forEach(function (cs) {
+    var c = chord(cs);
+    pattern.forEach(function (p) {
+      var deg = p[0], dur = p[1], m;
+      if (typeof deg === "string") {
+        m = cur + (deg === "n+" ? 1 : -1);
+        while (c.scale.indexOf(mod12(m)) < 0) m += deg === "n+" ? 1 : -1;
+      } else {
+        var pc = c.pcs[deg % c.pcs.length], best = null;
+        for (var x = lo; x <= hi; x++) if (mod12(x) === pc && (best === null || Math.abs(x - cur) < Math.abs(best - cur))) best = x;
+        m = best;
+      }
+      out.push([dur, m]); cur = m;
+    });
+  });
+  return out;
+}
+
+/* ================================================================ 素材 (compose.py / compose_dialogo.py と同じ) */
+var S1 = mat([["D4",3],["E4",1],["F4",2],["F#4",1],["G4",1],["A4",2],["G4",1],["F4",1],["E4",2],["D4",1],["C#4",1],["D4",4]]);
+var H_S1 = [["Dm","Dm","Dm","Dm"],["Dm","Dm","D7","Gm"],["A","A","Gm","Dm"],["A7","A7","A7","A7"],["Dm","Dm","Dm","Dm"]];
+var S2 = mat([["F4",.5],["F4",.5],["F4",.5],["G4",.5],["A4",.5],["A4",.5],["G4",.5],["F4",.5],
+              ["D4",.5],["A3",.5],["A3",.5],["A3",.5],["D4",.5],["A3",.5],["Bb3",.5],["G3",.5],
+              ["C#4",.5],["D4",.5],["C#4",.5],["E4",.5],["D4",.5],["Bb3",.5],["F3",.5],["G3",.5]]);
+var H_S2 = [["Dm","Dm","Dm","Dm"],["Dm","Dm","D7","Gm"],["A","A","Gm","Dm"],["A7","A7","A7","A7"]];
+var S3 = mat([["Bb4",1],["A4",1],["D5",1],["A4",1],["Bb4",1],["A4",1],["G#4",1],["A4",1],
+              ["F4",.5],["G4",.5],["A4",.5],["F4",.5],["E4",.5],["D4",.5],["C#4",.5],["E4",.5]]);
+var H_S3 = [["A","A","Gm","Dm"],["A7","A7","A","A7"],["Dm","Dm","A7","A7"],["Dm","Dm","Dm","Dm"]];
+var H_TRIPLE = [["Dm","Dm","Dm","Dm"],["Dm","Dm","D7","Gm"],["A","A","Gm","Dm"],["A7","A7","A","A7"],["Dm","Dm","A7","A7"],["Dm","Dm","Dm","Dm"]];
+var BADA = mat([["Bb4",2],["A4",2],["D5",2],["A4",2]]);
+var LAMENT_H = [["Dm","Dm","A/C#","A/C#"],["F/C","F/C","G/B","G/B"],["Gm/Bb","Gm/Bb","A7","A7"]];
+var LAMENT_B = [n("D2"), n("C#2"), n("C2"), n("B1"), n("Bb1"), n("A1")];
+var BUILTIN_THEMES = [
+  { id:"S1", name:"主題 I 〈MOTHER〉", notes:S1 },
+  { id:"S2", name:"主題 II 〈トラック18〉", notes:S2 },
+  { id:"S3", name:"主題 III 〈B-A-D-A〉", notes:S3 },
+  { id:"BADA", name:"B-A-D-A (2 分音符)", notes:BADA },
+  { id:"LAMENT", name:"嘆きのバス (D C# C B B♭ A)", notes:mat([["D3",2],["C#3",2],["C3",2],["B2",2],["Bb2",2],["A2",2]]) },
+  { id:"RUN", name:"カデンツァの走句", notes:mat([["A4",.5],["Bb4",.5],["C#5",.5],["D5",.5],["E5",.5],["F5",.5],["G5",.5],["A5",.5],["Bb5",.5],["A5",.5],["G5",.5],["F5",.5],["E5",.5],["D5",.5],["C#5",.5],["E5",.5]]) }
+];
+
+/* ================================================================ ひな形の組み立て (compose.py / compose_pconcerto.py の移植) */
+function Builder(nbars) {
+  this.nbars = nbars; this.harm = []; for (var i = 0; i < nbars * BPB; i++) this.harm.push("Dm");
+  this.ent = []; this.rest = { S:{}, A:{}, T:{}, B:{} }; this.hold = {}; this.sections = [];
+  this.tempo = {}; this.dyn = {}; this.det = {}; this.role = {}; this.brass = {}; this.timp = {};
+}
+Builder.prototype.setHarm = function (bar, spec) {
+  if (typeof spec === "string") spec = [spec];
+  var k = Math.floor(BPB / spec.length);
+  for (var i = 0; i < spec.length; i++) for (var j = 0; j < k; j++) this.harm[bar * BPB + i * k + j] = spec[i];
+};
+Builder.prototype.setHarms = function (bar, specs) { for (var i = 0; i < specs.length; i++) this.setHarm(bar + i, specs[i]); };
+Builder.prototype.place = function (v, bar, material, semis, label, beat) {
+  this.ent.push({ v: v, beat: bar * BPB + (beat || 0), label: label || null, marker: !!label,
+    notes: material.map(function (x) { return [x[0], x[1] === null ? null : x[1] + (semis || 0)]; }) });
+};
+Builder.prototype.restBars = function (v, b0, b1, beats) {
+  for (var bar = b0; bar < b1; bar++) (beats || [0, 1, 2, 3]).forEach(function (bt) { this.rest[v][bar * BPB + bt] = true; }, this);
+};
+Builder.prototype.section = function (bar, title, sub) { this.sections.push({ bar: bar, title: title, sub: sub || "" }); };
+Builder.prototype.addTimp = function (bar, beat, dbeats, factor) { (this.timp[bar] = this.timp[bar] || []).push([beat, dbeats, factor]); };
+
+function copyBars(T, P, s0, s1, dst) {
+  var off = (dst - s0) * BPB, lo = s0 * BPB, hi = s1 * BPB;
+  for (var b = lo; b < hi; b++) P.harm[b + off] = T.harm[b];
+  T.ent.forEach(function (e) {
+    var t = e.beat, kept = [];
+    e.notes.forEach(function (x) { if (x[1] !== null && t >= lo && t < hi) kept.push([t, x[0], x[1]]); t += x[0]; });
+    if (!kept.length) return;
+    var notes = [], cur = kept[0][0];
+    kept.forEach(function (k) { if (k[0] > cur + 1e-9) notes.push([k[0] - cur, null]); notes.push([k[1], k[2]]); cur = k[0] + k[1]; });
+    P.ent.push({ v: e.v, beat: kept[0][0] + off, notes: notes, label: e.label, marker: e.marker && e.beat >= lo && e.beat < hi });
+  });
+  VOICES.forEach(function (v) { Object.keys(T.rest[v]).forEach(function (b) { b = +b; if (b >= lo && b < hi) P.rest[v][b + off] = true; }); });
+  Object.keys(T.hold).forEach(function (bar) { bar = +bar; if (bar >= s0 && bar < s1) P.hold[bar + dst - s0] = true; });
+  T.sections.forEach(function (s) { if (s.bar >= s0 && s.bar < s1) P.sections.push({ bar: s.bar + dst - s0, title: s.title, sub: s.sub }); });
+}
+function epHarm(E) { return [[E[0],E[0],E[1],E[1]],[E[2],E[2],E[3],E[3]],[E[4],E[4],E[5],E[5]],[E[6],E[6],E[7],E[7]]]; }
+function buildFugue(P) {
+  P.section(0, "I. Soggetto I 〈MOTHER〉", "主題 I の提示 — 4 声フーガ (ニ短調)");
+  P.setHarms(0, H_S1); P.place("A", 0, S1, 0, "S1");
+  "STB".split("").forEach(function (v) { P.restBars(v, 0, 5); });
+  P.setHarms(5, transposeH(H_S1, 7)); P.place("S", 5, S1, 7, "S1 (答唱)");
+  "TB".split("").forEach(function (v) { P.restBars(v, 5, 10); });
+  P.setHarms(10, [["Am","Am","Dm","Dm"],["Gm","Gm","A7","A7"]]);
+  "TB".split("").forEach(function (v) { P.restBars(v, 10, 12); });
+  P.setHarms(12, H_S1); P.place("B", 12, S1, -12, "S1");
+  P.restBars("T", 12, 17);
+  P.setHarms(17, transposeH(H_S1, 7)); P.place("T", 17, S1, -5, "S1 (答唱)");
+  var EP1 = ["Am","Dm","Gm","C","F","Bb","Em7b5","A7"];
+  P.setHarms(22, epHarm(EP1)); P.place("S", 22, seqLine(EP1, [[0,.5],[1,.5],[2,.5],["n+",.5]], n("E5"), 64, 81), 0, null);
+  P.restBars("B", 22, 24);
+  P.setHarms(26, H_S1); P.place("S", 26, S1, 12, "S1");
+  var EP2 = ["Dm","Gm","Cm","F7","Bb","Eb","Am7b5","D7"];
+  P.setHarms(31, epHarm(EP2)); P.place("A", 31, seqLine(EP2, [[1,.5],[0,.5],[2,.5],[1,.5]], n("A4"), 57, 74), 0, null);
+  P.restBars("S", 31, 33);
+  P.setHarms(35, transposeH(H_S1, 5)); P.place("T", 35, S1, -7, "S1 (下属調)");
+  var EP3 = ["Gm","C7","F","Bb","Em7b5","A7","Dm","A"];
+  P.setHarms(40, epHarm(EP3)); P.place("B", 40, seqLine(EP3.slice(0, 6), [[0,1],[2,.5],[1,.5]], n("G3"), 38, 57), 0, null);
+  P.restBars("A", 40, 42);
+  P.section(44, "II. Soggetto II 〈トラック18〉", "主題 II の提示 と 主題 I との二重結合");
+  P.setHarms(44, H_S2); P.place("A", 44, S2, 0, "S2");
+  "ST".split("").forEach(function (v) { P.restBars(v, 44, 47); });
+  P.setHarms(47, transposeH(H_S2, 7)); P.place("S", 47, S2, 7, "S2 (答唱)");
+  P.restBars("T", 47, 50);
+  P.setHarms(50, H_S2); P.place("T", 50, S2, -12, "S2");
+  P.restBars("B", 50, 53);
+  P.setHarms(53, transposeH(H_S2, 7)); P.place("B", 53, S2, -17, "S2 (答唱)");
+  var EP4 = ["Dm","Gm","C","F","Bb","Em7b5","A7","A7"];
+  P.setHarms(56, epHarm(EP4));
+  P.place("S", 56, seqLine(EP4.slice(0, 6), [[1,.5],[1,.5],[1,.5],[2,.5]], n("F5"), 64, 81), 0, null);
+  P.place("T", 56, seqLine(EP4.slice(0, 6), [[0,1],["n-",.5],[0,.5]], n("D4"), 50, 66), 0, null);
+  P.setHarms(60, H_S1); P.place("B", 60, S1, -12, "S1"); P.place("S", 60, S2, 12, "S2");
+  var EP5 = ["Dm","G","C","F","Bm7b5","E7","Am","E7"];
+  P.setHarms(65, epHarm(EP5)); P.place("A", 65, seqLine(EP5, [[0,.5],[1,.5],[2,.5],["n+",.5]], n("D4"), 57, 74), 0, null);
+  P.restBars("S", 65, 67);
+  P.setHarms(69, transposeH(H_S1, 7)); P.place("S", 69, S1, 7, "S1 (答唱)"); P.place("T", 69, S2, -5, "S2 (答唱)");
+  var EP6 = ["Am","Dm","Gm","C","F","Bb","Em7b5","A7"];
+  P.setHarms(74, epHarm(EP6)); P.place("S", 74, seqLine(EP6, [[1,.5],["n+",.5],[1,.5],[0,.5]], n("E5"), 64, 81), 0, null);
+  P.restBars("T", 74, 76);
+  P.setHarms(78, H_S1); P.place("A", 78, S1, 0, "S1"); P.place("B", 78, S2, -12, "S2");
+  P.setHarms(83, [["Gm","Gm","Em7b5","A7"],["Dm","Dm","A","A"]]);
+  P.section(85, "III. Soggetto III 〈B-A-D-A〉", "B♭-A-D-A の提示 と 三重結合 (Fuga a tre soggetti)");
+  P.setHarms(85, H_S3); P.place("A", 85, S3, 0, "S3 B-A-D-A");
+  P.restBars("S", 85, 88);
+  P.setHarms(88, transposeH(H_S3, 7)); P.place("S", 88, S3, 7, "S3 (答唱)");
+  P.restBars("T", 88, 91);
+  P.setHarms(91, H_S3); P.place("B", 91, S3, -24, "S3 B-A-D-A");
+  P.setHarms(94, transposeH(H_S3, 7)); P.place("T", 94, S3, -5, "S3 (答唱)");
+  var EP7 = ["Am","Dm","Gm","C","F","Bb","Em7b5","A7"];
+  P.setHarms(97, epHarm(EP7)); P.place("S", 97, seqLine(EP7, [["n+",.5],[1,.5],[0,1]], n("C5"), 64, 81), 0, null);
+  P.restBars("B", 97, 99);
+  P.setHarms(101, H_TRIPLE); P.place("B", 101, S1, -12, "S1"); P.place("S", 101, S2, 12, "S2"); P.place("A", 103, S3, 0, "S3 B-A-D-A");
+  var EP8 = ["Dm","G","C","F","Bm7b5","E7","Am","E7"];
+  P.setHarms(107, epHarm(EP8)); P.place("T", 107, seqLine(EP8, [[0,.5],[1,.5],[2,.5],["n+",.5]], n("D4"), 50, 66), 0, null);
+  P.restBars("S", 107, 109);
+  P.setHarms(111, transposeH(H_TRIPLE, 7)); P.place("T", 111, S1, -5, "S1 (答唱)"); P.place("S", 111, S2, 19, "S2 (答唱)"); P.place("A", 113, S3, 7, "S3 (答唱)");
+  var EP9 = ["Am","Dm","Gm","C","F","Bb","Em7b5","A7"];
+  P.setHarms(117, epHarm(EP9));
+  P.place("S", 117, seqLine(EP9, [[1,.5],["n+",.5],[1,.5],[0,.5]], n("E5"), 64, 81), 0, null);
+  P.place("B", 117, seqLine(EP9, [[0,1],[0,.5],[0,.5]], n("A2"), 38, 57), 0, null);
+  P.section(121, "III. Fuga a tre soggetti — 終結", "三主題の最終結合 と コーダ (ピカルディ終止)");
+  P.setHarms(121, H_TRIPLE); P.place("S", 121, S1, 12, "S1"); P.place("A", 121, S2, 0, "S2"); P.place("T", 123, S3, -12, "S3 B-A-D-A");
+  P.setHarms(126, [["Dm","Dm","Dm","Dm"],["Gm/D","Gm/D","Bb/D","Bb/D"],["A7/D","A7/D","A7","A7"],["D","D","D","D"]]);
+  VOICES.forEach(function (v) { P.restBars(v, 126, 127, [0, 1]); });
+  P.hold[127] = P.hold[128] = P.hold[129] = true;
+  P.setHarm(129, "D");
+}
+function singingBass(root, cs) {
+  var sc = chord(cs).scale, up = [], m = root;
+  while (up.length < 2) { m += 1; if (sc.indexOf(mod12(m)) >= 0) up.push(m); }
+  if (up[1] - up[0] > 2) up[0] = up[1] - 2;
+  return [[1, root], [.5, up[0]], [.5, up[1]]];
+}
+function lament(P, bar0, ncycles, opt) {
+  opt = opt || {};
+  var canon = opt.canon !== false;
+  for (var cyc = 0; cyc < ncycles; cyc++) {
+    var b = bar0 + 3 * cyc;
+    P.setHarms(b, LAMENT_H);
+    LAMENT_B.forEach(function (m, i) {
+      var cs = LAMENT_H[Math.floor(i / 2)][(i % 2) * 2];
+      P.place("B", b + Math.floor(i / 2), singingBass(m, cs), 0, (i === 0 && cyc === 0 && opt.label) ? "Lamento (歌う嘆きのバス)" : null, (i % 2) * 2);
+    });
+    if (opt.firstSolo && cyc === 0) P.place("T", b, BADA, -12, "B-A-D-A (左手)");
+    else {
+      P.place("A", b, BADA, 0, cyc === 0 ? "B-A-D-A" : null);
+      if (canon) P.place("T", b + 1, BADA, -12, cyc === 0 ? "B-A-D-A カノン (左手)" : null);
+    }
+    for (var k = 0; k < 3; k++) P.dyn[b + k] = typeof opt.dyn === "function" ? opt.dyn(cyc) : (opt.dyn === undefined ? 0.7 : opt.dyn);
+  }
+}
+function highBada(P, bar0, nreps, label) {
+  if (label === undefined) label = "B-A-D-A (最上声)";
+  P.ent.push({ v: "H", beat: bar0 * BPB, label: label, marker: false,
+    notes: [].concat.apply([], Array.from({ length: nreps }, function () { return [[4, n("Bb5")], [4, n("A5")], [4, n("D6")], [4, n("A5")]]; })) });
+}
+function buildPConcerto() {
+  var I_INTRO = 6, I_A = 40, CAD = 8, M2 = 58, M3 = 72, III_FUGA = 45, TOTAL = 123;
+  var T = new Builder(130); buildFugue(T);
+  var P = new Builder(TOTAL);
+  var MOV = {};
+  function setRange(b0, b1, mov, tempo, dyn, det, role) { for (var b = b0; b < b1; b++) { MOV[b] = mov; P.tempo[b] = tempo; P.dyn[b] = dyn; P.det[b] = det; P.role[b] = role; } }
+  P.section(0, "I. 序奏 — Tutti", "管弦楽の嘆きのパッサカリア: 低弦が歌う嘆きのバス、ヴィオラとホルンが B-A-D-A");
+  lament(P, 0, 2, { label: true, dyn: function () { return 0.7; }, firstSolo: true });
+  P.restBars("S", 0, 3); P.restBars("A", 0, 3);
+  setRange(0, I_INTRO, 1, 40, 0.7, 0.98, "tutti");
+  copyBars(T, P, 0, I_A, I_INTRO);
+  P.sections.forEach(function (s) { s.title = s.title.replace("I. Soggetto I 〈MOTHER〉", "I. Allegro moderato — 主題 I 〈MOTHER〉 (ピアノ独奏の提示)"); });
+  setRange(I_INTRO, I_INTRO + I_A, 1, 76, 0.85, 0.95, "solo");
+  [[22, 26], [31, 35]].forEach(function (r) { for (var b = I_INTRO + r[0]; b < I_INTRO + r[1]; b++) P.role[b] = "tutti"; });
+  var c0 = I_INTRO + I_A;
+  P.section(c0, "I. Cadenza — ピアノ独奏", "左手に主題 I、右手に B-A-D-A、半音階の走句からトリルへ (管弦楽は沈黙)");
+  P.setHarms(c0, H_S1.map(function (r) { return r.slice(); }).concat([["Gm","Gm","A7","A7"], ["A7"], ["A7"]]));
+  P.place("T", c0, S1, -12, "S1 (カデンツァ, 左手)");
+  P.place("S", c0 + 1, BADA, 12, "B-A-D-A (右手)");
+  P.restBars("A", c0, c0 + 3);
+  P.place("S", c0 + 5, BUILTIN_THEMES[5].notes, 0, null);
+  P.place("S", c0 + 7, mat([["A5",.5],["Bb5",.5],["A5",.5],["Bb5",.5],["A5",.5],["Bb5",.5],["A5",1]]), 0, null);
+  P.place("B", c0 + 6, mat([["A2",4],["A2",4]]), 0, null);
+  "AT".split("").forEach(function (v) { P.restBars(v, c0 + 6, c0 + 8); });
+  setRange(c0, c0 + CAD, 1, 52, 0.8, 0.95, "cadenza");
+  P.tempo[c0 + 7] = 44;
+  copyBars(T, P, I_A, 44, c0 + CAD);
+  setRange(c0 + CAD, M2, 1, 76, 0.9, 0.95, "tutti");
+  P.section(M2, "II. Adagio — Lamento", "嘆きのバス ×4: 管弦楽 → ピアノ → 合奏 → ピアノ。B-A-D-A のカノン");
+  var dl = [0.6, 0.65, 0.85, 0.55];
+  lament(P, M2, 4, { dyn: function (c) { return dl[c]; } });
+  P.setHarms(M2 + 12, [["Dm"], ["Dm"]]); P.hold[M2 + 12] = P.hold[M2 + 13] = true;
+  setRange(M2, M3, 2, 40, 0.6, 1.0, "tutti");
+  ["tutti", "solo", "both", "solo"].forEach(function (role, c) { for (var k = 0; k < 3; k++) { P.role[M2 + 3 * c + k] = role; P.dyn[M2 + 3 * c + k] = dl[c]; } });
+  P.role[M2 + 12] = P.role[M2 + 13] = "both"; P.dyn[M2 + 12] = P.dyn[M2 + 13] = 0.4;
+  highBada(P, M2 + 3, 1); highBada(P, M2 + 9, 1, null);
+  copyBars(T, P, 85, 130, M3);
+  P.sections.forEach(function (s) {
+    s.title = s.title.replace("III. Soggetto III 〈B-A-D-A〉", "III. Finale — 主題 III 〈B-A-D-A〉 と三重結合").replace("III. Fuga a tre soggetti — 終結", "III. Finale — 三重結合の終結 (合奏)");
+  });
+  setRange(M3, M3 + III_FUGA, 3, 84, 0.9, 0.95, "solo");
+  [[97, 101], [107, 111], [117, 121]].forEach(function (r) { for (var b = M3 + r[0] - 85; b < M3 + r[1] - 85; b++) P.role[b] = "tutti"; });
+  for (var b = M3 + 121 - 85; b < M3 + III_FUGA; b++) { P.role[b] = "both"; P.dyn[b] = 1.0; }
+  var k0 = M3 + III_FUGA;
+  P.section(k0, "III. Coda — Maestoso", "D 長調のコーダ: 全合奏の和音とティンパニ、ピアノの B♮-A-D-A");
+  P.setHarms(k0, [["D"], ["G/D"], ["D"], ["Bm","Bm","A7","A7"], ["D"], ["D"]]);
+  for (b = k0; b < TOTAL; b++) P.hold[b] = true;
+  P.place("S", k0, mat([["B5",2],["A5",2],["D6",2],["A5",2]]), 0, "B♮-A-D-A (長調)");
+  setRange(k0, TOTAL, 3, 60, 1.0, 1.0, "both");
+  P.dyn[TOTAL - 1] = 0.9;
+  /* post() の金管・ティンパニの指定を小節の属性へ */
+  for (b = 0; b < TOTAL; b++) {
+    if (MOV[b] === 3 && P.role[b] === "both") { P.brass[b] = b >= k0 ? 2 : 1; P.addTimp(b, 0, 0.6, 0.45); }
+  }
+  [0, 3, M2, M2 + 6].forEach(function (b) { P.addTimp(b, 0, 2, 0.5); });
+  P.addTimp(k0, 0, 4, 0.7); P.addTimp(k0 + 2, 0, 4, 0.6); P.addTimp(TOTAL - 2, 0, 8, 0.8);
+  return P;
+}
+/* Builder → プロジェクト (編集できるデータ) */
+function builderToProject(P, meta) {
+  var bars = [];
+  for (var i = 0; i < P.nbars; i++) {
+    var rest = {};
+    VOICES.forEach(function (v) { var mask = 0; for (var k = 0; k < 4; k++) if (P.rest[v][i * BPB + k]) mask |= 1 << k; if (mask) rest[v] = mask; });
+    var sec = P.sections.filter(function (s) { return s.bar === i; }).pop();
+    bars.push({ h: P.harm.slice(i * BPB, i * BPB + 4), role: P.role[i] || "solo", tempo: P.tempo[i] || null,
+      dyn: P.dyn[i] === undefined ? 1.0 : P.dyn[i], det: P.det[i] === undefined ? 1.0 : P.det[i], hold: !!P.hold[i],
+      rest: rest, brass: P.brass[i] || 0, timp: P.timp[i] || [], sec: sec ? { title: sec.title, sub: sec.sub } : null });
+  }
+  return { format: "bada-compose/1", title: meta.title, bpm: meta.bpm, seed: meta.seed, style: "concerto", transpose: 0,
+           key: { tonic: 2, minor: true }, tempoScale: 1, bars: bars, entries: P.ent.map(function (e) { return JSON.parse(JSON.stringify(e)); }),
+           themes: [] };
+}
+function sliceProject(proj, b0, b1, title) {
+  var p = JSON.parse(JSON.stringify(proj));
+  p.bars = p.bars.slice(b0, b1); p.title = title;
+  p.entries = p.entries.filter(function (e) { return e.beat >= b0 * BPB && e.beat < b1 * BPB; }).map(function (e) { e.beat -= b0 * BPB; return e; });
+  if (!p.bars[0].sec) p.bars[0].sec = { title: title, sub: "" };
+  return p;
+}
+function blankProject() {
+  var H = [["Dm"], ["Gm"], ["A7"], ["Dm"], ["Bb"], ["Gm", "A7"], ["Dm", "A7"], ["Dm"]];
+  var bars = H.map(function (h, i) {
+    return { h: h.length === 1 ? [h[0], h[0], h[0], h[0]] : [h[0], h[0], h[1], h[1]], role: "solo", tempo: null, dyn: 0.85, det: 0.95,
+             hold: i === 7, rest: {}, brass: 0, timp: [], sec: i === 0 ? { title: "新しい曲", sub: "和音を書き換えて、主題を置いてみましょう" } : null };
+  });
+  return { format: "bada-compose/1", title: "新しい曲", bpm: 72, seed: 7, style: "concerto", transpose: 0, key: { tonic: 2, minor: true },
+           tempoScale: 1, bars: bars, entries: [{ v: "S", beat: 0, notes: S1.map(function (x) { return [x[0], x[1] + 12]; }), label: "S1", marker: true }], themes: [] };
+}
+function makePreset(id) {
+  setKey(2, true);
+  var full = builderToProject(buildPConcerto(), { title: "Piano Concerto BADA — in D minor", bpm: 76, seed: 13 });
+  if (id === "mov1") return sliceProject(full, 0, 58, "Piano Concerto BADA — I. Allegro moderato");
+  if (id === "mov2") return sliceProject(full, 58, 72, "Piano Concerto BADA — II. Adagio — Lamento");
+  if (id === "mov3") return sliceProject(full, 72, 123, "Piano Concerto BADA — III. Finale");
+  if (id === "blank") return blankProject();
+  return full;
+}
+
+/* ================================================================ プロジェクト → 曲 (生成 + 管弦楽法) */
+function projectPiece(proj) {
+  setKey(proj.key.tonic, proj.key.minor);
+  var nb = proj.bars.length, P = new Piece(nb), last = "Dm";
+  proj.bars.forEach(function (bar, i) {
+    for (var k = 0; k < 4; k++) { var cs = bar.h[k]; if (chord(cs)) last = cs; P.harm[i * BPB + k] = last; }
+    if (bar.hold) P.hold[i] = true;
+    if (bar.tempo) P.tempo[i] = bar.tempo;
+    P.dyn[i] = bar.dyn; P.det[i] = bar.det; P.role[i] = bar.role;
+    Object.keys(bar.rest || {}).forEach(function (v) { for (var k = 0; k < 4; k++) if (bar.rest[v] & (1 << k)) P.rest[v][i * BPB + k] = true; });
+    if (bar.sec && bar.sec.title) P.sections.push({ bar: i, title: bar.sec.title, sub: bar.sec.sub || "" });
+  });
+  proj.entries.forEach(function (e) {
+    if (VOICES.indexOf(e.v) < 0) return;
+    var t = e.beat;
+    e.notes.forEach(function (x) { if (x[1] !== null && t < P.N && t >= 0) P.fixed[e.v].push([t, x[0], x[1], e.label]); t += x[0]; });
+    if (e.label && e.marker) P.entries.push([e.beat, e.label, e.v]);
+  });
+  return P;
+}
+function beatTimes(proj) {
+  var bt = [0], sc = proj.tempoScale || 1;
+  proj.bars.forEach(function (bar) { var bpm = (bar.tempo || proj.bpm) * sc; for (var k = 0; k < 4; k++) bt.push(bt[bt.length - 1] + 60 / bpm); });
+  return bt;
+}
+function timeOf(bt, beat) {
+  var i = Math.floor(beat); i = Math.max(0, Math.min(i, bt.length - 2));
+  return bt[i] + (beat - i) * (bt[i + 1] - bt[i]);
+}
+var INST = {
+  pf:  { name:"ピアノ", gm:0, ch:0, pan:0 },   pfh: { name:"ピアノ (鐘)", gm:0, ch:0, pan:0.3 },
+  vn1: { name:"Vn I", gm:40, ch:1, pan:-0.45 }, vn2: { name:"Vn II", gm:40, ch:2, pan:-0.25 }, va: { name:"Va", gm:41, ch:3, pan:0.15 },
+  vc:  { name:"Vc", gm:42, ch:4, pan:0.35 },    cb:  { name:"Cb", gm:43, ch:5, pan:0.5 },
+  fl:  { name:"Fl", gm:73, ch:6, pan:-0.1 },    ob:  { name:"Ob", gm:68, ch:7, pan:0.1 },    cl: { name:"Cl", gm:71, ch:8, pan:-0.05 },
+  hn:  { name:"Hn", gm:60, ch:10, pan:0.3 },    tp:  { name:"Tp", gm:56, ch:11, pan:0.35 },  tb: { name:"Tb", gm:57, ch:12, pan:0.45 },
+  timp:{ name:"Timp", gm:47, ch:13, pan:0.2 }
+};
+var PY_CODE = { vn1:"V1", vn2:"V2", va:"VA", vc:"VC", cb:"CB", fl:"FL", ob:"WW", cl:"CL", hn:"HN", tp:"TR", tb:"TB", timp:"TP", pfh:"H" };
+function compose(proj) {
+  var P = projectPiece(proj), seed = proj.seed | 0;
+  var g = generate(P, seed), rng = makeRng(seed), events = {};
+  VOICES.forEach(function (v) {
+    var ev = realize(P, v, g, rng).concat(P.fixed[v].map(function (f) { return [f[0], f[1], f[2], f[3]]; }));
+    ev.sort(function (a, b) { return a[0] - b[0] || a[2] - b[2]; });
+    events[v] = ev;
+  });
+  var chk = check(P, events), bt = beatTimes(proj);
+  var layers = arrangeLayers(proj, P, events), notes = [], hr = makeRng(seed + 1);
+  var VORD = { B:0, T:1, A:2, S:3 };
+  /* 4 声: 役割に応じてピアノ / 弦 / 両方 */
+  VOICES.forEach(function (v) {
+    events[v].forEach(function (e) {
+      var s = e[0], d = e[1], m = e[2], lab = e[3], bar = Math.floor(s / BPB), b = proj.bars[bar] || proj.bars[proj.bars.length - 1];
+      var role = b.role, dyn = b.dyn, det = b.det;
+      var t = timeOf(bt, s), dur = timeOf(bt, s + d) - t;
+      var strings = proj.style === "strings" || (proj.style === "concerto" && (role === "tutti" || role === "both"));
+      var piano = proj.style === "piano" || (proj.style === "concerto" && role !== "tutti");
+      if (strings) {
+        var vel = Math.min(1, 0.5 * (lab ? 1.15 : 1) * dyn + 0.05), sd = Math.max(0.12, dur * det);
+        var inst = { S:"vn1", A:"vn2", T:"va", B:"vc" }[v];
+        notes.push({ i: inst, t: t + 0.012 * VORD[v], d: sd, m: m, vel: vel, v: v, lab: lab, b: s, db: d * det });
+        if (v === "B") notes.push({ i: "cb", t: t + 0.012 * VORD[v], d: sd, m: m - 12, vel: vel * 0.8, v: v, lab: null, b: s, db: d * det });
+      }
+      if (piano) {
+        var pv = Math.min(1, 0.62 * (lab ? 1.12 : 1) * dyn + 0.08);
+        var pos = (s % 4) / 4;
+        pv *= 0.9 + 0.12 * Math.sin(Math.PI * pos + 0.3) * (v === "S" || v === "B" ? 1 : 0.6);
+        if ((v === "A" || v === "T") && !lab) pv *= 0.85;
+        var off = 0.016 * VORD[v] + ((s % 4) === 0 ? 0.03 : 0) + (hr.random() - 0.5) * 0.016;
+        notes.push({ i: "pf", t: Math.max(0, t + off), d: Math.max(0.18, dur * 0.92 * det), m: m, vel: pv * (strings ? 0.85 : 1), v: v, lab: lab, b: s, db: d * 0.92 * det });
+      }
+    });
+  });
+  layers.forEach(function (x) {
+    var t = timeOf(bt, x.b); notes.push({ i: x.i, t: t, d: timeOf(bt, x.b + x.db) - t, m: x.m, vel: x.vel, v: null, lab: x.lab || null, b: x.b, db: x.db });
+  });
+  var tr = proj.transpose | 0;
+  notes.forEach(function (x) { x.m += tr; });
+  notes.sort(function (a, b) { return a.t - b.t; });
+  return { P: P, events: events, layers: layers, notes: notes, bt: bt, duration: bt[bt.length - 1], check: chk };
+}
+/* compose_pconcerto.py の post() を一般化: 主題の重ね、和音の持続 (ホルン / Vn II)、金管、ティンパニ */
+function arrangeLayers(proj, P, events) {
+  var out = [], style = proj.style;
+  function add(i, b, db, m, vel, lab) { out.push({ i: i, b: b, db: db, m: m, vel: vel, lab: lab || null }); }
+  proj.entries.forEach(function (e) {
+    if (e.v !== "H") return;
+    var t = e.beat, first = true;
+    e.notes.forEach(function (x) {
+      if (x[1] !== null) { add(style === "strings" ? "vn1" : "pfh", t, x[0], x[1], style === "strings" ? 0.3 : 0.4, first ? e.label : null); first = false; }
+      t += x[0];
+    });
+  });
+  if (style !== "concerto") return out;
+  VOICES.forEach(function (v) {
+    events[v].forEach(function (e) {
+      var s = e[0], d = e[1], m = e[2], lab = e[3], bar = proj.bars[Math.floor(s / BPB)];
+      if (!bar || !lab || bar.role === "cadenza") return;
+      var dyn = bar.dyn;
+      if (bar.role === "tutti" || bar.role === "both") {
+        if (v === "S") add("fl", s, d, m < 72 ? m + 12 : m, 0.4 * dyn);
+        if (v === "A") add("ob", s, d, m, 0.45 * dyn);
+        if (v === "T") add("cl", s, d, m, 0.4 * dyn);
+      }
+      if (bar.role === "solo") {
+        var L = { S:["vn1", 0], A:["va", 0], T:["vc", 0], B:["cb", -12] }[v];
+        add(L[0], s, d, m + L[1], 0.25 * dyn);
+      }
+      if (bar.brass === 1 || bar.brass === 2) {
+        if (bar.role === "both" && (v === "S" || v === "A")) add("tp", s, d, (m >= 58 && m <= 82) ? m : m + 12, 0.4 * dyn);
+        if (bar.role === "both" && (v === "T" || v === "B")) add("tb", s, d, m, 0.42 * dyn);
+      }
+    });
+  });
+  var tonic2 = 36 + proj.key.tonic;
+  proj.bars.forEach(function (bar, i) {
+    if (bar.role === "cadenza") return;
+    var dyn = bar.dyn;
+    [0, 2].forEach(function (half) {
+      var c = chord(P.harm[i * BPB + half]) || chord("Dm"), root = 48 + c.root;
+      if (bar.role === "tutti" || bar.role === "both") { add("hn", i * BPB + half, 2.2, root, 0.3 * dyn); add("hn", i * BPB + half, 2.2, root + 7, 0.24 * dyn); }
+      else { var fifth = 55; while (mod12(fifth) !== c.fifth) fifth++; add("vn2", i * BPB + half, 2.2, fifth, 0.1 * dyn); }
+      if (bar.brass === 2) {
+        var third = 60; while (mod12(third) !== c.third) third++;
+        add("tp", i * BPB + half, 2.0, root + 12, 0.4 * dyn); add("tp", i * BPB + half, 2.0, third, 0.35 * dyn);
+        add("tb", i * BPB + half, 2.0, root - 12, 0.45 * dyn); add("tb", i * BPB + half, 2.0, root - 5, 0.35 * dyn);
+      }
+    });
+    (bar.timp || []).forEach(function (h) { add("timp", i * BPB + h[0], h[1], tonic2, h[2] * dyn); });
+  });
+  return out;
+}
+
+/* ================================================================ 書き出し: MIDI / WAV / score.json */
+function vlq(n) { var b = [n & 0x7f]; n >>>= 7; while (n) { b.unshift((n & 0x7f) | 0x80); n >>>= 7; } return b; }
+function strBytes(s) { return Array.from(new TextEncoder().encode(s)); }
+function midiFile(proj, R, b0, b1) {
+  var PPQ = 480, tracks = [], lo = b0 * BPB, hi = b1 * BPB;
+  function trk(evs, name) {
+    evs.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var nm = strBytes(name), out = [0x00, 0xff, 0x03].concat(vlq(nm.length), nm), last = 0;
+    evs.forEach(function (e) { Array.prototype.push.apply(out, vlq(e[0] - last)); Array.prototype.push.apply(out, e[2]); last = e[0]; });
+    out.push(0x00, 0xff, 0x2f, 0x00);
+    return [0x4d, 0x54, 0x72, 0x6b, (out.length >>> 24) & 255, (out.length >>> 16) & 255, (out.length >>> 8) & 255, out.length & 255].concat(out);
+  }
+  var meta = [[0, 0, [0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08]]], sc = proj.tempoScale || 1, lastBpm = null;
+  for (var i = b0; i < b1; i++) {
+    var bpm = (proj.bars[i].tempo || proj.bpm) * sc;
+    if (bpm !== lastBpm) { var us = Math.round(60e6 / bpm); meta.push([(i - b0) * BPB * PPQ, 0, [0xff, 0x51, 0x03, (us >> 16) & 255, (us >> 8) & 255, us & 255]]); lastBpm = bpm; }
+    var sec = proj.bars[i].sec;
+    if (sec && sec.title) { var tb = strBytes(sec.title); meta.push([(i - b0) * BPB * PPQ, 0, [0xff, 0x06].concat(vlq(tb.length), tb)]); }
+  }
+  tracks.push(trk(meta, proj.title || "BADA Compose"));
+  var byInst = {};
+  R.notes.forEach(function (x) { if (x.b >= lo && x.b < hi) (byInst[x.i] = byInst[x.i] || []).push(x); });
+  Object.keys(INST).forEach(function (k) {
+    if (!byInst[k]) return;
+    var ch = INST[k].ch, evs = [[0, 0, [0xc0 | ch, INST[k].gm]]];
+    byInst[k].forEach(function (x) {
+      var t0 = Math.round((x.b - lo) * PPQ), t1 = Math.max(t0 + 1, Math.round((x.b - lo + x.db) * PPQ)), m = Math.max(0, Math.min(127, x.m));
+      var vel = Math.max(1, Math.min(127, Math.round(20 + 100 * x.vel)));
+      evs.push([t0, 1, [0x90 | ch, m, vel]], [t1, 0, [0x80 | ch, m, 0]]);
+    });
+    tracks.push(trk(evs, INST[k].name));
+  });
+  var head = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, tracks.length, (PPQ >> 8) & 255, PPQ & 255];
+  var all = head; tracks.forEach(function (t) { all = all.concat(t); });
+  return new Uint8Array(all);
+}
+function wavFile(channels, sr) {
+  var len = channels[0].length, nch = channels.length, buf = new ArrayBuffer(44 + len * nch * 2), dv = new DataView(buf), p = 0;
+  function s(str) { for (var i = 0; i < str.length; i++) dv.setUint8(p++, str.charCodeAt(i)); }
+  function u32(x) { dv.setUint32(p, x, true); p += 4; } function u16(x) { dv.setUint16(p, x, true); p += 2; }
+  s("RIFF"); u32(36 + len * nch * 2); s("WAVE"); s("fmt "); u32(16); u16(1); u16(nch); u32(sr); u32(sr * nch * 2); u16(nch * 2); u16(16);
+  s("data"); u32(len * nch * 2);
+  for (var i = 0; i < len; i++) for (var c = 0; c < nch; c++) { var v = Math.max(-1, Math.min(1, channels[c][i])); dv.setInt16(p, v < 0 ? v * 0x8000 : v * 0x7fff, true); p += 2; }
+  return new Uint8Array(buf);
+}
+function scoreJson(proj, R) {
+  var st = { concerto: "pconcerto", piano: "elegia", strings: "symphony" }[proj.style] || "pconcerto", bt = R.bt, tr = proj.transpose | 0;
+  var notes = [];
+  VOICES.forEach(function (v) {
+    R.events[v].forEach(function (e) {
+      var bar = proj.bars[Math.floor(e[0] / BPB)] || proj.bars[proj.bars.length - 1], t = timeOf(bt, e[0]);
+      var role = proj.style === "piano" ? "solo" : (proj.style === "strings" ? "tutti" : bar.role);
+      notes.push({ v: v, t: +t.toFixed(4), d: +(timeOf(bt, e[0] + e[1]) - t).toFixed(4), m: e[2] + tr, label: e[3], beat: e[0], dyn: bar.dyn, det: bar.det, role: role });
+    });
+  });
+  var extras = R.layers.filter(function (x) { return PY_CODE[x.i]; }).map(function (x) {
+    var t = timeOf(bt, x.b);
+    return { v: PY_CODE[x.i], beat: x.b, dbeats: x.db, m: x.m + tr, gain: +x.vel.toFixed(3), label: x.lab, t: +t.toFixed(4), d: +(timeOf(bt, x.b + x.db) - t).toFixed(4) };
+  });
+  var harm = R.P.harm.map(function (c) { return transposeChordName(c, tr); });
+  return { bpm: proj.bpm, beats_per_bar: BPB, nbars: proj.bars.length, duration: bt[bt.length - 1],
+    bar_times: proj.bars.map(function (_, i) { return +bt[i * BPB].toFixed(4); }).concat([+bt[bt.length - 1].toFixed(4)]),
+    notes: notes, entries: R.P.entries.map(function (e) { return { t: timeOf(bt, e[0]), label: e[1], v: e[2], bar: Math.floor(e[0] / BPB) + 1 }; }),
+    sections: R.P.sections.map(function (s) { return { t: bt[s.bar * BPB], bar: s.bar + 1, title: s.title, sub: s.sub }; }),
+    harm: harm, meta: { style: st, detach: 0.92, humanize: true, title: proj.title, subtitle: "BADA Compose で作曲", footer: [] }, extras: extras };
+}
+function parseNotes(text) {
+  var toks = String(text || "").trim().split(/[\s,|]+/).filter(Boolean), out = [];
+  if (!toks.length) return { err: "音符がありません" };
+  for (var i = 0; i < toks.length; i++) {
+    var m = /^([A-Ga-g](?:#|b)?-?\d|[Rr])(?::(\d+(?:\.\d+)?|\.\d+))?$/.exec(toks[i]);
+    if (!m) return { err: "読めない音符: " + toks[i] };
+    var d = m[2] ? parseFloat(m[2]) : 1;
+    if (!(d > 0) || d > 64) return { err: "拍数が不正: " + toks[i] };
+    if (/^[Rr]$/.test(m[1])) out.push([d, null]);
+    else { var nm = m[1][0].toUpperCase() + m[1].slice(1), mm = n(nm); if (mm === null) return { err: "読めない音名: " + toks[i] }; out.push([d, mm]); }
+  }
+  return { notes: out };
+}
+function notesToText(notes) { return notes.map(function (x) { return (x[1] === null ? "R" : nameOf(x[1])) + ":" + (+x[0].toFixed(3)); }).join(" "); }
+function parseChordInput(text) {
+  var toks = String(text || "").trim().split(/[\s,|]+/).filter(Boolean);
+  if ([1, 2, 4].indexOf(toks.length) < 0) return { err: "和音は 1・2・4 個で書いてください" };
+  for (var i = 0; i < toks.length; i++) if (!chord(toks[i])) return { err: "読めない和音: " + toks[i] };
+  if (toks.length === 1) return { h: [toks[0], toks[0], toks[0], toks[0]] };
+  if (toks.length === 2) return { h: [toks[0], toks[0], toks[1], toks[1]] };
+  return { h: toks };
+}
+function chordsToText(h) {
+  if (h[0] === h[1] && h[1] === h[2] && h[2] === h[3]) return h[0];
+  if (h[0] === h[1] && h[2] === h[3]) return h[0] + " " + h[2];
+  return h.join(" ");
+}
+/* 小節の和音から旋律を作る (強拍は和音構成音、弱拍に経過音) */
+function genMelody(proj, bar0, nbars, seed) {
+  setKey(proj.key.tonic, proj.key.minor);
+  var rng = makeRng(seed), out = [], cur = 69;
+  for (var b = bar0; b < Math.min(proj.bars.length, bar0 + nbars); b++) {
+    for (var k = 0; k < 4; k++) {
+      var c = chord(proj.bars[b].h[k]) || chord("Dm"), strong = k === 0 || k === 2, cands = [];
+      for (var m = 62; m <= 79; m++) if (c.pcs.indexOf(mod12(m)) >= 0) cands.push(m);
+      cands.sort(function (x, y) { return (Math.abs(x - cur) + rng.random() * 3) - (Math.abs(y - cur) + rng.random() * 3); });
+      var tgt = cands[Math.min(cands.length - 1, rng.random() < 0.7 ? 0 : 1)];
+      if (!strong && rng.random() < 0.45 && Math.abs(tgt - cur) >= 2) {
+        var mid = cur + (tgt > cur ? 1 : -1); while (c.scale.indexOf(mod12(mid)) < 0) mid += tgt > cur ? 1 : -1;
+        out.push([0.5, cur], [0.5, mid]); cur = mid;
+      } else if (k === 3 && b === bar0 + nbars - 1) { out.push([1, tgt]); cur = tgt; }
+      else if (strong && rng.random() < 0.3 && k === 0) { out.push([2, tgt]); cur = tgt; k++; }
+      else { out.push([1, tgt]); cur = tgt; }
+    }
+  }
+  var merged = [];
+  out.forEach(function (x) { var l = merged[merged.length - 1]; if (l && l[1] === x[1] && l[0] < 2) l[0] += x[0]; else merged.push(x.slice()); });
+  return merged;
+}
+
+/* ================================================================ 音源 (Web Audio) */
+var _irCache = {};
+function makeEngine(ctx, dest) {
+  var E = { ctx: ctx }, sr = ctx.sampleRate;
+  var noise = ctx.createBuffer(1, sr, sr), nd = noise.getChannelData(0);
+  for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  var bus = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain(), conv = ctx.createConvolver(), comp = ctx.createDynamicsCompressor();
+  var irKey = sr;
+  if (!_irCache[irKey]) {
+    var len = Math.floor(sr * 3.0), ir = ctx.createBuffer(2, len, sr);
+    for (var c = 0; c < 2; c++) {
+      var d = ir.getChannelData(c), y = 0;
+      for (var j = 0; j < len; j++) { var x = (Math.random() * 2 - 1) * Math.exp(-j / (sr * 0.95)); y += 0.35 * (x - y); d[j] = j < sr * 0.012 ? 0 : y; }
+    }
+    _irCache[irKey] = ir;
+  }
+  conv.buffer = _irCache[irKey];
+  dry.gain.value = 0.85; wet.gain.value = 0.42;
+  comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.25;
+  bus.connect(dry); bus.connect(conv); conv.connect(wet); dry.connect(comp); wet.connect(comp); comp.connect(dest);
+  E.bus = bus; E.comp = comp;
+  var pans = {};
+  function out(inst) {
+    if (!pans[inst]) {
+      var g = ctx.createGain(); g.gain.value = 1;
+      if (ctx.createStereoPanner) { var p = ctx.createStereoPanner(); p.pan.value = INST[inst] ? INST[inst].pan : 0; g.connect(p); p.connect(bus); }
+      else g.connect(bus);
+      pans[inst] = g;
+    }
+    return pans[inst];
+  }
+  var waves = {};
+  function wave(key, amps) {
+    if (!waves[key]) {
+      var re = new Float32Array(amps.length + 1), im = new Float32Array(amps.length + 1);
+      for (var k = 0; k < amps.length; k++) im[k + 1] = amps[k];
+      waves[key] = ctx.createPeriodicWave(re, im);
+    }
+    return waves[key];
+  }
+  function harm(nh, p, oddBoost) { var a = []; for (var k = 1; k <= nh; k++) a.push((1 / Math.pow(k, p)) * (k % 2 ? (oddBoost || 1) : 1)); return a; }
+  function osc(type, f, t, stop, w) {
+    var o = ctx.createOscillator();
+    if (w) o.setPeriodicWave(w); else o.type = type;
+    o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o;
+  }
+  function env(g, t, a, peak, tEnd, rel) {
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, Math.max(t + a, tEnd)); g.gain.setTargetAtTime(0.0001, Math.max(t + a, tEnd), rel / 3);
+  }
+  function noiseBurst(t, dur, fc, q, gain, dst) {
+    var s = ctx.createBufferSource(); s.buffer = noise; s.playbackRate.value = 0.8 + Math.random() * 0.4;
+    var f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = fc; f.Q.value = q;
+    var g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.setTargetAtTime(0.0001, t + 0.002, dur / 3);
+    s.connect(f); f.connect(g); g.connect(dst); s.start(t); s.stop(t + dur * 3 + 0.05);
+  }
+  function piano(t, d, f, vel, dst) {
+    var oct = Math.max(0, Math.min(6, Math.round(Math.log2(f / 55)))), nh = Math.max(3, Math.min(24, Math.floor(6000 / f)));
+    var w = wave("pf" + oct + "_" + nh, harm(nh, 1.0 + 0.16 * oct));
+    var tEnd = t + d, stop = tEnd + 1.6, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    var peak = 0.2 * (0.35 + 0.65 * vel) * Math.min(1, Math.pow(262 / f, 0.25)), soft = f > 700;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + (soft ? 0.012 : 0.004));
+    g.gain.setTargetAtTime(peak * 0.42, t + 0.01, 0.12 + 0.2 * Math.min(1, 262 / f));
+    g.gain.setTargetAtTime(0.0001, t + 0.35, Math.min(3.2, 1.4 * Math.pow(262 / f, 0.55) + 0.35));
+    g.gain.setTargetAtTime(0.0001, tEnd, 0.28);
+    lp.type = "lowpass"; lp.Q.value = 0.5;
+    lp.frequency.setValueAtTime(Math.min(15000, f * (soft ? 4 : 7 + 6 * vel) + 1200), t);
+    lp.frequency.setTargetAtTime(Math.min(7000, f * 2.5 + 600), t + 0.02, 0.5);
+    var o1 = osc(null, f, t, stop, w), o2 = osc(null, f * 1.0009, t, stop, w), g2 = ctx.createGain(); g2.gain.value = 0.55;
+    o1.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g); g.connect(dst);
+    noiseBurst(t, 0.012, Math.min(8000, f * 4), 0.7, (soft ? 0.015 : 0.05) * vel, dst);
+    if (f < 200) { var o3 = osc("sine", f / 2, t, t + 2, null), g3 = ctx.createGain(); g3.gain.setValueAtTime(peak * 0.25, t); g3.gain.setTargetAtTime(0.0001, t, 0.4); o3.connect(g3); g3.connect(dst); }
+  }
+  function strings(t, d, f, vel, dark, dst) {
+    var a = 0.22 + 0.25 * dark, r = 0.45, tEnd = t + d, stop = tEnd + r * 3 + 0.1, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.Q.value = 0.6; lp.frequency.value = Math.min(6500, 1300 + f * (2.4 - 1.3 * dark));
+    env(g, t, a, 0.055 * vel, tEnd, r);
+    var lfo = osc("sine", 5.3, t, stop, null), lg = ctx.createGain();
+    lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.0035, t + 0.7); lfo.connect(lg);
+    [-7, 6].forEach(function (cents) {
+      var o = osc("sawtooth", f * Math.pow(2, cents / 1200), t, stop, null); lg.connect(o.frequency); o.connect(lp);
+    });
+    lp.connect(g); g.connect(dst);
+  }
+  function wind(t, d, f, vel, kind, dst) {
+    var tEnd = t + d, a = kind === "fl" ? 0.09 : 0.06, r = 0.18, stop = tEnd + 0.8, g = ctx.createGain(), w = null, type = "sine", lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = kind === "fl" ? 5000 : 3600;
+    if (kind === "ob") w = wave("ob", [1, .9, .85, .6, .45, .35, .25, .18, .12, .08]);
+    else if (kind === "cl") w = wave("cl", [1, 0.02, .5, 0.02, .28, 0.02, .14, 0.02, .07]);
+    else w = wave("fl", [1, .22, .08, .03]);
+    env(g, t, a, (kind === "fl" ? 0.07 : 0.05) * vel, tEnd, r);
+    var o = osc(type, f, t, stop, w), lfo = osc("sine", 5.4, t, stop, null), lg = ctx.createGain();
+    lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.004, t + 0.5); lfo.connect(lg); lg.connect(o.frequency);
+    o.connect(lp); lp.connect(g); g.connect(dst);
+    if (kind === "fl") noiseBurst(t, 0.08, f * 2, 1.2, 0.02 * vel, dst);
+  }
+  function brass(t, d, f, vel, kind, dst) {
+    var tEnd = t + d, a = kind === "tp" ? 0.05 : (kind === "hn" ? 0.14 : 0.09), r = kind === "hn" ? 0.35 : 0.22, stop = tEnd + r * 3 + 0.1;
+    var g = ctx.createGain(), lp = ctx.createBiquadFilter(), fc = kind === "tp" ? 3200 : (kind === "hn" ? 950 : 1500);
+    lp.type = "lowpass"; lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(fc * 0.5, t); lp.frequency.linearRampToValueAtTime(fc, t + a * 1.5);
+    env(g, t, a, (kind === "hn" ? 0.06 : 0.05) * vel, tEnd, r);
+    var w = wave("br" + kind, harm(kind === "hn" ? 12 : 20, kind === "tp" ? 0.95 : 1.3));
+    [0, 4].forEach(function (c) { var o = osc(null, f * Math.pow(2, c / 1200), t, stop, w); o.connect(lp); });
+    lp.connect(g); g.connect(dst);
+  }
+  function timp(t, d, f, vel, dst) {
+    var hits = d >= 1.2 ? Math.min(90, Math.floor(d * 11)) : 1;
+    for (var h = 0; h < hits; h++) {
+      var th = t + h / 11, v = hits > 1 ? (0.35 + 0.65 * Math.min(1, h / hits * 1.4)) * (h % 2 ? 0.9 : 1) : 1;
+      var o = osc("sine", f * 1.25, th, th + 2.0, null), g = ctx.createGain();
+      o.frequency.exponentialRampToValueAtTime(f, th + 0.06);
+      g.gain.setValueAtTime(0.35 * v * vel, th); g.gain.setTargetAtTime(0.0001, th + 0.005, 0.5);
+      o.connect(g); g.connect(dst);
+      var o2 = osc("sine", f * 1.5, th, th + 1.0, null), g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0.12 * v * vel, th); g2.gain.setTargetAtTime(0.0001, th, 0.2); o2.connect(g2); g2.connect(dst);
+      noiseBurst(th, 0.03, 400, 0.6, 0.25 * v * vel, dst);
+    }
+  }
+  E.play = function (x, base) {
+    var t = base + x.t, f = 440 * Math.pow(2, (x.m - 69) / 12), dst = out(x.i);
+    if (t < ctx.currentTime) return;
+    switch (x.i) {
+      case "pf": case "pfh": piano(t, x.d, f, x.vel, dst); break;
+      case "vn1": case "vn2": strings(t, x.d, f, x.vel, 0, dst); break;
+      case "va": strings(t, x.d, f, x.vel, 0.4, dst); break;
+      case "vc": strings(t, x.d, f, x.vel, 0.7, dst); break;
+      case "cb": strings(t, x.d, f, x.vel * 0.9, 1.0, dst); break;
+      case "fl": case "ob": case "cl": wind(t, x.d, f, x.vel, x.i, dst); break;
+      case "hn": case "tp": case "tb": brass(t, x.d, f, x.vel, x.i, dst); break;
+      case "timp": timp(t, x.d, f, x.vel, dst); break;
+    }
+  };
+  return E;
+}
+
+/* ================================================================ 保存 (Android: SAF / Chrome・Electron: 保存ダイアログ / その他: ダウンロード) */
+function sanitizeName(s) { return String(s || "bada").replace(/[\\\/:*?"<>|\u0000-\u001f]+/g, "_").replace(/\s+/g, "_").slice(0, 80) || "bada"; }
+function saveBlob(blob, name, mime, desc) {
+  var cdv = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
+  if (cdv && typeof cdv.saveFile === "function") {
+    setMsg("保存先を選択してください…");
+    try {
+      cdv.saveFile(blob, name).then(function () { setMsg("✅ 保存しました: " + name, "ok"); },
+        function (err) { if (err && !/cancel/i.test(String(err))) setMsg("保存に失敗しました: " + err, "err"); else setMsg(""); });
+    } catch (e) { setMsg("保存に失敗しました: " + e.message, "err"); }
+    return;
+  }
+  if (typeof window.showSaveFilePicker === "function") {
+    var ext = name.slice(name.lastIndexOf(".")), acc = {}; acc[mime] = [ext];
+    window.showSaveFilePicker({ suggestedName: name, types: [{ description: desc || "ファイル", accept: acc }] })
+      .then(function (h) { return h.createWritable(); })
+      .then(function (w) { return w.write(blob).then(function () { return w.close(); }); })
+      .then(function () { setMsg("✅ 保存しました: " + name, "ok"); })
+      .catch(function (e) { if (e && e.name === "AbortError") return; anchorDownload(blob, name); });
+    return;
+  }
+  anchorDownload(blob, name);
+}
+/* <a download> の名前に非 ASCII 文字があると "download" に置き換える環境があるため、ここだけ ASCII にする */
+function asciiName(name) {
+  var dot = name.lastIndexOf("."), ext = dot > 0 ? name.slice(dot) : "", base = dot > 0 ? name.slice(0, dot) : name;
+  base = base.replace(/[‐-―]/g, "-").normalize("NFKD").replace(/[^\x20-\x7e]/g, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_").replace(/^[_.-]+|[_.-]+$/g, "");
+  return (base || "bada-compose") + ext;
+}
+function anchorDownload(blob, name) {
+  var a = document.createElement("a"), url = URL.createObjectURL(blob);
+  name = asciiName(name);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  setMsg("💾 " + name + " をダウンロードしました。", "ok");
+}
+function pickRecorderMime() {
+  var list = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
+  for (var i = 0; i < list.length; i++) if (MediaRecorder.isTypeSupported(list[i])) return list[i];
+  return "";
+}
+
+/* ================================================================ 画面 */
+var COL = { S:"#f0c46e", A:"#e87a8e", T:"#60cec4", B:"#7a98ff", pfh:"#faf0c8", vn1:"#c8785a", vn2:"#aa6450", va:"#965a6e", vc:"#78463c", cb:"#5a3c32",
+            fl:"#bee8dc", ob:"#78c878", cl:"#6eaac8", hn:"#d2aa5a", tp:"#f0c850", tb:"#aa783c", timp:"#aa3c3c" };
+var STRV = { S:"#c8785a", A:"#aa6450", T:"#965a6e", B:"#78463c" };
+var ROLECOL = { solo:"#f0c46e", tutti:"#c8785a", both:"#a883d8", cadenza:"#eeeeee" };
+var S = { proj: null, R: null, sel: 0, playing: false, ctx: null, eng: null, base: 0, from: 0, idx: 0, timer: null, raf: 0,
+          rec: null, recCanvas: null, pps: 90, dirty: 0, editTheme: null };
+function setMsg(t, cls) { var el = document.getElementById("status"); if (!el) return; el.textContent = t || ""; el.className = cls || ""; }
+function $(id) { return document.getElementById(id); }
+function fmtTime(s) { s = Math.max(0, s || 0); return Math.floor(s / 60) + ":" + ("0" + Math.floor(s % 60)).slice(-2); }
+function keyLabel(tr) {
+  var t = mod12(S.proj.key.tonic + tr);
+  return (tr > 0 ? "+" : "") + tr + " (" + KEYNAMES_JP[t] + (S.proj.key.minor ? "短調" : "長調") + ")";
+}
+function recompute() {
+  var t0 = performance.now();
+  S.R = compose(S.proj);
+  var c = S.R.check;
+  $("check").textContent = "  対位法チェック: 平行 5 度・8 度 " + c.par + (c.parList.length ? " (" + c.parList.join(", ") + ")" : "") +
+    " ／ 強拍の不協和 " + c.diss + " ／ " + S.R.notes.length + " 音 · " + fmtTime(S.R.duration) + " · 生成 " + Math.round(performance.now() - t0) + " ms";
+  drawRollNow();
+}
+function changed(structural) {
+  recompute();
+  if (structural) renderStrip(); else updateStripCell(S.sel);
+  clearTimeout(S.dirty);
+  S.dirty = setTimeout(function () { try { localStorage.setItem("bada-compose-project", JSON.stringify(S.proj)); } catch (e) {} }, 700);
+}
+function barAtTime(t) {
+  var bt = S.R.bt, lo = 0, hi = S.proj.bars.length - 1;
+  while (lo < hi) { var mid = (lo + hi + 1) >> 1; if (bt[mid * BPB] <= t) lo = mid; else hi = mid - 1; }
+  return lo;
+}
+/* ---------- ピアノロール */
+function drawRoll(ctx, W, H, pos, video) {
+  var R = S.R, proj = S.proj, pps = video ? 110 : S.pps, top = video ? 150 : 22, bot = H - (video ? 128 : 16), M_LO = 24, M_HI = 100;
+  var nowX = Math.round(W * (video ? 0.28 : 0.25)), t0 = pos - nowX / pps, t1 = t0 + W / pps;
+  function y(m) { return bot - (Math.max(M_LO, Math.min(M_HI, m)) - M_LO) * (bot - top) / (M_HI - M_LO); }
+  ctx.fillStyle = "#07090e"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#0b0e16"; ctx.fillRect(0, top - 4, W, bot - top + 8);
+  ctx.font = "11px sans-serif"; ctx.textBaseline = "alphabetic";
+  for (var m = M_LO; m <= M_HI; m++) if (m % 12 === 0) { var yy = y(m); ctx.strokeStyle = "#1e2436"; ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(W, yy); ctx.stroke(); ctx.fillStyle = "#566078"; ctx.fillText("C" + (m / 12 - 1), 4, yy - 3); }
+  var bt = R.bt;
+  for (var i = 0; i < proj.bars.length; i++) {
+    var tb = bt[i * BPB], te = bt[(i + 1) * BPB];
+    if (te < t0 || tb > t1) continue;
+    var x0 = (tb - t0) * pps, x1 = (te - t0) * pps, bar = proj.bars[i];
+    ctx.fillStyle = ROLECOL[bar.role] || ROLECOL.solo; ctx.globalAlpha = 0.55; ctx.fillRect(x0, top - 10, x1 - x0 - 1, 4); ctx.globalAlpha = 1;
+    ctx.strokeStyle = i === S.sel && !video ? "#56628a" : "#1a2030"; ctx.beginPath(); ctx.moveTo(x0, top - 4); ctx.lineTo(x0, bot + 4); ctx.stroke();
+    ctx.fillStyle = "#4a5470"; ctx.fillText(String(i + 1), x0 + 3, top + 8);
+    if (i === S.sel && !video) { ctx.fillStyle = "rgba(120,140,200,0.07)"; ctx.fillRect(x0, top - 4, x1 - x0, bot - top + 8); }
+  }
+  var notes = R.notes;
+  for (var k = 0; k < notes.length; k++) {
+    var x = notes[k];
+    if (x.t > t1) break;
+    if (x.t + x.d < t0) continue;
+    var xa = (x.t - t0) * pps, xb = Math.max(xa + 2, (x.t + x.d - t0) * pps), yy2 = y(x.m), on = x.t <= pos && pos < x.t + x.d;
+    var col = x.i === "pf" ? COL[x.v] : ((x.v && STRV[x.v] && (x.i === "vn1" || x.i === "vn2" || x.i === "va" || x.i === "vc")) ? STRV[x.v] : COL[x.i] || "#888");
+    var hgt = x.i === "pf" || x.v ? (x.lab ? 8 : 6) : 4;
+    ctx.globalAlpha = on ? 1 : (x.lab ? 0.85 : 0.55);
+    ctx.fillStyle = col; ctx.fillRect(xa, yy2 - hgt / 2, xb - xa - 1, hgt);
+    if (x.lab && on) { ctx.strokeStyle = "#fff"; ctx.strokeRect(xa - 1, yy2 - hgt / 2 - 1, xb - xa + 1, hgt + 2); }
+  }
+  ctx.globalAlpha = 1;
+  R.P.entries.forEach(function (e) {
+    var te = timeOf(bt, e[0]); if (te < t0 || te > t1) return;
+    var mm = null; for (var q = 0; q < notes.length; q++) if (Math.abs(notes[q].b - e[0]) < 1e-6 && notes[q].v === e[2] && notes[q].lab) { mm = notes[q].m; break; }
+    if (mm === null) return;
+    ctx.fillStyle = COL[e[2]]; ctx.font = (video ? "15px" : "12px") + " sans-serif";
+    ctx.fillText(e[1].replace("S1", "主題 I").replace("S2", "主題 II").replace("S3", "主題 III") + " · " + e[2], (te - t0) * pps + 2, y(mm) - 10);
+  });
+  ctx.strokeStyle = "#faf0dc"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(nowX, top - 12); ctx.lineTo(nowX, bot + 6); ctx.stroke(); ctx.lineWidth = 1;
+  var beat = 0; for (var bb = 0; bb < bt.length - 1; bb++) if (bt[bb] <= pos) beat = bb;
+  var bi = Math.min(Math.floor(beat / BPB), proj.bars.length - 1);
+  ctx.fillStyle = "#d8d2be"; ctx.font = (video ? "italic 22px" : "italic 16px") + " serif";
+  ctx.fillText(transposeChordName(R.P.harm[Math.min(beat, R.P.harm.length - 1)], proj.transpose | 0), nowX + 8, bot - 6);
+  var sec = null; R.P.sections.forEach(function (s) { if (bt[s.bar * BPB] <= pos + 1e-3) sec = s; });
+  if (video) {
+    ctx.fillStyle = "#ece4d2"; ctx.font = "36px serif"; ctx.fillText(proj.title || "BADA Compose", 30, 52);
+    ctx.fillStyle = "#969cb0"; ctx.font = "16px sans-serif"; ctx.fillText("BADA Compose · " + keyLabel(proj.transpose | 0) + " · " + { concerto: "協奏曲", piano: "ピアノ独奏", strings: "弦楽合奏" }[proj.style], 32, 80);
+    if (sec) { ctx.fillStyle = "#ece4d2"; ctx.font = "22px sans-serif"; ctx.fillText(sec.title, 30, 114); ctx.fillStyle = "#a0a6ba"; ctx.font = "14px sans-serif"; ctx.fillText(sec.sub || "", 32, 136); }
+    ctx.fillStyle = "#c8ccd8"; ctx.font = "20px serif"; ctx.fillText("Bar " + (bi + 1) + " / " + proj.bars.length, W - 250, 40);
+    ctx.fillStyle = "#8c92a6"; ctx.fillText(fmtTime(pos) + " / " + fmtTime(R.duration), W - 250, 68);
+    var role = proj.bars[bi].role, lx = 30, ly = H - 96;
+    ctx.font = "14px sans-serif";
+    [["S", "S"], ["A", "A"], ["T", "T"], ["B", "B"], ["pfh", "ピアノ (鐘)"], ["vn1", "Vn I"], ["va", "Va"], ["vc", "Vc"], ["fl", "Fl"], ["ob", "Ob"], ["cl", "Cl"], ["hn", "Hn"], ["tp", "Tp"], ["timp", "Timp"]].forEach(function (L) {
+      ctx.fillStyle = COL[L[0]]; ctx.fillRect(lx, ly, 12, 12); ctx.fillStyle = "#c8ccd8"; ctx.fillText(L[1], lx + 17, ly + 11); lx += 17 + ctx.measureText(L[1]).width + 16;
+    });
+    ctx.fillStyle = ROLECOL[role] || "#ccc"; ctx.fillText({ solo: "ソロ (ピアノ)", tutti: "トゥッティ (管弦楽)", both: "合奏", cadenza: "カデンツァ" }[role] || "", 30, H - 58);
+    ctx.fillStyle = "#788098"; ctx.fillText("主題 I ← MOTHER ／ 主題 II ← トラック18 ／ 主題 III ← B♭-A-D-A ／ 嘆きのバス — BADA Compose で作曲", 30, H - 30);
+  } else if (sec) { ctx.fillStyle = "#b8b2a2"; ctx.font = "12px sans-serif"; ctx.fillText("§ " + sec.title, 8, 13); }
+}
+function drawRollNow() {
+  var cv = $("roll"); if (!cv || !S.R) return;
+  var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  var ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  var pos = S.playing ? S.ctx.currentTime - S.base : S.R.bt[S.sel * BPB];
+  drawRoll(ctx, w, h, pos, false);
+  var bi = barAtTime(pos);
+  $("pos").textContent = "Bar " + (bi + 1) + " / " + S.proj.bars.length + " · " + fmtTime(pos) + " / " + fmtTime(S.R.duration);
+  return { pos: pos, bar: bi };
+}
+function renderLegend() {
+  var L = S.proj.style === "piano" ? [["S", "S"], ["A", "A"], ["T", "T"], ["B", "B"], ["pfh", "鐘"]] :
+          S.proj.style === "strings" ? [["vn1", "Vn I (S)"], ["vn2", "Vn II (A)"], ["va", "Va (T)"], ["vc", "Vc (B)"], ["cb", "Cb"]] :
+          [["S", "Pf S"], ["A", "Pf A"], ["T", "Pf T"], ["B", "Pf B"], ["vn1", "Vn I"], ["vn2", "Vn II"], ["va", "Va"], ["vc", "Vc"], ["cb", "Cb"], ["fl", "Fl"], ["ob", "Ob"], ["cl", "Cl"], ["hn", "Hn"], ["tp", "Tp"], ["tb", "Tb"], ["timp", "Timp"]];
+  $("legend").innerHTML = L.map(function (x) { return '<span><i style="background:' + COL[x[0]] + '"></i>' + x[1] + "</span>"; }).join("") +
+    ' <span style="margin-left:8px">役割: <i style="background:' + ROLECOL.solo + '"></i>ソロ <i style="background:' + ROLECOL.tutti + '"></i>トゥッティ <i style="background:' + ROLECOL.both + '"></i>合奏 <i style="background:' + ROLECOL.cadenza + '"></i>カデンツァ</span>';
+}
+/* ---------- 小節の列 */
+function stripCellHtml(i) {
+  var b = S.proj.bars[i];
+  return "<b>" + (i + 1) + (b.tempo ? " ♩" + b.tempo : "") + "</b><span>" + escapeHtml(chordsToText(b.h).replace(/ /g, " · ")) + "</span>";
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
+function cellClass(i) {
+  var b = S.proj.bars[i];
+  return "bar r-" + b.role + (i === S.sel ? " sel" : "") + (b.sec && b.sec.title ? " sec" : "");
+}
+function renderStrip() {
+  var st = $("strip"), h = [];
+  for (var i = 0; i < S.proj.bars.length; i++) h.push('<button class="' + cellClass(i) + '" data-i="' + i + '">' + stripCellHtml(i) + "</button>");
+  st.innerHTML = h.join("");
+  $("inTo").max = $("inFrom").max = S.proj.bars.length;
+  selectBar(Math.min(S.sel, S.proj.bars.length - 1), true);
+}
+function updateStripCell(i) {
+  var el = $("strip").children[i]; if (!el) return;
+  el.className = cellClass(i); el.innerHTML = stripCellHtml(i);
+}
+function selectBar(i, scroll) {
+  var prev = $("strip").children[S.sel]; if (prev) prev.classList.remove("sel");
+  S.sel = Math.max(0, Math.min(i, S.proj.bars.length - 1));
+  var el = $("strip").children[S.sel];
+  if (el) { el.classList.add("sel"); if (scroll) el.scrollIntoView({ block: "nearest", inline: "center" }); }
+  fillBarEditor(); if (!S.playing) drawRollNow();
+}
+function fillBarEditor() {
+  var b = S.proj.bars[S.sel];
+  $("barTitle").textContent = "第 " + (S.sel + 1) + " 小節";
+  $("inChords").value = chordsToText(b.h); $("inChords").classList.remove("bad");
+  $("selRole").value = b.role; $("inBpm").value = b.tempo || ""; $("inBpm").placeholder = String(S.proj.bpm);
+  $("inDyn").value = b.dyn; $("selDet").value = String(nearest([1, 0.95, 0.8, 0.6], b.det));
+  document.querySelectorAll("[data-rest]").forEach(function (cb) { cb.checked = ((b.rest || {})[cb.dataset.rest] || 0) === 15; });
+  $("chkHold").checked = !!b.hold; $("selBrass").value = String(b.brass || 0);
+  var tp = (b.timp || []).length ? String(nearest([0.6, 2, 4, 8], b.timp[b.timp.length - 1][1])) : ""; $("selTimp").value = tp;
+  $("inSecTitle").value = b.sec && b.sec.title ? b.sec.title : "";
+  renderEntries(); renderPalette();
+}
+function nearest(list, x) { return list.reduce(function (a, b) { return Math.abs(b - x) < Math.abs(a - x) ? b : a; }); }
+function renderEntries() {
+  var lo = S.sel * BPB, hi = lo + BPB, rows = [];
+  S.proj.entries.forEach(function (e, idx) {
+    if (e.beat < lo || e.beat >= hi) return;
+    var cnt = e.notes.filter(function (x) { return x[1] !== null; }).length;
+    rows.push('<div class="item"><span class="grow">' + e.v + " · " + (e.beat - lo + 1) + " 拍目 · " + escapeHtml(e.label || "(無名の旋律)") + " · " + cnt + ' 音</span><button data-del="' + idx + '">✕</button></div>');
+  });
+  $("entryList").innerHTML = rows.length ? rows.join("") : '<div class="hint">この小節から始まる主題はありません (自由声部はエンジンが作ります)。</div>';
+}
+function renderPalette() {
+  var t = S.proj.key.tonic, minor = S.proj.key.minor;
+  var degs = minor ? [["m",0],["m7b5",2],["",3],["m",5],["m",7],["7",7],["",7],["",8],["maj7",8],["",10],["7",10],["7",0],["",5]]
+                   : [["",0],["maj7",0],["m",2],["m7",2],["m",4],["",5],["maj7",5],["",7],["7",7],["m",9],["m7",9],["dim",11],["7",4]];
+  var html = degs.map(function (d) { var nm = NAMES[mod12(t + d[1])] + d[0]; return '<button data-chord="' + nm + '">' + nm + "</button>"; });
+  html.push('<button data-chord="__clear">消す</button>');
+  $("palette").innerHTML = '<span class="hint" style="align-self:center">和音を足す:</span>' + html.join("");
+}
+function renderThemeSelect() {
+  var opts = BUILTIN_THEMES.map(function (t) { return '<option value="b:' + t.id + '">' + escapeHtml(t.name) + "</option>"; })
+    .concat(S.proj.themes.map(function (t, i) { return '<option value="u:' + i + '">★ ' + escapeHtml(t.name) + "</option>"; }));
+  $("selEntryTheme").innerHTML = opts.join("");
+  var rows = BUILTIN_THEMES.map(function (t) {
+    return '<div class="item"><span class="grow">' + escapeHtml(t.name) + ' <span class="hint">(組み込み · ' + t.notes.length + ' 音)</span></span><button data-tplay="b:' + t.id + '">▶</button><button data-tcopy="b:' + t.id + '">写して編集</button></div>';
+  }).concat(S.proj.themes.map(function (t, i) {
+    return '<div class="item"><span class="grow">★ ' + escapeHtml(t.name) + '</span><button data-tplay="u:' + i + '">▶</button><button data-tedit="' + i + '">編集</button><button data-tdel="' + i + '">✕</button></div>';
+  }));
+  $("themeList").innerHTML = rows.join("");
+}
+function themeNotes(ref) {
+  if (ref.indexOf("b:") === 0) { var id = ref.slice(2); return BUILTIN_THEMES.filter(function (t) { return t.id === id; })[0]; }
+  var u = S.proj.themes[+ref.slice(2)]; if (!u) return null;
+  var p = parseNotes(u.text); return p.notes ? { name: u.name, notes: p.notes } : null;
+}
+function fillSongPanel() {
+  $("inTitle").value = S.proj.title || ""; $("inSongBpm").value = S.proj.bpm;
+  var wk = []; for (var t = 0; t < 12; t++) { wk.push('<option value="' + t + ':1">' + KEYNAMES_JP[t] + "短調 (" + NAMES[t] + "m)</option>", '<option value="' + t + ':0">' + KEYNAMES_JP[t] + "長調 (" + NAMES[t] + ")</option>"); }
+  $("selWrittenKey").innerHTML = wk.join(""); $("selWrittenKey").value = S.proj.key.tonic + ":" + (S.proj.key.minor ? 1 : 0);
+  var ko = []; for (var tr = -6; tr <= 6; tr++) ko.push('<option value="' + tr + '">' + keyLabel(tr) + "</option>");
+  $("selKey").innerHTML = ko.join(""); $("selKey").value = String(S.proj.transpose | 0);
+  $("selStyle").value = S.proj.style; $("selTempo").value = String(S.proj.tempoScale || 1); $("inSeed").value = S.proj.seed;
+  $("projTitle").textContent = S.proj.title || "";
+  $("inFrom").value = 1; $("inTo").value = S.proj.bars.length;
+}
+function loadProject(p) {
+  stop();
+  S.proj = p; S.proj.themes = S.proj.themes || []; S.sel = 0;
+  setKey(p.key.tonic, p.key.minor);
+  fillSongPanel(); renderLegend(); renderThemeSelect(); recompute(); renderStrip();
+  try { localStorage.setItem("bada-compose-project", JSON.stringify(S.proj)); } catch (e) {}
+}
+function validProject(p) {
+  return p && Array.isArray(p.bars) && p.bars.length > 0 && p.bars.length <= 2000 && Array.isArray(p.entries) &&
+    p.bars.every(function (b) { return Array.isArray(b.h) && b.h.length === 4; }) && p.key && typeof p.key.tonic === "number";
+}
+/* ---------- 再生 */
+function ensureCtx() {
+  if (!S.ctx) { var AC = window.AudioContext || window.webkitAudioContext; S.ctx = new AC({ latencyHint: "playback" }); }
+  if (S.ctx.state === "suspended") S.ctx.resume();
+  return S.ctx;
+}
+function play(fromBar, opts) {
+  opts = opts || {};
+  stop();
+  var ctx = ensureCtx(), dest = ctx.createGain(); dest.gain.value = 0.9; dest.connect(ctx.destination);
+  if (opts.recDest) dest.connect(opts.recDest);
+  S.eng = makeEngine(ctx, dest); S.eng.master = dest;
+  S.from = S.R.bt[fromBar * BPB]; S.until = opts.toBar !== undefined ? S.R.bt[opts.toBar * BPB] : S.R.duration;
+  S.base = ctx.currentTime + 0.15 - S.from;
+  S.idx = 0; while (S.idx < S.R.notes.length && S.R.notes[S.idx].t < S.from - 1e-6) S.idx++;
+  S.playing = true; $("btnPlay").textContent = "⏸";
+  var tick = function () {
+    if (!S.playing) return;
+    var horizon = ctx.currentTime - S.base + 0.35;
+    while (S.idx < S.R.notes.length && S.R.notes[S.idx].t < horizon) {
+      var x = S.R.notes[S.idx++]; if (x.t < S.until) S.eng.play(x, S.base);
+    }
+  };
+  tick(); S.timer = setInterval(tick, 40);
+  var frame = function () {
+    if (!S.playing) return;
+    var st = drawRollNow();
+    var el = $("strip").querySelector(".now"); if (!el || +el.dataset.i !== st.bar) { if (el) el.classList.remove("now"); var ne = $("strip").children[st.bar]; if (ne) { ne.classList.add("now"); ne.scrollIntoView({ block: "nearest", inline: "center" }); } }
+    if (opts.onFrame) opts.onFrame(st.pos);
+    if (st.pos > S.until + (opts.tail || 2.5)) { stop(); if (opts.onEnd) opts.onEnd(); return; }
+    S.raf = requestAnimationFrame(frame);
+  };
+  S.raf = requestAnimationFrame(frame);
+}
+function stop() {
+  if (!S.playing) return;
+  S.playing = false; clearInterval(S.timer); cancelAnimationFrame(S.raf);
+  var eng = S.eng; if (eng && eng.master) { try { eng.master.gain.setTargetAtTime(0, S.ctx.currentTime, 0.05); } catch (e) {} setTimeout(function () { try { eng.master.disconnect(); } catch (e) {} }, 400); }
+  $("btnPlay").textContent = "▶";
+  var el = $("strip").querySelector(".now"); if (el) el.classList.remove("now");
+  drawRollNow();
+}
+function previewNotes(notes) {
+  stop();
+  var ctx = ensureCtx(), dest = ctx.createGain(); dest.gain.value = 0.9; dest.connect(ctx.destination);
+  var eng = makeEngine(ctx, dest), t = 0, spb = 60 / (S.proj.bpm * (S.proj.tempoScale || 1)), base = ctx.currentTime + 0.1;
+  notes.forEach(function (x) { if (x[1] !== null) eng.play({ i: "pf", t: t, d: x[0] * spb, m: x[1] + (S.proj.transpose | 0), vel: 0.7 }, base); t += x[0] * spb; });
+  setTimeout(function () { try { dest.disconnect(); } catch (e) {} }, (t + 3) * 1000);
+}
+/* ---------- 書き出し */
+function range() {
+  var a = Math.max(1, Math.min(S.proj.bars.length, parseInt($("inFrom").value, 10) || 1)), b = Math.max(a, Math.min(S.proj.bars.length, parseInt($("inTo").value, 10) || S.proj.bars.length));
+  return [a - 1, b];
+}
+function exportWav() {
+  var r = range(), t0 = S.R.bt[r[0] * BPB], t1 = S.R.bt[r[1] * BPB], sr = 44100, len = Math.ceil((t1 - t0 + 4) * sr);
+  var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  if (!OAC) { setMsg("この環境はオフライン合成に対応していません。", "err"); return; }
+  setMsg("🔊 合成中… (" + fmtTime(t1 - t0) + " の音声)");
+  var oc = new OAC(2, len, sr), eng = makeEngine(oc, oc.destination), base = 0.05 - t0;
+  S.R.notes.forEach(function (x) { if (x.t >= t0 - 1e-6 && x.t < t1) eng.play(x, base); });
+  oc.startRendering().then(function (buf) {
+    var L = buf.getChannelData(0), Rr = buf.getChannelData(1), peak = 1e-6;
+    for (var i = 0; i < L.length; i++) peak = Math.max(peak, Math.abs(L[i]), Math.abs(Rr[i]));
+    var g = 0.89 / peak, a = new Float32Array(L.length), b = new Float32Array(L.length), fade = Math.floor(2.5 * sr);
+    for (i = 0; i < L.length; i++) { var f = i > L.length - fade ? (L.length - i) / fade : 1; a[i] = L[i] * g * f; b[i] = Rr[i] * g * f; }
+    saveBlob(new Blob([wavFile([a, b], sr)], { type: "audio/wav" }), sanitizeName(S.proj.title) + ".wav", "audio/wav", "WAV 音声");
+  }).catch(function (e) { setMsg("合成に失敗しました: " + e.message, "err"); });
+}
+function exportMidi() {
+  var r = range();
+  saveBlob(new Blob([midiFile(S.proj, S.R, r[0], r[1])], { type: "audio/midi" }), sanitizeName(S.proj.title) + ".mid", "audio/midi", "MIDI");
+}
+function exportScore() {
+  saveBlob(new Blob([JSON.stringify(scoreJson(S.proj, S.R))], { type: "application/json" }), "score_" + sanitizeName(S.proj.title) + ".json", "application/json", "score.json");
+}
+function exportVideo() {
+  var mime = pickRecorderMime();
+  if (!mime) { setMsg("この環境は動画の録画 (MediaRecorder) に対応していません。", "err"); return; }
+  var r = range(), cv = S.recCanvas || (S.recCanvas = document.createElement("canvas"));
+  cv.width = 1280; cv.height = 720;
+  var ctx = ensureCtx(), ad = ctx.createMediaStreamDestination(), vs = cv.captureStream(30);
+  var stream = new MediaStream(vs.getVideoTracks().concat(ad.stream.getAudioTracks()));
+  var rec, chunks = [];
+  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000, audioBitsPerSecond: 192000 }); }
+  catch (e) { setMsg("録画を始められません: " + e.message, "err"); return; }
+  rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = function () {
+    var ext = /mp4/.test(mime) ? "mp4" : "webm", blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+    saveBlob(blob, sanitizeName(S.proj.title) + "." + ext, ext === "mp4" ? "video/mp4" : "video/webm", "動画");
+  };
+  var c2 = cv.getContext("2d");
+  rec.start(1000);
+  setMsg("🎬 録画中 (" + (/mp4/.test(mime) ? "MP4" : "WebM") + ") … 再生が終わると保存します。⏹ で途中終了。");
+  play(r[0], { recDest: ad, toBar: r[1], tail: 3, onFrame: function (pos) { drawRoll(c2, 1280, 720, pos, true); },
+    onEnd: function () { if (rec.state !== "inactive") rec.stop(); } });
+  S.rec = rec;
+}
+/* ---------- 操作 */
+function mutateBar(fn) { var b = S.proj.bars[S.sel]; fn(b); changed(false); }
+function insertBar(at, src) {
+  var nb = JSON.parse(JSON.stringify(src || S.proj.bars[Math.min(at, S.proj.bars.length - 1)]));
+  if (!src) { nb.sec = null; nb.timp = []; }
+  S.proj.bars.splice(at, 0, nb);
+  S.proj.entries.forEach(function (e) { if (e.beat >= at * BPB) e.beat += BPB; });
+  if (src) {
+    var srcIdx = at - 1, add = [];
+    S.proj.entries.forEach(function (e) { if (e.beat >= srcIdx * BPB && e.beat < at * BPB) { var c = JSON.parse(JSON.stringify(e)); c.beat += BPB; c.marker = false; add.push(c); } });
+    S.proj.entries = S.proj.entries.concat(add);
+  }
+}
+function deleteBar(at) {
+  if (S.proj.bars.length <= 1) { setMsg("最後の 1 小節は消せません。", "err"); return; }
+  S.proj.bars.splice(at, 1);
+  S.proj.entries = S.proj.entries.filter(function (e) { return !(e.beat >= at * BPB && e.beat < (at + 1) * BPB); });
+  S.proj.entries.forEach(function (e) { if (e.beat >= (at + 1) * BPB) e.beat -= BPB; });
+}
+function wire() {
+  $("btnPlay").onclick = function () { if (S.playing) { stop(); if (S.rec && S.rec.state !== "inactive") S.rec.stop(); } else play(S.sel); };
+  $("btnStop").onclick = function () { stop(); if (S.rec && S.rec.state !== "inactive") S.rec.stop(); };
+  $("btnTop").onclick = function () { selectBar(0, true); };
+  $("selStyle").onchange = function () { S.proj.style = this.value; renderLegend(); changed(false); };
+  $("selKey").onchange = function () { S.proj.transpose = parseInt(this.value, 10) || 0; changed(false); };
+  $("selTempo").onchange = function () { S.proj.tempoScale = parseFloat(this.value) || 1; changed(false); };
+  $("inSeed").onchange = function () { S.proj.seed = parseInt(this.value, 10) || 0; changed(false); };
+  $("btnDice").onclick = function () { S.proj.seed = Math.floor(Math.random() * 99999); $("inSeed").value = S.proj.seed; changed(false); setMsg("🎲 乱数 " + S.proj.seed + " で 4 声を作り直しました。"); };
+  $("strip").onclick = function (e) { var b = e.target.closest(".bar"); if (b) selectBar(+b.dataset.i, false); };
+  $("roll").onclick = function (e) {
+    if (S.playing || !S.R) return;
+    var rect = this.getBoundingClientRect(), pos = S.R.bt[S.sel * BPB], t = pos + (e.clientX - rect.left - rect.width * 0.25) / S.pps;
+    selectBar(barAtTime(Math.max(0, t)), true);
+  };
+  $("tabs").onclick = function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    document.querySelectorAll("#tabs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+    document.querySelectorAll(".panel").forEach(function (p) { p.classList.toggle("on", p.id === "p-" + b.dataset.tab); });
+  };
+  $("inChords").oninput = function () {
+    var r = parseChordInput(this.value);
+    this.classList.toggle("bad", !!r.err);
+    if (r.err) { setMsg(r.err, "err"); return; }
+    setMsg(""); mutateBar(function (b) { b.h = r.h; });
+  };
+  $("palette").onclick = function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    /* タップで和音を足す (4 個を超えたら新しく書き始める)。3 個のときは 4 個目を待つ */
+    var inp = $("inChords"), cur = inp.value.trim().split(/\s+/).filter(Boolean);
+    if (b.dataset.chord === "__clear") { inp.value = ""; setMsg("和音をタップして書き込んでください (1・2・4 個)。"); return; }
+    if (cur.length >= 4 || parseChordInput(inp.value).err && cur.length !== 3) cur = [];
+    cur.push(b.dataset.chord);
+    inp.value = cur.join(" ");
+    if (cur.length === 3) { inp.classList.add("bad"); setMsg("あと 1 つ和音をタップすると 4 拍分になります。"); return; }
+    inp.oninput();
+  };
+  $("selRole").onchange = function () { var v = this.value; mutateBar(function (b) { b.role = v; }); };
+  $("inBpm").onchange = function () { var v = parseInt(this.value, 10); mutateBar(function (b) { b.tempo = v >= 20 && v <= 240 ? v : null; }); updateStripCell(S.sel); };
+  $("inDyn").onchange = function () { var v = parseFloat(this.value); mutateBar(function (b) { b.dyn = v; }); };
+  $("selDet").onchange = function () { var v = parseFloat(this.value); mutateBar(function (b) { b.det = v; }); };
+  document.querySelectorAll("[data-rest]").forEach(function (cb) {
+    cb.onchange = function () { var v = cb.dataset.rest, on = cb.checked; mutateBar(function (b) { b.rest = b.rest || {}; if (on) b.rest[v] = 15; else delete b.rest[v]; }); };
+  });
+  $("chkHold").onchange = function () { var on = this.checked; mutateBar(function (b) { b.hold = on; }); };
+  $("selBrass").onchange = function () { var v = parseInt(this.value, 10) || 0; mutateBar(function (b) { b.brass = v; }); };
+  $("selTimp").onchange = function () { var v = parseFloat(this.value); mutateBar(function (b) { b.timp = v ? [[0, v, v < 1 ? 0.45 : 0.6]] : []; }); };
+  $("inSecTitle").onchange = function () { var v = this.value.trim(); mutateBar(function (b) { b.sec = v ? { title: v, sub: (b.sec && b.sec.sub) || "" } : null; }); };
+  $("btnInsBefore").onclick = function () { insertBar(S.sel, null); changed(true); setMsg("第 " + (S.sel + 1) + " 小節の前に 1 小節挿入しました。"); };
+  $("btnInsAfter").onclick = function () { insertBar(S.sel + 1, null); S.sel++; changed(true); setMsg("1 小節挿入しました。"); };
+  $("btnDup").onclick = function () { insertBar(S.sel + 1, S.proj.bars[S.sel]); S.sel++; changed(true); setMsg("小節を複製しました (主題も写しました)。"); };
+  $("btnDel").onclick = function () { deleteBar(S.sel); changed(true); setMsg("小節を削除しました。"); };
+  $("btnLoop4").onclick = function () {
+    var src = S.proj.bars.slice(S.sel, S.sel + 4);
+    src.forEach(function (b) { var c = JSON.parse(JSON.stringify(b)); c.sec = null; S.proj.bars.push(c); });
+    changed(true); setMsg("第 " + (S.sel + 1) + " 小節からの " + src.length + " 小節の和音を末尾に足しました。");
+  };
+  $("entryList").onclick = function (e) {
+    var b = e.target.closest("[data-del]"); if (!b) return;
+    S.proj.entries.splice(+b.dataset.del, 1); renderEntries(); changed(false);
+  };
+  $("btnAddEntry").onclick = function () {
+    var th = themeNotes($("selEntryTheme").value); if (!th) { setMsg("主題を選んでください。", "err"); return; }
+    var semis = parseInt($("inEntrySemis").value, 10) || 0, beat = parseInt($("selEntryBeat").value, 10) || 0, lab = $("inEntryLabel").value.trim() || th.name;
+    S.proj.entries.push({ v: $("selEntryV").value, beat: S.sel * BPB + beat, label: lab, marker: true,
+      notes: th.notes.map(function (x) { return [x[0], x[1] === null ? null : x[1] + semis]; }) });
+    renderEntries(); changed(false); setMsg("「" + lab + "」を第 " + (S.sel + 1) + " 小節の " + $("selEntryV").value + " に置きました。", "ok");
+  };
+  $("themeList").onclick = function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    if (b.dataset.tplay) { var t = themeNotes(b.dataset.tplay); if (t) previewNotes(t.notes); }
+    if (b.dataset.tcopy) { var tc = themeNotes(b.dataset.tcopy); S.editTheme = null; $("inThemeName").value = tc.name + " (写し)"; $("inThemeNotes").value = notesToText(tc.notes); $("themeEdTitle").textContent = "新しい主題"; }
+    if (b.dataset.tedit !== undefined) { var u = S.proj.themes[+b.dataset.tedit]; S.editTheme = +b.dataset.tedit; $("inThemeName").value = u.name; $("inThemeNotes").value = u.text; $("themeEdTitle").textContent = "主題を編集: " + u.name; }
+    if (b.dataset.tdel !== undefined) { S.proj.themes.splice(+b.dataset.tdel, 1); S.editTheme = null; renderThemeSelect(); changed(false); }
+  };
+  $("btnThemePreview").onclick = function () { var p = parseNotes($("inThemeNotes").value); if (p.err) { setMsg(p.err, "err"); return; } previewNotes(p.notes); };
+  $("btnThemeSave").onclick = function () {
+    var p = parseNotes($("inThemeNotes").value); if (p.err) { setMsg(p.err, "err"); $("inThemeNotes").classList.add("bad"); return; }
+    $("inThemeNotes").classList.remove("bad");
+    var t = { name: $("inThemeName").value.trim() || ("主題 " + (S.proj.themes.length + 1)), text: notesToText(p.notes) };
+    if (S.editTheme !== null && S.proj.themes[S.editTheme]) S.proj.themes[S.editTheme] = t; else { S.proj.themes.push(t); S.editTheme = S.proj.themes.length - 1; }
+    renderThemeSelect(); changed(false); setMsg("💾 主題「" + t.name + "」を保存しました。「小節」タブから置けます。", "ok");
+  };
+  $("btnThemeNew").onclick = function () { S.editTheme = null; $("inThemeName").value = ""; $("inThemeNotes").value = ""; $("themeEdTitle").textContent = "新しい主題"; };
+  $("btnGenMel").onclick = function () {
+    var mel = genMelody(S.proj, S.sel, 4, Math.floor(Math.random() * 99999));
+    S.editTheme = null; $("inThemeName").value = "旋律 (第 " + (S.sel + 1) + " 小節の和音から)"; $("inThemeNotes").value = notesToText(mel);
+    previewNotes(mel); setMsg("🎲 第 " + (S.sel + 1) + " 小節からの和音で旋律を作りました。気に入ったら保存して置いてください。");
+  };
+  $("inTitle").onchange = function () { S.proj.title = this.value; $("projTitle").textContent = this.value; changed(false); };
+  $("inSongBpm").onchange = function () { var v = parseInt(this.value, 10); if (v >= 20 && v <= 240) { S.proj.bpm = v; changed(false); } };
+  $("selWrittenKey").onchange = function () { var p = this.value.split(":"); S.proj.key = { tonic: +p[0], minor: p[1] === "1" }; setKey(S.proj.key.tonic, S.proj.key.minor); fillSongPanel(); renderPalette(); changed(false); };
+  $("btnPreset").onclick = function () { loadProject(makePreset($("selPreset").value)); setMsg("ひな形を開きました: " + S.proj.title, "ok"); };
+  $("btnSaveProj").onclick = function () { saveBlob(new Blob([JSON.stringify(S.proj, null, 1)], { type: "application/json" }), sanitizeName(S.proj.title) + ".bada.json", "application/json", "BADA Compose プロジェクト"); };
+  $("btnOpenProj").onclick = function () { $("fileProj").click(); };
+  $("fileProj").onchange = function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    f.text().then(function (txt) {
+      var p = JSON.parse(txt); if (!validProject(p)) throw new Error("BADA Compose のプロジェクトではありません");
+      loadProject(p); setMsg("📂 開きました: " + (p.title || f.name), "ok");
+    }).catch(function (e) { setMsg("開けませんでした: " + e.message, "err"); });
+    this.value = "";
+  };
+  $("btnRangeAll").onclick = function () { $("inFrom").value = 1; $("inTo").value = S.proj.bars.length; };
+  $("btnWav").onclick = exportWav; $("btnMidi").onclick = exportMidi; $("btnScore").onclick = exportScore; $("btnVideo").onclick = exportVideo;
+  document.addEventListener("keydown", function (e) {
+    if (e.code === "Space" && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) { e.preventDefault(); $("btnPlay").click(); }
+  });
+  window.addEventListener("resize", function () { if (!S.playing) drawRollNow(); });
+}
+function boot() {
+  wire();
+  var p = null;
+  try { var s = localStorage.getItem("bada-compose-project"); if (s) { p = JSON.parse(s); if (!validProject(p)) p = null; } } catch (e) { p = null; }
+  loadProject(p || makePreset("pconcerto"));
+  setMsg(p ? "前回の編集を開きました。ひな形は「📁 曲」タブから。" : "Piano Concerto BADA を読み込みました。▶ で再生、小節をタップして編集できます。", "ok");
+}
+if (!(typeof window !== "undefined" && window.__ENGINE_TEST__)) {
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+}
+</script>
+</body>
+</html>

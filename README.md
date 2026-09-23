@@ -125,6 +125,22 @@
 
 ---
 
+## 🎼 ダウンロード — BADA Compose(作曲スタジオ)
+
+**Piano Concerto BADA のコード進行エンジンで作曲するアプリ。** 起動すると Piano Concerto BADA (3 楽章 123 小節) が読み込まれ、小節ごとに**和音・役割 (ソロ / トゥッティ / 合奏 / カデンツァ)・テンポ・強弱・主題**を編集すると、Python 版 `bada_fuga/compose.py` から移植した**対位法エンジン**がその場で 4 声を作り直します。小節の挿入・複製・削除、自作主題・和音から作る旋律、協奏曲 / ピアノ独奏 / 弦楽合奏、出力の調とテンポ。Web Audio のピアノ + 管弦楽で再生し、**WAV / MIDI / 動画 (MP4・WebM) / score.json** に書き出し。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_compose/index.html をダウンロード**](bada_compose/index.html)
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-compose-debug.apk` |
+| **Windows 10 / 11** | `BadaCompose-*-x64.exe` (NSIS インストーラ) / `BadaCompose-*-portable.exe` |
+| **Linux** | `BadaCompose-*-x86_64.AppImage` / `BadaCompose-*-amd64.deb` |
+
+ビルドは [`compose-app-build.yml`](.github/workflows/compose-app-build.yml) が実行します(`bada_compose/` を変えた push で Actions アーティファクト / `compose-v*` タグで Release へ添付)。詳細は [`bada_compose/`](bada_compose/) を参照。
+
+---
+
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
 
 **ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。
