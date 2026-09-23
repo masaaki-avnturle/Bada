@@ -49,6 +49,7 @@ THEMES = {
     'symphony': dict(bg=(10, 12, 18), bg2=(26, 30, 44), roll=(6, 8, 14), title='Symphony BADA', subtitle='', footer=[], pause_bar=145),
     'pconcerto': dict(bg=(12, 12, 20), bg2=(30, 26, 40), roll=(8, 8, 14), title='Piano Concerto BADA', subtitle='', footer=[], pause_bar=112),
     'sweet': dict(bg=(16, 12, 20), bg2=(36, 28, 44), roll=(10, 7, 14), title='BADA 528 — Sweet Trio', subtitle='', footer=[], pause_bar=999),
+    'heart': dict(bg=(18, 8, 12), bg2=(42, 14, 22), roll=(12, 5, 8), title='Requiem BADA · Cor', subtitle='', footer=[], pause_bar=99),
     'acceptance': dict(bg=(14, 12, 16), bg2=(40, 30, 30), roll=(9, 7, 10), title='BADA 528 — Acceptance', subtitle='', footer=[], pause_bar=999),
 }
 
@@ -88,13 +89,15 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'Pf S', 'A': 'Pf A', 'T': 'Pf T', 'B': 'Pf Bass',
                       'EP': 'E.Piano', 'PD': 'Synth Pad', 'LD': 'Synth Lead', 'DR': 'Brushes',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
+    if meta.get('style') == 'heart':
+        COL.update({'HB': (235, 70, 90)}); VNAME.update({'S': 'Soprano', 'A': 'Alto', 'T': 'Tenore', 'B': 'Basso', 'HB': '鼓動 (ドックン)'})
     if meta.get('style') == 'acceptance':
         COL.update({'H': (250, 240, 200), 'CB': (150, 95, 70), 'CBP': (190, 130, 90), 'TA': (200, 170, 110), 'BN': (160, 230, 190), 'TB': (110, 210, 250),
                     'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'WW': (120, 200, 120), 'FL': (190, 235, 220), 'PD': (120, 110, 170)})
         VNAME.update({'S': 'S', 'A': 'A', 'T': 'T', 'B': 'B', 'H': 'Pf', 'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'TB': 'タブレット録音',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl', 'PD': 'Pad'})
     present = {x['v'] for x in notes}
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]; DET = np.array([n.get('det', 1.0) for n in notes]); ROLE = [n.get('role', '') for n in notes]
     order = np.argsort(T); T, D, M, DET = T[order], D[order], M[order], DET[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]; ROLE = [ROLE[i] for i in order]
@@ -139,10 +142,21 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (150 if v in 'HWLC' else 80)))
+        lx += (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (150 if v in ('H', 'W', 'L', 'C', 'HB') else 80)))
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
+    # 鼓動 (心電図と脈打つ心臓) のデータ
+    hb = [e for e in d.get('extras', []) if e['v'] == 'HB']
+    LUB = np.array([e['t'] for e in hb if e.get('kind') == 'lub']); LUBG = np.array([e['gain'] for e in hb if e.get('kind') == 'lub'])
+    DUB = np.array([e['t'] for e in hb if e.get('kind') == 'dub'])
+    def heart_poly(cx, cy, s):
+        pts = []
+        for k in range(40):
+            a = 2 * math.pi * k / 40
+            pts.append((cx + s * 16 * math.sin(a) ** 3 / 16, cy - s * (13 * math.cos(a) - 5 * math.cos(2 * a) - 2 * math.cos(3 * a) - math.cos(4 * a)) / 16))
+        return pts
+    f_bpm = font(SERIF, 22)
     ff = ffmpeg_exe()
     cmd = [ff, '-y', '-loglevel', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-s', '%dx%d' % (W, H), '-r', str(FPS), '-i', '-',
            '-i', wav, '-c:v', 'libx264', '-preset', 'medium', '-crf', '21', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k',
@@ -191,6 +205,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             y = max(ROLL_Y0 + 2, min(ROLL_Y1 - 2, y_of(M[i]))); c = COL[v]     # 音域外の音はロールの端に寄せる
             if ROLE[i] in ('tutti', 'str') and v in STRCOL: c = STRCOL[v]          # トゥッティ・弦の小節は弦の色
             sounding = T[i] <= now < T[i] + dd
+            if v == 'HB': continue                                                  # 鼓動は心電図として下に描く
             if v == 'X':
                 cx = x0; s = 9 if sounding else 6
                 dr.polygon([(cx, y - s), (cx + s, y), (cx, y + s), (cx - s, y)], fill=c if sounding else dim(c, 0.6))
@@ -226,6 +241,29 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         # 休止のオマージュ
         if pause_t - 0.2 <= now < pause_t + 1.6:
             dr.text((NOW_X + 20, ROLL_Y0 + 20), '— 休止 —  (自筆譜が途切れる箇所へのオマージュ)', font=f_sec, fill=(210, 200, 170))
+        # 心電図 (1 拍 = 1 心拍): QRS の鋭い山が「ドッ」、T 波が「クン」。止まった拍は平らな線になる
+        if len(LUB):
+            xs = np.arange(0, W, 2, dtype=np.float64); ts = now + (xs - NOW_X) / PPS
+            j = np.clip(np.searchsorted(LUB, ts), 1, len(LUB) - 1)
+            near = np.where(np.abs(ts - LUB[j - 1]) < np.abs(ts - LUB[j]), j - 1, j)
+            dl = ts - LUB[near]; gl = LUBG[near]
+            ecg = gl * (np.exp(-(dl / 0.011) ** 2) - 0.28 * np.exp(-((dl - 0.028) / 0.01) ** 2) + 0.1 * np.exp(-((dl + 0.13) / 0.03) ** 2))
+            if len(DUB):
+                k2 = np.clip(np.searchsorted(DUB, ts), 1, len(DUB) - 1)
+                dd = np.minimum(np.abs(ts - DUB[k2 - 1]), np.abs(ts - DUB[k2]))
+                ecg = ecg + 0.22 * gl * np.exp(-((dd - 0.04) / 0.05) ** 2)
+            base = ROLL_Y1 - 28; ys = base - 34 * ecg
+            pts = list(zip(xs.tolist(), ys.tolist()))
+            dr.line(pts[:NOW_X // 2 + 1], fill=(235, 70, 90), width=2)
+            dr.line(pts[NOW_X // 2:], fill=(120, 40, 52), width=2)
+            last = LUB[LUB <= now]
+            if len(last):
+                since = now - last[-1]; gnow = LUBG[len(last) - 1]
+                sc = 1.0 + 0.45 * gnow * math.exp(-since / 0.11)
+                bi2 = int(np.searchsorted(bt, now, side='right') - 1); bi2 = max(0, min(bi2, len(bt) - 2))
+                hr = 60.0 * bpb / (bt[bi2 + 1] - bt[bi2])
+                dr.polygon(heart_poly(W - 360, 44, 17 * sc), fill=(225, 55, 80) if since < 1.2 else (120, 40, 52))
+                dr.text((W - 336, 30), '%d' % round(hr), font=f_bpm, fill=(236, 200, 200))
         # now 線 + 音量
         dr.line([(NOW_X, ROLL_Y0 - 8), (NOW_X, ROLL_Y1 + 8)], fill=(250, 240, 220), width=2)
         lv = rms[fi]

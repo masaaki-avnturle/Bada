@@ -351,6 +351,24 @@ def bansuri_tone(freq, dur, vel=0.4, sr=SR):
     out += br * (0.07 + 0.08 * np.exp(-t * 8))
     return out * env(nsamp, a, r, sr) * vel
 
+def heart_tone(freq, kind='lub', vel=1.0, sr=SR):
+    """心音: lub = I 音 (僧帽弁・三尖弁が閉じる「ドッ」— 低く長く、22 ms 後に 2 つ目の弁の山)、
+    dub = II 音 (大動脈弁・肺動脈弁の「クン」— 短く明るい)。音高は freq (和音の低音 / 5 度)。"""
+    lub = kind == 'lub'
+    nsamp = int((0.34 if lub else 0.22) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    f = freq * (1 + (0.45 if lub else 0.3) * np.exp(-t * 35))
+    ph = 2 * np.pi * np.cumsum(f) / sr
+    body = np.sin(ph) + 0.5 * np.sin(2 * ph + 0.4) + (0.2 if lub else 0.32) * np.sin(3 * ph + 0.9)
+    e = (1 - np.exp(-t / 0.005)) * np.exp(-t / (0.06 if lub else 0.036))
+    if lub:
+        t2 = np.clip(t - 0.022, 0, None)
+        e += 0.5 * (t > 0.022) * (1 - np.exp(-t2 / 0.005)) * np.exp(-t2 / 0.05)
+    from scipy.signal import lfilter
+    nz = np.random.default_rng(17 if lub else 23).standard_normal(nsamp).astype(np.float32)
+    nz = lfilter([0.06], [1, -0.94], nz).astype(np.float32) * np.exp(-t / 0.014) * (2.2 if lub else 1.4)
+    y = np.tanh(1.6 * (body * e + nz)) / np.tanh(1.6)
+    return y.astype(np.float32) * vel
+
 _SAMPLES = {}
 def sample_clip(path, off, dur, sr=SR):
     """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
@@ -419,12 +437,13 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
     base_dir = os.path.dirname(os.path.abspath(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
+    HL = np.zeros(N, dtype=np.float32); HR = np.zeros(N, dtype=np.float32)   # 鼓動 (ほぼ乾いた音で近くに)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
-    requiem = style == 'requiem'
+    requiem = style in ('requiem', 'heart')
     symphony = style == 'symphony'
     pconcerto = style == 'pconcerto'
     piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto', 'sweet', 'acceptance')
@@ -514,6 +533,12 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
+        if ex['v'] == 'HB':
+            y = heart_tone(freq, ex.get('kind', 'lub'), ex.get('gain', 1.0)) * d.get('meta', {}).get('heart_gain', 1.0)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
+            L[i0:i1] += y[:i1 - i0] * 0.12; R[i0:i1] += y[:i1 - i0] * 0.12       # わずかに響きへ
+            continue
         if acc and ex['v'] == 'TB': continue          # 採譜した録音の音 (表示用・無音)
         if acc and ex['v'] == 'REC':
             y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d']) * ex.get('gain', 1.0)
@@ -594,7 +619,7 @@ def main(score='score.json', out='fuga.wav'):
         return y / np.sqrt((y ** 2).sum())
     irL, irR = make_ir(11), make_ir(12)
     Lw = fftconvolve(L, irL)[:N].astype(np.float32); Rw = fftconvolve(R, irR)[:N].astype(np.float32)
-    mixL = L + wet * Lw * 3.0; mixR = R + wet * Rw * 3.0
+    mixL = L + wet * Lw * 3.0 + HL; mixR = R + wet * Rw * 3.0 + HR
     st = np.stack([mixL, mixR], axis=1)
     peak = np.abs(st).max()
     st = st / peak * 0.89

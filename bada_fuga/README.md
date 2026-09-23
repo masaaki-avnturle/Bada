@@ -270,6 +270,33 @@ python3 video.py score_pconcerto.json pconcerto.wav pconcerto.mp4
 
 - `P.role` (小節 → 役割) を追加。合成側は役割に応じて同じ声部をピアノ / 弦 / 両方で鳴らし、動画はトゥッティの小節を弦の色で描く。
 
+## ❤️ Requiem BADA · Cor — 心臓のレクイエム (ニ短調, ♩=心拍数)
+
+- 🎬 **[heart.mp4](heart.mp4)** — 1280×720 · 30fps · 約 7 分 21 秒
+
+これまでのレクイエムとフーガを、心臓の鼓動「ドックン (I 音) – ドックン (II 音)」を音楽の流れの芯にして作り換えた版。
+
+- **1 拍 = 1 心拍** — 心拍数がそのままテンポになり、曲の起伏とともに 安静 56 → フーガ I で 72 → 嘆きで 58 → 三重フーガの頂点で 84 → Lux aeterna で 44 へ静まる
+- **鼓動は和声に溶ける** — 「ドッ」(I 音) はその拍の和音の低音、「クン」(II 音) はその 5 度上に調律。収縮期 (I 音 → II 音の間) は心拍が速いほど短い
+- **総休止で心臓も止まる** — フーガの総休止 (バッハの自筆譜が途切れる箇所へのオマージュ) では鼓動が 2 拍止まり、強く打ち直す
+- 動画の下に **心電図** (QRS の山 = ドッ、T 波 = クン、止まった拍は平らな線) と、脈打つ心臓・心拍数を表示
+
+| 部分 | 小節 | 心拍 (♩) | 内容 |
+|:--|:--|:--|:--|
+| I. Introitus — Cor | 1–8 | 56 → 60 | 鼓動だけ → D のドローン → Requiem aeternam の聖歌 → B-A-D-A |
+| II. Fuga | 9–52 | 62 → 72 | 主題 I 〈MOTHER〉の 4 声フーガ (第 I 部) |
+| Lamento | 53–58 | 66 → 58 | 歌う嘆きのバスと B-A-D-A のカノン、鼓動が深く落ち着く |
+| III. Fuga a tre soggetti | 59–103 | 64 → 84 → 60 | B-A-D-A の提示と三重結合 ×3、総休止、ピカルディ終止 |
+| IV. Lux aeterna | 104–119 | 60 → 44 | B-A-D-A のマントラ、D 長調の和音の中で鼓動が安らぐ |
+
+```bash
+python3 compose_heart.py score_heart.json
+python3 synth.py score_heart.json heart.wav
+python3 video.py score_heart.json heart.wav heart.mp4
+```
+
+- `synth.py` の `heart_tone` — I 音 (音高が落ちる低い打音 + 22 ms 後の 2 つ目の弁の山 + 胴の低いノイズ) と II 音 (短く明るい)。鼓動はほぼ乾いた音で近くに置き、ごく一部だけ大聖堂の響きへ送る。
+
 ## 🎹🎛 BADA 528 — Sweet Trio (ホ短調, ♩=72)
 
 - 🎬 **[sweet.mp4](sweet.mp4)** — 1280×720 · 30fps · 約 5 分 13 秒
