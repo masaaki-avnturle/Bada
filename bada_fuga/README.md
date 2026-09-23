@@ -406,6 +406,28 @@ python3 video.py score_acceptance.json acceptance.wav acceptance.mp4
 
 - `synth.py` に コントラバス (arco / pizz)・タンプーラ (ジャワリの倍音の開き)・バンスリ (下からの滑り込み + 息) と、録音の抜粋を鳴らす `REC` を追加。
 
+## 🎙 Requiem BADA — Tablet Sessions (ロ短調 → ホ短調 → 変ロ短調 → ロ短調, 約 7 分)
+
+タブレット録音 5 本 (20260922_174820 / 175717 / 175951, 20260923_080607 / 080918) を
+レクイエムとフーガにしたため、**録音の音そのもの**で鳴らし、最後に全部を 1 つのフーガに合わせる。
+録音と、録音を含む mp4・サンプル・採譜は個人の録音なのでリポジトリには入れていない (コードのみ)。
+
+| 区間 | 内容 |
+|---|---|
+| ①〜⑤ 各録音 | 実音の抜粋 (約 20 秒) → その最上声から作った主題の 4 声フーガ (主唱・答唱・コデッタ) → 抜粋の和音進行のコラール。各区間は録音の調へ移調 |
+| Finale — Fuga a cinque soggetti | 5 つの主題が 1 小節おきに重なり (2 周目は 5 度上)、各主題は自分の録音の音で鳴る |
+| Lux aeterna | B-A-D-A ×2 → ピカルディ終止 (ロ長調) → 最初の録音 (17:48) の実音で閉じる |
+
+- 4 声は **サンプラー**: 録音から 1 音だけが鳴っている区間を切り出し (pyin で音高、倍音の純度で選別)、
+  最も近い音を移調・持続部をループして鳴らす。ピアノロールの色は「どの録音の音か」を表す。
+
+```bash
+python3 build_sampler.py bank 20260922_174820.mp3 20260922_175717.mp3 20260922_175951.mp3 20260923_080607.mp3 20260923_080918.mp3
+python3 compose_tablet.py bank/bank.json score_tablet.json
+python3 synth.py score_tablet.json tablet.wav
+python3 video.py score_tablet.json tablet.wav tablet.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

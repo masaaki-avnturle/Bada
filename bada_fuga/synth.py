@@ -458,6 +458,32 @@ def overtone_tone(freq, dur, vel, t0, kmax=28, a=0.12, r=0.7, sr=SR):
         out += w * np.sin(k * ph + 0.7 * k)
     return out * env(n, a, r, sr) * vel / 2.2
 
+_BANK = {'samples': [], 'audio': {}}
+def load_bank(path):
+    """build_sampler.py が作った録音の 1 音サンプル集"""
+    _BANK['samples'] = json.load(open(path))['samples']; _BANK['audio'] = {}
+
+def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
+    """実録音の音で鳴らす: いちばん近い音高の録音の 1 音 (できればその区間の録音) を移調し、
+    長い音は持続部をクロスフェードでループして伸ばす"""
+    cands = _BANK['samples']
+    s = min(cands, key=lambda c: abs(c['midi'] - midi) + (0.0 if c['rid'] == rid else 2.5) - 0.02 * c['purity'])
+    if s['file'] not in _BANK['audio']: _BANK['audio'][s['file']] = sf.read(s['file'], dtype='float32')[0]
+    src = _BANK['audio'][s['file']]
+    ratio = 2 ** ((midi - s['midi']) / 12.0)
+    n_out = int((dur + rel) * sr); need = int(n_out * ratio) + 4
+    ext = src
+    if len(ext) < need:                                   # 持続部 (30%〜90%) をクロスフェードでつないで伸ばす
+        a, b = int(0.3 * len(src)), int(0.9 * len(src)); loop = src[a:b]; xf = min(int(0.06 * sr), len(loop) // 3)
+        fade = np.linspace(0, 1, xf, dtype=np.float32); ext = src[:b].copy()
+        while len(ext) < need:
+            ext = np.concatenate([ext[:-xf], ext[-xf:] * (1 - fade) + loop[:xf] * fade, loop[xf:]])
+    y = np.interp(np.arange(n_out) * ratio, np.arange(len(ext)), ext).astype(np.float32)
+    i0 = int(dur * sr); t = np.arange(n_out - i0, dtype=np.float32) / sr
+    y[i0:] *= np.exp(-t / (rel / 3))
+    y[:int(0.004 * sr)] *= np.linspace(0, 1, int(0.004 * sr))
+    return y * vel
+
 _SAMPLES = {}
 def sample_clip(path, off, dur, sr=SR):
     """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
@@ -526,7 +552,7 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
     base_dir = os.path.dirname(os.path.abspath(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock', 'mantra', 'arrhythmia') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock', 'mantra', 'arrhythmia', 'recsampler') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     HL = np.zeros(N, dtype=np.float32); HR = np.zeros(N, dtype=np.float32)   # 鼓動 (ほぼ乾いた音で近くに)
@@ -543,6 +569,8 @@ def main(score='score.json', out='fuga.wav'):
     sweet = style == 'sweet'
     acc = style == 'acceptance'
     mantra = style == 'mantra'
+    recs = style == 'recsampler'
+    if recs: load_bank(d['meta']['bank'])
     global _BEAT_GRID
     if d.get('bar_times'):
         bts = np.array(d['bar_times']); nb = len(bts) - 1
@@ -581,7 +609,13 @@ def main(score='score.json', out='fuga.wav'):
                 L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
             if not ((pconcerto or acc) and role == 'both'): continue
         if pconcerto and role == 'tutti': continue
-        if mantra:
+        if recs:
+            vel = 0.55 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
+            y = sampler_tone(nt['m'], max(0.2, nt['d'] * 0.97), vel, nt.get('src', ''))
+            if nt['v'] == 'B':                                    # 低音は 1 オクターヴ下の柔らかい正弦波で支える
+                tt = np.arange(len(y), dtype=np.float32) / SR
+                y = y + 0.35 * vel * np.sin(2 * np.pi * freq / 2 * tt) * np.minimum(1, tt / 0.05) * np.minimum(1, np.maximum(0, (nt['d'] + 0.3 - tt) / 0.3))
+        elif mantra:
             vel = 0.5 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
             y = overtone_tone(freq, dur + 0.08, vel, nt['t'])
         elif piano:
@@ -658,8 +692,8 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
             L[i0:i1] += y[:i1 - i0] * 0.12; R[i0:i1] += y[:i1 - i0] * 0.12       # わずかに響きへ
             continue
-        if acc and ex['v'] == 'TB': continue          # 採譜した録音の音 (表示用・無音)
-        if acc and ex['v'] == 'REC':
+        if ex['v'] == 'TB': continue                  # 採譜した録音の音 (表示用・無音)
+        if ex['v'] == 'REC':
             y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d']) * ex.get('gain', 1.0)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
             L[i0:i1] += y[:i1 - i0] * 0.707
@@ -725,7 +759,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (5.0, 1.7, 0.46) if mantra else (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    rv_len, rv_decay, wet = (4.2, 1.4, 0.36) if recs else (5.0, 1.7, 0.46) if mantra else (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
@@ -745,7 +779,7 @@ def main(score='score.json', out='fuga.wav'):
     # soft knee
     st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
-    tail = int((5.0 if (requiem or piano or symphony or mantra) else 2.5) * SR)
+    tail = int((5.0 if (requiem or piano or symphony or mantra or recs) else 2.5) * SR)
     st[-tail:] *= np.linspace(1, 0, tail)[:, None]
     sf.write(out, st, SR, subtype='PCM_16')
     print('wrote', out, '%.1fs' % total, 'peak', peak)
