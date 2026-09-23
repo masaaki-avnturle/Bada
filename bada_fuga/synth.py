@@ -369,6 +369,74 @@ def heart_tone(freq, kind='lub', vel=1.0, sr=SR):
     y = np.tanh(1.6 * (body * e + nz)) / np.tanh(1.6)
     return y.astype(np.float32) * vel
 
+def _noise(n, seed):
+    return np.random.default_rng(seed).standard_normal(n).astype(np.float32)
+
+def _lp(x, a):
+    from scipy.signal import lfilter
+    return lfilter([a], [1, -(1 - a)], x).astype(np.float32)
+
+def rock_drum(kind, vel=0.8, freq=110.0, sr=SR):
+    """ロックのドラム: kick / snare / hatc / hato / crash / ride / tom (freq が音高)"""
+    if kind == 'kick':
+        n = int(0.45 * sr); t = np.arange(n, dtype=np.float32) / sr
+        f = 48 + 110 * np.exp(-t * 32)
+        y = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-t * 7.5)
+        y += 0.35 * _lp(_noise(n, 1), 0.25) * np.exp(-t * 180)                 # ビーターのアタック
+        y = np.tanh(1.8 * y) / np.tanh(1.8)
+    elif kind == 'snare':
+        n = int(0.4 * sr); t = np.arange(n, dtype=np.float32) / sr
+        body = np.sin(2 * np.pi * 190 * t) * np.exp(-t * 24) + 0.5 * np.sin(2 * np.pi * 330 * t) * np.exp(-t * 30)
+        nz = _noise(n, 2); nz = nz - _lp(nz, 0.08)                              # 高域のスナッピー
+        y = 0.7 * body + 0.9 * nz * np.exp(-t * 16)
+    elif kind in ('hatc', 'hato', 'ride', 'crash'):
+        dur, dec = {'hatc': (0.08, 60), 'hato': (0.45, 7), 'ride': (1.2, 3.2), 'crash': (2.6, 1.3)}[kind]
+        n = int(dur * sr); t = np.arange(n, dtype=np.float32) / sr
+        metal = sum(np.sign(np.sin(2 * np.pi * f0 * t + i)) for i, f0 in enumerate((205.3, 304.4, 369.6, 522.7, 540.0, 800.0)))
+        nz = _noise(n, 3 if kind != 'crash' else 4)
+        y = 0.25 * metal + (0.8 if kind == 'crash' else 0.5) * nz
+        y = y - _lp(y, 0.35 if kind != 'ride' else 0.2)                         # 金属音は高域だけ
+        if kind == 'ride': y += 0.4 * np.sin(2 * np.pi * 3100 * t) * np.exp(-t * 2)
+        y *= np.exp(-t * dec) * (1 - np.exp(-t / 0.001))
+        if kind == 'crash': y *= 1.2
+    else:                                                                      # tom
+        n = int(0.6 * sr); t = np.arange(n, dtype=np.float32) / sr
+        f = freq * (1 + 0.35 * np.exp(-t * 25))
+        y = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-t * 6) + 0.2 * _lp(_noise(n, 5), 0.3) * np.exp(-t * 60)
+        y = np.tanh(1.4 * y)
+    return (y / (np.abs(y).max() + 1e-9)).astype(np.float32) * vel
+
+def synth_bass(freq, dur, vel=0.6, sr=SR):
+    """シンセ・ベース: 鋸歯波 2 本 + 矩形の低音、フィルターが開いてすぐ閉じる。キックに合わせて頭を少し沈める (ポンピング)"""
+    n = int((dur + 0.08) * sr); t = np.arange(n, dtype=np.float32) / sr
+    tab = _table('saw', 24, 1.0)
+    bright = _wavetable_voice(freq, n, tab, [(0.0, 0.0), (9.0, 1.0)], 0.0, 0.0, t, sr)
+    sub = np.sign(np.sin(2 * np.pi * freq / 2 * t)) * 0.35
+    dark = _lp(bright, 0.06)
+    y = dark + (bright - dark) * np.exp(-t / 0.07) + _lp(sub, 0.05)
+    pump = 0.35 + 0.65 * np.clip(t / 0.06, 0, 1) ** 1.5
+    return y * env(n, 0.004, 0.08, sr) * pump * vel
+
+def arp_pluck(freq, dur, vel=0.4, sr=SR):
+    """アルペジオのシンセ: 鋸歯波 + 矩形波、明るい立ち上がりからすぐ暗くなる短い音"""
+    n = int((min(dur, 0.35) + 0.25) * sr); t = np.arange(n, dtype=np.float32) / sr
+    y = _wavetable_voice(freq, n, _table('saw', 18, 1.0), [(0.0, 0.0), (-7.0, 1.3)], 0.0, 0.0, t, sr)
+    y += 0.4 * np.sign(np.sin(2 * np.pi * freq * 1.002 * t))
+    dark = _lp(y, 0.08)
+    y = (dark + (y - dark) * np.exp(-t / 0.05)) * np.exp(-t / 0.18)
+    y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
+    return y * vel
+
+def guitar_power(freq, dur, vel=0.5, mute=True, sr=SR):
+    """歪んだギターのパワーコード (根音 + 5 度 + オクターヴ)。mute=True はブリッジ・ミュートの刻み"""
+    n = int((dur + (0.06 if mute else 0.6)) * sr); t = np.arange(n, dtype=np.float32) / sr
+    tab = _table('saw', 30, 1.0)
+    y = sum(_wavetable_voice(freq * r, n, tab, [(0.0, 0.0), (8.0, 1.0)], 0.002, 5.0, t, sr) * a for r, a in ((1, 1.0), (1.5, 0.8), (2, 0.6)))
+    y *= np.exp(-t / (0.09 if mute else 1.4))
+    y = np.tanh(7.0 * y)                                                        # 歪み
+    y = _lp(y, 0.35); y = _lp(y, 0.45); y = y - _lp(y, 0.012)                  # キャビネット
+    return y * env(n, 0.003, 0.05, sr) * vel
+
 _SAMPLES = {}
 def sample_clip(path, off, dur, sr=SR):
     """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
@@ -437,13 +505,13 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
     base_dir = os.path.dirname(os.path.abspath(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     HL = np.zeros(N, dtype=np.float32); HR = np.zeros(N, dtype=np.float32)   # 鼓動 (ほぼ乾いた音で近くに)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
-    requiem = style in ('requiem', 'heart')
+    requiem = style in ('requiem', 'heart', 'rock')
     symphony = style == 'symphony'
     pconcerto = style == 'pconcerto'
     piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto', 'sweet', 'acceptance')
@@ -532,6 +600,23 @@ def main(score='score.json', out='fuga.wav'):
             pan = {'V1': -0.45, 'V2': -0.25, 'VA': 0.15, 'VC': 0.35, 'CB': 0.5, 'WW': 0.1, 'FL': -0.1, 'HN': 0.3, 'TP': 0.2, 'TR': 0.35, 'TB': 0.45, 'CL': -0.05}[v]
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
+        if ex['v'] in ('DR', 'SB', 'AR', 'GT'):                  # ロックバンド + シンセ (乾いた音で前に、少しだけ響きへ)
+            v = ex['v']; vel = ex.get('gain', 0.6)
+            if v == 'DR': y = rock_drum(ex.get('kind', 'kick'), vel, freq)
+            elif v == 'SB': y = synth_bass(freq, ex['d'], vel)
+            elif v == 'AR': y = arp_pluck(freq, ex['d'], vel)
+            else: y = guitar_power(freq, ex['d'], vel, mute=ex.get('mute', True))
+            y = y * d.get('meta', {}).get('band_gain', 1.0)
+            pan = ex.get('pan', 0.0); send = {'DR': 0.18, 'SB': 0.05, 'AR': 0.35, 'GT': 0.2}[v]
+            cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
+            L[i0:i1] += y[:i1 - i0] * cl * send; R[i0:i1] += y[:i1 - i0] * cr * send
+            continue
+        if ex['v'] == 'PD' and style == 'rock':
+            y = pad_tone(freq, ex['d'], ex.get('gain', 0.2)); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
             continue
         if ex['v'] == 'HB':
             y = heart_tone(freq, ex.get('kind', 'lub'), ex.get('gain', 1.0)) * d.get('meta', {}).get('heart_gain', 1.0)

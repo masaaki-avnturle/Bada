@@ -49,6 +49,7 @@ THEMES = {
     'symphony': dict(bg=(10, 12, 18), bg2=(26, 30, 44), roll=(6, 8, 14), title='Symphony BADA', subtitle='', footer=[], pause_bar=145),
     'pconcerto': dict(bg=(12, 12, 20), bg2=(30, 26, 40), roll=(8, 8, 14), title='Piano Concerto BADA', subtitle='', footer=[], pause_bar=112),
     'sweet': dict(bg=(16, 12, 20), bg2=(36, 28, 44), roll=(10, 7, 14), title='BADA 528 — Sweet Trio', subtitle='', footer=[], pause_bar=999),
+    'rock': dict(bg=(10, 8, 14), bg2=(34, 12, 30), roll=(7, 5, 10), title='Requiem BADA · Cor — Rock', subtitle='', footer=[], pause_bar=99),
     'heart': dict(bg=(18, 8, 12), bg2=(42, 14, 22), roll=(12, 5, 8), title='Requiem BADA · Cor', subtitle='', footer=[], pause_bar=99),
     'acceptance': dict(bg=(14, 12, 16), bg2=(40, 30, 30), roll=(9, 7, 10), title='BADA 528 — Acceptance', subtitle='', footer=[], pause_bar=999),
 }
@@ -89,6 +90,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'Pf S', 'A': 'Pf A', 'T': 'Pf T', 'B': 'Pf Bass',
                       'EP': 'E.Piano', 'PD': 'Synth Pad', 'LD': 'Synth Lead', 'DR': 'Brushes',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
+    if meta.get('style') == 'rock':
+        COL.update({'DR': (235, 70, 90), 'SB': (90, 200, 255), 'AR': (200, 120, 255), 'GT': (255, 150, 60), 'PD': (120, 110, 170)})
+        VNAME.update({'S': 'Soprano', 'A': 'Alto', 'T': 'Tenore', 'B': 'Basso', 'DR': 'ドラム (キック = 鼓動)', 'SB': 'シンセ・ベース', 'AR': 'アルペジオ', 'GT': 'ギター', 'PD': 'パッド'})
     if meta.get('style') == 'heart':
         COL.update({'HB': (235, 70, 90)}); VNAME.update({'S': 'Soprano', 'A': 'Alto', 'T': 'Tenore', 'B': 'Basso', 'HB': '鼓動 (ドックン)'})
     if meta.get('style') == 'acceptance':
@@ -97,7 +101,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'S', 'A': 'A', 'T': 'T', 'B': 'B', 'H': 'Pf', 'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'TB': 'タブレット録音',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl', 'PD': 'Pad'})
     present = {x['v'] for x in notes}
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'rock': ['S', 'A', 'T', 'B', 'DR', 'SB', 'AR', 'GT', 'PD', 'X'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]; DET = np.array([n.get('det', 1.0) for n in notes]); ROLE = [n.get('role', '') for n in notes]
     order = np.argsort(T); T, D, M, DET = T[order], D[order], M[order], DET[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]; ROLE = [ROLE[i] for i in order]
@@ -142,7 +146,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (150 if v in ('H', 'W', 'L', 'C', 'HB') else 80)))
+        lx += (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') else (125 if v in ('SB', 'AR') else 80)))))
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
@@ -150,6 +154,11 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     hb = [e for e in d.get('extras', []) if e['v'] == 'HB']
     LUB = np.array([e['t'] for e in hb if e.get('kind') == 'lub']); LUBG = np.array([e['gain'] for e in hb if e.get('kind') == 'lub'])
     DUB = np.array([e['t'] for e in hb if e.get('kind') == 'dub'])
+    SNARE = np.array([])
+    if meta.get('style') == 'rock':                       # 鼓動がキックになった: 心電図はキックで打つ
+        kk = [e for e in d.get('extras', []) if e['v'] == 'DR' and e.get('kind') == 'kick']
+        LUB = np.array([e['t'] for e in kk]); LUBG = np.array([min(1.0, e['gain'] * 1.1) for e in kk])
+        SNARE = np.array([e['t'] for e in d.get('extras', []) if e['v'] == 'DR' and e.get('kind') == 'snare'])
     def heart_poly(cx, cy, s):
         pts = []
         for k in range(40):
@@ -205,7 +214,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             y = max(ROLL_Y0 + 2, min(ROLL_Y1 - 2, y_of(M[i]))); c = COL[v]     # 音域外の音はロールの端に寄せる
             if ROLE[i] in ('tutti', 'str') and v in STRCOL: c = STRCOL[v]          # トゥッティ・弦の小節は弦の色
             sounding = T[i] <= now < T[i] + dd
-            if v == 'HB': continue                                                  # 鼓動は心電図として下に描く
+            if v in ('HB', 'DR'): continue                                                  # 鼓動は心電図として下に描く
             if v == 'X':
                 cx = x0; s = 9 if sounding else 6
                 dr.polygon([(cx, y - s), (cx + s, y), (cx, y + s), (cx - s, y)], fill=c if sounding else dim(c, 0.6))
@@ -256,6 +265,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             pts = list(zip(xs.tolist(), ys.tolist()))
             dr.line(pts[:NOW_X // 2 + 1], fill=(235, 70, 90), width=2)
             dr.line(pts[NOW_X // 2:], fill=(120, 40, 52), width=2)
+            for st in SNARE[(SNARE > now - back) & (SNARE < now + ahead)]:
+                sx = NOW_X + (st - now) * PPS; hit = 0 <= now - st < 0.15
+                dr.ellipse([sx - (5 if hit else 3), base + 12 - (5 if hit else 3), sx + (5 if hit else 3), base + 12 + (5 if hit else 3)], fill=(245, 235, 220) if hit else (110, 100, 96))
             last = LUB[LUB <= now]
             if len(last):
                 since = now - last[-1]; gnow = LUBG[len(last) - 1]

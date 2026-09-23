@@ -297,6 +297,25 @@ python3 video.py score_heart.json heart.wav heart.mp4
 
 - `synth.py` の `heart_tone` — I 音 (音高が落ちる低い打音 + 22 ms 後の 2 つ目の弁の山 + 胴の低いノイズ) と II 音 (短く明るい)。鼓動はほぼ乾いた音で近くに置き、ごく一部だけ大聖堂の響きへ送る。
 
+## 🥁🎛 Requiem BADA · Cor — Rock (ニ短調, ♩=心拍数)
+
+- 🎬 **[rock.mp4](rock.mp4)** — 1280×720 · 30fps · 約 7 分 21 秒
+
+Cor の心臓の鼓動を、ロックバンドのドラムとシンセサイザーのビートに作り換えた版。合唱 + オルガンのレクイエムとフーガ、テンポ・マップ (心拍 56 → 72 → 58 → 84 → 44)、総休止はそのまま。
+
+- **鼓動がキックになる** — 「ドッ・クン」はキックの 2 連打 (本打 + 収縮期ぶん後の弱い打) としてビートの中に残る。動画の心電図もキックで打つ
+- **ドラム** — スネアのバックビート、ハイハット (8 分 / 16 分)、クラッシュ、区切りの前のタム回し
+- **シンセ** — キックで沈むシンセ・ベース (8 分)、16 分のアルペジオ、パッド。三重フーガでは歪んだギターのパワーコード
+- **流れ** — Introitus はキックの鼓動だけ → バンドが入る ／ Fuga I はロックのビート ／ Lamento はハーフタイム ／ 三重フーガは 8 分のキックとギターで疾走し、総休止で全員止まって打ち直す ／ Lux aeterna でドラムは減り、キックの鼓動だけに戻る
+
+```bash
+python3 compose_rock.py score_rock.json
+python3 synth.py score_rock.json rock.wav
+python3 video.py score_rock.json rock.wav rock.mp4
+```
+
+- `synth.py` に `rock_drum` (キック / スネア / ハイハット / クラッシュ / ライド / タム)、`synth_bass`、`arp_pluck`、`guitar_power` を追加。バンドは乾いた音で前に置き、少しだけ大聖堂の響きへ送る。
+
 ## 🎹🎛 BADA 528 — Sweet Trio (ホ短調, ♩=72)
 
 - 🎬 **[sweet.mp4](sweet.mp4)** — 1280×720 · 30fps · 約 5 分 13 秒
