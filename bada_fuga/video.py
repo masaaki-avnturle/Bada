@@ -49,6 +49,7 @@ THEMES = {
     'symphony': dict(bg=(10, 12, 18), bg2=(26, 30, 44), roll=(6, 8, 14), title='Symphony BADA', subtitle='', footer=[], pause_bar=145),
     'pconcerto': dict(bg=(12, 12, 20), bg2=(30, 26, 40), roll=(8, 8, 14), title='Piano Concerto BADA', subtitle='', footer=[], pause_bar=112),
     'sweet': dict(bg=(16, 12, 20), bg2=(36, 28, 44), roll=(10, 7, 14), title='BADA 528 — Sweet Trio', subtitle='', footer=[], pause_bar=999),
+    'acceptance': dict(bg=(14, 12, 16), bg2=(40, 30, 30), roll=(9, 7, 10), title='BADA 528 — Acceptance', subtitle='', footer=[], pause_bar=999),
 }
 
 def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
@@ -57,7 +58,8 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     th = dict(THEMES[meta.get('style', 'organ')])
     for k in ('title', 'subtitle', 'footer'):
         if meta.get(k): th[k] = meta[k]
-    notes = d['notes'] + [dict(e, label=e.get('label')) for e in d.get('extras', [])]
+    recs = [e for e in d.get('extras', []) if e['v'] == 'REC']
+    notes = d['notes'] + [dict(e, label=e.get('label')) for e in d.get('extras', []) if e['v'] != 'REC']
     COL.update({'X': (236, 214, 150), 'D': (120, 70, 140), 'P': (190, 60, 70), 'H': (250, 240, 200), 'W': (170, 150, 120), 'L': (150, 110, 90)})
     VNAME.update({'X': '弔鐘', 'D': 'ドローン', 'P': '心拍', 'H': '鐘のカノン', 'W': '分散和音', 'L': '低音の心拍'})
     if meta.get('style') == 'mallet':
@@ -86,8 +88,13 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'Pf S', 'A': 'Pf A', 'T': 'Pf T', 'B': 'Pf Bass',
                       'EP': 'E.Piano', 'PD': 'Synth Pad', 'LD': 'Synth Lead', 'DR': 'Brushes',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
+    if meta.get('style') == 'acceptance':
+        COL.update({'H': (250, 240, 200), 'CB': (150, 95, 70), 'CBP': (190, 130, 90), 'TA': (200, 170, 110), 'BN': (160, 230, 190), 'TB': (110, 210, 250),
+                    'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'WW': (120, 200, 120), 'FL': (190, 235, 220), 'PD': (120, 110, 170)})
+        VNAME.update({'S': 'S', 'A': 'A', 'T': 'T', 'B': 'B', 'H': 'Pf', 'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'TB': 'タブレット録音',
+                      'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl', 'PD': 'Pad'})
     present = {x['v'] for x in notes}
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC']}[meta.get('style', 'organ')]
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]; DET = np.array([n.get('det', 1.0) for n in notes]); ROLE = [n.get('role', '') for n in notes]
     order = np.argsort(T); T, D, M, DET = T[order], D[order], M[order], DET[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]; ROLE = [ROLE[i] for i in order]
@@ -132,7 +139,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (150 if v in 'HWLC' else 80)))
+        lx += (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (150 if v in 'HWLC' else 80)))
     for i, line in enumerate(th['footer']):
         bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
@@ -167,6 +174,13 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                 dr.line([(x, ROLL_Y0 - 6), (x, ROLL_Y1 + 6)], fill=(34, 38, 56))
                 if b + 1 <= d['nbars']:
                     dr.text((x + 3, ROLL_Y0 - 4), str(b + 1), font=f_small, fill=(70, 76, 98))
+        # 録音の実音が流れる区間
+        for e in recs:
+            x0 = NOW_X + (e['t'] - now) * PPS; x1 = NOW_X + (e['t'] + e['d'] - now) * PPS
+            if x1 < 0 or x0 > W: continue
+            on = e['t'] <= now < e['t'] + e['d']
+            dr.rectangle([max(x0, 0), ROLL_Y0 + 2, min(x1, W), ROLL_Y0 + 18], fill=dim(COL.get('TB', (110, 210, 250)), 0.5 if on else 0.25))
+            dr.text((max(x0, 0) + 6, ROLL_Y0 + 2), '♪ タブレット録音 20260922_%s (実音)' % e.get('rid', ''), font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
         # 音符
         vis = np.where((T < now + ahead) & (T + D > now - back))[0]
         detach = meta.get('detach', 1.0)
@@ -175,7 +189,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             dd = D[i] if v in ('C', 'X', 'D', 'P') else max(0.12, D[i] * detach * DET[i])
             x0 = NOW_X + (T[i] - now) * PPS; x1 = NOW_X + (T[i] + dd - now) * PPS
             y = max(ROLL_Y0 + 2, min(ROLL_Y1 - 2, y_of(M[i]))); c = COL[v]     # 音域外の音はロールの端に寄せる
-            if ROLE[i] == 'tutti' and v in STRCOL: c = STRCOL[v]                   # トゥッティの小節は弦の色
+            if ROLE[i] in ('tutti', 'str') and v in STRCOL: c = STRCOL[v]          # トゥッティ・弦の小節は弦の色
             sounding = T[i] <= now < T[i] + dd
             if v == 'X':
                 cx = x0; s = 9 if sounding else 6

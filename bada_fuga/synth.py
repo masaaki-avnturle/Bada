@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """score.json -> fuga.wav  (加算合成オルガン風 4 声 + 合成リバーブ)"""
-import json, sys, math
+import json, sys, math, os
 import numpy as np
 import soundfile as sf
 from scipy.signal import fftconvolve
@@ -286,6 +286,88 @@ def drum_brush(midi, dur, vel=0.5, sr=SR):
         return np.random.default_rng(46).standard_normal(nsamp).astype(np.float32) * np.exp(-t * 15) * 0.35 * vel
     return np.zeros(int(0.1 * sr), dtype=np.float32)
 
+_CB_TABLES = {}
+def contrabass_tone(freq, dur, vel=0.5, pizz=False, sr=SR):
+    """コントラバス: arco = 胴の共鳴 (200 Hz 付近) を強めた鋸歯波 3 本 + 弓の擦過音 + 遅いビブラート、
+    pizz = 指で弾いた弦 (倍音ごとに速く減衰) + 胴の低い鳴り"""
+    if pizz:
+        ring = 1.8
+        nsamp = int((min(dur, 1.2) + ring) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+        out = np.zeros(nsamp, dtype=np.float32)
+        for k in range(1, 14):
+            if freq * k > 5000: break
+            out += (1.0 / k ** 1.25) * np.sin(2 * np.pi * freq * k * t + 0.4 * k) * np.exp(-t * (2.2 + 1.6 * k))
+        out += 0.5 * np.sin(2 * np.pi * freq * t) * np.exp(-t * 1.3)
+        nh = int(0.004 * sr)
+        out[:nh] += np.random.default_rng(int(freq * 3)).standard_normal(nh).astype(np.float32) * np.linspace(0.6, 0, nh)
+        out[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
+        return out * vel
+    a, r = 0.22, 0.45
+    nsamp = int((dur + r) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    nh = int(max(8, min(40, 7000.0 / freq)))
+    key = (nh, int(freq))
+    if key not in _CB_TABLES:
+        N = 4096; ph = np.arange(N) / N; tab = np.zeros(N, dtype=np.float32)
+        for k in range(1, nh + 1):
+            fk = freq * k
+            body = 1.0 + 0.9 * math.exp(-((fk - 210.0) / 140.0) ** 2) + 0.35 * math.exp(-((fk - 520.0) / 200.0) ** 2)
+            tab += np.sin(2 * np.pi * k * ph + 0.3 * k) * body / k ** 1.05
+        _CB_TABLES[key] = np.append(tab / np.abs(tab).max(), tab[0])
+    out = _wavetable_voice(freq, nsamp, _CB_TABLES[key], [(0.0, 0.0), (5.0, 1.3), (-6.0, 2.6)], 0.0035, 4.6, t, sr)
+    bow = np.random.default_rng(int(freq * 7)).standard_normal(nsamp).astype(np.float32)
+    from scipy.signal import lfilter
+    bow = lfilter([0.08], [1, -0.92], bow).astype(np.float32) - lfilter([0.08], [1, -0.985], bow).astype(np.float32)
+    out += bow * 0.35 * (1 + 0.5 * np.exp(-t * 6))
+    e = env(nsamp, a, r, sr) * (1 + 0.1 * np.sin(2 * np.pi * 0.18 * t))
+    return out * e * vel
+
+def tanpura_tone(freq, dur, vel=0.3, sr=SR):
+    """タンプーラ: 弾いた後に高次倍音が遅れて咲く (ジャワリ) 長い減衰の開放弦"""
+    ring = max(dur, 3.5) + 1.5
+    nsamp = int(ring * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    out = np.zeros(nsamp, dtype=np.float32)
+    for k in range(1, 24):
+        fk = freq * k
+        if fk > 9000: break
+        bloom = 1 - np.exp(-t * (0.8 + 0.25 * k)) if k > 2 else 1.0
+        sweep = np.exp(-((t - 0.25 * k ** 0.5) / (0.8 + 0.1 * k)) ** 2) * 0.6 + 0.4
+        out += (1.0 / k ** 0.8) * bloom * sweep * np.sin(2 * np.pi * fk * (1 + 0.0004 * np.sin(2 * np.pi * 0.3 * t)) * t + k)
+    out *= np.exp(-t * 0.55)
+    out[:int(0.004 * sr)] *= np.linspace(0, 1, int(0.004 * sr))
+    return out * vel * 0.35
+
+def bansuri_tone(freq, dur, vel=0.4, sr=SR):
+    """バンスリ (竹の横笛): 下から滑り上がる音の入り (ミーンド)、息の雑音、遅れて掛かるビブラート"""
+    a, r = 0.12, 0.3
+    nsamp = int((dur + r) * sr); t = np.arange(nsamp, dtype=np.float32) / sr
+    glide = 2 ** ((-120.0 * np.exp(-t / 0.09)) / 1200.0)
+    vib = 1 + 0.006 * np.sin(2 * np.pi * 5.0 * t) * np.clip((t - 0.35) / 0.5, 0, 1)
+    phase = np.cumsum(freq * glide * vib / sr)
+    tab = _table('bn', 6, 2.1)
+    out = np.interp((phase % 1.0) * 4096, np.arange(4097), tab).astype(np.float32)
+    from scipy.signal import lfilter
+    br = np.random.default_rng(int(freq)).standard_normal(nsamp).astype(np.float32)
+    br = lfilter([0.25], [1, -0.75], br).astype(np.float32)
+    out += br * (0.07 + 0.08 * np.exp(-t * 8))
+    return out * env(nsamp, a, r, sr) * vel
+
+_SAMPLES = {}
+def sample_clip(path, off, dur, sr=SR):
+    """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
+    if path not in _SAMPLES:
+        y, fs = sf.read(path, dtype='float32')
+        if y.ndim == 2: y = y.mean(axis=1)
+        if fs != sr:
+            from scipy.signal import resample_poly
+            y = resample_poly(y, sr, fs).astype(np.float32)
+        from scipy.signal import butter, sosfilt
+        y = sosfilt(butter(2, [60.0, 8000.0], btype='bandpass', fs=sr, output='sos'), y).astype(np.float32)
+        _SAMPLES[path] = y / (np.sqrt((y ** 2).mean()) + 1e-9) * 0.1
+    y = _SAMPLES[path][int(off * sr):int((off + dur) * sr)].copy()
+    fi, fo = int(0.03 * sr), int(min(1.5, dur / 4) * sr)
+    y[:fi] *= np.linspace(0, 1, fi); y[-fo:] *= np.linspace(1, 0, fo)
+    return y
+
 def drone_tone(freq, dur, sr=SR):
     a, r = 2.5, 3.0
     nsamp = int((dur + r) * sr)
@@ -336,7 +418,8 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet') else 4.0)
+    base_dir = os.path.dirname(os.path.abspath(score))
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     rng = np.random.default_rng(3)
@@ -344,12 +427,13 @@ def main(score='score.json', out='fuga.wav'):
     requiem = style == 'requiem'
     symphony = style == 'symphony'
     pconcerto = style == 'pconcerto'
-    piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto', 'sweet')
+    piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto', 'sweet', 'acceptance')
     mallet = style == 'mallet'
     grief = style == 'grief'
-    elegia = style in ('elegia', 'concerto', 'pconcerto')
+    elegia = style in ('elegia', 'concerto', 'pconcerto', 'acceptance')
     concerto = style == 'concerto'
     sweet = style == 'sweet'
+    acc = style == 'acceptance'
     detach = d.get('meta', {}).get('detach', 1.0)
     humanize = bool(d.get('meta', {}).get('humanize', False))
     spb = 60.0 / d['bpm']
@@ -362,10 +446,11 @@ def main(score='score.json', out='fuga.wav'):
         dur = max(nt['d'] - 0.035, 0.06)
         t_off = 0.0
         role = nt.get('role', '')
-        if symphony or (pconcerto and role in ('tutti', 'both')):
+        if symphony or (pconcerto and role in ('tutti', 'both')) or (acc and role in ('str', 'both')):
             # 弦 5 部: S→Vn I, A→Vn II, T→Va, B→Vc (+Cb 1 オクターヴ下)
             dyn = nt.get('dyn', 1.0); det = nt.get('det', 1.0)
             vel = min(1.0, 0.5 * (1.15 if nt['label'] else 1.0) * dyn + 0.05)
+            if acc and role == 'both': vel *= 0.7
             dd = max(0.12, nt['d'] * det)
             dark = {'S': 0.0, 'A': 0.15, 'T': 0.45, 'B': 0.75}[nt['v']]
             y = string_tone(freq, dd, vel, dark=dark)
@@ -377,10 +462,11 @@ def main(score='score.json', out='fuga.wav'):
             i0 = max(0, int((nt['t'] + t_off) * SR)); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * g * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * g * math.sin((pan + 1) * math.pi / 4)
             if nt['v'] == 'B':
-                yb = string_tone(freq / 2, dd, vel * 0.8, dark=1.0)
+                if acc: yb = contrabass_tone(freq / 2 if freq / 2 >= 41.0 else freq, dd, vel * 0.9)
+                else: yb = string_tone(freq / 2, dd, vel * 0.8, dark=1.0)
                 i1 = min(i0 + len(yb), N)
                 L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
-            if not (pconcerto and role == 'both'): continue
+            if not ((pconcerto or acc) and role == 'both'): continue
         if pconcerto and role == 'tutti': continue
         if piano:
             vel = min(1.0, 0.62 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0) + 0.08)
@@ -428,6 +514,29 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
+        if acc and ex['v'] == 'TB': continue          # 採譜した録音の音 (表示用・無音)
+        if acc and ex['v'] == 'REC':
+            y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d']) * ex.get('gain', 1.0)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
+            L[i0:i1] += y[:i1 - i0] * 0.707
+            j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707
+            continue
+        if acc and ex['v'] in ('CB', 'CBP', 'TA', 'BN', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'PD'):
+            v = ex['v']; vel = ex.get('gain', 0.4)
+            if v == 'CB': y = contrabass_tone(freq, ex['d'], vel)
+            elif v == 'CBP': y = contrabass_tone(freq, ex['d'], vel, pizz=True)
+            elif v == 'TA': y = tanpura_tone(freq, ex['d'], vel)
+            elif v == 'BN': y = bansuri_tone(freq, ex['d'], vel)
+            elif v in ('V1', 'V2'): y = string_tone(freq, ex['d'], vel, dark=0.0)
+            elif v == 'VA': y = string_tone(freq, ex['d'], vel, dark=0.4)
+            elif v == 'VC': y = string_tone(freq, ex['d'], vel, dark=0.7)
+            elif v == 'WW': y = wind_tone(freq, ex['d'], vel, 'oboe')
+            elif v == 'FL': y = wind_tone(freq, ex['d'], vel, 'flute')
+            else: y = pad_tone(freq, ex['d'], vel)
+            pan = {'CB': 0.3, 'CBP': 0.3, 'TA': -0.3, 'BN': -0.15, 'V1': -0.45, 'V2': -0.25, 'VA': 0.15, 'VC': 0.35, 'WW': 0.1, 'FL': -0.1, 'PD': 0.0}[v]
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if sweet and ex['v'] in ('EP', 'PD', 'LD', 'DR', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL'):
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v == 'EP': y = ep_tone(freq, ex['d'], vel)
@@ -472,7 +581,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    rv_len, rv_decay, wet = (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
