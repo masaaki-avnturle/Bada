@@ -526,13 +526,13 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
     base_dir = os.path.dirname(os.path.abspath(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock', 'mantra') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock', 'mantra', 'arrhythmia') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     HL = np.zeros(N, dtype=np.float32); HR = np.zeros(N, dtype=np.float32)   # 鼓動 (ほぼ乾いた音で近くに)
     rng = np.random.default_rng(3)
     style = d.get('meta', {}).get('style', 'organ')
-    requiem = style in ('requiem', 'heart', 'rock')
+    requiem = style in ('requiem', 'heart', 'rock', 'arrhythmia')
     symphony = style == 'symphony'
     pconcerto = style == 'pconcerto'
     piano = style in ('piano', 'mallet', 'grief', 'elegia', 'concerto', 'pconcerto', 'sweet', 'acceptance')

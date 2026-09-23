@@ -49,6 +49,7 @@ THEMES = {
     'symphony': dict(bg=(10, 12, 18), bg2=(26, 30, 44), roll=(6, 8, 14), title='Symphony BADA', subtitle='', footer=[], pause_bar=145),
     'pconcerto': dict(bg=(12, 12, 20), bg2=(30, 26, 40), roll=(8, 8, 14), title='Piano Concerto BADA', subtitle='', footer=[], pause_bar=112),
     'sweet': dict(bg=(16, 12, 20), bg2=(36, 28, 44), roll=(10, 7, 14), title='BADA 528 — Sweet Trio', subtitle='', footer=[], pause_bar=999),
+    'arrhythmia': dict(bg=(12, 8, 10), bg2=(36, 16, 20), roll=(8, 5, 7), title='Requiem BADA — Long Distance', subtitle='', footer=[], pause_bar=165),
     'mantra': dict(bg=(6, 8, 16), bg2=(16, 24, 44), roll=(4, 6, 12), title='Requiem BADA · Cor — Mantra', subtitle='', footer=[], pause_bar=99),
     'rock': dict(bg=(10, 8, 14), bg2=(34, 12, 30), roll=(7, 5, 10), title='Requiem BADA · Cor — Rock', subtitle='', footer=[], pause_bar=99),
     'heart': dict(bg=(18, 8, 12), bg2=(42, 14, 22), roll=(12, 5, 8), title='Requiem BADA · Cor', subtitle='', footer=[], pause_bar=99),
@@ -91,6 +92,8 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'Pf S', 'A': 'Pf A', 'T': 'Pf T', 'B': 'Pf Bass',
                       'EP': 'E.Piano', 'PD': 'Synth Pad', 'LD': 'Synth Lead', 'DR': 'Brushes',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
+    if meta.get('style') == 'arrhythmia':
+        COL.update({'DR': (235, 70, 90), 'SB': (90, 200, 255)}); VNAME.update({'DR': 'ドラム (不整脈)', 'SB': 'シンセ・ベース'})
     if meta.get('style') == 'mantra':
         COL.update({'S': (150, 220, 255), 'A': (120, 180, 255), 'T': (110, 230, 210), 'B': (160, 140, 255), 'DR': (235, 70, 90), 'SB': (90, 200, 255), 'OD': (120, 200, 255)})
         VNAME.update({'S': '倍音シンセ S', 'A': '倍音シンセ A', 'T': '倍音シンセ T', 'B': '倍音シンセ B', 'DR': 'ドラム (キック = 鼓動)', 'SB': 'シンセ・ベース', 'OD': '倍音 (共鳴)'})
@@ -105,7 +108,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'S': 'S', 'A': 'A', 'T': 'T', 'B': 'B', 'H': 'Pf', 'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'TB': 'タブレット録音',
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl', 'PD': 'Pad'})
     present = {x['v'] for x in notes}
-    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'rock': ['S', 'A', 'T', 'B', 'DR', 'SB', 'AR', 'GT', 'PD', 'X'], 'mantra': ['S', 'A', 'T', 'B', 'OD', 'DR', 'SB', 'X'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
+    LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'rock': ['S', 'A', 'T', 'B', 'DR', 'SB', 'AR', 'GT', 'PD', 'X'], 'mantra': ['S', 'A', 'T', 'B', 'OD', 'DR', 'SB', 'X'], 'arrhythmia': ['S', 'A', 'T', 'B', 'DR', 'SB', 'X', 'D'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]; DET = np.array([n.get('det', 1.0) for n in notes]); ROLE = [n.get('role', '') for n in notes]
     order = np.argsort(T); T, D, M, DET = T[order], D[order], M[order], DET[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]; ROLE = [ROLE[i] for i in order]
@@ -159,6 +162,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     LUB = np.array([e['t'] for e in hb if e.get('kind') == 'lub']); LUBG = np.array([e['gain'] for e in hb if e.get('kind') == 'lub'])
     DUB = np.array([e['t'] for e in hb if e.get('kind') == 'dub'])
     SNARE = np.array([])
+    DRUMS = sorted((e['t'], e.get('kind', 'kick'), e['gain']) for e in d.get('extras', []) if e['v'] == 'DR') if meta.get('style') == 'arrhythmia' else []
     if meta.get('style') in ('rock', 'mantra'):           # 鼓動がキックになった: 心電図はキックで打つ
         kk = [e for e in d.get('extras', []) if e['v'] == 'DR' and e.get('kind') == 'kick']
         LUB = np.array([e['t'] for e in kk]); LUBG = np.array([min(1.0, e['gain'] * 1.1) for e in kk])
@@ -269,6 +273,17 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         # 休止のオマージュ
         if pause_t - 0.2 <= now < pause_t + 1.6:
             dr.text((NOW_X + 20, ROLL_Y0 + 20), '— 休止 —  (自筆譜が途切れる箇所へのオマージュ)', font=f_sec, fill=(210, 200, 170))
+        # ドラムの帯 (不整脈): キック = 赤の高い棒、スネア = 白、ハイハット = 灰、タム = 橙、クラッシュ = 金。抜けた脈は空白になる
+        if meta.get('style') == 'arrhythmia':
+            yb = ROLL_Y1 - 6
+            dr.rectangle([0, yb - 44, W, yb + 4], fill=(14, 8, 10))
+            for tt, kind, gg in DRUMS:
+                if tt < now - back or tt > now + ahead: continue
+                x = NOW_X + (tt - now) * PPS; hit = 0 <= now - tt < 0.12
+                h, c, wdt = {'kick': (36, (235, 70, 90), 5), 'snare': (26, (240, 236, 226), 4), 'hatc': (9, (130, 126, 130), 2), 'hato': (14, (170, 166, 170), 2),
+                             'ride': (12, (150, 150, 170), 2), 'tom': (20, (240, 150, 70), 4), 'crash': (42, (240, 210, 110), 2)}.get(kind, (10, (120, 120, 120), 2))
+                h = h * (0.55 + 0.45 * min(1.0, gg / 0.9)) * (1.25 if hit else 1.0)
+                dr.rectangle([x - wdt / 2, yb - h, x + wdt / 2, yb], fill=c if (hit or x > NOW_X) else dim(c, 0.6))
         # 心電図 (1 拍 = 1 心拍): QRS の鋭い山が「ドッ」、T 波が「クン」。止まった拍は平らな線になる
         if len(LUB):
             xs = np.arange(0, W, 2, dtype=np.float64); ts = now + (xs - NOW_X) / PPS
