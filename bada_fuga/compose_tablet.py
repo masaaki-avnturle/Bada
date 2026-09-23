@@ -116,8 +116,7 @@ def build():
         s0 = b; bar_s = 240.0 / bpm
         for k in range(E + 14): P.tempo[b + k] = bpm; P.dyn[b + k] = 0.8
         # 録音の実音の抜粋 (4 声は休む。採譜した音は表示用)
-        P.section(b, '%s 録音 %s — 実音' % (MARK[i], hm(rid)), '%s · ♩=%d ／ タブレット録音 20260922_%s の実音の抜粋 (%.0f 秒)' % (kname, bpm, rid[9:], E * bar_s) if rid.startswith('20260922') else
-                  '%s · ♩=%d ／ タブレット録音 %s の実音の抜粋 (%.0f 秒)' % (kname, bpm, rid, E * bar_s))
+        P.section(b, '%s 録音 %s — 実音' % (MARK[i], hm(rid)), '%s · ♩=%d ／ タブレット録音 %s の実音の抜粋 (%.0f 秒)' % (kname, bpm, rid, E * bar_s))
         for v in VOICES: P.rest_bars(v, b, b + E)
         add('REC', b * BPB, E * BPB + 1.5, 0, REC_GAIN.get(rid, 1.3), None, src=REC[rid]['file'], off=t0, rid=rid)
         for s in inside:

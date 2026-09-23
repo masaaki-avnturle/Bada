@@ -222,7 +222,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             if x1 < 0 or x0 > W: continue
             on = e['t'] <= now < e['t'] + e['d']
             dr.rectangle([max(x0, 0), ROLL_Y0 + 2, min(x1, W), ROLL_Y0 + 18], fill=dim(COL.get('TB', (110, 210, 250)), 0.5 if on else 0.25))
-            dr.text((max(x0, 0) + 6, ROLL_Y0 + 2), '♪ タブレット録音 20260922_%s (実音)' % e.get('rid', ''), font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
+            dr.text((max(x0, 0) + 6, ROLL_Y0 + 2), '♪ タブレット録音 %s (実音)' % (e.get('rid', '') if '_' in e.get('rid', '') else '20260922_' + e.get('rid', '')), font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
         # 倍音の共鳴 (mantra): 低い D の倍音列のうち、いま共鳴している倍音を光る線で (synth.py と同じ式・拍に同期)
         if meta.get('style') == 'mantra':
             Lc = math.log2(300.0) + 3.3 * (0.5 - 0.5 * math.cos(2 * math.pi * beat / 8.0)); best = (0, 1)
