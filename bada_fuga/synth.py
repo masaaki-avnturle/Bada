@@ -7,6 +7,7 @@ import soundfile as sf
 from scipy.signal import fftconvolve
 
 SR = 44100
+BPB_S = 4
 
 # 声部ごとの音色: (倍音振幅, attack, release, gain, pan, detune cents, vibrato depth)
 TIMBRE = {
@@ -437,6 +438,26 @@ def guitar_power(freq, dur, vel=0.5, mute=True, sr=SR):
     y = _lp(y, 0.35); y = _lp(y, 0.45); y = y - _lp(y, 0.012)                  # キャビネット
     return y * env(n, 0.003, 0.05, sr) * vel
 
+_BEAT_GRID = (np.array([0.0, 1e6]), np.array([0.0, 1e6]))       # (時刻, 拍) — main() がスコアのテンポ・マップで置き換える
+def beat_of(t):
+    return np.interp(t, _BEAT_GRID[0], _BEAT_GRID[1])
+
+def formant_log2(beats):
+    """倍音を鳴らす共鳴の中心 (log2 Hz): 2 小節で 300 Hz → 3000 Hz → 300 Hz とゆっくり往復 (拍に同期)"""
+    return np.log2(300.0) + 3.3 * (0.5 - 0.5 * np.cos(2 * np.pi * beats / 8.0))
+
+def overtone_tone(freq, dur, vel, t0, kmax=28, a=0.12, r=0.7, sr=SR):
+    """倍音シンセ: 倍音列を加算合成し、狭い共鳴 (倍音唱法のように) が倍音を 1 本ずつ鳴らしながら上下する"""
+    n = int((dur + r) * sr); t = np.arange(n, dtype=np.float32) / sr
+    L = formant_log2(beat_of(t0 + t)).astype(np.float32)
+    vib = 1 + 0.0025 * np.sin(2 * np.pi * 4.6 * t) * np.clip((t - 0.3) / 0.6, 0, 1)
+    ph = (2 * np.pi * freq * np.cumsum(vib) / sr).astype(np.float32)
+    out = np.zeros(n, dtype=np.float32); K = max(4, min(kmax, int(7500.0 / freq)))
+    for k in range(1, K + 1):
+        w = k ** -0.7 * (0.12 + 1.9 * np.exp(-((np.float32(math.log2(k * freq)) - L) / 0.17) ** 2))
+        out += w * np.sin(k * ph + 0.7 * k)
+    return out * env(n, a, r, sr) * vel / 2.2
+
 _SAMPLES = {}
 def sample_clip(path, off, dur, sr=SR):
     """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
@@ -505,7 +526,7 @@ def piano_tone(freq, dur, vel=0.6, pedal=1.4, sr=SR, soft=False):
 def main(score='score.json', out='fuga.wav'):
     d = json.load(open(score))
     base_dir = os.path.dirname(os.path.abspath(score))
-    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock') else 4.0)
+    total = d['duration'] + (7.0 if d.get('meta', {}).get('style') in ('requiem', 'piano', 'mallet', 'grief', 'elegia', 'concerto', 'symphony', 'pconcerto', 'sweet', 'acceptance', 'heart', 'rock', 'mantra') else 4.0)
     N = int(total * SR)
     L = np.zeros(N, dtype=np.float32); R = np.zeros(N, dtype=np.float32)
     HL = np.zeros(N, dtype=np.float32); HR = np.zeros(N, dtype=np.float32)   # 鼓動 (ほぼ乾いた音で近くに)
@@ -521,6 +542,11 @@ def main(score='score.json', out='fuga.wav'):
     concerto = style == 'concerto'
     sweet = style == 'sweet'
     acc = style == 'acceptance'
+    mantra = style == 'mantra'
+    global _BEAT_GRID
+    if d.get('bar_times'):
+        bts = np.array(d['bar_times']); nb = len(bts) - 1
+        _BEAT_GRID = (np.concatenate([np.linspace(bts[i], bts[i + 1], BPB_S, endpoint=False) for i in range(nb)] + [bts[-1:]]), np.arange(nb * BPB_S + 1, dtype=float))
     detach = d.get('meta', {}).get('detach', 1.0)
     humanize = bool(d.get('meta', {}).get('humanize', False))
     spb = 60.0 / d['bpm']
@@ -555,7 +581,10 @@ def main(score='score.json', out='fuga.wav'):
                 L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
             if not ((pconcerto or acc) and role == 'both'): continue
         if pconcerto and role == 'tutti': continue
-        if piano:
+        if mantra:
+            vel = 0.5 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
+            y = overtone_tone(freq, dur + 0.08, vel, nt['t'])
+        elif piano:
             vel = min(1.0, 0.62 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0) + 0.08)
             if humanize:
                 # ルバート: 小節内の位置で強弱の起伏、声部ごとの打鍵の時間差 (低音が先)、強拍はわずかに遅れる
@@ -613,6 +642,11 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * send; R[i0:i1] += y[:i1 - i0] * cr * send
+            continue
+        if ex['v'] == 'OD':                                      # 倍音ドローン: 低い D の倍音が共鳴に合わせて 1 本ずつ鳴り響く
+            y = overtone_tone(freq, ex['d'], ex.get('gain', 0.5), ex['t'], kmax=90, a=2.5, r=4.0)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
             continue
         if ex['v'] == 'PD' and style == 'rock':
             y = pad_tone(freq, ex['d'], ex.get('gain', 0.2)); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
@@ -691,7 +725,7 @@ def main(score='score.json', out='fuga.wav'):
         i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
-    rv_len, rv_decay, wet = (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    rv_len, rv_decay, wet = (5.0, 1.7, 0.46) if mantra else (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):
@@ -711,7 +745,7 @@ def main(score='score.json', out='fuga.wav'):
     # soft knee
     st = np.tanh(st * 1.15) / np.tanh(1.15)
     # fade out tail
-    tail = int((5.0 if (requiem or piano or symphony) else 2.5) * SR)
+    tail = int((5.0 if (requiem or piano or symphony or mantra) else 2.5) * SR)
     st[-tail:] *= np.linspace(1, 0, tail)[:, None]
     sf.write(out, st, SR, subtype='PCM_16')
     print('wrote', out, '%.1fs' % total, 'peak', peak)

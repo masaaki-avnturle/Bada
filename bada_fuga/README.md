@@ -297,6 +297,25 @@ python3 video.py score_heart.json heart.wav heart.mp4
 
 - `synth.py` の `heart_tone` — I 音 (音高が落ちる低い打音 + 22 ms 後の 2 つ目の弁の山 + 胴の低いノイズ) と II 音 (短く明るい)。鼓動はほぼ乾いた音で近くに置き、ごく一部だけ大聖堂の響きへ送る。
 
+## 🌀 Requiem BADA · Cor — Mantra (ニ短調, ♩=心拍数)
+
+- 🎬 **[mantra.mp4](mantra.mp4)** — 1280×720 · 30fps · 約 7 分 21 秒
+
+Cor — Rock から流れるアルペジオ (とギター・パッド) を外し、ドラムを洗脳的に反復するビートにして、曲全体をシンセサイザーの倍音が鳴り響く洗脳の曲に作り換えた版。曲・テンポ・マップ・総休止はそのまま。
+
+- **倍音シンセ** — 4 声 (S A T B) を合唱・オルガンではなく倍音列の加算合成で鳴らす。狭い共鳴が 2 小節ごとに 300 → 3000 → 300 Hz を往復し、倍音唱法のように倍音を 1 本ずつ鳴らす (共鳴は拍に同期)
+- **倍音ドローン** — 低い D と A の倍音列が、同じ共鳴に合わせて全曲で鳴り響く。動画では、いま共鳴している倍音を光る線で表示
+- **洗脳的なドラム** — 毎拍の鼓動キック (ドッ・クン)、2・4 拍のスネア、同じアクセントを繰り返す 16 分のハイハット、毎小節同じ位置の低いタムのオスティナート。フィルもタム回しもなく、同じ型だけが続く
+- **流れ** — Lamento はハーフタイム、総休止で全員止まって打ち直し、Lux aeterna でドラムは 1 つずつ消えて鼓動のキックだけが残る
+
+```bash
+python3 compose_mantra.py score_mantra.json
+python3 synth.py score_mantra.json mantra.wav
+python3 video.py score_mantra.json mantra.wav mantra.mp4
+```
+
+- `synth.py` の `overtone_tone` — 倍音列の加算合成 + 拍に同期して動く狭い共鳴 (`formant_log2`)。動画も同じ式で共鳴している倍音を描く。
+
 ## 🥁🎛 Requiem BADA · Cor — Rock (ニ短調, ♩=心拍数)
 
 - 🎬 **[rock.mp4](rock.mp4)** — 1280×720 · 30fps · 約 7 分 21 秒
