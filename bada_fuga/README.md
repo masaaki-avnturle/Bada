@@ -270,6 +270,51 @@ python3 video.py score_pconcerto.json pconcerto.wav pconcerto.mp4
 
 - `P.role` (小節 → 役割) を追加。合成側は役割に応じて同じ声部をピアノ / 弦 / 両方で鳴らし、動画はトゥッティの小節を弦の色で描く。
 
+## 🎹🎛 BADA 528 — Sweet Trio (ホ短調, ♩=72)
+
+- 🎬 **[sweet.mp4](sweet.mp4)** — 1280×720 · 30fps · 約 5 分 13 秒
+
+これまでの主題 (I・II・B-A-D-A・嘆きのバス・三重フーガ) を、BWV 528 (トリオ・ソナタ第 4 番 ホ短調) の
+「2 上声 + バス」のトリオ書法で集大成し、坂本龍一「Sweet Revenge」風の循環コード (Em7–Cmaj7–Am7–B7)・
+エレピ・シンセパッド・シンセリード・ブラシの上に置いた版 (旋律は引用せず)。
+
+```bash
+python3 compose_sweet.py score_sweet.json
+python3 synth.py score_sweet.json sweet.wav
+python3 video.py score_sweet.json sweet.wav sweet.mp4
+```
+
+## 🎻🪈 BADA 528 — Acceptance (ホ短調, ♩=54–63)
+
+- 🎬 acceptance.mp4 — 1280×720 · 30fps · 約 6 分 47 秒 (作曲者のタブレット録音の実音を含むため、リポジトリには置いていません。下の手順で元の録音から作り直せます)
+
+BWV 528 を、坂本龍一『リトル・ブッダ』の「Acceptance」を思わせる哀愁の弦楽に作り換え、
+作曲者のタブレット録音 (20260922_090933 / 090146) と合わせた版 (旋律は引用せず、雰囲気と編成だけを参照)。
+
+- Sweet Trio 冒頭の金属的な高音 (エレピの FM 倍音・ブラシのハイハット — トライアングルのように聞こえた音) を、**コントラバスの独奏**に置き換えた。
+- タブレット録音の**実音**を 2 か所 (Tablet I / Tablet II) で流し、採譜した低音をコントラバス、内声を弦が追って伴奏する。録音の音はピアノロールに水色で表示。
+- 録音の最上声と和声 (Em7–D–Dsus4–A–Gmaj7/F#…) から**タブレットの主題 T** を作り、Adagio と頂点 (Acceptance) で弦が歌う。
+
+| 部分 | 小節 | テンポ | 内容 |
+|:--|:--|:--|:--|
+| Prologo | 1–3 | ♩=60 | コントラバス独奏 (E1 → B1 E2 → G2 F#2 D2)、タンプーラの E–B |
+| Tablet I | 4–11 | ♩=60 | 録音 090933 (Gmaj7–Em–Bm7–F#m7–C–Am7–Em7–Dsus4) の実音 + Cb・弦 |
+| Adagio | 12–19 | ♩=56 | 主題 T の弦のコラール、下行する低音 |
+| Andante — Trio | 20–31 | ♩=60 | BWV 528 風トリオ: ピアノ + オーボエ (主題 I)、フルート (主題 II)、Cb のピッツィカート |
+| Lamento | 32–43 | ♩=58 | 嘆きのバス + B-A-D-A のカノン (バンスリ・ピアノ)、弦が満ちる |
+| Fugato → 三重結合 | 44–66 | ♩=63 → 60 | 主題 I の 4 声提示 (ピアノ → ピアノ + 弦) → 主題 I + II + III |
+| Acceptance | 67–82 | ♩=54 | 主題 T ×2 を厚い弦がオクターヴで、ピアノの分散和音、2 回目はバンスリ |
+| Tablet II → Fine | 83–97 | ♩=60 → 50 | 録音 090146 (B7–D–Bm–C–Em–F#m7–Am–Bm–D7–Em) の実音、録音自身の Em で終わり、B-A-D-A |
+
+```bash
+python3 extract_tablet.py 20260922_090933.mp3 20260922_090146.mp3   # samples/ に抜粋 (FLAC) と採譜 (JSON)
+python3 compose_acceptance.py score_acceptance.json
+python3 synth.py score_acceptance.json acceptance.wav
+python3 video.py score_acceptance.json acceptance.wav acceptance.mp4
+```
+
+- `synth.py` に コントラバス (arco / pizz)・タンプーラ (ジャワリの倍音の開き)・バンスリ (下からの滑り込み + 息) と、録音の抜粋を鳴らす `REC` を追加。
+
 ## 作り方 (再現)
 
 ```bash
