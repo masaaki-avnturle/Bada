@@ -111,7 +111,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     RCOL = {}
     if meta.get('style') == 'recsampler':
         COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90), 'PF': (220, 220, 230),
-                    'BV': (250, 170, 200), 'LD': (255, 230, 120), 'PD': (120, 110, 170), 'SB': (90, 200, 255), 'GT': (240, 120, 60)})
+                    'BV': (250, 170, 200), 'LD': (255, 230, 120), 'PD': (120, 110, 170), 'SB': (90, 200, 255), 'GT': (240, 120, 60), 'DR': (235, 70, 90)})
         VNAME.update({'BV': 'コーラス (歌声)', 'LD': 'シンセ・リード', 'PD': 'シンセ・パッド', 'SB': 'シンセ・ベース', 'GT': 'ギター'})
         VNAME.update({'TB': meta.get('tb_label', 'タブレット録音 (実音)'), 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
