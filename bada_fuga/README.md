@@ -625,6 +625,17 @@ python3 build_sampler.py bank8 20260924_084937.mp3 20260924_085314.mp3 20260924_
 python3 compose_tablet7.py bank8/bank.json score_tablet7.json && python3 synth.py score_tablet7.json tablet7.wav && python3 video.py score_tablet7.json tablet7.wav tablet7.mp4
 ```
 
+## 🌀🎹 Requiem BADA — Tablet Sessions VIII · Ipnotico (ホ短調 → 変ロ短調 → ヘ短調 → ヘ長調, ♩=60, 約 4 分 30 秒)
+
+Tablet Sessions VII から、シンセサイザーの「正義の味方」のような明るく勇ましい部分 (シンセのリード・パッド、ピアノとシンセの録音 11:21 の実音と主題) を消し、
+ピアノ録音 4 本 (09-24 08:49 / 08:53 / 11:18 / 11:23) の実音と、その旋律のレクイエムとフーガだけにした、人に聞かせられる洗脳的な版。
+♩=60 の柔らかい鼓動 (録音の低い打鍵) が最後まで止まらず、フーガの下では録音の音のオスティナートと持続音が回り続ける。
+最後は 08:49 の本当の終わり (属和音で止まる) → ヘ長調の和音。(録音・mp4 はリポジトリに入れていない)
+
+```bash
+python3 compose_tablet8.py bank8/bank.json score_tablet8.json && python3 synth.py score_tablet8.json tablet8.wav && python3 video.py score_tablet8.json tablet8.wav tablet8.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
