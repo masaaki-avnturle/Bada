@@ -57,7 +57,7 @@ def build():
     T2.MANTRA.append((0, b, R_A, ('PK',)))
     # ---------------- Fuga I (ホ短調)
     f0 = b; entries, labmap = [], {}
-    P.section(b, 'Fuga I — 主題 ①② 〈%s · %s〉' % (hm(R_A), hm(R_B)), '2 本の録音の主題の二重フーガ — 下で録音の音のオスティナートと持続音が同じ形を回し続ける')
+    P.section(b, 'Fuga I — 主題 ①② 〈%s · %s〉' % (hm(R_A), hm(R_B)), '2 本の録音の主題の二重フーガ — 下で録音の音のオスティナートが同じ形を刻み続ける')
     for bar, v, r, tr0 in ((0, 'A', R_A, 0), (2, 'S', R_B, 0), (4, 'T', R_A, 7), (6, 'B', R_B, 0), (8, 'S', R_A, 0), (8, 'T', R_B, 0)):
         T7.entry(P, f0 + bar, v, r, tr0, entries, labmap, synth=False)
     for v, z in {'S': 2, 'T': 4, 'B': 6}.items(): P.rest_bars(v, f0, f0 + z)
@@ -79,7 +79,7 @@ def build():
     T2.MANTRA.append((b, b + 10, R_C, ('PK',))); CT.LAYOUT.append((b, b + 10, KEYS[R_C], {v: R_C for v in VOICES}, {})); b += 10
     # ---------------- Finale (ヘ短調): 4 つの主題が 2 小節ごとに
     f1 = b; entries, labmap = [], {}
-    P.section(b, 'Finale — Fuga a quattro soggetti', '4 本の録音の主題が 2 小節ごとに次々と — 下でオスティナートと持続音が回り続ける (ヘ短調)')
+    P.section(b, 'Finale — Fuga a quattro soggetti', '4 本の録音の主題が 2 小節ごとに次々と — 下でオスティナートが刻み続ける (ヘ短調)')
     for k in range(4): T7.entry(P, f1 + 2 * k, ['A', 'S', 'T', 'B'][k], ORDER[k], 0, entries, labmap, synth=False)
     for v, z in {'S': 2, 'T': 4, 'B': 6}.items(): P.rest_bars(v, f1, f1 + z)
     T5.harm_from_entries(P, f1, f1 + 8, entries); P.set_harms(f1 + 8, [['Gm', 'Gm', 'A7', 'A7']])
