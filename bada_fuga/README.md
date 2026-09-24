@@ -472,6 +472,28 @@ python3 synth.py score_tablet3.json tablet3.wav
 python3 video.py score_tablet3.json tablet3.wav tablet3.mp4
 ```
 
+## 🎚🎙 Requiem BADA — Tablet Sessions IV · Mix (ホ短調, ♩=60, 約 5 分)
+
+録音 11 本 (09-20 15:40 / 15:41、09-22 09:09 / 17:45 / 17:51 / 17:54 / 17:59、09-23 08:06 / 08:09、09-24 08:49 / 08:53) を
+順に並べるのではなく**同時に重ねてミックス**した、洗脳的なレクイエムとフーガ。全部の録音をテープのように速さごと移調して
+ホ短調にそろえ、止まらない鼓動の上で重ねる。鳴るのは録音の音だけ (録音・mp4 はリポジトリに入れていない)。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 鼓動と持続音、最初の録音のループが立ち上がる |
+| Mix — 11 本の実音 | 11 本の抜粋 (各 2 小節) をクロスフェードでつなぐ |
+| Kyrie — ループの重ね | 2 小節ごとに次の録音のループが入り 3 本が常に重なる。入るたびにその録音の主題を 1 声がその録音の音で歌う |
+| Fuga — 2 つずつ | 2 つの主題を同時に (上声と低音)、それぞれ自分の録音の音で。下で 2 本のループ |
+| Mantra — 全部のミックス | ループが 1 小節ごとに 1 本ずつ増え、最後は 11 本全部が同時に回る。B-A-D-A ×6 |
+| Lux aeterna | ピカルディ終止 → 最後の録音のループが消えていく |
+
+```bash
+python3 build_sampler.py bank4 20260920_154001.mp3 ... 20260924_085314.mp3
+python3 compose_tablet4.py bank4/bank.json score_tablet4.json
+python3 synth.py score_tablet4.json tablet4.wav
+python3 video.py score_tablet4.json tablet4.wav tablet4.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
