@@ -466,8 +466,9 @@ def load_bank(path):
 def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
     """実録音の音で鳴らす: いちばん近い音高の録音の 1 音 (できればその区間の録音) を移調し、
     長い音は持続部をクロスフェードでループして伸ばす"""
-    cands = [c for c in _BANK['samples'] if c['rid'] == 'VOX'] if rid == 'VOX' else [c for c in _BANK['samples'] if c['rid'] != 'VOX']
-    cands = cands or _BANK['samples']                     # 'VOX' = 歌声のサンプルだけから選ぶ
+    vox = str(rid).startswith('VOX')                      # 'VOX' / 'VOXF' = その歌声のサンプルだけから選ぶ
+    cands = [c for c in _BANK['samples'] if c['rid'] == rid] if vox else [c for c in _BANK['samples'] if not str(c['rid']).startswith('VOX')]
+    cands = cands or _BANK['samples']
     s = min(cands, key=lambda c: abs(c['midi'] - midi) + (0.0 if c['rid'] == rid else 2.5) - 0.02 * c['purity'])
     if s['file'] not in _BANK['audio']: _BANK['audio'][s['file']] = sf.read(s['file'], dtype='float32')[0]
     src = _BANK['audio'][s['file']]
@@ -693,6 +694,20 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
             L[i0:i1] += y[:i1 - i0] * 0.12; R[i0:i1] += y[:i1 - i0] * 0.12       # わずかに響きへ
             continue
+        if recs and ex['v'] == 'BV':                        # 後ろのコーラス: 歌声の 1 音 (柔らかく立ち上げ、少しだけ響きへ)
+            y = sampler_tone(ex['m'], ex['d'], ex.get('gain', 0.12), ex.get('rid', 'VOXF'), rel=0.5)
+            na = min(len(y), int(0.12 * SR)); y[:na] *= np.linspace(0, 1, na)
+            pan = ex.get('pan', 0.0); cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * cl * 0.8; HR[i0:i1] += y[:i1 - i0] * cr * 0.8
+            L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
+            continue
+        if recs and ex['v'] in ('PD', 'LD'):                # シンセサイザー: パッドとリード
+            y = pad_tone(freq, ex['d'], ex.get('gain', 0.1)) if ex['v'] == 'PD' else lead_tone(freq, ex['d'], ex.get('gain', 0.2))
+            pan = 0.0 if ex['v'] == 'PD' else 0.15
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if recs and ex['v'] == 'PF':                        # 実録音の音のピアノ (音域で左右に振る)
             y = sampler_tone(ex['m'], max(0.08, ex['d']), ex.get('gain', 0.3), ex.get('rid', ''), rel=ex.get('rel', 0.35))
             pan = max(-0.6, min(0.6, (ex['m'] - 62) / 40.0))
@@ -730,6 +745,9 @@ def main(score='score.json', out='fuga.wav'):
             if 'pshift' in ex:                              # 歌声: 子音などの突出したピークだけを柔らかく抑える
                 lim = 4.0 * float(np.sqrt((y ** 2).mean()) + 1e-9); y = (lim * np.tanh(y / lim)).astype(np.float32)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
+            if ex.get('dry'):                               # 残響なし: 乾いた声をそのまま前に
+                HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
+                continue
             L[i0:i1] += y[:i1 - i0] * 0.707
             j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707
             continue

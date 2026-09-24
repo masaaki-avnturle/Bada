@@ -576,6 +576,32 @@ python3 voice_bank.py voice/voice.json vbank
 python3 compose_vox.py bank6/bank.json vbank/bank.json score_vox.json && python3 synth.py score_vox.json vox.wav && python3 video.py score_vox.json vox.wav vox.mp4
 ```
 
+## 🎸🎤 Requiem BADA — Vox · Rock (イ短調, ♩=80, 約 3 分)
+
+9/23・9/24 のタブレットのピアノ録音 7 本の旋律を、ロックバンド (ドラム・シンセベース・ギター) とシンセサイザー (パッド・リード) の上の
+洗脳的なレクイエムとフーガに。作曲者の歌声 (2025-01-08 20:00 / 20:15 から取り出したもの) を**残響をかけず**乾いたきれいな声で前に置く。
+(録音・歌声・mp4 はリポジトリに入れていない)
+
+- `feminize_voice.py`: WORLD ボコーダー (pyworld) で、大げさにせず女性的に — f0 を 1 オクターヴ上げ、フォルマントは 1.12 倍だけ。
+  伸ばした音だけ音階へ 60% 寄せる控えめな音程補正、歌っていない所のゲート。残響は足さない。
+- 後ろのコーラス (`BV`) は同じ歌声の 1 音を 3 声で正確な音程に重ねたもの (プロの歌手の録音は使っていない)。
+- `synth.py`: `REC` の `dry` (残響なし)、`BV` (コーラス)、`recsampler` でも `PD` / `LD` (シンセ)。`VOX…` のサンプルは同じ印のものだけから選ぶ。
+
+| 区間 | 内容 |
+|---|---|
+| Intro | ピアノ録音 11:23 の実音 → 鼓動のようなキックとパッド |
+| Verse I / II | 歌声とバンド (8 分音符の同じ刻み)、和音は歌声に合わせて |
+| Chorus I | 9/23 08:09 の旋律の 4 声フーガ + ギター + コーラス |
+| Chorus II | 7 本の旋律が 1 小節おきに (上の声にシンセのリード) |
+| Bridge | 08:09 の実音、キックだけ |
+| Mantra | B-A-D-A ×4 (コーラスと 4 声)、バンド全開、歌声 → イ長調 |
+
+```bash
+python3 feminize_voice.py voice/voice.json fem 0 12 1.12 -- 20250108_201532 20250108_200038
+python3 voice_bank.py fem/voice.json fbank --tag=VOXF
+python3 compose_rockvox.py bank7/bank.json fbank/bank.json score_rockvox.json && python3 synth.py score_rockvox.json rockvox.wav && python3 video.py score_rockvox.json rockvox.wav rockvox.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
