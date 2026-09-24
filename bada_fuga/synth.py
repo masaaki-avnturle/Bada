@@ -692,9 +692,31 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
             L[i0:i1] += y[:i1 - i0] * 0.12; R[i0:i1] += y[:i1 - i0] * 0.12       # わずかに響きへ
             continue
+        if recs and ex['v'] in ('OS', 'DN', 'PK'):          # 実録音の音のオスティナート・持続音・鼓動
+            v = ex['v']; vel = ex.get('gain', 0.4)
+            if v == 'PK':                                   # 鼓動: 録音の低い打鍵を 2 オクターヴ下げ、低域だけ残す
+                y = sampler_tone(ex['m'], 0.3, 1.0, ex.get('rid', ''), rel=0.3)
+                from scipy.signal import butter, sosfilt
+                y = sosfilt(butter(4, 160.0, btype='lowpass', fs=SR, output='sos'), y).astype(np.float32)
+                y = y / (np.abs(y).max() + 1e-9) * vel
+                i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+                HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
+                L[i0:i1] += y[:i1 - i0] * 0.1; R[i0:i1] += y[:i1 - i0] * 0.1
+                continue
+            if v == 'DN':                                   # 持続音: 打鍵を消して (ゆっくり立ち上げ) ループで伸ばす
+                y = sampler_tone(ex['m'], ex['d'], vel, ex.get('rid', ''), rel=2.0)
+                y[:int(1.2 * SR)] *= np.linspace(0, 1, int(1.2 * SR)) ** 2; pan = 0.0
+            else:
+                y = sampler_tone(ex['m'], ex['d'], vel, ex.get('rid', ''), rel=0.5)
+                pan = 0.35 if int(round(ex['beat'] * 2)) % 2 else -0.35
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if ex['v'] == 'TB': continue                  # 採譜した録音の音 (表示用・無音)
         if ex['v'] == 'REC':
-            y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d']) * ex.get('gain', 1.0)
+            ratio = 2 ** (ex.get('semis', 0) / 12.0)            # 移調はテープのように速さごと変える
+            y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d'] * ratio) * ex.get('gain', 1.0)
+            if ratio != 1.0: y = np.interp(np.arange(int(len(y) / ratio)) * ratio, np.arange(len(y)), y).astype(np.float32)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
             L[i0:i1] += y[:i1 - i0] * 0.707
             j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707

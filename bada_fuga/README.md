@@ -428,6 +428,27 @@ python3 synth.py score_tablet.json tablet.wav
 python3 video.py score_tablet.json tablet.wav tablet.mp4
 ```
 
+## 🌀🎙 Requiem BADA — Tablet Sessions II · Mantra lento (ヘ短調 → ホ短調, ♩=52→48, 約 6 分)
+
+タブレット録音 2 本 (20260924_084937 / 085314) の、ゆったりとした洗脳的なレクイエムとフーガ。鳴るのは録音の音だけ
+(録音・mp4 は個人の録音を含むのでリポジトリに入れていない)。
+
+| 区間 | 内容 |
+|---|---|
+| ①② 各録音 | 実音の抜粋 → 抜粋の最初の 1 小節のテープ・ループ + 持続音 + 鼓動 → 4 声フーガ (下で実録音のオスティナートが根音・5 度・3 度・5 度を刻み続ける) → 抜粋の和音のコラール ×2 (2 回目はループが戻る) |
+| Finale — Fuga doppia | 2 つの主題の二重フーガ、最後は 2 つの主題が同時に (ホ短調) |
+| Mantra → Lux aeterna | 2 つの録音のループが交互に回る中で B-A-D-A ×4 (08:49 はテープのように半音下げて) → ピカルディ終止 → ループが消えていく |
+
+- 鼓動は録音の低い打鍵を 2 オクターヴ下げて 160 Hz 以下だけ残した音 (毎拍、1 拍目を強く)。持続音は打鍵を消してループで伸ばしたサンプラーの音。
+- `synth.py`: `REC` に `semis` (テープのような移調)、`recsampler` に `OS` / `DN` / `PK` を追加。
+
+```bash
+python3 build_sampler.py bank2 20260924_084937.mp3 20260924_085314.mp3
+python3 compose_tablet2.py bank2/bank.json score_tablet2.json
+python3 synth.py score_tablet2.json tablet2.wav
+python3 video.py score_tablet2.json tablet2.wav tablet2.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
