@@ -485,7 +485,7 @@ def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
     return y * vel
 
 _SAMPLES = {}
-def sample_clip(path, off, dur, sr=SR):
+def sample_clip(path, off, dur, sr=SR, fin=0.03, fout=None):
     """録音の抜粋: 60 Hz 以下と 8 kHz 以上を落とし、入りと終わりをフェード"""
     if path not in _SAMPLES:
         y, fs = sf.read(path, dtype='float32')
@@ -497,7 +497,7 @@ def sample_clip(path, off, dur, sr=SR):
         y = sosfilt(butter(2, [60.0, 8000.0], btype='bandpass', fs=sr, output='sos'), y).astype(np.float32)
         _SAMPLES[path] = y / (np.sqrt((y ** 2).mean()) + 1e-9) * 0.1
     y = _SAMPLES[path][int(off * sr):int((off + dur) * sr)].copy()
-    fi, fo = int(0.03 * sr), int(min(1.5, dur / 4) * sr)
+    fi, fo = int(min(fin, dur / 3) * sr), int((min(1.5, dur / 4) if fout is None else min(fout, dur / 2)) * sr)
     y[:fi] *= np.linspace(0, 1, fi); y[-fo:] *= np.linspace(1, 0, fo)
     return y
 
@@ -715,7 +715,7 @@ def main(score='score.json', out='fuga.wav'):
         if ex['v'] == 'TB': continue                  # 採譜した録音の音 (表示用・無音)
         if ex['v'] == 'REC':
             ratio = 2 ** (ex.get('semis', 0) / 12.0)            # 移調はテープのように速さごと変える
-            y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d'] * ratio) * ex.get('gain', 1.0)
+            y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d'] * ratio, fin=ex.get('fin', 0.03), fout=ex.get('fout')) * ex.get('gain', 1.0)
             if ratio != 1.0: y = np.interp(np.arange(int(len(y) / ratio)) * ratio, np.arange(len(y)), y).astype(np.float32)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
             L[i0:i1] += y[:i1 - i0] * 0.707

@@ -494,6 +494,31 @@ python3 synth.py score_tablet4.json tablet4.wav
 python3 video.py score_tablet4.json tablet4.wav tablet4.mp4
 ```
 
+## 🎙🎚 Requiem BADA — Tablet Sessions V · Mix (実音) (ヘ短調 → ホ短調, ♩=60, 約 7 分)
+
+ループを使わず、録音 5 本 (09-22 17:57 / 17:59、09-23 08:09、09-24 08:49 / 08:53) を**実音のまま (速さも音高も元のまま)** 40〜64 秒ずつ流し、
+長いクロスフェードでつないだレクイエムとフーガ。各録音から、その調にいちばん合う区間を自動で選ぶ。
+実音の後半は 4 声 (録音の 1 音のサンプラー) が録音の和音 (小節でいちばん長く鳴る和音) を全音符で静かに支える。
+(録音・mp4 はリポジトリに入れていない)
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 08:49 (ヘ短調) の実音 64 秒 |
+| Fuga I | 08:49 の主題の 4 声フーガ → ヘ長調の終止 → ナポリの和音 (F) → B7 でホ短調へ |
+| Kyrie — ミックス | 17:59 → 08:53 → 08:09 (ホ短調) の実音を 8 秒のクロスフェードで重ねてつなぐ |
+| Fuga II | 3 本の主題の三重フーガ → 属和音で止まる |
+| Lacrimosa | 17:57 (ロ短調) の実音 48 秒 |
+| Finale → In paradisum | 5 つの主題のフーガ → 08:09 の本当の終わり 20 秒 (録音自身のホ短調の終止) |
+
+- `synth.py`: `REC` に `fin` / `fout` (フェードの長さ、クロスフェード用)。
+
+```bash
+python3 build_sampler.py bank5 20260922_175951.mp3 20260922_175717.mp3 20260923_080918.mp3 20260924_084937.mp3 20260924_085314.mp3
+python3 compose_tablet5.py bank5/bank.json score_tablet5.json
+python3 synth.py score_tablet5.json tablet5.wav
+python3 video.py score_tablet5.json tablet5.wav tablet5.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
