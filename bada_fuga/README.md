@@ -605,6 +605,26 @@ python3 voice_bank.py fem/voice.json fbank --tag=VOXF
 python3 compose_rockvox.py bank7/bank.json fbank/bank.json score_rockvox.json && python3 synth.py score_rockvox.json rockvox.wav && python3 video.py score_rockvox.json rockvox.wav rockvox.mp4
 ```
 
+## 🎹🎛 Requiem BADA — Tablet Sessions VII · Piano & Synth (ホ短調 → 変ロ短調 → ヘ短調, ♩=60, 約 5 分)
+
+2026-09-24 の録音 5 本を実音のまま (ループなし・速さも音高も元のまま) つなぎ、その旋律で作ったレクイエムとフーガを混ぜた自分流のミックス。
+11:21 はピアノとシンセサイザーを 1 曲にした録音 (音が減衰せず明るい — 0.45 秒後の残り 0.91、ほかは 0.58〜0.71) なので、
+フーガの旋律もピアノの音にシンセサイザーのリード (`LD`) を重ね、シンセのパッド (`PD`) が和音を支える。(録音・mp4 はリポジトリに入れていない)
+
+| 区間 | 内容 |
+|---|---|
+| Introitus — Mix | 11:23 → 08:53 (ホ短調) の実音をクロスフェードで |
+| Fuga I | 11:23 と 08:53 の主題の二重フーガ (ピアノ + シンセ) → B7 → F7 で変ロ短調へ |
+| Lacrimosa | 11:18 (変ロ短調) の実音 |
+| Sanctus — Mix | 08:49 → 11:21 (ピアノとシンセの曲, ヘ短調) の実音 |
+| Finale | 5 つの主題が 2 小節ごとに (ピアノ + シンセ) |
+| In paradisum | 11:21 の本当の終わりの実音 |
+
+```bash
+python3 build_sampler.py bank8 20260924_084937.mp3 20260924_085314.mp3 20260924_111846.mp3 20260924_112131.mp3 20260924_112313.mp3
+python3 compose_tablet7.py bank8/bank.json score_tablet7.json && python3 synth.py score_tablet7.json tablet7.wav && python3 video.py score_tablet7.json tablet7.wav tablet7.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
