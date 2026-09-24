@@ -449,6 +449,29 @@ python3 synth.py score_tablet2.json tablet2.wav
 python3 video.py score_tablet2.json tablet2.wav tablet2.mp4
 ```
 
+## 🌀🎙🎙 Requiem BADA — Tablet Sessions III · Mantra of All (♩=56 のまま, 約 7 分 50 秒)
+
+録音 11 本 (09-20 15:40 / 15:41 の動画 2 本の音、09-22 09:01 / 17:40 / 17:48 / 17:57 / 17:59、09-23 08:06 / 08:09、09-24 08:49 / 08:53)
+を全部合わせた、止まらない鼓動の上の洗脳的なレクイエムとフーガ。鳴るのは録音の音だけ (録音・mp4 はリポジトリに入れていない)。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 鼓動と持続音だけ (鼓動は最後まで ♩=56 で止まらない) |
+| Requiem — 11 の祈り | 録音順に各 7 小節: 実音の抜粋 3 小節 → ループが回る中、抜粋の最上声から作った主題を上声 → 低音が歌う (下でオスティナート)。調は各録音の調 |
+| Fuga — 11 の主題 | 11 の主題が 1 小節おきに 4 声へ次々に入る。各主題は自分の録音の音で (ホ短調) |
+| Mantra | 11 本のループが 1 小節ずつ回り (テープのように速さごと移調してホ短調へ)、B-A-D-A ×6 |
+| Lux aeterna | ピカルディ終止 → 最後の録音のループが消えていく |
+
+- 新しい録音の調は音高の分布 (Krumhansl のプロファイル) から推定した短調。抜粋の音量は録音全体との比から自動で合わせる。
+- `video.py`: 録音が 6 本以上のときは色相を等分し、録音の凡例を 2 段目に出す。
+
+```bash
+python3 build_sampler.py bank3 20260920_154001.mp4 20260920_154118.mp4 20260922_090146.mp3 ... 20260924_085314.mp3
+python3 compose_tablet3.py bank3/bank.json score_tablet3.json
+python3 synth.py score_tablet3.json tablet3.wav
+python3 video.py score_tablet3.json tablet3.wav tablet3.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

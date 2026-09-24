@@ -114,6 +114,9 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'TB': 'タブレット録音 (実音)', 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')})
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]
+        if len(rids) > len(pal):                         # 録音が多いときは色相を等分
+            import colorsys
+            pal = [tuple(int(255 * x) for x in colorsys.hsv_to_rgb((0.08 + k / len(rids)) % 1.0, 0.5, 0.95)) for k in range(len(rids))]
         RCOL = {r: pal[k % len(pal)] for k, r in enumerate(rids)}
     present = {x['v'] for x in notes}
     LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'rock': ['S', 'A', 'T', 'B', 'DR', 'SB', 'AR', 'GT', 'PD', 'X'], 'mantra': ['S', 'A', 'T', 'B', 'OD', 'DR', 'SB', 'X'], 'arrhythmia': ['S', 'A', 'T', 'B', 'DR', 'SB', 'X', 'D'], 'recsampler': ['TB', 'OS', 'DN', 'PK', 'X'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
@@ -163,11 +166,16 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
         lx += {'TB': 190, 'OS': 130, 'DN': 80, 'PK': 160}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
-    circ = '①②③④⑤⑥⑦⑧'
+    circ = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯'
+    many = len(RCOL) > 5                                  # 録音が多いときは録音の凡例を 2 段目に
+    if many: lx = 30
     for k, (r, c) in enumerate(RCOL.items()):
-        bd.rectangle([lx, 612, lx + 14, 626], fill=c); bd.text((lx + 20, 609), '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]), font=f_small, fill=(200, 204, 216)); lx += 132
+        yy = 634 if many else 612
+        bd.rectangle([lx, yy, lx + 14, yy + 14], fill=c)
+        bd.text((lx + 20, yy - 3), '%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]), font=f_small, fill=(200, 204, 216))
+        lx += 112 if many else 132
     for i, line in enumerate(th['footer']):
-        bd.text((30, 640 + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
+        bd.text((30, (662 if many else 640) + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
     # 鼓動 (心電図と脈打つ心臓) のデータ
     hb = [e for e in d.get('extras', []) if e['v'] == 'HB']
