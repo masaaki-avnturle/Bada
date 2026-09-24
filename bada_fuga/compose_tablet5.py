@@ -185,8 +185,9 @@ def build():
 
 META = {
     'style': 'recsampler', 'bank': sys.argv[1],
-    'title': 'Requiem BADA — Tablet Sessions V · Mix (実音)',
-    'subtitle': 'ループなし — 録音 5 本を実音のままクロスフェードでつなぎ、レクイエムとフーガに (音はすべて録音から)',
+    'title': 'Requiem BADA — Tablet Sessions V · Mix',
+    'subtitle': '実音・ループなし — 録音 5 本を実音のままクロスフェードでつなぎ、レクイエムとフーガに (音はすべて録音から)',
+    'rec_order': ORDER,                                   # 凡例の ①〜⑤ を主題の番号と同じ順に
     'footer': ['Introitus 08:49 (ヘ短調) → Fuga I → Kyrie: 17:59 → 08:53 → 08:09 のミックス → Fuga II (三重) → Lacrimosa 17:57 (ロ短調) → Finale → In paradisum',
                '録音は速さも音高も元のまま。実音の後半は 4 声 (録音の 1 音のサンプラー) が録音の和音を全音符で支える。最後は 08:09 の本当の終わり。'],
 }

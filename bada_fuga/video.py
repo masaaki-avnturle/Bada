@@ -113,6 +113,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90)})
         VNAME.update({'TB': 'タブレット録音 (実音)', 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')})
+        if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]
         if len(rids) > len(pal):                         # 録音が多いときは色相を等分
             import colorsys
