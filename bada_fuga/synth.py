@@ -466,7 +466,8 @@ def load_bank(path):
 def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
     """実録音の音で鳴らす: いちばん近い音高の録音の 1 音 (できればその区間の録音) を移調し、
     長い音は持続部をクロスフェードでループして伸ばす"""
-    cands = _BANK['samples']
+    cands = [c for c in _BANK['samples'] if c['rid'] == 'VOX'] if rid == 'VOX' else [c for c in _BANK['samples'] if c['rid'] != 'VOX']
+    cands = cands or _BANK['samples']                     # 'VOX' = 歌声のサンプルだけから選ぶ
     s = min(cands, key=lambda c: abs(c['midi'] - midi) + (0.0 if c['rid'] == rid else 2.5) - 0.02 * c['purity'])
     if s['file'] not in _BANK['audio']: _BANK['audio'][s['file']] = sf.read(s['file'], dtype='float32')[0]
     src = _BANK['audio'][s['file']]
@@ -723,6 +724,9 @@ def main(score='score.json', out='fuga.wav'):
             ratio = 2 ** (ex.get('semis', 0) / 12.0)            # 移調はテープのように速さごと変える
             y = sample_clip(os.path.join(base_dir, ex['src']), ex['off'], ex['d'] * ratio, fin=ex.get('fin', 0.03), fout=ex.get('fout')) * ex.get('gain', 1.0)
             if ratio != 1.0: y = np.interp(np.arange(int(len(y) / ratio)) * ratio, np.arange(len(y)), y).astype(np.float32)
+            if ex.get('pshift'):                            # 速さを変えない移調 (歌声)
+                import librosa
+                y = librosa.effects.pitch_shift(y, sr=SR, n_steps=ex['pshift']).astype(np.float32)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
             L[i0:i1] += y[:i1 - i0] * 0.707
             j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707

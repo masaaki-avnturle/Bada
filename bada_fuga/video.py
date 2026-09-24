@@ -111,7 +111,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     RCOL = {}
     if meta.get('style') == 'recsampler':
         COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90), 'PF': (220, 220, 230)})
-        VNAME.update({'TB': 'タブレット録音 (実音)', 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
+        VNAME.update({'TB': meta.get('tb_label', 'タブレット録音 (実音)'), 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
         if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]
@@ -173,7 +173,8 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     for k, (r, c) in enumerate(RCOL.items()):
         yy = 634 if many else 612
         bd.rectangle([lx, yy, lx + 14, yy + 14], fill=c)
-        bd.text((lx + 20, yy - 3), '%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]), font=f_small, fill=(200, 204, 216))
+        lab = ('%s わたしの歌声' % circ[k]) if r == 'VOX' else ('%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]))
+        bd.text((lx + 20, yy - 3), lab, font=f_small, fill=(200, 204, 216))
         lx += 112 if many else 132
     for i, line in enumerate(th['footer']):
         bd.text((30, (662 if many else 640) + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
@@ -232,6 +233,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
             if x1 < 0 or x0 > W: continue
             on = e['t'] <= now < e['t'] + e['d']
             dr.rectangle([max(x0, 0), ROLL_Y0 + 2, min(x1, W), ROLL_Y0 + 18], fill=dim(COL.get('TB', (110, 210, 250)), 0.5 if on else 0.25))
+            if e.get('tag'): dr.text((max(x0, 0) + 6, ROLL_Y0 + 2), '♪ ' + e['tag'], font=f_small, fill=(230, 240, 250) if on else (150, 160, 170)); continue
             dr.text((max(x0, 0) + 6, ROLL_Y0 + 2), ('♪ タブレット録音 %s (ループ)' if e.get('loop') else '♪ タブレット録音 %s (実音)') % (e.get('rid', '') if '_' in e.get('rid', '') else '20260922_' + e.get('rid', '')), font=f_small, fill=(230, 240, 250) if on else (150, 160, 170))
         # 倍音の共鳴 (mantra): 低い D の倍音列のうち、いま共鳴している倍音を光る線で (synth.py と同じ式・拍に同期)
         if meta.get('style') == 'mantra':
