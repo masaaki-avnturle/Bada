@@ -110,7 +110,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
                       'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl', 'PD': 'Pad'})
     RCOL = {}
     if meta.get('style') == 'recsampler':
-        COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90)})
+        COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90), 'PF': (220, 220, 230)})
         VNAME.update({'TB': 'タブレット録音 (実音)', 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')})
         if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
@@ -123,7 +123,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     LEGEND = {'organ': ['S', 'A', 'T', 'B'], 'requiem': ['S', 'A', 'T', 'B', 'X', 'D', 'P'], 'piano': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'mallet': ['S', 'A', 'T', 'B', 'H', 'W', 'L'], 'grief': ['S', 'A', 'T', 'B', 'H', 'C', 'L'], 'elegia': ['S', 'A', 'T', 'B', 'H', 'L'], 'concerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP'], 'symphony': ['S', 'A', 'T', 'B', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'pconcerto': ['S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'CB', 'FL', 'WW', 'CL', 'HN', 'TR', 'TB', 'TP'], 'sweet': ['S', 'A', 'T', 'B', 'EP', 'PD', 'LD', 'DR', 'WW', 'FL', 'VA', 'VC'], 'heart': ['S', 'A', 'T', 'B', 'HB', 'X', 'D'], 'rock': ['S', 'A', 'T', 'B', 'DR', 'SB', 'AR', 'GT', 'PD', 'X'], 'mantra': ['S', 'A', 'T', 'B', 'OD', 'DR', 'SB', 'X'], 'arrhythmia': ['S', 'A', 'T', 'B', 'DR', 'SB', 'X', 'D'], 'recsampler': ['TB', 'OS', 'DN', 'PK', 'X'], 'acceptance': ['TB', 'CB', 'CBP', 'S', 'A', 'T', 'B', 'H', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'BN', 'TA']}[meta.get('style', 'organ')]
     T = np.array([n['t'] for n in notes]); D = np.array([n['d'] for n in notes]); M = np.array([n['m'] for n in notes])
     V = [n['v'] for n in notes]; LAB = [n['label'] for n in notes]; DET = np.array([n.get('det', 1.0) for n in notes]); ROLE = [n.get('role', '') for n in notes]
-    SRC = [n.get('rid') or n.get('src', '') if n['v'] in ('S', 'A', 'T', 'B', 'OS') else '' for n in notes]
+    SRC = [n.get('rid') or n.get('src', '') if n['v'] in ('S', 'A', 'T', 'B', 'OS', 'PF') else '' for n in notes]
     order = np.argsort(T); T, D, M, DET = T[order], D[order], M[order], DET[order]; V = [V[i] for i in order]; LAB = [LAB[i] for i in order]; ROLE = [ROLE[i] for i in order]; SRC = [SRC[i] for i in order]
     STRCOL = {'S': (200, 120, 90), 'A': (170, 100, 80), 'T': (150, 90, 110), 'B': (120, 70, 60)}
     entries = d['entries']; sections = d['sections']

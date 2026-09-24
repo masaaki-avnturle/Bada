@@ -29,6 +29,8 @@ VOICE_SRC = {'S': '20260923_080918', 'A': '20260922_175951', 'T': '20260924_0853
 MINOR = np.array([6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17])
 XF = 2                               # クロスフェード (小節)
 
+USED = {}                            # 録音 id → すでに流した区間 [(開始, 終了)] (同じ所を 2 度流さない)
+
 def best_window(rid, semis, seconds, avoid_end=0.0):
     """録音の中から、その調 (短調) にいちばん合う seconds 秒を選ぶ (打鍵の頭から始め、主和音で始まると加点)"""
     segs = REC[rid]['segs']; tonic = (2 + semis) % 12; prof = np.roll(MINOR, tonic)
@@ -36,6 +38,7 @@ def best_window(rid, semis, seconds, avoid_end=0.0):
     for s in segs:
         t0 = s['t'] - 0.03
         if t0 < 2 or t0 + seconds > REC[rid]['dur'] - 1 - avoid_end: continue
+        if any(t0 < u1 and t0 + seconds > u0 for u0, u1 in USED.get(rid, [])): continue
         h = np.zeros(12)
         for x in segs:
             if t0 <= x['t'] < t0 + seconds:
@@ -46,14 +49,16 @@ def best_window(rid, semis, seconds, avoid_end=0.0):
     t0 = best[1] if best else 3.0
     return t0, [x for x in segs if t0 <= x['t'] < t0 + seconds]
 
-def passage(P, rid, bar, bars, semis, choir_from, fin=0.03, fout=6.0, t0=None, gain=None):
+def passage(P, rid, bar, bars, semis, choir_from, fin=0.03, fout=6.0, t0=None, gain=None, bpm=None):
     """実音を bars 小節流す。採譜は表示用、和声は録音の和音 (小節でいちばん長く鳴る和音)。choir_from 小節目から 4 声が全音符で支える"""
+    bpm = bpm or BPM; BAR_S = 240.0 / bpm
     if t0 is None: t0, inside = best_window(rid, semis, bars * BAR_S)
     else: inside = [x for x in REC[rid]['segs'] if t0 <= x['t'] < t0 + bars * BAR_S]
+    USED.setdefault(rid, []).append((t0, t0 + bars * BAR_S))
     g = gain if gain is not None else 0.75 * T3.rec_gain(rid, t0, bars * BAR_S)     # サンプラーの 4 声と釣り合う大きさに
     add('REC', bar * BPB, bars * BPB + 1.0, 0, g, None, src=REC[rid]['file'], off=t0, rid=rid, fin=fin, fout=fout)
     for s in inside:
-        for m in s['m']: add('TB', bar * BPB + (s['t'] - t0) * BPM / 60.0, s['d'] * BPM / 60.0, m - semis, 0.0, None)
+        for m in s['m']: add('TB', bar * BPB + (s['t'] - t0) * bpm / 60.0, s['d'] * bpm / 60.0, m - semis, 0.0, None)
     for k in range(bars):
         a, z = t0 + k * BAR_S, t0 + (k + 1) * BAR_S; w = {}
         for s in inside:

@@ -692,6 +692,12 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * 0.707; HR[i0:i1] += y[:i1 - i0] * 0.707
             L[i0:i1] += y[:i1 - i0] * 0.12; R[i0:i1] += y[:i1 - i0] * 0.12       # わずかに響きへ
             continue
+        if recs and ex['v'] == 'PF':                        # 実録音の音のピアノ (音域で左右に振る)
+            y = sampler_tone(ex['m'], max(0.08, ex['d']), ex.get('gain', 0.3), ex.get('rid', ''), rel=ex.get('rel', 0.35))
+            pan = max(-0.6, min(0.6, (ex['m'] - 62) / 40.0))
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if recs and ex['v'] in ('OS', 'DN', 'PK'):          # 実録音の音のオスティナート・持続音・鼓動
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v == 'PK':                                   # 鼓動: 録音の低い打鍵を 2 オクターヴ下げ、低域だけ残す

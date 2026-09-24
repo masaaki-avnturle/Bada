@@ -519,6 +519,36 @@ python3 synth.py score_tablet5.json tablet5.wav
 python3 video.py score_tablet5.json tablet5.wav tablet5.mp4
 ```
 
+## 🌀🎙 Requiem BADA — Tablet Sessions VI · Lento ipnotico (♩=50, 約 8 分 40 秒)
+
+録音 5 本 (09-24 08:49 / 08:53 / 11:18 / 11:21 / 11:23) の、ゆったりとした洗脳的なレクイエムとフーガ。
+録音はループせず実音のまま流し、その下で録音の低い打鍵から作った鼓動が最後まで止まらない。
+各録音: 実音 8 小節 (後半は 4 声が録音の和音を支える) → その主題の 4 声フーガ (下で実録音のオスティナートと持続音) → 次の調の属和音。
+調は 11:18 (変ロ短調) → 08:49 · 11:21 (ヘ短調) → 08:53 · 11:23 (ホ短調)。Finale は 5 つの主題のフーガ → 11:23 の実音 → ピカルディ終止。
+
+```bash
+python3 build_sampler.py bank6 20260924_084937.mp3 20260924_085314.mp3 20260924_111846.mp3 20260924_112131.mp3 20260924_112313.mp3
+python3 compose_tablet6.py bank6/bank.json score_tablet6.json && python3 synth.py score_tablet6.json tablet6.wav && python3 video.py score_tablet6.json tablet6.wav tablet6.mp4
+```
+
+## 🎹🔥 Fantaisie-Révolution — Tablet Sessions (ハ短調 → 嬰ハ短調 → 変ニ長調 → 嬰ハ長調, 約 2 分 45 秒)
+
+同じ録音 5 本を、ショパンの**革命のエチュード** (Op.10-12) と**幻想即興曲** (Op.66) の書法でリメイクしたピアノ曲。
+鳴る音はすべて録音の 1 音 (サンプラー、新しい声 `PF`)。旋律は各録音の最上声から作った主題。
+
+| 区間 | 内容 |
+|---|---|
+| Preludio | 11:18 の実音 |
+| Rivoluzione (ハ短調, ♩=144) | 属和音 G7♭9 の強打と左手の 16 分音符の奔流 (音階を駆け下り、和音を駆け上がる) → 右手のオクターヴで主題 (11:18, 08:49) |
+| Ponte | G7 → G♯7 と半音ずり上げて嬰ハ短調へ |
+| Fantaisie (嬰ハ短調, ♩=152) | 左手の 3 連符 (根音-5 度-根音-10 度-根音-5 度) に右手の 16 分音符 (4 対 3)、拍の頭が主題 (11:21, 08:53) |
+| Moderato cantabile (変ニ長調, ♩=66) | 11:23 の主題を長調にして歌う、左手は広い分散和音 |
+| ripresa → Coda → Fine | 幻想即興曲が戻り、革命の奔流で強奏 → 低音に歌の旋律が静かに戻り嬰ハ長調で消える |
+
+```bash
+python3 compose_tablet_chopin.py bank6/bank.json score_chopin.json && python3 synth.py score_chopin.json chopin.wav && python3 video.py score_chopin.json chopin.wav chopin.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
