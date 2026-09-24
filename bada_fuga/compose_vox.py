@@ -191,7 +191,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': None, 'tb_label': '歌声 (伸ばした音)',
     'title': 'Requiem BADA — Vox',
-    'subtitle': 'わたしの声のレクイエムとフーガ — 録音から取り出した歌声とピアノ録音のミックス、止まらない柔らかな鼓動 (音はすべて録音から)',
+    'subtitle': 'わたしの声のレクイエムとフーガ — 取り出した歌声とピアノ録音のミックス (音はすべて録音から)',
     'footer': ['Introitus (声だけ) → Kyrie (声と合唱) → Mix (ピアノ録音と声) → Fuga (声の主題) → Agnus Dei (B-A-D-A) → Lux aeterna (長調で安らかに)',
                '歌声は MDX-Net (Kim_Vocal_2) で取り出したもの。合唱の下 2 声は歌声の 1 音、上 2 声・持続音・オスティナート・鼓動はピアノ録音の 1 音。'],
 }
