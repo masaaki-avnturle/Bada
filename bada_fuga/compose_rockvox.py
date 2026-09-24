@@ -22,7 +22,9 @@ import compose_tablet as CT          # ピアノ録音 (argv[1])、主題、移�
 import compose_tablet5 as T5         # 実音の区間、フーガの提示、主題からの和声
 
 add, REC = CT.add, CT.REC
-VB = json.load(open(sys.argv[2]))
+INST = '--instrumental' in sys.argv                          # 声・歌声・コーラスなしの版 (Verse は洗脳的なシンセのリフ)
+ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
+VB = {'recordings': {}, 'samples': []} if INST else json.load(open(ARGS[1]))
 BPM = 80; BAR_S = 240.0 / BPM
 SEMIS = -5                                                   # イ短調 (ニ短調から)。女性的にした歌はハ長調 = イ短調の平行調
 KEYS = {'20260923_080607': -4, '20260923_080918': 2, '20260924_084937': 3, '20260924_085314': 2,
@@ -31,6 +33,8 @@ PIANO = sorted(r for r in REC if r in KEYS)
 MARK = '①②③④⑤⑥⑦'
 BAND = []                                                    # (開始小節, 終了小節, 強さ 0〜2)
 CHOIR = []                                                   # (開始小節, 終了小節) — 後ろのコーラス
+RIFF = []                                                    # (開始小節, 終了小節, 大きさ) — シンセ・リードのリフ
+LOOP = [['Dm'], ['Bb'], ['Gm'], ['A7']]                       # リフの 4 小節の和声 (イ短調で Am - F - Dm - E7) を繰り返す
 VOICE_SRC = {'S': '20260923_080918', 'A': '20260924_085314', 'T': '20260924_084937', 'B': '20260923_080607'}
 
 def hm(r): return '%d/%d %s:%s' % (int(r[4:6]), int(r[6:8]), r[9:11], r[11:13])
@@ -85,7 +89,13 @@ def post(P, events, extras):
             if lv == 2: add('DR', B0 + 2.5, 0.5, 36, 0.6, None, kind='kick')
             for q in (1, 3): add('DR', B0 + q, 0.5, 38, 0.7 if lv == 2 else 0.5, None, kind='snare')
             if lv == 2 and (bar - b0) % 4 == 0: add('DR', B0, 2.0, 49, 0.45, None, kind='crash', pan=-0.2)
-    for b0, b1 in CHOIR:                                                 # 後ろのコーラス: 歌声の 1 音を 3 声で正確に
+    for b0, b1, g in RIFF:                                               # リフ: 8 分音符で 根音・5 度・3 度・5 度 … を毎小節同じ形で
+        for bar in range(b0, b1):
+            for q in range(8):
+                t = bar * BPB + q * 0.5; c = chord(P.harm[int(t)] or 'Dm')
+                pc = [c['root'], c['fifth'], c['third'], c['fifth'], c['root'], c['fifth'], c['third'], c['seventh'] if c['seventh'] is not None else c['fifth']][q]
+                add('LD', t, 0.42, near(pc, 74 if q % 4 == 0 else 71), g * (1.2 if q % 4 == 0 else 1.0), None)
+    for b0, b1 in ([] if INST else CHOIR):                               # 後ろのコーラス: 歌声の 1 音を 3 声で正確に
         for bar in range(b0, b1):
             B0 = bar * BPB
             for half in (0, 2):
@@ -96,7 +106,7 @@ def post(P, events, extras):
 SUBJ_R = []
 
 def build():
-    Q = phrases(); qi = 0
+    Q = phrases() or [(None, {'d': 1.0})]; qi = 0
     def nxt():
         nonlocal qi
         x = Q[qi % len(Q)]; qi += 1; return x
@@ -104,7 +114,8 @@ def build():
     for r in PIANO:
         t0, inside = CT.excerpt(r, KEYS[r], 13.0)
         subj = CT.make_subject(inside, KEYS[r], 60); T5.SUBJ[r] = (subj, CT.harmonize(subj))
-    total = 8 + sum(NB(p) for _, p in v1) + 10 + sum(NB(p) for _, p in v2) + 9 + 6 + 8 + 3
+    VL = 8 if INST else None
+    total = 8 + (VL if INST else sum(NB(p) for _, p in v1)) + 10 + (VL if INST else sum(NB(p) for _, p in v2)) + 9 + 6 + 8 + 3
     P = Piece(total)
     for k in range(total): P.tempo[k] = BPM; P.dyn[k] = 0.75
     # ---------------- Intro
@@ -119,8 +130,13 @@ def build():
     b = 8
     # ---------------- Verse I
     s0 = b
-    P.section(b, 'Verse I — わたしの声', '歌声は残響をかけず乾いたきれいな声で、大げさにせず女性的に — 和音は歌声の音に合わせて 1 小節ごとに')
-    for r, p in v1: b += voice(P, b, r, p)
+    if INST:
+        P.section(b, 'Verse I — リフ', 'シンセのリフが毎小節同じ形を刻み、Am - F - Dm - E7 の 4 小節が回り続ける')
+        for k in range(VL): P.set_harms(b + k, [LOOP[k % 4] * 4])
+        RIFF.append((b, b + VL, 0.15)); b += VL
+    else:
+        P.section(b, 'Verse I — わたしの声', '歌声は残響をかけず乾いたきれいな声で、大げさにせず女性的に — 和音は歌声の音に合わせて 1 小節ごとに')
+        for r, p in v1: b += voice(P, b, r, p)
     for v in VOICES: P.rest_bars(v, s0, b)
     BAND.append((s0, b, 1)); CT.LAYOUT.append((s0, b, SEMIS, VOICE_SRC, {}))
     # ---------------- Chorus I — Fuga
@@ -128,12 +144,17 @@ def build():
     P.section(b, 'Chorus I — Fuga 〈%s〉' % hm(rf), '9/23 08:09 の旋律の 4 声フーガ (タブレットのピアノの音) — ギター、後ろのコーラス (歌声の 3 声)')
     T5.expo(P, b, rf, '①'); P.set_harms(b + 8, [['Gm', 'Gm', 'A7', 'A7'], ['Dm']])
     for k in range(10): P.dyn[b + k] = 0.8
-    BAND.append((b, b + 10, 2)); CHOIR.append((b + 2, b + 10)); CT.LAYOUT.append((s0, b + 10, SEMIS, {v: rf for v in VOICES}, {}))
+    BAND.append((b, b + 10, 2)); CHOIR.append((b + 2, b + 10)); RIFF.append((b, b + 10, 0.07)) if INST else None; CT.LAYOUT.append((s0, b + 10, SEMIS, {v: rf for v in VOICES}, {}))
     b += 10
     # ---------------- Verse II
     s0 = b
-    P.section(b, 'Verse II — わたしの声', '歌声とバンド — 同じ刻みが回り続ける')
-    for r, p in v2: b += voice(P, b, r, p)
+    if INST:
+        P.section(b, 'Verse II — リフ', '同じリフと同じ 4 小節がもう一度 — 刻みは一度も止まらない')
+        for k in range(VL): P.set_harms(b + k, [LOOP[k % 4] * 4])
+        RIFF.append((b, b + VL, 0.15)); b += VL
+    else:
+        P.section(b, 'Verse II — わたしの声', '歌声とバンド — 同じ刻みが回り続ける')
+        for r, p in v2: b += voice(P, b, r, p)
     for v in VOICES: P.rest_bars(v, s0, b)
     BAND.append((s0, b, 1)); CT.LAYOUT.append((s0, b, SEMIS, VOICE_SRC, {}))
     # ---------------- Chorus II — 7 本の旋律
@@ -168,7 +189,9 @@ def build():
         for j in range(2): P.place('B', bb + j, H.DRONE_BAR, 0, None)
     P.hold.update(range(b, b + 8))
     t = b + 1
-    for r, p in last: t += voice(P, t, r, p, gain=1.3, harm=False) + 1
+    if INST: RIFF.append((b, b + 8, 0.11))
+    else:
+        for r, p in last: t += voice(P, t, r, p, gain=1.3, harm=False) + 1
     BAND.append((b, b + 8, 2)); CHOIR.append((b, b + 8)); CT.LAYOUT.append((m0, b + 8, SEMIS, VOICE_SRC, {}))
     b += 8
     P.set_harms(b, [['D']] * 3); P.hold.update(range(b, b + 3))
@@ -194,10 +217,17 @@ def merged_bank(path):
     json.dump({'recordings': {}, 'samples': pb['samples'] + VB['samples']}, open(path, 'w'), ensure_ascii=False)
     return path
 
+if INST:
+    META.update({'title': 'Requiem BADA — Rock (Instrumental)', 'tb_label': 'タブレット録音 (実音)',
+                 'subtitle': '声を消した版 — タブレットのピアノとシンセとロックバンドの、洗脳的なレクイエムとフーガ',
+                 'legend': ['TB', 'LD', 'PD', 'SB', 'GT'],
+                 'footer': ['Intro (ピアノ録音 11:23) → Verse I (リフ) → Chorus I (08:09 のフーガ) → Verse II (リフ) → Chorus II (7 本の旋律) → Bridge (08:09 の実音) → Mantra → イ長調',
+                            '声・歌声・コーラスはなし。Verse はシンセのリフが毎小節同じ形を刻む。4 声とピアノの刻みはタブレットのピアノの 1 音、ドラム・ベース・ギター・パッドは合成。']})
+
 if __name__ == '__main__':
-    out = sys.argv[3] if len(sys.argv) > 3 else 'score_rockvox.json'
+    out = (ARGS[1] if INST else ARGS[2]) if len(ARGS) > (1 if INST else 2) else 'score_rockvox.json'
     META['bank'] = merged_bank(os.path.join(os.path.dirname(os.path.abspath(out)), 'bank_rockvox.json'))
-    META['rec_order'] = PIANO + ['VOXF']
+    META['rec_order'] = PIANO + ([] if INST else ['VOXF'])
     compose.main(out, seed=67, bpm=BPM, builder=build, meta=META, extras=CT.extras, post=post)
     CT.finish(out)
     for r in PIANO: print(r, 'subject', ' '.join('%s:%g' % (name_of(m), d) for d, m in T5.SUBJ[r][0]))

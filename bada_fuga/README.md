@@ -596,6 +596,9 @@ python3 compose_vox.py bank6/bank.json vbank/bank.json score_vox.json && python3
 | Bridge | 08:09 の実音、キックだけ |
 | Mantra | B-A-D-A ×4 (コーラスと 4 声)、バンド全開、歌声 → イ長調 |
 
+- **Instrumental 版** (`--instrumental`): 声・歌声・コーラスを消し、Verse はシンセのリフが毎小節同じ形を刻み
+  Am - F - Dm - E7 の 4 小節が回り続ける洗脳的な版 (約 3 分)。`python3 compose_rockvox.py bank7/bank.json score_rockinst.json --instrumental`
+
 ```bash
 python3 feminize_voice.py voice/voice.json fem 0 12 1.12 -- 20250108_201532 20250108_200038
 python3 voice_bank.py fem/voice.json fbank --tag=VOXF
