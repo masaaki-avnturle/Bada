@@ -111,7 +111,8 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     RCOL = {}
     if meta.get('style') == 'recsampler':
         COL.update({'TB': (110, 210, 250), 'OS': (200, 200, 215), 'DN': (130, 100, 160), 'PK': (235, 70, 90), 'PF': (220, 220, 230),
-                    'BV': (250, 170, 200), 'LD': (255, 230, 120), 'PD': (120, 110, 170), 'SB': (90, 200, 255), 'GT': (240, 120, 60), 'DR': (235, 70, 90)})
+                    'BV': (250, 170, 200), 'LD': (255, 230, 120), 'PD': (120, 110, 170), 'SB': (90, 200, 255), 'GT': (240, 120, 60), 'DR': (235, 70, 90), 'GL': (200, 235, 255), 'SUB': (110, 90, 200)})
+        VNAME.update({'GL': 'シンセ (高音)', 'SUB': 'シンセ (低音)'})
         VNAME.update({'BV': 'コーラス (歌声)', 'LD': 'シンセ・リード', 'PD': 'シンセ・パッド', 'SB': 'シンセ・ベース', 'GT': 'ギター'})
         VNAME.update({'TB': meta.get('tb_label', 'タブレット録音 (実音)'), 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
@@ -168,7 +169,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
+        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70, 'GL': 120, 'SUB': 120}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
     circ = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯'
     many = len(RCOL) > 5 or lx + 132 * len(RCOL) > W - 20   # 録音が多い (入りきらない) ときは録音の凡例を 2 段目に
     if many: lx = 30

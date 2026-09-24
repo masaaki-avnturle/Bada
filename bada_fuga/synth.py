@@ -407,6 +407,20 @@ def rock_drum(kind, vel=0.8, freq=110.0, sr=SR):
         y = np.tanh(1.4 * y)
     return (y / (np.abs(y).max() + 1e-9)).astype(np.float32) * vel
 
+def glass_tone(freq, dur, vel=0.08, sr=SR):
+    """やさしい高音のシンセ (ガラスのような): 正弦波 + 少しの 2 倍・3 倍音、柔らかい立ち上がりと長い減衰"""
+    n = int((dur + 1.8) * sr); t = np.arange(n, dtype=np.float32) / sr
+    y = np.sin(2 * np.pi * freq * t) + 0.18 * np.sin(2 * np.pi * freq * 2.0 * t) * np.exp(-t * 3) + 0.06 * np.sin(2 * np.pi * freq * 3.01 * t) * np.exp(-t * 5)
+    y *= np.minimum(1, t / 0.012) * np.exp(-t / 1.1)
+    return (y * vel).astype(np.float32)
+
+def sub_tone(freq, dur, vel=0.18, sr=SR):
+    """やさしい低音のシンセ: 正弦波と少しの 2 倍音、ゆっくり立ち上がりゆっくり消える"""
+    n = int((dur + 1.2) * sr); t = np.arange(n, dtype=np.float32) / sr
+    y = np.sin(2 * np.pi * freq * t) + 0.12 * np.sin(2 * np.pi * freq * 2 * t)
+    y *= env(n, 0.35, 1.1, sr)
+    return (y * vel).astype(np.float32)
+
 def synth_bass(freq, dur, vel=0.6, sr=SR):
     """シンセ・ベース: 鋸歯波 2 本 + 矩形の低音、フィルターが開いてすぐ閉じる。キックに合わせて頭を少し沈める (ポンピング)"""
     n = int((dur + 0.08) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -616,7 +630,7 @@ def main(score='score.json', out='fuga.wav'):
         if recs:
             vel = 0.55 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
             y = sampler_tone(nt['m'], max(0.2, nt['d'] * 0.97), vel, nt.get('src', ''))
-            if nt['v'] == 'B':                                    # 低音は 1 オクターヴ下の柔らかい正弦波で支える
+            if nt['v'] == 'B' and not _BANK['decay']:            # 低音は 1 オクターヴ下の柔らかい正弦波で支える (減衰させる時は足さない)
                 tt = np.arange(len(y), dtype=np.float32) / SR
                 y = y + 0.35 * vel * np.sin(2 * np.pi * freq / 2 * tt) * np.minimum(1, tt / 0.05) * np.minimum(1, np.maximum(0, (nt['d'] + 0.3 - tt) / 0.3))
         elif mantra:
@@ -703,6 +717,11 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl * 0.8; HR[i0:i1] += y[:i1 - i0] * cr * 0.8
             L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
+            continue
+        if recs and ex['v'] in ('GL', 'SUB'):               # やさしいシンセ: 高音のガラス / 低音の正弦波
+            y = glass_tone(freq, ex['d'], ex.get('gain', 0.08)) if ex['v'] == 'GL' else sub_tone(freq, ex['d'], ex.get('gain', 0.18))
+            pan = ex.get('pan', 0.0); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
         if recs and ex['v'] in ('PD', 'LD'):                # シンセサイザー: パッドとリード
             y = pad_tone(freq, ex['d'], ex.get('gain', 0.1)) if ex['v'] == 'PD' else lead_tone(freq, ex['d'], ex.get('gain', 0.2))

@@ -648,6 +648,18 @@ VIII から、電車の警笛のように聞こえる「伸ばしたまま鳴り
 python3 compose_tablet9.py bank8/bank.json score_tablet9.json && python3 synth.py score_tablet9.json tablet9.wav && python3 video.py score_tablet9.json tablet9.wav tablet9.mp4
 ```
 
+## 🎹✨ Requiem BADA — Tablet Sessions X · Alto e basso (ホ短調 → 変ロ短調 → ヘ短調 → ヘ長調, ♩=60, 約 5 分 20 秒)
+
+IX から、近い音を上下する警笛のようなオスティナートを外し、2026-09-23 / 09-24 のピアノ録音 6 本 (ピアノとシンセの 11:21 は除く) の
+実音とそのレクイエムとフーガに、高音と低音が大きく離れたやさしいシンセサイザーを重ねた版。
+- 高音 (`GL`, ガラスのような柔らかい正弦波): 大きく跳ぶ分散和音を毎小節同じ形で (隣り合う音へは動かない)。実音の区間では 1・3 拍目だけ
+- 低音 (`SUB`, やさしい正弦波): 和音の根音をゆっくり。中音域に実音のピアノと 4 声 (自然に減衰)
+- `synth.py`: `glass_tone` / `sub_tone`。`piano_decay` のときはバスの 1 オクターヴ下の持続する正弦波を足さない (伸び続ける低音をなくす)
+
+```bash
+python3 compose_tablet10.py bank7/bank.json score_tablet10.json && python3 synth.py score_tablet10.json tablet10.wav && python3 video.py score_tablet10.json tablet10.wav tablet10.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
