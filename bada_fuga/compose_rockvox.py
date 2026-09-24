@@ -183,7 +183,8 @@ def build():
     b += 6
     # ---------------- Mantra → イ長調
     m0 = b
-    P.section(b, 'Mantra — B-A-D-A', 'B-A-D-A を 4 回、コーラスと 4 声で — バンド全開、歌声が重なる → イ長調の和音で終わる')
+    P.section(b, 'Mantra — B-A-D-A', 'B-A-D-A を 4 回、4 声とリフで — バンド全開 → イ長調の和音で終わる' if INST else
+              'B-A-D-A を 4 回、コーラスと 4 声で — バンド全開、歌声が重なる → イ長調の和音で終わる')
     for k in range(4):
         bb = b + 2 * k; P.set_harms(bb, H.MANTRA_PROG); P.place('A', bb, H.BADA, 0, 'B-A-D-A' if k == 0 else None)
         for j in range(2): P.place('B', bb + j, H.DRONE_BAR, 0, None)
