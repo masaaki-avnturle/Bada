@@ -549,6 +549,33 @@ python3 compose_tablet6.py bank6/bank.json score_tablet6.json && python3 synth.p
 python3 compose_tablet_chopin.py bank6/bank.json score_chopin.json && python3 synth.py score_chopin.json chopin.wav && python3 video.py score_chopin.json chopin.wav chopin.mp4
 ```
 
+## 🎤 Requiem BADA — Vox (わたしの声のレクイエムとフーガ, イ短調, ♩=60, 約 4 分)
+
+2025 年の録音 9 本 (01-08 と 04-20 の歌) から**作曲者の歌声を取り出し**、2026-09-24 のタブレットのピアノ録音 5 本とミックスした、
+洗脳的で安心感のあるレクイエムとフーガ。♩=60 (安静時の心拍) の柔らかい鼓動が最後まで止まらない。
+(録音・取り出した歌声・mp4 は個人の録音なのでリポジトリに入れていない)
+
+- `extract_voice.py`: UVR の MDX-Net ボーカル分離モデル (Kim_Vocal_2.onnx, GitHub の model_repo から) を onnxruntime で動かし、
+  numpy/librosa の STFT で歌声を取り出す。歌っている区間 (フレーズ) と音高を測る。2026 年のピアノ録音には歌声はなかった。
+- `voice_bank.py`: 歌声の伸ばした音 (±0.3 半音以内に 0.35 秒以上) を切り出して歌声のサンプラーにする (rid `VOX`)。
+- `compose_vox.py`: 歌声の音の分布から調を決め (歌は長調 → 平行短調でレクイエム)、録音ごとに速さを変えずに移調してそろえる。
+  合唱の下 2 声は歌声の 1 音 = 作曲者の声の合唱、上 2 声・持続音・オスティナート・鼓動はピアノ録音の 1 音。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 歌声だけ (持続音と鼓動の上で) |
+| Kyrie | 歌声の音に合う和音を 1 小節ごとに選び、合唱が全音符で包む |
+| Mix | タブレットのピアノ録音の実音に歌声が重なる |
+| Fuga | 歌声から作った主題の 4 声フーガ (テノールとバスは歌声で歌う) |
+| Sanctus | 歌声のフレーズが次々に、下でオスティナート |
+| Agnus Dei → Lux aeterna | B-A-D-A と歌声 → 最後の歌声 → 長調の和音で安らかに |
+
+```bash
+python3 extract_voice.py Kim_Vocal_2.onnx voice 2025-01-08_*.wav 2025-04-20_*.wav recording_20250108-144205*.mp3
+python3 voice_bank.py voice/voice.json vbank
+python3 compose_vox.py bank6/bank.json vbank/bank.json score_vox.json && python3 synth.py score_vox.json vox.wav && python3 video.py score_vox.json vox.wav vox.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

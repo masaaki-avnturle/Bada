@@ -727,6 +727,8 @@ def main(score='score.json', out='fuga.wav'):
             if ex.get('pshift'):                            # 速さを変えない移調 (歌声)
                 import librosa
                 y = librosa.effects.pitch_shift(y, sr=SR, n_steps=ex['pshift']).astype(np.float32)
+            if 'pshift' in ex:                              # 歌声: 子音などの突出したピークだけを柔らかく抑える
+                lim = 4.0 * float(np.sqrt((y ** 2).mean()) + 1e-9); y = (lim * np.tanh(y / lim)).astype(np.float32)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N); dl = int(0.009 * SR)
             L[i0:i1] += y[:i1 - i0] * 0.707
             j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707
