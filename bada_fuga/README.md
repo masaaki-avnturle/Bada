@@ -636,6 +636,18 @@ Tablet Sessions VII から、シンセサイザーの「正義の味方」のよ
 python3 compose_tablet8.py bank8/bank.json score_tablet8.json && python3 synth.py score_tablet8.json tablet8.wav && python3 video.py score_tablet8.json tablet8.wav tablet8.mp4
 ```
 
+## 🌀🎹 Requiem BADA — Tablet Sessions IX · Ipnotico (警笛のような持続音を消した版, 約 4 分 30 秒)
+
+VIII から、電車の警笛のように聞こえる「伸ばしたまま鳴り続ける和音・持続音」を消した版。
+サンプラーはピアノ録音の 1 音の持続部をループで伸ばすため、長い音や和音がオルガンや警笛のように鳴り続けていた。
+- 低い持続音 (`DN`) をなくし、サンプラーの音はループで伸ばさずピアノのように自然に減衰させる (`synth.py` の meta `piano_decay`、ここでは 1.4 秒)
+- 調の変わり目と最後の全音符の和音 → 自然に消えていくピアノの分散和音 (`PF`)
+- 実音の区間の下で和音を伸ばす 4 声をなくし、実音だけを流す (鼓動とオスティナートは残す)
+
+```bash
+python3 compose_tablet9.py bank8/bank.json score_tablet9.json && python3 synth.py score_tablet9.json tablet9.wav && python3 video.py score_tablet9.json tablet9.wav tablet9.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

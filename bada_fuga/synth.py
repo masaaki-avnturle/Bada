@@ -458,7 +458,7 @@ def overtone_tone(freq, dur, vel, t0, kmax=28, a=0.12, r=0.7, sr=SR):
         out += w * np.sin(k * ph + 0.7 * k)
     return out * env(n, a, r, sr) * vel / 2.2
 
-_BANK = {'samples': [], 'audio': {}}
+_BANK = {'samples': [], 'audio': {}, 'decay': 0.0}
 def load_bank(path):
     """build_sampler.py が作った録音の 1 音サンプル集"""
     _BANK['samples'] = json.load(open(path))['samples']; _BANK['audio'] = {}
@@ -484,6 +484,8 @@ def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
     i0 = int(dur * sr); t = np.arange(n_out - i0, dtype=np.float32) / sr
     y[i0:] *= np.exp(-t / (rel / 3))
     y[:int(0.004 * sr)] *= np.linspace(0, 1, int(0.004 * sr))
+    if _BANK['decay'] and not vox:                        # ピアノのように自然に減衰させる (ループで伸ばした持続音を残さない)
+        y *= np.exp(-np.arange(len(y), dtype=np.float32) / (sr * _BANK['decay']))
     return y * vel
 
 _SAMPLES = {}
@@ -572,7 +574,7 @@ def main(score='score.json', out='fuga.wav'):
     acc = style == 'acceptance'
     mantra = style == 'mantra'
     recs = style == 'recsampler'
-    if recs: load_bank(d['meta']['bank'])
+    if recs: load_bank(d['meta']['bank']); _BANK['decay'] = float(d['meta'].get('piano_decay', 0.0))
     global _BEAT_GRID
     if d.get('bar_times'):
         bts = np.array(d['bar_times']); nb = len(bts) - 1
