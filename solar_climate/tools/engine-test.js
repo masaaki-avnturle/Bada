@@ -200,5 +200,32 @@ near(SC.fracWhere(ep, v => v >= 1), 2 / 3, 1e-12, "メンバー割合 = 確率")
 ok(SC.ensembleDaily(hourly, "precipitation", "2030-01-01", "sum").length === 0, "該当日なしは空");
 ok(SC.wmoText(71) === "弱い雪" && SC.wmoText(1234) === "コード 1234", "WMO コード");
 
+/* 8. 地域検索 / 複数地点 */
+const gu = SC.geocodeUrl(" 北海道 ", "jp");
+ok(gu.includes("name=%E5%8C%97%E6%B5%B7%E9%81%93&") || gu.endsWith("name=%E5%8C%97%E6%B5%B7%E9%81%93&countryCode=JP"), "地名は trim + URL エンコード");
+ok(gu.includes("countryCode=JP") && gu.includes("count=10") && gu.includes("language=ja"), "国コード・件数・言語");
+ok(!SC.geocodeUrl("Paris", "").includes("countryCode") && !SC.geocodeUrl("Paris", "x;y").includes("countryCode"), "全世界 / 不正な国コードは付けない");
+const geo = SC.parseGeocode({ results: [
+  { name: "札幌市", latitude: 43.06, longitude: 141.35, country: "日本", country_code: "JP", admin1: "北海道", admin2: "札幌市", feature_code: "PPLA", population: 1973395, elevation: 29 },
+  { name: "Yorkshire", latitude: 54, longitude: -1.5, country: "イギリス", country_code: "GB", admin1: "England", feature_code: "ADM2" },
+  { name: "bad", latitude: null, longitude: 1 }
+] });
+ok(geo.length === 2, "座標のない結果は除外");
+ok(geo[0].region === "北海道" && geo[0].kind === "州都・県庁所在地" && geo[0].pop === 1973395, "地域名 (地名と同じ admin2 は省く)・種類・人口");
+ok(geo[0].label === "日本 · 北海道 · 札幌市", "ラベル = 国 · 地域 · 地名");
+ok(geo[1].kind === "郡・地方" && geo[1].label === "イギリス · England · Yorkshire", "行政区画の検索");
+ok(SC.parseGeocode({}).length === 0 && SC.parseGeocode(null).length === 0, "結果なし");
+const pts = [{ lat: 35.68, lon: 139.69 }, { lat: 34.69, lon: 135.5 }];
+const mu = SC.multiForecastUrl(pts);
+ok(mu.includes("latitude=35.68,34.69") && mu.includes("longitude=139.69,135.5") && mu.includes("forecast_days=3"), "複数地点 URL");
+const day = t => ({ daily: { time: ["2026-09-25", "2026-09-26"], weather_code: [0, 61], temperature_2m_max: [25, t], temperature_2m_min: [18, null],
+  precipitation_sum: [0, 5], precipitation_probability_max: [10, 80] } });
+const pm = SC.parseMulti([day(22), day(27)], pts);
+ok(pm.length === 2 && pm[1].days[1].tmax === 27 && isNaN(pm[0].days[1].tmin) && pm[0].days[1].pp === 80, "複数地点の配列応答");
+const p1 = SC.parseMulti(day(20), [pts[0]]);
+ok(p1.length === 1 && p1[0].days.length === 2, "1 地点ならオブジェクト応答");
+ok(SC.parseMulti([day(1)], pts)[1].days.length === 0, "欠けた地点は空");
+ok(SC.wmoIcon(0) === "☀️" && SC.wmoIcon(73) === "❄️" && SC.wmoIcon(63) === "🌧️" && SC.wmoIcon(95) === "⛈️" && SC.wmoIcon(3) === "☁️", "天気アイコン");
+
 console.log(`SolarCast engine tests: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

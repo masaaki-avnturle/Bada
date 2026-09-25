@@ -54,6 +54,10 @@ button.act{background:var(--accent);border-color:var(--accent);color:#fff;cursor
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 svg{display:block;width:100%;height:auto}
 .good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.hit{display:flex;justify-content:space-between;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:7px 10px;margin:4px 0;cursor:pointer;font:inherit}
+.hit:hover,.hit:focus{border-color:var(--accent)}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:99px;padding:2px 10px;cursor:pointer;font:inherit;font-size:12px}
+tr.pick{cursor:pointer} tr.pick:hover td{background:var(--accent-soft)}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
 .scotoma{background:repeating-linear-gradient(45deg,transparent 0 6px,rgba(127,127,127,.12) 6px 12px)}
 footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
@@ -97,12 +101,22 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
 <!-- ============ 地域の予報 ============ -->
 <section class="tab" id="tab-region">
   <div class="card">
+    <h3 style="margin-top:0">🔎 国の地域の天気を検索</h3>
+    <form class="row" id="search-form" autocomplete="off">
+      <select id="search-cc" aria-label="国で絞り込む"></select>
+      <input id="region-search" placeholder="市・町・県・州の名前 (例: 北海道, Yorkshire, Texas)" size="30" aria-label="地域名">
+      <button class="act" id="region-go" type="submit">検索</button>
+    </form>
+    <div id="search-results" class="small"></div>
+    <div id="search-recent" class="row small"></div>
+  </div>
+  <div class="card">
     <div class="row">
       <select id="region-country"></select>
       <select id="region-city"></select>
-      <input id="region-search" placeholder="都市名で検索 (例: Reykjavik)" size="22">
-      <button class="act" id="region-go">検索</button>
+      <button class="act" id="region-list">この国の地域を一覧</button>
     </div>
+    <div id="region-overview" class="small"></div>
     <div class="row">
       <label class="small">予測したい日: <input type="date" id="region-date"></label>
       <button class="act" id="region-predict">この日を予測</button>
@@ -487,7 +501,58 @@ var SC = (function(){
     85:"にわか雪", 86:"強いにわか雪", 95:"雷雨", 96:"雹を伴う雷雨", 99:"強い雹を伴う雷雨" };
   function wmoText(c){ return WMO[c] || (c == null ? "—" : "コード " + c); }
 
+  /* ---- 地域検索 (Open-Meteo Geocoding) ---- */
+  function geocodeUrl(q, cc, lang){
+    var u = "https://geocoding-api.open-meteo.com/v1/search?count=10&format=json&language=" +
+      encodeURIComponent(lang || "ja") + "&name=" + encodeURIComponent(String(q).trim());
+    if (cc && /^[A-Za-z]{2}$/.test(cc)) u += "&countryCode=" + cc.toUpperCase();
+    return u;
+  }
+  /* 結果を「地名 · 地域 (都道府県/州) · 国」に整形。行政区画 (ADM1 など) は種類も付ける */
+  var FEATURE = { ADM1: "州・都道府県", ADM2: "郡・地方", ADM3: "市区町村", PPLC: "首都", PPLA: "州都・県庁所在地", PPLA2: "主要都市" };
+  function parseGeocode(json){
+    var rs = (json && json.results) || [];
+    return rs.filter(function(r){ return r && typeof r.latitude === "number" && typeof r.longitude === "number" && isFinite(r.latitude) && isFinite(r.longitude); }).map(function(r){
+      var region = [r.admin1, r.admin2].filter(function(v, i, a){ return v && v !== r.name && a.indexOf(v) === i; });
+      return {
+        name: r.name, lat: +r.latitude, lon: +r.longitude,
+        region: region.join(" · "), country: r.country || r.country_code || "",
+        cc: r.country_code || "", kind: FEATURE[r.feature_code] || "",
+        pop: r.population || 0, elev: r.elevation,
+        label: [r.country || r.country_code, region[0], r.name].filter(Boolean).join(" · ")
+      };
+    });
+  }
+  /* 複数地点の予報: Open-Meteo は座標をカンマ区切りで渡すと配列で返す (1 地点ならオブジェクト) */
+  function multiForecastUrl(points){
+    return "https://api.open-meteo.com/v1/forecast?latitude=" + points.map(function(p){ return p.lat; }).join(",") +
+      "&longitude=" + points.map(function(p){ return p.lon; }).join(",") +
+      "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max&forecast_days=3&timezone=auto";
+  }
+  function parseMulti(json, points){
+    var arr = Array.isArray(json) ? json : [json];
+    return points.map(function(p, i){
+      var d = arr[i] && arr[i].daily;
+      if (!d) return { place: p, days: [] };
+      return { place: p, days: (d.time || []).map(function(t, k){
+        return { date: t, code: d.weather_code[k], tmax: num(d.temperature_2m_max, k), tmin: num(d.temperature_2m_min, k),
+                 pr: num(d.precipitation_sum, k), pp: d.precipitation_probability_max ? d.precipitation_probability_max[k] : null };
+      }) };
+    });
+  }
+  function wmoIcon(c){
+    if (c === 0 || c === 1) return "☀️";
+    if (c === 2) return "⛅";
+    if (c === 3) return "☁️";
+    if (c === 45 || c === 48) return "🌫️";
+    if (c >= 95) return "⛈️";
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "❄️";
+    if (c >= 51 && c <= 82) return "🌧️";
+    return "·";
+  }
+
   return {
+    geocodeUrl: geocodeUrl, parseGeocode: parseGeocode, multiForecastUrl: multiForecastUrl, parseMulti: parseMulti, wmoIcon: wmoIcon,
     gammaFn: gammaFn, gammaCheck: gammaCheck, jonesAbs: jonesAbs, heatTheta: heatTheta, jonesHeat: jonesHeat,
     flareClass: flareClass, flareIndex: flareIndex, parseXrays: parseXrays, parseKp: parseKp, kpLabel: kpLabel,
     parseDailySolar: parseDailySolar, parseOutlook: parseOutlook,
@@ -776,15 +841,87 @@ function predictDate(){
 $("region-city").addEventListener("change", function(){ loadRegion(selected($("region-country"), $("region-city"))); });
 $("region-country").addEventListener("change", function(){ loadRegion(selected($("region-country"), $("region-city"))); });
 $("region-predict").addEventListener("click", predictDate);
-$("region-go").addEventListener("click", function(){
-  var q = $("region-search").value.trim();
-  if (!q) return;
-  getJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&language=ja&name=" + encodeURIComponent(q)).then(function(j){
-    var r = j.results && j.results[0];
-    if (!r){ $("region-result").textContent = "見つかりませんでした: " + q; return; }
-    loadRegion({ name: (r.country || "") + " · " + r.name, lat: r.latitude, lon: r.longitude });
-  }).catch(function(e){ $("region-result").textContent = "検索できませんでした: " + e.message; });
+
+/* ---------- 🔎 国の地域の検索 ---------- */
+var COUNTRIES = [["", "全世界"], ["JP", "日本"], ["GB", "イギリス"], ["US", "アメリカ"], ["CA", "カナダ"], ["FR", "フランス"],
+  ["DE", "ドイツ"], ["IT", "イタリア"], ["ES", "スペイン"], ["PT", "ポルトガル"], ["NL", "オランダ"], ["IE", "アイルランド"],
+  ["NO", "ノルウェー"], ["SE", "スウェーデン"], ["FI", "フィンランド"], ["IS", "アイスランド"], ["CH", "スイス"], ["AT", "オーストリア"],
+  ["PL", "ポーランド"], ["RU", "ロシア"], ["TR", "トルコ"], ["CN", "中国"], ["KR", "韓国"], ["TW", "台湾"], ["HK", "香港"],
+  ["TH", "タイ"], ["VN", "ベトナム"], ["PH", "フィリピン"], ["ID", "インドネシア"], ["IN", "インド"], ["AE", "アラブ首長国連邦"],
+  ["AU", "オーストラリア"], ["NZ", "ニュージーランド"], ["BR", "ブラジル"], ["AR", "アルゼンチン"], ["MX", "メキシコ"],
+  ["EG", "エジプト"], ["ZA", "南アフリカ"], ["KE", "ケニア"]];
+$("search-cc").innerHTML = COUNTRIES.map(function(c){ return '<option value="' + c[0] + '"' + (c[0] === "JP" ? " selected" : "") + ">" + c[1] + "</option>"; }).join("");
+var RECENT_KEY = "solarcast.recent";
+function loadRecent(){ try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch (e){ return []; } }
+function saveRecent(p){
+  var list = loadRecent().filter(function(x){ return x.name !== p.name; });
+  list.unshift({ name: p.name, lat: p.lat, lon: p.lon });
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 8))); } catch (e){}
+  renderRecent();
+}
+function renderRecent(){
+  var list = loadRecent();
+  $("search-recent").innerHTML = list.length ? '<span class="muted">最近:</span>' + list.map(function(x, i){
+    return '<button class="chip" data-recent="' + i + '">' + esc(x.name) + "</button>"; }).join("") : "";
+}
+$("search-recent").addEventListener("click", function(e){
+  var b = e.target.closest("[data-recent]");
+  if (b){ var x = loadRecent()[+b.dataset.recent]; if (x) loadRegion(x); }
 });
+var hits = [];
+$("search-form").addEventListener("submit", function(e){
+  e.preventDefault();
+  var q = $("region-search").value.trim(), cc = $("search-cc").value;
+  if (!q){ $("search-results").textContent = "地名を入力してください。"; return; }
+  $("search-results").textContent = "検索中…";
+  getJSON(SC.geocodeUrl(q, cc)).then(function(j){
+    hits = SC.parseGeocode(j);
+    if (!hits.length){
+      $("search-results").innerHTML = '<span class="muted">見つかりませんでした: ' + esc(q) + (cc ? "(国の絞り込みを「全世界」にすると見つかる場合があります。英語表記も試してください)" : "") + "</span>";
+      return;
+    }
+    if (hits.length === 1){ pickHit(0); }
+    $("search-results").innerHTML = hits.map(function(h, i){
+      return '<button class="hit" data-hit="' + i + '"><span><b>' + esc(h.name) + "</b>" + (h.kind ? ' <span class="pill">' + h.kind + "</span>" : "") +
+        '<br><span class="muted">' + esc([h.region, h.country].filter(Boolean).join(" · ")) + "</span></span>" +
+        '<span class="muted">' + (h.pop ? "人口 " + h.pop.toLocaleString() : "") + (h.elev != null ? "<br>標高 " + Math.round(h.elev) + " m" : "") + "</span></button>";
+    }).join("");
+  }).catch(function(e){ $("search-results").textContent = "検索できませんでした: " + e.message; });
+});
+function pickHit(i){
+  var h = hits[i]; if (!h) return;
+  var p = { name: h.label, lat: h.lat, lon: h.lon };
+  saveRecent(p);
+  loadRegion(p);
+  var fc = $("region-forecast"); if (fc.scrollIntoView) fc.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+$("search-results").addEventListener("click", function(e){
+  var b = e.target.closest("[data-hit]");
+  if (b) pickHit(+b.dataset.hit);
+});
+renderRecent();
+
+/* ---------- 国内の地域を一覧 (複数地点を 1 回の API で取得) ---------- */
+function regionOverview(){
+  var country = $("region-country").value;
+  var pts = REGIONS[country].map(function(c){ return { name: country + " · " + c[0], short: c[0], lat: c[1], lon: c[2] }; });
+  $("region-overview").textContent = "取得中…";
+  return getJSON(SC.multiForecastUrl(pts)).then(function(j){
+    var rows = SC.parseMulti(j, pts), dates = (rows[0] && rows[0].days.map(function(d){ return d.date; })) || [];
+    var names = ["今日", "明日", "明後日"];
+    $("region-overview").innerHTML = '<div class="scroll"><table><tr><th>地域</th>' + dates.map(function(d, i){ return "<th>" + (names[i] || "") + " " + d.slice(5) + "</th>"; }).join("") + "</tr>" +
+      rows.map(function(r, i){
+        return '<tr class="pick" data-pt="' + i + '"><td>' + esc(r.place.short) + "</td>" + r.days.map(function(d){
+          return "<td>" + SC.wmoIcon(d.code) + " " + f1(d.tmax) + " / " + f1(d.tmin) + "°" + (d.pp != null ? ' <span class="muted">' + d.pp + "%</span>" : "") + "</td>";
+        }).join("") + "</tr>";
+      }).join("") + '</table></div><p class="muted small">最高 / 最低 °C と降水確率。行を押すとその地域の 16 日予報を表示します。</p>';
+    $("region-overview").onclick = function(e){
+      var tr = e.target.closest("[data-pt]");
+      if (tr){ $("region-city").value = tr.dataset.pt; loadRegion(pts[+tr.dataset.pt]); }
+    };
+  }).catch(function(e){ $("region-overview").textContent = "取得できませんでした: " + e.message; });
+}
+$("region-list").addEventListener("click", regionOverview);
 
 /* ---------- 🎄 英国クリスマス ---------- */
 $("xmas-city").innerHTML = UK_CITIES.map(function(c, i){ return '<option value="' + i + '">' + c[0] + "</option>"; }).join("");
