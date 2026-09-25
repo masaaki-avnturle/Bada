@@ -761,6 +761,20 @@ Introitus (持続音) → Kyrie: Fuga I (08:53, バッハ風) → Lacrimosa: Fug
 python3 compose_tablet18.py bank17.json score_tablet18.json && python3 synth.py score_tablet18.json tablet18.wav && python3 video.py score_tablet18.json tablet18.wav tablet18.mp4
 ```
 
+## 🎹🌟 Requiem BADA — Tablet Sessions XIX · Pastorale della Natività (ト短調 / ト長調, ♩=66, 約 4 分 40 秒)
+
+XVIII から、シンセサイザーの全音 (4 声・持続音) を**実録音のピアノ一色** (9/23・9/24 の録音から切り出した 1 音、自然に減衰) に置き換え、
+「悲しみの正義の味方」のような勇ましい旋律を消して、曲調をキリスト生誕を哀れみで描く**牧歌 (パストラーレ)** に書き換えた版。
+- `gentle()`: 主題の 5 半音より大きな跳躍をオクターヴに畳んでなだらかにし、同じ長さの 2 音をシチリアーナの長短 (1.5 + 0.5) に
+- 低音で開いた 5 度 (羊飼いの笛のドローン) が長短のリズムで静かに繰り返す (ピアノの 1 音、`PF`)
+- ト短調 (哀れみ) とト長調 (生誕の光) を行き来: Pastorale (Fuga I, 08:53) → Kyrie (Fuga II) → Gloria (ト長調、08:09 の主題を長調に) →
+  Misericordia (Fuga III, 9/23 08:06 · 08:49) → Finale (7 つの主題) → Wiegenlied (子守歌、ト長調で pp に消える)
+- 長調の区間は `harm_major` で主題の音に合う長調の和音を選ぶ (固定の和音では主題とぶつかった)
+
+```bash
+python3 compose_tablet19.py bank17.json score_tablet19.json && python3 synth.py score_tablet19.json tablet19.wav && python3 video.py score_tablet19.json tablet19.wav tablet19.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
