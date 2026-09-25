@@ -786,6 +786,15 @@ Fuga I (08:53) → Kyrie: Fuga II (11:23 · 11:18) → Gloria (ト長調) → Mi
 python3 compose_tablet20.py bank17.json score_tablet20.json && python3 synth.py score_tablet20.json tablet20.wav && python3 video.py score_tablet20.json tablet20.wav tablet20.mp4
 ```
 
+## 🎹🌟 Requiem BADA — Tablet Sessions XXI · Pastorale pianistica (ト短調 / ト長調, ♩=66, 約 4 分 25 秒)
+
+XX (出だしの伴奏なし、フーガの 4 声だけ) の全音を、9/23・9/24 の録音から切り出した**実録音のピアノの 1 音** (自然に減衰) に置き換えた版。
+4 声の音はその主題の元の録音のピアノの音 (動画の色で示す)。最後のト長調の和音もピアノの分散和音。
+
+```bash
+python3 compose_tablet21.py bank17.json score_tablet21.json && python3 synth.py score_tablet21.json tablet21.wav && python3 video.py score_tablet21.json tablet21.wav tablet21.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
