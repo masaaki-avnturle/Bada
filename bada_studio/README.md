@@ -1,0 +1,49 @@
+# 🎬🎼 BADA Studio — 音・映像・作曲スタジオ
+
+**音源 (どの拡張子でも) と映像を読み込んで編集し、自分でも作曲するアプリ。**
+[`bada_compose/`](../bada_compose/) の対位法エンジン (Python 版 [`bada_fuga/compose.py`](../bada_fuga/compose.py) の移植) をそのまま使い、
+オーケストラ版の**多段 (5 行以上) のコード進行**を表で編集して、Web Audio の管弦楽 / ピアノ / サンプラー (読み込んだ音源) で鳴らします。依存ゼロ・単一 HTML・完全オフライン動作。
+
+## ✨ できること
+
+- **音源・映像の読み込み** — `<input type="file">` はどの拡張子でも選べ、中身でデコードします (mp3 / wav / ogg / flac / m4a / aac / opus / mp4 / webm / mov …)。デコードできない形式は「生 PCM として読み込む」(16 bit 44.1 kHz)。マイク録音も音源になります
+- **タイムライン編集** — 映像 / 作曲 / 音声トラック。クリップのドラッグ移動、両端の切り詰め、✂ 分割、複製、削除、音量、フェードイン・アウト、トラック移動。ルーラーで再生位置、ループ再生
+- **作曲 (自動でも手でも)** — 🎲 自動作曲: 調とテンポから機能和声のコード進行、8 拍の主題、フーガの提示部の入り (A → S → T → B)、オーケストラの行を作る。🕯 レクイエムとフーガ: ♩=48・短調・ゆっくりの主題と持続の行。主題は `D4:3 E4:1 F4:2 …` の書式で手書きでき、好きな声部・小節・移調で入りを置けます。対位法エンジンが自由声部を書き、平行進行と強拍の不協和を表示
+- **オーケストラ版の多段コード進行** — 主進行 (4 声の和声) + Vn I / Vn II / Va / Vc / Cb / 木管 / 金管 / ティンパニ の標準 8 行 (行の追加・削除は自由)。セルは `Dm`・`Gm A7`・`Dm Gm A7 A7`、空欄は主進行に従う。行ごとに楽器・型 (持続 / 刻み / 2 分 / 分散 8 分・16 分 / バス / 保続低音 / ロール / S・A・T・B の重ね / 休み)・オクターヴ・音量。和音パレットで書き込み
+- **様式** — 管弦楽 (4 声 = 弦 + 行) / ピアノ / サンプラー (4 声 = 読み込んだ音源、基準音は自動推定) / ピアノ + 管弦楽。4 声の楽器は声部ごとに選べます
+- **書き出し** — WAV (ミックス全体 / 作曲だけ、オフライン合成)、MIDI (楽器ごとのトラック)、動画 (映像トラックの映像、なければピアノロールと波形を音と合成して録画、MP4 または WebM)、score.json (Python 版 `synth.py`・`video.py` 用)、プロジェクト (.studio.json)
+
+## 🚀 使い方
+
+1. [`index.html`](index.html) を保存してダブルクリック (インストール不要)、または下のネイティブアプリ
+2. 「🎧 音源・映像」で読み込み → 「＋ タイムラインへ」。映像は映像トラックに、音声は音声トラックに置かれます。「🎹 楽器に」でその音が 4 声のサンプラーになります
+3. 「🎼 作曲」で 🎲 自動作曲 (または 🕯 レクイエムとフーガ)、主題や入りを直す
+4. 「🎻 コード進行」で主進行と行の和音・楽器・型を編集
+5. ▶ で再生し、「💾 書き出し」で WAV / MIDI / 動画 / score.json / プロジェクト
+
+```bash
+node bada_studio/tools/engine-test.js   # エンジンの単体テスト (解析 / 自動作曲 / 対位法 + 行 / 書き出し / タイムライン)
+```
+
+## 📱💻 ネイティブ アプリ
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-studio-debug.apk` |
+| **Windows 10 / 11** | `BadaStudio-*-x64.exe` (NSIS インストーラ) / `BadaStudio-*-portable.exe` |
+| **Linux** (Ubuntu ほか) | `BadaStudio-*-x86_64.AppImage` / `BadaStudio-*-amd64.deb` |
+
+ビルドは [`studio-app-build.yml`](../.github/workflows/studio-app-build.yml) が実行します
+(`bada_studio/` を変えた push で Actions アーティファクト、`studio-v*` タグ / `workflow_dispatch` の `release_tag` で Release へ添付)。
+ダウンロード: リポジトリの **Actions** → 「BADA Studio app build」→ 最新の実行 → **Artifacts** の `studio-android` / `studio-windows` / `studio-linux`。
+
+- `app/cordova/config.xml` — Android (Cordova 12, SAF の保存ダイアログ, マイク許可)
+- `app/electron/` — Windows / Linux (Electron 31 + electron-builder)
+
+## 💾 保存
+
+1. **Android (APK)** — 保存ダイアログ (SAF) で保存先を選ぶ (`cordova-plugin-save-dialog`)
+2. **Windows / Linux / Chrome / Edge** — ネイティブの保存ダイアログ (`showSaveFilePicker`)
+3. **それ以外のブラウザ** — 通常のダウンロード
+
+編集中のプロジェクト (音源の音そのものは含まない) は端末内 (localStorage) に自動保存されます。プロジェクトを開き直したら、同じ名前の音源を「音源・映像」で読み込み直してください。

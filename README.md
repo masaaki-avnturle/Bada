@@ -125,6 +125,24 @@
 
 ---
 
+## 🎬🎼 ダウンロード — BADA Studio (音・映像・作曲スタジオ / オーケストラ版の多段コード進行)
+
+**音源 (どの拡張子でも、中身でデコード) と映像を読み込んでタイムラインで編集し、自分でも作曲するアプリ。** 対位法エンジン (bada_fuga/compose.py の移植) が 4 声を書き、**オーケストラ版の 5 行以上のコード進行** (主進行 + Vn I / Vn II / Va / Vc / Cb / 木管 / 金管 / ティンパニ) を表で編集して、Web Audio の管弦楽 / ピアノ / サンプラー (読み込んだ音源そのもの) で鳴らします。🎲 自動作曲 (機能和声の進行・主題・フーガの入り・行) と 🕯 レクイエムとフーガ。WAV / MIDI / 動画 (MP4・WebM) / score.json / プロジェクトに書き出し。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bada_studio/index.html をダウンロード**](bada_studio/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-studio-debug.apk` |
+| **Windows 10 / 11** | `BadaStudio-*-x64.exe` (NSIS インストーラ) / `BadaStudio-*-portable.exe` |
+| **Linux** (Ubuntu ほか) | `BadaStudio-*-x86_64.AppImage` / `BadaStudio-*-amd64.deb` |
+
+ビルドは [`studio-app-build.yml`](.github/workflows/studio-app-build.yml) が実行します(`bada_studio/` を変えた push で Actions アーティファクト / `studio-v*` タグで Release へ添付)。**Actions** → 「BADA Studio app build」→ 最新の実行 → **Artifacts** からダウンロード。詳細は [`bada_studio/`](bada_studio/) を参照。
+
 ## 🎼 ダウンロード — BADA Compose(作曲スタジオ)
 
 **Piano Concerto BADA のコード進行エンジンで作曲するアプリ。** 起動すると Piano Concerto BADA (3 楽章 123 小節) が読み込まれ、小節ごとに**和音・役割 (ソロ / トゥッティ / 合奏 / カデンツァ)・テンポ・強弱・主題**を編集すると、Python 版 `bada_fuga/compose.py` から移植した**対位法エンジン**がその場で 4 声を作り直します。小節の挿入・複製・削除、自作主題・和音から作る旋律、協奏曲 / ピアノ独奏 / 弦楽合奏、出力の調とテンポ。Web Audio のピアノ + 管弦楽で再生し、**WAV / MIDI / 動画 (MP4・WebM) / score.json** に書き出し。依存ゼロ・単一 HTML・オフライン動作。

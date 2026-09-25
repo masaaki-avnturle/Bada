@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BADA Studio — 音・映像・作曲スタジオ</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#141925; --panel2:#1b2231; --line:#2a3246; --text:#e6e2d6; --dim:#9aa2b6; --accent:#f0c46e; --err:#ff7a7a; --ok:#8fd8a0;
+          --video:#6f8fd8; --music:#f0c46e; --audio:#60cec4; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic UI","Meiryo",system-ui,sans-serif; font-size:14px; }
+  body { padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+  header { padding:10px 14px 6px; display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 14px; }
+  header h1 { margin:0; font-size:20px; font-weight:600; letter-spacing:.02em; }
+  header .sub { color:var(--dim); font-size:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:4px 14px; }
+  button, select, input, textarea { font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line); border-radius:6px; }
+  button { padding:6px 10px; cursor:pointer; min-height:34px; }
+  button:hover { border-color:#4a5575; }
+  button.primary { background:#3a3120; border-color:#7a6230; color:#ffe2a6; }
+  button.big { font-size:16px; min-width:46px; }
+  button.small { min-height:26px; padding:2px 7px; font-size:12px; }
+  select, input { padding:5px 6px; min-height:34px; }
+  input[type=number] { width:78px; }
+  input[type=range] { padding:0; }
+  input[type=file] { display:none; }
+  textarea { width:100%; padding:6px; min-height:56px; resize:vertical; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; }
+  label.f { display:flex; flex-direction:column; gap:3px; font-size:12px; color:var(--dim); }
+  label.c { display:inline-flex; gap:4px; align-items:center; font-size:13px; }
+  #pos { font-variant-numeric:tabular-nums; color:var(--dim); min-width:130px; }
+  #stage { display:block; width:100%; height:240px; background:#07090e; }
+  #tl { display:block; width:100%; height:230px; background:#0a0d13; touch-action:none; cursor:default; }
+  .tabs { display:flex; gap:4px; padding:4px 14px 0; border-bottom:1px solid var(--line); overflow-x:auto; }
+  .tabs button { border-bottom:none; border-radius:6px 6px 0 0; background:var(--panel); white-space:nowrap; flex:0 0 auto; }
+  .tabs button.on { background:var(--panel2); color:var(--accent); }
+  .panel { display:none; padding:10px 14px 16px; background:var(--panel2); }
+  .panel.on { display:block; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px 12px; align-items:end; }
+  .list { margin:6px 0; display:flex; flex-direction:column; gap:4px; }
+  .item { display:flex; gap:8px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:4px 8px; flex-wrap:wrap; }
+  .item .grow { flex:1; min-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .item canvas { width:120px; height:28px; background:#07090e; border-radius:3px; }
+  .hint { color:var(--dim); font-size:12px; line-height:1.55; }
+  .bad { border-color:var(--err) !important; }
+  h3 { margin:12px 0 6px; font-size:14px; color:var(--accent); font-weight:600; }
+  #status { position:sticky; bottom:0; padding:7px 14px; background:#0e1320; border-top:1px solid var(--line); font-size:13px; min-height:32px; }
+  #status.err { color:var(--err); } #status.ok { color:var(--ok); }
+  #check { color:var(--dim); font-size:12px; }
+  /* コード進行の表 (行 = オーケストラの声部) */
+  #progWrap { overflow-x:auto; margin:6px 0; }
+  table.prog { border-collapse:collapse; font-size:12px; }
+  table.prog th, table.prog td { border:1px solid var(--line); padding:2px 3px; white-space:nowrap; }
+  table.prog th { background:var(--panel); color:var(--dim); font-weight:500; text-align:left; position:sticky; left:0; z-index:1; min-width:150px; }
+  table.prog th.bar { position:static; min-width:0; text-align:center; }
+  table.prog td input { width:74px; min-height:28px; padding:2px 4px; font-size:12px; text-align:center; }
+  table.prog td.main input { color:var(--accent); font-weight:600; }
+  table.prog td.now { background:#27304a; }
+  table.prog select { min-height:28px; padding:2px 3px; font-size:12px; }
+  table.prog input.oct { width:44px; }
+  .palette { display:flex; flex-wrap:wrap; gap:4px; margin:6px 0; }
+  .palette button { min-height:30px; padding:3px 8px; font-size:13px; }
+  @media (max-width:640px) { #stage { height:180px; } #tl { height:200px; } header h1 { font-size:17px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎬🎼 BADA Studio</h1>
+  <span class="sub">音源 (どの拡張子でも) と映像を読み込んで編集し、自分で作曲もするスタジオ — オーケストラ版の多段コード進行 (5 行以上) を編集して合成。依存ゼロ・単一 HTML・オフライン</span>
+</header>
+
+<div class="row">
+  <button id="btnPlay" class="primary big" title="再生 / 停止">▶</button>
+  <button id="btnStop" class="big" title="停止して先頭へ">⏹</button>
+  <span id="pos">0:00 / 0:00</span>
+  <label class="c"><input type="checkbox" id="chkLoop"> ループ</label>
+  <label class="f">ズーム <input type="range" id="zoom" min="8" max="200" value="40" style="width:120px"></label>
+  <button id="btnFit" class="small">全体</button>
+  <span id="check"></span>
+</div>
+
+<canvas id="stage" width="1280" height="240"></canvas>
+<canvas id="tl" width="1280" height="230"></canvas>
+
+<div class="row">
+  <button id="btnSplit" class="small">✂ 再生位置で分割</button>
+  <button id="btnDup" class="small">⧉ 複製</button>
+  <button id="btnDel" class="small">🗑 削除</button>
+  <label class="f">開始 (秒)<input type="number" id="cStart" step="0.01" min="0"></label>
+  <label class="f">元の位置 (秒)<input type="number" id="cOff" step="0.01" min="0"></label>
+  <label class="f">長さ (秒)<input type="number" id="cDur" step="0.01" min="0.05"></label>
+  <label class="f">音量<input type="number" id="cGain" step="0.05" min="0" max="4"></label>
+  <label class="f">フェードイン<input type="number" id="cFin" step="0.1" min="0"></label>
+  <label class="f">フェードアウト<input type="number" id="cFout" step="0.1" min="0"></label>
+  <label class="f">トラック<select id="cTrack"></select></label>
+  <span id="clipName" class="hint"></span>
+</div>
+
+<div class="tabs">
+  <button data-tab="src" class="on">🎧 音源・映像</button>
+  <button data-tab="comp">🎼 作曲</button>
+  <button data-tab="prog">🎻 コード進行 (オーケストラ)</button>
+  <button data-tab="out">💾 書き出し</button>
+  <button data-tab="help">❓ 使い方</button>
+</div>
+
+<div class="panel on" id="tab-src">
+  <div class="row" style="padding:0 0 6px">
+    <button id="btnImport" class="primary">📂 音源・映像を読み込む (どの拡張子でも)</button>
+    <input type="file" id="fileIn" multiple>
+    <button id="btnImportRaw">🧱 生 PCM として読み込む (デコードできない拡張子)</button>
+    <input type="file" id="fileRaw">
+    <button id="btnRecMic">🎙 マイク録音</button>
+    <span class="hint">読み込んだ音源は下の一覧へ。「＋タイムラインへ」で編集トラックに置く。「🎹 楽器に」でその音を作曲の楽器 (サンプラー) にする。</span>
+  </div>
+  <div class="list" id="srcList"></div>
+</div>
+
+<div class="panel" id="tab-comp">
+  <div class="grid">
+    <label class="f">題名<input id="pTitle" type="text"></label>
+    <label class="f">テンポ (BPM)<input id="pBpm" type="number" min="20" max="240" step="1"></label>
+    <label class="f">調<select id="pKey"></select></label>
+    <label class="f">小節数<input id="pBars" type="number" min="1" max="256" step="1"></label>
+    <label class="f">曲の開始位置 (タイムライン 秒)<input id="pStart" type="number" min="0" step="0.1"></label>
+    <label class="f">乱数<input id="pSeed" type="number" min="0" step="1"></label>
+    <label class="f">様式<select id="pStyle"><option value="orch">管弦楽 (4 声 = 弦 + 行のオーケストラ)</option><option value="piano">ピアノ (4 声 = ピアノ)</option><option value="sampler">サンプラー (4 声 = 読み込んだ音源)</option><option value="mix">ピアノ + 管弦楽</option></select></label>
+    <label class="f">4 声のサンプラー音源<select id="pSmp"></select></label>
+  </div>
+  <div class="row" style="padding:8px 0 0">
+    <button id="btnAuto" class="primary">🎲 自動作曲 (進行・主題・フーガの入り・オーケストラの行をすべて作る)</button>
+    <button id="btnAutoProg">進行だけ作り直す</button>
+    <button id="btnAutoSubj">主題だけ作り直す</button>
+    <button id="btnRegen">🎲 自由声部を作り直す</button>
+    <button id="btnRequiem">🕯 レクイエムとフーガ (ゆっくり・短調)</button>
+  </div>
+  <h3>主題 (フーガ) — 音名:拍 (例 D4:3 E4:1 F4:2 A4:2)</h3>
+  <textarea id="pSubject"></textarea>
+  <div class="row" style="padding:4px 0">
+    <button id="btnSubjApply" class="small">主題を保存</button>
+    <button id="btnSubjPlay" class="small">▶ 主題を聞く</button>
+    <span class="hint">主題の入り: </span>
+    <label class="f">声部<select id="eVoice"><option>S</option><option>A</option><option>T</option><option>B</option></select></label>
+    <label class="f">小節<input id="eBar" type="number" min="1" step="1" value="1"></label>
+    <label class="f">移調<input id="eTr" type="number" step="1" value="0"></label>
+    <button id="btnEntryAdd" class="small">＋ 入りを置く</button>
+    <button id="btnEntryExpo" class="small">提示部 (A→S→T→B、2 小節ごと)</button>
+    <button id="btnEntryClear" class="small">入りを消す</button>
+  </div>
+  <div id="entryList" class="hint"></div>
+  <h3>4 声の楽器</h3>
+  <div class="row" style="padding:0" id="voiceInst"></div>
+</div>
+
+<div class="panel" id="tab-prog">
+  <div class="hint">主進行 (1 行目、金色) と、オーケストラの各行。セルは「Dm」「Gm A7」(2 拍ずつ)「Dm Gm A7 A7」(1 拍ずつ) のように書け、空欄はその小節の主進行に従う。行ごとに楽器・型 (持続 / 刻み / 分散 / バス / 声部の重ね) ・オクターヴ・音量。</div>
+  <div class="row" style="padding:6px 0">
+    <button id="btnLineAdd" class="small">＋ 行を足す</button>
+    <button id="btnLineOrch" class="small">オーケストラの標準 8 行に戻す</button>
+    <button id="btnBarAdd" class="small">＋ 小節を足す</button>
+    <button id="btnBarDel" class="small">− 最後の小節を消す</button>
+    <span class="hint">和音パレット (選んだセルに書き込み):</span>
+  </div>
+  <div class="palette" id="palette"></div>
+  <div id="progWrap"></div>
+</div>
+
+<div class="panel" id="tab-out">
+  <div class="row" style="padding:0">
+    <button id="btnWav" class="primary">💾 WAV (ミックス全体)</button>
+    <button id="btnWavMusic">💾 WAV (作曲だけ)</button>
+    <button id="btnMidi">💾 MIDI (作曲)</button>
+    <button id="btnVideo">🎬 動画 (映像 + 音、MP4 / WebM)</button>
+    <button id="btnScore">💾 score.json (Python 版 synth.py 用)</button>
+    <button id="btnSaveProj">💾 プロジェクト</button>
+    <button id="btnLoadProj">📂 プロジェクトを開く</button>
+    <input type="file" id="projIn" accept=".json,application/json">
+  </div>
+  <div class="hint" style="margin-top:8px">動画: 映像トラックの映像 (なければピアノロールと波形) を音と合成して録画します。再生時間ぶんの時間がかかります。Android では保存ダイアログ、Windows / Linux ではネイティブの保存ダイアログで保存先を選びます。プロジェクトには音源の音そのものは含みません (ファイル名を記録し、開き直すときに同じ音源を読み込み直してください)。</div>
+</div>
+
+<div class="panel" id="tab-help">
+  <div class="hint">
+    <b>1. 音源・映像</b> — 「読み込む」でどの拡張子のファイルでも選べます (mp3 / wav / ogg / flac / m4a / aac / opus / mp4 / webm / mov …、中身で判断してデコード)。デコードできない形式は「生 PCM として読み込む」で 16 bit 44.1 kHz として読みます。<br>
+    <b>2. タイムライン</b> — 上から 映像 / 作曲 / 音声トラック。クリップをドラッグで移動、両端をドラッグで切り詰め、✂ で分割。数値欄で開始・元の位置・長さ・音量・フェード。ルーラーをタップして再生位置。<br>
+    <b>3. 作曲</b> — 🎲 自動作曲で、調とテンポからコード進行 (機能和声)、主題、フーガの入り、オーケストラの行を作ります。対位法エンジン (bada_fuga/compose.py の移植) が 4 声を書き、行の和音で管弦楽が支えます。主題は手で書けます。読み込んだ音源をサンプラー楽器として使えます。<br>
+    <b>4. コード進行 (オーケストラ)</b> — 主進行 + 弦 5 部・木管・金管・ティンパニなど 5 行以上の表。行ごとに違う和音を書けば多層の進行 (複和音) になります。<br>
+    <b>5. 書き出し</b> — WAV / MIDI / 動画 / score.json / プロジェクト。
+  </div>
+</div>
+
+<div id="status"></div>
+<script src="cordova.js"></script>
+<script>
+"use strict";
+/* ================================================================ 音名・和音 */
+var PC = { C:0, "C#":1, Db:1, D:2, "D#":3, Eb:3, E:4, F:5, "F#":6, Gb:6, G:7, "G#":8, Ab:8, A:9, "A#":10, Bb:10, B:11 };
+var NAMES = ["C","C#","D","Eb","E","F","F#","G","G#","A","Bb","B"];
+var KEYNAMES_JP = { 0:"ハ", 1:"嬰ハ", 2:"ニ", 3:"変ホ", 4:"ホ", 5:"ヘ", 6:"嬰ヘ", 7:"ト", 8:"変イ", 9:"イ", 10:"変ロ", 11:"ロ" };
+function mod12(x) { return ((x % 12) + 12) % 12; }
+function n(name) {
+  var m = /^([A-G](?:#|b)?)(-?\d)$/.exec(name);
+  if (!m || !(m[1] in PC)) return null;
+  return 12 * (parseInt(m[2], 10) + 1) + PC[m[1]];
+}
+function nameOf(m) { return NAMES[mod12(m)] + (Math.floor(m / 12) - 1); }
+var QUAL = { "":[0,4,7], m:[0,3,7], "7":[0,4,7,10], m7:[0,3,7,10], maj7:[0,4,7,11], dim:[0,3,6], dim7:[0,3,6,9],
+             m7b5:[0,3,6,10], sus4:[0,5,7], sus2:[0,2,7], aug:[0,4,8], "6":[0,4,7,9], m6:[0,3,7,9] };
+/* 記譜の調: 自由声部の経過音に使う音階の基準 (Python 版の「ニ短調 + 和音の臨時記号」を一般化) */
+var KEY = { tonic: 2, minor: true };
+var REPL_MINOR_D = { 1:0, 8:7, 6:5, 3:4, 11:10 };   /* ニ短調: C#→C を外す … (Python と同じ) */
+var REPL_MAJOR_C = { 1:0, 3:4, 6:5, 8:7, 10:11 };
+var _chordCache = {};
+function setKey(tonic, minor) { KEY = { tonic: mod12(tonic), minor: !!minor }; _chordCache = {}; }
+function keyBase() {
+  var iv = KEY.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11];
+  return iv.map(function (x) { return mod12(x + KEY.tonic); });
+}
+function keyRepl() {
+  var out = {}, src = KEY.minor ? REPL_MINOR_D : REPL_MAJOR_C, t = KEY.minor ? KEY.tonic - 2 : KEY.tonic;
+  Object.keys(src).forEach(function (k) { out[mod12(+k + t)] = mod12(src[k] + t); });
+  return out;
+}
+function chord(s) {
+  if (typeof s !== "string") return null;
+  if (_chordCache.hasOwnProperty(s)) return _chordCache[s];
+  var m = /^([A-G](?:#|b)?)([^\/]*)(?:\/([A-G](?:#|b)?))?$/.exec(s.trim());
+  if (!m || !(m[1] in PC) || !QUAL.hasOwnProperty(m[2]) || (m[3] && !(m[3] in PC))) { _chordCache[s] = null; return null; }
+  var root = PC[m[1]], q = QUAL[m[2]];
+  var pcs = q.map(function (x) { return (root + x) % 12; });
+  var c = { name: s, root: root, pcs: pcs, bass: m[3] ? PC[m[3]] : root, third: pcs[1], fifth: pcs[2],
+            seventh: pcs.length > 3 ? pcs[3] : null, major3: q[1] === 4, slash: !!m[3] };
+  var base = keyBase(), repl = keyRepl();
+  pcs.forEach(function (p) {
+    if (base.indexOf(p) < 0 && repl.hasOwnProperty(p)) {
+      var i = base.indexOf(repl[p]); if (i >= 0) base.splice(i, 1);
+      base.push(p);
+    }
+  });
+  c.scale = base.slice().sort(function (a, b) { return a - b; });
+  _chordCache[s] = c;
+  return c;
+}
+function transposeChordName(cs, semis) {
+  var m = /^([A-G](?:#|b)?)([^\/]*)(?:\/([A-G](?:#|b)?))?$/.exec(cs);
+  if (!m) return cs;
+  var s = NAMES[mod12(PC[m[1]] + semis)] + m[2];
+  if (m[3]) s += "/" + NAMES[mod12(PC[m[3]] + semis)];
+  return s;
+}
+function transposeH(H, semis) { return H.map(function (bar) { return bar.map(function (c) { return transposeChordName(c, semis); }); }); }
+function mat(items) { return items.map(function (it) { return [it[1], it[0] ? n(it[0]) : null]; }); }
+
+/* ================================================================ 乱数 (再現可能) */
+function makeRng(seed) {
+  var a = (seed >>> 0) || 1;
+  return { random: function () {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  } };
+}
+
+/* ================================================================ 対位法エンジン (compose.py の移植) */
+var VOICES = ["S", "A", "T", "B"];
+var RANGE = { S:[60,84], A:[55,77], T:[48,69], B:[36,58] };
+var CENTER = { S:71, A:65, T:58, B:46 };
+var ORDER = { S:3, A:2, T:1, B:0 };
+var BPB = 4;
+
+function Piece(nbars) {
+  this.nbars = nbars; this.N = nbars * BPB;
+  this.harm = []; for (var i = 0; i < this.N; i++) this.harm.push("Dm");
+  this.fixed = { S:[], A:[], T:[], B:[] };
+  this.rest = { S:{}, A:{}, T:{}, B:{} };
+  this.hold = {}; this.entries = []; this.sections = [];
+  this.dyn = {}; this.tempo = {}; this.det = {}; this.role = {};
+}
+Piece.prototype.fixedCover = function (v) {
+  var cov = new Array(this.N).fill(null);
+  this.fixed[v].forEach(function (f) {
+    var s = f[0], d = f[1], m = f[2];
+    var b = Math.floor(s), e = Math.ceil(s + d - 1e-9);
+    for (var k = b; k < Math.min(e, this.N); k++) if (cov[k] === null || s <= k) cov[k] = m;
+  }, this);
+  return cov;
+};
+function melodicCost(d) {
+  d = Math.abs(d);
+  if (d === 0) return 0.9; if (d <= 2) return 0.0; if (d <= 4) return 0.5; if (d === 5) return 1.0;
+  if (d === 6) return 2.5; if (d === 7) return 1.3; if (d <= 9) return 2.4; if (d <= 11) return 4.0;
+  if (d === 12) return 2.0; return 7.0;
+}
+function chooseNote(v, b, c, now, prev, prevSelf, prevChord, rng, strong) {
+  var lo = RANGE[v][0], hi = RANGE[v][1], best = null, bestc = 1e9;
+  var present = []; Object.keys(now).forEach(function (o) { if (now[o] !== null) present.push(mod12(now[o])); });
+  for (var m = lo; m <= hi; m++) {
+    var pc = mod12(m);
+    if (c.pcs.indexOf(pc) < 0) continue;
+    var cost = rng.random() * 0.5;
+    if (prevSelf !== null) {
+      cost += melodicCost(m - prevSelf);
+      if (prevChord) {
+        if (prevChord.major3 && mod12(prevSelf) === prevChord.third && mod12(prevChord.root - prevSelf) !== 0) {
+          if (m - prevSelf === 1) cost -= 1.2; else if (Math.abs(m - prevSelf) > 2) cost += 1.0;
+        }
+        if (prevChord.seventh !== null && mod12(prevSelf) === prevChord.seventh) {
+          if (prevSelf - m === 1 || prevSelf - m === 2) cost -= 1.0; else if (m > prevSelf) cost += 1.5;
+        }
+      }
+    } else cost += Math.abs(m - CENTER[v]) / 6.0;
+    cost += Math.abs(m - CENTER[v]) / 10.0;
+    if (m < lo + 3 || m > hi - 3) cost += 2.0;
+    if (v === "B") {
+      if (pc === c.bass) cost -= 0.8; else if (c.slash) cost += 6.0; else if (pc === c.third) cost += 1.2;
+      else if (pc === c.fifth) cost += 3.5; else cost += 3.0;
+    } else {
+      if (c.seventh !== null && pc === c.seventh && present.indexOf(pc) >= 0) cost += 3.0;
+      if (c.major3 && pc === c.third && present.indexOf(pc) >= 0) cost += 3.5;
+      if (present.indexOf(pc) < 0) cost -= 1.3;
+    }
+    for (var o in now) {
+      var om = now[o]; if (om === null || om === undefined) continue;
+      if ((ORDER[o] > ORDER[v] && om <= m) || (ORDER[o] < ORDER[v] && om >= m)) cost += 40.0;
+      if (om === m) cost += 6.0;
+      var diff = Math.abs(om - m) % 12;
+      if (diff === 1 || diff === 11) cost += strong ? 8.0 : 3.0;
+      if ((diff === 2 || diff === 10) && strong && c.pcs.indexOf(mod12(om)) < 0) cost += 4.0;
+      if (diff === 0 && strong && om !== m) cost += 1.0;
+      var adj = Math.abs(ORDER[o] - ORDER[v]) === 1;
+      if (adj && o !== "B" && v !== "B" && Math.abs(om - m) > 12) cost += 2.5;
+      if (adj && (o === "B" || v === "B") && Math.abs(om - m) > 19) cost += 2.0;
+      var op = prev[o];
+      if (op !== null && op !== undefined && prevSelf !== null && op !== om && prevSelf !== m) {
+        var i1 = Math.abs(prevSelf - op) % 12, i2 = Math.abs(m - om) % 12;
+        if (i1 === i2 && (i1 === 0 || i1 === 7)) cost += 30.0;
+        if ((i2 === 0 || i2 === 7) && (m - prevSelf) * (om - op) > 0 && Math.abs(m - prevSelf) > 2 &&
+            ((o === "S" && v === "B") || (o === "B" && v === "S"))) cost += 4.0;
+      }
+    }
+    if (cost < bestc) { best = m; bestc = cost; }
+  }
+  return best;
+}
+function generate(piece, seed) {
+  var rng = makeRng(seed), cov = {}, skel = {}, isfree = {}, prevNote = {}, prevChord = null;
+  VOICES.forEach(function (v) {
+    cov[v] = piece.fixedCover(v); skel[v] = new Array(piece.N).fill(null); prevNote[v] = null;
+    isfree[v] = []; for (var b = 0; b < piece.N; b++) isfree[v].push(cov[v][b] === null && !piece.rest[v][b]);
+  });
+  var order = VOICES.slice().sort(function (a, b) { return ORDER[a] - ORDER[b]; });
+  for (var b = 0; b < piece.N; b++) {
+    var c = chord(piece.harm[b]) || chord("Dm"), strong = (b % BPB) === 0 || (b % BPB) === 2, now = {}, prev = {};
+    VOICES.forEach(function (v) { if (cov[v][b] !== null) now[v] = cov[v][b]; prev[v] = prevNote[v]; });
+    order.forEach(function (v) {
+      if (!isfree[v][b]) return;
+      var ps = (b > 0 && (isfree[v][b - 1] || cov[v][b - 1] !== null)) ? prevNote[v] : null;
+      var m = chooseNote(v, b, c, now, prev, ps, prevChord, rng, strong);
+      skel[v][b] = m; now[v] = m;
+    });
+    VOICES.forEach(function (v) {
+      if (now[v] !== undefined && now[v] !== null) prevNote[v] = now[v];
+      else if (piece.rest[v][b]) prevNote[v] = null;
+    });
+    prevChord = c;
+  }
+  return { skel: skel, cov: cov, isfree: isfree };
+}
+function neighbor(m, c, up) {
+  var x = m + (up ? 1 : -1), guard = 0;
+  while (c.scale.indexOf(mod12(x)) < 0 && guard++ < 12) x += up ? 1 : -1;
+  return x;
+}
+function realize(piece, v, g, rng) {
+  var skel = g.skel[v], isfree = g.isfree[v], ev = [], N = piece.N, b = 0, firsts = {};
+  piece.fixed[v].forEach(function (f) { var k = Math.floor(f[0]); if (!(k in firsts)) firsts[k] = f[2]; });
+  while (b < N) {
+    var m = skel[b];
+    if (m === null) { b++; continue; }
+    var bar = Math.floor(b / BPB), c = chord(piece.harm[b]) || chord("Dm");
+    if (piece.hold[bar]) {
+      var e = b;
+      while (e < N && Math.floor(e / BPB) === bar && isfree[e] && skel[e] === m) e++;
+      ev.push([b, e - b, m, null]); b = e; continue;
+    }
+    var nxt = null;
+    if (b + 1 < N) nxt = skel[b + 1] !== null ? skel[b + 1] : (firsts.hasOwnProperty(b + 1) ? firsts[b + 1] : null);
+    var d = nxt === null ? null : nxt - m, r = rng.random(), strong = (b % BPB) === 0 || (b % BPB) === 2;
+    if (d !== null && (Math.abs(d) === 3 || Math.abs(d) === 4) && r < 0.72) {
+      var step = d > 0 ? 1 : -1, ok = [m + step, m + 2 * step].filter(function (x) { return c.scale.indexOf(mod12(x)) >= 0; });
+      ev.push([b, 0.5, m, null], [b + 0.5, 0.5, ok.length ? ok[0] : m + 2 * step, null]); b += 1;
+    } else if (d === 0 && b + 1 < N && skel[b + 1] === m && isfree[b + 1]) {
+      if (r < 0.30) { ev.push([b, 2, m, null]); b += 2; }
+      else if (r < 0.75) { ev.push([b, 0.5, m, null], [b + 0.5, 0.5, neighbor(m, c, m < CENTER[v]), null]); b += 1; }
+      else { ev.push([b, 1, m, null]); b += 1; }
+    } else if (d !== null && Math.abs(d) >= 5 && Math.abs(d) <= 9 && r < 0.5) {
+      var mids = []; for (var x = Math.min(m, nxt) + 1; x < Math.max(m, nxt); x++) if (c.pcs.indexOf(mod12(x)) >= 0) mids.push(x);
+      if (mids.length) ev.push([b, 0.5, m, null], [b + 0.5, 0.5, d > 0 ? mids[mids.length - 1] : mids[0], null]);
+      else ev.push([b, 1, m, null]);
+      b += 1;
+    } else if (d !== null && (Math.abs(d) === 1 || Math.abs(d) === 2) && !strong && r < 0.22) {
+      ev.push([b, 0.5, m, null], [b + 0.5, 0.5, neighbor(m, c, d < 0), null]); b += 1;
+    } else { ev.push([b, 1, m, null]); b += 1; }
+  }
+  return ev;
+}
+function check(piece, events) {
+  var N = piece.N, sound = {}, diss = 0, par = 0, list = [];
+  VOICES.forEach(function (v) {
+    sound[v] = new Array(N * 2).fill(null);
+    events[v].forEach(function (e) {
+      for (var k = Math.round(e[0] * 2); k < Math.min(Math.round((e[0] + e[1]) * 2), N * 2); k++) sound[v][k] = e[2];
+    });
+  });
+  for (var k = 0; k < N * 2; k += 2) {
+    var b = k / 2, strong = (b % BPB) === 0 || (b % BPB) === 2, ch = chord(piece.harm[b]) || chord("Dm");
+    var vs = VOICES.filter(function (v) { return sound[v][k] !== null; });
+    for (var i = 0; i < vs.length; i++) for (var j = i + 1; j < vs.length; j++) {
+      var a = sound[vs[i]][k], c2 = sound[vs[j]][k], iv = Math.abs(a - c2) % 12;
+      var nct = ch.pcs.indexOf(mod12(a)) < 0 || ch.pcs.indexOf(mod12(c2)) < 0;
+      if ((strong && [1, 2, 11, 10, 6].indexOf(iv) >= 0 && nct) || iv === 1 || iv === 11) diss++;
+      if (k >= 2 && sound[vs[i]][k - 2] !== null && sound[vs[j]][k - 2] !== null) {
+        var a0 = sound[vs[i]][k - 2], c0 = sound[vs[j]][k - 2];
+        if (a0 !== a && c0 !== c2 && mod12(a0 - c0) === mod12(a - c2) && (mod12(a - c2) === 0 || mod12(a - c2) === 7)) {
+          par++; if (list.length < 8) list.push((Math.floor(b / BPB) + 1) + "." + (b % BPB + 1) + " " + vs[i] + "–" + vs[j]);
+        }
+      }
+    }
+  }
+  return { diss: diss, par: par, parList: list };
+}
+
+/* ================================================================ 楽器 (管弦楽 + ピアノ + サンプラー) */
+var INST = {
+  pf:  { name:"ピアノ", gm:0, ch:0, pan:0 },
+  vn1: { name:"Vn I (第 1 ヴァイオリン)", gm:40, ch:1, pan:-0.45 }, vn2: { name:"Vn II (第 2 ヴァイオリン)", gm:40, ch:2, pan:-0.25 },
+  va:  { name:"Va (ヴィオラ)", gm:41, ch:3, pan:0.15 }, vc: { name:"Vc (チェロ)", gm:42, ch:4, pan:0.35 }, cb: { name:"Cb (コントラバス)", gm:43, ch:5, pan:0.5 },
+  fl:  { name:"Fl (フルート)", gm:73, ch:6, pan:-0.1 }, ob: { name:"Ob (オーボエ)", gm:68, ch:7, pan:0.1 }, cl: { name:"Cl (クラリネット)", gm:71, ch:8, pan:-0.05 },
+  hn:  { name:"Hn (ホルン)", gm:60, ch:10, pan:0.3 }, tp: { name:"Tp (トランペット)", gm:56, ch:11, pan:0.35 }, tb: { name:"Tb (トロンボーン)", gm:57, ch:12, pan:0.45 },
+  timp:{ name:"Timp (ティンパニ)", gm:47, ch:13, pan:0.2 },
+  smp: { name:"サンプラー (読み込んだ音源)", gm:0, ch:14, pan:0 }
+};
+var PY_CODE = { vn1:"V1", vn2:"V2", va:"VA", vc:"VC", cb:"CB", fl:"FL", ob:"WW", cl:"CL", hn:"HN", tp:"TR", tb:"TB", timp:"TP" };
+var INST_RANGE = { pf:[21,108], vn1:[55,100], vn2:[55,96], va:[48,84], vc:[36,72], cb:[28,55], fl:[60,96], ob:[58,91], cl:[50,91], hn:[41,77], tp:[55,82], tb:[40,72], timp:[38,55], smp:[24,96] };
+/* 行の型 */
+var PATTERNS = {
+  hold:  "持続 (全音符の和音)", pulse: "刻み (4 分音符の和音)", half: "2 分音符の和音", arp: "分散 (8 分音符)", arp16: "分散 (16 分音符)",
+  bass:  "バス (根音・5 度)", ped: "保続低音 (根音を打ち直す)", roll: "ロール (ティンパニ)", top: "最上声を重ねる (S)", alto: "A を重ねる", tenor: "T を重ねる", bassv: "B を重ねる", rest: "休み"
+};
+var ORCH_LINES = [
+  { name:"主進行", inst:"vn1", pat:"top", oct:0, vel:0.9 },
+  { name:"Vn II", inst:"vn2", pat:"alto", oct:0, vel:0.8 },
+  { name:"Va", inst:"va", pat:"tenor", oct:0, vel:0.8 },
+  { name:"Vc", inst:"vc", pat:"bassv", oct:0, vel:0.85 },
+  { name:"Cb", inst:"cb", pat:"ped", oct:-1, vel:0.8 },
+  { name:"木管", inst:"fl", pat:"hold", oct:1, vel:0.55 },
+  { name:"金管", inst:"hn", pat:"half", oct:0, vel:0.5 },
+  { name:"ティンパニ", inst:"timp", pat:"roll", oct:0, vel:0.6 }
+];
+
+/* ================================================================ プロジェクト */
+function blankProject(nbars) {
+  nbars = nbars || 8;
+  var main = []; for (var i = 0; i < nbars; i++) main.push(i % 4 === 3 ? "A7" : "Dm");
+  return { title: "BADA Studio", bpm: 72, key: { tonic: 2, minor: true }, seed: 7, style: "orch", smp: -1, musicStart: 0,
+           main: main, lines: ORCH_LINES.map(function (l, li) { return { name: l.name, inst: l.inst, pat: l.pat, oct: l.oct, vel: l.vel, cells: new Array(nbars).fill("") }; }),
+           subject: [[3, 62], [1, 64], [2, 65], [2, 69]], entries: [], voiceInst: { S:"vn1", A:"vn2", T:"va", B:"vc" },
+           sources: [], clips: [], tracks: ["音声 1", "音声 2"] };
+}
+function parseCell(text) {
+  var cs = String(text || "").trim().split(/\s+/).filter(Boolean);
+  if (!cs.length) return null;
+  if ([1, 2, 4].indexOf(cs.length) < 0) return { err: "和音は 1・2・4 個" };
+  for (var i = 0; i < cs.length; i++) if (!chord(cs[i])) return { err: "読めない和音: " + cs[i] };
+  var k = BPB / cs.length, out = [];
+  for (var b = 0; b < BPB; b++) out.push(cs[Math.floor(b / k)]);
+  return { h: out };
+}
+function barHarm(proj, li, bar) {
+  var txt = li < 0 ? proj.main[bar] : (proj.lines[li].cells[bar] || "");
+  var p = parseCell(txt);
+  if (!p || p.err) { if (li < 0) return ["Dm", "Dm", "Dm", "Dm"]; return barHarm(proj, -1, bar); }
+  return p.h;
+}
+function parseNotes(text) {
+  var toks = String(text || "").trim().split(/\s+/).filter(Boolean), out = [];
+  if (!toks.length) return { err: "主題が空です" };
+  for (var i = 0; i < toks.length; i++) {
+    var m = /^([A-Ga-g](?:#|b)?-?\d|[Rr])(?::([\d.]+))?$/.exec(toks[i]);
+    if (!m) return { err: "読めません: " + toks[i] };
+    var d = m[2] ? parseFloat(m[2]) : 1;
+    if (!(d > 0)) return { err: "長さが不正: " + toks[i] };
+    if (/^[Rr]$/.test(m[1])) out.push([d, null]);
+    else { var mm = n(m[1][0].toUpperCase() + m[1].slice(1)); if (mm === null) return { err: "読めません: " + toks[i] }; out.push([d, mm]); }
+  }
+  return { notes: out };
+}
+function notesToText(notes) { return notes.map(function (x) { return (x[1] === null ? "R" : nameOf(x[1])) + ":" + (+x[0].toFixed(3)); }).join(" "); }
+function projectPiece(proj) {
+  var nb = proj.main.length, P = new Piece(nb);
+  setKey(proj.key.tonic, proj.key.minor);
+  for (var bar = 0; bar < nb; bar++) { var h = barHarm(proj, -1, bar); for (var q = 0; q < BPB; q++) P.harm[bar * BPB + q] = h[q]; }
+  (proj.entries || []).forEach(function (e) {
+    var t = e.bar * BPB, notes = proj.subject, lab = "主題" + (e.tr ? (e.tr > 0 ? " +" + e.tr : " " + e.tr) : ""), tr = fitVoice(e.v, notes, e.tr | 0);
+    notes.forEach(function (x) { if (x[1] !== null) P.fixed[e.v].push([t, x[0], x[1] + tr, lab]); t += x[0]; });
+    P.entries.push([e.bar * BPB, lab, e.v]);
+  });
+  /* 提示部らしく: 最初の入りより前はその声部を休ませる (入りが 4 声にあれば) */
+  var first = {};
+  (proj.entries || []).forEach(function (e) { if (!(e.v in first) || e.bar < first[e.v]) first[e.v] = e.bar; });
+  if (Object.keys(first).length >= 2) {
+    var minBar = Math.min.apply(null, Object.keys(first).map(function (v) { return first[v]; }));
+    VOICES.forEach(function (v) { if (v in first) for (var b = minBar * BPB; b < first[v] * BPB; b++) P.rest[v][b] = true; });
+  }
+  return P;
+}
+/* 主題をその声部の音域に入るオクターヴへ (S は上、T・B は下へ) */
+function fitVoice(v, notes, tr) {
+  var ms = notes.filter(function (x) { return x[1] !== null; }).map(function (x) { return x[1] + tr; });
+  if (!ms.length) return tr;
+  var lo = Math.min.apply(null, ms), hi = Math.max.apply(null, ms), rg = RANGE[v], guard = 0;
+  while (hi > rg[1] && guard++ < 6) { lo -= 12; hi -= 12; tr -= 12; }
+  while (lo < rg[0] && guard++ < 12) { lo += 12; hi += 12; tr += 12; }
+  return tr;
+}
+function beatSec(proj) { return 60 / (proj.bpm || 72); }
+/* 4 声 + 行のオーケストラ → 音符 { i, b (拍), db (拍), m, vel, lab } */
+function compose(proj) {
+  var P = projectPiece(proj), seed = proj.seed | 0, g = generate(P, seed), rng = makeRng(seed), events = {};
+  VOICES.forEach(function (v) {
+    var ev = realize(P, v, g, rng).concat(P.fixed[v].map(function (f) { return [f[0], f[1], f[2], f[3]]; }));
+    ev.sort(function (a, b) { return a[0] - b[0] || a[2] - b[2]; });
+    events[v] = ev;
+  });
+  var chk = check(P, events), notes = [];
+  var vinst = { orch: proj.voiceInst, piano: { S:"pf", A:"pf", T:"pf", B:"pf" }, sampler: { S:"smp", A:"smp", T:"smp", B:"smp" }, mix: { S:"pf", A:"pf", T:"pf", B:"pf" } }[proj.style] || proj.voiceInst;
+  VOICES.forEach(function (v) {
+    events[v].forEach(function (e) {
+      notes.push({ i: vinst[v] || "pf", v: v, b: e[0], db: e[1], m: e[2], vel: e[3] ? 0.9 : 0.72, lab: e[3] });
+      if (proj.style === "mix") notes.push({ i: proj.voiceInst[v] || "vn1", v: v, b: e[0], db: e[1], m: e[2], vel: 0.45, lab: null, dbl: true });
+    });
+  });
+  /* 行 */
+  proj.lines.forEach(function (L, li) {
+    var inst = L.inst, rg = INST_RANGE[inst] || [36, 84], oct = (L.oct | 0) * 12, vel = +L.vel || 0.7, pat = L.pat;
+    if (pat === "rest") return;
+    var vmap = { top:"S", alto:"A", tenor:"T", bassv:"B" };
+    if (vmap[pat]) {
+      events[vmap[pat]].forEach(function (e) { notes.push({ i: inst, b: e[0], db: e[1], m: fitRange(e[2] + oct, rg), vel: vel * 0.8, lab: null, line: li }); });
+      return;
+    }
+    var cur = null;
+    for (var bar = 0; bar < proj.main.length; bar++) {
+      var h = barHarm(proj, li, bar), b0 = bar * BPB;
+      if (pat === "hold" || pat === "half" || pat === "pulse") {
+        var step = pat === "hold" ? BPB : (pat === "half" ? 2 : 1);
+        for (var q = 0; q < BPB; q += step) {
+          var c = chord(h[q]) || chord("Dm"), vo = voicing(c, rg, oct, cur); cur = vo[0];
+          vo.forEach(function (m, k) { notes.push({ i: inst, b: b0 + q, db: step, m: m, vel: vel * (k ? 0.85 : 1), lab: null, line: li }); });
+        }
+      } else if (pat === "arp" || pat === "arp16") {
+        var st = pat === "arp" ? 0.5 : 0.25;
+        for (var t = 0; t < BPB; t += st) {
+          var c2 = chord(h[Math.floor(t)]) || chord("Dm"), vo2 = voicing(c2, rg, oct, cur); cur = vo2[0];
+          var idx = Math.round(t / st) % (vo2.length * 2 - 2), k2 = idx < vo2.length ? idx : vo2.length * 2 - 2 - idx;
+          notes.push({ i: inst, b: b0 + t, db: st * 1.1, m: vo2[k2], vel: vel * (t % 1 === 0 ? 0.95 : 0.7), lab: null, line: li });
+        }
+      } else if (pat === "bass" || pat === "ped") {
+        for (var q2 = 0; q2 < BPB; q2++) {
+          var c3 = chord(h[q2]) || chord("Dm"), pc = (pat === "bass" && (q2 === 1 || q2 === 3)) ? c3.fifth : c3.bass;
+          var m3 = fitRange(lowest(pc, rg[0] + 3) + oct, rg);
+          notes.push({ i: inst, b: b0 + q2, db: pat === "ped" ? 0.9 : 1, m: m3, vel: vel * (q2 % 2 ? 0.75 : 1), lab: null, line: li });
+        }
+      } else if (pat === "roll") {
+        var c4 = chord(h[0]) || chord("Dm"), m4 = fitRange(lowest(c4.root, 38), [38, 55]);
+        notes.push({ i: inst, b: b0, db: bar % 4 === 3 ? BPB : 1, m: m4, vel: vel, lab: null, line: li });
+        if (bar % 4 !== 3) notes.push({ i: inst, b: b0 + 2, db: 1, m: m4, vel: vel * 0.7, lab: null, line: li });
+      }
+    }
+  });
+  notes.sort(function (a, b) { return a.b - b.b; });
+  return { P: P, events: events, notes: notes, chk: chk, dur: proj.main.length * BPB * beatSec(proj) };
+}
+function lowest(pc, lo) { var m = lo; while (mod12(m) !== pc) m++; return m; }
+function fitRange(m, rg) { while (m < rg[0]) m += 12; while (m > rg[1]) m -= 12; return m; }
+function voicing(c, rg, oct, prev) {
+  var pcs = c.pcs.slice(0, 4), center = Math.round((rg[0] + rg[1]) / 2) + oct, out = [];
+  var base = lowest(c.bass, Math.max(rg[0], center - 10));
+  out.push(base);
+  pcs.forEach(function (pc) { if (pc === c.bass) return; var m = base + 1; while (mod12(m) !== pc) m++; out.push(m); });
+  return out.map(function (m) { return fitRange(m, rg); }).sort(function (a, b) { return a - b; });
+}
+
+/* ================================================================ 自動作曲 (機能和声の進行・主題・入り・行) */
+var PROG_MINOR = [["i","iv","V","i"],["i","VI","iv","V"],["i","VII","VI","V"],["iv","i","V","i"],["i","V","VI","iv"],["VI","VII","i","V"],["i","iv","VII","III"],["ii°","V","i","i"]];
+var PROG_MAJOR = [["I","IV","V","I"],["I","vi","IV","V"],["I","V","vi","IV"],["vi","IV","I","V"],["I","ii","V","I"],["IV","V","iii","vi"],["I","IV","vi","V"],["ii","V","I","I"]];
+var DEG = { minor: { i:[0,"m"], "ii°":[2,"dim"], III:[3,""], iv:[5,"m"], V:[7,"7"], VI:[8,""], VII:[10,""] },
+            major: { I:[0,""], ii:[2,"m"], iii:[4,"m"], IV:[5,""], V:[7,"7"], vi:[9,"m"], "vii°":[11,"dim"] } };
+function degChord(deg, key) {
+  var d = DEG[key.minor ? "minor" : "major"][deg]; return NAMES[mod12(key.tonic + d[0])] + d[1];
+}
+function autoProgression(key, nbars, seed) {
+  var rng = makeRng(seed * 7 + 3), tpl = key.minor ? PROG_MINOR : PROG_MAJOR, out = [];
+  while (out.length < nbars) {
+    var p = tpl[Math.floor(rng.random() * tpl.length)];
+    for (var i = 0; i < p.length && out.length < nbars; i++) {
+      var c = degChord(p[i], key), last = out.length === nbars - 1;
+      if (last) { out.push(degChord(key.minor ? "i" : "I", key)); break; }
+      if (rng.random() < 0.3 && i < p.length - 1) out.push(c + " " + degChord(p[i + 1], key)); else out.push(c);
+    }
+  }
+  if (nbars >= 2) out[nbars - 2] = degChord("V", key);
+  return out;
+}
+function autoSubject(key, seed, slow) {
+  var rng = makeRng(seed * 13 + 5), scale = key.minor ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11], tonic = 60 + key.tonic, out = [], beats = 0, cur = 0;
+  var durs = slow ? [2, 3, 1, 2, 1.5] : [1, 0.5, 1, 2, 1.5, 0.5];
+  var pc = [0, 2, 4, 7, 5, 3, 1];
+  while (beats < 8) {
+    var d = durs[Math.floor(rng.random() * durs.length)]; if (beats + d > 8) d = 8 - beats;
+    var deg = beats === 0 ? 0 : Math.max(0, Math.min(6, cur + Math.round((rng.random() - 0.5) * (rng.random() < 0.3 ? 5 : 3))));
+    var m = tonic + scale[deg % 7];
+    if (beats + d >= 8) { deg = rng.random() < 0.6 ? 0 : 4; m = tonic + scale[deg]; }
+    out.push([d, m]); beats += d; cur = deg;
+  }
+  return out;
+}
+function autoLines(nbars, seed, slow) {
+  var rng = makeRng(seed * 31 + 9);
+  return ORCH_LINES.map(function (l, i) {
+    var pat = l.pat;
+    if (i >= 5 && rng.random() < 0.5) pat = ["hold", "half", "arp", "pulse"][Math.floor(rng.random() * 4)];
+    if (slow && (pat === "arp16" || pat === "pulse")) pat = "hold";
+    return { name: l.name, inst: l.inst, pat: pat, oct: l.oct, vel: l.vel, cells: new Array(nbars).fill("") };
+  });
+}
+function autoCompose(proj, opt) {
+  opt = opt || {};
+  var nb = proj.main.length, key = proj.key, seed = proj.seed | 0;
+  proj.main = autoProgression(key, nb, seed);
+  proj.subject = autoSubject(key, seed, !!opt.slow);
+  proj.lines = autoLines(nb, seed, !!opt.slow);
+  proj.entries = exposition(nb);
+  return proj;
+}
+function exposition(nb) {
+  var e = [], vs = ["A", "S", "T", "B"];
+  for (var k = 0; k < 4; k++) if (2 * k + 2 <= nb) e.push({ v: vs[k], bar: 2 * k, tr: 0 });
+  if (nb >= 12) e.push({ v: "S", bar: nb - 4, tr: 0 });
+  return e;
+}
+
+/* ================================================================ 書き出し (MIDI / WAV / score.json) */
+function vlq(n) { var b = [n & 0x7f]; n >>>= 7; while (n) { b.unshift((n & 0x7f) | 0x80); n >>>= 7; } return b; }
+function strBytes(s) { return Array.from(new TextEncoder().encode(s)); }
+function midiFile(proj, R) {
+  var PPQ = 480, tracks = [];
+  function trk(evs, name) {
+    evs.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    var nm = strBytes(name), out = [0x00, 0xff, 0x03].concat(vlq(nm.length), nm), last = 0;
+    evs.forEach(function (e) { Array.prototype.push.apply(out, vlq(e[0] - last)); Array.prototype.push.apply(out, e[2]); last = e[0]; });
+    out.push(0x00, 0xff, 0x2f, 0x00);
+    return [0x4d, 0x54, 0x72, 0x6b, (out.length >>> 24) & 255, (out.length >>> 16) & 255, (out.length >>> 8) & 255, out.length & 255].concat(out);
+  }
+  var us = Math.round(60e6 / proj.bpm);
+  tracks.push(trk([[0, 0, [0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08]], [0, 0, [0xff, 0x51, 0x03, (us >> 16) & 255, (us >> 8) & 255, us & 255]]], proj.title || "BADA Studio"));
+  var byInst = {};
+  R.notes.forEach(function (x) { if (!x.dbl) (byInst[x.i] = byInst[x.i] || []).push(x); });
+  Object.keys(INST).forEach(function (k) {
+    if (!byInst[k]) return;
+    var ch = INST[k].ch, evs = [[0, 0, [0xc0 | ch, INST[k].gm]]];
+    byInst[k].forEach(function (x) {
+      var t0 = Math.round(x.b * PPQ), t1 = Math.max(t0 + 1, Math.round((x.b + x.db) * PPQ)), m = Math.max(0, Math.min(127, x.m));
+      var vel = Math.max(1, Math.min(127, Math.round(20 + 100 * x.vel)));
+      evs.push([t0, 1, [0x90 | ch, m, vel]], [t1, 0, [0x80 | ch, m, 0]]);
+    });
+    tracks.push(trk(evs, INST[k].name));
+  });
+  var head = [0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, tracks.length, (PPQ >> 8) & 255, PPQ & 255];
+  var all = head; tracks.forEach(function (t) { all = all.concat(t); });
+  return new Uint8Array(all);
+}
+function wavFile(channels, sr) {
+  var len = channels[0].length, nch = channels.length, buf = new ArrayBuffer(44 + len * nch * 2), dv = new DataView(buf), p = 0;
+  function s(str) { for (var i = 0; i < str.length; i++) dv.setUint8(p++, str.charCodeAt(i)); }
+  function u32(x) { dv.setUint32(p, x, true); p += 4; } function u16(x) { dv.setUint16(p, x, true); p += 2; }
+  s("RIFF"); u32(36 + len * nch * 2); s("WAVE"); s("fmt "); u32(16); u16(1); u16(nch); u32(sr); u32(sr * nch * 2); u16(nch * 2); u16(16);
+  s("data"); u32(len * nch * 2);
+  for (var i = 0; i < len; i++) for (var c = 0; c < nch; c++) { var v = Math.max(-1, Math.min(1, channels[c][i])); dv.setInt16(p, v < 0 ? v * 0x8000 : v * 0x7fff, true); p += 2; }
+  return new Uint8Array(buf);
+}
+function scoreJson(proj, R) {
+  var bs = beatSec(proj), notes = [], extras = [];
+  R.notes.forEach(function (x) {
+    if (x.v && !x.dbl) notes.push({ v: x.v, t: +(x.b * bs).toFixed(4), d: +(x.db * bs).toFixed(4), m: x.m, label: x.lab, beat: x.b, dyn: 1.0, det: 0.92, role: "tutti" });
+    else if (PY_CODE[x.i]) extras.push({ v: PY_CODE[x.i], beat: x.b, dbeats: x.db, m: x.m, gain: +x.vel.toFixed(3), label: null, t: +(x.b * bs).toFixed(4), d: +(x.db * bs).toFixed(4) });
+  });
+  var bt = []; for (var i = 0; i <= proj.main.length; i++) bt.push(+(i * BPB * bs).toFixed(4));
+  return { bpm: proj.bpm, beats_per_bar: BPB, nbars: proj.main.length, duration: bt[bt.length - 1], bar_times: bt, notes: notes,
+    entries: R.P.entries.map(function (e) { return { t: e[0] * bs, label: e[1], v: e[2], bar: Math.floor(e[0] / BPB) + 1 }; }),
+    sections: [], harm: R.P.harm.slice(), meta: { style: "symphony", detach: 0.92, humanize: true, title: proj.title, subtitle: "BADA Studio で作曲", footer: [] }, extras: extras };
+}
+
+/* ================================================================ 合成エンジン (Web Audio: ピアノ / 弦 / 木管 / 金管 / ティンパニ / サンプラー) */
+var _irCache = {};
+function makeEngine(ctx, dest, sources) {
+  var E = { ctx: ctx }, sr = ctx.sampleRate;
+  var noise = ctx.createBuffer(1, sr, sr), nd = noise.getChannelData(0);
+  for (var i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  var bus = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain(), conv = ctx.createConvolver(), comp = ctx.createDynamicsCompressor();
+  if (!_irCache[sr]) {
+    var len = Math.floor(sr * 2.6), ir = ctx.createBuffer(2, len, sr);
+    for (var c = 0; c < 2; c++) {
+      var d = ir.getChannelData(c), y = 0;
+      for (var j = 0; j < len; j++) { var x = (Math.random() * 2 - 1) * Math.exp(-j / (sr * 0.85)); y += 0.35 * (x - y); d[j] = j < sr * 0.012 ? 0 : y; }
+    }
+    _irCache[sr] = ir;
+  }
+  conv.buffer = _irCache[sr];
+  dry.gain.value = 0.85; wet.gain.value = 0.36;
+  comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = 0.01; comp.release.value = 0.25;
+  bus.connect(dry); bus.connect(conv); conv.connect(wet); dry.connect(comp); wet.connect(comp); comp.connect(dest);
+  E.bus = bus; E.comp = comp; E.direct = ctx.createGain(); E.direct.connect(comp);
+  var pans = {};
+  function out(inst) {
+    if (!pans[inst]) {
+      var g = ctx.createGain(); g.gain.value = 1;
+      if (ctx.createStereoPanner) { var p = ctx.createStereoPanner(); p.pan.value = INST[inst] ? INST[inst].pan : 0; g.connect(p); p.connect(bus); }
+      else g.connect(bus);
+      pans[inst] = g;
+    }
+    return pans[inst];
+  }
+  var waves = {};
+  function wave(key, amps) {
+    if (!waves[key]) {
+      var re = new Float32Array(amps.length + 1), im = new Float32Array(amps.length + 1);
+      for (var k = 0; k < amps.length; k++) im[k + 1] = amps[k];
+      waves[key] = ctx.createPeriodicWave(re, im);
+    }
+    return waves[key];
+  }
+  function harm(nh, p, oddBoost) { var a = []; for (var k = 1; k <= nh; k++) a.push((1 / Math.pow(k, p)) * (k % 2 ? (oddBoost || 1) : 1)); return a; }
+  function osc(type, f, t, stop, w) {
+    var o = ctx.createOscillator();
+    if (w) o.setPeriodicWave(w); else o.type = type;
+    o.frequency.setValueAtTime(f, t); o.start(t); o.stop(stop); return o;
+  }
+  function env(g, t, a, peak, tEnd, rel) {
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a);
+    g.gain.setValueAtTime(peak, Math.max(t + a, tEnd)); g.gain.setTargetAtTime(0.0001, Math.max(t + a, tEnd), rel / 3);
+  }
+  function noiseBurst(t, dur, fc, q, gain, dst) {
+    var s = ctx.createBufferSource(); s.buffer = noise; s.playbackRate.value = 0.8 + Math.random() * 0.4;
+    var f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = fc; f.Q.value = q;
+    var g = ctx.createGain(); g.gain.setValueAtTime(gain, t); g.gain.setTargetAtTime(0.0001, t + 0.002, dur / 3);
+    s.connect(f); f.connect(g); g.connect(dst); s.start(t); s.stop(t + dur * 3 + 0.05);
+  }
+  function piano(t, d, f, vel, dst) {
+    var oct = Math.max(0, Math.min(6, Math.round(Math.log2(f / 55)))), nh = Math.max(3, Math.min(24, Math.floor(6000 / f)));
+    var w = wave("pf" + oct + "_" + nh, harm(nh, 1.0 + 0.16 * oct));
+    var tEnd = t + d, stop = tEnd + 1.6, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    var peak = 0.2 * (0.35 + 0.65 * vel) * Math.min(1, Math.pow(262 / f, 0.25)), soft = f > 700;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + (soft ? 0.012 : 0.004));
+    g.gain.setTargetAtTime(peak * 0.42, t + 0.01, 0.12 + 0.2 * Math.min(1, 262 / f));
+    g.gain.setTargetAtTime(0.0001, t + 0.35, Math.min(3.2, 1.4 * Math.pow(262 / f, 0.55) + 0.35));
+    g.gain.setTargetAtTime(0.0001, tEnd, 0.28);
+    lp.type = "lowpass"; lp.Q.value = 0.5;
+    lp.frequency.setValueAtTime(Math.min(15000, f * (soft ? 4 : 7 + 6 * vel) + 1200), t);
+    lp.frequency.setTargetAtTime(Math.min(7000, f * 2.5 + 600), t + 0.02, 0.5);
+    var o1 = osc(null, f, t, stop, w), o2 = osc(null, f * 1.0009, t, stop, w), g2 = ctx.createGain(); g2.gain.value = 0.55;
+    o1.connect(lp); o2.connect(g2); g2.connect(lp); lp.connect(g); g.connect(dst);
+    noiseBurst(t, 0.012, Math.min(8000, f * 4), 0.7, (soft ? 0.015 : 0.05) * vel, dst);
+    if (f < 200) { var o3 = osc("sine", f / 2, t, t + 2, null), g3 = ctx.createGain(); g3.gain.setValueAtTime(peak * 0.25, t); g3.gain.setTargetAtTime(0.0001, t, 0.4); o3.connect(g3); g3.connect(dst); }
+  }
+  function strings(t, d, f, vel, dark, dst) {
+    var a = 0.22 + 0.25 * dark, r = 0.45, tEnd = t + d, stop = tEnd + r * 3 + 0.1, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.Q.value = 0.6; lp.frequency.value = Math.min(6500, 1300 + f * (2.4 - 1.3 * dark));
+    env(g, t, a, 0.055 * vel, tEnd, r);
+    var lfo = osc("sine", 5.3, t, stop, null), lg = ctx.createGain();
+    lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.0035, t + 0.7); lfo.connect(lg);
+    [-7, 6].forEach(function (cents) { var o = osc("sawtooth", f * Math.pow(2, cents / 1200), t, stop, null); lg.connect(o.frequency); o.connect(lp); });
+    lp.connect(g); g.connect(dst);
+  }
+  function wind(t, d, f, vel, kind, dst) {
+    var tEnd = t + d, a = kind === "fl" ? 0.09 : 0.06, r = 0.18, stop = tEnd + 0.8, g = ctx.createGain(), w = null, lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = kind === "fl" ? 5000 : 3600;
+    if (kind === "ob") w = wave("ob", [1, .9, .85, .6, .45, .35, .25, .18, .12, .08]);
+    else if (kind === "cl") w = wave("cl", [1, 0.02, .5, 0.02, .28, 0.02, .14, 0.02, .07]);
+    else w = wave("fl", [1, .22, .08, .03]);
+    env(g, t, a, (kind === "fl" ? 0.07 : 0.05) * vel, tEnd, r);
+    var o = osc("sine", f, t, stop, w), lfo = osc("sine", 5.4, t, stop, null), lg = ctx.createGain();
+    lg.gain.setValueAtTime(0, t); lg.gain.linearRampToValueAtTime(f * 0.004, t + 0.5); lfo.connect(lg); lg.connect(o.frequency);
+    o.connect(lp); lp.connect(g); g.connect(dst);
+    if (kind === "fl") noiseBurst(t, 0.08, f * 2, 1.2, 0.02 * vel, dst);
+  }
+  function brass(t, d, f, vel, kind, dst) {
+    var tEnd = t + d, a = kind === "tp" ? 0.05 : (kind === "hn" ? 0.14 : 0.09), r = kind === "hn" ? 0.35 : 0.22, stop = tEnd + r * 3 + 0.1;
+    var g = ctx.createGain(), lp = ctx.createBiquadFilter(), fc = kind === "tp" ? 3200 : (kind === "hn" ? 950 : 1500);
+    lp.type = "lowpass"; lp.Q.value = 0.8;
+    lp.frequency.setValueAtTime(fc * 0.5, t); lp.frequency.linearRampToValueAtTime(fc, t + a * 1.5);
+    env(g, t, a, (kind === "hn" ? 0.06 : 0.05) * vel, tEnd, r);
+    var w = wave("br" + kind, harm(kind === "hn" ? 12 : 20, kind === "tp" ? 0.95 : 1.3));
+    [0, 4].forEach(function (c) { var o = osc(null, f * Math.pow(2, c / 1200), t, stop, w); o.connect(lp); });
+    lp.connect(g); g.connect(dst);
+  }
+  function timp(t, d, f, vel, dst) {
+    var hits = d >= 1.2 ? Math.min(90, Math.floor(d * 11)) : 1;
+    for (var h = 0; h < hits; h++) {
+      var th = t + h / 11, v = hits > 1 ? (0.35 + 0.65 * Math.min(1, h / hits * 1.4)) * (h % 2 ? 0.9 : 1) : 1;
+      var o = osc("sine", f * 1.25, th, th + 2.0, null), g = ctx.createGain();
+      o.frequency.exponentialRampToValueAtTime(f, th + 0.06);
+      g.gain.setValueAtTime(0.35 * v * vel, th); g.gain.setTargetAtTime(0.0001, th + 0.005, 0.5);
+      o.connect(g); g.connect(dst);
+      var o2 = osc("sine", f * 1.5, th, th + 1.0, null), g2 = ctx.createGain();
+      g2.gain.setValueAtTime(0.12 * v * vel, th); g2.gain.setTargetAtTime(0.0001, th, 0.2); o2.connect(g2); g2.connect(dst);
+      noiseBurst(th, 0.03, 400, 0.6, 0.25 * v * vel, dst);
+    }
+  }
+  function sampler(t, d, m, vel, dst) {
+    var src = (sources || []).filter(function (s) { return s && s.buf; }), s0 = null;
+    if (!src.length) return piano(t, d, 440 * Math.pow(2, (m - 69) / 12), vel, dst);
+    var idx = E.smp | 0; s0 = (idx >= 0 && sources[idx] && sources[idx].buf) ? sources[idx] : src[0];
+    var bs = ctx.createBufferSource(); bs.buffer = s0.buf; bs.playbackRate.value = Math.pow(2, (m - (s0.base || 60)) / 12);
+    var g = ctx.createGain(), rel = 0.25, tEnd = t + d, stop = Math.min(tEnd + rel * 3, t + s0.buf.duration / bs.playbackRate.value);
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.5 * vel, t + 0.006);
+    g.gain.setValueAtTime(0.5 * vel, tEnd); g.gain.setTargetAtTime(0.0001, tEnd, rel / 3);
+    bs.connect(g); g.connect(dst); bs.start(t, s0.off || 0); bs.stop(stop + 0.05);
+  }
+  E.smp = -1;
+  E.play = function (x, base) {
+    var t = base + x.t, f = 440 * Math.pow(2, (x.m - 69) / 12), dst = out(x.i);
+    if (t < ctx.currentTime - 0.05) return;
+    switch (x.i) {
+      case "pf": piano(t, x.d, f, x.vel, dst); break;
+      case "vn1": case "vn2": strings(t, x.d, f, x.vel, 0, dst); break;
+      case "va": strings(t, x.d, f, x.vel, 0.4, dst); break;
+      case "vc": strings(t, x.d, f, x.vel, 0.7, dst); break;
+      case "cb": strings(t, x.d, f, x.vel * 0.9, 1.0, dst); break;
+      case "fl": case "ob": case "cl": wind(t, x.d, f, x.vel, x.i, dst); break;
+      case "hn": case "tp": case "tb": brass(t, x.d, f, x.vel, x.i, dst); break;
+      case "timp": timp(t, x.d, f, x.vel, dst); break;
+      case "smp": sampler(t, x.d, x.m, x.vel, dst); break;
+      default: piano(t, x.d, f, x.vel, dst);
+    }
+  };
+  /* 音源クリップ: base = ctx の時刻 (タイムラインの 0 秒)、from = 再生開始のタイムライン秒 */
+  E.clip = function (clip, src, base, from) {
+    if (!src || !src.buf) return null;
+    var start = clip.start, end = clip.start + clip.dur;
+    if (end <= from) return null;
+    var lead = Math.max(0, from - start), t = base + Math.max(0, start - from);
+    var bs = ctx.createBufferSource(); bs.buffer = src.buf;
+    var g = ctx.createGain(), gain = clip.gain == null ? 1 : +clip.gain, fin = +clip.fin || 0, fout = +clip.fout || 0;
+    g.gain.setValueAtTime(fin > lead ? gain * (lead / fin) : gain, t);
+    if (fin > lead) g.gain.linearRampToValueAtTime(gain, t + (fin - lead));
+    if (fout > 0) { var tf = base + (end - from) - fout; if (tf > t) { g.gain.setValueAtTime(gain, tf); g.gain.linearRampToValueAtTime(0.0001, base + (end - from)); } }
+    bs.connect(g); g.connect(E.direct);
+    var off = (clip.off || 0) + lead, dur = clip.dur - lead;
+    if (off >= src.buf.duration) return null;
+    bs.start(t, off, Math.min(dur, src.buf.duration - off));
+    return bs;
+  };
+  return E;
+}
+
+/* ================================================================ 音源 (どの拡張子でも中身でデコード / 生 PCM / マイク) */
+function peaksOf(buf, per) {
+  per = per || 0.02; var ch = buf.numberOfChannels, sr = buf.sampleRate, n = Math.floor(buf.duration / per), out = new Float32Array(n), step = Math.floor(per * sr);
+  var data = []; for (var c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+  for (var i = 0; i < n; i++) { var s = 0, a = i * step, b = Math.min(buf.length, a + step); for (var k = a; k < b; k += 4) for (var c2 = 0; c2 < ch; c2++) s = Math.max(s, Math.abs(data[c2][k])); out[i] = s; }
+  return out;
+}
+function estimateBase(buf) {
+  var sr = buf.sampleRate, d = buf.getChannelData(0), n = Math.min(d.length, Math.floor(sr * 0.6)), a = Math.floor(n * 0.15), x = d.subarray(a, n);
+  var best = 0, bestc = 0, minL = Math.floor(sr / 1000), maxL = Math.floor(sr / 40);
+  for (var L = minL; L < maxL && L < x.length / 2; L++) {
+    var s = 0, e = 0; for (var i = 0; i + L < x.length; i += 2) { s += x[i] * x[i + L]; e += x[i] * x[i]; }
+    var c = e ? s / e : 0; if (c > bestc) { bestc = c; best = L; }
+  }
+  if (!best || bestc < 0.3) return 60;
+  var f = sr / best; return Math.max(24, Math.min(96, Math.round(69 + 12 * Math.log2(f / 440))));
+}
+function isVideoName(name, type) { return /^video\//.test(type || "") || /\.(mp4|m4v|webm|mov|mkv|avi|ogv|3gp)$/i.test(name || ""); }
+function decodeBytes(ctx, ab) { return new Promise(function (res, rej) { try { var p = ctx.decodeAudioData(ab.slice(0), res, rej); if (p && p.then) p.then(res, rej); } catch (e) { rej(e); } }); }
+function rawPcmBuffer(ctx, ab) {
+  var n = Math.floor(ab.byteLength / 2), dv = new DataView(ab), buf = ctx.createBuffer(1, Math.max(1, n), 44100), d = buf.getChannelData(0);
+  for (var i = 0; i < n; i++) d[i] = dv.getInt16(i * 2, true) / 32768;
+  return buf;
+}
+function addSource(name, buf, videoUrl, type) {
+  var s = { name: name, buf: buf, peaks: peaksOf(buf), base: estimateBase(buf), off: 0, video: null, url: videoUrl || null, type: type || "" };
+  if (videoUrl) { var v = document.createElement("video"); v.src = videoUrl; v.muted = true; v.playsInline = true; v.preload = "auto"; v.crossOrigin = "anonymous"; s.video = v; }
+  S.sources.push(s);
+  return S.sources.length - 1;
+}
+function importFiles(files, raw) {
+  var ctx = ensureCtx(), list = Array.prototype.slice.call(files || []);
+  if (!list.length) return Promise.resolve();
+  setMsg("読み込み中… " + list.map(function (f) { return f.name; }).join(", "));
+  return list.reduce(function (p, f) {
+    return p.then(function () {
+      return f.arrayBuffer().then(function (ab) {
+        if (raw) { addSource(f.name, rawPcmBuffer(ctx, ab), null, f.type); return; }
+        return decodeBytes(ctx, ab).then(function (buf) {
+          addSource(f.name, buf, isVideoName(f.name, f.type) ? URL.createObjectURL(f) : null, f.type);
+        }, function () {
+          setMsg("⚠ " + f.name + " はデコードできませんでした (対応していない形式)。「生 PCM として読み込む」も試せます。", "err"); S.warn = true;
+        });
+      });
+    });
+  }, Promise.resolve()).then(function () {
+    renderSources(); fillSmp(); if (!S.warn) setMsg("✅ 読み込みました: " + list.length + " ファイル", "ok"); S.warn = false;
+  });
+}
+function recordMic() {
+  if (S.mic) { S.mic.stop(); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setMsg("この環境ではマイクが使えません", "err"); return; }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+    var rec = new MediaRecorder(stream), chunks = [];
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    rec.onstop = function () {
+      stream.getTracks().forEach(function (t) { t.stop(); }); S.mic = null; $("btnRecMic").textContent = "🎙 マイク録音";
+      var blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" }), f = new File([blob], "mic_" + new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19) + ".webm", { type: blob.type });
+      importFiles([f]);
+    };
+    rec.start(250); S.mic = rec; $("btnRecMic").textContent = "⏹ 録音を止める"; setMsg("🎙 録音中… もう一度押すと止めて音源に追加します");
+  }, function (e) { setMsg("マイクを開けません: " + e.message, "err"); });
+}
+
+/* ================================================================ タイムライン (クリップ) */
+function newClip(srcIdx, track, start) {
+  var s = S.sources[srcIdx];
+  return { id: ++S.clipId, src: s.name, track: track, start: +start.toFixed(3), off: 0, dur: +s.buf.duration.toFixed(3), gain: 1, fin: 0.02, fout: 0.05 };
+}
+function srcOf(clip) { for (var i = 0; i < S.sources.length; i++) if (S.sources[i].name === clip.src) return S.sources[i]; return null; }
+function totalDur() {
+  var d = 0;
+  S.proj.clips.forEach(function (c) { d = Math.max(d, c.start + c.dur); });
+  if (S.R) d = Math.max(d, (+S.proj.musicStart || 0) + S.R.dur);
+  return d;
+}
+function activeVideoClip(pos) {
+  var best = null;
+  S.proj.clips.forEach(function (c) { if (c.track === "V" && pos >= c.start && pos < c.start + c.dur) best = c; });
+  return best;
+}
+
+/* ================================================================ 再生 / 録画 / オフライン合成 */
+var S = { proj: null, R: null, sources: [], clipId: 0, sel: null, playing: false, ctx: null, eng: null, base: 0, from: 0, pos: 0, idx: 0, timer: null, raf: 0,
+          nodes: [], rec: null, recCanvas: null, pps: 40, scrollX: 0, drag: null, mic: null, warn: false, focusCell: null, videoClip: null, onFrame: null, onEnd: null, stopAt: null };
+function setMsg(t, cls) { var el = document.getElementById("status"); if (!el) return; el.textContent = t || ""; el.className = cls || ""; }
+function $(id) { return document.getElementById(id); }
+function fmtTime(s) { s = Math.max(0, s || 0); return Math.floor(s / 60) + ":" + ("0" + Math.floor(s % 60)).slice(-2) + "." + Math.floor((s % 1) * 10); }
+function ensureCtx() {
+  if (!S.ctx) { S.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+  if (S.ctx.state === "suspended") S.ctx.resume();
+  return S.ctx;
+}
+function musicNotes() {
+  var bs = beatSec(S.proj), st = +S.proj.musicStart || 0;
+  return S.R.notes.map(function (x) { return { i: x.i, t: st + x.b * bs, d: Math.max(0.05, x.db * bs * 0.95), m: x.m, vel: x.vel }; });
+}
+function play(from, opts) {
+  opts = opts || {};
+  if (S.playing) stop(true);
+  var ctx = ensureCtx(), dest = opts.recDest || ctx.destination;
+  S.eng = makeEngine(ctx, dest, S.sources); S.eng.smp = S.proj.smp | 0;
+  if (opts.recDest) { /* 画面でも聞こえるように */ S.eng.comp.connect(ctx.destination); }
+  S.from = from; S.base = ctx.currentTime + 0.12; S.playing = true; S.nodes = []; S.onFrame = opts.onFrame || null; S.onEnd = opts.onEnd || null;
+  S.stopAt = opts.toEnd ? totalDur() + (opts.tail || 0) : null;
+  S.proj.clips.forEach(function (c) { if (c.track !== "V" && !S.proj.mute) { var nd = S.eng.clip(c, srcOf(c), S.base, from); if (nd) S.nodes.push(nd); } });
+  S.proj.clips.forEach(function (c) { if (c.track === "V") { var s = srcOf(c); if (s && s.buf) { var nd2 = S.eng.clip(c, s, S.base, from); if (nd2) S.nodes.push(nd2); } } });
+  S.notes = S.R ? musicNotes().filter(function (x) { return x.t + x.d > from; }) : [];
+  S.idx = 0;
+  function pump() {
+    var now = ctx.currentTime, horizon = now - S.base + from + 1.5;
+    while (S.idx < S.notes.length && S.notes[S.idx].t < horizon) { var x = S.notes[S.idx++]; S.eng.play(x, S.base - from); }
+  }
+  pump(); S.timer = setInterval(pump, 120);
+  $("btnPlay").textContent = "⏸";
+  function frame() {
+    if (!S.playing) return;
+    S.pos = from + (ctx.currentTime - S.base);
+    var end = S.stopAt != null ? S.stopAt : totalDur();
+    syncVideo(S.pos);
+    if (S.pos >= end) {
+      if ($("chkLoop").checked && !opts.recDest) { play(0, opts); return; }
+      var cb = S.onEnd; stop(false); S.pos = 0; drawAll(); if (cb) cb(); return;
+    }
+    drawAll(); if (S.onFrame) S.onFrame(S.pos);
+    S.raf = requestAnimationFrame(frame);
+  }
+  S.raf = requestAnimationFrame(frame);
+}
+function syncVideo(pos) {
+  var c = activeVideoClip(pos), s = c ? srcOf(c) : null, v = s && s.video ? s.video : null;
+  if (S.videoEl && S.videoEl !== v) { S.videoEl.pause(); S.videoEl = null; }
+  if (!v) return;
+  var want = (c.off || 0) + (pos - c.start);
+  if (S.videoEl !== v) { S.videoEl = v; v.currentTime = want; v.play().catch(function () {}); }
+  else if (Math.abs(v.currentTime - want) > 0.2) v.currentTime = want;
+}
+function stop(keepPos) {
+  S.playing = false; clearInterval(S.timer); cancelAnimationFrame(S.raf);
+  S.nodes.forEach(function (n) { try { n.stop(); } catch (e) {} }); S.nodes = [];
+  if (S.eng) { try { S.eng.comp.disconnect(); } catch (e) {} S.eng = null; }
+  if (S.videoEl) { S.videoEl.pause(); S.videoEl = null; }
+  if (S.rec && S.rec.state !== "inactive") { S.rec.stop(); }
+  $("btnPlay").textContent = "▶";
+  if (!keepPos) { /* 位置はそのまま */ }
+  drawAll();
+}
+function renderMix(opts) {
+  opts = opts || {};
+  var dur = opts.musicOnly ? (S.R ? S.R.dur + 2.5 : 1) : totalDur() + 2.5, sr = 44100;
+  if (dur <= 2.6) return Promise.reject(new Error("何もありません (音源を置くか、作曲してください)"));
+  var off = new OfflineAudioContext(2, Math.ceil(dur * sr), sr), eng = makeEngine(off, off.destination, S.sources); eng.smp = S.proj.smp | 0;
+  if (!opts.musicOnly) S.proj.clips.forEach(function (c) { eng.clip(c, srcOf(c), 0, 0); });
+  if (S.R) {
+    var st = opts.musicOnly ? 0 : (+S.proj.musicStart || 0), bs = beatSec(S.proj);
+    S.R.notes.forEach(function (x) { eng.play({ i: x.i, t: st + x.b * bs, d: Math.max(0.05, x.db * bs * 0.95), m: x.m, vel: x.vel }, 0); });
+  }
+  return off.startRendering();
+}
+function exportWav(musicOnly) {
+  setMsg("合成中…");
+  renderMix({ musicOnly: musicOnly }).then(function (buf) {
+    var a = buf.getChannelData(0), b = buf.getChannelData(1), peak = 0;
+    for (var i = 0; i < a.length; i++) peak = Math.max(peak, Math.abs(a[i]), Math.abs(b[i]));
+    var g = peak > 0.98 ? 0.98 / peak : 1; if (g !== 1) { for (var j = 0; j < a.length; j++) { a[j] *= g; b[j] *= g; } }
+    saveBlob(new Blob([wavFile([a, b], buf.sampleRate)], { type: "audio/wav" }), sanitizeName(S.proj.title) + (musicOnly ? "_music" : "") + ".wav", "audio/wav", "WAV 音声");
+  }, function (e) { setMsg("合成できません: " + e.message, "err"); });
+}
+function exportVideo() {
+  var mime = pickRecorderMime();
+  if (!mime) { setMsg("この環境は動画の録画 (MediaRecorder) に対応していません。", "err"); return; }
+  var cv = S.recCanvas || (S.recCanvas = document.createElement("canvas")); cv.width = 1280; cv.height = 720;
+  var ctx = ensureCtx(), ad = ctx.createMediaStreamDestination(), vs = cv.captureStream(30);
+  var stream = new MediaStream(vs.getVideoTracks().concat(ad.stream.getAudioTracks())), rec, chunks = [];
+  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5000000, audioBitsPerSecond: 192000 }); }
+  catch (e) { setMsg("録画を始められません: " + e.message, "err"); return; }
+  rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.onstop = function () {
+    var ext = /mp4/.test(mime) ? "mp4" : "webm", blob = new Blob(chunks, { type: ext === "mp4" ? "video/mp4" : "video/webm" });
+    S.rec = null; saveBlob(blob, sanitizeName(S.proj.title) + "." + ext, ext === "mp4" ? "video/mp4" : "video/webm", "動画");
+  };
+  var c2 = cv.getContext("2d");
+  rec.start(1000); S.rec = rec;
+  setMsg("🎬 録画中 (" + (/mp4/.test(mime) ? "MP4" : "WebM") + ") … 再生が終わると保存します。⏹ で途中終了。");
+  play(0, { recDest: ad, toEnd: true, tail: 2, onFrame: function (pos) { drawStage(c2, 1280, 720, pos); }, onEnd: function () { if (rec.state !== "inactive") rec.stop(); } });
+}
+
+/* ================================================================ 保存 (Android: SAF / Chrome・Electron: 保存ダイアログ / その他: ダウンロード) */
+function sanitizeName(s) { return String(s || "bada").replace(/[\\\/:*?"<>|\u0000-\u001f]+/g, "_").replace(/\s+/g, "_").slice(0, 80) || "bada"; }
+function saveBlob(blob, name, mime, desc) {
+  var cdv = window.cordova && window.cordova.plugins && window.cordova.plugins.saveDialog;
+  if (cdv && typeof cdv.saveFile === "function") {
+    setMsg("保存先を選択してください…");
+    try {
+      cdv.saveFile(blob, name).then(function () { setMsg("✅ 保存しました: " + name, "ok"); },
+        function (err) { if (err && !/cancel/i.test(String(err))) setMsg("保存に失敗しました: " + err, "err"); else setMsg(""); });
+    } catch (e) { setMsg("保存に失敗しました: " + e.message, "err"); }
+    return;
+  }
+  if (typeof window.showSaveFilePicker === "function") {
+    var ext = name.slice(name.lastIndexOf(".")), acc = {}; acc[mime] = [ext];
+    window.showSaveFilePicker({ suggestedName: name, types: [{ description: desc || "ファイル", accept: acc }] })
+      .then(function (h) { return h.createWritable(); })
+      .then(function (w) { return w.write(blob).then(function () { return w.close(); }); })
+      .then(function () { setMsg("✅ 保存しました: " + name, "ok"); })
+      .catch(function (e) { if (e && e.name === "AbortError") return; anchorDownload(blob, name); });
+    return;
+  }
+  anchorDownload(blob, name);
+}
+function asciiName(name) {
+  var dot = name.lastIndexOf("."), ext = dot > 0 ? name.slice(dot) : "", base = dot > 0 ? name.slice(0, dot) : name;
+  base = base.replace(/[‐-―]/g, "-").normalize("NFKD").replace(/[^\x20-\x7e]/g, "").replace(/[^A-Za-z0-9._-]+/g, "_").replace(/_+/g, "_").replace(/^[_.-]+|[_.-]+$/g, "");
+  return (base || "bada-studio") + ext;
+}
+function anchorDownload(blob, name) {
+  var a = document.createElement("a"), url = URL.createObjectURL(blob);
+  name = asciiName(name);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1000);
+  setMsg("💾 " + name + " をダウンロードしました。", "ok");
+}
+function pickRecorderMime() {
+  var list = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,mp4a", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  if (typeof MediaRecorder === "undefined" || !MediaRecorder.isTypeSupported) return "";
+  for (var i = 0; i < list.length; i++) if (MediaRecorder.isTypeSupported(list[i])) return list[i];
+  return "";
+}
+
+/* ================================================================ 画面: ステージ (映像 / ピアノロール) とタイムライン */
+var COL = { pf:"#faf0c8", vn1:"#c8785a", vn2:"#aa6450", va:"#965a6e", vc:"#78463c", cb:"#5a3c32", fl:"#bee8dc", ob:"#78c878", cl:"#6eaac8", hn:"#d2aa5a", tp:"#f0c850", tb:"#aa783c", timp:"#aa3c3c", smp:"#9fd8ff" };
+var VCOL = { S:"#f0c46e", A:"#e87a8e", T:"#60cec4", B:"#7a98ff" };
+function drawStage(g, W, H, pos) {
+  g.fillStyle = "#07090e"; g.fillRect(0, 0, W, H);
+  var vc = activeVideoClip(pos), vsrc = vc ? srcOf(vc) : null;
+  if (vsrc && vsrc.video && vsrc.video.videoWidth) {
+    var v = vsrc.video, sc = Math.min(W / v.videoWidth, H / v.videoHeight), w = v.videoWidth * sc, h = v.videoHeight * sc;
+    try { g.drawImage(v, (W - w) / 2, (H - h) / 2, w, h); } catch (e) {}
+  }
+  /* ピアノロール (映像があるときは下 30% に半透明で) */
+  var top = vsrc ? H * 0.7 : 0, rh = H - top, win = 6, bs = beatSec(S.proj), st = +S.proj.musicStart || 0;
+  if (S.R && S.R.notes.length) {
+    g.save(); g.globalAlpha = vsrc ? 0.75 : 1;
+    if (vsrc) { g.fillStyle = "rgba(7,9,14,0.6)"; g.fillRect(0, top, W, rh); }
+    var lo = 24, hi = 100, ph = rh / (hi - lo), x0 = W * 0.3;
+    for (var m = lo; m <= hi; m += 12) { g.fillStyle = "#1a2030"; g.fillRect(0, top + rh - (m - lo) * ph, W, 1); }
+    S.R.notes.forEach(function (x) {
+      var t0 = st + x.b * bs, t1 = t0 + x.db * bs;
+      if (t1 < pos - win * 0.3 || t0 > pos + win) return;
+      var xa = x0 + (t0 - pos) / win * W * 0.7, xb = x0 + (t1 - pos) / win * W * 0.7;
+      g.fillStyle = x.v ? VCOL[x.v] : (COL[x.i] || "#888"); g.globalAlpha = (vsrc ? 0.75 : 1) * (x.v ? 1 : 0.55);
+      if (t0 <= pos && pos < t1) g.globalAlpha = 1;
+      g.fillRect(xa, top + rh - (x.m - lo + 1) * ph, Math.max(2, xb - xa - 1), Math.max(2, ph - 1));
+    });
+    g.globalAlpha = 1; g.fillStyle = "#e6e2d6"; g.fillRect(x0, top, 1, rh);
+    /* 和音名 */
+    var beat = (pos - st) / bs; if (beat >= 0 && beat < S.R.P.N) { g.font = "italic 18px Georgia,serif"; g.fillStyle = "#e6e2d6"; g.fillText(S.R.P.harm[Math.floor(beat)], x0 + 8, top + 24); }
+    g.restore();
+  }
+  /* 音声クリップの波形 (上 20%) */
+  if (!vsrc) {
+    var wh = H * 0.22;
+    S.proj.clips.forEach(function (c) {
+      if (c.track === "V") return;
+      var s = srcOf(c); if (!s) return;
+      if (pos < c.start - win || pos > c.start + c.dur + win * 0.3) return;
+      g.fillStyle = "#60cec4"; g.globalAlpha = 0.5;
+      for (var px = 0; px < W; px += 2) {
+        var t = pos + (px - W * 0.3) / (W * 0.7) * win; if (t < c.start || t >= c.start + c.dur) continue;
+        var k = Math.floor(((c.off || 0) + t - c.start) / 0.02); var a = s.peaks[k] || 0;
+        g.fillRect(px, H - wh * (1 + a) / 2 + (wh - wh * a) / 2 - wh * 0.1, 2, Math.max(1, wh * a * 0.8));
+      }
+      g.globalAlpha = 1;
+    });
+  }
+  g.font = "13px sans-serif"; g.fillStyle = "#9aa2b6"; g.fillText(S.proj.title + "  " + fmtTime(pos), 10, H - 8);
+}
+function tlRows() {
+  var rows = [{ id: "V", name: "映像", col: "#6f8fd8" }, { id: "M", name: "作曲", col: "#f0c46e" }];
+  S.proj.tracks.forEach(function (t, i) { rows.push({ id: i, name: t, col: "#60cec4" }); });
+  return rows;
+}
+var TL = { ruler: 22, rowH: 40, label: 70 };
+function tlX(t) { return TL.label + (t - S.scrollX) * S.pps; }
+function tlT(x) { return S.scrollX + (x - TL.label) / S.pps; }
+function drawTimeline() {
+  var cv = $("tl"), g = cv.getContext("2d"), W = cv.width, H = cv.height, rows = tlRows();
+  g.fillStyle = "#0a0d13"; g.fillRect(0, 0, W, H);
+  /* ルーラー */
+  g.fillStyle = "#141925"; g.fillRect(0, 0, W, TL.ruler);
+  var step = S.pps >= 80 ? 1 : (S.pps >= 30 ? 5 : (S.pps >= 12 ? 10 : 30));
+  g.font = "11px sans-serif"; g.fillStyle = "#9aa2b6";
+  for (var t = Math.ceil(S.scrollX / step) * step; tlX(t) < W; t += step) { var x = tlX(t); g.fillRect(x, 0, 1, TL.ruler); g.fillText(fmtTime(t).slice(0, -2), x + 3, 14); }
+  rows.forEach(function (r, i) {
+    var y = TL.ruler + i * TL.rowH;
+    g.fillStyle = i % 2 ? "#0d1119" : "#0a0d13"; g.fillRect(TL.label, y, W - TL.label, TL.rowH);
+    g.fillStyle = "#141925"; g.fillRect(0, y, TL.label, TL.rowH); g.fillStyle = r.col; g.fillRect(0, y, 3, TL.rowH);
+    g.fillStyle = "#e6e2d6"; g.font = "12px sans-serif"; g.fillText(r.name, 8, y + 24);
+    g.fillStyle = "#2a3246"; g.fillRect(TL.label, y + TL.rowH - 1, W - TL.label, 1);
+  });
+  /* 作曲ブロック */
+  if (S.R) {
+    var st = +S.proj.musicStart || 0, xa = tlX(st), xb = tlX(st + S.R.dur), y1 = TL.ruler + TL.rowH;
+    g.fillStyle = S.sel === "M" ? "#5a4a20" : "#3a3120"; g.fillRect(Math.max(TL.label, xa), y1 + 4, Math.max(2, xb - Math.max(TL.label, xa)), TL.rowH - 8);
+    g.strokeStyle = "#f0c46e"; g.strokeRect(Math.max(TL.label, xa) + 0.5, y1 + 4.5, Math.max(2, xb - Math.max(TL.label, xa)) - 1, TL.rowH - 9);
+    var bs = beatSec(S.proj);
+    g.fillStyle = "#f0c46e"; g.globalAlpha = 0.6;
+    S.R.notes.forEach(function (x) { if (!x.v) return; var nx = tlX(st + x.b * bs); if (nx < TL.label || nx > W) return; g.fillRect(nx, y1 + 4 + (TL.rowH - 8) * (1 - (x.m - 36) / 60), Math.max(1, x.db * bs * S.pps - 1), 2); });
+    g.globalAlpha = 1; g.font = "11px sans-serif"; g.fillStyle = "#ffe2a6"; g.fillText("🎼 " + S.proj.title + " (" + S.proj.main.length + " 小節, ♩=" + S.proj.bpm + ")", Math.max(TL.label, xa) + 6, y1 + 16);
+  }
+  /* クリップ */
+  S.proj.clips.forEach(function (c) {
+    var ri = c.track === "V" ? 0 : 2 + (+c.track); if (ri >= rows.length) return;
+    var y = TL.ruler + ri * TL.rowH, xa = tlX(c.start), xb = tlX(c.start + c.dur), s = srcOf(c);
+    if (xb < TL.label || xa > W) return;
+    var x0 = Math.max(TL.label, xa), w = Math.max(2, xb - x0);
+    g.fillStyle = c.track === "V" ? (S.sel === c.id ? "#3a4a80" : "#25315a") : (S.sel === c.id ? "#1f5a58" : "#163d3c"); g.fillRect(x0, y + 4, w, TL.rowH - 8);
+    if (s) { g.fillStyle = c.track === "V" ? "#8fa8ff" : "#60cec4"; g.globalAlpha = 0.7;
+      for (var px = x0; px < x0 + w; px += 2) { var k = Math.floor(((c.off || 0) + tlT(px) - c.start) / 0.02); var a = s.peaks[k] || 0; g.fillRect(px, y + TL.rowH / 2 - a * (TL.rowH / 2 - 5), 2, Math.max(1, a * (TL.rowH - 10))); }
+      g.globalAlpha = 1; }
+    g.strokeStyle = S.sel === c.id ? "#ffffff" : (c.track === "V" ? "#6f8fd8" : "#60cec4"); g.strokeRect(x0 + 0.5, y + 4.5, w - 1, TL.rowH - 9);
+    g.fillStyle = "#e6e2d6"; g.font = "11px sans-serif"; g.save(); g.beginPath(); g.rect(x0, y, w, TL.rowH); g.clip(); g.fillText((s ? "" : "⚠ ") + c.src, x0 + 5, y + 15); g.restore();
+  });
+  /* 再生位置 */
+  var px2 = tlX(S.pos); if (px2 >= TL.label) { g.fillStyle = "#ff7a7a"; g.fillRect(px2, 0, 2, H); }
+}
+function drawAll() {
+  var cv = $("stage"); drawStage(cv.getContext("2d"), cv.width, cv.height, S.pos);
+  drawTimeline();
+  $("pos").textContent = fmtTime(S.pos) + " / " + fmtTime(totalDur());
+}
+function hitTest(x, y) {
+  var rows = tlRows(), ri = Math.floor((y - TL.ruler) / TL.rowH);
+  if (y < TL.ruler) return { kind: "ruler" };
+  if (ri < 0 || ri >= rows.length || x < TL.label) return { kind: "none", row: ri };
+  var t = tlT(x);
+  if (ri === 1) { if (S.R) { var st = +S.proj.musicStart || 0; if (t >= st && t <= st + S.R.dur) return { kind: "music", dt: t - st }; } return { kind: "none", row: ri }; }
+  var hit = null;
+  S.proj.clips.forEach(function (c) {
+    var cr = c.track === "V" ? 0 : 2 + (+c.track);
+    if (cr !== ri) return;
+    if (t >= c.start - 6 / S.pps && t <= c.start + c.dur + 6 / S.pps) {
+      var edge = 8 / S.pps, mode = t < c.start + edge ? "L" : (t > c.start + c.dur - edge ? "R" : "move");
+      hit = { kind: "clip", clip: c, mode: mode, dt: t - c.start };
+    }
+  });
+  return hit || { kind: "none", row: ri };
+}
+function wireTimeline() {
+  var cv = $("tl");
+  function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+  cv.addEventListener("pointerdown", function (e) {
+    var p = pt(e), h = hitTest(p.x, p.y); cv.setPointerCapture(e.pointerId);
+    if (h.kind === "ruler" || h.kind === "none") { S.pos = Math.max(0, tlT(p.x)); if (S.playing) { play(S.pos); } S.sel = null; S.drag = { kind: "seek" }; }
+    else if (h.kind === "music") { S.sel = "M"; S.drag = { kind: "music", dt: h.dt }; }
+    else { S.sel = h.clip.id; S.drag = { kind: "clip", clip: h.clip, mode: h.mode, dt: h.dt, s0: h.clip.start, o0: h.clip.off, d0: h.clip.dur }; }
+    fillClipEditor(); drawAll();
+  });
+  cv.addEventListener("pointermove", function (e) {
+    var p = pt(e);
+    if (!S.drag) { var h = hitTest(p.x, p.y); cv.style.cursor = h.kind === "clip" ? (h.mode === "move" ? "grab" : "ew-resize") : "default"; return; }
+    var t = Math.max(0, tlT(p.x));
+    if (S.drag.kind === "seek") { S.pos = t; drawAll(); return; }
+    if (S.drag.kind === "music") { S.proj.musicStart = +Math.max(0, t - S.drag.dt).toFixed(2); $("pStart").value = S.proj.musicStart; drawAll(); return; }
+    var c = S.drag.clip, s = srcOf(c), maxDur = s ? s.buf.duration : 1e9;
+    if (S.drag.mode === "move") c.start = +Math.max(0, t - S.drag.dt).toFixed(3);
+    else if (S.drag.mode === "R") c.dur = +Math.max(0.05, Math.min(maxDur - (c.off || 0), t - c.start)).toFixed(3);
+    else { var ns = Math.max(S.drag.s0 - S.drag.o0, Math.min(t, S.drag.s0 + S.drag.d0 - 0.05)); c.off = +(S.drag.o0 + ns - S.drag.s0).toFixed(3); c.dur = +(S.drag.d0 - (ns - S.drag.s0)).toFixed(3); c.start = +ns.toFixed(3); }
+    var ri = Math.floor((p.y - TL.ruler) / TL.rowH), rows = tlRows();
+    if (S.drag.mode === "move" && ri >= 2 && ri < rows.length && c.track !== "V") c.track = ri - 2;
+    fillClipEditor(); drawAll();
+  });
+  function up() { if (S.drag && S.drag.kind !== "seek") changed(false); S.drag = null; }
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+}
+function selClip() { for (var i = 0; i < S.proj.clips.length; i++) if (S.proj.clips[i].id === S.sel) return S.proj.clips[i]; return null; }
+function fillClipEditor() {
+  var c = selClip(), ids = ["cStart", "cOff", "cDur", "cGain", "cFin", "cFout", "cTrack"];
+  ids.forEach(function (id) { $(id).disabled = !c; });
+  var sel = $("cTrack"); sel.innerHTML = "";
+  if (!c) { $("clipName").textContent = S.sel === "M" ? "作曲ブロック (ドラッグで開始位置)" : ""; return; }
+  if (c.track === "V") sel.innerHTML = "<option value='V'>映像</option>";
+  else S.proj.tracks.forEach(function (t, i) { var o = document.createElement("option"); o.value = i; o.textContent = t; if (i === +c.track) o.selected = true; sel.appendChild(o); });
+  $("cStart").value = c.start; $("cOff").value = c.off; $("cDur").value = c.dur; $("cGain").value = c.gain; $("cFin").value = c.fin; $("cFout").value = c.fout;
+  $("clipName").textContent = c.src;
+}
+function splitAt(pos) {
+  var c = selClip(); if (!c || pos <= c.start || pos >= c.start + c.dur) { setMsg("再生位置がクリップの中にありません", "err"); return; }
+  var d = +(pos - c.start).toFixed(3), c2 = JSON.parse(JSON.stringify(c)); c2.id = ++S.clipId; c2.start = +pos.toFixed(3); c2.off = +((c.off || 0) + d).toFixed(3); c2.dur = +(c.dur - d).toFixed(3); c2.fin = 0.01;
+  c.dur = d; c.fout = 0.01; S.proj.clips.push(c2); S.sel = c2.id; changed(false);
+}
+
+/* ================================================================ 画面: 音源一覧・作曲・コード進行の表 */
+function renderSources() {
+  var box = $("srcList"); box.innerHTML = "";
+  if (!S.sources.length) { box.innerHTML = "<div class='hint'>まだ音源がありません。「読み込む」で音声・映像ファイルを選んでください。</div>"; return; }
+  S.sources.forEach(function (s, i) {
+    var it = document.createElement("div"); it.className = "item";
+    var cv = document.createElement("canvas"); cv.width = 240; cv.height = 56; var g = cv.getContext("2d"); g.fillStyle = "#07090e"; g.fillRect(0, 0, 240, 56); g.fillStyle = s.video ? "#8fa8ff" : "#60cec4";
+    for (var px = 0; px < 240; px++) { var a = s.peaks[Math.floor(px / 240 * s.peaks.length)] || 0; g.fillRect(px, 28 - a * 26, 1, Math.max(1, a * 52)); }
+    it.appendChild(cv);
+    var nm = document.createElement("div"); nm.className = "grow"; nm.innerHTML = "<b>" + escapeHtml(s.name) + "</b> <span class='hint'>" + (s.video ? "映像+音声 · " : "音声 · ") + fmtTime(s.buf.duration) + " · " + s.buf.sampleRate + " Hz · 基準音 " + nameOf(s.base) + "</span>";
+    it.appendChild(nm);
+    var b1 = mkBtn("＋ タイムラインへ", function () { var tr = s.video ? "V" : 0; var st = S.pos; S.proj.clips.push(newClip(i, tr, st)); S.sel = S.clipId; changed(false); setMsg("✅ " + s.name + " を置きました (" + fmtTime(st) + ")", "ok"); });
+    var b2 = mkBtn("🎹 楽器に (サンプラー)", function () { S.proj.smp = i; S.proj.style = "sampler"; $("pStyle").value = "sampler"; fillSmp(); changed(true); setMsg("✅ 4 声を " + s.name + " の音で鳴らします", "ok"); });
+    var b3 = mkBtn("▶", function () { var ctx = ensureCtx(), bs = ctx.createBufferSource(); bs.buffer = s.buf; bs.connect(ctx.destination); bs.start(0, 0, Math.min(6, s.buf.duration)); });
+    var b4 = mkBtn("🗑", function () { S.sources.splice(i, 1); renderSources(); fillSmp(); drawAll(); });
+    [b3, b1, b2, b4].forEach(function (b) { b.className = "small"; it.appendChild(b); });
+    box.appendChild(it);
+  });
+}
+function mkBtn(label, fn) { var b = document.createElement("button"); b.textContent = label; b.onclick = fn; return b; }
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
+function fillSmp() {
+  var sel = $("pSmp"); sel.innerHTML = "<option value='-1'>(最初の音源)</option>";
+  S.sources.forEach(function (s, i) { var o = document.createElement("option"); o.value = i; o.textContent = s.name; if (i === (S.proj.smp | 0)) o.selected = true; sel.appendChild(o); });
+}
+function fillComposer() {
+  var p = S.proj;
+  $("pTitle").value = p.title; $("pBpm").value = p.bpm; $("pBars").value = p.main.length; $("pStart").value = p.musicStart; $("pSeed").value = p.seed; $("pStyle").value = p.style;
+  var ks = $("pKey"); if (!ks.options.length) { for (var t = 0; t < 12; t++) [true, false].forEach(function (mi) { var o = document.createElement("option"); o.value = t + (mi ? "m" : "M"); o.textContent = NAMES[t] + (mi ? " 短調" : " 長調"); ks.appendChild(o); }); }
+  ks.value = p.key.tonic + (p.key.minor ? "m" : "M");
+  $("pSubject").value = notesToText(p.subject);
+  $("entryList").textContent = p.entries.length ? "入り: " + p.entries.map(function (e) { return e.v + " 第 " + (e.bar + 1) + " 小節" + (e.tr ? " (" + (e.tr > 0 ? "+" : "") + e.tr + ")" : ""); }).join(" · ") : "入りなし (自由声部だけ)";
+  var vi = $("voiceInst"); vi.innerHTML = "";
+  VOICES.forEach(function (v) {
+    var lab = document.createElement("label"); lab.className = "f"; lab.textContent = v + " (" + { S:"ソプラノ", A:"アルト", T:"テノール", B:"バス" }[v] + ")";
+    var sel = document.createElement("select"); Object.keys(INST).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = INST[k].name; sel.appendChild(o); });
+    sel.value = p.voiceInst[v] || "vn1"; sel.onchange = function () { p.voiceInst[v] = sel.value; changed(true); };
+    lab.appendChild(sel); vi.appendChild(lab);
+  });
+  fillSmp();
+}
+function renderProg() {
+  var p = S.proj, nb = p.main.length, wrap = $("progWrap"), tbl = document.createElement("table"); tbl.className = "prog";
+  var tr = document.createElement("tr"), th0 = document.createElement("th"); th0.textContent = "行 / 小節"; tr.appendChild(th0);
+  for (var b = 0; b < nb; b++) { var th = document.createElement("th"); th.className = "bar"; th.textContent = b + 1; tr.appendChild(th); }
+  tbl.appendChild(tr);
+  function cellInput(val, cls, onch) { var td = document.createElement("td"); td.className = cls || ""; var inp = document.createElement("input"); inp.type = "text"; inp.value = val; inp.onfocus = function () { S.focusCell = inp; }; inp.onchange = function () { onch(inp.value.trim()); inp.className = parseCell(inp.value) && parseCell(inp.value).err ? "bad" : ""; }; td.appendChild(inp); return td; }
+  var trm = document.createElement("tr"), thm = document.createElement("th"); thm.innerHTML = "<b style='color:var(--accent)'>主進行</b> <span class='hint'>(4 声の和声)</span>"; trm.appendChild(thm);
+  p.main.forEach(function (c, b) { trm.appendChild(cellInput(c, "main", function (v) { if (parseCell(v) && !parseCell(v).err) { p.main[b] = v; changed(true); } })); });
+  tbl.appendChild(trm);
+  p.lines.forEach(function (L, li) {
+    var trl = document.createElement("tr"), th = document.createElement("th");
+    var nm = document.createElement("input"); nm.type = "text"; nm.value = L.name; nm.style.width = "64px"; nm.onchange = function () { L.name = nm.value; };
+    var si = document.createElement("select"); Object.keys(INST).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = k === "smp" ? "サンプラー" : INST[k].name.split(" (")[0]; si.appendChild(o); }); si.value = L.inst; si.onchange = function () { L.inst = si.value; changed(true); };
+    var sp = document.createElement("select"); Object.keys(PATTERNS).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = PATTERNS[k]; sp.appendChild(o); }); sp.value = L.pat; sp.onchange = function () { L.pat = sp.value; changed(true); };
+    var oc = document.createElement("input"); oc.type = "number"; oc.className = "oct"; oc.min = -3; oc.max = 3; oc.value = L.oct; oc.title = "オクターヴ"; oc.onchange = function () { L.oct = +oc.value | 0; changed(true); };
+    var ve = document.createElement("input"); ve.type = "number"; ve.className = "oct"; ve.min = 0; ve.max = 1.5; ve.step = 0.05; ve.value = L.vel; ve.title = "音量"; ve.onchange = function () { L.vel = +ve.value; changed(true); };
+    var del = mkBtn("×", function () { p.lines.splice(li, 1); changed(true); }); del.className = "small"; del.title = "行を消す";
+    [nm, si, sp, oc, ve, del].forEach(function (x) { th.appendChild(x); th.appendChild(document.createTextNode(" ")); });
+    trl.appendChild(th);
+    for (var b2 = 0; b2 < nb; b2++) (function (b3) { trl.appendChild(cellInput(L.cells[b3] || "", "", function (v) { var pc = parseCell(v); if (!pc || !pc.err) { L.cells[b3] = v; changed(true); } })); })(b2);
+    tbl.appendChild(trl);
+  });
+  wrap.innerHTML = ""; wrap.appendChild(tbl);
+  var pal = $("palette"); pal.innerHTML = "";
+  var key = p.key, degs = key.minor ? ["i", "ii°", "III", "iv", "V", "VI", "VII"] : ["I", "ii", "iii", "IV", "V", "vi", "vii°"];
+  degs.map(function (d) { return degChord(d, key); }).concat([NAMES[mod12(key.tonic + 7)] + "7", NAMES[key.tonic] + (key.minor ? "m7" : "maj7"), NAMES[mod12(key.tonic + 5)] + (key.minor ? "m7" : "maj7"), NAMES[mod12(key.tonic + 7)] + "sus4"]).forEach(function (c) {
+    var b = mkBtn(c, function () { if (!S.focusCell) { setMsg("先に表のセルを選んでください"); return; } var cur = S.focusCell.value.trim(); S.focusCell.value = cur && cur.split(/\s+/).length < 2 ? cur + " " + c : c; S.focusCell.dispatchEvent(new Event("change")); S.focusCell.focus(); });
+    pal.appendChild(b);
+  });
+}
+function resizeBars(nb) {
+  var p = S.proj; nb = Math.max(1, Math.min(256, nb | 0));
+  while (p.main.length < nb) p.main.push(p.main.length % 4 === 3 ? degChord("V", p.key) : degChord(p.key.minor ? "i" : "I", p.key));
+  p.main.length = nb;
+  p.lines.forEach(function (L) { while (L.cells.length < nb) L.cells.push(""); L.cells.length = nb; });
+  p.entries = p.entries.filter(function (e) { return e.bar < nb; });
+}
+
+/* ================================================================ 状態の更新・保存・配線 */
+function recompute() {
+  try { S.R = compose(S.proj); $("check").textContent = "対位法: 平行 " + S.R.chk.par + " · 強拍の不協和 " + S.R.chk.diss + " · 音符 " + S.R.notes.length; }
+  catch (e) { S.R = null; $("check").textContent = "作曲エラー: " + e.message; console.error(e); }
+}
+function changed(structural) {
+  if (structural) { recompute(); renderProg(); fillComposer(); }
+  if (S.playing) { var pos = S.pos; play(pos); }
+  drawAll(); fillClipEditor(); autosave();
+}
+function autosave() { try { localStorage.setItem("bada_studio_proj", JSON.stringify(S.proj)); } catch (e) {} }
+function validProject(p) { return p && Array.isArray(p.main) && Array.isArray(p.lines) && p.key && Array.isArray(p.clips); }
+function loadProject(p) {
+  var base = blankProject(p.main.length);
+  Object.keys(base).forEach(function (k) { if (p[k] === undefined) p[k] = base[k]; });
+  S.proj = p; S.clipId = p.clips.reduce(function (m, c) { return Math.max(m, c.id | 0); }, 0);
+  recompute(); fillComposer(); renderProg(); renderSources(); drawAll(); fillClipEditor();
+}
+function wire() {
+  document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll(".tabs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      document.querySelectorAll(".panel").forEach(function (p) { p.classList.toggle("on", p.id === "tab-" + b.dataset.tab); });
+    };
+  });
+  $("btnPlay").onclick = function () { if (S.playing) { stop(); } else { play(S.pos); } };
+  $("btnStop").onclick = function () { stop(); S.pos = 0; drawAll(); };
+  $("zoom").oninput = function () { S.pps = +this.value; drawAll(); };
+  $("btnFit").onclick = function () { var d = Math.max(5, totalDur()); S.pps = Math.max(2, Math.min(200, ($("tl").width - TL.label - 10) / d)); $("zoom").value = S.pps; S.scrollX = 0; drawAll(); };
+  $("tl").addEventListener("wheel", function (e) { S.scrollX = Math.max(0, S.scrollX + (e.deltaX || e.deltaY) / S.pps * 0.5); drawAll(); e.preventDefault(); }, { passive: false });
+  $("btnImport").onclick = function () { $("fileIn").value = ""; $("fileIn").click(); };
+  $("fileIn").onchange = function () { importFiles(this.files, false); };
+  $("btnImportRaw").onclick = function () { $("fileRaw").value = ""; $("fileRaw").click(); };
+  $("fileRaw").onchange = function () { importFiles(this.files, true); };
+  $("btnRecMic").onclick = recordMic;
+  $("btnSplit").onclick = function () { splitAt(S.pos); };
+  $("btnDup").onclick = function () { var c = selClip(); if (!c) return; var c2 = JSON.parse(JSON.stringify(c)); c2.id = ++S.clipId; c2.start = +(c.start + c.dur).toFixed(3); S.proj.clips.push(c2); S.sel = c2.id; changed(false); };
+  $("btnDel").onclick = function () { var c = selClip(); if (!c) return; S.proj.clips = S.proj.clips.filter(function (x) { return x !== c; }); S.sel = null; changed(false); };
+  [["cStart", "start"], ["cOff", "off"], ["cDur", "dur"], ["cGain", "gain"], ["cFin", "fin"], ["cFout", "fout"]].forEach(function (pr) {
+    $(pr[0]).onchange = function () { var c = selClip(); if (!c) return; c[pr[1]] = Math.max(0, +this.value || 0); if (pr[1] === "dur") c.dur = Math.max(0.05, c.dur); changed(false); };
+  });
+  $("cTrack").onchange = function () { var c = selClip(); if (!c || c.track === "V") return; c.track = +this.value; changed(false); };
+  /* 作曲 */
+  $("pTitle").onchange = function () { S.proj.title = this.value || "BADA Studio"; changed(false); };
+  $("pBpm").onchange = function () { S.proj.bpm = Math.max(20, Math.min(240, +this.value || 72)); changed(true); };
+  $("pKey").onchange = function () { var v = this.value; S.proj.key = { tonic: parseInt(v, 10), minor: /m$/.test(v) }; changed(true); };
+  $("pBars").onchange = function () { resizeBars(+this.value); changed(true); };
+  $("pStart").onchange = function () { S.proj.musicStart = Math.max(0, +this.value || 0); changed(false); };
+  $("pSeed").onchange = function () { S.proj.seed = +this.value | 0; changed(true); };
+  $("pStyle").onchange = function () { S.proj.style = this.value; changed(true); };
+  $("pSmp").onchange = function () { S.proj.smp = +this.value | 0; changed(true); };
+  $("btnAuto").onclick = function () { S.proj.seed = (S.proj.seed | 0) + 1; autoCompose(S.proj); changed(true); setMsg("🎲 自動作曲しました: 進行・主題・入り・行 (乱数 " + S.proj.seed + ")", "ok"); };
+  $("btnRequiem").onclick = function () { S.proj.seed = (S.proj.seed | 0) + 1; S.proj.key.minor = true; S.proj.bpm = 48; if (S.proj.main.length < 16) resizeBars(16); autoCompose(S.proj, { slow: true }); changed(true); setMsg("🕯 レクイエムとフーガ: ♩=48、短調、ゆっくりの主題と持続の行", "ok"); };
+  $("btnAutoProg").onclick = function () { S.proj.seed = (S.proj.seed | 0) + 1; S.proj.main = autoProgression(S.proj.key, S.proj.main.length, S.proj.seed); changed(true); };
+  $("btnAutoSubj").onclick = function () { S.proj.seed = (S.proj.seed | 0) + 1; S.proj.subject = autoSubject(S.proj.key, S.proj.seed, S.proj.bpm < 60); changed(true); };
+  $("btnRegen").onclick = function () { S.proj.seed = (S.proj.seed | 0) + 1; changed(true); };
+  $("btnSubjApply").onclick = function () { var p = parseNotes($("pSubject").value); if (p.err) { setMsg(p.err, "err"); $("pSubject").classList.add("bad"); return; } $("pSubject").classList.remove("bad"); S.proj.subject = p.notes; changed(true); setMsg("✅ 主題を保存しました", "ok"); };
+  $("btnSubjPlay").onclick = function () { var p = parseNotes($("pSubject").value); if (p.err) { setMsg(p.err, "err"); return; } var ctx = ensureCtx(), eng = makeEngine(ctx, ctx.destination, S.sources), t = 0, bs = beatSec(S.proj); p.notes.forEach(function (x) { if (x[1] !== null) eng.play({ i: "pf", t: t, d: x[0] * bs * 0.95, m: x[1], vel: 0.8 }, ctx.currentTime + 0.05); t += x[0] * bs; }); };
+  $("btnEntryAdd").onclick = function () { S.proj.entries.push({ v: $("eVoice").value, bar: Math.max(0, (+$("eBar").value | 0) - 1), tr: +$("eTr").value | 0 }); changed(true); };
+  $("btnEntryExpo").onclick = function () { S.proj.entries = exposition(S.proj.main.length); changed(true); };
+  $("btnEntryClear").onclick = function () { S.proj.entries = []; changed(true); };
+  /* 進行 */
+  $("btnLineAdd").onclick = function () { S.proj.lines.push({ name: "行 " + (S.proj.lines.length + 1), inst: "vn2", pat: "hold", oct: 0, vel: 0.7, cells: new Array(S.proj.main.length).fill("") }); changed(true); };
+  $("btnLineOrch").onclick = function () { S.proj.lines = ORCH_LINES.map(function (l) { return { name: l.name, inst: l.inst, pat: l.pat, oct: l.oct, vel: l.vel, cells: new Array(S.proj.main.length).fill("") }; }); changed(true); };
+  $("btnBarAdd").onclick = function () { resizeBars(S.proj.main.length + 1); changed(true); };
+  $("btnBarDel").onclick = function () { resizeBars(S.proj.main.length - 1); changed(true); };
+  /* 書き出し */
+  $("btnWav").onclick = function () { exportWav(false); };
+  $("btnWavMusic").onclick = function () { exportWav(true); };
+  $("btnMidi").onclick = function () { if (!S.R) return; saveBlob(new Blob([midiFile(S.proj, S.R)], { type: "audio/midi" }), sanitizeName(S.proj.title) + ".mid", "audio/midi", "MIDI"); };
+  $("btnVideo").onclick = exportVideo;
+  $("btnScore").onclick = function () { if (!S.R) return; saveBlob(new Blob([JSON.stringify(scoreJson(S.proj, S.R))], { type: "application/json" }), "score_" + sanitizeName(S.proj.title) + ".json", "application/json", "score.json"); };
+  $("btnSaveProj").onclick = function () { saveBlob(new Blob([JSON.stringify(S.proj, null, 1)], { type: "application/json" }), sanitizeName(S.proj.title) + ".studio.json", "application/json", "BADA Studio プロジェクト"); };
+  $("btnLoadProj").onclick = function () { $("projIn").value = ""; $("projIn").click(); };
+  $("projIn").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { var p = JSON.parse(t); if (!validProject(p)) throw new Error("形式が違います"); loadProject(p); setMsg("✅ プロジェクトを開きました。音源は「音源・映像」で読み込み直してください (" + p.clips.map(function (c) { return c.src; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(", ") + ")", "ok"); }).catch(function (e) { setMsg("開けません: " + e.message, "err"); }); };
+  wireTimeline();
+  window.addEventListener("resize", drawAll);
+}
+function boot() {
+  var p = null;
+  try { p = JSON.parse(localStorage.getItem("bada_studio_proj") || "null"); } catch (e) {}
+  if (!validProject(p)) { p = blankProject(8); autoCompose(p); }
+  p.clips = []; /* 音源は読み込み直すので、クリップは空から */
+  wire(); loadProject(p);
+  setMsg("音源・映像を読み込んでタイムラインに置き、🎲 自動作曲で曲を作り、💾 で書き出します。");
+}
+if (typeof window !== "undefined" && !window.__ENGINE_TEST__) document.addEventListener("DOMContentLoaded", boot);
+</script>
+</body>
+</html>
