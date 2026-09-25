@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; connect-src https://services.swpc.noaa.gov https://api.open-meteo.com https://archive-api.open-meteo.com https://ensemble-api.open-meteo.com https://geocoding-api.open-meteo.com; img-src 'self' data:">
+<title>Bada SolarCast</title>
+<style>
+:root{
+  --bg:#f5f6f8; --panel:#ffffff; --ink:#1b1f27; --muted:#5d6675; --line:#dde1e8;
+  --accent:#c2410c; --accent-soft:#fff1e8; --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+  --cold:#2563eb; --warm:#dc2626; --bar:#94a3b8;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d1117; --panel:#161b22; --ink:#e6e9ef; --muted:#9aa4b2; --line:#2a313c;
+    --accent:#fb923c; --accent-soft:#2a1a10; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+    --cold:#60a5fa; --warm:#f87171; --bar:#64748b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0d1117; --panel:#161b22; --ink:#e6e9ef; --muted:#9aa4b2; --line:#2a313c;
+  --accent:#fb923c; --accent-soft:#2a1a10; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  --cold:#60a5fa; --warm:#f87171; --bar:#64748b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
+header{padding:14px 16px 0;max-width:1100px;margin:0 auto}
+h1{font-size:20px;margin:0}
+h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+h2{font-size:17px;margin:0 0 10px}
+h3{font-size:15px;margin:14px 0 6px}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:12px 16px;max-width:1100px;margin:0 auto}
+nav button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1100px;margin:0 auto;padding:0 16px 40px}
+section.tab{display:none}
+section.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .k{color:var(--muted);font-size:12px}
+.stat .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .s{color:var(--muted);font-size:12px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.note{background:var(--accent-soft);border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.scroll{overflow-x:auto}
+select,input,button.act{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+button.act{background:var(--accent);border-color:var(--accent);color:#fff;cursor:pointer}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+svg{display:block;width:100%;height:auto}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+.scotoma{background:repeating-linear-gradient(45deg,transparent 0 6px,rgba(127,127,127,.12) 6px 12px)}
+footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>☀️ Bada SolarCast <small>太陽フレア × 気象 × 気候予測</small></h1>
+</header>
+<nav id="tabs">
+  <button data-tab="sun" class="on">☀️ 太陽活動</button>
+  <button data-tab="region">🌍 地域の予報</button>
+  <button data-tab="xmas">🎄 英国クリスマス</button>
+  <button data-tab="lab">🔬 検証ラボ</button>
+  <button data-tab="about">📖 仕組み</button>
+</nav>
+<main>
+
+<!-- ============ 太陽活動 ============ -->
+<section class="tab on" id="tab-sun">
+  <div class="card">
+    <div class="row"><h2 style="margin:0">現在の太陽活動 (NOAA SWPC 実測)</h2>
+      <button class="act" id="sun-reload">更新</button><span class="muted small" id="sun-status"></span></div>
+    <div class="grid" id="sun-stats"></div>
+  </div>
+  <div class="card">
+    <h3>GOES X 線フラックス (0.1–0.8 nm, 過去 7 日, 対数軸)</h3>
+    <div id="xray-chart" class="muted small">読み込み中…</div>
+  </div>
+  <div class="card">
+    <h3>日別の太陽指数とフレア数 (過去 30 日)</h3>
+    <div class="scroll" id="daily-table"></div>
+  </div>
+  <div class="card">
+    <h3>27 日先の宇宙天気予報 (NOAA 27-day outlook)</h3>
+    <p class="small muted">太陽の自転周期 (約 27 日) を使った NOAA の公式見通しです。予報できるのは電離圏・地磁気への影響で、地上の天気ではありません。</p>
+    <div class="scroll" id="outlook-table"></div>
+  </div>
+</section>
+
+<!-- ============ 地域の予報 ============ -->
+<section class="tab" id="tab-region">
+  <div class="card">
+    <div class="row">
+      <select id="region-country"></select>
+      <select id="region-city"></select>
+      <input id="region-search" placeholder="都市名で検索 (例: Reykjavik)" size="22">
+      <button class="act" id="region-go">検索</button>
+    </div>
+    <div class="row">
+      <label class="small">予測したい日: <input type="date" id="region-date"></label>
+      <button class="act" id="region-predict">この日を予測</button>
+    </div>
+    <div id="region-result" class="small muted">地域を選ぶと、16 日間の予報と任意の日付の気候予測を表示します。</div>
+  </div>
+  <div class="card">
+    <h3>16 日間の予報 + Jones 熱感知指数</h3>
+    <div id="region-forecast" class="muted small">—</div>
+  </div>
+</section>
+
+<!-- ============ 英国クリスマス ============ -->
+<section class="tab" id="tab-xmas">
+  <div class="card">
+    <div class="row">
+      <h2 style="margin:0">🎄 イギリスのクリスマス (12/25) の天気</h2>
+    </div>
+    <div class="row">
+      <select id="xmas-city"></select>
+      <select id="xmas-year"></select>
+      <button class="act" id="xmas-go">予測する</button>
+      <span class="muted small" id="xmas-status"></span>
+    </div>
+    <div id="xmas-result"></div>
+  </div>
+  <div class="card">
+    <h3>過去のクリスマス (ERA5 再解析, 12/25 の実績)</h3>
+    <div class="scroll" id="xmas-history" class="muted small">—</div>
+  </div>
+</section>
+
+<!-- ============ 検証ラボ ============ -->
+<section class="tab" id="tab-lab">
+  <div class="card">
+    <h2>仮説の検証: 「太陽フレアは 2 週間後の地上気温を動かすか」</h2>
+    <p class="small">直近 30 日の <b>フレア指数</b> (C + 10·M + 100·X) と、選んだ地域の <b>日平均気温の偏差</b> (線形トレンド除去後) の相関を、
+      ラグ 0〜14 日 (フレアが先行) で計算します。NOAA の日別ファイルは直近 30 日分なので、ラグ 14 日の相関は約 16 組から計算されます。有意性は <b>ブロック置換検定</b> (5 日ブロック, 2,000 回, 全ラグの最大 |r| で多重比較を補正) で判定します。</p>
+    <div class="row">
+      <select id="lab-country"></select><select id="lab-city"></select>
+      <select id="lab-solar"><option value="flare">フレア指数</option><option value="f107">F10.7 電波フラックス</option></select>
+      <button class="act" id="lab-go">検証する</button><span class="muted small" id="lab-status"></span>
+    </div>
+    <div id="lab-result"></div>
+  </div>
+</section>
+
+<!-- ============ 仕組み ============ -->
+<section class="tab" id="tab-about">
+  <div class="card">
+    <h2>このアプリが実際に行っていること</h2>
+    <h3>1. 予報のスコトーマ (盲点) = 約 2 週間</h3>
+    <p class="small">大気はカオス系で、初期値の小さな誤差が約 2 週間で予報全体に広がります (Lorenz の予測可能性限界)。
+      「2 週間で天気が変わる」のは太陽フレアのせいではなく、この決定論的予報の地平線です。
+      本アプリはこの地平線より先を <b>スコトーマ</b> と呼び、そこでは予報を 30 年以上の再解析データから作る <b>気候値の確率予報</b> に切り替えます。
+      予報と気候値は、リードタイム L 日に対して重み w = max(0, 1 − L/16) で混ぜます (目安の重み付けであり、検証済みの予報スキルではありません)。
+      これが「いつの日でも」予測を出せる仕組みで、日付が遠いほど答えは確率になります。</p>
+    <h3>2. 太陽フレアが地上の天気に与える影響</h3>
+    <p class="small">フレアの X 線・紫外線は高度 60 km 以上の電離圏で吸収され、短波通信の途絶やオーロラの原因になります。
+      一方、地表に届くエネルギーの変化はごくわずかです。11 年の太陽周期でも全太陽放射照度の変化は約 0.1% (放射強制力で約 0.2 W/m²) で、
+      2 週間で地域の天気を大きく動かすという観測的証拠はありません。これはアプリ内の <b>検証ラボ</b> で、いつでも実データで確かめられます。</p>
+    <h3>3. Γ 関数の大域的部分積分多様体 × Jones 多項式の熱感知</h3>
+    <p class="small">論文 <i>exo-gamma.bada</i> の実装を移植しています:
+      Γ は Lanczos 近似で、部分積分の関数等式 Γ(z+1) = zΓ(z) を起動時に自己検証します。
+      熱感知は三葉結び目の Jones 多項式 V(t) = −t⁻⁴ + t⁻³ + t⁻¹ を t = e<sup>iθ</sup> で評価するもので、
+      元論文では惑星の平衡温度 100–1500 K を θ ∈ [0, π] に写します。本アプリでは地表気温 −40〜50 °C を θ ∈ [0, π] に写し、
+      |V|/3 を「熱感知指数」(0〜1) として各日に表示します。これは気温を可視化するための変換で、予測能力を足すものではありません。</p>
+    <div id="gamma-check" class="note"></div>
+    <h3>4. データの出典</h3>
+    <ul class="small">
+      <li>太陽: NOAA Space Weather Prediction Center (GOES X 線, 惑星 Kp, 日別太陽指数, 27 日見通し)</li>
+      <li>予報: Open-Meteo Forecast API / Ensemble API (ECMWF IFS 0.25° アンサンブル)</li>
+      <li>気候値: Open-Meteo Historical API (ECMWF ERA5 再解析, 1991 年〜前年)</li>
+    </ul>
+  </div>
+</section>
+</main>
+<footer>Bada SolarCast · MIT · データは各機関の公開 API から取得します。気象警報や防災判断には各国の気象機関の公式情報を使ってください。</footer>
+
+<script id="engine">
+/* ================================================================
+ * SolarCast エンジン (DOM 非依存。tools/engine-test.js が検証する)
+ * ================================================================ */
+var SC = (function(){
+  "use strict";
+  var PI = Math.PI;
+
+  /* ---- Γ 関数: Lanczos 近似 (exo-gamma.bada と同じ係数) ---- */
+  var LANCZOS = [676.5203681218851, -1259.1392167224028, 771.32342877765313,
+    -176.61502916214059, 12.507343278686905, -0.13857109526572012,
+    9.9843695780195716e-6, 1.5056327351493116e-7];
+  function gammaFn(z){
+    if (z < 0.5) return PI / (Math.sin(PI * z) * gammaFn(1 - z));   // 反射公式
+    z -= 1;
+    var x = 0.99999999999980993;
+    for (var i = 0; i < 8; i++) x += LANCZOS[i] / (z + i + 1);
+    var t = z + 7.5;
+    return Math.sqrt(2 * PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+  }
+  /* 部分積分の関数等式 Γ(z+1) = zΓ(z) の検証値 (=1 が正解) */
+  function gammaCheck(w){ return gammaFn(1 + w) / (w * gammaFn(w)); }
+
+  /* ---- Jones 多項式 (三葉結び目) の熱感知 ----
+   * V(t) = −t⁻⁴ + t⁻³ + t⁻¹,  t = e^{iθ}  →  t⁻ᵏ = cos kθ − i sin kθ */
+  function jonesAbs(theta){
+    var re = -Math.cos(4 * theta) + Math.cos(3 * theta) + Math.cos(theta);
+    var im =  Math.sin(4 * theta) - Math.sin(3 * theta) - Math.sin(theta);
+    return Math.sqrt(re * re + im * im);
+  }
+  /* 地表気温 −40〜50 °C → θ ∈ [0, π] (元論文は平衡温度 100–1500 K) */
+  var HEAT_MIN_C = -40, HEAT_MAX_C = 50;
+  function heatTheta(tempC){
+    var t = Math.min(HEAT_MAX_C, Math.max(HEAT_MIN_C, tempC));
+    return (t - HEAT_MIN_C) / (HEAT_MAX_C - HEAT_MIN_C) * PI;
+  }
+  /* 熱感知指数 0〜1 (|V| ≤ 3 で正規化) */
+  function jonesHeat(tempC){
+    if (!isFinite(tempC)) return NaN;
+    return jonesAbs(heatTheta(tempC)) / 3;
+  }
+
+  /* ---- 太陽フレア ---- */
+  function flareClass(flux){
+    if (!(flux > 0)) return "—";
+    var bands = [["X", 1e-4], ["M", 1e-5], ["C", 1e-6], ["B", 1e-7], ["A", 1e-8]];
+    for (var i = 0; i < bands.length; i++){
+      if (flux >= bands[i][1] || i === bands.length - 1){
+        return bands[i][0] + (flux / bands[i][1]).toFixed(1);
+      }
+    }
+  }
+  function flareIndex(c, m, x){
+    if (!(c >= 0) || !(m >= 0) || !(x >= 0)) return NaN;
+    return c + 10 * m + 100 * x;
+  }
+  function parseXrays(json){
+    if (!Array.isArray(json)) return [];
+    return json.filter(function(r){ return r && r.energy === "0.1-0.8nm" && r.flux > 0; })
+      .map(function(r){ return { t: Date.parse(r.time_tag), flux: +r.flux }; })
+      .filter(function(r){ return isFinite(r.t); })
+      .sort(function(a, b){ return a.t - b.t; });
+  }
+  /* Kp: 旧形式 (ヘッダ行付き配列の配列) と新形式 (オブジェクト配列) の両方に対応 */
+  function parseKp(json){
+    if (!Array.isArray(json) || !json.length) return [];
+    var out = [];
+    if (Array.isArray(json[0])){
+      var head = json[0].map(function(h){ return String(h).toLowerCase(); });
+      var ti = head.indexOf("time_tag"), ki = head.indexOf("kp");
+      if (ki < 0) ki = head.indexOf("kp_index");
+      for (var i = 1; i < json.length; i++){
+        out.push({ t: Date.parse(String(json[i][ti]).replace(" ", "T") + "Z"), kp: parseFloat(json[i][ki]) });
+      }
+    } else {
+      json.forEach(function(r){
+        var kp = r.Kp != null ? r.Kp : (r.kp != null ? r.kp : r.kp_index);
+        var tt = String(r.time_tag || "");
+        if (!/Z$|[+-]\d\d:?\d\d$/.test(tt)) tt = tt.replace(" ", "T") + "Z";
+        out.push({ t: Date.parse(tt), kp: parseFloat(kp) });
+      });
+    }
+    return out.filter(function(r){ return isFinite(r.t) && isFinite(r.kp); });
+  }
+  function kpLabel(kp){
+    if (kp >= 9) return "G5 (極端)";
+    if (kp >= 8) return "G4 (深刻)";
+    if (kp >= 7) return "G3 (強い)";
+    if (kp >= 6) return "G2 (中程度)";
+    if (kp >= 5) return "G1 (小)";
+    if (kp >= 4) return "活発";
+    return "静穏";
+  }
+  /* NOAA daily-solar-indices.txt:
+   *  yyyy mm dd  F10.7  SSN  Area  NewReg  MeanField  Bkgd  C M X  S 1 2 3 */
+  function parseDailySolar(text){
+    var out = [];
+    String(text).split(/\r?\n/).forEach(function(line){
+      if (!/^\d{4}\s+\d{1,2}\s+\d{1,2}\s/.test(line)) return;
+      var tk = line.trim().split(/\s+/);
+      if (tk.length < 12) return;
+      var num = function(s){ var v = parseFloat(s); return (isFinite(v) && v >= 0) ? v : NaN; };
+      var n = tk.length;
+      out.push({
+        date: tk[0] + "-" + pad2(tk[1]) + "-" + pad2(tk[2]),
+        f107: num(tk[3]), ssn: num(tk[4]),
+        c: num(tk[n - 7]), m: num(tk[n - 6]), x: num(tk[n - 5])
+      });
+    });
+    return out;
+  }
+  var MONTHS = { Jan:1, Feb:2, Mar:3, Apr:4, May:5, Jun:6, Jul:7, Aug:8, Sep:9, Oct:10, Nov:11, Dec:12 };
+  /* NOAA 27-day-outlook.txt: "2025 Sep 22     140           8          3" */
+  function parseOutlook(text){
+    var out = [];
+    String(text).split(/\r?\n/).forEach(function(line){
+      var m = line.match(/^\s*(\d{4})\s+([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)/);
+      if (!m || !MONTHS[m[2]]) return;
+      out.push({ date: m[1] + "-" + pad2(MONTHS[m[2]]) + "-" + pad2(m[3]),
+                 f107: +m[4], ap: +m[5], kp: +m[6] });
+    });
+    return out;
+  }
+
+  /* ---- 統計 ---- */
+  function pad2(v){ v = String(v); return v.length < 2 ? "0" + v : v; }
+  function mean(a){ var s = 0, n = 0; a.forEach(function(v){ if (isFinite(v)){ s += v; n++; } }); return n ? s / n : NaN; }
+  function quantile(a, q){
+    var s = a.filter(isFinite).slice().sort(function(x, y){ return x - y; });
+    if (!s.length) return NaN;
+    var pos = (s.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+    return s[lo] + (s[hi] - s[lo]) * (pos - lo);
+  }
+  function pearson(x, y){
+    var xs = [], ys = [];
+    for (var i = 0; i < Math.min(x.length, y.length); i++){
+      if (isFinite(x[i]) && isFinite(y[i])){ xs.push(x[i]); ys.push(y[i]); }
+    }
+    var n = xs.length;
+    if (n < 3) return { r: NaN, n: n };
+    var mx = mean(xs), my = mean(ys), sxy = 0, sxx = 0, syy = 0;
+    for (var j = 0; j < n; j++){
+      var dx = xs[j] - mx, dy = ys[j] - my;
+      sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
+    }
+    if (sxx === 0 || syy === 0) return { r: NaN, n: n };
+    return { r: sxy / Math.sqrt(sxx * syy), n: n };
+  }
+  /* 最小二乗の直線 y = a + b x */
+  function linfit(x, y){
+    var xs = [], ys = [];
+    for (var i = 0; i < x.length; i++) if (isFinite(x[i]) && isFinite(y[i])){ xs.push(x[i]); ys.push(y[i]); }
+    if (xs.length < 2) return { a: NaN, b: NaN };
+    var mx = mean(xs), my = mean(ys), sxy = 0, sxx = 0;
+    for (var j = 0; j < xs.length; j++){ sxy += (xs[j] - mx) * (ys[j] - my); sxx += (xs[j] - mx) * (xs[j] - mx); }
+    var b = sxx ? sxy / sxx : 0;
+    return { a: my - b * mx, b: b };
+  }
+  function detrend(y){
+    var x = y.map(function(_, i){ return i; });
+    var f = linfit(x, y);
+    return y.map(function(v, i){ return isFinite(v) ? v - (f.a + f.b * i) : NaN; });
+  }
+  /* 太陽系列 s が k 日先行: r_k = corr(s[t], w[t+k]) */
+  function laggedCorr(s, w, maxLag){
+    var out = [];
+    for (var k = 0; k <= maxLag; k++){
+      var a = s.slice(0, s.length - k), b = w.slice(k);
+      var p = pearson(a, b);
+      out.push({ lag: k, r: p.r, n: p.n });
+    }
+    return out;
+  }
+  function maxAbsR(rows){
+    var m = 0;
+    rows.forEach(function(r){ if (isFinite(r.r) && Math.abs(r.r) > m) m = Math.abs(r.r); });
+    return m;
+  }
+  function rng(seed){
+    var a = seed >>> 0;
+    return function(){
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  /* ブロック置換検定: 太陽系列を B 日のブロックに切り、ブロックの順序を並べ替える。
+   * ブロック内の自己相関を保ったまま「太陽と気温の時間的な対応」だけを壊す。
+   * 統計量は全ラグの最大 |r| (多重比較を補正)。 */
+  function blockShuffle(s, B, rand){
+    var blocks = [];
+    for (var i = 0; i < s.length; i += B) blocks.push(s.slice(i, i + B));
+    for (var k = blocks.length - 1; k > 0; k--){
+      var j = Math.floor(rand() * (k + 1)), t = blocks[k]; blocks[k] = blocks[j]; blocks[j] = t;
+    }
+    return [].concat.apply([], blocks);
+  }
+  function permutationTest(s, w, maxLag, iters, seed, B){
+    var obs = laggedCorr(s, w, maxLag), stat = maxAbsR(obs);
+    var rand = rng(seed || 12345), ge = 0;
+    B = B || 5;
+    for (var i = 0; i < iters; i++){
+      if (maxAbsR(laggedCorr(blockShuffle(s, B, rand), w, maxLag)) >= stat - 1e-12) ge++;
+    }
+    return { rows: obs, stat: stat, p: (ge + 1) / (iters + 1), iters: iters, block: B };
+  }
+
+  /* ---- 日付 ---- */
+  function ymd(d){ return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate()); }
+  function parseYmd(s){ var p = String(s).split("-"); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+  function leadDays(target, today){ return Math.round((parseYmd(target) - parseYmd(today)) / 86400000); }
+  /* 平年の通日 (2/29 は 2/28 と同じ扱い) */
+  var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+  function doy(s){
+    var p = String(s).split("-"), m = +p[1], d = +p[2];
+    if (m === 2 && d === 29) d = 28;
+    return CUM[m - 1] + d;
+  }
+  function doyDist(a, b){ var d = Math.abs(doy(a) - doy(b)); return Math.min(d, 365 - d); }
+  function nextChristmas(today){
+    var y = +String(today).slice(0, 4);
+    return (today <= y + "-12-25") ? y : y + 1;
+  }
+
+  /* ---- スコトーマ (予報の盲点) と確率の混合 ---- */
+  var SKILL_DAYS = 16;
+  function forecastWeight(lead){
+    if (lead <= 0) return 1;
+    return Math.max(0, 1 - lead / SKILL_DAYS);
+  }
+  function inScotoma(lead){ return lead >= SKILL_DAYS; }
+  function blend(pFc, pClim, lead){
+    var w = forecastWeight(lead);
+    if (!isFinite(pFc)) return pClim;
+    if (!isFinite(pClim)) return pFc;
+    return w * pFc + (1 - w) * pClim;
+  }
+
+  /* ---- 気候値 ----
+   * daily: Open-Meteo の daily オブジェクト {time[], temperature_2m_max[], ...}
+   * 目標日 (月日) の ±window 日を全年から集める */
+  function climatology(daily, targetDate, window){
+    var t = daily.time || [], rows = [];
+    for (var i = 0; i < t.length; i++){
+      if (doyDist(t[i], targetDate) > window) continue;
+      rows.push({
+        date: t[i], year: +t[i].slice(0, 4),
+        tmax: num(daily.temperature_2m_max, i), tmin: num(daily.temperature_2m_min, i),
+        precip: num(daily.precipitation_sum, i), snow: num(daily.snowfall_sum, i)
+      });
+    }
+    var frac = function(pred){
+      var ok = rows.filter(function(r){ return pred(r) !== null; });
+      if (!ok.length) return NaN;
+      return ok.filter(function(r){ return pred(r); }).length / ok.length;
+    };
+    var tmax = rows.map(function(r){ return r.tmax; }), tmin = rows.map(function(r){ return r.tmin; });
+    var trend = linfit(rows.map(function(r){ return r.year; }), tmax);
+    var years = rows.map(function(r){ return r.year; });
+    return {
+      n: rows.length, rows: rows,
+      firstYear: years.length ? Math.min.apply(null, years) : NaN,
+      lastYear: years.length ? Math.max.apply(null, years) : NaN,
+      pSnow: frac(function(r){ return isFinite(r.snow) ? r.snow >= 0.1 : null; }),
+      pRain: frac(function(r){ return isFinite(r.precip) ? r.precip >= 1 : null; }),
+      pFrost: frac(function(r){ return isFinite(r.tmin) ? r.tmin < 0 : null; }),
+      tmaxMean: mean(tmax), tmaxP10: quantile(tmax, 0.1), tmaxP90: quantile(tmax, 0.9),
+      tminMean: mean(tmin), tminP10: quantile(tmin, 0.1), tminP90: quantile(tmin, 0.9),
+      trendPerDecade: trend.b * 10
+    };
+  }
+  function num(arr, i){ var v = arr ? arr[i] : null; return (v === null || v === undefined) ? NaN : +v; }
+
+  /* ---- アンサンブル (Open-Meteo Ensemble API の hourly) ----
+   * 各メンバーについて、日付 date の時刻値を集計 (sum / max / min) */
+  function ensembleDaily(hourly, base, date, agg){
+    var keys = Object.keys(hourly || {}).filter(function(k){
+      return k === base || k.indexOf(base + "_member") === 0;
+    });
+    var idx = [];
+    (hourly.time || []).forEach(function(t, i){ if (String(t).slice(0, 10) === date) idx.push(i); });
+    if (!idx.length) return [];
+    return keys.map(function(k){
+      var vals = idx.map(function(i){ return hourly[k][i]; }).filter(function(v){ return v !== null && isFinite(v); });
+      if (!vals.length) return NaN;
+      if (agg === "sum") return vals.reduce(function(a, b){ return a + b; }, 0);
+      if (agg === "max") return Math.max.apply(null, vals);
+      return Math.min.apply(null, vals);
+    }).filter(isFinite);
+  }
+  function fracWhere(arr, pred){
+    if (!arr.length) return NaN;
+    return arr.filter(pred).length / arr.length;
+  }
+
+  /* WMO 天気コード → 日本語 */
+  var WMO = { 0:"快晴", 1:"晴れ", 2:"晴れ時々曇り", 3:"曇り", 45:"霧", 48:"着氷性の霧",
+    51:"弱い霧雨", 53:"霧雨", 55:"強い霧雨", 56:"着氷性の霧雨", 57:"強い着氷性の霧雨",
+    61:"弱い雨", 63:"雨", 65:"強い雨", 66:"着氷性の雨", 67:"強い着氷性の雨",
+    71:"弱い雪", 73:"雪", 75:"大雪", 77:"霧雪", 80:"にわか雨", 81:"強いにわか雨", 82:"激しいにわか雨",
+    85:"にわか雪", 86:"強いにわか雪", 95:"雷雨", 96:"雹を伴う雷雨", 99:"強い雹を伴う雷雨" };
+  function wmoText(c){ return WMO[c] || (c == null ? "—" : "コード " + c); }
+
+  return {
+    gammaFn: gammaFn, gammaCheck: gammaCheck, jonesAbs: jonesAbs, heatTheta: heatTheta, jonesHeat: jonesHeat,
+    flareClass: flareClass, flareIndex: flareIndex, parseXrays: parseXrays, parseKp: parseKp, kpLabel: kpLabel,
+    parseDailySolar: parseDailySolar, parseOutlook: parseOutlook,
+    mean: mean, quantile: quantile, pearson: pearson, linfit: linfit, detrend: detrend,
+    laggedCorr: laggedCorr, permutationTest: permutationTest, rng: rng, blockShuffle: blockShuffle,
+    ymd: ymd, leadDays: leadDays, doy: doy, doyDist: doyDist, nextChristmas: nextChristmas,
+    SKILL_DAYS: SKILL_DAYS, forecastWeight: forecastWeight, inScotoma: inScotoma, blend: blend,
+    climatology: climatology, ensembleDaily: ensembleDaily, fracWhere: fracWhere, wmoText: wmoText
+  };
+})();
+if (typeof module !== "undefined") module.exports = SC;
+</script>
+
+<script>
+/* ================================================================
+ * UI
+ * ================================================================ */
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); };
+var pct = function(p){ return isFinite(p) ? Math.round(p * 100) + "%" : "—"; };
+var f1 = function(v){ return isFinite(v) ? v.toFixed(1) : "—"; };
+var todayStr = function(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+};
+
+var SWPC = "https://services.swpc.noaa.gov";
+var URLS = {
+  xray: SWPC + "/json/goes/primary/xrays-7-day.json",
+  kp: SWPC + "/products/noaa-planetary-k-index.json",
+  daily: SWPC + "/text/daily-solar-indices.txt",
+  outlook: SWPC + "/text/27-day-outlook.txt"
+};
+
+/* 国家と地域 (代表都市) */
+var REGIONS = {
+  "日本": [["札幌", 43.06, 141.35], ["仙台", 38.27, 140.87], ["東京", 35.68, 139.69], ["名古屋", 35.18, 136.91],
+           ["大阪", 34.69, 135.50], ["広島", 34.39, 132.46], ["福岡", 33.59, 130.40], ["那覇", 26.21, 127.68]],
+  "イギリス": [["ロンドン", 51.51, -0.13], ["マンチェスター", 53.48, -2.24], ["バーミンガム", 52.49, -1.89],
+           ["エディンバラ", 55.95, -3.19], ["グラスゴー", 55.86, -4.25], ["アバディーン", 57.15, -2.09],
+           ["カーディフ", 51.48, -3.18], ["ベルファスト", 54.60, -5.93], ["ニューカッスル", 54.98, -1.61], ["プリマス", 50.38, -4.14]],
+  "アメリカ": [["ニューヨーク", 40.71, -74.01], ["シカゴ", 41.88, -87.63], ["ロサンゼルス", 34.05, -118.24],
+           ["マイアミ", 25.76, -80.19], ["デンバー", 39.74, -104.99], ["アンカレッジ", 61.22, -149.90]],
+  "カナダ": [["トロント", 43.65, -79.38], ["バンクーバー", 49.28, -123.12], ["イエローナイフ", 62.45, -114.37]],
+  "フランス": [["パリ", 48.86, 2.35], ["マルセイユ", 43.30, 5.37]],
+  "ドイツ": [["ベルリン", 52.52, 13.40], ["ミュンヘン", 48.14, 11.58]],
+  "ノルウェー": [["オスロ", 59.91, 10.75], ["トロムソ", 69.65, 18.96]],
+  "アイスランド": [["レイキャビク", 64.15, -21.94]],
+  "ロシア": [["モスクワ", 55.76, 37.62], ["ヤクーツク", 62.03, 129.73]],
+  "中国": [["北京", 39.90, 116.41], ["上海", 31.23, 121.47]],
+  "韓国": [["ソウル", 37.57, 126.98], ["釜山", 35.18, 129.08]],
+  "インド": [["デリー", 28.61, 77.21], ["ムンバイ", 19.08, 72.88]],
+  "オーストラリア": [["シドニー", -33.87, 151.21], ["パース", -31.95, 115.86]],
+  "ブラジル": [["サンパウロ", -23.55, -46.63], ["マナウス", -3.12, -60.02]],
+  "エジプト": [["カイロ", 30.04, 31.24]],
+  "南アフリカ": [["ケープタウン", -33.92, 18.42]]
+};
+var UK_CITIES = REGIONS["イギリス"];
+
+function getJSON(url){
+  return fetch(url, { cache: "no-store" }).then(function(r){
+    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+    return r.json();
+  });
+}
+function getText(url){
+  return fetch(url, { cache: "no-store" }).then(function(r){
+    if (!r.ok) throw new Error("HTTP " + r.status + " " + url);
+    return r.text();
+  });
+}
+var archiveCache = {};
+function archiveFor(lat, lon){
+  var key = lat.toFixed(2) + "," + lon.toFixed(2);
+  if (archiveCache[key]) return archiveCache[key];
+  var endYear = new Date().getFullYear() - 1;
+  var url = "https://archive-api.open-meteo.com/v1/archive?latitude=" + lat + "&longitude=" + lon +
+    "&start_date=1991-01-01&end_date=" + endYear + "-12-31" +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=auto";
+  archiveCache[key] = getJSON(url).then(function(j){ return j.daily; })
+    .catch(function(e){ delete archiveCache[key]; throw e; });
+  return archiveCache[key];
+}
+function forecastFor(lat, lon){
+  var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+    "&daily=weather_code,temperature_2m_max,temperature_2m_min,temperature_2m_mean,precipitation_sum,snowfall_sum,precipitation_probability_max" +
+    "&past_days=31&forecast_days=16&timezone=auto";
+  return getJSON(url);
+}
+function ensembleFor(lat, lon){
+  var url = "https://ensemble-api.open-meteo.com/v1/ensemble?latitude=" + lat + "&longitude=" + lon +
+    "&models=ecmwf_ifs025&hourly=temperature_2m,precipitation,snowfall&forecast_days=15&timezone=auto";
+  return getJSON(url).then(function(j){ return j.hourly; });
+}
+
+/* ---------- タブ ---------- */
+$("tabs").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-tab]");
+  if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(function(x){ x.classList.toggle("on", x === b); });
+  document.querySelectorAll("section.tab").forEach(function(s){ s.classList.toggle("on", s.id === "tab-" + b.dataset.tab); });
+});
+
+/* ---------- 小さな SVG チャート ---------- */
+function xrayChart(rows){
+  if (!rows.length) return '<span class="muted">データなし</span>';
+  var W = 720, H = 220, L = 44, R = 10, T = 10, B = 24;
+  var t0 = rows[0].t, t1 = rows[rows.length - 1].t;
+  var lo = -8, hi = -3;
+  var X = function(t){ return L + (t - t0) / Math.max(1, t1 - t0) * (W - L - R); };
+  var Y = function(f){ var v = Math.log10(Math.max(f, 1e-9)); v = Math.min(hi, Math.max(lo, v)); return T + (hi - v) / (hi - lo) * (H - T - B); };
+  var step = Math.max(1, Math.floor(rows.length / 1500));
+  var d = "";
+  for (var i = 0; i < rows.length; i += step) d += (d ? "L" : "M") + X(rows[i].t).toFixed(1) + " " + Y(rows[i].flux).toFixed(1);
+  var bands = [["A", -8], ["B", -7], ["C", -6], ["M", -5], ["X", -4]], g = "";
+  bands.forEach(function(b){
+    var y = Y(Math.pow(10, b[1]));
+    g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '" stroke="var(--line)"/>' +
+         '<text x="' + (L - 8) + '" y="' + (y - 4) + '" font-size="11" text-anchor="end" fill="var(--muted)">' + b[0] + '</text>';
+  });
+  var days = "";
+  for (var t = Math.ceil(t0 / 86400000) * 86400000; t <= t1; t += 86400000){
+    var dd = new Date(t);
+    days += '<text x="' + X(t) + '" y="' + (H - 6) + '" font-size="10" text-anchor="middle" fill="var(--muted)">' + (dd.getUTCMonth() + 1) + "/" + dd.getUTCDate() + '</text>';
+  }
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="GOES X線フラックス">' + g + days +
+    '<path d="' + d + '" fill="none" stroke="var(--accent)" stroke-width="1.4"/></svg>';
+}
+function barChart(values, labels, opts){
+  opts = opts || {};
+  var W = 720, H = opts.h || 180, L = 36, R = 8, T = 10, B = 22, n = values.length;
+  var fin = values.filter(isFinite);
+  var lo = Math.min(0, opts.min != null ? opts.min : Math.min.apply(null, fin));
+  var hi = Math.max(0, opts.max != null ? opts.max : Math.max.apply(null, fin));
+  if (hi === lo) hi = lo + 1;
+  var bw = (W - L - R) / n;
+  var Y = function(v){ return T + (hi - v) / (hi - lo) * (H - T - B); };
+  var s = '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="var(--muted)"/>';
+  [lo, hi].forEach(function(v){ s += '<text x="' + (L - 4) + '" y="' + (Y(v) + 4) + '" font-size="10" text-anchor="end" fill="var(--muted)">' + (+v.toFixed(2)) + '</text>'; });
+  values.forEach(function(v, i){
+    if (!isFinite(v)) return;
+    var x = L + i * bw + bw * 0.15, y = Math.min(Y(v), Y(0)), h = Math.abs(Y(v) - Y(0));
+    var col = opts.color ? opts.color(v, i) : "var(--bar)";
+    s += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + (bw * 0.7).toFixed(1) + '" height="' + Math.max(0.5, h).toFixed(1) + '" fill="' + col + '" rx="2"/>';
+    if (labels && (n <= 20 || i % Math.ceil(n / 16) === 0))
+      s += '<text x="' + (x + bw * 0.35) + '" y="' + (H - 6) + '" font-size="10" text-anchor="middle" fill="var(--muted)">' + esc(labels[i]) + '</text>';
+  });
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '">' + s + '</svg>';
+}
+
+/* ---------- ☀️ 太陽活動 ---------- */
+var solarDaily = null;
+function stat(k, v, s){ return '<div class="stat"><div class="k">' + k + '</div><div class="v">' + v + '</div><div class="s">' + (s || "") + '</div></div>'; }
+function loadSun(){
+  $("sun-status").textContent = "取得中…";
+  var jobs = [
+    getJSON(URLS.xray).then(SC.parseXrays),
+    getJSON(URLS.kp).then(SC.parseKp),
+    getText(URLS.daily).then(SC.parseDailySolar),
+    getText(URLS.outlook).then(SC.parseOutlook)
+  ].map(function(p){ return p.catch(function(e){ return { error: e }; }); });
+  return Promise.all(jobs).then(function(res){
+    var xr = res[0], kp = res[1], daily = res[2], outlook = res[3], errs = res.filter(function(r){ return r && r.error; });
+    var html = "";
+    if (Array.isArray(xr) && xr.length){
+      var last = xr[xr.length - 1], mx = xr.reduce(function(a, b){ return b.flux > a.flux ? b : a; });
+      var day = xr.filter(function(r){ return r.t > last.t - 86400000; }).reduce(function(a, b){ return b.flux > a.flux ? b : a; });
+      html += stat("現在の X 線クラス", SC.flareClass(last.flux), new Date(last.t).toLocaleString());
+      html += stat("24 時間の最大", SC.flareClass(day.flux), new Date(day.t).toLocaleString());
+      html += stat("7 日間の最大", SC.flareClass(mx.flux), new Date(mx.t).toLocaleString());
+      $("xray-chart").innerHTML = xrayChart(xr);
+    } else $("xray-chart").textContent = "X 線データを取得できませんでした。";
+    if (Array.isArray(kp) && kp.length){
+      var k = kp[kp.length - 1];
+      html += stat("惑星 Kp 指数", k.kp.toFixed(1), SC.kpLabel(k.kp) + " · " + new Date(k.t).toLocaleString());
+    }
+    if (Array.isArray(daily) && daily.length){
+      solarDaily = daily;
+      var d = daily[daily.length - 1];
+      html += stat("F10.7 電波フラックス", f1(d.f107), d.date + " (sfu)");
+      html += stat("黒点数", isFinite(d.ssn) ? d.ssn : "—", d.date);
+      var rows = daily.slice().reverse().map(function(r){
+        return "<tr><td>" + r.date + "</td><td>" + f1(r.f107) + "</td><td>" + (isFinite(r.ssn) ? r.ssn : "—") + "</td><td>" +
+          [r.c, r.m, r.x].map(function(v){ return isFinite(v) ? v : "—"; }).join("</td><td>") + "</td><td>" + f1(SC.flareIndex(r.c, r.m, r.x)) + "</td></tr>";
+      }).join("");
+      $("daily-table").innerHTML = "<table><tr><th>日付 (UTC)</th><th>F10.7</th><th>黒点数</th><th>C</th><th>M</th><th>X</th><th>フレア指数</th></tr>" + rows + "</table>";
+    } else $("daily-table").textContent = "日別指数を取得できませんでした。";
+    if (Array.isArray(outlook) && outlook.length){
+      $("outlook-table").innerHTML = "<table><tr><th>日付</th><th>F10.7</th><th>Ap</th><th>最大 Kp</th><th>地磁気</th></tr>" +
+        outlook.map(function(o){ return "<tr><td>" + o.date + "</td><td>" + o.f107 + "</td><td>" + o.ap + "</td><td>" + o.kp + "</td><td>" + SC.kpLabel(o.kp) + "</td></tr>"; }).join("") + "</table>";
+    } else $("outlook-table").textContent = "27 日見通しを取得できませんでした。";
+    $("sun-stats").innerHTML = html || '<span class="muted">データを取得できませんでした。</span>';
+    $("sun-status").textContent = errs.length ? ("一部取得失敗: " + errs.map(function(e){ return e.error.message; }).join(" / ")) : "更新: " + new Date().toLocaleTimeString();
+  });
+}
+$("sun-reload").addEventListener("click", loadSun);
+
+/* ---------- 地域セレクタ ---------- */
+function fillCountry(sel, citySel, def){
+  sel.innerHTML = Object.keys(REGIONS).map(function(c){ return "<option" + (c === def ? " selected" : "") + ">" + c + "</option>"; }).join("");
+  var fillCity = function(){
+    citySel.innerHTML = REGIONS[sel.value].map(function(c, i){ return '<option value="' + i + '">' + c[0] + "</option>"; }).join("");
+  };
+  sel.addEventListener("change", fillCity);
+  fillCity();
+}
+function selected(sel, citySel){ var c = REGIONS[sel.value][+citySel.value]; return { name: sel.value + " · " + c[0], lat: c[1], lon: c[2] }; }
+
+/* ---------- 🌍 地域の予報 ---------- */
+var place = null;
+fillCountry($("region-country"), $("region-city"), "日本");
+$("region-date").value = todayStr();
+function loadRegion(p){
+  place = p;
+  $("region-forecast").textContent = "取得中…";
+  return forecastFor(p.lat, p.lon).then(function(j){
+    var d = j.daily, today = todayStr();
+    var rows = [];
+    for (var i = 0; i < d.time.length; i++){
+      if (d.time[i] < today) continue;
+      rows.push({ date: d.time[i], code: d.weather_code[i], tmax: d.temperature_2m_max[i], tmin: d.temperature_2m_min[i],
+        tmean: d.temperature_2m_mean ? d.temperature_2m_mean[i] : (d.temperature_2m_max[i] + d.temperature_2m_min[i]) / 2,
+        pr: d.precipitation_sum[i], sn: d.snowfall_sum[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null });
+    }
+    var heat = rows.map(function(r){ return SC.jonesHeat(r.tmean); });
+    var tbl = "<table><tr><th>日付</th><th>リード</th><th>天気</th><th>最高</th><th>最低</th><th>降水 mm</th><th>降雪 cm</th><th>降水確率</th><th>熱感知 |V|/3</th></tr>" +
+      rows.map(function(r, i){
+        return "<tr><td>" + r.date + "</td><td>" + SC.leadDays(r.date, today) + " 日</td><td>" + SC.wmoText(r.code) + "</td><td>" + f1(r.tmax) + "</td><td>" + f1(r.tmin) +
+          "</td><td>" + f1(r.pr) + "</td><td>" + f1(r.sn) + "</td><td>" + (r.pp == null ? "—" : r.pp + "%") + "</td><td>" + (isFinite(heat[i]) ? heat[i].toFixed(3) : "—") + "</td></tr>";
+      }).join("") + "</table>";
+    $("region-forecast").innerHTML = '<p class="small"><b>' + esc(p.name) + "</b> (" + p.lat.toFixed(2) + ", " + p.lon.toFixed(2) + ")</p>" +
+      barChart(rows.map(function(r){ return r.tmean; }), rows.map(function(r){ return r.date.slice(5); }),
+        { color: function(v){ return v < 0 ? "var(--cold)" : "var(--warm)"; } }) +
+      '<p class="small muted">棒: 日平均気温 (°C)。16 日目以降は予報のスコトーマで、下の「この日を予測」は気候値の確率予報に切り替わります。</p>' +
+      '<div class="scroll">' + tbl + "</div>";
+    return predictDate();
+  }).catch(function(e){ $("region-forecast").textContent = "取得できませんでした: " + e.message; });
+}
+function predictionCard(p, target, fcRow, clim, ens){
+  var today = todayStr(), lead = SC.leadDays(target, today), w = SC.forecastWeight(lead);
+  var pFcRain = NaN, pFcSnow = NaN, tFc = NaN;
+  if (ens && ens.pr.length){
+    pFcRain = SC.fracWhere(ens.pr, function(v){ return v >= 1; });
+    pFcSnow = SC.fracWhere(ens.sn, function(v){ return v >= 0.1; });
+    tFc = SC.mean(ens.tmax);
+  } else if (fcRow){
+    pFcRain = fcRow.pp != null ? fcRow.pp / 100 : (fcRow.pr >= 1 ? 0.8 : 0.2);
+    pFcSnow = fcRow.sn >= 0.1 ? 0.8 : 0.05;
+    tFc = fcRow.tmax;
+  }
+  var pRain = SC.blend(pFcRain, clim.pRain, lead), pSnow = SC.blend(pFcSnow, clim.pSnow, lead);
+  var tmax = isFinite(tFc) ? w * tFc + (1 - w) * clim.tmaxMean : clim.tmaxMean;
+  var mode = lead < 0 ? "過去の日付 (実績)" : SC.inScotoma(lead) ? "スコトーマ: 気候値の確率予報" : (ens && ens.pr.length ? "アンサンブル予報 × 気候値" : "決定論予報 × 気候値");
+  return '<div class="card' + (SC.inScotoma(lead) ? " scotoma" : "") + '" style="margin:10px 0 0">' +
+    '<div class="row"><b>' + esc(p.name) + " · " + target + '</b><span class="pill">リード ' + lead + ' 日</span><span class="pill">' + mode + '</span><span class="pill">予報の重み ' + Math.round(w * 100) + '%</span></div>' +
+    '<div class="grid">' +
+      stat("降水 (≥1 mm) の確率", pct(pRain), "気候値 " + pct(clim.pRain)) +
+      stat("降雪 (≥0.1 cm) の確率", pct(pSnow), "気候値 " + pct(clim.pSnow)) +
+      stat("最高気温の見込み", f1(tmax) + " °C", "平年の 80% 範囲 " + f1(clim.tmaxP10) + "〜" + f1(clim.tmaxP90) + " °C") +
+      stat("最低気温 < 0 °C の確率", pct(clim.pFrost), "気候値 · 平年最低 " + f1(clim.tminMean) + " °C") +
+      stat("熱感知指数 |V|/3", isFinite(SC.jonesHeat(tmax)) ? SC.jonesHeat(tmax).toFixed(3) : "—", "Jones 三葉結び目 (見込み最高気温から)") +
+      stat("温暖化傾向", (clim.trendPerDecade >= 0 ? "+" : "") + f1(clim.trendPerDecade) + " °C/10年", "この時期の最高気温 " + clim.firstYear + "–" + clim.lastYear) +
+    "</div>" +
+    '<p class="small muted">気候値は ERA5 再解析 ' + clim.firstYear + "–" + clim.lastYear + " 年の、同じ月日 ±3 日 (" + clim.n + " 日分) から計算しています。</p></div>";
+}
+function predictDate(){
+  if (!place) return;
+  var p = place, target = $("region-date").value || todayStr(), today = todayStr(), lead = SC.leadDays(target, today);
+  $("region-result").innerHTML = '<span class="muted">気候値 (1991 年〜) を取得中… 初回は数秒かかります。</span>';
+  var fcP = (lead >= 0 && lead < SC.SKILL_DAYS) ? forecastFor(p.lat, p.lon).catch(function(){ return null; }) : Promise.resolve(null);
+  var enP = (lead >= 0 && lead < 15) ? ensembleFor(p.lat, p.lon).catch(function(){ return null; }) : Promise.resolve(null);
+  return Promise.all([archiveFor(p.lat, p.lon), fcP, enP]).then(function(r){
+    var clim = SC.climatology(r[0], target, 3), fcRow = null, ens = null;
+    if (r[1]){
+      var d = r[1].daily, i = d.time.indexOf(target);
+      if (i >= 0) fcRow = { tmax: d.temperature_2m_max[i], pr: d.precipitation_sum[i], sn: d.snowfall_sum[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null };
+    }
+    if (r[2]) ens = { tmax: SC.ensembleDaily(r[2], "temperature_2m", target, "max"),
+                      pr: SC.ensembleDaily(r[2], "precipitation", target, "sum"),
+                      sn: SC.ensembleDaily(r[2], "snowfall", target, "sum") };
+    $("region-result").innerHTML = predictionCard(p, target, fcRow, clim, ens);
+  }).catch(function(e){ $("region-result").textContent = "取得できませんでした: " + e.message; });
+}
+$("region-city").addEventListener("change", function(){ loadRegion(selected($("region-country"), $("region-city"))); });
+$("region-country").addEventListener("change", function(){ loadRegion(selected($("region-country"), $("region-city"))); });
+$("region-predict").addEventListener("click", predictDate);
+$("region-go").addEventListener("click", function(){
+  var q = $("region-search").value.trim();
+  if (!q) return;
+  getJSON("https://geocoding-api.open-meteo.com/v1/search?count=1&language=ja&name=" + encodeURIComponent(q)).then(function(j){
+    var r = j.results && j.results[0];
+    if (!r){ $("region-result").textContent = "見つかりませんでした: " + q; return; }
+    loadRegion({ name: (r.country || "") + " · " + r.name, lat: r.latitude, lon: r.longitude });
+  }).catch(function(e){ $("region-result").textContent = "検索できませんでした: " + e.message; });
+});
+
+/* ---------- 🎄 英国クリスマス ---------- */
+$("xmas-city").innerHTML = UK_CITIES.map(function(c, i){ return '<option value="' + i + '">' + c[0] + "</option>"; }).join("");
+(function(){
+  var y0 = SC.nextChristmas(todayStr()), opts = "";
+  for (var y = y0; y <= y0 + 10; y++) opts += "<option>" + y + "</option>";
+  $("xmas-year").innerHTML = opts;
+})();
+function loadXmas(){
+  var c = UK_CITIES[+$("xmas-city").value], p = { name: "イギリス · " + c[0], lat: c[1], lon: c[2] };
+  var target = $("xmas-year").value + "-12-25", lead = SC.leadDays(target, todayStr());
+  $("xmas-status").textContent = "取得中…";
+  var fcP = (lead >= 0 && lead < SC.SKILL_DAYS) ? forecastFor(p.lat, p.lon).catch(function(){ return null; }) : Promise.resolve(null);
+  var enP = (lead >= 0 && lead < 15) ? ensembleFor(p.lat, p.lon).catch(function(){ return null; }) : Promise.resolve(null);
+  return Promise.all([archiveFor(p.lat, p.lon), fcP, enP]).then(function(r){
+    var clim = SC.climatology(r[0], target, 3), exact = SC.climatology(r[0], target, 0), fcRow = null, ens = null;
+    if (r[1]){
+      var d = r[1].daily, i = d.time.indexOf(target);
+      if (i >= 0) fcRow = { tmax: d.temperature_2m_max[i], pr: d.precipitation_sum[i], sn: d.snowfall_sum[i], pp: d.precipitation_probability_max ? d.precipitation_probability_max[i] : null };
+    }
+    if (r[2]) ens = { tmax: SC.ensembleDaily(r[2], "temperature_2m", target, "max"),
+                      pr: SC.ensembleDaily(r[2], "precipitation", target, "sum"),
+                      sn: SC.ensembleDaily(r[2], "snowfall", target, "sum") };
+    var head = SC.inScotoma(lead)
+      ? '<p class="note">' + target + " まで " + lead + " 日。予報の地平線 (約 " + SC.SKILL_DAYS + " 日) より先なので、どんな手法でも当日の天気を一点で当てることはできません。下の数字は <b>過去 " + (clim.lastYear - clim.firstYear + 1) + " 年のクリスマス前後から計算した確率</b> です。12 月 10 日頃から実際の予報が混ざり始め、当日に近づくほど鋭くなります。</p>"
+      : '<p class="note">' + target + " まで " + lead + " 日。予報の地平線の内側なので、" + (ens && ens.pr.length ? "ECMWF アンサンブル (" + ens.pr.length + " メンバー)" : "決定論予報") + " を気候値と混ぜて出しています。</p>";
+    $("xmas-result").innerHTML = head + predictionCard(p, target, fcRow, clim, ens) +
+      '<p class="small muted">12/25 当日だけの実績 (' + exact.n + " 年): 雪 " + pct(exact.pSnow) + " · 雨 " + pct(exact.pRain) + " · 霜 " + pct(exact.pFrost) +
+      "。英国気象庁の「ホワイトクリスマス」は国内のどこか 1 地点で雪片が観測されれば成立する定義のため、格子点の再解析より頻度が高くなります。</p>";
+    $("xmas-history").innerHTML = "<table><tr><th>年</th><th>最高 °C</th><th>最低 °C</th><th>降水 mm</th><th>降雪 cm</th><th>熱感知</th></tr>" +
+      exact.rows.slice().reverse().map(function(r){
+        return "<tr><td>" + r.year + (r.snow >= 0.1 ? " ❄️" : "") + "</td><td>" + f1(r.tmax) + "</td><td>" + f1(r.tmin) + "</td><td>" + f1(r.precip) + "</td><td>" + f1(r.snow) + "</td><td>" + SC.jonesHeat((r.tmax + r.tmin) / 2).toFixed(3) + "</td></tr>";
+      }).join("") + "</table>";
+    $("xmas-status").textContent = "";
+  }).catch(function(e){ $("xmas-status").textContent = "取得できませんでした: " + e.message; });
+}
+$("xmas-go").addEventListener("click", loadXmas);
+
+/* ---------- 🔬 検証ラボ ---------- */
+fillCountry($("lab-country"), $("lab-city"), "イギリス");
+function runLab(){
+  var p = selected($("lab-country"), $("lab-city")), kind = $("lab-solar").value;
+  $("lab-status").textContent = "計算中…";
+  var sP = solarDaily ? Promise.resolve(solarDaily) : getText(URLS.daily).then(SC.parseDailySolar);
+  return Promise.all([sP, forecastFor(p.lat, p.lon)]).then(function(r){
+    var solar = r[0], d = r[1].daily, today = todayStr();
+    var tMap = {};
+    d.time.forEach(function(t, i){ if (t < today) tMap[t] = d.temperature_2m_mean ? d.temperature_2m_mean[i] : (d.temperature_2m_max[i] + d.temperature_2m_min[i]) / 2; });
+    var dates = solar.map(function(s){ return s.date; }).filter(function(t){ return t in tMap; });
+    var sMap = {}; solar.forEach(function(s){ sMap[s.date] = s; });
+    var s = dates.map(function(t){ var x = sMap[t]; return kind === "f107" ? x.f107 : SC.flareIndex(x.c, x.m, x.x); });
+    var w = SC.detrend(dates.map(function(t){ return tMap[t]; }));
+    if (dates.length < 15) throw new Error("重なる日数が足りません (" + dates.length + " 日)");
+    var maxLag = Math.min(14, dates.length - 12);
+    var res = SC.permutationTest(s, w, maxLag, 2000, 20260925);
+    var best = res.rows.reduce(function(a, b){ return Math.abs(b.r) > Math.abs(a.r || 0) ? b : a; }, { r: 0 });
+    var verdict = res.p < 0.05
+      ? '<b class="warn">p = ' + res.p.toFixed(3) + " — この標本では偶然とは言いにくい相関があります。</b> ただし " + dates.length + " 日は短く、物理的な仕組みも確認されていません。他の地域・時期でも再現するかを確かめてください。"
+      : '<b class="good">p = ' + res.p.toFixed(3) + " — 偶然で説明できる範囲です。</b> この期間・この地域では、太陽活動が 0〜" + maxLag + " 日後の気温を動かした証拠は見つかりません。";
+    $("lab-result").innerHTML =
+      '<p class="small">' + esc(p.name) + " · " + dates[0] + " 〜 " + dates[dates.length - 1] + " (" + dates.length + " 日) · 最大 |r| = " + res.stat.toFixed(3) + " (ラグ " + best.lag + " 日)</p>" +
+      barChart(res.rows.map(function(x){ return x.r; }), res.rows.map(function(x){ return x.lag + "日"; }),
+        { min: -1, max: 1, color: function(v){ return v < 0 ? "var(--cold)" : "var(--warm)"; } }) +
+      '<p class="small muted">棒: ラグ k 日の相関係数 r (太陽が k 日先行)。</p><p class="note">' + verdict + "</p>";
+    $("lab-status").textContent = "";
+  }).catch(function(e){ $("lab-status").textContent = "計算できませんでした: " + e.message; });
+}
+$("lab-go").addEventListener("click", runLab);
+
+/* ---------- 起動 ---------- */
+(function(){
+  var ws = [0.57, 0.70, 5.58].map(function(w){ return "w=" + w + ": " + SC.gammaCheck(w).toFixed(6); });
+  $("gamma-check").textContent = "起動時の自己検証 Γ(z+1)/(zΓ(z)) = 1 → " + ws.join(" · ") +
+    " · Γ(0.5)² = " + Math.pow(SC.gammaFn(0.5), 2).toFixed(6) + " (π = " + Math.PI.toFixed(6) + ")";
+})();
+loadSun();
+loadRegion(selected($("region-country"), $("region-city")));
+})();
+</script>
+</body>
+</html>
