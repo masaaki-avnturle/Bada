@@ -660,6 +660,20 @@ IX から、近い音を上下する警笛のようなオスティナートを�
 python3 compose_tablet10.py bank7/bank.json score_tablet10.json && python3 synth.py score_tablet10.json tablet10.wav && python3 video.py score_tablet10.json tablet10.wav tablet10.mp4
 ```
 
+## 🎼🕯 Requiem BADA — Tablet Sessions XI · Adagio in tre bemolli (ハ短調 → 変ロ短調 → 変ホ短調 → 変ト長調 → ハ短調, ♩=48, 約 7 分 15 秒)
+
+X から高音のガラスのシンセを消し、2026-09-23 / 09-24 のピアノ録音 6 本の実音とその旋律をもとに、Adagio のバッハ風フーガで再構築した荘厳で洗脳的なレクイエム。
+- **3 つの♭ B♭・E♭・G♭ をめぐる調**: ハ短調 (導音は白鍵の B♮) → 変ロ短調 → 変ホ短調 → 変ト長調 (pp のコラール) → ハ短調 → ハ長調
+- **バッハ風フーガ** (`bach_fugue`): 提示 (主唱・答唱 ×2) → エピソード (ゼクエンツ) → 下属調の入り → ストレッタ → 拍ごとに打ち直す保続低音
+- **降圧剤**: 高音で pp の実音のピアノが、その調の♭の音階 (B♭ → A♭ → G♭ → F → E♭ …) を 2 小節で 1 巡、ゆっくり降り続ける
+- ホ短調の録音 (08:09 / 08:53 / 11:23) は速さを変えずに半音下げて変ホ短調に、ヘ短調の 08:49 は 2 半音下げ (`passage(..., pshift=)`)。
+  08:06 の本当の終わり (B♭7) を変ホ短調への属和音として使う
+- 鼓動は T2 より小さく (pp)、低音はやさしい正弦波。ステムごとに測って合唱・実音・鼓動・降りる音階の釣り合いを取った
+
+```bash
+python3 compose_tablet11.py bank7/bank.json score_tablet11.json && python3 synth.py score_tablet11.json tablet11.wav && python3 video.py score_tablet11.json tablet11.wav tablet11.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

@@ -49,16 +49,17 @@ def best_window(rid, semis, seconds, avoid_end=0.0):
     t0 = best[1] if best else 3.0
     return t0, [x for x in segs if t0 <= x['t'] < t0 + seconds]
 
-def passage(P, rid, bar, bars, semis, choir_from, fin=0.03, fout=6.0, t0=None, gain=None, bpm=None):
-    """実音を bars 小節流す。採譜は表示用、和声は録音の和音 (小節でいちばん長く鳴る和音)。choir_from 小節目から 4 声が全音符で支える"""
+def passage(P, rid, bar, bars, semis, choir_from, fin=0.03, fout=6.0, t0=None, gain=None, bpm=None, pshift=0, gmul=1.0):
+    """実音を bars 小節流す。採譜は表示用、和声は録音の和音 (小節でいちばん長く鳴る和音)。choir_from 小節目から 4 声が全音符で支える。
+    pshift: 速さを変えない移調 (半音)。semis はその移調のあとの調 (ニ短調から)"""
     bpm = bpm or BPM; BAR_S = 240.0 / bpm
-    if t0 is None: t0, inside = best_window(rid, semis, bars * BAR_S)
+    if t0 is None: t0, inside = best_window(rid, semis - pshift, bars * BAR_S)
     else: inside = [x for x in REC[rid]['segs'] if t0 <= x['t'] < t0 + bars * BAR_S]
     USED.setdefault(rid, []).append((t0, t0 + bars * BAR_S))
-    g = gain if gain is not None else 0.75 * T3.rec_gain(rid, t0, bars * BAR_S)     # サンプラーの 4 声と釣り合う大きさに
-    add('REC', bar * BPB, bars * BPB + 1.0, 0, g, None, src=REC[rid]['file'], off=t0, rid=rid, fin=fin, fout=fout)
+    g = gain if gain is not None else 0.75 * gmul * T3.rec_gain(rid, t0, bars * BAR_S)     # サンプラーの 4 声と釣り合う大きさに
+    add('REC', bar * BPB, bars * BPB + 1.0, 0, g, None, src=REC[rid]['file'], off=t0, rid=rid, fin=fin, fout=fout, **({'pshift': pshift} if pshift else {}))
     for s in inside:
-        for m in s['m']: add('TB', bar * BPB + (s['t'] - t0) * bpm / 60.0, s['d'] * bpm / 60.0, m - semis, 0.0, None)
+        for m in s['m']: add('TB', bar * BPB + (s['t'] - t0) * bpm / 60.0, s['d'] * bpm / 60.0, m + pshift - semis, 0.0, None)
     for k in range(bars):
         a, z = t0 + k * BAR_S, t0 + (k + 1) * BAR_S; w = {}
         for s in inside:
@@ -67,8 +68,8 @@ def passage(P, rid, bar, bars, semis, choir_from, fin=0.03, fout=6.0, t0=None, g
         prev = None
         for s in REC[rid]['segs']:
             if s['t'] <= a: prev = s['ch']
-        ch = max(w, key=w.get) if w else (prev or CT.transpose_h([['Dm']], semis)[0][0])
-        lab = transpose_h([[ch]], -semis)[0][0]
+        ch = max(w, key=w.get) if w else (prev or CT.transpose_h([['Dm']], semis - pshift)[0][0])
+        lab = transpose_h([[ch]], pshift - semis)[0][0]
         for q in range(BPB): P.harm[(bar + k) * BPB + q] = lab
     for v in VOICES: P.rest_bars(v, bar, bar + choir_from)
     P.hold.update(range(bar + choir_from, bar + bars))
