@@ -142,7 +142,7 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
     'title': 'Requiem BADA — Tablet Sessions XV · Violino',
     'subtitle': '主題に重なるシンセをバイオリンに — 切り裂かず、高揚しても耳障りにならない (♩=60)',
-    'legend': ['TB', 'VN', 'PK'],
+    'legend': ['TB', 'VN', 'PK'], 'vname': {'VN': 'バイオリン (主題)'},
     'footer': ['Introitus: 11:23 → 08:53 (ホ短調) → Fuga I (08:53, バッハ風) → Lacrimosa 11:18 (変ロ短調) → Fuga II (二重) → Sanctus: 08:49 → 11:21 (ヘ短調) → Finale (ストレッタ) → 11:21 の終わり → ヘ長調',
                'バイオリン (合成): 弓の弦の倍音列 → 胴の共鳴 (275 / 450 / 1000 / 1900 Hz) → 3 kHz 以上はなだらかに落とす。A5 より上は音量を抑える。シンセはなし。'],
 }
