@@ -674,6 +674,21 @@ X から高音のガラスのシンセを消し、2026-09-23 / 09-24 のピア�
 python3 compose_tablet11.py bank7/bank.json score_tablet11.json && python3 synth.py score_tablet11.json tablet11.wav && python3 video.py score_tablet11.json tablet11.wav tablet11.mp4
 ```
 
+## 🎹🎛 Requiem BADA — Tablet Sessions XII · Risonanza (ホ短調 → 変ロ短調 → ヘ短調 → ヘ長調, ♩=60, 約 6 分 20 秒)
+
+XI の pianissimo の降りる音階を消し、2026-09-24 のピアノ録音 5 本 (08:49 / 08:53 / 11:18 / 11:21 / 11:23、速さも音高も元のまま) の実音と
+その旋律のレクイエムとフーガに、**本格的なアナログ風シンセサイザー**を重ねた版。
+- `synth.reso_synth`: デチューンした鋸歯波 3 本 + サブ (矩形波) を、共鳴する 2 次ローパス (RBJ biquad, Q 6〜8、512 サンプルごとに係数を更新) に通し、
+  カットオフが立ち上がりで開いて LFO でゆっくり往復する (共鳴のうねり)。鍵盤追従、軽い飽和
+- `RS` (パッド): 和音の根音・5 度・3 度を 2 小節ごとに、うねりは 2 小節で 1 往復。実音の下では控えめ
+- `RL` (主題に共鳴するリード): フーガの主題の入り (ラベル付きの音) を同じ音で重ねて響かせる (post で events から)
+- 形は VII と同じ (Introitus → Fuga I (バッハ風, 08:53) → Lacrimosa → Fuga II (二重) → Sanctus (08:49 → ピアノとシンセの 11:21) → Finale (ストレッタ) → 11:21 の終わり → ヘ長調)
+- ステムごとに測って、ピアノ (合唱) がいちばん前、パッドとリードはその下、鼓動は pp に
+
+```bash
+python3 compose_tablet12.py bank8/bank.json score_tablet12.json && python3 synth.py score_tablet12.json tablet12.wav && python3 video.py score_tablet12.json tablet12.wav tablet12.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

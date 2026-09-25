@@ -407,6 +407,25 @@ def rock_drum(kind, vel=0.8, freq=110.0, sr=SR):
         y = np.tanh(1.4 * y)
     return (y / (np.abs(y).max() + 1e-9)).astype(np.float32) * vel
 
+def reso_synth(freq, dur, vel=0.2, cut0=220.0, cut1=2400.0, q=6.0, lfo=0.125, phase=0.0, a=0.5, r=1.4, sub=0.4, sat=0.9, sr=SR):
+    """本格的なアナログ風シンセ: デチューンした鋸歯波 3 本 + サブ (矩形波) を、共鳴する 2 次ローパス (RBJ, Q) に通す。
+    カットオフは立ち上がりで開き、LFO でゆっくり往復する (共鳴のうねり)。鍵盤追従、軽い飽和"""
+    from scipy.signal import sosfilt
+    n = int((dur + r) * sr); t = np.arange(n, dtype=np.float32) / sr
+    nh = int(max(8, min(48, 9000.0 / freq)))
+    y = _wavetable_voice(freq, n, _table('saw', nh, 1.0), [(0.0, 0.0), (7.0, 1.1), (-7.0, 2.3)], 0.0, 0.0, t, sr)
+    y += sub * np.sign(np.sin(2 * np.pi * freq / 2 * t)) * 0.5
+    y = y / (np.abs(y).max() + 1e-9)
+    cut = cut0 + (cut1 - cut0) * (0.5 - 0.5 * np.cos(2 * np.pi * lfo * t + phase)) * (1 - np.exp(-t / 0.5))
+    cut = np.clip(cut * (freq / 110.0) ** 0.3, 50.0, 0.45 * sr)
+    out = np.empty(n, dtype=np.float32); zi = np.zeros((1, 2)); blk = 512
+    for i in range(0, n, blk):
+        w = 2 * np.pi * float(cut[i]) / sr; al = np.sin(w) / (2 * q); cw = np.cos(w); a0 = 1 + al
+        sos = np.array([[(1 - cw) / 2 / a0, (1 - cw) / a0, (1 - cw) / 2 / a0, 1.0, -2 * cw / a0, (1 - al) / a0]])
+        out[i:i + blk], zi = sosfilt(sos, y[i:i + blk].astype(np.float64), zi=zi)
+    out = np.tanh(out * sat) / np.tanh(sat)
+    return (out * env(n, a, r, sr) * vel).astype(np.float32)
+
 def glass_tone(freq, dur, vel=0.08, sr=SR):
     """やさしい高音のシンセ (ガラスのような): 正弦波 + 少しの 2 倍・3 倍音、柔らかい立ち上がりと長い減衰"""
     n = int((dur + 1.8) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -717,6 +736,12 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl * 0.8; HR[i0:i1] += y[:i1 - i0] * cr * 0.8
             L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
+            continue
+        if recs and ex['v'] in ('RS', 'RL'):                # 共鳴するシンセ: パッド (RS) / 主題に共鳴するリード (RL)
+            if ex['v'] == 'RS': y = reso_synth(freq, ex['d'], ex.get('gain', 0.1), cut0=180.0, cut1=2200.0, q=6.5, lfo=ex.get('lfo', 0.125), phase=ex.get('phase', 0.0), a=0.7, r=1.8, sub=0.45)
+            else: y = reso_synth(freq, ex['d'], ex.get('gain', 0.12), cut0=350.0, cut1=3800.0, q=8.0, lfo=0.3, phase=0.0, a=0.03, r=0.6, sub=0.2, sat=1.4)
+            pan = ex.get('pan', 0.0); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
         if recs and ex['v'] in ('GL', 'SUB'):               # やさしいシンセ: 高音のガラス / 低音の正弦波
             y = glass_tone(freq, ex['d'], ex.get('gain', 0.08)) if ex['v'] == 'GL' else sub_tone(freq, ex['d'], ex.get('gain', 0.18))
