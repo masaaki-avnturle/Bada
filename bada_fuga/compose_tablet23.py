@@ -168,8 +168,8 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': [SYN], 'src_name': {SYN: '11:21 のシンセ (実音)'},
     'title': 'Requiem BADA — Tablet Sessions XXIII · Summa sintetica',
     'subtitle': '集大成 XXII を、11:21 のシンセサイザーの実音一色で — 荘厳で洗脳的なレクイエムとフーガ (♩=56)',
-    'legend': ['SP', 'PK'], 'vname': {'SP': '11:21 のシンセ (採譜の鳴らし直し)', 'PK': '鼓動 (シンセの低い音)'},
-    'footer': ['Introitus 11:23 → 08:53 (ホ短調) → Kyrie: Fuga I → Graduale 9/23 08:06 → 11:18 (変ロ短調) → Dies irae: Fuga II → Offertorium 08:49 (ヘ短調) → Sanctus: Fuga III → Agnus Dei: B-A-D-A → Finale → In paradisum',
+    'legend': ['SP', 'PK'], 'vname': {'SP': 'シンセ (採譜の鳴らし直し)', 'PK': '鼓動'},
+    'footer': ['Introitus 11:23→08:53 → Kyrie: Fuga I → Graduale 08:06→11:18 → Dies irae: Fuga II → Offertorium 08:49 → Sanctus: Fuga III → Agnus Dei → Finale → In paradisum',
                '音はすべて 11:21 の録音から切り出したシンセの持続音 (実音)。抜粋は録音の採譜を鳴らし直したもの。バッハ風のフーガ、ストレッタ、打ち直す保続低音、鼓動。'],
 }
 
