@@ -190,7 +190,7 @@ def build():
 
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
-    'title': 'Requiem BADA — Tablet Sessions XXV · A quattro mani impossibili',
+    'title': 'Requiem BADA — Tablet Sessions XXV · Quattro mani',
     'subtitle': '4 手の指がなければ不可能な不協和音の塊と 6 オクターヴの分散和音の波 — 9/23・9/24 の実録音のピアノ一色 (♩=56)',
     'legend': ['TB', 'PK'], 'vname': {'PK': '鼓動 (ピアノの低い打鍵)'},
     'footer': ['Introitus 11:23 の和声 → Kyrie: Fuga I → Graduale 08:06 の和声 → Dies irae: Fuga II → Offertorium 08:49 の和声 → Sanctus: Fuga III → Agnus Dei → Finale → In paradisum',
