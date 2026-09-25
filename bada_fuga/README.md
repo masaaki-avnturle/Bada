@@ -863,6 +863,34 @@ python3 compose_tablet24.py bank17.json score_synth.json synth && python3 synth.
 python3 compose_tablet24.py bank17.json score_piano.json piano && python3 synth.py score_piano.json piano.wav && python3 video.py score_piano.json piano.wav piano.mp4
 ```
 
+## 🎹✋✋✋✋ Requiem BADA — Tablet Sessions XXV · A quattro mani impossibili (4 手でなければ不可能, ♩=56, 約 6 分 30 秒)
+
+2026-09-23 / 09-24 の 7 本の録音 (主題と和声) をもとに、**2 本の手では物理的に弾けない不協和音と分散和音**でレクイエムとフーガを作り換えた。
+音はすべて録音から切り出したピアノの 1 音 (実音、自然に減衰)。
+
+- **不協和音の塊** — 根音の上に短 2 度・増 4 度・短 9 度・長 7 度を積んだ 12 音を 4〜5 オクターヴにわたって同時に打つ。フーガの入りと Dies irae の各小節の頭で。
+- **分散和音の波** — 1 拍 6 音の分散和音が A0 付近から C8 付近までの 6 オクターヴを休みなく往復する。和音の構成音に ♭9・長 7・♭13 を足した不協和な分散和音。
+  2 本の波が反行 (片方が上り、片方が下り) で同時に走り、その上に 4 声のフーガ、鼓動、保続低音 — 手が 4 本あってはじめて可能。
+- **録音の和声** — Introitus / Graduale / Offertorium では 11:23、08:06、08:49 の採譜の和音進行をそのまま使い、波と塊で鳴らす (`rec_harmony`)。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 11:23 の和声を反行する 2 本の波と 2 小節ごとの塊で |
+| Kyrie — Fuga I | 08:53 のバッハ風フーガ、ストレッタから下からの波 |
+| Graduale | 9/23 08:06 の和声を 2 本の波と塊で |
+| Dies irae — Fuga II | 11:23 と 11:18 の二重フーガ、各小節の頭に 12 音の塊、後半は反行する波 |
+| Offertorium | 08:49 の和声を上りの波 1 本で |
+| Sanctus — Fuga III | 9/23 08:06 と 08:09 の二重フーガ、下りの波の上で |
+| Agnus Dei | B-A-D-A の 1 拍遅れのカノン、保続低音、反行する波 |
+| Finale | 7 主題のストレッタ、入りごとに塊、反行する波 → 保続低音 |
+| In paradisum | ヘ長調の波が 6 オクターヴを上って遅くなり、12 音の長和音にほどける |
+
+ステムを測って、波と塊は抜粋の区間で RMS ≈ 0.06、フーガの下では −4〜−7 dB、鼓動はその −12 dB に (`GW`)。
+
+```bash
+python3 compose_tablet25.py bank17.json score_tablet25.json && python3 synth.py score_tablet25.json tablet25.wav && python3 video.py score_tablet25.json tablet25.wav tablet25.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
