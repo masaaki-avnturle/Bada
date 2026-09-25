@@ -172,9 +172,9 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.6,
     'title': 'Requiem BADA — Tablet Sessions XI · Adagio in tre bemolli',
-    'subtitle': 'B♭・E♭・G♭ の 3 つの♭をめぐる、荘厳で洗脳的なバッハ風フーガのレクイエム — 9/23・9/24 の実音のピアノで (Adagio ♩=48)',
+    'subtitle': 'B♭・E♭・G♭ の 3 つの♭をめぐる、荘厳で洗脳的なバッハ風フーガのレクイエム (Adagio ♩=48)',
     'legend': ['TB', 'SUB', 'PK'],
-    'footer': ['Introitus: Fuga I (ハ短調) → Kyrie: 08:06 → 11:18 の実音・フガート (変ロ短調) → Graduale: 11:23 → 08:53 (変ホ短調)・二重フーガ → Lux aeterna (変ト長調) → 08:49 → Finale: ストレッタ (ハ短調) → ハ長調',
+    'footer': ['Fuga I (ハ短調) → Kyrie: 08:06 → 11:18・フガート (変ロ短調) → Graduale: 11:23 → 08:53・二重フーガ (変ホ短調) → Lux aeterna (変ト長調) → 08:49 → Finale: ストレッタ (ハ短調) → ハ長調',
                '高音では pp の実音のピアノが♭の音階を降り続ける (降圧剤)。ホ短調の録音は半音下げ、ヘ短調は 2 半音下げ (速さは元のまま)。高音のガラスのシンセはなし。'],
 }
 
