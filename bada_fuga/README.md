@@ -748,6 +748,19 @@ XVI から、合成していた側の楽器 = フーガの 4 声を**パイプ�
 python3 compose_tablet17.py bank17.json score_tablet17.json && python3 synth.py score_tablet17.json tablet17.wav && python3 video.py score_tablet17.json tablet17.wav tablet17.mp4
 ```
 
+## 🎛🕯 Requiem BADA — Tablet Sessions XVIII · Lacrimosa (ホ短調 → 変ロ短調 → ヘ短調, Adagio ♩=52, 約 5 分)
+
+XVII からピアノをすべて消した版: 実音のピアノの録音、ピアノの 1 音のサンプラー、ピアノの低音から作った鼓動、パイプオルガン。
+残る楽器は 2026-09-24 の 2 曲目 (11:21) から切り出した**シンセサイザーの持続音の実音**だけ。4 声のフーガをこの実音が歌い (すべての音の
+`src` を `VOXSY` に)、下では同じ実音の低い持続音 (`SP`) が支える。旋律は 9/23・9/24 の 7 本から作った主題。
+悲しみのレクイエム: Adagio、短調のまま終わる (ピカルディ終止なし)、最後は半音ずつ下がる嘆きの低音 (D → C♯ → C → B → B♭ → A)。
+Introitus (持続音) → Kyrie: Fuga I (08:53, バッハ風) → Lacrimosa: Fuga II (11:23 · 11:18) · Fuga III (9/23 08:06 · 08:09) → Finale (7 つの主題のストレッタ) → Lamento。
+`video.py`: meta `src_name` で `VOX…` の凡例の名前を指定。
+
+```bash
+python3 compose_tablet18.py bank17.json score_tablet18.json && python3 synth.py score_tablet18.json tablet18.wav && python3 video.py score_tablet18.json tablet18.wav tablet18.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

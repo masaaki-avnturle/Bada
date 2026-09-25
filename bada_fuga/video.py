@@ -177,7 +177,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     for k, (r, c) in enumerate(RCOL.items()):
         yy = 634 if many else 612
         bd.rectangle([lx, yy, lx + 14, yy + 14], fill=c)
-        lab = ('%s わたしの歌声' % circ[k]) if r == 'VOX' else ('%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]))
+        lab = ('%s %s' % (circ[k], meta.get('src_name', {}).get(r, 'わたしの歌声'))) if r.startswith('VOX') else ('%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]))
         bd.text((lx + 20, yy - 3), lab, font=f_small, fill=(200, 204, 216))
         lx += 112 if many else 132
     for i, line in enumerate(th['footer']):
