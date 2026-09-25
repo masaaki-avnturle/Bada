@@ -426,6 +426,39 @@ def reso_synth(freq, dur, vel=0.2, cut0=220.0, cut1=2400.0, q=6.0, lfo=0.125, ph
     out = np.tanh(out * sat) / np.tanh(sat)
     return (out * env(n, a, r, sr) * vel).astype(np.float32)
 
+def _biquad(kind, f0, sr, q=1.0, db=0.0):
+    """RBJ の biquad (sos 1 段): 'lp' ローパス / 'pk' ピーキング (db) / 'hs' ハイシェルフ (db)"""
+    w = 2 * np.pi * f0 / sr; cw, sw = np.cos(w), np.sin(w); al = sw / (2 * q); A = 10 ** (db / 40.0)
+    if kind == 'lp': b0, b1, b2, a0, a1, a2 = (1 - cw) / 2, 1 - cw, (1 - cw) / 2, 1 + al, -2 * cw, 1 - al
+    elif kind == 'pk': b0, b1, b2, a0, a1, a2 = 1 + al * A, -2 * cw, 1 - al * A, 1 + al / A, -2 * cw, 1 - al / A
+    else:
+        sa = np.sqrt(A) * 2 * al / 1.0 * 0 + 2 * np.sqrt(A) * al
+        b0 = A * ((A + 1) + (A - 1) * cw + sa); b1 = -2 * A * ((A - 1) + (A + 1) * cw); b2 = A * ((A + 1) + (A - 1) * cw - sa)
+        a0 = (A + 1) - (A - 1) * cw + sa; a1 = 2 * ((A - 1) - (A + 1) * cw); a2 = (A + 1) - (A - 1) * cw - sa
+    return np.array([[b0 / a0, b1 / a0, b2 / a0, 1.0, a1 / a0, a2 / a0]])
+
+_VIOLIN_BODY = None
+def violin_tone(freq, dur, vel=0.2, sr=SR):
+    """バイオリン (物理に近い合成): 弓で弾く弦の倍音列 (鋸歯波、わずかな揺れ) → 胴の共鳴 (275 / 450 / 1000 Hz のピーク) →
+    3.2 kHz からなだらかに落とす (切り裂かない)。弓の摩擦音を薄く、ビブラートは 0.3 秒遅れて入る。高い音ほど音量を抑えて耳障りにしない"""
+    from scipy.signal import sosfilt
+    global _VIOLIN_BODY
+    a, r = 0.11, 0.28
+    n = int((dur + r) * sr); t = np.arange(n, dtype=np.float32) / sr
+    nh = int(max(6, min(40, 7000.0 / freq)))
+    jit = 1 + 0.0012 * np.cumsum(np.random.default_rng(int(freq)).standard_normal(n)).astype(np.float32) / np.sqrt(np.arange(1, n + 1))
+    y = _wavetable_voice(freq * jit, n, _table('saw', nh, 0.85), [(0.0, 0.0)], 0.0045, 5.4, t, sr)
+    bow = _noise(n, 7); bow = bow - _lp(bow, 0.12); bow = _lp(bow, 0.55)
+    y = y + 0.05 * bow * (1 + 1.5 * np.exp(-t / 0.08))
+    if _VIOLIN_BODY is None:
+        _VIOLIN_BODY = np.concatenate([_biquad('pk', 275, sr, 2.5, 4.0), _biquad('pk', 450, sr, 3.0, 2.5), _biquad('pk', 1000, sr, 2.0, 3.5),
+                                       _biquad('pk', 1900, sr, 2.0, 3.0), _biquad('lp', 4200, sr, 0.6), _biquad('hs', 3200, sr, 0.7, -4.0)])
+    y = sosfilt(_VIOLIN_BODY, y.astype(np.float64)).astype(np.float32)
+    y = y / (np.abs(y).max() + 1e-9)
+    swell = 1 - 0.18 * np.exp(-t / 0.35)                                              # 弓の入りは少し柔らかく
+    soft = min(1.0, (880.0 / freq) ** 0.45) if freq > 880 else 1.0                   # A5 より上は音量を抑える
+    return (y * env(n, a, r, sr) * swell * vel * soft).astype(np.float32)
+
 def glass_tone(freq, dur, vel=0.08, sr=SR):
     """やさしい高音のシンセ (ガラスのような): 正弦波 + 少しの 2 倍・3 倍音、柔らかい立ち上がりと長い減衰"""
     n = int((dur + 1.8) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -736,6 +769,11 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl * 0.8; HR[i0:i1] += y[:i1 - i0] * cr * 0.8
             L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
+            continue
+        if recs and ex['v'] == 'VN':                        # バイオリン (合成): 主題に重なる、または和音の音を長く
+            y = violin_tone(freq, ex['d'], ex.get('gain', 0.2))
+            pan = ex.get('pan', -0.15); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
         if recs and ex['v'] in ('RS', 'RL'):                # 共鳴するシンセ: パッド (RS) / 主題に共鳴するリード (RL)
             if ex['v'] == 'RS': y = reso_synth(freq, ex['d'], ex.get('gain', 0.1), cut0=180.0, cut1=2200.0, q=ex.get('q', 6.5), lfo=ex.get('lfo', 0.125), phase=ex.get('phase', 0.0), a=0.7, r=1.8, sub=0.45, open_t=ex.get('open', 0.5))

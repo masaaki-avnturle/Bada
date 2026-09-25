@@ -709,6 +709,18 @@ XIII から、シンセの「ビュー」という音 — 共鳴するフィル�
 python3 compose_tablet14.py bank8/bank.json score_tablet14.json && python3 synth.py score_tablet14.json tablet14.wav && python3 video.py score_tablet14.json tablet14.wav tablet14.mp4
 ```
 
+## 🎻 Requiem BADA — Tablet Sessions XV · Violino (約 6 分 27 秒)
+
+XIV から、主題の入り (11:23 の主題を含む) に重なっていたシンセサイザーを**バイオリン**に置き換えた版。本物のバイオリンの録音はないので、
+`synth.violin_tone` で物理に近い合成: 弓で弾く弦の倍音列 (鋸歯波、わずかな揺れ、0.3 秒遅れて入るビブラート、薄い弓の摩擦音) →
+胴の共鳴 (275 / 450 / 1000 / 1900 Hz のピーク、`_biquad` の RBJ ピーキング) → 4.2 kHz のローパスと 3.2 kHz からのハイシェルフで
+切り裂かない音に。A5 より上は音量を抑え、高揚しても耳障りにならない。最後のヘ長調の和音にはバイオリンの重音 (C5・A5)。
+ステムを測ってバイオリンはピアノの約 3.5 dB 下に。
+
+```bash
+python3 compose_tablet15.py bank8/bank.json score_tablet15.json && python3 synth.py score_tablet15.json tablet15.wav && python3 video.py score_tablet15.json tablet15.wav tablet15.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
