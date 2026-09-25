@@ -689,6 +689,16 @@ XI の pianissimo の降りる音階を消し、2026-09-24 のピアノ録音 5 
 python3 compose_tablet12.py bank8/bank.json score_tablet12.json && python3 synth.py score_tablet12.json tablet12.wav && python3 video.py score_tablet12.json tablet12.wav tablet12.mp4
 ```
 
+## 🎹🎛 Requiem BADA — Tablet Sessions XIII · Risonanza senza onda (うねりなし, 約 6 分 27 秒)
+
+XII から、シンセの「共鳴するうねり」(LFO でカットオフが往復するパッド `RS`) を消した版。残るのはフーガの主題の入りに同じ音で重なる
+共鳴シンセ (`RL`) だけで、そのフィルターは一度開いて固定 (`lfo=0, phase=π, open=0.03`)。最後のヘ長調の和音は一度だけゆっくり開く (`open=3.0`)。
+`synth.reso_synth` に `open_t` (フィルターの開く速さ) を追加。
+
+```bash
+python3 compose_tablet13.py bank8/bank.json score_tablet13.json && python3 synth.py score_tablet13.json tablet13.wav && python3 video.py score_tablet13.json tablet13.wav tablet13.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
