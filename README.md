@@ -103,6 +103,28 @@
 
 ---
 
+## 🎼 ダウンロード — Bada Contrapunctus(未完のフーガ × 祈るカミーユ 動画工房)
+
+**楽曲を J.S. バッハ「コントラプンクトゥス XIV(未完)」の気配に編曲し、オーケストラのような平行トラックで作曲・編集して、モネ風の「祈りを捧げるカミーユ」の動画に仕立てるソフト。** どの拡張子の楽曲でも取り込み(ブラウザ復号 → WAV / AIFF 自前解析 → **MIDI は音符として**)、クロマ × Krumhansl–Schmuckler で調性を解析して **D 短調 / F 長調** へ位相ボコーダで移調、大聖堂残響、**第 1・第 2・B–A–C–H 主題による 4 声オルガン対位法**、第 239 小節のように全声部を断ち切る**未完の終止**。**11 行の平行ミックス画面**(元の音楽 + オルガン 4 声 + 弦楽 / 合唱 / フルート / チェンバロ / コントラバス / ティンパニ)で、`Dm | Gm A7 | B♭maj7 | …` のコード進行に沿って各楽器が役割(持続和音 / 分散和音 / 低音 / 旋律 / 拍打ち)で平行に演奏、ピアノロールで音符を編集、MIDI / WAV / プロジェクト(JSON)/ 動画(MP4 / WebM)を保存。映像は 1 万本超の筆致による印象派レンダリングで、光が音に呼吸し、筆が止まる瞬間に画布が剥き出しになります。依存ゼロ・単一 HTML・オフライン動作。
+
+### 👉 [**bach_monet_film/index.html をダウンロード**](bach_monet_film/index.html)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存 → ダブルクリックで起動(インストール不要)。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows / Ubuntu)
+
+[Actions](https://github.com/masaaki-avnturle/Bada/actions/workflows/contrapunctus-app-build.yml)(実行を開いて下の **Artifacts**)または [Releases](https://github.com/masaaki-avnturle/Bada/releases) から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-contrapunctus-debug.apk`(アーティファクト `contrapunctus-android`) |
+| **Windows 10 / 11** | `BadaContrapunctus-*-x64.exe` (NSIS インストーラ / ポータブル)(`contrapunctus-windows`) |
+| **Ubuntu** | `BadaContrapunctus-*-x86_64.AppImage` / `BadaContrapunctus-*-amd64.deb`(`contrapunctus-linux`) |
+
+ビルドは [`contrapunctus-app-build.yml`](.github/workflows/contrapunctus-app-build.yml) が実行します(`bach_monet_film/` への push・`workflow_dispatch` で Actions アーティファクト / `contrapunctus-v*` タグで Release へ添付)。作例の動画・編曲音声は [`bach_monet_film/works/`](bach_monet_film/works/)、使い方・仕組みは [`bach_monet_film/`](bach_monet_film/) を参照。
+
+---
+
 ## 🎬 ダウンロード — Bada SoundFilm(MP3 → 動画 変換スタジオ)
 
 **MP3 を動画に変換するソフト。** MP3(ほか WAV / OGG / M4A / FLAC)を読み込むと、**ID3v2/ID3v1 タグ**(曲名 / アーティスト / アルバム / ジャケット画像 APIC)を自前実装のパーサで解析し、音に反応する**ビジュアライザ**(スペクトラムバー / サークル / 波形 / シンプル — FFT を対数スケールで 64 バーに集計)を Canvas に描画、Web Audio API の音声トラックと合成して **MediaRecorder** で動画ファイルへ録画します。出力は対応環境で **MP4 (H.264 + AAC)**、それ以外は **WebM (VP9/VP8 + Opus)**。解像度プリセット(フル HD / HD / 正方形 / 縦型ショート 1080×1920)、24/30/60 fps、背景色・背景画像、複数ファイルの連続変換、プレビュー再生に対応。音楽ファイルは端末の外に出ません。依存ゼロ・単一 HTML・オフライン動作。
@@ -258,6 +280,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`bada_vm_pro/`** | ★ **Bada VM Pro(集大成)** — ブラウザーデザインのシェル · BadaGPT カーネル(OS update/upgrade 担当) · Bada on Rails · 量子 Bada 実行系 · 合い言葉コマンド(silent talk/音声) · self-attention トランスフォーマー · GUI/CUI プログラミング · APK/EXE/AppImage 配布 | [→ 開く](bada_vm_pro/) |
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
+| **`bach_monet_film/`** | 🎼 **Bada Contrapunctus** — 楽曲を「コントラプンクトゥス XIV(未完)」の気配に編曲(調性解析 → D 短調 / F 長調へ移調 · 大聖堂残響 · B–A–C–H を含む 4 声オルガン対位法 · 未完の終止)· 11 行の平行ミックス作曲(コード進行 → 役割で平行演奏 · ピアノロール · MIDI/WAV/JSON 保存)· モネ風「祈るカミーユ」の筆致レンダリング動画 · どの拡張子でも取り込み · APK/EXE/AppImage 配布 | [→ 開く](bach_monet_film/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
 
 ---
