@@ -699,6 +699,16 @@ XII から、シンセの「共鳴するうねり」(LFO でカットオフが�
 python3 compose_tablet13.py bank8/bank.json score_tablet13.json && python3 synth.py score_tablet13.json tablet13.wav && python3 video.py score_tablet13.json tablet13.wav tablet13.mp4
 ```
 
+## 🎹 Requiem BADA — Tablet Sessions XIV · Senza risonanza (「ビュー」なし, 約 6 分 27 秒)
+
+XIII から、シンセの「ビュー」という音 — 共鳴するフィルターが開くときの音 (主題に重なるシンセの音ごとの開き、最後の和音のゆっくりした開き) — を消した版。
+フィルターの共鳴をなくし (`q=0.8`)、開き方も最初から固定 (`open=0.002`)。残るのは主題の入りに同じ音で重なる、共鳴しないシンセだけ。
+`synth.py`: `RS` / `RL` は event の `q` を受ける。`video.py`: meta `vname` で声部名を上書き。
+
+```bash
+python3 compose_tablet14.py bank8/bank.json score_tablet14.json && python3 synth.py score_tablet14.json tablet14.wav && python3 video.py score_tablet14.json tablet14.wav tablet14.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

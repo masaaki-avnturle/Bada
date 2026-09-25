@@ -738,8 +738,8 @@ def main(score='score.json', out='fuga.wav'):
             L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
             continue
         if recs and ex['v'] in ('RS', 'RL'):                # 共鳴するシンセ: パッド (RS) / 主題に共鳴するリード (RL)
-            if ex['v'] == 'RS': y = reso_synth(freq, ex['d'], ex.get('gain', 0.1), cut0=180.0, cut1=2200.0, q=6.5, lfo=ex.get('lfo', 0.125), phase=ex.get('phase', 0.0), a=0.7, r=1.8, sub=0.45, open_t=ex.get('open', 0.5))
-            else: y = reso_synth(freq, ex['d'], ex.get('gain', 0.12), cut0=350.0, cut1=3800.0, q=8.0, lfo=ex.get('lfo', 0.3), phase=ex.get('phase', 0.0), a=0.03, r=0.6, sub=0.2, sat=1.4, open_t=ex.get('open', 0.5))
+            if ex['v'] == 'RS': y = reso_synth(freq, ex['d'], ex.get('gain', 0.1), cut0=180.0, cut1=2200.0, q=ex.get('q', 6.5), lfo=ex.get('lfo', 0.125), phase=ex.get('phase', 0.0), a=0.7, r=1.8, sub=0.45, open_t=ex.get('open', 0.5))
+            else: y = reso_synth(freq, ex['d'], ex.get('gain', 0.12), cut0=350.0, cut1=3800.0, q=ex.get('q', 8.0), lfo=ex.get('lfo', 0.3), phase=ex.get('phase', 0.0), a=0.03, r=0.6, sub=0.2, sat=1.4, open_t=ex.get('open', 0.5))
             pan = ex.get('pan', 0.0); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
