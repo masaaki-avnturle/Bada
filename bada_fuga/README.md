@@ -845,6 +845,24 @@ XXII で実音の抜粋だった区間は、その録音の採譜 (打鍵ごと�
 python3 compose_tablet23.py bank17.json score_tablet23.json && python3 synth.py score_tablet23.json tablet23.wav && python3 video.py score_tablet23.json tablet23.wav tablet23.mp4
 ```
 
+## 🎛🎹 Requiem BADA — Tablet Sessions XXIV · Attrito (擦れ) — sintetico / pianistico (2 曲, ♩=56, 各約 8 分)
+
+XXII / XXIII と同じ形式・同じ主題 (レクイエム、主題はフーガ) を、**音と音が合わさるときの擦れの微妙なニュアンス**を曲の中で表現するように
+作り換えた 2 曲。`compose_tablet24.py <bank> <score> synth|piano` — synth は 11:21 のシンセの実音一色 (XXIII の音)、piano は実録音のピアノ一色 (XXII の音)。
+
+擦れ (attrito) の表現:
+
+1. **掛留 (suspension)** — 自由声部が強拍で 2 度下がるところで、前の音を 1 拍 (短い音なら半拍) 引き伸ばして強拍に持ち越す。
+   強拍で他の声部と 2 度・7 度・4 度で擦れ、次の拍で解決する (バッハの「擦れて、ほどける」)。主題と保続低音の音は動かさない。1 曲に 20 か所。
+2. **B-A-D-A の 1 拍遅れのカノン** (Agnus Dei) — テノールが 1 拍遅れて同じ動機を追うので、B♭ と A、A と D が常に擦れ合う。
+3. **うなるユニゾン** (`synth.py` の `unison_detune`) — 1 音ごとに数セントずらした同じ音を重ね、ゆっくりうなる。
+   シンセは 7 セント (C4 で約 1 Hz のうなり)、ピアノは 3 セント (調律のわずかにずれたユニゾン弦のように)。
+
+```bash
+python3 compose_tablet24.py bank17.json score_synth.json synth && python3 synth.py score_synth.json synth.wav && python3 video.py score_synth.json synth.wav synth.mp4
+python3 compose_tablet24.py bank17.json score_piano.json piano && python3 synth.py score_piano.json piano.wav && python3 video.py score_piano.json piano.wav piano.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

@@ -559,14 +559,20 @@ def sampler_tone(midi, dur, vel, rid, rel=0.35, sr=SR):
     if s['file'] not in _BANK['audio']: _BANK['audio'][s['file']] = sf.read(s['file'], dtype='float32')[0]
     src = _BANK['audio'][s['file']]
     ratio = 2 ** ((midi - s['midi']) / 12.0)
-    n_out = int((dur + rel) * sr); need = int(n_out * ratio) + 4
+    n_out = int((dur + rel) * sr); need = int(n_out * ratio * 1.01) + 4
     ext = src
     if len(ext) < need:                                   # 持続部 (30%〜90%) をクロスフェードでつないで伸ばす
         a, b = int(0.3 * len(src)), int(0.9 * len(src)); loop = src[a:b]; xf = min(int(0.06 * sr), len(loop) // 3)
         fade = np.linspace(0, 1, xf, dtype=np.float32); ext = src[:b].copy()
         while len(ext) < need:
             ext = np.concatenate([ext[:-xf], ext[-xf:] * (1 - fade) + loop[:xf] * fade, loop[xf:]])
-    y = np.interp(np.arange(n_out) * ratio, np.arange(len(ext)), ext).astype(np.float32)
+    det = _BANK.get('detune', 0.0)                        # ユニゾンの擦れ: 数セントずらした同じ音を重ねて、ゆっくりうなる
+    if det:
+        ra, rb = ratio * 2 ** (-det / 2400.0), ratio * 2 ** (det / 2400.0)
+        y = 0.5 * (np.interp(np.arange(n_out) * ra, np.arange(len(ext)), ext) + np.interp(np.arange(n_out) * rb, np.arange(len(ext)), ext))
+        y = y.astype(np.float32)
+    else:
+        y = np.interp(np.arange(n_out) * ratio, np.arange(len(ext)), ext).astype(np.float32)
     i0 = int(dur * sr); t = np.arange(n_out - i0, dtype=np.float32) / sr
     y[i0:] *= np.exp(-t / (rel / 3))
     y[:int(0.004 * sr)] *= np.linspace(0, 1, int(0.004 * sr))
@@ -660,7 +666,7 @@ def main(score='score.json', out='fuga.wav'):
     acc = style == 'acceptance'
     mantra = style == 'mantra'
     recs = style == 'recsampler'
-    if recs: load_bank(d['meta']['bank']); _BANK['decay'] = float(d['meta'].get('piano_decay', 0.0))
+    if recs: load_bank(d['meta']['bank']); _BANK['decay'] = float(d['meta'].get('piano_decay', 0.0)); _BANK['detune'] = float(d['meta'].get('unison_detune', 0.0))
     global _BEAT_GRID
     if d.get('bar_times'):
         bts = np.array(d['bar_times']); nb = len(bts) - 1
