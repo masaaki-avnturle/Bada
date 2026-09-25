@@ -909,6 +909,20 @@ Contrapunctus XIV の第 2 主題 (駆け足の 8 分音符) は入れず、代�
 python3 compose_tablet26.py bank17.json score_tablet26.json && python3 synth.py score_tablet26.json tablet26.wav && python3 video.py score_tablet26.json tablet26.wav tablet26.mp4
 ```
 
+## 🎹🌀 Requiem BADA — Tablet Sessions XXVII · Contrapunctus turbato (乱れる三重フーガ + 9/23・9/24 の実音, ♩=56, 約 7 分)
+
+XXVI (Contrapunctus XIV の形) をもとに、フーガの入りを「乱し」、9/23・9/24 の実音の抜粋をミックスした。音はすべて実録音のピアノ。
+
+- **乱れる入り (turbato)** — 主題が小節の頭ではなく拍の途中で、不揃いな間隔 (1.5 小節、3 拍、半小節、1 拍) で崩れ込むように入る。
+  原形・反行形・拡大形 (2 倍)・縮小形 (半分) が同じ小節の中で同時に走る。B-A-D-A は 2 拍ごとの密なストレッタ。三重フーガでも 3 つの主題が拍をずらして重なる。
+- **実音の抜粋** — 各 Sectio の前に 8 秒のクロスフェードでミックス: Introitus 11:23 → 08:53 (ホ短調)、Interludium I 9/23 08:06 → 9/24 11:18 (変ロ短調)、
+  Interludium II 08:49 → 11:21 (ヘ短調)。フーガはその抜粋の調で歌う (`CT.LAYOUT`)。
+- 最後は XXVI と同じく、2 度目の三重の重なりの途中、小節の 2 拍目で楽譜が途切れ、鼓動だけが 8 小節かけて消える。
+
+```bash
+python3 compose_tablet27.py bank17.json score_tablet27.json && python3 synth.py score_tablet27.json tablet27.wav && python3 video.py score_tablet27.json tablet27.wav tablet27.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
