@@ -775,6 +775,17 @@ XVIII から、シンセサイザーの全音 (4 声・持続音) を**実録音
 python3 compose_tablet19.py bank17.json score_tablet19.json && python3 synth.py score_tablet19.json tablet19.wav && python3 video.py score_tablet19.json tablet19.wav tablet19.mp4
 ```
 
+## 🎛🌟 Requiem BADA — Tablet Sessions XX · Pastorale sintetica (ト短調 / ト長調, ♩=66, 約 4 分 25 秒)
+
+XIX から、始めの出だしの伴奏 (羊飼いの笛のドローンの 4 小節と、その後のドローン) を消し、4 声すべてを 2026-09-24 11:21 の録音から切り出した
+**シンセサイザーの持続音の実音** (rid `VOXSY`) にした版。伴奏はなく、フーガの 4 声だけが曲になる。主題・調・形は XIX のまま
+(跳躍を畳んだなだらかな主題、シチリアーナの揺れ、ト短調とト長調、Gloria と Wiegenlied は主題から選んだ長調の和音)。
+Fuga I (08:53) → Kyrie: Fuga II (11:23 · 11:18) → Gloria (ト長調) → Misericordia: Fuga III (9/23 08:06 · 08:49) → Finale (7 つの主題) → Wiegenlied (ト長調)。
+
+```bash
+python3 compose_tablet20.py bank17.json score_tablet20.json && python3 synth.py score_tablet20.json tablet20.wav && python3 video.py score_tablet20.json tablet20.wav tablet20.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
