@@ -923,6 +923,34 @@ XXVI (Contrapunctus XIV の形) をもとに、フーガの入りを「乱し」
 python3 compose_tablet27.py bank17.json score_tablet27.json && python3 synth.py score_tablet27.json tablet27.wav && python3 video.py score_tablet27.json tablet27.wav tablet27.mp4
 ```
 
+## 🎹🎛 Requiem BADA — Tablet Sessions XXVIII · Lento ipnotico (2026-09-25 の 3 本, ♩=42, 約 5 分)
+
+2026-09-25 の録音 3 本 — 12:46:43 (ヘ短調、途中にシンセサイザーの実音)、12:50:53 (ロ短調)、13:04:31 (変ホ短調、ゆっくり) — から。
+速さは 13:04 に合わせて ♩=42 (Contrapunctus XIV より遅い)。レクイエムとフーガが交互に雰囲気を変える:
+
+- **Requiem** — 実音の抜粋 (録音そのもの) の下で、12:46 の途中から切り出したシンセの持続音 (実音、`build_synthbank.py`、29 音) が
+  録音の和音を 1 小節ずつ静かに支える (`PAD`)。鼓動は最後まで止まらない。
+- **Fuga** — その録音の主題 (`CT.make_subject`、♩=42 なので 3〜6 音のゆっくりした主題) を、録音から切り出したピアノの 1 音で 4 声のフーガに。
+  主題の入りにシンセの実音が 1 オクターヴ上で重なる。
+
+| 区間 | 内容 |
+|---|---|
+| Requiem I | 13:04 の実音 (変ホ短調) |
+| Fuga I | 13:04 の主題の提示 → ストレッタ |
+| Requiem II | 12:46 の途中、シンセが鳴っている実音 (ヘ短調) |
+| Fuga II | 12:46 と 13:04 の二重フーガ |
+| Requiem III | 12:50 の実音 (ロ短調) |
+| Fuga III | 12:50 の主題の提示 → 3 つの主題が同時に重なる三重フーガ → ストレッタ |
+| Requiem finale | 13:04 の本当の終わり → シンセの和音が残り、鼓動とともに消える |
+
+ステム: 実音 ≈ フーガ ≈ 0.05、シンセの支え −5 dB、鼓動 −13 dB。
+
+```bash
+python3 build_sampler.py bank25 20260925_124643.mp3 20260925_125053.mp3 20260925_130431.mp3
+python3 build_synthbank.py 20260925_124643.mp3 sybank25 0.4 0.2      # bank26.json = bank25 + sybank25 の samples
+python3 compose_tablet28.py bank26.json score_tablet28.json && python3 synth.py score_tablet28.json tablet28.wav && python3 video.py score_tablet28.json tablet28.wav tablet28.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
