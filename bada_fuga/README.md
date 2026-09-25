@@ -795,6 +795,30 @@ XX (出だしの伴奏なし、フーガの 4 声だけ) の全音を、9/23・9
 python3 compose_tablet21.py bank17.json score_tablet21.json && python3 synth.py score_tablet21.json tablet21.wav && python3 video.py score_tablet21.json tablet21.wav tablet21.mp4
 ```
 
+## 🎹🕯 Requiem BADA — Tablet Sessions XXII · Summa (集大成, ホ短調 → 変ロ短調 → ヘ短調 → ヘ長調, ♩=56, 約 8 分)
+
+VI〜XXI の集大成。合成の楽器 (ガラスの高音、共鳴シンセ、リード、パッド、低音の正弦波、ロックバンド、パイプオルガン) をすべて消し、
+鳴る音は 2026-09-23 / 09-24 の録音 7 本の**実録音のピアノだけ**: 実音の抜粋 (8 秒のクロスフェード)、切り出した 1 音による 4 声のフーガ、
+ピアノの低い打鍵から作った柔らかい鼓動。荘厳: Adagio、短調、拍ごとに打ち直す保続低音。洗脳的: 止まらない鼓動、ストレッタ、B-A-D-A の繰り返し。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 11:23 → 08:53 (ホ短調) の実音 |
+| Kyrie — Fuga I | 08:53 のバッハ風フーガ (提示 → エピソード → 下属調 → ストレッタ → 保続低音) |
+| Graduale | 9/23 08:06 → 11:18 (変ロ短調) の実音 |
+| Dies irae — Fuga II | 11:23 と 11:18 の二重フーガ |
+| Offertorium | 08:49 (ヘ短調) の実音 |
+| Sanctus — Fuga III | 9/23 08:06 と 08:09 の二重フーガ |
+| Agnus Dei | B-A-D-A ×2、保続低音の上で |
+| Finale | 7 つの主題のストレッタ → 保続低音 |
+| In paradisum | 08:49 の本当の終わり → ヘ長調の和音 (pp) |
+
+ステムを測って、フーガと実音を同じくらいに、鼓動はその約 12 dB 下に。
+
+```bash
+python3 compose_tablet22.py bank17.json score_tablet22.json && python3 synth.py score_tablet22.json tablet22.wav && python3 video.py score_tablet22.json tablet22.wav tablet22.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
