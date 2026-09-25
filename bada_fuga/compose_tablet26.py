@@ -133,8 +133,8 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
     'title': 'Requiem BADA — Tablet Sessions XXVI · Contrapunctus',
-    'subtitle': 'Contrapunctus XIV のように — 3 つの主題 (08:53、08:06、B-A-D-A) の三重フーガが途中で途切れる。分散和音なし、駆け足の主題なし。実録音のピアノ一色 (♩=56, ニ短調)',
-    'legend': ['TB', 'PK'], 'vname': {'PK': '鼓動 (ピアノの低い打鍵)'},
+    'subtitle': 'Contrapunctus XIV のように — 3 つの主題 (08:53、08:06、B-A-D-A) の三重フーガが途中で途切れる。実録音のピアノ一色 (♩=56)',
+    'legend': ['TB', 'PK'], 'vname': {'PK': '鼓動'},
     'footer': ['Sectio I: 主題 I の提示 → 反行 → 拡大  |  Sectio II: 主題 II の提示 → I+II の二重フーガ  |  Sectio III: B-A-D-A の提示 → I+II+B-A-D-A の三重フーガ → 途切れる → 鼓動だけ',
                '『フーガの技法』の未完の Contrapunctus XIV にならい、B-A-C-H の代わりに B-A-D-A。音はすべて 9/23・9/24 の録音から切り出したピアノ。各 Sectio の頭に 12 音の塊 (弔鐘)。'],
 }
