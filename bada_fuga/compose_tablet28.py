@@ -113,7 +113,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [SYN], 'piano_decay': 1.5, 'src_name': {SYN: '12:46 のシンセ (実音)'},
     'title': 'Requiem BADA — Tablet Sessions XXVIII · Lento ipnotico',
-    'subtitle': '2026-09-25 の 3 本 (12:46・12:50・13:04) — レクイエムとフーガが交互に、13:04 のゆっくりで (♩=42)、12:46 のシンセの実音とともに',
+    'subtitle': '9/25 の 3 本 (12:46・12:50・13:04) — レクイエムとフーガが交互に、13:04 のゆっくりで (♩=42)、12:46 のシンセの実音',
     'legend': ['TB', 'SP', 'PK'], 'vname': {'SP': '12:46 のシンセ (実音)', 'PK': '鼓動'},
     'footer': ['Requiem I 13:04 → Fuga I → Requiem II 12:46 (シンセ) → Fuga II (二重) → Requiem III 12:50 → Fuga III (三重) → Requiem finale 13:04 の終わり',
                '実音の抜粋の下でシンセの実音が和音を支え、フーガは録音から切り出したピアノの 1 音、主題の入りにシンセが重なる。鼓動は最後まで。'],
