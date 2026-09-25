@@ -891,6 +891,24 @@ python3 compose_tablet24.py bank17.json score_piano.json piano && python3 synth.
 python3 compose_tablet25.py bank17.json score_tablet25.json && python3 synth.py score_tablet25.json tablet25.wav && python3 video.py score_tablet25.json tablet25.wav tablet25.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions XXVI · Contrapunctus (Contrapunctus XIV のように, ニ短調, ♩=56, 約 4 分)
+
+XXV から分散和音の波を消し、バッハ『フーガの技法』の未完の三重フーガ Contrapunctus XIV の形で作り換えたレクイエム。
+Contrapunctus XIV の第 2 主題 (駆け足の 8 分音符) は入れず、代わりに 9/23 の主題をゆっくり歌う。音はすべて実録音のピアノ。
+
+| Sectio | 内容 |
+|---|---|
+| I | 第 1 主題 = 9/24 08:53 の主題: 4 声の提示 → エピソード → 反行形 (S, T) → 低音の拡大形 (2 倍の長さ) |
+| II | 第 2 主題 = 9/23 08:06 の主題 (ゆっくり): 4 声の提示 → 第 1 主題と重なる二重フーガ |
+| III | 第 3 主題 = B-A-D-A (バッハの B-A-C-H の代わり): 4 声の提示 → 3 つの主題を同時に重ねる三重フーガ (2 回目は第 1 主題を拡大で低音に) → 2 回目の途中、小節の 2 拍目で楽譜が途切れる → 鼓動だけが 8 小節かけて消える |
+
+各 Sectio の頭に XXV の 12 音の塊をひとつ (弔鐘)。主題の入りはすべてオクターヴ (属調の答唱は使わない)。
+`post` が途切れる位置 (`CUT`) 以降の音を切り、鼓動の音量を `TAIL` で下げていく。
+
+```bash
+python3 compose_tablet26.py bank17.json score_tablet26.json && python3 synth.py score_tablet26.json tablet26.wav && python3 video.py score_tablet26.json tablet26.wav tablet26.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
