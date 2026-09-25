@@ -770,6 +770,12 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl * 0.8; HR[i0:i1] += y[:i1 - i0] * cr * 0.8
             L[i0:i1] += y[:i1 - i0] * cl * 0.25; R[i0:i1] += y[:i1 - i0] * cr * 0.25
             continue
+        if recs and ex['v'] == 'SP':                        # 録音のシンセの持続音 (サンプラー、減衰させない): 主題に重なる
+            y = sampler_tone(ex['m'], ex['d'], ex.get('gain', 0.2), ex.get('rid', 'VOXSY'), rel=0.5)
+            na = min(len(y), int(0.08 * SR)); y[:na] *= np.linspace(0, 1, na)
+            pan = ex.get('pan', 0.15); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if recs and ex['v'] == 'VN':                        # バイオリン (合成): 主題に重なる、または和音の音を長く
             y = violin_tone(freq, ex['d'], ex.get('gain', 0.2))
             pan = ex.get('pan', -0.15); i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)

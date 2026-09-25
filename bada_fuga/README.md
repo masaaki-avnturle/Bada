@@ -721,6 +721,20 @@ XIV から、主題の入り (11:23 の主題を含む) に重なっていたシ
 python3 compose_tablet15.py bank8/bank.json score_tablet15.json && python3 synth.py score_tablet15.json tablet15.wav && python3 video.py score_tablet15.json tablet15.wav tablet15.mp4
 ```
 
+## 🎹🎛 Requiem BADA — Tablet Sessions XVI · Sintetizzatore reale (約 6 分 27 秒)
+
+XV のバイオリンを、2026-09-24 の 11:21 (ピアノとシンセサイザーを重ねた録音) から切り出した**シンセの持続音の実音**に置き換えた版。
+主題はピアノ (録音の 1 音) のまま、フーガのまま、レクイエム。
+- `build_synthbank.py`: pyin で ±0.3 半音以内に伸びる音を探し、ピアノの打鍵から 0.2 秒あとの、減衰せず一定に伸びている部分 (= シンセ) を切り出す
+  (11:21 から C♯2〜G♯3 の 8 音、持続部の音量比 0.66〜1.03)。rid `VOXSY` — `sampler_tone` はこの印のサンプルだけから選び、減衰させない
+- `synth.py`: `SP` (録音のシンセの持続音、80 ms のフェードイン)。ステムを測ってピアノの約 4 dB 下に
+- 使い方は XV と同じ (`bank16.json` は bank8 と sybank を結合したもの)
+
+```bash
+python3 build_synthbank.py 20260924_112131.mp3 sybank 0.4 0.2
+python3 compose_tablet16.py bank16.json score_tablet16.json && python3 synth.py score_tablet16.json tablet16.wav && python3 video.py score_tablet16.json tablet16.wav tablet16.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
