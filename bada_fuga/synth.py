@@ -459,6 +459,26 @@ def violin_tone(freq, dur, vel=0.2, sr=SR):
     soft = min(1.0, (880.0 / freq) ** 0.45) if freq > 880 else 1.0                   # A5 より上は音量を抑える
     return (y * env(n, a, r, sr) * swell * vel * soft).astype(np.float32)
 
+ORGAN_STOPS = {'S': ((1, 1.0), (2, 0.55), (3, 0.2), (4, 0.3)), 'A': ((1, 1.0), (2, 0.5), (3, 0.18)), 'T': ((1, 1.0), (2, 0.45), (3, 0.15)),
+               'B': ((0.5, 0.8), (1, 1.0), (2, 0.35))}                       # ストップ (倍率, 大きさ): 8' プリンシパル + 4' + 2⅔' + 2' / 低音は 16'
+def organ_tone(freq, dur, vel=0.3, voice='A', sr=SR):
+    """パイプオルガン (合成): ストップごとのパイプ (プリンシパルの倍音列 1/k^0.9、わずかな不揃い) を重ねる。
+    減衰せず鳴り続け、入りに短いチフ (息の雑音と一瞬のオクターヴ)、送風のごくわずかな揺れ、切ったあとは室内の残り"""
+    a, r = 0.045, 0.22
+    n = int((dur + r) * sr); t = np.arange(n, dtype=np.float32) / sr
+    out = np.zeros(n, dtype=np.float32)
+    wind = 1 + 0.0015 * np.sin(2 * np.pi * 0.7 * t) + 0.0008 * np.sin(2 * np.pi * 5.9 * t)
+    for mult, amp in ORGAN_STOPS.get(voice, ORGAN_STOPS['A']):
+        f0 = freq * mult
+        for k in range(1, 12):
+            f = f0 * k
+            if f > 0.42 * sr: break
+            det = 1 + 0.0006 * ((k * 7 + int(mult * 10)) % 5 - 2)
+            out += amp / k ** 0.9 * np.sin(2 * np.pi * f * det * wind * t + 0.3 * k)
+    chiff = (_noise(n, 9) - _lp(_noise(n, 9), 0.2)) * 0.25 * np.exp(-t / 0.02) + 0.35 * np.sin(2 * np.pi * freq * 2 * t) * np.exp(-t / 0.03)
+    out = out / (np.abs(out).max() + 1e-9) + chiff
+    return (out * env(n, a, r, sr) * vel).astype(np.float32)
+
 def glass_tone(freq, dur, vel=0.08, sr=SR):
     """やさしい高音のシンセ (ガラスのような): 正弦波 + 少しの 2 倍・3 倍音、柔らかい立ち上がりと長い減衰"""
     n = int((dur + 1.8) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -679,7 +699,10 @@ def main(score='score.json', out='fuga.wav'):
                 L[i0:i1] += yb[:i1 - i0] * g * 0.5; R[i0:i1] += yb[:i1 - i0] * g * 0.85
             if not ((pconcerto or acc) and role == 'both'): continue
         if pconcerto and role == 'tutti': continue
-        if recs:
+        if recs and d.get('meta', {}).get('choir') == 'organ':      # 4 声をパイプオルガン (合成) で
+            vel = 0.17 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
+            y = organ_tone(freq, max(0.2, nt['d'] * 0.99), vel, nt['v'])
+        elif recs:
             vel = 0.55 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
             y = sampler_tone(nt['m'], max(0.2, nt['d'] * 0.97), vel, nt.get('src', ''))
             if nt['v'] == 'B' and not _BANK['decay']:            # 低音は 1 オクターヴ下の柔らかい正弦波で支える (減衰させる時は足さない)

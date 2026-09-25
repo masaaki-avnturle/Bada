@@ -735,6 +735,19 @@ python3 build_synthbank.py 20260924_112131.mp3 sybank 0.4 0.2
 python3 compose_tablet16.py bank16.json score_tablet16.json && python3 synth.py score_tablet16.json tablet16.wav && python3 video.py score_tablet16.json tablet16.wav tablet16.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions XVII · Organo (ホ短調 → 変ロ短調 → ヘ短調 → ヘ長調, ♩=60, 約 7 分 45 秒)
+
+XVI から、合成していた側の楽器 = フーガの 4 声を**パイプオルガンのシンセ**に置き換え、11:21 の録音のシンセサイザーの実音は主題に重ねたまま。
+2026-09-23 の録音 2 本 (08:06 / 08:09) を実音のミックスと主題に加え、9/24 の 5 本と合わせて 7 本。
+- `synth.organ_tone`: ストップ (8 フィートのプリンシパルに 4・2⅔・2 フィート、低音は 16 フィート) ごとにプリンシパルの倍音列 (1/k^0.9、わずかな不揃い) を重ね、
+  減衰せず鳴り続ける。入りに短いチフ (息の雑音と一瞬のオクターヴ)、送風のごくわずかな揺れ。meta `choir: 'organ'` で 4 声がオルガンになる
+- Introitus は 3 本 (11:23 → 08:53 → 9/23 08:09)、Lacrimosa は 9/23 08:06 → 11:18、Finale は 7 つの主題 (最後の 3 つはストレッタ)
+- ステムを測って、オルガンは実音と同じくらい、11:21 のシンセの実音はその約 7 dB 下、鼓動は約 13 dB 下
+
+```bash
+python3 compose_tablet17.py bank17.json score_tablet17.json && python3 synth.py score_tablet17.json tablet17.wav && python3 video.py score_tablet17.json tablet17.wav tablet17.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
