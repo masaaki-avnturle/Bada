@@ -140,7 +140,7 @@ def build():
 
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
-    'title': 'Requiem BADA — Tablet Sessions XIX · Pastorale della Natività',
+    'title': 'Requiem BADA — Tablet Sessions XIX · Pastorale',
     'subtitle': '実録音のピアノ一色 — キリスト生誕を哀れみで、レクイエムのフーガを牧歌に書き換えて (ト短調 / ト長調, ♩=66)',
     'legend': ['PF'], 'vname': {'PF': 'ドローン (ピアノの開いた 5 度)'},
     'footer': ['Pastorale: ドローン → Fuga I (08:53) → Kyrie: Fuga II (11:23 · 11:18) → Gloria (ト長調, 08:09) → Misericordia: Fuga III (9/23 08:06 · 08:49) → Finale (7 つの主題) → Wiegenlied (ト長調)',
