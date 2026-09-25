@@ -819,6 +819,32 @@ VI〜XXI の集大成。合成の楽器 (ガラスの高音、共鳴シンセ、
 python3 compose_tablet22.py bank17.json score_tablet22.json && python3 synth.py score_tablet22.json tablet22.wav && python3 video.py score_tablet22.json tablet22.wav tablet22.mp4
 ```
 
+## 🎛🕯 Requiem BADA — Tablet Sessions XXIII · Summa sintetica (集大成をシンセの実音一色で, ♩=56, 約 8 分)
+
+XXII (Summa) と同じ形式・同じ主題を、**ピアノの音をすべて 2026-09-24 11:21 の録音から切り出したシンセサイザーの持続音 (実音) 一色**に
+置き換えたもの。4 声のフーガ、鼓動、分散和音、すべてが VOXSY の 1 つの音色 (`build_synthbank.py` で切り出した 8 音を移調)。
+XXII で実音の抜粋だった区間は、その録音の採譜 (打鍵ごとの和音と長さ) をシンセの実音で鳴らし直す (`synth_passage`、和声も録音の和音)。
+洗脳的: 減衰しない同じ音色が 8 分間途切れず、鼓動 (シンセの低い音) が最後まで止まらない。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 11:23 → 08:53 (ホ短調) の採譜をシンセで |
+| Kyrie — Fuga I | 08:53 のバッハ風フーガ (提示 → エピソード → 下属調 → ストレッタ → 保続低音) |
+| Graduale | 9/23 08:06 → 11:18 (変ロ短調) の採譜をシンセで |
+| Dies irae — Fuga II | 11:23 と 11:18 の二重フーガ |
+| Offertorium | 08:49 (ヘ短調) の採譜をシンセで |
+| Sanctus — Fuga III | 9/23 08:06 と 08:09 の二重フーガ |
+| Agnus Dei | B-A-D-A ×2、保続低音の上で |
+| Finale | 7 つの主題のストレッタ → 保続低音 |
+| In paradisum | 08:49 の本当の終わり → ヘ長調の和音をシンセが静かに分散 |
+
+シンセのサンプルは減衰しないので、ピアノ用の強弱 (1.15〜1.3) のままでは合唱がシンセの抜粋より 14 dB 大きくなった。
+ステムを測って強弱を 0.7〜0.78 に下げ、フーガ ≈ 抜粋 (RMS 0.06〜0.08)、鼓動はその約 13 dB 下に。
+
+```bash
+python3 compose_tablet23.py bank17.json score_tablet23.json && python3 synth.py score_tablet23.json tablet23.wav && python3 video.py score_tablet23.json tablet23.wav tablet23.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
