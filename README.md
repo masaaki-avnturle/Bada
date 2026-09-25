@@ -181,6 +181,22 @@
 
 ---
 
+## 🔮 ダウンロード — Bada Akasha(BadaGPT × 方程式 × 直感ポート)
+
+**提出論文 16 本を端末内で検索し出典つきで答える BadaGPT(論文に答えがなければ「見つかりません」と答える)、数値で成り立つ関係だけを出して Bada で再検証する方程式探索、直感が 心臓・予感・パターン のどのポートを通って届いているかを実際に測り、そのポートに映っていたものを示すラボ。** 中核は Bada 言語の量子エンジン [`akasha.bada`](bada_akasha/src/akasha.bada)。通信なし・単一 HTML。アカシックレコードへの接続や未来の知識の取り出しは行いません(理由は [`bada_akasha/`](bada_akasha/) を参照)。
+
+### 👉 [**bada_akasha/index.html をダウンロード**](bada_akasha/index.html)
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `bada-akasha-debug.apk` |
+| **Windows 10 / 11** | `BadaAkasha-*-x64.exe` (NSIS インストーラ / ポータブル) |
+| **Linux** | `BadaAkasha-*-x86_64.AppImage` / `BadaAkasha-*-amd64.deb` |
+
+ビルドは [`akasha-app-build.yml`](.github/workflows/akasha-app-build.yml) が実行します(Actions の実行結果の Artifacts からダウンロード / `akasha-v*` タグで Release へ添付)。
+
+---
+
 ## ☀️ ダウンロード — Bada SolarCast(太陽フレア × 気象 × 気候予測)
 
 **NOAA の太陽フレア実測と、世界各地の予報・30 年以上の気候値を合わせて、どの日付でも確率で天気を予測するアプリ。** ☀️ GOES X 線フレアクラス・Kp・F10.7・27 日見通し、🔎 国で絞り込んで市・町・県・州を検索する地域検索と国内地域の一覧、🌍 16 日予報と任意日付の確率予報(約 16 日の予報の地平線 =「スコトーマ」より先は ERA5 気候値に切り替え)、🎄 イギリスのクリスマス (12/25) の天気、🔬 「太陽フレアは 2 週間後の気温を動かすか」をブロック置換検定で確かめる検証ラボ。Γ 関数 (Γ(z+1)=zΓ(z) の自己検証) × Jones 多項式の熱感知指数も表示します。依存ゼロ・単一 HTML。

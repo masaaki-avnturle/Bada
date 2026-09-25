@@ -1,0 +1,184 @@
+# ============================================================
+# akasha.bada — Bada Akasha 量子エンジン (Bada 言語で書いた中核)
+#
+# アプリ (index.html) は、このファイルの先頭に入力を Bada の代入文として
+# 差し込み、同梱の Bada インタープリタ (bada_gui_ide/www/bada.js) で実行し、
+# print された行を読み取ります。MODE で 3 つの仕事を切り替えます:
+#
+#   MODE 1  BadaGPT の段落選択
+#     入力  SCORES (検索スコア上位 k 件), COVER (最上位段落が質問語をどれだけ含むか 0..1), SEED, PICK, FLOOR
+#     softmax → 振幅分布を Measure で測定台帳へコミットし、
+#     その分布から PICK 件を非復元抽出 (Park–Miller 乱数, SEED で再現可能)。
+#     COVER が FLOOR 未満なら「論文集に答えがない」と正直に返す
+#     (PrecogBada の P3 honest ignorance と同じ規約)。
+#
+#   MODE 2  方程式の再検証
+#     入力  KIND_T, ARG_T (左辺: 1=ζ(s), 2=Γ(z)), BASE, POW, NUM, DEN
+#     左辺 T と右辺 (NUM/DEN)·BASE^POW を Bada 内で独立に計算して差を出す。
+#     ζ は Euler–Maclaurin、Γ は Lanczos (exo-gamma.bada と同じ係数)。
+#
+#   MODE 3  直感ポートの判定
+#     入力  EVID (各ポートの証拠の強さ), QUAL (基準を満たすか 1/0)
+#     softmax → 振幅を測定し、基準を満たすポートのうち振幅最大のものを返す。
+#     どれも満たさなければ -1 (どのポートも偶然の範囲)。
+#
+# 単体でも実行できます (既定の入力で 3 モードを順に試す):
+#   node bada_gui_ide/cli/bada-cli.js run bada_akasha/src/akasha.bada
+# ============================================================
+
+# ---- 既定の入力 (アプリはこの行より前に自分の値を差し込むので、未定義の時だけ使う) ----
+# Bada には「未定義なら」の構文が無いので、アプリは DEMO := 0 を差し込む。
+if (DEMO == 1) {
+    MODE := 0
+}
+
+PI := 3.141592653589793
+
+def powf(b, e) {
+    if (b <= 0.0) { return 0.0 }
+    return exp(e * log(b))
+}
+
+# ---- Park–Miller 乱数 (積は 2^53 未満に収まる) ----
+def rng_next(s) { return (s * 16807) % 2147483647 }
+
+# ---- Γ 関数: Lanczos 近似 (z >= 0.5) ----
+def gamma_fn(z) {
+    g := [676.5203681218851, 0.0 - 1259.1392167224028, 771.32342877765313,
+          0.0 - 176.61502916214059, 12.507343278686905, 0.0 - 0.13857109526572012,
+          0.0000099843695780195716, 0.00000015056327351493116]
+    z := z - 1.0
+    x := 0.99999999999980993
+    i := 0
+    while (i < 8) {
+        x := x + g[i] / (z + i + 1.0)
+        i := i + 1
+    }
+    t := z + 7.5
+    return sqrt(2.0 * PI) * powf(t, z + 0.5) * exp(0.0 - t) * x
+}
+
+# ---- ζ(s) (s > 1): 20 項の和 + Euler–Maclaurin 補正 ----
+def zeta_fn(s) {
+    N := 20.0
+    acc := 0.0
+    n := 1.0
+    while (n < N) {
+        acc := acc + powf(n, 0.0 - s)
+        n := n + 1.0
+    }
+    acc := acc + powf(N, 1.0 - s) / (s - 1.0) + powf(N, 0.0 - s) / 2.0
+    acc := acc + s * powf(N, 0.0 - s - 1.0) / 12.0
+    acc := acc - s * (s + 1.0) * (s + 2.0) * powf(N, 0.0 - s - 3.0) / 720.0
+    acc := acc + s * (s + 1.0) * (s + 2.0) * (s + 3.0) * (s + 4.0) * powf(N, 0.0 - s - 5.0) / 30240.0
+    return acc
+}
+
+def base_val(b) {
+    if (b == 1) { return PI }
+    if (b == 2) { return exp(1.0) }
+    if (b == 3) { return log(2.0) }
+    return sqrt(2.0)
+}
+
+# ============ MODE 1: BadaGPT の段落選択 ============
+if (MODE == 1) {
+    n := len(SCORES)
+    top := 0.0
+    i := 0
+    while (i < n) {
+        if (SCORES[i] > top) { top := SCORES[i] }
+        i := i + 1
+    }
+    if (COVER < FLOOR) {
+        print("IGNORANCE", COVER)
+    } else {
+        # 温度 1 の softmax。スコアを最上位で割って尺度をそろえる
+        z := []
+        i := 0
+        while (i < n) { z <- 4.0 * SCORES[i] / top; i := i + 1 }
+        amp := Measure(softmax(z))
+        i := 0
+        while (i < n) { print("AMP", i, f5(amp[i])); i := i + 1 }
+        taken := []
+        i := 0
+        while (i < n) { taken <- 0; i := i + 1 }
+        s := SEED
+        k := 0
+        while (k < PICK) {
+            s := rng_next(s)
+            u := s / 2147483647.0
+            # 未選択の振幅だけで正規化して逆関数法
+            rest := 0.0
+            i := 0
+            while (i < n) {
+                if (taken[i] == 0) { rest := rest + amp[i] }
+                i := i + 1
+            }
+            target := u * rest
+            c := 0.0
+            chosen := 0 - 1
+            last := 0 - 1
+            i := 0
+            while (i < n) {
+                if (taken[i] == 0) {
+                    last := i
+                    c := c + amp[i]
+                    if (chosen < 0) {
+                        if (c >= target) { chosen := i }
+                    }
+                }
+                i := i + 1
+            }
+            if (chosen < 0) { chosen := last }
+            # Bada は添字代入を持たないので、印を付けた新しい配列を作る
+            nt := []
+            i := 0
+            while (i < n) {
+                if (i == chosen) { nt <- 1 } else { nt <- taken[i] }
+                i := i + 1
+            }
+            taken := nt
+            print("PICK", chosen)
+            k := k + 1
+        }
+    }
+    print("LEDGER", len(tuplespace))
+}
+
+# ============ MODE 2: 方程式の再検証 ============
+if (MODE == 2) {
+    lhs := 0.0
+    if (KIND_T == 1) { lhs := zeta_fn(ARG_T) } else { lhs := gamma_fn(ARG_T) }
+    rhs := (NUM / DEN) * powf(base_val(BASE), POW)
+    print("LHS", lhs)
+    print("RHS", rhs)
+    print("DIFF", sci(abs(lhs - rhs)))
+    print("CHECK", gamma_fn(1.5) / (0.5 * gamma_fn(0.5)))
+}
+
+# ============ MODE 3: 直感ポートの判定 ============
+if (MODE == 3) {
+    n := len(EVID)
+    amp := Measure(softmax(EVID))
+    best := 0 - 1
+    bestAmp := 0.0
+    i := 0
+    while (i < n) {
+        print("AMP", i, f5(amp[i]))
+        if (QUAL[i] == 1) {
+            if (amp[i] > bestAmp) { bestAmp := amp[i]; best := i }
+        }
+        i := i + 1
+    }
+    print("PORT", best)
+}
+
+# ============ デモ (単体実行時) ============
+if (DEMO == 1) {
+    print("Bada Akasha engine demo")
+    print("gamma(0.5)^2 =", f5(gamma_fn(0.5) * gamma_fn(0.5)), " pi =", f5(PI))
+    print("zeta(2) =", f5(zeta_fn(2.0)), " pi^2/6 =", f5(PI * PI / 6.0))
+    print("zeta(3) =", f5(zeta_fn(3.0)), " (Apery: irrational; closed form unknown)")
+    print("@@AKASHA-OK")
+}

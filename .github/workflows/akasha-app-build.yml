@@ -1,0 +1,176 @@
+name: Bada Akasha app build (Android APK + Windows EXE + Linux)
+
+# bada_akasha/ の「Bada Akasha」— 中核を Bada 言語の量子エンジン (src/akasha.bada) で書いた
+#   - BadaGPT: 提出論文 16 本 (src/corpus.json) を端末内で検索し、出典つきで答える
+#     (論文に答えがなければ「見つかりません」と返す = 正直な無知)。辞書 (出現箇所) と組み換え生成つき
+#   - 方程式: ζ(s)・Γ(z) と π, e, ln2, √2 の関係を数値探索し、Bada エンジンが独立に再検証
+#   - 直感ポート: 心臓 (内受容感覚) / 予感 (選んだ後に決まる暗号乱数) / パターン (暗黙の学習) を測り、
+#     Bada エンジンが一番強い証拠のポートと、そこに映っていたものを示す
+# を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Linux 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_akasha/index.html の自己完結 HTML
+# (tools/build.js が bada_gui_ide/www/bada.js・akasha.bada・corpus.json を埋め込んだもの) で、
+# これをそのまま www として各ラッパーに同梱します。
+# Actions アーティファクト、および (akasha-v* タグ / release_tag 指定時) GitHub Release に添付します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: akasha-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - 'claude/solar-flare-climate-app-*'
+    paths:
+      - 'bada_akasha/**'
+      - 'bada_gui_ide/www/bada.js'
+      - '.github/workflows/akasha-app-build.yml'
+    tags:
+      - 'akasha-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: index.html is built from src (bada.js + akasha.bada + corpus)
+        run: node bada_akasha/tools/build.js --check
+      - name: Engine tests (search / honest ignorance / Bada engine modes / equations / ports)
+        run: node bada_akasha/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みで、そのままだと "Failed to find package 'tools'" で落ちる。
+      # packages を空にして既定の導入を止め、必要な物は次のステップで明示的に入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_akasha/app/www
+          cp bada_akasha/index.html bada_akasha/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_akasha/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badaakasha BadaAkasha
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-akasha-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: akasha-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_akasha/app/www
+          cp bada_akasha/index.html bada_akasha/app/www/index.html
+      - name: Build Windows EXE (Electron)
+        working-directory: bada_akasha/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: akasha-windows
+          path: bada_akasha/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_akasha/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_akasha/app/www
+          cp bada_akasha/index.html bada_akasha/app/www/index.html
+      - name: Build Ubuntu AppImage + deb (Electron)
+        working-directory: bada_akasha/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: akasha-linux
+          path: |
+            bada_akasha/app/electron/dist/*.AppImage
+            bada_akasha/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_akasha/app/electron/dist/*.AppImage
+            bada_akasha/app/electron/dist/*.deb

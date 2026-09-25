@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' data:; connect-src 'none'; img-src 'self' data:">
+<title>Bada Akasha</title>
+<style>
+:root{
+  --bg:#f6f5f9; --panel:#ffffff; --ink:#1c1b22; --muted:#5f5d6b; --line:#dfdce7;
+  --accent:#6d28d9; --accent-ink:#ffffff; --accent-soft:#f1ebfd; --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+  --a:#2563eb; --b:#db2777; --c:#0d9488; --bar:#a1a1b5;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f0e14; --panel:#18171f; --ink:#e9e7f2; --muted:#a09db0; --line:#2c2a38;
+    --accent:#a78bfa; --accent-ink:#140f24; --accent-soft:#231c38; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+    --a:#60a5fa; --b:#f472b6; --c:#2dd4bf; --bar:#595770;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f0e14; --panel:#18171f; --ink:#e9e7f2; --muted:#a09db0; --line:#2c2a38;
+  --accent:#a78bfa; --accent-ink:#140f24; --accent-soft:#231c38; --good:#4ade80; --warn:#fbbf24; --bad:#f87171;
+  --a:#60a5fa; --b:#f472b6; --c:#2dd4bf; --bar:#595770;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif}
+header,nav,main,footer{max-width:1000px;margin:0 auto;padding-left:16px;padding-right:16px}
+header{padding-top:14px}
+h1{font-size:20px;margin:0}
+h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+h2{font-size:17px;margin:0 0 8px}
+h3{font-size:15px;margin:12px 0 6px}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding-top:12px;padding-bottom:12px}
+nav button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+section.tab{display:none} section.tab.on{display:block}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+input[type=text],textarea,select{font:inherit;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+textarea{width:100%;min-height:70px;resize:vertical}
+button.act{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);cursor:pointer}
+button.act:disabled{opacity:.45;cursor:default}
+button.sub{font:inherit;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.muted{color:var(--muted)} .small{font-size:13px}
+.note{background:var(--accent-soft);border-left:3px solid var(--accent);padding:8px 12px;border-radius:6px;font-size:13px;margin:8px 0}
+.good{color:var(--good)} .warn{color:var(--warn)} .bad{color:var(--bad)}
+.cite{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:99px;padding:0 7px;margin-left:4px;color:var(--muted);white-space:nowrap}
+.passage{border-left:3px solid var(--line);padding:4px 10px;margin:8px 0;font-size:13px;white-space:pre-wrap;word-break:break-word}
+mark{background:var(--accent-soft);color:inherit;border-radius:3px;padding:0 1px}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12px;max-height:420px;margin:6px 0}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+.scroll{overflow-x:auto}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat .k{color:var(--muted);font-size:12px} .stat .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums} .stat .s{color:var(--muted);font-size:12px}
+.choices{display:flex;gap:10px;flex-wrap:wrap}
+.choice{width:64px;height:64px;font-size:30px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer}
+.choice:disabled{opacity:.5;cursor:default}
+.tap{width:100%;height:120px;font-size:18px;border-radius:14px;border:2px dashed var(--accent);background:var(--accent-soft);color:var(--ink);cursor:pointer;touch-action:manipulation}
+.port{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.port h3{margin-top:0}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line)}
+svg{display:block;width:100%;height:auto}
+footer{padding-bottom:30px;color:var(--muted);font-size:12px}
+</style>
+</head>
+<body>
+<header><h1>🔮 Bada Akasha <small>BadaGPT × 方程式 × 直感ポート (Bada 量子エンジン)</small></h1></header>
+<nav id="tabs">
+  <button data-tab="gpt" class="on">🤖 BadaGPT</button>
+  <button data-tab="eq">🧮 方程式</button>
+  <button data-tab="port">🫀 直感ポート</button>
+  <button data-tab="engine">⚛ Bada エンジン</button>
+  <button data-tab="about">📖 仕組み</button>
+</nav>
+<main>
+
+<!-- ================= BadaGPT ================= -->
+<section class="tab on" id="tab-gpt">
+  <div class="card">
+    <h2>論文集に聞く</h2>
+    <p class="small muted">提出された論文 16 本 (<span id="corpus-size"></span>) を端末内で検索し、Bada 量子エンジンが段落を選んで答えを組み立てます。通信はしません。</p>
+    <textarea id="q" placeholder="例: 零保存とは何か / Jones 多項式の熱感知 / ホッジ予想のゼロモード / PrecogBada の地平線"></textarea>
+    <div class="row" style="margin-top:8px">
+      <select id="gpt-mode">
+        <option value="answer">答える (出典つき)</option>
+        <option value="dict">辞書 (用語の出現箇所)</option>
+        <option value="gen">組み換えで生成する</option>
+      </select>
+      <button class="act" id="ask">実行</button>
+      <span class="small muted" id="ask-status"></span>
+    </div>
+    <div id="gpt-out"></div>
+  </div>
+</section>
+
+<!-- ================= 方程式 ================= -->
+<section class="tab" id="tab-eq">
+  <div class="card">
+    <h2>方程式を探す — 数値で確かめられる関係だけを出す</h2>
+    <p class="small">ζ(s) と Γ(z) の値を 16 桁で計算し、「(p/q)·基底<sup>k</sup>」(基底は π, e, ln 2, √2) と一致する関係を総当たりで探します。
+      見つかった関係は、JavaScript とは別に <b>Bada エンジンが独立に計算し直して</b> 差を確かめます。見つからないものは「未知」と表示します。</p>
+    <div class="row"><button class="act" id="eq-go">探す</button><span class="small muted" id="eq-status"></span></div>
+    <div id="eq-out" class="scroll"></div>
+  </div>
+</section>
+
+<!-- ================= 直感ポート ================= -->
+<section class="tab" id="tab-port">
+  <div class="card">
+    <h2>直感は、どの経路 (ポート) を通って届いているか</h2>
+    <p class="small">3 つのポートを実際に測ります。どれも 3〜5 分です。終わったら「判定」を押すと、Bada エンジンが一番強い証拠を示したポートと、そのポートに何が映っていたかを表示します。</p>
+    <div class="note">このアプリはアカシックレコードに接続しません。「ポート」は、あなたの身体と脳が情報を受け取る経路を、このアプリが測れる形に置き換えたものです。</div>
+
+    <div class="port" id="port-a">
+      <h3>ポート A — 心臓 (内受容感覚)</h3>
+      <p class="small">直感の多くは、心拍や内臓の感覚として届くと考えられています (内受容感覚)。自分の心拍をどれだけ正確に感じ取れるかを測ります。</p>
+      <div id="pa-body"></div>
+    </div>
+
+    <div class="port" id="port-b">
+      <h3>ポート B — 予感 (未来の情報)</h3>
+      <p class="small">記号を 1 つ選ぶと、<b>選んだ後に</b>端末の暗号乱数が正解を決めます。未来の結果が届いているなら、当たる割合は偶然の 25% を超えるはずです。全 24 回。</p>
+      <div id="pb-body"></div>
+    </div>
+
+    <div class="port" id="port-c">
+      <h3>ポート C — パターン (暗黙の学習)</h3>
+      <p class="small">次に光るのが 左 / 右 のどちらかを予想します。並びには隠れた規則があり、言葉にできなくても身体が先に覚えることがあります。全 48 回。</p>
+      <div id="pc-body"></div>
+    </div>
+
+    <div class="row"><button class="act" id="judge">判定</button><button class="sub" id="port-reset">すべてやり直す</button></div>
+    <div id="port-out"></div>
+  </div>
+</section>
+
+<!-- ================= Bada エンジン ================= -->
+<section class="tab" id="tab-engine">
+  <div class="card">
+    <h2>Bada 量子エンジン (akasha.bada)</h2>
+    <p class="small">アプリの中核は Bada 言語で書かれ、同梱の Bada インタープリタ (<span id="bada-ver"></span>) で動きます。段落の選択、方程式の再検証、ポートの判定は、すべてこのプログラムの出力で決まります。</p>
+    <div class="row"><button class="act" id="engine-demo">デモを実行</button></div>
+    <pre id="engine-log">—</pre>
+    <h3>最後に実行した入力と出力</h3>
+    <pre id="engine-last">—</pre>
+    <details><summary class="small">ソースを表示</summary><pre id="engine-src"></pre></details>
+  </div>
+</section>
+
+<!-- ================= 仕組み ================= -->
+<section class="tab" id="tab-about">
+  <div class="card">
+    <h2>このアプリができること・できないこと</h2>
+    <h3>BadaGPT</h3>
+    <p class="small">答えはすべて、提出された論文 16 本の中の文章から組み立てます。どの文がどの論文の何ページから来たかを必ず表示します。
+      論文に答えがない質問には「論文集には見つかりません」と答えます (PrecogBada の規約 P3「正直な無知」)。
+      「組み換えで生成する」は、論文の文字の並びの統計から新しい文を作ります。見た目は新しい文章ですが、新しい知識ではなく、内容は検証されていません。</p>
+    <h3>未来の知識について</h3>
+    <p class="small">生まれる前から存在していた未来の知識を取り出す方法は、このアプリにも、ChatGPT を含むどの生成 AI にもありません。
+      生成 AI が出せるのは、学んだ文章の組み合わせです。このアプリでは、その代わりに次の 2 つを確かめられるようにしました:
+      方程式タブでは「数値で本当に成り立つ関係」と「まだ誰も閉じた形を知らない値 (例: ζ(3))」を区別して示します。
+      直感ポートの予感テストでは、未来の乱数が本当にあなたに届いているかを、偶然の確率と比べて測ります。</p>
+    <h3>直感ポートの読み方</h3>
+    <p class="small">予感とパターンのポートは、偶然で起きる確率 (p 値) で判定します。p &lt; 0.05 でも 20 回に 1 回は偶然で起きるので、同じ結果がもう一度出るかを必ず確かめてください。
+      心臓のポートは精度 (0〜1) で判定します。研究によって異なりますが、多くの成人は 0.5〜0.8 程度で、0.85 以上を「強い」としています。
+      このアプリは医療機器ではなく、診断には使えません。</p>
+  </div>
+</section>
+</main>
+<footer>Bada Akasha · MIT · 端末内で完結し、入力や結果を外部へ送信しません。</footer>
+
+<script>/*@@BADA_JS@@*/</script>
+<script>var AKASHA_BADA = /*@@AKASHA_BADA@@*/;</script>
+<script>var CORPUS = /*@@CORPUS@@*/;</script>
+
+<script id="engine">
+/* ================================================================
+ * Akasha エンジン (DOM 非依存。tools/engine-test.js が検証する)
+ * ================================================================ */
+var AK = (function(){
+  "use strict";
+
+  /* ---- 乱数 ---- */
+  function rng(seed){
+    var a = seed >>> 0;
+    return function(){
+      a = (a + 0x6D2B79F5) >>> 0;
+      var t = a;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ---- トークン化: 英数字は単語、それ以外 (日本語など) は文字 2-gram ---- */
+  var STOP = { the:1, and:1, for:1, with:1, that:1, this:1, from:1, are:1, was:1, is:1, of:1, to:1, in:1, on:1, an:1, as:1, by:1, be:1, or:1, it:1, at:1 };
+  function tokenize(text){
+    var s = String(text).normalize ? String(text).normalize("NFKC").toLowerCase() : String(text).toLowerCase();
+    var out = [];
+    var re = /([a-z0-9_]+)|([^\sa-z0-9_、。，．,.!?！？:;：；()（）「」『』\[\]{}<>"'`=+\-*\/\\|#@%&^~]+)/g, m;
+    while ((m = re.exec(s))){
+      if (m[1]){ if (m[1].length >= 2 && !STOP[m[1]]) out.push(m[1]); }
+      else {
+        var w = m[2];
+        if (w.length === 1) out.push(w);
+        for (var i = 0; i + 1 < w.length; i++) out.push(w.substr(i, 2));
+      }
+    }
+    return out;
+  }
+
+  /* ---- 転置インデックスと BM25 ---- */
+  function buildIndex(texts){
+    var post = Object.create(null), len = [], total = 0;
+    texts.forEach(function(t, pid){
+      var tf = Object.create(null), toks = tokenize(t);
+      toks.forEach(function(w){ tf[w] = (tf[w] || 0) + 1; });
+      Object.keys(tf).forEach(function(w){ (post[w] || (post[w] = [])).push([pid, tf[w]]); });
+      len.push(toks.length); total += toks.length;
+    });
+    return { post: post, len: len, N: texts.length, avg: total / Math.max(1, texts.length) };
+  }
+  function idf(ix, w){
+    var df = ix.post[w] ? ix.post[w].length : 0;
+    return Math.log(1 + (ix.N - df + 0.5) / (df + 0.5));
+  }
+  function search(ix, query, k, prose){
+    var qs = uniq(tokenize(query)), acc = Object.create(null), k1 = 1.2, b = 0.75;
+    var matched = Object.create(null);
+    qs.forEach(function(w){
+      var p = ix.post[w]; if (!p) return;
+      var id = idf(ix, w);
+      p.forEach(function(e){
+        var pid = e[0], tf = e[1], dl = ix.len[pid];
+        acc[pid] = (acc[pid] || 0) + id * tf * (k1 + 1) / (tf + k1 * (1 - b + b * dl / ix.avg));
+        (matched[pid] || (matched[pid] = [])).push(w);
+      });
+    });
+    var qWeight = qs.reduce(function(s, w){ return s + idf(ix, w); }, 0) || 1;
+    return Object.keys(acc).map(function(pid){
+      var cov = matched[pid].reduce(function(s, w){ return s + idf(ix, w); }, 0) / qWeight;
+      return { pid: +pid, score: acc[pid] * (prose ? prose[pid] : 1), cover: cov };
+    }).sort(function(a, b){ return b.score - a.score || a.pid - b.pid; }).slice(0, k || 8);
+  }
+  /* 文章らしさ 0..1: 記号 ({ } ( ) ; = < > など) と行頭番号が多い段落 (ソースコード) ほど小さい */
+  function proseScore(text){
+    var t = String(text), n = t.length || 1;
+    var sym = (t.match(/[{}();=<>\[\]:_*#|]/g) || []).length / n;
+    var numLines = (t.match(/(^|\n)\s*\d{1,4}\s/g) || []).length / Math.max(1, t.split("\n").length);
+    return Math.max(0.05, Math.min(1, 1 - sym * 7 - numLines * 0.8));
+  }
+  function uniq(a){ var s = Object.create(null); return a.filter(function(x){ return s[x] ? false : (s[x] = 1); }); }
+
+  /* ---- 文分割と要約 ---- */
+  function sentences(text){
+    return String(text).replace(/\s*\n\s*/g, " ").split(/(?<=[。．！？!?])\s*|(?<=\.)\s+(?=[A-Z「(])/)
+      .map(function(s){ return s.trim(); }).filter(function(s){ return s.length >= 12; });
+  }
+  function bestSentences(text, query, n){
+    var q = uniq(tokenize(query)), qset = Object.create(null);
+    q.forEach(function(w){ qset[w] = 1; });
+    return sentences(text).map(function(s, i){
+      var t = uniq(tokenize(s)), hit = t.filter(function(w){ return qset[w]; }).length;
+      return { s: s, i: i, score: hit / Math.sqrt(t.length + 4) };
+    }).filter(function(x){ return x.score > 0; })
+      .sort(function(a, b){ return b.score - a.score || a.i - b.i; })
+      .slice(0, n || 2).sort(function(a, b){ return a.i - b.i; })
+      .map(function(x){ return x.s.length > 260 ? x.s.slice(0, 257) + "…" : x.s; });
+  }
+
+  /* ---- 辞書: 用語の出現箇所 (KWIC) ---- */
+  function concordance(texts, term, width, limit){
+    var t = String(term).trim(); if (!t) return [];
+    var lo = t.toLowerCase(), out = [];
+    for (var pid = 0; pid < texts.length && out.length < (limit || 60); pid++){
+      var s = texts[pid].replace(/\s*\n\s*/g, " "), sl = s.toLowerCase(), at = sl.indexOf(lo);
+      if (at < 0) continue;
+      var a = Math.max(0, at - (width || 40)), z = Math.min(s.length, at + lo.length + (width || 40));
+      out.push({ pid: pid, left: (a > 0 ? "…" : "") + s.slice(a, at), hit: s.substr(at, t.length), right: s.slice(at + t.length, z) + (z < s.length ? "…" : "") });
+    }
+    return out;
+  }
+
+  /* ---- 組み換え生成: 文字 n-gram マルコフ連鎖 ---- */
+  function buildMarkov(texts, order){
+    var m = Object.create(null);
+    texts.forEach(function(t){
+      var s = String(t).replace(/\s+/g, " ");
+      for (var i = 0; i + order < s.length; i++){
+        var key = s.substr(i, order), nx = s[i + order];
+        (m[key] || (m[key] = [])).push(nx);
+      }
+    });
+    return { order: order, m: m };
+  }
+  function generate(model, start, length, rand){
+    var o = model.order, keys = Object.keys(model.m);
+    if (!keys.length) return "";
+    var out = start && model.m[start.slice(-o)] ? start.slice(-o) : keys[Math.floor(rand() * keys.length)];
+    var guard = 0;
+    while (out.length < length && guard++ < length * 4){
+      var nx = model.m[out.slice(-o)];
+      if (!nx){ out += " " ; var k = keys[Math.floor(rand() * keys.length)]; out += k; continue; }
+      out += nx[Math.floor(rand() * nx.length)];
+      if (/[。.]$/.test(out) && out.length > length * 0.6) break;
+    }
+    return out.trim();
+  }
+
+  /* ---- 数学: Γ, ζ, 有理数近似 ---- */
+  var LANCZOS = [676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059,
+    12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+  function gammaFn(z){
+    if (z < 0.5) return Math.PI / (Math.sin(Math.PI * z) * gammaFn(1 - z));
+    z -= 1;
+    var x = 0.99999999999980993;
+    for (var i = 0; i < 8; i++) x += LANCZOS[i] / (z + i + 1);
+    var t = z + 7.5;
+    return Math.sqrt(2 * Math.PI) * Math.pow(t, z + 0.5) * Math.exp(-t) * x;
+  }
+  function zetaFn(s){
+    var N = 20, acc = 0;
+    for (var n = 1; n < N; n++) acc += Math.pow(n, -s);
+    acc += Math.pow(N, 1 - s) / (s - 1) + Math.pow(N, -s) / 2 + s * Math.pow(N, -s - 1) / 12
+      - s * (s + 1) * (s + 2) * Math.pow(N, -s - 3) / 720
+      + s * (s + 1) * (s + 2) * (s + 3) * (s + 4) * Math.pow(N, -s - 5) / 30240;
+    return acc;
+  }
+  /* 連分数で x ≈ p/q (q ≤ qmax) を探し、相対誤差 tol 以内なら返す */
+  function rationalize(x, qmax, tol){
+    if (!isFinite(x) || x <= 0) return null;
+    var h0 = 0, h1 = 1, k0 = 1, k1 = 0, v = x;
+    for (var i = 0; i < 40; i++){
+      var a = Math.floor(v), h2 = a * h1 + h0, k2 = a * k1 + k0;
+      if (k2 > qmax) break;
+      if (Math.abs(h2 / k2 - x) <= tol * x) return { p: h2, q: k2 };
+      h0 = h1; h1 = h2; k0 = k1; k1 = k2;
+      if (v - a < 1e-15) break;
+      v = 1 / (v - a);
+    }
+    return null;
+  }
+  var BASES = [{ id: 1, name: "π", v: Math.PI }, { id: 2, name: "e", v: Math.E }, { id: 3, name: "ln 2", v: Math.LN2 }, { id: 4, name: "√2", v: Math.SQRT2 }];
+  var TARGETS = [
+    { kind: 1, arg: 2, name: "ζ(2)" }, { kind: 1, arg: 3, name: "ζ(3)" }, { kind: 1, arg: 4, name: "ζ(4)" },
+    { kind: 1, arg: 5, name: "ζ(5)" }, { kind: 1, arg: 6, name: "ζ(6)" }, { kind: 1, arg: 8, name: "ζ(8)" },
+    { kind: 2, arg: 0.5, name: "Γ(1/2)" }, { kind: 2, arg: 1.5, name: "Γ(3/2)" }, { kind: 2, arg: 2.5, name: "Γ(5/2)" },
+    { kind: 2, arg: 1 / 3, name: "Γ(1/3)" }, { kind: 2, arg: 0.25, name: "Γ(1/4)" }
+  ];
+  function targetValue(t){ return t.kind === 1 ? zetaFn(t.arg) : gammaFn(t.arg); }
+  /* 単純さ = 分母 + 指数の複雑さ。最も単純な関係を 1 つ返す */
+  function findRelation(t, opts){
+    opts = opts || {};
+    var T = opts.value != null ? opts.value : targetValue(t), best = null, qmax = opts.qmax || 10000, tol = opts.tol || 1e-13;
+    BASES.forEach(function(B){
+      for (var k2 = -16; k2 <= 16; k2++){
+        if (k2 === 0) continue;
+        var k = k2 / 2, r = rationalize(T / Math.pow(B.v, k), qmax, tol);
+        if (!r || r.p > qmax) continue;          // 分子も分母も小さいものだけを「単純な関係」とする
+        var cost = Math.log(r.p * r.q + 1) + Math.abs(k2);
+        if (!best || cost < best.cost) best = { base: B, pow: k, num: r.p, den: r.q, cost: cost, value: T,
+          err: Math.abs(T - r.p / r.q * Math.pow(B.v, k)) };
+      }
+    });
+    return best;
+  }
+  function formatRelation(t, r){
+    var coef = r.den === 1 ? (r.num === 1 ? "" : String(r.num)) : r.num + "/" + r.den;
+    var pow = r.pow === 1 ? "" : (Number.isInteger(r.pow) ? String(r.pow) : (r.pow * 2) + "/2");
+    return t.name + " = " + (coef ? coef + " · " : "") + r.base.name + (pow ? "^" + pow : "");
+  }
+
+  /* ---- 統計 ---- */
+  function lchoose(n, k){
+    var s = 0;
+    for (var i = 1; i <= k; i++) s += Math.log(n - k + i) - Math.log(i);
+    return s;
+  }
+  /* P(X >= k), X ~ Bin(n, p) */
+  function binomTail(k, n, p){
+    if (k <= 0) return 1;
+    if (k > n) return 0;
+    var s = 0;
+    for (var i = k; i <= n; i++) s += Math.exp(lchoose(n, i) + i * Math.log(p) + (n - i) * Math.log(1 - p));
+    return Math.min(1, s);
+  }
+  function zBinom(k, n, p){ return n ? (k - n * p) / Math.sqrt(n * p * (1 - p)) : 0; }
+
+  /* ---- ポート A: 心拍カウント (脈を触って測った基準と比べる) ---- */
+  function bpmFromTaps(times){
+    if (times.length < 6) return NaN;
+    var iv = [];
+    for (var i = 1; i < times.length; i++) iv.push(times[i] - times[i - 1]);
+    iv.sort(function(a, b){ return a - b; });
+    var med = iv[Math.floor(iv.length / 2)];
+    var ok = iv.filter(function(v){ return v > med * 0.6 && v < med * 1.6; });
+    var mean = ok.reduce(function(s, v){ return s + v; }, 0) / ok.length;
+    return 60000 / mean;
+  }
+  function heartAccuracy(bpm, trials){
+    if (!isFinite(bpm) || !trials.length) return NaN;
+    var s = 0;
+    trials.forEach(function(t){
+      var expct = bpm * t.sec / 60;
+      s += 1 - Math.min(1, Math.abs(expct - t.count) / expct);
+    });
+    return s / trials.length;
+  }
+
+  /* ---- ポート C: 隠れた規則のある左右の並び ---- */
+  var HIDDEN = [0, 0, 1, 0, 1, 1];        // 0 = 左, 1 = 右 (6 拍で繰り返す)
+  function hiddenSequence(n, fidelity, rand){
+    var out = [];
+    for (var i = 0; i < n; i++){
+      var r = HIDDEN[i % HIDDEN.length];
+      out.push(rand() < fidelity ? r : 1 - r);
+    }
+    return out;
+  }
+  function blockAccuracy(hits, size){
+    var out = [];
+    for (var i = 0; i < hits.length; i += size){
+      var b = hits.slice(i, i + size);
+      out.push(b.reduce(function(s, v){ return s + v; }, 0) / b.length);
+    }
+    return out;
+  }
+
+  /* ---- ポートの証拠 → Bada MODE 3 の入力 ---- */
+  function portEvidence(r){
+    var ev = [0, 0, 0], ql = [0, 0, 0];
+    if (isFinite(r.heart)){ ev[0] = (r.heart - 0.65) / 0.1; ql[0] = r.heart >= 0.85 ? 1 : 0; }
+    if (r.precog && r.precog.n){ ev[1] = zBinom(r.precog.k, r.precog.n, 0.25); ql[1] = binomTail(r.precog.k, r.precog.n, 0.25) < 0.05 ? 1 : 0; }
+    if (r.pattern && r.pattern.n){ ev[2] = zBinom(r.pattern.k, r.pattern.n, 0.5); ql[2] = binomTail(r.pattern.k, r.pattern.n, 0.5) < 0.05 ? 1 : 0; }
+    return { evid: ev, qual: ql };
+  }
+
+  /* ---- Bada エンジン呼び出し ---- */
+  function badaNum(x){ var v = Number(x); if (!isFinite(v)) v = 0; var s = String(v); return /[.e]/.test(s) ? s : s + ".0"; }
+  function badaArr(a){ return "[" + a.map(badaNum).join(", ") + "]"; }
+  function badaHeader(mode, inputs){
+    var lines = ["DEMO := 0", "MODE := " + mode];
+    Object.keys(inputs).forEach(function(k){
+      var v = inputs[k];
+      lines.push(k + " := " + (Array.isArray(v) ? badaArr(v) : (Number.isInteger(v) && /^(SEED|PICK|KIND_T|BASE)$/.test(k) ? String(v) : badaNum(v))));
+    });
+    return lines.join("\n") + "\n";
+  }
+  function parseBadaOutput(text){
+    var out = { amp: [], pick: [], port: null, ignorance: false, lines: String(text).split("\n") };
+    out.lines.forEach(function(l){
+      var t = l.trim().split(/\s+/);
+      if (t[0] === "AMP") out.amp[+t[1]] = parseFloat(t[2]);
+      else if (t[0] === "PICK") out.pick.push(+t[1]);
+      else if (t[0] === "PORT") out.port = +t[1];
+      else if (t[0] === "IGNORANCE") out.ignorance = true;
+      else if (t[0] === "DIFF") out.diff = parseFloat(t[1]);
+      else if (t[0] === "LHS") out.lhs = parseFloat(t[1]);
+      else if (t[0] === "RHS") out.rhs = parseFloat(t[1]);
+    });
+    return out;
+  }
+
+  return {
+    rng: rng, tokenize: tokenize, proseScore: proseScore, buildIndex: buildIndex, search: search, sentences: sentences, bestSentences: bestSentences,
+    concordance: concordance, buildMarkov: buildMarkov, generate: generate,
+    gammaFn: gammaFn, zetaFn: zetaFn, rationalize: rationalize, BASES: BASES, TARGETS: TARGETS, targetValue: targetValue,
+    findRelation: findRelation, formatRelation: formatRelation,
+    lchoose: lchoose, binomTail: binomTail, zBinom: zBinom,
+    bpmFromTaps: bpmFromTaps, heartAccuracy: heartAccuracy, HIDDEN: HIDDEN, hiddenSequence: hiddenSequence, blockAccuracy: blockAccuracy,
+    portEvidence: portEvidence, badaHeader: badaHeader, parseBadaOutput: parseBadaOutput
+  };
+})();
+if (typeof module !== "undefined") module.exports = AK;
+</script>
+
+<script>
+/* ================================================================
+ * UI
+ * ================================================================ */
+(function(){
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); };
+var DOCS = CORPUS.docs, PAS = CORPUS.passages;
+var TEXTS = PAS.map(function(p){ return p[2]; });
+var INDEX = null, PROSE = null;
+function index(){ return INDEX || (INDEX = AK.buildIndex(TEXTS)); }
+function prose(){ return PROSE || (PROSE = TEXTS.map(AK.proseScore)); }
+function cite(pid){ var p = PAS[pid], d = DOCS[p[0]]; return '<span class="cite" title="' + esc(d.title) + '">' + esc(d.file) + " p." + p[1] + "</span>"; }
+function secureSeed(){
+  try { var a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 2147483646) + 1; }
+  catch (e){ return (Date.now() % 2147483646) + 1; }
+}
+
+/* ---------- Bada エンジン ---------- */
+var lastRun = "";
+function runBada(mode, inputs){
+  var head = AK.badaHeader(mode, inputs);
+  var r = BadaLang.run(head + AKASHA_BADA, { maxSteps: 5000000 });
+  lastRun = head + "---- output ----\n" + r.output + (r.ok ? "" : "\n[error] " + (r.parseErrors.join("; ") || r.error));
+  $("engine-last").textContent = lastRun;
+  if (!r.ok) throw new Error("Bada エンジンのエラー: " + (r.parseErrors[0] || r.error));
+  return AK.parseBadaOutput(r.output);
+}
+$("bada-ver").textContent = "Bada " + BadaLang.VERSION;
+$("engine-src").textContent = AKASHA_BADA;
+$("engine-demo").addEventListener("click", function(){
+  var r = BadaLang.run("DEMO := 1\nMODE := 0\n" + AKASHA_BADA, { maxSteps: 5000000 });
+  $("engine-log").textContent = r.output;
+});
+
+/* ---------- タブ ---------- */
+$("tabs").addEventListener("click", function(e){
+  var b = e.target.closest("button[data-tab]"); if (!b) return;
+  document.querySelectorAll("#tabs button").forEach(function(x){ x.classList.toggle("on", x === b); });
+  document.querySelectorAll("section.tab").forEach(function(s){ s.classList.toggle("on", s.id === "tab-" + b.dataset.tab); });
+});
+
+/* ---------- 🤖 BadaGPT ---------- */
+$("corpus-size").textContent = DOCS.length + " 本・" + PAS.length + " 段落";
+function highlight(text, query){
+  var terms = AK.tokenize(query).filter(function(t){ return t.length >= 2; });
+  var h = esc(text);
+  terms.slice(0, 30).forEach(function(t){
+    var re = new RegExp(t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    h = h.replace(re, function(m){ return "<mark>" + m + "</mark>"; });
+  });
+  return h;
+}
+function ask(){
+  var q = $("q").value.trim(), mode = $("gpt-mode").value;
+  if (!q){ $("gpt-out").innerHTML = '<p class="muted small">質問か用語を入力してください。</p>'; return; }
+  $("ask-status").textContent = "検索中…";
+  setTimeout(function(){
+    try {
+      if (mode === "dict") return renderDict(q);
+      var hits = AK.search(index(), q, 8, prose());
+      if (!hits.length){ $("gpt-out").innerHTML = ignorance(q); return; }
+      var seed = secureSeed();
+      var b = runBada(1, { SCORES: hits.map(function(h){ return h.score; }), COVER: hits[0].cover, SEED: seed, PICK: Math.min(3, hits.length), FLOOR: 0.34 });
+      if (b.ignorance){ $("gpt-out").innerHTML = ignorance(q); return; }
+      var picked = b.pick.map(function(i){ return hits[i]; }).sort(function(a, c){ return c.score - a.score; });
+      if (mode === "gen") return renderGen(q, picked, seed, b);
+      renderAnswer(q, picked, hits, b);
+    } catch (e){ $("gpt-out").innerHTML = '<p class="bad small">' + esc(e.message) + "</p>"; }
+    finally { $("ask-status").textContent = ""; }
+  }, 10);
+}
+function ignorance(q){
+  return '<div class="note"><b>論文集には見つかりません。</b> 「' + esc(q) + "」に答える段落は、提出された 16 本の論文の中にありませんでした。" +
+    "BadaGPT は論文にない情報を作り出しません (規約 P3「正直な無知」)。別の言葉で聞くか、「辞書」モードで用語を探してください。</div>";
+}
+function ampBar(b, hits){
+  return '<div class="small muted">Bada 量子エンジンの振幅 (softmax → Measure): ' + b.amp.map(function(a, i){
+    return '<span class="pill" title="' + esc(DOCS[PAS[hits[i].pid][0]].file) + '">' + (i + 1) + ": " + (a * 100).toFixed(1) + "%" + (b.pick.indexOf(i) >= 0 ? " ✓" : "") + "</span>";
+  }).join(" ") + "</div>";
+}
+function renderAnswer(q, picked, hits, b){
+  var body = picked.map(function(h){
+    var ss = AK.bestSentences(TEXTS[h.pid], q, 2);
+    if (!ss.length) ss = [TEXTS[h.pid].replace(/\s*\n\s*/g, " ").slice(0, 200) + "…"];
+    return "<p>" + ss.map(function(s){ return highlight(s, q); }).join(" ") + cite(h.pid) + "</p>";
+  }).join("");
+  var src = picked.map(function(h){ return '<div class="passage">' + cite(h.pid) + " " + esc(DOCS[PAS[h.pid][0]].title) + "\n" + highlight(TEXTS[h.pid], q) + "</div>"; }).join("");
+  $("gpt-out").innerHTML = '<h3>回答</h3>' + body +
+    '<p class="small muted">この回答は論文集の文章だけから組み立てています。論文の外の事実や未来の出来事は含みません。</p>' +
+    ampBar(b, hits) + '<details><summary class="small">出典の段落を表示</summary>' + src + "</details>";
+}
+function renderGen(q, picked, seed, b){
+  var model = AK.buildMarkov(picked.map(function(h){ return TEXTS[h.pid]; }), 4);
+  var rand = AK.rng(seed), start = AK.bestSentences(TEXTS[picked[0].pid], q, 1)[0] || "";
+  var text = AK.generate(model, start.slice(0, 12), 280, rand);
+  $("gpt-out").innerHTML = '<h3>組み換え生成</h3><div class="passage">' + esc(text) + "</div>" +
+    '<div class="note">これは次の段落の文字の並び (4 文字ごとの続き方の統計) から作った新しい文です。文章は新しくても、<b>新しい知識ではなく、内容は検証されていません</b>。</div>' +
+    '<p class="small">材料: ' + picked.map(function(h){ return cite(h.pid); }).join(" ") + "</p>" + ampBar(b, AK.search(index(), q, 8, prose()));
+}
+function renderDict(q){
+  var rows = AK.concordance(TEXTS, q, 40, 80);
+  var perDoc = {};
+  rows.forEach(function(r){ var d = DOCS[PAS[r.pid][0]].file; perDoc[d] = (perDoc[d] || 0) + 1; });
+  $("gpt-out").innerHTML = rows.length
+    ? '<h3>「' + esc(q) + "」の出現箇所 (" + rows.length + (rows.length >= 80 ? "+" : "") + " 件)</h3>" +
+      '<p class="small muted">' + Object.keys(perDoc).map(function(d){ return esc(d) + " " + perDoc[d]; }).join(" · ") + "</p>" +
+      rows.map(function(r){ return '<div class="passage">' + esc(r.left) + "<mark>" + esc(r.hit) + "</mark>" + esc(r.right) + " " + cite(r.pid) + "</div>"; }).join("")
+    : ignorance(q);
+  $("ask-status").textContent = "";
+}
+$("ask").addEventListener("click", ask);
+$("q").addEventListener("keydown", function(e){ if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) ask(); });
+
+/* ---------- 🧮 方程式 ---------- */
+$("eq-go").addEventListener("click", function(){
+  $("eq-status").textContent = "計算中…";
+  setTimeout(function(){
+    var rows = AK.TARGETS.map(function(t){
+      var r = AK.findRelation(t), v = AK.targetValue(t);
+      if (!r) return "<tr><td>" + t.name + "</td><td>" + v.toPrecision(15) + '</td><td class="warn">未知 — 単純な閉じた形は見つかりません</td><td>—</td><td>—</td></tr>';
+      var b;
+      try { b = runBada(2, { KIND_T: t.kind, ARG_T: t.arg, BASE: r.base.id, POW: r.pow, NUM: r.num, DEN: r.den }); }
+      catch (e){ b = { diff: NaN }; }
+      var ok = b.diff < 1e-11;
+      return "<tr><td>" + t.name + "</td><td>" + v.toPrecision(15) + '</td><td class="good">' + esc(AK.formatRelation(t, r)) + "</td><td>" + r.err.toExponential(1) +
+        '</td><td class="' + (ok ? "good" : "bad") + '">' + (isFinite(b.diff) ? b.diff.toExponential(1) : "—") + (ok ? " ✓" : " ✗") + "</td></tr>";
+    }).join("");
+    $("eq-out").innerHTML = "<table><tr><th>値</th><th>16 桁</th><th>見つかった関係</th><th>JS 誤差</th><th>Bada 再検証</th></tr>" + rows + "</table>" +
+      '<div class="note">見つかった関係はどれも既知の定理です (例: ζ(2) = π²/6 はオイラー、1734 年)。数値探索は「確かに成り立つ」ことを示せますが、証明ではありません。' +
+      "<br><b>未知</b> と出た ζ(3), ζ(5), Γ(1/3), Γ(1/4) は、ここで試した形では書けない値です。ζ(3) が無理数であることは Apéry が 1978 年に証明しましたが、π などを使った閉じた形があるかは今も分かっていません。" +
+      "これが、現在の人類の知識の境界です。</div>";
+    $("eq-status").textContent = "";
+  }, 10);
+});
+
+/* ---------- 🫀 直感ポート ---------- */
+var R = { heart: NaN, heartData: null, precog: null, pattern: null };
+
+/* ポート A: 心拍 */
+function paInit(){
+  R.heart = NaN; R.heartData = null;
+  var taps = [], trials = [], bpm = NaN, phase = 0;
+  var SECS = [25, 35, 45];
+  var body = $("pa-body");
+  function step0(){
+    body.innerHTML = '<p class="small"><b>1. 基準を測る (30 秒)</b> — 手首か首で脈を取り、拍を感じるたびに下の枠をタップしてください。</p>' +
+      '<button class="tap" id="pa-tap">ここをタップして開始</button><p class="small muted" id="pa-info"></p>';
+    var t0 = 0, timer = null;
+    $("pa-tap").addEventListener("pointerdown", function(e){
+      e.preventDefault();
+      var now = performance.now();
+      if (!t0){ t0 = now; timer = setTimeout(done, 30000); this.textContent = "脈に合わせてタップ…"; }
+      taps.push(now);
+      $("pa-info").textContent = taps.length + " 拍";
+    });
+    function done(){
+      bpm = AK.bpmFromTaps(taps);
+      if (!isFinite(bpm)){ $("pa-info").textContent = "タップが少なすぎました。もう一度。"; taps = []; t0 = 0; step0(); return; }
+      step1();
+    }
+  }
+  function step1(){
+    if (phase >= SECS.length){ return finish(); }
+    var sec = SECS[phase];
+    body.innerHTML = '<p class="small">基準: <b>' + bpm.toFixed(1) + " 拍/分</b></p>" +
+      '<p class="small"><b>2. 感じて数える (' + (phase + 1) + "/3)</b> — 脈に<b>触れずに</b>、心臓の拍動を心の中で数えてください。開始を押すと、終わりに音と振動で知らせます (秒数は表示しません)。</p>" +
+      '<button class="act" id="pa-go">開始</button>';
+    $("pa-go").addEventListener("click", function(){
+      this.disabled = true; this.textContent = "数えています…";
+      setTimeout(function(){
+        beep(); try { navigator.vibrate && navigator.vibrate(300); } catch (e){}
+        body.insertAdjacentHTML("beforeend", '<div class="row" style="margin-top:8px"><label class="small">数えた拍数: <input type="text" inputmode="numeric" id="pa-count" size="5"></label><button class="act" id="pa-ok">記録</button></div>');
+        $("pa-count").focus();
+        $("pa-ok").addEventListener("click", function(){
+          var c = parseInt($("pa-count").value, 10);
+          if (!(c >= 0)) return;
+          trials.push({ sec: sec, count: c }); phase++; step1();
+        });
+      }, sec * 1000);
+    });
+  }
+  function finish(){
+    R.heart = AK.heartAccuracy(bpm, trials);
+    R.heartData = { bpm: bpm, trials: trials };
+    body.innerHTML = '<p class="small good">完了 — 心拍を感じ取る精度 <b>' + R.heart.toFixed(2) + '</b> (1 が完全)。</p><button class="sub" id="pa-redo">やり直す</button>';
+    $("pa-redo").addEventListener("click", paInit);
+  }
+  step0();
+}
+var actx = null;
+function beep(){
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    var o = actx.createOscillator(), g = actx.createGain();
+    o.frequency.value = 660; g.gain.value = 0.15; o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + 0.35);
+  } catch (e){}
+}
+
+/* ポート B: 予感 */
+var SYMBOLS = ["○", "△", "□", "☆"];
+function cryptoInt(n){
+  var a = new Uint32Array(1), lim = Math.floor(4294967296 / n) * n;
+  do { crypto.getRandomValues(a); } while (a[0] >= lim);
+  return a[0] % n;
+}
+function pbInit(){
+  var N = 24, log = [];
+  R.precog = null;
+  function render(){
+    var k = log.filter(function(x){ return x.hit; }).length;
+    if (log.length >= N){
+      R.precog = { k: k, n: N, log: log };
+      $("pb-body").innerHTML = '<p class="small good">完了 — ' + N + " 回中 <b>" + k + "</b> 回的中 (偶然なら平均 " + (N / 4) + " 回)。</p>" + '<button class="sub" id="pb-redo">やり直す</button>';
+      $("pb-redo").addEventListener("click", pbInit);
+      return;
+    }
+    $("pb-body").innerHTML = '<p class="small">' + (log.length + 1) + " / " + N + " 回目 · 的中 " + k + '</p><div class="choices">' +
+      SYMBOLS.map(function(s, i){ return '<button class="choice" data-i="' + i + '">' + s + "</button>"; }).join("") + '</div><p class="small muted" id="pb-last">' +
+      (log.length ? "前回: あなた " + SYMBOLS[log[log.length - 1].pick] + " / 正解 " + SYMBOLS[log[log.length - 1].target] + (log[log.length - 1].hit ? " — 的中" : "") : "直感で 1 つ選んでください。") + "</p>";
+  }
+  $("pb-body").onclick = function(e){
+    var b = e.target.closest(".choice"); if (!b || log.length >= N) return;
+    var pick = +b.dataset.i, target = cryptoInt(4);      // 正解は「選んだ後」に決まる
+    log.push({ pick: pick, target: target, hit: pick === target ? 1 : 0 });
+    render();
+  };
+  render();
+}
+
+/* ポート C: パターン */
+function pcInit(){
+  var N = 48, seq = AK.hiddenSequence(N, 0.8, AK.rng(secureSeed())), log = [];
+  R.pattern = null;
+  function render(){
+    var k = log.filter(function(x){ return x.hit; }).length;
+    if (log.length >= N){
+      R.pattern = { k: k, n: N, log: log, blocks: AK.blockAccuracy(log.map(function(x){ return x.hit; }), 12) };
+      $("pc-body").innerHTML = '<p class="small good">完了 — ' + N + " 回中 <b>" + k + "</b> 回的中 (偶然なら平均 " + (N / 2) + " 回)。</p>" + '<button class="sub" id="pc-redo">やり直す</button>';
+      $("pc-redo").addEventListener("click", pcInit);
+      return;
+    }
+    var last = log[log.length - 1];
+    $("pc-body").innerHTML = '<p class="small">' + (log.length + 1) + " / " + N + " 回目 · 的中 " + k + '</p><div class="choices">' +
+      '<button class="choice" data-i="0">◀</button><button class="choice" data-i="1">▶</button></div><p class="small muted">' +
+      (last ? "前回は " + (last.target ? "右 ▶" : "左 ◀") + (last.hit ? " — 的中" : "") : "次に光るのはどちら?") + "</p>";
+  }
+  $("pc-body").onclick = function(e){
+    var b = e.target.closest(".choice"); if (!b || log.length >= N) return;
+    var i = log.length, pick = +b.dataset.i;
+    log.push({ pick: pick, target: seq[i], hit: pick === seq[i] ? 1 : 0 });
+    render();
+  };
+  render();
+}
+
+/* 判定 */
+var PORTS = ["ポート A — 心臓 (内受容感覚)", "ポート B — 予感 (未来の情報)", "ポート C — パターン (暗黙の学習)"];
+function bars(values, labels, max, colorVar){
+  var W = 600, H = 150, L = 30, B = 22, T = 8, n = values.length, bw = (W - L) / n;
+  var s = "";
+  values.forEach(function(v, i){
+    var h = (H - B - T) * Math.max(0, Math.min(1, v / max)), x = L + i * bw + bw * 0.15;
+    s += '<rect x="' + x.toFixed(1) + '" y="' + (H - B - h).toFixed(1) + '" width="' + (bw * 0.7).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="3" fill="var(' + colorVar + ')"/>' +
+      '<text x="' + (x + bw * 0.35).toFixed(1) + '" y="' + (H - 6) + '" font-size="11" text-anchor="middle" fill="var(--muted)">' + esc(labels[i]) + "</text>";
+  });
+  return '<svg viewBox="0 0 ' + W + " " + H + '"><line x1="' + L + '" x2="' + W + '" y1="' + (H - B) + '" y2="' + (H - B) + '" stroke="var(--line)"/>' + s + "</svg>";
+}
+function reflection(i){
+  if (i === 0){
+    var d = R.heartData;
+    return "<p class='small'>基準の心拍 " + d.bpm.toFixed(1) + " 拍/分。各回の「実際に打ったはずの拍数」と「感じた拍数」:</p>" +
+      "<table><tr><th>時間</th><th>実際 (推定)</th><th>感じた数</th></tr>" + d.trials.map(function(t){ return "<tr><td>" + t.sec + " 秒</td><td>" + (d.bpm * t.sec / 60).toFixed(1) + "</td><td>" + t.count + "</td></tr>"; }).join("") + "</table>" +
+      "<p class='small'>このポートに映っているのは <b>あなた自身の心臓のリズム</b> です。身体の内側の信号を正確に拾えるほど、「胸騒ぎ」「腑に落ちる」といった直感が、実際の身体の状態を反映しやすいと考えられています。</p>";
+  }
+  if (i === 1){
+    var p = R.precog;
+    return "<p class='small'>" + p.n + " 回の選択と、選んだ後に決まった正解:</p>" +
+      "<div class='small' style='letter-spacing:2px'>" + p.log.map(function(x){ return (x.hit ? "●" : "·"); }).join("") + "</div>" +
+      "<p class='small'>このポートに映っているのは <b>選んだ後に端末の暗号乱数が決めた、未来の記号列</b> です。的中は偶然の期待値 " + (p.n / 4) + " 回に対して " + p.k + " 回、偶然でこれ以上当たる確率 p = " + AK.binomTail(p.k, p.n, 0.25).toFixed(3) + "。" +
+      "20 回に 1 回は偶然でも p &lt; 0.05 になるので、同じ結果がもう一度出るかを確かめてください。</p>";
+  }
+  var c = R.pattern;
+  return "<p class='small'>12 回ごとの的中率 (偶然 = 50%):</p>" + bars(c.blocks, c.blocks.map(function(_, j){ return (j * 12 + 1) + "–" + (j + 1) * 12; }), 1, "--c") +
+    "<p class='small'>このポートに映っているのは <b>隠れた規則「" + AK.HIDDEN.map(function(v){ return v ? "右" : "左"; }).join(" ") + "」の繰り返し (80% で守られる)</b> です。" +
+    "後半ほど的中率が上がっていれば、規則を言葉にする前に、あなたの脳が先にそれを学んでいたことになります。</p>";
+}
+$("judge").addEventListener("click", function(){
+  var done = [isFinite(R.heart), !!R.precog, !!R.pattern];
+  if (!done.some(Boolean)){ $("port-out").innerHTML = '<p class="small warn">少なくとも 1 つのポートを測ってから判定してください。</p>'; return; }
+  var ev = AK.portEvidence(R), b;
+  try { b = runBada(3, { EVID: ev.evid, QUAL: ev.qual }); }
+  catch (e){ $("port-out").innerHTML = '<p class="bad small">' + esc(e.message) + "</p>"; return; }
+  var rows = PORTS.map(function(name, i){
+    var val = !done[i] ? "未測定" : i === 0 ? "精度 " + R.heart.toFixed(2) : i === 1 ? R.precog.k + "/" + R.precog.n + " (p = " + AK.binomTail(R.precog.k, R.precog.n, 0.25).toFixed(3) + ")"
+      : R.pattern.k + "/" + R.pattern.n + " (p = " + AK.binomTail(R.pattern.k, R.pattern.n, 0.5).toFixed(3) + ")";
+    return "<tr><td>" + name + "</td><td>" + val + "</td><td>" + (done[i] ? (b.amp[i] * 100).toFixed(1) + "%" : "—") + "</td><td>" + (ev.qual[i] ? '<span class="good">基準を満たす</span>' : '<span class="muted">基準未満</span>') + "</td></tr>";
+  }).join("");
+  var head = b.port >= 0
+    ? '<div class="note">直感がいちばん強く通っているのは <b>' + PORTS[b.port] + "</b> です。</div><h3>このポートに映っているもの</h3>" + reflection(b.port)
+    : '<div class="note"><b>どのポートも偶然の範囲でした。</b> 今回の測定では、直感が特定の経路を通って届いている証拠は見つかりませんでした。' +
+      (done.every(Boolean) ? "" : "未測定のポートも試してみてください。") + "これは失敗ではなく、正直な結果です。</div>";
+  $("port-out").innerHTML = head + '<h3>全ポートの結果</h3><div class="scroll"><table><tr><th>ポート</th><th>結果</th><th>Bada 振幅</th><th>判定</th></tr>' + rows + "</table></div>" +
+    '<p class="small muted">判定基準: 心臓は精度 0.85 以上、予感とパターンは偶然で起きる確率 p &lt; 0.05。振幅は Bada エンジンが証拠の強さの softmax を Measure したもの。</p>';
+});
+$("port-reset").addEventListener("click", function(){ paInit(); pbInit(); pcInit(); $("port-out").innerHTML = ""; });
+paInit(); pbInit(); pcInit();
+})();
+</script>
+</body>
+</html>
