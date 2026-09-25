@@ -176,10 +176,10 @@ def build():
 
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
-    'title': 'Requiem BADA — Tablet Sessions XXVII · Contrapunctus turbato',
+    'title': 'Requiem BADA — Tablet Sessions XXVII · Turbato',
     'subtitle': 'XXVI の三重フーガを乱れる入りで — 9/23・9/24 の実音の抜粋をミックス、途中で楽譜が途切れる。実録音のピアノ一色 (♩=56)',
     'legend': ['TB', 'PK'], 'vname': {'PK': '鼓動'},
-    'footer': ['Introitus 11:23→08:53 → Sectio I (主題 I turbato) → Interludium 08:06→11:18 → Sectio II (主題 II + I) → Interludium 08:49→11:21 → Sectio III (B-A-D-A · 三重フーガ → 途切れる)',
+    'footer': ['Introitus 11:23→08:53 → Sectio I (主題 I) → Interludium 08:06→11:18 → Sectio II (II + I) → Interludium 08:49→11:21 → Sectio III (B-A-D-A · 三重 → 途切れる)',
                '乱れ: 拍の途中の不揃いな入り、原形・反行・縮小・拡大の同時進行、2 拍ごとのストレッタ。Contrapunctus XIV にならい B-A-C-H の代わりに B-A-D-A。'],
 }
 
