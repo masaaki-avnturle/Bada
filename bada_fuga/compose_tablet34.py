@@ -241,7 +241,7 @@ META = {
     'title': 'Requiem BADA — Tablet Sessions XXXIV · Inno',
     'subtitle': '君が代をレクイエムと讃美歌の哀しみのフーガで — 提出した録音の実音、ピアノの実音、重低音、掛留とアーメン終止 (♩=50)',
     'legend': ['TB', 'SUB', 'PK'], 'vname': {'SUB': '重低音', 'PK': '太鼓'},
-    'footer': ['Introitus 08:06 → Inno I (讃美歌) → Fuga I (君が代は) → Interludium 11:18 → Inno II → Fuga II (千代に + 08:06 の主題) → Finale (讃美歌 + ストレッタ + アーメン) → Coda 08:06 の終わり',
+    'footer': ['Introitus 08:06 → Inno I (讃美歌) → Fuga I (君が代は) → Interludium 11:18 → Inno II → Fuga II (千代に + 08:06) → Finale (讃美歌 + ストレッタ) → Coda 08:06',
                '旋律: 君が代 (林廣守) と 9/23 08:06 の主題。讃美歌: 4 声のコラール、掛留、iv → i のアーメン終止。音は 9/23・9/24 の録音の実音とピアノの実音、正弦波のサブベース。'],
 }
 
