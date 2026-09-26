@@ -143,21 +143,21 @@ def build():
     for v in VOICES: entry(P, f + t, v, KIMI[5], 0, None, E, synth=0)
     for v in VOICES: P.rest_bars(v, f + t + 1, f + 8)
     harm_flat(P, f, f + 8, E); P.hold.update(range(f, f + 8))
-    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.22
+    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.07
     BELL.append((f, f + 8, 0.12, B1))
     T2.MANTRA.append((f, f + 8, B1, ('PK',))); CT.LAYOUT.append((f, f + 8, SEMIS, VOICE_SRC, {})); b = f + 8
     # ---------------- Fuga I — バッハ風
     f = b
     P.section(b, 'Fuga I — 「君が代は」のバッハ風フーガ', '提示 (A → S 答唱 → B → T 答唱) → エピソード → 下属調の入り → ストレッタ → 拍ごとに打ち直す保続低音 — サブベースが根音を追う')
     n_ = T11.bach_fugue(P, b, 'KIMI', '①')
-    for k in range(n_): P.dyn[f + k] = 1.25; SUBG[f + k] = 0.18
+    for k in range(n_): P.dyn[f + k] = 1.25; SUBG[f + k] = 0.055
     T2.MANTRA.append((f, f + n_, B1, ('PK',))); CT.LAYOUT.append((f, f + n_, SEMIS, VOICE_SRC, {})); b = f + n_
     # ---------------- Requiem II
     f = b; E = []
     P.section(b, 'Requiem II — 「千代に八千代に」「さざれ石の」のコラール', '第 2・3 句を 2 倍の長さで — 句の終わりは iv・♭VI へ沈む')
     t = chorale(P, f, [KIMI[1], KIMI[2]], E, ['千代に八千代に', 'さざれ石の'])
     harm_flat(P, f, f + 8, E); P.hold.update(range(f, f + 8))
-    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.22
+    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.07
     BELL.append((f, f + 8, 0.1, B1))
     T2.MANTRA.append((f, f + 8, B2, ('PK',))); CT.LAYOUT.append((f, f + 8, SEMIS, VOICE_SRC, {})); b = f + 8
     # ---------------- Fuga II — 第 2 句
@@ -165,7 +165,7 @@ def build():
     P.section(b, 'Fuga II — 「千代に八千代に」のフーガ', '第 2 句 (E G A G E G A → C E♭ F E♭ C E♭ F) を主題に、A → S → T → B → ストレッタ')
     stretto_fuga(P, f, SUBJ2, E, '主題 ② (千代に)')
     harm_flat(P, f, f + 10, E)
-    for k in range(10): P.dyn[f + k] = 1.25; SUBG[f + k] = 0.18
+    for k in range(10): P.dyn[f + k] = 1.25; SUBG[f + k] = 0.055
     T2.MANTRA.append((f, f + 10, B2, ('PK',))); CT.LAYOUT.append((f, f + 10, SEMIS, VOICE_SRC, {})); b = f + 10
     # ---------------- Requiem III
     f = b; E = []
@@ -173,7 +173,7 @@ def build():
     t = chorale(P, f, [KIMI[3], KIMI[4]], E, ['巌となりて', '苔のむすまで'])
     harm_flat(P, f, f + 8, E); P.hold.update(range(f, f + 8))
     for q in range(2): P.harm[(f + 1) * BPB + q] = 'Eb'
-    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.22
+    for k in range(8): P.dyn[f + k] = 1.15; SUBG[f + k] = 0.07
     BELL.append((f, f + 8, 0.1, B1))
     T2.MANTRA.append((f, f + 8, B1, ('PK',))); CT.LAYOUT.append((f, f + 8, SEMIS, VOICE_SRC, {})); b = f + 8
     # ---------------- Fuga III — 二重 (君が代は + 怒りの日)
@@ -184,7 +184,7 @@ def build():
     for v, z in {'A': 1, 'S': 3, 'T': 5}.items(): P.rest_bars(v, f, f + z)
     entry(P, f + 7, 'S', SUBJ, 0, '主題 ① ストレッタ', E, beat=2, synth=0); entry(P, f + 8, 'A', SUBJ, 0, None, E, beat=1, synth=0)
     harm_flat(P, f, f + 10, E)
-    for k in range(10): P.dyn[f + k] = 1.3; SUBG[f + k] = 0.26
+    for k in range(10): P.dyn[f + k] = 1.3; SUBG[f + k] = 0.085
     BELL.append((f, f + 10, 0.16, B2))
     T2.MANTRA.append((f, f + 10, B2, ('PK',))); CT.LAYOUT.append((f, f + 10, SEMIS, VOICE_SRC, {})); b = f + 10
     # ---------------- Finale — 全旋律 + ストレッタ
@@ -201,12 +201,12 @@ def build():
     harm_flat(P, f, f + 12, E)
     for q in range(BPB): P.harm[f * BPB + q] = 'Dm'; P.harm[(f + t) * BPB + q] = 'Dm'
     P.hold.update({f + 10, f + 11})
-    for k in range(12): P.dyn[f + k] = 1.3; SUBG[f + k] = 0.24
+    for k in range(12): P.dyn[f + k] = 1.3; SUBG[f + k] = 0.075
     BELL.append((f, f + t + 1, 0.14, B1))
     T2.MANTRA.append((f, f + 12, B1, ('PK',))); CT.LAYOUT.append((f, f + 12, SEMIS, VOICE_SRC, {})); b = f + 12
     P.set_harms(b, [['Dm']] * 3)
     for v in VOICES: P.rest_bars(v, b, b + 3)
-    for k in range(3): SUBG[b + k] = 0.24 - 0.07 * k
+    for k in range(3): SUBG[b + k] = 0.075 - 0.022 * k
     DRUM.append((b + 1, b + 3)); BELL.append((b, b + 1, 0.14, B1))
     T2.MANTRA.append((b, b + 3, B1, ('PK',))); CT.LAYOUT.append((b, b + 3, SEMIS, VOICE_SRC, {})); b += 3
     assert b == total, (b, total)
@@ -216,8 +216,8 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 2.2,
     'title': 'Requiem BADA — Tablet Sessions XXXII · Basso profondo',
     'subtitle': '君が代を重低音のシンセと実音のピアノで — メロディーはフーガに、主題はレクイエム (コラール) に (変ロ短調, ♩=50)',
-    'legend': ['SUB', 'PK'], 'vname': {'SUB': '重低音のシンセ (サブベース)', 'PK': '葬送の太鼓'},
-    'footer': ['Requiem I (コラール) → Fuga I (バッハ風) → Requiem II → Fuga II (第 2 句) → Requiem III → Fuga III (二重: 君が代は + 怒りの日) → Finale (全旋律 + ストレッタ) → ユニゾンの B♭',
+    'legend': ['SUB', 'PK'], 'vname': {'SUB': '重低音のシンセ', 'PK': '太鼓'},
+    'footer': ['Requiem I (コラール) → Fuga I (バッハ風) → Requiem II → Fuga II (第 2 句) → Requiem III → Fuga III (君が代は + 怒りの日) → Finale (全旋律 + ストレッタ) → B♭',
                '旋律: 君が代 (林廣守) と「怒りの日」(聖歌)。和声: B♭m・E♭m・G♭・F7・C♭。音は 9/23・9/24 の録音から切り出したピアノの実音と、正弦波のサブベースだけ。'],
 }
 
