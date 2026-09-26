@@ -61,13 +61,15 @@ def harm_flat(P, b0, b1, entries, cold=0.35):
                     t += d
             def score(cs):
                 c = chord(cs); s = sum(w * (1 if m % 12 in c['pcs'] else -0.9) for w, m in notes)
-                if cs == 'Ab': s += cold * (1 if notes else 3)
+                if cs == 'Ab': s += cold * (3.5 if notes else 3)
                 if cs == 'F': s += 0.6
                 if cs == 'Bb': s -= 0.2
                 if cs == 'C': s -= 0.5
                 if cs == 'Dm' and (bar - b0) % 4 == 0 and h == 0: s += 0.4
                 return s
             cs = max(FLAT, key=score) if notes else ('Ab' if (bar - b0) % 4 in (1, 2) else ('Dm' if (bar - b0) % 4 == 0 else 'C'))
+            held = [m for w, m in notes if w >= 2 and m % 12 == 2]                       # 句の終わりに伸ばす D (→C) の後半: G♭ で擦らせる
+            if h == 1 and held and len(notes) == len(held): cs = 'Ab'
             for q in range(2): P.harm[a + q] = cs
 
 def post(P, events, extras):
