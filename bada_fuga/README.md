@@ -973,6 +973,29 @@ python3 compose_tablet28.py bank26.json score_tablet28.json && python3 synth.py 
 python3 compose_tablet29.py bank26.json score_tablet29.json && python3 synth.py score_tablet29.json tablet29.wav && python3 video.py score_tablet29.json tablet29.wav tablet29.mp4
 ```
 
+## 🎌🕯 Requiem BADA — Tablet Sessions XXX · Kimigayo patetico (君が代を変ロ短調で、悲愴を帯びた哀しみに, ♩=50, 約 4 分)
+
+XXIX を、2026-09-23 / 09-24 の録音 (7 本 + 11:21 のシンセの実音、`bank17`) で **変ロ短調 (B♭ minor)** に作り換えた。
+斉唱のユニゾン (童謡のように聞こえる部分) は省き、旋律はフーガの主題と、哀しみの和声の上の全旋律だけで歌う。
+
+- **哀しみの和声** — i・iv・♭VI・V7・ナポリの ♭II (B♭m・E♭m・G♭・F7・C♭)。句の終わりで伸ばす主音の下を iv や ♭VI へ沈め、属七は小節の後半だけ (`harm_flat`)。
+- **Lamento** — 「千代に八千代に」〜「苔のむすまで」をアルトが歌い、バスは半音で下がる嘆きの音型 (B♭ A A♭ G G♭ F)。
+- **奇麗な実音** — 9/23 08:06 と 9/24 11:18 (どちらも元から変ロ短調) の抜粋を移調なしで、フーガと全旋律は録音から切り出したピアノの 1 音。
+- **ペダルの反響** — S の 1 オクターヴ上と B の 1 オクターヴ下を 11:21 のシンセの実音が 2.2〜2.6 倍の長さで重ね、次の音へ溶け込む (`COLD` → ペダル)。ピアノの減衰も長く (`piano_decay` 2.8)。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 9/23 08:06 の実音 (変ロ短調)、低いシンセの支え、鼓動 |
+| Lamento | 嘆きのバスの上の君が代 2〜5 句 (アルト) |
+| Fuga | 「君が代は」(B♭ B♭ A♭ B♭ C E♭ C B♭) の提示 → ストレッタ |
+| Interludium | 9/24 11:18 の実音 (変ロ短調) |
+| Kimigayo | 全旋律をソプラノに、「巌となりて」にナポリの C♭ → ユニゾンの B♭ |
+| Coda | 08:06 の本当の終わり → ユニゾンの B♭ と反響が消える |
+
+```bash
+python3 compose_tablet30.py bank17.json score_tablet30.json && python3 synth.py score_tablet30.json tablet30.wav && python3 video.py score_tablet30.json tablet30.wav tablet30.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
