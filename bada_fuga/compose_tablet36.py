@@ -34,7 +34,7 @@ T7.MARK.update({E3: '①', B1: '②'})
 VOICE_SRC = {'S': E3, 'A': B1, 'T': E3, 'B': B1}
 S1, S2 = E3, B1                       # 第 1 主題 (08:09)、第 2 主題 (08:06)
 BELL = []
-CLUSTERS = []; CUT = None; TAIL = ()
+CLUSTERS = []; CUT = None; CUT_END = None; TAIL = ()
 octs, TOP = T7.octs, T7.TOP
 
 def fit(v, mat, tr):
@@ -85,7 +85,7 @@ def post(P, events, extras):
             add('PF', beat + 0.006 * j, 3.0, base + x + (12 if j >= 8 else 0), gain * (1.0 if j < 3 else 0.8), None, rid=rid or VOICE_SRC['B'], rel=2.5)
     if CUT is not None:                                                  # 楽譜が途切れる: 2 拍目以降の音を切る
         for v in VOICES:
-            events[v] = [(s, min(d, CUT - s), m, lab) for s, d, m, lab in events[v] if s < CUT]
+            events[v] = [(s, min(d, CUT - s) if s < CUT else d, m, lab) for s, d, m, lab in events[v] if s < CUT or s >= CUT_END]
     for b0, b1, rid, kinds in T2.MANTRA:
         for bar in range(b0, b1):
             g = 0.35 if TAIL and TAIL[0] <= bar < TAIL[0] + TAIL[1] else 1.0
@@ -96,7 +96,7 @@ def chorale(P, f, mat_, E, label):
     entry(P, f, 'S', aug, 0, label, E); return int(round(sum(d for d, _ in aug) / BPB))
 
 def build():
-    global CUT, TAIL
+    global CUT, CUT_END, TAIL
     for r in ORDER:
         t0, inside = CT.excerpt(r, KEYS[r], 13.0)
         subj = CT.make_subject(inside, KEYS[r], 56); T5.SUBJ[r] = (subj, CT.harmonize(subj))
@@ -163,7 +163,7 @@ def build():
     # ---------------- 沈黙 1 小節
     for v in VOICES: P.rest_bars(v, b, b + 1)
     P.harm[b * BPB:(b + 1) * BPB] = ['Dm'] * BPB
-    TAIL = (b, 1); BELL.append((b, b + 1, 0.14, B1)); T2.MANTRA.append((b, b + 1, B1, ('PK',))); CT.LAYOUT.append((b, b + 1, 0, VOICE_SRC, {})); b += 1
+    CUT_END = (b + 1) * BPB; TAIL = (b, 1); BELL.append((b, b + 1, 0.14, B1)); T2.MANTRA.append((b, b + 1, B1, ('PK',))); CT.LAYOUT.append((b, b + 1, 0, VOICE_SRC, {})); b += 1
     # ---------------- Choral — コラール (変ロ短調)
     f = b; E = []
     P.section(b, 'Choral — 4 声のコラール 〈%s〉 (変ロ短調)' % hm(B1), 'バッハのレクイエムのように、途切れたあとに 4 声のコラール: 08:06 の主題を 2 倍の長さでソプラノに、掛留、iv → i のアーメン終止')
@@ -184,8 +184,8 @@ def build():
 
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.5,
-    'title': 'Requiem BADA — Tablet Sessions XXXVI · Contrapunctus XIV ramo',
-    'subtitle': '9/23 の 2 本 (08:06・08:09) から — バッハのレクイエムでありながら Contrapunctus XIV の分派: 三重フーガが途切れ、コラールが続く (♩=56)',
+    'title': 'Requiem BADA — Tablet Sessions XXXVI · Ramo',
+    'subtitle': '9/23 の 2 本 (08:06・08:09) から — バッハのレクイエムでありながら Contrapunctus XIV の分派: 三重フーガが途切れ、コラールへ',
     'legend': ['TB', 'PK'], 'vname': {'PK': '鼓動'},
     'footer': ['Introitus 08:09 → Sectio I (主題 ①, ホ短調) → Interludium 08:06 → Sectio II (② + ①, 変ロ短調) → Sectio III (B-A-D-A · 三重, ニ短調 → 途切れる) → Choral → Coda 08:06',
                '『フーガの技法』の未完の Contrapunctus XIV にならい、B-A-C-H の代わりに B-A-D-A。音はすべて 9/23 の 2 本の録音のピアノと実音、弔鐘、鼓動。掛留とアーメン終止のコラール。'],
