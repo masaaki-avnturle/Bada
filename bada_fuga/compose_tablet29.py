@@ -178,9 +178,9 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [SYN], 'piano_decay': 1.5, 'src_name': {SYN: '12:46 のシンセ (実音)'},
     'title': 'Requiem BADA — Tablet Sessions XXIX · Kimigayo',
-    'subtitle': '君が代をハ短調 (E♭・G♭・B♭) で — アステールプラザの国歌斉唱、冷たい外気、ご先祖様と子孫への眼差し (9/25 の実音, ♩=48)',
+    'subtitle': '君が代をハ短調 (E♭・G♭・B♭) で — アステールプラザの国歌斉唱、冷たい外気、ご先祖様と子孫への眼差し (♩=48)',
     'legend': ['TB', 'SP', 'PK'], 'vname': {'SP': '12:46 のシンセ (実音)', 'PK': '鼓動'},
-    'footer': ['Introitus 13:04 → Kimigayo I (斉唱 → テノールの定旋律) → Fuga (「君が代は」の主題) → Interludium 12:46 (シンセ) → Kimigayo II (荘厳、保続低音) → Coda 13:04 の終わり → ユニゾンの C',
+    'footer': ['Introitus 13:04 → Kimigayo I (斉唱 → 定旋律) → Fuga (「君が代は」) → Interludium 12:46 → Kimigayo II (荘厳) → Coda 13:04 の終わり → ユニゾンの C',
                '旋律: 君が代 (林廣守)。和声: Cm・E♭・G♭・B♭ (i・♭III・♭V・♭VII)。音は 9/25 の録音から切り出したピアノとシンセの実音、抜粋は C minor に移調。'],
 }
 
