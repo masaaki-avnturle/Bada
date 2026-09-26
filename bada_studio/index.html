@@ -91,7 +91,10 @@
   <label class="f">音量<input type="number" id="cGain" step="0.05" min="0" max="4"></label>
   <label class="f">フェードイン<input type="number" id="cFin" step="0.1" min="0"></label>
   <label class="f">フェードアウト<input type="number" id="cFout" step="0.1" min="0"></label>
+  <label class="f">速さ (0.5〜2)<input type="number" id="cRate" step="0.05" min="0.5" max="2"></label>
+  <label class="c"><input type="checkbox" id="cMute"> ミュート</label>
   <label class="f">トラック<select id="cTrack"></select></label>
+  <button id="btnClipWav" class="small">💾 このクリップを WAV に</button>
   <span id="clipName" class="hint"></span>
 </div>
 
@@ -106,12 +109,16 @@
 
 <div class="panel on" id="tab-src">
   <div class="row" style="padding:0 0 6px">
-    <button id="btnImport" class="primary">📂 音源・映像を読み込む (どの拡張子でも)</button>
+    <button id="btnImportMp3" class="primary">🎵 mp3 を取り込む</button>
+    <input type="file" id="fileMp3" multiple accept=".mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,audio/*">
+    <button id="btnImportMp4" class="primary">🎬 mp4 を取り込む</button>
+    <input type="file" id="fileMp4" multiple accept=".mp4,.m4v,.webm,.mov,.mkv,video/*">
+    <button id="btnImport">📂 その他のファイル (どの拡張子でも)</button>
     <input type="file" id="fileIn" multiple>
     <button id="btnImportRaw">🧱 生 PCM として読み込む (デコードできない拡張子)</button>
     <input type="file" id="fileRaw">
     <button id="btnRecMic">🎙 マイク録音</button>
-    <span class="hint">読み込んだ音源は下の一覧へ。「＋タイムラインへ」で編集トラックに置く。「🎹 楽器に」でその音を作曲の楽器 (サンプラー) にする。</span>
+    <span class="hint">mp3 は音声トラック、mp4 は映像トラック (音声も自動で取り出す) に置いて編集できます: 移動・切り詰め・分割・複製・削除、音量、フェード、速さ、ミュート。読み込んだ音源は下の一覧へ。「＋タイムラインへ」で編集トラックに置く。「🎹 楽器に」でその音を作曲の楽器 (サンプラー) にする。</span>
   </div>
   <div class="list" id="srcList"></div>
 </div>
@@ -214,8 +221,8 @@
 
 <div class="panel" id="tab-help">
   <div class="hint">
-    <b>1. 音源・映像</b> — 「読み込む」でどの拡張子のファイルでも選べます (mp3 / wav / ogg / flac / m4a / aac / opus / mp4 / webm / mov …、中身で判断してデコード)。デコードできない形式は「生 PCM として読み込む」で 16 bit 44.1 kHz として読みます。<br>
-    <b>2. タイムライン</b> — 上から 映像 / 作曲 / 音声トラック。クリップをドラッグで移動、両端をドラッグで切り詰め、✂ で分割。数値欄で開始・元の位置・長さ・音量・フェード。ルーラーをタップして再生位置。<br>
+    <b>1. 音源・映像</b> — 「🎵 mp3 を取り込む」「🎬 mp4 を取り込む」(mp4 は映像と音声の両方)、または「その他のファイル」でどの拡張子でも (wav / ogg / flac / m4a / aac / opus / webm / mov …、中身で判断してデコード)。デコードできない形式は「生 PCM として読み込む」で 16 bit 44.1 kHz として読みます。<br>
+    <b>2. タイムライン (編集)</b> — 上から 映像 / 作曲 / 楽譜 / 音声トラック。クリップをドラッグで移動、両端をドラッグで切り詰め、✂ で再生位置で分割、⧉ 複製、🗑 削除。数値欄で開始・元の位置・長さ・音量・フェードイン / アウト・速さ (0.5〜2 倍)・ミュート。「このクリップを WAV に」で編集したクリップだけを書き出し。ルーラーをタップして再生位置、ループ再生。<br>
     <b>3. 作曲</b> — 🎲 自動作曲で、調とテンポからコード進行 (機能和声)、主題、フーガの入り、オーケストラの行を作ります。対位法エンジン (bada_fuga/compose.py の移植) が 4 声を書き、行の和音で管弦楽が支えます。主題は手で書けます。読み込んだ音源をサンプラー楽器として使えます。<br>
     <b>4. コード進行 (オーケストラ)</b> — 主進行 + 弦 5 部・木管・金管・ティンパニなど 5 行以上の表。行ごとに違う和音を書けば多層の進行 (複和音) になります。<br>
     <b>5. 楽譜 (score.json)</b> — Requiem BADA の曲の score.json を読み込んで編曲: 移調、速さ、声部の楽器、シンセ・鼓動・抜粋の on/off、音符の移動・削除・追加。同じ録音を「音源・映像」で読み込んでおくと、実音の抜粋もその音で鳴ります。編集した楽譜は score.json に書き戻せます (Python 版 synth.py でそのまま高音質に)。<br>
@@ -954,17 +961,17 @@ function makeEngine(ctx, dest, sources) {
   };
   /* 音源クリップ: base = ctx の時刻 (タイムラインの 0 秒)、from = 再生開始のタイムライン秒 */
   E.clip = function (clip, src, base, from) {
-    if (!src || !src.buf) return null;
-    var start = clip.start, end = clip.start + clip.dur;
+    if (!src || !src.buf || clip.mute) return null;
+    var start = clip.start, end = clip.start + clip.dur, rate = Math.max(0.25, Math.min(4, +clip.rate || 1));
     if (end <= from) return null;
     var lead = Math.max(0, from - start), t = base + Math.max(0, start - from);
-    var bs = ctx.createBufferSource(); bs.buffer = src.buf;
+    var bs = ctx.createBufferSource(); bs.buffer = src.buf; bs.playbackRate.value = rate;
     var g = ctx.createGain(), gain = clip.gain == null ? 1 : +clip.gain, fin = +clip.fin || 0, fout = +clip.fout || 0;
     g.gain.setValueAtTime(fin > lead ? gain * (lead / fin) : gain, t);
     if (fin > lead) g.gain.linearRampToValueAtTime(gain, t + (fin - lead));
     if (fout > 0) { var tf = base + (end - from) - fout; if (tf > t) { g.gain.setValueAtTime(gain, tf); g.gain.linearRampToValueAtTime(0.0001, base + (end - from)); } }
     bs.connect(g); g.connect(E.direct);
-    var off = (clip.off || 0) + lead, dur = clip.dur - lead;
+    var off = (clip.off || 0) + lead * rate, dur = (clip.dur - lead) * rate;
     if (off >= src.buf.duration) return null;
     bs.start(t, off, Math.min(dur, src.buf.duration - off));
     return bs;
@@ -1039,7 +1046,7 @@ function recordMic() {
 /* ================================================================ タイムライン (クリップ) */
 function newClip(srcIdx, track, start) {
   var s = S.sources[srcIdx];
-  return { id: ++S.clipId, src: s.name, track: track, start: +start.toFixed(3), off: 0, dur: +s.buf.duration.toFixed(3), gain: 1, fin: 0.02, fout: 0.05 };
+  return { id: ++S.clipId, src: s.name, track: track, start: +start.toFixed(3), off: 0, dur: +s.buf.duration.toFixed(3), gain: 1, fin: 0.02, fout: 0.05, rate: 1, mute: false };
 }
 function srcOf(clip) { for (var i = 0; i < S.sources.length; i++) if (S.sources[i].name === clip.src) return S.sources[i]; return null; }
 function totalDur() {
@@ -1108,8 +1115,8 @@ function syncVideo(pos) {
   var c = activeVideoClip(pos), s = c ? srcOf(c) : null, v = s && s.video ? s.video : null;
   if (S.videoEl && S.videoEl !== v) { S.videoEl.pause(); S.videoEl = null; }
   if (!v) return;
-  var want = (c.off || 0) + (pos - c.start);
-  if (S.videoEl !== v) { S.videoEl = v; v.currentTime = want; v.play().catch(function () {}); }
+  var rate = Math.max(0.25, Math.min(4, +c.rate || 1)), want = (c.off || 0) + (pos - c.start) * rate;
+  if (S.videoEl !== v) { S.videoEl = v; v.playbackRate = rate; v.currentTime = want; v.play().catch(function () {}); }
   else if (Math.abs(v.currentTime - want) > 0.2) v.currentTime = want;
 }
 function stop(keepPos) {
@@ -1331,11 +1338,11 @@ function drawTimeline() {
     if (xb < TL.label || xa > W) return;
     var x0 = Math.max(TL.label, xa), w = Math.max(2, xb - x0);
     g.fillStyle = c.track === "V" ? (S.sel === c.id ? "#3a4a80" : "#25315a") : (S.sel === c.id ? "#1f5a58" : "#163d3c"); g.fillRect(x0, y + 4, w, TL.rowH - 8);
-    if (s) { g.fillStyle = c.track === "V" ? "#8fa8ff" : "#60cec4"; g.globalAlpha = 0.7;
-      for (var px = x0; px < x0 + w; px += 2) { var k = Math.floor(((c.off || 0) + tlT(px) - c.start) / 0.02); var a = s.peaks[k] || 0; g.fillRect(px, y + TL.rowH / 2 - a * (TL.rowH / 2 - 5), 2, Math.max(1, a * (TL.rowH - 10))); }
+    if (s) { g.fillStyle = c.mute ? "#556" : (c.track === "V" ? "#8fa8ff" : "#60cec4"); g.globalAlpha = c.mute ? 0.35 : 0.7; var cr2 = Math.max(0.25, Math.min(4, +c.rate || 1));
+      for (var px = x0; px < x0 + w; px += 2) { var k = Math.floor(((c.off || 0) + (tlT(px) - c.start) * cr2) / 0.02); var a = s.peaks[k] || 0; g.fillRect(px, y + TL.rowH / 2 - a * (TL.rowH / 2 - 5), 2, Math.max(1, a * (TL.rowH - 10))); }
       g.globalAlpha = 1; }
     g.strokeStyle = S.sel === c.id ? "#ffffff" : (c.track === "V" ? "#6f8fd8" : "#60cec4"); g.strokeRect(x0 + 0.5, y + 4.5, w - 1, TL.rowH - 9);
-    g.fillStyle = "#e6e2d6"; g.font = "11px sans-serif"; g.save(); g.beginPath(); g.rect(x0, y, w, TL.rowH); g.clip(); g.fillText((s ? "" : "⚠ ") + c.src, x0 + 5, y + 15); g.restore();
+    g.fillStyle = "#e6e2d6"; g.font = "11px sans-serif"; g.save(); g.beginPath(); g.rect(x0, y, w, TL.rowH); g.clip(); g.fillText((s ? "" : "⚠ ") + (c.mute ? "🔇 " : "") + c.src + ((+c.rate || 1) !== 1 ? " ×" + c.rate : ""), x0 + 5, y + 15); g.restore();
   });
   /* 再生位置 */
   var px2 = tlX(S.pos); if (px2 >= TL.label) { g.fillStyle = "#ff7a7a"; g.fillRect(px2, 0, 2, H); }
@@ -1381,10 +1388,10 @@ function wireTimeline() {
     if (S.drag.kind === "seek") { S.pos = t; drawAll(); return; }
     if (S.drag.kind === "music") { S.proj.musicStart = +Math.max(0, t - S.drag.dt).toFixed(2); $("pStart").value = S.proj.musicStart; drawAll(); return; }
     if (S.drag.kind === "score") { S.proj.scoreStart = +Math.max(0, t - S.drag.dt).toFixed(2); $("xStart").value = S.proj.scoreStart; drawAll(); return; }
-    var c = S.drag.clip, s = srcOf(c), maxDur = s ? s.buf.duration : 1e9;
+    var c = S.drag.clip, s = srcOf(c), rate = Math.max(0.25, Math.min(4, +c.rate || 1)), maxDur = s ? (s.buf.duration - (c.off || 0)) / rate : 1e9;
     if (S.drag.mode === "move") c.start = +Math.max(0, t - S.drag.dt).toFixed(3);
-    else if (S.drag.mode === "R") c.dur = +Math.max(0.05, Math.min(maxDur - (c.off || 0), t - c.start)).toFixed(3);
-    else { var ns = Math.max(S.drag.s0 - S.drag.o0, Math.min(t, S.drag.s0 + S.drag.d0 - 0.05)); c.off = +(S.drag.o0 + ns - S.drag.s0).toFixed(3); c.dur = +(S.drag.d0 - (ns - S.drag.s0)).toFixed(3); c.start = +ns.toFixed(3); }
+    else if (S.drag.mode === "R") c.dur = +Math.max(0.05, Math.min(maxDur, t - c.start)).toFixed(3);
+    else { var ns = Math.max(S.drag.s0 - S.drag.o0 / rate, Math.min(t, S.drag.s0 + S.drag.d0 - 0.05)); c.off = +(S.drag.o0 + (ns - S.drag.s0) * rate).toFixed(3); c.dur = +(S.drag.d0 - (ns - S.drag.s0)).toFixed(3); c.start = +ns.toFixed(3); }
     var ri = Math.floor((p.y - TL.ruler) / TL.rowH), rows = tlRows();
     if (S.drag.mode === "move" && ri >= 3 && ri < rows.length && c.track !== "V") c.track = ri - 3;
     fillClipEditor(); drawAll();
@@ -1394,18 +1401,18 @@ function wireTimeline() {
 }
 function selClip() { for (var i = 0; i < S.proj.clips.length; i++) if (S.proj.clips[i].id === S.sel) return S.proj.clips[i]; return null; }
 function fillClipEditor() {
-  var c = selClip(), ids = ["cStart", "cOff", "cDur", "cGain", "cFin", "cFout", "cTrack"];
+  var c = selClip(), ids = ["cStart", "cOff", "cDur", "cGain", "cFin", "cFout", "cTrack", "cRate", "cMute", "btnClipWav"];
   ids.forEach(function (id) { $(id).disabled = !c; });
   var sel = $("cTrack"); sel.innerHTML = "";
   if (!c) { $("clipName").textContent = S.sel === "M" ? "作曲ブロック (ドラッグで開始位置)" : (S.sel === "X" ? "楽譜ブロック (ドラッグで開始位置、「📜 楽譜」タブで編曲)" : ""); return; }
   if (c.track === "V") sel.innerHTML = "<option value='V'>映像</option>";
   else S.proj.tracks.forEach(function (t, i) { var o = document.createElement("option"); o.value = i; o.textContent = t; if (i === +c.track) o.selected = true; sel.appendChild(o); });
-  $("cStart").value = c.start; $("cOff").value = c.off; $("cDur").value = c.dur; $("cGain").value = c.gain; $("cFin").value = c.fin; $("cFout").value = c.fout;
+  $("cStart").value = c.start; $("cOff").value = c.off; $("cDur").value = c.dur; $("cGain").value = c.gain; $("cFin").value = c.fin; $("cFout").value = c.fout; $("cRate").value = c.rate || 1; $("cMute").checked = !!c.mute;
   $("clipName").textContent = c.src;
 }
 function splitAt(pos) {
   var c = selClip(); if (!c || pos <= c.start || pos >= c.start + c.dur) { setMsg("再生位置がクリップの中にありません", "err"); return; }
-  var d = +(pos - c.start).toFixed(3), c2 = JSON.parse(JSON.stringify(c)); c2.id = ++S.clipId; c2.start = +pos.toFixed(3); c2.off = +((c.off || 0) + d).toFixed(3); c2.dur = +(c.dur - d).toFixed(3); c2.fin = 0.01;
+  var d = +(pos - c.start).toFixed(3), c2 = JSON.parse(JSON.stringify(c)); c2.id = ++S.clipId; c2.start = +pos.toFixed(3); c2.off = +((c.off || 0) + d * Math.max(0.25, Math.min(4, +c.rate || 1))).toFixed(3); c2.dur = +(c.dur - d).toFixed(3); c2.fin = 0.01;
   c.dur = d; c.fout = 0.01; S.proj.clips.push(c2); S.sel = c2.id; changed(false);
 }
 
@@ -1647,6 +1654,16 @@ function wire() {
   $("btnFit").onclick = function () { var d = Math.max(5, totalDur()); S.pps = Math.max(2, Math.min(200, ($("tl").width - TL.label - 10) / d)); $("zoom").value = S.pps; S.scrollX = 0; drawAll(); };
   $("tl").addEventListener("wheel", function (e) { S.scrollX = Math.max(0, S.scrollX + (e.deltaX || e.deltaY) / S.pps * 0.5); drawAll(); e.preventDefault(); }, { passive: false });
   $("btnImport").onclick = function () { $("fileIn").value = ""; $("fileIn").click(); };
+  $("btnImportMp3").onclick = function () { $("fileMp3").value = ""; $("fileMp3").click(); };
+  $("fileMp3").onchange = function () { importFiles(this.files, false); };
+  $("btnImportMp4").onclick = function () { $("fileMp4").value = ""; $("fileMp4").click(); };
+  $("fileMp4").onchange = function () { importFiles(this.files, false); };
+  $("cRate").onchange = function () { var c = selClip(); if (!c) return; c.rate = Math.max(0.5, Math.min(2, +this.value || 1)); var s = srcOf(c); if (s) c.dur = +Math.min(c.dur, (s.buf.duration - (c.off || 0)) / c.rate).toFixed(3); changed(false); };
+  $("cMute").onchange = function () { var c = selClip(); if (!c) return; c.mute = this.checked; changed(false); };
+  $("btnClipWav").onclick = function () { var c = selClip(), s = c && srcOf(c); if (!c || !s) { setMsg("クリップが選ばれていません", "err"); return; }
+    setMsg("合成中…"); var sr = 44100, off = new OfflineAudioContext(2, Math.ceil((c.dur + 0.5) * sr), sr), eng = makeEngine(off, off.destination, S.sources);
+    eng.clip(Object.assign({}, c, { start: 0, mute: false }), s, 0, 0);
+    off.startRendering().then(function (buf) { saveBlob(new Blob([wavFile([buf.getChannelData(0), buf.getChannelData(1)], sr)], { type: "audio/wav" }), sanitizeName(c.src.replace(/\.[^.]+$/, "")) + "_edit.wav", "audio/wav", "WAV 音声"); }, function (e) { setMsg("合成できません: " + e.message, "err"); }); };
   $("fileIn").onchange = function () { importFiles(this.files, false); };
   $("btnImportRaw").onclick = function () { $("fileRaw").value = ""; $("fileRaw").click(); };
   $("fileRaw").onchange = function () { importFiles(this.files, true); };
