@@ -951,6 +951,28 @@ python3 build_synthbank.py 20260925_124643.mp3 sybank25 0.4 0.2      # bank26.js
 python3 compose_tablet28.py bank26.json score_tablet28.json && python3 synth.py score_tablet28.json tablet28.wav && python3 video.py score_tablet28.json tablet28.wav tablet28.mp4
 ```
 
+## 🎌🕯 Requiem BADA — Tablet Sessions XXIX · Kimigayo (君が代をハ短調で — アステールプラザの国歌斉唱, ♩=48, 約 4 分 30 秒)
+
+2026-09-25 の 3 本の録音をミックスし、日本国歌「君が代」(林廣守の旋律、公有) を B♭ 版の高さ (主音 C) で **ハ短調 (C minor) の上に**置いた。
+和声は Cm に **E♭・G♭・B♭ の長三和音** (i・♭III・♭V・♭VII) — 旋律の D・F・G が E♭・G♭ と擦れ、荘厳で洗脳的な響きになる (`harm_flat`)。
+情景: 小学校 6 年生の剣道試合、アステールプラザの国歌斉唱。**冷たい外気** = 高い E♭6・G♭5・B♭5 のシンセの実音 (12:46 から切り出した) が細く持続する (`COLD`)。
+**子孫とご先祖様への眼差し** = ゆっくり ♩=48、止まらない鼓動、最後は全声部がユニゾンの C に集まる (国歌の終わりと同じ)。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 13:04 の実音を C minor に移調 (`pshift`) → 冷たい外気のシンセ、鼓動 |
+| Kimigayo I — 斉唱 | 「君が代は」を 4 声がオクターヴのユニゾンで → 続く 4 句はテノールの定旋律、上に自由声部 |
+| Fuga | 第 1 句 D D C D E G E D (→ C C B♭ C D F D C) を主題に、A → S → T → B の提示 → 拍をずらしたストレッタ |
+| Interludium | 12:46 のシンセの部分の実音を C minor に |
+| Kimigayo II — 荘厳 | 全旋律をソプラノに、拍ごとに打ち直す保続低音の C、シンセの和音 E♭・G♭・B♭ → ユニゾンの C |
+| Coda | 13:04 の本当の終わり (C minor に) → ユニゾンの C と冷たいシンセが鼓動とともに消える |
+
+ニ短調の枠で書いて `CT.LAYOUT` で −2 半音 (旋律は主音 D で書き、C になる)。表示の和音名は G♭・A♭ に直す。
+
+```bash
+python3 compose_tablet29.py bank26.json score_tablet29.json && python3 synth.py score_tablet29.json tablet29.wav && python3 video.py score_tablet29.json tablet29.wav tablet29.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
