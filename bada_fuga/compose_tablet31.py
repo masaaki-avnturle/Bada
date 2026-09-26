@@ -162,7 +162,7 @@ def build():
     # ---------------- Fuga — バッハ風 (君が代は)
     f = b
     P.section(b, 'Fuga — 「君が代は」のバッハ風フーガ (変ロ短調)', '提示 (A → S 答唱 → B → T 答唱) → エピソード → 下属調の入り → ストレッタ → 拍ごとに打ち直す保続低音 — 弔鐘は鳴り続ける')
-    n_ = T11.bach_fugue(P, b, 'KIMI', '君が代')
+    n_ = T11.bach_fugue(P, b, 'KIMI', '①')
     for k in range(n_): P.dyn[f + k] = 1.25
     COLD.append((f, f + n_, 0.06)); BELL.append((f + 8, f + n_, 0.12, B1))
     T2.MANTRA.append((f, f + n_, B1, ('PK',))); CT.LAYOUT.append((f, f + n_, SEMIS, VOICE_SRC, {})); b = f + n_
@@ -197,7 +197,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [SYN], 'piano_decay': 2.8, 'src_name': {SYN: '11:21 のシンセ (実音)'},
     'title': 'Requiem BADA — Tablet Sessions XXXI · Requiem di guerra',
-    'subtitle': '戦争の悲哀のレクイエムとフーガ + 君が代 (変ロ短調) — 弔鐘、葬送の太鼓、怒りの日との二重フーガ、黙祷、バッハ風フーガ (♩=50)',
+    'subtitle': '戦争の悲哀のレクイエムとフーガ + 君が代 (変ロ短調) — 弔鐘、葬送の太鼓、怒りの日との二重フーガ、黙祷 (♩=50)',
     'legend': ['TB', 'SP', 'PK'], 'vname': {'SP': '11:21 のシンセ (反響)', 'PK': '葬送の太鼓'},
     'footer': ['Introitus 08:06 → Kyrie (嘆きのバス) → Dies irae (二重フーガ) → 黙祷 → Lacrimosa 11:18 → Fuga (バッハ風) → Kimigayo (全旋律) → Libera me 08:06 の終わり',
                '旋律: 君が代 (林廣守) と「怒りの日」(聖歌)。和声: B♭m・E♭m・G♭・F7・C♭。弔鐘 = 低い B♭ のピアノの実音。音は 9/23・9/24 の録音のピアノとシンセの実音。'],
