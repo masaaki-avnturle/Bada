@@ -1109,6 +1109,20 @@ python3 compose_tablet35.py bank35.json score_tablet35.json && python3 synth.py 
 python3 compose_tablet36.py bank17.json score_tablet36.json && python3 synth.py score_tablet36.json tablet36.wav && python3 video.py score_tablet36.json tablet36.wav tablet36.mp4
 ```
 
+## 🎹🎛📜 Requiem BADA — Tablet Sessions XXXVII · Wohltemperiert (10 本の録音を平均律のように「前奏曲とフーガ」で、Contrapunctus XIV へ, ♩=60, 約 7 分)
+
+9/23・9/24・9/25 の 10 本の録音 (`bank37.json`) を、平均律クラヴィーア曲集のように調の違う **5 組の前奏曲とフーガ**にし、Contrapunctus XIV の三重フーガで締める。
+
+- **前奏曲** — 録音の実音の抜粋 (元の調のまま) の上で、シンセの実音 (11:21・12:46 の持続音) が **平均律 第 1 巻 ハ長調の前奏曲の型** (低音 → 内声 → 上の 3 音 ×2) の分散和音を録音の和音で刻み続ける (`ARP`、洗脳的)。重低音のサブベース (`SUBG`) と鼓動
+- **フーガ** — もう 1 本の録音の主題を同じ調で 4 声 (ピアノの実音) のフーガに: 提示 → ストレッタ、終わりに分散和音が戻る
+- 組: ホ短調 (11:23 / 08:53)、変ロ短調 (08:06 / 11:18)、ヘ短調 (12:46 / 08:49)、ロ短調 (12:50:53 / 12:50:36)、ホ短調 (08:09 / 11:21)
+- **Contrapunctus XIV (ニ短調)** — 08:53・11:18・08:49 の主題を順に出して同時に重ねる三重フーガ → 楽譜が途切れる → 沈黙 → **Choral** (08:06 の主題、掛留、アーメン) → 08:06 の本当の終わり
+
+```bash
+python3 build_sampler.py bank2536 20260925_125036.mp3     # bank37.json = bank17 + bank25 + bank2536 + sybank25
+python3 compose_tablet37.py bank37.json score_tablet37.json && python3 synth.py score_tablet37.json tablet37.wav && python3 video.py score_tablet37.json tablet37.wav tablet37.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
