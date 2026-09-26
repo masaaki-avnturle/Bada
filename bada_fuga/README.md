@@ -996,6 +996,31 @@ XXIX を、2026-09-23 / 09-24 の録音 (7 本 + 11:21 のシンセの実音、`
 python3 compose_tablet30.py bank17.json score_tablet30.json && python3 synth.py score_tablet30.json tablet30.wav && python3 video.py score_tablet30.json tablet30.wav tablet30.mp4
 ```
 
+## 🎌⚰ Requiem BADA — Tablet Sessions XXXI · Requiem di guerra (戦争の悲哀のレクイエムとフーガ + 君が代, 変ロ短調, ♩=50, 約 5 分 30 秒)
+
+XXX (変ロ短調の君が代、9/23・9/24 の実音、ペダルの反響) に、戦争の悲哀を表すレクイエムとフーガを合わせた。
+
+- **弔鐘** — 低い B♭ (ピアノの実音、`PF` rel 3.5) が小節ごとに鳴り、長く減衰する (`BELL`)
+- **葬送の太鼓** — 鼓動を葬送行進の型 (強・中・付点の弱) に (`DRUM` で止める区間 = 黙祷)
+- **Dies irae** — グレゴリオ聖歌「怒りの日」の冒頭 (公有) をバスが 2 倍の長さで唱え、その上で「君が代は」の主題が A → S → T と入り、ストレッタで重なる二重フーガ
+- **黙祷** — すべてが止まり、弔鐘とシンセの反響だけが残る 2 小節
+- **バッハ風フーガ** — 「君が代は」を主題に `compose_tablet11.bach_fugue` (提示 → エピソード → 下属調 → ストレッタ → 打ち直す保続低音)
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 9/23 08:06 の実音、弔鐘、葬送の太鼓 |
+| Kyrie | 嘆きのバスの上の君が代 2〜5 句 (アルト) |
+| Dies irae | 二重フーガ 〈君が代は · 怒りの日〉 |
+| 黙祷 | 沈黙 — 弔鐘と反響だけ |
+| Lacrimosa | 9/24 11:18 の実音 |
+| Fuga | 「君が代は」のバッハ風フーガ (16 小節) |
+| Kimigayo | 哀しみの全旋律、ナポリの C♭ → ユニゾンの B♭ |
+| Libera me | 08:06 の本当の終わり → 弔鐘と反響が消える |
+
+```bash
+python3 compose_tablet31.py bank17.json score_tablet31.json && python3 synth.py score_tablet31.json tablet31.wav && python3 video.py score_tablet31.json tablet31.wav tablet31.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
