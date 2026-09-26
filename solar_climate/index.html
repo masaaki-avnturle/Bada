@@ -70,6 +70,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
 <nav id="tabs">
   <button data-tab="sun" class="on">☀️ 太陽活動</button>
   <button data-tab="region">🌍 地域の予報</button>
+  <button data-tab="snow">❄️ 雪の日検索</button>
   <button data-tab="xmas">🎄 英国クリスマス</button>
   <button data-tab="lab">🔬 検証ラボ</button>
   <button data-tab="about">📖 仕組み</button>
@@ -126,6 +127,31 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 30px;color:var(--muted);fon
   <div class="card">
     <h3>16 日間の予報 + Jones 熱感知指数</h3>
     <div id="region-forecast" class="muted small">—</div>
+  </div>
+</section>
+
+<!-- ============ 雪の日検索 ============ -->
+<section class="tab" id="tab-snow">
+  <div class="card">
+    <h2>❄️ 雪が高い確率で降る 年・月・日 を探す</h2>
+    <p class="small muted">選んだ地点の 1991 年〜昨年の実績 (ERA5 再解析) から、日ごとに「雪が降った年の割合」を計算し、条件に合う日を確率の高い順に並べます。16 日以内の日は実際の予報も混ぜます。</p>
+    <div class="row">
+      <select id="snow-country"></select><select id="snow-city"></select>
+      <input id="snow-search" placeholder="地名で検索 (例: 札幌, 新潟, Oslo)" size="20">
+    </div>
+    <div class="row">
+      <label class="small">年 <select id="snow-year"></select></label>
+      <label class="small">月 <select id="snow-month"></select></label>
+      <label class="small">雪の量 <select id="snow-thr">
+        <option value="0.1">降る (≥0.1 cm)</option><option value="1">積もる (≥1 cm)</option><option value="5">大雪 (≥5 cm)</option>
+      </select></label>
+      <label class="small">確率 <select id="snow-min">
+        <option value="0.7">70% 以上</option><option value="0.5" selected>50% 以上</option><option value="0.3">30% 以上</option><option value="0.1">10% 以上</option>
+      </select></label>
+      <button class="act" id="snow-go">検索</button>
+      <span class="small muted" id="snow-status"></span>
+    </div>
+    <div id="snow-out"></div>
   </div>
 </section>
 
@@ -551,7 +577,76 @@ var SC = (function(){
     return "·";
   }
 
+  /* ---- ❄️ 雪の日検索 ----
+   * daily (ERA5 の日別) から、平年の通日ごとに「雪が threshold cm 以上降った年の割合」を出す。
+   * 1 日だけだと年数 (約 35) が少なくてぶれるので、±window 日の窓でならす。 */
+  var MONTH_START = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366];
+  function doyToMonthDay(d){
+    for (var m = 0; m < 12; m++) if (d < MONTH_START[m + 1]) return { month: m + 1, day: d - MONTH_START[m] + 1 };
+    return { month: 12, day: 31 };
+  }
+  /* 平年の通日 d を、その年の日付に (月日は平年の暦で決める。2/29 は 2/28 と同じ扱い) */
+  function dateOfDoy(year, d){
+    var md = doyToMonthDay(d);
+    return year + "-" + pad2(md.month) + "-" + pad2(md.day);
+  }
+  function weekdayJa(date){ return "日月火水木金土"[new Date(parseYmd(date)).getUTCDay()]; }
+  function snowClimatology(daily, threshold, window){
+    var t = daily.time || [], sn = daily.snowfall_sum || [];
+    var hit = new Array(366).fill(0), tot = new Array(366).fill(0), yearDays = {}, yearSeen = {};
+    for (var i = 0; i < t.length; i++){
+      var v = num(sn, i); if (!isFinite(v)) continue;
+      var d = doy(t[i]), y = +t[i].slice(0, 4), isSnow = v >= threshold;
+      tot[d]++; if (isSnow) hit[d]++;
+      yearSeen[y] = (yearSeen[y] || 0) + 1;
+      if (isSnow) yearDays[y] = (yearDays[y] || 0) + 1;
+    }
+    var byDoy = [null];
+    for (var dd = 1; dd <= 365; dd++){
+      var h = 0, n = 0;
+      for (var k = -window; k <= window; k++){
+        var j = ((dd - 1 + k) % 365 + 365) % 365 + 1;
+        h += hit[j]; n += tot[j];
+      }
+      byDoy.push(n ? h / n : NaN);
+    }
+    var byMonth = [];
+    for (var m = 0; m < 12; m++){
+      var ps = byDoy.slice(MONTH_START[m], MONTH_START[m + 1]).filter(isFinite);
+      byMonth.push({ month: m + 1, expectedDays: ps.reduce(function(a, b){ return a + b; }, 0), maxProb: ps.length ? Math.max.apply(null, ps) : NaN });
+    }
+    /* 年ごとの雪の日数 (データが 360 日以上ある年だけ) */
+    var byYear = Object.keys(yearSeen).filter(function(y){ return yearSeen[y] >= 360; }).map(function(y){ return { year: +y, days: yearDays[y] || 0 }; })
+      .sort(function(a, b){ return a.year - b.year; });
+    var fit = linfit(byYear.map(function(r){ return r.year; }), byYear.map(function(r){ return r.days; }));
+    var resid = byYear.map(function(r){ return r.days - (fit.a + fit.b * r.year); });
+    var sd = Math.sqrt(resid.reduce(function(a, v){ return a + v * v; }, 0) / Math.max(1, resid.length - 2));
+    return { byDoy: byDoy, byMonth: byMonth, byYear: byYear, fit: fit, sd: sd, threshold: threshold, window: window,
+             annualDays: byMonth.reduce(function(a, r){ return a + r.expectedDays; }, 0) };
+  }
+  /* 条件に合う日を確率の高い順に */
+  function rankSnowDays(clim, year, opts){
+    opts = opts || {};
+    var out = [];
+    for (var d = 1; d <= 365; d++){
+      var p = clim.byDoy[d], md = doyToMonthDay(d);
+      if (!isFinite(p) || p < (opts.minProb || 0)) continue;
+      if (opts.month && md.month !== opts.month) continue;
+      out.push({ doy: d, month: md.month, day: md.day, prob: p, date: dateOfDoy(year, d) });
+    }
+    out.sort(function(a, b){ return b.prob - a.prob || a.doy - b.doy; });
+    return opts.top ? out.slice(0, opts.top) : out;
+  }
+  /* 年の雪の日数の見込み: 線形トレンド ± 残差の標準偏差 (80% の目安は ±1.28σ) */
+  function projectSnowYear(clim, year){
+    if (clim.byYear.length < 5 || !isFinite(clim.fit.b)) return null;
+    var mid = clim.fit.a + clim.fit.b * year;
+    return { expected: Math.max(0, mid), lo: Math.max(0, mid - 1.28 * clim.sd), hi: Math.max(0, mid + 1.28 * clim.sd), trendPerDecade: clim.fit.b * 10 };
+  }
+
   return {
+    doyToMonthDay: doyToMonthDay, dateOfDoy: dateOfDoy, weekdayJa: weekdayJa, snowClimatology: snowClimatology,
+    rankSnowDays: rankSnowDays, projectSnowYear: projectSnowYear,
     geocodeUrl: geocodeUrl, parseGeocode: parseGeocode, multiForecastUrl: multiForecastUrl, parseMulti: parseMulti, wmoIcon: wmoIcon,
     gammaFn: gammaFn, gammaCheck: gammaCheck, jonesAbs: jonesAbs, heatTheta: heatTheta, jonesHeat: jonesHeat,
     flareClass: flareClass, flareIndex: flareIndex, parseXrays: parseXrays, parseKp: parseKp, kpLabel: kpLabel,
@@ -922,6 +1017,98 @@ function regionOverview(){
   }).catch(function(e){ $("region-overview").textContent = "取得できませんでした: " + e.message; });
 }
 $("region-list").addEventListener("click", regionOverview);
+
+/* ---------- ❄️ 雪の日検索 ---------- */
+fillCountry($("snow-country"), $("snow-city"), "日本");
+(function(){
+  var y0 = new Date().getFullYear(), o = "";
+  for (var y = y0; y <= y0 + 10; y++) o += "<option>" + y + "</option>";
+  $("snow-year").innerHTML = o;
+  var m = '<option value="0">すべての月</option>';
+  for (var k = 1; k <= 12; k++) m += '<option value="' + k + '">' + k + " 月</option>";
+  $("snow-month").innerHTML = m;
+})();
+var snowPlace = null;
+$("snow-city").addEventListener("change", function(){ snowPlace = null; $("snow-search").value = ""; });
+$("snow-country").addEventListener("change", function(){ snowPlace = null; $("snow-search").value = ""; });
+function snowTarget(){
+  var q = $("snow-search").value.trim();
+  if (!q) return Promise.resolve(selected($("snow-country"), $("snow-city")));
+  if (snowPlace && snowPlace.q === q) return Promise.resolve(snowPlace);
+  return getJSON(SC.geocodeUrl(q, "")).then(function(j){
+    var h = SC.parseGeocode(j)[0];
+    if (!h) throw new Error("地名が見つかりません: " + q);
+    snowPlace = { q: q, name: h.label, lat: h.lat, lon: h.lon };
+    return snowPlace;
+  });
+}
+function snowCalendar(clim, minProb){
+  var W = 720, L = 34, T = 16, cw = (W - L) / 31, ch = 17, H = T + ch * 12 + 6, s = "";
+  for (var dd = 1; dd <= 31; dd += (dd === 1 ? 4 : 5))
+    s += '<text x="' + (L + (dd - 0.5) * cw).toFixed(1) + '" y="11" font-size="10" text-anchor="middle" fill="var(--muted)">' + dd + "</text>";
+  for (var d = 1; d <= 365; d++){
+    var md = SC.doyToMonthDay(d), p = clim.byDoy[d];
+    var x = L + (md.day - 1) * cw, y = T + (md.month - 1) * ch;
+    var a = isFinite(p) ? Math.max(0.06, Math.min(1, p)) : 0;
+    s += '<rect x="' + (x + 0.5).toFixed(1) + '" y="' + (y + 0.5) + '" width="' + (cw - 1).toFixed(1) + '" height="' + (ch - 1) + '" rx="2" fill="var(--cold)" fill-opacity="' + a.toFixed(2) + '"' +
+      (p >= minProb ? ' stroke="var(--ink)" stroke-width="1.2"' : "") + "><title>" + md.month + "/" + md.day + " " + pct(p) + "</title></rect>";
+  }
+  for (var m = 1; m <= 12; m++) s += '<text x="' + (L - 6) + '" y="' + (T + (m - 1) * ch + 12) + '" font-size="10" text-anchor="end" fill="var(--muted)">' + m + "月</text>";
+  return '<svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="日ごとの雪の確率">' + s + "</svg>";
+}
+function loadSnow(){
+  var year = +$("snow-year").value, month = +$("snow-month").value, thr = +$("snow-thr").value, minProb = +$("snow-min").value;
+  $("snow-status").textContent = "取得中… (初回は数秒)";
+  var place;
+  return snowTarget().then(function(p){
+    place = p;
+    return Promise.all([archiveFor(p.lat, p.lon), forecastFor(p.lat, p.lon).catch(function(){ return null; })]);
+  }).then(function(r){
+    var clim = SC.snowClimatology(r[0], thr, 3);
+    var today = todayStr(), fc = {};
+    var allHits = SC.rankSnowDays(clim, year, { month: month, minProb: minProb });
+    var hits = allHits.filter(function(h){ return h.date >= today; });   // 過ぎた日は出さない
+    var dropped = allHits.length - hits.length;
+    if (r[1]){ var d = r[1].daily; d.time.forEach(function(t, i){ if (t >= today) fc[t] = d.snowfall_sum[i]; }); }
+    var best = clim.byMonth.slice().sort(function(a, b){ return b.expectedDays - a.expectedDays; })[0];
+    var proj = SC.projectSnowYear(clim, year);
+    var thrLabel = $("snow-thr").selectedOptions[0].textContent;
+    var yrs = clim.byYear.length;
+
+    var rows = hits.slice(0, 40).map(function(h){
+      var lead = SC.leadDays(h.date, today), past = lead < 0, f = fc[h.date];
+      var fcCell = past ? '<span class="muted">過去</span>' : (f != null ? (f >= thr ? '<b class="good">予報: 雪 ' + f1(f) + " cm</b>" : '<span class="muted">予報: ' + f1(f) + " cm</span>") : '<span class="muted">予報の範囲外</span>');
+      return "<tr><td>" + h.date + " (" + SC.weekdayJa(h.date) + ")</td><td><b>" + pct(h.prob) + "</b></td><td>" + fcCell + "</td></tr>";
+    }).join("");
+    var none = "";
+    if (!hits.length && dropped) none = '<p class="note">' + year + " 年の該当日 (" + dropped + " 日) はもう過ぎました。次の年を選んでください。</p>";
+    else if (!hits.length){
+      var t = SC.rankSnowDays(clim, year, { month: month, top: 1 })[0];
+      none = '<p class="note">条件 (' + (month ? month + " 月、" : "") + thrLabel + "、" + pct(minProb) + " 以上) に合う日はありません。" +
+        (t && t.prob > 0 ? "この地点で" + (month ? "この月に" : "") + "いちばん確率が高いのは " + t.month + "/" + t.day + " の " + pct(t.prob) + " です。確率の条件を下げてみてください。"
+                         : "この地点では" + (month ? "この月に" : "") + "過去 " + yrs + " 年、この量の雪は一度も降っていません。") + "</p>";
+    } else if (dropped) none = '<p class="small muted">すでに過ぎた ' + dropped + " 日は除いています。</p>";
+
+    $("snow-out").innerHTML =
+      '<p class="small"><b>' + esc(place.name) + "</b> (" + place.lat.toFixed(2) + ", " + place.lon.toFixed(2) + ") · " + thrLabel + " · 過去 " + yrs + " 年</p>" +
+      '<div class="grid">' +
+        stat("雪の多い月", best.expectedDays >= 0.5 ? best.month + " 月" : "—", best.expectedDays >= 0.5 ? "平年 " + f1(best.expectedDays) + " 日" : "ほとんど降りません") +
+        stat("1 年の雪の日 (平年)", f1(clim.annualDays) + " 日", thrLabel) +
+        stat(year + " 年の見込み", proj ? f1(proj.expected) + " 日" : "—", proj ? "80% の目安 " + f1(proj.lo) + "〜" + f1(proj.hi) + " 日" : "データ不足") +
+        stat("増減の傾向", proj ? (proj.trendPerDecade >= 0 ? "+" : "") + f1(proj.trendPerDecade) + " 日/10年" : "—", yrs ? clim.byYear[0].year + "–" + clim.byYear[yrs - 1].year : "") +
+      "</div>" +
+      "<h3>" + year + " 年の、雪が高い確率で降る日" + (month ? " (" + month + " 月)" : "") + "</h3>" + none +
+      (rows ? '<div class="scroll"><table><tr><th>日付</th><th>雪の確率 (平年)</th><th>16 日予報</th></tr>' + rows + "</table></div>" +
+        (hits.length > 40 ? '<p class="small muted">ほか ' + (hits.length - 40) + " 日</p>" : "") : "") +
+      "<h3>日ごとの雪の確率 (濃いほど高い。枠 = 条件以上)</h3>" + snowCalendar(clim, minProb) +
+      "<h3>月ごとの雪の日数 (平年)</h3>" + barChart(clim.byMonth.map(function(r){ return r.expectedDays; }), clim.byMonth.map(function(r){ return r.month + "月"; }), { color: function(){ return "var(--cold)"; } }) +
+      "<h3>年ごとの雪の日数 (実績)</h3>" + barChart(clim.byYear.map(function(r){ return r.days; }), clim.byYear.map(function(r){ return String(r.year).slice(2); }), { color: function(){ return "var(--bar)"; } }) +
+      '<p class="note">「確率」は、その日の前後 3 日に過去 ' + yrs + " 年のうち何割の年で雪が降ったか (平年の気候値) です。どの年が大雪になるかを何か月も前に当てる方法はないため、" + year +
+      " 年の日付にも同じ平年の確率を表示しています。年の見込みは実績の傾向を延ばした目安です。当日の 16 日前からは実際の予報を表示します。</p>";
+    $("snow-status").textContent = "";
+  }).catch(function(e){ $("snow-status").textContent = "取得できませんでした: " + e.message; });
+}
+$("snow-go").addEventListener("click", loadSnow);
 
 /* ---------- 🎄 英国クリスマス ---------- */
 $("xmas-city").innerHTML = UK_CITIES.map(function(c, i){ return '<option value="' + i + '">' + c[0] + "</option>"; }).join("");

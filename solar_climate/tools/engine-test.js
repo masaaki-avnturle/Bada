@@ -227,5 +227,46 @@ ok(p1.length === 1 && p1[0].days.length === 2, "1 地点ならオブジェクト
 ok(SC.parseMulti([day(1)], pts)[1].days.length === 0, "欠けた地点は空");
 ok(SC.wmoIcon(0) === "☀️" && SC.wmoIcon(73) === "❄️" && SC.wmoIcon(63) === "🌧️" && SC.wmoIcon(95) === "⛈️" && SC.wmoIcon(3) === "☁️", "天気アイコン");
 
+/* 9. ❄️ 雪の日検索 */
+ok(SC.doyToMonthDay(1).month === 1 && SC.doyToMonthDay(59).day === 28 && SC.doyToMonthDay(60).month === 3 && SC.doyToMonthDay(365).day === 31, "通日 → 月日");
+{ let bad = 0; for (let d = 1; d <= 365; d++) if (SC.doy(SC.dateOfDoy(2027, d)) !== d) bad++; ok(bad === 0, "通日 ↔ 日付の往復"); }
+ok(SC.dateOfDoy(2028, 60) === "2028-03-01" && SC.dateOfDoy(2027, 32) === "2027-02-01", "うるう年も月日は同じ");
+ok(SC.weekdayJa("2026-12-25") === "金" && SC.weekdayJa("2027-01-01") === "金", "曜日");
+// 合成データ 30 年: 1 月前半に雪 (年ごとに減る)、2/10 は 3 年に 1 回 0.5 cm、それ以外は無し
+const st = [], ss = [];
+for (let y = 1991; y <= 2020; y++){
+  const days = 365 + (y % 4 === 0 ? 1 : 0);
+  for (let i = 0; i < days; i++){
+    const dt = new Date(Date.UTC(y, 0, 1 + i)).toISOString().slice(0, 10);
+    const m = +dt.slice(5, 7), dd = +dt.slice(8, 10);
+    let v = 0;
+    if (m === 1 && dd <= 20 - Math.floor((y - 1991) / 3)) v = 2;
+    if (m === 2 && dd === 10 && y % 3 === 0) v = 0.5;
+    st.push(dt); ss.push(v);
+  }
+}
+const sc0 = SC.snowClimatology({ time: st, snowfall_sum: ss }, 0.1, 0);
+near(sc0.byDoy[1], 1, 1e-12, "1/1 は毎年雪 → 100%");
+near(sc0.byDoy[41], 10 / 30, 1e-12, "2/10 は 3 年に 1 回 → 33%");
+near(sc0.byDoy[200], 0, 1e-12, "夏は 0%");
+near(SC.snowClimatology({ time: st, snowfall_sum: ss }, 1, 0).byDoy[41], 0, 1e-12, "しきい値 1 cm なら 0.5 cm の日は数えない");
+const sc3 = SC.snowClimatology({ time: st, snowfall_sum: ss }, 0.1, 3);
+ok(sc3.byDoy[41] > 0 && sc3.byDoy[41] < 10 / 30, "±3 日の窓でならす");
+ok(sc3.byDoy[365] > 0 && sc3.byDoy[365] < 1, "年末は年始の雪を窓で拾う (巡回)");
+ok(sc0.byMonth[0].expectedDays > sc0.byMonth[1].expectedDays && sc0.byMonth[6].expectedDays === 0, "月ごとの雪の日数: 1 月が最多");
+ok(sc0.byYear.length === 30 && sc0.byYear[0].days === 20 && sc0.byYear[29].days === 11, "年ごとの雪の日数 (1991: 20, 2020: 10+1) got " + sc0.byYear[0].days + "," + sc0.byYear[29].days);
+ok(sc0.fit.b < 0, "減る傾向を検出");
+const pj = SC.projectSnowYear(sc0, 2027);
+ok(pj && pj.expected < 11 && pj.lo <= pj.expected && pj.hi >= pj.expected && pj.trendPerDecade < 0, "2027 年の見込みは傾向を延ばす");
+ok(SC.projectSnowYear({ byYear: [{ year: 2000, days: 3 }], fit: { b: 0 } }, 2027) === null, "年数が少なければ見込みなし");
+const rk = SC.rankSnowDays(sc0, 2027, { minProb: 0.5 });
+ok(rk.length > 0 && rk.every(r => r.prob >= 0.5 && r.month === 1) && rk[0].date === "2027-01-01", "50% 以上の日は 1 月、最上位は 1/1");
+ok(rk.every((r, i) => i === 0 || rk[i - 1].prob >= r.prob), "確率の高い順");
+ok(SC.rankSnowDays(sc0, 2027, { month: 2, minProb: 0.3 }).map(r => r.date).join() === "2027-02-10", "2 月で 30% 以上は 2/10 だけ");
+ok(SC.rankSnowDays(sc0, 2027, { month: 7, minProb: 0.1 }).length === 0, "7 月は該当なし");
+ok(SC.rankSnowDays(sc0, 2027, { top: 3 }).length === 3, "上位 N 件");
+const empty = SC.snowClimatology({ time: [], snowfall_sum: [] }, 0.1, 3);
+ok(empty.byYear.length === 0 && isNaN(empty.byDoy[10]) && SC.rankSnowDays(empty, 2027, {}).length === 0, "データなしでも落ちない");
+
 console.log(`SolarCast engine tests: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
