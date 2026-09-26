@@ -1021,6 +1021,20 @@ XXX (変ロ短調の君が代、9/23・9/24 の実音、ペダルの反響) に�
 python3 compose_tablet31.py bank17.json score_tablet31.json && python3 synth.py score_tablet31.json tablet31.wav && python3 video.py score_tablet31.json tablet31.wav tablet31.mp4
 ```
 
+## 🎌🔊 Requiem BADA — Tablet Sessions XXXII · Basso profondo (重低音のシンセと実音のピアノで君が代, 変ロ短調, ♩=50, 約 6 分)
+
+全体を**重低音のシンセサイザー**と**実音のピアノ** (9/23・9/24 の録音から切り出した 1 音) だけで。実音の抜粋と 11:21 のシンセは使わない。
+
+- **重低音** — 和声の根音を B♭0・B♭1 あたりの正弦波のサブベース (`synth.py` の `sub_tone`、`SUB`) が半小節ごとに支え、ゆっくり立ち上がりゆっくり消える (`SUBG` で区間ごとの音量)
+- **メロディーはフーガに** — 君が代の句を主題にしたフーガが 3 つ: Fuga I 第 1 句のバッハ風 (`bach_fugue`)、Fuga II 第 2 句「千代に八千代に」の提示 → ストレッタ、Fuga III 第 1 句と「怒りの日」の二重フーガ
+- **主題はレクイエムに** — 各句を 2 倍の長さのコラール (ソプラノ + 4 声の全音符、`chorale`) として、フーガの間に置く (Requiem I〜III)
+- **Finale** — 全旋律をソプラノに、その下で第 1 句が A・T・B にストレッタで重なり、最後は全声部がユニゾンの B♭、サブベースだけが残って消える
+- 和声は XXX の哀しみの組に ♭VII (A♭) と ii°7 を足し、弔鐘と葬送の太鼓 (ピアノの低い打鍵) を残す
+
+```bash
+python3 compose_tablet32.py bank17.json score_tablet32.json && python3 synth.py score_tablet32.json tablet32.wav && python3 video.py score_tablet32.json tablet32.wav tablet32.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
