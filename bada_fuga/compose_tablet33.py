@@ -233,7 +233,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 2.2,
     'title': 'Requiem BADA — Tablet Sessions XXXIII · Chiyo ni yachiyo ni',
-    'subtitle': '「千代に八千代に」の哀しみのレクイエムとフーガ — 高音をきれいなシンセでばら撒き、重低音と実音のピアノ (変ロ短調, ♩=50)',
+    'subtitle': '「千代に八千代に」の哀しみのレクイエムとフーガ — 高音をきれいなシンセでばら撒き、重低音と実音のピアノ (♩=50)',
     'legend': ['GL', 'SUB', 'PK'], 'vname': {'GL': '高音のシンセ', 'SUB': '重低音', 'PK': '太鼓'},
     'footer': ['Requiem I (千代に のコラール) → Fuga I (バッハ風) → Requiem II → Fuga II (千代に + 08:06 の主題) → Requiem III → Fuga III (千代に + 怒りの日) → Finale → B♭',
                '旋律: 君が代 (林廣守) の第 2 句を中心に、9/23 08:06 の主題と「怒りの日」。音は 9/23・9/24 の録音のピアノの実音、ガラスのような高音のシンセ、正弦波のサブベース。'],
