@@ -45,4 +45,4 @@ python3 build_requiem.py --src <録音ディレクトリ> --out output --no-vide
 - `requiem.mp4` — 1280×720 / 30 fps / H.264 + AAC 224 kbps
 - `chords.txt` — 推定した和音進行 (開始秒, 終了秒, 和音, 楽章)
 
-生成物は容量が大きいので git には含めていません (`output/` は `.gitignore` 済み)。
+生成物のうち、圧縮版 `output/requiem_compact.mp4` (960×540, 24 MB) と `output/chords.txt` だけをリポジトリに含めています。フル解像度版 (1280×720, 65 MB) はスクリプトを実行して生成してください。
