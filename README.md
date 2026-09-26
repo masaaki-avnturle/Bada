@@ -31,11 +31,11 @@
 
 ## 🕯 ダウンロード — Bada Requiem(requiem × fuga ミックス)
 
-**提出された 8 本の録音を素材に、「requiem と fuga の曲調で、ミックスで、requiem の曲を作り換えた」1 本の MP4。** 遅く暗いレクイエム側の録音を主題に、フーガの提示部の形(主題 → 完全 5 度上の応答 → 1 オクターブ下の第 3 声)で時間差をつけて重ね、聖堂風の残響とオルガン風ドローン(F・B♭・E♭・C♯)で包んで **I. Introitus / II. Fuga / III. Dies irae(ストレッタ)/ IV. Lacrimosa / V. Lux aeterna** の 5 楽章・約 5 分のレクイエムに作り換えた。ピッチ・テンポは `ffmpeg` の rubberband、配置・残響・ドローンは `numpy` / `scipy` で自前実装。
+**提出された 8 本の録音(mp3)だけを素材に、「requiem と fuga の曲調で、ミックスで、requiem の曲を作り換えた」1 本の MP4。** 遅く暗いレクイエム側の録音を主題に、フーガの提示部の形(主題 → 完全 5 度上の応答 → 1 オクターブ下の第 3 声)で時間差をつけて重ね、聖堂風の残響とオルガン風ドローン(録音の解析から取った F 短調の音 F・A♭・B♭・C・E♭)で包んで **I. Introitus / II. Fuga / III. Dies irae(ストレッタ)/ IV. Lacrimosa / V. Lux aeterna** の 5 楽章・約 5 分のレクイエムに作り換えた。ピッチ・テンポは `ffmpeg` の rubberband、配置・残響・ドローンは `numpy` / `scipy` で自前実装。
 
 ### 👉 [**requiem_mix/output/requiem_fuga_mix.mp4 をダウンロード**](requiem_mix/output/requiem_fuga_mix.mp4)
 
-上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存(1280×720 / H.264 + AAC / 4 分 56 秒 / 約 23 MB)。構成・素材の割り当て・作り直し方は [`requiem_mix/`](requiem_mix/) を参照。
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存(1280×720 / H.264 + AAC / 4 分 56 秒 / 約 23 MB)。素材の録音は [`requiem_mix/source/`](requiem_mix/source/)、構成・素材の割り当て・作り直し方は [`requiem_mix/`](requiem_mix/) を参照。
 
 ---
 
@@ -269,7 +269,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
-| **`requiem_mix/`** | 🕯 **Bada Requiem** — requiem × fuga ミックス(MP4) · 提出録音 8 本の解析(鍵・テンポ・音の密度)→ 主題・応答(+7)・第三声(−12)のフーガ提示部 · 聖堂風 FFT 畳み込み残響 · ドローン F・B♭・E♭・C♯ · showcqt ビジュアライザ付き動画 | [→ 開く](requiem_mix/) |
+| **`requiem_mix/`** | 🕯 **Bada Requiem** — requiem × fuga ミックス(MP4) · 提出録音 8 本の解析(鍵・テンポ・音の密度)→ 主題・応答(+7)・第三声(−12)のフーガ提示部 · 聖堂風 FFT 畳み込み残響 · 録音の調から取ったドローン F・A♭・B♭・C・E♭ · 素材 mp3 同梱 · showcqt ビジュアライザ付き動画 | [→ 開く](requiem_mix/) |
 
 ---
 

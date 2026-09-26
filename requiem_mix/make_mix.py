@@ -3,16 +3,17 @@
 """
 Bada Requiem — 「requiem と fuga の曲調で、ミックスで、requiem の曲を作り換える」
 
-提出された 8 本の録音(Android 録音 / モノラル AAC)を素材に、
+提出された 8 本の録音(source/*.mp3 — Android 録音 / モノラル AAC)だけを素材に、
   * requiem 側(遅く・暗い・低い録音)を主題として、
   * fuga 側 (音数が多く・明るい録音)を対旋律として、
 フーガの提示部の形(主題 → 完全 5 度上の応答 → 1 オクターブ下の第 3 声)で
 時間差をつけて重ね、聖堂風の残響とオルガン風ドローン(F・B♭・E♭・C♯)を
 足して 1 本のレクイエムに作り換え、MP4(H.264 + AAC, ビジュアライザ付き)
-として書き出します。
+として書き出します。ドローンの音も録音の解析(主題の調 = F 短調)から取ります。
 
 使い方:
-    python3 requiem_mix/make_mix.py --src <録音フォルダ> --out requiem_mix/output
+    python3 requiem_mix/make_mix.py                       # source/ の録音から output/ へ
+    python3 requiem_mix/make_mix.py --src <録音フォルダ>  # 別の場所の録音を使う
 
 必要なもの: ffmpeg(rubberband フィルタ入り)・numpy・scipy
 """
@@ -41,8 +42,9 @@ FUGA = {  # 音数が多く・明るい(スペクトル重心 ≈ 1000–1500 Hz
     "Z": "20260925_125053",  # 長い、G / D 系
 }
 
-# ドローン(octave74.tex の「バッハのフーガ … 音階は、B♭とE♭とC♯である」から)
-DRONE_NOTES = {"F2": 87.31, "Bb2": 116.54, "Eb3": 155.56, "Db3": 138.59}
+# ドローン — 録音の解析から: 主題(requiem B)は F 短調、導入(requiem A)は F / B♭。
+#   F 短調の主音 F・属音 C・下属音 B♭・第 3 音 A♭・第 7 音 E♭ を楽章ごとに使う。
+DRONE_NOTES = {"F2": 87.31, "Ab2": 103.83, "Bb2": 116.54, "C3": 130.81, "Eb3": 155.56}
 
 
 # ---------------------------------------------------------------- 低レベル
@@ -183,7 +185,7 @@ def build(src_dir, cache):
     m.place(subj, 50, gain_db=-1, pan=0.0, send_db=-12)
     m.place(ans, 58, gain_db=-7, pan=-0.6, send_db=-11)
     m.place(bass, 66, gain_db=-5, pan=+0.6, send_db=-13)
-    m.place(drone([DRONE_NOTES["F2"]], 80, -26, attack=12, release=12), 50, send_db=-9)
+    m.place(drone([DRONE_NOTES["F2"], DRONE_NOTES["C3"]], 80, -26, attack=12, release=12), 50, send_db=-9)
 
     # III. Dies irae (120–186): fuga 側 X・Y を近い間隔で重ね(ストレッタ)、
     #   requiem C を下支えに。X はテンポを 1.08 倍に。
@@ -195,18 +197,18 @@ def build(src_dir, cache):
     m.place(c, 120, gain_db=-7, pan=0.0, send_db=-10)
 
     # IV. Lacrimosa (184–242): requiem A を 0.85 倍に引き延ばし、深い残響 +
-    #   E♭・C♯ のドローン(B♭・E♭・C♯ の音階)
+    #   F 短調の主和音 F・A♭ と第 7 音 E♭ のドローン
     lac = fade(clip(S["A"], 150, 55, cache, tempo=0.85), 5, 7)  # ≈ 64.7 秒
     m.place(lac, 182, gain_db=-2, pan=0.0, send_db=-5)
-    m.place(drone([DRONE_NOTES["Eb3"], DRONE_NOTES["Db3"], DRONE_NOTES["Bb2"]], 66, -24, 10, 12), 182, send_db=-8)
+    m.place(drone([DRONE_NOTES["F2"], DRONE_NOTES["Ab2"], DRONE_NOTES["Eb3"]], 66, -24, 10, 12), 182, send_db=-8)
 
     # V. Lux aeterna (242–296): fuga Z の明るい高声(+12)を遠くに、requiem B の
-    #   冒頭を 0.8 倍で下に敷き、ドローン F で閉じる
+    #   冒頭を 0.8 倍で下に敷き、ドローン F・C で閉じる
     lux_hi = fade(hp(clip(S["Z"], 240, 24, cache, semitones=+12), 600), 6, 8)  # 24 秒
     lux_lo = fade(clip(S["B"], 30, 42, cache, tempo=0.8), 6, 14)  # ≈ 52.5 秒
     m.place(lux_hi, 238, gain_db=-14, pan=+0.5, send_db=-6)
     m.place(lux_lo, 238, gain_db=-3, pan=0.0, send_db=-6)
-    m.place(drone([DRONE_NOTES["F2"], DRONE_NOTES["Bb2"]], 56, -22, 10, 16), 238, send_db=-8)
+    m.place(drone([DRONE_NOTES["F2"], DRONE_NOTES["C3"]], 56, -22, 10, 16), 238, send_db=-8)
     return m.render()
 
 
@@ -239,8 +241,9 @@ def write_video(master_wav, out_mp4, font):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--src", required=True, help="提出された録音(*.mp3)のフォルダ")
-    ap.add_argument("--out", default="requiem_mix/output", help="出力フォルダ")
+    here = os.path.dirname(os.path.abspath(__file__))
+    ap.add_argument("--src", default=os.path.join(here, "source"), help="提出された録音(*.mp3)のフォルダ")
+    ap.add_argument("--out", default=os.path.join(here, "output"), help="出力フォルダ")
     ap.add_argument("--cache", default=None, help="切り出し済み素材のキャッシュ(既定: <out>/cache)")
     ap.add_argument("--font", default="/usr/share/fonts/truetype/fonts-japanese-gothic.ttf")
     ap.add_argument("--name", default="requiem_fuga_mix")
