@@ -125,6 +125,16 @@
 
 ---
 
+## 🕯 ダウンロード — Requiem(提出された録音から生成したレクイエム / MP4)
+
+**提出された 4 本の録音を素材に、レクイエム (死者のためのミサ曲) を 1 曲生成した MP4 動画。** ヘ短調、約 9 分 12 秒。典礼文の 5 楽章 — **Introitus**(ドローンと風と鐘)/ **Kyrie**(録音を引き延ばした 4 声のカノン)/ **Dies irae**(歪みとゲートの刻み、三全音の鐘)/ **Lacrimosa**(嘆きのテトラコルド F–E♭–D♭–C の下降、逆再生リバーブ)/ **Lux aeterna**(グラニュラー・フリーズの「合唱」、ピカルディの三度で光へ)。生成は Python スクリプト(numpy / scipy / ffmpeg)で、Krumhansl 調性推定 → 移調 → フェーズボコーダ / 畳み込みリバーブ / グラニュラー合成 → `showcqt` の映像と楽章タイトルを重ねて H.264 + AAC に符号化。同じ入力からは同じ曲が出来る。
+
+### 👉 [**requiem/requiem.mp4 をダウンロード**](requiem/requiem.mp4)
+
+上のリンクを開き **「Download raw file」(⬇ アイコン)** で保存。楽章ごとの解説・生成スクリプトの使い方は [`requiem/`](requiem/) を参照。
+
+---
+
 ## ⛩ ダウンロード — BadaGPT道場(ChatGPTの技を伝授する技術伝授アプリ)
 
 **ChatGPT が「応答し、アプリケーションを作る」ときに試行している技を、量子プログラミング言語 Bada の上でユーザーに伝授するアプリケーション。** BadaGPT は応答のたびに自分のパイプライン(**トークン化 → 意図解析 → 計画 → 生成 → 検証 → 応答**)を開示し、道場カリキュラムで七つの技(トークン化 / 自己注意 self-attention / 次トークン予測 / 意図解析 / 計画と生成=アプリ錬成 / 検証と自己修正 / 量子 Bada)をひとつずつ稽古 → 印可 → **免許皆伝**。日本語の依頼文からアプリを錬成する **🛠 アプリ錬成**(Bada on Rails scaffold / GUI / 量子デモ)、本物の self-attention 順伝播、量子 Bada 実行系(qubit / H / X / Z / CNOT / measure)を搭載。依存ゼロ・単一 HTML・オフライン動作。
@@ -259,6 +269,7 @@ APK / EXE / AppImage 版にもそのまま同梱されます(同じ `www/index.h
 | **`laevateinn/`** | **Laevateinn** — 自動走行アシスタントAI「アル」 · トランスフォーマー知覚(16レイ attention) · 衛星不使用のWeb地図測位(AEAD検証タイル+推測航法+ランドマーク補正)/人工衛星測位(最小二乗) · A* 経路計画 · APK/EXE/AppImage 配布 | [→ 開く](laevateinn/) |
 | **`mimir/`** | 🕶 **Mimir** — ARグラス・コンシェルジュ(集大成) · 特殊相対論の光路差反射システム(γ · 相対論的ドップラー · 光行差 · Δ=2nd·cosθt · 干渉輝度補正) · 単眼ミラー/両眼 SBS 投影 · 画像・文章の HUD 投影 · 意図エンジン「ミーミル」 · APK/EXE/AppImage 配布 | [→ 開く](mimir/) |
 | **`badaos-iso/`** | **Bada VM Pro OS** — 起動可能 ISO(Ubuntu 22.04 ベース) · w9wm 既定セッション · Bada アプリ プリインストール · Calamares で実ディスクへインストール · NAT/DHCP で apt · 自リポジトリの apt リポジトリ対応 · Rufus で USB ブート | [→ 開く](badaos-iso/) |
+| **`requiem/`** | 🕯 **Requiem** — 提出された録音から生成したレクイエム (MP4, ヘ短調, 5 楽章) · Krumhansl 調性推定 · フェーズボコーダ · 畳み込みリバーブ · グラニュラー合成 · `make_requiem.py` で再生成可能 | [→ 開く](requiem/) |
 
 ---
 
