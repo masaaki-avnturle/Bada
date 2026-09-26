@@ -1048,6 +1048,30 @@ XXXII (重低音のシンセと実音のピアノ) をもとに、**「千代に
 python3 compose_tablet33.py bank17.json score_tablet33.json && python3 synth.py score_tablet33.json tablet33.wav && python3 video.py score_tablet33.json tablet33.wav tablet33.mp4
 ```
 
+## 🎌⛪ Requiem BADA — Tablet Sessions XXXIV · Inno (君が代をレクイエムと讃美歌の哀しみのフーガで, 変ロ短調, ♩=50, 約 5 分 40 秒)
+
+XXXIII から高音のシンセを消し、君が代を**讃美歌 (コラール) の哀しみ**と**フーガ**で、提出された録音を使って作り換えた。
+
+- **讃美歌** — 各句を 4 声のコラール (等しい音価) に。掛留 (`compose_tablet24.suspend`) が強拍で擦れて次の拍でほどけ、句の終わりは iv → i のアーメン終止 (`amen`)
+- **フーガ** — 第 1 句のバッハ風フーガ (`bach_fugue`)、第 2 句「千代に八千代に」と 9/23 08:06 の主題との二重フーガ
+- **提出された録音** — 9/23 08:06 と 9/24 11:18 の実音の抜粋 (元から変ロ短調、移調なし) を Introitus と Interludium に、Coda は 08:06 の本当の終わり
+- 音は録音から切り出したピアノの実音、重低音のサブベース (控えめ)、弔鐘。太鼓はやわらかく
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 08:06 の実音 |
+| Inno I | 讃美歌「君が代は」「千代に八千代に」 |
+| Fuga I | 「君が代は」のバッハ風フーガ |
+| Interludium | 11:18 の実音 |
+| Inno II | 讃美歌「さざれ石の」「巌となりて」(ナポリの C♭)「苔のむすまで」 |
+| Fuga II | 二重フーガ 〈千代に八千代に · 08:06 の主題〉 |
+| Finale | 全旋律の讃美歌 + 「君が代は」のストレッタ → ユニゾンの B♭、アーメン |
+| Coda | 08:06 の本当の終わり |
+
+```bash
+python3 compose_tablet34.py bank17.json score_tablet34.json && python3 synth.py score_tablet34.json tablet34.wav && python3 video.py score_tablet34.json tablet34.wav tablet34.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
