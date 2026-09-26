@@ -1035,6 +1035,19 @@ python3 compose_tablet31.py bank17.json score_tablet31.json && python3 synth.py 
 python3 compose_tablet32.py bank17.json score_tablet32.json && python3 synth.py score_tablet32.json tablet32.wav && python3 video.py score_tablet32.json tablet32.wav tablet32.mp4
 ```
 
+## 🎌✨ Requiem BADA — Tablet Sessions XXXIII · Chiyo ni yachiyo ni (「千代に八千代に」の哀しみのレクイエム, 変ロ短調, ♩=50, 約 6 分)
+
+XXXII (重低音のシンセと実音のピアノ) をもとに、**「千代に八千代に」(第 2 句) を中心の旋律**にし、**高音をきれいな響きのシンセでばら撒いた**。
+
+- **千代に八千代に** — コラール (Requiem I)、バッハ風フーガ (Fuga I)、提出された録音 9/23 08:06 (元から変ロ短調) の主題との二重フーガ (Fuga II)、
+  「怒りの日」との二重フーガ (Fuga III)、Finale では全旋律の下で A・T・B にストレッタで重なる
+- **高音のシンセ** — ガラスのような正弦波 (`synth.py` の `glass_tone`、`GL`) を各小節に 2〜4 粒、和音の構成音を C6〜E7 に散らす (`GLB`)。「千代に八千代に」の旋律には 1 オクターヴ上で寄り添う
+- 重低音のサブベース、弔鐘、葬送の太鼓は XXXII のまま
+
+```bash
+python3 compose_tablet33.py bank17.json score_tablet33.json && python3 synth.py score_tablet33.json tablet33.wav && python3 video.py score_tablet33.json tablet33.wav tablet33.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
