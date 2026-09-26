@@ -193,7 +193,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [SYN], 'piano_decay': 1.5, 'src_name': {SYN: 'シンセの実音'},
     'title': 'Requiem BADA — Tablet Sessions XXXVII · Wohltemperiert',
-    'subtitle': '10 本の録音を平均律のように 5 組の前奏曲とフーガで — シンセの分散和音が洗脳的に刻み、Contrapunctus XIV の三重フーガへ (♩=60)',
+    'subtitle': '10 本の録音を平均律のように 5 組の前奏曲とフーガで — シンセの分散和音が洗脳的に刻み、Contrapunctus XIV へ (♩=60)',
     'legend': ['TB', 'SP', 'SUB', 'PK'], 'vname': {'SP': 'シンセの分散和音', 'SUB': '重低音', 'PK': '鼓動'},
     'footer': ['前奏曲とフーガ ×5 (ホ短調 → 変ロ短調 → ヘ短調 → ロ短調 → ホ短調) → Contrapunctus XIV (ニ短調, 三重フーガ → 途切れる) → Choral (変ロ短調) → Coda 08:06',
                '前奏曲 = 録音の実音 + シンセの実音 (11:21・12:46) の分散和音 (平均律 I-1 の型) + サブベース。フーガ = 録音から切り出したピアノの実音。弔鐘、鼓動、掛留のコラール。'],
