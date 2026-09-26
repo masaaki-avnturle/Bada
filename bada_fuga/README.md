@@ -1089,6 +1089,26 @@ python3 build_sampler.py bank22 20260922_090933.mp3 20260922_090146.mp3      # b
 python3 compose_tablet35.py bank35.json score_tablet35.json && python3 synth.py score_tablet35.json tablet35.wav && python3 video.py score_tablet35.json tablet35.wav tablet35.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions XXXVI · Contrapunctus XIV ramo (9/23 の 2 本から、バッハのレクイエムでありながら Contrapunctus XIV の分派, ♩=56, 約 5 分 50 秒)
+
+2026-09-23 の 2 本の録音 — 08:06 (変ロ短調) と 08:09 (ホ短調) — だけから。それぞれの主題を『フーガの技法』Contrapunctus XIV の形で。
+
+| 区間 | 内容 |
+|---|---|
+| Introitus | 08:09 の実音 (ホ短調のまま)、弔鐘、鼓動 |
+| Sectio I (ホ短調) | 第 1 主題 = 08:09 の主題: 4 声の提示 → 反行形 → 低音の拡大形 |
+| Interludium | 08:06 の実音 (変ロ短調のまま) |
+| Sectio II (変ロ短調) | 第 2 主題 = 08:06 の主題: 4 声の提示 → 第 1 主題との二重フーガ |
+| Sectio III (ニ短調) | B-A-D-A (B-A-C-H の代わり) の提示 → 三重フーガ ×2 → 2 度目の途中で楽譜が途切れる |
+| Choral (変ロ短調) | バッハのレクイエム (葬送カンタータ) のように、途切れたあとに 4 声のコラール: 08:06 の主題を 2 倍の長さで、掛留、iv → i のアーメン |
+| Coda | 08:06 の本当の終わり (実音) |
+
+音はすべて 2 本の録音から切り出したピアノの 1 音と実音の抜粋、弔鐘 (低い打鍵)、鼓動。掛留は `compose_tablet24.suspend`。
+
+```bash
+python3 compose_tablet36.py bank17.json score_tablet36.json && python3 synth.py score_tablet36.json tablet36.wav && python3 video.py score_tablet36.json tablet36.wav tablet36.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
