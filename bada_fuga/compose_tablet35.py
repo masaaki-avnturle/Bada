@@ -191,12 +191,13 @@ def build():
     P.section(b, 'Prologo — Contrabbasso solo', 'BADA 528 Acceptance の冒頭のように: コントラバスの独奏、タンプーラの B♭–F が遠くで鳴る')
     for v in VOICES: P.rest_bars(v, b, b + 3)
     P.set_harms(b, [['Dm'], ['Dm'], ['Dm', 'Dm', 'F', 'C']])
-    for bar, beat, d, name, g in ((0, 0, 4, 'D1', .62), (1, 0, 2, 'A1', .56), (1, 2, 2, 'D2', .58), (2, 0, 2, 'F2', .6), (2, 2, 1, 'E2', .54), (2, 3, 1, 'C2', .5)):
+    for bar, beat, d, name, g in ((0, 0, 4, 'D1', .3), (1, 0, 2, 'A1', .27), (1, 2, 2, 'D2', .28), (2, 0, 2, 'F2', .29), (2, 2, 1, 'E2', .26), (2, 3, 1, 'C2', .24)):
         add('CB', (b + bar) * BPB + beat, d + 0.1, n(name), g, 'Contrabbasso solo' if bar == 0 else None)
     TAN.append((b + 1, b + 3, 0.09)); DRUM.append((b, b + 3))
+    for k in range(3): SUBG[k] = 0.03
     T2.MANTRA.append((b, b + 3, B1, ('PK',))); CT.LAYOUT.append((b, b + 3, SEMIS, VOICE_SRC, {})); b += 3
     # ---------------- Introitus — 08:06
-    P.section(b, 'Introitus — 9/23 %s の実音 (変ロ短調)' % hm(B1), '提出された録音をそのまま — コントラバスとタンプーラが寄り添う')
+    P.section(b, 'Introitus — %s の実音 (変ロ短調)' % hm(B1), '提出された録音をそのまま — コントラバスとタンプーラが寄り添う')
     b += requiem(P, b, B1, 6, pad=0.0); TAN.append((b - 6, b, 0.08)); BELL.append((b - 6, b, 0.1, B1))
     for k in range(b - 6, b): SUBG[k] = 0.05
     # ---------------- Inno I
@@ -223,27 +224,27 @@ def build():
     P.set_harms(f, H_T); P.place('S', f, THEME_T, 0, 'T (タブレットの主題)'); P.place('B', f, BASS_T, 0, None)
     P.set_harms(f + 8, H_T2); P.place('S', f + 8, THEME_T, 0, 'T (バンスリと弦)'); P.place('B', f + 8, BASS_T2, 0, None)
     for k in range(16): P.dyn[f + k] = 1.0 + 0.02 * k if k < 8 else 1.2; P.tempo[f + k] = 50; SUBG[f + k] = 0.04
-    STR.append((f, f + 16, 0.16)); VOX1.append((f, f + 16, 0.14)); BNS.append((f + 8, f + 16, 0.28)); DRUM.append((f, f + 16))
+    STR.append((f, f + 16, 0.1)); VOX1.append((f, f + 16, 0.09)); BNS.append((f + 8, f + 16, 0.2)); DRUM.append((f, f + 16))
     for bar in range(f, f + 16):                                                            # ピアノの分散和音 (8 分音符)
         for half in (0, 2):
             c = chord(P.harm[bar * BPB + half]); tones = [m for m in range(62, 86) if m % 12 in c['pcs']]
-            for i_, m in enumerate(tones[:4]): add('PF', bar * BPB + half + i_ * 0.5, 1.2, m, 0.16 * P.dyn[bar], None, rid=T1, rel=1.2)
+            for i_, m in enumerate(tones[:4]): add('PF', bar * BPB + half + i_ * 0.5, 1.2, m, 0.1 * P.dyn[bar], None, rid=T1, rel=1.2)
     T2.MANTRA.append((f, f + 16, T1, ('PK',))); CT.LAYOUT.append((f, f + 16, 2, VS9, {})); b = f + 16
     # ---------------- Tablet — 090146 の実音 (ホ短調)
-    P.section(b, 'Tablet — 9/22 %s の実音 (ホ短調)' % hm(T1), '提出された録音をそのまま (ホ短調) — コントラバスとタンプーラが寄り添い、変ロ短調へ戻る')
+    P.section(b, 'Tablet — %s の実音 (ホ短調)' % hm(T1), '提出された録音をそのまま (ホ短調) — コントラバスとタンプーラが寄り添い、変ロ短調へ戻る')
     T5.passage(P, T1, b, 8, 2, 8, fin=1.5, fout=3.0, bpm=BPM, gmul=0.6)
     for v in VOICES: P.rest_bars(v, b, b + 8)
     for k in range(8): P.dyn[b + k] = 0.5; P.tempo[b + k] = 54; SUBG[b + k] = 0
     TAN.append((b, b + 8, 0.08)); DRUM.append((b, b + 8))
-    add('CB', b * BPB, 8 * BPB, 26, 0.35, None)
+    add('CB', b * BPB, 8 * BPB, 26, 0.2, None)
     T2.MANTRA.append((b, b + 8, T1, ('PK',))); CT.LAYOUT.append((b, b + 8, 2, {v: T1 for v in VOICES}, {})); b += 8
     # ---------------- Interludium — 11:18 (変ロ短調)
-    P.section(b, 'Interludium — 9/24 %s の実音 (変ロ短調)' % hm(B2), '提出された録音をそのまま — 弔鐘とサブベース')
+    P.section(b, 'Interludium — %s の実音 (変ロ短調)' % hm(B2), '提出された録音をそのまま — 弔鐘とサブベース')
     b += requiem(P, b, B2, 6, pad=0.0); BELL.append((b - 6, b, 0.09, B2))
     for k in range(b - 6, b): SUBG[k] = 0.05
     # ---------------- Fuga II
     f = b; E = []
-    P.section(b, 'Fuga II — 二重フーガ 〈千代に八千代に · 9/23 %s の主題〉' % hm(B1), '提出された録音の主題と「千代に八千代に」が交互に入り、ストレッタで重なる — 弦が満ちる')
+    P.section(b, 'Fuga II — 二重フーガ 〈千代に八千代に · %s の主題〉' % hm(B1), '提出された録音の主題と「千代に八千代に」が交互に入り、ストレッタで重なる — 弦が満ちる')
     for k, (v, r, lab) in enumerate((('A', 'CHIYO', '主題 ② (千代に)'), ('S', B1, '主題 ④ (08:06)'), ('T', 'CHIYO', '主題 ② (千代に)'), ('B', B1, '主題 ④ (08:06)'))):
         entry(P, f + 2 * k, v, T5.SUBJ[r][0], 0, lab, E, synth=0)
     for v, z in {'S': 2, 'T': 4, 'B': 6}.items(): P.rest_bars(v, f, f + z)
@@ -268,16 +269,16 @@ def build():
     amen(P, f + t - 1)
     P.hold.update({f + 10, f + 11})
     for k in range(12): P.dyn[f + k] = 1.3; SUBG[f + k] = 0.06
-    STR.append((f, f + 12, 0.17)); VOX1.append((f, f + t + 1, 0.13)); BNS.append((f + 2, f + 4, 0.26)); BELL.append((f, f + t + 1, 0.11, B1))
+    STR.append((f, f + 12, 0.11)); VOX1.append((f, f + t + 1, 0.08)); BNS.append((f + 2, f + 4, 0.2)); BELL.append((f, f + t + 1, 0.11, B1))
     T2.MANTRA.append((f, f + 12, B1, ('PK',))); CT.LAYOUT.append((f, f + 12, SEMIS, VOICE_SRC, {})); b = f + 12
     # ---------------- Coda
-    P.section(b, 'Coda — 9/23 %s の本当の終わり' % hm(B1), '08:06 の最後 → ユニゾンの B♭、コントラバスとタンプーラが消える')
+    P.section(b, 'Coda — %s の本当の終わり' % hm(B1), '08:06 の最後 → ユニゾンの B♭、コントラバスとタンプーラが消える')
     b += requiem(P, b, B1, 5, t0=end_b1, fin=1.0, fout=2.5, gmul=0.65, pad=0.0)
     for k in range(b - 5, b): SUBG[k] = 0.04
     P.set_harms(b, [['Dm']] * 3)
     for v in VOICES: P.rest_bars(v, b, b + 3)
     for k in range(3): SUBG[b + k] = 0
-    DRUM.append((b, b + 3)); TAN.append((b, b + 3, 0.07)); add('CB', b * BPB, 12, 26, 0.45, None)
+    DRUM.append((b, b + 3)); TAN.append((b, b + 3, 0.07)); add('CB', b * BPB, 12, 26, 0.25, None)
     for m, v, g in ((50, 'VC', .12), (57, 'VA', .1), (65, 'V2', .08), (69, 'V1', .07)): add(v, b * BPB, 12, m, g, None)
     T2.MANTRA.append((b, b + 3, B1, ('PK',))); CT.LAYOUT.append((b, b + 3, SEMIS, VOICE_SRC, {})); b += 3
     assert b == total, (b, total)
@@ -286,7 +287,7 @@ def build():
 META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [T1, T2R], 'piano_decay': 2.2,
     'title': 'Requiem BADA — Tablet Sessions XXXV · Acceptance',
-    'subtitle': 'BADA 528 Acceptance (哀愁の弦、コントラバス、タンプーラ、バンスリ、主題 T) と、君が代のレクイエム・讃美歌・フーガの融合 (♩=54)',
+    'subtitle': 'BADA 528 Acceptance (哀愁の弦、コントラバス、タンプーラ、バンスリ、主題 T) と君が代のレクイエム・讃美歌・フーガの融合',
     'legend': ['TB', 'V1', 'CB', 'TA', 'BN', 'SUB', 'PK'], 'vname': {'V1': '弦', 'SUB': '重低音', 'PK': '太鼓'},
     'footer': ['Prologo (Cb) → Introitus 08:06 → Inno I → Fuga I → Acceptance (主題 T, ホ短調) → Tablet 9/22 090146 → Interludium 11:18 → Fuga II → Finale → Coda 08:06',
                '旋律: 君が代 (林廣守)、9/22 090146 の主題 T、9/23 08:06 の主題。音は 9/22〜9/24 の録音の実音とピアノの実音、弦・コントラバス・タンプーラ・バンスリ、サブベース。'],
