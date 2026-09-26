@@ -118,7 +118,7 @@
     <button id="btnImportRaw">🧱 生 PCM として読み込む (デコードできない拡張子)</button>
     <input type="file" id="fileRaw">
     <button id="btnRecMic">🎙 マイク録音</button>
-    <span class="hint">mp3 は音声トラック、mp4 は映像トラック (音声も自動で取り出す) に置いて編集できます: 移動・切り詰め・分割・複製・削除、音量、フェード、速さ、ミュート。読み込んだ音源は下の一覧へ。「＋タイムラインへ」で編集トラックに置く。「🎹 楽器に」でその音を作曲の楽器 (サンプラー) にする。</span>
+    <span class="hint">「🎼 json に変換」で mp3 / mp4 の音を採譜して楽譜 (score.json) にし、そのまま「📜 楽譜」で編集・保存できます。mp3 は音声トラック、mp4 は映像トラック (音声も自動で取り出す) に置いて編集できます: 移動・切り詰め・分割・複製・削除、音量、フェード、速さ、ミュート。読み込んだ音源は下の一覧へ。「＋タイムラインへ」で編集トラックに置く。「🎹 楽器に」でその音を作曲の楽器 (サンプラー) にする。</span>
   </div>
   <div class="list" id="srcList"></div>
 </div>
@@ -225,6 +225,7 @@
     <b>2. タイムライン (編集)</b> — 上から 映像 / 作曲 / 楽譜 / 音声トラック。クリップをドラッグで移動、両端をドラッグで切り詰め、✂ で再生位置で分割、⧉ 複製、🗑 削除。数値欄で開始・元の位置・長さ・音量・フェードイン / アウト・速さ (0.5〜2 倍)・ミュート。「このクリップを WAV に」で編集したクリップだけを書き出し。ルーラーをタップして再生位置、ループ再生。<br>
     <b>3. 作曲</b> — 🎲 自動作曲で、調とテンポからコード進行 (機能和声)、主題、フーガの入り、オーケストラの行を作ります。対位法エンジン (bada_fuga/compose.py の移植) が 4 声を書き、行の和音で管弦楽が支えます。主題は手で書けます。読み込んだ音源をサンプラー楽器として使えます。<br>
     <b>4. コード進行 (オーケストラ)</b> — 主進行 + 弦 5 部・木管・金管・ティンパニなど 5 行以上の表。行ごとに違う和音を書けば多層の進行 (複和音) になります。<br>
+    <b>4b. mp3 / mp4 → json</b> — 「音源・映像」の「🎼 json に変換」で、音を打鍵ごとに区切って強い倍音の山を音にし (最大 4 声)、4 秒ごとの和音をクロマから求めて score.json (拡張子 .json) に保存します。同時に「📜 楽譜」に読み込まれるので、そのまま編曲できます。元の音は実音の抜粋 (REC) として一緒に鳴ります。<br>
     <b>5. 楽譜 (score.json)</b> — Requiem BADA の曲の score.json を読み込んで編曲: 移調、速さ、声部の楽器、シンセ・鼓動・抜粋の on/off、音符の移動・削除・追加。同じ録音を「音源・映像」で読み込んでおくと、実音の抜粋もその音で鳴ります。編集した楽譜は score.json に書き戻せます (Python 版 synth.py でそのまま高音質に)。<br>
     <b>6. 書き出し</b> — WAV / MIDI / 動画 / score.json / プロジェクト。
   </div>
@@ -747,6 +748,109 @@ function exportScoreJson() {
     bar_times: x.bar_times.map(function (t) { return +(t / rate).toFixed(4); }), notes: notes, entries: [],
     sections: x.sections.map(function (s) { var o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; }); if (typeof o.t === "number") o.t = +(o.t / rate).toFixed(4); return o; }),
     harm: x.harm.map(function (h) { return tr ? transposeChordName(h, tr) : h; }), meta: Object.assign({}, x.meta, { subtitle: (x.meta.subtitle || "") + " (BADA Studio で編曲)" }), extras: extras };
+}
+
+/* ================================================================ mp3 / mp4 → json (採譜): 打鍵で区切り、各区間の強い倍音の山を音にする */
+function fft(re, im) {
+  var n = re.length;
+  for (var i = 1, j = 0; i < n; i++) { var bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { var t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  for (var len = 2; len <= n; len <<= 1) {
+    var ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (var s0 = 0; s0 < n; s0 += len) {
+      var cr = 1, ci = 0;
+      for (var k = 0; k < len / 2; k++) {
+        var a = s0 + k, b = a + len / 2, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        var nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+var CHORD_T = (function () { var out = []; for (var r = 0; r < 12; r++) { out.push([NAMES[r], [r, (r + 4) % 12, (r + 7) % 12]]); out.push([NAMES[r] + "m", [r, (r + 3) % 12, (r + 7) % 12]]); } return out; })();
+function chordOfChroma(ch) {
+  var best = null, bs = -1e9;
+  CHORD_T.forEach(function (c) { var sc = 0; for (var p = 0; p < 12; p++) sc += ch[p] * (c[1].indexOf(p) >= 0 ? 1 : -0.5); if (sc > bs) { bs = sc; best = c[0]; } });
+  return best || "Dm";
+}
+function transcribe(x, sr, opt) {
+  opt = opt || {}; var N = 2048, hop = 1024, nf = Math.max(1, Math.floor((x.length - N) / hop)), win = new Float32Array(N);
+  for (var i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+  var re = new Float32Array(N), im = new Float32Array(N), mags = [], flux = new Float32Array(nf), prev = null, binHz = sr / N;
+  var lo = Math.floor(50 / binHz), hi = Math.min(N / 2, Math.ceil(2200 / binHz));
+  for (var f = 0; f < nf; f++) {
+    for (i = 0; i < N; i++) { re[i] = x[f * hop + i] * win[i]; im[i] = 0; }
+    fft(re, im);
+    var mg = new Float32Array(hi); var fl = 0;
+    for (i = lo; i < hi; i++) { mg[i] = Math.sqrt(re[i] * re[i] + im[i] * im[i]); if (prev) { var d = mg[i] - prev[i]; if (d > 0) fl += d; } }
+    mags.push(mg); flux[f] = fl; prev = mg;
+  }
+  /* 打鍵 (スペクトル・フラックスの山) */
+  var onsets = [0], thr = 0, mean = 0; for (f = 0; f < nf; f++) mean += flux[f]; mean /= nf;
+  var minGap = Math.max(1, Math.round((opt.minGap || 0.18) * sr / hop));
+  for (f = 2; f < nf - 2; f++) {
+    var w0 = Math.max(0, f - 8), loc = 0; for (i = w0; i < f; i++) loc += flux[i]; loc /= (f - w0) || 1;
+    thr = loc * 1.6 + mean * 0.5;
+    if (flux[f] > thr && flux[f] >= flux[f - 1] && flux[f] >= flux[f + 1] && flux[f] > flux[f - 2] && f - onsets[onsets.length - 1] >= minGap) onsets.push(f);
+  }
+  var segs = [], maxPeak = 0;
+  for (var k = 0; k < onsets.length; k++) {
+    var a = onsets[k], b = k + 1 < onsets.length ? onsets[k + 1] : nf, m1 = Math.min(b, a + Math.max(2, Math.floor((b - a) * 0.5)));
+    var avg = new Float32Array(hi); for (f = a; f < m1; f++) for (i = lo; i < hi; i++) avg[i] += mags[f][i]; for (i = lo; i < hi; i++) avg[i] /= (m1 - a) || 1;
+    var peaks = [];
+    for (i = lo + 1; i < hi - 1; i++) if (avg[i] > avg[i - 1] && avg[i] >= avg[i + 1]) { var den = avg[i - 1] - 2 * avg[i] + avg[i + 1], off = den ? 0.5 * (avg[i - 1] - avg[i + 1]) / den : 0; peaks.push([avg[i], (i + off) * binHz]); }
+    peaks.sort(function (p, q) { return q[0] - p[0] }); peaks = peaks.slice(0, 12);
+    var top = peaks.length ? peaks[0][0] : 0; maxPeak = Math.max(maxPeak, top);
+    var notes = [];
+    peaks.forEach(function (pk) {
+      if (pk[0] < top * 0.12) return;
+      var m = Math.round(69 + 12 * Math.log2(pk[1] / 440)); if (m < 24 || m > 100) return;
+      /* 倍音の抑制: 1/2, 1/3, 1/4 の高さに同じくらい強い山があれば倍音 */
+      var isHarm = peaks.some(function (q) { var r = pk[1] / q[1]; return q[0] >= pk[0] * 0.45 && [2, 3, 4, 5].some(function (h) { return Math.abs(r - h) < 0.04 * h; }); });
+      if (isHarm) return;
+      if (notes.some(function (n) { return n[0] === m; })) return;
+      notes.push([m, pk[0]]);
+    });
+    notes.sort(function (p, q) { return q[1] - p[1]; }); notes = notes.slice(0, 4);
+    var t0 = a * hop / sr, t1 = b * hop / sr;
+    if (notes.length && top > 0) segs.push({ t: +t0.toFixed(3), d: +Math.max(0.1, t1 - t0).toFixed(3), m: notes.map(function (n) { return n[0]; }).sort(function (p, q) { return p - q; }), amp: top });
+  }
+  segs = segs.filter(function (sg) { return sg.amp > maxPeak * 0.03; });
+  /* 小節 (♩=60, 4 秒) ごとの和音: クロマ */
+  var dur = x.length / sr, nb = Math.max(1, Math.ceil(dur / 4)), harm = [];
+  for (var bar = 0; bar < nb; bar++) {
+    var ch = new Float32Array(12);
+    segs.forEach(function (sg) { var ov = Math.min(bar * 4 + 4, sg.t + sg.d) - Math.max(bar * 4, sg.t); if (ov > 0) sg.m.forEach(function (m) { ch[m % 12] += ov; }); });
+    var c = chordOfChroma(ch); for (var q = 0; q < 4; q++) harm.push(c);
+  }
+  return { segs: segs, harm: harm, duration: dur };
+}
+function scoreFromTranscription(tr, name) {
+  var rid = String(name || "rec").replace(/\.[^.]+$/, ""), notes = [], nb = Math.max(1, Math.ceil(tr.duration / 4)), bt = [];
+  for (var i = 0; i <= nb; i++) bt.push(i * 4);
+  tr.segs.forEach(function (sg) {
+    var ms = sg.m.slice().sort(function (p, q) { return q - p; }), vs = ms.length === 1 ? ["S"] : (ms.length === 2 ? ["S", "B"] : (ms.length === 3 ? ["S", "A", "B"] : ["S", "A", "T", "B"]));
+    ms.forEach(function (m, k) { notes.push({ v: vs[k], t: sg.t, d: sg.d, m: m, label: null, beat: +(sg.t).toFixed(3), dyn: 1, det: 0.92, role: "tutti", src: rid }); });
+  });
+  return { bpm: 60, beats_per_bar: 4, nbars: nb, duration: +tr.duration.toFixed(3), bar_times: bt, notes: notes, entries: [],
+    sections: [{ t: 0, bar: 1, title: name || rid, sub: "mp3 / mp4 から BADA Studio が採譜" }], harm: tr.harm,
+    meta: { style: "recsampler", title: rid, subtitle: "mp3 / mp4 から変換 (BADA Studio)", footer: [], rec_order: [rid] },
+    extras: [{ v: "REC", t: 0, d: +tr.duration.toFixed(3), m: 0, gain: 0.5, src: name || rid, rid: rid, off: 0, fin: 0.5, fout: 1.0, beat: 0, dbeats: +tr.duration.toFixed(3) }] };
+}
+function convertSourceToJson(i) {
+  var src = S.sources[i]; if (!src) return;
+  setMsg("🎼 採譜中… " + src.name);
+  setTimeout(function () {
+    try {
+      var buf = src.buf, ch = buf.numberOfChannels, x = new Float32Array(buf.length), data = [];
+      for (var c = 0; c < ch; c++) data.push(buf.getChannelData(c));
+      for (var k = 0; k < buf.length; k++) { var v = 0; for (c = 0; c < ch; c++) v += data[c][k]; x[k] = v / ch; }
+      var tr = transcribe(x, buf.sampleRate), j = scoreFromTranscription(tr, src.name);
+      S.score = parseScore(j); S.nsel = {}; S.rx = 0; S.proj.scoreMute = {}; fillScorePanel(); changed(false);
+      saveBlob(new Blob([JSON.stringify(j)], { type: "application/json" }), sanitizeName(src.name.replace(/\.[^.]+$/, "")) + ".json", "application/json", "楽譜 (json)");
+      setMsg("✅ " + src.name + " を json に変換しました (" + tr.segs.length + " 打鍵, " + j.notes.length + " 音符)。「📜 楽譜」タブで編集できます", "ok");
+      document.querySelector(".tabs button[data-tab=score]").click();
+    } catch (e) { setMsg("変換できません: " + e.message, "err"); console.error(e); }
+  }, 30);
 }
 
 /* ================================================================ 書き出し (MIDI / WAV / score.json) */
@@ -1431,7 +1535,8 @@ function renderSources() {
     var b2 = mkBtn("🎹 楽器に (サンプラー)", function () { S.proj.smp = i; S.proj.style = "sampler"; $("pStyle").value = "sampler"; fillSmp(); changed(true); setMsg("✅ 4 声を " + s.name + " の音で鳴らします", "ok"); });
     var b3 = mkBtn("▶", function () { var ctx = ensureCtx(), bs = ctx.createBufferSource(); bs.buffer = s.buf; bs.connect(ctx.destination); bs.start(0, 0, Math.min(6, s.buf.duration)); });
     var b4 = mkBtn("🗑", function () { S.sources.splice(i, 1); renderSources(); fillSmp(); drawAll(); });
-    [b3, b1, b2, b4].forEach(function (b) { b.className = "small"; it.appendChild(b); });
+    var b5 = mkBtn("🎼 json に変換 (採譜)", function () { convertSourceToJson(i); });
+    [b3, b1, b2, b5, b4].forEach(function (b) { b.className = "small"; it.appendChild(b); });
     box.appendChild(it);
   });
 }

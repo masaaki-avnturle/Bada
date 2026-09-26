@@ -125,5 +125,19 @@ const xo = E.exportScoreJson();
 ok(xo.bpm === 120 && xo.notes[0].m === 64 && xo.notes[1].t === 0.5 && xo.harm[0] === "Em" && xo.extras[0].m === 76 && xo.extras[1].m === 0, "score.json への書き戻し (速さ・移調を反映)");
 E.S.proj.scoreTr = 0; E.S.proj.scoreTempo = 100;
 
+console.log("7. mp3 / mp4 → json (採譜)");
+const sr = 22050, x = new Float32Array(sr * 2);
+for (let i = 0; i < sr; i++) x[i] = 0.5 * Math.sin(2 * Math.PI * 440 * i / sr) * Math.exp(-i / sr * 2);
+for (let i = sr; i < sr * 2; i++) { const k = i - sr; x[i] = (0.4 * Math.sin(2 * Math.PI * 220 * k / sr) + 0.35 * Math.sin(2 * Math.PI * 329.63 * k / sr)) * Math.exp(-k / sr * 2); }
+const tr = E.transcribe(x, sr);
+ok(tr.segs.length >= 2 && tr.segs.length <= 4, "打鍵の数 (2 つの区間): " + tr.segs.length);
+ok(tr.segs[0].m.indexOf(69) >= 0, "第 1 区間に A4 (69): " + JSON.stringify(tr.segs[0].m));
+const last = tr.segs[tr.segs.length - 1];
+ok(last.m.indexOf(57) >= 0 && last.m.indexOf(64) >= 0, "第 2 区間に A3 (57) と E4 (64): " + JSON.stringify(last.m));
+ok(tr.harm.length === 4 && /^[A-G]/.test(tr.harm[0]), "和音 (♩=60、4 拍): " + tr.harm[0]);
+const sj2 = E.scoreFromTranscription(tr, "20260923_080607.mp3");
+ok(sj2.notes.length >= 3 && sj2.extras[0].v === "REC" && sj2.extras[0].rid === "20260923_080607" && sj2.bar_times.length === 2, "score.json の形 (音符・REC・小節)");
+const X2 = E.parseScore(sj2); ok(X2.notes.length === sj2.notes.length && X2.kinds.REC === 1, "変換した json は楽譜として読める");
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);
