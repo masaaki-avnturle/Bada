@@ -103,5 +103,27 @@ eq(E.S.proj.clips.map(c => [c.start, c.off, c.dur]), [[1.5, 0, 2.5], [4, 2.5, 7.
 ok(Math.abs(E.totalDur() - Math.max(11.5, R.dur)) < 1e-9, "全体の長さ (クリップと作曲の長い方)");
 ok(E.activeVideoClip(2) === null, "映像トラックにクリップがなければ null");
 
+console.log("6. 楽譜 (score.json)");
+const sj = { bpm: 60, duration: 8, bar_times: [0, 4, 8], notes: [{ v: "S", t: 0, d: 1, m: 62, label: "主題", beat: 0, src: "20260923_080607" }, { v: "B", t: 1, d: 2, m: 50, label: null, beat: 1 }, { v: "Q", t: 2, d: 0, m: 64.4 }],
+             extras: [{ v: "SP", t: 0, d: 4, m: 74, gain: 0.1, rid: "VOXSY" }, { v: "REC", t: 4, d: 4, m: 0, gain: 0.5, src: "/x/20260923_080607.wav", off: 12.5, rid: "20260923_080607", fin: 1, fout: 2 }, { v: "TB", t: 4, d: 1, m: 70, gain: 0 }],
+             harm: ["Dm", "Dm", "Gm", "A7"], sections: [{ t: 0, bar: 1, title: "Intro" }], meta: { title: "T" } };
+const X = E.parseScore(sj);
+eq([X.notes.length, X.notes[2].v, X.notes[2].m, X.notes[2].d], [3, "S", 64, 0.5], "音符の正規化 (声部・音高・長さ)");
+eq(Object.keys(X.kinds).sort(), ["REC", "SP", "TB"], "追加の種類");
+ok(X.duration === 8 && X.bpm === 60, "長さと速さ");
+ok(() => { try { E.parseScore({}); return false; } catch (e) { return true; } }, "notes がなければエラー");
+E.S.proj = E.blankProject(4); E.S.score = X; E.S.sources = [{ name: "a-20260923_080607.mp3", buf: { duration: 100 }, peaks: new Float32Array(10), base: 60 }];
+E.S.proj.scoreTr = 2; E.S.proj.scoreTempo = 200; E.S.proj.scoreStart = 10;
+const ev = E.scoreEvents();
+ok(ev.length === 4 && ev.every(e => e.i in E.INST), "再生用の音符 (4 声 + SP、TB と REC は除く)");
+ok(Math.abs(ev[0].t - 10) < 1e-9 && ev[0].m === 64 && Math.abs(ev[1].t - 10.5) < 1e-9, "開始位置・移調・速さ (200% で半分の時間)");
+const rc = E.scoreRecClips();
+ok(rc.length === 1 && rc[0].src && Math.abs(rc[0].clip.start - 12) < 1e-9 && rc[0].clip.off === 12.5 && Math.abs(rc[0].clip.dur - 2) < 1e-9, "実音の抜粋を録音の日時でファイルに結びつける");
+E.S.sources = []; ok(E.scoreRecClips()[0].missing === "20260923_080607", "録音がなければ missing");
+ok(Math.abs(E.scoreEnd() - 14) < 1e-9, "楽譜の終わり (開始 10 + 8/2)");
+const xo = E.exportScoreJson();
+ok(xo.bpm === 120 && xo.notes[0].m === 64 && xo.notes[1].t === 0.5 && xo.harm[0] === "Em" && xo.extras[0].m === 76 && xo.extras[1].m === 0, "score.json への書き戻し (速さ・移調を反映)");
+E.S.proj.scoreTr = 0; E.S.proj.scoreTempo = 100;
+
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

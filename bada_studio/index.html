@@ -99,6 +99,7 @@
   <button data-tab="src" class="on">🎧 音源・映像</button>
   <button data-tab="comp">🎼 作曲</button>
   <button data-tab="prog">🎻 コード進行 (オーケストラ)</button>
+  <button data-tab="score">📜 楽譜 (score.json を編集)</button>
   <button data-tab="out">💾 書き出し</button>
   <button data-tab="help">❓ 使い方</button>
 </div>
@@ -164,6 +165,39 @@
   <div id="progWrap"></div>
 </div>
 
+<div class="panel" id="tab-score">
+  <div class="row" style="padding:0 0 6px">
+    <button id="btnScoreIn" class="primary">📂 楽譜 (score.json) を読み込む</button>
+    <input type="file" id="scoreIn" accept=".json,application/json">
+    <button id="btnScoreOut">💾 編集した楽譜を score.json に書き出す</button>
+    <button id="btnScoreClear">🗑 楽譜を消す</button>
+    <span id="scoreInfo" class="hint">Requiem BADA の各曲の score.json (Python 版 compose_*.py の出力) を読み込むと、その曲の 4 声・シンセ・鼓動・実音の抜粋がタイムラインの「楽譜」トラックに載り、ここで編曲できます。</span>
+  </div>
+  <div class="grid">
+    <label class="f">開始位置 (タイムライン 秒)<input id="xStart" type="number" min="0" step="0.1" value="0"></label>
+    <label class="f">移調 (半音)<input id="xTr" type="number" min="-24" max="24" step="1" value="0"></label>
+    <label class="f">速さ (%)<input id="xTempo" type="number" min="25" max="300" step="5" value="100"></label>
+    <label class="f">音量<input id="xGain" type="number" min="0" max="3" step="0.1" value="1"></label>
+    <label class="f">S の楽器<select id="xiS"></select></label>
+    <label class="f">A の楽器<select id="xiA"></select></label>
+    <label class="f">T の楽器<select id="xiT"></select></label>
+    <label class="f">B の楽器<select id="xiB"></select></label>
+  </div>
+  <div class="row" style="padding:6px 0" id="xKinds"></div>
+  <div class="row" style="padding:0 0 4px">
+    <span class="hint">音符の編集: クリックで選択 (Shift で追加、空所をドラッグで範囲選択)、ドラッグで移動 (上下 = 音高、左右 = 時間)、空所をダブルクリックで追加。</span>
+    <label class="f">追加する声部<select id="nVoice"><option>S</option><option>A</option><option>T</option><option>B</option></select></label>
+    <button id="btnNDel" class="small">🗑 選択を削除</button>
+    <button id="btnNUp" class="small">♯ +1</button><button id="btnNDown" class="small">♭ −1</button>
+    <button id="btnNOctUp" class="small">+8va</button><button id="btnNOctDown" class="small">−8va</button>
+    <button id="btnNLonger" class="small">長く</button><button id="btnNShorter" class="small">短く</button>
+    <label class="f">ズーム <input type="range" id="rzoom" min="10" max="240" value="60" style="width:110px"></label>
+    <span id="nSel" class="hint"></span>
+  </div>
+  <canvas id="roll" width="1280" height="360" style="display:block;width:100%;height:360px;background:#07090e;touch-action:none"></canvas>
+  <div class="hint" style="margin-top:6px">実音の抜粋 (REC) は、「音源・映像」で同じ録音 (ファイル名に 20260923_080607 などの日時を含む mp3 / mp4) を読み込んであると、その音源から自動的に鳴ります。読み込んでいない録音の抜粋は鳴りません (一覧に ⚠ で表示)。</div>
+</div>
+
 <div class="panel" id="tab-out">
   <div class="row" style="padding:0">
     <button id="btnWav" class="primary">💾 WAV (ミックス全体)</button>
@@ -184,7 +218,8 @@
     <b>2. タイムライン</b> — 上から 映像 / 作曲 / 音声トラック。クリップをドラッグで移動、両端をドラッグで切り詰め、✂ で分割。数値欄で開始・元の位置・長さ・音量・フェード。ルーラーをタップして再生位置。<br>
     <b>3. 作曲</b> — 🎲 自動作曲で、調とテンポからコード進行 (機能和声)、主題、フーガの入り、オーケストラの行を作ります。対位法エンジン (bada_fuga/compose.py の移植) が 4 声を書き、行の和音で管弦楽が支えます。主題は手で書けます。読み込んだ音源をサンプラー楽器として使えます。<br>
     <b>4. コード進行 (オーケストラ)</b> — 主進行 + 弦 5 部・木管・金管・ティンパニなど 5 行以上の表。行ごとに違う和音を書けば多層の進行 (複和音) になります。<br>
-    <b>5. 書き出し</b> — WAV / MIDI / 動画 / score.json / プロジェクト。
+    <b>5. 楽譜 (score.json)</b> — Requiem BADA の曲の score.json を読み込んで編曲: 移調、速さ、声部の楽器、シンセ・鼓動・抜粋の on/off、音符の移動・削除・追加。同じ録音を「音源・映像」で読み込んでおくと、実音の抜粋もその音で鳴ります。編集した楽譜は score.json に書き戻せます (Python 版 synth.py でそのまま高音質に)。<br>
+    <b>6. 書き出し</b> — WAV / MIDI / 動画 / score.json / プロジェクト。
   </div>
 </div>
 
@@ -438,10 +473,11 @@ var INST = {
   fl:  { name:"Fl (フルート)", gm:73, ch:6, pan:-0.1 }, ob: { name:"Ob (オーボエ)", gm:68, ch:7, pan:0.1 }, cl: { name:"Cl (クラリネット)", gm:71, ch:8, pan:-0.05 },
   hn:  { name:"Hn (ホルン)", gm:60, ch:10, pan:0.3 }, tp: { name:"Tp (トランペット)", gm:56, ch:11, pan:0.35 }, tb: { name:"Tb (トロンボーン)", gm:57, ch:12, pan:0.45 },
   timp:{ name:"Timp (ティンパニ)", gm:47, ch:13, pan:0.2 },
-  smp: { name:"サンプラー (読み込んだ音源)", gm:0, ch:14, pan:0 }
+  smp: { name:"サンプラー (読み込んだ音源)", gm:0, ch:14, pan:0 },
+  syn: { name:"シンセ (持続音)", gm:89, ch:15, pan:0.1 }, sine: { name:"正弦波 (低音 / 高音)", gm:80, ch:9, pan:-0.1 }
 };
 var PY_CODE = { vn1:"V1", vn2:"V2", va:"VA", vc:"VC", cb:"CB", fl:"FL", ob:"WW", cl:"CL", hn:"HN", tp:"TR", tb:"TB", timp:"TP" };
-var INST_RANGE = { pf:[21,108], vn1:[55,100], vn2:[55,96], va:[48,84], vc:[36,72], cb:[28,55], fl:[60,96], ob:[58,91], cl:[50,91], hn:[41,77], tp:[55,82], tb:[40,72], timp:[38,55], smp:[24,96] };
+var INST_RANGE = { syn:[36,96], sine:[24,108], pf:[21,108], vn1:[55,100], vn2:[55,96], va:[48,84], vc:[36,72], cb:[28,55], fl:[60,96], ob:[58,91], cl:[50,91], hn:[41,77], tp:[55,82], tb:[40,72], timp:[38,55], smp:[24,96] };
 /* 行の型 */
 var PATTERNS = {
   hold:  "持続 (全音符の和音)", pulse: "刻み (4 分音符の和音)", half: "2 分音符の和音", arp: "分散 (8 分音符)", arp16: "分散 (16 分音符)",
@@ -465,7 +501,8 @@ function blankProject(nbars) {
   return { title: "BADA Studio", bpm: 72, key: { tonic: 2, minor: true }, seed: 7, style: "orch", smp: -1, musicStart: 0,
            main: main, lines: ORCH_LINES.map(function (l, li) { return { name: l.name, inst: l.inst, pat: l.pat, oct: l.oct, vel: l.vel, cells: new Array(nbars).fill("") }; }),
            subject: [[3, 62], [1, 64], [2, 65], [2, 69]], entries: [], voiceInst: { S:"vn1", A:"vn2", T:"va", B:"vc" },
-           sources: [], clips: [], tracks: ["音声 1", "音声 2"] };
+           sources: [], clips: [], tracks: ["音声 1", "音声 2"],
+           scoreStart: 0, scoreTr: 0, scoreTempo: 100, scoreGain: 1, scoreInst: { S:"pf", A:"pf", T:"pf", B:"pf" }, scoreMute: {} };
 }
 function parseCell(text) {
   var cs = String(text || "").trim().split(/\s+/).filter(Boolean);
@@ -650,6 +687,61 @@ function exposition(nb) {
   return e;
 }
 
+/* ================================================================ 楽譜 (score.json): 読み込み・再生用の音符・書き出し */
+var XKIND = { SP:"syn", PD:"syn", LD:"syn", OS:"syn", DN:"syn", TA:"syn", RS:"syn", RL:"syn", PK:"pf", PF:"pf", H:"pf", SUB:"sine", GL:"sine", BN:"fl", FL:"fl", WW:"ob", CB:"cb", CBP:"cb", V1:"vn1", V2:"vn2", VA:"va", VC:"vc", VN:"vn1", BV:"syn", SB:"sine" };
+var XNAME = { SP:"シンセの実音 (持続音)", PK:"鼓動", PF:"ピアノの 1 音", SUB:"重低音", GL:"高音のシンセ", TA:"タンプーラ", BN:"バンスリ", CB:"コントラバス", CBP:"Cb pizz", V1:"Vn I", V2:"Vn II", VA:"Va", VC:"Vc", WW:"Ob", FL:"Fl", REC:"実音の抜粋 (録音)", TB:"録音の採譜 (表示だけ)", OS:"オスティナート", DN:"持続音", PD:"パッド", LD:"リード", RS:"共鳴パッド", RL:"共鳴リード", VN:"バイオリン", H:"ピアノ", BV:"コーラス", SB:"シンセ・ベース" };
+function parseScore(j) {
+  if (!j || !Array.isArray(j.notes)) throw new Error("score.json ではありません (notes がない)");
+  var notes = j.notes.filter(function (n) { return typeof n.t === "number" && typeof n.m === "number"; }).map(function (n, k) {
+    return { id: k + 1, v: "SATB".indexOf(n.v) >= 0 ? n.v : "S", t: +n.t, d: Math.max(0.05, +n.d || 0.5), m: Math.round(n.m), label: n.label || null, src: n.src || null, dyn: n.dyn == null ? 1 : +n.dyn };
+  });
+  var extras = (j.extras || []).filter(function (e) { return e && typeof e.t === "number"; }).map(function (e) {
+    var o = {}; Object.keys(e).forEach(function (k) { o[k] = e[k]; }); o.d = Math.max(0.05, +e.d || 0.5); return o;
+  });
+  var dur = +j.duration || 0;
+  notes.forEach(function (n) { dur = Math.max(dur, n.t + n.d); }); extras.forEach(function (e) { dur = Math.max(dur, e.t + e.d); });
+  var kinds = {}; extras.forEach(function (e) { kinds[e.v] = (kinds[e.v] || 0) + 1; });
+  return { notes: notes, extras: extras, harm: j.harm || [], sections: j.sections || [], bar_times: j.bar_times || [], bpm: +j.bpm || 60, meta: j.meta || {}, duration: dur, kinds: kinds, nextId: notes.length + 1 };
+}
+function scoreRate() { return Math.max(0.25, Math.min(3, (+S.proj.scoreTempo || 100) / 100)); }
+function scoreEvents() {
+  if (!S.score) return [];
+  var st = +S.proj.scoreStart || 0, tr = +S.proj.scoreTr | 0, rate = scoreRate(), gain = +S.proj.scoreGain || 1, out = [], mute = S.proj.scoreMute || {};
+  S.score.notes.forEach(function (n) {
+    out.push({ i: S.proj.scoreInst[n.v] || "pf", t: st + n.t / rate, d: Math.max(0.05, n.d / rate * 0.97), m: n.m + tr, vel: Math.min(1, 0.7 * (n.label ? 1.15 : 1) * (n.dyn || 1)) * gain });
+  });
+  S.score.extras.forEach(function (e) {
+    var inst = XKIND[e.v]; if (!inst || mute[e.v] || e.v === "REC" || e.v === "TB") return;
+    var g = (e.gain == null ? 0.2 : +e.gain), vel = Math.min(1, g * (e.v === "PK" ? 2.5 : (e.v === "SUB" ? 2.0 : (e.v === "PF" ? 2.2 : 3.0)))) * gain;
+    out.push({ i: inst, t: st + e.t / rate, d: Math.max(0.05, e.d / rate), m: (e.m | 0) + tr, vel: vel });
+  });
+  return out;
+}
+function scoreRecClips() {
+  /* 実音の抜粋 (REC): ファイル名に録音の日時を含む音源があれば、その音源のその位置を鳴らす */
+  if (!S.score) return [];
+  var st = +S.proj.scoreStart || 0, rate = scoreRate(), gain = +S.proj.scoreGain || 1, out = [], mute = S.proj.scoreMute || {};
+  if (mute.REC) return out;
+  S.score.extras.forEach(function (e) {
+    if (e.v !== "REC") return;
+    var rid = e.rid || String(e.src || "").replace(/^.*[\\/]/, "").replace(/\.[^.]+$/, ""), src = null;
+    S.sources.forEach(function (s) { if (!src && rid && s.name.indexOf(rid) >= 0) src = s; });
+    if (!src) { out.push({ missing: rid }); return; }
+    out.push({ src: src, clip: { start: st + e.t / rate, off: +e.off || 0, dur: e.d / rate, gain: (e.gain == null ? 0.5 : +e.gain) * 1.6 * gain, fin: +e.fin || 0.05, fout: +e.fout || 1.0 } });
+  });
+  return out;
+}
+function scoreEnd() { return S.score ? (+S.proj.scoreStart || 0) + S.score.duration / scoreRate() : 0; }
+function exportScoreJson() {
+  var x = S.score, tr = +S.proj.scoreTr | 0, rate = scoreRate();
+  var notes = x.notes.map(function (n) { return { v: n.v, t: +(n.t / rate).toFixed(4), d: +(n.d / rate).toFixed(4), m: n.m + tr, label: n.label, beat: +(n.t / rate * x.bpm / 60).toFixed(3), dyn: n.dyn, det: 0.92, role: "tutti", src: n.src }; });
+  var extras = x.extras.map(function (e) { var o = {}; Object.keys(e).forEach(function (k) { o[k] = e[k]; }); o.t = +(e.t / rate).toFixed(4); o.d = +(e.d / rate).toFixed(4); if (typeof o.m === "number" && e.v !== "REC") o.m = o.m + tr; return o; });
+  return { bpm: x.bpm * rate, beats_per_bar: 4, nbars: x.bar_times.length ? x.bar_times.length - 1 : Math.ceil(x.duration * x.bpm / 240), duration: +(x.duration / rate).toFixed(3),
+    bar_times: x.bar_times.map(function (t) { return +(t / rate).toFixed(4); }), notes: notes, entries: [],
+    sections: x.sections.map(function (s) { var o = {}; Object.keys(s).forEach(function (k) { o[k] = s[k]; }); if (typeof o.t === "number") o.t = +(o.t / rate).toFixed(4); return o; }),
+    harm: x.harm.map(function (h) { return tr ? transposeChordName(h, tr) : h; }), meta: Object.assign({}, x.meta, { subtitle: (x.meta.subtitle || "") + " (BADA Studio で編曲)" }), extras: extras };
+}
+
 /* ================================================================ 書き出し (MIDI / WAV / score.json) */
 function vlq(n) { var b = [n & 0x7f]; n >>>= 7; while (n) { b.unshift((n & 0x7f) | 0x80); n >>>= 7; } return b; }
 function strBytes(s) { return Array.from(new TextEncoder().encode(s)); }
@@ -827,6 +919,20 @@ function makeEngine(ctx, dest, sources) {
     g.gain.setValueAtTime(0.5 * vel, tEnd); g.gain.setTargetAtTime(0.0001, tEnd, rel / 3);
     bs.connect(g); g.connect(dst); bs.start(t, s0.off || 0); bs.stop(stop + 0.05);
   }
+  function syn(t, d, f, vel, dst) {                     /* シンセの持続音 (ずらした鋸歯波 2 本 + ローパス) */
+    var a = 0.08, r = 0.5, tEnd = t + d, stop = tEnd + r * 3 + 0.1, g = ctx.createGain(), lp = ctx.createBiquadFilter();
+    lp.type = "lowpass"; lp.Q.value = 0.7; lp.frequency.value = Math.min(5000, 900 + f * 2.5);
+    env(g, t, a, 0.06 * vel, tEnd, r);
+    [-5, 5].forEach(function (c) { var o = osc("sawtooth", f * Math.pow(2, c / 1200), t, stop, null); o.connect(lp); });
+    var o2 = osc("triangle", f, t, stop, null); o2.connect(lp);
+    lp.connect(g); g.connect(dst);
+  }
+  function sine(t, d, f, vel, dst) {                    /* 正弦波 (サブベース / 高いガラス) */
+    var a = f < 120 ? 0.3 : 0.02, r = f < 120 ? 0.8 : 1.2, tEnd = t + d, stop = tEnd + r * 3 + 0.1, g = ctx.createGain();
+    env(g, t, a, (f < 120 ? 0.35 : 0.08) * vel, tEnd, r);
+    var o = osc("sine", f, t, stop, null); o.connect(g); g.connect(dst);
+    if (f < 120) { var o2 = osc("sine", f * 2, t, stop, null), g2 = ctx.createGain(); g2.gain.value = 0.12; o2.connect(g2); g2.connect(g); }
+  }
   E.smp = -1;
   E.play = function (x, base) {
     var t = base + x.t, f = 440 * Math.pow(2, (x.m - 69) / 12), dst = out(x.i);
@@ -841,6 +947,8 @@ function makeEngine(ctx, dest, sources) {
       case "hn": case "tp": case "tb": brass(t, x.d, f, x.vel, x.i, dst); break;
       case "timp": timp(t, x.d, f, x.vel, dst); break;
       case "smp": sampler(t, x.d, x.m, x.vel, dst); break;
+      case "syn": syn(t, x.d, f, x.vel, dst); break;
+      case "sine": sine(t, x.d, f, x.vel, dst); break;
       default: piano(t, x.d, f, x.vel, dst);
     }
   };
@@ -910,7 +1018,7 @@ function importFiles(files, raw) {
       });
     });
   }, Promise.resolve()).then(function () {
-    renderSources(); fillSmp(); if (!S.warn) setMsg("✅ 読み込みました: " + list.length + " ファイル", "ok"); S.warn = false;
+    renderSources(); fillSmp(); if (S.score) fillScorePanel(); if (!S.warn) setMsg("✅ 読み込みました: " + list.length + " ファイル", "ok"); S.warn = false;
   });
 }
 function recordMic() {
@@ -938,6 +1046,7 @@ function totalDur() {
   var d = 0;
   S.proj.clips.forEach(function (c) { d = Math.max(d, c.start + c.dur); });
   if (S.R) d = Math.max(d, (+S.proj.musicStart || 0) + S.R.dur);
+  if (S.score) d = Math.max(d, scoreEnd());
   return d;
 }
 function activeVideoClip(pos) {
@@ -947,7 +1056,7 @@ function activeVideoClip(pos) {
 }
 
 /* ================================================================ 再生 / 録画 / オフライン合成 */
-var S = { proj: null, R: null, sources: [], clipId: 0, sel: null, playing: false, ctx: null, eng: null, base: 0, from: 0, pos: 0, idx: 0, timer: null, raf: 0,
+var S = { proj: null, R: null, score: null, nsel: {}, rz: 60, rx: 0, rdrag: null, sources: [], clipId: 0, sel: null, playing: false, ctx: null, eng: null, base: 0, from: 0, pos: 0, idx: 0, timer: null, raf: 0,
           nodes: [], rec: null, recCanvas: null, pps: 40, scrollX: 0, drag: null, mic: null, warn: false, focusCell: null, videoClip: null, onFrame: null, onEnd: null, stopAt: null };
 function setMsg(t, cls) { var el = document.getElementById("status"); if (!el) return; el.textContent = t || ""; el.className = cls || ""; }
 function $(id) { return document.getElementById(id); }
@@ -971,7 +1080,9 @@ function play(from, opts) {
   S.stopAt = opts.toEnd ? totalDur() + (opts.tail || 0) : null;
   S.proj.clips.forEach(function (c) { if (c.track !== "V" && !S.proj.mute) { var nd = S.eng.clip(c, srcOf(c), S.base, from); if (nd) S.nodes.push(nd); } });
   S.proj.clips.forEach(function (c) { if (c.track === "V") { var s = srcOf(c); if (s && s.buf) { var nd2 = S.eng.clip(c, s, S.base, from); if (nd2) S.nodes.push(nd2); } } });
-  S.notes = S.R ? musicNotes().filter(function (x) { return x.t + x.d > from; }) : [];
+  S.notes = (S.R ? musicNotes() : []).concat(scoreEvents()).filter(function (x) { return x.t + x.d > from; });
+  S.notes.sort(function (a, b) { return a.t - b.t; });
+  scoreRecClips().forEach(function (r) { if (r.src) { var nd3 = S.eng.clip(r.clip, r.src, S.base, from); if (nd3) S.nodes.push(nd3); } });
   S.idx = 0;
   function pump() {
     var now = ctx.currentTime, horizon = now - S.base + from + 1.5;
@@ -1014,12 +1125,17 @@ function stop(keepPos) {
 function renderMix(opts) {
   opts = opts || {};
   var dur = opts.musicOnly ? (S.R ? S.R.dur + 2.5 : 1) : totalDur() + 2.5, sr = 44100;
+  if (!opts.musicOnly && S.score && dur > 60 * 25) return Promise.reject(new Error("長すぎます (25 分まで)"));
   if (dur <= 2.6) return Promise.reject(new Error("何もありません (音源を置くか、作曲してください)"));
   var off = new OfflineAudioContext(2, Math.ceil(dur * sr), sr), eng = makeEngine(off, off.destination, S.sources); eng.smp = S.proj.smp | 0;
   if (!opts.musicOnly) S.proj.clips.forEach(function (c) { eng.clip(c, srcOf(c), 0, 0); });
   if (S.R) {
     var st = opts.musicOnly ? 0 : (+S.proj.musicStart || 0), bs = beatSec(S.proj);
     S.R.notes.forEach(function (x) { eng.play({ i: x.i, t: st + x.b * bs, d: Math.max(0.05, x.db * bs * 0.95), m: x.m, vel: x.vel }, 0); });
+  }
+  if (S.score && !opts.musicOnly) {
+    scoreEvents().forEach(function (x) { eng.play(x, 0); });
+    scoreRecClips().forEach(function (r) { if (r.src) eng.clip(r.clip, r.src, 0, 0); });
   }
   return off.startRendering();
 }
@@ -1105,7 +1221,32 @@ function drawStage(g, W, H, pos) {
   }
   /* ピアノロール (映像があるときは下 30% に半透明で) */
   var top = vsrc ? H * 0.7 : 0, rh = H - top, win = 6, bs = beatSec(S.proj), st = +S.proj.musicStart || 0;
-  if (S.R && S.R.notes.length) {
+  var XC = { SP:"#96c8ff", PK:"#eb465a", PF:"#dcdce6", SUB:"#6e5ac8", GL:"#c8ebff", TA:"#c8aa6e", BN:"#a0e6be", CB:"#96604a", V1:"#c8785a", V2:"#aa6450", VA:"#965a6e", VC:"#78463c", TB:"#3c7896" };
+  if (S.score && S.score.notes.length) {
+    var xs = +S.proj.scoreStart || 0, xr = scoreRate(), xt = +S.proj.scoreTr | 0, xlo = 24, xhi = 100, xph = rh / (xhi - xlo), xx0 = W * 0.3, xmute = S.proj.scoreMute || {};
+    g.save(); g.globalAlpha = vsrc ? 0.75 : 1;
+    if (vsrc) { g.fillStyle = "rgba(7,9,14,0.6)"; g.fillRect(0, top, W, rh); }
+    for (var xm = xlo; xm <= xhi; xm += 12) { g.fillStyle = "#1a2030"; g.fillRect(0, top + rh - (xm - xlo) * xph, W, 1); }
+    S.score.extras.forEach(function (e) {
+      if (typeof e.m !== "number" || e.v === "REC" || xmute[e.v]) return;
+      var t0 = xs + e.t / xr, t1 = t0 + e.d / xr; if (t1 < pos - win * 0.3 || t0 > pos + win) return;
+      var xa = xx0 + (t0 - pos) / win * W * 0.7, xb = xx0 + (t1 - pos) / win * W * 0.7;
+      g.fillStyle = XC[e.v] || "#667"; g.globalAlpha = (vsrc ? 0.75 : 1) * (e.v === "TB" ? 0.35 : 0.5);
+      g.fillRect(xa, top + rh - (e.m + xt - xlo + 1) * xph, Math.max(2, xb - xa - 1), Math.max(2, xph - 1));
+    });
+    S.score.notes.forEach(function (n) {
+      var t0 = xs + n.t / xr, t1 = t0 + n.d / xr; if (t1 < pos - win * 0.3 || t0 > pos + win) return;
+      var xa = xx0 + (t0 - pos) / win * W * 0.7, xb = xx0 + (t1 - pos) / win * W * 0.7;
+      g.fillStyle = VCOL[n.v]; g.globalAlpha = (vsrc ? 0.75 : 1) * (t0 <= pos && pos < t1 ? 1 : 0.85);
+      g.fillRect(xa, top + rh - (n.m + xt - xlo + 1) * xph, Math.max(2, xb - xa - 1), Math.max(2, xph - 1));
+      if (n.label && t0 >= pos - 0.02 && t0 < pos + win) { g.font = "12px sans-serif"; g.fillStyle = VCOL[n.v]; g.fillText(n.label, xa, top + rh - (n.m + xt - xlo + 1) * xph - 3); }
+    });
+    g.globalAlpha = 1; g.fillStyle = "#e6e2d6"; g.fillRect(xx0, top, 1, rh);
+    var xsec = null; S.score.sections.forEach(function (sc) { if (xs + (+sc.t || 0) / xr <= pos) xsec = sc; });
+    if (xsec) { g.font = "15px sans-serif"; g.fillStyle = "#e6e2d6"; g.fillText(xsec.title || "", 10, top + 22); }
+    g.restore();
+  }
+  if (S.R && S.R.notes.length && !S.score) {
     g.save(); g.globalAlpha = vsrc ? 0.75 : 1;
     if (vsrc) { g.fillStyle = "rgba(7,9,14,0.6)"; g.fillRect(0, top, W, rh); }
     var lo = 24, hi = 100, ph = rh / (hi - lo), x0 = W * 0.3;
@@ -1142,7 +1283,7 @@ function drawStage(g, W, H, pos) {
   g.font = "13px sans-serif"; g.fillStyle = "#9aa2b6"; g.fillText(S.proj.title + "  " + fmtTime(pos), 10, H - 8);
 }
 function tlRows() {
-  var rows = [{ id: "V", name: "映像", col: "#6f8fd8" }, { id: "M", name: "作曲", col: "#f0c46e" }];
+  var rows = [{ id: "V", name: "映像", col: "#6f8fd8" }, { id: "M", name: "作曲", col: "#f0c46e" }, { id: "X", name: "楽譜", col: "#c8a0ff" }];
   S.proj.tracks.forEach(function (t, i) { rows.push({ id: i, name: t, col: "#60cec4" }); });
   return rows;
 }
@@ -1174,9 +1315,18 @@ function drawTimeline() {
     S.R.notes.forEach(function (x) { if (!x.v) return; var nx = tlX(st + x.b * bs); if (nx < TL.label || nx > W) return; g.fillRect(nx, y1 + 4 + (TL.rowH - 8) * (1 - (x.m - 36) / 60), Math.max(1, x.db * bs * S.pps - 1), 2); });
     g.globalAlpha = 1; g.font = "11px sans-serif"; g.fillStyle = "#ffe2a6"; g.fillText("🎼 " + S.proj.title + " (" + S.proj.main.length + " 小節, ♩=" + S.proj.bpm + ")", Math.max(TL.label, xa) + 6, y1 + 16);
   }
+  /* 楽譜ブロック */
+  if (S.score) {
+    var xs2 = +S.proj.scoreStart || 0, xa2 = tlX(xs2), xb2 = tlX(scoreEnd()), y2 = TL.ruler + 2 * TL.rowH, xr2 = scoreRate();
+    g.fillStyle = S.sel === "X" ? "#4a3a6a" : "#302548"; g.fillRect(Math.max(TL.label, xa2), y2 + 4, Math.max(2, xb2 - Math.max(TL.label, xa2)), TL.rowH - 8);
+    g.strokeStyle = "#c8a0ff"; g.strokeRect(Math.max(TL.label, xa2) + 0.5, y2 + 4.5, Math.max(2, xb2 - Math.max(TL.label, xa2)) - 1, TL.rowH - 9);
+    g.fillStyle = "#c8a0ff"; g.globalAlpha = 0.6;
+    S.score.notes.forEach(function (n) { var nx = tlX(xs2 + n.t / xr2); if (nx < TL.label || nx > W) return; g.fillRect(nx, y2 + 4 + (TL.rowH - 8) * (1 - (n.m - 36) / 60), Math.max(1, n.d / xr2 * S.pps - 1), 2); });
+    g.globalAlpha = 1; g.font = "11px sans-serif"; g.fillStyle = "#e6d8ff"; g.fillText("📜 " + (S.score.meta.title || "score") + " (" + fmtTime(S.score.duration / xr2) + ")", Math.max(TL.label, xa2) + 6, y2 + 16);
+  }
   /* クリップ */
   S.proj.clips.forEach(function (c) {
-    var ri = c.track === "V" ? 0 : 2 + (+c.track); if (ri >= rows.length) return;
+    var ri = c.track === "V" ? 0 : 3 + (+c.track); if (ri >= rows.length) return;
     var y = TL.ruler + ri * TL.rowH, xa = tlX(c.start), xb = tlX(c.start + c.dur), s = srcOf(c);
     if (xb < TL.label || xa > W) return;
     var x0 = Math.max(TL.label, xa), w = Math.max(2, xb - x0);
@@ -1192,7 +1342,7 @@ function drawTimeline() {
 }
 function drawAll() {
   var cv = $("stage"); drawStage(cv.getContext("2d"), cv.width, cv.height, S.pos);
-  drawTimeline();
+  drawTimeline(); if (S.score && document.getElementById("tab-score").classList.contains("on")) drawRoll();
   $("pos").textContent = fmtTime(S.pos) + " / " + fmtTime(totalDur());
 }
 function hitTest(x, y) {
@@ -1201,9 +1351,10 @@ function hitTest(x, y) {
   if (ri < 0 || ri >= rows.length || x < TL.label) return { kind: "none", row: ri };
   var t = tlT(x);
   if (ri === 1) { if (S.R) { var st = +S.proj.musicStart || 0; if (t >= st && t <= st + S.R.dur) return { kind: "music", dt: t - st }; } return { kind: "none", row: ri }; }
+  if (ri === 2) { if (S.score) { var xs3 = +S.proj.scoreStart || 0; if (t >= xs3 && t <= scoreEnd()) return { kind: "score", dt: t - xs3 }; } return { kind: "none", row: ri }; }
   var hit = null;
   S.proj.clips.forEach(function (c) {
-    var cr = c.track === "V" ? 0 : 2 + (+c.track);
+    var cr = c.track === "V" ? 0 : 3 + (+c.track);
     if (cr !== ri) return;
     if (t >= c.start - 6 / S.pps && t <= c.start + c.dur + 6 / S.pps) {
       var edge = 8 / S.pps, mode = t < c.start + edge ? "L" : (t > c.start + c.dur - edge ? "R" : "move");
@@ -1219,6 +1370,7 @@ function wireTimeline() {
     var p = pt(e), h = hitTest(p.x, p.y); cv.setPointerCapture(e.pointerId);
     if (h.kind === "ruler" || h.kind === "none") { S.pos = Math.max(0, tlT(p.x)); if (S.playing) { play(S.pos); } S.sel = null; S.drag = { kind: "seek" }; }
     else if (h.kind === "music") { S.sel = "M"; S.drag = { kind: "music", dt: h.dt }; }
+    else if (h.kind === "score") { S.sel = "X"; S.drag = { kind: "score", dt: h.dt }; }
     else { S.sel = h.clip.id; S.drag = { kind: "clip", clip: h.clip, mode: h.mode, dt: h.dt, s0: h.clip.start, o0: h.clip.off, d0: h.clip.dur }; }
     fillClipEditor(); drawAll();
   });
@@ -1228,12 +1380,13 @@ function wireTimeline() {
     var t = Math.max(0, tlT(p.x));
     if (S.drag.kind === "seek") { S.pos = t; drawAll(); return; }
     if (S.drag.kind === "music") { S.proj.musicStart = +Math.max(0, t - S.drag.dt).toFixed(2); $("pStart").value = S.proj.musicStart; drawAll(); return; }
+    if (S.drag.kind === "score") { S.proj.scoreStart = +Math.max(0, t - S.drag.dt).toFixed(2); $("xStart").value = S.proj.scoreStart; drawAll(); return; }
     var c = S.drag.clip, s = srcOf(c), maxDur = s ? s.buf.duration : 1e9;
     if (S.drag.mode === "move") c.start = +Math.max(0, t - S.drag.dt).toFixed(3);
     else if (S.drag.mode === "R") c.dur = +Math.max(0.05, Math.min(maxDur - (c.off || 0), t - c.start)).toFixed(3);
     else { var ns = Math.max(S.drag.s0 - S.drag.o0, Math.min(t, S.drag.s0 + S.drag.d0 - 0.05)); c.off = +(S.drag.o0 + ns - S.drag.s0).toFixed(3); c.dur = +(S.drag.d0 - (ns - S.drag.s0)).toFixed(3); c.start = +ns.toFixed(3); }
     var ri = Math.floor((p.y - TL.ruler) / TL.rowH), rows = tlRows();
-    if (S.drag.mode === "move" && ri >= 2 && ri < rows.length && c.track !== "V") c.track = ri - 2;
+    if (S.drag.mode === "move" && ri >= 3 && ri < rows.length && c.track !== "V") c.track = ri - 3;
     fillClipEditor(); drawAll();
   });
   function up() { if (S.drag && S.drag.kind !== "seek") changed(false); S.drag = null; }
@@ -1244,7 +1397,7 @@ function fillClipEditor() {
   var c = selClip(), ids = ["cStart", "cOff", "cDur", "cGain", "cFin", "cFout", "cTrack"];
   ids.forEach(function (id) { $(id).disabled = !c; });
   var sel = $("cTrack"); sel.innerHTML = "";
-  if (!c) { $("clipName").textContent = S.sel === "M" ? "作曲ブロック (ドラッグで開始位置)" : ""; return; }
+  if (!c) { $("clipName").textContent = S.sel === "M" ? "作曲ブロック (ドラッグで開始位置)" : (S.sel === "X" ? "楽譜ブロック (ドラッグで開始位置、「📜 楽譜」タブで編曲)" : ""); return; }
   if (c.track === "V") sel.innerHTML = "<option value='V'>映像</option>";
   else S.proj.tracks.forEach(function (t, i) { var o = document.createElement("option"); o.value = i; o.textContent = t; if (i === +c.track) o.selected = true; sel.appendChild(o); });
   $("cStart").value = c.start; $("cOff").value = c.off; $("cDur").value = c.dur; $("cGain").value = c.gain; $("cFin").value = c.fin; $("cFout").value = c.fout;
@@ -1345,13 +1498,141 @@ function changed(structural) {
   if (S.playing) { var pos = S.pos; play(pos); }
   drawAll(); fillClipEditor(); autosave();
 }
-function autosave() { try { localStorage.setItem("bada_studio_proj", JSON.stringify(S.proj)); } catch (e) {} }
+function autosave() { try { var p = Object.assign({}, S.proj); delete p.score; localStorage.setItem("bada_studio_proj", JSON.stringify(p)); } catch (e) {} }
 function validProject(p) { return p && Array.isArray(p.main) && Array.isArray(p.lines) && p.key && Array.isArray(p.clips); }
 function loadProject(p) {
   var base = blankProject(p.main.length);
   Object.keys(base).forEach(function (k) { if (p[k] === undefined) p[k] = base[k]; });
   S.proj = p; S.clipId = p.clips.reduce(function (m, c) { return Math.max(m, c.id | 0); }, 0);
-  recompute(); fillComposer(); renderProg(); renderSources(); drawAll(); fillClipEditor();
+  if (p.score) { try { S.score = parseScore(p.score); } catch (e) { S.score = null; } delete p.score; }
+  recompute(); fillComposer(); renderProg(); renderSources(); fillScorePanel(); drawAll(); fillClipEditor();
+}
+
+/* ================================================================ 楽譜の編集 (ピアノロール) */
+function fillScorePanel() {
+  var p = S.proj, x = S.score;
+  $("xStart").value = p.scoreStart; $("xTr").value = p.scoreTr; $("xTempo").value = p.scoreTempo; $("xGain").value = p.scoreGain;
+  VOICES.forEach(function (v) {
+    var sel = $("xi" + v); if (!sel.options.length) Object.keys(INST).forEach(function (k) { var o = document.createElement("option"); o.value = k; o.textContent = INST[k].name; sel.appendChild(o); });
+    sel.value = p.scoreInst[v] || "pf";
+  });
+  var kb = $("xKinds"); kb.innerHTML = "";
+  if (!x) { $("scoreInfo").textContent = "楽譜はまだ読み込まれていません。Requiem BADA の score.json を選んでください。"; drawRoll(); return; }
+  var recs = scoreRecClips(), missing = recs.filter(function (r) { return r.missing; }).map(function (r) { return r.missing; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+  $("scoreInfo").textContent = (x.meta.title || "score") + " — " + x.notes.length + " 音符, " + x.extras.length + " 追加, " + fmtTime(x.duration) + ", ♩=" + x.bpm + (missing.length ? "  ⚠ 未読込の録音: " + missing.join(", ") : "  ✅ 抜粋の録音はすべて読み込み済み");
+  var span = document.createElement("span"); span.className = "hint"; span.textContent = "鳴らすもの: "; kb.appendChild(span);
+  Object.keys(x.kinds).sort().forEach(function (k) {
+    var lab = document.createElement("label"); lab.className = "c"; var cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !p.scoreMute[k];
+    cb.onchange = function () { p.scoreMute[k] = !cb.checked; changed(false); };
+    lab.appendChild(cb); lab.appendChild(document.createTextNode((XNAME[k] || k) + " (" + x.kinds[k] + ")")); kb.appendChild(lab);
+  });
+  drawRoll();
+}
+var RL = { top: 14, left: 34 };
+function rollRange() {
+  var lo = 36, hi = 84;
+  if (S.score) S.score.notes.forEach(function (n) { lo = Math.min(lo, n.m - 2); hi = Math.max(hi, n.m + 2); });
+  return [lo, hi];
+}
+function rollX(t) { return RL.left + (t - S.rx) * S.rz; }
+function rollT(x) { return S.rx + (x - RL.left) / S.rz; }
+function drawRoll() {
+  var cv = $("roll"); if (!cv) return; var g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.fillStyle = "#07090e"; g.fillRect(0, 0, W, H);
+  if (!S.score) { g.fillStyle = "#9aa2b6"; g.font = "14px sans-serif"; g.fillText("score.json を読み込むと、ここに音符が並びます", 20, 40); return; }
+  var rg = rollRange(), lo = rg[0], hi = rg[1], ph = (H - RL.top) / (hi - lo + 1), x = S.score, tr = +S.proj.scoreTr | 0;
+  for (var m = lo; m <= hi; m++) {
+    var y = H - (m - lo + 1) * ph, pc = m % 12, black = [1, 3, 6, 8, 10].indexOf(pc) >= 0;
+    g.fillStyle = black ? "#0b0e15" : "#0f1320"; g.fillRect(RL.left, y, W - RL.left, ph);
+    if (pc === 0) { g.fillStyle = "#2a3246"; g.fillRect(RL.left, y + ph, W - RL.left, 1); g.fillStyle = "#9aa2b6"; g.font = "10px sans-serif"; g.fillText("C" + (Math.floor(m / 12) - 1), 4, y + ph - 2); }
+  }
+  /* 小節線と区間 */
+  g.font = "10px sans-serif";
+  x.bar_times.forEach(function (bt, i) { var bx = rollX(bt); if (bx < RL.left || bx > W) return; g.fillStyle = i % 4 === 0 ? "#3a4560" : "#1e2535"; g.fillRect(bx, RL.top, 1, H - RL.top); if (i % 4 === 0) { g.fillStyle = "#9aa2b6"; g.fillText(i + 1, bx + 2, RL.top - 3); } });
+  x.sections.forEach(function (sc) { var sx = rollX(+sc.t || 0); if (sx < RL.left - 200 || sx > W) return; g.fillStyle = "#f0c46e"; g.fillRect(sx, 0, 1, H); g.fillText(sc.title || "", sx + 3, 10); });
+  var XC = { SP:"#96c8ff", PK:"#eb465a", PF:"#dcdce6", SUB:"#6e5ac8", GL:"#c8ebff", TA:"#c8aa6e", BN:"#a0e6be", CB:"#96604a", V1:"#c8785a", V2:"#aa6450", VA:"#965a6e", VC:"#78463c", TB:"#3c7896", REC:"#3c7896" };
+  x.extras.forEach(function (e) {
+    if (e.v === "REC") { var ra = rollX(e.t), rb = rollX(e.t + e.d); if (rb < RL.left || ra > W) return; g.fillStyle = "rgba(60,120,150,0.25)"; g.fillRect(Math.max(RL.left, ra), RL.top, Math.max(2, rb - Math.max(RL.left, ra)), H - RL.top); g.fillStyle = "#8fc8e6"; g.fillText("♪ " + (e.rid || ""), Math.max(RL.left, ra) + 4, RL.top + 12); return; }
+    if (typeof e.m !== "number" || S.proj.scoreMute[e.v]) return;
+    var xa = rollX(e.t), xb = rollX(e.t + e.d); if (xb < RL.left || xa > W) return;
+    g.fillStyle = XC[e.v] || "#667"; g.globalAlpha = e.v === "TB" ? 0.3 : 0.45;
+    g.fillRect(Math.max(RL.left, xa), H - (e.m - lo + 1) * ph + 1, Math.max(2, xb - Math.max(RL.left, xa) - 1), Math.max(2, ph - 2)); g.globalAlpha = 1;
+  });
+  x.notes.forEach(function (n) {
+    var xa = rollX(n.t), xb = rollX(n.t + n.d); if (xb < RL.left || xa > W) return;
+    var y = H - (n.m - lo + 1) * ph, sel = S.nsel[n.id];
+    g.fillStyle = VCOL[n.v]; g.fillRect(Math.max(RL.left, xa), y + 1, Math.max(2, xb - Math.max(RL.left, xa) - 1), Math.max(2, ph - 2));
+    if (sel) { g.strokeStyle = "#fff"; g.lineWidth = 2; g.strokeRect(Math.max(RL.left, xa) + 1, y + 1, Math.max(2, xb - Math.max(RL.left, xa) - 1) - 2, Math.max(2, ph - 2)); g.lineWidth = 1; }
+    if (n.label) { g.fillStyle = VCOL[n.v]; g.fillText(n.label, Math.max(RL.left, xa) + 2, y - 2); }
+  });
+  if (S.rdrag && S.rdrag.kind === "box") { g.strokeStyle = "#ffffff88"; g.strokeRect(Math.min(S.rdrag.x0, S.rdrag.x1), Math.min(S.rdrag.y0, S.rdrag.y1), Math.abs(S.rdrag.x1 - S.rdrag.x0), Math.abs(S.rdrag.y1 - S.rdrag.y0)); }
+  /* 再生位置 */
+  var st = +S.proj.scoreStart || 0, rate = scoreRate(), px = rollX((S.pos - st) * rate);
+  if (px >= RL.left && px <= W) { g.fillStyle = "#ff7a7a"; g.fillRect(px, RL.top, 2, H - RL.top); }
+  var cnt = Object.keys(S.nsel).length; $("nSel").textContent = cnt ? cnt + " 音符を選択中" : "";
+}
+function rollNoteAt(px, py) {
+  if (!S.score) return null;
+  var cv = $("roll"), H = cv.height, rg = rollRange(), lo = rg[0], hi = rg[1], ph = (H - RL.top) / (hi - lo + 1), t = rollT(px), m = Math.floor((H - py) / ph) + lo, hit = null;
+  S.score.notes.forEach(function (n) { if (n.m === m && t >= n.t && t <= n.t + n.d) hit = n; });
+  return hit || { m: m, t: t, empty: true };
+}
+function selNotes() { return S.score ? S.score.notes.filter(function (n) { return S.nsel[n.id]; }) : []; }
+function editSel(fn) { var ns = selNotes(); if (!ns.length) { setMsg("音符が選ばれていません", "err"); return; } ns.forEach(fn); scoreChanged(); }
+function scoreChanged() { if (S.score) { var d = 0; S.score.notes.forEach(function (n) { d = Math.max(d, n.t + n.d); }); S.score.extras.forEach(function (e) { d = Math.max(d, e.t + e.d); }); S.score.duration = Math.max(d, S.score.bar_times.length ? S.score.bar_times[S.score.bar_times.length - 1] : 0); } changed(false); drawRoll(); }
+function wireRoll() {
+  var cv = $("roll");
+  function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+  cv.addEventListener("pointerdown", function (e) {
+    if (!S.score) return; var p = pt(e), h = rollNoteAt(p.x, p.y); cv.setPointerCapture(e.pointerId);
+    if (h && !h.empty) {
+      if (!S.nsel[h.id] && !e.shiftKey) S.nsel = {};
+      S.nsel[h.id] = true; S.rdrag = { kind: "move", x0: p.x, y0: p.y, orig: selNotes().map(function (n) { return [n, n.t, n.m]; }), moved: false };
+    } else { if (!e.shiftKey) S.nsel = {}; S.rdrag = { kind: "box", x0: p.x, y0: p.y, x1: p.x, y1: p.y }; }
+    drawRoll();
+  });
+  cv.addEventListener("pointermove", function (e) {
+    if (!S.rdrag) return; var p = pt(e), cv2 = $("roll"), H = cv2.height, rg = rollRange(), ph = (H - RL.top) / (rg[1] - rg[0] + 1);
+    if (S.rdrag.kind === "box") { S.rdrag.x1 = p.x; S.rdrag.y1 = p.y; drawRoll(); return; }
+    var dt = (p.x - S.rdrag.x0) / S.rz, dm = Math.round((S.rdrag.y0 - p.y) / ph);
+    S.rdrag.orig.forEach(function (o) { o[0].t = Math.max(0, +(o[1] + dt).toFixed(3)); o[0].m = Math.max(21, Math.min(108, o[2] + dm)); });
+    S.rdrag.moved = S.rdrag.moved || Math.abs(dt) > 0.01 || dm !== 0; drawRoll();
+  });
+  function up(e) {
+    if (!S.rdrag) return;
+    if (S.rdrag.kind === "box") {
+      var x0 = Math.min(S.rdrag.x0, S.rdrag.x1), x1 = Math.max(S.rdrag.x0, S.rdrag.x1), y0 = Math.min(S.rdrag.y0, S.rdrag.y1), y1 = Math.max(S.rdrag.y0, S.rdrag.y1);
+      if (x1 - x0 > 4 || y1 - y0 > 4) {
+        var cv2 = $("roll"), H = cv2.height, rg = rollRange(), ph = (H - RL.top) / (rg[1] - rg[0] + 1), ta = rollT(x0), tb = rollT(x1), ma = Math.floor((H - y1) / ph) + rg[0], mb = Math.floor((H - y0) / ph) + rg[0];
+        S.score.notes.forEach(function (n) { if (n.t + n.d >= ta && n.t <= tb && n.m >= ma && n.m <= mb) S.nsel[n.id] = true; });
+      }
+      S.rdrag = null; drawRoll(); return;
+    }
+    var moved = S.rdrag.moved; S.rdrag = null; if (moved) scoreChanged(); else drawRoll();
+  }
+  cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+  cv.addEventListener("dblclick", function (e) {
+    if (!S.score) return; var p = pt(e), h = rollNoteAt(p.x, p.y);
+    if (h && h.empty) { var n = { id: S.score.nextId++, v: $("nVoice").value, t: +Math.max(0, h.t).toFixed(3), d: +(60 / S.score.bpm).toFixed(3), m: h.m, label: null, src: null, dyn: 1 }; S.score.notes.push(n); S.nsel = {}; S.nsel[n.id] = true; scoreChanged(); }
+  });
+  cv.addEventListener("wheel", function (e) { S.rx = Math.max(0, S.rx + (e.deltaX || e.deltaY) / S.rz * 0.5); drawRoll(); e.preventDefault(); }, { passive: false });
+  $("rzoom").oninput = function () { S.rz = +this.value; drawRoll(); };
+  $("btnNDel").onclick = function () { var ns = selNotes(); if (!ns.length) return; S.score.notes = S.score.notes.filter(function (n) { return !S.nsel[n.id]; }); S.nsel = {}; scoreChanged(); };
+  $("btnNUp").onclick = function () { editSel(function (n) { n.m = Math.min(108, n.m + 1); }); };
+  $("btnNDown").onclick = function () { editSel(function (n) { n.m = Math.max(21, n.m - 1); }); };
+  $("btnNOctUp").onclick = function () { editSel(function (n) { n.m = Math.min(108, n.m + 12); }); };
+  $("btnNOctDown").onclick = function () { editSel(function (n) { n.m = Math.max(21, n.m - 12); }); };
+  $("btnNLonger").onclick = function () { editSel(function (n) { n.d = +(n.d * 1.5).toFixed(3); }); };
+  $("btnNShorter").onclick = function () { editSel(function (n) { n.d = +Math.max(0.05, n.d / 1.5).toFixed(3); }); };
+  $("btnScoreIn").onclick = function () { $("scoreIn").value = ""; $("scoreIn").click(); };
+  $("scoreIn").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { S.score = parseScore(JSON.parse(t)); S.nsel = {}; S.rx = 0; S.proj.scoreMute = {}; fillScorePanel(); changed(false); setMsg("✅ 楽譜を読み込みました: " + (S.score.meta.title || f.name) + " — タイムラインの「楽譜」トラックに載っています", "ok"); }).catch(function (e) { setMsg("読み込めません: " + e.message, "err"); }); };
+  $("btnScoreOut").onclick = function () { if (!S.score) { setMsg("楽譜がありません", "err"); return; } saveBlob(new Blob([JSON.stringify(exportScoreJson())], { type: "application/json" }), "score_" + sanitizeName(S.score.meta.title || "bada") + "_edit.json", "application/json", "score.json"); };
+  $("btnScoreClear").onclick = function () { S.score = null; S.nsel = {}; fillScorePanel(); changed(false); };
+  $("xStart").onchange = function () { S.proj.scoreStart = Math.max(0, +this.value || 0); changed(false); };
+  $("xTr").onchange = function () { S.proj.scoreTr = Math.max(-24, Math.min(24, +this.value | 0)); changed(false); drawRoll(); };
+  $("xTempo").onchange = function () { S.proj.scoreTempo = Math.max(25, Math.min(300, +this.value || 100)); changed(false); };
+  $("xGain").onchange = function () { S.proj.scoreGain = Math.max(0, +this.value || 1); changed(false); };
+  VOICES.forEach(function (v) { $("xi" + v).onchange = function () { S.proj.scoreInst[v] = this.value; changed(false); }; });
 }
 function wire() {
   document.querySelectorAll(".tabs button").forEach(function (b) {
@@ -1407,10 +1688,10 @@ function wire() {
   $("btnMidi").onclick = function () { if (!S.R) return; saveBlob(new Blob([midiFile(S.proj, S.R)], { type: "audio/midi" }), sanitizeName(S.proj.title) + ".mid", "audio/midi", "MIDI"); };
   $("btnVideo").onclick = exportVideo;
   $("btnScore").onclick = function () { if (!S.R) return; saveBlob(new Blob([JSON.stringify(scoreJson(S.proj, S.R))], { type: "application/json" }), "score_" + sanitizeName(S.proj.title) + ".json", "application/json", "score.json"); };
-  $("btnSaveProj").onclick = function () { saveBlob(new Blob([JSON.stringify(S.proj, null, 1)], { type: "application/json" }), sanitizeName(S.proj.title) + ".studio.json", "application/json", "BADA Studio プロジェクト"); };
+  $("btnSaveProj").onclick = function () { var p = Object.assign({}, S.proj); if (S.score) p.score = exportScoreJson(); saveBlob(new Blob([JSON.stringify(p, null, 1)], { type: "application/json" }), sanitizeName(S.proj.title) + ".studio.json", "application/json", "BADA Studio プロジェクト"); };
   $("btnLoadProj").onclick = function () { $("projIn").value = ""; $("projIn").click(); };
   $("projIn").onchange = function () { var f = this.files[0]; if (!f) return; f.text().then(function (t) { var p = JSON.parse(t); if (!validProject(p)) throw new Error("形式が違います"); loadProject(p); setMsg("✅ プロジェクトを開きました。音源は「音源・映像」で読み込み直してください (" + p.clips.map(function (c) { return c.src; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).join(", ") + ")", "ok"); }).catch(function (e) { setMsg("開けません: " + e.message, "err"); }); };
-  wireTimeline();
+  wireTimeline(); wireRoll();
   window.addEventListener("resize", drawAll);
 }
 function boot() {
