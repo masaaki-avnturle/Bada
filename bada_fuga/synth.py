@@ -870,7 +870,7 @@ def main(score='score.json', out='fuga.wav'):
             L[i0:i1] += y[:i1 - i0] * 0.707
             j0 = min(i0 + dl, N); j1 = min(j0 + len(y), N); R[j0:j1] += y[:j1 - j0] * 0.707
             continue
-        if acc and ex['v'] in ('CB', 'CBP', 'TA', 'BN', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL', 'PD'):
+        if (acc or recs) and ex['v'] in ('CB', 'CBP', 'TA', 'BN', 'V1', 'V2', 'VA', 'VC', 'WW', 'FL') or (acc and ex['v'] == 'PD'):   # Acceptance の楽器 (recsampler でも)
             v = ex['v']; vel = ex.get('gain', 0.4)
             if v == 'CB': y = contrabass_tone(freq, ex['d'], vel)
             elif v == 'CBP': y = contrabass_tone(freq, ex['d'], vel, pizz=True)

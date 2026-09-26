@@ -115,6 +115,8 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'GL': 'シンセ (高音)', 'SUB': 'シンセ (低音)', 'RS': '共鳴シンセ (パッド)', 'RL': '共鳴シンセ (主題)', 'VN': 'バイオリン (主題に重なる)', 'SP': '11:21 のシンセの実音 (主題)'})
         VNAME.update({'BV': 'コーラス (歌声)', 'LD': 'シンセ・リード', 'PD': 'シンセ・パッド', 'SB': 'シンセ・ベース', 'GT': 'ギター'})
         VNAME.update({'TB': meta.get('tb_label', 'タブレット録音 (実音)'), 'OS': 'オスティナート', 'DN': '持続音', 'PK': '鼓動 (録音の低音)'})
+        COL.update({'CB': (150, 95, 70), 'CBP': (190, 130, 90), 'TA': (200, 170, 110), 'BN': (160, 230, 190), 'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'WW': (120, 200, 120), 'FL': (190, 235, 220)})
+        VNAME.update({'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
         if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]

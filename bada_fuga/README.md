@@ -1072,6 +1072,23 @@ XXXIII から高音のシンセを消し、君が代を**讃美歌 (コラール
 python3 compose_tablet34.py bank17.json score_tablet34.json && python3 synth.py score_tablet34.json tablet34.wav && python3 video.py score_tablet34.json tablet34.wav tablet34.mp4
 ```
 
+## 🎌🎻 Requiem BADA — Tablet Sessions XXXV · Acceptance (BADA 528 Acceptance と君が代のレクイエム・讃美歌・フーガの融合, ♩=54, 約 7 分)
+
+XXXIV に、以前の **BADA 528 — Acceptance** (哀愁の弦楽、コントラバス独奏、タンプーラ、バンスリ、タブレット録音の主題 T) を融合した。
+
+- **Acceptance の楽器** — `synth.py` の弦 (`V1`〜`VC`)・コントラバス (`CB`)・タンプーラ (`TA`)・バンスリ (`BN`) を recsampler でも鳴らせるようにし (`video.py` にも色と名前)、
+  厚い弦が 4 声 (ピアノの実音) に重なる (`STR`)、Vn I がソプラノの 1 オクターヴ上 (`VOX1`)、バンスリが「千代に八千代に」に (`BNS`)、タンプーラの B♭–F (`TAN`)
+- **Prologo** — コントラバス独奏 (BADA 528 Acceptance と同じ音型を変ロ短調で)
+- **Acceptance (ホ短調)** — 9/22 090146 の録音から作った主題 T を厚い弦がオクターヴで歌い、9/22 のピアノの実音が分散和音を降らせ、2 回目はバンスリ →
+  録音 090146 の実音 (ホ短調のまま) にコントラバスとタンプーラが寄り添う → 変ロ短調へ戻る
+- 讃美歌 (掛留・アーメン終止)、フーガ I (バッハ風)、フーガ II (千代に + 08:06 の主題)、Finale、Coda は XXXIV から
+- 提出された録音: 9/22 090146・090933 (`bank35.json` = bank17 + 9/22 の 2 本)、9/23 08:06、9/24 11:18
+
+```bash
+python3 build_sampler.py bank22 20260922_090933.mp3 20260922_090146.mp3      # bank35.json = bank17 + bank22
+python3 compose_tablet35.py bank35.json score_tablet35.json && python3 synth.py score_tablet35.json tablet35.wav && python3 video.py score_tablet35.json tablet35.wav tablet35.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
