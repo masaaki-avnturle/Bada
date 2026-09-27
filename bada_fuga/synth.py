@@ -827,6 +827,11 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
             continue
+        if recs and ex['v'] == 'BR':                        # ブラシのドラム (キック 36 とスウィッシュ 38 だけ、ハイハットなし)
+            y = drum_brush(36 if ex['m'] <= 36 else 38, ex['d'], ex.get('gain', 0.2)); pan = ex.get('pan', 0.05)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
         if recs and ex['v'] == 'PF':                        # 実録音の音のピアノ (音域で左右に振る)
             y = sampler_tone(ex['m'], max(0.08, ex['d']), ex.get('gain', 0.3), ex.get('rid', ''), rel=ex.get('rel', 0.35))
             pan = max(-0.6, min(0.6, (ex['m'] - 62) / 40.0))

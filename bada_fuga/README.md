@@ -1123,6 +1123,24 @@ python3 build_sampler.py bank2536 20260925_125036.mp3     # bank37.json = bank17
 python3 compose_tablet37.py bank37.json score_tablet37.json && python3 synth.py score_tablet37.json tablet37.wav && python3 video.py score_tablet37.json tablet37.wav tablet37.mp4
 ```
 
+## 🎹🎻🥁 Requiem BADA — Tablet Sessions XXXVIII · Intermezzi (ブラームスの間奏曲 + 坂本龍一の Intermezzo と Sweet Revenge の雰囲気, 約 5 分)
+
+9/24・9/25 の 9 本の録音から。ブラームス (公有) は書法をそのまま借り、坂本龍一の 2 曲は**旋律を引用せず**、響きと編成だけを参照した (Acceptance と同じ方針)。
+
+| 楽章 | 調 / 速さ | 内容 |
+|---|---|---|
+| I. Intermezzo (Brahms) | 変ホ短調 ♩=60 | 13:04 の実音 → 旋律は内声 (テノール)、両手にまたがる幅の広い分散和音が 8 分音符で 3 つずつ回る (2 拍子の中の 3 のうねり、`ARPB`)。中間部は旋律がソプラノへ、終わりは主題の拡大とリタルダンド |
+| II. Intermezzo (坂本の雰囲気) | ヘ短調 ♩=56 | 12:46 の実音 (シンセの部分) → 左手の低いオクターヴ、右手は 5・9・3・9 度の 4 音の繰り返し (add9 の響き)、長いペダル、シンセの実音の薄い持続音 (`SAKA`)。旋律は 2 倍の長さで |
+| III. Sweet Revenge (の雰囲気) | ロ短調 ♩=76 | 12:50 の実音 → ボサノヴァ: Cb pizz の根音 - 5 度、ピアノのシンコペーションの和音 (3・7・9 度)、ブラシ (キックとスウィッシュだけ、ハイハットなし)、厚い弦、m7・maj7・7 の和音 (`BOSSA`・`BRUSH`・`STRG`)。旋律は 12:50 の 2 本と 11:18 の主題、2 回目は Vn I が重なる |
+| IV. Sintesi | 変ホ短調 ♩=66 | ブラームスの内声の旋律 (08:53) + 坂本の 4 音の繰り返し + ボサノヴァの低音とブラシ + 弦 + 11:21 のシンセの実音 |
+| Coda | ♩=50 | 13:04 の本当の終わり → add9 の和音が分散して消える |
+
+`synth.py` / `video.py` にブラシのドラム (`BR`: キック 36 とスウィッシュ 38 だけ) を recsampler で鳴らせるように追加。ステムを測って、旋律 ≈ 実音、伴奏は −3〜−6 dB、低音とブラシはさらに下に。
+
+```bash
+python3 compose_tablet38.py bank37.json score_tablet38.json && python3 synth.py score_tablet38.json tablet38.wav && python3 video.py score_tablet38.json tablet38.wav tablet38.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
