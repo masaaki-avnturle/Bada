@@ -54,7 +54,7 @@ def main(key, src, dst):
     for a, b in zip(lyr_meta, lyr_meta[1:]): a[1] = min(a[1], b[0])
     d['extras'] = d.get('extras', []) + vo
     m = d['meta']; m['lyrics'] = lyr_meta
-    m['title'] = m['title'] + ' (歌入り)'
+    m['title'] = m['title'] + ' · Vocal'
     if 'VO' not in m.get('legend', []): m['legend'] = m.get('legend', []) + ['VO']
     json.dump(d, open(dst, 'w'), ensure_ascii=False)
     print('\n'.join(report)); print('phrases', ph_id, 'VO notes', len(vo))
