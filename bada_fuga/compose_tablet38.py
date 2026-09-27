@@ -181,7 +181,7 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER + [SYN], 'piano_decay': 1.8, 'src_name': {SYN: 'シンセの実音'},
     'title': 'Requiem BADA — Tablet Sessions XXXVIII · Intermezzi',
     'subtitle': 'ブラームスの間奏曲 + 坂本龍一の Intermezzo の雰囲気 + Sweet Revenge の雰囲気 — 9/24・9/25 の 9 本の録音から',
-    'legend': ['TB', 'PF', 'SP', 'CBP', 'V1', 'BR'], 'vname': {'PF': 'ピアノ (分散和音・伴奏)', 'SP': 'シンセの実音', 'CBP': 'Cb pizz', 'V1': '弦', 'BR': 'ブラシ'},
+    'legend': ['TB', 'PF', 'SP', 'CBP', 'V1', 'BR'], 'vname': {'PF': 'ピアノ伴奏', 'SP': 'シンセ', 'CBP': 'Cb pizz', 'V1': '弦', 'BR': 'ブラシ'},
     'footer': ['I. Intermezzo (Brahms, 変ホ短調) → II. Intermezzo (坂本の雰囲気, ヘ短調) → III. Sweet Revenge (の雰囲気, ボサノヴァ, ロ短調) → IV. Sintesi → Coda 13:04',
                'ブラームスは書法を借り、坂本龍一の 2 曲は旋律を引用せず響きと編成だけを参照。音は 9 本の録音の実音と、そこから切り出したピアノとシンセの音。'],
 }
