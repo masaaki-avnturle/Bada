@@ -858,8 +858,8 @@ def main(score='score.json', out='fuga.wav'):
     if vo:
         import sing
         dly = int(0.75 * 60.0 / d['bpm'] * SR)
-        for notes, g, pan, k in sing.phrases(vo):
-            y, t0 = sing.render_phrase(notes, rng_seed=int(k) + 7); y = y * g
+        for notes, g, pan, k, tim in sing.phrases(vo):
+            y, t0 = sing.render_phrase(notes, rng_seed=int(k) + 7, timbre=tim); y = y * g
             i0 = max(0, int(t0 * SR)); i1 = min(i0 + len(y), N); y = y[:i1 - i0]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             HL[i0:i1] += y * cl; HR[i0:i1] += y * cr

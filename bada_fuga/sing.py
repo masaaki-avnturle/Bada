@@ -67,8 +67,10 @@ def _bp(x, lo, hi, order=2):
     from scipy.signal import butter, sosfilt
     return sosfilt(butter(order, [lo, min(hi, SR * 0.45)], 'bandpass', fs=SR, output='sos'), x)
 
-def render_phrase(notes, rng_seed=0):
-    """notes: [(t 秒, d 秒, midi, (子音, 母音) or None)]。None はメリスマ (前の母音のまま音だけ動く)。 (波形, 開始秒) を返す"""
+def render_phrase(notes, rng_seed=0, timbre='voice'):
+    """notes: [(t 秒, d 秒, midi, (子音, 母音) or None)]。None はメリスマ (前の母音のまま音だけ動く)。 (波形, 開始秒) を返す。
+    timbre='hypno': 洗脳のシンセサイザーの声 — デチューンした鋸歯波 3 本 + 1 オクターヴ下 (ボコーダーのように母音で整形)、
+    ビブラートなしのまっすぐな音高、共鳴の山が 8 秒周期でゆっくり往復して倍音がうねる (曲の時刻に同期するので、どのフレーズも同じうねりの中)"""
     rng = np.random.default_rng(rng_seed)
     t0 = notes[0][0] - 0.2; t1 = notes[-1][0] + notes[-1][1] + 0.35
     nf = int((t1 - t0) / FR) + 2; ft = t0 + np.arange(nf) * FR
@@ -122,22 +124,31 @@ def render_phrase(notes, rng_seed=0):
     lf0 = _smooth(lf0, 0.028)
     amp = _smooth(amp, 0.014)
     Ft = _smooth(Ft, 0.022); Bt = _smooth(Bt, 0.022); Wt = _smooth(Wt, 0.022)
+    hyp = timbre == 'hypno'
+    if hyp: vib *= 0.0; lf0 = _smooth(lf0, 0.03)                               # まっすぐな音高、少し長いグライド
     vib = vib * (0.38 * np.sin(2 * np.pi * 5.3 * ft + 0.4) + 0.05 * rng.standard_normal(nf).cumsum() / np.sqrt(np.arange(1, nf + 1)))
     f0 = 440.0 * 2 ** ((lf0 + vib - 69) / 12.0)
     # 倍音の加算
     n = int((t1 - t0) * SR); ts = t0 + np.arange(n) / SR
     f0s = np.interp(ts, ft, f0); amps = np.interp(ts, ft, amp)
     out = np.zeros(n)
-    kmax = int(7000 / f0.min())
-    for det, gv in ((1.0, 1.0), (1.0045, 0.45)):
+    fmax = 5500.0 if hyp else 7000.0
+    kmax = int(fmax / f0.min())
+    if hyp: fc = 400 + 2000 * (0.5 - 0.5 * np.cos(2 * np.pi * 0.125 * ft))     # 共鳴の山 (曲の時刻で往復)
+    for det, gv in (((1.0, 0.8), (1.004, 0.6), (0.996, 0.6)) if hyp else ((1.0, 1.0), (1.0045, 0.45))):
         ph_ = 2 * np.pi * np.cumsum(f0s * det) / SR
         for k in range(1, kmax + 1):
             fk = k * f0 * det
-            if fk.min() > 7000: break
+            if fk.min() > fmax: break
             H = sum(Wt[:, i] / (1 + ((fk - Ft[:, i]) / (0.5 * Bt[:, i])) ** 2) for i in range(4)) + 0.012
             H = H + 0.1 / (1 + ((fk - 3000) / 450) ** 2)                      # 歌い手のフォルマント (声が伴奏から抜ける)
-            a = H * (fk < 7000) * np.clip((7000 - fk) / 1500, 0, 1) / k ** 0.65
+            if hyp: H = (H + 0.03) * (1 + 1.6 / (1 + ((fk - fc) / (0.14 * fc)) ** 2))   # 鋸歯波の明るさ + うねる共鳴
+            a = H * (fk < fmax) * np.clip((fmax - fk) / 1500, 0, 1) / k ** (0.45 if hyp else 0.65)
             out += gv * np.interp(ts, ft, a) * np.sin(k * ph_ + 1.3 * k * (det - 1) * 1000)
+    if hyp:                                                                  # 1 オクターヴ下の矩形波のサブ (低い倍音だけ)
+        ph2 = np.pi * np.cumsum(f0s) / SR
+        out += 0.35 * (np.sin(ph2) + np.sin(3 * ph2) / 3 * 0.5)
+        out *= 0.6
     out *= amps
     out += 0.018 * _bp(rng.standard_normal(n), 1500, 6000) * amps                # 息の成分
     # 子音のノイズ
@@ -173,7 +184,7 @@ def phrases(vo):
                 mm = morae(e['lyr'])
                 ph = (mm[0][0], mm[0][1]) if mm else None
             notes.append((e['t'], e['d'], e['m'], ph))
-        out.append((notes, es[0].get('gain', 0.3), es[0].get('pan', 0.0), k))
+        out.append((notes, es[0].get('gain', 0.3), es[0].get('pan', 0.0), k, es[0].get('tim', 'voice')))
     return out
 
 if __name__ == '__main__':                                                     # 試聴: python sing.py out.wav
@@ -184,6 +195,6 @@ if __name__ == '__main__':                                                     #
     for (c, v, lab), m in zip(words, mel):
         d = 0.9 if lab in ('め',) else 0.38
         notes.append((t, d * 0.97, m, (c, v))); t += d
-    y, _ = render_phrase(notes)
+    y, _ = render_phrase(notes, timbre=sys.argv[2] if len(sys.argv) > 2 else 'voice')
     sf.write(sys.argv[1] if len(sys.argv) > 1 else 'sing_test.wav', y / np.abs(y).max() * 0.8, SR)
     print('ok', len(y) / SR, [w[2] for w in words])

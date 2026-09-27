@@ -44,7 +44,7 @@ def main(key, src, dst):
                 first = i == 0 or idx[i] != idx[i - 1]
                 lab = mm[idx[i]][2] if first else None
                 vo.append({'v': 'VO', 't': round(t, 4), 'd': round(dd * 0.98, 4), 'm': m + sh, 'lyr': lab, 'ph': ph_id,
-                           'gain': round(spec.get('gain', 0.3) * boost, 3), 'label': None, 'beat': 0, 'dbeats': 0})
+                           'gain': round(spec.get('gain', 0.3) * boost, 3), 'tim': spec.get('timbre', 'hypno'), 'label': None, 'beat': 0, 'dbeats': 0})
                 if first: marks.append([round(t, 3), lab])
             lyr_meta.append([round(seq[0][0] - 0.35, 3), round(seq[-1][0] + seq[-1][1] + 0.25, 3), line, marks])
             for n in notes: n['dyn'] = round(n.get('dyn', 1.0) * 0.78, 4)
