@@ -232,8 +232,8 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.6,
     'title': 'Requiem BADA — Tablet Sessions XLI · Recall',
     'subtitle': 'LUNA SEA の Recall のようなロックに Anubis の冥界の響きを合わせたレクイエム — 9/22 の 8 本 (♩=72)',
-    'legend': ['TB', 'CG', 'EB', 'DR', 'OU', 'CO', 'V1'], 'vname': {'V1': '弦'},
-    'footer': ['Introitus (09:01) → Intro → Kyrie → Pre → Sequentia (17:59) → Requiem aeternam 17:57 → Duat (ヒジャーズ) → Solo → Lacrimosa 17:51 (変ロ短調) → Lux aeterna ×2 → In paradisum 09:01',
+    'legend': ['TB', 'CG', 'EB', 'DR', 'OU', 'TA', 'BN', 'CO', 'V1'], 'vname': {'V1': '弦', 'TA': 'タンプーラ', 'BN': 'ネイ'},
+    'footer': ['Introitus 09:01 → Kyrie → Sequentia 17:59 → Requiem aeternam 17:57 → Duat (ヒジャーズ) → Solo → Lacrimosa 17:51 → Lux aeterna ×2 → In paradisum 09:01',
                'LUNA SEA の曲は旋律を引用せず、音色と編曲だけを参照。冥界の部分はヒジャーズの旋法・ウード・ダラブッカ・タンプーラ・ネイ。旋律は 8 本の録音の主題。'],
 }
 

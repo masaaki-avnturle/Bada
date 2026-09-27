@@ -184,7 +184,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         bd.rectangle([lx, yy, lx + 14, yy + 14], fill=c)
         lab = ('%s %s' % (circ[k], meta.get('src_name', {}).get(r, 'わたしの歌声'))) if r.startswith('VOX') else ('%s %d/%d %s:%s' % (circ[k], int(r[4:6]), int(r[6:8]), r[9:11], r[11:13]) if many else '%s %s:%s の音' % (circ[k], r[9:11], r[11:13]))
         bd.text((lx + 20, yy - 3), lab, font=f_small, fill=(200, 204, 216))
-        lx += 112 if many else 132
+        lx += min(124, (W - 60) // max(1, len(RCOL))) if many else 132
     for i, line in enumerate(th['footer']):
         bd.text((30, (662 if many else 640) + 22 * i), line, font=f_small, fill=(150, 156, 176) if i < 2 else (120, 126, 146))
 
