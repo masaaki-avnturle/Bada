@@ -27,7 +27,8 @@ import compose_tablet3 as T3
 import compose_tablet5 as T5
 import compose_tablet7 as T7
 
-add, REC, hm = CT.add, CT.REC, T3.hm
+add, REC = CT.add, CT.REC
+def hm(r): return T3.hm(r) + (':' + r[13:15] if r[9:13] == '1250' else '')     # 12:50:36 と 12:50:53 を区別する
 BPM = 148; BAR_S = 240.0 / BPM
 R1, R2, R3, R4 = '20260925_124643', '20260925_125053', '20260925_125036', '20260925_130431'
 KEYS = {R1: 3, R2: -3, R3: -3, R4: 1}
@@ -204,7 +205,7 @@ META = {
     'title': 'Requiem BADA — Tablet Sessions XLII · Ray',
     'subtitle': 'LUNA SEA の Ray を参考にした、疾走する 90 年代のロック — 9/25 の 4 本の録音から (♩=148)',
     'legend': ['TB', 'CG', 'DG', 'EB', 'DR', 'LG', 'VN', 'V1'], 'vname': {'V1': '弦', 'VN': 'バイオリン'},
-    'footer': ['Intro 12:50:53 → Band → Verse (12:50:36) → Pre → Chorus (12:46) → Interlude 12:46 → Verse 2 → Pre → Chorus 2 → Violin solo (変ホ短調) → Break 13:04 → Last chorus ×2 (ハ短調) → Outro',
+    'footer': ['Intro 12:50:53 → Verse (12:50:36) → Chorus (12:46) → Interlude → Verse 2 → Chorus 2 → Violin solo (変ホ短調) → Break 13:04 → Last chorus ×2 (ハ短調) → Outro',
                'LUNA SEA の曲は旋律を引用せず、音色と編曲 (駆ける 8 ビート、走るベース、クリーンと歪みの 2 本のギター、バイオリン) だけを参照。旋律は 4 本の録音の主題。'],
 }
 
