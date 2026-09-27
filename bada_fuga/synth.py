@@ -400,6 +400,18 @@ def rock_drum(kind, vel=0.8, freq=110.0, sr=SR):
         if kind == 'ride': y += 0.4 * np.sin(2 * np.pi * 3100 * t) * np.exp(-t * 2)
         y *= np.exp(-t * dec) * (1 - np.exp(-t / 0.001))
         if kind == 'crash': y *= 1.2
+    elif kind in ('dum', 'tek', 'daf'):                                        # ダラブッカ (dum = 胴の低音 / tek = 縁の乾いた音) と枠太鼓 (daf、鈴なし)
+        n = int({'dum': 0.7, 'tek': 0.16, 'daf': 1.0}[kind] * sr); t = np.arange(n, dtype=np.float32) / sr
+        if kind == 'tek':
+            nz = _lp(_noise(n, 7), 0.35); nz = nz - _lp(nz, 0.06)
+            y = 0.8 * np.sin(2 * np.pi * 640 * t) * np.exp(-t * 55) + 0.7 * nz * np.exp(-t * 70)
+            y = _lp(y, 0.45)                                                   # 高い金属音は出さない
+        else:
+            f0 = 88.0 if kind == 'dum' else 62.0
+            f = f0 * (1 + 0.5 * np.exp(-t * 30)); dec = 5.5 if kind == 'dum' else 3.2
+            y = np.sin(2 * np.pi * np.cumsum(f) / sr) * np.exp(-t * dec) + 0.3 * np.sin(2 * np.pi * np.cumsum(f * 1.59) / sr) * np.exp(-t * dec * 2.2)
+            y += 0.25 * _lp(_noise(n, 8), 0.12) * np.exp(-t * 45)
+            y = np.tanh(1.3 * y)
     else:                                                                      # tom
         n = int(0.6 * sr); t = np.arange(n, dtype=np.float32) / sr
         f = freq * (1 + 0.35 * np.exp(-t * 25))
@@ -536,6 +548,20 @@ def clean_guitar(freq, dur, vel=0.3, sr=SR):
     y = y - _lp(y, 0.02)                                                          # 低域を少し削る (シングルコイル)
     i0 = int(dur * sr)
     if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.35)
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
+def oud_tone(freq, dur, vel=0.3, sr=SR):
+    """ウード (フレットのない撥弦、羽根のピックで駒の近く): 明るい立ち上がり、短い余韻、胴の鼻にかかった響き"""
+    from scipy.signal import lfilter
+    n = int((dur + 0.9) * sr); P = int(sr / freq) + 1
+    burst = np.random.default_rng(int(freq * 11) % 99991).uniform(-1, 1, P)
+    burst = lfilter([0.7, 0.3], [1.0], burst) * np.hanning(P) ** 0.3
+    y = _ks_string(freq, n, 1.1 * (220.0 / freq) ** 0.3, burst, sr)
+    y = y / (np.abs(y).max() + 1e-9)
+    y = 0.6 * y + 0.5 * (_lp(y, 0.12) - _lp(y, 0.03))                              # 胴の中域
+    y = _lp(_lp(y, 0.3), 0.5)
+    t = np.arange(n, dtype=np.float32) / sr; i0 = int(dur * sr)
+    if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.12)
     return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
 
 def picked_bass(freq, dur, vel=0.4, sr=SR):
@@ -896,10 +922,14 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
-        if recs and ex['v'] in ('CG', 'EB', 'LG'):          # ロックのバンド: クリーン・ギター / ベース / リードギター (乾いた音 + 響き)
+        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
-            y = clean_guitar(freq, ex['d'], vel) if v == 'CG' else (picked_bass(freq, ex['d'], vel) if v == 'EB' else lead_guitar(freq, ex['d'], vel))
-            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4}[v]
+            if v == 'CG': y = clean_guitar(freq, ex['d'], vel)
+            elif v == 'EB': y = picked_bass(freq, ex['d'], vel)
+            elif v == 'LG': y = lead_guitar(freq, ex['d'], vel)
+            elif v == 'OU': y = oud_tone(freq, ex['d'], vel)
+            else: y = choir_tone(freq, ex['d'], a=0.5, r=1.2) * vel
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8}[v]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr

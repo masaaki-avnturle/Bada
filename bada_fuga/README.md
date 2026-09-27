@@ -1175,6 +1175,23 @@ python3 build_sampler.py bank40 20260922_1745*.mp3 20260922_1748*.mp3 20260922_1
 python3 compose_tablet40.py bank40.json score_tablet40.json && python3 synth.py score_tablet40.json tablet40.wav && python3 video.py score_tablet40.json tablet40.wav tablet40.mp4
 ```
 
+## 🎸🏺 Requiem BADA — Tablet Sessions XLI · Recall (LUNA SEA の Recall のようなロックに、Anubis の冥界の響きを合わせたレクイエム, ♩=72, 約 4 分 55 秒)
+
+9/22 の 8 本の録音 (09:01・09:09・17:45・17:48・17:51・17:53・17:57・17:59、`bank41.json` = `bank40` + 09:01) から。LUNA SEA の曲は
+**旋律を引用せず**、音色と編曲だけを参照した (コーラスのクリーン・ギターの分散和音と付点 8 分のディレイ、歌うベース、ハーフタイムから 8 ビートへ開くドラム、リードギター、弦)。
+「Anubis」は死者の魂を冥界へ導くエジプトの神として解釈し、その響きをレクイエムに重ねた。旋律は 8 本の録音の主題 (ピアノの実音)。
+
+- **ヒジャーズの旋法** — レ・ミ♭・ファ#・ソ・ラ・シ♭・ド。冥界 (Duat) の部分では録音の主題をこの旋法に読み替え (`hijaz`)、和声は 2 拍ごとに D / E♭ / Cm / Gm から選ぶ (`harm_hijaz`)
+- **新しい音** (`synth.py`) — ウード (`oud_tone`: フレットのない撥弦、胴の中域、高域は削る)、ダラブッカ (`rock_drum` の `dum` / `tek`) と枠太鼓 (`daf`、鈴なしで金属音を出さない)、
+  合唱 (`CO`: `choir_tone` の Ah)。タンプーラとネイ (バンスリの音) は既存のもの
+- **レクイエムの流れ** — Introitus (冥界の入口: タンプーラ・枠太鼓・ネイ → 09:01 の実音) → Kyrie (Verse) → Pre → Sequentia (サビ, 17:59) → Requiem aeternam (17:57 の実音)
+  → Duat (ホのヒジャーズ: ウード・マクスームのダラブッカ・合唱) → ギター・ソロ → Lacrimosa (17:51 の実音 → 17:53 の主題を 2 倍の長さで) → Lux aeterna (最後のサビ ×2) → In paradisum (09:01 の本当の終わり) → ホ長調で消える
+- **調** — ロ短調 (17:45・17:48・17:59) を中心に、ホ短調の 09:01・09:09・17:57 を冥界 (ホのヒジャーズ) に、変ロ短調の 17:51・17:53 を Lacrimosa に通り、最後のサビは半音上のロ短調へ戻る
+
+```bash
+python3 compose_tablet41.py bank41.json score_tablet41.json && python3 synth.py score_tablet41.json tablet41.wav && python3 video.py score_tablet41.json tablet41.wav tablet41.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
