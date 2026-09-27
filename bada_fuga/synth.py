@@ -550,6 +550,28 @@ def clean_guitar(freq, dur, vel=0.3, sr=SR):
     if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.35)
     return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
 
+def drive_guitar(freq, dur, vel=0.3, mute=False, sr=SR):
+    """歪んだエレキギターのパワーコード (撥弦 = Karplus-Strong の根音・5 度・オクターヴ → 真空管のような歪み → キャビネットの低域通過)。
+    mute=True はブリッジ・ミュートの刻み。鋸歯波のシンセではないので、ゲームのような音にならない"""
+    from scipy.signal import lfilter
+    n = int((dur + (0.08 if mute else 0.5)) * sr); t = np.arange(n, dtype=np.float32) / sr
+    y = np.zeros(n, dtype=np.float32)
+    for k, (r, a) in enumerate(((1.0, 1.0), (1.4983, 0.85), (2.0, 0.55))):
+        f = freq * r * (1 + 0.0015 * (k - 1)); P = int(sr / f) + 1
+        burst = lfilter([0.6, 0.4], [1.0], np.random.default_rng(int(f * 5) % 99991 + k).uniform(-1, 1, P))
+        z = np.zeros(n, dtype=np.float32); d0 = int(0.004 * k * sr)                  # ピックが弦を順に弾く
+        z[d0:] = _ks_string(f, n - d0, 0.5 if mute else 3.0, burst, sr)
+        y += a * z / (np.abs(z).max() + 1e-9)
+    if mute: y *= np.exp(-t / 0.07)
+    y = y - _lp(y, 0.012)
+    y = np.tanh(6.0 * y) / np.tanh(6.0)                                           # 歪み
+    y = _lp(_lp(y, 0.28), 0.28)                                                  # キャビネット (高域を丸める)
+    y = y - 0.35 * (_lp(y, 0.05) - _lp(y, 0.015))                                # 中域を少し削る
+    i0 = int(dur * sr)
+    if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.05)
+    y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
 def oud_tone(freq, dur, vel=0.3, sr=SR):
     """ウード (フレットのない撥弦、羽根のピックで駒の近く): 明るい立ち上がり、短い余韻、胴の鼻にかかった響き"""
     from scipy.signal import lfilter
@@ -922,14 +944,15 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
-        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
+        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
             if v == 'CG': y = clean_guitar(freq, ex['d'], vel)
             elif v == 'EB': y = picked_bass(freq, ex['d'], vel)
             elif v == 'LG': y = lead_guitar(freq, ex['d'], vel)
             elif v == 'OU': y = oud_tone(freq, ex['d'], vel)
+            elif v == 'DG': y = drive_guitar(freq, ex['d'], vel, mute=ex.get('mute', False))
             else: y = choir_tone(freq, ex['d'], a=0.5, r=1.2) * vel
-            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8}[v]
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12}[v]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr

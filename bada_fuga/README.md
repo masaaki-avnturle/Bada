@@ -1192,6 +1192,22 @@ python3 compose_tablet40.py bank40.json score_tablet40.json && python3 synth.py 
 python3 compose_tablet41.py bank41.json score_tablet41.json && python3 synth.py score_tablet41.json tablet41.wav && python3 video.py score_tablet41.json tablet41.wav tablet41.mp4
 ```
 
+## 🎸🎻 Requiem BADA — Tablet Sessions XLII · Ray (LUNA SEA の Ray を参考にした、疾走する 90 年代のロック, ♩=148, 約 4 分 40 秒)
+
+9/25 の 4 本の録音 (12:46・12:50:36・12:50:53・13:04、`bank37.json`) から。LUNA SEA の曲は**旋律を引用せず**、音色と編曲だけを参照した。
+旋律は 4 本の録音の主題 (ピアノの実音) を 2 倍の長さにして、速いバンドの上で歌が大きく流れるようにした (ソロだけ元の速さ)。
+
+- **駆ける 8 ビート** (キック 1・2 拍目の裏・3・3 拍目の裏、スネア 2・4) と、8 分で走り続けるベース (4 拍目の裏で次の和音へ半音で寄る)
+- **2 本のギター** — コーラスのクリーン・ギターの分散和音 (付点 8 分のディレイ) と、新しい歪んだギター (`synth.py` の `drive_guitar`:
+  Karplus-Strong の根音・5 度・オクターヴ → 歪み → キャビネットの低域通過。鋸歯波のシンセではないのでゲームのような音にならない)。Verse はブリッジ・ミュートの刻み、サビで開く
+- **バイオリンのソロ** (変ホ短調) — 13:04 と 12:46 の主題を元の速さで。最後のサビの 2 回目は 1 オクターヴ上で旋律に重なる
+- **調** — ロ短調 (12:50) を中心に、ヘ短調の 12:46 を間奏に、変ホ短調のソロと 13:04 のブレイクを通って、最後のサビは半音上のハ短調へ → 全員の最後の一撃 → 13:04 の本当の終わり
+- 形式: Intro (12:50:53 の実音 → バンド) → Verse 1 (12:50:36) → Pre → Chorus 1 (12:46) → Interlude (12:46 の実音) → Verse 2 → Pre → Chorus 2 → Violin solo → Break (13:04) → Last chorus ×2 → 最後の一撃 → Outro
+
+```bash
+python3 compose_tablet42.py bank37.json score_tablet42.json && python3 synth.py score_tablet42.json tablet42.wav && python3 video.py score_tablet42.json tablet42.wav tablet42.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
