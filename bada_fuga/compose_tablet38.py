@@ -148,7 +148,7 @@ def build():
     # ================= III. Sweet Revenge (の雰囲気) — ロ短調のボサノヴァ
     excerpt(R2, 4, 'III. Sweet Revenge — %s の実音 (ロ短調)' % hm(R2), '12:50 の実音からボサノヴァへ')
     f = b; E = []
-    P.section(b, 'III. Sweet Revenge (の雰囲気) — ♩=76 のボサノヴァ', 'Cb のピッツィカート (根音 - 5 度)、ピアノのシンコペーションの和音 (3・7・9 度)、ブラシ、厚い弦、m7・maj7・7 の和音 — 旋律は 12:50 の 2 本と 11:18 の主題 (旋律の引用はしない)')
+    P.section(b, 'III. Sweet Revenge (の雰囲気) — ♩=76 のボサノヴァ', 'Cb pizz (根音 - 5 度)、ピアノのシンコペーションの和音 (3・7・9 度)、ブラシ、厚い弦、7 の和音 — 旋律は 12:50 の 2 本と 11:18 の主題')
     for k, r in enumerate((R3, R2, B2, R3, R2, B2, R3, R2)):
         E += place(P, 'S', f + 2 * k, subj(r), 0, '旋律 (%s)' % hm(r) if k < 3 else None); harm_of(P, f + 2 * k, subj(r), jazz=True)
     for v in ('A', 'T', 'B'): P.rest_bars(v, f, f + 16)
