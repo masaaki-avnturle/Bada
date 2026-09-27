@@ -1157,6 +1157,24 @@ python3 compose_tablet38.py bank37.json score_tablet38.json && python3 synth.py 
 python3 compose_tablet39.py bank37.json score_tablet39.json && python3 synth.py score_tablet39.json tablet39.wav && python3 video.py score_tablet39.json tablet39.wav tablet39.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions XL · Human Nature (SWV「Right Here (Human Nature Remix)」のような 90 年代 R&B のスロー・ジャム, ♩=90, 約 3 分 30 秒)
+
+9/22 の 9 本の録音 (09:09・17:45・17:48 ×2・17:51・17:53・17:54・17:57・17:59、`bank40.json`) から。SWV の曲とその元の Michael Jackson「Human Nature」は
+**旋律も印象的なフレーズも引用せず**、音と編曲だけを参照した。旋律は 9 本の録音の主題 (ピアノの実音)。
+
+- **ビート** — 16 分のスウィング (裏の 16 分を 0.07 拍遅らせる、`sw`)、キック (1 拍・2 拍目の裏の 16 分・3 拍目の裏)、スネア 2・4、やわらかいハイハット (`BEAT`)
+- **ローズ** — `synth.py` の `rhodes_tone`: 1:1 の FM で柔らかく、2 kHz 以上の金属的な倍音を入れない (以前の FM エレピとは別)。
+  コンピング (1 拍目・2 拍目の裏の 16 分・3 拍目の裏、3・7・9・5 度のルートレス・ボイシング、`RHC`) と、夢見るように上がる 16 分の分散和音 (自作の音型、`RHA`)
+- **なめらかなベース** (`picked_bass`) と弦、サビで Vn I が旋律に重なる
+- **7 と 9 の和音** — 録音の主題の和声を m7・maj7・7 に (`JAZZ`)
+- **調** — ニ長調 / ロ短調 (17:45・17:48・17:59) を中心に、ホ短調の 17:57 を ii の間奏に、変ロ短調の 3 本をブリッジに通って、最後のサビは半音上の変ホ長調へ (R&B の転調、ブリッジの終わりの B♭7 が V)
+- 形式: Intro (17:48 の実音 + ローズ) → Verse 1 → Pre (G△7 - F#m7 - Em7 - A7) → Chorus 1 → Interlude (17:57) → Verse 2 → Pre → Chorus 2 → Bridge (17:51 の実音 → 17:53・17:54) → Last chorus ×2 (変ホ長調) → Outro (フェード) → E♭maj9
+
+```bash
+python3 build_sampler.py bank40 20260922_1745*.mp3 20260922_1748*.mp3 20260922_1751*.mp3 20260922_1753*.mp3 20260922_1754*.mp3 20260922_1757*.mp3 20260922_1759*.mp3   # + 09:09 (bank22)
+python3 compose_tablet40.py bank40.json score_tablet40.json && python3 synth.py score_tablet40.json tablet40.wav && python3 video.py score_tablet40.json tablet40.wav tablet40.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

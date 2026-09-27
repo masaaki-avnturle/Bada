@@ -562,6 +562,20 @@ def lead_guitar(freq, dur, vel=0.2, sr=SR):
     y = _lp(_lp(y, 0.25), 0.3); y = y - _lp(y, 0.015)
     return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
 
+def rhodes_tone(freq, dur, vel=0.3, sr=SR):
+    """あたたかいローズ (1:1 の FM で柔らかく、金属的な高い倍音は入れない)、ゆっくりしたトレモロ"""
+    n = int((dur + 1.6) * sr); t = np.arange(n, dtype=np.float32) / sr
+    idx = (0.6 + 1.0 * vel) * np.exp(-t * 2.5) + 0.25
+    y = np.sin(2 * np.pi * freq * t + idx * np.sin(2 * np.pi * freq * t))
+    y += 0.25 * np.sin(2 * np.pi * 2 * freq * t) * np.exp(-t * 4.0)
+    e = 0.65 * np.exp(-t * (0.9 + freq / 1500.0)) + 0.35 * np.exp(-t * 0.3)
+    i0 = int(dur * sr)
+    if i0 < n: e[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.3)
+    y *= e * (1 + 0.07 * np.sin(2 * np.pi * 4.5 * t))
+    y[:int(0.004 * sr)] *= np.linspace(0, 1, int(0.004 * sr))
+    y = _lp(y, 0.35)
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
 def guitar_power(freq, dur, vel=0.5, mute=True, sr=SR):
     """歪んだギターのパワーコード (根音 + 5 度 + オクターヴ)。mute=True はブリッジ・ミュートの刻み"""
     n = int((dur + (0.06 if mute else 0.6)) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -874,6 +888,13 @@ def main(score='score.json', out='fuga.wav'):
             pan = 0.0 if ex['v'] == 'PD' else 0.15
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
+        if recs and ex['v'] == 'RH':                        # ローズ (ステレオのトレモロは左右の振りで)
+            y = rhodes_tone(freq, ex['d'], ex.get('gain', 0.25)); pan = ex.get('pan', 0.0)
+            cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
+            L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
         if recs and ex['v'] in ('CG', 'EB', 'LG'):          # ロックのバンド: クリーン・ギター / ベース / リードギター (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
