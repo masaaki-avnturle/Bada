@@ -1245,6 +1245,28 @@ python3 add_vocals.py tablet40 score_tablet40.json score_tablet40v.json   # 41�
 python3 synth.py score_tablet40v.json tablet40v.wav && python3 video.py score_tablet40v.json tablet40v.wav tablet40v.mp4
 ```
 
+## 🎸🎤 Requiem BADA — Tablet Sessions XLIV · Anubis (LUNA SEA の Anubis を参考にした、暗く重いレクイエム — 9/28 のわたしの声で歌う, ♩=84, 約 4 分 25 秒)
+
+9/22 の 8 本の録音 (`bank41.json`) と、**2026/9/28 06:42 のわたしの声** (話し声の録音) から。LUNA SEA の曲は**旋律も歌詞も引用せず**、
+雰囲気と編曲だけを参照した (暗く重い歪んだギターのリフ、儀式のようなタムの連打、コーラスのクリーン・ギターの分散和音、うねるベース、弦)。
+歌詞はこの曲のために書いたオリジナル (`lyrics_tablet.py` の `tablet44`)。
+
+- **わたしの声を取り出す** (`voice_templates.py`) — WORLD (pyworld) で 5 ms ごとに分析し、有声のフレームの F1・F2 を LPC で測って、
+  話者ごとに正規化して日本語の母音 (あ・い・う・え・お) に分け、はっきり分かれて安定したフレームだけで母音ごとのスペクトル包絡 (その人の声の響き) を作る。
+  無声の s も同じように。出力の npz は録音から作ったデータなのでリポジトリには入れない
+- **わたしの声で歌う** (`sing_user.py`) — 歌詞の母音の順に響きをつなぎ、旋律の音高 (ポルタメント、遅れて入るビブラート) で WORLD に鳴らす。
+  響きはそのまま、音高だけが歌になる。録音はこもっていた (500 Hz より上が急に落ちる) ので、5 つの母音の平均をふつうの声の平均に合わせる補正と、
+  母音の違いを少しはっきりさせる補正をかけた。声域はバリトン (フレーズの平均がシ2〜ド4)
+- `add_vocals.py tablet44 score_tablet44.json score_tablet44v.json voice0928_tmpl.npz` で歌を入れ、`synth.py` は `VO` の `tim='user'` を `sing_user` で合成する
+- 形式: Introitus (17:57 の実音 → 重いリフ) → Verse 1 (ホ短調、09:09・09:01) → Pre (刻みとタム) → Chorus 1 (ロ短調、17:59) → Interlude (17:48)
+  → Verse 2 → Pre → Chorus 2 → Lacrimosa (17:51 → 17:53 の主題を 2 倍) → Solo (リードギター) → Last chorus ×2 → In paradisum (09:01 の本当の終わり)
+
+```bash
+python3 voice_templates.py voice0928.wav voice0928_tmpl.npz
+python3 compose_tablet44.py bank41.json score_tablet44.json && python3 add_vocals.py tablet44 score_tablet44.json score_tablet44v.json voice0928_tmpl.npz
+python3 synth.py score_tablet44v.json tablet44v.wav && python3 video.py score_tablet44v.json tablet44v.wav tablet44v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

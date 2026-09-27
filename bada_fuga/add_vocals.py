@@ -6,13 +6,13 @@
   1 音に 1 モーラ。モーラが多ければ長い音を半分に割って足し、少なければ音をまたいで母音をのばす (メリスマ)。
   歌はフレーズごとに声域 (ラ3〜ミ5 くらい) に収まるようオクターヴを選ぶ。ピアノの旋律は歌の下で少し控えめに (dyn × 0.78)。
   出力: extras に 'VO'、meta に 'lyrics' (動画に歌詞を出す)、題名に「歌入り」。
-  使い方: python add_vocals.py tablet40 score_tablet40.json score_tablet40v.json
+  使い方: python add_vocals.py tablet40 score_tablet40.json score_tablet40v.json [voice.npz (その人の声で歌う曲だけ)]
 """
 import sys, json
 import sing
 from lyrics_tablet import LYRICS
 
-def main(key, src, dst):
+def main(key, src, dst, voice_bank=None):
     d = json.load(open(src)); spec = LYRICS[key]
     bar_s = 240.0 / d['bpm']; secs = d['sections']
     S = sorted([n for n in d['notes'] if n['v'] == 'S'], key=lambda n: n['t'])
@@ -37,8 +37,9 @@ def main(key, src, dst):
             nm, nn = len(mm), len(seq)
             idx = [min(nm - 1, i * nm // nn) for i in range(nn)]           # 少ない: 均等にメリスマ
             mean = sum(m for _, _, m in seq) / nn; sh = 0
-            while mean + sh > 72: sh -= 12
-            while mean + sh < 57: sh += 12
+            lo_, hi_ = spec.get('range', (57, 72))                          # 声域 (フレーズの平均の音高をこの間に)
+            while mean + sh > hi_: sh -= 12
+            while mean + sh < lo_: sh += 12
             marks = []
             for i, (t, dd, m) in enumerate(seq):
                 first = i == 0 or idx[i] != idx[i - 1]
@@ -54,10 +55,14 @@ def main(key, src, dst):
     for a, b in zip(lyr_meta, lyr_meta[1:]): a[1] = min(a[1], b[0])
     d['extras'] = d.get('extras', []) + vo
     m = d['meta']; m['lyrics'] = lyr_meta
-    m['title'] = m['title'] + ' · Vocal'
+    if spec.get('timbre') == 'user':                                    # その人の声の型 (voice_templates.py の npz)
+        assert voice_bank, 'この曲は声の型 (npz) が要る: add_vocals.py key src dst voice.npz'
+        m['voice_bank'] = voice_bank
+    if spec.get('title_suffix', ' · Vocal'): m['title'] = m['title'] + spec.get('title_suffix', ' · Vocal')
+    if spec.get('voice_name'): m.setdefault('vname', {})['VO'] = spec['voice_name']
     if 'VO' not in m.get('legend', []): m['legend'] = m.get('legend', []) + ['VO']
     json.dump(d, open(dst, 'w'), ensure_ascii=False)
     print('\n'.join(report)); print('phrases', ph_id, 'VO notes', len(vo))
 
 if __name__ == '__main__':
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])
