@@ -1222,6 +1222,26 @@ LUNA SEA の Recall だけを参考にした (**旋律は引用せず**、音色
 python3 compose_tablet43.py bank41.json score_tablet43.json && python3 synth.py score_tablet43.json tablet43.wav && python3 video.py score_tablet43.json tablet43.wav tablet43.mp4
 ```
 
+## 🎤 Tablet Sessions XL〜XLIII · 歌入り (シンセサイザーの歌声で歌詞をうたう)
+
+XL · Human Nature、XLI · Recall、XLII · Ray、XLIII · Recall II の旋律に、シンセサイザーの歌声で日本語の歌詞をのせた版。
+歌詞はすべてこの 4 曲のために書いたオリジナル (`lyrics_tablet.py`、参考にした曲の歌詞は使っていない)。
+
+- **歌声** (`sing.py`) — 倍音の加算合成。声帯の音 (倍音列) を日本語の母音 (あ・い・う・え・お・ん) のフォルマントで整形し、
+  5 ms ごとに母音から母音へなめらかに動かす。音高はポルタメントでつなぎ、長い音には 0.3 秒遅れてビブラート。
+  子音はノイズ (s・sh・h・f と、k・t・p の破裂) と有声のつなぎ (n・m・r・y・w・g・d・b・z・j)、拗音 (きゃ・しゅ…) も。
+  少し揺らした 2 本目の声を重ねてシンセサイザーらしく、7 kHz より上の倍音は切って耳に刺さらないようにした
+- **歌詞ののせ方** (`add_vocals.py`) — 区間ごとに主題 1 つ分 (XLII は 2 倍の長さの 4 小節) を 1 フレーズとして 1 行を割り当てる。
+  1 音に 1 モーラ、モーラが多ければ長い音を半分に割り、少なければ母音をのばす (メリスマ)。フレーズごとに声域に収まるオクターヴを選ぶ。
+  録音の実音の区間とギター / バイオリンのソロではうたわない。ピアノの旋律は歌の下で控えめに、サビでは歌を少し前に
+- **動画** — 画面の下に歌詞を出し、うたい終えたモーラから金色に変わる (カラオケのように)
+- `synth.py` は extras の `VO` をフレーズごとに `sing.render_phrase` で合成し、乾いた音 + 響き + 付点 8 分のディレイで混ぜる
+
+```bash
+python3 add_vocals.py tablet40 score_tablet40.json score_tablet40v.json   # 41・42・43 も同じ
+python3 synth.py score_tablet40v.json tablet40v.wav && python3 video.py score_tablet40v.json tablet40v.wav tablet40v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

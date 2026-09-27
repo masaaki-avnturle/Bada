@@ -853,8 +853,22 @@ def main(score='score.json', out='fuga.wav'):
         pan = tb['pan'] if not piano else max(-0.6, min(0.6, (nt['m'] - 60) / 40.0))
         L[i0:i1] += y[:i1 - i0] * g * math.cos((pan + 1) * math.pi / 4)
         R[i0:i1] += y[:i1 - i0] * g * math.sin((pan + 1) * math.pi / 4)
+    # シンセの歌声 (歌詞): フレーズごとに合成 (sing.py)、乾いた音を前に + 響きへ少し + 付点 8 分のディレイ
+    vo = [e for e in d.get('extras', []) if e['v'] == 'VO']
+    if vo:
+        import sing
+        dly = int(0.75 * 60.0 / d['bpm'] * SR)
+        for notes, g, pan, k in sing.phrases(vo):
+            y, t0 = sing.render_phrase(notes, rng_seed=int(k) + 7); y = y * g
+            i0 = max(0, int(t0 * SR)); i1 = min(i0 + len(y), N); y = y[:i1 - i0]
+            cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            HL[i0:i1] += y * cl; HR[i0:i1] += y * cr
+            L[i0:i1] += y * 0.3; R[i0:i1] += y * 0.3
+            j0 = min(i0 + dly, N); j1 = min(j0 + len(y), N)
+            L[j0:j1] += y[:j1 - j0] * 0.12; R[j0:j1] += y[:j1 - j0] * 0.16
     # 鐘・ドローン
     for ex in d.get('extras', []):
+        if ex['v'] == 'VO': continue
         freq = 440.0 * 2 ** ((ex['m'] - 69) / 12.0)
         if (concerto or symphony or pconcerto) and ex['v'] in ('V1', 'V2', 'VA', 'VC', 'CB', 'WW', 'FL', 'HN', 'TP', 'TR', 'TB', 'CL'):
             v = ex['v']; vel = ex.get('gain', 0.4)

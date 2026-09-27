@@ -119,7 +119,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         VNAME.update({'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
         COL.update({'BR': (235, 110, 90)}); VNAME.update({'BR': 'ブラシ'})
         COL.update({'CG': (140, 210, 240), 'EB': (120, 100, 220), 'LG': (255, 180, 90), 'DR': (235, 70, 90)}); VNAME.update({'CG': 'ギター', 'EB': 'ベース', 'LG': 'リードギター', 'DR': 'ドラム'})
-        COL.update({'RH': (240, 190, 120), 'OU': (200, 140, 80), 'CO': (190, 200, 235), 'DG': (230, 120, 70)}); VNAME.update({'RH': 'ローズ', 'OU': 'ウード', 'CO': '合唱', 'DG': '歪みギター'})
+        COL.update({'RH': (240, 190, 120), 'OU': (200, 140, 80), 'CO': (190, 200, 235), 'DG': (230, 120, 70), 'VO': (255, 214, 120)}); VNAME.update({'RH': 'ローズ', 'OU': 'ウード', 'CO': '合唱', 'DG': '歪みギター', 'VO': '歌 (シンセ)'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
         if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]
@@ -153,6 +153,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     rms = rms / (rms.max() + 1e-9)
 
     f_title = font(SERIF, 40); f_sub = font(JP, 17); f_sec = font(JP, 23); f_secsub = font(JP, 15)
+    f_lyr = font(JP, 28)
     f_small = font(JP, 14); f_lab = font(JP, 15); f_chord = font(SERIF_I, 22); f_num = font(SERIF, 20)
 
     # 背景 (固定部分) を一度描いて再利用
@@ -175,7 +176,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70, 'GL': 120, 'SUB': 120, 'RS': 165, 'RL': 165, 'VN': 150, 'SP': 190, 'PF': 120, 'CBP': 100, 'CB': 70, 'TA': 100, 'BN': 100, 'BR': 80, 'CG': 90, 'EB': 90, 'LG': 130, 'DR': 90, 'RH': 90, 'OU': 90, 'CO': 80, 'DG': 120}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
+        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70, 'GL': 120, 'SUB': 120, 'RS': 165, 'RL': 165, 'VN': 150, 'SP': 190, 'PF': 120, 'CBP': 100, 'CB': 70, 'TA': 100, 'BN': 100, 'BR': 80, 'CG': 90, 'EB': 90, 'LG': 130, 'DR': 90, 'RH': 90, 'OU': 90, 'CO': 80, 'DG': 120, 'VO': 110}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
     circ = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯'
     many = len(RCOL) > 5 or lx + 132 * len(RCOL) > W - 20   # 録音が多い (入りきらない) ときは録音の凡例を 2 段目に
     if many: lx = 30
@@ -303,6 +304,19 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         # 現在の和音
         bi = min(int(beat), len(harm) - 1)
         dr.text((NOW_X + 8, ROLL_Y1 - 26), harm[bi], font=f_chord, fill=(190, 186, 170))
+        # 歌詞 (シンセの歌声): うたい終えたモーラから金色に
+        for ly in meta.get('lyrics', []):
+            if ly[0] <= now < ly[1]:
+                txt = ly[2]; wtot = f_lyr.getlength(txt); x = (W - wtot) / 2; yb = ROLL_Y1 - 70
+                dr.rectangle([x - 16, yb - 6, x + wtot + 16, yb + 38], fill=(10, 12, 20))
+                sung = sum(len(lab) for tt, lab in ly[3] if tt <= now)
+                k = 0
+                for ch in txt:
+                    on = ch != ' ' and k < sung
+                    dr.text((x, yb), ch, font=f_lyr, fill=(255, 214, 120) if on else (150, 156, 176))
+                    x += f_lyr.getlength(ch)
+                    if ch != ' ': k += 1
+                break
         # 休止のオマージュ
         if pause_t - 0.2 <= now < pause_t + 1.6:
             dr.text((NOW_X + 20, ROLL_Y0 + 20), '— 休止 —  (自筆譜が途切れる箇所へのオマージュ)', font=f_sec, fill=(210, 200, 170))
