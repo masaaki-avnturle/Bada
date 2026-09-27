@@ -1208,6 +1208,20 @@ python3 compose_tablet41.py bank41.json score_tablet41.json && python3 synth.py 
 python3 compose_tablet42.py bank37.json score_tablet42.json && python3 synth.py score_tablet42.json tablet42.wav && python3 video.py score_tablet42.json tablet42.wav tablet42.mp4
 ```
 
+## 🎸🌆 Requiem BADA — Tablet Sessions XLIII · Recall II (XLI から Anubis の要素を外し、LUNA SEA の Recall だけを参考にしたロック, ♩=72, 約 4 分 40 秒)
+
+XLI · Recall と同じ 9/22 の 8 本の録音 (`bank41.json`) から。ヒジャーズの旋法・ウード・ダラブッカ・タンプーラ・ネイ・合唱をすべて外し、
+LUNA SEA の Recall だけを参考にした (**旋律は引用せず**、音色と編曲だけ: コーラスのクリーン・ギターの分散和音と付点 8 分のディレイ、2 本目のギター、
+歌うベース、ハーフタイムから 8 ビートへ開くドラム、リードギター、もの悲しい弦)。旋律は 8 本の録音の主題 (ピアノの実音)。
+
+- 冥界 (Duat) だった部分は、ホ短調の Verse 2 (09:09・17:57 の主題) とギター・ソロ (09:01・09:09 の主題) に
+- **調** — 09:01 の実音 (ホ短調) で始まり、ロ短調のバンド → ホ短調の間奏・Verse 2・ソロ → 変ロ短調のブリッジ → F#7 で半音上のロ短調の最後のサビへ
+- 形式: Intro (09:01 の実音 → バンド) → Verse 1 (17:48・17:45) → Pre → Chorus 1 (17:59) → Interlude (17:57) → Verse 2 → Guitar solo → Bridge (17:51 → 17:53 の主題を 2 倍) → Last chorus ×2 → Outro (09:01 の本当の終わり) → add9
+
+```bash
+python3 compose_tablet43.py bank41.json score_tablet43.json && python3 synth.py score_tablet43.json tablet43.wav && python3 video.py score_tablet43.json tablet43.wav tablet43.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
