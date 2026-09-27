@@ -514,6 +514,54 @@ def arp_pluck(freq, dur, vel=0.4, sr=SR):
     y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
     return y * vel
 
+def _ks_string(freq, n, t60, burst, sr=SR):
+    """Karplus-Strong の弦: 平均化フィルター + 1 次オールパスで端数の遅延を合わせる (音程が正確)。t60 = 60 dB 減衰の秒数"""
+    from scipy.signal import lfilter
+    P = sr / freq; N = max(2, int(np.floor(P - 0.6))); D = P - 0.5 - N
+    C = (1 - D) / (1 + D); rho = 10 ** (-3.0 / (t60 * freq)); k = 0.5 * rho
+    a = np.zeros(N + 3); a[0] = 1.0; a[1] = C; a[N] -= k * C; a[N + 1] -= k * (1 + C); a[N + 2] -= k
+    exc = np.zeros(n, dtype=np.float64); m = min(len(burst), n); exc[:m] = burst[:m]
+    return lfilter([1.0, C], a, exc).astype(np.float32)
+
+def clean_guitar(freq, dur, vel=0.3, sr=SR):
+    """コーラスのかかったクリーンのエレキギター (撥弦 = Karplus-Strong、ゆっくり揺れる短い遅延を重ねる)"""
+    from scipy.signal import lfilter
+    n = int((dur + 1.4) * sr); P = int(sr / freq) + 1
+    burst = np.random.default_rng(int(freq * 7) % 99991).uniform(-1, 1, P)
+    burst = lfilter([0.55, 0.45], [1.0], burst)                                   # ピックのやわらかさ
+    y = _ks_string(freq, n, 2.6 * (220.0 / freq) ** 0.35, burst, sr)
+    t = np.arange(n, dtype=np.float32) / sr
+    dl = (0.007 + 0.0022 * np.sin(2 * np.pi * 0.8 * t)) * sr                     # コーラス
+    y = 0.75 * y + 0.55 * np.interp(np.arange(n) - dl, np.arange(n), y, left=0.0)
+    y = y - _lp(y, 0.02)                                                          # 低域を少し削る (シングルコイル)
+    i0 = int(dur * sr)
+    if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.35)
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
+def picked_bass(freq, dur, vel=0.4, sr=SR):
+    """ピック弾きのエレキベース (撥弦 + 基音の正弦波、やや暗く)"""
+    from scipy.signal import lfilter
+    n = int((dur + 0.5) * sr); P = int(sr / freq) + 1
+    burst = lfilter([0.3], [1.0, -0.7], np.random.default_rng(int(freq * 13) % 99991).uniform(-1, 1, P))
+    y = _ks_string(freq, n, 1.8, burst, sr)
+    y = y / (np.abs(y).max() + 1e-9)
+    t = np.arange(n, dtype=np.float32) / sr
+    y = 0.7 * _lp(y, 0.18) + 0.5 * np.sin(2 * np.pi * freq * t) * np.exp(-t / 1.2)
+    i0 = int(dur * sr)
+    if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.08)
+    y[:int(0.003 * sr)] *= np.linspace(0, 1, int(0.003 * sr))
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
+def lead_guitar(freq, dur, vel=0.2, sr=SR):
+    """リードギター: 少し歪んだ持続音、遅れてかかるビブラート、暗めのキャビネット"""
+    n = int((dur + 0.5) * sr); t = np.arange(n, dtype=np.float32) / sr
+    vib = 1 + 0.006 * np.sin(2 * np.pi * 5.2 * t) * np.clip((t - 0.25) / 0.4, 0, 1)
+    ph = 2 * np.pi * freq * np.cumsum(vib) / sr
+    y = sum(np.sin(k * ph) / k for k in range(1, 9))
+    y = np.tanh(2.6 * y) * env(n, 0.012, 0.35, sr)
+    y = _lp(_lp(y, 0.25), 0.3); y = y - _lp(y, 0.015)
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
 def guitar_power(freq, dur, vel=0.5, mute=True, sr=SR):
     """歪んだギターのパワーコード (根音 + 5 度 + オクターヴ)。mute=True はブリッジ・ミュートの刻み"""
     n = int((dur + (0.06 if mute else 0.6)) * sr); t = np.arange(n, dtype=np.float32) / sr
@@ -826,6 +874,15 @@ def main(score='score.json', out='fuga.wav'):
             pan = 0.0 if ex['v'] == 'PD' else 0.15
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             L[i0:i1] += y[:i1 - i0] * math.cos((pan + 1) * math.pi / 4); R[i0:i1] += y[:i1 - i0] * math.sin((pan + 1) * math.pi / 4)
+            continue
+        if recs and ex['v'] in ('CG', 'EB', 'LG'):          # ロックのバンド: クリーン・ギター / ベース / リードギター (乾いた音 + 響き)
+            v = ex['v']; vel = ex.get('gain', 0.3)
+            y = clean_guitar(freq, ex['d'], vel) if v == 'CG' else (picked_bass(freq, ex['d'], vel) if v == 'EB' else lead_guitar(freq, ex['d'], vel))
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4}[v]
+            cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
+            L[i0:i1] += y[:i1 - i0] * cl * send; R[i0:i1] += y[:i1 - i0] * cr * send
             continue
         if recs and ex['v'] == 'BR':                        # ブラシのドラム (キック 36 とスウィッシュ 38 だけ、ハイハットなし)
             y = drum_brush(36 if ex['m'] <= 36 else 38, ex['d'], ex.get('gain', 0.2)); pan = ex.get('pan', 0.05)

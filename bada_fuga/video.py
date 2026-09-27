@@ -118,6 +118,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
         COL.update({'CB': (150, 95, 70), 'CBP': (190, 130, 90), 'TA': (200, 170, 110), 'BN': (160, 230, 190), 'V1': (200, 120, 90), 'V2': (170, 100, 80), 'VA': (150, 90, 110), 'VC': (120, 70, 60), 'WW': (120, 200, 120), 'FL': (190, 235, 220)})
         VNAME.update({'CB': 'Cb', 'CBP': 'Cb pizz', 'TA': 'Tanpura', 'BN': 'Bansuri', 'V1': 'Vn I', 'V2': 'Vn II', 'VA': 'Va', 'VC': 'Vc', 'WW': 'Ob', 'FL': 'Fl'})
         COL.update({'BR': (235, 110, 90)}); VNAME.update({'BR': 'ブラシ'})
+        COL.update({'CG': (140, 210, 240), 'EB': (120, 100, 220), 'LG': (255, 180, 90), 'DR': (235, 70, 90)}); VNAME.update({'CG': 'ギター', 'EB': 'ベース', 'LG': 'リードギター', 'DR': 'ドラム'})
         rids = sorted({n['src'] for n in d['notes'] if n.get('src')} | {e['rid'] for e in d.get('extras', []) if e['v'] in ('OS', 'PF') and e.get('rid')})
         if meta.get('rec_order'): rids = [r for r in meta['rec_order'] if r in rids] + [r for r in rids if r not in meta['rec_order']]
         pal = [(240, 196, 110), (232, 122, 142), (150, 220, 120), (96, 206, 196), (170, 150, 255)]
@@ -173,7 +174,7 @@ def main(score='score.json', wav='fuga.wav', out='fuga.mp4'):
     lx = 30
     for v in [x for x in LEGEND if x in present]:
         bd.rectangle([lx, 612, lx + 14, 626], fill=COL[v]); bd.text((lx + 20, 609), VNAME[v], font=f_small, fill=(200, 204, 216))
-        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70, 'GL': 120, 'SUB': 120, 'RS': 165, 'RL': 165, 'VN': 150, 'SP': 190, 'PF': 120, 'CBP': 100, 'CB': 70, 'TA': 100, 'BN': 100, 'BR': 80}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
+        lx += {'TB': 150 if len(VNAME['TB']) < 11 else 190, 'OS': 130, 'DN': 80, 'PK': 160, 'BV': 130, 'LD': 120, 'PD': 120, 'SB': 120, 'GT': 70, 'GL': 120, 'SUB': 120, 'RS': 165, 'RL': 165, 'VN': 150, 'SP': 190, 'PF': 120, 'CBP': 100, 'CB': 70, 'TA': 100, 'BN': 100, 'BR': 80, 'CG': 90, 'EB': 90, 'LG': 130, 'DR': 90}.get(v, 72) if meta.get('style') == 'recsampler' else (130 if v == 'TB' else 72) if meta.get('style') == 'acceptance' else (72 if meta.get('style') in ('concerto', 'symphony', 'pconcerto', 'sweet') else (110 if v in 'SATB' else (190 if v == 'DR' else (150 if v in ('H', 'W', 'L', 'C', 'HB') or (meta.get('style') == 'mantra' and v in 'SATB') else (125 if v in ('SB', 'AR', 'OD') else 80)))))
     circ = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯'
     many = len(RCOL) > 5 or lx + 132 * len(RCOL) > W - 20   # 録音が多い (入りきらない) ときは録音の凡例を 2 段目に
     if many: lx = 30

@@ -1141,6 +1141,22 @@ python3 compose_tablet37.py bank37.json score_tablet37.json && python3 synth.py 
 python3 compose_tablet38.py bank37.json score_tablet38.json && python3 synth.py score_tablet38.json tablet38.wav && python3 video.py score_tablet38.json tablet38.wav tablet38.mp4
 ```
 
+## 🎸🌙 Requiem BADA — Tablet Sessions XXXIX · Eden (LUNA SEA の EDEN のような、もの悲しい 90 年代のロック, ♩=76, 約 4 分 50 秒)
+
+9/25 の 3 本の録音 (12:46 ヘ短調、12:50:53 ロ短調、13:04 変ホ短調) から。LUNA SEA の曲は**旋律を引用せず**、音色と編曲だけを参照した。旋律は 3 本の録音の主題 (ピアノの実音)。
+
+- **クリーン・ギター** — `synth.py` の `clean_guitar`: Karplus-Strong の撥弦 (平均化フィルター + 1 次オールパスで端数の遅延を合わせ、音程は数セント以内)、ゆっくり揺れる短い遅延のコーラス。
+  8 分の分散和音 (根音・5 度・9 度・3 度、属七では 9 度を避ける) に付点 8 分のディレイを反対側へ (`GTR`)、サビでは 2 本目が高い音域で 16 分ずらして (`GTR2`)
+- **歌うベース** — `picked_bass`: ピック弾きの撥弦 + 基音。8 分の根音、オクターヴの跳躍、次の和音へのつなぎ (`BASS`)
+- **ドラム** — Verse はハーフタイム (キック 1・2.5 拍、スネア 3 拍)、サビは 8 ビート、スネアとタムのフィル、クラッシュ (`DRUM`・`FILL`・`CRASH`、既存の `rock_drum`)
+- **もの悲しい弦**と**リードギター** (`lead_guitar`: 少し歪んだ持続音、遅れてかかるビブラート) — サビで旋律の 1 オクターヴ下、ソロで主題、最後のサビの 2 回目は同じ高さで
+- 形式: Intro (12:50 の実音 + ギター) → Verse 1 → Pre-chorus (G△7 - A - Bm - F#7) → Chorus 1 (12:46) → Verse 2 → Pre → Chorus 2 → Interlude (12:46 の実音、ヘ短調) → Guitar solo → Bridge (変ホ短調、ピアノと弦だけ) → Last chorus ×2 (変ホ短調) → Outro (13:04 の本当の終わり)
+- 音量: 録音の音の大きさは dyn の 2 乗で効くので、旋律は dyn ×1.55、伴奏はその分を割り戻す (`DYNK`)。ステムを測って、旋律 ≈ 実音、ギター・ベース・ドラムは −3〜−6 dB、弦とリードはその下に
+
+```bash
+python3 compose_tablet39.py bank37.json score_tablet39.json && python3 synth.py score_tablet39.json tablet39.wav && python3 video.py score_tablet39.json tablet39.wav tablet39.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
