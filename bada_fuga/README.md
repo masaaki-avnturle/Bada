@@ -1346,8 +1346,8 @@ XLVII の大聖堂 (パイプオルガン、長い響き) に、**5 人の歌い
   `add_vocals.py` は歌い手ごとに声の設定・声域・左右の位置・大きさを変え (`vopts`・`ranges`・`pans`・`gains`)、`extra` で同じ旋律をもう 1 人に重ねる
   (フーガではバリトンがテノールの 1 オクターヴ下、コラールではバスの 1 オクターヴ上)。block のモードでも複数の声部が同じ行を同時に歌える (和声で歌う)
 - **ビオラ** — フーガではアルトの声部を、コラール・Klang・Amen では内声 (テノール) を弾く (`VIOLA`)
-- **共鳴する不協和音 (Klang)** — 4 声が置いた和音を全員で長く響かせてから解決する: Klang I „Ruhe“ は D・G・C#・E (9 度・4 度・導音) → D 長三和音、
-  Klang II „Tränen“ は D・E・A・B♭ (短 2 度のぶつかり) → D 短三和音 (ホ短調・ヘ短調に移調)。自動の声部の修正はこの置いた不協和音には触れない
+- **共鳴する不協和音 (Klang)** — 4 声が置いた和音を全員で長く響かせてから解決する: Klang I 「Ruhe」 は D・G・C#・E (9 度・4 度・導音) → D 長三和音、
+  Klang II 「Tränen」 は D・E・A・B♭ (短 2 度のぶつかり) → D 短三和音 (ホ短調・ヘ短調に移調)。自動の声部の修正はこの置いた不協和音には触れない
 - **ドイツ語のフーガ** — 主題が入るたびに、その声部の歌い手が同じ祈りを歌う。歌詞はレクイエムの典礼文のドイツ語
   (Herr, gib ihnen ewige Ruhe / und das ewige Licht leuchte ihnen / Herr, erbarme dich / Christus, erbarme dich / Ewiges Licht, leuchte ihnen / Herr, mit deinen Heiligen / Amen)
 - 形式: Introitus (08:49 の実音) → Klang I → Fuga I (ホ短調、08:53 の主題) → Kyrie (5 人のコラール) → Klang II → Fuga II (ヘ短調、11:21 の主題) → Amen (ヘ長調)

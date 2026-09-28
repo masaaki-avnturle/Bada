@@ -10,8 +10,8 @@ Requiem BADA — Tablet Sessions XLVIII · Klang und Fuge (XLVII の大聖堂に
   ドイツ語のフーガ: 主題が入るたびに、その声部の歌い手が同じ祈りを歌う (バリトンはテノールの 1 オクターヴ下で重なる)。
   歌詞はレクイエムの典礼文のドイツ語 (Herr, gib ihnen ewige Ruhe / und das ewige Licht leuchte ihnen / Herr, erbarme dich …、lyrics_tablet.py の tablet48)。
   形式 (♩=56):
-    Introitus (08:49 の実音) → Klang I „Ruhe“ (ホ短調 → ホ長調) → Fuga I „Herr, gib ihnen ewige Ruhe“ (ホ短調、08:53 の主題)
-    → Kyrie „Herr, erbarme dich“ (全員のコラール) → Klang II „Tränen“ (ヘ短調) → Fuga II „Ewiges Licht“ (ヘ短調、11:21 の主題) → Amen (ヘ長調)
+    Introitus (08:49 の実音) → Klang I 「Ruhe」 (ホ短調 → ホ長調) → Fuga I 「Herr, gib ihnen ewige Ruhe」 (ホ短調、08:53 の主題)
+    → Kyrie 「Herr, erbarme dich」 (全員のコラール) → Klang II 「Tränen」 (ヘ短調) → Fuga II 「Ewiges Licht」 (ヘ短調、11:21 の主題) → Amen (ヘ長調)
   使い方: python compose_tablet48.py <bank37.json> [score_tablet48.json]  (歌は add_vocals.py tablet48 ... voice.npz、曲だけの演奏はこの楽譜のまま)
 """
 import sys, json
@@ -82,34 +82,34 @@ def build():
         P.section(b, title, sub); f = b; CT.LAYOUT.append((f, f + bars, semis, VOICE_SRC if src is None else {v: src for v in VOICES}, {})); b += bars; return f
     def klang(f, parts, harms, word):              # 共鳴する不協和音: 4 声が置いた音を長く響かせ、2 小節目で解決する
         P.set_harms(f, harms)
-        for v, pitches in parts.items(): P.place(v, f, [(4, n(pitches[0])), (4, n(pitches[1]))], 0, 'Klang „%s“' % word)
+        for v, pitches in parts.items(): P.place(v, f, [(4, n(pitches[0])), (4, n(pitches[1]))], 0, 'Klang 「%s」' % word)
     # ================= Introitus
     excerpt(B1, 4, 'Introitus — %s の実音 (ヘ短調)' % hm(B1), '大聖堂に響く 08:49 の録音 — 弦がそっと寄り添う', 3)
     STRG.append((b - 2, b, 0.02))
     # ================= Klang I (ホ短調 → ホ長調)
-    f = section('Klang I „Ruhe“ — 共鳴する不協和音 (ホ短調)', '全員が 9 度・4 度・導音のぶつかる和音を響かせ、ホ長調の和音へ解決する', 2, 2)
+    f = section('Klang I 「Ruhe」 — 共鳴する不協和音 (ホ短調)', '全員が 9 度・4 度・導音のぶつかる和音を響かせ、ホ長調の和音へ解決する', 2, 2)
     klang(f, {'S': ('E5', 'D5'), 'A': ('C#5', 'A4'), 'T': ('G4', 'F#4'), 'B': ('D3', 'D3')}, [['A7'], ['D']], 'Ruhe')
     STRG.append((f, f + 2, 0.025)); LOWS.append((f, f + 2, 0.025)); VIOLA.append((f, f + 2, 0.05, 'T'))
     for k in range(2): P.dyn[f + k] = DYNK * 0.8
     # ================= Fuga I
-    f = section('Fuga I „Herr, gib ihnen ewige Ruhe“ (ホ短調)', '%s の主題の 4 声フーガ — 主題が入るたびに、その声部の歌い手が歌う (ビオラはアルトの声部)' % hm(B2), 16, 2)
+    f = section('Fuga I 「Herr, gib ihnen ewige Ruhe」 (ホ短調)', '%s の主題の 4 声フーガ — 主題が入るたびに、その声部の歌い手が歌う (ビオラはアルトの声部)' % hm(B2), 16, 2)
     n_ = T11.bach_fugue(P, f, B2, '①')
     for k in range(n_): P.dyn[f + k] = DYNK * 0.72
     VIOLA.append((f, f + 16, 0.045, 'A')); LOWS.append((f + 12, f + 16, 0.018))
     # ================= Kyrie (全員のコラール)
-    f = section('Kyrie „Herr, erbarme dich“ — 全員のコラール (ホ短調)', '%s・%s の主題を 2 倍の長さで、5 人が和声で歌う (ビオラは内声)' % (hm(B5), hm(B2)), 8, 2)
+    f = section('Kyrie 「Herr, erbarme dich」 — 全員のコラール (ホ短調)', '%s・%s の主題を 2 倍の長さで、5 人が和声で歌う (ビオラは内声)' % (hm(B5), hm(B2)), 8, 2)
     for k, r in enumerate([B5, B2]):
         place(P, f + 4 * k, aug(subj(r)), 'コラール (%s) · 2 倍' % hm(r))
         T5.harm_from_entries(P, f + 4 * k, f + 4 * k + 4, [((f + 4 * k) * BPB, aug(subj(r)))])
     for k in range(8): P.dyn[f + k] = DYNK * 0.7
     STRG.append((f, f + 8, 0.022)); VIOLA.append((f, f + 8, 0.04, 'T'))
     # ================= Klang II (ヘ短調)
-    f = section('Klang II „Tränen“ — 共鳴する不協和音 (ヘ短調)', '短 2 度と増 4 度がぶつかる和音を響かせ、ヘ短調の和音へ解決する', 2, 3)
+    f = section('Klang II 「Tränen」 — 共鳴する不協和音 (ヘ短調)', '短 2 度と増 4 度がぶつかる和音を響かせ、ヘ短調の和音へ解決する', 2, 3)
     klang(f, {'S': ('Bb4', 'A4'), 'A': ('A4', 'F4'), 'T': ('E4', 'D4'), 'B': ('D3', 'D3')}, [['A7'], ['Dm']], 'Tränen')
     STRG.append((f, f + 2, 0.025)); LOWS.append((f, f + 2, 0.025)); VIOLA.append((f, f + 2, 0.05, 'T'))
     for k in range(2): P.dyn[f + k] = DYNK * 0.8
     # ================= Fuga II
-    f = section('Fuga II „Ewiges Licht“ (ヘ短調)', '%s の主題のフーガ — 最後はストレッタで歌い手が重なる' % hm(B4), 16, 3)
+    f = section('Fuga II 「Ewiges Licht」 (ヘ短調)', '%s の主題のフーガ — 最後はストレッタで歌い手が重なる' % hm(B4), 16, 3)
     n_ = T11.bach_fugue(P, f, B4, '②')
     for k in range(n_): P.dyn[f + k] = DYNK * 0.72
     VIOLA.append((f, f + 16, 0.045, 'A')); LOWS.append((f + 12, f + 16, 0.02)); STRG.append((f + 14, f + 16, 0.02))
@@ -128,7 +128,7 @@ META = {
     'title': 'Requiem BADA — XLVIII · Klang und Fuge',
     'subtitle': '共鳴する不協和音のレクイエムとドイツ語のフーガ — 5 人の歌い手 (淑女・紳士)、ビオラ、パイプオルガン (♩=56)',
     'legend': ['TB', 'VA', 'V1', 'VC'], 'vname': {'VA': 'ビオラ', 'V1': '弦', 'VC': 'チェロ'},
-    'footer': ['Introitus 08:49 → Klang I „Ruhe“ → Fuga I (08:53) → Kyrie (5 人のコラール) → Klang II „Tränen“ → Fuga II (11:21) → Amen (ヘ長調)',
+    'footer': ['Introitus 08:49 → Klang I 「Ruhe」 → Fuga I (08:53) → Kyrie (5 人のコラール) → Klang II 「Tränen」 → Fuga II (11:21) → Amen (ヘ長調)',
                '歌い手: ソプラノ・アルトの淑女、テノール・バリトン・重低音の紳士 (9/28 のわたしの声の響きから)。歌詞はレクイエムの典礼文のドイツ語。'],
 }
 
