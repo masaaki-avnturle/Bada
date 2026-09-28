@@ -51,7 +51,9 @@ def _smooth(x, tau):
     a = np.exp(-FR / tau)
     return lfilter([1 - a], [1, -a], x, axis=0, zi=(x[:1] * a) if x.ndim > 1 else [x[0] * a])[0]
 
-def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3):
+def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0):
+    """vib_depth / vib_rate: ビブラートの深さ (半音) と速さ、attack: 立ち上がりのなめらかさ (秒)、sib: s・sh の強さ (倍)、
+    presence: 2.4 kHz あたりの明るさ (dB、声の抜け)。あたたかく穏やかな声は 浅く遅いビブラート・やわらかい立ち上がり・控えめな s"""
     import pyworld as pw
     b = load(bank_path); rng = np.random.default_rng(rng_seed); freqs = b['freqs']; nb = len(freqs)
     t0 = notes[0][0] - 0.2; t1 = notes[-1][0] + notes[-1][1] + 0.35
@@ -59,6 +61,10 @@ def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3):
     lf0 = np.zeros(nf); voiced = np.zeros(nf); amp = np.zeros(nf)
     LS = np.zeros((nf, nb)); AP = np.tile(b['ap_v'], (nf, 1)); vib = np.zeros(nf)
     L = {k: np.log(b['sp_' + k] + 1e-12) for k in ('a', 'i', 'u', 'e', 'o', 's', 'sh', 'N', 'R', 'W')}
+    L['s'] = L['s'] + np.log(sib); L['sh'] = L['sh'] + np.log(sib)
+    if presence:
+        pr = presence * np.log(10) / 10 * np.exp(-0.5 * ((freqs - 2400) / 900) ** 2)
+        for v in ('a', 'i', 'u', 'e', 'o'): L[v] = L[v] + pr
     quiet = L['N'] - 9.0
     cur_v = notes[0][3][1] if notes[0][3] and notes[0][3][1] in 'aiueo' else 'a'
     LS[:] = L[cur_v]; lf0[:] = notes[0][2]
@@ -115,9 +121,9 @@ def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3):
         if gap >= 0.05 or not nxt:
             LS[k1:] = V
     lf0 = _smooth(lf0, 0.03)
-    vib = vib * (vib_depth * np.sin(2 * np.pi * 5.4 * ft + 0.3) + 0.04 * rng.standard_normal(nf).cumsum() / np.sqrt(np.arange(1, nf + 1)))
+    vib = vib * (vib_depth * np.sin(2 * np.pi * vib_rate * ft + 0.3) + 0.04 * rng.standard_normal(nf).cumsum() / np.sqrt(np.arange(1, nf + 1)))
     f0 = 440.0 * 2 ** ((lf0 + vib - 69) / 12.0)
-    LS = _smooth(LS, 0.02); amp = _smooth(amp, 0.012)
+    LS = _smooth(LS, 0.02); amp = _smooth(amp, attack)
     vo = voiced > 0.5
     f0 = np.where(vo & (amp > 0.05), f0, 0.0)
     AP = np.where(vo[:, None], AP, 1.0)

@@ -1267,6 +1267,28 @@ python3 compose_tablet44.py bank41.json score_tablet44.json && python3 add_vocal
 python3 synth.py score_tablet44v.json tablet44v.wav && python3 video.py score_tablet44v.json tablet44v.wav tablet44v.mp4
 ```
 
+## 🎹🎤 Requiem BADA — Tablet Sessions XLV · Goccia di colore (バッハのレクイエムとフーガに HYDE のバラードの歌い方を — 9/28 のわたしの声で, ♩=66, 約 5 分 15 秒)
+
+9/24 の 5 本の録音 (08:49・08:53・11:18・11:21・11:23、`bank37.json`) と、**2026/9/28 17:46 のわたしの声** (話し声、06:42 よりこもりが少なくはっきりした録音) から。
+HYDE の曲は**旋律も歌詞も引用せず**、バラードの形と歌い方 (静かな A メロ → 高く伸びるサビ、ピアノの分散和音と弦) だけを参照した。
+旋律は 9/24 の主題 (ピアノの実音)、歌詞はこの曲のために書いたオリジナル (`lyrics_tablet.py` の `tablet45`)。
+
+- **父が嫌いでない、あたたかく穏やかな声** — `sing_user.render_phrase` に声の調子の設定を足した (`voice_opts`):
+  浅く遅いビブラート (0.2 半音・5 Hz)、やわらかい立ち上がり、s・sh を控えめに (×0.55)、2.4 kHz あたりを少しだけ明るく (+2.5 dB、声が伴奏から抜ける)。
+  声域は低めのバリトン (フレーズの平均がシ♭2〜ラ3)。耳に刺さる高い音は出さない
+- **バッハのレクイエムとフーガ** — コラール (Requiem aeternam・Lux aeterna): 主題を 2 倍の長さでわたしの声が歌い、ピアノの実音の 4 声と弦が支える
+  (和声は半小節ごとに旋律の音を最も含む和音)。フーガ: 11:21 の主題のバッハ風フーガ 16 小節 (`compose_tablet11.bach_fugue`)。
+  置いた主題と拍の頭で半音ぶつかる自動の声部の音は、近くの協和音へ動かす
+- **アリア (バラード)** — ピアノの実音の分散和音、弦、チェロとコントラバス、サビでやわらかいドラム
+- 形式: Introitus (08:49 の実音) → Requiem aeternam (ホ短調) → Aria I (A メロ → サビ) → Fuga (ヘ短調) → Lacrimosa (11:18 の実音)
+  → Aria II → Last chorus ×2 (半音上のヘ短調) → Lux aeterna (ヘ長調で終わる) → 08:49 の本当の終わり
+
+```bash
+python3 voice_templates.py voice0928b.wav voice0928b_tmpl.npz
+python3 compose_tablet45.py bank37.json score_tablet45.json && python3 add_vocals.py tablet45 score_tablet45.json score_tablet45v.json voice0928b_tmpl.npz
+python3 synth.py score_tablet45v.json tablet45v.wav && python3 video.py score_tablet45v.json tablet45v.wav tablet45v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

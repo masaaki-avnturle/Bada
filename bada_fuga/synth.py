@@ -858,10 +858,10 @@ def main(score='score.json', out='fuga.wav'):
     if vo:
         import sing
         dly = int(0.75 * 60.0 / d['bpm'] * SR)
-        for notes, g, pan, k, tim in sing.phrases(vo):
+        for notes, g, pan, k, tim, vopts in sing.phrases(vo):
             if tim == 'user':                                    # その人の声 (voice_templates.py → sing_user.py、WORLD で合成)
                 import sing_user
-                y, t0 = sing_user.render_phrase(notes, d['meta']['voice_bank'], rng_seed=int(k) + 7); y = y * g
+                y, t0 = sing_user.render_phrase(notes, d['meta']['voice_bank'], rng_seed=int(k) + 7, **vopts); y = y * g
             else:
                 y, t0 = sing.render_phrase(notes, rng_seed=int(k) + 7, timbre=tim); y = y * g
             i0 = max(0, int(t0 * SR)); i1 = min(i0 + len(y), N); y = y[:i1 - i0]

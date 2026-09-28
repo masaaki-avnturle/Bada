@@ -184,7 +184,7 @@ def phrases(vo):
                 mm = morae(e['lyr'])
                 ph = (mm[0][0], mm[0][1]) if mm else None
             notes.append((e['t'], e['d'], e['m'], ph))
-        out.append((notes, es[0].get('gain', 0.3), es[0].get('pan', 0.0), k, es[0].get('tim', 'voice')))
+        out.append((notes, es[0].get('gain', 0.3), es[0].get('pan', 0.0), k, es[0].get('tim', 'voice'), es[0].get('vopts') or {}))
     return out
 
 if __name__ == '__main__':                                                     # 試聴: python sing.py out.wav
