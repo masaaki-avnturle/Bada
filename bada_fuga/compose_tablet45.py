@@ -152,7 +152,7 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': ORDER, 'piano_decay': 1.8,
     'title': 'Requiem BADA — Tablet Sessions XLV · Goccia di colore',
     'subtitle': 'バッハのレクイエムとフーガに HYDE のバラードの歌い方を — 9/24 の 5 本と 9/28 のわたしの声 (♩=66)',
-    'legend': ['TB', 'PF', 'V1', 'VC', 'DR'], 'vname': {'V1': '弦', 'VC': 'チェロ・Cb', 'PF': 'ピアノ (実音)'},
+    'legend': ['TB', 'PF', 'V1', 'VC', 'DR'], 'vname': {'V1': '弦', 'VC': 'チェロ', 'PF': 'ピアノ (実音)'},
     'footer': ['Introitus 08:49 → Requiem aeternam (コラール) → Aria I → Fuga (11:21) → Lacrimosa 11:18 → Aria II → Last chorus ×2 (ヘ短調) → Lux aeterna → 08:49',
                'HYDE の曲は旋律も歌詞も引用せず、バラードの形と歌い方だけを参照。歌は 9/28 のわたしの声 (話し声から取り出した響き)、歌詞はオリジナル。'],
 }
