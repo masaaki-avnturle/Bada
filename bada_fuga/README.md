@@ -1337,6 +1337,27 @@ python3 compose_tablet47.py bank37.json score_tablet47.json && python3 add_vocal
 python3 synth.py score_tablet47v.json tablet47v.wav && python3 video.py score_tablet47v.json tablet47v.wav tablet47v.mp4
 ```
 
+## ⛪🎼 Requiem BADA — Tablet Sessions XLVIII · Klang und Fuge (5 人の歌い手とビオラ — 共鳴する不協和音のレクイエムとドイツ語のフーガ, ♩=56, 約 3 分 40 秒)
+
+XLVII の大聖堂 (パイプオルガン、長い響き) に、**5 人の歌い手とビオラ**を加え、共鳴する不協和音のレクイエムとドイツ語のフーガに書き換えた。曲だけの演奏の版もある。
+
+- **5 人の歌い手** — すべて 9/28 17:46 のわたしの声の響きから、響きの長さ (`formant`) と声域・息・ビブラートを変えて作る (`lyrics_tablet.py` の `_SINGERS`):
+  ソプラノの淑女 (1.24 倍)・アルトの淑女 (1.15 倍)・高音の紳士 = テノール (1.04 倍)・バリトンの紳士 (1.0 倍)・重低音の紳士 = バッソ・プロフォンド (0.9 倍、声域はド 2〜ド 3)。
+  `add_vocals.py` は歌い手ごとに声の設定・声域・左右の位置・大きさを変え (`vopts`・`ranges`・`pans`・`gains`)、`extra` で同じ旋律をもう 1 人に重ねる
+  (フーガではバリトンがテノールの 1 オクターヴ下、コラールではバスの 1 オクターヴ上)。block のモードでも複数の声部が同じ行を同時に歌える (和声で歌う)
+- **ビオラ** — フーガではアルトの声部を、コラール・Klang・Amen では内声 (テノール) を弾く (`VIOLA`)
+- **共鳴する不協和音 (Klang)** — 4 声が置いた和音を全員で長く響かせてから解決する: Klang I „Ruhe“ は D・G・C#・E (9 度・4 度・導音) → D 長三和音、
+  Klang II „Tränen“ は D・E・A・B♭ (短 2 度のぶつかり) → D 短三和音 (ホ短調・ヘ短調に移調)。自動の声部の修正はこの置いた不協和音には触れない
+- **ドイツ語のフーガ** — 主題が入るたびに、その声部の歌い手が同じ祈りを歌う。歌詞はレクイエムの典礼文のドイツ語
+  (Herr, gib ihnen ewige Ruhe / und das ewige Licht leuchte ihnen / Herr, erbarme dich / Christus, erbarme dich / Ewiges Licht, leuchte ihnen / Herr, mit deinen Heiligen / Amen)
+- 形式: Introitus (08:49 の実音) → Klang I → Fuga I (ホ短調、08:53 の主題) → Kyrie (5 人のコラール) → Klang II → Fuga II (ヘ短調、11:21 の主題) → Amen (ヘ長調)
+
+```bash
+python3 compose_tablet48.py bank37.json score_tablet48.json && python3 add_vocals.py tablet48 score_tablet48.json score_tablet48v.json voice0928b_tmpl.npz
+python3 synth.py score_tablet48v.json tablet48v.wav && python3 video.py score_tablet48v.json tablet48v.wav tablet48v.mp4   # 歌入り
+python3 synth.py score_tablet48.json tablet48.wav && python3 video.py score_tablet48.json tablet48.wav tablet48.mp4       # 曲だけの演奏
+```
+
 ## 作り方 (再現)
 
 ```bash

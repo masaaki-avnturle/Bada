@@ -120,3 +120,32 @@ LYRICS['tablet47'] = {
                      ('Bring us home where we be-long', 'bring as houm wer wii bi long')]),
         ('Amen', [('A-men', 'aa men')], 3),
     ]}
+
+# XLVIII · Klang und Fuge — 5 人の歌い手 (淑女 2 人・紳士 3 人) がドイツ語で歌う。歌詞はレクイエムの典礼文のドイツ語 (表示, 発音の表記)
+_SINGERS = {                                   # 歌い手ごとの声: 響きの長さ (formant)・息・ビブラート。声域は ranges (フレーズの平均の音高)
+    'S':   {'formant': 1.24, 'breath': 0.16, 'vib_depth': 0.42, 'vib_rate': 5.8, 'vib_delay': 0.22, 'presence': 3.5, 'sib': 0.8, 'attack': 0.022},   # ソプラノの淑女
+    'A':   {'formant': 1.15, 'breath': 0.12, 'vib_depth': 0.36, 'vib_rate': 5.5, 'vib_delay': 0.25, 'presence': 3.0, 'sib': 0.8, 'attack': 0.025},   # アルトの淑女
+    'T':   {'formant': 1.04, 'breath': 0.05, 'vib_depth': 0.32, 'vib_rate': 5.4, 'vib_delay': 0.25, 'presence': 2.5, 'sib': 0.8, 'attack': 0.02},    # 高音の紳士 (テノール)
+    'Bar': {'formant': 1.0, 'breath': 0.04, 'vib_depth': 0.28, 'vib_rate': 5.2, 'vib_delay': 0.3, 'presence': 2.0, 'sib': 0.8, 'attack': 0.025},    # バリトンの紳士
+    'B':   {'formant': 0.9, 'breath': 0.03, 'vib_depth': 0.2, 'vib_rate': 5.0, 'vib_delay': 0.35, 'presence': 1.5, 'sib': 0.7, 'attack': 0.03},     # 重低音の紳士 (バッソ・プロフォンド)
+}
+_CHOIR = {'voices': 'SATB', 'vopts': _SINGERS, 'boost': 1.0,
+          'ranges': {'S': (66, 76), 'A': (58, 67), 'T': (55, 64), 'Bar': (47, 56), 'B': (38, 48)},
+          'pans': {'S': -0.35, 'A': 0.35, 'T': 0.15, 'Bar': -0.15, 'B': 0.0},
+          'gains': {'B': 1.1, 'Bar': 0.85}}
+_FUGUE = dict(_CHOIR, entries=True, extra=[{'name': 'Bar', 'src': 'T'}])        # フーガ: 主題の入りごと、バリトンはテノールの 1 オクターヴ下
+_KLANG = dict(_FUGUE, prefix='Klang')                                            # 共鳴する不協和音: 4 声が置いた和音を全員で
+_HOMO = dict(_CHOIR, extra=[{'name': 'Bar', 'src': 'B'}])                         # コラール / Amen: 全員が同じ言葉を和声で、バリトンはバスの 1 オクターヴ上
+LYRICS['tablet48'] = {
+    'block': 2, 'gain': 0.6, 'timbre': 'user', 'range': (60, 72), 'top': 81, 'voice_name': '歌い手 5 人', 'title_suffix': '',
+    'voice_opts': _SINGERS['S'],
+    'sections': [
+        ('Klang I', [('Ru-he', 'ruu hx')], 2, _KLANG),
+        ('Fuga I', [('Herr, gib ih-nen e-wi-ge Ru-he', 'her gip ii nxn e vi gx ruu hx'),
+                    ('und das e-wi-ge Licht leuch-te ih-nen', 'unt das e vi gx lisht loish tx ii nxn')], 2, _FUGUE),
+        ('Kyrie', [('Herr, er-bar-me dich', 'her er baar mx dish'), ('Chri-stus, er-bar-me dich', 'kri stus er baar mx dish')], 4, _HOMO),
+        ('Klang II', [('Trä-nen', 'tre nxn')], 2, _KLANG),
+        ('Fuga II', [('E-wi-ges Licht, leuch-te ih-nen', 'e vi gxs lisht loish tx ii nxn'),
+                     ('Herr, mit dei-nen Hei-li-gen', 'her mit dai nxn hai li gxn')], 2, _FUGUE),
+        ('Amen', [('A-men', 'aa men')], 3, _HOMO),
+    ]}
