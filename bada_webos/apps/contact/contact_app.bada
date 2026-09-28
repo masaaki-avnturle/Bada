@@ -1,0 +1,88 @@
+// contact_app.bada — generate the 3-D blueprint of the "Contact" Machine.
+//
+// Pipeline: collider door -> Lorentz time budget (1 s Earth / 18 h pod, Vega)
+//           -> koma gimbal rings -> Gamma radii + Jones spins
+//           -> inter-dimensional port -> Wavefront OBJ blueprint.
+
+#include lib/contact.bada
+
+say "=== CONTACT MACHINE :: blueprint generator (Bada) ==="
+
+// ---------------------------------------------------------------- 1. door
+// sample collision event: visible transverse momenta [px, py] in GeV.
+// (illustrative numbers, not real LHC data)
+event <- [[52.0, 11.0], [0.0 - 18.5, 40.2], [0.0 - 9.0, 0.0 - 23.7], [14.3, 6.1]]
+door <- door_axis(event)
+say "1. collider door: missing p_T [GeV, azimuth rad]:"
+print door
+
+// ---------------------------------------------------------------- 2. time
+dt_earth <- 1.0
+dt_pod <- 18.0 * 3600.0
+g <- lorentz_gamma(dt_pod, dt_earth)
+phi <- rapidity(g)
+say "2. time budget  gamma = 18h / 1s:"
+print g
+say "   1 - v/c:"
+print one_minus_beta(g)
+say "   rapidity phi = acosh(gamma):"
+print phi
+say "   boost invariant gamma^2 - (gamma beta)^2 (must be 1):"
+print boost_invariant(g)
+vega_ly <- 25.0
+say "   Vega distance [ly] / one-way time at that v, Earth frame [yr]:"
+print [vega_ly, vega_ly / (1.0 - one_minus_beta(g))]
+
+// ---------------------------------------------------------------- 3-4. rings
+R <- 15.0
+radii <- ring_radii(R)
+spins <- [ring_spin(1), ring_spin(2), ring_spin(3)]
+say "3. gimbal rings (precession / nutation / spin)"
+say "   radii [m] from Gamma(k+1/2)/(Gamma(k+1)Gamma(1/2)):"
+print radii
+say "   spin ratios |V_trefoil(e^{i k pi/2})|:"
+print spins
+
+// koma check: ring mass distribution must survive every phase
+a <- [0.5, 0.25, 0.25]
+thetas <- [spins[0] * phi, spins[1] * phi, spins[2] * phi]
+res <- koma_residual(a, thetas)
+say "   koma |psi|^2 = a residual (integrity check):"
+print res
+-< res < 0.000000000001 { say "   koma invariant OK - rings may spin up" }
+
+// ---------------------------------------------------------------- 5. port
+n <- warp_matched_port(g)
+home <- port(1)
+dest <- port(n)
+mirror <- reflect(dest)
+names <- thurston_names()
+say "5. port directory"
+say "   home port #1 (EUCLID-PORT):"
+print home
+say "   warp-matched destination port #" + str(n) + " (" + names[dest[0] - 1] + "):"
+print dest
+say "   mirror partner R(port) in the other dimension (" + names[mirror[0] - 1] + "):"
+print mirror
+say "   R^2 = id ?"
+print same_port(reflect(mirror), dest)
+
+// ---------------------------------------------------------------- 6. blueprint
+// spec = [R_outer, pod_radius, hub_height, door_angle, phi, tau]
+hub <- 1.7 * R
+spec <- [R, 1.5, hub, door[1], phi, 0.25]
+parts <- machine(spec, 48)
+say "6. blueprint: parts / vertices"
+print len(parts)
+print count_vertices(parts)
+
+Omega::DATABASE[contact] {
+  push([g, phi, n])
+  push(radii)
+  push(spins)
+  push("Contact Machine: 3 koma gimbal rings, pod drop column, door = missing p_T")
+}
+
+say "---- BEGIN OBJ ----"
+say to_obj(parts)
+say "---- END OBJ ----"

@@ -143,6 +143,14 @@ def cmd_run(args):
     print("\n".join(proc.output))
 
 
+def cmd_contact(args):
+    from contact import ContactApp
+    app = ContactApp().generate()
+    print(app.report, end="")
+    for kind, path in app.save(args.outdir).items():
+        print(f"wrote {kind}: {path}")
+
+
 def build_parser():
     p = argparse.ArgumentParser(
         prog="bada-webos", description=__doc__,
@@ -175,6 +183,9 @@ def build_parser():
 
     sp = sub.add_parser("run"); sp.add_argument("file")
     sp.set_defaults(func=cmd_run)
+    sp = sub.add_parser("contact", help="Contact Machine 3-D blueprint (Bada)")
+    sp.add_argument("--outdir", default="generated/contact")
+    sp.set_defaults(func=cmd_contact)
     return p
 
 
