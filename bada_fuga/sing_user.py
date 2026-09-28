@@ -51,11 +51,11 @@ def _smooth(x, tau):
     a = np.exp(-FR / tau)
     return lfilter([1 - a], [1, -a], x, axis=0, zi=(x[:1] * a) if x.ndim > 1 else [x[0] * a])[0]
 
-def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0, formant=1.0, breath=0.0):
+def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0, formant=1.0, breath=0.0, vib_delay=0.3):
     """vib_depth / vib_rate: ビブラートの深さ (半音) と速さ、attack: 立ち上がりのなめらかさ (秒)、sib: s・sh の強さ (倍)、
     presence: 2.4 kHz あたりの明るさ (dB、声の抜け)。あたたかく穏やかな声は 浅く遅いビブラート・やわらかい立ち上がり・控えめな s。
     formant: 声の響き (スペクトル包絡) を周波数の方向に何倍にのばすか — 1.18 くらいで男声の響きが若い女性の響きになる (声道が短くなる)。
-    breath: 2.5 kHz より上に息の成分を足す量 (0〜0.3、透きとおった軽い声に)"""
+    breath: 2.5 kHz より上に息の成分を足す量 (0〜0.3、透きとおった軽い声に)。vib_delay: 音の始まりからビブラートが入るまでの秒数"""
     import pyworld as pw
     b = load(bank_path); rng = np.random.default_rng(rng_seed); freqs = b['freqs']; nb = len(freqs)
     t0 = notes[0][0] - 0.2; t1 = notes[-1][0] + notes[-1][1] + 0.35
@@ -88,8 +88,8 @@ def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, att
         j0, j1 = int((t - t0) / FR), int((t + d - t0) / FR)
         c0 = max(0, int((t - 0.6 * cd - t0) / FR))
         lf0[j0:] = m
-        if d > 0.45:
-            s_ = j0 + int(0.3 / FR)
+        if d > vib_delay + 0.15:
+            s_ = j0 + int(vib_delay / FR)
             if s_ < j1: vib[s_:j1] = np.linspace(0, 1, j1 - s_) ** 0.5
         V = L[cur_v]
         if ph and cons:

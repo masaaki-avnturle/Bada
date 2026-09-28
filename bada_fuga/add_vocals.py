@@ -49,6 +49,8 @@ def main(key, src, dst, voice_bank=None):
             lo_, hi_ = opt.get('ranges', {}).get(gv, spec.get('range', (57, 72)))   # 声域 (フレーズの平均の音高をこの間に)
             while mean + sh > hi_: sh -= 12
             while mean + sh < lo_: sh += 12
+            top = opt.get('top', spec.get('top'))                          # いちばん高い音の上限 (耳に刺さる高さを避ける)
+            if top and max(m for _, _, m in seq) + sh > top: sh -= 12
             marks = []
             for i, (t, dd, m) in enumerate(seq):
                 first = i == 0 or idx[i] != idx[i - 1]
