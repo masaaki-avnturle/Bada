@@ -96,3 +96,13 @@ LYRICS = {
             ('In paradisum — コラール', [('May the an-gels lead you home', 'mei dhx ein jxlz liid yuu houm')], 4),
         ]},
 }
+# 十八歳の淑女の英語の歌声: 英語版と同じ歌詞・フーガで、響きをもう少し明るく (1.25 倍)、息を少し足して軽く若々しく、声域をわずかに上げる
+_SEC18 = []
+for sec in LYRICS['tablet46en']['sections']:
+    if len(sec) > 3:
+        sec = sec[:3] + (dict(sec[3], ranges={'S': (67, 77), 'A': (61, 70), 'T': (61, 70), 'B': (59, 68)}),)
+    _SEC18.append(sec)
+LYRICS['tablet46en18'] = dict(LYRICS['tablet46en'], range=(66, 76), top=81, voice_name='Soprano (18)', sections=_SEC18,
+    title='Requiem BADA — XLVI · Requiem in fuga (English, 18)',
+    subtitle='歌の旋律がフーガのレクイエムを英語で — わたしの声から書き換えた十八歳の淑女の声 (♩=60)',
+    voice_opts={'formant': 1.25, 'breath': 0.18, 'vib_depth': 0.38, 'vib_rate': 5.9, 'vib_delay': 0.2, 'presence': 4.0, 'sib': 0.85, 'attack': 0.018})

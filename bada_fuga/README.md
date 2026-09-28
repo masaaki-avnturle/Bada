@@ -1315,6 +1315,8 @@ XLV と同じ 9/24 の 5 本の録音 (`bank37.json`) から。歌は 9/28 17:46
 ```bash
 python3 compose_tablet46.py bank37.json score_tablet46.json && python3 add_vocals.py tablet46 score_tablet46.json score_tablet46v.json voice0928b_tmpl.npz
 python3 add_vocals.py tablet46en score_tablet46.json score_tablet46en.json voice0928b_tmpl.npz   # 英語版
+python3 add_vocals.py tablet46en18 score_tablet46.json score_tablet46en18.json voice0928b_tmpl.npz   # 十八歳の淑女の英語の歌声 (響き 1.25 倍・息 0.18・声域を 1 半音上)
+# 歌詞無しの版: score_tablet46.json をそのまま (歌を入れずに) synth.py → video.py (題名と副題だけ「Instrumental」に)
 python3 synth.py score_tablet46v.json tablet46v.wav && python3 video.py score_tablet46v.json tablet46v.wav tablet46v.mp4
 ```
 
