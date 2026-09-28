@@ -149,6 +149,10 @@ def cmd_contact(args):
     print(app.report, end="")
     for kind, path in app.save(args.outdir).items():
         print(f"wrote {kind}: {path}")
+    if args.video:
+        from contact import video
+        for kind, path in video.build(args.outdir, mp4=not args.no_mp4).items():
+            print(f"wrote {kind}: {path}")
 
 
 def build_parser():
@@ -185,6 +189,9 @@ def build_parser():
     sp.set_defaults(func=cmd_run)
     sp = sub.add_parser("contact", help="Contact Machine 3-D blueprint (Bada)")
     sp.add_argument("--outdir", default="generated/contact")
+    sp.add_argument("--video", action="store_true",
+                    help="also render the blueprint-drawing video (HTML player + MP4)")
+    sp.add_argument("--no-mp4", action="store_true", help="with --video: HTML player only")
     sp.set_defaults(func=cmd_contact)
     return p
 

@@ -7,11 +7,36 @@ Jones 多項式）の原理をつなぎ、**Bada 言語だけで** Machine の 3
 cd bada_webos
 python3 cli.py contact                 # レポート + generated/contact/{obj,txt,html}
 python3 -m contact out/                # 同じ（出力先指定）
-python3 -m unittest tests.test_contact # 16 テスト（Bada の数値を Python で照合）
+python3 -m unittest tests.test_contact # 21 テスト（Bada の数値を Python で照合）
 ```
 
 生成例は `examples/`（`contact_machine.obj` は Blender 等でそのまま開けます、
-`contact_blueprint.html` はドラッグで回転できるビューア）。
+`contact_blueprint.html` はドラッグで回転できるビューア、`contact_blueprint_video.mp4` / `.html` は描画過程の動画）。
+
+## 設計図を描く過程の動画（`contact_video.bada`）
+
+```
+python3 cli.py contact --video          # + contact_blueprint_video.{html,mp4}
+python3 cli.py contact --video --no-mp4 # HTML プレーヤーのみ（標準ライブラリだけで動作）
+```
+
+動画の**すべての数値とすべての頂点は Bada が方程式から計算**します
+（`contact_video.bada` → `CARD` / `PART` / `FRAME` ストリーム）。プレーヤーは投影して線を引くだけです。
+
+| 時刻 | 場面 | 元の方程式 |
+|:--|:--|:--|
+| 0–3 s | タイトル | — |
+| 3–30 s | 9 枚の方程式カードを「解読」（映画のプライマーの解読のように、式がタイプされ Bada の計算値が現れる） | MET、γ、φ = arccosh γ、γ²(1−β)(1+β)=1、Γ 半径、Jones 自転比、\|ψ\|²=a、IDPD ポート、設計図の式 |
+| 30–46 s | 部品を一筆ずつ描画（ペン先がパラメータ t を追う） | `x_k(t) = hub + R_z(φ_door) S_k(θ_k) r_k (cos t, sin t, 0)`、ポッドの球面、ガントリー |
+| 46–57 s | 起動：3 本のリングがジンバル回転、ポッドが落下、地球 1 秒 ↔ ポッド 18 時間の時計 | `θ_k(τ) = ω_k φ τ`、`z_pod(τ) = hub + (1−2τ)·1.5R`、`t_pod = γ t_earth` |
+| 57–61 s | 完成 | 5 部品 / 216 頂点 / 241 フレーム |
+
+MP4 は Node の Playwright（Chromium）で `render(t)` を 1 フレームずつ実行して PNG を取り出し、
+ffmpeg（`FFMPEG` 環境変数、PATH 上の `ffmpeg`、または `pip install imageio-ffmpeg`）で
+H.264 に符号化します（`contact/record_video.js`）。Bada VM での 241 フレーム計算に約 35 秒かかります。
+
+リングは自分の法線ではなく**面内の軸**のまわりに回転します（本物のジンバルと同じ。
+法線まわりの回転では円は見た目が変わらないため）。τ = 0 で 3 枚のリング面は互いに直交します。
 
 ## パイプライン（`contact_app.bada`）
 

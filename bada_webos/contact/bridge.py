@@ -31,15 +31,20 @@ def run_app() -> str:
     return buf.getvalue()
 
 
-def call(expr: str) -> str:
-    """Evaluate one Bada expression against the library; return printed text."""
+def call_text(expr: str) -> str:
+    """Evaluate one Bada expression against the library; return all output."""
     global _LIB_SRC
     if _LIB_SRC is None:
         _LIB_SRC = load_program(LIB)
     buf = io.StringIO()
     with redirect_stdout(buf):
         run_source(_LIB_SRC + "\nprint " + expr)
-    return buf.getvalue().strip().splitlines()[-1]
+    return buf.getvalue()
+
+
+def call(expr: str) -> str:
+    """Evaluate one Bada expression; return the last printed line."""
+    return call_text(expr).strip().splitlines()[-1]
 
 
 def num(expr: str) -> float:

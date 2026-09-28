@@ -1,0 +1,53 @@
+// contact_video.bada — every number and every frame of the blueprint video,
+// computed from the equations in Bada.  The player/recorder only draws.
+//
+// stream format:
+//   CARD|<title>|<equation>|<value computed here>
+//   PART <name> <nverts> <edge pairs...>          (topology, once)
+//   FRAME <k> <tau> <th0> <th1> <th2> <z_pod> <t_pod> | <x y z ...>
+//         geometry at pod time tau, gimbal angles th_k = w_k phi tau,
+//         pod height, and pod-clock seconds t_pod = gamma * tau * 1 s
+
+#include lib/contact.bada
+
+// ---- the same design inputs as contact_app.bada
+event <- [[52.0, 11.0], [-18.5, 40.2], [-9.0, -23.7], [14.3, 6.1]]
+door <- door_axis(event)
+g <- lorentz_gamma(18.0 * 3600.0, 1.0)
+phi <- rapidity(g)
+R <- 15.0
+hub <- 1.7 * R
+radii <- ring_radii(R)
+spins <- [ring_spin(1), ring_spin(2), ring_spin(3)]
+a <- [0.5, 0.25, 0.25]
+res <- koma_residual(a, [spins[0] * phi, spins[1] * phi, spins[2] * phi])
+n <- warp_matched_port(g)
+dest <- port(n)
+mirror <- reflect(dest)
+names <- thurston_names()
+
+// ---- equation cards (value column is evaluated right here)
+say "CARD|1. Collider door|p_miss = - Σ p_T ,  φ_door = atan2(p_y, p_x)|" + "|p_miss| = " + str(r3(door[0])) + " GeV,  φ_door = " + str(r3(door[1])) + " rad"
+say "CARD|2. Time budget (Contact: 1 s ↔ 18 h)|γ = Δt_pod / Δt_earth = 64800 s / 1 s|" + "γ = " + str(g) + ",  1 − v/c = " + str(one_minus_beta(g))
+say "CARD|3. Lorentz boost = imaginary rotation|φ = arccosh γ = ln(γ + √(γ² − 1))|" + "φ = " + str(phi) + " rad"
+say "CARD|4. Boost invariant|γ²(1 − β)(1 + β) = 1|" + "= " + str(boost_invariant(g))
+say "CARD|5. Gamma-function ring radii|r_k = R · Γ(k + ½) / (Γ(k + 1) Γ(½))|" + "r = " + str(r3(radii[0])) + ", " + str(r3(radii[1])) + ", " + str(r3(radii[2])) + " m"
+say "CARD|6. Jones polynomial spin ratios|V(t) = t + t³ − t⁴ ,  ω_k = |V(e^{ikπ/2})||" + "ω = " + str(r3(spins[0])) + " : " + str(r3(spins[1])) + " : " + str(r3(spins[2]))
+say "CARD|7. Koma (spinning top) integrity|ψ_k = √a_k · e^{iθ_k} ,  |ψ_k|² = a_k|" + "max | |ψ|² − a | = " + str(res)
+say "CARD|8. Inter-dimensional port|P_W = e^{−2πT} ≈ 1/γ ,  R: P_W → 1/P_W , P_Z → 1 − P_Z|" + "port #" + str(n) + " (" + names[dest[0] - 1] + ") → mirror " + names[mirror[0] - 1] + ",  P*_W = " + str(r3(mirror[4]))
+say "CARD|9. Blueprint equations|x_k(t) = hub + R_z(φ_door) S_k(ω_k φ τ) r_k (cos t, sin t, 0)|" + "pod: z(τ) = hub + (1 − 2τ)·1.5R ,  t_pod = γ · t_earth"
+
+// ---- topology + frames
+spec <- [R, 1.5, hub, door[1], phi, 0.0]
+say topology_lines(machine(spec, 48))
+NF <- 240
+k <- 0
+-> k <= NF {
+  tau <- 1.0 * k / NF
+  spec <- [R, 1.5, hub, door[1], phi, tau]
+  th <- [spins[0] * phi * tau, spins[1] * phi * tau, spins[2] * phi * tau]
+  zp <- hub + (1.0 - 2.0 * tau) * 1.5 * R
+  head <- "FRAME " + str(k) + " " + str(tau) + " " + str(r3(th[0])) + " " + str(r3(th[1])) + " " + str(r3(th[2]))
+  say head + " " + str(r3(zp)) + " " + str(r3(g * tau)) + " | " + frame_line(machine(spec, 48))
+  k <- k + 1
+}
