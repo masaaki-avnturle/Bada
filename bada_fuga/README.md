@@ -1289,6 +1289,25 @@ python3 compose_tablet45.py bank37.json score_tablet45.json && python3 add_vocal
 python3 synth.py score_tablet45v.json tablet45v.wav && python3 video.py score_tablet45v.json tablet45v.wav tablet45v.mp4
 ```
 
+## 🎹👩‍🎤 Requiem BADA — Tablet Sessions XLVI · Requiem in fuga (歌の旋律がフーガのレクイエム — 20 代の女性のきれいな声で, ♩=60, 約 4 分 10 秒)
+
+XLV と同じ 9/24 の 5 本の録音 (`bank37.json`) から。歌は 9/28 17:46 のわたしの声の響き (`voice0928b_tmpl.npz`) を、**若い女性のきれいな声に書き換えて**歌う。
+歌の旋律はフーガの主題そのもので、**主題が入るたびに、その声部を女声が同じ祈りの言葉で歌う** (モーツァルトのレクイエムの Kyrie のフーガと同じ作り方)。
+
+- **女性の声への書き換え** (`sing_user.render_phrase` の `formant`・`breath`) — 響き (スペクトル包絡) を周波数の方向に 1.18 倍にのばし (声道を短く)、
+  声域はソプラノ (フレーズの平均がミ♭4〜ド#5) とアルト。2.5 kHz より上に軽い息を足して透きとおった声に、ビブラートは少し速く浅く (0.28 半音・5.6 Hz)
+- **歌うフーガ** (`add_vocals.py` の `entries` モード) — 楽譜の `entries` (主題の入り) ごとに、その声部の 2 小節を 1 フレーズとして歌う。
+  ソプラノ・アルトの入りはそのまま、テノール・バスの入りは女声の声域へオクターヴを上げて歌う (女声合唱のフーガ)。声部ごとに左右に置く。
+  主題と重なる自動の声部の音が拍の頭で半音ぶつかるときは、近くの協和音へ動かす (ソプラノの自動の音も)
+- 歌詞はレクイエムの祈りの言葉 (Requiem aeternam・Kyrie・Lux aeterna・In paradisum) をもとに書いたオリジナルの日本語 (`lyrics_tablet.py` の `tablet46`)
+- 形式: Introitus (08:49 の実音) → Requiem aeternam — Fuga I (ホ短調、08:53 の主題) → Kyrie — コラール → Lacrimosa (11:18 の実音)
+  → Lux aeterna — Fuga II (ヘ短調、11:21 の主題、ストレッタ) → In paradisum — コラール (ヘ長調で終わる) → 08:49 の本当の終わり
+
+```bash
+python3 compose_tablet46.py bank37.json score_tablet46.json && python3 add_vocals.py tablet46 score_tablet46.json score_tablet46v.json voice0928b_tmpl.npz
+python3 synth.py score_tablet46v.json tablet46v.wav && python3 video.py score_tablet46v.json tablet46v.wav tablet46v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

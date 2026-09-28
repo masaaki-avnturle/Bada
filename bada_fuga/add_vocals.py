@@ -21,13 +21,22 @@ def main(key, src, dst, voice_bank=None):
         t_a = sec['t']; t_b = secs[si + 1]['t'] if si + 1 < len(secs) else 1e9
         hit = [x for x in spec['sections'] if sec['title'].startswith(x[0])]
         if not hit: continue
-        lines = hit[0][1]; block = hit[0][2] if len(hit[0]) > 2 else spec['block']
-        boost = 1.35 if ('horus' in sec['title'] or sec['title'].startswith(('Sequentia', 'Lux aeterna'))) else 1.0   # サビは伴奏が厚いので歌を前に
-        ns = [n for n in S if t_a - 1e-6 <= n['t'] < t_b - 1e-6]
-        blocks = {}
-        for n in ns: blocks.setdefault(int((n['t'] - t_a + 1e-6) // (block * bar_s)), []).append(n)
-        for bi, k in enumerate(sorted(blocks)):
-            notes = blocks[k]; line = lines[bi % len(lines)]; mm = sing.morae(line)
+        lines = hit[0][1]; block = hit[0][2] if len(hit[0]) > 2 and hit[0][2] else spec['block']
+        opt = hit[0][3] if len(hit[0]) > 3 else {}
+        boost = opt.get('boost', 1.35 if ('horus' in sec['title'] or sec['title'].startswith(('Sequentia', 'Lux aeterna'))) else 1.0)   # サビは伴奏が厚いので歌を前に
+        groups = []                                                         # [(声部, その声部の音)] — 1 つが 1 フレーズ
+        if opt.get('entries'):                                              # フーガ: 主題が入るたびに、その声部が block 小節を歌う
+            for e in d['entries']:
+                if t_a - 1e-6 <= e['t'] < t_b - 1e-6 and e['v'] in opt.get('voices', 'S') and e['label'].startswith(opt.get('prefix', '主題')):
+                    ns = sorted([n for n in d['notes'] if n['v'] == e['v'] and e['t'] - 1e-6 <= n['t'] < e['t'] + block * bar_s - 1e-6], key=lambda n: n['t'])
+                    if ns: groups.append((e['v'], ns))
+        else:
+            ns = [n for n in S if t_a - 1e-6 <= n['t'] < t_b - 1e-6]
+            blocks = {}
+            for n in ns: blocks.setdefault(int((n['t'] - t_a + 1e-6) // (block * bar_s)), []).append(n)
+            groups = [('S', blocks[k]) for k in sorted(blocks)]
+        for bi, (gv, notes) in enumerate(groups):
+            line = lines[bi % len(lines)]; mm = sing.morae(line)
             seq = [[n['t'], n['d'], n['m']] for n in notes]
             while len(seq) < len(mm):                                     # モーラが多い: いちばん長い音を半分に
                 j = max(range(len(seq)), key=lambda i: seq[i][1])
@@ -37,7 +46,7 @@ def main(key, src, dst, voice_bank=None):
             nm, nn = len(mm), len(seq)
             idx = [min(nm - 1, i * nm // nn) for i in range(nn)]           # 少ない: 均等にメリスマ
             mean = sum(m for _, _, m in seq) / nn; sh = 0
-            lo_, hi_ = spec.get('range', (57, 72))                          # 声域 (フレーズの平均の音高をこの間に)
+            lo_, hi_ = opt.get('ranges', {}).get(gv, spec.get('range', (57, 72)))   # 声域 (フレーズの平均の音高をこの間に)
             while mean + sh > hi_: sh -= 12
             while mean + sh < lo_: sh += 12
             marks = []
@@ -45,13 +54,15 @@ def main(key, src, dst, voice_bank=None):
                 first = i == 0 or idx[i] != idx[i - 1]
                 lab = mm[idx[i]][2] if first else None
                 vo.append({'v': 'VO', 't': round(t, 4), 'd': round(dd * 0.98, 4), 'm': m + sh, 'lyr': lab, 'ph': ph_id,
-                           'gain': round(spec.get('gain', 0.3) * boost, 3), 'tim': spec.get('timbre', 'hypno'), 'vopts': spec.get('voice_opts') if i == 0 else None, 'label': None, 'beat': 0, 'dbeats': 0})
+                           'gain': round(spec.get('gain', 0.3) * boost, 3), 'tim': spec.get('timbre', 'hypno'), 'vopts': spec.get('voice_opts') if i == 0 else None,
+                           'pan': opt.get('pans', {}).get(gv, 0.0), 'label': None, 'beat': 0, 'dbeats': 0})
                 if first: marks.append([round(t, 3), lab])
             lyr_meta.append([round(seq[0][0] - 0.35, 3), round(seq[-1][0] + seq[-1][1] + 0.25, 3), line, marks])
             for n in notes: n['dyn'] = round(n.get('dyn', 1.0) * 0.78, 4)
             report.append('%-22s %2d 音 / %2d モーラ  %s' % (sec['title'][:22], len(notes), len(sing.morae(line)), line))
             ph_id += 1
-    # 行の表示が重ならないよう、次の行の始まりで切る
+    # 行の表示が重ならないよう、次の行の始まりで切る (フーガでは声部が重なるので、始まりの順に並べてから)
+    lyr_meta.sort(key=lambda x: x[0])
     for a, b in zip(lyr_meta, lyr_meta[1:]): a[1] = min(a[1], b[0])
     d['extras'] = d.get('extras', []) + vo
     m = d['meta']; m['lyrics'] = lyr_meta

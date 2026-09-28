@@ -51,9 +51,11 @@ def _smooth(x, tau):
     a = np.exp(-FR / tau)
     return lfilter([1 - a], [1, -a], x, axis=0, zi=(x[:1] * a) if x.ndim > 1 else [x[0] * a])[0]
 
-def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0):
+def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0, formant=1.0, breath=0.0):
     """vib_depth / vib_rate: ビブラートの深さ (半音) と速さ、attack: 立ち上がりのなめらかさ (秒)、sib: s・sh の強さ (倍)、
-    presence: 2.4 kHz あたりの明るさ (dB、声の抜け)。あたたかく穏やかな声は 浅く遅いビブラート・やわらかい立ち上がり・控えめな s"""
+    presence: 2.4 kHz あたりの明るさ (dB、声の抜け)。あたたかく穏やかな声は 浅く遅いビブラート・やわらかい立ち上がり・控えめな s。
+    formant: 声の響き (スペクトル包絡) を周波数の方向に何倍にのばすか — 1.18 くらいで男声の響きが若い女性の響きになる (声道が短くなる)。
+    breath: 2.5 kHz より上に息の成分を足す量 (0〜0.3、透きとおった軽い声に)"""
     import pyworld as pw
     b = load(bank_path); rng = np.random.default_rng(rng_seed); freqs = b['freqs']; nb = len(freqs)
     t0 = notes[0][0] - 0.2; t1 = notes[-1][0] + notes[-1][1] + 0.35
@@ -62,6 +64,12 @@ def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, att
     LS = np.zeros((nf, nb)); AP = np.tile(b['ap_v'], (nf, 1)); vib = np.zeros(nf)
     L = {k: np.log(b['sp_' + k] + 1e-12) for k in ('a', 'i', 'u', 'e', 'o', 's', 'sh', 'N', 'R', 'W')}
     L['s'] = L['s'] + np.log(sib); L['sh'] = L['sh'] + np.log(sib)
+    if formant != 1.0:                                                          # 響きを高い方へのばす (母音・鼻音は全部、s・sh は半分だけ)
+        for k in L:
+            a = formant if k not in ('s', 'sh') else 1 + (formant - 1) * 0.5
+            L[k] = np.interp(freqs / a, freqs, L[k])
+    if breath:
+        AP = np.clip(AP + breath * np.clip((freqs - 2500) / 3000, 0, 1)[None, :], 0, 1)
     if presence:
         pr = presence * np.log(10) / 10 * np.exp(-0.5 * ((freqs - 2400) / 900) ** 2)
         for v in ('a', 'i', 'u', 'e', 'o'): L[v] = L[v] + pr
