@@ -70,7 +70,7 @@ LYRICS = {
             ('Lux aeterna', ['とわの ひかりを きみに'], 4),
         ]},
     'tablet46': {                              # XLVI · Requiem in fuga — レクイエムの祈りの言葉をもとにした日本語 (オリジナル)。主題が入るたびに同じ祈りを歌う
-        'block': 2, 'gain': 0.85, 'timbre': 'user', 'range': (62, 72), 'voice_name': '女声 (わたしの声から)', 'title_suffix': '',
+        'block': 2, 'gain': 0.85, 'timbre': 'user', 'range': (62, 72), 'voice_name': '女声の歌', 'title_suffix': '',
         'voice_opts': {'formant': 1.18, 'breath': 0.15, 'vib_depth': 0.28, 'vib_rate': 5.6, 'presence': 3.0, 'sib': 0.7, 'attack': 0.02},
         'sections': [
             ('Requiem aeternam — Fuga I', ['とわの やすらぎを かれらに', 'たえざる ひかりで てらせ'], 2,
