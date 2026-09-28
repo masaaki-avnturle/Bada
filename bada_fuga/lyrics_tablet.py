@@ -80,4 +80,18 @@ LYRICS = {
              {'entries': True, 'voices': 'SATB', 'ranges': {'S': (66, 76), 'A': (60, 69), 'T': (60, 69), 'B': (58, 67)}, 'pans': {'S': -0.3, 'A': 0.3, 'T': 0.1, 'B': -0.1}, 'boost': 1.0}),
             ('In paradisum — コラール', ['てんしよ みちびきたまえ'], 4),
         ]},
+    'tablet46en': {                            # XLVI · Requiem in fuga の英語版 — レクイエムの祈りの言葉をもとに書いたオリジナルの英語。(表示, 発音の表記) の組
+        'block': 2, 'gain': 0.85, 'timbre': 'user', 'range': (65, 75), 'top': 81, 'voice_name': 'Soprano', 'title_suffix': ' · English',
+        'voice_opts': {'formant': 1.22, 'breath': 0.12, 'vib_depth': 0.45, 'vib_rate': 5.7, 'vib_delay': 0.2, 'presence': 3.5, 'sib': 0.85, 'attack': 0.02},
+        'sections': [
+            ('Requiem aeternam — Fuga I', [('Grant them rest for-ev-er-more', 'grant dhem rest fxr e vxr mor'),
+                                           ('Let the end-less light shine on them', 'let dhx end lxs lait shain on dhem')], 2,
+             {'entries': True, 'voices': 'SATB', 'ranges': {'S': (66, 76), 'A': (60, 69), 'T': (60, 69), 'B': (58, 67)}, 'pans': {'S': -0.3, 'A': 0.3, 'T': 0.1, 'B': -0.1}, 'boost': 1.0}),
+            ('Kyrie — コラール', [('Lord, have mer-cy on us all', 'lord haev mxr sii on as ol'),
+                                  ('Hear our qui-et prayer', 'hiir aur kwai xt prer')], 4),
+            ('Lux aeterna — Fuga II', [('Light e-ter-nal, shine up-on them', 'lait ii txr nxl shain x pon dhem'),
+                                       ('Soft-ly and gent-ly for-ev-er-more', 'soft lii aend jent lii fxr e vxr mor')], 2,
+             {'entries': True, 'voices': 'SATB', 'ranges': {'S': (66, 76), 'A': (60, 69), 'T': (60, 69), 'B': (58, 67)}, 'pans': {'S': -0.3, 'A': 0.3, 'T': 0.1, 'B': -0.1}, 'boost': 1.0}),
+            ('In paradisum — コラール', [('May the an-gels lead you home', 'mei dhx ein jxlz liid yuu houm')], 4),
+        ]},
 }

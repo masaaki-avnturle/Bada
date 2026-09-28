@@ -36,7 +36,11 @@ def main(key, src, dst, voice_bank=None):
             for n in ns: blocks.setdefault(int((n['t'] - t_a + 1e-6) // (block * bar_s)), []).append(n)
             groups = [('S', blocks[k]) for k in sorted(blocks)]
         for bi, (gv, notes) in enumerate(groups):
-            line = lines[bi % len(lines)]; mm = sing.morae(line)
+            line = lines[bi % len(lines)]
+            if isinstance(line, (tuple, list)):                               # 英語: (表示の行, 発音) → 音節 (表示, 頭子音, 母音, 末尾子音)
+                en = sing.en_line(*line); mm = [(None, None, s_[0], s_[1:]) for s_ in en]; line = line[0].replace('-', '')
+            else:
+                mm = sing.morae(line)
             seq = [[n['t'], n['d'], n['m']] for n in notes]
             while len(seq) < len(mm):                                     # モーラが多い: いちばん長い音を半分に
                 j = max(range(len(seq)), key=lambda i: seq[i][1])
@@ -54,14 +58,20 @@ def main(key, src, dst, voice_bank=None):
             marks = []
             for i, (t, dd, m) in enumerate(seq):
                 first = i == 0 or idx[i] != idx[i - 1]
+                last = i == nn - 1 or idx[i + 1] != idx[i]
                 lab = mm[idx[i]][2] if first else None
-                vo.append({'v': 'VO', 't': round(t, 4), 'd': round(dd * 0.98, 4), 'm': m + sh, 'lyr': lab, 'ph': ph_id,
-                           'gain': round(spec.get('gain', 0.3) * boost, 3), 'tim': spec.get('timbre', 'hypno'), 'vopts': spec.get('voice_opts') if i == 0 else None,
-                           'pan': opt.get('pans', {}).get(gv, 0.0), 'label': None, 'beat': 0, 'dbeats': 0})
+                e_ = {'v': 'VO', 't': round(t, 4), 'd': round(dd * 0.98, 4), 'm': m + sh, 'lyr': lab, 'ph': ph_id,
+                      'gain': round(spec.get('gain', 0.3) * boost, 3), 'tim': spec.get('timbre', 'hypno'), 'vopts': spec.get('voice_opts') if i == 0 else None,
+                      'pan': opt.get('pans', {}).get(gv, 0.0), 'label': None, 'beat': 0, 'dbeats': 0}
+                if mm[idx[i]][0] is None:                                     # 英語の音節
+                    on, nu, co = mm[idx[i]][3]
+                    if first: e_['en'] = {'on': on, 'nu': nu, 'co': co}; e_['last'] = last
+                    elif last and co: e_['coda'] = co
+                vo.append(e_)
                 if first: marks.append([round(t, 3), lab])
             lyr_meta.append([round(seq[0][0] - 0.35, 3), round(seq[-1][0] + seq[-1][1] + 0.25, 3), line, marks])
             for n in notes: n['dyn'] = round(n.get('dyn', 1.0) * 0.78, 4)
-            report.append('%-22s %2d 音 / %2d モーラ  %s' % (sec['title'][:22], len(notes), len(sing.morae(line)), line))
+            report.append('%-22s %2d 音 / %2d 音節  %s' % (sec['title'][:22], len(notes), nm, line))
             ph_id += 1
     # 行の表示が重ならないよう、次の行の始まりで切る (フーガでは声部が重なるので、始まりの順に並べてから)
     lyr_meta.sort(key=lambda x: x[0])

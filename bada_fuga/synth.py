@@ -861,7 +861,8 @@ def main(score='score.json', out='fuga.wav'):
         for notes, g, pan, k, tim, vopts in sing.phrases(vo):
             if tim == 'user':                                    # その人の声 (voice_templates.py → sing_user.py、WORLD で合成)
                 import sing_user
-                y, t0 = sing_user.render_phrase(notes, d['meta']['voice_bank'], rng_seed=int(k) + 7, **vopts); y = y * g
+                fn = sing_user.render_phrase_en if any(n[3] and n[3][0] == 'EN' for n in notes) else sing_user.render_phrase   # 英語の歌詞か
+                y, t0 = fn(notes, d['meta']['voice_bank'], rng_seed=int(k) + 7, **vopts); y = y * g
             else:
                 y, t0 = sing.render_phrase(notes, rng_seed=int(k) + 7, timbre=tim); y = y * g
             i0 = max(0, int(t0 * SR)); i1 = min(i0 + len(y), N); y = y[:i1 - i0]

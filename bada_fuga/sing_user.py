@@ -140,6 +140,116 @@ def render_phrase(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, att
     ref = np.sqrt(np.exp(L['a']).sum())                                         # 声の大きさの基準 (母音あ)
     return (y / (ref + 1e-12) * 2.8).astype(np.float32), t0
 
+# ---------------------------------------------------------------- 英語で歌う
+EN_CDUR = {'b': 0.045, 'd': 0.04, 'g': 0.05, 'p': 0.06, 't': 0.055, 'k': 0.065, 'ch': 0.08, 'j': 0.07, 'f': 0.08, 'v': 0.06, 'th': 0.08, 'dh': 0.045,
+           's': 0.1, 'z': 0.075, 'sh': 0.1, 'h': 0.06, 'm': 0.07, 'n': 0.065, 'ng': 0.07, 'l': 0.06, 'r': 0.06, 'w': 0.06, 'y': 0.055}
+EN_UNV = {'p', 't', 'k', 'ch', 'f', 'th', 's', 'sh', 'h'}
+
+def render_phrase_en(notes, bank_path, rng_seed=0, vib_depth=0.3, vib_rate=5.4, attack=0.012, sib=1.0, presence=0.0, formant=1.0, breath=0.0, vib_delay=0.3):
+    """英語の歌詞で歌う。notes = [(t, d, midi, ph)]、ph = ('EN', 頭子音, 母音, 末尾子音) が音節の始まり、('CO', 末尾子音) がメリスマの最後の音、None は続き。
+    英語の母音は日本語の 5 母音の響きを対数スペクトルで混ぜて作る (ɪ = い+え、æ = あ+え、ɑ = あ+お、ʊ = う+お、あいまい母音 = 5 つの平均)。
+    二重母音 (ai・ei・au・ou・oi) は音節の終わり 35% で次の母音へわたる。末尾子音は音節の最後の音の終わりに置く"""
+    import pyworld as pw
+    b = load(bank_path); rng = np.random.default_rng(rng_seed); freqs = b['freqs']; nb = len(freqs)
+    t0 = notes[0][0] - 0.25; t1 = notes[-1][0] + notes[-1][1] + 0.4
+    nf = int((t1 - t0) / FR) + 2; ft = t0 + np.arange(nf) * FR
+    lf0 = np.zeros(nf); voiced = np.zeros(nf); amp = np.zeros(nf)
+    LS = np.zeros((nf, nb)); AP = np.tile(b['ap_v'], (nf, 1)); vib = np.zeros(nf)
+    L = {k: np.log(b['sp_' + k] + 1e-12) for k in ('a', 'i', 'u', 'e', 'o', 's', 'sh', 'N', 'R', 'W')}
+    mix = lambda p, q, w: (1 - w) * L[p] + w * L[q]
+    V = {'a': mix('a', 'e', 0.15), 'aa': mix('a', 'o', 0.35), 'ae': mix('a', 'e', 0.5), 'e': L['e'], 'i': mix('i', 'e', 0.45), 'ii': L['i'],
+         'o': mix('o', 'a', 0.3), 'u': mix('u', 'o', 0.4), 'uu': mix('u', 'W', 0.4), 'x': np.mean([L[v] for v in 'aiueo'], 0) - 0.3}
+    DIPH = {'ai': ('a', 'i'), 'au': ('a', 'uu'), 'ei': ('e', 'i'), 'oi': ('o', 'i'), 'ou': ('o', 'uu')}
+    L['s'] = L['s'] + np.log(sib); L['sh'] = L['sh'] + np.log(sib)
+    L['L'] = mix('o', 'N', 0.45) + 0.4                                          # l: 暗く丸い有声音
+    if presence:
+        pr = presence * np.log(10) / 10 * np.exp(-0.5 * ((freqs - 2400) / 900) ** 2)
+        for k in V: V[k] = V[k] + pr
+    if formant != 1.0:
+        for D in (L, V):
+            for k in D:
+                a = formant if k not in ('s', 'sh') else 1 + (formant - 1) * 0.5
+                D[k] = np.interp(freqs / a, freqs, D[k])
+    if breath: AP = np.clip(AP + breath * np.clip((freqs - 2500) / 3000, 0, 1)[None, :], 0, 1)
+    quiet = L['N'] - 9.0
+    fr_ = lambda t: max(0, min(nf, int((t - t0) / FR)))
+
+    def cons(c, a, e, Vc):                                                      # 子音 c をフレーム a..e に
+        if e <= a: return
+        seg = slice(a, e)
+        if c in ('m', 'n', 'ng'): LS[seg] = L['N']; voiced[seg] = 1; amp[seg] = 0.8
+        elif c == 'l':           LS[seg] = L['L']; voiced[seg] = 1; amp[seg] = 0.85
+        elif c == 'r':           LS[seg] = L['R'] + 0.5; voiced[seg] = 1; amp[seg] = 0.85
+        elif c == 'w':           LS[seg] = L['W']; voiced[seg] = 1; amp[seg] = 0.9
+        elif c == 'y':           LS[seg] = L['i']; voiced[seg] = 1; amp[seg] = 0.9
+        elif c in ('b', 'd', 'g'):
+            m_ = a + max(1, int(0.65 * (e - a)))
+            LS[a:m_] = L['N'] - 1.5; voiced[a:m_] = 1; amp[a:m_] = 0.55
+            LS[m_:e] = {'g': L['a'], 'd': L['s'], 'b': L['o']}[c] - 2.2; voiced[m_:e] = 0; amp[m_:e] = 1
+        elif c in ('p', 't', 'k'):
+            m_ = a + max(1, int(0.6 * (e - a)))
+            LS[a:m_] = quiet; voiced[a:m_] = 0; amp[a:m_] = 1
+            burst = {'k': L['a'] + np.log(np.exp(-0.5 * ((freqs - 2200) / 700) ** 2) + 0.05), 't': L['s'], 'p': L['o'] + np.log(b['lp'](1200, 0.05))}[c]
+            LS[m_:e] = burst - 0.7; voiced[m_:e] = 0; amp[m_:e] = 1
+        elif c in ('s', 'sh'):   LS[seg] = L[c]; voiced[seg] = 0; amp[seg] = 1
+        elif c == 'z':           LS[seg] = L['s'] - 0.8; voiced[seg] = 1; amp[seg] = 0.85; AP[seg] = np.clip(b['ap_v'] + 0.5, 0, 1)
+        elif c == 'j':           LS[seg] = L['sh'] - 0.8; voiced[seg] = 1; amp[seg] = 0.85; AP[seg] = np.clip(b['ap_v'] + 0.5, 0, 1)
+        elif c == 'ch':          LS[seg] = L['sh']; voiced[seg] = 0; amp[seg] = 1; LS[a:a + 2] = quiet
+        elif c == 'f':           LS[seg] = Vc + np.log(b['lp'](1500, 0.05)) - 2.2; voiced[seg] = 0; amp[seg] = 1
+        elif c == 'th':          LS[seg] = Vc + np.log(b['lp'](2500, 0.1)) - 2.8; voiced[seg] = 0; amp[seg] = 1
+        elif c == 'v':           LS[seg] = Vc + np.log(b['lp'](1500, 0.05)) - 1.2; voiced[seg] = 1; amp[seg] = 0.7; AP[seg] = np.clip(b['ap_v'] + 0.4, 0, 1)
+        elif c == 'dh':          LS[seg] = L['N'] - 0.8; voiced[seg] = 1; amp[seg] = 0.7; AP[seg] = np.clip(b['ap_v'] + 0.35, 0, 1)
+        elif c == 'h':           LS[seg] = Vc - 1.8; voiced[seg] = 0; amp[seg] = 1
+
+    # 音高・ビブラート (音ごと)
+    lf0[:] = notes[0][2]
+    for (t, d, m, ph) in notes:
+        j0, j1 = fr_(t), fr_(t + d); lf0[j0:] = m
+        if d > vib_delay + 0.15:
+            s_ = j0 + int(vib_delay / FR)
+            if s_ < j1: vib[s_:j1] = np.linspace(0, 1, j1 - s_) ** 0.5
+    # 音節ごと: [始まりの音 … 終わりの音]
+    starts = [i for i, n in enumerate(notes) if n[3] and n[3][0] == 'EN']
+    for si, i0 in enumerate(starts):
+        i1 = (starts[si + 1] - 1) if si + 1 < len(starts) else len(notes) - 1
+        _, on, nu, co1 = notes[i0][3]
+        co = co1 or next((n[3][1] for n in notes[i0 + 1:i1 + 1] if n[3] and n[3][0] == 'CO'), [])
+        ts, te = notes[i0][0], notes[i1][0] + notes[i1][1]
+        nxt = notes[i1 + 1] if i1 + 1 < len(notes) else None
+        gap = (nxt[0] - te) if nxt else 1.0
+        od = min(sum(EN_CDUR.get(c, 0.06) for c in on), 0.2, 0.45 * (te - ts))
+        cd = min(sum(EN_CDUR.get(c, 0.06) for c in co), 0.18, 0.3 * (te - ts))
+        v_on, v_off = ts + 0.4 * od, te - cd - (0.0 if gap < 0.05 else 0.02)
+        nuv = nu[0]; v1, v2 = (DIPH[nuv] if nuv in DIPH else (nuv, None))
+        Va = V[v1]
+        # 頭子音 (音の頭の少し前から)
+        t_ = ts - 0.6 * od
+        for c in on:
+            dd = od * EN_CDUR.get(c, 0.06) / max(1e-6, sum(EN_CDUR.get(x, 0.06) for x in on))
+            cons(c, fr_(t_), fr_(t_ + dd), Va); t_ += dd
+        k0, k1 = fr_(v_on), fr_(v_off)
+        LS[k0:k1] = Va; voiced[k0:k1] = 1; amp[k0:k1] = 1.0
+        if v2:                                                                  # 二重母音: 終わり 35% で次の母音へ
+            g0 = k0 + int(0.65 * (k1 - k0)); LS[g0:k1] = V[v2]
+        # 末尾子音 (音節の終わりに)
+        t_ = te - cd
+        Vend = V[v2] if v2 else Va
+        for c in co:
+            dd = cd * EN_CDUR.get(c, 0.06) / max(1e-6, sum(EN_CDUR.get(x, 0.06) for x in co))
+            cons(c, fr_(t_), fr_(t_ + dd), Vend); t_ += dd
+        if not co and (gap >= 0.05 or not nxt): LS[k1:] = Vend
+    lf0 = _smooth(lf0, 0.03)
+    vib = vib * (vib_depth * np.sin(2 * np.pi * vib_rate * ft + 0.3) + 0.04 * rng.standard_normal(nf).cumsum() / np.sqrt(np.arange(1, nf + 1)))
+    f0 = 440.0 * 2 ** ((lf0 + vib - 69) / 12.0)
+    LS = _smooth(LS, 0.018); amp = _smooth(amp, attack)
+    vo = voiced > 0.5
+    f0 = np.where(vo & (amp > 0.05), f0, 0.0)
+    AP = np.where(vo[:, None], AP, 1.0)
+    sp = np.exp(LS) * (amp[:, None] ** 2) + 1e-16
+    y = pw.synthesize(np.ascontiguousarray(f0), np.ascontiguousarray(sp), np.ascontiguousarray(AP), SR, FP)
+    ref = np.sqrt(np.exp(L['a']).sum())
+    return (y / (ref + 1e-12) * 2.8).astype(np.float32), t0
+
 if __name__ == '__main__':                                                     # 試聴: python sing_user.py bank.npz out.wav
     import sys, soundfile as sf
     words = sing.morae('よるのまちにひかるあめ')

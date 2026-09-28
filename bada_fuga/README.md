@@ -1305,8 +1305,16 @@ XLV と同じ 9/24 の 5 本の録音 (`bank37.json`) から。歌は 9/28 17:46
 - 形式: Introitus (08:49 の実音) → Requiem aeternam — Fuga I (ホ短調、08:53 の主題) → Kyrie — コラール → Lacrimosa (11:18 の実音)
   → Lux aeterna — Fuga II (ヘ短調、11:21 の主題、ストレッタ) → In paradisum — コラール (ヘ長調で終わる) → 08:49 の本当の終わり
 
+- **英語版** (`tablet46en`、20 代前半の淑女の歌声) — 同じフーガを英語で歌う。歌詞はレクイエムの祈りの言葉をもとに書いたオリジナルの英語
+  (Grant them rest forevermore / Let the endless light shine on them / Light eternal, shine upon them …)。
+  `sing.en_line` が表示の行と発音の簡単な表記 (例 'lait ii txr nxl') から音節 (頭子音・母音・末尾子音) を作り、
+  `sing_user.render_phrase_en` が歌う: 英語の母音 (ɪ・æ・ɑ・ʊ・あいまい母音) は日本語の 5 母音の響きを対数スペクトルで混ぜて作り、
+  二重母音 (ai・ei・au・ou・oi) は音節の終わり 35% で次の母音へわたり、子音の連なり (gr・st・nt…) と末尾子音 (-t・-n・-lz…) も鳴らす。
+  声は響き 1.22 倍、息は少なめ (0.12) で澄んだ声に、ビブラート 0.45 半音・5.7 Hz、英語の s がはっきり聞こえるよう少し明るく
+
 ```bash
 python3 compose_tablet46.py bank37.json score_tablet46.json && python3 add_vocals.py tablet46 score_tablet46.json score_tablet46v.json voice0928b_tmpl.npz
+python3 add_vocals.py tablet46en score_tablet46.json score_tablet46en.json voice0928b_tmpl.npz   # 英語版
 python3 synth.py score_tablet46v.json tablet46v.wav && python3 video.py score_tablet46v.json tablet46v.wav tablet46v.mp4
 ```
 

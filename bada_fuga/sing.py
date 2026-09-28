@@ -170,6 +170,34 @@ def render_phrase(notes, rng_seed=0, timbre='voice'):
         seg = out[i0:i0 + ln]; seg += (g * z * e)[:len(seg)]
     return (0.22 * out).astype(np.float32), t0
 
+# ---------------------------------------------------------------- 英語の音節 (発音の簡単な表記 → 頭子音・母音・末尾子音)
+EN_CONS = ['ch', 'sh', 'th', 'dh', 'ng', 'b', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'r', 's', 't', 'v', 'w', 'y', 'z']
+EN_VOW = ['ai', 'au', 'ei', 'oi', 'ou', 'ii', 'uu', 'aa', 'ae', 'a', 'e', 'i', 'o', 'u', 'x']
+
+def en_syllable(tok):
+    """'lait' → (['l'], ['ai'], ['t'])。母音: a (ʌ)・aa (ɑ)・ae (æ)・e (ɛ)・i (ɪ)・ii (iː)・o (ɔ)・u (ʊ)・uu (uː)・x (あいまい母音)・
+    ai・au・ei・oi・ou (二重母音)。子音: ch・sh・th・dh (ð)・ng と b d f g h j k l m n p r s t v w y z"""
+    def take(s, table):
+        for x in table:
+            if s.startswith(x): return x
+        return None
+    on, nu, co = [], [], []; s = tok
+    while s and take(s, EN_CONS) and not take(s, EN_VOW): c = take(s, EN_CONS); on.append(c); s = s[len(c):]
+    v = take(s, EN_VOW)
+    if v: nu.append(v); s = s[len(v):]
+    while s:
+        c = take(s, EN_CONS)
+        if not c: s = s[1:]; continue
+        co.append(c); s = s[len(c):]
+    return on, nu or ['x'], co
+
+def en_line(disp, phon):
+    """表示の行 ('Light e-ter-nal, shine on them') と発音 ('lait ii txr nxl shain on dhem') → [(表示の音節, 頭子音, 母音, 末尾子音)]"""
+    labs = [p for w in disp.split() for p in w.split('-')]
+    toks = phon.split()
+    assert len(labs) == len(toks), (disp, phon, len(labs), len(toks))
+    return [(lab,) + en_syllable(tok) for lab, tok in zip(labs, toks)]
+
 def phrases(vo):
     """VO の extras をフレーズ番号でまとめ、render_phrase の入力に"""
     from collections import OrderedDict
@@ -180,7 +208,11 @@ def phrases(vo):
         notes = []
         for e in es:
             ph = None
-            if e.get('lyr'):
+            if e.get('en'):                                                     # 英語の音節の始まり (1 音だけの音節なら末尾子音もここ)
+                ph = ('EN', e['en']['on'], e['en']['nu'], e['en']['co'] if e.get('last') else [])
+            elif e.get('coda'):                                                 # 英語の音節の最後の音 (メリスマの終わりに末尾子音)
+                ph = ('CO', e['coda'])
+            elif e.get('lyr'):
                 mm = morae(e['lyr'])
                 ph = (mm[0][0], mm[0][1]) if mm else None
             notes.append((e['t'], e['d'], e['m'], ph))
