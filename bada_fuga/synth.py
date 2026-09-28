@@ -816,7 +816,7 @@ def main(score='score.json', out='fuga.wav'):
             if not ((pconcerto or acc) and role == 'both'): continue
         if pconcerto and role == 'tutti': continue
         if recs and d.get('meta', {}).get('choir') == 'organ':      # 4 声をパイプオルガン (合成) で
-            vel = 0.17 * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
+            vel = 0.17 * d['meta'].get('organ_gain', 1.0) * (1.12 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
             y = organ_tone(freq, max(0.2, nt['d'] * 0.99), vel, nt['v'])
         elif recs:
             vel = 0.55 * (1.15 if nt['label'] else 1.0) * nt.get('dyn', 1.0)
@@ -868,7 +868,8 @@ def main(score='score.json', out='fuga.wav'):
             i0 = max(0, int(t0 * SR)); i1 = min(i0 + len(y), N); y = y[:i1 - i0]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             HL[i0:i1] += y * cl; HR[i0:i1] += y * cr
-            L[i0:i1] += y * 0.3; R[i0:i1] += y * 0.3
+            vs = d.get('meta', {}).get('vo_send', 0.3)            # 響きへ送る量 (大聖堂では多く)
+            L[i0:i1] += y * vs; R[i0:i1] += y * vs
             j0 = min(i0 + dly, N); j1 = min(j0 + len(y), N)
             L[j0:j1] += y[:j1 - j0] * 0.12; R[j0:j1] += y[:j1 - j0] * 0.16
     # 鐘・ドローン
@@ -1086,6 +1087,7 @@ def main(score='score.json', out='fuga.wav'):
         L[i0:i1] += y[:i1 - i0] * 0.707; R[i0:i1] += y[:i1 - i0] * 0.707
     # 合成リバーブ (指数減衰ノイズ, ローパス)
     rv_len, rv_decay, wet = (4.2, 1.4, 0.36) if recs else (5.0, 1.7, 0.46) if mantra else (4.4, 1.45, 0.40) if acc else (4.2, 1.35, 0.42) if requiem else ((4.6, 1.5, 0.42) if grief else ((3.6, 1.15, 0.34) if mallet else ((3.8, 1.2, 0.36) if (concerto or symphony or pconcerto or sweet) else ((3.4, 1.05, 0.30) if elegia else ((3.0, 0.9, 0.26) if piano else (2.2, 0.75, 0.30))))))
+    if d.get('meta', {}).get('reverb'): rv_len, rv_decay, wet = d['meta']['reverb']   # 曲ごとの響き (例: 大聖堂 = 長く深く)
     ir_len = int(rv_len * SR)
     t = np.arange(ir_len) / SR
     def make_ir(seed):

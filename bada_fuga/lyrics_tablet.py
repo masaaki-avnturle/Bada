@@ -106,3 +106,17 @@ LYRICS['tablet46en18'] = dict(LYRICS['tablet46en'], range=(66, 76), top=81, voic
     title='Requiem BADA — XLVI · Requiem in fuga (English, 18)',
     subtitle='歌の旋律がフーガのレクイエムを英語で — わたしの声から書き換えた十八歳の淑女の声 (♩=60)',
     voice_opts={'formant': 1.25, 'breath': 0.18, 'vib_depth': 0.38, 'vib_rate': 5.9, 'vib_delay': 0.2, 'presence': 4.0, 'sib': 0.85, 'attack': 0.018})
+
+# XLVII · Aria di cattedrale — 大聖堂の賛美歌のアリア。この曲のために書いたオリジナルの英語の賛美歌 (表示, 発音の表記)。19 歳の淑女の声
+LYRICS['tablet47'] = {
+    'block': 4, 'gain': 0.85, 'timbre': 'user', 'range': (66, 76), 'top': 81, 'voice_name': 'Soprano (19)', 'title_suffix': '',
+    'voice_opts': {'formant': 1.24, 'breath': 0.16, 'vib_depth': 0.42, 'vib_rate': 5.8, 'vib_delay': 0.22, 'presence': 3.5, 'sib': 0.8, 'attack': 0.022},
+    'sections': [
+        ('Verse 1', [('Hol-y light up-on the wa-ters', 'hou lii lait x pon dhx wo txrz'),
+                     ('Gent-ly guide us through the night', 'jent lii gaid as thruu dhx nait')]),
+        ('Verse 2', [('All the bells of heav-en ring-ing', 'ol dhx belz xv he vxn rin ging'),
+                     ('Sing a-loud the morn-ing song', 'sing x laud dhx mor ning song')]),
+        ('Verse 3', [('Grace that holds us, love e-ter-nal', 'greis dhaet houldz as lav ii txr nxl'),
+                     ('Bring us home where we be-long', 'bring as houm wer wii bi long')]),
+        ('Amen', [('A-men', 'aa men')], 3),
+    ]}

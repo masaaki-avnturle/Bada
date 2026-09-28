@@ -1320,6 +1320,23 @@ python3 add_vocals.py tablet46en18 score_tablet46.json score_tablet46en18.json v
 python3 synth.py score_tablet46v.json tablet46v.wav && python3 video.py score_tablet46v.json tablet46v.wav tablet46v.mp4
 ```
 
+## ⛪🎤 Requiem BADA — Tablet Sessions XLVII · Aria di cattedrale (XLVI を大聖堂の賛美歌のアリアに — 19 歳の淑女の英語の歌声, ♩=56, 約 3 分 10 秒)
+
+XLVI と同じ 9/24 の 5 本の録音と、9/28 17:46 のわたしの声の響き (`voice0928b_tmpl.npz`) から。キリスト教の大聖堂で歌われる賛美歌のアリアに書き換えた。
+
+- **大聖堂** — 4 声はパイプオルガン (`choir: 'organ'`、8' プリンシパル + 4' + 2⅔' + 2'、低音は 16')、響きは長く深く (`reverb`: 7 秒・減衰 2.4 秒・wet 0.5)、
+  歌声も響きへ多く送る (`vo_send` 0.5)。オルガンの大きさは `organ_gain` で歌の下に
+- **賛美歌のアリア** — オルガンがまず賛美歌の旋律を弾き (前奏)、ソプラノの独唱が 3 つの節を歌う。旋律は 9/24 の主題を 2 倍の長さに、和声は半小節ごとに旋律の音を最も含む和音。
+  節の間にオルガンのフーガの提示 (11:21 の主題)、最後の節は半音上 (ヘ短調)、そして「Amen」(変格終止 iv → I、ヘ長調の和音)
+- **19 歳の淑女の声** — 響き 1.24 倍・息 0.16・ビブラート 0.42 半音 (5.8 Hz)。歌詞はこの曲のために書いたオリジナルの英語の賛美歌
+  (Holy light upon the waters / Gently guide us through the night / All the bells of heaven ringing … / Amen)
+- オルガンは音が伸び続けて連続 8 度・5 度が目立つので、自動の声部の音をそのとき鳴っている和音の別の音へ動かして避ける (拍の頭の半音のぶつかりも)
+
+```bash
+python3 compose_tablet47.py bank37.json score_tablet47.json && python3 add_vocals.py tablet47 score_tablet47.json score_tablet47v.json voice0928b_tmpl.npz
+python3 synth.py score_tablet47v.json tablet47v.wav && python3 video.py score_tablet47v.json tablet47v.wav tablet47v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
