@@ -133,9 +133,9 @@ _CHOIR = {'voices': 'SATB', 'vopts': _SINGERS, 'boost': 1.0,
           'ranges': {'S': (66, 76), 'A': (58, 67), 'T': (55, 64), 'Bar': (47, 56), 'B': (38, 48)},
           'pans': {'S': -0.35, 'A': 0.35, 'T': 0.15, 'Bar': -0.15, 'B': 0.0},
           'gains': {'B': 1.1, 'Bar': 0.85}}
-_FUGUE = dict(_CHOIR, entries=True, extra=[{'name': 'Bar', 'src': 'T'}])        # フーガ: 主題の入りごと、バリトンはテノールの 1 オクターヴ下
-_KLANG = dict(_FUGUE, prefix='Klang')                                            # 共鳴する不協和音: 4 声が置いた和音を全員で
-_HOMO = dict(_CHOIR, extra=[{'name': 'Bar', 'src': 'B'}])                         # コラール / Amen: 全員が同じ言葉を和声で、バリトンはバスの 1 オクターヴ上
+_FUGUE = dict(_CHOIR, entries=True, extra=[{'name': 'Bar', 'src': 'T'}], boost=1.5)   # フーガ: 主題の入りごと、バリトンはテノールの 1 オクターヴ下 (入りがまばらなので大きめ)
+_KLANG = dict(_FUGUE, prefix='Klang', boost=1.0)                                 # 共鳴する不協和音: 4 声が置いた和音を全員で
+_HOMO = dict(_CHOIR, extra=[{'name': 'Bar', 'src': 'B'}], boost=0.6)              # コラール / Amen: 全員が同じ言葉を和声で、バリトンはバスの 1 オクターヴ上 (5 人そろうので小さめ)
 LYRICS['tablet48'] = {
     'block': 2, 'gain': 0.6, 'timbre': 'user', 'range': (60, 72), 'top': 81, 'voice_name': '歌い手 5 人', 'title_suffix': '',
     'voice_opts': _SINGERS['S'],
