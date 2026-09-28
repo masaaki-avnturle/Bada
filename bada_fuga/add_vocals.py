@@ -82,6 +82,8 @@ def main(key, src, dst, voice_bank=None):
         assert voice_bank, 'この曲は声の型 (npz) が要る: add_vocals.py key src dst voice.npz'
         m['voice_bank'] = voice_bank
     if spec.get('title_suffix', ' · Vocal'): m['title'] = m['title'] + spec.get('title_suffix', ' · Vocal')
+    if spec.get('title'): m['title'] = spec['title']                          # 題名・副題をまるごと差し替える (長すぎるとき)
+    if spec.get('subtitle'): m['subtitle'] = spec['subtitle']
     if spec.get('voice_name'): m.setdefault('vname', {})['VO'] = spec['voice_name']
     if 'VO' not in m.get('legend', []): m['legend'] = m.get('legend', []) + ['VO']
     json.dump(d, open(dst, 'w'), ensure_ascii=False)

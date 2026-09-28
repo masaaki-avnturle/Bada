@@ -81,7 +81,8 @@ LYRICS = {
             ('In paradisum — コラール', ['てんしよ みちびきたまえ'], 4),
         ]},
     'tablet46en': {                            # XLVI · Requiem in fuga の英語版 — レクイエムの祈りの言葉をもとに書いたオリジナルの英語。(表示, 発音の表記) の組
-        'block': 2, 'gain': 0.85, 'timbre': 'user', 'range': (65, 75), 'top': 81, 'voice_name': 'Soprano', 'title_suffix': ' · English',
+        'block': 2, 'gain': 0.85, 'timbre': 'user', 'range': (65, 75), 'top': 81, 'voice_name': 'Soprano', 'title_suffix': '',
+        'title': 'Requiem BADA — XLVI · Requiem in fuga (English)', 'subtitle': '歌の旋律がフーガのレクイエムを英語で — 9/24 の 5 本と、わたしの声から書き換えた 20 代前半の淑女の声 (♩=60)',
         'voice_opts': {'formant': 1.22, 'breath': 0.12, 'vib_depth': 0.45, 'vib_rate': 5.7, 'vib_delay': 0.2, 'presence': 3.5, 'sib': 0.85, 'attack': 0.02},
         'sections': [
             ('Requiem aeternam — Fuga I', [('Grant them rest for-ev-er-more', 'grant dhem rest fxr e vxr mor'),
