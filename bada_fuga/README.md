@@ -1377,6 +1377,21 @@ python3 synth.py score_tablet49v.json tablet49v.wav && python3 video.py score_ta
 # 曲だけの演奏: score_tablet49.json (歌なし) の organ_gain を 0.9 に上げ、題名・副題・区間の説明から歌い手を外して synth.py → video.py
 ```
 
+## 💓🥁 Requiem BADA — Tablet Sessions L · Herzschlag & Jungle (曲だけの演奏: 鼓動の不整脈ときれいなジャングルのビート, ♩=56 / 168, 約 3 分 45 秒)
+
+XLVIII の楽譜 (パイプオルガンの 4 声・ビオラ・弦・Klang・フーガ) をそのまま、歌は入れずに (曲だけの演奏)、心臓の鼓動とジャングルのビートを重ねた (`compose_tablet50.py`)。
+
+- **鼓動 (ドックン)** — 心音 (`heart_tone`: lub =「ドッ」、0.3 秒後に dub =「クン」) が ♩=56 (安静時の心拍) で打つ。音高は和音の根音と 5 度。
+  2 小節ごとに型を変えて不整脈を入れる (`RHYTHM`): 早く来る脈 (期外収縮: 拍の途中で小さな「ドックン」→ 次の拍が抜けて、その次が強い代償の脈) と、抜ける脈。
+  動画には心電図と心拍の数字が出る
+- **ジャングル** — ♩=168 (♩=56 のちょうど 3 倍 = オルガンの 1 小節にジャングルの 3 小節) のブレイクビート。キック・スネア・小さなゴースト・スネア・暗いハイハットの 16 分で、
+  2 種類の型を交互に (`PAT`・`SNR`)、区間の終わりはスネアの 16 分の連打。特定の曲のブレイク (録音) は使わず自作のドラムの音で組む。重低音は和音の根音を長く
+- **入り方** — Introitus の終わりから鼓動 → Klang I (鼓動が強く) → Fuga I は 5 小節目からジャングル → Kyrie は鼓動だけ → Klang II (不整脈) → Fuga II はジャングル → Amen で鼓動が消える
+
+```bash
+python3 compose_tablet50.py bank37.json score_tablet50.json && python3 synth.py score_tablet50.json tablet50.wav && python3 video.py score_tablet50.json tablet50.wav tablet50.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
