@@ -614,7 +614,7 @@ def synth_piano(freq, dur, vel=0.3, sr=SR):
 
 MEMBRANE = (1.0, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501)             # 張った円い膜の固有振動の比 (ベッセル関数の零点)
 
-def acoustic_drum(kind, vel=0.8, sr=SR):
+def acoustic_drum(kind, vel=0.8, sr=SR, f0=None):
     """実際の太鼓の鳴り方をまねたドラム (膜の固有振動の和 = モード合成、シンセの電子音ではなく):
     kick = 24 インチのバスドラム (52 Hz、フェルトのビーター、胴の低い響き)、floor = 16 インチのフロアタム (82 Hz、スティック)、
     tom = タム (120 Hz)、snare / ghost = スネア (膜 185 Hz + 響き線のざらつき)、hat = クローズド・ハイハット (金属の不協和な振動、暗めで小さく)、
@@ -634,7 +634,8 @@ def acoustic_drum(kind, vel=0.8, sr=SR):
         nz = rng.standard_normal(n).astype(np.float32); nz = nz - _lp(nz, 0.2)
         y = _lp(_lp(y + 0.6 * nz * np.exp(-t / 0.018), 0.45), 0.5)
         return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
-    f0, drop, dtau, amps, decs, tail = P[kind]
+    f0_, drop, dtau, amps, decs, tail = P[kind]
+    f0 = f0 or f0_                                                               # f0 を渡せば、その音高に張る (和音の根音に合わせる)
     n = int(tail * 1.6 * sr); t = np.arange(n, dtype=np.float32) / sr
     bend = 1 + drop * np.exp(-t / dtau)                                          # 打った瞬間は膜が張って少し高い
     y = np.zeros(n, dtype=np.float32)
@@ -1064,7 +1065,7 @@ def main(score='score.json', out='fuga.wav'):
             L[i0:i1] += y[:i1 - i0] * cl * send; R[i0:i1] += y[:i1 - i0] * cr * send
             continue
         if recs and ex['v'] == 'AD':                        # 実際の太鼓の鳴り方をまねたドラム (乾いた音を前に、部屋の響きへ少し)
-            y = acoustic_drum(ex.get('kind', 'kick'), ex.get('gain', 0.3))
+            y = acoustic_drum(ex.get('kind', 'kick'), ex.get('gain', 0.3), f0=freq if ex.get('tuned') else None)
             if ex.get('damp'):                              # 手で押さえて響きを止める (damp 秒のあと 40 ms で消える)
                 tt = np.arange(len(y)) / SR; y = y * np.where(tt > ex['damp'], np.exp(-(tt - ex['damp']) / 0.04), 1.0).astype(np.float32)
             pan = ex.get('pan', {'kick': 0.0, 'floor': 0.25, 'tom': -0.15, 'snare': -0.05, 'ghost': -0.05, 'hat': 0.3, 'odaiko': 0.0, 'nagado': 0.2}.get(ex.get('kind', 'kick'), 0.0))

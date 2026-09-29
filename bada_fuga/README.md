@@ -1469,6 +1469,20 @@ LV と同じ楽譜・実音のピアノの 4 声・和太鼓をまねた太鼓�
 python3 compose_tablet56.py bank37.json score_tablet56.json && python3 synth.py score_tablet56.json tablet56.wav && python3 video.py score_tablet56.json tablet56.wav tablet56.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LVII · Klavier & Taiko III (太鼓が実音のピアノの旋律に合わせて打つ, ♩=56, 約 3 分 45 秒)
+
+楽譜と実音のピアノの 4 声は LV・LVI と同じ。シンセの音はなし。太鼓を決まった型ではなく、**ピアノの旋律に合わせて**打つようにした (`compose_tablet57.py`)。
+
+- **旋律の音の頭で打つ** — フーガは今いちばん新しい主題の入りの声部 (楽譜の `P.entries` から、次の入りまで・長くても 2 小節)、Klang・Kyrie・Amen はソプラノ。
+  太鼓の 117 打すべてがピアノの音の頭と同じ時刻
+- **長さで打ち分け** — 1 拍以上の長い音は大太鼓を長く響かせ (「どー」)、短い音は長胴太鼓を手で押さえて短く (「ど」、`damp`)。主題の頭の音は少し強く
+- **音高を和音の根音に張る** — `acoustic_drum` に `f0` (extras の `tuned`) を足し、ティンパニのように太鼓の音高を和音の根音に合わせてピアノと濁らないように
+  (大太鼓はレ#1〜レ 2、長胴太鼓はド 2〜シ 2)。太鼓はピアノの 3〜5 dB 下
+
+```bash
+python3 compose_tablet57.py bank37.json score_tablet57.json && python3 synth.py score_tablet57.json tablet57.wav && python3 video.py score_tablet57.json tablet57.wav tablet57.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
