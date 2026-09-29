@@ -1,0 +1,182 @@
+# helpers for batch B (eq_B: system_transport + BadaUFO_OS_paper)
+# no `let` inside loop bodies (bada_c env growth)
+def hB_G()
+  return 6.674e-11
+end
+def hB_h()
+  return 6.62607015e-34
+end
+def hB_hbar()
+  return 1.054571817e-34
+end
+def hB_ME()
+  return 5.972e24
+end
+def hB_R0()
+  return 6.371e6
+end
+# Planck length sqrt(hbar G / c^3) [m]
+def hB_lp()
+  return sqrt(hB_hbar() * hB_G() / pow(C_LIGHT, 3))
+end
+# inequality indicator: 1 if a >= b else 0
+def hB_ge(a, b)
+  if a >= b
+    return 1
+  end
+  return 0
+end
+# Simpson rule (n even); h may be negative (reversed bounds)
+def hB_quad(f, a, b, n)
+  let h = (b - a) / n
+  let s = f(a) + f(b)
+  let i = 1
+  let w = 2
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    s = s + w * f(a + i * h)
+    i = i + 1
+  end
+  return s * h / 3
+end
+# solve y log y = c (c > 0) by Newton
+def hB_ylogy_root(c)
+  let y = 2 + c
+  let k = 0
+  while k < 60
+    y = y - (y * log(y) - c) / (log(y) + 1)
+    k = k + 1
+  end
+  return y
+end
+# Euler–Mascheroni via H_n − log n − 1/(2n) + 1/(12n²)
+def hB_euler_gamma()
+  let n = 2000
+  let s = 0
+  let k = 1
+  while k <= n
+    s = s + 1 / k
+    k = k + 1
+  end
+  return s - log(n) - 1 / (2 * n) + 1 / (12 * n * n)
+end
+# Σ_{k=0}^{N} z^k
+def hB_geo(z, N)
+  let s = 0
+  let t = 1
+  let k = 0
+  while k <= N
+    s = s + t
+    t = t * z
+    k = k + 1
+  end
+  return s
+end
+# exp(Σ_{m=1}^{N} (qk T)^m / m)
+def hB_weil(qk, T, N)
+  let s = 0
+  let m = 1
+  while m <= N
+    s = s + pow(qk * T, m) / m
+    m = m + 1
+  end
+  return exp(s)
+end
+# exp(Σ_{m=1}^{N} qk T^m / m)  (as printed in ST.560)
+def hB_weil_printed(qk, T, N)
+  let s = 0
+  let m = 1
+  while m <= N
+    s = s + qk * pow(T, m) / m
+    m = m + 1
+  end
+  return exp(s)
+end
+def hB_det3(a, b, c, d, e, f, g, h, i)
+  return a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g)
+end
+def hB_cossum(n, t)
+  let s = 0
+  let k = 0
+  while k <= n
+    s = s + cos(k * t)
+    k = k + 1
+  end
+  return s
+end
+def hB_sinsum(n, t)
+  let s = 0
+  let k = 0
+  while k <= n
+    s = s + sin(k * t)
+    k = k + 1
+  end
+  return s
+end
+# Σ_{k=0}^{N} 1/(k+1)^s
+def hB_zsum(s, N)
+  let acc = 0
+  let k = 0
+  while k <= N
+    acc = acc + pow(k + 1, 0 - s)
+    k = k + 1
+  end
+  return acc
+end
+# total discrepancy of Euler forms of sin, cos, tan
+def hB_trig_euler(t)
+  let e1 = cexp(C(0, t))
+  let e2 = cexp(C(0, 0 - t))
+  let s = cdiv(csub(e1, e2), C(0, 2))
+  let c = cscale(cadd(e1, e2), 0.5)
+  let tn = cdiv(csub(e1, e2), cmul(C(0, 1), cadd(e1, e2)))
+  return cabs(csub(s, C(sin(t), 0))) + cabs(csub(c, C(cos(t), 0))) + cabs(csub(tn, C(sin(t) / cos(t), 0)))
+end
+# (1/θ)(sinθ, cosθ)(θ 1; 1 θ)(cosθ; sinθ)^T  (scalar)
+def hB_rot_limit(t)
+  let r1 = sin(t) * t + cos(t)
+  let r2 = sin(t) + cos(t) * t
+  return (r1 * cos(t) + r2 * sin(t)) / t
+end
+# manifold coordinate x = 1 + r0/r (reproduces paper Table 2: x=2 at r=r0)
+def hB_mcoord(r)
+  return 1 + hB_R0() / r
+end
+# lift ratio L = cosh(x log x) at altitude alt
+def hB_L(alt)
+  let x = hB_mcoord(hB_R0() + alt)
+  return cosh(x * log(x))
+end
+# ascent: 10 semi-implicit Euler steps (dt = 1 s) of a = (L−1) GM/r² → C(altitude, v)
+def hB_ascent(nsteps)
+  let alt = 0
+  let v = 0
+  let a = 0
+  let r = 0
+  let k = 0
+  while k < nsteps
+    r = hB_R0() + alt
+    a = (hB_L(alt) - 1) * hB_G() * hB_ME() / (r * r)
+    v = v + a
+    alt = alt + v
+    k = k + 1
+  end
+  return C(alt, v)
+end
+# vacuum reservoir: 10 draws of 5× current level, refill to ρ x^x floor; returns final/initial
+def hB_reservoir(x, rho)
+  let floorv = rho * pow(x, x)
+  let R = floorv
+  let k = 0
+  while k < 10
+    R = R - 5 * R
+    if R < floorv
+      R = floorv
+    end
+    k = k + 1
+  end
+  return R / floorv
+end

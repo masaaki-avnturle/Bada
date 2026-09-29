@@ -1,0 +1,234 @@
+# helpers for batch A1 (eq_A cafe / caostics / category / category_stream)
+# Simpson rule, real integrand (n even)
+def hA1_quad(f, a, b, n)
+  let w = 0
+  let h = (b - a) / n
+  let s = f(a) + f(b)
+  let i = 1
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    s = s + w * f(a + i * h)
+    i = i + 1
+  end
+  return s * h / 3
+end
+# Simpson rule, complex integrand f(x) -> C(re, im)
+def hA1_cquad(f, a, b, n)
+  let w = 0
+  let h = (b - a) / n
+  let s = cadd(f(a), f(b))
+  let i = 1
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    s = cadd(s, cscale(f(a + i * h), w))
+    i = i + 1
+  end
+  return cscale(s, h / 3)
+end
+# 2D Gaussian integral (∫ e^{-x^2} dx)^2 over [-8, 8]
+def hA1_gauss2()
+  let g = hA1_quad(def(x) return exp(0 - x * x) end, -8, 8, 400)
+  return g * g
+end
+# digamma via recurrence + asymptotic series
+def hA1_digamma(x)
+  let acc = 0
+  let y = x
+  while y < 8
+    acc = acc - 1 / y
+    y = y + 1
+  end
+  let y2 = 1 / (y * y)
+  return acc + log(y) - 0.5 / y - y2 * (1 / 12 - y2 * (1 / 120 - y2 / 252))
+end
+# Γ'(x) = Γ(x) ψ(x)
+def hA1_dgamma(x)
+  return gamma(x) * hA1_digamma(x)
+end
+# solve x log x = c by Newton
+def hA1_xlogx_root(c)
+  let x = 2
+  let k = 0
+  while k < 40
+    x = x - (x * log(x) - c) / (log(x) + 1)
+    k = k + 1
+  end
+  return x
+end
+def hA1_isprime(n)
+  if n < 2
+    return false
+  end
+  let d = 2
+  while d * d <= n
+    if mod(n, d) == 0
+      return false
+    end
+    d = d + 1
+  end
+  return true
+end
+# prime counting π(n)
+def hA1_primepi(n)
+  let c = 0
+  let k = 2
+  while k <= n
+    if hA1_isprime(k)
+      c = c + 1
+    end
+    k = k + 1
+  end
+  return c
+end
+# Euler product Π_{p<=N} (1 - p^{-s})^{-1}
+def hA1_euler_product(s, N)
+  let pr = 1
+  let k = 2
+  while k <= N
+    if hA1_isprime(k)
+      pr = pr / (1 - pow(k, 0 - s))
+    end
+    k = k + 1
+  end
+  return pr
+end
+# winding number of ζ around circle |s - c| = r (argument principle)
+def hA1_zeta_winding(cre, cim, r, npts)
+  let t = 0
+  let a = 0
+  let d = 0
+  let tot = 0
+  let prev = carg(czeta(C(cre + r, cim)))
+  let k = 1
+  while k <= npts
+    t = 2 * pi() * k / npts
+    a = carg(czeta(C(cre + r * cos(t), cim + r * sin(t))))
+    d = a - prev
+    while d > pi()
+      d = d - 2 * pi()
+    end
+    while d < 0 - pi()
+      d = d + 2 * pi()
+    end
+    tot = tot + d
+    prev = a
+    k = k + 1
+  end
+  return tot / (2 * pi())
+end
+# Σ_{n=r}^{N} nPr f^n g^{n-r}
+def hA1_npr_series(f, g, r, N)
+  let s = 0
+  let n = r
+  while n <= N
+    s = s + fact(n) / fact(n - r) * pow(f, n) * pow(g, n - r)
+    n = n + 1
+  end
+  return s
+end
+# ─── complex 2x2 matrices: [a00, a01, a10, a11] of C ───
+def hA1_m2(a, b, c, d)
+  return list(a, b, c, d)
+end
+def hA1_m2mul(A, B)
+  return list(cadd(cmul(at(A, 0), at(B, 0)), cmul(at(A, 1), at(B, 2))), cadd(cmul(at(A, 0), at(B, 1)), cmul(at(A, 1), at(B, 3))), cadd(cmul(at(A, 2), at(B, 0)), cmul(at(A, 3), at(B, 2))), cadd(cmul(at(A, 2), at(B, 1)), cmul(at(A, 3), at(B, 3))))
+end
+def hA1_m2add(A, B)
+  return list(cadd(at(A, 0), at(B, 0)), cadd(at(A, 1), at(B, 1)), cadd(at(A, 2), at(B, 2)), cadd(at(A, 3), at(B, 3)))
+end
+def hA1_m2scale(A, k)
+  return list(cmul(at(A, 0), k), cmul(at(A, 1), k), cmul(at(A, 2), k), cmul(at(A, 3), k))
+end
+def hA1_m2real(a, b, c, d)
+  return list(C(a, 0), C(b, 0), C(c, 0), C(d, 0))
+end
+# matrix exponential by Taylor series (30 terms)
+def hA1_m2expm(A)
+  let S = hA1_m2real(1, 0, 0, 1)
+  let T = hA1_m2real(1, 0, 0, 1)
+  let k = 1
+  while k <= 30
+    T = hA1_m2scale(hA1_m2mul(T, A), C(1 / k, 0))
+    S = hA1_m2add(S, T)
+    k = k + 1
+  end
+  return S
+end
+# Frobenius distance |A - B|
+def hA1_m2dist(A, B)
+  let d = 0
+  let s = 0
+  let i = 0
+  while i < 4
+    d = cabs(csub(at(A, i), at(B, i)))
+    s = s + d * d
+    i = i + 1
+  end
+  return sqrt(s)
+end
+# e^{H log H} for real symmetric PSD H = [[a, b], [b, d]] (b != 0): spectral log, Taylor exp; returns (0,0) entry
+def hA1_expm_hlogh00(a, b, d)
+  let tr = a + d
+  let disc = sqrt((a - d) * (a - d) + 4 * b * b)
+  let l1 = (tr + disc) / 2
+  let l2 = (tr - disc) / 2
+  # eigenvector for l1: (b, l1 - a)
+  let nx = b
+  let ny = l1 - a
+  let nn = sqrt(nx * nx + ny * ny)
+  let ux = nx / nn
+  let uy = ny / nn
+  let m1 = l1 * log(l1)
+  let m2 = l2 * log(l2)
+  # M = m1 u u^T + m2 (I - u u^T)
+  let M = hA1_m2real(m1 * ux * ux + m2 * (1 - ux * ux), (m1 - m2) * ux * uy, (m1 - m2) * ux * uy, m1 * uy * uy + m2 * (1 - uy * uy))
+  return re(at(hA1_m2expm(M), 0))
+end
+# trace of Kronecker product K ⊗ H (real 2x2 as [a,b,c,d]), built explicitly as 4x4
+def hA1_kron_trace(K, H)
+  let j = 0
+  let kv = 0
+  let hv = 0
+  let E = []
+  let i = 0
+  while i < 4
+    j = 0
+    while j < 4
+      kv = at(K, floor(i / 2) * 2 + floor(j / 2))
+      hv = at(H, mod(i, 2) * 2 + mod(j, 2))
+      E = append(E, kv * hv)
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return at(E, 0) + at(E, 5) + at(E, 10) + at(E, 15)
+end
+# Ricci flow on round S^n for g = r^2: dg/dt = -2 Ric = -2 (n-1)/g * g, forward Euler
+def hA1_ricci_sphere(g0, n, t, steps)
+  let ric = 0
+  let g = g0
+  let h = t / steps
+  let k = 0
+  while k < steps
+    ric = (n - 1) / g * g
+    g = g - 2 * ric * h
+    k = k + 1
+  end
+  return g
+end
+# box (d'Alembertian circle fn) □ = cos(i x log x) - i sin(i x log x)
+def hA1_box(x)
+  let u = C(0, x * log(x))
+  return csub(ccos(u), cmul(C(0, 1), csin(u)))
+end
+# antigravity □' = 2(sin(i x log x) + cos(i x log x))
+def hA1_boxp(x)
+  let u = C(0, x * log(x))
+  return cscale(cadd(csin(u), ccos(u)), 2)
+end

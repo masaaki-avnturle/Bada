@@ -1,0 +1,394 @@
+# helpers_A2.bada — helpers for eq_A.md entries (GBZ/GMK/GZE/QC4/HODGE)
+# composite Simpson rule on [a,b], n even
+def hA2_simp(f, a, b, n)
+  let w = 0
+  let h = (b - a) / n
+  let acc = f(a) + f(b)
+  let i = 1
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    acc = acc + w * f(a + i * h)
+    i = i + 1
+  end
+  return acc * h / 3
+end
+# Γ(s) = ∫0^∞ e^{-x} x^{s-1} dx, via x = e^u
+def hA2_gam(s)
+  return hA2_simp(def(u) return exp(0 - exp(u) + s * u) end, -60, 5, 1600)
+end
+# Γ'(s) = ∫0^∞ e^{-x} x^{s-1} log x dx, via x = e^u
+def hA2_dgam(s)
+  return hA2_simp(def(u) return u * exp(0 - exp(u) + s * u) end, -60, 5, 1600)
+end
+# upper incomplete gamma Γ(a, y) = ∫_y^∞ t^{a-1} e^{-t} dt
+def hA2_igam(a, y)
+  return hA2_simp(def(t) return pow(t, a - 1) * exp(0 - t) end, y, y + 50, 1000)
+end
+# digamma via central difference of lgamma
+def hA2_digamma(s)
+  let h = 0.00001
+  return (cfn("m", "lgamma", s + h) - cfn("m", "lgamma", s - h)) / (2 * h)
+end
+# f'(x) = 2x(log x + log(x+1)) and f(x) = ∫_1^x f'
+def hA2_fp(x)
+  return 2 * x * (log(x) + log(x + 1))
+end
+def hA2_f(x)
+  return hA2_simp(def(t) return hA2_fp(t) end, 1, x, 200)
+end
+# fraction of grid points (x,y) in [lo,hi]^2 where p(x,y) is true
+def hA2_grid(p, lo, hi, n)
+  let j = 0
+  let x = 0
+  let y = 0
+  let ok = 0
+  let tot = 0
+  let i = 0
+  while i <= n
+    j = 0
+    while j <= n
+      x = lo + (hi - lo) * i / n
+      y = lo + (hi - lo) * j / n
+      if p(x, y)
+        ok = ok + 1
+      end
+      tot = tot + 1
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return ok / tot
+end
+# ── 2x2 complex matrices: list [m00, m01, m10, m11] of complex ──
+def hA2_m2(a, b, c, d)
+  return list(a, b, c, d)
+end
+def hA2_m2mul(A, B)
+  return list(cadd(cmul(at(A, 0), at(B, 0)), cmul(at(A, 1), at(B, 2))), cadd(cmul(at(A, 0), at(B, 1)), cmul(at(A, 1), at(B, 3))), cadd(cmul(at(A, 2), at(B, 0)), cmul(at(A, 3), at(B, 2))), cadd(cmul(at(A, 2), at(B, 1)), cmul(at(A, 3), at(B, 3))))
+end
+def hA2_m2add(A, B)
+  return list(cadd(at(A, 0), at(B, 0)), cadd(at(A, 1), at(B, 1)), cadd(at(A, 2), at(B, 2)), cadd(at(A, 3), at(B, 3)))
+end
+def hA2_m2sc(A, z)
+  return list(cmul(at(A, 0), z), cmul(at(A, 1), z), cmul(at(A, 2), z), cmul(at(A, 3), z))
+end
+def hA2_sx()
+  return hA2_m2(C(0, 0), C(1, 0), C(1, 0), C(0, 0))
+end
+def hA2_sz()
+  return hA2_m2(C(1, 0), C(0, 0), C(0, 0), C(-1, 0))
+end
+# matrix exponential by Taylor series (30 terms)
+def hA2_expm2(A)
+  let S = hA2_m2(C(1, 0), C(0, 0), C(0, 0), C(1, 0))
+  let T = S
+  let k = 1
+  while k < 30
+    T = hA2_m2sc(hA2_m2mul(T, A), C(1 / k, 0))
+    S = hA2_m2add(S, T)
+    k = k + 1
+  end
+  return S
+end
+# U(t) = e^{-iHt} with H = σx
+def hA2_U(t)
+  return hA2_expm2(hA2_m2sc(hA2_sx(), C(0, 0 - t)))
+end
+# Heisenberg operator A(t) = e^{iHt} σz e^{-iHt}, H = σx
+def hA2_heis(t)
+  return hA2_m2mul(hA2_m2mul(hA2_U(0 - t), hA2_sz()), hA2_U(t))
+end
+# <Ψ(t)| σz |Ψ(t)>, Ψ(0) = (1,0), H = σx
+def hA2_expect(t)
+  let U = hA2_U(t)
+  let p0 = at(U, 0)
+  let p1 = at(U, 2)
+  return re(cadd(cmul(cconj(p0), p0), cscale(cmul(cconj(p1), p1), -1)))
+end
+# RK4 for i dψ/dt = σx ψ from ψ(0)=(1,0), returns ψ(T) as list of 2 complex
+def hA2_rk_f(p)
+  # dψ/dt = -i σx ψ
+  return list(cmul(C(0, -1), at(p, 1)), cmul(C(0, -1), at(p, 0)))
+end
+def hA2_rk_ax(p, k, h)
+  return list(cadd(at(p, 0), cscale(at(k, 0), h)), cadd(at(p, 1), cscale(at(k, 1), h)))
+end
+def hA2_schr(T, n)
+  let k1 = 0
+  let k2 = 0
+  let k3 = 0
+  let k4 = 0
+  let a0 = 0
+  let a1 = 0
+  let h = T / n
+  let p = list(C(1, 0), C(0, 0))
+  let i = 0
+  while i < n
+    k1 = hA2_rk_f(p)
+    k2 = hA2_rk_f(hA2_rk_ax(p, k1, h / 2))
+    k3 = hA2_rk_f(hA2_rk_ax(p, k2, h / 2))
+    k4 = hA2_rk_f(hA2_rk_ax(p, k3, h))
+    a0 = cadd(cadd(at(k1, 0), cscale(at(k2, 0), 2)), cadd(cscale(at(k3, 0), 2), at(k4, 0)))
+    a1 = cadd(cadd(at(k1, 1), cscale(at(k2, 1), 2)), cadd(cscale(at(k3, 1), 2), at(k4, 1)))
+    p = list(cadd(at(p, 0), cscale(a0, h / 6)), cadd(at(p, 1), cscale(a1, h / 6)))
+    i = i + 1
+  end
+  return p
+end
+# Heisenberg eq check: dA/dt (finite diff) and (1/i)[A,H] at t, entry 01
+def hA2_heis_lhs(t)
+  let h = 0.0001
+  return cscale(csub(at(hA2_heis(t + h), 1), at(hA2_heis(t - h), 1)), 1 / (2 * h))
+end
+def hA2_heis_rhs(t)
+  let A = hA2_heis(t)
+  let H = hA2_sx()
+  let com = hA2_m2add(hA2_m2mul(A, H), hA2_m2sc(hA2_m2mul(H, A), C(-1, 0)))
+  return cdiv(at(com, 1), C(0, 1))
+end
+# Euler-Mascheroni via H_n - ln n
+def hA2_euler(n)
+  let s = 0
+  let k = 1
+  while k <= n
+    s = s + 1 / k
+    k = k + 1
+  end
+  return s - log(n)
+end
+# Ricci flow on round S^n: dr/dt = -(n-1)/r, forward Euler
+def hA2_ricci(n, r0, T, steps)
+  let r = r0
+  let h = T / steps
+  let i = 0
+  while i < steps
+    r = r - h * (n - 1) / r
+    i = i + 1
+  end
+  return r
+end
+# ── heat traces ──
+def hA2_K0s(t)
+  let s = 0
+  let l = 0
+  while l <= 300
+    s = s + (2 * l + 1) * exp(0 - t * l * (l + 1))
+    l = l + 1
+  end
+  return s
+end
+def hA2_K1s(t)
+  let s = 0
+  let l = 1
+  while l <= 300
+    s = s + 2 * (2 * l + 1) * exp(0 - t * l * (l + 1))
+    l = l + 1
+  end
+  return s
+end
+# 1D theta sum Σ_{n∈Z} e^{-t n^2}; T^2 (side 2π) K0 = θ(t)^2
+def hA2_th(t)
+  let s = 1
+  let n = 1
+  while n <= 300
+    s = s + 2 * exp(0 - t * n * n)
+    n = n + 1
+  end
+  return s
+end
+def hA2_K0t(t)
+  let a = hA2_th(t)
+  return a * a
+end
+# circle graph C_n Laplacian eigenvalues 2-2cos(2πk/n): trace and zero count
+def hA2_circ_tr(n)
+  let s = 0
+  let k = 0
+  while k < n
+    s = s + 2 - 2 * cos(2 * pi() * k / n)
+    k = k + 1
+  end
+  return s
+end
+def hA2_circ_zero(n)
+  let c = 0
+  let k = 0
+  while k < n
+    if abs(2 - 2 * cos(2 * pi() * k / n)) < 0.000000001
+      c = c + 1
+    end
+    k = k + 1
+  end
+  return c
+end
+# spectral zeta of S^1 (length 2π): Σ_{k≥1} 2 k^{-2s}
+def hA2_zS1(s, N)
+  let acc = 0
+  let k = 1
+  while k <= N
+    acc = acc + 2 * pow(k, 0 - 2 * s)
+    k = k + 1
+  end
+  return acc
+end
+def hA2_binom(n, k)
+  return fact(n) / (fact(k) * fact(n - k))
+end
+# ── 4x4 real matrices: flat list of 16, row-major ──
+def hA2_m4mul(A, B)
+  let j = 0
+  let s = 0
+  let k = 0
+  let out = []
+  let i = 0
+  while i < 4
+    j = 0
+    while j < 4
+      s = 0
+      k = 0
+      while k < 4
+        s = s + at(A, 4 * i + k) * at(B, 4 * k + j)
+        k = k + 1
+      end
+      out = append(out, s)
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return out
+end
+def hA2_m4T(A)
+  let j = 0
+  let out = []
+  let i = 0
+  while i < 4
+    j = 0
+    while j < 4
+      out = append(out, at(A, 4 * j + i))
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return out
+end
+def hA2_m4lin(A, a, B, b)
+  let out = []
+  let i = 0
+  while i < 16
+    out = append(out, a * at(A, i) + b * at(B, i))
+    i = i + 1
+  end
+  return out
+end
+def hA2_m4maxd(A, B)
+  let d = 0
+  let m = 0
+  let i = 0
+  while i < 16
+    d = abs(at(A, i) - at(B, i))
+    if d > m
+      m = d
+    end
+    i = i + 1
+  end
+  return m
+end
+def hA2_I4()
+  return [0, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, -1, 0, 0, 1, 0]
+end
+def hA2_K4()
+  return [0, 0, 0, -1, 0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0]
+end
+def hA2_E4()
+  return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+end
+def hA2_Jth(th)
+  return hA2_m4lin(hA2_I4(), cos(th), hA2_K4(), sin(th))
+end
+# || J^T Ω J − Ω ||_max
+def hA2_inv(J, W)
+  return hA2_m4maxd(hA2_m4mul(hA2_m4mul(hA2_m4T(J), W), J), W)
+end
+# antisymmetric 4x4 from 6 coords (01,02,03,12,13,23)
+def hA2_asym(a, b, c, d, e, f)
+  return list(0, a, b, c, 0 - a, 0, d, e, 0 - b, 0 - d, 0, f, 0 - c, 0 - e, 0 - f, 0)
+end
+# Picard rank of T^4 with J_θ: count integral (1,1) forms, coords in {-1,0,1},
+# rank = log_3(#solutions)
+def hA2_rho(th)
+  let b = 0
+  let c = 0
+  let d = 0
+  let e = 0
+  let f = 0
+  let W = 0
+  let J = hA2_Jth(th)
+  let JT = hA2_m4T(J)
+  let N = 0
+  let a = -1
+  while a <= 1
+    b = -1
+    while b <= 1
+      c = -1
+      while c <= 1
+        d = -1
+        while d <= 1
+          e = -1
+          while e <= 1
+            f = -1
+            while f <= 1
+              W = hA2_asym(a, b, c, d, e, f)
+              if hA2_m4maxd(hA2_m4mul(hA2_m4mul(JT, W), J), W) < 0.00000001
+                N = N + 1
+              end
+              f = f + 1
+            end
+            e = e + 1
+          end
+          d = d + 1
+        end
+        c = c + 1
+      end
+      b = b + 1
+    end
+    a = a + 1
+  end
+  return floor(log(N) / log(3) + 0.5)
+end
+# Hom(Eτ1, Eτ2) brute force: α = a + bτ2 (|a|,|b|≤4) with ατ1 = c + dτ2, |c|,|d|≤4 integers
+def hA2_isint(v)
+  if abs(v - floor(v + 0.5)) < 0.000000001
+    return true
+  end
+  return false
+end
+def hA2_homN(t1, t2)
+  let b = 0
+  let w = 0
+  let d = 0
+  let c = 0
+  let N = 0
+  let a = -4
+  while a <= 4
+    b = -4
+    while b <= 4
+      w = cmul(cadd(C(a, 0), cscale(t2, b)), t1)
+      d = im(w) / im(t2)
+      c = re(w) - d * re(t2)
+      if hA2_isint(c) and hA2_isint(d)
+        if abs(c) <= 4.5 and abs(d) <= 4.5
+          N = N + 1
+        end
+      end
+      b = b + 1
+    end
+    a = a + 1
+  end
+  return N
+end
+def hA2_picE(t1, t2)
+  return 2 + floor(log(hA2_homN(t1, t2)) / log(9) + 0.5)
+end

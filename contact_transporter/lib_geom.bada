@@ -1,0 +1,264 @@
+# ════════════════════════════════════════════════════════════════════
+#  lib_geom.bada — 3次元設計図の幾何生成 (Wavefront OBJ 出力)
+#  すべてのメッシュは cons リスト上で組み立て、チャンク化した文字列
+#  バッファ (O(n log n) 連結) で書き出す。
+# ════════════════════════════════════════════════════════════════════
+
+# ─── チャンク化文字列バッファ ─────────────────────────────
+let BUF_CHUNK = ""
+let BUF_PARTS = []
+let VCOUNT = 0
+def emit(line)
+  BUF_CHUNK = BUF_CHUNK + line + "\n"
+  if len(BUF_CHUNK) > 4000
+    BUF_PARTS = append(BUF_PARTS, BUF_CHUNK)
+    BUF_CHUNK = ""
+  end
+end
+def join_balanced(parts)
+  let nxt = 0
+  let i = 0
+  if len(parts) == 0
+    return ""
+  end
+  let cur = parts
+  while len(cur) > 1
+    nxt = []
+    i = 0
+    while i < len(cur)
+      if i + 1 < len(cur)
+        nxt = append(nxt, at(cur, i) + at(cur, i + 1))
+      else
+        nxt = append(nxt, at(cur, i))
+      end
+      i = i + 2
+    end
+    cur = nxt
+  end
+  return at(cur, 0)
+end
+def buffer_text()
+  return join_balanced(append(BUF_PARTS, BUF_CHUNK))
+end
+
+# ─── ベクトル ─────────────────────────────────────────────
+def v3(x, y, z)
+  return list(x, y, z)
+end
+def vadd(a, b)
+  return v3(at(a, 0) + at(b, 0), at(a, 1) + at(b, 1), at(a, 2) + at(b, 2))
+end
+def vsub(a, b)
+  return v3(at(a, 0) - at(b, 0), at(a, 1) - at(b, 1), at(a, 2) - at(b, 2))
+end
+def vscale(a, k)
+  return v3(at(a, 0) * k, at(a, 1) * k, at(a, 2) * k)
+end
+def vdot(a, b)
+  return at(a, 0) * at(b, 0) + at(a, 1) * at(b, 1) + at(a, 2) * at(b, 2)
+end
+def vcross(a, b)
+  return v3(at(a, 1) * at(b, 2) - at(a, 2) * at(b, 1), at(a, 2) * at(b, 0) - at(a, 0) * at(b, 2), at(a, 0) * at(b, 1) - at(a, 1) * at(b, 0))
+end
+def vnorm(a)
+  return sqrt(vdot(a, a))
+end
+def vunit(a)
+  let n = vnorm(a)
+  if n == 0
+    return v3(0, 0, 1)
+  end
+  return vscale(a, 1 / n)
+end
+# 任意軸 k まわりの回転 (Rodrigues)
+def vrot(v, k, ang)
+  let ku = vunit(k)
+  let c = cos(ang)
+  let s = sin(ang)
+  return vadd(vadd(vscale(v, c), vscale(vcross(ku, v), s)), vscale(ku, vdot(ku, v) * (1 - c)))
+end
+
+def obj_vertex(p)
+  emit("v " + str(at(p, 0)) + " " + str(at(p, 1)) + " " + str(at(p, 2)))
+  VCOUNT = VCOUNT + 1
+end
+def obj_group(name)
+  emit("g " + name)
+end
+# (nu × nv) の格子を四角形面で閉じる (u,v とも周期的なら wrapu/wrapv = 1)
+def obj_grid_faces(base, nu, nv, wrapu, wrapv)
+  let j = 0
+  let i2 = 0
+  let j2 = 0
+  let a = 0
+  let b = 0
+  let c = 0
+  let d = 0
+  let i = 0
+  let iu = nu - 1
+  if wrapu == 1
+    iu = nu
+  end
+  let jv = nv - 1
+  if wrapv == 1
+    jv = nv
+  end
+  while i < iu
+    j = 0
+    while j < jv
+      i2 = mod(i + 1, nu)
+      j2 = mod(j + 1, nv)
+      a = base + i * nv + j + 1
+      b = base + i2 * nv + j + 1
+      c = base + i2 * nv + j2 + 1
+      d = base + i * nv + j2 + 1
+      emit("f " + str(a) + " " + str(b) + " " + str(c) + " " + str(d))
+      j = j + 1
+    end
+    i = i + 1
+  end
+end
+
+# ─── プリミティブ ─────────────────────────────────────────
+# トーラス環: 中心 c, 法線軸 n, 大半径 R, 管半径 r
+def mesh_torus(name, c, n, R, r, nu, nv)
+  let u = 0
+  let radial = 0
+  let j = 0
+  let w = 0
+  let p = 0
+  obj_group(name)
+  let base = VCOUNT
+  let nn = vunit(n)
+  let e1 = vunit(vcross(nn, v3(0.37, 0.61, 0.7)))
+  let e2 = vcross(nn, e1)
+  let i = 0
+  while i < nu
+    u = 2 * pi() * i / nu
+    radial = vadd(vscale(e1, cos(u)), vscale(e2, sin(u)))
+    j = 0
+    while j < nv
+      w = 2 * pi() * j / nv
+      p = vadd(c, vadd(vscale(radial, R + r * cos(w)), vscale(nn, r * sin(w))))
+      obj_vertex(p)
+      j = j + 1
+    end
+    i = i + 1
+  end
+  obj_grid_faces(base, nu, nv, 1, 1)
+end
+# 球 (ポッド)
+def mesh_sphere(name, c, R, nu, nv)
+  let th = 0
+  let j = 0
+  let ph = 0
+  obj_group(name)
+  let base = VCOUNT
+  let i = 0
+  while i < nu
+    th = pi() * (i + 0.5) / nu
+    j = 0
+    while j < nv
+      ph = 2 * pi() * j / nv
+      obj_vertex(vadd(c, v3(R * sin(th) * cos(ph), R * sin(th) * sin(ph), R * cos(th))))
+      j = j + 1
+    end
+    i = i + 1
+  end
+  obj_grid_faces(base, nu, nv, 0, 1)
+end
+# 円柱 (塔・シャフト): a→b, 半径 r
+def mesh_cylinder(name, a, b, r, nv)
+  let o = 0
+  let j = 0
+  let w = 0
+  obj_group(name)
+  let base = VCOUNT
+  let ax = vsub(b, a)
+  let e1 = vunit(vcross(ax, v3(0.37, 0.61, 0.7)))
+  let e2 = vunit(vcross(ax, e1))
+  let k = 0
+  while k < 2
+    o = a
+    if k == 1
+      o = b
+    end
+    j = 0
+    while j < nv
+      w = 2 * pi() * j / nv
+      obj_vertex(vadd(o, vadd(vscale(e1, r * cos(w)), vscale(e2, r * sin(w)))))
+      j = j + 1
+    end
+    k = k + 1
+  end
+  obj_grid_faces(base, 2, nv, 0, 1)
+end
+# 曲線 path(t) のまわりの管 (Jones 結び目コイル・光線)
+def mesh_tube(name, pts, r, nv, closed)
+  let p = 0
+  let q = 0
+  let tng = 0
+  let e1 = 0
+  let e2 = 0
+  let j = 0
+  let w = 0
+  obj_group(name)
+  let base = VCOUNT
+  let n = len(pts)
+  let i = 0
+  while i < n
+    p = at(pts, i)
+    q = at(pts, mod(i + 1, n))
+    if i == n - 1 and closed == 0
+      q = vadd(p, vsub(p, at(pts, i - 1)))
+    end
+    tng = vunit(vsub(q, p))
+    e1 = vunit(vcross(tng, v3(0.37, 0.61, 0.7)))
+    e2 = vcross(tng, e1)
+    j = 0
+    while j < nv
+      w = 2 * pi() * j / nv
+      obj_vertex(vadd(p, vadd(vscale(e1, r * cos(w)), vscale(e2, r * sin(w)))))
+      j = j + 1
+    end
+    i = i + 1
+  end
+  obj_grid_faces(base, n, nv, closed, 1)
+end
+# (p,q) トーラス結び目 — 3_1 = T(2,3), 5_1 = T(2,5)
+def torus_knot_points(c, n, R, r, p, q, samples)
+  let t = 0
+  let rad = 0
+  let p3 = 0
+  let nn = vunit(n)
+  let e1 = vunit(vcross(nn, v3(0.37, 0.61, 0.7)))
+  let e2 = vcross(nn, e1)
+  let pts = []
+  let i = 0
+  while i < samples
+    t = 2 * pi() * i / samples
+    rad = R + r * cos(q * t)
+    p3 = vadd(c, vadd(vadd(vscale(e1, rad * cos(p * t)), vscale(e2, rad * sin(p * t))), vscale(nn, r * sin(q * t))))
+    pts = append(pts, p3)
+    i = i + 1
+  end
+  return pts
+end
+# 8 の字結び目 4_1 のリサージュ型パラメータ化
+def fig8_points(c, s, samples)
+  let t = 0
+  let x = 0
+  let y = 0
+  let z = 0
+  let pts = []
+  let i = 0
+  while i < samples
+    t = 2 * pi() * i / samples
+    x = (2 + cos(2 * t)) * cos(3 * t)
+    y = (2 + cos(2 * t)) * sin(3 * t)
+    z = sin(4 * t)
+    pts = append(pts, vadd(c, vscale(v3(x, y, z), s)))
+    i = i + 1
+  end
+  return pts
+end

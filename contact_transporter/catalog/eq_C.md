@@ -1,0 +1,847 @@
+# Equation extraction — batch C (invel, explorerfiles)
+
+Notes: source text is pypdf-extracted and heavily garbled; the author's notation is idiosyncratic (□ = d'Alembertian box, □' / "□ " = a second box symbol rendered as a dotted/barred box in the PDF, ⊕L = direct-sum over L, dxm = "dx^m" manifold measure, [Im] = imaginary-part marker, ≪p = "≪ p" bracket). Equations are transcribed faithfully to the source, not corrected. Where the source is self-contradictory it is kept as written and flagged "(sic)". Line refs (Lnnn) point into the extracted .txt.
+
+## invel (Masaaki Yamaguchi, "Twister made universe ... Leonald Euler product", invel.pdf)
+- INV.1 | ∫∫ e^(−x²−y²) dx dy = π | Gaussian integral over the plane | GAMMA,OTHER | CALC: numerical 2D quad over R² → 3.14159
+- INV.2 | π^e = ( ∫ e^(cosθ + i sinθ) dθ )^e | pi^e as e-th power of circle integral | ROT,OTHER | CALC: ∫_0^{2π} e^{e^{iθ}}dθ = 2π (residue), so RHS=(2π)^e vs π^e=22.46 (inconsistent)
+- INV.3 | π^e = ( ∫ e^(iθ) dθ )^e | pi^e via unit-circle integral | ROT,OTHER | CALC: ∫_0^{2π}e^{iθ}dθ=0; ∫_0^{π/2}... ambiguous — compare π^e=22.459
+- INV.4 | e^(f→f) = 1 ,  x log x = 1 | fixed-point exponent and x·logx=1 condition | ENTROPY,OTHER | CALC: solve x ln x=1 → x≈1.7632 (Ω-related, x=e^{W(1)})
+- INV.5 | ∫ e^(−iθ) dθ = π^e | conjugate circle integral set to pi^e | ROT,OTHER | SYMB
+- INV.6 | □' = 2( sin(i x log x) + cos(i x log x) ) | "antigravity equation" as circle function (×2) | ROT,ENTROPY | CALC: evaluate for real x using sin(iz)=i sinh z, cos(iz)=cosh z
+- INV.7 | □ = cos(i x log x) − i sin(i x log x) | "d'Alembertian" as circle function e^{-i·(ix logx)} (×2) | ROT,ENTROPY | CALC: equals e^{x ln x}=x^x for real x → e.g. x=2 → 4
+- INV.8 | ∫ e^(−□) d□ = π^e | integral of exp(−box) equals pi^e (×3) | OTHER | SYMB
+- INV.9 | 1/x = C / log x ,  C = ∫_1 x^s dx − log x | reciprocal via log and constant C | ZETA | SYMB
+- INV.10 | x^y = 1/y^x ,  π^e = ∫ e^(−□) d□ = e^π / ∫ e^(□') d□' | reciprocity x^y·y^x=1 and pi^e / e^pi relation | OTHER | CALC: π^e=22.459, e^π=23.141
+- INV.11 | □ = □' ⊠ Ψ → □' = Ψ ⊠ □ | box-product exchange with wavefunction Ψ | QUANTUM | SYMB
+- INV.12 | (d/dl) □(HΨ)∇ ,  □ (d/dl)(HΨ)∇ | derivative of Hamiltonian-wave operator | QUANTUM | SYMB
+- INV.13 | β□ − □'/log x = β□ − □' | beta-box difference relation (sic) | BETA | SYMB
+- INV.14 | ^t∭ (∇ / ∇_l) □(HΨ)∇ d∇ = ∫ π(χ,□) ∇ d∇ = ∨ ∬ π(□) d∇^m | "variant equation" via fundamental group π(χ,·) | MANIFOLD,QUANTUM | SYMB
+- INV.15 | e^π = e^{ ∫ e^(−x²−y²) dxdy } = x^y = 1/y^x = π^e | chain e^π ≅ π^e via Gaussian integral | GAMMA,OTHER | CALC: e^π=23.1407 vs π^e=22.4592 (not equal)
+- INV.16 | 1/e^π = 1 / ∫ e^(−□) d□ ,  e^π = ∫ e^(−□)d□ / ∫ e^(□')d□' | inverse e^pi as box integrals (×2) | OTHER | SYMB
+- INV.17 | π^e = e^π ∫ e^(□') d□' ;  e^π = π^e / ∫ e^(□')d□' | pi^e from e^pi times box integral | OTHER | SYMB
+- INV.18 | π^e = ( ∫ e^(−(cosθ + i sinθ)) dθ )^e | pi^e from e^{-e^{iθ}} circle integral | ROT,OTHER | CALC: ∫_0^{2π}e^{-e^{iθ}}dθ=2π → (2π)^e=147.9 (≠π^e)
+- INV.19 | π^e = 1/e^π = 1/∫ e^(−□) d□ | pi^e as reciprocal (sic) | OTHER | SYMB
+- INV.20 | log e^π = log( π^e / ∫ e^(□') d□' ) | logarithm of e^pi relation | OTHER | SYMB
+- INV.21 | π = □ / □' | pi as ratio of box operators | OTHER | SYMB
+- INV.22 | π = e^β ∫ β dx^m | pi from beta-function integral on manifold | BETA,MANIFOLD | SYMB
+- INV.23 | π = 1/log x = √g = 1 = π r² ,  r = 1/√π | pi, sqrt(g)=1 and unit-area circle radius | ZETA,MANIFOLD | CALC: r=1/√π=0.5642
+- INV.24 | 1/√π = ∫_1 log x dx ,  π = ∫ log x dx^m | "Kolmogorov function" for pi | ENTROPY | CALC: ∫_0^1 ln x dx=−1 (compare 1/√π=0.5642)
+- INV.25 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group as commutator (non-commutative) (×2) | MANIFOLD,QUANTUM | SYMB
+- INV.26 | iπ(χ,x) ∘ f(x) = i ∫ x log x dx ,  f(x) ∘ π(χ,x) = ∫_1 (x log x) dx | two orderings of composition | ENTROPY,MANIFOLD | CALC: ∫_0^1 x ln x dx = −1/4
+- INV.27 | π(χ,x) = ∫ x log x dx ;  π(χ,x) = ∫_1 x log x dx | fundamental group as Shannon-type integral | ENTROPY,MANIFOLD | CALC: ∫x lnx dx = x²lnx/2 − x²/4
+- INV.28 | π(χ,x) = iπ(χ,x) ,  i ∫ x log x dx ≅ ∫_1 (x log x) dx | imaginary vs real entropy integrals | ENTROPY | SYMB
+- INV.29 | ∫_1 (x log x) dx = i ∫ x log x dx − ∫_1 (x log x) dx | imaginary/real Shannon–Kolmogorov entropy split (×2) | ENTROPY | SYMB
+- INV.30 | ∫∫_1 (x log x)² dx^m = 1/(2i) | "antigravity" double entropy integral | ENTROPY | CALC: ∫_0^1 (x lnx)² dx = 2/27 ≈0.0741 (vs 1/(2i))
+- INV.31 | (d/df) F(x,y) = (d/df) ∫∫_1 (x log x)² dx^m + (d/df) ∫∫_1 (y log y)^(1/2) dy^m | global integral/differential manifold functional (×4) | ENTROPY,MANIFOLD | CALC: ∫_0^1 x²ln²x dx=2/27; ∫_0^1 (y ln y)^{1/2} complex
+- INV.32 | i = x^(90°) ,  x sin 90° = i | imaginary unit as 90° rotation | ROT | SYMB
+- INV.33 | i = x^(1/2) ,  x = −1 | i = sqrt(−1) | ROT | CALC: (−1)^{1/2}=i
+- INV.34 | π(χ,x) f(x) = i ∫_1 (x log x) ∘ f(x) dx = i ∫ x log x dx | left action of π on f | ENTROPY,MANIFOLD | SYMB
+- INV.35 | f(x) π(χ,x) = f(x) ∫_1 (x log x) dx = ∫_1 (x log x) dx | right action of f on π | ENTROPY,MANIFOLD | SYMB
+- INV.36 | i y = x sin 90° ;  y = i, x = 1, i x = y | imaginary rotation relation | ROT | SYMB
+- INV.37 | i sin 90° = −1 ,  1 sin 90° = i | "imaginary pole" Euler rotation (sic) | ROT | SYMB
+- INV.38 | π^e ≅ e^π | pi^e approximately e^pi (×2) | OTHER | CALC: 22.459 vs 23.141
+- INV.39 | 2² = e^(x log x) = 4 ; 3³ = e^(x log x) = 27 ; 4⁴ = 256 ; 5⁵ = 3125 | x^x = e^{x ln x} table | ENTROPY | CALC: exp(x ln x) at x=2..5
+- INV.40 | y = x log x ,  log x → (log x)^(−1) | substitution of log by its inverse (×2) | ENTROPY | SYMB
+- INV.41 | x^(1/2 + iy) = x log x / log x ;  x^(1/2 + iy) = e^(x log x) | critical-line power vs x^x | ZETA,ENTROPY | SYMB
+- INV.42 | x^(1/2 + iy) = log_x e^(x log x) = log_x 4, log_x 27, log_x 256, log_x 3125 | critical-line power as logs of x^x | ZETA | CALC: log base x of x^x = x
+- INV.43 | y = e^(x log x) = √a ,  e^(e^(x log x)) = a ,  e^((x log x)²) | nested exponentials of x log x | ENTROPY | SYMB
+- INV.44 | x² = ±a ,  lim_{n→∞} (x − y) = e^(x log x) | limit relation | OTHER | SYMB
+- INV.45 | ||ds²|| = 8πG ( p/c³ + V/S ) | metric norm from pressure and volume/surface (×6) | SR,MANIFOLD | CALC: needs p,V,S; G=6.674e-11, c=2.998e8
+- INV.46 | y = x log x / (log x) = x ;  x log x = a ⇒ a/(log x) → x | extraction of x from x log x | ENTROPY | SYMB
+- INV.47 | x^(1/2 + iy) = e^(x log x) ,  x^(1/2+iy) = x log x / (log x) = x | critical-line identity (Japanese text) (×7) | ZETA | SYMB
+- INV.48 | x = 1/2 ,  iy = 0 | independence condition: real part 1/2 | ZETA | SYMB
+- INV.49 | ∫ C dx^m = 0 ,  (d/df) ∫ C dx^m = 0 ,  0' = e^(x log x) | constant integral vanishes | MANIFOLD | SYMB
+- INV.50 | HΨ = ⊕_L (iℏ∇) ⊕ L = ⊕ a f x^(1−f) [Im] = ∫ e^x x^(1−t) dx^m = e^(x log x) | Hamiltonian as direct sum = gamma-type integral | QUANTUM,GAMMA | SYMB
+- INV.51 | H = −K Σ p log p | Shannon entropy | ENTROPY | CALC: −Σp ln p for given distribution
+- INV.52 | ∫ Γ(γ)' dx^m = (e^f + e^(−f)) ≥ (e^f − e^(−f)) | gamma derivative integral bounded by cosh ≥ sinh | GAMMA | CALC: 2cosh f ≥ 2sinh f ∀f
+- INV.53 | (e^f + e^(−f))(e^f − e^(−f)) = 0 | product of cosh/sinh forms set to zero (sic) | OTHER | CALC: equals e^{2f}−e^{−2f}=2sinh2f, zero only at f=0
+- INV.54 | (d/df) F · ∫ C dx^m ≥ 0 | nonnegativity of functional | MANIFOLD | SYMB
+- INV.55 | y = f(g(x)') dx = ∫ f(x)' g(x)' dx | chain rule variant (sic) | OTHER | SYMB
+- INV.56 | y = f(log x)' dx = f'(x) · (1/x) | derivative of f(log x) | OTHER | SYMB
+- INV.57 | y = f'(x)/x = 2( cos(i x log x) − i sin(i x log x) ) = C | derivative ratio equals circle function (×5) | ROT,ENTROPY | CALC: 2e^{x ln x}=2x^x for real x
+- INV.58 | c = f(x) · log x ,  dx^m = (log x)^(−1) | measure as inverse log | ZETA | SYMB
+- INV.59 | C = (d/dγ) Γ = ⊕ (iℏ∇) ⊕ L | constant as gamma derivative = quantum direct sum | GAMMA,QUANTUM | SYMB
+- INV.60 | e^θ · (d/dγ) Γ = Γ γ' = ∫ Γ(γ)' dx^m | gamma derivative integral | GAMMA | SYMB
+- INV.61 | y = f(x) log x ,  y' = f'(x) + f'(x)/x | product rule (sic; correct is f' log x + f/x) (×2) | OTHER | SYMB
+- INV.62 | (sin(log x))' dx = cos(log x) · (1/x) | derivative of sin(log x) (×3) | ROT | CALC: check numerically d/dx sin(ln x)=cos(ln x)/x
+- INV.63 | sin y / x = sin u⃗ = a + t sin u⃗ | vector sine relation | ROT | SYMB
+- INV.64 | roots: i, −i, 2i, −2i | listed imaginary values | ROT | SYMB
+- INV.65 | lim_{n→∞} ( f(b) − f(a) ) = f'(c)(b − a) | mean value theorem | OTHER | SYMB
+- INV.66 | sin y / x = 2( cos(i x log x) − i sin(i x log x) ) = e^θ | circle function to exponential | ROT | SYMB
+- INV.67 | ^t∬ Δ(π(χ,x)) [Im] | imaginary Laplacian of fundamental group | MANIFOLD | SYMB
+- INV.68 | [□/∇]_μν ,  ∇+ ⊗ Δ ,  F^⊤⊥ ,  Σ ( σ( H(δ) × K(δ) ) ) | "Ricci formula" operator list | MANIFOLD | SYMB
+- INV.69 | ∇_i∇_j (□ × □') dτ ,  √(x^m y^m) | D-brane Hessian of box product | MANIFOLD | SYMB
+- INV.70 | ∬ □ cohom D_χ [Im] ⊗ [ S D_χ ⊗ hν ] | cohomology D-brane tensor photon energy | MANIFOLD,QUANTUM | SYMB
+- INV.71 | ≪ iℏψ || ∗ || HΨ ≫ ,  ∫ Δ(ζ) dζ | quantum bracket and zeta Laplacian integral | QUANTUM,ZETA | SYMB
+- INV.72 | ∯ R (Im) ∇_L | closed surface integral of curvature | MANIFOLD | SYMB
+- INV.73 | −2 ∫ ∇_i∇_j (R + ∇_i∇_j f) / Δ(R + Δ) dm | Ricci-flow functional variant | MANIFOLD | SYMB
+- INV.74 | Δ( F(Δ) × Δ(G(Δ)) ) = −( F(Δ) ∪ F(Δ) ) + ( F(Δ) ∩ F(Δ) ) | "sum and cup of cap" | MANIFOLD | SYMB
+- INV.75 | Σ □(∇)[Im] ∇+ ,  [∇/□] ,  (∇+ +) ,  χ(x) | operator list | MANIFOLD | SYMB
+- INV.76 | π || ∫ ∇_i∇_j ∫ ∇f dη ||² = S^m × S^(m−1) | "secure product formula" sphere product | MANIFOLD | SYMB
+- INV.77 | π r² dr^m ,  (a t − t^n + a) = e^f → ∂/df | Jones manifold / knot area expression | JONES,MANIFOLD | SYMB
+- INV.78 | (d/d(e^f + e^(−f))) (e^(−f) − e^f) | derivative of −sinh wrt cosh form | OTHER | CALC: = −coth f
+- INV.79 | e^f = a t^n − t^(n−1) + nCr x^n y^(n−1) | "Fuchs function" polynomial | JONES,GAMMA | SYMB
+- INV.80 | (1/2) m t² − ∈ x^n y^(n−1) dx^m dy^m | kinetic-type term with binomial | OTHER | SYMB
+- INV.81 | ≪ iℏψ | ∗ | HΨ ≫ = ∮ □'(□Ψ) dm | quantum bracket = closed box integral | QUANTUM | SYMB
+- INV.82 | ×([π(χ,x), ⇃]) = χ(y | : → x) = χ^(−1)(x) x χ(y) ,  □Ψ = ∇+ π || ∫ [× | : x→y] ||² dτ | conjugation action and box on Ψ | QUANTUM,MANIFOLD | SYMB
+- INV.83 | □ | : x → f(x) ,  Ψ([π(χ,x), ↿]) = (↿, ⇃, →, ←) | spin-arrow action | QUANTUM | SYMB
+- INV.84 | σ( H(δ) × K(δ) ) = □' ∬ d ⋈ | D-brane projection | MANIFOLD | SYMB
+- INV.85 | m ⊕(iℏ∇)⊕L + n ⊕(iℏ∇)⊕L = (m+n) ⊕(iℏ∇)⊕L | additivity of quantum direct sum | QUANTUM | SYMB
+- INV.86 | m ⊕(iℏ∇)⊕L − n ⊕(iℏ∇)⊕L = (m−n) ⊕(iℏ∇)⊕L | subtraction rule | QUANTUM | SYMB
+- INV.87 | ⊕(iℏ∇)⊕L^m × ⊕(iℏ∇)⊕L^n = ⊕(iℏ∇)⊕L^(m+n) | exponent product rule | QUANTUM | SYMB
+- INV.88 | ⊕(iℏ∇)⊕L^m / ⊕(iℏ∇)⊕L^n = ⊕(iℏ∇)⊕L^(m/n) (sic, should be m−n) | exponent quotient rule | QUANTUM | SYMB
+- INV.89 | d/df ⊕(iℏ∇)⊕L = ⊕(iℏ∇)⊕L ⊕ (iℏ∇)⊕L' = ⊕(iℏ∇)⊕L' | derivative of quantum direct sum | QUANTUM | SYMB
+- INV.90 | ∫ ⊕(iℏ∇)⊕L dx^m ,  ⊕(iℏ∇)⊕L = n | integral of direct sum; equals integer n | QUANTUM | SYMB
+- INV.91 | n^(L+1) / (n+1) = ∫ e^x x^(1−t) dx | power-rule integral as gamma-type integral | GAMMA | SYMB
+- INV.92 | ( ⊕(iℏ∇)⊕L + m ⊕(iℏ∇)⊕L + n ) = n^(L+1)/(n+1) = t ∫ (1−x)^n x^(m−1) dx = ∫ x^(m−1)(1−x)^(n−1) dx | beta function from gamma (Thurston–Perelman) | BETA,GAMMA,MANIFOLD | CALC: B(m,n)=Γ(m)Γ(n)/Γ(m+n)
+- INV.93 | ∇(iℏ∇)⊕L ,  ⊕(iℏ∇)⊕L ,  □(iℏ∇)⊕L ,  ⊠(iℏ∇)|L dx^m ,  ⊞(iℏ∇|L dx^m) | operator variants on quantum sum | QUANTUM | SYMB
+- INV.94 | ∫ f(x) dx = ∫ Γ(γ)' dx^m = 2( cos(i x log x) − i sin(i x log x) ) | integral as gamma derivative = circle function | GAMMA,ROT | SYMB
+- INV.95 | ( ∫ f(x)dx / log x ) = lim_{θ→∞} ( ∫ f(x)dx / θ ) = 0, 1 | normalised integral limit is 0 or 1 | OTHER | SYMB
+- INV.96 | e^(iθ) = cos θ + i sin θ | Euler formula (×3) | ROT | CALC: cos θ + i sin θ for any θ
+- INV.97 | ( ∫ f(x) dx )' = 2( i sin(i x log x) − cos(i x log x) ) = 2( −cos(i x log x) + i sin(i x log x) ) | derivative of circle function | ROT | SYMB
+- INV.98 | ( cos(i x log x) − i sin(i x log x) )' = (d/de^(iθ)) ( (cos, −sin) · (sin, cos) ) | rotation-matrix derivative | ROT | SYMB
+- INV.99 | ∫ Γ(γ)'' dx^m = ∫ Γ(γ)' dx^m / ∇L | second gamma derivative | GAMMA | SYMB
+- INV.100 | ∫ Γ dx^m · (d/dγ)Γ / ∇L ≤ ( ∫ Γ dx^m + (d/dγ)Γ ) / ∇L ≤ | e^f − e^(−f) ≤ e^(−f) + e^f' | = 0, 1 | gamma inequality chain | GAMMA | SYMB
+- INV.101 | f = Π_p f_p (conductor of abelian K/k) | conductor as product over primes | ZETA | SYMB
+- INV.102 | ( α, K/k / p ) = ( K/k / b ) (∈ G) | Artin symbol / norm residue | ZETA | SYMB
+- INV.103 | α/α₀ ≡ 1 (mod f_p) ,  α₀ ≡ 1 (mod f f_p^(−1)) → α ∈ k ,  (α₀) = p^α b | Artin reciprocity congruences | ZETA | SYMB
+- INV.104 | ( α, K/k / p_j^(∞) ) = 1 or 0 | infinite-prime symbol values | ZETA | SYMB
+- INV.105 | Π_p ( α, b / p ) = 1 | Hilbert product formula | ZETA | SYMB
+- INV.106 | ||ds²|| = lim_{x→∞} [ δ(x) ∭ π ( Σ_{k=0}^∞ (ⁿ√p , x/n) )^(1/2) dτ ]_μν | metric norm as prime-root series (×4) | ZETA,MANIFOLD | SYMB
+- INV.107 | p^(α n) = ⁿ√p / n ,  ⁿ√p = ⊕(iℏ∇)⊕L = n p^(1/n) = n − n p | n-th root of prime relations | ZETA,QUANTUM | SYMB
+- INV.108 | ∫ Γ(γ)' dx^m = e^(−x log x) | gamma derivative integral = x^(−x) | GAMMA,ENTROPY | CALC: e^{−x ln x}
+- INV.109 | lim_{s→1+0} Σ_{p∈M} (1/N(p)^s) / log(1/(s−1)) = density of M | Dirichlet density of prime set | ZETA | CALC: for all primes → 1
+- INV.110 | α(f d/dt, g d/dt) = ∫_S | f' f'' ; g' g'' | dt | Gelfand–Fuks 2-cocycle | OTHER | SYMB
+- INV.111 | B(f d/dt, g d/dt, h d/dt) = ∫_S | f f' f'' ; g g' g'' ; h h' h'' | dt | Gelfand–Fuks 3-cocycle (Wronskian) | OTHER | SYMB
+- INV.112 | E₀ × S² | beta manifold with wormhole (genus 3) | MANIFOLD | SYMB
+- INV.113 | e^(−x log x) ≤ y ≤ e^(x log x) ,  y ≠ 0 | Fermat-solution range bound | ENTROPY | CALC: x^{−x} ≤ y ≤ x^x
+- INV.114 | (∂/∂f) F(x) = ∬ cohom D_k(x) [Im] | partial of F as D-brane cohomology (×2) | MANIFOLD | SYMB
+- INV.115 | (∂/∂f) F = ^t∬ cohom D_k(x) ≪ p  = □' | partial of F as cohomology bracket (×4) | MANIFOLD | SYMB
+- INV.116 | ∇_i∇_j ∫ f(x) dη = ∂²/(∂x∂y) ∫ □' dη | Hessian of integral | MANIFOLD | SYMB
+- INV.117 | = R'_μν + (1/2) Λ g'_ij = ∫ ( i v/√(1−(v/t)²) + v/√(1−(v/t)²) ) dvol | Einstein-type tensor with Lorentz-factor integrand | SR,MANIFOLD | CALC: γ=1/√(1−(v/c)²) integrand (t plays c)
+- INV.118 | = ∫ C dx^m = ∫ κ T_μν dx^m = T_μν T^μν' | constant integral = stress-energy contraction | MANIFOLD | SYMB
+- INV.119 | □' = (8πG/c⁴) T_μν / log x | Einstein-field-equation form divided by log x | SR,MANIFOLD | CALC: 8πG/c⁴=2.077e-43 s²/(kg·m)
+- INV.120 | ^t∭ cohom D_χ [Im] = ∮ (p x^n + q x + r) ∇_l | cohomology equals polynomial contour integral | MANIFOLD | SYMB
+- INV.121 | (d/dl) L(x,y) = 2 ∫ || sin 2x ||² dτ ,  (d/dγ) Γ | Lagrangian derivative via sin² | ROT,GAMMA | CALC: ∫_0^{π} sin²2x dx = π/2
+- INV.122 | ∯ ≅ ||ds²|| = lim_{x→∞}[ δ(x) ∭ π( Σ ⁿ√p, x/n )^(1/2) dτ ]_μν | closed surface ≅ metric norm | ZETA,MANIFOLD | SYMB
+- INV.123 | e^(−2πT) ||ψ|| [η + h̄] dx^μ dx^ν + T² d²ψ | Randall–Sundrum-like warped metric (×many, see INV.160) | MANIFOLD | SYMB
+- INV.124 | −(16πG/c⁴) T_μν / log x = □' ;  −(16πG/c⁴) T_μν / e^(−2πT)||ψ|| = 4πGρ | Einstein/Poisson relations | SR,MANIFOLD | SYMB
+- INV.125 | ∂/(∂x∂y) = ∇_i∇_j ;  □ ∭ = ^t∭ ;  (∂/∂x) ∭ = ∇_i∇_j ∫ ∇f(x) dη ;  (∂/∂f)∭ = □ ∭ | operator identifications | MANIFOLD | SYMB
+- INV.126 | Γ|Γ, B|B, E|E, C|C, F|F, β|β, D|D ,  ^t∬ ≅ ⊕ D ⊕ L | self-restriction list of function symbols | GAMMA,BETA | SYMB
+- INV.127 | □ + □' = ∅ ,  □' | ∅ = □ | box sum is empty set | OTHER | SYMB
+- INV.128 | [[1,0],[0,−i]]^(1/2) · [[1,0],[0,−i]] | matrix square root times matrix | QUANTUM | CALC: numpy: sqrtm(diag(1,−i))@diag(1,−i)=diag(1,(−i)^{3/2})
+- INV.129 | x^(1/2) ≅ x ,  ∅^(1/2) = ∅ | idempotence statements | OTHER | SYMB
+- INV.130 | ∮ r dx^m = O(x,y) | contour integral as order term | MANIFOLD | SYMB
+- INV.131 | ^t∭ D(χ,x) Hom[D²ψ] ≪ p ≅ vol (V/S) | D-brane Hom ≅ volume ratio | MANIFOLD | SYMB
+- INV.132 | (d/df) F = (F) f' ,  ∫ F dx^m = (F) f | derivative/integral of F | OTHER | SYMB
+- INV.133 | (d/df) ∫∫_1 (x log x)² dx^m = ∫∫_1 (x log x)² dx^m | self-derivative (exponential-type) | ENTROPY | SYMB
+- INV.134 | f'/f' = 2x( log x + log(x+1) ) | log-derivative expression | OTHER | SYMB
+- INV.135 | ∬ F dx^m = (1/(x log x)²) ( ∫ 2x(log x + log(x+1)) dx ) = e^(−f) | double integral = e^{−f} | ENTROPY | SYMB
+- INV.136 | (d/df) F = (1/(x log x)²) ( 2x(log x + log(x+1)) ) = e^f | derivative = e^f | ENTROPY | CALC: evaluate at given x
+- INV.137 | log(x log x) ≥ 2 (y log y)^(1/2) ;  log(x log x) ≥ 2√(y log y) | AM–GM-type entropy inequality | ENTROPY | CALC: test numerically
+- INV.138 | ∫ ||ds²|| dx^m = ∫ 8πG(p/c³ + V/S) dvol = ∫ 8πG(p/c³+V/S) dy^m = ∫_1 8πG(p/c³+V/S) dx^m | integrated metric norm | SR,MANIFOLD | SYMB
+- INV.139 | (d/df) F = m(x) ,  ⊕ iℏ∇ ⊕ L = ∇_i∇_j ∫ ∇f(x) dη | F' = mass function; quantum sum = Hessian integral (×many) | QUANTUM,MANIFOLD | SYMB
+- INV.140 | dx^m = y / log x ,  dy^m = x / log x | measure definitions | ZETA | SYMB
+- INV.141 | e^(−f) dV = dy^m = dvol | Perelman weighted volume | MANIFOLD | SYMB
+- INV.142 | β(p,q) = (number) + Abel manifold = AdS₅ manifold = (d/df)F + ∫ C dx^m = ∫ Γ(γ)' dx^m | beta function = AdS5 (×2) | BETA,GAMMA,MANIFOLD | SYMB
+- INV.143 | ||ds²|| = e^(−2πG ||ψ||) [η + h̄(x)] dx^μ dx^ν + T² d²ψ | warped metric norm | MANIFOLD | SYMB
+- INV.144 | ∫ dvol = □ψ ,  ∫ ∇ψ² d∇ψ = □ψ | volume = box psi (×2) | MANIFOLD | SYMB
+- INV.145 | expanding of universe = exist of value = log(x log x) = □ψ | expansion as log entropy | ENTROPY | SYMB
+- INV.146 | freeze out of universe = reality of value = (y log y)^(1/2) = ∇ψ | freeze-out as sqrt entropy | ENTROPY | SYMB
+- INV.147 | x^n + y^n = z^n ,  β(p,q) = x^n + y^n − δ(x) = z^n − δ(x) | Fermat relation via beta | BETA | SYMB
+- INV.148 | (d/dt) g_ij = −2 R_ij | Ricci flow (×6) | MANIFOLD | SYMB
+- INV.149 | cos x / ( (cos x)' · (sin x)' ) = z^n ,  z^n = −2 e^(x log x) | trig ratio = Fermat power (×2) | ROT | CALC: cos x/(−sin x cos x) = −1/sin x
+- INV.150 | z = e^(−f) + e^f − y ,  β(p,q) = e^(−f) + e^f | beta as 2cosh f | BETA | CALC: 2cosh f
+- INV.151 | □x = ∫^{f(x)} ∇(R+ ∩ E+) d□x = ∫^{Δf(x)∘E+} ∇(R+∩E+) □x | box as integral over R+∩E+ | MANIFOLD | SYMB
+- INV.152 | □x = ∫^{d(R∇E+)} ∇(R+∩E+) d□x = ∫^{∇i∇j(R+E+)} ∇(R+∩E+) d□x | variant | MANIFOLD | SYMB
+- INV.153 | exp( ∇(R+ ∩ E+), Δ(C ⊃ R) ) = π(R1 ⊂ ∇E+) = rot(E1, div E2) | exponential map = curl/div | ROT,MANIFOLD | SYMB
+- INV.154 | x f(x) = F(x) ,  s Γ(s) = Γ(s+1) | gamma recurrence | GAMMA | CALC: Γ(s+1)/Γ(s)=s
+- INV.155 | Q ∇ C+ = (d/df) F(x) ∇ ∫ δ(s) f(x) dx | Q-derivative relation | OTHER | SYMB
+- INV.156 | E+ ∇ f = e^(x log x) ∇ n! f(x) | exponential factorial relation | GAMMA | SYMB
+- INV.157 | E(x) (d/df)F F f' = e^(x log x) ;  (C∇) ⊕ Q = e^(x log x) | derivative = x^x | ENTROPY | SYMB
+- INV.158 | R∇E+ = f(x) ∇ e^(x log x) ,  (d/df)F = F f' = e^(x log x) | curvature exp relation | ENTROPY | SYMB
+- INV.159 | ∫ dx = x + C (C integration constant) | indefinite integral | OTHER | SYMB
+- INV.160 | β(p,q) = ∫ x^(1−t)(1−x)^t dx = ∫ t^x (1−t)^(x−1) dt | beta function forms | BETA | CALC: scipy.special.beta
+- INV.161 | 0 ≤ y ≤ 1 ,  ∫_0^1 x^10 (1−x)^20 dx = B(11,21) = Γ(11)Γ(21)/Γ(32) = 10!·20!/31! = 1/931395465 | beta-function numeric example | BETA,GAMMA | CALC: 10!20!/31! = 1/931395465 ≈ 1.0737e-9 (verified identity)
+- INV.162 | 1/931395465 = 1/9 = 1/(1−x) (sic) | spurious reduction | OTHER | SYMB
+- INV.163 | 1/(1−z) = Σ_{k=0}^∞ z^k ,  1/(1+z²) = Σ_{k=0}^∞ (−1)^k z^(2k) | geometric series | OTHER | CALC: |z|<1 partial sums
+- INV.164 | f(x) = Σ_{k=0}^∞ a_k z^k | power series | OTHER | SYMB
+- INV.165 | d^n y/dx^n = n! y^(n+1) ,  f^(0)(0) = n! f(0)^(n+1) = n! | derivatives of y=1/(1−x) | OTHER | SYMB
+- INV.166 | f(x) ≅ Σ_{k=0}^∞ x^n = 1/(1−x) | geometric series | OTHER | SYMB
+- INV.167 | dy/dx = y² ,  (1/y²)(dy/dx) = 1 ,  ∫ (1/y²)(dy/dx) dx = ∫ dy/y² = −1/y ,  −1/y = x − C ,  y = 1/(C − x) | separable ODE | OTHER | CALC: y(0)=1 → C=1
+- INV.168 | ∃ x = 0, y = 1 ⇒ y = 1/(1−x) | initial condition solution | OTHER | SYMB
+- INV.169 | (dx, ∂x) · (εx, δx) = [[1,0],[0,−1]]^(1/2) | differential pairing = sqrt(σ_z) | QUANTUM | CALC: sqrtm(diag(1,−1))=diag(1,i)
+- INV.170 | π( Σ_{k=0}^∞ (ⁿ√p, x/n) )^(1/2) dτ ]_μν = e^(−f) dV | series = weighted volume | ZETA,MANIFOLD | SYMB
+- INV.171 | V = ∭ π( e^(−f) dV ) dx^m ,  δV = M ,  (d/dM) V = m(x) | volume, variation, Seifert manifold | MANIFOLD | SYMB
+- INV.172 | ∇ϕ² = 8πG( p/c³ + V/S ) | scalar-field gradient = entropy/energy (×6) | SR,ENTROPY | SYMB
+- INV.173 | y = x ;  y = (∇ϕ)^(1/2) | identifications | OTHER | SYMB
+- INV.174 | ΔE^(1/2) / √(2πG) = p/c³ + ρ | energy–pressure relation | SR | SYMB
+- INV.175 | ds² = g_μν(x) dx^μ dx^ν + ϕ²(x) (κ² A_μν(x) dx^μ)² | Kaluza–Klein metric | MANIFOLD,SR | SYMB
+- INV.176 | ds = ( g_μν(x) dx^μ dx^ν + ϕ²(x)(κ² A_μν(x) dx^μ)² )^(1/2) | KK line element | MANIFOLD,SR | SYMB
+- INV.177 | ΔE^(1/2)/√(2πG) − ρ = c³ ,  p/(2π) = c³ | rearranged energy relation | SR | SYMB
+- INV.178 | ds² = e^(−2kT(x)|ϕ|) [η_μν + h̄_μν(x)] dx^μ dx^ν + T²(x) dϕ² | Randall–Sundrum/Goldberger–Wise metric | MANIFOLD | SYMB
+- INV.179 | f_z = ∫ [ √( |x1 x2 x3; y1 y2 y3| ∘ |x1 x2 x3; y1 y2 y3| ) ] dx dy dz | determinant-product volume integral (×3) | MANIFOLD | SYMB
+- INV.180 | (∂/∂f) ∫ (sin 2x)² dx = ||x − y||² | derivative of sin² integral as distance | ROT | SYMB
+- INV.181 | x = x⃗ / |x̄| | vector over norm | OTHER | SYMB
+- INV.182 | |x⃗| = √x ,  i = √(−1) ,  |x⃗| x = x⃗ ,  |x⃗| = 1x ,  |x⃗|² = −1 | imaginary-as-vector definitions | ROT | SYMB
+- INV.183 | ( x / |x⃗| )² = 1/(−1) ,  |√x| = i | imaginary norm | ROT | SYMB
+- INV.184 | x mod N = 0 | divisibility | OTHER | SYMB
+- INV.185 | Σ_{M=0}^∞ ∫_M dm → Σ_{x=0}^∞ F_x = ∫_m dm = F | sum-integral equivalence | OTHER | SYMB
+- INV.186 | (x−y)/a = (y−z)/b = (z−x)/c ,  Π(x−y) / ∂xy | cyclic ratio | OTHER | SYMB
+- INV.187 | || ∫ f(x) ||² → ∫ π r² dx ≅ V(τ) | norm → volume | MANIFOLD | SYMB
+- INV.188 | ∫ |f(x)|² / f(x) dx | entropy-formula part | ENTROPY | SYMB
+- INV.189 | V(τ) → mesh ∫ |x1 x2 x3; y1 y2 y3; z1 z2 z3| dv(τ) ,  |x1..z3| dx = v | volume via 3×3 determinant | MANIFOLD | CALC: numpy.linalg.det
+- INV.190 | z y = a x + b y + c z ,  d z y = d(zy) | linear relation | OTHER | SYMB
+- INV.191 | [f, f^(−1)] = f f^(−1) − f^(−1) f | commutator | QUANTUM | SYMB
+- INV.192 | V(τ) = ∫ τ(q)^(−n/2) exp( −(1/√(2τ(q))) L(x) dx ) + O(N^(−1)) | Perelman reduced volume | MANIFOLD,ENTROPY | SYMB
+- INV.193 | (1/τ) ( N/2 + τ(2Δf − |∇f|² + R) + f ) mod N^(−1) | Perelman W-entropy integrand | ENTROPY,MANIFOLD | SYMB
+- INV.194 | ΔE = −2(T−t) | R_ij + ∇_i∇_j f − g_ij/(2(T−t)) |² | Perelman monotonicity (shrinking soliton) | ENTROPY,MANIFOLD | SYMB
+- INV.195 | (d/df) F = 2 ∫ (R + ∇_i∇_j f)² / −(R + Δf) dm | Perelman F-functional variation | ENTROPY,MANIFOLD | SYMB
+- INV.196 | (d/dt) g_ij(t) = −2 R_ij | Ricci flow (counted in INV.148) | MANIFOLD | SYMB
+- INV.197 | dx = ( g_μν(x)² dx² − g_μν(x) dx g_μν )^(1/2) | line element variant | MANIFOLD | SYMB
+- INV.198 | ds² = −N(r)² dt² + ψ²(r)(dr² + r² dθ²) | static axisymmetric metric (lapse N) | SR,MANIFOLD | SYMB
+- INV.199 | Σ_{n=0}^∞ (a1 x1 + a2 x2 ... a_{n−1} x_{n−1}) → Σ_{n=0}^∞ a_n x^n → α | series convergence | OTHER | SYMB
+- INV.200 | f = n ν λ ,  λ = x/l ,  ∫ d n ν λ = f(x) ,  x f(x) = F(x) ,  [f(x)] = ν h | wave relation | QUANTUM | SYMB
+- INV.201 | O(x) = ([∇_i∇_j f(x)])' ≅ nCr (x)^n (y)^(n−r) δ(x,y) | binomial operator | MANIFOLD | SYMB
+- INV.202 | (□ψ)' = ∇_i∇_j (δ(x) ∘ G(x))_μν ( p/c³ ∘ V/S ) | box-psi derivative | MANIFOLD | SYMB
+- INV.203 | F_m^t = (1/(4g²)) ij ,  x^(1/2+iy) = e^(x log x) | Yang–Mills coupling form | QUANTUM,ZETA | SYMB
+- INV.204 | S^μν_m ⊗ S^μν_n = G_μν × T_μν | surface gravity tensor product | MANIFOLD | SYMB
+- INV.205 | S^μν_m ⊗ S^μν_n = −2R_ij / V(τ) [D²ψ] | surface tensor = Ricci/volume | MANIFOLD | SYMB
+- INV.206 | S^μν_m = π(χ,x) ⊗ h_μν ,  π(χ,x) = ∫ exp[L(p,q)] dψ | path-integral fundamental group | QUANTUM,MANIFOLD | SYMB
+- INV.207 | ds² = e^(−2πT|ϕ|) [η + h̄_μν] dx^μν dx^μν + T² d²ψ | warped metric (see INV.123) | MANIFOLD | SYMB
+- INV.208 | M3 ⊗_{k=0}^∞ E+− = rot(div E, E1) = m(x) ,  P^2n_M3 = H3(M1) | 3-manifold product = curl of div | ROT,MANIFOLD | SYMB
+- INV.209 | ∃[R + |∇f|²]^(1/2+iy) = ∫ exp[L(p,q)] dψ = ∃[R + |∇f|²]^(1/2+iy) ⊗ ∫ exp[L(p,q)] dψ + N mod(e^(x log x)) = O(ψ) | critical-line curvature ↔ path integral | ZETA,QUANTUM | SYMB
+- INV.210 | P^2n_M3 = H3(M1) ,  H3(M1) = π(χ,x) ⊗ h_μν | homology = fundamental group ⊗ metric | MANIFOLD | SYMB
+- INV.211 | S^μν_m × S^μν_n = [D²ψ] ,  S×S = ker f / im f ,  S ⊗ S = m(x)[D²ψ] ,  −2R_ij / V(τ) = f^(−1) x f(x) | surface-tensor identities | MANIFOLD | SYMB
+- INV.212 | f_z = ∫ [ √( |x y z; u v w| ∘ |x y z; u v w| ) ] dx dy dz → f^(1/2) | determinant volume | MANIFOLD | SYMB
+- INV.213 | z → (0,1)·(0,1) = −1 ,  i = √(−1) | i² as dot product | ROT | SYMB
+- INV.214 | (x,y,z)² = (x,y,z)·(x,y,z) → −1 | vector square | ROT | SYMB
+- INV.215 | O(x) = ∇_i∇_j ∫ e^((2/m) sinθ cosθ) × N mod(e^(x log x)) | rotation exponent operator | ROT | SYMB
+- INV.216 | O(x) (x + Δ|f|²)^(1/2) | operator on sqrt | OTHER | SYMB
+- INV.217 | x Γ(x) = 2 ∫ | sin 2θ |² dθ ,  O(x) = m(x)[D²ψ] | gamma recurrence as sin² integral | GAMMA,ROT | CALC: 2∫_0^{π}sin²2θ dθ=π (compare xΓ(x)=Γ(x+1))
+- INV.218 | lim_{θ→0} (1/θ) [sinθ; cosθ] [[θ,1],[1,θ]] [cosθ; sinθ] = [[1,0],[0,−1]] | rotation-matrix limit to σ_z | ROT,QUANTUM | SYMB
+- INV.219 | f^(−1)(x) x f(x) = I'_m ,  I'_m = [1,0] × [0,1] | conjugation to unit | QUANTUM | SYMB
+- INV.220 | i² = (0,1)·(0,1) ,  |a||b| cosθ = −1 ,  E = div(E, E1) | i² as dot product; divergence | ROT | SYMB
+- INV.221 | {f,g} / [f,g]' = i² ,  E = mc² ,  I' = i² | anticommutator/commutator ratio; mass–energy | QUANTUM,SR | CALC: E=mc² (c=2.998e8)
+- INV.222 | O(x) = || ∇ ∫ [∇_i∇_j f ∘ g(x)]^(1/2+iy) || ,  ∂r^n ||∇||² → ∇_i∇_j ||v⃗||² | critical-line operator norm | ZETA,MANIFOLD | SYMB
+- INV.223 | ∇²ϕ = 8πG ( p/c³ + V/S ) | Poisson-type scalar equation | SR,MANIFOLD | SYMB
+- INV.224 | (log x^(1/2))' = (1/2)(1/(x log x)) (sic) ,  (sinθ)' = cosθ ,  (f_z)' = i e^(i x log x) ,  (d/df)F = m(x) | derivatives list | ROT | SYMB
+- INV.225 | (d/df)∫∫_1 (x log x)² dx^m + (d/df)∫∫_1 (y log y)^(1/2) dy^m = (d/df)∫∫ ( 1/(x log x)² + 1/(y log y)^(1/2) ) dm ≥ (d/df) ∫∫ ( 1/((x log x)² ∘ (y log y)^(1/2)) ) dm ≥ 2h | entropy inequality ≥ 2h | ENTROPY,QUANTUM | SYMB
+- INV.226 | (d/df) ∫∫ ( 1/((x log x)² ∘ (y log y)^(1/2)) ) dm ≥ ℏ | Planck bound on entropy integral | ENTROPY,QUANTUM | SYMB
+- INV.227 | y = x ,  xy = x² ,  (□ψ)' = 8πG ( p/c³ ∘ V/S ) | box-psi derivative | MANIFOLD | SYMB
+- INV.228 | □ψ = ∬ exp[ 8πG ( h̄_μν ∘ η_μ )ν ] dm dψ | box-psi exponential integral | MANIFOLD | SYMB
+- INV.229 | Σ a_k x^k = (d/df) ΣΣ (1/a_k²) f_k dx_k ;  Σ a_k f_k = (d/df) ΣΣ ζ(s)/a_k dx_k^m ;  a_k² f^(1/2) → lim_{k→1} a_k f_k = α | zeta-weighted series | ZETA | SYMB
+- INV.230 | O(x) = D²ψ ⊗ h_μν (×3) ,  ds² = e^(−2πT|ψ|)[η_μν + h̄_μν] dx^μ dx^ν + T² d²ψ | operator & warped metric | MANIFOLD | SYMB
+- INV.231 | f(x) + f(y) ≥ 2√( f(x) f(y) ) ,  (1/4)( f(x) + f(y) )² ≥ f(x) f(y) | AM–GM inequality | OTHER | CALC: check any positive values
+- INV.232 | T_μν = ( p/c³ + V/S )^(−1) ,  E+ = f^(−1) x f(x) ,  E = mc² | stress tensor inverse | SR | SYMB
+- INV.233 | O(x) = □ ∭ (∇_i∇_j f ∘ g(x))² / V(x) dm | operator integral | MANIFOLD | SYMB
+- INV.234 | ds² = g²_μν d²x + g_μν dx g_μν(x) ,  E+ = f^(−1) x f(x) ,  V/S = A A^(−1) ,  A A^(−1) = E | metric and identity | MANIFOLD | SYMB
+- INV.235 | O(x) = ∭ f(x³, y³, z³) dx dy dz ,  S(r) = π r² ,  V(r) = 4π r³ (sic; 4/3 πr³) | area/volume | OTHER | CALC: S=πr², V=4πr³ as written
+- INV.236 | E+− = f(x) · e^(−x log x) ,  Σ_{k=0}^∞ a_k f_k = f(x) · e^(−x log x) | series = f·x^(−x) | ENTROPY | SYMB
+- INV.237 | P^2n_M3 = E+ − ϕ ,  ζ(x) / Σ_{k=0}^∞ a_k x^k = O(x) | zeta over power series | ZETA | SYMB
+- INV.238 | O(N^(−1)) = 1/O(x) ,  □ = (8πG/c³) T_μν | inverse order; box as Einstein (c³ sic) | SR,MANIFOLD | SYMB
+- INV.239 | ∂²f(□ψ) = −2□ ∭ V/S² dm | second derivative of box-psi | MANIFOLD | SYMB
+- INV.240 | E+− = e^(−2πT|ψ|)[η_μν + h̄_μν] dx^μ dx^ν + T² d²ψ | E-field as warped metric | MANIFOLD | SYMB
+- INV.241 | S^mn_1 ⊗ S^mn_2 = D²ψ ⊗ h_μν ,  S^μν_m ⊗ S^μν_n = ∫ [D²ψ] dm = ∇_i∇_j ∫ f(x) dm | surface tensor product | MANIFOLD | SYMB
+- INV.242 | h = p/(mv) (sic; λ=h/p) ,  hλ = f ,  fλ = hν | de Broglie / wave relations | QUANTUM | SYMB
+- INV.243 | ||ds²|| = S^μν_m ⊗ S^μν_n ,  E+− = f^(−1)(x) x f(x) | metric = surface product | MANIFOLD | SYMB
+- INV.244 | R+ ⊂ C+− ,  ∇R+ → ⊕ Q+− ,  ∇_i∇_j R+− = ⊕ ∇Q+− | complex group decomposition | MANIFOLD | SYMB
+- INV.245 | M1 = R+_3 / E+− − {ϕ} ,  M3 ≅ M2 ,  M3 ≅ M1 | manifold quotients | MANIFOLD | SYMB
+- INV.246 | H3(Π) = Z1 ⊕ Z1 ,  H3(M1) = 0 | homology groups (lens space) | MANIFOLD | SYMB
+- INV.247 | ds² = e^(−2πT|ψ|)[η_μν + h̄_μν(x)] dx^μ dx^ν + T² d²ψ | fifth-dimension warped metric (×6 overall with INV.123/143/207/230/240) | MANIFOLD | SYMB
+- INV.248 | ∇ψ² = 8πG( p/c³ + V/S ) | scalar gradient (see INV.172) | SR | SYMB
+- INV.249 | (∂γ_n + m²) · ψ = ∫ [D²ψ ⊗ h_μν] dm = 0 | Dirac/KG-type equation | QUANTUM,SR | SYMB
+- INV.250 | □ = π(χ,x) ⊗ h_μν = D²ψ ⊗ h_μν | box as fundamental group ⊗ metric | MANIFOLD | SYMB
+- INV.251 | ∫ [D²ψ] dm = π(M1) ,  H_n(m1) = D²ψ − π(χ,x) = ker f / im f | homology of non-entropy | MANIFOLD | SYMB
+- INV.252 | ∫ D q exp[L(x)] dψ + O(N^1) = π(χ,x) ⊗ h_μν = D²ψ ⊗ h_μν | path integral of route entropy | QUANTUM,ENTROPY | SYMB
+- INV.253 | lim_{x→1} Σ_{k=0}^∞ ζ(x)/(a_k f_k) = ∫ || [D²ψ ⊗ h_μν] || dm | zeta series norm space | ZETA | SYMB
+- INV.254 | ∇ψ² = □ ∭ V/S² dm | gradient from volume/area | MANIFOLD | SYMB
+- INV.255 | dx < ∂x < ∇ψ < □v ;  ⊕ < Σ < ⊗ < ∫ < ∧ | operator scale ordering | OTHER | SYMB
+- INV.256 | (δψ(x))² = ∭ V(x)/S² dm ,  δψ(x) = ( ∭ V(x)/S² dm )^(1/2) | variation of psi | MANIFOLD | SYMB
+- INV.257 | ∇ψ² = −4R ∫ δ(V · S^(−3)) dm | gradient from curvature | MANIFOLD | SYMB
+- INV.258 | ∇ψ = 2R ζ(s) i Σ_{k=0}^∞ a_k x^k | gradient via zeta series | ZETA | SYMB
+- INV.259 | m d_x f_k(x) = m / (n! f_n(x)) = (ζ(s))^k / df m(x) ,  (δ(x))^(1/2) = (x log x / x^n) n | zeta power relation | ZETA | SYMB
+- INV.260 | O(x) = ∫[D²ψ ⊗ h_μν] dm / e^(x log x) ;  O(x) = V(x) / ∫[D²ψ ⊗ h_μν] dm | operator normalizations | MANIFOLD | SYMB
+- INV.261 | M3 = e^(x log x) ,  x^(1/2+iy) = e^(x log x) ,  O(x) = M3 / e^(x log x) = n E_x | quantum effective lowest energy | ZETA,QUANTUM | SYMB
+- INV.262 | V/S² = p/c³ ,  hν ≠ p/(mv) ,  E1 = hν ,  E2 = mc² ,  E1 ≅ E2 | Planck–Einstein energies | QUANTUM,SR | CALC: hν and mc² given ν, m
+- INV.263 | l = √(ℏG/c³) | Planck length | QUANTUM,SR | CALC: sqrt(1.0546e-34*6.674e-11/(2.998e8)^3) = 1.616e-35 m
+- INV.264 | ∬_1 (y log y)^(1/2) dy^m / ∬_1 (x log x)² dx^m = 1/i | ratio of entropy integrals = −i | ENTROPY | SYMB
+- INV.265 | i h c = G ,  h c = G/i ,  (1/2)/(1/(2i)) = v⃗1/v⃗2 ≤ 1 | Gauss-operator "quota" relation (sic) | QUANTUM | SYMB
+- INV.266 | A = BQ + R | division algorithm | OTHER | SYMB
+- INV.267 | ds² = g_μν dx^μ dx^ν + κ² (A_μν)² | KK metric | MANIFOLD | SYMB
+- INV.268 | Γ(x) = ∫ e^(−x) x^(1−t) dx = δ(x) π(x) f_n(x) | gamma integral (variables swapped) | GAMMA | CALC: Γ(s)=∫_0^∞ e^{−x}x^{s−1}dx
+- INV.269 | ds² = [T² d²ψ] ,  O(x) = [x] | metric reduction | MANIFOLD | SYMB
+- INV.270 | ∇ψ² = 8πG( p/c³ ∘ V/S ) | variant of INV.172 | SR | SYMB
+- INV.271 | p V / S = h | volume ~ Planck constant | QUANTUM | SYMB
+- INV.272 | β(p,q) = Γ(p)Γ(q)/Γ(p+q) ≅ Γ(p+q)/(Γ(p)Γ(q)) | beta–gamma relation (and its reciprocal, sic) | BETA,GAMMA | CALC: B(2,3)=1/12 vs reciprocal 12
+- INV.273 | ker f / im f ≅ im f / ker f | homology duality claim | MANIFOLD | SYMB
+- INV.274 | ⊕ ∇g(x) = [ ∇_i∇_j ∫ ∇f(x) dη ] ,  ⋃_{k=0}^∞ ( ⊕ ∇f(x) ) = □ ∭ ∇g(x) dη | Ricci/Gauss operator | MANIFOLD | SYMB
+- INV.275 | a' = √( v / (1 − (v/c)²) ) ,  F = m a' | "relativistic acceleration" with Lorentz denominator | SR | CALC: v=0.6c → 1−0.36=0.64; γ=1.25
+- INV.276 | ∇f(x) = ∫_M □ ⊕ ∇f(x)^n dm | gradient via box | MANIFOLD | SYMB
+- INV.277 | □ = 2(T−t) | R_ij + ∇∇f − (1/(2(T−t))) g²_ij | | box as Perelman soliton | MANIFOLD | SYMB
+- INV.278 | (□ + m) · ψ = 0 | Klein–Gordon-like (×3) | QUANTUM,SR | SYMB
+- INV.279 | □ × □ = (□ + m²) · ψ ,  (∂γ_n + δψ) · ψ = 0 | Dirac/KG variants | QUANTUM,SR | SYMB
+- INV.280 | ∇_i∇_j ∬ ⊕ ∇f(t) dt = □ ( ⋃_{k=0}^∞ ⊕ ∇g(x) dη ) | d'Alembert = category sum | MANIFOLD | SYMB
+- INV.281 | ∫ ⊕ (l × l) dm = Σ l ⊕ l dη | category sum | OTHER | SYMB
+- INV.282 | = [D²ψ ⊗ h_μν]^(1/2+iy) = H3(M1) | critical-line brane homology | ZETA,MANIFOLD | SYMB
+- INV.283 | y = ∇_i∇_j ∫ ∇g(x) dx ,  y' − y + (d/dx) z + [n] = 0 | differential equation | OTHER | SYMB
+- INV.284 | z = cos x + i sin x = e^(iθ) | Euler formula (see INV.96) | ROT | CALC: yes
+- INV.285 | T_μν = −2R_ij ,  (d/dt) g_ij(t) = −2R_ij | stress = Ricci flow | MANIFOLD | SYMB
+- INV.286 | G_μν = R_μν T_μν ,  σ(x) ⊕ δ(x) = (E+_n × H_m) | Einstein tensor product (sic) (×2) | MANIFOLD | SYMB
+- INV.287 | G_μν = [ ∂R_ij/∂f ]² ,  δ(x) · V(x) = lim_{n→1} δ(x) | Einstein tensor as squared derivative | MANIFOLD | SYMB
+- INV.288 | lim_{n→∞} mesh V(x) = m/(m+1) ,  V(x) = σ · S²(x) ,  ∭ V(x)/S²(x) dm = [D²ψ ⊗ h_μν] | mesh limit | MANIFOLD | SYMB
+- INV.289 | g(x)|δ(x,y) = (d/dt) g_ij(t) ,  σ(x,y) · g(x)|δ(x,y) = R_ij|σ(x,y) = ∫ R^{a(x−y)^n + r^n}_ij (ux + vy + wz)/Γ = ∫ R^{(x−u)(y−v)(z−w)}_ij dV | curvature integrals | MANIFOLD,GAMMA | SYMB
+- INV.290 | (□ + m) · ψ = 0 ,  E = mc² ,  (∂/∂f) □ψ = 4πGρ | Poisson from box-psi | SR,MANIFOLD | SYMB
+- INV.291 | (∂γ_n + m) · ψ = 0 ,  E = mc² − (1/2) m v² = ( −(1/2)(v/c)² + m ) · c² = ( −(1/2) a² + m ) · c² | energy with kinetic subtraction (sic) | SR | CALC: E=mc²−½mv² for given m,v
+- INV.292 | F = m a ,  ∫ a dx = (1/2) a² + C ,  T_μν = −(1/2) a² ,  (e^(iθ))' = i e^(iθ) | Newton, integrals, Euler derivative | ROT,OTHER | SYMB
+- INV.293 | ds² = [ g²_μν, dx ] | metric commutator (M2) | MANIFOLD | SYMB
+- INV.294 | ds² = g^(−1)_μν ( g²_μν(x) − dx g²_μν ) = h(x) ⊗ g_μν d²x − h(x) ⊗ dx g_μν(x) ,  h(x) = ( f²(x⃗) − E⃗+ ) | metric expansion | MANIFOLD | SYMB
+- INV.295 | G_μν = R_μν T_μν ,  ∂M2 = ⊕ ∇C+− | boundary relation | MANIFOLD | SYMB
+- INV.296 | r = 2 f^(1/2)(x) ,  f(x) = (1/4) ||r||² | radius–potential relation (×2) | OTHER | CALC: consistent: f=r²/4
+- INV.297 | E+ = f^(−1) x f(x) ,  h(x) ⊗ g(x⃗) ≅ V/S ,  R/M2 = E+ − ϕ = M3 ⊃ R | fifth-dimension abel relations | MANIFOLD | SYMB
+- INV.298 | M+_2 = E+_1 ∪ E+_2 → E+_1 ⊕ E+_2 = M1 ⊕ ∇C+− ,  (E+_1 ⊕ E+_2) · (R− ⊂ C+) | union to direct sum | MANIFOLD | SYMB
+- INV.299 | R/M2 = E+ − {ϕ} = M3 ⊃ R ,  M+_3 ≅ h(x) · R+_3 = ⊕ ∇C+− ,  R = E+ ⊕ M2 − (E+ ∩ M2) | inclusion–exclusion | MANIFOLD | SYMB
+- INV.300 | E+ = g_μν dx g_μν ,  M2 = g_μν d²x ,  F = ρ g l → V/S | fields as metric pieces | MANIFOLD | SYMB
+- INV.301 | O(x) = δ(x)[ f(x) + g(x̄) ] + ρ g l ,  F = (1/2) m v² − (1/2) k x² ,  M2 = P^2n | Lagrangian-type (kinetic − potential) | OTHER | CALC: ½mv²−½kx²
+- INV.302 | V = R+ Σ K^m ,  W = C+ Σ_{k=0}^∞ K^(n+2) ,  V/W = R+ Σ K^m / C+ Σ K^(n+2) = R+/C+ Σ x^k/(a_k f_k(x)) = M+− | vector-space quotient series | MANIFOLD | SYMB
+- INV.303 | (d/df) F = m(x) → M+− ,  Σ_{k=0}^∞ x^k/(a_k f_k(x)) = a_k x^k / ζ(x) | zeta quotient series | ZETA | SYMB
+- INV.304 | {f,g}/[f,g] = (fg + gf)/(fg − gf) ,  ∇f = 2 ,  ∂H3 = 2 ,  (1+f)/(1−f) = 1 ,  (d/df)F = ⊕ ∇C+− ,  F⃗ = 1/2 | anticommutator/commutator (fermion/boson) | QUANTUM | SYMB
+- INV.305 | H1 ≅ H3 = M3 ;  H3 ≅ H1 → π(χ,x) ,  H_n, H_m = rank(m,n) ,  lim mesh(rank(m,n)) → 0 | homology/rank | MANIFOLD | SYMB
+- INV.306 | (fg)' = f g' + g f' ,  (f/g)' = (f'g − g'f)/g² ,  {f,g}/[f,g] = (fg)' ⊗ d_x fg | product and quotient rules | OTHER | SYMB
+- INV.307 | (f/g)' ⊗ g^(−2) d_x fg = (fg)' ⊗ d_x fg / ((f/g)' ⊗ g^(−2) d_x fg) = (d/df) F | quotient-rule operator identity | OTHER | SYMB
+- INV.308 | ℏψ = (1/i) HΨ ,  i[H, ψ] = −HΨ ,  ({f,g}/[f,g])' = (i)² | Schrödinger/Heisenberg-type relations | QUANTUM | SYMB
+- INV.309 | [∇_i∇_j f(x), δ(x)] = ∇_i∇_j ∫ f(x,y) dm_xy ,  f(x,y) = [f(x), h(x)] × [g(x), h^(−1)(x)] | commutator of Hessian with delta | QUANTUM,MANIFOLD | SYMB
+- INV.310 | δ(x) = 1/f'(x) ,  [H, ψ] = Δf(x) ,  O(x) = ∇_i∇_j ∫ δ(x) f(x) dx ,  O(x) = ∫ δ(x) f(x) dx | delta and operator definitions | QUANTUM | SYMB
+- INV.311 | R+ ∩ E+− ∋ x ,  M × R+ ∋ M3 ,  Q ⊃ C+− ,  Z ∈ Q∇f ,  f ≅ ⊕_{k=0}^n ∇C+− | set/group memberships | MANIFOLD | SYMB
+- INV.312 | ⊕_{k=0}^∞ ∇C+− = M1 ,  ⊕_{k=0}^∞ ∇M+− ≅ E+− ,  M3 ≅ M1 ,  ⊕_{k=0}^∞ ∇V+−/S | direct-sum manifold identities | MANIFOLD | SYMB
+- INV.313 | P^2n / M2 ≅ ⊕_{k=0}^∞ ∇C+− ,  E+− × R+− ≅ M2 | quotient ≅ direct sum | MANIFOLD | SYMB
+- INV.314 | ζ(x) = P^2n × Σ_{k=0}^∞ a_k x^k ,  M2 ≅ P^2n / ker f → ⊕ ∇C+− | zeta as P^2n times power series | ZETA,MANIFOLD | SYMB
+- INV.315 | S+− × V+− ≅ (V/S) ⊕_{k=0}^∞ ∇C+− ,  V+ ≅ M+− ⊗ S+− ,  Q × M1 ⊂ ⊕ ∇C+− | volume/surface decomposition | MANIFOLD | SYMB
+- INV.316 | Σ_{k=0}^∞ Z ⊗ Q+− = ⊗_{k=0}^∞ ∇M1 = ⊗_{k=0}^∞ ∇C+− × Σ_{k=0}^∞ M1 ,  x ∈ R+ × C+− ⊃ M1 ,  M1 ⊂ M2 ⊂ M3 | tensor tower | MANIFOLD | SYMB
+- INV.317 | Thurston geometries: S³, H¹×E¹, E¹, S¹×E¹, S²×E¹, H¹×S¹, H¹, S²×E (×2) | eight differential structures (as written) | MANIFOLD | SYMB
+- INV.318 | ⊕ ∇C+− ≅ M3 ,  R ⊃ Q ,  R ∩ Q ,  R ⊂ M3 ,  C+ ⊕ M_n ,  E+ ∩ R+ ,  E2 ⊕ E1 ,  R− ⊂ C+ ,  M+−, C+− ,  M+−∇C+− ,  C+∇H_m ,  E+∇R+− ,  E2∇E1 ,  R−∇C+− (×3) | structure relations list | MANIFOLD | SYMB
+- INV.319 | ∇/Δ ∫ x f(x) dx ,  ∇R / Δf ,  □ = 2 ∫ (R + ∇_i∇_j f)² / −(R + Δf) e^(−f) dV | Perelman functional with weighted volume | ENTROPY,MANIFOLD | SYMB
+- INV.320 | □ = ∇R/Δf ,  (d/dt) g_ij = □ → ∇f/Δx ,  (R + |∇f|²) dm → −2 (R + ∇_i∇_j f)² e^(−f) dV | Perelman F-functional monotonicity | ENTROPY,MANIFOLD | SYMB
+- INV.321 | x^n + y^n = z^n → ∇ψ² = 8πG T_μν ,  f(x+y) ≥ f(x) ∘ f(y) | Fermat → field equation | SR,MANIFOLD | SYMB
+- INV.322 | im f / ker f = ∂f ,  ker f = ∂f ,  ker f / im f ≅ ∂f ,  ker f = f^(−1)(x) x f(x) | homology identities | MANIFOLD | SYMB
+- INV.323 | f^(−1)(x) x f(x) = ∫ ∂f(x) d(ker f) → ∇f = 2 ;  nCr = nC(n−r) → im f/ker f ≅ ker f/im f | binomial symmetry | OTHER | CALC: C(n,r)=C(n,n−r)
+- INV.324 | Σ_{k=0}^∞ a_k f_k = T² d²ϕ ,  a_k ≅ Σ_{r=0}^∞ nCr | fifth dimension as series (×2) | MANIFOLD | SYMB
+- INV.325 | V/W = R/C Σ_{k=0}^∞ x^k/(a_k f_k) ,  W/V = C/R Σ_{k=0}^∞ a_k f_k / x^k ,  V/W ≅ W/V ≅ R/C (Σ_{r=0}^∞ nCr)^(−1) Σ_{k=0}^∞ x^k | quotient series | OTHER | SYMB
+- INV.326 | W/V = x F(x) ,  χ(x) = (−1)^k a_k ,  Γ(x) = ∫ e^(−x) x^(1−t) dx | Euler char and gamma | GAMMA,MANIFOLD | SYMB
+- INV.327 | Σ_{k=0}^n a_k f_k = (f_k)' ,  Σ_{k=0}^n a_k f_k = Σ_k nCr f_k = (f_k)' ,  Σ_{k=0}^∞ a_k f_k = [f(x)] ,  Σ a_k f_k = α | series identities | OTHER | SYMB
+- INV.328 | Σ_{k=0}^∞ 1/(a_k f_k) ,  Σ_{k=0}^∞ (a_k f_k)^(−1) = 1/(1−z) | inverse series geometric | OTHER | SYMB
+- INV.329 | ∬_1 (x log x)(y log y) dxy = nCr xy / ( nC(n−r) (x log x)(y log y) )^(−1) = (nC(n−r))² | entropy double integral binomial | ENTROPY | CALC: ∫_0^1∫_0^1 (x lnx)(y lny) = 1/16
+- INV.330 | Σ_{k=0}^∞ ( 1/(x log x) − 1/(y log y) ) d(1/(n xy)) × xy = Σ_{k=0}^∞ a_k f_k = α | entropy difference series | ENTROPY | SYMB
+- INV.331 | Z ⊃ C ⊕ ∇R+ ,  ∇(R+ ∩ E+) ∋ x ,  Δ(C ⊂ R) ∋ x ,  M+− ⊕ R+ ,  E+ ∈ ⊕ ∇R+ ,  S+− ⊂ R+_2 ,  V+− × R+− ≅ V/S | set relations | MANIFOLD | SYMB
+- INV.332 | C+ ∪ V+− ∋ M1 ⊕ ∇C+− ,  Q ⫆ R+− ,  Q ⊂ ⊕ M+− ,  ⊗ Q ⊂ ζ(x) ,  ⊕ ∇C+− ≅ M3 | set relations | ZETA,MANIFOLD | SYMB
+- INV.333 | [ −Δv + ∇_i∇_j v_ij − R_ij v_ij − v_ij ∇_i∇_j + 2<∇f, ∇h> + (R + ∇f²)(v/2 − h) ] | Perelman first-variation of F functional | ENTROPY,MANIFOLD | SYMB
+- INV.334 | x^(1/2+iy) = [ f(x) ∘ g(x), h̄(x) ] / ∂f∂g∂h | critical-line power as bracket | ZETA | SYMB
+- INV.335 | x^(1/2+iy) = exp[ ∫ ∇_i∇_j f(g(x)) g'(x) / ∂f∂g ] | critical-line power as exponential integral (×2) | ZETA | SYMB
+- INV.336 | O(x) = { [f(x) ∘ g(x), h̄(x)], g^(−1)(x) } | operator as nested bracket | QUANTUM | SYMB
+- INV.337 | ∃[ ∇_i∇_j(R + Δf), g(x) ] = ⊕_{k=0}^∞ ∇ ∫ ∇_i∇_j f(x) dm ,  ∨(∇_i∇_j f) = ⊗ ∇E+ | curvature bracket | MANIFOLD | SYMB
+- INV.338 | g(x,y) = O(x)[ f(x) + h̄(x) ] + T² d²ϕ | metric with warp term | MANIFOLD | SYMB
+- INV.339 | O(x) = ∫ [g(x)] e^(−f) dV' − Σ δ(x) | weighted operator | MANIFOLD | SYMB
+- INV.340 | O(x) = [∇_i∇_j f(x)]' ≅ nCr f(x)^n f(y)^(n−r) δ(x,y) ,  V(τ) = ∫ [f(x)] dm / ∂f_xy | binomial operator/volume (×2) | MANIFOLD | SYMB
+- INV.341 | □ψ = 8πG T_μν ,  (□ψ)' = ∇_i∇_j (δ(x) ∘ G(x))_μν (p/c³ ∘ V/S) ,  x^(1/2+iy) = e^(x log x) | box-psi field eq | SR,MANIFOLD,ZETA | SYMB
+- INV.342 | δ(x) ϕ = ∨[ ∇_i∇_j f ∘ g(x) ] ,  ∃(R + Δf) | delta field | MANIFOLD | SYMB
+- INV.343 | −nCr = (1/i) Hψ C ℏψ + [H, ψ] C^(−n−r) ;  nCr = nC(n−r) | Heisenberg-algebra binomial | QUANTUM | SYMB
+- INV.344 | ∬_1 (x log x)² dx^m → O(x) = [∇_i∇_j f]' / ∂f_xy | singularity of process | ENTROPY | SYMB
+- INV.345 | ⋃_{x=0}^∞ f(x) = ∇_i∇_j f(x) ⊕ Σ f(x) = ⊕ ∇f(x) ;  ∇_i∇_j f ≅ ∂x∂y ∫ ∇_i∇_j f dm ≅ ∫ [f(x)] dm ≅ {[f(x), g(x)], g^(−1)(x)} ≅ □ψ ≅ ∇ψ² ≅ f(x∘y) ≤ f(x)∘g(x) ≅ |f(x)| + |g(x)| | chain of operator equivalences | MANIFOLD | SYMB
+- INV.346 | δ(x) ψ = <f, g> ∘ |h^(−1)(x)| ,  ∂f_x · δ(x) ψ = x ,  x ∈ O(x) ,  O(x) = { [f∘g, h^(−1)(x)], g(x) } | delta-psi relations | QUANTUM | SYMB
+- INV.347 | lim_{n→∞} Σ_{k=n}^∞ ∇f = [ ∇ ∫ ∇_i∇_j f(x) dx^m, g^(−1)(x) ] → ⊕_{k=0}^∞ ∇E+− = M3 = ⊕_{k=0}^∞ E+− | tail series to 3-manifold | MANIFOLD | SYMB
+- INV.348 | dx² = [g²_μν, dx] ,  g^(−1) = dx ∫ δ(x) f(x) dx ,  f(x) = exp[ ∇_i∇_j f(x), g^(−1)(x) ] | metric commutator | MANIFOLD | SYMB
+- INV.349 | ( g(x)/f(x) )' = lim_{n→∞} g(x)/f(x) = g'(x)/f'(x) | L'Hôpital-type limit | OTHER | SYMB
+- INV.350 | ∇F = f · (1/4)|r|² ,  ∇_i∇_j f = (d/dx_i)(d/dx_j) f(x) g(x) | gradient/Hessian | MANIFOLD | SYMB
+- INV.351 | ∬_1 (x log x)² dx^m = [ ∇_i∇_j ∫ ∇f(x) dη ] × U(r) | entropy position (Hörmander manifold) | ENTROPY | SYMB
+- INV.352 | S^mn_1 ⊗ S^mn_2 = ∫ [D²ψ ⊗ h_μν] dm | D-brane sheaf (see INV.241) | MANIFOLD | SYMB
+- INV.353 | U(r) = (1/2) √(1 + f'(r)) / f(r) + m g r ,  F_m^t = (1/4)|r|² | potential with gravity term | OTHER | SYMB
+- INV.354 | ∬_1 (y log y)^(1/2) dy^m = [ ∇_i∇_j ∫ ∇f(x) dη ] × E+− ,  E+− = exp[L(x)] dm dψ + O(N^−) | entropy × Lenz field path integral | ENTROPY,QUANTUM | SYMB
+- INV.355 | (d/df) F = [ ∇_i∇_j ∫ ∇f(x) dη ] ( U(r) + E+− ) = (1/2) m v² + m c² | relativistic energy (kinetic + rest) | SR | CALC: ½mv² + mc²
+- INV.356 | ∇_i∇_j ∫ ∇f(x) dη / ∇_i∇_j ⊕ M3 = M3/P^2n ≅ P^2n/M3 ≅ M1 = [M1] | manifold quotient chain | MANIFOLD | SYMB
+- INV.357 | [f(x)] = Σ_{k=0}^∞ a_k f_k ,  lim_{n→1} [f(x)] = lim_{n→1} Σ_{k=0}^∞ a_k f_k = α ,  e^(iθ) = cos θ + i sin θ ,  H3(M1) = 0 | Abel manifold → zeta | ZETA,ROT | SYMB
+- INV.358 | x² cosθ / a + y² sinθ / b = r² | rotated conic | ROT | SYMB
+- INV.359 | [[cosθ, −sinθ],[sinθ, cosθ]] [x; y] = [[1,0],[0,−1]] | rotation matrix set equal to σ_z (sic) | ROT,QUANTUM | CALC: R(θ)=σ_z has no solution (det R=1, det σ_z=−1)
+- INV.360 | χ(x) = Σ_{k=0}^∞ (−1)^n r^n ,  (d/df)F = (d/df) ΣΣ a_k f_k = |a1 a2 ... a_n| − |a1 ... a_{n−1}| − |a_n ... a1| ,  lim_{n→0} χ(x) = 2 | Euler characteristic series | MANIFOLD | CALC: Σ(−r)^n = 1/(1+r); χ(S²)=2
+- INV.361 | lim_{n→1} Σ_{k=0}^∞ a_k f_k = nCr f(x)^n f(y)^(n−r) δ(x,y) ;  lim_{n→∞} nCr f(x)^n f(y)^(n−r) δ(x,y) | binomial limits | OTHER | SYMB
+- INV.362 | lim_{n→1} Σ_{k=0}^∞ ( 1/(n+1) )^s = lim_{n→1} Z^r = 1/z | zeta-type sum | ZETA | CALC: Σ_{n≥0}(n+1)^{−s} = ζ(s)
+- INV.363 | β(p,q) = Γ(p)Γ(q)/Γ(p+q) ≅ Γ(p+q)/(Γ(p)Γ(q)) ,  lim_{n→1} a_k f_k ≅ lim_{n→∞} ζ(s)/(a_k f_k) ,  ker f/im f ≅ im f/ker f | beta–gamma (see INV.272) (×2) | BETA,GAMMA,ZETA | CALC: scipy.special.beta
+- INV.364 | lim_{n→1} ζ(s) = 0 ,  O(x) = ζ(s) Σ_{x=0}^∞ f(x) → ⊕_{k=0}^∞ ∇f(x) = ∫_M δ(x) f(x) dx | zeta vanishing claim (sic; ζ has pole at 1) | ZETA | CALC: ζ(s)→∞ as s→1 (contradicts)
+- INV.365 | ∭_M V/S² e^(−f) dV = ∬_D −( f(x,y)², g(x,y)² ) − ∬_D ( g(x,y)², f(x,y)² ) | Green-type identity for pressure | MANIFOLD | SYMB
+- INV.366 | lim_{n→1} Σ_{k=0}^∞ a_k f_k = ∫ [D²ψ ⊗ h_μν] dm = ∫ exp[L(x)] dψ dm × E+− = S^mn_1 ⊗ S^mn_1 = Z1 ⊕ Z1 = M1 | series = path integral = homology | ZETA,QUANTUM,MANIFOLD | SYMB
+- INV.367 | H^m_n(χ, h) = ∬_M V (R + Δf) e^(−f) dV ,  V/S² = ∭_M [Dψ ⊗ h_μν] dm | cohomology via Perelman weighted curvature | MANIFOLD,ENTROPY | SYMB
+- INV.368 | ∭_M V/S² dm = ∫_D (l × l) dm | pressure equation (string) | MANIFOLD | SYMB
+- INV.369 | ∬_D −g(x,y)² dm − ∬_D −f(x,y)² dm = −2R_ij ,  [f(x), g(x)] × [h(x), g^(−1)(x)] | curvature from squared fields | MANIFOLD | SYMB
+- INV.370 | [[D_m, d_x],[d_x, ∂_m]] [[cosθ, −sinθ],[sinθ, cosθ]] [x; y] = [[1,0],[0,−1]]^(1/2) = (D_m, d_x)·(cosθ, sinθ) × (d_x, ∂_m)·(cosθ, sinθ) (×2) | differential operator matrix × rotation | ROT,QUANTUM | SYMB
+- INV.371 | [[1,0],[0,i]] β(x,θ) [x; y] = [[i,0],[0,−1]] | phase-gate times beta | BETA,QUANTUM | SYMB
+- INV.372 | l = √(ℏG/c³) ,  σ_m · [[δ(x), −1],[1, ε(x)]]^(1/2) = [[i,0],[0,−i]] | Planck length and Pauli-type matrix | QUANTUM | CALC: l_P=1.616e-35 m
+- INV.373 | ( ∂/∂τ f(x,y,z) )^(3') = A_μν ,  (d/dt) g_ij(t) = −2R_ij | third derivative = gauge field | MANIFOLD | SYMB
+- INV.374 | lim_{n→1} Σ_{k=0}^∞ a_k f_k = lim_{n→1} a_n / a_{n−1} ≅ α ;  lim_{n→1} Σ_{k=0}^∞ a_k/a_{k+1} = Σ_{k=0}^∞ a_k f_k | ratio-test type | OTHER | SYMB
+- INV.375 | □ = (8πG/c⁴) T_μν | Einstein equation as box (×5) | SR,MANIFOLD | CALC: κ=8πG/c⁴=2.0766e-43
+- INV.376 | ∫ x log x dx = ∬_M ( e^(x log x) sinθ dθ ) dx dθ = (log sinθ dθ)^(1/2) − (δ(x) · ε(x))^(1/2) | entropy integral as angular integral | ENTROPY,ROT | SYMB
+- INV.377 | T_μν = || ∬_M [ ∇_i∇_j e^(∫ x log x dx) + O(N^(−1)) ] dm dψ || | stress tensor from entropy exponent | ENTROPY,MANIFOLD | SYMB
+- INV.378 | [[d_x, δ(x)],[ε(x), ∂_m(x)]] ( f_mn(x), g_μν(x) ) = [[1,0],[0,−1]]^(1/2) | operator matrix (Von Neumann) | QUANTUM | SYMB
+- INV.379 | ||ds²|| = H(x)_mn ⊗ K(y)_mn | metric norm as tensor product | MANIFOLD | SYMB
+- INV.380 | ||H(x)||^(−1/2+iy) ⊂ R+− ∪ C+− ≅ M3 ;  ||H(x)||^(1/2+iy) ⊆ M3 | Selberg-type critical-line norm | ZETA,MANIFOLD | SYMB
+- INV.381 | K(y) = |x y z; a b c|² / g_μν(x) ≅ f(x,y,z) / ( g(a,b,c) h^(−1)(u,v,w) ) | mass from determinant | MANIFOLD | SYMB
+- INV.382 | V = ∫ [D²ψ ⊗ h_μν] dm ,  S² = ∫ e^(−2 sinθ cosθ) · log sinθ dx_θ + O(N^(−1)) ,  O(x) = ζ(s) / lim_{x→1} Σ a_k f_k = α | volume/surface/zeta | ZETA,ROT | SYMB
+- INV.383 | O(x) = T_μν ,  lim_{x→1} Σ_{k=0}^∞ a_k f_k = T_μν | stress tensor as series | ZETA | SYMB
+- INV.384 | G_μν = R_μν T_μν ,  M3 = ∭ V/S² dm ,  −(1/(2(T−t))) | R_ij = □ψ | three-manifold equation | MANIFOLD | SYMB
+- INV.385 | m(x) = [f(x)] ,  f(x) = ∬ e^(∫ x log x dx) + O(N^(−1)) + T² d²ψ | route-integral mass | ENTROPY | SYMB
+- INV.386 | F(x) = || ∇_i∇_j ∫ ∇f(x,y) dm ||^(1/2+iy) | critical-line norm | ZETA | SYMB
+- INV.387 | G_μν = || [ ∇_i∇_j ∫ ∇g(x,y,z) dx dy dz ] ||^m / (2 sinθ cosθ log sinθ dθ dψ) | Einstein tensor via rotation log integral | ROT,MANIFOLD | SYMB
+- INV.388 | T_μν = F(x) ,  2(T−t) | g²_ij = ∬_1 (x log x)² dx^m | stress from entropy | ENTROPY | SYMB
+- INV.389 | ψδ(x) = [m(x)] ,  ∇(□ψ) = ∇_i∇_j ∫ ∇g(x,y) dη ,  ∇·(□ψ) = (1/4) g²_ij ,  □ψ = (8πG/c⁴) T_μν | box-psi relations | SR,MANIFOLD | SYMB
+- INV.390 | p V / c³ = S ∘ h_μν = h | pressure-volume = Planck | QUANTUM | SYMB
+- INV.391 | T_μν = ℏν / S ,  T_μν = ∭ V/S² dm ,  (d/df) m(x) = V(x)/F(x) | stress as photon energy density | QUANTUM | SYMB
+- INV.392 | y = x ,  (d/df)F = m(x) ,  R_ij | g_μν(x) = [∇_i∇_j g(x,y)]^(1/2+iy) | Ricci critical-line | ZETA | SYMB
+- INV.393 | ∇ ∘ (□ψ) = (∂/∂f) F = ∬ ∇_i∇_j f(x) dη_μν ,  ∫ [∇_i∇_j g(x,y)] dm = (∂/∂f) R_ij | g_μν(x) | partial differential on global metric | MANIFOLD | SYMB
+- INV.394 | G(x) = ∇_i∇_j f + R_ij | g_μν(x) + ∇(□ψ) + (□ψ)² | four-force element | MANIFOLD | SYMB
+- INV.395 | G_μν + Λ g_ij = T_μν ,  T_μν = (d/dx^μ)(d/dx^ν) f_μν + −2(T−t) | R_ij + f'' + (f')² = ∫ exp[L(x)] dm + O(N^(−1)) = ∫ e^((2/m) sinθ cosθ · log(sinθ)) dx + O(N^(−1)) | Einstein with Λ; stress as path integral | MANIFOLD,ROT,QUANTUM | SYMB
+- INV.396 | (∂/∂f) F = (∇_i∇_j)^(−1) ∘ F(x) | inverse Hessian | MANIFOLD | SYMB
+- INV.397 | O(x) = ∫ [ ∇_i∇_j ∫ ∇f(x) dm ] dψ = ∫ [ ∇_i∇_j f(x) dη_μν ] dψ | operator | MANIFOLD | SYMB
+- INV.398 | ∇f = ∫ ∇_i∇_j [ ∫^{S^(−3)} δ(x) dV ] dm | gradient via delta volume | MANIFOLD | SYMB
+- INV.399 | || ∫ [∇_i∇_j f] dm ||^(1/2+iy) = rot(div, E, E1) = 2<f, h> ;  V(x)/f(x) = ρ(x) | Maxwell as critical-line norm | ROT,ZETA | SYMB
+- INV.400 | ∫_M ρ(x) dx = □ψ ,  −2<g, h> = div(rot E, E1) = −2R_ij | Higgs field / Maxwell | MANIFOLD | SYMB
+- INV.401 | O(x) = || ∇_i∇_j / S² ∫ [∇_i∇_j f · g(x) dx dy] dψ || = ∫ (δ(x))² sinθ cosθ log sinθ dθ dψ | Hörmander duality operator | ROT | SYMB
+- INV.402 | δ · O(x) = [ || ∇_i∇_j f dη || / ∫ e^(2 sinθ cosθ) · log sinθ dθ ] | open-set group operator | ROT | SYMB
+- INV.403 | iℏψ = || ∫ (∂/∂z) [ i(xy + yx) / (z − z̄) ] dm dψ || | complex-variable wave equation | QUANTUM | SYMB
+- INV.404 | δ(x) ∫_C R² sinθ cosθ = Γ(p + q) | complex curvature in gamma function | GAMMA,ROT | SYMB
+- INV.405 | (□ + m) · ψ = ( ∇_i∇_j f | g_μν(x) + v ∇_i∇_j ) ∫ [ m(x) ( rot · div(E, E1) ) ] dm dψ | electroweak + strong | QUANTUM,ROT | SYMB
+- INV.406 | G_μν = □ ∭ (x,y,z)³ dx dy dz = (8πG/c⁴) T_μν | Einstein tensor as cubic volume | SR,MANIFOLD | SYMB
+- INV.407 | (d/dV) F = δ(x) ∫ ∇_i∇_j f dη_μν | d'Alembertian duality | MANIFOLD | SYMB
+- INV.408 | x^n + y^n = z^n ,  δ(x) ∫ z^n = (d/dV) z³ ,  (x,y)·(δm, ∂m) = (x,y)·(z^n, f) ,  n ⊥ x ,  n ⊥ y = 0 | Fermat singularity constancy | OTHER | SYMB
+- INV.409 | ∨(∇_i∇_j f) · XOR(□ψ) = (d/df) ∫_M F dV | logical operators on fields | OTHER | SYMB
+- INV.410 | ∂(x) ∫ z³ = (d/dV) z³ ,  Σ_{k=0}^∞ 1/(n+1)^s = O(x) | zeta series as operator | ZETA | CALC: Σ(n+1)^{-s}=ζ(s)
+- INV.411 | ∫ O(x) dx = δ(x) π(x) f(x) ,  O(x) = ∫ σ(x)² sinθ cosθ log sinθ dθ dψ | Fermat singularity operator | ROT,ZETA | SYMB
+- INV.412 | y = x ,  O(x) = || ∇_i∇_j f / S² ∫ [∇_i∇_j f ∘ g(x) dx dy] || | operator norm | MANIFOLD | SYMB
+- INV.413 | lim_{n→1} Σ_{k=0}^∞ a_k/a_{k+1} = (log sinθ dx)' = cosθ / sinθ = x/y | cot as series ratio | ROT | CALC: d/dθ ln sinθ = cotθ
+- INV.414 | lim_{n→1} Σ_{k=0}^∞ a_k f_k = 1/(1−z) | geometric sum | OTHER | SYMB
+- INV.415 | □ψ = (8πG/c⁴) T_μν ,  (∂/∂f) □ψ = 4πGρ ,  ∫ ρ(x) = □ψ ,  V(x)/f(x) = ρ(x) | Einstein → Poisson | SR,MANIFOLD | SYMB
+- INV.416 | (∂^n/∂f^(n−1)) F = ∫ [D²ψ ⊗ h_μν] dm = (P1 P3 ... P_{2n−1}) / (P0 P2 ... P_{2n+2}) | Wallis-type product | ZETA | SYMB
+- INV.417 | ⊗ ∇M1 ⊕ ∇M1 = σ_n(χ,x) ⊕ σ_(n−1)(χ,x) = {f,h} ∘ [f,h]^(−1) = g^(−1)(x)_μν d_x g_μν(x) | anticommutator/commutator | QUANTUM,MANIFOLD | SYMB
+- INV.418 | Σ_{k=0}^∞ ∇^n nCr f^n(x) ≅ Σ_{k=0}^∞ ∇^n ∇^(n−1) nCr f^n(x) g^(n−r)(x) | binomial derivative series | OTHER | SYMB
+- INV.419 | Σ_{k=0}^∞ (∂^n/∂^(n−1) f) ∘ ζ(x)/n! = lim_{n→1} Σ a_k f_k ;  (f)^n = nCr f^n(x) g^(n−r)(x) · δ(x,y) | zeta Taylor series | ZETA | SYMB
+- INV.420 | (e^(iθ))' = i e^(iθ) ,  ∫ e^(iθ) = (1/i) e^(iθ) ,  i h c = G ,  h c = (1/i) G | Euler derivative/integral (×3) | ROT | CALC: d/dθ e^{iθ}=ie^{iθ}
+- INV.421 | (□ψ, ∇f²) · ( (8πG/c⁴) T_μν, 4πGρ ) = ( −(1/2) m v² + m c², (1/2) k T² + (1/2) m v² ) · [[cosθ, −sinθ],[sinθ, cosθ]] = [[1,0],[0,i]] | field eq pair rotated = phase matrix (rotation + relativistic energy) | ROT,SR | SYMB
+- INV.422 | ({f,g}/[f,g])' = i² ,  ∇f² / □ψ = (1/2) ∬ {f,g}/[f,g] = 1/(2i) | anticommutator ratio | QUANTUM | SYMB
+- INV.423 | ∬_1 (y log y)^(1/2) dy^m = (1/2) ∬_1 (x log x)² dx^m = 1/(2i) ,  (d/dt) g_ij = −2R_ij | entropy integrals = 1/(2i) | ENTROPY | SYMB
+- INV.424 | (∂/∂x)( f(x) g(x) )' = ⊕ ∇_i∇_j f(x) g(x) ;  ∫ f'(x) g(x) dx = [f(x) g(x)] − ∫ f(x) g'(x) dx | integration by parts | OTHER | SYMB
+- INV.425 | f = n ν λ ,  λ = x/l ,  ∫ d n ν λ = f(x) ,  x f(x) = F(x) ,  [f(x)] = ν h (see INV.200) | wave relation | QUANTUM | SYMB
+- INV.426 | p_x = m v ,  λ(x) = esperial f(x) ,  [F(x)] = 1/(1−z) ,  0 < tanθ < i ,  −1 < tanθ < i ,  −1 ≤ sinθ ≤ 1 ,  −1 ≤ cosθ ≤ 1 | momentum and trig bounds | ROT,QUANTUM | SYMB
+- INV.427 | R∇E+ = f(x) ∇ e^(x log x) ,  Q∇C+ = (d/df)F(x) ∇ ∫ δ(x) f(x) dx ,  E+∇f = e^(x log x) ∇ n! f(x) / E(X) (see INV.155-158) (×2) | category Laplace operator | ENTROPY | SYMB
+- INV.428 | (u + v + w)(x + y + z) / Γ | Seifert structure Maxwell term | GAMMA | SYMB
+- INV.429 | exp( ∇(R+ ∩ E+), Δ(C ⊃ R) ) = π(R, C∇E+) = rot(E1, div E2) (see INV.153) (×3) | fundamental group = curl | ROT | SYMB
+- INV.430 | d(R∇E+) = Δf(x) ∘ E+(x) ;  □x = ∫^{∇i∇j(R+E+)} ∇(R+∩E+) d□x ;  x^n + y^n = z^n → □x = ... | material quantum potential | MANIFOLD | SYMB
+- INV.431 | □ = −2(T−t) | R_ij + ∇∇f + (1/(−2(T−t))) g²_ij | heat equation (Perelman soliton) | ENTROPY,MANIFOLD | SYMB
+- INV.432 | □ = −2 ∫ (R + ∇_i∇_j f) / −(R + Δf) e^(−f) dV | heat functional | ENTROPY,MANIFOLD | SYMB
+- INV.433 | R∇E+ = Δf(x) ∘ E+(x) ,  d(R∇E+) = ∇_i∇_j(R + E+) ,  R∇E+ = f(x) ,  f(x) = M1 | category relations | MANIFOLD | SYMB
+- INV.434 | −2(T−t) | R_ij + ∇∇f = ∬_1 (y log y)^(1/2) dy^m ;  1/(−2(T−t)) | g²_ij = ∬_1 (x log x)² dx^m | soliton terms as entropy integrals | ENTROPY,MANIFOLD | SYMB
+- INV.435 | (□ + m²) ϕ = 0 ,  (γ^n ∂_n + m²) ψ = 0 | Klein–Gordon and Dirac (mass² sic) | QUANTUM,SR | SYMB
+- INV.436 | □ = (δϕ + m²) ψ ,  (δϕ + m² c) ψ = 0 ,  E = mc² ,  E = −(1/2) m v² + m c² ,  □ψ² = (∂ϕ + m²) ψ | field-energy relations | QUANTUM,SR | SYMB
+- INV.437 | □ϕ² = (8πG/c⁴) T_μν ,  ∇ϕ² = 8πG(p/c³ + V/S) ,  (d/dt) g_ij = −2R_ij ,  f(x) + g(x) ≥ f(x) ∘ g(x) | field equations bundle | SR,MANIFOLD | SYMB
+- INV.438 | ∫_β^α a(x−1)(y−1) ≥ 2 ∫ f(x) g(x) dx | integral inequality | OTHER | SYMB
+- INV.439 | m² = 2πT ( (26 − D_n)/24 ) ,  r^n = 1/(1−z) | bosonic-string mass (critical dim 26) | QUANTUM | CALC: D=26 → m²=0; D=4 → m²=2πT·22/24
+- INV.440 | (∂ψ + m² c) ϕ = 0 ,  T_μν = (1/2) m v² − (1/2) k x² | Lagrangian as stress (×2) | QUANTUM | SYMB
+- INV.441 | ∫ [f(x)] dx = || ∫ f(x) dx || ,  ∫ ∇x dx = Δ Σ f(x) dx ,  (e^(iθ))' = i e^(iθ) | misc | ROT | SYMB
+- INV.442 | T_μν = n h ν ;  T_μν = (1/2) m v² − (1/2) k x² ≥ m c² − (1/2) m v² | light cannot exceed ½kx² energy | SR,QUANTUM | SYMB
+- INV.443 | Z ∈ R ∩ Q ,  R ⊂ M+ ,  C+ ⊕_{k=0}^n H_m ,  E+ ∩ R+ ,  M+ = Σ_{k=0}^n C+ ⊕ H_M ,  M+ = Σ_{k=0}^n C+ ∪ H+ ,  E2 ⊕ E1 ,  ... ,  (d/df)F = ⊕ ∇M+− , ⊕ ∇C+− | eight differential structures in Laplace eq | MANIFOLD | SYMB
+- INV.444 | ∇ ∘ Δ = ∇ Σ f(x) / Δ → mesh f(x) dx ,  ∂x/∇ → ∂xy ,  (d/dx) f(x) (d/dx) g(x) / □x = −[f, g] | operator mesh / commutator | QUANTUM | SYMB
+- INV.445 | lim_{x→∞} Σ f(x) dx = ∫ dx ,  ∇ ∫ dx | Riemann-sum limit | OTHER | SYMB
+- INV.446 | ( E2 ⊕_{k=0}^n E1 ) · (R− ⊂ C+) = ⊕_{k=0}^n ∇C+− ,  ∨ ∫^{C+−} ∇H_m | category of complex surface | MANIFOLD | SYMB
+- INV.447 | Δ(M+− ∇C+−) = ∧ M+− ⊕_{k=0}^n C+− ,  ∃(M+− ∇C+−) = XOR( ⊕_{k=0}^n ∇M+− ) ,  −[E+ ∇R+−] = ∇+ ∇− C+− | logical-category operators | MANIFOLD | SYMB
+- INV.448 | ∫ dx, ∂x, ∇_i∇_j, Δx → E+ ∇M1 ,  E+ ∩ R ∈ M1 ,  R∇C+ | operator chain | MANIFOLD | SYMB
+- INV.449 | [[cos x, sin x],[sin x, −cos x]] [x; y] = [[1,0],[0,−1]] | reflection matrix = σ_z | ROT,QUANTUM | CALC: equals σ_z at x=0
+- INV.450 | [[cos x, −1],[1, −sin x]] [cos x; sin x] = [[1,0],[0,−1]] (×3) | operator matrix acting on unit circle vector | ROT,QUANTUM | CALC: LHS=(cos²x−sin x, cos x−sin²x)
+- INV.451 | Σ_{k=0}^n cos kθ = sin((n+1)θ/2) / sin(θ/2) · cos(nθ/2) | Lagrange cosine-sum identity | ROT | CALC: verify n=5, θ=0.3 numerically
+- INV.452 | Σ_{k=0}^n sin kθ = sin((n+1)θ/2) / sin(θ/2) · sin(nθ/2) | Lagrange sine-sum identity | ROT | CALC: verify numerically
+- INV.453 | sinθ = (e^(iθ) − e^(−iθ))/(2i) ,  cosθ = (e^(iθ) + e^(−iθ))/2 ,  tanθ = (e^(iθ) − e^(−iθ)) / (i(e^(iθ) + e^(−iθ))) | Euler forms of trig functions | ROT | CALC: exact identities
+- INV.454 | lim_{θ→0} sinθ/θ → 1 ,  lim_{θ→0} cosθ/θ → 1 (sic; diverges) | trig limits | ROT | CALC: sinθ/θ→1; cosθ/θ→∞
+- INV.455 | (e^(iθ))' = 2 ,  ∇f = 2 ,  e^(iθ) = cos θ + i sin θ | derivative set to 2 (sic) | ROT | SYMB
+- INV.456 | → [ cos²θ + sinθ + cosθ − 2 sin²θ ] [[1,0],[0,−1]] | trig combination times σ_z | ROT | SYMB
+- INV.457 | 2 sinθ cosθ = 2nλ sinθ | Bragg-like / double-angle relation | ROT,QUANTUM | CALC: sin2θ; Bragg is nλ=2d sinθ
+- INV.458 | lim_{θ→0} (1/θ)[sinθ; cosθ][[θ,1],[1,θ]][cosθ; sinθ] = [[1,0],[0,−1]] ,  f^(−1)(x) x f(x) = 1 (see INV.218) | rotation limit σ_z | ROT,QUANTUM | SYMB
+- INV.459 | sinθ = λ/d ,  −p y1 sin 90° ≤ sinθ ≤ p y2 sin 90° ,  λ = h/(mv) | diffraction + de Broglie | QUANTUM,ROT | CALC: λ=h/(mv), e.g. electron at 1e6 m/s → 7.27e-10 m
+- INV.460 | λ2/λ1 = sinθ / sin(θ/2) ,  h ,  λ' ≥ 2h ,  ∫ sin 2θ = ||x − y|| | uncertainty-type bound | QUANTUM,ROT | SYMB
+- INV.461 | D²ψ = ∇ ∫ (∇_i∇_j f)² dη | second variation of psi | MANIFOLD | SYMB
+- INV.462 | E = mc² ,  E = (1/2) m v² − (1/2) k x² ,  G_μν = (1/2) Λ g_ij ,  □ = (1/2) k T² | energy forms | SR | CALC: mc²
+- INV.463 | ker f / im f ≅ S^μν_m ,  S^μν_m = π(χ,x) ⊗ h_μν | sheaf homology | MANIFOLD | SYMB
+- INV.464 | D²ψ = O(x)( p/c³ + V/S ) ,  V(x) = D²ψ ⊗ M+_3 ,  S^μν_m ⊗ S^μν_n = −2R_ij / V(τ) [D²ψ] | sheaf/Selberg | MANIFOLD | SYMB
+- INV.465 | ∇_i∇_j [S^mn_1 ⊗ S^mn_2] = ∫^{V(τ)} f(x) [D²ψ] = ∫^{V(τ)} f(x) O(x) | Hessian of sheaf product | MANIFOLD | SYMB
+- INV.466 | z(x) = g(cx + d) / ( f(ax + b) h(ex + l) ) = ∫^{V(τ)} f(x) O(x) | Möbius-like ratio | OTHER | SYMB
+- INV.467 | V(x)/f(x) = m(x) ,  O(x) = m(x)[D²ψ(x)] ,  (d/df)F = m(x) ,  ∫ F dx^m = Σ_{k=0}^∞ m(x) | mass function (×4) | MANIFOLD | SYMB
+- INV.468 | ∫ ∇ψ² d∇ψ = □ψ ,  □ψ = ∫ [D²ψ ⊗ h_μν] dm | box-psi as integral | MANIFOLD | SYMB
+- INV.469 | O(x) = [ ∇_i∇_j ∫ ∇f(x) dη ]^(1/2) ,  δ·O(x) = [ ∇_i∇_j ∫ ∇g(x) dx_ij ]^(iy) | real part 1/2 and imaginary iy split | ZETA | SYMB
+- INV.470 | ||ds²|| = e^(−2πT|ϕ|) [ O(x) + δO(x) ] dx^μ dx^ν + lim_{n→1} Σ_{k=0}^∞ a_k f_k | warped metric with critical-line operators | ZETA,MANIFOLD | SYMB
+- INV.471 | log(x log x) ≥ 2 (y log y)^(1/2) ,  (y log y)^(1/2) / log(x log x) ≤ 1/2 | entropy inequality (×5) | ENTROPY | CALC: test on x,y>1
+- INV.472 | δ(x) = (reality of value)/(exist of value) ≤ 1 ;  log(x log x) = □ψ ;  (y log y)^(1/2) = ∇ψ² | quota metric of expansion/freeze-out | ENTROPY | SYMB
+- INV.473 | l(x) = 2x² + qx + r = (ax + b)(cx + d) + r ,  e^(l(x)) = (d/df) L(x) ,  G_μν = g(x) ∧ f(x) | Weil quadratic | OTHER | SYMB
+- INV.474 | V(τ) = ∬ exp[L(x)] dx^m + O(N^(−1)) ,  g(x) = L(x) ∘ ∬ e^(2x² + 2x + r) dx^m | lens-space path integral | QUANTUM | SYMB
+- INV.475 | ||ds²|| = || (d/df) L(x) || ,  η = [∇_i∇_j ∫ ∇f(x) dη]^(1/2) ,  h̄ = [∇_i∇_j ∫ ∇g(x) d_ij]^(iy) | KK decomposition | ZETA,MANIFOLD | SYMB
+- INV.476 | (1/τ) ( N/2 + r(2ΔF − |∇f|² + R) + f ) mod N^(−1) | W-entropy integrand (see INV.193) | ENTROPY | SYMB
+- INV.477 | (x²/a) cos x + (y²/b) sin x = r² | curvature equation (rotated conic) (×2 incl INV.358) | ROT | SYMB
+- INV.478 | S²_m = || ∫ π r² dr ||² ,  V(τ) = r² × S²_m ,  S^mn_1 ⊗ S^mn_2 = ∫ [D²ψ ⊗ h_μν] dm | area-volume | MANIFOLD | CALC: ∫_0^R πr²dr = πR³/3
+- INV.479 | V(x) = ∫ (1/√(2τq)) (exp L(x) dx) + O(N^(−1)) | reduced volume variant | MANIFOLD | SYMB
+- INV.480 | V(x) = 2 ∫ (R + ∇_i∇_j f) / −(R + Δf) e^(−f) dV ,  V(τ) = ∫ τ(p)^(−n/2) exp( −(1/√(2τq)) L(x) dx ) + O(N^(−1)) | Perelman reduced volume | MANIFOLD,ENTROPY | SYMB
+- INV.481 | Zeta(x, h) = exp( q f(x) )^m / m | "zeta" as exponential (Weil-type) (×2) | ZETA | SYMB
+- INV.482 | |x y z; u v w|² / g_μν(x) = ( f(x) dx^μ dx^ν, f'(y) dy^μ dy^ν, f''(z) dz^μ dz^ν ) · (u, v, w) = [[1,0,0],[0,1,0],[0,0,i]] ≅ g(x,y,z) / ( f(a,b,c) · h^(−1)(u,v,w) ) | complex duality matrix | QUANTUM,MANIFOLD | SYMB
+- INV.483 | (d/df) ∭ □ψ dψ_xy = V(□ψ) ,  lim_{n→∞} Σ_{k=0}^∞ V_k(□ψ) = (∂/∂f) i h c | quark emergence | QUANTUM | SYMB
+- INV.484 | lim_{n→∞} Σ_{k=0}^∞ G_μν = f(x) ∘ m(x) ,  V(x)/f(x) = m(x) | universe | MANIFOLD | SYMB
+- INV.485 | (a_k f_k)' = nC0 a_0 f^n + nC1 a_1 f^(n−1) ... nC(r−1) a_n f^(n−1) | binomial derivative | OTHER | SYMB
+- INV.486 | ∫ a_k f_k dx_k = (a_(n+1)/(k+1)) f^(n+1) + (a_(k+2)/(k+2)) f^(k+2) + ... + (a_0/k) f_k | termwise integration | OTHER | SYMB
+- INV.487 | (∂/∂f) □ψ = (1/4) g²_ij (×2) ,  ( ∇ψ² / □ψ )' = 0 (×2) | box-psi rate | MANIFOLD | SYMB
+- INV.488 | (y log y)^(1/2) / log(x log x) = (1/2)/(1/(2i)) | entropy ratio = i | ENTROPY | SYMB
+- INV.489 | {f,g}/[f,g] = 1/i ,  ({f,g}/[f,g])' = i² ,  (i)² → (1/4) g_ij ,  F_m^t = (1/4) g²_ij ,  f(r) = (1/4)|r|² ,  4 f(r) = g²_ij | fermion/boson quotient | QUANTUM | SYMB
+- INV.490 | (1/y)·(1/y')·(y''/y')·(y'''/y'')··· = nCr y2·y3··· / (nCr y1 y2 ···) | derivative ratio product | OTHER | SYMB
+- INV.491 | (∂y/∂x)·(∂/∂y) f(y) = y' · f'(y) | chain rule | OTHER | SYMB
+- INV.492 | ∫ l × l dm = (l ⊕ l) m ,  = (d/dx^μ)(d/dx^ν) f_μν · ∇ψ² = □ψ | Planck-scale symmetry | OTHER | SYMB
+- INV.493 | ∇ψ² / □ψ = 1/2 ,  l = 2πr ,  V/S = (4πr³)/(4πr³) (sic) ,  2πr = 2·(πr²) = πr² ,  H3 = 2 ,  π(H3) = 0 | circle circumference/area (sic) | OTHER | CALC: l=2πr; V/S for sphere = r/3
+- INV.494 | f(r) = (1/2) √(1 + f'(r)) / f(r) + m g f(r) | Euler–Lagrange radial function (×2) | OTHER | SYMB
+- INV.495 | S^m_n = | S2 S1 − S1 S2 | ,  □ψ = V · S^m_n ,  G_μν ≅ R_μν | commutator of surfaces | MANIFOLD | SYMB
+- INV.496 | ∇_i∇_j(□ψ) dψ_xy = (∂/∂f) □ψ · T_μν = (8πG/c⁴)(T_μν)² ,  (χ ⊕ π) = ∭ □ψ d³ψ = div(rot E, E1) · e^(−i x log x) | squared Einstein + Maxwell phase | SR,ROT,ENTROPY | SYMB
+- INV.497 | σ(H_n ⊗ K_m) = E_n × H_m ,  H_n = [∇_i∇_j ∫ ∇g(x) dx_i dx_j]^(iy) ,  K_m = [∇_i∇_j ∫ ∇f(x) dη]^(1/2) | Von Neumann world line | ZETA,MANIFOLD | SYMB
+- INV.498 | ||ds²|| = | σ(H_n × K_m) ,  σ(χ,x) × π(χ,x) = (∂/∂f) L(x) ,  V'_τ(x) = (∂/∂V) L(x) (×2) | network theorem | MANIFOLD | SYMB
+- INV.499 | (□ψ)' = (∂/∂f) ⊕ ( ∭ f(x,y,z) dx dy dz )' dψ ;  V'_τ(x) = same (×3) | box-psi derivative | MANIFOLD | SYMB
+- INV.500 | (∂/∂V) L(x) = V(τ) ∬ e^(∫ x log x dx + O(N^(−1))) dψ | Lagrangian volume derivative | ENTROPY | SYMB
+- INV.501 | (d/df) Σ_{k=1}^n Σ_{k=0}^∞ a_k f_k = (d/df) m(x) ,  V(x)/f(x) = m(x) | mass series | OTHER | SYMB
+- INV.502 | 4 V'_τ(x) = g²_ij ,  (d/dl) L(x) = σ(χ,x) × V_τ(x) | volume derivative = metric square | MANIFOLD | SYMB
+- INV.503 | ||ds²|| = e^(−2πT|ψ|)[η_μν + h̄_μν(x)] dx^μ dx^ν + T² dψ² (×3 more) | warped metric | MANIFOLD | SYMB
+- INV.504 | f^(2)(x) = [ ∇_i∇_j ∫ ∇f^(5) dη ]^(1/2) = [ f^(2)(x) dη ]^(1/2) | fifth-dim reduction | MANIFOLD | SYMB
+- INV.505 | ∇_i∇_j ∫ F(x) dη = (∂/∂f) F ,  ∇f = (d/dx) f ,  ∇_i∇_j ∫ ∇f dη = (∂/∂x_i)(∂/∂x_j)((d/dx) f) | Hessian identifications | MANIFOLD | SYMB
+- INV.506 | (z3 z2 − z2 z3)/(z2 z1 − z1 z2) = ω ,  (z̄3 z2 − z̄2 z3)/(z̄2 z1 − z̄1 z2) = ω̄ ,  ω · ω̄ = 0 ,  z_n = ω − {x} ,  z_n · z̄_n = 0 ,  z⃗_n · z̄⃗_n = 0 | complex cross-ratio network | ROT | SYMB
+- INV.507 | [f, g] × [g, f] = fg + gf = {f, g} | commutator product = anticommutator (sic) | QUANTUM | SYMB
+- INV.508 | V(τ) = ∬ e^(∫ x log x + O(N^(−1))) dψ | route-entropy volume (×3) | ENTROPY | SYMB
+- INV.509 | (□ψ)' = 4 v⃗(x) ,  (∂/∂V) L(x) = m(x) ,  V(τ) = ∫ (1/√(2τq)) exp[L(x)] dψ + O(N^(−1)) | velocity / volume | MANIFOLD | SYMB
+- INV.510 | V(τ) = ∭ V/S² dm ,  f(r) = ... ,  log(x log x) ≥ 2(y log y)^(1/2) ,  F_m^t = (1/4) g²_ij ,  (d/dt) g_ij(t) = −2R_ij | summary bundle | MANIFOLD,ENTROPY | SYMB
+- INV.511 | ∇_i∇_j v = (1/2) m v² + m c² ,  ∫ ∇_i∇_j v dv = (∂/∂f) L(x) | relativistic energy as Hessian | SR | CALC: ½mv²+mc²
+- INV.512 | (□ψ)² = −2 ∫ ∇_i∇_j v d²v ,  (□ψ)² = ( ∇ψ²/□ψ )' = (d/df) ∬_1 (x log x)² dm | box-psi squared | ENTROPY | SYMB
+- INV.513 | ⊕ ∇M+_3 = ∫ ∨(R + ∇_i∇_j f)² / ∃(R + Δf) dV = (x,y,z)·(u,v,w)/Γ | 3-manifold direct sum | GAMMA,MANIFOLD | SYMB
+- INV.514 | ⊕ C+− = ∫ exp[ ∫ ∇_i∇_j f dη ] dψ = L(x) · (∂/∂l) F(x) = (□ψ)² | complex sum = path integral | QUANTUM | SYMB
+- INV.515 | l = √(hG/c³) ,  T_μν = (1/2) k l² + (1/2) m v² ,  E = mc² − (1/2) m v² | Planck length (h not ℏ) and energies | QUANTUM,SR | CALC: √(hG/c³)=4.05e-35 m
+- INV.516 | e^(x log x) = x^x ,  x = log x^x / log x ,  y = x ,  x = e | x^x identity | ENTROPY | CALC: e^{x ln x}=x^x
+- INV.517 | ∫_1 (x log x) dx = i ∫ x log x dx + ∫_1 (x log x) dx | variant of INV.29 with + | ENTROPY | SYMB
+- INV.518 | ∬_1 (x log x)² dx^m = i (1/2) x² ;  ∬_1 (x log x)² dx^m = i ∬_M dx^m ≤ 1/(2i) + x² | entropy bounds | ENTROPY | SYMB
+- INV.519 | E = −(1/2) m v² + m c² (×4 overall) | "relativistic" energy minus kinetic | SR | CALC: mc²−½mv²
+- INV.520 | lim_{x→∞} ∬_1 (x log x)² dx^m ≥ 1/(2i) ,  (d/df) ∬_1 (x log x)² dx^m = 1/(2i) | entropy limit | ENTROPY | SYMB
+- INV.521 | lim_{x→∞} x² / e^(x log x) = 0 | x²/x^x → 0 | ENTROPY | CALC: x=10 → 1e-8
+- INV.522 | ∫ dx → ∂f → dx → cons | operator chain | OTHER | SYMB
+- INV.523 | (□ψ)' = ( ∃ ∫ ∨(R + ∇_i∇_j f) e^(−f) dV )' dψ | heat equation entropy flow | ENTROPY,MANIFOLD | SYMB
+- INV.524 | ⊕ M+_3 = (∂/∂f) L(x) ,  (∂/∂l) L(x) = ∇_i∇_j ∫ ∇f(x) dη ,  L(x) = V(x)/f(x) ,  l(x) = L'(x) | Lagrangian relations | MANIFOLD | SYMB
+- INV.525 | V'(τ) = ∬ e^(∫ x log x dx + O(N^(−1))) dψ ;  F = same | Weil's theorem integral (×2) | ENTROPY | SYMB
+- INV.526 | T_μν = ∭ V(x)/S² dm ,  S² = π r² · S(x) = 4π r³ / τ(x) | stress from volume/area | MANIFOLD | SYMB
+- INV.527 | η = ∇_i∇_j ∫ ∇f(x) dη ,  h̄ = ∇_i∇_j ∫ ∇g(x) dx_i dx_j ,  δO(x) = [∇_i∇_j ∫ f(x) dη]^(1/2+iy) | metric pieces | ZETA,MANIFOLD | SYMB
+- INV.528 | Z(x, h) = lim_{x→∞} Σ_{k=0}^∞ q T^m / m = δ(x) | zeta generating series | ZETA | SYMB
+- INV.529 | l(x) = 2x² + p x + q ,  m(x) = lim_{x→∞} Σ_{k=0}^∞ (q x^m)' / f(x) | quadratic and mass | OTHER | SYMB
+- INV.530 | Z(T, X) = exp( Σ_{m=1}^∞ q^k T^m / m ) ,  Z(x, h) = exp( q f(x) )^m / m | Weil (Hasse–Weil) zeta function | ZETA | CALC: Z(T)=exp(Σ N_m T^m/m); for P¹ over F_q: 1/((1−T)(1−qT))
+- INV.531 | lim_{x→1} mesh m/(m+1) = 0 ,  ∫ x^m = x^m/(m+1) (sic; x^{m+1}/(m+1)) | power integral | OTHER | SYMB
+- INV.532 | (d/df) ∫ x^m = m x^m ,  lim_{x→1} mesh(x) = lim_{m→∞} m/(m+1) ,  lim_{x→1} Σ a_k f_k = α | mesh limits | OTHER | CALC: m/(m+1)→1
+- INV.533 | (∂/∂V) ||ds²|| = T_μν ,  V(τ) = ∫ e^(x log x) dψ = l(x) | metric volume derivative = stress | MANIFOLD | SYMB
+- INV.534 | R_ij = (∂/∂x_i)(∂/∂x_j) T_μν ,  G_μν = R_μν T_μν | Ricci as Hessian of stress | MANIFOLD | SYMB
+- INV.535 | F(x) = ∬ e^(∫ x log x dx + O(N^(−1))) dψ ,  (d/dV) F(x) = V'(x) | route integral | ENTROPY | SYMB
+- INV.536 | T_μν = R_μν ,  T_μν = ∭ V/S² dm ,  δO(x) = [D²ψ ⊗ h_μν] dm | stress = Ricci | MANIFOLD | SYMB
+- INV.537 | ∇(□ψ)' = [ ∇_i∇_j ∫ ∇f(x) dη ]^(1/2+iy) | critical-line gradient | ZETA | SYMB
+- INV.538 | ( f(x), g(x) )' = (A_μν)' [[d_x, δ(x)],[ε(x), ∂_x]] · ( f(x,y), g(x,y) ) = [[1,0],[0,−1]] | complex variable ODE matrix | QUANTUM | SYMB
+- INV.539 | δ(x) · O(x) = [[1,0],[0,−1]]^(1/2) | operator = sqrt(σ_z) | QUANTUM | CALC: diag(1,i)
+- INV.540 | p = e^(x log x), e^(−x log x) ;  p = ⊕ (iℏ∇) ⊕ L | prime range via x^x | ZETA,QUANTUM | SYMB
+- INV.541 | ||ds²|| = 0, 1 (Hilbert manifold of genus 3) | metric norm values | MANIFOLD | SYMB
+- INV.542 | ||ds²|| = e^(−2πT||ψ||)[η_μν + h̄(x)] dx^μν + T² d²ψ = [∞]/e^(−2πT||ψ||) + T² d²ψ ≥ [∞]/e^(−2πT||ψ||) · T² d²ψ = (n/(n+1)) Γ_n = ∫ e^(−x) x^(1−t) dx | metric → gamma | GAMMA,MANIFOLD | SYMB
+- INV.543 | lim_{x=∞} Σ_{x=0}^∞ n/(n+1) = a_k f_k | series | OTHER | SYMB
+- INV.544 | β(p,q) = ∫ e^(−sinθ cosθ) ∫ sinθ cosθ dθ = ∫ Γ(γ)' dx^m | beta via rotation integral | BETA,ROT,GAMMA | CALC: ∫_0^{π/2} sinθcosθ dθ=1/2
+- INV.545 | ∫ Γ(γ)' dx^m = ∫ Γ dx^m · (d/dγ) Γ ≤ ∫ Γ dx^m + (d/dγ) Γ = ⊕(iℏ∇)⊕L' ∫ ⊕(iℏ∇)⊕L dx^m ,  ⊕(iℏ∇)⊕L = n | gamma inequality (repeat of INV.100) | GAMMA,QUANTUM | SYMB
+- INV.546 | β(p,q)^(−1) = Γ(p)Γ(q)/Γ(p+q) (sic; this is β itself) | inverse beta | BETA,GAMMA | CALC: B(p,q)=Γ(p)Γ(q)/Γ(p+q)
+- INV.547 | √g = 1 ;  Γ(p+q)/(Γ(p)Γ(q)) = β(p,q) (sic; = 1/B) | "Fermat theorem" from factoring | BETA,GAMMA | CALC: 1/B(p,q)
+- INV.548 | x^n + y^n ≥ z^n | Fermat inequality form | OTHER | SYMB
+- INV.549 | (Γ(p)Γ(q))² − Γ(p,q)² = 0 ;  (Γ(p)Γ(q) − Γ(p,q))(Γ(p)Γ(q) + Γ(p,q)) = 0 | difference of squares for gamma | GAMMA | SYMB
+- INV.550 | ( (d/dγ) Γ'(γ) ) ( ∬ Γ'(γ) dx^m ) ( e^π − π^e ) = (□ − □')(□ + □') | factorisation into gravity/antigravity | GAMMA,OTHER | CALC: e^π−π^e = 0.6815
+- INV.551 | ( 2(sin(i x log x) + cos(i x log x)) )( cos(i x log x) − i sin(i x log x) ) / ( 2(sin(i x log x) + cos(i x log x))( cos(i x log x) + i sin(i x log x) ) ) = 0 | ratio of circle functions (claimed 0) | ROT,ENTROPY | CALC: ratio = e^{−2i·(ix lnx)}=x^{2x}≠0
+- INV.552 | = (99 − 96)(94 + 92)(90 − 87)(85 + 82)(80 − 78) ··· = 0 | alternating prime-ish product | ZETA | SYMB
+- INV.553 | β(p,q)^(−1) = 1 / ( (5−3)(7+13)(17−19)(23+29)(31−37)(41+47)(51−53) ··· ) = 1/( 2·20·(−2)·52·(−6)·88·(−2) ··· ) = ∫_1 β(p,q) dx = ∫_1 t² dt | prime-pair product for inverse beta | BETA,ZETA | CALC: 2·20·(−2)·52·(−6)·88·(−2) = −2196480 (partial)
+- INV.554 | ( β(p,q) − β(p,q)^(−1) )( β(p,q) + β(p,q)^(−1) ) = 0 | β = ±1/β ⇒ β² = 1 | BETA | CALC: β=±1
+- INV.555 | Γ(2) = β(5, −3) = Γ(5)Γ(−3)/Γ(5−3) | Γ(2) via beta with negative arg (sic; Γ(−3) is a pole) | GAMMA,BETA | CALC: Γ(2)=1; Γ(−3) undefined (pole)
+- INV.556 | Γ(2) = ∫ e^(−2) 2^(t−1) dx = √e = ζ(s) | claimed Γ(2)=√e=ζ(s) (sic) | GAMMA,ZETA | CALC: Γ(2)=1 vs √e=1.6487
+- INV.557 | β(p,q) = Γ(−1) = −1/12 | claimed; relates to ζ(−1)=−1/12 (Γ(−1) is actually a pole) (×3) | GAMMA,ZETA,BETA | CALC: ζ(−1)=−1/12 = −0.08333 (mpmath.zeta(−1))
+- INV.558 | x = (1/(2πi)) log( √(1 − 1/□²) ) | "complex manifold of special relativity": log of Lorentz factor sqrt(1−1/□²) (×2) | SR,ROT | CALC: with □=c/v, √(1−v²/c²)=1/γ; x = −ln γ/(2πi) = i·ln γ/(2π); e.g. v=0.6c → γ=1.25 → x = 0.03551 i
+- INV.559 | □ = 2( sin(i x log x) + cos(i x log x) ) | box (antigravity) circle function (repeat of INV.6) | ROT | SYMB
+- INV.560 | Γ(5) = 3 = □ = 3 ;  Γ(3) = 2 = □ = 2 ;  Γ(2) = 1 = □ = 1 | prime rank ↔ gamma (sic; Γ(5)=24, Γ(3)=2, Γ(2)=1) | GAMMA,ZETA | CALC: Γ(5)=24, Γ(3)=2, Γ(2)=1
+- INV.561 | e^π = π^e ,  x = √g | pi-e equality claim (sic) | OTHER | CALC: 23.1407 ≠ 22.4592
+- INV.562 | x = 2 e^(−1) e^(−1) ,  √g = 1 ,  √g = √e | metric root claims | OTHER | CALC: 2e^{−2}=0.2707
+- INV.563 | 1 / (x log x) = √g ;  e^(x log x) ,  x = 2 ,  2² = 4 ,  2² = e^(2 log 2) ,  4 = e^(log 4) ,  log 4 = log log 4 = √(4 log 4) = 1 − 2 = 1 (sic) | x^x at 2 and spurious chain | ENTROPY | CALC: 1/(2 ln 2)=0.7213; e^{2ln2}=4
+- INV.564 | Σ_{k=0}^∞ a_k f(x,y)^(a_k) = π(χ,x) = ∫ x log x dx | fundamental group as series | ENTROPY | SYMB
+- INV.565 | β(p,q) / (x log x) = ζ(s) | beta over entropy = zeta (claimed conclusion) | BETA,ZETA,ENTROPY | SYMB
+- INV.566 | π(χ,x) = iπ(χ,x) ∘ f(x) − f(x) ∘ π(χ,x) | non-commutative fundamental group | QUANTUM,MANIFOLD | SYMB
+- INV.567 | ∬_1 (x log x)² dx^m ≥ 1/(2i) (×3) ;  y = x ⇒ ∬_1 (y log y)^(1/2) dy^m ≥ 1/2 | entropy bounds | ENTROPY | SYMB
+- INV.568 | F_m^t ≥ ∫_M (R + ∇_i∇_j f) e^(−f) dV | Perelman F-functional lower bound | ENTROPY,MANIFOLD | SYMB
+- INV.569 | F_t ≥ (2/n) f² | F-functional bound (Perelman: dF/dt ≥ (2/n)F²) | ENTROPY,MANIFOLD | SYMB
+- INV.570 | (d/df) F = 2 ∫ (R + ∇_i∇_j f)² / −(R + Δf) dm (×3) | F-functional derivative | ENTROPY,MANIFOLD | SYMB
+- INV.571 | (d/df) F_t = (1/4) g²_ij | F rate = metric square | MANIFOLD | SYMB
+- INV.572 | f(r) = (1/(2m)) √(1 + f'(r)) / f(r) − m g f(r) ;  m = 1, g = 1 ⇒ f(r) = (1/4)|r|² | Euler–Lagrange solution | OTHER | CALC: f(r)=r²/4
+- INV.573 | ∬_1 (x log x)² dx^m + ∬_1 (y log y)^(1/2) dy^m = 0 | imaginary+real entropy cancellation | ENTROPY | SYMB
+- INV.574 | x^(1/2 + iy) = e^(x log x) | critical-line power = x^x (key claim, ×~10 overall) | ZETA,ENTROPY | SYMB
+- INV.575 | (d/df) F(v_ij, h) = ∫ e^(−f) [ −Δv + ∇_i∇_j v_ij − R_ij v_ij − v_ij ∇_i∇_j + 2<∇f, ∇h> + (R + ∇f²)(v/2 − h) ] | Perelman first variation of F | ENTROPY,MANIFOLD | SYMB
+- INV.576 | F ≥ (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m | F-functional ≥ entropy integrals | ENTROPY | SYMB
+- INV.577 | ζ(2) = 1/4 = π²/6 (sic) | Basel value (1/4 wrong) | ZETA | CALC: ζ(2)=π²/6=1.644934
+- INV.578 | Γ(−1) = −1/12 | claimed (really ζ(−1)) | GAMMA,ZETA | CALC: ζ(−1)=−0.083333
+- INV.579 | β(2, −3) = Γ(2)Γ(−3)/Γ(2 − 3) ;  Γ(2)Γ(−3) / (−1/12) = Γ(2) = ∫ e^(−2) (−2)^(t−1) dx ,  Γ(−3) = ∫ e^3 (−3)^(t−1) dx | beta with negative arg | BETA,GAMMA | CALC: Γ(−3),Γ(−1) poles; limit ratio Γ(−3)/Γ(−1)=1/6 → β(2,−3)=1/6 via reflection limit
+- INV.580 | ∫ e^(−2) e^3 (−2)^(t−1) (−3)^(t−1) dx = ∫ e^1 (−2)^u (−3)^u dx ;  ∫ e^1 (−1) z^n dx = ∫ w e dx = −(log x)' = −1/x | spurious chain | OTHER | SYMB
+- INV.581 | 1 + 1/2 + 1/3 + 1/4 + 1/5 + ··· = −1/12 (sic; harmonic series diverges) | harmonic series claim | ZETA | CALC: diverges; ζ(−1)=1+2+3+…=−1/12 (regularised)
+- INV.582 | β(p,q) = ( β(p,q) )^(−1) | beta self-inverse claim | BETA | CALC: requires β=±1
+- INV.583 | Γ(−1) = 1 + 2 − 3 + 4 − 5 + ··· = −1/12 | regularised series claim (true value: η-type Abel sum of 1−2+3−4… is 1/4) | GAMMA,ZETA | CALC: Abel sum of 1−2+3−4+… = 1/4; ζ(−1)=−1/12
+- INV.584 | β□β = β(p,q) / log x | final: beta-box-beta equals beta over log (logment equation) | BETA,ZETA | SYMB
+
+
+## explorerfiles (Masaaki Yamaguchi, mixed Japanese/English notes, explorerfiles.pdf)
+Note: many equations duplicate invel verbatim; these are cross-referenced as "=INV.n".
+- EXP.1 | f(x) = x² + 1 ,  f | : x → y | example map (injective/surjective discussion) | OTHER | CALC: f(2)=5
+- EXP.2 | T' = ∫ Γ(γ)' dx^m | variation of T as gamma-derivative integral (×2) | GAMMA | SYMB
+- EXP.3 | CH2(OH)–CH(OH)–C(=O)–OH + 2NH4+ → Me/Me–C–CH3/CH2–OH–COOH (garbled organic scheme) | chemical reaction scheme (glyceric acid + ammonium) | OTHER | SYMB
+- EXP.4 | NH2 / NH2–H2N ;  NH–CH2–CH(NH2)–COOH | amino-acid structures | OTHER | SYMB
+- EXP.5 | H2C–CH–CHO–C(=O)–HO + 2NH4+ → Me Me HCHO C(=O) HO | second reaction scheme | OTHER | SYMB
+- EXP.6 | [CH2–C–N–CH2] Cl + ONa + heat → CO2 + H2O + NaCl | combustion/neutralisation of amine chloride | OTHER | SYMB
+- EXP.7 | [CH2–C–N–CH2] Cl + NaO–CH2–C(=O)–CH2–CH3 + heat → CO2 + H2O + NaCl | reaction with sodium alkoxide | OTHER | SYMB
+- EXP.8 | R1[CH2–C(=O)–N(H)]R2 + NaO–CH2–C(=O)–CH2–CH3 + heat → CO2 + H2O + NaCl + R1–C(=O)–OH + R2–NH4+ | amide hydrolysis (Na) | OTHER | SYMB
+- EXP.9 | R1[CH2–C(=O)–N(H)]R2 + KO–CH2–C(=O)–CH2–CH3 + heat → CO2 + H2O + KCl + R1–C(=O)–OH + R2–NH4+ | amide hydrolysis (K) | OTHER | SYMB
+- EXP.10 | Na : 10/11 mol ,  K : 25/19 mol (per 1 ml³) | molar amounts | OTHER | CALC: 0.909 mol, 1.316 mol
+- EXP.11 | ∇_i∇_j(□ψ) = □ + □' | decomposing gravity into gravity + antigravity | MANIFOLD | SYMB
+- EXP.12 | □' = (8πG/c⁴) T_μν / log x (=INV.119) (×2) | antigravity equation | SR,MANIFOLD | SYMB
+- EXP.13 | ( R_μν + (1/2) Λ g_ij )_μν = κ ( T^μν_e + T^μν_y + T^μν_g + T^μν_h + ··· ) | Einstein eq with summed stress tensors (EM, Yukawa, gravity, Higgs) | SR,MANIFOLD | SYMB
+- EXP.14 | (d/dM)(κ T_μν) → ⊕ (iℏ∇) ⊕ L ,  HΨ = iℏψ | decomposition (1): gravity → quantum | QUANTUM | SYMB
+- EXP.15 | ⊕ (iℏ∇) ⊕ L → (d/dM)(κ T_μν) | decomposition (2): quantum → gravity | QUANTUM | SYMB
+- EXP.16 | ||ds²|| = lim_{x→∞} [ δ(x) ∭ π( Σ_{k=0}^∞ (ⁿ√p, x/n) )^(1/2) dτ ]_μν (=INV.106) (×4) | metric norm prime series | ZETA,MANIFOLD | SYMB
+- EXP.17 | ||ds²|| = ∫ [ D²ψ ⊗ hν ] dτ = (d/dM) F | metric as D-brane integral | MANIFOLD,QUANTUM | SYMB
+- EXP.18 | E = mc² − (1/2) m v² = ||ds²|| = ∫ Γ(γ)' dx^m = ∫ e^(−f) dV = ∫ dvol = e^(−f) + e^f ≥ e^f − e^(−f) ≥ e^(−f) − e^f | energy = metric = gamma integral = cosh/sinh chain | SR,GAMMA | CALC: mc²−½mv²; 2cosh f ≥ 2sinh f
+- EXP.19 | = R'_μν + (1/2) Λ g'_ij = ∫ ( i v/√(1 − (v/t)²) + v/√(1 − (v/t)²) ) dvol (=INV.117) | Einstein tensor = Lorentz-factor integral (time dilation form) | SR | CALC: v/√(1−v²/c²)=γv; v=0.8c → γ=1.667
+- EXP.20 | = (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m (=INV.31) | entropy functional | ENTROPY | SYMB
+- EXP.21 | = ∫ C dx^m = ∫ κ T_μν dx^m = T_μν T^μν' (=INV.118) | stress contraction | MANIFOLD | SYMB
+- EXP.22 | (d/dM) F = (d/df) F = −2 ∫ (R + ∇_i∇_j) / (Δ + R) e^(−f) dV | M-theory genus decomposition via Perelman | ENTROPY,MANIFOLD | SYMB
+- EXP.23 | Seifert manifold = (x, y, z)/Γ | Seifert manifold as quotient | MANIFOLD,GAMMA | SYMB
+- EXP.24 | ∫ (κ T_μν) ∇ dx^m = ∫ e^(x log x) div(rot E) dx^m = e^(−x log x) | stress divergence = x^x Maxwell | ROT,ENTROPY | SYMB
+- EXP.25 | ∫ f(x) dx = ∫ Γ(γ)' dx^m = 2( cos(i x log x) − i sin(i x log x) ) (=INV.94) | integral = circle fn | GAMMA,ROT | SYMB
+- EXP.26 | ( ∫ f(x)dx / log x ) = lim_{θ→∞} ( ∫ f(x)dx / θ ) = 0, 1 ;  e^(iθ) = cosθ + i sinθ (=INV.95/96) | limit | ROT | SYMB
+- EXP.27 | ( ∫ f(x)dx )' = 2( i sin(i x log x) − cos(i x log x) ) = 2( −cos(i x log x) + i sin(i x log x) ) (=INV.97) | derivative | ROT | SYMB
+- EXP.28 | ( cos(i x log x) − i sin(i x log x) )' = (d/de^(iθ)) ( (cos, −sin)·(sin, cos) ) (=INV.98) | rotation derivative | ROT | SYMB
+- EXP.29 | ∫ Γ(γ)'' dx^m = ∫Γ(γ)' dx^m / ∇L = ∫Γ dx^m · (d/dγ)Γ / ∇L ≤ (∫Γ dx^m + (d/dγ)Γ)/∇L ≤ | e^f − e^(−f) ≤ e^(−f) + e^f' | = 0, 1 (=INV.99/100) | gamma inequality | GAMMA | SYMB
+- EXP.30 | log x | ∇L ;  g_ij = f f' ,  F f | ∇L ;  g_ij | : x → y ,  x^p → y ;  f(x) = log x^p = p log x ,  f(y) = p log x | global partial derivative definitions | MANIFOLD | CALC: log x^p = p log x
+- EXP.31 | (d²/df²) F = F f' · f f'' ,  ∬ F dx^m = F f · F(f)' | second derivative/double integral | OTHER | SYMB
+- EXP.32 | (d/(df dg))(f, g) = (f·g) f' + g' | mixed derivative | OTHER | SYMB
+- EXP.33 | (F f · G g) = ∫ (f·g) f' + g' ;  ∬ F · G dx^m = [F f · G g] − ∫ (f·g) f' + g' | global partial integration | OTHER | SYMB
+- EXP.34 | ∫ (d/(df dg)) FG = ∫ F f' G + ∫ F G g' ;  ∫ F f' G dx^m = [F f G g] − ∫ F G g' dx^m | integration by parts on manifold | OTHER | SYMB
+- EXP.35 | ( F(x)/G(x) ) (fg)' = ( F f' G − F G g' ) / G g | quotient rule | OTHER | SYMB
+- EXP.36 | (d/(df dg)) FG = (d/df^m) FG ,  (∂/∂f^m) FG = F f^μν · G + F · G g^μν ,  ∫ F dx^m = F f | tensor product rule | OTHER | SYMB
+- EXP.37 | β(p,q) = Γ(p)Γ(q)/Γ(p+q) | Beta–Gamma identity | BETA,GAMMA | CALC: scipy.special.beta(p,q)
+- EXP.38 | t = Γ(x) ,  T = ∫ Γ(x) dx | T as integral of gamma | GAMMA | CALC: ∫_1^2 Γ(x)dx ≈ 0.9227
+- EXP.39 | β(p,q) = −∫_1 t² dt | beta as polynomial integral (sic) | BETA | SYMB
+- EXP.40 | T_m = ∫ Γ(x) dx^m | manifold gamma integral | GAMMA | SYMB
+- EXP.41 | T' = t' log t dt + C (C integration constant) | derivative | OTHER | SYMB
+- EXP.42 | dx^m = (1/log x) dx ,  dx^m = (log x^(−1))' | manifold measure | ZETA | SYMB
+- EXP.43 | T' = ∫ Γ(γ)' dx^m | monotone derivation | GAMMA | SYMB
+- EXP.44 | ⊕ T ∇ = ∫ T dx^m ,  δ(t) = t dx^m | sum/integral | OTHER | SYMB
+- EXP.45 | i^i = (√i)^(√i) = e^(x log x) | i^i as x^x | ROT,ENTROPY | CALC: i^i = e^{−π/2} = 0.20788; (√i)^{√i} = 0.48762+0.30257i (both checked in Python)
+- EXP.46 | e^x = i ,  e^(2πm) = i^n ,  (d/dx) e^(2πm) = i^n | imaginary exponent relations | ROT | CALC: e^x=i → x=iπ/2
+- EXP.47 | e^(iθ) = cosθ + i sinθ ,  e^(2πm) = i^n ,  2πm = n ,  e = i (sic) | Euler/Caltan circulation (×2) | ROT | SYMB
+- EXP.48 | (d/di) i^i = i^i = e^(x log x) ,  m = 1/(2π) ,  l = 2πr ,  π = l/(2r) | circle definitions | ROT | CALC: π = l/(2r)
+- EXP.49 | ||ds²|| = e^(−2πT||ψ||)[η_μν + h̄(x)] dx^μ dx^ν + T² d²ψ (=INV.143) | warped metric | MANIFOLD | SYMB
+- EXP.50 | [η_μν + h̄(x)] dx^μ dx^ν / i = HΨ = iℏψ ,  HΨ = (1/i)[H, Ψ] | metric / i = Hamiltonian (Heisenberg from AdS5) | QUANTUM | SYMB
+- EXP.51 | ⊕ (iℏ∇) ⊕ L = e^(i x log x) e^(i x log x)' ,  HΨ = ⊕ HΨ / ∇L | quantum direct sum as phase | QUANTUM,ENTROPY | SYMB
+- EXP.52 | n!^(−1) = ⊕ ∇L ,  n!^(−1) = ∫ T'_μν dV − ∫ T_μν dV = ∫ f(x)^(−1) x f(x) − f(x) | factorial inverse as stress variation | GAMMA | SYMB
+- EXP.53 | ∃ x = a ,  1 − ∃ ∫ x dx ,  Λ = ∫ A dx | cosmological constant as integral | OTHER | SYMB
+- EXP.54 | ∇f(x) = (1/n!) ∫∫···∫ dx Σ ∫ ( ∫ ··· A ∫ dz ) / n! | repeated integral (Cauchy) | OTHER | SYMB
+- EXP.55 | M² a(m) = k a(m) | eigen-equation | QUANTUM | SYMB
+- EXP.56 | Z_M3 = ∫ dA e^(k i /(4π) L_M3) | Chern–Simons partition function (Witten; Jones polynomial) | JONES,QUANTUM | SYMB
+- EXP.57 | Z_M = ⟨M1 | M2⟩ | TQFT amplitude as inner product | JONES,QUANTUM | SYMB
+- EXP.58 | e^x = Σ x^n / n! (r = ∞) | exponential series | OTHER | CALC: partial sums
+- EXP.59 | (d/df) ∫ dx^m = (1/n!) Σ x^n | measure derivative | OTHER | SYMB
+- EXP.60 | ∫_n^(n+1) dx/x < 1/n  (n ≥ 1) | Euler-constant bound | ZETA | CALC: ln(1+1/n) < 1/n
+- EXP.61 | 1 + 1/2 + ··· + 1/n > ∫_1^(n+1) dx/x = log(n+1) | harmonic lower bound | ZETA | CALC: H_n > ln(n+1)
+- EXP.62 | 1 + 1/2 + ··· + 1/n − log x > log(n+1) − log n > 0 ;  1/(n+1) < ∫_0^(n+1) dx/x = log(n+1) − log n (sic lower limit n) | monotone bound | ZETA | SYMB
+- EXP.63 | lim_{n→∞} ( 1 + 1/2 + ··· + 1/n − log n ) = C = ∫ ( ∫_1 x^s dx − log x ) dvol = ∫ C dx^m ,  C = 0.5772156··· | Euler–Mascheroni constant | ZETA,GAMMA | CALC: H_n − ln n → 0.5772156649
+- EXP.64 | C = ∫_1 x^s dx − log x ;  = ∫ ( ∫_1 x^s dx − log x ) dvol = ∬_1 x^s dx − ∫ log x dvol | constant as integral (=INV.9) (×3) | ZETA | SYMB
+- EXP.65 | F = Γ = ∫ e^(−x) x^(1−t) dx = (d/df) ∬_1 (y log y)^(1/2) dx^m − ∫ e^(−x) x^(1−t) log x dx^m | gamma = entropy − digamma integral | GAMMA,ENTROPY | SYMB
+- EXP.66 | ∫ x^(1−t) e^(−x) dV = ∫ x^(1−t) dm ;  ∫ x^(1−t) e^(−x) dV = ∫ x^(1−t) dvol | weighted-volume gamma | GAMMA,MANIFOLD | SYMB
+- EXP.67 | f = γ = Γ' = ∫ e^(−x) x^(1−t) log x dx = (d/dγ)Γ^(−1) − ∫ e^(−x) x^(1−t) log x dx^m = (d/dγ)Γ^(−1) − (γ)γ' = e^(−f) − e^f = 2 cos(i x log x) (sic) | Γ'(1) = −γ (Euler–Mascheroni) link | GAMMA,ZETA | CALC: Γ'(1) = ∫_0^∞ e^{−x} ln x dx = −0.5772
+- EXP.68 | ds² = g_μν(x) dx^μ dx^ν + ψ²(x)( dx² + κ² A_μ(x) dx^ν )² | Kaluza–Klein metric (×2) | MANIFOLD,SR | SYMB
+- EXP.69 | ds² = −N(r)² dt² + ψ²(x)( dr² + r² dθ² ) | static lapse metric (×2) | SR,MANIFOLD | SYMB
+- EXP.70 | ds² = −dt² + r^(−8πGm) ( dr² + r² dθ² ) | 2+1 point-mass conical metric (×2) | SR,MANIFOLD | SYMB
+- EXP.71 | dx² = g_μν(x)( g_μν(x) dx² − dx g_μν(x) ) ;  dx = ( g_μν(x)² dx² − g_μν(x) dx g_μν(x) )^(1/2) (=INV.197) (×2) | line-element variant | MANIFOLD | SYMB
+- EXP.72 | π(χ,x) = iπ(χ,x) f(x) − f(x) π(χ,x) (=INV.566) (×2) | non-commutative fundamental group | QUANTUM,MANIFOLD | SYMB
+- EXP.73 | ds² = −(1 − r_s/r) c² dt² + dr²/(1 − r_s/r) + r² dθ² + r² sin²θ dψ² | Schwarzschild metric; gravitational time dilation dτ = √(1−r_s/r) dt (×2) | SR,MANIFOLD | CALC: r_s=2GM/c²; Earth surface √(1−r_s/r)=1−6.96e-10
+- EXP.74 | R_μν + (1/2) g_ij Λ = κ T_μν | Einstein field equation (as written, sign/Λ placement sic) (×2) | SR,MANIFOLD | CALC: κ=8πG/c⁴
+- EXP.75 | ∫ κ T_μν dvol = ∫ ( R_μν + (1/2) g_ij Λ ) dvol | integrated Einstein eq (×2) | MANIFOLD | SYMB
+- EXP.76 | ∫ Γ · (d/dγ)Γ dx^m ≤ ∫ Γ dx^m + (d/dγ)Γ = ∫ Γ(γ)' dx^m (×2) | gamma inequality | GAMMA | SYMB
+- EXP.77 | ∬ ( ∫_1 x^s dx − log x ) dvol = e^f − e^(−f) ≤ e^f + e^(−f) (×2) | Euler constant manifold integral bound | ZETA | SYMB
+- EXP.78 | (d/df) F + ∫ C dx^m = 2( cos(i x log x) − i sin(i x log x) ) (×2) | F + Euler const = circle fn | ROT,ZETA | SYMB
+- EXP.79 | (d/df) F ≥ (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m (×2; cf INV.576) | F ≥ entropy integrals | ENTROPY | SYMB
+- EXP.80 | HΨ = ⊕ ( iℏ∇ ⊕ L ) = (1/(2i)) e^(iĤ) ,  (iℏ)' = (−e^(iĤ))' = −i e^(iĤ) (×2) | Hamiltonian as exponential | QUANTUM | SYMB
+- EXP.81 | ψ(x) = e^(−iĤt) ,  ⊕ (iℏ∇)⊕L = (1/2) e^(iĤ) (−i e^(iĤ)) = (1/(2f))^(−if) = (1/2)^(−if) · e^(−x log x) · (f)^i = ∫ e^(−x) x^(t−1) dx (×2) | quantum sum → gamma function | QUANTUM,GAMMA | SYMB
+- EXP.82 | (d/dγ) Γ = e^(−x log x) ;  f = x, i = t, 1/2 = a ;  ⊕ a^(−t) x x^t [Im] ≅ ∫ e^(−x) x^(t−1) dx (×2) | Mellin/gamma identification | GAMMA | CALC: Γ(t)=∫_0^∞ e^{−x}x^{t−1}dx
+- EXP.83 | |ψ(t)⟩_s = e^(−iĤt) |Ψ⟩_H ,  Â_s = Â_H(0) (×2) | Schrödinger vs Heisenberg picture | QUANTUM | SYMB
+- EXP.84 | |Ψ(t)⟩_s → (d/dt) :  i (d/dt) |ψ(t)⟩_s = Ĥ |ψ(t)⟩_s (×2) | Schrödinger equation (ℏ=1) | QUANTUM | CALC: expm(−iHt)ψ0
+- EXP.85 | ⟨Â(t)⟩ = ⟨Ψ(t)| Â(0) |Ψ(t)⟩ (×2) | expectation value | QUANTUM | SYMB
+- EXP.86 | (d/dt) Â = (1/i) [Â, H] (×2) | Heisenberg equation of motion (sign convention sic) | QUANTUM | SYMB
+- EXP.87 | Â(t) = e^(iĤt) Â(0) e^(−iĤt) (×2) | Heisenberg-picture evolution | QUANTUM | CALC: numpy expm
+- EXP.88 | lim_{θ→0} (1/θ) [sinθ; cosθ][[θ,1],[1,θ]][cosθ; sinθ] = [[1,0],[0,−1]] ;  f^(−1)(x) x f(x) = I'_m ,  I'_m = [1,0] × [0,1] (=INV.218/219) (×2) | rotation limit to σ_z | ROT,QUANTUM | SYMB
+- EXP.89 | x + y ≥ √(xy) | AM–GM (sic factor 2) (×2) | OTHER | SYMB
+- EXP.90 | x^(1/2 + iy) / e^(x log x) = 1 | critical line = x^x (×2) | ZETA,ENTROPY | SYMB
+- EXP.91 | O(x) = ∇_i∇_j ∫ e^((2/m) sinθ cosθ) × N mod(e^(x log x)) ;  O(x)(x + Δ|f|²)^(1/2) (=INV.215/216) (×2) | rotation operator | ROT | SYMB
+- EXP.92 | x Γ(x) = 2 ∫ | sin 2θ |² dθ ,  O(x) = m(x)[D²ψ] (=INV.217) (×2) | gamma via sin² | GAMMA,ROT | SYMB
+- EXP.93 | i² = (0,1)·(0,1) ,  |a||b| cosθ = −1 ,  E = div(E, E1) ,  {f,g}/[f,g] = i² ,  E = mc² ,  I' = i² (=INV.220/221) (×2) | imaginary / mass-energy | ROT,SR,QUANTUM | SYMB
+- EXP.94 | HΨ = ⊕ (iℏ∇)⊕L = ⊕ HΨ / ∇L = e^(x log x) = x^(x)' ;  (d/df) F = m(x) | Hamiltonian = x^x | QUANTUM,ENTROPY | SYMB
+- EXP.95 | (d/dt) ψ(t) = ℏ = (1/(2i)) e^(iĤ) ,  (iℏ)' = −i e^(iĤ) | time derivative of psi | QUANTUM | SYMB
+- EXP.96 | (d/dγ) Γ = m(x) = e^(−x log x) | gamma derivative = mass = x^(−x) | GAMMA,ENTROPY | SYMB
+- EXP.97 | sin(ix) = (e^(−x) + e^x)/(2i) (sic; correct is (e^{−x}−e^{x})/(2i) = i sinh x) | sine of imaginary argument | ROT | CALC: sin(ix)=i sinh x
+- EXP.98 | (d/df) F = m(x) = e^f + e^(−f) = 2i sin(i x log x) (sic) | F derivative as cosh | ROT,ENTROPY | SYMB
+- EXP.99 | β(p,q) = ∫ x^(1−t)(1−x)^t dx = ∫ t^x (1−t)^(x−1) dt (=INV.160) | beta forms | BETA | SYMB
+- EXP.100 | ∫_0^1 x^10 (1−x)^20 dx = B(11,21) = Γ(11)Γ(21)/Γ(32) = 10!20!/31! = 1/931395465 (=INV.161) | beta numeric example | BETA,GAMMA | CALC: verified 1/931395465
+- EXP.101 | 1/931395465 = 1/9 = 1/(1−x) ;  1/(1−z) = Σ z^k ;  1/(1+z²) = Σ(−1)^k z^(2k) ;  f(x) = Σ a_k z^k (=INV.162-164) | series | OTHER | SYMB
+- EXP.102 | d^n y/dx^n = n! y^(n+1) ,  f^(0)(0) = n! f(0)^(n+1) = n! ,  f(x) ≅ Σ x^n = 1/(1−x) (=INV.165/166) | derivatives of geometric fn | OTHER | SYMB
+- EXP.103 | dy/dx = y² ⇒ −1/y = x − C ⇒ y = 1/(C − x) ;  x=0, y=1 ⇒ y = 1/(1−x) (=INV.167/168) | separable ODE ("example script") | OTHER | CALC: y(0.5)=2
+- EXP.104 | HΨ = ⊕ HΨ / ∇L ,  Γ = ∫ e^(−x) x^(1−t) dx ,  γ = ∫ e^(−x) x^(1−t) log x dx = ∫ Γ(γ)' dx^m = (d/dγ) Γ | gamma & digamma-type integral | GAMMA | CALC: ∫e^{−x}x^{s−1}ln x dx = Γ'(s)
+- EXP.105 | E = mc² ,  E = m² c² | heat-energy change in three manifolds (special relativity) | SR | CALC: mc²
+- EXP.106 | ∇(iℏ∇)⊕L ,  ⊕(iℏ∇)⊕L ,  □(iℏ∇)⊕L (=INV.93) (×2) | operators on quantum sum (8 geometries / 4 Jones patterns) | QUANTUM,JONES | SYMB
+- EXP.107 | (d/dγ) Γ = e^f + e^(−f) ≥ e^f − e^f | Jones flow via gamma derivative ≥ (Stokes analogy) | GAMMA,JONES | SYMB
+- EXP.108 | (d/dγ) Γ + ∫ C dx^m = 2( cos(i x log x) − i sin(i x log x) ) | gamma derivative + Euler const = circle fn | GAMMA,ROT | SYMB
+- EXP.109 | e^(−θ) = cos(i x log x) − i sin(i x log x) | "Jones" exponential circle identity | ROT,JONES | SYMB
+- EXP.110 | ∫ Γ(γ)' dx^m = 2( cos(i x log x) − i sin(i x log x) ) | gamma integral = circle fn | GAMMA,ROT | SYMB
+- EXP.111 | □ = −(16πG/c⁴) T_μν | gravity equation (box form) | SR,MANIFOLD | CALC: 16πG/c⁴ = 4.153e-43
+- EXP.112 | ^t∭ cohom D_χ [Im] = ∮ (p x^n + q x + r) ∇_l ;  (d/dl) L(x,y) = 2 ∫ ||sin 2x||² dτ ,  (d/dγ)Γ (=INV.120/121) | cohomology/Lagrangian | ROT,MANIFOLD | SYMB
+- EXP.113 | = [ iπ(χ,x), f(x) ] (=INV.25) | commutator | QUANTUM | SYMB
+- EXP.114 | (d/dγ) Γ = ∫ C dx^m = ∫ ( ∫_1 x^s dx − log x ) dvol | gamma derivative = Euler constant integral ("akashic record") | GAMMA,ZETA | CALC: −Γ'(1)=γ=0.5772
+- EXP.115 | m ⊕(iℏ∇)⊕L + n ⊕(iℏ∇)⊕L = (m+n)⊕(iℏ∇)⊕L ; (m−n) ; ⊕L^m × ⊕L^n = ⊕L^(m+n) ; ⊕L^m / ⊕L^n = ⊕L^(m/n) (=INV.85-88) | quantum-sum algebra | QUANTUM | SYMB
+- EXP.116 | d/df ⊕(iℏ∇)⊕L = ⊕(iℏ∇)⊕L' ,  ∫ ⊕(iℏ∇)⊕L dx^m ,  ⊕(iℏ∇)⊕L = n ,  n^(L+1)/(n+1) = ∫ e^x x^(1−t) dx (=INV.89-91) | derivative/integral of quantum sum | QUANTUM,GAMMA | SYMB
+- EXP.117 | ( ⊕(iℏ∇)⊕L + m ⊕(iℏ∇)⊕L + n ) = n^(L+1)/(n+1) = t ∫ (1−x)^n x^(m−1) dx ;  ∫ x^(m−1)(1−x)^(n−1) dx (=INV.92) | beta from quantum sum | BETA,GAMMA | SYMB
+- EXP.118 | ⊠(iℏ∇)|L dx^m ,  ⊞(iℏ∇|L dx^m) ,  x^(1/2+iy) = e^(x log x) (=INV.93/47) (×2) | operators / critical line | QUANTUM,ZETA | SYMB
+- EXP.119 | C = b0 + c1/(b1 + c2/(b2 + c3/(b3 + c4/(b4 + ···)))) | Euler constant as continued fraction | ZETA | CALC: needs b_i,c_i; γ CF = [0;1,1,2,1,2,1,4,3,13,…]
+- EXP.120 | (2.71828)^2.828 = a^a + b^b + c^c + d^d ··· = ∫ e^f · x^(1−t) dx | e^(2√2) as sum of self-powers = gamma-type integral | GAMMA,ENTROPY | CALC: e^{2.828}=16.91 (2.71828^2.828=16.912)
+- EXP.121 | (d/df) F(v_ij, h) = ∫ e^(−f) dV [ −Δv + ∇_i∇_j v_ij − R_ij v_ij − v_ij ∇_i∇_j + 2<∇f,∇h> + (R + ∇f²)(v/2 − h) ] = (d/df)F = 2 ∫ (R + ∇_i∇_j f)² / −(R + Δf) dm (=INV.575/570) | Perelman first variation | ENTROPY,MANIFOLD | SYMB
+- EXP.122 | F ≥ (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m (=INV.576) | F bound | ENTROPY | SYMB
+- EXP.123 | V(τ) = [f(x), g(x)] × [f^(−1)(x), h(x)] | reduced volume as commutator product | MANIFOLD,QUANTUM | SYMB
+- EXP.124 | Γ(p,q) = ∫ e^(−x) x^(1−t) dx = β(p,q) = π( f(χ,x), x ) | gamma = beta = fundamental group | GAMMA,BETA,MANIFOLD | SYMB
+- EXP.125 | ||ds²|| = O(x)[ (f(x) ∘ g(x))_μν ] dx^μ dx^ν = lim_{x→∞} Σ_{k=0}^∞ a_k f_k | metric as operator series | MANIFOLD | SYMB
+- EXP.126 | G_μν = (∂/∂f) ∫ [ f(x)_μν ∘ G(x)_μν dx^μ dx^ν ]_μν dm = g_μν(x) dx^μ dx^ν − f(x)_μν dx^μ dx^ν | Einstein tensor as metric difference | MANIFOLD | SYMB
+- EXP.127 | [ iπ(χ,x), f(x) ] = iπ f(x) − f(x) π(χ,x) | commutator expansion | QUANTUM | SYMB
+- EXP.128 | T_μν = ( lim_{x→∞} Σ_{k=0}^∞ ∬ [ V(τ) ∘ S_μν(χ,x) ] dm )_μν dx^μ dx^ν ,  G_μν = R_μν T_μν | stress from volume series | MANIFOLD | SYMB
+- EXP.129 | [[D_m, d_x],[d_x, σ_m]] [[cosθ, −sinθ],[sinθ, cosθ]] [x; y] = [[1,0],[0,−1]]^(1/2) (cf INV.370) (×2) | operator × rotation = √σ_z | ROT,QUANTUM | SYMB
+- EXP.130 | σ_m [[δ(x), −1],[1, ε(x)]]^(1/2) = [[i,0],[0,−i]] (=INV.372) (×3) | Pauli-type | QUANTUM | SYMB
+- EXP.131 | V(M) = (∂/∂f) ( N ∫ [f ∖ M] ⊕ N )_μν dx^μ dx^ν | volume via set difference | MANIFOLD | SYMB
+- EXP.132 | V(M) = π( 2 ∫ sin² dx ) ⊕ (d/df) F_M dx^m | volume via sin² | ROT,MANIFOLD | CALC: 2∫_0^π sin²x dx = π
+- EXP.133 | lim_{x→∞} Σ_{k=0}^∞ a_k f_k = ∫ ( F(V) dx^m )_μν dx^μ dx^ν ,  ⊕_{k=0}^∞ [f ∖ g] = ∨(M ∧ N) | series = volume integral | MANIFOLD | SYMB
+- EXP.134 | π1(M) = e^(−f² ∫ sin² x dm + O(N^(−1))) = [ iπ(χ,x), f(x) ] | fundamental group as exp of sin² integral | ROT,MANIFOLD | SYMB
+- EXP.135 | M ∘ f(x) = e^(−f ∫ sin x cos x dx^m) + log( O(N^(−1)) ) | non-symmetry space time | ROT | SYMB
+- EXP.136 | (d/dL) V(τ) = (d/df) ∬_M 1/(x log x)² dx^m + (d/df) ∬_M 1/(y log y)^(1/2) dy^m (×2) | D-brane/anti-D-brane volume derivative | ENTROPY,MANIFOLD | SYMB
+- EXP.137 | ε_S(ν) = □v · (∂/∂χ)( ⁵√p ∧ g² ) dχ | AdS5 graviton differential volume | MANIFOLD | SYMB
+- EXP.138 | ∧(F_m^t)'' = (1/12) g²_ij | quarks of other dimension | MANIFOLD | SYMB
+- EXP.139 | π(V_τ) = e^(−(√π/16) log x)^δ × 1/(x log x) | expanding-space volume | ENTROPY | SYMB
+- EXP.140 | (d/dt)(g_ij)² = (1/24)(F_m^t)² | metric square flow | MANIFOLD | SYMB
+- EXP.141 | m² = 2πT ( (26 − D_n)/24 ) (=INV.439) | bosonic string mass formula | QUANTUM | CALC: D=26→0
+- EXP.142 | g_ij ∧ π(ν_τ) = e^(−2πT|ψ|)[η_μν + h̄_μν(x)] dx^μ dx^ν + T² dψ² ;  ||ds²|| = g_ij ∧ π(ν_v) | AdS5 warped metric | MANIFOLD | SYMB
+- EXP.143 | e^(iθ) = cosθ + i sinθ ,  e^(x log x) = x^(1/2+iy) ,  x log x = log(cosθ + i sinθ) = log cosθ + i log sinθ (sic) | log of Euler formula | ROT,ZETA | CALC: log(e^{iθ}) = iθ
+- EXP.144 | log(sinθ + i cosθ) = log(sinθ − i cosθ) ;  log( sinθ / (i cosθ) ) = −2R_ij ,  (d/dt) g_ij(t) = −2R_ij | Frobenius log relation = Ricci | ROT,MANIFOLD | SYMB
+- EXP.145 | O(x) = ζ(s) / Σ_{k=0}^∞ a_k f_k ,  Im f = ker f ,  χ(x) = ker f / Im f ,  H(3) = 2 ,  ∇H(x) = 2 ,  π(x) = 0 | world-line invariants | ZETA,MANIFOLD | SYMB
+- EXP.146 | [f(x)] = ∞ ,  ||ds²|| = O(x)[η_μν + h̄_μν(x)] dx^μ dx^ν + T² d²ψ ,  O(x) = e^(−2πT|ψ|) (×2) | metric with operator warp | MANIFOLD | SYMB
+- EXP.147 | T² d²ψ = [f(x)] ,  T² d²ψ = lim_{x→1} Σ_{k=0}^∞ a_k f_k = [T² d²ψ] (×2) | fifth dimension as series | ZETA,MANIFOLD | SYMB
+- EXP.148 | (d/dL) V(τ) = (d/df) ∬_M ( ⁵√(x²) ) dΛ + (d/df) ∬_M N( ³√x ) ⊕ N dΛ | volume derivative with roots | MANIFOLD | SYMB
+- EXP.149 | M( ∨(∧ f ∘ g) N )^(1/2) = (d/df) ∬_M 1/(x log x)² dx^m + (d/df) ∬_M 1/(y log y)^(1/2) dy^m | brane entropy | ENTROPY | SYMB
+- EXP.150 | G_μν = R_μν T_μν = −(1/2) Λ g_ij(x) + T_μν | Einstein tensor with Λ | MANIFOLD | SYMB
+- EXP.151 | C = ∬_1 (x log x)² dx^m | Euler constant as squared-entropy integral (claim) | ZETA,ENTROPY | CALC: ∫_0^1(x ln x)²dx=2/27=0.0741 vs γ=0.5772
+- EXP.152 | (D_m, d_x)·(cosθ, sinθ) × (d_x, ∂_m)·(cosθ, sinθ) ;  [[1,0],[0,i]] β(x,θ) [x; y] = [[i,0],[0,−1]] ;  l = √(ℏG/c³) (=INV.370-372) (×2) | rotation operator / Planck length | ROT,QUANTUM,BETA | CALC: 1.616e-35 m
+- EXP.153 | ( ∂/∂τ f(x,y,z) )^(3') = A_μν ,  (d/dt) g_ij(t) = −2R_ij (=INV.373) | gauge field | MANIFOLD | SYMB
+- EXP.154 | x^y = 1/y^x → | reciprocity (=INV.10) | OTHER | SYMB
+- EXP.155 | π(χ,x) = [ iπ(χ,x), f(x) ] ,  (d/df) F = F f' | commutator, derivative | QUANTUM | SYMB
+- EXP.156 | SiO2 prism; (Al, Mg) → S; material list: Cs, Fe·Co60·Pt·Al alloy, H2SO4, Al2O3, He, H2, Mg, Al (heat), CnH2n | "UFO materials" chemistry notes | OTHER | SYMB
+- EXP.157 | (∂/∂f) F(x) = ∬ cohom D_k(x) [Im] ;  (∂/∂f)F = ^t∬ cohom D_k(x) ≪ p = □' (=INV.114/115) (×6) | cohomology D-brane | MANIFOLD | SYMB
+- EXP.158 | ∇_i∇_j ∫ f(x) dη = ∂²/(∂x∂y) ∫ □' dη (=INV.116) | Hessian | MANIFOLD | SYMB
+- EXP.159 | R'_μν + (1/2) Λ g'_ij = ∫ ( i v/√(1−(v/t)²) + v/√(1−(v/t)²) ) dvol = (d/df)∬(x log x)² dx^m + (d/df)∬(y log y)^(1/2) dy^m = ∫ C dx^m = ∫ κ T_μν dx^m = T_μν T^μν' (=INV.117/118, EXP.19) | Einstein ↔ Lorentz-factor ↔ entropy chain | SR,ENTROPY | CALC: γv integrand
+- EXP.160 | □' = (8πG/c⁴) T_μν / log x ;  ^t∭ cohom D_χ[Im] = ∮ (p x^n + q x + r) ∇_l ;  (d/dl) L(x,y) = 2∫||sin 2x||² dτ (=INV.119-121) | antigravity etc. | SR,ROT | SYMB
+- EXP.161 | ∯ ≅ ||ds²|| = lim_{x→∞}[ δ(x) ∭ π(Σ ⁿ√p, x/n)^(1/2) dτ ]_μν ;  e^(−2πT||ψ||)[η + h̄] dx^μ dx^ν + T² d²ψ (=INV.122/123) | metric norm | ZETA,MANIFOLD | SYMB
+- EXP.162 | −(16πG/c⁴) T_μν / log x = □' ;  −(16πG/c⁴) T_μν / e^(−2πT||ψ||) = 4πGρ (=INV.124) | Einstein/Poisson | SR | SYMB
+- EXP.163 | ∂/(∂x∂y) = ∇_i∇_j ;  □∭ = ^t∭ ;  (∂/∂x)∭ = ∇_i∇_j ∫∇f(x) dη ;  (∂/∂f)∭ = □∭ ;  Γ|Γ, B|B, E|E, C|C, F|F, β|β, D|D, ^t∬ ≅ ⊕ D ⊕ L (=INV.125/126) | operator identifications | MANIFOLD,GAMMA,BETA | SYMB
+- EXP.164 | □ + □' = ∅ ,  □' | ∅ = □ ,  [[1,0],[0,−i]]^(1/2) [[1,0],[0,−i]] ,  x^(1/2) ≅ x ,  ∅^(1/2) = ∅ (=INV.127-129) | empty-set box identities | QUANTUM | SYMB
+- EXP.165 | ∫^{≪n} ||ds²|| = ∭ 8πG ( p/c³ + V/S ) dx dy dz = (∂/∂f^n) ||ds²|| | entropy of 3-manifold as metric integral | SR,ENTROPY | SYMB
+- EXP.166 | ∮ r dx^m = O(x,y) ;  ^t∭ D(χ,x) Hom[D²ψ] ≪ p ≅ vol(V/S) (=INV.130/131) (×2) | cohomology volume | MANIFOLD | SYMB
+- EXP.167 | (d/df)F = (F)f' ,  ∫F dx^m = (F)f ,  (d/df)∬_1(x log x)² dx^m = ∬_1(x log x)² dx^m ,  f'/f' = 2x(log x + log(x+1)) ,  ∬F dx^m = (1/(x log x)²)(∫2x(log x+log(x+1))dx) = e^(−f) ,  (d/df)F = (1/(x log x)²)(2x(log x + log(x+1))) = e^f (=INV.132-136) (×2) | derivative/integral pair | ENTROPY | SYMB
+- EXP.168 | log(x log x) ≥ 2 (y log y)^(1/2) = 2√(y log y) (=INV.137) (×3) | entropy inequality | ENTROPY | SYMB
+- EXP.169 | ||ds²|| = 8πG(p/c³ + V/S) ;  ∫||ds²|| dx^m = ∫ 8πG(p/c³ + V/S) dvol = ... dy^m = ∫_1 ... dx^m (=INV.45/138) | integrated metric norm | SR | SYMB
+- EXP.170 | (d/df)F = m(x) ,  ⊕ iℏ∇ ⊕ L = ∇_i∇_j ∫ ∇f(x) dη ,  dx^m = y/log x ,  dy^m = x/log x ,  e^(−f) dV = dy^m = dvol (=INV.139-141) | measure definitions | MANIFOLD | SYMB
+- EXP.171 | β(p,q) = (number) + Abel manifold = AdS5 manifold = (d/df)F + ∫ C dx^m = ∫ Γ(γ)' dx^m (=INV.142) (×2) | beta = AdS5 | BETA,GAMMA | SYMB
+- EXP.172 | ||ds²|| = e^(−2πG||ψ||)[η + h̄(x)] dx^μ dx^ν + T² d²ψ (=INV.143) | warped metric | MANIFOLD | SYMB
+- EXP.173 | ∫ dvol = □ψ ,  ∫ ∇ψ² d∇ψ = □ψ (×2) ;  expanding = log(x log x) = □ψ ;  freeze-out = (y log y)^(1/2) = ∇ψ (=INV.144-146) | cosmology entropy | ENTROPY | SYMB
+- EXP.174 | x^n + y^n = z^n ,  β(p,q) = x^n + y^n − δ(x) = z^n − δ(x) ;  (d/dt)g_ij = −2R_ij ;  cos x/((cos x)'·(sin x)') = z^n ,  z^n = −2e^(x log x) ;  z = e^(−f) + e^f − y ;  β(p,q) = e^(−f) + e^f (=INV.147-150) (×2) | Fermat–beta–Ricci | BETA,ROT,MANIFOLD | SYMB
+- EXP.175 | □x = ∫^{f(x)} ∇(R+∩E+) d□x = ∫^{Δf(x)∘E+} ∇(R+∩E+) □x ;  □x = ∫^{d(R∇E+)} ... = ∫^{∇i∇j(R+E+)} ... ;  exp(∇(R+∩E+), Δ(C⊃R)) = π(R1⊂∇E+) = rot(E1, div E2) (=INV.151-153) | box-x integrals | ROT,MANIFOLD | SYMB
+- EXP.176 | x f(x) = F(x) ,  s Γ(s) = Γ(s+1) ;  Q∇C+ = (d/df)F(x) ∇ ∫ δ(s) f(x) dx ;  E+∇f = e^(x log x) ∇ n! f(x) / E(x) ;  (d/df)F F f' = e^(x log x) ;  (C∇)⊕Q = e^(x log x) ;  R∇E+ = f(x)∇e^(x log x) (=INV.154-158) | gamma recurrence etc. | GAMMA,ENTROPY | CALC: Γ(s+1)=sΓ(s)
+- EXP.177 | ∫ δ(x) f(x) dx ;  ∫ ∇ψ² d∇ψ = □ψ ;  ∫ dx = x + C (=INV.159) | misc | OTHER | SYMB
+- EXP.178 | β(p,q) = ∫ x^(1−t)(1−x)^t dx = ∫ t^x(1−t)^(x−1) dt ;  ∫_0^1 x^10(1−x)^20 dx = B(11,21) = 10!20!/31! = 1/931395465 ;  series 1/(1−z), 1/(1+z²) ;  d^n y/dx^n = n! y^(n+1) ;  dy/dx = y² → y = 1/(1−x) (=INV.160-168, EXP.99-103) (×3 overall) | beta example & ODE | BETA,GAMMA | CALC: 1/931395465
+- EXP.179 | (dx, ∂x)·(εx, δx) = [[1,0],[0,−1]]^(1/2) ,  (d/df)F = m(x) (=INV.169) | sqrt σ_z | QUANTUM | SYMB
+- EXP.180 | □( (σ1 + σ2)/2 ) = [ 3π(χ,x) ∘ f(x), σ(x) ] | box of averaged Pauli/spin = commutator | QUANTUM,ROT | SYMB
+- EXP.181 | □ψ = 8πG T_μν ,  (d/dt) g_ij(t) = −2R_ij ,  ∇ψ² = 4πGρ | Einstein / Ricci / Poisson | SR,MANIFOLD | SYMB
+- EXP.182 | □(σ1 + σ2) = [ 6π(χ,x) ∘ f(x), σ(x) ] = [ iπ(χ,x), f(x) ] ;  □ψ = [ 12π(χ,x) ∘ f(x), σ(x) ] | spin-sum commutators (3,6,12 multiples) | QUANTUM | SYMB
+- EXP.183 | (d/df) F = ∫ e^(−f) [ −Δv + R_ij v_ij + ∇_i∇_j f + v ∇_i∇_j + 2<f,h> + (R + ∇f)(v/2 − h) ] = [ iπ(χ,x), f(x) ] | Perelman variation = commutator (time route) | ENTROPY,QUANTUM | SYMB
+- EXP.184 | f^(−1)(x) x f(x) = 1 ,  H_m = E_m × K_m | conjugation identity | QUANTUM | SYMB
+- EXP.185 | i = (1,0)·(1,0) (sic) ,  e^(iθ) = cosθ + i sinθ ,  e^(−iθ) = cosθ − i sinθ | Euler and conjugate | ROT | CALC: exact
+- EXP.186 | sinθ = (e^(iθ) − e^(−iθ))/(2i) ,  sin(iθ) = (e^(−θ) − e^θ)/2 (sic; = i sinh θ) | sine/imaginary sine | ROT | CALC: sin(iθ)=i sinhθ
+- EXP.187 | π(χ,x) = cosθ + i sinθ | fundamental group as unit phase | ROT,MANIFOLD | SYMB
+- EXP.188 | R(−α) = [[cosα, sinα],[−sinα, cosα]] ,  R(α) = [[cosα, −sinα],[sinα, cosα]] | 2D rotation matrices | ROT | CALC: numpy rotation matrix
+- EXP.189 | R(α) M R(−α) = R(α)[[1,0],[0,−1]]R(−α) = [[cos²α − sin²α, 2 sinα cosα],[2 sinα cosα, −cos²α + sin²α]] = [[cos 2α, sin 2α],[sin 2α, −cos 2α]] | conjugating σ_z by rotation = reflection at 2α (correct) | ROT,QUANTUM | CALC: verify with α=0.3 in numpy
+- EXP.190 | [[cosα, −1],[1, −sinα]] [cosα; sinα] = [[1,0],[0,−1]] (=INV.450) | operator on unit vector | ROT | SYMB
+- EXP.191 | [[cosα, sinα],[sinα, −cosα]] [x; y] = [[1,0],[0,−1]] (=INV.449) | reflection | ROT | SYMB
+- EXP.192 | lim_{θ→0} (1/θ)[sinθ; cosθ][[θ,1],[1,θ]][cosθ; sinθ] = [[1,0],[0,−1]] ;  f^(−1) x f(x) = 1 (=INV.218) | rotation limit | ROT | SYMB
+- EXP.193 | (log x)' = 1/x ,  x^n + y^n = z^n ,  x^n = −y^n + c ,  n x^(n−1) = −n y^(n−1) y' ,  y' = n x^(n−1)/(n y^(n−1)) = x^(n−1)/y^(n−1) = −(y/x)·(x/y)^n | implicit differentiation of Fermat curve (sign sic) | OTHER | CALC: y'=−(x/y)^{n−1}
+- EXP.194 | −cos x / ((cos x)'(sin x)') = z^n ,  z^n = −2 e^(x log x) | trig ratio = Fermat power | ROT | CALC: −cos x/(−sin x cos x)=1/sin x
+- EXP.195 | lim_{x→∞} f(x) = a ,  lim_{y→∞} f(y) = b ,  lim_{x,y→∞} {f(x) + f(y)} = a + b | limit sum rule | OTHER | SYMB
+- EXP.196 | lim_{z→0} f(z) = c ,  δ ∫ z^n = (d/dV) x³ ;  lim_{x→∞} = c − lim f(y) · lim f(x) + lim f(y) = lim_{z→∞} f(z) | limit relations | OTHER | SYMB
+- EXP.197 | z^n = cos nθ + i sin nθ = −2 e^(x log x) | de Moivre = gravity/antigravity | ROT | CALC: (e^{iθ})^n
+- EXP.198 | (d/dσ)[ (σ1 + σ2)/2 ] = σ(↿⇃) + σ(⇈) + σ(⇊) + σ(⇔) + σ(⇒) | spin-configuration sum | QUANTUM | SYMB
+- EXP.199 | (d/df) ∬_1 (x log x)² dx^m = σ(↾) ;  (d/df) ∬_1 (y log y)^(1/2) dy^m = σ(⇂) | entropy integrals as spin states | ENTROPY,QUANTUM | SYMB
+- EXP.200 | σ(↢) + σ(↣) = ∫ e^(−f) [ −Δv + R_ij v_ij + ∇_i∇_j v + v∇_i∇_j + 2<f,h> + (R + ∇f)(v − h/2) ] | spin sum = Perelman variation | QUANTUM,ENTROPY | SYMB
+- EXP.201 | σ(⇃) = σ(↾⇂ + ⇈ + ⇒) ,  σ(↿) = σ(↾⇂ + ⇊ + ⇔) ,  weak electric theorem = σ(↿) ,  strong electric theorem = σ(⇃) | force assignment to spin states | QUANTUM | SYMB
+- EXP.202 | C = ∫_1 x^s dx − log x = ∬(∫_1 x^s dx − log x) dvol = ∬_1 x^s dvol − ∫ log x dvol | Euler constant representation (Higgs + Euler = Zeta) | ZETA | SYMB
+- EXP.203 | = (d/df) ∬_1 (y log y)^(1/2) dy^m − ∫ e^(−x) x^(1−t) log x dx^m ;  ∫ x^(1−t) e^(−x) dV = ∫ x^(1−t) dm = ∫ x^(1−t) dvol ;  f = γ = Γ' = ∫ e^(−x) x^(1−t) log x dx = (d/dγ)Γ^(−1) − (γ)γ' = e^(−f) − e^f (=EXP.65-67) | digamma chain | GAMMA | SYMB
+- EXP.204 | e^(−f) − e^f = (d/df)∬_1 (y log y)^(1/2) dy^m − (d/df)∬_1 (x log x)² dx^m = 2 cos(i x log x) | difference of entropy integrals = 2cos (sic: −2sinh f) | ENTROPY,ROT | SYMB
+- EXP.205 | (d/df)∬_1 (y log y)^(1/2) dy^m + (d/df)∬_1 (x log x)² dx^m = (d/df)F = 2i sin(i x log x) | sum of entropy integrals = 2i sin | ENTROPY,ROT | SYMB
+- EXP.206 | (d/df) F + ∫ C dx^m = 2( cos(i x log x) + i sin(i x log x) ) = 2 e^(−θ) = 2 e^(−i x log x) = (d/dt) g_ij(t) = −2R_ij | F + Euler const = 2e^{−i x log x} = Ricci flow | ROT,ENTROPY,MANIFOLD | SYMB
+- EXP.207 | log(x log x) ≥ 2√(y log y) ,  log(x log x) = log x + log log x | entropy log identity | ENTROPY | CALC: exact
+- EXP.208 | ∇ψ² = 8πG( p/c³ + V/S ) ;  ∇ψ² = 8πGℏ + 8π V/S | entropy/energy (black/white hole) | SR,QUANTUM | SYMB
+- EXP.209 | □v = 2√(2πGℏ) + 2√(2π V/S) | box-v root form | QUANTUM | CALC: 2√(2πGℏ)=2√(2π·6.674e-11·1.055e-34)=1.33e-22
+- EXP.210 | √(2πT) = 2√(2π V/S) | temperature vs volume/area | OTHER | SYMB
+- EXP.211 | 2 cos(i x log x) + 2i sin(i x log x) = 2 e^(−f) ;  2√(2π V/S) = (d/df) ∬_1 (x log x) dx^m | circle fn = 2e^{−f} | ROT,ENTROPY | CALC: 2cos(iz)+2i sin(iz)=2e^{−z}, z=x ln x → 2x^{−x}
+- EXP.212 | e^(−2π||ψ||)[η_μν + ℏx] dx^μ dx^ν + T² d²ψ = e^(−f) + e^f = (u + d) + c ,  (w + s) + b = −e^(−f) + e^f | warped metric = quark flavours (u,d,c / w?,s,b) | QUANTUM,MANIFOLD | SYMB
+- EXP.213 | □ = (atom) → [η_μν + ℏ(x)] dx^μ dx^ν / e^(2πT||ψ||) ;  ||ds²|| = e^(2πT||ψ||)([η_μν + ℏ(x)] dx^μ dx^ν)^(−1) + (T² d²ψ)^(−1) ;  ||ds²|| = e^(−2πT||ψ||)[η_μν + ℏ(x)] dx^μ dx^ν + T² d²ψ | inverted warped metric; density y/x | MANIFOLD | SYMB
+- EXP.214 | (u + d) + c = e^(−f) + e^f ,  (w + s) + b = e^(−f) + e^f ;  R'_ij = −R_ij (×2) | quark sums; Ricci sign flip (rotation of T²d²ψ = neutron-star rotation) | ROT,QUANTUM | SYMB
+- EXP.215 | ||ds²|| = □ + ρ ,  ||ds²|| = ∇Ψ² + ψ / (η_μν + h̄(x)) | metric as box + density | MANIFOLD | SYMB
+- EXP.216 | ploximetry = Δx Δp − Δp Δx + δ(p, x) | commutator-type uncertainty ("proximity") | QUANTUM | SYMB
+- EXP.217 | ||ds²|| = e^(−2πT||ψ||) + [η_μν + h̄(x)] dx^μν + T² d²ψ | metric variant | MANIFOLD | SYMB
+- EXP.218 | (d/df) F = e^f + e^(−f) ,  (d/df) ∫ C dx^m = e^f − e^(−f) | F' = 2cosh f; Euler const' = 2sinh f | ZETA | CALC: 2cosh f, 2sinh f
+- EXP.219 | (u + d) + c = e^(−f) − e^f ,  b + (w + s) = e^(−f) + e^f | quark-flavour sums variant | QUANTUM | SYMB
+- EXP.220 | ∬_1 x^s dvol − ∫ log x dvol = (d/df) ∬_1 (y log y)^(1/2) dy^m − ∫ C dx^m = e^(−f) − e^f | Euler const vs entropy | ZETA,ENTROPY | SYMB
+- EXP.221 | (d/df) F = (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m = e^f + e^(−f) (Jones; weak electric) | F = 2cosh f | ENTROPY,JONES | SYMB
+- EXP.222 | ||ds²|| = e^(−2πT|ψ|)[η + h̄(x)] dx^μ dx^ν + T² d²ψ | warped metric (fermion energy distribution) | MANIFOLD | SYMB
+- EXP.223 | □ = 2( cos(i x log x) + i sin(i x log x) ) | box as circle function (complex manifold) | ROT | CALC: =2e^{−x ln x}
+- EXP.224 | π(χ,x) = [iπ(χ,x), f(x)] ;  ∫_1 (x log x) dx = i ∫_1 (x log x) dx N + N i ∫_1 (x log x) dx | non-commutative entropy integral | ENTROPY,QUANTUM | SYMB
+- EXP.225 | ∫_1 (x log x) dx = i ∫ x log x dx − ∫_1 (x log x) dx (=INV.29) ;  ∬_1 (x log x)² dx^m = i (1/2) x² = i ∬_M dx^m ≤ 1/(2i) + x² (=INV.518) | entropy integrals | ENTROPY | SYMB
+- EXP.226 | E = −(1/2) m v² + m c² ;  lim_{x→∞} ∬_1 (x log x)² dx^m ≥ 1/(2i) ;  (d/df) ∬_1 (x log x)² dx^m = 1/(2i) = ∬_1 (x log x)² dx^m (=INV.519/520) (×2) | energy and entropy | SR,ENTROPY | CALC: mc²−½mv²
+- EXP.227 | (f)' / ( (f)(f)' ) = (f f)' = e^(x log x) | derivative of x^x | ENTROPY | CALC: d/dx x^x = x^x(ln x+1)
+- EXP.228 | Γ = ∫ e^(−x) x^(1−t) dx ,  (d/df) F = e^f ,  ∫ F dx^m = e^(−f) ,  ∫ x^(1−t) dx = (d/df) F ,  ∫ e^(−x) dx = ∫ F dx^m | gamma parts | GAMMA | SYMB
+- EXP.229 | x ⊥ y → x · y = 0⃗ ;  (d/df) ∬_1 (x log x)² dx^m = 1/(2i) ;  (f)' | orthogonality | OTHER | SYMB
+- EXP.230 | 1/2 + 1/(2i) = 0⃗ ,  (1/2)·(1/(2i)) ;  A + B = 0⃗ ,  A · B = 1/(4i) ,  tan 90 ≠ 0 ,  ||ds²|| = A + B | critical-line real part 1/2 as vector | ZETA | CALC: ½·1/(2i) = −i/4
+- EXP.231 | sin 0 = 0 ,  e^(iθ) = cosθ + i sinθ | real pole 1/2 note | ROT | SYMB
+- EXP.232 | (d/df) F = (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m = Γ(x, y) | entropy functional = incomplete gamma | GAMMA,ENTROPY | SYMB
+- EXP.233 | (d/dγ) Γ = (e^(−x) x^(1−t)) γ' → (d/dγ) Γ = Γ(γ)' | gamma derivative | GAMMA | SYMB
+- EXP.234 | Γ(s) = ∫_0^∞ e^(−x) x^(s−1) dx ,  Γ'(s) = ∫_0^∞ e^(−x) x^(s−1) log x dx (×2) | Gamma function and its derivative (correct) | GAMMA | CALC: scipy.special.gamma, Γ'(s)=Γ(s)ψ(s); Γ'(1)=−0.5772
+- EXP.235 | x^(s−1) = e^((s−1) log x) ;  (∂/∂s) x^(s−1) = (∂/∂s) e^(−x)·(e^((s−1) log x)) = e^(−x) · log x · e^((s−1) log x) = e^(−x) · log x · x^(s−1) | differentiating under integral | GAMMA | CALC: exact
+- EXP.236 | (d/dγ) Γ = Γ(γ)' ;  (d/dγ) Γ(s) = ∫_0^∞ e^(−x) x^(s−1) dx / ( ∫_0^∞ e^(−x) x^(s−1) log x dx )' = Γ( Γ ∫ log x dx )' = e^(−x log x) | gamma derivative chain (sic) | GAMMA | SYMB
+- EXP.237 | (d/df) F = ∫ x^(s−1) dx ,  ∫ F dx^m = ∫ e^(−x) dx ,  (d/df) F = F(f)' ,  ∫ F dx^m = F(f) | global diff/integral = gamma pieces | GAMMA | SYMB
+- EXP.238 | HΨ = ⊕ (iℏ∇)⊕L = ⊕ HΨ/∇L = e^(x log x) = x^(x)' ;  (d/df)F = m(x) (=EXP.94) | Hamiltonian = x^x | QUANTUM | SYMB
+- EXP.239 | (d/dt) ψ(t) = ℏ = (1/(2i)) e^(iĤ) ... (=EXP.80-87 block repeated, 3rd copy) | Schrödinger/Heisenberg block | QUANTUM | SYMB
+- EXP.240 | (d/dγ)Γ = m(x) = e^(−x log x) ;  sin(ix) = (e^(−x) + e^x)/(2i) ;  (d/df)F = m(x) = e^f + e^(−f) = 2i sin(i x log x) (=EXP.96-98, 2nd copy) | circle function (hyper circle) | ROT,GAMMA | SYMB
+- EXP.241 | HΨ = ⊕ (iℏ∇)⊕L = iℏψ   (1) | QLDS eq. (1): Hamiltonian as quantum direct sum | QUANTUM | SYMB
+- EXP.242 | (d/df) F = m(x)   (2) | QLDS eq. (2): F-derivative is mass | MANIFOLD | SYMB
+- EXP.243 | = (d/df) ∬_1 (x log x)² dx^m + (d/df) ∬_1 (y log y)^(1/2) dy^m   (3) | QLDS eq. (3): entropy functional | ENTROPY | SYMB
+- EXP.244 | ⊕ (iℏ∇)⊕L = ∫ e^(−x) x^(1−t) dx^m   (4) | QLDS eq. (4): quantum sum = gamma | QUANTUM,GAMMA | SYMB
+- EXP.245 | = (d/dγ) Γ = ∫ Γ(γ)' dx^m   (5) | QLDS eq. (5) | GAMMA | SYMB
+- EXP.246 | = e^f + e^(−f)   (6) | QLDS eq. (6): 2cosh f | GAMMA | CALC: 2cosh f
+- EXP.247 | (d/dγ) Γ^(−1) = e^f − e^(−f)   (7) | QLDS eq. (7): 2sinh f | GAMMA | CALC: 2sinh f
+
+## Bada code in papers
+None. Neither invel nor explorerfiles contains any Bada-language (or other) source code. The only "script" mentions are the prose line "In example script is," (invel L1099; explorerfiles L1059, L2235), which introduces the separable ODE dy/dx = y² → y = 1/(1−x) (INV.167–168 / EXP.103), and a mention of "Ruby" in the Japanese preamble of explorerfiles (L10), which is not code.
+
+## Totals
+- invel: 584 entries (INV.1–INV.584). Many entries bundle several comma-separated equations that sit on one displayed line in the source, so the count of individual relations is about 900+. Heavy internal repetition is marked (×k).
+- explorerfiles: 247 entries (EXP.1–EXP.247). Roughly 45% repeat invel equations verbatim, cross-referenced as "=INV.n". Includes 7 chemical-reaction or chemistry entries (EXP.3–10, 156).

@@ -1,0 +1,342 @@
+# ════════════════════════════════════════════════════════════════════
+#  main_blueprint.bada — 『コンタクト』型 異次元輸送機 3次元設計図 生成器
+#
+#  パイプライン:
+#   ① CERN (Linac4→LHC) の pp 衝突 → 消失運動量の方向 = 異次元への扉の軸
+#   ② 特殊相対論: 地球 1 s ↔ 搭乗者 18 h → Γ = 64800, ラピディティ φ
+#   ③ 複素回転体（コマ）: 複素角 Θ = θ + iφ で回転する異次元 → 3 環ジンバル
+#   ④ ガンマ・ゼータの大域的部分積分多様体: Riemann–Siegel θ(φ), Z(φ)
+#   ⑤ Jones 多項式 V_K(t*), t* = e^{iθ(φ)} → 設計図生成機能 (コイル・窓・位相)
+#   ⑥ 論文の全方程式レジストリ → 各部品へ割り当て, 数値エネルギーで寸法を変調
+#   ⑦ Wavefront OBJ (3D) + 仕様書テキスト + 端末用 ASCII 三面図 を出力
+# ════════════════════════════════════════════════════════════════════
+
+def rule(label)
+  print ""
+  print "━━━━ " + label + " ━━━━"
+end
+def pad(s, n)
+  let out = s
+  while len(out) < n
+    out = out + " "
+  end
+  return out
+end
+
+print "╔══════════════════════════════════════════════════════════════╗"
+print "║  CONTACT TRANSPORTER — Bada 量子設計図生成器                 ║"
+print "║  複素回転体(コマ) × 特殊相対論 × Γ・ζ 多様体 × Jones 多項式  ║"
+print "╚══════════════════════════════════════════════════════════════╝"
+
+# ─── ① 衝突段 ─────────────────────────────────────────
+rule("① CERN 衝突段 (Linac4 → PSB → PS → SPS → LHC, √s = 13.6 TeV)")
+let SQRT_S = 13600
+let COL = collide(48, SQRT_S)
+let DOOR_AXIS = vunit(at(COL, 0))
+print "可視粒子 48 本, 可視エネルギー Σ E = " + str(at(COL, 2)) + " GeV"
+print "横方向消失運動量 E_T^miss = " + str(at(COL, 1)) + " GeV"
+print "粒子が消えた方向 (扉の軸) n̂ = " + str(DOOR_AXIS)
+
+# ─── ② 特殊相対論 ─────────────────────────────────────
+rule("② 特殊相対論 — 地球 1 秒 = ベガ往還 18 時間")
+let SR = sr_block(1, 18 * 3600)
+let GAMMA_L = at(SR, 0)
+let PHI = at(SR, 2)
+print "ローレンツ因子 Γ = 18h / 1s = " + str(GAMMA_L)
+print "1 − β = " + str(at(SR, 1)) + "   (β = v/c)"
+print "ラピディティ φ = arcosh Γ = " + str(PHI)
+print "地球–ベガ距離 L = " + str(VEGA_LY) + " ly → 収縮距離 L/Γ = " + str(at(SR, 4) / 1000) + " km"
+let ONE_WAY_H = at(SR, 5) / 3600
+print "片道 (搭乗者時間) = " + str(ONE_WAY_H) + " h, 往復 = " + str(2 * ONE_WAY_H) + " h"
+print "ベガ滞在 = 18 − 往復 = " + str(18 - 2 * ONE_WAY_H) + " h"
+let BOOST = boost_as_complex_rotation(PHI)
+print "ブースト = 虚角回転: cos(iφ) = " + cstr_(at(BOOST, 0)) + "  (= Γ)"
+
+# ─── ②' 異次元輸送の計量 (system_transport) ───────────
+rule("②' 次元の輸送計量 ds² = e^{−2πT|ψ|}[η+h̄]dx^μdx^ν + T²dψ²")
+#   「次元の回転は、他の次元への次元の輸送である」(system_transport p.66)
+#   ワープ因子 e^{−2πT|ψ|} を時間の伸び 1/Γ に一致させる → T|ψ| = ln Γ / 2π
+let TPSI = log(GAMMA_L) / (2 * pi())
+let WARP = exp(0 - 2 * pi() * TPSI)
+print "T|ψ| = ln Γ / 2π = " + str(TPSI) + "   ワープ因子 e^{−2πT|ψ|} = " + str(WARP) + " (= 1/Γ = " + str(1 / GAMMA_L) + ")"
+# 論文の x log x = 1 の根 (x ≈ 1.7632) と比較 (数値的近さの記録のみ)
+let XR = 1.5
+let XI = 0
+while XI < 30
+  XR = XR - (XR * log(XR) - 1) / (log(XR) + 1)
+  XI = XI + 1
+end
+print "論文の x log x = 1 の根 x = " + str(XR) + "  (T|ψ| との差 " + str(TPSI - XR) + ")"
+# BadaUFO-OS: 反重力箱演算子 □ag = 2(sin(i x log x) + cos(i x log x)) の実部 = 2cosh(x log x)
+let BOX_AG = cscale(cadd(csin(C(0, TPSI * log(TPSI))), ccos(C(0, TPSI * log(TPSI)))), 2)
+print "□ag(x = T|ψ|) = " + cstr_(BOX_AG) + "   揚力比 L = cosh(x log x) = " + str(cosh(TPSI * log(TPSI)))
+
+# ─── ③ 複素回転体（コマ）─────────────────────────────
+rule("③ 複素回転体(コマ)の幾何学 — 宇宙の中で回転する異次元")
+let THETA0 = pi() / 6
+let TOP = complex_top(THETA0, PHI)
+print "複素章動角 Θ = θ + iφ = " + cstr_(at(TOP, 0))
+print "cos Θ = " + cstr_(at(TOP, 1))
+print "|cosΘ|² + |sinΘ|² = cosh 2φ = " + str(at(TOP, 3))
+let W0 = 2 * pi() / 60
+let OMEGAS = ring_omegas(W0, PHI)
+print "3 環の角速度 [rad/s] = " + str(OMEGAS)
+let PREC = top_precession(1200, 9.81, 2.5, 5400, at(OMEGAS, 2))
+let NUT = top_nutation(3100, 5400, at(OMEGAS, 2))
+print "ポッド歳差 Ω_p = Mgl/(I3 ω3) = " + str(PREC) + " rad/s,  章動 ω_n = " + str(NUT) + " rad/s"
+let V_RIM = C_LIGHT * (1 - at(SR, 1))
+print "Thomas 歳差 (r = 1 AU を β 速度で) ω_T = " + str(thomas_precession(GAMMA_L, V_RIM, 1.496e11)) + " rad/s"
+
+# ─── ④ Γ・ζ 大域的部分積分多様体 ─────────────────────
+rule("④ ガンマ関数におけるゼータ関数の大域的部分積分多様体")
+let RS_TH = rs_theta(PHI)
+let RS_Z = rs_Z(PHI)
+print "Riemann–Siegel θ(φ) = " + str(RS_TH)
+print "Z(φ) = e^{iθ} ζ(1/2 + iφ) = " + cstr_(RS_Z) + "  (虚部≈0: 多様体上で実)"
+print "部分積分検算 ∫₀^∞ x⁴ e^{-x} dx = " + str(gamma_integral(5, 40, 4000)) + " = Γ(5)"
+print "Γ(2)ζ(2) = ∫ x/(eˣ−1) dx = " + str(bose_integral(2, 40, 8000)) + "  (厳密値 π²/6 = " + str(pi() * pi() / 6) + ")"
+print "大域的部分積分多様体の不変量 Ξ(扉軸²) = " + str(xi(list(at(DOOR_AXIS, 0) * at(DOOR_AXIS, 0), at(DOOR_AXIS, 1) * at(DOOR_AXIS, 1), at(DOOR_AXIS, 2) * at(DOOR_AXIS, 2))))
+
+# ─── ⑤ Jones 多項式 → 設計図生成機能 ──────────────────
+rule("⑤ Jones 多項式 V_K(t*) — 異次元への輸送機の設計図生成機能")
+let T_STAR = cis(RS_TH)
+let KNOTS = list(list("3_1 三葉結び目", [[1,5,2,4],[3,1,4,6],[5,3,6,2]], -3, 2, 3), list("4_1 8の字結び目", [[4,2,5,1],[8,6,1,5],[6,3,7,4],[2,7,3,8]], 0, 0, 0), list("5_1 五葉結び目", [[1,6,2,7],[3,8,4,9],[5,10,6,1],[7,2,8,3],[9,4,10,5]], 5, 2, 5))
+let JV = []
+let ki = 0
+let K = 0
+let vA = 0
+let val = 0
+let res = 0
+while ki < len(KNOTS)
+  K = at(KNOTS, ki)
+  vA = jones_from_bracket(kauffman_bracket(at(K, 1)), at(K, 2))
+  val = jones_eval(vA, T_STAR)
+  res = jones_unit_zeros(vA, 240)
+  JV = append(JV, list(at(K, 0), vA, val, res))
+  print at(K, 0) + ":  V(t) = " + jones_string(vA)
+  print "    V(t*) = " + cstr_(val) + "   |V| = " + str(cabs(val)) + "   arg = " + str(carg(val))
+  print "    扉の共鳴角 (|V(e^{iα})| 極小) α = " + str(len(res)) + " 個"
+  ki = ki + 1
+end
+
+# ─── ⑥ 全方程式レジストリ ─────────────────────────────
+rule("⑥ 論文の全方程式 → 設計図部品への割り当て")
+load_all_equations()
+print "登録式 " + str(REG_N) + " 本 (数値評価 " + str(REG_CALC) + " / 記号 " + str(REG_N - REG_CALC) + ")"
+print "数値検証した等式: 成立 " + str(REG_HOLD) + " / 不成立 " + str(REG_FAIL)
+let ci = 0
+while ci < len(COMP_NAMES)
+  print "  " + pad(at(COMP_NAMES, ci), 10) + " 式 " + pad(str(at(COMP_COUNT, ci)), 4) + " エネルギー " + str(at(COMP_ENERGY, ci))
+  ci = ci + 1
+end
+def comp_e(name)
+  return at(COMP_ENERGY, comp_index(name))
+end
+def comp_n(name)
+  return at(COMP_COUNT, comp_index(name))
+end
+
+# ─── ⑦ 3次元設計図 ───────────────────────────────────
+rule("⑦ 3次元設計図 (単位: m, z 軸 = 扉の軸に整列)")
+# 部品寸法: 映画の装置 (直径 ~ 100 m 級の 3 重ジンバル環) を基準に、
+# 各方程式群の数値エネルギーで変調する (log 圧縮で有界)
+def modul(name)
+  return 1 + 0.1 * log(1 + comp_e(name)) / log(10)
+end
+let R_OUT = 48 * modul("ROT")
+# 環の半径比 = φ/(φ+π) (ラピディティと半回転の比)
+let R_MID = R_OUT * PHI / (PHI + pi())
+let R_IN = R_MID * PHI / (PHI + pi())
+let TUBE = 1.6 * modul("MANIFOLD")
+let POD_R = 4 * modul("TRANSPORT")
+let TOWER_H = R_OUT * 2.2
+let COIL_R = R_OUT + 9 * modul("JONES")
+let WELL_DEPTH = 17 * TPSI * modul("SR")
+# 設計図座標系: 扉の軸 n̂ を z 軸へ (ここでは表示のため z 軸固定、軸ベクトルは仕様書に記録)
+let ZUP = v3(0, 0, 1)
+let CEN = v3(0, 0, 0)
+# 3 環の姿勢: 複素角 Θ の実部 θ と Euler 角 (φ mod 2π) で傾ける
+let TILT_MID = vrot(ZUP, v3(1, 0, 0), THETA0)
+let TILT_IN = vrot(TILT_MID, v3(0, 1, 0), mod(floor(PHI * 1000), 6283) / 1000)
+mesh_torus("gimbal_outer", CEN, ZUP, R_OUT, TUBE, 120, 12)
+mesh_torus("gimbal_middle", CEN, TILT_MID, R_MID, TUBE * 0.8, 100, 12)
+mesh_torus("gimbal_inner", CEN, TILT_IN, R_IN, TUBE * 0.6, 80, 12)
+mesh_sphere("pod", CEN, POD_R, 18, 28)
+# 4 本の塔 (映画の装置の支柱) と 頂部ガントリー
+let TW = 0
+let a = 0
+let base = 0
+let top = 0
+while TW < 4
+  a = pi() / 4 + TW * pi() / 2
+  base = v3((R_OUT + 12) * cos(a), (R_OUT + 12) * sin(a), 0 - WELL_DEPTH)
+  top = v3((R_OUT + 4) * cos(a), (R_OUT + 4) * sin(a), TOWER_H)
+  mesh_cylinder("tower_" + str(TW), base, top, 2.4, 16)
+  mesh_cylinder("gantry_" + str(TW), top, v3(0, 0, TOWER_H + 6), 1.2, 12)
+  TW = TW + 1
+end
+# ポッド投下シャフト (ガントリー中心 → 扉)
+mesh_cylinder("drop_shaft", v3(0, 0, TOWER_H + 6), v3(0, 0, POD_R), 0.5, 12)
+# Jones 結び目コイル: 3_1 → T(2,3), 5_1 → T(2,5), 4_1 → 8 の字 (床下)
+let J31 = at(at(JV, 0), 2)
+let J51 = at(at(JV, 2), 2)
+let J41 = at(at(JV, 1), 2)
+mesh_tube("jones_coil_3_1", torus_knot_points(CEN, ZUP, COIL_R, 4 + cabs(J31), 2, 3, 360), 0.9, 10, 1)
+mesh_tube("jones_coil_5_1", torus_knot_points(v3(0, 0, TOWER_H * 0.5), ZUP, COIL_R * 0.8, 3 + cabs(J51), 2, 5, 480), 0.7, 10, 1)
+mesh_tube("jones_coil_4_1", fig8_points(v3(0, 0, 0 - WELL_DEPTH * 0.6), 6 + cabs(J41), 360), 0.8, 10, 1)
+# 扉 (消失方向): 扉軸に沿った光線と、共鳴角に置いた窓 (小球)
+mesh_tube("door_axis_beam", list(vscale(ZUP, 0 - WELL_DEPTH), vscale(ZUP, 0 - WELL_DEPTH * 0.5), CEN), 0.35, 8, 0)
+let RES = at(at(JV, 1), 3)
+let ri = 0
+let al = 0
+while ri < len(RES)
+  al = at(at(RES, ri), 0)
+  mesh_sphere("resonance_window_" + str(ri), v3(R_IN * 0.7 * cos(al), R_IN * 0.7 * sin(al), 0), 0.9, 8, 12)
+  ri = ri + 1
+end
+let OBJ = "# Contact Transporter — generated by Bada (contact_transporter/main_blueprint.bada)\n" + "# door axis (lab frame) = " + str(DOOR_AXIS) + "\n" + "# Lorentz factor = " + str(GAMMA_L) + ", rapidity = " + str(PHI) + "\n" + buffer_text()
+write_file("contact_machine.obj", OBJ)
+print "外環 R = " + str(R_OUT) + ", 中環 R = " + str(R_MID) + ", 内環 R = " + str(R_IN) + ", 管径 = " + str(TUBE)
+print "ポッド半径 = " + str(POD_R) + ", 塔高 = " + str(TOWER_H) + ", 井戸深さ = " + str(WELL_DEPTH) + ", コイル半径 = " + str(COIL_R)
+print "頂点数 = " + str(VCOUNT) + "  → contact_machine.obj に書き出し"
+
+# ─── ASCII 三面図 (上面図 xy / 正面図 xz) ─────────────
+def ascii_view(title, pts, ia, ib, w, h, span)
+  let line = 0
+  let c = 0
+  let p = 0
+  let x = 0
+  let y = 0
+  let s = 0
+  let row = 0
+  let j = 0
+  let rows = []
+  let r = 0
+  while r < h
+    line = []
+    c = 0
+    while c < w
+      line = append(line, " ")
+      c = c + 1
+    end
+    rows = append(rows, line)
+    r = r + 1
+  end
+  let k = 0
+  while k < len(pts)
+    p = at(pts, k)
+    x = floor((at(at(p, 0), ia) / span + 1) / 2 * (w - 1) + 0.5)
+    y = floor((1 - at(at(p, 0), ib) / span) / 2 * (h - 1) + 0.5)
+    if x >= 0 and x < w and y >= 0 and y < h
+      rows = put(rows, y, put(at(rows, y), x, at(p, 1)))
+    end
+    k = k + 1
+  end
+  print title
+  let i = 0
+  while i < h
+    s = ""
+    row = at(rows, i)
+    j = 0
+    while j < w
+      s = s + at(row, j)
+      j = j + 1
+    end
+    print "  |" + s + "|"
+    i = i + 1
+  end
+end
+def ring_pts(c, n, R, sym, cnt)
+  let u = 0
+  let nn = vunit(n)
+  let e1 = vunit(vcross(nn, v3(0.37, 0.61, 0.7)))
+  let e2 = vcross(nn, e1)
+  let out = []
+  let i = 0
+  while i < cnt
+    u = 2 * pi() * i / cnt
+    out = append(out, list(vadd(c, vadd(vscale(e1, R * cos(u)), vscale(e2, R * sin(u)))), sym))
+    i = i + 1
+  end
+  return out
+end
+def concat(a, b)
+  let out = a
+  let i = 0
+  while i < len(b)
+    out = append(out, at(b, i))
+    i = i + 1
+  end
+  return out
+end
+let VIEWP = concat(concat(ring_pts(CEN, ZUP, R_OUT, "O", 90), ring_pts(CEN, TILT_MID, R_MID, "M", 70)), ring_pts(CEN, TILT_IN, R_IN, "I", 50))
+let KP = torus_knot_points(CEN, ZUP, COIL_R, 4 + cabs(J31), 2, 3, 120)
+let kk = 0
+while kk < len(KP)
+  VIEWP = append(VIEWP, list(at(KP, kk), "~"))
+  kk = kk + 1
+end
+let TWI = 0
+let a = 0
+let zz = 0
+while TWI < 4
+  a = pi() / 4 + TWI * pi() / 2
+  zz = 0 - WELL_DEPTH
+  while zz < TOWER_H
+    VIEWP = append(VIEWP, list(v3((R_OUT + 8) * cos(a), (R_OUT + 8) * sin(a), zz), "#"))
+    zz = zz + 8
+  end
+  TWI = TWI + 1
+end
+VIEWP = append(VIEWP, list(CEN, "@"))
+ascii_view("上面図 (xy)  O=外環 M=中環 I=内環 ~=Jones 3_1 コイル #=塔 @=ポッド", VIEWP, 0, 1, 64, 28, 80)
+ascii_view("正面図 (xz)", VIEWP, 0, 2, 64, 24, 120)
+
+# ─── 仕様書 ───────────────────────────────────────────
+BUF_PARTS = []
+BUF_CHUNK = ""
+emit("CONTACT TRANSPORTER — 3D BLUEPRINT SPECIFICATION (generated by Bada)")
+emit("====================================================================")
+emit("[1] Collider stage (CERN, Linac4 -> LHC, sqrt(s) = 13.6 TeV)")
+emit("    E_T^miss = " + str(at(COL, 1)) + " GeV, door axis n = " + str(DOOR_AXIS))
+emit("[2] Special relativity: Earth 1 s <-> traveller 18 h")
+emit("    Gamma = " + str(GAMMA_L) + ", 1-beta = " + str(at(SR, 1)) + ", rapidity phi = " + str(PHI))
+emit("    Vega 25.04 ly contracted to " + str(at(SR, 4) / 1000) + " km; one way " + str(ONE_WAY_H) + " h")
+emit("[2'] Transport metric warp e^{-2 pi T|psi|} = 1/Gamma -> T|psi| = " + str(TPSI) + ", box_ag = " + cstr_(BOX_AG))
+emit("[3] Complex rotating top: Theta = " + cstr_(at(TOP, 0)) + ", ring omegas = " + str(OMEGAS))
+emit("[4] Gamma-zeta manifold: RS theta(phi) = " + str(RS_TH) + ", Z(phi) = " + cstr_(RS_Z))
+emit("[5] Jones blueprint function at t* = e^{i theta(phi)} = " + cstr_(T_STAR))
+let jj = 0
+let J = 0
+while jj < len(JV)
+  J = at(JV, jj)
+  emit("    " + at(J, 0) + ": V(t) = " + jones_string(at(J, 1)) + ", V(t*) = " + cstr_(at(J, 2)))
+  jj = jj + 1
+end
+emit("[6] Components (m)")
+emit("    gimbal_outer  R=" + str(R_OUT) + " tube=" + str(TUBE) + " omega=" + str(at(OMEGAS, 0)))
+emit("    gimbal_middle R=" + str(R_MID) + " tube=" + str(TUBE * 0.8) + " omega=" + str(at(OMEGAS, 1)) + " tilt=theta0")
+emit("    gimbal_inner  R=" + str(R_IN) + " tube=" + str(TUBE * 0.6) + " omega=" + str(at(OMEGAS, 2)))
+emit("    pod           r=" + str(POD_R) + "  drop shaft from h=" + str(TOWER_H + 6))
+emit("    towers x4     h=" + str(TOWER_H) + " well depth=" + str(WELL_DEPTH))
+emit("    Jones coils   3_1 R=" + str(COIL_R) + ", 5_1 R=" + str(COIL_R * 0.8) + ", 4_1 under floor")
+emit("[7] Equation registry: " + str(REG_N) + " equations (" + str(REG_CALC) + " numeric, " + str(REG_HOLD) + " hold, " + str(REG_FAIL) + " differ)")
+let q = 0
+let E = 0
+while q < len(REG)
+  E = at(REG, q)
+  emit("  " + at(E, 0) + " [" + at(E, 4) + "] " + at(E, 1))
+  if at(E, 5) != ""
+    emit("        = " + at(E, 5) + "    -> " + str(at(E, 3)))
+  else
+    emit("        -> " + str(at(E, 3)) + "  (" + at(E, 2) + ")")
+  end
+  q = q + 1
+end
+emit("")
+emit("NOTE: this is a speculative/fictional design derived from the papers' formulas;")
+emit("it is a geometric visualisation, not an engineering-validated device.")
+write_file("contact_blueprint.txt", buffer_text())
+print ""
+print "仕様書 → contact_blueprint.txt (全 " + str(REG_N) + " 式の割り当て表を含む)"
+print "3D モデル → contact_machine.obj (Blender / MeshLab / 3D ビューアで表示可)"

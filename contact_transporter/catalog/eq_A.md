@@ -1,0 +1,536 @@
+# eq_A: equations extracted (pypdf text; exponents/fractions reconstructed; '[op]' = operator lost in extraction)
+Notes: caostics block is reused verbatim inside category; GBZ, GZE and QC4 share an identical ~69-equation core (QC4 adds a head and a tail). Duplicates are listed per paper for completeness.
+
+## cafe (Library of akashic recode)
+
+- ACAFE.1 | ∇Δ = ∮_D ⊕ M(□) d□ | open integral gravity from d'Alembertian deprivation | MANIFOLD | SYMB
+- ACAFE.2 | ∮_M π(χ,x) = ∮_M [iπ(χ,x), f(x)] | gravity equals fundamental group (commutator) | MANIFOLD | SYMB
+- ACAFE.3 | M(□) = x^y + y^x + z^a + u^b + v^c = 0  (pypdf: 'xy+yx+za+ub+vc'; exponents lost) | 'Kalavi-Yau manifold' defining hypersurface | MANIFOLD | CALC: evaluate x^y+y^x+z^a+u^b+v^c on grid / root-find zero set (numpy/scipy)
+- ACAFE.4 | 1/y + 1/x + 1/a + 1/b + 1/c = 1 | Calabi-Yau (weight) condition on exponents | MANIFOLD | CALC: enumerate integer 5-tuples with Σ1/k=1 (e.g. all 5 = quintic)
+- ACAFE.5 | ∇Δ = ∮_D ⊕ M(□) dm ,  T = Γ'(γ) dx^m | gravity integral; T given by gamma derivative | GAMMA MANIFOLD | CALC: Γ'(γ)=Γ(γ)ψ(γ) via mpmath.diff(gamma) or scipy digamma
+- ACAFE.6 | □ = 2( sin(i x log x) + i cos(i x log x) ) | box (circumstance of gravity) as circle function | ROT OTHER | CALC: complex eval; identity: = 2i(sinh u + cosh u) = 2i·x^x, u=x ln x
+- ACAFE.7 | = d/dγ Γ | gravity equation equals gamma derivative | GAMMA | CALC: Γ'(γ)=Γ(γ)ψ(γ)
+- ACAFE.8 | M = [iπ(χ,x), f(x)] | commutator / fundamental group element | MANIFOLD | SYMB
+- ACAFE.9 | □ = −(16πG/c^4) T_μν | gravity equation, gamma in partial gravity | OTHER | CALC: 16πG/c^4 ≈ 4.15e-43 s²/(kg·m) times T_μν
+- ACAFE.10 | = κ T_μν | Einstein equation, concluded with GR | OTHER | CALC: κ=8πG/c^4 ≈ 2.076e-43
+- ACAFE.11 | ∫ E'(σ) dσ = ∇_i∇_j ⊕_M (H(σ) ⊗ K(σ)) ∇η dη | D-brane from Thurston-Perelman manifold, quantum | MANIFOLD QUANTUM | SYMB
+- ACAFE.12 | σ = ∫ (hν) ∇^{⊕L} dΨ | quantum formula for σ | QUANTUM | SYMB
+- ACAFE.13 | ∇+ (□(∇ψ))^{∇⊕L} = ∫ □'(∇ψ) dx^m = ⊞Ψ | secure product, quantum level gravity | QUANTUM | SYMB
+- ACAFE.14 | (1/x) ⊠ y = ⊕ ∇w = (⊠x)^{x+y} | projection with box element, category theory | OTHER | SYMB
+- ACAFE.15 | (⊕∇w) ⊠ (⊕∇w) = ⊕ (iℏ∇)^{⊕L} | quantum level of space ideality | QUANTUM | SYMB
+- ACAFE.16 | (⊕(iℏ∇)^{⊕L} + m)(⊕(iℏ∇)^{⊕L} + n) = L^{m+1}/(m+1) | factor equation of space ideality | QUANTUM BETA | SYMB
+- ACAFE.17 | L^{m+1}/(m+1) = ∫ (x−1)^{t−1} · t^{x−1} dt = β(p,q) | concluded with beta function | BETA | CALC: β(p,q)=Γ(p)Γ(q)/Γ(p+q) (scipy.special.beta); compare ∫0^1 t^{p−1}(1−t)^{q−1}dt
+- ACAFE.18 | □^{(x+y)/2} − √(x·y) = □^{≪o} | average (AM-GM) box equation | OTHER | CALC: (x+y)/2 − √(xy) ≥ 0
+- ACAFE.19 | □Ψ ⊠ □Ψ | d'Alembertian zeta of average equation | ZETA | SYMB
+- ACAFE.20 | ⊠ = F_{⊤⊥} ,  F_{⊤⊥}^{1/2} = ∇+ | tunnel diode eq., Jones manifold, zeta value | JONES ZETA TRANSPORT | SYMB
+- ACAFE.21 | □ ∫ Z(ζ)/(hν) dx^ζ | Euler function of circumstance formula | ZETA | SYMB
+- ACAFE.22 | = □ ∫ Z(ζ)/(log x) dx^ζ | zeta over log (Euler function) | ZETA | SYMB
+- ACAFE.23 | S = π ∮ ||r²|| dr | circle area-type integral | OTHER | CALC: π·∫ r² dr over chosen range
+- ACAFE.24 | = ∫∫ e^{−x²−y²} dx dy · ∮ ||r²|| dr | Gaussian integral times circle integral | ZETA | CALC: Gaussian = π (scipy dblquad)
+- ACAFE.25 | = 2πS | result 2πS | OTHER | CALC
+- ACAFE.26 | e^{2πr} = 1 | zeta from Gauss circle function, quantum element | ROT ZETA | CALC: holds iff r = i·k (k integer): e^{2πik}=1
+- ACAFE.27 | Γ| : r → χ = ∇Y → □Y → [Δ, ∇, d, ∂, δ, dx^m]^2 → Y| : m → n | gamma function via deprivation of element | GAMMA | SYMB
+- ACAFE.28 | d/df F(x,y) = ⊕ [ π(χ,x)/(x log x) dx^m + iπ(χ,x)/(x log x) dy^m ][Im] | Higgs average = Cauchy of Euler equation | GAMMA OTHER | CALC(if π(χ,x) read as prime-counting π(x)): π(x)/(x ln x) via sympy.primepi
+- ACAFE.29 | ∇+ [ ∫ π(χ,x) dx^m + ∫ N π(χ,x) dy^m ][dIm] | integrated fundamental-group term | MANIFOLD | SYMB
+- ACAFE.30 | ∫ d⋈ = ∫ f(x) d(x log x) = F | time of deprivate value is log element | ENTROPY | CALC: ∫ f(x)(ln x + 1) dx by quad
+- ACAFE.31 | ⋈ = f/(x log x) | definition of bowtie operator | ENTROPY | CALC
+- ACAFE.32 | (e^f + e^{−f})/(e^f − e^{−f}) = ∫ Γ'(γ) dx^m / m(x) | Jones manifold from partial gamma integral, Higgs | JONES GAMMA | CALC: LHS = coth f; Γ' by mpmath
+- ACAFE.33 | d/df F(x,y) = m(x,y) | fundamental group of time scale value | OTHER | SYMB
+- ACAFE.34 | □_{k=prime}^{∞} Z^{≪D} ⋈(ζ)[Im] = π(⋈·⋈̄, m) | Mobius formula, product over primes | ZETA MANIFOLD | CALC: Euler product Π_p (1−p^{−s})^{−1} vs mpmath.zeta(s)
+- ACAFE.35 | t∭ Dχ[π(χ,x)| : x → 2, | : y → ∞][dIm] = ∭ [ (⋈x·⋈̄m − ⋈̄y·⋈n)/(t − t1) ] d⋈m | triple varint integral with poles; equals beta | BETA MANIFOLD | SYMB
+- ACAFE.36 | β(p,q) = ∇+ [ ⋈m|x,y · ⋈̄|x,y ] × [σ(⋈)] | beta function from pole seeds | BETA | SYMB
+- ACAFE.37 | E = K(σ) ⊗ H(σ) = β^{−1}(x) x β(x) | Thurston-Perelman mixing with Mobius dimension | MANIFOLD BETA | SYMB
+- ACAFE.38 | ∇∇| : χ → ∇_i∇_j Γ'(γ) dγ r^m → Δ∇ □Ψ | fundamental group → d'Alembertian via gamma | GAMMA MANIFOLD | SYMB
+- ACAFE.39 | ⋈(HΨ Dχ)^{≪Dψ} = ∮ Z'(ζ)/(2πi) [dN] | Cauchy integral of zeta | ZETA | CALC: argument principle (1/2πi)∮ζ'/ζ ds counts zeros (mpmath contour)
+- ACAFE.40 | = [f(x)g'(x) − g(x)f'(x)] − [F(x)G(x)] | Wronskian-like term | OTHER | SYMB
+- ACAFE.41 | x log x = iπ(χ,x) | x log x as imaginary fundamental group | ENTROPY | SYMB
+- ACAFE.42 | log x = Δf − ∇g | log as difference of operators | OTHER | SYMB
+- ACAFE.43 | = (d/df F_g) · (g(f)) | chain-rule form | OTHER | SYMB
+- ACAFE.44 | ∂/∂f F(x,y) = F_f(x,y) f'(x,y) = ∂/∂f F(g(x,y)) | chain rule of F | OTHER | SYMB
+- ACAFE.45 | ○○∬^N (⋈·⋈̄)^D = ΔΔ Dχ(*∇)^{≪D} | time-scale pair, Jones manifold, time flow universe→other dimension | JONES TRANSPORT QUANTUM | SYMB
+- ACAFE.46 | t∬ D π(χ,x) m = ≪ |∅| □ | ≫ | particle operator, varint quantum integral | QUANTUM | SYMB
+- ACAFE.47 | y = e^n  (n prime ⇒ 'productivity number') | exponential of primes | ENTROPY | CALC: exp(n)
+- ACAFE.48 | e · n ~ Shannon entropy (text: 'neipia number times n') | e times n relates to Shannon entropy | ENTROPY | CALC: e·n
+- ACAFE.49 | u = e^n / log 2 ,  n = x log x | sensitivity with zeta function | ZETA ENTROPY | CALC: u = x^x/ln2
+- ACAFE.50 | x^{1/2 + iy} = e^{x log x} | 'is zeta function', Cauchy law | ZETA | CALC: compare both sides numerically (generally unequal)
+- ACAFE.51 | lim_{n→∞} (1 + 1/n)^n = e | history of number e | OTHER | CALC: 2.718281828
+- ACAFE.52 | C = 2e ,  C = e^5 (or e/5; garbled) | constants C | OTHER | CALC: 5.43656 ; 148.41
+- ACAFE.53 | C = lim_{x→2} e^{x log x}/log 2 | constant C from x^x | ENTROPY | CALC: 4/ln2 = 5.77078
+- ACAFE.54 | ∫ C dx^m = n | integral of C | OTHER | SYMB
+- ACAFE.55 | ∫∫ e^{−x²−y²} dx dy = π | Gaussian integral | OTHER | CALC: π
+- ACAFE.56 | S = πr² | circle area | ROT | CALC
+- ACAFE.57 | V = π || ∫ sin 2x dx ||² dx | volume of revolution | ROT | CALC: solid of revolution π∫(−cos2x/2)² dx
+- ACAFE.58 | V − ∫ sin x dx = β(p,q) | volume minus integral = beta | BETA | CALC: compare with scipy beta
+- ACAFE.59 | β(p,q) = ⊕(iℏ∇)^{⊕L} = d/df F(x,y) | beta = quantum operator | BETA QUANTUM | SYMB
+- ACAFE.60 | = ∫ Γ'(γ) dx^m = (x,y)·(x,y) = e^{ix} | gamma derivative integral = e^{ix} | GAMMA ROT | SYMB
+- ACAFE.61 | e^{ix} = cos x + i sin x | Euler formula | ROT | CALC: cmath.exp(1j*x)
+- ACAFE.62 | d/df e^{ix} = sin(i log x) + i cos(i log x) = n | Euler product, general Euler equation | ROT ZETA | CALC: sin(i ln x)+i cos(i ln x) = i·x identically
+- ACAFE.63 | π ∫ || [Φ/πr²] || dr | Higgs field integral | OTHER | SYMB
+- ACAFE.64 | t∬ Δ(π(χ,x))[Im] | Laplacian of fundamental group | MANIFOLD | SYMB
+- ACAFE.65 | Σ (σ(H × K)) | sum of σ over H×K | OTHER | SYMB
+- ACAFE.66 | [□/∇]_{μν} ,  ∇+ ⊗ Δ | operator ratio | OTHER | SYMB
+- ACAFE.67 | ∇_i∇_j(□ × □) dτ | double box covariant derivative | OTHER | SYMB
+- ACAFE.68 | √(x^m · y^m) | geometric mean | OTHER | CALC
+- ACAFE.69 | ∬ □ cohom Dχ [Im] | cohomology of D-brane box | MANIFOLD | SYMB
+- ACAFE.70 | ⊗ [ S Dχ ⊗ hν ] | tensor with photon energy | QUANTUM | SYMB
+- ACAFE.71 | ≪ iℏψ* HΨ ≫ | zeta function on quantum matrix | QUANTUM ZETA | CALC: expectation ⟨ψ|H|ψ⟩ for chosen matrix
+- ACAFE.72 | ∫ Δ(ζ) dζ | zeta Laplacian integral | ZETA | SYMB
+- ACAFE.73 | ○○∫ (Im)^{∇L} | dia integral manifold, quantum geometry | QUANTUM MANIFOLD | SYMB
+- ACAFE.74 | −2 ∫ ∇_i∇_j(R + ∇∇f) / (Δ(R + Δ)) dm | Ricci flow on Thurston-Perelman manifold | MANIFOLD | SYMB
+- ACAFE.75 | Δ(F(Δ) × Δ(G(Δ))) = −(F(Δ) ∪ F(Δ)) + (F(Δ) ∩ F(Δ)) | 'Alfe' eq destructs Thurston-Perelman | MANIFOLD | SYMB
+- ACAFE.76 | Σ □(∇)[Im], ∇+, [∇/□], π || ∫ ∇_i∇_j f ∇dη ||² = S^m × S^{m−1} | escorts into Jones manifold | JONES MANIFOLD | SYMB
+- ACAFE.77 | (πr²) dr^m ,  ∂(e^f + e^{−f}) / d(e^f − e^{−f}) | hyperbolic ratio | JONES ROT | CALC: d(2cosh f)/d(2sinh f) = tanh f
+- ACAFE.78 | ζ = (a^t − t^n + a) = e^f | zeta also has knot theory | ZETA JONES | CALC: evaluate polynomial in t for given a,n; compare Jones-type Laurent poly
+
+## caostics (Euler product ... Heisenberg non-commutative)
+
+- ACAOS.1 | ∫∫ e^{−x²−y²} dx dy = π | Gaussian: circle element, neipa step | OTHER | CALC: π
+- ACAOS.2 | π^e = ( ∫ e^{cos θ + i sin θ} dθ )^e | circle function to power e | ROT | CALC: ∫0^{2π} e^{e^{iθ}}dθ = 2π ⇒ (2π)^e ≠ π^e=22.459
+- ACAOS.3 | = ( ∫ e^{iθ} dθ )^e | rewritten via e^{iθ} | ROT | CALC: ∫0^{2π} e^{iθ}dθ = 0
+- ACAOS.4 | e^f → f = 1 ,  x log x = 1 | Jones manifold and Shannon entropy | JONES ENTROPY | CALC: x=e^{W(1)}=1.76322 (scipy lambertw)
+- ACAOS.5 | ∫ e^{−iθ} dθ = π^e | circle integral = π^e | ROT | CALC: check numerically (0 over full period)
+- ACAOS.6 | □' = 2( sin(i x log x) + cos(i x log x) ) | antigravity equation as circle function | ROT OTHER | CALC: = 2(cosh u + i sinh u), u = x ln x
+- ACAOS.7 | □ = cos(i x log x) − i sin(i x log x) | d'Alembertian as circle function | ROT | CALC: = cosh u + sinh u = x^x
+- ACAOS.8 | ∫ e^{−□} d□ = π^e | circle of neipa step function | OTHER | CALC: ∫0^∞ e^{−u}du=1 vs π^e
+- ACAOS.9 | x = C/log x ,  C = ∫ (1/x^s) dx − log x | Euler product as reverse of zeta | ZETA | CALC: ∫1/x^s = x^{1−s}/(1−s); s→1 gives Euler γ limit
+- ACAOS.10 | x^y = 1/y^x | reciprocal power relation | OTHER | CALC: solve x^y·y^x=1
+- ACAOS.11 | π^e = ∫ e^{−□} d□ = e^π ∫ e^{□'} d□' | emerged from beta function | BETA | CALC
+- ACAOS.12 | □ = □' ⊠ Ψ → □ = Ψ ⊠ □' | box product swap | OTHER | SYMB
+- ACAOS.13 | (1/(d/dl)) □(HΨ)∇ ,  □ d/dl (HΨ)∇ | global differential equation | QUANTUM MANIFOLD | SYMB
+- ACAOS.14 | β^{□−□'} / log x = β^{□−□'} | beta power relation | BETA | SYMB
+- ACAOS.15 | t∭ (∇/∇l) □(HΨ)∇ d∇ | varint equation, fundamental function | MANIFOLD | SYMB
+- ACAOS.16 | = ∫ π(χ, □) ∇ d∇ | varint via fundamental group | MANIFOLD | SYMB
+- ACAOS.17 | = ∨∬ π(□) d∇m | varint double integral | MANIFOLD | SYMB
+- ACAOS.18 | e^π = e^{∫∫ e^{−x²−y²} dx dy} | e^π via Gaussian | OTHER | CALC: 23.1407
+- ACAOS.19 | = x^y = 1/y^x = π^e · (1/e^π) | chain of power identities | OTHER | CALC
+- ACAOS.20 | 1/e^π = 1/∫ e^{−□} d□ | reciprocal | OTHER | CALC
+- ACAOS.21 | e^π = ∫ e^{−□} d□ ∫ e^{□'} d□' | product of integrals | OTHER | CALC
+- ACAOS.22 | π^e = e^π ∫ e^{□'} d□' | π^e from e^π | OTHER | CALC
+- ACAOS.23 | e^π = π^e ∫ e^{□'} d□' | e^π from π^e | OTHER | CALC: ratio e^π/π^e = 1.0304
+- ACAOS.24 | π^e = ( ∫ e^{−(cos θ + i sin θ)} dθ )^e | circle function to power e | ROT | CALC: ∫0^{2π} e^{−e^{iθ}}dθ = 2π
+- ACAOS.25 | π^e = 1/e^π = 1/∫ e^{−□} d□ | reciprocal relation | OTHER | CALC: false numerically (22.46 vs 0.0432)
+- ACAOS.26 | □' = 2( sin(i x log x) + cos(i x log x) )  (repeat) | antigravity circle function | ROT | CALC
+- ACAOS.27 | □ = cos(i x log x) − i sin(i x log x)  (repeat) | d'Alembertian circle function | ROT | CALC: = x^x
+- ACAOS.28 | ∫ e^{−□} d□ = π^e  (repeat) | neipa step | OTHER | CALC
+- ACAOS.29 | log e^π = log ( π^e ∫ e^{□'} d□' )^2 | pi via log, neipa & pi step function | ZETA | CALC
+- ACAOS.30 | π = □/□' | pi as ratio of d'Alembertian and antigravity | OTHER | CALC: x^x / (2(cosh u + i sinh u))
+- ACAOS.31 | π = e^β ∫ β dx^m | pi via beta, global integral manifold | BETA MANIFOLD | SYMB
+- ACAOS.32 | π = 1/log x = √g | pi via log and root of g, zeta | ZETA | CALC: x = e^{1/π} = 1.3748
+- ACAOS.33 | = 1 = πr² ,  r = 1/√π | unit circle radius | ROT | CALC: r = 0.56419
+- ACAOS.34 | 1/√π = ∫ (1/log x) dx ,  π = ∫ log x dx^m | Kolmogorov function, neipa & pi | ZETA ENTROPY | CALC: li(x) (mpmath.li); ∫ln x = x ln x − x
+- ACAOS.35 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group of zeta, reverse function | MANIFOLD | SYMB
+- ACAOS.36 | iπ(χ,x) ∘ f(x) = i ∫ x log x dx ,  f(x) ∘ π(χ,x) = ∫ 1/(x log x) dx | non-commutative compositions | ENTROPY | CALC: x²lnx/2 − x²/4 ; ln(ln x)
+- ACAOS.37 | π(χ,x) = [ iπ(χ,x), f(x) ]  (repeat) | non-commutative equation | MANIFOLD | SYMB
+- ACAOS.38 | π(χ,x) = ∫ x log x dx | fundamental group as entropy integral | ENTROPY | CALC: x²ln x/2 − x²/4
+- ACAOS.39 | π(χ,x) = ∫ 1/(x log x) dx | fundamental group as log-log | ENTROPY | CALC: ln ln x
+- ACAOS.40 | π(χ,x) = iπ(χ,x) ,  i ∫ x log x dx ≅ ∫ 1/(x log x) dx | same entropy energy imaginary/real | ENTROPY | SYMB
+- ACAOS.41 | ∫ 1/(x log x) dx = i ∫ x log x dx − ∫ 1/(x log x) dx | Shannon/Kolmogorov entropy integrals equal | ENTROPY | SYMB
+- ACAOS.42 | ∫∫ 1/(x log x)^2 dx^m = (1/2) i^3 | antigravity equation | OTHER | CALC: RHS = −i/2
+- ACAOS.43 | d/df F(x,y) = d/df ∫∫ 1/(x log x)^2 dx^m + d/df ∫∫ 1/(y log y)^{1/2} dy^m | global integral & differential manifold | MANIFOLD | CALC: quad of 1/(x ln x)^2 and (y ln y)^{-1/2} on chosen interval
+- ACAOS.44 | i = x^{90°} ,  x sin 90° = i | imaginary as 90-degree rotation | ROT | CALC: e^{iπ/2} = i
+- ACAOS.45 | i = x^{1/2} ,  x = −1 | sqrt(−1) | ROT | CALC
+- ACAOS.46 | π(χ,x) f(x) = i ∫ 1/(x log x) ∘ f(x) dx = i ∫ x log x dx | reverse of imaginary result | ENTROPY | SYMB
+- ACAOS.47 | f(x) π(χ,x) = f(x) ∫ 1/(x log x) dx = ∫ 1/(x log x) dx | reverse ordering | ENTROPY | SYMB
+- ACAOS.48 | i y = x sin 90° | imaginary pole | ROT | SYMB
+- ACAOS.49 | y = i ,  x = 1 ,  i x = y | solution of imaginary pole | ROT | CALC
+- ACAOS.50 | i sin 90° = −1 | imaginary rotation (Cartan idea) | ROT | CALC: LHS = i (statement false)
+- ACAOS.51 | 1 · sin 90° = i | reverse pole in circle function | ROT | CALC: LHS = 1
+- ACAOS.52 | π^e ≅ e^π | mystery of Euler product, (anti)gravity | ZETA | CALC: 22.459 vs 23.141
+- ACAOS.53 | [ ^^∨| : χ → ^^□ ]^{≪(p,q)} | Heisenberg deprivate manifold | QUANTUM | SYMB
+- ACAOS.54 | = [ ^^∨| : y → ^^□ ]^{≪β(□,□')} | beta step, double acceleration of hat | QUANTUM BETA | SYMB
+- ACAOS.55 | ∨| : χ → HΨD → ⊕ iℏ ⊗ x1 ⊗ x2 ⋯ | D-group module entrance | QUANTUM | SYMB
+- ACAOS.56 | Φ(δ(HΨ))∇ = ∭ cohom Dχ(M) | Heisenberg step into deprivate manifold | QUANTUM MANIFOLD | SYMB
+- ACAOS.57 | = lim_{n→∞} ( nPr f(x)^n g(x)^{n−r} ) ∇ | binomial-type expansion | OTHER | CALC: partial sums of nPr f^n g^{n−r}
+- ACAOS.58 | ⊕(iℏ∇)^{⊕L} = ^^HΨ^{iℏ iℏ ⋯} | divergence operator = step deprivate function | QUANTUM | SYMB
+- ACAOS.59 | = HΨ^{iℏ'} | iterated derivative of HΨ | QUANTUM | SYMB
+- ACAOS.60 | = iℏ^{iℏ'} | iℏ to power iℏ' | QUANTUM | CALC: (iħ)^{iħ} complex power
+- ACAOS.61 | = e^{HΨ log HΨ} | exponential of entropy-like H log H | QUANTUM ENTROPY | CALC: scipy.linalg.expm(H@logm(H)) for PSD matrix H
+
+## category (Category theory escream into Seifert manifold)
+
+- ACAT.1 | E(σ) = K(σ) ⊗ H(σ) | Seifert manifold to quantum component | MANIFOLD QUANTUM | CALC: Kronecker product if K,H are matrices
+- ACAT.2 | d/dγ Γ = d/dγ ∫∫ 1/(x log x)^2 dx^m + d/dγ ∫∫ 1/(y log y)^{1/2} dy^m | gamma derivative as double integrals | GAMMA | CALC: quad on chosen interval
+- ACAT.3 | HΨ = ⊕(iℏ)∇^{⊕L} | quantum Hamiltonian operator | QUANTUM | SYMB
+- ACAT.4 | d/dV ∫ z^n dV = x^n + y^n | Seifert circle zone, GR | MANIFOLD | CALC: Fermat-type x^n+y^n=z^n check
+- ACAT.5 | d/dt g_ij(t) = −2 R_ij | Ricci flow; universe & other dimension | MANIFOLD TRANSPORT | CALC: round S^n: r(t)² = r0² − 2(n−1)t
+- ACAT.6 | □* = −2 · 1/(R + Δ) |g_ij + (R + ∇_ij)| T_ij + R_ij | space of quantum equation | MANIFOLD | SYMB
+- ACAT.7 | L(s) = √x e^{i x log x} | quantum level component L | ZETA ROT | CALC: complex eval
+- ACAT.8 | L(s) = ( Γ(s) ∫∫ e^{i x log x} ) dx^m | L via gamma times phase integral | GAMMA ZETA | CALC: mpmath.gamma(s)·quad(exp(i x ln x))
+- ACAT.9 | 1/L(s) = ζ(1 − s) ζ(s) ζ(1 + s) ⋯ | new session, space to time reversed | ZETA TRANSPORT | CALC: mpmath.zeta products
+- ACAT.10 | = ∫ C dx^m | integral of constant | OTHER | SYMB
+- ACAT.11 | ||ds²|| = 8πG ( p/c³ + V/S ) | Seifert AdS5 zone, time machine system | TRANSPORT SR MANIFOLD | CALC: plug SI p (momentum), V, S
+- ACAT.12 | ||ds²|| = HΨ = (1/i) [HΨ, ΨH] | metric as Heisenberg commutator | TRANSPORT QUANTUM | SYMB
+- ACAT.13 | ||h_λ||² = HΨ | three-manifold energy of entropy | ENTROPY MANIFOLD | SYMB
+- ACAT.14 | ∫ 2 sin x cos x dx ∫ e^{2 sin x cos x} dx = β(p,q) | beta on tuple space, eternal value | BETA ROT | CALC: B(p,q)=2∫0^{π/2} sin^{2p−1}cos^{2q−1}; ∫0^{π/2}2sin cos=1=B(1,1)
+- ACAT.15 | e^β · □ e^{x log x} = ⊕(iℏ∇)^{⊕L} | beta emerges on all equations | BETA QUANTUM | SYMB
+- ACAT.16 | ∫∫ e^{−x²−y²} dx dy = π | Gaussian: circle element, neipa step | OTHER | CALC: π
+- ACAT.17 | π^e = ( ∫ e^{cos θ + i sin θ} dθ )^e | circle function to power e | ROT | CALC: ∫0^{2π} e^{e^{iθ}}dθ = 2π ⇒ (2π)^e ≠ π^e=22.459
+- ACAT.18 | = ( ∫ e^{iθ} dθ )^e | rewritten via e^{iθ} | ROT | CALC: ∫0^{2π} e^{iθ}dθ = 0
+- ACAT.19 | e^f → f = 1 ,  x log x = 1 | Jones manifold and Shannon entropy | JONES ENTROPY | CALC: x=e^{W(1)}=1.76322 (scipy lambertw)
+- ACAT.20 | ∫ e^{−iθ} dθ = π^e | circle integral = π^e | ROT | CALC: check numerically (0 over full period)
+- ACAT.21 | □' = 2( sin(i x log x) + cos(i x log x) ) | antigravity equation as circle function | ROT OTHER | CALC: = 2(cosh u + i sinh u), u = x ln x
+- ACAT.22 | □ = cos(i x log x) − i sin(i x log x) | d'Alembertian as circle function | ROT | CALC: = cosh u + sinh u = x^x
+- ACAT.23 | ∫ e^{−□} d□ = π^e | circle of neipa step function | OTHER | CALC: ∫0^∞ e^{−u}du=1 vs π^e
+- ACAT.24 | x = C/log x ,  C = ∫ (1/x^s) dx − log x | Euler product as reverse of zeta | ZETA | CALC: ∫1/x^s = x^{1−s}/(1−s); s→1 gives Euler γ limit
+- ACAT.25 | x^y = 1/y^x | reciprocal power relation | OTHER | CALC: solve x^y·y^x=1
+- ACAT.26 | π^e = ∫ e^{−□} d□ = e^π ∫ e^{□'} d□' | emerged from beta function | BETA | CALC
+- ACAT.27 | □ = □' ⊠ Ψ → □ = Ψ ⊠ □' | box product swap | OTHER | SYMB
+- ACAT.28 | (1/(d/dl)) □(HΨ)∇ ,  □ d/dl (HΨ)∇ | global differential equation | QUANTUM MANIFOLD | SYMB
+- ACAT.29 | β^{□−□'} / log x = β^{□−□'} | beta power relation | BETA | SYMB
+- ACAT.30 | t∭ (∇/∇l) □(HΨ)∇ d∇ | varint equation, fundamental function | MANIFOLD | SYMB
+- ACAT.31 | = ∫ π(χ, □) ∇ d∇ | varint via fundamental group | MANIFOLD | SYMB
+- ACAT.32 | = ∨∬ π(□) d∇m | varint double integral | MANIFOLD | SYMB
+- ACAT.33 | e^π = e^{∫∫ e^{−x²−y²} dx dy} | e^π via Gaussian | OTHER | CALC: 23.1407
+- ACAT.34 | = x^y = 1/y^x = π^e · (1/e^π) | chain of power identities | OTHER | CALC
+- ACAT.35 | 1/e^π = 1/∫ e^{−□} d□ | reciprocal | OTHER | CALC
+- ACAT.36 | e^π = ∫ e^{−□} d□ ∫ e^{□'} d□' | product of integrals | OTHER | CALC
+- ACAT.37 | π^e = e^π ∫ e^{□'} d□' | π^e from e^π | OTHER | CALC
+- ACAT.38 | e^π = π^e ∫ e^{□'} d□' | e^π from π^e | OTHER | CALC: ratio e^π/π^e = 1.0304
+- ACAT.39 | π^e = ( ∫ e^{−(cos θ + i sin θ)} dθ )^e | circle function to power e | ROT | CALC: ∫0^{2π} e^{−e^{iθ}}dθ = 2π
+- ACAT.40 | π^e = 1/e^π = 1/∫ e^{−□} d□ | reciprocal relation | OTHER | CALC: false numerically (22.46 vs 0.0432)
+- ACAT.41 | □' = 2( sin(i x log x) + cos(i x log x) )  (repeat) | antigravity circle function | ROT | CALC
+- ACAT.42 | □ = cos(i x log x) − i sin(i x log x)  (repeat) | d'Alembertian circle function | ROT | CALC: = x^x
+- ACAT.43 | ∫ e^{−□} d□ = π^e  (repeat) | neipa step | OTHER | CALC
+- ACAT.44 | □' = −2i cosh dV  (pypdf 'cos hdV') | reverse of square, antigravity | ROT OTHER | CALC: −2i·cosh(V)
+- ACAT.45 | □' = 1/□ | antigravity as reciprocal box | OTHER | CALC: x^{−x}
+- ACAT.46 | [ ^^∨| : χ → ^^□ ]^{≪(p,q)} | Heisenberg deprivate manifold | QUANTUM | SYMB
+- ACAT.47 | = [ ^^∨| : y → ^^□ ]^{≪β(□,□')} | beta step, double acceleration of hat | QUANTUM BETA | SYMB
+- ACAT.48 | ∨| : χ → HΨD → ⊕ iℏ ⊗ x1 ⊗ x2 ⋯ | D-group module entrance | QUANTUM | SYMB
+- ACAT.49 | Φ(δ(HΨ))∇ = ∭ cohom Dχ(M) | Heisenberg step into deprivate manifold | QUANTUM MANIFOLD | SYMB
+- ACAT.50 | = lim_{n→∞} ( nPr f(x)^n g(x)^{n−r} ) ∇ | binomial-type expansion | OTHER | CALC: partial sums of nPr f^n g^{n−r}
+- ACAT.51 | ⊕(iℏ∇)^{⊕L} = ^^HΨ^{iℏ iℏ ⋯} | divergence operator = step deprivate function | QUANTUM | SYMB
+- ACAT.52 | = HΨ^{iℏ'} | iterated derivative of HΨ | QUANTUM | SYMB
+- ACAT.53 | = iℏ^{iℏ'} | iℏ to power iℏ' | QUANTUM | CALC: (iħ)^{iħ} complex power
+- ACAT.54 | = e^{HΨ log HΨ} | exponential of entropy-like H log H | QUANTUM ENTROPY | CALC: scipy.linalg.expm(H@logm(H)) for PSD matrix H
+
+## category_stream (Field of projection system)
+
+- ACATS.1 | g_ij|_{Dχ} (□ : x ⊢ y) → g_ij|_{Dχ} x·y/∼ | projection from Seifert manifold, Ricci flow | MANIFOLD | SYMB
+- ACATS.2 | x·y/Γ = −2 ∫ (R + ∇_i∇_j)/(R + Δ) e^{−f} dV | Perelman-like functional over gamma | MANIFOLD GAMMA | SYMB
+- ACATS.3 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group retains | MANIFOLD | SYMB
+- ACATS.4 | L(Δx)| : x ⊢ y → g_ij|_{Dχ} ll'·gg'/∼ | L-function projection | ZETA MANIFOLD | SYMB
+- ACATS.5 | Ll'·Gg'/Γ = β(p,q) | beta from gamma and L function | BETA GAMMA ZETA | SYMB
+- ACATS.6 | L[f(x) : g(x)] = (f(x) + g(x))/2 ≥ √(f(x)·g(x)) | average of add and even (AM-GM) | OTHER | CALC
+- ACATS.7 | ∇·Δ = g_μν(x) x g^{−1}_μν(x) = e | non-commutative differential operator | OTHER | SYMB
+- ACATS.8 | U^{−1} E U = [[1, 0], [0, −1]] | Maskawa non-symmetric transform to other dimension | QUANTUM TRANSPORT | CALC: diagonalize E (e.g. Hadamard maps σx→σz)
+- ACATS.9 | HΨ = ⊕(iℏ∇)^{⊕L} = e^{iHΨ − iHΨ} | quantum level function | QUANTUM | CALC: = e^0 = 1
+- ACATS.10 | e^{−iHΨ} f(x) e^{iHΨ} = E_n | unitary conjugation gives energy | QUANTUM | CALC: expm(-iH) F expm(iH)
+- ACATS.11 | E_n = K_n × H_n | Thurston-Perelman manifold | MANIFOLD | SYMB
+- ACATS.12 | d/dγ Γ = e^{−f} + e^{f} = i sin(i x log x) | gamma to imaginary complex function | GAMMA ROT | CALC: i sin(iu) = −sinh u (≠ 2cosh u)
+
+## gamma_beta_zeta_estimate (Global differential/integrate equation; 'David Hilbert' byline)
+
+- AGBZ.1 | ∂/∂f F(x) = ∬ cohom D_k(x) [Im] | cohomology from isotopy of D-brane | MANIFOLD | SYMB
+- AGBZ.2 | ∂/∂f F = t∬ cohom D_k(x)^{≪p} | double integral of projection | MANIFOLD | SYMB
+- AGBZ.3 | ∮ r dx^m = O(x,y) | horizon cut integral | OTHER | SYMB
+- AGBZ.4 | t∭ D(χ,x) Hom[D²ψ]^{≪p} ≅ vol(V/S) | triple varint = volume | MANIFOLD | SYMB
+- AGBZ.5 | ∂/∂f F(x) = t∬ cohom D_k(x)^{≪p} | global partial diff = cohomology cut | MANIFOLD | SYMB
+- AGBZ.6 | d/df F = (F)^{f'} ,  ∫ F dx^m = (F)^f | global differential/integral definitions | MANIFOLD | SYMB
+- AGBZ.7 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{f'} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AGBZ.8 | f' = 2x( log x + log(x + 1) ) | exponent f' | OTHER | CALC
+- AGBZ.9 | ∫∫ F dx^m = ( 1/(x log x)^2 )^{∫ 2x(log x + log(x+1)) dx} = e^{−f} | global integral value | MANIFOLD | CALC: numeric power with quad exponent
+- AGBZ.10 | d/df F = ( 1/(x log x)^2 )^{2x(log x + log(x+1))} = e^{f} | global differential value | MANIFOLD | CALC
+- AGBZ.11 | log(x log x) ≥ 2 (y log y)^{1/2} | inequality | ENTROPY | CALC: test on grid
+- AGBZ.12 | log(x log x) ≥ 2 √(y log y) | inequality | ENTROPY | CALC
+- AGBZ.13 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group commutator | MANIFOLD | SYMB
+- AGBZ.14 | ∫ 1/(x log x) dx = i ∫ 1/(x log x) dx^N + N i ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AGBZ.15 | ∫ 1/(x log x) dx = i ∫ x log x dx − ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AGBZ.16 | ∫∫ 1/(x log x)^2 dx^m = i (1/2) x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.17 | ∫∫ 1/(x log x)^2 dx^m = i ∬_M dx^m ≤ (1/2) i + x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.18 | E = −(1/2) m v^2 + m c^2 | energy (kinetic sign flipped) | SR | CALC: compare γmc² ≈ mc² + ½mv²
+- AGBZ.19 | lim_{x→∞} ∫∫ 1/(x log x)^2 dx^m ≥ (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.20 | d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.21 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.22 | (f)(f)' = (f f)'/2 = e^{x log x} | (no gloss in text; continuation of chain) | ENTROPY | CALC: x^x
+- AGBZ.23 | Γ = ∫ e^{−x} x^{1−t} dx ,  d/df F = e^f ,  ∫ F dx^m = e^{−f} | gamma as global differential | GAMMA | CALC: Γ(2−t)
+- AGBZ.24 | ∫ x^{1−t} dx = d/df F ,  ∫ e^{−x} dx = ∫ F dx^m | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGBZ.25 | e^{iθ} = cos θ + i sin θ | Euler formula | ROT | CALC
+- AGBZ.26 | x ⊥ y → x·y = 0⃗ ,  d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.27 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ ... )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.28 | 1/2 + (1/2) i = 0⃗ ,  (1/2)·(1/2) i | real pole 1/2 (critical line) | ZETA | CALC
+- AGBZ.29 | A + B = 0⃗ ,  A·B = (1/4) i | (no gloss in text; continuation of chain) | ZETA | CALC: A=1/2, B=i/2
+- AGBZ.30 | tan 90 ≠ 0 ,  ||ds²|| = A + B | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.31 | sin 0 = 0 | real pole of 1/2 | ZETA | CALC
+- AGBZ.32 | e^{iθ} = cos θ + i sin θ  (repeat) | non-certain system of particles | ROT QUANTUM | CALC
+- AGBZ.33 | d/df F = d/df ∫∫ 1/(x log x)^2 dx^m + d/df ∫∫ 1/(y log y)^{1/2} dy^m = Γ(x,y) | gamma of two variables | GAMMA | CALC
+- AGBZ.34 | d/dγ Γ = (e^{−x} x^{1−t})^{γ'} → d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGBZ.35 | Γ(s) = ∫ e^{−x} x^{s−1} dx ,  Γ'(s) = ∫ e^{−x} x^{s−1} log x dx | gamma and its derivative (correct) | GAMMA | CALC: scipy gamma; Γ'(1) = −γ = −0.57722
+- AGBZ.36 | x^{s−1} = e^{(s−1) log x} | (no gloss in text; continuation of chain) | GAMMA | CALC
+- AGBZ.37 | ∂/∂s x^{s−1} = ∂/∂s e^{−x}·e^{(s−1)log x} = e^{−x}·log x·e^{(s−1)log x} = e^{−x}·log x·x^{s−1} | derivative of integrand | GAMMA | CALC
+- AGBZ.38 | d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | CALC: digamma·gamma
+- AGBZ.39 | d/dγ Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx^{(∫0^∞ e^{−x}x^{s−1} log x dx)'} = Γ(Γ ∫ log x dx)' = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGBZ.40 | Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx | gamma function | GAMMA | CALC
+- AGBZ.41 | Γ'(s) = ∫0^∞ e^{−x} x^{s−1} log x dx | gamma derivative | GAMMA | CALC
+- AGBZ.42 | d/df F = ∫ x^{s−1} dx ,  ∫ F dx^m = ∫ e^{−x} dx | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGBZ.43 | d/df F = F^{(f)'} ,  ∫ F dx^m = F^{(f)} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AGBZ.44 | HΨ = ⊕(iℏ∇)^{⊕L} = ⊕ HΨ^{∇L} = e^{x log x} = x^{(x)'} | quantum physics, no Gauss surface | QUANTUM | CALC: x^x
+- AGBZ.45 | d/df F = m(x) | gravity in quantum physics | OTHER | SYMB
+- AGBZ.46 | d/dt ψ(t) = ℏ = (1/(2i)) e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AGBZ.47 | (iℏ)' = (−e^{iĤ})' = −i e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AGBZ.48 | ψ(x) = e^{−iĤt} ,  ⊕(iℏ∇)^{⊕L} = (1/2) e^{iĤ(−i e^{iĤ})} | (no gloss in text; continuation of chain) | QUANTUM | CALC: expm(-iHt)
+- AGBZ.49 | = (1/(2f))^{−if} = (1/2)^{−if} · e^{−x log x} · (f)^i | (no gloss in text; continuation of chain) | QUANTUM GAMMA | CALC
+- AGBZ.50 | = ∫ e^{−x} x^{t−1} dx ,  d/dγ Γ = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | CALC: Γ(t)
+- AGBZ.51 | f = x , i = t , 1/2 = a ,  ⊕ a^{−t} x x^t [Im] ≅ ∫ e^{−x} x^{t−1} dx | Dirichlet-type sum ≅ gamma | GAMMA ZETA | CALC: compare Σ a^{−t}... with Γ(t)
+- AGBZ.52 | |ψ(t)⟩_s = e^{−iĤt} |Ψ⟩_H ,  Â_s = Â_H(0) | Schrödinger/Heisenberg pictures | QUANTUM | CALC: expm
+- AGBZ.53 | |Ψ(t)⟩_s → d/dt ;  i d/dt |ψ(t)⟩_s = Ĥ |ψ(t)⟩_s | Schrödinger equation | QUANTUM | CALC: ODE solve
+- AGBZ.54 | ⟨Â(t)⟩ = ⟨Ψ(t)| Â(0) |Ψ(t)⟩ | expectation value | QUANTUM | CALC
+- AGBZ.55 | d/dt Â = (1/i) [Â, H] | Heisenberg equation | QUANTUM | CALC
+- AGBZ.56 | Â(t) = e^{iĤt} Â(0) e^{−iĤt} | Heisenberg picture operator | QUANTUM | CALC
+- AGBZ.57 | lim_{θ→0} (sin θ, cos θ) [[θ, 1], [1, θ]] (cos θ, sin θ)^T = [[1, 0], [0, −1]] | rotation limit to σz | ROT | CALC: evaluate at small θ (scalar result ≈ 1)
+- AGBZ.58 | f^{−1}(x) x f(x) = I'_m ,  I'_m = [1, 0] × [0, 1] | conjugation identity | OTHER | SYMB
+- AGBZ.59 | x + y ≥ √(x y) | (no gloss in text; continuation of chain) | OTHER | CALC
+- AGBZ.60 | x^{1/2 + iy} / e^{x log x} = 1 | zeta critical-line form | ZETA | CALC: compare both
+- AGBZ.61 | O(x) = ∇_i∇_j ∫ e^{(2/m) sin θ cos θ} × N mod(e^{x log x}) | (no gloss in text; continuation of chain) | ROT | SYMB
+- AGBZ.62 | O(x) (x + Δ|f|^2)^{1/2} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.63 | x Γ(x) = 2 ∫ |sin 2θ|^2 dθ ,  O(x) = m(x)[D²ψ] | (no gloss in text; continuation of chain) | GAMMA ROT | CALC: xΓ(x)=Γ(x+1); ∫0^{π/2}sin²2θ=π/4
+- AGBZ.64 | i^2 = (0,1)·(0,1) ,  |a||b| cos θ = −1 | (no gloss in text; continuation of chain) | ROT | CALC
+- AGBZ.65 | E = div(E, E_1) | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGBZ.66 | {f,g}/[f,g] = i^2 ,  E = m c^2 ,  I' = i^2 | Poisson/commutator ratio; mass-energy | QUANTUM SR | CALC: E=mc²
+- AGBZ.67 | d/dγ Γ = m(x) = e^{−x log x} | Higgs field, zeta, quantum group | GAMMA ZETA | CALC: x^{−x}
+- AGBZ.68 | sin(ix) = (e^{−x} + e^{x})/(2i) | hyper circle function | ROT | CALC: true value (e^{−x} − e^{x})/(2i) = i sinh x
+- AGBZ.69 | d/df F = m(x) = e^f + e^{−f} = 2i sin(i x log x) | hyper circle, beta reverse | ROT BETA | CALC: 2cosh f vs −2 sinh u
+
+## gamma_mebius_to_klein (Gamma function relativity restream into Mebius/Klein)
+
+- AGMK.1 | F(vertex) − N(edge) + E(face) = 2 | Euler number; vertices ~ universe singularities | MANIFOLD | CALC: V−E+F=2 for polyhedra
+- AGMK.2 | Γ^{(x,y,z)} = ∫ (F − N + E) + (F − E + N) + (N − E + F) dx^m  (operators lost in pypdf) | integrating Euler number gives gamma | GAMMA MANIFOLD | SYMB
+- AGMK.3 | ∂/∂f S Γ^{(x,y,z)} | partial derivative of gamma volume | GAMMA | SYMB
+- AGMK.4 | = ∫ ( ∫ (1/x^s) dx − log x ) dvol | Euler constant integrated over manifold | GAMMA ZETA | CALC: Euler-Mascheroni γ = lim(H_n − ln n) = 0.57722
+- AGMK.5 | = ∫ e^{−x} x^{1−t} dx^m | becomes gamma function | GAMMA | CALC: Γ(2−t)
+- AGMK.6 | ||ds²|| = e^{−2πT||ψ||} [η + h̄(x)] dx^μ dx^ν + T² d²ψ | AdS5 warped metric | SR MANIFOLD TRANSPORT | CALC: warp factor e^{−2πT|ψ|} (Randall-Sundrum)
+- AGMK.7 | = O(x) | metric equals O(x) | OTHER | SYMB
+- AGMK.8 | □ = (8πG/c^4) T_μν | d'Alembertian variation (gravity) | OTHER | CALC: 8πG/c^4 = 2.076e-43
+- AGMK.9 | ∇ψ = 4πGρ | Poisson gravity | OTHER | CALC: 4πGρ
+- AGMK.10 | = ∫ ( ∫ (1/x^s) dx − log x ) dvol  (repeat) | Euler constant into global manifold | GAMMA ZETA | CALC: γ
+- AGMK.11 | = ∫ e^{−x} x^{1−t} dx^m  (repeat) | gamma function | GAMMA | CALC: Γ(2−t)
+- AGMK.12 | = d/df F = ∫ Γ(γ)' dx^m | gamma derivative integral | GAMMA | CALC: Γ'=Γψ
+- AGMK.13 | = ∫ C dx^m = ( ∫ Γ dx^m − d/dγ Γ ) / ( ∫ Γ dx^m + d/dγ Γ ) | ratio of gamma integral and derivative | GAMMA | CALC: mpmath
+- AGMK.14 | = e^{−θ} + e^{iθ} | circle function | ROT | CALC
+- AGMK.15 | = □ = 2( cos(i x log x) − i sin(i x log x) ) | d'Alembertian circle | ROT | CALC: = 2x^x
+- AGMK.16 | = (e^{−f} − e^{f}) / (e^{−f} + e^{f}) | reaches Jones | JONES | CALC: −tanh f
+- AGMK.17 | X → Y ,  Y → X | forgetful functor / non-relativity | OTHER | SYMB
+- AGMK.18 | ⊕(iℏ∇)^{⊕L} = e^{−x log x} | entropy of non-exchange, quantum diff. geometry | QUANTUM ENTROPY | CALC: x^{−x}
+- AGMK.19 | □ → ∇_j : x → y ,  f(x) → g(y) ,  f^{−1}(x) x f(x) → g(y) | magnetic component, gravity/antigravity | OTHER | SYMB
+- AGMK.20 | □ → ∇_j : f(x) = g(y) | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGMK.21 | d/dt g_ij(t) = −2 R_ij ,  F_t^m = −2 ∫ (R + ∇_i∇_j f)/(Δ + f) dm | Ricci flow & Perelman F | MANIFOLD | CALC: sphere radius flow
+- AGMK.22 | d/df F = m(x) | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGMK.23 | F_j = d/df F ,  F_t^m = e^{−f} dV | Perelman measure | MANIFOLD | SYMB
+- AGMK.24 | ⊕(iℏ∇)^{⊕L} = e^{−x log x}  (repeat) | represent Forgotten theory | QUANTUM ENTROPY | CALC: x^{−x}
+- AGMK.25 | β(p,q) = Γ(p)Γ(q)/Γ(p+q) | beta function (operator lost) | BETA GAMMA | CALC: scipy.special.beta
+- AGMK.26 | Γ(p)Γ(q)/Γ(p+q) [op] 1 | (no gloss in text; continuation of chain) | BETA | SYMB
+- AGMK.27 | ∫ e^{−x} x^{1−t} dx^m = ∫ e^{−x} x^{1−t} dx [op] e^{−θ} | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGMK.28 | = Γγ' = e^{−x log x} | gamma derivative = x^{−x} | GAMMA ENTROPY | CALC: compare Γ'(γ) with x^{−x}
+- AGMK.29 | ⟨f,g⟩ ↦ ⟨d,d⟩ | Big Bang as collider, plane | OTHER | SYMB
+
+## gamma_zeta_estimate (same text as GBZ + Japanese notes)
+
+- AGZE.1 | ∂/∂f F(x) = ∬ cohom D_k(x) [Im] | cohomology from isotopy of D-brane | MANIFOLD | SYMB
+- AGZE.2 | ∂/∂f F = t∬ cohom D_k(x)^{≪p} | double integral of projection | MANIFOLD | SYMB
+- AGZE.3 | ∮ r dx^m = O(x,y) | horizon cut integral | OTHER | SYMB
+- AGZE.4 | t∭ D(χ,x) Hom[D²ψ]^{≪p} ≅ vol(V/S) | triple varint = volume | MANIFOLD | SYMB
+- AGZE.5 | ∂/∂f F(x) = t∬ cohom D_k(x)^{≪p} | global partial diff = cohomology cut | MANIFOLD | SYMB
+- AGZE.6 | d/df F = (F)^{f'} ,  ∫ F dx^m = (F)^f | global differential/integral definitions | MANIFOLD | SYMB
+- AGZE.7 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{f'} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AGZE.8 | f' = 2x( log x + log(x + 1) ) | exponent f' | OTHER | CALC
+- AGZE.9 | ∫∫ F dx^m = ( 1/(x log x)^2 )^{∫ 2x(log x + log(x+1)) dx} = e^{−f} | global integral value | MANIFOLD | CALC: numeric power with quad exponent
+- AGZE.10 | d/df F = ( 1/(x log x)^2 )^{2x(log x + log(x+1))} = e^{f} | global differential value | MANIFOLD | CALC
+- AGZE.11 | log(x log x) ≥ 2 (y log y)^{1/2} | inequality | ENTROPY | CALC: test on grid
+- AGZE.12 | log(x log x) ≥ 2 √(y log y) | inequality | ENTROPY | CALC
+- AGZE.13 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group commutator | MANIFOLD | SYMB
+- AGZE.14 | ∫ 1/(x log x) dx = i ∫ 1/(x log x) dx^N + N i ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AGZE.15 | ∫ 1/(x log x) dx = i ∫ x log x dx − ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AGZE.16 | ∫∫ 1/(x log x)^2 dx^m = i (1/2) x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.17 | ∫∫ 1/(x log x)^2 dx^m = i ∬_M dx^m ≤ (1/2) i + x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.18 | E = −(1/2) m v^2 + m c^2 | energy (kinetic sign flipped) | SR | CALC: compare γmc² ≈ mc² + ½mv²
+- AGZE.19 | lim_{x→∞} ∫∫ 1/(x log x)^2 dx^m ≥ (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.20 | d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.21 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.22 | (f)(f)' = (f f)'/2 = e^{x log x} | (no gloss in text; continuation of chain) | ENTROPY | CALC: x^x
+- AGZE.23 | Γ = ∫ e^{−x} x^{1−t} dx ,  d/df F = e^f ,  ∫ F dx^m = e^{−f} | gamma as global differential | GAMMA | CALC: Γ(2−t)
+- AGZE.24 | ∫ x^{1−t} dx = d/df F ,  ∫ e^{−x} dx = ∫ F dx^m | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGZE.25 | e^{iθ} = cos θ + i sin θ | Euler formula | ROT | CALC
+- AGZE.26 | x ⊥ y → x·y = 0⃗ ,  d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.27 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ ... )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.28 | 1/2 + (1/2) i = 0⃗ ,  (1/2)·(1/2) i | real pole 1/2 (critical line) | ZETA | CALC
+- AGZE.29 | A + B = 0⃗ ,  A·B = (1/4) i | (no gloss in text; continuation of chain) | ZETA | CALC: A=1/2, B=i/2
+- AGZE.30 | tan 90 ≠ 0 ,  ||ds²|| = A + B | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.31 | sin 0 = 0 | real pole of 1/2 | ZETA | CALC
+- AGZE.32 | e^{iθ} = cos θ + i sin θ  (repeat) | non-certain system of particles | ROT QUANTUM | CALC
+- AGZE.33 | d/df F = d/df ∫∫ 1/(x log x)^2 dx^m + d/df ∫∫ 1/(y log y)^{1/2} dy^m = Γ(x,y) | gamma of two variables | GAMMA | CALC
+- AGZE.34 | d/dγ Γ = (e^{−x} x^{1−t})^{γ'} → d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGZE.35 | Γ(s) = ∫ e^{−x} x^{s−1} dx ,  Γ'(s) = ∫ e^{−x} x^{s−1} log x dx | gamma and its derivative (correct) | GAMMA | CALC: scipy gamma; Γ'(1) = −γ = −0.57722
+- AGZE.36 | x^{s−1} = e^{(s−1) log x} | (no gloss in text; continuation of chain) | GAMMA | CALC
+- AGZE.37 | ∂/∂s x^{s−1} = ∂/∂s e^{−x}·e^{(s−1)log x} = e^{−x}·log x·e^{(s−1)log x} = e^{−x}·log x·x^{s−1} | derivative of integrand | GAMMA | CALC
+- AGZE.38 | d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | CALC: digamma·gamma
+- AGZE.39 | d/dγ Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx^{(∫0^∞ e^{−x}x^{s−1} log x dx)'} = Γ(Γ ∫ log x dx)' = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGZE.40 | Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx | gamma function | GAMMA | CALC
+- AGZE.41 | Γ'(s) = ∫0^∞ e^{−x} x^{s−1} log x dx | gamma derivative | GAMMA | CALC
+- AGZE.42 | d/df F = ∫ x^{s−1} dx ,  ∫ F dx^m = ∫ e^{−x} dx | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AGZE.43 | d/df F = F^{(f)'} ,  ∫ F dx^m = F^{(f)} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AGZE.44 | HΨ = ⊕(iℏ∇)^{⊕L} = ⊕ HΨ^{∇L} = e^{x log x} = x^{(x)'} | quantum physics, no Gauss surface | QUANTUM | CALC: x^x
+- AGZE.45 | d/df F = m(x) | gravity in quantum physics | OTHER | SYMB
+- AGZE.46 | d/dt ψ(t) = ℏ = (1/(2i)) e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AGZE.47 | (iℏ)' = (−e^{iĤ})' = −i e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AGZE.48 | ψ(x) = e^{−iĤt} ,  ⊕(iℏ∇)^{⊕L} = (1/2) e^{iĤ(−i e^{iĤ})} | (no gloss in text; continuation of chain) | QUANTUM | CALC: expm(-iHt)
+- AGZE.49 | = (1/(2f))^{−if} = (1/2)^{−if} · e^{−x log x} · (f)^i | (no gloss in text; continuation of chain) | QUANTUM GAMMA | CALC
+- AGZE.50 | = ∫ e^{−x} x^{t−1} dx ,  d/dγ Γ = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | CALC: Γ(t)
+- AGZE.51 | f = x , i = t , 1/2 = a ,  ⊕ a^{−t} x x^t [Im] ≅ ∫ e^{−x} x^{t−1} dx | Dirichlet-type sum ≅ gamma | GAMMA ZETA | CALC: compare Σ a^{−t}... with Γ(t)
+- AGZE.52 | |ψ(t)⟩_s = e^{−iĤt} |Ψ⟩_H ,  Â_s = Â_H(0) | Schrödinger/Heisenberg pictures | QUANTUM | CALC: expm
+- AGZE.53 | |Ψ(t)⟩_s → d/dt ;  i d/dt |ψ(t)⟩_s = Ĥ |ψ(t)⟩_s | Schrödinger equation | QUANTUM | CALC: ODE solve
+- AGZE.54 | ⟨Â(t)⟩ = ⟨Ψ(t)| Â(0) |Ψ(t)⟩ | expectation value | QUANTUM | CALC
+- AGZE.55 | d/dt Â = (1/i) [Â, H] | Heisenberg equation | QUANTUM | CALC
+- AGZE.56 | Â(t) = e^{iĤt} Â(0) e^{−iĤt} | Heisenberg picture operator | QUANTUM | CALC
+- AGZE.57 | lim_{θ→0} (sin θ, cos θ) [[θ, 1], [1, θ]] (cos θ, sin θ)^T = [[1, 0], [0, −1]] | rotation limit to σz | ROT | CALC: evaluate at small θ (scalar result ≈ 1)
+- AGZE.58 | f^{−1}(x) x f(x) = I'_m ,  I'_m = [1, 0] × [0, 1] | conjugation identity | OTHER | SYMB
+- AGZE.59 | x + y ≥ √(x y) | (no gloss in text; continuation of chain) | OTHER | CALC
+- AGZE.60 | x^{1/2 + iy} / e^{x log x} = 1 | zeta critical-line form | ZETA | CALC: compare both
+- AGZE.61 | O(x) = ∇_i∇_j ∫ e^{(2/m) sin θ cos θ} × N mod(e^{x log x}) | (no gloss in text; continuation of chain) | ROT | SYMB
+- AGZE.62 | O(x) (x + Δ|f|^2)^{1/2} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.63 | x Γ(x) = 2 ∫ |sin 2θ|^2 dθ ,  O(x) = m(x)[D²ψ] | (no gloss in text; continuation of chain) | GAMMA ROT | CALC: xΓ(x)=Γ(x+1); ∫0^{π/2}sin²2θ=π/4
+- AGZE.64 | i^2 = (0,1)·(0,1) ,  |a||b| cos θ = −1 | (no gloss in text; continuation of chain) | ROT | CALC
+- AGZE.65 | E = div(E, E_1) | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AGZE.66 | {f,g}/[f,g] = i^2 ,  E = m c^2 ,  I' = i^2 | Poisson/commutator ratio; mass-energy | QUANTUM SR | CALC: E=mc²
+- AGZE.67 | d/dγ Γ = m(x) = e^{−x log x} | Higgs field, zeta, quantum group | GAMMA ZETA | CALC: x^{−x}
+- AGZE.68 | sin(ix) = (e^{−x} + e^{x})/(2i) | hyper circle function | ROT | CALC: true value (e^{−x} − e^{x})/(2i) = i sinh x
+- AGZE.69 | d/df F = m(x) = e^f + e^{−f} = 2i sin(i x log x) | hyper circle, beta reverse | ROT BETA | CALC: 2cosh f vs −2 sinh u
+
+## quantum_computer4 (Quantum Computer in a certain theorem)
+
+- AQC4.1 | (E² ⊕ E²) · (R− ⊂ C±) = ⊕ ∇C± | pattern assembled; Euler product | ZETA | SYMB
+- AQC4.2 | = ⊕ ∇C± | zeta radius, quantum tunnel, quarks | ZETA QUANTUM | SYMB
+- AQC4.3 | ∂/∂f F(x) = ∬ cohom D_k(x) [Im] | cohomology from isotopy of D-brane | MANIFOLD | SYMB
+- AQC4.4 | ∂/∂f F = t∬ cohom D_k(x)^{≪p} | double integral of projection | MANIFOLD | SYMB
+- AQC4.5 | ∮ r dx^m = O(x,y) | horizon cut integral | OTHER | SYMB
+- AQC4.6 | t∭ D(χ,x) Hom[D²ψ]^{≪p} ≅ vol(V/S) | triple varint = volume | MANIFOLD | SYMB
+- AQC4.7 | ∂/∂f F(x) = t∬ cohom D_k(x)^{≪p} | global partial diff = cohomology cut | MANIFOLD | SYMB
+- AQC4.8 | d/df F = (F)^{f'} ,  ∫ F dx^m = (F)^f | global differential/integral definitions | MANIFOLD | SYMB
+- AQC4.9 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{f'} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.10 | f' = 2x( log x + log(x + 1) ) | exponent f' | OTHER | CALC
+- AQC4.11 | ∫∫ F dx^m = ( 1/(x log x)^2 )^{∫ 2x(log x + log(x+1)) dx} = e^{−f} | global integral value | MANIFOLD | CALC: numeric power with quad exponent
+- AQC4.12 | d/df F = ( 1/(x log x)^2 )^{2x(log x + log(x+1))} = e^{f} | global differential value | MANIFOLD | CALC
+- AQC4.13 | log(x log x) ≥ 2 (y log y)^{1/2} | inequality | ENTROPY | CALC: test on grid
+- AQC4.14 | log(x log x) ≥ 2 √(y log y) | inequality | ENTROPY | CALC
+- AQC4.15 | π(χ,x) = [ iπ(χ,x), f(x) ] | fundamental group commutator | MANIFOLD | SYMB
+- AQC4.16 | ∫ 1/(x log x) dx = i ∫ 1/(x log x) dx^N + N i ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AQC4.17 | ∫ 1/(x log x) dx = i ∫ x log x dx − ∫ 1/(x log x) dx | (no gloss in text; continuation of chain) | ENTROPY | SYMB
+- AQC4.18 | ∫∫ 1/(x log x)^2 dx^m = i (1/2) x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.19 | ∫∫ 1/(x log x)^2 dx^m = i ∬_M dx^m ≤ (1/2) i + x^2 | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.20 | E = −(1/2) m v^2 + m c^2 | energy (kinetic sign flipped) | SR | CALC: compare γmc² ≈ mc² + ½mv²
+- AQC4.21 | lim_{x→∞} ∫∫ 1/(x log x)^2 dx^m ≥ (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.22 | d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.23 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ 1/(x log x)^2 dx^m )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.24 | (f)(f)' = (f f)'/2 = e^{x log x} | (no gloss in text; continuation of chain) | ENTROPY | CALC: x^x
+- AQC4.25 | Γ = ∫ e^{−x} x^{1−t} dx ,  d/df F = e^f ,  ∫ F dx^m = e^{−f} | gamma as global differential | GAMMA | CALC: Γ(2−t)
+- AQC4.26 | ∫ x^{1−t} dx = d/df F ,  ∫ e^{−x} dx = ∫ F dx^m | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AQC4.27 | e^{iθ} = cos θ + i sin θ | Euler formula | ROT | CALC
+- AQC4.28 | x ⊥ y → x·y = 0⃗ ,  d/df ∫∫ 1/(x log x)^2 dx^m = (1/2) i | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.29 | d/df ∫∫ 1/(x log x)^2 dx^m = ( ∫∫ ... )^{(f)'} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.30 | 1/2 + (1/2) i = 0⃗ ,  (1/2)·(1/2) i | real pole 1/2 (critical line) | ZETA | CALC
+- AQC4.31 | A + B = 0⃗ ,  A·B = (1/4) i | (no gloss in text; continuation of chain) | ZETA | CALC: A=1/2, B=i/2
+- AQC4.32 | tan 90 ≠ 0 ,  ||ds²|| = A + B | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.33 | sin 0 = 0 | real pole of 1/2 | ZETA | CALC
+- AQC4.34 | e^{iθ} = cos θ + i sin θ  (repeat) | non-certain system of particles | ROT QUANTUM | CALC
+- AQC4.35 | d/df F = d/df ∫∫ 1/(x log x)^2 dx^m + d/df ∫∫ 1/(y log y)^{1/2} dy^m = Γ(x,y) | gamma of two variables | GAMMA | CALC
+- AQC4.36 | d/dγ Γ = (e^{−x} x^{1−t})^{γ'} → d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AQC4.37 | Γ(s) = ∫ e^{−x} x^{s−1} dx ,  Γ'(s) = ∫ e^{−x} x^{s−1} log x dx | gamma and its derivative (correct) | GAMMA | CALC: scipy gamma; Γ'(1) = −γ = −0.57722
+- AQC4.38 | x^{s−1} = e^{(s−1) log x} | (no gloss in text; continuation of chain) | GAMMA | CALC
+- AQC4.39 | ∂/∂s x^{s−1} = ∂/∂s e^{−x}·e^{(s−1)log x} = e^{−x}·log x·e^{(s−1)log x} = e^{−x}·log x·x^{s−1} | derivative of integrand | GAMMA | CALC
+- AQC4.40 | d/dγ Γ = Γ(γ)' | (no gloss in text; continuation of chain) | GAMMA | CALC: digamma·gamma
+- AQC4.41 | d/dγ Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx^{(∫0^∞ e^{−x}x^{s−1} log x dx)'} = Γ(Γ ∫ log x dx)' = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AQC4.42 | Γ(s) = ∫0^∞ e^{−x} x^{s−1} dx | gamma function | GAMMA | CALC
+- AQC4.43 | Γ'(s) = ∫0^∞ e^{−x} x^{s−1} log x dx | gamma derivative | GAMMA | CALC
+- AQC4.44 | d/df F = ∫ x^{s−1} dx ,  ∫ F dx^m = ∫ e^{−x} dx | (no gloss in text; continuation of chain) | GAMMA | SYMB
+- AQC4.45 | d/df F = F^{(f)'} ,  ∫ F dx^m = F^{(f)} | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.46 | HΨ = ⊕(iℏ∇)^{⊕L} = ⊕ HΨ^{∇L} = e^{x log x} = x^{(x)'} | quantum physics, no Gauss surface | QUANTUM | CALC: x^x
+- AQC4.47 | d/df F = m(x) | gravity in quantum physics | OTHER | SYMB
+- AQC4.48 | d/dt ψ(t) = ℏ = (1/(2i)) e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AQC4.49 | (iℏ)' = (−e^{iĤ})' = −i e^{iĤ} | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AQC4.50 | ψ(x) = e^{−iĤt} ,  ⊕(iℏ∇)^{⊕L} = (1/2) e^{iĤ(−i e^{iĤ})} | (no gloss in text; continuation of chain) | QUANTUM | CALC: expm(-iHt)
+- AQC4.51 | = (1/(2f))^{−if} = (1/2)^{−if} · e^{−x log x} · (f)^i | (no gloss in text; continuation of chain) | QUANTUM GAMMA | CALC
+- AQC4.52 | = ∫ e^{−x} x^{t−1} dx ,  d/dγ Γ = e^{−x log x} | (no gloss in text; continuation of chain) | GAMMA | CALC: Γ(t)
+- AQC4.53 | f = x , i = t , 1/2 = a ,  ⊕ a^{−t} x x^t [Im] ≅ ∫ e^{−x} x^{t−1} dx | Dirichlet-type sum ≅ gamma | GAMMA ZETA | CALC: compare Σ a^{−t}... with Γ(t)
+- AQC4.54 | |ψ(t)⟩_s = e^{−iĤt} |Ψ⟩_H ,  Â_s = Â_H(0) | Schrödinger/Heisenberg pictures | QUANTUM | CALC: expm
+- AQC4.55 | |Ψ(t)⟩_s → d/dt ;  i d/dt |ψ(t)⟩_s = Ĥ |ψ(t)⟩_s | Schrödinger equation | QUANTUM | CALC: ODE solve
+- AQC4.56 | ⟨Â(t)⟩ = ⟨Ψ(t)| Â(0) |Ψ(t)⟩ | expectation value | QUANTUM | CALC
+- AQC4.57 | d/dt Â = (1/i) [Â, H] | Heisenberg equation | QUANTUM | CALC
+- AQC4.58 | Â(t) = e^{iĤt} Â(0) e^{−iĤt} | Heisenberg picture operator | QUANTUM | CALC
+- AQC4.59 | lim_{θ→0} (sin θ, cos θ) [[θ, 1], [1, θ]] (cos θ, sin θ)^T = [[1, 0], [0, −1]] | rotation limit to σz | ROT | CALC: evaluate at small θ (scalar result ≈ 1)
+- AQC4.60 | f^{−1}(x) x f(x) = I'_m ,  I'_m = [1, 0] × [0, 1] | conjugation identity | OTHER | SYMB
+- AQC4.61 | x + y ≥ √(x y) | (no gloss in text; continuation of chain) | OTHER | CALC
+- AQC4.62 | x^{1/2 + iy} / e^{x log x} = 1 | zeta critical-line form | ZETA | CALC: compare both
+- AQC4.63 | O(x) = ∇_i∇_j ∫ e^{(2/m) sin θ cos θ} × N mod(e^{x log x}) | (no gloss in text; continuation of chain) | ROT | SYMB
+- AQC4.64 | O(x) (x + Δ|f|^2)^{1/2} | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.65 | x Γ(x) = 2 ∫ |sin 2θ|^2 dθ ,  O(x) = m(x)[D²ψ] | (no gloss in text; continuation of chain) | GAMMA ROT | CALC: xΓ(x)=Γ(x+1); ∫0^{π/2}sin²2θ=π/4
+- AQC4.66 | i^2 = (0,1)·(0,1) ,  |a||b| cos θ = −1 | (no gloss in text; continuation of chain) | ROT | CALC
+- AQC4.67 | E = div(E, E_1) | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.68 | {f,g}/[f,g] = i^2 ,  E = m c^2 ,  I' = i^2 | Poisson/commutator ratio; mass-energy | QUANTUM SR | CALC: E=mc²
+- AQC4.69 | d/dγ Γ = m(x) = e^{−x log x} | Higgs field, zeta, quantum group | GAMMA ZETA | CALC: x^{−x}
+- AQC4.70 | sin(ix) = (e^{−x} + e^{x})/(2i) | hyper circle function | ROT | CALC: true value (e^{−x} − e^{x})/(2i) = i sinh x
+- AQC4.71 | d/df F = m(x) = e^f + e^{−f} = 2i sin(i x log x) | hyper circle, beta reverse | ROT BETA | CALC: 2cosh f vs −2 sinh u
+- AQC4.72 | (E² ⊕ E²) · (R− ⊂ C±) = ⊕ ∇C±  (repeat) | Euler product | ZETA | SYMB
+- AQC4.73 | = ⊕ ∇C±  (repeat) | (no gloss in text; continuation of chain) | ZETA | SYMB
+- AQC4.74 | ∂/∂f F = t∬ cohom D_k(x)^{≪p} = ∇∇ ∫ ∇f dx^m = ⊕(iℏ∇)^{⊕L} | partial integral manifold in global integral | MANIFOLD QUANTUM | SYMB
+- AQC4.75 | ∨ ∫ C± ∇ M^m | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.76 | Δ(M± ∇C±) = ∃(M± ∇R+) | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.77 | ∃(M± ∇C+) = XOR( ⊕ ∇M± ) | (no gloss in text; continuation of chain) | QUANTUM | SYMB
+- AQC4.78 | −[E+ ∇R+] = ∇+ ∇− C± | (no gloss in text; continuation of chain) | OTHER | SYMB
+- AQC4.79 | ∫ dx, ∂x, ∇_i∇_j, Δx → E+∇M1 ,  E+ ∩ R ∈ M1 ,  R ∇C+ | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.80 | ∨(R + ∇_i∇_j f)^n = ∫ ∧(R + ∇_i∇_j f)^2 / ∃(R + Δf)^n | zeta with Ricci flow cohomology, locality | ZETA MANIFOLD | SYMB
+- AQC4.81 | ∧(R + ∇_i∇_j f)^x = d/df ∫∫ 1/(y log y)^{1/2} dy^m | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.82 | d/dt g_ij(x) = −2 R_ij | Ricci flow | MANIFOLD | CALC: sphere radius flow
+- AQC4.83 | ∨ ∫ ∧(R + ∇_i∇_j f)^x = ∧(R + ∇_i∇_j f)^n / ∃(R + ∇_i∇_j f∘g)^n | (no gloss in text; continuation of chain) | MANIFOLD | SYMB
+- AQC4.84 | x + y ≥ 2√(xy) ,  x(x) + y(x) ≥ x(x) y(x) | AM-GM | OTHER | CALC
+- AQC4.85 | x^y = (cos θ + i sin θ)^n | de Moivre rotation | ROT | CALC: e^{inθ}
+- AQC4.86 | x^y = 1/y^x | zeta constructed from quantum eq | ZETA | CALC
+
+## hodge_zeromodes (Vol.13, Hodge zero-modes; Japanese, Claude-assisted)
+
+- AHODGE.1 | Δ_p = dδ + δd | Hodge Laplacian on p-forms | MANIFOLD | CALC: discrete/eigenvalue spectra
+- AHODGE.2 | b_p = dim ker Δ_p = n0(Δ_p) | Betti number = zero-mode count (Hodge thm 1) | MANIFOLD | CALC: count zero eigenvalues
+- AHODGE.3 | ker Δ_p ≅ H^p(M,R) | harmonic forms = cohomology | MANIFOLD | SYMB
+- AHODGE.4 | ζ_p(s) = Σ_{λ>0} λ^{−s} | spectral zeta of Δ_p | ZETA | CALC: sum over nonzero eigenvalues (analytic continuation)
+- AHODGE.5 | ζ_p(0) = a_1^{(p)} − b_p  (d=2) | zeta at origin from heat coeff & Betti | ZETA MANIFOLD | CALC
+- AHODGE.6 | ζ_p(0) = −b_p = −C(d,p)  (flat torus) | flat-torus value | ZETA | CALC: binomial
+- AHODGE.7 | Σ_{p=0}^{d} (−1)^p Tr e^{−tΔ_p} = χ(M)  (all t>0) | McKean-Singer supersymmetric sum | MANIFOLD | CALC: S² gives 2.0000000000, T² gives 0 (t=0.05,0.5,5)
+- AHODGE.8 | K_0(t) = Σ_{ℓ≥0} (2ℓ+1) e^{−tℓ(ℓ+1)} ,  K_1(t) = Σ_{ℓ≥1} 2(2ℓ+1) e^{−tℓ(ℓ+1)} ,  K_2 = K_0  (S²) | heat traces on S² | MANIFOLD | CALC: ℓ≤3000; t=0.05: K0=20.336699, K1=38.673398
+- AHODGE.9 | T²: Δ_1 ≅ Δ_0 ⊕ Δ_0 ;  K_0(0.05)=62.831853 | heat traces on T² (theta/Poisson) | MANIFOLD | CALC: Jacobi theta sums
+- AHODGE.10 | χ = 6(ζ_0(0) + 1) | Vol.8 result from p=0 only | ZETA MANIFOLD | CALC
+- AHODGE.11 | H^k(X,C) = ⊕_{p+q=k} H^{p,q}(X) | Hodge decomposition | MANIFOLD | SYMB
+- AHODGE.12 | Hodge class ∈ H^{2p}(X,Q) ∩ H^{p,p}(X) ;  [Z] ∈ H^{2p}(X,Q) ∩ H^{p,p} | Hodge classes, algebraic cycle class | MANIFOLD | SYMB
+- AHODGE.13 | Ω^p = ker Δ_p ⊕ im d ⊕ im δ | Hodge decomposition of forms | MANIFOLD | SYMB
+- AHODGE.14 | X = C^n/Λ , Λ ≅ Z^{2n} ,  ker Δ_k ≅ Λ^k(R^{2n})* ,  b_k = C(2n,k) | complex torus harmonic forms | MANIFOLD | CALC: binomial
+- AHODGE.15 | J² = −1 ,  h^{p,q} = C(n,p) C(n,q) | Hodge numbers of torus | MANIFOLD | CALC
+- AHODGE.16 | Ω(Jx, Jy) = Ω(x,y)  ⟺  J^T Ω J = Ω | (1,1)-type condition | MANIFOLD ROT | CALC: matrix check
+- AHODGE.17 | Λ = Z·1 ⊕ Z·τ1 ⊕ Z·1 ⊕ Z·τ2 ;  e1=(1,0), e2=(τ1,0), e3=(0,1), e4=(0,τ2) | lattice of Eτ1×Eτ2 | MANIFOLD | SYMB
+- AHODGE.18 | τ = x + iy :  J e1 = (−x/y) e1 + (1/y) e2 ,  J e2 = (−y − x²/y) e1 + (x/y) e2 | complex structure as real 4x4 block | MANIFOLD ROT | CALC: block [[−x/y, −y−x²/y],[1/y, x/y]]
+- AHODGE.19 | 9^6 = 531441 | brute-force count |coef|≤4, 6 components | OTHER | CALC
+- AHODGE.20 | ρ(Eτ1 × Eτ2) = 2 + rank Hom(Eτ1, Eτ2) | Picard number formula (Thm 3) | MANIFOLD | CALC: brute force; i,i→4; generic→2
+- AHODGE.21 | #solutions ≈ 9^ρ  (81 = 9², 6561 = 9⁴) | lattice points in box | OTHER | CALC
+- AHODGE.22 | H²(X,Z) ≅ Z^6 ,  b_2 = 6 | zero-mode space fixed | MANIFOLD | CALC
+- AHODGE.23 | 0 → Z → O → O* → 0 ;  H¹(O*) → H²(Z) | exponential sequence (Lefschetz (1,1)) | MANIFOLD | SYMB
+- AHODGE.24 | J_θ = cos θ·I + sin θ·K ,  J_θ² = −1 ,  J_θ^T J_θ = 1 | rotating complex structure, fixed metric | ROT MANIFOLD | CALC: numpy with explicit I,K
+- AHODGE.25 | b_p = (1, 4, 6, 4, 1) | Betti numbers of T^4 | MANIFOLD | CALC
+- AHODGE.26 | ρ(θ) = 4 if cos θ : sin θ ∈ Q ;  ρ(θ) = 3 otherwise | Picard rank jumps, same spectrum (Thm 5) | ROT MANIFOLD | CALC: θ=0,π/4,atan2→4; θ=1,0.7→3
+- AHODGE.27 | Λ² = Λ⁺ ⊕ Λ⁻ | self-dual/anti-self-dual split | MANIFOLD | SYMB
+- AHODGE.28 | (1,1) real forms = Λ⁻ ⊕ R·ω_θ ,  ω_θ = cos θ·ω_I + sin θ·ω_K | rotating Kähler form | ROT MANIFOLD | CALC
+- AHODGE.29 | I = [[0,−1,0,0],[1,0,0,0],[0,0,0,−1],[0,0,1,0]] ,  K = [[0,0,0,−1],[0,0,−1,0],[0,1,0,0],[1,0,0,0]] | quaternion complex structures | ROT | CALC
+- AHODGE.30 | ||J^T Ω J − Ω||_max < 1e−8 | numerical tolerance | OTHER | CALC
+- AHODGE.31 | ζ3 = 1/2 + i√3/2 | CM point | OTHER | CALC
+- AHODGE.32 | M(□) = x^y + y^x + z^a + u^b + v^c = 0 ,  1/y + 1/x + 1/a + 1/b + 1/c = 1  (quoted from cafe) | 'Kalavi-Yau' judged unverified | MANIFOLD | CALC
+- AHODGE.33 | Σ x_i^d = 0  (d = number of variables) | Fermat Calabi-Yau example | MANIFOLD | CALC
+- AHODGE.34 | c_1 = 0 | Calabi-Yau definition | MANIFOLD | SYMB
+- AHODGE.35 | ∇_i∇_j(R + ∇∇f)  (quoted) | Ricci flow notation, unverified | MANIFOLD | SYMB
+- AHODGE.36 | ζ(s) = β/log x ,  HΨ = ⊕(iℏ∇)^{⊕L}  (quoted) | refuted/undefined framework claims | ZETA QUANTUM | SYMB
+- AHODGE.37 | s = Σ_p (−1)^p heat_trace(spec_p, t) | Bada rule mckean_singer | MANIFOLD | CALC
+
+## Totals
+- CAFE: 78
+- CAOS: 61
+- CAT: 54
+- CATS: 12
+- GBZ: 69
+- GMK: 29
+- GZE: 69
+- QC4: 86
+- HODGE: 37
+- ALL: 495

@@ -1,0 +1,473 @@
+# ════════════════════════════════════════════════════════════════════
+#  lib_core.bada — 複素数・ガンマ・ゼータ・特殊相対論・複素回転体(コマ)・
+#                   Jones 多項式・大域的部分積分多様体 の計算核
+#  (bada_c 方言: def/let/while/if/elsif/end, cons リスト, libm FFI)
+# ════════════════════════════════════════════════════════════════════
+
+# ─── 基本 ───────────────────────────────────────────────
+def atan2(y, x)
+  return cfn("m", "atan2", y, x)
+end
+def tanh(x)
+  return cfn("m", "tanh", x)
+end
+def acosh(x)
+  return cfn("m", "acosh", x)
+end
+def sinh(x)
+  return (exp(x) - exp(0 - x)) / 2
+end
+def cosh(x)
+  return (exp(x) + exp(0 - x)) / 2
+end
+def fmt(x)
+  return str(x)
+end
+# 配列風リストの i 番目を v に置換した新リスト
+def put(xs, i, v)
+  let out = []
+  let k = 0
+  while k < len(xs)
+    if k == i
+      out = append(out, v)
+    else
+      out = append(out, at(xs, k))
+    end
+    k = k + 1
+  end
+  return out
+end
+def zeros(n)
+  let out = []
+  let k = 0
+  while k < n
+    out = append(out, 0)
+    k = k + 1
+  end
+  return out
+end
+
+# ─── 複素数 z = [re, im] ───────────────────────────────
+def C(a, b)
+  return list(a, b)
+end
+def re(z)
+  return at(z, 0)
+end
+def im(z)
+  return at(z, 1)
+end
+def cadd(a, b)
+  return C(re(a) + re(b), im(a) + im(b))
+end
+def csub(a, b)
+  return C(re(a) - re(b), im(a) - im(b))
+end
+def cmul(a, b)
+  return C(re(a) * re(b) - im(a) * im(b), re(a) * im(b) + im(a) * re(b))
+end
+def cscale(a, k)
+  return C(re(a) * k, im(a) * k)
+end
+def cabs(a)
+  return sqrt(re(a) * re(a) + im(a) * im(a))
+end
+def carg(a)
+  return atan2(im(a), re(a))
+end
+def cconj(a)
+  return C(re(a), 0 - im(a))
+end
+def cdiv(a, b)
+  let d = re(b) * re(b) + im(b) * im(b)
+  return C((re(a) * re(b) + im(a) * im(b)) / d, (im(a) * re(b) - re(a) * im(b)) / d)
+end
+def cexp(a)
+  let r = exp(re(a))
+  return C(r * cos(im(a)), r * sin(im(a)))
+end
+def clog(a)
+  return C(log(cabs(a)), carg(a))
+end
+def cpow(a, b)
+  if cabs(a) == 0
+    return C(0, 0)
+  end
+  return cexp(cmul(b, clog(a)))
+end
+def csin(a)
+  return C(sin(re(a)) * cosh(im(a)), cos(re(a)) * sinh(im(a)))
+end
+def ccos(a)
+  return C(cos(re(a)) * cosh(im(a)), 0 - sin(re(a)) * sinh(im(a)))
+end
+def cis(t)
+  return C(cos(t), sin(t))
+end
+def cstr_(z)
+  if im(z) < 0
+    return str(re(z)) + " - " + str(0 - im(z)) + "i"
+  end
+  return str(re(z)) + " + " + str(im(z)) + "i"
+end
+
+# ─── 複素ガンマ関数 Γ(z) (Lanczos g=7, n=9) ─────────────
+let LANCZOS = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 0.0000099843695780195716, 0.00000015056327351493116]
+def cgamma(z)
+  if re(z) < 0.5
+    # 反射公式 Γ(z)Γ(1-z) = π / sin(πz)
+    let s = csin(cscale(z, pi()))
+    return cdiv(C(pi(), 0), cmul(s, cgamma(csub(C(1, 0), z))))
+  end
+  let zz = csub(z, C(1, 0))
+  let x = C(at(LANCZOS, 0), 0)
+  let i = 1
+  while i < 9
+    x = cadd(x, cdiv(C(at(LANCZOS, i), 0), cadd(zz, C(i, 0))))
+    i = i + 1
+  end
+  let t = cadd(zz, C(7.5, 0))
+  let a = cpow(t, cadd(zz, C(0.5, 0)))
+  let b = cexp(cscale(t, -1))
+  return cscale(cmul(cmul(a, b), x), sqrt(2 * pi()))
+end
+
+# ─── 複素ゼータ関数 ζ(s) (Borwein のイータ加速 + 関数等式) ──
+def fact(n)
+  let r = 1
+  let i = 2
+  while i <= n
+    r = r * i
+    i = i + 1
+  end
+  return r
+end
+let BORWEIN_N = 24
+def borwein_d()
+  let n = BORWEIN_N
+  let ds = []
+  let acc = 0
+  let k = 0
+  while k <= n
+    acc = acc + n * fact(n + k - 1) * pow(4, k) / (fact(n - k) * fact(2 * k))
+    ds = append(ds, acc)
+    k = k + 1
+  end
+  return ds
+end
+let BORWEIN_D = borwein_d()
+def czeta(s)
+  let term = 0
+  if re(s) < 0.5
+    # ζ(s) = 2^s π^(s-1) sin(πs/2) Γ(1-s) ζ(1-s)
+    let one_s = csub(C(1, 0), s)
+    let f1 = cpow(C(2, 0), s)
+    let f2 = cpow(C(pi(), 0), csub(s, C(1, 0)))
+    let f3 = csin(cscale(s, pi() / 2))
+    let f4 = cgamma(one_s)
+    return cmul(cmul(cmul(f1, f2), cmul(f3, f4)), czeta(one_s))
+  end
+  let n = BORWEIN_N
+  let dn = at(BORWEIN_D, n)
+  let sum = C(0, 0)
+  let k = 0
+  let sign = 1
+  while k < n
+    term = cdiv(C(sign * (at(BORWEIN_D, k) - dn), 0), cpow(C(k + 1, 0), s))
+    sum = cadd(sum, term)
+    sign = 0 - sign
+    k = k + 1
+  end
+  let eta = cscale(sum, -1 / dn)
+  let denom = csub(C(1, 0), cpow(C(2, 0), csub(C(1, 0), s)))
+  return cdiv(eta, denom)
+end
+def zeta(x)
+  return re(czeta(C(x, 0)))
+end
+
+# ─── 特殊相対論: 映画『コンタクト』の時間比 ────────────────
+#   地球時計 Δt = 1 s, 搭乗者固有時 Δτ = 18 h → 比 Γ = 64800
+let C_LIGHT = 299792458
+let LY = 9.4607304725808e15
+def lorentz_gamma_from_ratio(t_long, t_short)
+  return t_long / t_short
+end
+# 1 - β = 1 - sqrt(1 - 1/γ²) を桁落ちなしで
+def one_minus_beta(g)
+  let x = 1 / (g * g)
+  # 1 - sqrt(1-x) = x / (1 + sqrt(1-x))
+  return x / (1 + sqrt(1 - x))
+end
+def rapidity(g)
+  return acosh(g)
+end
+# ブースト = 虚角回転: (ict, x) 平面の角 iφ → cos(iφ)=coshφ=γ
+def boost_as_complex_rotation(phi)
+  return list(ccos(C(0, phi)), csin(C(0, phi)))
+end
+
+# ─── 複素回転体（コマ）の幾何学 ──────────────────────────
+#   対称コマ: I1=I2, I3。スピン ω3, 歳差 Ω = I3 ω3 / (I1 cosθ) (ジャイロ近似 M g l / (I3 ω3))
+#   複素化: 角 θ → θ + iφ (φ=ラピディティ)。コマの軸がブースト方向に「虚回転」する
+def top_precession(m, g, l, i3, w3)
+  return m * g * l / (i3 * w3)
+end
+def top_nutation(i1, i3, w3)
+  return i3 * w3 / i1
+end
+# Thomas–Wigner 歳差 ω_T = (γ²/(γ+1)) a v / c²  (円運動 a = v²/r)
+def thomas_precession(g, v, r)
+  let a = v * v / r
+  return g * g / (g + 1) * a * v / (C_LIGHT * C_LIGHT)
+end
+# コマの 3 軸回転行列 (Euler 角 z-x-z) — 実部
+def euler_rot(phi, theta, psi, v)
+  let x = at(v, 0)
+  let y = at(v, 1)
+  let z = at(v, 2)
+  # R = Rz(phi) Rx(theta) Rz(psi)
+  let x1 = x * cos(psi) - y * sin(psi)
+  let y1 = x * sin(psi) + y * cos(psi)
+  let z1 = z
+  let x2 = x1
+  let y2 = y1 * cos(theta) - z1 * sin(theta)
+  let z2 = y1 * sin(theta) + z1 * cos(theta)
+  return list(x2 * cos(phi) - y2 * sin(phi), x2 * sin(phi) + y2 * cos(phi), z2)
+end
+
+# ─── Jones 多項式 (Kauffman ブラケットの状態和, PD コード) ───
+#   PD 交点 X[a,b,c,d]: A-平滑化 (a~d)(b~c), B-平滑化 (a~b)(c~d)  (KnotAtlas 規約)
+def uf_find(par, x)
+  while at(par, x) != x
+    x = at(par, x)
+  end
+  return x
+end
+def count_loops(pd, state, nedges)
+  let x = 0
+  let bit = 0
+  let p1 = 0
+  let q1 = 0
+  let p2 = 0
+  let q2 = 0
+  let r1 = 0
+  let s1 = 0
+  let r2 = 0
+  let s2 = 0
+  let par = []
+  let i = 0
+  while i <= nedges
+    par = append(par, i)
+    i = i + 1
+  end
+  let k = 0
+  let bits = state
+  while k < len(pd)
+    x = at(pd, k)
+    bit = mod(bits, 2)
+    bits = floor(bits / 2)
+    p1 = at(x, 0)
+    q1 = at(x, 3)
+    p2 = at(x, 1)
+    q2 = at(x, 2)
+    if bit == 1
+      q1 = at(x, 1)
+      p2 = at(x, 2)
+      q2 = at(x, 3)
+    end
+    r1 = uf_find(par, p1)
+    s1 = uf_find(par, q1)
+    if r1 != s1
+      par = put(par, r1, s1)
+    end
+    r2 = uf_find(par, p2)
+    s2 = uf_find(par, q2)
+    if r2 != s2
+      par = put(par, r2, s2)
+    end
+    k = k + 1
+  end
+  let loops = 0
+  let e = 1
+  while e <= nedges
+    if uf_find(par, e) == e
+      loops = loops + 1
+    end
+    e = e + 1
+  end
+  return loops
+end
+# Laurent 多項式 = 疎な項リスト [[指数, 係数], ...] (A の指数)
+def lpoly_zero()
+  return []
+end
+def lpoly_add_term(p, e, c)
+  let t = 0
+  let out = []
+  let found = false
+  let i = 0
+  while i < len(p)
+    t = at(p, i)
+    if at(t, 0) == e
+      found = true
+      if at(t, 1) + c != 0
+        out = append(out, list(e, at(t, 1) + c))
+      end
+    else
+      out = append(out, t)
+    end
+    i = i + 1
+  end
+  if not found and c != 0
+    out = append(out, list(e, c))
+  end
+  return out
+end
+def lpoly_add(p, q)
+  let r = p
+  let i = 0
+  while i < len(q)
+    r = lpoly_add_term(r, at(at(q, i), 0), at(at(q, i), 1))
+    i = i + 1
+  end
+  return r
+end
+def lpoly_mul(p, q)
+  let j = 0
+  let r = []
+  let i = 0
+  while i < len(p)
+    j = 0
+    while j < len(q)
+      r = lpoly_add_term(r, at(at(p, i), 0) + at(at(q, j), 0), at(at(p, i), 1) * at(at(q, j), 1))
+      j = j + 1
+    end
+    i = i + 1
+  end
+  return r
+end
+# δ = -A² - A⁻²
+def delta_pow(n)
+  let d = list(list(2, -1), list(-2, -1))
+  let r = list(list(0, 1))
+  let i = 0
+  while i < n
+    r = lpoly_mul(r, d)
+    i = i + 1
+  end
+  return r
+end
+def kauffman_bracket(pd)
+  let nb = 0
+  let t = 0
+  let k = 0
+  let na = 0
+  let loops = 0
+  let term = 0
+  let n = len(pd)
+  let nedges = 2 * n
+  let total = lpoly_zero()
+  let s = 0
+  while s < pow(2, n)
+    nb = 0
+    t = s
+    k = 0
+    while k < n
+      nb = nb + mod(t, 2)
+      t = floor(t / 2)
+      k = k + 1
+    end
+    na = n - nb
+    loops = count_loops(pd, s, nedges)
+    term = lpoly_mul(list(list(na - nb, 1)), delta_pow(loops - 1))
+    total = lpoly_add(total, term)
+    s = s + 1
+  end
+  return total
+end
+# V(t) = (-A³)^(-w) <K>,  A = t^(-1/4) → A の指数 e ↦ t の指数 -e/4
+def jones_from_bracket(br, writhe)
+  return lpoly_mul(list(list(-3 * writhe, pow(-1, abs(writhe)))), br)
+end
+# t の指数の昇順に整列した [t指数, 係数] リスト
+def jones_terms(vA)
+  let best = 0
+  let i = 0
+  let t = 0
+  let nr = 0
+  let k = 0
+  let out = []
+  let rest = vA
+  while len(rest) > 0
+    best = 0
+    i = 1
+    while i < len(rest)
+      if at(at(rest, i), 0) > at(at(rest, best), 0)
+        best = i
+      end
+      i = i + 1
+    end
+    t = at(rest, best)
+    out = append(out, list(0 - at(t, 0) / 4, at(t, 1)))
+    nr = []
+    k = 0
+    while k < len(rest)
+      if k != best
+        nr = append(nr, at(rest, k))
+      end
+      k = k + 1
+    end
+    rest = nr
+  end
+  return out
+end
+def jones_string(vA)
+  let e = 0
+  let c = 0
+  let sgn = 0
+  let mag = 0
+  let ms = 0
+  let ts = 0
+  let terms = jones_terms(vA)
+  let out = ""
+  let i = 0
+  while i < len(terms)
+    e = at(at(terms, i), 0)
+    c = at(at(terms, i), 1)
+    sgn = " + "
+    if c < 0
+      sgn = " - "
+    end
+    if out == ""
+      sgn = ""
+      if c < 0
+        sgn = "-"
+      end
+    end
+    mag = abs(c)
+    ms = str(mag)
+    if mag == 1 and e != 0
+      ms = ""
+    end
+    ts = "t^" + str(e)
+    if e == 0
+      ts = ""
+    end
+    out = out + sgn + ms + ts
+    i = i + 1
+  end
+  return out
+end
+# 複素 t で V(t) を数値評価
+def jones_eval(vA, t)
+  let e = 0
+  let sum = C(0, 0)
+  let i = 0
+  while i < len(vA)
+    e = 0 - at(at(vA, i), 0) / 4
+    sum = cadd(sum, cscale(cpow(t, C(e, 0)), at(at(vA, i), 1)))
+    i = i + 1
+  end
+  return sum
+end

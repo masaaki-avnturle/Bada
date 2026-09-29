@@ -1,0 +1,107 @@
+# ════════════════════════════════════════════════════════════════════
+#  lib_registry.bada — 論文の全方程式レジストリ
+#   eq(id, 式, 意味, [タグ...], calc)  : 数値化可能な式。calc() を実行して値を得る
+#   eqs(id, 式, 意味, [タグ...])     : 記号的な式。設計図には構造として割り当てる
+#   calc() の返り値: 数値 / 複素数 [re, im] / chk(左辺, 右辺) (等式の数値検証)
+# ════════════════════════════════════════════════════════════════════
+
+let REG = []
+let REG_N = 0
+let REG_CALC = 0
+let REG_HOLD = 0
+let REG_FAIL = 0
+# 部品ごとの集計: [名前, 件数, 数値エネルギー Σ log(1+|v|)]
+let COMP_NAMES = ["ROT", "SR", "GAMMA", "ZETA", "BETA", "JONES", "MANIFOLD", "QUANTUM", "TRANSPORT", "ENTROPY", "OTHER"]
+let COMP_COUNT = zeros(11)
+let COMP_ENERGY = zeros(11)
+
+def chk(lhs, rhs)
+  return list("chk", lhs, rhs)
+end
+def is_chk(v)
+  if len(v) == 3
+    if at(v, 0) == "chk"
+      return true
+    end
+  end
+  return false
+end
+def num_or_c_abs(v)
+  if len(v) == 2
+    return cabs(v)
+  end
+  return abs(v)
+end
+def val_str(v)
+  if len(v) == 2
+    return cstr_(v)
+  end
+  return str(v)
+end
+def comp_index(tag)
+  let i = 0
+  while i < len(COMP_NAMES)
+    if at(COMP_NAMES, i) == tag
+      return i
+    end
+    i = i + 1
+  end
+  return 10
+end
+def add_energy(tags, e)
+  let k = 0
+  let i = 0
+  while i < len(tags)
+    k = comp_index(at(tags, i))
+    COMP_COUNT = put(COMP_COUNT, k, at(COMP_COUNT, k) + 1)
+    COMP_ENERGY = put(COMP_ENERGY, k, at(COMP_ENERGY, k) + e)
+    i = i + 1
+  end
+end
+def eq(id, text, gloss, tags, calc)
+  let v = calc()
+  let status = "calc"
+  let shown = ""
+  let e = 0
+  if is_chk(v)
+    let l = at(v, 1)
+    let r = at(v, 2)
+    let dl = num_or_c_abs(l)
+    let d = 0
+    if len(l) == 2 or len(r) == 2
+      let lc = l
+      let rc = r
+      if len(l) != 2
+        lc = C(l, 0)
+      end
+      if len(r) != 2
+        rc = C(r, 0)
+      end
+      d = cabs(csub(lc, rc))
+    else
+      d = abs(l - r)
+    end
+    let scale = 1 + dl
+    if d / scale < 0.001
+      status = "holds"
+      REG_HOLD = REG_HOLD + 1
+    else
+      status = "differs"
+      REG_FAIL = REG_FAIL + 1
+    end
+    shown = val_str(l) + " vs " + val_str(r)
+    e = log(1 + dl)
+  else
+    shown = val_str(v)
+    e = log(1 + num_or_c_abs(v))
+  end
+  REG_CALC = REG_CALC + 1
+  REG_N = REG_N + 1
+  add_energy(tags, e)
+  REG = append(REG, list(id, text, gloss, tags, status, shown))
+end
+def eqs(id, text, gloss, tags)
+  REG_N = REG_N + 1
+  add_energy(tags, 1)
+  REG = append(REG, list(id, text, gloss, tags, "symb", ""))
+end

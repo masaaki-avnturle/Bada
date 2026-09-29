@@ -1,0 +1,144 @@
+# ════════════════════════════════════════════════════════════════════
+#  lib_physics.bada — 衝突実験・特殊相対論・複素回転体(コマ)・
+#                      ガンマ/ゼータ大域的部分積分多様体・Jones 共鳴
+# ════════════════════════════════════════════════════════════════════
+
+# ─── 決定論的乱数 (Park–Miller, 倍精度で厳密) ─────────────
+let RNG_STATE = 20260929
+def rng()
+  RNG_STATE = mod(RNG_STATE * 16807, 2147483647)
+  return RNG_STATE / 2147483647
+end
+
+# ─── 1. ジュネーブ (CERN) 衝突段 ──────────────────────────
+#   陽子は線形加速器 Linac4 (160 MeV) から PSB→PS→SPS→LHC へ。
+#   √s = 13.6 TeV の pp 衝突で生じた終状態粒子の運動量和の不足
+#   (missing momentum) を「粒子が消えた方向」= 異次元への扉の軸とする。
+#   (ADD 型大きな余剰次元の探索では、重力子が余剰次元へ抜けると
+#    横方向運動量の不足 E_T^miss として観測される。)
+def collide(nparticles, sqrt_s_gev)
+  let e = 0
+  let costh = 0
+  let sinth = 0
+  let ph = 0
+  let p = 0
+  let px = 0
+  let py = 0
+  let pz = 0
+  let etot = 0
+  let visible = []
+  let i = 0
+  while i < nparticles
+    e = sqrt_s_gev * 0.5 * pow(rng(), 3) / nparticles * 6
+    costh = 2 * rng() - 1
+    sinth = sqrt(1 - costh * costh)
+    ph = 2 * pi() * rng()
+    p = v3(e * sinth * cos(ph), e * sinth * sin(ph), e * costh)
+    visible = append(visible, p)
+    px = px + at(p, 0)
+    py = py + at(p, 1)
+    pz = pz + at(p, 2)
+    etot = etot + e
+    i = i + 1
+  end
+  # 初期状態の運動量は 0 → 不足運動量 = −Σp (消えた粒子の方向)
+  let miss = v3(0 - px, 0 - py, 0 - pz)
+  let met = sqrt(px * px + py * py)
+  return list(miss, met, etot, visible)
+end
+
+# ─── 2. 特殊相対論 ────────────────────────────────────────
+#   『コンタクト』: 地球では 1 s、エリーの記録は 18 h。
+#   比 Γ = Δτ_long / Δt_short = 64800 をローレンツ因子とみなす。
+let VEGA_LY = 25.04
+def sr_block(t_short, t_long)
+  let g = t_long / t_short
+  let omb = one_minus_beta(g)
+  let phi = rapidity(g)
+  let L = VEGA_LY * LY
+  let Lc = L / g
+  let one_way = Lc / ((1 - omb) * C_LIGHT)
+  return list(g, omb, phi, L, Lc, one_way)
+end
+
+# ─── 3. 複素回転体（コマ）: 異次元が宇宙の中で回転しているモデル ──
+#   ローレンツブーストは虚角 iφ の回転。コマの章動角 θ に iφ を加えた
+#   複素角 Θ = θ + iφ の回転体として扱い、その実部を 3 つのジンバル環の
+#   回転角、虚部 (φ) をブースト (時間の伸び) に割り当てる。
+def complex_top(theta, phi)
+  let Th = C(theta, phi)
+  let cT = ccos(Th)
+  let sT = csin(Th)
+  # |cos Θ|² + |sin Θ|² = cosh 2φ  (複素回転の「伸び」)
+  let stretch = cabs(cT) * cabs(cT) + cabs(sT) * cabs(sT)
+  return list(Th, cT, sT, stretch)
+end
+# 3 環の角速度: 外環 ω0, 中環 ω0·φ/π, 内環 ω0·φ²/π² (ラピディティ梯子)
+def ring_omegas(w0, phi)
+  return list(w0, w0 * phi / pi(), w0 * phi * phi / (pi() * pi()))
+end
+
+# ─── 4. ガンマ・ゼータの大域的部分積分多様体 ───────────────
+#   Riemann–Siegel θ(t) = arg Γ(1/4 + it/2) − (t/2) log π
+#   Z(t) = e^{iθ(t)} ζ(1/2 + it) は実数 → 臨界線上の「多様体の位相」
+def rs_theta(t)
+  return t / 2 * log(t / (2 * pi())) - t / 2 - pi() / 8 + 1 / (48 * t) + 7 / (5760 * t * t * t)
+end
+def rs_Z(t)
+  let z = czeta(C(0.5, t))
+  return cmul(cis(rs_theta(t)), z)
+end
+# 大域的部分積分: ∫_0^∞ x^{s-1} e^{-x} dx = Γ(s) を台形則で (部分積分の検算)
+def gamma_integral(s, xmax, n)
+  let x = 0
+  let h = xmax / n
+  let acc = 0
+  let i = 1
+  while i < n
+    x = i * h
+    acc = acc + pow(x, s - 1) * exp(0 - x)
+    i = i + 1
+  end
+  acc = acc + 0.5 * pow(xmax, s - 1) * exp(0 - xmax)
+  return acc * h
+end
+# Γ(s)ζ(s) = ∫_0^∞ x^{s-1}/(e^x − 1) dx (ボース積分, 中点則)
+def bose_integral(s, xmax, n)
+  let h = xmax / n
+  let acc = 0
+  let i = 1
+  let x = 0
+  while i <= n
+    x = (i - 0.5) * h
+    acc = acc + pow(x, s - 1) / (exp(x) - 1)
+    i = i + 1
+  end
+  return acc * h
+end
+
+# ─── 5. Jones 共鳴: 設計図生成機能 ────────────────────────
+#   t* = e^{iθ(φ)} (θ = Riemann–Siegel θ at ラピディティ φ) で V_K(t*) を評価。
+#   |V_K(t*)| → コイル巻数・電流比、arg → コイル位相。
+#   単位円上の |V_K| の極小 (零点を含む) → 扉が開く共鳴角 (設計図の窓位置)。
+#   返り値: [[角度, |V|], ...]
+def jones_unit_zeros(vA, samples)
+  let a = 0
+  let t = 0
+  let m = 0
+  let ml = 0
+  let mr = 0
+  let zs = []
+  let i = 1
+  while i <= samples
+    a = 2 * pi() * i / samples
+    t = cis(a)
+    m = cabs(jones_eval(vA, t))
+    ml = cabs(jones_eval(vA, cis(a - 2 * pi() / samples)))
+    mr = cabs(jones_eval(vA, cis(a + 2 * pi() / samples)))
+    if m < ml and m < mr
+      zs = append(zs, list(a, m))
+    end
+    i = i + 1
+  end
+  return zs
+end

@@ -1,0 +1,384 @@
+# helpers_CD.bada — helpers for eq_C.md / eq_D.md calc closures
+def hCD_e()
+  return exp(1)
+end
+# Simpson rule, n even
+def hCD_quad(f, a, b, n)
+  let w = 0
+  let h = (b - a) / n
+  let acc = f(a) + f(b)
+  let i = 1
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    acc = acc + w * f(a + i * h)
+    i = i + 1
+  end
+  return acc * h / 3
+end
+# midpoint rule (for integrable endpoint singularities)
+def hCD_mid(f, a, b, n)
+  let h = (b - a) / n
+  let acc = 0
+  let i = 0
+  while i < n
+    acc = acc + f(a + (i + 0.5) * h)
+    i = i + 1
+  end
+  return acc * h
+end
+# complex Simpson, f returns C(re, im)
+def hCD_cquad(f, a, b, n)
+  let w = 0
+  let h = (b - a) / n
+  let acc = cadd(f(a), f(b))
+  let i = 1
+  while i < n
+    w = 2
+    if mod(i, 2) == 1
+      w = 4
+    end
+    acc = cadd(acc, cscale(f(a + i * h), w))
+    i = i + 1
+  end
+  return cscale(acc, h / 3)
+end
+# 2D Simpson over [a,b]x[c,d]
+def hCD_quad2(f, a, b, c, d, n)
+  return hCD_quad(def(x) return hCD_quad(def(y) return f(x, y) end, c, d, n) end, a, b, n)
+end
+def hCD_gauss2d()
+  return hCD_quad2(def(x, y) return exp(0 - x * x - y * y) end, -6, 6, -6, 6, 80)
+end
+def hCD_xlnx(x)
+  if x <= 0
+    return 0
+  end
+  return x * log(x)
+end
+# solve x ln x = 1 by Newton
+def hCD_solve_xlnx()
+  let x = 2
+  let k = 0
+  while k < 50
+    x = x - (x * log(x) - 1) / (log(x) + 1)
+    k = k + 1
+  end
+  return x
+end
+def hCD_dnum(f, x)
+  let h = 0.00001
+  return (f(x + h) - f(x - h)) / (2 * h)
+end
+def hCD_binom(n, r)
+  return fact(n) / (fact(r) * fact(n - r))
+end
+def hCD_det3(m)
+  let a = at(m, 0)
+  let b = at(m, 1)
+  let c = at(m, 2)
+  return at(a, 0) * (at(b, 1) * at(c, 2) - at(b, 2) * at(c, 1)) - at(a, 1) * (at(b, 0) * at(c, 2) - at(b, 2) * at(c, 0)) + at(a, 2) * (at(b, 0) * at(c, 1) - at(b, 1) * at(c, 0))
+end
+def hCD_isprime(n)
+  if n < 2
+    return false
+  end
+  let d = 2
+  while d * d <= n
+    if mod(n, d) == 0
+      return false
+    end
+    d = d + 1
+  end
+  return true
+end
+# Dirichlet density of all primes at s: P(s)/log(1/(s-1)),
+# P(s) = log zeta(s) - sum_p (-log(1-p^-s) - p^-s)   (correction converges fast)
+def hCD_prime_density(s)
+  let u = 0
+  let corr = 0
+  let p = 2
+  while p < 600
+    if hCD_isprime(p)
+      u = pow(p, 0 - s)
+      corr = corr + (0 - log(1 - u) - u)
+    end
+    p = p + 1
+  end
+  return (log(zeta(s)) - corr) / log(1 / (s - 1))
+end
+def hCD_series(z, nmax)
+  let s = 0
+  let k = 0
+  let t = 1
+  while k <= nmax
+    s = s + t
+    t = t * z
+    k = k + 1
+  end
+  return s
+end
+def hCD_harmonic(n)
+  let s = 0
+  let k = 1
+  while k <= n
+    s = s + 1 / k
+    k = k + 1
+  end
+  return s
+end
+def hCD_zeta_partial(s, n)
+  let acc = 0
+  let k = 0
+  while k <= n
+    acc = acc + pow(k + 1, 0 - s)
+    k = k + 1
+  end
+  # Euler–Maclaurin tail beyond N=n+1
+  let N = n + 1
+  return acc + pow(N, 1 - s) / (s - 1) - 0.5 * pow(N, 0 - s)
+end
+def hCD_cos_sum(n, t)
+  let s = 0
+  let k = 0
+  while k <= n
+    s = s + cos(k * t)
+    k = k + 1
+  end
+  return s
+end
+def hCD_sin_sum(n, t)
+  let s = 0
+  let k = 0
+  while k <= n
+    s = s + sin(k * t)
+    k = k + 1
+  end
+  return s
+end
+# Abel sum of 1 + 2 - 3 + 4 - 5 + ... (as written) at x
+def hCD_abel_1p2m3(x)
+  let sg = 0
+  let s = 1 * x
+  let k = 2
+  let xk = x * x
+  while k < 4000
+    sg = 1
+    if mod(k, 2) == 1
+      sg = -1
+    end
+    s = s + sg * k * xk
+    xk = xk * x
+    k = k + 1
+  end
+  return s
+end
+# Weil zeta of P^1 over F_q : exp(sum_{m>=1} N_m T^m / m), N_m = q^m + 1
+def hCD_weil_p1(q, T)
+  let s = 0
+  let m = 1
+  while m <= 200
+    s = s + (pow(q, m) + 1) * pow(T, m) / m
+    m = m + 1
+  end
+  return exp(s)
+end
+# ─── Bada engine (natural-log) ───
+def hCD_softmax(z)
+  let v = 0
+  let mx = at(z, 0)
+  let i = 1
+  while i < len(z)
+    if at(z, i) > mx
+      mx = at(z, i)
+    end
+    i = i + 1
+  end
+  let out = []
+  let s = 0
+  i = 0
+  while i < len(z)
+    v = 0
+    if at(z, i) - mx >= -30
+      v = exp(at(z, i) - mx)
+    end
+    out = append(out, v)
+    s = s + v
+    i = i + 1
+  end
+  return hCD_norm(out)
+end
+def hCD_softmax_naive(z)
+  let out = []
+  let i = 0
+  while i < len(z)
+    out = append(out, exp(at(z, i)))
+    i = i + 1
+  end
+  return hCD_norm(out)
+end
+def hCD_norm(p)
+  let s = 0
+  let i = 0
+  while i < len(p)
+    s = s + at(p, i)
+    i = i + 1
+  end
+  if s <= 0
+    return p
+  end
+  let out = []
+  i = 0
+  while i < len(p)
+    out = append(out, at(p, i) / s)
+    i = i + 1
+  end
+  return out
+end
+def hCD_H(p)
+  let q = 0
+  let h = 0
+  let i = 0
+  while i < len(p)
+    q = at(p, i)
+    if q < 0.000000000001
+      q = 0.000000000001
+    end
+    h = h - q * log(q)
+    i = i + 1
+  end
+  return h
+end
+def hCD_uniform(V)
+  let out = []
+  let i = 0
+  while i < V
+    out = append(out, 1 / V)
+    i = i + 1
+  end
+  return out
+end
+def hCD_update(p, e, lr)
+  let out = []
+  let i = 0
+  while i < len(p)
+    out = append(out, (1 - lr) * at(p, i) + lr * at(e, i))
+    i = i + 1
+  end
+  return hCD_norm(out)
+end
+def hCD_maxdiff(a, b)
+  let d = 0
+  let m = 0
+  let i = 0
+  while i < len(a)
+    d = abs(at(a, i) - at(b, i))
+    if d > m
+      m = d
+    end
+    i = i + 1
+  end
+  return m
+end
+def hCD_zero_count(p)
+  let c = 0
+  let i = 0
+  while i < len(p)
+    if at(p, i) == 0
+      c = c + 1
+    end
+    i = i + 1
+  end
+  return c
+end
+def hCD_zero_idxsum(p)
+  let c = 0
+  let i = 0
+  while i < len(p)
+    if at(p, i) == 0
+      c = c + i
+    end
+    i = i + 1
+  end
+  return c
+end
+def hCD_z8()
+  return [1.6, 0.6, 0.1, -40, -0.4, 1.1, -40, 0.4]
+end
+# sample phases theta_i for 8 outcomes (sample phi vectors)
+def hCD_theta8()
+  let out = []
+  let i = 0
+  while i < 8
+    out = append(out, 0.7 * 1.66958 * sin(i + 1) + 0.5 * 1.65002 * cos(i) + 0.9 * log(8) * 0.5)
+    i = i + 1
+  end
+  return out
+end
+def hCD_psi(a, th)
+  let out = []
+  let i = 0
+  while i < len(a)
+    out = append(out, cscale(cexp(C(0, at(th, i))), sqrt(at(a, i))))
+    i = i + 1
+  end
+  return out
+end
+def hCD_born(psi)
+  let z = 0
+  let out = []
+  let i = 0
+  while i < len(psi)
+    z = at(psi, i)
+    out = append(out, re(z) * re(z) + im(z) * im(z))
+    i = i + 1
+  end
+  return hCD_norm(out)
+end
+def hCD_embed(x)
+  let n = sqrt(vdot(x, x))
+  return vscale(x, 1 / (n + 0.000000000001))
+end
+def hCD_expseries(x, nmax)
+  let s = 0
+  let t = 1
+  let n = 0
+  while n <= nmax
+    s = s + t
+    n = n + 1
+    t = t * x / n
+  end
+  return s
+end
+# Gamma'(s) = int_0^inf e^-x x^(s-1) ln x dx, via x = u^2 : 4 u^(2s-1) e^(-u^2) ln u du
+def hCD_gammaprime(s)
+  return hCD_quad(def(u) return hCD_gp_int(u, s) end, 0, 7, 2000)
+end
+def hCD_gp_int(u, s)
+  if u <= 0
+    return 0
+  end
+  return 4 * pow(u, 2 * s - 1) * exp(0 - u * u) * log(u)
+end
+# continued fraction b0 + c1/(b1 + c2/(b2 + ...)) with all c_i = 1
+def hCD_cf(bs)
+  let n = len(bs) - 1
+  let v = at(bs, n)
+  n = n - 1
+  while n >= 0
+    v = at(bs, n) + 1 / v
+    n = n - 1
+  end
+  return v
+end
+def hCD_mm2(a, b)
+  return [[at(at(a, 0), 0) * at(at(b, 0), 0) + at(at(a, 0), 1) * at(at(b, 1), 0), at(at(a, 0), 0) * at(at(b, 0), 1) + at(at(a, 0), 1) * at(at(b, 1), 1)], [at(at(a, 1), 0) * at(at(b, 0), 0) + at(at(a, 1), 1) * at(at(b, 1), 0), at(at(a, 1), 0) * at(at(b, 0), 1) + at(at(a, 1), 1) * at(at(b, 1), 1)]]
+end
+def hCD_mdiff2(a, b)
+  return abs(at(at(a, 0), 0) - at(at(b, 0), 0)) + abs(at(at(a, 0), 1) - at(at(b, 0), 1)) + abs(at(at(a, 1), 0) - at(at(b, 1), 0)) + abs(at(at(a, 1), 1) - at(at(b, 1), 1))
+end
+def hCD_rot(t)
+  return [[cos(t), 0 - sin(t)], [sin(t), cos(t)]]
+end
