@@ -33,13 +33,14 @@
 
 **3 つのアプリはすべて量子プログラミング言語 Bada で書かれています**([`contact_transporter/bada/apps/`](contact_transporter/bada/apps/))。Bada 処理系を JavaScript に忠実移植(リポジトリ内の Bada 99 本で Python 版と出力一致)し、アプリ内の **Bada IDE** でソースを編集・新規作成して各タブで実行、各タブの **Bada コンソール**で動作中のアプリを操作できます。設計図書 **「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」**([`contact_transporter/contact_blueprint.pdf`](contact_transporter/contact_blueprint.pdf))の**方程式 2111 本**から作った設計スイート。**ContactGPT**(外部ライブラリなしでゼロから実装した Transformer を方程式レジストリで学習 + 方程式検索・数式電卓)、**異次元輸送機の 3D CAD**(Γ = 64800, φ = arcosh Γ, Riemann–Siegel Z(φ), Jones 多項式からジンバル環・ポッド・Jones コイル・扉の軸をパラメトリック生成、STL / OBJ / DXF 書き出し)、**UFO 設計図面作成ソフト**(三面図 + 等角図 + 寸法 + 表題欄 + 部材表を A3 図面に自動作図、反重力モデル L = cosh(x log x) の飛行シミュレーション)。※ 思索的・フィクションの設計図(幾何的な可視化)です。
 
-**Actions** → 「Contact Transporter Studio build」→ 最新の実行の **Artifacts** から、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `contact-transporter-latest` から:
+**Actions** → 「Bada 3 apps build」→ 最新の実行の **Artifacts** から、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `contact-transporter-latest` から、**3 つのアプリを別々に**ダウンロードできます:
 
-| プラットフォーム | ファイル |
-|:---|:---|
-| **Android** (APK) | `ContactTransporterStudio-android.apk` |
-| **Windows 10 / 11** | `ContactTransporterStudio-*-x64.exe` (インストーラ) / `*-portable.exe` |
-| **Linux** | `ContactTransporterStudio-*-x86_64.AppImage` / `*-amd64.deb` |
+| アプリ | Android (APK) | Windows 10 / 11 | Linux |
+|:---|:---|:---|:---|
+| **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-*-x64.exe` / `*-portable.exe` | `ContactGPT-*.AppImage` / `*.deb` |
+| **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
+| **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
+| 統合版 | `ContactTransporterStudio-android.apk` | `ContactTransporterStudio-*.exe` | `ContactTransporterStudio-*.AppImage` / `*.deb` |
 
 ビルドは [`contact-transporter-build.yml`](.github/workflows/contact-transporter-build.yml)、詳細は [`contact_transporter/`](contact_transporter/) を参照。
 

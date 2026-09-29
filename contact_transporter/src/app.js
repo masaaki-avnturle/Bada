@@ -18,10 +18,20 @@
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const fmt = (v) => (typeof v === "number" ? (Number.isInteger(v) ? String(v) : String(+v.toPrecision(8))) : B.toText(v));
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+  // アプリの種類 (apps.json): ContactGPT / 輸送機 3D CAD / UFO 設計図面 / 統合版
+  const APP = window.CT_APP || { key: "studio", tabs: ["chat", "cad", "ufo", "ide", "eqs", "about"] };
+  const HAS = (t) => APP.tabs.includes(t);
+  // 保存キーはアプリごとに分ける (同じ端末に複数のアプリを入れても混ざらない)
+  const nsKey = (k) => k.replace(/^ct\./, `ct.${APP.key}.`);
   const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 容量超過などは無視 */ } },
+    get(k, d) { try { const v = localStorage.getItem(nsKey(k)); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem(nsKey(k), JSON.stringify(v)); } catch (e) { /* 容量超過などは無視 */ } },
   };
+  // このアプリに含まれないタブを取り除く
+  $$("#tabs button").forEach((b) => { if (!HAS(b.dataset.tab)) b.remove(); });
+  $$("main > .tab").forEach((t) => { if (!HAS(t.id.replace("tab-", ""))) t.remove(); });
+  $$("#ide-target option").forEach((o) => { if (o.value !== "console" && !HAS(o.value)) o.remove(); });
+  if (APP.tabs.filter((t) => ["chat", "cad", "ufo"].includes(t)).length === 1) $$("#tabs button").forEach((b) => { if (b.dataset.tab === "ide") b.textContent = "⌨ Bada IDE (ソース)"; });
 
   // ------------------------------------------------------------ 共通
   let toastT;
@@ -457,7 +467,7 @@
   let last = performance.now();
   (function loop(now) {
     const dt = Math.min(0.1, (now - last) / 1000); last = now;
-    for (const name of ["cad", "ufo"]) if (tabs[name] && $(`#tab-${name}`).classList.contains("on")) tabs[name].tick(dt);
+    for (const name of ["cad", "ufo"]) if (tabs[name] && $(`#tab-${name}`) && $(`#tab-${name}`).classList.contains("on")) tabs[name].tick(dt);
     requestAnimationFrame(loop);
   })(last);
 
@@ -476,8 +486,12 @@
     function open(f, target) {
       if (!(f in files)) return;
       cur = f; text().value = files[f]; $("#ide-name").textContent = f;
-      if (target) $("#ide-target").value = target;
-      else if (f.startsWith("apps/")) $("#ide-target").value = f.includes("ufo") ? "ufo" : f.includes("gpt") ? "chat" : "cad";
+      // 実行先: 指定 → ファイル名からの推測 → このアプリの 3D タブ → コンソール
+      let tg = target || (f.startsWith("apps/") ? (f.includes("ufo") ? "ufo" : f.includes("gpt") ? "chat" : "cad") : null);
+      if (!tg && /template|my_ship/.test(f)) tg = HAS("cad") ? "cad" : "ufo";
+      if (tg && !HAS(tg)) tg = HAS("cad") ? "cad" : HAS("ufo") ? "ufo" : null;
+      if (tg === "chat" && !f.includes("gpt")) tg = null;
+      $("#ide-target").value = tg || "console";
       highlight(); listFiles(); $("#ide-asmout").textContent = "";
       store.set("ct.ide.cur", f);
     }
@@ -567,8 +581,9 @@
         const name = "user/" + f.name.replace(/[^\w.\-]+/g, "_"); files[name] = await f.text(); saveFiles(); open(name);
       });
       $("#ide-ref").innerHTML = `<b>予約語</b><br>${Array.from(B.KEYWORDS).join(" ")}<br><b>指示オブジェクト</b><br>${Object.entries(B.DIRECTIVES).map(([k, v]) => `<code>${esc(k)}</code> ${esc(v)}`).join("<br>")}<br><b>組込み関数</b><br>${Array.from(B.BUILTINS).join(" ")}<br><b>アプリ用ライブラリ (${HOST_NAMES.length})</b><br>${HOST_NAMES.join(" ")}`;
-      const last = store.get("ct.ide.cur", "apps/transporter.bada");
-      open(last in files ? last : "apps/transporter.bada");
+      const mainFile = HAS("cad") ? "apps/transporter.bada" : HAS("ufo") ? "apps/ufo.bada" : "apps/contactgpt.bada";
+      const last = store.get("ct.ide.cur", mainFile);
+      open(last in files ? last : mainFile);
     }
     return { open, init, run };
   })();
@@ -615,6 +630,6 @@
   // ============================================================ 起動
   const BI = window.CT_BUILD || {};
   $("#build-info").textContent = `build ${BI.version || "dev"} ${BI.date || ""}`;
-  const first = store.get("ct.tab", "chat");
-  showTab(tabInit[first] || first === "about" ? first : "chat");
+  const first = store.get("ct.tab", APP.tabs[0]);
+  showTab(HAS(first) ? first : APP.tabs[0]);
 })();

@@ -31,21 +31,25 @@
   編集内容はブラウザ (アプリ) 内に保存されます。`examples/my_ship.bada` は Bada で新しい宇宙船 (葉巻型母船) を設計する例、
   `examples/template.bada` は新規アプリのひな形です。
 
-## ダウンロード (GitHub Actions)
+## ダウンロード (GitHub Actions) — 3 つのアプリ
 
-1. リポジトリの **Actions** → **「Contact Transporter Studio build (Android APK + Windows 10/11 EXE + Linux)」** を開く
-2. 最新の成功した実行 (✅) を開き、ページ下部の **Artifacts** からダウンロード
+リポジトリの **Actions** → **「Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 …)」** →
+最新の成功した実行 (✅) を開き、ページ下部の **Artifacts** からダウンロードします。
 
-| Artifact | 中身 |
-|:---|:---|
-| `contact-transporter-android-apk` | `ContactTransporterStudio-android.apk` (提供元不明アプリのインストールを許可して導入) |
-| `contact-transporter-windows-exe` | `ContactTransporterStudio-1.0.0-x64.exe` (インストーラ) / `…-portable.exe` (インストール不要) — Windows 10 / 11 |
-| `contact-transporter-linux` | `ContactTransporterStudio-1.0.0-x86_64.AppImage` (`chmod +x` で実行) / `…-amd64.deb` (`sudo apt install ./….deb`) |
-| `contact-transporter-www` | 自己完結 HTML (`index.html` をブラウザで開くだけでも動作) |
+| アプリ | Android (APK) | Windows 10 / 11 (EXE) | Linux (AppImage / deb) |
+|:--|:--|:--|:--|
+| **ContactGPT** | `ContactGPT-android-apk` | `ContactGPT-windows-exe` | `ContactGPT-linux` |
+| **輸送機 3D CAD** | `TransporterCAD-android-apk` | `TransporterCAD-windows-exe` | `TransporterCAD-linux` |
+| **UFO 設計図面** | `UFODesigner-android-apk` | `UFODesigner-windows-exe` | `UFODesigner-linux` |
+| 統合版 (3 アプリ入り) | `ContactTransporterStudio-android-apk` | `ContactTransporterStudio-windows-exe` | `ContactTransporterStudio-linux` |
+
+- **Android**: zip を展開して `…-android.apk` を開く (提供元不明のアプリのインストールを許可)
+- **Windows 10 / 11**: `…-1.0.0-x64.exe` はインストーラ、`…-1.0.0-portable.exe` はインストール不要
+- **Linux**: `chmod +x …-x86_64.AppImage` で実行、または `sudo apt install ./…-amd64.deb`
 
 同じファイルは [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`contact-transporter-latest`** にも添付されます
-(`ct-v*` タグを push するとそのタグの Release、Actions の **Run workflow** では任意のタグを指定可)。
-ワークフロー: [`.github/workflows/contact-transporter-build.yml`](../.github/workflows/contact-transporter-build.yml)
+(`ct-v*` タグを push するとそのタグの Release)。ワークフロー: [`.github/workflows/contact-transporter-build.yml`](../.github/workflows/contact-transporter-build.yml)、
+アプリの定義 (名前・ID・含める画面): [`apps.json`](apps.json)。各アプリには Bada IDE・方程式レジストリが付いています。
 
 ## 1. ContactGPT — [`bada/apps/contactgpt.bada`](bada/apps/contactgpt.bada)
 
@@ -109,12 +113,13 @@ PDF のテキスト ([`data/contact_blueprint.txt`](data/contact_blueprint.txt))
 ## 開発
 
 ```sh
-node contact_transporter/tools/build.js      # → contact_transporter/dist/www/index.html (ブラウザで開けば動く)
+node contact_transporter/tools/build.js all  # → dist/{contactgpt,transporter,ufo,studio}/www/index.html (ブラウザで開けば動く)
+node contact_transporter/tools/package-app.js ufo   # → dist/ufo/electron (Windows/Linux) + dist/ufo/cordova (Android)
 node contact_transporter/tools/test.js       # Bada アプリ 3 本・設計図書の数値再現・GPT 勾配・CAD・図面のテスト
 python3 contact_transporter/tools/conformance.py   # Bada の JS 移植 ↔ Python 本家 (全 .bada で出力一致)
 node contact_transporter/tools/badahost.js apps/ufo.bada   # Bada アプリをヘッドレス実行
 node contact_transporter/tools/train.js 2400 # ContactGPT をゼロから学習 (--resume で追加学習)
-cd contact_transporter/app/electron && npm install && npm start   # デスクトップ版をローカル起動
+cd contact_transporter/dist/ufo/electron && npm install && npm start   # デスクトップ版をローカル起動
 ```
 
 ```
@@ -123,7 +128,8 @@ contact_transporter/
   bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight)  examples/
   data/  equations.json  contactgpt_weights.json  contact_blueprint.txt
   src/   bada.js badalib.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
-  tools/ build.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py
+  tools/ build.js package-app.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py
+  apps.json  3 アプリ + 統合版の定義 (名前・アプリ ID・含める画面)
   app/   electron/ (Windows / Linux)   cordova/config.xml (Android)
 ```
 

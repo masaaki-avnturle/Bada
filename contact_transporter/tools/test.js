@@ -163,7 +163,7 @@ truthy(`図面 SVG (尺度 1:${sh.scale})`, sh.svg.startsWith("<svg") && sh.svg.
 truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"));
 
 // ---- ビルド成果物
-const dist = path.join(__dirname, "..", "dist", "www", "index.html");
+const dist = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
 if (fs.existsSync(dist)) {
   const h = fs.readFileSync(dist, "utf8");
   truthy("dist/www/index.html にプレースホルダが残っていない", !/\/\*@@[A-Z_]+@@\*\//.test(h));
