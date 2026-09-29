@@ -595,6 +595,23 @@ def bass808(freq, dur, vel=0.3, slide_to=None, sr=SR):
     if i0 < n: e[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.04)
     return (_lp(y * e, 0.12) * vel).astype(np.float32)
 
+def synth_piano(freq, dur, vel=0.3, sr=SR):
+    """ピアノのように弾くきれいなシンセ: わずかにずらした鋸歯波 2 本 (倍音の加算、4 kHz まで)。打った瞬間は明るく、
+    明るさ (倍音を削る山) が 0.8 秒ほどでピアノのように暗くなり、音量も音の高さに応じて減衰する。離すと 0.3 秒で消える。金属的な高音は出さない"""
+    rel = 0.3; n = int((dur + rel) * sr); t = np.arange(n, dtype=np.float32) / sr
+    fc = 600 + 2600 * (freq / 262.0) ** 0.3 * np.exp(-t / 0.8)                    # 明るさ: 打鍵で開いて、すぐ閉じていく
+    tau = 1.8 * (262.0 / freq) ** 0.45                                          # 高い音ほど早く減衰 (ピアノのように)
+    y = np.zeros(n, dtype=np.float32)
+    for det in (0.9977, 1.0023):
+        ph = 2 * np.pi * freq * det * t
+        for k in range(1, 40):
+            if k * freq > 4000: break
+            y += (1.0 / k) * np.sin(k * ph + 0.7 * k) / (1 + (k * freq / fc) ** 4)
+    e = np.minimum(1, t / 0.004) * np.exp(-t / tau)
+    i0 = int(dur * sr)
+    if i0 < n: e[i0:] *= np.exp(-(t[i0:] - t[i0]) / (rel / 3))
+    return (y * e / 2.2 * vel).astype(np.float32)
+
 def oud_tone(freq, dur, vel=0.3, sr=SR):
     """ウード (フレットのない撥弦、羽根のピックで駒の近く): 明るい立ち上がり、短い余韻、胴の鼻にかかった響き"""
     from scipy.signal import lfilter
@@ -987,16 +1004,17 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
-        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG', 'E8'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
+        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG', 'E8', 'SY'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
             if v == 'CG': y = clean_guitar(freq, ex['d'], vel)
             elif v == 'EB': y = picked_bass(freq, ex['d'], vel)
             elif v == 'LG': y = lead_guitar(freq, ex['d'], vel)
             elif v == 'OU': y = oud_tone(freq, ex['d'], vel)
             elif v == 'DG': y = drive_guitar(freq, ex['d'], vel, mute=ex.get('mute', False))
+            elif v == 'SY': y = synth_piano(freq, ex['d'], vel)
             elif v == 'E8': y = bass808(freq, ex['d'], vel, slide_to=440.0 * 2 ** ((ex['slide'] - 69) / 12.0) if ex.get('slide') else None)
             else: y = choir_tone(freq, ex['d'], a=0.5, r=1.2) * vel
-            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35, 'E8': 0.0}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12, 'E8': 0.02}[v]
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35, 'E8': 0.0, 'SY': 0.2}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12, 'E8': 0.02, 'SY': 0.35}[v]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr

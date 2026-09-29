@@ -1392,6 +1392,22 @@ XLVIII の楽譜 (パイプオルガンの 4 声・ビオラ・弦・Klang・フ
 python3 compose_tablet50.py bank37.json score_tablet50.json && python3 synth.py score_tablet50.json tablet50.wav && python3 video.py score_tablet50.json tablet50.wav tablet50.mp4
 ```
 
+## 🎹💓 Requiem BADA — Tablet Sessions LI · Herzschlag & Jungle (Klavier) (L を実音のピアノだけに、ピアノのように弾くきれいなシンセを加えて, 約 3 分 45 秒)
+
+楽譜・鼓動の不整脈・ジャングルのビートは L とまったく同じで、楽器だけを変えた (`compose_tablet51.py` は `compose_tablet50` の `build`・`post` を使う)。
+
+- **実音のピアノだけ** — 4 声はパイプオルガンをやめ、録音から切り出したピアノの実音で弾く (`choir` を外す、響きは 4.8 秒に)。ピアノの 4 声は 1.25 倍 (dyn) で前に
+- **冒頭で膨らむシンセの音を消す** — 08:49 の録音に 8.6 秒・12.9 秒から重なってゆっくり膨らんでいた (音が上がって聞こえた) シンセの弦を含め、
+  シンセの弦・ビオラ・チェロ・コントラバスをすべて外した (XLVIII の `post` を鳴らさない)
+- **ピアノのように弾くきれいなシンセ** (`synth.py` の `synth_piano`、extras の `SY`) — わずかにずらした鋸歯波 2 本を倍音の加算で (4 kHz まで)。
+  打鍵で明るく、明るさが 0.8 秒ほどでピアノのように暗くなり、高い音ほど早く減衰する。金属的な高音は出さない。
+  Klang と Amen は下から上へ分散して弾く和音、Fuga I は主題の入りを 1 オクターヴ上で重ね、Kyrie と Fuga II の後半は 8 分の分散和音 (ピアノの左手のように)
+- ピアノが主役になるよう、ジャングルと重低音は 0.85 倍、鼓動は少し小さく
+
+```bash
+python3 compose_tablet51.py bank37.json score_tablet51.json && python3 synth.py score_tablet51.json tablet51.wav && python3 video.py score_tablet51.json tablet51.wav tablet51.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
