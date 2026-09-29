@@ -24,7 +24,7 @@ def theme_notes(seq, octv, start, beat, vel):
     return out, t - start
 
 
-def main(notes_json, mid_out):
+def main(notes_json, mid_out, themes=True):
     rec = json.load(open(notes_json))
     voices = []
     for k in sorted(rec, key=int):
@@ -45,13 +45,13 @@ def main(notes_json, mid_out):
     _, tl = theme_notes(MAIN, 3, 0, beat, 0)
     entries = [(MAIN, 3, 0.0, 62), (ANSWER, 4, 0.5, 52), (MAIN, 4, 1.0, 50), (BACH * 3, 4, 1.5, 55), (MAIN, 2, 2.0, 60)]
     t0 = 0.0
-    while t0 < total - tl:
+    while themes and t0 < total - tl:
         for seq, octv, frac, vel in entries:
             ev, _ = theme_notes(seq, octv, t0 + frac * tl, beat, vel)
             events += [x for x in ev if x[0] < total - 10]
         t0 += tl * 3
     # final D-minor chord, pianissimo, let it ring out
-    for p in (38, 50, 53, 57, 62):
+    for p in ((38, 50, 53, 57, 62) if themes else ()):
         events.append((total - 18, total - 2, p, 40))
 
     # solo-piano constraints: one key cannot sound twice at once, <=10 simultaneous new keys per 0.3 s
@@ -99,4 +99,4 @@ def main(notes_json, mid_out):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], themes="--no-themes" not in sys.argv)
