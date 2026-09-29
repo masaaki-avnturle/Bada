@@ -612,6 +612,44 @@ def synth_piano(freq, dur, vel=0.3, sr=SR):
     if i0 < n: e[i0:] *= np.exp(-(t[i0:] - t[i0]) / (rel / 3))
     return (y * e / 2.2 * vel).astype(np.float32)
 
+MEMBRANE = (1.0, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501)             # 張った円い膜の固有振動の比 (ベッセル関数の零点)
+
+def acoustic_drum(kind, vel=0.8, sr=SR):
+    """実際の太鼓の鳴り方をまねたドラム (膜の固有振動の和 = モード合成、シンセの電子音ではなく):
+    kick = 24 インチのバスドラム (52 Hz、フェルトのビーター、胴の低い響き)、floor = 16 インチのフロアタム (82 Hz、スティック)、
+    tom = タム (120 Hz)、snare / ghost = スネア (膜 185 Hz + 響き線のざらつき)、hat = クローズド・ハイハット (金属の不協和な振動、暗めで小さく)"""
+    P = {'kick': (52.0, 0.3, 0.02, (1, .35, .2, .12, .08, .05), (.38, .12, .08, .06, .05, .04), 0.5),
+         'floor': (82.0, 0.15, 0.03, (1, .5, .32, .22, .14, .1), (.75, .28, .16, .11, .08, .06), 0.8),
+         'tom': (120.0, 0.12, 0.03, (1, .5, .3, .2, .12), (.45, .18, .11, .08, .06), 0.6),
+         'snare': (185.0, 0.08, 0.02, (1, .6, .5, .35, .3, .2), (.16, .1, .08, .06, .05, .04), 0.45),
+         'ghost': (185.0, 0.05, 0.02, (1, .5, .4, .3), (.08, .06, .05, .04), 0.2)}
+    rng = np.random.default_rng({'kick': 31, 'floor': 32, 'tom': 33, 'snare': 34, 'ghost': 35, 'hat': 36}[kind])
+    if kind == 'hat':
+        n = int(0.12 * sr); t = np.arange(n, dtype=np.float32) / sr
+        fs = rng.uniform(3200, 8500, 12)
+        y = sum(np.sin(2 * np.pi * f * t + rng.uniform(0, 6.28)) for f in fs) / 12 * np.exp(-t / 0.028)
+        nz = rng.standard_normal(n).astype(np.float32); nz = nz - _lp(nz, 0.2)
+        y = _lp(_lp(y + 0.6 * nz * np.exp(-t / 0.018), 0.45), 0.5)
+        return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+    f0, drop, dtau, amps, decs, tail = P[kind]
+    n = int(tail * 1.6 * sr); t = np.arange(n, dtype=np.float32) / sr
+    bend = 1 + drop * np.exp(-t / dtau)                                          # 打った瞬間は膜が張って少し高い
+    y = np.zeros(n, dtype=np.float32)
+    for r, a, dcy in zip(MEMBRANE, amps, decs):
+        y += a * np.sin(2 * np.pi * np.cumsum(f0 * r * bend) / sr + rng.uniform(0, 6.28)) * np.exp(-t / dcy)
+    nz = rng.standard_normal(n).astype(np.float32)
+    if kind == 'kick':                                                           # フェルトのビーターの当たり + 胴の低い響き
+        y += 0.45 * _lp(nz, 0.15) * np.exp(-t / 0.003) + 0.35 * np.sin(2 * np.pi * 104 * t) * np.exp(-t / 0.09)
+    elif kind in ('floor', 'tom'):                                               # スティックの当たり
+        y += 0.35 * (_lp(nz, 0.3) - _lp(nz, 0.03)) * np.exp(-t / 0.002)
+    else:                                                                        # スネアの響き線 (1.5〜7 kHz のざらつき、1 ms 遅れて)
+        wire = (_lp(nz, 0.4) - _lp(nz, 0.06)); d0 = int(0.001 * sr)
+        w = np.zeros(n, dtype=np.float32); w[d0:] = wire[:n - d0] * np.exp(-t[:n - d0] / (0.09 if kind == 'snare' else 0.04))
+        y += (1.1 if kind == 'snare' else 0.7) * w + 0.3 * (_lp(nz, 0.35) - _lp(nz, 0.05)) * np.exp(-t / 0.002)
+    y = np.tanh(1.2 * y) / np.tanh(1.2)
+    y[:int(0.0015 * sr)] *= np.linspace(0, 1, int(0.0015 * sr))
+    return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
 def oud_tone(freq, dur, vel=0.3, sr=SR):
     """ウード (フレットのない撥弦、羽根のピックで駒の近く): 明るい立ち上がり、短い余韻、胴の鼻にかかった響き"""
     from scipy.signal import lfilter
@@ -1019,6 +1057,14 @@ def main(score='score.json', out='fuga.wav'):
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * send; R[i0:i1] += y[:i1 - i0] * cr * send
+            continue
+        if recs and ex['v'] == 'AD':                        # 実際の太鼓の鳴り方をまねたドラム (乾いた音を前に、部屋の響きへ少し)
+            y = acoustic_drum(ex.get('kind', 'kick'), ex.get('gain', 0.3))
+            pan = ex.get('pan', {'kick': 0.0, 'floor': 0.25, 'tom': -0.15, 'snare': -0.05, 'ghost': -0.05, 'hat': 0.3}.get(ex.get('kind', 'kick'), 0.0))
+            cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
+            i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
+            HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
+            L[i0:i1] += y[:i1 - i0] * cl * 0.12; R[i0:i1] += y[:i1 - i0] * cr * 0.12
             continue
         if recs and ex['v'] == 'BR':                        # ブラシのドラム (キック 36 とスウィッシュ 38 だけ、ハイハットなし)
             y = drum_brush(36 if ex['m'] <= 36 else 38, ex['d'], ex.get('gain', 0.2)); pan = ex.get('pan', 0.05)

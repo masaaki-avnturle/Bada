@@ -1420,6 +1420,22 @@ python3 compose_tablet51.py bank37.json score_tablet51.json && python3 synth.py 
 python3 compose_tablet52.py bank37.json score_tablet52.json && python3 synth.py score_tablet52.json tablet52.wav && python3 video.py score_tablet52.json tablet52.wav tablet52.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LIII · Klavier & Trommeln (LII に、太鼓の鳴り方をまねたドラムの重低音のジャングル「っど・っど・っど・どどど」, 約 3 分 45 秒)
+
+楽譜・実音のピアノの 4 声・中から入るピアノのようなシンセは LII とまったく同じで、ドラムの重低音のジャングルを重ねた (`compose_tablet53.py`)。
+
+- **シンセ特有の音をやめ、実際の太鼓の鳴り方に** (`synth.py` の `acoustic_drum`、extras の `AD`) — 張った円い膜の固有振動 (ベッセル関数の零点の比) の和 (モード合成) で、
+  打った瞬間に膜が張って少し高く鳴るところ、フェルトのビーター・スティックの当たり、スネアの響き線 (1 ms 遅れのざらつき) もまねる。
+  24 インチのバスドラム (52 Hz) とフロアタム (82 Hz) の胴鳴りが重低音 (ドラムのエネルギーの 83% が 120 Hz 以下)、ハイハットは小さく暗く。808 やシンセのドラムは使わない。
+  ドラムの録音そのものではない (手元にドラムの録音がないため) — 録音をもらえればその音で鳴らせる
+- **リズム** — ジャングル (♩=168 = ♩=56 の 3 倍) の 1 小節が「っど・っど・っど・どどど」: 1〜3 拍目の裏にバスドラム、4 拍目は 16 分 3 つ (バスドラム・フロアタム・フロアタム)。
+  その上にスネアの 2・4 拍と小さなゴースト・スネア、8 分の小さなハイハット。区間の終わりはタム → フロアタム → バスドラムと下りる連打
+- ドラムが入るのは Fuga I の 5 小節目からと Fuga II の 2 小節目から (Klang・Kyrie・Amen はピアノとシンセだけ)
+
+```bash
+python3 compose_tablet53.py bank37.json score_tablet53.json && python3 synth.py score_tablet53.json tablet53.wav && python3 video.py score_tablet53.json tablet53.wav tablet53.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
