@@ -1436,6 +1436,15 @@ python3 compose_tablet52.py bank37.json score_tablet52.json && python3 synth.py 
 python3 compose_tablet53.py bank37.json score_tablet53.json && python3 synth.py score_tablet53.json tablet53.wav && python3 video.py score_tablet53.json tablet53.wav tablet53.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LIV · Klavier & Trommeln (LIII からシンセの演奏を消し、実音のピアノとドラムだけに, 約 3 分 45 秒)
+
+楽譜・実音のピアノの 4 声・太鼓の鳴り方をまねたドラムの重低音のジャングル「っど・っど・っど・どどど」は LIII とまったく同じで、
+ピアノのようなシンセの演奏 (Kyrie・Fuga II 後半の分散和音、Klang II・Amen の分散する和音) をすべて消した (`compose_tablet54.py`)。
+
+```bash
+python3 compose_tablet54.py bank37.json score_tablet54.json && python3 synth.py score_tablet54.json tablet54.wav && python3 video.py score_tablet54.json tablet54.wav tablet54.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
