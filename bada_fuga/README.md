@@ -1483,6 +1483,20 @@ python3 compose_tablet56.py bank37.json score_tablet56.json && python3 synth.py 
 python3 compose_tablet57.py bank37.json score_tablet57.json && python3 synth.py score_tablet57.json tablet57.wav && python3 video.py score_tablet57.json tablet57.wav tablet57.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LVIII · Klavier & Rock-Drums (実音のピアノ主体に、ドラマーが叩くロックの 8 ビート — 重低音は大太鼓, ♩=56 / 112, 約 3 分 45 秒)
+
+楽譜と実音のピアノの 4 声は LV〜LVII と同じ。シンセ (ピアノに似たシンセも) なし。旋律に合わせて打っていた太鼓 (っど) をやめ、ドラマーがふつうに叩くロックの 8 ビートにした (`compose_tablet58.py`)。
+
+- **ロックの 8 ビート** — ♩=56 の倍 (♩=112) で数えて、バスドラムの役は大太鼓が 1・3 拍 (2 小節に 1 回は 3 拍目の裏の押し)、スネアが 2・4 拍、ハイハットは 8 分で小さく暗く。
+  ジャングルのような軽いビートではない。Kyrie はハーフタイム (スネアは 3 拍目だけ)
+- **重低音は大太鼓** — 蹴るようなキックではなく、大太鼓 (46 Hz) の深い「ドン」を、ロックらしく 0.45 秒で響きを止めて (`damp`)
+- **ドラマーのフィル** — 4 小節ごとに最後の 2 拍をタム → フロアタムの 16 分、区間の終わりは 1 小節まるごと (スネア → タム → フロアタム)。
+  金属的なクラッシュは使わず、Klang・Amen は大太鼓とフロアタムの一打。ドラムはピアノの下 (ピアノ主体)
+
+```bash
+python3 compose_tablet58.py bank37.json score_tablet58.json && python3 synth.py score_tablet58.json tablet58.wav && python3 video.py score_tablet58.json tablet58.wav tablet58.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
