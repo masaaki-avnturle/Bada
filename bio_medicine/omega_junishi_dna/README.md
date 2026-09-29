@@ -13,7 +13,7 @@
 | 寅 | トラ | *Panthera tigris* |
 | 卯 | ウサギ | *Oryctolagus cuniculus* |
 | 辰 | 竜 | — (伝説上の生物で DNA が存在しないため検査対象外) |
-| 巳 | ヘビ | *Elaphe climacophora* (アオダイショウ。NCBI で取得できない場合は近縁種) |
+| 巳 | ヘビ | *Dinodon semicarinatus* (アカマタ。日本産ヘビで mtDNA 全長が公開されている種) |
 | 午 | ウマ | *Equus caballus* |
 | 未 | ヒツジ | *Ovis aries* |
 | 申 | サル | *Macaca fuscata* (ニホンザル。取得できない場合は *M. mulatta*) |

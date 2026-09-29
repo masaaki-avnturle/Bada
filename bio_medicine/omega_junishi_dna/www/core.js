@@ -146,7 +146,7 @@
     { key: "tora",  kanji: "寅", yomi: "とら", animal: "トラ",       species: "Panthera tigris",         acc: "NC_010642.1", traits: "勇敢・情熱的・決断力" },
     { key: "u",     kanji: "卯", yomi: "う",   animal: "ウサギ",     species: "Oryctolagus cuniculus",   acc: "NC_001913.1", traits: "温和・繊細・社交的" },
     { key: "tatsu", kanji: "辰", yomi: "たつ", animal: "竜",         species: null,                      acc: null,          traits: "威厳・理想家・活力" },
-    { key: "mi",    kanji: "巳", yomi: "み",   animal: "ヘビ",       species: "Elaphe climacophora",     acc: null,          traits: "思慮深い・直感的・執念" },
+    { key: "mi",    kanji: "巳", yomi: "み",   animal: "ヘビ",       species: "Dinodon semicarinatus",    acc: "NC_001945.1",         traits: "思慮深い・直感的・執念" },
     { key: "uma",   kanji: "午", yomi: "うま", animal: "ウマ",       species: "Equus caballus",          acc: "NC_001640.1", traits: "活発・自由・行動力" },
     { key: "hitsuji", kanji: "未", yomi: "ひつじ", animal: "ヒツジ", species: "Ovis aries",              acc: "NC_001941.1", traits: "穏やか・優しい・協調的" },
     { key: "saru",  kanji: "申", yomi: "さる", animal: "サル",       species: "Macaca fuscata",          acc: null,          traits: "器用・機知・好奇心" },

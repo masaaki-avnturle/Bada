@@ -22,7 +22,7 @@ SPECIES = {
     "ushi":    ("ウシ",     [("NC_006853.1", "Bos taurus")]),
     "tora":    ("トラ",     [("NC_010642.1", "Panthera tigris")]),
     "u":       ("ウサギ",   [("NC_001913.1", "Oryctolagus cuniculus")]),
-    "mi":      ("ヘビ",     [(None, "Elaphe climacophora"), (None, "Dinodon semicarinatum"),
+    "mi":      ("ヘビ",     [("NC_001945.1", "Dinodon semicarinatus"), (None, "Elaphe climacophora"),
                              (None, "Python bivittatus")]),
     "uma":     ("ウマ",     [("NC_001640.1", "Equus caballus")]),
     "hitsuji": ("ヒツジ",   [("NC_001941.1", "Ovis aries")]),
