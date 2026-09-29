@@ -314,9 +314,9 @@ def main(notes_json, mid_out):
             # legatissimo: the key is held until just after the next note sounds, joining the line without pedal
             t1 = (s + d) * Q + (1.6 * Q if s >= pedal + 8 else 0.09)
             # finger sustain: keep this key down under the next note and release it only when the note after next
-            # sounds - if the two are consonant; otherwise release just after the next note (plain legatissimo)
+            # sounds (steps overlap too, as in finger legato); only a tritone is released right after the next note
             nn = out[i + 2] if i + 2 < len(out) else None
-            if nxt and nn and s < pedal and abs(m(nxt[2]) - p) % 12 not in CLASH:
+            if nxt and nn and s < pedal and abs(m(nxt[2]) - p) % 12 != 6:  # overlapping steps = Ueberlegato; no tritone
                 t1 = max(t1, min(nn[0], s + d + 6) * Q + 0.05)
             raw.append([max(0, t0), t1, p, vel])
             fug.append((s, s + d, p))
