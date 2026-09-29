@@ -1,0 +1,184 @@
+name: Contact Transporter Studio build (Android APK + Windows 10/11 EXE + Linux)
+
+# contact_transporter/ の「Contact Transporter Studio」
+#   - ContactGPT: 設計図書 (contact_blueprint.pdf) の全方程式 2111 本で学習した、
+#     ゼロから実装の小型 Transformer (自動微分・Adam・因果的自己注意) + 方程式検索・電卓
+#   - 異次元輸送機の 3D CAD: Γ = 64800, φ = arcosh Γ, Riemann–Siegel Z(φ), Jones 多項式から
+#     ジンバル環・ポッド・塔・Jones コイル・扉の軸をパラメトリック生成 (STL / OBJ / DXF)
+#   - UFO 設計図面作成ソフト: 三面図 + 等角図 + 寸法 + 表題欄 + 部材表 (SVG / PNG / DXF)
+# を
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Linux 向け AppImage / deb
+# としてビルドし、Actions の成果物 (Artifacts) としてダウンロードできるようにします。
+# さらに Release「contact-transporter-latest」にも添付します (タグ ct-v* 指定時はそのタグの Release)。
+
+on:
+  push:
+    paths:
+      - "contact_transporter/**"
+      - ".github/workflows/contact-transporter-build.yml"
+    tags:
+      - "ct-v*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "添付先の GitHub Release タグ (空欄なら contact-transporter-latest)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'contact-transporter-latest' }}
+
+jobs:
+  test-and-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Bundle self-contained app (dist/www/index.html)
+        run: node contact_transporter/tools/build.js
+      - name: Engine tests (設計図書の数値再現 / GPT 勾配 / CAD / 図面)
+        run: node contact_transporter/tools/test.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contact-transporter-www
+          path: contact_transporter/dist/www
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-and-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: contact-transporter-www
+          path: contact_transporter/dist/www
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定パッケージ 'tools' は廃止済みなので空にして明示導入する
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # cordova-android 12 は Gradle 7.x が必要
+      - name: Pin Gradle 7.6.4
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          cordova create cordova-build io.github.masaaki_avnturle.contacttransporter "Contact Transporter"
+          rm -rf cordova-build/www
+          cp -r contact_transporter/dist/www cordova-build/www
+          # プラグイン (ファイル保存) を使うため cordova.js を読み込む
+          sed -i 's#</head>#<script src="cordova.js"></script>\n</head>#' cordova-build/www/index.html
+          cp contact_transporter/app/cordova/config.xml cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova plugin add cordova-plugin-file@8.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/ContactTransporterStudio-android.apk
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contact-transporter-android-apk
+          path: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-and-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: contact-transporter-www
+          path: contact_transporter/dist/www
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows 10/11 EXE (Electron — NSIS installer + portable)
+        working-directory: contact_transporter/app/electron
+        run: |
+          npm install
+          npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contact-transporter-windows-exe
+          path: contact_transporter/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-and-bundle
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: contact-transporter-www
+          path: contact_transporter/dist/www
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: contact_transporter/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contact-transporter-linux
+          path: |
+            contact_transporter/app/electron/dist/*.AppImage
+            contact_transporter/app/electron/dist/*.deb
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [android-apk, windows-exe, linux-app]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contact-transporter-*
+          path: release
+          merge-multiple: true
+      - name: List files
+        run: ls -laR release
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Contact Transporter Studio (${{ env.RELEASE_TAG }})
+          prerelease: true
+          body: |
+            Contact Transporter Studio — ContactGPT + 異次元輸送機 3D CAD + UFO 設計図面作成ソフト
+
+            - **Android**: `ContactTransporterStudio-android.apk` (提供元不明のアプリのインストールを許可)
+            - **Windows 10 / 11**: `ContactTransporterStudio-*-x64.exe` (インストーラ) / `*-portable.exe` (インストール不要)
+            - **Linux**: `*.AppImage` (chmod +x で実行) / `*.deb` (sudo apt install ./xxx.deb)
+
+            ※ 設計図書 (contact_blueprint.pdf) の方程式に基づく思索的・フィクションの設計図 (幾何的な可視化) です。
+          files: |
+            release/*.apk
+            release/*.exe
+            release/*.AppImage
+            release/*.deb

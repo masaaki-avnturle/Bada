@@ -29,6 +29,22 @@
 
 ---
 
+## 🛸 ダウンロード — Contact Transporter Studio(ContactGPT · 異次元輸送機 3D CAD · UFO 設計図面)
+
+設計図書 **「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」**([`contact_transporter/contact_blueprint.pdf`](contact_transporter/contact_blueprint.pdf))の**方程式 2111 本**から作った設計スイート。**ContactGPT**(外部ライブラリなしでゼロから実装した Transformer を方程式レジストリで学習 + 方程式検索・数式電卓)、**異次元輸送機の 3D CAD**(Γ = 64800, φ = arcosh Γ, Riemann–Siegel Z(φ), Jones 多項式からジンバル環・ポッド・Jones コイル・扉の軸をパラメトリック生成、STL / OBJ / DXF 書き出し)、**UFO 設計図面作成ソフト**(三面図 + 等角図 + 寸法 + 表題欄 + 部材表を A3 図面に自動作図、反重力モデル L = cosh(x log x) の飛行シミュレーション)。※ 思索的・フィクションの設計図(幾何的な可視化)です。
+
+**Actions** → 「Contact Transporter Studio build」→ 最新の実行の **Artifacts** から、または [Releases](https://github.com/masaaki-avnturle/Bada/releases) の `contact-transporter-latest` から:
+
+| プラットフォーム | ファイル |
+|:---|:---|
+| **Android** (APK) | `ContactTransporterStudio-android.apk` |
+| **Windows 10 / 11** | `ContactTransporterStudio-*-x64.exe` (インストーラ) / `*-portable.exe` |
+| **Linux** | `ContactTransporterStudio-*-x86_64.AppImage` / `*-amd64.deb` |
+
+ビルドは [`contact-transporter-build.yml`](.github/workflows/contact-transporter-build.yml)、詳細は [`contact_transporter/`](contact_transporter/) を参照。
+
+---
+
 ## 🜂 ダウンロード — Bada 遊(量子「遊び」処理系 / 違反思考変異アルゴリズム)
 
 **今までの集大成の上に、生成AIが量子プログラミング言語 Bada で「遊び」の概念そのものを築いたアプリケーション。** 日本語の「遊び」には**遊戯**(円環の内側でだけ規則が停止する営み)と**機械の遊び**(ハンドルの遊び — 遊びが零の機械は焼き付く)の二つの意味があるが、本処理系はその二つを**規則の固有状態から外れて持てる振幅** |Φ(θ)⟩ = cos(θ/2)|順⟩ − i sin(θ/2)|違⟩ として一本化する。そして**「違反行為そのものの“考え”」**を、規則のスタビライザ S と反交換する違反生成子 V の**部分回転** Û(θ) = exp(−iθV/2) として定式化した ── **θ = 0 は遵守、θ = π は行為、そのあいだの半端な角こそが「考え」であり「遊び」である**。処理系は θ ≤ θ<sub>max</sub> = 0.85π を強制し、**考えが行為へ到達しないこと**を実行時に保証する。円環(magic circle)は比喩ではなく**ユニタリ共役**で、帰還 C<sup>†</sup>C|ψ⟩ = |ψ⟩ により状態は一切漏れず、外へ出るのは観測が許されたときの古典的記録(台帳)だけ。`sacred` と宣言した**不可侵規則**は違反生成子の候補から外され、[V,S₀] = 0 を課されるため、**遊びの中で何を考えても、観測の後でも、その値は動かない**(テストで毎回検査)。この円環の中で、**個体の変異アルゴリズムを作り換えた** ── 無作為なビット反転をやめ、**いちばん強く縛っている規則を、ほかの規範と不可侵をすべて守ったまま、それひとつだけ破る最小違反生成子**による協調反転とし、重ね合わせのまま期待適応度を測り、違反の振幅 sin²(θ/2) をそのまま受理確率とする(**違反思考変異 TTM**)。遊び予算 Δ は集団で保存され多様性から恒常的に調節され、破られ続けた規範は弛緩してやがて**制度化**される。依存ゼロ・単一 HTML・オフライン動作。
