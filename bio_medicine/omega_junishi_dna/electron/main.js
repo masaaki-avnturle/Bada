@@ -1,6 +1,6 @@
 /*
  * main.js — Electron ラッパー (Windows 10/11 EXE, Linux AppImage/deb)
- * Ω-Canis DNA: DNA 配列の k-mer 照合による戌 (イヌ) DNA 検査 ＋ Γ×Jones 熱エネルギー概念ビュー。
+ * Ω-Junishi DNA: DNA 配列の k-mer 照合による十二支の動物の DNA 検査 ＋ Γ×Jones 熱エネルギー概念ビュー。
  * 非医療・研究/教育用。
  */
 const { app, BrowserWindow } = require("electron");
@@ -13,7 +13,7 @@ function indexPath() {
 function createWindow() {
   const win = new BrowserWindow({
     width: 1080, height: 820, backgroundColor: "#04060a",
-    title: "Ω-Canis DNA",
+    title: "Ω-Junishi DNA",
     webPreferences: { contextIsolation: true, nodeIntegration: false }
   });
   win.setMenuBarVisibility(false);

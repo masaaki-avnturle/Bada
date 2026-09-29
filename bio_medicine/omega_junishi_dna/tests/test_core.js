@@ -1,4 +1,4 @@
-// node bio_medicine/omega_canis_dna/tests/test_core.js
+// node bio_medicine/omega_junishi_dna/tests/test_core.js
 const assert = require("assert");
 const C = require("../www/core.js");
 
@@ -24,19 +24,34 @@ for (const v of [j31, j41, j51]) assert(Math.abs(C.evalPoly(v, 1) - 1) < 1e-12, 
 assert(Math.abs(C.gammaKernel(1) - 2) < 1e-12);
 assert(C.gammaKernel(1 / Math.E) > C.gammaKernel(0.9));
 
-// 種判別: 無関係なランダム参照 2 種で合成リードを作り、混合比を再現できること
+// 種判別: 十二支 (辰を除く 11 種) + ヒトの無関係なランダム参照で合成リードを作り、
+// 混合比と判定レベルを再現できること
 let s = 7;
 const rnd = () => ((s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296);
 const randSeq = (n) => Array.from({ length: n }, () => "ACGT"[Math.floor(rnd() * 4)]).join("");
-const refs = { dog: randSeq(16000), human: randSeq(16500) };
+const species = C.JUNISHI.filter((j) => j.species);
+assert.strictEqual(C.JUNISHI.length, 12);
+assert.strictEqual(species.length, 11); // 辰は DNA なし
+const refs = { human: randSeq(16569) };
+for (const sp of species) refs[sp.key] = randSeq(16000 + Math.floor(rnd() * 1500));
 const idx = C.buildIndex(refs, 21);
-for (const [frac, expect] of [[0, "neg"], [0.3, "mixed"], [1, "dog"]]) {
-  const reads = C.simulateReads(refs, "dog", "human", 400, 150, frac, 0.01, 99);
-  const res = C.classifyReads(reads, idx, { minHits: 3 });
-  const v = C.verdict(res, "dog");
-  console.log(`dogFrac=${frac}:`, res.counts, v.level);
-  assert.strictEqual(v.level, expect);
-}
+const reads = C.simulateMix(refs, { human: 0.6, inu: 0.3, tora: 0.1, ne: 0.002 }, 3000, 150, 0.01, 99);
+const res = C.classifyReads(reads, idx, { minHits: 3 });
+const v = Object.fromEntries(C.verdictAll(res, species.concat([C.HUMAN]), "human").map((x) => [x.key, x.level]));
+console.log(res.counts, v);
+assert.strictEqual(res.counts.unassigned, 0);
+assert.strictEqual(v.inu, "mixed");
+assert.strictEqual(v.tora, "mixed");
+assert.strictEqual(v.ne, "trace");
+assert.strictEqual(v.ushi, "neg");
+assert.strictEqual(v.human, "major");
+const dogOnly = C.classifyReads(C.simulateMix(refs, { inu: 1 }, 300, 150, 0.01, 5), idx, {});
+assert.strictEqual(C.speciesVerdict(dogOnly, "inu", "イヌ", "human").level, "major");
+
+// 干支
+assert.strictEqual(C.etoOfYear(2026).kanji, "午");
+assert.strictEqual(C.etoOfYear(1984).kanji, "子");
+assert.strictEqual(C.etoOfYear(2024).kanji, "辰");
 
 // 入力形式
 assert.deepStrictEqual(C.parseSequences(">a\nACGU\nNN\n>b\nttt\n"), ["ACGTNN", "TTT"]);

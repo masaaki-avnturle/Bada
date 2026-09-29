@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<!--
+  Ω-Junishi DNA — 十二支 DNA 配列検査 ＋ Γ×Jones 熱エネルギー統合ビュー
+  Masaaki Yamaguchi / Bada — bio_medicine/omega_junishi_dna
+
+  ① 実際の DNA 配列データ (FASTA/FASTQ) を、十二支の動物 (子=ネズミ, 丑=ウシ, 寅=トラ, 卯=ウサギ,
+     巳=ヘビ, 午=ウマ, 未=ヒツジ, 申=サル, 酉=ニワトリ, 戌=イヌ, 亥=イノシシ) とヒトの
+     ミトコンドリアゲノム参照に k-mer 照合し、どの動物由来の配列が試料中に存在するかを判定する (本物の計算)。
+     辰 (竜) は伝説上の生物で DNA が存在しないため検査対象外。
+  ② fMRI / MRI / 脳トポグラフィー / 血液検査 / 脳磁場 (MEG) / 体表熱 の各値を
+     Γ大域的部分積分多様体の核 e^{-x log x} で熱重みに変換し、Jones 多項式 V(t) を
+     t=e^{-β} で評価する概念ビュー (数学は本物、生体への意味づけは概念モデル)。
+
+  ⚠ 非医療。十二支の「性質 (性格)」は民間伝承であり DNA では決まらない。
+     ②の生体計測値には DNA の種情報が含まれないため判定には使わない。
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Ω-Junishi DNA</title>
+<style>
+  :root{--bg:#04060a;--panel:#0a0e16;--line:#1b2638;--gold:#c8a44a;--cyan:#40b8c0;--violet:#9060d0;--txt:#e6ecf5;--dim:#8794a8;--ok:#4cc38a;--warn:#e0b020;--bad:#e0605a;--mono:Consolas,Menlo,monospace}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(1100px 700px at 50% -10%,#0a1020,#04060a);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Meiryo,sans-serif;line-height:1.5}
+  header{padding:16px 16px 8px}h1{margin:0;font-size:20px}h1 .om{color:var(--gold)}.sub{color:var(--dim);font-size:12px}
+  .eq{font-family:var(--mono);color:var(--cyan);font-size:12px;margin-top:6px;overflow-wrap:anywhere}
+  .disc{margin:12px 16px 0;padding:9px 12px;border:1px solid #5a3a12;background:#1a1304;border-radius:8px;color:var(--warn);font-size:12px}
+  nav{display:flex;gap:6px;padding:12px 16px 0;flex-wrap:wrap}
+  nav button{width:auto;margin:0;flex:1;min-width:150px;color:var(--dim);border-color:var(--line);background:var(--panel)}
+  nav button.on{color:var(--gold);border-color:var(--gold)}
+  main{padding:14px 16px 50px}.tab{display:none}.tab.on{display:flex;gap:14px;flex-wrap:wrap}
+  .col{flex:1;min-width:280px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:13px}
+  .card h3{margin:0 0 9px;font-size:13.5px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:6px}
+  canvas{background:#000;border:1px solid var(--line);border-radius:8px;display:block;width:100%;height:auto}
+  label{display:block;font-size:12px;color:var(--dim);margin:9px 0 4px}
+  input[type=range]{width:100%}select,textarea,input[type=number]{width:100%;background:#06090f;color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:7px;font-family:var(--mono);font-size:12px}
+  textarea{min-height:110px;resize:vertical}
+  input[type=file]{width:100%;font-size:12px;color:var(--dim)}
+  .val{color:var(--cyan);font-family:var(--mono)}
+  button{background:linear-gradient(180deg,#1a2740,#0e1626);color:var(--gold);border:1px solid var(--gold);border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700;font-size:13px;margin-top:10px;width:100%}
+  button.sec{color:var(--cyan);border-color:var(--cyan)}
+  .stat{display:flex;justify-content:space-between;gap:8px;font-family:var(--mono);font-size:12px;padding:3px 0;border-bottom:1px solid var(--line)}
+  .verdict{padding:12px;border-radius:8px;font-size:13.5px;border:1px solid var(--line);margin-top:8px}
+  .neg{border-color:var(--ok);color:var(--ok)}.trace,.mixed{border-color:var(--warn);color:var(--warn)}
+  .major{border-color:var(--bad);color:var(--bad)}.none{color:var(--dim)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:8px}
+  .z{border:1px solid var(--line);border-radius:8px;padding:8px;background:#06090f;min-height:96px}
+  .z .k{font-size:24px;font-weight:700;color:var(--txt);line-height:1.1}
+  .z .a{font-size:12px;color:var(--dim)}
+  .z .s{font-size:11px;font-style:italic;color:var(--dim);overflow-wrap:anywhere}
+  .z .b{display:inline-block;margin-top:5px;font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid currentColor}
+  .z .n{font-family:var(--mono);font-size:11px;color:var(--dim)}
+  .z.neg .k,.z.trace .k,.z.mixed .k,.z.major .k{color:inherit}
+  .bar{height:14px;background:#06090f;border:1px solid var(--line);border-radius:7px;overflow:hidden;display:flex}
+  .bar i{display:block;height:100%}
+  .legend{font-size:11px;color:var(--dim);display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:5px}
+  .note{font-size:11.5px;color:var(--dim)}
+  .eto{display:flex;gap:12px;align-items:center;margin-top:8px}
+  .eto .big{font-size:44px;font-weight:700;color:var(--gold);line-height:1}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:12px;background:#06090f;border:1px solid var(--line);border-radius:6px;padding:10px;margin:0}
+  footer{color:var(--dim);font-size:11px;padding:14px;text-align:center;border-top:1px solid var(--line)}
+  code{font-family:var(--mono);color:var(--violet)}
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="om">Ω</span>-Junishi DNA — 十二支 DNA 検査</h1>
+  <div class="sub">k-mer Species Identification against 11 zodiac animals + human mtDNA · Γ×Jones Thermal View · Bada/bio_medicine</div>
+  <div class="eq">∫Γ(γ)′dx<sub>m</sub> = 2e<sup>−x log x</sup> &nbsp;·&nbsp; V(t) = (−A<sup>3</sup>)<sup>−w</sup>⟨K⟩, A=t<sup>−1/4</sup> &nbsp;·&nbsp; t = e<sup>−β</sup></div>
+</header>
+<div class="disc">⚠ <b>非医療・研究/教育用</b>: 十二支の動物の DNA が試料に含まれるかは <b>① の DNA 配列照合だけ</b>で判定します。
+  十二支の<b>「性質」(性格) は民間伝承で、DNA では決まりません</b>。生まれ年の干支は ① とは無関係の参考表示です。
+  fMRI・MRI・脳トポグラフィー・血液検査・脳磁場・体表熱の値には DNA の種の情報が含まれないため、② は<b>概念指標</b>です。
+  ヒトのゲノムに他の動物の DNA が遺伝的に含まれることはなく、ヒト試料からの検出は通常<b>混入 (食品・動物との接触・器具)</b>です。
+  辰 (竜) は伝説上の生物で DNA が存在しないため検査できません。</div>
+
+<nav>
+  <button class="on" data-tab="t1">① 十二支 DNA 配列検査</button>
+  <button data-tab="t2">② 生体データ × Γ×Jones 熱</button>
+  <button data-tab="t3">③ 総合レポート</button>
+</nav>
+
+<main>
+  <!-- ① 配列検査 -->
+  <section class="tab on" id="t1">
+    <div class="col" style="flex:0 0 300px">
+      <div class="card">
+        <h3>参照ゲノム (mtDNA)</h3>
+        <div id="refStatus" class="note"></div>
+        <label>参照 FASTA を追加 (マルチ FASTA 可。ヘッダの学名で種を自動判別)</label>
+        <input type="file" id="refFile" accept=".fa,.fasta,.fna,.txt" multiple/>
+      </div>
+      <div class="card">
+        <h3>対象者の DNA 配列</h3>
+        <label>ファイル (FASTA / FASTQ / 配列テキスト)</label>
+        <input type="file" id="sample" accept=".fa,.fasta,.fq,.fastq,.txt,.seq"/>
+        <label>または貼り付け</label>
+        <textarea id="paste" placeholder=">read1&#10;ACGT..."></textarea>
+        <label>k-mer 長 k: <span class="val" id="k_v">21</span></label>
+        <input type="range" id="k" min="15" max="31" step="2" value="21"/>
+        <label>割当に必要な最小ヒット数: <span class="val" id="mh_v">3</span></label>
+        <input type="range" id="mh" min="1" max="20" value="3"/>
+        <button id="run">十二支 DNA 検査を実行</button>
+      </div>
+      <div class="card">
+        <h3>動作確認 (合成試料)</h3>
+        <div class="note">参照配列から変異入りの合成リードを作り、判定の正しさを確かめます。実在の人の結果ではありません。</div>
+        <label>混ぜる動物</label>
+        <select id="demoSp"></select>
+        <label>その動物のリード混合率: <span class="val" id="mix_v">0.0%</span></label>
+        <input type="range" id="mix" min="0" max="1000" value="100"/>
+        <button class="sec" id="demo">合成試料で検査</button>
+      </div>
+      <div class="card">
+        <h3>生まれ年の干支 (参考・DNA とは無関係)</h3>
+        <label>生まれ年 (西暦)</label>
+        <input type="number" id="birth" min="1900" max="2100" value="1990"/>
+        <div class="eto"><div class="big" id="etoK"></div><div id="etoT" class="note"></div></div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>判定</h3>
+        <div id="summary" class="verdict none">まだ検査していません。</div>
+        <div style="margin-top:12px" class="bar" id="bar"></div>
+        <div class="legend" id="legend"></div>
+        <div class="grid" id="grid" style="margin-top:12px"></div>
+        <div id="stats" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h3>方法</h3>
+        <div class="note">
+          1. 十二支の動物 11 種 (辰を除く) とヒトの mtDNA 全長の k-mer (相補鎖含む) を列挙し、1 種にしか現れない<b>種固有 k-mer</b>の索引を作る。<br/>
+          2. 各リードの k-mer を索引で引き、固有ヒット数が最小ヒット数以上かつ次点の種の 4 倍以上なら、その種に割り当てる。<br/>
+          3. 種ごとに: 割当 0 → 非検出、少数 (&lt;3 本または &lt;1%) → 痕跡/混入疑い、&lt;50% → 混合、それ以上 → 主成分。<br/>
+          ミトコンドリア DNA は細胞あたりのコピー数が多く、法医学・食品検査の種判別で標準的に使われる標的です。<br/>
+          参照: ネズミ <i>Mus musculus</i> · ウシ <i>Bos taurus</i> · トラ <i>Panthera tigris</i> · ウサギ <i>Oryctolagus cuniculus</i> ·
+          ヘビ <i>Elaphe climacophora</i> (アオダイショウ, 取得不可時は近縁種) · ウマ <i>Equus caballus</i> · ヒツジ <i>Ovis aries</i> ·
+          サル <i>Macaca fuscata</i> (ニホンザル) · ニワトリ <i>Gallus gallus</i> · イヌ <i>Canis lupus familiaris</i> · イノシシ <i>Sus scrofa</i> · ヒト <i>Homo sapiens</i><br/>
+          ※ 23andMe 等の SNP 生データ (rsID 形式) はヒト SNP の遺伝型のみで配列を含まないため、この検査には使えません。
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 生体データ × Γ×Jones -->
+  <section class="tab" id="t2">
+    <div class="col" style="flex:0 0 300px">
+      <div class="card">
+        <h3>生体データ一覧 (0–1 に正規化)</h3>
+        <div class="note">既存の Ω アプリ (Ω-Tomograph, Ω-Thermal Trace, Ω-Biofeedback など) の出力値、または実測値を正規化して入力します。</div>
+        <div id="mods"></div>
+        <label>結び目 (Jones 多項式)</label>
+        <select id="knot"></select>
+        <button id="calc">Γ×Jones 熱エネルギーを計算</button>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>結果 (概念指標)</h3>
+        <div id="thermalOut"></div>
+        <canvas id="plot" width="640" height="300" style="margin-top:10px"></canvas>
+        <div class="note" style="margin-top:6px">曲線: |V(e<sup>−2e<sup>−x log x</sup></sup>)| (x∈(0,1]) · 金点: 現在の β による t。
+          ここに含まれる値は神経活動・組織コントラスト・血液成分・磁場・温度であり、<b>DNA の塩基配列ではありません</b>。そのため十二支 DNA の判定材料にはなりません。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 総合レポート -->
+  <section class="tab" id="t3">
+    <div class="col">
+      <div class="card">
+        <h3>総合レポート</h3>
+        <pre id="report">①・② を実行するとここにまとまります。</pre>
+        <button class="sec" id="dl">レポートを保存 (.txt)</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>© 2025 Masaaki Yamaguchi · 山口 雅旭 · Bada / bio_medicine · 非医療・研究/教育用</footer>
+
+<script src="refs.js"></script>
+<script src="core.js"></script>
+<script>
+(function () {
+  "use strict";
+  const C = window.JunishiCore;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  // 検査対象 = DNA を持つ十二支の動物 + ヒト (宿主)
+  const SPECIES = C.JUNISHI.filter((j) => j.species).concat([Object.assign({ kanji: "人" }, C.HUMAN)]);
+  const COLORS = {};
+  SPECIES.forEach((sp, i) => COLORS[sp.key] = sp.key === "human" ? "#40b8c0" : `hsl(${(i * 33) % 360} 65% 58%)`);
+  const refs = {}, refNames = {};
+  const state = { dna: null, thermal: null };
+  let idxCache = null;
+
+  // 同梱参照 (CI ビルド時に NCBI から取得)
+  const META = window.JUNISHI_REFS_META || {};
+  for (const [key, seq] of Object.entries(window.JUNISHI_REFS || {})) { refs[key] = seq; refNames[key] = META[key] || key; }
+
+  function refStatus() {
+    $("refStatus").innerHTML = C.JUNISHI.concat([Object.assign({ kanji: "人" }, C.HUMAN)]).map((sp) => {
+      if (!sp.species) return `${sp.kanji} ${sp.animal}: <span style="color:var(--dim)">— DNA なし (伝説上の生物)</span>`;
+      const s = refs[sp.key];
+      return `${sp.kanji} ${sp.animal}: ` + (s ? `<span style="color:var(--ok)">✔</span> ${s.length.toLocaleString()} bp` : `<span style="color:var(--bad)">✖</span> 未読み込み`);
+    }).join("<br/>");
+  }
+  refStatus();
+
+  const readFile = (f) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(f); });
+  // ヘッダの学名 (属名+種小名、なければ属名) で種を判別して参照に追加
+  function matchSpecies(header) {
+    const h = header.toLowerCase();
+    return SPECIES.find((sp) => h.indexOf(sp.species.toLowerCase()) !== -1) ||
+      SPECIES.find((sp) => h.indexOf(sp.species.split(" ")[0].toLowerCase()) !== -1 && !(sp.key === "human" && h.indexOf("homo") === -1));
+  }
+  $("refFile").onchange = async () => {
+    const unknown = [];
+    for (const f of $("refFile").files) {
+      for (const rec of C.parseFastaRecords(await readFile(f))) {
+        const sp = matchSpecies(rec.header);
+        if (sp && rec.seq.length) { refs[sp.key] = rec.seq; refNames[sp.key] = rec.header; }
+        else unknown.push(rec.header);
+      }
+    }
+    idxCache = null; refStatus();
+    if (unknown.length) $("refStatus").innerHTML += `<br/><span style="color:var(--warn)">判別できなかったレコード: ${esc(unknown.join(", "))}</span>`;
+  };
+
+  // タブ
+  document.querySelectorAll("nav button").forEach((b) => b.onclick = () => {
+    document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
+    document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.id === b.dataset.tab));
+    if (b.dataset.tab === "t3") buildReport();
+  });
+
+  const bindRange = (id, fmt) => { const u = () => $(id + "_v").textContent = fmt($(id).value); $(id).oninput = u; u(); };
+  bindRange("k", (v) => v);
+  bindRange("mh", (v) => v);
+  bindRange("mix", (v) => (v / 10).toFixed(1) + "%");
+  $("demoSp").innerHTML = SPECIES.filter((s) => s.key !== "human").map((s) => `<option value="${s.key}">${s.kanji} ${s.animal}</option>`).join("");
+  $("demoSp").value = "inu";
+
+  // 生まれ年の干支
+  function showEto() {
+    const y = parseInt($("birth").value, 10);
+    if (!(y > 0)) return;
+    const e = C.etoOfYear(y);
+    $("etoK").textContent = e.kanji;
+    $("etoT").innerHTML = `${y}年生まれ: <b>${e.kanji} (${e.yomi})・${e.animal}</b><br/>伝承上の性質: ${e.traits}<br/>` +
+      `<span style="color:var(--warn)">民間伝承であり、DNA・遺伝とは関係ありません。</span><br/>(立春/旧正月前生まれを前年とする数え方もあります)`;
+  }
+  $("birth").oninput = showEto; showEto();
+
+  function loadedSpecies() { return SPECIES.filter((sp) => refs[sp.key]); }
+  function getIndex() {
+    const k = +$("k").value;
+    const sps = loadedSpecies();
+    if (!refs.human || sps.length < 2) return null;
+    const sig = k + ":" + sps.map((s) => s.key + refs[s.key].length).join(",");
+    if (!idxCache || idxCache.sig !== sig) {
+      const r = {}; sps.forEach((s) => r[s.key] = refs[s.key]);
+      idxCache = Object.assign(C.buildIndex(r, k), { sig });
+    }
+    return idxCache;
+  }
+
+  const LABEL = { neg: "非検出", trace: "痕跡", mixed: "検出 (混合)", major: "主成分", none: "判定不能", na: "未検査" };
+  function showResult(res, source) {
+    const sps = loadedSpecies();
+    const vs = C.verdictAll(res, sps, "human");
+    const byKey = Object.fromEntries(vs.map((v) => [v.key, v]));
+    state.dna = { res, vs, source, k: +$("k").value, minHits: +$("mh").value, species: sps.map((s) => s.key) };
+
+    const found = vs.filter((v) => v.key !== "human" && v.level !== "neg" && v.level !== "none");
+    const cls = found.some((v) => v.level === "major") ? "major" : found.some((v) => v.level === "mixed") ? "mixed" : found.length ? "trace" : res.total ? "neg" : "none";
+    const name = (key) => { const sp = SPECIES.find((s) => s.key === key); return `${sp.kanji}(${sp.animal})`; };
+    $("summary").className = "verdict " + cls;
+    $("summary").innerHTML = !res.total ? "配列がありません。" :
+      res.total === res.counts.unassigned ? "どの参照種にも割り当てられるリードがありません (参照範囲外または品質不足)。判定不能です。" :
+      found.length ? `<b>十二支の動物の DNA を検出: ${found.map((v) => `${name(v.key)} ${LABEL[v.level]}`).join("、")}</b><br/>` +
+        found.map((v) => esc(v.text)).join("<br/>") :
+      `<b>十二支の動物の DNA は検出されませんでした</b> (検査した ${sps.length - 1} 種)。`;
+
+    const t = res.total || 1;
+    $("bar").innerHTML = sps.map((s) => `<i title="${s.animal}" style="width:${100 * (res.counts[s.key] || 0) / t}%;background:${COLORS[s.key]}"></i>`).join("") +
+      `<i style="width:${100 * res.counts.unassigned / t}%;background:#333"></i>`;
+    $("legend").innerHTML = sps.filter((s) => res.counts[s.key]).map((s) => `<span><span style="color:${COLORS[s.key]}">■</span> ${s.animal}</span>`).join("") + `<span><span style="color:#333">■</span> 未割当</span>`;
+
+    $("grid").innerHTML = C.JUNISHI.map((j) => {
+      const v = byKey[j.key];
+      const lv = !j.species ? "none" : v ? v.level : "na";
+      const badge = !j.species ? "DNA なし" : LABEL[lv];
+      const n = v ? `${v.count.toLocaleString()} リード · ${(100 * v.frac).toFixed(2)}%` : j.species ? "参照なし" : "伝説上の生物";
+      return `<div class="z ${lv}"><div class="k">${j.kanji}</div><div class="a">${j.yomi} · ${j.animal}</div>` +
+        `<div class="s">${j.species || "—"}</div><span class="b">${badge}</span><div class="n">${n}</div></div>`;
+    }).join("");
+
+    const row = (a, b) => `<div class="stat"><span>${a}</span><span>${b}</span></div>`;
+    $("stats").innerHTML = row("入力", esc(source)) + row("総リード数", res.total.toLocaleString()) +
+      row("ヒト由来リード", (res.counts.human || 0).toLocaleString()) + row("未割当リード", res.counts.unassigned.toLocaleString());
+  }
+
+  function requireRefs() {
+    const idx = getIndex();
+    if (!idx) { $("summary").className = "verdict none"; $("summary").textContent = "ヒトと少なくとも 1 種の動物の参照 FASTA を読み込んでください。"; }
+    return idx;
+  }
+
+  $("run").onclick = async () => {
+    const idx = requireRefs(); if (!idx) return;
+    let text = $("paste").value, source = "貼り付け";
+    const f = $("sample").files[0];
+    if (f) { text = await readFile(f); source = f.name; }
+    if (C.looksLikeSnpArray(text)) {
+      $("summary").className = "verdict none";
+      $("summary").textContent = "SNP 生データ (rsID 形式) です。ヒト SNP の遺伝型のみで塩基配列を含まないため、十二支 DNA の検査はできません。FASTA/FASTQ の配列データを使ってください。";
+      return;
+    }
+    showResult(C.classifyReads(C.parseSequences(text), idx, { minHits: +$("mh").value }), source);
+  };
+
+  $("demo").onclick = () => {
+    const idx = requireRefs(); if (!idx) return;
+    const key = $("demoSp").value, mix = $("mix").value / 1000;
+    if (!refs[key]) { $("summary").className = "verdict none"; $("summary").textContent = "選んだ動物の参照配列がありません。"; return; }
+    const sp = SPECIES.find((s) => s.key === key);
+    const reads = C.simulateMix(refs, { human: 1 - mix, [key]: mix }, 2000, 150, 0.01, Date.now() & 0xffff);
+    showResult(C.classifyReads(reads, idx, { minHits: +$("mh").value }), `合成試料 (${sp.animal} ${(mix * 100).toFixed(1)}% + ヒト, 2000 リード, 変異率 1%)`);
+  };
+
+  // ② 生体データ
+  const MODS = [
+    ["fmri", "fMRI BOLD 信号変化", 0.42],
+    ["mri", "MRI T2 強調コントラスト", 0.55],
+    ["topo", "脳トポグラフィー (NIRS oxy-Hb)", 0.38],
+    ["blood", "血液検査 (総合スコア)", 0.61],
+    ["meg", "脳磁場 MEG (fT 正規化)", 0.33],
+    ["heat", "体表熱エネルギー (Ω-Thermal)", 0.47],
+  ];
+  $("mods").innerHTML = MODS.map(([id, name, v]) =>
+    `<label>${name}: <span class="val" id="m_${id}_v"></span></label><input type="range" id="m_${id}" min="1" max="1000" value="${v * 1000}"/>`).join("");
+  MODS.forEach(([id]) => bindRange("m_" + id, (v) => (v / 1000).toFixed(3)));
+  $("knot").innerHTML = Object.keys(C.KNOTS).map((k) => `<option>${k}</option>`).join("");
+
+  function calcThermal() {
+    const mods = {};
+    MODS.forEach(([id, name]) => mods[name] = $("m_" + id).value / 1000);
+    const pd = C.KNOTS[$("knot").value];
+    const r = C.thermalIndex(mods, pd);
+    state.thermal = { mods, knot: $("knot").value, r };
+    const row = (a, b) => `<div class="stat"><span>${a}</span><span>${b}</span></div>`;
+    $("thermalOut").innerHTML =
+      row("Jones 多項式 V(t)", C.polyToString(r.poly)) +
+      Object.entries(r.weights).map(([k, w]) => row(k + " → 2e^{−x log x}", w.toFixed(4))).join("") +
+      row("β (平均熱重み)", r.beta.toFixed(4)) + row("t = e^{−β}", r.t.toFixed(5)) +
+      row("熱エネルギー |V(t)| (概念)", Math.abs(r.V).toExponential(4)) +
+      `<div class="verdict none">この値は十二支 DNA の有無や性質を示しません (判定は ① のみ)。</div>`;
+    drawPlot(pd, r);
+  }
+  function drawPlot(pd, r) {
+    const cv = $("plot"), g = cv.getContext("2d"), W = cv.width, H = cv.height, P = 34;
+    const v = C.jones(pd);
+    const pts = [];
+    for (let i = 1; i <= 400; i++) {
+      const x = i / 400, t = Math.exp(-C.gammaKernel(x));
+      pts.push([t, Math.log10(Math.abs(C.evalPoly(v, t)) + 1e-12)]);
+    }
+    const tmin = Math.min(...pts.map((p) => p[0])), tmax = Math.max(...pts.map((p) => p[0]));
+    const ys = pts.map((p) => p[1]).concat(Math.log10(Math.abs(r.V) + 1e-12));
+    const ymin = Math.min(...ys), ymax = Math.max(...ys) + 1e-9;
+    const X = (t) => P + (W - 2 * P) * (t - tmin) / (tmax - tmin || 1), Y = (y) => H - P - (H - 2 * P) * (y - ymin) / (ymax - ymin || 1);
+    g.fillStyle = "#000"; g.fillRect(0, 0, W, H);
+    g.strokeStyle = "#1b2638"; g.strokeRect(P, P, W - 2 * P, H - 2 * P);
+    g.fillStyle = "#8794a8"; g.font = "11px monospace";
+    g.fillText(`t ∈ [${tmin.toFixed(4)}, ${tmax.toFixed(4)}]`, P, H - 10);
+    g.fillText(`log10|V(t)| ∈ [${ymin.toFixed(2)}, ${ymax.toFixed(2)}]`, P, 20);
+    pts.sort((a, b) => a[0] - b[0]);
+    g.strokeStyle = "#40b8c0"; g.lineWidth = 2; g.beginPath();
+    pts.forEach(([t, y], i) => i ? g.lineTo(X(t), Y(y)) : g.moveTo(X(t), Y(y))); g.stroke();
+    g.fillStyle = "#c8a44a"; g.beginPath(); g.arc(X(r.t), Y(Math.log10(Math.abs(r.V) + 1e-12)), 6, 0, 7); g.fill();
+  }
+  $("calc").onclick = calcThermal;
+  calcThermal();
+
+  // ③ レポート
+  function buildReport() {
+    const L = [];
+    L.push("Ω-Junishi DNA 総合レポート", "生成日時: " + new Date().toLocaleString(), "");
+    L.push("■ ① 十二支 DNA 配列検査 (判定根拠)");
+    if (state.dna) {
+      const { res, vs, source, k, minHits } = state.dna;
+      const byKey = Object.fromEntries(vs.map((v) => [v.key, v]));
+      L.push(`  入力: ${source}`, `  k=${k}, 最小ヒット=${minHits}`,
+        `  総リード ${res.total} / ヒト ${res.counts.human || 0} / 未割当 ${res.counts.unassigned}`);
+      for (const j of C.JUNISHI) {
+        const v = byKey[j.key];
+        if (!j.species) L.push(`  ${j.kanji} ${j.animal}: 検査対象外 (伝説上の生物で DNA なし)`);
+        else if (!v) L.push(`  ${j.kanji} ${j.animal}: 参照なしのため未検査`);
+        else L.push(`  ${j.kanji} ${j.animal} (${j.species}): ${LABEL[v.level]} — ${v.count} リード (${(100 * v.frac).toFixed(2)}%)`);
+      }
+      for (const v of vs) if (v.key !== "human" && (v.level === "trace" || v.level === "mixed" || v.level === "major")) L.push("    → " + v.text);
+      L.push("  参照:"); for (const key of state.dna.species) L.push(`    ${key}: ${refNames[key]}`);
+    } else L.push("  未実施");
+    const y = parseInt($("birth").value, 10);
+    if (y > 0) { const e = C.etoOfYear(y); L.push("", "■ 生まれ年の干支 (参考・DNA とは無関係)", `  ${y}年: ${e.kanji}(${e.yomi})・${e.animal} — 伝承上の性質: ${e.traits}`); }
+    L.push("", "■ ② 生体データ × Γ×Jones 熱エネルギー (概念指標・判定には不使用)");
+    if (state.thermal) {
+      const { mods, knot, r } = state.thermal;
+      for (const [k, x] of Object.entries(mods)) L.push(`  ${k}: x=${x.toFixed(3)} → Γ熱重み ${r.weights[k].toFixed(4)}`);
+      L.push(`  結び目 ${knot}: V(t) = ${C.polyToString(r.poly)}`, `  β=${r.beta.toFixed(4)}, t=${r.t.toFixed(5)}, |V(t)|=${Math.abs(r.V).toExponential(4)}`);
+    } else L.push("  未実施");
+    L.push("", "■ 注意",
+      "  本アプリは非医療・研究/教育用です。十二支の動物の DNA の有無は DNA 配列照合のみで判断しています。",
+      "  十二支の「性質」(性格) は民間伝承であり、DNA では決まりません。",
+      "  生体計測値 (fMRI/MRI/脳トポグラフィー/血液/MEG/熱) は DNA の種情報を含みません。",
+      "  ヒトのゲノムに他の動物の DNA が遺伝的に含まれることはなく、検出時は混入を疑ってください。");
+    $("report").textContent = L.join("\n");
+    return L.join("\n");
+  }
+  $("dl").onclick = () => {
+    const blob = new Blob([buildReport()], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "omega_junishi_dna_report.txt"; a.click();
+  };
+})();
+</script>
+</body>
+</html>

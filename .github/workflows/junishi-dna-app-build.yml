@@ -1,9 +1,9 @@
-name: Ω-Canis DNA build (APK + Windows EXE + Linux)
+name: Ω-Junishi DNA build (APK + Windows EXE + Linux)
 
-# bio_medicine/omega_canis_dna (www + electron + cordova) から
+# bio_medicine/omega_junishi_dna (www + electron + cordova) から
 # Android APK・Windows 10/11 EXE・Linux (AppImage / deb) をビルドし、
-# Actions アーティファクト、および (canis-v* タグ時) GitHub Release に添付します。
-# ビルド前に NCBI からイヌ/ヒト mtDNA 参照 (NC_002008 / NC_012920) を取得して同梱します。
+# Actions アーティファクト、および (junishi-v* タグ時) GitHub Release に添付します。
+# ビルド前に NCBI から十二支の動物 11 種 + ヒトの mtDNA 参照を取得して同梱します。
 #
 # ⚠ 非医療・研究/教育用。
 
@@ -14,16 +14,16 @@ on:
       - 'claude/dog-dna-detection-app-*'
       - main
     paths:
-      - 'bio_medicine/omega_canis_dna/**'
-      - '.github/workflows/canis-dna-app-build.yml'
+      - 'bio_medicine/omega_junishi_dna/**'
+      - '.github/workflows/junishi-dna-app-build.yml'
     tags:
-      - 'canis-v*'
+      - 'junishi-v*'
 
 permissions:
   contents: write
 
 env:
-  APP: bio_medicine/omega_canis_dna
+  APP: bio_medicine/omega_junishi_dna
 
 jobs:
   refs:
@@ -40,7 +40,7 @@ jobs:
       - name: Upload www with references
         uses: actions/upload-artifact@v4
         with:
-          name: canis-www
+          name: junishi-www
           path: ${{ env.APP }}/www
 
   windows-exe:
@@ -50,7 +50,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: canis-www
+          name: junishi-www
           path: ${{ env.APP }}/www
       - uses: actions/setup-node@v4
         with:
@@ -63,7 +63,7 @@ jobs:
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omega_canis_dna-windows
+          name: omega_junishi_dna-windows
           path: ${{ env.APP }}/electron/dist/*.exe
       - name: Attach EXE to Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: canis-www
+          name: junishi-www
           path: ${{ env.APP }}/www
       - uses: actions/setup-node@v4
         with:
@@ -91,7 +91,7 @@ jobs:
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: omega_canis_dna-linux
+          name: omega_junishi_dna-linux
           path: |
             ${{ env.APP }}/electron/dist/*.AppImage
             ${{ env.APP }}/electron/dist/*.deb
@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: canis-www
+          name: junishi-www
           path: ${{ env.APP }}/www
       - uses: actions/setup-java@v4
         with:
@@ -149,12 +149,12 @@ jobs:
       - name: Collect APK
         run: |
           mkdir -p out
-          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega_canis_dna-debug.apk
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega_junishi_dna-debug.apk
           ls -la out
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omega_canis_dna-android
+          name: omega_junishi_dna-android
           path: out/*.apk
       - name: Attach APK to Release
         if: startsWith(github.ref, 'refs/tags/')

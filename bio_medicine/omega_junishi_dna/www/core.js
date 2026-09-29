@@ -1,10 +1,11 @@
 /*
- * core.js — Ω-Canis DNA の計算コア (ブラウザ / Node 共用)
- * Masaaki Yamaguchi / Bada — bio_medicine/omega_canis_dna
+ * core.js — Ω-Junishi DNA (十二支 DNA 検査) の計算コア (ブラウザ / Node 共用)
+ * Masaaki Yamaguchi / Bada — bio_medicine/omega_junishi_dna
  *
- * 1) 実DNA配列の種判別: k-mer 照合で「イヌ (Canis lupus familiaris)」由来の
- *    配列リードが試料中に存在するかを数える。これが本アプリで唯一「戌のDNAの有無」を
- *    判断に使う実計算。参照は NCBI の mtDNA 全長 (イヌ NC_002008 / ヒト NC_012920)。
+ * 1) 実DNA配列の種判別: k-mer 照合で、十二支の動物 (子=ネズミ … 亥=イノシシ) の
+ *    どの種に由来する配列リードが試料中に存在するかを数える。これが本アプリで唯一
+ *    「十二支の DNA の有無」を判断に使う実計算。参照は NCBI の各種 mtDNA 全長。
+ *    辰 (竜) は伝説上の生物で DNA が存在しないため検査対象外。
  * 2) Γ×Jones 熱エネルギー (概念): Kauffman ブラケットの状態和で Jones 多項式を
  *    厳密に計算し、Γ大域的部分積分多様体の核 e^{-x log x} から作った「熱」パラメータ t で
  *    評価する。計算自体は本物の数学だが、生体データへの意味づけは概念モデルであり、
@@ -12,7 +13,7 @@
  */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.CanisCore = factory();
+  else root.JunishiCore = factory();
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
@@ -48,6 +49,17 @@
       }
     }
     return reads.filter((r) => r.length > 0);
+  }
+
+  // マルチ FASTA をヘッダ付きレコードに分解する (参照の手動読み込み用)。
+  function parseFastaRecords(text) {
+    const recs = [];
+    let cur = null;
+    for (const l of text.replace(/\r/g, "").split("\n")) {
+      if (l.startsWith(">")) { cur = { header: l.slice(1).trim(), parts: [] }; recs.push(cur); }
+      else if (cur) cur.parts.push(l.trim());
+    }
+    return recs.map((r) => ({ header: r.header, seq: cleanSeq(r.parts.join("")) }));
   }
 
   function cleanSeq(s) {
@@ -124,36 +136,70 @@
     return { total: reads.length, counts, hitsTotal };
   }
 
-  // イヌ由来リード数から判定文を作る (統計的に控えめな閾値)。
-  function verdict(res, dogName) {
-    const dog = res.counts[dogName] || 0;
-    const assigned = res.total - res.counts.unassigned;
-    const frac = assigned > 0 ? dog / assigned : 0;
-    let level, text;
-    if (res.total === 0) {
-      level = "none"; text = "配列がありません。";
-    } else if (assigned === 0) {
-      level = "none"; text = "どの参照種にも割り当てられるリードがありません (参照範囲外、または品質不足)。判定不能です。";
-    } else if (dog === 0) {
-      level = "neg"; text = "イヌ由来の配列は検出されませんでした。";
-    } else if (dog < 3 || frac < 0.01) {
-      level = "trace"; text = "ごく少量のイヌ由来配列を検出 (痕跡)。ペットの毛・唾液、器具や試薬からの混入 (コンタミネーション) が最も考えられます。再採取・陰性対照での確認が必要です。";
-    } else if (frac < 0.5) {
-      level = "mixed"; text = "イヌ由来配列が有意に含まれます。混合試料 (ヒト＋イヌ) です。ヒトのゲノムにイヌの DNA が遺伝的に組み込まれることは生物学的にありえないため、試料への付着・混入と解釈してください。";
-    } else {
-      level = "dog"; text = "試料の大部分がイヌ由来です。この試料自体がイヌから採取された可能性が高いです。";
-    }
-    return { level, text, dog, assigned, frac };
+  /* ---------------- 十二支 ---------------- */
+
+  // 十二支と対応する生物種・参照 mtDNA (NCBI RefSeq)。辰は伝説上の生物で DNA なし。
+  // traits は民間伝承で語られる性格であり、遺伝的な性質ではない (DNA では決まらない)。
+  const JUNISHI = [
+    { key: "ne",    kanji: "子", yomi: "ね",   animal: "ネズミ",     species: "Mus musculus",            acc: "NC_005089.1", traits: "機敏・倹約家・社交的" },
+    { key: "ushi",  kanji: "丑", yomi: "うし", animal: "ウシ",       species: "Bos taurus",              acc: "NC_006853.1", traits: "誠実・忍耐強い・努力家" },
+    { key: "tora",  kanji: "寅", yomi: "とら", animal: "トラ",       species: "Panthera tigris",         acc: "NC_010642.1", traits: "勇敢・情熱的・決断力" },
+    { key: "u",     kanji: "卯", yomi: "う",   animal: "ウサギ",     species: "Oryctolagus cuniculus",   acc: "NC_001913.1", traits: "温和・繊細・社交的" },
+    { key: "tatsu", kanji: "辰", yomi: "たつ", animal: "竜",         species: null,                      acc: null,          traits: "威厳・理想家・活力" },
+    { key: "mi",    kanji: "巳", yomi: "み",   animal: "ヘビ",       species: "Elaphe climacophora",     acc: null,          traits: "思慮深い・直感的・執念" },
+    { key: "uma",   kanji: "午", yomi: "うま", animal: "ウマ",       species: "Equus caballus",          acc: "NC_001640.1", traits: "活発・自由・行動力" },
+    { key: "hitsuji", kanji: "未", yomi: "ひつじ", animal: "ヒツジ", species: "Ovis aries",              acc: "NC_001941.1", traits: "穏やか・優しい・協調的" },
+    { key: "saru",  kanji: "申", yomi: "さる", animal: "サル",       species: "Macaca fuscata",          acc: null,          traits: "器用・機知・好奇心" },
+    { key: "tori",  kanji: "酉", yomi: "とり", animal: "ニワトリ",   species: "Gallus gallus",           acc: "NC_053523.1", traits: "勤勉・几帳面・率直" },
+    { key: "inu",   kanji: "戌", yomi: "いぬ", animal: "イヌ",       species: "Canis lupus familiaris",  acc: "NC_002008.4", traits: "忠実・誠実・正義感" },
+    { key: "i",     kanji: "亥", yomi: "い",   animal: "イノシシ",   species: "Sus scrofa",              acc: "NC_000845.1", traits: "猪突猛進・正直・情に厚い" },
+  ];
+  const HUMAN = { key: "human", animal: "ヒト", species: "Homo sapiens", acc: "NC_012920.1" };
+
+  // 西暦年の干支 (十二支)。1年のうち旧暦正月/立春前の生まれは前年扱いとする流派もある。
+  function etoOfYear(y) {
+    return JUNISHI[(((y - 4) % 12) + 12) % 12];
   }
 
-  // 参照配列から検証用の合成リードを作る (点変異率 err、混合比 dogFrac)。
-  function simulateReads(refs, dogName, humanName, n, len, dogFrac, err, seed) {
+  // 1 種ぶんの判定 (統計的に控えめな閾値)。
+  function speciesVerdict(res, key, label, hostKey) {
+    const c = res.counts[key] || 0;
+    const assigned = res.total - res.counts.unassigned;
+    const frac = assigned > 0 ? c / assigned : 0;
+    const host = hostKey && key !== hostKey;
+    let level, text;
+    if (res.total === 0 || assigned === 0) {
+      level = "none"; text = "判定不能 (割り当て可能なリードなし)";
+    } else if (c === 0) {
+      level = "neg"; text = `${label}由来の配列は検出されませんでした。`;
+    } else if (c < 3 || frac < 0.01) {
+      level = "trace"; text = `${label}由来配列を痕跡量検出。食品・動物との接触・器具や試薬からの混入 (コンタミネーション) が考えられます。再採取・陰性対照での確認が必要です。`;
+    } else if (frac < 0.5) {
+      level = "mixed"; text = `${label}由来配列が有意に含まれる混合試料です。` +
+        (host ? `ヒトのゲノムに${label}の DNA が遺伝的に含まれることはないため、試料への付着・混入と解釈してください。` : "");
+    } else {
+      level = "major"; text = `試料の大部分が${label}由来です。` + (host ? `この試料自体が${label}から採取された可能性が高いです。` : "");
+    }
+    return { key, level, text, count: c, assigned, frac };
+  }
+
+  // 全種の判定。
+  function verdictAll(res, species, hostKey) {
+    return species.map((sp) => speciesVerdict(res, sp.key, sp.animal, hostKey));
+  }
+
+  // 参照配列から検証用の合成リードを作る。mix = { 種key: 比率 } (残りは等分しない; 正規化して使う)。
+  function simulateMix(refs, mix, n, len, err, seed) {
     let s = seed >>> 0 || 12345;
     const rnd = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+    const keys = Object.keys(mix).filter((k) => mix[k] > 0 && refs[k]);
+    const tot = keys.reduce((a, k) => a + mix[k], 0);
     const bases = "ACGT";
     const reads = [];
-    for (let i = 0; i < n; i++) {
-      const src = rnd() < dogFrac ? refs[dogName] : refs[humanName];
+    for (let i = 0; i < n && tot > 0; i++) {
+      let u = rnd() * tot, key = keys[keys.length - 1];
+      for (const k of keys) { if (u < mix[k]) { key = k; break; } u -= mix[k]; }
+      const src = refs[key];
       const p = Math.floor(rnd() * (src.length - len));
       let r = src.substr(p, len).split("");
       for (let j = 0; j < r.length; j++) if (rnd() < err) r[j] = bases[Math.floor(rnd() * 4)];
@@ -281,7 +327,8 @@
   }
 
   return {
-    parseSequences, looksLikeSnpArray, revComp, buildIndex, classifyReads, verdict, simulateReads,
+    parseSequences, parseFastaRecords, looksLikeSnpArray, revComp, buildIndex, classifyReads, speciesVerdict, verdictAll, simulateMix,
+    JUNISHI, HUMAN, etoOfYear,
     gammaKernel, kauffmanBracket, writhe, jones, evalPoly, polyToString, KNOTS, thermalIndex,
   };
 });
