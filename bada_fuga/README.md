@@ -1510,6 +1510,19 @@ python3 compose_tablet58.py bank37.json score_tablet58.json && python3 synth.py 
 python3 compose_tablet59.py bank37.json score_tablet59.json && python3 synth.py score_tablet59.json tablet59.wav && python3 video.py score_tablet59.json tablet59.wav tablet59.mp4
 ```
 
+## 🎹 Requiem BADA — Tablet Sessions LX · Klavier solo (心臓の鼓動と、始めの Klang I「Ruhe」を消した、実音のピアノの独奏, ♩=56, 約 3 分 37 秒)
+
+楽譜と実音のピアノの 4 声は XLVIII〜LIX と同じ。鳴るのは録音から切り出したピアノの実音 (と Introitus の 08:49 の録音) だけ。
+
+- 心臓の鼓動 (`HB`) を外した。ドラム・シンセ・弦・オルガンもなし
+- 始めの Klang I「Ruhe」(全員で長く伸ばす不協和音の和音、2 小節 — シンセのように聞こえた所) は、楽譜を書き出したあとで `cut_bars(d, 4, 6)` で切り取り、
+  後ろの音・区間・主題の入り・和音・小節の時刻を前へ詰めた。Introitus の録音が消えていくところから、そのまま Fuga I の主題へ入る
+- 構成: Introitus (08:49) → Fuga I → Kyrie (コラール) → Klang II「Tränen」 → Fuga II → Amen (ヘ長調)
+
+```bash
+python3 compose_tablet60.py bank37.json score_tablet60.json && python3 synth.py score_tablet60.json tablet60.wav && python3 video.py score_tablet60.json tablet60.wav tablet60.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
