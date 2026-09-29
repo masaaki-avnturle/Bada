@@ -1459,6 +1459,16 @@ python3 compose_tablet54.py bank37.json score_tablet54.json && python3 synth.py 
 python3 compose_tablet55.py bank37.json score_tablet55.json && python3 synth.py score_tablet55.json tablet55.wav && python3 video.py score_tablet55.json tablet55.wav tablet55.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LVI · Klavier & Taiko II (太鼓を「っどー・っどー・っどー・っど・っど・っど・どど・っどー・っどー」に, ♩=56, 約 3 分 45 秒)
+
+LV と同じ楽譜・実音のピアノの 4 声・和太鼓をまねた太鼓で、型だけを変えた (`compose_tablet56.py`)。♩=56 の拍の 3 小節 (12 拍) で一回り:
+「っどー・っどー・っどー」(0.5・2・3.5 拍目、大太鼓を長く響かせる) →「っど・っど・っど」(5・6・7 拍目、長胴太鼓) →「どど」(7.5・8 拍目、長胴太鼓)
+→「っどー・っどー」(9・10.5 拍目、大太鼓を長く)。「ど」を短くするため、長胴太鼓は手で押さえて響きを止める (`AD` の `damp`: 0.35 秒 / 0.25 秒のあと 40 ms で消える)。
+
+```bash
+python3 compose_tablet56.py bank37.json score_tablet56.json && python3 synth.py score_tablet56.json tablet56.wav && python3 video.py score_tablet56.json tablet56.wav tablet56.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

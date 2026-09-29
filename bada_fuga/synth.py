@@ -1065,6 +1065,8 @@ def main(score='score.json', out='fuga.wav'):
             continue
         if recs and ex['v'] == 'AD':                        # 実際の太鼓の鳴り方をまねたドラム (乾いた音を前に、部屋の響きへ少し)
             y = acoustic_drum(ex.get('kind', 'kick'), ex.get('gain', 0.3))
+            if ex.get('damp'):                              # 手で押さえて響きを止める (damp 秒のあと 40 ms で消える)
+                tt = np.arange(len(y)) / SR; y = y * np.where(tt > ex['damp'], np.exp(-(tt - ex['damp']) / 0.04), 1.0).astype(np.float32)
             pan = ex.get('pan', {'kick': 0.0, 'floor': 0.25, 'tom': -0.15, 'snare': -0.05, 'ghost': -0.05, 'hat': 0.3, 'odaiko': 0.0, 'nagado': 0.2}.get(ex.get('kind', 'kick'), 0.0))
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
