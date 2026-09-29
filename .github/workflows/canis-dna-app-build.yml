@@ -1,0 +1,163 @@
+name: Ω-Canis DNA build (APK + Windows EXE + Linux)
+
+# bio_medicine/omega_canis_dna (www + electron + cordova) から
+# Android APK・Windows 10/11 EXE・Linux (AppImage / deb) をビルドし、
+# Actions アーティファクト、および (canis-v* タグ時) GitHub Release に添付します。
+# ビルド前に NCBI からイヌ/ヒト mtDNA 参照 (NC_002008 / NC_012920) を取得して同梱します。
+#
+# ⚠ 非医療・研究/教育用。
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'claude/dog-dna-detection-app-*'
+      - main
+    paths:
+      - 'bio_medicine/omega_canis_dna/**'
+      - '.github/workflows/canis-dna-app-build.yml'
+    tags:
+      - 'canis-v*'
+
+permissions:
+  contents: write
+
+env:
+  APP: bio_medicine/omega_canis_dna
+
+jobs:
+  refs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Unit tests (k-mer 判別 / Jones 多項式)
+        run: node "$APP/tests/test_core.js"
+      - name: Fetch mtDNA references from NCBI
+        run: python3 "$APP/tools/fetch_refs.py"
+      - name: Upload www with references
+        uses: actions/upload-artifact@v4
+        with:
+          name: canis-www
+          path: ${{ env.APP }}/www
+
+  windows-exe:
+    needs: refs
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: canis-www
+          path: ${{ env.APP }}/www
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Windows EXE (Electron)
+        working-directory: ${{ env.APP }}/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_canis_dna-windows
+          path: ${{ env.APP }}/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.APP }}/electron/dist/*.exe
+
+  linux-app:
+    needs: refs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: canis-www
+          path: ${{ env.APP }}/www
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: ${{ env.APP }}/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_canis_dna-linux
+          path: |
+            ${{ env.APP }}/electron/dist/*.AppImage
+            ${{ env.APP }}/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.APP }}/electron/dist/*.AppImage
+            ${{ env.APP }}/electron/dist/*.deb
+
+  android-apk:
+    needs: refs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: canis-www
+          path: ${{ env.APP }}/www
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android 既定の 'tools' は廃止済みのため packages を空にし、次で明示導入する。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # cordova-android 12 は Gradle 7.x が必要 (他の Android ワークフローと同じ対処)。
+      - name: Pin Gradle 7.6.4
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          cordova create cordova-build com.bada.omega TmpApp
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/omega_canis_dna-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: omega_canis_dna-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*.apk
