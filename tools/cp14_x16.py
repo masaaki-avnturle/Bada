@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""J.S. Bach, Die Kunst der Fuge BWV 1080, Contrapunctus 14 (Fuga a 3 soggetti, unfinished), every note x16.
+"""J.S. Bach, Die Kunst der Fuge BWV 1080, Contrapunctus 14 (Fuga a 3 soggetti, unfinished), every note x16
+(or x4 / x8 given as the third argument).
 
 Source: Mutopia Project edition (after Breitkopf & Haertel 1885, public domain), converted to MIDI by LilyPond.
 Base tempo: quarter = 0.5 s (half note = 60, about 8 minutes for the 239 bars); x16 -> one quarter = 8 s.
 Every note is kept exactly as written, only 16 times longer: the keys are held for the full stretched value,
-and notes longer than 1.5 stretched quarters are softly re-sounded every quarter so they do not die away.
+and long notes are softly re-sounded about every 8 s (every quarter at x16, 2 at x8, 4 at x4) so they do not die away.
 Pedal: syncopated legato pedal changed on every (stretched) quarter so the long notes ring into each other
 without blurring the harmony.  The piece ends where Bach's manuscript breaks off.
 """
@@ -12,7 +13,7 @@ import sys
 import mido
 
 BASE_Q = 0.5
-STRETCH = 16
+STRETCH = int(sys.argv[3]) if len(sys.argv) > 3 else 16  # 4, 8 or 16
 Q = BASE_Q * STRETCH  # 8 s per quarter
 VEL = {1: 60, 2: 56, 3: 56, 4: 62}  # soprano, alto, tenor, bass (track index in the LilyPond MIDI)
 
@@ -36,13 +37,14 @@ def main(src, out):
     end_q = max(n[1] for n in notes) / Q
     # a piano tone dies away long before a note stretched x16 ends (a whole note lasts 32 s): notes longer than
     # one and a half stretched quarters are re-sounded softly every quarter, so the written value is heard to the end
+    RS = max(1, round(8.0 / Q)) * Q  # re-sound about every 8 s: every quarter x16, 2 quarters x8, 4 quarters x4
     sounded = []
     for t0, t1, p, v in notes:
         t = t0
         first = True
-        while t1 - t > 1.5 * Q:
-            sounded.append([t, t + Q + 0.05, p, v if first else max(30, v - 16)])
-            t += Q
+        while t1 - t > 1.5 * RS:
+            sounded.append([t, t + RS + 0.05, p, v if first else max(30, v - 16)])
+            t += RS
             first = False
         sounded.append([t, t1, p, v if first else max(30, v - 16)])
     notes = sorted(sounded)
