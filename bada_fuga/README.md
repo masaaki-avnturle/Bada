@@ -1497,6 +1497,19 @@ python3 compose_tablet57.py bank37.json score_tablet57.json && python3 synth.py 
 python3 compose_tablet58.py bank37.json score_tablet58.json && python3 synth.py score_tablet58.json tablet58.wav && python3 video.py score_tablet58.json tablet58.wav tablet58.mp4
 ```
 
+## 🎹💓 Requiem BADA — Tablet Sessions LIX · Klavier & Herzschlag-Rock (LVIII のドラムの音を心臓の「ドクン」に置き換え, ♩=56 / 112, 約 3 分 45 秒)
+
+楽譜・実音のピアノの 4 声・ロックの 8 ビートのリズム (フィルも) は LVIII とまったく同じで、音だけを心音 (`heart_tone`、extras の `HB`) に置き換えた
+(`compose_tablet59.py` は LVIII の `post` が作ったドラムを、その場で心音に書き換える)。
+
+- 大太鼓 (1・3 拍) →「ドッ」(I 音)、スネア (2・4 拍) →「クン」(II 音) — 交互に鳴って「ドクン、ドクン」。フィルのタム → 高い「クン」、フロアタム →「ドッ」、
+  Klang・Amen の一打 → 強い「ドクン」。ハイハットは心音にないので外した。心音の音高は和音の根音 (ドッ) と 5 度 (クン)
+- 心音はピアノの約 3 dB 下 (`heart_gain` 2.2)。シンセなし、ピアノ主体
+
+```bash
+python3 compose_tablet59.py bank37.json score_tablet59.json && python3 synth.py score_tablet59.json tablet59.wav && python3 video.py score_tablet59.json tablet59.wav tablet59.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
