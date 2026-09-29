@@ -1445,6 +1445,20 @@ python3 compose_tablet53.py bank37.json score_tablet53.json && python3 synth.py 
 python3 compose_tablet54.py bank37.json score_tablet54.json && python3 synth.py score_tablet54.json tablet54.wav && python3 video.py score_tablet54.json tablet54.wav tablet54.mp4
 ```
 
+## 🎹🥁 Requiem BADA — Tablet Sessions LV · Klavier & Taiko (実音のピアノ主体に、和太鼓に近い重低音のゆっくりした太鼓, ♩=56, 約 3 分 45 秒)
+
+楽譜と実音のピアノの 4 声は LIV までとまったく同じ。キック・スネア・ハイハット (ジャングル) とシンセの音をやめ、和太鼓をまねた太鼓にした (`compose_tablet55.py`)。
+
+- **和太鼓** (`acoustic_drum` の `odaiko`・`nagado`) — 張った膜の固有振動の和に、太い木の撥 (ばち) の柔らかい当たりと胴 (樽) の響き。
+  大太鼓 (46 Hz) は 1.3 秒響く深い「ドン」(キックの約 3 倍長く、エネルギーの 99% が 120 Hz 以下)、長胴太鼓 (72 Hz) は連打に
+- **ゆっくりした型** (♩=56 の拍、3 小節 = 12 拍で一回り) — 「っど・っど・っど・っど」(拍の裏に大太鼓) →「どどど」(長胴太鼓の 8 分 3 つ)
+  →「っど・っど・っど・っど」→「どどどど」(長胴太鼓の 8 分 4 つ)
+- 太鼓が入るのは Fuga I の 5 小節目からと Fuga II の 2 小節目から。Klang I・Klang II の頭と Amen の長調の和音で大太鼓の大きな一打。ピアノ主体になるよう太鼓はピアノの約 3 dB 下
+
+```bash
+python3 compose_tablet55.py bank37.json score_tablet55.json && python3 synth.py score_tablet55.json tablet55.wav && python3 video.py score_tablet55.json tablet55.wav tablet55.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash

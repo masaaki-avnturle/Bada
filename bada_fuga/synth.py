@@ -617,13 +617,16 @@ MEMBRANE = (1.0, 1.594, 2.136, 2.296, 2.653, 2.918, 3.156, 3.501)             # 
 def acoustic_drum(kind, vel=0.8, sr=SR):
     """実際の太鼓の鳴り方をまねたドラム (膜の固有振動の和 = モード合成、シンセの電子音ではなく):
     kick = 24 インチのバスドラム (52 Hz、フェルトのビーター、胴の低い響き)、floor = 16 インチのフロアタム (82 Hz、スティック)、
-    tom = タム (120 Hz)、snare / ghost = スネア (膜 185 Hz + 響き線のざらつき)、hat = クローズド・ハイハット (金属の不協和な振動、暗めで小さく)"""
+    tom = タム (120 Hz)、snare / ghost = スネア (膜 185 Hz + 響き線のざらつき)、hat = クローズド・ハイハット (金属の不協和な振動、暗めで小さく)、
+    odaiko = 大太鼓 (和太鼓、46 Hz、1.3 秒響く)、nagado = 長胴太鼓 (72 Hz) — 太い木の撥の柔らかい当たりと胴 (樽) の響き"""
     P = {'kick': (52.0, 0.3, 0.02, (1, .35, .2, .12, .08, .05), (.38, .12, .08, .06, .05, .04), 0.5),
          'floor': (82.0, 0.15, 0.03, (1, .5, .32, .22, .14, .1), (.75, .28, .16, .11, .08, .06), 0.8),
          'tom': (120.0, 0.12, 0.03, (1, .5, .3, .2, .12), (.45, .18, .11, .08, .06), 0.6),
          'snare': (185.0, 0.08, 0.02, (1, .6, .5, .35, .3, .2), (.16, .1, .08, .06, .05, .04), 0.45),
-         'ghost': (185.0, 0.05, 0.02, (1, .5, .4, .3), (.08, .06, .05, .04), 0.2)}
-    rng = np.random.default_rng({'kick': 31, 'floor': 32, 'tom': 33, 'snare': 34, 'ghost': 35, 'hat': 36}[kind])
+         'ghost': (185.0, 0.05, 0.02, (1, .5, .4, .3), (.08, .06, .05, .04), 0.2),
+         'odaiko': (46.0, 0.2, 0.05, (1, .45, .3, .2, .12, .08), (1.3, .4, .25, .15, .1, .08), 1.5),     # 大太鼓 (和太鼓): 深く長い「ドン」
+         'nagado': (72.0, 0.18, 0.04, (1, .5, .32, .2, .12), (.85, .3, .2, .12, .08), 1.0)}               # 長胴太鼓: 連打の「ドドド」
+    rng = np.random.default_rng({'kick': 31, 'floor': 32, 'tom': 33, 'snare': 34, 'ghost': 35, 'hat': 36, 'odaiko': 37, 'nagado': 38}[kind])
     if kind == 'hat':
         n = int(0.12 * sr); t = np.arange(n, dtype=np.float32) / sr
         fs = rng.uniform(3200, 8500, 12)
@@ -640,6 +643,8 @@ def acoustic_drum(kind, vel=0.8, sr=SR):
     nz = rng.standard_normal(n).astype(np.float32)
     if kind == 'kick':                                                           # フェルトのビーターの当たり + 胴の低い響き
         y += 0.45 * _lp(nz, 0.15) * np.exp(-t / 0.003) + 0.35 * np.sin(2 * np.pi * 104 * t) * np.exp(-t / 0.09)
+    elif kind in ('odaiko', 'nagado'):                                           # 和太鼓: 太い木の撥 (ばち) の柔らかい当たり + 胴 (樽) の響き
+        y += 0.3 * _lp(nz, 0.1) * np.exp(-t / 0.004) + 0.25 * np.sin(2 * np.pi * f0 * 2.2 * t) * np.exp(-t / 0.18)
     elif kind in ('floor', 'tom'):                                               # スティックの当たり
         y += 0.35 * (_lp(nz, 0.3) - _lp(nz, 0.03)) * np.exp(-t / 0.002)
     else:                                                                        # スネアの響き線 (1.5〜7 kHz のざらつき、1 ms 遅れて)
@@ -1060,7 +1065,7 @@ def main(score='score.json', out='fuga.wav'):
             continue
         if recs and ex['v'] == 'AD':                        # 実際の太鼓の鳴り方をまねたドラム (乾いた音を前に、部屋の響きへ少し)
             y = acoustic_drum(ex.get('kind', 'kick'), ex.get('gain', 0.3))
-            pan = ex.get('pan', {'kick': 0.0, 'floor': 0.25, 'tom': -0.15, 'snare': -0.05, 'ghost': -0.05, 'hat': 0.3}.get(ex.get('kind', 'kick'), 0.0))
+            pan = ex.get('pan', {'kick': 0.0, 'floor': 0.25, 'tom': -0.15, 'snare': -0.05, 'ghost': -0.05, 'hat': 0.3, 'odaiko': 0.0, 'nagado': 0.2}.get(ex.get('kind', 'kick'), 0.0))
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
