@@ -21,6 +21,12 @@
 x = manifold_coord(r0/r) = 2√(r0/r) とおくと L(h) = cosh(x log x) と 10 ステップ上昇
 (607.5 m, 110.45 m/s) がレポート値と一致する。外形寸法は図解用 (質量 1.2×10⁴ kg のみレポート値)。
 
+## アプリ (Android APK / Windows 10・11 / Linux)
+
+輸送機・ChatGPT・UFO の各設計図作成ソフトは `app/` にあります。GitHub Actions の
+「Blueprint apps build」ワークフローでビルドされ、Actions のアーティファクトからダウンロードできます。
+詳細は [`app/README.md`](app/README.md)。
+
 ## 動画の構成
 
 1. 設計パラメータ（レポート 1 章の Bada 実行結果）

@@ -1,0 +1,199 @@
+name: Blueprint apps build (輸送機 / ChatGPT / UFO 設計図作成ソフト — Android APK + Windows EXE + Linux)
+
+# contact_transporter_media/app/ の「Blueprint Studio」3 アプリ
+#   - 輸送機設計図作成ソフト   (transporter)  … CONTACT TRANSPORTER: 方程式 2111 本 → 3D 設計図 / 組み立て・起動の動画
+#   - ChatGPT 設計図作成ソフト (chatgpt)      … GPT 系 Transformer の部品と方程式 → 3D 設計図 / 推論の動画
+#   - UFO 設計図作成ソフト     (ufo)          … 反重力の方程式 UFO.1〜26 → 3D 設計図 / 飛行の動画
+# を
+#   - Android 向け APK (Cordova)
+#   - Windows 10/11 向け EXE (Electron: NSIS インストーラ + ポータブル)
+#   - Linux 向け AppImage / deb (Electron)
+# としてビルドし、Actions のアーティファクトとしてダウンロードできるようにします。
+# (blueprint-v* タグ / release_tag 指定時は GitHub Release にも添付)
+#
+# アプリは自己完結 HTML (app/tools/build_www.js が生成) で、設計図 PDF と動画 mp4
+# (WebCodecs + mp4-muxer) をアプリ内で書き出します。
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: blueprint-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    branches:
+      - '**'
+    paths:
+      - 'contact_transporter_media/app/**'
+      - 'contact_transporter_media/data/equations.json'
+      - '.github/workflows/blueprint-apps-build.yml'
+    tags:
+      - 'blueprint-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check (engine + apps)
+        run: |
+          set -e
+          cd contact_transporter_media/app
+          for f in src/engine.js src/transporter.js src/chatgpt.js src/ufo.js tools/*.js electron/*.js; do node --check "$f"; done
+      - name: Engine tests (Riemann–Siegel θ/Z, Jones V(t*), UFO 揚力・上昇軌道, 注意行列, 全フレーム/PDF/音声)
+        run: node contact_transporter_media/app/tools/engine-test.js
+      - name: Build www for all apps
+        run: |
+          set -e
+          for a in transporter chatgpt ufo; do
+            node contact_transporter_media/app/tools/build_www.js "$a" "www-$a"
+            test -s "www-$a/index.html"
+            test -s "www-$a/fonts/ipag.ttf"
+          done
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [transporter, chatgpt, ufo]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は廃止済みのため packages を空にして明示導入する。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www + config.xml
+        run: node contact_transporter_media/app/tools/prepare.js ${{ matrix.app }} cordova app-src
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APPID=$(node -p "require('./contact_transporter_media/app/apps.json')['${{ matrix.app }}'].appId")
+          PNAME=$(node -p "require('./contact_transporter_media/app/apps.json')['${{ matrix.app }}'].productName")
+          cordova create cordova-build "$APPID" "$PNAME"
+          rm -rf cordova-build/www
+          cp -r app-src/www cordova-build/www
+          cp app-src/config.xml cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          # WebView は <a download href="blob:"> を処理しないため、SAF の保存ダイアログで PDF / mp4 を保存する。
+          cordova plugin add cordova-plugin-save-dialog
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          ART=$(node -p "require('./contact_transporter_media/app/apps.json')['${{ matrix.app }}'].artifact")
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk "out/${ART}-debug.apk"
+          echo "ART=$ART" >> "$GITHUB_ENV"
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ART }}-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [transporter, chatgpt, ufo]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare Electron project
+        shell: bash
+        run: |
+          node contact_transporter_media/app/tools/prepare.js ${{ matrix.app }} electron electron-build
+          echo "ART=$(node -p "require('./contact_transporter_media/app/apps.json')['${{ matrix.app }}'].artifact")" >> "$GITHUB_ENV"
+      - name: Build Windows EXE (Electron, NSIS + portable)
+        working-directory: electron-build
+        run: |
+          npm install --no-audit --no-fund
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ART }}-windows
+          path: electron-build/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: electron-build/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [transporter, chatgpt, ufo]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare Electron project
+        run: |
+          node contact_transporter_media/app/tools/prepare.js ${{ matrix.app }} electron electron-build
+          echo "ART=$(node -p "require('./contact_transporter_media/app/apps.json')['${{ matrix.app }}'].artifact")" >> "$GITHUB_ENV"
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: electron-build
+        run: |
+          npm install --no-audit --no-fund
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ART }}-linux
+          path: |
+            electron-build/dist/*.AppImage
+            electron-build/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            electron-build/dist/*.AppImage
+            electron-build/dist/*.deb

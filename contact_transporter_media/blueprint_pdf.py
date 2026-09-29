@@ -301,7 +301,7 @@ def tr_notes(pdf, n):
         "・本図面は contact_blueprint.pdf の数値 (Bada 実行結果) を唯一の寸法根拠とし、形状の配置は可視化のための解釈である。",
         "・部品への方程式割り当ては各式の先頭タグによる: ROT→環, SR/QUANTUM→ポッド, GAMMA/BETA→塔, ZETA→共鳴窓,",
         "   JONES→コイル, MANIFOLD/ENTROPY→井戸, TRANSPORT→扉の軸, OTHER→基礎。",
-        "・θ(φ), Z(φ), V_K(t*) は mpmath で再計算し、レポート値と有効数字 6 桁で一致した。",
+        "・θ(φ), Z(φ) は mpmath で再計算しレポート値と有効数字 6 桁で一致。V_K(t*) は 4 桁以上で一致 (V_3_1 実部 −0.116358 / レポート −0.116342)。",
         "・共鳴窓の角度は |V_K(e^{iα})| の極小 (α ∈ [0, 2π), 0.1° 刻み) から求めた。",
         "・生成スクリプト: contact_transporter_media/ (transporter_model.py, transporter_video.py, blueprint_pdf.py)",
         "",

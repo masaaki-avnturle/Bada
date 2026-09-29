@@ -152,7 +152,7 @@ def s_params(fig, u, sec):
         y = 0.80 - i * 0.105
         fig.text(0.05 + 0.02 * (1 - a), y, h, color=col, fontsize=17, weight="bold", alpha=a)
         fig.text(0.23 + 0.02 * (1 - a), y, body, color=FG, fontsize=15, alpha=a)
-    fig.text(0.05, 0.06, "再計算 (mpmath) でも θ(φ), Z(φ), V(t*) はレポート値と一致", color=C["hud"],
+    fig.text(0.05, 0.06, "再計算 (mpmath) でも θ(φ), Z(φ), V(t*) はレポート値と一致 (V は 4 桁以上)", color=C["hud"],
              fontsize=12, alpha=smooth(u * 3 - 2))
 
 
