@@ -9,7 +9,7 @@ global.CTPhys = require("../src/physics.js");
 global.ContactGPT = require("../src/gpt.js");
 global.CTCad = require("../src/cad.js");
 const P = global.CTPhys, CAD = global.CTCad;
-const M = require("../src/models.js"), D = require("../src/drafting.js"), { Chat, calc } = require("../src/chat.js");
+const D = require("../src/drafting.js"), H = require("./badahost.js");
 
 let fail = 0, pass = 0;
 function near(name, got, want, tol) {
@@ -46,9 +46,9 @@ near("UFO.11 L(0) = cosh(2 ln 2·…)", P.ufo.L(0), 2.125, 1e-9);
 near("UFO.23 L(1 km)", P.ufo.L(1000), 2.12450, 1e-5);
 near("UFO.23 L(100 km)", P.ufo.L(1e5), 2.07677, 1e-5);
 near("UFO.19 a", P.ufo.accel(0), 11.047, 1e-3);
-const tr = P.ufo.ascend(10, 1).pop();
-near("UFO.24 高度 10 step", tr.h, 607.6, 1e-3);
-near("UFO.24 速度 10 step", tr.v, 110.46, 1e-3);
+const asc = P.ufo.ascend(10, 1).pop();
+near("UFO.24 高度 10 step", asc.h, 607.6, 1e-3);
+near("UFO.24 速度 10 step", asc.v, 110.46, 1e-3);
 near("UFO.1 U = GMm/r (m=1.2e4)", P.ufo.Ugrav(12000, 0), 7.50723e11, 1e-3);
 near("UFO.9 β(3,2)", P.betaR(3, 2), 0.0833333, 1e-5);
 // ---- 方程式レジストリ
@@ -59,14 +59,54 @@ near("数値評価 632 本", cnt("calc") + cnt("holds") + cnt("differs"), 632, 0
 near("成立 231", cnt("holds"), 231, 0);
 near("不成立 181", cnt("differs"), 181, 0);
 
-// ---- 電卓 / 対話
-near("calc gamma(0.5)^2", calc("gamma(0.5)^2"), Math.PI, 1e-9);
-near("calc Z(11.7722)", calc("Z(11.7722)"), -1.33415, 1e-4);
-near("calc 2^3^2 (右結合)", calc("2^3^2"), 512, 0);
-const chat = new Chat(eqs, null, bp);
-truthy("対話: ID 参照 UFO.19", chat.ask("UFO.19").refs[0].id === "UFO.19");
-truthy("対話: 反重力 → UFO 系を検索", chat.ask("反重力で上昇するには？").refs.some((e) => e.id.startsWith("UFO.")));
-truthy("対話: Γ の即答", chat.ask("ローレンツ因子は？").answer.join().includes("64800"));
+// ---- Bada アプリ: 3 つとも Bada プログラムとして実行し、Bada が計算した値を設計図書と照合
+const tr = H.makeApp("apps/transporter.bada");
+const out = (k) => tr.ui.outputs[k][1];
+near("[Bada] transporter.bada Γ", out("G"), 64800, 0);
+near("[Bada] transporter.bada φ", out("phi"), 11.7722, 1e-5);
+near("[Bada] transporter.bada T|ψ|", out("tpsi"), 1.76329, 1e-5);
+near("[Bada] transporter.bada θ(φ)", out("rsth"), -2.58136, 1e-5);
+near("[Bada] transporter.bada Z(φ) (Borwein ζ を Bada で)", out("Z"), -1.33415, 1e-5);
+truthy("[Bada] transporter.bada V_3_1(t*) = -0.116342 + 2.30908i", out("V31") === "-0.116342 + 2.30908i");
+truthy("[Bada] transporter.bada V_5_1(t*) = -2.81527 + 1.09654i", out("V51") === "-2.81527 + 1.09654i");
+truthy("[Bada] transporter.bada 歳差 Ω = 3.7064", String(out("Omega")).startsWith("3.7064"));
+truthy(`[Bada] transporter.bada 部品 ${tr.env.scene.parts.size} 個`, tr.env.scene.parts.size >= 24);
+tr.app.call("frame", [3.5]);
+truthy("[Bada] transporter.bada frame(t) で外環が回転", tr.env.scene.parts.get("ring_outer").matrix != null);
+tr.app.call("make_sheet", []);
+truthy(`[Bada] transporter.bada 図面 (尺度 1:${tr.env.lastSheet && tr.env.lastSheet.scale})`, tr.env.lastSheet && tr.env.lastSheet.svg.includes("CONTACT TRANSPORTER"));
+const uf = H.makeApp("apps/ufo.bada");
+near("[Bada] ufo.bada L = cosh(x log x)", uf.ui.outputs.L[1], 2.125, 1e-9);
+truthy("[Bada] ufo.bada 10 s 後 h = 607.58 m, v = 110.46 m/s", uf.ui.outputs.h10[1] === "h = 607.58 m, v = 110.46 m/s");
+truthy("[Bada] ufo.bada が図面を描く", uf.env.lastSheet && uf.env.lastSheet.svg.includes("部材表") && uf.env.lastSheet.svg.includes("SiO₂"));
+const ub = CAD.Mesh && require("../src/badalib.js").boundsOf(uf.env.scene.baked());
+near("[Bada] ufo.bada 着陸時の最下点 z = 0", ub.min[2], 0, 1e-6);
+near("[Bada] ufo.bada 全高 = 脚+下殻+上殻+ドーム", ub.max[2], 3.2 + 2.2 + 3.2 + 3.2, 1e-6);
+uf.app.call("preset_mothership", []);
+near("[Bada] ufo.bada プリセット (大型母船) ⌀60", uf.ui.vals.diameter, 60, 0);
+const cg = H.makeApp("apps/contactgpt.bada", { model: false });
+cg.app.call("on_message", ["UFO.19"]);
+truthy("[Bada] contactgpt.bada ID 参照 UFO.19", cg.chat.refs[0] === "UFO.19");
+cg.chat.refs.length = 0; cg.app.call("on_message", ["反重力で上昇するには？"]);
+truthy("[Bada] contactgpt.bada 反重力 → UFO 系を検索", cg.chat.refs.some((id) => id.startsWith("UFO.")));
+cg.chat.replies.length = 0; cg.app.call("on_message", ["ローレンツ因子は？"]);
+truthy("[Bada] contactgpt.bada Γ の即答", cg.chat.replies.join().includes("64800"));
+cg.chat.replies.length = 0; cg.app.call("on_message", ["計算 rs_z(14.1347)"]);
+truthy("[Bada] contactgpt.bada 計算 = Bada の式 (Z の第 1 零点 ≈ 0)", /\*\*-?0\.0000/.test(cg.chat.replies[0]));
+{
+  const files = H.badaFiles(), B = require("../src/bada.js"), Lb = require("../src/badalib.js"), o = [];
+  const vm = new B.BadaVM({ host: Lb.makeHost({ files, ui: {}, chat: {} }), files, onPrint: (l) => o.push(l) });
+  vm.load(files["examples/quantum_demo.bada"]);
+  truthy("[Bada] 量子: ベル状態 [0.5, 0, 0, 0.5]", o[1] === "[0.5, 0, 0, 0.5]");
+  truthy("[Bada] 量子: Grover (2 qubit) が |11⟩ を確率 1 で見つける", o[5] === "[0, 0, 0, 1]");
+  const z = []; const vm2 = new B.BadaVM({ host: Lb.makeHost({ files, ui: {}, chat: {} }), files, onPrint: (l) => z.push(l) });
+  vm2.load(files["examples/zeta_zeros.bada"]);
+  truthy("[Bada] ζ の非自明零点 14.134725 / 21.022040 / 25.010858", z[1].includes("14.134725") && z[2].includes("21.022040") && z[3].includes("25.010858"));
+  for (const f of Object.keys(files)) {
+    const diags = B.lint(new B.BadaVM({ files }).expand(files[f], f), new Set(Object.keys(Lb.makeHost({ files, ui: {}, chat: {}, equations: [], index: { search: () => [], tagsIn: () => [] }, scene: new Lb.Scene() }))));
+    truthy(`[Bada] 構文チェック ${f}`, diags.length === 0);
+  }
+}
 
 // ---- GPT 勾配チェック + 学習で損失が下がる + 重みの往復
 {
@@ -110,22 +150,17 @@ function signedVolume(m) {
 near("トーラス体積 2π²Rr²", signedVolume(CAD.shapes.torus(10, 2, 256, 64)), 2 * Math.PI ** 2 * 10 * 4, 2e-3);
 near("球体積 4/3πr³", signedVolume(CAD.shapes.sphere(3, 128, 64)), 4 / 3 * Math.PI * 27, 2e-3);
 truthy("結び目チューブが外向き", signedVolume(CAD.shapes.torusKnot(10, 2, 2, 3, 0.5)) > 0);
-const parts = M.bake(M.transporter(bp, 0));
-truthy(`輸送機アセンブリ ${parts.length} 部品`, parts.length >= 20);
+const parts = tr.env.scene.baked();
+truthy(`輸送機アセンブリ (Bada) ${parts.length} 部品`, parts.length >= 20);
 const stl = CAD.toSTLBinary(parts);
 const tris = parts.reduce((s, p) => s + p.mesh.triCount, 0);
 near("STL バイト数 = 84 + 50·三角形数", stl.byteLength, 84 + 50 * tris, 0);
 truthy("OBJ に全部品", CAD.toOBJ(parts).split("\no ").length - 1 === parts.length);
-const ub = M.bake(M.ufo({}, 0)).reduce((m, p) => m.merge(p.mesh), new CAD.Mesh()).bounds();
-near("UFO 着陸時の最下点 z = 0", ub.min[2], 0, 1e-6);
-near("UFO 全高 = 脚+下殻+上殻+ドーム", ub.max[2], 3.2 + 2.2 + 3.2 + 3.2, 1e-6);
 
 // ---- 図面
-const sh = D.sheet({ parts, dims: M.transporterDims(bp), title: "test" });
+const sh = D.sheet({ parts, dims: tr.env.scene.dims, title: "test" });
 truthy(`図面 SVG (尺度 1:${sh.scale})`, sh.svg.startsWith("<svg") && sh.svg.includes("平面図") && sh.svg.endsWith("</svg>"));
 truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"));
-const us = D.sheet({ parts: M.bake(M.ufo({}, 0)), dims: M.ufoDims({}), bom: M.ufoBOM({}), title: "UFO" });
-truthy("UFO 図面に部材表", us.svg.includes("部材表") && us.svg.includes("SiO₂"));
 
 // ---- ビルド成果物
 const dist = path.join(__dirname, "..", "dist", "www", "index.html");

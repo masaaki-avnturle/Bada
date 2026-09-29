@@ -3,12 +3,13 @@
  * build.js — src/ を 1 枚の自己完結 HTML (dist/www/index.html) にまとめる
  *   方程式 2111 本 (data/equations.json) と ContactGPT の学習済み重み
  *   (data/contactgpt_weights.json) も埋め込むので、オフラインで動きます。
+ *   Bada ソース (bada/ 以下の .bada) も仮想ファイル表として埋め込みます。
  *   このファイルを Android (Cordova) / Windows・Linux (Electron) が同梱します。
  */
 const fs = require("fs"), path = require("path");
 const ROOT = path.join(__dirname, ".."), SRC = path.join(ROOT, "src"), DATA = path.join(ROOT, "data");
 const OUT = path.join(ROOT, "dist", "www");
-const ORDER = ["physics.js", "gpt.js", "cad.js", "models.js", "drafting.js", "viewer.js", "chat.js", "app.js"];
+const ORDER = ["physics.js", "gpt.js", "cad.js", "drafting.js", "viewer.js", "chat.js", "bada.js", "badalib.js", "app.js"];
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const safe = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
@@ -24,6 +25,16 @@ put("STYLE", read(path.join(SRC, "style.css")));
 put("GPT_SRC", safe(read(path.join(SRC, "gpt.js"))));
 put("EQUATIONS", safe(read(path.join(DATA, "equations.json")).replace(/\n/g, "")));
 put("WEIGHTS", safe(weights));
+// Bada ソース (apps / lib / examples) を仮想ファイル表として埋め込む
+const badaFiles = {};
+(function walk(d) {
+  for (const f of fs.readdirSync(d).sort()) {
+    const p = path.join(d, f);
+    if (fs.statSync(p).isDirectory()) walk(p);
+    else if (f.endsWith(".bada")) badaFiles[path.relative(path.join(ROOT, "bada"), p).split(path.sep).join("/")] = read(p);
+  }
+})(path.join(ROOT, "bada"));
+put("BADA", safe(JSON.stringify(badaFiles)));
 put("BUILD", JSON.stringify({ version: pkg.version, date: new Date().toISOString().slice(0, 10) }));
 put("SCRIPTS", ORDER.map((f) => `\n/* ---- ${f} ---- */\n` + safe(read(path.join(SRC, f)))).join("\n"));
 

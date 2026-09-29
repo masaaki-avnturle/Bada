@@ -1,12 +1,35 @@
-# Contact Transporter Studio — ContactGPT · 異次元輸送機 3D CAD · UFO 設計図面
+# Contact Transporter Studio — Bada で書かれた ContactGPT · 異次元輸送機 3D CAD · UFO 設計図面
 
 設計図書 **「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」**
 ([`contact_blueprint.pdf`](contact_blueprint.pdf), 量子プログラミング言語 Bada による生成, 37 ページ)
-に載っている方程式から作ったアプリです。1 枚の自己完結 HTML にまとめ、
-**Android APK / Windows 10・11 EXE / Linux AppImage・deb** として GitHub Actions でビルドします。
+に載っている方程式から作ったアプリです。**3 つのアプリはすべて量子プログラミング言語 Bada で書かれており**
+([`bada/apps/`](bada/apps/))、アプリ内の **Bada IDE** でソースを読み・書き換え・新しいアプリを作って、その場で実行できます。
+1 枚の自己完結 HTML にまとめ、**Android APK / Windows 10・11 EXE / Linux AppImage・deb** として GitHub Actions でビルドします。
 
 > ※ 設計図書自身が述べているとおり、これは論文の方程式に基づく**思索的・フィクションの設計図 (幾何的な可視化)** です。
 > 工学的に検証された装置ではなく、異次元への輸送や反重力飛行を実現するものではありません。
+
+## Bada がアプリケーションプログラミング言語
+
+```
+ bada/apps/contactgpt.bada   bada/apps/transporter.bada   bada/apps/ufo.bada      ← アプリ本体 (Bada)
+ bada/lib/  complex · zeta · jones · quantum · blueprint · ufo_flight .bada        ← ライブラリ (Bada)
+        │  ui_* / cad_* / sheet_draw / gpt_* / eq_* / chat_* …  (アプリ用組込み関数)
+ src/bada.js      Bada 処理系 (字句解析 → 構文解析 → バイトコード → スタック VM)
+ src/badalib.js   ランタイムライブラリ: 数学・文字列・3D メッシュ・図面・Transformer 行列演算・UI
+```
+
+- **Bada 処理系** [`src/bada.js`](src/bada.js) — リポジトリの本家 [`bada_silent_vim/bada`](../bada_silent_vim/bada) (Python) を
+  JavaScript へ忠実に移植 (同じ文法・同じバイトコード・同じ意味論、Python の任意精度整数も BigInt で再現)。
+  **リポジトリ内の Bada プログラム 99 本で Python 版と出力が完全一致** ([`tools/conformance.py`](tools/conformance.py) を CI で検査)。
+  `<-` 代入 / `<->` 比較 / `-<` 分岐・spawn / `>-` 合流・emit / `->` 遷移 / `>>` / `=>`、`Omega::DATABASE[space]`、`def`、`#include`。
+- **アプリ = Bada プログラム**。UI (パラメータ欄・計算結果・グラフ・ボタン・プリセット) も Bada の `ui_*` 宣言から生成され、
+  値が変わると `build()`、アニメーションは毎フレーム `frame(t)`、チャットは送信ごとに `on_message(q)` が呼ばれます。
+- **各タブの Bada コンソール (REPL)** — 動いているアプリと同じ VM で Bada を実行: `ui_set("diameter", 30)  build()` など。
+- **Bada IDE タブ** — ファイル一覧 (apps / lib / examples / user)、構文ハイライト、構文チェック、逆アセンブル (バイトコード表示)、
+  **実行先の選択** (輸送機 3D CAD タブ / UFO 設計図面タブ / ContactGPT タブ / コンソール)、新規・読込・保存 (.bada)、既定に戻す。
+  編集内容はブラウザ (アプリ) 内に保存されます。`examples/my_ship.bada` は Bada で新しい宇宙船 (葉巻型母船) を設計する例、
+  `examples/template.bada` は新規アプリのひな形です。
 
 ## ダウンロード (GitHub Actions)
 
@@ -24,7 +47,14 @@
 (`ct-v*` タグを push するとそのタグの Release、Actions の **Run workflow** では任意のタグを指定可)。
 ワークフロー: [`.github/workflows/contact-transporter-build.yml`](../.github/workflows/contact-transporter-build.yml)
 
-## 1. ContactGPT — ゼロから実装した Transformer
+## 1. ContactGPT — [`bada/apps/contactgpt.bada`](bada/apps/contactgpt.bada)
+
+対話の流れはすべて Bada: `計算 …` は Bada の式として評価 (例 `計算 rs_z(14.1347)`, `計算 c_text(zeta_c([2, 0]), 8)`)、
+方程式 ID の参照、設計値の即答 (lib/blueprint.bada で計算)、全文検索、そして生成。
+**生成は Bada が 1 文字ずつ決めます**: Transformer のロジット (`gpt_logits`) → 上位 k (`topk`) → 温度付き softmax →
+**量子状態 ψ_i = √a_i · e^{iθ_i} に符号化 (`q_encode`) → Born 則で測定 (`q_measure`)** — 設計図書 Q.1–Q.10 の「認知システム」そのもの。
+
+### Transformer (ランタイムライブラリ側)
 
 [`src/gpt.js`](src/gpt.js) — 外部ライブラリなし、Float32Array 上のテープ式自動微分で書いた decoder-only Transformer。
 
@@ -36,14 +66,13 @@
 - アプリ内の **Web Worker** で追加学習 / **ゼロから学習し直す** ことも可能 (損失曲線を表示、重みの保存・読込)
 - 逆伝播は数値微分と照合済み (`tools/gradcheck.js`, 相対誤差 < 1e-5)
 
-対話エンジン [`src/chat.js`](src/chat.js) は、Transformer の生成に加えて
-**方程式 ID の参照** (`UFO.19`)、**設計値の即答** (Γ, φ, Z(φ), Jones, 寸法, 反重力 …)、
-**レジストリ全文検索** (文字 bigram BM25 + タグ)、**数式電卓** (`計算 Z(11.7722)`, `= gamma(0.5)^2`, `beta`, `zeta`, `theta`, `L(h)` …) を組み合わせて答えます。
+検索エンジン [`src/chat.js`](src/chat.js) (文字 bigram BM25 + タグ + 日本語キーワード展開) は Bada から `eq_search` で呼びます。
 
-## 2. 異次元輸送機の 3D CAD
+## 2. 異次元輸送機の 3D CAD — [`bada/apps/transporter.bada`](bada/apps/transporter.bada)
 
-[`src/physics.js`](src/physics.js) が設計図書 第 1 章の値を方程式から再計算し ([`tools/test.js`](tools/test.js) で PDF の値と照合)、
-[`src/models.js`](src/models.js) がパラメトリックに 3D モデルを生成します。
+設計図書 第 1 章の値を **Bada で** 方程式から計算し ([`bada/lib/blueprint.bada`](bada/lib/blueprint.bada)。
+Riemann–Siegel θ、Borwein 法の ζ(½+it)、Jones 多項式、複素数演算もすべて Bada — [`tools/test.js`](tools/test.js) で PDF の値と照合)、
+`cad_torus` / `cad_knot` / `cad_pose` … で部品を組み立て、`frame(t)` でジンバルを回します。
 
 | 段 | 方程式 | 値 |
 |:---|:---|:---|
@@ -59,7 +88,9 @@
 - WebGL ビューア (オービット / パン / ピンチ、ISO・上・正面・側面、ワイヤ、青図、部品の表示切替)
 - 書き出し: **STL** (バイナリ) / **OBJ + MTL** / **DXF (3DFACE)** / PNG / **図面 SVG・DXF** / パラメータ JSON
 
-## 3. UFO 設計図面作成ソフト
+## 3. UFO 設計図面作成ソフト — [`bada/apps/ufo.bada`](bada/apps/ufo.bada)
+
+船体の回転断面・部品配置・寸法・部材表・飛行計算をすべて Bada で書いています (`sheet_draw` で A3 図面を生成)。
 
 - パラメトリック円盤機: 直径・縁厚・上下殻高さ・ドーム・舷窓・推進ポッド・着陸脚・反重力コイル (Jones 3_1 / 4_1 / 5_1)・コンタクト・リング・配色
 - プリセット: 標準円盤 01 / アダムスキー型 / 大型母船 / コンタクト機
@@ -79,7 +110,9 @@ PDF のテキスト ([`data/contact_blueprint.txt`](data/contact_blueprint.txt))
 
 ```sh
 node contact_transporter/tools/build.js      # → contact_transporter/dist/www/index.html (ブラウザで開けば動く)
-node contact_transporter/tools/test.js       # 設計図書の数値再現・GPT 勾配・CAD・図面のテスト
+node contact_transporter/tools/test.js       # Bada アプリ 3 本・設計図書の数値再現・GPT 勾配・CAD・図面のテスト
+python3 contact_transporter/tools/conformance.py   # Bada の JS 移植 ↔ Python 本家 (全 .bada で出力一致)
+node contact_transporter/tools/badahost.js apps/ufo.bada   # Bada アプリをヘッドレス実行
 node contact_transporter/tools/train.js 2400 # ContactGPT をゼロから学習 (--resume で追加学習)
 cd contact_transporter/app/electron && npm install && npm start   # デスクトップ版をローカル起動
 ```
@@ -87,9 +120,10 @@ cd contact_transporter/app/electron && npm install && npm start   # デスクト
 ```
 contact_transporter/
   contact_blueprint.pdf        元の設計図書
+  bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight)  examples/
   data/  equations.json  contactgpt_weights.json  contact_blueprint.txt
-  src/   physics.js gpt.js chat.js cad.js models.js drafting.js viewer.js app.js index.html style.css
-  tools/ build.js test.js train.js gradcheck.js extract_equations.py
+  src/   bada.js badalib.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
+  tools/ build.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py
   app/   electron/ (Windows / Linux)   cordova/config.xml (Android)
 ```
 

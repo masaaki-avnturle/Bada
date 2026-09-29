@@ -1,0 +1,111 @@
+// quantum.bada — 量子状態ベクトル (振幅 [re, im] の配列) と量子ゲート、Bada で。
+//   設計図書 Q.1–Q.21 の「認知システム」:
+//     a_i = softmax(z)_i,  ψ_i = √(a_i) · e^{iθ_i},  P(i) = |ψ_i|² / Σ|ψ_j|²  (Born 則)
+//   ContactGPT は次の文字をこの量子測定でサンプリングする。
+#include lib/complex.bada
+
+// n 量子ビットのレジスタ |0…0⟩
+def q_register(n) {
+  st <- []
+  repeat pow2(n) {
+    append(st, [0, 0])
+  }
+  st[0] <- [1, 0]
+  return st
+}
+// k 番目の量子ビットのビット値
+def q_bit(i, k) {
+  return imod(idiv(i, pow2(k)), 2)
+}
+// 1 量子ビットゲート [[a, b], [c, d]] (各要素は複素数) を k 番目に作用
+def q_gate1(st, k, g) {
+  n <- len(st)
+  out <- []
+  repeat n {
+    append(out, [0, 0])
+  }
+  i <- 0
+  -> i < n {
+    b <- q_bit(i, k)
+    j <- i + pow2(k)
+    -< b <-> 1 {
+      j <- i - pow2(k)
+    }
+    // out[i] = g[b][b]·st[i] + g[b][1−b]·st[j]
+    out[i] <- c_add(c_mul(g[b][b], st[i]), c_mul(g[b][1 - b], st[j]))
+    i <- i + 1
+  }
+  return out
+}
+def q_h(st, k) {
+  r <- 1 / sqrt(2)
+  return q_gate1(st, k, [[[r, 0], [r, 0]], [[r, 0], [-r, 0]]])
+}
+def q_x(st, k) {
+  return q_gate1(st, k, [[[0, 0], [1, 0]], [[1, 0], [0, 0]]])
+}
+// 位相回転 Rz(λ): |1⟩ に e^{iλ}  (S = Rz(π/2), T = Rz(π/4))
+def q_rz(st, k, lam) {
+  return q_gate1(st, k, [[[1, 0], [0, 0]], [[0, 0], c_expi(lam)]])
+}
+// CNOT (制御 c, 標的 t)
+def q_cnot(st, c, t) {
+  n <- len(st)
+  out <- []
+  i <- 0
+  -> i < n {
+    j <- i
+    -< q_bit(i, c) <-> 1 {
+      -< q_bit(i, t) <-> 1 {
+        j <- i - pow2(t)
+      } >- {
+        j <- i + pow2(t)
+      }
+    }
+    append(out, st[j])
+    i <- i + 1
+  }
+  return out
+}
+// 確率 |ψ_i|² (正規化済み)
+def q_probs(st) {
+  p <- []
+  s <- 0
+  i <- 0
+  -> i < len(st) {
+    v <- st[i][0] * st[i][0] + st[i][1] * st[i][1]
+    append(p, v)
+    s <- s + v
+    i <- i + 1
+  }
+  i <- 0
+  -> i < len(p) {
+    p[i] <- p[i] / s
+    i <- i + 1
+  }
+  return p
+}
+// 確率分布 a と位相 θ から状態 ψ_i = √a_i e^{iθ_i} を用意 (Q.3)
+def q_encode(a, theta) {
+  st <- []
+  i <- 0
+  -> i < len(a) {
+    append(st, c_scale(c_expi(theta[i]), sqrt(a[i])))
+    i <- i + 1
+  }
+  return st
+}
+// 測定 (Born 則): 添字を返す
+def q_measure(st) {
+  p <- q_probs(st)
+  r <- rand()
+  i <- 0
+  -> i < len(p) {
+    r <- r - p[i]
+    -< r <= 0 {
+      return i
+    }
+    i <- i + 1
+  }
+  return len(p) - 1
+}

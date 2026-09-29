@@ -1,0 +1,51 @@
+// ufo_flight.bada — UFO.1–26 の反重力モデル、Bada で。
+//   x = manifold_coord(r0/r) = 1 + r0/r          (UFO.14: 地表で x = 2)
+//   L = E_ag / U_grav = cosh(x log x)             (UFO.11: 地表 2.125)
+//   a = (L − 1)·g_eff,  g_eff = GM/r²             (UFO.19: 11.047 m/s²)
+//   U = GMm/r (UFO.1),  E_ag = U·L (UFO.13),  E⊥ = mc² − ½mv² (UFO.3)
+//   上昇: v ← v + a dt;  h ← h + v dt              (UFO.24: 10 s で 607.6 m, 110.46 m/s)
+
+def r_earth() {
+  return 6371000
+}
+def gm_earth() {
+  return 398600441800000
+}
+def manifold_x(h) {
+  return 1 + r_earth() / (r_earth() + h)
+}
+def ufo_L(h) {
+  x <- manifold_x(h)
+  return cosh(x * ln(x))
+}
+def g_eff(h) {
+  r <- r_earth() + h
+  return gm_earth() / (r * r)
+}
+def ufo_accel(h, gain) {
+  return (ufo_L(h) - 1) * g_eff(h) * gain
+}
+def u_grav(m, h) {
+  return gm_earth() * m / (r_earth() + h)
+}
+def e_ag(m, h) {
+  return u_grav(m, h) * ufo_L(h)
+}
+def e_perp(m, v) {
+  c <- 299792458
+  return m * c * c - 0.5 * m * v * v
+}
+// [[t, h, v], ...]
+def ascend(steps, dt, gain) {
+  h <- 0.0
+  v <- 0.0
+  tr <- [[0, 0, 0]]
+  i <- 1
+  -> i <= steps {
+    v <- v + ufo_accel(h, gain) * dt
+    h <- h + v * dt
+    append(tr, [i * dt, h, v])
+    i <- i + 1
+  }
+  return tr
+}

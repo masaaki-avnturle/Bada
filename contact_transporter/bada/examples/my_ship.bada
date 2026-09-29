@@ -1,0 +1,61 @@
+// my_ship.bada — Bada で新しい宇宙船を設計する例 (実行先: 輸送機 3D CAD / UFO 設計図面)
+//   Jones 結び目コイル 3 段 + 葉巻型の船体 + 図面
+#include lib/jones.bada
+
+ui_section("葉巻型 母船")
+ui_text("name", "機体名", "BADA CIGAR-1")
+ui_param("len", "全長 [m]", 80, 1)
+ui_param("rad", "胴の半径 [m]", 7, 0.1)
+ui_select("knot", "コイル", ["3_1", "5_1"], "5_1")
+ui_button("図面を作成", "make_sheet")
+
+def build() {
+  cad_clear()
+  L <- param("len")
+  R <- param("rad")
+  // 胴体: 回転体の断面を Bada で計算 (両端が丸い葉巻形)
+  pr <- []
+  k <- 0
+  -> k <= 40 {
+    s <- k / 40
+    append(pr, [R * sqrt(max2(0, 1 - pow(2 * s - 1, 6))), s * L])
+    k <- k + 1
+  }
+  pr[0][0] <- 0
+  pr[40][0] <- 0
+  cad_lathe("hull", "胴体", "#cfd8dc", pr, 64)
+  q <- 3
+  -< param("knot") <-> "5_1" {
+    q <- 5
+  }
+  i <- 0
+  -> i < 3 {
+    cad_knot("coil" + str(i), "Jones " + param("knot") + " コイル", "#ef5350", R * 1.5, R * 0.3, 2, q, 0.3)
+    i <- i + 1
+  }
+  frame(0)
+  cad_dim("front", [0, R + 2], [L, R + 2], 4, "全長 " + str(L))
+  cad_dim("side", [-R, L / 2], [R, L / 2], 3, "⌀" + str(2 * R))
+  cad_bom("1", "胴体", "Fe·Co60·Pt·Al 合金", "1")
+  cad_bom("2", "Jones " + param("knot") + " コイル", "Cs / Mg", "3")
+  terms <- knot_terms(param("knot"))
+  cad_note("Jones V = " + jones_text(terms))
+  cad_note("共鳴角 α = " + str(resonance(terms, 1)))
+}
+
+def frame(t) {
+  L <- param("len")
+  // 胴を水平に寝かせる
+  cad_pose("hull", [["T", -L / 2, 0, param("rad") * 2], ["R", 0, 1, 0, pi() / 2]])
+  i <- 0
+  -> i < 3 {
+    x <- -L / 2 + L * (i + 1) / 4
+    cad_pose("coil" + str(i), [["T", x, 0, param("rad") * 2], ["R", 0, 1, 0, pi() / 2], ["R", 0, 0, 1, t * (i + 1) * 0.4]])
+    i <- i + 1
+  }
+}
+
+def make_sheet() {
+  frame(0)
+  sheet_draw(param("name"), "BADA-SHIP-01", "my_ship.bada", "blue")
+}

@@ -44,6 +44,7 @@ canvas.gl { width: 100%; height: 100%; display: block; flex: 1; min-width: 0; }
   background: rgba(8, 14, 28, .78); padding: 6px; border-radius: var(--radius); border: 1px solid var(--line); backdrop-filter: blur(6px); max-width: calc(100% - 16px); }
 .viewbar label { font-size: 12px; display: flex; gap: 4px; align-items: center; }
 .viewbar button { padding: 4px 8px; font-size: 12px; }
+.hud:empty { display: none; }
 .hud { position: absolute; right: 10px; top: 10px; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; color: #bfe6ff;
   background: rgba(8, 14, 28, .7); padding: 8px 10px; border-radius: var(--radius); border: 1px solid var(--line); pointer-events: none; white-space: pre; }
 
@@ -115,4 +116,55 @@ canvas.gl { width: 100%; height: 100%; display: block; flex: 1; min-width: 0; }
   .pane2d .viewbar { position: static; margin: 8px; }
   .chat { height: calc(100vh - 110px); flex: none; }
   .top { gap: 6px; }
+}
+
+/* ---- Bada: ソース表示・生成 UI・コンソール ---- */
+.srcbar { display: flex; gap: 6px; align-items: center; margin: 10px 0 4px; flex-wrap: wrap; }
+.srcbar .src { font: 12px ui-monospace, Menlo, Consolas, monospace; color: #bfe6ff; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srcbar button { font-size: 11px; padding: 3px 8px; }
+.badge { background: linear-gradient(90deg, #7c4dff, #4fc3f7); color: #fff; font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 10px; letter-spacing: .06em; }
+.bada-ui .kv { margin-bottom: 6px; }
+.console { margin-top: 14px; border: 1px solid var(--line); border-radius: 8px; background: #050912; overflow: hidden; }
+.conhead { font-size: 11px; color: var(--accent); padding: 5px 8px; border-bottom: 1px solid var(--line); background: #0a1322; }
+.conhead small { color: var(--muted); margin-left: 6px; }
+.console .out { max-height: 180px; overflow-y: auto; padding: 4px 8px; font: 12px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+.console.big .out { max-height: none; height: 100%; }
+.cl.err { color: var(--danger); } .cl.sys { color: #7e93b8; } .cl.in { color: var(--accent2); }
+.repl { display: flex; gap: 6px; align-items: center; border-top: 1px solid var(--line); padding: 4px 8px; font: 12px ui-monospace, monospace; color: var(--accent2); }
+.repl input { flex: 1; font: 12px ui-monospace, Menlo, Consolas, monospace; padding: 4px 6px; }
+.msg .ans + .ans { margin-top: 4px; }
+.msg code { background: #0a1322; padding: 0 4px; border-radius: 4px; }
+.gen.streaming::after { content: "▍"; animation: blink 1s steps(2) infinite; color: var(--accent); }
+@keyframes blink { 50% { opacity: 0; } }
+
+/* ---- Bada IDE ---- */
+.files { width: 220px; flex: none; overflow-y: auto; padding: 4px 12px 20px; background: var(--panel); border-right: 1px solid var(--line); font-size: 13px; }
+.files .fgroup { color: var(--muted); font-size: 11px; margin: 8px 0 2px; }
+.files .file { padding: 3px 8px; border-radius: 6px; cursor: pointer; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12.5px; }
+.files .file:hover { background: var(--panel2); }
+.files .file.on { background: #12305e; color: #fff; }
+.files .file i { color: var(--accent2); font-style: normal; }
+.files code { color: var(--accent2); }
+.ide { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.idebar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.idebar b { font-family: ui-monospace, Menlo, Consolas, monospace; color: #bfe6ff; }
+.idebar label { font-size: 12px; display: flex; gap: 4px; align-items: center; }
+.editor { flex: 3; min-height: 0; display: flex; background: #060a14; font: 13px/1.5 ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; }
+.gutter { margin: 0; padding: 10px 8px; color: #3d5278; text-align: right; user-select: none; overflow: hidden; background: #070c18; border-right: 1px solid var(--line); min-width: 44px; font: inherit; }
+.code { position: relative; flex: 1; min-width: 0; }
+.code pre, .code textarea { position: absolute; inset: 0; margin: 0; padding: 10px 12px; font: inherit; white-space: pre; overflow: auto; tab-size: 2; border: 0; border-radius: 0; }
+.code pre { pointer-events: none; color: #d6e4ff; }
+.code textarea { background: transparent; color: transparent; caret-color: #fff; resize: none; outline: none; }
+.code textarea::selection { background: rgba(79, 195, 247, .3); color: transparent; }
+#ide-hl .c { color: #6b7f9e; font-style: italic; } #ide-hl .s { color: #a5d6a7; } #ide-hl .n { color: #ffcc80; }
+#ide-hl .k { color: #ce93d8; font-weight: 600; } #ide-hl .b { color: #80deea; } #ide-hl .h { color: #4fc3f7; } #ide-hl .o { color: #ffd54f; font-weight: 700; }
+.ideout { flex: 2; min-height: 0; display: flex; border-top: 1px solid var(--line); }
+.ideout .console { flex: 1; margin: 0; border: 0; border-radius: 0; display: flex; flex-direction: column; }
+.ideout .console .out { flex: 1; }
+.asm { flex: 1; margin: 0; overflow: auto; padding: 8px; font: 11.5px/1.4 ui-monospace, monospace; color: #9fb4d8; border-left: 1px solid var(--line); background: #050912; }
+.asm:empty { display: none; }
+@media (max-width: 860px) {
+  .files { width: 100%; border-right: 0; border-bottom: 1px solid var(--line); max-height: 30vh; }
+  .ide { height: 90vh; flex: none; }
+  .ideout { flex-direction: column; }
 }

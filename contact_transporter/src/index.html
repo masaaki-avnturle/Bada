@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: gap: file:; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;">
-<title>Contact Transporter Studio</title>
+<title>Contact Transporter Studio — Bada</title>
 <style>/*@@STYLE@@*/</style>
 </head>
 <body>
 <header class="top">
-  <div class="brand"><span class="logo">◎</span><div><b>CONTACT TRANSPORTER STUDIO</b><small>異次元輸送機 設計スイート — Bada</small></div></div>
+  <div class="brand"><span class="logo">◎</span><div><b>CONTACT TRANSPORTER STUDIO</b><small>量子プログラミング言語 Bada で動く設計スイート</small></div></div>
   <nav id="tabs">
     <button data-tab="chat" class="on">💬 ContactGPT</button>
     <button data-tab="cad">🛰 輸送機 3D CAD</button>
     <button data-tab="ufo">🛸 UFO 設計図面</button>
+    <button data-tab="ide">⌨ Bada IDE</button>
     <button data-tab="eqs">∑ 方程式 2111</button>
     <button data-tab="about">ⓘ</button>
   </nav>
@@ -26,17 +27,15 @@
     <div id="chat-log" class="log"></div>
     <div class="chips" id="chat-chips"></div>
     <form id="chat-form" class="ask">
-      <input id="chat-in" autocomplete="off" placeholder="質問・方程式 ID・「計算 Z(11.77)」…">
+      <input id="chat-in" autocomplete="off" placeholder="質問・方程式 ID・「計算 rs_z(14.13)」(Bada の式) …">
       <button class="primary">送信</button>
     </form>
   </div>
   <aside class="side">
-    <h3>ContactGPT モデル</h3>
-    <div id="gpt-info" class="kv"></div>
-    <label class="row"><input type="checkbox" id="gpt-gen" checked> 生成 (Transformer) を表示</label>
-    <label class="row">温度 <input type="range" id="gpt-temp" min="0.1" max="1.5" step="0.05" value="0.6"><span id="gpt-temp-v">0.6</span></label>
+    <div class="srcbar"><span class="badge">Bada</span><span class="src" id="chat-src"></span><button data-open="chat">ソースを開く</button><button data-rerun="chat">再実行</button></div>
+    <div id="chat-ui" class="bada-ui"></div>
     <h3>学習 (ブラウザ内・Web Worker)</h3>
-    <p class="muted">設計図書の全方程式 2111 本 + 設計パラメータ Q&amp;A をコーパスに、同梱の Transformer を追加学習、またはゼロから学習し直せます。</p>
+    <p class="muted">設計図書の全方程式 2111 本 + 設計パラメータ Q&amp;A で、Transformer を追加学習、またはゼロから学習し直せます。</p>
     <label class="row">ステップ <input type="number" id="train-steps" value="200" min="10" max="20000" step="10"></label>
     <div class="btns">
       <button id="train-more">追加学習</button>
@@ -46,6 +45,7 @@
     <canvas id="loss-plot" class="plot" width="300" height="120"></canvas>
     <div id="train-status" class="muted"></div>
     <div class="btns"><button id="gpt-save">重みを保存 (.json)</button><label class="file">重みを読込<input type="file" id="gpt-load" accept=".json"></label></div>
+    <div class="console" data-console="chat"></div>
   </aside>
 </section>
 
@@ -56,29 +56,25 @@
     <div class="hud" id="cad-hud"></div>
     <div class="viewbar">
       <button data-view="iso">ISO</button><button data-view="top">上</button><button data-view="front">正面</button><button data-view="side">側面</button>
-      <button id="cad-fit">全体</button>
-      <label><input type="checkbox" id="cad-anim" checked> 回転</label>
-      <label><input type="checkbox" id="cad-wire"> ワイヤ</label>
-      <label><input type="checkbox" id="cad-blue"> 青図</label>
-      <label><input type="checkbox" id="cad-grid" checked> グリッド</label>
+      <button data-fit>全体</button>
+      <label><input type="checkbox" data-anim checked> 回転</label>
+      <label><input type="checkbox" data-wire> ワイヤ</label>
+      <label><input type="checkbox" data-blue> 青図</label>
+      <label><input type="checkbox" data-grid checked> グリッド</label>
     </div>
   </div>
   <aside class="side">
-    <h3>設計パラメータ (方程式から再計算)</h3>
-    <div class="form" id="cad-form"></div>
-    <h3>計算結果</h3>
-    <div id="cad-calc" class="kv"></div>
-    <h3>Γ・ζ 多様体 / Jones 共鳴</h3>
-    <canvas id="plot-z" class="plot" width="300" height="130"></canvas>
-    <canvas id="plot-j" class="plot" width="300" height="130"></canvas>
+    <div class="srcbar"><span class="badge">Bada</span><span class="src" id="cad-src"></span><button data-open="cad">ソースを開く</button><button data-rerun="cad">再実行</button></div>
+    <div id="cad-ui" class="bada-ui"></div>
     <h3>部品</h3>
-    <div id="cad-parts" class="parts"></div>
+    <div class="parts" data-parts="cad"></div>
     <h3>書き出し</h3>
-    <div class="btns" id="cad-export">
+    <div class="btns" data-export="cad">
       <button data-x="stl">STL</button><button data-x="obj">OBJ+MTL</button><button data-x="dxf3">DXF (3D)</button>
-      <button data-x="png">PNG</button><button data-x="sheet">図面 SVG</button><button data-x="sheetdxf">図面 DXF</button><button data-x="json">パラメータ JSON</button>
+      <button data-x="png">PNG</button><button data-x="sheet">図面 SVG</button><button data-x="sheetpng">図面 PNG</button><button data-x="sheetdxf">図面 DXF</button>
     </div>
-    <div id="cad-sheet" class="sheet"></div>
+    <div class="sheet" data-sheet="cad"></div>
+    <div class="console" data-console="cad"></div>
   </aside>
 </section>
 
@@ -86,32 +82,63 @@
 <section id="tab-ufo" class="tab">
   <div class="stage split">
     <div class="pane3d"><canvas id="ufo-view" class="gl"></canvas>
+      <div class="hud" id="ufo-hud"></div>
       <div class="viewbar">
         <button data-view="iso">ISO</button><button data-view="top">上</button><button data-view="front">正面</button><button data-view="side">側面</button>
-        <label><input type="checkbox" id="ufo-anim" checked> 回転</label>
-        <label><input type="checkbox" id="ufo-fly"> 飛行</label>
-        <label><input type="checkbox" id="ufo-wire"> ワイヤ</label>
+        <button data-fit>全体</button>
+        <label><input type="checkbox" data-anim checked> 回転</label>
+        <label><input type="checkbox" data-wire> ワイヤ</label>
+        <label><input type="checkbox" data-colorlines> 図面を部品色で</label>
       </div>
     </div>
-    <div class="pane2d"><div id="ufo-sheet" class="sheet big"></div>
-      <div class="viewbar"><label>図面テーマ <select id="ufo-theme"><option value="blue">青焼き</option><option value="paper">白紙</option></select></label><label><input type="checkbox" id="ufo-colorlines"> 部品色</label></div>
-    </div>
+    <div class="pane2d"><div class="sheet big" data-sheet="ufo"></div></div>
   </div>
   <aside class="side">
-    <h3>プリセット</h3>
-    <div class="btns" id="ufo-presets"></div>
-    <h3>形状パラメータ</h3>
-    <div class="form" id="ufo-form"></div>
-    <h3>飛行モデル (UFO.1–26)</h3>
-    <div id="ufo-flight" class="kv"></div>
-    <canvas id="plot-ascent" class="plot" width="300" height="130"></canvas>
+    <div class="srcbar"><span class="badge">Bada</span><span class="src" id="ufo-src"></span><button data-open="ufo">ソースを開く</button><button data-rerun="ufo">再実行</button></div>
+    <div id="ufo-ui" class="bada-ui"></div>
+    <h3>部品</h3>
+    <div class="parts" data-parts="ufo"></div>
     <h3>書き出し</h3>
-    <div class="btns" id="ufo-export">
+    <div class="btns" data-export="ufo">
       <button data-x="sheet">図面 SVG</button><button data-x="sheetpng">図面 PNG</button><button data-x="sheetdxf">図面 DXF</button>
-      <button data-x="stl">STL</button><button data-x="obj">OBJ+MTL</button><button data-x="dxf3">DXF (3D)</button>
-      <button data-x="save">プロジェクト保存</button><label class="file">プロジェクト読込<input type="file" id="ufo-load" accept=".json"></label>
+      <button data-x="stl">STL</button><button data-x="obj">OBJ+MTL</button><button data-x="dxf3">DXF (3D)</button><button data-x="png">PNG</button>
+      <button data-x="params">設計値 JSON</button><label class="file">設計値を読込<input type="file" data-import="ufo" accept=".json"></label>
     </div>
+    <div class="console" data-console="ufo"></div>
   </aside>
+</section>
+
+<!-- ======================================================= Bada IDE -->
+<section id="tab-ide" class="tab">
+  <aside class="files">
+    <h3>Bada ファイル</h3>
+    <div id="ide-files"></div>
+    <div class="btns"><button id="ide-new">新規</button><button id="ide-del">削除</button><label class="file">読込<input type="file" id="ide-load" accept=".bada,.txt"></label></div>
+    <h3>言語</h3>
+    <div class="muted" id="ide-ref"></div>
+  </aside>
+  <div class="ide">
+    <div class="idebar">
+      <b id="ide-name"></b>
+      <label>実行先 <select id="ide-target">
+        <option value="cad">輸送機 3D CAD タブ</option><option value="ufo">UFO 設計図面タブ</option><option value="chat">ContactGPT タブ</option><option value="console">コンソール (単独実行)</option>
+      </select></label>
+      <button id="ide-run" class="primary">▶ 実行</button>
+      <button id="ide-check">構文チェック</button>
+      <button id="ide-asm">逆アセンブル</button>
+      <button id="ide-save">保存 (.bada)</button>
+      <button id="ide-reset">既定に戻す</button>
+      <span id="ide-status" class="muted"></span>
+    </div>
+    <div class="editor">
+      <pre class="gutter" id="ide-gutter"></pre>
+      <div class="code"><pre id="ide-hl" aria-hidden="true"></pre><textarea id="ide-text" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea></div>
+    </div>
+    <div class="ideout">
+      <div class="console big" data-console="ide"></div>
+      <pre class="asm" id="ide-asmout"></pre>
+    </div>
+  </div>
 </section>
 
 <!-- ======================================================= 方程式レジストリ -->
@@ -133,11 +160,12 @@
 <section id="tab-about" class="tab">
   <div class="about">
     <h2>Contact Transporter Studio</h2>
-    <p>「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」(contact_blueprint.pdf, 量子プログラミング言語 Bada による生成) に載っている方程式から作った設計スイートです。</p>
+    <p>「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」(contact_blueprint.pdf) の方程式から作った設計スイートです。<b>3 つのアプリはすべて量子プログラミング言語 Bada で書かれており</b>、アプリ内の Bada IDE でソースを読み・書き換え・新しいアプリを作ってその場で実行できます。</p>
     <ul>
-      <li><b>ContactGPT</b> — 外部ライブラリなしでゼロから実装した decoder-only Transformer (自動微分・Adam・因果的自己注意)。設計図書の全方程式 2111 本と設計パラメータで学習。方程式検索・設計値の即答・数式電卓と組み合わせて回答します。</li>
-      <li><b>輸送機 3D CAD</b> — Γ = 18 h / 1 s、φ = arcosh Γ、Riemann–Siegel θ(φ)・Z(φ)、Jones 多項式 V(t*) を再計算し、ジンバル環・ポッド・塔・Jones コイル・扉の軸・共鳴窓をパラメトリックに生成。STL / OBJ / DXF / 図面 SVG に書き出し。</li>
-      <li><b>UFO 設計図面</b> — 円盤機をパラメトリックに設計し、第三角法の三面図 + 等角図 + 寸法 + 表題欄 + 部材表 (EXP.156 の材料) を A3 図面として生成。UFO.1–26 の反重力モデル L = cosh(x log x) で飛行シミュレーション。</li>
+      <li><b>Bada 処理系</b> — bada_silent_vim/bada (Python) の字句解析・構文解析・バイトコードコンパイラ・スタック VM を JavaScript へ忠実に移植 (リポジトリ内の Bada プログラム 99 本で出力が完全一致)。<code>&lt;-</code> <code>-&lt;</code> <code>&gt;-</code> <code>-&gt;</code> <code>&lt;-&gt;</code> <code>&gt;&gt;</code> <code>=&gt;</code>、<code>Omega::DATABASE[space]</code>、<code>#include</code>。</li>
+      <li><b>ContactGPT</b> (<code>apps/contactgpt.bada</code>) — ゼロから実装した Transformer のロジットを Bada が受け取り、上位 k → softmax → 量子状態 ψ = √a·e^{iθ} → Born 則測定で次の文字を選ぶ (設計図書 Q.1–Q.10)。方程式検索・設計値の即答・Bada 式の電卓。</li>
+      <li><b>輸送機 3D CAD</b> (<code>apps/transporter.bada</code>) — Γ, φ = arcosh Γ, Riemann–Siegel θ(φ)・Z(φ) (Borwein 法の ζ も Bada)、Jones 多項式を Bada で計算し、ジンバル環・ポッド・Jones コイル・扉の軸を組み立て、frame(t) で回転。</li>
+      <li><b>UFO 設計図面</b> (<code>apps/ufo.bada</code>) — 船体断面・部品配置・寸法・部材表・反重力モデル L = cosh(x log x) の飛行計算を Bada で書き、A3 図面を生成。</li>
     </ul>
     <p class="warn">※ 設計図書自身が述べているとおり、これは論文の方程式に基づく思索的・フィクションの設計図 (幾何的な可視化) です。工学的に検証された装置ではなく、異次元への輸送や反重力飛行を実現するものではありません。</p>
     <p class="muted">masaaki-avnturle / Bada — contact_transporter · MIT License · <span id="build-info"></span></p>
@@ -149,6 +177,7 @@
 <script id="gpt-src" type="text/plain">/*@@GPT_SRC@@*/</script>
 <script>window.CT_EQUATIONS = /*@@EQUATIONS@@*/;</script>
 <script>window.CT_WEIGHTS = /*@@WEIGHTS@@*/;</script>
+<script>window.CT_BADA = /*@@BADA@@*/;</script>
 <script>window.CT_BUILD = /*@@BUILD@@*/;</script>
 <script>/*@@SCRIPTS@@*/</script>
 </body>

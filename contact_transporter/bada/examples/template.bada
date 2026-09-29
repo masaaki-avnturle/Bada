@@ -1,0 +1,26 @@
+// 新しい Bada アプリのひな形 — 実行先「輸送機 3D CAD」または「UFO 設計図面」タブで動きます。
+//   ui_* で UI を宣言 → build() が部品 (cad_*) を組み立てる → frame(t) で動かす
+
+ui_section("パラメータ")
+ui_param("r", "半径 [m]", 10, 0.5)
+ui_param("n", "個数", 6, 1)
+
+def build() {
+  cad_clear()
+  cad_sphere("core", "コア", "#ffd54f", param("r") / 3)
+  i <- 0
+  -> i < param("n") {
+    cad_torus("ring" + str(i), "リング", "#4fc3f7", param("r"), 0.4)
+    i <- i + 1
+  }
+  frame(0)
+}
+
+def frame(t) {
+  i <- 0
+  -> i < param("n") {
+    cad_pose("ring" + str(i), [["T", 0, 0, param("r") + 2], ["R", 0, 0, 1, i * pi() / param("n") + t * 0.3], ["R", 1, 0, 0, pi() / 2]])
+    i <- i + 1
+  }
+  cad_pose("core", [["T", 0, 0, param("r") + 2]])
+}

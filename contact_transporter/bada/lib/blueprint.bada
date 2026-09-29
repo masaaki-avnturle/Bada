@@ -1,0 +1,79 @@
+// blueprint.bada — CONTACT TRANSPORTER 設計パラメータを方程式から計算する (設計図書 第 1 章)。
+//   ② 特殊相対論   Γ = 18 h / 1 s, 1 − β, ラピディティ φ = arcosh Γ, 収縮距離, 片道時間
+//   ②' 輸送計量    ds² = e^{−2πT|ψ|}[η + h̄h̄]dx^μdx^ν + T²dψ²,  e^{−2πT|ψ|} = 1/Γ
+//   ③ 複素回転体   Θ = θ + iφ,  ω 段間比 φ/π,  歳差 Ω = Mgl/(I₃ω₃)
+//   ④ Γ・ζ 多様体  θ(φ), Z(φ) = e^{iθ(φ)} ζ(½ + iφ)
+//   ⑤ Jones        V_K(t*),  t* = e^{iθ(φ)}
+// 結果は [[名前, 値], ...] のレコード。rget(bp, "phi") で取り出す。
+#include lib/complex.bada
+#include lib/zeta.bada
+#include lib/jones.bada
+
+def rget(rec, key) {
+  i <- 0
+  -> i < len(rec) {
+    -< rec[i][0] <-> key {
+      return rec[i][1]
+    }
+    i <- i + 1
+  }
+  return nil
+}
+def rset(rec, key, v) {
+  i <- 0
+  -> i < len(rec) {
+    -< rec[i][0] <-> key {
+      rec[i][1] <- v
+      return rec
+    }
+    i <- i + 1
+  }
+  append(rec, [key, v])
+  return rec
+}
+
+// x log x = target の根 (Newton 法)
+def solve_xlogx(target) {
+  x <- 2.0
+  repeat 60 {
+    x <- x - (x * ln(x) - target) / (ln(x) + 1)
+  }
+  return x
+}
+
+def blueprint(rider_hours, earth_seconds, ly, theta0, omega_outer, pod_mass, pod_r) {
+  bp <- []
+  G <- rider_hours * 3600 / earth_seconds
+  rset(bp, "Gamma", G)
+  rset(bp, "one_minus_beta", 1 - sqrt(1 - 1 / (G * G)))
+  phi <- acosh(G)
+  rset(bp, "phi", phi)
+  ly_km <- 9460730472580.8
+  rset(bp, "dist_km", ly * ly_km / G)
+  rset(bp, "one_way_h", ly * 365.25 * 24 / G)
+  rset(bp, "TPsi", ln(G) / (2 * pi()))
+  rset(bp, "xlogx_root", solve_xlogx(1))
+  rset(bp, "theta0", theta0)
+  ratio <- phi / pi()
+  rset(bp, "omega", [omega_outer, omega_outer * ratio, omega_outer * ratio * ratio])
+  // 歳差: 球殻ポッド I₃ = 2/5 M r², 支点までの腕 l
+  arm <- 5.60424
+  I3 <- 0.4 * pod_mass * pod_r * pod_r
+  rset(bp, "Omega", pod_mass * 9.80665 * arm / (I3 * omega_outer * ratio * ratio))
+  th <- rs_theta(phi)
+  rset(bp, "rs_theta", th)
+  rset(bp, "Z", rs_z(phi))
+  tstar <- c_expi(th)
+  names <- ["3_1", "4_1", "5_1"]
+  i <- 0
+  -> i < 3 {
+    terms <- knot_terms(names[i])
+    rset(bp, "V" + names[i], jones_eval(terms, tstar))
+    i <- i + 1
+  }
+  // 扉の軸 n̂ (CERN の衝突で粒子が消えた方向, E_T^miss)
+  n <- [0.86964, -0.25101, 0.42511]
+  l <- sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2])
+  rset(bp, "door", [n[0] / l, n[1] / l, n[2] / l])
+  return bp
+}

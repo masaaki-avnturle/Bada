@@ -1,0 +1,30 @@
+// quantum_demo.bada — 量子レジスタ (実行先: コンソール)
+#include lib/quantum.bada
+
+say "ベル状態: H(0) → CNOT(0,1)"
+st <- q_cnot(q_h(q_register(2), 0), 0, 1)
+print q_probs(st)
+
+say "GHZ 状態 (3 量子ビット)"
+g <- q_cnot(q_cnot(q_h(q_register(3), 0), 0, 1), 1, 2)
+print q_probs(g)
+
+say "Grover 探索 (2 量子ビット, 目印 |11⟩)"
+s <- q_h(q_h(q_register(2), 0), 1)
+// オラクル: |11⟩ の位相を反転 (CZ = H·CNOT·H)
+s <- q_h(q_cnot(q_h(s, 1), 0, 1), 1)
+// 拡散演算子 2|s⟩⟨s| − I
+s <- q_h(q_h(s, 0), 1)
+s <- q_x(q_x(s, 0), 1)
+s <- q_h(q_cnot(q_h(s, 1), 0, 1), 1)
+s <- q_x(q_x(s, 0), 1)
+s <- q_h(q_h(s, 0), 1)
+print q_probs(s)
+
+say "測定 (Born 則) 10 回:"
+rand_seed(2111)
+out <- []
+repeat 10 {
+  append(out, q_measure(st))
+}
+print out

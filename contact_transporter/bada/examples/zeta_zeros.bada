@@ -1,0 +1,26 @@
+// zeta_zeros.bada — 臨界線上の Z(t) の符号変化から ζ の非自明零点を探す (実行先: コンソール)
+#include lib/zeta.bada
+
+say "Z(t) = e^{iθ(t)} ζ(½ + it) の零点 (t < 40):"
+prev <- rs_z(10)
+t <- 10.0
+-> t < 40 {
+  cur <- rs_z(t + 0.25)
+  -< prev * cur < 0 {
+    // 二分法で詰める
+    a <- t
+    b <- t + 0.25
+    repeat 30 {
+      m <- (a + b) / 2
+      -< rs_z(a) * rs_z(m) <= 0 {
+        b <- m
+      } >- {
+        a <- m
+      }
+    }
+    say "  t = " + fixed((a + b) / 2, 6)
+  }
+  prev <- cur
+  t <- t + 0.25
+}
+say "φ = arcosh 64800 = " + str(sig(acosh(64800), 7)) + " → Z(φ) = " + str(sig(rs_z(acosh(64800)), 6))

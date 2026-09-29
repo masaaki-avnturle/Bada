@@ -1,0 +1,294 @@
+// ufo.bada — UFO 設計図面作成ソフト (アプリ本体・Bada)
+//
+// 円盤機の形状 (船体の回転断面・ドーム・舷窓・推進ポッド・着陸脚・反重力コイル・
+// コンタクト・リング) を Bada で組み立て、第三角法の三面図 + 等角図 + 寸法 + 表題欄 +
+// 部材表の A3 図面を描く。飛行計算は UFO.1–26 の反重力モデル (lib/ufo_flight.bada)。
+#include lib/ufo_flight.bada
+#include lib/jones.bada
+
+say "UFO 設計図面作成ソフト — 量子プログラミング言語 Bada"
+
+ui_section("プリセット")
+ui_button("標準円盤 01", "preset_standard")
+ui_button("アダムスキー型", "preset_adamski")
+ui_button("大型母船", "preset_mothership")
+ui_button("コンタクト機", "preset_contact")
+ui_section("表題欄")
+ui_text("name", "機体名", "BADA-UFO 01")
+ui_text("number", "図番", "UFO-0001")
+ui_text("author", "設計者", "")
+ui_select("theme", "図面テーマ", ["blue", "paper"], "blue")
+ui_section("形状パラメータ [m]")
+ui_param("diameter", "直径", 24, 0.1)
+ui_param("rim", "縁の厚さ", 0.8, 0.05)
+ui_param("upper", "上殻高さ", 3.2, 0.05)
+ui_param("lower", "下殻高さ", 2.2, 0.05)
+ui_param("dome_d", "ドーム直径", 9, 0.1)
+ui_param("dome_h", "ドーム高さ", 3.2, 0.05)
+ui_param("windows", "舷窓数", 8, 1)
+ui_param("engines", "推進ポッド数", 3, 1)
+ui_param("legs", "着陸脚数", 3, 1)
+ui_param("leg_len", "脚長", 3.2, 0.1)
+ui_select("knot", "反重力コイル (Jones)", ["3_1", "4_1", "5_1"], "3_1")
+ui_check("ring", "コンタクト・リング", true)
+ui_color("hull_color", "船体色", "#cfd8dc")
+ui_color("dome_color", "ドーム色", "#80deea")
+ui_color("accent", "アクセント色", "#ff7043")
+ui_section("飛行モデル (UFO.1–26)")
+ui_param("mass", "質量 m [kg]", 12000, 100)
+ui_param("gain", "反重力ゲイン", 1, 0.05)
+ui_check("fly", "飛行アニメーション (表示 1/20)", false)
+
+state <- [0]
+
+// ---------------------------------------------------------------- プリセット
+def preset(name, d, up, lo, rim, dd, dh, win, eng, legs, ll, knot, ring, mass) {
+  ui_set("name", name)
+  ui_set("diameter", d)
+  ui_set("upper", up)
+  ui_set("lower", lo)
+  ui_set("rim", rim)
+  ui_set("dome_d", dd)
+  ui_set("dome_h", dh)
+  ui_set("windows", win)
+  ui_set("engines", eng)
+  ui_set("legs", legs)
+  ui_set("leg_len", ll)
+  ui_set("knot", knot)
+  ui_set("ring", ring)
+  ui_set("mass", mass)
+  build()
+  view_fit()
+}
+def preset_standard() {
+  preset("BADA-UFO 01", 24, 3.2, 2.2, 0.8, 9, 3.2, 8, 3, 3, 3.2, "3_1", true, 12000)
+}
+def preset_adamski() {
+  preset("ADAMSKI-TYPE", 10, 1.6, 1.0, 0.4, 4.6, 2.6, 6, 3, 3, 1.6, "3_1", false, 3500)
+}
+def preset_mothership() {
+  preset("MOTHERSHIP M-1", 60, 7, 5, 1.6, 18, 7, 24, 8, 6, 6, "5_1", true, 250000)
+}
+def preset_contact() {
+  preset("CONTACT CRAFT", 18, 3.2, 2.2, 0.8, 7, 2.8, 10, 4, 4, 3.2, "4_1", true, 8000)
+}
+
+// ---------------------------------------------------------------- 形状の制約
+def clamp_params() {
+  -< param("diameter") < 1 {
+    ui_set("diameter", 1)
+  }
+  -< param("dome_d") > param("diameter") * 0.9 {
+    ui_set("dome_d", param("diameter") * 0.9)
+  }
+  -< param("rim") < 0.02 {
+    ui_set("rim", 0.02)
+  }
+  -< param("upper") < param("rim") / 2 + 0.05 {
+    ui_set("upper", param("rim") / 2 + 0.05)
+  }
+  -< param("lower") < param("rim") / 2 + 0.05 {
+    ui_set("lower", param("rim") / 2 + 0.05)
+  }
+}
+
+// 船体の回転断面 [[半径, z], ...] (下 → 上)
+def hull_profile() {
+  R <- param("diameter") / 2
+  rt <- param("dome_d") / 2
+  rb <- param("diameter") * 0.2
+  rim <- param("rim")
+  up <- param("upper")
+  lo <- param("lower")
+  n <- 18
+  pr <- [[0, -lo], [rb, -lo]]
+  k <- 1
+  -> k <= n {
+    s <- k / n
+    append(pr, [rb + (R - rb) * s, -lo + (lo - rim / 2) * pow(s, 2.2)])
+    k <- k + 1
+  }
+  append(pr, [R, rim / 2])
+  k <- 1
+  -> k <= n {
+    s <- k / n
+    append(pr, [R - (R - rt) * s, rim / 2 + (up - rim / 2) * (1 - pow(1 - s, 2.2))])
+    k <- k + 1
+  }
+  append(pr, [0, up])
+  return pr
+}
+// 下殻の高さ z(r)
+def lower_z(r) {
+  R <- param("diameter") / 2
+  rb <- param("diameter") * 0.2
+  s <- (r - rb) / (R - rb)
+  return -param("lower") + (param("lower") - param("rim") / 2) * pow(s, 2.2)
+}
+def dome_profile() {
+  rt <- param("dome_d") / 2
+  pr <- []
+  k <- 0
+  -> k <= 16 {
+    a <- k / 16 * pi() / 2
+    r <- rt * cos(a)
+    -< k <-> 16 {
+      r <- 0
+    }
+    append(pr, [r, param("upper") + param("dome_h") * sin(a)])
+    k <- k + 1
+  }
+  return pr
+}
+
+// ---------------------------------------------------------------- 組み立て
+def build() {
+  clamp_params()
+  cad_clear()
+  R <- param("diameter") / 2
+  rt <- param("dome_d") / 2
+  cad_lathe("hull", "船体 ⌀" + str(param("diameter")), param("hull_color"), hull_profile(), 96)
+  cad_lathe("dome", "ドーム ⌀" + str(param("dome_d")), param("dome_color"), dome_profile(), 64)
+  i <- 0
+  -> i < param("windows") {
+    cad_sphere("window" + str(i), "舷窓", param("accent"), min2(0.45, param("dome_d") * 0.05))
+    i <- i + 1
+  }
+  kR <- param("diameter") * 0.2
+  -< param("knot") <-> "4_1" {
+    cad_fig8("ag_coil", "反重力コイル Jones 4_1", param("accent"), kR / 3, 0.18)
+  } >- {
+    q <- 3
+    -< param("knot") <-> "5_1" {
+      q <- 5
+    }
+    cad_knot("ag_coil", "反重力コイル Jones " + param("knot"), param("accent"), kR * 0.85, kR * 0.15, 2, q, 0.18)
+  }
+  i <- 0
+  -> i < param("engines") {
+    cad_lathe("engine" + str(i), "推進ポッド", "#78909c", [[0, 0], [0.9, 0.2], [1.0, 0.9], [0.6, 1.4], [0, 1.5]], 32)
+    i <- i + 1
+  }
+  i <- 0
+  -> i < param("legs") {
+    cad_cylinder("leg" + str(i), "着陸脚", "#90a4ae", 0.18, 1)
+    cad_cylinder("pad" + str(i), "脚パッド", "#90a4ae", 0.7, 0.15)
+    i <- i + 1
+  }
+  -< param("ring") {
+    cad_torus("contact_ring", "コンタクト・リング", "#4fc3f7", R + 1.2, 0.35)
+  }
+  frame(0)
+  annotate()
+  flight()
+  sheet_draw(param("name"), param("number"), param("author"), param("theme"))
+}
+
+// 姿勢 (t: 秒) — 着陸状態 + コイル・リングの回転 + 飛行
+def frame(t) {
+  R <- param("diameter") / 2
+  rt <- param("dome_d") / 2
+  lift <- param("lower") + param("leg_len")
+  h <- 0
+  -< param("fly") {
+    tf <- t - 8 * floor(t / 8)
+    tr <- ascend(floor(tf * 4), 0.25, param("gain"))
+    h <- tr[len(tr) - 1][1] / 20
+  }
+  base <- ["T", 0, 0, lift + h]
+  cad_pose("hull", [base])
+  cad_pose("dome", [base])
+  i <- 0
+  -> i < param("windows") {
+    a <- i / param("windows") * 2 * pi()
+    rr <- (R + rt) / 2
+    z <- param("rim") / 2 + (param("upper") - param("rim") / 2) * 0.62
+    cad_pose("window" + str(i), [base, ["T", rr * cos(a), rr * sin(a), z]])
+    i <- i + 1
+  }
+  cad_pose("ag_coil", [base, ["T", 0, 0, -param("lower") - 0.25], ["R", 0, 0, 1, t * 0.8]])
+  i <- 0
+  -> i < param("engines") {
+    a <- (i + 0.5) / param("engines") * 2 * pi()
+    rr <- param("diameter") * 0.34
+    cad_pose("engine" + str(i), [base, ["T", rr * cos(a), rr * sin(a), lower_z(rr) - 1.3]])
+    i <- i + 1
+  }
+  i <- 0
+  -> i < param("legs") {
+    a <- i / param("legs") * 2 * pi()
+    r0 <- param("diameter") * 0.16
+    r1 <- param("diameter") * 0.26
+    top <- [r0 * cos(a), r0 * sin(a), lift - param("lower") + h]
+    bot <- [r1 * cos(a), r1 * sin(a), 0.15 + h]
+    d <- [top[0] - bot[0], top[1] - bot[1], top[2] - bot[2]]
+    L <- sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+    cad_pose("leg" + str(i), [["T", bot[0], bot[1], bot[2]], ["A", d[0], d[1], d[2]], ["S", 1, 1, L]])
+    cad_pose("pad" + str(i), [["T", bot[0], bot[1], h]])
+    i <- i + 1
+  }
+  -< param("ring") {
+    cad_pose("contact_ring", [base, ["R", 1, 0, 0, 0.08 * sin(t * 0.7)], ["R", 0, 0, 1, t * 0.3]])
+  }
+  -< param("fly") {
+    ui_hud("[Bada] 飛行中  t = " + fixed(t - 8 * floor(t / 8), 1) + " s\n高度 (表示 1/20)  " + fixed(h * 20, 1) + " m\nL = cosh(x log x) = " + str(sig(ufo_L(h * 20), 6)))
+  } >- {
+    ui_hud("[Bada] " + param("name") + "\n⌀" + str(param("diameter")) + " m   Jones " + param("knot") + " コイル")
+  }
+}
+
+// ---------------------------------------------------------------- 図面注記
+def annotate() {
+  R <- param("diameter") / 2
+  lift <- param("lower") + param("leg_len")
+  top <- lift + param("upper") + param("dome_h")
+  cad_dim("top", [-R, 0], [R, 0], -R - 2.5, "⌀" + str(param("diameter")))
+  cad_rdim("top", [0, 0], param("dome_d") / 2, 45, "⌀" + str(param("dome_d")))
+  cad_dim("front", [R, 0], [R, top], 3, fixed(top, 2))
+  cad_dim("front", [-R, lift], [R, lift], -(lift + 1.5), "⌀" + str(param("diameter")))
+  cad_dim("side", [-R - 1, lift - param("lower")], [-R - 1, lift + param("upper")], -2, fixed(param("lower") + param("upper"), 2))
+  cad_dim("side", [R + 1, 0], [R + 1, lift - param("lower")], 2, str(param("leg_len")))
+  // 部材表 (設計図書 EXP.156 の材料リスト)
+  cad_bom("1", "船体 (上下殻)", "Fe·Co60·Pt·Al 合金", "1")
+  cad_bom("2", "ドーム", "SiO₂ プリズム", "1")
+  cad_bom("3", "舷窓", "Al₂O₃", str(param("windows")))
+  cad_bom("4", "反重力コイル Jones " + param("knot"), "Cs / Mg 巻線", "1")
+  cad_bom("5", "推進ポッド", "Al (heat) / H₂", str(param("engines")))
+  cad_bom("6", "着陸脚 + パッド", "Al 合金", str(param("legs")))
+  ring_qty <- "0"
+  -< param("ring") {
+    ring_qty <- "1"
+  }
+  cad_bom("7", "コンタクト・リング", "He 冷却 / CnH2n", ring_qty)
+  tr <- ascend(10, 1, param("gain"))
+  cad_note("反重力 L = cosh(x log x) = " + str(sig(ufo_L(0), 5)) + " (UFO.11)")
+  cad_note("a = (L−1)·g_eff·ゲイン = " + str(sig(ufo_accel(0, param("gain")), 5)) + " m/s² (UFO.19)")
+  cad_note("10 s 後: 高度 " + str(sig(tr[10][1], 5)) + " m, v = " + str(sig(tr[10][2], 5)) + " m/s (UFO.24)")
+  cad_note("質量 " + str(param("mass")) + " kg, E_ag = " + sci(e_ag(param("mass"), 0), 4) + " J (UFO.13)")
+  cad_note("この図面は Bada プログラム ufo.bada が生成しました。")
+  cad_note("論文の方程式に基づく思索的・フィクションの設計図です。")
+}
+
+// ---------------------------------------------------------------- 飛行計算
+def flight() {
+  g <- param("gain")
+  m <- param("mass")
+  tr <- ascend(60, 1, g)
+  ui_output("x", "x = 1 + r₀/r", manifold_x(0))
+  ui_output("L", "L = cosh(x log x)", sig(ufo_L(0), 6))
+  ui_output("L2", "L(1 km) / L(100 km)", str(sig(ufo_L(1000), 6)) + " / " + str(sig(ufo_L(100000), 6)))
+  ui_output("g", "g_eff", str(sig(g_eff(0), 5)) + " m/s²")
+  ui_output("a", "a = (L−1)g·ゲイン", str(sig(ufo_accel(0, g), 5)) + " m/s²")
+  ui_output("U", "U = GMm/r", sci(u_grav(m, 0), 5) + " J")
+  ui_output("Eag", "E_ag = U·L", sci(e_ag(m, 0), 5) + " J")
+  ui_output("Ep", "E⊥ = mc² − ½mv²", sci(e_perp(m, tr[10][2]), 5) + " J")
+  ui_output("h10", "10 s 後", "h = " + str(sig(tr[10][1], 5)) + " m, v = " + str(sig(tr[10][2], 5)) + " m/s")
+  ui_output("h60", "60 s 後", "h = " + str(sig(tr[60][1] / 1000, 5)) + " km")
+  pts <- []
+  i <- 0
+  -> i < len(tr) {
+    append(pts, [tr[i][0], tr[i][1] / 1000])
+    i <- i + 1
+  }
+  ui_plot("ascent", "上昇シミュレーション h(t) [km]  (半陰的オイラー, dt = 1 s)", [["高度 km", "#ff7043", pts]], [[10, tr[10][1] / 1000, "10 s: " + str(sig(tr[10][1], 4)) + " m"]])
+}

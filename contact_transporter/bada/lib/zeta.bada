@@ -1,0 +1,50 @@
+// zeta.bada — ガンマ関数におけるゼータ関数の大域的部分積分多様体 (Riemann–Siegel)、Bada で。
+//   θ(t) = Im log Γ(¼ + it/2) − (t/2) log π   (漸近展開)
+//   ζ(s) = η(s) / (1 − 2^{1−s})               (Borwein のアルゴリズム)
+//   Z(t) = e^{iθ(t)} ζ(½ + it)                 (臨界線上で実数値; 零点 = ζ の非自明零点)
+#include lib/complex.bada
+
+def rs_theta(t) {
+  return t / 2 * ln(t / (2 * pi())) - t / 2 - pi() / 8 + 1 / (48 * t) + 7 / (5760 * t * t * t) + 31 / (80640 * t * t * t * t * t)
+}
+
+// Borwein 係数 d_k = n Σ_{i≤k} (n+i−1)! 4^i / ((n−i)! (2i)!)   (漸化式で計算)
+def borwein_d(n) {
+  d <- []
+  term <- 1.0 / n
+  sum <- term
+  append(d, n * sum)
+  i <- 1
+  -> i <= n {
+    term <- term * (n + i - 1) * (n - i + 1) * 4.0 / ((2 * i - 1) * (2 * i))
+    sum <- sum + term
+    append(d, n * sum)
+    i <- i + 1
+  }
+  return d
+}
+
+// ζ(s), s = [σ, t]
+def zeta_c(s) {
+  n <- 60
+  d <- borwein_d(n)
+  acc <- [0, 0]
+  k <- 0
+  -> k < n {
+    coef <- d[k] - d[n]
+    -< imod(k, 2) <-> 1 {
+      coef <- -coef
+    }
+    // (k+1)^{-s}
+    acc <- c_add(acc, c_scale(c_rpow(k + 1, [-s[0], -s[1]]), coef))
+    k <- k + 1
+  }
+  eta <- c_scale(acc, -1.0 / d[n])
+  denom <- c_sub([1, 0], c_rpow(2, [1 - s[0], -s[1]]))
+  return c_div(eta, denom)
+}
+
+def rs_z(t) {
+  z <- c_mul(c_expi(rs_theta(t)), zeta_c([0.5, t]))
+  return z[0]
+}

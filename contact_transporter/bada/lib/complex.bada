@@ -1,0 +1,61 @@
+// complex.bada — 複素数 z = [re, im] の代数を Bada で。
+// (Θ = θ + iφ の複素回転体、ζ(½+it)、Jones V(e^{iα}) はすべてこの上で計算する)
+
+def c_add(a, b) {
+  return [a[0] + b[0], a[1] + b[1]]
+}
+def c_sub(a, b) {
+  return [a[0] - b[0], a[1] - b[1]]
+}
+def c_mul(a, b) {
+  return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]]
+}
+def c_scale(a, k) {
+  return [a[0] * k, a[1] * k]
+}
+def c_div(a, b) {
+  d <- b[0] * b[0] + b[1] * b[1]
+  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]
+}
+def c_abs(a) {
+  return sqrt(a[0] * a[0] + a[1] * a[1])
+}
+// e^{it}
+def c_expi(t) {
+  return [cos(t), sin(t)]
+}
+// e^{z}
+def c_exp(z) {
+  m <- exp(z[0])
+  return [m * cos(z[1]), m * sin(z[1])]
+}
+// z^n (n は整数; 負なら 1/z を掛ける)
+def c_powi(z, n) {
+  r <- [1, 0]
+  b <- z
+  -< n < 0 {
+    b <- c_div([1, 0], z)
+    n <- -n
+  }
+  repeat n {
+    r <- c_mul(r, b)
+  }
+  return r
+}
+// base^s (base > 0 の実数, s は複素数) = e^{s log base}
+def c_rpow(base, s) {
+  lb <- ln(base)
+  return c_exp([s[0] * lb, s[1] * lb])
+}
+// 表示: "a + bi"
+def c_text(z, p) {
+  re <- sig(z[0], p)
+  im <- sig(z[1], p)
+  -< abs(z[1]) < 0.000000000001 * (1 + abs(z[0])) {
+    return str(re)
+  }
+  -< im < 0 {
+    return str(re) + " − " + str(-im) + "i"
+  }
+  return str(re) + " + " + str(im) + "i"
+}

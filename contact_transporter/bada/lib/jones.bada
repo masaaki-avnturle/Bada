@@ -1,0 +1,97 @@
+// jones.bada — Jones 多項式 = 設計図生成機能、Bada で。
+//   結び目は Laurent 多項式の項 [[指数, 係数], ...] で表す。
+//   V(t*) (t* = e^{iθ(φ)}) の |V| がコイル寸法、|V(e^{iα})| の極小が扉の共鳴窓の角度。
+#include lib/complex.bada
+
+def knot_terms(name) {
+  -< name <-> "3_1" {
+    return [[-4, -1], [-3, 1], [-1, 1]]
+  }
+  -< name <-> "4_1" {
+    return [[-2, 1], [-1, -1], [0, 1], [1, -1], [2, 1]]
+  }
+  -< name <-> "5_1" {
+    return [[2, 1], [4, 1], [5, -1], [6, 1], [7, -1]]
+  }
+  return []
+}
+def knot_name(name) {
+  -< name <-> "3_1" {
+    return "三葉結び目 (trefoil)"
+  }
+  -< name <-> "4_1" {
+    return "8 の字結び目 (figure-eight)"
+  }
+  return "五葉結び目 (cinquefoil)"
+}
+
+// V(t) を複素数 t で評価
+def jones_eval(terms, t) {
+  v <- [0, 0]
+  i <- 0
+  -> i < len(terms) {
+    v <- c_add(v, c_scale(c_powi(t, terms[i][0]), terms[i][1]))
+    i <- i + 1
+  }
+  return v
+}
+
+// "−t^-4 + t^-3 + t^-1"
+def jones_text(terms) {
+  s <- ""
+  i <- 0
+  -> i < len(terms) {
+    e <- terms[i][0]
+    c <- terms[i][1]
+    mono <- "t^" + str(e)
+    -< e <-> 0 {
+      mono <- "1"
+    }
+    -< c < 0 {
+      -< i <-> 0 {
+        s <- "−" + mono
+      } >- {
+        s <- s + " − " + mono
+      }
+    } >- {
+      -< i <-> 0 {
+        s <- mono
+      } >- {
+        s <- s + " + " + mono
+      }
+    }
+    i <- i + 1
+  }
+  return s
+}
+
+// |V(e^{iα})| の曲線 (α は度, step 度刻み) → [[α, |V|], ...]
+def jones_curve(terms, step) {
+  pts <- []
+  a <- 0
+  -> a < 360 {
+    append(pts, [a, c_abs(jones_eval(terms, c_expi(a * pi() / 180)))])
+    a <- a + step
+  }
+  return pts
+}
+
+// 極小 (周期境界) の角度一覧 = 扉の共鳴窓
+def resonance(terms, step) {
+  pts <- jones_curve(terms, step)
+  n <- len(pts)
+  out <- []
+  i <- 0
+  -> i < n {
+    p <- pts[imod(i - 1 + n, n)][1]
+    c <- pts[i][1]
+    q <- pts[imod(i + 1, n)][1]
+    -< c < p {
+      -< c <= q {
+        append(out, pts[i][0])
+      }
+    }
+    i <- i + 1
+  }
+  return out
+}
