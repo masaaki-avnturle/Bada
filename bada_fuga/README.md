@@ -1374,6 +1374,7 @@ python3 synth.py score_tablet48.json tablet48.wav && python3 video.py score_tabl
 ```bash
 python3 compose_tablet49.py bank37.json score_tablet49.json && python3 add_vocals.py tablet48 score_tablet49.json score_tablet49v.json voice0928b_tmpl.npz
 python3 synth.py score_tablet49v.json tablet49v.wav && python3 video.py score_tablet49v.json tablet49v.wav tablet49v.mp4
+# 曲だけの演奏: score_tablet49.json (歌なし) の organ_gain を 0.9 に上げ、題名・副題・区間の説明から歌い手を外して synth.py → video.py
 ```
 
 ## 作り方 (再現)
