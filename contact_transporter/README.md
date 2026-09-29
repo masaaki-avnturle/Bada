@@ -8,7 +8,7 @@ cd contact_transporter
 ./build.sh             # 結合 → 実行 → contact_machine.obj / contact_blueprint.txt を出力
 ./build.sh --native    # さらにネイティブ実行形式 ./contact_blueprint を生成
 ./build.sh --regen     # catalog/ から方程式レジストリ equations.bada を再生成してから実行
-python3 tools/render_obj.py contact_machine.obj preview.png   # プレビュー画像 (要 matplotlib)
+./build.sh --media     # さらに MP4 動画 contact_transporter.mp4 と PDF 設計図書 contact_blueprint.pdf を生成
 ```
 
 ## 結果 (現在のカタログ)
@@ -16,7 +16,9 @@ python3 tools/render_obj.py contact_machine.obj preview.png   # プレビュー�
 - 論文 15 本 → 方程式 **2111 本** を登録 (catalog/eq_A〜D.md)
   - 数値評価 **632 本** (うち等式・不等式の数値検証 412 本: 成立 231 / 不成立 181)
   - 記号的な式 1479 本 (設計図部品への構造的割り当て)
-- 実行時間: 約 17 秒 (`bada_c` インタプリタ)。出力: `contact_machine.obj` (頂点 16,760), `contact_blueprint.txt`, `preview.png`
+- 実行時間: 約 17 秒 (`bada_c` インタプリタ)。出力: `contact_machine.obj` (頂点 16,760), `contact_blueprint.txt`, `contact_data.txt`, `preview.png`
+- **動画** `contact_transporter.mp4` (1280×720, 46 秒): 3 環のスピンアップ → ポッド投下 → 扉の通過 (地球の時計 1 秒の間に搭乗者の時計が 18 時間進む) → 設計図の寸法
+- **PDF** `contact_blueprint.pdf` (37 ページ): 表紙・設計パラメータ・三面図 (青焼き)・Z(t) / Jones 共鳴 / 部品別グラフ・全 2111 式のレジストリ
 
 ![preview](preview.png)
 
@@ -45,7 +47,7 @@ python3 tools/render_obj.py contact_machine.obj preview.png   # プレビュー�
 | `main_blueprint.bada` | 設計図生成本体 |
 | `contact_blueprint.bada` | 上記を結合した単一ソース (build.sh が生成。bada_c に import が無いため) |
 | `catalog/` | 論文ごとの方程式カタログ (`eq_*.md`) と数値評価式 (`calc_*.tsv`, `helpers_*.bada`) |
-| `tools/` | `gen_equations.py` (レジストリ生成), `hoist_lets.py` (ループ内 `let` の巻き上げ), `render_obj.py` |
+| `tools/` | `gen_equations.py` (レジストリ生成), `hoist_lets.py` (ループ内 `let` の巻き上げ), `render_obj.py`, `make_video.py` (MP4), `make_pdf.py` (PDF) |
 
 ## 正直な範囲
 

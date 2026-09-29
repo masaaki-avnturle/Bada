@@ -340,3 +340,68 @@ write_file("contact_blueprint.txt", buffer_text())
 print ""
 print "仕様書 → contact_blueprint.txt (全 " + str(REG_N) + " 式の割り当て表を含む)"
 print "3D モデル → contact_machine.obj (Blender / MeshLab / 3D ビューアで表示可)"
+
+# ─── 動画・PDF 用データ (contact_data.txt) ─────────────────
+#   param 名前 値 / series 名前 x y  — tools/make_video.py, tools/make_pdf.py が読む
+BUF_PARTS = []
+BUF_CHUNK = ""
+def dparam(name, v)
+  emit("param " + name + " " + str(v))
+end
+dparam("gamma", GAMMA_L)
+dparam("one_minus_beta", at(SR, 1))
+dparam("rapidity", PHI)
+dparam("one_way_h", ONE_WAY_H)
+dparam("contracted_km", at(SR, 4) / 1000)
+dparam("tpsi", TPSI)
+dparam("xlogx_root", XR)
+dparam("met", at(COL, 1))
+dparam("door_x", at(DOOR_AXIS, 0))
+dparam("door_y", at(DOOR_AXIS, 1))
+dparam("door_z", at(DOOR_AXIS, 2))
+dparam("theta0", THETA0)
+dparam("omega_outer", at(OMEGAS, 0))
+dparam("omega_middle", at(OMEGAS, 1))
+dparam("omega_inner", at(OMEGAS, 2))
+dparam("precession", PREC)
+dparam("rs_theta", RS_TH)
+dparam("rs_Z", re(RS_Z))
+dparam("R_out", R_OUT)
+dparam("R_mid", R_MID)
+dparam("R_in", R_IN)
+dparam("tube", TUBE)
+dparam("pod_r", POD_R)
+dparam("tower_h", TOWER_H)
+dparam("well_depth", WELL_DEPTH)
+dparam("coil_r", COIL_R)
+dparam("reg_n", REG_N)
+dparam("reg_calc", REG_CALC)
+dparam("reg_hold", REG_HOLD)
+dparam("reg_fail", REG_FAIL)
+let DI = 0
+while DI < len(COMP_NAMES)
+  emit("comp " + at(COMP_NAMES, DI) + " " + str(at(COMP_COUNT, DI)) + " " + str(at(COMP_ENERGY, DI)))
+  DI = DI + 1
+end
+# 臨界線上の Z(t)
+let DT = 5
+while DT <= 40
+  emit("series Z " + str(DT) + " " + str(re(rs_Z(DT))))
+  DT = DT + 0.1
+end
+# 単位円上の |V_K(e^{iα})|
+let DK = 0
+let DA = 0
+let DVA = 0
+while DK < len(JV)
+  DVA = at(at(JV, DK), 1)
+  DA = 0
+  while DA <= 360
+    emit("series V" + str(DK) + " " + str(DA) + " " + str(cabs(jones_eval(DVA, cis(DA * pi() / 180)))))
+    DA = DA + 2
+  end
+  emit("jones " + str(DK) + " " + jones_string(DVA) + " | " + cstr_(at(at(JV, DK), 2)))
+  DK = DK + 1
+end
+write_file("contact_data.txt", buffer_text())
+print "動画/PDF 用データ → contact_data.txt"
