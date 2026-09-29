@@ -11,7 +11,7 @@ const P = require("../src/physics.js");
 const { GPT, buildCorpus, buildVocab } = require("../src/gpt.js");
 
 const DATA = path.join(__dirname, "..", "data");
-const OUT = path.join(DATA, "contactgpt_weights.json");
+const OUT = process.env.CT_WEIGHTS_OUT || path.join(DATA, "contactgpt_weights.json");  // 出力先 (既定: data/)
 const args = process.argv.slice(2);
 const steps = parseInt(args.find((a) => /^\d+$/.test(a)) || "3000", 10);
 const resume = args.includes("--resume");
@@ -19,7 +19,8 @@ const resume = args.includes("--resume");
 const eqs = JSON.parse(fs.readFileSync(path.join(DATA, "equations.json"), "utf8"));
 const corpus = buildCorpus(eqs, P.blueprint());
 let model;
-if (resume && fs.existsSync(OUT)) model = GPT.fromJSON(JSON.parse(fs.readFileSync(OUT, "utf8")));
+const IN = fs.existsSync(OUT) ? OUT : path.join(DATA, "contactgpt_weights.json");
+if (resume && fs.existsSync(IN)) model = GPT.fromJSON(JSON.parse(fs.readFileSync(IN, "utf8")));
 else model = new GPT({ nLayer: 2, nHead: 4, nEmbd: 96, block: 64, seed: 2111 }, buildVocab(corpus));
 const data = Int32Array.from(model.encode(corpus));
 // 末尾 5% を検証用に
