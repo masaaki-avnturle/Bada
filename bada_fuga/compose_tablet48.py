@@ -132,11 +132,9 @@ META = {
                '歌い手: ソプラノ・アルトの淑女、テノール・バリトン・重低音の紳士 (9/28 のわたしの声の響きから)。歌詞はレクイエムの典礼文のドイツ語。'],
 }
 
-if __name__ == '__main__':
-    out = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet48.json'
-    compose.main(out, seed=148, bpm=BPM, builder=build, meta=META, extras=CT.extras, post=post)
-    CT.finish(out)
-    d = json.load(open(out)); from collections import Counter
+def fix_voices(out):
+    """書き出した楽譜の自動の声部を直す (拍の頭の半音のぶつかり・連続 8 度 / 5 度)。置いた音 (主題・Klang) には触れない"""
+    d = json.load(open(out))
     # 拍の頭で置いた主題と半音でぶつかる自動の声部の音を動かす (Klang の置いた不協和音はそのまま残す)
     spb = 60.0 / BPM; fixed = 0
     def sounding(t, skip): return [n for n in d['notes'] if n is not skip and n['t'] - 1e-3 <= t < n['t'] + n['d'] - 1e-3]
@@ -171,4 +169,11 @@ if __name__ == '__main__':
                 mv['m'] = m2; pfix += 1; break
     json.dump(d, open(out, 'w'), ensure_ascii=False)
     print('clash fixed:', fixed, 'parallels fixed:', pfix)
+
+if __name__ == '__main__':
+    out = sys.argv[2] if len(sys.argv) > 2 else 'score_tablet48.json'
+    compose.main(out, seed=148, bpm=BPM, builder=build, meta=META, extras=CT.extras, post=post)
+    CT.finish(out)
+    fix_voices(out)
+    d = json.load(open(out)); from collections import Counter
     print('extras:', Counter(e['v'] for e in d['extras']), 'notes', len(d['notes']))

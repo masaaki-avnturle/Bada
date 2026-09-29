@@ -400,6 +400,15 @@ def rock_drum(kind, vel=0.8, freq=110.0, sr=SR):
         if kind == 'ride': y += 0.4 * np.sin(2 * np.pi * 3100 * t) * np.exp(-t * 2)
         y *= np.exp(-t * dec) * (1 - np.exp(-t / 0.001))
         if kind == 'crash': y *= 1.2
+    elif kind == 'clap':                                                       # 手拍子 (クラップ): 10 ms ずつずれた 3 回の破裂 + 短い残り、1〜3 kHz (明るすぎない)
+        n = int(0.3 * sr); t = np.arange(n, dtype=np.float32) / sr
+        nz = _noise(n, 21); nz = _lp(_lp(nz, 0.22), 0.3) - _lp(nz, 0.04)
+        e = sum(np.exp(-np.clip(t - k * 0.011, 0, None) / 0.006) * (t >= k * 0.011) for k in range(3)) + 0.5 * np.exp(-np.clip(t - 0.033, 0, None) / 0.06) * (t >= 0.033)
+        y = nz * e
+    elif kind == 'hatd':                                                       # 暗いクローズド・ハイハット (金属音を丸める: 3.5〜7 kHz、短く)
+        n = int(0.06 * sr); t = np.arange(n, dtype=np.float32) / sr
+        nz = _noise(n, 23); nz = _lp(_lp(nz, 0.3), 0.35) - _lp(nz, 0.16)
+        y = nz * np.exp(-t / 0.012) * (1 - np.exp(-t / 0.0008))
     elif kind in ('dum', 'tek', 'daf'):                                        # ダラブッカ (dum = 胴の低音 / tek = 縁の乾いた音) と枠太鼓 (daf、鈴なし)
         n = int({'dum': 0.7, 'tek': 0.16, 'daf': 1.0}[kind] * sr); t = np.arange(n, dtype=np.float32) / sr
         if kind == 'tek':
@@ -571,6 +580,20 @@ def drive_guitar(freq, dur, vel=0.3, mute=False, sr=SR):
     if i0 < n: y[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.05)
     y[:int(0.002 * sr)] *= np.linspace(0, 1, int(0.002 * sr))
     return (y / (np.abs(y).max() + 1e-9) * vel).astype(np.float32)
+
+def bass808(freq, dur, vel=0.3, slide_to=None, sr=SR):
+    """808 のベース: 正弦波の重低音 (入りに一瞬高い音から落ちる「コン」)、長い減衰、倍音を足す軽い歪み (小さなスピーカーでも聞こえる)。
+    slide_to があれば、終わりの 0.14 秒でその音へすべる (トラップのグライド)"""
+    n = int((dur + 0.15) * sr); t = np.arange(n, dtype=np.float32) / sr
+    f = freq * (1 + 0.6 * np.exp(-t / 0.012))
+    if slide_to:
+        g0 = max(0.0, dur - 0.14); f = f * np.where(t > g0, (slide_to / freq) ** np.clip((t - g0) / 0.14, 0, 1), 1.0)
+    y = np.sin(2 * np.pi * np.cumsum(f) / sr)
+    y = np.tanh(2.2 * y) / np.tanh(2.2)
+    e = np.exp(-t / max(0.4, 0.9 * dur)) * np.minimum(1, t / 0.003)
+    i0 = int(dur * sr)
+    if i0 < n: e[i0:] *= np.exp(-(t[i0:] - t[i0]) / 0.04)
+    return (_lp(y * e, 0.12) * vel).astype(np.float32)
 
 def oud_tone(freq, dur, vel=0.3, sr=SR):
     """ウード (フレットのない撥弦、羽根のピックで駒の近く): 明るい立ち上がり、短い余韻、胴の鼻にかかった響き"""
@@ -964,15 +987,16 @@ def main(score='score.json', out='fuga.wav'):
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr
             L[i0:i1] += y[:i1 - i0] * cl * 0.35; R[i0:i1] += y[:i1 - i0] * cr * 0.35
             continue
-        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
+        if recs and ex['v'] in ('CG', 'EB', 'LG', 'OU', 'CO', 'DG', 'E8'):   # ロックのバンド: クリーン・ギター / ベース / リードギター + ウード / 合唱 (乾いた音 + 響き)
             v = ex['v']; vel = ex.get('gain', 0.3)
             if v == 'CG': y = clean_guitar(freq, ex['d'], vel)
             elif v == 'EB': y = picked_bass(freq, ex['d'], vel)
             elif v == 'LG': y = lead_guitar(freq, ex['d'], vel)
             elif v == 'OU': y = oud_tone(freq, ex['d'], vel)
             elif v == 'DG': y = drive_guitar(freq, ex['d'], vel, mute=ex.get('mute', False))
+            elif v == 'E8': y = bass808(freq, ex['d'], vel, slide_to=440.0 * 2 ** ((ex['slide'] - 69) / 12.0) if ex.get('slide') else None)
             else: y = choir_tone(freq, ex['d'], a=0.5, r=1.2) * vel
-            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12}[v]
+            pan = ex.get('pan', {'CG': -0.3, 'EB': 0.0, 'LG': 0.15, 'OU': 0.2, 'CO': 0.0, 'DG': 0.35, 'E8': 0.0}[v]); send = {'CG': 0.5, 'EB': 0.06, 'LG': 0.4, 'OU': 0.3, 'CO': 0.8, 'DG': 0.12, 'E8': 0.02}[v]
             cl, cr = math.cos((pan + 1) * math.pi / 4), math.sin((pan + 1) * math.pi / 4)
             i0 = int(ex['t'] * SR); i1 = min(i0 + len(y), N)
             HL[i0:i1] += y[:i1 - i0] * cl; HR[i0:i1] += y[:i1 - i0] * cr

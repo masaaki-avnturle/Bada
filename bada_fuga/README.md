@@ -1358,6 +1358,24 @@ python3 synth.py score_tablet48v.json tablet48v.wav && python3 video.py score_ta
 python3 synth.py score_tablet48.json tablet48.wav && python3 video.py score_tablet48.json tablet48.wav tablet48.mp4       # 曲だけの演奏
 ```
 
+## ⛪🔊 Requiem BADA — Tablet Sessions XLIX · Klang und Fuge .exe (XLVIII に FrostBorne「stargod.exe」を参考にしたビートを, ♩=56, 約 3 分 45 秒)
+
+楽譜 (5 人の歌い手・ビオラ・パイプオルガン・Klang・ドイツ語のフーガ) は XLVIII とまったく同じで、その上にビートを重ねた (`compose_tablet49.py` は
+`compose_tablet48` の `build`・`post`・`fix_voices` をそのまま使う)。参考にした曲の音やリズムは写さず、「.exe」系の暗いトラップ (フォンク寄り) の特徴だけを取り入れた。
+
+- **808** (`synth.py` の `bass808`、extras の `E8`) — 正弦波の重低音 (入りに一瞬高い音から落ちる)、長い減衰、倍音を足す軽い歪み。
+  半小節ごとに和音の根音 (ミ 1〜レ# 2) をなぞり、次の根音が違えば終わりの 0.14 秒ですべる (グライド)
+- **キック・手拍子・暗いハイハット** — 手拍子 (`clap`: 10 ms ずつずれた 3 回の破裂、1〜3 kHz) は ♩=56 の 2・4 拍目 (倍の速さで数えるハーフタイム)。
+  ハイハット (`hatd`) は 3.5〜7 kHz に丸めた暗い音 (8 kHz より上は従来のハイハットの 68% に対して 27%) で細かく刻み、2 小節ごとの最後の拍は 3 連符で転がる。
+  明るいカウベルや金属的な高音は使わない
+- **ビートの入り方** — Introitus なし → Klang I は 808 の一撃 → Fuga I は 3 小節目から (前半は疎ら、後半は細かく転がる) → Kyrie は疎ら
+  → Klang II でいったん引く → Fuga II は細かく転がり、最後の 2 小節はキックが倍に → Amen で止まり、長調の和音で 808 の長い一撃。ビートは歌の約 3 dB 下
+
+```bash
+python3 compose_tablet49.py bank37.json score_tablet49.json && python3 add_vocals.py tablet48 score_tablet49.json score_tablet49v.json voice0928b_tmpl.npz
+python3 synth.py score_tablet49v.json tablet49v.wav && python3 video.py score_tablet49v.json tablet49v.wav tablet49v.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
