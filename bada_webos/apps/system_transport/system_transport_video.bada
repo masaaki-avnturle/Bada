@@ -1,0 +1,202 @@
+// system_transport_video.bada — the equation group of the reports, analysed
+// with the Contact-Machine principle, and the video stream of the resulting
+// transport machine.  Every value, verdict and vertex is computed here.
+//
+// stream:
+//   CARD§id§source§title§equation§bada result§verdict§component
+//   SITE <k> <thurston> <component> <x> <y>
+//   PART <name> <static> <site> <nverts> | <edges>      SV <name> | <xyz...>
+//   FH <k> <tau> <th0> <th1> <th2> <z_pod> <t_pod> <alpha> <r_ricci> <bloch> <mob_u> <zeta_t>
+//   FV <k> <name> | <xyz...>
+
+#include lib/components.bada
+
+def card(id, src, title, eq, result, v, comp) {
+  say "CARD§" + id + "§" + src + "§" + title + "§" + eq + "§" + result + "§" + v + "§" + comp
+  return 0
+}
+def sci(x) {
+  // compact scientific text for small residuals
+  -< x == 0 { return "0" }
+  e <- 0  m <- x
+  -< m < 0 { m <- 0 - m }
+  -> m < 1 { m <- m * 10  e <- e - 1 }
+  -> m >= 10 { m <- m / 10  e <- e + 1 }
+  return str(idiv(m * 100 + 0.5, 1) / 100.0) + "e" + str(e)
+}
+
+// ---------------------------------------------------------------- design inputs
+event <- [[52.0, 11.0], [-18.5, 40.2], [-9.0, -23.7], [14.3, 6.1]]
+door <- door_axis(event)
+g <- lorentz_gamma(18.0 * 3600.0, 1.0)
+phi <- rapidity(g)
+R <- 15.0  hub <- 1.7 * R
+
+// ---------------------------------------------------------------- analysis
+c1 <- check_beta()
+card("E01", "ST p.9,13,15", "Beta = Gamma Gamma / Gamma", "β(p,q) = Γ(p)Γ(q)/Γ(p+q)",
+     "p=2.5,q=1.5: ∫ = " + str(c1[1]) + " , ΓΓ/Γ = " + str(c1[2]) + " , Δ = " + sci(c1[0]),
+     verdict(c1[0], 0.000000001), "gimbal ring radii r_k")
+c2 <- check_dgamma()
+card("E02", "QC p.4", "Derivative of Gamma", "Γ'(s) = ∫₀^∞ e^{−x} x^{s−1} log x dx",
+     "Γ'(1) = " + str(c2[1]) + " (= −γ_Euler) , finite-diff Δ = " + sci(c2[0]),
+     verdict(c2[0], 0.000001), "—")
+c3 <- check_euler(2.2)
+card("E03", "QC p.3,6", "Euler's formula", "e^{iθ} = cos θ + i sin θ",
+     "θ=2.2 via Taylor series: Δ = " + sci(c3[0]), verdict(c3[0], 0.000000001), "ring phases")
+c4 <- check_sin_ix(1.3)
+card("E04", "QC p.6", "Hyperbolic circle function", "sin(ix) = (e^{−x} + e^{x}) / 2i",
+     "stated form Δ = " + str(r3(c4[0])) + " ; corrected (e^{−x} − e^{x})/2i = i sinh x : Δ = " + sci(c4[1]),
+     verdict(c4[0], 0.000000001), "— (corrected form only)")
+c5 <- check_amgm()
+card("E05", "ST p.3, QC p.7", "AM-GM inequality", "x + y ≥ 2√(xy)",
+     "1600-point grid: min(x + y − 2√xy) = " + str(c5) + " (equality at x = y)",
+     verdict(0 - c5, 0.000000001), "—")
+c6 <- check_ricci(7.0, 11.0, 200)
+card("E06", "ST p.7,10", "Ricci flow", "∂g/∂t = −2 Ric   (round S³:  r² = r₀² − 4t)",
+     "RK4 r(11) = " + str(c6[1]) + " vs √(49−44) , Δ = " + sci(c6[0]) + " ; extinction T = " + str(c6[2]),
+     verdict(c6[0], 0.000001), "Ricci sphere (S²×R port)")
+c7 <- check_planck()
+card("E07", "ST p.11", "Planck length", "L_p = √(ħG/c³)",
+     "L_p = " + str(c7[1]) + " × 10⁻³⁵ m (CODATA 1.616255) , rel Δ = " + sci(c7[0]),
+     verdict(c7[0], 0.000001), "— (scale reference)")
+c8 <- check_kk(2.5)
+card("E08", "ST p.9", "Kaluza-Klein 5th dimension", "ds² = g_μν dx^μ dx^ν + φ²(dy + κA_μ dx^μ)²",
+     "compact circle φ=2.5: ∮ = " + str(c8[1]) + " = 2πφ , Δ = " + sci(c8[0]),
+     verdict(c8[0], 0.000000001), "Kaluza-Klein torus")
+c9 <- check_ads()
+card("E09", "ST p.1,2,13", "AdS5 warp factor", "||ds²|| = e^{−2πT|ψ|}[η_μν + h_μν]dx^μdx^ν + T²dψ²",
+     "e^{−π} = " + str(c9[1]) + " , e^{−2π} = " + str(c9[2]) + " (port table) , Δ = " + sci(c9[0]),
+     verdict(c9[0], 0.000000001), "AdS5 throat")
+c10 <- check_mobius()
+card("E10", "ST p.9,15", "Moebius space (reflected 5th dim.)", "n(u = 2π) · n(u = 0) = −1  (non-orientable)",
+     "normal after one loop · start = " + str(c10), verdict(fabs(c10 + 1), 0.000000001), "Moebius band (H3 port)")
+c11 <- check_seifert()
+card("E11", "ST p.1,2,12,98", "Seifert fibration of S³ (Hopf)", "h(e^{αu} q) = h(q) ,  h(q) = q̄ u q",
+     "180 fibre points: max |Δh| = " + sci(c11), verdict(c11, 0.000000001), "Hopf fibres (S3 port)")
+G <- icosian_group()
+E <- icosian_edges(G)
+c12 <- check_icosa()
+card("E12", "ST p.13", "Braid relations of the report", "β⁵ = (βθ)² = θ³",
+     "quaternion rep: all = −1 (Δ = " + sci(c12) + ") ; ⟨β,θ⟩ has " + str(len(G)) + " elements, " + str(len(E)) + " edges = 600-cell",
+     verdict(c12, 0.000000001), "600-cell (Poincaré sphere π₁)")
+ch3 <- euler_char(3)  ch2 <- euler_char(2)
+v13 <- "NOT VERIFIED"
+-< ch2 == 2 { v13 <- "CONDITIONAL" }
+card("E13", "ST p.2,10", "Euler characteristic X(3)", "X = Σ(−1)^k #(k-simplices of a₀a₁a₂a₃) ,  χ(3) = 2",
+     "solid tetrahedron χ = " + str(ch3) + " ; its boundary S² χ = " + str(ch2) + " → χ = 2 holds for the boundary only",
+     v13, "tetrahedron (Nil port)")
+c14 <- check_heisenberg(0.7, 2.0)
+card("E14", "QC p.5", "Heisenberg equation", "Â(t) = e^{iĤt} Â e^{−iĤt} ,  dÂ/dt = (1/i)[Â, Ĥ]",
+     "Ĥ = σ_z, Â = σ_x : max |dÂ/dt − (1/i)[Â,Ĥ]| = " + sci(c14), verdict(c14, 0.000001), "Bloch precession (SL2 port)")
+c15 <- check_el()
+card("E15", "ST p.5", "Euler-Lagrange solution", "f(r) = ¼ |r|²",
+     "5-point Laplacian Δf = 1 , Δ = " + sci(c15) + " (derivation in the report not reproduced)",
+     verdict(c15, 0.000001), "gravity-well paraboloid (H2×R)")
+c16 <- check_xpow()
+v16 <- "NOT VERIFIED"
+-< len(c16[0]) > 0 { v16 <- "CONDITIONAL" }
+card("E16", "ST p.3,5,6", "Critical-line exponential", "x^{1/2 + iy} = e^{x log x}",
+     "|·| equal only at x ∈ " + str(c16[0]) + " ; x = 2, y = 0 : |√2 − 4| = " + str(r3(c16[1])),
+     v16, "—")
+c17 <- check_logineq()
+v17 <- "NOT VERIFIED"
+-< c17[0] > 0 { v17 <- "CONDITIONAL" }
+card("E17", "ST p.2,11,98,100", "Entropy inequality", "log(x log x) ≥ 2 (y log y)^{1/2}",
+     "holds on " + str(c17[0]) + " / " + str(c17[1]) + " grid points (y near 1) ; on y = x : " + str(c17[2]) + " / 60",
+     v17, "—")
+c18 <- check_int_xlogx()
+card("E18", "ST p.2,26 QC p.3 CA p.3", "Antigravity integral", "∫∫ 1/(x log x)² dx^m = 1/2i",
+     "real ∫_e^∞ dx/(x log x)² = E₂(1) = " + str(c18[1]) + " ; |value − 1/2i| = " + str(r3(c18[0])),
+     verdict(c18[0], 0.000001), "—")
+c19 <- check_euler_product()
+card("E19", "IDPD, QC", "Euler product", "ζ(s) = Π_p 1/(1 − p^{−s})",
+     "s = 2, " + str(c19[2]) + " primes: " + str(c19[1]) + " vs π²/6 , Δ = " + sci(c19[0]) + " (tail < 2/3000)",
+     verdict(c19[0], 2.0 / 3000), "cross-check of the ζ used by the curve")
+c20 <- check_zeros()
+card("E20", "IDPD", "Master ports = zeta zeros", "ζ(½ + iγ_n) = 0 ,  n = 1..10",
+     "Euler-Maclaurin (N=40, 8 Bernoulli): max |ζ| = " + sci(c20), verdict(c20, 0.000001), "zero markers on the curve")
+c21 <- boost_invariant(g)
+card("E21", "ST p.26 (UFO)", "Lorentz energy / time budget", "γ = 18 h / 1 s ,  γ²(1 − β)(1 + β) = 1",
+     "γ = " + str(g) + " , φ = arccosh γ = " + str(r3(phi)) + " , invariant = " + str(c21),
+     verdict(fabs(c21 - 1), 0.000000001), "clocks + spin budget φ")
+c22 <- check_jones()
+card("E22", "explorer (Jones 4 patterns)", "Jones polynomial (Kauffman bracket)", "V(t) = t + t³ − t⁴ ,  ω_k = |V(e^{ikπ/2})|",
+     "repo jones.bada: V = " + str(c22[1]) + " ; ω = 1 : 3 : 1 , Δ = " + sci(c22[0]),
+     verdict(c22[0], 0.000000001), "ring spin ratios")
+c23 <- check_gauss()
+card("E23", "CA p.1", "Gaussian integral", "∫∫ e^{−x²−y²} dx dy = π",
+     "quadrature = " + str(c23[1]) + " , Δ = " + sci(c23[0]), verdict(c23[0], 0.000000001), "Gaussian bell (E3 port)")
+c24 <- check_pie()
+card("E24", "CA p.2,4", "π^e ≅ e^π", "π^e = e^π",
+     "π^e = " + str(r3(c24[1])) + " , e^π = " + str(r3(c24[2])) + " , differ by " + str(r3(c24[0])),
+     verdict(c24[0], 0.000001), "—")
+c25 <- check_circle(1.7)
+card("E25", "CA p.1,2", "Circle function of x log x", "cos(ix log x) − i sin(ix log x) = e^{x log x} = x^x",
+     "x = 1.7: series = " + str(c25[1]) + " = 1.7^1.7 , Δ = " + sci(c25[0]), verdict(c25[0], 0.000000001), "—")
+
+// ---------------------------------------------------------------- sites
+geoms <- thurston_names()
+comps <- ["gauss_bell", "hopf+600cell", "mobius", "ricci_sphere", "paraboloid", "bloch", "tetra", "zeta_curve"]
+k <- 0
+-> k < 8 {
+  p <- site_pos(k, door[1])
+  say "SITE " + str(k) + " " + geoms[k] + " " + comps[k] + " " + str(r3(p[0])) + " " + str(r3(p[1]))
+  k <- k + 1
+}
+S <- []
+k <- 0
+-> k < 8 { append(S, site_pos(k, door[1]))  k <- k + 1 }
+hopfc <- vadd(S[1], [0.0, 0.0, 12.0])
+ricc <- vadd(S[3], [0.0, 0.0, 9.0])
+blc <- vadd(S[5], [0.0, 0.0, 8.0])
+
+// ---------------------------------------------------------------- static parts
+base <- machine([R, 1.5, hub, door[1], phi, 0.0], 48)
+emit_part(base[4], 1, -1)
+emit_part(ads_throat(hub - R - 1.0, 12.0, 0.31), 1, -1)
+emit_part(kk_torus(22.0, 2.5, hub), 1, -1)
+emit_part(gauss_bell(S[0]), 1, 0)
+emit_part(hopf_fibres(fibre_reps(G), 9.0, hopfc), 1, 1)
+emit_part(translate(mobius_band(7.0, 2.5, 0.0), vadd(S[2], [0.0, 0.0, 8.0])), 1, 2)
+emit_part(paraboloid(S[4]), 1, 4)
+emit_part(bloch_sphere(6.0, blc), 1, 5)
+emit_part(tetra(12.0, vadd(S[6], [0.0, 0.0, 7.0])), 1, 6)
+emit_part(zeta_curve(50.0, 240, S[7]), 1, 7)
+emit_part(zeta_zero_marks(S[7]), 1, 7)
+
+// ---------------------------------------------------------------- dynamic parts
+emit_part(base[0], 0, -1)
+emit_part(base[1], 0, -1)
+emit_part(base[2], 0, -1)
+emit_part(base[3], 0, -1)
+emit_part(cell600(G, E, 0.0, 9.0, hopfc), 0, 1)
+emit_part(mobius_arrow(0.0, 7.0, 2.5, 0.0), 0, 2)
+emit_part(ricci_sphere(7.0, ricc), 0, 3)
+emit_part(bloch_arrow(6.0, 0.0, 1.0472, blc), 0, 5)
+emit_part(zeta_runner(0.5, S[7]), 0, 7)
+
+NF <- 180
+k <- 0
+-> k <= NF {
+  tau <- 1.0 * k / NF
+  parts <- machine([R, 1.5, hub, door[1], phi, tau], 48)
+  alpha <- phi * tau
+  rr <- ricci_r(7.0, 0.95 * 49.0 / 4 * tau)
+  bang <- 6 * c_pi() * tau
+  mu <- two_pi() * tau
+  zt <- 0.5 + 49.5 * tau
+  sp <- [ring_spin(1), ring_spin(2), ring_spin(3)]
+  hd <- "FH " + str(k) + " " + str(tau) + " " + str(r3(sp[0] * phi * tau)) + " " + str(r3(sp[1] * phi * tau)) + " " + str(r3(sp[2] * phi * tau))
+  hd <- hd + " " + str(r3(hub + (1.0 - 2.0 * tau) * 1.5 * R)) + " " + str(r3(g * tau)) + " " + str(r3(alpha))
+  say hd + " " + str(r3(rr)) + " " + str(r3(bang)) + " " + str(r3(mu)) + " " + str(r3(zt))
+  i <- 0
+  -> i < 4 { emit_frame_part(k, parts[i])  i <- i + 1 }
+  emit_frame_part(k, cell600(G, E, alpha, 9.0, hopfc))
+  emit_frame_part(k, translate(mobius_arrow(mu, 7.0, 2.5, 0.0), vadd(S[2], [0.0, 0.0, 8.0])))
+  emit_frame_part(k, ricci_sphere(rr, ricc))
+  emit_frame_part(k, bloch_arrow(6.0, bang, 1.0472, blc))
+  emit_frame_part(k, zeta_runner(zt, S[7]))
+  k <- k + 1
+}
+say "END"

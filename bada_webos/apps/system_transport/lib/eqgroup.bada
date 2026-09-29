@@ -1,0 +1,477 @@
+// eqgroup.bada — the equation group of the reports, analysed in Bada.
+//
+// Sources (abbreviations used in the cards):
+//   ST = system_transport.pdf (100-page compilation), QC = quantum_computer4.pdf,
+//   CA = caostics.pdf, IDPD = inter_dimensional_port_directory.pdf.
+//
+// Same principle as the Contact Machine: every equation is evaluated
+// numerically here, gets a verdict from its residual, and (when it survives)
+// is assigned to a component of the transport machine.
+//   VERIFIED     : residual below tolerance
+//   CONDITIONAL  : true only on a region / special points (Bada finds them)
+//   NOT VERIFIED : a counterexample is computed
+// Verdicts are computed, never typed in.
+
+#include ../../contact/lib/contact.bada
+#include ../../lib/jones.bada
+
+// ============================================================ complex kernel
+def cx(a, b) { return [a, b] }
+def cadd(a, b) { return [a[0] + b[0], a[1] + b[1]] }
+def csub(a, b) { return [a[0] - b[0], a[1] - b[1]] }
+def cmul(a, b) { return [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]] }
+def cscale(a, k) { return [a[0] * k, a[1] * k] }
+def cabs(a) { return fsqrt(a[0] * a[0] + a[1] * a[1]) }
+def cdiv(a, b) {
+  d <- b[0] * b[0] + b[1] * b[1]
+  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]
+}
+// e^z via exp(re)(cos im + i sin im)
+def cexp(z) {
+  m <- fexp(z[0])
+  return [m * fcos(z[1]), m * fsin(z[1])]
+}
+// n^{-s} for real n > 0
+def npow_neg(n, s) {
+  return cexp([0 - s[0] * fln(n), 0 - s[1] * fln(n)])
+}
+// Taylor series of e^z (independent of cexp; used to test Euler's formula)
+def cexp_series(z) {
+  term <- [1.0, 0.0]  sum <- [1.0, 0.0]  k <- 1
+  -> k < 60 { term <- cscale(cmul(term, z), 1.0 / k)  sum <- cadd(sum, term)  k <- k + 1 }
+  return sum
+}
+// Taylor series of sin z and cos z
+def csin_series(z) {
+  z2 <- cmul(z, z)  term <- z  sum <- z  k <- 1
+  -> k < 30 { term <- cscale(cmul(term, z2), -1.0 / ((2 * k) * (2 * k + 1)))
+    sum <- cadd(sum, term)  k <- k + 1 }
+  return sum
+}
+def ccos_series(z) {
+  z2 <- cmul(z, z)  term <- [1.0, 0.0]  sum <- [1.0, 0.0]  k <- 1
+  -> k < 30 { term <- cscale(cmul(term, z2), -1.0 / ((2 * k - 1) * (2 * k)))
+    sum <- cadd(sum, term)  k <- k + 1 }
+  return sum
+}
+
+def verdict(res, tol) {
+  -< res < tol { return "VERIFIED" }
+  return "NOT VERIFIED"
+}
+def fmax(a, b) { -< a > b { return a }  return b }
+
+// ============================================================ 1. Beta = Gamma Gamma / Gamma
+// B(p,q) = 2 int_0^{pi/2} sin^{2p-1}u cos^{2q-1}u du   (periodic -> trapezoid)
+def beta_integral(p, q, n) {
+  h <- c_pi() / 2 / n  s <- 0.0  k <- 1
+  -> k < n {
+    u <- k * h
+    s <- s + fpowr(fsin(u), 2 * p - 1) * fpowr(fcos(u), 2 * q - 1)
+    k <- k + 1
+  }
+  return 2 * h * s
+}
+def check_beta() {
+  lhs <- beta_integral(2.5, 1.5, 400)
+  rhs <- fgamma(2.5) * fgamma(1.5) / fgamma(4.0)
+  return [fabs(lhs - rhs), lhs, rhs]
+}
+
+// ============================================================ 2. Gamma'(1) = int e^{-x} log x dx
+// x = e^u  ->  int e^{-e^u} u e^u du
+def dgamma1_integral() {
+  h <- 0.005  s <- 0.0  u <- 0.0 - 40.0
+  -> u < 4.0 {
+    x <- fexp(u)
+    s <- s + fexp(0 - x) * u * x
+    u <- u + h
+  }
+  return s * h
+}
+def check_dgamma() {
+  integral <- dgamma1_integral()
+  h <- 0.00001
+  fd <- (fgamma(1 + h) - fgamma(1 - h)) / (2 * h)
+  return [fabs(integral - fd), integral, fd]
+}
+
+// ============================================================ 3. e^{i theta} = cos + i sin
+def check_euler(theta) {
+  lhs <- cexp_series([0.0, theta])
+  return [cabs(csub(lhs, [fcos(theta), fsin(theta)])), lhs]
+}
+
+// ============================================================ 4. sin(ix) = (e^{-x}+e^x)/(2i) ?
+def check_sin_ix(x) {
+  lhs <- csin_series([0.0, x])
+  stated <- cdiv([fexp(0 - x) + fexp(x), 0.0], [0.0, 2.0])
+  fixed <- cdiv([fexp(0 - x) - fexp(x), 0.0], [0.0, 2.0])
+  return [cabs(csub(lhs, stated)), cabs(csub(lhs, fixed)), lhs]
+}
+
+// ============================================================ 5. AM-GM
+def check_amgm() {
+  worst <- 1000.0  i <- 1
+  -> i <= 40 {
+    j <- 1
+    -> j <= 40 {
+      x <- i * 0.25  y <- j * 0.25
+      gap <- x + y - 2 * fsqrt(x * y)
+      -< gap < worst { worst <- gap }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return worst
+}
+
+// ============================================================ 6. Ricci flow on round S^3
+// g = r^2 g_1, Ric = 2 g_1  =>  d(r^2)/dt = -4  =>  dr/dt = -2/r  (RK4 vs closed form)
+def ricci_r(r0, t) { return fsqrt(r0 * r0 - 4 * t) }
+def check_ricci(r0, T, n) {
+  h <- T / n  r <- r0  k <- 0
+  -> k < n {
+    k1 <- 0 - 2 / r
+    k2 <- 0 - 2 / (r + h * k1 / 2)
+    k3 <- 0 - 2 / (r + h * k2 / 2)
+    k4 <- 0 - 2 / (r + h * k3)
+    r <- r + h * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+    k <- k + 1
+  }
+  return [fabs(r - ricci_r(r0, T)), r, r0 * r0 / 4]
+}
+
+// ============================================================ 7. Planck length
+// mantissas: hbar = 1.054571817 e-34, G = 6.67430 e-11, c = 2.99792458 e8
+//   hbar G / c^3 = m * 1e-69 = (10 m) * 1e-70  ->  L_p = sqrt(10 m) * 1e-35 m
+def check_planck() {
+  c <- 2.99792458
+  m <- 1.054571817 * 6.67430 / (c * c * c)
+  lp <- fsqrt(10 * m)                     // in units of 1e-35 m
+  return [fabs(lp - 1.616255) / 1.616255, lp]
+}
+
+// ============================================================ 8. Kaluza-Klein circle
+// compact 5th direction y in [0, 2 pi): proper length = int |d/dy (phi cos y, phi sin y)| dy
+def check_kk(phi) {
+  n <- 720  h <- two_pi() / n  L <- 0.0  k <- 0
+  -> k < n {
+    y <- k * h
+    dx <- 0 - phi * fsin(y)  dz <- phi * fcos(y)
+    L <- L + fsqrt(dx * dx + dz * dz) * h
+    k <- k + 1
+  }
+  return [fabs(L - two_pi() * phi), L]
+}
+
+// ============================================================ 9. AdS5 warp
+def check_ads() {
+  a <- fexp(0 - c_pi())  b <- fexp(0 - two_pi())
+  return [fmax(fabs(a - 0.0432139183), fabs(b - 0.0018674427)), a, b]
+}
+
+// ============================================================ 10. Moebius band
+def mobius_point(u, v, R, w) {
+  return [(R + w * v * fcos(u / 2)) * fcos(u), (R + w * v * fcos(u / 2)) * fsin(u),
+          w * v * fsin(u / 2)]
+}
+def vsub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
+def vcross(a, b) {
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+}
+def vdot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
+def vunit(a) { L <- fsqrt(vdot(a, a))  return [a[0] / L, a[1] / L, a[2] / L] }
+def mobius_normal(u, R, w) {
+  h <- 0.0001
+  du <- vsub(mobius_point(u + h, 0.0, R, w), mobius_point(u - h, 0.0, R, w))
+  dv <- vsub(mobius_point(u, h, R, w), mobius_point(u, 0 - h, R, w))
+  return vunit(vcross(du, dv))
+}
+def check_mobius() {
+  return vdot(mobius_normal(0.0, 7.0, 2.5), mobius_normal(two_pi(), 7.0, 2.5))
+}
+
+// ============================================================ quaternions (11, 12)
+def qmul(a, b) {
+  return [a[0] * b[0] - a[1] * b[1] - a[2] * b[2] - a[3] * b[3],
+          a[0] * b[1] + a[1] * b[0] + a[2] * b[3] - a[3] * b[2],
+          a[0] * b[2] - a[1] * b[3] + a[2] * b[0] + a[3] * b[1],
+          a[0] * b[3] + a[1] * b[2] - a[2] * b[1] + a[3] * b[0]]
+}
+def qpow(q, n) { r <- [1.0, 0.0, 0.0, 0.0]  k <- 0  -> k < n { r <- qmul(r, q)  k <- k + 1 }  return r }
+def qdist(a, b) {
+  return fmax(fmax(fabs(a[0] - b[0]), fabs(a[1] - b[1])), fmax(fabs(a[2] - b[2]), fabs(a[3] - b[3])))
+}
+def golden() { return (1.0 + fsqrt(5.0)) / 2 }
+def gen_theta() { return [0.5, 0.5, 0.5, 0.5] }
+def gen_beta() { g <- golden()  return [g / 2, 0.5, 1.0 / (2 * g), 0.0] }
+
+// Hopf fibre direction: the unit pure part of beta (an order-10 element),
+// so left multiplication by exp(alpha u) slides the 600-cell along its own
+// 12 decagonal Hopf fibres.
+def hopf_axis() {
+  b <- gen_beta()  L <- fsqrt(b[1] * b[1] + b[2] * b[2] + b[3] * b[3])
+  return [0.0, b[1] / L, b[2] / L, b[3] / L]
+}
+def qexp_axis(alpha) {
+  u <- hopf_axis()  s <- fsin(alpha)
+  return [fcos(alpha), s * u[1], s * u[2], s * u[3]]
+}
+// Hopf map S^3 -> S^2 for LEFT fibres {e^{alpha u} q}:  h(q) = conj(q) u q
+def qconj(q) { return [q[0], 0 - q[1], 0 - q[2], 0 - q[3]] }
+def hopf_map(q) { return qmul(qmul(qconj(q), hopf_axis()), q) }
+
+def check_seifert() {
+  worst <- 0.0  g <- icosian_group()  i <- 0
+  -> i < 12 {
+    q <- g[i * 7 + 3]
+    base <- hopf_map(q)
+    k <- 1
+    -> k < 16 {
+      p <- qmul(qexp_axis(k * 0.4), q)
+      worst <- fmax(worst, qdist(hopf_map(p), base))
+      k <- k + 1
+    }
+    i <- i + 1
+  }
+  return worst
+}
+
+// BFS closure of <beta, theta>  (binary icosahedral group 2I)
+def q_in(list, q) {
+  i <- 0
+  -> i < len(list) { -< qdist(list[i], q) < 0.000000001 { return 1 }  i <- i + 1 }
+  return 0
+}
+def icosian_group() {
+  G <- [[1.0, 0.0, 0.0, 0.0]]  gens <- [gen_beta(), gen_theta()]  i <- 0
+  -> i < len(G) {
+    j <- 0
+    -> j < 2 {
+      x <- qmul(G[i], gens[j])
+      -< q_in(G, x) == 0 { append(G, x) }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return G
+}
+def icosian_edges(G) {
+  E <- []  t <- golden() / 2  i <- 0
+  -> i < len(G) {
+    j <- i + 1
+    -> j < len(G) {
+      d <- G[i][0] * G[j][0] + G[i][1] * G[j][1] + G[i][2] * G[j][2] + G[i][3] * G[j][3]
+      -< fabs(d - t) < 0.000000001 { append(E, [i, j]) }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return E
+}
+// beta^5 = (beta theta)^2 = theta^3  (all equal -1)
+def check_icosa() {
+  b <- gen_beta()  t <- gen_theta()
+  x <- qpow(b, 5)  y <- qpow(qmul(b, t), 2)  z <- qpow(t, 3)
+  return fmax(qdist(x, y), qdist(y, z))
+}
+
+// ============================================================ 13. Euler characteristic
+// simplices of the tetrahedron a0a1a2a3 enumerated as non-empty bit subsets
+def popcount4(m) {
+  c <- 0  k <- 0
+  -> k < 4 { -< imod(idiv(m, pow2(k)), 2) == 1 { c <- c + 1 }  k <- k + 1 }
+  return c
+}
+def euler_char(maxdim) {
+  chi <- 0  m <- 1
+  -> m < 16 {
+    d <- popcount4(m) - 1
+    -< d <= maxdim {
+      -< imod(d, 2) == 0 { chi <- chi + 1 }
+      -< imod(d, 2) == 1 { chi <- chi - 1 }
+    }
+    m <- m + 1
+  }
+  return chi
+}
+
+// ============================================================ 14. Heisenberg equation
+// 2x2 complex matrices as [[a,b],[c,d]] of complex numbers
+def mmul(A, B) {
+  return [[cadd(cmul(A[0][0], B[0][0]), cmul(A[0][1], B[1][0])),
+           cadd(cmul(A[0][0], B[0][1]), cmul(A[0][1], B[1][1]))],
+          [cadd(cmul(A[1][0], B[0][0]), cmul(A[1][1], B[1][0])),
+           cadd(cmul(A[1][0], B[0][1]), cmul(A[1][1], B[1][1]))]]
+}
+def msub(A, B) {
+  return [[csub(A[0][0], B[0][0]), csub(A[0][1], B[0][1])],
+          [csub(A[1][0], B[1][0]), csub(A[1][1], B[1][1])]]
+}
+def mscale(A, z) {
+  return [[cmul(A[0][0], z), cmul(A[0][1], z)], [cmul(A[1][0], z), cmul(A[1][1], z)]]
+}
+def mnorm(A) {
+  return fmax(fmax(cabs(A[0][0]), cabs(A[0][1])), fmax(cabs(A[1][0]), cabs(A[1][1])))
+}
+// H = (w/2) sigma_z  ->  e^{iHt} = diag(e^{iwt/2}, e^{-iwt/2})
+def heis_A(t, w) {
+  U <- [[cexp([0.0, w * t / 2]), [0.0, 0.0]], [[0.0, 0.0], cexp([0.0, 0 - w * t / 2])]]
+  Ud <- [[cexp([0.0, 0 - w * t / 2]), [0.0, 0.0]], [[0.0, 0.0], cexp([0.0, w * t / 2])]]
+  sx <- [[[0.0, 0.0], [1.0, 0.0]], [[1.0, 0.0], [0.0, 0.0]]]
+  return mmul(mmul(U, sx), Ud)
+}
+def check_heisenberg(t, w) {
+  h <- 0.00001
+  dA <- mscale(msub(heis_A(t + h, w), heis_A(t - h, w)), [1.0 / (2 * h), 0.0])
+  H <- [[[w / 2, 0.0], [0.0, 0.0]], [[0.0, 0.0], [0 - w / 2, 0.0]]]
+  A <- heis_A(t, w)
+  comm <- mscale(msub(mmul(A, H), mmul(H, A)), [0.0, -1.0])   // (1/i)[A,H]
+  return mnorm(msub(dA, comm))
+}
+
+// ============================================================ 15. f(r) = |r|^2 / 4  ->  Laplacian = 1
+def check_el() {
+  h <- 0.01  worst <- 0.0  i <- 0
+  -> i < 5 {
+    x <- 0.7 * i - 1.3  y <- 0.4 * i + 0.2
+    f0 <- (x * x + y * y) / 4
+    lap <- ((x + h) * (x + h) + y * y) / 4 + ((x - h) * (x - h) + y * y) / 4
+    lap <- lap + (x * x + (y + h) * (y + h)) / 4 + (x * x + (y - h) * (y - h)) / 4
+    lap <- (lap - 4 * f0) / (h * h)
+    worst <- fmax(worst, fabs(lap - 1))
+    i <- i + 1
+  }
+  return worst
+}
+
+// ============================================================ 16. x^{1/2+iy} = e^{x log x} ?
+// moduli: sqrt(x) = x^x  <=>  (x - 1/2) ln x = 0  -> roots x = 1/2, 1
+def check_xpow() {
+  roots <- []  prev <- (0.05 - 0.5) * fln(0.05)  x <- 0.05
+  -> x < 3.0 {
+    x2 <- x + 0.001
+    cur <- (x2 - 0.5) * fln(x2)
+    -< prev * cur <= 0 {
+      -< prev != 0 { append(roots, r3(x2)) }
+    }
+    prev <- cur  x <- x2
+  }
+  counter <- fabs(fsqrt(2.0) - 4.0)          // x = 2, y = 0 : sqrt 2 vs 2^2
+  return [roots, counter]
+}
+
+// ============================================================ 17. log(x log x) >= 2 sqrt(y log y)
+def check_logineq() {
+  holds <- 0  total <- 0  diag <- 0  i <- 1
+  -> i <= 60 {
+    x <- 1.5 + i * 0.8
+    -< fln(x * fln(x)) >= 2 * fsqrt(x * fln(x)) { diag <- diag + 1 }
+    j <- 1
+    -> j <= 60 {
+      y <- 1.0 + j * 0.8
+      total <- total + 1
+      -< fln(x * fln(x)) >= 2 * fsqrt(y * fln(y)) { holds <- holds + 1 }
+      j <- j + 1
+    }
+    i <- i + 1
+  }
+  return [holds, total, diag]
+}
+
+// ============================================================ 18. int 1/(x log x)^2 dx = 1/(2i) ?
+// int_e^inf dx/(x log x)^2 = int_1^inf e^{-u}/u^2 du = E_2(1)   (real)
+def check_int_xlogx() {
+  h <- 0.002  s <- 0.0  u <- 1.0 + h / 2
+  -> u < 32.0 { s <- s + fexp(0 - u) / (u * u)  u <- u + h }
+  val <- s * h
+  return [cabs(csub([val, 0.0], cdiv([1.0, 0.0], [0.0, 2.0]))), val]
+}
+
+// ============================================================ 19. Euler product at s = 2
+def primes_below(n) {
+  sieve <- []  k <- 0
+  -> k < n { append(sieve, 1)  k <- k + 1 }
+  P <- []  p <- 2
+  -> p < n {
+    -< sieve[p] == 1 {
+      append(P, p)
+      m <- p * p
+      -> m < n { sieve[m] <- 0  m <- m + p }
+    }
+    p <- p + 1
+  }
+  return P
+}
+def check_euler_product() {
+  P <- primes_below(3000)  prod <- 1.0  i <- 0
+  -> i < len(P) { prod <- prod / (1.0 - 1.0 / (P[i] * P[i]))  i <- i + 1 }
+  target <- c_pi() * c_pi() / 6
+  return [fabs(prod - target), prod, len(P)]
+}
+
+// ============================================================ 20. zeta zeros (Euler-Maclaurin)
+def bern2k() {
+  return [1.0 / 6, -1.0 / 30, 1.0 / 42, -1.0 / 30, 5.0 / 66, -691.0 / 2730, 7.0 / 6, -3617.0 / 510]
+}
+def zeta_em(s) {
+  N <- 40  sum <- [0.0, 0.0]  n <- 1
+  -> n < N { sum <- cadd(sum, npow_neg(n, s))  n <- n + 1 }
+  Ns <- npow_neg(N, s)                                 // N^{-s}
+  sum <- cadd(sum, cdiv(cscale(Ns, N), csub(s, [1.0, 0.0])))   // N^{1-s}/(s-1)
+  sum <- cadd(sum, cscale(Ns, 0.5))
+  B <- bern2k()  poly <- s  fact <- 2.0  Npow <- cscale(Ns, 1.0 / N)   // N^{-s-1}
+  k <- 1
+  -> k <= 8 {
+    sum <- cadd(sum, cscale(cmul(poly, Npow), B[k - 1] / fact))
+    poly <- cmul(poly, cmul(cadd(s, [2 * k - 1.0, 0.0]), cadd(s, [2.0 * k, 0.0])))
+    fact <- fact * (2 * k + 1) * (2 * k + 2)
+    Npow <- cscale(Npow, 1.0 / (N * N))
+    k <- k + 1
+  }
+  return sum
+}
+def check_zeros() {
+  z <- zeta_zeros()  worst <- 0.0  i <- 0
+  -> i < len(z) { worst <- fmax(worst, cabs(zeta_em([0.5, z[i]])))  i <- i + 1 }
+  return worst
+}
+
+// ============================================================ 22. Jones (repo Kauffman bracket)
+def jones_abs_at(V, theta) {
+  re <- 0.0  im <- 0.0  i <- 0
+  -> i < len(V) {
+    re <- re + V[i][1] * fcos(V[i][0] * theta)
+    im <- im + V[i][1] * fsin(V[i][0] * theta)
+    i <- i + 1
+  }
+  return fsqrt(re * re + im * im)
+}
+def check_jones() {
+  V <- jones_t([1, 1, 1], 2)
+  worst <- 0.0  k <- 1
+  -> k <= 3 { worst <- fmax(worst, fabs(jones_abs_at(V, k * c_pi() / 2) - ring_spin(k)))  k <- k + 1 }
+  return [worst, V]
+}
+
+// ============================================================ 23. Gauss integral
+def check_gauss() {
+  h <- 0.02  s <- 0.0  x <- 0.0 - 6.0
+  -> x <= 6.0 { s <- s + fexp(0 - x * x)  x <- x + h }
+  val <- s * h * s * h                               // separable: (int e^{-x^2})^2
+  return [fabs(val - c_pi()), val]
+}
+
+// ============================================================ 24. pi^e = e^pi ?
+def check_pie() {
+  a <- fpowr(c_pi(), fexp(1.0))  b <- fexp(c_pi())
+  return [fabs(a - b), a, b]
+}
+
+// ============================================================ 25. cos(ix log x) - i sin(ix log x) = x^x
+def check_circle(x) {
+  z <- [0.0, x * fln(x)]
+  lhs <- csub(ccos_series(z), cmul([0.0, 1.0], csin_series(z)))
+  return [cabs(csub(lhs, [fpowr(x, x), 0.0])), lhs[0]]
+}

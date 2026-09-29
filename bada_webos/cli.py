@@ -153,6 +153,10 @@ def cmd_contact(args):
         from contact import video
         for kind, path in video.build(args.outdir, mp4=not args.no_mp4).items():
             print(f"wrote {kind}: {path}")
+    if args.system_transport:
+        from contact import st_video
+        for kind, path in st_video.build(args.outdir, mp4=not args.no_mp4).items():
+            print(f"wrote {kind}: {path}")
 
 
 def build_parser():
@@ -192,6 +196,8 @@ def build_parser():
     sp.add_argument("--video", action="store_true",
                     help="also render the blueprint-drawing video (HTML player + MP4)")
     sp.add_argument("--no-mp4", action="store_true", help="with --video: HTML player only")
+    sp.add_argument("--system-transport", action="store_true",
+                    help="also render the equation-group analysis video (system_transport)")
     sp.set_defaults(func=cmd_contact)
     return p
 
