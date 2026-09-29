@@ -12,6 +12,14 @@
 | `contact_transporter_blueprint.pdf` | 輸送機の設計図 9 葉 (パラメータ・部品↔方程式対応表・三面図・3D 等角図・分解組立図・動作シーケンス・方程式抜粋) |
 | `chatgpt_blueprint.mp4` | ChatGPT (GPT 系 Transformer) の動画 (約 106 秒, 音声付き) |
 | `chatgpt_blueprint.pdf` | ChatGPT の設計図 7 葉 (パラメータ・部品↔方程式対応表・ブロック図/立面図・3D/分解組立図・推論フロー) |
+| `ufo_blueprint.mp4` | UFO (反重力機) の動画 (約 110 秒, 音声付き)。飛行シーンで制御ループが毎秒方程式を評価して上昇 |
+| `ufo_blueprint.pdf` | UFO の設計図 8 葉 (方程式と再計算・部品↔方程式対応表・三面図・3D/分解組立図・UFO_OS 制御・飛行シミュレーション) |
+
+### UFO (反重力機)
+
+レポートの方程式 UFO.1〜UFO.26 と `src/UFO_OS.om` から作図。26 本すべてを 10 部品に割り当て、
+x = manifold_coord(r0/r) = 2√(r0/r) とおくと L(h) = cosh(x log x) と 10 ステップ上昇
+(607.5 m, 110.45 m/s) がレポート値と一致する。外形寸法は図解用 (質量 1.2×10⁴ kg のみレポート値)。
 
 ## 動画の構成
 
@@ -41,5 +49,7 @@
 pip install numpy matplotlib mpmath imageio-ffmpeg pillow
 python3 transporter_video.py   # output/contact_transporter.mp4
 python3 chatgpt_video.py       # output/chatgpt_blueprint.mp4
-python3 blueprint_pdf.py       # output/*.pdf
+python3 blueprint_pdf.py       # output/contact_transporter_blueprint.pdf, chatgpt_blueprint.pdf
+python3 ufo_video.py           # output/ufo_blueprint.mp4
+python3 ufo_pdf.py             # output/ufo_blueprint.pdf
 ```
