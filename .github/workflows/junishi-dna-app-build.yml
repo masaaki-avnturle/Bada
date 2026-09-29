@@ -2,7 +2,8 @@ name: Ω-Junishi DNA build (APK + Windows EXE + Linux)
 
 # bio_medicine/omega_junishi_dna (www + electron + cordova) から
 # Android APK・Windows 10/11 EXE・Linux (AppImage / deb) をビルドし、
-# Actions アーティファクト、および (junishi-v* タグ時) GitHub Release に添付します。
+# Actions アーティファクトとして保存し、さらに GitHub Release
+# (ブランチ push 時は junishi-v<package.json の version>、タグ push 時はそのタグ) に添付します。
 # ビルド前に NCBI から十二支の動物 11 種 + ヒトの mtDNA 参照を取得して同梱します。
 #
 # ⚠ 非医療・研究/教育用。
@@ -65,11 +66,6 @@ jobs:
         with:
           name: omega_junishi_dna-windows
           path: ${{ env.APP }}/electron/dist/*.exe
-      - name: Attach EXE to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ${{ env.APP }}/electron/dist/*.exe
 
   linux-app:
     needs: refs
@@ -93,13 +89,6 @@ jobs:
         with:
           name: omega_junishi_dna-linux
           path: |
-            ${{ env.APP }}/electron/dist/*.AppImage
-            ${{ env.APP }}/electron/dist/*.deb
-      - name: Attach Linux builds to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
             ${{ env.APP }}/electron/dist/*.AppImage
             ${{ env.APP }}/electron/dist/*.deb
 
@@ -156,8 +145,41 @@ jobs:
         with:
           name: omega_junishi_dna-android
           path: out/*.apk
-      - name: Attach APK to Release
-        if: startsWith(github.ref, 'refs/tags/')
+
+  # 3 種のビルドが揃ってから 1 回だけ Release を作成/更新する (Releases ページから期限なしでダウンロード可)。
+  release:
+    needs: [windows-exe, linux-app, android-apk]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: bio_medicine/omega_junishi_dna/electron/package.json
+      - name: Decide release tag
+        id: tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "name=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            v=$(python3 -c "import json;print(json.load(open('$APP/electron/package.json'))['version'])")
+            echo "name=junishi-v$v" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: omega_junishi_dna-*
+          path: dist
+          merge-multiple: true
+      - run: ls -la dist
+      - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: out/*.apk
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Ω-Junishi DNA ${{ steps.tag.outputs.name }} (APK / Windows 10・11 / Linux)
+          body: |
+            十二支 DNA 配列検査アプリ Ω-Junishi DNA のビルドです (非医療・研究/教育用)。
+            - Android: `omega_junishi_dna-debug.apk`
+            - Windows 10/11: `Omega-Junishi-DNA-Setup-*-x64.exe` (インストーラ) / `Omega-Junishi-DNA-Portable-*-x64.exe` (インストール不要)
+            - Linux: `Omega-Junishi-DNA-*-x86_64.AppImage` / `.deb`
+            ビルド元コミット: ${{ github.sha }}
+          files: dist/*
+          fail_on_unmatched_files: true

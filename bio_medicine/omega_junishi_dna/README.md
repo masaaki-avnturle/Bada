@@ -53,10 +53,11 @@
 ## ダウンロード (GitHub Actions)
 
 - **Actions** タブ → 「Ω-Junishi DNA build (APK + Windows EXE + Linux)」→ 最新の実行 (または **Run workflow**) → Artifacts:
-  - `omega_junishi_dna-android` — APK
-  - `omega_junishi_dna-windows` — Windows 10/11 EXE (インストーラ + ポータブル)
+  - `omega_junishi_dna-android` — APK (`omega_junishi_dna-debug.apk`)
+  - `omega_junishi_dna-windows` — Windows 10/11 EXE (`…-Setup-…exe` インストーラ / `…-Portable-…exe` インストール不要)
   - `omega_junishi_dna-linux` — AppImage + deb
-- タグ `junishi-v1.0.0` を push すると **Releases** にも添付されます。
+- 同じファイルは **Releases** (`junishi-v<version>`) にも自動で添付されます (Actions の Artifacts は 90 日で期限切れ、Releases は無期限)。
+  タグ `junishi-v*` を push した場合はそのタグの Release に添付されます。
 
 ## テスト
 
