@@ -11,8 +11,8 @@ import itertools, json, sys
 import numpy as np
 import mido
 
-STRETCH = 4.0
-Q = 0.8  # seconds per quarter after the x4 stretch (75 bpm)
+STRETCH = float(sys.argv[3]) if len(sys.argv) > 3 else 4.0
+Q = 0.2 * STRETCH  # seconds per quarter: x4 -> 0.8 s (75 bpm), x8 -> 1.6 s (37.5 bpm)
 DEG = [0, 2, 3, 5, 7, 8, 10]  # D minor (natural) above D
 ALTO, SOP, BASS, TEN = 0, 1, 2, 3
 RANGE = {SOP: (60, 79), ALTO: (53, 74), TEN: (47, 67), BASS: (36, 58)}
