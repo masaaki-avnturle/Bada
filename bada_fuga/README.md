@@ -1408,6 +1408,18 @@ python3 compose_tablet50.py bank37.json score_tablet50.json && python3 synth.py 
 python3 compose_tablet51.py bank37.json score_tablet51.json && python3 synth.py score_tablet51.json tablet51.wav && python3 video.py score_tablet51.json tablet51.wav tablet51.mp4
 ```
 
+## 🎹 Requiem BADA — Tablet Sessions LII · Klang und Fuge (Klavier) (LI から始めのシンセ・ビート・鼓動を消し、中から上がるシンセだけを, 約 3 分 45 秒)
+
+楽譜は XLVIII〜LI とまったく同じで、4 声は録音から切り出したピアノの実音 (LI と同じ)。`compose_tablet52.py` は LI のシンセの弾き方 (`post`) を使い、ビートと鼓動 (L の `build`) は使わない。
+
+- **消したもの** — 始めのシンセ (Klang I の下から上へ分散する和音、Fuga I の主題の重ね)、ジャングルのビートと重低音、心臓の鼓動
+- **残したもの** — 曲の中ほど (Kyrie) から弾くピアノのようなシンセ (`synth_piano`): Kyrie の 8 分の分散和音、Klang II の下から上へ分散する和音、
+  Fuga II 後半の分散和音、Amen の分散する和音。前半はピアノの実音だけ
+
+```bash
+python3 compose_tablet52.py bank37.json score_tablet52.json && python3 synth.py score_tablet52.json tablet52.wav && python3 video.py score_tablet52.json tablet52.wav tablet52.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
