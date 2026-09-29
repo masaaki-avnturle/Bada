@@ -63,7 +63,7 @@ def build():
 
 META = dict(K.META,
     title='Requiem BADA — XLIX · Klang und Fuge .exe',
-    subtitle='XLVIII に「.exe」系の暗いトラップのビート (808・キック・手拍子・暗いハイハット) を — FrostBorne「stargod.exe」を参考に (♩=56)',
+    subtitle='XLVIII に「.exe」系の暗いトラップのビートを — FrostBorne「stargod.exe」を参考に (♩=56)',
     legend=['TB', 'VA', 'E8', 'DR', 'V1'], vname=dict(K.META['vname'], DR='ビート', E8='808'),
     footer=['Introitus → Klang I (808) → Fuga I (ビートが入る) → Kyrie → Klang II (808) → Fuga II (細かく転がる) → Amen (808 の長い一撃)',
             'ビートは FrostBorne「stargod.exe」を参考にした「.exe」系の暗いトラップの特徴だけで、音やリズムは写していない。歌い手・歌詞は XLVIII と同じ。'])
