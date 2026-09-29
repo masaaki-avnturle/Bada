@@ -68,7 +68,7 @@ def main(notes_json, mid_out):
         if c % 4 == 3:
             return list(SUBJ), "subject"  # the Bach subject returns every fourth span as a refrain
         t0, t1 = c * CYCLE * Q, (c + 1) * CYCLE * Q
-        for r in [(c + k) % 4 for k in range(4)]:
+        for r in [(c + k) % len(voices) for k in range(len(voices))]:
             seq = [p for t, p in rec_notes[r] if t0 <= t < t1]
             if len(seq) < 4:
                 continue
