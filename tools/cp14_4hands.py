@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Bach, Contrapunctus 14 (Fuga a 3 soggetti, BWV 1080) x16 for piano four hands, with no break in the sound.
+Input: the LilyPond MIDI of Bach's text, or a JSON note list such as Bach + completion (complete_cp14.py).
 
 Every written note is kept, 16 times longer (quarter = 8 s).  The four voices are spread over four hands:
   Secondo LH  bass, doubled an octave below (notes of a quarter or longer)
@@ -25,9 +26,14 @@ FILL = [("Secondo RH", 43, 60), ("Primo LH", 55, 72)]
 
 
 def main(src, out):
+    notes = []  # [t0, t1, pitch, vel, hand]
+    if src.endswith(".json"):  # (start_q, dur_q, midi, voice), e.g. Bach's text + the completion
+        import json
+        for s, d, p, v in json.load(open(src)):
+            notes.append([s * Q, (s + d) * Q, p, VEL[v], HAND_OF[v]])
+        return finish(notes, out)
     mf = mido.MidiFile(src)
     tpb = mf.ticks_per_beat
-    notes = []  # [t0, t1, pitch, vel, hand]
     for i, tr in enumerate(mf.tracks):
         if i not in VOICE:
             continue
@@ -40,6 +46,10 @@ def main(src, out):
             elif m.type in ("note_off", "note_on") and m.note in on:
                 s = on.pop(m.note)
                 notes.append([s / tpb * Q, t / tpb * Q, m.note, VEL[v], HAND_OF[v]])
+    return finish(notes, out)
+
+
+def finish(notes, out):
     notes.sort()
     lead = notes[0][0]
     notes = [[a - lead, b - lead, p, vel, h] for a, b, p, vel, h in notes]
