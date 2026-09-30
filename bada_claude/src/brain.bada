@@ -1,0 +1,483 @@
+# ══════════════════════════════════════════════════════════════════════
+#  brain.bada — BadaClaude の頭脳 (量子プログラミング言語 Bada で記述)
+#
+#  Claude / ChatGPT 型の対話パイプラインを Bada で作り換えたもの:
+#    ① 字句化        tokens()
+#    ② 意図推定      Unknown-Prior Engine (softmax → 位相 → |ψ|² = a)
+#    ③ 検索 (RAG)    方程式レジストリ 2111 本 + 論文チャンクへの BM25
+#    ④ 道具          方程式の数値計算 / Q# 型量子回路 / Bada コード実行
+#    ⑤ 生成          根拠つき応答の構成 + 文字 n-gram 言語モデル
+#    ⑥ 記録          Omega (append-only 台帳) への commit
+#  ホスト (JS) は I/O と、利用者が API キーを設定した場合の Claude API への
+#  送信だけを担う。何を検索し、何を計算し、何を Claude に渡すかは Bada が決める。
+# ══════════════════════════════════════════════════════════════════════
+
+BRAIN_VERSION := "1.0.0"
+
+# ─── 索引 (転置索引 + BM25) ───────────────────────────────────────────
+DOCS := []
+IDX := {}
+AVG := 1
+EQ_BY_ID := {}
+STATUS_JA := {symb: "記号式 (数値化なし)", calc: "数値評価", holds: "数値検証で成立", differs: "数値検証で不成立"}
+TAG_JA := {ROT: "複素回転体", SR: "特殊相対論", GAMMA: "ガンマ関数", ZETA: "ゼータ関数", BETA: "ベータ関数",
+  JONES: "Jones 多項式", MANIFOLD: "大域的部分積分多様体", QUANTUM: "量子", TRANSPORT: "輸送", ENTROPY: "エントロピー", OTHER: "その他"}
+
+SYN := {
+  "ゼータ": ["zeta", "ζ"], "ベータ": ["beta", "β"], "ガンマ": ["gamma", "γ"], "リーマン": ["riemann", "ζ", "臨界線"],
+  "エントロピー": ["entropy", "shannon", "シャノン"], "量子": ["quantum", "qubit"], "多様体": ["manifold"],
+  "ジョーンズ": ["jones"], "jones": ["ジョーンズ", "結び目"], "結び目": ["jones"], "反重力": ["antigravity", "□"],
+  "相対論": ["sr", "relativity"], "零点": ["zero", "zeros"], "ラムベルト": ["lambert"], "ランベルト": ["lambert"],
+  "zeta": ["ゼータ", "ζ"], "beta": ["ベータ", "β"], "gamma": ["ガンマ", "γ"], "entropy": ["エントロピー"],
+  "ufo": ["反重力", "補空間"], "np": ["充足", "sat", "ゼロモード"], "sat": ["充足"], "reviser": ["文法", "拡張"],
+  "bada": ["言語", "インタプリタ"], "暗号": ["jones", "crypto", "qkd"], "オイラー": ["euler"], "euler": ["オイラー"]
+}
+
+fn brain_boot() {
+  for q in kb_equations() {
+    EQ_BY_ID[q.id] = q
+    tl := []
+    for t in q.tags { tl <- t; tl <- get(TAG_JA, t, t) }
+    DOCS <- {kind: "eq", id: q.id, text: q.eq + " " + join(tl, " ") + " " + q.id, eq: q}
+  }
+  srcs := kb_sources()
+  for c in kb_chunks() {
+    DOCS <- {kind: "chunk", id: "S" + str(c.src) + "p" + str(c.page), text: srcs[c.src].title + "\n" + c.text, body: c.text, src: srcs[c.src].title, page: c.page}
+  }
+  total := 0
+  for d, i in DOCS {
+    tf := {}
+    toks := tokens(d.text)
+    for t in toks { tf[t] = get(tf, t, 0) + 1 }
+    for t, n in tf {
+      if has(IDX, t) { IDX[t] <- [i, n] } else { IDX[t] = [[i, n]] }
+    }
+    d.len = len(toks)
+    total = total + len(toks)
+  }
+  AVG = total / len(DOCS)
+  Omega >> ["boot", "brain.bada", BRAIN_VERSION, len(DOCS), len(keys(IDX))]
+  return len(DOCS)
+}
+
+fn expand(ts) {
+  out := []
+  for t in ts {
+    out <- t
+    if has(SYN, t) { for s in SYN[t] { out <- s } }
+  }
+  return unique(out)
+}
+
+STOP := ["の", "は", "が", "を", "に", "で", "と", "て", "た", "し", "も", "な", "か", "です", "ます", "ください",
+  "について", "とは", "って", "what", "is", "the", "a", "of", "to", "and", "in", "教えて", "する", "ある", "いる", "こと"]
+
+fn search(q, k, kind) {
+  qt := filter(expand(tokens(q)), |t| not contains(STOP, t))
+  N := len(DOCS)
+  scores := {}
+  for t in qt {
+    if has(IDX, t) {
+      plist := IDX[t]
+      df := len(plist)
+      idf := log(1 + (N - df + 0.5) / (df + 0.5))
+      for p in plist {
+        d := DOCS[p[0]]
+        if kind == nil or d.kind == kind {
+          tf := p[1]
+          s := idf * tf * 2.2 / (tf + 1.2 * (0.25 + 0.75 * d.len / AVG))
+          key := str(p[0])
+          scores[key] = get(scores, key, 0) + s
+        }
+      }
+    }
+  }
+  ranked := sortby(keys(scores), |key| -scores[key])
+  hits := []
+  for key in slice(ranked, 0, k) { hits <- {doc: DOCS[num(key)], score: scores[key]} }
+  return hits
+}
+
+# 論文チャンクと方程式は長さが大きく違うので、別々に順位付けして合わせる
+fn retrieve(q, off) {
+  ch := slice(search(q, 4 + off, "chunk"), off)
+  eq := slice(search(q, 6 + off, "eq"), off)
+  return ch + eq
+}
+
+# ─── ② 意図推定: Unknown-Prior Engine ────────────────────────────────
+INTENTS := ["greet", "identity", "help", "calc", "eqid", "stats", "quantum", "code", "blueprint", "open_problem", "generate", "more", "explain"]
+CUES := {
+  greet: ["こんにちは", "こんばんは", "おはよう", "hello", "hi", "やあ", "はじめまして"],
+  identity: ["あなた", "君", "誰", "だれ", "何者", "claude", "chatgpt", "gpt", "who", "自己紹介"],
+  help: ["ヘルプ", "help", "使い方", "何ができる", "できること", "機能"],
+  calc: ["計算", "求め", "値", "calc", "compute", "評価", "いくつ?"],
+  eqid: [],
+  stats: ["何本", "統計", "件数", "いくつある", "how many", "内訳", "全部で"],
+  quantum: ["量子", "reviser", "文法を拡張", "qubit", "キュービット", "ベル", "bell", "ghz", "アダマール", "hadamard", "測定", "回路", "もつれ"],
+  code: ["実行", "run", "コード", "プログラム", "bada で", "書いて実行"],
+  blueprint: ["輸送機", "設計図", "transporter", "contact", "異次元", "ポッド", "三面図"],
+  open_problem: ["リーマン予想", "証明", "解決", "解け", "p≠np", "p=np", "未解決", "ミレニアム", "本当", "正しい"],
+  generate: ["生成", "文章", "作文", "書いて", "詩", "物語", "連想"],
+  more: ["もっと", "続き", "詳しく", "他には", "ほかに", "more"],
+  explain: ["とは", "説明", "意味", "なぜ", "どう", "解説", "what", "why", "how", "について"]
+}
+
+fn cue_count(text, cues) {
+  n := 0
+  for c in cues { if contains(text, c) { n = n + 1 } }
+  return n
+}
+
+fn classify(text, hits) {
+  low := lower(text)
+  z := []
+  for it in INTENTS { z <- 2.2 * cue_count(low, CUES[it]) }
+  # 構造的な手掛かり (字面より強い)
+  if match(text, "\\b[A-Z][A-Z0-9]*\\.\\d+\\b") != nil { z[index_of(INTENTS, "eqid")] = z[index_of(INTENTS, "eqid")] + 6 }
+  if contains(text, "```") or startswith(low, "run:") or startswith(text, "実行:") { z[index_of(INTENTS, "code")] = z[index_of(INTENTS, "code")] + 8 }
+  if match(text, "(zeta|gamma|beta|lambertw|rs_Z|rs_theta|jones|sqrt|exp|log|sin|cos|integrate)\\s*\\(") != nil or match(text, "^[\\d\\s+\\-*/^().]+$") != nil {
+    z[index_of(INTENTS, "calc")] = z[index_of(INTENTS, "calc")] + 5
+  }
+  z[index_of(INTENTS, "explain")] = z[index_of(INTENTS, "explain")] + 1.0      # 既定の事前分布
+  if len(hits) > 0 { z[index_of(INTENTS, "explain")] = z[index_of(INTENTS, "explain")] + 0.5 }
+
+  a := softmax(z)
+  # 検索モジュール: 上位スコアの分布の鋭さ (エントロピー) が位相を回す
+  sc := map(hits, |h| h.score)
+  q_ret := if_empty(sc)
+  phi_ret := map(range(len(INTENTS)), |i| 0.25 * i)
+  cs := cognitive_system(a, [[q_ret, phi_ret], [unknown_prior(len(INTENTS)), 0.5]], [0.7, 0.9])
+  best := argmax(cs.q)
+  V := len(INTENTS)
+  return {intent: INTENTS[best], a: a, q: cs.q, H: cs.entropy, conf: 1 - cs.entropy / log(V), maxdiff: cs.maxdiff, zeros: cs.zeros}
+}
+
+fn if_empty(sc) {
+  if len(sc) == 0 { return [1] }
+  return dist(sc)
+}
+
+# ─── ④ 道具 ───────────────────────────────────────────────────────────
+fn fmt_eq(q) {
+  line := "**" + q.id + "** `" + q.eq + "`"
+  if q.value != "" { line = line + " → `" + q.value + "`" }
+  tags := join(map(q.tags, |t| get(TAG_JA, t, t)), "・")
+  return line + " — " + STATUS_JA[q.status] + " (" + tags + ")"
+}
+
+fn tool_calc(text) {
+  expr := text
+  m := match(text, "(?:計算|求めて|評価|calc|compute)[:：]?\\s*(.+)$")
+  if m != nil { expr = m[1] }
+  m2 := match(expr, "([A-Za-z_][A-Za-z0-9_]*\\s*\\(.*\\)|[\\d\\s+\\-*/^().]+[\\d)])")
+  if m2 != nil and not contains(expr, "\n") and m == nil { expr = m2[1] }
+  expr = trim(replace(replace(replace(expr, "を計算", ""), "は?", ""), "？", ""))
+  r := eval_bada(expr)
+  return {expr: expr, r: r}
+}
+
+QPROGS := {
+  bell: "qubit q[2]\nH(q, 0)\nCNOT(q, 0, 1)\nprint(\"状態:\", qstate(q))\nprint(\"確率:\", probs(q))\nprint(\"測定:\", Measure(q, 0), Measure(q, 1))",
+  ghz: "qubit q[3]\nH(q, 0)\nCNOT(q, 0, 1)\nCNOT(q, 1, 2)\nprint(\"状態:\", qstate(q))\nprint(\"確率:\", probs(q))",
+  hadamard: "qubit q[1]\nH(q, 0)\np := probs(q)\nprint(\"H|0⟩ 確率 a =\", p)\na := [0.5, 0.5]\nprint(\"|ψ|² = a の最大偏差:\", maxdiff(p, a))",
+  reviser: "@reviser GRAMMAR {\n  rule bell(r) { H(r, 0); CNOT(r, 0, 1) }\n}\nqubit w[2]\nbell w\nprint(\"reviser で追加した文 `bell w` →\", qstate(w))\nprint(\"文法台帳:\", rules())",
+  forbidden: "z := [1.6, 0.6, 0.1, -40, -0.4, 1.1, -40, 0.4]\na := softmax(z)\ncs := cognitive_system(a, [[a, map(range(8), |i| 0.3 * i)], [unknown_prior(8), 0.5]], [0.7, 0.9])\nprint(\"base zeros =\", zeros_of(a), \" posterior zeros =\", cs.zeros)\nprint(\"|ψ|² = a 最大偏差 =\", cs.maxdiff)"
+}
+
+fn tool_quantum(text) {
+  low := lower(text)
+  key := "bell"
+  if contains(low, "ghz") or contains(low, "3") { key = "ghz" }
+  if contains(low, "アダマール") or contains(low, "hadamard") or contains(low, "重ね合わせ") { key = "hadamard" }
+  if contains(low, "reviser") or contains(low, "文法") { key = "reviser" }
+  if contains(low, "禁止") or contains(low, "ゼロ保存") or contains(low, "零保存") or contains(low, "forbidden") { key = "forbidden" }
+  src := QPROGS[key]
+  return {key: key, src: src, r: eval_bada(src)}
+}
+
+fn extract_code(text) {
+  m := match(text, "```(?:bada)?\\s*\\n?([\\s\\S]*?)```")
+  if m != nil { return m[1] }
+  m2 := match(text, "^(?:run:|実行:)\\s*([\\s\\S]+)$")
+  if m2 != nil { return m2[1] }
+  return text
+}
+
+fn stats_md() {
+  st := {}
+  tg := {}
+  pre := {}
+  for q in kb_equations() {
+    st[q.status] = get(st, q.status, 0) + 1
+    for t in q.tags { tg[t] = get(tg, t, 0) + 1 }
+    p := split(q.id, ".")[0]
+    pre[p] = get(pre, p, 0) + 1
+  }
+  md := "方程式レジストリ (contact_blueprint.pdf) には **" + str(len(kb_equations())) + " 本** の方程式が登録されています。\n\n"
+  md = md + "| 判定 | 本数 |\n|:--|--:|\n"
+  for k in ["symb", "calc", "holds", "differs"] { md = md + "| " + STATUS_JA[k] + " | " + str(get(st, k, 0)) + " |\n" }
+  md = md + "\n**タグ別**: "
+  parts := []
+  for t in sortby(keys(tg), |t| -tg[t]) { parts <- get(TAG_JA, t, t) + " " + str(tg[t]) }
+  md = md + join(parts, " / ") + "\n\n**系列 (論文) 別**: "
+  parts2 := []
+  for p in sortby(keys(pre), |p| -pre[p]) { parts2 <- "`" + p + "` " + str(pre[p]) }
+  md = md + join(parts2, ", ") + "\n\n数値評価のある式は " + str(get(st, "calc", 0) + get(st, "holds", 0) + get(st, "differs", 0)) + " 本、そのうち等式として検証できたものが成立 " + str(get(st, "holds", 0)) + "・不成立 " + str(get(st, "differs", 0)) + " です。"
+  return md
+}
+
+# ─── ⑤ 生成: 文字 n-gram 言語モデル (遅延学習) ───────────────────────
+LM := {}
+LM_READY := false
+LM_N := 5
+
+fn lm_train() {
+  if LM_READY { return len(keys(LM)) }
+  for c in kb_chunks() {
+    t := c.text
+    if match(t, "[ぁ-ん]") != nil and not contains(kb_sources()[c.src].file, "source") {
+      cs := chars(replace(t, "\n", ""))
+      for i in range(0, len(cs) - LM_N) {
+        ctx := join(slice(cs, i, i + LM_N - 1), "")
+        nx := cs[i + LM_N - 1]
+        if not has(LM, ctx) { LM[ctx] = {} }
+        row := LM[ctx]
+        row[nx] = get(row, nx, 0) + 1
+      }
+    }
+  }
+  LM_READY = true
+  Omega >> ["lm_train", LM_N, len(keys(LM))]
+  return len(keys(LM))
+}
+
+fn lm_generate(prompt, n, temp) {
+  lm_train()
+  cs := chars(prompt)
+  out := prompt
+  # 文脈が表に無ければ、最も近い見出し語から始める
+  ctx := join(slice(cs, max(0, len(cs) - LM_N + 1)), "")
+  if not has(LM, ctx) {
+    cands := filter(keys(LM), |k| contains(k, slice(prompt, 0, 1)))
+    if len(cands) == 0 { cands = keys(LM) }
+    ctx = cands[floor(rand() * len(cands))]
+    out = out + " … " + ctx
+  }
+  for step in range(n) {
+    if not has(LM, ctx) { break }
+    row := LM[ctx]
+    ks := keys(row)
+    ws := map(ks, |k| row[k] ^ (1 / temp))
+    tot := sum(ws)
+    r := rand() * tot
+    pick := ks[0]
+    acc := 0
+    for k, j in ks {
+      acc = acc + ws[j]
+      if acc >= r { pick = k; break }
+    }
+    out = out + pick
+    ctx = slice(ctx + pick, 1)
+    if pick == "。" and step > n / 2 { break }
+  }
+  return out
+}
+
+# ─── ⑤ 生成: 根拠つき応答の構成 ────────────────────────────────────────
+fn first_sentences(t, n) {
+  s := replace(t, "\n", "")
+  parts := split(s, "。")
+  out := join(slice(parts, 0, n), "。")
+  if len(parts) > n { out = out + "。" }
+  if len(out) > 420 { out = slice(out, 0, 420) + "…" }
+  return out
+}
+
+fn compose_explain(q, hits, offset) {
+  chunks := filter(hits, |h| h.doc.kind == "chunk")
+  eqs := filter(hits, |h| h.doc.kind == "eq")
+  if len(hits) == 0 {
+    return "手元の知識ベース (論文 10 本・方程式 2111 本) には「" + q + "」に直接対応する記述が見つかりませんでした。言い換えるか、`ヘルプ` で使い方をご覧ください。"
+  }
+  md := ""
+  if len(chunks) > 0 {
+    top := chunks[0].doc
+    md = md + first_sentences(top.body, 3) + "\n\n"
+    md = md + "> 出典: *" + top.src + "* p." + str(top.page) + "\n\n"
+    if len(chunks) > 1 {
+      md = md + "**関連する記述**\n"
+      for h in slice(chunks, 1, 4) { md = md + "- " + first_sentences(h.doc.body, 1) + " — *" + h.doc.src + "* p." + str(h.doc.page) + "\n" }
+      md = md + "\n"
+    }
+  }
+  if len(eqs) > 0 {
+    md = md + "**関連する方程式 (レジストリより)**\n"
+    for h in slice(eqs, 0, 6) { md = md + "- " + fmt_eq(h.doc.eq) + "\n" }
+    md = md + "\n"
+  }
+  md = md + "_「もっと」で続きの検索結果を表示します。判定は論文側の数値検証の結果で、記号式は数値的な裏付けがないことを表します。_"
+  return md
+}
+
+fn honesty_note(text) {
+  low := lower(text)
+  if contains(low, "リーマン") { return "\n\n**標識**: 論文集自身の結論として、リーマン予想は **未解決** です。確立したのはベータ型関数等式・自明な零点・対称軸としての臨界線までで、零点の位置はこれらからは導けません。" }
+  if contains(low, "np") { return "\n\n**標識**: 第十二巻は P ≠ NP を証明していません (P = NP も)。スペクトル解析器の出力 n0 は #SAT で、その計算が問題そのものです。" }
+  if contains(low, "輸送") or contains(low, "ufo") or contains(low, "反重力") { return "\n\n**標識**: 設計図書・UFO-OS は論文の方程式に基づく思索的な可視化で、工学的に検証された装置ではありません。" }
+  return ""
+}
+
+HELP_MD := "私は **BadaClaude** — 量子プログラミング言語 **Bada** で書かれた対話エンジンです。できること:\n\n| 例 | 動作 |\n|:--|:--|\n| `ゼータ関数とベータ関数の関係は?` | 論文と方程式レジストリを検索して根拠つきで回答 |\n| `ACAFE.17` | 方程式 ID で直接参照 |\n| `計算 zeta(2)` / `beta(1/2, 1/2)` / `rs_Z(14.1347)` | Bada で数値計算 (Γ・β・ζ・Lambert W・Riemann–Siegel Z・Jones) |\n| `ベル状態を作って` / `GHZ` / `reviser` | Q# 型量子副言語で回路を実行 |\n| ` ```bada … ``` ` | 送ったコードを Bada で実行 |\n| `方程式は全部で何本?` | レジストリの統計 |\n| `輸送機の設計図` | CONTACT TRANSPORTER の設計パラメータ |\n| `ゼータで文章を生成` | 論文コーパスで学習した文字 n-gram で生成 |\n\n右上の ⚙ で **Claude API キー** を設定すると、同じ Bada パイプラインが検索・計算した文脈を Claude (claude-opus-5-5) に渡して回答させます。"
+
+IDENTITY_MD := "私は **BadaClaude** です。Claude や ChatGPT の「応答する仕組み」— 字句化・意図推定・検索・道具使用・生成・記録 — を、量子プログラミング言語 Bada で書き直した対話エンジンです (頭脳のソースは「brain.bada」タブで読めます)。\n\n正直にお伝えすると、Anthropic の Claude や OpenAI の ChatGPT の**学習済みの重み (数千億パラメータ) は含まれていません**。ローカルモードでの私の知識は、同梱した論文 10 本と方程式 2111 本、そして Bada の数値核だけです。汎用の会話力が必要なときは ⚙ 設定で Claude API キーを入れてください。その場合も、何を検索し何を計算して Claude に渡すかは Bada の頭脳が決めます。"
+
+# ─── 対話状態 ─────────────────────────────────────────────────────────
+CTX := {last_query: "", offset: 0, turns: 0}
+
+fn trace_intent(ci) {
+  return "intent=" + ci.intent + "  conf=" + fixed(ci.conf, 3) + "  H=" + fixed(ci.H, 3) + "  |ψ|²=a 偏差=" + sci(ci.maxdiff, 2)
+}
+
+# ─── 入口: respond ───────────────────────────────────────────────────
+fn respond(text) {
+  CTX.turns = CTX.turns + 1
+  trace := []
+  toks := tokens(text)
+  trace <- ["① 字句化", str(len(toks)) + " トークン: " + join(slice(toks, 0, 12), " ")]
+
+  hits := retrieve(text, 0)
+  ci := classify(text, hits)
+  trace <- ["② 意図推定 (Unknown-Prior Engine)", trace_intent(ci)]
+  intent := ci.intent
+  if intent == "more" and CTX.last_query == "" { intent = "explain" }
+
+  md := ""
+  tool := nil
+  sources := []
+  q := text
+  if intent == "more" {
+    q = CTX.last_query
+    CTX.offset = CTX.offset + 6
+    hits = retrieve(q, CTX.offset)
+  } elif intent == "explain" or intent == "open_problem" {
+    CTX.last_query = text
+    CTX.offset = 0
+  }
+  trace <- ["③ 検索 (BM25)", str(len(hits)) + " 件: " + join(map(slice(hits, 0, 5), |h| h.doc.id), ", ")]
+
+  if intent == "greet" {
+    md = "こんにちは。BadaClaude です。論文の内容の解説、方程式の検索と数値計算、量子回路の実行、Bada コードの実行ができます。`ヘルプ` と送ると使い方を表示します。"
+  } elif intent == "identity" {
+    md = IDENTITY_MD
+  } elif intent == "help" {
+    md = HELP_MD
+  } elif intent == "stats" {
+    md = stats_md()
+    tool = "stats"
+  } elif intent == "eqid" {
+    ids := match_all(text, "\\b[A-Z][A-Z0-9]*\\.\\d+\\b")
+    found := filter(ids, |i| has(EQ_BY_ID, i))
+    if len(found) == 0 {
+      md = "`" + join(ids, ", ") + "` はレジストリにありません。ID は `ACAFE.17` や `Q.16` の形です。"
+    } else {
+      md = join(map(found, |i| fmt_eq(EQ_BY_ID[i])), "\n\n")
+      tool = "eqid"
+    }
+  } elif intent == "calc" {
+    c := tool_calc(text)
+    tool = "calc"
+    if c.r.ok {
+      md = "```bada\n" + c.expr + "\n```\n= **" + c.r.shown + "**"
+      if len(c.r.out) > 0 { md = md + "\n\n```\n" + join(c.r.out, "\n") + "\n```" }
+      rel := search(c.expr, 3, "eq")
+      if len(rel) > 0 { md = md + "\n\n関連する方程式:\n" + join(map(rel, |h| "- " + fmt_eq(h.doc.eq)), "\n") }
+    } else {
+      md = "式 `" + c.expr + "` を評価できませんでした: " + c.r.error + "\n\n使える関数: `gamma lgamma beta zeta rs_Z rs_theta lambertw xlogx_root jones integrate deriv solve sqrt exp log sin cos` など。"
+    }
+  } elif intent == "quantum" {
+    qr := tool_quantum(text)
+    tool = "quantum:" + qr.key
+    md = "Q# 型量子副言語 (位相核の上に実装) で実行しました:\n\n```bada\n" + qr.src + "\n```\n\n```\n" + join(qr.r.out, "\n") + "\n```\n\n"
+    md = md + "測定は台帳 Ω への commit として記録され、位相ゲートは確率を変えません (|ψ|² = a)。振幅ゼロの基底状態はどのゲートでも復活しません (ゼロ保存 = no-resurrection)。"
+  } elif intent == "code" {
+    src := extract_code(text)
+    r := eval_bada(src)
+    tool = "code"
+    if r.ok {
+      md = "Bada で実行しました。\n\n"
+      if len(r.out) > 0 { md = md + "```\n" + join(r.out, "\n") + "\n```\n" }
+      md = md + "戻り値: `" + r.shown + "`  · 台帳 Ω: " + str(r.ledger) + " 件"
+      if len(r.rules) > 0 { md = md + " · 追加された文法規則: " + join(r.rules, ", ") }
+    } else {
+      md = "実行エラー: `" + r.error + "`"
+      if len(r.out) > 0 { md = md + "\n\n```\n" + join(r.out, "\n") + "\n```" }
+    }
+  } elif intent == "blueprint" {
+    md = "**CONTACT TRANSPORTER — 設計パラメータ** (contact_blueprint.pdf, Bada 実行結果)\n\n```\n" + kb_blueprint() + "\n```\n\nBada で再計算すると:\n"
+    th := rs_theta(11.7722)
+    md = md + "- ラピディティ φ = arcosh(64800) = `" + fixed(acosh(64800), 6) + "`\n"
+    md = md + "- Riemann–Siegel θ(φ) = `" + fixed(th, 6) + "`, Z(φ) = `" + fixed(rs_Z(11.7722), 6) + "`\n"
+    md = md + "- x log x = 1 の根 = e^{W(1)} = `" + fixed(xlogx_root(), 6) + "`\n"
+    md = md + "- Jones 3_1 (" + jones_poly("3_1") + ") at t* = e^{iθ}: `" + str(jones("3_1", exp(cx(0, th)))) + "`"
+    md = md + honesty_note("輸送")
+    tool = "blueprint"
+  } elif intent == "generate" {
+    seedw := trim(replace(replace(replace(replace(text, "で文章を生成", ""), "生成", ""), "して", ""), "文章", ""))
+    if seedw == "" { seedw = "ゼータ関数" }
+    gen := lm_generate(slice(seedw, 0, 6), 160, 0.8)
+    md = gen + "\n\n_— 論文コーパスで Bada が学習した文字 " + str(LM_N) + "-gram モデル (" + str(len(keys(LM))) + " 文脈) による生成です。文法的なつながりだけを真似ており、内容の正しさは保証されません。_"
+    tool = "lm"
+  } else {
+    md = compose_explain(q, hits, CTX.offset) + honesty_note(text)
+  }
+
+  for h in slice(hits, 0, 6) {
+    if h.doc.kind == "chunk" { sources <- h.doc.src + " p." + str(h.doc.page) } else { sources <- "方程式 " + h.doc.id }
+  }
+  sources = unique(sources)
+  trace <- ["④ 道具", if_nil(tool, "なし")]
+
+  mode := host_mode()
+  out := {mode: "local", text: md, intent: intent, conf: ci.conf, trace: trace, sources: sources}
+  if mode == "llm" {
+    out.mode = "llm"
+    out.system = build_system(text, hits, md, tool)
+    trace <- ["⑤ 生成", "Claude API へ Bada の文脈 (" + str(len(out.system)) + " 字) を添えて送信"]
+  } else {
+    trace <- ["⑤ 生成", "ローカル Bada エンジンで構成 (" + str(len(md)) + " 字)"]
+  }
+  Omega >> ["turn", CTX.turns, intent, fixed(ci.conf, 4), len(hits)]
+  trace <- ["⑥ 記録", "Ω::DATABASE に commit (計 " + str(len(Omega)) + " 件)"]
+  return out
+}
+
+fn if_nil(v, d) {
+  if v == nil { return d }
+  return v
+}
+
+# Claude API に渡すシステムプロンプト (Bada が検索・計算した文脈を埋め込む)
+fn build_system(text, hits, local_md, tool) {
+  s := "あなたは BadaClaude です。量子プログラミング言語 Bada で書かれたパイプライン (brain.bada) が、利用者の質問に対して知識ベースを検索し、必要な計算を実行し、その結果を以下の <bada_context> に入れて渡します。\n"
+  s = s + "知識ベースは山口フレームワークの論文 10 本と、contact_blueprint.pdf の方程式レジストリ 2111 本です。各方程式には判定 (記号式 / 数値評価 / 数値検証で成立 / 不成立) が付いています。\n"
+  s = s + "回答の方針: 文脈にある事実はその出典 (論文名・ページ・方程式 ID) を示して使ってください。論文自身が「未解決」「予想」「否定」と標識した主張を、解決済みや真であるかのように述べないでください。文脈に無いことは一般知識として区別して述べてください。利用者の言語 (通常は日本語) で答えてください。Bada のコード例を示すときは ```bada で囲んでください。\n\n"
+  s = s + "<bada_context>\n"
+  if tool != nil { s = s + "<tool_result tool=\"" + tool + "\">\n" + local_md + "\n</tool_result>\n" }
+  for h in slice(hits, 0, 8) {
+    d := h.doc
+    if d.kind == "chunk" {
+      s = s + "<document source=\"" + d.src + "\" page=\"" + str(d.page) + "\">\n" + d.body + "\n</document>\n"
+    } else {
+      s = s + "<equation id=\"" + d.id + "\" status=\"" + d.eq.status + "\" tags=\"" + join(d.eq.tags, ",") + "\">" + d.eq.eq + (if_nil(d.eq.value, "") != "" and " = " + d.eq.value or "") + "</equation>\n"
+    }
+  }
+  s = s + "</bada_context>"
+  return s
+}
+
+# ホストが Claude の返答を受け取った後に呼ぶ (台帳へ記録)
+fn after_llm(reply, stop) {
+  Omega >> ["llm_reply", CTX.turns, len(reply), stop]
+  return len(Omega)
+}

@@ -29,6 +29,24 @@
 
 ---
 
+## ⟨ψ⟩ ダウンロード — BadaClaude(Claude / ChatGPT の対話パイプラインを量子 Bada で作り換えた対話エンジン)
+
+**Claude や ChatGPT が質問に答えるまでの仕組み — 字句化 → 意図推定 (Unknown-Prior Engine) → 検索 (論文 10 本 + 方程式レジストリ 2111 本) → 道具 (ζ・Γ・β・Riemann–Siegel Z・Jones の数値計算 / Q# 型量子回路 / Bada 実行) → 生成 → 台帳記録 — を、すべて量子プログラミング言語 Bada で書き直した対話アプリ。** 頭脳のソース [`brain.bada`](bada_claude/src/brain.bada) はアプリ内でも読めます。学習済みの Claude / ChatGPT の重みは含まないため、汎用の会話が必要なときは設定で Claude API キーを入れると、Bada が組み立てた文脈を Claude (claude-opus-5-5) に渡して回答します。
+
+#### 📱💻 ネイティブ アプリ (APK / Windows 10・11 / Linux) — Actions からダウンロード
+
+[Actions → BadaClaude app build](https://github.com/masaaki-avnturle/Bada/actions/workflows/badaclaude-app-build.yml) の最新の成功した実行を開き、**Artifacts** から:
+
+| プラットフォーム | アーティファクト | ファイル |
+|:---|:---|:---|
+| **Android** (APK) | `badaclaude-android` | `bada-claude-debug.apk` |
+| **Windows 10 / 11** | `badaclaude-windows` | `BadaClaude-*-x64.exe` (NSIS インストーラ) / `BadaClaude-*-portable.exe` |
+| **Linux** | `badaclaude-linux` | `BadaClaude-*-x86_64.AppImage` / `BadaClaude-*-amd64.deb` |
+
+ブラウザ版は [**bada_claude/index.html**](bada_claude/index.html) を「Download raw file」で保存してダブルクリック。詳細は [`bada_claude/`](bada_claude/) を参照。
+
+---
+
 ## 🜂 ダウンロード — Bada 遊(量子「遊び」処理系 / 違反思考変異アルゴリズム)
 
 **今までの集大成の上に、生成AIが量子プログラミング言語 Bada で「遊び」の概念そのものを築いたアプリケーション。** 日本語の「遊び」には**遊戯**(円環の内側でだけ規則が停止する営み)と**機械の遊び**(ハンドルの遊び — 遊びが零の機械は焼き付く)の二つの意味があるが、本処理系はその二つを**規則の固有状態から外れて持てる振幅** |Φ(θ)⟩ = cos(θ/2)|順⟩ − i sin(θ/2)|違⟩ として一本化する。そして**「違反行為そのものの“考え”」**を、規則のスタビライザ S と反交換する違反生成子 V の**部分回転** Û(θ) = exp(−iθV/2) として定式化した ── **θ = 0 は遵守、θ = π は行為、そのあいだの半端な角こそが「考え」であり「遊び」である**。処理系は θ ≤ θ<sub>max</sub> = 0.85π を強制し、**考えが行為へ到達しないこと**を実行時に保証する。円環(magic circle)は比喩ではなく**ユニタリ共役**で、帰還 C<sup>†</sup>C|ψ⟩ = |ψ⟩ により状態は一切漏れず、外へ出るのは観測が許されたときの古典的記録(台帳)だけ。`sacred` と宣言した**不可侵規則**は違反生成子の候補から外され、[V,S₀] = 0 を課されるため、**遊びの中で何を考えても、観測の後でも、その値は動かない**(テストで毎回検査)。この円環の中で、**個体の変異アルゴリズムを作り換えた** ── 無作為なビット反転をやめ、**いちばん強く縛っている規則を、ほかの規範と不可侵をすべて守ったまま、それひとつだけ破る最小違反生成子**による協調反転とし、重ね合わせのまま期待適応度を測り、違反の振幅 sin²(θ/2) をそのまま受理確率とする(**違反思考変異 TTM**)。遊び予算 Δ は集団で保存され多様性から恒常的に調節され、破られ続けた規範は弛緩してやがて**制度化**される。依存ゼロ・単一 HTML・オフライン動作。

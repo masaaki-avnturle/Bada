@@ -1,0 +1,190 @@
+name: BadaClaude app build (Android APK + Windows 10/11 EXE + Linux)
+
+# bada_claude/ の「BadaClaude」— Claude / ChatGPT 型の対話パイプラインを
+# 量子プログラミング言語 Bada で作り換えた対話エンジン。
+#   ① 字句化 → ② 意図推定 (Unknown-Prior Engine) → ③ 検索 (BM25 / 論文 10 本 + 方程式 2111 本)
+#   → ④ 道具 (ζ・Γ・β・Riemann–Siegel Z・Jones / Q# 型量子回路 / Bada 実行)
+#   → ⑤ 生成 (根拠つき応答・文字 n-gram、または Claude API) → ⑥ 記録 (Ω 台帳)
+# これを
+#   - Android 向け APK
+#   - Windows 10/11 向け EXE (NSIS インストーラ + ポータブル)
+#   - Linux 向け AppImage / deb
+# としてビルドします。アプリ本体は bada_claude/index.html の自己完結 HTML で、
+# これをそのまま www として各ラッパーに同梱します。
+#
+# ダウンロード: リポジトリの Actions タブ → このワークフローの実行 → 「Artifacts」
+#   badaclaude-android / badaclaude-windows / badaclaude-linux
+# (badaclaude-v* タグ / release_tag 指定時は GitHub Release にも添付)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'GitHub Release に添付するタグ名 (例: badaclaude-v1.0.0)。空欄なら Actions アーティファクトのみ。'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'badaclaude-v*'
+    branches:
+      - '**'
+    paths:
+      - 'bada_claude/**'
+      - '.github/workflows/badaclaude-app-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: index.html is built from src/ (engine.js + brain.bada + kb.json + app.js)
+        run: node bada_claude/tools/build.js --check
+      - name: Self-check app HTML (inline JS syntax)
+        run: |
+          set -e
+          node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("bada_claude/index.html", "utf8");
+            const scripts = [...src.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+            if (scripts.length !== 2) { console.error("expected 2 inline scripts, got " + scripts.length); process.exit(1); }
+            scripts.forEach((s, i) => fs.writeFileSync("/tmp/badaclaude-" + i + ".js", s));
+            JSON.parse(src.match(/<script type="application\/json" id="kb-data">([\s\S]*?)<\/script>/)[1]);
+            if (!/<script type="text\/bada" id="brain-src">[\s\S]*fn respond\(text\)/.test(src)) { console.error("brain.bada missing"); process.exit(1); }
+          '
+          node --check /tmp/badaclaude-0.js
+          node --check /tmp/badaclaude-1.js
+          echo "BadaClaude self-check OK"
+      - name: Engine tests (Bada language / reviser grammar / numeric core / Unknown-Prior Engine / quantum / KB / brain.bada)
+        run: node bada_claude/tools/engine-test.js
+
+  android-apk:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # setup-android の既定インストール対象 'tools' は SDK リポジトリから
+      # 廃止済みのため、packages を空にして必要な物を次のステップで入れる。
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ''
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      # ランナー標準の Gradle 9 は cordova-android 12 と非互換のため 7.6.4 を明示。
+      - name: Pin Gradle 7.6.4 (cordova-android 12 requires Gradle 7.x)
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_claude/app/www
+          cp bada_claude/index.html bada_claude/app/www/index.html
+      - name: Build debug APK (Cordova, pinned versions)
+        run: |
+          set -e
+          gradle --version
+          npm install -g cordova@12.0.0
+          APP="bada_claude/app"
+          cordova create cordova-build io.github.masaaki_avnturle.badaclaude BadaClaude
+          rm -rf cordova-build/www
+          cp -r "$APP/www" cordova-build/www
+          cp "$APP/cordova/config.xml" cordova-build/config.xml
+          cd cordova-build
+          cordova platform add android@12.0.1
+          cordova build android --verbose
+      - name: Collect APK
+        run: |
+          mkdir -p out
+          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk out/bada-claude-debug.apk
+          ls -la out
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaclaude-android
+          path: out/*.apk
+      - name: Attach APK to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: out/*.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        shell: bash
+        run: |
+          mkdir -p bada_claude/app/www
+          cp bada_claude/index.html bada_claude/app/www/index.html
+      - name: Build Windows 10/11 EXE (Electron, NSIS installer + portable)
+        working-directory: bada_claude/app/electron
+        run: |
+          npm install
+          npm run dist
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaclaude-windows
+          path: bada_claude/app/electron/dist/*.exe
+      - name: Attach EXE to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: bada_claude/app/electron/dist/*.exe
+
+  linux-app:
+    runs-on: ubuntu-latest
+    needs: test-core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Prepare www (self-contained app)
+        run: |
+          mkdir -p bada_claude/app/www
+          cp bada_claude/index.html bada_claude/app/www/index.html
+      - name: Build Linux AppImage + deb (Electron)
+        working-directory: bada_claude/app/electron
+        run: |
+          npm install
+          npm run dist:linux
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: badaclaude-linux
+          path: |
+            bada_claude/app/electron/dist/*.AppImage
+            bada_claude/app/electron/dist/*.deb
+      - name: Attach Linux builds to Release
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            bada_claude/app/electron/dist/*.AppImage
+            bada_claude/app/electron/dist/*.deb

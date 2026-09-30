@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BadaClaude</title>
+<style>
+:root{
+  --bg:#f7f5f0; --panel:#ffffff; --side:#efece4; --ink:#1f1d1a; --muted:#6d685f; --line:#dedad0;
+  --accent:#c2643a; --accent-ink:#ffffff; --code:#f1eee7; --user:#ece7dc; --ok:#2e7d4f; --bad:#b3372e; --chip:#e6e1d5;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1b1a18; --panel:#23221f; --side:#161513; --ink:#ecE8df; --muted:#a39e93; --line:#35332e;
+    --accent:#d9774a; --accent-ink:#1b1a18; --code:#2c2b27; --user:#2e2c28; --ok:#6cc08f; --bad:#e3786d; --chip:#302e2a;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1b1a18; --panel:#23221f; --side:#161513; --ink:#ece8df; --muted:#a39e93; --line:#35332e;
+  --accent:#d9774a; --accent-ink:#1b1a18; --code:#2c2b27; --user:#2e2c28; --ok:#6cc08f; --bad:#e3786d; --chip:#302e2a;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 -apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP","Yu Gothic UI",sans-serif;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.app{display:flex;height:100%}
+aside{width:270px;flex:none;background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:12px;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;padding:4px 6px}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:15px}
+.newchat{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 12px;text-align:left}
+.newchat:hover{border-color:var(--accent)}
+nav.tabs{display:flex;flex-direction:column;gap:2px}
+nav.tabs button{background:none;border:0;text-align:left;padding:7px 10px;border-radius:8px;color:var(--muted)}
+nav.tabs button.on,nav.tabs button:hover{background:var(--chip);color:var(--ink)}
+.hist-h{font-size:12px;color:var(--muted);padding:6px 10px 0}
+.hist{flex:1;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.hist .item{display:flex;align-items:center;border-radius:8px}
+.hist .item.on,.hist .item:hover{background:var(--chip)}
+.hist .item button.t{flex:1;min-width:0;background:none;border:0;text-align:left;padding:6px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist .item button.x{background:none;border:0;color:var(--muted);padding:4px 8px;visibility:hidden}
+.hist .item:hover button.x{visibility:visible}
+.foot{font-size:12px;color:var(--muted);padding:0 6px}
+main{flex:1;min-width:0;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--bg)}
+header .title{font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--panel);white-space:nowrap}
+.badge.api{border-color:var(--accent);color:var(--accent)}
+.icon{background:none;border:1px solid var(--line);border-radius:8px;padding:5px 9px;background:var(--panel)}
+.menu{display:none}
+.view{flex:1;min-height:0;display:none;flex-direction:column}
+.view.on{display:flex}
+#msgs{flex:1;overflow:auto;padding:24px 16px 8px}
+.wrap{max-width:780px;margin:0 auto}
+.msg{margin:0 0 22px}
+.msg.user .bubble{background:var(--user);border-radius:14px;padding:10px 14px;margin-left:auto;max-width:85%;width:fit-content;white-space:pre-wrap;word-break:break-word}
+.msg.bot{display:flex;gap:12px}
+.msg.bot .av{flex:none;width:28px;height:28px;border-radius:8px;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:14px;margin-top:2px}
+.msg.bot .body{flex:1;min-width:0}
+.md p{margin:.4em 0}
+.md h1,.md h2,.md h3{margin:.8em 0 .3em;line-height:1.3}
+.md h1{font-size:1.3em}.md h2{font-size:1.15em}.md h3{font-size:1.05em}
+.md code{background:var(--code);border-radius:5px;padding:1px 5px;font:13px/1.5 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;word-break:break-word}
+.md pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px 12px;overflow:auto;position:relative}
+.md pre code{background:none;padding:0;white-space:pre;word-break:normal}
+.md pre .run{position:absolute;top:6px;right:6px;font-size:12px;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:2px 8px}
+.md table{border-collapse:collapse;margin:.5em 0;display:block;overflow:auto;max-width:100%}
+.md th,.md td{border:1px solid var(--line);padding:4px 9px;text-align:left}
+.md blockquote{margin:.5em 0;padding:2px 12px;border-left:3px solid var(--accent);color:var(--muted)}
+.md ul,.md ol{padding-left:1.4em;margin:.4em 0}
+.md em{color:var(--muted)}
+details.trace{margin-top:8px;font-size:13px;color:var(--muted)}
+details.trace summary{cursor:pointer;user-select:none}
+details.trace table{border-collapse:collapse;margin-top:6px;width:100%}
+details.trace td{border-top:1px solid var(--line);padding:3px 6px;vertical-align:top;word-break:break-word}
+details.trace td:first-child{white-space:nowrap;color:var(--ink)}
+.meta{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap}
+.meta button{background:none;border:0;color:var(--muted);padding:0}
+.meta button:hover{color:var(--ink)}
+.cursor::after{content:"▍";animation:blink 1s steps(1) infinite;color:var(--accent)}
+@keyframes blink{50%{opacity:0}}
+.empty{text-align:center;padding:8vh 0 2vh}
+.empty .big{font-size:28px;font-weight:700;margin:10px 0 4px}
+.empty p{color:var(--muted);margin:0 0 18px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.chips button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font-size:14px}
+.chips button:hover{border-color:var(--accent)}
+.composer{padding:8px 16px 16px}
+.box{max-width:780px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:8px 8px 8px 14px;display:flex;align-items:flex-end;gap:8px;box-shadow:0 1px 6px rgba(0,0,0,.05)}
+.box:focus-within{border-color:var(--accent)}
+.box textarea{flex:1;border:0;outline:0;background:none;resize:none;max-height:220px;min-height:26px;padding:4px 0}
+.send{width:36px;height:36px;border-radius:10px;border:0;background:var(--accent);color:var(--accent-ink);font-size:17px;flex:none}
+.send:disabled{opacity:.4;cursor:default}
+.hint{max-width:780px;margin:6px auto 0;font-size:12px;color:var(--muted);text-align:center}
+.pane{flex:1;min-height:0;overflow:auto;padding:16px}
+.pane h2{margin:0 0 8px;font-size:18px}
+.pane p.sub{color:var(--muted);margin:0 0 12px;font-size:14px}
+.ed{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100% - 90px);min-height:360px}
+.ed textarea,.ed pre{margin:0;width:100%;height:100%;min-height:300px;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:10px;font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.ed textarea{resize:none;outline:0;white-space:pre}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 12px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.row input[type=search],.row select{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px}
+.row input[type=search]{flex:1;min-width:160px}
+.eq{border-bottom:1px solid var(--line);padding:8px 2px;font-size:14px}
+.eq .id{font-weight:600;margin-right:8px}
+.eq code{font:13px/1.5 ui-monospace,Menlo,Consolas,monospace;word-break:break-word}
+.st{font-size:11px;border-radius:999px;padding:1px 8px;margin-left:6px;border:1px solid var(--line);white-space:nowrap}
+.st.holds{color:var(--ok);border-color:var(--ok)}.st.differs{color:var(--bad);border-color:var(--bad)}
+.src{font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--code);border:1px solid var(--line);border-radius:10px;padding:12px;white-space:pre;overflow:auto}
+.src .c{color:var(--muted)}.src .k{color:var(--accent);font-weight:600}.src .s{color:var(--ok)}
+.led{font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace}
+.led div{border-bottom:1px solid var(--line);padding:3px 0;word-break:break-word}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--panel);color:var(--ink);padding:0;width:min(520px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dlg{padding:18px 20px}
+.dlg h3{margin:0 0 12px}
+.dlg label{display:block;margin:12px 0 4px;font-size:14px;font-weight:600}
+.dlg input,.dlg select{width:100%;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px}
+.dlg .radio{display:flex;gap:16px;flex-wrap:wrap}
+.dlg .radio label{font-weight:400;display:flex;gap:6px;align-items:center;margin:0}
+.dlg .radio input{width:auto}
+.dlg small{color:var(--muted);display:block;margin-top:4px;font-size:12px;line-height:1.5}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+#boot{position:fixed;inset:0;background:var(--bg);display:grid;place-items:center;z-index:9;text-align:center}
+#boot .logo{width:48px;height:48px;font-size:24px;margin:0 auto 12px;border-radius:12px}
+#boot p{color:var(--muted)}
+.scrim{display:none}
+@media (max-width:760px){
+  aside{position:fixed;inset:0 auto 0 0;z-index:5;transform:translateX(-100%);transition:transform .2s;width:84vw;max-width:300px}
+  aside.open{transform:none}
+  .scrim.open{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:4}
+  .menu{display:inline-block}
+  #msgs{padding:16px 12px 8px}
+  .composer{padding:6px 10px 12px}
+  .ed{grid-template-columns:1fr;height:auto}
+  .ed textarea,.ed pre{min-height:240px}
+  .badge{display:none}
+}
+</style>
+</head>
+<body>
+<div id="boot"><div><div class="logo">⟨ψ⟩</div><b>BadaClaude</b><p id="bootmsg">Bada の頭脳 (brain.bada) を起動しています…</p></div></div>
+<div class="app">
+  <aside id="side">
+    <div class="brand"><div class="logo">⟨ψ⟩</div>BadaClaude</div>
+    <button class="newchat" id="newchat">＋ 新しいチャット</button>
+    <nav class="tabs" id="tabs">
+      <button data-v="chat" class="on">💬 チャット</button>
+      <button data-v="editor">⌨ Bada エディタ</button>
+      <button data-v="eqs">∑ 方程式レジストリ</button>
+      <button data-v="ledger">Ω 台帳</button>
+      <button data-v="brain">🧠 brain.bada</button>
+    </nav>
+    <div class="hist-h">履歴</div>
+    <div class="hist" id="hist"></div>
+    <div class="foot">量子プログラミング言語 Bada 製 · <span id="ver"></span></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <main>
+    <header>
+      <button class="icon menu" id="menu" aria-label="メニュー">☰</button>
+      <div class="title" id="title">新しいチャット</div>
+      <span class="badge" id="badge">ローカル Bada エンジン</span>
+      <button class="icon" id="theme" aria-label="テーマ">◐</button>
+      <button class="icon" id="gear" aria-label="設定">⚙</button>
+    </header>
+
+    <section class="view on" id="v-chat">
+      <div id="msgs"><div class="wrap" id="thread"></div></div>
+      <div class="composer">
+        <div class="box">
+          <textarea id="inp" rows="1" placeholder="BadaClaude にメッセージを送る (Shift+Enter で改行)"></textarea>
+          <button class="send" id="send" aria-label="送信">↑</button>
+        </div>
+        <div class="hint" id="hint">ローカルモード: 同梱の論文と方程式、Bada の数値核だけで答えます。</div>
+      </div>
+    </section>
+
+    <section class="view" id="v-editor">
+      <div class="pane">
+        <h2>Bada エディタ</h2>
+        <p class="sub">BadaClaude の頭脳と同じ処理系で Bada プログラムを実行します。</p>
+        <div class="row">
+          <select id="ex"></select>
+          <button class="btn primary" id="runbtn">▶ 実行</button>
+          <span class="sub" id="runinfo"></span>
+        </div>
+        <div class="ed"><textarea id="code" spellcheck="false"></textarea><pre id="out"></pre></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-eqs">
+      <div class="pane">
+        <h2>方程式レジストリ</h2>
+        <p class="sub" id="eqsub"></p>
+        <div class="row">
+          <input type="search" id="eqq" placeholder="検索 (例: ζ, beta, ACAFE, Jones)">
+          <select id="eqst"><option value="">すべての判定</option><option value="holds">成立</option><option value="differs">不成立</option><option value="calc">数値評価</option><option value="symb">記号式</option></select>
+          <select id="eqtag"><option value="">すべてのタグ</option></select>
+        </div>
+        <div id="eqlist"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-ledger">
+      <div class="pane">
+        <h2>Ω::DATABASE — append-only 台帳</h2>
+        <p class="sub">頭脳が行った commit (起動・各ターン・学習・Claude 応答) の記録です。追記のみで、書き換えはできません。</p>
+        <div class="led" id="led"></div>
+      </div>
+    </section>
+
+    <section class="view" id="v-brain">
+      <div class="pane">
+        <h2>brain.bada</h2>
+        <p class="sub">この対話エンジンのパイプライン全体 (Bada で記述)。ホストの JavaScript は Bada 処理系と I/O だけを担います。</p>
+        <div class="src" id="brainsrc"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg" id="dlgform">
+    <h3>設定</h3>
+    <label>応答エンジン</label>
+    <div class="radio">
+      <label><input type="radio" name="mode" value="local"> ローカル Bada エンジン</label>
+      <label><input type="radio" name="mode" value="llm"> Claude API (Bada パイプライン経由)</label>
+    </div>
+    <small>どちらのモードでも、検索・計算・量子回路・コード実行は Bada の頭脳が行います。Claude API モードでは、その結果を文脈として Claude に渡し、文章を生成させます。</small>
+    <label for="key">Anthropic API キー</label>
+    <input id="key" type="password" autocomplete="off" placeholder="sk-ant-...">
+    <small>キーはこの端末のアプリ内保存領域にだけ保存され、送信先は https://api.anthropic.com のみです。共有端末では使わないでください。</small>
+    <label for="model">モデル</label>
+    <select id="model">
+      <option value="claude-opus-5-5">Claude Opus 5.5 (claude-opus-5-5)</option>
+      <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (claude-sonnet-5-5)</option>
+      <option value="claude-haiku-4-5">Claude Haiku 4.5 (claude-haiku-4-5)</option>
+    </select>
+    <label for="effort">思考の深さ (effort)</label>
+    <select id="effort"><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select>
+    <div class="acts"><button class="btn" value="cancel">キャンセル</button><button class="btn primary" value="ok" id="save">保存</button></div>
+  </form>
+</dialog>
+
+<script type="application/json" id="kb-data">/*__KB__*/</script>
+<script type="text/bada" id="brain-src">/*__BRAIN__*/</script>
+<script>
+/*__ENGINE__*/
+</script>
+<script>
+/*__APP__*/
+</script>
+</body>
+</html>
