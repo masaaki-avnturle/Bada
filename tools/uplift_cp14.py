@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Contrapunctus 14 (Bach + completion) re-made as a hypnotic, rising piece in C major built around C and G.
+"""Contrapunctus 14 (Bach + completion) re-made as a hypnotic, rising piece in C major built around C and G
+(or, with --minor, as a fugue in C minor over the same C-G pulse; only the final chord turns to C major).
 
 * The whole fugue is moved from D minor to C major: down a whole tone, then the minor third, sixth and seventh
   (E-flat, A-flat, B-flat) are raised to E, A, B.
@@ -17,6 +18,7 @@ PULSE = 0.5
 VEL = {"S": 58, "A": 52, "T": 52, "B": 58}
 DISS = {1, 2, 6, 10, 11}
 TO_MAJOR = {3: 4, 8: 9, 10: 11}  # after the transposition to C: Eb->E, Ab->A, Bb->B
+MINOR = "--minor" in sys.argv  # keep C minor: a fugue in C minor, pulse a little softer
 
 
 def main(src, out):
@@ -24,7 +26,8 @@ def main(src, out):
     for s, d, p, v in json.load(open(src)):
         p2 = p - 2
         pc = p2 % 12
-        p2 += TO_MAJOR.get(pc, pc) - pc
+        if not MINOR:
+            p2 += TO_MAJOR.get(pc, pc) - pc
         notes.append([s * Q, (s + d) * Q, p2, VEL[v]])
     end = max(n[1] for n in notes)
 
@@ -45,7 +48,7 @@ def main(src, out):
             if cands:
                 p = min(cands, key=lambda q: abs(q - base))
         r = ramp(t)
-        vel = int(34 + 34 * r + (6 if k % 8 == 0 else 0))
+        vel = int(34 + 34 * r + (6 if k % 8 == 0 else 0)) - (8 if MINOR else 0)
         pulses.append([t, t + PULSE * 0.9, p, vel])
         if r > 0.35:
             pulses.append([t, t + PULSE * 0.9, p + 12, int(vel * 0.8)])  # octaves as the energy rises
@@ -88,4 +91,4 @@ def main(src, out):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(*[a for a in sys.argv[1:] if not a.startswith("--")][:2])
