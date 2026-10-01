@@ -1807,6 +1807,26 @@ python3 compose_tablet67.py level score_tablet73.json back.wav <peak> 0.055     
 python3 synth.py score_tablet73.json tablet73.wav && python3 video.py score_tablet73.json tablet73.wav tablet73.mp4
 ```
 
+## 🎼🕯 Requiem BADA — Tablet Sessions LXXIV · Symphonia (LXVIII〜LXXIII を 1 つの交響曲に, 4 楽章, ♩=60, 約 21 分 36 秒)
+
+LXVIII〜LXXIII はどれも ♩=60 (1 小節 = 4 秒) で、主題曲 (ピアノの実音の録音) の主題を 16 倍 (LXVIII は 8 倍) に伸ばして打ち直し、
+先程の曲をバックに流し、保続音の上でフーガの主題が入る — 同じ作りなので、区間の切れ目 (小節の頭) で切って並べると打鍵の脈が途切れずにつながる。
+`compose_tablet74.py` はその楽譜をそのまま切り出して 1 つの楽譜にまとめ (音・録音の抜粋・区間・和声・主題の入りを時間をずらして写し、
+切れ目にかかる録音は静かに消す)、全部の録音を含むサンプラー (bank74) でもう一度合成する。楽章の間は 1 小節の休み。
+
+| 楽章 | 調 | 組み立て (もとの曲の区間) | 主題曲 |
+|:--|:--|:--|:--|
+| I. Introduzione e Allegro | ホ短調 | LXVIII の Adagio ×8 (フーガ入り) → LXIX の Introitus・×16・Fuga | 9/23 08:09 |
+| II. Adagio lamentoso | 変ロ短調 | LXX の Introitus・×16・Lacrimosa | 9/23 08:06 |
+| III. Scherzo fugato | ヘ短調 | LXXI の ×16 (下りる主題)・Fuga → LXXII の Fuga (上る主題)・Lacrimosa | 9/25 12:46 |
+| IV. Finale a tre soggetti | ヘ短調 → ホ短調 → ホ長調 | LXXIII の Introitus・×16 (A)・Interludium・三重フーガ・×16 (C)・Amen | 9/24 08:49・08:53、9/23 08:09 |
+
+```bash
+python3 build_sampler.py bank74 20260923_080607.mp3 20260923_080918.mp3 20260924_084937.mp3 20260924_085314.mp3 20260929_*.mp3 20260925_*.mp3
+# scores.json: {"68": "score_tablet68.json", …, "73": "score_tablet73.json"}
+python3 compose_tablet74.py bank74/bank.json scores.json score_tablet74.json && python3 synth.py score_tablet74.json tablet74.wav && python3 video.py score_tablet74.json tablet74.wav tablet74.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
