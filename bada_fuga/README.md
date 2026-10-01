@@ -1677,6 +1677,28 @@ python3 compose_tablet67.py level score_tablet67.json conv.wav
 python3 synth.py score_tablet67.json tablet67.wav && python3 video.py score_tablet67.json tablet67.wav tablet67.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions LXVIII · Fuga (Klavier) (LXVII の全音符を 2 倍に伸ばし、フーガを醸す曲に, ♩=60, 約 21 分)
+
+LXVII (すべて実音のピアノの交響曲) をもとに、**全音符を 2 倍に** (拡大 — 「フーガの技法」コントラプンクトゥス VII のように) して、長い音の上で **フーガ** が入るようにした。
+
+- I・II 楽章の ×4 (4 分音符が全音符) を **×8** (全音符が 2 全音符 = 2 小節) に。深い鐘 (バス) も全音符から 2 全音符 (2 小節ごと) に。伸ばした音はテノールが 4 分音符ごとに打ち直す
+- ×8 の 4 つの区間すべてで、伸ばした主音・属音 (保続音) の上にフーガの主題が入る (`fugato()`):
+
+| 伸ばした音 | フーガ |
+|:--|:--|
+| 最初のレ (6 小節) | 主題 I がアルトで入り、ソプラノが対位法で応える |
+| ラ (属音、4 小節) | 主題 III (B-A-D-A) がソプラノで |
+| 最後のレ (8 小節) | 主題 I と主題 II を同時に (二重フーガ) |
+
+- ほかの長い音の中では、LXVII と同じく提出した曲をピアノで弾き直したもの (`compose_tablet67.convert`) が鳴る。III 楽章 (ハ長調 ×8)・IV 楽章 (ニ短調 ×16、最後は三重フーガ) は LXVII と同じ形で、深い鐘だけ 2 全音符に
+- フーガの主題 (ソプラノ・アルト) は少し前に出す。すべて録音から切り出したピアノの実音
+
+```bash
+python3 compose_tablet68.py bank61/bank.json src sources.json score_tablet68.json
+python3 compose_tablet67.py level score_tablet68.json conv.wav     # ピアノに直した所だけを鳴らした wav で、抜粋の大きさをそろえる
+python3 synth.py score_tablet68.json tablet68.wav && python3 video.py score_tablet68.json tablet68.wav tablet68.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
