@@ -1990,6 +1990,27 @@ python3 compose_tablet82.py bank82/bank.json score_tablet82.json && python3 synt
 python3 compose_tablet83.py bank82/bank.json score_tablet83.json && python3 synth.py score_tablet83.json tablet83.wav && python3 video.py score_tablet83.json tablet83.wav tablet83.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions LXXXIV · Requiem e Fuga grande (LXXXIII を、レクイエムを額縁に、主体をフーガに, ロ短調, ♩=60, 7 分 4 秒)
+
+- LXXXIII と同じ 9/25 12:50:36 の 8.6 秒の録音・同じ主題 (レ・ファ#・シ・レ・シ・ファ#・ラ#・ファ#・ラ#・シ)。レクイエムは初めと終わりの静かな額縁にして、その間を **86 小節の大きなフーガ** に
+- **Introitus** (録音そのもの) → **I. Requiem ×4** (17 の和音を 4 倍に、主題は 2 回だけ遠くから)
+- **II. Fuga** (主体):
+  1. 提示 (4 声、下属調の入り、ストレッタ、保続低音) 16 小節
+  2. 間奏 — 録音の和音の進みの上で、主題の頭 (分散和音の 3 音) が声部から声部へ 8
+  3. 転回のフーガ — 主題を音階の上で上下に返した主題 (シ♭・ソ・レ・シ♭・レ・ソ・ミ・ソ・ミ・レ をエンジンのニ短調で = 下りる分散和音) 16
+  4. 二重フーガ — 上る主題と下りる転回を反行で同時に 8
+  5. 拡大 — バスが主題を 4 倍で (Requiem の伸ばしの記憶)、続いてテノールが 2 倍で、その上で 1 倍の主題 16
+  6. ストレッタ — 1 小節半ずつ: 前の入りの終わりの主音 (2 拍) に次の入りの分散和音が重なるので、ぶつからずに 7 回つながる 12
+  7. 属音の保続 → 主音の保続の上で 2 倍の主題 10
+- **III. Requiem aeternam ×2** (録音を 2 倍で静かに) → **Amen** (ロ長調の和音)
+- 拡大とストレッタの 1 倍の入りは、5 度・4 度の移しとオクターヴの中から、ほかの入りと 2 度でぶつかる長さがいちばん短い高さを選ぶ (強拍の不協和 44 → 21、残りはほぼ主音の保続の上の A7)
+- 音域: LXXXII/LXXXIII の「1 オクターヴ下」はフーガが C1〜C4 に詰まって濁ったので、普通の 4 声の音域に (ソプラノの中央ファ# 4、バスの中央ファ# 2)。
+  高音は抑えたまま: いちばん上はミ 5、それより上に出る入りは入りごとオクターヴ下へ。音量はレクイエム約 −24 dB → フーガで −17 dB まで → 終わりで静まる。すべてピアノの実音
+
+```bash
+python3 compose_tablet84.py bank82/bank.json score_tablet84.json && python3 synth.py score_tablet84.json tablet84.wav && python3 video.py score_tablet84.json tablet84.wav tablet84.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
