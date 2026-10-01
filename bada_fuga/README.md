@@ -1607,6 +1607,34 @@ LXIII の 2 つの主題 (15:16・15:12、`smooth()` でなめらかにしたも
 python3 compose_tablet64.py bank61/bank.json score_tablet64.json && python3 synth.py score_tablet64.json tablet64.wav && python3 video.py score_tablet64.json tablet64.wav tablet64.mp4
 ```
 
+## 🌀📜 Requiem BADA — Tablet Sessions LXV · Summa per augmentationem (これまでの曲を 1 曲に — 主題 I を 4 倍・16 倍に伸ばし、その中に fuga を, ニ短調, ♩=60, 約 8 分 27 秒)
+
+requiem.mp4・fuga.mp4・tablet.mp4・tablet4〜6.mp4・LXIV を 1 曲にまとめた洗脳的なレクイエムとフーガ。
+骨組みは fuga.mp4 (Contrapunctus BADA) の **主題 I** (レ・ミ・ファ・ファ#・ソ・ラ・ソ・ファ・ミ・レ・ド#・レ) の拡大:
+
+- **Augmentatio ×4**: 4 分音符が全音符に (20 小節)。**Augmentatio ×16**: 4 分音符が 4 小節に (80 小節)
+- 伸ばした音は、テノールがピアノで 4 分音符ごとに打ち直す (♩=60 = 1 秒に 1 打、止まらない)。バスは 2 オクターヴ下で小節の頭だけ (深い鐘)。和声も主題 I のもとの和声を 4 倍・16 倍に伸ばす
+- **16 倍に伸ばしている音の中に fuga**:
+
+| 16 倍の音 | その中で鳴るもの |
+|:--|:--|
+| レ (12 小節) | fuga.mp4 の提示部 |
+| ミ・ファ | tablet.mp4 (Tablet Sessions I, 全音下げ) |
+| ファ#・ソ / ミ | ピアノの 4 声の自由な対位法 + 分散和音 |
+| ラ (属音の保続) | fuga.mp4 の三重結合のあたり |
+| ソ・ファ | tablet5.mp4 (V, 短 3 度下げ) |
+| レ・ド# | tablet4.mp4 (IV, 全音下げ) |
+| 最後のレ (16 小節、主音の保続) | 主題 I・II・III (B-A-D-A) の三重フーガをピアノで 2 回 |
+
+- 形式: Introitus (requiem.mp4 の始まり) → Augmentatio ×4 → Lacrimosa (tablet6.mp4, 短 3 度下げ) → Augmentatio ×16 con Fuga → LXIV の Canon II の終わり → Amen (ニ長調)
+- mp4 の音は `REC` の抜粋として流し (`tag` で曲名を表示)、`semis` でテープのように調をニ短調へ合わせる。新しく足した音はすべて録音から切り出したピアノの実音 (bank61)
+- 別の場所で作った「コントラプンクトゥス XIV の 4 倍・16 倍」の曲そのものはこのリポジトリにも Bada_Music にもなかったので、その技法 (4 倍・16 倍の拡大と、16 倍の音の中のフーガ) をここで作り直した
+
+```bash
+# 素材: requiem.mp4・fuga.mp4・tablet.mp4・tablet4〜6.mp4 の音を 44.1 kHz の wav に (src/requiem.wav など)、LXIV の tablet64.wav も src/ に
+python3 compose_tablet65.py bank61/bank.json src score_tablet65.json && python3 synth.py score_tablet65.json tablet65.wav && python3 video.py score_tablet65.json tablet65.wav tablet65.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
