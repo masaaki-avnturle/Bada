@@ -2011,6 +2011,25 @@ python3 compose_tablet83.py bank82/bank.json score_tablet83.json && python3 synt
 python3 compose_tablet84.py bank82/bank.json score_tablet84.json && python3 synth.py score_tablet84.json tablet84.wav && python3 video.py score_tablet84.json tablet84.wav tablet84.mp4
 ```
 
+## 🎹🌸 Requiem BADA — Tablet Sessions LXXXV · Fiore dolce (11 曲の録音 × 坂本龍一「Sweet Revenge」「Flower is not a Flower」の曲調, ホ短調, ♩=66/60, 3 分 58 秒)
+
+- 坂本龍一の 2 曲からは **曲調だけ** を借りる (旋律・音源は使わない、引用しない):
+  - **Sweet** — ゆっくりした短調のバラード。Em7 → Cmaj7 → Am7 → B7 の 4 小節の循環和音 (7・9 の響き)、左手は根音のあとに 8 分音符で揺れる分散和音
+  - **Flower** — 五音音階 (ミ・ソ・ラ・シ・レ) の東洋的な旋律、空虚 5 度の低音と 4 度を重ねた和音、間をとった遅いテンポ (♩=60、句の終わりで息をつく)、
+    Cmaj7 → D → Bm7 → Em (IV → V → iii → vi) の進み
+- **旋律はすべてユーザーの 11 曲の録音から**: 採譜の最上声 (同じ音の打ち直しは 1 つに) で、いちばん歌う 16 拍 (順次進行が多く、音の種類が多く、音域が 14 半音以内) を探し、
+  8 分音符に揃えてホ短調 (長調の録音はト長調) に移し、Sweet ではホ短調の音階、Flower では五音音階に寄せる。1 音目をラ 4 のあたりに置き、あとは前の音にいちばん近いオクターヴへ (流れる線に)。
+  9/28 17:46 (歌) は LXXXI で採った代表の節を 2 倍の長さで
+- 小節ごとの和音は、循環和音の型 (Em7 / Cmaj7 / Am7 / B7 の系統) を守りながら、旋律と半音でぶつからない和音を候補から選ぶ。伴奏は旋律と半音でぶつかる音を抜く
+- 形式: **Intro** (9/24 11:21 の実音を半音下げて) → **I. Sweet** (08:53・08:09・13:04・11:18) → **II. Flower** (06:42・11:23・12:46・17:46) →
+  **III. Fuga dolce** (08:49・08:06・11:21 の旋律に、同じ旋律が 1 小節遅れてオクターヴ下で応えるカノン) → **IV. Sweet ritorno** (08:53、2 回目はオクターヴ下を重ねて) → **Coda** (Em9 で開いたまま)
+- 旋律の音はそれぞれの録音から切り出した 1 音 (画面の色 = 録音)。伴奏は旋律より約 6 dB 下。音域はミ 1〜ミ 5 (高音を抑えて)。すべてピアノの実音
+
+```bash
+python3 build_sampler.py bank85 <11 曲の録音.mp3>
+python3 compose_tablet85.py bank85/bank.json score_tablet85.json && python3 synth.py score_tablet85.json tablet85.wav && python3 video.py score_tablet85.json tablet85.wav tablet85.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
