@@ -14,7 +14,7 @@ Requiem BADA — Tablet Sessions LXVII · Symphonia per augmentationem (Klavier)
   使い方:
     python compose_tablet67.py <bank61.json> <素材の wav フォルダ> <sources.json> [score_tablet67.json]
       sources.json: {"symphony.wav": {"score": "…/score_symphony.json"}, "cp14_x8_part3.wav": {"transcribe": true}, …}
-    python compose_tablet67.py level <score_tablet67.json> <ピアノに直した所だけの wav> <その wav を書いたとき synth.py が表示した peak>   (抜粋ごとの大きさをそろえる、2 回目)
+    python compose_tablet67.py level <score_tablet67.json> <ピアノに直した所だけの wav> <その wav を書いたとき synth.py が表示した peak> [大きさ, 既定 0.07]   (抜粋ごとの大きさをそろえる、2 回目)
 """
 import sys, os, re, json
 import numpy as np
@@ -30,6 +30,7 @@ if len(sys.argv) > 1 and sys.argv[1] == 'level':
     d = json.load(open(score)); y, sr = sf.read(stem); y = y.mean(1) if y.ndim > 1 else y
     # synth.py は書き出す前に正規化するので、表示した peak (正規化の前の大きさ) で元に戻す。ない時は書き出した wav の最大値 (相対の比べだけ正しい)
     peak = float(sys.argv[4]) if len(sys.argv) > 4 else float(np.abs(y).max())
+    if len(sys.argv) > 5: TARGET = float(sys.argv[5])                 # 抜粋の大きさ (バックとして小さくしたい時など)
     y = np.arctanh(np.clip(y * np.tanh(1.15), -.999, .999)) / 1.15 / .89 * peak
     wins = {}
     for e in d['extras']:

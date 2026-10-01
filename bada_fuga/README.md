@@ -1782,6 +1782,31 @@ python3 synth.py score_tablet71.json tablet71.wav && python3 video.py score_tabl
 python3 compose_tablet72.py bank61/bank.json src score_tablet72.json && python3 synth.py score_tablet72.json tablet72.wav && python3 video.py score_tablet72.json tablet72.wav tablet72.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions LXXIII · Requiem a tre soggetti (9/24 08:49・08:53、9/23 08:09 の 3 本を主題曲に、16 倍に伸ばし、LXXII をバックに, ♩=60, 約 9 分 15 秒)
+
+3 本の録音 (ピアノの実音) から 3 つの主題を作り、コントラプンクトゥス XIV のような **三重フーガのレクイエム** に:
+
+| 主題 | 録音 | 主題 (8 拍) | ×16 にした楽章 |
+|:--|:--|:--|:--|
+| A | 9/24 08:49 (ヘ短調) | ファ・ラ♭・シ♭・レ♭・ファ と上る | I. Requiem (ヘ短調): レ 8・ファ 2・ソ 2・シ♭ 8・レ 12 小節 |
+| B | 9/24 08:53 (ホ短調) | ミ・ファ#・シ・ミ・ミ と上る | II. Adagio (ホ短調): 4・12・6・6・4 小節 |
+| C | 9/23 08:09 (ホ短調) | シ・ラ・シ・ソ・ド・ミ | IV. Finale (ホ短調): 2・2・12・6・6・4 小節 |
+
+- **16 倍の伸び**: テノールが 4 分音符ごとに打ち直し (♩=60)、深い鐘は 2 全音符ごと。各 ×16 の頭で主題 → 5 度上の答え、長い音の上でストレッタ、最後の主音の上で 1 倍と 2 倍 (拡大) の主題
+- **バック (LXXII、ヘ短調)**: ヘ短調の I 楽章では音をそのまま、ホ短調の II・IV 楽章では採譜して **1 半音下げ**、ピアノの実音で弾き直す。
+  伸ばした長い音と同じ働きの所 (主音・属和音・VI) を LXXII から選んで重ねる。主題曲の実音より約 1〜4 dB 小さく
+- **III. Fuga a tre soggetti**: A・B・C を順に提示 (A と B は 4 声の提示、C は 2 声) し、最後の 4 小節で 3 つを同時に重ねる (2 回、声部を入れ替えて)
+- IV 楽章の最後の主音の上では、主題 A と C がソプラノに、C の 2 倍がアルトに — 3 本の主題曲が集まって終わる
+- 形式: Introitus (08:49) → I. ×16 (A) → Interludium (08:53 の実音、半音下のホ短調へ) → II. ×16 (B) → III. 三重フーガ → IV. ×16 (C) → Amen (ホ長調)
+
+```bash
+python3 build_sampler.py bank73 20260924_084937.mp3 20260924_085314.mp3 20260923_080918.mp3 20260929_151249.mp3 20260929_151602.mp3 20260925_130431.mp3 20260925_124643.mp3
+# src/ に 3 本の録音の wav と tablet72.wav (LXXII)
+python3 compose_tablet73.py bank73/bank.json src score_tablet73.json
+python3 compose_tablet67.py level score_tablet73.json back.wav <peak> 0.055     # LXXII を弾き直した所だけを鳴らした wav で、バックとして少し小さめにそろえる
+python3 synth.py score_tablet73.json tablet73.wav && python3 video.py score_tablet73.json tablet73.wav tablet73.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
