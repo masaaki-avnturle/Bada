@@ -42,6 +42,31 @@
 日本語の要求文の解析 (キーワードの前後の数値・倍率・「」の名前・否定・書き出し形式・視点) も Bada で書いています ([`lib/nlp.bada`](bada/lib/nlp.bada))。
 ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じく `ui_*` で画面を宣言し、`build()` / `frame(t)` / `sheet_draw` で 3D と図面を作ります。
 
+## 論文 PDF を投稿して、アプリを作ってダウンロード
+
+3 アプリとも **「📄 論文→アプリ」タブ** で論文の PDF を投稿できます (ドロップまたは「PDF を選ぶ」。同梱の設計図書で試すボタンもあります)。
+
+1. **読む** — pdf.js (日本語 CMap 同梱、オフライン) で本文を取り出し、[`src/paper.js`](src/paper.js) が題名・方程式
+   (登録簿形式 / 本文中の数式)・数値パラメータ (「記号 = 数値 単位」)・分類を抽出し、数式の両辺を数値評価して成立 / 不成立を判定
+2. **Bada でアプリを書く** — [`lib/paper.bada`](bada/lib/paper.bada) が論文のデータを Bada のリテラルとして埋め込んだアプリを書く:
+   **方程式多様体アプリ** (方程式を Jones 結び目の上に並べた 3D・分類リング・数値パラメータの柱・A3 図面・「式 3」「ζ を含む式」に答える `on_request`)、
+   **論文から設計した UFO**、**論文から設計した異次元輸送機**。ContactGPT に「論文からアプリを作って」「この論文の○○について」と頼むこともできます
+3. **ダウンロード フォルダへ保存** ([`src/exporters.js`](src/exporters.js))
+
+| ボタン | 保存されるもの |
+|:--|:--|
+| 作ったアプリ | Bada ソース `paper_*.bada` |
+| 単体アプリ | `paper_*.html` — Bada 処理系 + 作ったアプリ入りの 1 ファイル。どの端末のブラウザでも動く |
+| Android アプリ | `paper_*.apk` — ランナー APK の `assets/www/index.html` を差し替え、APK v1 (JAR) 署名 ([デバッグ鍵](app/signing/)) |
+| Linux アプリ | `bada-paper-*_1.0.0_all.deb` — `sudo apt install ./….deb` でアプリ一覧に入る (Chromium / Firefox / xdg-open で起動) |
+| 設計書 PDF | `paper_*_report.pdf` — 表紙・3D (等角図)・A3 図面・方程式・Bada ソースのページ |
+| 論文 PDF | 投稿した PDF (原本) |
+
+保存先: Windows / Linux (Electron) は OS の **ダウンロード** フォルダ、Android は `Download/` (書けない機種ではアプリ専用フォルダ)、ブラウザは既定のダウンロード先。
+※ 論文から作った APK はすべて同じパッケージ ID (`io.github.masaaki_avnturle.badapaperapp`) なので、新しく入れると前のものを置き換えます。
+
+**Actions でも作れます**: [`papers/`](papers/) に PDF を置いて push すると、`paper-apps` ジョブが同じ一式を作り Artifacts **`PaperApps`** に置きます。
+
 ## ダウンロード (GitHub Actions) — 3 つのアプリ
 
 リポジトリの **Actions** → **「Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 …)」** →
@@ -53,6 +78,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | **輸送機 3D CAD** | `TransporterCAD-android-apk` | `TransporterCAD-windows-exe` | `TransporterCAD-linux` |
 | **UFO 設計図面** | `UFODesigner-android-apk` | `UFODesigner-windows-exe` | `UFODesigner-linux` |
 | 統合版 (3 アプリ入り) | `ContactTransporterStudio-android-apk` | `ContactTransporterStudio-windows-exe` | `ContactTransporterStudio-linux` |
+| 論文 PDF から作ったアプリ | `PaperApps` (論文ごとに `.apk` / `.deb` / `.html` / `.bada` / 図面 / 論文 PDF) | ← | ← |
 
 - **Android**: zip を展開して `…-android.apk` を開く (提供元不明のアプリのインストールを許可)
 - **Windows 10 / 11**: `…-1.0.0-x64.exe` はインストーラ、`…-1.0.0-portable.exe` はインストール不要
@@ -138,8 +164,10 @@ contact_transporter/
   contact_blueprint.pdf        元の設計図書
   bada/  apps/ (contactgpt · transporter · ufo)  lib/ (complex · zeta · jones · quantum · blueprint · ufo_flight · nlp · codegen)  examples/
   data/  equations.json  contactgpt_weights.json  contact_blueprint.txt
-  src/   bada.js badalib.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
+  src/   bada.js badalib.js  paper.js exporters.js  physics.js gpt.js chat.js cad.js drafting.js viewer.js app.js index.html style.css
   tools/ build.js package-app.js test.js conformance.py badahost.js train.js gradcheck.js extract_equations.py
+         paper2app.js paperinfo.js verify-apk.js   (論文 PDF → アプリ)
+  papers/  論文 PDF の投稿先 (Actions が PaperApps を作る)   app/signing/  論文アプリ APK のデバッグ署名鍵
   apps.json  3 アプリ + 統合版の定義 (名前・アプリ ID・含める画面)
   app/   electron/ (Windows / Linux)   cordova/config.xml (Android)
 ```

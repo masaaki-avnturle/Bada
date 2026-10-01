@@ -53,5 +53,7 @@ let cfg = fs.readFileSync(path.join(ROOT, "app", "cordova", "config.xml"), "utf8
 cfg = cfg.replace(/<widget id="[^"]*"/, `<widget id="${A.id}"`)
   .replace(/<name>[^<]*<\/name>/, `<name>${xml(A.name)}</name>`)
   .replace(/<description>[^<]*<\/description>/, `<description>${xml(A.description)}</description>`);
+// 論文から作ったアプリの APK (ランナー) は v1 (JAR) 署名で配るため targetSdk 29 にする
+if (A.targetSdk) cfg = cfg.replace('<preference name="android-minSdkVersion" value="24" />', `<preference name="android-minSdkVersion" value="24" />\n  <preference name="android-targetSdkVersion" value="${A.targetSdk}" />`);
 fs.writeFileSync(path.join(C, "config.xml"), cfg);
 console.log(`${A.name}: dist/${key}/electron (appId ${A.id}) + dist/${key}/cordova/config.xml`);

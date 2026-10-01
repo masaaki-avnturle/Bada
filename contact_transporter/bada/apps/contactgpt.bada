@@ -14,6 +14,7 @@
 #include lib/ufo_flight.bada
 #include lib/quantum.bada
 #include lib/codegen.bada
+#include lib/paper.bada
 
 say "ContactGPT — 量子プログラミング言語 Bada で動く対話エンジン"
 
@@ -34,6 +35,12 @@ i <- 0
 
 // ---------------------------------------------------------------- 対話
 def on_message(q) {
+  // ⓟ 投稿された論文 PDF についての質問・アプリ作成
+  -< paper_loaded() {
+    -< has_any(q, ["論文", "PDF", "pdf", "投稿"]) {
+      return on_paper(q)
+    }
+  }
   // ⓪ アプリ作成の要求 → Bada のプログラムを書く
   app <- codegen(q)
   -< app != nil {
@@ -254,4 +261,53 @@ def generate(prompt) {
     }
   }
   return trim(out)
+}
+
+// ---------------------------------------------------------------- 投稿された論文
+def on_paper(q) {
+  info <- paper_info()
+  -< is_build_request(q) {
+    kind <- "manifold"
+    -< has_any(q, ["UFO", "ufo", "円盤"]) {
+      kind <- "ufo"
+    }
+    -< has_any(q, ["輸送機", "トランスポーター", "CAD"]) {
+      kind <- "transporter"
+    }
+    app <- paper_app(kind)
+    file_write(app[0], app[1])
+    chat_reply("**論文「" + info[0] + "」から Bada でアプリを書きました** — " + app[3] + "\n`" + app[0] + "` (" + str(len(split(app[1], "\n"))) + " 行)。「📄 論文→アプリ」タブで APK / Linux / HTML / 設計書 PDF としてダウンロードできます。")
+    chat_code(app[0], app[1], app[2], app[3])
+    return nil
+  }
+  st <- paper_stat()
+  tags <- paper_tags()
+  top <- ""
+  i <- 0
+  -> i < min2(4, len(tags)) {
+    top <- top + tags[i][0] + " " + str(tags[i][1]) + "  "
+    i <- i + 1
+  }
+  chat_reply("**論文「" + info[0] + "」** (" + info[1] + ", " + str(info[2]) + " ページ): 方程式 " + str(info[3]) + " 本 (記号式 " + str(st[0]) + " / 数値評価 " + str(st[1]) + " / 成立 " + str(st[2]) + " / 不成立 " + str(st[3]) + ")。多い分類: " + top)
+  ps <- paper_params(6)
+  -< len(ps) > 0 {
+    t <- ""
+    i <- 0
+    -> i < len(ps) {
+      t <- t + ps[i][0] + " = " + str(ps[i][1]) + " " + ps[i][2] + "   "
+      i <- i + 1
+    }
+    chat_reply("本文の数値パラメータ: " + t)
+  }
+  // 質問の言葉で論文の式を検索
+  w <- trim(replace(replace(replace(q, "論文", ""), "の", " "), "？", ""))
+  hits <- paper_search(w, 4)
+  i <- 0
+  -> i < len(hits) {
+    e <- paper_eq(hits[i])
+    chat_reply("`" + e[0] + "` [" + join(e[2], ", ") + ", " + e[1] + ", p." + str(e[5]) + "] " + e[3] + "  " + e[4])
+    i <- i + 1
+  }
+  chat_reply("「論文からアプリを作って」「論文からUFOを設計して」と頼むと、この論文の Bada アプリを書きます。")
+  return nil
 }

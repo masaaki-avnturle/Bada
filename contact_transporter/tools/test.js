@@ -217,12 +217,71 @@ truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"
 const dist = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
 if (fs.existsSync(dist)) {
   const h = fs.readFileSync(dist, "utf8");
-  truthy("dist/www/index.html にプレースホルダが残っていない", !/\/\*@@[A-Z_]+@@\*\//.test(h));
+  truthy("dist/studio/www/index.html にプレースホルダが残っていない (書き出し用の PAYLOAD 以外)", !/\/\*@@(?!PAYLOAD@@)[A-Z_]+@@\*\//.test(h));
   const scripts = h.match(/<script>([\s\S]*?)<\/script>/g) || [];
   let ok = true;
   for (const s of scripts) { try { new Function(s.slice(8, -9)); } catch (e) { ok = false; console.log(e.message); } }
   truthy(`埋め込みスクリプト ${scripts.length} 個が構文的に正しい`, ok);
 }
 
-console.log(`\n${pass} passed, ${fail} failed`);
-process.exit(fail ? 1 : 0);
+// ---- 論文 PDF → アプリ / 書き出し (非同期)
+(async () => {
+  const X = require("../src/exporters.js"), Lb = require("../src/badalib.js"), B = require("../src/bada.js");
+  const { loadPaper } = require("./paperinfo.js");
+  const qw = console.warn; console.warn = () => {};
+  const qlog = console.log; console.log = (...a) => { if (!/polyfill|Require stack|^- \//.test(String(a[0]))) qlog(...a); };
+  const paper = await loadPaper(path.join(__dirname, "..", "contact_blueprint.pdf"));
+  console.warn = qw;
+  near("[論文] contact_blueprint.pdf から方程式を抽出", paper.equations.length, 2111, 0);
+  const st = new Map(eqs.map((e) => [e.id, e.status]));
+  truthy("[論文] 全 2111 本の状態 (symb/calc/holds/differs) が設計図書と一致", paper.registry && paper.equations.every((e) => st.get(e.id) === e.status));
+  truthy(`[論文] 題名「${paper.title}」`, paper.title.includes("Contact Transporter"));
+  truthy("[論文] 数値パラメータ Γ = 64800 を本文から読む", paper.params.some((x) => x.name === "Γ" && x.value === 64800));
+  near("[論文] 数式の数値評価 2^10 + √16 = 1028", require("../src/paper.js").evalNum("2^10 + √16"), 1028, 0);
+  const files = H.badaFiles();
+  const vm = new B.BadaVM({ host: Lb.makeHost({ files, ui: {}, chat: {}, paper: () => paper }), files });
+  vm.load("#include lib/paper.bada\n");
+  for (const kind of ["manifold", "ufo", "transporter"]) {
+    const r = vm.call("paper_app", [kind]);
+    let info = "";
+    try {
+      const env = { files, ui: H.stubUI(), chat: {}, scene: new Lb.Scene(), onError: (e) => { throw e; } };
+      const a = new Lb.BadaApp(env); a.start(r[1], r[0]); a.call("frame", [1]); a.call("make_sheet", []);
+      info = `部品 ${env.scene.parts.size}, 図面 ${env.lastSheet ? "あり" : "なし"}`;
+      truthy(`[論文] Bada が書いた ${kind} アプリ ${r[0]} が動く (${info})`, env.scene.parts.size >= 8 && env.lastSheet);
+      if (kind === "manifold") truthy("[論文]   on_request「一番多い分類は？」→ MANIFOLD", String(a.call("on_request", ["一番多い分類は？"])).includes("MANIFOLD"));
+    } catch (e) { truthy(`[論文] Bada が書いた ${kind} アプリが動く: ${e.message}`, false); }
+  }
+  // 書き出し
+  const enc = (t) => new TextEncoder().encode(t);
+  const zip = await X.writeZip([{ name: "a.txt", data: enc("hello ".repeat(50)) }, { name: "b/c.bin", data: new Uint8Array([1, 2, 3]), store: true }]);
+  const back = X.readZip(zip);
+  truthy("[書き出し] ZIP の書き込み → 読み込み", back.length === 2 && new TextDecoder().decode(await X.entryData(back[0])) === "hello ".repeat(50));
+  const key = { pk8: new Uint8Array(fs.readFileSync(path.join(__dirname, "..", "app", "signing", "debug-key.pk8"))), cert: new Uint8Array(fs.readFileSync(path.join(__dirname, "..", "app", "signing", "debug-cert.der"))) };
+  const tpl = await X.writeZip([{ name: "AndroidManifest.xml", data: enc("<m/>".repeat(30)) }, { name: "resources.arsc", data: enc("R".repeat(200)), store: true }, { name: "assets/www/index.html", data: enc("<html><head></head></html>") }]);
+  const apk = await X.buildApk(tpl, "<html><head></head><body>論文アプリ</body></html>", key);
+  const ents = X.readZip(apk).map((e) => e.name);
+  truthy("[書き出し] APK に MANIFEST.MF / CERT.SF / CERT.RSA と差し替えた index.html", ["META-INF/MANIFEST.MF", "META-INF/CERT.SF", "META-INF/CERT.RSA", "assets/www/index.html"].every((n) => ents.includes(n)));
+  const cp = require("child_process");
+  let hasJar = false; try { cp.execSync("jarsigner -help", { stdio: "ignore" }); hasJar = true; } catch (e) { /* jarsigner なし */ }
+  if (hasJar) {
+    const tmp = path.join(require("os").tmpdir(), "ct_test.apk"); fs.writeFileSync(tmp, apk);
+    const out = cp.execSync(`jarsigner -verify "${tmp}" 2>&1`).toString();
+    truthy("[書き出し] APK の JAR 署名を jarsigner が検証 (jar verified)", out.includes("jar verified"));
+  }
+  const deb = await X.buildDeb({ pkg: "Bada Test", title: "テスト", description: "d", html: "<html></html>" });
+  const debStr = new TextDecoder().decode(deb.bytes.subarray(0, 200));
+  truthy("[書き出し] .deb (ar: debian-binary / control.tar.gz / data.tar.gz)", debStr.startsWith("!<arch>\n") && debStr.includes("debian-binary") && new TextDecoder("latin1").decode(deb.bytes).includes("data.tar.gz") && deb.pkg === "bada-test");
+  const pdf = X.imagePdf([{ jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), w: 10, h: 14 }, { jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), w: 14, h: 10 }], "設計書");
+  const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
+  const d = await pdfjs.getDocument({ data: pdf }).promise;
+  truthy(`[書き出し] 設計書 PDF (画像ページ) を pdf.js が読める: ${d.numPages} ページ`, d.numPages === 2);
+  const runner = path.join(__dirname, "..", "dist", "runner", "www", "index.html");
+  if (fs.existsSync(runner)) {
+    const html = X.standaloneHtml(fs.readFileSync(runner, "utf8"), { title: "T", main: "user/x.bada", files: { "user/x.bada": "say 1" } });
+    truthy("[書き出し] 単体 HTML アプリに Bada ソースを同梱", html.includes('window.CT_PAYLOAD = {"title":"T","main":"user/x.bada","files":{"user/x.bada":"say 1"}}'));
+  }
+  console.log = qlog;
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})().catch((e) => { console.error(e); process.exit(1); });

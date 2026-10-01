@@ -20,6 +20,8 @@
  *   対話      chat_reply chat_ref chat_gen chat_stream chat_code
  *   要求      ui_request (日本語の要求欄 → Bada の on_request(q))  export_file
  *   ファイル  file_write file_read file_exists (Bada が書いたプログラムを保存)
+ *   論文      paper_loaded paper_info paper_eqs paper_eq paper_tags paper_params paper_stat paper_search paper_text
+ *             (投稿された論文 PDF を paper.js が解析したもの)
  *   Bada      bada_expr (式を評価)
  *
  * 環境 (env) の ui / chat / exporter はタブごとの UI アダプタ。Node ではスタブで動く。
@@ -238,6 +240,44 @@
     };
   }
 
+  // 投稿された論文 (env.paper() が paper.js の analyze 結果を返す)
+  function paperLib(env) {
+    const P = () => (env.paper ? env.paper() : null);
+    let idxFor = null, idx = null;
+    const index = () => {
+      const p = P(); if (!p) return null;
+      if (idxFor !== p) {
+        const C = root.CTChat || require("./chat.js");
+        idx = new C.Index(p.equations.map((e) => ({ id: e.id, expr: e.text, tags: e.tags, status: e.status, value: e.value })));
+        idxFor = p;
+      }
+      return idx;
+    };
+    const rec = (e) => [e.id, e.status, e.tags.slice(), e.text, e.value, e.page];
+    return {
+      paper_loaded: () => !!P(),
+      // [題名, ファイル名, ページ数, 方程式数, 登録簿形式か, 種 (ハッシュ)]
+      paper_info: () => { const p = P(); return p ? [p.title, p.file, p.pages, p.equations.length, p.registry, p.hash % 1000003] : null; },
+      // 代表的な式 n 本 (数値評価・成立・不成立の式を優先し、残りは記号式)
+      paper_eqs: (n) => {
+        const p = P(); if (!p) return [];
+        const k = Math.max(1, toNum(n) || 40), num = p.equations.filter((e) => e.status !== "symb"), sym = p.equations.filter((e) => e.status === "symb");
+        const a = num.slice(0, Math.ceil(k / 2)); return a.concat(sym.slice(0, k - a.length)).concat(num.slice(a.length)).slice(0, k).map(rec);
+      },
+      paper_eq: (id) => { const p = P(); const e = p && p.equations.find((x) => x.id.toUpperCase() === String(id).toUpperCase()); return e ? rec(e) : null; },
+      paper_tags: () => { const p = P(); return p ? Object.entries(p.tagCount).sort((a, b) => b[1] - a[1]) : []; },
+      paper_params: (n) => {
+        const p = P(); if (!p) return [];
+        const seen = new Set(), out = [];
+        for (const x of p.params) { if (seen.has(x.name)) continue; seen.add(x.name); out.push([x.name, x.value, x.unit]); if (out.length >= (toNum(n) || 12)) break; }
+        return out;
+      },
+      paper_stat: () => { const p = P(); return p ? [p.stat.symb || 0, p.stat.calc || 0, p.stat.holds || 0, p.stat.differs || 0] : [0, 0, 0, 0]; },
+      paper_search: (q, n) => { const ix = index(); return ix ? ix.search(String(q), toNum(n) || 5).map((e) => e.id) : []; },
+      paper_text: (n) => { const p = P(); return p ? p.excerpt.slice(0, toNum(n) || 10) : []; },
+    };
+  }
+
   // Bada の式を同じ VM 上で評価する (電卓・REPL)
   function badaLib(env) {
     return {
@@ -255,7 +295,7 @@
 
   // すべてのホスト関数をまとめる
   function makeHost(env) {
-    return Object.assign({}, mathLib(env), env.equations ? eqLib(env) : {}, gptLib(env), env.scene ? cadLib(env) : {}, uiLib(env), badaLib(env));
+    return Object.assign({}, mathLib(env), env.equations ? eqLib(env) : {}, gptLib(env), env.scene ? cadLib(env) : {}, uiLib(env), paperLib(env), badaLib(env));
   }
 
   // Bada アプリのインスタンス: ソースを VM に読み込み、build / frame / on_message を呼ぶ
@@ -283,7 +323,7 @@
     eval(src) { this.vm.maxSteps = 5e7; this.vm.eval(src); }
   }
 
-  const api = { mathLib, eqLib, gptLib, cadLib, uiLib, makeHost, Scene, BadaApp, opsMatrix, boundsOf };
+  const api = { mathLib, eqLib, gptLib, cadLib, uiLib, paperLib, makeHost, Scene, BadaApp, opsMatrix, boundsOf };
   root.BadaLib = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

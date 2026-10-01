@@ -13,6 +13,11 @@ name: Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 — An
 # としてビルドし、Actions の成果物 (Artifacts) からダウンロードできるようにします。
 # 同じファイルを Release「contact-transporter-latest」(タグ ct-v* の push 時はそのタグ) にも添付します。
 # アプリの定義 (名前・ID・含めるタブ) は contact_transporter/apps.json。
+#
+# 論文 PDF → アプリ: 3 アプリとも「📄 論文→アプリ」タブで論文 PDF を投稿すると、Bada でアプリを書き、
+# 作ったアプリ (.bada / 単体 HTML)・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できる。
+# その APK は runner-apk ジョブが作る「ランナー APK」(論文アプリの入れ物) を差し替え・署名して作る。
+# また contact_transporter/papers/ に置いた PDF からは paper-apps ジョブが同じ一式を作り、Artifacts「PaperApps」に置く。
 
 on:
   push:
@@ -20,6 +25,7 @@ on:
     paths:
       - "contact_transporter/**"
       - "bada_silent_vim/bada/**"
+      - "contact_transporter/papers/**"
       - ".github/workflows/contact-transporter-build.yml"
     tags:
       - "ct-v*"
@@ -37,13 +43,76 @@ env:
   RELEASE_TAG: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'contact-transporter-latest' }}
 
 jobs:
-  test-and-bundle:
+  runner-apk:
+    # 論文から作ったアプリの APK の「入れ物」(ランナー)。アプリ内で index.html を差し替えて JAR 署名し直す
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: ""
+      - name: Install Android SDK packages (+ accept licenses)
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+      - name: Pin Gradle 7.6.4
+        run: |
+          curl -sSL https://services.gradle.org/distributions/gradle-7.6.4-bin.zip -o "$HOME/gradle.zip"
+          unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
+          echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
+          echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
+      - name: Bundle runner (dist/runner/www) + Cordova config
+        run: |
+          node contact_transporter/tools/build.js runner
+          node contact_transporter/tools/package-app.js runner
+      - name: Build runner APK (Cordova, targetSdk 29)
+        run: |
+          set -e
+          npm install -g cordova@12.0.0
+          cordova create runner-build app.placeholder Placeholder
+          rm -rf runner-build/www
+          cp -r contact_transporter/dist/runner/www runner-build/www
+          sed -i 's#</head>#<script src="cordova.js"></script>\n</head>#' runner-build/www/index.html
+          cp contact_transporter/dist/runner/cordova/config.xml runner-build/config.xml
+          cd runner-build
+          cordova platform add android@12.0.1
+          cordova plugin add cordova-plugin-file@8.0.1
+          cordova build android
+          cp platforms/android/app/build/outputs/apk/debug/*.apk ../runner.apk
+      - name: Verify — repack a paper app into the runner and check the signature (apksigner)
+        run: |
+          node contact_transporter/tools/verify-apk.js runner.apk repacked.apk
+          "$ANDROID_SDK_ROOT/build-tools/33.0.2/apksigner" verify --verbose --min-sdk-version 24 repacked.apk
+          jarsigner -verify repacked.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: runner-apk
+          path: runner.apk
+          retention-days: 3
+
+  test-and-bundle:
+    needs: runner-apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: runner-apk
+          path: contact_transporter/data
+      - name: Install build tools (pdf.js)
+        working-directory: contact_transporter
+        run: npm ci --no-audit --no-fund
       - name: Bundle self-contained apps (dist/<app>/www/index.html)
         run: node contact_transporter/tools/build.js all
       - name: Bada conformance (JS 移植 ↔ Python 本家 bada_silent_vim、リポジトリ内の全 .bada)
@@ -52,7 +121,7 @@ jobs:
         run: node contact_transporter/tools/test.js
       - name: Prepare native wrappers (Electron / Cordova) per app
         run: |
-          for app in contactgpt transporter ufo studio; do
+          for app in contactgpt transporter ufo studio runner; do
             node contact_transporter/tools/package-app.js "$app"
           done
       - uses: actions/upload-artifact@v4
@@ -60,6 +129,44 @@ jobs:
           name: bundle
           path: contact_transporter/dist
           retention-days: 3
+
+  paper-apps:
+    # contact_transporter/papers/*.pdf (なければ同梱の設計図書) → 論文ごとの Bada アプリ一式
+    needs: test-and-bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundle
+          path: contact_transporter/dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: runner-apk
+          path: contact_transporter/data
+      - name: Install build tools (pdf.js)
+        working-directory: contact_transporter
+        run: npm ci --no-audit --no-fund
+      - name: Paper PDF → Bada app (.bada / .html / .apk / .deb / drawing / PDF)
+        run: |
+          set -e
+          shopt -s nullglob
+          pdfs=(contact_transporter/papers/*.pdf)
+          if [ ${#pdfs[@]} -eq 0 ]; then pdfs=(contact_transporter/contact_blueprint.pdf); fi
+          for f in "${pdfs[@]}"; do
+            name=$(basename "$f" .pdf); name=${name//[^A-Za-z0-9_.-]/_}
+            node contact_transporter/tools/paper2app.js "$f" "paper-apps/$name"
+            jarsigner -verify paper-apps/$name/*.apk
+            dpkg-deb -I paper-apps/$name/*.deb | head -3
+          done
+          ls -laR paper-apps
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaperApps
+          path: paper-apps
 
   android-apk:
     needs: test-and-bundle
@@ -186,13 +293,17 @@ jobs:
 
   release:
     runs-on: ubuntu-latest
-    needs: [android-apk, windows-exe, linux-app]
+    needs: [android-apk, windows-exe, linux-app, paper-apps]
     steps:
       - uses: actions/download-artifact@v4
         with:
           pattern: "*-*"
           path: release
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: PaperApps
+          path: release/paper-apps
       - name: List files
         run: ls -laR release
       - name: Publish to GitHub Release
@@ -215,9 +326,16 @@ jobs:
             - Windows: `*-x64.exe` はインストーラ、`*-portable.exe` はインストール不要
             - Linux: `chmod +x *.AppImage` で実行、または `sudo apt install ./xxx.deb`
 
+            **論文 PDF → アプリ**: 各アプリの「📄 論文→アプリ」タブで PDF を投稿すると、Bada でアプリを書き、
+            作ったアプリ (.bada / .html)・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できます。
+            `contact_transporter/papers/` に置いた PDF から作った一式 (`paper_*.apk` / `bada-paper-*.deb` / `paper_*.html`) も添付しています。
+
             ※ 設計図書 (contact_blueprint.pdf) の方程式に基づく思索的・フィクションの設計図 (幾何的な可視化) です。
           files: |
             release/*.apk
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/paper-apps/*/*.apk
+            release/paper-apps/*/*.deb
+            release/paper-apps/*/*.html

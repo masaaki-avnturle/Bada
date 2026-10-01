@@ -39,6 +39,8 @@
 
   // ------------------------------------------------------------ 共通
   let toastT;
+  // Electron: 保存先 (ダウンロード フォルダのパス) を表示
+  window.addEventListener("ct-saved", (e) => toast("保存しました: " + e.detail));
   function toast(msg) {
     const t = $("#toast"); t.textContent = msg; t.classList.add("on");
     clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("on"), 3200);
@@ -67,7 +69,7 @@
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-    toast(`${name} を書き出しました`);
+    toast(`${name} をダウンロード フォルダへ保存しました`);
   }
   function svgToPng(svg, width) {
     return new Promise((resolve, reject) => {
@@ -129,6 +131,15 @@
   }
   for (const k of store.get("ct.bada.deleted", [])) delete files[k];
   const MAIN = Object.assign({ chat: "apps/contactgpt.bada", cad: "apps/transporter.bada", ufo: "apps/ufo.bada" }, store.get("ct.bada.main", {}));
+  // 書き出された単体アプリ (論文 PDF から作ったアプリ): 同梱の Bada ソースを主プログラムにする
+  const PAYLOAD = window.CT_PAYLOAD;
+  if (PAYLOAD) {
+    Object.assign(files, PAYLOAD.files || {});
+    if (PAYLOAD.main) MAIN.cad = PAYLOAD.main;
+    if (PAYLOAD.title) { const b = $(".brand b"); if (b) b.textContent = PAYLOAD.title; const sm = $(".brand small"); if (sm && PAYLOAD.from) sm.textContent = "論文「" + PAYLOAD.from + "」から Bada で作られたアプリ"; }
+  }
+  // 投稿された論文 (全タブの Bada から paper_* で参照)
+  const PAPER = { analysis: null, bytes: null, file: null, app: null };
 
   // ------------------------------------------------------------ コンソール
   function consoleOf(name) { return $(`[data-console="${name}"]`); }
@@ -234,7 +245,7 @@
       this.ui = makeUI(this.uiRoot, this);
       this.t = 0; this.fitted = false;
       this.env = {
-        files, ui: this.ui, chat: opts.chat || null, equations: EQS, index: INDEX, scene: this.scene,
+        files, ui: this.ui, chat: opts.chat || null, equations: EQS, index: INDEX, scene: this.scene, paper: () => PAPER.analysis,
         onFileWrite: (n) => { saveFiles(); if (IDE.refresh) IDE.refresh(); conLine(name, `── ${n} を保存しました`, "sys"); },
         model: () => MODEL.current,
         colorLines: () => { const c = $(`#tab-${name} [data-colorlines]`); return !!(c && c.checked); },
@@ -652,6 +663,224 @@
   })();
   tabInit.ide = IDE.init;
 
+  // ============================================================ 論文 PDF → アプリ
+  const X = window.CTExport, CP = window.CTPaper;
+  function pickTarget(t) { return t === "console" ? "console" : HAS(t) ? t : HAS("cad") ? "cad" : HAS("ufo") ? "ufo" : "console"; }
+  function pdfjs() {
+    const lib = window.pdfjsLib;
+    if (!lib) throw new Error("pdf.js が同梱されていません");
+    if (!lib.GlobalWorkerOptions.workerPort) {
+      const src = $("#pdfjs-worker").textContent;
+      lib.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+    }
+    return lib;
+  }
+  // 同梱した日本語 CMap を pdf.js に渡す
+  class EmbeddedCMaps {
+    constructor() {}
+    async fetch({ name }) {
+      const b = (window.CT_CMAPS || {})[name];
+      if (!b) throw new Error(`CMap ${name} は同梱していません`);
+      return { cMapData: X.unb64(b), compressionType: 1 };
+    }
+  }
+  // 論文の Bada 生成器 (lib/paper.bada) を動かす VM
+  function paperVM() {
+    const env = { files, ui: { toast }, chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
+    const vm = new B.BadaVM({ host: L.makeHost(env), files, maxSteps: 2e8 });
+    vm.load("#include lib/paper.bada\n", "<paper>");
+    return vm;
+  }
+  function makePaperApp(kind) {
+    const r = paperVM().call("paper_app", [kind]);
+    if (!r) return null;
+    const app = { file: r[0], src: r[1], target: r[2], desc: r[3], kind };
+    files[app.file] = app.src; saveFiles(); if (IDE.refresh) IDE.refresh();
+    PAPER.app = app;
+    return app;
+  }
+  tabInit.paper = function () {
+    const prog = $("#paper-progress");
+    async function load(bytes, name) {
+      try {
+        prog.textContent = `${name} を読んでいます…`;
+        const lib = pdfjs();
+        const doc = await CP.readPdf(lib, bytes.slice(), {
+          docOptions: { CMapReaderFactory: EmbeddedCMaps, cMapUrl: "embedded/", cMapPacked: true, useWorkerFetch: false },
+          onProgress: (n, total) => { prog.textContent = `${name}: ${n} / ${total} ページ`; },
+        });
+        PAPER.analysis = CP.analyze(doc, name); PAPER.bytes = bytes; PAPER.file = name;
+        prog.textContent = `✔ ${name} を解析しました`;
+        showSummary();
+        showApp(makePaperApp("manifold"));
+        for (const t of Object.values(tabs)) if (t.name === "chat") conLine("chat", `── 論文「${PAPER.analysis.title}」を読み込みました (ContactGPT に「論文」について質問できます)`, "sys");
+      } catch (e) { prog.textContent = "✖ 読み込めませんでした: " + e.message; console.error(e); }
+    }
+    function showSummary() {
+      const p = PAPER.analysis, el = $("#paper-summary"); el.hidden = false;
+      const tags = Object.entries(p.tagCount).sort((a, b) => b[1] - a[1]);
+      const mx = Math.max(1, ...tags.map((t) => t[1]));
+      el.innerHTML = `<h2>${esc(p.title)}</h2><div class="muted">${esc(p.file)} · ${p.pages} ページ · ${p.lines} 行 · ${p.chars.toLocaleString()} 文字 · ${p.registry ? "方程式登録簿の形式" : "本文から数式を抽出"}</div>` +
+        `<div class="kv"><div>方程式</div><div>${p.equations.length} 本</div><div>記号式 / 数値評価</div><div>${p.stat.symb || 0} / ${p.stat.calc || 0}</div><div>等式 成立 / 不成立</div><div>${p.stat.holds || 0} / ${p.stat.differs || 0}</div><div>数値パラメータ</div><div>${p.params.length} 個</div></div>` +
+        `<h3>分類</h3><div class="bars">${tags.map(([t, c]) => `<div><span>${esc(CP.TAG_JA[t] || t)}</span><i style="width:${(c / mx * 100).toFixed(1)}%"></i><b>${c}</b></div>`).join("")}</div>` +
+        `<h3>数値パラメータ (本文の「記号 = 数値」)</h3><div class="params">${p.params.slice(0, 16).map((x) => `<code>${esc(x.name)} = ${x.value}${x.unit ? " " + esc(x.unit) : ""}</code>`).join(" ")}</div>` +
+        `<h3>方程式 (先頭)</h3><div class="eqlist">${p.equations.slice(0, 8).map((e) => `<div class="eq"><div><div class="id">${esc(e.id)}</div><div class="st-${e.status}" style="font-size:11px">${esc(e.status)} p.${e.page}</div></div><div><div class="ex">${esc(e.text)}</div>${e.value ? `<div class="val st-${e.status}">= ${esc(e.value)}</div>` : ""}</div></div>`).join("")}</div>`;
+      $("#paper-make").hidden = false; $("#paper-dl").hidden = false;
+    }
+    function showApp(app) {
+      if (!app) return;
+      const box = $("#paper-code"), where = pickTarget(app.target);
+      const tabLabel = (($(`#tabs [data-tab="${where}"]`) || {}).textContent || where).trim();
+      box.innerHTML = `<div class="codeblock"><div class="cbhead"><b>${esc(app.file)}</b><span>${app.src.split("\n").length} 行 · Bada</span></div><div class="cbdesc">${esc(app.desc)}</div><pre class="cbsrc">${IDE.highlightHTML(app.src)}</pre>` +
+        `<div class="btns"><button class="primary" data-a="run">▶ ${esc(tabLabel)} で実行</button><button data-a="ide">IDE で開く</button><button data-a="fold">全体を表示</button></div></div>`;
+      box.onclick = (e) => {
+        const a = e.target.dataset && e.target.dataset.a; if (!a) return;
+        if (a === "run") { showTab(where); tabs[where].start(app.file); }
+        if (a === "ide") { showTab("ide"); IDE.open(app.file, where); }
+        if (a === "fold") { $(".codeblock", box).classList.toggle("open"); }
+      };
+    }
+    $("#paper-file").addEventListener("change", async (e) => { const f = e.target.files[0]; if (f) load(new Uint8Array(await f.arrayBuffer()), f.name); });
+    const drop = $("#paper-drop");
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+    drop.addEventListener("drop", async (e) => { e.preventDefault(); drop.classList.remove("over"); const f = e.dataTransfer.files[0]; if (f) load(new Uint8Array(await f.arrayBuffer()), f.name); });
+    $("#paper-sample").addEventListener("click", () => load(X.unb64(window.CT_SAMPLE_PDF || ""), "contact_blueprint.pdf"));
+    if (!window.CT_SAMPLE_PDF) $("#paper-sample").remove();
+    $$("#paper-make [data-kind]").forEach((b) => b.addEventListener("click", () => { const a = makePaperApp(b.dataset.kind); showApp(a); toast(`${a.file} を Bada で書きました`); }));
+    $$("#paper-dl [data-dl]").forEach((b) => b.addEventListener("click", () => download(b.dataset.dl)));
+    $("#dl-all").addEventListener("click", async () => { for (const k of ["bada", "html", "apk", "deb", "report", "paper"]) { await download(k); await new Promise((r) => setTimeout(r, 700)); } });
+  };
+
+  // ------------------------------------------------------------ 作ったアプリの書き出し
+  const dlLog = (m) => { const el = $("#dl-log"); if (el) el.textContent = m; };
+  function exportedHtml(app) {
+    const runner = $("#runner-html").textContent.trim();
+    if (!runner) throw new Error("ランナーが同梱されていません");
+    const html = new TextDecoder().decode(X.unb64(runner));
+    return X.standaloneHtml(html, { title: PAPER.analysis.title.slice(0, 60), from: PAPER.file, main: app.file, files: { [app.file]: app.src } });
+  }
+  function baseName(app) { return app.file.split("/").pop().replace(/\.bada$/, ""); }
+  async function download(kind) {
+    if (!PAPER.analysis) { toast("先に論文 PDF を投稿してください"); return; }
+    const app = PAPER.app || makePaperApp("manifold"), base = baseName(app);
+    try {
+      dlLog(`${kind} を作成中…`);
+      if (kind === "bada") await saveFile(base + ".bada", app.src, "text/plain");
+      if (kind === "html") await saveFile(base + ".html", exportedHtml(app), "text/html");
+      if (kind === "apk") {
+        const tpl = $("#runner-apk").textContent.trim();
+        if (!tpl) { dlLog("✖ この版には APK のひな形が同梱されていません (GitHub Actions でビルドした APK / EXE / Linux 版には同梱されています)"); return; }
+        const kj = JSON.parse($("#signing-key").textContent);
+        const apk = await X.buildApk(X.unb64(tpl), exportedHtml(app), { pk8: X.unb64(kj.pk8), cert: X.unb64(kj.cert) });
+        await saveFile(base + ".apk", new Blob([apk], { type: "application/vnd.android.package-archive" }));
+      }
+      if (kind === "deb") {
+        const d = await X.buildDeb({ pkg: "bada-" + base.replace(/_/g, "-"), title: PAPER.analysis.title.slice(0, 60), description: app.desc,
+          html: exportedHtml(app), bada: { name: base + ".bada", src: app.src }, pdf: { name: PAPER.file.replace(/[^\w.\-]+/g, "_"), data: PAPER.bytes } });
+        await saveFile(`${d.pkg}_1.0.0_all.deb`, new Blob([d.bytes], { type: "application/vnd.debian.binary-package" }));
+      }
+      if (kind === "report") await saveFile(base + "_report.pdf", new Blob([await buildReport(app)], { type: "application/pdf" }));
+      if (kind === "paper") await saveFile(PAPER.file, new Blob([PAPER.bytes], { type: "application/pdf" }));
+      dlLog(`✔ ${kind} を保存しました`);
+    } catch (e) { dlLog("✖ " + kind + ": " + e.message); console.error(e); }
+  }
+
+  // 画面を持たない UI (設計書を描くために作ったアプリを裏で動かす)
+  function headlessUI() {
+    const vals = {}, init = (k, d) => { if (!(k in vals)) vals[k] = d; return vals[k]; };
+    const nop = () => null;
+    return { vals, reset: nop, section: nop, param: init, check: init, select: (k, l, o, d) => init(k, d), text: init, color: init,
+      set: (k, v) => { vals[k] = v; return null; }, get: (k) => (k in vals ? vals[k] : null), button: nop, output: nop, plot: nop,
+      hud: nop, toast: nop, chips: nop, view: nop, fit: nop, request: nop, export: nop };
+  }
+  // 設計書 PDF: 表紙・3D・図面・方程式・Bada ソースを画像ページにする
+  async function buildReport(app) {
+    const p = PAPER.analysis, pages = [];
+    const page = (w, h) => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); return [c, g]; };
+    const jpeg = async (c) => { const b = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.88)); return { jpeg: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height }; };
+    const FONT = "'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif";
+    function wrapText(g, text, x, y, maxW, lh, maxY) {
+      let line = "";
+      for (const ch of Array.from(text)) {
+        if (g.measureText(line + ch).width > maxW && line) { g.fillText(line, x, y); y += lh; line = ""; if (y > maxY) return y; }
+        line += ch;
+      }
+      if (line) { g.fillText(line, x, y); y += lh; }
+      return y;
+    }
+    // 1) 表紙
+    {
+      const [c, g] = page(1240, 1754);
+      g.fillStyle = "#0b3d91"; g.fillRect(0, 0, 1240, 260);
+      g.fillStyle = "#fff"; g.font = `bold 54px ${FONT}`; g.fillText("設計書 — Bada アプリ", 80, 120);
+      g.font = `28px ${FONT}`; g.fillText("論文 PDF から量子プログラミング言語 Bada で作成", 80, 190);
+      g.fillStyle = "#111"; g.font = `bold 40px ${FONT}`;
+      let y = wrapText(g, p.title, 80, 360, 1080, 54, 600);
+      g.font = `26px ${FONT}`; g.fillStyle = "#333";
+      const rows = [["出典", `${p.file} (${p.pages} ページ, ${p.chars.toLocaleString()} 文字)`], ["方程式", `${p.equations.length} 本 (記号式 ${p.stat.symb || 0} / 数値評価 ${p.stat.calc || 0} / 成立 ${p.stat.holds || 0} / 不成立 ${p.stat.differs || 0})`],
+        ["数値パラメータ", `${p.params.length} 個`], ["作ったアプリ", app.file], ["説明", app.desc], ["作成日", new Date().toISOString().slice(0, 10)]];
+      y += 30;
+      for (const [k, v] of rows) { g.fillStyle = "#0b3d91"; g.fillText(k, 80, y); g.fillStyle = "#222"; y = wrapText(g, v, 330, y, 830, 38, 1500) + 12; }
+      y += 20; g.fillStyle = "#0b3d91"; g.font = `bold 30px ${FONT}`; g.fillText("分類ごとの方程式数", 80, y); y += 30;
+      const tags = Object.entries(p.tagCount).sort((a, b) => b[1] - a[1]), mx = Math.max(1, ...tags.map((t) => t[1]));
+      g.font = `24px ${FONT}`;
+      for (const [t, n] of tags.slice(0, 11)) { g.fillStyle = "#333"; g.fillText(CP.TAG_JA[t] || t, 80, y + 26); g.fillStyle = "#1e88e5"; g.fillRect(330, y + 6, 700 * n / mx, 26); g.fillStyle = "#111"; g.fillText(String(n), 340 + 700 * n / mx, y + 28); y += 40; }
+      g.fillStyle = "#888"; g.font = `20px ${FONT}`; g.fillText("Contact Transporter Studio — masaaki-avnturle / Bada", 80, 1700);
+      pages.push(await jpeg(c));
+    }
+    dlLog("設計書: 3D と図面を描いています…");
+    // 2) 3D と 3) 図面 — 作ったアプリを裏で動かして描く
+    const env = { files, ui: headlessUI(), chat: {}, equations: EQS, index: INDEX, scene: new L.Scene(), model: () => MODEL.current, paper: () => PAPER.analysis };
+    const run = new L.BadaApp(env);
+    run.start(app.src, app.file);
+    if (run.has("frame")) run.call("frame", [0]);
+    if (run.has("make_sheet")) run.call("make_sheet", []);
+    if (env.scene.parts.size) {
+      // 3D は WebGL を使わず、等角投影の輪郭線・特徴稜線を 2D で描く (端末のメモリに優しい)
+      const baked = env.scene.baked();
+      const proj = Draft.projectView(baked, "iso", 30), bd = proj.bounds;
+      const W = 2000, H = 1400, M = 80, sc = Math.min((W - 2 * M) / (bd.x1 - bd.x0 || 1), (H - 2 * M - 120) / (bd.y1 - bd.y0 || 1));
+      const [c, g] = page(W, H);
+      g.fillStyle = "#070b14"; g.fillRect(0, 0, W, H);
+      g.fillStyle = "#fff"; g.font = `bold 44px ${FONT}`; g.fillText("3D モデル (等角図) — " + app.file, 60, 80);
+      g.lineWidth = 1.3; g.lineCap = "round";
+      const cx = W / 2 - (bd.x0 + bd.x1) / 2 * sc, cy = (H + 120) / 2 + (bd.y0 + bd.y1) / 2 * sc;
+      for (const [x1, y1, x2, y2, col] of proj.lines) {
+        g.strokeStyle = col; g.beginPath(); g.moveTo(cx + x1 * sc, cy - y1 * sc); g.lineTo(cx + x2 * sc, cy - y2 * sc); g.stroke();
+      }
+      g.fillStyle = "#8aa0c4"; g.font = `24px ${FONT}`; g.fillText(`部品 ${env.scene.parts.size} 個 · 稜線 ${proj.lines.length} 本`, 60, H - 40);
+      pages.push(await jpeg(c));
+    }
+    if (env.lastSheet) {
+      const blob = await svgToPng(env.lastSheet.svg, 2480);
+      const im = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.src = URL.createObjectURL(blob); });
+      const [c, g] = page(im.width, im.height); g.drawImage(im, 0, 0); pages.push(await jpeg(c));
+    }
+    // 4) 方程式 (最大 4 ページ)
+    const eqs = p.equations.slice(0, 160);
+    for (let k = 0; k < eqs.length && pages.length < 12; ) {
+      const [c, g] = page(1240, 1754);
+      g.fillStyle = "#0b3d91"; g.font = `bold 34px ${FONT}`; g.fillText(`方程式 (${k + 1}–)`, 70, 90);
+      let y = 150; g.font = `21px ${FONT}`;
+      while (k < eqs.length && y < 1660) {
+        const e = eqs[k++]; g.fillStyle = "#0b3d91"; g.fillText(`${e.id}  [${e.tags.join(", ")}] ${e.status} p.${e.page}`, 70, y); y += 28;
+        g.fillStyle = "#111"; y = wrapText(g, e.text + (e.value ? "   = " + e.value : ""), 100, y, 1070, 28, 1690) + 10;
+      }
+      pages.push(await jpeg(c));
+    }
+    // 5) Bada ソース (最大 3 ページ)
+    const lines = app.src.split("\n");
+    for (let k = 0; k < lines.length && k < 3 * 70; ) {
+      const [c, g] = page(1240, 1754);
+      g.fillStyle = "#0b3d91"; g.font = `bold 32px ${FONT}`; g.fillText(`Bada ソース ${app.file} (${k + 1}–)`, 70, 80);
+      g.font = "17px ui-monospace, Menlo, Consolas, monospace"; let y = 125;
+      for (let j = 0; j < 70 && k < lines.length; j++, k++) { g.fillStyle = "#999"; g.fillText(String(k + 1).padStart(4), 50, y); g.fillStyle = lines[k].trim().startsWith("//") ? "#2e7d32" : "#111"; g.fillText(lines[k].slice(0, 110), 110, y); y += 23; }
+      pages.push(await jpeg(c));
+    }
+    return X.imagePdf(pages, p.title);
+  }
+
   // ============================================================ 方程式レジストリ
   tabInit.eqs = function () {
     const tags = Array.from(new Set(EQS.flatMap((e) => e.tags))).sort();
@@ -693,6 +922,6 @@
   // ============================================================ 起動
   const BI = window.CT_BUILD || {};
   $("#build-info").textContent = `build ${BI.version || "dev"} ${BI.date || ""}`;
-  const first = store.get("ct.tab", APP.tabs[0]);
+  const first = PAYLOAD ? "cad" : store.get("ct.tab", APP.tabs[0]);
   showTab(HAS(first) ? first : APP.tabs[0]);
 })();

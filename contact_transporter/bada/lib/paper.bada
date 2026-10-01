@@ -1,0 +1,340 @@
+// paper.bada — 投稿された論文 PDF から、Bada のアプリケーションを書く (Bada で書かれた Bada プログラム生成器)
+//
+//   paper_app(kind) → [ファイル名, Bada ソース, 実行先, 説明]
+//     kind = "manifold"    論文の方程式多様体アプリ (方程式を Jones 結び目の上に並べた 3D + 図面 + 登録簿 + 検索)
+//          = "ufo"         論文の統計から設計した UFO の設計図アプリ
+//          = "transporter" 論文の統計から設計した異次元輸送機 CAD アプリ
+//
+// 論文のデータは組込み関数 paper_* (paper.js が PDF から抽出) で受け取り、生成するソースに
+// Bada のリテラルとして埋め込む。生成されたアプリは論文 PDF がなくても単体で動く。
+#include lib/codegen.bada
+
+// Bada の文字列リテラルにする
+def bada_quote(s) {
+  s <- replace(str(s), "\\", "\\\\")
+  s <- replace(s, "\"", "\\\"")
+  s <- replace(s, "\n", " ")
+  return "\"" + s + "\""
+}
+
+// 数値を Bada のリテラル (式) にする: 1.19075e-10 → (1.19075 * pow(10, -10))
+def bada_num(v) {
+  t <- str(v)
+  -< has_any(t, ["nan", "inf"]) {
+    return "0"
+  }
+  -< contains(t, "e") {
+    p <- split(t, "e")
+    return "(" + p[0] + " * pow(10, " + str(num(p[1])) + "))"
+  }
+  return t
+}
+
+def tag_color(tag) {
+  names <- ["ZETA", "GAMMA", "BETA", "JONES", "SR", "ROT", "QUANTUM", "MANIFOLD", "ENTROPY", "TRANSPORT", "OTHER"]
+  colors <- ["#4fc3f7", "#ffd54f", "#a1887f", "#ef5350", "#ff7043", "#ab47bc", "#7e57c2", "#26a69a", "#66bb6a", "#ec407a", "#90a4ae"]
+  i <- 0
+  -> i < len(names) {
+    -< names[i] <-> tag {
+      return colors[i]
+    }
+    i <- i + 1
+  }
+  return "#90a4ae"
+}
+
+def paper_app(kind) {
+  -< paper_loaded() <-> false {
+    return nil
+  }
+  info <- paper_info()
+  title <- info[0]
+  -< kind <-> "ufo" {
+    return paper_ufo(info)
+  }
+  -< kind <-> "transporter" {
+    return paper_transporter(info)
+  }
+  return paper_manifold(info)
+}
+
+// 論文の統計 → UFO の寸法 (同じ論文からは同じ機体)
+def paper_ufo(info) {
+  n <- info[3]
+  tags <- paper_tags()
+  h <- info[5]
+  d <- round(12 + sqrt(n) * 0.8)
+  win <- max2(4, min2(24, len(tags) * 2))
+  legs <- 3 + imod(h, 3)
+  knots <- ["3_1", "4_1", "5_1"]
+  knot <- knots[imod(idiv(h, 7), 3)]
+  name <- substr(info[0], 0, 24)
+  req <- "「" + name + "」という名前で直径" + str(d) + "m、" + str(win) + "個の窓と" + str(legs) + "本の脚、" + knot + "コイルのUFOの設計図アプリを作って"
+  app <- gen_ufo(req)
+  src <- "// 論文「" + info[0] + "」(" + info[1] + ", " + str(info[2]) + " ページ, 方程式 " + str(n) + " 本) から設計\n" + app[1]
+  return ["user/paper_ufo_" + slug(info[1]) + ".bada", src, app[2], "論文から設計した UFO: " + app[3]]
+}
+
+def paper_transporter(info) {
+  n <- info[3]
+  tags <- paper_tags()
+  h <- info[5]
+  rings <- max2(2, min2(7, len(tags)))
+  R0 <- round(30 + sqrt(n) * 1.2)
+  hours <- 6 + imod(h, 30)
+  knots <- ["3_1", "4_1", "5_1"]
+  knot <- knots[imod(idiv(h, 7), 3)]
+  req <- "「" + substr(info[0], 0, 24) + "」という名前でリング" + str(rings) + "つ、外環" + str(R0) + "m、搭乗者" + str(hours) + "時間、" + knot + "コイルの輸送機を作って"
+  app <- gen_transporter(req)
+  src <- "// 論文「" + info[0] + "」(" + info[1] + ", 方程式 " + str(n) + " 本) から設計\n" + app[1]
+  return ["user/paper_transporter_" + slug(info[1]) + ".bada", src, app[2], "論文から設計した異次元輸送機: " + app[3]]
+}
+
+// ---------------------------------------------------------------- 論文の方程式多様体アプリ
+def paper_manifold(info) {
+  title <- info[0]
+  file <- info[1]
+  eqs <- paper_eqs(48)
+  tags <- paper_tags()
+  params <- paper_params(12)
+  st <- paper_stat()
+  knot <- "3_1"
+  q <- 3
+  -< imod(info[5], 2) <-> 1 {
+    knot <- "5_1"
+    q <- 5
+  }
+  s <- []
+  append(s, "// " + title)
+  append(s, "//   — 投稿された論文 PDF (" + file + ", " + str(info[2]) + " ページ) から ContactGPT が Bada で書いたアプリ")
+  append(s, "//   方程式 " + str(info[3]) + " 本を Jones " + knot + " 結び目の上に並べた「方程式多様体」の 3D・図面・登録簿・検索")
+  append(s, "")
+  append(s, "TITLE <- " + bada_quote(title))
+  append(s, "SOURCE <- " + bada_quote(file))
+  append(s, "TOTAL <- " + str(info[3]))
+  append(s, "STAT <- [" + str(st[0]) + ", " + str(st[1]) + ", " + str(st[2]) + ", " + str(st[3]) + "]   // symb, calc, holds, differs")
+  append(s, "// [ID, 状態, 分類, 式, 値, ページ]")
+  append(s, "EQS <- []")
+  i <- 0
+  -> i < len(eqs) {
+    e <- eqs[i]
+    append(s, "append(EQS, [" + bada_quote(e[0]) + ", " + bada_quote(e[1]) + ", " + bada_quote(e[2][0]) + ", " + bada_quote(substr(e[3], 0, 140)) + ", " + bada_quote(e[4]) + ", " + str(e[5]) + "])")
+    i <- i + 1
+  }
+  append(s, "// [分類, 本数, 色]")
+  append(s, "TAGS <- []")
+  i <- 0
+  -> i < len(tags) {
+    append(s, "append(TAGS, [" + bada_quote(tags[i][0]) + ", " + str(tags[i][1]) + ", " + bada_quote(tag_color(tags[i][0])) + "])")
+    i <- i + 1
+  }
+  append(s, "// [記号, 値, 単位]  (本文の「記号 = 数値」)")
+  append(s, "PARAMS <- []")
+  i <- 0
+  -> i < len(params) {
+    append(s, "append(PARAMS, [" + bada_quote(params[i][0]) + ", " + bada_num(params[i][1]) + ", " + bada_quote(params[i][2]) + "])")
+    i <- i + 1
+  }
+  append(s, "")
+  append(s, "say TITLE")
+  append(s, "say \"方程式 \" + str(TOTAL) + \" 本 (記号式 \" + str(STAT[0]) + \", 数値評価 \" + str(STAT[1]) + \", 成立 \" + str(STAT[2]) + \", 不成立 \" + str(STAT[3]) + \")\"")
+  append(s, "Omega::DATABASE[paper] {")
+  append(s, "  push(TITLE)")
+  append(s, "  push(TOTAL)")
+  append(s, "}")
+  append(s, "ui_section(" + bada_quote(substr(title, 0, 40)) + ")")
+  append(s, "ui_param(\"shown\", \"3D に並べる式の数\", " + str(len(eqs)) + ", 1)")
+  append(s, "ui_param(\"R\", \"結び目の半径 [m]\", 40, 1)")
+  append(s, "ui_select(\"knot\", \"結び目\", [\"3_1\", \"5_1\"], \"" + knot + "\")")
+  append(s, "ui_button(\"図面を作成\", \"make_sheet\")")
+  append(s, "ui_request(\"例: 式 3 / ζ を含む式 / 一番多い分類は？ / 図面を作って / STLで保存\")")
+  append(s, "")
+  append(s, "def shown() {")
+  append(s, "  return min2(len(EQS), max2(1, round(param(\"shown\"))))")
+  append(s, "}")
+  append(s, "")
+  append(s, "// (2,q) トーラス結び目上の点")
+  append(s, "def knot_point(u) {")
+  append(s, "  q <- 3")
+  append(s, "  -< param(\"knot\") <-> \"5_1\" {")
+  append(s, "    q <- 5")
+  append(s, "  }")
+  append(s, "  R <- param(\"R\")")
+  append(s, "  a <- u * 2 * pi()")
+  append(s, "  w <- R * 0.85 + R * 0.15 * cos(2 * a)")
+  append(s, "  return [w * cos(q * a), w * sin(q * a), R * 0.15 * sin(2 * a) + R * 0.6]")
+  append(s, "}")
+  append(s, "")
+  append(s, "def build() {")
+  append(s, "  cad_clear()")
+  append(s, "  R <- param(\"R\")")
+  append(s, "  q <- 3")
+  append(s, "  -< param(\"knot\") <-> \"5_1\" {")
+  append(s, "    q <- 5")
+  append(s, "  }")
+  append(s, "  cad_knot(\"knot\", \"Jones \" + param(\"knot\") + \" 結び目 (方程式の軌道)\", \"#ef5350\", R * 0.85, R * 0.15, 2, q, R * 0.012)")
+  append(s, "  i <- 0")
+  append(s, "  -> i < shown() {")
+  append(s, "    c <- \"#90a4ae\"")
+  append(s, "    k <- 0")
+  append(s, "    -> k < len(TAGS) {")
+  append(s, "      -< TAGS[k][0] <-> EQS[i][2] {")
+  append(s, "        c <- TAGS[k][2]")
+  append(s, "      }")
+  append(s, "      k <- k + 1")
+  append(s, "    }")
+  append(s, "    size <- 0.9")
+  append(s, "    -< EQS[i][1] <-> \"holds\" {")
+  append(s, "      size <- 1.4")
+  append(s, "    }")
+  append(s, "    -< EQS[i][1] <-> \"differs\" {")
+  append(s, "      size <- 1.2")
+  append(s, "    }")
+  append(s, "    cad_sphere(\"eq\" + str(i), EQS[i][0] + \" \" + EQS[i][2], c, size * R / 40)")
+  append(s, "    i <- i + 1")
+  append(s, "  }")
+  append(s, "  // 分類ごとのリング (半径 ∝ √本数) を積み重ねる")
+  append(s, "  k <- 0")
+  append(s, "  -> k < len(TAGS) {")
+  append(s, "    cad_torus(\"tag\" + str(k), TAGS[k][0] + \" ×\" + str(TAGS[k][1]), TAGS[k][2], R * 0.12 + sqrt(TAGS[k][1]) * R / 60, R * 0.012)")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  // 本文の数値パラメータを柱の高さに (log10(1+|v|))")
+  append(s, "  k <- 0")
+  append(s, "  -> k < len(PARAMS) {")
+  append(s, "    cad_cylinder(\"param\" + str(k), PARAMS[k][0] + \" = \" + str(PARAMS[k][1]) + \" \" + PARAMS[k][2], \"#ffd54f\", R * 0.025, max2(0.5, log10(1 + abs(PARAMS[k][1])) * R / 8))")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  cad_lathe(\"base\", \"台座\", \"#37474f\", [[0, 0], [R * 1.3, 0]], 96)")
+  append(s, "  frame(0)")
+  append(s, "  pts <- []")
+  append(s, "  k <- 0")
+  append(s, "  -> k < len(TAGS) {")
+  append(s, "    append(pts, [k, TAGS[k][1]])")
+  append(s, "    ui_output(\"t\" + str(k), TAGS[k][0], TAGS[k][1])")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  ui_plot(\"tags\", \"分類ごとの方程式数\", [[\"本数\", \"#4fc3f7\", pts]], [])")
+  append(s, "  ui_output(\"total\", \"方程式\", str(TOTAL) + \" 本\")")
+  append(s, "  ui_output(\"stat\", \"成立 / 不成立 / 数値評価\", str(STAT[2]) + \" / \" + str(STAT[3]) + \" / \" + str(STAT[1]))")
+  append(s, "  cad_rdim(\"top\", [0, 0], R, 45, \"R\" + str(R))")
+  append(s, "  cad_dim(\"front\", [R * 1.3, 0], [R * 1.3, R * 0.75], 6, fixed(R * 0.75, 1))")
+  append(s, "  k <- 0")
+  append(s, "  -> k < min2(8, len(TAGS)) {")
+  append(s, "    cad_bom(str(k + 1), \"分類 \" + TAGS[k][0], \"リング\", str(TAGS[k][1]))")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  cad_note(\"出典: \" + SOURCE)")
+  append(s, "  i <- 0")
+  append(s, "  -> i < min2(6, len(EQS)) {")
+  append(s, "    cad_note(EQS[i][0] + \": \" + substr(EQS[i][3], 0, 60))")
+  append(s, "    i <- i + 1")
+  append(s, "  }")
+  append(s, "  cad_note(\"論文 PDF から ContactGPT が Bada で生成したアプリ\")")
+  append(s, "}")
+  append(s, "")
+  append(s, "def frame(t) {")
+  append(s, "  R <- param(\"R\")")
+  append(s, "  spin <- [\"R\", 0, 0, 1, t * 0.15]")
+  append(s, "  cad_pose(\"knot\", [spin, [\"T\", 0, 0, R * 0.6]])")
+  append(s, "  i <- 0")
+  append(s, "  -> i < shown() {")
+  append(s, "    p <- knot_point(i / shown())")
+  append(s, "    cad_pose(\"eq\" + str(i), [spin, [\"T\", p[0], p[1], p[2]]])")
+  append(s, "    i <- i + 1")
+  append(s, "  }")
+  append(s, "  k <- 0")
+  append(s, "  z <- R * 0.05")
+  append(s, "  -> k < len(TAGS) {")
+  append(s, "    cad_pose(\"tag\" + str(k), [[\"T\", 0, 0, z], [\"R\", 0, 0, 1, -t * 0.2 * (k + 1)]])")
+  append(s, "    z <- z + R * 0.05")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  k <- 0")
+  append(s, "  -> k < len(PARAMS) {")
+  append(s, "    a <- k / max2(1, len(PARAMS)) * 2 * pi()")
+  append(s, "    cad_pose(\"param\" + str(k), [[\"T\", R * 1.15 * cos(a), R * 1.15 * sin(a), 0]])")
+  append(s, "    k <- k + 1")
+  append(s, "  }")
+  append(s, "  ui_hud(\"[Bada] \" + substr(TITLE, 0, 30) + \"\\n方程式 \" + str(TOTAL) + \" 本 / 3D に \" + str(shown()) + \" 本\")")
+  append(s, "}")
+  append(s, "")
+  append(s, "def make_sheet() {")
+  append(s, "  frame(0)")
+  append(s, "  sheet_draw(substr(TITLE, 0, 40), \"PAPER-" + str(imod(info[5], 100000)) + "\", \"ContactGPT (Bada)\", \"blue\")")
+  append(s, "}")
+  append(s, "")
+  append(s, "// 要求・質問: 「式 3」「ζ を含む式」「一番多い分類は？」「図面を作って」「STLで保存」")
+  append(s, "def on_request(q) {")
+  append(s, "  out <- []")
+  append(s, "  m <- regex_find(q, \"[0-9]+\")")
+  append(s, "  -< contains(q, \"式\") {")
+  append(s, "    -< len(m) > 0 {")
+  append(s, "      k <- num(m[0]) - 1")
+  append(s, "      -< k >= 0 {")
+  append(s, "        -< k < len(EQS) {")
+  append(s, "          e <- EQS[k]")
+  append(s, "          append(out, e[0] + \" [\" + e[2] + \", \" + e[1] + \", p.\" + str(e[5]) + \"] \" + e[3] + \"  \" + e[4])")
+  append(s, "        }")
+  append(s, "      }")
+  append(s, "    }")
+  append(s, "  }")
+  append(s, "  -< has_any(q, [\"多い\", \"分類\"]) {")
+  append(s, "    best <- 0")
+  append(s, "    k <- 0")
+  append(s, "    -> k < len(TAGS) {")
+  append(s, "      -< TAGS[k][1] > TAGS[best][1] {")
+  append(s, "        best <- k")
+  append(s, "      }")
+  append(s, "      k <- k + 1")
+  append(s, "    }")
+  append(s, "    -< len(TAGS) > 0 {")
+  append(s, "      append(out, \"一番多い分類は \" + TAGS[best][0] + \" (\" + str(TAGS[best][1]) + \" 本)\")")
+  append(s, "    }")
+  append(s, "  }")
+  append(s, "  -< contains(q, \"含む\") {")
+  append(s, "    w <- trim(substr(q, 0, find(q, \"を含む\")))")
+  append(s, "    hits <- 0")
+  append(s, "    i <- 0")
+  append(s, "    -> i < len(EQS) {")
+  append(s, "      -< contains(EQS[i][3], w) {")
+  append(s, "        -< hits < 5 {")
+  append(s, "          append(out, EQS[i][0] + \": \" + EQS[i][3])")
+  append(s, "        }")
+  append(s, "        hits <- hits + 1")
+  append(s, "      }")
+  append(s, "      i <- i + 1")
+  append(s, "    }")
+  append(s, "    append(out, \"「\" + w + \"」を含む式: \" + str(hits) + \" 本 (このアプリに収めた \" + str(len(EQS)) + \" 本の中)\")")
+  append(s, "  }")
+  append(s, "  -< contains(q, \"図面\") {")
+  append(s, "    make_sheet()")
+  append(s, "    append(out, \"図面を作成しました\")")
+  append(s, "  }")
+  append(s, "  -< has_any(q, [\"保存\", \"書き出\"]) {")
+  append(s, "    k <- \"stl\"")
+  append(s, "    -< contains(upper(q), \"OBJ\") {")
+  append(s, "      k <- \"obj\"")
+  append(s, "    }")
+  append(s, "    export_file(k)")
+  append(s, "    append(out, k + \" 形式で書き出しました\")")
+  append(s, "  }")
+  append(s, "  -< len(out) <-> 0 {")
+  append(s, "    return TITLE + \" — 方程式 \" + str(TOTAL) + \" 本。例: 「式 3」「ζ を含む式」「一番多い分類は？」「図面を作って」\"")
+  append(s, "  }")
+  append(s, "  return join(out, \"\\n\")")
+  append(s, "}")
+  append(s, "")
+  append(s, "def has_any(q, words) {")
+  append(s, "  i <- 0")
+  append(s, "  -> i < len(words) {")
+  append(s, "    -< contains(q, words[i]) {")
+  append(s, "      return true")
+  append(s, "    }")
+  append(s, "    i <- i + 1")
+  append(s, "  }")
+  append(s, "  return false")
+  append(s, "}")
+  desc <- "論文「" + title + "」の方程式多様体アプリ: 方程式 " + str(info[3]) + " 本 (3D に " + str(len(eqs)) + " 本)、分類 " + str(len(tags)) + "、数値パラメータ " + str(len(params)) + "、Jones " + knot
+  return ["user/paper_" + slug(file) + ".bada", join(s, "\n"), "cad", desc]
+}
