@@ -1635,6 +1635,27 @@ requiem.mp4・fuga.mp4・tablet.mp4・tablet4〜6.mp4・LXIV を 1 曲にまと�
 python3 compose_tablet65.py bank61/bank.json src score_tablet65.json && python3 synth.py score_tablet65.json tablet65.wav && python3 video.py score_tablet65.json tablet65.wav tablet65.mp4
 ```
 
+## 🎼🌀 Requiem BADA — Tablet Sessions LXVI · Symphonia per augmentationem (提出した 16 曲を LXV に合わせた洗脳的な交響曲, 4 楽章, ♩=60, 約 15 分 55 秒)
+
+LXV の技法 (主題を何倍にも伸ばし、伸ばした音をピアノで 4 分音符ごとに打ち直す — 1 秒に 1 打、止まらない) を 4 つの楽章の骨組みにして、
+伸ばしている長い音の中で提出された 16 曲 (mp4 の音) が次々に鳴る。楽章は切れ目なく続く。
+
+| 楽章 | 骨組み | 中で鳴る曲 |
+|:--|:--|:--|
+| I. Introduzione e Allegro (ニ短調 → イ短調) | 主題 I ×4、イ短調の答え ×4 | symphony (始まり)・requiem_fuga_drill・tablet62・requiem_fuga_small・symphony (イ短調の所) |
+| II. Adagio (ホ短調) | 主題 I ×4 を 2 回 | acceptance・tablet46inst・tablet48inst・tablet6・tablet49inst・tablet61 |
+| III. Scherzo luminoso (ハ長調) | 主題 I の長調の形 ×8、合い間はピアノの 1 倍の主題 | cp14_C_G_uplift・piano_solo_8x |
+| IV. Finale con Fuga (ニ短調) | 主題 I ×16、最後の主音の保続の中で主題 I・II・III の三重フーガ | requiem_fuga_embrace・tablet (全音下げ)・cp14_x8_part3・tablet60 (短 3 度下げ)・LXV (同じ ×16 の所に重ねる) |
+| Coda (ニ長調) | — | symphony (終わりのニ長調) → Amen |
+
+- 曲の調が楽章の調と違うときは、`REC` の `semis` でテープのように合わせる。抜粋の大きさは、その曲全体との比でそろえる (`ex_gain`)
+- 新しく足した音はすべて録音から切り出したピアノの実音 (bank61)。提出された曲はもとの音のまま
+
+```bash
+# 素材: 提出された 16 曲と LXV の音を 44.1 kHz の wav に (src/symphony.wav, src/tablet65.wav など)
+python3 compose_tablet66.py bank61/bank.json src score_tablet66.json && python3 synth.py score_tablet66.json tablet66.wav && python3 video.py score_tablet66.json tablet66.wav tablet66.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
