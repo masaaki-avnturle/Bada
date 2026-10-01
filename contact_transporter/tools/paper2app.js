@@ -46,9 +46,16 @@ async function main(pdf, outDir) {
     const apk = await X.buildApk(new Uint8Array(fs.readFileSync(tpl)), html, { pk8: new Uint8Array(fs.readFileSync(path.join(sig, "debug-key.pk8"))), cert: new Uint8Array(fs.readFileSync(path.join(sig, "debug-cert.der"))) });
     fs.writeFileSync(path.join(outDir, base + ".apk"), apk); apkMsg = `APK ${(apk.length / 1024).toFixed(0)} KB`;
   }
+  // Windows 10 / 11 EXE (ランチャー + アプリ一式)
+  const lpath = process.env.CT_LAUNCHER_EXE || path.join(ROOT, "data", "bada-launcher.exe");
+  let exeMsg = "EXE: ランチャーがないため省略";
+  if (fs.existsSync(lpath)) {
+    const exe = X.buildWinExe(new Uint8Array(fs.readFileSync(lpath)), [{ name: "index.html", data: html }, { name: base + ".bada", data: main[1] }, { name: path.basename(pdf).replace(/[^\w.\-]+/g, "_"), data: pdfBytes }], "bada-" + base);
+    fs.writeFileSync(path.join(outDir, base + ".exe"), exe); exeMsg = `EXE ${(exe.length / 1024).toFixed(0)} KB`;
+  }
   fs.copyFileSync(pdf, path.join(outDir, path.basename(pdf).replace(/[^\w.\-]+/g, "_")));
   fs.writeFileSync(path.join(outDir, base + ".json"), JSON.stringify(paper, null, 1));
-  log(`${path.basename(pdf)} → ${outDir}\n  「${paper.title}」 ${paper.pages} ページ, 方程式 ${paper.equations.length} 本, 部品 ${env2.scene.parts.size}, ${apkMsg}, deb ${(deb.bytes.length / 1024).toFixed(0)} KB`);
+  log(`${path.basename(pdf)} → ${outDir}\n  「${paper.title}」 ${paper.pages} ページ, 方程式 ${paper.equations.length} 本, 部品 ${env2.scene.parts.size}, ${apkMsg}, ${exeMsg}, deb ${(deb.bytes.length / 1024).toFixed(0)} KB`);
 }
 if (require.main === module) {
   const [pdf, out] = process.argv.slice(2);

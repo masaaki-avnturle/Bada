@@ -57,12 +57,13 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 |:--|:--|
 | 作ったアプリ | Bada ソース `paper_*.bada` |
 | 単体アプリ | `paper_*.html` — Bada 処理系 + 作ったアプリ入りの 1 ファイル。どの端末のブラウザでも動く |
+| Windows アプリ | `paper_*.exe` — Windows 10 / 11 用。ダブルクリックで `%LOCALAPPDATA%\BadaApps\` に展開し、標準搭載の Microsoft Edge のアプリ ウィンドウで起動 ([ランチャー](app/windows/launcher.c)、Actions で Windows 実機テスト)。署名なしのため初回は SmartScreen の「詳細情報 → 実行」 |
 | Android アプリ | `paper_*.apk` — ランナー APK の `assets/www/index.html` を差し替え、APK v1 (JAR) 署名 ([デバッグ鍵](app/signing/)) |
 | Linux アプリ | `bada-paper-*_1.0.0_all.deb` — `sudo apt install ./….deb` でアプリ一覧に入る (Chromium / Firefox / xdg-open で起動) |
 | 設計書 PDF | `paper_*_report.pdf` — 表紙・3D (等角図)・A3 図面・方程式・Bada ソースのページ |
 | 論文 PDF | 投稿した PDF (原本) |
 
-保存先: Windows / Linux (Electron) は OS の **ダウンロード** フォルダ、Android は `Download/` (書けない機種ではアプリ専用フォルダ)、ブラウザは既定のダウンロード先。
+保存先: Windows 10 / 11・Linux (Electron 版) は OS の **ダウンロード** フォルダ、Android は `Download/` (書けない機種ではアプリ専用フォルダ)、ブラウザは既定のダウンロード先。
 ※ 論文から作った APK はすべて同じパッケージ ID (`io.github.masaaki_avnturle.badapaperapp`) なので、新しく入れると前のものを置き換えます。
 
 **Actions でも作れます**: [`papers/`](papers/) に PDF を置いて push すると、`paper-apps` ジョブが同じ一式を作り Artifacts **`PaperApps`** に置きます。

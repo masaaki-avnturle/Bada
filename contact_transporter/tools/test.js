@@ -272,6 +272,11 @@ if (fs.existsSync(dist)) {
   const deb = await X.buildDeb({ pkg: "Bada Test", title: "テスト", description: "d", html: "<html></html>" });
   const debStr = new TextDecoder().decode(deb.bytes.subarray(0, 200));
   truthy("[書き出し] .deb (ar: debian-binary / control.tar.gz / data.tar.gz)", debStr.startsWith("!<arch>\n") && debStr.includes("debian-binary") && new TextDecoder("latin1").decode(deb.bytes).includes("data.tar.gz") && deb.pkg === "bada-test");
+  const lpath = path.join(__dirname, "..", "data", "bada-launcher.exe");
+  const launcher = fs.existsSync(lpath) ? new Uint8Array(fs.readFileSync(lpath)) : new Uint8Array([0x4d, 0x5a, 0, 0]);
+  const exe = X.buildWinExe(launcher, [{ name: "index.html", data: "<html>論文アプリ</html>" }, { name: "a.bada", data: "say 1" }], "bada-test");
+  const back2 = X.readWinExe(exe);
+  truthy("[書き出し] Windows EXE (ランチャー + アプリ一式) の末尾を読み戻せる", exe[0] === 0x4d && exe[1] === 0x5a && new TextDecoder().decode(back2["index.html"]) === "<html>論文アプリ</html>" && new TextDecoder().decode(back2["app.id"]) === "bada-test");
   const pdf = X.imagePdf([{ jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), w: 10, h: 14 }, { jpeg: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), w: 14, h: 10 }], "設計書");
   const pdfjs = require("pdfjs-dist/legacy/build/pdf.js");
   const d = await pdfjs.getDocument({ data: pdf }).promise;

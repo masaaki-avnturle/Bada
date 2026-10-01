@@ -749,7 +749,7 @@
     if (!window.CT_SAMPLE_PDF) $("#paper-sample").remove();
     $$("#paper-make [data-kind]").forEach((b) => b.addEventListener("click", () => { const a = makePaperApp(b.dataset.kind); showApp(a); toast(`${a.file} を Bada で書きました`); }));
     $$("#paper-dl [data-dl]").forEach((b) => b.addEventListener("click", () => download(b.dataset.dl)));
-    $("#dl-all").addEventListener("click", async () => { for (const k of ["bada", "html", "apk", "deb", "report", "paper"]) { await download(k); await new Promise((r) => setTimeout(r, 700)); } });
+    $("#dl-all").addEventListener("click", async () => { for (const k of ["bada", "html", "exe", "apk", "deb", "report", "paper"]) { await download(k); await new Promise((r) => setTimeout(r, 700)); } });
   };
 
   // ------------------------------------------------------------ 作ったアプリの書き出し
@@ -774,6 +774,15 @@
         const kj = JSON.parse($("#signing-key").textContent);
         const apk = await X.buildApk(X.unb64(tpl), exportedHtml(app), { pk8: X.unb64(kj.pk8), cert: X.unb64(kj.cert) });
         await saveFile(base + ".apk", new Blob([apk], { type: "application/vnd.android.package-archive" }));
+      }
+      if (kind === "exe") {
+        const l = $("#win-launcher").textContent.trim();
+        if (!l) { dlLog("✖ この版には Windows ランチャーが同梱されていません (GitHub Actions でビルドした版には同梱されています)"); return; }
+        const pdfName = PAPER.file.replace(/[^\w.\-]+/g, "_");
+        const exe = X.buildWinExe(X.unb64(l), [{ name: "index.html", data: exportedHtml(app) }, { name: base + ".bada", data: app.src }, { name: pdfName, data: PAPER.bytes }], "bada-" + base);
+        await saveFile(base + ".exe", new Blob([exe], { type: "application/vnd.microsoft.portable-executable" }));
+        dlLog("✔ Windows アプリを保存しました — 初回は SmartScreen の「詳細情報 → 実行」で起動します (署名なしのため)");
+        return;
       }
       if (kind === "deb") {
         const d = await X.buildDeb({ pkg: "bada-" + base.replace(/_/g, "-"), title: PAPER.analysis.title.slice(0, 60), description: app.desc,

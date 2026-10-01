@@ -15,8 +15,9 @@ name: Bada 3 apps build (ContactGPT / 輸送機 3D CAD / UFO 設計図面 — An
 # アプリの定義 (名前・ID・含めるタブ) は contact_transporter/apps.json。
 #
 # 論文 PDF → アプリ: 3 アプリとも「📄 論文→アプリ」タブで論文 PDF を投稿すると、Bada でアプリを書き、
-# 作ったアプリ (.bada / 単体 HTML)・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できる。
-# その APK は runner-apk ジョブが作る「ランナー APK」(論文アプリの入れ物) を差し替え・署名して作る。
+# 作ったアプリ (.bada / 単体 HTML)・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できる。
+# その APK は runner-apk ジョブが作る「ランナー APK」を差し替え・署名して、EXE は win-launcher ジョブが作る
+# ランチャー (app/windows/launcher.c、Windows 実機で動作確認) の末尾にアプリ一式を付けて作る。
 # また contact_transporter/papers/ に置いた PDF からは paper-apps ジョブが同じ一式を作り、Artifacts「PaperApps」に置く。
 
 on:
@@ -43,6 +44,51 @@ env:
   RELEASE_TAG: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'contact-transporter-latest' }}
 
 jobs:
+  win-launcher:
+    # 論文から作ったアプリの Windows 10 / 11 EXE の「入れ物」(ランチャー)。アプリ一式を末尾に付けて配る
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build launcher (MinGW-w64, x86_64, GUI)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q gcc-mingw-w64-x86-64
+          x86_64-w64-mingw32-gcc -O2 -municode -mwindows -s contact_transporter/app/windows/launcher.c -o bada-launcher.exe -lshell32
+          file bada-launcher.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win-launcher
+          path: bada-launcher.exe
+          retention-days: 3
+
+  win-launcher-test:
+    # Windows 実機 (windows-latest) で、ランチャー + アプリ一式の EXE が展開・起動準備できることを確認
+    needs: win-launcher
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/download-artifact@v4
+        with:
+          name: win-launcher
+          path: launcher
+      - name: Make a test app EXE and run it (--extract)
+        shell: pwsh
+        run: |
+          node contact_transporter/tools/make-test-exe.js launcher/bada-launcher.exe test-app.exe
+          $dir = Join-Path $env:RUNNER_TEMP "bada-extract"
+          $p = Start-Process -FilePath ".\test-app.exe" -ArgumentList @("--extract", $dir) -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "launcher exit code $($p.ExitCode)" }
+          Get-ChildItem $dir | Format-Table Name, Length
+          $html = Get-Content -Raw -Encoding UTF8 (Join-Path $dir "index.html")
+          if ($html -notmatch "Windows テスト") { throw "index.html の内容が違います" }
+          if (-not (Test-Path (Join-Path $dir "test.bada"))) { throw "test.bada がありません" }
+          if (-not (Test-Path (Join-Path $dir "paper.pdf"))) { throw "paper.pdf がありません" }
+          $edge = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          Write-Host "Edge: $edge"
+          Write-Host "OK: Windows で展開できました"
+
   runner-apk:
     # 論文から作ったアプリの APK の「入れ物」(ランナー)。アプリ内で index.html を差し替えて JAR 署名し直す
     runs-on: ubuntu-latest
@@ -99,7 +145,7 @@ jobs:
           retention-days: 3
 
   test-and-bundle:
-    needs: runner-apk
+    needs: [runner-apk, win-launcher-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -109,6 +155,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: runner-apk
+          path: contact_transporter/data
+      - uses: actions/download-artifact@v4
+        with:
+          name: win-launcher
           path: contact_transporter/data
       - name: Install build tools (pdf.js)
         working-directory: contact_transporter
@@ -147,6 +197,10 @@ jobs:
         with:
           name: runner-apk
           path: contact_transporter/data
+      - uses: actions/download-artifact@v4
+        with:
+          name: win-launcher
+          path: contact_transporter/data
       - name: Install build tools (pdf.js)
         working-directory: contact_transporter
         run: npm ci --no-audit --no-fund
@@ -160,6 +214,7 @@ jobs:
             name=$(basename "$f" .pdf); name=${name//[^A-Za-z0-9_.-]/_}
             node contact_transporter/tools/paper2app.js "$f" "paper-apps/$name"
             jarsigner -verify paper-apps/$name/*.apk
+            file paper-apps/$name/*.exe
             dpkg-deb -I paper-apps/$name/*.deb | head -3
           done
           ls -laR paper-apps
@@ -327,8 +382,8 @@ jobs:
             - Linux: `chmod +x *.AppImage` で実行、または `sudo apt install ./xxx.deb`
 
             **論文 PDF → アプリ**: 各アプリの「📄 論文→アプリ」タブで PDF を投稿すると、Bada でアプリを書き、
-            作ったアプリ (.bada / .html)・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できます。
-            `contact_transporter/papers/` に置いた PDF から作った一式 (`paper_*.apk` / `bada-paper-*.deb` / `paper_*.html`) も添付しています。
+            作ったアプリ (.bada / .html)・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できます。
+            `contact_transporter/papers/` に置いた PDF から作った一式 (`paper_*.exe` / `paper_*.apk` / `bada-paper-*.deb` / `paper_*.html`) も添付しています。
 
             ※ 設計図書 (contact_blueprint.pdf) の方程式に基づく思索的・フィクションの設計図 (幾何的な可視化) です。
           files: |
@@ -337,5 +392,6 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/paper-apps/*/*.apk
+            release/paper-apps/*/*.exe
             release/paper-apps/*/*.deb
             release/paper-apps/*/*.html

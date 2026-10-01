@@ -5,6 +5,8 @@
  *   buildApk(templateApk, html, key)           Android APK: ランナー APK の assets/www/index.html を差し替えて
  *                                              JAR 署名 (APK v1 署名: MANIFEST.MF / CERT.SF / CERT.RSA)
  *   buildDeb(opts)                             Linux 用 .deb パッケージ (ar + control.tar.gz + data.tar.gz)
+ *   buildWinExe(launcher, files, appId)         Windows 10 / 11 用 EXE: ランチャー (app/windows/launcher.c) の末尾に
+ *                                              アプリ一式を付け、起動すると展開して Edge のアプリ ウィンドウで開く
  *   imagePdf(pages)                            JPEG 画像のページから PDF を作る (設計書 PDF)
  *   readZip / writeZip                          ZIP の読み書き (deflate は CompressionStream / zlib)
  */
@@ -292,6 +294,38 @@ Description: ${o.title.replace(/\n/g, " ").slice(0, 70)}
     return concat(parts);
   }
 
+  // ------------------------------------------------------------ Windows 10 / 11 EXE
+  // files: [{ name, data }] (index.html は必須)。末尾形式は launcher.c を参照
+  function buildWinExe(launcher, files, appId) {
+    if (!(launcher[0] === 0x4d && launcher[1] === 0x5a)) throw new Error("ランチャー EXE ではありません");
+    const id = String(appId || "bada-app").replace(/[^A-Za-z0-9_.-]+/g, "-").slice(0, 100) || "bada-app";
+    const all = files.concat([{ name: "app.id", data: enc(id) }]);
+    const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b; };
+    const u64 = (n) => { const b = new Uint8Array(8); const v = new DataView(b.buffer); v.setUint32(0, n % 4294967296, true); v.setUint32(4, Math.floor(n / 4294967296), true); return b; };
+    const parts = [launcher, enc("BADAPKG1"), u32(all.length)];
+    for (const f of all) {
+      const name = enc(f.name), data = typeof f.data === "string" ? enc(f.data) : f.data;
+      parts.push(u32(name.length), name, u64(data.length), data);
+    }
+    parts.push(u64(launcher.length), enc("BADAEND1"));
+    return concat(parts);
+  }
+  // EXE の末尾からアプリ一式を読み出す (テスト用、launcher.c と同じ解釈)
+  function readWinExe(exe) {
+    const dv = new DataView(exe.buffer, exe.byteOffset, exe.byteLength), n = exe.length;
+    if (td.decode(exe.subarray(n - 8)) !== "BADAEND1") throw new Error("アプリ一式がありません");
+    const start = dv.getUint32(n - 16, true) + dv.getUint32(n - 12, true) * 4294967296;
+    if (td.decode(exe.subarray(start, start + 8)) !== "BADAPKG1") throw new Error("壊れています");
+    const count = dv.getUint32(start + 8, true), out = {};
+    let off = start + 12;
+    for (let i = 0; i < count; i++) {
+      const nl = dv.getUint32(off, true), name = td.decode(exe.subarray(off + 4, off + 4 + nl));
+      const len = dv.getUint32(off + 4 + nl, true) + dv.getUint32(off + 8 + nl, true) * 4294967296;
+      out[name] = exe.subarray(off + 12 + nl, off + 12 + nl + len); off += 12 + nl + len;
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------ 単体 HTML アプリ
   // runnerHtml の /*@@PAYLOAD@@*/null を { title, main, files } に置き換える
   function standaloneHtml(runnerHtml, payload) {
@@ -303,7 +337,7 @@ Description: ${o.title.replace(/\n/g, " ").slice(0, 70)}
     return html;
   }
 
-  const api = { readZip, writeZip, entryData, signJar, buildApk, buildDeb, tar, ar, imagePdf, standaloneHtml, crc32, sha256, b64, unb64, deflateRaw, inflateRaw, gzip, pkcs7 };
+  const api = { readZip, writeZip, entryData, signJar, buildApk, buildDeb, buildWinExe, readWinExe, tar, ar, imagePdf, standaloneHtml, crc32, sha256, b64, unb64, deflateRaw, inflateRaw, gzip, pkcs7 };
   root.CTExport = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

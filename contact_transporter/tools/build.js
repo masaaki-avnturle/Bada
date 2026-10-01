@@ -60,10 +60,13 @@ function build(key) {
     put("RUNNER_APK", fs.existsSync(apkPath) ? fs.readFileSync(apkPath).toString("base64") : "");
     if (!fs.existsSync(apkPath)) console.warn(`  (${key}: APK のひな形 ${path.relative(ROOT, apkPath)} がないため、アプリ内の APK 作成は無効 — Actions では runner-apk ジョブが作って同梱)`);
     const sig = path.join(ROOT, "app", "signing");
+    const exePath = process.env.CT_LAUNCHER_EXE || path.join(DATA, "bada-launcher.exe");
+    put("LAUNCHER_EXE", fs.existsSync(exePath) ? fs.readFileSync(exePath).toString("base64") : "");
+    if (!fs.existsSync(exePath)) console.warn(`  (${key}: Windows ランチャー ${path.relative(ROOT, exePath)} がないため、アプリ内の .exe 作成は無効 — Actions では win-launcher ジョブが作って同梱)`);
     put("SAMPLE_PDF", JSON.stringify(fs.readFileSync(path.join(ROOT, "contact_blueprint.pdf")).toString("base64")));
     put("SIGNING_KEY", JSON.stringify({ pk8: fs.readFileSync(path.join(sig, "debug-key.pk8")).toString("base64"), cert: fs.readFileSync(path.join(sig, "debug-cert.der")).toString("base64") }));
   } else {
-    for (const k of ["PDFJS", "PDFJS_WORKER", "RUNNER_HTML", "RUNNER_APK", "SIGNING_KEY"]) put(k, "");
+    for (const k of ["PDFJS", "PDFJS_WORKER", "RUNNER_HTML", "RUNNER_APK", "SIGNING_KEY", "LAUNCHER_EXE"]) put(k, "");
     put("CMAPS", "null");
     put("SAMPLE_PDF", "null");
   }

@@ -5,6 +5,7 @@ GitHub Actions「Bada 3 apps build」の **paper-apps** ジョブが論文ごと
 
 | ファイル | 中身 |
 |:--|:--|
+| `<論文>.exe` | Windows 10 / 11 アプリ (ダブルクリックで展開し、Edge のアプリ ウィンドウで起動) |
 | `<論文>.apk` | Android アプリ (Bada ランナー + 論文から作った Bada アプリ、JAR 署名) |
 | `bada-<論文>_1.0.0_all.deb` | Linux (Debian / Ubuntu) パッケージ — `sudo apt install ./….deb` で入り、アプリ一覧から起動 |
 | `<論文>.html` | 単体で動く HTML アプリ (どの端末のブラウザでも) |
