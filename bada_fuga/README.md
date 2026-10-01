@@ -1564,6 +1564,27 @@ LXI と同じ録音・主題・形式を、プロの楽曲のトラック 18 の
 python3 compose_tablet62.py bank61/bank.json score_tablet62.json && python3 synth.py score_tablet62.json tablet62.wav && python3 video.py score_tablet62.json tablet62.wav tablet62.mp4
 ```
 
+## 🎹🎶 Requiem BADA — Tablet Sessions LXIII · Requiem e Fuga cantabile (LXII に、トラック 8 の曲調を取り込み — 旋律が自然に流れるように, イ短調, ♩=66, 約 3 分 12 秒)
+
+LXI・LXII と同じ録音から、プロの楽曲のトラック 8 の曲調へ寄せ、旋律が自然に流れるように作り直した。トラック 8 も **音そのもの・旋律は使っていない** (解析で得た曲調だけ)。
+
+| トラック 8 (解析) | この曲で |
+|:--|:--|
+| イ短調、♩≈99、まっすぐな拍 (跳ねない) | イ短調、♩=66。左手の 3 連の分散和音が 1 分に 198 (= トラック 8 の 1 拍に 2 つ) |
+| イ短調とホ短調を行き来する | Introitus (ホ短調) → アリア (イ短調、2 段目はホ短調の答え) → Fuga I (イ短調) |
+| 中ほどでニ長調・ハ長調・ト長調、イ長調の明るい瞬間 | Lacrimosa (15:19 の実音, ト長調) → Fuga II (ニ短調) → Amen (イ長調) |
+| 低音があたたかい、静かに始まり少しずつ厚くなる | 左手の分散和音 (根音・5 度・10 度と上がって下りる)、録音の実音で静かに始める |
+
+- **旋律が自然に流れるように**
+  - `smooth()`: 主題の音を前の音にいちばん近いオクターヴに置き直し、4 度より大きい跳躍は前の音を分けて音階の経過音でつなぐ
+  - Requiem はアリア: ソプラノが 15:16 → 15:12 (ホ短調の答え) → 15:16 → 13:04 と 2 小節ずつ歌い継ぐ。歌う旋律を前に、内声を後ろへ
+  - フーガは段のように動く主題 (Fuga I は 15:16、Fuga II は 15:12)。主題の入りを少し前に
+- すべて録音から切り出したピアノの実音。シンセ・ドラム・心臓の鼓動・弦・オルガンなし。分散和音はピアノの 4 声の約 10 dB 下、4 声と半音でぶつかる所は鳴っている音へ寄せる (`fix_pulse`)
+
+```bash
+python3 compose_tablet63.py bank61/bank.json score_tablet63.json && python3 synth.py score_tablet63.json tablet63.wav && python3 video.py score_tablet63.json tablet63.wav tablet63.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
