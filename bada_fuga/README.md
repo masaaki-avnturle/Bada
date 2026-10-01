@@ -1924,6 +1924,29 @@ python3 compose_tablet78.py bank74/bank.json score_tablet75.json bank74 score_ta
 python3 compose_tablet79.py bank74/bank.json score_tablet78.json bank74 score_tablet79.json && python3 synth.py score_tablet79.json tablet79.wav && python3 video.py score_tablet79.json tablet79.wav tablet79.mp4
 ```
 
+## 🎹📜 Requiem BADA — Tablet Sessions LXXX · Fuga 08:53 (9/24 08:53 の録音を想像して — くり返さず、LXXIX と同じ長さの 1 つのフーガに、高音を抑えて, ホ短調, ♩=60, 7 分 4 秒)
+
+主題 (ホ短調で **ミ・ファ#・シ・ミ・ミ**) も和音の進みも 9/24 08:53 の録音から。ループせず、フーガの技法を順にたどって 106 小節 (LXXIX と同じ 424 秒) を書き通す:
+
+| 区間 | 小節 | 内容 |
+|:--|:--|:--|
+| 1. 提示 | 16 | 4 声フーガ (アルト → ソプラノの答え → バス → テノール、下属調の入り、ストレッタ、保続低音) |
+| 2. 間奏 | 8 | 録音の和音の進み (`rec_chords`) の上で、主題の頭 (ミ・ファ#) が声部から声部へ — その小節の和音に合う高さで |
+| 3. 転回のフーガ | 16 | 主題を上下に返した、オクターヴ下りる線 (レ・ド・ソ・レ・レ → ホ短調でミ・レ・ラ・ミ・ミ) のフーガ |
+| 4. 間奏 | 8 | 5 度ずつ下りるゼクエンツ、主題の頭が模倣で追いかける |
+| 5. 二重フーガ | 8 | 上る主題と下りる転回を反行で同時に、声部を入れ替えて 4 回 |
+| 6. 拡大 | 16 | バスが主題を 4 倍で、続いてテノールが 2 倍で — その上で 1 倍の主題・転回がストレッタで |
+| 7. コラール | 8 | 録音の和音の進みを、主題・転回を 2 倍にしたソプラノで静かに (レクイエム) |
+| 8. ストレッタ | 12 | 1 小節ずつずれて 4 声が次々に入る — 主題と転回が重なり合う |
+| 9. 保続音と終止 | 14 | 属音シの保続の上で主題 → 主音ミの保続の上で 2 倍の主題 → ホ長調の和音 |
+
+- **高音を抑える**: 曲全体を 1 オクターヴ低く書く (主題がミ 3〜ミ 4)。いちばん上でもミ 5 のあたり、いちばん下はミ 1 (音色の重心は約 620 Hz — 暗く深く)
+- すべて録音から切り出したピアノの実音。シンセ・ドラムなし
+
+```bash
+python3 compose_tablet80.py bank74/bank.json score_tablet80.json && python3 synth.py score_tablet80.json tablet80.wav && python3 video.py score_tablet80.json tablet80.wav tablet80.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
