@@ -1699,6 +1699,29 @@ python3 compose_tablet67.py level score_tablet68.json conv.wav     # ピアノ�
 python3 synth.py score_tablet68.json tablet68.wav && python3 video.py score_tablet68.json tablet68.wav tablet68.mp4
 ```
 
+## 🎹🕯 Requiem BADA — Tablet Sessions LXIX · Requiem 08:09 (9/23 08:09 の録音を主題曲に、LXVIII をバックに — フーガを醸すレクイエム, ホ短調, ♩=60, 約 5 分 40 秒)
+
+- **主題曲**: 9/23 08:09 の録音 (ト長調 / ホ短調)。最上声から主題 (ホ短調で シ・ラ・シ・ソ・ド・ミ、8 拍、`smooth()` でなめらかに) を作り、録音の実音も Introitus・長い音の中・Lacrimosa で流す
+- **バック**: LXVIII の技法と音 — 主題を ×16・×8 に伸ばしてテノールが 4 分音符ごとに打ち直し、深い鐘は 2 全音符ごと。長い音の中では LXVIII のホ短調の Adagio の抜粋
+  (主音ミの保続の上のフーガ — すべてピアノの実音) が、主題曲より約 4 dB 小さくバックで鳴る
+- **フーガを醸す**: ×16 の最初 (シ・ラ) で主題 → 5 度上の答え、属音シの保続の上でストレッタ、最後の主音ミの上で 1 倍と 2 倍 (拡大) の主題を同時に。
+  II 楽章は 08:09 の主題の 4 声フーガ (提示・下属調・ストレッタ・保続低音)、IV 楽章 ×8 の中でもストレッタ
+
+| 区間 | 内容 |
+|:--|:--|
+| Introitus | 主題曲の始まり (実音) |
+| I. Requiem ×16 (32 小節) | シ 2・ラ 2: 主題と答え / シ 12: LXVIII の二重フーガ → ストレッタ / ソ 6: 主題曲の実音 / ド 6: LXVIII のフーガの入り / ミ 4: 1 倍 + 2 倍の主題 |
+| II. Fuga | 08:09 の主題の 4 声フーガ |
+| III. Lacrimosa | 主題曲の実音 |
+| IV. Finale ×8 | シ 6: LXVIII 二度目のフーガ / ソ 3: ストレッタ / ド 3: 主題曲の終わり近く / ミ 2 |
+| Amen | ホ長調 |
+
+```bash
+python3 build_sampler.py bank69 20260923_080918.mp3 20260929_*.mp3 20260925_*.mp3
+# src/ に tablet68.wav (LXVIII) と 20260923_080918.wav
+python3 compose_tablet69.py bank69/bank.json src score_tablet69.json && python3 synth.py score_tablet69.json tablet69.wav && python3 video.py score_tablet69.json tablet69.wav tablet69.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
