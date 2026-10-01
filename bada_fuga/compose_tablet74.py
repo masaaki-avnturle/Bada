@@ -70,7 +70,7 @@ def main():
     m0 = src['73']['meta']
     out['meta'] = {k: v for k, v in m0.items() if k not in ('title', 'subtitle', 'footer', 'legend', 'vname', 'bank', 'rec_order')}
     out['meta'].update(bank=BANK, rec_order=rec_order,
-        title='Requiem BADA — LXXIV · Symphonia (LXVIII〜LXXIII)',
+        title='Requiem BADA — LXXIV · Symphonia LXVIII-LXXIII',
         subtitle='主題曲 (ピアノの実音) を 16 倍に伸ばし、先程の曲をバックに — フーガを醸すレクイエムの交響曲 (4 楽章、♩=60)',
         legend=['PF'], vname={'PF': 'ピアノ'},
         footer=['I. ホ短調 (LXVIII・LXIX) → II. 変ロ短調 (LXX) → III. ヘ短調 (LXXI・LXXII) → IV. ヘ短調 → ホ短調 → ホ長調 (LXXIII)',
