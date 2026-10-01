@@ -90,7 +90,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | **輸送機 3D CAD** | `TransporterCAD-android-apk` | `TransporterCAD-windows-exe` | `TransporterCAD-linux` |
 | **UFO 設計図面** | `UFODesigner-android-apk` | `UFODesigner-windows-exe` | `UFODesigner-linux` |
 | **BadaClaude** | `BadaClaude-android-apk` | `BadaClaude-windows-exe` | `BadaClaude-linux` |
-| 統合版 (3 アプリ入り) | `ContactTransporterStudio-android-apk` | `ContactTransporterStudio-windows-exe` | `ContactTransporterStudio-linux` |
+| **Bada 統合スタジオ** (4 アプリ入りの統合アプリ) | `BadaStudio-android-apk` | `BadaStudio-windows-exe` | `BadaStudio-linux` |
 | 論文 PDF から作ったアプリ | `PaperApps` (論文ごとに `.apk` / `.deb` / `.html` / `.bada` / 図面 / 論文 PDF) | ← | ← |
 
 - **Android**: zip を展開して `…-android.apk` を開く (提供元不明のアプリのインストールを許可)
@@ -100,6 +100,14 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 同じファイルは [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`contact-transporter-latest`** にも添付されます
 (`ct-v*` タグを push するとそのタグの Release)。ワークフロー: [`.github/workflows/contact-transporter-build.yml`](../.github/workflows/contact-transporter-build.yml)、
 アプリの定義 (名前・ID・含める画面): [`apps.json`](apps.json)。各アプリには Bada IDE・方程式レジストリが付いています。
+
+## Bada 統合スタジオ — 4 アプリを 1 つに
+
+**ContactGPT・BadaClaude・異次元輸送機 3D CAD・UFO 設計図面**を 1 つにまとめた統合アプリです (`apps.json` の `studio`)。
+タブ: 💬 ContactGPT / 🧠 BadaClaude / 🛰 輸送機 3D CAD / 🛸 UFO 設計図面 / 📄 論文→アプリ / ⌨ Bada IDE / ∑ 方程式 2111 / ⓘ。
+どちらの対話タブで「…のアプリを作って」と頼んでも、書かれた Bada アプリはそのまま CAD / UFO タブで動き、IDE で編集できます。
+学習した ContactGPT の重みは BadaClaude の生成にも使われます。Claude API の設定欄は BadaClaude タブにあります。
+Android は `BadaStudio-android-apk`、Windows 10 / 11 は `BadaStudio-windows-exe`、Linux は `BadaStudio-linux` からダウンロードします (アプリ ID は従来の統合版と同じなので、上書きで更新されます)。
 
 ## 1. ContactGPT — [`bada/apps/contactgpt.bada`](bada/apps/contactgpt.bada)
 

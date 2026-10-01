@@ -41,7 +41,7 @@
 | **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
 | **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
 | **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-*-x64.exe` / `*-portable.exe` | `BadaClaude-*.AppImage` / `*.deb` |
-| 統合版 | `ContactTransporterStudio-android.apk` | `ContactTransporterStudio-*.exe` | `ContactTransporterStudio-*.AppImage` / `*.deb` |
+| **Bada 統合スタジオ** (4 アプリを 1 つに) | `BadaStudio-android.apk` | `BadaStudio-*-x64.exe` / `*-portable.exe` | `BadaStudio-*.AppImage` / `*.deb` |
 
 **BadaClaude** は Claude / ChatGPT の対話の仕組み (字句化 → 意図推定 ψ = √a·e^{iθ} → 論文 10 本 + 方程式 2111 本の BM25 検索 → 道具 → 出典つき回答 → Ω 台帳) を正規の Bada で書いた対話エンジンです ([`contact_transporter/bada/apps/badaclaude.bada`](contact_transporter/bada/apps/badaclaude.bada))。ほかの 3 アプリと同じく要求に応えて Bada でアプリを書き、論文 PDF からアプリ一式を作ってダウンロードできます。Claude API モード (任意・API キーは利用者が設定) では Bada が集めた文脈を Claude に渡します。学習済みの Claude / ChatGPT の重みは含みません。
 

@@ -265,6 +265,12 @@ for (const app of Object.keys(require("../apps.json"))) {
   const cfgDir = path.join(__dirname, "..", "dist", "ufo", "cordova", "bada-files", "plugin.xml");
   if (fs.existsSync(path.join(__dirname, "..", "dist", "ufo", "cordova"))) truthy("package-app.js がプラグインを dist/<app>/cordova/bada-files に同梱", fs.existsSync(cfgDir));
 }
+{
+  const A = require("../apps.json").studio;
+  truthy("統合アプリ (studio): ContactGPT・BadaClaude・輸送機 CAD・UFO・論文→アプリ・IDE を 1 つに", ["chat", "claude", "cad", "ufo", "paper", "ide", "eqs"].every((t) => A.tabs.includes(t)) && A.kb && A.claude && A.weights && A.file === "BadaStudio");
+  const sd = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
+  if (fs.existsSync(sd)) { const h = fs.readFileSync(sd, "utf8"); truthy("dist/studio に BadaClaude の頭脳・知識ベース・ContactGPT の重みを同梱", h.includes("apps/badaclaude.bada") && h.includes("window.CT_KB = {\"sources\"") && !h.includes("window.CT_WEIGHTS = null") && h.includes('id="tab-claude"')); }
+}
 const bcDist = path.join(__dirname, "..", "dist", "badaclaude", "www", "index.html");
 if (fs.existsSync(bcDist)) {
   const h = fs.readFileSync(bcDist, "utf8");
