@@ -2030,6 +2030,21 @@ python3 build_sampler.py bank85 <11 曲の録音.mp3>
 python3 compose_tablet85.py bank85/bank.json score_tablet85.json && python3 synth.py score_tablet85.json tablet85.wav && python3 video.py score_tablet85.json tablet85.wav tablet85.mp4
 ```
 
+## 🎹🌸 Requiem BADA — Tablet Sessions LXXXVI · Fiore dolce (piano) (LXXXV から声を消して — ピアノの音だけで, ホ短調, 3 分 58 秒)
+
+- **声が入っていた理由**: `synth.py` の実音サンプラーは「いちばん近い音高の 1 音」を音源の表の **全部の録音** から探す (同じ録音の音を少し優先するだけ)。
+  bank85 には歌声・声の混じった録音 (9/28 06:42・17:46 など) の 1 音も入っていて、ピアノの録音にない低い音 (ミ 2・ファ 2 …) はそれらから選ばれていた。
+  LXXXV では旋律の一部も 06:42 の音で鳴らしていた。Intro の 9/24 11:21 の実音も、ピアノの 1 音が切り出せない (声・シンセの混じった) 録音だった
+- **直したこと**:
+  - 音源の表を、ピアノだけの 4 本の録音 (08:09・08:53・08:49・13:04) の 1 音だけに絞って書き出し (`score_tablet86.bank.json`)、それで鳴らす
+  - 旋律もすべて 08:09 の音で。Intro は録音そのものをやめ、左手の分散和音だけで静かに始める
+  - いちばん低い音はド 2 まで (Coda の Em9 の分散和音はミ 2 から): ピアノの録音の 1 音 (いちばん低いのはラ# 2) から下げすぎないように
+- 曲 (旋律・和音・形式) は LXXXV と同じ。旋律の「音の高さと流れ」は 11 曲の録音から採ったまま (06:42・17:46 も旋律としてピアノで弾く)
+
+```bash
+python3 compose_tablet86.py bank85/bank.json score_tablet86.json && python3 synth.py score_tablet86.json tablet86.wav && python3 video.py score_tablet86.json tablet86.wav tablet86.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
