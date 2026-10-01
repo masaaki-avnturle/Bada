@@ -959,7 +959,7 @@
       if (kind === "deb") {
         const d = await X.buildDeb({ pkg: "bada-" + base.replace(/_/g, "-"), title: PAPER.analysis.title.slice(0, 60), description: app.desc,
           html: exportedHtml(app), bada: { name: base + ".bada", src: app.src }, pdf: { name: PAPER.file.replace(/[^\w.\-]+/g, "_"), data: PAPER.bytes } });
-        await saveFile(`${d.pkg}_1.0.0_all.deb`, new Blob([d.bytes], { type: "application/vnd.debian.binary-package" }));
+        await saveFile(`${d.pkg}_all.deb`, new Blob([d.bytes], { type: "application/vnd.debian.binary-package" }));
       }
       if (kind === "report") await saveFile(base + "_report.pdf", new Blob([await buildReport(app)], { type: "application/pdf" }));
       if (kind === "paper") await saveFile(PAPER.file, new Blob([PAPER.bytes], { type: "application/pdf" }));
@@ -1102,7 +1102,13 @@
 
   // ============================================================ 起動
   const BI = window.CT_BUILD || {};
-  $("#build-info").textContent = `build ${BI.version || "dev"} ${BI.date || ""}`;
+  $("#build-info").textContent = `バージョン ${BI.version || "dev"} (versionCode ${BI.versionCode || "-"}) ${BI.date || ""}`;
+  // 上書きインストールでアップデートされたら知らせる (設定・作ったアプリ・学習した重みはそのまま)
+  if (!PAYLOAD && BI.version) {
+    const prev = store.get("ct.version", null);
+    if (prev && prev !== BI.version) setTimeout(() => toast(`${APP.name || "アプリ"} を ${prev} → ${BI.version} にアップデートしました (データはそのまま)`), 1500);
+    store.set("ct.version", BI.version);
+  }
   const first = PAYLOAD ? "cad" : store.get("ct.tab", APP.tabs[0]);
   showTab(HAS(first) ? first : APP.tabs[0]);
 })();

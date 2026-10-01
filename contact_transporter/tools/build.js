@@ -18,7 +18,7 @@ const ORDER = ["physics.js", "gpt.js", "cad.js", "drafting.js", "viewer.js", "ch
 
 const read = (p) => fs.readFileSync(p, "utf8");
 const safe = (s) => s.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
-const pkg = JSON.parse(read(path.join(ROOT, "app", "electron", "package.json")));
+const VER = require("./version.js");
 const wPath = path.join(DATA, "contactgpt_weights.json");
 const weights = fs.existsSync(wPath) ? read(wPath) : "null";
 if (weights === "null") console.warn("warning: data/contactgpt_weights.json がありません (ContactGPT は生成なしで動作)");
@@ -48,7 +48,7 @@ function build(key) {
     }
   })(path.join(ROOT, "bada"));
   put("BADA", safe(JSON.stringify(badaFiles)));
-  put("BUILD", JSON.stringify({ version: pkg.version, date: new Date().toISOString().slice(0, 10) }));
+  put("BUILD", JSON.stringify({ version: VER.version, versionCode: VER.versionCode, date: new Date().toISOString().slice(0, 10) }));
   put("APP", JSON.stringify(Object.assign({ key }, A)));
   // Claude API モード (BadaClaude) だけ api.anthropic.com への接続を許可する
   if (A.claude) html = html.replace("default-src 'self' data: blob: gap: file:;", "default-src 'self' data: blob: gap: file:; connect-src 'self' data: blob: file: https://api.anthropic.com;");

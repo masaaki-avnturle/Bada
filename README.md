@@ -37,13 +37,15 @@
 
 | アプリ | Android (APK) | Windows 10 / 11 | Linux |
 |:---|:---|:---|:---|
-| **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-*-x64.exe` / `*-portable.exe` | `ContactGPT-*.AppImage` / `*.deb` |
-| **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
-| **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
-| **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-*-x64.exe` / `*-portable.exe` | `BadaClaude-*.AppImage` / `*.deb` |
-| **Bada 統合スタジオ** (4 アプリを 1 つに) | `BadaStudio-android.apk` | `BadaStudio-*-x64.exe` / `*-portable.exe` | `BadaStudio-*.AppImage` / `*.deb` |
+| **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-Setup-x64.exe` / `ContactGPT-portable.exe` | `ContactGPT-x86_64.AppImage` / `ContactGPT-amd64.deb` |
+| **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-Setup-x64.exe` / `TransporterCAD-portable.exe` | `TransporterCAD-x86_64.AppImage` / `TransporterCAD-amd64.deb` |
+| **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-Setup-x64.exe` / `UFODesigner-portable.exe` | `UFODesigner-x86_64.AppImage` / `UFODesigner-amd64.deb` |
+| **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-Setup-x64.exe` / `BadaClaude-portable.exe` | `BadaClaude-x86_64.AppImage` / `BadaClaude-amd64.deb` |
+| **Bada 統合スタジオ** (4 アプリを 1 つに) | `BadaStudio-android.apk` | `BadaStudio-Setup-x64.exe` / `BadaStudio-portable.exe` | `BadaStudio-x86_64.AppImage` / `BadaStudio-amd64.deb` |
 
 **BadaClaude** は Claude / ChatGPT の対話の仕組み (字句化 → 意図推定 ψ = √a·e^{iθ} → 論文 10 本 + 方程式 2111 本の BM25 検索 → 道具 → 出典つき回答 → Ω 台帳) を正規の Bada で書いた対話エンジンです ([`contact_transporter/bada/apps/badaclaude.bada`](contact_transporter/bada/apps/badaclaude.bada))。ほかの 3 アプリと同じく要求に応えて Bada でアプリを書き、論文 PDF からアプリ一式を作ってダウンロードできます。Claude API モード (任意・API キーは利用者が設定) では Bada が集めた文脈を Claude に渡します。学習済みの Claude / ChatGPT の重みは含みません。
+
+**アップデート**: ファイル名・アプリ ID・デジタル署名は毎回同じで、バージョンだけが大きくなるので、新しい版を開けば上書きでアップデートされます (データはそのまま。詳しくは [`contact_transporter/`](contact_transporter/#アップデート-上書きインストール))。
 
 ビルドは [`contact-transporter-build.yml`](.github/workflows/contact-transporter-build.yml)、詳細は [`contact_transporter/`](contact_transporter/) を参照。
 

@@ -37,7 +37,7 @@ async function main(pdf, outDir) {
   // .deb
   const pdfBytes = new Uint8Array(fs.readFileSync(pdf));
   const deb = await X.buildDeb({ pkg: "bada-" + base.replace(/_/g, "-"), title, description: main[3], html, bada: { name: base + ".bada", src: main[1] }, pdf: { name: path.basename(pdf).replace(/[^\w.\-]+/g, "_"), data: pdfBytes } });
-  fs.writeFileSync(path.join(outDir, `${deb.pkg}_1.0.0_all.deb`), deb.bytes);
+  fs.writeFileSync(path.join(outDir, `${deb.pkg}_all.deb`), deb.bytes);
   // APK (ランナー APK のひな形 + JAR 署名)
   const tpl = process.env.CT_RUNNER_APK || path.join(ROOT, "data", "runner.apk");
   let apkMsg = "APK: ひな形がないため省略";

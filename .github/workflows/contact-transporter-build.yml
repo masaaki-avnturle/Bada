@@ -43,6 +43,9 @@ permissions:
   contents: write
 
 env:
+  # 全アプリ共通のビルド番号 → バージョン 1.1.<番号> / Android versionCode 100000+<番号> (tools/version.js)。
+  # 毎回大きくなり、署名は固定鍵なので、Android / Windows / Linux とも上書きインストールでアップデートできる
+  CT_BUILD: ${{ github.run_number }}
   RELEASE_TAG: ${{ github.event.inputs.release_tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || 'contact-transporter-latest' }}
 
 jobs:
@@ -267,7 +270,7 @@ jobs:
           unzip -q "$HOME/gradle.zip" -d "$HOME/gradle-dist"
           echo "$HOME/gradle-dist/gradle-7.6.4/bin" >> "$GITHUB_PATH"
           echo "CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL=https://services.gradle.org/distributions/gradle-7.6.4-bin.zip" >> "$GITHUB_ENV"
-      - name: Build debug APK (Cordova) — ${{ matrix.file }}
+      - name: Build APK (Cordova, release) — ${{ matrix.file }}
         run: |
           set -e
           npm install -g cordova@12.0.0
@@ -282,12 +285,31 @@ jobs:
           cordova plugin add cordova-plugin-file@8.0.1
           # ファイルの取り込み (フォルダを開いて選ぶ) とダウンロード フォルダへの保存
           cordova plugin add "../dist/${{ matrix.app }}/cordova/bada-files"
-          cordova build android
+          cordova build android --release -- --packageType=apk
           grep -q "BadaFiles" platforms/android/app/src/main/res/xml/config.xml
-      - name: Collect APK
+      # 署名は毎回同じ固定鍵 (app/signing/bada-apps-*、Secrets ANDROID_SIGNING_KEY_PK8 / ANDROID_SIGNING_CERT
+      # (base64) があればそちら)。以前の CI はビルドごとに違うデバッグ鍵だったため上書きインストールできなかった
+      - name: Sign with the fixed key + verify (same signature on every build → installs as an update)
+        env:
+          KEY_B64: ${{ secrets.ANDROID_SIGNING_KEY_PK8 }}
+          CERT_B64: ${{ secrets.ANDROID_SIGNING_CERT }}
         run: |
+          set -e
+          BT="$ANDROID_SDK_ROOT/build-tools/33.0.2"
+          KEY="dist/${{ matrix.app }}/signing/bada-apps-key.pk8"; CERT="dist/${{ matrix.app }}/signing/bada-apps-cert.der"
+          if [ -n "$KEY_B64" ] && [ -n "$CERT_B64" ]; then
+            echo "$KEY_B64" | base64 -d > "$RUNNER_TEMP/key.pk8"; echo "$CERT_B64" | base64 -d > "$RUNNER_TEMP/cert.der"
+            KEY="$RUNNER_TEMP/key.pk8"; CERT="$RUNNER_TEMP/cert.der"; echo "署名鍵: Secrets"
+          else echo "署名鍵: app/signing/bada-apps-* (リポジトリ同梱の固定鍵)"; fi
+          UNSIGNED=$(ls cordova-build/platforms/android/app/build/outputs/apk/release/*.apk | head -1)
           mkdir -p out
-          cp cordova-build/platforms/android/app/build/outputs/apk/debug/*.apk "out/${{ matrix.file }}-android.apk"
+          "$BT/zipalign" -f -p 4 "$UNSIGNED" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" sign --key "$KEY" --cert "$CERT" --out "out/${{ matrix.file }}-android.apk" "$RUNNER_TEMP/aligned.apk"
+          "$BT/apksigner" verify --verbose --print-certs "out/${{ matrix.file }}-android.apk" | tee "$RUNNER_TEMP/v.txt"
+          WANT=$(openssl x509 -inform DER -in "$CERT" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr 'A-F' 'a-f')
+          grep -q "certificate SHA-256 digest: $WANT" "$RUNNER_TEMP/v.txt"
+          "$BT/aapt" dump badging "out/${{ matrix.file }}-android.apk" | head -1
+          "$BT/aapt" dump badging "out/${{ matrix.file }}-android.apk" | head -1 | grep -q "versionCode='$((100000 + CT_BUILD))'"
           ls -la out
       - uses: actions/upload-artifact@v4
         with:
@@ -314,11 +336,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Build Windows 10/11 EXE (Electron — NSIS installer + portable) — ${{ matrix.file }}
+      # Authenticode 署名も毎回同じ証明書 (app/signing/bada-apps-codesign.pfx、Secrets WIN_CSC_LINK /
+      # WIN_CSC_KEY_PASSWORD があればそちら)。同じ appId + 大きいバージョンなので、インストーラは上書きでアップデートする
+      - name: Build Windows 10/11 EXE (Electron — NSIS installer + portable, signed) — ${{ matrix.file }}
         working-directory: dist/${{ matrix.app }}/electron
+        env:
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
         run: |
+          if (-not $env:CSC_LINK) { $env:CSC_LINK = (Resolve-Path ../signing/bada-apps-codesign.pfx).Path; $env:CSC_KEY_PASSWORD = "bada-apps" }
           npm install --no-audit --no-fund
           npm run dist
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($f in Get-ChildItem dist/*.exe) {
+            $sig = Get-AuthenticodeSignature $f.FullName
+            Write-Host "$($f.Name): $($sig.SignerCertificate.Subject) / $($sig.SignerCertificate.Thumbprint) / $($sig.Status)"
+            if (-not $sig.SignerCertificate) { throw "$($f.Name) が署名されていません" }
+            $ver = (Get-Item $f.FullName).VersionInfo.ProductVersion
+            Write-Host "  version $ver"
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.file }}-windows-exe
@@ -382,15 +418,21 @@ jobs:
 
             | アプリ | Android | Windows 10 / 11 | Linux |
             |:--|:--|:--|:--|
-            | **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-*-x64.exe` / `*-portable.exe` | `ContactGPT-*.AppImage` / `*.deb` |
-            | **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-*-x64.exe` / `*-portable.exe` | `TransporterCAD-*.AppImage` / `*.deb` |
-            | **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-*-x64.exe` / `*-portable.exe` | `UFODesigner-*.AppImage` / `*.deb` |
-            | **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-*-x64.exe` / `*-portable.exe` | `BadaClaude-*.AppImage` / `*.deb` |
-            | **Bada 統合スタジオ** (4 アプリ入り) | `BadaStudio-android.apk` | `BadaStudio-*-x64.exe` / `*-portable.exe` | `BadaStudio-*.AppImage` / `*.deb` |
+            | **ContactGPT** | `ContactGPT-android.apk` | `ContactGPT-Setup-x64.exe` / `ContactGPT-portable.exe` | `ContactGPT-x86_64.AppImage` / `ContactGPT-amd64.deb` |
+            | **輸送機 3D CAD** | `TransporterCAD-android.apk` | `TransporterCAD-Setup-x64.exe` / `TransporterCAD-portable.exe` | `TransporterCAD-x86_64.AppImage` / `TransporterCAD-amd64.deb` |
+            | **UFO 設計図面** | `UFODesigner-android.apk` | `UFODesigner-Setup-x64.exe` / `UFODesigner-portable.exe` | `UFODesigner-x86_64.AppImage` / `UFODesigner-amd64.deb` |
+            | **BadaClaude** | `BadaClaude-android.apk` | `BadaClaude-Setup-x64.exe` / `BadaClaude-portable.exe` | `BadaClaude-x86_64.AppImage` / `BadaClaude-amd64.deb` |
+            | **Bada 統合スタジオ** (4 アプリ入り) | `BadaStudio-android.apk` | `BadaStudio-Setup-x64.exe` / `BadaStudio-portable.exe` | `BadaStudio-x86_64.AppImage` / `BadaStudio-amd64.deb` |
 
             - Android: 提供元不明のアプリのインストールを許可して APK を開く
-            - Windows: `*-x64.exe` はインストーラ、`*-portable.exe` はインストール不要
+            - Windows: `*-Setup-x64.exe` はインストーラ、`*-portable.exe` はインストール不要
             - Linux: `chmod +x *.AppImage` で実行、または `sudo apt install ./xxx.deb`
+
+            **アップデート (上書きインストール)**: ファイル名・アプリ ID・署名は毎回同じで、バージョンだけが大きくなります
+            (このビルドは ${{ env.CT_BUILD }} 番 = バージョン 1.1.${{ env.CT_BUILD }})。新しいファイルをそのまま開けば、
+            設定・作ったアプリ・学習した重みを残したまま上書きでアップデートされます
+            (Android: 同じ署名 + 大きい versionCode、Windows: 同じ appId + 署名済みインストーラ、Linux: `sudo apt install ./xxx.deb`)。
+            ※ 以前の版 (ビルドごとに違う署名だったもの) が入っている Android 端末だけは、一度アンインストールしてから入れてください。
 
             **論文 PDF → アプリ**: 各アプリの「📄 論文→アプリ」タブで PDF を投稿すると、Bada でアプリを書き、
             作ったアプリ (.bada / .html)・Windows 10 / 11 EXE・APK・Linux .deb・設計書 PDF・論文 PDF をダウンロード フォルダへ保存できます。

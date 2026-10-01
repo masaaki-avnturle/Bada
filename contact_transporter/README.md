@@ -42,6 +42,24 @@
 日本語の要求文の解析 (キーワードの前後の数値・倍率・「」の名前・否定・書き出し形式・視点) も Bada で書いています ([`lib/nlp.bada`](bada/lib/nlp.bada))。
 ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じく `ui_*` で画面を宣言し、`build()` / `frame(t)` / `sheet_draw` で 3D と図面を作ります。
 
+## アップデート (上書きインストール)
+
+全アプリとも、**ファイル名・アプリ ID・デジタル署名は毎回同じ**で、**バージョンだけがビルドごとに大きく**なります
+(バージョン `1.1.<ビルド番号>`、Android の versionCode `100000 + ビルド番号`、[`tools/version.js`](tools/version.js))。
+新しい版のファイルをそのまま開けば、**設定・作ったアプリ・学習した重みを残したまま上書きでアップデート**されます。
+アップデート後の初回起動では「○○ を 1.1.10 → 1.1.11 にアップデートしました」と表示され、ⓘ タブにバージョンが出ます。
+
+| 端末 | ファイル | 上書きアップデートの仕組み |
+|:--|:--|:--|
+| Android | `<アプリ>-android.apk` | 固定鍵 ([`app/signing/`](app/signing/)) で `apksigner` 署名 (v2 + v3) + versionCode が大きい。Actions で署名の指紋と versionCode を検査 |
+| Windows 10 / 11 | `<アプリ>-Setup-x64.exe` / `<アプリ>-portable.exe` | 固定の証明書で Authenticode 署名 (発行元「Bada Apps」) + 同じ appId のインストーラが旧版を置き換える |
+| Linux | `<アプリ>-amd64.deb` / `<アプリ>-x86_64.AppImage` | 同じパッケージ名 + 大きいバージョン → `sudo apt install ./<アプリ>-amd64.deb` で上書き (AppImage は置き換えるだけ) |
+| 論文から作ったアプリ | `.apk` / `.exe` / `.deb` | APK は同じ鍵・同じ ID、EXE は同じ展開先に上書き、.deb は作成日時のバージョン (`1.0.YYYYMMDDhhmm`) |
+
+※ これより前の版 (Actions がビルドごとに違うデバッグ鍵で署名していた APK) が入っている Android 端末では、
+署名が違うため **一度だけアンインストール**してから新しい APK を入れてください。以後は上書きでアップデートできます。
+自分だけの鍵を使う場合は [`app/signing/README.md`](app/signing/README.md) のとおり Secrets に登録します。
+
 ## 論文 PDF を投稿して、アプリを作ってダウンロード
 
 4 アプリとも **「📄 論文→アプリ」タブ** で論文の PDF を投稿できます (ドロップまたは「📂 PDF を選ぶ」。同梱の設計図書で試すボタンもあります)。
@@ -70,7 +88,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | 単体アプリ | `paper_*.html` — Bada 処理系 + 作ったアプリ入りの 1 ファイル。どの端末のブラウザでも動く |
 | Windows アプリ | `paper_*.exe` — Windows 10 / 11 用。ダブルクリックで `%LOCALAPPDATA%\BadaApps\` に展開し、標準搭載の Microsoft Edge のアプリ ウィンドウで起動 ([ランチャー](app/windows/launcher.c)、Actions で Windows 実機テスト)。署名なしのため初回は SmartScreen の「詳細情報 → 実行」 |
 | Android アプリ | `paper_*.apk` — ランナー APK の `assets/www/index.html` を差し替え、APK v1 (JAR) 署名 ([デバッグ鍵](app/signing/)) |
-| Linux アプリ | `bada-paper-*_1.0.0_all.deb` — `sudo apt install ./….deb` でアプリ一覧に入る (Chromium / Firefox / xdg-open で起動) |
+| Linux アプリ | `bada-paper-*_all.deb` — `sudo apt install ./….deb` でアプリ一覧に入る (Chromium / Firefox / xdg-open で起動) |
 | 設計書 PDF | `paper_*_report.pdf` — 表紙・3D (等角図)・A3 図面・方程式・Bada ソースのページ |
 | 論文 PDF | 投稿した PDF (原本) |
 
@@ -94,7 +112,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | 論文 PDF から作ったアプリ | `PaperApps` (論文ごとに `.apk` / `.deb` / `.html` / `.bada` / 図面 / 論文 PDF) | ← | ← |
 
 - **Android**: zip を展開して `…-android.apk` を開く (提供元不明のアプリのインストールを許可)
-- **Windows 10 / 11**: `…-1.0.0-x64.exe` はインストーラ、`…-1.0.0-portable.exe` はインストール不要
+- **Windows 10 / 11**: `…-Setup-x64.exe` はインストーラ、`…-portable.exe` はインストール不要
 - **Linux**: `chmod +x …-x86_64.AppImage` で実行、または `sudo apt install ./…-amd64.deb`
 
 同じファイルは [Releases](https://github.com/masaaki-avnturle/Bada/releases) の **`contact-transporter-latest`** にも添付されます

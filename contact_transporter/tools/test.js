@@ -271,6 +271,24 @@ for (const app of Object.keys(require("../apps.json"))) {
   const sd = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
   if (fs.existsSync(sd)) { const h = fs.readFileSync(sd, "utf8"); truthy("dist/studio に BadaClaude の頭脳・知識ベース・ContactGPT の重みを同梱", h.includes("apps/badaclaude.bada") && h.includes("window.CT_KB = {\"sources\"") && !h.includes("window.CT_WEIGHTS = null") && h.includes('id="tab-claude"')); }
 }
+// ---- アップデート (上書きインストール): 名前・ID・署名は毎回同じ、バージョンだけ大きくなる
+{
+  const cp = require("child_process"), crypto = require("crypto");
+  const ver = (b) => JSON.parse(cp.execFileSync(process.execPath, [path.join(__dirname, "version.js")], { env: Object.assign({}, process.env, { CT_BUILD: String(b) }) }).toString());
+  const v1 = ver(11), v2 = ver(12);
+  truthy(`バージョンはビルド番号で増える: ${v1.version} (${v1.versionCode}) → ${v2.version} (${v2.versionCode})、旧版 1.0.0 (10000) より大きい`, v2.versionCode > v1.versionCode && v1.versionCode > 10000 && v2.version === "1.1.12");
+  const sig = path.join(__dirname, "..", "app", "signing");
+  const key = crypto.createPrivateKey({ key: fs.readFileSync(path.join(sig, "bada-apps-key.pk8")), format: "der", type: "pkcs8" });
+  const cert = new crypto.X509Certificate(fs.readFileSync(path.join(sig, "bada-apps-cert.der")));
+  const msg = Buffer.from("bada"), sg = crypto.sign("sha256", msg, key);
+  truthy(`固定の署名鍵と証明書が対 (${cert.subject.replace(/\n/g, ", ")}、期限 ${cert.validTo})`, crypto.verify("sha256", msg, cert.publicKey, sg) && cert.keyUsage.includes("1.3.6.1.5.5.7.3.3"));
+  for (const app of Object.keys(require("../apps.json"))) {
+    const d = path.join(__dirname, "..", "dist", app);
+    if (!fs.existsSync(path.join(d, "cordova", "config.xml"))) continue;
+    const cfg = fs.readFileSync(path.join(d, "cordova", "config.xml"), "utf8"), pkg = JSON.parse(fs.readFileSync(path.join(d, "electron", "package.json"), "utf8"));
+    truthy(`dist/${app}: versionCode と固定のファイル名 (${pkg.build.win.artifactName})、署名鍵を同梱`, /android-versionCode="\d+"/.test(cfg) && !/\$\{version\}/.test(pkg.build.win.artifactName + pkg.build.portable.artifactName + pkg.build.linux.artifactName) && fs.existsSync(path.join(d, "signing", "bada-apps-key.pk8")));
+  }
+}
 const bcDist = path.join(__dirname, "..", "dist", "badaclaude", "www", "index.html");
 if (fs.existsSync(bcDist)) {
   const h = fs.readFileSync(bcDist, "utf8");
@@ -333,6 +351,7 @@ if (fs.existsSync(dist)) {
   const deb = await X.buildDeb({ pkg: "Bada Test", title: "テスト", description: "d", html: "<html></html>" });
   const debStr = new TextDecoder().decode(deb.bytes.subarray(0, 200));
   truthy("[書き出し] .deb (ar: debian-binary / control.tar.gz / data.tar.gz)", debStr.startsWith("!<arch>\n") && debStr.includes("debian-binary") && new TextDecoder("latin1").decode(deb.bytes).includes("data.tar.gz") && deb.pkg === "bada-test");
+  truthy(`[書き出し] 論文アプリ .deb のバージョンは作成日時 (${deb.version}) — 作り直すと apt で上書きアップデート`, /^1\.0\.\d{12}$/.test(deb.version) && new TextDecoder("latin1").decode(deb.bytes).length > 0);
   const lpath = path.join(__dirname, "..", "data", "bada-launcher.exe");
   const launcher = fs.existsSync(lpath) ? new Uint8Array(fs.readFileSync(lpath)) : new Uint8Array([0x4d, 0x5a, 0, 0]);
   const exe = X.buildWinExe(launcher, [{ name: "index.html", data: "<html>論文アプリ</html>" }, { name: "a.bada", data: "say 1" }], "bada-test");

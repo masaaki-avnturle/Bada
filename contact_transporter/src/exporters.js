@@ -219,8 +219,16 @@
     }
     return concat(parts);
   }
+  // 論文アプリ .deb のバージョン: 作った日時 (1.0.YYYYMMDDhhmm)。作り直すたびに大きくなるので
+  // apt / dpkg で同じパッケージ名のまま上書き (アップデート) インストールできる
+  function stampVersion(d) {
+    d = d || new Date();
+    const p = (n) => String(n).padStart(2, "0");
+    return `1.0.${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
+  }
   // opts: { pkg, version, title, description, html, bada: {name, src}, maintainer }
   async function buildDeb(o) {
+    const version = o.version || stampVersion();
     const pkg = o.pkg.toLowerCase().replace(/[^a-z0-9+.-]+/g, "-").replace(/^-+|-+$/g, "") || "bada-app";
     const dir = `/usr/share/bada-apps/${pkg}`;
     const launcher = `#!/bin/sh
@@ -249,7 +257,7 @@ Categories=Education;Science;
     if (o.pdf) files.push({ path: `.${dir}/${o.pdf.name}`, data: o.pdf.data });
     const size = Math.ceil(files.reduce((s, f) => s + (typeof f.data === "string" ? enc(f.data).length : f.data.length), 0) / 1024);
     const control = `Package: ${pkg}
-Version: ${o.version || "1.0.0"}
+Version: ${version}
 Architecture: all
 Maintainer: ${o.maintainer || "masaaki-avnturle <masaaki.tabu4@gmail.com>"}
 Installed-Size: ${size}
@@ -263,7 +271,7 @@ Description: ${o.title.replace(/\n/g, " ").slice(0, 70)}
 `;
     const controlTar = await gzip(tar([{ path: "./control", data: control }]));
     const dataTar = await gzip(tar(files));
-    return { pkg, bytes: ar([{ name: "debian-binary", data: enc("2.0\n") }, { name: "control.tar.gz", data: controlTar }, { name: "data.tar.gz", data: dataTar }]) };
+    return { pkg, version, bytes: ar([{ name: "debian-binary", data: enc("2.0\n") }, { name: "control.tar.gz", data: controlTar }, { name: "data.tar.gz", data: dataTar }]) };
   }
 
   // ------------------------------------------------------------ PDF (JPEG ページ)
