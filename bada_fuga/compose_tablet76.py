@@ -175,6 +175,7 @@ def build():
     P.place('S', f + 8, [(4, n('B4')), (4, n('A4')), (8, n('F#4'))], 0, 'Amen')
     for k in range(12): P.dyn[f + k] = DYNK * (0.55 + 0.1 * min(k, 6) / 6 - 0.15 * max(0, k - 8) / 4)
     LXIII.ARP.append((f, f + 10, 0.09, 0))
+    P.entries[:] = [e for e in P.entries if e[1] != '和声']                       # 伴奏の和音にはラベルを出さない
     assert b == total, (b, total)
     return P
 
@@ -182,7 +183,7 @@ META = {
     'style': 'recsampler', 'bank': sys.argv[1], 'rec_order': [R0809, R0853, R0849, R1246, R0806], 'piano_decay': 2.4, 'reverb': [6.0, 2.2, 0.5],
     'title': 'Requiem BADA — LXXVI · Requiem della vita',
     'subtitle': '人生の縮図 — 誕生・青春・闘い・愛と喪失・老い・死・永遠の光を、途切れずに調和と共鳴でたどるレクイエム',
-    'legend': ['PF'], 'vname': {'PF': '分散和音 (共鳴)'},
+    'legend': ['PF'], 'vname': {'PF': '分散和音'},
     'footer': ['誕生 ニ長調 → 青春 ト長調 → 闘い ロ短調 → 愛と喪失 ト短調 → 老い ホ短調 → 死 ニ短調 → 永遠の光 ニ長調',
                '主題はすべて主題曲 (9/23 08:06・08:09、9/24 08:49・08:53、9/25 12:46 の録音) から。すべてピアノの実音。'],
 }
