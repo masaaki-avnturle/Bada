@@ -1656,6 +1656,27 @@ LXV の技法 (主題を何倍にも伸ばし、伸ばした音をピアノで 4
 python3 compose_tablet66.py bank61/bank.json src score_tablet66.json && python3 synth.py score_tablet66.json tablet66.wav && python3 video.py score_tablet66.json tablet66.wav tablet66.mp4
 ```
 
+## 🎹🎼 Requiem BADA — Tablet Sessions LXVII · Symphonia (Klavier) (LXVI を、すべて実音のピアノで弾いているように, 4 楽章, ♩=60, 約 15 分 55 秒)
+
+楽譜・形式・骨組みは LXVI と同じ。LXVI で mp4 の音のまま流していた 20 の抜粋を、ピアノの実音 (録音から切り出した 1 音、bank61) で弾き直した。
+
+- **このリポジトリで作った曲** (symphony・acceptance・tablet・tablet6・tablet46/48/49inst・tablet60/61/62・LXV): もとの楽譜の音をそのまま使う —
+  4 声と、音の高さのある楽器 (弦・管・シンセ・オルガン・ピアノ) をすべてピアノで。ドラム・ティンパニ・心臓の鼓動・808 のベースは外す
+- **曲の中で流れていた別の mp4 の音** (LXV の中の tablet4 など): その曲の楽譜までたどってピアノで (`convert()` が再帰的にたどる)
+- **曲の中の「わたしの録音の実音」**: もともとピアノの実音なのでそのまま (調を動かす所は、その採譜をピアノで)
+- **楽譜のない 6 曲** (cp14_C_G_uplift・cp14_x8_part3・piano_solo_8x・requiem_fuga_drill/embrace/small): 音から採譜して (basic-pitch、ONNX) ピアノで
+- 両手で弾ける厚さに: 同じ高さの重なった音は 1 つに、同時の打鍵は 7 つまで (外声と強い音を残す)。調はテープのように速さを変えず、音の高さだけを動かす
+- 抜粋ごとの大きさは 2 回目の `level` でそろえる (ピアノに直した所だけを鳴らして測り、抜粋ごとに倍率を掛ける)
+
+```bash
+pip install basic-pitch --no-deps && pip install pretty_midi mir_eval resampy onnxruntime
+# sources.json: 各素材 (src/*.wav) の楽譜の場所、または {"transcribe": true}
+python3 compose_tablet67.py bank61/bank.json src sources.json score_tablet67.json
+# ピアノに直した所だけ (extras に "win" があるもの) を鳴らした wav で、抜粋ごとの大きさをそろえる
+python3 compose_tablet67.py level score_tablet67.json conv.wav
+python3 synth.py score_tablet67.json tablet67.wav && python3 video.py score_tablet67.json tablet67.wav tablet67.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
