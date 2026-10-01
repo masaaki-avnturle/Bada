@@ -1545,6 +1545,25 @@ python3 build_sampler.py bank61 20260929_151249.mp3 20260929_151602.mp3 20260929
 python3 compose_tablet61.py bank61/bank.json score_tablet61.json && python3 synth.py score_tablet61.json tablet61.wav && python3 video.py score_tablet61.json tablet61.wav tablet61.mp4
 ```
 
+## 🎹 Requiem BADA — Tablet Sessions LXII · Requiem e Fuga in re (LXI に、トラック 18 の雰囲気を合わせて — 実音のピアノだけで, ニ短調, ♩=62, 約 3 分 24 秒)
+
+LXI と同じ録音・主題・形式を、プロの楽曲のトラック 18 の雰囲気へ寄せた。トラック 18 も **音そのもの・旋律は使っていない** (解析で得た雰囲気だけ)。
+
+| トラック 18 (解析) | この曲で |
+|:--|:--|
+| ニ短調、♩≈123 | ニ短調、♩=62 (8 分音符が 1 分に 124) |
+| 軽い響き (低音が薄い)、1 秒に 4〜8 打の細かい動き | ドラムを外し、ピアノの左手の刻み (根音・オクターヴ・5 度・オクターヴの 8 分音符、`PF`) で動きを出す |
+| 調の道のり: ニ短調 → イ短調 → 変ロ → ト短調 → ヘ長調 → ニ短調 → ニ長調 | Requiem (ニ短調) → Fuga I (イ短調) → Lacrimosa (変ロ短調) → Fuga II (ニ短調、下属調ト短調の入り) → Amen (ニ長調) |
+| 50 秒・100 秒あたりの静かな谷 | Lacrimosa (録音の実音だけ、刻みが止まる) |
+
+- すべて録音から切り出したピアノの実音。シンセ・ドラム・心臓の鼓動・弦・オルガンなし
+- Introitus の 15:20 の録音 (ホ短調) は、テープのように全音下げてニ短調に (`REC` の `semis` -2、採譜の表示も時間を伸ばして合わせる)
+- 左手の刻みは 4 声と半音でぶつかる所だけ、鳴っている音の音名へ寄せる (`fix_pulse`)。大きさはピアノの 4 声の約 9 dB 下
+
+```bash
+python3 compose_tablet62.py bank61/bank.json score_tablet62.json && python3 synth.py score_tablet62.json tablet62.wav && python3 video.py score_tablet62.json tablet62.wav tablet62.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
