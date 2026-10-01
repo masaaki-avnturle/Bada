@@ -146,7 +146,7 @@
     row("図番 DWG No.", opts.number || "CT-0001");
     row("尺度 SCALE", `1:${scale}  (等角図 1:${isoScale})  単位 m`);
     row("投影法", "第三角法");
-    row("設計 DESIGNED BY", opts.author || "Bada Contact Transporter Studio");
+    row("設計 DESIGNED BY", opts.author || "Bada Nexus");
     row("日付 DATE", opts.date || new Date().toISOString().slice(0, 10));
     y += 3;
     if (opts.bom && opts.bom.length) {

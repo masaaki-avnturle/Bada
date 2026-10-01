@@ -2,7 +2,7 @@
 /*
  * package-app.js — アプリごとのネイティブ ラッパーを用意する
  *
- *   node tools/package-app.js <contactgpt|transporter|ufo|badaclaude|studio>
+ *   node tools/package-app.js <contactgpt|transporter|ufo|badaclaude|nexus>
  *
  *   dist/<アプリ>/electron/  … Windows 10/11 EXE (NSIS + ポータブル) / Linux AppImage・deb 用
  *                              (app/electron の main.js・preload.js・package.json をアプリ名・ID で書き換え)
@@ -50,6 +50,14 @@ main = main.replace('path.join(__dirname, "..", "..", "dist", "www", "index.html
   .replace('title: "Contact Transporter Studio"', `title: ${JSON.stringify(A.name)}`);
 fs.writeFileSync(path.join(E, "main.js"), main);
 fs.copyFileSync(path.join(ROOT, "app", "electron", "preload.js"), path.join(E, "preload.js"));
+// アプリごとのアイコン (app/icons/<アプリ>.png、tools/make-icons.js) — 同じようなアプリと見分けられるように
+const ICON = path.join(ROOT, "app", "icons", key + ".png");
+if (fs.existsSync(ICON)) {
+  fs.copyFileSync(ICON, path.join(E, "icon.png")); pkg.build.icon = "icon.png";
+  const LI = path.join(ROOT, "app", "icons", key + "-linux");
+  if (fs.existsSync(LI)) { fs.cpSync(LI, path.join(E, "icons"), { recursive: true }); pkg.build.linux.icon = "icons"; }
+  fs.writeFileSync(path.join(E, "package.json"), JSON.stringify(pkg, null, 2));
+}
 
 // ---- Cordova
 const C = path.join(DIST, "cordova");
@@ -60,6 +68,7 @@ cfg = cfg.replace(/<widget id="[^"]*" version="[^"]*"/, `<widget id="${A.id}" ve
   .replace(/<description>[^<]*<\/description>/, `<description>${xml(A.description)}</description>`);
 // 論文から作ったアプリの APK (ランナー) は v1 (JAR) 署名で配るため targetSdk 29 にする
 if (A.targetSdk) cfg = cfg.replace('<preference name="android-minSdkVersion" value="24" />', `<preference name="android-minSdkVersion" value="24" />\n  <preference name="android-targetSdkVersion" value="${A.targetSdk}" />\n  <preference name="android-compileSdkVersion" value="33" />`);
+if (fs.existsSync(ICON)) cfg = cfg.replace('<content src="index.html" />', '<content src="index.html" />\n  <icon src="www/icon.png" />');
 // Claude API モード (BadaClaude): 通信先は api.anthropic.com だけを許可
 if (A.claude) cfg = cfg.replace('<content src="index.html" />', '<content src="index.html" />\n  <access origin="https://api.anthropic.com" />');
 fs.writeFileSync(path.join(C, "config.xml"), cfg);
@@ -78,6 +87,7 @@ for (const f of ["bada-apps-key.pk8", "bada-apps-cert.der", "bada-apps-codesign.
   const W = path.join(C, "www");
   fs.mkdirSync(W, { recursive: true });
   fs.writeFileSync(path.join(W, "index.html"), html.slice(0, at) + '<script src="cordova.js"></script>\n' + html.slice(at));
+  if (fs.existsSync(ICON)) fs.copyFileSync(ICON, path.join(W, "icon.png"));
 }
 // ファイルの取り込み・保存プラグイン (Storage Access Framework / MediaStore) を同梱
 fs.cpSync(path.join(ROOT, "app", "cordova", "bada-files"), path.join(C, "bada-files"), { recursive: true });

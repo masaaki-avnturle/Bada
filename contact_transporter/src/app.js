@@ -1,5 +1,5 @@
 /*
- * app.js — Contact Transporter Studio の UI ホスト
+ * app.js — Bada Nexus ほか Bada アプリ共通の UI ホスト
  *
  * 3 つのアプリ (ContactGPT / 輸送機 3D CAD / UFO 設計図面) はそれぞれ Bada プログラム
  * (bada/apps/*.bada) で、ここはその実行環境です:
@@ -21,7 +21,7 @@
   const fmt = (v) => (typeof v === "number" ? (Number.isInteger(v) ? String(v) : String(+v.toPrecision(8))) : B.toText(v));
   const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
   // アプリの種類 (apps.json): ContactGPT / 輸送機 3D CAD / UFO 設計図面 / 統合版
-  const APP = window.CT_APP || { key: "studio", tabs: ["chat", "cad", "ufo", "ide", "eqs", "about"] };
+  const APP = window.CT_APP || { key: "nexus", tabs: ["chat", "cad", "ufo", "ide", "eqs", "about"] };
   const HAS = (t) => APP.tabs.includes(t);
   // 保存キーはアプリごとに分ける (同じ端末に複数のアプリを入れても混ざらない)
   const nsKey = (k) => k.replace(/^ct\./, `ct.${APP.key}.`);
@@ -1007,7 +1007,7 @@
       const tags = Object.entries(p.tagCount).sort((a, b) => b[1] - a[1]), mx = Math.max(1, ...tags.map((t) => t[1]));
       g.font = `24px ${FONT}`;
       for (const [t, n] of tags.slice(0, 11)) { g.fillStyle = "#333"; g.fillText(CP.TAG_JA[t] || t, 80, y + 26); g.fillStyle = "#1e88e5"; g.fillRect(330, y + 6, 700 * n / mx, 26); g.fillStyle = "#111"; g.fillText(String(n), 340 + 700 * n / mx, y + 28); y += 40; }
-      g.fillStyle = "#888"; g.font = `20px ${FONT}`; g.fillText("Contact Transporter Studio — masaaki-avnturle / Bada", 80, 1700);
+      g.fillStyle = "#888"; g.font = `20px ${FONT}`; g.fillText("Bada Nexus — masaaki-avnturle / Bada", 80, 1700);
       pages.push(await jpeg(c));
     }
     dlLog("設計書: 3D と図面を描いています…");

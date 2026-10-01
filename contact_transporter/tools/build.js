@@ -2,7 +2,7 @@
 /*
  * build.js — src/ を 1 枚の自己完結 HTML (dist/<アプリ>/www/index.html) にまとめる
  *
- *   node tools/build.js [contactgpt|transporter|ufo|studio|runner|all]   (既定: all。runner は常に作る)
+ *   node tools/build.js [contactgpt|transporter|ufo|badaclaude|nexus|runner|all]   (既定: all。runner は常に作る)
  *   アプリの定義 (名前・ID・含めるタブ) は apps.json。
  *   方程式 2111 本 (data/equations.json) と ContactGPT の学習済み重み
  *   (data/contactgpt_weights.json) も埋め込むので、オフラインで動きます。

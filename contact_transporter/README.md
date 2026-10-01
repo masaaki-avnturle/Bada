@@ -1,4 +1,4 @@
-# Contact Transporter Studio — Bada で書かれた ContactGPT · 異次元輸送機 3D CAD · UFO 設計図面
+# Bada Nexus ほか — Bada で書かれた ContactGPT · BadaClaude · 異次元輸送機 3D CAD · UFO 設計図面
 
 設計図書 **「CONTACT TRANSPORTER 異次元への輸送機 3 次元設計図書」**
 ([`contact_blueprint.pdf`](contact_blueprint.pdf), 量子プログラミング言語 Bada による生成, 37 ページ)
@@ -108,7 +108,7 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 | **輸送機 3D CAD** | `TransporterCAD-android-apk` | `TransporterCAD-windows-exe` | `TransporterCAD-linux` |
 | **UFO 設計図面** | `UFODesigner-android-apk` | `UFODesigner-windows-exe` | `UFODesigner-linux` |
 | **BadaClaude** | `BadaClaude-android-apk` | `BadaClaude-windows-exe` | `BadaClaude-linux` |
-| **Bada 統合スタジオ** (4 アプリ入りの統合アプリ) | `BadaStudio-android-apk` | `BadaStudio-windows-exe` | `BadaStudio-linux` |
+| **Bada Nexus** (統合アプリ・4 アプリ入り) | `BadaNexus-android-apk` | `BadaNexus-windows-exe` | `BadaNexus-linux` |
 | 論文 PDF から作ったアプリ | `PaperApps` (論文ごとに `.apk` / `.deb` / `.html` / `.bada` / 図面 / 論文 PDF) | ← | ← |
 
 - **Android**: zip を展開して `…-android.apk` を開く (提供元不明のアプリのインストールを許可)
@@ -119,13 +119,26 @@ ContactGPT が書いたプログラムは、ふつうの Bada アプリと同じ
 (`ct-v*` タグを push するとそのタグの Release)。ワークフロー: [`.github/workflows/contact-transporter-build.yml`](../.github/workflows/contact-transporter-build.yml)、
 アプリの定義 (名前・ID・含める画面): [`apps.json`](apps.json)。各アプリには Bada IDE・方程式レジストリが付いています。
 
-## Bada 統合スタジオ — 4 アプリを 1 つに
+## Bada Nexus — 4 アプリを 1 つにした統合アプリ (コードネーム Nexus)
 
-**ContactGPT・BadaClaude・異次元輸送機 3D CAD・UFO 設計図面**を 1 つにまとめた統合アプリです (`apps.json` の `studio`)。
+**ContactGPT・BadaClaude・異次元輸送機 3D CAD・UFO 設計図面**を 1 つにまとめた統合アプリです (`apps.json` の `nexus`)。
 タブ: 💬 ContactGPT / 🧠 BadaClaude / 🛰 輸送機 3D CAD / 🛸 UFO 設計図面 / 📄 論文→アプリ / ⌨ Bada IDE / ∑ 方程式 2111 / ⓘ。
 どちらの対話タブで「…のアプリを作って」と頼んでも、書かれた Bada アプリはそのまま CAD / UFO タブで動き、IDE で編集できます。
 学習した ContactGPT の重みは BadaClaude の生成にも使われます。Claude API の設定欄は BadaClaude タブにあります。
-Android は `BadaStudio-android-apk`、Windows 10 / 11 は `BadaStudio-windows-exe`、Linux は `BadaStudio-linux` からダウンロードします (アプリ ID は従来の統合版と同じなので、上書きで更新されます)。
+
+| | Bada Nexus |
+|:--|:--|
+| アプリ名 | **Bada Nexus** (アイコンは紺地に 4 色の点を結んだ「N」と NEXUS の文字) |
+| アプリ ID | `io.github.masaaki_avnturle.badanexus` |
+| ダウンロード | `BadaNexus-android-apk` / `BadaNexus-windows-exe` / `BadaNexus-linux` |
+| ファイル | `BadaNexus-android.apk` / `BadaNexus-Setup-x64.exe` / `BadaNexus-portable.exe` / `BadaNexus-amd64.deb` / `BadaNexus-x86_64.AppImage` |
+
+以前の統合版 (**Bada Studio** / **Contact Transporter Studio**、アプリ ID `…contacttransporter`) とは名前もアプリ ID も別なので、
+並べて入れても区別でき、Bada Nexus は以後この名前のまま上書きでアップデートできます。古い統合版は不要ならアンインストールしてください
+(Android: 設定 → アプリ → Bada Studio / Contact Transporter Studio → アンインストール、Windows: 設定 → アプリ、Linux: `sudo apt remove contacttransporterstudio badastudio`)。
+
+各アプリには専用のアイコンがあります ([`app/icons/`](app/icons/)、`tools/make-icons.js` で作成):
+Bada Nexus = 紺の「N」、ContactGPT = 青の吹き出し「GPT」、BadaClaude = 琥珀色の「ψ」、輸送機 3D CAD = 緑のジンバル環、UFO 設計図面 = 紫の円盤、論文から作ったアプリ = 灰色の論文。
 
 ## 1. ContactGPT — [`bada/apps/contactgpt.bada`](bada/apps/contactgpt.bada)
 
@@ -209,7 +222,7 @@ PDF のテキスト ([`data/contact_blueprint.txt`](data/contact_blueprint.txt))
 ## 開発
 
 ```sh
-node contact_transporter/tools/build.js all  # → dist/{contactgpt,transporter,ufo,badaclaude,studio}/www/index.html (ブラウザで開けば動く)
+node contact_transporter/tools/build.js all  # → dist/{contactgpt,transporter,ufo,badaclaude,nexus}/www/index.html (ブラウザで開けば動く)
 node contact_transporter/tools/package-app.js ufo   # → dist/ufo/electron (Windows/Linux) + dist/ufo/cordova (Android)
 node contact_transporter/tools/test.js       # Bada アプリ 4 本・設計図書の数値再現・GPT 勾配・CAD・図面のテスト
 python3 contact_transporter/tools/conformance.py   # Bada の JS 移植 ↔ Python 本家 (全 .bada で出力一致)

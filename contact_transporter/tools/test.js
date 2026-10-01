@@ -246,7 +246,7 @@ truthy(`図面 SVG (尺度 1:${sh.scale})`, sh.svg.startsWith("<svg") && sh.svg.
 truthy("図面 DXF", sh.dxf.includes("ENTITIES") && sh.dxf.trim().endsWith("EOF"));
 
 // ---- ビルド成果物
-const dist = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
+const dist = path.join(__dirname, "..", "dist", "nexus", "www", "index.html");
 // ファイルの取り込み: Android の WebView で開かない <input type="file" accept="…"> を HTML に置かない
 for (const app of Object.keys(require("../apps.json"))) {
   const f = path.join(__dirname, "..", "dist", app, "www", "index.html");
@@ -277,10 +277,10 @@ for (const app of Object.keys(require("../apps.json"))) {
   if (fs.existsSync(path.join(__dirname, "..", "dist", "ufo", "cordova"))) truthy("package-app.js がプラグインを dist/<app>/cordova/bada-files に同梱", fs.existsSync(cfgDir));
 }
 {
-  const A = require("../apps.json").studio;
-  truthy("統合アプリ (studio): ContactGPT・BadaClaude・輸送機 CAD・UFO・論文→アプリ・IDE を 1 つに", ["chat", "claude", "cad", "ufo", "paper", "ide", "eqs"].every((t) => A.tabs.includes(t)) && A.kb && A.claude && A.weights && A.file === "BadaStudio");
-  const sd = path.join(__dirname, "..", "dist", "studio", "www", "index.html");
-  if (fs.existsSync(sd)) { const h = fs.readFileSync(sd, "utf8"); truthy("dist/studio に BadaClaude の頭脳・知識ベース・ContactGPT の重みを同梱", h.includes("apps/badaclaude.bada") && h.includes("window.CT_KB = {\"sources\"") && !h.includes("window.CT_WEIGHTS = null") && h.includes('id="tab-claude"')); }
+  const A = require("../apps.json").nexus;
+  truthy("統合アプリ Bada Nexus (nexus): ContactGPT・BadaClaude・輸送機 CAD・UFO・論文→アプリ・IDE を 1 つに", ["chat", "claude", "cad", "ufo", "paper", "ide", "eqs"].every((t) => A.tabs.includes(t)) && A.kb && A.claude && A.weights && A.file === "BadaNexus" && A.id === "io.github.masaaki_avnturle.badanexus");
+  const sd = path.join(__dirname, "..", "dist", "nexus", "www", "index.html");
+  if (fs.existsSync(sd)) { const h = fs.readFileSync(sd, "utf8"); truthy("dist/nexus に BadaClaude の頭脳・知識ベース・ContactGPT の重みを同梱", h.includes("apps/badaclaude.bada") && h.includes("window.CT_KB = {\"sources\"") && !h.includes("window.CT_WEIGHTS = null") && h.includes('id="tab-claude"')); }
 }
 // ---- アップデート (上書きインストール): 名前・ID・署名は毎回同じ、バージョンだけ大きくなる
 {
@@ -297,6 +297,7 @@ for (const app of Object.keys(require("../apps.json"))) {
     const d = path.join(__dirname, "..", "dist", app);
     if (!fs.existsSync(path.join(d, "cordova", "config.xml"))) continue;
     const cfg = fs.readFileSync(path.join(d, "cordova", "config.xml"), "utf8"), pkg = JSON.parse(fs.readFileSync(path.join(d, "electron", "package.json"), "utf8"));
+    truthy(`dist/${app}: 専用アイコン (Android / Windows / Linux)`, pkg.build.icon === "icon.png" && fs.existsSync(path.join(d, "electron", "icon.png")) && cfg.includes('<icon src="www/icon.png" />') && fs.existsSync(path.join(d, "cordova", "www", "icon.png")));
     truthy(`dist/${app}: versionCode と固定のファイル名 (${pkg.build.win.artifactName})、署名鍵を同梱`, /android-versionCode="\d+"/.test(cfg) && !/\$\{version\}/.test(pkg.build.win.artifactName + pkg.build.portable.artifactName + pkg.build.linux.artifactName) && fs.existsSync(path.join(d, "signing", "bada-apps-key.pk8")));
   }
 }
@@ -307,7 +308,7 @@ if (fs.existsSync(bcDist)) {
 }
 if (fs.existsSync(dist)) {
   const h = fs.readFileSync(dist, "utf8");
-  truthy("dist/studio/www/index.html にプレースホルダが残っていない (書き出し用の PAYLOAD 以外)", !/\/\*@@(?!PAYLOAD@@)[A-Z_]+@@\*\//.test(h));
+  truthy("dist/nexus/www/index.html にプレースホルダが残っていない (書き出し用の PAYLOAD 以外)", !/\/\*@@(?!PAYLOAD@@)[A-Z_]+@@\*\//.test(h));
   const scripts = h.match(/<script>([\s\S]*?)<\/script>/g) || [];
   let ok = true;
   for (const s of scripts) { try { new Function(s.slice(8, -9)); } catch (e) { ok = false; console.log(e.message); } }

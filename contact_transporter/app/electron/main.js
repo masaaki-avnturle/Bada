@@ -1,5 +1,5 @@
 /*
- * main.js — Contact Transporter Studio の Electron ラッパー
+ * main.js — Bada アプリ (Bada Nexus ほか) の Electron ラッパー
  *          (Windows 10/11 EXE / Linux AppImage・deb)
  *
  * アプリ本体は www/index.html (tools/build.js が生成する自己完結 HTML)。
