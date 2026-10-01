@@ -1962,6 +1962,21 @@ python3 compose_tablet80.py bank74/bank.json score_tablet80.json && python3 synt
 python3 compose_tablet81.py bank74/bank.json score_tablet80.json score_tablet81.json && python3 synth.py score_tablet81.json tablet81.wav && python3 video.py score_tablet81.json tablet81.wav tablet81.mp4
 ```
 
+## 🎹⛪ Requiem BADA — Tablet Sessions LXXXII · Requiem e Fuga 12:50 (9/25 12:50:36 の 8.6 秒の録音を 16 倍に伸ばして — レクイエムとフーガ, ロ短調, ♩=60, 4 分 24 秒)
+
+- **録音**: 9/25 12:50:36 は 8.6 秒の、ロ短調の劇的な一節。採譜 (basic-pitch) すると 17 の和音 (Bm・F#7・Gmaj7・C7・Em・E …)。短いので、曲そのものを本当に 16 倍に伸ばせる (8.6 秒 → 2 分 18 秒)
+- **主題**: 録音の最上声から — **レ・ファ#・シ・レ・シ・ファ#・ラ#・ファ#・ラ#・シ** (8 拍、上って導音から主音へ)
+- **Introitus**: 録音そのもの (8.6 秒)
+- **I. Requiem ×16**: 17 の和音のすべての音を 16 倍の長さに。伸ばした音は 2 拍ごと (低い音は 4 拍ごと) に息をするように打ち直す。
+  長い F#7・Gmaj7・Em の和音の中で、主題 (1 倍) が 7 回、フーガのように次々と入る (入るごとに終わりの音がその和音の音に着く高さで)
+- **II. Fuga**: 主題の 4 声フーガ (提示・下属調・ストレッタ・保続低音)、1 オクターヴ低く
+- **III. Finale ×4**: 録音を 4 倍 (34 秒) で、その上で主題が 2 小節ずつずれて 4 回重なる → **Amen** (iv → V → I、ロ長調の和音)
+- 高音を抑える: フーガは 1 オクターヴ低く、伸ばした音はミ 5 より上をオクターヴ下へ。音域はシ 0〜ミ 5。各部の音量は伸ばした層を約 8 dB 上げてフーガとそろえた。すべてピアノの実音
+
+```bash
+python3 compose_tablet82.py bank82/bank.json score_tablet82.json && python3 synth.py score_tablet82.json tablet82.wav && python3 video.py score_tablet82.json tablet82.wav tablet82.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
