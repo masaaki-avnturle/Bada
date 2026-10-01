@@ -1947,6 +1947,21 @@ python3 compose_tablet79.py bank74/bank.json score_tablet78.json bank74 score_ta
 python3 compose_tablet80.py bank74/bank.json score_tablet80.json && python3 synth.py score_tablet80.json tablet80.wav && python3 video.py score_tablet80.json tablet80.wav tablet80.mp4
 ```
 
+## 🎹🕯 Requiem BADA — Tablet Sessions LXXXI · Requiem 9/28 (LXXX を圧縮して重低音の土台に、9/28 の歌を想像して作曲し、その代表の節を 8 倍に伸ばして強調, 変ロ短調, ♩=60, 3 分 32 秒)
+
+- **9/28 の代表の節**: 9/28 17:46 の録音 (低い声で歌った 2 分 40 秒、変ロ短調) を音高で採り (pyin)、変ロ短調の音階に寄せて、いちばん多く歌われた 5 音の並びを探すと
+  **ラ♭・シ♭・シ♭・ファ・ソ♭・(ラ・シ♭)** — いちばん歌が濃い 35 秒あたりにも現れる。シ♭ まで上がってファへ落ち、ソ♭・ラ・シ♭ と半音で上り直す嘆きの節を主題に (8 拍)
+- **土台 (LXXX を圧縮)**: 時間を 2 倍の速さに (424 秒 → 212 秒)、高低音をシ♭ 1〜シ♭ 3 の 2 オクターヴに折りたたみ (同じ時刻・同じ音は 1 つに)、6 半音動かして変ロ短調に — 暗く低く小さく
+- **作曲 (土台と同じ 212 秒 = 53 小節)**: 主題の 1 拍ごとの和音 (i・VI…: F・Dm・Dm・Dm・Gm・Gm・A7・Dm をエンジンのニ短調で) を 8 倍に伸ばした和声の上で、
+  1 倍の主題がアルト・テノールに 2 小節ごとに入り (終わりの音がその時の和音の根音に着く高さで)、ほかの声部が対位法で動く
+- **代表の強調**: 主題を 8 倍に伸ばして (16 小節) 3 回 — シ♭ 4 のあたりとオクターヴ下で、2 拍ごとに息をするように打ち直す。対位法より約 6 dB 大きく。
+  最後は iv → V → I の変ロ長調の和音
+- 音域はシ♭ 1〜シ♭ 4 (高音を抑えたまま)。すべてピアノの実音
+
+```bash
+python3 compose_tablet81.py bank74/bank.json score_tablet80.json score_tablet81.json && python3 synth.py score_tablet81.json tablet81.wav && python3 video.py score_tablet81.json tablet81.wav tablet81.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
