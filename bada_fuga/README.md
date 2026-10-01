@@ -1904,6 +1904,26 @@ LXXVII (LXXV を真ん中で割って調をそろえて重ねた交響曲、9/24
 python3 compose_tablet78.py bank74/bank.json score_tablet75.json bank74 score_tablet78.json && python3 synth.py score_tablet78.json tablet78.wav && python3 video.py score_tablet78.json tablet78.wav tablet78.mp4
 ```
 
+## 🎹🌑 Requiem BADA — Tablet Sessions LXXIX · Impossibile XVI (LXXVIII を折りたたんで重低音の土台に、9/24 08:53 を主題に、9/29 の 2 曲を伴奏に, ホ短調, ♩=60, 約 7 分 11 秒)
+
+- **土台 (重低音)**: LXXVIII を折りたたむ — 第 1 部 (ホ短調) と第 2 部 (ヘ短調 → 1 半音下げ) を重ね、1 オクターヴ下げて低い音 (ソ 3 まで) だけを残す (同じ時刻・同じ音は 1 つに)。これを 2 回
+- **主題 (9/24 08:53、ミ・ファ#・シ・ミ・ミ)** を 4 つの速さで同時に — 1 人のピアニストには弾けない (不可能な) 重なり:
+
+| 層 | 音域 | 鳴らし方 |
+|:--|:--|:--|
+| ×16 | ミ 4〜ミ 5 | 4 拍ごとに打ち直す。2 分 8 秒で 1 回り、3 回 — いちばん前に |
+| ×8 | ミ 3〜ミ 4 | 4 拍ごとに打ち直す。6 回 |
+| ×4 | ミ 5〜ミ 6 | 打ち直さない。12 回、小さく |
+| ×1 | ミ 5〜ミ 6 | 32 秒に 1 回、遠く |
+
+- **伴奏 (9/29)**: 15:12 と 15:16 の録音の一節 (16 秒) を採譜し、6 半音下げ (変ロ短調 → ホ短調)、リズムを 2 倍に伸ばし、同時に 3 音まで・0.5 秒より詰めないように間引いてループ — 前半は 15:12、後半は 15:16
+- **雰囲気は piano_solo_8x のように**: 解析すると 1 秒に 0.4〜0.7 打のまばらな打鍵、暗い音色、長い響き。この曲も打鍵は 1 秒に 1.4 ほど、残響 7.5 秒・ピアノの減衰を長く
+- 音域: ド 1〜ミ 6 の 5.3 オクターヴ。終わりはミの重低音とホ長調の和音が長く響いて消える。すべてピアノの実音
+
+```bash
+python3 compose_tablet79.py bank74/bank.json score_tablet78.json bank74 score_tablet79.json && python3 synth.py score_tablet79.json tablet79.wav && python3 video.py score_tablet79.json tablet79.wav tablet79.mp4
+```
+
 ## 作り方 (再現)
 
 ```bash
